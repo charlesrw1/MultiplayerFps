@@ -514,6 +514,7 @@
     <ClInclude Include="Source\Framework\ConsoleCmdGroup.h" />
     <ClInclude Include="Source\Scripting\ScriptManager.h" />
     <ClInclude Include="Source\Framework\StringUtils.h" />
+    <ClInclude Include="Source\Framework\StructReflection.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

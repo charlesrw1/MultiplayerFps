@@ -3,6 +3,14 @@
 #include "TopDownShooterGame.h"
 #include "Animation/SkeletonData.h"
 #include "Sound/SoundComponent.h"
+#include "Framework/StructReflection.h"
+
+struct MyStruct
+{
+	STRUCT_BODY();
+	REF float x = 0;
+	REF float y = 0;
+};
 
 class CameraShake
 {

@@ -8,6 +8,7 @@
 #include "Framework/ClassTypePtr.h"
 
 #include "Assets/IAsset.h"
+#include "Animation/Runtime/Animation.h"
 
 class DictParser;
 class DictWriter;

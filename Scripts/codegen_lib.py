@@ -1,49 +1,74 @@
 from io import TextIOWrapper
 import os
-#from pickle import NONE
-#from pyclbr import Class
-#import sys
-from pydoc import classname
 import shlex
 from pathlib import Path
-import time
+
 import itertools
-from typing import List, Optional
+from typing import Any, List, Optional
 
 
 VERSION = 1
 
-NONE_TYPE = 0
+# where are enums reeee
+
+NONE_TYPE = 0 # also stand in for void
+
 INT_TYPE = 1
 BOOL_TYPE = 2
 FLOAT_TYPE = 3
-STRING_TYPE = 4
-ENTITYPTR_TYPE = 5
-ASSETPTR_TYPE = 6
-VEC3_TYPE = 7
-QUAT_TYPE = 8
+ENUM_TYPE = 5
+
 FUNCTION_TYPE = 9
 MULTICAST_TYPE = 10
-LIST_TYPE = 11
-COLOR32_TYPE = 12
-ENUM_TYPE = 13
-STRUCT_TYPE = 14
-SOFTASSETPTR_TYPE = 15
-CLASSTYPEINFO_TYPE = 16
-UNORDERED_SET = 17
-UNORDERED_MAP = 18
+
+# containers
+ARRAY_TYPE = 20
+UNORDERED_SET = 21
+UNORDERED_MAP = 22
+STRING_TYPE = 23 # std::string
+
+VEC2_TYPE = 30
+VEC3_TYPE = 31
+QUAT_TYPE = 32
+COLOR32_TYPE = 33
+
+STRUCT_TYPE = 40 # STRUCT_BODY() type
+
+# ptr types
+ASSET_PTR_TYPE = 50  
+SOFTASSET_PTR_TYPE = 51
+HANDLE_PTR_TYPE = 52 # entities/components
+UNIQUE_PTR_TYPE = 53 # std::uniqueptr to a class type
+RAW_PTR_TYPE = 54
+
+CLASSTYPEINFO_TYPE = 60
+
+OTHER_CLASS_TYPE = 100
+
 
 class CppType:
-    def __init__(self, type: int, templates: Optional[List["CppType"]] = None, const: bool = False, typename: str = "") -> None:
+    def __init__(self,type_string_raw:str, typename: Any, type: int, templates: Optional[List["CppType"]] = None, const: bool = False, is_ptr : bool=False) -> None:
         self.type: int = type
         self.template_args: List["CppType"] = templates if templates is not None else []
         self.constant: bool = const
-        self.typename: str = typename
+        self.typename: ClassDef|None = typename
+        self.is_pointer : bool = is_ptr
 
-        
-CLASS_OBJECT = 0
-STRUCT_OBJECT = 1
-ENUM_OBJECT = 2
+        self.type_string_raw : str = type_string_raw
+
+    def get_raw_type_string(self)->str:
+        out : str = ""
+        if self.constant:
+            out += "const "
+        out += self.type_string_raw
+        if self.template_args:
+            out += "<"
+            for p in self.template_args:
+                out += p.get_raw_type_string()
+            out += ">"
+        if self.is_pointer:
+            out += "*"
+        return out
 
 class Property:
     def __init__(self):
@@ -51,13 +76,14 @@ class Property:
         self.nameoverride = ""
         self.transient = False
         self.hide = False
-        self.prop_type : int = NONE_TYPE
 
         # or return type
-        self.new_type : CppType|None = None
+        self.new_type : CppType
         self.func_args : list[tuple[CppType,str]] = []
+        self.return_type : CppType
 
         self.is_static = False
+        self.is_virtual = False
 
         self.tooltip = ""
         self.custom_type = ""
@@ -65,7 +91,7 @@ class Property:
         self.hint = ""
         self.is_getter = False
         self.is_setter = False
-        self.enum_or_struct_name = ""
+
     def get_flags(self):
         if not self.transient and not self.hide:
             return "PROP_DEFAULT"
@@ -76,119 +102,60 @@ class Property:
         return "0"
 
 
-class ClassDef:
-    def __init__(self, name_and_bases : list[str]):
-        self.object_type = CLASS_OBJECT
+class ClassDef:      
+    TYPE_CLASS = 0
+    TYPE_STRUCT = 1
+    TYPE_ENUM = 2
+    TYPE_INTERFACE = 3
+
+    def __init__(self, name_and_bases : list[str], type:int):
+        self.source_file : str = ""
+        self.source_file_line : int = 0
+
+        self.object_type : int = type
         self.classname = name_and_bases[0]
+        self.supername : str = ""
         if len(name_and_bases) > 1:
             self.supername = name_and_bases[1]
-        self.interfaces : list[str] = []
+
+        self.super_type_def : ClassDef|None = None
+        self.interface_defs :list[ClassDef] = []
+
+        self.interfaces_names : list[str] = []
         if len(name_and_bases) > 2:
-            self.interfaces = name_and_bases[2:]
+            self.interfaces_names = name_and_bases[2:]
         self.properties : list[Property] = []
 
-def write_headers(path:str, additional_includes:list[str]):
-    out = f"// **** GENERATED SOURCE FILE version:{VERSION} ****\n"
-    out += f"#include \"{path}\"\n"
-    out += "#include \"Framework/ReflectionProp.h\"\n"
-    out += "#include \"Framework/ReflectionMacros.h\"\n"
-    out += "#include \"Game/AssetPtrMacro.h\"\n"
-    out += "#include \"Game/AssetPtrArrayMacro.h\"\n"
-    out += "#include \"Game/EntityPtrMacro.h\"\n"
-    out += "#include \"Scripting/FunctionReflection.h\"\n"
-    out += "#include \"Framework/VectorReflect2.h\"\n"
-    out += "#include \"Framework/EnumDefReflection.h\"\n"
-    for inc in additional_includes:
-        out += f"#include {inc}\n"
+        self.tooltip = ""
 
-    return out + "\n"
+    def find_property_for_name(self, name:str) -> Property|None:
+        for p in self.properties:
+            if p.name==name:
+                return p
+        return None
 
-# code gen to make macros to make templates to make code ...
-def write_prop(prop : Property) -> str:
-    prop.custom_type = f'"{prop.custom_type}"'
-    prop.hint = f'"{prop.hint}"'
-
-    if prop.prop_type == BOOL_TYPE:
-        return f"REG_BOOL_W_CUSTOM({prop.name},{prop.get_flags()},{prop.custom_type},{prop.hint})"
-    elif prop.prop_type == FLOAT_TYPE:
-        return f"REG_FLOAT({prop.name},{prop.get_flags()},{prop.hint})"
-    elif prop.prop_type == INT_TYPE:
-        return f"REG_INT({prop.name},{prop.get_flags()},{prop.hint})"
-    elif prop.prop_type == ASSETPTR_TYPE:
-        return f"REG_ASSET_PTR({prop.name},{prop.get_flags()})"
-    elif prop.prop_type == STRING_TYPE:
-        return f"REG_STDSTRING_CUSTOM_TYPE({prop.name},{prop.get_flags()},{prop.custom_type})"
-    elif prop.prop_type == ENTITYPTR_TYPE:
-        return f"REG_ENTITY_PTR({prop.name},{prop.get_flags()})"
-    elif prop.prop_type == FUNCTION_TYPE:
-        name = prop.nameoverride if len(prop.nameoverride)!=0 else prop.name
-        name = f'"{name}"'
-        if prop.is_getter:
-            return f"REG_GETTER_FUNCTION({prop.name},{name})"
-        else:
-            return f"REG_FUNCTION_EXPLICIT_NAME({prop.name},{name})"
-    elif prop.prop_type == MULTICAST_TYPE:
-        return f"REG_MULTICAST_DELEGATE({prop.name})"
-    elif prop.prop_type == VEC3_TYPE:
-        return f"REG_VEC3({prop.name},{prop.get_flags()})"
-    elif prop.prop_type == QUAT_TYPE:
-        return f"REG_QUAT({prop.name},{prop.get_flags()})"
-    elif prop.prop_type == LIST_TYPE:
-        return f"REG_STDVECTOR_NEW({prop.name},{prop.get_flags()})"
-    elif prop.prop_type == COLOR32_TYPE:
-        return f"REG_INT_W_CUSTOM({prop.name}, {prop.get_flags()}, \"\", \"ColorUint\")"
-    elif prop.prop_type == NONE_TYPE:
-        return f"REG_STRUCT_CUSTOM_TYPE({prop.name},{prop.get_flags()},{prop.custom_type})"
-    elif prop.prop_type == ENUM_TYPE:
-        return f"REG_ENUM({prop.name},{prop.get_flags()},{prop.hint},{prop.enum_or_struct_name})"
-    elif prop.prop_type == SOFTASSETPTR_TYPE:
-        return f"REG_SOFT_ASSET_PTR({prop.name},{prop.get_flags()})"
-    else:
-        assert(0)
-    return ""
-    
-def write_class(newclass : ClassDef):
-    output = ""
-    if newclass.object_type==CLASS_OBJECT:
-        output += f"ClassTypeInfo {newclass.classname}::StaticType = ClassTypeInfo(\n \
-                    \"{newclass.classname}\",\n \
-                    &{newclass.supername}::StaticType,\n \
-                    {newclass.classname}::get_props,\n \
-                    default_class_create<{newclass.classname}>(),\n \
-                    {newclass.classname}::CreateDefaultObject\n \
-                );\n"
-
-
-    if newclass.object_type == CLASS_OBJECT or newclass.object_type == STRUCT_OBJECT:
-        output += f"const PropertyInfoList* {newclass.classname}::get_props()\n"
-        output += "{\n"
-        if len(newclass.properties) > 0:
-            for p in newclass.properties:
-                if p.prop_type == LIST_TYPE:
-                    output += f"\tMAKE_VECTOR_ATOM_CALLBACKS_ASSUMED({p.name})\n"
-
-
-            output += f"    START_PROPS({newclass.classname})"
-            for p in newclass.properties:
-                output += "\n\t\t" + write_prop(p) + ","
-            output=output[:-1]
-            output += f"\n    END_PROPS({newclass.classname})\n"
-        else:
-            output += "\treturn nullptr;\n"
-        output += "}\n\n"
-    elif newclass.object_type == ENUM_OBJECT:
-        nameWithoutColons = newclass.classname.replace("::","")
-
-        output += f"static EnumIntPair enumstrs{nameWithoutColons}[] = " + "{\n"
-        for p in newclass.properties:
-            name = f'"{p.name}"'
-            displayname = f'"{p.nameoverride}"'
-            full_name = f"{newclass.classname}::{p.name}"
-            output += f"\tEnumIntPair({name},{displayname},(int64_t){full_name}),\n"
-        output = output[:-2]+"\n};\n"
-
-        output += f"EnumTypeInfo EnumTrait<{newclass.classname}>::StaticEnumType = EnumTypeInfo(\"{newclass.classname}\",enumstrs{nameWithoutColons},{len(newclass.properties)});\n\n"
-    return output
+    @staticmethod
+    def fixup_types(typenames:dict[str,"ClassDef"]):
+        for t in typenames.values():
+            t.fixup_classdef_types(typenames)
+    def fixup_classdef_types(self, typenames:dict[str,"ClassDef"]):
+        assert(typenames[self.classname]!=None)
+        if self.object_type!=ClassDef.TYPE_CLASS:
+            return
+        if len(self.supername) == 0:
+            return
+        self.super_type_def = typenames[self.supername]
+        for t in self.interfaces_names:
+            self.interface_defs.append(typenames[t])
+    def is_self_derived_from(self,other:"ClassDef"):
+        assert(other.object_type==ClassDef.TYPE_CLASS)
+        assert(self.object_type==ClassDef.TYPE_CLASS)
+        mysuper : ClassDef|None = self.super_type_def
+        while mysuper != None:
+            if mysuper == other:
+                return True
+            mysuper = mysuper.super_type_def
+        return False
 
 def parse_reflect_macro(line : str) -> Property:
     start_p = line.find("(")
@@ -241,11 +208,9 @@ def parse_reflect_macro(line : str) -> Property:
     
     return current_prop
 
-
-
-def parse_enum(enumname : str, file_iter : enumerate[str]) -> ClassDef:
-    obj = ClassDef([enumname])
-    obj.object_type = ENUM_OBJECT
+def parse_enum(enumname : str, file_iter : enumerate[str], typenames:dict[str,ClassDef]) -> ClassDef:
+    obj = typenames[enumname]
+    assert(obj.object_type==ClassDef.TYPE_ENUM)
 
     current_prop = None
     for _,line in file_iter:
@@ -280,16 +245,26 @@ STANDARD_CPP_TYPES: dict[str, int] = {
     # std containers
     "std::string": STRING_TYPE,
     "string":STRING_TYPE,
-    "std::vector": LIST_TYPE,
-    "vector":LIST_TYPE,
+    "std::vector": ARRAY_TYPE,
+    "vector":ARRAY_TYPE,
     "std::unordered_set":UNORDERED_SET,
     "unordered_set":UNORDERED_SET,
     "std::unordered_map":UNORDERED_MAP,
     "unordered_map":UNORDERED_MAP,
 
     "MulticastDelegate": MULTICAST_TYPE,
-    "AssetPtr": ASSETPTR_TYPE,
-    "SoftAssetPtr": SOFTASSETPTR_TYPE,
+
+    "AssetPtr": ASSET_PTR_TYPE,
+    "SoftAssetPtr": SOFTASSET_PTR_TYPE,
+    "obj": HANDLE_PTR_TYPE,
+    "EntityPtr": HANDLE_PTR_TYPE,
+    "uptr" : UNIQUE_PTR_TYPE,
+    "unique_ptr" : UNIQUE_PTR_TYPE,
+    "std::unique_ptr" : UNIQUE_PTR_TYPE,
+    "ClassTypeInfo" : CLASSTYPEINFO_TYPE,
+    "ClassTypePtr" : CLASSTYPEINFO_TYPE,
+
+
     "float": FLOAT_TYPE,
     "bool": BOOL_TYPE,
     "int": INT_TYPE,
@@ -297,15 +272,22 @@ STANDARD_CPP_TYPES: dict[str, int] = {
     "int32_t": INT_TYPE,
     "int16_t": INT_TYPE,
     "uint16_t": INT_TYPE,
+    "short" : INT_TYPE,
     "int64_t": INT_TYPE,
+    "uint64_t": INT_TYPE,
     "int8_t": INT_TYPE,
     "uint8_t": INT_TYPE,
-    "EntityPtr": ENTITYPTR_TYPE,
-    "obj": ENTITYPTR_TYPE,
+    "char": INT_TYPE,
+
+
     "glm::vec3": VEC3_TYPE,
+    "vec3": VEC3_TYPE,
+    "glm::vec2": VEC2_TYPE,
+    "vec2": VEC2_TYPE,
     "glm::quat": QUAT_TYPE,
-    "Color32": COLOR32_TYPE,
-    "ClassTypeInfo":CLASSTYPEINFO_TYPE
+    "quat": QUAT_TYPE,
+
+    "Color32":COLOR32_TYPE,
 }
 
 def parse_class_decl(line:str) -> list[str]:
@@ -334,28 +316,78 @@ def parse_class_decl(line:str) -> list[str]:
                 idx += 1
     return [class_name] + bases
 
+def find_class_in_typenames(line:str,file_iter:enumerate[str], typenames:dict[str,ClassDef])->ClassDef|None:
+    if remove_comment_from_end(line).strip().endswith(";"):  # to skip forward declares, hacky
+        return None
+    name_and_bases = parse_class_decl(line)
+    classname = name_and_bases[0]
+    if classname in typenames:
+        assert(typenames[classname].object_type==ClassDef.TYPE_CLASS)
+        return typenames[classname]
+    return None
+
+def find_struct_in_typenames(line:str,file_iter:enumerate[str], typenames:dict[str,ClassDef])->ClassDef|None:
+    if remove_comment_from_end(line).strip().endswith(";"):  # to skip forward declares, hacky
+        return None
+    name = parse_struct_decl(line)
+    if name in typenames:
+        assert(typenames[name].object_type==ClassDef.TYPE_STRUCT)
+        return typenames[name]
+    return None
+
 def parse_class_from_start(line:str, file_iter:enumerate[str]) -> ClassDef|None:
     if remove_comment_from_end(line).strip().endswith(";"):  # to skip forward declares, hacky
         return None
 
     name_and_bases = parse_class_decl(line)
-    c = ClassDef(name_and_bases)
+    c = ClassDef(name_and_bases, ClassDef.TYPE_CLASS)
+
     # now check its really a class, expects CLASS_BODY(name) on next 1-3 lines...
     good = False
     for i in range(0,3):
         _,line = next(file_iter)
         line = line.strip()
-        if line.startswith(f"CLASS_BODY({name_and_bases[0]})"):
+        if line.startswith(f"CLASS_BODY("):
             good = True
             break
     if good:
         return c
     return None
 
+def parse_struct_decl(line : str) -> str:
+    line  = line.replace(",", " , ")
+    line  = line.replace("{", " { ")
+    line  = line.replace(":", " : ")
+    tokens = line.split()
+    assert(tokens[0]=="struct")
+    return tokens[1]
+
+def parse_struct_from_start(line:str, file_iter:enumerate[str]) -> ClassDef|None:
+    if remove_comment_from_end(line).strip().endswith(";"):  # to skip forward declares, hacky
+        return None
+    
+    name_and_bases = parse_struct_decl(line)
+    c = ClassDef([name_and_bases],ClassDef.TYPE_STRUCT)
+
+    # now check its really a struct, expects struct_body() on next 1-3 lines...
+    good = False
+    try:
+        for i in range(0,3):
+            _,line = next(file_iter)
+            line = line.strip()
+            if line.startswith(f"STRUCT_BODY("):
+                good = True
+                break
+        if good:
+            return c
+    except Exception as e:
+        return None # stop iteration
+    return None
+
+    
 
 
-
-def parse_type_from_tokens(idx: int, tokens:list[str], typenames: dict[str, int]) -> tuple[CppType, int]:
+def parse_type_from_tokens(idx: int, tokens:list[str], typenames: dict[str, ClassDef]) -> tuple[CppType, int]:
     const_local = False
     
     if tokens[idx] == "const":
@@ -363,21 +395,26 @@ def parse_type_from_tokens(idx: int, tokens:list[str], typenames: dict[str, int]
         idx += 1
     base = tokens[idx]
     idx += 1
-    base_type = NONE_TYPE
-    base_typename = ""
+
+    base_type : int = NONE_TYPE
+    base_typename : ClassDef|None = None
     #is_ptr = False
 
     if base in STANDARD_CPP_TYPES:
         base_type = STANDARD_CPP_TYPES[base]
     elif base in typenames:
-        base_type = typenames[base]
-        base_typename = base
+        thetype : ClassDef = typenames[base]
+        base_typename = thetype
+        if thetype.object_type == ClassDef.TYPE_ENUM:
+            base_type = ENUM_TYPE
+        elif thetype.object_type == ClassDef.TYPE_CLASS:
+            base_type = OTHER_CLASS_TYPE
+        elif thetype.object_type == ClassDef.TYPE_STRUCT:
+            base_type = STRUCT_TYPE
     else:
         print(f"unknown type, assuming struct: {base}")
-        base_typename = base
         base_type = STRUCT_TYPE
-        #raise Exception(f"cant parse type: {base}")
-
+       # raise Exception(f"cant parse type: {base}")
 
     template_args : list[CppType]= []
     if idx < len(tokens) and tokens[idx] == "<":
@@ -393,15 +430,26 @@ def parse_type_from_tokens(idx: int, tokens:list[str], typenames: dict[str, int]
         # end of template args
 
     # skip pointer or reference
-    while idx < len(tokens) and tokens[idx] in ("*", "&"):
+    is_pointer = False
+    while idx < len(tokens) and tokens[idx] in ("*"):
+        if is_pointer == True:
+            raise RuntimeError("double pointer, not allowed")
+        is_pointer = True
         idx += 1
+    is_reference = False
+    while idx < len(tokens) and tokens[idx] in ("&"):
+        if is_reference == True:
+            raise RuntimeError("double pointer, not allowed")
+        is_reference = True
+        idx += 1
+    return CppType(base, base_typename,base_type, template_args, const_local, is_pointer), idx
 
-    return CppType(base_type, template_args, const_local, base_typename), idx
-
-def parse_type(string: str, typenames: dict[str, int]) -> CppType:
+def parse_type(string: str, typenames: dict[str, ClassDef]) -> CppType:
     string = string.replace("<", " < ")
     string = string.replace(">", " > ")
     string = string.replace("*", " * ")
+    string = string.replace("&", " & ")
+
     string = string.replace(",", " , ")
     tokens = string.split()
     cpp_type, _ = parse_type_from_tokens(0,tokens,typenames)
@@ -409,7 +457,7 @@ def parse_type(string: str, typenames: dict[str, int]) -> CppType:
 
 
 
-def parse_function(cur_line: str, typenames: dict[str, int]) -> tuple[str, list[tuple[CppType, str]]]:
+def parse_function(cur_line: str, typenames: dict[str, ClassDef]) -> tuple[str, list[tuple[CppType, str]]]:
     # Example: "void MyFunc(int a, float b)"
     l_paren = cur_line.find("(")
     r_paren = cur_line.rfind(")")
@@ -439,7 +487,7 @@ def parse_function(cur_line: str, typenames: dict[str, int]) -> tuple[str, list[
     return func_name, args
 
 # handles both functions and variables
-def parse_property(cur_line: str, file: enumerate[str], typenames: dict[str, int]) -> Property:
+def parse_property(cur_line: str, file: enumerate[str], typenames: dict[str, ClassDef]) -> Property:
     assert(cur_line.startswith("REF") or cur_line.startswith("REFLECT"))
 
     prop = Property()
@@ -459,6 +507,11 @@ def parse_property(cur_line: str, file: enumerate[str], typenames: dict[str, int
     # Remove 'static' for further parsing
     if is_static:
         cur_line = " ".join(tokens[1:])
+    is_virtual = tokens[0]=="virtual"
+    prop.is_virtual = is_virtual
+    if is_virtual:
+        cur_line = " ".join(tokens[1:])
+    
     # Determine if function or variable
     assignment_sign = cur_line.find("=")
     l_paren = cur_line.find("(")
@@ -466,14 +519,14 @@ def parse_property(cur_line: str, file: enumerate[str], typenames: dict[str, int
     if l_paren != -1 and r_paren != -1 and (r_paren < assignment_sign or assignment_sign == -1):
         # Function
         func_name, args = parse_function(cur_line, typenames)
-        prop.prop_type = FUNCTION_TYPE
+        prop.new_type = CppType("",None, FUNCTION_TYPE)
         prop.name = func_name
         prop.func_args = args
         # Parse return type
         before_paren = cur_line[:l_paren].strip()
         tokens = before_paren.split()
         return_type_str = " ".join(tokens[:-1])
-        prop.new_type = parse_type(return_type_str, typenames)
+        prop.return_type = parse_type(return_type_str, typenames)
     else:
         # Variable
         # Remove trailing ';' or '=' and value
@@ -488,15 +541,6 @@ def parse_property(cur_line: str, file: enumerate[str], typenames: dict[str, int
         var_name = tokens[-1]
         prop.name = var_name
         prop.new_type = parse_type(type_str, typenames)
-        # Try to determine prop_type from type_str
-        base_type = type_str.split("<")[0].strip()
-        if base_type in STANDARD_CPP_TYPES:
-            prop.prop_type = STANDARD_CPP_TYPES[base_type]
-        elif base_type in typenames:
-            prop.prop_type = typenames[base_type]
-            prop.enum_or_struct_name = base_type
-        else:
-            prop.prop_type = NONE_TYPE
     return prop
 
 
@@ -505,18 +549,33 @@ def remove_comment_from_end(line:str)->str:
     if find != -1:
         return line[:find]
     return line
+def get_comment_from_end(line:str)->str:
+    find = line.find("//")
+    if find != -1:
+        return line[find+2:]
+    return ""
 
+def combine_comments(list:list[str]) -> str:
+    out : str = ""
+    for s in list:
+        stripped= s.strip()
+        if len(stripped)>0:
+            out += s.strip() + "\\n"
+    return out
 
-def parse_file(file_path:str, typenames:dict[str,int]):
+def parse_file(file_path:str, typenames:dict[str,ClassDef]):
     #print(f"File: {file_name}")
     classes :list[ClassDef]= []
     additional_includes : list[str] = []
 
     current_class : ClassDef|None = None
 
+    current_comments : list[str] = []
+
     with open(file_path,"r") as file:
         file_iter = enumerate(iter(file),start=1)
-        cur_namespace = ""
+        line_num = 0
+        orig_line = ""
         try:
             for line_num,orig_line in file_iter:
                 line:str= orig_line.strip()
@@ -524,7 +583,18 @@ def parse_file(file_path:str, typenames:dict[str,int]):
                     if current_class != None:
                         classes.append(current_class)
                         current_class = None
-                    current_class = parse_class_from_start(line,file_iter)  # valid if current class is none
+                    current_class = find_class_in_typenames(line,file_iter,typenames)  # valid if current class is none
+                    if current_class != None:
+                        current_class.tooltip = combine_comments(current_comments)
+                        current_comments.clear()
+                elif orig_line.startswith("struct"):
+                    if current_class != None:
+                        classes.append(current_class)
+                        current_class = None
+                    current_class = find_struct_in_typenames(line,file_iter,typenames)  # valid if current class is none
+                    if current_class != None:
+                        current_class.tooltip = combine_comments(current_comments)
+                        current_comments.clear()
                 elif line.startswith("NEWENUM"):
                     start_p = line.find("(")
                     end_p = line.find(")")
@@ -532,19 +602,22 @@ def parse_file(file_path:str, typenames:dict[str,int]):
                     if start_p==-1 or end_p==-1:
                         raise Exception("expected NEWENUM(<enumname>)")
                     enumname = line[start_p+1:comma].strip()
-                    enumname = cur_namespace + enumname
                     print(f"FOUND ENUM: {enumname}")
                     if current_class != None:
                         classes.append(current_class)
                         current_class = None
-                    
-                    outclass = parse_enum(enumname,file_iter)
+                    outclass = parse_enum(enumname,file_iter,typenames)
                     classes.append(outclass)
+                    assert(current_class==None)
+
                 elif line.startswith("REFLECT") or line.startswith("REF"):
                     if current_class == None:
                         raise Exception("REFLECT seen before NEWCLASS")
                     current_prop = parse_property(line, file_iter, typenames)
                     current_class.properties.append(current_prop)
+
+                    current_prop.tooltip = combine_comments(current_comments + [get_comment_from_end(orig_line)])
+                    current_comments.clear()
 
                 elif line.startswith("GENERATED_CLASS_INCLUDE"):
                     start_p = line.find("(")
@@ -553,13 +626,13 @@ def parse_file(file_path:str, typenames:dict[str,int]):
                         raise Exception("expcted GENERATED_CLASS_INCLUDE(...)")
                     include_name : str = line[start_p+1:end_p].strip()
                     additional_includes.append(include_name)
-                elif line.startswith("namespace"):
-                    tokens = shlex.split(line)
-                    assert(tokens[0]=="namespace")
-                    cur_namespace += tokens[1] + "::"
+                elif line.startswith("//"):
+                    current_comments.append(line[2:])
+                else:
+                    current_comments.clear()
+
         except Exception as e:
-            what_line_num, what_line_str =    itertools.tee(file_iter)
-            raise Exception("{}:{}:\"{}\"-{}".format(file_path,what_line_num,what_line_str,e.args[0]))
+            raise Exception("{}:{}:\"{}\"-{}".format(file_path, line_num, orig_line.strip(), e.args[0]))
     if current_class != None:
         classes.append(current_class)
     return (classes,additional_includes)
@@ -572,11 +645,10 @@ def should_skip_this(path : str, skip_dirs:list[str]) -> bool:
             return True
     return False
 
-def read_typenames_from_text(filetext:TextIOWrapper) -> dict[str,int]:
-    cur_namespace = ""
-    typenames : dict[str,int] = {}
+def read_typenames_from_text(filetext:TextIOWrapper, filepath : str) -> dict[str,ClassDef]:
+    typenames : dict[str,ClassDef] = {}
     file_iter = enumerate(filetext)
-    for _,org_line in file_iter:
+    for line_num, org_line in file_iter:
         line = org_line.strip()
         if line.startswith("NEWENUM"):
             start_p = line.find("(")
@@ -584,29 +656,28 @@ def read_typenames_from_text(filetext:TextIOWrapper) -> dict[str,int]:
             comma = line.find(",")
             if start_p==-1 or end_p==-1:
                 continue
-            enumname = line[start_p+1:comma].strip()
-            typenames[cur_namespace+enumname] = ENUM_TYPE
-        elif line.startswith("NEWSTRUCT"):
-            start_p = line.find("(")
-            end_p = line.find(")")
-            if start_p==-1 or end_p==-1:
-                continue
-            structname = line[start_p+1:end_p]
-            typenames[cur_namespace+structname] = STRUCT_TYPE
+            enumname = line[start_p+1:comma].strip()            
+            c = ClassDef([enumname],ClassDef.TYPE_ENUM)
+            c.source_file = filepath
+            c.source_file_line = line_num
+            typenames[enumname] = c
+        elif line.startswith("struct"):
+            c = parse_struct_from_start(line,file_iter)
+            if c != None:
+                c.source_file = filepath
+                c.source_file_line = line_num
+                typenames[c.classname] = c
+
         elif org_line.startswith("class"):
             c = parse_class_from_start(line,file_iter)
             if c != None:
-                typenames[cur_namespace+c.classname] = STRUCT_TYPE
-        elif line.startswith("namespace"):
-            tokens = shlex.split(line)
-            assert(tokens[0]=="namespace")
-            if len(tokens) > 1:
-                cur_namespace += tokens[1] + "::"
+                c.source_file = filepath
+                c.source_file_line = line_num
+                typenames[c.classname] = c
     return typenames
 
-
-def read_typenames_from_files(skip_dirs:list[str]) -> dict[str,int]:
-    typenames : dict[str,int] ={}
+def read_typenames_from_files(skip_dirs:list[str]) -> dict[str,ClassDef]:
+    typenames : dict[str,ClassDef] ={}
     for root, _, files in os.walk("."):
         if should_skip_this(root, skip_dirs):
             continue
@@ -614,7 +685,7 @@ def read_typenames_from_files(skip_dirs:list[str]) -> dict[str,int]:
             if os.path.splitext(file_name)[-1] != ".h":
                 continue
             with open(root+"/"+file_name,"r") as file:
-                typenames_out = read_typenames_from_text(file)
+                typenames_out = read_typenames_from_text(file,file_name)
                 typenames = typenames | typenames_out
     return typenames
 
@@ -663,7 +734,7 @@ class ParseOutput:
         self.root : str = ""
         self.filename : str = ""
 
-def parse_file_for_output(root:str,filename:str, typenames:dict[str,int]) -> ParseOutput|None:
+def parse_file_for_output(root:str,filename:str, typenames:dict[str,ClassDef]) -> ParseOutput|None:
     file_path : str= "{}/{}".format(root,filename)
     output = ParseOutput()
     output.classes,output.additional_includes = parse_file(file_path, typenames) 
@@ -674,43 +745,4 @@ def parse_file_for_output(root:str,filename:str, typenames:dict[str,int]) -> Par
         return None
     return output
 
-def write_output_file(GENERATED_DIR:str,filename:str,root:str,classes:list[ClassDef],additional_includes:list[str]):
-    generated_path = root + "/" + os.path.splitext(filename)[0]
-    if generated_path[0]=='.':
-        generated_path=generated_path[2:]
-    generated_path = GENERATED_DIR+generated_path+".gen.cpp"
-    generated_path.replace("\\","/")
-    os.makedirs(os.path.dirname(generated_path), exist_ok=True)
-    with open(generated_path,"w") as file:
-        print(f"Writing {generated_path}")
-        if len(classes)>0:
-            file.write(write_headers(root+"/"+filename, additional_includes))
-            for c in classes:
-                file.write(write_class(c))
-
-def do_codegen(path:str, skip_dirs:list[str], full_rebuild:bool):
-    print("Starting codegen script...")
-    start_time = time.perf_counter()
-    typenames : dict[str,int] = read_typenames_from_files(skip_dirs)
-    end_time = time.perf_counter()
-    elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
-    print(f"read enums and structs in {elapsed_time:.2f} ms")
-
-    source_files_to_build : list[tuple[str,str]] = get_source_files_to_build(path, skip_dirs, full_rebuild)
-
-    GENERATED_ROOT = "./.generated/"
-    print("Cleaning .generated/...")
-    clean_old_source_files(GENERATED_ROOT, full_rebuild)
-
-    output_files : list[ParseOutput] = []
-    for (root,filename) in source_files_to_build:  
-        output : ParseOutput|None = parse_file_for_output(root,filename,typenames)
-        if output != None:
-            output_files.append(output)
-    for o in output_files:
-        write_output_file(GENERATED_ROOT,o.filename,o.root,o.classes,o.additional_includes)
-
-    end_time = time.perf_counter()
-    elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
-    print(f"Finished in {elapsed_time:.2f} ms")
 

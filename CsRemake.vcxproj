@@ -81,6 +81,7 @@
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
     <ClInclude Include="Source\Framework\StringUtils.h" />
+    <ClInclude Include="Source\Framework\StructReflection.h" />
     <ClInclude Include="Source\Framework\SysPrint.h" />
     <ClInclude Include="Source\Framework\Jobs.h" />
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
