@@ -6,12 +6,14 @@
 #include "Framework/ArrayReflection.h"
 #include "Assets/IAsset.h"
 #include "Game/SerializePtrHelpers.h"
-
+#include "Render/Model.h"
 class Model;
 class AnimationSeq;
 // an "alias" asset meant to refernce an animation clip inside a model to use with the asset browser and asset ptr's
-CLASS_H(AnimationSeqAsset, IAsset)
+class AnimationSeqAsset : public IAsset {
 public:
+	CLASS_BODY(AnimationSeqAsset);
+
 	void uninstall() override;
 	void post_load() override {}
 	bool load_asset(IAssetLoadingInterface* load) override;

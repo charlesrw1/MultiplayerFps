@@ -50,8 +50,6 @@ public:
 REGISTER_ASSETMETADATA_MACRO(AnimationSeqAssetMetadata);
 #endif
 
-CLASS_IMPL(AnimationSeqAsset);
-
 
 #include "Render/Model.h"
 #include "Animation/SkeletonData.h"
