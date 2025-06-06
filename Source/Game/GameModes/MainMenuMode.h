@@ -138,28 +138,4 @@ public:
 
 
 
-CLASS_H(MainMenuModeManager, Entity)
-public:
-
-	void start() {
-		ui = new MainMenuUILayout;
-		eng->get_gui()->add_gui_panel_to_root(ui);
-
-		eng->set_game_focused(false);	// disable mouse capture
-	}
-
-
-	void update() {
-
-	}
-
-	void end() {
-		ui->unlink_and_release_from_parent();
-		delete ui;
-		ui = nullptr;
-	}
-
-
-	MainMenuUILayout* ui = nullptr;
-};
 #endif

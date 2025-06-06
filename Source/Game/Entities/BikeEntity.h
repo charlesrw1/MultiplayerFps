@@ -1,11 +1,14 @@
 #pragma once
 #include "Game/EntityComponent.h"
+#include "Framework/Reflection2.h"
 #include <memory>
 class Model;
 class Texture;
 class CharacterController;
-CLASS_H(BikeEntity,Component)
+class BikeEntity : public Component {
 public:
+	CLASS_BODY(BikeEntity);
+
 	BikeEntity();
 	void update() final;
 	void start() final;

@@ -19,30 +19,6 @@ class MeshBuilder;
 class Animation_Set;
 
 
-CLASS_H(PlayerGun, Entity)
-public:
-	MeshComponent* gunmesh = nullptr;
-
-	Player* owner = nullptr;
-
-	glm::vec3 lastoffset;
-	glm::quat lastrot;
-	glm::vec3 last_view_dir;
-
-	glm::vec3 viewmodel_offsets = glm::vec3(0.f);
-	glm::vec3 view_recoil = glm::vec3(0.f);			// local recoil to apply to view
-
-	glm::vec3 vm_offset = glm::vec3(0.f, -2.9f, 0.f);
-	glm::vec3 vm_scale = glm::vec3(1.f);
-	float vm_reload_start = 0.f;
-	float vm_reload_end = 0.f;
-	float vm_recoil_start_time = 0.f;
-	float vm_recoil_end_time = 0.f;
-	glm::vec3 viewmodel_recoil_ofs = glm::vec3(0.f);
-	glm::vec3 viewmodel_recoil_ang = glm::vec3(0.f);
-};
-
-
 extern void find_spawn_position(Entity* ent);
 
 enum class Action_State

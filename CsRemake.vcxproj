@@ -92,7 +92,6 @@
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
     <ClInclude Include="Source\Game\Components\TileMapComponent.h" />
-    <ClInclude Include="Source\Game\Entities\CollectionContainer.h" />
     <ClInclude Include="Source\Game\EntityPtr.h" />
     <ClInclude Include="Source\Game\EntityPtrArrayMacro.h" />
     <ClInclude Include="Source\Game\EntityPtrMacro.h" />
@@ -192,7 +191,6 @@
     <ClInclude Include="Source\Game\Entities\BikeEntity.h" />
     <ClInclude Include="Source\Game\Entities\BikeSystem.h" />
     <ClInclude Include="Source\Game\Entities\CharacterController.h" />
-    <ClInclude Include="Source\Game\Entities\MiscEntities.h" />
     <ClInclude Include="Source\Game\Entity.h" />
     <ClInclude Include="Source\Game\EntityComponent.h" />
     <ClInclude Include="Source\Game\GameAnimEvents.h" />
@@ -331,7 +329,6 @@
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
     <ClCompile Include="Source\Game\Entities\BikeEntity.cpp" />
     <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
-    <ClCompile Include="Source\Game\Entities\MiscEntities.cpp" />
     <ClCompile Include="Source\Game\Entity.cpp" />
     <ClCompile Include="Source\Game\EntityComponent.cpp" />
     <ClCompile Include="Source\Game\Components\FogComponent.cpp" />

@@ -341,9 +341,3 @@ public:
 
 	physx::PxD6Joint* joint = nullptr;
 };
-CLASS_H(DistanceJointComponent, PhysicsJointComponent)
-public:
-};
-CLASS_H(FixedJointComponent, PhysicsJointComponent)
-public:
-};
