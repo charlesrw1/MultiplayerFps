@@ -17,10 +17,12 @@ def write_headers(path:str, additional_includes:list[str]):
     return out + "\n"
 
 
-def output_macro_for_prop(type:int,name:str,flags:str,offset:str,custom_type:str,hint:str,nameoverride:str, name_and_offset:str, classname:str,raw_str:str)->str:
+def output_macro_for_prop(cpptype:CppType,name:str,flags:str,offset:str,custom_type:str,hint:str,nameoverride:str,tooltip:str)->str:
     name_with_quotes = f"\"{name}\""
     name_offset_flags = f"{name_with_quotes},{offset},{flags}"
     name_offset_flags_hint = f"{name_offset_flags},{hint}"
+    type = cpptype.type
+    raw_str = cpptype.get_raw_type_string()
 
     if type == BOOL_TYPE:
         #return f"REG_BOOL_W_CUSTOM({name},{flags},{custom_type},{hint})"
@@ -67,15 +69,21 @@ def output_macro_for_prop(type:int,name:str,flags:str,offset:str,custom_type:str
         return f"make_struct_property({name_offset_flags},{custom_type})"
 
     elif type == STRUCT_TYPE:
+        assert(not cpptype.is_pointer)
+        structtype = cpptype.typename
+        assert(structtype!=None)
         #assert(not prop.new_type.is_pointer)
         #structtype = prop.new_type.typename
         #assert(structtype!=None)
-        return f"make_new_struct_type({name_and_offset},&{classname}::StructType)"
+        return f"make_new_struct_type({name_offset_flags},{tooltip},&{structtype.classname}::StructType)"
     elif type == ENUM_TYPE:
+        assert(not cpptype.is_pointer)
+        enumtype = cpptype.typename
+        assert(enumtype!=None)
         #name = prop.new_type.typename
         #assert(name!=None)
         #return f"REG_ENUM({name},{flags},{hint},{classname})"
-        return f"make_enum_property({name_offset_flags},sizeof({raw_str}),&::EnumTrait<{classname}>::StaticEnumType, {hint})"
+        return f"make_enum_property({name_offset_flags},sizeof({raw_str}),&::EnumTrait<{enumtype.classname}>::StaticEnumType, {hint})"
 
     elif type == SOFTASSET_PTR_TYPE:
         return f"REG_SOFT_ASSET_PTR({name},{flags})"
@@ -90,17 +98,11 @@ def output_macro_for_prop(type:int,name:str,flags:str,offset:str,custom_type:str
 def write_prop(prop : Property,newclass:ClassDef) -> str:
     prop.custom_type = f'"{prop.custom_type}"'
     prop.hint = f'"{prop.hint}"'
-    type = prop.new_type.type
-
+    prop.tooltip = f'"{prop.tooltip}"'
+   
     offset_str = f"offsetof({newclass.classname}, {prop.name})"
-    name_str = f"\"{prop.name}\""
-    name_and_offset = name_str + "," + offset_str +","+prop.get_flags()+ ",\"" + prop.tooltip + "\""
 
-    type_name = ""
-    if prop.new_type.typename != None:
-        type_name = prop.new_type.typename.classname
-    rawstr = prop.new_type.get_raw_type_string()
-    return output_macro_for_prop(type,prop.name,prop.get_flags(),offset_str,prop.custom_type,prop.hint,prop.nameoverride,name_and_offset,type_name,rawstr)
+    return output_macro_for_prop(prop.new_type,prop.name,prop.get_flags(),offset_str,prop.custom_type,prop.hint,prop.nameoverride, prop.tooltip)
 
 
 
