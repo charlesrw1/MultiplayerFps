@@ -41,8 +41,10 @@ class HealthComponent;
 class InputUser;
 class CharacterController;
 class BikeEntity;
-CLASS_H(Player, Component)
+
+class Player : public Component {
 public:
+	CLASS_BODY(Player);
 
 	Player();
 	~Player() override;
@@ -59,8 +61,7 @@ public:
 	MulticastDelegate<int> score_update_delegate;
 
 	std::unique_ptr<CharacterController> ccontroller;
-	
-	static const PropertyInfoList* get_props() = delete;
+
 
 	// PlayerBase overrides
 	void get_view(glm::mat4& viewMatrix, float& fov);

@@ -44,40 +44,10 @@
 
 
 
-CLASS_IMPL(Player);
-
 
 
 #include "Game/Components/BillboardComponent.h"
 #include "Game/Components/ArrowComponent.h"
-
-
-CLASS_H(PlayerSpawnPoint, Component)
-public:
-	PlayerSpawnPoint() {
-
-		if (eng->is_editor_level())
-		{
-			//auto b = construct_sub_component<BillboardComponent>("Billboard");
-			//b->set_texture(default_asset_load<Texture>("icon/_nearest/player_start.png"));
-			//b->dont_serialize_or_edit = true;	// editor only item, dont serialize
-			//
-			//auto a_obj = construct_sub_entity<Entity>("arrow-obj");
-			//a_obj->construct_sub_component<ArrowComponent>("arrow-comp");
-			//a_obj->set_ls_transform({}, {}, glm::vec3(0.3));
-			//a_obj->dont_serialize_or_edit = true;
-		}
-	}
-
-	static const PropertyInfoList* get_props() {
-		START_PROPS(PlayerSpawnPoint)
-			REG_INT(team, PROP_DEFAULT, "0"),
-		END_PROPS(PlayerSpawnPoint)
-	};
-	int team = 0;
-};
-
-CLASS_IMPL(PlayerSpawnPoint);
 
 
 

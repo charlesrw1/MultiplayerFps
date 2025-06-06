@@ -5,6 +5,7 @@
 #include <glm/glm.hpp>
 #include <unordered_map>
 #include "Render/DynamicMaterialPtr.h"
+#include "Framework/Reflection2.h"
 class GuiFont;
 class Texture;
 class MaterialInstance;
@@ -19,8 +20,10 @@ struct GuiFontGlyph
 	int16_t advance{};
 };
 class IAssetLoadingInterface;
-CLASS_H(GuiFont, IAsset)
+class GuiFont : public IAsset {
 public:
+	CLASS_BODY(GuiFont);
+
 	int ptSz = 20;
 	int lineHeight = 0;
 	int base = 0;

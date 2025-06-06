@@ -10,7 +10,6 @@
 #include "GameEnginePublic.h"
 #include "GUISystemPublic.h"
 
-CLASS_IMPL(GuiFont);
 
 // global
 GuiFontLoader g_fonts;
