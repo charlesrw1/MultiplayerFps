@@ -3,6 +3,7 @@
 #include <string>
 #include "Framework/Util.h"
 #include "Framework/ClassBase.h"
+#include "Framework/Reflection2.h"
 
 #ifdef EDITOR_BUILD
 #include <unordered_set>
@@ -14,8 +15,9 @@
 class GcMarkingInterface;
 class IAssetLoadingInterface;
 class PrimaryAssetLoadingInterface;
-CLASS_H(IAsset, ClassBase)
+class IAsset : public ClassBase {
 public:
+	CLASS_BODY(IAsset);
 
 	IAsset();
 	virtual ~IAsset();

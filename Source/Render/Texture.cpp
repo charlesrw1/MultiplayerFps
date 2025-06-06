@@ -19,8 +19,6 @@
 
 
 
-CLASS_IMPL(Texture);
-
 
 // TextureEditor.cpp
 extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*);
@@ -601,6 +599,7 @@ Texture* Texture::install_system(const std::string& path)
 	g_assets.install_system_asset(t, path);
 	return t;
 }
+
 
 void benchmark_run()
 {

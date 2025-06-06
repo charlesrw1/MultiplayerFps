@@ -12,6 +12,7 @@
 #include "Framework/InlineVec.h"
 #include "Assets/IAsset.h"
 #include "Framework/MathLib.h"
+#include "Framework/Reflection2.h"
 
 // Hardcoded attribute locations for shaders
 const int POSITION_LOC  = 0;
@@ -113,8 +114,10 @@ struct MeshLod
 class MSkeleton;
 class PhysicsBodyDefinition;
 class IAssetLoadingInterface;
-CLASS_H(Model,IAsset)
+class Model : public IAsset {
 public:
+	CLASS_BODY(Model);
+	Model();
 	~Model() override;
 
 	void uninstall() override;

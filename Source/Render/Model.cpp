@@ -38,7 +38,6 @@
 
 ModelMan g_modelMgr;
 
-CLASS_IMPL(Model);
 
 #ifdef EDITOR_BUILD
 extern IEditorTool* g_model_editor;	// defined in AssetCompile/ModelAssetEditorLocal.h
@@ -69,6 +68,7 @@ REGISTER_ASSETMETADATA_MACRO(ModelAssetMetadata);
 #endif
 
 Model::~Model() {}
+Model::Model() {}
 
 static const int MODEL_FORMAT_VERSION = 13;
 

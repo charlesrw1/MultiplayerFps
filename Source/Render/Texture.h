@@ -5,6 +5,7 @@
 #include "DrawTypedefs.h"
 #include "glm/glm.hpp"
 #include "Assets/IAsset.h"
+#include "Framework/Reflection2.h"
 #include <memory>
 
 enum Texture_Format
@@ -37,9 +38,12 @@ inline int get_mip_map_count(int width, int height)
 	return floor(glm::log2((double)glm::max(width, height))) + 1;
 }
 
-CLASS_H(Texture, IAsset)
+
+class Texture : public IAsset {
 public:
-	~Texture() {}
+	CLASS_BODY(Texture);
+	Texture();
+	~Texture();
 
 	void uninstall() override;
 	void sweep_references(IAssetLoadingInterface* loading) const override {}
