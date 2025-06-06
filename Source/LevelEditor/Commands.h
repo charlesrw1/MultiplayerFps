@@ -324,21 +324,7 @@ public:
 	uint64_t comp_handle = 0;
 	const ClassTypeInfo* info = nullptr;
 };
-class CreateScriptComponentCommand : public CreateComponentCommand
-{
-public:
-	CreateScriptComponentCommand(EditorDoc& ed_doc, Entity* e, Script* s)
-		: CreateComponentCommand(ed_doc, e,&ScriptComponent::StaticType) {
-		this->s = s;
-	}
-	void post_create(Component* ec)override {
-		auto sc = ec->cast_to<ScriptComponent>();
-		ASSERT(sc);
-		sc->script = s;
-	}
 
-	Script* s = nullptr;
-};
 class CreateMeshComponentCommand : public CreateComponentCommand
 {
 public:

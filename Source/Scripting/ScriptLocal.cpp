@@ -228,45 +228,6 @@ static int vec_create(lua_State* L)
 }
 
 
-
-CLASS_H(EngineWrapper,ClassBase)
-public:
-	void change_level(const char* s) {
-		eng->open_level(s);
-	}
-	float get_dt() {
-		return eng->get_dt();
-	}
-	Entity* spawn_entity() {
-		return eng->get_level()->spawn_entity();
-	}
-	Entity* spawn_prefab(PrefabAsset* prefab) {
-		return eng->get_level()->spawn_prefab(prefab);
-	}
-	float get_time() {
-		return eng->get_game_time();
-	}
-	IAsset* find_asset(const char* asset_type, const char* name) {
-		return g_assets.find_sync(name, ClassBase::find_class(asset_type), 0).get();
-	}
-	void log_to_screen(const char* text) {
-		eng->log_to_fullscreen_gui(Info, text);
-	}
-
-	static const PropertyInfoList* get_props() {
-		START_PROPS(EngineWrapper)
-			REG_FUNCTION(change_level),
-			REG_FUNCTION(get_dt),
-			REG_FUNCTION(spawn_entity),
-			REG_FUNCTION(spawn_prefab),
-			REG_FUNCTION(get_time),
-			REG_FUNCTION(find_asset),
-			REG_FUNCTION(log_to_screen)
-		END_PROPS(EngineWrapper)
-	}
-};
-CLASS_IMPL(EngineWrapper);
-
 int object_table_access(lua_State* L);
 int classbase_table_access(lua_State* L);
 int objects_are_equal(lua_State* L);
@@ -275,8 +236,7 @@ class ScriptManagerLocal : public ScriptManagerPublic
 {
 public:
 	void init() final {
-		enginewrapper.reset(new EngineWrapper);
-
+	
 		L = luaL_newstate();
 		luaL_openlibs(L);
 		// init metatables
@@ -337,7 +297,7 @@ public:
 			}
 		}
 
-		push_global(enginewrapper.get(), "eng");
+		//push_global(enginewrapper.get(), "eng");
 
 
 		{
@@ -362,7 +322,7 @@ public:
 	}
 
 	lua_State* L = nullptr;
-	std::unique_ptr<EngineWrapper> enginewrapper;
+
 };
 
 // global mgr
@@ -767,7 +727,7 @@ void ScriptComponent::pre_start()
 
 	}
 	else {
-		if (script) {
+		if (0) {
 			auto L = script_local.L;
 
 			{
@@ -789,13 +749,13 @@ void ScriptComponent::pre_start()
 
 				ASSERT(lua_gettop(L) == 0);
 			}
-
-			if (luaL_loadstring(L, script->script_str.c_str()) != LUA_OK) {
-				sys_print(Error, "error loading script: %s\n", lua_tostring(L, -1));
-				lua_pop(L, 1);
-				ASSERT(lua_gettop(L) == 0);
-				return;
-			}
+			return;
+			//if (luaL_loadstring(L, script->script_str.c_str()) != LUA_OK) {
+			//	sys_print(Error, "error loading script: %s\n", lua_tostring(L, -1));
+			//	lua_pop(L, 1);
+			//	ASSERT(lua_gettop(L) == 0);
+			//	return;
+			//}
 
 			push_table_to_stack();
 			{

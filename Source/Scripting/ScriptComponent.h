@@ -35,12 +35,7 @@ public:
 	}
 #endif
 
-	Entity* get_ref(int index) {
-		if (index >= 0 && index < refs.size())
-			return refs[index].get();
-		sys_print(Warning, "attempted out of bounds get_ref %d %s\n", index,script->get_name().c_str());
-		return nullptr;
-	}
+	
 	int get_num_refs() {
 		return (int)refs.size();
 	}
@@ -52,7 +47,7 @@ public:
 
 	std::vector<EntityPtr> refs;
 	std::vector<OutstandingScriptDelegate> outstandings;
-	REF AssetPtr<Script> script;
+
 
 	REFLECT(type = "code_block");
 	std::string ctor;

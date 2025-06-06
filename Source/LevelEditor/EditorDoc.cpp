@@ -1466,14 +1466,13 @@ void EdPropertyGrid::draw()
 						if (payload) {
 
 							auto component_metadata = AssetRegistrySystem::get().find_for_classtype(&Component::StaticType);
-							auto script_metadata = AssetRegistrySystem::get().find_for_classtype(&Script::StaticType);
 							auto mesh_metadata = AssetRegistrySystem::get().find_for_classtype(&Model::StaticType);
 
 
 							AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
 							bool actually_accept = false;
 							auto type = resource->type;
-							if (type==component_metadata||type==script_metadata||type==mesh_metadata) {
+							if (type==component_metadata||type==mesh_metadata) {
 								actually_accept = true;
 							}
 
@@ -1489,10 +1488,6 @@ void EdPropertyGrid::draw()
 												new CreateComponentCommand(ed_doc, ent, comp_type)
 											);
 										}
-									}
-									else if (type == script_metadata) {
-										ed_doc.command_mgr->add_command(
-											new CreateScriptComponentCommand(ed_doc, ent, g_assets.find_sync<Script>(resource->filename).get()));
 									}
 									else if (type == mesh_metadata) {
 										ed_doc.command_mgr->add_command(
