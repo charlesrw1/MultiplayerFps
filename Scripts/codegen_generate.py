@@ -65,8 +65,8 @@ def output_macro_for_prop(cpptype:CppType,name:str,flags:str,offset:str,custom_t
         return f"make_quat_property({name_offset_flags})"
         #return f"REG_QUAT({name},{flags})"
     elif type == ARRAY_TYPE:
-        #return f"make_new_array_type({name_and_offset}, vecdef_{name})"
-        return f"REG_STDVECTOR_NEW({name},{flags})"
+        return f"make_new_array_type({name_offset_flags},{tooltip}, &vecdefnew_{name})"
+        #return f"REG_STDVECTOR_NEW({name},{flags})"
     elif type == COLOR32_TYPE:
         #return f"REG_INT_W_CUSTOM({name}, {flags}, \"\", \"ColorUint\")"
         return f"make_integer_property({name_offset_flags},sizeof({raw_str}),{hint},\"ColorUint\")"
@@ -271,8 +271,10 @@ def write_class_old(newclass : ClassDef)->str:
         if len(newclass.properties) > 0:
             for p in newclass.properties:
                 if p.new_type.type == ARRAY_TYPE:
-                
-                    output += f"\tMAKE_VECTOR_ATOM_CALLBACKS_ASSUMED({p.name})\n"
+                    prop_str = output_macro_for_prop(p.new_type.template_args[0],"","PROP_DEFAULT","0",'""','""','""','""')
+                    arg = p.new_type.template_args[0].get_raw_type_string()
+                    callback = f"static StdVectorCallback<{arg}> vecdefnew_{p.name}({prop_str});"
+                    output += f"\t{callback}\n"
 
 
             output += f"    START_PROPS({newclass.classname})"
