@@ -3,7 +3,6 @@
 #include "GameEnginePublic.h"
 #include "ParticleMgr.h"
 
-CLASS_IMPL(ParticleComponent);
 void ParticleComponent::on_sync_render_data()
 {
 	if(!obj.is_valid())
