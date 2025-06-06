@@ -154,6 +154,8 @@ class GroupRow : public IGridRow
 {
 public:
 	GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, const PropertyInfoList* info, int row_idx, uint32_t property_flag_mask);
+	GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, const PropertyInfo* info, int row_idx, uint32_t property_flag_mask);
+
 
 	virtual bool internal_update() override;
 	virtual void draw_header(float header_ofs) override;
@@ -169,6 +171,7 @@ public:
 	}
 
 	void* inst = nullptr;
+	const PropertyInfo* property = nullptr;
 	const PropertyInfoList* proplist = nullptr;
 	std::string name;
 	bool passthrough_to_list_if_possible = false;

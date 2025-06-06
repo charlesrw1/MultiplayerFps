@@ -140,7 +140,7 @@ static IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow*
 			create->post_construct_for_custom_type(inst, prop, parent);
 			return new PropertyRow(create, parent, inst, prop, row_idx);	// create a property row
 		}
-		auto row = new GroupRow(factory, parent, prop->get_ptr(inst), prop->struct_type->properties, row_idx, property_flag_mask);
+		auto row = new GroupRow(factory, parent, prop->get_ptr(inst), prop, row_idx, property_flag_mask);
 		return row;
 	}
 	else {
@@ -725,6 +725,54 @@ bool ArrayRow::draw_row_controls()
 	 return ret;
 }
 
+
+ static std::string type_to_string(const PropertyInfo* p)
+ {
+	 switch (p->type)
+	 {
+	 case core_type_id::Bool: return "Bool";
+	 case core_type_id::Int8: return "Int8";
+	 case core_type_id::Int16: return "Int16";
+	 case core_type_id::Int32: return "Int32";
+	 case core_type_id::Int64: return "Int64";
+	 case core_type_id::Float: return "Float";
+	 case core_type_id::ActualStruct: {
+		 return p->struct_type->structname;
+	 }break;
+	 case core_type_id::List: {
+		 if (!p->list_ptr->get_is_new_list_type())
+			 return "vector";
+		 return "vector<" + type_to_string(p->list_ptr->get_property()) + ">";
+	 }break;
+	 case core_type_id::StdString: return "String";
+	 case core_type_id::Quat: return "Quat";
+	 case core_type_id::Vec3: return "Vec3";
+	 case core_type_id::Enum8:
+	 case core_type_id::Enum16:
+	 case core_type_id::Enum32:
+		 return p->enum_type->name;
+	 case core_type_id::Struct: {
+		 return p->custom_type_str;
+	 }
+	 default:
+		 break;
+	 }
+	 return "Unknown Type";
+ }
+
+ static void draw_tooltip(const PropertyInfo* prop)
+ {
+	 if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+		 ImGui::BeginTooltip();
+		 ImGui::Text("%s", type_to_string(prop).c_str());
+		 if (*prop->tooltip) {
+			 ImGui::TextColored(ImVec4(0.8, 0.8, 0.8, 1), "%s", prop->tooltip);
+		 }
+		 ImGui::EndTooltip();
+	 }
+ }
+
+
  void ArrayRow::draw_header(float header_ofs)
  {
 	 ImGui::Dummy(ImVec2(header_ofs, 0));
@@ -738,6 +786,7 @@ bool ArrayRow::draw_row_controls()
 	 if (!name_override.empty()) name = name_override.c_str();
 
 	 expanded = ImGui::TreeNodeEx(name, ImGuiTreeNodeFlags_DefaultOpen);
+	 draw_tooltip(prop);
 	 if(expanded)
 		 ImGui::TreePop();
 	 ImGui::PopStyleColor(3);
@@ -767,15 +816,17 @@ bool ArrayRow::draw_row_controls()
 	 }
  }
 
+
+
  void PropertyRow::draw_header(float ofs)
  {
 	 ImGui::Dummy(ImVec2(ofs, 0));
 	 ImGui::SameLine();
 	 if (name_override.empty())
-		 ImGui::Text(prop->name);
+		 ImGui::Text("%s",prop->name);
 	 else
-		 ImGui::Text(name_override.c_str());
-
+		 ImGui::Text("%s",name_override.c_str());
+	 draw_tooltip(prop);
  }
 
  bool PropertyRow::internal_update()
@@ -783,6 +834,29 @@ bool ArrayRow::draw_row_controls()
 	 return prop_editor->update();
  }
 
+ GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, const PropertyInfo* info, int row_idx, uint32_t property_flag_mask)
+	 : IGridRow(parent, row_idx), property(info), inst(instance)
+ {
+	 assert(info->type == core_type_id::ActualStruct);
+	 proplist = info->struct_type->properties;
+	 auto list = proplist;
+	 for (int i = 0; i < list->count; i++) {
+		 auto& prop = list->list[i];
+		 if (!prop.can_edit())
+			 continue;
+		 bool passed_mask_check = (prop.flags & property_flag_mask) != 0;
+		 if (!passed_mask_check)
+			 continue;
+
+		 auto row = create_row(factory, this, &prop, inst, -1, property_flag_mask);
+		 if (row)
+			 child_rows.push_back(std::unique_ptr<IGridRow>(row));
+	 }
+	 name = info->name;	// the variable name
+	 if (row_idx != -1) {
+		 name = string_format("[ %d ]", row_idx);
+	 }
+ }
 
  GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, const PropertyInfoList* list,
 	 int row_idx, uint32_t property_flag_mask) 
@@ -885,8 +959,11 @@ bool ArrayRow::draw_row_controls()
 	 }
 	 if(!has_drawn) {
 
-		 uint32_t flags = (row_index == -1) ? ImGuiTreeNodeFlags_DefaultOpen : 0;
-		 expanded = ImGui::TreeNodeEx(name.c_str(), flags);
+		uint32_t flags = (row_index == -1) ? ImGuiTreeNodeFlags_DefaultOpen : 0;
+		expanded = ImGui::TreeNodeEx(name.c_str(), flags);
+		if (property)
+			draw_tooltip(property);
+
 		if(expanded)
 			 ImGui::TreePop();
 

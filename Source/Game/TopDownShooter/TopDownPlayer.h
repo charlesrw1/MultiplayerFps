@@ -21,8 +21,12 @@ class ComponentWithStruct : public Component
 public:
 	CLASS_BODY(ComponentWithStruct);
 
+	// Set your thing here
 	REF MyStruct things;
+	// Is it happening?
+	// Maybe it is.
 	REF bool is_happening = false;
+	// A list of all the things.
 	REF vector<MyStruct> list_of_things;
 };
 
