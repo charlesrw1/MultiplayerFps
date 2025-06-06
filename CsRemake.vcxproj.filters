@@ -255,12 +255,6 @@
     <ClInclude Include="Source\AssetCompile\Someutils.h">
       <Filter>Source\AssetCompile</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Particles\ParticlesPublic.h">
-      <Filter>Source\Particles</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Particles\ParticlesLocal.h">
-      <Filter>Source\Particles</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\Rect2d.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
@@ -739,7 +733,6 @@
     <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
     <ClCompile Include="Source\Animation\AnimationSeqAsset.cpp" />
     <ClCompile Include="Source\Render\Editor\MaterialEditorLocal.cpp" />
-    <ClCompile Include="Source\Particles\ParticlesLocal.cpp" />
     <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
     <ClCompile Include="Source\Game\BaseUpdater.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
