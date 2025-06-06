@@ -231,6 +231,8 @@ class PropertyRow : public IGridRow
 {
 public:
 	PropertyRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx);
+	PropertyRow(IPropertyEditor* editor, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx);
+
 
 	virtual bool internal_update() override;
 	virtual void draw_header(float header_ofs) override;

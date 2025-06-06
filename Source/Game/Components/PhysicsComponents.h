@@ -6,6 +6,7 @@
 #include "Framework/ReflectionMacros.h"
 #include "Framework/MulticastDelegate.h"
 #include "Framework/Reflection2.h"
+#include "Framework/StructReflection.h"
 
 class PhysicsActor;
 class MeshBuilder;
@@ -215,8 +216,9 @@ public:
 
 struct JointAnchor
 {
-	glm::quat q = glm::quat();
-	glm::vec3 p = glm::vec3(0.f);
+	STRUCT_BODY();
+	REF glm::vec3 p = glm::vec3(0.f);
+	REF glm::quat q = glm::quat();
 };
 
 class PhysicsJointComponent : public PhysicsBody
@@ -258,8 +260,7 @@ protected:
 	float limit_damping = 0.f;
 	
 	REF obj<Entity> target;
-	REFLECT(type="JointAnchor");
-	JointAnchor anchor;
+	REF JointAnchor anchor;
 	REF int local_joint_axis = 0;	//0=x,1=y,2=z
 
 	MeshBuilderComponent* editor_meshbuilder = nullptr;

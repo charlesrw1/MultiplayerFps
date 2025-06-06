@@ -517,6 +517,7 @@
     <ClInclude Include="Source\Framework\StructReflection.h" />
     <ClInclude Include="Source\Framework\PropertyPtr.h" />
     <ClInclude Include="Source\Framework\Serializer.h" />
+    <ClInclude Include="Source\Framework\BoolButton.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

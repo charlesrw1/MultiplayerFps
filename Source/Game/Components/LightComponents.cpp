@@ -188,11 +188,10 @@ void SkylightComponent::on_sync_render_data()
 }
 
 void SkylightComponent::editor_on_change_property()  {
-	if (recapture_skylight) {
+	if (recapture_skylight.check_and_swap()) {
 		sys_print(Debug, "recapturing skylight");
 		sync_render_data();
 	}
-	recapture_skylight = false;
 }
 
 #include "Game/Entity.h"
@@ -257,8 +256,7 @@ void CubemapComponent::end() {
 	}
 }
 void CubemapComponent::editor_on_change_property() {
-	if (recapture) {
-		recapture = false;
+	if (recapture.check_and_swap()) {
 		sync_render_data();
 	}
 	update_editormeshbuilder();

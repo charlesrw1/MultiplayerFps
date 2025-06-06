@@ -70,9 +70,8 @@ void SoundComponent::editor_on_change_property()
 {
 #ifdef EDITOR_BUILD
 	update_ed_mesh();
-	if (editor_test_sound) {
+	if (editor_test_sound.check_and_swap()) {
 		play_one_shot();
-		editor_test_sound = false;
 	}
 	
 #endif

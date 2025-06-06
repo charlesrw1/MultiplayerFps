@@ -235,12 +235,13 @@ void ColorEditor::reset_value() {
 }
 
 bool ButtonPropertyEditor::internal_update() {
-	ASSERT(prop->type == core_type_id::Bool);
+	ASSERT(prop->type == core_type_id::ActualStruct && prop->struct_type == &BoolButton::StructType);
+	BoolButton* b = (BoolButton*)prop->get_ptr(instance);
 
 	bool ret = false;
-	if (ImGui::Button(prop->range_hint)) {
+	if (ImGui::Button(prop->tooltip)) {
 		ret = true;
-		prop->set_int(instance, true);
+		b->b = true;
 	}
 
 	return ret;

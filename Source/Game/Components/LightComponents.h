@@ -3,6 +3,8 @@
 #include "Game/EntityComponent.h"
 #include "Game/SerializePtrHelpers.h"
 #include "Framework/Reflection2.h"
+#include "Framework/StructReflection.h"
+#include "Framework/BoolButton.h"
 
 GENERATED_CLASS_INCLUDE("Render/Texture.h");
 
@@ -137,6 +139,7 @@ public:
 	uint64_t editor_arrow = 0;
 };
 
+
 struct Render_Skylight;
 class SkylightComponent : public Component
 {
@@ -151,8 +154,8 @@ public:
 	void on_sync_render_data() final;
 	void editor_on_change_property() final;
 
-	REFLECT(type="BoolButton",hint="Recapture",transient)
-	bool recapture_skylight = false;
+	REFLECT(transient)
+	BoolButton recapture_skylight;	// Recapture
 
 	Texture* mytexture = nullptr;
 	handle<Render_Skylight> handle;
@@ -160,8 +163,10 @@ public:
 
 struct CubemapAnchor
 {
-	bool worldspace = false;
-	glm::vec3 p = glm::vec3(0.f);
+	STRUCT_BODY();
+
+	REF bool worldspace = false;
+	REF glm::vec3 p = glm::vec3(0.f);
 };
 struct Render_Reflection_Volume;
 class MeshComponent;
@@ -181,12 +186,10 @@ public:
 	void editor_on_change_property() final;
 	void on_sync_render_data() final;
 
-	REFLECT(type = "BoolButton", hint = "Recapture", transient);
-	bool recapture = false;
+	REFLECT(transient)
+	BoolButton recapture;	// Recapture
 
-	REFLECT(type = "CubemapAnchor");
-	CubemapAnchor anchor;
-
+	REF CubemapAnchor anchor;
 private:
 	void update_editormeshbuilder();
 	handle<Render_Reflection_Volume> handle;

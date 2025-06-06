@@ -3,6 +3,7 @@
 #include "Sound/SoundPublic.h"
 #include "Game/SerializePtrHelpers.h"
 #include "Framework/Reflection2.h"
+#include "Framework/BoolButton.h"
 class MeshBuilderComponent;
 
 class SoundComponent : public Component
@@ -75,8 +76,11 @@ private:
     // STATE
     SoundPlayer* player = nullptr;
 
-    REFLECT(type="BoolButton", transient,hint="Test Sound");
-    bool editor_test_sound = false;
+
+    // Test Sound
+    REFLECT(transient);
+    BoolButton editor_test_sound;
+
 #ifdef EDITOR_BUILD
     MeshBuilderComponent* editor_mesh = nullptr;
     void update_ed_mesh();

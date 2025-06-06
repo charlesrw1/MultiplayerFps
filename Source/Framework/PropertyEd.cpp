@@ -134,6 +134,12 @@ static IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow*
 		return row;
 	}
 	else if (prop->type == core_type_id::ActualStruct) {
+		// try finding a property editor first
+		auto create = factory.create(prop->struct_type->structname);
+		if (create) {
+			create->post_construct_for_custom_type(inst, prop, parent);
+			return new PropertyRow(create, parent, inst, prop, row_idx);	// create a property row
+		}
 		auto row = new GroupRow(factory, parent, prop->get_ptr(inst), prop->struct_type->properties, row_idx, property_flag_mask);
 		return row;
 	}
@@ -568,10 +574,16 @@ int ArrayRow::get_size()
 	return prop->list_ptr->get_size(prop->get_ptr(instance));
 }
 
-PropertyRow::PropertyRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) : IGridRow(parent, row_idx), instance(instance), prop(prop)
+PropertyRow::PropertyRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) 
+	: IGridRow(parent, row_idx), instance(instance), prop(prop)
 {
 	prop_editor = std::unique_ptr<IPropertyEditor>(create_ipropertyed(factory, prop,instance, this));
 }
+PropertyRow::PropertyRow(IPropertyEditor* editor, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) 
+	: IGridRow(parent,row_idx),instance(instance),prop(prop) {
+	prop_editor.reset(editor);
+}
+
 
 void ArrayRow::hook_update_pre_tree_node()
 {
