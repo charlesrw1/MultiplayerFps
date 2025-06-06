@@ -19,7 +19,9 @@ def write_headers(path:str, additional_includes:list[str]):
 
 def output_macro_for_prop(type:int,name:str,flags:str,offset:str,custom_type:str,hint:str,nameoverride:str, name_and_offset:str, classname:str,raw_str:str)->str:
     name_with_quotes = f"\"{name}\""
-    name_offset_flags_hint = f"{name_with_quotes},{offset},{flags},{hint}"
+    name_offset_flags = f"{name_with_quotes},{offset},{flags}"
+    name_offset_flags_hint = f"{name_offset_flags},{hint}"
+
     if type == BOOL_TYPE:
         #return f"REG_BOOL_W_CUSTOM({name},{flags},{custom_type},{hint})"
         return f"make_bool_property_custom({name_offset_flags_hint},{custom_type})"
@@ -29,13 +31,14 @@ def output_macro_for_prop(type:int,name:str,flags:str,offset:str,custom_type:str
         return f"make_float_property({name_offset_flags_hint})"
 
     elif type == INT_TYPE:
-        return f"make_integer_property({name_with_quotes},{offset},{flags},sizeof({raw_str}),{hint})"
+        return f"make_integer_property({name_offset_flags},sizeof({raw_str}),{hint})"
         #return f"REG_INT({name},{flags},{hint})"
 
     elif type == ASSET_PTR_TYPE:
         return f"REG_ASSET_PTR({name},{flags})"
     elif type == STRING_TYPE:
-        return f"REG_STDSTRING_CUSTOM_TYPE({name},{flags},{custom_type})"
+        #return f"REG_STDSTRING_CUSTOM_TYPE({name},{flags},{custom_type})"
+        return f"make_string_property({name_offset_flags},{custom_type})"
     elif type == HANDLE_PTR_TYPE:
         return f"REG_ENTITY_PTR({name},{flags})"
     elif type == FUNCTION_TYPE:
@@ -48,18 +51,21 @@ def output_macro_for_prop(type:int,name:str,flags:str,offset:str,custom_type:str
     elif type == MULTICAST_TYPE:
         return f"REG_MULTICAST_DELEGATE({name})"
     elif type == VEC3_TYPE:
-        return f"make_vec3_property({name_with_quotes},{offset},{flags})"
+        return f"make_vec3_property({name_offset_flags})"
         #return f"REG_VEC3({name},{flags})"
     elif type == QUAT_TYPE:
-        return f"make_quat_property({name_with_quotes},{offset},{flags})"
+        return f"make_quat_property({name_offset_flags})"
         #return f"REG_QUAT({name},{flags})"
     elif type == ARRAY_TYPE:
         #return f"make_new_array_type({name_and_offset}, vecdef_{name})"
         return f"REG_STDVECTOR_NEW({name},{flags})"
     elif type == COLOR32_TYPE:
-        return f"REG_INT_W_CUSTOM({name}, {flags}, \"\", \"ColorUint\")"
+        #return f"REG_INT_W_CUSTOM({name}, {flags}, \"\", \"ColorUint\")"
+        return f"make_integer_property({name_offset_flags},sizeof({raw_str}),{hint},\"ColorUint\")"
     elif type == OLD_VOID_STRUCT_TYPE:
-        return f"REG_STRUCT_CUSTOM_TYPE({name},{flags},{custom_type})"
+        #return f"REG_STRUCT_CUSTOM_TYPE({name},{flags},{custom_type})"
+        return f"make_struct_property({name_offset_flags},{custom_type})"
+
     elif type == STRUCT_TYPE:
         #assert(not prop.new_type.is_pointer)
         #structtype = prop.new_type.typename
@@ -68,7 +74,9 @@ def output_macro_for_prop(type:int,name:str,flags:str,offset:str,custom_type:str
     elif type == ENUM_TYPE:
         #name = prop.new_type.typename
         #assert(name!=None)
-        return f"REG_ENUM({name},{flags},{hint},{classname})"
+        #return f"REG_ENUM({name},{flags},{hint},{classname})"
+        return f"make_enum_property({name_offset_flags},sizeof({raw_str}),&::EnumTrait<{classname}>::StaticEnumType, {hint})"
+
     elif type == SOFTASSET_PTR_TYPE:
         return f"REG_SOFT_ASSET_PTR({name},{flags})"
     elif type == CLASSTYPEINFO_TYPE:
