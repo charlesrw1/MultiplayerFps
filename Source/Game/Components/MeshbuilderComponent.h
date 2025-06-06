@@ -4,8 +4,11 @@
 #include "Render/DrawPublic.h"
 #include "Framework/MeshBuilder.h"
 
-CLASS_H(MeshBuilderComponent, Component)
+
+class MeshBuilderComponent : public Component {
 public:
+	CLASS_BODY(MeshBuilderComponent);
+
 	MeshBuilderComponent() {
 		dont_serialize_or_edit = true;
 		set_call_init_in_editor(true);
@@ -14,7 +17,6 @@ public:
 		assert(!editor_mb_handle.is_valid());
 	}
 
-	static const PropertyInfoList* get_props() = delete;
 	void start() override {
 		sync_render_data();
 	}
