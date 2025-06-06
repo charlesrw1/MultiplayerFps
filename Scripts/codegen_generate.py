@@ -24,6 +24,10 @@ def output_macro_for_prop(cpptype:CppType,name:str,flags:str,offset:str,custom_t
     type = cpptype.type
     raw_str = cpptype.get_raw_type_string()
 
+    type_of_template :str= ""
+    if len(cpptype.template_args)>0:
+        type_of_template = f"{cpptype.template_args[0].get_raw_type_string()}::StaticType"
+
     if type == BOOL_TYPE:
         #return f"REG_BOOL_W_CUSTOM({name},{flags},{custom_type},{hint})"
         return f"make_bool_property_custom({name_offset_flags_hint},{custom_type})"
@@ -37,12 +41,14 @@ def output_macro_for_prop(cpptype:CppType,name:str,flags:str,offset:str,custom_t
         #return f"REG_INT({name},{flags},{hint})"
 
     elif type == ASSET_PTR_TYPE:
-        return f"REG_ASSET_PTR({name},{flags})"
+        #return f"REG_ASSET_PTR({name},{flags})"
+        return f'make_struct_property({name_offset_flags}, "AssetPtr", {type_of_template}.classname)'
     elif type == STRING_TYPE:
         #return f"REG_STDSTRING_CUSTOM_TYPE({name},{flags},{custom_type})"
         return f"make_string_property({name_offset_flags},{custom_type})"
     elif type == HANDLE_PTR_TYPE:
-        return f"REG_ENTITY_PTR({name},{flags})"
+        #return f"REG_ENTITY_PTR({name},{flags})"
+        return f'make_struct_property({name_offset_flags}, "ObjPtr", {type_of_template}.classname)'
     elif type == FUNCTION_TYPE:
         name = nameoverride if len(nameoverride)!=0 else name
         name = f'"{name}"'
@@ -86,9 +92,11 @@ def output_macro_for_prop(cpptype:CppType,name:str,flags:str,offset:str,custom_t
         return f"make_enum_property({name_offset_flags},sizeof({raw_str}),&::EnumTrait<{enumtype.classname}>::StaticEnumType, {hint})"
 
     elif type == SOFTASSET_PTR_TYPE:
-        return f"REG_SOFT_ASSET_PTR({name},{flags})"
+        #return f"REG_SOFT_ASSET_PTR({name},{flags})"
+        return f'make_struct_property({name_offset_flags}, "AssetPtr", {type_of_template}.classname)'
     elif type == CLASSTYPEINFO_TYPE:
-        return f"REG_CLASSTYPE_PTR({name},{flags})"
+        return f'make_struct_property({name_offset_flags}, "ClassTypePtr", {type_of_template}.classname)'
+        #return f"REG_CLASSTYPE_PTR({name},{flags})"
     else:
         print(f"Unknown type {name} {type}")
         assert(0)

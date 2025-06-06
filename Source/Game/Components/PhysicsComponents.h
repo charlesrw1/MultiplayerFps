@@ -257,7 +257,7 @@ protected:
 	float limit_spring = 0.f;
 	float limit_damping = 0.f;
 	
-	REF EntityPtr target;
+	REF obj<Entity> target;
 	REFLECT(type="JointAnchor");
 	JointAnchor anchor;
 	REF int local_joint_axis = 0;	//0=x,1=y,2=z
