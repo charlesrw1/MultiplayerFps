@@ -58,203 +58,6 @@ ConfigVar editor_draw_name_text_alpha("editor_draw_name_text_alpha", "150", CVAR
 
 extern bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAsset* for_prefab);
 
-CLASS_H(EditorUILayout, guiFullscreen)
-public:
-	
-	EditorUILayout() {
-		recieve_mouse = guiMouseFilter::Block;
-		eat_scroll_event = true;
-	}
-	void start() final {
-
-		guiBase::start();
-
-		tool_text = get_owner()->create_child_entity()->create_component<guiText>();
-		tool_text->hidden = true;
-		tool_text->anchor = guiAnchor::Center;
-	}
-
-	void on_pressed(int x, int y, int button) override {
-		set_focus();
-		ASSERT(mouse_down_delegate.get_head());
-
-		mouse_clicked = true;
-		button_clicked = button;
-		//if(!editor_draw_name_text.get_bool())
-		mouse_down_delegate.invoke(x, y, button);
-	}
-	void on_released(int x, int y, int button) override {
-
-		mouse_up_delegate.invoke(x, y, button);
-	}
-	void on_key_down(const SDL_KeyboardEvent& key_event) override {
-		key_down_delegate.invoke(key_event);
-	}
-	void on_key_up(const SDL_KeyboardEvent& key_event) override {
-		key_up_delegate.invoke(key_event);
-	}
-	void on_mouse_scroll(const SDL_MouseWheelEvent& wheel) override {
-		wheel_delegate.invoke(wheel);
-	}
-	void on_dragging(int x, int y) override {
-		mouse_drag_delegate.invoke(x, y);
-	}
-	void paint(UIBuilder& builder) override {
-		int x, y;
-		SDL_GetMouseState(&x, &y);
-		bool do_mouse_click = mouse_clicked && button_clicked==1;
-		mouse_clicked = false;
-
-		if (ed_doc.selection_state->has_any_selected() && (ed_doc.manipulate->is_hovered() || ed_doc.manipulate->is_using()))
-			do_mouse_click = false;
-
-		if (!editor_draw_name_text.get_bool())
-			return;
-		if (!eng->get_level())
-			return;
-
-		const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
-		if (!font) font = g_fonts.get_default_font();
-
-		struct obj {
-			glm::vec3 pos = glm::vec3(0.f);
-			const Entity* e = nullptr;
-		};
-		std::vector<obj> objs;
-		auto& all_objs = eng->get_level()->get_all_objects();
-		for (auto o : all_objs) {
-			if (Entity* e = o->cast_to<Entity>()) {
-				if (!this_is_a_serializeable_object(e, ed_doc.get_editing_prefab()))
-					continue;
-
-
-				obj ob;
-				glm::vec3 todir = glm::vec3(e->get_ws_position()) - ed_doc.vs_setup.origin;
-				float dist = glm::dot(todir, todir);
-				if (dist > 20.0 * 20.0)
-					continue;
-				ob.e = e;
-				glm::vec4 pos = ed_doc.vs_setup.viewproj * glm::vec4(e->get_ws_position(),1.0);
-				ob.pos = pos / pos.w;
-
-				if (ob.pos.z < 0)
-					continue;
-
-				objs.push_back(ob);
-			}
-		}
-		std::sort(objs.begin(), objs.end(), [](const obj& a, const obj& b)->bool
-			{
-				return a.pos.z < b.pos.z;
-			});
-		const Entity* clicked = nullptr;
-		for (auto o : objs) {
-			const char* name = (o.e->get_editor_name().c_str());
-			if (!*name) {
-				if (o.e->is_root_of_prefab && o.e->what_prefab)
-					name = o.e->what_prefab->get_name().c_str();
-				else {
-					if (auto m = o.e->get_component<MeshComponent>()) {
-						if (m->get_model())
-							name = m->get_model()->get_name().c_str();
-					}
-				}
-			}
-			if (!*name) {
-				name = o.e->get_type().classname;
-			}
-
-			const int icon_size = 16;
-			InlineVec<Texture*,6> icons;
-			auto e = o.e;
-			if (e->is_root_of_prefab && e->what_prefab != ed_doc.get_editing_prefab()) {
-				const char* s = "eng/editor/prefab_p.png";
-				auto tex = g_assets.find_global_sync<Texture>(s);
-				icons.push_back(tex.get());
-			}
-
-			for (auto c : o.e->get_components()) {
-				if (c->dont_serialize_or_edit_this()) continue;
-				const char* s = c->get_editor_outliner_icon();
-				if (!*s) continue;
-				auto tex = g_assets.find_global_sync<Texture>(s);
-				icons.push_back(tex.get());
-			}
-
-			auto size = GuiHelpers::calc_text_size_no_wrap(name, font);
-
-			const int text_offset = (icon_size + 1) * icons.size();
-			size.w += text_offset;
-
-			
-			o.pos.y *= -1;
-			auto coordx = o.pos.x * 0.5 + 0.5;
-			auto coordy = o.pos.y * 0.5 + 0.5;
-			coordx *= this->ws_size.x;
-			coordy *= this->ws_size.y;
-			coordx += this->ws_position.x;
-			coordy += this->ws_position.y;
-			coordx -= size.w/2;
-			coordy -= size.h / 2;
-
-			Color32 color = { 50,50,50,(uint8_t)editor_draw_name_text_alpha.get_integer() };
-			if (o.e->get_selected_in_editor())
-				color = { 255,180,0,150 };
-
-			if (do_mouse_click) {
-				Rect2d r(coordx-3, coordy-3, size.w+6, size.h+6);
-				if (r.is_point_inside(x, y)) {
-
-					clicked = o.e;
-				}
-			}
-			glm::ivec2 textofs = { 0,font->base };
-			builder.draw_solid_rect({ coordx - 3,coordy - 3 },  {size.w+6,size.h+ 6}, color);
-			for (int i = 0; i < icons.size(); i++) {
-				const int ofs = (i) * (icon_size + 1);
-				builder.draw_rect_with_texture({ coordx + ofs,coordy }, { icon_size,icon_size }, 1, icons[i]);
-			}
-
-			builder.draw_text(glm::ivec2{ coordx+1+ text_offset,coordy+1 }+ textofs, {}, font, name, COLOR_BLACK);
-			builder.draw_text(glm::ivec2{ coordx + text_offset,coordy }+ textofs, {}, font, name, COLOR_WHITE);
-		}
-		if (clicked) {
-			if (ImGui::GetIO().KeyShift) {
-				ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::ADD_SELECT, clicked, true);
-			}
-			else if (ImGui::GetIO().KeyCtrl) {
-				ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::UNSELECT, clicked, true);
-			}
-			else {
-				ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::SELECT_ONLY, clicked, true);
-			}
-		}
-		else {
-			//if(do_mouse_click)
-			//	mouse_down_delegate.invoke(x-ws_position.x, y-ws_position.y, button_clicked);
-		}
-
-	}
-
-	bool mouse_clicked = false;
-	int button_clicked = 0;
-
-
-	MulticastDelegate<const SDL_KeyboardEvent&> key_down_delegate;
-	MulticastDelegate<const SDL_KeyboardEvent&> key_up_delegate;
-	MulticastDelegate<int, int, int> mouse_down_delegate;
-	MulticastDelegate<int, int> mouse_drag_delegate;
-
-	MulticastDelegate<int, int, int> mouse_up_delegate;
-	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
-
-
-	guiText* tool_text = nullptr;
-};
-CLASS_IMPL(EditorUILayout);
-
-
-
 
 static std::string to_string(StringView view) {
 	return std::string(view.str_start, view.str_len);
@@ -1889,5 +1692,188 @@ void EditorDoc::hook_menu_bar()
 		ImGui::EndMenu();
 	}
 }
+
+EditorUILayout::EditorUILayout() {
+	recieve_mouse = guiMouseFilter::Block;
+	eat_scroll_event = true;
+}
+
+void EditorUILayout::start() {
+
+	guiBase::start();
+
+	tool_text = get_owner()->create_child_entity()->create_component<guiText>();
+	tool_text->hidden = true;
+	tool_text->anchor = guiAnchor::Center;
+}
+
+void EditorUILayout::on_pressed(int x, int y, int button) {
+	set_focus();
+	ASSERT(mouse_down_delegate.get_head());
+
+	mouse_clicked = true;
+	button_clicked = button;
+	//if(!editor_draw_name_text.get_bool())
+	mouse_down_delegate.invoke(x, y, button);
+}
+
+void EditorUILayout::on_released(int x, int y, int button) {
+
+	mouse_up_delegate.invoke(x, y, button);
+}
+
+void EditorUILayout::on_key_down(const SDL_KeyboardEvent& key_event) {
+	key_down_delegate.invoke(key_event);
+}
+
+void EditorUILayout::on_key_up(const SDL_KeyboardEvent& key_event) {
+	key_up_delegate.invoke(key_event);
+}
+
+void EditorUILayout::on_mouse_scroll(const SDL_MouseWheelEvent& wheel) {
+	wheel_delegate.invoke(wheel);
+}
+
+void EditorUILayout::on_dragging(int x, int y) {
+	mouse_drag_delegate.invoke(x, y);
+}
+
+void EditorUILayout::paint(UIBuilder& builder) {
+	int x, y;
+	SDL_GetMouseState(&x, &y);
+	bool do_mouse_click = mouse_clicked && button_clicked == 1;
+	mouse_clicked = false;
+
+	if (ed_doc.selection_state->has_any_selected() && (ed_doc.manipulate->is_hovered() || ed_doc.manipulate->is_using()))
+		do_mouse_click = false;
+
+	if (!editor_draw_name_text.get_bool())
+		return;
+	if (!eng->get_level())
+		return;
+
+	const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+	if (!font) font = g_fonts.get_default_font();
+
+	struct obj {
+		glm::vec3 pos = glm::vec3(0.f);
+		const Entity* e = nullptr;
+	};
+	std::vector<obj> objs;
+	auto& all_objs = eng->get_level()->get_all_objects();
+	for (auto o : all_objs) {
+		if (Entity* e = o->cast_to<Entity>()) {
+			if (!this_is_a_serializeable_object(e, ed_doc.get_editing_prefab()))
+				continue;
+
+
+			obj ob;
+			glm::vec3 todir = glm::vec3(e->get_ws_position()) - ed_doc.vs_setup.origin;
+			float dist = glm::dot(todir, todir);
+			if (dist > 20.0 * 20.0)
+				continue;
+			ob.e = e;
+			glm::vec4 pos = ed_doc.vs_setup.viewproj * glm::vec4(e->get_ws_position(), 1.0);
+			ob.pos = pos / pos.w;
+
+			if (ob.pos.z < 0)
+				continue;
+
+			objs.push_back(ob);
+		}
+	}
+	std::sort(objs.begin(), objs.end(), [](const obj& a, const obj& b)->bool
+		{
+			return a.pos.z < b.pos.z;
+		});
+	const Entity* clicked = nullptr;
+	for (auto o : objs) {
+		const char* name = (o.e->get_editor_name().c_str());
+		if (!*name) {
+			if (o.e->is_root_of_prefab && o.e->what_prefab)
+				name = o.e->what_prefab->get_name().c_str();
+			else {
+				if (auto m = o.e->get_component<MeshComponent>()) {
+					if (m->get_model())
+						name = m->get_model()->get_name().c_str();
+				}
+			}
+		}
+		if (!*name) {
+			name = o.e->get_type().classname;
+		}
+
+		const int icon_size = 16;
+		InlineVec<Texture*, 6> icons;
+		auto e = o.e;
+		if (e->is_root_of_prefab && e->what_prefab != ed_doc.get_editing_prefab()) {
+			const char* s = "eng/editor/prefab_p.png";
+			auto tex = g_assets.find_global_sync<Texture>(s);
+			icons.push_back(tex.get());
+		}
+
+		for (auto c : o.e->get_components()) {
+			if (c->dont_serialize_or_edit_this()) continue;
+			const char* s = c->get_editor_outliner_icon();
+			if (!*s) continue;
+			auto tex = g_assets.find_global_sync<Texture>(s);
+			icons.push_back(tex.get());
+		}
+
+		auto size = GuiHelpers::calc_text_size_no_wrap(name, font);
+
+		const int text_offset = (icon_size + 1) * icons.size();
+		size.w += text_offset;
+
+
+		o.pos.y *= -1;
+		auto coordx = o.pos.x * 0.5 + 0.5;
+		auto coordy = o.pos.y * 0.5 + 0.5;
+		coordx *= this->ws_size.x;
+		coordy *= this->ws_size.y;
+		coordx += this->ws_position.x;
+		coordy += this->ws_position.y;
+		coordx -= size.w / 2;
+		coordy -= size.h / 2;
+
+		Color32 color = { 50,50,50,(uint8_t)editor_draw_name_text_alpha.get_integer() };
+		if (o.e->get_selected_in_editor())
+			color = { 255,180,0,150 };
+
+		if (do_mouse_click) {
+			Rect2d r(coordx - 3, coordy - 3, size.w + 6, size.h + 6);
+			if (r.is_point_inside(x, y)) {
+
+				clicked = o.e;
+			}
+		}
+		glm::ivec2 textofs = { 0,font->base };
+		builder.draw_solid_rect({ coordx - 3,coordy - 3 }, { size.w + 6,size.h + 6 }, color);
+		for (int i = 0; i < icons.size(); i++) {
+			const int ofs = (i) * (icon_size + 1);
+			builder.draw_rect_with_texture({ coordx + ofs,coordy }, { icon_size,icon_size }, 1, icons[i]);
+		}
+
+		builder.draw_text(glm::ivec2{ coordx + 1 + text_offset,coordy + 1 } + textofs, {}, font, name, COLOR_BLACK);
+		builder.draw_text(glm::ivec2{ coordx + text_offset,coordy } + textofs, {}, font, name, COLOR_WHITE);
+	}
+	if (clicked) {
+		if (ImGui::GetIO().KeyShift) {
+			ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::ADD_SELECT, clicked, true);
+		}
+		else if (ImGui::GetIO().KeyCtrl) {
+			ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::UNSELECT, clicked, true);
+		}
+		else {
+			ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::SELECT_ONLY, clicked, true);
+		}
+	}
+	else {
+		//if(do_mouse_click)
+		//	mouse_down_delegate.invoke(x-ws_position.x, y-ws_position.y, button_clicked);
+	}
+
+}
+
 
 #endif

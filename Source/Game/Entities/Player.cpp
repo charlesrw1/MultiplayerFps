@@ -471,31 +471,6 @@ public:
 };
 #endif
 
-CLASS_H(HealthComponent, Component)
-public:
-
-	MulticastDelegate<Entity* /* inflictor*/, int/* damage */> on_take_damage;
-	MulticastDelegate<> on_death;
-
-	int healthCounter = 0;
-	int maxHealth = 100;
-
-	void reset() {}
-
-	void set_to_full() {}
-
-	void take_damage() {
-		on_take_damage.invoke(nullptr, 0);
-	}
-
-	static const PropertyInfoList* get_props() {
-		START_PROPS(HealthComponent)
-			REG_INT(maxHealth,PROP_DEFAULT,"100")
-		END_PROPS(HealthComponent)
-	}
-};
-CLASS_IMPL(HealthComponent);
-
 
 void Player::on_jump_callback()
 {

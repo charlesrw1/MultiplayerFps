@@ -1,15 +1,9 @@
 #pragma once
-
-// A data class is simply a ClassBase object that can be serialized and edited
-// Allows for data driven assets in a really easy way!!!
-// Just create a ClassBase inherited object, then open the editor with the classes name ("start_ed DataClass <ClassName>")
-// This has the advantage of not needing manual parsers and it integrates 
-// with all custom property editors! (like assets or other ClassBase's, just drag and drop, omg I love this so much)
-
 #include "Assets/IAsset.h"
-
-CLASS_H(DataClass, IAsset)
+#include "Framework/Reflection2.h"
+class DataClass : public IAsset {
 public:
+	CLASS_BODY(DataClass);
 	const ClassBase* get_obj() const {
 		return object;
 	}
@@ -25,6 +19,5 @@ public:
 	bool load_asset(IAssetLoadingInterface*);
 private:
 	ClassBase* object = nullptr;
-
 	friend class DataClassLoadJob;
 };

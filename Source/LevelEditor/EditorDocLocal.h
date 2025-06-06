@@ -32,6 +32,7 @@
 #include "Game/SerializePtrHelpers.h"
 #include "Framework/FnFactory.h"
 #include "Framework/ConsoleCmdGroup.h"
+#include "UI/Widgets/Layouts.h"
 
 extern ConfigVar g_mousesens;
 
@@ -204,6 +205,38 @@ public:
 		return glm::ortho(-width, width, -width * aspect_ratio, width * aspect_ratio,0.001f, 1000.f);
 	}
 }; 
+class guiText;
+class EditorUILayout : public guiFullscreen {
+public:
+	CLASS_BODY(EditorUILayout);
+
+	EditorUILayout();
+	void start() final;
+
+	void on_pressed(int x, int y, int button) override;
+	void on_released(int x, int y, int button) override;
+	void on_key_down(const SDL_KeyboardEvent& key_event) override;
+	void on_key_up(const SDL_KeyboardEvent& key_event) override;
+	void on_mouse_scroll(const SDL_MouseWheelEvent& wheel) override;
+	void on_dragging(int x, int y) override;
+	void paint(UIBuilder& builder) override;
+
+	bool mouse_clicked = false;
+	int button_clicked = 0;
+
+
+	MulticastDelegate<const SDL_KeyboardEvent&> key_down_delegate;
+	MulticastDelegate<const SDL_KeyboardEvent&> key_up_delegate;
+	MulticastDelegate<int, int, int> mouse_down_delegate;
+	MulticastDelegate<int, int> mouse_drag_delegate;
+
+	MulticastDelegate<int, int, int> mouse_up_delegate;
+	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
+
+
+	guiText* tool_text = nullptr;
+};
+
 
 class SelectionState
 {

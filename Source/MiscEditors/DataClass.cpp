@@ -11,7 +11,7 @@
 class IEditorTool;
 extern IEditorTool* g_dataclass_editor;	// defined in MiscEditors/DataClassEditor.h
 
-CLASS_IMPL(DataClass);
+
 
 #ifdef EDITOR_BUILD
 class DataClassAssetMetadata : public AssetMetadata
