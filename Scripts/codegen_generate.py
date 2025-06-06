@@ -16,6 +16,68 @@ def write_headers(path:str, additional_includes:list[str]):
 
     return out + "\n"
 
+
+def output_macro_for_prop(type:int,name:str,flags:str,offset:str,custom_type:str,hint:str,nameoverride:str, name_and_offset:str, classname:str,raw_str:str)->str:
+    name_with_quotes = f"\"{name}\""
+    name_offset_flags_hint = f"{name_with_quotes},{offset},{flags},{hint}"
+    if type == BOOL_TYPE:
+        #return f"REG_BOOL_W_CUSTOM({name},{flags},{custom_type},{hint})"
+        return f"make_bool_property_custom({name_offset_flags_hint},{custom_type})"
+
+    elif type == FLOAT_TYPE:
+        #return f"REG_FLOAT({name},{flags},{hint})"
+        return f"make_float_property({name_offset_flags_hint})"
+
+    elif type == INT_TYPE:
+        return f"make_integer_property({name_with_quotes},{offset},{flags},sizeof({raw_str}),{hint})"
+        #return f"REG_INT({name},{flags},{hint})"
+
+    elif type == ASSET_PTR_TYPE:
+        return f"REG_ASSET_PTR({name},{flags})"
+    elif type == STRING_TYPE:
+        return f"REG_STDSTRING_CUSTOM_TYPE({name},{flags},{custom_type})"
+    elif type == HANDLE_PTR_TYPE:
+        return f"REG_ENTITY_PTR({name},{flags})"
+    elif type == FUNCTION_TYPE:
+        name = nameoverride if len(nameoverride)!=0 else name
+        name = f'"{name}"'
+        if False:#fixme
+            return f"REG_GETTER_FUNCTION({name},{name})"
+        else:
+            return f"REG_FUNCTION_EXPLICIT_NAME({name},{name})"
+    elif type == MULTICAST_TYPE:
+        return f"REG_MULTICAST_DELEGATE({name})"
+    elif type == VEC3_TYPE:
+        return f"make_vec3_property({name_with_quotes},{offset},{flags})"
+        #return f"REG_VEC3({name},{flags})"
+    elif type == QUAT_TYPE:
+        return f"make_quat_property({name_with_quotes},{offset},{flags})"
+        #return f"REG_QUAT({name},{flags})"
+    elif type == ARRAY_TYPE:
+        #return f"make_new_array_type({name_and_offset}, vecdef_{name})"
+        return f"REG_STDVECTOR_NEW({name},{flags})"
+    elif type == COLOR32_TYPE:
+        return f"REG_INT_W_CUSTOM({name}, {flags}, \"\", \"ColorUint\")"
+    elif type == OLD_VOID_STRUCT_TYPE:
+        return f"REG_STRUCT_CUSTOM_TYPE({name},{flags},{custom_type})"
+    elif type == STRUCT_TYPE:
+        #assert(not prop.new_type.is_pointer)
+        #structtype = prop.new_type.typename
+        #assert(structtype!=None)
+        return f"make_new_struct_type({name_and_offset},&{classname}::StructType)"
+    elif type == ENUM_TYPE:
+        #name = prop.new_type.typename
+        #assert(name!=None)
+        return f"REG_ENUM({name},{flags},{hint},{classname})"
+    elif type == SOFTASSET_PTR_TYPE:
+        return f"REG_SOFT_ASSET_PTR({name},{flags})"
+    elif type == CLASSTYPEINFO_TYPE:
+        return f"REG_CLASSTYPE_PTR({name},{flags})"
+    else:
+        print(f"Unknown type {name} {type}")
+        assert(0)
+    return ""
+
 # code gen to make macros to make templates to make code ...
 def write_prop(prop : Property,newclass:ClassDef) -> str:
     prop.custom_type = f'"{prop.custom_type}"'
@@ -26,55 +88,13 @@ def write_prop(prop : Property,newclass:ClassDef) -> str:
     name_str = f"\"{prop.name}\""
     name_and_offset = name_str + "," + offset_str +","+prop.get_flags()+ ",\"" + prop.tooltip + "\""
 
-    if type == BOOL_TYPE:
-        return f"REG_BOOL_W_CUSTOM({prop.name},{prop.get_flags()},{prop.custom_type},{prop.hint})"
-    elif type == FLOAT_TYPE:
-        return f"REG_FLOAT({prop.name},{prop.get_flags()},{prop.hint})"
-    elif type == INT_TYPE:
-        return f"REG_INT({prop.name},{prop.get_flags()},{prop.hint})"
-    elif type == ASSET_PTR_TYPE:
-        return f"REG_ASSET_PTR({prop.name},{prop.get_flags()})"
-    elif type == STRING_TYPE:
-        return f"REG_STDSTRING_CUSTOM_TYPE({prop.name},{prop.get_flags()},{prop.custom_type})"
-    elif type == HANDLE_PTR_TYPE:
-        return f"REG_ENTITY_PTR({prop.name},{prop.get_flags()})"
-    elif type == FUNCTION_TYPE:
-        name = prop.nameoverride if len(prop.nameoverride)!=0 else prop.name
-        name = f'"{name}"'
-        if prop.is_getter:
-            return f"REG_GETTER_FUNCTION({prop.name},{name})"
-        else:
-            return f"REG_FUNCTION_EXPLICIT_NAME({prop.name},{name})"
-    elif type == MULTICAST_TYPE:
-        return f"REG_MULTICAST_DELEGATE({prop.name})"
-    elif type == VEC3_TYPE:
-        return f"REG_VEC3({prop.name},{prop.get_flags()})"
-    elif type == QUAT_TYPE:
-        return f"REG_QUAT({prop.name},{prop.get_flags()})"
-    elif type == ARRAY_TYPE:
-        return f"make_new_array_type({name_and_offset}, vecdef_{prop.name})"
-       # return f"REG_STDVECTOR_NEW({prop.name},{prop.get_flags()})"
-    elif type == COLOR32_TYPE:
-        return f"REG_INT_W_CUSTOM({prop.name}, {prop.get_flags()}, \"\", \"ColorUint\")"
-    elif type == OLD_VOID_STRUCT_TYPE:
-        return f"REG_STRUCT_CUSTOM_TYPE({prop.name},{prop.get_flags()},{prop.custom_type})"
-    elif type == STRUCT_TYPE:
-        assert(not prop.new_type.is_pointer)
-        structtype = prop.new_type.typename
-        assert(structtype!=None)
-        return f"make_new_struct_type({name_and_offset},&{structtype.classname}::StructType)"
-    elif type == ENUM_TYPE:
-        name = prop.new_type.typename
-        assert(name!=None)
-        return f"REG_ENUM({prop.name},{prop.get_flags()},{prop.hint},{name.classname})"
-    elif type == SOFTASSET_PTR_TYPE:
-        return f"REG_SOFT_ASSET_PTR({prop.name},{prop.get_flags()})"
-    elif type == CLASSTYPEINFO_TYPE:
-        return f"REG_CLASSTYPE_PTR({prop.name},{prop.get_flags()})"
-    else:
-        print(f"Unknown type {prop.name} {type}")
-        assert(0)
-    return ""
+    type_name = ""
+    if prop.new_type.typename != None:
+        type_name = prop.new_type.typename.classname
+    rawstr = prop.new_type.get_raw_type_string()
+    return output_macro_for_prop(type,prop.name,prop.get_flags(),offset_str,prop.custom_type,prop.hint,prop.nameoverride,name_and_offset,type_name,rawstr)
+
+
 
 def write_class_property(newclass:ClassDef,p:Property)->str:
     offset_str = f"offsetof({newclass.classname}, {p.name})"
@@ -233,6 +253,7 @@ def write_class_old(newclass : ClassDef)->str:
         if len(newclass.properties) > 0:
             for p in newclass.properties:
                 if p.new_type.type == ARRAY_TYPE:
+                
                     output += f"\tMAKE_VECTOR_ATOM_CALLBACKS_ASSUMED({p.name})\n"
 
 

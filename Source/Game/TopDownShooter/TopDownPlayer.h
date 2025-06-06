@@ -23,6 +23,7 @@ public:
 
 	REF MyStruct things;
 	REF bool is_happening = false;
+	//REF vector<MyStruct> list_of_things;
 };
 
 class CameraShake

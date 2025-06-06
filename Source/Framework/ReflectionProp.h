@@ -141,6 +141,9 @@ PropertyInfo make_struct_property(const char* name, uint16_t offset, uint32_t fl
 PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
 PropertyInfo make_quat_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
 
+
+PropertyInfo make_new_array_type(const char* name, uint16_t offset, int flags, const char* tooltip, IListCallback* type);
+
 struct PropertyInfoList
 {
 	PropertyInfo* list = nullptr;
