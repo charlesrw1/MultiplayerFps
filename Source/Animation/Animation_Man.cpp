@@ -11,7 +11,6 @@
 #include "Animation/Runtime/Animation.h"
 #include "Animation/Runtime/AnimationTreeLocal.h"
 
-CLASS_IMPL(Animation_Tree_CFG);
 
 Animation_Tree_CFG::Animation_Tree_CFG()
 {

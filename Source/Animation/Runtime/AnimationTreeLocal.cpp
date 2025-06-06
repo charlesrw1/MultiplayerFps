@@ -420,16 +420,6 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 	 return -1;
  }
 
- const PropertyInfoList* Animation_Tree_CFG::get_props()
- {
-	 MAKE_VECTORCALLBACK_ATOM(std::string, direct_slot_names);
-	 START_PROPS(Animation_Tree_CFG)
-		REG_STRUCT_CUSTOM_TYPE(root, PROP_SERIALIZE, "AgSerializeNodeCfg"),
-		REG_BOOL(graph_is_valid, PROP_SERIALIZE, ""),
-		REG_STDVECTOR(direct_slot_names, PROP_SERIALIZE),
-		REG_CLASSTYPE_PTR(animator_class, PROP_DEFAULT),
-	END_PROPS(Animation_Tree_CFG)
- }
 
 
  bool Animation_Tree_CFG::read_from_dict(DictParser& in, IAssetLoadingInterface* load)

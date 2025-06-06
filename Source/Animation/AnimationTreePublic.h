@@ -20,8 +20,11 @@ class Script;
 class BaseAGNode;
 class AnimatorInstance;
 
-CLASS_H(Animation_Tree_CFG, IAsset)
+
+class Animation_Tree_CFG : public IAsset {
 public:
+	CLASS_BODY(Animation_Tree_CFG);
+
 	Animation_Tree_CFG();
 	~Animation_Tree_CFG() override;
 
@@ -73,10 +76,11 @@ public:
 		return is_fake_tree;
 	}
 private:
-	bool graph_is_valid = false;
+	REF bool graph_is_valid = false;
 	bool is_fake_tree = false;
 
 	// graph root node
+	REFLECT(type="AgSerializeNodeCfg")
 	Node_CFG* root = nullptr;
 	
 	// data in bytes for runtime nodes
@@ -84,15 +88,14 @@ private:
 
 	std::vector<BaseAGNode*> all_nodes;
 
+	REFLECT(type = "ClassTypePtr");
 	ClassTypePtr<AnimatorInstance> animator_class;
 
 	// provides names + indicies for playing animations directly
 	// these get provided by adding 'Direct play' nodes and setting their names
 	// if 2 nodes share a name, then they reference same index
 	// TODO: might want better way than this than tying it to a graph asset
-	std::vector<std::string> direct_slot_names;
-
-	static const PropertyInfoList* get_props();
+	REF std::vector<std::string> direct_slot_names;
 
 	friend class Animation_Tree_Manager;
 	friend class AnimationGraphEditor;
