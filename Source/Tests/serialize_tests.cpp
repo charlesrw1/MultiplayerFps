@@ -118,13 +118,13 @@ ADD_TEST(Serialization, BuildPath)
 
 	work.post_unserialization();
 	// test basic path
-	TEST_TRUE(build_path_for_object(e, nullptr) == std::to_string(e->unique_file_id));
+	checkTrue(build_path_for_object(e, nullptr) == std::to_string(e->unique_file_id));
 	auto e2 = work.add_entity<Entity>();
 	e2->parent_to(e);
 	// test parented path
-	TEST_TRUE(build_path_for_object(e2, nullptr) == std::to_string(e2->unique_file_id));
+	checkTrue(build_path_for_object(e2, nullptr) == std::to_string(e2->unique_file_id));
 
-	TEST_TRUE(build_path_for_object(pent, nullptr) == std::to_string(pent->unique_file_id));
+	checkTrue(build_path_for_object(pent, nullptr) == std::to_string(pent->unique_file_id));
 
 }
 
@@ -136,13 +136,13 @@ ADD_TEST(unserialize_prefab)
 	PrefabAsset temp;
 	auto unserialized = unserialize_entities_from_text(text, nullptr, &temp);
 	auto root = unserialized.get_root_entity();
-	TEST_TRUE(root);
-	TEST_TRUE(!root->creator_source && root->is_root_of_prefab && root->what_prefab == &temp);
-	TEST_TRUE(unserialized.find("/"));
-	TEST_TRUE(unserialized.find("2"));
-	TEST_TRUE(unserialized.find("2/~2122221332"));
-	TEST_TRUE(unserialized.find("3"));
-	TEST_TRUE(unserialized.find("3/~2122221332"));
+	checkTrue(root);
+	checkTrue(!root->creator_source && root->is_root_of_prefab && root->what_prefab == &temp);
+	checkTrue(unserialized.find("/"));
+	checkTrue(unserialized.find("2"));
+	checkTrue(unserialized.find("2/~2122221332"));
+	checkTrue(unserialized.find("3"));
+	checkTrue(unserialized.find("3/~2122221332"));
 }
 
 extern bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_prefab);
@@ -157,25 +157,25 @@ ADD_TEST(serialize_newly_created)
 	pent->parent_to(work.add_entity<Entity>());
 	work.post_unserialization();
 
-	TEST_TRUE(this_is_newly_created(pent, nullptr));
-	TEST_TRUE(this_is_newly_created(newent, nullptr));
-	TEST_TRUE(this_is_newly_created(newcomp, nullptr));
+	checkTrue(this_is_newly_created(pent, nullptr));
+	checkTrue(this_is_newly_created(newent, nullptr));
+	checkTrue(this_is_newly_created(newcomp, nullptr));
 
-	TEST_TRUE(!this_is_newly_created(subent, nullptr));
-	TEST_TRUE(this_is_newly_created(subent, loadPrefab));
+	checkTrue(!this_is_newly_created(subent, nullptr));
+	checkTrue(this_is_newly_created(subent, loadPrefab));
 }
 
 ADD_TEST(serialize_relative_paths)
 {
-	TEST_TRUE(serialize_build_relative_path("1/2", "1") == "..");
-	TEST_TRUE(serialize_build_relative_path("1", "1/2") == "2");
-	TEST_TRUE(serialize_build_relative_path("1/2/3", "1/3") == "../../3");
-	TEST_TRUE(serialize_build_relative_path("1/2/3", "2/~3") == "../../../2/~3");
+	checkTrue(serialize_build_relative_path("1/2", "1") == "..");
+	checkTrue(serialize_build_relative_path("1", "1/2") == "2");
+	checkTrue(serialize_build_relative_path("1/2/3", "1/3") == "../../3");
+	checkTrue(serialize_build_relative_path("1/2/3", "2/~3") == "../../../2/~3");
 
-	TEST_TRUE(unserialize_relative_to_absolute("..", "1/2") == "1");
-	TEST_TRUE(unserialize_relative_to_absolute("2", "1") == "1/2");
-	TEST_TRUE(unserialize_relative_to_absolute("../../3", "1/2/3") == "1/3");
-	TEST_TRUE(unserialize_relative_to_absolute("../../../2/~3", "1/2/3") == "2/~3");
+	checkTrue(unserialize_relative_to_absolute("..", "1/2") == "1");
+	checkTrue(unserialize_relative_to_absolute("2", "1") == "1/2");
+	checkTrue(unserialize_relative_to_absolute("../../3", "1/2/3") == "1/3");
+	checkTrue(unserialize_relative_to_absolute("../../../2/~3", "1/2/3") == "2/~3");
 
 	SerializeTestWorkbench work;
 	PrefabAsset* loadPrefab = g_assets.find_sync<PrefabAsset>("test4.pfb").get();
@@ -191,8 +191,8 @@ ADD_TEST(serialize_relative_paths)
 	auto rel = serialize_build_relative_path(from.c_str(), to.c_str());
 	auto abs = unserialize_relative_to_absolute(rel.c_str(), from.c_str());
 
-	TEST_TRUE(build_path_for_object(pent, nullptr) == std::to_string(pent->unique_file_id));
-	TEST_TRUE(build_path_for_object(subent, nullptr) == std::to_string(pent->unique_file_id) + "/" + std::to_string(subent->unique_file_id));
+	checkTrue(build_path_for_object(pent, nullptr) == std::to_string(pent->unique_file_id));
+	checkTrue(build_path_for_object(subent, nullptr) == std::to_string(pent->unique_file_id) + "/" + std::to_string(subent->unique_file_id));
 
 }
 
@@ -206,13 +206,13 @@ ADD_TEST(serialize_nested_prefabs)
 	auto subent = pent->get_children().at(0);
 	work.post_unserialization();
 
-	TEST_TRUE(subent->what_prefab && subent->what_prefab->get_name() == "test2.pfb");
+	checkTrue(subent->what_prefab && subent->what_prefab->get_name() == "test2.pfb");
 	PrefabAsset* diff_prefab = nullptr;
-	TEST_TRUE(find_diff_class(pent, nullptr, diff_prefab) == loadPrefab->sceneFile->get_root_entity());
-	TEST_TRUE(diff_prefab == loadPrefab);
+	checkTrue(find_diff_class(pent, nullptr, diff_prefab) == loadPrefab->sceneFile->get_root_entity());
+	checkTrue(diff_prefab == loadPrefab);
 	diff_prefab = nullptr;
-	TEST_TRUE(find_diff_class(subent, nullptr, diff_prefab) == loadPrefab->sceneFile->get_root_entity()->get_children().at(0));
-	TEST_TRUE(diff_prefab == loadPrefab);
+	checkTrue(find_diff_class(subent, nullptr, diff_prefab) == loadPrefab->sceneFile->get_root_entity()->get_children().at(0));
+	checkTrue(diff_prefab == loadPrefab);
 
 
 
@@ -235,9 +235,9 @@ ADD_TEST(serialize_write_prefab)
 
 	auto file = serialize_entities_to_text({ root }, prefab);
 
-	TEST_TRUE(build_path_for_object(pent, prefab) == std::to_string(pent->unique_file_id));
+	checkTrue(build_path_for_object(pent, prefab) == std::to_string(pent->unique_file_id));
 	auto child_ent = pent->get_children()[0];
-	TEST_TRUE(build_path_for_object(child_ent, prefab) == std::to_string(pent->unique_file_id) + "/" + std::to_string(child_ent->unique_file_id));
+	checkTrue(build_path_for_object(child_ent, prefab) == std::to_string(pent->unique_file_id) + "/" + std::to_string(child_ent->unique_file_id));
 
 
 
@@ -255,15 +255,15 @@ ADD_TEST(serialize_write_prefab)
 		}
 	}
 
-	TEST_TRUE(good && "creator source not set");
+	checkTrue(good && "creator source not set");
 	auto path = build_path_for_object(pent, prefab);
-	TEST_TRUE(path == std::to_string(pent->unique_file_id));
+	checkTrue(path == std::to_string(pent->unique_file_id));
 	auto find = unserialized.find(path);
-	TEST_TRUE(find && find->cast_to<Entity>()->get_children().size() == loadPrefab->sceneFile->get_root_entity()->get_children().size());
+	checkTrue(find && find->cast_to<Entity>()->get_children().size() == loadPrefab->sceneFile->get_root_entity()->get_children().size());
 
 
 
-	//TEST_TRUE(unserialized.get_root_entity());
+	//checkTrue(unserialized.get_root_entity());
 }
 
 extern bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_prefab);
@@ -298,12 +298,12 @@ ADD_TEST(serialize_find_diff)
 
 	PrefabAsset* diff_prefab = nullptr;
 	auto diff = find_diff_class(root, prefab, diff_prefab);
-	TEST_TRUE(diff == Entity::StaticType.default_class_object);
+	checkTrue(diff == Entity::StaticType.default_class_object);
 	diff = find_diff_class(comp, prefab, diff_prefab);
-	TEST_TRUE(diff == PointLightComponent::StaticType.default_class_object);
+	checkTrue(diff == PointLightComponent::StaticType.default_class_object);
 
 	diff = find_diff_class(pent, prefab, diff_prefab);
-	TEST_TRUE(diff == loadPrefab->sceneFile->get_root_entity());
+	checkTrue(diff == loadPrefab->sceneFile->get_root_entity());
 }
 
 ADD_TEST(serialize_diff_in_scene)
@@ -319,12 +319,12 @@ ADD_TEST(serialize_diff_in_scene)
 
 	PrefabAsset* diff_prefab = nullptr;
 	auto diff = find_diff_class(ent1, nullptr, diff_prefab);
-	TEST_TRUE(diff == Entity::StaticType.default_class_object);
+	checkTrue(diff == Entity::StaticType.default_class_object);
 	diff = find_diff_class(comp, nullptr, diff_prefab);
-	TEST_TRUE(diff == PointLightComponent::StaticType.default_class_object);
+	checkTrue(diff == PointLightComponent::StaticType.default_class_object);
 
 	diff = find_diff_class(pent, nullptr, diff_prefab);
-	TEST_TRUE(diff == loadPrefab->sceneFile->get_root_entity());
+	checkTrue(diff == loadPrefab->sceneFile->get_root_entity());
 }
 
 
@@ -342,9 +342,9 @@ ADD_TEST(serialize_basic)
 	auto file = serialize_entities_to_text(ents);
 
 	auto scene2 = unserialize_entities_from_text(file.text, nullptr, nullptr);
-	TEST_TRUE(scene2.get_objects().size() == work.all.size());
+	checkTrue(scene2.get_objects().size() == work.all.size());
 	auto path = build_path_for_object(e, nullptr);
-	TEST_TRUE(scene2.find(path)->cast_to<Entity>());
+	checkTrue(scene2.find(path)->cast_to<Entity>());
 	path = build_path_for_object(another_e, nullptr);
-	TEST_TRUE(scene2.find(path)->cast_to<Entity>()->get_parent());
+	checkTrue(scene2.find(path)->cast_to<Entity>()->get_parent());
 }

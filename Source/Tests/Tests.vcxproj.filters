@@ -33,12 +33,18 @@
     <ClCompile Include="framwork_test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="serializer_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Unittest.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="object_outliner_filter.cpp">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="test_class.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -102,6 +102,7 @@ class TopDownPlayer : public Component
 public:
 	CLASS_BODY(TopDownPlayer);
 	REF MyStruct numbers;
+	REF std::vector<int> myarray = { 0,5,10,15 };
 
 	TopDownControls con;
 	REF AssetPtr<PrefabAsset> shotgunSoundAsset;
@@ -397,9 +398,9 @@ public:
 	CameraComponent* the_camera = nullptr;
 
 	bool ragdoll_enabled = false;
-	float fov = 50.0;
+	REF float fov = 50.0;
 
-	float shoot_cooldown = 0.0;
+	REF float shoot_cooldown = 0.0;
 
 	bool is_in_car = false;
 
@@ -413,7 +414,7 @@ public:
 
 	bool did_move = false;
 	bool is_jumping = false;
-	bool using_third_person_movement = false;
+	REF bool using_third_person_movement = false;
 	bool has_had_update = false;
 
 	glm::mat4 last_ws = glm::mat4(1.f);

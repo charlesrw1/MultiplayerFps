@@ -7,5 +7,5 @@ ADD_TEST(script_parse)
 
 	auto result = ScriptLoadingUtil::parse_text(text);
 
-	TEST_TRUE(result.size() == 4);
+	checkTrue(result.size() == 4);
 }

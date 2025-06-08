@@ -1,8 +1,3 @@
-#include "SkeletonAsset.h"
-
-CLASS_IMPL(SkeletonMask);
-CLASS_IMPL(SkeletonMirror);
-
 
 
 // SKELETON BIN FORMAT

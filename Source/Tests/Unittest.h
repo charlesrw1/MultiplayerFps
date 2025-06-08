@@ -4,18 +4,17 @@
 #include <vector>
 #include <string>
 
-#define TEST_TRUE_COMMENT(code, comment) \
+#define checkTrueComment(code, comment) \
 	if(!(code)) { \
 		_CrtDbgBreak();	\
 		ProgramTester::get().set_test_failed(#code, comment); \
 		throw std::runtime_error("er"); \
 	}
 
-#define TEST_TRUE(code) \
-	TEST_TRUE_COMMENT(code, "expected true")
+#define checkTrue(code) \
+	checkTrueComment(code,"expected true")
 
-
-#define TEST_THROW(code) \
+#define checkThrow(code) \
 	try { \
 		code; \
 		ProgramTester::get().set_test_failed(#code, "expected exception"); \

@@ -26,21 +26,21 @@ public:
 			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW,
 				string_format("start_ed Prefab %s", file));
 		}
-		TEST_TRUE(ed_doc.get_is_open());
-		TEST_TRUE(eng_local.get_state() == Engine_State::Loading);
-		TEST_TRUE(ed_doc.get_doc_name() == file);
+		checkTrue(ed_doc.get_is_open());
+		checkTrue(eng_local.get_state() == Engine_State::Loading);
+		checkTrue(ed_doc.get_doc_name() == file);
 		eng_local.state_machine_update();
-		TEST_TRUE(eng_local.get_state() == Engine_State::Idle);
+		checkTrue(eng_local.get_state() == Engine_State::Idle);
 		g_assets.finish_all_jobs();
-		TEST_TRUE(eng_local.get_state() == Engine_State::Game);
-		TEST_TRUE(eng_local.get_level());
-		//TEST_TRUE(eng_local.get_level()->get_source_asset()->get_name() == file);
+		checkTrue(eng_local.get_state() == Engine_State::Game);
+		checkTrue(eng_local.get_level());
+		//checkTrue(eng_local.get_level()->get_source_asset()->get_name() == file);
 	}
 	void close_editor() {
 		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "close_ed");
-		TEST_TRUE(!ed_doc.get_is_open());
+		checkTrue(!ed_doc.get_is_open());
 		eng_local.state_machine_update();
-		TEST_TRUE(eng_local.get_state() == Engine_State::Idle);
+		checkTrue(eng_local.get_state() == Engine_State::Idle);
 	}
 	void add_command_and_execute(Command* c) {
 		ed_doc.command_mgr->add_command(c);
@@ -62,14 +62,14 @@ public:
 		add_command_and_execute(new CreateCppClassCommand("Entity", glm::mat4(1.f), EntityPtr(parented), false
 		));
 		auto& selection = ed_doc.selection_state;
-		TEST_TRUE(selection->has_only_one_selected());
+		checkTrue(selection->has_only_one_selected());
 		auto ent = selection->get_only_one_selected();
 		ent->set_editor_name(std::to_string(number++));
 		return selection->get_only_one_selected().get();
 	}
 	void parent_to(Entity* child, Entity* parent) {
 		add_command_and_execute(new ParentToCommand({ child }, parent, false, false));
-		TEST_TRUE(child->get_parent() == parent);
+		checkTrue(child->get_parent() == parent);
 	}
 	std::vector<EntityPtr> find_random_entities(Random& r, int min, int max) {
 		int count = r.RandI(min, max);
@@ -145,14 +145,14 @@ static void do_testing(EditorTestBench& bench, bool for_prefab = false)
 				}
 				auto ent = bench.create_entity(p);
 				if (!for_prefab) {
-					TEST_TRUE(ent->get_parent() == p);
+					checkTrue(ent->get_parent() == p);
 				}
 				else {
 					if (!p) {
-						TEST_TRUE(ent->get_parent());
+						checkTrue(ent->get_parent());
 					}
 					else {
-						TEST_TRUE(ent->get_parent() == p);
+						checkTrue(ent->get_parent() == p);
 					}
 				}
 				auto ptr = ent->get_self_ptr();
@@ -162,7 +162,7 @@ static void do_testing(EditorTestBench& bench, bool for_prefab = false)
 						self(self, true);
 
 					bench.undo();
-					TEST_TRUE(!ptr);
+					checkTrue(!ptr);
 				}
 			}
 		}
@@ -172,7 +172,7 @@ static void do_testing(EditorTestBench& bench, bool for_prefab = false)
 				auto ptr = p->get_self_ptr();
 				auto preparent = EntityPtr(ptr->get_parent());
 				bench.add_command_and_execute(new RemoveEntitiesCommand({ ptr }));
-				TEST_TRUE(!ptr.get() || (for_prefab && !preparent));
+				checkTrue(!ptr.get() || (for_prefab && !preparent));
 
 				if (do_undo) {
 
@@ -180,7 +180,7 @@ static void do_testing(EditorTestBench& bench, bool for_prefab = false)
 						self(self, true);
 
 					bench.undo();
-					TEST_TRUE(ptr && ptr->get_parent() == preparent.get());
+					checkTrue(ptr && ptr->get_parent() == preparent.get());
 				}
 			}
 		}
@@ -188,7 +188,7 @@ static void do_testing(EditorTestBench& bench, bool for_prefab = false)
 			//auto ents = bench.find_random_entities(r, 2, 10);
 			//bench.add_command_and_execute(new RemoveEntitiesCommand(ents));
 			//for (auto e : ents) {
-			//	TEST_TRUE(!e.get());
+			//	checkTrue(!e.get());
 			//}
 			//if (do_undo) {
 			//	bench.undo();
@@ -204,14 +204,14 @@ static void do_testing(EditorTestBench& bench, bool for_prefab = false)
 				auto pre_parent = p1->get_parent();
 				EntityPtr pre_parentptr(pre_parent);
 				bench.add_command_and_execute(new ParentToCommand({ p1 }, p2, false, false));
-				TEST_TRUE(p1->get_parent() == p2);
+				checkTrue(p1->get_parent() == p2);
 				if (do_undo) {
 					if (nest_iteration)
 						self(self, true);
 
 					bench.undo();
-					TEST_TRUE(p1ptr && p2ptr);
-					TEST_TRUE(p1ptr->get_parent() == pre_parentptr.get());
+					checkTrue(p1ptr && p2ptr);
+					checkTrue(p1ptr->get_parent() == pre_parentptr.get());
 				}
 			}
 		}
@@ -222,14 +222,14 @@ static void do_testing(EditorTestBench& bench, bool for_prefab = false)
 				auto pre_parent = p1->get_parent();
 				EntityPtr preparentptr(pre_parent);
 				bench.add_command_and_execute(new ParentToCommand({ p1 }, nullptr, true, false));
-				TEST_TRUE(p1->get_parent() || (for_prefab && !pre_parent));
+				checkTrue(p1->get_parent() || (for_prefab && !pre_parent));
 				if (do_undo) {
 
 					if (nest_iteration)
 						self(self, true);
 					bench.undo();
-					TEST_TRUE(p1ptr);
-					TEST_TRUE(p1ptr->get_parent() == preparentptr.get());
+					checkTrue(p1ptr);
+					checkTrue(p1ptr->get_parent() == preparentptr.get());
 				}
 			}
 		}
@@ -238,16 +238,16 @@ static void do_testing(EditorTestBench& bench, bool for_prefab = false)
 			if (p1 && p1->get_parent()) {
 				bench.add_command_and_execute(new ParentToCommand({ p1->get_parent() }, nullptr, false, true));
 				if (!for_prefab) {
-					TEST_TRUE(!p1->get_parent());
+					checkTrue(!p1->get_parent());
 				}
 				else {
-					TEST_TRUE(p1->get_parent());
+					checkTrue(p1->get_parent());
 				}
 				if (do_undo) {
 					if (nest_iteration)
 						self(self, true);
 					bench.undo();
-					TEST_TRUE(p1->get_parent());
+					checkTrue(p1->get_parent());
 				}
 			}
 		}
@@ -257,11 +257,11 @@ static void do_testing(EditorTestBench& bench, bool for_prefab = false)
 			if (p)
 				bench.add_command_and_execute(new DuplicateEntitiesCommand({ EntityPtr(p) }));
 			if (do_undo && p) {
-				TEST_TRUE(preptr);
+				checkTrue(preptr);
 				if (nest_iteration)
 					self(self, true);
 				bench.undo();
-				TEST_TRUE(preptr);
+				checkTrue(preptr);
 			}
 		}
 	};
@@ -287,28 +287,28 @@ ADD_TEST(le_command_testing)
 	{
 		bench.add_command_and_execute(new CreateCppClassCommand("Entity", glm::mat4(1.f), EntityPtr(), false
 		));
-		TEST_TRUE(selection->has_only_one_selected());
+		checkTrue(selection->has_only_one_selected());
 		auto ent = selection->get_only_one_selected();
 		Entity* e = ent.get();
-		TEST_TRUE(ent.get());
+		checkTrue(ent.get());
 		bench.add_command_and_execute(new CreateComponentCommand(ent.get(), &MeshComponent::StaticType));
-		TEST_TRUE(ent->get_components().size() == 1 && ent->get_components()[0]->is_a<MeshComponent>());
+		checkTrue(ent->get_components().size() == 1 && ent->get_components()[0]->is_a<MeshComponent>());
 		bench.undo();
-		TEST_TRUE(ent->get_components().empty());
+		checkTrue(ent->get_components().empty());
 		bench.undo();
-		TEST_TRUE(ent.get() == nullptr);
+		checkTrue(ent.get() == nullptr);
 
 	}
 	{
 		auto ent1 = bench.create_entity();
 		auto ent2 = bench.create_entity(ent1);
-		TEST_TRUE(ent2->get_parent() == ent1);
+		checkTrue(ent2->get_parent() == ent1);
 		bench.parent_to(ent1, ent2);
-		TEST_TRUE(ent1->get_parent() == ent2);
+		checkTrue(ent1->get_parent() == ent2);
 		bench.undo();
-		TEST_TRUE(ent2->get_parent() == ent1);
+		checkTrue(ent2->get_parent() == ent1);
 		bench.undo();
-		TEST_TRUE(ent1->get_children().size() == 0);
+		checkTrue(ent1->get_children().size() == 0);
 	}
 	do_testing(bench);
 }

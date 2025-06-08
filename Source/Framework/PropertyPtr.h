@@ -1,10 +1,11 @@
 #pragma once
 #include "ReflectionProp.h"
+#include "StructReflection.h"
 
 // encapsulates a specific instance of a property
 class PropertyPtr;
 struct PropertyInfo;
-class StructTypeInfo;
+
 class ArrayPropPtr
 {
 public:
@@ -14,61 +15,140 @@ public:
 	void resize_array(int newsize);
 	// iterate over the array
 	struct Iterator {
-		Iterator(const PropertyInfo* p, void* inst);
-		Iterator();
+		Iterator(ArrayPropPtr&);
 		bool operator!=(const Iterator& other);
 		Iterator& operator++();
 		PropertyPtr operator*();
 		void advance();
+		ArrayPropPtr& owner;
 		int index = 0;
-		const PropertyInfo* p;
-		void* inst;
 		int count = 0;
 	};
 	Iterator begin();
 	Iterator end();
 private:
+	void* get_ptr() {
+		return property->get_ptr(instance);
+	}
+	const PropertyInfo* get_array_template_property() {
+		return property->list_ptr->get_property();
+	}
 	const PropertyInfo* property = nullptr;
 	void* instance = nullptr;
 };
+struct Serializer;
 class StructPropPtr
 {
 public:
-	StructPropPtr(const StructTypeInfo* info, void* ptr);
+	StructPropPtr(const PropertyInfo* property, void* ptr);
 
 	template<typename T>
 	T* get_struct() const;
 	int get_num_properties() const;
+	void call_serialize(Serializer& s);
 
 	// iterate over properties of struct
 	struct Iterator {
-		Iterator(ClassBase* obj, bool only_seri);
+		Iterator(StructPropPtr&);
+		bool operator!=(const Iterator& other);
+		Iterator& operator++();
+		PropertyPtr operator*();
+		StructPropPtr& self;
+		int index = 0;
+	};
+	Iterator begin();
+	Iterator end();
+private:
+	const PropertyInfoList& properties() {
+		return *property->struct_type->properties;
+	}
+	void* get_ptr() {
+		return property->get_ptr(instance);
+	}
+	const PropertyInfo* property = nullptr;
+	void* instance = nullptr;
+};
+class ClassPropPtr
+{
+public:
+	ClassPropPtr(ClassBase* base)
+		: obj(base) {}
+
+	struct Iterator {
+		Iterator(ClassBase* obj);
 		Iterator();
 		bool operator!=(const Iterator& other);
 		Iterator& operator++();
 		PropertyPtr operator*();
 		void advance();
+
+		const ClassTypeInfo* info = nullptr;
+		int index = -1;
+		ClassBase* obj = nullptr;
 	};
 	Iterator begin();
 	Iterator end();
 private:
-	const PropertyInfo* property = nullptr;
-	void* instance = nullptr;
+	ClassBase* obj = nullptr;
 };
+
+class EnumPropPtr
+{
+public:
+	int32_t get_as_integer();
+	void set_from_integer(int32_t i);
+	const char* get_as_string();
+	void set_from_string(const char* str);
+};
+
 
 class PropertyPtr
 {
 public:
 	PropertyPtr(const PropertyInfo* property, void* inst)
 		: property(property), instance(inst) {}
+	const char* get_name() const {
+		return property->name;
+	}
+	bool is_an_array_property() const {
+		return *property->name == 0;	// empty name, property belongs to an array
+	}
+	core_type_id get_type() const { return property->type; }
+
 	bool is_array() const { return property->type == core_type_id::List;  }
-	bool is_struct() const { return property->type == core_type_id::ActualStruct; }
 	ArrayPropPtr as_array();
+
+	bool is_struct() const { return property->type == core_type_id::ActualStruct; }
 	StructPropPtr as_struct();
+
+	bool is_string() const;
+	std::string& as_string();
+
+	bool is_float() const;
+	float& as_float();
+
+	bool is_numeric() const;
+	int64_t get_integer_casted();
+	void set_integer_casted(int64_t i);
+
+	bool is_boolean() const;
+	bool& as_boolean();
+
+	bool is_enum() const;
+	EnumPropPtr as_enum();
 	//bool is_class() const;
-	//bool is_numeric() const;
-	//bool is_string() const;
+
+	
+	void* get_instance_ptr_unsafe() {
+		return instance;
+	}
+	const PropertyInfo* get_property_info() {
+		return property;
+	}
 private:
+	void* get_ptr() const {
+		return property->get_ptr(instance);
+	}
 	const PropertyInfo* property = nullptr;
 	void* instance = nullptr;
 };

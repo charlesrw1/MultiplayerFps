@@ -31,6 +31,8 @@
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
     <ClCompile Include="Source\Framework\JsonSerialization.cpp" />
     <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
+    <ClCompile Include="Source\Framework\SerializerJson.cpp" />
+    <ClCompile Include="Source\Framework\Serializer.cpp" />
     <ClCompile Include="Source\Framework\StringUtils.cpp" />
     <ClCompile Include="Source\LevelEditor\Commands.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
@@ -84,6 +86,8 @@
     <ClInclude Include="Source\Framework\PropertyPtr.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
     <ClInclude Include="Source\Framework\Serializer.h" />
+    <ClInclude Include="Source\Framework\SerializerJson.h" />
+    <ClInclude Include="Source\Framework\SerializerOldDict.h" />
     <ClInclude Include="Source\Framework\StringUtils.h" />
     <ClInclude Include="Source\Framework\StructReflection.h" />
     <ClInclude Include="Source\Framework\SysPrint.h" />
