@@ -1,6 +1,7 @@
 #pragma once
 #include "ReflectionProp.h"
 #include "StructReflection.h"
+#include <glm/gtc/quaternion.hpp>
 
 // encapsulates a specific instance of a property
 class PropertyPtr;
@@ -133,6 +134,15 @@ public:
 
 	bool is_boolean() const;
 	bool& as_boolean();
+
+	bool is_vec3() const;
+	glm::vec3& as_vec3();
+
+	bool is_vec2() const;
+	glm::vec2& as_vec2();
+
+	bool is_quat() const;
+	glm::quat& as_quat();
 
 	bool is_enum() const;
 	EnumPropPtr as_enum();

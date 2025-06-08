@@ -53,13 +53,11 @@ struct Serializer
 	void serialize_property(PropertyPtr ptr);
 	void serialize_property_ar(PropertyPtr ptr);
 
-	virtual void serialize_struct(const char* tag, const StructTypeInfo& info, void* ptr) {}
 	virtual void serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) {}
-	virtual void serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) {}
-	virtual void serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) {}
-	virtual void serialize_struct_ar(const StructTypeInfo& info, void* ptr) {}
 	virtual void serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) {}
+	virtual void serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) {}
 	virtual void serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr) {}
+	virtual void serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) {}
 	virtual void serialize_enum_ar(const EnumTypeInfo* info, int& i) {}
 	virtual void serialize_object_handle() {}
 
@@ -80,7 +78,9 @@ inline Serializer& Serializer::serialize_struct(const char* tag, T& t)
 template<typename T>
 inline Serializer& Serializer::serialize_class(const char* tag, T*& ptr)
 {
-	serialize_class(tag, T::StaticType, ptr);
+	ClassBase* p = ptr;
+	serialize_class(tag, T::StaticType, p);
+	ptr = (T*)p;
 	return *this;
 }
 

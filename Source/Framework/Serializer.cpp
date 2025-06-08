@@ -1,17 +1,5 @@
 #include "Serializer.h"
 
-class SerializerRoot
-{
-public:
-	std::unordered_map<std::string, ClassBase*> reference_table;
-
-
-	// holds references etc
-	// serialize object, gets added to table with its path
-	// also can get the exter references when finished. references that arent in the set
-};
-
-
 void Serializer::serialize_property_ar(PropertyPtr ptr)
 {
 	assert(ptr.is_an_array_property());
@@ -61,6 +49,15 @@ void Serializer::serialize_property_ar(PropertyPtr ptr)
 		case core_type_id::Float: {
 			float& f = ptr.as_float();
 			serialize_ar(f);
+		}break;
+		case core_type_id::Quat: {
+			serialize_ar(ptr.as_quat());
+		}break;
+		case core_type_id::Vec2: {
+			serialize_ar(ptr.as_vec2());
+		}break;
+		case core_type_id::Vec3: {
+			serialize_ar(ptr.as_vec3());
 		}break;
 
 		}
@@ -119,6 +116,15 @@ void Serializer::serialize_property(PropertyPtr ptr)
 		case core_type_id::Float: {
 			float& f = ptr.as_float();
 			serialize(ptr.get_name(), f);
+		}break;
+		case core_type_id::Quat: {
+			serialize(ptr.get_name(),ptr.as_quat());
+		}break;
+		case core_type_id::Vec2: {
+			serialize(ptr.get_name(),ptr.as_vec2());
+		}break;
+		case core_type_id::Vec3: {
+			serialize(ptr.get_name(),ptr.as_vec3());
 		}break;
 
 		}

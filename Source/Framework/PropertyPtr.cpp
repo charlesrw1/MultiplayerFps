@@ -200,3 +200,25 @@ EnumPropPtr PropertyPtr::as_enum()
 {
 	return EnumPropPtr();
 }
+
+bool PropertyPtr::is_vec3() const {
+	return core_type_id::Vec3 == get_type();
+}
+glm::vec3& PropertyPtr::as_vec3() {
+	assert(is_vec3());
+	return *(glm::vec3*)get_ptr();
+}
+bool PropertyPtr::is_vec2() const {
+	return core_type_id::Vec2 == get_type();
+}
+glm::vec2& PropertyPtr::as_vec2() {
+	assert(is_vec2());
+	return *(glm::vec2*)get_ptr();
+}
+bool PropertyPtr::is_quat() const {
+	return core_type_id::Quat == get_type();
+}
+glm::quat& PropertyPtr::as_quat() {
+	assert(is_quat());
+	return *(glm::quat*)get_ptr();
+}

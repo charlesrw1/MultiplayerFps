@@ -17,12 +17,39 @@ public:
 	virtual ClassBase* create_from_name(Serializer& s, const std::string& str) = 0;
 };
 
+
+class MakePathForGenericObj : public IMakePathForObject {
+public:
+	int uid_counter = 1;
+	std::unordered_map<ClassBase*, int> mapping;
+	std::string make_path(ClassBase* obj) final {
+		if (mapping.find(obj) != mapping.end())return std::to_string(mapping[obj]);
+		mapping[obj] = uid_counter++;
+		return std::to_string(uid_counter - 1);
+	}
+	std::string make_type_name(ClassBase* obj) final {
+		return obj->get_type().classname;
+	}
+	ClassBase* create_from_name(Serializer& s, const std::string& str) final {
+		return ClassBase::create_class<ClassBase>(str.c_str());
+	}
+};
+
 class WriteSerializerBackendJson : public Serializer
 {
 public:
-	WriteSerializerBackendJson() {
-		stack.push_back(&obj);
-	}
+	struct Object {
+		ClassBase* o = nullptr;
+		bool has_been_written = false;
+		bool is_from_sub_object = false;	// dont write out a new statement
+	};
+	std::unordered_map<std::string, Object> paths_to_objects;
+	std::vector<ClassBase*> write_queue;
+
+	void write_actual_class(ClassBase* o, const std::string& path);
+
+	WriteSerializerBackendJson(IMakePathForObject* pathmaker, ClassBase* obj_to_serialize);
+
 	JsonStack& get_back() {
 		return stack.back();
 	}
@@ -179,15 +206,16 @@ public:
 		return false;
 	}
 
-	void serialize_struct(const char* tag, const StructTypeInfo& info, void* ptr) final;
+
 	void serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
 	void serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
 	void serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) final;
-	void serialize_struct_ar(const StructTypeInfo& info, void* ptr) final;
+
 	void serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) final;
 	void serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr) final;
 	void serialize_enum_ar(const EnumTypeInfo* info, int& i) final;
 
+	IMakePathForObject* pathmaker = nullptr;
 	std::vector<JsonStack> stack;
 	nlohmann::json obj;
 };
@@ -196,10 +224,9 @@ public:
 class ReadSerializerBackendJson : public Serializer
 {
 public:
-	ReadSerializerBackendJson(const std::string& text) {
-		obj = nlohmann::json::parse(text);
-		stack.push_back(&obj);
-	}
+	std::unordered_map<std::string, ClassBase*> path_to_objs;
+
+	ReadSerializerBackendJson(const std::string& text, IMakePathForObject* pathmaker);
 
 	JsonStack& get_back() {
 		return stack.back();
@@ -376,6 +403,8 @@ public:
 		return true;
 	}
 
+	ClassBase* rootobj = nullptr;
+	IMakePathForObject* pathmaker = nullptr;
 	std::vector<JsonStack> stack;
 	nlohmann::json obj;
 };

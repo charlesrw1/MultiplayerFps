@@ -16,19 +16,7 @@ struct MyStruct
 
 	}
 };
-class ComponentWithStruct : public Component
-{
-public:
-	CLASS_BODY(ComponentWithStruct);
 
-	// Set your thing here
-	REF MyStruct things;
-	// Is it happening?
-	// Maybe it is.
-	REF bool is_happening = false;
-	// A list of all the things.
-	REF vector<MyStruct> list_of_things;
-};
 
 class CameraShake
 {
@@ -480,4 +468,27 @@ public:
 	REF bool bRunning = false;
 	REF float flMovex = 0.0;
 	REF float flMovey = 0.0;
+};
+#include "Framework/Serializer.h"
+class TopDownPlayer;
+class ComponentWithStruct : public Component
+{
+public:
+	CLASS_BODY(ComponentWithStruct);
+
+	void serialize(Serializer& s) {
+		s.serialize_class("player", player);
+		s.serialize_class("what", what);
+	}
+	TopDownPlayer* player = nullptr;
+	Entity* what = nullptr;
+
+	REF glm::vec3 target={};
+	// Set your thing here
+	REF MyStruct things;
+	// Is it happening?
+	// Maybe it is.
+	REF bool is_happening = false;
+	// A list of all the things.
+	REF vector<MyStruct> list_of_things;
 };

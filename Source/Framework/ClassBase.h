@@ -157,6 +157,7 @@ private:
 	int32_t end = 0;
 };
 
+struct Serializer;
 class ClassBase
 {
 public:
@@ -167,6 +168,7 @@ public:
 	}
 
 	virtual const ClassTypeInfo& get_type() const;
+	virtual void serialize(Serializer& s) {}	// override to add custom serialization functionality
 
 	// cast this class to type T, returns nullptr if failed
 	template<typename T>
