@@ -520,6 +520,7 @@
     <ClInclude Include="Source\Framework\BoolButton.h" />
     <ClInclude Include="Source\Framework\SerializerJson.h" />
     <ClInclude Include="Source\Framework\SerializerOldDict.h" />
+    <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -748,7 +749,6 @@
     <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
     <ClCompile Include="Source\Game\EntityTest.cpp" />
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
-    <ClCompile Include="Source\LevelSerialization\SerializationTests.cpp" />
     <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
     <ClCompile Include="Source\Game\Entities\TestEntity.cpp" />
     <ClCompile Include="Source\Game\LevelAssets.cpp" />
@@ -785,6 +785,7 @@
     <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
     <ClCompile Include="Source\Framework\Serializer.cpp" />
     <ClCompile Include="Source\Framework\SerializerJson.cpp" />
+    <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

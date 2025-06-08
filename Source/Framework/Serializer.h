@@ -37,30 +37,30 @@ struct Serializer
 	virtual void serialize_ar(std::string& s) = 0;
 
 	template<typename T>
-	Serializer& serialize_struct(const char* tag, T& t);
+	bool serialize_struct(const char* tag, T& t);
 	template<typename T>
-	Serializer& serialize_class(const char* tag, T*& ptr);	// owning
+	bool serialize_class(const char* tag, T*& ptr);	// owning
 	template<typename T>
-	Serializer& serialize_class_reference(const char* tag, T*& ptr);	// non owning
+	bool serialize_class_reference(const char* tag, T*& ptr);	// non owning
 	template<typename T>
-	Serializer& serialize_struct_ar(T& t);
+	void serialize_struct_ar(T& t);
 	template<typename T>
-	Serializer& serialize_class_ar(T*& ptr);	// owning
+	void serialize_class_ar(T*& ptr);	// owning
 	template<typename T>
-	Serializer& serialize_class_reference_ar(T*& ptr);	// non owning
+	void serialize_class_reference_ar(T*& ptr);	// non owning
 	
 	// Handles both loading and saving
 	void serialize_property(PropertyPtr ptr);
 	void serialize_property_ar(PropertyPtr ptr);
 
-	virtual void serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) {}
-	virtual void serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) {}
-	virtual void serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) {}
-	virtual void serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr) {}
-	virtual void serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) {}
-	virtual void serialize_enum_ar(const EnumTypeInfo* info, int& i) {}
-	virtual void serialize_object_handle() {}
-
+	virtual bool serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) = 0;
+	virtual void serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) = 0;
+	virtual bool serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) = 0;
+	virtual void serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr) = 0;
+	virtual bool serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) = 0;
+	virtual void serialize_enum_ar(const EnumTypeInfo* info, int& i) = 0;
+	//virtual bool serialize_object_handle() = 0;
+	//
 	virtual bool is_loading() = 0;
 	bool is_saving() { return !is_loading(); }
 };
@@ -69,44 +69,44 @@ struct Serializer
 class BaseUpdater;
 
 template<typename T>
-inline Serializer& Serializer::serialize_struct(const char* tag, T& t)
+inline bool Serializer::serialize_struct(const char* tag, T& t)
 {
-	serialize_struct(tag, T::StructType, &t);
-	return *this;
+	return serialize_struct(tag, T::StructType, &t);
 }
 
 template<typename T>
-inline Serializer& Serializer::serialize_class(const char* tag, T*& ptr)
+inline bool Serializer::serialize_class(const char* tag, T*& ptr)
 {
 	ClassBase* p = ptr;
-	serialize_class(tag, T::StaticType, p);
+	bool res = serialize_class(tag, T::StaticType, p);
 	ptr = (T*)p;
-	return *this;
+	return res;
 }
 
 template<typename T>
-inline Serializer& Serializer::serialize_class_reference(const char* tag, T*& ptr)
+inline bool Serializer::serialize_class_reference(const char* tag, T*& ptr)
 {
-	serialize_class_reference(tag, T::StaticType, ptr);
-	return *this;
+	ClassBase* p = ptr;
+	bool res =  serialize_class_reference(tag, T::StaticType, p);
+	ptr = (T*)p;
+	return res;
 }
 template<typename T>
-inline Serializer& Serializer::serialize_struct_ar(T& t)
+inline void Serializer::serialize_struct_ar(T& t)
 {
-	serialize_struct(T::StructType, &t);
-	return *this;
-}
-
-template<typename T>
-inline Serializer& Serializer::serialize_class_ar(T*& ptr)
-{
-	serialize_class(T::StaticType, ptr);
-	return *this;
+	serialize_struct_ar(T::StructType, &t);
 }
 
 template<typename T>
-inline Serializer& Serializer::serialize_class_reference_ar(T*& ptr)
+inline void Serializer::serialize_class_ar(T*& ptr)
 {
-	serialize_class_reference(T::StaticType, ptr);
-	return *this;
+	ClassBase* p = ptr;
+	serialize_class_ar(T::StaticType, p);
+	ptr = (T*)p;
+}
+
+template<typename T>
+inline void Serializer::serialize_class_reference_ar(T*& ptr)
+{
+	serialize_class_reference_ar(T::StaticType, ptr);
 }

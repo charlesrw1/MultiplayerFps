@@ -148,7 +148,6 @@ public:
 	EnumPropPtr as_enum();
 	//bool is_class() const;
 
-	
 	void* get_instance_ptr_unsafe() {
 		return instance;
 	}

@@ -109,7 +109,9 @@ bool SceneAsset::load_asset(IAssetLoadingInterface* load)
 	text = std::string(fileptr->size(), ' ');
 	fileptr->read((void*)text.data(), text.size());
 	try {
+		double start = GetTime();
 		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text, load,nullptr));
+		printf("level time: %f\n", GetTime() - start);
 	}
 	catch (int) {
 		sys_print(Error, "error loading SceneAsset %s\n", path.c_str());

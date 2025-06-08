@@ -23,6 +23,8 @@ public:
 	virtual void update() {}
 	virtual void end() {}
 
+	void serialize(Serializer& s);
+
 	void init_updater();
 	void shutdown_updater();
 	void set_ticking(bool shouldTick);

@@ -10,6 +10,17 @@ static bool vec_equals(const glm::vec3& v, glm::vec3 target)
 	return glm::abs(v.x - target.x) < ep && glm::abs(v.y - target.y) < ep && glm::abs(v.z - target.z) < ep;
 }
 
+ADD_TEST(diff_testing)
+{
+	using namespace nlohmann;
+	json a;
+	a["object"] = { 1,2,3,4 };
+	json b;
+	b["object"] = { 1,2 };
+	auto diff = JsonSerializerUtil::diff_json(a,b);
+	checkTrue((diff["object"] == std::vector<int>{1, 2}));
+}
+
 ADD_TEST(serializer)
 {
 	Entity e;
@@ -19,6 +30,8 @@ ADD_TEST(serializer)
 	thing.target = glm::vec3(3, 2, 1);
 	thing.what = &e;
 	TopDownPlayer obj;
+	e.add_component_from_unserialization(&obj);
+	e.add_component_from_unserialization(&thing);
 	thing.player = &obj;
 	checkTrue(obj.is_a<ClassBase>());
 	obj.using_third_person_movement = true;
@@ -27,7 +40,17 @@ ADD_TEST(serializer)
 	MakePathForGenericObj pathmaker;
 	WriteSerializerBackendJson backend(&pathmaker,&thing);
 
-	std::cout << backend.obj.dump(-1)<<'\n';
+	// test diffing
+	MakePathForGenericObj pathmaker2;
+	ComponentWithStruct default_thing;
+	WriteSerializerBackendJson backend2(&pathmaker2, &default_thing);
+	auto diff = JsonSerializerUtil::diff_json(backend2.obj["objs"]["1"], backend.obj["objs"]["1"]);
+	std::cout << "pre\n";
+	std::cout << backend.obj.dump(1) << '\n';
+
+	//backend.obj["objs"]["1"] = diff;
+	//std::cout << "post\n";
+	//std::cout << backend.obj.dump(-1)<<'\n';
 
 	ReadSerializerBackendJson read(backend.obj.dump(),&pathmaker);
 	

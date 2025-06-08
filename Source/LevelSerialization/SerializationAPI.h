@@ -97,6 +97,12 @@ bool am_i_the_root_prefab_node(const Entity* b, const PrefabAsset* for_prefab);
 std::string serialize_build_relative_path(const char* from, const char* to);
 std::string unserialize_relative_to_absolute(const char* relative,const char* root);
 std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for_prefab);
+const char* get_type_for_new_serialized_item(const BaseUpdater* b, PrefabAsset* for_prefab);
+bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAsset* for_prefab);
+bool serialize_this_objects_children(const Entity* b, const PrefabAsset* for_prefab);
+uint32_t parse_fileid(const std::string& path);
+Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, PrefabAsset* prefab, Entity* starting_root, IAssetLoadingInterface* load);
+
 
 // Passed down to serializers
 

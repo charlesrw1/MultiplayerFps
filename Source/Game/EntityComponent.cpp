@@ -6,6 +6,8 @@
 #include "GameEnginePublic.h"
 #include "Scripting/FunctionReflection.h"
 #include "Framework/ReflectionMacros.h"
+#include "Framework/Serializer.h"
+#include <stdexcept>
 
 #ifdef EDITOR_BUILD
 // create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
@@ -54,6 +56,17 @@ void Component::set_ticking(bool shouldTick)
 			level->remove_from_update_list(this);
 	}
 	tick_enabled = shouldTick;
+}
+void Component::serialize(Serializer& s)
+{
+	Entity* owner = get_owner();
+	s.serialize_class_reference<Entity>("owner", owner);
+	if (s.is_loading()) {
+		if (!owner)
+			throw std::runtime_error("Component without owner");
+		owner->add_component_from_unserialization(this);
+	}
+
 }
 void Component::init_updater()
 {

@@ -12,20 +12,24 @@ struct JsonStack {
 
 class IMakePathForObject {
 public:
-	virtual std::string make_path(ClassBase* obj)=0;	// unique file id along with prefab nesting
+
+	virtual std::string make_path(const ClassBase* toobj)=0;	// unique file id along with prefab nesting
 	virtual std::string make_type_name(ClassBase* obj) = 0;	// returns if prefab owner or not
 	virtual ClassBase* create_from_name(Serializer& s, const std::string& str) = 0;
+	virtual nlohmann::json* find_diff_for_obj(ClassBase* obj) = 0;
 };
 
 
 class MakePathForGenericObj : public IMakePathForObject {
 public:
 	int uid_counter = 1;
-	std::unordered_map<ClassBase*, int> mapping;
-	std::string make_path(ClassBase* obj) final {
-		if (mapping.find(obj) != mapping.end())return std::to_string(mapping[obj]);
-		mapping[obj] = uid_counter++;
-		return std::to_string(uid_counter - 1);
+	bool diff_available = false;
+	MakePathForGenericObj(bool diffable=true) : diff_available(diffable) {}
+	std::unordered_map<const ClassBase*, int> mapping;
+	std::string make_path(const ClassBase* toobj) final {
+		if (mapping.find(toobj) != mapping.end())return { std::to_string(mapping[toobj]) };
+		mapping[toobj] = uid_counter++;
+		return { std::to_string(uid_counter - 1) };
 	}
 	std::string make_type_name(ClassBase* obj) final {
 		return obj->get_type().classname;
@@ -33,6 +37,7 @@ public:
 	ClassBase* create_from_name(Serializer& s, const std::string& str) final {
 		return ClassBase::create_class<ClassBase>(str.c_str());
 	}
+	nlohmann::json* find_diff_for_obj(ClassBase* obj) final;
 };
 
 class WriteSerializerBackendJson : public Serializer
@@ -45,10 +50,15 @@ public:
 	};
 	std::unordered_map<std::string, Object> paths_to_objects;
 	std::vector<ClassBase*> write_queue;
+	ClassBase* currently_writing_class = nullptr;
 
 	void write_actual_class(ClassBase* o, const std::string& path);
 
 	WriteSerializerBackendJson(IMakePathForObject* pathmaker, ClassBase* obj_to_serialize);
+	nlohmann::json* get_root_object() {
+		std::string rootpath = obj["root"];
+		return &obj["objs"][rootpath];
+	}
 
 	JsonStack& get_back() {
 		return stack.back();
@@ -207,10 +217,9 @@ public:
 	}
 
 
-	void serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
-	void serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
-	void serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) final;
-
+	bool serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
+	bool serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
+	bool serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) final;
 	void serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) final;
 	void serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr) final;
 	void serialize_enum_ar(const EnumTypeInfo* info, int& i) final;
@@ -225,14 +234,19 @@ class ReadSerializerBackendJson : public Serializer
 {
 public:
 	std::unordered_map<std::string, ClassBase*> path_to_objs;
-
+	const std::string* current_root_path = nullptr;
 	ReadSerializerBackendJson(const std::string& text, IMakePathForObject* pathmaker);
 
 	JsonStack& get_back() {
 		return stack.back();
 	}
 
-	void serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
+	bool serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
+	bool serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
+	bool serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) final;
+	void serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) final;
+	void serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr) final;
+	void serialize_enum_ar(const EnumTypeInfo* info, int& i) final;
 
 	template<typename T>
 	void read_from_array(T& t) {
@@ -407,4 +421,11 @@ public:
 	IMakePathForObject* pathmaker = nullptr;
 	std::vector<JsonStack> stack;
 	nlohmann::json obj;
+};
+
+class JsonSerializerUtil
+{
+public:
+	// takes in 2 objects A,B, and returns the diff such that B = A + diff
+	static nlohmann::json diff_json(const nlohmann::json& a, const nlohmann::json& b);
 };

@@ -23,6 +23,8 @@
 #include "EntityPtrArrayMacro.h"
 #include "EntityPtrMacro.h"
 
+#include "Framework/Serializer.h"
+
 // create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
 #ifdef EDITOR_BUILD
 extern IEditorTool* g_editor_doc;	// EditorDocPublic.h
@@ -168,6 +170,15 @@ void Entity::remove_this(Entity* child)
 void Entity::destroy()
 {
 	eng->get_level()->destroy_entity(this);
+}
+
+void Entity::serialize(Serializer& s)
+{
+	Entity* myparent = get_parent();
+	bool hasparent = s.serialize_class_reference("parent", myparent);
+	if (s.is_loading() && hasparent && myparent) {
+		parent_to(myparent);
+	}
 }
 
 void Entity::destroy_internal()

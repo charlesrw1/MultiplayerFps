@@ -34,7 +34,7 @@ public:
 
 	// destroy already reflected in BaseUpdater
 	void destroy();
-
+	void serialize(Serializer& s) final;
 	template<typename T>
 	T* get_component() const {
 		return (T*)get_component_typeinfo(&T::StaticType);

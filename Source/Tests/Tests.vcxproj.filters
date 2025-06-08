@@ -36,6 +36,9 @@
     <ClCompile Include="serializer_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="serialize_new_testing.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Unittest.h">
@@ -45,6 +48,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="test_class.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="serialize_test_bench.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>

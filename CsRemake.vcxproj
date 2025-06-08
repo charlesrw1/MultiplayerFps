@@ -38,6 +38,7 @@
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
     <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp" />
+    <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
     <ClCompile Include="Source\Scripting\LuaBuiltinFuncs.cpp" />
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
     <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
@@ -110,6 +111,7 @@
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h" />
     <ClInclude Include="Source\LevelEditor\PropertyEditors.h" />
+    <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Source\Misc\PropTween.h" />
     <ClInclude Include="Source\Navigation\Navigation.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
@@ -353,7 +355,6 @@
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
-    <ClCompile Include="Source\LevelSerialization\SerializationTests.cpp" />
     <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
     <ClCompile Include="Source\LevelSerialization\Unserialize.cpp" />
     <ClCompile Include="Source\EngineMain.cpp" />

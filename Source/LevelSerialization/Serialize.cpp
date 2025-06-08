@@ -31,7 +31,8 @@ BaseUpdater* LevelSerializationContext::get_object(uint64_t handle)
 
 bool am_i_the_root_prefab_node(const Entity* b, const PrefabAsset* for_prefab)
 {
-	if (!for_prefab) return false;
+	if (!for_prefab) 
+		return false;
 	bool has_parent = b->get_parent();
 	return !has_parent || (b->is_root_of_prefab&&for_prefab==b->what_prefab);
 }

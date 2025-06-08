@@ -83,6 +83,8 @@ StructPropPtr::Iterator::Iterator(StructPropPtr& self):self(self)
 
 }
 bool StructPropPtr::Iterator::operator!=(const StructPropPtr::Iterator& other) {
+	if (!self.property->struct_type->properties)
+		return false;
 	return index < self.properties().count;
 }
 StructPropPtr::Iterator& StructPropPtr::Iterator::operator++() {

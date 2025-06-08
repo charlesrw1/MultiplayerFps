@@ -150,11 +150,13 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="script_test.cpp" />
     <ClCompile Include="serializer_tests.cpp" />
+    <ClCompile Include="serialize_new_testing.cpp" />
     <ClCompile Include="serialize_tests.cpp" />
     <ClCompile Include="string_util_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="object_outliner_filter.cpp" />
+    <ClInclude Include="serialize_test_bench.h" />
     <ClInclude Include="test_class.h" />
     <ClInclude Include="Unittest.h" />
   </ItemGroup>
