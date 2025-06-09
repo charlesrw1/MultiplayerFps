@@ -1,7 +1,13 @@
 #pragma once
 #include "Serializer.h"
 #include <json.hpp>
+#include <optional>	// just to try it out :)
 #include "glm/gtc/quaternion.hpp"
+
+using std::unordered_map;
+using std::string;
+template<typename T>
+using opt = std::optional<T>;
 
 struct JsonStack {
 	JsonStack(nlohmann::json* j) : ptr(j) {}
@@ -9,85 +15,61 @@ struct JsonStack {
 	int arr_idx = 0;
 };
 
-
+// The writer version
 class IMakePathForObject {
 public:
 
 	virtual std::string make_path(const ClassBase* toobj)=0;	// unique file id along with prefab nesting
 	virtual std::string make_type_name(ClassBase* obj) = 0;	// returns if prefab owner or not
-	virtual ClassBase* create_from_name(Serializer& s, const std::string& str) = 0;
 	virtual nlohmann::json* find_diff_for_obj(ClassBase* obj) = 0;
 };
-
+// The reader version
+class IMakeObjectFromPath {
+public:
+	virtual ClassBase* create_from_name(Serializer& s, const std::string& str) = 0;
+};
 
 class MakePathForGenericObj : public IMakePathForObject {
 public:
-	int uid_counter = 1;
-	bool diff_available = false;
-	MakePathForGenericObj(bool diffable=true) : diff_available(diffable) {}
-	std::unordered_map<const ClassBase*, int> mapping;
+	MakePathForGenericObj(bool diffable=true) 
+		: diff_available(diffable) {}
 	std::string make_path(const ClassBase* toobj) final {
-		if (mapping.find(toobj) != mapping.end())return { std::to_string(mapping[toobj]) };
-		mapping[toobj] = uid_counter++;
-		return { std::to_string(uid_counter - 1) };
+		return "x"+std::to_string(uintptr_t(toobj));
 	}
 	std::string make_type_name(ClassBase* obj) final {
 		return obj->get_type().classname;
 	}
+	nlohmann::json* find_diff_for_obj(ClassBase* obj) final;
+private:
+	bool diff_available = false;
+};
+class MakeObjectFromPathGeneric : public IMakeObjectFromPath {
+public:
 	ClassBase* create_from_name(Serializer& s, const std::string& str) final {
 		return ClassBase::create_class<ClassBase>(str.c_str());
 	}
-	nlohmann::json* find_diff_for_obj(ClassBase* obj) final;
 };
 
 class WriteSerializerBackendJson : public Serializer
 {
 public:
-	struct Object {
-		ClassBase* o = nullptr;
-		bool has_been_written = false;
-		bool is_from_sub_object = false;	// dont write out a new statement
-	};
-	std::unordered_map<std::string, Object> paths_to_objects;
-	std::vector<ClassBase*> write_queue;
-	ClassBase* currently_writing_class = nullptr;
+	WriteSerializerBackendJson(IMakePathForObject& pathmaker, ClassBase& obj_to_serialize);
 
-	void write_actual_class(ClassBase* o, const std::string& path);
-
-	WriteSerializerBackendJson(IMakePathForObject* pathmaker, ClassBase* obj_to_serialize);
 	nlohmann::json* get_root_object() {
+		nlohmann::json* objs = get_objects_object();
+		if (!objs) return nullptr;
+		if (!obj.contains("root")) return nullptr;
 		std::string rootpath = obj["root"];
-		return &obj["objs"][rootpath];
+		if (!objs->contains(rootpath)) return nullptr;
+		return &(*objs)[rootpath];
 	}
-
-	JsonStack& get_back() {
-		return stack.back();
+	nlohmann::json* get_objects_object() {
+		if (!obj.contains("objs")) return nullptr;
+		return &obj["objs"];
 	}
-	nlohmann::json& get_json(const char* tag) {
-		auto& back = get_back();
-		auto& backptr = *back.ptr;
-		backptr[tag] = nlohmann::json::array();
-		return backptr[tag];
+	nlohmann::json& get_output() {
+		return obj;
 	}
-	nlohmann::json& get_json_ar() {
-		auto& back = get_back();
-		auto& backptr = *back.ptr;
-		backptr[back.arr_idx] = nlohmann::json::array();
-		return backptr[back.arr_idx++];
-	}
-
-	template<typename T>
-	void write_to_array(T& t) {
-		JsonStack& s = get_back();
-		(*s.ptr)[s.arr_idx++] = t;
-	}
-	template<typename T>
-	bool write_to_dict(const char* tag, T& t) {
-		JsonStack& s = get_back();
-		(*s.ptr)[tag] = t;
-		return true;
-	}
-
 	void serialize_ar(bool& b) final {
 		write_to_array(b);
 	}
@@ -216,7 +198,6 @@ public:
 		return false;
 	}
 
-
 	bool serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
 	bool serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
 	bool serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) final;
@@ -226,44 +207,76 @@ public:
 	void serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr) final;
 	bool serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr) final;
 
-	IMakePathForObject* pathmaker = nullptr;
+private:
+	template<typename T>
+	void write_to_array(T& t) {
+		JsonStack& s = get_back();
+		(*s.ptr)[s.arr_idx++] = t;
+	}
+	template<typename T>
+	bool write_to_dict(const char* tag, T& t) {
+		JsonStack& s = get_back();
+		(*s.ptr)[tag] = t;
+		return true;
+	}
+	JsonStack& get_back() {
+		assert(!stack.empty());
+		return stack.back();
+	}
+	nlohmann::json& get_json(const char* tag) {
+		auto& back = get_back();
+		auto& backptr = *back.ptr;
+		backptr[tag] = nlohmann::json::array();
+		return backptr[tag];
+	}
+	nlohmann::json& get_json_ar() {
+		auto& back = get_back();
+		auto& backptr = *back.ptr;
+		backptr[back.arr_idx] = nlohmann::json::array();
+		return backptr[back.arr_idx++];
+	}
+
+	void serialize_class_shared(opt<const char*> tag, const ClassTypeInfo& info, ClassBase*& ptr, bool is_only_reference);
+	void write_actual_class(ClassBase* o, const std::string& path);
+
+	struct Object {
+		ClassBase* o = nullptr;
+		bool has_been_written = false;
+		bool is_from_sub_object = false;	// dont write out a new statement
+	};
+	std::unordered_map<std::string, Object> paths_to_objects;
+	std::vector<ClassBase*> write_queue;
+	ClassBase* currently_writing_class = nullptr;
+
+	IMakePathForObject& pathmaker;
 	std::vector<JsonStack> stack;
 	nlohmann::json obj;
 };
-
-using std::unordered_map;
-using std::string;
-#include <optional>
-
-template<typename T>
-using opt = std::optional<T>;
-
 
 class IAssetLoadingInterface;
 class ReadSerializerBackendJson : public Serializer
 {
 public:
+	ReadSerializerBackendJson(const std::string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader);
+	
 	unordered_map<string, ClassBase*> path_to_objs;
 	unordered_map<ClassBase*, string> obj_to_path;
 
-	opt<ClassBase*> find_object_for_path(const string& path) {
+	ClassBase* get_root_obj() {
+		return rootobj;
+	}
+
+	ClassBase* find_object_for_path(const string& path) {
 		auto find = path_to_objs.find(path);
 		if (find == path_to_objs.end())
-			return std::nullopt;
+			return nullptr;
 		return find->second;
 	}
-	opt<string> get_path_for_object(ClassBase* object) {
-		auto find = obj_to_path.find(object);
-		if(find==obj_to_path.end())
-			return std::nullopt;
-		return find->second;
-	}
-
-	const std::string* current_root_path = nullptr;
-	ReadSerializerBackendJson(const std::string& text, IMakePathForObject* pathmaker, IAssetLoadingInterface* loader);
-
-	JsonStack& get_back() {
-		return stack.back();
+	const string* get_path_for_object(ClassBase& object) {
+		auto find = obj_to_path.find(&object);
+		if (find == obj_to_path.end())
+			return nullptr;
+		return &find->second;
 	}
 
 	bool serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
@@ -274,25 +287,6 @@ public:
 	void serialize_enum_ar(const EnumTypeInfo* info, int& i) final;
 	void serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr) final;
 	bool serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr) final;
-
-
-	template<typename T>
-	void read_from_array(T& t) {
-		auto& back = get_back();
-		auto& backptr = *back.ptr;
-
-		t = backptr[back.arr_idx++];
-	}
-	template<typename T>
-	bool read_from_dict(const char* tag, T& t) {
-		auto& back = get_back();
-		auto& backptr = *back.ptr;
-		if (backptr.contains(tag)) {
-			t = backptr[tag];
-			return true;
-		}
-		return false;
-	}
 
 	void serialize_ar(bool& b) final {
 		read_from_array(b);
@@ -332,17 +326,6 @@ public:
 	}
 	bool serialize(const char* tag, int64_t& i) final {
 		return read_from_dict(tag, i);
-	}
-
-	nlohmann::json& get_json(const char* tag) {
-		auto& back = get_back();
-		auto& backptr = *back.ptr;
-		return backptr[tag];
-	}
-	nlohmann::json& get_json_ar() {
-		auto& back = get_back();
-		auto& backptr = *back.ptr;
-		return backptr[back.arr_idx++];
 	}
 
 	bool serialize(const char* tag, glm::vec3& v) final {
@@ -444,10 +427,44 @@ public:
 	bool is_loading() final {
 		return true;
 	}
+private:
+	nlohmann::json& get_json(const char* tag) {
+		auto& back = get_back();
+		auto& backptr = *back.ptr;
+		return backptr[tag];
+	}
+	nlohmann::json& get_json_ar() {
+		auto& back = get_back();
+		auto& backptr = *back.ptr;
+		return backptr[back.arr_idx++];
+	}
+	JsonStack& get_back() {
+		return stack.back();
+	}
+	template<typename T>
+	void read_from_array(T& t) {
+		auto& back = get_back();
+		auto& backptr = *back.ptr;
 
-	IAssetLoadingInterface* loader = nullptr;
+		t = backptr[back.arr_idx++];
+	}
+	template<typename T>
+	bool read_from_dict(const char* tag, T& t) {
+		auto& back = get_back();
+		auto& backptr = *back.ptr;
+		if (backptr.contains(tag)) {
+			t = backptr[tag];
+			return true;
+		}
+		return false;
+	}
+
+	bool serialize_class_shared(opt<const char*> tag, const ClassTypeInfo& info, ClassBase*& ptr, bool is_only_reference);
+
+	const std::string* current_root_path = nullptr;
+	IAssetLoadingInterface& loader;
 	ClassBase* rootobj = nullptr;
-	IMakePathForObject* pathmaker = nullptr;
+	IMakeObjectFromPath& objmaker;
 	std::vector<JsonStack> stack;
 	nlohmann::json obj;
 };

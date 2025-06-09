@@ -579,7 +579,11 @@ void PhysicsJointComponent::refresh_joint()
 		}
 	}
 	init_joint(self_physics, other/* can be nullptr */);
-	ASSERT(get_joint());
+
+	if (!get_joint()) {
+		sys_print(Error, "couldnt find joint\n");
+		//ASSERT(get_joint());
+	}
 }
 
 void PhysicsJointComponent::start()
