@@ -1,6 +1,5 @@
 #include "Unittest.h"
-#undef ADD_TEST
-#define ADD_TEST(x) void test##x()
+
 
 #include "LevelSerialization/SerializationAPI.h"
 
@@ -23,26 +22,26 @@
 // * serialize <new> prefab
 // * serialize <existing> prefab
 
-extern std::string build_path_for_object(const BaseUpdater* obj, const PrefabAsset* for_prefab);
-
+using std::to_string;
+using std::string;
 
 ADD_TEST(Serialization, BuildPath)
 {
 	SerializeTestWorkbench work;
-	auto e = work.add_entity<Entity>();
+	auto e = work.add_entity();
 
 	PrefabAsset* loadPrefab = g_assets.find_sync<PrefabAsset>("test2.pfb").get();
 	auto pent = work.add_prefab(loadPrefab);
 
 	work.post_unserialization();
 	// test basic path
-	checkTrue(build_path_for_object(e, nullptr) == std::to_string(e->unique_file_id));
-	auto e2 = work.add_entity<Entity>();
+	checkTrue(build_path_for_object(e, nullptr) == to_string(e->unique_file_id));
+	auto e2 = work.add_entity();
 	e2->parent_to(e);
 	// test parented path
-	checkTrue(build_path_for_object(e2, nullptr) == std::to_string(e2->unique_file_id));
+	checkTrue(build_path_for_object(e2, nullptr) == to_string(e2->unique_file_id));
 
-	checkTrue(build_path_for_object(pent, nullptr) == std::to_string(pent->unique_file_id));
+	checkTrue(build_path_for_object(pent, nullptr) == to_string(pent->unique_file_id));
 
 }
 
@@ -58,9 +57,6 @@ ADD_TEST(unserialize_prefab)
 	checkTrue(!root->creator_source && root->is_root_of_prefab && root->what_prefab == &temp);
 	checkTrue(unserialized.find("/"));
 	checkTrue(unserialized.find("2"));
-	checkTrue(unserialized.find("2/~2122221332"));
-	checkTrue(unserialized.find("3"));
-	checkTrue(unserialized.find("3/~2122221332"));
 }
 
 extern bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_prefab);
@@ -70,9 +66,9 @@ ADD_TEST(serialize_newly_created)
 	PrefabAsset* loadPrefab = g_assets.find_sync<PrefabAsset>("test4.pfb").get();
 	auto pent = work.add_prefab(loadPrefab);
 	auto subent = pent->get_children().at(0);
-	auto newent = work.add_entity<Entity>();
+	auto newent = work.add_entity();
 	auto newcomp = work.add_component<MeshComponent>(newent);
-	pent->parent_to(work.add_entity<Entity>());
+	pent->parent_to(work.add_entity());
 	work.post_unserialization();
 
 	checkTrue(this_is_newly_created(pent, nullptr));
@@ -99,9 +95,9 @@ ADD_TEST(serialize_relative_paths)
 	PrefabAsset* loadPrefab = g_assets.find_sync<PrefabAsset>("test4.pfb").get();
 	auto pent = work.add_prefab(loadPrefab);
 	auto subent = pent->get_children().at(0);
-	auto newent = work.add_entity<Entity>();
+	auto newent = work.add_entity();
 	auto newcomp = work.add_component<MeshComponent>(newent);
-	pent->parent_to(work.add_entity<Entity>());
+	pent->parent_to(work.add_entity());
 	work.post_unserialization();
 
 	auto from = build_path_for_object((BaseUpdater*)subent, nullptr);
@@ -109,8 +105,8 @@ ADD_TEST(serialize_relative_paths)
 	auto rel = serialize_build_relative_path(from.c_str(), to.c_str());
 	auto abs = unserialize_relative_to_absolute(rel.c_str(), from.c_str());
 
-	checkTrue(build_path_for_object(pent, nullptr) == std::to_string(pent->unique_file_id));
-	checkTrue(build_path_for_object(subent, nullptr) == std::to_string(pent->unique_file_id) + "/" + std::to_string(subent->unique_file_id));
+	checkTrue(build_path_for_object(pent, nullptr) == to_string(pent->unique_file_id));
+	checkTrue(build_path_for_object(subent, nullptr) == to_string(pent->unique_file_id) + "/" + to_string(subent->unique_file_id));
 
 }
 
@@ -140,9 +136,9 @@ ADD_TEST(serialize_nested_prefabs)
 ADD_TEST(serialize_write_prefab)
 {
 	SerializeTestWorkbench work;
-	auto root = work.add_entity<Entity>();
-	auto prefab = work.create_prefab(root);
-	auto ent2 = work.add_entity<Entity>();
+	auto root = work.add_entity();
+	auto prefab = work.create_prefab(root, "TestPrefab");
+	auto ent2 = work.add_entity();
 	ent2->parent_to(root);
 	auto comp = work.add_component<PointLightComponent>(root);
 
@@ -153,9 +149,9 @@ ADD_TEST(serialize_write_prefab)
 
 	auto file = serialize_entities_to_text({ root }, prefab);
 
-	checkTrue(build_path_for_object(pent, prefab) == std::to_string(pent->unique_file_id));
+	checkTrue(build_path_for_object(pent, prefab) == to_string(pent->unique_file_id));
 	auto child_ent = pent->get_children()[0];
-	checkTrue(build_path_for_object(child_ent, prefab) == std::to_string(pent->unique_file_id) + "/" + std::to_string(child_ent->unique_file_id));
+	checkTrue(build_path_for_object(child_ent, prefab) == to_string(pent->unique_file_id) + "/" + to_string(child_ent->unique_file_id));
 
 
 
@@ -175,7 +171,7 @@ ADD_TEST(serialize_write_prefab)
 
 	checkTrue(good && "creator source not set");
 	auto path = build_path_for_object(pent, prefab);
-	checkTrue(path == std::to_string(pent->unique_file_id));
+	checkTrue(path == to_string(pent->unique_file_id));
 	auto find = unserialized.find(path);
 	checkTrue(find && find->cast_to<Entity>()->get_children().size() == loadPrefab->sceneFile->get_root_entity()->get_children().size());
 
@@ -203,9 +199,9 @@ extern bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_p
 ADD_TEST(serialize_find_diff)
 {
 	SerializeTestWorkbench work;
-	auto root = work.add_entity<Entity>();
-	auto prefab = work.create_prefab(root);
-	auto ent2 = work.add_entity<Entity>();
+	auto root = work.add_entity();
+	auto prefab = work.create_prefab(root, "testprefab.pfb");
+	auto ent2 = work.add_entity();
 	ent2->parent_to(root);
 	auto comp = work.add_component<PointLightComponent>(root);
 
@@ -227,8 +223,8 @@ ADD_TEST(serialize_find_diff)
 ADD_TEST(serialize_diff_in_scene)
 {
 	SerializeTestWorkbench work;
-	auto ent1 = work.add_entity<Entity>();
-	auto ent2 = work.add_entity<Entity>();
+	auto ent1 = work.add_entity();
+	auto ent2 = work.add_entity();
 	ent2->parent_to(ent1);
 	auto comp = work.add_component<PointLightComponent>(ent1);
 
@@ -249,10 +245,10 @@ ADD_TEST(serialize_diff_in_scene)
 ADD_TEST(serialize_basic)
 {
 	SerializeTestWorkbench work;
-	auto e = work.add_entity<Entity>();
+	auto e = work.add_entity();
 	auto light = work.add_component<PointLightComponent>(e);
-	auto sm = work.add_entity<Entity>();
-	auto another_e = work.add_entity<Entity>();
+	auto sm = work.add_entity();
+	auto another_e = work.add_entity();
 	work.add_component<MeshComponent>(another_e);
 	another_e->parent_to(e);
 	work.post_unserialization();

@@ -52,7 +52,7 @@ public:
 	}
 	UnserializedSceneFile* out = nullptr;
 	IAssetLoadingInterface* load= nullptr;
-	PrefabAsset* for_prefab = nullptr;
+	IAsset* for_prefab = nullptr;
 };
 void SerializeEntitiesContainer::serialize(Serializer& s)
 {
@@ -65,22 +65,45 @@ void SerializeEntitiesContainer::serialize(Serializer& s)
 	}
 	s.end_obj();
 }
-static void set_object_vars(BaseUpdater* e, std::string path, Entity* opt_source_owner, PrefabAsset* opt_prefab) {
+static void set_object_vars(BaseUpdater* e, std::string path, Entity* opt_source_owner, IAsset* opt_prefab) {
 	e->unique_file_id = parse_fileid(path);
 	e->creator_source = opt_source_owner;
-	e->what_prefab = opt_prefab;
+	e->owner_asset = opt_prefab;
 }
+// level=multiple roots, prefab=single root
+// World
+//	Level0/
+//		Object
+//		Prefab
+//			Object
+//		
+//	Level1/
+//		
 
-UnserializedSceneFile NewSerialization::unserialize_from_text(const std::string& text, IAssetLoadingInterface* load, PrefabAsset* opt_source_prefab)
+using std::vector;
+UnserializedSceneFile NewSerialization::unserialize_from_text(const std::string& text, IAssetLoadingInterface* load, IAsset* opt_source_prefab)
 {
 	UnserializedSceneFile outfile;
 	MakePathForObjectNew pathmaker;
 	pathmaker.load = load;
 	pathmaker.out = &outfile;
 	pathmaker.for_prefab = opt_source_prefab;
-	ReadSerializerBackendJson writer(text, &pathmaker);
-	auto rootobj = writer.rootobj->cast_to<SerializeEntitiesContainer>();
-
+	ReadSerializerBackendJson reader(text, &pathmaker);
+	SerializeEntitiesContainer* rootobj = reader.rootobj->cast_to<SerializeEntitiesContainer>();
+	assert(rootobj);	//fixme
+	
+	vector<Entity*> roots;
+	for (auto obj : rootobj->objects) {
+		auto path = pathmaker.make_path(obj);
+		set_object_vars(obj, path, nullptr, opt_source_prefab);
+		outfile.get_objects().insert({ path,obj });
+		auto e = obj->cast_to<Entity>();
+		if (e&&!e->get_parent()) {
+			roots.push_back(e);
+		}
+	}
+	if (!roots.empty())
+		outfile.set_root_entity(roots[0]);
 	return outfile;
 }
 
@@ -100,30 +123,36 @@ void NewSerialization::add_objects_to_write(SerializeEntitiesContainer& con, Ent
 			add_objects_to_write(con,child,for_prefab);
 	}
 }
-extern std::vector<Entity*> root_objects_to_write(const std::vector<Entity*>& input_objs);
-void NewSerialization::add_objects_to_container(const std::vector<Entity*>& input_objs, SerializeEntitiesContainer& container, PrefabAsset* for_prefab)
+void NewSerialization::add_objects_to_container(const std::vector<Entity*>& input_objs, SerializeEntitiesContainer& container, PrefabAsset* for_prefab, SerializedSceneFile& output)
 {
 	auto roots = root_objects_to_write(input_objs);
-	for (auto r : roots)
+	for (auto r : roots) {
+		if (r->get_parent())
+			add_to_extern_parents(r, r->get_parent(), for_prefab, output);
 		add_objects_to_write(container, r, for_prefab);
+	}
 }
 #include <iostream>
 
-SerializedSceneFile NewSerialization::serialize_to_text(const std::vector<Entity*>& input_objs, PrefabAsset* opt_prefab)
+SerializedSceneFile NewSerialization::serialize_to_text(const std::vector<Entity*>& input_objs, IAsset* opt_prefab)
 {
 	double start = GetTime();
+	SerializedSceneFile out;
 	SerializeEntitiesContainer container;
 	MakePathForObjectNew pathmaker;
 	pathmaker.for_prefab = opt_prefab;
-	add_objects_to_container(input_objs, container, opt_prefab);
+	add_objects_to_container(input_objs, container, opt_prefab, out);
 	WriteSerializerBackendJson writer(&pathmaker,&container);
 	double end = GetTime();
 
-	SerializedSceneFile out;
 	out.text = writer.obj.dump(1);
-	//std::cout << out.text << '\n';
+	std::cout << out.text << '\n';
+	for (auto obj : container.objects) {
+		out.path_to_instance_handle.insert({ pathmaker.make_path(obj),obj->get_instance_id() });
+	}
 
-	NewSerialization::unserialize_from_text(out.text, nullptr, opt_prefab);
+	//NewSerialization::unserialize_from_text(out.text, nullptr, opt_prefab);
+
 	double end2 = GetTime();
 	printf("%f %f\n", (end - start), (end2 - end));
 	return out;

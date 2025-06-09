@@ -92,6 +92,7 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 
 
 // helper utils for editor
+void add_to_extern_parents(const BaseUpdater* obj, const BaseUpdater* parent, const PrefabAsset* for_prefab, SerializedSceneFile& output);
 bool this_is_newly_created(const BaseUpdater* b, const PrefabAsset* for_prefab);
 bool am_i_the_root_prefab_node(const Entity* b, const PrefabAsset* for_prefab);
 std::string serialize_build_relative_path(const char* from, const char* to);
@@ -102,6 +103,26 @@ bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAsset* for
 bool serialize_this_objects_children(const Entity* b, const PrefabAsset* for_prefab);
 uint32_t parse_fileid(const std::string& path);
 Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath, PrefabAsset* prefab, Entity* starting_root, IAssetLoadingInterface* load);
+std::vector<Entity*> root_objects_to_write(const std::vector<Entity*>& input_objs);
+using std::vector;
+using std::string;
+class IAsset;
+
+class PrefabToolsUtil {
+public:
+	static bool is_this_the_root_of_the_prefab(const Entity* e);
+	static Entity* find_root_of_this_prefab(Entity* e);
+	static bool is_part_of_a_prefab(const BaseUpdater* e);
+
+	static bool am_i_the_root_prefab_node_for_this_prefab(const Entity* b, const PrefabAsset* for_prefab);
+	static bool this_is_created_by(const BaseUpdater* b, const IAsset* for_asset);
+	static PrefabAsset* get_prefab_of_object(const BaseUpdater* e);
+	static bool is_set_of_objects_valid(const vector<BaseUpdater*>& objs);
+
+	static bool serialize_this_objects_children(const Entity* b, const IAsset* for_asset);
+
+	static const Entity* get_outermost_entity(const Entity* e, const IAsset* editing);
+};
 
 
 // Passed down to serializers

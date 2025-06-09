@@ -177,12 +177,13 @@ ADD_TEST(assets)
 }
 
 
-
+#include "Assets/AssetDatabase.h"
 
 int main(int argc, char**argv)
 {
 	FileSys::init();
 	ClassBase::init_class_reflection_system();
+	g_assets.init();
 
 	return !ProgramTester::get().run_all(true);
 }

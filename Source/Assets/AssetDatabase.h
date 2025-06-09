@@ -25,6 +25,8 @@ public:
 	static IAssetLoadingInterface* loader;
 
 	void init();
+	void reset_testing();
+
 	// update any async resource requests that have finished, executes callbacks, calls post_load (ie to upload GPU resources)
 	void tick_asyncs();	
 	// wait for everything to finish, then tick_async

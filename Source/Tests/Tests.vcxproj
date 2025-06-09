@@ -152,6 +152,7 @@
     <ClCompile Include="serializer_tests.cpp" />
     <ClCompile Include="serialize_new_testing.cpp" />
     <ClCompile Include="serialize_tests.cpp" />
+    <ClCompile Include="serialize_test_bench.cpp" />
     <ClCompile Include="string_util_test.cpp" />
   </ItemGroup>
   <ItemGroup>

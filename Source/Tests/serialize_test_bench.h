@@ -1,27 +1,30 @@
 #include "Game/Entity.h"
 #include "Game/EntityComponent.h"
 #include "Game/LevelAssets.h"
+#include "LevelSerialization/SerializationAPI.h"
+using std::string;
+using std::unordered_map;
+using std::vector;
+using std::unordered_set;
+
+class MapUtil
+{
+public:
+	template<typename T,typename K>
+	static bool contains(const unordered_map<K, T>&, const K& key);
+};
+
+
+class SerializeTestUtil
+{
+public:
+	static bool do_properties_equal(ClassBase* base1, ClassBase* base2);
+};
 
 class SerializeTestWorkbench
 {
 public:
-	~SerializeTestWorkbench() {
-		//
-		for (auto e : all) {
-			e->init_state = BaseUpdater::initialization_state::CONSTRUCTOR;
-			if (auto ent = e->cast_to<Entity>())
-				ent->all_components.clear();
-			delete e;
-		}
-	}
-
-	template<typename T>
-	T* add_entity() {
-		Entity* e = (Entity*)T::StaticType.allocate();
-		e->unique_file_id = ++file_id;
-		post_unserialization_R(e);
-		return (T*)e;
-	}
+	~SerializeTestWorkbench();
 
 	template<typename T>
 	T* add_component(Entity* e) {
@@ -32,56 +35,22 @@ public:
 		return (T*)ec;
 	}
 
-	Entity* add_prefab(PrefabAsset* asset) {
-		auto unserialized_scene = unserialize_entities_from_text(asset->text, nullptr, asset);
-		unserialized_scene.get_root_entity()->is_root_of_prefab = true;
-		unserialized_scene.get_root_entity()->unique_file_id = ++file_id;
-		post_unserialization_R(unserialized_scene.get_root_entity());
-		return unserialized_scene.get_root_entity();
-	}
-
-	PrefabAsset* create_prefab(Entity* root) {
-		PrefabAsset* pa = new PrefabAsset;
-		prefabs.insert(pa);
-		root->is_root_of_prefab = true;
-		root->what_prefab = pa;
-		return pa;
-	}
-
-	void post_unserialization_R(Entity* e)
-	{
-		all.insert(e);
-
-		for (int i = 0; i < e->all_components.size(); i++) {
-			auto& c = e->all_components[i];
-			ASSERT(c->get_instance_id() == 0);
-			all.insert(c);
-		}
-
-		for (auto child : e->get_children())
-			post_unserialization_R(child);
-	}
-	void post_unserialization() {
-		for (auto a : all)
-			a->post_unserialization(get_next_id_and_increment());
-	}
+	Entity* add_entity();
+	Entity* add_prefab(PrefabAsset* asset);
+	PrefabAsset* create_prefab(Entity* root, string name);
+	PrefabAsset* load_prefab(string s);
+	void post_unserialization_R(Entity* e);
+	void post_unserialization();
+	vector<Entity*> get_all_entities();
+	uint64_t get_next_id_and_increment();
 
 	uint32_t file_id = 0;
 	uint64_t handle_start = 0;
-	std::unordered_set<BaseUpdater*> all;
-	std::unordered_set<PrefabAsset*> prefabs;
-
-	std::vector<Entity*> get_all_entities() {
-		std::vector<Entity*> out;
-		for (auto e : all) {
-			if (e->is_a<Entity>())
-				out.push_back((Entity*)e);
-		}
-		return out;
-	}
-
-	uint64_t get_next_id_and_increment()
-	{
-		return ++handle_start;
-	}
+	unordered_set<BaseUpdater*> all;
 };
+
+template<typename T, typename K>
+inline bool MapUtil::contains(const unordered_map<K, T>& map, const K& key)
+{
+	return map.find(key)!=map.end();
+}

@@ -84,6 +84,7 @@ public:
 	void combine_asset_tables(unordered_map<string, IAsset*>& table);
 	uptr<AsyncQueuedJob> pop_finished_job();
 	void finish_all_jobs();
+	bool is_in_reset_state();
 private:
 	void loader_loop();
 	void execute_job(AsyncQueuedJob* job);
@@ -142,6 +143,12 @@ private:
 
 	friend class SubAssetLoadingInterface;
 };
+bool AssetBackend::is_in_reset_state()
+{
+	std::lock_guard<std::mutex> l(job_mutex);
+	return jobs.empty() && finished_jobs.empty() && local_asset_loads.empty();
+}
+
 IAsset* SubAssetLoadingInterface::load_asset(const ClassTypeInfo* type, string path)
 {
 	return backend.find_or_create_and_load_asset(path, type, false,whatjob);
@@ -392,6 +399,20 @@ public:
 	}
 	~AssetDatabaseImpl() {
 
+	}
+
+	void reset_testing() {
+		finish_all_jobs();
+		tick_asyncs_standard();
+		assert(backend.is_in_reset_state());
+		for (auto& a : allAssets) {
+			a.second->uninstall();
+			delete a.second;
+		}
+		allAssets.clear();
+
+		assert(allAssets.empty());
+		assert(backend.is_in_reset_state());
 	}
 
 	void install_system_direct(IAsset* asset, const std::string& name) {
@@ -704,6 +725,10 @@ void AssetDatabase::init() {
 	// init the loader thread
 	impl = std::make_unique<AssetDatabaseImpl>();
 	AssetDatabase::loader = new PrimaryAssetLoadingInterface(*impl);
+}
+void AssetDatabase::reset_testing()
+{
+	impl->reset_testing();
 }
 void AssetDatabase::finish_all_jobs()
 {

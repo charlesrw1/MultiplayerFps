@@ -15,6 +15,7 @@
 class GcMarkingInterface;
 class IAssetLoadingInterface;
 class PrimaryAssetLoadingInterface;
+class TestAssetLoadingInterface;
 class IAsset : public ClassBase {
 public:
 	CLASS_BODY(IAsset);
@@ -120,4 +121,5 @@ private:
 	friend class AssetRegistrySystem;
 	friend class GcMarkingInterface;
 	friend class PrimaryAssetLoadingInterface;
+	friend class TestAssetLoadingInterface;
 };
