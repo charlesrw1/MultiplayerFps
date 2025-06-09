@@ -20,7 +20,6 @@ void UnserializedSceneFile::delete_objs()
 	for (auto& o : all_objs)
 		delete o.second;
 	all_objs.clear();
-	objs_with_extern_references.clear();
 }
 
 BaseUpdater* UnserializedSceneFile::find(const std::string& path)

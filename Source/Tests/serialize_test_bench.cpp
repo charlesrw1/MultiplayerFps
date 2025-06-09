@@ -86,8 +86,8 @@ bool SerializeTestUtil::do_properties_equal(ClassBase* base1, ClassBase* base2)
 	if (&base1->get_type() != &base2->get_type())
 		return false;
 	MakePathForGenericObj pathmaker;
-	WriteSerializerBackendJson write1(&pathmaker,base1);
-	WriteSerializerBackendJson write2(&pathmaker,base2);
+	WriteSerializerBackendJson write1(pathmaker,*base1);
+	WriteSerializerBackendJson write2(pathmaker,*base2);
 	if (!write1.get_root_object() || !write2.get_root_object())
 		return false;
 	bool is_eq = *write1.get_root_object() == *write2.get_root_object();

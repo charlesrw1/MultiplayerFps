@@ -1,12 +1,13 @@
 #pragma once
 #include "SerializationAPI.h"
+#include <unordered_set>
+
 class SerializeEntitiesContainer : public ClassBase
 {
 public:
 	CLASS_BODY(SerializeEntitiesContainer);
 	void serialize(Serializer& s);
-	std::vector<BaseUpdater*> objects;
-	std::vector<BaseUpdater*> roots;
+	std::unordered_set<BaseUpdater*> objects;
 };
 class NewSerialization
 {

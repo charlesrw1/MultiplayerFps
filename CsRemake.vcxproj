@@ -29,7 +29,6 @@
   <ItemGroup>
     <ClCompile Include="Source\EditorPopups.cpp" />
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
-    <ClCompile Include="Source\Framework\JsonSerialization.cpp" />
     <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
     <ClCompile Include="Source\Framework\SerializerJson.cpp" />
     <ClCompile Include="Source\Framework\Serializer.cpp" />
@@ -80,10 +79,13 @@
     <ClInclude Include="Source\Assets\IAsset.h" />
     <ClInclude Include="Source\EditorPopups.h" />
     <ClInclude Include="Source\EditorPopupTemplate.h" />
+    <ClInclude Include="Source\Framework\ArenaAllocator.h" />
+    <ClInclude Include="Source\Framework\ArenaStd.h" />
     <ClInclude Include="Source\Framework\BoolButton.h" />
     <ClInclude Include="Source\Framework\ConsoleCmdGroup.h" />
     <ClInclude Include="Source\Framework\FnFactory.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
+    <ClInclude Include="Source\Framework\MapUtil.h" />
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
     <ClInclude Include="Source\Framework\PropertyPtr.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
@@ -113,6 +115,7 @@
     <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h" />
     <ClInclude Include="Source\LevelEditor\PropertyEditors.h" />
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
+    <ClInclude Include="Source\LevelSerialization\SerializeNewMakers.h" />
     <ClInclude Include="Source\Misc\PropTween.h" />
     <ClInclude Include="Source\Navigation\Navigation.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />

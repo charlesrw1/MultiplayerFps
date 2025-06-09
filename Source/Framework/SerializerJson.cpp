@@ -1,5 +1,6 @@
 #include "SerializerJson.h"
 #include "Assets/IAsset.h"
+#include "Framework/MapUtil.h"
 
 const char* const CLASSNAME = "classname";
 
@@ -42,8 +43,10 @@ void WriteSerializerBackendJson::serialize_class_shared(opt<const char*> tag, co
 	if(!is_only_reference)
 		write_queue.push_back(ptr);
 
-	paths_to_objects[path].o = ptr;
-	paths_to_objects[path].is_from_sub_object = is_path_a_subpath(path);
+	if (!MapUtil::contains(paths_to_objects, path)) {
+		paths_to_objects[path].o = ptr;
+		paths_to_objects[path].is_from_sub_object = is_path_a_subpath(path);
+	}
 }
 
 void WriteSerializerBackendJson::write_actual_class(ClassBase* ptr, const std::string& path)
@@ -79,8 +82,8 @@ WriteSerializerBackendJson::WriteSerializerBackendJson(IMakePathForObject& pathm
 	while (!write_queue.empty()) {
 		ClassBase* obj = write_queue.back();
 		write_queue.pop_back();
-		auto path = pathmaker.make_path(obj);
-		assert(paths_to_objects.find(path) != paths_to_objects.end());
+		const string path = pathmaker.make_path(obj);
+		assert(MapUtil::contains(paths_to_objects, path));
 
 		if(!paths_to_objects.find(path)->second.has_been_written)
 			write_actual_class(obj,path);
@@ -164,14 +167,20 @@ ReadSerializerBackendJson::ReadSerializerBackendJson(const std::string& text, IM
 		for (int i = 0; i < sz; i++) {
 			int count = 0;
 			serialize_array_ar(count);
-			assert(count == 2);//fixme
-			std::string path;
-			std::string type;
+			if (count != 2) {
+				printf("count != 2 in paths json serialize\n");
+				continue;
+			}
+			string path;
+			string type;
 			serialize_ar(path);
 			serialize_ar(type);
-			auto obj = objmaker.create_from_name(*this, type);
-			path_to_objs.insert({ path,obj });
-			obj_to_path.insert({ obj,path });
+			ClassBase* obj = objmaker.create_from_name(*this, type);
+			
+			MapUtil::insert_test_exists(path_to_objs, path, obj);
+			if (obj)
+				MapUtil::insert_test_exists(obj_to_path, obj, path);
+
 			end_obj();
 		}
 		end_obj();
@@ -270,9 +279,11 @@ bool ReadSerializerBackendJson::serialize_class_shared(opt<const char*> tag, con
 	else
 		path = relativepath;
 
-	auto find = path_to_objs.find(path);
-	if (find != path_to_objs.end())
-		ptr = find->second;
+	//auto find = path_to_objs.find(path);
+	//if (find != path_to_objs.end())
+	//	ptr = find->second;
+
+	ptr = MapUtil::get_or_null(path_to_objs, path);
 
 	return true;
 

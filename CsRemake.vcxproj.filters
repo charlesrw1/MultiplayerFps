@@ -521,6 +521,10 @@
     <ClInclude Include="Source\Framework\SerializerJson.h" />
     <ClInclude Include="Source\Framework\SerializerOldDict.h" />
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
+    <ClInclude Include="Source\Framework\MapUtil.h" />
+    <ClInclude Include="Source\LevelSerialization\SerializeNewMakers.h" />
+    <ClInclude Include="Source\Framework\ArenaAllocator.h" />
+    <ClInclude Include="Source\Framework\ArenaStd.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -778,7 +782,6 @@
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
     <ClCompile Include="Source\Framework\StringUtils.cpp" />
     <ClCompile Include="Source\Scripting\LuaBuiltinFuncs.cpp" />
-    <ClCompile Include="Source\Framework\JsonSerialization.cpp" />
     <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
     <ClCompile Include="Source\Framework\Serializer.cpp" />
     <ClCompile Include="Source\Framework\SerializerJson.cpp" />

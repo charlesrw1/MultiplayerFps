@@ -29,7 +29,7 @@ static void set_from_prefab_recursive(Entity* e, PrefabAsset* asset)
 		set_from_prefab_recursive(child, asset);
 }
 
-static bool check_file_ids(vector<BaseUpdater*>& inobjs) {
+static bool check_file_ids(unordered_set<BaseUpdater*>& inobjs) {
 	unordered_set<int> fileids;
 	for (auto o : inobjs) {
 		if (fileids.find(o->unique_file_id) != fileids.end())

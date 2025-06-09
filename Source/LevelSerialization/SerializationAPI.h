@@ -18,7 +18,6 @@ public:
 	~UnserializedSceneFile() = default;
 	UnserializedSceneFile(UnserializedSceneFile&& other) {
 		all_objs = std::move(other.all_objs);
-		objs_with_extern_references = std::move(other.objs_with_extern_references);
 		root_entity = other.root_entity;
 	}
 	UnserializedSceneFile& operator=(const UnserializedSceneFile&) = delete;
@@ -38,9 +37,6 @@ public:
 	void set_root_entity(Entity* root) {
 		root_entity = root;
 	}
-	void add_entityptr_refer(BaseUpdater* ptr) {
-		objs_with_extern_references.insert(ptr);
-	}
 
 	void unserialize_post_assign_ids();
 
@@ -49,7 +45,6 @@ private:
 
 	Entity* root_entity = nullptr;
 	std::unordered_map<std::string, BaseUpdater*> all_objs;	// fileID/.../fileID -> entity/component
-	std::unordered_set<BaseUpdater*> objs_with_extern_references;
 	friend class Level;
 };
 

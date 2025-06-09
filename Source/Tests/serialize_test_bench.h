@@ -2,17 +2,14 @@
 #include "Game/EntityComponent.h"
 #include "Game/LevelAssets.h"
 #include "LevelSerialization/SerializationAPI.h"
+#include "Framework/MapUtil.h"
+
 using std::string;
 using std::unordered_map;
 using std::vector;
 using std::unordered_set;
 
-class MapUtil
-{
-public:
-	template<typename T,typename K>
-	static bool contains(const unordered_map<K, T>&, const K& key);
-};
+
 
 
 class SerializeTestUtil
@@ -48,9 +45,3 @@ public:
 	uint64_t handle_start = 0;
 	unordered_set<BaseUpdater*> all;
 };
-
-template<typename T, typename K>
-inline bool MapUtil::contains(const unordered_map<K, T>& map, const K& key)
-{
-	return map.find(key)!=map.end();
-}

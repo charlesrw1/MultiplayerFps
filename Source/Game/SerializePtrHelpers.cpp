@@ -118,7 +118,7 @@ class SerializeEntityPtr : public IPropertySerializer
 			assert(find->is_a<BaseUpdater>());
 			*p = reinterpret_cast<uint64_t>(find);	// to get fixed up later
 
-			ctx->in->add_entityptr_refer((BaseUpdater*)ctx->cur_obj);
+			//ctx->in->add_entityptr_refer((BaseUpdater*)ctx->cur_obj);
 		}
 	}
 };
