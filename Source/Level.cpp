@@ -281,16 +281,28 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 			auto ent = o.second;
 			if (Entity* e = ent->cast_to<Entity>())
 				e->initialize_internal(); // just sets init_state => CALLED_START
-			else if (Component* ec = ent->cast_to<Component>())
-				ec->initialize_internal_step1();
+			else if (Component* ec = ent->cast_to<Component>()) {
+				if (!ec->get_owner()) {
+					sys_print(Error, "component witout owner");
+					ASSERT(ec->get_instance_id() != 0);
+					all_world_ents.remove(ec->get_instance_id());
+					delete ec;
+					objs[o.first] = nullptr;
+				}
+				else {
+					ec->initialize_internal_step1();
+				}
+			}
 			else
 				ASSERT(0);
 		}
 
 		for (auto& o : objs) {
-			auto ent = o.second;
-			if (Component* ec = ent->cast_to<Component>())
-				ec->initialize_internal_step2();
+			if (o.second) {
+				auto ent = o.second;
+				if (Component* ec = ent->cast_to<Component>())
+					ec->initialize_internal_step2();
+			}
 		}
 	}
 }

@@ -477,6 +477,7 @@ public:
 	CLASS_BODY(ComponentWithStruct);
 
 	void serialize(Serializer& s) {
+		Component::serialize(s);
 		s.serialize_class("player", player);
 		s.serialize_class("what", what);
 	}

@@ -62,9 +62,11 @@ void Component::serialize(Serializer& s)
 	Entity* owner = get_owner();
 	s.serialize_class_reference<Entity>("owner", owner);
 	if (s.is_loading()) {
-		if (!owner)
-			throw std::runtime_error("Component without owner");
-		owner->add_component_from_unserialization(this);
+		if (owner) {
+			//throw std::runtime_error("Component without owner");
+			owner->add_component_from_unserialization(this);
+			assert(this->entity_owner == owner);
+		}
 	}
 
 }

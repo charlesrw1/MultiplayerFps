@@ -604,9 +604,6 @@
     <ClCompile Include="Source\Physics\Physics2Local.cpp">
       <Filter>Source\Physics</Filter>
     </ClCompile>
-    <ClCompile Include="Source\LevelEditor\EditorDoc.cpp">
-      <Filter>Source\LevelEditor</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Framework\PersistentlyMappedBuffer.cpp">
       <Filter>Source\Framework\Render</Filter>
     </ClCompile>

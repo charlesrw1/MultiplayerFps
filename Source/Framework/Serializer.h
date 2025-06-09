@@ -2,7 +2,7 @@
 #include "StructReflection.h"
 #include <glm/glm.hpp>
 #include "PropertyPtr.h"
-
+class IAsset;
 struct Serializer
 {
 	STRUCT_BODY();
@@ -60,7 +60,10 @@ struct Serializer
 	virtual bool serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) = 0;
 	virtual void serialize_enum_ar(const EnumTypeInfo* info, int& i) = 0;
 	//virtual bool serialize_object_handle() = 0;
-	//
+	virtual bool serialize_asset(const char* tag, const ClassTypeInfo& type, IAsset*& ptr) = 0;
+	virtual void serialize_asset_ar(const ClassTypeInfo& type, IAsset*& ptr) = 0;
+
+
 	virtual bool is_loading() = 0;
 	bool is_saving() { return !is_loading(); }
 };
@@ -108,5 +111,7 @@ inline void Serializer::serialize_class_ar(T*& ptr)
 template<typename T>
 inline void Serializer::serialize_class_reference_ar(T*& ptr)
 {
-	serialize_class_reference_ar(T::StaticType, ptr);
+	ClassBase* p = ptr;
+	serialize_class_reference_ar(T::StaticType, p);
+	ptr = (T*)p;
 }

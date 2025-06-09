@@ -302,7 +302,6 @@
     <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
     <ClCompile Include="Source\Game\TP\TPGame.cpp" />
     <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
-    <ClCompile Include="Source\LevelEditor\EditorDoc.cpp" />
     <ClCompile Include="Source\External\glad.c" />
     <ClCompile Include="Source\External\imgui.cpp" />
     <ClCompile Include="Source\External\ImGuizmo.cpp" />

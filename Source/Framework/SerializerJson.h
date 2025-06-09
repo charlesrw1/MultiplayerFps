@@ -223,19 +223,44 @@ public:
 	void serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) final;
 	void serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr) final;
 	void serialize_enum_ar(const EnumTypeInfo* info, int& i) final;
+	void serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr) final;
+	bool serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr) final;
 
 	IMakePathForObject* pathmaker = nullptr;
 	std::vector<JsonStack> stack;
 	nlohmann::json obj;
 };
 
+using std::unordered_map;
+using std::string;
+#include <optional>
 
+template<typename T>
+using opt = std::optional<T>;
+
+
+class IAssetLoadingInterface;
 class ReadSerializerBackendJson : public Serializer
 {
 public:
-	std::unordered_map<std::string, ClassBase*> path_to_objs;
+	unordered_map<string, ClassBase*> path_to_objs;
+	unordered_map<ClassBase*, string> obj_to_path;
+
+	opt<ClassBase*> find_object_for_path(const string& path) {
+		auto find = path_to_objs.find(path);
+		if (find == path_to_objs.end())
+			return std::nullopt;
+		return find->second;
+	}
+	opt<string> get_path_for_object(ClassBase* object) {
+		auto find = obj_to_path.find(object);
+		if(find==obj_to_path.end())
+			return std::nullopt;
+		return find->second;
+	}
+
 	const std::string* current_root_path = nullptr;
-	ReadSerializerBackendJson(const std::string& text, IMakePathForObject* pathmaker);
+	ReadSerializerBackendJson(const std::string& text, IMakePathForObject* pathmaker, IAssetLoadingInterface* loader);
 
 	JsonStack& get_back() {
 		return stack.back();
@@ -247,6 +272,9 @@ public:
 	void serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) final;
 	void serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr) final;
 	void serialize_enum_ar(const EnumTypeInfo* info, int& i) final;
+	void serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr) final;
+	bool serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr) final;
+
 
 	template<typename T>
 	void read_from_array(T& t) {
@@ -417,6 +445,7 @@ public:
 		return true;
 	}
 
+	IAssetLoadingInterface* loader = nullptr;
 	ClassBase* rootobj = nullptr;
 	IMakePathForObject* pathmaker = nullptr;
 	std::vector<JsonStack> stack;

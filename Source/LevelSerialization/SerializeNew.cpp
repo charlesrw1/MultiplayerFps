@@ -88,15 +88,17 @@ UnserializedSceneFile NewSerialization::unserialize_from_text(const std::string&
 	pathmaker.load = load;
 	pathmaker.out = &outfile;
 	pathmaker.for_prefab = opt_source_prefab;
-	ReadSerializerBackendJson reader(text, &pathmaker);
+	ReadSerializerBackendJson reader(text, &pathmaker,load);
 	SerializeEntitiesContainer* rootobj = reader.rootobj->cast_to<SerializeEntitiesContainer>();
 	assert(rootobj);	//fixme
 	
 	vector<Entity*> roots;
 	for (auto obj : rootobj->objects) {
-		auto path = pathmaker.make_path(obj);
-		set_object_vars(obj, path, nullptr, opt_source_prefab);
-		outfile.get_objects().insert({ path,obj });
+		if (!obj)
+			continue;
+		auto path = reader.get_path_for_object(obj);
+		set_object_vars(obj, path.value(), nullptr, opt_source_prefab);
+		outfile.get_objects().insert({ path.value(),obj });
 		auto e = obj->cast_to<Entity>();
 		if (e&&!e->get_parent()) {
 			roots.push_back(e);
@@ -104,7 +106,7 @@ UnserializedSceneFile NewSerialization::unserialize_from_text(const std::string&
 	}
 	if (!roots.empty())
 		outfile.set_root_entity(roots[0]);
-	return outfile;
+	return std::move(outfile);
 }
 
 void NewSerialization::add_objects_to_write(SerializeEntitiesContainer& con, Entity* e,PrefabAsset* for_prefab)
@@ -145,7 +147,7 @@ SerializedSceneFile NewSerialization::serialize_to_text(const std::vector<Entity
 	WriteSerializerBackendJson writer(&pathmaker,&container);
 	double end = GetTime();
 
-	out.text = writer.obj.dump(1);
+	out.text = "!json\n"+writer.obj.dump(1);
 	std::cout << out.text << '\n';
 	for (auto obj : container.objects) {
 		out.path_to_instance_handle.insert({ pathmaker.make_path(obj),obj->get_instance_id() });

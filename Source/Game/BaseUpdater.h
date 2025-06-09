@@ -14,7 +14,7 @@ class BaseUpdater : public ClassBase
 public:
 	CLASS_BODY(BaseUpdater);
 
-	static const int INVALID_FILEID = -1;
+	static const int INVALID_FILEID = 0;
 
 	// queues this entity/component to be destroyed at the end of the frame
 	REFLECT(name="destroy");

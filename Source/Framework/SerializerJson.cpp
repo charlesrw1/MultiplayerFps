@@ -147,21 +147,59 @@ void WriteSerializerBackendJson::serialize_class_ar(const ClassTypeInfo& info, C
 
 	write_queue.push_back(ptr);
 	serialize_ar(pathtowrite);
-	paths_to_objects[path] = { ptr };
+	paths_to_objects[path].o = ptr;
 	paths_to_objects[path].is_from_sub_object = is_path_a_subpath(path);
 }
 
 void WriteSerializerBackendJson::serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr)
 {
+	if (!ptr) {
+		std::string path = "";
+		serialize_ar(path);
+		return;
+	}
+
+	auto path = pathmaker->make_path(ptr);
+	std::string pathtowrite = "";
+	if (currently_writing_class) {
+		auto parentpath = pathmaker->make_path(currently_writing_class);
+		auto relative = serialize_build_relative_path(parentpath.c_str(), path.c_str());
+		pathtowrite = relative;
+	}
+	else
+		pathtowrite = path;
+	serialize_ar(pathtowrite);
+	paths_to_objects[path].o = ptr;
+	paths_to_objects[path].is_from_sub_object = is_path_a_subpath(path);
 }
 
 void WriteSerializerBackendJson::serialize_enum_ar(const EnumTypeInfo* info, int& i)
 {
 }
+#include "Assets/IAsset.h"
 
-ReadSerializerBackendJson::ReadSerializerBackendJson(const std::string& text, IMakePathForObject* pathmaker) {
+void WriteSerializerBackendJson::serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr)
+{
+	std::string name = "";
+	if (ptr)
+		name = ptr->get_name();
+	serialize_ar(name);
+}
+
+bool WriteSerializerBackendJson::serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr)
+{
+	std::string name = "";
+	if (ptr)
+		name = ptr->get_name();
+	serialize(tag, name);
+	return true;
+}
+
+ReadSerializerBackendJson::ReadSerializerBackendJson(const std::string& text, IMakePathForObject* pathmaker, IAssetLoadingInterface* loader) {
 	this->pathmaker = pathmaker;
 	this->obj = nlohmann::json::parse(text);
+	this->loader = loader;
+
 	stack.push_back(&obj);
 
 	int sz = 0;
@@ -176,6 +214,7 @@ ReadSerializerBackendJson::ReadSerializerBackendJson(const std::string& text, IM
 			serialize_ar(type);
 			auto obj = pathmaker->create_from_name(*this, type);
 			path_to_objs.insert({ path,obj });
+			obj_to_path.insert({ obj,path });
 			end_obj();
 		}
 		end_obj();
@@ -272,6 +311,29 @@ void ReadSerializerBackendJson::serialize_class_reference_ar(const ClassTypeInfo
 
 void ReadSerializerBackendJson::serialize_enum_ar(const EnumTypeInfo* info, int& i)
 {
+}
+
+#include "Assets/AssetDatabase.h"
+void ReadSerializerBackendJson::serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr)
+{
+	std::string path = "";
+	serialize_ar(path);
+	if (path.empty())
+		ptr = nullptr;
+	else
+		ptr = loader->load_asset(&info, path);
+}
+bool ReadSerializerBackendJson::serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr)
+{
+	std::string path = "";
+	bool found = serialize(tag, path);
+	if (!found) 
+		return false;
+	if (path.empty())
+		ptr = nullptr;
+	else
+		ptr = loader->load_asset(&info, path);
+	return true;
 }
 
 nlohmann::json JsonSerializerUtil::diff_json(const nlohmann::json& a, const nlohmann::json& b) {

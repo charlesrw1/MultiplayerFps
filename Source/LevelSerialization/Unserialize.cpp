@@ -243,11 +243,18 @@ Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, co
 	return root_entity;
 }
 
-
+#include "SerializeNew.h"
+#include "Framework/StringUtils.h"
 UnserializedSceneFile unserialize_entities_from_text(const std::string& text, IAssetLoadingInterface* load,PrefabAsset* source_prefab)
 {
+
 	if (!load)
 		load = AssetDatabase::loader;
+	if (StringUtils::starts_with(text, "!json\n")) {
+		auto fixedtext = text.substr(5);
+		return NewSerialization::unserialize_from_text(fixedtext,load, source_prefab);
+	}
+
 		
 	UnserializedSceneFile scene;
 	auto root = unserialize_entities_from_text_internal(scene,text,"", source_prefab, nullptr,load);
@@ -281,12 +288,14 @@ void check_props_for_entityptr(void* inst, const PropertyInfoList* list)
 
 void UnserializedSceneFile::unserialize_post_assign_ids()
 {
-	for (auto obj : objs_with_extern_references) {
-		auto type = &obj->get_type();
+	for (auto& obj : all_objs) {
+		if (!obj.second)
+			continue;
+		auto type = &obj.second->get_type();
 		while (type) {
 			auto props = type->props;
 			if(props)
-				check_props_for_entityptr(obj, props);
+				check_props_for_entityptr(obj.second, props);
 			type = type->super_typeinfo;
 		}
 	}

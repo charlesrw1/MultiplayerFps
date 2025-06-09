@@ -337,10 +337,12 @@ void add_to_extern_parents(const BaseUpdater* obj, const BaseUpdater* parent, co
 	ext.external_parent_handle = parent->get_instance_id();
 	output.extern_parents.push_back(ext);
 }
+#include "SerializeNew.h"
 
 SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input_objs, PrefabAsset* for_prefab)
 {
-	
+	return NewSerialization::serialize_to_text(input_objs, for_prefab);
+
 	SerializedSceneFile output;
 	DictWriter out;
 

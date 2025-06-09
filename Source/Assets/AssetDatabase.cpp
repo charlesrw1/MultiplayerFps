@@ -543,6 +543,9 @@ public:
 		backend.push_job_to_queue(std::move(job));
 	}
 	void load_asset_async(const std::string& str, const ClassTypeInfo* type, bool is_system, std::function<void(GenericAssetPtr)>& func) {
+		if (str.empty())
+			return;
+		
 		auto existing = find_in_all_assets(str);
 		if (existing) {
 			assert(existing->get_type().is_a(*type));
@@ -561,6 +564,9 @@ public:
 	}
 	IAsset* load_asset_sync(const std::string& str, const ClassTypeInfo* type, bool is_system)
 	{
+		if (str.empty())
+			return nullptr;
+
 		auto existing = find_in_all_assets(str);
 		if (existing) {
 			assert(existing->get_type().is_a(*type));
