@@ -213,7 +213,7 @@ void CubemapComponent::start() {
 
 	if (eng->is_editor_level()) {
 		editor_meshbuilder = get_owner()->create_component<MeshBuilderComponent>();
-		editor_meshbuilder->editor_transient = true;
+		editor_meshbuilder->dont_serialize_or_edit = true;
 		editor_meshbuilder->use_background_color = true;
 		editor_meshbuilder->use_transform = false;
 		update_editormeshbuilder();

@@ -613,7 +613,7 @@ public:
 
 
 	void validate_fileids_before_serialize();
-	uint32_t get_next_file_id() {
+	int get_next_file_id() {
 		return ++file_id_start;
 	}
 private:
@@ -621,7 +621,7 @@ private:
 	void on_mouse_drag(int x, int y);
 
 
-	uint32_t file_id_start = 0;
+	int file_id_start = 0;
 
 	bool eye_dropper_active = false;
 	void* active_eyedropper_user_id = nullptr;	// for id purposes only

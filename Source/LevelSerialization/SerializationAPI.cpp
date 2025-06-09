@@ -9,7 +9,7 @@ bool PrefabToolsUtil::is_this_the_root_of_the_prefab(const Entity* e)
 	auto parent = e->get_parent();
 	if (!parent)
 		return true;
-	return parent->owner_asset != e->owner_asset;
+	return false;// parent->owner_asset != e->owner_asset;
 }
 Entity* PrefabToolsUtil::find_root_of_this_prefab(Entity* e)
 {
@@ -33,8 +33,8 @@ bool PrefabToolsUtil::is_part_of_a_prefab(const BaseUpdater* e)
 }
 PrefabAsset* PrefabToolsUtil::get_prefab_of_object(const BaseUpdater* e)
 {
-	ASSERT(e->owner_asset);
-	return e->owner_asset->cast_to<PrefabAsset>();
+	//ASSERT(e->owner_asset);
+	return nullptr;// e->owner_asset->cast_to<PrefabAsset>();
 }
 
 bool PrefabToolsUtil::am_i_the_root_prefab_node_for_this_prefab(const Entity* b, const PrefabAsset* for_prefab)
@@ -53,6 +53,7 @@ bool PrefabToolsUtil::this_is_created_by(const BaseUpdater* b, const IAsset* for
 {
 	ASSERT(b);
 	ASSERT(for_asset);
-	ASSERT(b->owner_asset);
-	return b->owner_asset == for_asset;
+	//ASSERT(b->owner_asset);
+	//return b->owner_asset == for_asset;
+	return false;
 }

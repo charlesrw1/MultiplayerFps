@@ -14,17 +14,18 @@ class BaseUpdater : public ClassBase
 public:
 	CLASS_BODY(BaseUpdater);
 
+	static const int INVALID_FILEID = -1;
+
 	// queues this entity/component to be destroyed at the end of the frame
 	REFLECT(name="destroy");
 	void destroy_deferred();
 
 	// Editor Data >>>>
-	void set_editor_transient(bool transient) { editor_transient = true; }
+	void set_editor_transient(bool transient) { dont_serialize_or_edit = transient; }
 	Entity* creator_source = nullptr;		// my creator
 	PrefabAsset* what_prefab = nullptr;	// (optional) what prefab created this (might be differnt than owner's prefab)
-	uint32_t unique_file_id = 0;			// unique id in source owner (either native c++, prefab, map)
+	int unique_file_id = INVALID_FILEID;			// unique id in source owner (either native c++, prefab, map)
 	bool is_root_of_prefab = false;
-	bool editor_transient = false;	// if true, dont serialize
 	// <<<<<<<<<<<<<<<<
 	bool dont_serialize_or_edit = false;
 

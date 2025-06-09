@@ -786,6 +786,7 @@
     <ClCompile Include="Source\Framework\Serializer.cpp" />
     <ClCompile Include="Source\Framework\SerializerJson.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
+    <ClCompile Include="Source\LevelSerialization\SerializationAPI.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

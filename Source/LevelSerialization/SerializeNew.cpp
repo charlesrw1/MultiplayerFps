@@ -17,7 +17,7 @@ public:
 		if (!bu)
 			return "x" + std::to_string((uintptr_t)to);
 			//throw std::runtime_error("make_path request for non baseupdater");
-		return build_path_for_object(bu, for_prefab);
+		return build_path_for_object(bu, nullptr);
 	}
 	virtual std::string make_type_name(ClassBase* obj) override
 	{
@@ -25,7 +25,7 @@ public:
 		if (!bu)
 			return obj->get_type().classname;
 			//throw std::runtime_error("make_type_name request for non baseupdater");
-		return get_type_for_new_serialized_item(bu, for_prefab);
+		return get_type_for_new_serialized_item(bu, nullptr);
 	}
 	virtual ClassBase* create_from_name(Serializer& s, const std::string& str) override
 	{
@@ -68,7 +68,7 @@ void SerializeEntitiesContainer::serialize(Serializer& s)
 static void set_object_vars(BaseUpdater* e, std::string path, Entity* opt_source_owner, IAsset* opt_prefab) {
 	e->unique_file_id = parse_fileid(path);
 	e->creator_source = opt_source_owner;
-	e->owner_asset = opt_prefab;
+	//e->owner_asset = opt_prefab;
 }
 // level=multiple roots, prefab=single root
 // World
@@ -81,7 +81,7 @@ static void set_object_vars(BaseUpdater* e, std::string path, Entity* opt_source
 //		
 
 using std::vector;
-UnserializedSceneFile NewSerialization::unserialize_from_text(const std::string& text, IAssetLoadingInterface* load, IAsset* opt_source_prefab)
+UnserializedSceneFile NewSerialization::unserialize_from_text(const std::string& text, IAssetLoadingInterface* load, PrefabAsset* opt_source_prefab)
 {
 	UnserializedSceneFile outfile;
 	MakePathForObjectNew pathmaker;
@@ -134,7 +134,7 @@ void NewSerialization::add_objects_to_container(const std::vector<Entity*>& inpu
 }
 #include <iostream>
 
-SerializedSceneFile NewSerialization::serialize_to_text(const std::vector<Entity*>& input_objs, IAsset* opt_prefab)
+SerializedSceneFile NewSerialization::serialize_to_text(const std::vector<Entity*>& input_objs, PrefabAsset* opt_prefab)
 {
 	double start = GetTime();
 	SerializedSceneFile out;

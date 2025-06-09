@@ -330,6 +330,13 @@ void serialize_overrides_R(Entity* e, PrefabAsset* for_prefab, SerializedSceneFi
 		}
 	}
 }
+void add_to_extern_parents(const BaseUpdater* obj, const BaseUpdater* parent, const PrefabAsset* for_prefab, SerializedSceneFile& output)
+{
+	SerializedSceneFile::external_parent ext;
+	ext.child_path = build_path_for_object(obj, for_prefab);
+	ext.external_parent_handle = parent->get_instance_id();
+	output.extern_parents.push_back(ext);
+}
 
 SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input_objs, PrefabAsset* for_prefab)
 {
@@ -337,13 +344,7 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 	SerializedSceneFile output;
 	DictWriter out;
 
-	auto add_to_extern_parents = [&](const BaseUpdater* obj, const BaseUpdater* parent) {
-		SerializedSceneFile::external_parent ext;
-		ext.child_path = build_path_for_object(obj, for_prefab);
-		ext.external_parent_handle = parent->get_instance_id();
-		output.extern_parents.push_back(ext);
-	};
-
+	
 	// write out top level objects (no parent in serialize set)
 
 
@@ -360,8 +361,7 @@ SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input
 		ASSERT(!ent->dont_serialize_or_edit);
 		auto root_parent = ent->get_parent();
 		if (root_parent)
-				add_to_extern_parents(obj, root_parent);
-			
+			add_to_extern_parents(obj, root_parent, for_prefab, output);
 		serialize_new_object_text_R(ent, out, root_parent != nullptr /* dont_write_parent if root_parent exists*/, for_prefab, output);
 	}
 
