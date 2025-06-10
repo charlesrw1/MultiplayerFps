@@ -114,6 +114,17 @@ void UIBuilder::draw_text(
 	impl->add_drawcall(mat, start,font->font_texture);
 }
 
+MeshBuilder& UIBuilder::get_meshbuilder()
+{
+	// TODO: insert return statement here
+	return impl->meshbuilder;
+}
+
+void UIBuilder::add_drawcall(int start, const MaterialInstance* material, const Texture* override)
+{
+	impl->add_drawcall((MaterialInstance*)material, start, override);
+}
+
 Rect2d GuiHelpers::calc_text_size_no_wrap(const char* str, const GuiFont* font)
 {
 	int x = 0;

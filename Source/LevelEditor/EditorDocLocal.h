@@ -205,6 +205,7 @@ public:
 		return glm::ortho(-width, width, -width * aspect_ratio, width * aspect_ratio,0.001f, 1000.f);
 	}
 }; 
+class guiEditorCube;
 class guiText;
 class EditorUILayout : public guiFullscreen {
 public:
@@ -233,7 +234,7 @@ public:
 	MulticastDelegate<int, int, int> mouse_up_delegate;
 	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
 
-
+	guiEditorCube* cube = nullptr;
 	guiText* tool_text = nullptr;
 };
 
@@ -616,6 +617,8 @@ public:
 	int get_next_file_id() {
 		return ++file_id_start;
 	}
+
+	void set_camera_target_to_sel();
 private:
 
 	void on_mouse_drag(int x, int y);

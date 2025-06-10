@@ -612,28 +612,34 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 		using_ortho = false;
 	}
 	else if (scancode == SDL_SCANCODE_KP_7 && key.keysym.mod & KMOD_CTRL) {
+		set_camera_target_to_sel();
 		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, ORTHO_DIST + 50.0, 0), glm::vec3(0, -1, 0));
+		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, ORTHO_DIST + 50.0, 0), glm::vec3(0, -1, 0));
 	}
 	else if (scancode == SDL_SCANCODE_KP_7) {
+		set_camera_target_to_sel();
 		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, -(ORTHO_DIST + 50.0), 0), glm::vec3(0, 1, 0));
+		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, -(ORTHO_DIST + 50.0), 0), glm::vec3(0, 1, 0));
 	}
 	else if (scancode == SDL_SCANCODE_KP_3 && key.keysym.mod & KMOD_CTRL) {
+		set_camera_target_to_sel();
 		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.position + glm::vec3(ORTHO_DIST, 0, 0), glm::vec3(-1, 0, 0));
+		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(ORTHO_DIST, 0, 0), glm::vec3(-1, 0, 0));
 	}
 	else if (scancode == SDL_SCANCODE_KP_3) {
+		set_camera_target_to_sel();
 		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.position + glm::vec3(-ORTHO_DIST, 0, 0), glm::vec3(1, 0, 0));
+		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(-ORTHO_DIST, 0, 0), glm::vec3(1, 0, 0));
 	}
 	else if (scancode == SDL_SCANCODE_KP_1 && key.keysym.mod & KMOD_CTRL) {
+		set_camera_target_to_sel();
 		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, 0, ORTHO_DIST), glm::vec3(0, 0, -1));
+		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, 0, ORTHO_DIST), glm::vec3(0, 0, -1));
 	}
 	else if (scancode == SDL_SCANCODE_KP_1) {
+		set_camera_target_to_sel();
 		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.position + glm::vec3(0, 0, -ORTHO_DIST), glm::vec3(0, 0, 1));
+		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, 0, -ORTHO_DIST), glm::vec3(0, 0, 1));
 	}
 }
 
@@ -1604,7 +1610,21 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 }
 
 #include "PropertyEditors.h"
-
+void EditorDoc::set_camera_target_to_sel()
+{
+	if(selection_state->has_only_one_selected()) {
+		auto ptr = selection_state->get_only_one_selected();
+		if (ptr) {
+			float radius = 1.f;
+			auto mesh = ptr->get_component<MeshComponent>();
+			if (mesh && mesh->get_model()) {
+				radius = glm::max(mesh->get_model()->get_bounding_sphere().w, 0.5f);
+			}
+			auto pos = ptr->get_ws_position();
+			camera.set_orbit_target(pos, radius);
+		}
+	}
+}
 EditorDoc::EditorDoc() {
 
 	command_mgr = std::make_unique<UndoRedoSystem>();
@@ -1623,19 +1643,7 @@ EditorDoc::EditorDoc() {
 
 	cmds = ConsoleCmdGroup::create("");
 	cmds->add("SET_ORBIT_TARGET", [this](const Cmd_Args&) {
-		// body
-		if (selection_state->has_only_one_selected()) {
-			auto ptr = selection_state->get_only_one_selected();
-			if (ptr) {
-				float radius = 1.f;
-				auto mesh = ptr->get_component<MeshComponent>();
-				if (mesh && mesh->get_model()) {
-					radius = glm::max(mesh->get_model()->get_bounding_sphere().w, 0.5f);
-				}
-				auto pos = ptr->get_ws_position();
-				camera.set_orbit_target(pos, radius);
-			}
-		}
+		set_camera_target_to_sel();
 		});
 	cmds->add("ed.HideSelected", [this](const Cmd_Args&) {
 		eng->log_to_fullscreen_gui(Info, "Hide selected");
@@ -1694,14 +1702,23 @@ EditorUILayout::EditorUILayout() {
 	recieve_mouse = guiMouseFilter::Block;
 	eat_scroll_event = true;
 }
+#include "UI/Widgets/EditorCube.h"
 
 void EditorUILayout::start() {
 
 	guiBase::start();
 
-	tool_text = get_owner()->create_child_entity()->create_component<guiText>();
+	Entity& owner = *get_owner();
+
+	tool_text = owner.create_entity_with_component<guiText>();
 	tool_text->hidden = true;
 	tool_text->anchor = guiAnchor::Center;
+	tool_text->set_ls_position({ 0,0 });
+
+	cube = owner.create_entity_with_component<guiEditorCube>();
+	cube->anchor = guiAnchor::TopLeft;
+	cube->set_ls_size({ 45,45 });
+	cube->set_ls_position({ 20,20 });
 }
 
 void EditorUILayout::on_pressed(int x, int y, int button) {
@@ -1736,6 +1753,9 @@ void EditorUILayout::on_dragging(int x, int y) {
 }
 
 void EditorUILayout::paint(UIBuilder& builder) {
+
+	cube->rotation_matrix = (glm::mat3)ed_doc.vs_setup.view;
+
 	int x, y;
 	SDL_GetMouseState(&x, &y);
 	bool do_mouse_click = mouse_clicked && button_clicked == 1;

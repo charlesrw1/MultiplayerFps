@@ -61,7 +61,7 @@ void main()
 {
 	FSmain();
 	
-	FS_OUT_Color = vec4(EMISSIVE*FS_IN_Color.rgb, OPACITY*FS_IN_Color.a);
+	FS_OUT_Color = vec4(EMISSIVE*pow(FS_IN_Color.rgb,vec3(1.0/2.2)), OPACITY*FS_IN_Color.a);
 }
 
 #endif // _FRAGMENT_SHADER

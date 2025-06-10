@@ -42,6 +42,7 @@
     <ClCompile Include="Source\Scripting\LuaBuiltinFuncs.cpp" />
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
     <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
+    <ClCompile Include="Source\UI\Widgets\EditorCube.cpp" />
     <ClCompile Include="Source\UI\Widgets\Layouts.cpp" />
     <ClCompile Include="Source\UI\Widgets\SharedFuncs.cpp" />
     <ClCompile Include="Source\UI\Widgets\Visuals.cpp" />
@@ -85,6 +86,7 @@
     <ClInclude Include="Source\Framework\ConsoleCmdGroup.h" />
     <ClInclude Include="Source\Framework\FnFactory.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
+    <ClInclude Include="Source\Framework\Log.h" />
     <ClInclude Include="Source\Framework\MapUtil.h" />
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
     <ClInclude Include="Source\Framework\PropertyPtr.h" />
@@ -265,6 +267,7 @@
     <ClInclude Include="Source\UI\GUISystemPublic.h" />
     <ClInclude Include="Source\UI\UIBuilder.h" />
     <ClInclude Include="Source\UI\UILoader.h" />
+    <ClInclude Include="Source\UI\Widgets\EditorCube.h" />
     <ClInclude Include="Source\UI\Widgets\Interactables.h" />
     <ClInclude Include="Source\UI\Widgets\Layouts.h" />
     <ClInclude Include="Source\UI\Widgets\SharedFuncs.h" />

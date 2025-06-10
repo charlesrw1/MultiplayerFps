@@ -1814,9 +1814,10 @@ inline const int get_lod_to_render(const Model* model, const float percentage)
 
 #include "Frustum.h"
 
-void build_frustum_for_cascade(Frustum& f, int index)
+Frustum build_frustom_for_ortho(const glm::mat4& ortho_viewproj)
 {
-	auto inv = glm::inverse(draw.shadowmap.matricies[index]);
+	Frustum f;
+	auto inv = glm::inverse(ortho_viewproj);
 	const glm::vec3 front = -inv[2];
 	const glm::vec3 side = inv[0];
 	const glm::vec3 up = inv[1];
@@ -1832,14 +1833,26 @@ void build_frustum_for_cascade(Frustum& f, int index)
 	f.top_plane = glm::vec4(n, -glm::dot(n, corners[0]));
 
 	f.bot_plane = glm::vec4(-n, glm::dot(n, corners[2]));
-	n = glm::normalize(corners[1]- corners[0]);
+	n = glm::normalize(corners[1] - corners[0]);
 	f.right_plane = glm::vec4(n, -glm::dot(n, corners[0]));
 	f.left_plane = glm::vec4(-n, glm::dot(n, corners[1]));
+	return f;
+}
+
+
+void build_frustum_for_cascade(Frustum& f, int index)
+{
+	f = build_frustom_for_ortho(draw.shadowmap.matricies[index]);
 }
 
 
 void build_a_frustum_for_perspective(Frustum& f, const View_Setup& view, glm::vec3* arrow_origin)
 {
+	if (view.is_ortho) {
+		f = build_frustom_for_ortho(view.viewproj);
+		return;
+	}
+
 	const float fakeFar = 5.0;
 	const float fakeNear = 0.0;
 	const float aratio = view.width / (float)view.height;
@@ -2984,8 +2997,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		ZoneScopedN("TaaResolve");
 		bool wants_disable = disable_taa_this_frame;
 		disable_taa_this_frame = false;
-		if (wants_disable)
-			sys_print(Debug, "disabled taa this frame\n");
+		//if (wants_disable)
+		//	sys_print(Debug, "disabled taa this frame\n");
 		if (!r_taa_enabled.get_bool()||wants_disable) {
 			return tex.scene_color;
 		}

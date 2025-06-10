@@ -3,7 +3,7 @@
 #include <json.hpp>
 #include <optional>	// just to try it out :)
 #include "glm/gtc/quaternion.hpp"
-
+class ReadSerializerBackendJson;
 using std::unordered_map;
 using std::string;
 template<typename T>
@@ -26,7 +26,7 @@ public:
 // The reader version
 class IMakeObjectFromPath {
 public:
-	virtual ClassBase* create_from_name(Serializer& s, const std::string& str) = 0;
+	virtual ClassBase* create_from_name(ReadSerializerBackendJson& s, const std::string& str, const string& parent_path) = 0;
 };
 
 class MakePathForGenericObj : public IMakePathForObject {
@@ -45,7 +45,7 @@ private:
 };
 class MakeObjectFromPathGeneric : public IMakeObjectFromPath {
 public:
-	ClassBase* create_from_name(Serializer& s, const std::string& str) final {
+	ClassBase* create_from_name(ReadSerializerBackendJson& s, const std::string& str, const string& parent_path) final {
 		return ClassBase::create_class<ClassBase>(str.c_str());
 	}
 };
@@ -259,6 +259,9 @@ class ReadSerializerBackendJson : public Serializer
 public:
 	ReadSerializerBackendJson(const std::string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader);
 	
+	// expects a second file
+	void insert_nested_object(string path, ClassBase* obj);
+
 	unordered_map<string, ClassBase*> path_to_objs;
 	unordered_map<ClassBase*, string> obj_to_path;
 

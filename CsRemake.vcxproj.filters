@@ -525,6 +525,8 @@
     <ClInclude Include="Source\LevelSerialization\SerializeNewMakers.h" />
     <ClInclude Include="Source\Framework\ArenaAllocator.h" />
     <ClInclude Include="Source\Framework\ArenaStd.h" />
+    <ClInclude Include="Source\Framework\Log.h" />
+    <ClInclude Include="Source\UI\Widgets\EditorCube.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -787,6 +789,7 @@
     <ClCompile Include="Source\Framework\SerializerJson.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializationAPI.cpp" />
+    <ClCompile Include="Source\UI\Widgets\EditorCube.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

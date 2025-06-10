@@ -56,6 +56,9 @@ public:
 	// will also parent to this
 	Entity* create_child_entity();
 
+	template<typename T>
+	T* create_entity_with_component();
+
 	// ONLY USE in serialization!
 	void add_component_from_unserialization(Component* component);
 
@@ -261,4 +264,11 @@ template<typename T>
 inline T* Entity::create_component() {
 	static_assert(std::is_base_of<Component, T>::value, "Type not derived from EntityComponent");
 	return (T*)create_component_type(&T::StaticType);
+}
+
+template<typename T>
+inline T* Entity::create_entity_with_component()
+{
+	Entity* e = create_child_entity();
+	return e->create_component<T>();
 }

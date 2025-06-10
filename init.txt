@@ -98,5 +98,5 @@ start_ed Map structtest.tmap
 
 bind 7 "start_ed AnimGraph beu_character.ag"
 
-loglevel 1
+loglevel 6
 developer_mode 0

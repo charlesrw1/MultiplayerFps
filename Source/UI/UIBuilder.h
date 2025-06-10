@@ -64,6 +64,9 @@ public:
 		std::string_view text, Color32 color, /* and alpha*/
 		bool with_drop_shadow = false, Color32 drop_shadow_color = {});
 
+	// manual drawing
+	MeshBuilder& get_meshbuilder();
+	void add_drawcall(int start_index, const MaterialInstance* material, const Texture* override);
 private:
 	GuiSystemLocal* sys = nullptr;
 	UIBuilderImpl* impl = nullptr;

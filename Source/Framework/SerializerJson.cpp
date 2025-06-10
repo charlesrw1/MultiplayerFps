@@ -1,6 +1,7 @@
 #include "SerializerJson.h"
 #include "Assets/IAsset.h"
 #include "Framework/MapUtil.h"
+#include "Log.h"
 
 const char* const CLASSNAME = "classname";
 
@@ -168,15 +169,20 @@ ReadSerializerBackendJson::ReadSerializerBackendJson(const std::string& text, IM
 			int count = 0;
 			serialize_array_ar(count);
 			if (count != 2) {
-				printf("count != 2 in paths json serialize\n");
+				LOG_WARN("expected 2-tuple in paths");
 				continue;
 			}
 			string path;
 			string type;
 			serialize_ar(path);
 			serialize_ar(type);
-			ClassBase* obj = objmaker.create_from_name(*this, type);
+			ClassBase* obj = objmaker.create_from_name(*this, type, path);
 			
+			if (!obj) {
+				LOG_WARN("null obj from creation");
+				// fallthrough
+			}
+
 			MapUtil::insert_test_exists(path_to_objs, path, obj);
 			if (obj)
 				MapUtil::insert_test_exists(obj_to_path, obj, path);
@@ -190,7 +196,12 @@ ReadSerializerBackendJson::ReadSerializerBackendJson(const std::string& text, IM
 
 	serialize_dict("objs");
 	for (auto& p : path_to_objs) {
-		if (p.second && serialize_dict(p.first.c_str())) {
+		if (!p.second) {
+			LOG_WARN("null obj in objs");
+			continue;
+		}
+
+		if (serialize_dict(p.first.c_str())) {
 			assert(!current_root_path);
 			current_root_path = &p.first;
 			p.second->serialize(*this);
@@ -329,4 +340,10 @@ nlohmann::json* MakePathForGenericObj::find_diff_for_obj(ClassBase* obj) {
 	const ClassBase* diffobj = obj->get_type().default_class_object;
 	WriteSerializerBackendJson writer(pathmaker,*const_cast<ClassBase*>(diffobj));
 	return new nlohmann::json(*writer.get_root_object());	// FIXME, test
+}
+void ReadSerializerBackendJson::insert_nested_object(string path, ClassBase* obj)
+{
+	LOG_MSG("inserted nested obj");
+	MapUtil::insert_test_exists(path_to_objs, path, obj);
+	MapUtil::insert_test_exists(obj_to_path, obj, path);
 }

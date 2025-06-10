@@ -1837,20 +1837,16 @@ void GameEngineLocal::loop()
 	auto frame_start = [&]() -> bool
 	{
 		ZoneScopedN("frame_start");
-
 		// reset cursor if in relative mode
 		if (is_game_focused()) {
 			SDL_WarpMouseInWindow(window, saved_mouse_x, saved_mouse_y);
 		}
-
 		// update input
 		memset(inp.keychanges, 0, sizeof inp.keychanges);
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{
 			ImGui_ImplSDL2_ProcessEvent(&event);
-
-
 			switch (event.type) {
 			case SDL_QUIT:
 				::Quit();
@@ -1861,13 +1857,10 @@ void GameEngineLocal::loop()
 					SDL_GetWindowSize(window, &x, &y);
 					if (x % 2 == 1) x -= 1;
 					if (y % 2 == 1) y -= 1;
-
 					if (x != g_window_w.get_integer())
 						g_window_w.set_integer(x);
 					if (y != g_window_h.get_integer())
 						g_window_h.set_integer(y);
-
-					//SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
 				}
 				break;
 			case SDL_KEYUP:
@@ -1878,9 +1871,7 @@ void GameEngineLocal::loop()
 				key_event(event);
 				break;
 			}
-
 			g_inputSys.handle_event(event);
-
 			if (!is_game_focused()) {
 				if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) && ImGui::GetIO().WantCaptureKeyboard)
 					continue;
@@ -1890,11 +1881,8 @@ void GameEngineLocal::loop()
 			g_guiSystem->handle_event(event);
 		}
 		g_guiSystem->post_handle_events();
-
 		g_guiSystem->think();
-
 		Cmd_Manager::get()->execute_buffer();
-
 		return state_machine_update();
 	};
 
@@ -1902,10 +1890,7 @@ void GameEngineLocal::loop()
 	{
 		ZoneScopedN("OverlappedUpdate");
 		CPUSCOPESTART(OverlappedUpdate);
-
-
 		BooleanScope scope(b_is_in_overlapped_period);
-
 		GameUpdateOuput out;
 		jobs::Counter* gameupdatecounter{};
 		jobs::add_job(game_update_job,uintptr_t(&out), gameupdatecounter);
@@ -1950,9 +1935,7 @@ void GameEngineLocal::loop()
 	auto do_sync_update = [&]()
 	{
 		ZoneScopedN("SyncUpdate");
-
 		DebugShapeCtx::get().update(frame_time);
-
 		g_assets.tick_asyncs();	// tick async loaded assets, this will call the async load_map callback
 #ifdef EDITOR_BUILD
 		// update hot reloading
@@ -1960,11 +1943,8 @@ void GameEngineLocal::loop()
 #endif
 		if (get_level())
 			get_level()->sync_level_render_data();
-
 		g_guiSystem->sync_to_renderer();
-
-		g_physics.sync_render_data();
-		
+		g_physics.sync_render_data();		
 		idraw->sync_update();
 	};
 	auto wait_for_swap = [&]()
@@ -1975,13 +1955,11 @@ void GameEngineLocal::loop()
 		SDL_GL_SwapWindow(window);
 	};
 
-
 	double last = GetTime() - 0.1;
 	// these are from the last game frame
 	SceneDrawParamsEx drawparamsNext(0, 0);
 	View_Setup setupNext;
 	bool shouldDrawNext = true;
-
 
 	for (;;)
 	{

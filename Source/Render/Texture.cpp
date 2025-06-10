@@ -428,13 +428,13 @@ static void make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 	int x_real = x;
 	int y_real = y;
 
-	GLenum type;
-	GLenum internal_format;
-	GLenum format;
-	bool compressed;
+	GLenum type{};
+	GLenum internal_format{};
+	GLenum format{};
+	bool compressed{};
 	texture_format_to_gl(informat, &format, &internal_format, &type, &compressed);
 
-	size_t size = 0;
+	int size = 0;
 	if (compressed) {
 		size = ((x + 3) / 4) * ((y + 3) / 4) *
 			(informat == TEXFMT_RGBA8_DXT5 ? 16 : 8);
@@ -554,7 +554,7 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 	auto& filedata = user->filedata;
 	auto& is_float = user->is_float;
 
-	if (path.find("/_nearest"))
+	if (path.find("/_nearest")!=std::string::npos)
 		user->wantsNearestFiltering = true;	// hack moment
 
 

@@ -3,6 +3,7 @@
 class PrefabAsset;
 class UnserializedSceneFile;
 class IAssetLoadingInterface;
+class ReadSerializerBackendJson;
 class MakePathForObjectNew : public IMakePathForObject
 {
 public:
@@ -16,7 +17,7 @@ public:
 class MakeObjectForPathNew : public IMakeObjectFromPath {
 public:
 	MakeObjectForPathNew(IAssetLoadingInterface& load, UnserializedSceneFile& out, PrefabAsset* for_prefab);
-	ClassBase* create_from_name(Serializer& s, const std::string& str) override;
+	ClassBase* create_from_name(ReadSerializerBackendJson& s, const std::string& str, const string& parent_path) override;
 	PrefabAsset* prefab = nullptr;
 	UnserializedSceneFile& out;
 	IAssetLoadingInterface& load;
