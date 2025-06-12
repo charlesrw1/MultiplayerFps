@@ -93,10 +93,11 @@ file_print_all_openfile_fails 0
 g_draw_grid 1
 
 #start_ed AnimGraph "testcharacter_a.ag"
-start_ed Map structtest.tmap
 #start_ed Material "top_down/fake_fog.mm"
 
 bind 7 "start_ed AnimGraph beu_character.ag"
 
 loglevel 6
 developer_mode 0
+
+start_ed Prefab BRUH_NEST.pfb

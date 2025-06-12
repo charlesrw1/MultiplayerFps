@@ -22,8 +22,9 @@ class MakePrefabEditable : public Command
 public:
 	EditorDoc& ed_doc;
 	MakePrefabEditable(EditorDoc& ed, Entity* me, bool editable):ed_doc(ed) {
-		is_valid_flag = me && me->is_root_of_prefab && me->what_prefab && me->what_prefab != ed_doc.get_editing_prefab();
-		if (!is_valid_flag) return;
+		is_valid_flag = me && me->what_prefab && PrefabToolsUtil::is_this_the_root_of_the_prefab(*me) && me->what_prefab != ed_doc.get_editing_prefab();
+		if (!is_valid_flag) 
+			return;
 		ptr = me->get_self_ptr();
 		value = editable;
 	}
@@ -47,10 +48,17 @@ public:
 	bool value = false;
 	bool is_valid() final { return is_valid_flag; }
 };
-
+struct SavedCreateObj {
+	uint64_t eng_handle = 0;
+	int unique_file_id = 0;
+	const PrefabAsset* what_prefab = nullptr;
+	const PrefabAsset* nested_owner = nullptr;
+};
 class RemoveEntitiesCommand : public Command
 {
 public:
+	std::vector<SavedCreateObj> removed_objs;
+
 	EditorDoc& ed_doc;
 	RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles);
 	bool is_valid_flag = true;
@@ -213,7 +221,9 @@ public:
 	}
 	struct created_obj {
 		uint64_t eng_handle = 0;
-		uint64_t unique_file_id = 0;
+		int unique_file_id = 0;
+		const PrefabAsset* what_prefab = nullptr;
+		const PrefabAsset* nested_owner = nullptr;
 	};
 	std::vector<created_obj> created_objs;
 	EntityPtr me;
@@ -299,7 +309,7 @@ public:
 			sys_print(Warning, "no entity in createcomponentcommand\n");
 			return;
 		}
-		auto ec = e->create_component_type(info);
+		auto ec = ed_doc.attach_component(info, e);
 		comp_handle = ec->get_instance_id();
 		post_create(ec);
 

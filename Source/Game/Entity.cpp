@@ -376,6 +376,15 @@ void Entity::add_component_from_unserialization(Component* component)
 	ASSERT(init_state == initialization_state::CONSTRUCTOR);
 	ASSERT(component->init_state == initialization_state::CONSTRUCTOR);
 	component->entity_owner = this;
+	
+	auto try_find = [&]() -> bool {
+		for (auto& c : all_components)
+			if (c == component)
+				return true;
+		return false;
+	};
+	ASSERT(!try_find());
+
 	all_components.push_back(component);
 }
 

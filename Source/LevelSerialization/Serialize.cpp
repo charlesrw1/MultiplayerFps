@@ -50,9 +50,10 @@ bool serialize_this_objects_children(const Entity* b, const PrefabAsset* for_pre
 {
 	if (b->dont_serialize_or_edit)
 		return false;
-	if (b->what_prefab && b->what_prefab != for_prefab && b->is_root_of_prefab && !b->get_prefab_editable()) {
+
+	if (PrefabToolsUtil::is_part_of_a_prefab(*b) && b->what_prefab!=for_prefab&& PrefabToolsUtil::is_this_the_root_of_the_prefab(*b) && !b->get_prefab_editable())
 		return false;
-	}
+
 	return true;
 }
 bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAsset* for_prefab)

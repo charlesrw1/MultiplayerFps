@@ -196,6 +196,12 @@ public:
 	void set_prefab_editable(bool b) {
 		prefab_editable = b;
 	}
+	void set_nested_owner_prefab(const PrefabAsset* asset) {
+		this->nested_owner_prefab = asset;
+	}
+	const PrefabAsset* get_nested_owner_prefab() const  {
+		return this->nested_owner_prefab;
+	}
 #endif
 	// fixme
 	bool get_prefab_editable() const {
@@ -234,6 +240,7 @@ private:
 #ifdef EDITOR_BUILD
 	bool selected_in_editor = false;
 	bool hidden_in_editor = false;
+	const PrefabAsset* nested_owner_prefab = nullptr;
 #endif
 
 	bool world_transform_is_dirty = true;

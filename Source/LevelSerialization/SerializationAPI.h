@@ -105,18 +105,17 @@ class IAsset;
 
 class PrefabToolsUtil {
 public:
-	static bool is_this_the_root_of_the_prefab(const Entity* e);
-	static Entity* find_root_of_this_prefab(Entity* e);
-	static bool is_part_of_a_prefab(const BaseUpdater* e);
+	static bool is_this_the_root_of_the_prefab(const Entity& e);
+	static const Entity& find_root_of_this_prefab(const BaseUpdater& e);
+	static const Entity& find_root_of_this_one_prefab(const BaseUpdater& e, const PrefabAsset& asset);
+	static bool is_part_of_a_prefab(const BaseUpdater& e);
+	static bool is_newly_created(const BaseUpdater& e, const PrefabAsset* editing_prefab);
 
-	static bool am_i_the_root_prefab_node_for_this_prefab(const Entity* b, const PrefabAsset* for_prefab);
-	static bool this_is_created_by(const BaseUpdater* b, const IAsset* for_asset);
-	static PrefabAsset* get_prefab_of_object(const BaseUpdater* e);
-	static bool is_set_of_objects_valid(const vector<BaseUpdater*>& objs);
+	static bool is_newly_created_nested(const BaseUpdater& e, const PrefabAsset* editing_prefab);
 
-	static bool serialize_this_objects_children(const Entity* b, const IAsset* for_asset);
-
-	static const Entity* get_outermost_entity(const Entity* e, const IAsset* editing);
+	static const Entity* get_outer_prefab(const BaseUpdater& e);
+	static bool am_i_the_root_prefab_node_for_this_prefab(const Entity& b, const PrefabAsset* for_prefab);
+	static bool validate_object_collection(const vector<BaseUpdater*>& objects);
 };
 
 

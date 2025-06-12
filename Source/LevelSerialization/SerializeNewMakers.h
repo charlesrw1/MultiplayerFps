@@ -9,7 +9,7 @@ class MakePathForObjectNew : public IMakePathForObject
 public:
 	MakePathForObjectNew(PrefabAsset* opt_prefab);
 	// Inherited via IMakePathForObject
-	std::string make_path(const ClassBase* to) override;
+	MakePath make_path(const ClassBase* to) override;
 	std::string make_type_name(ClassBase* obj) override;
 	nlohmann::json* find_diff_for_obj(ClassBase* obj) override;
 	PrefabAsset* for_prefab = nullptr;

@@ -14,26 +14,30 @@ struct JsonStack {
 	nlohmann::json* ptr = nullptr;
 	int arr_idx = 0;
 };
-
 // The writer version
 class IMakePathForObject {
 public:
+	struct MakePath {
+		MakePath(string path) : path(path) {}
+		string path;
+		bool is_subobject = false;
+	};
 
-	virtual std::string make_path(const ClassBase* toobj)=0;	// unique file id along with prefab nesting
-	virtual std::string make_type_name(ClassBase* obj) = 0;	// returns if prefab owner or not
+	virtual MakePath make_path(const ClassBase* toobj)=0;	// unique file id along with prefab nesting
+	virtual string make_type_name(ClassBase* obj) = 0;	// returns if prefab owner or not
 	virtual nlohmann::json* find_diff_for_obj(ClassBase* obj) = 0;
 };
 // The reader version
 class IMakeObjectFromPath {
 public:
-	virtual ClassBase* create_from_name(ReadSerializerBackendJson& s, const std::string& str, const string& parent_path) = 0;
+	virtual ClassBase* create_from_name(ReadSerializerBackendJson& s, const string& str, const string& parentpath) = 0;
 };
 
 class MakePathForGenericObj : public IMakePathForObject {
 public:
 	MakePathForGenericObj(bool diffable=true) 
 		: diff_available(diffable) {}
-	std::string make_path(const ClassBase* toobj) final {
+	MakePath make_path(const ClassBase* toobj) final {
 		return "x"+std::to_string(uintptr_t(toobj));
 	}
 	std::string make_type_name(ClassBase* obj) final {
@@ -45,7 +49,7 @@ private:
 };
 class MakeObjectFromPathGeneric : public IMakeObjectFromPath {
 public:
-	ClassBase* create_from_name(ReadSerializerBackendJson& s, const std::string& str, const string& parent_path) final {
+	ClassBase* create_from_name(ReadSerializerBackendJson& s, const std::string& str, const string& parentpath) final {
 		return ClassBase::create_class<ClassBase>(str.c_str());
 	}
 };

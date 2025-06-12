@@ -36,6 +36,26 @@ void validate_remove_entities(EditorDoc& ed_doc, std::vector<EntityPtr>& input)
 	}
 }
 
+static void add_to_remove_list_R(vector<SavedCreateObj>& objs, Entity* e)
+{
+	for (auto c : e->get_components()) {
+		SavedCreateObj created;
+		created.eng_handle = c->get_instance_id();
+		created.unique_file_id = c->unique_file_id;
+		created.what_prefab = c->what_prefab;
+		objs.push_back(created);
+	}
+	SavedCreateObj created;
+	created.eng_handle = e->get_instance_id();
+	created.unique_file_id = e->unique_file_id;
+	created.what_prefab = e->what_prefab;
+	created.nested_owner = e->get_nested_owner_prefab();
+	objs.push_back(created);
+	for (auto c : e->get_children()) {
+		add_to_remove_list_R(objs,c);
+	}
+}
+
 RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles):ed_doc(ed_doc) {
 	validate_remove_entities(ed_doc, handles);
 	for (auto e : handles) {
@@ -46,12 +66,17 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<Enti
 	if (!is_valid_flag)
 		return;
 
+	for (auto e : handles) {
+		Entity* ent = e.get();
+		if (ent)
+			add_to_remove_list_R(removed_objs, ent);
+	}
 
 	scene = CommandSerializeUtil::serialize_entities_text(ed_doc, handles);
 
 	this->handles = handles;
 }
-
+#include "Framework/Log.h"
 void RemoveEntitiesCommand::undo() {
 	ASSERT(is_valid());
 
@@ -73,8 +98,24 @@ void RemoveEntitiesCommand::undo() {
 			sys_print(Warning, "restored obj doesnt exist\n");
 	}
 
-	eng->get_level()->insert_unserialized_entities_into_level(restored, scene.get());	// pass in scene so handles get set to what they were
+	ed_doc.insert_unserialized_into_scene(restored, scene.get());
+	//eng->get_level()->insert_unserialized_entities_into_level(restored, scene.get());	// pass in scene so handles get set to what they were
 	auto& objs = restored.get_objects();
+
+	for (SavedCreateObj c : removed_objs) {
+		BaseUpdater* obj = eng->get_level()->get_entity(c.eng_handle);
+		if (!obj) {
+			LOG_WARN("obj not valid to put back");
+			continue;
+		}
+		obj->what_prefab = (PrefabAsset*)c.what_prefab;
+		obj->unique_file_id = c.unique_file_id;
+		if (c.nested_owner) {
+			auto ent = obj->cast_to<Entity>();
+			assert(ent);
+			ent->set_nested_owner_prefab(c.nested_owner);
+		}
+	}
 
 	// refresh handles i guess ? fixme
 	handles.clear();
@@ -169,7 +210,7 @@ void ParentToCommand::execute() {
 
 	if (create_new_parent) {
 		ASSERT(!parent_to);
-		auto newparent = eng->get_level()->spawn_entity();
+		Entity* newparent = ed_doc.spawn_entity();
 		glm::vec3 pos(0.f);
 		int count = 0;
 		for (auto e : entities) {
@@ -252,7 +293,8 @@ void ParentToCommand::undo() {
 		if (!p) {
 			sys_print(Warning, "create_new_parent ptr was null??\n");
 		}
-		eng->get_level()->destroy_entity(p);
+		ed_doc.remove_scene_object(p);
+		//eng->get_level()->destroy_entity(p);
 		parent_to = EntityPtr();
 	}
 
@@ -275,10 +317,9 @@ CreatePrefabCommand::CreatePrefabCommand(EditorDoc& ed_doc, const std::string& p
 }
 
 void CreatePrefabCommand::execute() {
-	auto l = eng->get_level();
 	auto p = g_assets.find_sync<PrefabAsset>(prefab_name);
 	if (p) {
-		auto ent = l->spawn_prefab(p.get());
+		Entity* ent = ed_doc.spawn_prefab(p.get());
 		if (ent) {
 			handle = ent->get_self_ptr();
 			if (parent_to.get())
@@ -308,8 +349,8 @@ CreateStaticMeshCommand::CreateStaticMeshCommand(EditorDoc& ed_doc, const std::s
 }
 
 void CreateStaticMeshCommand::execute() {
-	auto ent = eng->get_level()->spawn_entity();
-	ent->create_component<MeshComponent>();
+	auto ent = ed_doc.spawn_entity();
+	ed_doc.attach_component(&MeshComponent::StaticType, ent);
 	if (parent_to.get())
 		ent->parent_to(parent_to.get());
 	else
@@ -366,15 +407,17 @@ void CreateCppClassCommand::execute() {
 	assert(ti);
 	Entity* ent{};
 	if (is_component_type) {
-		ent = eng->get_level()->spawn_entity();
-		ent->create_component_type(ti);
+		ent = ed_doc.spawn_entity();// eng->get_level()->spawn_entity();
+		ed_doc.attach_component(ti, ent);// ent->create_component_type(ti);
 	}
 	else
-		ent = eng->get_level()->spawn_entity();
+		ent = ed_doc.spawn_entity();
+
 	if (parent_to.get())
 		ent->parent_to(parent_to.get());
 	else
 		ent->set_ws_transform(transform);
+
 	handle = ent->get_self_ptr();
 	ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
 	ed_doc.on_entity_created.invoke(handle);
@@ -384,8 +427,9 @@ void CreateCppClassCommand::execute() {
 void CreateCppClassCommand::undo() {
 
 	auto ent = handle.get();
-	auto level = eng->get_level();
-	level->destroy_entity(ent);
+	ed_doc.remove_scene_object(ent);
+	//auto level = eng->get_level();
+	//level->destroy_entity(ent);
 	ed_doc.post_node_changes.invoke();
 	handle = {};
 }
@@ -429,7 +473,8 @@ InstantiatePrefabCommand::InstantiatePrefabCommand(EditorDoc& ed_doc, Entity* e)
 {
 	if (ed_doc.is_editing_prefab() && ed_doc.get_prefab_root_entity() == e)
 		return;	// is_valid == false
-
+	if (e->get_nested_owner_prefab() != ed_doc.get_editing_prefab())
+		return;	// is_valid == false
 
 	me = e->get_self_ptr();
 	asset = me->what_prefab;
@@ -442,30 +487,42 @@ InstantiatePrefabCommand::InstantiatePrefabCommand(EditorDoc& ed_doc, Entity* e)
 		creator_source = me->creator_source->get_self_ptr();
 }
 
+
 void InstantiatePrefabCommand::execute_R(Entity* e) {
 	for (auto c : e->get_components()) {
-		if (this_is_newly_created(c, asset)) {
+		const bool this_is_created = PrefabToolsUtil::is_newly_created_nested(*c, asset);
+
+		if (this_is_created) {
 			created_obj created;
 			created.eng_handle = c->get_instance_id();
 			created.unique_file_id = c->unique_file_id;
+			created.what_prefab = c->what_prefab;
 			created_objs.push_back(created);
 
-			c->creator_source = nullptr;
-			if (c->what_prefab == asset)
-				c->what_prefab = nullptr;
-			c->unique_file_id = ed_doc.get_next_file_id();
+			//c->creator_source = nullptr;
+			//if (c->what_prefab == asset)
+			//	c->what_prefab = nullptr;
+			//c->unique_file_id = ed_doc.get_next_file_id();
+
+			ed_doc.instantiate_into_scene(c);
 		}
 	}
 	for (auto c : e->get_children()) {
-		if (this_is_newly_created(c, asset)) {
+		const bool this_is_created = PrefabToolsUtil::is_newly_created_nested(*c, asset);
+
+		if (this_is_created) {
 			created_obj created;
 			created.eng_handle = c->get_instance_id();
 			created.unique_file_id = c->unique_file_id;
+			created.what_prefab = c->what_prefab;
+			created.nested_owner = c->get_nested_owner_prefab();
 			created_objs.push_back(created);
-			c->creator_source = nullptr;
-			if (c->what_prefab == asset)
-				c->what_prefab = nullptr;
-			c->unique_file_id = ed_doc.get_next_file_id();
+			//c->creator_source = nullptr;
+			//if (c->what_prefab == asset)
+			//	c->what_prefab = nullptr;
+			//c->unique_file_id = ed_doc.get_next_file_id();
+
+			ed_doc.instantiate_into_scene(c);
 		}
 		execute_R(c);
 	}
@@ -495,9 +552,13 @@ void InstantiatePrefabCommand::undo() {
 	for (auto c : created_objs) {
 		auto obj = eng->get_level()->get_entity(c.eng_handle);
 		obj->creator_source = me.get();
-		if (!obj->what_prefab)
-			obj->what_prefab = asset;
+		obj->what_prefab = (PrefabAsset*)c.what_prefab;
 		obj->unique_file_id = c.unique_file_id;
+		if (c.nested_owner) {
+			auto ent = obj->cast_to<Entity>();
+			assert(ent);
+			ent->set_nested_owner_prefab(c.nested_owner);
+		}
 	}
 	created_objs.clear();
 
@@ -529,7 +590,7 @@ DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vecto
 }
 
 void DuplicateEntitiesCommand::execute() {
-	auto duplicated = unserialize_entities_from_text(scene->text, AssetDatabase::loader,nullptr);
+	UnserializedSceneFile duplicated = unserialize_entities_from_text(scene->text, AssetDatabase::loader,nullptr);
 
 	auto& extern_parents = scene->extern_parents;
 	for (auto ep : extern_parents) {
@@ -549,11 +610,13 @@ void DuplicateEntitiesCommand::execute() {
 	}
 
 	// zero out file ids so new ones are set
-	for (auto o : duplicated.get_objects())
-		if (o.second->creator_source == nullptr) // ==nullptr meaning that its created by level
-			o.second->unique_file_id = 0;
+	//for (auto o : duplicated.get_objects())
+	//	if (o.second->creator_source == nullptr) // ==nullptr meaning that its created by level
+	//		o.second->unique_file_id = 0;
 
-	eng->get_level()->insert_unserialized_entities_into_level(duplicated);	// since duplicating, DONT pass in scene
+	ed_doc.insert_unserialized_into_scene(duplicated, nullptr);
+
+	//eng->get_level()->insert_unserialized_entities_into_level(duplicated);	// since duplicating, DONT pass in scene
 
 
 	handles.clear();

@@ -233,7 +233,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 
 				ImGui::Separator();
 
-				const bool is_entity_root_of_prefab = context_menu_entity && context_menu_entity->what_prefab && context_menu_entity->is_root_of_prefab;
+				const bool is_entity_root_of_prefab = context_menu_entity && context_menu_entity->what_prefab && PrefabToolsUtil::is_this_the_root_of_the_prefab(*context_menu_entity);
 				if (is_entity_root_of_prefab) {
 					if (ImGui::MenuItem("Select prefab in browser")) {
 						global_asset_browser.set_selected(context_menu_entity->what_prefab->get_name());
@@ -254,8 +254,8 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 					ImGui::CloseCurrentPopup();
 				}
 
-				auto is_prefab_instance_root = [&ed_doc](const Entity* e) -> bool {
-					return e && e->is_root_of_prefab && e->what_prefab && e->what_prefab != ed_doc.get_editing_prefab();
+				auto is_prefab_instance_root = [&ed_doc,is_entity_root_of_prefab](const Entity* e) -> bool {
+					return is_entity_root_of_prefab && e->what_prefab != ed_doc.get_editing_prefab();
 				};
 
 				if (is_prefab_instance_root(context_menu_entity)) {
@@ -307,10 +307,10 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 	}
 	else {
 		const Entity* const e = node_entity;
-
+		const bool is_prefab_root = PrefabToolsUtil::is_part_of_a_prefab(*e)&&PrefabToolsUtil::is_this_the_root_of_the_prefab(*e);
 		const char* name = (e->get_editor_name().c_str());
 		if (!*name) {
-			if (e->is_root_of_prefab && e->what_prefab)
+			if (is_prefab_root)
 				name = e->what_prefab->get_name().c_str();
 			else {
 				if (auto m = e->get_component<MeshComponent>()) {
@@ -323,7 +323,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 			name = e->get_type().classname;
 		}
 
-		if (e->is_root_of_prefab && e->what_prefab != ed_doc.get_editing_prefab()) {
+		if (is_prefab_root && e->what_prefab != ed_doc.get_editing_prefab()) {
 			const char* s = "eng/editor/prefab_p.png";
 			auto tex = g_assets.find_global_sync<Texture>(s);
 			if (tex) {

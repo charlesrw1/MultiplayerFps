@@ -184,7 +184,7 @@ bool EditorDoc::save_document_internal()
 	}
 
 	auto serialized = serialize_entities_to_text(all_ents, pa);
-	NewSerialization::serialize_to_text(all_ents, pa);
+	//NewSerialization::serialize_to_text(all_ents, pa);
 
 	auto path = get_doc_name();
 	{
@@ -193,7 +193,7 @@ bool EditorDoc::save_document_internal()
 	}
 	sys_print(Info, "Wrote out to %s\n", path.c_str());
 
-	if (is_editing_prefab()) {
+	if (is_editing_prefab()&&!pa->get_name().empty()) {
 		g_assets.reload_async(pa, [](GenericAssetPtr) {printf("reload finished prefab\n"); });
 	}
 
@@ -209,6 +209,8 @@ Entity* EditorDoc::get_prefab_root_entity()
 		if (auto e = o->cast_to<Entity>()) {
 			if (e->dont_serialize_or_edit)
 				continue;
+			if (e->what_prefab != get_editing_prefab())
+				continue;
 			if (!e->get_parent()) {
 				return e;
 			}
@@ -216,6 +218,15 @@ Entity* EditorDoc::get_prefab_root_entity()
 	}
 	sys_print(Warning, "couldnt get root of prefab??\n");
 	return nullptr;
+}
+string EditorDoc::get_name() {
+	string name = get_doc_name();
+	if (name.empty()) 
+		name = "<unnamed>";
+	if (is_editing_prefab())
+		return "Prefab: " + name;
+	else
+		return "Scene: " + name;
 }
 void EditorDoc::enable_entity_eyedropper_mode(void* id) {
 	eng->log_to_fullscreen_gui(Debug, "entering eyedropper mode...");
@@ -267,7 +278,7 @@ void EditorDoc::validate_prefab()
 	}
 	if (!root) {
 		sys_print(Debug, "prefab had no root\n");
-		root = level->spawn_entity();
+		root = spawn_entity();
 	}
 	root->is_root_of_prefab = true;
 	root->what_prefab = get_editing_prefab();
@@ -318,8 +329,8 @@ void EditorDoc::on_map_load_return(bool good)
 			}
 
 			if (!get_doc_name().empty()) {
-				editing_prefab = g_assets.find_sync<PrefabAsset>(get_doc_name()).get();
-				if (!editing_prefab) {
+				editing_prefab_ptr = g_assets.find_sync<PrefabAsset>(get_doc_name()).get();
+				if (!editing_prefab_ptr) {
 					PopupTemplate::create_basic_okay(
 						EditorPopupManager::inst,
 						"Error",
@@ -329,10 +340,17 @@ void EditorDoc::on_map_load_return(bool good)
 					set_empty_doc();
 				}
 				else
-					eng->get_level()->spawn_prefab(editing_prefab);
+					eng->get_level()->spawn_prefab(editing_prefab_ptr);
 			}
+
+			if (!editing_prefab_ptr) {
+				editing_prefab_ptr = new PrefabAsset;
+				g_assets.install_system_asset(editing_prefab_ptr, "!EMPTY");
+			}
+			ASSERT(editing_prefab_ptr);
+
 			if (get_doc_name().empty())
-				eng->get_level()->spawn_entity();	// spawn empty prefab entity
+				spawn_entity();// spawn empty prefab entity
 
 			validate_prefab();
 		}
@@ -345,7 +363,7 @@ void EditorDoc::on_map_load_return(bool good)
 }
 bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 {
-	editing_prefab = nullptr;
+	editing_prefab_ptr = nullptr;
 
 	// schema vs level edit switch
 	if (strcmp(arg, "prefab") == 0)
@@ -1894,3 +1912,53 @@ void EditorUILayout::paint(UIBuilder& builder) {
 
 
 #endif
+
+Entity* EditorDoc::spawn_entity()
+{
+	Entity* e = eng->get_level()->spawn_entity();
+	instantiate_into_scene(e);
+	return e;
+}
+
+Component* EditorDoc::attach_component(const ClassTypeInfo* ti, Entity* e)
+{
+	Component* c = e->create_component_type(ti);
+	instantiate_into_scene(c);
+	return c;
+}
+
+void EditorDoc::remove_scene_object(BaseUpdater* u)
+{
+	u->destroy_deferred();
+}
+
+void EditorDoc::insert_unserialized_into_scene(UnserializedSceneFile& file, SerializedSceneFile* scene)
+{
+	if (!scene) {	// means assign new ids
+		for (auto& [path, e] : file.get_objects()) {
+			instantiate_into_scene(e);
+		}
+	}
+	eng->get_level()->insert_unserialized_entities_into_level(file, scene);
+}
+
+void EditorDoc::instantiate_into_scene(BaseUpdater* u)
+{
+	u->unique_file_id = get_next_file_id();
+	u->what_prefab = get_editing_prefab();
+	if (auto ent = u->cast_to<Entity>())
+		ent->set_nested_owner_prefab(nullptr);	// remove, this is only used for nested prfabs, which is
+}
+
+Entity* EditorDoc::spawn_prefab(PrefabAsset* prefab)
+{
+	if (!prefab)
+		return nullptr;
+	Entity* e = eng->get_level()->spawn_prefab(prefab);
+	if (!e)
+		return nullptr;
+	e->unique_file_id = get_next_file_id();
+	assert(e->what_prefab);	// should have this already
+	e->set_nested_owner_prefab(get_editing_prefab());
+	return e;
+}

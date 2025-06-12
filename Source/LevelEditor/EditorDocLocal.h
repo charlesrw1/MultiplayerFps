@@ -34,6 +34,8 @@
 #include "Framework/ConsoleCmdGroup.h"
 #include "UI/Widgets/Layouts.h"
 
+#include <variant>
+
 extern ConfigVar g_mousesens;
 
 enum TransformType
@@ -462,7 +464,8 @@ private:
 
 	EditorDoc& ed_doc;
 };
-
+template<class... Ts>
+struct overloads : Ts... { using Ts::operator()...; };
 class LEPlugin;
 class EditorUILayout;
 class Model;
@@ -527,11 +530,7 @@ public:
 	};
 
 	bool is_this_object_not_inherited(const BaseUpdater* b) const {
-		if (edit_category == EditCategory::EDIT_SCENE) 
-			return this_is_newly_created(b,nullptr);
-		else {
-			return this_is_newly_created(b, editing_prefab);
-		}
+		return PrefabToolsUtil::is_newly_created(*b, get_editing_prefab() /* null for scene mode */);
 	}
 	bool is_this_object_inherited(const BaseUpdater* b) const {
 		return !is_this_object_not_inherited(b);
@@ -540,14 +539,16 @@ public:
 	bool can_delete_this_object(const BaseUpdater* b) const {
 		if (is_this_object_inherited(b)) // cant delete inherited objects
 			return false;
-		if (edit_category == EditCategory::EDIT_PREFAB) {
+		if (is_editing_prefab()) {
 			auto ent = b->cast_to<Entity>();
-			if (ent && !ent->get_parent())
-				return false;	// cant delete the root of the current prefab
+			if (!ent)
+				return true;
+			const bool is_part_of_prefab = PrefabToolsUtil::is_part_of_a_prefab(*ent);
+			const bool is_root = is_part_of_prefab && PrefabToolsUtil::am_i_the_root_prefab_node_for_this_prefab(*ent, get_editing_prefab());
+			return !is_root;
 		}
 		return true;	// else can delete
 	}
-
 	bool is_in_eyedropper_mode() const {
 		return eye_dropper_active;
 	}
@@ -558,20 +559,15 @@ public:
 	}
 	bool is_editing_prefab() const { return edit_category == EditCategory::EDIT_PREFAB; }
 	bool is_editing_scene() const { return edit_category == EditCategory::EDIT_SCENE; }
-	PrefabAsset* get_editing_prefab() {
-		return editing_prefab;
+	PrefabAsset* get_editing_prefab() const {
+		if (!is_editing_prefab()) 
+			return nullptr;
+		ASSERT(editing_prefab_ptr);
+		return editing_prefab_ptr;
 	}
 	void validate_prefab();
 	Entity* get_prefab_root_entity();
-
-	std::string get_name() {
-		auto name = get_doc_name();
-		if (name.empty()) name = "<unnamed>";
-		if (is_editing_prefab())
-			return "Prefab: " + name;
-		else
-			return "Scene: " + name;
-	}
+	string get_name();
 
 	bool local_transform = false;
 	TransformType transform_tool_type;
@@ -580,9 +576,15 @@ public:
 	void transform_tool_update();
 	void enter_transform_tool(TransformType type);
 	void leave_transform_tool(bool apply_delta);
-
-	
 	void set_plugin(const ClassTypeInfo* plugin_type) {}
+
+	Entity* spawn_entity();
+	Component* attach_component(const ClassTypeInfo* ti, Entity* e);
+	void remove_scene_object(BaseUpdater* u);
+	void insert_unserialized_into_scene(UnserializedSceneFile& file, SerializedSceneFile* scene);
+	void instantiate_into_scene(BaseUpdater* u);
+	Entity* spawn_prefab(PrefabAsset* prefab);
+
 
 	//std::unique_ptr<LEPlugin> active_plugin;
 	std::unique_ptr<UndoRedoSystem> command_mgr;
@@ -614,13 +616,12 @@ public:
 
 
 	void validate_fileids_before_serialize();
-	int get_next_file_id() {
-		return ++file_id_start;
-	}
 
 	void set_camera_target_to_sel();
 private:
-
+	int get_next_file_id() {
+		return ++file_id_start;
+	}
 	void on_mouse_drag(int x, int y);
 
 
@@ -630,8 +631,7 @@ private:
 	void* active_eyedropper_user_id = nullptr;	// for id purposes only
 
 	EditCategory edit_category = EditCategory::EDIT_SCENE;
-	PrefabAsset* editing_prefab = nullptr;
-
+	PrefabAsset* editing_prefab_ptr = nullptr;
 	FnFactory<IPropertyEditor> grid_factory;
 	uptr<ConsoleCmdGroup> cmds;
 };

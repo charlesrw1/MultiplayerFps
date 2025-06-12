@@ -5,20 +5,78 @@
 
 const char* const CLASSNAME = "classname";
 
-extern std::string serialize_build_relative_path(const char* from, const char* to);
-extern std::string unserialize_relative_to_absolute(const char* relative, const char* root);
-static bool is_path_a_subpath(const std::string& p)
-{
-	auto find = p.find('/');
-	return find != std::string::npos;
+//extern string serialize_build_relative_path(const char* from, const char* to);
+//extern string unserialize_relative_to_absolute(const char* relative, const char* root);
+
+using std::vector;
+
+vector<string> split_path(const string& path, char delimiter='/') {
+	vector<string> result;
+	size_t start = 0;
+	size_t end = 0;
+	while ((end = path.find(delimiter, start)) !=  string::npos) {
+		if (end != start) // skip empty segments
+			result.emplace_back(path.substr(start, end - start));
+		start = end + 1;
+	}
+	// Add last segment if not empty
+	if (start < path.length()) {
+		result.emplace_back(path.substr(start));
+	}
+	return result;
 }
+
+vector<string> make_relative_path(const vector<string>& from, const vector<string>& to)
+{
+	size_t common = 0;
+	while (common < from.size() && common < to.size() && from[common] == to[common]) {
+		++common;
+	}
+	vector<string> result;
+	// Go up from "from" to the common base
+	for (size_t i = common; i < from.size(); ++i) {
+		result.push_back("..");
+	}
+	// Go down into "to"
+	for (size_t i = common; i < to.size(); ++i) {
+		result.push_back(to[i]);
+	}
+
+	return result;
+}
+
+
+vector<string> resolve_relative_path(const vector<string>& base, const vector<string>& relative)
+{
+	vector<string> result = base;
+
+	for (const auto& part : relative) {
+		if (part == "..") {
+			if (!result.empty()) result.pop_back(); // go up one level
+		}
+		else if (part != ".") {
+			result.push_back(part); // descend into directory or file
+		}
+	}
+
+	return result;
+}
+
+string combine_path(const vector<string>& paths) {
+	string out;
+	for (auto& p : paths)
+		out += p + "/";
+	if (!out.empty()) out.pop_back();
+	return out;
+}
+
 
 void WriteSerializerBackendJson::serialize_class_shared(opt<const char*> tag, const ClassTypeInfo& info, ClassBase*& ptr, bool is_only_reference)
 {
 	const bool is_array = !tag.has_value();
 
 	if (!ptr) {
-		std::string path = "";
+		string path = "";
 		if (is_array)
 			serialize_ar(path);
 		else
@@ -26,15 +84,23 @@ void WriteSerializerBackendJson::serialize_class_shared(opt<const char*> tag, co
 		return;
 	}
 
-	auto path = pathmaker.make_path(ptr);
-	std::string pathtowrite = "";
+	//string path = pathmaker.make_path(ptr);
+	auto [path, is_subobject] = pathmaker.make_path(ptr);
+	vector<string> path_s = split_path(path);
+	assert(!path_s.empty());
+
+	string pathtowrite = "";
 	if (currently_writing_class) {
-		auto parentpath = pathmaker.make_path(currently_writing_class);
-		auto relative = serialize_build_relative_path(parentpath.c_str(), path.c_str());
-		pathtowrite = relative;
+		vector<string> parent_s = split_path(pathmaker.make_path(currently_writing_class).path);
+		assert(!parent_s.empty());
+		if (parent_s.at(0) == path_s.at(0)) {
+			auto relative = make_relative_path(parent_s, path_s);
+			pathtowrite = combine_path(relative);
+		}
 	}
-	else
+	if (pathtowrite.empty())
 		pathtowrite = path;
+
 
 	if (is_array)
 		serialize_ar(pathtowrite);
@@ -46,11 +112,11 @@ void WriteSerializerBackendJson::serialize_class_shared(opt<const char*> tag, co
 
 	if (!MapUtil::contains(paths_to_objects, path)) {
 		paths_to_objects[path].o = ptr;
-		paths_to_objects[path].is_from_sub_object = is_path_a_subpath(path);
+		paths_to_objects[path].is_from_sub_object = is_subobject;
 	}
 }
 
-void WriteSerializerBackendJson::write_actual_class(ClassBase* ptr, const std::string& path)
+void WriteSerializerBackendJson::write_actual_class(ClassBase* ptr, const string& path)
 {
 	assert(ptr);
 	assert(!currently_writing_class);
@@ -83,12 +149,10 @@ WriteSerializerBackendJson::WriteSerializerBackendJson(IMakePathForObject& pathm
 	while (!write_queue.empty()) {
 		ClassBase* obj = write_queue.back();
 		write_queue.pop_back();
-		const string path = pathmaker.make_path(obj);
+		const string path = pathmaker.make_path(obj).path;
 		assert(MapUtil::contains(paths_to_objects, path));
-
 		if(!paths_to_objects.find(path)->second.has_been_written)
 			write_actual_class(obj,path);
-
 		paths_to_objects[path].has_been_written = true;
 	}
 	end_obj();
@@ -99,7 +163,7 @@ WriteSerializerBackendJson::WriteSerializerBackendJson(IMakePathForObject& pathm
 		const bool is_valid = o.second.has_been_written && !o.second.is_from_sub_object;
 		if (is_valid) {
 			serialize_array_ar(dummysz);
-			std::string path = o.first;
+			string path = o.first;
 			serialize_ar(path);
 			auto type = pathmaker.make_type_name(o.second.o);
 			serialize_ar(type);
@@ -142,7 +206,7 @@ void WriteSerializerBackendJson::serialize_enum_ar(const EnumTypeInfo* info, int
 
 void WriteSerializerBackendJson::serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr)
 {
-	std::string name = "";
+	string name = "";
 	if (ptr)
 		name = ptr->get_name();
 	serialize_ar(name);
@@ -150,14 +214,14 @@ void WriteSerializerBackendJson::serialize_asset_ar(const ClassTypeInfo& info, I
 
 bool WriteSerializerBackendJson::serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr)
 {
-	std::string name = "";
+	string name = "";
 	if (ptr)
 		name = ptr->get_name();
 	serialize(tag, name);
 	return true;
 }
 
-ReadSerializerBackendJson::ReadSerializerBackendJson(const std::string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
+ReadSerializerBackendJson::ReadSerializerBackendJson(const string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
 	:objmaker(objmaker), loader(loader)
 {
 	this->obj = nlohmann::json::parse(text);
@@ -247,7 +311,7 @@ void ReadSerializerBackendJson::serialize_enum_ar(const EnumTypeInfo* info, int&
 #include "Assets/AssetDatabase.h"
 void ReadSerializerBackendJson::serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr)
 {
-	std::string path = "";
+	string path = "";
 	serialize_ar(path);
 	if (path.empty())
 		ptr = nullptr;
@@ -256,7 +320,7 @@ void ReadSerializerBackendJson::serialize_asset_ar(const ClassTypeInfo& info, IA
 }
 bool ReadSerializerBackendJson::serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr)
 {
-	std::string path = "";
+	string path = "";
 	bool found = serialize(tag, path);
 	if (!found) 
 		return false;
@@ -266,14 +330,14 @@ bool ReadSerializerBackendJson::serialize_asset(const char* tag, const ClassType
 		ptr = loader.load_asset(&info, path);
 	return true;
 }
-
+#include <variant>
 bool ReadSerializerBackendJson::serialize_class_shared(opt<const char*> tag, const ClassTypeInfo& info, ClassBase*& ptr, bool is_only_reference)
 {
 	const bool is_array = !tag.has_value();
 
 	ptr = nullptr;
 	// find in dict
-	std::string relativepath;
+	string relativepath;
 	bool found = true;
 	if (is_array)
 		serialize_ar(relativepath);
@@ -284,11 +348,22 @@ bool ReadSerializerBackendJson::serialize_class_shared(opt<const char*> tag, con
 	if (relativepath.empty())
 		return true;	// found so true, but a nullptr
 
-	std::string path;
-	if (current_root_path)
-		path = unserialize_relative_to_absolute(relativepath.c_str(), current_root_path->c_str());
-	else
+	string path;
+	if (current_root_path) {
+		vector<string> rel_s = split_path(relativepath);
+		vector<string> cur_s = split_path(*current_root_path);
+		assert(!rel_s.empty());
+		if (rel_s.at(0) == "..") {
+			path = combine_path(resolve_relative_path(cur_s, rel_s));
+		}
+
+		//path = unserialize_relative_to_absolute(relativepath.c_str(), current_root_path->c_str());
+	}
+	if (path.empty()) {
 		path = relativepath;
+	}
+	//else
+	//	path = relativepath;
 
 	//auto find = path_to_objs.find(path);
 	//if (find != path_to_objs.end())
@@ -312,7 +387,7 @@ nlohmann::json JsonSerializerUtil::diff_json(const nlohmann::json& a, const nloh
 	json result;
 	if (a.is_object()) {
 		for (auto it = b.begin(); it != b.end(); ++it) {
-			const std::string& key = it.key();
+			const string& key = it.key();
 			if (!a.contains(key)) {
 				result[key] = it.value();  // new key
 			}

@@ -240,7 +240,7 @@ void Level::close_level()
 	all_world_ents.clear_all();
 	source_asset.reset(nullptr);	// deletes level
 }
-
+#include "Framework/Log.h"
 void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids) // was bool assign_new_ids=false
 {
 	auto& objs = scene.get_objects();
@@ -254,8 +254,10 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 				if (idfind != reassign_ids->path_to_instance_handle.end()) {
 					id_to_use = idfind->second;
 				}
-				else
+				else {
+					LOG_WARN("couldnt find id");
 					id_to_use = get_next_id_and_increment();
+				}
 				ASSERT(id_to_use != 0);
 				ASSERT(all_world_ents.find(id_to_use) == nullptr);
 

@@ -63,10 +63,16 @@ void guiEditorCube::paint(UIBuilder& builder)
 		glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec2(0.0f, 1.0f),
 		glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, 0.0f),
 	};
+	glm::mat4 proj = glm::perspective(glm::radians(90.f), 1.f, 0.001f, 100.f);
 	for (int i = 0; i < 36; i++) {
 		corners[i].z *= -1;
 		corners[i] =  (rotation_matrix) * (corners[i]);
+		corners[i].z -= 7.f;
+		glm::vec4 v = proj * glm::vec4(corners[i], 1.f);
+		v /= v.w;
+		corners[i] = v;
 		corners[i].y *= -1;
+		corners[i] *= 7.0;
 		corners[i] = transform_to_screen(corners[i]);
 	}
 

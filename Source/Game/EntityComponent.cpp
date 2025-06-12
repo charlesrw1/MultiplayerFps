@@ -57,15 +57,21 @@ void Component::set_ticking(bool shouldTick)
 	}
 	tick_enabled = shouldTick;
 }
+#include "Framework/Log.h"
 void Component::serialize(Serializer& s)
 {
 	Entity* owner = get_owner();
 	s.serialize_class_reference<Entity>("owner", owner);
 	if (s.is_loading()) {
 		if (owner) {
-			//throw std::runtime_error("Component without owner");
-			owner->add_component_from_unserialization(this);
-			assert(this->entity_owner == owner);
+			if (this->entity_owner) {
+				LOG_WARN("already have owner from unserialize");
+			}
+			else {
+				//throw std::runtime_error("Component without owner");
+				owner->add_component_from_unserialization(this);
+				assert(this->entity_owner == owner);
+			}
 		}
 	}
 

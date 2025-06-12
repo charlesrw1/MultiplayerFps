@@ -121,14 +121,14 @@ bool PhysicsManager::load_physics_into_shape(BinaryReader& reader, physics_shape
 class MyPhysicsQueryFilter : public physx::PxQueryFilterCallback
 {
 public:
-	MyPhysicsQueryFilter(const TraceIgnoreVec* vec) : ignored(vec) {}
+	MyPhysicsQueryFilter(const TraceIgnoreVec* vec) : ignored(*vec) {}
 
 	// Inherited via PxQueryFilterCallback
 	virtual PxQueryHitType::Enum preFilter(const PxFilterData& filterData, const PxShape* shape, const PxRigidActor* actor, PxHitFlags& queryFlags) override
 	{
 		PhysicsBody* ptr =(PhysicsBody*)actor->userData;
-		for (int i = 0; i < ignored->size(); i++)
-			if (ptr == (*ignored)[i])
+		for (int i = 0; i < ignored.size(); i++)
+			if (ptr == (ignored)[i])
 				return PxQueryHitType::eNONE;
 		return PxQueryHitType::eBLOCK;
 	}
@@ -137,7 +137,7 @@ public:
 		return PxQueryHitType::eBLOCK;
 	}
 
-	const TraceIgnoreVec* ignored = nullptr;
+	const TraceIgnoreVec& ignored;
 };
 
 bool PhysicsManager::trace_ray(world_query_result& out, const glm::vec3& start, const glm::vec3& end, const TraceIgnoreVec* ignore, uint32_t mask) {
