@@ -3379,7 +3379,7 @@ handle<Render_Object> Renderer::mouse_pick_scene_for_editor(int x, int y)
 	}
 	int handle_out = scene.proxy_list.objects.at(realid).handle;
 
-	sys_print(Debug, "MODEL: %s\n", scene.proxy_list.objects.at(realid).type_.proxy.model->get_name().c_str());
+	//sys_print(Debug, "MODEL: %s\n", scene.proxy_list.objects.at(realid).type_.proxy.model->get_name().c_str());
 
 	return { handle_out };
 }

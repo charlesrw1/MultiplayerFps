@@ -77,6 +77,7 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<Enti
 	this->handles = handles;
 }
 #include "Framework/Log.h"
+
 void RemoveEntitiesCommand::undo() {
 	ASSERT(is_valid());
 
@@ -590,7 +591,7 @@ DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vecto
 }
 
 void DuplicateEntitiesCommand::execute() {
-	UnserializedSceneFile duplicated = unserialize_entities_from_text(scene->text, AssetDatabase::loader,nullptr);
+	UnserializedSceneFile duplicated = unserialize_entities_from_text(scene->text, AssetDatabase::loader,ed_doc.get_editing_prefab());
 
 	auto& extern_parents = scene->extern_parents;
 	for (auto ep : extern_parents) {

@@ -63,12 +63,6 @@ extern bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAss
 static std::string to_string(StringView view) {
 	return std::string(view.str_start, view.str_len);
 }
-
-// Create from a class, create from a schema, create from a duplication
-// -> serialize to use as an interchange format
-
-
-
 // Unproject mouse coords into a vector
 glm::vec3 EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
 {
@@ -409,37 +403,14 @@ bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
 
 void EditorDoc::close_internal()
 {
-
 	// level will get unloaded in the main loop
-
 	sys_print(Debug, "deleting map file for editor...\n");
-
 	command_mgr->clear_all();
-
 	on_close.invoke();
-
 	gui = nullptr;
-
 	// close the level document, its already been saved at this point
 	eng->leave_level();
 }
-
-
-DECLARE_ENGINE_CMD(ManipulateRotateCommand)
-{
-
-}
-
-DECLARE_ENGINE_CMD(ManipulateTranslateCommand)
-{
-
-}
-
-DECLARE_ENGINE_CMD(ManipulateScaleCommand)
-{
-
-}
-
 
 
 ConfigVar ed_has_snap("ed_has_snap", "0", CVAR_BOOL, "");
@@ -1936,7 +1907,8 @@ void EditorDoc::insert_unserialized_into_scene(UnserializedSceneFile& file, Seri
 {
 	if (!scene) {	// means assign new ids
 		for (auto& [path, e] : file.get_objects()) {
-			instantiate_into_scene(e);
+			e->unique_file_id = get_next_file_id();
+
 		}
 	}
 	eng->get_level()->insert_unserialized_entities_into_level(file, scene);
