@@ -4,7 +4,7 @@
 #include "AnimationGraphEditor.h"
 #include "Root_node.h"
 #include "Animation/Runtime/AnimationTreeLocal.h"
-
+#if 0
 bool State_EdNode::is_start_node() const
 {
 	return get_type() == StateStart_EdNode::StaticType;
@@ -323,4 +323,5 @@ void State_EdNode::remove_output_to(State_EdNode* node, int slot)
 #include "Framework/AddClassToFactory.h"
 #include "AnimationGraphEditor.h"
 
+#endif
 #endif

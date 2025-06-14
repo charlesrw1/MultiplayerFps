@@ -5,6 +5,7 @@
 #include "Basic_nodes.h"
 #include "../Runtime/Statemachine_cfg.h"
 
+#if 0
 class AgSerializeContext;
 CLASS_H(Statemachine_EdNode, Base_EdNode)
 
@@ -65,4 +66,5 @@ public:
 	std::vector<State_EdNode*> states;
 	Statemachine_Node_CFG* node = nullptr;
 };
+#endif
 #endif

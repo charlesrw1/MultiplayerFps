@@ -7,7 +7,7 @@
 #include "../Runtime/Statemachine_cfg.h"
 
 class Statemachine_EdNode;
-
+#if 0
 CLASS_H(State_EdNode, Base_EdNode)
 
 	~State_EdNode() override {
@@ -186,4 +186,5 @@ std::string get_tooltip() const override {
 	std::string get_output_pin_name() const { return "START"; }
 	bool allow_creation_from_menu() const { return false; }
 };
+#endif
 #endif

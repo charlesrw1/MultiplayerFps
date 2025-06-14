@@ -27,6 +27,9 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Source\Animation\Editor\AnimationGraphEditor2.cpp" />
+    <ClCompile Include="Source\Animation\Editor\AnimCommands.cpp" />
+    <ClCompile Include="Source\Animation\Editor\Base_node.cpp" />
     <ClCompile Include="Source\EditorPopups.cpp" />
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
     <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
@@ -50,13 +53,19 @@
     <ClInclude Include="Source\Animation\AnimationTypes.h" />
     <ClInclude Include="Source\Animation\AnimationUtil.h" />
     <ClInclude Include="Source\Animation\Editor\AnimationGraphEditor.h" />
+    <ClInclude Include="Source\Animation\Editor\AnimationGraphEditor2.h" />
     <ClInclude Include="Source\Animation\Editor\AnimationGraphEditorPublic.h" />
+    <ClInclude Include="Source\Animation\Editor\AnimCommands.h" />
     <ClInclude Include="Source\Animation\Editor\Base_node.h" />
+    <ClInclude Include="Source\Animation\Editor\GraphEditor.h" />
     <ClInclude Include="Source\Animation\Editor\Basic_nodes.h" />
     <ClInclude Include="Source\Animation\Editor\Blendspace_nodes.h" />
+    <ClInclude Include="Source\Animation\Editor\Optional.h" />
+    <ClInclude Include="Source\Animation\Editor\Range.h" />
     <ClInclude Include="Source\Animation\Editor\Root_node.h" />
     <ClInclude Include="Source\Animation\Editor\Statemachine_node.h" />
     <ClInclude Include="Source\Animation\Editor\State_node.h" />
+    <ClInclude Include="Source\Animation\Editor\GraphUtil.h" />
     <ClInclude Include="Source\Animation\Event.h" />
     <ClInclude Include="Source\Animation\SkeletonData.h" />
     <ClInclude Include="Source\Animation\Runtime\Animation.h" />

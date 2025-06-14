@@ -5,9 +5,20 @@
 
 #include "../Runtime/AnimationTreeLocal.h"
 #include "Animation/Editor/AnimationGraphEditor.h"
+#include "Framework/Reflection2.h"
+
+class Math_EdNode : public Base_EdNode {
+public:
+	CLASS_BODY(Math_EdNode);
+	Math_EdNode() {
+		add_in_port(0, "in_0");
+		add_in_port(1, "in_0");
+		add_out_port(0, "out_0");
+	}
+};
 
 
-
+#if 0
 template<typename T>
 inline bool util_create_or_ensure(T*& node)
 {
@@ -180,6 +191,7 @@ public:
 	
 	VariableNameAndType variable;
 };
+
 
 CLASS_H_EXPLICIT_SUPER(FloatConstant_EdNode, BaseNodeUtil_EdNode<FloatConstant>, Base_EdNode)
 public:
@@ -546,4 +558,5 @@ CLASS_H_EXPLICIT_SUPER(Blend_Layered_EdNode, BaseNodeUtil_EdNode<Blend_Masked_CF
 
 	std::string maskname = "";
 };
+#endif
 #endif

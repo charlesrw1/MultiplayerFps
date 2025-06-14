@@ -12,20 +12,24 @@
 #include "Framework/ReflectionProp.h"
 
 #include "Framework/ClassBase.h"
+#include "Framework/Reflection2.h"
+#include "Framework/StructReflection.h"
+#include "Optional.h"
+#include "Framework/MapUtil.h"
 
 struct ImNodesEditorContext;
 struct editor_layer {
 	ImNodesEditorContext* context = nullptr;
-	uint32_t id = 1;
+	int id = 1;
 };
 
-const uint32_t MAX_INPUTS = 32;
-const uint32_t MAX_NODES_IN_GRAPH = (1 << 14);
-const uint32_t INPUT_START = MAX_NODES_IN_GRAPH;
-const uint32_t OUTPUT_START = INPUT_START + MAX_INPUTS * MAX_NODES_IN_GRAPH;
-const uint32_t LINK_START = OUTPUT_START + MAX_INPUTS * MAX_NODES_IN_GRAPH;
-const uint32_t MAX_STATIC_ATRS = 8;
-const uint32_t STATIC_ATR_START = LINK_START + MAX_INPUTS * MAX_NODES_IN_GRAPH;
+const int MAX_INPUTS = 32;
+const int MAX_NODES_IN_GRAPH = (1 << 14);
+const int INPUT_START = MAX_NODES_IN_GRAPH;
+const int OUTPUT_START = INPUT_START + MAX_INPUTS * MAX_NODES_IN_GRAPH;
+const int LINK_START = OUTPUT_START + MAX_INPUTS * MAX_NODES_IN_GRAPH;
+const int MAX_STATIC_ATRS = 8;
+const int STATIC_ATR_START = LINK_START + MAX_INPUTS * MAX_NODES_IN_GRAPH;
 
 const Color32 ROOT_COLOR = { 94, 2, 2 };
 const Color32 SM_COLOR = { 82, 2, 94 };
@@ -71,14 +75,125 @@ inline GraphPinType hint_str_to_GraphPinType(const char* str)
 	return GraphPinType(anim_graph_value::float_t);
 }
 
+struct GraphNodeHandle {
+	STRUCT_BODY();
+	GraphNodeHandle(int id) : id(id) {}
+	GraphNodeHandle() = default;
+	REF int id = 0;
+	bool is_valid() const {
+		return id != 0;
+	}
+
+	bool operator==(const GraphNodeHandle& other) const { return id == other.id; }
+};
+struct GraphPortHandle {
+	STRUCT_BODY();
+	GraphPortHandle(int id) : id(id) {}
+	GraphPortHandle() = default;
+	REF int id = 0;
+	GraphNodeHandle get_node()const;
+	int get_index() const;
+	bool is_output() const;
+	bool operator==(const GraphPortHandle& other) const { return id == other.id; }
+
+	static GraphPortHandle make(GraphNodeHandle node, int index, bool is_output);
+
+	string to_string() {
+		return "port(" +std::to_string(get_node().id) + ":" + std::to_string(get_index()) + ")";
+	}
+};
+struct GraphLayerHandle {
+	STRUCT_BODY();
+	GraphLayerHandle(int id) : id(id) {}
+	GraphLayerHandle() = default;
+	REF int id = 0;
+	bool operator==(const GraphLayerHandle& other) const { return id == other.id; }
+	bool operator!=(const GraphLayerHandle& other) const { return id != other.id; }
+
+};
+
+struct GraphPort
+{
+	int index = 0;
+	bool output_port = false;
+	string name = "";
+	GraphPinType type;
+
+	GraphPortHandle get_handle(GraphNodeHandle node) const;
+	bool is_output() const {
+		return output_port;
+	}
+	bool is_input() const {
+		return !is_output();
+	}
+	int get_idx() const {
+		return index;
+	}
+
+};
+
+struct GraphLink {
+	STRUCT_BODY();
+	GraphLink() = default;
+	GraphLink(GraphPortHandle input, GraphPortHandle output) {
+		assert(!input.is_output());
+		assert(output.is_output());
+		this->input = input;
+		this->output = output;
+	}
+
+	REF GraphPortHandle input;
+	REF GraphPortHandle output;
+
+	string to_string() {
+		return "link(" + input.to_string() + "," + output.to_string() + ")";
+	}
+
+	bool operator==(const GraphLink& other) {
+		return input == other.input && output == other.output;
+	}
+
+	int get_link_id() const {
+		return input.id;// reuse input, its unique
+	}
+	int get_input_node_id() const {
+		return input.get_node().id;
+	}
+	int get_output_node_id() const {
+		return output.get_node().id;
+	}
+
+	GraphNodeHandle get_other_node(GraphNodeHandle self) {
+		auto n1 = input.get_node();
+		auto n2 = output.get_node();
+		assert(n1 == self || n2 == self);
+		if (n1 == self)
+			return n2;
+		return n1;
+	}
+};
+struct CompilationError
+{
+	enum ErrorType {
+		ERROR,
+		WARN,
+		INFO,
+	}type = ERROR;
+	GraphNodeHandle node;
+	string message;
+};
 
 struct PropertyInfo;
 class Base_EdNode;
 struct GraphNodeInput
 {
-	std::string name;
+	string name;
 	GraphPinType type;
+	int output_id = 0;
+	int input_id = 0;
+
 	Base_EdNode* node = nullptr;
+
 	const PropertyInfo* prop_link = nullptr;
 
 	bool is_node_required = true;	// set to false to not emit errors when node is missing
@@ -86,28 +201,24 @@ struct GraphNodeInput
 	bool is_attached_to_node() const { return node; }
 };
 
-class AnimationGraphEditor;
-CLASS_H(Base_EdNode, ClassBase)
+class AnimationGraphEditorNew;
+
+class EditorNodeGraph;
+class Base_EdNode : public ClassBase
+{
 public:
-	Base_EdNode() {
-		for (int i = 0; i < inputs.size(); i++) 
-			inputs[i].node = nullptr;
-	}
+	CLASS_BODY(Base_EdNode);
+	AnimationGraphEditorNew* editor = nullptr;
+
 	virtual ~Base_EdNode() {}
 
-	static const PropertyInfoList* get_props() {
-		START_PROPS(Base_EdNode)
-			REG_INT(id, PROP_SERIALIZE, ""),
-			REG_INT(graph_layer, PROP_SERIALIZE, ""),
-		END_PROPS(Base_EdNode)
-	}
-
-	void post_construct(uint32_t id, uint32_t graph_layer);
+	virtual void draw_imnode();
 
 	// called after either creation or load from file
-	virtual void init() = 0;
-	virtual std::string get_name() const = 0;
-	virtual bool compile_my_data(const AgSerializeContext* ctx) = 0;
+	const std::string& get_name() const {
+		return name;
+	}
+	//virtual bool compile_my_data(const AgSerializeContext* ctx) = 0;
 
 	// used to specify menu to draw the creation for this in
 	virtual std::string get_menu_category() const { return ""; }
@@ -121,31 +232,19 @@ public:
 	virtual bool has_pin_colors() const { return false; }
 	virtual ImVec4 get_pin_colors() const { return ImVec4(1, 1, 1, 1); }
 	virtual BaseAGNode* get_graph_node() { return nullptr; }
-	// used for blendspace nodes to add ref'd clip nodes
-	virtual void get_any_extra_refed_graph_nodes(std::vector<BaseAGNode*>& refed_nodes) {}
-
-	// this call adds elements that are being edited like Node_CFG, State
-	virtual void add_props_for_extra_editable_element(std::vector<PropertyListInstancePair>& props) {
-	}
-
-	virtual void get_link_props(std::vector<PropertyListInstancePair>& props, int slot) {}
 
 	virtual bool dont_call_compile() const { return false; }
-	virtual bool traverse_and_find_errors();
-	virtual void remove_reference(Base_EdNode* node);
+	//virtual bool traverse_and_find_errors();
+	//virtual void remove_reference(Base_EdNode* node);
 	
 	// for statemachine and state nodes
 	virtual const editor_layer* get_layer() const { return nullptr; }
 	virtual std::string get_layer_tab_title() const { return ""; }
 
-	virtual void on_remove_pin(int slot, bool force = false) {
-		inputs[slot].node = nullptr;
-	}
-	virtual void on_post_remove_pins() {}
-	virtual bool add_input(AnimationGraphEditor* ed, Base_EdNode* input, uint32_t slot) {
-		inputs[slot].node = input;
-		return false;
-	}
+	//virtual bool add_input(AnimationGraphEditor* ed, Base_EdNode* input, uint32_t slot) {
+	//	inputs[slot].node = input;
+	//	return false;
+	//}
 
 
 	// animation graph specific stuff
@@ -163,97 +262,180 @@ public:
 	virtual bool has_output_pin() const { return true; }
 	virtual bool can_delete() const { return true; }
 
-	virtual std::string get_input_pin_name(int index) const { return inputs[index].name; }
-	virtual std::string get_output_pin_name() const { return  "out"; }
+	//virtual std::string get_input_pin_name(int index) const { return inputs[index].name; }
+	//virtual std::string get_output_pin_name() const { return  "out"; }
 
-	virtual GraphPinType get_output_type_general() const = 0;
-	virtual bool can_output_to_type(GraphPinType input_pin) const {
-		return get_output_type_general() == input_pin;
+	//virtual GraphPinType get_output_type_general() const = 0;
+	//virtual bool can_output_to_type(GraphPinType input_pin) const {
+	//	return get_output_type_general() == input_pin;
+	//}
+
+	GraphPortHandle getinput_id(int inputslot) const {
+		return inputslot + self.id * MAX_INPUTS + INPUT_START;
+	}
+	GraphPortHandle getoutput_id(int outputslot) const {
+		return outputslot + self.id * MAX_INPUTS + OUTPUT_START;
+	}
+	int getlink_id(int link_idx) const {
+		return link_idx + self.id * MAX_INPUTS + LINK_START;
 	}
 
-	uint32_t getinput_id(uint32_t inputslot) const {
-		return inputslot + id * MAX_INPUTS + INPUT_START;
-	}
-	uint32_t getoutput_id(uint32_t outputslot) const {
-		return outputslot + id * MAX_INPUTS + OUTPUT_START;
-	}
-	uint32_t getlink_id(uint32_t link_idx) const {
-		return link_idx + id * MAX_INPUTS + LINK_START;
-	}
-
-	static uint32_t get_slot_from_id(uint32_t id) {
+	static int get_slot_from_id(int id) {
 		return id % MAX_INPUTS;
 	}
 
-	static uint32_t get_nodeid_from_output_id(uint32_t outputid) {
+	static int get_nodeid_from_output_id(int outputid) {
 		return (outputid - OUTPUT_START) / MAX_INPUTS;
 	}
-	static uint32_t get_nodeid_from_input_id(uint32_t inputid) {
+	static int get_nodeid_from_input_id(int inputid) {
 		return (inputid - INPUT_START) / MAX_INPUTS;
 	}
-	static uint32_t get_nodeid_from_link_id(uint32_t linkid) {
+	static int get_nodeid_from_link_id(int linkid) {
 		return (linkid - LINK_START) / MAX_INPUTS;
 	}
-	static uint32_t get_nodeid_from_static_atr_id(uint32_t staticid) {
+	static int get_nodeid_from_static_atr_id(int staticid) {
 		return (staticid - STATIC_ATR_START) / MAX_STATIC_ATRS;
 	}
-
-	void append_fail_msg(const char* msg) {
-		compile_error_string += msg;
+	GraphPort& add_in_port(int index, string name) {
+		GraphPort p;
+		p.index = index;
+		p.output_port = false;
+		p.name = name;
+		ports.push_back(p);
+		return ports.back();
 	}
-	void append_info_msg(const char* msg) {
-		compile_info_string += msg;
-	}
-
-	uint32_t id = 0;
-	uint32_t graph_layer = 0;
-
-	bool has_errors() const {
-		return !compile_error_string.empty();
-	}
-
-	void clear_info_and_fail_msgs() {
-		compile_error_string.clear();
-		compile_info_string.clear();
+	GraphPort& add_out_port(int index, string name) {
+		GraphPort p;
+		p.output_port = true;
+		p.index = index;
+		p.name = name;
+		ports.push_back(p);
+		return ports.back();
 	}
 
-	bool children_have_errors = false;
-	std::string compile_error_string;
-	std::string compile_info_string;
+	//void append_fail_msg(const char* msg) {
+	//	compile_error_string += msg;
+	//}
+	//void append_info_msg(const char* msg) {
+	//	compile_info_string += msg;
+	//}
 
-	bool is_this_node_created() const {
-		return is_newly_created;
+	//bool has_errors() const {
+	//	return !compile_error_string.empty();
+	//}
+
+	//void clear_info_and_fail_msgs() {
+	//	compile_error_string.clear();
+	//	compile_info_string.clear();
+	//}
+
+	//bool children_have_errors = false;
+	//string compile_error_string;
+	//string compile_info_string;
+
+	//bool is_this_node_created() const {
+	//	return is_newly_created;
+	//}
+	//void clear_newly_created() {
+	//	is_newly_created = false;
+	//}
+
+	//int get_input_size() const { return (int)inputs.size(); }
+	//std::vector<GraphNodeInput> inputs;
+
+	opt<int> find_link_idx(GraphPortHandle port) {
+
+		for (int i = 0; i < links.size(); i++) {
+			const GraphLink& l = links.at(i);
+			if (l.input == port || l.output == port)
+				return i;
+		}
+		return std::nullopt;
 	}
-	void clear_newly_created() {
-		is_newly_created = false;
+	opt<GraphLink> find_link(GraphPortHandle port) {
+		opt<int> idx = find_link_idx(port);
+		if (!idx.has_value())
+			return std::nullopt;
+		return links.at(idx.value());
 	}
-
-	uint32_t get_input_size() const { return inputs.size(); }
-
-	std::vector<GraphNodeInput> inputs;
-
-	void init_graph_node_input(const char* name, GraphPinType type, const PropertyInfo* pi) {
-		GraphNodeInput i;
-		i.name = name;
-		i.type = type;
-		i.prop_link = pi;
-		inputs.push_back(i);
-	}
-	void init_graph_nodes_from_node() {
-		auto node = get_graph_node();
-		if (!node||!node->get_type().props)
-			return;
-		auto props = node->get_type().props;
-		for (int i = 0; i < props->count; i++) {
-			auto& prop = props->list[i];
-			// value/pose node type
-			if (strcmp(prop.custom_type_str, "AgSerializeNodeCfg") == 0) {
-				auto type = hint_str_to_GraphPinType(prop.range_hint);
-				init_graph_node_input(prop.name, type, &props->list[i]);
-			}
+	void get_ports(vector<int>& input, vector<int>& output) {
+		for (int i = 0; i < ports.size(); i++) {
+			if (ports.at(i).is_input())
+				input.push_back(i);
+			else
+				output.push_back(i);
 		}
 	}
+	opt<int> get_link_index(GraphLink link) {
+		for (int i = 0; i < links.size();i++) {
+			auto& l = links.at(i);
+			if (l == link)
+				return i;
+		}
+		return std::nullopt;
+	}
+	bool does_input_have_port_already(GraphPortHandle input) {
+		assert(input.get_node() == self);
+		assert(!input.is_output());
+		for (GraphLink& link : links) {
+			if (link.input == input)
+				return true;
+		}
+		return false;
+	}
+
+	void add_link(GraphLink link) {
+		assert(link.input.get_node() == self || link.output.get_node() == self);
+		opt<int> index = get_link_index(link);
+		if (index.has_value()) {
+			sys_print(Warning, "link already exists\n");
+			return;
+		}
+		links.push_back(link);
+	}
+	void remove_link(GraphLink link) {
+		opt<int> index = get_link_index(link);
+		if (index.has_value()) {
+			links.erase(links.begin() + index.value());
+		}
+		else {
+			sys_print(Warning, "cant remove link, not found\n");
+		}
+	}
+	void remove_node_from_other_ports();
+
+	bool vaildate_links();
+
+	string name;
+	vector<GraphPort> ports;
+	REF vector<GraphLink> links;
+	REF GraphNodeHandle self;
+	REF GraphLayerHandle layer;
+	REF bool hidden_node = false;
+
+	//void init_graph_node_input(const char* name, GraphPinType type, const PropertyInfo* pi) {
+	//	GraphNodeInput i;
+	//	i.name = name;
+	//	i.type = type;
+	//	i.prop_link = pi;
+	//	inputs.push_back(i);
+	//}
+	//void init_graph_nodes_from_node() {
+	//	auto node = get_graph_node();
+	//	if (!node||!node->get_type().props)
+	//		return;
+	//	auto props = node->get_type().props;
+	//	for (int i = 0; i < props->count; i++) {
+	//		auto& prop = props->list[i];
+	//		// value/pose node type
+	//		if (strcmp(prop.custom_type_str, "AgSerializeNodeCfg") == 0) {
+	//			auto type = hint_str_to_GraphPinType(prop.range_hint);
+	//			init_graph_node_input(prop.name, type, &props->list[i]);
+	//		}
+	//	}
+	//}
+	//
 private:
-	bool is_newly_created = false;
+	//bool is_newly_created = false;
 };
 #endif

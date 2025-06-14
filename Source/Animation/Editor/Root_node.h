@@ -2,7 +2,7 @@
 #ifdef EDITOR_BUILD
 #include "Base_node.h"
 #include "State_node.h"
-
+#if 0
 CLASS_H(Root_EdNode, Base_EdNode)
 	void init() override {
 		init_graph_node_input("input", GraphPinType(GraphPinType::localspace_pose), nullptr);
@@ -45,4 +45,5 @@ CLASS_H(Root_EdNode, Base_EdNode)
 
 
 };
+#endif
 #endif

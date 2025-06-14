@@ -25,30 +25,7 @@
 
 #include "Framework/MulticastDelegate.h"
 #include "EditorTool3d.h"
-
-#include "Game/AssetPtrMacro.h"
-#include "Framework/FnFactory.h"
-
-struct GraphTab {
-	const editor_layer* layer = nullptr;
-	Base_EdNode* owner_node = nullptr;
-	bool open = true;
-	glm::vec2 pan = glm::vec2(0.f, 0.f);
-	std::string tabname;
-	bool reset_pan_to_middle_next_draw = false;
-
-	bool is_statemachine_tab() {
-		return owner_node && owner_node->is_statemachine();
-	}
-
-	void update_tab_name() {
-		if (!owner_node)
-			tabname = "ROOT";
-		else
-			tabname = owner_node->get_layer_tab_title();
-	}
-};
-
+#if 0
 class AnimationGraphEditor;
 class TabState
 {
@@ -111,7 +88,7 @@ public:
 		return -1;
 	}
 
-	uint32_t get_current_layer_from_tab() {
+	int get_current_layer_from_tab() {
 		// 0 = root layer
 
 		int active = active_tab;
@@ -129,7 +106,7 @@ public:
 			if (find == name_to_count.end()) name_to_count[tabs[i].tabname] = 1;
 			else name_to_count[tabs[i].tabname]++;
 		}
-		for (int i = tabs.size() - 1; i >= 0; i--) {
+		for (int i = (int)tabs.size() - 1; i >= 0; i--) {
 			auto find = name_to_count.find(tabs[i].tabname);
 			if (find->second > 1) {
 				tabs[i].tabname += "_";
@@ -167,7 +144,7 @@ private:
 
 struct VariableNameAndType
 {
-	std::string str;
+	string str;
 	anim_graph_value type = anim_graph_value::float_t;
 };
 
@@ -198,17 +175,7 @@ private:
 };
 
 
-class AnimGraphClipboard
-{
-public:
-	AnimGraphClipboard();
-	void remove_references(Base_EdNode* node);
-	void on_key_down(const SDL_KeyboardEvent& k);
-private:
-	void on_close();
-	void paste_selected();
-	std::vector<Base_EdNode*> clipboard;
-};
+
 
 class Texture;
 class AG_GuiLayout;
@@ -226,12 +193,6 @@ public:
 
 	bool can_save_document() override;
 	virtual void imgui_draw() override;
-
-	enum class graph_playback_state {
-		stopped,
-		running,
-		paused,
-	};
 
 
 	graph_playback_state get_playback_state() { return playback; }
@@ -260,16 +221,16 @@ public:
 	}
 
 	void delete_selected();
-	void nuke_layer(uint32_t layer_id);
+	void nuke_layer(int layer_id);
 	void remove_node_from_index(int index, bool force);
-	void remove_node_from_id(uint32_t index);
-	int find_for_id(uint32_t id);
-	Base_EdNode* find_node_from_id(uint32_t id) {
+	void remove_node_from_id(int index);
+	int find_for_id(int id);
+	Base_EdNode* find_node_from_id(int id) {
 		return nodes.at(find_for_id(id));
 	}
 
 	template<typename T>
-	T* find_first_node_in_layer(uint32_t layer) {
+	T* find_first_node_in_layer(int layer) {
 		for (int i = 0; i < nodes.size(); i++) {
 			if (nodes[i]->graph_layer == layer && nodes[i]->get_type() == T::StaticType) {
 				return nodes[i]->cast_to<T>();
@@ -277,7 +238,7 @@ public:
 		}
 		return nullptr;
 	}
-	Base_EdNode* get_owning_node_for_layer(uint32_t layer) {
+	Base_EdNode* get_owning_node_for_layer(int layer) {
 		for (int i = 0; i < nodes.size(); i++) {
 
 			auto sublayer = nodes[i]->get_layer();
@@ -327,9 +288,9 @@ public:
 		return layer;
 	}
 
-	Base_EdNode* user_create_new_graphnode(const char* typename_, uint32_t layer);
+	Base_EdNode* user_create_new_graphnode(const char* typename_, int layer);
 
-	void add_root_node_to_layer(Base_EdNode* parent, uint32_t layer, bool is_statemachine) {
+	void add_root_node_to_layer(Base_EdNode* parent, int layer, bool is_statemachine) {
 		user_create_new_graphnode((is_statemachine) ? "StateStart_EdNode" : "Root_EdNode", layer);
 	}
 
@@ -338,7 +299,7 @@ public:
 	void draw_popups();
 	void draw_prop_editor();
 	void handle_imnode_creations(bool* open_popup_menu_from_drop);
-	void draw_graph_layer(uint32_t layer);
+	void draw_graph_layer(int layer);
 
 	void signal_nessecary_prop_ed_reset() {
 		reset_prop_editor_next_tick = true;
@@ -391,14 +352,14 @@ public:
 
 	struct selection_state
 	{
-		uint32_t node_last_frame = -1;
-		uint32_t link_last_frame = -1;
+		int node_last_frame = -1;
+		int link_last_frame = -1;
 	}sel;
 
 	struct create_from_drop_state {
 		Base_EdNode* from = nullptr;
 		bool from_is_input = false;
-		uint32_t slot = 0;
+		int slot = 0;
 	}drop_state;
 
 	ImNodesEditorContext* default_editor = nullptr;
@@ -407,8 +368,8 @@ public:
 	std::unique_ptr<Animation_Tree_CFG> editing_tree;
 
 	GraphOutput out;
-	uint32_t current_id = 0;
-	uint32_t current_layer = 1;	// layer 0 is root
+	int current_id = 0;
+	int current_layer = 1;	// layer 0 is root
 
 	PropertyGrid self_grid;
 
@@ -416,10 +377,10 @@ public:
 		editing_tree->all_nodes.push_back(n);
 	}
 
+	void post_map_load_callback();
 	const ClassTypeInfo& get_asset_type_info() const override {
 		return Animation_Tree_CFG::StaticType;
 	}
-	void post_map_load_callback();
 	const char* get_save_file_extension() const override {
 		return "ag";
 	}
@@ -428,4 +389,5 @@ public:
 };
 
 extern AnimationGraphEditor anim_graph_ed;
+#endif
 #endif

@@ -4,7 +4,7 @@
 #include "Basic_nodes.h"
 
 
-
+#if 0
 CLASS_H_EXPLICIT_SUPER(Blendspace2d_EdNode, BaseNodeUtil_EdNode<BlendSpace2d_CFG>, Base_EdNode)
 public:
 	MAKE_STANDARD_FUNCTIONS(
@@ -190,4 +190,5 @@ public:
 		cols--;
 	}
 };
+#endif
 #endif

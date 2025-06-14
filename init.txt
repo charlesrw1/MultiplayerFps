@@ -52,6 +52,8 @@ bind "Keypad 7" Ctrl "FILTER_FOR AnimationSeq"
 bind "Keypad 8" Ctrl "FILTER_FOR EntityClass"
 bind "F" SET_ORBIT_TARGET
 
+bind "Z" Ctrl "anim.undo"
+
 bind J "toggle r.taa"
 bind K "toggle r.taa_flicker_remove"
 bind L "toggle r.disable_animated_velocity_vector"

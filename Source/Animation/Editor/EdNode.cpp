@@ -8,42 +8,7 @@
 #include "Framework/AddClassToFactory.h"
 #include "Framework/ReflectionMacros.h"
 
-
-CLASS_IMPL(Base_EdNode);
-
-CLASS_IMPL(Clip_EdNode);
-CLASS_IMPL(Frame_Evaluate_EdNode);
-CLASS_IMPL(Additive_EdNode);
-CLASS_IMPL(Subtract_EdNode);
-CLASS_IMPL(Root_EdNode);
-CLASS_IMPL(Statemachine_EdNode);
-CLASS_IMPL(Blend_EdNode);
-CLASS_IMPL(Blend_int_EdNode);
-
-CLASS_IMPL(Mirror_EdNode);
-CLASS_IMPL(Blendspace2d_EdNode);
-CLASS_IMPL(Blend_Layered_EdNode);
-
-CLASS_IMPL(State_EdNode);
-CLASS_IMPL(StateStart_EdNode);
-CLASS_IMPL(StateAlias_EdNode);
-
-CLASS_IMPL(MeshToLocalspace_EdNode);
-CLASS_IMPL(LocalToMeshspace_EdNode);
-CLASS_IMPL(GetCachedPose_EdNode);
-CLASS_IMPL(SavePoseToCache_EdNode);
-CLASS_IMPL(DirectPlaySlot_EdNode);
-CLASS_IMPL(TwoBoneIK_EdNode);
-CLASS_IMPL(CopyBone_EdNode);
-
-CLASS_IMPL(FloatConstant_EdNode);
-CLASS_IMPL(Curve_EdNode);
-CLASS_IMPL(VectorConstant_EdNode);
-CLASS_IMPL(Variable_EdNode);
-CLASS_IMPL(RotationConstant_EdNode);
-CLASS_IMPL(ModifyBone_EdNode);
-
-
+#if 0
 
 void Base_EdNode::remove_reference(Base_EdNode* node)
 {
@@ -73,4 +38,5 @@ bool Base_EdNode::traverse_and_find_errors()
 
 	return !children_have_errors && compile_error_string.empty();
 }
+#endif
 #endif

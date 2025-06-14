@@ -527,6 +527,12 @@
     <ClInclude Include="Source\Framework\ArenaStd.h" />
     <ClInclude Include="Source\Framework\Log.h" />
     <ClInclude Include="Source\UI\Widgets\EditorCube.h" />
+    <ClInclude Include="Source\Animation\Editor\AnimationGraphEditor2.h" />
+    <ClInclude Include="Source\Animation\Editor\GraphEditor.h" />
+    <ClInclude Include="Source\Animation\Editor\GraphUtil.h" />
+    <ClInclude Include="Source\Animation\Editor\AnimCommands.h" />
+    <ClInclude Include="Source\Animation\Editor\Optional.h" />
+    <ClInclude Include="Source\Animation\Editor\Range.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -790,6 +796,9 @@
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializationAPI.cpp" />
     <ClCompile Include="Source\UI\Widgets\EditorCube.cpp" />
+    <ClCompile Include="Source\Animation\Editor\AnimationGraphEditor2.cpp" />
+    <ClCompile Include="Source\Animation\Editor\AnimCommands.cpp" />
+    <ClCompile Include="Source\Animation\Editor\Base_node.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

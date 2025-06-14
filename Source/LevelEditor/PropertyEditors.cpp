@@ -353,6 +353,7 @@ bool CubemapAnchorEditor::internal_update()
 
 bool BlendspaceGridEd::internal_update()
 {
+#if 0
 	//auto str = (VariableNameAndType*)prop->get_ptr(instance);
 	//drag_drop_property_ed_func(&str->str, Color32{ 62, 27, 82 }, [&](void* payload) {
 	//
@@ -467,13 +468,14 @@ bool BlendspaceGridEd::internal_update()
 
 		ImGui::EndPopup();
 	}
-
+#endif
 
 	return false;
 }
 
 AgBoneFinder::AgBoneFinder(AnimationGraphEditor& editor) : editor(editor)
 {
+#if 0
 	auto model = editor.out.get_model();
 	if (!model || !model->get_skel()) {
 		no_model = true;
@@ -481,6 +483,7 @@ AgBoneFinder::AgBoneFinder(AnimationGraphEditor& editor) : editor(editor)
 	}
 	for (int i = 0; i < model->get_skel()->bone_dat.size(); i++)
 		bones.push_back(model->get_skel()->bone_dat[i].strname);
+#endif
 
 }
 
@@ -575,6 +578,7 @@ bool FindAnimationClipPropertyEditor::internal_update()
 
 bool FindAnimGraphVariableProp::internal_update()
 {
+#if 0
 	auto str = (VariableNameAndType*)prop->get_ptr(instance);
 	return drag_drop_property_ed_func(&str->str, Color32{ 62, 27, 82 }, [&](void* payload) {
 
@@ -584,6 +588,8 @@ bool FindAnimGraphVariableProp::internal_update()
 		return true;
 
 		}, "AnimGraphVariableDrag", "variable");
+#endif
+	return false;
 
 }
 int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
@@ -863,6 +869,7 @@ void StateTransitionPropertyEditor::draw_value_header_side(StateTransitionScript
 }
 
 void StateTransitionPropertyEditor::draw_value_side(StateTransitionScript* self, bool rhs) {
+#if 0
 	auto& vd = (rhs) ? self->rhs : self->lhs;
 	auto id = (rhs) ? "##rhs" : "##lhs";
 	ImGui::PushID(id);
@@ -916,6 +923,7 @@ void StateTransitionPropertyEditor::draw_value_side(StateTransitionScript* self,
 
 
 	ImGui::PopID();
+#endif
 }
 
 // Inherited via IPropertyEditor

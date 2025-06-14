@@ -27,20 +27,13 @@
 #include "GameEnginePublic.h"
 #include "Game/Components/MeshComponent.h"
 #include "Game/Entity.h"
+#include "Framework/StringUtils.h"
+#include "GraphUtil.h"
 
-std::string remove_whitespace(const char* str)
-{
-	std::string s = str;
-	while (!s.empty() && (s.back() == ' ' || s.back() == '\t' || s.back() == '\n'))
-		s.pop_back();
-	while (!s.empty() && (s[0] == ' ' || s[0] == '\t' || s[0] == '\n'))
-		s.erase(s.begin() + 0);
-	return s;
-}
-
+#if 0
 
 AnimationGraphEditor anim_graph_ed;
-IEditorTool* g_anim_ed_graph = &anim_graph_ed;
+//IEditorTool* g_anim_ed_graph = &anim_graph_ed;
 
 
 CLASS_H(AG_GuiLayout, guiFullscreen)
@@ -191,37 +184,6 @@ void AnimationGraphEditor::close_internal()
 static std::string saved_settings = "";
 
 
-static Color32 to_color32(glm::vec4 v) {
-	Color32 c;
-	c.r = glm::clamp(v.r * 255.f, 0.f, 255.f);
-	c.g = glm::clamp(v.g * 255.f, 0.f, 255.f);
-	c.b = glm::clamp(v.b * 255.f, 0.f, 255.f);
-	c.a = glm::clamp(v.a * 255.f, 0.f, 255.f);
-	return c;
-}
-static glm::vec4 to_vec4(Color32 color) {
-	return glm::vec4(color.r, color.g, color.b, color.a) / 255.f;
-}
-
-Color32 mix_with(Color32 c, Color32 mix, float fac) {
-	return to_color32(glm::mix(to_vec4(c), to_vec4(mix), fac));
-}
-
-Color32 add_brightness(Color32 c, int brightness) {
-	int r = c.r + brightness;
-	int g = c.g + brightness;
-	int b = c.b + brightness;
-	if (r < 0) r = 0;
-	if (r > 255) r = 255;
-	if (g < 0)g = 0;
-	if (g > 255)g = 255;
-	if (b < 0)b = 0;
-	if (b > 255)b = 255;
-	c.r = r;
-	c.g = g;
-	c.b = b;
-	return c;
-}
 #include "Assets/AssetDatabase.h"
 
 void TabState::imgui_draw() {
@@ -230,7 +192,8 @@ void TabState::imgui_draw() {
 
 	int rendered = 0;
 
-	if (tabs.empty()) return;
+	if (tabs.empty()) 
+		return;
 
 	auto forward_img = g_assets.find_global_sync<Texture>("icon/forward.png");
 	auto back_img = g_assets.find_global_sync<Texture>("icon/back.png");
@@ -801,7 +764,7 @@ void AnimationGraphEditor::imgui_draw()
 	IEditorTool::imgui_draw();
 }
 #include "Assets/AssetRegistry.h"
-void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
+void AnimationGraphEditor::draw_graph_layer(int layer)
 {
 	auto strong_error = g_assets.find_global_sync<Texture>("icon/fatalerr.png");
 	auto weak_error = g_assets.find_global_sync<Texture>("icon/error.png");
@@ -816,8 +779,8 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		Color32 nodecolor = node->get_node_color();
 
 		ImNodes::PushColorStyle(ImNodesCol_TitleBar,nodecolor.to_uint());
-		Color32 select_color = add_brightness(nodecolor, 30);
-		Color32 hover_color = add_brightness(mix_with(nodecolor, { 5, 225, 250 }, 0.6), 5);
+		Color32 select_color = GraphUtil::add_brightness(nodecolor, 30);
+		Color32 hover_color = GraphUtil::add_brightness(GraphUtil::mix_with(nodecolor, { 5, 225, 250 }, 0.6), 5);
 		ImNodes::PushColorStyle(ImNodesCol_TitleBarHovered, hover_color.to_uint());
 		ImNodes::PushColorStyle(ImNodesCol_TitleBarSelected, select_color.to_uint());
 
@@ -979,7 +942,6 @@ void AnimationGraphEditor::draw_graph_layer(uint32_t layer)
 		}
 	}
 
-
 	ImNodes::MiniMap();
 	ImNodes::EndNodeEditor();
 
@@ -1083,12 +1045,12 @@ void AnimationGraphEditor::delete_selected()
 
 
 
-void AnimationGraphEditor::remove_node_from_id(uint32_t id)
+void AnimationGraphEditor::remove_node_from_id(int id)
 {
 	return remove_node_from_index(find_for_id(id), false);
 }
 
-void AnimationGraphEditor::nuke_layer(uint32_t id)
+void AnimationGraphEditor::nuke_layer(int id)
 {
 	for (int i = 0; i < nodes.size(); i++) {
 		if (!nodes[i]) continue;
@@ -1145,7 +1107,7 @@ void AnimationGraphEditor::remove_node_from_index(int index, bool force)
 	nodes.resize(sum);
 }
 
-int AnimationGraphEditor::find_for_id(uint32_t id)
+int AnimationGraphEditor::find_for_id(int id)
 {
 	for (int i = 0; i < nodes.size(); i++)
 		if (nodes[i]->id == id)return i;
@@ -1156,7 +1118,7 @@ int AnimationGraphEditor::find_for_id(uint32_t id)
 
 
 
-Base_EdNode* AnimationGraphEditor::user_create_new_graphnode(const char* typename_, uint32_t layer)
+Base_EdNode* AnimationGraphEditor::user_create_new_graphnode(const char* typename_, int layer)
 {
 
 	Base_EdNode* node = ClassBase::create_class<Base_EdNode>(typename_);//factory.createObject(typename_);
@@ -1872,4 +1834,5 @@ AnimationGraphEditor::AnimationGraphEditor() : self_grid(grid_factory) {
 	graph_tabs = std::make_unique<TabState>(this);
 	clipboard = std::make_unique<AnimGraphClipboard>();
 }
+#endif
 #endif
