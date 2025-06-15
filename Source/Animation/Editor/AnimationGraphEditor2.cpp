@@ -74,9 +74,7 @@ void AnimationGraphEditorNew::handle_link_changes()
 
 void AnimationGraphEditorNew::init()
 {
-	//PropertyFactoryUtil::register_anim_editor(*this, grid_factory);
-
-	select_mgr = make_unique<NodeSelectionManager>(*this);
+	PropertyFactoryUtil::register_basic(grid_factory);
 	graph = make_unique<EditorNodeGraph>();
 	settings = make_unique<AnimNodeGraphSettings>();
 	tab_manager = make_unique<GraphTabManager>(*this);
@@ -90,21 +88,20 @@ void AnimationGraphEditorNew::init()
 	concmds->add("anim.del", [this](const Cmd_Args&) {
 		delete_selected();
 		});
-
+	concmds->add("anim.dup", [this](const Cmd_Args&) {
+		dup_selected();
+		});
 	init_node_factory();
-
 	imnodes_context = ImNodes::CreateContext();
 	//ImNodes::GetIO().LinkDetachWithModifierClick.Modifier = &is_modifier_pressed;
 	ImNodes::GetStyle().Flags |= ImNodesStyleFlags_GridSnapping | ImNodesStyleFlags_GridLinesPrimary;
-
 	if (!graph->get_root()) {
 		auto root = graph->create_layer();
 		graph->set_root(root);
 	}
-
 	assert(graph->get_root());
-
 	tab_manager->open_tab(graph->get_root()->get_id(), true);
+	on_node_changes.invoke();
 }
 
 void GraphTabManager::draw_popup_menu()
@@ -158,15 +155,8 @@ void GraphTabManager::draw_popup_menu()
 
 void AnimationGraphEditorNew::init_node_factory()
 {
-	prototypes.add("Add", []() {
-		auto n = new Math_EdNode;
-		return n;
-		});
-	prototypes.add("Sub", []() {
-		auto n = new Math_EdNode;
-		return n;
-		});
-
+	prototypes.add("Add", []() { return new Math_EdNode; });
+	prototypes.add("Sub", []() { return new Math_EdNode; });
 	prototypes.add("Clip", []() { return new Clip_EdNode; });
 	prototypes.add("BreakVec3", []() { return new BreakMake_EdNode(false,true); });
 	prototypes.add("BreakVec2", []() { return new BreakMake_EdNode(false, false); });
@@ -174,24 +164,19 @@ void AnimationGraphEditorNew::init_node_factory()
 	prototypes.add("MakeVec2", []() { return new BreakMake_EdNode(true, false); });
 	prototypes.add("Blend2", []() { return new Blend2_EdNode; });
 	prototypes.add("BlendByInt", []() { return new BlendInt_EdNode; });
-
 }
-
 void AnimationGraphEditorNew::delete_selected()
 {
-	std::vector<int> link_ids;
-	link_ids.resize(ImNodes::NumSelectedLinks());
-	if (link_ids.size() > 0) {
-		ImNodes::GetSelectedLinks(link_ids.data());
-	}
-	vector<int> node_ids;
-	node_ids.resize(ImNodes::NumSelectedNodes());
-	if (node_ids.size() > 0) {
-		ImNodes::GetSelectedNodes(node_ids.data());
-	}
-
+	vector<int> link_ids, node_ids;
+	GraphCommandUtil::get_selected(link_ids, node_ids);
 	add_command(new RemoveGraphObjectsCommand(*this, link_ids, node_ids));
 
+}
+void AnimationGraphEditorNew::dup_selected()
+{
+	vector<int> link_ids, node_ids;
+	GraphCommandUtil::get_selected(link_ids, node_ids);
+	add_command(new DuplicateNodesCommand(*this, node_ids));
 }
 
 void AnimationGraphEditorNew::close_internal()
@@ -215,17 +200,34 @@ bool AnimationGraphEditorNew::can_save_document()
 
 void AnimationGraphEditorNew::imgui_draw()
 {
-	tab_manager->draw();
+	if(ImGui::Begin("Graph")) {
+		playback->draw();
+		tab_manager->draw();
+	}
+	ImGui::End();
+
 	property_window->draw();
 	handle_link_changes();
 	cmd_manager.execute_queued_commands();
+
+	auto update_selected = [this]() {
+		Base_EdNode* nextselected = get_selected_node();
+		if (!nextselected) {
+			if (selected_last_frame.is_valid()) {
+				selected_last_frame = GraphNodeHandle();
+				on_node_changes.invoke();
+			}
+		}
+		else if (!(nextselected->self == selected_last_frame)) {
+			selected_last_frame = nextselected->self;
+			on_node_changes.invoke();
+		}
+	};
+	update_selected();
 }
 
 bool AnimationGraphEditorNew::save_document_internal()
 {
-
-
-
 	return false;
 }
 
@@ -673,6 +675,15 @@ void EditorNodeGraph::remove_node(GraphNodeHandle handle) {
 	nodes.remove(handle.id);
 	delete node;
 }
+void EditorNodeGraph::insert_new_node(Base_EdNode& node, GraphLayerHandle layer, glm::vec2 pos) {
+	auto layerptr = get_layer(layer);
+	assert(layerptr);
+	node.self = GraphNodeHandle(get_next_id());
+	node.layer = layer;
+	nodes.insert(node.self.id, &node);
+	layerptr->add_node_to_layer(node);
+	ImNodes::SetNodeScreenSpacePos(node.self.id, GraphUtil::to_imgui(pos));
+}
 void EditorNodeGraph::insert_nodes(SerializeGraphContainer& container)
 {
 	assert(root_layer);
@@ -703,6 +714,56 @@ void EditorNodeGraph::insert_nodes(SerializeGraphContainer& container)
 		}
 	}
 
+}
+void EditorNodeGraph::insert_nodes_with_new_id(SerializeGraphContainer& container)
+{
+	unordered_map<int, int> old_id_to_new_id;
+	assert(root_layer);
+	for (auto n : container.layers) {
+		assert(n && n->get_id().is_valid());
+		const int oldid = n->get_id().id;
+		n->set_id(get_next_id());
+		const int id = n->get_id().id;
+		old_id_to_new_id.insert({ oldid,id });
+		assert(layers.find(id) == nullptr);
+		layers.insert(id, n);
+	}
+	for (auto n : container.nodes) {
+		assert(n && n->self.is_valid());
+		const int oldid = n->self.id;
+		n->self.id = get_next_id();
+		old_id_to_new_id.insert({ oldid,n->self.id });
+		assert(layers.find(n->self.id) == nullptr);
+		nodes.insert(n->self.id, n);
+		if(MapUtil::contains(old_id_to_new_id, n->layer.id))
+			n->layer = old_id_to_new_id.find(n->layer.id)->second;
+		auto layer = get_layer(n->layer);
+		if (!layer) {
+			sys_print(Warning, "layer not found for unserialized node\n");
+			n->layer = root_layer->get_id();
+			layer = root_layer;
+		}
+		layer->add_node_to_layer(*n);
+		ImNodes::SetNodeGridSpacePos(n->self.id, ImVec2(n->nodex, n->nodey));
+
+	}
+	for (auto n : container.nodes) {
+		for (int i = 0; i < (int)n->links.size(); i++) {
+			GraphLinkWithNode& l = n->links.at(i);
+			if (l.opt_link_node.is_valid())
+				l.opt_link_node = old_id_to_new_id.find(l.opt_link_node.id)->second;
+			GraphNodeHandle inp = l.link.input.get_node();
+			GraphNodeHandle out = l.link.output.get_node();
+			if (MapUtil::contains(old_id_to_new_id, inp.id) && MapUtil::contains(old_id_to_new_id, out.id)) {
+				l.link.input = GraphPortHandle::make(old_id_to_new_id.find(inp.id)->second, l.link.input.get_index(), false);
+				l.link.output = GraphPortHandle::make(old_id_to_new_id.find(out.id)->second, l.link.output.get_index(), true);
+			}
+			else {
+				n->links.erase(n->links.begin() + i);
+				i--;
+			}
+		}
+	}
 }
 void NodeGraphLayer::handle_drag_drop()
 {
@@ -742,8 +803,22 @@ void NodeGraphLayer::handle_drag_drop()
 }
 
 GraphPropertyWindow::GraphPropertyWindow(AnimationGraphEditorNew& editor)
-	: graph_grid(editor.get_factory()), node_grid(editor.get_factory())
+	: grid(editor.get_factory()), ed(editor)
 {
+	editor.on_node_changes.add(this, [this]() {
+			update_property_window();
+		});
+}
+void GraphPropertyWindow::update_property_window()
+{
+	grid.clear_all();
+	Base_EdNode* node = ed.get_selected_node();
+	if (!node) {
+		grid.add_class_to_grid(ed.get_options_ptr());
+	}
+	else {
+		grid.add_class_to_grid(node);
+	}
 }
 
 void ImNodesInterface::set_node_position(GraphNodeHandle self, glm::vec2 pos)
@@ -794,9 +869,38 @@ void SerializeGraphContainer::serialize(Serializer& s)
 	serialize_set_of_ptrs(s, "nodes", nodes);
 }
 
-uptr<SerializeGraphContainer> SerializeGraphUtils::unserialize(const string& text)
+class MakePathForAnimNode : public IMakePathForObject {
+public:
+	MakePathForAnimNode(const NodePrototypes& p) : p(p) {}
+	MakePath make_path(const ClassBase* toobj) final {
+		return "x" + std::to_string(uintptr_t(toobj));
+	}
+	std::string make_type_name(ClassBase* obj) final {
+		if (auto ednode = obj->cast_to<Base_EdNode>()) {
+			return ednode->name;
+		}
+		return obj->get_type().classname;
+	}
+	nlohmann::json* find_diff_for_obj(ClassBase* obj) final { return nullptr; }
+private:
+	const NodePrototypes& p;
+};
+class MakeObjectFromAnimNode : public IMakeObjectFromPath {
+public:
+	MakeObjectFromAnimNode(const NodePrototypes& p) : p(p) {}
+	ClassBase* create_from_name(ReadSerializerBackendJson& s, const std::string& str, const string& parentpath) final {
+		if (MapUtil::contains(p.creations, str)) {
+			return p.create(str);
+		}
+		return ClassBase::create_class<ClassBase>(str.c_str());
+	}
+	const NodePrototypes& p;
+};
+
+
+uptr<SerializeGraphContainer> SerializeGraphUtils::unserialize(const string& text, const NodePrototypes& p)
 {
-	MakeObjectFromPathGeneric objmaker;
+	MakeObjectFromAnimNode objmaker(p);
 	ReadSerializerBackendJson writer(text, objmaker, *AssetDatabase::loader);
 	ClassBase* rootobj = writer.get_root_obj();
 	if (rootobj&&rootobj->cast_to<SerializeGraphContainer>()) {
@@ -807,9 +911,9 @@ uptr<SerializeGraphContainer> SerializeGraphUtils::unserialize(const string& tex
 	return nullptr;
 }
 
-string SerializeGraphUtils::serialize_to_string(SerializeGraphContainer& container, EditorNodeGraph& graph)
+string SerializeGraphUtils::serialize_to_string(SerializeGraphContainer& container, EditorNodeGraph& graph, const NodePrototypes& p)
 {
-	MakePathForGenericObj pathmaker(false);
+	MakePathForAnimNode pathmaker(p);
 	WriteSerializerBackendJson writer(pathmaker,container);
 	return writer.get_output().dump();
 }
@@ -846,4 +950,29 @@ SerializeGraphContainer SerializeGraphUtils::make_container_from_nodeids(const v
 	for (auto l : links)
 		handles.push_back(GraphNodeHandle(l));
 	return make_container_from_handles(handles, graph);
+}
+
+Base_EdNode* AnimationGraphEditorNew::get_selected_node()
+{
+	vector<int> nodes;
+	vector<int> links;
+	GraphCommandUtil::get_selected(links, nodes);
+	if (!nodes.empty() && !links.empty())
+		return nullptr;
+	if (nodes.size() == 1) {
+		Base_EdNode* n = graph->get_node(nodes[0]);
+		return n;
+	}
+	if (links.size() == 1) {
+		Base_EdNode* n = GraphCommandUtil::get_optional_link_object(links[0], *graph);
+		return n;
+	}
+	return nullptr;
+}
+void GraphPropertyWindow::draw()
+{
+	if (ImGui::Begin("Properties")) {
+		grid.update();
+	}
+	ImGui::End();
 }

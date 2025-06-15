@@ -3,6 +3,7 @@
 #include "Base_node.h"
 #include "Framework/ConsoleCmdGroup.h"
 class NodeGraphLayer;
+using std::unordered_set;
 
 class GraphCommandUtil
 {
@@ -11,6 +12,8 @@ public:
 	static void add_link(GraphLink link, EditorNodeGraph& graph);
 	static GraphPortHandle get_input_port_from_link(int id);
 	static opt<GraphLink> get_graph_link_from_linkid(int id, EditorNodeGraph& graph);
+	static void get_selected(vector<int>& link_ids, vector<int>& node_ids);
+	static Base_EdNode* get_optional_link_object(int linkid, EditorNodeGraph& graph);
 };
 
 class AnimationGraphEditorNew;
@@ -64,4 +67,15 @@ public:
 class DuplicateNodesCommand : public Command
 {
 public:
+	DuplicateNodesCommand(AnimationGraphEditorNew& ed, vector<int> node_ids);
+	bool is_valid() final { return is_node_valid; }
+	// Inherited via Command
+	virtual void execute() override;
+	virtual void undo() override;
+	virtual std::string to_string() override;
+	AnimationGraphEditorNew& ed;
+	vector<GraphNodeHandle> nodes_to_delete;
+	unordered_set<int> orig_nodes;
+	string serialized;
+	bool is_node_valid = false;
 };

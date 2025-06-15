@@ -3,11 +3,11 @@
 #include <variant>
 using std::variant;
 
-
-struct ClipNode_SData
-{
+class AnimationSeqAsset;
+struct ClipNode_SData {
 	STRUCT_BODY(ClipNode_SData);
 	REF AssetPtr<AnimationSeqAsset> Clip;
+
 	REF bool loop = true;
 	REF StringName SyncGroup;
 	REF sync_opt SyncOption = sync_opt::Default;

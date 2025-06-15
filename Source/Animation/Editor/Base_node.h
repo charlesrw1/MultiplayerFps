@@ -132,7 +132,6 @@ struct GraphPort
 	int get_idx() const {
 		return index;
 	}
-
 };
 
 struct GraphLink {
@@ -214,9 +213,18 @@ struct GraphNodeInput
 
 	bool is_attached_to_node() const { return node; }
 };
+enum class EdNodeCategory
+{
+	None,
+	Math,
+	Function,
 
+	AnimSource,
+	AnimBlend,
+	AnimBoneModify,
+	AnimStatemachine,
+};
 class AnimationGraphEditorNew;
-
 class EditorNodeGraph;
 class Base_EdNode : public ClassBase
 {
@@ -310,136 +318,31 @@ public:
 	static int get_nodeid_from_static_atr_id(int staticid) {
 		return (staticid - STATIC_ATR_START) / MAX_STATIC_ATRS;
 	}
-	GraphPort& add_in_port(int index, string name) {
-		GraphPort p;
-		p.index = index;
-		p.output_port = false;
-		p.name = name;
-		ports.push_back(p);
-		return ports.back();
-	}
-	GraphPort& add_out_port(int index, string name) {
-		GraphPort p;
-		p.output_port = true;
-		p.index = index;
-		p.name = name;
-		ports.push_back(p);
-		return ports.back();
-	}
-
-	//void append_fail_msg(const char* msg) {
-	//	compile_error_string += msg;
-	//}
-	//void append_info_msg(const char* msg) {
-	//	compile_info_string += msg;
-	//}
-
-	//bool has_errors() const {
-	//	return !compile_error_string.empty();
-	//}
-
-	//void clear_info_and_fail_msgs() {
-	//	compile_error_string.clear();
-	//	compile_info_string.clear();
-	//}
-
-	//bool children_have_errors = false;
-	//string compile_error_string;
-	//string compile_info_string;
-
-	//bool is_this_node_created() const {
-	//	return is_newly_created;
-	//}
-	//void clear_newly_created() {
-	//	is_newly_created = false;
-	//}
-
-	//int get_input_size() const { return (int)inputs.size(); }
-	//std::vector<GraphNodeInput> inputs;
-
-	opt<int> find_link_idx_from_port(GraphPortHandle port) {
-
-		for (int i = 0; i < links.size(); i++) {
-			const GraphLink& l = links.at(i).link;
-			if (l.input == port || l.output == port)
-				return i;
-		}
-		return std::nullopt;
-	}
-	opt<GraphLink> find_link_from_port(GraphPortHandle port) {
-		opt<int> idx = find_link_idx_from_port(port);
-		if (!idx.has_value())
-			return std::nullopt;
-		return links.at(idx.value()).link;
-	}
-	void get_ports(vector<int>& input, vector<int>& output) {
-		for (int i = 0; i < ports.size(); i++) {
-			if (ports.at(i).is_input())
-				input.push_back(i);
-			else
-				output.push_back(i);
-		}
-	}
-	opt<int> get_link_index(GraphLink link) {
-		for (int i = 0; i < links.size();i++) {
-			auto& l = links.at(i);
-			if (l.link == link)
-				return i;
-		}
-		return std::nullopt;
-	}
-	bool does_input_have_port_already(GraphPortHandle input) {
-		assert(input.get_node() == self);
-		assert(!input.is_output());
-		for (GraphLinkWithNode& link : links) {
-			if (link.link.input == input)
-				return true;
-		}
-		return false;
-	}
-	void add_link(GraphLink link) {
-		assert(link.input.get_node() == self || link.output.get_node() == self);
-		opt<int> index = get_link_index(link);
-		if (index.has_value()) {
-			sys_print(Warning, "link already exists\n");
-			return;
-		}
-		links.push_back(GraphLinkWithNode(link));
-	}
-	GraphNodeHandle remove_link_to_input(GraphPortHandle p) {
-		opt<int> index = find_link_idx_from_port(p);
-		if (index.has_value()) {
-			return remove_link(links.at(index.value()).link);
-		}
-		else {
-			printf("couldnt find link to input\n");
-			return GraphNodeHandle();
-		}
-	}
-
-	GraphNodeHandle remove_link(GraphLink link) {
-		opt<int> index = get_link_index(link);
-		if (index.has_value()) {
-			GraphNodeHandle link_opt_node = links.at(index.value()).opt_link_node;
-			links.erase(links.begin() + index.value());
-			return link_opt_node;
-		}
-		else {
-			sys_print(Warning, "cant remove link, not found\n");
-			return GraphNodeHandle();
-		}
-	}
+	GraphPort& add_in_port(int index, string name);
+	GraphPort& add_out_port(int index, string name);
+	opt<int> find_link_idx_from_port(GraphPortHandle port);
+	opt<GraphLink> find_link_from_port(GraphPortHandle port);
+	void get_ports(vector<int>& input, vector<int>& output);
+	opt<int> get_link_index(GraphLink link);
+	bool does_input_have_port_already(GraphPortHandle input);
+	void add_link(GraphLink link);
+	GraphNodeHandle remove_link_to_input(GraphPortHandle p);
+	GraphNodeHandle remove_link(GraphLink link);
 	void remove_node_from_other_ports();
 
 	bool vaildate_links();
 
 	string name;
 	vector<GraphPort> ports;
-	REF vector<GraphLinkWithNode> links;
-	REF GraphNodeHandle self;
-	REF GraphLayerHandle layer;
-	REF bool hidden_node = false;
 
+	REFLECT(hide);
+	vector<GraphLinkWithNode> links;
+	REFLECT(hide);
+	GraphNodeHandle self;
+	REFLECT(hide);
+	GraphLayerHandle layer;
+	REFLECT(hide);
+	bool hidden_node = false;
 	REFLECT(hide);
 	float nodex = 0.0;
 	REFLECT(hide);

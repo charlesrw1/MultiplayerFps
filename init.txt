@@ -53,7 +53,8 @@ bind "Keypad 8" Ctrl "FILTER_FOR EntityClass"
 bind "F" SET_ORBIT_TARGET
 
 bind "Z" Ctrl "anim.undo"
-bind "Del" "anim.del"
+bind "D" Shift "anim.dup"
+bind "Delete" "anim.del"
 
 
 bind J "toggle r.taa"

@@ -88,7 +88,7 @@ public:
 	}
 	NodeGraphLayer* create_layer() {
 		NodeGraphLayer* l = new NodeGraphLayer;
-		GraphLayerHandle handle(++id_start);
+		GraphLayerHandle handle(get_next_id());
 		layers.insert(handle.id, l);
 		l->set_id(handle);
 		assert(get_layer(handle) == l);
@@ -98,17 +98,13 @@ public:
 		assert(!root_layer);
 		this->root_layer = l;
 	}
-	void insert_new_node(Base_EdNode& node, GraphLayerHandle layer, glm::vec2 pos) {
-		auto layerptr = get_layer(layer);
-		assert(layerptr);
-		node.self = GraphNodeHandle(++id_start);
-		node.layer = layer;
-		nodes.insert(node.self.id, &node);
-		layerptr->add_node_to_layer(node);
-		ImNodes::SetNodeScreenSpacePos(node.self.id, GraphUtil::to_imgui(pos));
-	}
+	void insert_new_node(Base_EdNode& node, GraphLayerHandle layer, glm::vec2 pos);
 	void insert_nodes(SerializeGraphContainer& container);
+	void insert_nodes_with_new_id(SerializeGraphContainer& container);
 private:
+	int get_next_id() {
+		return ++id_start;
+	}
 	NodeGraphLayer* root_layer = nullptr;
 	hash_map<Base_EdNode*> nodes;
 	hash_map<NodeGraphLayer*> layers;
@@ -128,12 +124,16 @@ enum class GraphPlayState {
 	Running,
 	Paused,
 };
+
 class PlaybackManager
 {
 public:
 	PlaybackManager(AnimationGraphEditorNew& editor) : editor(editor) {}
-	bool is_playing() const;
-	GraphPlayState get_state() const;
+	~PlaybackManager() {}
+
+	bool is_playing() const { return get_state() != GraphPlayState::Stopped; }
+	GraphPlayState get_state() const { return state; }
+	void draw() {}
 private:
 	AnimationGraphEditorNew& editor;
 	Entity* output_entity = nullptr;
@@ -168,10 +168,11 @@ class GraphPropertyWindow
 {
 public:
 	GraphPropertyWindow(AnimationGraphEditorNew& editor);
-	void draw() {}
+	void draw();
 private:
-	PropertyGrid node_grid;
-	PropertyGrid graph_grid;
+	void update_property_window();
+	PropertyGrid grid;
+	AnimationGraphEditorNew& ed;
 };
 
 class ControlParamsWindowNew
@@ -198,12 +199,6 @@ private:
 //	VariableNameAndType dragdrop;
 };
 
-class NodeSelectionManager
-{
-public:
-	NodeSelectionManager(AnimationGraphEditorNew& graph){}
-private:
-};
 class NodeSearcher
 {
 public:
@@ -253,11 +248,18 @@ public:
 		assert(graph);
 		return *graph.get();
 	}
-	const AnimNodeGraphSettings& get_options() {
+	const AnimNodeGraphSettings& get_options() const {
 		assert(settings);
 		return *settings.get();
 	}
+	AnimNodeGraphSettings* get_options_ptr() {
+		assert(settings);
+		return settings.get();
+	}
+
 	MulticastDelegate<const Model*> on_set_new_model;
+	MulticastDelegate<> on_set_new_animator_class;
+	MulticastDelegate<> on_node_changes;
 
 	void add_command(Command* command);
 	bool is_node_selected(Base_EdNode& node) {
@@ -272,10 +274,12 @@ public:
 	ImNodesInterface& get_imnodes() {
 		return *imnodes.get();
 	}
+	Base_EdNode* get_selected_node();
 private:
 	void handle_link_changes();
 	void init_node_factory();
 	void delete_selected();
+	void dup_selected();
 
 	void post_map_load_callback() override{}
 	void init() override;
@@ -296,7 +300,6 @@ private:
 	uptr<GraphTabManager> tab_manager;
 	uptr<PlaybackManager> playback;
 	uptr<ControlParamsWindowNew> params_window;
-	uptr<NodeSelectionManager> select_mgr;
 	uptr<NodeSearcher> node_searcher;
 	FnFactory<IPropertyEditor> grid_factory;
 	NodePrototypes prototypes;
@@ -304,6 +307,8 @@ private:
 	UndoRedoSystem cmd_manager;
 	uptr<ConsoleCmdGroup> concmds;
 	void* imnodes_context = nullptr;
+
+	GraphNodeHandle selected_last_frame;
 };
 
 using std::unordered_map;
@@ -320,8 +325,8 @@ public:
 class SerializeGraphUtils
 {
 public:
-	static uptr<SerializeGraphContainer> unserialize(const string& text);
-	static string serialize_to_string(SerializeGraphContainer& container, EditorNodeGraph& graph);
+	static uptr<SerializeGraphContainer> unserialize(const string& text, const NodePrototypes& p);
+	static string serialize_to_string(SerializeGraphContainer& container, EditorNodeGraph& graph, const NodePrototypes& p);
 	static SerializeGraphContainer make_container_from_handles(vector<GraphNodeHandle> handles, EditorNodeGraph& graph);
 	static SerializeGraphContainer make_container_from_nodeids(const vector<int>& nodes,const vector<int>& links, EditorNodeGraph& graph);
 

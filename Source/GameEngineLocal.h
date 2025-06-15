@@ -21,7 +21,7 @@ class IEditorTool;
 class Player;
 class Model;
 using std::string;
-
+using std::vector;
 class Archive;
 class Client;
 class Server;
@@ -201,10 +201,8 @@ private:
 
 	friend class Ent_Iterator;
 
-
-	std::string* find_keybind(SDL_Scancode code, uint16_t keymod);
-
-	std::unordered_map<uint32_t, string> keybinds;
+	vector<string>* find_keybinds(SDL_Scancode code, uint16_t keymod);
+	std::unordered_map<uint32_t, vector<string>> keybinds;
 };
 
 extern GameEngineLocal eng_local;

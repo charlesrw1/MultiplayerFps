@@ -557,7 +557,7 @@ DECLARE_ENGINE_CMD(quit)
 }
 
 
-std::string* GameEngineLocal::find_keybind(SDL_Scancode code, uint16_t keymod) {
+vector<string>* GameEngineLocal::find_keybinds(SDL_Scancode code, uint16_t keymod) {
 
 	auto mod_to_integer = [](uint16_t mod) -> uint16_t {
 		if (mod & KMOD_CTRL)
@@ -590,7 +590,8 @@ void GameEngineLocal::set_keybind(SDL_Scancode code, uint16_t keymod, std::strin
 		return mod;
 	};
 	uint32_t both = uint32_t(code) | ((uint32_t)mod_to_integer(keymod) << 16);
-	keybinds.insert({ both,bind });
+	keybinds[both].push_back(bind);
+	//keybinds.insert({ both,bind });
 }
 
 
@@ -598,7 +599,8 @@ DECLARE_ENGINE_CMD(bind)
 {
 	if (args.size() < 2) return;
 	SDL_Scancode scancode = SDL_GetScancodeFromName(args.at(1));
-	if (scancode == SDL_SCANCODE_UNKNOWN) return;
+	if (scancode == SDL_SCANCODE_UNKNOWN) 
+		return;
 	if (args.size() <= 2)
 		eng_local.set_keybind(scancode,0, "");
 	else if (args.size() <= 3)
@@ -1141,10 +1143,11 @@ void GameEngineLocal::key_event(SDL_Event event)
 		inp.keychanges[scancode] = true;
 
 		// check keybind activation
-		std::string* keybind = find_keybind(scancode, event.key.keysym.mod);
+		vector<string>* keybinds = find_keybinds(scancode, event.key.keysym.mod);
 	
-		if (keybind != nullptr) {
-			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, keybind->c_str());
+		if (keybinds != nullptr) {
+			for(string& k : *keybinds)
+				Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, k.c_str());
 		}
 	}
 	else if (event.type == SDL_KEYUP) {

@@ -31,6 +31,35 @@ opt<GraphLink> GraphCommandUtil::get_graph_link_from_linkid(int id, EditorNodeGr
 	return node->find_link_from_port(inp);
 }
 
+void GraphCommandUtil::get_selected(vector<int>& link_ids, vector<int>& node_ids) {
+	link_ids.resize(ImNodes::NumSelectedLinks());
+	if (link_ids.size() > 0) {
+		ImNodes::GetSelectedLinks(link_ids.data());
+	}
+	node_ids.resize(ImNodes::NumSelectedNodes());
+	if (node_ids.size() > 0) {
+		ImNodes::GetSelectedNodes(node_ids.data());
+	}
+}
+
+Base_EdNode* GraphCommandUtil::get_optional_link_object(int linkid, EditorNodeGraph& graph)
+{
+	opt<GraphLink> link = GraphCommandUtil::get_graph_link_from_linkid(linkid, graph);
+	if (!link.has_value())
+		return nullptr;
+	GraphLink l = link.value();
+	Base_EdNode* e = graph.get_node(link.value().input.get_node());
+	if (!e)
+		return nullptr;
+	opt<int> index = e->get_link_index(l);
+	if (!index.has_value())
+		return nullptr;
+	GraphLinkWithNode glwn = e->links.at(index.value());
+	if (glwn.opt_link_node.is_valid())
+		return graph.get_node(glwn.opt_link_node);
+	return nullptr;
+}
+
 void GraphCommandUtil::remove_link(GraphLink link, EditorNodeGraph& graph)
 {
 	Base_EdNode* inn = graph.get_node(link.input.get_node());
@@ -56,10 +85,12 @@ AddLinkCommand::AddLinkCommand(AnimationGraphEditorNew& ed, GraphPortHandle inpu
 void AddLinkCommand::execute()
 {
 	GraphCommandUtil::add_link(link, ed.get_graph());
+	ed.on_node_changes.invoke();
 }
 void AddLinkCommand::undo()
 {
 	GraphCommandUtil::remove_link(link, ed.get_graph());
+	ed.on_node_changes.invoke();
 }
 std::string AddLinkCommand::to_string()
 {
@@ -79,11 +110,13 @@ void AddNodeCommand::execute()
 	ed.get_graph().insert_new_node(*node, what_layer, pos);
 	created_handle = node->self;
 	assert(created_handle.is_valid());
+	ed.on_node_changes.invoke();
 }
 void AddNodeCommand::undo()
 {
 	assert(created_handle.is_valid());
 	ed.get_graph().remove_node(created_handle);
+	ed.on_node_changes.invoke();
 }
 std::string AddNodeCommand::to_string()
 {
@@ -93,7 +126,7 @@ RemoveGraphObjectsCommand::RemoveGraphObjectsCommand(AnimationGraphEditorNew& ed
 {
 	// serialize the objects
 	SerializeGraphContainer container = SerializeGraphUtils::make_container_from_nodeids(node_ids, link_ids,ed.get_graph());
-	serialized = SerializeGraphUtils::serialize_to_string(container, ed.get_graph());
+	serialized = SerializeGraphUtils::serialize_to_string(container, ed.get_graph(), ed.get_prototypes());
 	printf("%s\n", serialized.c_str());
 	this->nodes = std::move(node_ids);
 	for (int l : link_ids) {
@@ -115,12 +148,14 @@ void RemoveGraphObjectsCommand::execute()
 		GraphNodeHandle h(n);
 		graph.remove_node(h);
 	}
+
+	ed.on_node_changes.invoke();
 }
 
 void RemoveGraphObjectsCommand::undo()
 {
 	// put back removed objects
-	auto unserialized = SerializeGraphUtils::unserialize(serialized);
+	auto unserialized = SerializeGraphUtils::unserialize(serialized, ed.get_prototypes());
 	if (!unserialized) {
 		LOG_WARN("couldnt unserialize");
 		return;
@@ -129,9 +164,78 @@ void RemoveGraphObjectsCommand::undo()
 	for (GraphLink link : links) {
 		GraphCommandUtil::add_link(link, ed.get_graph());
 	}
+
+	ed.on_node_changes.invoke();
 }
 
 std::string RemoveGraphObjectsCommand::to_string()
 {
 	return "RemoveGraphObjectsCommand";
+}
+
+DuplicateNodesCommand::DuplicateNodesCommand(AnimationGraphEditorNew& ed, vector<int> node_ids)
+	: ed(ed)
+{
+	if (node_ids.empty())
+		return;
+	Base_EdNode* first = ed.get_graph().get_node(node_ids.at(0));
+	if (!first)
+		return;
+	GraphLayerHandle layer = first->layer;
+	for (int i = 1; i < node_ids.size(); i++) {
+		if (ed.get_graph().get_node(node_ids[i])->layer != layer)
+			return;
+	}
+
+	SerializeGraphContainer container = SerializeGraphUtils::make_container_from_nodeids(node_ids, {}, ed.get_graph());
+	serialized = SerializeGraphUtils::serialize_to_string(container, ed.get_graph(), ed.get_prototypes());
+	printf("%s\n", serialized.c_str());
+	for (auto i : node_ids)
+		orig_nodes.insert(i);
+	is_node_valid = true;
+}
+
+void DuplicateNodesCommand::execute()
+{
+	auto unserialized = SerializeGraphUtils::unserialize(serialized, ed.get_prototypes());
+	if (!unserialized) {
+		LOG_WARN("couldnt unserialize");
+		return;
+	}
+	vector<Base_EdNode*> rootnodes;
+	for (auto n : unserialized->nodes) {
+		if (SetUtil::contains(orig_nodes, n->self.id)) {
+			n->nodex += 50;
+			n->nodey += 50;
+			rootnodes.push_back(n);
+		}
+	}
+
+	ed.get_graph().insert_nodes_with_new_id(*unserialized);
+	nodes_to_delete.clear();
+	for (auto n : unserialized->nodes) {
+		nodes_to_delete.push_back(n->self);
+	}
+
+	ImNodes::ClearLinkSelection();
+	ImNodes::ClearNodeSelection();
+	for (auto n : rootnodes) {
+		ImNodes::SelectNode(n->self.id);
+	}
+
+	ed.on_node_changes.invoke();
+}
+
+void DuplicateNodesCommand::undo()
+{
+	for (auto n : nodes_to_delete)
+		ed.get_graph().remove_node(n);
+	nodes_to_delete.clear();
+
+	ed.on_node_changes.invoke();
+}
+
+std::string DuplicateNodesCommand::to_string()
+{
+	return "Duplicate";
 }
