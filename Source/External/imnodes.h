@@ -291,6 +291,8 @@ void PopStyleVar(int count = 1);
 // id can be any positive or negative integer, but INT_MIN is currently reserved for internal use.
 void BeginNode(int id);
 void EndNode();
+void BeginComment(int id);
+void EndComment();
 
 ImVec2 GetNodeDimensions(int id);
 

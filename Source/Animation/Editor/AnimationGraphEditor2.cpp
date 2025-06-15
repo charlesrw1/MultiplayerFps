@@ -164,6 +164,7 @@ void AnimationGraphEditorNew::init_node_factory()
 	prototypes.add("MakeVec2", []() { return new BreakMake_EdNode(true, false); });
 	prototypes.add("Blend2", []() { return new Blend2_EdNode; });
 	prototypes.add("BlendByInt", []() { return new BlendInt_EdNode; });
+	prototypes.add("Comment", []() { return new CommentNode; });
 }
 void AnimationGraphEditorNew::delete_selected()
 {
@@ -975,4 +976,16 @@ void GraphPropertyWindow::draw()
 		grid.update();
 	}
 	ImGui::End();
+}
+
+extern ImFont* global_big_imgui_font;
+void CommentNode::draw_imnode()
+{
+	ImNodes::PushColorStyle(ImNodesCol_NodeBackground, ImColor(120, 5, 5, 255));
+	ImNodes::BeginComment(self.id);
+	ImGui::PushFont(global_big_imgui_font);
+	ImGui::Text("This is a comment...");
+	ImGui::PopFont();
+	ImNodes::EndComment();
+	ImNodes::PopColorStyle();
 }

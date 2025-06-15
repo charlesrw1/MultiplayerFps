@@ -1569,6 +1569,7 @@ Entity* entity_from_mdcontext(MdContextBase& ctx)
 }
 
 
+ImFont* global_big_imgui_font = nullptr;
 
 extern void register_input_actions_for_game();
 void GameEngineLocal::init(int argc, char** argv)
@@ -1632,6 +1633,7 @@ void GameEngineLocal::init(int argc, char** argv)
 	ImGui_ImplOpenGL3_Init();
 	auto path = FileSys::get_full_path_from_game_path("Inconsolata-Bold.ttf");
 	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
+	global_big_imgui_font = ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 24.0);
 	ImGui::GetIO().Fonts->Build();
 
 	//engine_fullscreen_gui = new GUIFullscreen();

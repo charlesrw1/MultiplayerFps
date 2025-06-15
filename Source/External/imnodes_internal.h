@@ -58,6 +58,9 @@ enum ImNodesClickInteractionType_
     ImNodesClickInteractionType_Panning,
     ImNodesClickInteractionType_BoxSelection,
     ImNodesClickInteractionType_ImGuiItem,
+
+    ImNodesClickInteractionType_CommentCorner,
+
     ImNodesClickInteractionType_None
 };
 
@@ -134,6 +137,9 @@ struct ImNodeData
     ImVec2 Origin; // The node origin is in editor space
     ImRect TitleBarContentRect;
     ImRect Rect;
+
+    bool is_comment = false;                //------ > ADDITION
+    ImVec2 CommentSize = ImVec2(20, 20);    //------ > ADDITION
 
     struct
     {
@@ -266,6 +272,7 @@ struct ImNodesEditorContext
 
     ImVector<int> SelectedNodeIndices;
     ImVector<int> SelectedLinkIndices;
+    ImOptionalIndex SelectedCommentCorner;  //------> ADDITION
 
     // Relative origins of selected nodes for snapping of dragged nodes
     ImVector<ImVec2> SelectedNodeOffsets;
@@ -334,6 +341,7 @@ struct ImNodesContext
     ImOptionalIndex HoveredNodeIdx;
     ImOptionalIndex HoveredLinkIdx;
     ImOptionalIndex HoveredPinIdx;
+    ImOptionalIndex HoveredCommentCornerIdx;    //------> ADDITION
 
     ImOptionalIndex DeletedLinkIdx;
     ImOptionalIndex SnapLinkIdx;

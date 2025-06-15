@@ -29,6 +29,7 @@
 
 ImNodesContext* GImNodes = NULL;
 
+static const int COMMENT_RECT_SIZE = 12;
 
 static float my_min(float x, float y) {
     return (x < y) ? x : y;
@@ -520,16 +521,26 @@ void DrawListActivateClickInteractionChannel()
         GImNodes->CanvasDrawList, GImNodes->CanvasDrawList->_Splitter._Count - 1);
 }
 
-void DrawListActivateCurrentNodeForeground()
+void DrawListActivateCurrentNodeForeground(bool is_comment)
 {
+    //if (is_comment) {
+    //    GImNodes->CanvasDrawList->_Splitter.SetCurrentChannel(GImNodes->CanvasDrawList, GImNodes->NodeIdxToSubmissionIdx.Data.size()*2);
+    //    return;
+    //}
+
     const int foreground_channel_idx =
         DrawListSubmissionIdxToForegroundChannelIdx(GImNodes->NodeIdxSubmissionOrder.Size - 1);
     GImNodes->CanvasDrawList->_Splitter.SetCurrentChannel(
         GImNodes->CanvasDrawList, foreground_channel_idx);
 }
 
-void DrawListActivateNodeBackground(const int node_idx)
+void DrawListActivateNodeBackground(const int node_idx, bool is_comment)
 {
+    //if (is_comment) {
+    //    GImNodes->CanvasDrawList->_Splitter.SetCurrentChannel(GImNodes->CanvasDrawList, GImNodes->NodeIdxToSubmissionIdx.Data.size()*2+1);
+    //    return;
+    //}
+
     const int submission_idx =
         GImNodes->NodeIdxToSubmissionIdx.GetInt(static_cast<ImGuiID>(node_idx), -1);
     // There is a discrepancy in the submitted node count and the rendered node count! Did you call
@@ -563,6 +574,24 @@ void DrawListSwapSubmissionIndices(const int lhs_idx, const int rhs_idx)
         lhs_foreground_channel_idx,
         rhs_foreground_channel_idx);
 }
+
+void DrawListSwapLinkIndexAboveComment(const int top_comment)
+{
+    const int LINK_CHANNEL = 0;
+    const int comment_fore = DrawListSubmissionIdxToForegroundChannelIdx(top_comment);
+    const int comment_back = DrawListSubmissionIdxToBackgroundChannelIdx(top_comment);
+    assert(comment_fore > comment_back);
+
+    ImDrawListSplitterSwapChannels(
+        GImNodes->CanvasDrawList->_Splitter,
+        comment_back,
+        LINK_CHANNEL);
+    ImDrawListSplitterSwapChannels(
+        GImNodes->CanvasDrawList->_Splitter,
+        comment_back,
+        comment_fore);
+}
+
 
 void DrawListSortChannelsByDepth(const ImVector<int>& node_idx_depth_order)
 {
@@ -936,6 +965,37 @@ void TranslateSelectedNodes(ImNodesEditorContext& editor)
     }
 }
 
+bool ResizeCommentNode(ImNodesEditorContext& editor)
+{
+    if (GImNodes->LeftMouseDragging)
+    {
+        if (!editor.SelectedCommentCorner.HasValue())
+            return false;
+        const int i = editor.SelectedCommentCorner.Value();
+        ImNodeData& node = editor.Nodes.Pool[i];
+        if (!node.is_comment)
+            return false;
+        // If we have grid snap enabled, don't start moving nodes until we've moved the mouse
+        // slightly
+        const bool shouldTranslate = (GImNodes->Style.Flags & ImNodesStyleFlags_GridSnapping)
+            ? ImGui::GetIO().MouseDragMaxDistanceSqr[0] > 5.0
+            : true;
+
+        const ImVec2 origin = SnapOriginToGrid(
+            ImVec2(COMMENT_RECT_SIZE,COMMENT_RECT_SIZE)*-0.5 + GImNodes->MousePos - GImNodes->CanvasOriginScreenSpace - editor.Panning +
+            editor.PrimaryNodeOffset);
+        if (node.Draggable && shouldTranslate)
+        {
+            const auto origin_of_comment = origin  + editor.AutoPanningDelta;
+            const float p = node.CommentSize.x;
+            node.CommentSize = origin_of_comment - node.Origin;
+            printf("%f %f %f %f %f\n",p, node.CommentSize.x,node.Rect.Min.x, GImNodes->CanvasOriginScreenSpace.x,node.Origin.x);
+        }
+    }
+
+    return true;
+}
+
 struct LinkPredicate
 {
     bool operator()(const ImLinkData& lhs, const ImLinkData& rhs) const
@@ -1069,6 +1129,16 @@ void ClickInteractionUpdate(ImNodesEditorContext& editor)
         }
     }
     break;
+
+    case ImNodesClickInteractionType_CommentCorner: {
+        bool out = ResizeCommentNode(editor);
+        if (!out||GImNodes->LeftMouseReleased)
+        {
+            printf("finished corner resize\n");
+            editor.ClickInteraction.Type = ImNodesClickInteractionType_None;
+        }
+    }break;
+
     case ImNodesClickInteractionType_Node:
     {
         TranslateSelectedNodes(editor);
@@ -1585,7 +1655,6 @@ void DrawPin(ImNodesEditorContext& editor, const int pin_idx)
 
     DrawPinShape(pin.Pos, pin, pin_color);
 }
-
 void DrawNode(ImNodesEditorContext& editor, const int node_idx)
 {
     const ImNodeData& node = editor.Nodes.Pool[node_idx];
@@ -1609,6 +1678,24 @@ void DrawNode(ImNodesEditorContext& editor, const int node_idx)
         titlebar_background = node.ColorStyle.TitlebarHovered;
     }
 
+    if (node.is_comment) {
+        const ImRect commentrect(node.Rect.Min, node.Rect.Min + node.CommentSize);
+
+        ImColor trans_color(node_background);
+        trans_color.Value.w = 0.5;
+        const ImU32 trans_color_to_use = ImU32(trans_color);
+
+        // transparent background
+        GImNodes->CanvasDrawList->AddRectFilled(
+            commentrect.Min, commentrect.Max, trans_color_to_use, node.LayoutStyle.CornerRounding);
+
+        // title
+        GImNodes->CanvasDrawList->AddRectFilled(
+            node.Rect.Min, node.Rect.Max, node_background, node.LayoutStyle.CornerRounding);
+
+        GImNodes->CanvasDrawList->AddTriangleFilled(commentrect.Max - ImVec2(0, COMMENT_RECT_SIZE), commentrect.Max, commentrect.Max - ImVec2(COMMENT_RECT_SIZE, 0), ImColor(180, 180, 180, 200));
+    }
+    else
     {
         // node base
         GImNodes->CanvasDrawList->AddRectFilled(
@@ -2336,8 +2423,10 @@ void BeginNodeEditor()
     GImNodes->HoveredPinIdx.Reset();
     GImNodes->DeletedLinkIdx.Reset();
     GImNodes->SnapLinkIdx.Reset();
+    GImNodes->HoveredCommentCornerIdx.Reset();
 
     GImNodes->NodeIndicesOverlappingWithMouse.clear();
+
 
     GImNodes->ImNodesUIState = ImNodesUIState_None;
 
@@ -2389,6 +2478,22 @@ void BeginNodeEditor()
                 DrawGrid(editor, canvas_size);
             }
         }
+    }
+}
+void begin_comment_selection(ImNodesEditorContext& editor)
+{
+    printf("has comment corner clicked\n");
+    if (editor.ClickInteraction.Type == ImNodesClickInteractionType_None) {
+        editor.SelectedCommentCorner = GImNodes->HoveredCommentCornerIdx;
+        if (!editor.SelectedCommentCorner.HasValue())
+            return;
+        const int i = editor.SelectedCommentCorner.Value();
+        ImNodeData& node = editor.Nodes.Pool[i];
+        if (!node.is_comment)
+            return;
+        auto ref_origin = node.Origin + node.CommentSize;
+        editor.PrimaryNodeOffset = ref_origin + GImNodes->CanvasOriginScreenSpace + editor.Panning - GImNodes->MousePos;
+        editor.ClickInteraction.Type = ImNodesClickInteractionType_CommentCorner;
     }
 }
 
@@ -2443,14 +2548,16 @@ void EndNodeEditor()
         }
     }
 
-    for (int node_idx = 0; node_idx < editor.Nodes.Pool.size(); ++node_idx)
-    {
-        if (editor.Nodes.InUse[node_idx])
-        {
-            DrawListActivateNodeBackground(node_idx);
+
+    for (int node_idx = 0; node_idx < editor.Nodes.Pool.size(); ++node_idx) {
+        if (editor.Nodes.InUse[node_idx]) {
+            const ImNodeData& node = editor.Nodes.Pool[node_idx];
+            DrawListActivateNodeBackground(node_idx, node.is_comment);
             DrawNode(editor, node_idx);
         }
     }
+
+
 
     // In order to render the links underneath the nodes, we want to first select the bottom draw
     // channel.
@@ -2494,7 +2601,10 @@ void EndNodeEditor()
         {
             BeginNodeSelection(editor, GImNodes->HoveredNodeIdx.Value());
         }
-
+        else if (GImNodes->LeftMouseClicked && GImNodes->HoveredCommentCornerIdx.HasValue())
+        {
+            begin_comment_selection(editor);
+        }
         else if (
             GImNodes->LeftMouseClicked || GImNodes->LeftMouseReleased ||
             GImNodes->AltMouseClicked || GImNodes->AltMouseScrollDelta != 0.f)
@@ -2526,7 +2636,28 @@ void EndNodeEditor()
     ObjectPoolUpdate(editor.Nodes);
     ObjectPoolUpdate(editor.Pins);
 
+    // fix depth order for comments, hacky
+    int comment_count = 0;
+    {
+        ImVector<int>& depth_stack = editor.NodeDepthOrder;
+        for (int i = 0; i < depth_stack.size(); ++i) {
+            const int node_idx = depth_stack[i];
+            if (editor.Nodes.InUse[node_idx]) {
+                const ImNodeData& node = editor.Nodes.Pool[node_idx];
+                if (node.is_comment) {
+                    depth_stack.erase(depth_stack.begin() + i);
+                    depth_stack.insert(depth_stack.begin(), node_idx);
+                    comment_count++;
+                }
+            }
+        }
+    }
+
     DrawListSortChannelsByDepth(editor.NodeDepthOrder);
+    if (comment_count > 0) {
+        DrawListSwapLinkIndexAboveComment(comment_count-1);
+    }
+
 
     // After the links have been rendered, the link pool can be updated as well.
     ObjectPoolUpdate(editor.Links);
@@ -2569,8 +2700,7 @@ void MiniMap(
     // correctly relative to their respective nodes. Hence, we must store some of
     // of the state for the mini map in GImNodes for the actual drawing/updating
 }
-
-void BeginNode(const int node_id)
+void BeginComment(int node_id)
 {
     // Remember to call BeginNodeEditor before calling BeginNode
     IM_ASSERT(GImNodes->CurrentScope == ImNodesScope_Editor);
@@ -2582,6 +2712,7 @@ void BeginNode(const int node_id)
     GImNodes->CurrentNodeIdx = node_idx;
 
     ImNodeData& node = editor.Nodes.Pool[node_idx];
+    node.is_comment = true;
     node.ColorStyle.Background = GImNodes->Style.Colors[ImNodesCol_NodeBackground];
     node.ColorStyle.BackgroundHovered = GImNodes->Style.Colors[ImNodesCol_NodeBackgroundHovered];
     node.ColorStyle.BackgroundSelected = GImNodes->Style.Colors[ImNodesCol_NodeBackgroundSelected];
@@ -2599,7 +2730,47 @@ void BeginNode(const int node_id)
     ImGui::SetCursorPos(GridSpaceToEditorSpace(editor, GetNodeTitleBarOrigin(node)));
 
     DrawListAddNode(node_idx);
-    DrawListActivateCurrentNodeForeground();
+    DrawListActivateCurrentNodeForeground(node.is_comment);
+
+    ImGui::PushID(node.Id);
+    ImGui::BeginGroup();
+}
+void EndComment()
+{
+    EndNode();
+}
+
+void BeginNode(const int node_id)
+{
+    // Remember to call BeginNodeEditor before calling BeginNode
+    IM_ASSERT(GImNodes->CurrentScope == ImNodesScope_Editor);
+    GImNodes->CurrentScope = ImNodesScope_Node;
+
+    ImNodesEditorContext& editor = EditorContextGet();
+
+    const int node_idx = ObjectPoolFindOrCreateIndex(editor.Nodes, node_id);
+    GImNodes->CurrentNodeIdx = node_idx;
+
+    ImNodeData& node = editor.Nodes.Pool[node_idx];
+    node.is_comment = false;
+    node.ColorStyle.Background = GImNodes->Style.Colors[ImNodesCol_NodeBackground];
+    node.ColorStyle.BackgroundHovered = GImNodes->Style.Colors[ImNodesCol_NodeBackgroundHovered];
+    node.ColorStyle.BackgroundSelected = GImNodes->Style.Colors[ImNodesCol_NodeBackgroundSelected];
+    node.ColorStyle.Outline = GImNodes->Style.Colors[ImNodesCol_NodeOutline];
+    node.ColorStyle.Titlebar = GImNodes->Style.Colors[ImNodesCol_TitleBar];
+    node.ColorStyle.TitlebarHovered = GImNodes->Style.Colors[ImNodesCol_TitleBarHovered];
+    node.ColorStyle.TitlebarSelected = GImNodes->Style.Colors[ImNodesCol_TitleBarSelected];
+    node.LayoutStyle.CornerRounding = GImNodes->Style.NodeCornerRounding;
+    node.LayoutStyle.Padding = GImNodes->Style.NodePadding;
+    node.LayoutStyle.BorderThickness = GImNodes->Style.NodeBorderThickness;
+
+    // ImGui::SetCursorPos sets the cursor position, local to the current widget
+    // (in this case, the child object started in BeginNodeEditor). Use
+    // ImGui::SetCursorScreenPos to set the screen space coordinates directly.
+    ImGui::SetCursorPos(GridSpaceToEditorSpace(editor, GetNodeTitleBarOrigin(node)));
+
+    DrawListAddNode(node_idx);
+    DrawListActivateCurrentNodeForeground(node.is_comment);
 
     ImGui::PushID(node.Id);
     ImGui::BeginGroup();
@@ -2619,6 +2790,21 @@ void EndNode()
     ImNodeData& node = editor.Nodes.Pool[GImNodes->CurrentNodeIdx];
     node.Rect = GetItemRect();
     node.Rect.Expand(node.LayoutStyle.Padding);
+    
+    if (node.is_comment) {
+        const auto rect_size = node.Rect.GetSize();
+        node.CommentSize.x = ImMax(node.CommentSize.x, rect_size.x);
+        node.CommentSize.y = ImMax(node.CommentSize.y, rect_size.y + COMMENT_RECT_SIZE*2.f);
+        if (node.CommentSize.x > rect_size.x) {
+            node.Rect.Max.x = node.Rect.Min.x + node.CommentSize.x;
+        }
+
+        ImVec2 endcorner = node.Rect.Min + node.CommentSize;
+        ImRect therect = ImRect(endcorner - ImVec2(COMMENT_RECT_SIZE, COMMENT_RECT_SIZE), endcorner);
+        if (therect.Contains(GImNodes->MousePos)) {
+            GImNodes->HoveredCommentCornerIdx = GImNodes->CurrentNodeIdx;
+        }
+    }
 
     editor.GridContentBounds.Add(node.Origin);
     editor.GridContentBounds.Add(node.Origin + node.Rect.GetSize());

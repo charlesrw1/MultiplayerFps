@@ -4,6 +4,21 @@
 using std::variant;
 
 class AnimationSeqAsset;
+
+class CommentNode : public Base_EdNode
+{
+public:
+	CLASS_BODY(CommentNode);
+
+	REF string desc;
+	REFLECT(hide);
+	int sizex = 10;
+	REFLECT(hide);
+	int sizey = 10;
+
+	void draw_imnode() final;
+};
+
 struct ClipNode_SData {
 	STRUCT_BODY(ClipNode_SData);
 	REF AssetPtr<AnimationSeqAsset> Clip;

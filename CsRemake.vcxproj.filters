@@ -800,6 +800,7 @@
     <ClCompile Include="Source\Animation\Editor\AnimationGraphEditor2.cpp" />
     <ClCompile Include="Source\Animation\Editor\AnimCommands.cpp" />
     <ClCompile Include="Source\Animation\Editor\Base_node.cpp" />
+    <ClCompile Include="Source\Animation\Editor\ClipNode.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
