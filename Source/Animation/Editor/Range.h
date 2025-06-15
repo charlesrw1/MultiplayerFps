@@ -23,7 +23,7 @@ public:
 			return *this;
 		}
 		bool operator!=(const Iterator& other) {
-			return idx != other.idx;
+			return idx < other.idx;
 		}
 		int idx = 0;
 	};

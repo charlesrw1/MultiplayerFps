@@ -533,6 +533,7 @@
     <ClInclude Include="Source\Animation\Editor\AnimCommands.h" />
     <ClInclude Include="Source\Animation\Editor\Optional.h" />
     <ClInclude Include="Source\Animation\Editor\Range.h" />
+    <ClInclude Include="Source\Animation\Editor\ClipNode.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

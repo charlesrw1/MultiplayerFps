@@ -3,22 +3,15 @@
 #include "Base_node.h"
 #include "Framework/ConsoleCmdGroup.h"
 class NodeGraphLayer;
-using std::unordered_map;
 
-class SerializeGraphContainer
+class GraphCommandUtil
 {
 public:
-	unordered_map<int, Base_EdNode*> nodes;
-	unordered_map<int, NodeGraphLayer*> layers;
+	static void remove_link(GraphLink link, EditorNodeGraph& graph);
+	static void add_link(GraphLink link, EditorNodeGraph& graph);
+	static GraphPortHandle get_input_port_from_link(int id);
+	static opt<GraphLink> get_graph_link_from_linkid(int id, EditorNodeGraph& graph);
 };
-
-class SerializeGraphUtils
-{
-public:
-	static uptr<SerializeGraphContainer> unserialize();
-	static void serialize(SerializeGraphContainer& container);
-};
-
 
 class AnimationGraphEditorNew;
 class AddLinkCommand : public Command
@@ -34,17 +27,7 @@ public:
 	GraphLink link;
 	bool is_link_valid = true;
 };
-class RemoveLinkCommand : public Command
-{
-public:
-	RemoveLinkCommand(AnimationGraphEditorNew& ed, GraphPortHandle input);
 
-	// Inherited via Command
-	void execute() override;
-	void undo() override;
-	std::string to_string() override;
-	AnimationGraphEditorNew& ed;
-};
 class AddNodeCommand : public Command
 {
 public:
@@ -69,6 +52,10 @@ public:
 	void execute() override;
 	void undo() override;
 	std::string to_string() override;
+	string serialized;
+	vector<GraphLink> links;
+	vector<int> nodes;
+	AnimationGraphEditorNew& ed;
 };
 class MoveNodeCommand : public Command
 {

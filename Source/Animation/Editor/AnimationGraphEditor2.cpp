@@ -6,6 +6,7 @@
 #include "Framework/Log.h"
 #include "GraphUtil.h"
 #include "AnimCommands.h"
+#include "ClipNode.h"
 
 using std::make_unique;
 AnimationGraphEditorNew animgraphnew;
@@ -61,10 +62,7 @@ void AnimationGraphEditorNew::handle_link_changes()
 	}
 	if (ImNodes::IsLinkDestroyed(&link_id)) {
 
-		uint32_t node_id = Base_EdNode::get_nodeid_from_link_id(link_id);
-		uint32_t slot = Base_EdNode::get_slot_from_id(link_id);
-
-		add_command(new RemoveLinkCommand(*this,GraphPortHandle(link_id)));
+		add_command(new RemoveGraphObjectsCommand(*this, { link_id }, {}));
 
 	//	Base_EdNode* node_s = find_node_from_id(node_id);
 	//
@@ -162,14 +160,21 @@ void AnimationGraphEditorNew::init_node_factory()
 {
 	prototypes.add("Add", []() {
 		auto n = new Math_EdNode;
-		n->name = "Add";
 		return n;
 		});
 	prototypes.add("Sub", []() {
 		auto n = new Math_EdNode;
-		n->name = "Sub";
 		return n;
 		});
+
+	prototypes.add("Clip", []() { return new Clip_EdNode; });
+	prototypes.add("BreakVec3", []() { return new BreakMake_EdNode(false,true); });
+	prototypes.add("BreakVec2", []() { return new BreakMake_EdNode(false, false); });
+	prototypes.add("MakeVec3", []() { return new BreakMake_EdNode(true, true); });
+	prototypes.add("MakeVec2", []() { return new BreakMake_EdNode(true, false); });
+	prototypes.add("Blend2", []() { return new Blend2_EdNode; });
+	prototypes.add("BlendByInt", []() { return new BlendInt_EdNode; });
+
 }
 
 void AnimationGraphEditorNew::delete_selected()
@@ -509,11 +514,11 @@ void Base_EdNode::draw_imnode()
 	vector<int> input_ports;
 	vector<int> output_ports;
 	get_ports(input_ports, output_ports);
-
+	const float topy = ImGui::GetCursorPosY();
 	for (int input_idx : input_ports) {
 		const GraphPort& port = ports.at(input_idx);
 		GraphPortHandle phandle = port.get_handle(self);
-		opt<GraphLink> link = find_link(phandle);
+		opt<GraphLink> link = find_link_from_port(phandle);
 		ImNodesPinShape pin = ImNodesPinShape_Quad;
 
 		if (link.has_value())
@@ -523,10 +528,21 @@ void Base_EdNode::draw_imnode()
 		ImGui::Text("%s",str.c_str());
 
 		//auto input_type = node->inputs[j].type;
-
+		//float f[3] = { 0,0,0 };
+		//	ImGui::PushItemWidth(90);
+		//if (input_idx == 0) {
+		//	ImGui::InputFloat3("##nolabel", f);
+		//}
+		//else {
+		//	bool b = false;
+		//	//ImGui::Checkbox("##b", &b);
+		//	ImGui::InputFloat("##f", f);
+		//}
+		//	ImGui::PopItemWidth();
 		//ImGui::TextColored(graph_pin_type_to_color(input_type), str.c_str());
 		ImNodes::EndInputAttribute();
 	}
+	ImGui::SetCursorPosY(topy);
 	for (int output_idx : output_ports) {
 		const GraphPort& port = ports.at(output_idx);
 		GraphPortHandle phandle = port.get_handle(self);
@@ -545,6 +561,12 @@ void Base_EdNode::draw_imnode()
 	}
 	ImNodes::EndNode();
 
+	{
+		glm::vec2 pos = GraphUtil::to_glm(ImNodes::GetNodeGridSpacePos(self.id));
+		this->nodex = pos.x;
+		this->nodey = pos.y;
+	}
+
 	ImNodes::PopColorStyle();
 	ImNodes::PopColorStyle();
 	ImNodes::PopColorStyle();
@@ -558,7 +580,7 @@ void Base_EdNode::draw_imnode()
 	for (int input_idx : input_ports) {
 		const GraphPort& port = ports.at(input_idx);
 		GraphPortHandle phandle = port.get_handle(self);
-		opt<GraphLink> link = find_link(phandle);
+		opt<GraphLink> link = find_link_from_port(phandle);
 		
 		if (link.has_value()) {
 			const GraphLink& lv = link.value();
@@ -616,6 +638,70 @@ void NodeGraphLayer::draw(EditorNodeGraph& graph)
 
 
 	handle_drag_drop();
+
+}
+void EditorNodeGraph::remove_node(GraphNodeHandle handle) {
+	if (!handle.is_valid())
+		return;
+	sys_print(Debug, "removing node: %d\n", handle.id);
+	auto node = get_node(handle);
+	if (!node) {
+		sys_print(Warning, "node not found: %d\n", handle.id);
+		return;
+	}
+	
+	{
+		int size = node->links.size();
+		while (!node->links.empty())
+		{
+			GraphLinkWithNode linkwithnode = node->links.back();
+			if (linkwithnode.opt_link_node.is_valid())
+				remove_node(linkwithnode.opt_link_node);
+			GraphCommandUtil::remove_link(linkwithnode.link, *this);
+			assert(node->links.size() < size);
+			size = node->links.size();
+		}
+	}
+
+	auto layer = get_layer(node->layer);
+	if (!layer) {
+		sys_print(Warning, "nodes layer not found %d\n", node->layer.id);
+	}
+	else {
+		layer->remove_node(*node);
+	}
+	nodes.remove(handle.id);
+	delete node;
+}
+void EditorNodeGraph::insert_nodes(SerializeGraphContainer& container)
+{
+	assert(root_layer);
+	for (auto n : container.layers) {
+		assert(n && n->get_id().is_valid());
+		int id = n->get_id().id;
+		assert(layers.find(id) == nullptr);
+		layers.insert(id, n);
+	}
+	for (auto n : container.nodes) {
+		assert(n && n->self.is_valid());
+		assert(nodes.find(n->self.id) == nullptr);
+		nodes.insert(n->self.id, n);
+		auto layer = get_layer(n->layer);
+		if (!layer) {
+			sys_print(Warning, "layer not found for unserialized node\n");
+			n->layer = root_layer->get_id();
+			layer = root_layer;
+		}
+		layer->add_node_to_layer(*n);
+
+		ImNodes::SetNodeGridSpacePos(n->self.id, ImVec2(n->nodex, n->nodey));
+	}
+	for (Base_EdNode* n : container.nodes) {
+		// fixup links for nodes that werent deleted
+		for (GraphLinkWithNode l : n->links) {
+			GraphCommandUtil::add_link(l.link, *this);
+		}
+	}
 
 }
 void NodeGraphLayer::handle_drag_drop()
@@ -677,4 +763,87 @@ GraphPortHandle GraphPortHandle::make(GraphNodeHandle node, int index, bool is_o
 GraphPortHandle GraphPort::get_handle(GraphNodeHandle node) const
 {
 	return GraphPortHandle::make(node, index, is_output());
+}
+
+#include "Framework/SerializerJson.h"
+
+template<typename T>
+void serialize_set_of_ptrs(Serializer& s, const char* tag, unordered_set<T*>& set)
+{
+	int size = set.size();
+	s.serialize_array(tag, size);
+	if (s.is_saving()) {
+		for (auto l : set) {
+			s.serialize_class_ar<T>(l);
+		}
+	}
+	else {
+		for (int i = 0; i < size;i++) {
+			T* ptr = nullptr;
+			s.serialize_class_ar<T>(ptr);
+			if (ptr)
+				SetUtil::insert_test_exists(set, ptr);
+		}
+	}
+	s.end_obj();
+}
+
+void SerializeGraphContainer::serialize(Serializer& s)
+{
+	serialize_set_of_ptrs(s, "layers", layers);
+	serialize_set_of_ptrs(s, "nodes", nodes);
+}
+
+uptr<SerializeGraphContainer> SerializeGraphUtils::unserialize(const string& text)
+{
+	MakeObjectFromPathGeneric objmaker;
+	ReadSerializerBackendJson writer(text, objmaker, *AssetDatabase::loader);
+	ClassBase* rootobj = writer.get_root_obj();
+	if (rootobj&&rootobj->cast_to<SerializeGraphContainer>()) {
+		return uptr<SerializeGraphContainer>(rootobj->cast_to<SerializeGraphContainer>());
+	}
+	sys_print(Warning, "couldnt load graph\n");
+	delete rootobj;
+	return nullptr;
+}
+
+string SerializeGraphUtils::serialize_to_string(SerializeGraphContainer& container, EditorNodeGraph& graph)
+{
+	MakePathForGenericObj pathmaker(false);
+	WriteSerializerBackendJson writer(pathmaker,container);
+	return writer.get_output().dump();
+}
+
+SerializeGraphContainer SerializeGraphUtils::make_container_from_handles(vector<GraphNodeHandle> handles, EditorNodeGraph& graph)
+{
+	SerializeGraphContainer container;
+	// handles: nodes, also transitions, and nodes in sub layers
+	while (!handles.empty()) {
+		GraphNodeHandle h = handles.back();
+		handles.pop_back();
+		Base_EdNode* e = graph.get_node(h);
+		if (!e) {
+			LOG_WARN("no node");
+			continue;
+		}
+		if (SetUtil::contains(container.nodes, e))
+			continue;
+		SetUtil::insert_test_exists(container.nodes, e);
+		for (auto l : e->links) {
+			if (l.opt_link_node.is_valid()) {
+				handles.push_back(l.opt_link_node);
+			}
+		}
+	}
+	return container;
+}
+
+SerializeGraphContainer SerializeGraphUtils::make_container_from_nodeids(const vector<int>& nodes, const vector<int>& links, EditorNodeGraph& graph)
+{
+	vector<GraphNodeHandle> handles;
+	for (auto h : nodes)
+		handles.push_back(GraphNodeHandle(h));
+	for (auto l : links)
+		handles.push_back(GraphNodeHandle(l));
+	return make_container_from_handles(handles, graph);
 }

@@ -109,6 +109,9 @@ struct GraphLayerHandle {
 	REF int id = 0;
 	bool operator==(const GraphLayerHandle& other) const { return id == other.id; }
 	bool operator!=(const GraphLayerHandle& other) const { return id != other.id; }
+	bool is_valid() const {
+		return id != 0;
+	}
 
 };
 
@@ -172,6 +175,17 @@ struct GraphLink {
 		return n1;
 	}
 };
+
+struct GraphLinkWithNode
+{
+	STRUCT_BODY();
+
+	GraphLinkWithNode() = default;
+	GraphLinkWithNode(GraphLink l) : link(l) {}
+	REF GraphLink link;
+	REF GraphNodeHandle opt_link_node;
+};
+
 struct CompilationError
 {
 	enum ErrorType {
@@ -221,8 +235,8 @@ public:
 	//virtual bool compile_my_data(const AgSerializeContext* ctx) = 0;
 
 	// used to specify menu to draw the creation for this in
-	virtual std::string get_menu_category() const { return ""; }
-	virtual bool allow_creation_from_menu() const { return true; }
+	//virtual std::string get_menu_category() const { return ""; }
+	//virtual bool allow_creation_from_menu() const { return true; }
 
 	// get title to use for node in graph
 	virtual std::string get_title() const { return get_name(); }
@@ -231,14 +245,14 @@ public:
 
 	virtual bool has_pin_colors() const { return false; }
 	virtual ImVec4 get_pin_colors() const { return ImVec4(1, 1, 1, 1); }
-	virtual BaseAGNode* get_graph_node() { return nullptr; }
+	//virtual BaseAGNode* get_graph_node() { return nullptr; }
 
 	virtual bool dont_call_compile() const { return false; }
 	//virtual bool traverse_and_find_errors();
 	//virtual void remove_reference(Base_EdNode* node);
 	
 	// for statemachine and state nodes
-	virtual const editor_layer* get_layer() const { return nullptr; }
+	//virtual const editor_layer* get_layer() const { return nullptr; }
 	virtual std::string get_layer_tab_title() const { return ""; }
 
 	//virtual bool add_input(AnimationGraphEditor* ed, Base_EdNode* input, uint32_t slot) {
@@ -248,10 +262,10 @@ public:
 
 
 	// animation graph specific stuff
-	virtual bool draw_flat_links() const { return false; }
-	virtual bool push_imnode_link_colors(int index) { return false; }
-	virtual bool is_statemachine() const { return false; }
-	virtual bool is_state_node() const { return false; }
+	//virtual bool draw_flat_links() const { return false; }
+	//virtual bool push_imnode_link_colors(int index) { return false; }
+	//virtual bool is_statemachine() const { return false; }
+	//virtual bool is_state_node() const { return false; }
 
 	virtual void on_post_edit() {}
 	virtual void draw_node_top_bar() {}
@@ -343,20 +357,20 @@ public:
 	//int get_input_size() const { return (int)inputs.size(); }
 	//std::vector<GraphNodeInput> inputs;
 
-	opt<int> find_link_idx(GraphPortHandle port) {
+	opt<int> find_link_idx_from_port(GraphPortHandle port) {
 
 		for (int i = 0; i < links.size(); i++) {
-			const GraphLink& l = links.at(i);
+			const GraphLink& l = links.at(i).link;
 			if (l.input == port || l.output == port)
 				return i;
 		}
 		return std::nullopt;
 	}
-	opt<GraphLink> find_link(GraphPortHandle port) {
-		opt<int> idx = find_link_idx(port);
+	opt<GraphLink> find_link_from_port(GraphPortHandle port) {
+		opt<int> idx = find_link_idx_from_port(port);
 		if (!idx.has_value())
 			return std::nullopt;
-		return links.at(idx.value());
+		return links.at(idx.value()).link;
 	}
 	void get_ports(vector<int>& input, vector<int>& output) {
 		for (int i = 0; i < ports.size(); i++) {
@@ -369,7 +383,7 @@ public:
 	opt<int> get_link_index(GraphLink link) {
 		for (int i = 0; i < links.size();i++) {
 			auto& l = links.at(i);
-			if (l == link)
+			if (l.link == link)
 				return i;
 		}
 		return std::nullopt;
@@ -377,13 +391,12 @@ public:
 	bool does_input_have_port_already(GraphPortHandle input) {
 		assert(input.get_node() == self);
 		assert(!input.is_output());
-		for (GraphLink& link : links) {
-			if (link.input == input)
+		for (GraphLinkWithNode& link : links) {
+			if (link.link.input == input)
 				return true;
 		}
 		return false;
 	}
-
 	void add_link(GraphLink link) {
 		assert(link.input.get_node() == self || link.output.get_node() == self);
 		opt<int> index = get_link_index(link);
@@ -391,15 +404,29 @@ public:
 			sys_print(Warning, "link already exists\n");
 			return;
 		}
-		links.push_back(link);
+		links.push_back(GraphLinkWithNode(link));
 	}
-	void remove_link(GraphLink link) {
+	GraphNodeHandle remove_link_to_input(GraphPortHandle p) {
+		opt<int> index = find_link_idx_from_port(p);
+		if (index.has_value()) {
+			return remove_link(links.at(index.value()).link);
+		}
+		else {
+			printf("couldnt find link to input\n");
+			return GraphNodeHandle();
+		}
+	}
+
+	GraphNodeHandle remove_link(GraphLink link) {
 		opt<int> index = get_link_index(link);
 		if (index.has_value()) {
+			GraphNodeHandle link_opt_node = links.at(index.value()).opt_link_node;
 			links.erase(links.begin() + index.value());
+			return link_opt_node;
 		}
 		else {
 			sys_print(Warning, "cant remove link, not found\n");
+			return GraphNodeHandle();
 		}
 	}
 	void remove_node_from_other_ports();
@@ -408,10 +435,15 @@ public:
 
 	string name;
 	vector<GraphPort> ports;
-	REF vector<GraphLink> links;
+	REF vector<GraphLinkWithNode> links;
 	REF GraphNodeHandle self;
 	REF GraphLayerHandle layer;
 	REF bool hidden_node = false;
+
+	REFLECT(hide);
+	float nodex = 0.0;
+	REFLECT(hide);
+	float nodey = 0.0;
 
 	//void init_graph_node_input(const char* name, GraphPinType type, const PropertyInfo* pi) {
 	//	GraphNodeInput i;

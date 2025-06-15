@@ -53,6 +53,8 @@ bind "Keypad 8" Ctrl "FILTER_FOR EntityClass"
 bind "F" SET_ORBIT_TARGET
 
 bind "Z" Ctrl "anim.undo"
+bind "Del" "anim.del"
+
 
 bind J "toggle r.taa"
 bind K "toggle r.taa_flicker_remove"
@@ -102,4 +104,5 @@ bind 7 "start_ed AnimGraph beu_character.ag"
 loglevel 6
 developer_mode 0
 
-start_ed Prefab BRUH_NEST.pfb
+#start_ed Prefab BRUH_NEST.pfb
+start_ed AnimGraph ""

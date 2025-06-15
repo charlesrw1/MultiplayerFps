@@ -13,6 +13,7 @@
 #include "Base_node.h"
 #include "imnodes.h"
 #include "Framework/Log.h"
+#include "GraphUtil.h"
 
 class Base_EdNode;
 class AnimationGraphEditorNew;
@@ -22,7 +23,7 @@ using std::unordered_map;
 using std::function;
 
 class EditorNodeGraph;
-
+class SerializeGraphContainer;
 class NodeGraphLayer : public ClassBase
 {
 public:
@@ -64,7 +65,7 @@ protected:
 	bool wants_reset_view = false;
 };
 
-class StatemachineGraphLayer : public NodeGraphLayer
+class StatemachineGraphLayer : public ClassBase
 {
 public:
 	CLASS_BODY(StatemachineGraphLayer);
@@ -74,28 +75,10 @@ public:
 class EditorNodeGraph : public ClassBase
 {
 public:
-	CLASS_BODY(EditorNodeGraph);
-	void serialize(Serializer& s) override {}
 	Base_EdNode* get_node(GraphNodeHandle handle) const {
 		return nodes.find(handle.id);
 	}
-	void remove_node(GraphNodeHandle handle) {
-		sys_print(Debug, "removing node: %d\n", handle.id);
-		auto node = get_node(handle);
-		if (!node) {
-			sys_print(Warning, "node not found: %d\n", handle.id);
-			return;
-		}
-		auto layer = get_layer(node->layer);
-		if (!layer) {
-			sys_print(Warning, "nodes layer not found %d\n", node->layer.id);
-		}
-		else {
-			layer->remove_node(*node);
-		}
-		nodes.remove(handle.id);
-		delete node;
-	}
+	void remove_node(GraphNodeHandle handle);
 
 	NodeGraphLayer* get_layer(GraphLayerHandle handle) const {
 		return layers.find(handle.id);
@@ -115,14 +98,16 @@ public:
 		assert(!root_layer);
 		this->root_layer = l;
 	}
-	void insert_new_node(Base_EdNode& node, GraphLayerHandle layer) {
+	void insert_new_node(Base_EdNode& node, GraphLayerHandle layer, glm::vec2 pos) {
 		auto layerptr = get_layer(layer);
 		assert(layerptr);
 		node.self = GraphNodeHandle(++id_start);
 		node.layer = layer;
 		nodes.insert(node.self.id, &node);
 		layerptr->add_node_to_layer(node);
+		ImNodes::SetNodeScreenSpacePos(node.self.id, GraphUtil::to_imgui(pos));
 	}
+	void insert_nodes(SerializeGraphContainer& container);
 private:
 	NodeGraphLayer* root_layer = nullptr;
 	hash_map<Base_EdNode*> nodes;
@@ -143,7 +128,6 @@ enum class GraphPlayState {
 	Running,
 	Paused,
 };
-
 class PlaybackManager
 {
 public:
@@ -239,8 +223,12 @@ class NodePrototypes
 public:
 	Base_EdNode* create(const string& name) const {
 		auto func = MapUtil::get_opt(creations, name);
-		if (!func) return nullptr;
-		return (*func)();
+		if (!func) 
+			return nullptr;
+		Base_EdNode* node =  (*func)();
+		if (node)
+			node->name = name;
+		return node;
 	}
 	void add(string name, function<Base_EdNode* ()> creation) {
 		MapUtil::insert_test_exists(creations, name, creation);
@@ -316,4 +304,25 @@ private:
 	UndoRedoSystem cmd_manager;
 	uptr<ConsoleCmdGroup> concmds;
 	void* imnodes_context = nullptr;
+};
+
+using std::unordered_map;
+
+class SerializeGraphContainer : public ClassBase
+{
+public:
+	CLASS_BODY(SerializeGraphContainer);
+	void serialize(Serializer& s) final;
+	unordered_set<Base_EdNode*> nodes;
+	unordered_set<NodeGraphLayer*> layers;
+};
+
+class SerializeGraphUtils
+{
+public:
+	static uptr<SerializeGraphContainer> unserialize(const string& text);
+	static string serialize_to_string(SerializeGraphContainer& container, EditorNodeGraph& graph);
+	static SerializeGraphContainer make_container_from_handles(vector<GraphNodeHandle> handles, EditorNodeGraph& graph);
+	static SerializeGraphContainer make_container_from_nodeids(const vector<int>& nodes,const vector<int>& links, EditorNodeGraph& graph);
+
 };
