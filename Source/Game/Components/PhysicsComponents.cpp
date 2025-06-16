@@ -18,8 +18,7 @@
 #include <physx/foundation/PxTransform.h>
 
 #include "Framework/AddClassToFactory.h"
-#include "Game/AssetPtrMacro.h"
-#include "Game/EntityPtrMacro.h"
+
 
 ConfigVar ed_physics_shapes_depth_tested("ed_physics_shapes_depth_tested", "1", CVAR_BOOL, "are physics shapes in the editor depth tested");
 

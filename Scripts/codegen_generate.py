@@ -5,9 +5,6 @@ def write_headers(path:str, additional_includes:list[str]):
     out += f"#include \"{path}\"\n"
     out += "#include \"Framework/ReflectionProp.h\"\n"
     out += "#include \"Framework/ReflectionMacros.h\"\n"
-    out += "#include \"Game/AssetPtrMacro.h\"\n"
-    out += "#include \"Game/AssetPtrArrayMacro.h\"\n"
-    out += "#include \"Game/EntityPtrMacro.h\"\n"
     out += "#include \"Scripting/FunctionReflection.h\"\n"
     out += "#include \"Framework/VectorReflect2.h\"\n"
     out += "#include \"Framework/EnumDefReflection.h\"\n"
@@ -109,7 +106,7 @@ def escape_quote_characters(instr:str) -> str:
     outstr : str = ""
     for c in instr:
         if c== '"':
-            outstr += "\""
+            outstr += "\\\""
         else:
             outstr += c
     return outstr

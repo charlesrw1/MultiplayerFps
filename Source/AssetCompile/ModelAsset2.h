@@ -14,12 +14,13 @@
 
 #include "Framework/ArrayReflection.h"
 #include "Game/SerializePtrHelpers.h"
-#include "Game/AssetPtrArrayMacro.h"
-#include "Game/AssetPtrMacro.h"
+
 #include "Framework/Reflection2.h"
 #include "MiscEditors/DataClass.h"
 #include "Game/SoftAssetPtr.h"
-
+//
+//
+//asdf
 template<>
 struct GetAtomValueWrapper<std::unique_ptr<AnimationEvent>> {
 	static PropertyInfo get() {
@@ -31,7 +32,6 @@ struct GetAtomValueWrapper<std::unique_ptr<AnimationEvent>> {
 		return pi;
 	}
 };
-
 
 
 class BoneRenameContainer : public ClassBase

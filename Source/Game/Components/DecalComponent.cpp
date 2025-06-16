@@ -9,7 +9,7 @@
 #include "BillboardComponent.h"
 #include "Assets/AssetDatabase.h"
 #include "ArrowComponent.h"
-#include "Game/AssetPtrMacro.h"
+
 #include "Framework/ReflectionMacros.h"
 
 DecalComponent::DecalComponent() {

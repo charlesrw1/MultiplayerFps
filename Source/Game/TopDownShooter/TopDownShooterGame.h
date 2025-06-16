@@ -17,8 +17,7 @@
 #include "Game/LevelAssets.h"
 #include "Animation/Runtime/Animation.h"
 #include "Animation/AnimationSeqAsset.h"
-#include "Game/AssetPtrMacro.h"
-#include "Game/EntityPtrArrayMacro.h"
+
 #include "Scripting/FunctionReflection.h"
 #include "Framework/Reflection2.h"
 #include "Physics/Physics2.h"

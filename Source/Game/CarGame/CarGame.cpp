@@ -17,7 +17,7 @@
 #include "Animation/AnimationSeqAsset.h"
 #include "imgui.h"
 #include "Physics/Physics2.h"
-#include "Game/AssetPtrMacro.h"
+
 #include "CarGame.h"
 
 float spring_damp = 200;

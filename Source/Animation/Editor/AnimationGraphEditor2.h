@@ -7,7 +7,6 @@
 #include "Framework/StringUtils.h"
 #include "Framework/Hashmap.h"
 #include "Framework/ConsoleCmdGroup.h"
-#include "Game/AssetPtrMacro.h"
 #include "LevelEditor/CommandMgr.h"
 #include "EditorTool3d.h"
 #include "Base_node.h"

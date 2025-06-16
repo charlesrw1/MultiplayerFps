@@ -5,7 +5,7 @@
 #include "Render/DrawPublic.h"
 #include "Render/TerrainPublic.h"
 #include "Framework/ReflectionMacros.h"
-#include "Game/AssetPtrMacro.h"
+
 #include "GameEnginePublic.h"
 
 #include "Game/Components/BillboardComponent.h"

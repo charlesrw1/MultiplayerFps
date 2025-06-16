@@ -1,5 +1,5 @@
 #include "SoundComponent.h"
-#include "Game/AssetPtrMacro.h"
+
 #include "Framework/ReflectionMacros.h"
 #include "GameEnginePublic.h"
 #include "Game/Components/MeshbuilderComponent.h"

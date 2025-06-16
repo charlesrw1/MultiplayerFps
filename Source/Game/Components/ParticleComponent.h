@@ -5,8 +5,8 @@
 #include "Render/DrawPublic.h"
 #include "Framework/MathLib.h"
 #include "Framework/Hashset.h"
-#include "Game/AssetPtrMacro.h"
 #include "Framework/ReflectionMacros.h"
+#include "Game/SerializePtrHelpers.h"
 
 // todo: make this an asset instead
 

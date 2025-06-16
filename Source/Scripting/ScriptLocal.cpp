@@ -9,8 +9,7 @@ extern "C" {
 #include <lualib.h>
 #include <lauxlib.h>
 }
-#include "Game/AssetPtrMacro.h"
-#include "Game/EntityPtrArrayMacro.h"
+
 #include "Game/Entity.h"
 #include "Game/EntityComponent.h"
 

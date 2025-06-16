@@ -20,8 +20,6 @@
 #include "Framework/ReflectionMacros.h"
 #include "Framework/AddClassToFactory.h"
 
-#include "EntityPtrArrayMacro.h"
-#include "EntityPtrMacro.h"
 
 #include "Framework/Serializer.h"
 

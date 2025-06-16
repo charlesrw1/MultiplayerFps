@@ -5,7 +5,7 @@
 #include "Render/RenderObj.h"
 #include "Render/Model.h"
 #include "Game/Entity.h"
-#include "Game/AssetPtrMacro.h"
+
 #include "Framework/ReflectionMacros.h"
 #include "Render/ModelManager.h"
 

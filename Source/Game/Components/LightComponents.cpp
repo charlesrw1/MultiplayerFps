@@ -16,7 +16,7 @@
 
 #include "GameEnginePublic.h"
 
-#include "Game/AssetPtrMacro.h"
+
 
 
 

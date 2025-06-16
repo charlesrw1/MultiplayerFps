@@ -21,7 +21,7 @@
 #include "GameEnginePublic.h"
 #include "Level.h"
 
-#include "Game/AssetPtrMacro.h"
+
 #include "Game/Components/MeshComponent.h"
 #include "Game/Entity.h"
 #include <string>

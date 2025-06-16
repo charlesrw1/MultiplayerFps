@@ -14,8 +14,8 @@
 
 #include "Framework/ArrayReflection.h"
 
-#include "Game/AssetPtrMacro.h"
-#include "Game/AssetPtrArrayMacro.h"
+
+
 #include "Scripting/FunctionReflection.h"
 
 #include "Framework/VectorReflect2.h"
