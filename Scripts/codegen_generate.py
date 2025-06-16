@@ -42,13 +42,15 @@ def output_macro_for_prop(cpptype:CppType,name:str,flags:str,offset:str,custom_t
 
     elif type == ASSET_PTR_TYPE:
         #return f"REG_ASSET_PTR({name},{flags})"
-        return f'make_struct_property({name_offset_flags}, "AssetPtr", {type_of_template}.classname)'
+        #return f'make_struct_property({name_offset_flags}, "AssetPtr", {type_of_template}.classname)'
+        return f'make_assetptr_property_new({name_offset_flags},{tooltip},&{type_of_template})'
     elif type == STRING_TYPE:
         #return f"REG_STDSTRING_CUSTOM_TYPE({name},{flags},{custom_type})"
         return f"make_string_property({name_offset_flags},{custom_type})"
     elif type == HANDLE_PTR_TYPE:
         #return f"REG_ENTITY_PTR({name},{flags})"
-        return f'make_struct_property({name_offset_flags}, "ObjPtr", {type_of_template}.classname)'
+        #return f'make_struct_property({name_offset_flags}, "ObjPtr", {type_of_template}.classname)'
+        return f'make_objhandleptr_property({name_offset_flags},{tooltip},&{type_of_template})'
     elif type == FUNCTION_TYPE:
         name = nameoverride if len(nameoverride)!=0 else name
         name = f'"{name}"'
@@ -93,20 +95,30 @@ def output_macro_for_prop(cpptype:CppType,name:str,flags:str,offset:str,custom_t
 
     elif type == SOFTASSET_PTR_TYPE:
         #return f"REG_SOFT_ASSET_PTR({name},{flags})"
-        return f'make_struct_property({name_offset_flags}, "AssetPtr", {type_of_template}.classname)'
+        return f'make_softassetptr_property_new({name_offset_flags},{tooltip},&{type_of_template})'
     elif type == CLASSTYPEINFO_TYPE:
-        return f'make_struct_property({name_offset_flags}, "ClassTypePtr", {type_of_template}.classname)'
+        #return f'make_struct_property({name_offset_flags}, "ClassTypePtr", {type_of_template}.classname)'
         #return f"REG_CLASSTYPE_PTR({name},{flags})"
+        return f'make_classtypeinfo_property({name_offset_flags},{tooltip},&{type_of_template})'
     else:
         print(f"Unknown type {name} {type}")
         assert(0)
     return ""
 
+def escape_quote_characters(instr:str) -> str:
+    outstr : str = ""
+    for c in instr:
+        if c== '"':
+            outstr += "\""
+        else:
+            outstr += c
+    return outstr
+
 # code gen to make macros to make templates to make code ...
 def write_prop(prop : Property,newclass:ClassDef) -> str:
     prop.custom_type = f'"{prop.custom_type}"'
     prop.hint = f'"{prop.hint}"'
-    prop.tooltip = f'"{prop.tooltip}"'
+    prop.tooltip = f'"{escape_quote_characters(prop.tooltip)}"'
    
     offset_str = f"offsetof({newclass.classname}, {prop.name})"
 

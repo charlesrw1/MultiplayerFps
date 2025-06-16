@@ -1982,9 +1982,35 @@ static inline void CalcMiniMapLayout()
     editor.MiniMapScaling = mini_map_scaling;
 }
 
+static void MiniMapDrawCommentNode(ImNodesEditorContext& editor, const int node_idx)
+{
+    const ImNodeData& node = editor.Nodes.Pool[node_idx];
+    ImRect rect = node.Rect;
+    rect.Max = rect.Min + node.CommentSize;
+    const ImRect node_rect = ScreenSpaceToMiniMapSpace(editor, rect);
+
+    // Round to near whole pixel value for corner-rounding to prevent visual glitches
+    const float mini_map_node_rounding =
+        floorf(node.LayoutStyle.CornerRounding * editor.MiniMapScaling);
+
+    ImU32 mini_map_node_background = node.ColorStyle.Background;
+
+    const ImU32 mini_map_node_outline = GImNodes->Style.Colors[ImNodesCol_MiniMapNodeOutline];
+
+    GImNodes->CanvasDrawList->AddRectFilled(
+        node_rect.Min, node_rect.Max, mini_map_node_background, 0.0);
+
+    GImNodes->CanvasDrawList->AddRect(
+        node_rect.Min, node_rect.Max, mini_map_node_outline, 0.0);
+}
+
 static void MiniMapDrawNode(ImNodesEditorContext& editor, const int node_idx)
 {
     const ImNodeData& node = editor.Nodes.Pool[node_idx];
+    if (node.is_comment) {
+        MiniMapDrawCommentNode(editor, node_idx);
+        return;
+    }
 
     const ImRect node_rect = ScreenSpaceToMiniMapSpace(editor, node.Rect);
 
@@ -2022,6 +2048,8 @@ static void MiniMapDrawNode(ImNodesEditorContext& editor, const int node_idx)
     GImNodes->CanvasDrawList->AddRect(
         node_rect.Min, node_rect.Max, mini_map_node_outline, mini_map_node_rounding);
 }
+
+
 
 static void MiniMapDrawLink(ImNodesEditorContext& editor, const int link_idx)
 {
@@ -2097,6 +2125,14 @@ static void MiniMapUpdate()
     GImNodes->CanvasDrawList->PushClipRect(
         mini_map_rect.Min, mini_map_rect.Max, true /* intersect with editor clip-rect */);
 
+    ImVector<int>& depth_stack = editor.NodeDepthOrder;
+    for (int i = 0; i < depth_stack.size(); ++i) {
+        const int node_idx = depth_stack[i];
+        if (editor.Nodes.InUse[node_idx])
+        {
+            MiniMapDrawNode(editor, node_idx);
+        }
+    }
     // Draw links first so they appear under nodes, and we can use the same draw channel
     for (int link_idx = 0; link_idx < editor.Links.Pool.size(); ++link_idx)
     {
@@ -2106,13 +2142,6 @@ static void MiniMapUpdate()
         }
     }
 
-    for (int node_idx = 0; node_idx < editor.Nodes.Pool.size(); ++node_idx)
-    {
-        if (editor.Nodes.InUse[node_idx])
-        {
-            MiniMapDrawNode(editor, node_idx);
-        }
-    }
 
     // Draw editor canvas rect inside mini-map
     {
@@ -2804,10 +2833,14 @@ void EndNode()
         if (therect.Contains(GImNodes->MousePos)) {
             GImNodes->HoveredCommentCornerIdx = GImNodes->CurrentNodeIdx;
         }
-    }
 
-    editor.GridContentBounds.Add(node.Origin);
-    editor.GridContentBounds.Add(node.Origin + node.Rect.GetSize());
+        editor.GridContentBounds.Add(node.Origin);
+        editor.GridContentBounds.Add(node.Origin + node.CommentSize);
+    }
+    else {
+        editor.GridContentBounds.Add(node.Origin);
+        editor.GridContentBounds.Add(node.Origin + node.Rect.GetSize());
+    }
 
     if (node.Rect.Contains(GImNodes->MousePos))
     {
@@ -3092,6 +3125,16 @@ ImVec2 GetNodeGridSpacePos(const int node_id)
     IM_ASSERT(node_idx != -1);
     ImNodeData& node = editor.Nodes.Pool[node_idx];
     return node.Origin;
+}
+
+ImVec2 GetCommentNodeSize(const int node_id)
+{
+    ImNodesEditorContext& editor = EditorContextGet();
+    const int             node_idx = ObjectPoolFind(editor.Nodes, node_id);
+    IM_ASSERT(node_idx != -1);
+    ImNodeData& node = editor.Nodes.Pool[node_idx];
+    IM_ASSERT(node.is_comment);
+    return node.CommentSize;
 }
 
 void SnapNodeToGrid(int node_id)

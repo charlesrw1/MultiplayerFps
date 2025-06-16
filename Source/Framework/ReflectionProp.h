@@ -29,6 +29,10 @@ enum class core_type_id : uint8_t
 	StdString,
 	List,
 	ActualStruct,	// not the fake struct...
+	AssetPtr,
+	SoftAssetPtr,
+	ObjHandlePtr,
+	ClassTypeInfo,
 
 	Function,	// not really a property... represents a callable function by script (call_function)
 	GetterFunc,	// a function but it can be called like a variable access, must be const and have no parameters
@@ -101,6 +105,7 @@ struct PropertyInfo {
 	const char* tooltip = "";
 	const EnumTypeInfo* enum_type = nullptr;
 	const StructTypeInfo* struct_type = nullptr;
+	const ClassTypeInfo* class_type = nullptr;	// used for objtype,assetptr,classtype
 
 	//SerializePropFunc_t serialize_func = nullptr;
 	//UnSerializePropFunc_t unserialize_func = nullptr;
@@ -143,6 +148,11 @@ PropertyInfo make_quat_property(const char* name, uint16_t offset, uint32_t flag
 
 
 PropertyInfo make_new_array_type(const char* name, uint16_t offset, int flags, const char* tooltip, IListCallback* type);
+PropertyInfo make_assetptr_property_new(const char* name, uint16_t offset, int flags, const char* tooltip, const ClassTypeInfo* type);
+PropertyInfo make_objhandleptr_property(const char* name, uint16_t offset, int flags, const char* tooltip, const ClassTypeInfo* type);
+PropertyInfo make_classtypeinfo_property(const char* name, uint16_t offset, int flags, const char* tooltip, const ClassTypeInfo* type);
+PropertyInfo make_softassetptr_property_new(const char* name, uint16_t offset, int flags, const char* tooltip, const ClassTypeInfo* type);
+
 
 struct PropertyInfoList
 {

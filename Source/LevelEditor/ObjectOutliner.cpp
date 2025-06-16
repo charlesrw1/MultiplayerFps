@@ -574,7 +574,7 @@ static bool check_props_for_assetptr_or_entityptr(const string& filter, void* in
 {
 	for (int i = 0; i < list->count; i++) {
 		auto& prop = list->list[i];
-		if (strcmp("AssetPtr", prop.custom_type_str) == 0)
+		if (prop.type==core_type_id::AssetPtr)
 		{
 			IAsset** asset = (IAsset**)prop.get_ptr(inst);
 			if (*asset) {
@@ -582,7 +582,7 @@ static bool check_props_for_assetptr_or_entityptr(const string& filter, void* in
 					return true;
 			}
 		}
-		else if (strcmp("ObjPtr", prop.custom_type_str) == 0) {
+		else if (prop.type==core_type_id::ObjHandlePtr) {
 			obj<BaseUpdater>* eptr = (obj<BaseUpdater>*)prop.get_ptr(inst);
 			BaseUpdater* what = eptr->get();
 			if (what && OONameFilter::is_in_string(filter, std::to_string(what->get_instance_id())))	// entity ptr instance id

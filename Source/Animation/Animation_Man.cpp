@@ -46,7 +46,7 @@ static void check_props_for_assetptr(void* inst, const PropertyInfoList* list, I
 {
 	for (int i = 0; i < list->count; i++) {
 		auto prop = list->list[i];
-		if (strcmp(prop.custom_type_str, "AssetPtr") == 0) {
+		if (prop.type==core_type_id::AssetPtr) {
 			// wtf!
 			IAsset** e = (IAsset**)prop.get_ptr(inst);
 			if (*e)

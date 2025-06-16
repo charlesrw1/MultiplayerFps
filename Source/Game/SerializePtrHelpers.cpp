@@ -44,7 +44,7 @@ public:
 
 			// this does a sync or async depending on the parent request
 
-			auto typeInfo = ClassBase::find_class(info.range_hint);
+			auto typeInfo = info.class_type;
 			if (typeInfo)
 				*ptr_prop = load->load_asset(typeInfo, to_str);// g_assets.find_assetptr_unsafe(to_str, typeInfo);
 			else {
@@ -111,7 +111,7 @@ class SerializeEntityPtr : public IPropertySerializer
 		if (!find) {
 			sys_print(Error, "couldnt find path for entityptr %s\n", path.c_str());
 		}
-		else if (strcmp(find->get_type().classname, info.range_hint) != 0) {
+		else if (!find->get_type().is_a(*info.class_type)) {
 			sys_print(Error, "mismatch type for objptr %s\n", path.c_str());
 		}
 		else {

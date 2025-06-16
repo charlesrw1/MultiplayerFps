@@ -19,16 +19,16 @@ public:
 		ClassBase** uniquePtr = (ClassBase**)info->get_ptr(instance);
 
 		add_children(*uniquePtr);
-		type_of_base = ClassBase::find_class(info->range_hint);
+		type_of_base = info->class_type;
 		this->info = info;
 		this->inst = instance;
 
 	}
 	bool internal_update() override {
-		auto classroot = info->range_hint;
+		auto classroot = info->class_type;
 
 		if (!type_of_base) {
-			ImGui::Text("Couldnt find base class: %s\n", info->range_hint);
+			ImGui::Text("Couldnt find base class: %s\n", info->class_type->classname);
 			return false;
 		}
 		ClassBase** uniquePtr = (ClassBase**)info->get_ptr(inst);
@@ -467,12 +467,24 @@ static IPropertyEditor* create_ipropertyed(const FnFactory<IPropertyEditor>& fac
 		return new VectorEditor(instance, prop);
 	case core_type_id::Quat:
 		return new RotationEditor(instance, prop);
+	case core_type_id::ObjHandlePtr: {
+		out = factory.create("ObjPtr");
+	}break;
+	case core_type_id::AssetPtr: {
+		out = factory.create("AssetPtr");
+	}break;
+	case core_type_id::SoftAssetPtr: {
+		out = factory.create("SoftAssetPtr");
+	}break;
 
 	default:
 		printf("!!!! NO TYPE DEFINED FOR IPropertyEditorFactory %s !!!\n", prop->name);
 		return nullptr;
 	}
-
+	if (out) {
+		out->post_construct_for_custom_type(instance, prop, parent);
+	}
+	return out;
 }
 
 int imgui_input_text_callback_completion(ImGuiInputTextCallbackData* data, ImguiInputTextCallbackUserStruct* user)

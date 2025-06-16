@@ -264,7 +264,7 @@ void check_props_for_entityptr(void* inst, const PropertyInfoList* list)
 {
 	for (int i = 0; i < list->count; i++) {
 		auto prop = list->list[i];
-		if (strcmp(prop.custom_type_str, "ObjPtr") == 0) {
+		if (prop.type==core_type_id::ObjHandlePtr) {
 			// wtf!
 			BaseUpdater** e = (BaseUpdater**)prop.get_ptr(inst);
 

@@ -977,15 +977,50 @@ void GraphPropertyWindow::draw()
 	}
 	ImGui::End();
 }
-
+extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 extern ImFont* global_big_imgui_font;
+
+static int count_characters(const std::string& s, char what) {
+	int num = 0;
+	for (char c : s)
+		if (c == what)
+			num++;
+	return num;
+}
+
 void CommentNode::draw_imnode()
 {
-	ImNodes::PushColorStyle(ImNodesCol_NodeBackground, ImColor(120, 5, 5, 255));
+	ImNodes::PushColorStyle(ImNodesCol_NodeBackground, color.to_uint());
 	ImNodes::BeginComment(self.id);
 	ImGui::PushFont(global_big_imgui_font);
-	ImGui::Text("This is a comment...");
+
+	int lines = count_characters(desc, '\n') + 1;
+
+	if (is_editing) {
+		if (ImGui::InputTextMultiline("##text", (char*)desc.c_str(), desc.size() + 1, ImVec2(this->sizex-30.0, lines*30), ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize,&desc)) {
+		}
+		if (ImGui::IsItemDeactivated()) {
+			is_editing = false;
+			desc = desc.c_str();
+		}
+	}
+	else {
+		ImGui::Text("%s", desc.c_str());
+	}
+	if (ImGui::IsItemHovered()) {
+		if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+			is_editing = true;
+		}
+	}
+
 	ImGui::PopFont();
 	ImNodes::EndComment();
 	ImNodes::PopColorStyle();
+
+	auto pos = GraphUtil::to_glm(ImNodes::GetNodeGridSpacePos(self.id));
+	auto size = GraphUtil::to_glm(ImNodes::GetCommentNodeSize(self.id));
+	this->nodex = pos.x;
+	this->nodey = pos.y;
+	this->sizex = size.x;
+	this->sizey = size.y;
 }

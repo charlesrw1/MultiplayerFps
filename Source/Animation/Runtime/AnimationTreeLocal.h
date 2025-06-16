@@ -362,7 +362,7 @@ NODECFG_HEADER(Clip_Node_CFG, Clip_Node_RT)
 	{
 		START_PROPS(Clip_Node_CFG)
 			//REG_STDSTRING_CUSTOM_TYPE(clip_name, PROP_DEFAULT, "AG_CLIP_TYPE"),
-			REG_ASSET_PTR(Clip,PROP_DEFAULT),
+			//REG_ASSET_PTR(Clip,PROP_DEFAULT),
 
 			REG_ENUM(rm[0], PROP_DEFAULT, "rootmotion_setting::keep", rootmotion_setting),
 			REG_ENUM(rm[1], PROP_DEFAULT, "rootmotion_setting::keep", rootmotion_setting),
@@ -639,7 +639,7 @@ NODECFG_HEADER(BlendSpace2d_CFG, BlendSpace2d_RT)
 			START_PROPS(GridPoint)
 				REG_FLOAT(x,PROP_SERIALIZE,""),
 				REG_FLOAT(y, PROP_SERIALIZE,""),
-				REG_ASSET_PTR(seq,PROP_SERIALIZE)
+				//REG_ASSET_PTR(seq,PROP_SERIALIZE)
 			END_PROPS(GridPoint)
 		}
 	};

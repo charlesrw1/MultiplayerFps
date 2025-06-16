@@ -24,10 +24,10 @@ bool SharedAssetPropertyEditor::internal_update() {
 	if (!has_init) {
 		has_init = true;
 		asset_str = get_str();
-		metadata = AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class(prop->range_hint));
+		metadata = AssetRegistrySystem::get().find_for_classtype(prop->class_type);
 	}
 	if (!metadata) {
-		ImGui::Text("Asset has no metadata: %s\n", prop->range_hint);
+		ImGui::Text("Asset has no metadata: %s\n", prop->class_type->classname);
 		return false;
 	}
 
@@ -148,7 +148,7 @@ void AssetPropertyEditor::set_asset(const std::string& str) {
 		*ptr = nullptr;
 	}
 	else {
-		auto classtype = ClassBase::find_class(prop->range_hint);
+		auto classtype = prop->class_type;
 		auto asset = g_assets.find_sync(str, classtype, 0).get();// loader->load_asset(resource->filename);
 		*ptr = asset;
 	}
@@ -663,7 +663,7 @@ bool MaterialParamPropEditor::internal_update()
 			internalEditor->post_construct_for_custom_type(&param, &pi, nullptr);
 		}
 		else if (param.type == MatParamType::Texture2D) {
-			pi = make_asset_ptr_property(paramDef.name.c_str(), pi.offset, PROP_DEFAULT, (AssetPtr<Texture>*)(0));
+			pi = make_assetptr_property_new(paramDef.name.c_str(), pi.offset, PROP_DEFAULT, "", &Texture::StaticType);// (AssetPtr<Texture>*)(0));
 			auto ed = factory.create(pi.custom_type_str/*AssetPtr*/);
 			assert(ed);
 			internalEditor = std::unique_ptr<IPropertyEditor>(ed);
@@ -931,14 +931,11 @@ void StateTransitionPropertyEditor::draw_value_side(StateTransitionScript* self,
 bool ClassTypePtrPropertyEditor::internal_update()
 {
 	if (!has_init) {
-		type_of_base = ClassBase::find_class(prop->range_hint);
+		type_of_base = prop->class_type;
 		has_init = true;
 	}
-	if (!type_of_base) {
-		ImGui::Text("Couldnt find base class: %s\n", prop->range_hint);
-		return false;
-	}
-
+	assert(type_of_base);
+	
 	bool has_update = false;
 	const ClassTypeInfo** ptr_prop = (const ClassTypeInfo**)prop->get_ptr(instance);
 	const char* preview = (*ptr_prop) ? (*ptr_prop)->classname : "<empty>";

@@ -62,27 +62,24 @@ void Serializer::serialize_property_ar(PropertyPtr ptr)
 		case core_type_id::Vec3: {
 			serialize_ar(ptr.as_vec3());
 		}break;
-		case core_type_id::Struct: {
+		case core_type_id::AssetPtr: {
 			auto pi = ptr.get_property_info();
-			if (strcmp(pi->custom_type_str, "AssetPtr") == 0) {
-				IAsset** assetptr = (IAsset**)pi->get_ptr(ptr.get_instance_ptr_unsafe());
-				auto type = ClassBase::find_class(pi->range_hint);
-				serialize_asset_ar(*type, *assetptr);
+			IAsset** assetptr = (IAsset**)pi->get_ptr(ptr.get_instance_ptr_unsafe());
+			serialize_asset_ar(*pi->class_type, *assetptr);
+		}break;
+		case core_type_id::ObjHandlePtr: {
+			auto pi = ptr.get_property_info();
+			int64_t* handle = (int64_t*)pi->get_ptr(ptr.get_instance_ptr_unsafe());
+			if (is_loading()) {
+				BaseUpdater* b = nullptr;
+				serialize_class_reference_ar(b);
+				if (b) {
+					*((BaseUpdater**)handle) = b;	// gets fixed up later
+				}
 			}
-			else if (strcmp(pi->custom_type_str, "ObjPtr") == 0) {
-				int64_t* handle = (int64_t*)pi->get_ptr(ptr.get_instance_ptr_unsafe());
-				auto type = ClassBase::find_class(pi->range_hint);
-				if (is_loading()) {
-					BaseUpdater* b = nullptr;
-					serialize_class_reference_ar(b);
-					if (b) {
-						*((BaseUpdater**)handle) = b;	// gets fixed up later
-					}
-				}
-				else {
-					BaseUpdater* b = eng->get_object(*handle);
-					serialize_class_reference_ar(b);
-				}
+			else {
+				BaseUpdater* b = eng->get_object(*handle);
+				serialize_class_reference_ar(b);
 			}
 		}break;
 
@@ -153,30 +150,26 @@ void Serializer::serialize_property(PropertyPtr ptr)
 		case core_type_id::Vec3: {
 			serialize(ptr.get_name(),ptr.as_vec3());
 		}break;
-		case core_type_id::Struct: {
+		case core_type_id::AssetPtr: {
 			auto pi = ptr.get_property_info();
-			if (strcmp(pi->custom_type_str, "AssetPtr") == 0) {
-				IAsset** assetptr = (IAsset**)pi->get_ptr(ptr.get_instance_ptr_unsafe());
-				auto type = ClassBase::find_class(pi->range_hint);
-				serialize_asset(ptr.get_name(), *type, *assetptr);
-			}
-			else if (strcmp(pi->custom_type_str, "ObjPtr") == 0) {
-				int64_t* handle = (int64_t*)pi->get_ptr(ptr.get_instance_ptr_unsafe());
-				auto type = ClassBase::find_class(pi->range_hint);
-				if (is_loading()) {
-					BaseUpdater* b = nullptr;
-					serialize_class_reference(ptr.get_name(), b);
-					if (b) {
-						*((BaseUpdater**)handle) = b;	// gets fixed up later
-					}
+			IAsset** assetptr = (IAsset**)pi->get_ptr(ptr.get_instance_ptr_unsafe());
+			serialize_asset(ptr.get_name(), *pi->class_type, *assetptr);
+		}break;
+		case core_type_id::ObjHandlePtr: {
+			auto pi = ptr.get_property_info();
+			int64_t* handle = (int64_t*)pi->get_ptr(ptr.get_instance_ptr_unsafe());
+			if (is_loading()) {
+				BaseUpdater* b = nullptr;
+				serialize_class_reference(ptr.get_name(), b);
+				if (b) {
+					*((BaseUpdater**)handle) = b;	// gets fixed up later
 				}
-				else {
-					BaseUpdater* b = eng->get_object(*handle);
-					serialize_class_reference(ptr.get_name(), b);
-				}			
+			}
+			else {
+				BaseUpdater* b = eng->get_object(*handle);
+				serialize_class_reference(ptr.get_name(), b);
 			}
 		}break;
-
 		}
 	}
 }

@@ -96,9 +96,10 @@ public:
 #endif
 
 	static PropertyInfoList* get_props() {
-		START_PROPS(MaterialEditorLocal)
-			REG_ASSET_PTR(model,PROP_DEFAULT),
-		END_PROPS(MaterialEditorLocal)
+		return nullptr;
+		//START_PROPS(MaterialEditorLocal)
+		//	REG_ASSET_PTR(model,PROP_DEFAULT),
+		//END_PROPS(MaterialEditorLocal)
 	}
 
 	void post_map_load_callback() override {

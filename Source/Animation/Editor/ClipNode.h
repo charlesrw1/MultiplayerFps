@@ -9,12 +9,19 @@ class CommentNode : public Base_EdNode
 {
 public:
 	CLASS_BODY(CommentNode);
+	CommentNode() {
+		desc = "A Comment";
+		color = Color32{ 120, 5, 5, 255 };
+	}
 
 	REF string desc;
+	REF Color32 color;
 	REFLECT(hide);
 	int sizex = 10;
 	REFLECT(hide);
 	int sizey = 10;
+
+	bool is_editing = false;
 
 	void draw_imnode() final;
 };

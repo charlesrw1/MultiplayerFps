@@ -571,6 +571,19 @@ bool read_list_field(PropertyInfo* prop, void* listptr, DictParser& in, StringVi
 }
 bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringView tok, ClassBase* userptr, IAssetLoadingInterface* load)
 {
+	auto do_serializer_for_explicit = [&](const char* type) -> bool {
+		auto& fac = IPropertySerializer::get_factory();
+		auto serializer = fac.createObject(type);
+		if (serializer) {
+			serializer->unserialize(in, *prop, ptr, tok, userptr, load);
+			delete serializer;	// fixme: inplace new/free instead?
+			return true;
+		}
+		else {
+			printf("!!!!!! NO SERIALIZER FOR STRUCT %s !!!!!!!!", prop->custom_type_str);
+			return false;
+		}
+	};
 
 	switch (prop->type)
 	{
@@ -626,20 +639,20 @@ bool read_propety_field(PropertyInfo* prop, void* ptr, DictParser& in, StringVie
 		if (!res)
 			parse_skip_object(in);
 	}break;
+	case core_type_id::AssetPtr: {
+		return do_serializer_for_explicit("AssetPtr");
+	}break;
+	case core_type_id::ObjHandlePtr: {
+		return do_serializer_for_explicit("ObjPtr");
+	}break;
+	case core_type_id::SoftAssetPtr: {
+		return do_serializer_for_explicit("SoftAssetPtr");
+	}break;
+	case core_type_id::ClassTypeInfo: {
+		return do_serializer_for_explicit("ClassTypeInfo");
+	}break;
 	case core_type_id::Struct: {
-
-		auto& fac = IPropertySerializer::get_factory();
-		auto serializer = fac.createObject(prop->custom_type_str);
-		if (serializer) {
-			serializer->unserialize(in, *prop, ptr, tok, userptr,load);
-			delete serializer;	// fixme: inplace new/free instead?
-			return true;
-		}
-		else {
-			printf("!!!!!! NO SERIALIZER FOR STRUCT %s !!!!!!!!", prop->custom_type_str);
-			return "";
-		}
-
+		return do_serializer_for_explicit(prop->custom_type_str);
 	}break;
 
 	case core_type_id::Vec3:
@@ -823,6 +836,40 @@ PropertyInfo make_new_array_type(const char* name, uint16_t offset, int flags, c
 	p.tooltip = tooltip;
 	p.type = core_type_id::List;
 	p.list_ptr = type;
+	return p;
+}
+
+PropertyInfo make_assetptr_property_new(const char* name, uint16_t offset, int flags, const char* tooltip, const ClassTypeInfo* type)
+{
+	PropertyInfo p(name, offset, flags);
+	p.tooltip = tooltip;
+	p.type = core_type_id::AssetPtr;
+	p.class_type = type;
+	return p;
+}
+PropertyInfo make_softassetptr_property_new(const char* name, uint16_t offset, int flags, const char* tooltip, const ClassTypeInfo* type)
+{
+	PropertyInfo p(name, offset, flags);
+	p.tooltip = tooltip;
+	p.type = core_type_id::SoftAssetPtr;
+	p.class_type = type;
+	return p;
+}
+PropertyInfo make_objhandleptr_property(const char* name, uint16_t offset, int flags, const char* tooltip, const ClassTypeInfo* type)
+{
+	PropertyInfo p(name, offset, flags);
+	p.tooltip = tooltip;
+	p.type = core_type_id::ObjHandlePtr;
+	p.class_type = type;
+	return p;
+}
+
+PropertyInfo make_classtypeinfo_property(const char* name, uint16_t offset, int flags, const char* tooltip, const ClassTypeInfo* type)
+{
+	PropertyInfo p(name, offset, flags);
+	p.tooltip = tooltip;
+	p.type = core_type_id::ClassTypeInfo;
+	p.class_type = type;
 	return p;
 }
 
