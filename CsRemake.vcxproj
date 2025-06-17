@@ -30,6 +30,7 @@
     <ClCompile Include="Source\Animation\Editor\AnimationGraphEditor2.cpp" />
     <ClCompile Include="Source\Animation\Editor\AnimCommands.cpp" />
     <ClCompile Include="Source\Animation\Editor\Base_node.cpp" />
+    <ClCompile Include="Source\Animation\Editor\Basic_nodes.cpp" />
     <ClCompile Include="Source\Animation\Editor\ClipNode.cpp" />
     <ClCompile Include="Source\EditorPopups.cpp" />
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
@@ -69,6 +70,7 @@
     <ClInclude Include="Source\Animation\Editor\State_node.h" />
     <ClInclude Include="Source\Animation\Editor\GraphUtil.h" />
     <ClInclude Include="Source\Animation\Event.h" />
+    <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew.h" />
     <ClInclude Include="Source\Animation\SkeletonData.h" />
     <ClInclude Include="Source\Animation\Runtime\Animation.h" />
     <ClInclude Include="Source\Animation\Runtime\AnimationTreeLocal.h" />

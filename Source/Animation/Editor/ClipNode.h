@@ -1,9 +1,21 @@
 #pragma once
 #include "Base_node.h"
+#include "Framework/EnumDefReflection.h"
+#include "Animation/Runtime/RuntimeNodesNew.h"
 #include <variant>
 using std::variant;
 
 class AnimationSeqAsset;
+
+NEWENUM(CommentColors, int32_t)
+{
+	Gray,
+	Red,
+	Green,
+	Blue,
+	Yellow,
+	Orange,
+};
 
 class CommentNode : public Base_EdNode
 {
@@ -11,11 +23,12 @@ public:
 	CLASS_BODY(CommentNode);
 	CommentNode() {
 		desc = "A Comment";
-		color = Color32{ 120, 5, 5, 255 };
 	}
 
+	Color32 get_color() const;
+
 	REF string desc;
-	REF Color32 color;
+	REF CommentColors color=CommentColors::Gray;
 	REFLECT(hide);
 	int sizex = 10;
 	REFLECT(hide);
@@ -26,25 +39,27 @@ public:
 	void draw_imnode() final;
 };
 
-struct ClipNode_SData {
-	STRUCT_BODY(ClipNode_SData);
-	REF AssetPtr<AnimationSeqAsset> Clip;
-
-	REF bool loop = true;
-	REF StringName SyncGroup;
-	REF sync_opt SyncOption = sync_opt::Default;
-	bool has_sync_group() const {
-		return !SyncGroup.is_null();
-	}
-	REF float speed = 1.0;
-	REF int start_frame = 0;
-};
 
 class Clip_EdNode : public Base_EdNode
 {
 public:
 	CLASS_BODY(Clip_EdNode);
-	REF ClipNode_SData Data;
+
+	Clip_EdNode(bool is_evaluator) {
+		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
+		if (is_evaluator)
+			add_in_port(0, "time").type = GraphPinType::Float;
+	}
+	REF stClipNode Data;
+};
+
+class Statemachine_EdNode : public Base_EdNode
+{
+public:
+	CLASS_BODY(Statemachine_EdNode);
+	Statemachine_EdNode() {
+		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
+	}
 };
 
 class Variable_EdNode : public Base_EdNode
@@ -58,35 +73,127 @@ class Blend2_EdNode : public Base_EdNode
 {
 public:
 	CLASS_BODY(Blend2_EdNode);
+	Blend2_EdNode() {
+		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
+		add_in_port(0, "value").type = GraphPinType::Float;
+		add_in_port(1, "0").type = GraphPinType::LocalSpacePose;
+		add_in_port(2, "1").type = GraphPinType::LocalSpacePose;
+	}
 };
 class BlendInt_EdNode : public Base_EdNode
 {
 public:
 	CLASS_BODY(BlendInt_EdNode);
 	BlendInt_EdNode() = default;
+	BlendInt_EdNode(bool byenum) {
+		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
+		if(byenum)
+			add_in_port(0, "value").type = GraphPinType::EnumType;
+		else
+			add_in_port(0, "value").type = GraphPinType::Integer;
+		add_in_port(1, "0").type = GraphPinType::LocalSpacePose;
+		add_in_port(2, "1").type = GraphPinType::LocalSpacePose;
+	}
 };
-
-class ConstValue_EdNode : public Base_EdNode
-{
+class Ik2Bone_EdNode : public Base_EdNode {
 public:
-	CLASS_BODY(ConstValue_EdNode);
-	variant<bool, int64_t, float, glm::vec3, glm::quat> values;
-	void serialize(Serializer& s) final {}
+	CLASS_BODY(Ik2Bone_EdNode);
+	Ik2Bone_EdNode() {
+		add_out_port(0, "").type = GraphPinType::MeshSpacePose;
+		add_in_port(0, "pose").type = GraphPinType::MeshSpacePose;
+		add_in_port(1, "target").type = GraphPinType::Vec3;
+		add_in_port(2, "pole").type = GraphPinType::Vec3;
+		add_in_port(3, "alpha").type = GraphPinType::Float;
+	}
+
 };
 
+class ModifyBone_EdNode : public Base_EdNode {
+public:
+	CLASS_BODY(ModifyBone_EdNode);
+	ModifyBone_EdNode() {
+		add_out_port(0, "").type = GraphPinType::MeshSpacePose;
+		add_in_port(0, "pose").type = GraphPinType::MeshSpacePose;
+		add_in_port(1, "translation").type = GraphPinType::Vec3;
+		add_in_port(2, "rotation").type = GraphPinType::Quat;
+		add_in_port(3, "alpha").type = GraphPinType::Float;
+	}
+
+	REF ModifyBoneType rotation = ModifyBoneType::None;
+	REF ModifyBoneType translation = ModifyBoneType::None;
+};
 
 class Func_EdNode : public Base_EdNode
 {
 public:
+	CLASS_BODY(Func_EdNode);
+	Func_EdNode() = default;
+	enum Type {
+		GetCurve,
+		DidEventStart,
+		DidEventEnd,
+		IsEventActive,
+		BreakVec3,
+		BreakVec2,
+		MakeVec3,
+		MakeVec2
+	};
+	Func_EdNode(Type t) {
+		switch (t)
+		{
+		case Func_EdNode::GetCurve:
+			add_out_port(0, "").type = GraphPinType::Float;
+			add_in_port(0, "name").type = GraphPinType::StringName;
+			break;
+		case Func_EdNode::DidEventStart:
+			add_out_port(0, "").type = GraphPinType::Boolean;
+			add_in_port(0, "name").type = GraphPinType::StringName;
+			break;
+		case Func_EdNode::DidEventEnd:
+			add_out_port(0, "").type = GraphPinType::Boolean;
+			add_in_port(0, "name").type = GraphPinType::StringName;
+			break;
+		case Func_EdNode::IsEventActive:
+			add_out_port(0, "").type = GraphPinType::Boolean;
+			add_in_port(0, "name").type = GraphPinType::ClassInfoType;
+			break;
+		case Func_EdNode::MakeVec3:
+			add_in_port(0, "x").type = GraphPinType::Float;
+			add_in_port(1, "y").type = GraphPinType::Float;
+			add_in_port(2, "z").type = GraphPinType::Float;
+			add_out_port(0, "").type = GraphPinType::Vec3;
+			break;
+		case Func_EdNode::BreakVec3:
+			add_out_port(0, "x").type = GraphPinType::Float;
+			add_out_port(1, "y").type = GraphPinType::Float;
+			add_out_port(2, "z").type = GraphPinType::Float;
+			add_in_port(0, "").type = GraphPinType::Vec3;
+			break;
+		default:
+			break;
+		}
+	}
 };
 
-class BreakMake_EdNode : public Base_EdNode
+class LayerRoot_EdNode : public Base_EdNode
 {
 public:
-	CLASS_BODY(BreakMake_EdNode);
+	CLASS_BODY(LayerRoot_EdNode);
 
-	BreakMake_EdNode() = default;
-	BreakMake_EdNode(bool make, bool is_vec3) {}
-private:
+	LayerRoot_EdNode(bool is_for_transition) {
+		if (is_for_transition)
+			add_in_port(0, "").type = GraphPinType::Boolean;
+		else
+			add_in_port(0, "").type = GraphPinType::LocalSpacePose;
+	}
+};
 
+class LogicalOp_EdNode : public Base_EdNode {
+public:
+	CLASS_BODY(LogicalOp_EdNode);
+	LogicalOp_EdNode(bool isor) {
+		add_out_port(0, "").type = GraphPinType::Boolean;
+		add_in_port(0, "").type = GraphPinType::Boolean;
+		add_in_port(1, "").type = GraphPinType::Boolean;
+	}
 };

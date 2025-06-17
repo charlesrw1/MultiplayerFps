@@ -11,10 +11,12 @@ void GraphCommandUtil::add_link(GraphLink link, EditorNodeGraph& graph)
 	opt<int> index = inn->find_link_idx_from_port(link.input);
 	if (!index.has_value()) {
 		inn->add_link(link);
+		inn->on_link_changes();
 	}
 	index = outn->find_link_idx_from_port(link.input);
 	if (!index.has_value()) {
 		outn->add_link(link);
+		outn->on_link_changes();
 	}
 }
 
@@ -60,15 +62,28 @@ Base_EdNode* GraphCommandUtil::get_optional_link_object(int linkid, EditorNodeGr
 	return nullptr;
 }
 
+bool GraphCommandUtil::can_connect_these_ports(GraphLink link, EditorNodeGraph& graph)
+{
+	auto porta = link.input.get_port_ptr(graph);
+	auto portb = link.output.get_port_ptr(graph);
+	if (!porta || !portb) return false;
+	if (porta->type.type == portb->type.type) return true;
+	if (porta->type.type == GraphPinType::Any || portb->type.type == GraphPinType::Any) return true;
+	return false;
+}
+
 void GraphCommandUtil::remove_link(GraphLink link, EditorNodeGraph& graph)
 {
 	Base_EdNode* inn = graph.get_node(link.input.get_node());
 	Base_EdNode* outn = graph.get_node(link.output.get_node());
-	assert(inn && outn);
-	GraphNodeHandle nh1 = inn->remove_link(link);
-	GraphNodeHandle nh2 = outn->remove_link(link);
-	graph.remove_node(nh1);
-	graph.remove_node(nh2);
+	if (inn) {
+		GraphNodeHandle nh1 = inn->remove_link(link);
+		graph.remove_node(nh1);
+	}
+	if (outn) {
+		GraphNodeHandle nh2 = outn->remove_link(link);
+		graph.remove_node(nh2);
+	}
 }
 
 AddLinkCommand::AddLinkCommand(AnimationGraphEditorNew& ed, GraphPortHandle input, GraphPortHandle output) : ed(ed)
@@ -79,6 +94,11 @@ AddLinkCommand::AddLinkCommand(AnimationGraphEditorNew& ed, GraphPortHandle inpu
 	if (index.has_value()) {
 		is_link_valid = false;
 		sys_print(Warning, "link input already has link\n");
+		return;
+	}
+	if (!GraphCommandUtil::can_connect_these_ports(link, ed.get_graph())) {
+		is_link_valid = false;
+		sys_print(Warning, "cant connect ports\n");
 		return;
 	}
 }
@@ -106,7 +126,6 @@ void AddNodeCommand::execute()
 {
 	auto node = ed.get_prototypes().create(creation_name);
 	assert(node);
-	node->editor = &ed;
 	ed.get_graph().insert_new_node(*node, what_layer, pos);
 	created_handle = node->self;
 	assert(created_handle.is_valid());

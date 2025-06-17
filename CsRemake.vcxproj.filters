@@ -530,6 +530,7 @@
     <ClInclude Include="Source\Animation\Editor\Optional.h" />
     <ClInclude Include="Source\Animation\Editor\Range.h" />
     <ClInclude Include="Source\Animation\Editor\ClipNode.h" />
+    <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -797,6 +798,7 @@
     <ClCompile Include="Source\Animation\Editor\AnimCommands.cpp" />
     <ClCompile Include="Source\Animation\Editor\Base_node.cpp" />
     <ClCompile Include="Source\Animation\Editor\ClipNode.cpp" />
+    <ClCompile Include="Source\Animation\Editor\Basic_nodes.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

@@ -100,7 +100,14 @@ public:
 	void insert_new_node(Base_EdNode& node, GraphLayerHandle layer, glm::vec2 pos);
 	void insert_nodes(SerializeGraphContainer& container);
 	void insert_nodes_with_new_id(SerializeGraphContainer& container);
+
+	AnimationGraphEditorNew* editor = nullptr;
+
+	const hash_map<Base_EdNode*>& get_nodes() {
+		return nodes;
+	}
 private:
+
 	int get_next_id() {
 		return ++id_start;
 	}
@@ -279,6 +286,7 @@ private:
 	void init_node_factory();
 	void delete_selected();
 	void dup_selected();
+	void resolve_any_types();
 
 	void post_map_load_callback() override{}
 	void init() override;

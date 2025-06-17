@@ -2,6 +2,8 @@
 #include "Framework/Util.h"
 #include <glm/glm.hpp>
 #include "imgui.h"
+#include "Base_node.h"
+
 class GraphUtil
 {
 public:
@@ -47,4 +49,16 @@ public:
 	static glm::vec2 to_glm(ImVec2 v) {
 		return glm::vec2(v.x, v.y);
 	}
+
+	struct PinShapeColor {
+		Color32 color;
+		enum Type {
+			Circle,
+			Square,
+			Triangle
+		}type;
+	};
+
+	static PinShapeColor get_pin_for_value_type(const GraphPinType::Enum& type);
+
 };

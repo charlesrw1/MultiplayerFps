@@ -7,14 +7,57 @@
 #include "Animation/Editor/AnimationGraphEditor.h"
 #include "Framework/Reflection2.h"
 
+enum class MathNodeType
+{
+	Add,Sub,Mult,Div,Lt,Gt,Leq,Geq,Eq,Neq
+};
+
+inline bool is_math_node_type_a_comparison(MathNodeType t) {
+	if (t == MathNodeType::Add || t == MathNodeType::Sub || t == MathNodeType::Mult || t == MathNodeType::Div)
+		return false;
+	return true;
+}
+inline bool is_math_node_type_an_equality(MathNodeType t) {
+	if (t == MathNodeType::Eq || t == MathNodeType::Neq)
+		return true;
+	return false;
+}
+
+inline bool does_type_have_equality(GraphPinType::Enum t) {
+	using GPT = GraphPinType;
+	if (t == GPT::Boolean || t == GPT::Integer || t == GPT::StringName || t == GPT::EnumType)
+		return true;
+	return false;
+}
+inline bool does_type_have_comparisons(GraphPinType::Enum t) {
+	using GPT = GraphPinType;
+	if (t == GPT::Float || t == GPT::Integer)
+		return true;
+	return false;
+}
+inline bool does_type_have_mathops(GraphPinType::Enum t) {
+	using GPT = GraphPinType;
+	if (t == GPT::Float || t == GPT::Integer || t == GPT::Quat||t==GPT::Vec3)
+		return true;
+	return false;
+}
+
 class Math_EdNode : public Base_EdNode {
 public:
 	CLASS_BODY(Math_EdNode);
-	Math_EdNode() {
-		add_in_port(0, "in_0");
-		add_in_port(1, "in_0");
-		add_out_port(0, "out_0");
+	Math_EdNode() = default;
+	Math_EdNode(MathNodeType type) :type(type) {
+		add_in_port(0, "");
+		add_in_port(1, "");
+		if (is_math_node_type_a_comparison(type)) {
+			add_out_port(0, "").type=GraphPinType::Boolean;
+		}
+		else {
+			add_out_port(0, "");
+		}
 	}
+	void on_link_changes() override;
+	MathNodeType type;
 };
 
 

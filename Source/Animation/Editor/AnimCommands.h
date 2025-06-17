@@ -14,6 +14,8 @@ public:
 	static opt<GraphLink> get_graph_link_from_linkid(int id, EditorNodeGraph& graph);
 	static void get_selected(vector<int>& link_ids, vector<int>& node_ids);
 	static Base_EdNode* get_optional_link_object(int linkid, EditorNodeGraph& graph);
+
+	static bool can_connect_these_ports(GraphLink link, EditorNodeGraph& graph);
 };
 
 class AnimationGraphEditorNew;

@@ -40,6 +40,9 @@ void Serializer::serialize_property_ar(PropertyPtr ptr)
 			bool& b = ptr.as_boolean();
 			serialize_ar(b);
 		}break;
+		case core_type_id::Enum8:
+		case core_type_id::Enum16:
+		case core_type_id::Enum32:
 		case core_type_id::Int8:
 		case core_type_id::Int16:
 		case core_type_id::Int32:
@@ -128,6 +131,9 @@ void Serializer::serialize_property(PropertyPtr ptr)
 			bool& b = ptr.as_boolean();
 			serialize(ptr.get_name(),b);
 		}break;
+		case core_type_id::Enum8:
+		case core_type_id::Enum16:
+		case core_type_id::Enum32:
 		case core_type_id::Int8:
 		case core_type_id::Int16:
 		case core_type_id::Int32:

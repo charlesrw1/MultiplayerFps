@@ -12,6 +12,22 @@ using std::make_unique;
 AnimationGraphEditorNew animgraphnew;
 IEditorTool* g_anim_ed_graph = &animgraphnew;
 
+static ImNodesPinShape push_and_get_pin_type(const GraphPinType::Enum& type, bool selected)
+{
+	selected = true;
+	auto [color, shape] = GraphUtil::get_pin_for_value_type(type);
+	ImNodes::PushColorStyle(ImNodesCol_Pin, color.to_uint());
+	switch (shape)
+	{
+	case GraphUtil::PinShapeColor::Circle: return selected ? ImNodesPinShape_CircleFilled : ImNodesPinShape_Circle;
+	case GraphUtil::PinShapeColor::Square: return selected ? ImNodesPinShape_QuadFilled : ImNodesPinShape_Quad;
+	case GraphUtil::PinShapeColor::Triangle: return selected ? ImNodesPinShape_TriangleFilled : ImNodesPinShape_Triangle;
+	default:
+		break;
+	}
+	return {};
+}
+
 void AnimationGraphEditorNew::add_command(Command* command)
 {
 	cmd_manager.add_command(command);
@@ -27,21 +43,7 @@ void AnimationGraphEditorNew::handle_link_changes()
 	{
 		if (start_atr >= INPUT_START && start_atr < OUTPUT_START)
 			std::swap(start_atr, end_atr);
-
-		//int start_node_id = Base_EdNode::get_nodeid_from_output_id(start_atr);
-		//int end_node_id = Base_EdNode::get_nodeid_from_input_id(end_atr);
-		//int start_idx = Base_EdNode::get_slot_from_id(start_atr);
-		//int end_idx = Base_EdNode::get_slot_from_id(end_atr);
-		//
-		//ASSERT(start_idx == 0);
-
 		add_command(new AddLinkCommand(*this,GraphPortHandle(end_atr), GraphPortHandle(start_atr)));
-
-	//	Base_EdNode* node_s = find_node_from_id(start_node_id);
-	//	Base_EdNode* node_e = find_node_from_id(end_node_id);
-	//
-	//	if (end_idx >= node_e->inputs.size() /* because state nodes can have exposed slots that dont exist yet*/ || node_s->can_output_to_type(node_e->inputs[end_idx].type))
-	//		bool destroy = node_e->add_input(this, node_s, end_idx);
 	}
 	if (ImNodes::IsLinkDropped(&start_atr)) {
 
@@ -61,14 +63,7 @@ void AnimationGraphEditorNew::handle_link_changes()
 		//*open_popup_menu_from_drop = true;
 	}
 	if (ImNodes::IsLinkDestroyed(&link_id)) {
-
 		add_command(new RemoveGraphObjectsCommand(*this, { link_id }, {}));
-
-	//	Base_EdNode* node_s = find_node_from_id(node_id);
-	//
-	//	node_s->on_remove_pin(slot);
-	//
-	//	node_s->on_post_remove_pins();
 	}
 }
 
@@ -76,6 +71,8 @@ void AnimationGraphEditorNew::init()
 {
 	PropertyFactoryUtil::register_basic(grid_factory);
 	graph = make_unique<EditorNodeGraph>();
+	graph->editor = this;
+
 	settings = make_unique<AnimNodeGraphSettings>();
 	tab_manager = make_unique<GraphTabManager>(*this);
 	playback = make_unique<PlaybackManager>(*this);
@@ -91,6 +88,14 @@ void AnimationGraphEditorNew::init()
 	concmds->add("anim.dup", [this](const Cmd_Args&) {
 		dup_selected();
 		});
+	concmds->add("anim.resolve_anys", [this](const Cmd_Args&) {
+		resolve_any_types();
+		});
+
+	on_node_changes.add(this, [this]() {
+		resolve_any_types();
+		});
+
 	init_node_factory();
 	imnodes_context = ImNodes::CreateContext();
 	//ImNodes::GetIO().LinkDetachWithModifierClick.Modifier = &is_modifier_pressed;
@@ -155,15 +160,41 @@ void GraphTabManager::draw_popup_menu()
 
 void AnimationGraphEditorNew::init_node_factory()
 {
-	prototypes.add("Add", []() { return new Math_EdNode; });
-	prototypes.add("Sub", []() { return new Math_EdNode; });
-	prototypes.add("Clip", []() { return new Clip_EdNode; });
-	prototypes.add("BreakVec3", []() { return new BreakMake_EdNode(false,true); });
-	prototypes.add("BreakVec2", []() { return new BreakMake_EdNode(false, false); });
-	prototypes.add("MakeVec3", []() { return new BreakMake_EdNode(true, true); });
-	prototypes.add("MakeVec2", []() { return new BreakMake_EdNode(true, false); });
+	prototypes.add("+", []() { return new Math_EdNode(MathNodeType::Add); });
+	prototypes.add("-", []() { return new Math_EdNode(MathNodeType::Sub); });
+	prototypes.add("*", []() { return new Math_EdNode(MathNodeType::Mult); });
+	prototypes.add("/", []() { return new Math_EdNode(MathNodeType::Div); });
+	prototypes.add("==", []() { return new Math_EdNode(MathNodeType::Eq); });
+	prototypes.add("!=", []() { return new Math_EdNode(MathNodeType::Neq); });
+	prototypes.add("<=", []() { return new Math_EdNode(MathNodeType::Leq); });
+	prototypes.add("<", []() { return new Math_EdNode(MathNodeType::Lt); });
+	prototypes.add(">", []() { return new Math_EdNode(MathNodeType::Gt); });
+	prototypes.add(">=", []() { return new Math_EdNode(MathNodeType::Geq); });
+	prototypes.add("Or", []() { return new LogicalOp_EdNode(true); });
+	prototypes.add("And", []() { return new LogicalOp_EdNode(false); });
+
+
+
+
+	prototypes.add("PlayClip", []() { return new Clip_EdNode(false); });
+	prototypes.add("EvaluateClip", []() { return new Clip_EdNode(true); });
+	prototypes.add("StateMachine", []() { return new Statemachine_EdNode(); });
+
+
 	prototypes.add("Blend2", []() { return new Blend2_EdNode; });
-	prototypes.add("BlendByInt", []() { return new BlendInt_EdNode; });
+	prototypes.add("BlendByInt", []() { return new BlendInt_EdNode(false); });
+	prototypes.add("BlendByEnum", []() { return new BlendInt_EdNode(true); });
+	prototypes.add("ReturnTransition", []() {return new LayerRoot_EdNode(true); });
+	prototypes.add("ReturnPose", []() {return new LayerRoot_EdNode(false); });
+
+	prototypes.add("ModifyBone", []() {return new ModifyBone_EdNode(); });
+	prototypes.add("Ik2Bone", []() {return new Ik2Bone_EdNode(); });
+
+	prototypes.add("GetCurve", []() {return new Func_EdNode(Func_EdNode::GetCurve); });
+	prototypes.add("IsEventActive", []() {return new Func_EdNode(Func_EdNode::IsEventActive); });
+	prototypes.add("MakeVec3", []() {return new Func_EdNode(Func_EdNode::MakeVec3); });
+	prototypes.add("BreakVec3", []() {return new Func_EdNode(Func_EdNode::BreakVec3); });
+
 	prototypes.add("Comment", []() { return new CommentNode; });
 }
 void AnimationGraphEditorNew::delete_selected()
@@ -520,12 +551,11 @@ void Base_EdNode::draw_imnode()
 	const float topy = ImGui::GetCursorPosY();
 	for (int input_idx : input_ports) {
 		const GraphPort& port = ports.at(input_idx);
-		GraphPortHandle phandle = port.get_handle(self);
-		opt<GraphLink> link = find_link_from_port(phandle);
-		ImNodesPinShape pin = ImNodesPinShape_Quad;
+		const GraphPortHandle phandle = port.get_handle(self);
+		const ImNodesPinShape pin = push_and_get_pin_type(port.type.type, find_link_from_port(phandle).has_value());
 
-		if (link.has_value())
-			pin = ImNodesPinShape_TriangleFilled;
+		//if (link.has_value())
+		//	pin = ImNodesPinShape_TriangleFilled;
 		ImNodes::BeginInputAttribute(phandle.id, pin);
 		const string& str = port.name;
 		ImGui::Text("%s",str.c_str());
@@ -544,12 +574,16 @@ void Base_EdNode::draw_imnode()
 		//	ImGui::PopItemWidth();
 		//ImGui::TextColored(graph_pin_type_to_color(input_type), str.c_str());
 		ImNodes::EndInputAttribute();
+
+		ImNodes::PopColorStyle();
 	}
 	ImGui::SetCursorPosY(topy);
 	for (int output_idx : output_ports) {
 		const GraphPort& port = ports.at(output_idx);
-		GraphPortHandle phandle = port.get_handle(self);
-		ImNodes::BeginOutputAttribute(phandle.id);
+		const GraphPortHandle phandle = port.get_handle(self);
+		const ImNodesPinShape pin = push_and_get_pin_type(port.type.type, find_link_from_port(phandle).has_value());
+
+		ImNodes::BeginOutputAttribute(phandle.id, pin);
 		const string& output_str = port.name;
 
 		auto posX = (ImGui::GetCursorPosX() + (x2 - x1) - ImGui::CalcTextSize(output_str.c_str()).x - 2 * ImGui::GetStyle().ItemSpacing.x) - 5.0;
@@ -561,6 +595,8 @@ void Base_EdNode::draw_imnode()
 		//ImGui::TextColored(graph_pin_type_to_color(output_type), output_str.c_str());
 		ImGui::Text("%s", output_str.c_str());
 		ImNodes::EndOutputAttribute();
+
+		ImNodes::PopColorStyle();
 	}
 	ImNodes::EndNode();
 
@@ -598,10 +634,11 @@ void Base_EdNode::draw_imnode()
 
 
 			//bool pushed_colors = node->push_imnode_link_colors(j);
-
+			auto [color, type] = GraphUtil::get_pin_for_value_type(port.type.type);
+			ImNodes::PushColorStyle(ImNodesCol_Link, color.to_uint());
 			//ImNodes::Link(node->getlink_id(j), node->inputs[j].node->getoutput_id(0), node->getinput_id(j), draw_flat_links, offset);
 			ImNodes::Link(lv.get_link_id(), lv.input.id, lv.output.id);
-
+			ImNodes::PopColorStyle();
 			//if (pushed_colors) {
 			//	ImNodes::PopColorStyle();
 			//	ImNodes::PopColorStyle();
@@ -681,6 +718,7 @@ void EditorNodeGraph::insert_new_node(Base_EdNode& node, GraphLayerHandle layer,
 	assert(layerptr);
 	node.self = GraphNodeHandle(get_next_id());
 	node.layer = layer;
+	node.editor = editor;
 	nodes.insert(node.self.id, &node);
 	layerptr->add_node_to_layer(node);
 	ImNodes::SetNodeScreenSpacePos(node.self.id, GraphUtil::to_imgui(pos));
@@ -698,6 +736,7 @@ void EditorNodeGraph::insert_nodes(SerializeGraphContainer& container)
 		assert(n && n->self.is_valid());
 		assert(nodes.find(n->self.id) == nullptr);
 		nodes.insert(n->self.id, n);
+		n->editor = editor;
 		auto layer = get_layer(n->layer);
 		if (!layer) {
 			sys_print(Warning, "layer not found for unserialized node\n");
@@ -733,6 +772,7 @@ void EditorNodeGraph::insert_nodes_with_new_id(SerializeGraphContainer& containe
 		assert(n && n->self.is_valid());
 		const int oldid = n->self.id;
 		n->self.id = get_next_id();
+		n->editor = editor;
 		old_id_to_new_id.insert({ oldid,n->self.id });
 		assert(layers.find(n->self.id) == nullptr);
 		nodes.insert(n->self.id, n);
@@ -761,6 +801,7 @@ void EditorNodeGraph::insert_nodes_with_new_id(SerializeGraphContainer& containe
 			}
 			else {
 				n->links.erase(n->links.begin() + i);
+				n->on_link_changes();
 				i--;
 			}
 		}
@@ -990,7 +1031,7 @@ static int count_characters(const std::string& s, char what) {
 
 void CommentNode::draw_imnode()
 {
-	ImNodes::PushColorStyle(ImNodesCol_NodeBackground, color.to_uint());
+	ImNodes::PushColorStyle(ImNodesCol_NodeBackground, get_color().to_uint());
 	ImNodes::BeginComment(self.id);
 	ImGui::PushFont(global_big_imgui_font);
 
@@ -1023,4 +1064,70 @@ void CommentNode::draw_imnode()
 	this->nodey = pos.y;
 	this->sizex = size.x;
 	this->sizey = size.y;
+}
+GraphUtil::PinShapeColor GraphUtil::get_pin_for_value_type(const GraphPinType::Enum& type)
+{
+	const auto circle = GraphUtil::PinShapeColor::Circle;
+	const auto square = GraphUtil::PinShapeColor::Square;
+	const auto tri = GraphUtil::PinShapeColor::Triangle;
+
+
+	switch (type)
+	{
+	case GraphPinType::Any: return { {155,155,155},circle };
+	case GraphPinType::Boolean: return { {120,30,30},circle };
+	case GraphPinType::Float: return { {80,190,40},circle };
+	case GraphPinType::Integer: return { {120,250,200},circle };
+	case GraphPinType::Vec3: return { {230,130,50},circle };
+	case GraphPinType::Quat: return { {120,120,250},circle };
+	case GraphPinType::EnumType: return { {80,100,30},circle };
+	case GraphPinType::StringName: return { {200,80,200},circle };
+	case GraphPinType::ClassInfoType: return { {230,230,80},circle };
+	case GraphPinType::LocalSpacePose: return { {220,220,220},square };
+	case GraphPinType::MeshSpacePose: return { {90,180,220},square };
+	default: return {};
+
+	}
+
+}
+
+Color32 CommentNode::get_color() const
+{
+	switch (color)
+	{
+	case CommentColors::Gray:return { 100,100,100 };
+	case CommentColors::Red: return { 120,10,10 };
+	case CommentColors::Green: return { 50,90,30 };
+	case CommentColors::Blue: return { 20,60,120 };
+	case CommentColors::Yellow: return { 120,120,20 };
+	case CommentColors::Orange: return { 120,70,20 };
+	default:
+		break;
+	}
+	return { 100,100,100 };
+}
+void AnimationGraphEditorNew::resolve_any_types()
+{
+	auto recurse = [](auto&& self,unordered_set<int>& visited, EditorNodeGraph& graph, Base_EdNode* n) {
+		if (!n)
+			return;
+		if (visited.find(n->self.id) != visited.end())
+			return;
+		visited.insert(n->self.id);
+		vector<int> inputs, outputs;
+		n->get_ports(inputs, outputs);
+		for (int inputidx : inputs) {
+			GraphPort* myport = &n->ports.at(inputidx);
+			Base_EdNode* other = n->find_other_node_from_port(myport->get_handle(n->self));
+			self(self, visited, graph, other);
+		}
+		n->on_link_changes();
+	};
+
+	unordered_set<int> visited;
+	const auto& nodes = graph->get_nodes();
+	for (auto n : nodes) {
+		// go down the chain, then go back up
+		recurse(recurse, visited, *graph, n);
+	}
 }

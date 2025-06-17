@@ -17,6 +17,9 @@
 #include "Optional.h"
 #include "Framework/MapUtil.h"
 
+#include <variant>
+using std::variant;
+
 struct ImNodesEditorContext;
 struct editor_layer {
 	ImNodesEditorContext* context = nullptr;
@@ -44,36 +47,57 @@ const Color32 CACHE_COLOR = { 5,5,5 };
 const Color32 DIRPLAY_COLOR = { 112, 112, 112 };
 
 extern ImVec4 scriptparamtype_to_color(anim_graph_value type);
-
-struct GraphPinType
+class EditorNodeGraph;
+enum class eGraphPinType
 {
-	GraphPinType() = default;
+	Boolean,
+	Integer,
+	Float,
+	Vec3,
+	Quat,
+	Enum,
 
-	enum type_ {
-		value_t,
-		localspace_pose,
-		meshspace_pose,
-		state_t,
-	}type=localspace_pose;
-	anim_graph_value value_type = anim_graph_value::bool_t;
-	GraphPinType(anim_graph_value agv) : type(value_t), value_type(agv) {}
-	GraphPinType(type_ agv) : type(agv) {}
+	StringName,
+	ClassTypeInfo,
 
-	bool operator==(const GraphPinType& other) const { return other.type == type && value_type == other.value_type; }
+	LocalSpacePose,
+	MeshSpacePose,
 };
 
-inline GraphPinType hint_str_to_GraphPinType(const char* str)
-{
-	if (strcmp(str, "float") == 0) return GraphPinType(anim_graph_value::float_t);
-	if (strcmp(str, "int") == 0) return GraphPinType(anim_graph_value::int_t);
-	if (strcmp(str, "bool") == 0) return GraphPinType(anim_graph_value::bool_t);
-	if (strcmp(str, "local") == 0) return GraphPinType(GraphPinType::localspace_pose);
-	if (strcmp(str, "mesh") == 0) return GraphPinType(GraphPinType::meshspace_pose);
-	if (strcmp(str, "vec3") == 0) return GraphPinType(anim_graph_value::vec3_t);
-	if (strcmp(str, "quat") == 0) return GraphPinType(anim_graph_value::quat_t);
-	ASSERT(0);
-	return GraphPinType(anim_graph_value::float_t);
-}
+struct GraphPinType {
+	enum Enum {
+		Any,
+
+		Boolean,
+		Integer,
+		Float,
+		Vec3,
+		Quat,
+		EnumType,
+
+		StringName,
+		ClassInfoType,
+
+		LocalSpacePose,
+		MeshSpacePose,
+	};
+	Enum type = Enum::Any;
+	variant<const EnumTypeInfo*, const ClassTypeInfo*, std::monostate> data;
+
+	GraphPinType(Enum type) : type(type) {}
+	GraphPinType() = default;
+
+	bool operator!=(const GraphPinType& other) const {
+		return !(*this == other);
+	}
+	bool operator==(const GraphPinType& other) const { 
+		assert(0);
+		return other.type == type;
+	}
+	bool is_any() const {
+		return type == Enum::Any;
+	}
+};
 
 struct GraphNodeHandle {
 	STRUCT_BODY();
@@ -86,6 +110,8 @@ struct GraphNodeHandle {
 
 	bool operator==(const GraphNodeHandle& other) const { return id == other.id; }
 };
+class Base_EdNode;
+struct GraphPort;
 struct GraphPortHandle {
 	STRUCT_BODY();
 	GraphPortHandle(int id) : id(id) {}
@@ -101,6 +127,19 @@ struct GraphPortHandle {
 	string to_string() {
 		return "port(" +std::to_string(get_node().id) + ":" + std::to_string(get_index()) + ")";
 	}
+
+	struct NodeIndexOutput {
+		GraphNodeHandle h;
+		int index = 0;
+		bool is_output = false;
+	};
+	NodeIndexOutput break_to_values() const {
+		return { get_node(),get_index(),is_output() };
+	}
+
+	GraphPort* get_port_ptr(EditorNodeGraph& graph);
+	Base_EdNode* get_node_ptr(EditorNodeGraph& graph);
+
 };
 struct GraphLayerHandle {
 	STRUCT_BODY();
@@ -112,15 +151,15 @@ struct GraphLayerHandle {
 	bool is_valid() const {
 		return id != 0;
 	}
-
 };
-
 struct GraphPort
 {
+	GraphPort() = default;
+
+	GraphPinType type;
+	string name = "";
 	int index = 0;
 	bool output_port = false;
-	string name = "";
-	GraphPinType type;
 
 	GraphPortHandle get_handle(GraphNodeHandle node) const;
 	bool is_output() const {
@@ -165,13 +204,22 @@ struct GraphLink {
 		return output.get_node().id;
 	}
 
-	GraphNodeHandle get_other_node(GraphNodeHandle self) {
+	bool self_is_input(GraphNodeHandle self) {
 		auto n1 = input.get_node();
 		auto n2 = output.get_node();
 		assert(n1 == self || n2 == self);
 		if (n1 == self)
-			return n2;
-		return n1;
+			return true;
+		return false;
+	}
+	GraphPortHandle get_other_port(GraphNodeHandle self) {
+		return self_is_input(self) ? output : input;
+	}
+	GraphPortHandle get_self_port(GraphNodeHandle self) {
+		return self_is_input(self) ? input : output;
+	}
+	GraphNodeHandle get_other_node(GraphNodeHandle self) {
+		return get_other_port(self).get_node();
 	}
 };
 
@@ -196,23 +244,6 @@ struct CompilationError
 	string message;
 };
 
-struct PropertyInfo;
-class Base_EdNode;
-struct GraphNodeInput
-{
-	string name;
-	GraphPinType type;
-	int output_id = 0;
-	int input_id = 0;
-
-	Base_EdNode* node = nullptr;
-
-	const PropertyInfo* prop_link = nullptr;
-
-	bool is_node_required = true;	// set to false to not emit errors when node is missing
-
-	bool is_attached_to_node() const { return node; }
-};
 enum class EdNodeCategory
 {
 	None,
@@ -225,7 +256,6 @@ enum class EdNodeCategory
 	AnimStatemachine,
 };
 class AnimationGraphEditorNew;
-class EditorNodeGraph;
 class Base_EdNode : public ClassBase
 {
 public:
@@ -318,19 +348,30 @@ public:
 	static int get_nodeid_from_static_atr_id(int staticid) {
 		return (staticid - STATIC_ATR_START) / MAX_STATIC_ATRS;
 	}
+
+	virtual void on_link_changes() {}
+
 	GraphPort& add_in_port(int index, string name);
 	GraphPort& add_out_port(int index, string name);
+	opt<int> find_my_port_idx(int index, bool output);
+	GraphPort* find_my_port(int index, bool output);
+	opt<int> find_port_idx_from_handle(GraphPortHandle handle);
+	GraphPort* find_port_from_handle(GraphPortHandle handle);
 	opt<int> find_link_idx_from_port(GraphPortHandle port);
 	opt<GraphLink> find_link_from_port(GraphPortHandle port);
+	Base_EdNode* find_other_node_from_port(GraphPortHandle port);
 	void get_ports(vector<int>& input, vector<int>& output);
 	opt<int> get_link_index(GraphLink link);
 	bool does_input_have_port_already(GraphPortHandle input);
 	void add_link(GraphLink link);
 	GraphNodeHandle remove_link_to_input(GraphPortHandle p);
 	GraphNodeHandle remove_link(GraphLink link);
+	GraphNodeHandle remove_link_from_idx(int index);
 	void remove_node_from_other_ports();
-
 	bool vaildate_links();
+	const GraphPort* get_other_nodes_port(GraphLink whatlink);
+	const GraphPort* get_other_nodes_port_from_myport(GraphPortHandle handle);
+
 
 	string name;
 	vector<GraphPort> ports;

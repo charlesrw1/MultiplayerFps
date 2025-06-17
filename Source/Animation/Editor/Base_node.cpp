@@ -112,13 +112,17 @@ GraphNodeHandle Base_EdNode::remove_link_to_input(GraphPortHandle p) {
 		return GraphNodeHandle();
 	}
 }
-
+GraphNodeHandle Base_EdNode::remove_link_from_idx(int index)
+{
+	assert(index >= 0 && index < links.size());
+	GraphNodeHandle link_opt_node = links.at(index).opt_link_node;
+	links.erase(links.begin() + index);
+	return link_opt_node;
+}
 GraphNodeHandle Base_EdNode::remove_link(GraphLink link) {
 	opt<int> index = get_link_index(link);
 	if (index.has_value()) {
-		GraphNodeHandle link_opt_node = links.at(index.value()).opt_link_node;
-		links.erase(links.begin() + index.value());
-		return link_opt_node;
+		return remove_link_from_idx(index.value());
 	}
 	else {
 		sys_print(Warning, "cant remove link, not found\n");
@@ -140,4 +144,68 @@ GraphPort& Base_EdNode::add_out_port(int index, string name) {
 	p.name = name;
 	ports.push_back(p);
 	return ports.back();
+}
+opt<int> Base_EdNode::find_my_port_idx(int index, bool is_output) {
+	for (int i = 0; i < ports.size(); i++) {
+		GraphPort& p = ports[i];
+		if (p.is_output() == is_output && p.get_idx() == index) {
+			return i;
+		}
+	}
+	return std::nullopt;
+}
+GraphPort* Base_EdNode::find_my_port(int index, bool output)
+{
+	opt<int> idx = find_my_port_idx(index, output);
+	if (idx.has_value())
+		return &ports.at(idx.value());
+	return nullptr;
+}
+
+const GraphPort* Base_EdNode::get_other_nodes_port(GraphLink whatlink)
+{
+	auto [othernode, index, is_output] = whatlink.get_other_port(self).break_to_values();
+	Base_EdNode* n = editor->get_graph().get_node(othernode);
+	if (!n)
+		return nullptr;
+	return n->find_my_port(index, is_output);
+}
+opt<int> Base_EdNode::find_port_idx_from_handle(GraphPortHandle handle)
+{
+	assert(handle.get_node() == self);
+	int index = handle.get_index();
+	bool is_output = handle.is_output();
+	return find_my_port_idx(index, is_output);
+}
+const GraphPort* Base_EdNode::get_other_nodes_port_from_myport(GraphPortHandle handle)
+{
+	opt<GraphLink> link;
+	link = find_link_from_port(handle);
+	if (link.has_value()) {
+		return get_other_nodes_port(link.value());
+	}
+	return nullptr;
+}
+GraphPort* Base_EdNode::find_port_from_handle(GraphPortHandle handle)
+{
+	opt<int> idx = find_port_idx_from_handle(handle);
+	if (!idx.has_value()) return nullptr;
+	return &ports.at(idx.value());
+}
+GraphPort* GraphPortHandle::get_port_ptr(EditorNodeGraph& graph)
+{
+	auto n = graph.get_node(get_node());
+	if (!n) return nullptr;
+	return n->find_port_from_handle(*this);
+}
+Base_EdNode* GraphPortHandle::get_node_ptr(EditorNodeGraph& graph)
+{
+	return graph.get_node(get_node());
+}
+Base_EdNode* Base_EdNode::find_other_node_from_port(GraphPortHandle port)
+{
+	auto p = find_link_from_port(port);
+	if (p.has_value())
+		return p->get_other_port(self).get_node_ptr(editor->get_graph());
+	return nullptr;
 }
