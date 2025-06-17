@@ -51,6 +51,8 @@ public:
 		if (is_evaluator)
 			add_in_port(0, "time").type = GraphPinType::Float;
 	}
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimSource); }
+
 	REF stClipNode Data;
 };
 
@@ -88,6 +90,8 @@ public:
 		return sublayer;
 	}
 	void set_owning_sublayer(GraphLayerHandle h);
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimSource); }
+
 	REFLECT(hide);
 	GraphLayerHandle sublayer;
 };
@@ -121,6 +125,7 @@ public:
 		add_in_port(1, "0").type = GraphPinType::LocalSpacePose;
 		add_in_port(2, "1").type = GraphPinType::LocalSpacePose;
 	}
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimBlend); }
 };
 class BlendInt_EdNode : public Base_EdNode
 {
@@ -136,6 +141,7 @@ public:
 		add_in_port(1, "0").type = GraphPinType::LocalSpacePose;
 		add_in_port(2, "1").type = GraphPinType::LocalSpacePose;
 	}
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimBlend); }
 };
 class Ik2Bone_EdNode : public Base_EdNode {
 public:
@@ -147,7 +153,7 @@ public:
 		add_in_port(2, "pole").type = GraphPinType::Vec3;
 		add_in_port(3, "alpha").type = GraphPinType::Float;
 	}
-
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimBoneModify); }
 };
 
 class ModifyBone_EdNode : public Base_EdNode {
@@ -160,7 +166,7 @@ public:
 		add_in_port(2, "rotation").type = GraphPinType::Quat;
 		add_in_port(3, "alpha").type = GraphPinType::Float;
 	}
-
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimBoneModify); }
 	REF ModifyBoneType rotation = ModifyBoneType::None;
 	REF ModifyBoneType translation = ModifyBoneType::None;
 };
@@ -215,6 +221,7 @@ public:
 			break;
 		}
 	}
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Function); }
 };
 
 class LayerRoot_EdNode : public Base_EdNode
@@ -228,6 +235,7 @@ public:
 		else
 			add_in_port(0, "").type = GraphPinType::LocalSpacePose;
 	}
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Function); }
 };
 
 class LogicalOp_EdNode : public Base_EdNode {
@@ -238,4 +246,6 @@ public:
 		add_in_port(0, "").type = GraphPinType::Boolean;
 		add_in_port(1, "").type = GraphPinType::Boolean;
 	}
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Math); }
+
 };

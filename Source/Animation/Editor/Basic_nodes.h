@@ -56,6 +56,7 @@ public:
 			add_out_port(0, "");
 		}
 	}
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Math); }
 	void on_link_changes() override;
 	MathNodeType type;
 };

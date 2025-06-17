@@ -636,22 +636,22 @@ void Base_EdNode::draw_imnode()
 				ImGui::InputFloat("##b", &b);
 				port.inlineValue = b;
 			}
+			else if (port.type.type == GraphPinType::Integer) {
+				if (!std::holds_alternative<int>(port.inlineValue))
+					port.inlineValue = 0;
+				int i = std::get<int>(port.inlineValue);
+				ImGui::InputInt("##", &i);
+				port.inlineValue = i;
+			}
+			else if (port.type.type == GraphPinType::Vec3) {
+				if (!std::holds_alternative<glm::vec3>(port.inlineValue))
+					port.inlineValue = glm::vec3(0.f);
+				glm::vec3 v = std::get<glm::vec3>(port.inlineValue);
+				ImGui::InputFloat3("##", &v.x);
+				port.inlineValue = v;
+			}
 			ImGui::PopItemWidth();
 		}
-
-		//auto input_type = node->inputs[j].type;
-		//float f[3] = { 0,0,0 };
-		//	ImGui::PushItemWidth(90);
-		//if (input_idx == 0) {
-		//	ImGui::InputFloat3("##nolabel", f);
-		//}
-		//else {
-		//	bool b = false;
-		//	//ImGui::Checkbox("##b", &b);
-		//	ImGui::InputFloat("##f", f);
-		//}
-		//	ImGui::PopItemWidth();
-		//ImGui::TextColored(graph_pin_type_to_color(input_type), str.c_str());
 		ImNodes::EndInputAttribute();
 
 		ImNodes::PopColorStyle();
@@ -1436,4 +1436,25 @@ void ControlParamsWindowNew::imgui_draw()
 		ImGui::EndTable();
 	}
 	ImGui::End();
+}
+Color32 get_color_for_category(EdNodeCategory cat)
+{
+	switch (cat)
+	{
+	case EdNodeCategory::None: return COLOR_BLACK;
+		break;
+	case EdNodeCategory::Math: return { 22, 61, 99 };
+		break;
+	case EdNodeCategory::Function: return { 94, 31, 31 };
+		break;
+	case EdNodeCategory::AnimSource: return { 0,0,0 };
+		break;
+	case EdNodeCategory::AnimBlend: return { 13, 82, 23 };
+		break;
+	case EdNodeCategory::AnimBoneModify: return { 138, 109, 17 };
+		break;
+	default:
+		break;
+	}
+	return COLOR_BLACK;
 }

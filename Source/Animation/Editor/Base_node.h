@@ -147,7 +147,7 @@ struct GraphPort
 	string name = "";
 	int index = 0;
 	bool output_port = false;
-	variant<int64_t, bool, float, glm::vec3, std::monostate> inlineValue = std::monostate{};
+	variant<int, bool, float, glm::vec3, std::monostate> inlineValue = std::monostate{};
 
 	GraphPortHandle get_handle(GraphNodeHandle node) const;
 	bool is_output() const {
@@ -237,12 +237,12 @@ enum class EdNodeCategory
 	None,
 	Math,
 	Function,
-
 	AnimSource,
 	AnimBlend,
 	AnimBoneModify,
-	AnimStatemachine,
 };
+Color32 get_color_for_category(EdNodeCategory cat);
+
 class AnimationGraphEditorNew;
 class Base_EdNode : public ClassBase
 {

@@ -78,6 +78,7 @@ ImVec4 scriptparamtype_to_color(anim_graph_value type)
 	return color[(uint32_t)type];
 }
 
+
 ImVec4 graph_pin_type_to_color(GraphPinType pin)
 {
 	if (pin.type == GraphPinType::value_t)
