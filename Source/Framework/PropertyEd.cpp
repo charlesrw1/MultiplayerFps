@@ -476,13 +476,16 @@ static IPropertyEditor* create_ipropertyed(const FnFactory<IPropertyEditor>& fac
 	case core_type_id::SoftAssetPtr: {
 		out = factory.create("SoftAssetPtr");
 	}break;
-
-	default:
-		printf("!!!! NO TYPE DEFINED FOR IPropertyEditorFactory %s !!!\n", prop->name);
-		return nullptr;
+	case core_type_id::ClassTypeInfo: {
+		out = factory.create("ClassTypePtr");
+	}break;
 	}
 	if (out) {
 		out->post_construct_for_custom_type(instance, prop, parent);
+	}
+	else {
+		printf("!!!! NO TYPE DEFINED FOR IPropertyEditorFactory %s !!!\n", prop->name);
+		return nullptr;
 	}
 	return out;
 }

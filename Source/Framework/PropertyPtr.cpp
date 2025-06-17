@@ -110,7 +110,13 @@ PropertyPtr ClassPropPtr::Iterator::operator*()  {
 }
 
 ClassPropPtr::Iterator ClassPropPtr::begin()  {
-	return Iterator(obj);
+	if (!obj) {
+		assert(ti);
+		return Iterator(ti);
+	}
+	else {
+		return Iterator(obj);
+	}
 }
 ClassPropPtr::Iterator ClassPropPtr::end()  {
 	return Iterator();
@@ -121,6 +127,13 @@ ClassPropPtr::Iterator::Iterator(ClassBase* obj)
 	info = &obj->get_type();
 	advance();
 }
+ClassPropPtr::Iterator::Iterator(const ClassTypeInfo* ti)
+	: obj(nullptr)
+{
+	info = ti;
+	advance();
+}
+
 ClassPropPtr::Iterator::Iterator()
 	{}
 

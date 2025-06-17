@@ -37,6 +37,7 @@ public:
 	bool is_editing = false;
 
 	void draw_imnode() final;
+	void on_link_changes() override;
 };
 
 
@@ -53,6 +54,28 @@ public:
 	REF stClipNode Data;
 };
 
+class StateTransition_EdNode : public Base_EdNode
+{
+public:
+	CLASS_BODY(StateTransition_EdNode);
+	StateTransition_EdNode() {
+
+	}
+	REF GraphLayerHandle transition_graph;
+};
+
+class State_EdNode : public Base_EdNode
+{
+public:
+	CLASS_BODY(State_EdNode);
+	State_EdNode() {
+		add_out_port(0, "").type = GraphPinType::StateType;
+		add_in_port(0, "").type = GraphPinType::StateType;
+	}
+	REF string statename;
+	bool is_entry_state = false;
+};
+
 class Statemachine_EdNode : public Base_EdNode
 {
 public:
@@ -60,13 +83,28 @@ public:
 	Statemachine_EdNode() {
 		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
 	}
+	void on_link_changes() override;
+	GraphLayerHandle get_owning_sublayer() const override {
+		return sublayer;
+	}
+	void set_owning_sublayer(GraphLayerHandle h);
+	REFLECT(hide);
+	GraphLayerHandle sublayer;
 };
 
 class Variable_EdNode : public Base_EdNode
 {
 public:
 	CLASS_BODY(Variable_EdNode);
-	REF StringName Variable;
+	Variable_EdNode() = default;
+	Variable_EdNode(const string& name) {
+		this->variable_name = name;
+	}
+	void on_link_changes() override;
+
+	REFLECT(hide)
+	string variable_name;
+	opt<GraphPinType::Enum> foundType;
 };
 
 class Blend2_EdNode : public Base_EdNode

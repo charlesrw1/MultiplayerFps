@@ -32,6 +32,7 @@
     <ClCompile Include="Source\Animation\Editor\Base_node.cpp" />
     <ClCompile Include="Source\Animation\Editor\Basic_nodes.cpp" />
     <ClCompile Include="Source\Animation\Editor\ClipNode.cpp" />
+    <ClCompile Include="Source\Animation\Editor\GraphUtil.cpp" />
     <ClCompile Include="Source\EditorPopups.cpp" />
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
     <ClCompile Include="Source\Framework\PropertyPtr.cpp" />

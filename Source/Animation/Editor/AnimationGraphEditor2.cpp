@@ -77,6 +77,7 @@ void AnimationGraphEditorNew::init()
 	tab_manager = make_unique<GraphTabManager>(*this);
 	playback = make_unique<PlaybackManager>(*this);
 	property_window = make_unique<GraphPropertyWindow>(*this);
+	params_window = make_unique<ControlParamsWindowNew>(*this);
 	imnodes = make_unique<ImNodesInterface>();
 	concmds = ConsoleCmdGroup::create("");
 	concmds->add("anim.undo", [this](const Cmd_Args&) {
@@ -106,55 +107,29 @@ void AnimationGraphEditorNew::init()
 	}
 	assert(graph->get_root());
 	tab_manager->open_tab(graph->get_root()->get_id(), true);
-	on_node_changes.invoke();
+	on_selection_change.invoke();
 }
 
 void GraphTabManager::draw_popup_menu()
 {
-	
-	for (const auto&[name,create] : editor.get_prototypes().creations) {
-		//const ClassBase* default_obj = infos.at(i)->default_class_object;
-		//assert(default_obj && default_obj->is_a<Base_EdNode>());
-		//const Base_EdNode* node = default_obj->cast_to<Base_EdNode>();
-		//
-		//	if (node->is_state_node() != is_state_mode)
-		//		continue;
-
-		//if (!node->allow_creation_from_menu())
-		//	continue;
-
-		//if (drop_state.from && drop_state.from_is_input && drop_state.slot < drop_state.from->inputs.size() && /* because state nodes can have num slots greater than actual slots */
-		//	!node->can_output_to_type(drop_state.from->inputs[drop_state.slot].type))
-		//	continue;
-		//
-		//if (drop_state.from && !drop_state.from_is_input && !drop_state.from->is_a<State_EdNode>())
-		//	continue;
-
-		//const std::string& name = node->get_name();
-
-		if (ImGui::Selectable(name.c_str())) {
-			opt<GraphLayerHandle> layer = get_active_tab();
-			assert(layer.has_value());
-
-			editor.add_command(new AddNodeCommand(editor,name, mouse_click_pos, layer.value()));
-
-			//	int cur_layer = graph_tabs->get_current_layer_from_tab();
-
-		//	Base_EdNode* a = user_create_new_graphnode(node->get_type().classname, cur_layer);
-
-			//ImNodes::ClearNodeSelection();
-			//ImNodes::SetNodeScreenSpacePos(a->id, mouse_click_pos);
-			//ImNodes::SelectNode(a->id);
-			//
-			//if (drop_state.from) {
-			//	if (drop_state.from_is_input) {
-			//		drop_state.from->add_input(this, a, drop_state.slot);
-			//	}
-			//	else
-			//		a->add_input(this, drop_state.from, 0);
-			//}
+	auto draw_menu = [this](auto&& self,NodeMenu& menu) -> void {
+		for (auto& item : menu.menus) {
+			if (item.menu.has_value()) {
+				if (ImGui::BeginMenu(item.name.c_str())) {
+					self(self, item.menu.value());
+					ImGui::EndMenu();
+				}
+			}
+			else {
+				if (ImGui::MenuItem(item.name.c_str())) {
+					opt<GraphLayerHandle> layer = get_active_tab();
+					assert(layer.has_value());
+					editor.add_command(new AddNodeCommand(editor, item.name, mouse_click_pos, layer.value()));
+				}
+			}
 		}
-	}
+	};
+	draw_menu(draw_menu, editor.get_menu());
 }
 #include "Basic_nodes.h"
 
@@ -172,8 +147,6 @@ void AnimationGraphEditorNew::init_node_factory()
 	prototypes.add(">=", []() { return new Math_EdNode(MathNodeType::Geq); });
 	prototypes.add("Or", []() { return new LogicalOp_EdNode(true); });
 	prototypes.add("And", []() { return new LogicalOp_EdNode(false); });
-
-
 
 
 	prototypes.add("PlayClip", []() { return new Clip_EdNode(false); });
@@ -196,6 +169,56 @@ void AnimationGraphEditorNew::init_node_factory()
 	prototypes.add("BreakVec3", []() {return new Func_EdNode(Func_EdNode::BreakVec3); });
 
 	prototypes.add("Comment", []() { return new CommentNode; });
+
+	NodeMenu mathmenu;
+	mathmenu
+		.add("+")
+		.add("-")
+		.add("*")
+		.add("/");
+	NodeMenu logcmp;
+	logcmp
+		.add("<")
+		.add("<=")
+		.add(">")
+		.add(">=")
+		.add("==")
+		.add("!=")
+		.add("Or")
+		.add("And");
+	NodeMenu blends;
+	blends
+		.add("Blend2")
+		.add("BlendByInt")
+		.add("BlendByEnum");
+	NodeMenu modifies;
+	modifies
+		.add("Ik2Bone")
+		.add("ModifyBone");
+	NodeMenu play;
+	play
+		.add("PlayClip")
+		.add("EvaluateClip");
+
+	NodeMenu funcs;
+	funcs
+		.add("GetCurve")
+		.add("IsEventActive")
+		.add("MakeVec3")
+		.add("BreakVec3")
+		.add("ReturnPose")
+		.add("ReturnTransition");
+	NodeMenu emptyVariables;
+
+	animGraphMenu.add_submenu("Math", mathmenu);
+	animGraphMenu.add_submenu("Logical", logcmp);
+	animGraphMenu.add_submenu("Clips", play);
+	animGraphMenu.add_submenu("Blends", blends);
+	animGraphMenu.add_submenu("Modify", modifies);
+	animGraphMenu.add_submenu("Misc", funcs);
+	animGraphMenu.add_submenu("Variables", emptyVariables);
+	animGraphMenu.add("StateMachine");
+	animGraphMenu.add("Comment");
 }
 void AnimationGraphEditorNew::delete_selected()
 {
@@ -232,13 +255,27 @@ bool AnimationGraphEditorNew::can_save_document()
 
 void AnimationGraphEditorNew::imgui_draw()
 {
+	auto check_open_tab = [this]() {
+		Base_EdNode* const selected = get_selected_node();
+		const bool doubleclicked = ImGui::GetIO().MouseClickedCount[0] == 2;
+		if (doubleclicked && ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows | ImGuiHoveredFlags_RootWindow) && selected) {
+			if (selected->get_owning_sublayer().is_valid()) {
+				const auto sublayerhandle = selected->get_owning_sublayer();
+				tab_manager->open_tab(sublayerhandle, true);
+				ImNodes::ClearNodeSelection();
+			}
+		}
+	};
+
 	if(ImGui::Begin("Graph")) {
 		playback->draw();
 		tab_manager->draw();
+		check_open_tab();
 	}
 	ImGui::End();
 
 	property_window->draw();
+	params_window->imgui_draw();
 	handle_link_changes();
 	cmd_manager.execute_queued_commands();
 
@@ -247,12 +284,12 @@ void AnimationGraphEditorNew::imgui_draw()
 		if (!nextselected) {
 			if (selected_last_frame.is_valid()) {
 				selected_last_frame = GraphNodeHandle();
-				on_node_changes.invoke();
+				on_selection_change.invoke();
 			}
 		}
 		else if (!(nextselected->self == selected_last_frame)) {
 			selected_last_frame = nextselected->self;
-			on_node_changes.invoke();
+			on_selection_change.invoke();
 		}
 	};
 	update_selected();
@@ -308,7 +345,7 @@ void GraphTabManager::draw()
 	// keeps a history of what that last tab actually rendered was
 	static int actual_last_tab_rendered = -1;
 
-	vector<int> delete_indicies;
+	unordered_set<int> delete_indicies;
 
 	EditorNodeGraph& graph = editor.get_graph();
 
@@ -320,6 +357,7 @@ void GraphTabManager::draw()
 			NodeGraphLayer* const layer = graph.get_layer(tabs.at(n));
 			if (!layer) {
 				LOG_WARN("no layer");
+				delete_indicies.insert(n);
 				continue;
 			}
 
@@ -327,7 +365,7 @@ void GraphTabManager::draw()
 			bool open_bool = true;
 			ImGui::PushID(layer);
 			const string tabname = layer->get_tab_name();
-			if (ImGui::BeginTabItem(string_format("%s###", tabname.c_str()), &open_bool, flags))
+			if (ImGui::BeginTabItem(string_format("%s", tabname.c_str()), &open_bool, flags))
 			{
 				bool this_is_an_old_active_tab_or_just_skip = n != active_tab && active_tab_dirty;
 
@@ -364,7 +402,7 @@ void GraphTabManager::draw()
 			}
 			ImGui::PopID();
 			if (!open_bool) {
-				delete_indicies.push_back(n);
+				delete_indicies.insert(n);
 			}
 		}
 		ImGui::EndTabBar();
@@ -373,7 +411,15 @@ void GraphTabManager::draw()
 	active_tab_dirty = false;
 
 	if (delete_indicies.size() > 0) {
-		// fixme
+		vector<GraphLayerHandle> next;
+		for (int i = 0; i < tabs.size(); i++) {
+			if (delete_indicies.find(i) == delete_indicies.end()) {
+				next.push_back(tabs[i]);
+				if (active_tab.has_value() && active_tab == i)
+					active_tab = (int)next.size() - 1;
+			}
+		}
+		this->tabs = next;
 	}
 
 	const bool is_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_RootWindow);
@@ -391,8 +437,14 @@ void GraphTabManager::draw()
 
 void GraphTabManager::open_tab(GraphLayerHandle handle, bool set_active)
 {
-	tabs.push_back(handle);
-	active_tab = tabs.size() - 1;
+	opt<int> existing = find_tab(handle);
+	if (existing.has_value()) {
+		active_tab = existing.value();
+	}
+	else {
+		tabs.push_back(handle);
+		active_tab = tabs.size() - 1;
+	}
 	active_tab_dirty = true;
 }
 
@@ -528,23 +580,11 @@ void Base_EdNode::draw_imnode()
 #pragma warning(default: 4312)
 
 
-
 	ImNodes::EndNodeTitleBar();
 
 	float x1 = ImGui::GetItemRectMin().x;
 	float x2 = ImGui::GetItemRectMax().x;
 
-
-	//ImGui::BeginDisabled(graph_is_read_only());
-	draw_node_top_bar();
-	//ImGui::EndDisabled();
-
-	//MyImSeperator(x1, x2, 1.0);
-
-	ImVec4 pin_color = ImGui::GetStyle().Colors[ImGuiCol_Text];
-	if (has_pin_colors())
-		pin_color = get_pin_colors();
-	
 	vector<int> input_ports;
 	vector<int> output_ports;
 	get_ports(input_ports, output_ports);
@@ -680,6 +720,20 @@ void NodeGraphLayer::draw(EditorNodeGraph& graph)
 	handle_drag_drop();
 
 }
+void EditorNodeGraph::remove_layer(NodeGraphLayer* layer)
+{
+	assert(layer);
+	sys_print(Debug, "removing layer: %d (owned: %d)\n", layer->get_id().id, layer->get_owner_node().id);
+	unordered_set<int> copied_ids = layer->get_nodes();
+	for (int i : copied_ids) {
+		remove_node(GraphNodeHandle(i));
+	}
+	assert(layer->get_nodes().size() == 0);
+	const int id = layer->get_id().id;
+	assert(layers.find(id) != nullptr);
+	layers.remove(id);
+	delete layer;
+}
 void EditorNodeGraph::remove_node(GraphNodeHandle handle) {
 	if (!handle.is_valid())
 		return;
@@ -702,7 +756,6 @@ void EditorNodeGraph::remove_node(GraphNodeHandle handle) {
 			size = node->links.size();
 		}
 	}
-
 	auto layer = get_layer(node->layer);
 	if (!layer) {
 		sys_print(Warning, "nodes layer not found %d\n", node->layer.id);
@@ -710,6 +763,10 @@ void EditorNodeGraph::remove_node(GraphNodeHandle handle) {
 	else {
 		layer->remove_node(*node);
 	}
+	if (node->get_owning_sublayer().is_valid()) {
+		remove_layer(get_layer(node->get_owning_sublayer()));
+	}
+
 	nodes.remove(handle.id);
 	delete node;
 }
@@ -722,6 +779,9 @@ void EditorNodeGraph::insert_new_node(Base_EdNode& node, GraphLayerHandle layer,
 	nodes.insert(node.self.id, &node);
 	layerptr->add_node_to_layer(node);
 	ImNodes::SetNodeScreenSpacePos(node.self.id, GraphUtil::to_imgui(pos));
+	ImVec2 v = ImNodes::GetNodeGridSpacePos(node.self.id);
+	node.nodex = v.x;
+	node.nodey = v.y;
 }
 void EditorNodeGraph::insert_nodes(SerializeGraphContainer& container)
 {
@@ -744,7 +804,6 @@ void EditorNodeGraph::insert_nodes(SerializeGraphContainer& container)
 			layer = root_layer;
 		}
 		layer->add_node_to_layer(*n);
-
 		ImNodes::SetNodeGridSpacePos(n->self.id, ImVec2(n->nodex, n->nodey));
 	}
 	for (Base_EdNode* n : container.nodes) {
@@ -785,8 +844,18 @@ void EditorNodeGraph::insert_nodes_with_new_id(SerializeGraphContainer& containe
 			layer = root_layer;
 		}
 		layer->add_node_to_layer(*n);
-		ImNodes::SetNodeGridSpacePos(n->self.id, ImVec2(n->nodex, n->nodey));
 
+		if (n->get_owning_sublayer().is_valid()) {
+			const int subid = n->get_owning_sublayer().id;
+			assert(MapUtil::contains(old_id_to_new_id,subid));
+			const int duplayer = old_id_to_new_id.find(subid)->second;
+			NodeGraphLayer* layer = get_layer(duplayer);
+			assert(layer);
+			layer->set_owner_node(n->self);
+			n->set_owning_sublayer(duplayer);
+		}
+
+		ImNodes::SetNodeGridSpacePos(n->self.id, ImVec2(n->nodex, n->nodey));
 	}
 	for (auto n : container.nodes) {
 		for (int i = 0; i < (int)n->links.size(); i++) {
@@ -849,6 +918,9 @@ GraphPropertyWindow::GraphPropertyWindow(AnimationGraphEditorNew& editor)
 {
 	editor.on_node_changes.add(this, [this]() {
 			update_property_window();
+		});
+	editor.on_selection_change.add(this, [this]() {
+		update_property_window();
 		});
 }
 void GraphPropertyWindow::update_property_window()
@@ -980,6 +1052,15 @@ SerializeGraphContainer SerializeGraphUtils::make_container_from_handles(vector<
 				handles.push_back(l.opt_link_node);
 			}
 		}
+		if (e->get_owning_sublayer().is_valid()) {
+			NodeGraphLayer* layer = graph.get_layer(e->get_owning_sublayer());
+			assert(layer);
+			SetUtil::insert_test_exists(container.layers, layer);
+			for (int i : layer->get_nodes()) {
+				GraphNodeHandle handle(i);
+				handles.push_back(handle);
+			}
+		}
 	}
 	return container;
 }
@@ -1015,6 +1096,10 @@ void GraphPropertyWindow::draw()
 {
 	if (ImGui::Begin("Properties")) {
 		grid.update();
+
+		if (grid.rows_had_changes) {
+			ed.on_changed_graph_classes.invoke();
+		}
 	}
 	ImGui::End();
 }
@@ -1064,6 +1149,23 @@ void CommentNode::draw_imnode()
 	this->nodey = pos.y;
 	this->sizex = size.x;
 	this->sizey = size.y;
+}
+GraphUtil::PinColorName GraphUtil::get_type_color_name(const GraphPinType::Enum& type)
+{
+	auto [color, shape] = get_pin_for_value_type(type);
+	const char* str = "";
+	switch (type)
+	{
+	case GraphPinType::Boolean: str = "Bool";break;
+	case GraphPinType::Float: str = "Float";break;
+	case GraphPinType::Integer:str = "Int";break;
+	case GraphPinType::Vec3: str = "Vec3";break;
+	case GraphPinType::Quat: str = "Quat";break;
+	case GraphPinType::EnumType: str = "Enum";break;
+	default:
+		break;
+	}
+	return { color,str };
 }
 GraphUtil::PinShapeColor GraphUtil::get_pin_for_value_type(const GraphPinType::Enum& type)
 {
@@ -1121,6 +1223,8 @@ void AnimationGraphEditorNew::resolve_any_types()
 			Base_EdNode* other = n->find_other_node_from_port(myport->get_handle(n->self));
 			self(self, visited, graph, other);
 		}
+
+		ImNodes::EditorContextSet(graph.get_layer(n->layer)->get_context());
 		n->on_link_changes();
 	};
 
@@ -1130,4 +1234,154 @@ void AnimationGraphEditorNew::resolve_any_types()
 		// go down the chain, then go back up
 		recurse(recurse, visited, *graph, n);
 	}
+}
+ControlParamsWindowNew::ControlParamsWindowNew(AnimationGraphEditorNew& ed)
+	:ed(ed)
+{
+	ed.on_changed_graph_classes.add(this, [this]() {
+		refresh_props();
+		});
+	refresh_props();
+}
+void ControlParamsWindowNew::refresh_props()
+{
+	props.clear();
+	auto animclass = ed.get_options().anim_class_type.ptr;
+	if (!animclass)
+		return;
+	for (PropertyPtr p : ClassPropPtr(animclass)) {
+		VariableParam param;
+		param.nativepi = p.get_property_info();
+		if (p.is_boolean()) {
+			param.type = GraphPinType::Boolean;
+		}
+		else if (p.is_enum()) {
+			param.type = GraphPinType::EnumType;
+		}
+		else if (p.is_float()) {
+			param.type = GraphPinType::Float;
+		}
+		else if (p.is_numeric()) {
+			param.type = GraphPinType::Integer;
+		}
+		else if (p.is_vec3()) {
+			param.type = GraphPinType::Vec3;
+		}
+		else if (p.is_quat()) {
+			param.type = GraphPinType::Quat;
+		}
+		else {
+			continue;
+		}
+		props.push_back(param);
+	}
+}
+void ControlParamsWindowNew::imgui_draw()
+{
+	if (!ImGui::Begin("Instance Parameters")) {
+		ImGui::End();
+		return;
+	}
+
+	uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
+		ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
+
+	const bool is_graph_running = false;// anim_graph_ed.playback != AnimationGraphEditor::graph_playback_state::stopped;
+
+	const int num_cols = (is_graph_running) ? 3 : 2;
+
+	if (ImGui::BeginTable("controlproplistabc", num_cols, ent_list_flags))
+	{
+		ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
+		if (is_graph_running)
+			ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+		ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, 50.0f, 0);
+		ImGui::TableHeadersRow();
+
+		for (int row_n = 0; row_n < props.size(); row_n++)
+		{
+			auto& res = props[row_n];
+			ImGui::PushID(res.nativepi->name);
+
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+
+			ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+			if (ImGui::Selectable("##selectednode", false, selectable_flags, ImVec2(0, 0))) {
+
+			}
+
+			//if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+			//{
+			//	dragdrop = { res.str, res.type };
+			//	auto ptr = &dragdrop;
+			//
+			//
+			//	ImGui::SetDragDropPayload("AnimGraphVariableDrag", &ptr, sizeof(VariableNameAndType*));
+			//
+			//	ImGui::TextColored(scriptparamtype_to_color(res.type), res.str.c_str());
+			//
+			//	ImGui::EndDragDropSource();
+			//}
+
+			ImGui::SameLine();
+			ImGui::Text("%s",res.nativepi->name);
+
+#if 0
+			if (is_graph_running) {
+				ImGui::TableNextColumn();
+				switch (res.type)
+				{
+				case anim_graph_value::float_t: {
+					float f = res.nativepi->get_float(anim_graph_ed.out.get_animator());
+					ImGui::DragFloat("##inpf", &f, 0.05);
+					res.nativepi->set_float(anim_graph_ed.out.get_animator(), f);
+				}break;
+				case anim_graph_value::bool_t: {
+					bool b = res.nativepi->get_int(anim_graph_ed.out.get_animator());
+					ImGui::Checkbox("##inpf", &b);
+					res.nativepi->set_int(anim_graph_ed.out.get_animator(), b);
+				}break;
+				case anim_graph_value::vec3_t: {
+					glm::vec3* v = (glm::vec3*)res.nativepi->get_ptr(anim_graph_ed.out.get_animator());
+					ImGui::DragFloat3("##inpf", &v->x, 0.025);
+				}break;
+				case anim_graph_value::quat_t: {
+					glm::quat* v = (glm::quat*)res.nativepi->get_ptr(anim_graph_ed.out.get_animator());
+
+					glm::vec3 eul = glm::eulerAngles(*v);
+					eul *= 180.f / PI;
+					if (ImGui::DragFloat3("##eul", &eul.x, 1.0)) {
+						eul *= PI / 180.f;
+						*v = glm::quat(eul);
+					}
+
+				}break;
+				case anim_graph_value::int_t:
+				{
+					int b = res.nativepi->get_int(anim_graph_ed.out.get_animator());
+					ImGui::InputInt("##inpf", &b);
+					res.nativepi->set_int(anim_graph_ed.out.get_animator(), b);
+				}break;
+				};
+			}
+#endif
+
+
+			ImGui::TableNextColumn();
+			//const EnumIntPair* eip = EnumTrait<anim_graph_value>::StaticEnumType.find_for_value((int)res.type);
+			//if (!eip) {
+			//	printf("Warning: anim_graph_value_t bad\n");
+			//	res.type = anim_graph_value::bool_t;
+			//	eip = EnumTrait<anim_graph_value>::StaticEnumType.find_for_value((int)res.type);
+			//	ASSERT(eip);
+			//}
+			auto [color, str] = GraphUtil::get_type_color_name(res.type);
+			ImGui::TextColored(ImColor(color.to_uint()),str);
+
+			ImGui::PopID();
+		}
+		ImGui::EndTable();
+	}
+	ImGui::End();
 }

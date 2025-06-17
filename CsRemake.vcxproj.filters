@@ -799,6 +799,7 @@
     <ClCompile Include="Source\Animation\Editor\Base_node.cpp" />
     <ClCompile Include="Source\Animation\Editor\ClipNode.cpp" />
     <ClCompile Include="Source\Animation\Editor\Basic_nodes.cpp" />
+    <ClCompile Include="Source\Animation\Editor\GraphUtil.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

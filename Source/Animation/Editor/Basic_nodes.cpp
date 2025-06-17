@@ -3,6 +3,8 @@
 #include "AnimationGraphEditor2.h"
 
 void Math_EdNode::on_link_changes() {
+	Base_EdNode::on_link_changes();
+
 	find_my_port(0, false)->type = GraphPinType::Any;
 	find_my_port(1, false)->type = GraphPinType::Any;
 	auto set_type_to_other = [&](const int idx) {

@@ -53,6 +53,15 @@ public:
 		assert(layer_nodes.find(node.self.id)!=layer_nodes.end());
 		layer_nodes.erase(node.self.id);
 	}
+	void set_owner_node(GraphNodeHandle p) {
+		owner = p;
+	}
+	GraphNodeHandle get_owner_node() const {
+		return owner;
+	}
+	const unordered_set<int>& get_nodes() const {
+		return layer_nodes;
+	}
 protected:
 	GraphNodeHandle selected;
 
@@ -64,12 +73,6 @@ protected:
 	bool wants_reset_view = false;
 };
 
-class StatemachineGraphLayer : public ClassBase
-{
-public:
-	CLASS_BODY(StatemachineGraphLayer);
-	//void draw(EditorNodeGraph& graph) final;
-};
 
 class EditorNodeGraph : public ClassBase
 {
@@ -93,6 +96,8 @@ public:
 		assert(get_layer(handle) == l);
 		return l;
 	}
+	void remove_layer(NodeGraphLayer* layer);
+
 	void set_root(NodeGraphLayer* l) {
 		assert(!root_layer);
 		this->root_layer = l;
@@ -161,6 +166,12 @@ public:
 		return tabs.at(i);
 	}
 private:
+	opt<int> find_tab(GraphLayerHandle handle) {
+		for (int i = 0; i < tabs.size(); i++) {
+			if (tabs[i] == handle) return i;
+		}
+		return std::nullopt;
+	}
 	void draw_popup_menu();
 
 	opt<int> active_tab;
@@ -180,29 +191,29 @@ private:
 	PropertyGrid grid;
 	AnimationGraphEditorNew& ed;
 };
-
+#include "Base_node.h"
 class ControlParamsWindowNew
 {
 public:
-	ControlParamsWindowNew() {}
-
+	ControlParamsWindowNew(AnimationGraphEditorNew& ed);
 	void imgui_draw();
-	void refresh_props();
-private:
-	void on_set_animator_instance(AnimatorInstance* a) {
-		refresh_props();
+	opt<GraphPinType::Enum> find_value_type(const string& name) const {
+		for (auto& p : props)
+			if (p.nativepi->name == name)
+				return p.type;
+		return std::nullopt;
 	}
+private:
+	void refresh_props();
 	void on_close() {
 		props.clear();
 	}
-
 	struct VariableParam {
-		std::string str;
-		anim_graph_value type = anim_graph_value::float_t;
+		GraphPinType::Enum type{};
 		const PropertyInfo* nativepi = nullptr;
 	};
 	std::vector<VariableParam> props;
-//	VariableNameAndType dragdrop;
+	AnimationGraphEditorNew& ed;
 };
 
 class NodeSearcher
@@ -210,13 +221,6 @@ class NodeSearcher
 public:
 	
 private:
-};
-
-struct CreateFromDropState 
-{
-	CreateFromDropState(GraphPortHandle handle) : from_port(handle) {}
-	GraphPortHandle from_port;
-	void draw();
 };
 
 class NodePrototypes
@@ -247,6 +251,36 @@ public:
 	}
 };
 
+struct NodeMenuItem;
+class NodeMenu
+{
+public:
+	~NodeMenu();
+	vector<NodeMenuItem> menus;
+	NodeMenu& add(string s, opt<Color32> color = std::nullopt);
+	NodeMenu& add_submenu(string name, NodeMenu& m);
+	opt<int> find_item(string name) const {
+		for (int i = 0; i < menus.size(); i++)
+			if (menus[i].name == name)
+				return i;
+		return std::nullopt;
+	}
+};
+struct NodeMenuItem {
+	string name;
+	opt<NodeMenu> menu;
+	opt<Color32> color;
+};
+inline NodeMenu& NodeMenu::add(string s, opt<Color32> color) {
+	menus.push_back({ s, std::nullopt, color });
+	return *this;
+}
+inline NodeMenu& NodeMenu::add_submenu(string name, NodeMenu& m) {
+	menus.push_back({ name,std::move(m) });
+	return *this;
+}
+inline NodeMenu::~NodeMenu() {}
+
 class AnimationGraphEditorNew : public EditorTool3d
 {
 public:
@@ -262,10 +296,10 @@ public:
 		assert(settings);
 		return settings.get();
 	}
-
-	MulticastDelegate<const Model*> on_set_new_model;
-	MulticastDelegate<> on_set_new_animator_class;
+	MulticastDelegate<> on_changed_graph_classes;
 	MulticastDelegate<> on_node_changes;
+	MulticastDelegate<> on_selection_change;
+
 
 	void add_command(Command* command);
 	bool is_node_selected(Base_EdNode& node) {
@@ -281,6 +315,11 @@ public:
 		return *imnodes.get();
 	}
 	Base_EdNode* get_selected_node();
+	NodeMenu& get_menu() { return animGraphMenu; }
+	const ControlParamsWindowNew& get_params() { return *params_window.get(); }
+	NodePrototypes& get_prototypes_mut() {
+		return variablePrototypes;
+	}
 private:
 	void handle_link_changes();
 	void init_node_factory();
@@ -310,12 +349,18 @@ private:
 	uptr<NodeSearcher> node_searcher;
 	FnFactory<IPropertyEditor> grid_factory;
 	NodePrototypes prototypes;
-	uptr<CreateFromDropState> drop_state;
+	NodePrototypes variablePrototypes;
+
+
+	//uptr<CreateFromDropState> drop_state;
 	UndoRedoSystem cmd_manager;
 	uptr<ConsoleCmdGroup> concmds;
 	void* imnodes_context = nullptr;
 
 	GraphNodeHandle selected_last_frame;
+
+	NodeMenu animGraphMenu;
+	NodeMenu stateGraphMenu;
 };
 
 using std::unordered_map;

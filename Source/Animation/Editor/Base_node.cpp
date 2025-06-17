@@ -209,3 +209,7 @@ Base_EdNode* Base_EdNode::find_other_node_from_port(GraphPortHandle port)
 		return p->get_other_port(self).get_node_ptr(editor->get_graph());
 	return nullptr;
 }
+void Base_EdNode::on_link_changes()
+{
+	ImNodes::SetNodeGridSpacePos(self.id,ImVec2(nodex, nodey));
+}

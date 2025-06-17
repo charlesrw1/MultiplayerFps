@@ -3136,6 +3136,14 @@ ImVec2 GetCommentNodeSize(const int node_id)
     IM_ASSERT(node.is_comment);
     return node.CommentSize;
 }
+void SetCommentNodeSize(const int node_id,ImVec2 size)
+{
+    ImNodesEditorContext& editor = EditorContextGet();
+    const int             node_idx = ObjectPoolFind(editor.Nodes, node_id);
+    IM_ASSERT(node_idx != -1);
+    ImNodeData& node = editor.Nodes.Pool[node_idx];
+    node.CommentSize = size;
+}
 
 void SnapNodeToGrid(int node_id)
 {

@@ -8,6 +8,8 @@ void GraphCommandUtil::add_link(GraphLink link, EditorNodeGraph& graph)
 {
 	Base_EdNode* outn = graph.get_node(link.output.get_node());
 	Base_EdNode* inn = graph.get_node(link.input.get_node());
+	assert(inn && outn);
+	assert(inn->layer == outn->layer);
 	opt<int> index = inn->find_link_idx_from_port(link.input);
 	if (!index.has_value()) {
 		inn->add_link(link);
@@ -257,4 +259,19 @@ void DuplicateNodesCommand::undo()
 std::string DuplicateNodesCommand::to_string()
 {
 	return "Duplicate";
+}
+
+AddVariableNodeCommand::AddVariableNodeCommand(AnimationGraphEditorNew& ed, const string& variable_name, glm::vec2 pos, GraphLayerHandle layer)
+	:AddNodeCommand(ed,"Variable",pos,layer)
+{
+	this->variable_name = variable_name;
+}
+#include "ClipNode.h"
+void AddVariableNodeCommand::execute()
+{
+	AddNodeCommand::execute();
+	Base_EdNode* e = ed.get_graph().get_node(created_handle);
+	if (!e)
+		return;
+	e->cast_to<Variable_EdNode>();
 }

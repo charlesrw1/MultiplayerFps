@@ -60,5 +60,9 @@ public:
 	};
 
 	static PinShapeColor get_pin_for_value_type(const GraphPinType::Enum& type);
-
+	struct PinColorName {
+		Color32 color;
+		const char* name = "";
+	};
+	static PinColorName get_type_color_name(const GraphPinType::Enum& type);
 };

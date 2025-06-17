@@ -74,9 +74,12 @@ class ClassPropPtr
 public:
 	ClassPropPtr(ClassBase* base)
 		: obj(base) {}
+	ClassPropPtr(const ClassTypeInfo* ti)
+		: obj(nullptr),ti(ti) {}
 
 	struct Iterator {
 		Iterator(ClassBase* obj);
+		Iterator(const ClassTypeInfo* ti);
 		Iterator();
 		bool operator!=(const Iterator& other);
 		Iterator& operator++();
@@ -90,6 +93,7 @@ public:
 	Iterator begin();
 	Iterator end();
 private:
+	const ClassTypeInfo* ti = nullptr;
 	ClassBase* obj = nullptr;
 };
 

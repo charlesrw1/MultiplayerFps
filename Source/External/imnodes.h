@@ -352,6 +352,7 @@ ImVec2 GetNodeScreenSpacePos(const int node_id);
 ImVec2 GetNodeEditorSpacePos(const int node_id);
 ImVec2 GetNodeGridSpacePos(const int node_id);
 ImVec2 GetCommentNodeSize(const int node_id);
+void SetCommentNodeSize(const int node_id, ImVec2 size);
 
 // If ImNodesStyleFlags_GridSnapping is enabled, snap the specified node's origin to the grid.
 void SnapNodeToGrid(int node_id);
