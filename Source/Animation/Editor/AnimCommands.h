@@ -48,16 +48,6 @@ public:
 	AnimationGraphEditorNew& ed;
 	GraphNodeHandle created_handle;
 };
-class AddVariableNodeCommand : public AddNodeCommand
-{
-public:
-	AddVariableNodeCommand(AnimationGraphEditorNew& ed, const string& variable_name, glm::vec2 pos, GraphLayerHandle layer);
-	void execute() final;
-	string to_string() final {
-		return "AddVariableNode";
-	}
-	string variable_name;
-};
 
 
 class RemoveGraphObjectsCommand : public Command

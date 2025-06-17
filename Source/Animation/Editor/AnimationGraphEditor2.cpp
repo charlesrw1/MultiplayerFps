@@ -77,7 +77,6 @@ void AnimationGraphEditorNew::init()
 	tab_manager = make_unique<GraphTabManager>(*this);
 	playback = make_unique<PlaybackManager>(*this);
 	property_window = make_unique<GraphPropertyWindow>(*this);
-	params_window = make_unique<ControlParamsWindowNew>(*this);
 	imnodes = make_unique<ImNodesInterface>();
 	concmds = ConsoleCmdGroup::create("");
 	concmds->add("anim.undo", [this](const Cmd_Args&) {
@@ -98,6 +97,8 @@ void AnimationGraphEditorNew::init()
 		});
 
 	init_node_factory();
+	params_window = make_unique<ControlParamsWindowNew>(*this);
+
 	imnodes_context = ImNodes::CreateContext();
 	//ImNodes::GetIO().LinkDetachWithModifierClick.Modifier = &is_modifier_pressed;
 	ImNodes::GetStyle().Flags |= ImNodesStyleFlags_GridSnapping | ImNodesStyleFlags_GridLinesPrimary;
@@ -121,10 +122,18 @@ void GraphTabManager::draw_popup_menu()
 				}
 			}
 			else {
+				if (item.color.has_value()) {
+					ImGui::PushStyleColor(ImGuiCol_Text, item.color->to_uint());
+				}
+
 				if (ImGui::MenuItem(item.name.c_str())) {
 					opt<GraphLayerHandle> layer = get_active_tab();
 					assert(layer.has_value());
 					editor.add_command(new AddNodeCommand(editor, item.name, mouse_click_pos, layer.value()));
+				}
+
+				if (item.color.has_value()) {
+					ImGui::PopStyleColor();
 				}
 			}
 		}
@@ -167,7 +176,7 @@ void AnimationGraphEditorNew::init_node_factory()
 	prototypes.add("IsEventActive", []() {return new Func_EdNode(Func_EdNode::IsEventActive); });
 	prototypes.add("MakeVec3", []() {return new Func_EdNode(Func_EdNode::MakeVec3); });
 	prototypes.add("BreakVec3", []() {return new Func_EdNode(Func_EdNode::BreakVec3); });
-
+	prototypes.add("Variable", []() {return new Variable_EdNode(); });	// this assumes it got a variable name alredy
 	prototypes.add("Comment", []() { return new CommentNode; });
 
 	NodeMenu mathmenu;
@@ -515,72 +524,78 @@ void Base_EdNode::draw_imnode()
 
 	ImNodes::BeginNode(self.id);
 
-	ImNodes::BeginNodeTitleBar();
-	{
-		auto cursorpos = ImGui::GetCursorPos();
-		ImGui::Dummy(ImVec2(100, 0.0));
-		ImGui::SameLine(0, 0);
-		ImGui::SetCursorPosX(cursorpos.x);
-		ImGui::Text("%s\n", title.c_str());
-	}
+	if (has_top_bar()) {
+		ImNodes::BeginNodeTitleBar();
+		{
+			auto cursorpos = ImGui::GetCursorPos();
+			ImGui::Dummy(ImVec2(100, 0.0));
+			ImGui::SameLine(0, 0);
+			ImGui::SetCursorPosX(cursorpos.x);
+			ImGui::Text("%s\n", title.c_str());
+		}
 
-	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal) && ImGui::BeginTooltip()) {
-		auto drawlist = ImGui::GetForegroundDrawList();
-		auto& style = ImGui::GetStyle();
-		auto min = ImGui::GetCursorScreenPos();
-		const string& tooltip = get_tooltip();
-		auto sz = ImGui::CalcTextSize(tooltip.c_str());
-		float width = ImGui::CalcItemWidth();
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal) && ImGui::BeginTooltip()) {
+			auto drawlist = ImGui::GetForegroundDrawList();
+			auto& style = ImGui::GetStyle();
+			auto min = ImGui::GetCursorScreenPos();
+			const string& tooltip = get_tooltip();
+			auto sz = ImGui::CalcTextSize(tooltip.c_str());
+			float width = ImGui::CalcItemWidth();
 
-		auto minrect = ImVec2(min.x - style.FramePadding.x * 5.0, min.y);
-		auto maxrect = ImVec2(min.x + sz.x + style.FramePadding.x * 5.0, min.y + sz.y + style.FramePadding.y * 2.0);
-		float border = 2.0;
-		drawlist->AddRectFilled(ImVec2(minrect.x - border, minrect.y - border), ImVec2(maxrect.x + border, maxrect.y + border), Color32{ 0,0,0, 255 }.to_uint());
+			auto minrect = ImVec2(min.x - style.FramePadding.x * 5.0, min.y);
+			auto maxrect = ImVec2(min.x + sz.x + style.FramePadding.x * 5.0, min.y + sz.y + style.FramePadding.y * 2.0);
+			float border = 2.0;
+			drawlist->AddRectFilled(ImVec2(minrect.x - border, minrect.y - border), ImVec2(maxrect.x + border, maxrect.y + border), Color32{ 0,0,0, 255 }.to_uint());
 
 
-		drawlist->AddRectFilled(minrect, maxrect, Color32{ 255,255,255, 255 }.to_uint());
-		auto cursor = ImGui::GetCursorScreenPos();
-		drawlist->AddText(cursor, Color32{ 0,0,0 }.to_uint(), tooltip.c_str());
-		//ImGui::Text(str.c_str());
-		//ImGui::Text(node->get_tooltip().c_str());
-		ImGui::EndTooltip();
-	}
+			drawlist->AddRectFilled(minrect, maxrect, Color32{ 255,255,255, 255 }.to_uint());
+			auto cursor = ImGui::GetCursorScreenPos();
+			drawlist->AddText(cursor, Color32{ 0,0,0 }.to_uint(), tooltip.c_str());
+			//ImGui::Text(str.c_str());
+			//ImGui::Text(node->get_tooltip().c_str());
+			ImGui::EndTooltip();
+		}
 
 #pragma warning(disable: 4312)
-	//if (!node->compile_error_string.empty()) {
-	//	ImGui::SameLine();
-	//	ImGui::Image((ImTextureID)strong_error->gl_id, ImVec2(16, 16));
-	//
-	//	if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
-	//		ImGui::Text(node->compile_error_string.c_str());
-	//		ImGui::EndTooltip();
-	//	}
-	//
-	//}
-	//
-	//if (node->children_have_errors) {
-	//	ImGui::SameLine();
-	//	ImGui::Image((ImTextureID)weak_error->gl_id, ImVec2(16, 16));
-	//
-	//	if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
-	//		ImGui::Text("children have errors");
-	//		ImGui::EndTooltip();
-	//	}
-	//}
-	//
-	//if (!node->compile_info_string.empty()) {
-	//	ImGui::SameLine();
-	//	ImGui::Image((ImTextureID)info_img->gl_id, ImVec2(16, 16));
-	//
-	//	if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
-	//		ImGui::Text(node->compile_info_string.c_str());
-	//		ImGui::EndTooltip();
-	//	}
-	//}
+		//if (!node->compile_error_string.empty()) {
+		//	ImGui::SameLine();
+		//	ImGui::Image((ImTextureID)strong_error->gl_id, ImVec2(16, 16));
+		//
+		//	if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
+		//		ImGui::Text(node->compile_error_string.c_str());
+		//		ImGui::EndTooltip();
+		//	}
+		//
+		//}
+		//
+		//if (node->children_have_errors) {
+		//	ImGui::SameLine();
+		//	ImGui::Image((ImTextureID)weak_error->gl_id, ImVec2(16, 16));
+		//
+		//	if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
+		//		ImGui::Text("children have errors");
+		//		ImGui::EndTooltip();
+		//	}
+		//}
+		//
+		//if (!node->compile_info_string.empty()) {
+		//	ImGui::SameLine();
+		//	ImGui::Image((ImTextureID)info_img->gl_id, ImVec2(16, 16));
+		//
+		//	if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
+		//		ImGui::Text(node->compile_info_string.c_str());
+		//		ImGui::EndTooltip();
+		//	}
+		//}
 #pragma warning(default: 4312)
 
 
-	ImNodes::EndNodeTitleBar();
+		ImNodes::EndNodeTitleBar();
+	}
+	else {
+		ImGui::Dummy(ImVec2(0, 0.0));
+		ImGui::SameLine(0, 0);
+	}
 
 	float x1 = ImGui::GetItemRectMin().x;
 	float x2 = ImGui::GetItemRectMax().x;
@@ -590,15 +605,39 @@ void Base_EdNode::draw_imnode()
 	get_ports(input_ports, output_ports);
 	const float topy = ImGui::GetCursorPosY();
 	for (int input_idx : input_ports) {
-		const GraphPort& port = ports.at(input_idx);
+		GraphPort& port = ports.at(input_idx);
 		const GraphPortHandle phandle = port.get_handle(self);
 		const ImNodesPinShape pin = push_and_get_pin_type(port.type.type, find_link_from_port(phandle).has_value());
+		opt<GraphLink> link = find_link_from_port(phandle);
 
 		//if (link.has_value())
 		//	pin = ImNodesPinShape_TriangleFilled;
 		ImNodes::BeginInputAttribute(phandle.id, pin);
+		
 		const string& str = port.name;
 		ImGui::Text("%s",str.c_str());
+
+		if (!link.has_value()) {
+			ImGui::PushItemWidth(90);
+			if (str.empty())
+				ImGui::SameLine();
+
+			if (port.type.type == GraphPinType::Boolean) {
+				if (!std::holds_alternative<bool>(port.inlineValue))
+					port.inlineValue = false;
+				bool b = std::get<bool>(port.inlineValue);
+				ImGui::Checkbox("##b", &b);
+				port.inlineValue = b;
+			}
+			else if (port.type.type == GraphPinType::Float) {
+				if (!std::holds_alternative<float>(port.inlineValue))
+					port.inlineValue = 0.f;
+				float b = std::get<float>(port.inlineValue);
+				ImGui::InputFloat("##b", &b);
+				port.inlineValue = b;
+			}
+			ImGui::PopItemWidth();
+		}
 
 		//auto input_type = node->inputs[j].type;
 		//float f[3] = { 0,0,0 };
@@ -1246,6 +1285,11 @@ ControlParamsWindowNew::ControlParamsWindowNew(AnimationGraphEditorNew& ed)
 void ControlParamsWindowNew::refresh_props()
 {
 	props.clear();
+	ed.get_var_prototypes().creations.clear();
+	opt<int> idx = ed.get_menu().find_item("Variables");
+	assert(idx.has_value());
+	NodeMenu& menu = ed.get_menu().menus.at(idx.value()).menu.value();
+	menu.menus.clear();
 	auto animclass = ed.get_options().anim_class_type.ptr;
 	if (!animclass)
 		return;
@@ -1275,6 +1319,14 @@ void ControlParamsWindowNew::refresh_props()
 		}
 		props.push_back(param);
 	}
+	for (auto& p : props) {
+		auto [color, str] = GraphUtil::get_type_color_name(p.type);
+		string name_as_str = p.nativepi->name;
+		menu.add(name_as_str, color);
+		ed.get_var_prototypes().add(name_as_str, [name_as_str]() { return new Variable_EdNode(name_as_str); });
+	}
+
+	ed.on_node_changes.invoke();
 }
 void ControlParamsWindowNew::imgui_draw()
 {

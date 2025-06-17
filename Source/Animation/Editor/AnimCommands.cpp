@@ -127,6 +127,9 @@ AddNodeCommand::AddNodeCommand(AnimationGraphEditorNew& ed, const string& creati
 void AddNodeCommand::execute()
 {
 	auto node = ed.get_prototypes().create(creation_name);
+	if (!node) {
+		node = ed.get_var_prototypes().create(creation_name);
+	}
 	assert(node);
 	ed.get_graph().insert_new_node(*node, what_layer, pos);
 	created_handle = node->self;
@@ -261,17 +264,3 @@ std::string DuplicateNodesCommand::to_string()
 	return "Duplicate";
 }
 
-AddVariableNodeCommand::AddVariableNodeCommand(AnimationGraphEditorNew& ed, const string& variable_name, glm::vec2 pos, GraphLayerHandle layer)
-	:AddNodeCommand(ed,"Variable",pos,layer)
-{
-	this->variable_name = variable_name;
-}
-#include "ClipNode.h"
-void AddVariableNodeCommand::execute()
-{
-	AddNodeCommand::execute();
-	Base_EdNode* e = ed.get_graph().get_node(created_handle);
-	if (!e)
-		return;
-	e->cast_to<Variable_EdNode>();
-}

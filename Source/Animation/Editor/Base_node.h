@@ -143,10 +143,11 @@ struct GraphPort
 {
 	GraphPort() = default;
 
-	GraphPinType type;
+	GraphPinType type=GraphPinType::Any;
 	string name = "";
 	int index = 0;
 	bool output_port = false;
+	variant<int64_t, bool, float, glm::vec3, std::monostate> inlineValue = std::monostate{};
 
 	GraphPortHandle get_handle(GraphNodeHandle node) const;
 	bool is_output() const {
@@ -261,6 +262,7 @@ public:
 	virtual std::string get_title() const { return get_name(); }
 	virtual std::string get_tooltip() const { return ""; }
 	virtual void draw_node_topbar() { }
+	virtual bool has_top_bar() { return true; }
 
 	virtual std::string get_layer_tab_title() const { return ""; }
 	virtual void on_post_edit() {}

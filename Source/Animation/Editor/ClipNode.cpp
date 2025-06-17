@@ -24,11 +24,13 @@ void CommentNode::on_link_changes()
 }
 void Variable_EdNode::on_link_changes()
 {
-	this->foundType = editor->get_params().find_value_type(name);
+	this->name = "Variable";
+	this->foundType = editor->get_params().find_value_type(variable_name);
 	if (foundType.has_value()) {
 		find_my_port(0, true)->type.type = foundType.value();
 	}
 	else{
 		find_my_port(0, true)->type.type = GraphPinType::Any;
 	}
+	find_my_port(0, true)->name = variable_name;
 }

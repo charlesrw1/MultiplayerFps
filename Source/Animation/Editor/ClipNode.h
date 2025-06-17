@@ -96,11 +96,15 @@ class Variable_EdNode : public Base_EdNode
 {
 public:
 	CLASS_BODY(Variable_EdNode);
-	Variable_EdNode() = default;
+	Variable_EdNode() {
+		add_out_port(0, "");
+	}
 	Variable_EdNode(const string& name) {
+		add_out_port(0, "");
 		this->variable_name = name;
 	}
 	void on_link_changes() override;
+	bool has_top_bar() override { return false; }
 
 	REFLECT(hide)
 	string variable_name;
