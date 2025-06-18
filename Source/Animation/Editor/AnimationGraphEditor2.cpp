@@ -163,11 +163,16 @@ void AnimationGraphEditorNew::init_node_factory()
 	prototypes.add("StateMachine", []() { return new Statemachine_EdNode(); });
 
 
-	prototypes.add("Blend2", []() { return new Blend2_EdNode; });
-	prototypes.add("BlendByInt", []() { return new BlendInt_EdNode(false); });
-	prototypes.add("BlendByEnum", []() { return new BlendInt_EdNode(true); });
-	prototypes.add("ReturnTransition", []() {return new LayerRoot_EdNode(true); });
-	prototypes.add("ReturnPose", []() {return new LayerRoot_EdNode(false); });
+	prototypes.add("Blend2", []() { return new ComposePoses_EdNode(false); });
+	prototypes.add("AddPoses", []() { return new ComposePoses_EdNode(true); });
+	prototypes.add("SubtractPoses", []() { return new SubtractPoses_EdNode(); });
+
+
+
+	prototypes.add("BlendByInt", []() { return new BlendInt_EdNode(); });
+	//prototypes.add("BlendByEnum", []() { return new BlendEnum_EdNode(); });
+	prototypes.add("ReturnTransition", []() {return new Func_EdNode(Func_EdNode::ReturnTransition); });
+	prototypes.add("ReturnPose", []() {return new Func_EdNode(Func_EdNode::ReturnPose); });
 
 	prototypes.add("ModifyBone", []() {return new ModifyBone_EdNode(); });
 	prototypes.add("Ik2Bone", []() {return new Ik2Bone_EdNode(); });
@@ -199,7 +204,10 @@ void AnimationGraphEditorNew::init_node_factory()
 	blends
 		.add("Blend2")
 		.add("BlendByInt")
-		.add("BlendByEnum");
+		.add("BlendByEnum")
+		.add("AddPoses")
+		.add("SubtractPoses");
+
 	NodeMenu modifies;
 	modifies
 		.add("Ik2Bone")
@@ -502,6 +510,26 @@ void GraphTabManager::close_tab(GraphLayerHandle handle)
 	}
 
 */
+static void draw_enum_editor(int& myval, const EnumTypeInfo* type) {
+	assert(type);
+	const EnumIntPair* myenumint = type->find_for_value(myval);
+	if (!myenumint) {
+		assert(type->str_count > 0);
+		myval = type->strs[0].value;
+		myenumint = &type->strs[0];
+	}
+	if (ImGui::BeginCombo("##type", myenumint->name)) {
+		for (auto& enumiterator : *type) {
+			bool selected = (int)enumiterator.value == myval;
+			if (ImGui::Selectable(enumiterator.name, &selected)) {
+				myval = (int)enumiterator.value;
+			}
+		}
+		ImGui::EndCombo();
+	}
+}
+
+
 #include "GraphUtil.h"
 void Base_EdNode::draw_imnode()
 {
@@ -616,40 +644,51 @@ void Base_EdNode::draw_imnode()
 		
 		const string& str = port.name;
 		ImGui::Text("%s",str.c_str());
-
+		using std::holds_alternative;
 		if (!link.has_value()) {
 			ImGui::PushItemWidth(90);
 			if (str.empty())
 				ImGui::SameLine();
 
 			if (port.type.type == GraphPinType::Boolean) {
-				if (!std::holds_alternative<bool>(port.inlineValue))
+				if (!holds_alternative<bool>(port.inlineValue))
 					port.inlineValue = false;
 				bool b = std::get<bool>(port.inlineValue);
 				ImGui::Checkbox("##b", &b);
 				port.inlineValue = b;
 			}
 			else if (port.type.type == GraphPinType::Float) {
-				if (!std::holds_alternative<float>(port.inlineValue))
+				if (!holds_alternative<float>(port.inlineValue))
 					port.inlineValue = 0.f;
 				float b = std::get<float>(port.inlineValue);
 				ImGui::InputFloat("##b", &b);
 				port.inlineValue = b;
 			}
 			else if (port.type.type == GraphPinType::Integer) {
-				if (!std::holds_alternative<int>(port.inlineValue))
+				if (!holds_alternative<int>(port.inlineValue))
 					port.inlineValue = 0;
 				int i = std::get<int>(port.inlineValue);
 				ImGui::InputInt("##", &i);
 				port.inlineValue = i;
 			}
 			else if (port.type.type == GraphPinType::Vec3) {
-				if (!std::holds_alternative<glm::vec3>(port.inlineValue))
+				if (!holds_alternative<glm::vec3>(port.inlineValue))
 					port.inlineValue = glm::vec3(0.f);
 				glm::vec3 v = std::get<glm::vec3>(port.inlineValue);
 				ImGui::InputFloat3("##", &v.x);
 				port.inlineValue = v;
 			}
+			else if (port.type.type == GraphPinType::EnumType&& holds_alternative<const EnumTypeInfo*>(port.type.data)) {
+				auto enumtype = std::get<const EnumTypeInfo*>(port.type.data);
+				if (enumtype) {
+					if (!holds_alternative<int>(port.inlineValue))
+						port.inlineValue = 0;
+					int i = std::get<int>(port.inlineValue);
+					draw_enum_editor(i, std::get<const EnumTypeInfo*>(port.type.data));
+					port.inlineValue = i;
+				}
+			}
+
 			ImGui::PopItemWidth();
 		}
 		ImNodes::EndInputAttribute();
@@ -678,6 +717,7 @@ void Base_EdNode::draw_imnode()
 		ImNodes::PopColorStyle();
 	}
 	ImNodes::EndNode();
+
 
 	{
 		glm::vec2 pos = GraphUtil::to_glm(ImNodes::GetNodeGridSpacePos(self.id));
@@ -909,7 +949,7 @@ void EditorNodeGraph::insert_nodes_with_new_id(SerializeGraphContainer& containe
 			}
 			else {
 				n->links.erase(n->links.begin() + i);
-				n->on_link_changes();
+				//n->on_link_changes();
 				i--;
 			}
 		}
@@ -1138,6 +1178,10 @@ void GraphPropertyWindow::draw()
 
 		if (grid.rows_had_changes) {
 			ed.on_changed_graph_classes.invoke();
+
+			auto selected= ed.get_selected_node();
+			if (selected)
+				selected->on_property_changes();
 		}
 	}
 	ImGui::End();
@@ -1216,7 +1260,7 @@ GraphUtil::PinShapeColor GraphUtil::get_pin_for_value_type(const GraphPinType::E
 	switch (type)
 	{
 	case GraphPinType::Any: return { {155,155,155},circle };
-	case GraphPinType::Boolean: return { {120,30,30},circle };
+	case GraphPinType::Boolean: return { {170,30,30},circle };
 	case GraphPinType::Float: return { {80,190,40},circle };
 	case GraphPinType::Integer: return { {120,250,200},circle };
 	case GraphPinType::Vec3: return { {230,130,50},circle };
@@ -1301,6 +1345,7 @@ void ControlParamsWindowNew::refresh_props()
 		}
 		else if (p.is_enum()) {
 			param.type = GraphPinType::EnumType;
+			param.type.data = p.get_property_info()->enum_type;
 		}
 		else if (p.is_float()) {
 			param.type = GraphPinType::Float;
@@ -1320,7 +1365,7 @@ void ControlParamsWindowNew::refresh_props()
 		props.push_back(param);
 	}
 	for (auto& p : props) {
-		auto [color, str] = GraphUtil::get_type_color_name(p.type);
+		auto [color, str] = GraphUtil::get_type_color_name(p.type.type);
 		string name_as_str = p.nativepi->name;
 		menu.add(name_as_str, color);
 		ed.get_var_prototypes().add(name_as_str, [name_as_str]() { return new Variable_EdNode(name_as_str); });
@@ -1428,8 +1473,8 @@ void ControlParamsWindowNew::imgui_draw()
 			//	eip = EnumTrait<anim_graph_value>::StaticEnumType.find_for_value((int)res.type);
 			//	ASSERT(eip);
 			//}
-			auto [color, str] = GraphUtil::get_type_color_name(res.type);
-			ImGui::TextColored(ImColor(color.to_uint()),str);
+			auto [color, str] = GraphUtil::get_type_color_name(res.type.type);
+			ImGui::TextColored(ImColor(color.to_uint()),"%s",str);
 
 			ImGui::PopID();
 		}

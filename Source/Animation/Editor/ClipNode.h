@@ -50,6 +50,11 @@ public:
 		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
 		if (is_evaluator)
 			add_in_port(0, "time").type = GraphPinType::Float;
+		else {
+			auto& p = add_in_port(0, "speed");
+			p.type = GraphPinType::Float;
+			p.inlineValue = 1.f;
+		}
 	}
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimSource); }
 
@@ -112,37 +117,56 @@ public:
 
 	REFLECT(hide)
 	string variable_name;
-	opt<GraphPinType::Enum> foundType;
+	opt<GraphPinType> foundType;
 };
 
-class Blend2_EdNode : public Base_EdNode
+class ComposePoses_EdNode : public Base_EdNode
 {
 public:
-	CLASS_BODY(Blend2_EdNode);
-	Blend2_EdNode() {
+	CLASS_BODY(ComposePoses_EdNode);
+	ComposePoses_EdNode(bool is_additive) {
 		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
-		add_in_port(0, "value").type = GraphPinType::Float;
-		add_in_port(1, "0").type = GraphPinType::LocalSpacePose;
-		add_in_port(2, "1").type = GraphPinType::LocalSpacePose;
+		add_in_port(0, "0").type = GraphPinType::LocalSpacePose;
+		add_in_port(1, "1").type = GraphPinType::LocalSpacePose;
+		add_in_port(2, "alpha").type = GraphPinType::Float;
 	}
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimBlend); }
 };
-class BlendInt_EdNode : public Base_EdNode
-{
+class SubtractPoses_EdNode : public Base_EdNode {
+public:
+	CLASS_BODY(SubtractPoses_EdNode);
+	SubtractPoses_EdNode() {
+		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
+		add_in_port(0, "base").type = GraphPinType::LocalSpacePose;
+		add_in_port(1, "delta").type = GraphPinType::LocalSpacePose;
+	}
+};
+class MirrorPose_EdNode : public Base_EdNode {
+public:
+	CLASS_BODY(MirrorPose_EdNode);
+	MirrorPose_EdNode() {
+		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
+		add_in_port(0, "").type = GraphPinType::LocalSpacePose;
+		add_in_port(1, "alpha").type = GraphPinType::Float;
+	}
+};
+
+class BlendInt_EdNode : public Base_EdNode {
 public:
 	CLASS_BODY(BlendInt_EdNode);
-	BlendInt_EdNode() = default;
-	BlendInt_EdNode(bool byenum) {
-		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
-		if(byenum)
-			add_in_port(0, "value").type = GraphPinType::EnumType;
-		else
-			add_in_port(0, "value").type = GraphPinType::Integer;
-		add_in_port(1, "0").type = GraphPinType::LocalSpacePose;
-		add_in_port(2, "1").type = GraphPinType::LocalSpacePose;
-	}
+	BlendInt_EdNode();
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimBlend); }
+	void on_link_changes() override;
+	void on_property_changes() override;
+
+	REFLECT();
+	int num_blend_cases = 0;
+
+	int get_index_of_value_input() {
+		return MAX_INPUTS - 1;
+	}
 };
+
 class Ik2Bone_EdNode : public Base_EdNode {
 public:
 	CLASS_BODY(Ik2Bone_EdNode);
@@ -184,7 +208,9 @@ public:
 		BreakVec3,
 		BreakVec2,
 		MakeVec3,
-		MakeVec2
+		MakeVec2,
+		ReturnPose,
+		ReturnTransition
 	};
 	Func_EdNode(Type t) {
 		switch (t)
@@ -217,6 +243,12 @@ public:
 			add_out_port(2, "z").type = GraphPinType::Float;
 			add_in_port(0, "").type = GraphPinType::Vec3;
 			break;
+		case Func_EdNode::ReturnPose:
+			add_in_port(0, "").type = GraphPinType::LocalSpacePose;
+			break;
+		case Func_EdNode::ReturnTransition:
+			add_in_port(0, "").type = GraphPinType::Boolean;
+			break;
 		default:
 			break;
 		}
@@ -224,28 +256,20 @@ public:
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Function); }
 };
 
-class LayerRoot_EdNode : public Base_EdNode
-{
-public:
-	CLASS_BODY(LayerRoot_EdNode);
-
-	LayerRoot_EdNode(bool is_for_transition) {
-		if (is_for_transition)
-			add_in_port(0, "").type = GraphPinType::Boolean;
-		else
-			add_in_port(0, "").type = GraphPinType::LocalSpacePose;
-	}
-	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Function); }
-};
-
 class LogicalOp_EdNode : public Base_EdNode {
 public:
 	CLASS_BODY(LogicalOp_EdNode);
+	LogicalOp_EdNode() = default;
 	LogicalOp_EdNode(bool isor) {
 		add_out_port(0, "").type = GraphPinType::Boolean;
 		add_in_port(0, "").type = GraphPinType::Boolean;
 		add_in_port(1, "").type = GraphPinType::Boolean;
+		num_inputs = 2;
 	}
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Math); }
-
+	void on_link_changes() override;
+	void on_property_changes() override;
+	
+	REFLECT();
+	int num_inputs = 0;
 };

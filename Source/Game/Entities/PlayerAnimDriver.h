@@ -8,6 +8,13 @@
 #include "Framework/ReflectionMacros.h"
 #include "Framework/Reflection2.h"
 
+NEWENUM(CharacterItemType, int)
+{
+	Grenade,
+	Rifle,
+	Pistol,
+	Knife,
+};
 
 class CharacterGraphDriver : public AnimatorInstance
 {
@@ -18,6 +25,7 @@ public:
 	virtual void on_update(float dt) override;
 	virtual void on_post_update() override;
 
+	REF CharacterItemType item_type = CharacterItemType::Knife;
 	REF float flMovex=0.f;
 	REF float flMovey=0.f;
 	REF float flSpeed=0.f;

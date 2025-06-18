@@ -84,6 +84,15 @@ struct GraphPinType {
 	bool is_any() const {
 		return type == Enum::Any;
 	}
+
+	const EnumTypeInfo* get_enum_or_set_to_null() {
+		assert(type == EnumType);
+		if (std::holds_alternative<const EnumTypeInfo*>(data)) {
+			return std::get<const EnumTypeInfo*>(data);
+		}
+		data = (const EnumTypeInfo*)nullptr;
+		return nullptr;
+	}
 };
 
 struct GraphNodeHandle {
@@ -104,6 +113,9 @@ struct GraphPortHandle {
 	GraphPortHandle(int id) : id(id) {}
 	GraphPortHandle() = default;
 	REF int id = 0;
+	bool is_valid() const {
+		return id != 0;
+	}
 	GraphNodeHandle get_node()const;
 	int get_index() const;
 	bool is_output() const;
@@ -243,6 +255,7 @@ enum class EdNodeCategory
 };
 Color32 get_color_for_category(EdNodeCategory cat);
 
+
 class AnimationGraphEditorNew;
 class Base_EdNode : public ClassBase
 {
@@ -269,7 +282,7 @@ public:
 	virtual Color32 get_node_color() const { return { 23, 82, 12 }; }
 	virtual GraphLayerHandle get_owning_sublayer() const { return GraphLayerHandle(); }
 	virtual void set_owning_sublayer(GraphLayerHandle h) { }
-
+	virtual void on_property_changes() {}
 
 	GraphPortHandle getinput_id(int inputslot) const {
 		return inputslot + self.id * MAX_INPUTS + INPUT_START;
@@ -300,6 +313,10 @@ public:
 
 	virtual void on_link_changes();
 
+	struct RemovedPortToPutBack {
+		string portname;
+		GraphPortHandle other;
+	};
 	GraphPort& add_in_port(int index, string name);
 	GraphPort& add_out_port(int index, string name);
 	opt<int> find_my_port_idx(int index, bool output);
@@ -319,8 +336,10 @@ public:
 	void remove_node_from_other_ports();
 	bool vaildate_links();
 	const GraphPort* get_other_nodes_port(GraphLink whatlink);
+	const GraphPort* get_my_node_port(GraphLink whatlink);
 	const GraphPort* get_other_nodes_port_from_myport(GraphPortHandle handle);
-
+	void remove_links_without_port();
+	void remove_port(int index, bool is_output);
 
 	string name;
 	vector<GraphPort> ports;

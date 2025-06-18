@@ -197,7 +197,7 @@ class ControlParamsWindowNew
 public:
 	ControlParamsWindowNew(AnimationGraphEditorNew& ed);
 	void imgui_draw();
-	opt<GraphPinType::Enum> find_value_type(const string& name) const {
+	opt<GraphPinType> find_value_type(const string& name) const {
 		for (auto& p : props)
 			if (p.nativepi->name == name)
 				return p.type;
@@ -209,7 +209,7 @@ private:
 		props.clear();
 	}
 	struct VariableParam {
-		GraphPinType::Enum type{};
+		GraphPinType type{};
 		const PropertyInfo* nativepi = nullptr;
 	};
 	std::vector<VariableParam> props;

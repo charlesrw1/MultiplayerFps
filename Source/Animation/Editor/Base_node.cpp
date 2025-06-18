@@ -1,4 +1,5 @@
 #include "Base_node.h"
+#include <algorithm>
 #include "AnimationGraphEditor2.h"
 
 GraphNodeHandle GraphPortHandle::get_node() const
@@ -75,6 +76,17 @@ void Base_EdNode::get_ports(vector<int>& input, vector<int>& output) {
 		else
 			output.push_back(i);
 	}
+	auto sort_ports = [this](vector<int>& inp) {
+		if (inp.size() > 1) {
+			std::sort(inp.begin(), inp.end(), [this](int i1, int i2) {
+				const GraphPort& p1 = ports.at(i1);
+				const GraphPort& p2 = ports.at(i2);
+				return p1.index < p2.index;
+				});
+		}
+	};
+	sort_ports(input);
+	sort_ports(output);
 }
 opt<int> Base_EdNode::get_link_index(GraphLink link) {
 	for (int i = 0; i < links.size(); i++) {
@@ -212,4 +224,38 @@ Base_EdNode* Base_EdNode::find_other_node_from_port(GraphPortHandle port)
 void Base_EdNode::on_link_changes()
 {
 	ImNodes::SetNodeGridSpacePos(self.id,ImVec2(nodex, nodey));
+}
+#include "AnimCommands.h"
+void Base_EdNode::remove_port(int index, bool is_output)
+{
+	opt<int> portidx = find_my_port_idx(index, is_output);
+	if (portidx.has_value()) {
+		opt<int> haslink = find_link_idx_from_port(GraphPortHandle::make(self, index, is_output));
+		if (haslink.has_value()) {
+			//remove_link_from_idx(haslink.value());
+			GraphCommandUtil::remove_link(links.at(haslink.value()).link, editor->get_graph());
+		}
+		ports.erase(ports.begin() + portidx.value());
+	}
+}
+
+void Base_EdNode::remove_links_without_port()
+{
+	for (int i = 0; i < links.size(); i++) {
+		GraphLinkWithNode gl = links.at(i);
+		const GraphPort* myport = get_my_node_port(gl.link);
+		const GraphPort* otherport = get_other_nodes_port(gl.link);
+		if (!myport || !otherport) {
+			const int presize = links.size();
+			GraphCommandUtil::remove_link(gl.link, editor->get_graph());
+			assert((int)links.size() == presize - 1);
+			i--;
+		}
+	}
+}
+const GraphPort* Base_EdNode::get_my_node_port(GraphLink whatlink)
+{
+	auto [othernode, index, is_output] = whatlink.get_self_port(self).break_to_values();
+	assert(othernode == self);
+	return find_my_port(index, is_output);
 }

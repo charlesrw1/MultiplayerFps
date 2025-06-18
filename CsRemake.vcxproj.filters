@@ -524,7 +524,6 @@
     <ClInclude Include="Source\Framework\Log.h" />
     <ClInclude Include="Source\UI\Widgets\EditorCube.h" />
     <ClInclude Include="Source\Animation\Editor\AnimationGraphEditor2.h" />
-    <ClInclude Include="Source\Animation\Editor\GraphEditor.h" />
     <ClInclude Include="Source\Animation\Editor\GraphUtil.h" />
     <ClInclude Include="Source\Animation\Editor\AnimCommands.h" />
     <ClInclude Include="Source\Animation\Editor\Optional.h" />
@@ -601,9 +600,6 @@
     </ClCompile>
     <ClCompile Include="Source\Framework\Profilier.cpp">
       <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Animation\Editor\EdNode.cpp">
-      <Filter>Source\Animation\Editor</Filter>
     </ClCompile>
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp">
       <Filter>Source\Animation\Runtime</Filter>
@@ -800,6 +796,7 @@
     <ClCompile Include="Source\Animation\Editor\ClipNode.cpp" />
     <ClCompile Include="Source\Animation\Editor\Basic_nodes.cpp" />
     <ClCompile Include="Source\Animation\Editor\GraphUtil.cpp" />
+    <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

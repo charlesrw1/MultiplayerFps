@@ -208,7 +208,7 @@ bool& PropertyPtr::as_boolean()
 
 bool PropertyPtr::is_enum() const
 {
-	return false;
+	return core_type_id::Enum8==get_type()||core_type_id::Enum16==get_type()||core_type_id::Enum32==get_type();
 }
 
 EnumPropPtr PropertyPtr::as_enum()

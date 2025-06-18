@@ -33,6 +33,7 @@
     <ClCompile Include="Source\Animation\Editor\Basic_nodes.cpp" />
     <ClCompile Include="Source\Animation\Editor\ClipNode.cpp" />
     <ClCompile Include="Source\Animation\Editor\GraphUtil.cpp" />
+    <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew.cpp" />
     <ClCompile Include="Source\EditorPopups.cpp" />
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
     <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
@@ -61,7 +62,6 @@
     <ClInclude Include="Source\Animation\Editor\AnimCommands.h" />
     <ClInclude Include="Source\Animation\Editor\Base_node.h" />
     <ClInclude Include="Source\Animation\Editor\ClipNode.h" />
-    <ClInclude Include="Source\Animation\Editor\GraphEditor.h" />
     <ClInclude Include="Source\Animation\Editor\Basic_nodes.h" />
     <ClInclude Include="Source\Animation\Editor\Blendspace_nodes.h" />
     <ClInclude Include="Source\Animation\Editor\Optional.h" />
@@ -288,7 +288,6 @@
     <ClCompile Include="Source\Animation\AnimationUtil.cpp" />
     <ClCompile Include="Source\Animation\Animation_Man.cpp" />
     <ClCompile Include="Source\Animation\Editor\AnimationGraphEditor.cpp" />
-    <ClCompile Include="Source\Animation\Editor\EdNode.cpp" />
     <ClCompile Include="Source\Animation\Editor\SerializersAndPropEds.cpp" />
     <ClCompile Include="Source\Animation\Editor\Statemachine_node.cpp" />
     <ClCompile Include="Source\Animation\Editor\State_node.cpp" />

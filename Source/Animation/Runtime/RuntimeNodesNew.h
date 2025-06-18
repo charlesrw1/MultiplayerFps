@@ -3,6 +3,40 @@
 #include "Framework/EnumDefReflection.h"
 #include "SyncTime.h"
 #include "Framework/StructReflection.h"
+#include "Animation/Editor/Optional.h"
+
+class AnimCurveData {
+public:
+};
+class AnimEventBuffer {
+public:
+};
+
+class AnimatorInstance;
+class AnimTreeGraphContext
+{
+public:
+	AnimatorInstance* instance = nullptr;
+	SyncGroupData* find_sync_group(StringName name) const;
+	const MSkeleton* get_skeleton() const;
+	AnimEventBuffer* event_buffer = nullptr;
+};
+
+class Pose;
+class AnimTreeUpdateStack
+{
+public:
+	AnimTreeUpdateStack(AnimTreeGraphContext& graph) : graph(graph) {}
+	AnimTreeGraphContext& graph;
+	AnimTreeGraphContext& get_graph() { return graph; }
+	vector<void*> playing_clip_nodes;
+	AnimCurveData* curves = nullptr;
+	Pose* pose = nullptr;
+	float dt = 0.0;
+	// if true, then clip will return that it is finished when current_time + auto_transition_time >= clip_time
+	bool has_auto_transition = false;
+	float automatic_transition_time = 0.0;
+};
 
 struct stClipNode {
 	STRUCT_BODY(ClipNode_SData);
@@ -34,7 +68,8 @@ public:
 	CLASS_BODY(AnimTreePoseNode);
 	struct Inst {
 		virtual ~Inst() {}
-		virtual void get_pose() {}
+		virtual void get_pose(AnimTreeUpdateStack& context) {}
+		virtual void reset() {}
 	};
 	virtual Inst* create_inst() { return nullptr; }
 };
@@ -63,17 +98,28 @@ class GraphValueFunction : public GraphValueNode {
 public:
 };
 
+struct BoneIndexRetargetMap;
 class ClipNode : public AnimTreePoseNode {
 public:
 	CLASS_BODY(ClipNode);
 	struct Inst : public PoseNodeInst {
 		Inst(ClipNode& o) : owner(o) {}
+
 		ClipNode& owner;
-		void get_pose() override {}
+		const AnimationSeq* clip = nullptr;
+		const BoneIndexRetargetMap* remap = nullptr;
+		float anim_time = 0.0;
+
+		void get_pose(AnimTreeUpdateStack& context) override;
+		void reset() override;
+		float get_clip_length() const;
+		bool has_sync_group() const;
+		float get_speed() const;
 	};
 	PoseNodeInst* create_inst() final { return new Inst(*this); }
 	REF stClipNode data;
 };
+
 
 class Ik2Bone : public AnimTreePoseNode {
 public:
@@ -84,7 +130,7 @@ public:
 		GraphValueNode* pole = nullptr;
 		GraphValueNode* alpha = nullptr;
 
-		void get_pose() override {}
+		void get_pose(AnimTreeUpdateStack& context) override {}
 	};
 	PoseNodeInst* create_inst() final { return new Inst(); }
 };
@@ -99,7 +145,7 @@ public:
 		GraphValueNode* rotation = nullptr;
 		GraphValueNode* alpha = nullptr;
 
-		void get_pose() override {}
+		void get_pose(AnimTreeUpdateStack& context) override {}
 	};
 	PoseNodeInst* create_inst() final { return new Inst(*this); }
 	REF ModifyBoneType translation={};
@@ -114,7 +160,7 @@ public:
 		BlendByInt& owner;
 		PoseNodeInst* default_input = nullptr;
 		vector<PoseNodeInst*> inputs;
-		int current_input = 0;
+		opt<int> current_input;
 		GraphValueNode* value = nullptr;
 	};
 };

@@ -13,12 +13,12 @@ void GraphCommandUtil::add_link(GraphLink link, EditorNodeGraph& graph)
 	opt<int> index = inn->find_link_idx_from_port(link.input);
 	if (!index.has_value()) {
 		inn->add_link(link);
-		inn->on_link_changes();
+	//	inn->on_link_changes();
 	}
 	index = outn->find_link_idx_from_port(link.input);
 	if (!index.has_value()) {
 		outn->add_link(link);
-		outn->on_link_changes();
+		//outn->on_link_changes();
 	}
 }
 
