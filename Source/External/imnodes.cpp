@@ -2040,7 +2040,7 @@ static void MiniMapDrawNode(ImNodesEditorContext& editor, const int node_idx)
         mini_map_node_background = GImNodes->Style.Colors[ImNodesCol_MiniMapNodeBackground];
     }
 
-    const ImU32 mini_map_node_outline = GImNodes->Style.Colors[ImNodesCol_MiniMapNodeOutline];
+    const ImU32 mini_map_node_outline = node.ColorStyle.Titlebar;// GImNodes->Style.Colors[ImNodesCol_MiniMapNodeOutline];
 
     GImNodes->CanvasDrawList->AddRectFilled(
         node_rect.Min, node_rect.Max, mini_map_node_background, mini_map_node_rounding);

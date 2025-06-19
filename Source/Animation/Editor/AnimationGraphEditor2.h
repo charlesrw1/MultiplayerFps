@@ -62,7 +62,14 @@ public:
 	const unordered_set<int>& get_nodes() const {
 		return layer_nodes;
 	}
+	void set_is_statemachine_layer(bool b) {
+		is_statemachine = b;
+	}
+	bool get_is_statemachine_layer() const {
+		return is_statemachine;
+	}
 protected:
+	bool is_statemachine = false;
 	GraphNodeHandle selected;
 
 	void handle_drag_drop();

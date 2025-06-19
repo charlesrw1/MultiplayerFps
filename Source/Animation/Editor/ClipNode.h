@@ -79,6 +79,9 @@ public:
 		add_out_port(0, "").type = GraphPinType::StateType;
 		add_in_port(0, "").type = GraphPinType::StateType;
 	}
+	void on_link_changes() override;
+	bool draw_links_as_arrows() final { return true; }
+
 	REF string statename;
 	bool is_entry_state = false;
 };
@@ -210,7 +213,7 @@ public:
 		MakeVec3,
 		MakeVec2,
 		ReturnPose,
-		ReturnTransition
+		ReturnTransition,
 	};
 	Func_EdNode(Type t) {
 		switch (t)
@@ -254,6 +257,22 @@ public:
 		}
 	}
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Function); }
+};
+class FloatMathFuncs_EdNode : public Base_EdNode {
+public:
+	CLASS_BODY(FloatMathFuncs_EdNode);
+	enum Type {
+		ScaleBias,
+		Clamp,
+		InRange,
+		Abs,
+		Remap,
+	};
+	FloatMathFuncs_EdNode() = default;
+	FloatMathFuncs_EdNode(Type t);
+
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Math); }
+
 };
 
 class LogicalOp_EdNode : public Base_EdNode {

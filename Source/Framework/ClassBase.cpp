@@ -51,7 +51,7 @@ ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_t
 {
 	this->classname = classname;
 	this->superclassname = "";
-	this->props = props;
+	this->props = nullptr;
 	this->allocate = alloc;
 	this->super_typeinfo = super_typeinfo;
 	this->get_props_function = get_props_func;

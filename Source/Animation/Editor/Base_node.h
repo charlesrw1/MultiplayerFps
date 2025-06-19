@@ -263,6 +263,8 @@ public:
 	CLASS_BODY(Base_EdNode);
 	AnimationGraphEditorNew* editor = nullptr;
 	virtual ~Base_EdNode() {}
+	void serialize(Serializer& s) final;
+
 	virtual void draw_imnode();
 	virtual void initialize() {	// called after editor ptr is set
 	}
@@ -283,6 +285,7 @@ public:
 	virtual GraphLayerHandle get_owning_sublayer() const { return GraphLayerHandle(); }
 	virtual void set_owning_sublayer(GraphLayerHandle h) { }
 	virtual void on_property_changes() {}
+	virtual bool draw_links_as_arrows() { return false; }
 
 	GraphPortHandle getinput_id(int inputslot) const {
 		return inputslot + self.id * MAX_INPUTS + INPUT_START;

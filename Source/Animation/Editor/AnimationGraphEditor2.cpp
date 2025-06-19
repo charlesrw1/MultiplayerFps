@@ -184,12 +184,28 @@ void AnimationGraphEditorNew::init_node_factory()
 	prototypes.add("Variable", []() {return new Variable_EdNode(); });	// this assumes it got a variable name alredy
 	prototypes.add("Comment", []() { return new CommentNode; });
 
+	prototypes.add("Abs", []() {return new FloatMathFuncs_EdNode(FloatMathFuncs_EdNode::Abs); });
+	prototypes.add("Clamp", []() {return new FloatMathFuncs_EdNode(FloatMathFuncs_EdNode::Clamp); });
+	prototypes.add("InRange", []() {return new FloatMathFuncs_EdNode(FloatMathFuncs_EdNode::InRange); });
+	prototypes.add("RemapFloat", []() {return new FloatMathFuncs_EdNode(FloatMathFuncs_EdNode::Remap); });
+	prototypes.add("ScaleBias", []() {return new FloatMathFuncs_EdNode(FloatMathFuncs_EdNode::ScaleBias); });
+
+	prototypes.add("State", []() {return new State_EdNode(); });
+
+
+
+
 	NodeMenu mathmenu;
 	mathmenu
 		.add("+")
 		.add("-")
 		.add("*")
-		.add("/");
+		.add("/")
+		.add("Abs")
+		.add("Clamp")
+		.add("InRange")
+		.add("RemapFloat")
+		.add("ScaleBias");
 	NodeMenu logcmp;
 	logcmp
 		.add("<")
@@ -235,6 +251,7 @@ void AnimationGraphEditorNew::init_node_factory()
 	animGraphMenu.add_submenu("Misc", funcs);
 	animGraphMenu.add_submenu("Variables", emptyVariables);
 	animGraphMenu.add("StateMachine");
+	animGraphMenu.add("State");
 	animGraphMenu.add("Comment");
 }
 void AnimationGraphEditorNew::delete_selected()
@@ -756,7 +773,9 @@ void Base_EdNode::draw_imnode()
 			auto [color, type] = GraphUtil::get_pin_for_value_type(port.type.type);
 			ImNodes::PushColorStyle(ImNodesCol_Link, color.to_uint());
 			//ImNodes::Link(node->getlink_id(j), node->inputs[j].node->getoutput_id(0), node->getinput_id(j), draw_flat_links, offset);
-			ImNodes::Link(lv.get_link_id(), lv.input.id, lv.output.id);
+			
+			const bool as_arrows = draw_links_as_arrows();
+			ImNodes::Link(lv.get_link_id(), lv.input.id, lv.output.id, as_arrows);
 			ImNodes::PopColorStyle();
 			//if (pushed_colors) {
 			//	ImNodes::PopColorStyle();
@@ -1245,6 +1264,8 @@ GraphUtil::PinColorName GraphUtil::get_type_color_name(const GraphPinType::Enum&
 	case GraphPinType::Vec3: str = "Vec3";break;
 	case GraphPinType::Quat: str = "Quat";break;
 	case GraphPinType::EnumType: str = "Enum";break;
+	case GraphPinType::StateType: str = "State"; break;
+
 	default:
 		break;
 	}
@@ -1270,6 +1291,9 @@ GraphUtil::PinShapeColor GraphUtil::get_pin_for_value_type(const GraphPinType::E
 	case GraphPinType::ClassInfoType: return { {230,230,80},circle };
 	case GraphPinType::LocalSpacePose: return { {220,220,220},square };
 	case GraphPinType::MeshSpacePose: return { {90,180,220},square };
+
+	case GraphPinType::StateType: return { {200,200,170},circle };
+
 	default: return {};
 
 	}

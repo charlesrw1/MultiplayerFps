@@ -173,6 +173,113 @@ GraphPort* Base_EdNode::find_my_port(int index, bool output)
 		return &ports.at(idx.value());
 	return nullptr;
 }
+#include "Framework/Serializer.h"
+void Base_EdNode::serialize(Serializer& s)
+{
+	using std::get;
+	using std::holds_alternative;
+	const int INTEGER_TYPE = 0;
+	const int FLOAT_TYPE = 1;
+	const int BOOL_TYPE = 2;
+	const int VEC3_TYPE = 3;
+
+
+	if (s.is_saving()) {
+		int count = 0;
+		for (auto& p : ports) {
+			if (!p.is_input())
+				continue;
+			if (!std::holds_alternative<std::monostate>(p.inlineValue)) {
+				count++;
+			}
+		}
+		s.serialize_array("inlineProps",count);
+		int written = 0;
+		for (auto& p : ports) {
+			if (!p.is_input())
+				continue;
+			auto write_begin = [&](const int type) {
+				int tuplesz = 3;
+				s.serialize_array_ar(tuplesz);
+				int idx = p.index;
+				s.serialize_ar(idx);
+				int type_val = type;
+				s.serialize_ar(type_val);
+				written++;
+			};
+
+			if (holds_alternative<int>(p.inlineValue)) {
+				write_begin(INTEGER_TYPE);
+				int i = get<int>(p.inlineValue);
+				s.serialize_ar(i);
+				s.end_obj();
+			}
+			else if (holds_alternative<float>(p.inlineValue)) {
+				write_begin(FLOAT_TYPE);
+				float i = get<float>(p.inlineValue);
+				s.serialize_ar(i);
+				s.end_obj();
+			}
+			else if (holds_alternative<bool>(p.inlineValue)) {
+				write_begin(BOOL_TYPE);
+				bool b = get<bool>(p.inlineValue);
+				s.serialize_ar(b);
+				s.end_obj();
+			}
+			else if (holds_alternative<glm::vec3>(p.inlineValue)) {
+				write_begin(VEC3_TYPE);
+				glm::vec3 b = get<glm::vec3>(p.inlineValue);
+				s.serialize_ar(b);
+				s.end_obj();
+			}
+		}
+		s.end_obj();
+		assert(written == count);
+	}
+	else {
+		int count = 0;
+		s.serialize_array("inlineProps", count);
+		for (int i = 0; i < count; i++) {
+			int tupsize = 0;
+			s.serialize_array_ar(tupsize);
+			assert(tupsize == 3);
+			int index = 0;
+			s.serialize_ar(index);
+			GraphPort* p = find_my_port(index, false);
+			if (!p) {
+				p = &add_in_port(index, "@created");
+			}
+
+			int type = 0;
+			s.serialize_ar(type);
+			if (type == INTEGER_TYPE) {
+				int integer = 0;
+				s.serialize_ar(integer);
+				p->inlineValue = integer;
+			}
+			else if (type == FLOAT_TYPE) {
+				float val = 0;
+				s.serialize_ar(val);
+				p->inlineValue = val;
+			}
+			else if (type == BOOL_TYPE) {
+				bool val = 0;
+				s.serialize_ar(val);
+				p->inlineValue = val;
+			}
+			else if (type == VEC3_TYPE) {
+				glm::vec3 val = {};
+				s.serialize_ar(val);
+				p->inlineValue = val;
+			}
+			else {
+				assert(0);
+			}
+			s.end_obj();
+		}
+		s.end_obj();
+	}
+}
 
 const GraphPort* Base_EdNode::get_other_nodes_port(GraphLink whatlink)
 {

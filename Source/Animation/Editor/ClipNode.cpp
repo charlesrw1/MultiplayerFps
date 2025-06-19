@@ -11,6 +11,7 @@ void Statemachine_EdNode::on_link_changes()  {
 	}
 	NodeGraphLayer* layer = editor->get_graph().get_layer(sublayer);
 	assert(layer && layer->get_owner_node() == self);
+	layer->set_is_statemachine_layer(true);
 }
 
 void Statemachine_EdNode::set_owning_sublayer(GraphLayerHandle h) {
@@ -154,4 +155,65 @@ void LogicalOp_EdNode::on_property_changes()
 	if (num_inputs >= MAX_INPUTS)
 		num_inputs = MAX_INPUTS;
 	on_link_changes();
+}
+#include "Animation/Runtime/Statemachine_cfg.h"//for easing, fixme
+FloatMathFuncs_EdNode::FloatMathFuncs_EdNode(Type t) {
+	switch (t)
+	{
+	case Type::ScaleBias:
+		add_out_port(0, "").type = GraphPinType::Float;
+		add_in_port(0, "value").type = GraphPinType::Float;
+		add_in_port(1, "scale").type = GraphPinType::Float;
+		add_in_port(2, "bias").type = GraphPinType::Float;
+		break;
+	case Type::Clamp:
+		add_out_port(0, "").type = GraphPinType::Float;
+		add_in_port(0, "value").type = GraphPinType::Float;
+		add_in_port(1, "min").type = GraphPinType::Float;
+		add_in_port(2, "max").type = GraphPinType::Float;
+		break;
+	case Type::InRange:
+		add_out_port(0, "").type = GraphPinType::Boolean;
+		add_in_port(0, "value").type = GraphPinType::Float;
+		add_in_port(1, "min").type = GraphPinType::Float;
+		add_in_port(2, "max").type = GraphPinType::Float;
+		break;
+	case Type::Abs:
+		add_out_port(0, "").type = GraphPinType::Float;
+		add_in_port(0, "").type = GraphPinType::Float;
+	case Type::Remap: {
+		add_out_port(0, "").type = GraphPinType::Float;
+		add_in_port(0, "value").type = GraphPinType::Float;
+		{
+			auto& in_min = add_in_port(1, "in_min");
+			in_min.type = GraphPinType::Float;
+			in_min.inlineValue = 0.f;
+		}
+		{
+			auto& in_max = add_in_port(2, "in_max");
+			in_max.type = GraphPinType::Float;
+			in_max.inlineValue = 1.f;
+		}
+		{
+			auto& out_min = add_in_port(3, "out_min");
+			out_min.type = GraphPinType::Float;
+			out_min.inlineValue = 0.f;
+		}
+		{
+			auto& out_max = add_in_port(4, "out_max");
+			out_max.type = GraphPinType::Float;
+			out_max.inlineValue = 1.f;
+		}
+		GraphPort& easing = add_in_port(5, "easing");
+		easing.type = GraphPinType::EnumType;
+		const EnumTypeInfo* easinginfo = &EnumTrait< Easing>::StaticEnumType;
+		easing.type.data = easinginfo;
+	}break;
+	default:
+		break;
+	}
+}
+
+void State_EdNode::on_link_changes()
+{
 }
