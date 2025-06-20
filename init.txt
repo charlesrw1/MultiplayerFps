@@ -55,6 +55,8 @@ bind "F" SET_ORBIT_TARGET
 bind "Z" Ctrl "anim.undo"
 bind "D" Shift "anim.dup"
 bind "Delete" "anim.del"
+bind "Left" Alt "anim.up_layer"
+bind "Right" Alt "anim.down_layer"
 
 
 bind J "toggle r.taa"

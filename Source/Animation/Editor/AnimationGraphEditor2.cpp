@@ -91,6 +91,13 @@ void AnimationGraphEditorNew::init()
 	concmds->add("anim.resolve_anys", [this](const Cmd_Args&) {
 		resolve_any_types();
 		});
+	concmds->add("anim.up_layer", [this](const Cmd_Args&) {
+		tab_manager->go_up_layer();
+		});
+	concmds->add("anim.down_layer", [this](const Cmd_Args&) {
+		tab_manager->go_down_layer();
+		});
+
 
 	on_node_changes.add(this, [this]() {
 		resolve_any_types();
@@ -334,6 +341,8 @@ void AnimationGraphEditorNew::imgui_draw()
 	}
 	ImGui::End();
 
+	draw_layer_window();
+
 	property_window->draw();
 	params_window->imgui_draw();
 	handle_link_changes();
@@ -430,7 +439,7 @@ void GraphTabManager::draw()
 
 			bool open_bool = true;
 			ImGui::PushID(layer);
-			const string tabname = layer->get_tab_name();
+			auto[tabname,backcolor] = layer->get_tab_name(graph);
 			if (ImGui::BeginTabItem(string_format("%s", tabname.c_str()), &open_bool, flags))
 			{
 				bool this_is_an_old_active_tab_or_just_skip = n != active_tab && active_tab_dirty;
@@ -452,9 +461,9 @@ void GraphTabManager::draw()
 				if (this_tab_needs_a_reset) {
 					ImNodes::ClearNodeSelection();
 				}
-
-
+				ImNodes::PushColorStyle(ImNodesCol_GridBackground, backcolor.to_uint());
 				layer->draw(graph);
+				ImNodes::PopColorStyle();
 
 				//parent->draw_graph_layer(layer);
 
@@ -503,15 +512,40 @@ void GraphTabManager::draw()
 
 void GraphTabManager::open_tab(GraphLayerHandle handle, bool set_active)
 {
-	opt<int> existing = find_tab(handle);
-	if (existing.has_value()) {
-		active_tab = existing.value();
-	}
-	else {
-		tabs.push_back(handle);
-		active_tab = tabs.size() - 1;
-	}
+	history.clear();
+	tabs.clear();
+	tabs.push_back(handle);
+	active_tab = 0;
 	active_tab_dirty = true;
+}
+void GraphTabManager::go_up_layer()
+{
+	if (tabs.empty())
+		return;
+	auto t = tabs[0];
+	auto layer = editor.get_graph().get_layer(t);
+	if (layer) {
+		auto owner = editor.get_graph().get_node(layer->get_owner_node());
+		if (owner) {
+			history.push_back(t);
+			tabs.clear();
+			tabs.push_back(owner->layer);
+			active_tab_dirty = true;
+			active_tab = 0;
+		}
+	}
+
+}
+void GraphTabManager::go_down_layer()
+{
+	if (!history.empty()) {
+		auto b = history.back();
+		history.pop_back();
+		tabs.clear();
+		tabs.push_back(b);
+		active_tab = 0;
+		active_tab_dirty = true;
+	}
 }
 
 void GraphTabManager::close_tab(GraphLayerHandle handle)
@@ -582,6 +616,9 @@ static void draw_enum_editor(int& myval, const EnumTypeInfo* type) {
 #include "GraphUtil.h"
 void Base_EdNode::draw_imnode()
 {
+	if (is_link_attached_node())
+		return;
+
 	const Color32 nodecolor = get_node_color();
 	const string title = get_title();
 	const string subtitle = get_subtitle();
@@ -1667,4 +1704,85 @@ Color32 get_color_for_category(EdNodeCategory cat)
 		break;
 	}
 	return GraphUtil::add_brightness(out, 90);
+}
+NodeGraphLayer::TabNameAndBackground NodeGraphLayer::get_tab_name(EditorNodeGraph& graph)
+{
+	Color32 defualtcolor = { 50,50,50 };
+	if (!owner.is_valid()) {
+		return { "RootLayer",defualtcolor };
+	}
+	Base_EdNode* owner = graph.get_node(this->owner);
+	if (!owner) {
+		return { "NoOwner?",defualtcolor };
+	}
+	Color32 color = defualtcolor;
+	if (type==Statemachine)
+		color = { 20,10,0 };
+	else if (type == Transition)
+		color = { 0,10,40 };
+	return { owner->get_title(),color };
+}
+
+void AnimationGraphEditorNew::draw_layer_window()
+{
+	auto draw_layers_R = [](auto&& self, AnimationGraphEditorNew& editor,NodeGraphLayer* layer,  int tab) ->void {
+		EditorNodeGraph& graph = editor.get_graph();
+		auto& nodes = layer->get_nodes();
+		opt<GraphLayerHandle> handle = editor.tab_manager->get_active_tab();
+		const bool is_selected = handle.has_value() && handle.value() == layer->get_id();
+		auto[name,color] = layer->get_tab_name(graph);
+		color.r = 255 - color.r;
+		color.g = 255 - color.g;
+		color.b = 255 - color.b;
+
+
+		ImColor imcol = color.to_uint();
+
+
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+
+		//ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, imcol);
+
+		const float tabwidth = 5.f;
+		//ImGui::Dummy(ImVec2(tab * tabwidth, 0.f));
+		//ImGui::SameLine();
+		ImGui::PushID(layer);
+		ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+		if (ImGui::Selectable("##selectednode", is_selected, selectable_flags, ImVec2(0, 0))) {
+			editor.tab_manager->open_tab(layer->get_id(), true);
+		}
+		ImGui::PopID();
+		ImGui::SameLine();
+		string s;
+		for (int i = 0; i < tab; i++) s += ".";
+
+		ImGui::PushStyleColor(ImGuiCol_Text, ImU32(imcol));
+		ImGui::Text("%s", (s+name).c_str());
+		ImGui::PopStyleColor();
+
+		for (int i : nodes) {
+			GraphNodeHandle h(i);
+			Base_EdNode* e = graph.get_node(h);
+			if (e->get_owning_sublayer().is_valid()) {
+				NodeGraphLayer* sub = graph.get_layer(e->get_owning_sublayer());
+				if (sub) {
+					self(self, editor, sub, tab + 1);
+				}
+			}
+		}
+
+	};
+
+	if (ImGui::Begin("Layers")) {
+		ImGuiTableFlags const flags =  ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
+
+		if (ImGui::BeginTable("Table", 1, flags)) {
+			ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
+			draw_layers_R(draw_layers_R,*this, graph->get_root(), 0);
+			ImGui::EndTable();
+		}
+
+	}
+	ImGui::End();
 }

@@ -35,7 +35,12 @@ public:
 	}
 
 	virtual void draw(EditorNodeGraph& graph);
-	string get_tab_name() { return"empty"; }
+	struct TabNameAndBackground {
+		string name;
+		Color32 color;
+	};
+
+	TabNameAndBackground get_tab_name(EditorNodeGraph& graph);
 	void serialize(Serializer& s) override {}
 	Base_EdNode* get_owning_node();
 	ImNodesEditorContext* get_context() { return context; }
@@ -62,17 +67,22 @@ public:
 	const unordered_set<int>& get_nodes() const {
 		return layer_nodes;
 	}
-	void set_is_statemachine_layer(bool b) {
-		is_statemachine = b;
+	enum Type {
+		BlendTree,
+		Statemachine,
+		Transition
+	};
+	void set_layer_type(Type t) {
+		type = t;
 	}
-	bool get_is_statemachine_layer() const {
-		return is_statemachine;
+	Type get_layer_type() const {
+		return type;
 	}
 	bool contains(GraphNodeHandle h) const {
 		return layer_nodes.find(h.id) != layer_nodes.end();
 	}
 protected:
-	bool is_statemachine = false;
+	Type type = BlendTree;
 	GraphNodeHandle selected;
 
 	void handle_drag_drop();
@@ -169,6 +179,8 @@ public:
 	GraphTabManager(AnimationGraphEditorNew& editor) : editor(editor) {}
 	void draw();
 	void open_tab(GraphLayerHandle handle, bool set_active);
+	void go_down_layer();
+	void go_up_layer();
 	void close_tab(GraphLayerHandle handle);
 	opt<GraphLayerHandle> get_active_tab() const {
 		if (!active_tab.has_value())
@@ -191,6 +203,7 @@ private:
 	vector<GraphLayerHandle> tabs;
 	AnimationGraphEditorNew& editor;
 	glm::vec2 mouse_click_pos{};
+	vector<GraphLayerHandle> history;
 };
 
 class GraphPropertyWindow
@@ -339,6 +352,7 @@ private:
 	void delete_selected();
 	void dup_selected();
 	void resolve_any_types();
+	void draw_layer_window();
 
 	void post_map_load_callback() override{}
 	void init() override;

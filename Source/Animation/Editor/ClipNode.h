@@ -75,6 +75,10 @@ public:
 	GraphLayerHandle get_owning_sublayer() const override { return transition_graph; }
 	void set_owning_sublayer(GraphLayerHandle h) { transition_graph = h; }
 
+	string get_title() const override {
+		return "Transition";
+	}
+
 	REF float transition_time = 0.2;
 	REF Easing blend = Easing::Linear;
 	REF int8_t priority = 0;
@@ -95,6 +99,11 @@ public:
 	bool draw_links_as_arrows() final { return true; }
 	GraphLayerHandle get_owning_sublayer() const override { return state_graph; }
 	void set_owning_sublayer(GraphLayerHandle h) { state_graph = h; }
+	string get_title() const override {
+		if (is_entry_state)
+			return "EntryState";
+		return statename.empty() ? "State" : (statename);
+	}
 
 	REF string statename;
 	REF GraphLayerHandle state_graph;
@@ -125,6 +134,7 @@ public:
 
 	REFLECT(hide);
 	GraphLayerHandle sublayer;
+
 };
 
 class Variable_EdNode : public Base_EdNode

@@ -22,7 +22,8 @@ void Statemachine_EdNode::on_link_changes()  {
 	Base_EdNode::on_link_changes();
 
 	NodeGraphLayer& layer = LayerOwnerUtil::check_or_create_sublayer(sublayer, this, editor->get_graph());
-	layer.set_is_statemachine_layer(true);
+	layer.set_layer_type(NodeGraphLayer::Statemachine);
+
 }
 
 void Statemachine_EdNode::set_owning_sublayer(GraphLayerHandle h) {
@@ -232,7 +233,7 @@ void State_EdNode::on_link_changes()
 
 	{
 		NodeGraphLayer& layer = LayerOwnerUtil::check_or_create_sublayer(state_graph, this, editor->get_graph());
-		layer.set_is_statemachine_layer(false);
+		layer.set_layer_type(NodeGraphLayer::BlendTree);
 	}
 
 	// rules:
@@ -300,7 +301,8 @@ void StateTransition_EdNode::on_link_changes()
 {
 	Base_EdNode::on_link_changes();
 	NodeGraphLayer& layer = LayerOwnerUtil::check_or_create_sublayer(transition_graph, this, editor->get_graph());
-	layer.set_is_statemachine_layer(false);
+	layer.set_layer_type(NodeGraphLayer::Transition);
+
 }
 #include "Animation/AnimationSeqAsset.h"
 string Clip_EdNode::get_subtitle() const {
