@@ -68,6 +68,9 @@ public:
 	bool get_is_statemachine_layer() const {
 		return is_statemachine;
 	}
+	bool contains(GraphNodeHandle h) const {
+		return layer_nodes.find(h.id) != layer_nodes.end();
+	}
 protected:
 	bool is_statemachine = false;
 	GraphNodeHandle selected;
@@ -118,6 +121,8 @@ public:
 	const hash_map<Base_EdNode*>& get_nodes() {
 		return nodes;
 	}
+
+	void validate_nodes();
 private:
 
 	int get_next_id() {
@@ -310,8 +315,8 @@ public:
 
 
 	void add_command(Command* command);
-	bool is_node_selected(Base_EdNode& node) {
-		return false;
+	bool is_node_selected(Base_EdNode& node) const {
+		return SetUtil::contains(multiple_selected_last_frame, node.self.id);
 	}
 	const NodePrototypes& get_prototypes() {
 		return prototypes;
@@ -366,6 +371,7 @@ private:
 	void* imnodes_context = nullptr;
 
 	GraphNodeHandle selected_last_frame;
+	unordered_set<int> multiple_selected_last_frame;
 
 	NodeMenu animGraphMenu;
 	NodeMenu stateGraphMenu;

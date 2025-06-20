@@ -86,7 +86,7 @@ bool ClipNode::Inst::has_sync_group() const {
 	return owner.data.has_sync_group();
 }
 float ClipNode::Inst::get_speed() const {
-	return owner.data.speed;
+	return 0.0f;
 }
 void ClipNode::Inst::reset() {
 	anim_time = 0.0;

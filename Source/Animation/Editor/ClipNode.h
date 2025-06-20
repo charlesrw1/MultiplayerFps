@@ -46,7 +46,7 @@ class Clip_EdNode : public Base_EdNode
 public:
 	CLASS_BODY(Clip_EdNode);
 
-	Clip_EdNode(bool is_evaluator) {
+	Clip_EdNode(bool is_evaluator) :is_evaluator(is_evaluator){
 		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
 		if (is_evaluator)
 			add_in_port(0, "time").type = GraphPinType::Float;
@@ -57,17 +57,29 @@ public:
 		}
 	}
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimSource); }
+	string get_subtitle() const override;
+
+	bool is_evaluator = false;
 
 	REF stClipNode Data;
 };
-
+#include "Animation/Runtime/Statemachine_cfg.h"
 class StateTransition_EdNode : public Base_EdNode
 {
 public:
 	CLASS_BODY(StateTransition_EdNode);
 	StateTransition_EdNode() {
-
 	}
+	void on_link_changes() override;
+	bool is_link_attached_node() final { return true; }
+	GraphLayerHandle get_owning_sublayer() const override { return transition_graph; }
+	void set_owning_sublayer(GraphLayerHandle h) { transition_graph = h; }
+
+	REF float transition_time = 0.2;
+	REF Easing blend = Easing::Linear;
+	REF int8_t priority = 0;
+	REF bool auto_transition = false;
+	REF bool interruptable = false;
 	REF GraphLayerHandle transition_graph;
 };
 
@@ -81,9 +93,20 @@ public:
 	}
 	void on_link_changes() override;
 	bool draw_links_as_arrows() final { return true; }
+	GraphLayerHandle get_owning_sublayer() const override { return state_graph; }
+	void set_owning_sublayer(GraphLayerHandle h) { state_graph = h; }
 
 	REF string statename;
+	REF GraphLayerHandle state_graph;
 	bool is_entry_state = false;
+};
+class StateAlias_EdNode : public Base_EdNode {
+public:
+	CLASS_BODY(StateAlias_EdNode);
+	StateAlias_EdNode() {
+		add_out_port(0, "").type = GraphPinType::StateType;
+	}
+	bool draw_links_as_arrows() final { return true; }
 };
 
 class Statemachine_EdNode : public Base_EdNode
@@ -150,8 +173,9 @@ public:
 	MirrorPose_EdNode() {
 		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
 		add_in_port(0, "").type = GraphPinType::LocalSpacePose;
-		add_in_port(1, "alpha").type = GraphPinType::Float;
+		add_in_port(1, "mirror").type = GraphPinType::Boolean;
 	}
+	REF bool latch_on_reset = true;
 };
 
 class BlendInt_EdNode : public Base_EdNode {
@@ -174,8 +198,8 @@ class Ik2Bone_EdNode : public Base_EdNode {
 public:
 	CLASS_BODY(Ik2Bone_EdNode);
 	Ik2Bone_EdNode() {
-		add_out_port(0, "").type = GraphPinType::MeshSpacePose;
-		add_in_port(0, "pose").type = GraphPinType::MeshSpacePose;
+		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
+		add_in_port(0, "pose").type = GraphPinType::LocalSpacePose;
 		add_in_port(1, "target").type = GraphPinType::Vec3;
 		add_in_port(2, "pole").type = GraphPinType::Vec3;
 		add_in_port(3, "alpha").type = GraphPinType::Float;
@@ -187,8 +211,8 @@ class ModifyBone_EdNode : public Base_EdNode {
 public:
 	CLASS_BODY(ModifyBone_EdNode);
 	ModifyBone_EdNode() {
-		add_out_port(0, "").type = GraphPinType::MeshSpacePose;
-		add_in_port(0, "pose").type = GraphPinType::MeshSpacePose;
+		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
+		add_in_port(0, "pose").type = GraphPinType::LocalSpacePose;
 		add_in_port(1, "translation").type = GraphPinType::Vec3;
 		add_in_port(2, "rotation").type = GraphPinType::Quat;
 		add_in_port(3, "alpha").type = GraphPinType::Float;
@@ -208,14 +232,17 @@ public:
 		DidEventStart,
 		DidEventEnd,
 		IsEventActive,
+		StateTimeRemaining,
+		StateDuration,
 		BreakVec3,
 		BreakVec2,
 		MakeVec3,
 		MakeVec2,
 		ReturnPose,
 		ReturnTransition,
+		EntryState,
 	};
-	Func_EdNode(Type t) {
+	Func_EdNode(Type t) :myType(t){
 		switch (t)
 		{
 		case Func_EdNode::GetCurve:
@@ -252,10 +279,22 @@ public:
 		case Func_EdNode::ReturnTransition:
 			add_in_port(0, "").type = GraphPinType::Boolean;
 			break;
+		case Func_EdNode::EntryState:
+			add_out_port(0, "").type = GraphPinType::StateType;
+			break;
+
+		case Func_EdNode::StateTimeRemaining:
+			add_out_port(0, "").type = GraphPinType::Float;
+			break;
+		case Func_EdNode::StateDuration:
+			add_out_port(0, "").type = GraphPinType::Float;
+			break;
 		default:
 			break;
 		}
 	}
+	Type myType{};
+	bool draw_links_as_arrows() override { return myType == Func_EdNode::EntryState; }
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Function); }
 };
 class FloatMathFuncs_EdNode : public Base_EdNode {

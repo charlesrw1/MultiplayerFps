@@ -4,7 +4,7 @@
 #include "Framework/SerializerJson.h"
 
 
-void GraphCommandUtil::add_link(GraphLink link, EditorNodeGraph& graph)
+void GraphCommandUtil::add_link(GraphLink link, EditorNodeGraph& graph, GraphNodeHandle link_node)
 {
 	Base_EdNode* outn = graph.get_node(link.output.get_node());
 	Base_EdNode* inn = graph.get_node(link.input.get_node());
@@ -14,6 +14,13 @@ void GraphCommandUtil::add_link(GraphLink link, EditorNodeGraph& graph)
 	if (!index.has_value()) {
 		inn->add_link(link);
 	//	inn->on_link_changes();
+	}
+	if (link_node.is_valid()) {
+		index = inn->find_link_idx_from_port(link.input);
+		assert(index.has_value());
+		auto& l = inn->links.at(index.value());
+		assert(!l.opt_link_node.is_valid() || l.opt_link_node == link_node);
+		l.opt_link_node = link_node;
 	}
 	index = outn->find_link_idx_from_port(link.input);
 	if (!index.has_value()) {
@@ -76,6 +83,7 @@ bool GraphCommandUtil::can_connect_these_ports(GraphLink link, EditorNodeGraph& 
 
 void GraphCommandUtil::remove_link(GraphLink link, EditorNodeGraph& graph)
 {
+	printf("removing link\n");
 	Base_EdNode* inn = graph.get_node(link.input.get_node());
 	Base_EdNode* outn = graph.get_node(link.output.get_node());
 	if (inn) {
@@ -106,7 +114,7 @@ AddLinkCommand::AddLinkCommand(AnimationGraphEditorNew& ed, GraphPortHandle inpu
 }
 void AddLinkCommand::execute()
 {
-	GraphCommandUtil::add_link(link, ed.get_graph());
+	GraphCommandUtil::add_link(link, ed.get_graph(), GraphNodeHandle());
 	ed.on_node_changes.invoke();
 }
 void AddLinkCommand::undo()
@@ -156,7 +164,11 @@ RemoveGraphObjectsCommand::RemoveGraphObjectsCommand(AnimationGraphEditorNew& ed
 	for (int l : link_ids) {
 		opt<GraphLink> link = GraphCommandUtil::get_graph_link_from_linkid(l,ed.get_graph());
 		if (link.has_value()) {
-			this->links.push_back(link.value());
+			auto node = link->input.get_node_ptr(ed.get_graph());
+			assert(node);
+			opt<int> idx = node->get_link_index(link.value());
+			assert(idx.has_value());
+			this->links.push_back(node->links.at(idx.value()));
 		}
 	}
 }
@@ -165,8 +177,8 @@ void RemoveGraphObjectsCommand::execute()
 {
 	auto& graph = ed.get_graph();
 	// have to remove all objects, including sub graph objects
-	for (GraphLink link : this->links) {
-		GraphCommandUtil::remove_link(link,graph);
+	for (GraphLinkWithNode link : this->links) {
+		GraphCommandUtil::remove_link(link.link,graph);
 	}
 	for (int n : this->nodes) {
 		GraphNodeHandle h(n);
@@ -185,8 +197,8 @@ void RemoveGraphObjectsCommand::undo()
 		return;
 	}
 	ed.get_graph().insert_nodes(*unserialized);
-	for (GraphLink link : links) {
-		GraphCommandUtil::add_link(link, ed.get_graph());
+	for (GraphLinkWithNode link : links) {
+		GraphCommandUtil::add_link(link.link, ed.get_graph(), link.opt_link_node);
 	}
 
 	ed.on_node_changes.invoke();

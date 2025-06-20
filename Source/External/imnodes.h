@@ -289,7 +289,7 @@ void PushStyleVar(ImNodesStyleVar style_item, const ImVec2& value);
 void PopStyleVar(int count = 1);
 
 // id can be any positive or negative integer, but INT_MIN is currently reserved for internal use.
-void BeginNode(int id);
+void BeginNode(int id, bool is_state_node);
 void EndNode();
 void BeginComment(int id);
 void EndComment();
@@ -299,7 +299,7 @@ ImVec2 GetNodeDimensions(int id);
 // Place your node title bar content (such as the node title, using ImGui::Text) between the
 // following function calls. These functions have to be called before adding any attributes, or the
 // layout of the node will be incorrect.
-void BeginNodeTitleBar();
+void BeginNodeTitleBar(ImTextureID titlebarTexture);
 void EndNodeTitleBar();
 
 // Attributes are ImGui UI elements embedded within the node. Attributes can have pin shapes

@@ -48,7 +48,6 @@ struct stClipNode {
 	bool has_sync_group() const {
 		return !SyncGroup.is_null();
 	}
-	REF float speed = 1.0;
 	REF int start_frame = 0;
 };
 

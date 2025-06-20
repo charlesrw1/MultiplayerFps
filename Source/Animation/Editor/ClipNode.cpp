@@ -1,17 +1,28 @@
 #include "ClipNode.h"
 #include "AnimationGraphEditor2.h"
+
+
+class LayerOwnerUtil
+{
+public:
+	static NodeGraphLayer& check_or_create_sublayer(GraphLayerHandle& handle, Base_EdNode* self, EditorNodeGraph& graph) {
+		if (!handle.is_valid()) {
+			NodeGraphLayer* layer = graph.create_layer();
+			layer->set_owner_node(self->self);
+			handle = layer->get_id();
+			printf("created sublayer %d\n", handle.id);
+		}
+		NodeGraphLayer* layer = graph.get_layer(handle);
+		assert(layer && layer->get_owner_node() == self->self);
+		return *layer;
+	}
+};
+
 void Statemachine_EdNode::on_link_changes()  {
 	Base_EdNode::on_link_changes();
 
-	if (!sublayer.is_valid()) {
-		NodeGraphLayer* layer = editor->get_graph().create_layer();
-		layer->set_owner_node(self);
-		sublayer = layer->get_id();
-		printf("created sublayer %d\n",sublayer.id);
-	}
-	NodeGraphLayer* layer = editor->get_graph().get_layer(sublayer);
-	assert(layer && layer->get_owner_node() == self);
-	layer->set_is_statemachine_layer(true);
+	NodeGraphLayer& layer = LayerOwnerUtil::check_or_create_sublayer(sublayer, this, editor->get_graph());
+	layer.set_is_statemachine_layer(true);
 }
 
 void Statemachine_EdNode::set_owning_sublayer(GraphLayerHandle h) {
@@ -181,6 +192,7 @@ FloatMathFuncs_EdNode::FloatMathFuncs_EdNode(Type t) {
 	case Type::Abs:
 		add_out_port(0, "").type = GraphPinType::Float;
 		add_in_port(0, "").type = GraphPinType::Float;
+		break;
 	case Type::Remap: {
 		add_out_port(0, "").type = GraphPinType::Float;
 		add_in_port(0, "value").type = GraphPinType::Float;
@@ -216,4 +228,83 @@ FloatMathFuncs_EdNode::FloatMathFuncs_EdNode(Type t) {
 
 void State_EdNode::on_link_changes()
 {
+	Base_EdNode::on_link_changes();
+
+	{
+		NodeGraphLayer& layer = LayerOwnerUtil::check_or_create_sublayer(state_graph, this, editor->get_graph());
+		layer.set_is_statemachine_layer(false);
+	}
+
+	// rules:
+	// ensure that all links are valid
+	// ensure that there is 1 input pin available
+	// ensure that links have a graph subobject
+
+	for (int i = 0; i < links.size(); i++) {
+		GraphLink l = links.at(i).link;
+		if (!l.self_is_input(self)) {
+			continue;
+		}
+		const GraphPort* other = get_other_nodes_port(l);
+		assert(other);
+		// self is input
+		const GraphPort* my = get_my_node_port(l);
+		if (!my) {
+			auto myport = l.get_self_port(self);
+			add_in_port(myport.get_index(), "").type = GraphPinType::StateType;
+		}
+		assert(get_my_node_port(l) != nullptr);
+
+		if (!links.at(i).opt_link_node.is_valid()) {
+			StateTransition_EdNode* transition = new StateTransition_EdNode;
+			editor->get_graph().insert_new_node(*transition, layer, {});
+			links.at(i).opt_link_node = transition->self;
+		}
+
+	}
+	bool found_empty = false;
+	for (int i = 0; i < ports.size(); i++) {
+		const GraphPort& p = ports[i];
+		if (p.is_output())
+			continue;
+		opt<GraphLink> gl = find_link_from_port(p.get_handle(self));
+		if (!gl.has_value()) {
+			found_empty = true;
+			break;
+		}
+	}
+	if (!found_empty) {
+		vector<int> inputs, output;
+		get_ports(inputs, output);
+		assert(inputs.size() <= MAX_INPUTS);
+		unordered_set<int> indicies;
+		for (auto i : inputs)
+			indicies.insert(ports.at(i).index);
+		bool found = false;
+		for (int i = 0; i < MAX_INPUTS; i++) {
+			if (indicies.find(i) == indicies.end()) {
+				add_in_port(i, "").type = GraphPinType::StateType;
+				found = true;
+				break;
+			}
+		}
+		if (!found) {
+			printf("State node is full\n");
+		}
+	}
+
+	//remove_links_without_port();
+}
+
+void StateTransition_EdNode::on_link_changes()
+{
+	Base_EdNode::on_link_changes();
+	NodeGraphLayer& layer = LayerOwnerUtil::check_or_create_sublayer(transition_graph, this, editor->get_graph());
+	layer.set_is_statemachine_layer(false);
+}
+#include "Animation/AnimationSeqAsset.h"
+string Clip_EdNode::get_subtitle() const {
+	if (Data.Clip.get())
+		return Data.Clip.get()->get_name();
+	return "";
 }

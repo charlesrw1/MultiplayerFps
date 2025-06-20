@@ -141,11 +141,14 @@ struct ImNodeData
     bool is_comment = false;                //------ > ADDITION
     ImVec2 CommentSize = ImVec2(20, 20);    //------ > ADDITION
 
+    bool is_statenode = false;  //------ > ADDITON
+
     struct
     {
         ImU32 Background, BackgroundHovered, BackgroundSelected, Outline, Titlebar, TitlebarHovered,
             TitlebarSelected;
     } ColorStyle;
+    ImTextureID titlebarImage = nullptr;
 
     struct
     {

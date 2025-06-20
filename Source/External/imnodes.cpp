@@ -205,7 +205,18 @@ static ImNodes::CubicBezier GetCubicBezier_Replacement(const ImPinData& start, c
     const ImNodeData& parent_end = editor.Nodes.Pool[end.ParentNodeIdx];
     ImVec2 ray_start, ray_end;
     closest_ray_between_rects(parent_start.Rect.Min, parent_start.Rect.Max, parent_end.Rect.Min, parent_end.Rect.Max, ray_start, ray_end, link.direct_line_offset);
+    ImVec2 dir = ray_end - ray_start;
+    dir = dir / sqrt(ImLengthSqr(dir));
 
+    return GetCubicBezier(ray_start+ dir*10.f, ray_end, start.Type, GImNodes->Style.LinkLineSegmentsPerLength, false);
+}
+static ImNodes::CubicBezier GetCubicBezier_Replacement_EndPos(const ImPinData& start, const ImVec2& endpos)
+{
+    const ImNodesEditorContext& editor = ImNodes::EditorContextGet();
+    const ImNodeData& parent_start = editor.Nodes.Pool[start.ParentNodeIdx];
+    ImVec2 ray_start, ray_end;
+    ray_end = endpos;
+    ray_start = ImClamp(endpos, parent_start.Rect.Min, parent_start.Rect.Max);
     return GetCubicBezier(ray_start, ray_end, start.Type, GImNodes->Style.LinkLineSegmentsPerLength, false);
 }
 
@@ -1044,6 +1055,21 @@ ImOptionalIndex FindDuplicateLink(
 
     return ImOptionalIndex();
 }
+bool is_pin_attached(ImNodesEditorContext& editor,const int pinIdx)
+{
+    for (int link_idx = 0; link_idx < editor.Links.Pool.size(); ++link_idx)
+    {
+        if (!editor.Links.InUse[link_idx]){
+            continue;
+        }
+        const ImLinkData& link = editor.Links.Pool[link_idx];
+        if (link.StartPinIdx == pinIdx || link.EndPinIdx == pinIdx)
+            return true;
+    }
+    return false;
+}
+
+
 
 bool ShouldLinkSnapToPin(
     const ImNodesEditorContext& editor,
@@ -1075,7 +1101,7 @@ bool ShouldLinkSnapToPin(
 
     return true;
 }
-
+CubicBezier get_cubic_bezier_for_created_new(const ImPinData& start_pin, const ImVec2& end, bool is_arrow);
 void ClickInteractionUpdate(ImNodesEditorContext& editor)
 {
     switch (editor.ClickInteraction.Type)
@@ -1162,6 +1188,8 @@ void ClickInteractionUpdate(ImNodesEditorContext& editor)
         const ImPinData& start_pin =
             editor.Pins.Pool[editor.ClickInteraction.LinkCreation.StartPinIdx];
 
+        const ImNodeData& node_of_pin = editor.Nodes.Pool[start_pin.ParentNodeIdx];
+
         const ImOptionalIndex maybe_duplicate_link_idx =
             GImNodes->HoveredPinIdx.HasValue()
                 ? FindDuplicateLink(
@@ -1198,20 +1226,21 @@ void ClickInteractionUpdate(ImNodesEditorContext& editor)
                                          editor, editor.Pins.Pool[GImNodes->HoveredPinIdx.Value()])
                                    : GImNodes->MousePos;
 
-        const CubicBezier cubic_bezier = GetCubicBezier(
-            start_pos, end_pos, start_pin.Type, GImNodes->Style.LinkLineSegmentsPerLength,true);
+        const CubicBezier cubic_bezier = get_cubic_bezier_for_created_new(
+            start_pin, end_pos, node_of_pin.is_statenode);
 #if IMGUI_VERSION_NUM < 18000
         GImNodes->CanvasDrawList->AddBezierCurve(
 #else
-        GImNodes->CanvasDrawList->AddBezierCubic(
+       GImNodes->CanvasDrawList->AddBezierCubic(
 #endif
-            cubic_bezier.P0,
-            cubic_bezier.P1,
-            cubic_bezier.P2,
-            cubic_bezier.P3,
-            GImNodes->Style.Colors[ImNodesCol_Link],
-            GImNodes->Style.LinkThickness,
-            cubic_bezier.NumSegments);
+                cubic_bezier.P0,
+                cubic_bezier.P1,
+                cubic_bezier.P2,
+                cubic_bezier.P3,
+                GImNodes->Style.Colors[ImNodesCol_Link],
+                GImNodes->Style.LinkThickness,
+                cubic_bezier.NumSegments);
+
 
         const bool link_creation_on_snap =
             GImNodes->HoveredPinIdx.HasValue() &&
@@ -1223,7 +1252,7 @@ void ClickInteractionUpdate(ImNodesEditorContext& editor)
             editor.ClickInteraction.LinkCreation.EndPinIdx.Reset();
         }
 
-        const bool create_link =
+        bool create_link =
             should_snap && (GImNodes->LeftMouseReleased || link_creation_on_snap);
 
         if (create_link && !maybe_duplicate_link_idx.HasValue())
@@ -1238,6 +1267,23 @@ void ClickInteractionUpdate(ImNodesEditorContext& editor)
 
             GImNodes->ImNodesUIState |= ImNodesUIState_LinkCreated;
             editor.ClickInteraction.LinkCreation.EndPinIdx = GImNodes->HoveredPinIdx.Value();
+        }
+
+        if (GImNodes->LeftMouseReleased && node_of_pin.is_statenode && GImNodes->HoveredNodeIdx.HasValue()) {
+            const ImNodeData& hoveredNode = editor.Nodes.Pool[GImNodes->HoveredNodeIdx.Value()];
+            if (hoveredNode.is_statenode&&&hoveredNode!=&node_of_pin) {
+                // find input
+                for (int i = 0; i < hoveredNode.PinIndices.size(); i++) {
+                    const int pin_index = hoveredNode.PinIndices[i];
+                    const ImPinData& pin = editor.Pins.Pool[pin_index];
+                    if ((pin.Type == ImNodesAttributeType_Input) && !is_pin_attached(editor, pin_index)) {
+                        editor.ClickInteraction.LinkCreation.EndPinIdx = pin_index;
+                        create_link = true;
+                        GImNodes->ImNodesUIState |= ImNodesUIState_LinkCreated;
+                        break;
+                    }
+                }
+            }
         }
 
         if (GImNodes->LeftMouseReleased)
@@ -1385,6 +1431,7 @@ ImOptionalIndex ResolveHoveredNode(const ImVector<int>& depth_stack)
     IM_ASSERT(node_idx_on_top != -1);
     return ImOptionalIndex(node_idx_on_top);
 }
+
 
 ImOptionalIndex ResolveHoveredLink(
     const ImObjectPool<ImLinkData>& links,
@@ -1694,6 +1741,15 @@ void DrawNode(ImNodesEditorContext& editor, const int node_idx)
             node.Rect.Min, node.Rect.Max, node_background, node.LayoutStyle.CornerRounding);
 
         GImNodes->CanvasDrawList->AddTriangleFilled(commentrect.Max - ImVec2(0, COMMENT_RECT_SIZE), commentrect.Max, commentrect.Max - ImVec2(COMMENT_RECT_SIZE, 0), ImColor(180, 180, 180, 200));
+   
+        // outline
+        GImNodes->CanvasDrawList->AddRect(
+            commentrect.Min,
+            commentrect.Max,
+            node.ColorStyle.Outline,
+            0.0,
+            ImDrawFlags_RoundCornersAll,
+            node.LayoutStyle.BorderThickness);
     }
     else
     {
@@ -1714,13 +1770,24 @@ void DrawNode(ImNodesEditorContext& editor, const int node_idx)
                 node.LayoutStyle.CornerRounding,
                 ImDrawCornerFlags_Top);
 #else
-            GImNodes->CanvasDrawList->AddRectFilled(
-                title_bar_rect.Min,
-                title_bar_rect.Max,
-                titlebar_background,
-                node.LayoutStyle.CornerRounding,
-                ImDrawFlags_RoundCornersTop);
-
+            if (node.titlebarImage!=nullptr) {
+                GImNodes->CanvasDrawList->AddImageRounded(
+                    node.titlebarImage,
+                    title_bar_rect.Min,
+                    title_bar_rect.Max,
+                    ImVec2(0,0),ImVec2(1,1),
+                    titlebar_background,
+                    node.LayoutStyle.CornerRounding,
+                    ImDrawFlags_RoundCornersTop);
+            }
+            else {
+                GImNodes->CanvasDrawList->AddRectFilled(
+                    title_bar_rect.Min,
+                    title_bar_rect.Max,
+                    titlebar_background,
+                    node.LayoutStyle.CornerRounding,
+                    ImDrawFlags_RoundCornersTop);
+            }
 #endif
         }
 
@@ -1748,6 +1815,9 @@ void DrawNode(ImNodesEditorContext& editor, const int node_idx)
 
     for (int i = 0; i < node.PinIndices.size(); ++i)
     {
+        const ImPinData& pin = editor.Pins.Pool[node.PinIndices[i]];
+        if (pin.Type == ImNodesAttributeType_Input && node.is_statenode)
+            continue;
         DrawPin(editor, node.PinIndices[i]);
     }
 
@@ -1757,6 +1827,57 @@ void DrawNode(ImNodesEditorContext& editor, const int node_idx)
     }
 }
 
+// get bezier for:
+// normal bezier, arrow
+// minimap, non minmap
+// for final nodes, for link creation node
+
+CubicBezier get_cubic_bezier_from_pins_new(const ImPinData& start_pin, const ImPinData& end_pin, const ImLinkData& link)
+{
+    CubicBezier out;
+    if (link.use_direct_line)
+        out = GetCubicBezier_Replacement(start_pin, end_pin, link);
+    else
+        out = GetCubicBezier(
+            start_pin.Pos, end_pin.Pos, start_pin.Type, GImNodes->Style.LinkLineSegmentsPerLength, true);
+    return out;
+}
+CubicBezier get_cubic_bezier_for_created_new(const ImPinData& start_pin, const ImVec2& end, bool is_arrow)
+{
+    CubicBezier out;
+    if (is_arrow)
+        out = GetCubicBezier_Replacement_EndPos(start_pin, end);
+    else
+        out = GetCubicBezier(
+            start_pin.Pos, end, start_pin.Type, GImNodes->Style.LinkLineSegmentsPerLength);
+    return out;
+}
+
+
+void draw_arrow_triangle(CubicBezier& bezier,ImU32 link_color)
+{
+    ImVec2 rayvec = bezier.P3 - bezier.P0;
+    if (ImLengthSqr(rayvec) > 0.00001) {
+        float len = sqrt(ImLengthSqr(rayvec));
+        rayvec /= len;
+        ImVec2 sidevec = ImVec2(rayvec.y, -rayvec.x);
+
+        ImVec2 tip = bezier.P3 + rayvec * 7.0;
+        ImVec2 base = tip + (rayvec * -12.f);
+        GImNodes->CanvasDrawList->AddTriangleFilled(
+            tip,
+            base,
+            base + (rayvec * -3.f + sidevec*9.f),
+            link_color
+        );
+        GImNodes->CanvasDrawList->AddTriangleFilled(
+            tip,
+            base + (rayvec * -3.f - sidevec*9.f),
+            base,
+            link_color
+        );
+    }
+}
 
 void DrawLink(ImNodesEditorContext& editor, const int link_idx)
 {
@@ -1764,12 +1885,8 @@ void DrawLink(ImNodesEditorContext& editor, const int link_idx)
     const ImPinData&  start_pin = editor.Pins.Pool[link.StartPinIdx];
     const ImPinData&  end_pin = editor.Pins.Pool[link.EndPinIdx];
 
-    CubicBezier cubic_bezier;
-    if (link.use_direct_line)
-        cubic_bezier = GetCubicBezier_Replacement(start_pin, end_pin, link);
-    else
-        cubic_bezier = GetCubicBezier(
-            start_pin.Pos, end_pin.Pos, start_pin.Type, GImNodes->Style.LinkLineSegmentsPerLength, true);
+    CubicBezier cubic_bezier = get_cubic_bezier_from_pins_new(start_pin, end_pin, link);
+
     const bool link_hovered =
         GImNodes->HoveredLinkIdx == link_idx &&
         editor.ClickInteraction.Type != ImNodesClickInteractionType_BoxSelection;
@@ -1800,24 +1917,8 @@ void DrawLink(ImNodesEditorContext& editor, const int link_idx)
     }
 
     if (link.use_direct_line) {
-        ImVec2 rayvec = cubic_bezier.P3 - cubic_bezier.P0;
-        if (ImLengthSqr(rayvec) > 0.00001) {
-            float len = sqrt(ImLengthSqr(rayvec));
-            rayvec /= len;
-            ImVec2 sidevec = ImVec2(rayvec.y, -rayvec.x);
-
-            ImVec2 arrowvec = rayvec*-1.8f + sidevec;
-
-            ImVec2 tip = cubic_bezier.P3 + rayvec * 4.0;
-            GImNodes->CanvasDrawList->AddTriangleFilled(
-                tip,
-                tip + (rayvec * -1.8f - sidevec)*10.0,
-                tip + (rayvec * -1.8f + sidevec)*10.0,
-                link_color
-            );
-        }
-}
-
+        draw_arrow_triangle(cubic_bezier,link_color);
+    }
 
 #if IMGUI_VERSION_NUM < 18000
     GImNodes->CanvasDrawList->AddBezierCurve(
@@ -2769,7 +2870,7 @@ void EndComment()
     EndNode();
 }
 
-void BeginNode(const int node_id)
+void BeginNode(const int node_id, bool is_state_node)
 {
     // Remember to call BeginNodeEditor before calling BeginNode
     IM_ASSERT(GImNodes->CurrentScope == ImNodesScope_Editor);
@@ -2782,6 +2883,8 @@ void BeginNode(const int node_id)
 
     ImNodeData& node = editor.Nodes.Pool[node_idx];
     node.is_comment = false;
+    node.is_statenode = is_state_node;
+
     node.ColorStyle.Background = GImNodes->Style.Colors[ImNodesCol_NodeBackground];
     node.ColorStyle.BackgroundHovered = GImNodes->Style.Colors[ImNodesCol_NodeBackgroundHovered];
     node.ColorStyle.BackgroundSelected = GImNodes->Style.Colors[ImNodesCol_NodeBackgroundSelected];
@@ -2857,10 +2960,14 @@ ImVec2 GetNodeDimensions(int node_id)
     return node.Rect.GetSize();
 }
 
-void BeginNodeTitleBar()
+void BeginNodeTitleBar(ImTextureID titlebarTexture)
 {
     IM_ASSERT(GImNodes->CurrentScope == ImNodesScope_Node);
     ImGui::BeginGroup();
+
+    ImNodesEditorContext& editor = EditorContextGet();
+    ImNodeData& node = editor.Nodes.Pool[GImNodes->CurrentNodeIdx];
+    node.titlebarImage = titlebarTexture;
 }
 
 void EndNodeTitleBar()

@@ -121,10 +121,6 @@ void Serializer::serialize_property(PropertyPtr ptr)
 		auto& ref = ptr.as_string();
 		serialize(ptr.get_name(), ref);
 	}
-	else if (ptr.is_enum()) {
-		//int32_t i = ptr.as_enum().get_as_integer();
-		//serialize(ptr.get_name(), i);
-	}
 	else {
 		switch (ptr.get_type()) {
 		case core_type_id::Bool: {

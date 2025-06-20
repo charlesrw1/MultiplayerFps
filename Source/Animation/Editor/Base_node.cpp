@@ -142,6 +142,8 @@ GraphNodeHandle Base_EdNode::remove_link(GraphLink link) {
 	}
 }
 GraphPort& Base_EdNode::add_in_port(int index, string name) {
+	assert(!find_my_port_idx(index, false).has_value());
+
 	GraphPort p;
 	p.index = index;
 	p.output_port = false;
@@ -150,6 +152,8 @@ GraphPort& Base_EdNode::add_in_port(int index, string name) {
 	return ports.back();
 }
 GraphPort& Base_EdNode::add_out_port(int index, string name) {
+	assert(!find_my_port_idx(index, true).has_value());
+
 	GraphPort p;
 	p.output_port = true;
 	p.index = index;

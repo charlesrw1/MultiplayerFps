@@ -21,11 +21,6 @@
 using std::variant;
 
 struct ImNodesEditorContext;
-struct editor_layer {
-	ImNodesEditorContext* context = nullptr;
-	int id = 1;
-};
-
 const int MAX_INPUTS = 32;
 const int MAX_NODES_IN_GRAPH = (1 << 14);
 const int INPUT_START = MAX_NODES_IN_GRAPH;
@@ -274,18 +269,21 @@ public:
 		return name;
 	}
 	// get title to use for node in graph
-	virtual std::string get_title() const { return get_name(); }
+	virtual string get_title() const { return get_name(); }
+	virtual string get_subtitle() const { return ""; }
+
 	virtual std::string get_tooltip() const { return ""; }
 	virtual void draw_node_topbar() { }
 	virtual bool has_top_bar() { return true; }
 
 	virtual std::string get_layer_tab_title() const { return ""; }
 	virtual void on_post_edit() {}
-	virtual Color32 get_node_color() const { return { 23, 82, 12 }; }
+	virtual Color32 get_node_color() const { return get_color_for_category(EdNodeCategory::None); }
 	virtual GraphLayerHandle get_owning_sublayer() const { return GraphLayerHandle(); }
 	virtual void set_owning_sublayer(GraphLayerHandle h) { }
 	virtual void on_property_changes() {}
 	virtual bool draw_links_as_arrows() { return false; }
+	virtual bool is_link_attached_node() { return false; }
 
 	GraphPortHandle getinput_id(int inputslot) const {
 		return inputslot + self.id * MAX_INPUTS + INPUT_START;

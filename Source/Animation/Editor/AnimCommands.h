@@ -9,7 +9,7 @@ class GraphCommandUtil
 {
 public:
 	static void remove_link(GraphLink link, EditorNodeGraph& graph);
-	static void add_link(GraphLink link, EditorNodeGraph& graph);
+	static void add_link(GraphLink link, EditorNodeGraph& graph, GraphNodeHandle link_node);
 	static GraphPortHandle get_input_port_from_link(int id);
 	static opt<GraphLink> get_graph_link_from_linkid(int id, EditorNodeGraph& graph);
 	static void get_selected(vector<int>& link_ids, vector<int>& node_ids);
@@ -59,7 +59,8 @@ public:
 	void undo() override;
 	std::string to_string() override;
 	string serialized;
-	vector<GraphLink> links;
+
+	vector<GraphLinkWithNode> links;
 	vector<int> nodes;
 	AnimationGraphEditorNew& ed;
 };
