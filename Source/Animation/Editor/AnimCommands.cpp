@@ -208,47 +208,67 @@ std::string RemoveGraphObjectsCommand::to_string()
 {
 	return "RemoveGraphObjectsCommand";
 }
-
-DuplicateNodesCommand::DuplicateNodesCommand(AnimationGraphEditorNew& ed, vector<int> node_ids)
-	: ed(ed)
+using GCU=GraphCommandUtil;
+opt<GCU::Clipboard> GCU::create_clipboard(const vector<int>& node_ids, AnimationGraphEditorNew& ed)
 {
+	auto& graph = ed.get_graph();
+
 	if (node_ids.empty())
-		return;
-	Base_EdNode* first = ed.get_graph().get_node(node_ids.at(0));
+		return std::nullopt;
+	Base_EdNode* first = graph.get_node(node_ids.at(0));
 	if (!first)
-		return;
+		return std::nullopt;
 	GraphLayerHandle layer = first->layer;
 	for (int i = 1; i < node_ids.size(); i++) {
-		if (ed.get_graph().get_node(node_ids[i])->layer != layer)
-			return;
+		if (graph.get_node(node_ids[i])->layer != layer)
+			std::nullopt;
 	}
+	Clipboard out;
+	SerializeGraphContainer container = SerializeGraphUtils::make_container_from_nodeids(node_ids, {}, graph);
+	out.serialized = SerializeGraphUtils::serialize_to_string(container, ed.get_graph(), ed.get_prototypes());
+	printf("%s\n", out.serialized.c_str());
+	for (auto i : node_ids) {
+		out.orig_nodes.insert(i);
+		Base_EdNode* node = graph.get_node(GraphNodeHandle(i));
+		assert(node);
+		for (auto& l : node->links) {
+			if (l.opt_link_node.is_valid())
+				out.orig_nodes.insert(l.opt_link_node.id);
+		}
+	}
+	return out;
+}
+void GCU::undo_paste(vector<GraphNodeHandle>& nodes_to_delete, AnimationGraphEditorNew& ed)
+{
+	for (auto n : nodes_to_delete)
+		ed.get_graph().remove_node(n);
+	nodes_to_delete.clear();
 
-	SerializeGraphContainer container = SerializeGraphUtils::make_container_from_nodeids(node_ids, {}, ed.get_graph());
-	serialized = SerializeGraphUtils::serialize_to_string(container, ed.get_graph(), ed.get_prototypes());
-	printf("%s\n", serialized.c_str());
-	for (auto i : node_ids)
-		orig_nodes.insert(i);
-	is_node_valid = true;
+	ed.on_node_changes.invoke();
 }
 
-void DuplicateNodesCommand::execute()
+vector<GraphNodeHandle> GCU::paste_clipboard(const GCU::Clipboard& clipboard, opt<GraphLayerHandle> whatlayer, AnimationGraphEditorNew& ed)
 {
-	auto unserialized = SerializeGraphUtils::unserialize(serialized, ed.get_prototypes());
+	printf("pasting clipboard\n");
+	auto unserialized = SerializeGraphUtils::unserialize(clipboard.serialized, ed.get_prototypes());
 	if (!unserialized) {
 		LOG_WARN("couldnt unserialize");
-		return;
+		return{};
 	}
 	vector<Base_EdNode*> rootnodes;
 	for (auto n : unserialized->nodes) {
-		if (SetUtil::contains(orig_nodes, n->self.id)) {
+		if (SetUtil::contains(clipboard.orig_nodes, n->self.id)) {
+			if (whatlayer.has_value())
+				n->layer = *whatlayer;
 			n->nodex += 50;
 			n->nodey += 50;
-			rootnodes.push_back(n);
+			if(!n->is_link_attached_node())
+				rootnodes.push_back(n);
 		}
 	}
 
 	ed.get_graph().insert_nodes_with_new_id(*unserialized);
-	nodes_to_delete.clear();
+	vector<GraphNodeHandle> nodes_to_delete;
 	for (auto n : unserialized->nodes) {
 		nodes_to_delete.push_back(n->self);
 	}
@@ -260,15 +280,32 @@ void DuplicateNodesCommand::execute()
 	}
 
 	ed.on_node_changes.invoke();
+
+	return nodes_to_delete;
 }
 
-void DuplicateNodesCommand::undo()
+DuplicateNodesCommand::DuplicateNodesCommand(AnimationGraphEditorNew& ed, vector<int> node_ids)
 {
-	for (auto n : nodes_to_delete)
-		ed.get_graph().remove_node(n);
-	nodes_to_delete.clear();
+	opt<GCU::Clipboard> res = GCU::create_clipboard(node_ids, ed);
+	if (!res.has_value())
+		return;
+	pasteCommand = std::make_unique<PasteNodeClipboardCommand>(ed,std::nullopt, res.value());
+}
+PasteNodeClipboardCommand::PasteNodeClipboardCommand(AnimationGraphEditorNew& ed, opt<GraphLayerHandle> whatlayer, const GraphCommandUtil::Clipboard& clipboard)
+	: ed(ed)
+{
+	this->whatLayer = whatlayer;
+	this->clipboard = clipboard;
+}
 
-	ed.on_node_changes.invoke();
+void PasteNodeClipboardCommand::execute()
+{
+	nodes_to_delete = GCU::paste_clipboard(clipboard,whatLayer, ed);
+}
+
+void PasteNodeClipboardCommand::undo()
+{
+	GCU::undo_paste(nodes_to_delete, ed);
 }
 
 std::string DuplicateNodesCommand::to_string()

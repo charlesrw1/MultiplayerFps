@@ -57,6 +57,10 @@ bind "D" Shift "anim.dup"
 bind "Delete" "anim.del"
 bind "Left" Alt "anim.up_layer"
 bind "Right" Alt "anim.down_layer"
+bind "C" Ctrl "anim.copy"
+bind "V" Ctrl "anim.paste"
+
+
 
 
 bind J "toggle r.taa"

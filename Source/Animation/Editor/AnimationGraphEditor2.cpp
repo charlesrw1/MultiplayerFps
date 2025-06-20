@@ -97,6 +97,18 @@ void AnimationGraphEditorNew::init()
 	concmds->add("anim.down_layer", [this](const Cmd_Args&) {
 		tab_manager->go_down_layer();
 		});
+	concmds->add("anim.copy", [this](const Cmd_Args&) {
+		vector<int> links, nodes;
+		GraphCommandUtil::get_selected(links, nodes);
+		auto out = GraphCommandUtil::create_clipboard(nodes,*this);
+		if (out.has_value())
+			this->clipboard = out.value();
+		});
+	concmds->add("anim.paste", [this](const Cmd_Args&) {
+		auto layer = tab_manager->get_active_tab();
+		if(layer.has_value())
+			add_command(new PasteNodeClipboardCommand(*this,*layer, this->clipboard));
+		});
 
 
 	on_node_changes.add(this, [this]() {
@@ -931,6 +943,11 @@ void EditorNodeGraph::remove_node(GraphNodeHandle handle) {
 			if (linkwithnode.opt_link_node.is_valid())
 				remove_node(linkwithnode.opt_link_node);
 			GraphCommandUtil::remove_link(linkwithnode.link, *this);
+			if (node->links.size() >= size) {
+				// didnt delte?
+				printf("link didn't delete\n");
+				node->links.pop_back();
+			}
 			assert(node->links.size() < size);
 			size = node->links.size();
 		}
@@ -994,6 +1011,7 @@ void EditorNodeGraph::validate_nodes()
 				auto linknode = get_node(l.opt_link_node);
 				assert(linknode);
 				assert(linknode->is_link_attached_node());
+				assert(linknode->layer == n->layer);
 				assert(!SetUtil::contains(seen_link_nodes, linknode));
 				seen_link_nodes.insert(linknode);
 			}

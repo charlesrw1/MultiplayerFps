@@ -13,6 +13,7 @@
 #include "imnodes.h"
 #include "Framework/Log.h"
 #include "GraphUtil.h"
+#include "AnimCommands.h"
 
 class Base_EdNode;
 class AnimationGraphEditorNew;
@@ -389,6 +390,8 @@ private:
 
 	NodeMenu animGraphMenu;
 	NodeMenu stateGraphMenu;
+
+	GraphCommandUtil::Clipboard clipboard;
 };
 
 using std::unordered_map;
