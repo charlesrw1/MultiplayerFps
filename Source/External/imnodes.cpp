@@ -2209,7 +2209,7 @@ static void MiniMapUpdate()
     }
 
     // Create a child window bellow mini-map, so it blocks all mouse interaction on canvas.
-    int flags = ImGuiWindowFlags_NoBackground;
+    int flags = ImGuiWindowFlags_NoBackground| ImGuiWindowFlags_NoNav;
     ImGui::SetCursorScreenPos(editor.MiniMapRectScreenSpace.Min);
     ImGui::BeginChild("minimap", editor.MiniMapRectScreenSpace.GetSize(), false, flags);
 
@@ -2590,7 +2590,7 @@ void BeginNodeEditor()
             ImVec2(0.f, 0.f),
             true,
             ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoMove |
-                ImGuiWindowFlags_NoScrollWithMouse);
+                ImGuiWindowFlags_NoScrollWithMouse| ImGuiWindowFlags_NoNav);
         GImNodes->CanvasOriginScreenSpace = ImGui::GetCursorScreenPos();
 
         // NOTE: we have to fetch the canvas draw list *after* we call

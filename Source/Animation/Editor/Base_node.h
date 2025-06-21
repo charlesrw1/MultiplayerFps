@@ -73,7 +73,7 @@ struct GraphPinType {
 		return !(*this == other);
 	}
 	bool operator==(const GraphPinType& other) const { 
-		assert(0);
+		//assert(0);
 		return other.type == type;
 	}
 	bool is_any() const {
@@ -250,7 +250,7 @@ enum class EdNodeCategory
 };
 Color32 get_color_for_category(EdNodeCategory cat);
 
-
+using std::unordered_map;
 class AnimationGraphEditorNew;
 class Base_EdNode : public ClassBase
 {
@@ -271,12 +271,13 @@ public:
 	// get title to use for node in graph
 	virtual string get_title() const { return get_name(); }
 	virtual string get_subtitle() const { return ""; }
+	virtual string get_layer_title() const { return get_title(); }
+	virtual void fixup_any_extra_references(const unordered_map<int, int>& old_id_to_new_id) {}
 
 	virtual std::string get_tooltip() const { return ""; }
 	virtual void draw_node_topbar() { }
 	virtual bool has_top_bar() { return true; }
 
-	virtual std::string get_layer_tab_title() const { return ""; }
 	virtual void on_post_edit() {}
 	virtual Color32 get_node_color() const { return get_color_for_category(EdNodeCategory::None); }
 	virtual GraphLayerHandle get_owning_sublayer() const { return GraphLayerHandle(); }

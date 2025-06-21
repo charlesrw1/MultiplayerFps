@@ -11,6 +11,7 @@
 using std::make_unique;
 AnimationGraphEditorNew animgraphnew;
 IEditorTool* g_anim_ed_graph = &animgraphnew;
+extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 
 static ImNodesPinShape push_and_get_pin_type(const GraphPinType::Enum& type, bool selected)
 {
@@ -33,7 +34,7 @@ void AnimationGraphEditorNew::add_command(Command* command)
 	cmd_manager.add_command(command);
 }
 
-void AnimationGraphEditorNew::handle_link_changes()
+void GraphTabManager::handle_link_changes()
 {
 	int start_atr = 0;
 	int end_atr = 0;
@@ -43,33 +44,26 @@ void AnimationGraphEditorNew::handle_link_changes()
 	{
 		if (start_atr >= INPUT_START && start_atr < OUTPUT_START)
 			std::swap(start_atr, end_atr);
-		add_command(new AddLinkCommand(*this,GraphPortHandle(end_atr), GraphPortHandle(start_atr)));
+		editor.add_command(new AddLinkCommand(editor,GraphPortHandle(end_atr), GraphPortHandle(start_atr)));
 	}
 	if (ImNodes::IsLinkDropped(&start_atr)) {
 
-		//bool is_input = start_atr >= INPUT_START && start_atr < OUTPUT_START;
-		//
-		//uint32_t id = 0;
-		//if (is_input)
-		//	id = Base_EdNode::get_nodeid_from_input_id(start_atr);
-		//else
-		//	id = Base_EdNode::get_nodeid_from_output_id(start_atr);
-		//
-		//auto node = find_node_from_id(id);
-		//
-		//drop_state.from = node;
-		//drop_state.from_is_input = is_input;
-		//drop_state.slot = Base_EdNode::get_slot_from_id(start_atr);
-		//*open_popup_menu_from_drop = true;
+		const GraphPortHandle port(start_atr);
+		ImGui::OpenPopup("my_select_popup");
+		mouse_click_pos = GraphUtil::to_glm(ImGui::GetMousePos());
+		from_drop = FromDropState{ port };
+		set_keyboard_focus = true;
 	}
 	if (ImNodes::IsLinkDestroyed(&link_id)) {
-		add_command(new RemoveGraphObjectsCommand(*this, { link_id }, {}));
+		editor.add_command(new RemoveGraphObjectsCommand(editor, { link_id }, {}));
 	}
 }
 
 void AnimationGraphEditorNew::init()
 {
 	PropertyFactoryUtil::register_basic(grid_factory);
+	PropertyFactoryUtil::register_anim_editor2(*this,grid_factory);
+
 	graph = make_unique<EditorNodeGraph>();
 	graph->editor = this;
 
@@ -125,6 +119,9 @@ void AnimationGraphEditorNew::init()
 	if (!graph->get_root()) {
 		auto root = graph->create_layer();
 		graph->set_root(root);
+		auto created = prototypes.create("ReturnPose");
+		assert(created);
+		graph->insert_new_node(*created, root->get_id(), std::nullopt);
 	}
 	assert(graph->get_root());
 	tab_manager->open_tab(graph->get_root()->get_id(), true);
@@ -133,32 +130,98 @@ void AnimationGraphEditorNew::init()
 
 void GraphTabManager::draw_popup_menu()
 {
-	auto draw_menu = [this](auto&& self,NodeMenu& menu) -> void {
+	auto does_match_type = [this](const string& creation_name) -> opt<int> {
+		assert(from_drop.has_value());
+		auto port = from_drop->link_node_to_this.get_port_ptr(editor.get_graph());
+		if (!port) return std::nullopt;
+		auto& type = port->type;
+		auto template_type = MapUtil::get_opt(editor.get_prototypes().creations, creation_name);
+		if(!template_type)
+			template_type = MapUtil::get_opt(editor.get_var_prototypes().creations, creation_name);
+		if (!template_type)
+			return std::nullopt;
+		assert(template_type->template_node);
+		for (const auto& tport : template_type->template_node->ports) {
+			if (tport.is_output() == from_drop->link_node_to_this.is_output())
+				continue;
+			if (tport.type == type)
+				return tport.index;
+			if (tport.type.type == GraphPinType::Any || type.type == GraphPinType::Any)
+				return tport.index;
+		}
+		return std::nullopt;
+	};
+	auto draw_item = [this](bool is_dropping, auto&& does_match_type, NodeMenuItem& item) {
+		if (item.color.has_value()) {
+			ImGui::PushStyleColor(ImGuiCol_Text, item.color->to_uint());
+		}
+		if (is_dropping) {
+			opt<int> matches = does_match_type(item.name);
+			if (matches.has_value() && ImGui::MenuItem(item.name.c_str())) {
+				opt<GraphLayerHandle> layer = get_active_tab();
+				assert(layer.has_value());
+				//editor.add_command(new AddNodeCommand(editor, item.name, mouse_click_pos, layer.value()));
+				assert(from_drop.has_value());
+				editor.add_command(new AddNodeWithLink(editor, item.name, mouse_click_pos, layer.value(), from_drop->link_node_to_this, matches.value()));
+			}
+		}
+		else {
+			if (ImGui::MenuItem(item.name.c_str())) {
+				opt<GraphLayerHandle> layer = get_active_tab();
+				assert(layer.has_value());
+				editor.add_command(new AddNodeCommand(editor, item.name, mouse_click_pos, layer.value()));
+			}
+		}
+
+		if (item.color.has_value()) {
+			ImGui::PopStyleColor();
+		}
+	};
+
+	const bool is_dropping = from_drop.has_value();
+	if (set_keyboard_focus) {
+		ImGui::SetKeyboardFocusHere();
+		set_keyboard_focus = false;
+	}
+	if (ImGui::InputText("##text", (char*)node_menu_filter_buf.c_str(), node_menu_filter_buf.size() + 1, ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &node_menu_filter_buf)) {
+		node_menu_filter_buf = node_menu_filter_buf.c_str();
+	}
+
+	auto draw_menu = [is_dropping](auto&& self,auto&& does_match_type,auto&& draw_item, NodeMenu& menu) -> void {
 		for (auto& item : menu.menus) {
 			if (item.menu.has_value()) {
 				if (ImGui::BeginMenu(item.name.c_str())) {
-					self(self, item.menu.value());
+					self(self, does_match_type, draw_item,item.menu.value());
 					ImGui::EndMenu();
 				}
 			}
 			else {
-				if (item.color.has_value()) {
-					ImGui::PushStyleColor(ImGuiCol_Text, item.color->to_uint());
-				}
-
-				if (ImGui::MenuItem(item.name.c_str())) {
-					opt<GraphLayerHandle> layer = get_active_tab();
-					assert(layer.has_value());
-					editor.add_command(new AddNodeCommand(editor, item.name, mouse_click_pos, layer.value()));
-				}
-
-				if (item.color.has_value()) {
-					ImGui::PopStyleColor();
-				}
+				draw_item(is_dropping, does_match_type, item);
 			}
 		}
 	};
-	draw_menu(draw_menu, editor.get_menu());
+
+	if(node_menu_filter_buf.empty())
+		draw_menu(draw_menu, does_match_type, draw_item,editor.get_menu());
+	else {
+		vector<NodeMenuItem*> item_list;
+		auto add_items = [](auto&& self, vector<NodeMenuItem*>& out, const string& filter, NodeMenu& menu) -> void {
+			for (auto& item : menu.menus) {
+				if (item.menu.has_value())
+					self(self, out, filter, item.menu.value());
+				else {
+					auto lower = StringUtils::to_lower(item.name);
+					if (lower.find(filter) !=  string::npos)
+						out.push_back(&item);
+				}
+			}
+		};
+		auto lower = StringUtils::to_lower(node_menu_filter_buf);
+		add_items(add_items, item_list, lower, editor.get_menu());
+		for (auto& item : item_list) {
+			draw_item(is_dropping, does_match_type, *item);
+		}
+	}
 }
 #include "Basic_nodes.h"
 
@@ -176,6 +239,8 @@ void AnimationGraphEditorNew::init_node_factory()
 	prototypes.add(">=", []() { return new Math_EdNode(MathNodeType::Geq); });
 	prototypes.add("Or", []() { return new LogicalOp_EdNode(true); });
 	prototypes.add("And", []() { return new LogicalOp_EdNode(false); });
+	prototypes.add("Not", []() { return new Not_EdNode(); });
+
 
 
 	prototypes.add("PlayClip", []() { return new Clip_EdNode(false); });
@@ -187,6 +252,8 @@ void AnimationGraphEditorNew::init_node_factory()
 	prototypes.add("AddPoses", []() { return new ComposePoses_EdNode(true); });
 	prototypes.add("SubtractPoses", []() { return new SubtractPoses_EdNode(); });
 	prototypes.add("MirrorPose", []() { return new MirrorPose_EdNode(); });
+	prototypes.add("2DBlend", []() { return new Blend2D_EdNode(false); });
+	prototypes.add("2DBlendAdd", []() { return new Blend2D_EdNode(true); });
 
 
 	prototypes.add("BlendByInt", []() { return new BlendInt_EdNode(); });
@@ -247,10 +314,13 @@ void AnimationGraphEditorNew::init_node_factory()
 		.add("==")
 		.add("!=")
 		.add("Or")
-		.add("And");
+		.add("And")
+		.add("Not");
 	NodeMenu blends;
 	blends
 		.add("Blend2")
+		.add("2DBlend")
+		.add("2DBlendAdd")
 		.add("BlendByInt")
 		.add("BlendByEnum")
 		.add("AddPoses")
@@ -346,7 +416,7 @@ void AnimationGraphEditorNew::imgui_draw()
 		}
 	};
 
-	if(ImGui::Begin("Graph")) {
+	if(ImGui::Begin("Graph",nullptr, ImGuiWindowFlags_NoNav)) {
 		playback->draw();
 		tab_manager->draw();
 		check_open_tab();
@@ -357,7 +427,6 @@ void AnimationGraphEditorNew::imgui_draw()
 
 	property_window->draw();
 	params_window->imgui_draw();
-	handle_link_changes();
 	cmd_manager.execute_queued_commands();
 
 	auto update_selected = [this]() {
@@ -509,15 +578,22 @@ void GraphTabManager::draw()
 		this->tabs = next;
 	}
 
+	handle_link_changes();
+
 	const bool is_focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_RootWindow);
 	if (is_focused && ImGui::GetIO().MouseClicked[1]) {
 		ImGui::OpenPopup("my_select_popup");
 		mouse_click_pos = GraphUtil::to_glm(ImGui::GetMousePos());
+		set_keyboard_focus = true;
 	}
 	if (ImGui::BeginPopup("my_select_popup"))
 	{
 		draw_popup_menu();
 		ImGui::EndPopup();
+	}
+	else {
+		from_drop = std::nullopt;
+		node_menu_filter_buf.clear();
 	}
 
 }
@@ -885,7 +961,7 @@ void NodeGraphLayer::draw(EditorNodeGraph& graph)
 	auto winsize = ImGui::GetWindowSize();
 	if (wants_reset_view) {
 		ImNodes::EditorContextResetPanning(ImVec2(0, 0));
-		ImNodes::EditorContextResetPanning(ImVec2(winsize.x / 4, winsize.y / 2.4));
+		ImNodes::EditorContextResetPanning(ImVec2(winsize.x / 2, winsize.y / 2));
 		wants_reset_view = false;
 	}
 
@@ -966,7 +1042,7 @@ void EditorNodeGraph::remove_node(GraphNodeHandle handle) {
 	nodes.remove(handle.id);
 	delete node;
 }
-void EditorNodeGraph::insert_new_node(Base_EdNode& node, GraphLayerHandle layer, glm::vec2 pos) {
+void EditorNodeGraph::insert_new_node(Base_EdNode& node, GraphLayerHandle layer, opt<glm::vec2> pos) {
 	printf("insert new node\n");
 	auto layerptr = get_layer(layer);
 	assert(layerptr);
@@ -975,10 +1051,15 @@ void EditorNodeGraph::insert_new_node(Base_EdNode& node, GraphLayerHandle layer,
 	node.editor = editor;
 	nodes.insert(node.self.id, &node);
 	layerptr->add_node_to_layer(node);
-	ImNodes::SetNodeScreenSpacePos(node.self.id, GraphUtil::to_imgui(pos));
-	ImVec2 v = ImNodes::GetNodeGridSpacePos(node.self.id);
-	node.nodex = v.x;
-	node.nodey = v.y;
+	if (pos.has_value()) {
+		ImNodes::SetNodeScreenSpacePos(node.self.id, GraphUtil::to_imgui(pos.value()));
+		ImVec2 v = ImNodes::GetNodeGridSpacePos(node.self.id);
+		node.nodex = v.x;
+		node.nodey = v.y;
+	}
+	else {
+		node.nodex = node.nodey = 0.f;
+	}
 }
 void EditorNodeGraph::validate_nodes()
 {
@@ -992,13 +1073,14 @@ void EditorNodeGraph::validate_nodes()
 	for (auto n : nodes) {
 		assert(get_node(n->self) == n);
 		assert(n->editor == editor);
-		auto layer = get_layer(n->layer);
-		assert(layer);
-		assert(layer->contains(n->self.id));
+		auto layerptr = get_layer(n->layer);
+		assert(layerptr);
+		assert(layerptr->contains(n->self.id));
 		auto sublayer = n->get_owning_sublayer();
 		if (sublayer.is_valid()) {
-			auto layer = get_layer(sublayer);
-			assert(layer && layer->get_owner_node() == n->self);
+			auto sublayerptr = get_layer(sublayer);
+			assert(sublayerptr && sublayerptr->get_owner_node() == n->self);
+			assert(sublayerptr != layerptr);
 		}
 		for (auto& l : n->links) {
 			auto in = l.link.input.get_node_ptr(*this);
@@ -1073,8 +1155,32 @@ void EditorNodeGraph::insert_nodes(SerializeGraphContainer& container)
 			GraphCommandUtil::add_link(l.link, *this, GraphNodeHandle());
 		}
 	}
-
 }
+#include "Framework/PropertyPtr.h"
+
+template<typename FUNCTOR>
+inline void visit_all_properties_and_apply_functor(ClassBase* b, FUNCTOR&& func)
+{
+	auto recurse = [](auto&& self, auto&& func, PropertyPtr prop) -> void {
+		func(prop);
+		if (prop.is_array()) {
+			for (auto p : prop.as_array()) {
+				self(self, func, p);
+			}
+		}
+		else if (prop.is_struct()) {
+			for (auto p : prop.as_struct()) {
+				self(self, func, p);
+			}
+		}
+	};
+	for (auto prop : ClassPropPtr(b)) {
+		recurse(recurse, func, prop);
+	}
+}
+
+
+
 void EditorNodeGraph::insert_nodes_with_new_id(SerializeGraphContainer& container)
 {
 	unordered_map<int, int> old_id_to_new_id;
@@ -1119,7 +1225,15 @@ void EditorNodeGraph::insert_nodes_with_new_id(SerializeGraphContainer& containe
 
 		ImNodes::SetNodeGridSpacePos(n->self.id, ImVec2(n->nodex, n->nodey));
 	}
-	for (auto n : container.nodes) {
+	vector<GraphNodeHandle> handles;
+	for (auto n : container.nodes)
+		handles.push_back(n->self);
+
+	for (auto h : handles) {
+		auto n = get_node(h);
+		if (!n)
+			continue;
+
 		for (int i = 0; i < (int)n->links.size(); i++) {
 			GraphLinkWithNode& l = n->links.at(i);
 			if (l.opt_link_node.is_valid()) {
@@ -1140,6 +1254,7 @@ void EditorNodeGraph::insert_nodes_with_new_id(SerializeGraphContainer& containe
 				i--;
 			}
 		}
+		n->fixup_any_extra_references(old_id_to_new_id);
 	}
 }
 void NodeGraphLayer::handle_drag_drop()
@@ -1191,6 +1306,7 @@ GraphPropertyWindow::GraphPropertyWindow(AnimationGraphEditorNew& editor)
 }
 void GraphPropertyWindow::update_property_window()
 {
+	printf("clear grid\n");
 	grid.clear_all();
 	Base_EdNode* node = ed.get_selected_node();
 	if (!node) {
@@ -1376,16 +1492,16 @@ void GraphPropertyWindow::draw()
 		grid.update();
 
 		if (grid.rows_had_changes) {
-			ed.on_changed_graph_classes.invoke();
-
 			auto selected= ed.get_selected_node();
 			if (selected)
 				selected->on_property_changes();
+			else
+				ed.on_changed_graph_classes.invoke();
 		}
 	}
 	ImGui::End();
 }
-extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
+
 extern ImFont* global_big_imgui_font;
 
 static int count_characters(const std::string& s, char what) {
@@ -1588,8 +1704,9 @@ void ControlParamsWindowNew::refresh_props()
 	for (auto& p : props) {
 		auto [color, str] = GraphUtil::get_type_color_name(p.type.type);
 		string name_as_str = p.nativepi->name;
+		GraphPinType the_type = p.type;
 		menu.add(name_as_str, color);
-		ed.get_var_prototypes().add(name_as_str, [name_as_str]() { return new Variable_EdNode(name_as_str); });
+		ed.get_var_prototypes().add(name_as_str, [name_as_str,the_type]() { return new Variable_EdNode(name_as_str, the_type); });
 	}
 
 	ed.on_node_changes.invoke();
@@ -1738,7 +1855,7 @@ NodeGraphLayer::TabNameAndBackground NodeGraphLayer::get_tab_name(EditorNodeGrap
 		color = { 20,10,0 };
 	else if (type == Transition)
 		color = { 0,10,40 };
-	return { owner->get_title(),color };
+	return { owner->get_layer_title(),color };
 }
 
 void AnimationGraphEditorNew::draw_layer_window()

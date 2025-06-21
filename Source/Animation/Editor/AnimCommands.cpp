@@ -313,3 +313,34 @@ std::string DuplicateNodesCommand::to_string()
 	return "Duplicate";
 }
 
+AddNodeWithLink::AddNodeWithLink(AnimationGraphEditorNew& ed, const string& creation_prototype, glm::vec2 pos, GraphLayerHandle layer, GraphPortHandle from_port, int to_port_index) {
+	addNode = std::make_unique<AddNodeCommand>(ed, creation_prototype, pos, layer);
+	this->from_port = from_port;
+	this->to_port_index = to_port_index;
+}
+
+void AddNodeWithLink::execute() {
+	addNode->execute();
+	auto created = addNode->created_handle;
+	GraphPortHandle whatport = GraphPortHandle::make(created, to_port_index, !from_port.is_output());
+	GraphLink link;
+	if (whatport.is_output()) {
+		link.output = whatport;
+		link.input = from_port;
+	}
+	else {
+		link.input = whatport;
+		link.output = from_port;
+	}
+
+	GraphCommandUtil::add_link(link, addNode->ed.get_graph(), GraphNodeHandle());
+	createdLink = link;
+
+	addNode->ed.on_node_changes.invoke();
+}
+
+void AddNodeWithLink::undo() {
+
+	GraphCommandUtil::remove_link(createdLink, addNode->ed.get_graph());
+	addNode->undo();
+}

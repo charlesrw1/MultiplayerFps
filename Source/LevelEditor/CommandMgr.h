@@ -22,6 +22,12 @@ class UndoRedoSystem
 {
 public:
 	UndoRedoSystem();
+	~UndoRedoSystem() {
+		clear_all();
+		for (auto c : queued_commands)
+			delete c;
+		queued_commands.clear();
+	}
 
 	void on_key_event(const SDL_KeyboardEvent& k);
 

@@ -91,7 +91,7 @@ protected:
 	REF GraphNodeHandle owner;
 	REF GraphLayerHandle self;
 	ImNodesEditorContext* context = nullptr;
-	bool wants_reset_view = false;
+	bool wants_reset_view = true;
 };
 
 
@@ -123,7 +123,7 @@ public:
 		assert(!root_layer);
 		this->root_layer = l;
 	}
-	void insert_new_node(Base_EdNode& node, GraphLayerHandle layer, glm::vec2 pos);
+	void insert_new_node(Base_EdNode& node, GraphLayerHandle layer, opt<glm::vec2> pos);
 	void insert_nodes(SerializeGraphContainer& container);
 	void insert_nodes_with_new_id(SerializeGraphContainer& container);
 
@@ -191,6 +191,7 @@ public:
 		return tabs.at(i);
 	}
 private:
+	void handle_link_changes();
 	opt<int> find_tab(GraphLayerHandle handle) {
 		for (int i = 0; i < tabs.size(); i++) {
 			if (tabs[i] == handle) return i;
@@ -199,11 +200,19 @@ private:
 	}
 	void draw_popup_menu();
 
+	struct FromDropState {
+		GraphPortHandle link_node_to_this;
+	};
+
 	opt<int> active_tab;
 	bool active_tab_dirty = false;
 	vector<GraphLayerHandle> tabs;
 	AnimationGraphEditorNew& editor;
 	glm::vec2 mouse_click_pos{};
+	opt<FromDropState> from_drop;
+	string node_menu_filter_buf;
+	bool set_keyboard_focus = false;
+
 	vector<GraphLayerHandle> history;
 };
 
@@ -252,19 +261,28 @@ private:
 class NodePrototypes
 {
 public:
+	struct Creation {
+		Creation(function<Base_EdNode* ()> func) {
+			this->creation = std::move(func);
+			template_node.reset(this->creation());
+		}
+		function<Base_EdNode*()> creation;
+		uptr<Base_EdNode> template_node;
+	};
 	Base_EdNode* create(const string& name) const {
 		auto func = MapUtil::get_opt(creations, name);
 		if (!func) 
 			return nullptr;
-		Base_EdNode* node =  (*func)();
+		Base_EdNode* node =  (func->creation)();
 		if (node)
 			node->name = name;
 		return node;
 	}
 	void add(string name, function<Base_EdNode* ()> creation) {
-		MapUtil::insert_test_exists(creations, name, creation);
+		assert(!MapUtil::contains(creations, name));
+		creations.insert({ name,Creation(creation) });
 	}
-	unordered_map<string, function<Base_EdNode*()>> creations;
+	unordered_map<string, Creation> creations;
 };
 
 class ImNodesInterface
@@ -348,7 +366,6 @@ public:
 		return variablePrototypes;
 	}
 private:
-	void handle_link_changes();
 	void init_node_factory();
 	void delete_selected();
 	void dup_selected();
@@ -379,7 +396,6 @@ private:
 	NodePrototypes prototypes;
 	NodePrototypes variablePrototypes;
 
-
 	//uptr<CreateFromDropState> drop_state;
 	UndoRedoSystem cmd_manager;
 	uptr<ConsoleCmdGroup> concmds;
@@ -387,6 +403,7 @@ private:
 
 	GraphNodeHandle selected_last_frame;
 	unordered_set<int> multiple_selected_last_frame;
+
 
 	NodeMenu animGraphMenu;
 	NodeMenu stateGraphMenu;

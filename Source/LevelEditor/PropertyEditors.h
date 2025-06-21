@@ -5,7 +5,7 @@ class EditorDoc;
 class AssetMetadata;
 class AnimationGraphEditor;
 class MaterialEditorLocal;
-
+class AnimationGraphEditorNew;
 class PropertyFactoryUtil
 {
 public:
@@ -13,6 +13,9 @@ public:
 	static void register_editor(EditorDoc& doc, FnFactory<IPropertyEditor>& editor);
 	static void register_anim_editor(AnimationGraphEditor& ed, FnFactory<IPropertyEditor>& factory);
 	static void register_mat_editor(MaterialEditorLocal& ed, FnFactory<IPropertyEditor>& factory);
+
+	static void register_anim_editor2(AnimationGraphEditorNew& ed, FnFactory<IPropertyEditor>& factory);
+
 };
 
 class SharedAssetPropertyEditor : public IPropertyEditor

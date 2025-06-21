@@ -3,6 +3,7 @@
 #include "StructReflection.h"
 #include <glm/gtc/quaternion.hpp>
 
+
 // encapsulates a specific instance of a property
 class PropertyPtr;
 struct PropertyInfo;
@@ -63,7 +64,7 @@ private:
 	const PropertyInfoList& properties() {
 		return *property->struct_type->properties;
 	}
-	void* get_ptr() {
+	void* get_ptr() const {
 		return property->get_ptr(instance);
 	}
 	const PropertyInfo* property = nullptr;
@@ -96,6 +97,8 @@ private:
 	const ClassTypeInfo* ti = nullptr;
 	ClassBase* obj = nullptr;
 };
+using std::vector;
+
 
 class EnumPropPtr
 {
@@ -165,3 +168,11 @@ private:
 	const PropertyInfo* property = nullptr;
 	void* instance = nullptr;
 };
+
+template<typename T>
+inline T* StructPropPtr::get_struct() const {
+	assert(property && instance);
+	if (property->struct_type == &T::StructType)
+		return (T*)get_ptr();
+	return nullptr;
+}

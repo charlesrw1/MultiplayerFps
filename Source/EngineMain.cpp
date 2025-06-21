@@ -1635,6 +1635,8 @@ void GameEngineLocal::init(int argc, char** argv)
 	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
 	global_big_imgui_font = ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 24.0);
 	ImGui::GetIO().Fonts->Build();
+	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
 
 	//engine_fullscreen_gui = new GUIFullscreen();
 	//gui_log = new OnScreenLogGui();

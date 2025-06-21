@@ -109,13 +109,31 @@ public:
 	REF GraphLayerHandle state_graph;
 	bool is_entry_state = false;
 };
+
+struct SAHandleWithFlag {
+	STRUCT_BODY();
+	REF GraphNodeHandle handle;
+	REF bool flag = false;
+};
+class StateAlias_EdNode;
+struct StateAliasStruct {
+	STRUCT_BODY();
+	REFLECT(hide);
+	vector<SAHandleWithFlag> handles;
+	REFLECT(hide);
+	bool default_true = false;
+};
+
 class StateAlias_EdNode : public Base_EdNode {
 public:
 	CLASS_BODY(StateAlias_EdNode);
 	StateAlias_EdNode() {
 		add_out_port(0, "").type = GraphPinType::StateType;
 	}
+	void fixup_any_extra_references(const unordered_map<int, int>& old_id_to_new_id) override;
 	bool draw_links_as_arrows() final { return true; }
+	void on_link_changes() override;
+	REF StateAliasStruct data;
 };
 
 class Statemachine_EdNode : public Base_EdNode
@@ -131,9 +149,16 @@ public:
 	}
 	void set_owning_sublayer(GraphLayerHandle h);
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimSource); }
+	string get_subtitle() const override {
+		return sm_name;
+	}
+	string get_layer_title() const override {
+		return sm_name.empty()?get_title():get_subtitle();
+	}
 
 	REFLECT(hide);
 	GraphLayerHandle sublayer;
+	REF string sm_name;
 
 };
 
@@ -144,8 +169,8 @@ public:
 	Variable_EdNode() {
 		add_out_port(0, "");
 	}
-	Variable_EdNode(const string& name) {
-		add_out_port(0, "");
+	Variable_EdNode(const string& name, GraphPinType type) {
+		add_out_port(0, "").type = type;
 		this->variable_name = name;
 	}
 	void on_link_changes() override;
@@ -168,6 +193,23 @@ public:
 	}
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimBlend); }
 };
+class Blend2D_EdNode : public Base_EdNode {
+public:
+	CLASS_BODY(Blend2D_EdNode);
+	Blend2D_EdNode(bool is_additive) :is_additive(is_additive) {
+		add_out_port(0,"").type = GraphPinType::LocalSpacePose;
+		if (is_additive) {
+			add_in_port(0, "in").type = GraphPinType::LocalSpacePose;
+		}
+		// can skip port
+		add_in_port(1, "x").type = GraphPinType::Float;
+		add_in_port(2, "y").type = GraphPinType::Float;
+	}
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimBlend); }
+
+	bool is_additive = false;
+};
+
 class SubtractPoses_EdNode : public Base_EdNode {
 public:
 	CLASS_BODY(SubtractPoses_EdNode);
@@ -322,6 +364,15 @@ public:
 
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Math); }
 
+};
+
+class Not_EdNode : public Base_EdNode {
+public:
+	CLASS_BODY(Not_EdNode);
+	Not_EdNode() {
+		add_out_port(0, "").type = GraphPinType::Boolean;
+		add_in_port(0, "").type = GraphPinType::Boolean;
+	}
 };
 
 class LogicalOp_EdNode : public Base_EdNode {

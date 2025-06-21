@@ -5,11 +5,20 @@
 class LayerOwnerUtil
 {
 public:
-	static NodeGraphLayer& check_or_create_sublayer(GraphLayerHandle& handle, Base_EdNode* self, EditorNodeGraph& graph) {
+	static NodeGraphLayer& check_or_create_sublayer(GraphLayerHandle& handle, Base_EdNode* self, AnimationGraphEditorNew& editor, opt<string> create_this_node) {
+		auto& graph = editor.get_graph();
 		if (!handle.is_valid()) {
 			NodeGraphLayer* layer = graph.create_layer();
 			layer->set_owner_node(self->self);
 			handle = layer->get_id();
+			if (create_this_node.has_value()) {
+				auto newnode = editor.get_prototypes().create(create_this_node.value());
+				if (newnode)
+					graph.insert_new_node(*newnode, handle, std::nullopt);
+				else
+					printf("couldnt create layer node\n");
+			}
+
 			printf("created sublayer %d\n", handle.id);
 		}
 		NodeGraphLayer* layer = graph.get_layer(handle);
@@ -21,12 +30,14 @@ public:
 void Statemachine_EdNode::on_link_changes()  {
 	Base_EdNode::on_link_changes();
 
-	NodeGraphLayer& layer = LayerOwnerUtil::check_or_create_sublayer(sublayer, this, editor->get_graph());
+	NodeGraphLayer& layer = LayerOwnerUtil::check_or_create_sublayer(sublayer, this, *editor, "EntryState");
 	layer.set_layer_type(NodeGraphLayer::Statemachine);
 
 }
 
+
 void Statemachine_EdNode::set_owning_sublayer(GraphLayerHandle h) {
+
 	this->sublayer = h;
 }
 
@@ -232,7 +243,7 @@ void State_EdNode::on_link_changes()
 	Base_EdNode::on_link_changes();
 
 	{
-		NodeGraphLayer& layer = LayerOwnerUtil::check_or_create_sublayer(state_graph, this, editor->get_graph());
+		NodeGraphLayer& layer = LayerOwnerUtil::check_or_create_sublayer(state_graph, this, *editor, "ReturnPose");
 		layer.set_layer_type(NodeGraphLayer::BlendTree);
 	}
 
@@ -300,7 +311,7 @@ void State_EdNode::on_link_changes()
 void StateTransition_EdNode::on_link_changes()
 {
 	Base_EdNode::on_link_changes();
-	NodeGraphLayer& layer = LayerOwnerUtil::check_or_create_sublayer(transition_graph, this, editor->get_graph());
+	NodeGraphLayer& layer = LayerOwnerUtil::check_or_create_sublayer(transition_graph, this, *editor, "ReturnTransition");
 	layer.set_layer_type(NodeGraphLayer::Transition);
 
 }
@@ -309,4 +320,47 @@ string Clip_EdNode::get_subtitle() const {
 	if (Data.Clip.get())
 		return Data.Clip.get()->get_name();
 	return "";
+}
+
+void StateAlias_EdNode::fixup_any_extra_references(const unordered_map<int, int>& old_id_to_new_id) {
+	for (auto& h : data.handles) {
+		if (MapUtil::contains(old_id_to_new_id, h.handle.id)) {
+			h.handle.id = old_id_to_new_id.find(h.handle.id)->second;
+		}
+	}
+}
+void StateAlias_EdNode::on_link_changes()
+{
+	Base_EdNode::on_link_changes();
+
+	unordered_set<State_EdNode*> nodes;
+	auto layerptr = editor->get_graph().get_layer(layer);
+	assert(layerptr);
+	for (int i : layerptr->get_nodes()) {
+		Base_EdNode* n = editor->get_graph().get_node(GraphNodeHandle(i));
+		assert(n);
+		State_EdNode* state = n->cast_to<State_EdNode>();
+		if (state) {
+			nodes.insert(state);
+		}
+	}
+	unordered_set<State_EdNode*> true_nodes_in_array;
+	for (auto& h : data.handles) {
+		if (h.flag==data.default_true) continue;
+		Base_EdNode* e = editor->get_graph().get_node(h.handle);
+		if (e && e->layer == layer && e->is_a<State_EdNode>()) {
+			SetUtil::insert_test_exists(true_nodes_in_array,e->cast_to<State_EdNode>());
+		}
+	}
+	data.handles.clear();
+	for (auto n : nodes) {
+		SAHandleWithFlag handle;
+		handle.handle = n->self;
+		if (SetUtil::contains(true_nodes_in_array, n))
+			handle.flag = !data.default_true;
+		else
+			handle.flag = data.default_true;
+
+		data.handles.push_back(handle);
+	}
 }

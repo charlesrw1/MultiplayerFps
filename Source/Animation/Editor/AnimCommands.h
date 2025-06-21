@@ -59,6 +59,25 @@ public:
 	GraphNodeHandle created_handle;
 };
 
+class AddNodeWithLink : public Command {
+public:
+	AddNodeWithLink(AnimationGraphEditorNew& ed, const string& creation_prototype, glm::vec2 pos, GraphLayerHandle layer,
+		GraphPortHandle from_port, int to_port_index);
+	void execute() final;
+	void undo() final;
+	string to_string() final {
+		return "AddNodeWithLink";
+	}
+	bool is_valid() final {
+		assert(addNode);
+		return addNode->is_valid();
+	}
+	GraphPortHandle from_port;
+	int to_port_index = 0;
+	uptr<AddNodeCommand> addNode;
+	GraphLink createdLink;
+};
+
 
 class RemoveGraphObjectsCommand : public Command
 {
