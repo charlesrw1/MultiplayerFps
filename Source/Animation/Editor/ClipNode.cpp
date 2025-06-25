@@ -1,8 +1,8 @@
 #include "ClipNode.h"
 #include "AnimationGraphEditor2.h"
-
 #include "Animation/Runtime/RuntimeNodesNew.h"
-
+#include "Animation/Runtime/RuntimeValueNodes.h"
+#include <algorithm>
 template<typename T, typename... Ts>
 inline T get_or(const std::variant<Ts...>& v, const T& fallback) {
 	if (auto ptr = std::get_if<T>(&v)) {
@@ -10,7 +10,6 @@ inline T get_or(const std::variant<Ts...>& v, const T& fallback) {
 	}
 	return fallback;
 }
-#include "Animation/Runtime/RuntimeValueNodes.h"
 
 opt<int> create_linked_node(CompilationContext& ctx, int input_index, Base_EdNode* node)
 {
@@ -47,6 +46,7 @@ opt<int> create_linked_node(CompilationContext& ctx, int input_index, Base_EdNod
 			return ctx.add_inline_output_node(node->self,port->get_idx(), outnode);
 		}
 		else {
+			ctx.add_error(node->self, "missing input");
 			return std::nullopt;
 		}
 	}
@@ -529,4 +529,182 @@ void ModifyBone_EdNode::compile(CompilationContext& ctx)
 	out->rotation = this->rotation;
 	out->translation = this->translation;
 	ctx.add_output_node(self, 0, out);
+}
+
+
+opt<int> find_entry_node(GraphLayerHandle handle, bool is_entry_pose, EditorNodeGraph& graph, GraphNodeHandle selfHandle, CompilationContext& ctx)
+{
+	auto layer = graph.get_layer(handle);
+	if (!layer) {
+		ctx.add_error(selfHandle, "layer doesn't exist\n");
+		return std::nullopt;
+	}
+	Func_EdNode* entry = nullptr;
+	for (int id : layer->get_nodes()) {
+		auto n = graph.get_node(id);
+		if (!n)
+			continue;
+		if (Func_EdNode* nf = n->cast_to<Func_EdNode>()) {
+			if ((nf->myType == Func_EdNode::ReturnTransition && !is_entry_pose) || (nf->myType == Func_EdNode::ReturnPose && is_entry_pose)) {
+				if (entry) {
+					ctx.add_error(selfHandle, "multiple entry nodes");
+					break;
+				}
+				entry = nf;
+			}
+		}
+	}
+	if (!entry) {
+		ctx.add_error(selfHandle, "no entry");
+		return std::nullopt;
+	}
+	opt<int> idx = create_linked_node(ctx, 0, entry);
+	return idx;
+}
+
+opt<int> find_entry_node(GraphLayerHandle handle, bool is_entry_pose, const Base_EdNode* node, CompilationContext& ctx)
+{
+	return find_entry_node(handle, is_entry_pose, node->editor->get_graph(), node->self, ctx);
+}
+
+
+inline opt<atSmTransition> make_transition(CompilationContext& ctx, int toIdx, atAnimStatemachine* out, const State_EdNode* toNode, GraphLinkWithNode link)
+{
+	EditorNodeGraph& graph = toNode->editor->get_graph();
+	auto node = graph.get_node(link.opt_link_node);
+	if (!node || !node->is_a<StateTransition_EdNode>()) {
+		ctx.add_error(toNode->self, "No transitino object on link");
+		return std::nullopt;
+	}
+	atSmTransition outT;
+	StateTransition_EdNode* t = node->cast_to<StateTransition_EdNode>();
+	outT.interruptable = t->interruptable;
+	outT.is_auto_transition = t->auto_transition;
+	outT.transition_condition = find_entry_node(t->transition_graph, false, toNode, ctx).value_or(0);
+	outT.transition_to = toIdx;
+	outT.transition_time = t->transition_time;
+	outT.temp_priority = t->priority;
+	return outT;
+}
+
+template<typename T>
+inline T* Cast(ClassBase* p) {
+	if (!p) return nullptr;
+	return p->cast_to<T>();
+}
+
+class StatemachineCompilier
+{
+public:
+	StatemachineCompilier(CompilationContext& ctx, Statemachine_EdNode* edNode) 
+		: ctx(ctx),edNode(edNode), graph(edNode->editor->get_graph()){}
+	
+	void compile() {
+		out = new atAnimStatemachine;
+
+		auto mylayer = graph.get_layer(edNode->sublayer);
+		assert(mylayer);
+		vector<State_EdNode*> ptrs;
+		for (int nodeId : mylayer->get_nodes()) {
+			if (State_EdNode* st = Cast<State_EdNode>(graph.get_node(nodeId))) {
+				atSmState state;
+				state.graph_root_node = find_entry_node(st->state_graph, true, st, ctx).value_or(0);
+				out->states.push_back(state);
+				MapUtil::insert_test_exists(ptr_to_index, (void*)st, int(out->states.size()-1));
+				ptrs.push_back(st);
+			}
+		}
+
+		for (auto ptr : ptrs) {
+			opt<int> myoptIndex = find_index(ptr);
+			assert(myoptIndex.has_value());
+			const int myOutputIndex = myoptIndex.value();
+			for (int i = 0; i < ptr->links.size(); i++) {
+				GraphLink l = ptr->links.at(i).link;
+				if (!l.self_is_input(ptr->self))
+					continue;
+				const Base_EdNode* otherNode = graph.get_node(l.get_other_node(ptr->self));
+				if (!otherNode)
+					continue;
+				if (auto aliasNode = otherNode->cast_to<StateAlias_EdNode>()) {
+					opt<atSmTransition> o = make_transition(ctx, myOutputIndex, out, ptr, ptr->links.at(i));
+					if (o.has_value()) {
+						const int transitionIdx = out->transitions.size();
+						out->transitions.push_back(o.value());
+						for (SAHandleWithFlag h : aliasNode->data.handles) {
+							if (h.flag && !(h.handle == ptr->self)) {
+								atSmState* out = find_out_state(h.handle);
+								assert(out);
+								out->transitions.push_back(transitionIdx);
+							}
+						}
+					}
+				}
+				else if (auto stateNode = otherNode->cast_to<State_EdNode>()) {
+					opt<atSmTransition> o = make_transition(ctx, myOutputIndex, out, ptr, ptr->links.at(i));
+					if (o.has_value()) {
+						const int transitionIdx = out->transitions.size();
+						out->transitions.push_back(o.value());
+						auto& outState = find_out_state(stateNode);
+						outState.transitions.push_back(transitionIdx);
+					}
+				}
+				else if (auto funcNode = otherNode->cast_to<Func_EdNode>()) {
+					if (funcNode->myType == Func_EdNode::EntryState) {
+						opt<atSmTransition> o = make_transition(ctx, myOutputIndex, out, ptr, ptr->links.at(i));
+						if (o.has_value()) {
+							const int transitionIdx = out->transitions.size();
+							out->transitions.push_back(o.value());
+							out->entry_transitions.push_back(transitionIdx);
+						}
+					}
+				}
+			}
+		}
+
+		if (out->entry_transitions.empty()) {
+			ctx.add_error(edNode->self, "no entry transitions");
+		}
+
+		auto do_sort = [&](int l, int r) -> bool {
+			return out->transitions.at(l).temp_priority < out->transitions.at(r).temp_priority;
+		};
+		std::sort(out->entry_transitions.begin(), out->entry_transitions.end(), do_sort);
+		for (auto& s : out->states) {
+			std::sort(s.transitions.begin(), s.transitions.end(), do_sort);
+		}
+
+		ctx.add_output_node(edNode->self, 0, out);
+	}
+private:
+	opt<int> find_index(const State_EdNode* st) {
+		int index = MapUtil::get_or(ptr_to_index, (void*)st, -1);
+		if (index == -1) return std::nullopt;
+		return index;
+	}
+
+	atSmState* find_out_state(GraphNodeHandle handle) {
+		auto snode = Cast<State_EdNode>(graph.get_node(handle));
+		int idx = MapUtil::get_or(ptr_to_index, (void*)snode, -1);
+		if (idx == -1) return nullptr;
+		return &out->states.at(idx);
+	}
+
+	atSmState& find_out_state(const State_EdNode* st) {
+		assert(MapUtil::contains(ptr_to_index, (void*)st));
+		int index = MapUtil::get_or(ptr_to_index, (void*)st, 0);
+		return out->states.at(index);
+	}
+
+	CompilationContext& ctx;
+	EditorNodeGraph& graph;
+	Statemachine_EdNode* edNode = nullptr;
+	unordered_map<void*, int> ptr_to_index;
+	atAnimStatemachine* out = nullptr;
+};
+
+void Statemachine_EdNode::compile(CompilationContext& ctx)
+{
+	StatemachineCompilier s(ctx,this);
+	s.compile();
 }

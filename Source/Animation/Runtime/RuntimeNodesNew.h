@@ -230,10 +230,11 @@ public:
 struct atSmTransition {
 	STRUCT_BODY();
 	REF int transition_condition = 0;
-	REF bool interruptable = true;
 	REF float transition_time = 0.2;
+	REF int transition_to = 0;
+	REF bool interruptable = true;
 	REF bool is_auto_transition = false;
-
+	int8_t temp_priority = 0;// used for sorting
 };
 struct atSmState {
 	STRUCT_BODY();

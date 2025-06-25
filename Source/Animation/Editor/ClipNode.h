@@ -5,6 +5,8 @@
 #include <variant>
 using std::variant;
 opt<int> create_linked_node(CompilationContext& ctx, int input_index, Base_EdNode* node);
+opt<int> find_entry_node(GraphLayerHandle handle, bool is_entry_pose, EditorNodeGraph& graph, GraphNodeHandle selfHandle, CompilationContext& ctx);
+
 
 class AnimationSeqAsset;
 
@@ -101,14 +103,11 @@ public:
 	GraphLayerHandle get_owning_sublayer() const override { return state_graph; }
 	void set_owning_sublayer(GraphLayerHandle h) { state_graph = h; }
 	string get_title() const override {
-		if (is_entry_state)
-			return "EntryState";
 		return statename.empty() ? "State" : (statename);
 	}
 
 	REF string statename;
 	REF GraphLayerHandle state_graph;
-	bool is_entry_state = false;
 };
 
 struct SAHandleWithFlag {
@@ -156,6 +155,8 @@ public:
 	string get_layer_title() const override {
 		return sm_name.empty()?get_title():get_subtitle();
 	}
+
+	void compile(CompilationContext& ctx) final;
 
 	REFLECT(hide);
 	GraphLayerHandle sublayer;

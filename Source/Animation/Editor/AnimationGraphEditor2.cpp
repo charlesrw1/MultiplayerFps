@@ -484,6 +484,16 @@ void AnimationGraphEditorNew::imgui_draw()
 
 bool AnimationGraphEditorNew::save_document_internal()
 {
+	Animation_Tree_CFG* outputTree = new Animation_Tree_CFG;
+	CompilationContext ctx;
+	opt<int> idx = find_entry_node(graph->get_root()->get_id(), true, *graph, GraphNodeHandle(), ctx);
+	for (auto& [id, errs] : ctx.node_to_err_messages) {
+		for (auto& er : errs) {
+			printf("%d %s\n", id, er.message.c_str());
+		}
+	}
+	delete tree_cfg;
+
 	return false;
 }
 
