@@ -4,6 +4,7 @@
 #include "Animation/Runtime/RuntimeNodesNew.h"
 #include <variant>
 using std::variant;
+opt<int> create_linked_node(CompilationContext& ctx, int input_index, Base_EdNode* node);
 
 class AnimationSeqAsset;
 
@@ -58,10 +59,10 @@ public:
 	}
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimSource); }
 	string get_subtitle() const override;
+	void compile(CompilationContext& ctx) final;
 
 	bool is_evaluator = false;
-
-	REF stClipNode Data;
+	REF atClipNodeStruct Data;
 };
 #include "Animation/Runtime/Statemachine_cfg.h"
 class StateTransition_EdNode : public Base_EdNode
@@ -175,6 +176,7 @@ public:
 	}
 	void on_link_changes() override;
 	bool has_top_bar() override { return false; }
+	void compile(CompilationContext& ctx) final;
 
 	REFLECT(hide)
 	string variable_name;
@@ -185,13 +187,15 @@ class ComposePoses_EdNode : public Base_EdNode
 {
 public:
 	CLASS_BODY(ComposePoses_EdNode);
-	ComposePoses_EdNode(bool is_additive) {
+	ComposePoses_EdNode(bool is_additive) :is_additive(is_additive) {
 		add_out_port(0, "").type = GraphPinType::LocalSpacePose;
 		add_in_port(0, "0").type = GraphPinType::LocalSpacePose;
 		add_in_port(1, "1").type = GraphPinType::LocalSpacePose;
 		add_in_port(2, "alpha").type = GraphPinType::Float;
 	}
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimBlend); }
+	void compile(CompilationContext& ctx) final;
+	const bool is_additive = false;
 };
 class Blend2D_EdNode : public Base_EdNode {
 public:
@@ -237,6 +241,7 @@ public:
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimBlend); }
 	void on_link_changes() override;
 	void on_property_changes() override;
+	void compile(CompilationContext& ctx) final;
 
 	REFLECT();
 	int num_blend_cases = 0;
@@ -257,6 +262,7 @@ public:
 		add_in_port(3, "alpha").type = GraphPinType::Float;
 	}
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimBoneModify); }
+	void compile(CompilationContext& ctx) final;
 };
 
 class ModifyBone_EdNode : public Base_EdNode {
@@ -270,6 +276,8 @@ public:
 		add_in_port(3, "alpha").type = GraphPinType::Float;
 	}
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::AnimBoneModify); }
+	void compile(CompilationContext& ctx) final;
+
 	REF ModifyBoneType rotation = ModifyBoneType::None;
 	REF ModifyBoneType translation = ModifyBoneType::None;
 };
@@ -359,11 +367,12 @@ public:
 		Abs,
 		Remap,
 	};
+	const Type funcType = Type::ScaleBias;
 	FloatMathFuncs_EdNode() = default;
 	FloatMathFuncs_EdNode(Type t);
 
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Math); }
-
+	void compile(CompilationContext& ctx) final;
 };
 
 class Not_EdNode : public Base_EdNode {
@@ -373,13 +382,15 @@ public:
 		add_out_port(0, "").type = GraphPinType::Boolean;
 		add_in_port(0, "").type = GraphPinType::Boolean;
 	}
+	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Math); }
+	void compile(CompilationContext& ctx) final;
 };
 
 class LogicalOp_EdNode : public Base_EdNode {
 public:
 	CLASS_BODY(LogicalOp_EdNode);
 	LogicalOp_EdNode() = default;
-	LogicalOp_EdNode(bool isor) {
+	LogicalOp_EdNode(bool isor)  : is_or(isor) {
 		add_out_port(0, "").type = GraphPinType::Boolean;
 		add_in_port(0, "").type = GraphPinType::Boolean;
 		add_in_port(1, "").type = GraphPinType::Boolean;
@@ -388,7 +399,9 @@ public:
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Math); }
 	void on_link_changes() override;
 	void on_property_changes() override;
+	void compile(CompilationContext& ctx) final;
 	
 	REFLECT();
 	int num_inputs = 0;
+	const bool is_or = false;
 };

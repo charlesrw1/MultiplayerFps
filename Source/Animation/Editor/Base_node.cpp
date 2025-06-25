@@ -332,6 +332,9 @@ Base_EdNode* Base_EdNode::find_other_node_from_port(GraphPortHandle port)
 		return p->get_other_port(self).get_node_ptr(editor->get_graph());
 	return nullptr;
 }
+GraphPortHandle Base_EdNode::make_my_port_handle(int index, bool is_output) {
+	return GraphPortHandle::make(self, index, is_output);
+}
 void Base_EdNode::on_link_changes()
 {
 	ImNodes::SetNodeGridSpacePos(self.id,ImVec2(nodex, nodey));
@@ -369,4 +372,12 @@ const GraphPort* Base_EdNode::get_my_node_port(GraphLink whatlink)
 	auto [othernode, index, is_output] = whatlink.get_self_port(self).break_to_values();
 	assert(othernode == self);
 	return find_my_port(index, is_output);
+}
+
+void CompilationContext::compile_this(Base_EdNode* n)
+{
+	if (has_compiled_already(n->self))
+		return;
+	n->compile(*this);
+	SetUtil::insert_test_exists(compiled_already, n->self.id);
 }

@@ -31,5 +31,5 @@ private:
 	friend class EditModelAnimations;
 	REF int frame = 0;
 	REF int frame_duration = 0;
-	REF uint16_t editor_layer = 0;	// hacky, stores what layer it is in the editor for persistance
+	REF int16_t editor_layer = 0;	// hacky, stores what layer it is in the editor for persistance
 };

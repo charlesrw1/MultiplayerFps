@@ -21,13 +21,13 @@
 #include "Animation/AnimationSeqAsset.h"
 
 #include <unordered_set>
-
 struct RootMotionTransform
 {
 	glm::vec3 position_displacement=glm::vec3(0.f);
 	glm::quat rotation_displacement=glm::quat();
 };
 
+class atGraphContext;
 class Pose;
 class Animator;
 class MSkeleton;
@@ -184,6 +184,7 @@ private:
 	friend class NodeRt_Ctx;
 	friend class EditModelAnimations;
 	friend class AnimationEditorTool;
+	friend class atGraphContext;
 };
 
 

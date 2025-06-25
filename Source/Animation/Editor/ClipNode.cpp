@@ -1,6 +1,77 @@
 #include "ClipNode.h"
 #include "AnimationGraphEditor2.h"
 
+#include "Animation/Runtime/RuntimeNodesNew.h"
+
+template<typename T, typename... Ts>
+inline T get_or(const std::variant<Ts...>& v, const T& fallback) {
+	if (auto ptr = std::get_if<T>(&v)) {
+		return *ptr;
+	}
+	return fallback;
+}
+#include "Animation/Runtime/RuntimeValueNodes.h"
+
+opt<int> create_linked_node(CompilationContext& ctx, int input_index, Base_EdNode* node)
+{
+	auto port = node->find_my_port(input_index, false);
+	if (!port) {
+		ctx.add_error(node->self, "Couldn't find port index");
+		return std::nullopt;
+	}
+
+	using std::get;
+	opt<GraphLink> link = node->find_link_from_port(port->get_handle(node->self));
+	if (!link.has_value()) {
+		opt<variant<bool, int, float, vec3>> values;
+		switch (port->type.type) {
+		case GraphPinType::Float: {
+			values = get_or<float>(port->inlineValue, 0.f);
+		}break;
+		case GraphPinType::EnumType:
+		case GraphPinType::Integer: {
+			values = get_or<int>(port->inlineValue, 0);
+		}break;
+		case GraphPinType::Boolean: {
+			values = get_or<bool>(port->inlineValue, false);
+		}break;
+		case GraphPinType::Vec3: {
+			values = get_or<vec3>(port->inlineValue, vec3(0.f));
+		}break;
+		default:
+			break;
+		}
+		if (values.has_value()) {
+			atConstantNode* outnode = new atConstantNode;
+			outnode->values = values.value();
+			return ctx.add_inline_output_node(node->self,port->get_idx(), outnode);
+		}
+		else {
+			return std::nullopt;
+		}
+	}
+	else {
+		auto otherport = node->get_other_nodes_port(link.value());
+		auto othernode = node->editor->get_graph().get_node(link->get_other_node(node->self));
+		if (!otherport || !othernode) {
+			ctx.add_warning(node->self, "no other port?");
+			return std::nullopt;
+		}
+		else if (otherport->type != port->type) {
+			ctx.add_error(node->self, "type mismatch on port");
+			return std::nullopt;
+		}
+		ctx.compile_this(othernode);
+		auto outhandle = otherport->get_handle(othernode->self).id;
+
+		if (!MapUtil::contains(ctx.output_nodes, outhandle)) {
+			ctx.add_error(node->self, "node not found");
+		}
+		return outhandle;
+	}
+}
+
+
 
 class LayerOwnerUtil
 {
@@ -57,6 +128,17 @@ void Variable_EdNode::on_link_changes()
 		find_my_port(0, true)->type = GraphPinType::Any;
 	}
 	find_my_port(0, true)->name = variable_name;
+}
+void Variable_EdNode::compile(CompilationContext& ctx)
+{
+	if (!foundType.has_value()) {
+		ctx.add_error(self, "Variable has no type.");
+	}
+	else {
+		atVariableNode* out = new atVariableNode;
+		out->varName = this->variable_name;
+		ctx.add_output_node(self,0, out);
+	}
 }
 #include "AnimCommands.h"
 void BlendInt_EdNode::on_link_changes()
@@ -139,6 +221,16 @@ void BlendInt_EdNode::on_property_changes() {
 	on_link_changes();
 }
 
+void BlendInt_EdNode::compile(CompilationContext& ctx)
+{
+	atBlendByInt* out = new atBlendByInt;
+	out->valudId = create_linked_node(ctx, get_index_of_value_input(), this).value_or(0);
+	for (int i = 0; i < num_blend_cases; i++) {
+		out->inputs.push_back(create_linked_node(ctx, i, this).value_or(0));
+	}
+	ctx.add_output_node(self, 0, out);
+}
+
 BlendInt_EdNode::BlendInt_EdNode() {
 	add_out_port(0, "").type = GraphPinType::LocalSpacePose;
 	add_in_port(0, "0").type = GraphPinType::LocalSpacePose;
@@ -179,8 +271,21 @@ void LogicalOp_EdNode::on_property_changes()
 		num_inputs = MAX_INPUTS;
 	on_link_changes();
 }
+void LogicalOp_EdNode::compile(CompilationContext& ctx)
+{
+	atLogicalOpNode* out = new atLogicalOpNode;
+	out->is_and = !this->is_or;
+	for (int i = 0; i < num_inputs; i++) {
+		opt<GraphLink> l = find_link_from_port(GraphPortHandle::make(self, i, false));
+		if (l.has_value()) {
+			out->nodes.push_back(create_linked_node(ctx, i, this).value_or(0));
+		}
+	}
+	ctx.add_output_node(self, 0, out);
+
+}
 #include "Animation/Runtime/Statemachine_cfg.h"//for easing, fixme
-FloatMathFuncs_EdNode::FloatMathFuncs_EdNode(Type t) {
+FloatMathFuncs_EdNode::FloatMathFuncs_EdNode(Type t) : funcType(t) {
 	switch (t)
 	{
 	case Type::ScaleBias:
@@ -236,6 +341,10 @@ FloatMathFuncs_EdNode::FloatMathFuncs_EdNode(Type t) {
 	default:
 		break;
 	}
+}
+
+void FloatMathFuncs_EdNode::compile(CompilationContext& ctx)
+{
 }
 
 void State_EdNode::on_link_changes()
@@ -322,6 +431,24 @@ string Clip_EdNode::get_subtitle() const {
 	return "";
 }
 
+
+void Clip_EdNode::compile(CompilationContext& ctx)
+{
+	assert(find_my_port(0, true));
+	if (!Data.Clip.get()) {
+		ctx.add_error(self, "Animation clip invalid.");
+	}
+	else {
+		atClipNode* out = new atClipNode;
+		out->data = this->Data;
+		opt<int> speedId = create_linked_node(ctx, 0, this);
+		out->speedId = speedId.value_or(0);
+		if (!speedId.has_value()) {
+			ctx.add_error(self, "Doesnt have speed input.");
+		}
+		ctx.add_output_node(self,0, out);
+	}
+}
 void StateAlias_EdNode::fixup_any_extra_references(const unordered_map<int, int>& old_id_to_new_id) {
 	for (auto& h : data.handles) {
 		if (MapUtil::contains(old_id_to_new_id, h.handle.id)) {
@@ -363,4 +490,43 @@ void StateAlias_EdNode::on_link_changes()
 
 		data.handles.push_back(handle);
 	}
+}
+
+void ComposePoses_EdNode::compile(CompilationContext& ctx)
+{
+	atComposePoses* combine = new atComposePoses;
+	combine->type = is_additive ? atComposePoses::Additive : atComposePoses::Blend;
+	combine->alphaId = create_linked_node(ctx, 0, this).value_or(0);
+	combine->pose0Id = create_linked_node(ctx, 1, this).value_or(0);
+	combine->pose1Id = create_linked_node(ctx, 2, this).value_or(0);
+	ctx.add_output_node(self, 0, combine);
+}
+
+void Not_EdNode::compile(CompilationContext& ctx)
+{
+	atNotNode* not_node = new atNotNode;
+	not_node->input = create_linked_node(ctx, 0, this).value_or(0);
+	ctx.add_output_node(self, 0, not_node);
+}
+
+void Ik2Bone_EdNode::compile(CompilationContext& ctx)
+{
+	atIk2Bone* out = new atIk2Bone;
+	out->inputId = create_linked_node(ctx, 0, this).value_or(0);
+	out->targetId = create_linked_node(ctx, 1, this).value_or(0);
+	out->poleId = create_linked_node(ctx, 2, this).value_or(0);
+	out->alphaId = create_linked_node(ctx, 3, this).value_or(0);
+	ctx.add_output_node(self, 0, out);
+}
+
+void ModifyBone_EdNode::compile(CompilationContext& ctx)
+{
+	atModifyBone* out = new atModifyBone;
+	out->inputId = create_linked_node(ctx, 0, this).value_or(0);
+	out->translationId = create_linked_node(ctx, 1, this).value_or(0);
+	out->rotationId = create_linked_node(ctx, 2, this).value_or(0);
+	out->alphaId = create_linked_node(ctx, 3, this).value_or(0);
+	out->rotation = this->rotation;
+	out->translation = this->translation;
+	ctx.add_output_node(self, 0, out);
 }

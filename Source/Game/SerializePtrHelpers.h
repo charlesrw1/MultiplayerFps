@@ -38,11 +38,11 @@ public:
 	operator bool() const {
 		return is_valid();
 	}
-	T* operator->() { 
+	T* operator->() const { 
 		assert(is_valid());
 		return ptr; 
 	}
-	T& operator*() {
+	T& operator*() const {
 		assert(is_valid());
 		return *ptr; 
 	}

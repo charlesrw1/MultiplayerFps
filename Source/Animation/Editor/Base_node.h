@@ -235,8 +235,43 @@ struct CompilationError
 		WARN,
 		INFO,
 	}type = ERROR;
-	GraphNodeHandle node;
 	string message;
+
+	CompilationError(ErrorType type, string message) : type(type), message(message) {}
+};
+using std::unordered_map;
+using std::unordered_set;
+
+struct CompilationContext {
+	void add_error(GraphNodeHandle h, string er) {
+		node_to_err_messages[h.id].push_back(CompilationError(CompilationError::ERROR,er));
+	}
+	void add_warning(GraphNodeHandle h, string er) {
+		node_to_err_messages[h.id].push_back(CompilationError(CompilationError::WARN, er));
+	}
+	void add_info(GraphNodeHandle h, string er) {
+		node_to_err_messages[h.id].push_back(CompilationError(CompilationError::INFO, er));
+	}
+
+	int add_output_node(GraphNodeHandle self,int output_idx, ClassBase* ptr) {
+		auto handle = GraphPortHandle::make(self, output_idx, true);
+		MapUtil::insert_test_exists(output_nodes, handle.id, ptr);
+		return handle.id;
+	}
+	int add_inline_output_node(GraphNodeHandle self, int input_idx, ClassBase* ptr) {
+		auto handle = GraphPortHandle::make(self, input_idx, false);
+		MapUtil::insert_test_exists(output_nodes, handle.id, ptr);
+		return handle.id;
+	}
+
+	bool has_compiled_already(GraphNodeHandle h) const {
+		return SetUtil::contains(compiled_already, h.id);
+	}
+	void compile_this(Base_EdNode* n);
+
+	unordered_set<int> compiled_already;
+	unordered_map<int, ClassBase*> output_nodes;
+	unordered_map<int, vector<CompilationError>> node_to_err_messages;
 };
 
 enum class EdNodeCategory
@@ -250,7 +285,6 @@ enum class EdNodeCategory
 };
 Color32 get_color_for_category(EdNodeCategory cat);
 
-using std::unordered_map;
 class AnimationGraphEditorNew;
 class Base_EdNode : public ClassBase
 {
@@ -286,6 +320,8 @@ public:
 	virtual bool draw_links_as_arrows() { return false; }
 	virtual bool is_link_attached_node() { return false; }
 
+	virtual void compile(CompilationContext& ctx) {}
+
 	GraphPortHandle getinput_id(int inputslot) const {
 		return inputslot + self.id * MAX_INPUTS + INPUT_START;
 	}
@@ -315,10 +351,6 @@ public:
 
 	virtual void on_link_changes();
 
-	struct RemovedPortToPutBack {
-		string portname;
-		GraphPortHandle other;
-	};
 	GraphPort& add_in_port(int index, string name);
 	GraphPort& add_out_port(int index, string name);
 	opt<int> find_my_port_idx(int index, bool output);
@@ -342,6 +374,7 @@ public:
 	const GraphPort* get_other_nodes_port_from_myport(GraphPortHandle handle);
 	void remove_links_without_port();
 	void remove_port(int index, bool is_output);
+	GraphPortHandle make_my_port_handle(int index, bool is_output);
 
 	string name;
 	vector<GraphPort> ports;

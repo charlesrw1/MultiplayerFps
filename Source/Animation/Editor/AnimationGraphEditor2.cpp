@@ -224,6 +224,7 @@ void GraphTabManager::draw_popup_menu()
 	}
 }
 #include "Basic_nodes.h"
+#include "Bttest.h"
 
 void AnimationGraphEditorNew::init_node_factory()
 {
@@ -289,6 +290,16 @@ void AnimationGraphEditorNew::init_node_factory()
 	prototypes.add("State", []() {return new State_EdNode(); });
 	prototypes.add("StateAlias", []() {return new StateAlias_EdNode(); });
 	prototypes.add("EntryState", []() {return new Func_EdNode(Func_EdNode::EntryState); });
+
+	prototypes.add("Parallel", []() {return new btParallel_EdNode(); });
+	prototypes.add("Selector", []() {return new btComposite_EdNode(true); });
+	prototypes.add("Sequence", []() {return new btComposite_EdNode(false); });
+
+	prototypes.add("Filter", []() {return new btFilter_EdNode(); });
+	prototypes.add("Action", []() {return new btAction_EdNode(); });
+	prototypes.add("ConditionalLoop", []() {return new btFilter_EdNode(); });
+	prototypes.add("TimeLimit", []() {return new btDecorator_EdNode(); });
+	prototypes.add("Cooldown", []() {return new btDecorator_EdNode(); });
 
 
 
@@ -368,6 +379,26 @@ void AnimationGraphEditorNew::init_node_factory()
 
 
 	animGraphMenu.add("Comment");
+
+	NodeMenu behaviors;
+	behaviors
+		.add("Sequence")
+		.add("Parallel")
+		.add("Selector")
+		.add("Filter")
+		.add("Action")
+		.add("ConditionalLoop")
+		.add("TimeLimit")
+		.add("Cooldown");
+	auto subclasses = ClassBase::get_subclasses<btDecorator>();
+	for (; !subclasses.is_end(); subclasses.next()) {
+		prototypes.add(subclasses.get_type()->classname, []() { return new btDecorator_EdNode(); });
+		behaviors.add(subclasses.get_type()->classname);
+	}
+
+	//animGraphMenu.add_submenu("Behavior", behaviors);
+
+
 }
 void AnimationGraphEditorNew::delete_selected()
 {

@@ -6,11 +6,7 @@
 #include "../Runtime/AnimationTreeLocal.h"
 #include "Animation/Editor/AnimationGraphEditor.h"
 #include "Framework/Reflection2.h"
-
-enum class MathNodeType
-{
-	Add,Sub,Mult,Div,Lt,Gt,Leq,Geq,Eq,Neq
-};
+#include "../Runtime/RuntimeValueNodes.h"
 
 inline bool is_math_node_type_a_comparison(MathNodeType t) {
 	if (t == MathNodeType::Add || t == MathNodeType::Sub || t == MathNodeType::Mult || t == MathNodeType::Div)
@@ -56,6 +52,8 @@ public:
 			add_out_port(0, "");
 		}
 	}
+	void compile(CompilationContext& ctx) final;
+
 	Color32 get_node_color() const override { return get_color_for_category(EdNodeCategory::Math); }
 	void on_link_changes() override;
 	MathNodeType type;

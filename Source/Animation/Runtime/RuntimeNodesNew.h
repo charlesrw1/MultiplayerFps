@@ -4,6 +4,19 @@
 #include "SyncTime.h"
 #include "Framework/StructReflection.h"
 #include "Animation/Editor/Optional.h"
+#include "Framework/PropertyPtr.h"
+#include "Animation/SkeletonData.h"
+#include "Animation/Runtime/Animation.h"
+#include <variant>
+using std::variant;
+using glm::vec3;
+using glm::vec2;
+class atValueNode;
+class AnimatorInstance;
+class atClipNode;
+class Pose;
+class atInitContext;
+struct BoneIndexRetargetMap;
 
 class AnimCurveData {
 public:
@@ -12,25 +25,28 @@ class AnimEventBuffer {
 public:
 };
 
-class AnimatorInstance;
-class AnimTreeGraphContext
+class atGraphContext
 {
 public:
-	AnimatorInstance* instance = nullptr;
-	SyncGroupData* find_sync_group(StringName name) const;
-	const MSkeleton* get_skeleton() const;
-	AnimEventBuffer* event_buffer = nullptr;
-};
+	atGraphContext(AnimatorInstance& inst, AnimEventBuffer& ev, AnimCurveData& cur, const MSkeleton& skel)
+		: instance(inst), events(ev), curves(cur), skeleton(skel)
+	{
 
-class Pose;
-class AnimTreeUpdateStack
+	}
+	SyncGroupData& find_sync_group(StringName name) const;
+
+	AnimatorInstance& instance;
+	AnimEventBuffer& events;
+	AnimCurveData& curves;
+	const MSkeleton& skeleton;
+};
+class atUpdateStack
 {
 public:
-	AnimTreeUpdateStack(AnimTreeGraphContext& graph) : graph(graph) {}
-	AnimTreeGraphContext& graph;
-	AnimTreeGraphContext& get_graph() { return graph; }
-	vector<void*> playing_clip_nodes;
-	AnimCurveData* curves = nullptr;
+	atUpdateStack(atGraphContext& graph) : graph(graph) {}
+	atGraphContext& graph;
+	atGraphContext& get_graph() { return graph; }
+	vector<variant<atClipNode*>> playing_clip_nodes;
 	Pose* pose = nullptr;
 	float dt = 0.0;
 	// if true, then clip will return that it is finished when current_time + auto_transition_time >= clip_time
@@ -38,8 +54,8 @@ public:
 	float automatic_transition_time = 0.0;
 };
 
-struct stClipNode {
-	STRUCT_BODY(ClipNode_SData);
+struct atClipNodeStruct {
+	STRUCT_BODY();
 	REF AssetPtr<AnimationSeqAsset> Clip;
 
 	REF bool loop = true;
@@ -59,134 +75,199 @@ NEWENUM(ModifyBoneType, int)
 	Localspace,
 	LocalspaceAdd
 };
-using glm::vec3;
-using glm::vec2;
 
 class AnimTreePoseNode : public ClassBase {
 public:
 	CLASS_BODY(AnimTreePoseNode);
 	struct Inst {
 		virtual ~Inst() {}
-		virtual void get_pose(AnimTreeUpdateStack& context) {}
+		virtual void get_pose(atUpdateStack& context) {}
 		virtual void reset() {}
 	};
-	virtual Inst* create_inst() { return nullptr; }
+	virtual Inst* create_inst(atInitContext& ctx) const = 0;
 };
-
 using PoseNodeInst = AnimTreePoseNode::Inst;
 
-class GraphValueNode : public ClassBase {
+class atInitContext {
 public:
-	virtual bool get_bool() const;
-	virtual int get_int() const;
-	virtual float get_float(int index) const;
-	virtual vec2 get_vector2() const;
-	virtual vec3 get_vector3() const;
-	virtual StringName get_name() const;
-};
-class GraphValueConstant : public GraphValueNode {
-public:
-};
-class GraphValueOperator : public GraphValueNode {
-public:
-};
-class GraphValueVariable : public GraphValueNode {
-public:
-};
-class GraphValueFunction : public GraphValueNode {
-public:
+	template<typename T>
+	T* find_node(int nodeid) {
+		return nullptr;
+	}
+
+	PoseNodeInst* create_inst(int nodeid) {
+		return nullptr;
+	}
+	atValueNode* find_value(int nodeidx) {
+		return nullptr;
+	}
+
+	AnimatorInstance* animatorInstance = nullptr;
+	const ClassTypeInfo* whatType = nullptr;
 };
 
-struct BoneIndexRetargetMap;
-class ClipNode : public AnimTreePoseNode {
+class atClipNode : public AnimTreePoseNode {
 public:
-	CLASS_BODY(ClipNode);
+	CLASS_BODY(atClipNode);
 	struct Inst : public PoseNodeInst {
-		Inst(ClipNode& o) : owner(o) {}
+		Inst(const atClipNode& o, atInitContext& ctx) : owner(o) {
+			this->speed = ctx.find_value(o.speedId);
+			const AnimationSeqAsset& seq = *o.data.Clip;
+			this->clip = seq.seq;
+			MSkeleton* skel = (MSkeleton*)ctx.animatorInstance->get_skel();
+			this->remap = skel->get_remap(seq.srcModel->get_skel());
+		}
 
-		ClipNode& owner;
+		const atClipNode& owner;
 		const AnimationSeq* clip = nullptr;
 		const BoneIndexRetargetMap* remap = nullptr;
 		float anim_time = 0.0;
+		atValueNode* speed = nullptr;
 
-		void get_pose(AnimTreeUpdateStack& context) override;
-		void reset() override;
+		void get_pose(atUpdateStack& context) final;
+		void reset() final;
 		float get_clip_length() const;
 		bool has_sync_group() const;
-		float get_speed() const;
+		float get_speed(atUpdateStack& ctx) const;
 	};
-	PoseNodeInst* create_inst() final { return new Inst(*this); }
-	REF stClipNode data;
+	PoseNodeInst* create_inst(atInitContext& ctx) const final { return new Inst(*this, ctx); }
+	REF atClipNodeStruct data;
+	REF int speedId = 0;
 };
 
-
-class Ik2Bone : public AnimTreePoseNode {
+// Both add and blend nodes
+class atComposePoses : public AnimTreePoseNode {
 public:
-	CLASS_BODY(Ik2Bone);
+	CLASS_BODY(atComposePoses);
 	struct Inst : public PoseNodeInst {
-		PoseNodeInst* input = nullptr;
-		GraphValueNode* target = nullptr;
-		GraphValueNode* pole = nullptr;
-		GraphValueNode* alpha = nullptr;
+		Inst(const atComposePoses& owner,atInitContext& ctx) {
+			pose0 = ctx.create_inst(owner.pose0Id);
+			pose1 = ctx.create_inst(owner.pose1Id);
+			alpha = ctx.find_value(owner.alphaId);
+		}
+		void get_pose(atUpdateStack& context) final {}
 
-		void get_pose(AnimTreeUpdateStack& context) override {}
+		PoseNodeInst* pose0 = nullptr;
+		PoseNodeInst* pose1 = nullptr;
+		atValueNode* alpha = nullptr;
 	};
-	PoseNodeInst* create_inst() final { return new Inst(); }
+	REF int pose0Id = 0;
+	REF int pose1Id = 0;
+	REF int alphaId = 0;
+	
+	enum Type {
+		Blend,Additive
+	};
+	REF int8_t type = Blend;
+
+	PoseNodeInst* create_inst(atInitContext& ctx) const final { return new Inst(*this,ctx); }
 };
-class ModifyBone : public AnimTreePoseNode {
-public:
-	CLASS_BODY(ModifyBone);
-	struct Inst : public PoseNodeInst {
-		Inst(ModifyBone& owner) :owner(owner) {}
-		ModifyBone& owner;
-		PoseNodeInst* input = nullptr;
-		GraphValueNode* translation = nullptr;
-		GraphValueNode* rotation = nullptr;
-		GraphValueNode* alpha = nullptr;
 
-		void get_pose(AnimTreeUpdateStack& context) override {}
+class atIk2Bone : public AnimTreePoseNode {
+public:
+	CLASS_BODY(atIk2Bone);
+	struct Inst : public PoseNodeInst {
+		PoseNodeInst* input = nullptr;
+		atValueNode* target = nullptr;
+		atValueNode* pole = nullptr;
+		atValueNode* alpha = nullptr;
+
+		void get_pose(atUpdateStack& context) final {}
 	};
-	PoseNodeInst* create_inst() final { return new Inst(*this); }
+	PoseNodeInst* create_inst(atInitContext& ctx) const final { return new Inst(); }
+	REF int inputId = 0;
+	REF int targetId = 0;
+	REF int poleId = 0;
+	REF int alphaId = 0;
+};
+class atModifyBone : public AnimTreePoseNode {
+public:
+	CLASS_BODY(atModifyBone);
+	struct Inst : public PoseNodeInst {
+		Inst(const atModifyBone& owner, atInitContext& ctx) :owner(owner) {
+			input = ctx.create_inst(owner.inputId);
+			translation = ctx.find_value(owner.translationId);
+			rotation = ctx.find_value(owner.rotationId);
+			alpha = ctx.find_value(owner.alphaId);
+		}
+		const atModifyBone& owner;
+		PoseNodeInst* input = nullptr;
+		atValueNode* translation = nullptr;
+		atValueNode* rotation = nullptr;
+		atValueNode* alpha = nullptr;
+
+		void get_pose(atUpdateStack& context) final {}
+	};
+	PoseNodeInst* create_inst(atInitContext& ctx) const final { return new Inst(*this,ctx); }
 	REF ModifyBoneType translation={};
 	REF ModifyBoneType rotation={};
+	REF int inputId = 0;
+	REF int translationId = 0;
+	REF int rotationId = 0;
+	REF int alphaId = 0;
 };
 
-class BlendByInt : public AnimTreePoseNode {
+class atBlendByInt : public AnimTreePoseNode {
 public:
-	CLASS_BODY(BlendByInt);
+	CLASS_BODY(atBlendByInt);
 	struct Inst : public PoseNodeInst {
-		Inst(BlendByInt& owner) :owner(owner) {}
-		BlendByInt& owner;
-		PoseNodeInst* default_input = nullptr;
+		Inst(const atBlendByInt& owner, atInitContext& ctx) {
+			value = ctx.find_value(owner.valudId);
+			for (int i : owner.inputs)
+				this->inputs.push_back(ctx.create_inst(i));
+		}
+		void get_pose(atUpdateStack& context) final {}
+		void reset() final {}
+
 		vector<PoseNodeInst*> inputs;
 		opt<int> current_input;
-		GraphValueNode* value = nullptr;
+		atValueNode* value = nullptr;
 	};
+	REF vector<int> inputs;
+	REF int valudId = 0;
+	PoseNodeInst* create_inst(atInitContext& ctx) const final { return new Inst(*this, ctx); }
 };
-struct AnimStatemachineTransition
-{
-	STRUCT_BODY(AnimStatemachineTransition);
-	REF int transition_condition = -1;
+struct atSmTransition {
+	STRUCT_BODY();
+	REF int transition_condition = 0;
 	REF bool interruptable = true;
 	REF float transition_time = 0.2;
 	REF bool is_auto_transition = false;
 
 };
-struct AnimStatemachineState
-{
-	STRUCT_BODY(AnimStatemachineState);
-	REF int graph_root_node = -1;
+struct atSmState {
+	STRUCT_BODY();
+	REF int graph_root_node = 0;
 	REF vector<int> transitions;
 };
 
-class AnimStatemachine : public AnimTreePoseNode {
+class atAnimStatemachine : public AnimTreePoseNode {
 public:
-	CLASS_BODY(AnimStatemachine);
+	CLASS_BODY(atAnimStatemachine);
 	struct Inst : public PoseNodeInst {
-		Inst(AnimStatemachine& owner) :owner(owner) {}
-		AnimStatemachine& owner;
+		Inst(const atAnimStatemachine& owner, atInitContext& ctx) :owner(owner) {
+			for (auto& t : owner.transitions)
+				transition_conds.push_back(ctx.find_value(t.transition_condition));
+			for (auto& s : owner.states)
+				state_pose_insts.push_back(ctx.create_inst(s.graph_root_node));
+		}
+		void get_pose(atUpdateStack& context) final {}
+		void reset() final {}
+
+		const atAnimStatemachine& owner;
+		opt<int> active_state;
+		opt<int> fading_out_state;
+		opt<int> active_transition;
+		Pose* cached_pose_from_transition = nullptr;
+		float blend_duration = 0.0;
+		float blend_percentage = 0.0;
+
+		vector<PoseNodeInst*> state_pose_insts;
+		vector<atValueNode*> transition_conds;
 	};
-	REF vector<AnimStatemachineTransition> transitions;
-	REF vector<AnimStatemachineState> states;
+	REF vector<atSmTransition> transitions;
+	REF vector<atSmState> states;
 	REF vector<int> entry_transitions;
+
+	PoseNodeInst* create_inst(atInitContext& ctx) const final { return new Inst(*this, ctx); }
 };
