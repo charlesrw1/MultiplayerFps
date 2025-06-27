@@ -1,18 +1,7 @@
-#include "AnimationTreeLocal.h"
-#include "../AnimationUtil.h"
-#include "Framework/DictWriter.h"
-#include "Framework/DictParser.h"
-#include "Framework/ReflectionMacros.h"
-#include "Framework/ArrayReflection.h"
+
 #include "Framework/AddClassToFactory.h"
-
-#include "Statemachine_cfg.h"
-
-#include "AssetCompile/Someutils.h"
 #include "Assets/AssetRegistry.h"
-#include "Framework/Files.h"
-#include "Animation/Editor/AnimationGraphEditorPublic.h"
-
+extern IEditorTool* g_anim_ed_graph;
 #ifdef EDITOR_BUILD
 class AnimGraphAssetMeta : public AssetMetadata
 {
@@ -44,7 +33,7 @@ REGISTER_ASSETMETADATA_MACRO(AnimGraphAssetMeta);
 Pool_Allocator<Pose> g_pose_pool = Pool_Allocator<Pose>(100, "g_pose_pool");
 Pool_Allocator<MatrixPose> g_matrix_pool = Pool_Allocator<MatrixPose>(10,"g_matrix_pool");
 
-
+#if 0
 CLASS_IMPL(BaseAGNode);
 
 // Pose nodes
@@ -385,120 +374,6 @@ bool Add_Node_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const
 	return ret;
 }
 
-// Inherited via At_Node
-
-void Animation_Tree_CFG::construct_all_nodes(NodeRt_Ctx& ctx) const {
-	for (int i = 0; i < all_nodes.size(); i++)
-		all_nodes[i]->construct(ctx);
-}
-
-bool Animation_Tree_CFG::post_load_init()
-{
-	for (int i = 0; i < all_nodes.size(); i++) {
-		all_nodes[i]->node_index = i;
-		all_nodes[i]->initialize(this);
-	}
-	BaseAGNode* rootagnode = serialized_nodecfg_ptr_to_ptr(root, this);
-	if (rootagnode) {
-		root = rootagnode->cast_to<Node_CFG>();
-		ASSERT(root);
-	}
-	else
-		root = nullptr;
-
-	if (!root)
-		graph_is_valid = false;
-
-	return graph_is_valid;
-}
-
-int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
- {
-	 for (int i = 0; i < all_nodes.size(); i++) {
-		 if (ptr == all_nodes[i]) return i;
-	 }
-	 return -1;
- }
-
-
-
- bool Animation_Tree_CFG::read_from_dict(DictParser& in, IAssetLoadingInterface* load)
- {
-	 if (!in.expect_string("runtime") || !in.expect_item_start())
-		 return false;
-
-	 {
-		 if (!in.expect_string("rootdata") || !in.expect_item_start())
-			 return false;
-		 auto res = read_properties(*get_props(), this, in, {}, {},load);
-
-		 if (!res.second || !in.check_item_end(res.first))
-			 return false;
-	 }
-
-	 {
-		 if (!in.expect_string("nodes") || !in.expect_list_start())
-			 return false;
-
-		bool good =  in.read_list_and_apply_functor([&](StringView view) -> bool
-			 {
-				BaseAGNode* node = read_object_properties<BaseAGNode>({}, in, view, load);
-				 if (node) {
-					 all_nodes.push_back(node);
-					 return true;
-				 }
-				 return false;
-			 }
-		 );
-		if (!good)
-			return false;
-	 }
-
-	 {
-		 // old version
-		 if (!in.expect_string("params") || !in.expect_item_start() || !in.expect_item_end())
-			 return false;
-	 }
-
-
-
-	 return in.expect_item_end();
- }
-
-
- void Animation_Tree_CFG::write_to_dict(DictWriter& out)
- {
-
-	 // out.set_should_add_indents(true);
-	 out.write_key("runtime");
-	 out.write_item_start();
-
-	 AgSerializeContext ctx;
-	 ctx.set_tree(this);
-
-	 {
-		 out.write_key("rootdata");
-		 out.write_item_start();
-		 write_properties(*get_props(), this, out, &ctx);
-		 out.write_item_end();
-	 }
-
-	 {
-		 out.write_key_list_start("nodes");
-		 for (int i = 0; i < all_nodes.size(); i++) {
-			 auto& node = all_nodes[i];
-			 write_object_properties(node, &ctx, out);
-		 }
-		 out.write_list_end();
-	 }
-	 { 
-		 out.write_key("params");
-		 out.write_item_start();
-		 out.write_item_end();
-	 }
-
-	 out.write_item_end();
- }
 
 
  // base64 encoding
@@ -534,63 +409,6 @@ int Animation_Tree_CFG::get_index_of_node(Node_CFG* ptr)
 		 }
 	 }
  }
-
-
- float PropertyInfo::get_float(const void* ptr) const
- {
-	 ASSERT(type == core_type_id::Float);
-
-	 return *(float*)((char*)ptr + offset);
- }
-
- void PropertyInfo::set_float(void* ptr, float f) const
- {
-	 ASSERT(type == core_type_id::Float);
-
-	 *(float*)((char*)ptr + offset) = f;
- }
-
- uint64_t PropertyInfo::get_int(const void* ptr) const
- {
-	 ASSERT(is_integral_type());
-	 if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
-		 return *(int8_t*)((char*)ptr + offset);
-	 }
-	 else if (type == core_type_id::Int16 || type == core_type_id::Enum16) {
-		 return *(uint16_t*)((char*)ptr + offset);
-	 }
-	 else if (type == core_type_id::Int32 || type == core_type_id::Enum32) {
-		 return *(uint32_t*)((char*)ptr + offset);
-	 }
-	 else if (type == core_type_id::Int64) {
-		 return *(uint64_t*)((char*)ptr + offset);
-	 }
-	 else {
-		 ASSERT(0);
-		 return 0;
-	 }
- }
-
- void PropertyInfo::set_int(void* ptr, uint64_t i) const
- {
-	 ASSERT(is_integral_type());
-	 if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
-		 *(int8_t*)((char*)ptr + offset) = i;
-	 }
-	 else if (type == core_type_id::Int16 || type == core_type_id::Enum16) {
-		 *(uint16_t*)((char*)ptr + offset) = i;
-	 }
-	 else if (type == core_type_id::Int32 || type == core_type_id::Enum32) {
-		 *(uint32_t*)((char*)ptr + offset) = i;
-	 }
-	 else if (type == core_type_id::Int64) {
-		 *(uint64_t*)((char*)ptr + offset) = i;	// ERROR NARROWING
-	 }
-	 else {
-		 ASSERT(0);
-	 }
- }
-
 
 
 
@@ -866,6 +684,8 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 	 return res;
  }
 
+
+
  bool CopyBone_CFG::get_pose_internal(NodeRt_Ctx& ctx, GetPose_Ctx pose) const {
 	 bool res = input->get_pose(ctx, pose);
 	 auto rt = get_rt(ctx);
@@ -973,3 +793,4 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 	 // sample rootmotion,curves,events here
 	 return true;
  }
+#endif

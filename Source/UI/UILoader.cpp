@@ -45,14 +45,9 @@ void GuiFont::sweep_references(IAssetLoadingInterface* load) const {
 	load->touch_asset(font_texture);
 }
 
-// path/file.png -> path/
-inline std::string get_directory(const std::string& path)
-{
-	auto pos = path.rfind("/");
-	if (pos == std::string::npos)
-		return "";
-	return path.substr(0,pos+1);
-}
+
+#include "Framework/StringUtils.h"
+
 void GuiFont::post_load()
 {
 }
@@ -123,7 +118,7 @@ bool GuiFont::load_asset(IAssetLoadingInterface* load)
 
 		character_to_glyph.insert({ id,glyph });
 	}
-	std::string texpath = get_directory(get_name()) + texname;
+	std::string texpath = StringUtils::get_directory(get_name()) + "/" + texname;
 	auto tex = load->load_asset(&Texture::StaticType, texpath);
 	font_texture = tex->cast_to<Texture>();
 	return true;
@@ -131,12 +126,7 @@ bool GuiFont::load_asset(IAssetLoadingInterface* load)
 
 
 #include "GameEnginePublic.h"
-DECLARE_ENGINE_CMD(FONT_TEST)
-{
-	//auto font = g_fonts.load_font("courier_20.fnt");
 
-	//auto sz = GuiHelpers::calc_text_size("This is a string", font);
-}
 #include "Render/MaterialPublic.h"
 void GuiFontLoader::init()
 {

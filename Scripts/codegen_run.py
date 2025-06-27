@@ -3,7 +3,8 @@ import codegen_generate as generate
 import time
 
 def do_codegen(path:str, skip_dirs:list[str], full_rebuild:bool):
-    print("Starting codegen script...")
+
+    print(f"Starting codegen script... fullrebuild={full_rebuild}")
     start_time = time.perf_counter()
     typenames : dict[str,ClassDef] = read_typenames_from_files(skip_dirs)
 
@@ -15,9 +16,21 @@ def do_codegen(path:str, skip_dirs:list[str], full_rebuild:bool):
     elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds
     print(f"read enums and structs in {elapsed_time:.2f} ms")
 
-    source_files_to_build : list[tuple[str,str]] = get_source_files_to_build(path, skip_dirs, full_rebuild)
-
     GENERATED_ROOT = "./.generated/"
+    mega_file_time = 0.0
+    try:
+        mega_file_time = os.path.getmtime(GENERATED_ROOT+"MEGA.gen.cpp")
+    except:
+        pass
+    print(f"mega file time {mega_file_time}")
+
+    source_files_to_build : list[tuple[str,str]] = get_source_files_to_build(path, skip_dirs, full_rebuild,mega_file_time)
+    print(source_files_to_build)
+    if len(source_files_to_build)==0:
+        print("Skipping")
+        return
+    source_files_to_build : list[tuple[str,str]] = get_source_files_to_build(path, skip_dirs, full_rebuild,0.0)
+
     print("Cleaning .generated/...")
     clean_old_source_files(GENERATED_ROOT, full_rebuild)
 
@@ -29,8 +42,16 @@ def do_codegen(path:str, skip_dirs:list[str], full_rebuild:bool):
             output_files.append(output)
 
     print("Writing output...")
+
+    mega_output = ParseOutput()
     for o in output_files:
-        generate.write_output_file(GENERATED_ROOT,o.filename,o.root,o.classes,o.additional_includes, typenames)
+        mega_output.classes += o.classes
+        mega_output.additional_includes += o.additional_includes
+        mega_output.additional_includes.append(f'"{o.root}/{o.filename}"')
+
+    #for o in output_files:
+    #   generate.write_output_file(GENERATED_ROOT,o.filename,o.root,o.classes,o.additional_includes, typenames)
+    generate.write_output_file(GENERATED_ROOT,"MEGA.h",".",mega_output.classes,mega_output.additional_includes,typenames)
 
     end_time = time.perf_counter()
     elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds

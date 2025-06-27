@@ -693,7 +693,7 @@ def read_typenames_from_files(skip_dirs:list[str]) -> dict[str,ClassDef]:
 
 # read 
 
-def get_source_files_to_build(path:str, skip_dirs:list[str], add_all_files:bool) -> list[tuple[str,str]]:
+def get_source_files_to_build(path:str, skip_dirs:list[str], add_all_files:bool, time_to_check:float) -> list[tuple[str,str]]:
     source_files_to_build : list[tuple[str,str]] = []
     for root, _, files in os.walk(path):
         if should_skip_this(root, skip_dirs):
@@ -705,11 +705,11 @@ def get_source_files_to_build(path:str, skip_dirs:list[str], add_all_files:bool)
             generated_path : str = "./.generated" + (root[1:] if root == "." else root[1:]) + "/"
             generated_path += os.path.splitext(file_name)[-2] + ".gen.cpp"
             generated_path.replace("\\","/")
-            if not os.path.exists(generated_path) or add_all_files:
+            #if not os.path.exists(generated_path) or add_all_files:
+            #    source_files_to_build.append( (root,file_name) )
+            #else:
+            if add_all_files or os.path.getmtime(root+"/"+file_name) > time_to_check:
                 source_files_to_build.append( (root,file_name) )
-            else:
-                if os.path.getmtime(root+"/"+file_name) > os.path.getmtime(generated_path):
-                    source_files_to_build.append( (root,file_name) )
     return source_files_to_build
 
 def clean_old_source_files(GENERATED_ROOT:str,delete_all_generated:bool):

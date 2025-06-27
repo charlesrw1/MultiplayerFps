@@ -34,6 +34,10 @@ float visual_wheel_interp = 0.0053;
 
 void car_debug_menu()
 {
+	// thi
+	// 
+
+	float v = 0.0;
 	ImGui::DragFloat("spring_damp", &spring_damp,0.1,200);
 	ImGui::DragFloat("spring_constant", &spring_constant,0.1,0,500);
 
@@ -169,17 +173,22 @@ void CarComponent::update() {
 	//body->apply_force(ws_pos, side_vec  *steer_force* side_force_mult);
 }
 void CarDriver::update() {
-	auto move_vec = move->get_value<glm::vec2>();
+
+	float steer = Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX);
+	float accel_val = Input::get_con_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+	float deccel_val = Input::get_con_axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+
+	if (Input::was_con_button_pressed(SDL_CONTROLLER_BUTTON_A))
+		top_view = !top_view;
+
 	//printf("%f %f\n", move_vec.x, move_vec.y);
 
-	float accel_val = accel->get_value<float>();
-	float deccel_val = brake->get_value<float>();
 	car->forward_force = accel_val;
 	car->brake_force = deccel_val;
 
 	float speed = glm::length(car->body->get_linear_velocity());
 
-	float what_val = glm::max(1.0 - speed * steer_mult, 0.1) * glm::sign(move_vec.x) * glm::pow(glm::abs(move_vec.x), 2.0) * 0.7;
+	float what_val = glm::max(1.0 - speed * steer_mult, 0.1) * glm::sign(steer) * glm::pow(glm::abs(steer), 2.0) * 0.7;
 
 	set_steer_angle = damp_dt_independent(what_val, set_steer_angle, 0.0001, eng->get_dt());
 

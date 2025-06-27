@@ -236,7 +236,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 				const bool is_entity_root_of_prefab = context_menu_entity && context_menu_entity->what_prefab && PrefabToolsUtil::is_this_the_root_of_the_prefab(*context_menu_entity);
 				if (is_entity_root_of_prefab) {
 					if (ImGui::MenuItem("Select prefab in browser")) {
-						global_asset_browser.set_selected(context_menu_entity->what_prefab->get_name());
+						AssetBrowser::inst->set_selected(context_menu_entity->what_prefab->get_name());
 						ImGui::CloseCurrentPopup();
 					}
 					ImGui::Separator();

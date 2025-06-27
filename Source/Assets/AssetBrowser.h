@@ -3,10 +3,13 @@
 #include "Assets/AssetRegistry.h"
 #include "Render/Texture.h"
 #include "Game/SerializePtrHelpers.h"
+#include "Framework/ConsoleCmdGroup.h"
 class AssetBrowser
 {
 public:
-	void init();
+	static AssetBrowser* inst;
+	AssetBrowser();
+
 	void imgui_draw();
 
 	void clear_filter() {
@@ -50,7 +53,8 @@ public:
 
 	AssetOnDisk drag_drop;
 	std::string all_lower_cast_filter_name;
+
+	uptr<ConsoleCmdGroup> commands;
 };
 
-extern AssetBrowser global_asset_browser;
 #endif

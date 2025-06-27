@@ -3,45 +3,6 @@
 #include <SDL2/SDL.h>	// for enums
 #include <string>
 
-struct InputValue
-{
-	glm::vec2 v{};
-	template<typename T>
-	T get_value() const {
-		static_assert(0, "needs bool/float/vec2 type");
-		return T();
-	}
-	template<typename T>
-	void set_value(T x) {
-		static_assert(0, "needs bool/float/vec2 type");
-	}
-
-};
-template<>
-inline float InputValue::get_value<float>() const {
-	return v.x;
-}
-template<>
-inline glm::vec2 InputValue::get_value<glm::vec2>() const {
-	return v;
-}
-template<>
-inline bool InputValue::get_value<bool>() const {
-	return (v.x > 0.5) ? true : false;
-}
-
-template<>
-inline void InputValue::set_value<float>(float x) {
-	v.x = x;
-}
-template<>
-inline void InputValue::set_value<glm::vec2>(glm::vec2 x) {
-	v = x;
-}
-template<>
-inline void InputValue::set_value<bool>(bool x) {
-	v.x = (float)x;
-}
 
 enum class TriggerMask
 {

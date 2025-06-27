@@ -1,5 +1,4 @@
 #include "DrawLocal.h"
-
 #include "Framework/Util.h"
 #include "glad/glad.h"
 #include "Render/Texture.h"
@@ -10,22 +9,15 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "Animation/SkeletonData.h"
 #include "Animation/Runtime/Animation.h"
-
 #include "Debug.h"
-
 #include <SDL2/SDL.h>
-
 #include "Render/TerrainInterfaceLocal.h"
-
 #include "UI/GUISystemPublic.h"	// for GuiSystemPublic::paint
-
 #include "Assets/AssetDatabase.h"
-
 #include "Game/Components/ParticleMgr.h"	// FIXME
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
 #include "Render/UIDrawPublic.h"
-
 #include "tracy/public/tracy/Tracy.hpp"
 #include "tracy/public/tracy/TracyOpenGL.hpp"
 
@@ -192,54 +184,6 @@ private:
 };
 static TaaManager r_taa_manager;
 
-DECLARE_ENGINE_CMD(otex)
-{
-	static const char* usage_str = "Usage: otex <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
-	if (args.size() != 5) {
-		sys_print(Info, usage_str);
-		return;
-	}
-
-	float scale = atof(args.at(1));
-	float alpha = atof(args.at(2));
-	float mip = atof(args.at(3));
-	const char* texture_name = args.at(4);
-
-	draw.debug_tex_out.output_tex = g_assets.find_sync<Texture>(texture_name).get();
-	draw.debug_tex_out.scale = scale;
-	draw.debug_tex_out.alpha = alpha;
-	draw.debug_tex_out.mip = mip;
-
-
-	if (!draw.debug_tex_out.output_tex) {
-		sys_print(Error, "output_texture: couldn't find texture %s\n", texture_name);
-	}
-
-}
-DECLARE_ENGINE_CMD(ot)
-{
-	static const char* usage_str = "Usage: ot <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
-	if (args.size() != 2) {
-		sys_print(Info, usage_str);
-		return;
-	}
-	const char* texture_name = args.at(1);
-
-	draw.debug_tex_out.output_tex = g_assets.find_sync<Texture>(texture_name).get();
-	draw.debug_tex_out.scale = 1.f;
-	draw.debug_tex_out.alpha = 1.f;
-	draw.debug_tex_out.mip = 1.f;
-
-
-	if (!draw.debug_tex_out.output_tex) {
-		sys_print(Error, "output_texture: couldn't find texture %s\n", texture_name);
-	}
-
-}
-DECLARE_ENGINE_CMD(cot)
-{
-	draw.debug_tex_out.output_tex = nullptr;
-}
 
 
 /*
@@ -256,7 +200,7 @@ const uint DEBUG_SPECULAR = 7;
 const uint DEBUG_OBJID = 8;
 const uint DEBUG_LIGHTING_ONLY = 9;
 */
-
+//
 // special:
 static const int DEBUG_OUTLINED = 100;//uses objID
 
@@ -856,23 +800,16 @@ void Renderer::init()
 	InitGlState();
 
 	mem_arena.init("Render Temp", renderer_memory_arena_size.get_integer());
-
 	// Init scene draw buffers
 	scene.init();
-
 	create_shaders();
-	
 	create_default_textures();
-
 	glCreateBuffers(1, &ubo.current_frame);
-
 	InitFramebuffers(true, g_window_w.get_integer(), g_window_h.get_integer());
-
 	EnviornmentMapHelper::get().init();
 	volfog.init();
 	shadowmap.init();
 	ssao.init();
-
 	lens_dirt = g_assets.find_global_sync<Texture>("lens_dirt.jpg").get();
 
 	glGenVertexArrays(1, &vao.default_);
@@ -883,15 +820,51 @@ void Renderer::init()
 	glBindVertexArray(0);
 
 	on_level_start();
-
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);
-
-
 	auto brdf_lut = Texture::install_system("_brdf_lut");
 	brdf_lut->gl_id = EnviornmentMapHelper::get().integrator.lut_id;
-	brdf_lut->width = BRDF_PREINTEGRATE_LUT_SIZE;
-	brdf_lut->height = BRDF_PREINTEGRATE_LUT_SIZE;
+	brdf_lut->width = EnviornmentMapHelper::BRDF_PREINTEGRATE_LUT_SIZE;
+	brdf_lut->height = EnviornmentMapHelper::BRDF_PREINTEGRATE_LUT_SIZE;
 	brdf_lut->type = Texture_Type::TEXTYPE_2D;
+	consoleCommands = ConsoleCmdGroup::create("");
+	consoleCommands->add("cot", [this](const Cmd_Args& args) { debug_tex_out.output_tex = nullptr; });
+	consoleCommands->add("ot", [this](const Cmd_Args& args) { 
+		static const char* usage_str = "Usage: ot <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
+		if (args.size() != 2) {
+			sys_print(Info, usage_str);
+			return;
+		}
+		const char* texture_name = args.at(1);
+
+		debug_tex_out.output_tex = g_assets.find_sync<Texture>(texture_name).get();
+		debug_tex_out.scale = 1.f;
+		debug_tex_out.alpha = 1.f;
+		debug_tex_out.mip = 1.f;
+
+
+		if (!debug_tex_out.output_tex) {
+			sys_print(Error, "output_texture: couldn't find texture %s\n", texture_name);
+		}	
+		});
+	consoleCommands->add("otex", [this](const Cmd_Args& args){
+			static const char* usage_str = "Usage: otex <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
+			if (args.size() != 5) {
+				sys_print(Info, usage_str);
+				return;
+			}
+			float scale = atof(args.at(1));
+			float alpha = atof(args.at(2));
+			float mip = atof(args.at(3));
+			const char* texture_name = args.at(4);
+			debug_tex_out.output_tex = g_assets.find_sync<Texture>(texture_name).get();
+			debug_tex_out.scale = scale;
+			debug_tex_out.alpha = alpha;
+			debug_tex_out.mip = mip;
+			if (!debug_tex_out.output_tex) {
+				sys_print(Error, "output_texture: couldn't find texture %s\n", texture_name);
+			}
+		});
+
 }
 
 
@@ -1053,7 +1026,7 @@ void Renderer::init_bloom_buffers()
 	
 	int x = cur_w / 2;
 	int y = cur_h / 2;
-	tex.number_bloom_mips = glm::min((int)MAX_BLOOM_MIPS, get_mip_map_count(x, y));
+	tex.number_bloom_mips = glm::min((int)MAX_BLOOM_MIPS, Texture::get_mip_map_count(x, y));
 	glCreateTextures(GL_TEXTURE_2D, tex.number_bloom_mips, tex.bloom_chain);
 
 	float fx = x;
@@ -2108,10 +2081,10 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		//CPUSCOPESTART(cpu_object_cull);
 		ZoneScopedN("SetupThreaded");
 
-		jobs::Counter* cullAndLodCounter{};
+		JobCounter* cullAndLodCounter{};
 
 		const int NUM_FRUSTUM_JOBS = 5;
-		jobs::JobDecl decls[NUM_FRUSTUM_JOBS];
+		JobDecl decls[NUM_FRUSTUM_JOBS];
 		CullObjectsUser mainview;
 		CullObjectsUser cascades[4];
 		mainview.count = visible_count;
@@ -2126,8 +2099,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 			decls[i + 1].funcarg = uintptr_t(&cascades[i]);
 		}
 
-		jobs::add_jobs(decls, NUM_FRUSTUM_JOBS, cullAndLodCounter);
-		jobs::add_job(calc_lod_job,uintptr_t(lod_to_render_array), cullAndLodCounter);
+		JobSystem::inst->add_jobs(decls, NUM_FRUSTUM_JOBS, cullAndLodCounter);
+		JobSystem::inst->add_job(calc_lod_job,uintptr_t(lod_to_render_array), cullAndLodCounter);
 		
 		// while waiting, can refresh static mesh data if needed
 		if (statics_meshes_are_dirty) {
@@ -2139,13 +2112,13 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 
 		}
 
-		jobs::wait_and_free_counter(cullAndLodCounter);
+		JobSystem::inst->wait_and_free_counter(cullAndLodCounter);
 	}
 	const size_t num_ren_objs = proxy_list.objects.size();
 	auto gpu_objects = (gpu::Object_Instance*)draw.get_arena().alloc_bottom(sizeof(gpu::Object_Instance) * num_ren_objs);
 	ASSERT(gpu_objects);
-	jobs::Counter* gpu_obj_set_cntr{};
-	jobs::add_job(set_gpu_objects_data_job, uintptr_t(gpu_objects), gpu_obj_set_cntr);
+	JobCounter* gpu_obj_set_cntr{};
+	JobSystem::inst->add_job(set_gpu_objects_data_job, uintptr_t(gpu_objects), gpu_obj_set_cntr);
 
 	{
 		ZoneScopedN("Traversal");
@@ -2212,14 +2185,14 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		{
 			ZoneScopedN("MergeStaticWithDynamic");
 			if (!skybox_only) {
-				jobs::Counter* mergeshadowcounter{};
-				jobs::add_job(merge_shadow_list_job,uintptr_t(lod_to_render_array), mergeshadowcounter);
+				JobCounter* mergeshadowcounter{};
+				JobSystem::inst->add_job(merge_shadow_list_job,uintptr_t(lod_to_render_array), mergeshadowcounter);
 
 				editor_sel_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
 				gbuffer_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
 				transparent_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
 
-				jobs::wait_and_free_counter(mergeshadowcounter);
+				JobSystem::inst->wait_and_free_counter(mergeshadowcounter);
 			}
 		}
 
@@ -2229,26 +2202,26 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		ZoneScopedN("MakeBatchesAndUploadGpuData");
 
 		// kick off gbuffer pass, but do the rest on this thread
-		jobs::Counter* c{};
-		jobs::add_job(make_batches_job,uintptr_t(&gbuffer_pass), c);
-		jobs::add_job(make_batches_job, uintptr_t(&shadow_pass), c);
+		JobCounter* c{};
+		JobSystem::inst->add_job(make_batches_job,uintptr_t(&gbuffer_pass), c);
+		JobSystem::inst->add_job(make_batches_job, uintptr_t(&shadow_pass), c);
 		transparent_pass.make_batches(*this);
 		editor_sel_pass.make_batches(*this);
 
-		jobs::wait_and_free_counter(gpu_obj_set_cntr);
+		JobSystem::inst->wait_and_free_counter(gpu_obj_set_cntr);
 		{
 			ZoneScopedN("UploadGpuData");
 			glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs, gpu_objects, GL_DYNAMIC_DRAW);
 		}
 
-		jobs::wait_and_free_counter(c);
+		JobSystem::inst->wait_and_free_counter(c);
 	}
 	{
 		ZoneScopedN("MakeRenderLists");
 
 		// kick off the shadow passes, but do rest locally
-		jobs::Counter* shadowlistcounter{};
-		jobs::JobDecl shadowlistdecl[4];
+		JobCounter* shadowlistcounter{};
+		JobDecl shadowlistdecl[4];
 		MakeShadowRenderListParam params[4];
 		for (int i = 0; i < 4; i++) {
 			params[i].visarray = cascade_vis[i];
@@ -2714,8 +2687,8 @@ void get_view_mat(int idx, glm::vec3 pos, glm::mat4& view, glm::vec3& front);
 
 void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Texture* cubemap, glm::vec3 position, bool skybox_only)
 {
-	const uint32_t specular_cubemap_size = CUBEMAP_SIZE;
-	const uint32_t num_mips = get_mip_map_count(specular_cubemap_size, specular_cubemap_size);
+	const int specular_cubemap_size = EnviornmentMapHelper::CUBEMAP_SIZE;
+	const int num_mips = Texture::get_mip_map_count(specular_cubemap_size, specular_cubemap_size);
 	assert(cubemap);
 	//static Texture* somthing = nullptr;
 	if (cubemap->gl_id == 0) {	// not created yet
@@ -3305,12 +3278,6 @@ void DebuggingTextureOutput::draw_out()
 	dd.draw(MeshBuilderDD::TRIANGLES);
 	dd.free();
 
-}
-
-static float linearize_depth(float d, float zNear, float zFar)
-{
-	float z_n = 2.0 * d - 1.0;
-	return 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
 }
 
 float Renderer::get_scene_depth_for_editor(int x, int y)

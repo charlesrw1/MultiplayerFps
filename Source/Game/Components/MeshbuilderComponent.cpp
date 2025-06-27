@@ -1,6 +1,6 @@
 #include "MeshbuilderComponent.h"
 #include "Game/Entity.h"
-
+// comment 4
 
 void MeshBuilderComponent::on_sync_render_data()  {
 	if (!editor_mb_handle.is_valid())

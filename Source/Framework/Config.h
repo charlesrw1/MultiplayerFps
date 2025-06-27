@@ -1,6 +1,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 #include "Framework/Util.h"
+#include <string>
 
 enum CVarFlags
 {
@@ -122,9 +123,15 @@ enum class Cmd_Execute_Mode
 class Cmd_Manager
 {
 public:
-	static Cmd_Manager* get();
+	static Cmd_Manager* inst;
+	static Cmd_Manager* get() { return inst; }
+	static Cmd_Manager* create();
 	virtual void add_command(const char* name, Engine_Cmd_Function) = 0;
 	virtual void execute(Cmd_Execute_Mode mode, const char* command_string) = 0;
+	virtual void append_cmd(const std::string& msg) = 0;
+	virtual void execute_cmd(const std::string& msg) = 0;
+
+
 	virtual void execute_file(Cmd_Execute_Mode mode, const char* path) = 0;
 	virtual void execute_buffer() = 0;
 	virtual void set_set_unknown_variables(bool b) = 0;
@@ -157,8 +164,5 @@ struct AddToDebugMenu
 };
 
 #define ADD_TO_DEBUG_MENU(funcname) static AddToDebugMenu debugmenuadd##funcname(#funcname, funcname);
-
-#define DECLARE_ENGINE_CMD(func_name) static void enginecmd_##func_name(const Cmd_Args&); static Auto_Engine_Cmd autoenginecmd_##func_name(#func_name, enginecmd_##func_name); static void enginecmd_##func_name(const Cmd_Args& args)
-#define DECLARE_ENGINE_CMD_CAT(category, func_name) static void enginecmd_##func_name(const Cmd_Args&); static Auto_Engine_Cmd autoenginecmd_##func_name(category#func_name, enginecmd_##func_name); static void enginecmd_##func_name(const Cmd_Args& args)
 
 #endif // !CONFIG_H

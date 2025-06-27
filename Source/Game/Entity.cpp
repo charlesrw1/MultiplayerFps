@@ -387,25 +387,8 @@ void Entity::add_component_from_unserialization(Component* component)
 }
 
 
-static void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::quat& q, glm::vec3& s)
-{
-	p = transform[3];
-	s = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
-	q = glm::quat_cast(glm::mat3(
-		transform[0] / s.x,
-		transform[1] / s.y,
-		transform[2] / s.z
-	));
-}
 
-static glm::mat4 compose_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& s)
-{
-	glm::mat4 model;
-	model = glm::translate(glm::mat4(1), v);
-	model = model * glm::mat4_cast(q);
-	model = glm::scale(model, glm::vec3(s));
-	return model;
-}
+
 
 #include "tracy/public/tracy/Tracy.hpp"
 
@@ -506,6 +489,26 @@ const glm::mat4& Entity::get_ws_transform() {
 		world_transform_is_dirty = false;
 	}
 	return cached_world_transform;
+}
+glm::vec3 Entity::get_ws_position() {
+	if (!parent)
+		return position;
+	auto& ws = get_ws_transform();
+	return ws[3];
+}
+
+glm::quat Entity::get_ws_rotation() {
+	if (!parent)
+		return rotation;
+	auto& ws = get_ws_transform();
+	return glm::quat_cast(ws);
+}
+
+glm::vec3 Entity::get_ws_scale() {
+	if (!parent)
+		return scale;
+	// fixme
+	return glm::vec3(1.f);
 }
 
 void Entity::set_is_top_level(bool b)

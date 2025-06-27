@@ -8,7 +8,6 @@
 #include "Debug.h"
 
 #include "GameEnginePublic.h"
-#include "OsInput.h"
 #include "Framework/MulticastDelegate.h"
 
 #include "Level.h"
@@ -26,11 +25,12 @@ class Archive;
 class Client;
 class Server;
 class SceneAsset;
-class ImNodesContext;
+struct ImNodesContext;
 class GUI_RootControl;
 class UIControl;
 struct SceneDrawParamsEx;
 struct View_Setup;
+class IntegrationTester;
 class GameEngineLocal : public GameEnginePublic
 {
 public:
@@ -75,9 +75,6 @@ public:
 	}
 	IEditorTool* get_current_tool() const final {
 		return active_tool;
-	}
-	const OsInput* get_input_state() final {
-		return &inp;
 	}
 	ImGuiContext* get_imgui_context() const final {
 		return imgui_context;
@@ -139,9 +136,13 @@ public:
 
 	// Host functions
 
+	MulticastDelegate<> on_begin_map_change;
 	MulticastDelegate<bool> on_map_load_return;
+	MulticastDelegate<> on_leave_level;
+	MulticastDelegate<> on_leave_editor;
+	MulticastDelegate<IEditorTool*> on_enter_editor;
 public:
-
+	void add_commands();
 	void set_keybind(SDL_Scancode code, uint16_t keymod, std::string bind);
 
 	bool map_spawned() { return level != nullptr; }
@@ -150,8 +151,6 @@ public:
 	//std::unique_ptr<Server> sv;
 
 	OnScreenLog* gui_log{};
-
-	OsInput inp;
 
 	string queued_mapname;
 	bool is_waiting_on_load_level_callback = false;
@@ -173,7 +172,8 @@ public:
 	int argc = 0;
 	char** argv = nullptr;
 
-
+	uptr<ConsoleCmdGroup> commands;
+	uptr<IntegrationTester> tester;
 #ifdef EDITOR_BUILD
 	// stores state changes to enable forwards/backwards when editing
 	// like ["start_ed Map mymap", "map mymap"]

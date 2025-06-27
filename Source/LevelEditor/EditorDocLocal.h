@@ -33,7 +33,7 @@
 #include "Framework/FnFactory.h"
 #include "Framework/ConsoleCmdGroup.h"
 #include "UI/Widgets/Layouts.h"
-
+#include "Input/InputSystem.h"
 #include <variant>
 
 extern ConfigVar g_mousesens;
@@ -191,9 +191,12 @@ public:
 		if (abs(width) < 0.000001)
 			width = 0.0001;
 	}
-	void update_from_input(const bool keys[], int mouse_dx, int mouse_dy, float aspectratio) {
-		position += side * (g_mousesens.get_float() * mouse_dx) * width;
-		position += up * (g_mousesens.get_float() * mouse_dy) * width * aspectratio;
+	void update_from_input(float aspectratio) {
+		auto mouseDelta = Input::get_mouse_delta();
+
+
+		position += side * (g_mousesens.get_float() * mouseDelta.x) * width;
+		position += up * (g_mousesens.get_float() * mouseDelta.y) * width * aspectratio;
 	}
 	glm::mat4 get_view_matrix() const {
 		return glm::lookAt(position, position+front, up);

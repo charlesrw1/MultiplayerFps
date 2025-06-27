@@ -12,13 +12,12 @@ class Texture;
 struct Render_Light;
 class BillboardComponent;
 class ArrowComponent;
-
 class SpotLightComponent : public Component
 {
 public:
 	CLASS_BODY(SpotLightComponent);
-
-	
+	SpotLightComponent();
+	~SpotLightComponent() override;
 	void start() final;
 	void end() final;
 	void on_sync_render_data() final;
@@ -33,27 +32,13 @@ public:
 		return "eng/editor/light.png";
 	}
 #endif
-
-	~SpotLightComponent() override;
-	SpotLightComponent();
-
-
-	REFLECT();
-	Color32 color = COLOR_WHITE;
-	REFLECT();
-	float intensity = 1.f;
-	REFLECT();
-	float radius = 20.f;
-	REFLECT();
-	float cone_angle = 45.0;
-	REFLECT();
-	float inner_cone = 40.0;
-	REFLECT();
-	AssetPtr<Texture> cookie_asset;
-	REFLECT();
-	bool visible = true;
-
-
+	REF Color32 color = COLOR_WHITE;
+	REF float intensity = 1.f;
+	REF float radius = 20.f;
+	REF float cone_angle = 45.0;
+	REF float inner_cone = 40.0;
+	REF AssetPtr<Texture> cookie_asset;
+	REF bool visible = true;
 	handle<Render_Light> light_handle;
 	uint64_t editor_billboard = 0;
 	uint64_t editor_arrow = 0;
@@ -63,7 +48,6 @@ class PointLightComponent : public Component
 {
 public:
 	CLASS_BODY(PointLightComponent);
-
 	PointLightComponent();
 	void start() final;
 	void end() final;
@@ -81,15 +65,10 @@ public:
 	}
 #endif
 
-	REFLECT();
-	Color32 color = COLOR_WHITE;
-	REFLECT();
-	float intensity = 1.f;
-	REFLECT();
-	float radius = 5.f;
-	REFLECT();
-	bool visible = true;
-
+	REF Color32 color = COLOR_WHITE;
+	REF float intensity = 1.f;
+	REF float radius = 5.f;
+	REF bool visible = true;
 	handle<Render_Light> light_handle;
 	uint64_t editor_billboard = 0;
 };
@@ -116,24 +95,14 @@ public:
 		return "eng/editor/light.png";
 	}
 #endif
-
-	REFLECT();
-	Color32 color = COLOR_WHITE;
-	REFLECT();
-	float intensity = 2.f;
-	REFLECT();
-	bool fit_to_scene = true;
-	REFLECT();
-	float log_lin_lerp_factor = 0.5;
-	REFLECT();
-	float max_shadow_dist = 80.f;
-	REFLECT();
-	float epsilon = 0.008f;
-	REFLECT();
-	float z_dist_scaling = 1.f;
-	REFLECT();
-	bool visible = true;
-
+	REF Color32 color = COLOR_WHITE;
+	REF float intensity = 2.f;
+	REF bool fit_to_scene = true;
+	REF float log_lin_lerp_factor = 0.5;
+	REF float max_shadow_dist = 80.f;
+	REF float epsilon = 0.008f;
+	REF float z_dist_scaling = 1.f;
+	REF bool visible = true;
 	handle<Render_Sun> light_handle;
 	uint64_t editor_billboard = 0;
 	uint64_t editor_arrow = 0;
@@ -148,23 +117,18 @@ public:
 	SkylightComponent() {
 		set_call_init_in_editor(true);
 	}
-
 	void start() final;
 	void end() final;
 	void on_sync_render_data() final;
 	void editor_on_change_property() final;
-
 	REFLECT(transient)
 	BoolButton recapture_skylight;	// Recapture
-
 	Texture* mytexture = nullptr;
 	handle<Render_Skylight> handle;
 };
 
-struct CubemapAnchor
-{
+struct CubemapAnchor {
 	STRUCT_BODY();
-
 	REF bool worldspace = false;
 	REF glm::vec3 p = glm::vec3(0.f);
 };
@@ -188,7 +152,6 @@ public:
 
 	REFLECT(transient)
 	BoolButton recapture;	// Recapture
-
 	REF CubemapAnchor anchor;
 private:
 	void update_editormeshbuilder();

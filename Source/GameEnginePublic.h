@@ -59,7 +59,6 @@ public:
 	virtual SDL_Window* get_os_window() = 0;
 	virtual IEditorTool* get_current_tool() const = 0;
 	virtual Engine_State get_state() const = 0;
-	virtual const OsInput* get_input_state() = 0;
 	virtual bool is_game_focused() const = 0;
 	virtual void set_game_focused(bool focus) = 0;
 	virtual glm::ivec2 get_game_viewport_size() const = 0;

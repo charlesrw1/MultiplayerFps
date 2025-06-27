@@ -348,9 +348,6 @@
     <ClInclude Include="Source\Framework\SubclassType.h">
       <Filter>Source\Framework\ClassSystem</Filter>
     </ClInclude>
-    <ClInclude Include="Source\OsInput.h">
-      <Filter>Source</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\MulticastDelegate.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
@@ -493,7 +490,6 @@
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
     <ClInclude Include="Source\Render\UIDrawPublic.h" />
     <ClInclude Include="Source\Render\UniformBuffer.h" />
-    <ClInclude Include="Source\Game\BeatEmUp\BeatEmUp.h" />
     <ClInclude Include="Source\Assets\AssetRegistryLocal.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
     <ClInclude Include="Source\Misc\PropTween.h" />
@@ -532,6 +528,12 @@
     <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew.h" />
     <ClInclude Include="Source\Animation\Editor\Bttest.h" />
     <ClInclude Include="Source\Animation\Runtime\RuntimeValueNodes.h" />
+    <ClInclude Include="Source\Animation\Runtime\RuntimeNodesBase.h" />
+    <ClInclude Include="Source\Framework\PropertyUtil.h" />
+    <ClInclude Include="Source\MEGA.h" />
+    <ClInclude Include="Source\Framework\RingBuffer.h" />
+    <ClInclude Include="Source\LevelEditor\TagManager.h" />
+    <ClInclude Include="Source\IntegrationTest.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -539,36 +541,6 @@
     </ClCompile>
     <ClCompile Include="Source\EngineMain.cpp">
       <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\Config.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\MyImguiLib.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\StringName.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Animation\Animation_Man.cpp">
-      <Filter>Source\Animation</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Animation\AnimationUtil.cpp">
-      <Filter>Source\Animation</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Animation\Editor\AnimationGraphEditor.cpp">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Animation\Editor\State_node.cpp">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Animation\Editor\Statemachine_node.cpp">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Animation\Runtime\Animation.cpp">
-      <Filter>Source\Animation\Runtime</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp">
-      <Filter>Source\Animation\Runtime</Filter>
     </ClCompile>
     <ClCompile Include="Source\External\glad.c">
       <Filter>Source\External</Filter>
@@ -600,29 +572,11 @@
     <ClCompile Include="Source\External\ImSequencer.cpp">
       <Filter>Source\External</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\Profilier.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp">
-      <Filter>Source\Animation\Runtime</Filter>
-    </ClCompile>
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp">
       <Filter>Source\AssetCompile</Filter>
     </ClCompile>
     <ClCompile Include="Source\Physics\Physics2Local.cpp">
       <Filter>Source\Physics</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\PersistentlyMappedBuffer.cpp">
-      <Filter>Source\Framework\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\MeshBuilder.cpp">
-      <Filter>Source\Framework\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\BVHBuild.cpp">
-      <Filter>Source\Framework\Containers</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\DictParser.cpp">
-      <Filter>Source\Framework\Containers</Filter>
     </ClCompile>
     <ClCompile Include="Source\External\ImGuizmo.cpp">
       <Filter>Source\External</Filter>
@@ -630,106 +584,21 @@
     <ClCompile Include="Source\AssetCompile\ModelAssetEditorLocal.cpp">
       <Filter>Source\AssetCompile</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\CurveEditorImgui.cpp">
-      <Filter>Source\Framework\Editor</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Game\GameAnimEvents.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
     <ClCompile Include="Source\Assets\CurveAsset.cpp" />
-    <ClCompile Include="Source\Assets\AssetRegistry.cpp">
-      <Filter>Source\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Assets\AssetBrowser.cpp">
-      <Filter>Source\Asset</Filter>
-    </ClCompile>
     <ClCompile Include="Source\IEditorTool.cpp">
       <Filter>Source\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\MaterialLocal.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Animation\Editor\SerializersAndPropEds.cpp">
-      <Filter>Source\Animation\Editor</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Assets\IAsset.cpp">
-      <Filter>Source\Asset</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\ReflectionProp.cpp">
-      <Filter>Source\Framework\ReflectionSys</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\PropertyEd.cpp">
-      <Filter>Source\Framework\PropertyGridSys</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\ClassBase.cpp">
-      <Filter>Source\Framework\ClassSystem</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\EnumDefReflection.cpp">
-      <Filter>Source\Framework\ReflectionSys</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Game\EntityComponent.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Game\Components\LightComponents.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\TerrainComponent.cpp">
-      <Filter>Source\Game\Components</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Game\Components\FogComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\Files.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\DrawLocal.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\EnvProbe.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Game\Entities\PlayerAnimDriver.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Game\Entity.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\Ssao.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\Texture.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\Volumetricfog.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Game\Game.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Game\Entities\Player.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\Shader.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\Shadowmap.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\Model.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Render\Meshlet.cpp" />
-    <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
-    <ClCompile Include="Source\UI\UILoader.cpp" />
-    <ClCompile Include="Source\Framework\ClassTypePtr.cpp" />
-    <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
-    <ClCompile Include="Source\Game\Components\DecalComponent.cpp" />
-    <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
     <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
-    <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
     <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
@@ -737,69 +606,109 @@
     <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelAsset2.cpp" />
     <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
-    <ClCompile Include="Source\Animation\AnimationSeqAsset.cpp" />
     <ClCompile Include="Source\Render\Editor\MaterialEditorLocal.cpp" />
-    <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
-    <ClCompile Include="Source\Game\BaseUpdater.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\EditorTool3d.cpp" />
     <ClCompile Include="Source\Render\Editor\TextureEditor.cpp" />
     <ClCompile Include="Source\Input\InputAction.cpp" />
-    <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
-    <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp" />
-    <ClCompile Include="Source\Game\Entities\BikeEntity.cpp" />
     <ClCompile Include="Source\DeferredSpawnScope.cpp" />
-    <ClCompile Include="Source\Framework\Util.cpp" />
-    <ClCompile Include="Source\LevelSerialization\Unserialize.cpp" />
-    <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
     <ClCompile Include="Source\Game\EntityTest.cpp" />
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
-    <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
-    <ClCompile Include="Source\Game\Entities\TestEntity.cpp" />
-    <ClCompile Include="Source\Game\LevelAssets.cpp" />
-    <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
-    <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
-    <ClCompile Include="Source\Game\Components\ParticleComponent.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
-    <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
-    <ClCompile Include="Source\Animation\SkeletonData.cpp" />
     <ClCompile Include="Source\Scripting\ScriptLocal.cpp" />
     <ClCompile Include="Source\Scripting\ScriptAsset.cpp" />
     <ClCompile Include="Source\Sound\SoundComponent.cpp" />
-    <ClCompile Include="Source\Game\TP\TPGame.cpp" />
     <ClCompile Include="Source\External\tracy\public\TracyClient.cpp" />
-    <ClCompile Include="Source\Framework\Jobs.cpp" />
-    <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
-    <ClCompile Include="Source\Game\BeatEmUp\BeatEmUp.cpp" />
-    <ClCompile Include="Source\UI\Widgets\Layouts.cpp" />
-    <ClCompile Include="Source\UI\BaseGUI.cpp" />
-    <ClCompile Include="Source\UI\UIBuilder.cpp" />
-    <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
-    <ClCompile Include="Source\UI\Widgets\SharedFuncs.cpp" />
-    <ClCompile Include="Source\UI\Widgets\Visuals.cpp" />
     <ClCompile Include="Source\EditorPopups.cpp" />
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
-    <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
-    <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
-    <ClCompile Include="Source\LevelEditor\Commands.cpp" />
-    <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp" />
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
-    <ClCompile Include="Source\Framework\StringUtils.cpp" />
     <ClCompile Include="Source\Scripting\LuaBuiltinFuncs.cpp" />
-    <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
-    <ClCompile Include="Source\Framework\Serializer.cpp" />
-    <ClCompile Include="Source\Framework\SerializerJson.cpp" />
-    <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
+    <ClCompile Include="Source\Framework\Files.cpp" />
+    <ClCompile Include="Source\Assets\AssetRegistry.cpp" />
+    <ClCompile Include="Source\Animation\Editor\AnimEdSourceFiles.cpp" />
+    <ClCompile Include="Source\Animation\Runtime\Animation.cpp" />
+    <ClCompile Include="Source\Game\LevelAssets.cpp" />
+    <ClCompile Include="Source\Game\Game.cpp" />
+    <ClCompile Include="Source\Game\EntityComponent.cpp" />
+    <ClCompile Include="Source\Game\Entity.cpp" />
+    <ClCompile Include="Source\Game\BaseUpdater.cpp" />
+    <ClCompile Include="Source\Game\TP\TPGame.cpp" />
+    <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
+    <ClCompile Include="Source\Game\Entities\PlayerAnimDriver.cpp" />
+    <ClCompile Include="Source\Game\Entities\Player.cpp" />
+    <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
+    <ClCompile Include="Source\Game\Entities\BikeEntity.cpp" />
+    <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
+    <ClCompile Include="Source\Game\Components\ParticleComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\LightComponents.cpp" />
+    <ClCompile Include="Source\Game\Components\DecalComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
+    <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
+    <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
+    <ClCompile Include="Source\LevelEditor\Commands.cpp" />
+    <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
+    <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
+    <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp" />
+    <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializationAPI.cpp" />
-    <ClCompile Include="Source\UI\Widgets\EditorCube.cpp" />
-    <ClCompile Include="Source\Animation\Editor\AnimationGraphEditor2.cpp" />
-    <ClCompile Include="Source\Animation\Editor\AnimCommands.cpp" />
-    <ClCompile Include="Source\Animation\Editor\Base_node.cpp" />
-    <ClCompile Include="Source\Animation\Editor\ClipNode.cpp" />
-    <ClCompile Include="Source\Animation\Editor\Basic_nodes.cpp" />
-    <ClCompile Include="Source\Animation\Editor\GraphUtil.cpp" />
-    <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew.cpp" />
+    <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
+    <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
+    <ClCompile Include="Source\LevelSerialization\Unserialize.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal.cpp" />
+    <ClCompile Include="Source\Render\EnvProbe.cpp" />
+    <ClCompile Include="Source\Render\MaterialLocal.cpp" />
+    <ClCompile Include="Source\Render\Model.cpp" />
+    <ClCompile Include="Source\Render\Shader.cpp" />
+    <ClCompile Include="Source\Render\Shadowmap.cpp" />
+    <ClCompile Include="Source\Render\Ssao.cpp" />
+    <ClCompile Include="Source\Render\TerrainComponent.cpp" />
+    <ClCompile Include="Source\Render\Texture.cpp" />
+    <ClCompile Include="Source\Render\Volumetricfog.cpp" />
+    <ClCompile Include="Source\Framework\Util.cpp" />
+    <ClCompile Include="Source\Framework\StringUtils.cpp" />
+    <ClCompile Include="Source\Framework\StringName.cpp" />
+    <ClCompile Include="Source\Framework\SerializerJson.cpp" />
+    <ClCompile Include="Source\Framework\Serializer.cpp" />
+    <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
+    <ClCompile Include="Source\Framework\ReflectionProp.cpp" />
+    <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
+    <ClCompile Include="Source\Framework\PropertyEd.cpp" />
+    <ClCompile Include="Source\Framework\Profilier.cpp" />
+    <ClCompile Include="Source\Framework\PersistentlyMappedBuffer.cpp" />
+    <ClCompile Include="Source\Framework\MyImguiLib.cpp" />
+    <ClCompile Include="Source\Framework\MeshBuilder.cpp" />
+    <ClCompile Include="Source\Framework\Jobs.cpp" />
+    <ClCompile Include="Source\Framework\EnumDefReflection.cpp" />
+    <ClCompile Include="Source\Framework\DictParser.cpp" />
+    <ClCompile Include="Source\Framework\CurveEditorImgui.cpp" />
+    <ClCompile Include="Source\Framework\Config.cpp" />
+    <ClCompile Include="Source\Framework\ClassTypePtr.cpp" />
+    <ClCompile Include="Source\Framework\ClassBase.cpp" />
+    <ClCompile Include="Source\Framework\BVHBuild.cpp" />
+    <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
+    <ClCompile Include="Source\Assets\AssetBrowser.cpp" />
+    <ClCompile Include="Source\Assets\IAsset.cpp" />
+    <ClCompile Include="Source\Animation\Animation_Man.cpp" />
+    <ClCompile Include="Source\Animation\AnimationSeqAsset.cpp" />
+    <ClCompile Include="Source\Animation\AnimationTypes.cpp" />
+    <ClCompile Include="Source\Animation\AnimationUtil.cpp" />
+    <ClCompile Include="Source\Animation\SkeletonData.cpp" />
+    <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp" />
     <ClCompile Include="Source\Animation\Runtime\RuntimeValueNodes.cpp" />
+    <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew.cpp" />
+    <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
+    <ClCompile Include="Source\UI\UILoader.cpp" />
+    <ClCompile Include="Source\UI\UIBuilder.cpp" />
+    <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
+    <ClCompile Include="Source\UI\BaseGUI.cpp" />
+    <ClCompile Include="Source\UI\Widgets\Visuals.cpp" />
+    <ClCompile Include="Source\UI\Widgets\SharedFuncs.cpp" />
+    <ClCompile Include="Source\UI\Widgets\Layouts.cpp" />
+    <ClCompile Include="Source\UI\Widgets\EditorCube.cpp" />
+    <ClCompile Include="Source\IntegrationTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

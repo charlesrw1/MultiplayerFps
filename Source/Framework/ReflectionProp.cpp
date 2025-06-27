@@ -150,7 +150,7 @@ PropertyInfo make_float_property(const char* name, uint16_t offset, uint32_t fla
 
 PropertyInfo make_enum_property(const char* name, uint16_t offset, uint32_t flags, int bytes, const EnumTypeInfo* enumtype, const char* hint)
 {
-	ASSERT(enumtype->name);
+	//ASSERT(enumtype->name);
 	PropertyInfo prop(name, offset, flags);
 	prop.range_hint = hint;
 	if (bytes == 1)
@@ -891,3 +891,61 @@ bool IListCallback::get_is_new_list_type() const
 {
 	return is_new_list_type;
 }
+
+
+
+float PropertyInfo::get_float(const void* ptr) const
+{
+	ASSERT(type == core_type_id::Float);
+
+	return *(float*)((char*)ptr + offset);
+}
+
+void PropertyInfo::set_float(void* ptr, float f) const
+{
+	ASSERT(type == core_type_id::Float);
+
+	*(float*)((char*)ptr + offset) = f;
+}
+
+uint64_t PropertyInfo::get_int(const void* ptr) const
+{
+	ASSERT(is_integral_type());
+	if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
+		return *(int8_t*)((char*)ptr + offset);
+	}
+	else if (type == core_type_id::Int16 || type == core_type_id::Enum16) {
+		return *(uint16_t*)((char*)ptr + offset);
+	}
+	else if (type == core_type_id::Int32 || type == core_type_id::Enum32) {
+		return *(uint32_t*)((char*)ptr + offset);
+	}
+	else if (type == core_type_id::Int64) {
+		return *(uint64_t*)((char*)ptr + offset);
+	}
+	else {
+		ASSERT(0);
+		return 0;
+	}
+}
+
+void PropertyInfo::set_int(void* ptr, uint64_t i) const
+{
+	ASSERT(is_integral_type());
+	if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
+		*(int8_t*)((char*)ptr + offset) = i;
+	}
+	else if (type == core_type_id::Int16 || type == core_type_id::Enum16) {
+		*(uint16_t*)((char*)ptr + offset) = i;
+	}
+	else if (type == core_type_id::Int32 || type == core_type_id::Enum32) {
+		*(uint32_t*)((char*)ptr + offset) = i;
+	}
+	else if (type == core_type_id::Int64) {
+		*(uint64_t*)((char*)ptr + offset) = i;	// ERROR NARROWING
+	}
+	else {
+		ASSERT(0);
+	}
+}
+

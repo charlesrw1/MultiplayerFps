@@ -56,7 +56,6 @@ public:
 	SpotLightComponent* spotlight{};
 
 	BikeEntity* bike = nullptr;
-	std::unique_ptr<InputUser> inputPtr;
 
 	MulticastDelegate<int> score_update_delegate;
 

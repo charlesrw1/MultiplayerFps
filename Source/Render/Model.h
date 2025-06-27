@@ -13,7 +13,10 @@
 #include "Assets/IAsset.h"
 #include "Framework/MathLib.h"
 #include "Framework/Reflection2.h"
-
+class MaterialInstance;
+using std::string;
+using std::vector;
+using std::unique_ptr;
 // Hardcoded attribute locations for shaders
 const int POSITION_LOC  = 0;
 const int UV_LOC		= 1;
@@ -35,16 +38,6 @@ struct ModelVertex
 	uint8_t color2[4];	// or bone weight
 };
 static_assert(sizeof(ModelVertex) == 40, "vertex size wrong");
-
-
-class MaterialInstance;
-
-
-
-using std::string;
-using std::vector;
-using std::unique_ptr;
-
 
 class RawMeshData
 {
@@ -80,14 +73,11 @@ private:
 	// index offset always = 0
 	std::vector<ModelVertex> verts;
 	std::vector<uint16_t> indicies;
-
-
 	friend class Model;
 	friend class ModelMan;
 };
 
-class Submesh
-{
+class Submesh {
 public:
 	int base_vertex = 0;	// index
 	int element_offset = 0;	// in bytes
@@ -96,13 +86,11 @@ public:
 	int vertex_count = 0;	// in element size
 };
 
-struct ModelTag
-{
+struct ModelTag {
 	string name;
 	int bone_index = -1;
 	glm::mat4 transform;
 };
-
 
 struct MeshLod
 {
@@ -119,44 +107,32 @@ public:
 	CLASS_BODY(Model);
 	Model();
 	~Model() override;
-
 	void uninstall() override;
 	void sweep_references(IAssetLoadingInterface* loading) const override;
 	void post_load() override;
 	bool load_asset(IAssetLoadingInterface* loading) override;
 	void move_construct(IAsset* src) override;
 	bool check_import_files_for_out_of_data() const override;
-
-
-	uint32_t get_uid() const { return uid; }
+	int get_uid() const { return uid; }
 	int bone_for_name(StringName name) const;
 	const glm::vec4& get_bounding_sphere() const { return bounding_sphere; }
 	Bounds get_aabb_from_sphere() const { 
 		return Bounds(glm::vec3(bounding_sphere) - glm::vec3(bounding_sphere.w),
 			glm::vec3(bounding_sphere) + glm::vec3(bounding_sphere.w));
 	}
-
 	MSkeleton* get_skel() const { return skel.get(); }
-
 	const Submesh& get_part(int index) const { return parts[index]; }
 	int get_num_lods() const { return lods.size(); }
 	const MeshLod& get_lod(int index) const { return lods[index]; }
-
 	const MaterialInstance* get_material(int index) const { return materials[index]; }
-
 	bool has_lightmap_coords() const;
 	bool has_colors() const;
 	bool has_bones() const;
 	bool has_tangents() const;
-
 	uint32_t get_merged_index_ptr() const { return merged_index_pointer; }
 	uint32_t get_merged_vertex_ofs() const { return merged_vert_offset; }
-
-
 	const glm::mat4& get_root_transform() const { return skeleton_root_transform; }
-
 	const Bounds& get_bounds() const { return aabb; }
-
 	const PhysicsBodyDefinition* get_physics_body() const {
 		return collision.get();
 	}
@@ -166,34 +142,25 @@ public:
 private:
 	bool load_internal(IAssetLoadingInterface* loading);
 
-	uint32_t uid = 0;
+	int uid = 0;
 	InlineVec<MeshLod, 2> lods;
 	vector<Submesh> parts;
-
 	Bounds aabb;
 	glm::vec4 bounding_sphere;
-
 	uint32_t merged_index_pointer = 0;	// in bytes
 	uint32_t merged_vert_offset = 0;
 	RawMeshData data;
-
 	// skeleton + animation data
 	unique_ptr<MSkeleton> skel;
-
 	// collision geometry, if null, then the aabb of the model will be used if the object is used as collision
 	unique_ptr<PhysicsBodyDefinition> collision;
-
 	vector<ModelTag> tags;
 	vector<const MaterialInstance*> materials;
-
 	glm::mat4 skeleton_root_transform = glm::mat4(1.f);
-
 	friend class ModelMan;
 	friend class ModelCompileHelper;
 	friend class ModelEditorTool;
 	friend class ModelLoadJob;
 };
-
-
 
 #endif // !MODEL_H

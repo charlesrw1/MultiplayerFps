@@ -7,6 +7,28 @@
 inline glm::vec3 AnglesToVector(float pitch, float yaw) {
 	return glm::vec3(cos(yaw) * cos(pitch), sin(pitch), sin(yaw) * cos(pitch));
 }
+inline void vector_to_angles(const glm::vec3& v, float& pitch, float& yaw) {
+	pitch = std::atan2(v.y, std::sqrt(v.x * v.x + v.z * v.z));
+	yaw = std::atan2(v.x, v.z);
+}
+
+inline glm::mat4 MakeInfReversedZProjRH(float fovY_radians, float aspectWbyH, float zNear)
+{
+	float f = 1.0f / tan(fovY_radians / 2.0f);
+	return glm::mat4(
+		f / aspectWbyH, 0.0f, 0.0f, 0.0f,
+		0.0f, f, 0.0f, 0.0f,
+		0.0f, 0.0f, 0.0f, -1.0f,
+		0.0f, 0.0f, zNear, 0.0f);
+}
+
+inline float linearize_depth(float d, float zNear, float zFar)
+{
+	float z_n = 2.0 * d - 1.0;
+	return 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
+}
+
+
 
 // smoothing = [0,1] where 0 is no smoothing and 1.0 is max smoothing 
 template<typename T>
@@ -225,5 +247,25 @@ public:
 
 	unsigned int state;
 };
+
+inline void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::quat& q, glm::vec3& s)
+{
+	p = transform[3];
+	s = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
+	q = glm::quat_cast(glm::mat3(
+		transform[0] / s.x,
+		transform[1] / s.y,
+		transform[2] / s.z
+	));
+	q = glm::normalize(q);
+}
+inline glm::mat4 compose_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& s)
+{
+	glm::mat4 model;
+	model = glm::translate(glm::mat4(1), v);
+	model = model * glm::mat4_cast(q);
+	model = glm::scale(model, glm::vec3(s));
+	return model;
+}
 
 #endif // !MATHLIB_H

@@ -3,7 +3,7 @@
 #include <vector>
 #include <memory>
 #include <unordered_map>
-
+#include "Framework/ConsoleCmdGroup.h"
 #include "IAsset.h"
 
 // All assets that you want showing in the asset browser should be registered here
@@ -78,6 +78,7 @@ public:
 
 	const ClassTypeInfo* find_asset_type_for_ext(const std::string& ext);
 private:
+	uptr<ConsoleCmdGroup> consoleCommands;
 	void reindex_all_assets();
 	std::unique_ptr<AssetFilesystemNode> root;
 	std::vector<std::unique_ptr<AssetMetadata>> all_assettypes;

@@ -191,14 +191,7 @@ public:
 	bool has_init = false;
 	std::vector<std::string> options;
 };
-class StateTransitionScript;
-class StateTransitionPropertyEditor : public IPropertyEditor
-{
-public:
-	bool internal_update() override;
-	void draw_value_header_side(StateTransitionScript* self, bool rhs);
-	void draw_value_side(StateTransitionScript* self, bool rhs);
-};
+
 class ClassTypePtrPropertyEditor : public IPropertyEditor
 {
 public:

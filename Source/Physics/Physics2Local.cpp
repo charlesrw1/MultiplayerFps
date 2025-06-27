@@ -322,7 +322,7 @@ static Color32 randcolor32(uint32_t number)
 	 // Inherited via PxCpuDispatcher
 	 virtual void submitTask(physx::PxBaseTask& task)
 	 {
-		 jobs::add_job_no_counter(physx_run_job, uintptr_t(&task));
+		 JobSystem::inst->add_job_no_counter(physx_run_job, uintptr_t(&task));
 	 }
 	 virtual uint32_t getWorkerCount() const
 	 {

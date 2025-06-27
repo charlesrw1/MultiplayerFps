@@ -392,6 +392,13 @@ public:
 			command_buffer += '\n';
 		}
 	}
+	void append_cmd(const std::string& msg) final {
+		command_buffer += msg;
+		command_buffer += '\n';
+	}
+	void execute_cmd(const std::string& msg) final {
+		execute_string(msg.c_str());
+	}
 	void execute_file(Cmd_Execute_Mode mode, const char* path) {
 
 		auto file = FileSys::open_read_engine(path);
@@ -473,12 +480,6 @@ public:
 	std::unordered_set<ConsoleCmdGroup*> cmd_groups;
 };
 
-Cmd_Manager* Cmd_Manager::get()
-{
-	static Cmd_Manager_Impl inst;
-	return &inst;
-}
-
 const char* Cmd_Args::at(int index) const {
 	ASSERT(index >= 0 && index < argc&& index < MAX_ARGS);
 	return &buffer[arg_to_index[index]];
@@ -510,4 +511,10 @@ ConsoleCmdGroup& ConsoleCmdGroup::add(std::string name, const std::function<void
 {
 	cmds.insert({ name,func });
 	return *this;
+}
+Cmd_Manager* Cmd_Manager::inst = nullptr;
+
+Cmd_Manager* Cmd_Manager::create()
+{
+	return new Cmd_Manager_Impl;
 }

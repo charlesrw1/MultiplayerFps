@@ -237,10 +237,10 @@ public:
 	PropertyRow(IPropertyEditor* editor, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx);
 
 
-	virtual bool internal_update() override;
-	virtual void draw_header(float header_ofs) override;
-	virtual bool has_reset_button() override { return prop_editor->can_reset(); }
-	virtual void on_reset() override { prop_editor->reset_value(); }
+	bool internal_update() override;
+	void draw_header(float header_ofs) override;
+	bool has_reset_button() override { return prop_editor->can_reset(); }
+	void on_reset() override { prop_editor->reset_value(); }
 
 	void* instance = nullptr;
 	PropertyInfo* prop = nullptr;

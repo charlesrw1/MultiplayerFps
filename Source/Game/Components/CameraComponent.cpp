@@ -7,6 +7,7 @@
 #include "Assets/AssetDatabase.h"
 #include "Render/Frustum.h"
 
+// comment 2
 
 CameraComponent* CameraComponent::scene_camera;
 
@@ -62,6 +63,21 @@ void CameraComponent::update_meshbuilder() {
 	mb.End();
 
 	editor_mbview->sync_render_data();
+}
+void CameraComponent::set_is_enabled(bool b) {
+	if (is_enabled == b) return;
+	if (is_enabled) {
+		ASSERT(scene_camera == this);
+		scene_camera = nullptr;
+	}
+	else {
+		if (scene_camera) {
+			ASSERT(scene_camera->is_enabled);
+			scene_camera->is_enabled = false;
+		}
+		scene_camera = this;
+		is_enabled = true;
+	}
 }
 void CameraComponent::get_view(glm::mat4& viewMatrix, float& fov)
 {

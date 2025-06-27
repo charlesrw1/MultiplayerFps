@@ -386,15 +386,15 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 	int uy = input_height;
 	uint8_t* data_ptr = (buffer+4+sizeof(ddsFileHeader_t));
 
-	const uint32_t compressed_stride = (input_format == TEXFMT_RGBA8_DXT1 || input_format == TEXFMT_RGB8_DXT1) ? 8 : 16;
+	const int compressed_stride = (input_format == TEXFMT_RGBA8_DXT1 || input_format == TEXFMT_RGB8_DXT1) ? 8 : 16;
 	for (int i = 0; i < numMipmaps; i++) {
-		size_t size = 0;
+		int size = 0;
 		if (compressed) {
 			size = ((ux + 3) / 4) * ((uy + 3) / 4) *
 				compressed_stride;
 		}
 		else {
-			size = ux*uy* (header->ddspf.RGBBitCount / 8);
+			size = ux*uy* int(header->ddspf.RGBBitCount / 8);
 		}
 		
 		if (compressed)
@@ -440,7 +440,7 @@ static void make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 			(informat == TEXFMT_RGBA8_DXT5 ? 16 : 8);
 	}
 
-	glTextureStorage2D(output->gl_id, get_mip_map_count(x, y), internal_format, x, y);
+	glTextureStorage2D(output->gl_id, Texture::get_mip_map_count(x, y), internal_format, x, y);
 	assert(x == x_real && y == y_real);
 	if (compressed)
 		glCompressedTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, internal_format, size, data);

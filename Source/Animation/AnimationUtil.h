@@ -63,4 +63,6 @@ void util_bilinear_blend(int bonecount, const Pose& x1, Pose& x2, const Pose& y1
 
 void util_set_to_bind_pose(Pose& pose, const MSkeleton* skel);
 
+void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& out_bone_matricies, const MSkeleton* model);
+void util_localspace_to_meshspace_with_physics(const Pose& local, std::vector<glm::mat4x4>& out_bone_matricies, const std::vector<bool>& phys_bitmask, const MSkeleton* model);
 

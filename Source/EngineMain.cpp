@@ -1,76 +1,63 @@
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <SDL2/SDL.h>
-
 #include "glad/glad.h"
-
 #include <cstdio>
 #include <vector>
 #include <string>
 #include <fstream>
 #include <sstream>
-
 #include "GameEngineLocal.h"
 #include "Level.h"
 #include "IEditorTool.h"
 #include "Types.h"
-
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtc/type_ptr.hpp"
-
 #include "Framework/MathLib.h"
 #include "Framework/Config.h"
 #include "Framework/ClassBase.h"
 #include "Framework/MeshBuilder.h"
 #include "Framework/Files.h"
-
 #include "Render/DrawPublic.h"
 #include "Render/Texture.h"
 #include "Render/MaterialPublic.h"
-
 #include "Game/Entities/Player.h"
 #include "Game/Entity.h"
 #include "Game/LevelAssets.h"
 #include "Game/Components/CameraComponent.h"
-
 #include "Physics/Physics2.h"
 #include "Assets/AssetBrowser.h"
 #include "Sound/SoundPublic.h"
-
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl2.h"
-
 #include "UI/UILoader.h"
 #include "UI/Widgets/Layouts.h"
 #include "UI/OnScreenLogGui.h"
 #include "UI/GUISystemPublic.h"
-
 #include "Assets/AssetDatabase.h"
-
 #include "Input/InputSystem.h"
-
 #include "Render/RenderObj.h"
-
 #include "LevelSerialization/SerializationAPI.h"
 #include "Render/ModelManager.h"
-
 #include "Framework/SysPrint.h"
-
 #include "Scripting/ScriptManagerPublic.h"
 #include "Game/Components/ParticleMgr.h"
 #include "Game/Components/GameAnimationMgr.h"
-
 #include "tracy/public/tracy/Tracy.hpp"
 #include "tracy/public/tracy/TracyOpenGL.hpp"
-
 #include "Framework/Jobs.h"
 #include "EditorPopups.h"
+#include "IntegrationTest.h"
+
+
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
 
 static double program_time_start;
+ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "Cfg", CVAR_DEV, "what folder to save .ini and other editor cfg to");
 
 
 struct Debug_Shape
@@ -115,7 +102,7 @@ private:
 	handle<MeshBuilder_Object> handle;
 	MeshBuilder mb;
 };
-
+//
 class Debug_Console
 {
 public:
@@ -274,10 +261,6 @@ bool User_Camera::can_take_input() const {
 	return orbit_mode || eng->is_game_focused();
 }
 
-static void vector_to_angles(const glm::vec3& v, float& pitch, float& yaw) {
-	pitch = std::atan2(v.y, std::sqrt(v.x * v.x + v.z * v.z));
-	yaw = std::atan2(v.x, v.z);
-}
 
 void User_Camera::set_orbit_target(glm::vec3 target, float object_size)
 {
@@ -303,11 +286,26 @@ void User_Camera::scroll_callback(int amt)
 	}
 }
 
-void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_dy, int width, int height, float aratio, float fov)
+void User_Camera::update_from_input(int width, int height, float aratio, float fov)
 {
-	int xpos, ypos;
-	xpos = mouse_dx;
-	ypos = mouse_dy;
+	//int xpos, ypos;
+	//xpos = mouse_dx;
+	//ypos = mouse_dy;
+
+	auto deadzone = [](float in) -> float {
+		const float dead_zone_val = 0.1;
+		return glm::abs(in) > dead_zone_val ? in : 0.f;
+	};
+
+	auto mousedelta = Input::get_mouse_delta();
+
+	const float controllerSens = 5.f;
+	mousedelta.x += deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_RIGHTX)) * controllerSens;
+	mousedelta.y += deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_RIGHTY)) * controllerSens;
+
+
+	int xpos = mousedelta.x;
+	int ypos = mousedelta.y;
 
 	float x_off = xpos;
 	float y_off = ypos;
@@ -336,8 +334,8 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 	if (orbit_mode)
 	{
 
-		auto keystate = SDL_GetKeyboardState(nullptr);
-		bool pan_in_orbit_model = keystate[SDL_SCANCODE_LSHIFT];
+		//auto keystate = SDL_GetKeyboardState(nullptr);
+		bool pan_in_orbit_model = Input::is_shift_down();// keystate[SDL_SCANCODE_LSHIFT];
 
 		if (!pan_in_orbit_model) {
 			update_pitch_yaw();
@@ -366,18 +364,22 @@ void User_Camera::update_from_input(const bool keys[], int mouse_dx, int mouse_d
 		front = AnglesToVector(pitch, yaw);
 		glm::vec3 delta = glm::vec3(0.f);
 		vec3 right = normalize(cross(up, front));
-		if (keys[SDL_SCANCODE_W])
+		if (Input::is_key_down(SDL_SCANCODE_W))
 			delta += move_speed * front;
-		if (keys[SDL_SCANCODE_S])
+		if (Input::is_key_down(SDL_SCANCODE_S))
 			delta -= move_speed * front;
-		if (keys[SDL_SCANCODE_A])
+		if (Input::is_key_down(SDL_SCANCODE_A))
 			delta += right * move_speed;
-		if (keys[SDL_SCANCODE_D])
+		if (Input::is_key_down(SDL_SCANCODE_D))
 			delta -= right * move_speed;
-		if (keys[SDL_SCANCODE_Z])
+		if (Input::is_key_down(SDL_SCANCODE_Z) || Input::is_con_button_down(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER))
 			delta += move_speed * up;
-		if (keys[SDL_SCANCODE_X])
+		if (Input::is_key_down(SDL_SCANCODE_X) || Input::is_con_button_down(SDL_CONTROLLER_BUTTON_LEFTSHOULDER))
 			delta -= move_speed * up;
+
+		delta -= move_speed * front * deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY));
+		delta -= move_speed * right * deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX));
+
 		position += delta;
 	}
 }
@@ -393,7 +395,8 @@ void GameEngineLocal::connect_to(string address)
 #include "EditorPopupTemplate.h"
 
 #ifdef EDITOR_BUILD
-DECLARE_ENGINE_CMD(TOGGLE_PLAY_EDIT_MAP)
+//TOGGLE_PLAY_EDIT_MAP
+void toggle_play_edit_map(const Cmd_Args& args)
 {
 	if (!eng->is_editor_level()) {
 		auto level = eng->get_level();
@@ -424,6 +427,7 @@ DECLARE_ENGINE_CMD(TOGGLE_PLAY_EDIT_MAP)
 			sys_print(Error, "no valid map");
 	}
 }
+#if 0
 DECLARE_ENGINE_CMD(EDITOR_BACK_ONE_PAGE)
 {
 	if (eng_local.engine_map_state_history.size() <= 1) {
@@ -446,8 +450,9 @@ DECLARE_ENGINE_CMD(EDITOR_FORWARD_ONE_PAGE)
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, eng_local.engine_map_state_history.back().c_str());
 	eng_local.engine_map_state_history.pop_back();	// will get appended again
 }
+#endif
 
-DECLARE_ENGINE_CMD(close_ed)
+void close_editor(const Cmd_Args& args)
 {
 	{
 		eng_local.engine_map_state_history.push_back(
@@ -458,7 +463,7 @@ DECLARE_ENGINE_CMD(close_ed)
 }
 
 
-DECLARE_ENGINE_CMD(start_ed)
+void start_editor(const Cmd_Args& args)
 {
 	static const char* usage_str = "Usage: starteditor [Map,AnimGraph,Model,<asset metadata typename>] <file>\n";
 	if (args.size() != 2 && args.size()!=3) {
@@ -532,16 +537,19 @@ void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg
 	if (active_tool != next_tool && active_tool != nullptr) {
 		// this should call close internally
 		get_current_tool()->close();
+		on_leave_editor.invoke();
 	}
 	active_tool = next_tool;
 	if (active_tool != nullptr) {
 		leave_level();
 		enable_imgui_docking();
-		global_asset_browser.init();
 		bool could_open = get_current_tool()->open(file, arg);
+
 		if (!could_open) {
 			active_tool = nullptr;
 		}
+		else
+			on_enter_editor.invoke(get_current_tool());
 	}
 
 	if (!active_tool)
@@ -550,11 +558,6 @@ void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg
 #endif
 
 
-
-DECLARE_ENGINE_CMD(quit)
-{
-	Quit();
-}
 
 
 vector<string>* GameEngineLocal::find_keybinds(SDL_Scancode code, uint16_t keymod) {
@@ -595,7 +598,7 @@ void GameEngineLocal::set_keybind(SDL_Scancode code, uint16_t keymod, std::strin
 }
 
 
-DECLARE_ENGINE_CMD(bind)
+void bind_key(const Cmd_Args& args)
 {
 	if (args.size() < 2) return;
 	SDL_Scancode scancode = SDL_GetScancodeFromName(args.at(1));
@@ -626,35 +629,23 @@ DECLARE_ENGINE_CMD(bind)
 	}
 }
 
-DECLARE_ENGINE_CMD_CAT("cl.",force_update)
+class EngineCommandBuilder
 {
-	//eng->get_client()->ForceFullUpdate();
-}
-
-DECLARE_ENGINE_CMD(connect)
-{
-	if (args.size() < 2) {
-		sys_print(Info, "usage connect <address>");
-		return;
+public:
+	static string create_change_map(const string& map, bool force_change) {
+		string out = "map ";
+		if (force_change) out += "f ";
+		out += map;
+		return out;
 	}
+};
 
-	eng_local.connect_to(args.at(1));
-}
-DECLARE_ENGINE_CMD(disconnect)
-{
-	eng->leave_level();
-}
-DECLARE_ENGINE_CMD(reconnect)
-{
-	//if(eng->get_client()->get_state() != CS_DISCONNECTED)
-	//	eng->get_client()->Reconnect();
-}
 #include "EditorPopupTemplate.h"
 // open a map for playing
-DECLARE_ENGINE_CMD(map)
+void start_map(const Cmd_Args& args)
 {
 	if (args.size() < 2) {
-		sys_print(Info, "usage: map <map name>");
+		sys_print(Info, "usage: map <opt> <map name>");
 		return;
 	}
 
@@ -662,69 +653,36 @@ DECLARE_ENGINE_CMD(map)
 		sys_print(Error, "map called but already waiting on another async map load (%s), skipping.\n", eng_local.queued_mapname.c_str());
 		return;
 	}
-
+	bool force_change = false;
+	for (int i = 1; i < args.size() - 1; i++) {
+		if (strcmp(args.at(i), "f") == 0)
+			force_change = true;
+	}
+	const int map_idx = args.size() - 1;
 
 #ifdef EDITOR_BUILD
+	std::string what_map = args.at(map_idx);
+	auto close_editor_func = [what_map]() {
+		sys_print(Warning, "starting game so closing any editors\n");
+		eng_local.change_editor_state(nullptr, "");
+		eng->open_level(what_map);
+	};
+
 	if (eng->get_current_tool() != nullptr) {
-		std::string what_map = args.at(1);
-		eng->get_current_tool()->try_close(
-			[what_map]() {
-			sys_print(Warning,"starting game so closing any editors\n");
-				eng_local.change_editor_state(nullptr, "");
-				
-				std::string cmd = "map";
-				cmd += " ";
-				cmd += what_map;
-				eng_local.engine_map_state_history.push_back(
-					cmd
-				);			
-				eng->open_level(what_map);
-			});
-		return;
+		if (force_change)
+			close_editor_func();
+		else
+			eng->get_current_tool()->try_close(close_editor_func);
 	}
 	else 
 #endif
 	{
-		eng->open_level(args.at(1));
+		eng->open_level(args.at(map_idx));
 	}
 }
 extern ConfigVar g_entry_level;
 // start game from the entry map
-DECLARE_ENGINE_CMD(goto_entry_map)
-{
-	if (args.size() != 1) {
-		sys_print(Info,"usage: goto_entry_map");
-		return;
-	}
 
-	const char* cmd = string_format("map %s\n", g_entry_level.get_string());
-	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, cmd);
-}
-
-DECLARE_ENGINE_CMD(exec)
-{
-	if (args.size() < 2) {
-		sys_print(Info,"usage: exec <exec filename>");
-		return;
-	}
-
-	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, args.at(1));
-}
-DECLARE_ENGINE_CMD(toggle)
-{
-	if (args.size() != 2) {
-		sys_print(Warning, "usage: toggle <boolean cvar>");
-		return;
-	}
-	auto var = VarMan::get()->find(args.at(1));
-	if (!var || !(var->get_var_flags() & CVAR_BOOL))
-	{
-		sys_print(Warning, "usage: toggle <boolean cvar>");
-		return;
-	}
-	var->set_bool(!var->get_bool());
-	sys_print(Info, "%s = %s\n", var->get_name(), var->get_string());
-}
 
 static void inc_or_dec_int_var(ConfigVar* var, bool decrement)
 {
@@ -744,211 +702,175 @@ static void inc_or_dec_int_var(ConfigVar* var, bool decrement)
 	sys_print(Info, "%s = %s\n", var->get_name(), var->get_string());
 }
 
-DECLARE_ENGINE_CMD(inc)
+
+
+void dump_imgui_ini(const Cmd_Args& args)
 {
 	if (args.size() != 2) {
-		sys_print(Warning, "usage: inc <int cvar>");
+		sys_print(Info, "usage: dump_imgui_ini  ($g_editor_cfg_folder)/<file>");
 		return;
 	}
-	auto var = VarMan::get()->find(args.at(1));
-	if (!var || !(var->get_var_flags() & CVAR_INTEGER))
-	{
-		sys_print(Warning, "usage: inc <int cvar>");
-		return;
-	}
-	inc_or_dec_int_var(var, false);
+
+	std::string relative = g_editor_cfg_folder.get_string();
+	relative += "/";
+	relative += args.at(1);
+
+	auto path = FileSys::get_full_path_from_relative(relative, FileSys::ENGINE_DIR);	// might change this to user dir
+
+	ImGui::SaveIniSettingsToDisk(path.c_str());
 }
-DECLARE_ENGINE_CMD(dec)
+void load_imgui_ini(const Cmd_Args& args)
 {
 	if (args.size() != 2) {
-		sys_print(Warning, "usage: dec <int cvar>");
+		sys_print(Info, "usage: load_imgui_ini ($g_editor_cfg_folder)/<file>");
 		return;
 	}
-	auto var = VarMan::get()->find(args.at(1));
-	if (!var || !(var->get_var_flags() & CVAR_INTEGER))
-	{
-		sys_print(Warning, "usage: dec <int cvar>");
-		return;
-	}
-	inc_or_dec_int_var(var, true);
+
+	std::string relative = g_editor_cfg_folder.get_string();
+	relative += "/";
+	relative += args.at(1);
+
+	auto path = FileSys::get_full_path_from_relative(relative, FileSys::ENGINE_DIR);
+
+	ImGui::LoadIniSettingsFromDisk(path.c_str());
 }
+#include "LevelEditor/TagManager.h"
 
+// tech debt nonsense
+extern void IMPORT_TEX_FOLDER(const Cmd_Args& args);
+extern void IMPORT_TEX(const Cmd_Args& args);
+extern void COMPILE_TEX(const Cmd_Args& args);
 
-DECLARE_ENGINE_CMD(net_stat)
+void GameEngineLocal::add_commands()
 {
-	float mintime = INFINITY;
-	float maxtime = -INFINITY;
-	int maxbytes = -5000;
-	int totalbytes = 0;
-	//for (int i = 0; i < 64; i++) {
-	//	auto& entry = eng->get_client()->server.incoming[i];
-	//	maxbytes = glm::max(maxbytes, entry.bytes);
-	//	totalbytes += entry.bytes;
-	//	mintime = glm::min(mintime, entry.time);
-	//	maxtime = glm::max(maxtime, entry.time);
-	//}
-
-	sys_print(Debug,"Client Network Stats:\n");
-	//sys_print(Debug,"%--15s %f\n", "Rtt", eng->get_client()->server.rtt);
-	sys_print(Debug,"%--15s %f\n", "Interval", maxtime - mintime);
-	sys_print(Debug,"%--15s %d\n", "Biggest packet", maxbytes);
-	sys_print(Debug,"%--15s %f\n", "Kbits/s", 8.f*(totalbytes / (maxtime-mintime))/1000.f);
-	sys_print(Debug,"%--15s %f\n", "Bytes/Packet", totalbytes / 64.0);
-}
-
-
-DECLARE_ENGINE_CMD(reload_shaders)
-{
-	idraw->reload_shaders();
-}
-
-#include "Input/InputAction.h"
-
-class SwizzleModifier : public InputModifier
-{
-public:
-	SwizzleModifier(bool swizzle, bool negate, float exp = 1.f) : swizzle(swizzle), negate(negate), exp(exp) {}
-	InputValue modify(InputValue value, float dt) const {
-
-		float f = value.v.x;
-		if (abs(f) <= 0.3)
-			f = 0;
-
-		f = glm::pow(abs(f), exp) * glm::sign(f);
-
-		if (negate) {
-			f = -f;
+	commands = ConsoleCmdGroup::create("");
+	commands->add("IMPORT_TEX_FOLDER", IMPORT_TEX_FOLDER);
+	commands->add("IMPORT_TEX", IMPORT_TEX);
+	commands->add("COMPILE_TEX", COMPILE_TEX);
+	commands->add("print_assets", [](const Cmd_Args&) { g_assets.print_usage(); });
+	commands->add("TOGGLE_PLAY_EDIT_MAP", toggle_play_edit_map);
+	commands->add("start_ed", start_editor);
+	commands->add("close_ed", close_editor);
+	commands->add("load_imgui_ini", load_imgui_ini);
+	commands->add("dump_imgui_ini", dump_imgui_ini);
+	commands->add("reload_shaders", [](const Cmd_Args&) { idraw->reload_shaders(); } );
+	commands->add("dec", [](const Cmd_Args& args) {
+		if (args.size() != 2) {
+			sys_print(Warning, "usage: dec <int cvar>");
+			return;
 		}
-		
-		InputValue out;
-		if (swizzle)
-			out.v.y = f;
-		else
-			out.v.x = f;
-
-		return out;
-	}
-	bool swizzle;
-	bool negate;
-	float exp;
-};
-
-
-class LookModifier : public InputModifier
-{
-public:
-	LookModifier(bool swizzle) : swizzle(swizzle) {}
-	InputValue modify(InputValue value, float dt) const {
-		if (swizzle)
-			std::swap(value.v.x, value.v.y);
-		value.v *= g_mousesens.get_float();
-		return value;
-	}
-	bool swizzle;
-};
-class LookModifierController : public InputModifier
-{
-public:
-	LookModifierController(bool swizzle) : swizzle(swizzle) {}
-	InputValue modify(InputValue value, float dt) const {
-
-		float f = value.v.x;
-		if (abs(f) <= 0.05)
-			f = 0;
-
-		float exp = 2.0;
-		f = glm::pow(abs(f),exp) * glm::sign(f);
-
-		f *= 0.1f;
-		InputValue v;
-		if (swizzle) {
-			v.v.y = f;
+		auto var = VarMan::get()->find(args.at(1));
+		if (!var || !(var->get_var_flags() & CVAR_INTEGER))
+		{
+			sys_print(Warning, "usage: dec <int cvar>");
+			return;
 		}
-		else
-			v.v.x = f;
-		return v;
-	}
-	bool swizzle;
-};
-class BasicButtonTrigger : public InputTrigger
+		inc_or_dec_int_var(var, true);
+	});
+	commands->add("inc", [](const Cmd_Args& args) {
+		if (args.size() != 2) {
+			sys_print(Warning, "usage: inc <int cvar>");
+			return;
+		}
+		auto var = VarMan::get()->find(args.at(1));
+		if (!var || !(var->get_var_flags() & CVAR_INTEGER))
+		{
+			sys_print(Warning, "usage: inc <int cvar>");
+			return;
+		}
+		inc_or_dec_int_var(var, false);
+		});
+	commands->add("toggle", [](const Cmd_Args& args) {
+		if (args.size() != 2) {
+			sys_print(Warning, "usage: toggle <boolean cvar>");
+			return;
+		}
+		auto var = VarMan::get()->find(args.at(1));
+		if (!var || !(var->get_var_flags() & CVAR_BOOL))
+		{
+			sys_print(Warning, "usage: toggle <boolean cvar>");
+			return;
+		}
+		var->set_bool(!var->get_bool());
+		sys_print(Info, "%s = %s\n", var->get_name(), var->get_string());
+		});
+	commands->add("exec", [](const Cmd_Args& args) {
+		if (args.size() < 2) {
+			sys_print(Info, "usage: exec <exec filename>");
+			return;
+		}
+		Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, args.at(1));
+		});
+	commands->add("goto_entry_map", [](const Cmd_Args& args) {
+		if (args.size() != 1) {
+			sys_print(Info, "usage: goto_entry_map");
+			return;
+		}
+		Cmd_Manager::inst->execute_cmd(EngineCommandBuilder::create_change_map(g_entry_level.get_string(), false));
+		});
+	commands->add("quit", [](const Cmd_Args& args) { Quit(); });
+	commands->add("map", start_map);
+	commands->add("bind", bind_key);
+	commands->add("REG_GAME_TAG", [](const Cmd_Args& args) {
+		if (args.size() != 2) {
+			sys_print(Error, "REG_GAME_TAG <tag>");
+			return;
+		}
+		GameTagManager::get().add_tag(args.at(1));
+		});
+
+	g_modelMgr.add_commands(*commands);
+}
+
+void test_integration_1(IntegrationTester& tester)
 {
-public:
-	BasicButtonTrigger(float thresh = 0.5f) : thresh(thresh){
-	}
-	TriggerMask check_trigger(InputValue value, float dt) const {
- 		return value.get_value<float>() >= thresh ? TriggerMask::Active : TriggerMask();
-	}
-
-	float thresh;
-};
-
-void register_input_actions_for_game()
+	sys_print(Info, "HELLO WORLD\n");
+	bool res = tester.wait_delegate(eng_local.on_map_load_return);
+	tester.checkTrue(!res, "Must have loaded map");
+	float time = GetTime();
+	tester.wait_ticks(1);
+	tester.wait_time(2.0);
+	float now = GetTime();
+	sys_print(Info, "Diff %f\n", now - time);
+	tester.wait_time(3.0);
+}
+void test_integration_2(IntegrationTester& tester)
 {
-	using IA = InputAction;
+	sys_print(Info, "HELLO WORLD\n");
+	Cmd_Manager::inst->append_cmd(EngineCommandBuilder::create_change_map("top_down/map0.tmap", true));// Cmd_Execute_Mode::APPEND, "map top_down/map0.tmap");
+	bool changeSuccesful = tester.wait_delegate(eng_local.on_map_load_return);
+	tester.checkTrue(changeSuccesful, "map change worked");
 
-	IA::register_action("game", "move", true)
-		->add_bind("x", IA::controller_axis(SDL_CONTROLLER_AXIS_LEFTX), new SwizzleModifier(false,true,1.0), nullptr)
-		->add_bind("y", IA::controller_axis(SDL_CONTROLLER_AXIS_LEFTY), new SwizzleModifier(true, true,1.0), nullptr)
-		->add_bind("y+", IA::keyboard_key(SDL_SCANCODE_W), new SwizzleModifier(true, false), nullptr)
-		->add_bind("y-", IA::keyboard_key(SDL_SCANCODE_S), new SwizzleModifier(true, true), {})
-		->add_bind("x-", IA::keyboard_key(SDL_SCANCODE_A), new SwizzleModifier(false, false), {})
-		->add_bind("x+", IA::keyboard_key(SDL_SCANCODE_D), new SwizzleModifier(false, true), {});
-
-	IA::register_action("game", "look", true)
-		->add_bind("x", GIB::MouseX, new LookModifier(false), {})
-		->add_bind("y", GIB::MouseY, new LookModifier(true), {})
-		->add_bind("x", IA::controller_axis(SDL_CONTROLLER_AXIS_RIGHTX), new LookModifierController(false), {})
-		->add_bind("y", IA::controller_axis(SDL_CONTROLLER_AXIS_RIGHTY), new LookModifierController(true), {});
-	IA::register_action("game", "shoot", false)
-		->add_bind("", GIB::MBLeft, {}, new BasicButtonTrigger())
-		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER), {}, new BasicButtonTrigger());
-
-	IA::register_action("game", "sprint")
-		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_RIGHTSHOULDER), {}, {})
-		->add_bind("", IA::keyboard_key(SDL_SCANCODE_LSHIFT), {}, {});
-	IA::register_action("game", "inv_next")
-		->add_bind("", GIB::MouseScroll, {}, {})
-		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_DPAD_RIGHT), {}, {});
-	IA::register_action("game", "inv_prev")
-		->add_bind("", GIB::MouseScroll, {}, {})
-		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_DPAD_LEFT), {}, {});
-	IA::register_action("game", "inv_0")
-		->add_bind("", IA::keyboard_key(SDL_SCANCODE_0), {}, {});
-	IA::register_action("game", "inv_1")
-		->add_bind("", IA::keyboard_key(SDL_SCANCODE_1), {}, {});
-	IA::register_action("game", "inv_2")
-		->add_bind("", IA::keyboard_key(SDL_SCANCODE_2), {}, {});
-	IA::register_action("game", "crouch")
-		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_LEFTSHOULDER), {}, {});
-
-	IA::register_action("game", "jump")
-		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_A), nullptr, new BasicButtonTrigger())
-		->add_bind("", IA::keyboard_key(SDL_SCANCODE_SPACE), nullptr, new BasicButtonTrigger());
-	IA::register_action("game", "test1")
-		->add_bind("", IA::keyboard_key(SDL_SCANCODE_Z), nullptr, new BasicButtonTrigger());
-
-	IA::register_action("ui", "right")
-		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_DPAD_RIGHT), {}, {})
-		->add_bind("", IA::keyboard_key(SDL_SCANCODE_RIGHT), {}, {});
-	IA::register_action("ui", "menu")
-		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_START), {}, new BasicButtonTrigger())
-		->add_bind("", IA::keyboard_key(SDL_SCANCODE_ESCAPE), {}, new BasicButtonTrigger());
-	IA::register_action("game", "reload")
-		->add_bind("", IA::controller_button(SDL_CONTROLLER_BUTTON_X), {}, new BasicButtonTrigger())
-		->add_bind("", IA::keyboard_key(SDL_SCANCODE_R), {}, new BasicButtonTrigger());
-
-	IA::register_action("game", "accelerate")
-		->add_bind("", IA::controller_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT), {}, {})
-		->add_bind("", IA::keyboard_key(SDL_SCANCODE_W), {}, {});
-	IA::register_action("game", "deccelerate")
-		->add_bind("", IA::controller_axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT), {}, {})
-		->add_bind("", IA::keyboard_key(SDL_SCANCODE_S), {}, {});
+	MulticastDelegate<> temp;
+	g_assets.find_async<PrefabAsset>("myprefabblah.pfb", [&temp](GenericAssetPtr) {
+		temp.invoke();
+		});
+	tester.wait_delegate(temp);
+	tester.wait_ticks(1);
+	tester.checkTrue(!EditorPopupManager::inst->has_popup_open(), "no popup after changing map");
+	tester.checkTrue(!eng->is_editor_level(), "not editor level");
+	tester.checkTrue(!eng_local.is_in_an_editor_state(), "not editor state");
+	tester.wait_time(1.0);
+	eng_local.leave_level();
+	tester.wait_ticks(1);
+	tester.checkTrue(!eng->get_level(), "");
+	tester.wait_time(1.0);
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "start_ed Map top_down/map0.tmap");
+	bool res = tester.wait_delegate(eng_local.on_map_load_return);
+	tester.checkTrue(res, "Must have opened editor");
+	tester.wait_time(2.0);
 }
 
 
 int game_engine_main(int argc, char** argv)
 {
 	eng_local.init(argc,argv);
+	
+	//vector<IntTestCase> tests;
+	//tests.push_back({ test_integration_1, "myTest" });
+	//tests.push_back({ test_integration_2, "myTest2" });
+	//eng_local.tester = std::make_unique<IntegrationTester>(true, tests);
+
 	eng_local.loop();
 	eng_local.cleanup();
 	
@@ -1056,6 +978,7 @@ void GameEngineLocal::execute_map_change()
 	// free current map
 	stop_game();
 	ASSERT(!level);
+	on_begin_map_change.invoke();
 
 	// try loading map
 #ifdef EDITOR_BUILD
@@ -1137,34 +1060,24 @@ void GameEngineLocal::key_event(SDL_Event event)
 		return;
 
 	if (event.type == SDL_KEYDOWN) {
-
-		SDL_Scancode scancode = event.key.keysym.scancode;
-		inp.keys[scancode] = true;
-		inp.keychanges[scancode] = true;
-
 		// check keybind activation
+		SDL_Scancode scancode = event.key.keysym.scancode;
 		vector<string>* keybinds = find_keybinds(scancode, event.key.keysym.mod);
-	
 		if (keybinds != nullptr) {
 			for(string& k : *keybinds)
-				Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, k.c_str());
+				Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, k.c_str());
 		}
-	}
-	else if (event.type == SDL_KEYUP) {
-		inp.keys[event.key.keysym.scancode] = false;
 	}
 	// when drawing to windowed viewport, handle game_focused during drawing
 	else if (event.type == SDL_MOUSEBUTTONDOWN) {
 		if (!is_in_game_level && event.button.button == 3 && !is_drawing_to_window_viewport()) {
 			set_game_focused(true);
 		}
-		inp.mousekeys |= (1<<event.button.button);
 	}
 	else if (event.type == SDL_MOUSEBUTTONUP) {
 		if (!is_in_game_level && event.button.button == 3 && !is_drawing_to_window_viewport()) {
 			set_game_focused(false);
 		}
-		inp.mousekeys &= ~(1 << event.button.button);
 	}
 }
 
@@ -1175,6 +1088,8 @@ void GameEngineLocal::cleanup()
 		get_current_tool()->close();
 #endif
 	isound->cleanup();
+
+	g_assets.quit();
 
 	// could get fatal error before initializing this stuff
 	if (gl_context && window) {
@@ -1299,7 +1214,7 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 	if (is_in_an_editor_state()) {
 		dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode, get_current_tool());
 		get_current_tool()->draw_imgui_public();
-		global_asset_browser.imgui_draw();
+		AssetBrowser::inst->imgui_draw();
 	}
 #endif
 
@@ -1311,7 +1226,7 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 	// will only be true if in a tool state
 	if (is_drawing_to_window_viewport() && eng->get_state()==Engine_State::Game) {
 
-		uint32_t flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+		uint32_t flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoNav;
 		if (scene_hovered)
 			flags |=  ImGuiWindowFlags_NoMove;
 
@@ -1351,6 +1266,8 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 			if (is_in_an_editor_state())
 				get_current_tool()->hook_scene_viewport_draw();
 		}
+		if (Input::is_con_button_down(SDL_CONTROLLER_BUTTON_A))
+			next_focus = true;
 
 		set_game_focused(next_focus);
 		ImGui::End();
@@ -1449,15 +1366,6 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 
 // RH, reverse Z, infinite far plane perspective matrix
 
-glm::mat4 MakeInfReversedZProjRH(float fovY_radians, float aspectWbyH, float zNear)
-{
-	float f = 1.0f / tan(fovY_radians / 2.0f);
-	return glm::mat4(
-		f / aspectWbyH, 0.0f, 0.0f, 0.0f,
-		0.0f, f, 0.0f, 0.0f,
-		0.0f, 0.0f, 0.0f, -1.0f,
-		0.0f, 0.0f, zNear, 0.0f);
-}
 glm::mat4 View_Setup::make_opengl_perspective_with_near_far() const
 {
 	return glm::perspectiveRH_NO(fov, width / (float)height, near, far);
@@ -1534,44 +1442,10 @@ void GameEngineLocal::init_sdl_window()
 	SDL_GL_SetSwapInterval(0);
 }
 
-struct MdContextBase
-{
-public:
-	template<typename T>
-	T get_key_as() const {
-		return T(uint64_t(key));
-	}
-	void* get_key() const {
-		return key;
-	}
-	uint64_t get_key_as_int() const {
-		return uint64_t(key);
-	}
-protected:
-	void* key = nullptr;
-};
-
-template<typename ...Args>
-struct MDContext : public MdContextBase
-{
-public:
-	void remove_me() const {
-		the_delegate->remove(get_key());
-	}
-private:
-	MulticastDelegate<Args...>* the_delegate = nullptr;
-};
-
-
-Entity* entity_from_mdcontext(MdContextBase& ctx)
-{
-	return EntityPtr(ctx.get_key_as_int()).get();
-}
 
 
 ImFont* global_big_imgui_font = nullptr;
 
-extern void register_input_actions_for_game();
 void GameEngineLocal::init(int argc, char** argv)
 {
 	this->argc = argc;
@@ -1580,8 +1454,9 @@ void GameEngineLocal::init(int argc, char** argv)
 	sys_print(Info, "--------- Initializing Engine ---------\n");
 
 	float start = GetTime();
-
 	program_time_start = GetTime();
+	Cmd_Manager::inst = Cmd_Manager::create();
+	add_commands();
 
 	// must come first
 	ClassBase::init_class_reflection_system();
@@ -1600,15 +1475,15 @@ void GameEngineLocal::init(int argc, char** argv)
 	FileSys::init();
 	g_assets.init();
 
-	jobs::init();	// spawns worker threads
+	JobSystem::inst = new JobSystem();// spawns worker threads
 
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
+	AssetBrowser::inst = new AssetBrowser();
 #endif
 	g_scriptMgr->init();
 
-	g_inputSys.init();
-	register_input_actions_for_game();
+	Input::inst = new Input();
 
 	EditorPopupManager::inst = new EditorPopupManager();
 
@@ -1637,15 +1512,8 @@ void GameEngineLocal::init(int argc, char** argv)
 	ImGui::GetIO().Fonts->Build();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-
-	//engine_fullscreen_gui = new GUIFullscreen();
-	//gui_log = new OnScreenLogGui();
-	//engine_fullscreen_gui->add_this(gui_log);
-	//engine_fullscreen_gui->recieve_events = false;
-	//gui_sys->add_gui_panel_to_root(engine_fullscreen_gui);
-
-	Cmd_Manager::get()->set_set_unknown_variables(true);
-	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
+	Cmd_Manager::inst->set_set_unknown_variables(true);
+	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
 	
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
@@ -1676,17 +1544,13 @@ void GameEngineLocal::init(int argc, char** argv)
 				cmd += argv[i++];
 			}
 
-			Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, cmd.c_str());
+			Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, cmd.c_str());
 		}
 	}
-	Cmd_Manager::get()->set_set_unknown_variables(false);
-
-
+	Cmd_Manager::inst->set_set_unknown_variables(false);
 	SDL_SetWindowPosition(window, startx, starty);
 	SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
-
-
-	Cmd_Manager::get()->execute_file(Cmd_Execute_Mode::NOW, "init.txt");
+	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "init.txt");
 
 	// not in editor and no queued map, load the entry point
 	if (!is_in_an_editor_state() && get_state() != Engine_State::Loading) {
@@ -1712,9 +1576,6 @@ void GameEngineLocal::game_update_tick()
 	};
 	auto update = [&](double dt) {
 		ZoneScopedN("update");
-
-		if (!is_editor_level())
-			g_inputSys.tick_users(dt);
 		level->update_level();
 	};
 	const double dt = frame_time;
@@ -1767,6 +1628,8 @@ void GameEngineLocal::stop_game()
 	gui_log = nullptr;
 	level->close_level();
 	level.reset();
+
+	on_leave_level.invoke();
 
 
 	// clear any debug shapes
@@ -1839,6 +1702,7 @@ bool GameEngineLocal::state_machine_update()
 	return false;
 }
 
+
 void GameEngineLocal::loop()
 {
 	auto frame_start = [&]() -> bool
@@ -1849,11 +1713,12 @@ void GameEngineLocal::loop()
 			SDL_WarpMouseInWindow(window, saved_mouse_x, saved_mouse_y);
 		}
 		// update input
-		memset(inp.keychanges, 0, sizeof inp.keychanges);
+		Input::inst->pre_events();
 		SDL_Event event;
 		while (SDL_PollEvent(&event))
 		{
 			ImGui_ImplSDL2_ProcessEvent(&event);
+			Input::inst->handle_event(event);
 			switch (event.type) {
 			case SDL_QUIT:
 				::Quit();
@@ -1877,8 +1742,9 @@ void GameEngineLocal::loop()
 			case SDL_MOUSEWHEEL:
 				key_event(event);
 				break;
+			default:
+				break;
 			}
-			g_inputSys.handle_event(event);
 			if (!is_game_focused()) {
 				if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) && ImGui::GetIO().WantCaptureKeyboard)
 					continue;
@@ -1887,6 +1753,7 @@ void GameEngineLocal::loop()
 			}
 			g_guiSystem->handle_event(event);
 		}
+		Input::inst->tick();
 		g_guiSystem->post_handle_events();
 		g_guiSystem->think();
 		Cmd_Manager::get()->execute_buffer();
@@ -1899,14 +1766,14 @@ void GameEngineLocal::loop()
 		CPUSCOPESTART(OverlappedUpdate);
 		BooleanScope scope(b_is_in_overlapped_period);
 		GameUpdateOuput out;
-		jobs::Counter* gameupdatecounter{};
-		jobs::add_job(game_update_job,uintptr_t(&out), gameupdatecounter);
+		JobCounter* gameupdatecounter{};
+		JobSystem::inst->add_job(game_update_job,uintptr_t(&out), gameupdatecounter);
 
 		if (!shouldDrawNext) {
 			drawparamsNext.draw_world = drawparamsNext.draw_ui = false;
 		}
 		idraw->scene_draw(drawparamsNext, setupNext);
-		jobs::wait_and_free_counter(gameupdatecounter);// wait for game update to finish while render is on this thread
+		JobSystem::inst->wait_and_free_counter(gameupdatecounter);// wait for game update to finish while render is on this thread
 
 		shouldDrawNext = out.drawOut;
 		drawparamsNext = out.paramsOut;
@@ -1977,6 +1844,14 @@ void GameEngineLocal::loop()
 		if (dt > 0.1)
 			dt = 0.1;
 		frame_time = dt;
+
+		if (tester) {
+			bool res = tester->tick(dt);
+			if (res) {
+				Quit();
+			}
+		}
+
 
 		// update input, console cmd buffer
 		const bool should_skip = frame_start();
@@ -2135,40 +2010,61 @@ void Debug_Console::print(const char* fmt, ...)
 	lines.push_back(buf);
 }
 
-ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "Cfg", CVAR_DEV, "what folder to save .ini and other editor cfg to");
 
-DECLARE_ENGINE_CMD(dump_imgui_ini)
-{
-	if (args.size() != 2) {
-		sys_print(Info, "usage: dump_imgui_ini  ($g_editor_cfg_folder)/<file>");
-		return;
+
+// SDL_CONTROLLER_AXIS_LEFTX = 0
+// SDL_CONTROLLER_AXIS_LEFTY = 1
+
+void update_char() {
+	SDL_GameControllerAxis moveAxisX = SDL_CONTROLLER_AXIS_LEFTX;
+	SDL_GameControllerAxis moveAxisY = SDL_CONTROLLER_AXIS_LEFTY;
+	if (Input::is_shift_down() && Input::is_alt_down() && Input::is_mouse_down(0)) {
+		
+	}
+	bool send_nav_next = false;
+
+	static float next_time = 0.0;
+	if (Input::is_any_con_active()) {
+		const bool down = Input::is_con_button_down(SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
+		if (!down) {
+			next_time = 0.0;
+		}
+		else if (down && GetTime() > next_time) {
+			send_nav_next = true;
+			next_time = GetTime() + 0.4;
+		}
 	}
 
-	std::string relative = g_editor_cfg_folder.get_string();
-	relative += "/";
-	relative += args.at(1);
+	vec2 move{};
+	move.x = Input::get_con_axis(moveAxisX);
+	move.y = Input::get_con_axis(moveAxisY);
 
-	auto path = FileSys::get_full_path_from_relative(relative, FileSys::ENGINE_DIR);	// might change this to user dir
+	const bool INVERT_Y = false;
+	if (INVERT_Y)
+		move.y = -move.y;
+	const float SENS = 0.01;
+	move *= SENS;
+	const float DEADZONE = 0.1;
+	if (glm::abs(move.y) < DEADZONE)move.y = 0;
+	if (glm::abs(move.x) < DEADZONE)move.x = 0;
+	if (glm::length(move) > 1)
+		move = move / glm::length(move);
 
-	ImGui::SaveIniSettingsToDisk(path.c_str());
-}
-DECLARE_ENGINE_CMD(load_imgui_ini)
-{
-	if (args.size() != 2) {
-		sys_print(Info, "usage: load_imgui_ini ($g_editor_cfg_folder)/<file>");
-		return;
+	bool wants_shoot = false;
+	if (Input::is_mouse_down(0))
+		wants_shoot = true;
+	if (Input::get_con_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 0.5)
+		wants_shoot = true;
+
+
+	Input::is_con_button_down(SDL_CONTROLLER_BUTTON_A);
+
+	if(Input::is_key_down(SDL_SCANCODE_W)) {
+
 	}
 
-	std::string relative = g_editor_cfg_folder.get_string();
-	relative += "/";
-	relative += args.at(1);
 
-	auto path = FileSys::get_full_path_from_relative(relative, FileSys::ENGINE_DIR);
-
-	ImGui::LoadIniSettingsFromDisk(path.c_str());
 }
-
-
 void Debug::add_line(glm::vec3 f, glm::vec3 to, Color32 color, float duration, bool fixedupdate)
 {
 	Debug_Shape shape;
@@ -2250,37 +2146,7 @@ void DebugShapeCtx::fixed_update_start()
 }
 
 // yeah its slow :)
-static void check_props_for_assetptr(void* inst, const PropertyInfoList* list, IAssetLoadingInterface* load)
-{
-	for (int i = 0; i < list->count; i++) {
-		auto& prop = list->list[i];
-		if (prop.type==core_type_id::AssetPtr) {
-			// wtf!
-			IAsset** e = (IAsset**)prop.get_ptr(inst);
-			if (*e)
-				load->touch_asset(*e);
-		}
-		else if (prop.type == core_type_id::List) {
-			auto listptr = prop.get_ptr(inst);
-			auto size = prop.list_ptr->get_size(listptr);
-			for (int j = 0; j < size; j++) {
-				auto ptr = prop.list_ptr->get_index(listptr, j);
-				check_props_for_assetptr(ptr, prop.list_ptr->props_in_list, load);
-			}
-		}
-	}
-}
-static void check_object_for_asset_ptr(ClassBase* obj, IAssetLoadingInterface* load)
-{
-	auto type = &obj->get_type();
-	while (type) {
-		auto props = type->props;
-		if(props)
-			check_props_for_assetptr(obj, props, load);
-		type = type->super_typeinfo;
-	}
-}
-
+#include "Framework/PropertyUtil.h"//
 void GameEngineLocal::do_asset_gc()
 {
 	if (!get_level())

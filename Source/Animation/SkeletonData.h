@@ -1,34 +1,43 @@
 #pragma once
-
 #include <vector>
 #include <string>
 #include <unordered_map>
-
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "Framework/StringName.h"
-
 #include "Event.h"
 #include "AnimationTypes.h"
+#include "Runtime/Easing.h"
+#include "Framework/ConsoleCmdGroup.h"
 
 class Node_CFG;
 class Pose;
 
-
-struct ChannelOffset
-{
+struct ChannelOffset {
 	uint32_t pos = 0;	// float[3]
 	uint32_t rot = 0;	// float[4]
 	uint32_t scale = 0;	// float[1]
 };
 
-struct ScalePositionRot
-{
+struct ScalePositionRot {
 	float scale;
 	glm::vec3 pos;
 	glm::quat rot;
 };
 
+struct SeqDirectPlayOpt {
+	float blend_time = 0.2;
+	StringName slotname;
+	Easing easing;
+};
+struct SyncMarker {
+	StringName name;
+	int time = 0;
+};
+struct AnimCurveData {
+	StringName name;
+	int offset = 0;	// offset in pose_data
+};
 
 class AnimationSeq
 {
@@ -41,19 +50,17 @@ public:
 	float fps = 30.0;
 	float average_linear_velocity = 0.0;
 	bool has_rootmotion = false;
-
+	SeqDirectPlayOpt directplayopt;
 	// store any animation events or curves here
-	std::vector<std::unique_ptr<AnimationEvent>> events;
+	vector<uptr<AnimationEvent>> events;
+	vector<SyncMarker> syncMarkers;
+	vector<uptr<AnimDurationEvent>> durationEvents;
+	vector<AnimCurveData> curveData;
 
-	int get_num_keyframes_inclusive() const {
-		return num_frames + 1;
-	}
-	int get_num_keyframes_exclusive() const { 
-		return num_frames; 
-	}
+	int get_num_keyframes_inclusive() const { return num_frames + 1; }
+	int get_num_keyframes_exclusive() const { return num_frames; }
 	bool is_pose_clip() const { return num_frames == 1; }
 	uint32_t get_num_channels() const { return channel_offsets.size(); }
-
 	float get_clip_play_speed_for_linear_velocity(float velocity) const { return (average_linear_velocity >= 0.000001) ? velocity / average_linear_velocity : 0.0; }
 	float get_duration() const { return duration; }
 	int get_frame_for_time(float time) const { 
@@ -63,11 +70,8 @@ public:
 		return frame;
 	}
 	float get_time_of_keyframe(int keyframe) const { return (float)keyframe / fps; }
-
 	ScalePositionRot get_keyframe(int bone, int keyframe, float lerp) const;
-
 	const AnimationEvent* get_events_for_keyframe(int keyframe, int* out_count) const;
-
 private:
 	glm::vec3* get_pos_write_ptr(int channel, int keyframe);
 	float* get_scale_write_ptr(int channel, int keyframe);
@@ -76,18 +80,14 @@ private:
 	friend class ModelCompileHelper;
 };
 
-
 // simple index remapping of bones
 class MSkeleton;
-struct BoneIndexRetargetMap
-{
+struct BoneIndexRetargetMap {
 	const MSkeleton* who = nullptr;
 	// size = bones.size() 
 	std::vector<int16_t> my_skeleton_to_who;
 	std::vector<glm::quat> my_skelton_to_who_quat_delta;
-
 };
-
 
 enum class RetargetBoneType : uint8_t
 {
@@ -95,7 +95,6 @@ enum class RetargetBoneType : uint8_t
 	FromTargetBindPose,
 	FromAnimationScaled,
 };
-
 
 struct BoneData
 {
@@ -123,59 +122,30 @@ public:
 	MSkeleton() = default;
 	~MSkeleton();
 
-	bool is_skeleton_the_same(const MSkeleton& other) const {
-		if (get_num_bones() != other.get_num_bones())
-			return false;
-		for (int i = 0; i < get_num_bones(); i++) {
-			if (bone_dat[i].name != other.bone_dat[i].name)
-				return false;
-		}
-		return true;
-	}
-
+	bool is_skeleton_the_same(const MSkeleton& other) const;
 	int get_num_bones() const { return bone_dat.size(); }
-	int get_bone_index(StringName name) const {
-		for (int i = 0; i < bone_dat.size(); i++) {
-			if (bone_dat[i].name == name)
-				return i;
-		}
-		return -1;
-	}
+	int get_bone_index(StringName name) const;
 	int get_root_bone_index() const { return 0; }
-	int get_bone_parent(int bone) const { return bone_dat[bone].parent; }
-
+	int get_bone_parent(int bone) const { return bone_dat.at(bone).parent; }
 	bool has_mirroring_table() const { return mirroring_table.size() == get_num_bones(); }
 	int get_mirrored_bone(int index) const {
 		assert(has_mirroring_table());
 		return mirroring_table[index];
 	}
-
 	const glm::mat4x3& get_bone_local_transform(int index) const { return bone_dat[index].localtransform; }
 	const glm::quat& get_bone_local_rotation(int index) const { return bone_dat[index].rot; }
 	const glm::mat4x3& get_inv_posematrix(int index) const { return bone_dat[index].invposematrix; }
-
 	const AnimationSeq* find_clip(const std::string& name) const;
-
 	const BoneIndexRetargetMap* get_remap(const MSkeleton* other);
-
-	const BonePoseMask* find_mask(StringName name) const {
-		for (int i = 0; i < masks.size(); i++) {
-			if (masks[i].idname == name)
-				return &masks[i];
-		}
-		return nullptr;
-	}
+	const BonePoseMask* find_mask(StringName name) const;
 	const std::vector<BoneData>& get_all_bones() const {
 		return bone_dat;
 	}
 private:
-
 	std::vector<BonePoseMask> masks;
 	std::vector<std::unique_ptr<BoneIndexRetargetMap>> remaps;
 	std::vector<BoneData> bone_dat;
 	std::vector<int16_t> mirroring_table;
-
-
 	struct refed_clip {
 		AnimationSeq* ptr = nullptr;
 	};

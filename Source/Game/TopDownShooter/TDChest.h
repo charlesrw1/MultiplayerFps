@@ -28,7 +28,7 @@ public:
 				soundfx, 1, 1, 1, 1, {}, false, false, {}
 			);
 
-			m->get_animator_instance()->play_animation_in_slot(
+			m->get_animator()->play_animation_in_slot(
 				openanim,
 				StringName("Default"),
 				1, 0

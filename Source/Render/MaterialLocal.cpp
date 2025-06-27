@@ -592,12 +592,14 @@ void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 }
 
 #ifdef EDITOR_BUILD
-static const char* const SHADER_PATH = "Shaders\\";
-static const char* const INCLUDE_SPECIFIER = "#include";
 
 static void read_and_add_recursive(std::string filepath, std::string& text);
 static void read_instream(std::istream& stream, std::string& text)
 {
+
+	static const char* const INCLUDE_SPECIFIER = "#include";
+
+
 	std::string line;
 	while (std::getline(stream, line)) {
 
@@ -621,6 +623,7 @@ static void read_instream(std::istream& stream, std::string& text)
 
 static void read_and_add_recursive(std::string filepath, std::string& text)
 {
+	static const char* const SHADER_PATH = "Shaders\\";
 	std::string path(SHADER_PATH);
 	path += filepath;
 	std::ifstream infile(path);
@@ -646,10 +649,6 @@ static void replace(std::string& str, const std::string& from, const std::string
 	}
 }
 
-bool is_alpha_numeric(char c)
-{
-	return isalnum(c);
-}
 
 static void replace_variable(std::string& str, const std::string& from, const std::string& to) {
 	if (from.empty())
@@ -657,11 +656,11 @@ static void replace_variable(std::string& str, const std::string& from, const st
 	size_t start_pos = 0;
 	while ((start_pos = str.find(from, start_pos)) != std::string::npos) {
 		// check the characters before and after
-		if (start_pos > 0 && is_alpha_numeric(str.at(start_pos - 1))) {
+		if (start_pos > 0 && isalnum(str.at(start_pos - 1))) {
 			start_pos += from.size();
 			continue;
 		}
-		if (start_pos + from.size() < str.size() - 1 && is_alpha_numeric(str.at(start_pos + from.size()))) {
+		if (start_pos + from.size() < str.size() - 1 && isalnum(str.at(start_pos + from.size()))) {
 			start_pos += from.size();
 			continue;
 		}

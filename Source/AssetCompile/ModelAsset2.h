@@ -51,8 +51,6 @@ public:
 	std::vector<std::string> remap;
 };
 
-
-
 class AnimImportSettings : public ClassBase {
 public:
 	CLASS_BODY(AnimImportSettings);

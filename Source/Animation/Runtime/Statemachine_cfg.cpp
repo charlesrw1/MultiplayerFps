@@ -4,7 +4,7 @@
 #include "Framework/ArrayReflection.h"
 
 #include "Animation/AnimationUtil.h"
-
+#if 0
 const PropertyInfoList* State_Transition::get_props()
 {
 	MAKE_VECTORCALLBACK(StateTransitionScript, conditions);
@@ -413,3 +413,4 @@ public:
 };
 #include "Framework/AddClassToFactory.h"
 ADDTOFACTORYMACRO_NAME(StateTransitionScriptSerializer, IPropertySerializer, "StateTransitionScript");
+#endif

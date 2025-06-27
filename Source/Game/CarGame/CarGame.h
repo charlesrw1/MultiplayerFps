@@ -156,30 +156,13 @@ public:
 
 
 	void start() override {
-		inputUser = g_inputSys.register_input_user(0);
-		inputUser->assign_device(g_inputSys.get_keyboard_device());
-		inputUser->enable_mapping("game");
+	
 		auto camobj = eng->get_level()->spawn_entity();
 		camera = camobj->create_component<CameraComponent>();
 		camera->set_is_enabled(true);
-		move = inputUser->get("game/move");
-		accel = inputUser->get("game/accelerate");
-		brake = inputUser->get("game/deccelerate");
 
 		car = get_owner()->get_component<CarComponent>();
 		set_ticking(true);
-
-		inputUser->get("game/jump")->on_start.add(
-			this, [&]()
-			{
-				top_view = !top_view;
-			}
-		);
-		for (auto d : g_inputSys.get_connected_devices())
-			if (d->get_type() == InputDeviceType::Controller) {
-				inputUser->assign_device(d);
-				break;
-			}
 	}
 	//
 	void update();
@@ -194,9 +177,4 @@ public:
 	bool top_view = false;
 	CarComponent* car = nullptr;
 	CameraComponent* camera = nullptr;
-	InputActionInstance* move = nullptr;
-	InputActionInstance* accel = nullptr;
-	InputActionInstance* brake = nullptr;
-
-	std::unique_ptr<InputUser> inputUser = nullptr;
 };

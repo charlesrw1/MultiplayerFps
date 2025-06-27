@@ -7,49 +7,8 @@
 
 using glm::vec3;
 using glm::mat4;
-static const float cube_verts[] = {
-    -0.5f, -0.5f, -0.5f,
-     0.5f, -0.5f, -0.5f,
-     0.5f,  0.5f, -0.5f,
-     0.5f,  0.5f, -0.5f,
-    -0.5f,  0.5f, -0.5f,
-    -0.5f, -0.5f, -0.5f,
 
-    -0.5f, -0.5f,  0.5f,
-     0.5f, -0.5f,  0.5f,
-     0.5f,  0.5f,  0.5f,
-     0.5f,  0.5f,  0.5f,
-    -0.5f,  0.5f,  0.5f,
-    -0.5f, -0.5f,  0.5f,
-
-    -0.5f,  0.5f,  0.5f,
-    -0.5f,  0.5f, -0.5f,
-    -0.5f, -0.5f, -0.5f,
-    -0.5f, -0.5f, -0.5f,
-    -0.5f, -0.5f,  0.5f,
-    -0.5f,  0.5f,  0.5f,
-
-     0.5f,  0.5f,  0.5f,
-     0.5f,  0.5f, -0.5f,
-     0.5f, -0.5f, -0.5f,
-     0.5f, -0.5f, -0.5f,
-     0.5f, -0.5f,  0.5f,
-     0.5f,  0.5f,  0.5f,
-
-    -0.5f, -0.5f, -0.5f,
-     0.5f, -0.5f, -0.5f,
-     0.5f, -0.5f,  0.5f,
-     0.5f, -0.5f,  0.5f,
-    -0.5f, -0.5f,  0.5f,
-    -0.5f, -0.5f, -0.5f,
-
-    -0.5f,  0.5f, -0.5f,
-     0.5f,  0.5f, -0.5f,
-     0.5f,  0.5f,  0.5f,
-     0.5f,  0.5f,  0.5f,
-    -0.5f,  0.5f,  0.5f,
-    -0.5f,  0.5f, -0.5f,
-};
+const int EnviornmentMapHelper::MAX_MIP_ROUGHNESS = Texture::get_mip_map_count(CUBEMAP_SIZE, CUBEMAP_SIZE);
 
 EnviornmentMapHelper& EnviornmentMapHelper::get()
 {
@@ -64,6 +23,49 @@ void EnviornmentMapHelper::init()
 
     prefilter_specular_new= prog_man.create_raster( "Helpers/EqrtCubemapV.txt", "Helpers/PrefilterSpecularNewF.txt");
 
+    static const float cube_verts[] = {
+    -0.5f, -0.5f, -0.5f,
+     0.5f, -0.5f, -0.5f,
+     0.5f,  0.5f, -0.5f,
+     0.5f,  0.5f, -0.5f,
+    -0.5f,  0.5f, -0.5f,
+    -0.5f, -0.5f, -0.5f,
+
+    -0.5f, -0.5f,  0.5f,
+     0.5f, -0.5f,  0.5f,
+     0.5f,  0.5f,  0.5f,
+     0.5f,  0.5f,  0.5f,
+    -0.5f,  0.5f,  0.5f,
+    -0.5f, -0.5f,  0.5f,
+
+    -0.5f,  0.5f,  0.5f,
+    -0.5f,  0.5f, -0.5f,
+    -0.5f, -0.5f, -0.5f,
+    -0.5f, -0.5f, -0.5f,
+    -0.5f, -0.5f,  0.5f,
+    -0.5f,  0.5f,  0.5f,
+
+     0.5f,  0.5f,  0.5f,
+     0.5f,  0.5f, -0.5f,
+     0.5f, -0.5f, -0.5f,
+     0.5f, -0.5f, -0.5f,
+     0.5f, -0.5f,  0.5f,
+     0.5f,  0.5f,  0.5f,
+
+    -0.5f, -0.5f, -0.5f,
+     0.5f, -0.5f, -0.5f,
+     0.5f, -0.5f,  0.5f,
+     0.5f, -0.5f,  0.5f,
+    -0.5f, -0.5f,  0.5f,
+    -0.5f, -0.5f, -0.5f,
+
+    -0.5f,  0.5f, -0.5f,
+     0.5f,  0.5f, -0.5f,
+     0.5f,  0.5f,  0.5f,
+     0.5f,  0.5f,  0.5f,
+    -0.5f,  0.5f,  0.5f,
+    -0.5f,  0.5f, -0.5f,
+    };
 
     glGenFramebuffers(1, &fbo);
     glGenRenderbuffers(1, &rbo);
@@ -105,7 +107,7 @@ void EnviornmentMapHelper::compute_specular_new(
 {
     assert(t);
     int size = t->width;
-    const int num_mips = get_mip_map_count(size, size);
+    const int num_mips = Texture::get_mip_map_count(size, size);
 
     glTextureParameteri(t->gl_id, GL_TEXTURE_BASE_LEVEL, 0);
     glTextureParameteri(t->gl_id, GL_TEXTURE_MAX_LEVEL, 0);
@@ -293,17 +295,6 @@ void EnviornmentMapHelper::compute_irradiance_new(Texture* t, // in cubemap, sce
 
 }
 
-static const float quad_verts[] =
-{
-    -1,-1,0,
-    1,-1,0,
-    1,1,0,
-
-    -1,-1,0,
-    -1,1,0,
-    1,1,0
-};
-
 void BRDFIntegration::drawdebug()
 {
 
@@ -347,8 +338,20 @@ void BRDFIntegration::drawdebug()
 #include "Framework/MeshBuilderImpl.h"
 void BRDFIntegration::run()
 {
-    Shader::compile (&integrate_shader, "MbTexturedV.txt", "Helpers/PreIntegrateF.txt");
+    static const float quad_verts[] =
+    {
+        -1,-1,0,
+        1,-1,0,
+        1,1,0,
 
+        -1,-1,0,
+        -1,1,0,
+        1,1,0
+    };
+
+
+    Shader::compile (&integrate_shader, "MbTexturedV.txt", "Helpers/PreIntegrateF.txt");
+    const int LUT_SIZE = EnviornmentMapHelper::BRDF_PREINTEGRATE_LUT_SIZE;
     glGenBuffers(1, &quadvbo);
     glGenVertexArrays(1, &quadvao);
     glBindVertexArray(quadvao);
@@ -362,7 +365,7 @@ void BRDFIntegration::run()
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
     glGenTextures(1, &lut_id);
     glBindTexture(GL_TEXTURE_2D, lut_id);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, BRDF_PREINTEGRATE_LUT_SIZE, BRDF_PREINTEGRATE_LUT_SIZE, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, LUT_SIZE, LUT_SIZE, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -372,7 +375,7 @@ void BRDFIntegration::run()
 
     glGenTextures(1, &depth);
     glBindTexture(GL_TEXTURE_2D, depth);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, BRDF_PREINTEGRATE_LUT_SIZE, BRDF_PREINTEGRATE_LUT_SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, LUT_SIZE, LUT_SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth, 0);

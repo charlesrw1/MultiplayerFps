@@ -1,10 +1,10 @@
 #include "AnimationSeqAsset.h"
-
 #include "Assets/AssetRegistry.h"
 #include "Framework/Files.h"
 #include "AssetCompile/Someutils.h"
-
-
+#include "Render/Model.h"
+#include "Animation/SkeletonData.h"
+#include "Assets/AssetDatabase.h"
 #include <fstream>
 
 #ifdef EDITOR_BUILD
@@ -50,10 +50,6 @@ public:
 REGISTER_ASSETMETADATA_MACRO(AnimationSeqAssetMetadata);
 #endif
 
-
-#include "Render/Model.h"
-#include "Animation/SkeletonData.h"
-#include "Assets/AssetDatabase.h"
 bool AnimationSeqAsset::load_asset(IAssetLoadingInterface* load)
 {
 	auto& path = get_name();

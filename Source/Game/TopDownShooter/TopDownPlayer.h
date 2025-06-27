@@ -71,13 +71,6 @@ public:
 	REF std::vector<float> values;
 };
 
-struct TopDownControls
-{
-	InputActionInstance* shoot{};
-	InputActionInstance* move{};
-	InputActionInstance* look{};
-};
-
 
 using std::unordered_map;
 using std::unordered_set;
@@ -92,7 +85,6 @@ public:
 	REF MyStruct numbers;
 	REF std::vector<int> myarray = { 0,5,10,15 };
 
-	TopDownControls con;
 	REF AssetPtr<PrefabAsset> shotgunSoundAsset;
 	REF AssetPtr<AnimationSeqAsset> runToStart;
 	REF AssetPtr<AnimationSeqAsset> idleToRun;
@@ -106,10 +98,6 @@ public:
 		//
 		//gun_entity = construct_sub_entity<Entity>("gun-entity");
 		//gun_entity->construct_sub_component<MeshComponent>("gun-model");
-	}
-
-	bool using_controller() const {
-		return inputPtr->get_device()->get_type() == InputDeviceType::Controller;
 	}
 
 	void start() final {
@@ -132,59 +120,8 @@ public:
 		ccontroller->capsule_height = capsule->height;
 		ccontroller->capsule_radius = capsule->radius;
 
-		inputPtr = g_inputSys.register_input_user(0);
-		inputPtr->assign_device(g_inputSys.get_keyboard_device());
-		for (auto d : g_inputSys.get_connected_devices())
-			if (d->get_type() == InputDeviceType::Controller) {
-				inputPtr->assign_device(d);
-				break;
-			}
-		inputPtr->on_changed_device.add(this, [&]()
-			{
-				if (!inputPtr->get_device())
-					inputPtr->assign_device(g_inputSys.get_keyboard_device());
-			});
 
 
-
-		inputPtr->enable_mapping("game");
-		inputPtr->enable_mapping("ui");
-		con.shoot = inputPtr->get("game/shoot");
-		con.move = inputPtr->get("game/move");
-		con.look = inputPtr->get("game/look");
-		inputPtr->get("game/jump")->on_start.add(this, [&]()
-			{
-				using_third_person_movement = !using_third_person_movement;
-
-				mesh->get_animator_instance()->play_animation_in_slot(
-					jumpSeq,
-					StringName("ACTION"),
-					1.f,
-					0.f
-				);
-
-				// is_jumping = !is_jumping;
-			});
-		inputPtr->get("game/test1")->on_start.add(this, [&]()
-			{
-				ragdoll_enabled = !ragdoll_enabled;
-
-				TopDownUtil::enable_ragdoll_shared(get_owner(), last_ws, ragdoll_enabled);
-
-				if (!ragdoll_enabled) {
-					int index = get_owner()->get_cached_mesh_component()->get_index_of_bone(StringName("mixamorig:Hips"));
-					glm::mat4 ws = get_ws_transform() * get_owner()->get_cached_mesh_component()->get_animator_instance()->get_global_bonemats().at(index);	//root
-					glm::vec3 pos = ws[3];
-					pos.y = 0;
-					get_owner()->set_ws_position(pos);
-					ccontroller->set_position(pos);
-					get_owner()->get_cached_mesh_component()->get_animator_instance()->set_update_owner_position_to_root(false);
-				}
-				else {
-					get_owner()->get_cached_mesh_component()->get_animator_instance()->set_update_owner_position_to_root(true);
-					//set_ws_transform(glm::mat4(1.f));
-				}
-			});
 
 
 		velocity = {};
@@ -194,7 +131,7 @@ public:
 		//eng->set_game_focused(true);
 	}
 	void end() final {
-		g_inputSys.device_connected.remove(this);
+		
 	}
 
 
@@ -232,16 +169,17 @@ public:
 	}
 
 	void update_view_angles() {
-		
-		auto off = con.look->get_value<glm::vec2>();
-		view_angles.x -= off.y;	// pitch
-		view_angles.y += off.x;	// yaw
-		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
-		view_angles.y = fmod(view_angles.y, TWOPI);
+	
+		//auto off = con.look->get_value<glm::vec2>();
+		//view_angles.x -= off.y;	// pitch
+		//view_angles.y += off.x;	// yaw
+		//view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
+		//view_angles.y = fmod(view_angles.y, TWOPI);
 	}
 	glm::vec3 get_front_dir() const {
 		return AnglesToVector(view_angles.x, view_angles.y);
 	}
+	int var = 0;
 
 	void update() final {
 
@@ -257,9 +195,39 @@ public:
 			return;
 		}
 
+		if (Input::was_key_pressed(SDL_SCANCODE_T)) {
+			using_third_person_movement = !using_third_person_movement;
+
+			mesh->get_animator()->play_animation_in_slot(
+				jumpSeq,
+				StringName("ACTION"),
+				1.f,
+				0.f);
+		}
+		if (Input::was_key_pressed(SDL_SCANCODE_Z)) {
+			ragdoll_enabled = !ragdoll_enabled;
+
+			TopDownUtil::enable_ragdoll_shared(get_owner(), last_ws, ragdoll_enabled);
+
+			if (!ragdoll_enabled) {
+				int index = get_owner()->get_cached_mesh_component()->get_index_of_bone(StringName("mixamorig:Hips"));
+				glm::mat4 ws = get_ws_transform() * get_owner()->get_cached_mesh_component()->get_animator()->get_global_bonemats().at(index);	//root
+				glm::vec3 pos = ws[3];
+				pos.y = 0;
+				get_owner()->set_ws_position(pos);
+				ccontroller->set_position(pos);
+				get_owner()->get_cached_mesh_component()->get_animator()->set_update_owner_position_to_root(false);
+			}
+			else {
+				get_owner()->get_cached_mesh_component()->get_animator()->set_update_owner_position_to_root(true);
+				//set_ws_transform(glm::mat4(1.f));
+			}
+		}
+
+
 		if (shoot_cooldown > 0.0)shoot_cooldown -= eng->get_dt();
 
-		if (con.shoot->get_value<bool>())
+		if(Input::is_mouse_down(0))
 			shoot_gun();
 
 		if (has_had_update) {
@@ -268,14 +236,7 @@ public:
 
 			}
 			else {
-				if (using_controller()) {
-					auto stick = con.look->get_value<glm::vec2>();
-					if (glm::length(stick) > 0.01) {
-						lookdir = glm::normalize(glm::vec3(-stick.x, 0, -stick.y));
-					}
-					mouse_pos = get_ws_position();
-				}
-				else {
+				{
 					glm::ivec2 mouse;
 					SDL_GetMouseState(&mouse.x, &mouse.y);
 
@@ -295,7 +256,12 @@ public:
 
 		}
 
-		auto move = con.move->get_value<glm::vec2>();
+		glm::vec2 move = {};
+		if (Input::is_key_down(SDL_SCANCODE_W)) move.y += 1;
+		if (Input::is_key_down(SDL_SCANCODE_S)) move.y -= 1;
+		if (Input::is_key_down(SDL_SCANCODE_A)) move.x += 1;
+		if (Input::is_key_down(SDL_SCANCODE_D)) move.x -= 1;
+
 		float len = glm::length(move);
 		if (len > 1.0)
 			move = glm::normalize(move);
@@ -382,7 +348,6 @@ public:
 	CapsuleComponent* capsule = nullptr;
 	MeshComponent* mesh = nullptr;
 	TopDownHealthComponent* health = nullptr;
-	std::unique_ptr<InputUser> inputPtr;
 	CameraComponent* the_camera = nullptr;
 
 	bool ragdoll_enabled = false;

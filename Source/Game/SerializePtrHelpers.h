@@ -46,10 +46,6 @@ public:
 		assert(is_valid());
 		return *ptr; 
 	}
-
-	// this is a fun one if you use this with a nullptr against a failed asset, I think it makes more sense to return true 
-	// in that case  because the rest of the api is similar like that as well (except for get_unsafe)
-	// just be mindful that this might not be exactly what you want!
 	bool operator==(AssetPtr<T> other) const {
 		return get() == other.get();
 	}

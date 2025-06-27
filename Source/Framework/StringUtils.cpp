@@ -122,3 +122,11 @@ bool StringUtils::starts_with(const std::string& str, const std::string& what)
 	auto find = str.find(what);
 	return find == 0;	// found at index 0 
 }
+
+string StringUtils::get_directory(const string& input)
+{
+	auto find = input.rfind('/');
+	if (find == std::string::npos) return "";
+	if (find == 0) return "";
+	return input.substr(0, find);
+}

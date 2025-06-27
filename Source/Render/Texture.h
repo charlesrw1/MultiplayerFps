@@ -33,10 +33,6 @@ enum Texture_Type
 	TEXTYPE_CUBEMAP,
 };
 
-inline int get_mip_map_count(int width, int height)
-{
-	return floor(glm::log2((double)glm::max(width, height))) + 1;
-}
 
 
 class Texture : public IAsset {
@@ -60,9 +56,7 @@ public:
 	bool no_filtering = false;
 	bool has_mips = false;
 	bool is_float = false;
-
 	texhandle gl_id = 0;
-
 	bool is_resident = false;
 	bindlesstexhandle bindless_handle = 0;
 
@@ -76,6 +70,9 @@ public:
 	}
 
 	static Texture* install_system(const std::string& path);
+	static int get_mip_map_count(int width, int height){
+		return glm::floor(glm::log2((double)glm::max(width, height))) + 1;
+	}
 private:
 	struct LoadData {
 		std::vector<uint8_t> filedata;

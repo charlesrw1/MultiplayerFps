@@ -3,6 +3,7 @@
 #include "Framework/Hashset.h"
 class MeshComponent;
 class AnimatorInstance;
+class AnimatorObject;
 class GameAnimationMgr
 {
 public:
@@ -10,8 +11,8 @@ public:
 	~GameAnimationMgr();
 	void init();
 	void update_animating();	// blocking
-	void add_to_animating_set(AnimatorInstance* mc);
-	void remove_from_animating_set(AnimatorInstance* mc);
+	void add_to_animating_set(AnimatorObject& mc);
+	void remove_from_animating_set(AnimatorObject& mc);
 	glm::mat4* get_bonemat_ptr(int ofs) {
 		assert(ofs >= 0 && ofs < matricies_allocated);
 		return (matricies + ofs);
@@ -20,7 +21,7 @@ public:
 		return matricies_used;
 	}
 private:
-	hash_set<AnimatorInstance> animating_meshcomponents;
+	hash_set<AnimatorObject> animating_meshcomponents;
 	glm::mat4* matricies = nullptr;
 	int matricies_allocated = 0;
 	int matricies_used = 0;

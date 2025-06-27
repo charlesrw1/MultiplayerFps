@@ -1,39 +1,13 @@
 #pragma once
+#include "Easing.h"
 #include "AnimationTreeLocal.h"
 #include <string>
-
-NEWENUM(Easing, uint8_t)
+NEWENUM(aasdf, int)
 {
-	Linear,
-	CubicEaseIn,
-	CubicEaseOut,
-	CubicEaseInOut,
+	asdf,asdfd,adf,
 };
 
-inline float evaluate_easing(Easing type, float t)
-{
-	switch (type)
-	{
-	case Easing::Linear:
-		return t;
-		break;
-	case Easing::CubicEaseIn:
-		return t * t * t;
-		break;
-	case Easing::CubicEaseOut: {
-		float oneminus = 1 - t;
-		return 1.0 - oneminus * oneminus * oneminus;
-	} break;
-	case Easing::CubicEaseInOut: {
-		float othert = -2 * t + 2;
-		return (t < 0.5) ? 4 * t * t * t : 1.0 - othert * othert * othert * 0.5;
-	}break;
-	default:
-		return t;
-		break;
-	}
-}
-
+#if 0
 enum class ScriptComparison : int8_t
 {
 	Eq,
@@ -166,3 +140,4 @@ NODECFG_HEADER(Statemachine_Node_CFG, Statemachine_Node_RT)
 	InlineVec<uint16_t, 6> entry_transitions;
 	std::vector<State_Transition> transitions;
 };
+#endif

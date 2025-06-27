@@ -6,7 +6,6 @@ IEditorTool* g_mateditor = &g_mateditor_local;
 
 #include "Assets/AssetDatabase.h"
 #include <SDL2/SDL.h>
-#include "OsInput.h"
 #include "Framework/AddClassToFactory.h"
 #include "LevelEditor/PropertyEditors.h"
 

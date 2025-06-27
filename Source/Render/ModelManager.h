@@ -35,13 +35,14 @@ private:
 	int move_append_buf_shared(int ofs, int size, const char* name, buffer& buf, uint32_t target);
 	int append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target);
 };
-
+#include "Framework/ConsoleCmdGroup.h"
 class ModelMan
 {
 public:
 	ModelMan();
 
 	void init();
+	void add_commands(ConsoleCmdGroup& group);
 
 	void compact_memory();
 	void print_usage() const;
@@ -82,7 +83,7 @@ private:
 	//vertexarrayhandle static_vao;
 	MainVbIbAllocator allocator;
 
-	uint32_t cur_mesh_id = 1;
+	int cur_mesh_id = 1;
 
 	friend class Model;
 	friend class ModelLoadJob;

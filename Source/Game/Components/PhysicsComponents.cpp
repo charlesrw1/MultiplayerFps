@@ -23,6 +23,7 @@
 ConfigVar ed_physics_shapes_depth_tested("ed_physics_shapes_depth_tested", "1", CVAR_BOOL, "are physics shapes in the editor depth tested");
 
 using namespace physx;
+//
 
 void PhysicsBody::fetch_new_transform()
 {
@@ -168,12 +169,12 @@ void PhysicsBody::update_bone_parent_animator()
 {
 	ASSERT(init_state != initialization_state::HAS_ID);
 
-	auto get_the_parent_animator = [&]() -> AnimatorInstance* {
+	auto get_the_parent_animator = [&]() -> AnimatorObject* {
 		if (get_owner()->has_parent_bone()) {
 			if (get_owner()->get_parent()) {
 				auto m = get_owner()->get_parent()->get_cached_mesh_component();
 				if (m) {
-					return m->get_animator_instance();
+					return m->get_animator();
 				}
 			}
 		}

@@ -1,4 +1,3 @@
-#include "RuntimeValueNodes.h"
 
 bool atLogicalOpNode::get_bool(atUpdateStack& ctx) const {
 	if (is_and) {
@@ -113,7 +112,7 @@ vec3 atMathNode::get_vector3(atUpdateStack& ctx) const {
 }
 
 void atVariableNode::init(atInitContext& ctx) {
-	for (auto prop : ClassPropPtr(ctx.whatType)) {
+	for (auto prop : ClassPropPtr(&ctx.get_instance_type())) {
 		if (prop.get_name() == varName) {
 			this->p = prop.get_property_info();
 			break;
@@ -125,25 +124,25 @@ void atVariableNode::init(atInitContext& ctx) {
 }
 
 bool atVariableNode::get_bool(atUpdateStack& ctx) const {
-	PropertyPtr ptr(p, &ctx.graph.instance);
+	PropertyPtr ptr(p, &ctx.graph.obj);
 	assert(ptr.is_boolean());
 	return ptr.as_boolean();
 }
 
 float atVariableNode::get_float(atUpdateStack& ctx) const {
-	PropertyPtr ptr(p, &ctx.graph.instance);
+	PropertyPtr ptr(p, &ctx.graph.obj);
 	assert(ptr.is_float());
 	return ptr.as_float();
 }
 
 int atVariableNode::get_int(atUpdateStack& ctx) const {
-	PropertyPtr ptr(p, &ctx.graph.instance);
+	PropertyPtr ptr(p, &ctx.graph.obj);
 	assert(ptr.is_numeric());
 	return (int)ptr.get_integer_casted();
 }
 
 vec3 atVariableNode::get_vector3(atUpdateStack& ctx) const {
-	PropertyPtr ptr(p, &ctx.graph.instance);
+	PropertyPtr ptr(p, &ctx.graph.obj);
 	assert(ptr.is_vec3());
 	return ptr.as_vec3();
 }

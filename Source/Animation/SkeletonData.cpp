@@ -6,6 +6,22 @@ MSkeleton::~MSkeleton() {
 		delete clip.second.ptr;
 	}
 }
+bool MSkeleton::is_skeleton_the_same(const MSkeleton& other) const {
+	if (get_num_bones() != other.get_num_bones())
+		return false;
+	for (int i = 0; i < get_num_bones(); i++) {
+		if (bone_dat[i].name != other.bone_dat[i].name)
+			return false;
+	}
+	return true;
+}
+int MSkeleton::get_bone_index(StringName name) const {
+	for (int i = 0; i < bone_dat.size(); i++) {
+		if (bone_dat[i].name == name)
+			return i;
+	}
+	return -1;
+}
 const AnimationSeq* MSkeleton::find_clip(const std::string& name) const
 {
 	auto findthis = clips.find(name);
@@ -49,4 +65,12 @@ const BoneIndexRetargetMap* MSkeleton::get_remap(const MSkeleton* other)
 
 	remaps.push_back(std::move(remap));
 	return remaps.back().get();
+}
+
+const BonePoseMask* MSkeleton::find_mask(StringName name) const {
+	for (int i = 0; i < masks.size(); i++) {
+		if (masks[i].idname == name)
+			return &masks[i];
+	}
+	return nullptr;
 }

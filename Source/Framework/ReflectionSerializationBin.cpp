@@ -21,7 +21,7 @@ struct FindInst2
 	void* instptr = nullptr;
 };
 
-static FindInst2 find_in_proplists(const char* name, std::vector<PropertyListInstancePair>& proplists)
+static FindInst2 find_in_proplists_2(const char* name, std::vector<PropertyListInstancePair>& proplists)
 {
 	for (auto& prop : proplists) {
 		if (!prop.list)
@@ -458,38 +458,11 @@ static void read_propety_field_binary(PropertyInfo* prop, void* ptr, BinaryReade
 	return;
 }
 
-
-static void read_multi_properties_binary(std::vector<PropertyListInstancePair>& proplists, BinaryReader& in,  ClassBase* userptr, IAssetLoadingInterface* load)
-{
-	while (!in.has_failed())
-	{
-		StringView property_name = in.read_string_view();
-
-		if (property_name.str_len == 0)	// null terminator
-			return;
-
-		core_type_id type = core_type_id(in.read_byte());
-
-		std::string name(property_name.str_start, property_name.str_len);
-		auto find = find_in_proplists(name.c_str(), proplists);
-
-		if (!find.prop) {
-			printf("\n\n!!! COULDN'T FIND PARAM %s !!!\n\n", name.c_str());
-			throw std::runtime_error("bad parse\n");
-			continue;
-		}
-		if (find.prop->type != type)
-			throw std::runtime_error("type mismatches with existing");
-
-		read_propety_field_binary(find.prop, find.instptr, in, userptr,load);
-	}
-}
-
 static void read_properties_binary(const PropertyInfoList& list, void* ptr, BinaryReader& in, ClassBase* userptr, IAssetLoadingInterface* load)
 {
 	std::vector<PropertyListInstancePair> props(1);
 	props[0] = { &list,ptr };
-	read_multi_properties_binary(props, in, userptr,load);
+	//read_multi_properties_binary(props, in, userptr,load);
 }
 
 

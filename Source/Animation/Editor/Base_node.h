@@ -19,7 +19,7 @@
 
 #include <variant>
 using std::variant;
-
+using std::string;
 struct ImNodesEditorContext;
 const int MAX_INPUTS = 32;
 const int MAX_NODES_IN_GRAPH = (1 << 14);

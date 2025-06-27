@@ -9,17 +9,34 @@
 #include "AssetCompile/Someutils.h"
 #include "AssetRegistryLocal.h"
 
-AssetBrowser global_asset_browser;
-
 #include "AssetDatabase.h"
-void AssetBrowser::init()
+AssetBrowser::AssetBrowser()
 {
 	asset_name_filter[0] = 0;
 	folder_closed = g_assets.find_global_sync<Texture>("eng/editor/folder_closed.png").get();
 	folder_open = g_assets.find_global_sync<Texture>("eng/editor/folder_open.png").get();
 	if (!folder_closed || !folder_open)
 		Fatalf("no folder icons\n");
+
+	commands = ConsoleCmdGroup::create("");
+	commands->add("CLEAR_AB_FILTER", [this](const Cmd_Args&) { clear_filter(); });
+	commands->add("FILTER_FOR", [this](const Cmd_Args& args) { 
+		if (args.size() != 2) {
+			sys_print(Warning, "FILTER_FOR <asset type>\n");
+			return;
+		}
+		auto type = AssetRegistrySystem::get().find_type(args.at(1));
+		if (!type)
+		{
+			sys_print(Warning, "no FILTER_FOR type name\n");
+			return;
+		}
+		filter_all();
+		unset_filter(1 << type->self_index);
+		});
+
 }
+AssetBrowser* AssetBrowser::inst = nullptr;
 
 static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesystemNode* node)
 {
@@ -250,24 +267,5 @@ void AssetBrowser::imgui_draw()
 
 }
 
-DECLARE_ENGINE_CMD(CLEAR_AB_FILTER)
-{
-	global_asset_browser.clear_filter();
-}
-DECLARE_ENGINE_CMD(FILTER_FOR)
-{
-	if (args.size() != 2) {
-		sys_print(Warning, "FILTER_FOR <asset type>\n");
-		return;
-	}
-	auto type = AssetRegistrySystem::get().find_type(args.at(1));
-	if (!type)
-	{
-		sys_print(Warning, "no FILTER_FOR type name\n");
-		return;
-	}
-	global_asset_browser.filter_all();
-	global_asset_browser.unset_filter(1<<type->self_index);
 
-}
 #endif

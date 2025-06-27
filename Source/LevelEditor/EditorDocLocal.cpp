@@ -14,7 +14,6 @@
 
 #include "Physics/Physics2.h"
 
-#include "OsInput.h"
 #include "Debug.h"
 
 
@@ -145,8 +144,36 @@ void EditorDoc::validate_fileids_before_serialize()
 
 void EditorDoc::init()
 {
-	global_asset_browser.init();
+	//global_asset_browser.init();
 	outliner->init();
+
+	cmds = ConsoleCmdGroup::create("");
+	cmds->add("SET_ORBIT_TARGET", [this](const Cmd_Args&) {
+		set_camera_target_to_sel();
+		});
+	cmds->add("ed.HideSelected", [this](const Cmd_Args&) {
+		eng->log_to_fullscreen_gui(Info, "Hide selected");
+		auto& selection = selection_state->get_selection();
+		for (auto s : selection) {
+			EntityPtr handle(s);
+			if (handle) {
+				handle->set_hidden_in_editor(true);
+			}
+		}
+		});
+	cmds->add("ed.UnHideAll", [this](const Cmd_Args&) {
+		eng->log_to_fullscreen_gui(Info, "Unhide all");
+		auto level = eng->get_level();
+		if (level) {
+			for (auto e : level->get_all_objects()) {
+				if (e->is_a<Entity>()) {
+					auto ent = e->cast_to<Entity>();
+					if (ent->get_hidden_in_editor())
+						ent->set_hidden_in_editor(false);
+				}
+			}
+		}
+		});
 }
 #include "LevelSerialization/SerializeNew.h"
 bool EditorDoc::save_document_internal()
@@ -672,7 +699,7 @@ void some_funcs()
 	//a.positions[1][1] = x[1];
 }
 AddToDebugMenu myfuncs("edbox test", some_funcs);
-
+#include "Input/InputSystem.h"
 void EditorDoc::tick(float dt)
 {
 
@@ -682,14 +709,13 @@ void EditorDoc::tick(float dt)
 
 
 	{
-		int x = 0, y = 0;
-		const Uint32 button_state = SDL_GetRelativeMouseState(&x, &y);
-		camera.orbit_mode = bool(button_state & (1 << 1)) && !eng->is_game_focused();
+		camera.orbit_mode = Input::is_mouse_down(1) && !eng->is_game_focused();
+
 		{
 			if (using_ortho && ortho_camera.can_take_input())
-				ortho_camera.update_from_input(eng->get_input_state()->keys, x, y, aratio);
+				ortho_camera.update_from_input(aratio);
 			if (!using_ortho && camera.can_take_input())
-				camera.update_from_input(eng->get_input_state()->keys, x, y, window_sz.x, window_sz.y, aratio, fov);
+				camera.update_from_input(window_sz.x, window_sz.y, aratio, fov);
 		}
 
 	}
@@ -805,17 +831,7 @@ bool ManipulateTransformTool::is_using()
 	return ImGuizmo::IsUsing();
 }
 
-static void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::quat& q, glm::vec3& s)
-{
-	p = transform[3];
-	s = glm::vec3(glm::length(transform[0]), glm::length(transform[1]), glm::length(transform[2]));
-	q = glm::quat_cast(glm::mat3(
-		transform[0] / s.x,
-		transform[1] / s.y,
-		transform[2] / s.z
-	));
-	q = glm::normalize(q);
-}
+
 
 
 ManipulateTransformTool::ManipulateTransformTool(EditorDoc& ed) : ed_doc(ed)
@@ -1248,14 +1264,6 @@ void EditorDoc::hook_scene_viewport_draw()
 
 }
 
-static std::string get_directory(const std::string& input)
-{
-	auto find = input.rfind('/');
-	if (find == std::string::npos) return "";
-	if (find == 0) return "";
-	return input.substr(0, find - 1);
-}
-
 #include "EditorPopups.h"
 
 
@@ -1576,7 +1584,7 @@ SelectionState::SelectionState(EditorDoc& ed_doc)
 }
 
 
-
+#if 0
 DECLARE_ENGINE_CMD(STRESS_TEST)
 {
 	static int counter = 0;
@@ -1597,6 +1605,7 @@ DECLARE_ENGINE_CMD(STRESS_TEST)
 	}
 	counter++;
 }
+#endif
 
 #include "PropertyEditors.h"
 void EditorDoc::set_camera_target_to_sel()
@@ -1629,34 +1638,6 @@ EditorDoc::EditorDoc() {
 
 	PropertyFactoryUtil::register_basic(grid_factory);
 	PropertyFactoryUtil::register_editor(*this, grid_factory);
-
-	cmds = ConsoleCmdGroup::create("");
-	cmds->add("SET_ORBIT_TARGET", [this](const Cmd_Args&) {
-		set_camera_target_to_sel();
-		});
-	cmds->add("ed.HideSelected", [this](const Cmd_Args&) {
-		eng->log_to_fullscreen_gui(Info, "Hide selected");
-		auto& selection = selection_state->get_selection();
-		for (auto s : selection) {
-			EntityPtr handle(s);
-			if (handle) {
-				handle->set_hidden_in_editor(true);
-			}
-		}
-		});
-	cmds->add("ed.UnHideAll", [this](const Cmd_Args&) {
-		eng->log_to_fullscreen_gui(Info, "Unhide all");
-		auto level = eng->get_level();
-		if (level) {
-			for (auto e : level->get_all_objects()) {
-				if (e->is_a<Entity>()) {
-					auto ent = e->cast_to<Entity>();
-					if (ent->get_hidden_in_editor())
-						ent->set_hidden_in_editor(false);
-				}
-			}
-		}
-		});
 }
 
 extern void export_scene_model();

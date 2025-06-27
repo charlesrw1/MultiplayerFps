@@ -68,7 +68,7 @@ void CharacterGraphDriver::on_update(float dt) {
 
 void CharacterGraphDriver::on_post_update() {
 
-	auto& cached_bonemats = get_global_bonemats();
+	auto& cached_bonemats = get_obj()->get_global_bonemats();
 	auto model = get_model();
 
 	const int lfoot = model->bone_for_name("mixamorig:LeftFoot");

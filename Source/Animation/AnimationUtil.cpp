@@ -436,3 +436,64 @@ void util_set_to_bind_pose(Pose& pose, const MSkeleton* skel)
 		pose.scale[i] = 1.f;
 	}
 }
+
+static const int ROOT_BONE = -1;
+
+void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& out_bone_matricies, const MSkeleton* model)
+{
+	for (int i = 0; i < model->get_num_bones(); i++)
+	{
+		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
+		matrix[3] = glm::vec4(local.pos[i], 1.0);
+		matrix = glm::scale(matrix, glm::vec3(local.scale[i]));
+
+		if (model->get_bone_parent(i) == ROOT_BONE) {
+			out_bone_matricies[i] = matrix;
+		}
+		else {
+			assert(model->get_bone_parent(i) < model->get_num_bones());
+			out_bone_matricies[i] = out_bone_matricies[model->get_bone_parent(i)] * matrix;
+		}
+	}
+}
+
+void util_localspace_to_meshspace_with_physics(const Pose& local, std::vector<glm::mat4x4>& out_bone_matricies, const std::vector<bool>& phys_bitmask, const MSkeleton* model)
+{
+	for (int i = 0; i < model->get_num_bones(); i++)
+	{
+		if (phys_bitmask[i])
+			continue;
+
+		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
+		matrix[3] = glm::vec4(local.pos[i], 1.0);
+		matrix = glm::scale(matrix, glm::vec3(local.scale[i]));
+
+		if (model->get_bone_parent(i) == ROOT_BONE) {
+			out_bone_matricies[i] = matrix;
+		}
+		else {
+			assert(model->get_bone_parent(i) < model->get_num_bones());
+			out_bone_matricies[i] = out_bone_matricies[model->get_bone_parent(i)] * matrix;
+		}
+	}
+
+}
+void util_localspace_to_meshspace_ptr(const Pose& local, glm::mat4* out_bone_matricies, const MSkeleton* model)
+{
+	for (int i = 0; i < model->get_num_bones(); i++)
+	{
+		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
+		matrix[3] = glm::vec4(local.pos[i], 1.0);
+		matrix = glm::scale(matrix, glm::vec3(local.scale[i]));
+
+		if (model->get_bone_parent(i) == ROOT_BONE) {
+			out_bone_matricies[i] = matrix;
+		}
+		else {
+			assert(model->get_bone_parent(i) < model->get_num_bones());
+			out_bone_matricies[i] = out_bone_matricies[model->get_bone_parent(i)] * matrix;
+		}
+	}
+	//for (int i = 0; i < model->bones.size(); i++)
+	//	out_bone_matricies[i] =  out_bone_matricies[i];
+}

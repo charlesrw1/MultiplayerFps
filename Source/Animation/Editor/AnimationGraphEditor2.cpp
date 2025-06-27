@@ -492,7 +492,7 @@ bool AnimationGraphEditorNew::save_document_internal()
 			printf("%d %s\n", id, er.message.c_str());
 		}
 	}
-	delete tree_cfg;
+	//delete tree_cfg;
 
 	return false;
 }

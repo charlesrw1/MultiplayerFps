@@ -4,15 +4,6 @@
 
 // see Scripts/codegen.py for the code gen tool
 
-#define EXPLICIT_NEWCLASS(classname, cpp_supername, reflected_super) \
-class classname : public cpp_supername { \
-public: \
-	using MyClassType = classname; \
-	using SuperClassType = reflected_super; \
-	static ClassTypeInfo StaticType; \
-	const ClassTypeInfo& get_type() const override { return classname::StaticType; } \
-	static const PropertyInfoList* get_props();
-
 // creates new class that will be picked by codegen tool
 // DONT make get_props() or CLASS_IMPL(x), the tool does that for you
 // use REFLECT() macros instead
@@ -22,7 +13,6 @@ public: \
 	static ClassTypeInfo StaticType; \
 	const ClassTypeInfo& get_type() const override { return classname::StaticType; } \
 	static const PropertyInfoList* get_props();
-
 
 // arguments are provided as comma seperated list, dont include outer quotes
 // options:
@@ -55,9 +45,3 @@ public: \
 // them in the generated file like AssetPtr<>'s
 // use GENERATED_CLASS_INCLUDE(file) to include a file in the generated source, but not in the header
 #define GENERATED_CLASS_INCLUDE(x)
-
-// todo
-#define NEWSTRUCT(classname) \
-struct classname {	\
-	using MyClassType = classname; \
-	static const PropertyInfoList* get_props();

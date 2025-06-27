@@ -26,6 +26,14 @@ struct ScopedPoolPtr
 	T* get() const {
 		return ptr;
 	}
+	T& operator*() const {
+		assert(ptr);
+		return *ptr;
+	}
+	Pool_Allocator<T>& get_parent() const {
+		assert(parent);
+		return *parent;
+	}
 private:
 	T* ptr = nullptr;
 	Pool_Allocator<T>* parent = nullptr;
@@ -74,6 +82,8 @@ public:
 		return ScopedPoolPtr<T>(allocate(), this);
 	}
 	void free(T* ptr) {
+		if (ptr == nullptr) return;
+
 		std::lock_guard<std::mutex> lock(mutex);
 
 		assert((void*)ptr >= memory && (void*)ptr < memory + allocated_size);

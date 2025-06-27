@@ -82,7 +82,6 @@ enum class MathNodeType
 	Add, Sub, Mult, Div, Lt, Gt, Leq, Geq, Eq, Neq
 };
 
-
 class atMathNode : public atValueNode {
 public:
 	CLASS_BODY(atMathNode);
@@ -133,3 +132,11 @@ public:
 	vector<atValueNode*> ptrs;
 };
 
+class atGetCurveValue : public atValueNode {
+public:
+	CLASS_BODY(atGetCurveValue);
+	float get_float(atUpdateStack& ctx) const final {
+		return ctx.graph.curves.get_curve(curveName);
+	}
+	REF StringName curveName;
+};

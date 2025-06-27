@@ -4,76 +4,90 @@
 #include "Framework/MulticastDelegate.h"
 #include <vector>
 #include <memory>
+#include "Animation/Editor/Optional.h"
 
-class InputUser;
-class InputDevice
-{
+#include "glm/glm.hpp"
+using glm::ivec2;
+using glm::vec2;
+using std::vector;
+
+// input wrapper over sdl with controller support
+class Input {
 public:
-	bool is_in_use() const {
-		return user != nullptr;
-	}
-	InputDeviceType get_type() const {
-		return type;
-	}
-	InputUser* get_user() const {
-		return user;
-	}
-	bool is_connected() const {
-		return type == InputDeviceType::KeyboardMouse || self_index != 0;
-	}
+	Input();
+	~Input();
+	void pre_events();
+	void handle_event(const SDL_Event& ev);
+	void tick();
+
+	static Input* inst;
+	static bool is_key_down(SDL_Scancode key);
+	static bool was_key_pressed(SDL_Scancode key);
+	static bool was_key_released(SDL_Scancode key);
+	static ivec2 get_mouse_delta();
+	static ivec2 get_mouse_pos();
+	static bool is_mouse_down(int button);
+	static bool is_mouse_double_clicked(int button);
+	static bool was_mouse_pressed(int button);
+	static bool was_mouse_released(int button);
+	static int get_mouse_scroll();
+	static bool is_shift_down();
+	static bool is_ctrl_down();
+	static bool is_alt_down();
+
+	// uses first controller
+	static bool is_con_button_down(SDL_GameControllerButton button);
+	static bool was_con_button_pressed(SDL_GameControllerButton button);
+	static bool was_con_button_released(SDL_GameControllerButton button);
+	static double get_con_axis(SDL_GameControllerAxis axis);
+	// uses specified controller
+	static bool is_con_button_down_idx(SDL_GameControllerButton b, int idx);
+	static bool was_con_button_pressed_idx(SDL_GameControllerButton b, int idx);
+	static bool was_con_button_released_idx(SDL_GameControllerButton b, int idx);
+	static double get_con_axis_idx(SDL_GameControllerAxis a, int idx);
+	static bool is_any_con_active();
+	static int get_num_active_cons();
+	static bool is_con_active(int idx);
+	static SDL_GameControllerType get_con_type();
+	static SDL_GameControllerType get_con_type_idx(int idx);
+
+	static MulticastDelegate<int /* index */, bool/* connected/disconnected */> on_con_status;
+	static MulticastDelegate<int /* controller index or -1 if keyboard */> on_any_input; // invoked on any input recieved from a device
 private:
-	void set_user(InputUser* user) {
-		this->user = user;
-	}
 
-	InputDeviceType type{};	// keyboard or controller
-	int index{};	// controller specific index, 0 indexed, the public facing (1,2,3,4 number)
-	SDL_GameController* sdl_controller_ptr = nullptr;	// internal ptr
-	InputUser* user = nullptr;
-	int self_index = 0;	// for controllers
+	struct PressReleaseState {
+		PressReleaseState() {
+			is_down = false;
+			is_pressed = false;
+			is_released = false;
+		}
+		bool is_down : 1;
+		bool is_pressed : 1;
+		bool is_released : 1;
+	};
+	static_assert(sizeof(PressReleaseState) == 1, "");
 
-	friend class GameInputSystem;
-	friend class GameInputSystemImpl;
-	friend class InputUser;
+	struct Device {
+		Device(SDL_GameController* ptr, int index);
+		int index = -1;
+		SDL_GameController* ptr = nullptr;
+		vector<PressReleaseState> buttonState;
+	};
+	vector<Device> devices;
+	opt<int> default_dev_index;
+	opt<int> recieved_input_from_this;
+
+	int mouseScrollAcum = 0;
+	int mouseXAccum = 0;
+	int mouseYAccum = 0;
+	int mouseX = 0;
+	int mouseY = 0;
+
+	const Uint8* keyState = nullptr;
+	vector<PressReleaseState> keyPressedReleasedState;	// 0 = not down, 1 = down, 2 = not down and released, 3 = down and pressed,
+	vector<PressReleaseState> mouseButtonsState;
+
+	opt<int> find_device_for_index(int idx) const;
+	opt<int> find_device_for_ptr(SDL_GameController* ptr) const;
+	SDL_GameController* get_device_ptr(int idx) const;
 };
-
-
-class InputAction;
-class GameInputSystemImpl;
-class GameInputSystem
-{
-public:
-
-	// create initial devices
-	void init();
-	void handle_event(const SDL_Event& event);
-	void tick_users(float dt);	// executes any callbacks
-
-	// create a user which can recieve callbacks and have its input data updated
-	// InputUsers must call assign_device() with a handle to start recieving input
-	std::unique_ptr<InputUser> register_input_user(int localPlayerIndex);
-	void free_input_user(InputUser* user);	// should only call this from destructor of unique_ptr<>
-
-	InputAction* register_input_action(std::unique_ptr<InputAction> action);
-	GlobalInputBinding find_bind_for_string(const std::string& key_str);
-
-	 // get the keyboard device, this is created on init. If keyboard input is disabled by config, this will return an invalid handle
-	InputDevice* get_keyboard_device();
-	// get all connected devices (keyboard + controllers) (dont cache these pointers, use for quick checks)
-	std::vector<InputDevice*> get_connected_devices();
-
-	void set_input_mapping_status(InputUser* user, const std::string& map_id, bool enable);
-
-	// called when a device gained/lost connection (controllers)
-	// if a device was owned by an InputUser, *their* on_device_lost will also be fired
-	MulticastDelegate<InputDevice*> device_connected;
-	MulticastDelegate<InputDevice*> device_disconnected;
-	// called when a device sends an input, use for detecting stuff (not for input handling!)
-	MulticastDelegate<InputDevice*, GlobalInputBinding> on_device_input;
-	~GameInputSystem();
-	GameInputSystem();
-private:
-	GameInputSystemImpl* impl = nullptr;
-};
-
-extern GameInputSystem g_inputSys;

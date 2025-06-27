@@ -9,7 +9,7 @@
 #include "Framework/ClassBase.h"
 #include "Framework/Reflection2.h"
 class Animator;
-
+class AnimatorObject;
 class AnimationEvent : public ClassBase {
 public:
 	CLASS_BODY(AnimationEvent);
@@ -32,4 +32,18 @@ private:
 	REF int frame = 0;
 	REF int frame_duration = 0;
 	REF int16_t editor_layer = 0;	// hacky, stores what layer it is in the editor for persistance
+};
+
+class AnimDurationEvent : public ClassBase {
+public:
+	CLASS_BODY(AnimDurationEvent);
+
+	// guaranted to fire on_end after on_start
+	virtual void on_start(AnimatorObject* animator) const {}
+	virtual void on_end(AnimatorObject* animator) const {}
+	int get_end_frame() const { return frame_begin + frame_duration; }
+
+	REF int frame_begin = 0;
+	REF int frame_duration = 0;
+	REF int16_t editor_layer = 0;
 };

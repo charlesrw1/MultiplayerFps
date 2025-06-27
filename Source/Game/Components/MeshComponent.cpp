@@ -4,24 +4,20 @@
 #include "Render/DrawPublic.h"
 #include "Render/RenderObj.h"
 #include "Render/MaterialPublic.h"
-
 #include "Physics/ChannelsAndPresets.h"
 #include "Assets/AssetDatabase.h"
 #include "GameEnginePublic.h"
 #include "Game/Entity.h"
 #include "Animation/SkeletonData.h"
 #include "Game/Components/MeshbuilderComponent.h"
-
 #include "Framework/ArrayReflection.h"
-
-
-
 #include "Scripting/FunctionReflection.h"
-
 #include "Framework/VectorReflect2.h"
 #include "Render/ModelManager.h"
-
 #include "GameAnimationMgr.h"
+#include "Debug.h"
+#include "Framework/Jobs.h"
+#include "tracy/public/tracy/Tracy.hpp"
 
 GameAnimationMgr g_gameAnimationMgr;
 
@@ -141,23 +137,16 @@ void MeshComponent::on_sync_render_data()
 
 void MeshComponent::update_animator_instance()
 {
-	auto pre_animator = animator.get();
+	animator.reset();
 	auto modToUse = (model.did_fail()) ? g_modelMgr.get_error_model() : model.get();
-	{
-		if (modToUse&&modToUse->get_skel() && animator_tree.get() && animator_tree->get_graph_is_valid()) {
-
-			AnimatorInstance* c = animator_tree->allocate_animator_class();
+	if (modToUse&&modToUse->get_skel() && animator_tree.get()) {
+		try {
+			AnimatorObject* c = new AnimatorObject(*modToUse, *animator_tree, get_owner());
 			animator.reset(c);
-
-			bool good = animator->initialize(modToUse, animator_tree.get(), get_owner());
-			if (!good) {
-				sys_print(Error, "couldnt initialize animator\n");
-				animator.reset();
-				animator_tree = nullptr;	// free tree reference
-			}
 		}
-		else {
-			animator.reset();
+		catch (...) {
+			sys_print(Error, "couldnt initialize animator\n");
+			animator_tree = nullptr;
 		}
 	}
 }
@@ -173,7 +162,7 @@ void MeshComponent::pre_start()
 void MeshComponent::start()
 {
 }
-#include "tracy/public/tracy/Tracy.hpp"
+
 void MeshComponent::on_changed_transform()
 {
 	sync_render_data();
@@ -194,6 +183,12 @@ void MeshComponent::end()
 const Model* MeshComponent::get_model() const { return model.get(); }
 const Animation_Tree_CFG* MeshComponent::get_animation_tree() const { return animator_tree.get(); }
 
+AnimatorInstance* MeshComponent::get_animator_instance() const {
+	if (animator.get())
+		return animator->get_instance();
+	return nullptr;
+}
+
 const MaterialInstance* MeshComponent::get_material_override() const {
 	return eMaterialOverride.empty() ? nullptr : eMaterialOverride[0].get();
 }
@@ -212,23 +207,23 @@ void GameAnimationMgr::init()
 	matricies = new glm::mat4[matricies_allocated];
 }
 
-void GameAnimationMgr::remove_from_animating_set(AnimatorInstance* mc)
+void GameAnimationMgr::remove_from_animating_set(AnimatorObject& mc)
 {
 	//ASSERT(animating_meshcomponents.find(mc));
-	animating_meshcomponents.remove(mc);
+	animating_meshcomponents.remove(&mc);
 }
-void GameAnimationMgr::add_to_animating_set(AnimatorInstance* mc)
+void GameAnimationMgr::add_to_animating_set(AnimatorObject& mc)
 {
 	//ASSERT(!animating_meshcomponents.find(mc));
-	animating_meshcomponents.insert(mc);
+	animating_meshcomponents.insert(&mc);
 }
-#include "Debug.h"
+
 extern ConfigVar g_debug_skeletons;
 
-static void draw_skeleton(const AnimatorInstance* a, float line_len, const glm::mat4& transform)
+static void draw_skeleton(const AnimatorObject* a, float line_len, const glm::mat4& transform)
 {
 	auto& bones = a->get_global_bonemats();
-	auto model = a->get_model();
+	auto model = &a->get_model();
 	if (!model || !model->get_skel())
 		return;
 
@@ -248,8 +243,7 @@ static void draw_skeleton(const AnimatorInstance* a, float line_len, const glm::
 		}
 	}
 }
-#include "Framework/Jobs.h"
-#include "tracy/public/tracy/Tracy.hpp"
+
 
 void GameAnimationMgr::update_animating()
 {
@@ -257,7 +251,7 @@ void GameAnimationMgr::update_animating()
 
 	matricies_used = 0;
 
-	for (AnimatorInstance* ai : animating_meshcomponents) {
+	for (AnimatorObject* ai : animating_meshcomponents) {
 		if (ai) {
 			if (matricies_used + ai->num_bones() > matricies_allocated)
 				Fatalf("animator out of memory\n");

@@ -11,7 +11,8 @@ IEditorTool* g_texture_editor_tool = &s_texture_editor_tool;
 #include "Framework/ReflectionProp.h"
 #include "Framework/DictWriter.h"
 
-DECLARE_ENGINE_CMD(IMPORT_TEX)
+
+void IMPORT_TEX(const Cmd_Args& args)
 {
 	if (args.size() != 2) {
 		sys_print(Error, "usage IMPORT_TEX <.png/.tga/.jpg/.hdr>");
@@ -34,7 +35,7 @@ DECLARE_ENGINE_CMD(IMPORT_TEX)
 	compile_texture_asset(strip_extension(gamepath) + ".dds", AssetDatabase::loader);
 }
 #include "AssetCompile/Someutils.h"
-DECLARE_ENGINE_CMD(IMPORT_TEX_FOLDER)
+void IMPORT_TEX_FOLDER(const Cmd_Args& args)
 {
 	if (args.size() != 2) {
 		sys_print(Error, "usage IMPORT_TEX_FOLDER <folder>");
@@ -78,7 +79,7 @@ DECLARE_ENGINE_CMD(IMPORT_TEX_FOLDER)
 }
 
 
-DECLARE_ENGINE_CMD(COMPILE_TEX)
+void COMPILE_TEX(const Cmd_Args& args)
 {
 	if (args.size() != 2) {
 		sys_print(Error, "usage COMPILE_TEX <.dds>");

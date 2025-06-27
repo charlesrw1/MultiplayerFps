@@ -44,6 +44,13 @@ NEWENUM(anim_graph_value,uint8_t)
 	quat_t,
 };
 
+NEWENUM(rootmotion_setting, uint8_t)
+{
+	keep,
+	remove,
+	add_velocity
+};
+
 
 inline anim_graph_value core_type_id_to_anim_graph_value(bool* good, core_type_id type)
 {
@@ -63,120 +70,12 @@ inline anim_graph_value core_type_id_to_anim_graph_value(bool* good, core_type_i
 	}
 }
 
-
-
-CLASS_H(AgSerializeContext,ClassBase)
-public:
-	void set_tree(Animation_Tree_CFG* tree);
-
-
-	std::unordered_map<BaseAGNode*, int> ptr_to_index;
-	Animation_Tree_CFG* tree = nullptr;
-};
-
-
-struct Rt_Vars_Base
-{
-
-	uint16_t last_update_tick = 0;
-};
-
 class BaseAGNode;
-inline BaseAGNode* serialized_nodecfg_ptr_to_ptr(BaseAGNode* ptr, Animation_Tree_CFG* cfg) {
-	uintptr_t index = (uintptr_t)ptr;	// serialized as indicies
-	if (index >= 0xffff && index != -1) { // assume anything larger is a bad pointer error
-		sys_print(Error, "pointer serialized wrong for node\n");
-		return nullptr;
-	}
-	return (index == -1) ? nullptr : cfg->get_node(index);
-}
-
-inline BaseAGNode* ptr_to_serialized_nodecfg_ptr(BaseAGNode* ptr, const AgSerializeContext* ctx) {
-	ASSERT(ptr == nullptr || ctx->ptr_to_index.find(ptr) != ctx->ptr_to_index.end());
-	uintptr_t index = (ptr) ? ctx->ptr_to_index.find(ptr)->second : -1;
-	return (BaseAGNode*)index;
-}
-
-
-
 class Animation_Tree_CFG;
 class Node_CFG;
-class NodeRt_Ctx
-{
-public:
-	NodeRt_Ctx(AnimatorInstance* inst);
-
-	const Model* model = nullptr;
-	AnimatorInstance* anim = nullptr;
-	uint16_t tick = 0;
 
 
-	MSkeleton* get_skeleton() const {
-		return model->get_skel();
-	}
-	//
-	int num_bones() const { return model->get_skel()->get_num_bones(); }
-
-	template<typename T>
-	T* get(int node_index) {
-		return (T*)anim->runtime_graph_data[node_index].get();
-	}
-	template<typename T>
-	void construct_runtime_node(int node_index) {
-		ASSERT(!anim->runtime_graph_data[node_index].get());
-		anim->runtime_graph_data[node_index].reset(new T());
-	}
-
-	// always returns valid sync group, DONT cache this!!
-	// only for short term usage
-	SyncGroupData& find_sync_group_data(StringName name) {
-		return anim->find_or_create_sync_group(name);
-	}
-
-	AnimatorInstance::DirectAnimationSlot& get_slot_for_index(int index) {
-		return anim->slots.at(index);
-	}
-
-};
-
-struct GetPose_Ctx
-{
-	GetPose_Ctx set_pose(Pose* newpose) {
-		GetPose_Ctx gp = *this;
-		gp.pose = newpose;
-		return gp;
-	}
-	GetPose_Ctx set_dt(float newdt) {
-		GetPose_Ctx gp = *this;
-		gp.dt = newdt;
-		return gp;
-	}
-
-	GetPose_Ctx set_rootmotion(float rm) {
-		GetPose_Ctx gp = *this;
-		gp.rootmotion_scale = rm;
-		return gp;
-	}
-	GetPose_Ctx set_automatic_transition(float time) {
-		GetPose_Ctx gp = *this;
-		gp.automatic_transition_time = time;
-		gp.has_auto_transition = true;
-		return gp;
-	}
-
-	Pose* pose = nullptr;
-	float dt = 0.0;
-
-	RootMotionTransform* accumulated_root_motion = nullptr;
-
-	// if > 0, then scale clip by rootmotion
-	float rootmotion_scale = -1.0;
-
-	// if true, then clip will return that it is finished when current_time + auto_transition_time >= clip_time
-	bool has_auto_transition = false;
-	float automatic_transition_time = 0.0;
-};
-
+#if 0
 CLASS_H(BaseAGNode, ClassBase)
 	// called once per Graph asset
 	virtual void initialize(Animation_Tree_CFG* cfg) = 0;
@@ -319,13 +218,6 @@ struct Clip_Node_RT : Rt_Vars_Base
 	bool stopped_flag = false;
 	const AnimationSeq* clip = nullptr;
 	const BoneIndexRetargetMap* remap = nullptr;
-};
-
-NEWENUM(rootmotion_setting, uint8_t)
-{
-	keep,
-	remove,
-	add_velocity
 };
 
 
@@ -1107,3 +999,4 @@ CLASS_H(BoolConstant, ValueNode)
 	}
 	bool b = false;
 };
+#endif

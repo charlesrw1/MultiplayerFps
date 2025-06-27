@@ -170,7 +170,7 @@ public:
 
 			phys->set_is_enable(true);
 		}
-		e->get_cached_mesh_component()->get_animator_instance()->set_update_owner_position_to_root(true);
+		e->get_cached_mesh_component()->get_animator()->set_update_owner_position_to_root(true);
 	}
 };
 
@@ -195,8 +195,8 @@ public:
 
 			if (enable) {
 				phys->enable_with_initial_transforms(
-					last_ws * m->get_animator_instance()->get_last_global_bonemats().at(i),
-					this_ws * m->get_animator_instance()->get_global_bonemats().at(i),
+					last_ws * m->get_animator()->get_last_global_bonemats().at(i),
+					this_ws * m->get_animator()->get_global_bonemats().at(i),
 					eng->get_dt());
 			}
 			else {

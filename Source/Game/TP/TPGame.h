@@ -53,12 +53,7 @@ public:
 	REF float flLean = 0.0;
 };
 
-struct TPActions
-{
-	InputActionInstance* shoot = nullptr;
-	InputActionInstance* move = nullptr;
-	InputActionInstance* look = nullptr;
-};
+
 
 class TPGun
 {
@@ -80,8 +75,6 @@ public:
 	REF AssetPtr<PrefabAsset> projectile;
 	REF AssetPtr<PrefabAsset> shotgunSound;
 
-	std::unique_ptr<InputUser> input;
-	TPActions act;
 
 	CharacterController cc;
 	glm::vec3 velocity = glm::vec3(0.f);
@@ -94,19 +87,7 @@ public:
 
 	void start() override {
 		cc.set_position(get_ws_position());
-		input = g_inputSys.register_input_user(0);
-		input->assign_device(g_inputSys.get_keyboard_device());
-		for (auto d : g_inputSys.get_connected_devices())
-			if (d->get_type() == InputDeviceType::Controller) {
-				input->assign_device(d);
-				break;
-			}
-		input->enable_mapping("game");
-		input->enable_mapping("ui");
-		act.shoot = input->get("game/shoot");
-		act.move = input->get("game/move");
-		act.look = input->get("game/look");
-
+	
 
 		capsule = get_owner()->get_component<CapsuleComponent>();
 		ASSERT(capsule);

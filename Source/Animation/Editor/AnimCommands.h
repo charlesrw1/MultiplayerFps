@@ -4,7 +4,7 @@
 #include "Framework/ConsoleCmdGroup.h"
 class NodeGraphLayer;
 using std::unordered_set;
-
+using std::string;
 
 class GraphCommandUtil
 {

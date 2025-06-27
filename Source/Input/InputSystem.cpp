@@ -6,337 +6,328 @@
 
 #include "GameEnginePublic.h"
 
-// global
-GameInputSystem g_inputSys;
-
-class GameInputSystemImpl
-{
-public:
-	GameInputSystemImpl() : allUsers(2) {}
-
-	InputDevice* get_device(handle<InputDevice> handle)
-	{
-		if (!handle.is_valid())
-			return nullptr;
-		if (handle.id == 0)
-			return &keyboardDevice;
-		if (handle.id >= 1 && handle.id <= 4)
-			return &controllerDevices[handle.id - 1];
-		return nullptr;
-	}
-
-	hash_set<InputUser> allUsers;
-
-	InputDevice keyboardDevice;
-	InputDevice controllerDevices[4];
-
-	std::vector<std::unique_ptr<InputAction>> registered_actions;
-
-	std::unordered_map<std::string, GlobalInputBinding> str_to_keybind;
-	std::unordered_map<std::string, int> mapping_id_to_integer;
-	int mapping_id_counter = 0;
-	int get_mapping_id_for_str(const std::string& id) {
-		assert(mapping_id_to_integer.find(id) != mapping_id_to_integer.end());
-		return mapping_id_to_integer[id];
-	}
-
-	static float sample_device_value_for_binding(GlobalInputBinding b, InputDevice* device);
-
-	int mouseXAccum = 0;
-	int mouseYAccum = 0;
-	int mouseScrollAccum = 0;
-};
-static GameInputSystemImpl* implLocal=nullptr;
-GameInputSystem::GameInputSystem() {
-	impl = new GameInputSystemImpl;
-	implLocal = impl;
-}
-GameInputSystem::~GameInputSystem() {
-	delete impl;
-	implLocal = nullptr;
+Input::Device::Device(SDL_GameController* ptr, int index) : index(index), ptr(ptr) {
+	assert(ptr && index >= 0 && index <= 3);
+	buttonState.resize(SDL_CONTROLLER_BUTTON_MAX);
 }
 
-InputDevice* GameInputSystem::get_keyboard_device()
+MulticastDelegate<int, bool> Input::on_con_status;
+MulticastDelegate<int> Input::on_any_input;
+Input* Input::inst;
+Input::Input()
 {
-	return &impl->keyboardDevice;
-}
-
-
-void GameInputSystem::init()
-{
-	impl->keyboardDevice.type = InputDeviceType::KeyboardMouse;
-	for (int i = 0; i < 4; i++) {
-		impl->controllerDevices[i].index = i;
-		impl->controllerDevices[i].type = InputDeviceType::Controller;
-	}
-
 	int numjoysticks = SDL_NumJoysticks();
-	sys_print(Debug,"%d existing controllers connected\n", numjoysticks);
-	using GIB = GlobalInputBinding;
-	const int count = (int)GIB::NumInputs;
-	for (int i = 0; i < count; i++)
-	{
-		auto str = get_button_type_string(GIB(i));
-		if (!str.empty()) {
-			//assert(impl->str_to_keybind.find(str) == impl->str_to_keybind.end());
-			// one string maps to multiple keys I guess
-			impl->str_to_keybind.insert({ str,GIB(i) });
-		}
+	sys_print(Debug, "%d existing controllers connected\n", numjoysticks);
+
+	keyState = SDL_GetKeyboardState(nullptr);
+	keyPressedReleasedState.resize(SDL_NUM_SCANCODES);
+	mouseButtonsState.resize(5);
+}
+Input::~Input()
+{
+	for (Device& c : devices) {
+		SDL_GameControllerClose(c.ptr);
+		c.ptr = nullptr;
 	}
 }
-InputAction* GameInputSystem::register_input_action(std::unique_ptr<InputAction> action)
-{
-	if (impl->mapping_id_to_integer.find(action->mapping_id_str) == impl->mapping_id_to_integer.end()) {
-		assert(impl->mapping_id_counter <= 30);
-		impl->mapping_id_to_integer.insert({ action->mapping_id_str, impl->mapping_id_counter++ });
-	}
-	action->mapping_id_num = impl->get_mapping_id_for_str(action->mapping_id_str);
-	impl->registered_actions.push_back(std::move(action));
-	return impl->registered_actions.back().get();
-}
-GlobalInputBinding GameInputSystem::find_bind_for_string(const std::string & key_str)
-{
-	auto find = impl->str_to_keybind.find(key_str);
-	return find == impl->str_to_keybind.end() ? GlobalInputBinding::Empty : find->second;
-}
-
-
-std::vector<InputDevice*> GameInputSystem::get_connected_devices()
-{
-	std::vector<InputDevice*> outDevices;
-	outDevices.push_back(&impl->keyboardDevice);
-	for (int i = 0; i < 4; i++) {
-		if (impl->controllerDevices[i].is_connected())
-			outDevices.push_back(&impl->controllerDevices[i]);
-	}
-	return outDevices;
-}
-void GameInputSystem::set_input_mapping_status(InputUser* user, const std::string& map_id, bool enable)
-{
-	int index = impl->get_mapping_id_for_str(map_id);
-	if (!user->has_mapping_tracked(index))
-	{
-		for (int i = 0; i < impl->registered_actions.size(); i++) {
-			if (impl->registered_actions[i]->mapping_id_num == index)
-			{
-				auto action = impl->registered_actions[i].get();
-				auto str = action->get_action_name();
-				assert(user->trackedActions.find(str) == user->trackedActions.end());
-				InputActionInstance& a = user->trackedActions[str];
-				a.action = action;
-				a.is_enabled = enable;
-			}
-		}
-		user->tracked_mapping_bitmasks |= 1ul << index;
-	}
-	else {
-		if (user->has_mapping_enabled(index) == enable)
-			return;
-
-		for (auto& a : user->trackedActions)
-		{
-			if (a.second.action->mapping_id_num == index)
-				a.second.is_enabled = enable;
-		}
-	}
-	if (enable)
-		user->mapping_enabled_bitmask |= (1ul << index);
-	else
-		user->mapping_enabled_bitmask &= ~(1ul << index);
-}
-
-std::unique_ptr<InputUser> GameInputSystem::register_input_user(int localPlayerIndex)
-{
-	InputUser* u = new InputUser;
-	u->playerIndex = localPlayerIndex;
-	impl->allUsers.insert(u);
-	return std::unique_ptr<InputUser>(u);
-}
-void GameInputSystem::free_input_user(InputUser* user)
-{
-	if (user->get_device()) {
-		ASSERT(user->get_device()->user == user);
-		user->get_device()->set_user(nullptr);
-	}
-
-	impl->allUsers.remove(user);
-}
-
-void GameInputSystem::handle_event(const SDL_Event& event)
+void Input::handle_event(const SDL_Event& event)
 {
 	switch (event.type)
 	{
-	case SDL_CONTROLLERDEVICEADDED:
-	{
+	case SDL_CONTROLLERDEVICEADDED: {
 		int joyindex = event.cdevice.which;
-		if (joyindex >= 4) {
-			sys_print(Warning,"SDL_CONTROLLERDEVICEADDED: device index is greater than 3\n");
+		if (joyindex >= 4||joyindex<0) {
+			sys_print(Warning, "SDL_CONTROLLERDEVICEADDED: device index not in [0,3]\n");
 		}
 		else {
-			auto controller = SDL_GameControllerOpen(joyindex);
-			assert(impl->controllerDevices[joyindex].sdl_controller_ptr == nullptr);
-			impl->controllerDevices[joyindex].sdl_controller_ptr = controller;
-			impl->controllerDevices[joyindex].self_index = { joyindex + 1 };
-
-			sys_print(Debug,"Controller %d added to game system\n",joyindex);
-
-			device_connected.invoke(&impl->controllerDevices[joyindex]);
+			opt<int> find_existing = find_device_for_index(joyindex);
+			if (find_existing.has_value()) {
+				sys_print(Warning, "SDL_CONTROLLERDEVICEADDED but device already exists %d\n", find_existing.value());
+			}
+			else {
+				SDL_GameController* controller = SDL_GameControllerOpen(joyindex);
+				devices.push_back(Device(controller, joyindex));
+				sys_print(Debug, "Controller %d added to game system\n", joyindex);
+				Input::on_con_status.invoke(joyindex, true);
+			}
 		}
 	}
-		break;
-	case SDL_CONTROLLERDEVICEREMOVED:
-	{
+	break;
+	case SDL_CONTROLLERDEVICEREMOVED: {
 		int deviceId = event.cdevice.which;
 
-		auto controller = SDL_GameControllerFromInstanceID(deviceId);
+		SDL_GameController* controller = SDL_GameControllerFromInstanceID(deviceId);
 		if (!controller)
 			return;
 
-		int myIndex = 0;
-		for (; myIndex < 4; myIndex++) {
-			if (impl->controllerDevices[myIndex].sdl_controller_ptr == controller)
-				break;
+		opt<int> idx = find_device_for_ptr(controller);
+		if (idx.has_value()) {
+			const int controller_index = devices.at(*idx).index;
+			sys_print(Debug, "Controller %d removed from game system\n", controller_index);
+			SDL_GameControllerClose(devices.at(*idx).ptr);
+			devices.at(*idx).ptr = nullptr;
+			devices.erase(devices.begin() + *idx);
+			Input::on_con_status.invoke(controller_index, false);
 		}
-		assert(myIndex != 4);
-
-		sys_print(Debug,"Controller %d removed from game system\n", myIndex);
-		auto device = &impl->controllerDevices[myIndex];
-		auto wasId = device->self_index;
-		device_disconnected.invoke(device);
-
-		auto user = device->user;
-		device->self_index = { 0 };
-		SDL_GameControllerClose(device->sdl_controller_ptr);
-		device->sdl_controller_ptr = nullptr;
-		device->user = nullptr;
-
-		if (user) {
-			sys_print(Debug,"user lost device\n");
-			assert(user->assigned_device == device);
-			user->assigned_device = nullptr;
-			user->on_changed_device.invoke();
+		else{
+			sys_print(Warning, "SDL_CONTROLLERDEVICEREMOVED does not exist: %d\n", deviceId);
 		}
 	}
-		break;
+	break;
 
-	case SDL_MOUSEWHEEL:
-	{
-		impl->mouseScrollAccum += event.wheel.y;
+	case SDL_MOUSEWHEEL: {
+		mouseScrollAcum += event.wheel.y;
+		recieved_input_from_this = -1;
 	} break;
-	case SDL_KEYDOWN:
-	case SDL_CONTROLLERBUTTONDOWN:
-	case SDL_MOUSEBUTTONDOWN:
-	{
-		if (!on_device_input.has_any_listeners())
-			return;
-	}
-	}
-}
-InputDeviceType get_device_type_for_keybind(GlobalInputBinding bind)
-{
-	assert(bind != GlobalInputBinding::Empty);
-	if (bind < GlobalInputBinding::ControllerButtonStart)
-		return InputDeviceType::KeyboardMouse;
-	return InputDeviceType::Controller;
-}
+	case SDL_KEYDOWN: {
+		recieved_input_from_this = -1;
+		keyPressedReleasedState.at(event.key.keysym.scancode).is_pressed = true;
+	}break;
+	case SDL_KEYUP: {
+		keyPressedReleasedState.at(event.key.keysym.scancode).is_released = true;
+	}break;
+	case SDL_MOUSEBUTTONDOWN: {
+		recieved_input_from_this = -1;
+		if (event.button.button >= 1 && event.button.button <= 5)
+			mouseButtonsState.at((int)event.button.button - 1).is_pressed = true;
+	}break;
+	case SDL_MOUSEBUTTONUP: {
+		if(event.button.button>=1&&event.button.button<=5)
+			mouseButtonsState.at((int)event.button.button - 1).is_released = true;
+	}break;
 
-float GameInputSystemImpl::sample_device_value_for_binding(GlobalInputBinding b, InputDevice* device)
+	case SDL_CONTROLLERAXISMOTION: {
+		const int AXIS_EPSILON = 10000;
+		if(std::abs((int)event.caxis.value) > AXIS_EPSILON)
+			recieved_input_from_this = event.caxis.which;
+	}break;
+	case SDL_CONTROLLERBUTTONDOWN: {
+		recieved_input_from_this = event.cbutton.which;
+		opt<int> idx = find_device_for_index(event.cbutton.which);
+		if (idx.has_value()) {
+			devices.at(*idx).buttonState.at(event.cbutton.button).is_pressed = true;
+		}
+	}break;
+	case SDL_CONTROLLERBUTTONUP: {
+		recieved_input_from_this = event.cbutton.which;
+		opt<int> idx = find_device_for_index(event.cbutton.which);
+		if (idx.has_value()) {
+			devices.at(*idx).buttonState.at(event.cbutton.button).is_released = true;
+		}
+	}break;
+	case SDL_MOUSEMOTION: {
+		recieved_input_from_this = -1;
+	}break;
+	}
+}
+void Input::pre_events()
 {
-	assert(get_device_type_for_keybind(b) == device->type);
-	if (b <= GlobalInputBinding::KeyboardEnd) {
-		auto keys = SDL_GetKeyboardState(nullptr);
-		int index = (int)b - (int)GlobalInputBinding::KeyboardStart;
-		assert(index >= 0 && index < SDL_NUM_SCANCODES);
-		return keys[index] ? 1.0 : 0.0;
+	mouseScrollAcum = 0;
+	for (auto& key : keyPressedReleasedState) {
+		key = PressReleaseState();
 	}
-	else if (b <= GlobalInputBinding::MouseButtonEnd) {
-		int index = (int)b - (int)GlobalInputBinding::MouseButtonStart;
-		assert(index >= 0 && index < 5);
-		int dummy{};
-		uint32_t state = SDL_GetMouseState(&dummy, &dummy);
-		bool down = state & SDL_BUTTON(index + 1);
-		return (down) ? 1.0 : 0.0;
+	for (auto& key : mouseButtonsState) {
+		key = PressReleaseState();
 	}
-	else if (b == GlobalInputBinding::MouseX) {
-		return implLocal->mouseXAccum;
+	for (auto& d : devices) {
+		for (auto& key : d.buttonState)
+			key = PressReleaseState();
 	}
-	else if (b == GlobalInputBinding::MouseY) {
-		return implLocal->mouseYAccum;
+}
+void Input::tick()
+{
+	if (recieved_input_from_this.has_value()) {
+		Input::on_any_input.invoke(*recieved_input_from_this);
+		recieved_input_from_this = std::nullopt;
 	}
-	else if (b == GlobalInputBinding::MouseScroll) {
-		return implLocal->mouseScrollAccum;
-	}
-	else if (b <= GlobalInputBinding::ControllerButtonEnd) {
-		int index = (int)b - (int)GlobalInputBinding::ControllerButtonStart;
-		int state = SDL_GameControllerGetButton(device->sdl_controller_ptr, (SDL_GameControllerButton)index);
-		return (state) ? 1.0 : 0.0;
-	}
-	else if (b <= GlobalInputBinding::ControllerAxisEnd) {
-		int index = (int)b - (int)GlobalInputBinding::ControllerAxisStart;
-		int16_t state = SDL_GameControllerGetAxis(device->sdl_controller_ptr, (SDL_GameControllerAxis)index);
-		return glm::clamp((double)state / INT16_MAX, -1.0, 1.0);
-	}
+	if (devices.empty())
+		default_dev_index = std::nullopt;
 	else
-		return 0.0;
+		default_dev_index = 0;
 
-}
+	SDL_GetRelativeMouseState(&mouseXAccum, &mouseYAccum);
 
-void GameInputSystem::tick_users(float dt)
-{
-	SDL_GetRelativeMouseState(&impl->mouseXAccum, &impl->mouseYAccum);
+	assert(keyPressedReleasedState.size() <= SDL_NUM_SCANCODES);
 
-	for (auto u : impl->allUsers)
-	{
-		auto device = u->get_device();
+	for (int i = 0; i < keyPressedReleasedState.size(); i++) {
+		keyPressedReleasedState[i].is_down = keyState[i];
+	}
+	const int mouseState = SDL_GetMouseState(&mouseX, &mouseY);
+	for (int i = 0; i < 3; i++) {
+		const bool is_down_this_tick = (mouseState&SDL_BUTTON(i + 1))!=0;
+		mouseButtonsState[i].is_down = is_down_this_tick;
+	}
 
-		if (!device)
-			continue;	// no valid device
-
-		ASSERT(device&&device->get_user()==u);
-		const auto myType = device->type;
-
-		for (auto& bindAndCallback : u->trackedActions) {
-			auto action = bindAndCallback.second.action;
-			auto& action_inst = bindAndCallback.second;
-			if (!action_inst.is_enabled) 
-				continue;
-
-			InputValue device_val = {};
-			for (int b = 0; b < action->binds.size(); b++) {
-				auto& bind = action->binds[b];
-				auto binding = bind.get_bind();
-				if (get_device_type_for_keybind(binding) != myType)
-					continue;
-				
-				InputValue raw_val;
-				raw_val.v.x = GameInputSystemImpl::sample_device_value_for_binding(binding, device);
-				if (bind.modifier)
-					raw_val = bind.modifier->modify(raw_val, dt);
-				
-				if (bind.trigger) {
-					int out = (int)bind.trigger->check_trigger(raw_val, dt);
-					bool isActive = (out & (int)TriggerMask::Active);
-					bool isTriggered = (out & (int)TriggerMask::Triggered);
-					if (isTriggered)
-						action_inst.on_trigger.invoke();
-					if (isActive && !action_inst.is_active)
-						action_inst.on_start.invoke();
-					if (action_inst.is_active)
-						action_inst.active_duration += dt;
-					action_inst.is_active = isActive;
-					if (!action_inst.is_active)
-						action_inst.active_duration = 0.0;
-				}
-
-
-				if (action->is_additive)
-					device_val.v += raw_val.v;
-				else
-					device_val.v = glm::max(device_val.v, raw_val.v);
-			}
-			action_inst.state = device_val;
+	for (Device& d : devices) {
+		assert(d.buttonState.size() == SDL_CONTROLLER_BUTTON_MAX);
+		for (int i = 0; i < d.buttonState.size(); i++) {
+			const bool is_down_this_tick = SDL_GameControllerGetButton(d.ptr, (SDL_GameControllerButton)i);
+			d.buttonState[i].is_down = is_down_this_tick;
 		}
 	}
+}
 
-	implLocal->mouseScrollAccum = 0;
+bool Input::is_shift_down()
+{
+	return is_key_down(SDL_SCANCODE_LSHIFT)||is_key_down(SDL_SCANCODE_RSHIFT);
+}
+bool Input::is_ctrl_down()
+{
+	return is_key_down(SDL_SCANCODE_LCTRL) || is_key_down(SDL_SCANCODE_RCTRL);
+}
+bool Input::is_alt_down()
+{
+	return is_key_down(SDL_SCANCODE_LALT) || is_key_down(SDL_SCANCODE_RALT);
+}
+
+SDL_GameControllerType Input::get_con_type()
+{
+	return get_con_type_idx(inst->default_dev_index.value_or(-1));
+}
+SDL_GameControllerType Input::get_con_type_idx(int idx)
+{
+	auto device = inst->get_device_ptr(idx);
+	if (!device)
+		return SDL_GameControllerType::SDL_CONTROLLER_TYPE_UNKNOWN;
+	return SDL_GameControllerGetType(device);
+}
+
+
+bool Input::is_key_down(SDL_Scancode key)
+{
+	assert(key >= 0 && key < SDL_NUM_SCANCODES);
+	return inst->keyPressedReleasedState[key].is_down;
+}
+bool Input::was_key_pressed(SDL_Scancode key)
+{
+	assert(key >= 0 && key < SDL_NUM_SCANCODES);
+	return inst->keyPressedReleasedState[key].is_pressed;
+}
+bool Input::was_key_released(SDL_Scancode key)
+{
+	assert(key >= 0 && key < SDL_NUM_SCANCODES);
+	return inst->keyPressedReleasedState[key].is_released;
+}
+
+ivec2 Input::get_mouse_delta()
+{
+	return ivec2(inst->mouseXAccum,inst->mouseYAccum);
+}
+
+ivec2 Input::get_mouse_pos()
+{
+	return ivec2(inst->mouseX,inst->mouseY);
+}
+
+bool Input::is_mouse_down(int button)
+{
+	assert(button >= 0 && button <= 4);
+	return inst->mouseButtonsState.at(button).is_down;
+}
+
+bool Input::was_mouse_pressed(int button)
+{
+	assert(button >= 0 && button <= 4);
+	return inst->mouseButtonsState.at(button).is_pressed;
+}
+
+bool Input::was_mouse_released(int button)
+{
+	assert(button >= 0 && button <= 4);
+	return inst->mouseButtonsState.at(button).is_released;
+}
+
+int Input::get_mouse_scroll()
+{
+	return inst->mouseScrollAcum;
+}
+
+
+bool Input::is_con_button_down(SDL_GameControllerButton button)
+{
+	return is_con_button_down_idx(button,inst->default_dev_index.value_or(-1));
+}
+
+bool Input::was_con_button_pressed(SDL_GameControllerButton button)
+{
+	return was_con_button_pressed_idx(button, inst->default_dev_index.value_or(-1));
+}
+
+bool Input::was_con_button_released(SDL_GameControllerButton button)
+{
+	return was_con_button_released_idx(button, inst->default_dev_index.value_or(-1));
+}
+
+double Input::get_con_axis(SDL_GameControllerAxis axis)
+{
+	return get_con_axis_idx(axis, inst->default_dev_index.value_or(-1));
+}
+
+bool Input::is_con_button_down_idx(SDL_GameControllerButton b, int idx)
+{
+	auto device = inst->get_device_ptr(idx);
+	if (!device)
+		return false;
+	return (bool)SDL_GameControllerGetButton(device, b);
+}
+
+bool Input::was_con_button_pressed_idx(SDL_GameControllerButton b, int idx)
+{
+	opt<int> dev = inst->find_device_for_index(idx);
+	if (dev.has_value()) {
+		return inst->devices.at(*dev).buttonState.at(b).is_pressed;
+	}
+	return false;
+}
+
+bool Input::was_con_button_released_idx(SDL_GameControllerButton b, int idx)
+{
+	opt<int> dev = inst->find_device_for_index(idx);
+	if (dev.has_value()) {
+		return inst->devices.at(*dev).buttonState.at(b).is_released;
+	}
+	return false;
+}
+
+double Input::get_con_axis_idx(SDL_GameControllerAxis a, int idx)
+{
+	auto device = inst->get_device_ptr(idx);
+	if (!device) 
+		return 0.0;
+	int16_t val = SDL_GameControllerGetAxis(device, a);
+	return double(val) / double(INT16_MAX);
+}
+
+bool Input::is_any_con_active()
+{
+	return !inst->devices.empty();
+}
+
+int Input::get_num_active_cons()
+{
+	return (int)inst->devices.size();
+}
+
+bool Input::is_con_active(int idx)
+{
+	return inst->find_device_for_index(idx).has_value();
+}
+SDL_GameController* Input::get_device_ptr(int idx) const {
+	auto i = find_device_for_index(idx);
+	if (i.has_value()) 
+		return devices.at(i.value()).ptr;
+	return nullptr;
+}
+opt<int> Input::find_device_for_index(int idx) const {
+	for (int i = 0; i < devices.size(); i++)
+		if (devices[i].index == idx)
+			return i;
+	return std::nullopt;
+}
+opt<int> Input::find_device_for_ptr(SDL_GameController* ptr) const
+{
+	for (int i = 0; i < devices.size(); i++)
+		if (devices[i].ptr == ptr)
+			return i;
+	return std::nullopt;
 }

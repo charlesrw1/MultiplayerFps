@@ -12,6 +12,8 @@
 
 #include "Framework/ReflectionMacros.h"
 
+// comment 3
+
 DecalComponent::DecalComponent() {
 	set_call_init_in_editor(true);
 }

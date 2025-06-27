@@ -79,7 +79,7 @@ struct lua_State;
 class ScriptManager
 {
 public:
-	ScriptManager* inst = nullptr;
+	static ScriptManager* inst;
 	ScriptManager();
 	~ScriptManager();
 

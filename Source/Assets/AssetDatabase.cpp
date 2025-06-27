@@ -78,8 +78,12 @@ public:
 	AssetBackend(const unordered_map<string,IAsset*>& global) 
 		: my_thread([this]() { loader_loop();}), global_assets(global)
 	{
-		my_thread.detach();
+		//my_thread.detach();
 	}
+	~AssetBackend() {
+		
+	}
+	void signal_end_work();
 	void push_job_to_queue(uptr<AsyncQueuedJob> job);
 	void combine_asset_tables(unordered_map<string, IAsset*>& table);
 	uptr<AsyncQueuedJob> pop_finished_job();
@@ -186,6 +190,14 @@ void AssetBackend::finish_all_jobs()
 	job_cv.wait(lock, [&] { return jobs.empty() && !is_in_job; });
 	sys_print(Info, "/finish all jobs\n");
 
+}
+void AssetBackend::signal_end_work() {
+	{
+		std::unique_lock<std::mutex> lock(job_mutex);
+		stop_processing = true;
+		job_cv.notify_all();
+	}
+	my_thread.join();
 }
 
 void AssetBackend::combine_asset_tables(unordered_map<string, IAsset*>& table) {
@@ -494,9 +506,10 @@ public:
 
 
 
-		backend.combine_asset_tables(allAssets);
 		uptr<AsyncQueuedJob> job = backend.pop_finished_job();
 		while (job) {
+			backend.combine_asset_tables(allAssets);
+
 			sys_print(Debug, "finalize job %s resource %s\n", job->out_object->get_type().classname, job->out_object->get_name().c_str());
 			assert(allAssets.find(job->path) != allAssets.end());
 			assert(job->out_object);
@@ -682,7 +695,10 @@ public:
 	void finish_all_jobs() {
 		backend.finish_all_jobs();
 	}
-
+	void quit() {
+		sys_print(Info, "quitting asset loader\n");
+		backend.signal_end_work();
+	}
 private:
 	IAsset* find_in_all_assets(const string& str) {
 		auto f= allAssets.find(str);
@@ -701,7 +717,9 @@ private:
 // when an object references a 
 
 
-
+void AssetDatabase::quit() {
+	impl->quit();
+}
 
 AssetDatabase::AssetDatabase() {
 
@@ -796,9 +814,4 @@ void PrimaryAssetLoadingInterface::touch_asset(const IAsset* asset)
 	mut->gc = IAsset::Gray;
 }
 
-
-DECLARE_ENGINE_CMD(print_assets)
-{
-	g_assets.print_usage();
-}
 IAssetLoadingInterface* AssetDatabase::loader=nullptr;

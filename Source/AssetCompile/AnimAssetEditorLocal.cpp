@@ -10,7 +10,6 @@
 #include "Animation/AnimationUtil.h"
 
 #include "GameEnginePublic.h"
-#include "OsInput.h"
 
 #include "Render/RenderObj.h"
 
@@ -36,8 +35,8 @@ IEditorTool* g_animseq_editor = &g_animseq_editor_static;
 void AnimationEditorTool::tick(float dt)
 {
 	EditorTool3d::tick(dt);
-	if(mc->get_animator_instance())
-		mc->get_animator_instance()->set_force_view_seq_time(animEdit->CURRENT_TIME);
+	//if(mc->get_animator_instance())
+	//	mc->get_animator_instance()->set_force_view_seq_time(animEdit->CURRENT_TIME);
 }
 
 void AnimationEditorTool::imgui_draw()
@@ -252,11 +251,11 @@ void AnimationEditorTool::post_map_load_callback()
 	entity = eng->get_level()->spawn_entity();
 	mc = entity->create_component<MeshComponent>();
 	mc->set_model(outputModel);
-	fake_tree = Animation_Tree_CFG::construct_fake_tree();
+	//fake_tree = Animation_Tree_CFG::construct_fake_tree();
 	mc->set_animation_graph(fake_tree.get());
-	if (outputModel) {
-		mc->get_animator_instance()->set_force_seq_for_editor(sequence);
-	}
+	//if (outputModel) {
+	//	mc->get_animator_instance()->set_force_seq_for_editor(sequence);
+	//}
 	on_start.invoke();
 }
 

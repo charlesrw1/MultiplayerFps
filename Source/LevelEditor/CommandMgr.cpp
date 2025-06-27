@@ -17,7 +17,8 @@ void UndoRedoSystem::clear_all() {
 	}
 }
 
-// returns number of errord commands
+// returns number of errord commands 
+//
 
 int UndoRedoSystem::execute_queued_commands() {
 

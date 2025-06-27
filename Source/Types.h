@@ -18,7 +18,7 @@ public:
 	void set_orbit_target(glm::vec3 target, float object_size);
 	bool can_take_input() const;
 	void scroll_callback(int amt);
-	void update_from_input(const bool keys[], int mouse_dx, int mouse_dy, int width, int height, float aratio, float fov);
+	void update_from_input(int width, int height, float aratio, float fov);
 	glm::mat4 get_view_matrix() const;
 };
 

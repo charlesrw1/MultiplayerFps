@@ -192,9 +192,47 @@ void ModelMan::compact_memory()
 		models[i]->merged_vert_offset /= sizeof(ModelVertex);
 	}
 }
-DECLARE_ENGINE_CMD(compact_vertex_buffer)
+
+#ifdef EDITOR_BUILD
+#include "AssetCompile/ModelAsset2.h"
+#include <fstream>
+#include "Framework/ReflectionProp.h"
+#include "Framework/DictWriter.h"
+void IMPORT_MODEL_FUNC(const Cmd_Args& args)
 {
-	g_modelMgr.compact_memory();
+	if (args.size() != 2) {
+		sys_print(Error, "usage: IMPORT_MODEL <.glb path>");
+		return;
+	}
+
+	auto savepath = strip_extension(args.at(1)) + ".mis";
+
+
+	ModelImportSettings mis;
+	mis.srcGlbFile = args.at(1);
+
+
+	DictWriter dw;
+	write_object_properties(&mis, nullptr, dw);
+
+	// save as text
+	auto outfile = FileSys::open_write_game(savepath);
+	outfile->write(dw.get_output().data(), dw.get_output().size());
+	outfile->close();
+
+	ModelCompilier::compile(savepath.c_str(), AssetDatabase::loader);
+}
+#endif
+
+
+void ModelMan::add_commands(ConsoleCmdGroup& group)
+{
+	group.add("compact_vertex_buffer", [this](const Cmd_Args&) { compact_memory(); });
+	group.add("print_vertex_usage", [this](const Cmd_Args&) { print_usage(); });
+
+#ifdef EDITOR_BUILD
+	group.add("IMPORT_MODEL", IMPORT_MODEL_FUNC);
+#endif
 }
 
 void MainVbIbAllocator::print_usage() const
@@ -219,10 +257,7 @@ void ModelMan::print_usage() const
 {
 	allocator.print_usage();
 }
-DECLARE_ENGINE_CMD(print_vertex_usage)
-{
-	g_modelMgr.print_usage();
-}
+
 
 int MainVbIbAllocator::append_to_v_buffer(const uint8_t* data, size_t size) {
 	return append_buf_shared(data, size, "Vertex", vbuffer, GL_ARRAY_BUFFER);
@@ -780,53 +815,3 @@ ModelMan::ModelMan() : all_models(6)
 
 }
 
-#ifdef EDITOR_BUILD
-#include "AssetCompile/ModelAsset2.h"
-#include <fstream>
-#include "Framework/ReflectionProp.h"
-#include "Framework/DictWriter.h"
-DECLARE_ENGINE_CMD(IMPORT_MODEL)
-{
-	if (args.size() != 2) {
-		sys_print(Error, "usage: IMPORT_MODEL <.glb path>");
-		return;
-	}
-
-	auto savepath = strip_extension(args.at(1)) + ".mis";
-	
-
-	ModelImportSettings mis;
-	mis.srcGlbFile = args.at(1);
-
-
-	DictWriter dw;
-	write_object_properties(&mis, nullptr, dw);
-
-	// save as text
-	auto outfile = FileSys::open_write_game(savepath);
-	outfile->write(dw.get_output().data(), dw.get_output().size());
-	outfile->close();
-
-	ModelCompilier::compile(savepath.c_str(),AssetDatabase::loader);
-}
-#endif
-
-
-DECLARE_ENGINE_CMD(print_skeleton)
-{
-	if (args.size() != 2) {
-		sys_print(Error, "usage: print_rig <.cmdl>");
-		return;
-	}
-	auto mod = g_assets.find_sync<Model>(args.at(1));
-	if (!mod) {
-		sys_print(Error, "couldnt find model\n");
-		return;
-	}
-	if (!mod->get_skel()) {
-		sys_print(Error, "model has no skeleton\n");
-		return;
-	}
-
-
-}

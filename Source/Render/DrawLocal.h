@@ -22,7 +22,7 @@
 #include "Render/RenderExtra.h"
 #include "Render/MaterialLocal.h"
 #include "Render/RenderScene.h"
-
+#include "Framework/ConsoleCmdGroup.h"
 
 class MeshPart;
 class Model;
@@ -389,6 +389,7 @@ public:
 	void check_cubemaps_dirty();	// render any cubemaps
 	void update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Texture* cubemap, glm::vec3 position, bool skybox_only);
 
+	uptr<ConsoleCmdGroup> consoleCommands;
 	Memory_Arena mem_arena;
 
 	Memory_Arena& get_arena() { return mem_arena; }

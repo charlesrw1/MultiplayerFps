@@ -12,6 +12,137 @@
 #include "AssetDatabase.h"
 #include "AssetRegistryLocal.h"
 
+#include "Framework/Config.h"
+#include "Assets/AssetDatabase.h"
+void TOUCH_ASSET(const Cmd_Args& args)
+{
+	if (args.size() != 2) {
+		sys_print(Warning, "TOUCH_ASSET <asset path>\n");
+		return;
+	}
+	auto type = AssetRegistrySystem::get().find_asset_type_for_ext(get_extension_no_dot(args.at(1)));
+	if (type) {
+		auto res = g_assets.find_sync(args.at(1), type, 0);
+		if (!res)
+			sys_print(Error, "TOUCH_ASSET failed\n");
+	}
+	else {
+		sys_print(Error, "couldnt find type\n");
+	}
+}
+
+
+
+// Ill just put this code here
+//DECLARE_ENGINE_CMD_CAT("sys.", ls)
+void SYS_LS_CMD(const Cmd_Args& args)
+{
+	std::string dir = args.size() == 2 ? args.at(1) : "";
+	auto tree = FileSys::find_game_files_path(dir);
+	const int len = strlen(FileSys::get_game_path());
+	for (auto f : tree) {
+		if (f.find(FileSys::get_game_path()) == 0)
+			f = f.substr(len + 1);
+		auto type = AssetRegistrySystem::get().find_asset_type_for_ext(get_extension_no_dot(f));
+		if (!type)
+			continue;
+		sys_print(Info, "%-40s %s\n", f.c_str(), type->classname);
+	}
+}
+#include "Render/Texture.h"
+#include "Render/Model.h"
+#include "Sound/SoundPublic.h"
+static std::string get_valid_asset_types_glob() {
+	std::string out;
+
+	out += " --glob \"*.mis\" ";	// model import settings
+	out += " --glob \"*.tis\" ";	// texture import settings
+
+	auto& types = AssetRegistrySystem::get().get_types();
+	for (auto& t : types) {
+		if (!t->assets_are_filepaths()) continue;
+		// hacky stuff, these are binary formats
+		if (t->get_asset_class_type() == &Texture::StaticType) continue;
+		if (t->get_asset_class_type() == &Model::StaticType) continue;
+		if (t->get_asset_class_type() == &SoundFile::StaticType) continue;
+		for (auto& ext : t->extensions) {
+			out += " --glob \"*." + ext + "\" ";
+		}
+	}
+	return out;
+}
+static std::string get_asset_references_pattern() {
+	std::string out;
+	out += ".mis\\b|.tis\\b";
+	auto& types = AssetRegistrySystem::get().get_types();
+	for (auto& t : types) {
+		if (!t->assets_are_filepaths()) continue;
+		// hacky stuff, these are binary formats
+		for (auto& ext : t->extensions) {
+			out += "|." + ext + "\\b";
+		}
+	}
+	return out;
+}
+
+
+//DECLARE_ENGINE_CMD_CAT("sys.", print_refs)
+void SYS_PRINT_REFS_CMD(const Cmd_Args& args)
+{
+	if (args.size() != 2) {
+		sys_print(Error, "usage: sys.print_refs <asset_path>\n");
+		return;
+	}
+
+	std::string parentDir = FileSys::get_full_path_from_game_path(args.at(1));
+	auto findSlash = parentDir.rfind('/');
+	if (findSlash != std::string::npos)
+		parentDir = parentDir.substr(0, findSlash + 1);
+
+	const std::string rg = "./x64/Debug/rg.exe ";
+	std::string commandLine = rg + '\'' + std::string(args.at(1)) + "\' " + std::string(FileSys::get_game_path()) + "/ " + get_valid_asset_types_glob();
+
+	STARTUPINFOA si = {};
+	PROCESS_INFORMATION out = {};
+	commandLine = "powershell.exe -Command \"" + commandLine + "\"";
+	//commandLine = "dir\n";
+	sys_print(Info, "executing search: %s\n", commandLine.c_str());
+	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &out)) {
+		sys_print(Error, "couldn't create process\n");
+		return;
+	}
+	WaitForSingleObject(out.hProcess, INFINITE);
+	CloseHandle(out.hProcess);
+	CloseHandle(out.hThread);
+}
+
+//DECLARE_ENGINE_CMD_CAT("sys.", print_deps)
+void SYS_PRINT_DEPS_CMD(const Cmd_Args& args)
+{
+	if (args.size() != 2) {
+		sys_print(Error, "usage: sys.print_deps <asset_path>\n");
+		return;
+	}
+
+	std::string full_path = FileSys::get_full_path_from_game_path(args.at(1));
+
+	const std::string rg = "./x64/Debug/rg.exe ";
+	std::string commandLine = rg + "\'" + get_asset_references_pattern() + "\' " + full_path;
+
+	STARTUPINFOA si = {};
+	PROCESS_INFORMATION out = {};
+	commandLine = "powershell.exe -Command \"" + commandLine + "\"";
+	//commandLine = "dir\n";
+	sys_print(Info, "executing search: %s\n", commandLine.c_str());
+	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &out)) {
+		sys_print(Error, "couldn't create process\n");
+		return;
+	}
+	WaitForSingleObject(out.hProcess, INFINITE);
+	CloseHandle(out.hProcess);
+	CloseHandle(out.hThread);
+}
+
 AssetRegistrySystem& AssetRegistrySystem::get()
 {
 	static AssetRegistrySystem inst;
@@ -170,6 +301,12 @@ void AssetRegistrySystem::init()
 	g_assets.install_system_asset(hackedAsset, "_hackedAsset");
 
 	reindex_all_assets();
+
+	consoleCommands = ConsoleCmdGroup::create("");
+	consoleCommands->add("sys.ls", SYS_LS_CMD);
+	consoleCommands->add("sys.print_deps", SYS_PRINT_DEPS_CMD);
+	consoleCommands->add("sys.print_refs", SYS_PRINT_REFS_CMD);
+	consoleCommands->add("TOUCH_ASSET", TOUCH_ASSET);
 }
 
 void AssetRegistrySystem::update()
@@ -230,146 +367,7 @@ const ClassTypeInfo* AssetRegistrySystem::find_asset_type_for_ext(const std::str
 	}
 	return nullptr;
 }
-#include "Framework/Config.h"
-#include "Assets/AssetDatabase.h"
-DECLARE_ENGINE_CMD(TOUCH_ASSET)
-{
-	if (args.size() != 2) {
-		sys_print(Warning, "TOUCH_ASSET <asset path>\n");
-		return;
-	}
-	auto type = AssetRegistrySystem::get().find_asset_type_for_ext(get_extension_no_dot(args.at(1)));
-	if (type) {
-		auto res = g_assets.find_sync(args.at(1), type, 0);
-		if (!res)
-			sys_print(Error, "TOUCH_ASSET failed\n");
-	}
-	else {
-		sys_print(Error, "couldnt find type\n");
-	}
-}
 
-static std::vector<std::string> split_path(const std::string& path)
-{
-	std::vector<std::string> out;
-	int start = 0;
-	auto find = path.find('/');
-	while (find != std::string::npos) {
-		out.push_back(path.substr(start, find));
-		start = find+1;
-		find = path.find('/',find+1);
-	}
-	if(start!=path.size())
-		out.push_back(path.substr(start));
-	return out;
-}
-
-// Ill just put this code here
-DECLARE_ENGINE_CMD_CAT("sys.", ls)
-{
-	std::string dir = args.size() == 2 ? args.at(1) : "";
-	auto tree = FileSys::find_game_files_path(dir);
-	const int len = strlen(FileSys::get_game_path());
-	for (auto f : tree) {
-		if (f.find(FileSys::get_game_path()) == 0)
-			f = f.substr(len + 1);
-		auto type = AssetRegistrySystem::get().find_asset_type_for_ext(get_extension_no_dot(f));
-		if (!type)
-			continue;
-		sys_print(Info, "%-40s %s\n", f.c_str(), type->classname);
-	}
-}
-#include "Render/Texture.h"
-#include "Render/Model.h"
-#include "Sound/SoundPublic.h"
-static std::string get_valid_asset_types_glob() {
-	std::string out;
-
-	out += " --glob \"*.mis\" ";	// model import settings
-	out += " --glob \"*.tis\" ";	// texture import settings
-
-	auto& types = AssetRegistrySystem::get().get_types();
-	for (auto& t : types) {
-		if (!t->assets_are_filepaths()) continue;
-		// hacky stuff, these are binary formats
-		if (t->get_asset_class_type() == &Texture::StaticType) continue;
-		if (t->get_asset_class_type() == &Model::StaticType) continue;
-		if (t->get_asset_class_type() == &SoundFile::StaticType) continue;
-		for (auto& ext : t->extensions) {
-			out += " --glob \"*." + ext + "\" ";
-		}
-	}
-	return out;
-}
-static std::string get_asset_references_pattern() {
-	std::string out;
-	out += ".mis\\b|.tis\\b";
-	auto& types = AssetRegistrySystem::get().get_types();
-	for (auto& t : types) {
-		if (!t->assets_are_filepaths()) continue;
-		// hacky stuff, these are binary formats
-		for (auto& ext : t->extensions) {
-			out += "|."+ext+"\\b";
-		}
-	}
-	return out;
-}
-
-
-DECLARE_ENGINE_CMD_CAT("sys.", print_refs)
-{
-	if (args.size() != 2) {
-		sys_print(Error, "usage: sys.print_refs <asset_path>\n");
-		return;
-	}
-
-	std::string parentDir = FileSys::get_full_path_from_game_path(args.at(1));
-	auto findSlash = parentDir.rfind('/');
-	if (findSlash != std::string::npos)
-		parentDir = parentDir.substr(0, findSlash + 1);
-
-	const std::string rg = "./x64/Debug/rg.exe ";
-	std::string commandLine = rg + '\'' + std::string(args.at(1)) + "\' " + std::string(FileSys::get_game_path()) + "/ " + get_valid_asset_types_glob();
-
-	STARTUPINFOA si = {};
-	PROCESS_INFORMATION out = {};
-	commandLine = "powershell.exe -Command \""+ commandLine+"\"";
-	//commandLine = "dir\n";
-	sys_print(Info, "executing search: %s\n", commandLine.c_str());
-	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &out)) {
-		sys_print(Error, "couldn't create process\n");
-		return;
-	}
-	WaitForSingleObject(out.hProcess, INFINITE);
-	CloseHandle(out.hProcess);
-	CloseHandle(out.hThread);
-}
-
-DECLARE_ENGINE_CMD_CAT("sys.", print_deps)
-{
-	if (args.size() != 2) {
-		sys_print(Error, "usage: sys.print_deps <asset_path>\n");
-		return;
-	}
-
-	std::string full_path = FileSys::get_full_path_from_game_path(args.at(1));
-	
-	const std::string rg = "./x64/Debug/rg.exe ";
-	std::string commandLine = rg + "\'" + get_asset_references_pattern() + "\' " + full_path;
-
-	STARTUPINFOA si = {};
-	PROCESS_INFORMATION out = {};
-	commandLine = "powershell.exe -Command \"" + commandLine + "\"";
-	//commandLine = "dir\n";
-	sys_print(Info, "executing search: %s\n", commandLine.c_str());
-	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &out)) {
-		sys_print(Error, "couldn't create process\n");
-		return;
-	}
-	WaitForSingleObject(out.hProcess, INFINITE);
-	CloseHandle(out.hProcess);
-	CloseHandle(out.hThread);
-}
 
 
 #endif

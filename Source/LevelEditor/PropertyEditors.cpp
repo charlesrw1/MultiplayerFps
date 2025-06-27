@@ -87,8 +87,8 @@ bool SharedAssetPropertyEditor::internal_update() {
 			}
 		}
 		else if (ImGui::GetIO().MouseClicked[0]) {
-			global_asset_browser.filter_all();
-			global_asset_browser.unset_filter(1 << metadata->self_index);
+			AssetBrowser::inst->filter_all();
+			AssetBrowser::inst->unset_filter(1 << metadata->self_index);
 		}
 	}
 	bool ret = false;
@@ -626,7 +626,6 @@ void PropertyFactoryUtil::register_anim_editor(AnimationGraphEditor& doc, FnFact
 	factory.add("FindAnimGraphVariableProp", [&doc]() {return new FindAnimGraphVariableProp(doc); });
 	factory.add("AgBoneFinder", [&doc]() {return new AgBoneFinder(doc); });
 	factory.add("BlendspaceGridEd", [&doc]() {return new BlendspaceGridEd(doc); });
-	factory.add("StateTransitionScript", []() {return new StateTransitionPropertyEditor(); });
 }
 void PropertyFactoryUtil::register_mat_editor(MaterialEditorLocal& doc, FnFactory<IPropertyEditor>& factory)
 {
@@ -728,28 +727,8 @@ bool MaterialParamPropEditor::internal_update()
 // Inherited via IPropertyEditor
 
 
-// fixme
-class GameTagManager
-{
-public:
-	static GameTagManager& get() {
-		static GameTagManager inst;
-		return inst;
-	}
-	void add_tag(const std::string& tag) {
-		registered_tags.insert(tag);
-	}
-	std::unordered_set<std::string> registered_tags;
-};
+#include "LevelEditor/TagManager.h"
 
-DECLARE_ENGINE_CMD(REG_GAME_TAG)
-{
-	if (args.size() != 2) {
-		sys_print(Error, "REG_GAME_TAG <tag>");
-		return;
-	}
-	GameTagManager::get().add_tag(args.at(1));
-}
 
 EntityTagEditor::~EntityTagEditor() {
 	StringName* myName = (StringName*)prop->get_ptr(instance);
@@ -856,124 +835,6 @@ bool EntityBoneParentStringEditor::internal_update()
 	return has_update;
 }
 
-bool StateTransitionPropertyEditor::internal_update() {
-	StateTransitionScript* self = (StateTransitionScript*)instance;
-	ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchSame;
-
-	if (ImGui::BeginTable("mytable", 3, flags)) {
-
-		ImGui::TableNextRow();
-		ImGui::TableNextColumn();
-
-		draw_value_header_side(self, false);
-
-		ImGui::TableNextColumn();
-
-		const char* drop_down_opt[] = { "==","!=","<","<=",">",">=" };
-		auto preview_value = drop_down_opt[(int)self->comparison];
-		if (ImGui::BeginCombo("##optmenu", preview_value)) {
-			for (int i = 0; i < 6; i++) {
-				bool selected = (i == (int)self->comparison);
-				if (ImGui::Selectable(drop_down_opt[i], &selected)) {
-					self->comparison = (ScriptComparison)i;
-				}
-			}
-			ImGui::EndCombo();
-		}
-
-		ImGui::TableNextColumn();
-
-		draw_value_header_side(self, true);
-
-		ImGui::TableNextRow();
-		ImGui::TableNextColumn();
-		draw_value_side(self, false);
-		ImGui::TableNextColumn();
-		ImGui::TableNextColumn();
-		draw_value_side(self, true);
-
-		ImGui::EndTable();
-	}
-
-	return false;
-}
-
-void StateTransitionPropertyEditor::draw_value_header_side(StateTransitionScript* self, bool rhs) {
-	const char* opt[] = { "<none>","Variable","Constant" };
-	auto& vd = (rhs) ? self->rhs : self->lhs;
-	if ((int)vd.type > 2 || (int)vd.type < 0) vd.type = ScriptValueType::None;
-	auto preview = opt[(int)vd.type];
-	auto id = (rhs) ? "##rhs" : "##lhs";
-
-	if (ImGui::BeginCombo(id, preview)) {
-		for (int i = 0; i < 3; i++) {
-			bool selected = (int)vd.type == i;
-			if (ImGui::Selectable(opt[i], &selected)) {
-				vd.type = ScriptValueType(i);
-				vd.str = "";
-			}
-		}
-		ImGui::EndCombo();
-	}
-}
-
-void StateTransitionPropertyEditor::draw_value_side(StateTransitionScript* self, bool rhs) {
-#if 0
-	auto& vd = (rhs) ? self->rhs : self->lhs;
-	auto id = (rhs) ? "##rhs" : "##lhs";
-	ImGui::PushID(id);
-
-	if (vd.type == ScriptValueType::Constant) {
-		float f = 0.0;
-		int ret = sscanf(vd.str.c_str(), "%f", &f);
-		if (ret == 0) vd.str = "0";
-		if (ImGui::InputFloat("##value", &f)) {
-			vd.str = string_format("%f", f);
-		}
-	}
-	else if (vd.type == ScriptValueType::Variable) {
-
-
-		const ClassTypeInfo* type = anim_graph_ed.get_animator_class();
-		if (!type) {
-			ImGui::Text("no class selected");
-			ImGui::PopID();
-			return;
-		}
-
-		std::vector<const PropertyInfoList*> getprop;
-		for (; type; type = type->super_typeinfo)
-			getprop.push_back(type->props);
-		auto preview = vd.str.empty() ? "<none>" : vd.str;
-		if (ImGui::BeginCombo("##varlist", preview.c_str())) {
-			for (int i = 0; i < getprop.size(); i++) {
-				auto list = getprop[i];
-				for (int j = 0; list && j < list->count; j++) {
-
-					bool good = false;
-					auto type = core_type_id_to_anim_graph_value(&good, list->list[j].type);
-					if (!good)
-						continue;
-					if (type != anim_graph_value::float_t && type != anim_graph_value::bool_t && type != anim_graph_value::int_t)
-						continue;
-					auto& prop = list->list[j];
-					bool selected = prop.name == vd.str;
-					if (ImGui::Selectable(prop.name, &selected)) {
-						vd.str = prop.name;
-					}
-
-				}
-			}
-			ImGui::EndCombo();
-		}
-	}
-	else if (vd.type == ScriptValueType::None)
-		vd.str.clear();
-
-
-	ImGui::PopID();
-#endif
-}
 
 // Inherited via IPropertyEditor
 

@@ -20,9 +20,7 @@ public:
 	void editor_on_change_property() final;
 	void on_changed_transform() final;
 	void on_sync_render_data() final;
-
 	void set_texture(const Texture* tex);
-	
 	void set_is_visible(bool b) {
 		if (visible != b) {
 			visible = b;
@@ -32,7 +30,6 @@ public:
 	bool get_is_visible() const {
 		return visible;
 	}
-
 private:
 	REF bool visible = true;
 	DynamicMatUniquePtr dynamicMaterial = nullptr;

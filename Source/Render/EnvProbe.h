@@ -5,9 +5,6 @@
 #include "Framework/Util.h"
 #include <string>
 #include "Texture.h"
-const int CUBEMAP_SIZE = 128;
-const int MAX_MIP_ROUGHNESS = get_mip_map_count(CUBEMAP_SIZE, CUBEMAP_SIZE);
-const int BRDF_PREINTEGRATE_LUT_SIZE = 512;
 
 class EnvCubemap
 {
@@ -40,6 +37,10 @@ class Texture;
 class EnviornmentMapHelper
 {
 public:
+	static const int CUBEMAP_SIZE = 128;
+	static const int MAX_MIP_ROUGHNESS;
+	static const int BRDF_PREINTEGRATE_LUT_SIZE = 512;
+
 	static EnviornmentMapHelper& get();
 	void init();
 

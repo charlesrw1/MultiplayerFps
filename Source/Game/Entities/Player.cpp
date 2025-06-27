@@ -511,13 +511,18 @@ void Player::on_jump_callback()
 
 void Player::update()
 {
-	auto moveAction = inputPtr->get("game/move");
-	auto lookAction = inputPtr->get("game/look");
-	auto accelAction = inputPtr->get("game/accelerate");
-	bike->forward_strength = accelAction->get_value<float>();
-	bike->turn_strength = moveAction->get_value<glm::vec2>().x;
+	vec2 moveAction = {};
+	moveAction.x = Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX);
+	moveAction.y = Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY);
+	vec2 lookAction = {};
+	lookAction.x = Input::get_con_axis(SDL_CONTROLLER_AXIS_RIGHTX);
+	lookAction.y = Input::get_con_axis(SDL_CONTROLLER_AXIS_RIGHTY);
+	float accelAction = Input::get_con_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+
+	bike->forward_strength = accelAction;
+	bike->turn_strength = moveAction.x;
 	{
-		auto off = lookAction->get_value<glm::vec2>();
+		auto off = lookAction;
 		view_angles.x -= off.y;	// pitch
 		view_angles.y += off.x;	// yaw
 		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
@@ -532,19 +537,26 @@ void Player::on_foot_update()
 		wall_jump_cooldown -= eng->get_dt();
 
 
-	auto moveAction = inputPtr->get("game/move");
-	auto lookAction = inputPtr->get("game/look");
-	auto jumpAction = inputPtr->get("game/jump");
-	is_crouching = inputPtr->get("game/crouch")->get_value<bool>();
+	vec2 moveAction = {};
+	moveAction.x = Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX);
+	moveAction.y = Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY);
+	vec2 lookAction = {};
+	lookAction.x = Input::get_con_axis(SDL_CONTROLLER_AXIS_RIGHTX);
+	lookAction.y = Input::get_con_axis(SDL_CONTROLLER_AXIS_RIGHTY);
+	float accelAction = Input::get_con_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+
+	// 
+
+	is_crouching = Input::is_con_button_down(SDL_CONTROLLER_BUTTON_Y);
 	{
-		auto off = lookAction->get_value<glm::vec2>();
+		auto off = lookAction;
 		view_angles.x -= off.y;	// pitch
 		view_angles.y += off.x;	// yaw
 		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
 		view_angles.y = fmod(view_angles.y, TWOPI);
 	}
 	{
-		auto move = moveAction->get_value<glm::vec2>();
+		auto move = moveAction;
 		float length = glm::length(move);
 		if (length > 1.0)
 			move /= length;
@@ -554,10 +566,12 @@ void Player::on_foot_update()
 		//printf("%f %f %f\n", move.x, move.y,length);
 
 	}
-	if (jumpAction->get_value<bool>())
+
+	if(Input::was_con_button_pressed(SDL_CONTROLLER_BUTTON_A))
 		on_jump_callback();
 
-	const bool is_sprinting = inputPtr->get("game/sprint")->get_value<bool>();
+
+	const bool is_sprinting = Input::is_con_button_down(SDL_CONTROLLER_BUTTON_X);
 
 	float friction_value = 0.0;// (is_on_ground()) ? ground_friction : air_friction;
 	float speed = glm::length(velocity);
@@ -643,7 +657,6 @@ void Player::on_foot_update()
 
 	 eng->set_game_focused(true);
 
-	 inputPtr = g_inputSys.register_input_user(0);
 //
 //	 {
 //		 std::vector<const InputDevice*> devices;
@@ -670,17 +683,14 @@ void Player::on_foot_update()
 //			 });
 //	 }
 //
-	 inputPtr->enable_mapping("game");
-	 inputPtr->enable_mapping("ui");
 
-	 auto jumpAction = inputPtr->get("game/jump");
 
 	// inputPtr->get("ui/menu")->bind_start_function([this] {
 	//		 if(hud)
 	//			 hud->toggle_menu_mode();
 	//	 });
 
-	 assert(jumpAction);
+
 
 
 	 Player::find_a_spawn_point();
@@ -701,7 +711,6 @@ void Player::on_foot_update()
 	 get_owner()->parent_to(bike->get_owner());
 }
  void Player::end() {
-	 g_inputSys.device_connected.remove(this);
  }
 
  Player::~Player() {

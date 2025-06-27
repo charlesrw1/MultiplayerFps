@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+using std::string;
 class StringUtils
 {
 public:
@@ -17,4 +18,5 @@ public:
 	static void get_filename(std::string& file);
 	static std::string to_lower(const std::string& s);
 	static bool starts_with(const std::string& str, const std::string& what);
+	static string get_directory(const string& path);
 };

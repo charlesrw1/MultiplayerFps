@@ -9,6 +9,8 @@
 #include "Framework/ReflectionMacros.h"
 #include "Render/ModelManager.h"
 
+// comment 1
+static int VARIABLE = 0;
 
 BillboardComponent::BillboardComponent() {
 	set_call_init_in_editor(true);

@@ -1,22 +1,6 @@
 #pragma once
 
 
-#include "UI/Widgets/Layouts.h"
-#include "UI/Widgets/Interactables.h"
-
-#include "UI/Widgets/Visuals.h"
-#include "UI/GUISystemPublic.h"
-
-#include "GameEnginePublic.h"
-
-#include "Sound/SoundPublic.h"
-
-#include "UI/Widgets/Visuals.h"
-
-#include "Game/Entity.h"
-#include "Framework/MulticastDelegate.h"
-
-#include "Assets/AssetDatabase.h"
 #if 0
 class GameTransitionUI
 {
