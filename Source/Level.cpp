@@ -283,10 +283,6 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 	}
 	scene.unserialize_post_assign_ids();
 
-	// dont call enable, will be manually activated
-	if (scene.get_root_entity() && scene.get_root_entity()->start_disabled && !is_editor_level())
-		return;
-
 	for (auto& o : objs) {
 		auto ent = o.second;
 		if (Entity* e = ent->cast_to<Entity>())
@@ -329,36 +325,28 @@ void Level::add_and_init_created_runtime_component(Component* c)
 	c->initialize_internal_step2();
 }
 
+
 DeferredSpawnScopePrefab Level::spawn_prefab_deferred(Entity*& out, const PrefabAsset* asset)
 {
 	if (!asset) {
 		sys_print(Warning, "Level::spawn_prefab_deferred: null prefab\n");
 		return DeferredSpawnScopePrefab(nullptr);
 	}
-	auto unserialized_scene = unserialize_entities_from_text("unserialize_prefab",asset->text, nullptr, const_cast<PrefabAsset*>(asset)/* fixme */);
+	auto unserialized_scene = asset->unserialize(nullptr);// unserialize_entities_from_text("unserialize_prefab", asset->text, nullptr);
 	out = unserialized_scene.get_root_entity();
 	if (!out) {
 		sys_print(Warning, "Level::spawn_prefab_deferred: null root object\n");
+		unserialized_scene.delete_objs();
 		return DeferredSpawnScopePrefab(nullptr);
 	}
+	set_prefab_spawned(*out, *asset, unserialized_scene);
 	return DeferredSpawnScopePrefab(new UnserializedSceneFile(std::move(unserialized_scene)));
 }
 
 
 Entity* Level::spawn_prefab(const PrefabAsset* asset)
 {
-	if (!asset||asset->did_load_fail()){
-		sys_print(Warning, "Level::spawn_prefab: null asset\n");
-		return nullptr;
-	}
-	auto unserialized_scene = unserialize_entities_from_text("unserialize_prefab",asset->text, nullptr, const_cast<PrefabAsset*>(asset) /* fixme */);
-	if (!unserialized_scene.get_root_entity()) {
-		sys_print(Warning, "Level::spawn_prefab: root of prefab is null\n");
-		return nullptr;
-	}
-	unserialized_scene.get_root_entity()->is_root_of_prefab = true;
-	insert_unserialized_entities_into_level(unserialized_scene, nullptr);
-	return unserialized_scene.get_root_entity();
+	return spawn_prefab_shared(asset, true);
 }
 
 void Level::queue_deferred_delete(BaseUpdater* e)
@@ -369,4 +357,44 @@ void Level::queue_deferred_delete(BaseUpdater* e)
 		sys_print(Debug, "Level::queue_deferred_delete: (%lld)", e->get_instance_id());
 	}
 	deferred_delete_list.insert(e->get_instance_id());
+}
+
+Entity* Level::editor_spawn_prefab_but_dont_set_spawned_by(const PrefabAsset* asset)
+{
+	return spawn_prefab_shared(asset, false);
+}
+
+void Level::set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file)
+{
+	for (auto& o : file.all_objs) {
+		if (o.second != &root) {
+			assert(o.second);
+			if (auto as_ent = o.second->cast_to<Entity>()) {
+				as_ent->set_spawned_by_prefab();
+			}
+		}
+	}
+	root.set_root_object_prefab(asset);
+}
+
+Entity* Level::spawn_prefab_shared(const PrefabAsset* asset, bool set_vars)
+{
+	if (!asset || asset->did_load_fail()) {
+		sys_print(Warning, "Level::spawn_prefab: null asset\n");
+		return nullptr;
+	}
+	auto unserialized_scene = asset->unserialize(nullptr);// unserialize_entities_from_text("unserialize_prefab", asset->text, nullptr);
+	auto root = unserialized_scene.get_root_entity();
+	if (!root) {
+		sys_print(Warning, "Level::spawn_prefab: root of prefab is null\n");
+		unserialized_scene.delete_objs();
+		return nullptr;
+	}
+	if(set_vars)
+		set_prefab_spawned(*root, *asset, unserialized_scene);
+	else {
+		assert(root->get_object_prefab_spawn_type() == EntityPrefabSpawnType::None);
+	}
+	insert_unserialized_entities_into_level(unserialized_scene, nullptr);
+	return unserialized_scene.get_root_entity();
 }

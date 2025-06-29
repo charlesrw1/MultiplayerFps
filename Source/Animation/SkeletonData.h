@@ -61,10 +61,10 @@ public:
 	int get_num_keyframes_exclusive() const { return num_frames; }
 	bool is_pose_clip() const { return num_frames == 1; }
 	uint32_t get_num_channels() const { return channel_offsets.size(); }
-	float get_clip_play_speed_for_linear_velocity(float velocity) const { return (average_linear_velocity >= 0.000001) ? velocity / average_linear_velocity : 0.0; }
+	double get_clip_play_speed_for_linear_velocity(float velocity) const { return (average_linear_velocity >= 0.000001) ? velocity / average_linear_velocity : 0.0; }
 	float get_duration() const { return duration; }
 	int get_frame_for_time(float time) const { 
-		int frame = time * fps;
+		int frame = int(time * fps);
 		if (frame < 0)return 0;
 		if (frame >= num_frames)return num_frames - 1;
 		return frame;
@@ -123,14 +123,14 @@ public:
 	~MSkeleton();
 
 	bool is_skeleton_the_same(const MSkeleton& other) const;
-	int get_num_bones() const { return bone_dat.size(); }
+	int get_num_bones() const { return (int)bone_dat.size(); }
 	int get_bone_index(StringName name) const;
 	int get_root_bone_index() const { return 0; }
-	int get_bone_parent(int bone) const { return bone_dat.at(bone).parent; }
-	bool has_mirroring_table() const { return mirroring_table.size() == get_num_bones(); }
+	int get_bone_parent(int bone) const { return (int)bone_dat.at(bone).parent; }
+	bool has_mirroring_table() const { return (int)mirroring_table.size() == get_num_bones(); }
 	int get_mirrored_bone(int index) const {
 		assert(has_mirroring_table());
-		return mirroring_table[index];
+		return (int)mirroring_table[index];
 	}
 	const glm::mat4x3& get_bone_local_transform(int index) const { return bone_dat[index].localtransform; }
 	const glm::quat& get_bone_local_rotation(int index) const { return bone_dat[index].rot; }

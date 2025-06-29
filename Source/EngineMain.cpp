@@ -482,7 +482,8 @@ void OpenEditorToolCommand::execute()
 	else {
 		sys_print(Warning, "OpenEditorToolCommand::execute: couldnt find asset metadata\n");
 	}
-	callback(false);
+	if(callback)
+		callback(false);
 
 }
 
@@ -1083,7 +1084,9 @@ void test_integration_2(IntegrationTester& tester)
 			tester.wait_delegate(tempMD);
 	};
 
-	open_editor_state(SceneAsset::StaticType, "top_down/map0.tmap",false,false);
+	open_editor_state(SceneAsset::StaticType, "top_down/map0.tmap",true,false);
+	tester.wait_time(200.0);
+
 	//tester.checkTrue(eng_local.editorState->has_tool(),"");
 	//tester.wait_ticks(get_rand_ticks());
 	//tester.wait_time(0.2);
@@ -1428,7 +1431,7 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 	// draw after to enable docking
 	if (g_drawconsole.get_bool())
 		dbg_console.draw();
-
+	//
 #ifdef EDITOR_BUILD
 	// will only be true if in a tool state
 	if (is_drawing_to_window_viewport() && eng->get_level()) {
@@ -2381,8 +2384,8 @@ void GameEngineLocal::do_asset_gc()
 		for (auto o : objs) {
 			check_object_for_asset_ptr(o, AssetDatabase::loader);
 			Entity* e = o->cast_to<Entity>();
-			if (e && e->what_prefab) {
-				AssetDatabase::loader->touch_asset(e->what_prefab);
+			if (e && e->get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab) {
+				AssetDatabase::loader->touch_asset(&e->get_object_prefab());
 			}
 		}
 	}

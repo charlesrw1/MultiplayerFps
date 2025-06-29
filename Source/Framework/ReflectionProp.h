@@ -33,6 +33,7 @@ enum class core_type_id : uint8_t
 	SoftAssetPtr,
 	ObjHandlePtr,
 	ClassTypeInfo,
+	StringName,	// hashed string
 
 	Function,	// not really a property... represents a callable function by script (call_function)
 	GetterFunc,	// a function but it can be called like a variable access, must be const and have no parameters
@@ -146,7 +147,7 @@ PropertyInfo make_struct_property(const char* name, uint16_t offset, uint32_t fl
 PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
 PropertyInfo make_quat_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
 
-
+PropertyInfo make_stringname_property(const char* name, uint16_t offset, int flags, const char* tooltip);
 PropertyInfo make_new_array_type(const char* name, uint16_t offset, int flags, const char* tooltip, IListCallback* type);
 PropertyInfo make_assetptr_property_new(const char* name, uint16_t offset, int flags, const char* tooltip, const ClassTypeInfo* type);
 PropertyInfo make_objhandleptr_property(const char* name, uint16_t offset, int flags, const char* tooltip, const ClassTypeInfo* type);

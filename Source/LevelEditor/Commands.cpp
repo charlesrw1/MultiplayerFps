@@ -1,4 +1,6 @@
 #include "Commands.h"
+#include <unordered_set>
+#include "Framework/MapUtil.h"
 
 void validate_remove_entities(EditorDoc& ed_doc, std::vector<EntityPtr>& input)
 {
@@ -35,30 +37,42 @@ void validate_remove_entities(EditorDoc& ed_doc, std::vector<EntityPtr>& input)
 			eng->log_to_fullscreen_gui(Error, "Cant remove root prefab entity");
 	}
 }
-
-static void add_to_remove_list_R(vector<SavedCreateObj>& objs, Entity* e)
+#include "LevelSerialization/SerializationAPI.h"
+static void add_to_remove_list_R(vector<SavedCreateObj>& objs, Entity* e, std::unordered_set<BaseUpdater*>& seen)
 {
+	if (!this_is_a_serializeable_object(e))
+		return;
+	assert(e->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab);
+	if (SetUtil::contains(seen, (BaseUpdater*)e))
+		return;
+	SetUtil::insert_test_exists(seen, (BaseUpdater*)e);
+
 	for (auto c : e->get_components()) {
+		if (!this_is_a_serializeable_object(c))
+			continue;
+		if (SetUtil::contains(seen, (BaseUpdater*)c))
+			continue;
+		SetUtil::insert_test_exists(seen, (BaseUpdater*)c);
+
 		SavedCreateObj created;
 		created.eng_handle = c->get_instance_id();
 		created.unique_file_id = c->unique_file_id;
-		created.what_prefab = c->what_prefab;
 		objs.push_back(created);
 	}
 	SavedCreateObj created;
 	created.eng_handle = e->get_instance_id();
 	created.unique_file_id = e->unique_file_id;
-	created.what_prefab = e->what_prefab;
-	created.nested_owner = e->get_nested_owner_prefab();
+	created.spawn_type = e->get_object_prefab_spawn_type();
+
 	objs.push_back(created);
 	for (auto c : e->get_children()) {
-		add_to_remove_list_R(objs,c);
+		add_to_remove_list_R(objs,c,seen);
 	}
 }
 
 RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles):ed_doc(ed_doc) {
 	validate_remove_entities(ed_doc, handles);
-	for (auto e : handles) {
+	for (EntityPtr e : handles) {
 		is_valid_flag &= ed_doc.can_delete_this_object(e.get());
 	}
 	if (handles.empty())
@@ -66,13 +80,19 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<Enti
 	if (!is_valid_flag)
 		return;
 
-	for (auto e : handles) {
+	std::unordered_set<BaseUpdater*> seen;
+	for (EntityPtr e : handles) {
 		Entity* ent = e.get();
 		if (ent)
-			add_to_remove_list_R(removed_objs, ent);
+			add_to_remove_list_R(removed_objs, ent,seen);
+		else {
+			sys_print(Warning, "RemoveEntitiesCommand(): handle invalid: %lld\n", e.handle);
+		}
 	}
 
 	scene = CommandSerializeUtil::serialize_entities_text(ed_doc, handles);
+	assert(seen.size() == removed_objs.size());
+	assert(removed_objs.size() == scene->path_to_instance_handle.size());
 
 	this->handles = handles;
 }
@@ -81,7 +101,7 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<Enti
 void RemoveEntitiesCommand::undo() {
 	ASSERT(is_valid());
 
-	auto restored = unserialize_entities_from_text("remove_entities",scene->text, AssetDatabase::loader, nullptr);
+	auto restored = unserialize_entities_from_text("remove_entities_undo",scene->text, AssetDatabase::loader);
 	auto& extern_parents = scene->extern_parents;
 	for (auto& ep : extern_parents) {
 		auto e = restored.get_objects().find(ep.child_path);
@@ -93,29 +113,29 @@ void RemoveEntitiesCommand::undo() {
 				ent->parent_to(parent.get());
 			}
 			else
-				sys_print(Warning, "restored parent doesnt exist\n");
+				sys_print(Warning, "RemoveEntitiesCommand::undo: restored parent doesnt exist\n");
 		}
 		else
-			sys_print(Warning, "restored obj doesnt exist\n");
+			sys_print(Warning, "RemoveEntitiesCommand::undo: restored obj doesnt exist\n");
 	}
 
 	ed_doc.insert_unserialized_into_scene(restored, scene.get());
 	//eng->get_level()->insert_unserialized_entities_into_level(restored, scene.get());	// pass in scene so handles get set to what they were
 	auto& objs = restored.get_objects();
+	std::unordered_set<BaseUpdater*> restored_ptrs;
+	for (auto& o : objs) SetUtil::insert_test_exists(restored_ptrs, o.second);// restored_ptrs.insert(o.second);
 
 	for (SavedCreateObj c : removed_objs) {
 		BaseUpdater* obj = eng->get_level()->get_entity(c.eng_handle);
 		if (!obj) {
-			LOG_WARN("obj not valid to put back");
+			sys_print(Warning, "RemoveEntitiesCommand::undo: object cant be found to put back %lld\n", c.eng_handle);
 			continue;
 		}
-		obj->what_prefab = (PrefabAsset*)c.what_prefab;
-		obj->unique_file_id = c.unique_file_id;
-		if (c.nested_owner) {
-			auto ent = obj->cast_to<Entity>();
-			assert(ent);
-			ent->set_nested_owner_prefab(c.nested_owner);
+		if (auto as_ent = obj->cast_to<Entity>()) {
+			assert(as_ent->get_object_prefab_spawn_type() == c.spawn_type);
 		}
+		obj->unique_file_id = c.unique_file_id;
+		assert(obj->get_instance_id() == c.eng_handle);
 	}
 
 	// refresh handles i guess ? fixme
@@ -472,71 +492,46 @@ void TransformCommand::execute() {
 InstantiatePrefabCommand::InstantiatePrefabCommand(EditorDoc& ed_doc, Entity* e) 
 	:ed_doc(ed_doc)
 {
-	if (ed_doc.is_editing_prefab() && ed_doc.get_prefab_root_entity() == e)
-		return;	// is_valid == false
-	if (e->get_nested_owner_prefab() != ed_doc.get_editing_prefab())
-		return;	// is_valid == false
-
-	me = e->get_self_ptr();
-	asset = me->what_prefab;
-	if (!asset || !me->is_root_of_prefab) {
-		asset = nullptr;
-		sys_print(Error, "Cant instantiate non-prefab, non-root object\n");
+	if (e->get_object_prefab_spawn_type()!=EntityPrefabSpawnType::RootOfPrefab) {
+		sys_print(Warning, "InstantiatePrefabCommand(): entity is not the root of the prefab\n");
 		return;
 	}
-	if (me->creator_source)
-		creator_source = me->creator_source->get_self_ptr();
+	//if (e->get_nested_owner_prefab() != ed_doc.get_editing_prefab())
+	//	return;	// is_valid == false
+
+	me = e->get_self_ptr();
+	asset = &e->get_object_prefab();
+
+
+	//if (me->creator_source)
+	//	creator_source = me->creator_source->get_self_ptr();
 }
 
-
-void InstantiatePrefabCommand::execute_R(Entity* e) {
-	for (auto c : e->get_components()) {
-		const bool this_is_created = PrefabToolsUtil::is_newly_created_nested(*c, asset);
-
-		if (this_is_created) {
-			created_obj created;
-			created.eng_handle = c->get_instance_id();
-			created.unique_file_id = c->unique_file_id;
-			created.what_prefab = c->what_prefab;
-			created_objs.push_back(created);
-
-			//c->creator_source = nullptr;
-			//if (c->what_prefab == asset)
-			//	c->what_prefab = nullptr;
-			//c->unique_file_id = ed_doc.get_next_file_id();
-
-			ed_doc.instantiate_into_scene(c);
-		}
-	}
-	for (auto c : e->get_children()) {
-		const bool this_is_created = PrefabToolsUtil::is_newly_created_nested(*c, asset);
-
-		if (this_is_created) {
-			created_obj created;
-			created.eng_handle = c->get_instance_id();
-			created.unique_file_id = c->unique_file_id;
-			created.what_prefab = c->what_prefab;
-			created.nested_owner = c->get_nested_owner_prefab();
-			created_objs.push_back(created);
-			//c->creator_source = nullptr;
-			//if (c->what_prefab == asset)
-			//	c->what_prefab = nullptr;
-			//c->unique_file_id = ed_doc.get_next_file_id();
-
-			ed_doc.instantiate_into_scene(c);
-		}
-		execute_R(c);
-	}
-}
 
 void InstantiatePrefabCommand::execute() {
-	ASSERT(created_objs.size() == 0);
-	ASSERT(me->what_prefab);
-	me->what_prefab = nullptr;
-	ASSERT(me->is_root_of_prefab);
-	me->is_root_of_prefab = false;
-	me->creator_source = nullptr;
-	execute_R(me.get());
+	ASSERT(revert_these.size() == 0);
+	Entity* meptr = me.get();
+	assert(meptr);
+	ASSERT(me->get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab);
+	for (int i = 0; i < meptr->get_children().size(); i++) {
+		auto c = meptr->get_children().at(i);
+		if (c->get_object_prefab_spawn_type() == EntityPrefabSpawnType::SpawnedByPrefab) {
+			const int pre = meptr->get_children().size();
+			c->destroy();
+			assert(meptr->get_children().size() + 1 == pre);
+			i--;
+		}
+	}
+	Entity* spawned_without_setting = eng->get_level()->editor_spawn_prefab_but_dont_set_spawned_by(&meptr->get_object_prefab());
+	for (auto c : spawned_without_setting->get_children()) {
+		assert(c->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab);
+		c->parent_to(meptr);
+		revert_these.push_back(c->get_self_ptr());
+	}
+	spawned_without_setting->destroy();
+	spawned_without_setting = nullptr;
+	me->set_prefab_no_owner_after_being_root();
+	assert(me->get_object_prefab_spawn_type() == EntityPrefabSpawnType::None);
 
 	ed_doc.post_node_changes.invoke();
 }
@@ -546,22 +541,20 @@ void InstantiatePrefabCommand::undo() {
 		sys_print(Warning, "couldnt undo instantiate prefab command\n");
 		return;
 	}
-
-	me->what_prefab = asset;
-	me->is_root_of_prefab = true;
-	me->creator_source = creator_source.get();
-	for (auto c : created_objs) {
-		auto obj = eng->get_level()->get_entity(c.eng_handle);
-		obj->creator_source = me.get();
-		obj->what_prefab = (PrefabAsset*)c.what_prefab;
-		obj->unique_file_id = c.unique_file_id;
-		if (c.nested_owner) {
-			auto ent = obj->cast_to<Entity>();
-			assert(ent);
-			ent->set_nested_owner_prefab(c.nested_owner);
+	for (auto& revert_me : revert_these) {
+		Entity* e = revert_me.get();
+		if (!e) {
+			sys_print(Warning, "InstantiatePrefabCommand::undo: couldnt find handle to revet %lld\n", revert_me.handle);
+		}
+		else {
+			e->set_spawned_by_prefab();
+			assert(e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::SpawnedByPrefab);
 		}
 	}
-	created_objs.clear();
+	revert_these.clear();
+	assert(asset);
+	me->set_root_object_prefab(*asset);
+	assert(me->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
 
 	ed_doc.post_node_changes.invoke();
 }
@@ -591,7 +584,7 @@ DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vecto
 }
 
 void DuplicateEntitiesCommand::execute() {
-	UnserializedSceneFile duplicated = unserialize_entities_from_text("duplicate_entities",scene->text, AssetDatabase::loader, ed_doc.get_editing_prefab());
+	UnserializedSceneFile duplicated = unserialize_entities_from_text("duplicate_entities",scene->text, AssetDatabase::loader);
 
 	auto& extern_parents = scene->extern_parents;
 	for (auto ep : extern_parents) {
@@ -675,7 +668,7 @@ std::unique_ptr<SerializedSceneFile> CommandSerializeUtil::serialize_entities_te
 	ed_doc.validate_fileids_before_serialize();
 
 
-	return std::make_unique<SerializedSceneFile>(serialize_entities_to_text("Command::serialize_entities_text", ents, ed_doc.get_editing_prefab()));
+	return std::make_unique<SerializedSceneFile>(serialize_entities_to_text("Command::serialize_entities_text", ents));
 }
 
 void RemoveComponentCommand::execute() {

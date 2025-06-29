@@ -35,7 +35,7 @@
 #include "UI/Widgets/Layouts.h"
 #include "Input/InputSystem.h"
 #include <variant>
-
+#include "LevelSerialization/SerializationAPI.h"
 extern ConfigVar g_mousesens;
 
 enum TransformType
@@ -46,7 +46,6 @@ enum TransformType
 };
 
 
-extern bool serialize_this_objects_children(const Entity* b, const PrefabAsset* for_prefab);
 extern bool std_string_input_text(const char* label, std::string& str, int flags);
 const ImColor non_owner_source_color = ImColor(252, 226, 131);
 
@@ -67,7 +66,8 @@ public:
 	void draw();
 	void init();
 private:	
-	bool should_draw_children(Entity* e) const;
+	bool should_draw_this(Entity* e) const;
+
 	void on_selection_change();
 	int determine_object_count() const;
 	void rebuild_tree();
@@ -524,8 +524,6 @@ public:
 	}
 
 	void duplicate_selected_and_select_them();
-
-
 	glm::vec3 unproject_mouse_to_ray(int mx, int my);
 
 	const char* get_save_file_extension() const {
@@ -539,22 +537,21 @@ public:
 	};
 
 	bool is_this_object_not_inherited(const BaseUpdater* b) const {
-		return PrefabToolsUtil::is_newly_created(*b, get_editing_prefab() /* null for scene mode */);
+		return this_is_a_serializeable_object(b);	// not inherted meaning i can edit it
 	}
 	bool is_this_object_inherited(const BaseUpdater* b) const {
-		return !is_this_object_not_inherited(b);
+		return !is_this_object_not_inherited(b);	// inherited, meaning i cant edit it
 	}
 
-	bool can_delete_this_object(const BaseUpdater* b) const {
+	bool can_delete_this_object(const BaseUpdater* b) {
+		assert(b);
 		if (is_this_object_inherited(b)) // cant delete inherited objects
 			return false;
 		if (is_editing_prefab()) {
 			auto ent = b->cast_to<Entity>();
-			if (!ent)
-				return true;
-			const bool is_part_of_prefab = PrefabToolsUtil::is_part_of_a_prefab(*ent);
-			const bool is_root = is_part_of_prefab && PrefabToolsUtil::am_i_the_root_prefab_node_for_this_prefab(*ent, get_editing_prefab());
-			return !is_root;
+			if (ent && ent == get_prefab_root_entity()) {
+				return false;
+			}
 		}
 		return true;	// else can delete
 	}
@@ -568,12 +565,7 @@ public:
 	}
 	bool is_editing_prefab() const { return edit_category == EditCategory::EDIT_PREFAB; }
 	bool is_editing_scene() const { return edit_category == EditCategory::EDIT_SCENE; }
-	PrefabAsset* get_editing_prefab() const {
-		if (!is_editing_prefab()) 
-			return nullptr;
-		ASSERT(uniqueTemporaryPrefab);
-		return uniqueTemporaryPrefab.get();
-	}
+	
 	void validate_prefab();
 	Entity* get_prefab_root_entity();
 	string get_name();
@@ -645,7 +637,6 @@ private:
 	void* active_eyedropper_user_id = nullptr;	// for id purposes only
 
 	EditCategory edit_category = EditCategory::EDIT_SCENE;
-	uptr<PrefabAsset> uniqueTemporaryPrefab;
 
 	FnFactory<IPropertyEditor> grid_factory;
 	uptr<ConsoleCmdGroup> cmds;

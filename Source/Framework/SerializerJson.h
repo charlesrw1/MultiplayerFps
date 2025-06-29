@@ -267,6 +267,7 @@ class ReadSerializerBackendJson : public Serializer
 {
 public:
 	ReadSerializerBackendJson(const char* debug_tag, const std::string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader);
+	ReadSerializerBackendJson(const char* debug_tag, nlohmann::json& json_obj, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader);
 	
 	const char* debug_tag = "";
 	const char* get_debug_tag() final {
@@ -445,6 +446,8 @@ public:
 		return true;
 	}
 private:
+	void load_shared();
+
 	nlohmann::json& get_json(const char* tag) {
 		auto& back = get_back();
 		auto& backptr = *back.ptr;
@@ -483,7 +486,7 @@ private:
 	ClassBase* rootobj = nullptr;
 	IMakeObjectFromPath& objmaker;
 	std::vector<JsonStack> stack;
-	nlohmann::json obj;
+	nlohmann::json* obj =nullptr;
 };
 
 class JsonSerializerUtil

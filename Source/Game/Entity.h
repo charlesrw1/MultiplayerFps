@@ -9,6 +9,7 @@
 #include <vector>
 #include <string>
 #include "Framework/Reflection2.h"
+#include "Framework/StructReflection.h"
 
 class Model;
 class PhysicsActor;
@@ -17,9 +18,27 @@ class MeshComponent;
 class Component;
 struct PropertyInfoList;
 
-// a comment
-GENERATED_CLASS_INCLUDE("Game/EntityComponent.h");
+#ifdef EDITOR_BUILD
+enum class EntityPrefabSpawnType : int8_t {
+	None, // default, spawned by map
+	RootOfPrefab,	// root of prefab, has prefab asset
+	SpawnedByPrefab	// spawned by prefab (can potentially be a prefab itself)
+};
+#endif
 
+
+struct EntityTagString {
+	STRUCT_BODY();
+	REF StringName name;
+};
+
+// What bone this entity is parented to. Requires a mesh component in parent.
+struct EntityBoneParentString {
+	STRUCT_BODY();
+	REF StringName name;
+};
+
+GENERATED_CLASS_INCLUDE("Game/EntityComponent.h");
 class Entity : public BaseUpdater
 {
 public:
@@ -27,9 +46,10 @@ public:
 	const static bool CreateDefaultObject = true;
 	Entity();
 	virtual ~Entity();
+	// ClassBase override
+	void serialize(Serializer& s) final;
 	// destroy already reflected in BaseUpdater
 	void destroy();
-	void serialize(Serializer& s) final;
 	template<typename T>
 	T* get_component() const { return (T*)get_component_typeinfo(&T::StaticType); }
 	REFLECT(name="get_comp");
@@ -63,16 +83,9 @@ public:
 	REF glm::vec3 get_ws_position();
 	glm::quat get_ws_rotation();
 	REF glm::vec3 get_ws_scale();
-	REF void set_ws_position(glm::vec3 v) {
-		set_ws_transform(v, get_ws_rotation(), get_ws_scale());
-	}
-	void set_ws_rotation(const glm::quat& q) {
-		set_ws_transform(get_ws_position(), q, get_ws_scale());
-	}
-	void set_ws_scale(const glm::vec3& s) {
-		set_ws_transform(get_ws_position(), get_ws_rotation(), s);
-	}
-
+	REF void set_ws_position(glm::vec3 v);
+	void set_ws_rotation(const glm::quat& q) { set_ws_transform(get_ws_position(), q, get_ws_scale()); }
+	void set_ws_scale(const glm::vec3& s) { set_ws_transform(get_ws_position(), get_ws_rotation(), s); }
 	// parent the root component of this to another entity
 	// can use nullptr to unparent
 	REF void parent_to(Entity* parentEntity);
@@ -87,28 +100,26 @@ public:
 	// returns wether this or any parent is selected
 	bool get_is_any_selected_in_editor() const;
 	// returns wether just this is selected
-	bool get_selected_in_editor() const {
-		return selected_in_editor;
-	}
+	bool get_selected_in_editor() const { return selected_in_editor; }
 #endif
 	// removes from list (use component->desroy() for real destruction)
 	void remove_this_component_internal(Component* component);
 	MeshComponent* get_cached_mesh_component() const { return cached_mesh_component; }
 	void set_cached_mesh_component(MeshComponent* c) { cached_mesh_component = c; }
 	glm::mat4 get_parent_transform() const;
-	void set_parent_bone(StringName name) { parent_bone = name; }
-	REF bool has_parent_bone() const { return !parent_bone.is_null(); }
-	REF StringName get_parent_bone() const { return parent_bone; }
-	REF bool get_start_disabled() const { return start_disabled; }
+	void set_parent_bone(StringName name) { parent_bone.name = name; }
+	REF bool has_parent_bone() const { return !parent_bone.name.is_null(); }
+	REF StringName get_parent_bone() const { return parent_bone.name; }
+	//REF bool get_start_disabled() const { return start_disabled; }
 	// this function only has an effect is called before inserting the entity into the level
 	// either set it in the editor, or spawn_deferred and set it
-	void set_start_disabled(bool b) { start_disabled = b; }
+	//void set_start_disabled(bool b) { start_disabled = b; }
 	// if start_disabled was true, then this function actually calls start()->pre_start() etc. on all sub entities
 	// if this entity was already started, then this function does nothing
-	REF void activate();
-	StringName get_tag() const { return tag; }
-	bool has_tag() const { return tag.get_hash() != 0; }
-	void set_tag(StringName name) { tag = name; }
+	//REF void activate();
+	StringName get_tag() const { return tag.name; }
+	bool has_tag() const { return tag.name.get_hash() != 0; }
+	void set_tag(StringName name) { tag.name = name; }
 	bool get_is_top_level() const { return is_top_level; }
 	void set_is_top_level(bool b);
 	const std::string& get_editor_name() const { return editor_name; }
@@ -116,34 +127,32 @@ public:
 #ifdef EDITOR_BUILD
 	bool get_hidden_in_editor() const { return hidden_in_editor; }
 	void set_hidden_in_editor(bool b);
-	void set_prefab_editable(bool b) { prefab_editable = b; }
-	void set_nested_owner_prefab(const PrefabAsset* asset) { this->nested_owner_prefab = asset; }
-	const PrefabAsset* get_nested_owner_prefab() const  { return this->nested_owner_prefab; }
+	const PrefabAsset& get_object_prefab() const;
+	void set_spawned_by_prefab();
+	void set_root_object_prefab(const PrefabAsset& asset);
+	void set_prefab_no_owner_after_being_root();
+	EntityPrefabSpawnType get_object_prefab_spawn_type() const;
 #endif
-	// fixme
-	bool get_prefab_editable() const { return prefab_editable; }
 	void check_for_transform_nans();
 private:
 	// components created either in code or defined in schema or created per instance
 	std::vector<Component*> all_components;
 	Entity* parent = nullptr;
 	std::vector<Entity*> children;
-	REFLECT(type="EntityTagString");
-	StringName tag;
+	REF EntityTagString tag;
+	REF EntityBoneParentString parent_bone;
 	REF glm::vec3 position = glm::vec3(0.f);
 	REF glm::quat rotation = glm::quat(1,0,0,0);
 	REF glm::vec3 scale = glm::vec3(1.f);
 	REF std::string editor_name;
-	REFLECT(type="EntityBoneParentString")
-	StringName parent_bone;
-	REF bool start_disabled = false;
-	REF bool prefab_editable = false;
+	//REF bool start_disabled = false;
 	MeshComponent* cached_mesh_component = nullptr;	// for bone lookups
-	glm::mat4 cached_world_transform = glm::mat4(1);
+	glm::mat4 cached_world_transform = glm::mat4(1);	// returned for get_ws_X calls, invalidated when local space moves or parent moves
 #ifdef EDITOR_BUILD
 	bool selected_in_editor = false;
 	bool hidden_in_editor = false;
-	const PrefabAsset* nested_owner_prefab = nullptr;
+	const PrefabAsset* what_prefab = nullptr;
+	bool spawned_by_prefab = false;
 #endif
 	bool world_transform_is_dirty = true;
 	bool is_top_level = false;	// if true, then local space is considered the world space transform, even if a parent exists
@@ -154,9 +163,7 @@ private:
 	// called by child entity to remove it from children list
 	void remove_this(Entity* child_entity);
 	static void set_active_R(Entity* e, bool b, bool step1);
-	bool has_transform_parent() const {
-		return !get_is_top_level() && get_parent() != nullptr;
-	}
+	bool has_transform_parent() const { return !get_is_top_level() && get_parent() != nullptr; }
 	void post_change_transform_R(bool ws_is_dirty = true, Component* skipthis = nullptr);
 
 	friend class EditorDoc;
@@ -169,7 +176,6 @@ private:
 	friend class EdPropertyGrid;
 	friend class SerializeTestWorkbench;
 };
-
 
 template<typename T>
 inline T* Entity::create_component() {

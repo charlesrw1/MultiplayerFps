@@ -220,15 +220,20 @@ bool WriteSerializerBackendJson::serialize_asset(const char* tag, const ClassTyp
 	serialize(tag, name);
 	return true;
 }
-
-ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, const string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
+ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, nlohmann::json& json_obj, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
 	:objmaker(objmaker), loader(loader), debug_tag(debug_tag)
 {
-	this->obj = nlohmann::json::parse(text);
-	stack.push_back(&obj);
+	this->obj = &json_obj;
+	load_shared();
+	this->obj = nullptr;
+	stack.clear();
+}
 
+void ReadSerializerBackendJson::load_shared()
+{
+	stack.push_back(obj);
 	int sz = 0;
-	if (serialize_array("paths",sz)) {
+	if (serialize_array("paths", sz)) {
 		for (int i = 0; i < sz; i++) {
 			int count = 0;
 			serialize_array_ar(count);
@@ -241,7 +246,7 @@ ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, cons
 			serialize_ar(path);
 			serialize_ar(type);
 			ClassBase* obj = objmaker.create_from_name(*this, type, path);
-			
+
 			if (!obj) {
 				LOG_WARN("null obj from creation");
 				// fallthrough
@@ -255,7 +260,7 @@ ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, cons
 		}
 		end_obj();
 	}
-	
+
 	serialize_class("root", ClassBase::StaticType, rootobj);
 
 	serialize_dict("objs");
@@ -277,6 +282,16 @@ ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, cons
 		}
 	}
 	end_obj();
+}
+
+ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, const string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
+	:objmaker(objmaker), loader(loader), debug_tag(debug_tag)
+{
+	auto objStack = nlohmann::json::parse(text);
+	this->obj = &objStack;
+	load_shared();
+	this->obj = nullptr;
+	stack.clear();
 }
 
 bool ReadSerializerBackendJson::serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr)
@@ -408,18 +423,18 @@ nlohmann::json JsonSerializerUtil::diff_json(const nlohmann::json& a, const nloh
 
 	return result;
 }
-
+#include "SerializedForDiffing.h"
 nlohmann::json* MakePathForGenericObj::find_diff_for_obj(ClassBase* obj) {
-	if (!diff_available) return nullptr;
-	MakePathForGenericObj pathmaker(false);
-	const ClassBase* diffobj = obj->get_type().default_class_object;
-	const char* tag = "find_diff";
-	WriteSerializerBackendJson writer(tag, pathmaker,*const_cast<ClassBase*>(diffobj));
-	return new nlohmann::json(*writer.get_root_object());	// FIXME, test
+	if (!diff_available) 
+		return nullptr;
+	if (obj->get_type().diff_data)
+		return &obj->get_type().diff_data->jsonObj;
+	else
+		return nullptr;
 }
 void ReadSerializerBackendJson::insert_nested_object(string path, ClassBase* obj)
 {
-	LOG_MSG("inserted nested obj");
+	//LOG_MSG("inserted nested obj");
 	MapUtil::insert_test_exists(path_to_objs, path, obj);
 	MapUtil::insert_test_exists(obj_to_path, obj, path);
 }

@@ -15,10 +15,6 @@
 #include "Physics/Physics2.h"
 
 #include "Debug.h"
-
-
-
-
 #include <algorithm>
 #include <stdexcept>
 #include <fstream>
@@ -229,16 +225,9 @@ bool EditorDoc::save_document_internal()
 		if (auto e = o->cast_to<Entity>())
 			all_ents.push_back(e);
 
-	PrefabAsset* pa = nullptr;
-	PrefabAsset temp_pa;
-	if (is_editing_prefab())
-	{
-		pa = get_prefab_root_entity()->what_prefab;
-		if (!pa) pa = &temp_pa;
-	}
 
 	string debug_tag = "saving:" + assetName.value_or("<new>");
-	auto serialized = serialize_entities_to_text(debug_tag.c_str(),all_ents, pa);
+	auto serialized = serialize_entities_to_text(debug_tag.c_str(),all_ents);
 	//NewSerialization::serialize_to_text(all_ents, pa);
 
 	auto path = get_doc_name();
@@ -248,9 +237,9 @@ bool EditorDoc::save_document_internal()
 	}
 	sys_print(Info, "Wrote out to %s\n", path.c_str());
 
-	if (is_editing_prefab()&&!pa->get_name().empty()) {
-		g_assets.reload_async(pa, [](GenericAssetPtr) {printf("reload finished prefab\n"); });
-	}
+	//if (is_editing_prefab()&&!pa->get_name().empty()) {
+	//	g_assets.reload_async(pa, [](GenericAssetPtr) {printf("reload finished prefab\n"); });
+	//}
 
 	return true;
 }
@@ -264,15 +253,19 @@ Entity* EditorDoc::get_prefab_root_entity()
 		if (auto e = o->cast_to<Entity>()) {
 			if (e->dont_serialize_or_edit)
 				continue;
-			if (e->what_prefab != get_editing_prefab())
-				continue;
 			if (!e->get_parent()) {
-				return e;
+				assert(e->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab);
+				if (root) {
+					sys_print(Warning, "EditorDoc::get_prefab_root_entity: multiple roots found\n");
+				}
+				root =  e;
 			}
 		}
 	}
-	sys_print(Warning, "couldnt get root of prefab??\n");
-	return nullptr;
+	if (!root) {
+		sys_print(Warning, "couldnt get root of prefab??\n");
+	}
+	return root;
 }
 string EditorDoc::get_name() {
 	string name = get_doc_name();
@@ -321,9 +314,6 @@ void EditorDoc::validate_prefab()
 				else
 					root = e;
 			}
-			if (can_delete_this_object(e) && e->what_prefab == get_editing_prefab()) {
-				e->is_root_of_prefab = false;
-			}
 		}
 	}
 	if (!deleteList.empty()) {
@@ -335,8 +325,8 @@ void EditorDoc::validate_prefab()
 		sys_print(Debug, "prefab had no root\n");
 		root = spawn_entity();
 	}
-	root->is_root_of_prefab = true;
-	root->what_prefab = get_editing_prefab();
+	assert(root->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab);
+
 }
 #include "EditorPopupTemplate.h"
 
@@ -361,21 +351,21 @@ void EditorDoc::init_for_prefab(PrefabAsset* prefab) {
 	for (auto o : objs) {
 		o->dont_serialize_or_edit = true;
 	}
-	uniqueTemporaryPrefab = std::make_unique<PrefabAsset>();
 	if (prefab) {
-		eng->get_level()->spawn_prefab(prefab);
-		for (auto o : objs) {
-			if (o->what_prefab == prefab)
-				o->what_prefab = uniqueTemporaryPrefab.get();
+		Entity* root = eng->get_level()->editor_spawn_prefab_but_dont_set_spawned_by(prefab);
+		if (!root) {
+			sys_print(Warning, "EditorDoc::init_for_prefab: prefab does not have a root, creating one.\n");
+			root = spawn_entity(); 
 		}
+		assert(root);
+		assert(root->get_object_prefab_spawn_type() == EntityPrefabSpawnType::None);
 		assetName = prefab->get_name();
 	}
 	else {
 		assetName = std::nullopt;
-		spawn_entity();
+		auto root = spawn_entity();
 	}
 	assert(get_prefab_root_entity());
-	assert(uniqueTemporaryPrefab);
 
 	validate_prefab();
 
@@ -540,12 +530,21 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 	}
 }
 
+const Entity* select_outermost_entity(const Entity* in) {
+	const Entity* sel = in;
+	while (sel) {
+		if (sel->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab)
+			break;
+		sel = sel->get_parent();
+	}
+	return sel;
+}
+
 void EditorDoc::do_mouse_selection(MouseSelectionAction action, const Entity* e, bool select_rootmost_entity)
 {
 	const Entity* actual_entity_to_select = e;
 	if (select_rootmost_entity) {
-		while (actual_entity_to_select->creator_source && !is_this_object_not_inherited(actual_entity_to_select))
-			actual_entity_to_select = actual_entity_to_select->creator_source;
+		actual_entity_to_select = select_outermost_entity(actual_entity_to_select);
 	}
 	if (is_in_eyedropper_mode()) {
 		sys_print(Debug, "eyedrop!\n");
@@ -1440,7 +1439,7 @@ void EdPropertyGrid::draw()
 			ImGui::Text("Select 1 entity to see components\n");
 			selected_component = 0;
 		}
-		else if (!serialize_this_objects_children(ss->get_only_one_selected().get(), ed_doc.get_editing_prefab())) {
+		else if (ss->get_only_one_selected().get() && !serialize_this_objects_children(ss->get_only_one_selected().get())) {
 			ImGui::Text("Prefab instance is not editable.\nMake it editable through the context menu.");
 			selected_component = 0;
 		}
@@ -1577,6 +1576,7 @@ void EdPropertyGrid::refresh_grid()
 
 	if (ss->has_only_one_selected()) {
 		auto entity = ss->get_only_one_selected();
+		assert(entity);
 		sys_print(Debug,"EdPropertyGrid::refresh_grid: adding to grid: %s\n", entity->get_type().classname);
 
 		auto ti = &entity->get_type();
@@ -1590,7 +1590,7 @@ void EdPropertyGrid::refresh_grid()
 
 		auto& comps = entity->get_components();
 
-		if (!comps.empty() && serialize_this_objects_children(entity.get(), ed_doc.get_editing_prefab())) {
+		if (!comps.empty() && serialize_this_objects_children(entity.get())) {
 			if (selected_component == 0)
 				selected_component = comps[0]->get_instance_id();
 			if (eng->get_object(selected_component) == nullptr || eng->get_object(selected_component)->cast_to<Component>() == nullptr ||
@@ -1772,10 +1772,8 @@ void EditorUILayout::paint(UIBuilder& builder) {
 	auto& all_objs = eng->get_level()->get_all_objects();
 	for (auto o : all_objs) {
 		if (Entity* e = o->cast_to<Entity>()) {
-			if (!this_is_a_serializeable_object(e, doc->get_editing_prefab()))
+			if (!this_is_a_serializeable_object(e))
 				continue;
-
-
 			obj ob;
 			glm::vec3 todir = glm::vec3(e->get_ws_position()) - doc->vs_setup.origin;
 			float dist = glm::dot(todir, todir);
@@ -1798,9 +1796,10 @@ void EditorUILayout::paint(UIBuilder& builder) {
 	const Entity* clicked = nullptr;
 	for (auto o : objs) {
 		const char* name = (o.e->get_editor_name().c_str());
+		const bool is_prefab_root = o.e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
 		if (!*name) {
-			if (o.e->is_root_of_prefab && o.e->what_prefab)
-				name = o.e->what_prefab->get_name().c_str();
+			if (is_prefab_root)
+				name = o.e->get_object_prefab().get_name().c_str();
 			else {
 				if (auto m = o.e->get_component<MeshComponent>()) {
 					if (m->get_model())
@@ -1815,7 +1814,7 @@ void EditorUILayout::paint(UIBuilder& builder) {
 		const int icon_size = 16;
 		InlineVec<Texture*, 6> icons;
 		auto e = o.e;
-		if (e->is_root_of_prefab && e->what_prefab != doc->get_editing_prefab()) {
+		if (is_prefab_root) {
 			const char* s = "eng/editor/prefab_p.png";
 			auto tex = g_assets.find_global_sync<Texture>(s);
 			icons.push_back(tex.get());
@@ -1910,8 +1909,12 @@ void EditorDoc::insert_unserialized_into_scene(UnserializedSceneFile& file, Seri
 {
 	if (!scene) {	// means assign new ids
 		for (auto& [path, e] : file.get_objects()) {
-			e->unique_file_id = get_next_file_id();
-
+			if(!is_this_object_inherited(e))
+				e->unique_file_id = get_next_file_id();
+			else {
+				auto as_ent = e->cast_to<Entity>();
+				assert(!as_ent || as_ent->get_object_prefab_spawn_type() == EntityPrefabSpawnType::SpawnedByPrefab);
+			}
 		}
 	}
 	eng->get_level()->insert_unserialized_entities_into_level(file, scene);
@@ -1920,9 +1923,9 @@ void EditorDoc::insert_unserialized_into_scene(UnserializedSceneFile& file, Seri
 void EditorDoc::instantiate_into_scene(BaseUpdater* u)
 {
 	u->unique_file_id = get_next_file_id();
-	u->what_prefab = get_editing_prefab();
-	if (auto ent = u->cast_to<Entity>())
-		ent->set_nested_owner_prefab(nullptr);	// remove, this is only used for nested prfabs, which is
+	if (auto ent = u->cast_to<Entity>()) {
+		assert(ent->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab);
+	}
 }
 
 Entity* EditorDoc::spawn_prefab(PrefabAsset* prefab)
@@ -1933,7 +1936,6 @@ Entity* EditorDoc::spawn_prefab(PrefabAsset* prefab)
 	if (!e)
 		return nullptr;
 	e->unique_file_id = get_next_file_id();
-	assert(e->what_prefab);	// should have this already
-	e->set_nested_owner_prefab(get_editing_prefab());
+	assert(e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
 	return e;
 }

@@ -51,7 +51,7 @@ ADD_TEST(unserialize_prefab)
 	// prefab unserialization
 	auto text = UnitTestUtil::get_text_of_file("TestFiles/test2.pfb");
 	PrefabAsset temp;
-	auto unserialized = unserialize_entities_from_text(text, nullptr, &temp);
+	auto unserialized = unserialize_entities_from_text("dummy",text, nullptr, &temp);
 	auto root = unserialized.get_root_entity();
 	checkTrue(root);
 	checkTrue(!root->creator_source && root->is_root_of_prefab && root->what_prefab == &temp);
@@ -132,7 +132,7 @@ ADD_TEST(serialize_nested_prefabs)
 
 
 
-	auto file = serialize_entities_to_text(work.get_all_entities(), nullptr);
+	auto file = serialize_entities_to_text("dummy",work.get_all_entities(), nullptr);
 }
 
 ADD_TEST(serialize_write_prefab)
@@ -149,7 +149,7 @@ ADD_TEST(serialize_write_prefab)
 	auto pent = work.add_prefab(loadPrefab);
 	pent->parent_to(root);
 
-	auto file = serialize_entities_to_text({ root }, prefab);
+	auto file = serialize_entities_to_text("dummy",{ root }, prefab);
 
 	checkTrue(build_path_for_object(pent, prefab) == to_string(pent->unique_file_id));
 	auto child_ent = pent->get_children()[0];
@@ -158,7 +158,7 @@ ADD_TEST(serialize_write_prefab)
 
 
 
-	auto unserialized = unserialize_entities_from_text(file.text, nullptr, prefab);
+	auto unserialized = unserialize_entities_from_text("dummy",file.text, nullptr, prefab);
 
 	bool good = true;
 	for (auto obj : unserialized.get_objects()) {
@@ -255,9 +255,9 @@ ADD_TEST(serialize_basic)
 	another_e->parent_to(e);
 	work.post_unserialization();
 	auto ents = work.get_all_entities();
-	auto file = serialize_entities_to_text(ents);
+	auto file = serialize_entities_to_text("dummy",ents);
 
-	auto scene2 = unserialize_entities_from_text(file.text, nullptr, nullptr);
+	auto scene2 = unserialize_entities_from_text("dummy",file.text, nullptr, nullptr);
 	checkTrue(scene2.get_objects().size() == work.all.size());
 	auto path = build_path_for_object(e, nullptr);
 	checkTrue(scene2.find(path)->cast_to<Entity>());

@@ -13,38 +13,31 @@ class BaseUpdater : public ClassBase
 {
 public:
 	CLASS_BODY(BaseUpdater);
-
 	static const int INVALID_FILEID = 0;
+
+	// Editor Data >>>>
+#ifdef EDITOR_BUILD
+	void set_editor_transient(bool transient) { dont_serialize_or_edit = transient; }
+	bool dont_serialize_or_edit_this() const { return dont_serialize_or_edit; }
+	bool dont_serialize_or_edit = false;
+	//Entity* creator_source = nullptr;		// my creator
+	//PrefabAsset* what_prefab = nullptr;	// (optional) what prefab created this (might be differnt than owner's prefab)
+	int unique_file_id = INVALID_FILEID;			// unique id in source owner (either native c++, prefab, map)
+	//bool is_root_of_prefab = false;
+	// <<<<<<<<<<<<<<<<
+#endif
 
 	// queues this entity/component to be destroyed at the end of the frame
 	REFLECT(name="destroy");
 	void destroy_deferred();
-
-	// Editor Data >>>>
-	void set_editor_transient(bool transient) { dont_serialize_or_edit = transient; }
-	Entity* creator_source = nullptr;		// my creator
-	PrefabAsset* what_prefab = nullptr;	// (optional) what prefab created this (might be differnt than owner's prefab)
-	int unique_file_id = INVALID_FILEID;			// unique id in source owner (either native c++, prefab, map)
-	bool is_root_of_prefab = false;
-	// <<<<<<<<<<<<<<<<
-	bool dont_serialize_or_edit = false;
-
-
-
 	void post_unserialization(uint64_t id) {
 		ASSERT(init_state == initialization_state::CONSTRUCTOR);
 		this->instance_id = id;
 		init_state = initialization_state::HAS_ID;
 	}
-	uint64_t get_instance_id() const {
-		return instance_id;
-	}
-
-	bool is_activated() const {
-		return init_state == initialization_state::CALLED_START;
-	}
+	uint64_t get_instance_id() const { return instance_id; }
+	bool is_activated() const { return init_state == initialization_state::CALLED_START; }
 protected:
-
 	enum class initialization_state : uint8_t {
 		CONSTRUCTOR,	// base state
 		HAS_ID,		// recieve instance_id

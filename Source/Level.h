@@ -61,7 +61,14 @@ public:
 	}
 	// appends object to list that will be destroyed at end of frame, instead of instantly
 	void queue_deferred_delete(BaseUpdater* e);
+
+#ifdef EDITOR_BUILD
+	Entity* editor_spawn_prefab_but_dont_set_spawned_by(const PrefabAsset* asset);
+#endif
 private:
+	static void set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file);
+	Entity* spawn_prefab_shared(const PrefabAsset* asset, bool set_vars);
+
 	string sourceAssetName;
 	// all entities/components in the map
 	hash_map<BaseUpdater*> all_world_ents;

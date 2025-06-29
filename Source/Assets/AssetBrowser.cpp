@@ -37,7 +37,7 @@ AssetBrowser::AssetBrowser()
 
 }
 AssetBrowser* AssetBrowser::inst = nullptr;
-
+#include "EngineSystemCommands.h"
 static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesystemNode* node)
 {
 	const float folder_indent = 20.0;
@@ -71,16 +71,13 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 				b->selected_resource = asset;
 				auto type = asset.type;
 				if (ImGui::GetIO().MouseClickedCount[0] == 2) {
-					if (type->tool_to_edit_me()) {
-						std::string cmdstr = "start_ed ";
-						cmdstr += '"';
-						cmdstr += type->get_type_name();
-						cmdstr += '"';
-						cmdstr += " ";
-						cmdstr += '"';
-						cmdstr += asset.filename;
-						cmdstr += '"';
-						Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, cmdstr.c_str());
+					auto assetType = type->get_asset_class_type();
+					if (assetType) {
+						auto cmd = std::make_unique<OpenEditorToolCommand>(*assetType, asset.filename, true);
+						Cmd_Manager::inst->append_cmd(std::move(cmd));
+					}
+					else {
+						sys_print(Warning, "AssetBrowser: Asset is not a standard IAsset, can't edit.\n");
 					}
 				}
 			}

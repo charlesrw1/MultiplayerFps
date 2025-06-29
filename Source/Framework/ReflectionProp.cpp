@@ -830,6 +830,13 @@ PropertyInfo make_new_struct_type(const char* name, uint16_t offset, int flags, 
 	p.struct_type = type;
 	return p;
 }
+PropertyInfo make_stringname_property(const char* name, uint16_t offset, int flags, const char* tooltip)
+{
+	PropertyInfo p(name, offset, flags);
+	p.tooltip = tooltip;
+	p.type = core_type_id::StringName;
+	return p;
+}
 PropertyInfo make_new_array_type(const char* name, uint16_t offset, int flags, const char* tooltip, IListCallback* type)
 {
 	PropertyInfo p(name, offset, flags);

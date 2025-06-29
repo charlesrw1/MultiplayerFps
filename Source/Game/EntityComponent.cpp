@@ -134,13 +134,11 @@ void Component::sync_render_data()
 
 void Component::initialize_internal_step1()
 {
-	if(!get_owner()->get_start_disabled() || eng->is_editor_level())
-		activate_internal_step1();
+	activate_internal_step1();
 }
 void Component::initialize_internal_step2()
 {
-	if(!get_owner()->get_start_disabled() || eng->is_editor_level())
-		activate_internal_step2();
+	activate_internal_step2();
 }
 
 void Component::destroy_internal()

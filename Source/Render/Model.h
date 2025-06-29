@@ -43,16 +43,16 @@ class RawMeshData
 {
 public:
 	int get_num_indicies(int index_size) const {
-		return indicies.size();
+		return (int)indicies.size();
 	}
 	int get_num_verticies(int vertex_size) const {
-		return verts.size();
+		return (int)verts.size();
 	}
 	int get_num_vertex_bytes() const {
-		return verts.size()*sizeof(ModelVertex);
+		return (int)verts.size()*sizeof(ModelVertex);
 	}
 	int get_num_index_bytes() const {
-		return indicies.size()*sizeof(uint16_t);
+		return (int)indicies.size()*sizeof(uint16_t);
 	}
 	const uint8_t* get_index_data(size_t* size) const {
 		*size = indicies.size() * sizeof(uint16_t);

@@ -216,6 +216,17 @@ EnumPropPtr PropertyPtr::as_enum()
 	return EnumPropPtr();
 }
 
+bool PropertyPtr::is_string_name() const
+{
+	return core_type_id::StringName == get_type();
+}
+
+StringName& PropertyPtr::as_string_name()
+{
+	assert(is_string_name());
+	return *(StringName*)get_ptr();
+}
+
 bool PropertyPtr::is_vec3() const {
 	return core_type_id::Vec3 == get_type();
 }

@@ -13,7 +13,7 @@
 #include "Game/Components/LightComponents.h"
 #include "Render/MaterialPublic.h"
 
-void post_load_map_callback_generic()
+void post_load_map_callback_generic(bool make_plane)
 {
 	auto dome = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
 	dome->set_model(g_assets.find_sync<Model>("eng/skydome.cmdl").get());
@@ -22,10 +22,12 @@ void post_load_map_callback_generic()
 	dome->set_casts_shadows(false);
 	//dome->Mesh->set_material_override(g_assets.find_sync<MaterialInstance>(ed_default_sky_material.get_string()).get());
 
-	auto plane = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
-	plane->set_model(g_modelMgr.get_default_plane_model());
-	plane->get_owner()->set_ws_transform({}, {}, glm::vec3(20.f));
-	plane->set_material_override((g_assets.find_sync<MaterialInstance>("eng/defaultWhite.mi").get()));
+	if (make_plane) {
+		auto plane = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
+		plane->set_model(g_modelMgr.get_default_plane_model());
+		plane->get_owner()->set_ws_transform({}, {}, glm::vec3(20.f));
+		plane->set_material_override((g_assets.find_sync<MaterialInstance>("eng/defaultWhite.mi").get()));
+	}
 
 	auto sun = eng->get_level()->spawn_entity()->create_component<SunLightComponent>();
 	sun->intensity = 2.0;
@@ -49,7 +51,7 @@ public:
 		cmd->callback = [callback,myAsset](OpenMapReturnCode code) {
 			if (code == OpenMapReturnCode::Success) {
 				assert(eng->get_level());
-				post_load_map_callback_generic();	// spawns default things
+				post_load_map_callback_generic(true);	// spawns default things
 				try {
 					uptr<AnimationGraphEditorNew> ed(new AnimationGraphEditorNew(myAsset));
 					callback(std::move(ed));

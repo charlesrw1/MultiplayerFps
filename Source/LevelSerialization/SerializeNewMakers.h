@@ -7,18 +7,16 @@ class ReadSerializerBackendJson;
 class MakePathForObjectNew : public IMakePathForObject
 {
 public:
-	MakePathForObjectNew(PrefabAsset* opt_prefab);
+	MakePathForObjectNew();
 	// Inherited via IMakePathForObject
 	MakePath make_path(const ClassBase* to) override;
 	std::string make_type_name(ClassBase* obj) override;
 	nlohmann::json* find_diff_for_obj(ClassBase* obj) override;
-	PrefabAsset* for_prefab = nullptr;
 };
 class MakeObjectForPathNew : public IMakeObjectFromPath {
 public:
-	MakeObjectForPathNew(IAssetLoadingInterface& load, UnserializedSceneFile& out, PrefabAsset* for_prefab);
+	MakeObjectForPathNew(IAssetLoadingInterface& load, UnserializedSceneFile& out);
 	ClassBase* create_from_name(ReadSerializerBackendJson& s, const std::string& str, const string& parent_path) override;
-	PrefabAsset* prefab = nullptr;
 	UnserializedSceneFile& out;
 	IAssetLoadingInterface& load;
 };

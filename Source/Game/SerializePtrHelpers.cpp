@@ -76,50 +76,14 @@ class SerializeEntityPtr : public IPropertySerializer
 	// Inherited via IPropertySerializer
 	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
 	{
-		ASSERT(user->is_a<LevelSerializationContext>());
-		auto ctx = (LevelSerializationContext*)user;
-		uint64_t handle = *(uint64_t*)info.get_ptr(inst);
-		if (handle == 0)
-			return "";
-		auto oent = ctx->get_object(handle);
-		if (!oent) {
-			sys_print(Warning, "handle wasnt found when serializing: %d", handle);
-			return "";
-		}
-
-
-		auto from = build_path_for_object((BaseUpdater*)ctx->cur_obj,nullptr);
-		auto to = build_path_for_object((BaseUpdater*)oent,nullptr);
-
-		return serialize_build_relative_path(from.c_str(),to.c_str());
+		assert(0);
+		
+		return "";
 	}
 
 	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user, IAssetLoadingInterface* load) override
 	{
-		ASSERT(user->is_a<LevelSerializationContext>());
-		auto ctx = (LevelSerializationContext*)user;
-		uint64_t* p = (uint64_t*)info.get_ptr(inst);
-
-		auto stack = token.to_stack_string();
-		if (stack.size() == 0) {
-			*p = 0;
-			return;
-		}
-
-		auto path = unserialize_relative_to_absolute(stack.c_str(), ctx->in_root->c_str());
-		auto find = ctx->in->find(path);
-		if (!find) {
-			sys_print(Error, "couldnt find path for entityptr %s\n", path.c_str());
-		}
-		else if (!find->get_type().is_a(*info.class_type)) {
-			sys_print(Error, "mismatch type for objptr %s\n", path.c_str());
-		}
-		else {
-			assert(find->is_a<BaseUpdater>());
-			*p = reinterpret_cast<uint64_t>(find);	// to get fixed up later
-
-			//ctx->in->add_entityptr_refer((BaseUpdater*)ctx->cur_obj);
-		}
+		assert(0);
 	}
 };
 

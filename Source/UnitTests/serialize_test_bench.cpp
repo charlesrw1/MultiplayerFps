@@ -14,15 +14,17 @@ SerializeTestWorkbench::~SerializeTestWorkbench() {
 	g_assets.reset_testing();
 }
 
-Entity* SerializeTestWorkbench::add_entity() {
+Entity* SerializeTestWorkbench::add_entity(Entity* parent) {
 	Entity* e = (Entity*)Entity::StaticType.allocate();
 	e->unique_file_id = ++file_id;
+	if (parent)
+		e->parent_to(parent);
 	post_unserialization_R(e);
 	return e;
 }
 
 Entity* SerializeTestWorkbench::add_prefab(PrefabAsset* asset) {
-	auto unserialized_scene = unserialize_entities_from_text(asset->text, nullptr, asset);
+	auto unserialized_scene = unserialize_entities_from_text("dummy",asset->text, nullptr, asset);
 	unserialized_scene.get_root_entity()->is_root_of_prefab = true;
 	unserialized_scene.get_root_entity()->unique_file_id = ++file_id;
 	post_unserialization_R(unserialized_scene.get_root_entity());
@@ -86,8 +88,8 @@ bool SerializeTestUtil::do_properties_equal(ClassBase* base1, ClassBase* base2)
 	if (&base1->get_type() != &base2->get_type())
 		return false;
 	MakePathForGenericObj pathmaker;
-	WriteSerializerBackendJson write1(pathmaker,*base1);
-	WriteSerializerBackendJson write2(pathmaker,*base2);
+	WriteSerializerBackendJson write1("dummy",pathmaker,*base1);
+	WriteSerializerBackendJson write2("dummy",pathmaker,*base2);
 	if (!write1.get_root_object() || !write2.get_root_object())
 		return false;
 	bool is_eq = *write1.get_root_object() == *write2.get_root_object();

@@ -17,42 +17,11 @@ public:
 };
 
 
-class MakePrefabEditable : public Command
-{
-public:
-	EditorDoc& ed_doc;
-	MakePrefabEditable(EditorDoc& ed, Entity* me, bool editable):ed_doc(ed) {
-		is_valid_flag = me && me->what_prefab && PrefabToolsUtil::is_this_the_root_of_the_prefab(*me) && me->what_prefab != ed_doc.get_editing_prefab();
-		if (!is_valid_flag) 
-			return;
-		ptr = me->get_self_ptr();
-		value = editable;
-	}
-	void execute() final {
-		if (ptr) {
-			ptr->set_prefab_editable(value);
-			ed_doc.post_node_changes.invoke();
-		}
-	}
-	void undo() final {
-		if (ptr) {
-			ptr->set_prefab_editable(!value);
-			ed_doc.post_node_changes.invoke();
-		}
-	}
-	std::string to_string() final {
-		return "MakePrefabEditable";
-	}
-	bool is_valid_flag = true;
-	EntityPtr ptr;
-	bool value = false;
-	bool is_valid() final { return is_valid_flag; }
-};
 struct SavedCreateObj {
 	uint64_t eng_handle = 0;
 	int unique_file_id = 0;
 	const PrefabAsset* what_prefab = nullptr;
-	const PrefabAsset* nested_owner = nullptr;
+	EntityPrefabSpawnType spawn_type = EntityPrefabSpawnType::None;
 };
 class RemoveEntitiesCommand : public Command
 {
@@ -212,23 +181,16 @@ public:
 		return asset != nullptr;
 	}
 
-	void execute_R(Entity* e);
 
 	void execute() final;
 	void undo() final;
 	std::string to_string() final {
 		return "Instantiate Prefab";
 	}
-	struct created_obj {
-		uint64_t eng_handle = 0;
-		int unique_file_id = 0;
-		const PrefabAsset* what_prefab = nullptr;
-		const PrefabAsset* nested_owner = nullptr;
-	};
-	std::vector<created_obj> created_objs;
+
+	std::vector<EntityPtr> revert_these;
 	EntityPtr me;
-	PrefabAsset* asset = nullptr;
-	EntityPtr creator_source;
+	const PrefabAsset* asset = nullptr;
 };
 
 class DuplicateEntitiesCommand : public Command

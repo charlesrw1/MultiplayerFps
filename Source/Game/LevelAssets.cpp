@@ -16,10 +16,13 @@ class IEditorTool;
 
 extern ConfigVar g_editor_newmap_template;
 
+extern void post_load_map_callback_generic(bool make_plane);
+
 class CreateLevelEditorAync : public CreateEditorAsync {
 public:
 	CreateLevelEditorAync(opt<string> assetPath) : assetPath(assetPath) {}
 	void execute(Callback callback) final {
+		assert(callback);
 		uptr<OpenMapCommand> cmd;
 		const bool wants_new_map = !assetPath.has_value();
 		if (wants_new_map) {
@@ -56,13 +59,15 @@ class CreatPrefabEditorAync : public CreateEditorAsync {
 public:
 	CreatPrefabEditorAync(opt<string> assetPath) : assetPath(assetPath) {}
 	void execute(Callback callback) final {
+		assert(callback);
 		opt<string> assetPath = this->assetPath;
 		string newmap_template = g_editor_newmap_template.get_string();
-		uptr<OpenMapCommand> cmd = make_unique<OpenMapCommand>(newmap_template, false/* for editor */);
+		uptr<OpenMapCommand> cmd = make_unique<OpenMapCommand>(std::nullopt, false/* for editor */);
 		cmd->callback = [callback, assetPath](OpenMapReturnCode code) {
 			uptr<EditorDoc> editorDoc;
 			if (code==OpenMapReturnCode::Success) {
 				assert(eng->get_level());
+				post_load_map_callback_generic(false);
 				if (assetPath.has_value()) {
 					PrefabAsset* prefab = g_assets.find_sync<PrefabAsset>(assetPath.value()).get();
 					if(prefab)
@@ -196,7 +201,7 @@ bool SceneAsset::load_asset(IAssetLoadingInterface* load)
 	text = std::string(fileptr->size(), ' ');
 	fileptr->read((void*)text.data(), text.size());
 	try {
-		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(get_name().c_str(), text, load,nullptr));
+		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(get_name().c_str(), text, load));
 	}
 	catch (int) {
 		sys_print(Error, "error loading SceneAsset %s\n", path.c_str());
@@ -209,20 +214,40 @@ bool SceneAsset::load_asset(IAssetLoadingInterface* load)
 PrefabAsset::~PrefabAsset() {
 	sys_print(Debug, "~PrefabAsset: %s\n", get_name().c_str());
 }
+#include "LevelSerialization/SerializeNewMakers.h"
+#include "Framework/MapUtil.h"
+#include "LevelSerialization/SerializeNew.h"
 
+UnserializedSceneFile PrefabAsset::unserialize(IAssetLoadingInterface* load) const
+{
+	assert(halfUnserialized);
+	if (!load) 
+		load = g_assets.loader;
+	double start = GetTime();
+	UnserializedSceneFile out = NewSerialization::unserialize_from_json(get_name().c_str(), *halfUnserialized, *load);
+	double now = GetTime();
+	sys_print(Debug, "PrefabAsset::unserialize: took %f\n", float(now - start));
+	return std::move(out);
+}
+#include "Framework/StringUtils.h"
 bool PrefabAsset::load_asset(IAssetLoadingInterface* load)
 {
 	auto& path = get_name();
-
 	auto fileptr = FileSys::open_read_game(path.c_str());
 	if (!fileptr) {
 		sys_print(Error, "couldn't open scene %s\n", path.c_str());
 		return false;
 	}
-	text = std::string(fileptr->size(), ' ');
-	fileptr->read((void*)text.data(), text.size());
+	string textForm = std::string(fileptr->size(), ' ');
+	fileptr->read((void*)textForm.data(), textForm.size());
+	if (StringUtils::starts_with(textForm, "!json\n")) {
+		textForm = textForm.substr(5);
+	}
 	try {
-		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(get_name().c_str(),text,load, this));
+		halfUnserialized = make_unique<SerializedForDiffing>();
+		halfUnserialized->jsonObj = nlohmann::json::parse(textForm);
+		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize(load));
+
 		// add instance ids here for diff'ing entity references
 		uint64_t id = 1ull << 63ull;
 		for (auto& obj : sceneFile->get_objects()) {
@@ -235,6 +260,7 @@ bool PrefabAsset::load_asset(IAssetLoadingInterface* load)
 		sys_print(Error, "error loading PrefabAsset %s\n", path.c_str());
 		return false;
 	}
+	assert(halfUnserialized);
 
 	return true;
 }
@@ -269,6 +295,7 @@ void PrefabAsset::move_construct(IAsset* other)
 	ASSERT(!sceneFile.get());
 	PrefabAsset* o = (PrefabAsset*)other;
 	sceneFile = std::move(o->sceneFile);
-	text = std::move(o->text);
+	halfUnserialized = std::move(o->halfUnserialized);
+	//text = std::move(o->text);
 	instance_ids_for_diffing = std::move(o->instance_ids_for_diffing);
 }

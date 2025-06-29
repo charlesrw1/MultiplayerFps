@@ -38,11 +38,11 @@ ADD_TEST(serializer)
 	obj.myarray = { 1,2,3,4 };
 	obj.fov = 10.0;
 	MakePathForGenericObj pathmaker;
-	WriteSerializerBackendJson backend(pathmaker,thing);
+	WriteSerializerBackendJson backend("dummy",pathmaker, thing);
 
 	// test diffing
 	ComponentWithStruct default_thing;
-	WriteSerializerBackendJson backend2(pathmaker, default_thing);
+	WriteSerializerBackendJson backend2("dummy",pathmaker, default_thing);
 	//auto diff = JsonSerializerUtil::diff_json(backend2.obj["objs"]["1"], backend.obj["objs"]["1"]);
 	//std::cout << "pre\n";
 	//std::cout << backend.get_output().dump(1) << '\n';
@@ -52,7 +52,7 @@ ADD_TEST(serializer)
 	//std::cout << backend.obj.dump(-1)<<'\n';
 
 	MakeObjectFromPathGeneric objmaker;
-	ReadSerializerBackendJson read(backend.get_output().dump(), objmaker ,*AssetDatabase::loader);
+	ReadSerializerBackendJson read("dummy",backend.get_output().dump(), objmaker, *AssetDatabase::loader);
 	
 	ClassBase* ptr = read.get_root_obj();
 	checkTrue(ptr);

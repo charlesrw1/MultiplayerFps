@@ -65,6 +65,17 @@ void Serializer::serialize_property_ar(PropertyPtr ptr)
 		case core_type_id::Vec3: {
 			serialize_ar(ptr.as_vec3());
 		}break;
+		case core_type_id::StringName: {
+			if (is_loading()) {
+				string s;
+				serialize_ar(s);
+				ptr.as_string_name() = StringName(s.c_str());
+			}
+			else {
+				string s = ptr.as_string_name().get_c_str();
+				serialize_ar(s);
+			}
+		}break;
 		case core_type_id::AssetPtr: {
 			auto pi = ptr.get_property_info();
 			IAsset** assetptr = (IAsset**)pi->get_ptr(ptr.get_instance_ptr_unsafe());
@@ -81,7 +92,9 @@ void Serializer::serialize_property_ar(PropertyPtr ptr)
 				}
 			}
 			else {
-				BaseUpdater* b = eng->get_object(*handle);
+				BaseUpdater* b = nullptr;
+				if (*handle != 0)
+					b = eng->get_object(*handle);
 				serialize_class_reference_ar(b);
 			}
 		}break;
@@ -152,6 +165,17 @@ void Serializer::serialize_property(PropertyPtr ptr)
 		case core_type_id::Vec3: {
 			serialize(ptr.get_name(),ptr.as_vec3());
 		}break;
+		case core_type_id::StringName: {
+			if (is_loading()) {
+				string s;
+				serialize(ptr.get_name(), s);
+				ptr.as_string_name() = StringName(s.c_str());
+			}
+			else {
+				string s = ptr.as_string_name().get_c_str();
+				serialize(ptr.get_name(), s);
+			}
+		}break;
 		case core_type_id::AssetPtr: {
 			auto pi = ptr.get_property_info();
 			IAsset** assetptr = (IAsset**)pi->get_ptr(ptr.get_instance_ptr_unsafe());
@@ -168,7 +192,9 @@ void Serializer::serialize_property(PropertyPtr ptr)
 				}
 			}
 			else {
-				BaseUpdater* b = eng->get_object(*handle);
+				BaseUpdater* b = nullptr;
+				if(*handle!=0)
+					b = eng->get_object(*handle);
 				serialize_class_reference(ptr.get_name(), b);
 			}
 		}break;

@@ -20,7 +20,7 @@ void ObjectOutliner::rebuild_tree() {
 	auto& all_objs = level->get_all_objects();
 	for (auto ent : all_objs) {
 		if (Entity* e = ent->cast_to<Entity>()) {
-			if (!e->get_parent() && !e->dont_serialize_or_edit) {
+			if (!e->get_parent() && should_draw_this(e)) {
 				rootnode->add_child(std::make_unique<Node>(this, e, the_filter));
 			
 				if (!rootnode->children.back()->is_visible) {
@@ -35,24 +35,24 @@ void ObjectOutliner::rebuild_tree() {
 }
 ObjectOutliner::Node::Node(ObjectOutliner* oo, Entity* initfrom, const std::vector<std::vector<std::string>>& filter) {
 	did_pass_filter = OONameFilter::does_entity_pass(filter, initfrom);
-
+	assert(oo->should_draw_this(initfrom));
 	ptr = initfrom->get_self_ptr();
 	auto& children = initfrom->get_children();
 	bool do_any_children_pass = false;
-	if (oo->should_draw_children(initfrom)) {
-		for (auto& c : children) {
-			if (!c->dont_serialize_or_edit) {
-				add_child(std::make_unique<Node>(oo, c, filter));
-				do_any_children_pass = do_any_children_pass || this->children.back()->did_pass_filter;
-				if (!this->children.back()->is_visible) {
-					this->children.pop_back();	// uptr does destruction
-					oo->num_nodes--;
-				}
+
+	for (auto& c : children) {
+		if (oo->should_draw_this(c)) {
+			add_child(std::make_unique<Node>(oo, c, filter));
+			do_any_children_pass = do_any_children_pass || this->children.back()->did_pass_filter;
+			if (!this->children.back()->is_visible) {
+				this->children.pop_back();	// uptr does destruction
+				oo->num_nodes--;
 			}
 		}
+	}
 		//if(!initfrom->get_parent())
 		//	sort_children();
-	}
+
 
 	is_visible = did_pass_filter || do_any_children_pass;
 
@@ -233,10 +233,10 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 
 				ImGui::Separator();
 
-				const bool is_entity_root_of_prefab = context_menu_entity && context_menu_entity->what_prefab && PrefabToolsUtil::is_this_the_root_of_the_prefab(*context_menu_entity);
+				const bool is_entity_root_of_prefab = context_menu_entity && context_menu_entity->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
 				if (is_entity_root_of_prefab) {
 					if (ImGui::MenuItem("Select prefab in browser")) {
-						AssetBrowser::inst->set_selected(context_menu_entity->what_prefab->get_name());
+						AssetBrowser::inst->set_selected(context_menu_entity->get_object_prefab().get_name());
 						ImGui::CloseCurrentPopup();
 					}
 					ImGui::Separator();
@@ -254,26 +254,6 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 					ImGui::CloseCurrentPopup();
 				}
 
-				auto is_prefab_instance_root = [&ed_doc,is_entity_root_of_prefab](const Entity* e) -> bool {
-					return is_entity_root_of_prefab && e->what_prefab != ed_doc.get_editing_prefab();
-				};
-
-				if (is_prefab_instance_root(context_menu_entity)) {
-					ImGui::Separator();
-					if (context_menu_entity->get_prefab_editable()) {
-						ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
-						if (ImGui::MenuItem("Make Prefab Not Editable")) {
-							ed_doc.command_mgr->add_command(new MakePrefabEditable(ed_doc, context_menu_entity, false));
-						}
-					}
-					else {
-						ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 10,110,255,255 }));
-						if (ImGui::MenuItem("Make Prefab Editable")) {
-							ed_doc.command_mgr->add_command(new MakePrefabEditable(ed_doc, context_menu_entity, true));
-						}
-					}
-					ImGui::PopStyleColor(1);
-				}
 
 				ImGui::Separator();
 				ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
@@ -307,11 +287,11 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 	}
 	else {
 		const Entity* const e = node_entity;
-		const bool is_prefab_root = PrefabToolsUtil::is_part_of_a_prefab(*e)&&PrefabToolsUtil::is_this_the_root_of_the_prefab(*e);
+		const bool is_prefab_root = e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
 		const char* name = (e->get_editor_name().c_str());
 		if (!*name) {
 			if (is_prefab_root)
-				name = e->what_prefab->get_name().c_str();
+				name = e->get_object_prefab().get_name().c_str();
 			else {
 				if (auto m = e->get_component<MeshComponent>()) {
 					if (m->get_model())
@@ -323,7 +303,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 			name = e->get_type().classname;
 		}
 
-		if (is_prefab_root && e->what_prefab != ed_doc.get_editing_prefab()) {
+		if (is_prefab_root) {
 			const char* s = "eng/editor/prefab_p.png";
 			auto tex = g_assets.find_global_sync<Texture>(s);
 			if (tex) {
@@ -390,9 +370,9 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 	ImGui::PopID();
 }
 
-bool ObjectOutliner::should_draw_children(Entity* e) const
+bool ObjectOutliner::should_draw_this(Entity* e) const
 {
-	return serialize_this_objects_children(e, ed_doc.get_editing_prefab());
+	return this_is_a_serializeable_object(e);
 }
 
 int ObjectOutliner::determine_object_count() const
@@ -469,11 +449,11 @@ void ObjectOutliner::draw()
 static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e)
 {
 	auto serialize_branch = [&ed_doc](Entity* e) -> auto {
-		PrefabAsset dummy;
+		assert(!"not implmented");
 		std::vector<Entity*> ents;
 		ents.push_back(e);
 		ed_doc.validate_fileids_before_serialize();
-		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text("save_branch",ents, &dummy));
+		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text("save_branch",ents));
 	};
 
 	// vars
@@ -612,7 +592,7 @@ bool OONameFilter::does_entity_pass_one_filter(const string& filter, Entity* e)
 		if (is_in_string(filter, c->get_type().classname))	// names of components
 			return true;
 	}
-	if (e->what_prefab && is_in_string(filter, e->what_prefab->get_name()))	// prefab name
+	if (e->get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab && is_in_string(filter, e->get_object_prefab().get_name()))	// prefab name
 		return true;
 	if (is_in_string(filter, std::to_string(e->get_instance_id())))	// instance id
 		return true;

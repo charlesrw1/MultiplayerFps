@@ -47,7 +47,8 @@ void EditorState::open_tool(uptr<CreateEditorAsync> creation, bool set_active, f
 			sys_print(Debug, "EditorState::open_tool: replacing current tool\n");
 		}
 		this->curTool = std::move(arg);
-		callback(this->curTool != nullptr);
+		if(callback)
+			callback(this->curTool != nullptr);
 		});
 }
 

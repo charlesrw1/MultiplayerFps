@@ -185,6 +185,7 @@
     <ClInclude Include="Source\Framework\PropertyUtil.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
     <ClInclude Include="Source\Framework\RingBuffer.h" />
+    <ClInclude Include="Source\Framework\SerializedForDiffing.h" />
     <ClInclude Include="Source\Framework\Serializer.h" />
     <ClInclude Include="Source\Framework\SerializerJson.h" />
     <ClInclude Include="Source\Framework\SerializerOldDict.h" />

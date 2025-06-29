@@ -32,7 +32,7 @@ public:
 		return (T*)ec;
 	}
 
-	Entity* add_entity();
+	Entity* add_entity(Entity* parent=nullptr);
 	Entity* add_prefab(PrefabAsset* asset);
 	PrefabAsset* create_prefab(Entity* root, string name);
 	PrefabAsset* load_prefab(string s);

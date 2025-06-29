@@ -1,13 +1,9 @@
 #include "Framework/ClassBase.h"
-
 #include <unordered_map>
 #include <vector>
-
 #include "Framework/Util.h"
-
-
-
 #include "PropHashTable.h"
+#include "SerializedForDiffing.h"
 
 ClassTypeInfo ClassBase::StaticType = ClassTypeInfo("ClassBase", nullptr, nullptr, nullptr, false);
 const bool ClassBase::CreateDefaultObject = false;
@@ -61,6 +57,10 @@ ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_t
 
 	// register this
 	ClassBase::register_class(this);
+}
+
+ClassTypeInfo::~ClassTypeInfo()
+{
 }
 
 const ClassTypeInfo* ClassTypeIterator::get_type() const
@@ -162,6 +162,19 @@ void ClassBase::init_class_reflection_system()
 				classtype->default_class_object = classtype->allocate();
 			else
 				classtype->default_class_object = nullptr;
+
+			if (classtype->default_class_object) {
+				MakePathForGenericObj pathmaker(false);
+				WriteSerializerBackendJson writer("DiffObj", pathmaker, *(ClassBase*)classtype->default_class_object);
+				auto rootOut = writer.get_root_object();
+				if (!rootOut) {
+					sys_print(Error, "ClassBase::init: couldn't create a diff for class: %s\n", classtype->classname);
+				}
+				else {
+					classtype->diff_data = std::make_unique<SerializedForDiffing>();
+					classtype->diff_data->jsonObj = std::move(*rootOut);
+				}
+			}
 		}
 	}
 

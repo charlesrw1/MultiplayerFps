@@ -1,10 +1,11 @@
 #pragma once
 #include <cstdint>
 #include <type_traits>
-
+#include <memory>
 struct PropertyInfoList;
 class ClassBase;
 
+struct SerializedForDiffing;
 struct PropHashTable;
 struct ClassTypeInfo
 {
@@ -18,6 +19,7 @@ public:
 		CreateObjectFunc alloc,
 		bool create_default_obj
 	);
+	~ClassTypeInfo();
 
 	int32_t id = 0;
 	int32_t last_child = 0;
@@ -34,6 +36,7 @@ public:
 	// use for default props etc.
 	// not every class type will have this
 	const ClassBase* default_class_object = nullptr;
+	std::unique_ptr<SerializedForDiffing> diff_data;
 
 	// opaque pointer to hash table for props
 	const PropHashTable* prop_hash_table = nullptr;

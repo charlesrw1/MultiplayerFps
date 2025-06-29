@@ -328,6 +328,11 @@ class TopDownSpawner : public Component {
 public:
 	CLASS_BODY(TopDownSpawner);
 	void start() {
+		
+	}
+
+	REFLECT();
+	void enable_object() {
 		Entity* e{};
 		float ofs = 0.0;
 		for (int i = 0; i < 1; i++)
@@ -335,24 +340,11 @@ public:
 			auto scope = eng->get_level()->spawn_prefab_deferred(e, prefab.get());
 			e->set_ws_position(get_ws_position() + glm::vec3(0, ofs, 0));
 			ofs += 1.5;
-			e->set_start_disabled(true);
 		}
-		whatSpawned = e->get_self_ptr();
 	}
-
-	REFLECT();
-	void enable_object() {
-		Entity* e = whatSpawned.get();
-		if (!e)
-			return;
-		e->activate();
-	}
-
 
 	REF AssetPtr<PrefabAsset> prefab;
 	REF int count = 1;
-
-	EntityPtr whatSpawned;
 	bool wait_to_spawn = false;
 	bool start_disabled = false;
 };

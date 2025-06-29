@@ -2,7 +2,7 @@
 #include "ReflectionProp.h"
 #include "StructReflection.h"
 #include <glm/gtc/quaternion.hpp>
-
+#include "Framework/StringName.h"
 
 // encapsulates a specific instance of a property
 class PropertyPtr;
@@ -153,6 +153,9 @@ public:
 
 	bool is_enum() const;
 	EnumPropPtr as_enum();
+
+	bool is_string_name() const;
+	StringName& as_string_name();
 	//bool is_class() const;
 
 	void* get_instance_ptr_unsafe() {

@@ -81,6 +81,42 @@ void Entity::set_hidden_in_editor(bool b)
 	for (int i = 0; i < all_components.size(); i++)
 		all_components[i]->sync_render_data();
 }
+const PrefabAsset& Entity::get_object_prefab() const {
+	assert(this->what_prefab && !spawned_by_prefab && get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab);
+	return *this->what_prefab;
+}
+void Entity::set_spawned_by_prefab() {
+	if (what_prefab)
+		what_prefab = nullptr;
+	spawned_by_prefab = true;
+	set_editor_transient(true);	// make it not editable
+}
+void Entity::set_root_object_prefab(const PrefabAsset& asset) {
+	if (what_prefab) {
+		sys_print(Warning, "Entity::set_root_object_prefab: already had prefab assigned?\n");
+	}
+	if (spawned_by_prefab)
+		sys_print(Warning, "Entity::set_root_object_prefab: spawned_by_prefab=True?\n");
+	spawned_by_prefab = false;
+	what_prefab = &asset;
+}
+void Entity::set_prefab_no_owner_after_being_root()
+{
+	assert(get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
+	what_prefab = nullptr;
+	spawned_by_prefab = false;
+	assert(get_object_prefab_spawn_type() == EntityPrefabSpawnType::None);
+}
+EntityPrefabSpawnType Entity::get_object_prefab_spawn_type() const {
+	if (what_prefab) {
+		assert(!spawned_by_prefab);
+		return EntityPrefabSpawnType::RootOfPrefab;
+	}
+	else if (spawned_by_prefab)
+		return EntityPrefabSpawnType::SpawnedByPrefab;
+	else
+		return EntityPrefabSpawnType::None;
+}
 void Entity::check_for_transform_nans()
 {
 	if (position.x != position.x || position.y != position.y || position.z != position.z) {
@@ -126,31 +162,12 @@ void Entity::set_active_R(Entity* e, bool b, bool step1)
 		set_active_R(c, b, step1);
 }
 
-void Entity::activate()
-{
-	if (is_activated()) {
-		sys_print(Warning, "activate called on already activated entity\n");
-		return;
-	}
-	ASSERT(start_disabled);
-	{
-		for (auto comp : get_components())
-			comp->activate_internal_step1();
-		for (auto c : get_children())
-			Entity::set_active_R(c,true, true);
-		for (auto comp : get_components())
-			comp->activate_internal_step2();
-		for (auto c : get_children())
-			Entity::set_active_R(c, true, false);
-	}
-	ASSERT(is_activated());
-}
+
 
 void Entity::initialize_internal()
 {
 	ASSERT(init_state == initialization_state::HAS_ID);
-	if(!start_disabled || eng->is_editor_level())
-		init_state = initialization_state::CALLED_START;
+	init_state = initialization_state::CALLED_START;
 	check_for_transform_nans();
 }
 
@@ -492,7 +509,7 @@ glm::mat4 Entity::get_parent_transform() const
 	else {
 		return
 			get_parent()->get_ws_transform()
-			* get_parent()->get_cached_mesh_component()->get_ls_transform_of_bone(parent_bone);
+			* get_parent()->get_cached_mesh_component()->get_ls_transform_of_bone(parent_bone.name);
 
 	}
 }
@@ -528,6 +545,8 @@ glm::vec3 Entity::get_ws_scale() {
 	// fixme
 	return glm::vec3(1.f);
 }
+
+void Entity::set_ws_position(glm::vec3 v) { set_ws_transform(v, get_ws_rotation(), get_ws_scale()); }
 
 void Entity::set_is_top_level(bool b)
 {

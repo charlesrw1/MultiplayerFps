@@ -19,6 +19,12 @@ std::string UnitTestUtil::get_text_of_file(const std::string& path)
 	return str;
 }
 
+//
+
+void fdf() {
+
+}
+
 
 bool ProgramTester::run_all(bool print_good)
 {
@@ -125,6 +131,7 @@ public:
 
 	virtual void do_stuff() = 0;
 };
+//
 class IEatable {
 public:
 	INTERFACE_BODY();
@@ -168,6 +175,8 @@ ADD_TEST(multiple_inheritance)
 }
 #include "Game/Components/MeshComponent.h"
 #include "Render/MaterialPublic.h"
+#include "Assets/AssetDatabase.h"
+
 ADD_TEST(assets)
 {
 	MeshComponent c;
@@ -175,15 +184,17 @@ ADD_TEST(assets)
 	inst->editor_set_newly_made_path("something/testgrid.mm");
 	c.set_material_override(inst);
 }
+#include "Physics/Physics2.h"
 
-
-#include "Assets/AssetDatabase.h"
 
 int main(int argc, char**argv)
 {
 	FileSys::init();
 	ClassBase::init_class_reflection_system();
 	g_assets.init();
+	g_physics.init();
+	bool run = !ProgramTester::get().run_all(true);
+	g_assets.quit();
 
-	return !ProgramTester::get().run_all(true);
+	return run;
 }

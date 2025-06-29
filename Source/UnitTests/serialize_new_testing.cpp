@@ -39,6 +39,163 @@ static bool check_file_ids(unordered_set<BaseUpdater*>& inobjs) {
 	return true;
 }
 
+#
+#include "Framework/SerializerJson.h"
+#include "LevelSerialization/SerializeNewMakers.h"
+static bool are_objects_equivlent(ClassBase& o1, ClassBase& o2, IMakePathForObject& pathmaker)
+{
+	if (&o1.get_type() != &o2.get_type()) return false;
+
+	WriteSerializerBackendJson writerA("TestEquivA", pathmaker,o1);
+	WriteSerializerBackendJson writerB("TestEquivB", pathmaker,o2);
+	if (!writerA.get_root_object())
+		return false;
+	if (!writerB.get_root_object())
+		return false;
+
+	auto theDiff = JsonSerializerUtil::diff_json(*writerA.get_root_object(), *writerB.get_root_object());
+	return theDiff.empty();
+}
+static bool are_entity_trees_equivlent(Entity& e1,Entity& e2,MakePathForObjectNew& pathmaker)
+{
+	auto cmp_base_updaters = [&](BaseUpdater& l, BaseUpdater& r) -> bool{
+		if (PrefabToolsUtil::is_part_of_a_prefab(l) != PrefabToolsUtil::is_part_of_a_prefab(r))
+			return false;
+		if (bool(PrefabToolsUtil::get_outer_prefab(l)) != bool(PrefabToolsUtil::get_outer_prefab(r)))
+			return false;
+		auto p1 = pathmaker.make_path(&l);
+		auto p2 = pathmaker.make_path(&r);
+		if (p1.path != p2.path || p1.is_subobject != p2.is_subobject)
+			return false;
+		if (!are_objects_equivlent(l, r, pathmaker))
+			return false;
+		return true;
+	};
+	if (!cmp_base_updaters(e1, e2))
+		return false;
+	if (PrefabToolsUtil::is_part_of_a_prefab(e1)) {	// e2 will be part_of_prefab also,checked above
+		if (PrefabToolsUtil::is_this_the_root_of_the_prefab(e1) != PrefabToolsUtil::is_this_the_root_of_the_prefab(e2))
+			return false;
+	}
+	if (e1.get_children().size() != e2.get_children().size()) {
+		return false;
+	}
+
+	for (int i = 0; i < e1.get_children().size(); i++) {
+		Entity* e1_c = e1.get_children().at(i);
+		Entity* e2_c = e2.get_children().at(i);
+		if (!e1_c || !e2_c) return false;
+		bool same = are_entity_trees_equivlent(*e1_c, *e2_c, pathmaker);
+		if (!same) 
+			return false;
+	}
+	if (e1.get_components().size() != e2.get_components().size()) 
+		return false;
+	for (int i = 0; i < e1.get_components().size(); i++) {
+		Component* e1_c = e1.get_components().at(i);
+		Component* e2_c = e2.get_components().at(i);
+		if (!e1_c || !e2_c) 
+			return false;
+		if (!cmp_base_updaters(*e1_c, *e2_c))
+			return false;
+	}
+	return true;
+}
+
+
+ADD_TEST(test_are_objects_equivlent)
+{
+	SerializeTestWorkbench workbench;
+	auto make_e1 = [&]() {
+		Entity* e = workbench.add_entity();
+		workbench.add_component<Component>(e);
+		e->set_ls_position(glm::vec3(1.f));
+		e->set_ls_scale(glm::vec3(2.f));
+		e->set_ls_euler_rotation(glm::vec3(3.f));
+		auto child = workbench.add_entity(e);
+		child->set_ls_euler_rotation(glm::vec3(0.1,-0.10005,0.000014));
+		return e;
+	};
+	auto make_e2 = [&]() {
+		Entity* e = workbench.add_entity();
+		e->set_ls_position(glm::vec3(-1.f,0.f,0.f));
+		e->set_ls_scale(glm::vec3(3.f));
+		e->set_ls_euler_rotation(glm::vec3(3.f));
+		add_component(e, new Component);
+		add_component(e, new Component);
+		return e;
+	};
+	Entity* e1_1 = make_e1();
+	Entity* e1_2 = make_e1();
+	Entity* e2_1 = make_e2();
+
+	MakePathForObjectNew pathmaker(nullptr);
+	checkTrue(are_objects_equivlent(*e1_1, *e1_2, pathmaker));
+	checkTrue(!are_objects_equivlent(*e1_1, *e2_1, pathmaker));
+
+	WriteSerializerBackendJson writerA("TestEquivA", pathmaker, *e1_2);
+
+	UnserializedSceneFile file;
+	MakeObjectForPathNew objmaker(*g_assets.loader, file, nullptr);
+	ReadSerializerBackendJson reader("dbg", writerA.get_output().dump(1), objmaker, *g_assets.loader);
+	ClassBase* root = reader.get_root_obj();
+	checkTrue(root && are_objects_equivlent(*root, *e1_2,pathmaker));
+
+
+	auto outFile = serialize_entities_to_text("", { e1_2 }, nullptr);
+	printf("%s\n", outFile.text.c_str());
+	auto unFile = unserialize_entities_from_text("", outFile.text, g_assets.loader, nullptr);
+
+	checkTrue(unFile.get_root_entity() && are_entity_trees_equivlent(*unFile.get_root_entity(), *e1_2, pathmaker));
+}
+
+ADD_TEST(path_builder)
+{
+	SerializeTestWorkbench workbench;
+	Entity* e = workbench.add_entity();
+	Entity* e1 = workbench.add_entity(e);
+	auto pfb = workbench.create_prefab(e, "MyPrefab.pfb");
+	e1->what_prefab = pfb;
+	MakePathForObjectNew pathmaker(nullptr);
+	checkTrue(pathmaker.make_path(e).path == std::to_string(e->unique_file_id));
+	auto subpath = pathmaker.make_path(e1).path;
+	checkTrue(subpath == std::to_string(e->unique_file_id)+"/"+std::to_string(e1->unique_file_id));
+	{
+		auto serialized = serialize_entities_to_text("", { e }, pfb);
+		pfb->text = serialized.text;
+
+		auto unserialized = unserialize_entities_from_text("", pfb->text, g_assets.loader, pfb);
+		checkTrue(are_entity_trees_equivlent(*unserialized.get_root_entity(), *e, pathmaker));
+	}
+
+
+	PrefabAsset* loadPfb = workbench.load_prefab("BIGTANK.pfb");
+	auto check_this = [&](Entity* root) {
+		checkTrue(pathmaker.make_path(root).path == std::to_string(root->unique_file_id));
+		auto child = root->get_children().at(0);
+		auto childpath = pathmaker.make_path(child).path;
+		checkTrue(childpath == std::to_string(root->unique_file_id) + "/" + std::to_string(child->unique_file_id));
+
+	};
+	auto root = loadPfb->sceneFile->get_root_entity();
+	check_this(root);
+
+	root->unique_file_id = 1;
+	auto serialized = serialize_entities_to_text("", { root }, nullptr);
+	{
+		auto unseri = unserialize_entities_from_text("", serialized.text, g_assets.loader, nullptr);
+		check_this(unseri.get_root_entity());
+	}
+}
+
+// Tests saving a prefab, then loading it again
+ADD_TEST(load_unload_prefab)
+{
+	SerializeTestWorkbench workbench;
+
+
+}
+
 ADD_TEST(serialize_scene_new)
 {
 	SerializeTestWorkbench workbench;
@@ -60,7 +217,8 @@ ADD_TEST(serialize_scene_new)
 	{
 		SerializeEntitiesContainer container;
 		SerializedSceneFile out;
-		NewSerialization::add_objects_to_container({ root }, container, prefab, out);
+		MakePathForObjectNew pathmaker(nullptr);
+		NewSerialization::add_objects_to_container("debug_tag", { root }, container, prefab, out);
 		checkTrue(container.objects.size() == 7);
 		checkTrue(out.extern_parents.size() == 0);
 

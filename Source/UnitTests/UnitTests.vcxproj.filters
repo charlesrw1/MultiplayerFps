@@ -18,22 +18,13 @@
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="level_edit_test.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="serialize_tests.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="script_test.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="string_util_test.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="framwork_test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="serializer_tests.cpp">
+    <ClCompile Include="level_edit_test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="script_test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="serialize_new_testing.cpp">
@@ -42,18 +33,24 @@
     <ClCompile Include="serialize_test_bench.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="serialize_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="serializer_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="string_util_test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Unittest.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="object_outliner_filter.cpp">
+    <ClInclude Include="serialize_test_bench.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="test_class.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="serialize_test_bench.h">
+    <ClInclude Include="Unittest.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
