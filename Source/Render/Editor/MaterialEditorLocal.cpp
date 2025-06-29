@@ -1,8 +1,8 @@
 #ifdef EDITOR_BUILD
 #include "MaterialEditorLocal.h"
 
-static MaterialEditorLocal g_mateditor_local;
-IEditorTool* g_mateditor = &g_mateditor_local;
+//static MaterialEditorLocal g_mateditor_local;
+//IEditorTool* g_mateditor = &g_mateditor_local;
 
 #include "Assets/AssetDatabase.h"
 #include <SDL2/SDL.h>

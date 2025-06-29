@@ -244,13 +244,13 @@ Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, co
 
 #include "SerializeNew.h"
 #include "Framework/StringUtils.h"
-UnserializedSceneFile unserialize_entities_from_text(const std::string& text, IAssetLoadingInterface* load,PrefabAsset* source_prefab)
+UnserializedSceneFile unserialize_entities_from_text(const char* debug_tag, const std::string& text, IAssetLoadingInterface* load,PrefabAsset* source_prefab)
 {
 	if (!load)
 		load = AssetDatabase::loader;
 	if (StringUtils::starts_with(text, "!json\n")) {
 		auto fixedtext = text.substr(5);
-		return NewSerialization::unserialize_from_text(fixedtext,*load, source_prefab);
+		return NewSerialization::unserialize_from_text(debug_tag,fixedtext, *load, source_prefab);
 	}
 
 		

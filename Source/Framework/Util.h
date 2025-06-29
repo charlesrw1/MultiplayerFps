@@ -30,6 +30,10 @@ void sys_print(LogType type, const char* fmt, ...);
 
 char* string_format(const char* fmt, ...);
 
+inline const char* print_get_bool_string(bool b) {
+	return b ? "True" : "False";
+}
+
 
 struct Color32
 {

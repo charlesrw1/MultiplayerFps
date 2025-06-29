@@ -287,17 +287,118 @@ void Program_Manager::recompile_all()
 		recompile(programs[i]);
 }
 
-void Program_Manager::recompile(program_def& def)
+std::string alphanumeric_hash(const std::string& input) {
+	// Basic hash computation (FNV-1a hash)
+	uint64_t hash = 14695981039346656037ULL;
+	for (char c : input) {
+		hash ^= static_cast<unsigned char>(c);
+		hash *= 1099511628211ULL;
+	}
+	// Encode using base36 (0-9, a-z) to ensure only alphanumerics
+	const char* chars = "0123456789abcdefghijklmnopqrstuvwxyz";
+	std::string result;
+	while (hash > 0) {
+		result.insert(result.begin(), chars[hash % 36]);
+		hash /= 36;
+	}
+
+	return result;
+}
+string compute_hash_for_program_def(Program_Manager::program_def& def)
 {
+	string inp = def.vert + def.frag+def.geo+def.defines;
+	return alphanumeric_hash(inp);
+}
+#include "Framework/BinaryReadWrite.h"
+
+ConfigVar log_shader_compiles("log_shader_compiles", "1", CVAR_BOOL, "");
+void Program_Manager::recompile(program_def& def) {
+	double start = GetTime();
+	recompile_do(def);
+	float time = GetTime() - start;
+	if(log_shader_compiles.get_bool())
+		sys_print(Debug, "Program_Manager::recompile: compiled/loaded %s in %f\n", def.vert.c_str(), time);
+}
+
+
+void Program_Manager::recompile_do(program_def& def)
+{
+	// look in shader cache, only for "shared shaders" now, these are the main materials so whatev
+	if(def.is_shared() && !def.is_tesselation)
+	{
+		string hashed_path = compute_hash_for_program_def(def) + ".bin";
+		auto binFile = FileSys::open_read(hashed_path.c_str(), FileSys::SHADER_CACHE);
+		auto shaderFile = FileSys::open_read_engine(def.vert.c_str());
+		if (shaderFile && binFile) {
+			if (shaderFile->get_timestamp() <= binFile->get_timestamp()) {
+				if(log_shader_compiles.get_bool())
+					sys_print(Debug, "Program_Manager::recompile: loading cached binary: %s\n", hashed_path.data());
+
+				// load cached binary
+				BinaryReader reader(binFile.get());
+				auto sourceType = reader.read_int32();
+				auto len = reader.read_int32();
+				vector<uint8_t> bytes(len,0);
+				reader.read_bytes_ptr(bytes.data(), bytes.size());
+
+				if (def.shader_obj.ID != 0) {
+					glDeleteProgram(def.shader_obj.ID);
+				}
+				def.shader_obj.ID=glCreateProgram();
+				glProgramBinary(def.shader_obj.ID, sourceType, bytes.data(), bytes.size());
+				glValidateProgram(def.shader_obj.ID);
+
+				GLint success = 0;
+				glGetProgramiv(def.shader_obj.ID, GL_LINK_STATUS, &success);
+				if (success == GL_FALSE) {
+					GLint logLength = 0;
+					glGetProgramiv(def.shader_obj.ID, GL_INFO_LOG_LENGTH, &logLength);
+					std::vector<GLchar> log(logLength);
+					glGetProgramInfoLog(def.shader_obj.ID, logLength, nullptr, log.data());
+					sys_print(Error, "Program_Manager::recompile: loading binary failed: %s\n", log.data());
+				}
+				else {
+					return;	// done
+				}
+			}
+		}
+		binFile.reset();
+
+		// fail path
+		def.compile_failed = Shader::compile_vert_frag_single_file(&def.shader_obj, def.vert, def.defines) != ShaderResult::SHADER_SUCCESS;
+	
+		if (!def.compile_failed) {
+			const auto program = def.shader_obj.ID;
+			GLint length = 0;
+			glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
+			if(log_shader_compiles.get_bool())
+				sys_print(Debug, "Program_Manager::recompile: saving cached binary: %s\n", hashed_path.data());
+			vector<uint8_t> bytes(length, 0);
+			GLenum outType = 0;
+			glGetProgramBinary(def.shader_obj.ID, bytes.size(),nullptr, &outType, bytes.data());
+			FileWriter writer(bytes.size()+8);
+			writer.write_int32(outType);
+			writer.write_int32(bytes.size());
+			writer.write_bytes_ptr(bytes.data(), bytes.size());
+			auto outFile = FileSys::open_write(hashed_path.c_str(), FileSys::SHADER_CACHE);
+			if (outFile) {
+				outFile->write(writer.get_buffer(), writer.get_size());
+			}
+			else {
+				sys_print(Error, "Program_Manager::recompile: couldnt open file to write program binary: %s\n", hashed_path.data());
+			}
+		}
+
+		return;	
+	}
+
 	if (def.is_compute) {
 		def.compile_failed = Shader::compute_compile(&def.shader_obj, def.vert, def.defines) 
 			!= ShaderResult::SHADER_SUCCESS;
 	}
 	else if (def.is_shared()) {
-		if (def.is_tesselation)
-			def.compile_failed = Shader::compile_vert_frag_tess_single_file(&def.shader_obj, def.vert, def.defines) != ShaderResult::SHADER_SUCCESS;
-		else
-			def.compile_failed = Shader::compile_vert_frag_single_file(&def.shader_obj, def.vert, def.defines)!=ShaderResult::SHADER_SUCCESS;
+		assert(def.is_tesselation);
+		def.compile_failed = Shader::compile_vert_frag_tess_single_file(&def.shader_obj, def.vert, def.defines) != ShaderResult::SHADER_SUCCESS;
 	}
 	else {
 		if (!def.geo.empty())
@@ -721,6 +822,12 @@ void Renderer::check_hardware_options()
 		Fatalf("Opengl driver needs GL_EXT_texture_compression_s3tc\n");
 	}
 
+	GLint binary_formats;
+	glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &binary_formats);
+	if (binary_formats == 0) {
+		Fatalf("Opengl driver must support program binary. (GL_NUM_PROGRAM_BINARY_FORMATS>0)\n");
+	}
+
 	sys_print(Debug,"==== GL Hardware Values ====\n");
 	int max_buffer_bindings = 0;
 	glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &max_buffer_bindings);
@@ -728,6 +835,8 @@ void Renderer::check_hardware_options()
 	int max_texture_units = 0;
 	glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &max_texture_units);
 	sys_print(Debug,"-GL_MAX_TEXTURE_IMAGE_UNITS: %d\n", max_texture_units);
+	sys_print(Debug, "-GL_NUM_PROGRAM_BINARY_FORMATS: %d\n", binary_formats);
+
 	sys_print(Debug,"\n");
 }
 
@@ -782,6 +891,7 @@ void Renderer::create_default_textures()
 	tex.scene_motion_vts_handle = Texture::install_system("_scene_motion");
 }
 
+ConfigVar enable_gl_debug_output("enable_gl_debug_output", "1", CVAR_BOOL, "");
 
 void Renderer::init()
 {
@@ -791,12 +901,13 @@ void Renderer::init()
 	check_hardware_options();
 
 	// Enable debug output on debug builds
-#ifdef _DEBUG
-	glEnable(GL_DEBUG_OUTPUT);
-	glDebugMessageCallback(debug_message_callback, nullptr);
-	glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE);
-	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
-#endif
+	if (enable_gl_debug_output.get_bool()) {
+		glEnable(GL_DEBUG_OUTPUT);
+		glDebugMessageCallback(debug_message_callback, nullptr);
+		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE);
+		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+	}
+
 	InitGlState();
 
 	mem_arena.init("Render Temp", renderer_memory_arena_size.get_integer());
@@ -818,6 +929,8 @@ void Renderer::init()
 	glBindVertexArray(vao.default_);
 	glBindBuffer(GL_ARRAY_BUFFER, buf.default_vb);
 	glBindVertexArray(0);
+
+
 
 	on_level_start();
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);
@@ -2537,6 +2650,7 @@ void Renderer::deferred_decal_pass()
 
 
 	static Model* cube = find_global_asset_s<Model>("eng/cube.cmdl");	// cube model
+	assert(cube->is_this_globally_referenced());
 	// Copied code from execute_render_lists
 	auto& part = cube->get_part(0);
 	const GLenum index_type = MODEL_INDEX_TYPE_GL;

@@ -8,7 +8,7 @@
 #include <fstream>
 
 #ifdef EDITOR_BUILD
-extern IEditorTool* g_animseq_editor;
+//extern IEditorTool* g_animseq_editor;
 class AnimationSeqAssetMetadata : public AssetMetadata
 {
 public:
@@ -37,9 +37,9 @@ public:
 			}
 		}
 	}
-	virtual IEditorTool* tool_to_edit_me() const override {
-		return g_animseq_editor; 
-	}
+	//virtual IEditorTool* tool_to_edit_me() const override {
+	//	return g_animseq_editor; 
+	//}
 	bool show_tool_in_toolbar() const override {
 		return false;
 	}

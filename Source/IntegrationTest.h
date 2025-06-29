@@ -11,6 +11,7 @@ using std::function;
 #include <condition_variable>
 #include "Framework/Util.h"
 #include <cassert>
+#include "Framework/MathLib.h"
 
 class IntegrationTester;
 struct IntTestCase {
@@ -22,7 +23,7 @@ struct IntTestCase {
 class IntegrationTester
 {
 public:
-	IntegrationTester(bool exit_on_finish, vector<IntTestCase>& test_cases);
+	IntegrationTester(bool exit_on_finish, vector<IntTestCase>& test_cases, unsigned int rand_seed = 7);
 	// called in main thread
 	bool tick(float dt);
 	// called by test functions
@@ -33,10 +34,11 @@ public:
 	T wait_delegate(MulticastDelegate<T>& delegate);
 	void checkTrue(bool b, const char* msg);
 	~IntegrationTester();
+	Random& get_rand() { return rand; }
 private:
 	void wait_delegate_shared();
 	void tester_thread();
-
+	Random rand;
 	int failed_tests = 0;
 	int total_tests = 0;
 

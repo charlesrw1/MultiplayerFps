@@ -4,8 +4,8 @@
 
 #include <Windows.h>
 #include <unordered_set>
-static TextureEditorTool s_texture_editor_tool;
-IEditorTool* g_texture_editor_tool = &s_texture_editor_tool;
+//static TextureEditorTool s_texture_editor_tool;
+//IEditorTool* g_texture_editor_tool = &s_texture_editor_tool;
 
 
 #include "Framework/ReflectionProp.h"

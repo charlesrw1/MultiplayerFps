@@ -30,12 +30,14 @@ void EditorTool3d::tick(float dt)
 }
 void EditorTool3d::close_internal()
 {
-	eng->leave_level();
+	assert(0);
+	//eng->leave_level();
 	eng->get_on_map_delegate().remove(this);
 }
 bool EditorTool3d::open_document_internal(const char* name, const char* arg) 
 {
-	eng->open_level("__empty__");
+	assert(0);
+	//eng->open_level("__empty__");
 	eng->get_on_map_delegate().add(this, &EditorTool3d::map_callback);
 	return true;
 }

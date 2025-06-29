@@ -137,8 +137,8 @@ void WriteSerializerBackendJson::write_actual_class(ClassBase* ptr, const string
 	}
 }
 
-WriteSerializerBackendJson::WriteSerializerBackendJson(IMakePathForObject& pathmaker, ClassBase& obj_to_serialize) 
-	:pathmaker(pathmaker)
+WriteSerializerBackendJson::WriteSerializerBackendJson(const char* debug_tag, IMakePathForObject& pathmaker, ClassBase& obj_to_serialize) 
+	: pathmaker(pathmaker), debug_tag(debug_tag)
 {
 	stack.push_back(&obj);
 	{
@@ -221,8 +221,8 @@ bool WriteSerializerBackendJson::serialize_asset(const char* tag, const ClassTyp
 	return true;
 }
 
-ReadSerializerBackendJson::ReadSerializerBackendJson(const string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
-	:objmaker(objmaker), loader(loader)
+ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, const string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
+	:objmaker(objmaker), loader(loader), debug_tag(debug_tag)
 {
 	this->obj = nlohmann::json::parse(text);
 	stack.push_back(&obj);
@@ -413,7 +413,8 @@ nlohmann::json* MakePathForGenericObj::find_diff_for_obj(ClassBase* obj) {
 	if (!diff_available) return nullptr;
 	MakePathForGenericObj pathmaker(false);
 	const ClassBase* diffobj = obj->get_type().default_class_object;
-	WriteSerializerBackendJson writer(pathmaker,*const_cast<ClassBase*>(diffobj));
+	const char* tag = "find_diff";
+	WriteSerializerBackendJson writer(tag, pathmaker,*const_cast<ClassBase*>(diffobj));
 	return new nlohmann::json(*writer.get_root_object());	// FIXME, test
 }
 void ReadSerializerBackendJson::insert_nested_object(string path, ClassBase* obj)

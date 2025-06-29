@@ -1,7 +1,7 @@
 #include "IntegrationTest.h"
 
-IntegrationTester::IntegrationTester(bool exit_on_finish, vector<IntTestCase>& test_cases)
-	: is_done(false), can_do_work(false)
+IntegrationTester::IntegrationTester(bool exit_on_finish, vector<IntTestCase>& test_cases, unsigned int rand_seed)
+	: is_done(false), can_do_work(false), rand(rand_seed)
 {
 	testcases = std::move(test_cases);
 	thread = std::thread(&IntegrationTester::tester_thread, this);
@@ -107,7 +107,7 @@ void IntegrationTester::tester_thread() {
 			try {
 				test.func(*this);
 				// Test passed
-				sys_print(Info, "Test '%s' passed: %s\n", test.test_name.c_str());
+				sys_print(Info, "Test '%s' passed\n", test.test_name.c_str());
 			}
 			catch (const std::exception& e) {
 				sys_print(Error, "Test '%s' failed: %s\n", test.test_name.c_str(), e.what());

@@ -171,6 +171,7 @@ struct Render_Stats {
 	int framebuffer_clears = 0;
 };
 
+// this caches programs
 class Program_Manager
 {
 public:
@@ -209,10 +210,12 @@ public:
 		if (handle >= 0 && handle < programs.size())
 			recompile(programs[handle]);
 		else
-			sys_print(Warning, "recompile handle out of range\n");
+			sys_print(Warning, "Program_Manager::recompile: handle out of range\n");
 	}
 private:
 	void recompile(program_def& def);
+	void recompile_do(program_def& def);
+
 };
 
 class OpenglRenderDevice

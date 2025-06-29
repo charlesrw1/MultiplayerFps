@@ -63,9 +63,10 @@ struct Serializer
 	virtual bool serialize_asset(const char* tag, const ClassTypeInfo& type, IAsset*& ptr) = 0;
 	virtual void serialize_asset_ar(const ClassTypeInfo& type, IAsset*& ptr) = 0;
 
-
 	virtual bool is_loading() = 0;
 	bool is_saving() { return !is_loading(); }
+
+	virtual const char* get_debug_tag() = 0;
 };
 
 

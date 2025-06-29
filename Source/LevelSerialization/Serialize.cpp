@@ -340,9 +340,9 @@ void add_to_extern_parents(const BaseUpdater* obj, const BaseUpdater* parent, co
 }
 #include "SerializeNew.h"
 
-SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input_objs, PrefabAsset* for_prefab)
+SerializedSceneFile serialize_entities_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs, PrefabAsset* for_prefab)
 {
-	return NewSerialization::serialize_to_text(input_objs, for_prefab);
+	return NewSerialization::serialize_to_text(debug_tag, input_objs, for_prefab);
 
 	SerializedSceneFile output;
 	DictWriter out;

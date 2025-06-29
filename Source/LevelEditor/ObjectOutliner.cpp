@@ -473,7 +473,7 @@ static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e)
 		std::vector<Entity*> ents;
 		ents.push_back(e);
 		ed_doc.validate_fileids_before_serialize();
-		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents, &dummy));
+		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text("save_branch",ents, &dummy));
 	};
 
 	// vars

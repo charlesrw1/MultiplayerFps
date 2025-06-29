@@ -70,7 +70,7 @@ public:
 		return AnimationSeqAsset::StaticType;
 	}
 
-	virtual void close_internal() override;
+	virtual void close_internal();
 	virtual bool save_document_internal() override;
 	void post_map_load_callback() override;
 	void imgui_draw() override;

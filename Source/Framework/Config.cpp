@@ -345,7 +345,7 @@ public:
 	void add_command(const char* name, Engine_Cmd_Function cmd) {
 
 		if (find_cmd(name)) {
-			printf("Set duplicate command %s\n", name);
+			sys_print(Warning, "Set duplicate command %s\n", name);
 			return;
 		}
 		all_cmds.insert({ std::string(name),cmd });
@@ -396,6 +396,14 @@ public:
 		command_buffer += msg;
 		command_buffer += '\n';
 	}
+	void append_cmd(uptr<SystemCommand> cmd) final {
+		if (!cmd) {
+			sys_print(Warning, "tried to append null cmd\n");
+			return;
+		}
+		systemCommands.push_back(std::move(cmd));
+	}
+
 	void execute_cmd(const std::string& msg) final {
 		execute_string(msg.c_str());
 	}
@@ -427,22 +435,36 @@ public:
 		}
 	}
 	void execute_buffer() {
-		if (command_buffer.empty())
-			return;
-		std::string line;
-		for (char c : command_buffer) {
-			if (c == '\n') {
-				if (!line.empty())
-					execute_string(line.c_str());
-				line.clear();
+		auto execute_string_buffer = [&] {
+			if (command_buffer.empty())
+				return;
+			std::string line;
+			for (char c : command_buffer) {
+				if (c == '\n') {
+					if (!line.empty())
+						execute_string(line.c_str());
+					line.clear();
+				}
+				else {
+					line += c;
+				}
 			}
-			else {
-				line += c;
+			if (!line.empty())
+				execute_string(line.c_str());
+			command_buffer.clear();
+		};
+		auto execute_object_commands = [&]() {
+			// commands can append to the systemCommands, it will still work and execute all of them
+			for (int i = 0; i < systemCommands.size(); i++) {
+				auto cmd = systemCommands[i].get();
+				assert(cmd);
+				sys_print(Info, "executing: %s\n", cmd->to_string().c_str());
+				cmd->execute();
 			}
-		}
-		if (!line.empty())
-			execute_string(line.c_str());
-		command_buffer.clear();
+			systemCommands.clear();	// calls destructors
+		};
+		execute_string_buffer();
+		execute_object_commands();	// called after, string commands can add to object commands
 	}
 
 	void set_set_unknown_variables(bool b) override {
@@ -469,6 +491,7 @@ public:
 	std::string command_buffer;
 	bool set_unknown_variables = false;
 	std::unordered_map<std::string, Engine_Cmd_Function> all_cmds;
+	std::vector<uptr<SystemCommand>> systemCommands;
 
 
 	void add_cmd_group(ConsoleCmdGroup* group) {

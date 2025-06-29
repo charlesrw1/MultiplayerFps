@@ -19,8 +19,17 @@ using std::function;
 template<typename T>
 using uptr = std::unique_ptr<T>;
 
+
+ConfigVar log_all_asset_loads("log_all_asset_loads", "1", CVAR_BOOL, "");
+ConfigVar log_finish_job_func("log_finish_job_func", "0", CVAR_BOOL, "");
+
+
 struct AsyncQueuedJob
 {
+	AsyncQueuedJob() {
+		creation_start_time = GetTime();
+	}
+
 	void validate() {
 		assert(is_hot_reload || (!path.empty()&&info));	// either has path or is hot reload
 		assert(!(is_hot_reload && force_reload));// cant be both hot reload and force reload
@@ -32,10 +41,14 @@ struct AsyncQueuedJob
 	bool force_reload = false;
 	bool is_hot_reload = false;
 	std::function<void(GenericAssetPtr)> callback;
+	// for debugging
+	double creation_start_time = 0.0;
+	double load_time = 0.0;
 
 	// output
 	IAsset* out_object = nullptr;
 	vector<IAsset*> other_assets;
+	vector<double> other_load_times;
 };
 
 class SubAssetLoadingInterface : public IAssetLoadingInterface
@@ -162,15 +175,19 @@ IAsset* AssetBackend::find_or_create_and_load_asset(const string& path, const Cl
 	IAsset* asset = find_asset_in_local_or_global(path);
 	if (!asset)
 	{
+		double now = GetTime();
+
 		asset = create_asset(path, info);
 		asset->is_loaded = true;
 		SubAssetLoadingInterface loadinterface(*this,job);
 		const bool success = asset->load_asset(&loadinterface);
-		asset->is_system = is_system;
+		asset->is_system |= is_system;
 		asset->load_failed = !success;
 
 		job->other_assets.push_back(asset);
+		job->other_load_times.push_back(GetTime() - now);
 	}
+	asset->is_system |= is_system;
 	assert(asset->is_loaded);
 	return asset;
 }
@@ -185,10 +202,12 @@ uptr<AsyncQueuedJob> AssetBackend::pop_finished_job()
 }
 void AssetBackend::finish_all_jobs()
 {
-	sys_print(Info, "start finish all jobs\n");
+	if(log_finish_job_func.get_bool())
+		sys_print(Debug, "AssetBackend::finish_all_jobs\n");
 	std::unique_lock<std::mutex> lock(job_mutex);
 	job_cv.wait(lock, [&] { return jobs.empty() && !is_in_job; });
-	sys_print(Info, "/finish all jobs\n");
+	if (log_finish_job_func.get_bool())
+		sys_print(Debug, "/AssetBackend::finish_all_jobs\n");
 
 }
 void AssetBackend::signal_end_work() {
@@ -254,7 +273,7 @@ void AssetBackend::execute_job(AsyncQueuedJob* job)
 			auto asset = create_asset(path, info);
 			SubAssetLoadingInterface loadinterface(*this, job);
 			const bool success = asset->load_asset(&loadinterface);
-			asset->is_system = is_system_asset;
+			asset->is_system |= is_system_asset;
 			asset->load_failed = !success;
 			asset->is_loaded = true;
 			return asset;
@@ -289,8 +308,11 @@ void AssetBackend::execute_job(AsyncQueuedJob* job)
 	}
 	else
 	{
+		double time_start = GetTime();
 		job->out_object = find_or_create_and_load_asset(job->path, job->info, job->is_system_asset,job);
+		job->load_time = GetTime() - time_start;
 		assert(find_asset_in_local_or_global(job->path));
+		assert(job->out_object->is_system || !job->is_system_asset);
 	}
 
 	// input=path
@@ -402,6 +424,7 @@ void AssetBackend::execute_job(AsyncQueuedJob* job)
 #endif
 }
 
+
 class AssetDatabaseImpl
 {
 public:
@@ -510,7 +533,10 @@ public:
 		while (job) {
 			backend.combine_asset_tables(allAssets);
 
-			sys_print(Debug, "finalize job %s resource %s\n", job->out_object->get_type().classname, job->out_object->get_name().c_str());
+			if (log_all_asset_loads.get_bool()) {
+				const double time_since_creation = GetTime() - job->creation_start_time;
+				sys_print(Debug, "finalize job %s resource %s (%f %f)\n", job->out_object->get_type().classname, job->out_object->get_name().c_str(), float(job->load_time), float(time_since_creation));
+			}
 			assert(allAssets.find(job->path) != allAssets.end());
 			assert(job->out_object);
 			if (job->force_reload) {
@@ -533,12 +559,45 @@ public:
 				}
 				job->out_object = job->other_assets.at(0);	// first object
 			}
-			for (auto o : job->other_assets) {
-				if (!o->load_failed && !o->has_run_post_load) {
-					o->post_load();
-					o->has_run_post_load = true;
+
+			if (log_all_asset_loads.get_bool() && job->other_assets.size() == job->other_load_times.size()) {
+				vector<int> nums(job->other_assets.size());
+				for (int i = 0; i < nums.size(); i++) nums[i] = i;
+				std::sort(nums.begin(), nums.end(), [&](int l, int r) {
+					return job->other_load_times[l] > job->other_load_times[r];
+					});
+				for (int i = 0; i < job->other_assets.size(); i++) {
+					auto o = job->other_assets[nums[i]];
+					double t = job->other_load_times[nums[i]];
+					sys_print(Debug, "	subasset %s (%f)\n", o->get_name().c_str(), float(t));
 				}
 			}
+
+			double pre_post_load = GetTime();
+			vector<std::pair<string, float>> timings;
+			for (auto o : job->other_assets) {
+				if (o->load_failed) {
+					sys_print(Error, "AssetDatabase: asset failed to load \"%s\" (type=%s) (FromJob: \"%s\")\n", o->get_name().c_str(),o->get_type().classname, job->out_object->get_name().c_str());
+				}
+				if (!o->load_failed && !o->has_run_post_load) {
+					double now = GetTime();
+					o->post_load();
+					o->has_run_post_load = true;
+					if (log_all_asset_loads.get_bool()) {
+						timings.push_back({ o->get_name(),float(GetTime() - now) });
+					}
+				}
+			}
+			if (log_all_asset_loads.get_bool()) {
+				std::sort(timings.begin(), timings.end(), [](const std::pair<string, float>& l, const std::pair<string, float>& r) {
+					return l.second > r.second;
+					});
+				for (auto& t : timings) {
+					sys_print(Debug, "		PostLoad(%s) took %fs\n",t.first.c_str(), t.second);
+				}
+				sys_print(Debug, "	took %f to run post_loads\n", float(GetTime() - pre_post_load));
+			}
+
 			if(job->callback)
 				job->callback(job->out_object);
 			job = backend.pop_finished_job();
@@ -550,7 +609,7 @@ public:
 		job->force_reload = true;
 		job->path = asset->get_name();
 		job->info = &asset->get_type();
-		job->is_system_asset = is_system;
+		job->is_system_asset |= is_system;
 		job->callback = std::move(func);
 		job->validate();
 		backend.push_job_to_queue(std::move(job));
@@ -569,7 +628,7 @@ public:
 			uptr<AsyncQueuedJob> job = std::make_unique<AsyncQueuedJob>();
 			job->path = str;
 			job->info = type;
-			job->is_system_asset = is_system;
+			job->is_system_asset |= is_system;
 			job->callback = std::move(func);
 			job->validate();
 			backend.push_job_to_queue(std::move(job));
@@ -582,7 +641,10 @@ public:
 
 		auto existing = find_in_all_assets(str);
 		if (existing) {
-			assert(existing->get_type().is_a(*type));
+			if (!existing->get_type().is_a(*type)) {
+				sys_print(Error, "2 assets with same name but different type: %s\n", str.c_str());
+				return nullptr;
+			}
 			existing->is_system |= is_system;
 			return existing;
 		}
@@ -598,12 +660,16 @@ public:
 			// guaranteed that job is finished by now
 			auto a = find_in_all_assets(str);
 			assert(a);
+			assert(!is_system || a->is_system);
 			return a;
 		}
 	}
 
 	void mark_assets_as_unreferenced()
 	{
+		finish_all_jobs();
+		tick_asyncs_standard();	// tick asyncs
+
 		for (auto& o : allAssets) {
 			if (o.second->is_system)
 				o.second->gc = IAsset::Gray;
@@ -634,7 +700,8 @@ public:
 		for (auto& asset : allAssets) {
 			if (asset.second->gc == IAsset::White) {
 				remove_these.push_back(asset.second);
-				sys_print(Info,"uninstalling %s resource %s\n", asset.second->get_type().classname, asset.second->get_name().c_str());
+				if(log_all_asset_loads.get_bool())
+					sys_print(Debug,"uninstalling %s resource %s\n", asset.second->get_type().classname, asset.second->get_name().c_str());
 				asset.second->uninstall();
 			}
 		}

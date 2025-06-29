@@ -233,6 +233,10 @@ IFilePtr FileSys::open_read(const char* p, WhereEnum flags)
 	else if (flags == FileSys::ENGINE_DIR) {
 		return open_read_dir(".", p);
 	}
+	else if (flags == FileSys::SHADER_CACHE) {
+		return open_read_dir("ShaderCache", p);
+	}
+
 	assert(0);
 
 	return nullptr;
@@ -248,6 +252,10 @@ IFilePtr FileSys::open_write(const char* relative_path, WhereEnum where)
 	else if (where == FileSys::ENGINE_DIR) {
 		return open_write_dir(".", relative_path);
 	}
+	else if (where == FileSys::SHADER_CACHE) {
+		return open_write_dir("ShaderCache", relative_path);
+	}
+
 	assert(0);
 
 	return nullptr;
@@ -260,6 +268,8 @@ const char* FileSys::get_path(WhereEnum where)
 		return g_project_base.get_string();
 	else if (where == ENGINE_DIR)
 		return ".";
+	else if (where == SHADER_CACHE)
+		return "ShaderCache";
 	else
 		return ".";
 }

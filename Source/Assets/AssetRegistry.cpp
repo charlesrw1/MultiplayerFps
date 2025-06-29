@@ -272,7 +272,7 @@ public:
 		is_in_loading = false;
 		AssetRegistrySystem::get().root = std::move(root);
 
-		sys_print(Info, "finished assset reindex\n");
+		sys_print(Debug, "AssetRegistry: finished assset reindex\n");
 	}
 	std::unique_ptr<AssetFilesystemNode> root;
 

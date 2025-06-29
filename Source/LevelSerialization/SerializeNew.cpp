@@ -74,13 +74,14 @@ ClassBase* MakeObjectForPathNew::create_from_name(ReadSerializerBackendJson& s, 
 	if (ext == ".pfb") {
 		PrefabAsset* pfb = cast_to<PrefabAsset>(load.load_asset(&PrefabAsset::StaticType, str));
 		if (pfb && !pfb->did_load_fail()) {
-			printf("instancing prefab\n");
+			sys_print(Debug, "MakeObjectForPathNew::create_from_name(%s): instancing prefab\n",s.get_debug_tag());
 
-			UnserializedSceneFile out = unserialize_entities_from_text(pfb->text, &load, pfb);
+			string debug_tag = s.get_debug_tag() + string("/") + pfb->get_name();
+			UnserializedSceneFile out = unserialize_entities_from_text(debug_tag.c_str(),pfb->text, &load, pfb);
 			//out.get_
 			Entity* root_of_prefab = out.get_root_entity();
 			if (!root_of_prefab) {
-				LOG_WARN("prefab didnt have root?");
+				sys_print(Warning, "MakeObjectForPathNew::create_from_name(%s): instanced prefab didnt have root?\n",s.get_debug_tag());
 				out.delete_objs();
 			}
 			else {
@@ -92,7 +93,7 @@ ClassBase* MakeObjectForPathNew::create_from_name(ReadSerializerBackendJson& s, 
 					string str = "";
 					auto find = objpath.find("/");
 					if (find == string::npos) {
-						LOG_WARN("sub object in pfb didnt have '/'");
+						sys_print(Warning, "MakeObjectForPathNew::create_from_name(%s): sub object missing '/' (%s)\n", s.get_debug_tag(), objpath.c_str());
 						str = objpath;
 					}
 					else {
@@ -110,7 +111,7 @@ ClassBase* MakeObjectForPathNew::create_from_name(ReadSerializerBackendJson& s, 
 			return root_of_prefab;
 		}
 		else {
-			LOG_WARN("prefab load failed");
+			sys_print(Error, "MakeObjectForPathNew::create_from_name(%s): prefab load failed (%s)\n",s.get_debug_tag(), str.c_str());
 			return nullptr;
 		}
 		return nullptr;
@@ -137,7 +138,7 @@ void SerializeEntitiesContainer::serialize(Serializer& s)
 				SetUtil::insert_test_exists(objects, (BaseUpdater*)c);
 			}
 			else {
-				LOG_WARN("null unserialized class");
+				sys_print(Warning, "SerializeEntitiesContainer::serialize: null unserialized class in (%s)\n", s.get_debug_tag());
 			}
 		}
 	}
@@ -171,12 +172,12 @@ static void set_object_vars(BaseUpdater& e, std::string path, Entity* opt_source
 //		
 
 using std::vector;
-UnserializedSceneFile NewSerialization::unserialize_from_text(const std::string& text, IAssetLoadingInterface& load, PrefabAsset* opt_source_prefab)
+UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_tag, const std::string& text, IAssetLoadingInterface& load, PrefabAsset* opt_source_prefab)
 {
-	printf("loading prefab\n");
+	//printf("loading prefab\n");
 	UnserializedSceneFile outfile;
 	MakeObjectForPathNew objmaker(load,outfile,opt_source_prefab);
-	ReadSerializerBackendJson reader(text, objmaker,load);
+	ReadSerializerBackendJson reader(debug_tag, text, objmaker,load);
 	SerializeEntitiesContainer* rootobj = reader.get_root_obj()->cast_to<SerializeEntitiesContainer>();
 
 	assert(rootobj);	//fixme
@@ -184,12 +185,12 @@ UnserializedSceneFile NewSerialization::unserialize_from_text(const std::string&
 	vector<Entity*> roots;
 	for (auto obj : rootobj->objects) {
 		if (!obj) {
-			LOG_WARN("no obj");
+			sys_print(Warning, "unserialize_from_text(%s): obj is null\n", debug_tag);
 			continue;
 		}
 		auto path = reader.get_path_for_object(*obj);
 		if (!path) {
-			LOG_WARN("no path");
+			sys_print(Warning, "unserialize_from_text(%s): no path\n", debug_tag);
 			continue;
 		}
 
@@ -212,17 +213,18 @@ UnserializedSceneFile NewSerialization::unserialize_from_text(const std::string&
 	if (!roots.empty()) {
 		outfile.set_root_entity(roots[0]);
 		if (roots.size() > 1)
-			LOG_WARN("more than 1 root");
+			sys_print(Warning, "unserialize_from_text(%s): more than 1 root (found %d)\n", debug_tag, (int)roots.size());
 	}
-	else
-		LOG_WARN("no roots");
-	printf("finished prefab\n");
+	else {
+		sys_print(Warning, "unserialize_from_text(%s): found no roots\n", debug_tag);
+	}
+	//printf("finished prefab\n");
 
 	delete rootobj;
 	return std::move(outfile);
 }
 
-void NewSerialization::add_objects_to_write(SerializeEntitiesContainer& con, Entity& e, PrefabAsset* for_prefab)
+void NewSerialization::add_objects_to_write(const char* debug_tag, SerializeEntitiesContainer& con, Entity& e, PrefabAsset* for_prefab)
 {
 	if (e.dont_serialize_or_edit)
 		return;
@@ -233,7 +235,7 @@ void NewSerialization::add_objects_to_write(SerializeEntitiesContainer& con, Ent
 		const auto& all_comps = e.get_components();
 		for (auto c : all_comps) {
 			if (!c) {
-				LOG_WARN("null component");
+				sys_print(Warning, "add_objects_to_write(%s): component was null in object (id=%lld)\n", debug_tag, e.get_instance_id());
 				continue;
 			}
 
@@ -243,10 +245,10 @@ void NewSerialization::add_objects_to_write(SerializeEntitiesContainer& con, Ent
 		auto& children = e.get_children();
 		for (auto child : children) {
 			if (!child) {
-				LOG_WARN("null child");
+				sys_print(Warning, "add_objects_to_write(%s): object had null child (id=%lld)\n", debug_tag, e.get_instance_id());
 				continue;
 			}
-			add_objects_to_write(con,*child,for_prefab);
+			add_objects_to_write(debug_tag,con,*child,for_prefab);
 		}
 	}
 }
@@ -258,13 +260,13 @@ void add_to_extern_parents_new(const BaseUpdater* obj, const BaseUpdater* parent
 	ext.external_parent_handle = parent->get_instance_id();
 	output.extern_parents.push_back(ext);
 }
-void NewSerialization::add_objects_to_container(const std::vector<Entity*>& input_objs, SerializeEntitiesContainer& container, PrefabAsset* for_prefab, SerializedSceneFile& output)
+void NewSerialization::add_objects_to_container(const char* debug_tag, const std::vector<Entity*>& input_objs, SerializeEntitiesContainer& container, PrefabAsset* for_prefab, SerializedSceneFile& output)
 {
 	auto roots = root_objects_to_write(input_objs);
 	for (auto r : roots) {
 		if (r->get_parent())
 			add_to_extern_parents_new(r, r->get_parent(), for_prefab, output);
-		add_objects_to_write(container, *r, for_prefab);
+		add_objects_to_write(debug_tag,container, *r, for_prefab);
 	}
 }
 
@@ -273,14 +275,14 @@ static void add_paths_to_put_back(Entity& e, MakePathForObjectNew& pathmaker, un
 	if (e.unique_file_id == 0)
 		return;
 
-	auto makepath = pathmaker.make_path(&e).path;
+	string makepath = pathmaker.make_path(&e).path;
 	MapUtil::insert_test_exists(path_to_handle, makepath, e.get_instance_id());
 	for (auto child : e.get_children())
 		add_paths_to_put_back(*child, pathmaker, path_to_handle);
 	for (auto c : e.get_components()) {
 		if (c->unique_file_id == 0)
 			continue;
-		auto cmakepath = pathmaker.make_path(c).path;
+		string cmakepath = pathmaker.make_path(c).path;
 		MapUtil::insert_test_exists(path_to_handle, cmakepath, c->get_instance_id());
 	}
 }
@@ -298,13 +300,13 @@ static void add_paths_from_container(const std::vector<Entity*>& input_objs, Mak
 // cant be a subobject of a prefab, has to be the prefab root
 
 
-SerializedSceneFile NewSerialization::serialize_to_text(const std::vector<Entity*>& input_objs, PrefabAsset* opt_prefab)
+SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs, PrefabAsset* opt_prefab)
 {
 	SerializedSceneFile out;
 	SerializeEntitiesContainer container;
 	MakePathForObjectNew pathmaker(opt_prefab);
-	add_objects_to_container(input_objs, container, opt_prefab, out);
-	WriteSerializerBackendJson writer(pathmaker,container);
+	add_objects_to_container(debug_tag,input_objs, container, opt_prefab, out);
+	WriteSerializerBackendJson writer(debug_tag, pathmaker,container);
 	add_paths_from_container(input_objs, pathmaker, out.path_to_instance_handle);
 	out.text = "!json\n"+writer.get_output().dump(1);
 	//std::cout << out.text << '\n';

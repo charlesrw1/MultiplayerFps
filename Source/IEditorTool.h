@@ -6,20 +6,21 @@
 #include <functional>
 union SDL_Event;
 struct View_Setup;
-
+#include "EngineEditorState.h"
 
 // Base editor tool class
 class IEditorTool
 {
 public:
+	virtual ~IEditorTool() {}
 
 	void try_close(std::function<void()> callback);	// will try closing document, if success, does callback.
 	void try_save(std::function<void()> callback);
 	
+	virtual uptr<CreateEditorAsync> create_command_to_load_back() = 0;
+
 	// if save is called when !current_document_has_path(), then it will open a popup to pick a save directory
-	void close();
 	bool save();
-	bool open(const char* name, const char* arg = "");
 	void draw_menu_bar();
 
 	// called every render frame while open
@@ -33,6 +34,7 @@ public:
 	virtual void hook_scene_viewport_draw() {}
 	virtual void hook_imgui_newframe() {}
 	virtual bool wants_scene_viewport_menu_bar() const { return false; }
+
 
 	virtual const char* get_save_file_extension() const = 0;
 
@@ -63,19 +65,9 @@ protected:
 	void set_empty_doc() { // sets the name to empty, will open a popup to save later
 		name = "";
 	}
-
-	// called once on the first time a call to open a document
-	virtual void init() {}
-
-	// return wether the document can be saved right now, if false, save_document_internal() will not be called
-	virtual bool can_save_document() { return true; };
-
 private:
-	// this is called by open(), if the document doesnt exist or fails to parse, you MUST open something, so create a new doc, this will be checked
-	virtual bool open_document_internal(const char* name, const char* arg) = 0;
-	// this is called by close(), remove all internal references to the currently open document, this only gets called if 
-	// has_document_open() is true, so you dont have to check
-	virtual void close_internal() = 0;
+
+
 	// this is called by save(), it guaranteed that this document will have a valid path to save to (get_save_root_dir()+get_doc_name())
 	// when called, assert otherwise
 	// return wether the document could compile+save properly

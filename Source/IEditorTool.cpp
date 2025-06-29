@@ -35,6 +35,7 @@ void IEditorTool::set_window_title()
 
 	SDL_SetWindowTitle(eng->get_os_window(), name);
 }
+#if 0
 bool IEditorTool::open(const char* name, const char* arg) {
 
 	if (!is_initialized) {
@@ -57,7 +58,7 @@ bool IEditorTool::open(const char* name, const char* arg) {
 
 	return true;
 }
-
+#endif
 extern ConfigVar g_project_name;
 
 #include "EditorPopups.h"
@@ -110,6 +111,7 @@ void IEditorTool::try_close(std::function<void()> callback)
 		}
 	);
 }
+#if 0
 
 void IEditorTool::close()
 {
@@ -125,12 +127,14 @@ void IEditorTool::close()
 
 	SDL_SetWindowTitle(eng->get_os_window(), g_project_name.get_string());
 }
+#endif
+
 bool IEditorTool::save()
 {
-	if (!can_save_document()) {
-		sys_print(Error, "cant save graph while playing\n");
-		return false;
-	}
+	//if (!can_save_document()) {
+	//	sys_print(Error, "cant save graph while playing\n");
+	//	return false;
+	//}
 	if (!current_document_has_path()) {
 		open_save_popup = true;
 		return false;
@@ -220,9 +224,9 @@ static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path
 	}
 
 	if (write_out) {
-		init = true;
-		ImGui::CloseCurrentPopup();
-		callback(buffer);
+init = true;
+ImGui::CloseCurrentPopup();
+callback(buffer);
 	}
 
 	ImGui::EndPopup();
@@ -242,16 +246,17 @@ static void draw_popups_for_editor(bool& open_open_popup, bool& open_save_popup,
 	if (ImGui::BeginPopupModal("Save file dialog")) {
 		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Will be saved under %s", prefix.c_str());
 		open_or_save_file_dialog([&](const char* buf) {
-			name = buf +std::string( "." ) + tool->get_save_file_extension();
+			name = buf + std::string(".") + tool->get_save_file_extension();
 			tool->save();
 			}, prefix.c_str(), true, tool);
 	}
 
 	if (ImGui::BeginPopupModal("Open file dialog")) {
-		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Searched for in %s", prefix.c_str());
-		open_or_save_file_dialog([&](const char* buf) {
-			tool->open( (buf +std::string( "." ) + tool->get_save_file_extension()).c_str() );
-			}, prefix.c_str(), false, tool);
+		assert(0);
+		//ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Searched for in %s", prefix.c_str());
+		//open_or_save_file_dialog([&](const char* buf) {
+		//	tool->open( (buf +std::string( "." ) + tool->get_save_file_extension()).c_str() );
+		//	}, prefix.c_str(), false, tool);
 	}
 }
 
@@ -286,7 +291,7 @@ void IEditorTool::draw_menu_bar()
 			if (ImGui::MenuItem("Save", "Ctrl+S")) {
 				save();
 			}
-			
+
 			hook_menu_bar_file_menu();
 
 			ImGui::EndMenu();
@@ -297,7 +302,7 @@ void IEditorTool::draw_menu_bar()
 
 			for (int i = 0; i < types.size(); i++) {
 				auto& type = types[i];
-				if (type->tool_to_edit_me()&&type->show_tool_in_toolbar()) {
+				if (type->tool_to_edit_me() && type->show_tool_in_toolbar()) {
 					std::string name = type->get_type_name();
 					ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(type->get_browser_color().to_uint()));
 					if (ImGui::MenuItem(name.c_str())) {

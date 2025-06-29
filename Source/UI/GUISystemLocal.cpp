@@ -309,7 +309,7 @@ void GuiSystemLocal::remove_gui_layer(guiBase* layer) {
 		sys_print(Warning, "couldnt remove gui layer, not found\n");
 	}
 	else {
-		sys_print(Info, "removing layer\n");
+		sys_print(Debug, "GuiSystemLocal::remove_gui_layer: removing layer\n");
 		gui_layers.erase(gui_layers.begin() + i);
 
 	}
@@ -317,7 +317,7 @@ void GuiSystemLocal::remove_gui_layer(guiBase* layer) {
 
 }
 void GuiSystemLocal::add_gui_layer(guiBase* layer) {
-	sys_print(Info, "adding layer\n");
+	sys_print(Debug, "GuiSystemLocal::add_gui_layer: adding layer\n");
 
 	ASSERT(find_existing_layer(layer) == -1);
 	gui_layers.push_back(layer);

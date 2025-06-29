@@ -1,22 +1,17 @@
 #pragma once
-
-
 #include "Render/MaterialPublic.h"
-
 #include <vector>
 #include <unordered_set>
-
 #include "Framework/Handle.h"
 #include "Shader.h"
 #include <unordered_map>
-
 #include "Framework/Files.h"
 #include "Game/SerializePtrHelpers.h"
 
 const int MAX_INSTANCE_PARAMETERS = 8;	// 8 scalars/color32s
-const uint32_t MATERIAL_SIZE = 64;	// 64 bytes
-const uint32_t MAX_MATERIALS = 1024;
-const uint32_t MAX_MAXTERIALS_BUFFER_SIZE = MATERIAL_SIZE * MAX_MATERIALS;
+const int MATERIAL_SIZE = 64;	// 64 bytes
+const int MAX_MATERIALS = 1024;
+const int MAX_MAXTERIALS_BUFFER_SIZE = MATERIAL_SIZE * MAX_MATERIALS;
 
 enum class LightingMode : uint8_t
 {
@@ -32,7 +27,6 @@ enum class MaterialUsage : uint8_t
 	UI,
 	Particle,
 };
-
 
 enum class blend_state : uint8_t
 {
@@ -56,6 +50,28 @@ enum class MatParamType : uint8_t
 // Variant for material parameters
 struct MaterialParameterValue
 {
+	MaterialParameterValue(bool boolean) {
+		this->boolean = boolean;
+		type = MatParamType::Bool;
+	}
+	MaterialParameterValue(glm::vec4 vec) {
+		this->vector = vec;
+		type = MatParamType::FloatVec;
+	}
+	MaterialParameterValue(unsigned int color32) {
+		this->color32 = color32;
+		type = MatParamType::Vector;
+	}
+	MaterialParameterValue(float scalar) {
+		this->scalar = scalar;
+		type = MatParamType::Float;
+	}
+	MaterialParameterValue(const Texture* t) {
+		this->tex_ptr = t;
+		type = MatParamType::Texture2D;
+	}
+	MaterialParameterValue() = default;
+
 	MatParamType type = MatParamType::Empty;
 	union {
 		glm::vec4 vector;
@@ -74,7 +90,7 @@ struct MaterialParameterDefinition
 	MaterialParameterValue default_value;
 	// For textures: offset = texture index
 	// Else: offset = byte offset in parameter SSBO buffer
-	uint32_t offset = 0;
+	int offset = 0;
 };
 
 struct InstanceData
@@ -84,75 +100,44 @@ struct InstanceData
 	uint32_t index = 0;
 };
 
-//class MaterialBufferLocal : public MaterialParameterBuffer
-//{
-//public:
-//	std::vector<MaterialParameterDefinition> param_defs;
-//	std::vector<MaterialParameterValue> values;
-//
-//	bufferhandle ubo_buffer = 0;
-//	uint32_t buffer_size = 0;
-//};
-
-
 // compilied material, material instances can be based off it to allow for variation but minimize draw call changes
 class MasterMaterialImpl
 {
 public:
 	MasterMaterialImpl() {}
-
-	// generated glsl fragment and vertex shader
-
-	const MaterialParameterDefinition* find_definition(const std::string& str, int& index) const {
-		for (int i = 0; i < param_defs.size(); i++)
-			if (param_defs[i].name == str) {
-				index = i;
-				return &param_defs[i];
-			}
-		return nullptr;
+	~MasterMaterialImpl() {
+		sys_print(Debug, "~MasterMaterialImpl: %s\n", self->get_name().c_str());
 	}
+	const MaterialParameterDefinition* find_definition(const std::string& str, int& index) const;
+	bool is_translucent() const { return blend == blend_state::ADD || blend == blend_state::BLEND; }
+	bool render_in_forward_pass() const { return is_translucent(); }
+	bool is_alphatested() const { return alpha_tested; }
+	void load_from_file(const std::string& fullpath, IFile* file, IAssetLoadingInterface* loading);
+#ifdef EDITOR_BUILD
+	// generated glsl fragment and vertex shader
+	std::string create_glsl_shader(std::string& vs_code,std::string& fs_code,const std::vector<InstanceData>& instdat);
+#endif
 
 	MaterialInstance* self = nullptr;
 	// All parameters that can be set by instances
 	std::vector<MaterialParameterDefinition> param_defs;
-	uint32_t num_texture_bindings = 0;
+	int num_texture_bindings = 0;
 	struct UboBinding {
 		//MaterialParameterBuffer* buffer = nullptr;
-		uint32_t binding_loc = 0;
+		int binding_loc = 0;
 	};
 	std::vector<UboBinding> constant_buffers;
-
-	bool is_translucent() const {
-		return blend == blend_state::ADD || blend == blend_state::BLEND;
-	}
-	bool render_in_forward_pass() const {
-		return is_translucent();
-	}
-	bool is_alphatested() const {
-		return alpha_tested;
-	}
-
 	// Material state parameters
 	bool alpha_tested = false;
 	blend_state blend = blend_state::OPAQUE;
 	LightingMode light_mode = LightingMode::Lit;
 	MaterialUsage usage = MaterialUsage::Default;
 	bool backface = false;
-
 	// uses the shared depth material
 	// this is true when nothing writes to worldPositionOffset and the material mode is not masked
 	bool is_using_default_depth = false;
-
-	uint32_t material_id = 0;
+	int material_id = 0;
 	bool is_compilied_shader_valid = false;
-
-	void load_from_file(const std::string& fullpath, IFile* file, IAssetLoadingInterface* loading);
-
-	std::string create_glsl_shader(
-		std::string& vs_code,
-		std::string& fs_code,
-		const std::vector<InstanceData>& instdat
-	);
 
 	friend class MaterialManagerLocal;
 	friend class MaterialLodJob;
@@ -161,40 +146,29 @@ public:
 class MaterialImpl
 {
 public:
-	static const uint32_t INVALID_MAPPING = uint32_t(-1);
-	MaterialImpl(
-		bool is_dynamic_mat=false
-	)  {
-	
+	static const int INVALID_MAPPING = int(-1);
+	MaterialImpl(bool is_dynamic_mat=false)  {
 	}
-	MaterialInstance* self = nullptr;
 
 	bool is_this_currently_uploaded() const { return gpu_buffer_offset != INVALID_MAPPING; }
+	const std::vector<const Texture*>& get_textures() const { return texture_bindings; }
+	void init_from(const MaterialInstance* parent);
+	bool load_from_file(MaterialInstance* self, IAssetLoadingInterface* loading);
+	void load_instance(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
+	void load_master(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
+	void post_load(MaterialInstance* self);
 
+	MaterialInstance* self = nullptr;
 	bool is_dynamic_material = false;
-
-	uint32_t unique_id = 0;	// unique id of this material instance (always valid)
-
+	int unique_id = 0;	// unique id of this material instance (always valid)
 	AssetPtr<MaterialInstance> parentMatInstance;
 	const MasterMaterialImpl* masterMaterial = nullptr;	// this points to what master material this is instancing (valid on every material!)
 	std::unique_ptr<MasterMaterialImpl> masterImpl;	// if this material instance is a default instance of a master material, this is filled
-
-	const std::vector<const Texture*>& get_textures() const { return texture_bindings; }
 	std::vector<const Texture*> texture_bindings;
 	std::vector<MaterialParameterValue> params;
-	uint32_t gpu_buffer_offset = INVALID_MAPPING;	// offset in buffer if uploaded (the buffer is uint's so byte = buffer_offset*4)
-
+	int gpu_buffer_offset = INVALID_MAPPING;	// offset in buffer if uploaded (the buffer is uint's so byte = buffer_offset*4)
 	int dirty_buffer_index = -1;	// if not -1, then its sitting in a queue already
-
 	bool has_called_post_load_already = false;
-
-	void init_from(const MaterialInstance* parent);
-	bool load_from_file(MaterialInstance* self, IAssetLoadingInterface* loading);
-
-	void load_instance(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
-	void load_master(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
-
-	void post_load(MaterialInstance* self);
 
 	friend class MaterialManagerLocal;
 	friend class MaterialLodJob;
@@ -236,11 +210,9 @@ class Material_Shader_Table
 {
 public:
 	Material_Shader_Table();
-
 	program_handle lookup(shader_key key);
 	void insert(shader_key key, program_handle handle);
 	void recompile_for_material(MasterMaterialImpl* mat);
-
 
 	std::unordered_map<uint32_t, program_handle> shader_key_to_program_handle;
 };
@@ -315,10 +287,10 @@ public:
 
 	}
 
-	uint32_t get_next_master_id() {
+	int get_next_master_id() {
 		return ++current_master_id;
 	}
-	uint32_t get_next_instance_id() {
+	int get_next_instance_id() {
 		return ++current_instance_id;
 	}
 	MaterialInstance* get_default_editor_sel_PP() {
@@ -336,7 +308,7 @@ private:
 
 	// global material buffer, all parameters get stuff in here and accessed by shaders
 	bufferhandle gpuMaterialBuffer = 0;
-	uint32_t materialBufferSize = 0;
+	int materialBufferSize = 0;
 
 	// bitmap allocator for materials
 	std::vector<uint64_t> materialBitmapAllocator;
@@ -346,7 +318,7 @@ private:
 	std::vector<MaterialInstance*> dirty_list;
 
 	// returns INDEX, not POINTER
-	uint32_t allocate_material_instance() {
+	int allocate_material_instance() {
 		for (int i = 0; i < materialBitmapAllocator.size(); i++) {
 			if (materialBitmapAllocator[i] == UINT64_MAX)
 				continue;
@@ -365,8 +337,8 @@ private:
 	}
 
 
-	uint32_t current_master_id = 0;
-	uint32_t current_instance_id = 0;
+	int current_master_id = 0;
+	int current_instance_id = 0;
 };
 
 extern MaterialManagerLocal matman;

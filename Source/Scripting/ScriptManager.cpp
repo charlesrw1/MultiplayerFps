@@ -142,6 +142,7 @@ ScriptManager::ScriptManager()
 {
 	printf("ScriptManager init...");
 	lua = luaL_newstate();
+
 	load_script_files();
 }
 

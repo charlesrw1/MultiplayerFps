@@ -18,12 +18,6 @@ extern ConfigVar g_window_h;
 extern ConfigVar g_window_fullscreen;
 extern ConfigVar g_host_port;
 
-enum class Engine_State
-{
-	Idle,		// main menu or in tool state
-	Loading,	// loading next level
-	Game,		// in game state
-};
 
 
 template<typename... Args>
@@ -57,8 +51,7 @@ public:
 	virtual Client* get_client() = 0;
 	virtual Server* get_server() = 0;
 	virtual SDL_Window* get_os_window() = 0;
-	virtual IEditorTool* get_current_tool() const = 0;
-	virtual Engine_State get_state() const = 0;
+
 	virtual bool is_game_focused() const = 0;
 	virtual void set_game_focused(bool focus) = 0;
 	virtual glm::ivec2 get_game_viewport_size() const = 0;
@@ -68,10 +61,6 @@ public:
 
 	virtual void log_to_fullscreen_gui(LogType type, const char* msg) = 0;
 
-	virtual void leave_level() = 0;
-	// queues a level to be loaded
-	virtual void open_level(std::string levelname) = 0;
-	virtual void connect_to(std::string address) = 0;
 
 	virtual void login_new_player(uint32_t index) = 0;
 	virtual void logout_player(uint32_t index) = 0;
@@ -93,7 +82,7 @@ public:
 
 	// used by client/server for syncing
 	void set_tick_interval(double next_interval) {
-		assert(get_state() != Engine_State::Game);
+		//assert(get_state() != Engine_State::Game);
 		tick_interval = next_interval;
 	}
 	void set_game_time(double newtime) {

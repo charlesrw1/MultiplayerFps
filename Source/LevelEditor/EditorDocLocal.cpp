@@ -48,8 +48,7 @@
 
 #include "UI/UIBuilder.h"
 
-EditorDoc ed_doc;
-IEditorTool* g_editor_doc = &ed_doc;
+
 
 ConfigVar g_editor_newmap_template("g_editor_newmap_template", "eng/template_map.tmap", CVAR_DEV, "whenever a new map is created, it will use this map as a template");
 ConfigVar editor_draw_name_text("editor_draw_name_text", "0", CVAR_BOOL, "draw text above every entities head in editor");
@@ -141,9 +140,26 @@ void EditorDoc::validate_fileids_before_serialize()
 			o->unique_file_id = get_next_file_id();
 	}
 }
-
-void EditorDoc::init()
+#include "PropertyEditors.h"
+void EditorDoc::init_new()
 {
+	sys_print(Debug, "Edit mode: %s", (edit_category == EDIT_PREFAB) ? "Prefab" : "Scene");
+
+	command_mgr = std::make_unique<UndoRedoSystem>();
+
+	command_mgr->on_command_execute_or_undo.add(this, [&]() {
+		set_has_editor_changes();
+		});
+
+	selection_state = std::make_unique<SelectionState>(*this);
+	prop_editor = std::make_unique<EdPropertyGrid>(*this, grid_factory);
+	manipulate = std::make_unique<ManipulateTransformTool>(*this);
+	outliner = std::make_unique<ObjectOutliner>(*this);
+
+	PropertyFactoryUtil::register_basic(grid_factory);
+	PropertyFactoryUtil::register_editor(*this, grid_factory);
+
+
 	//global_asset_browser.init();
 	outliner->init();
 
@@ -174,6 +190,23 @@ void EditorDoc::init()
 			}
 		}
 		});
+
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  leveldock.ini");
+
+	assert(eng->get_level());
+	assert(!gui);
+	gui = eng->get_level()->spawn_entity()->create_component<EditorUILayout>();
+	gui->doc = this;
+	printf("%lld\n", (uint64_t)&gui->mouse_down_delegate);
+	gui->set_owner_dont_serialize_or_edit(true);
+	gui->set_focus();
+	gui->key_down_delegate.add(this, &EditorDoc::on_key_down);
+	gui->mouse_down_delegate.add(this, &EditorDoc::on_mouse_down);
+	ASSERT(gui->mouse_down_delegate.get_head());
+	gui->mouse_drag_delegate.add(this, &EditorDoc::on_mouse_drag);
+	gui->wheel_delegate.add(this, &EditorDoc::on_mouse_wheel);
+	gui->key_down_delegate.add(command_mgr.get(), &UndoRedoSystem::on_key_event);
+	ASSERT(gui->mouse_down_delegate.get_head());
 }
 #include "LevelSerialization/SerializeNew.h"
 bool EditorDoc::save_document_internal()
@@ -204,7 +237,8 @@ bool EditorDoc::save_document_internal()
 		if (!pa) pa = &temp_pa;
 	}
 
-	auto serialized = serialize_entities_to_text(all_ents, pa);
+	string debug_tag = "saving:" + assetName.value_or("<new>");
+	auto serialized = serialize_entities_to_text(debug_tag.c_str(),all_ents, pa);
 	//NewSerialization::serialize_to_text(all_ents, pa);
 
 	auto path = get_doc_name();
@@ -306,6 +340,69 @@ void EditorDoc::validate_prefab()
 }
 #include "EditorPopupTemplate.h"
 
+EditorDoc* EditorDoc::create_prefab(PrefabAsset* prefab)
+{
+	EditorDoc* out = new EditorDoc();
+	out->init_for_prefab(prefab);
+	return out;
+}
+EditorDoc* EditorDoc::create_scene(opt<string> scene)
+{
+	EditorDoc* out = new EditorDoc();
+	out->init_for_scene(scene);
+	return out;
+}
+void EditorDoc::init_for_prefab(PrefabAsset* prefab) {
+	edit_category = EditCategory::EDIT_PREFAB;
+	init_new();
+	// marks the templated level objects as dont serialize or edit
+	auto level = eng->get_level();
+	auto& objs = level->get_all_objects();
+	for (auto o : objs) {
+		o->dont_serialize_or_edit = true;
+	}
+	uniqueTemporaryPrefab = std::make_unique<PrefabAsset>();
+	if (prefab) {
+		eng->get_level()->spawn_prefab(prefab);
+		for (auto o : objs) {
+			if (o->what_prefab == prefab)
+				o->what_prefab = uniqueTemporaryPrefab.get();
+		}
+		assetName = prefab->get_name();
+	}
+	else {
+		assetName = std::nullopt;
+		spawn_entity();
+	}
+	assert(get_prefab_root_entity());
+	assert(uniqueTemporaryPrefab);
+
+	validate_prefab();
+
+	validate_fileids_before_serialize();
+	on_start.invoke();
+}
+void EditorDoc::init_for_scene(opt<string> scene) {
+	edit_category = EditCategory::EDIT_SCENE;
+	init_new();
+	validate_fileids_before_serialize();
+
+	if (scene.has_value()) {
+		assetName = scene.value();
+	}
+	else {
+		assetName = std::nullopt;
+	}
+
+	on_start.invoke();
+}
+
+EditorDoc::EditorDoc() {
+	assert(eng->get_level());
+}
+
+
+#if 0
 void EditorDoc::on_map_load_return(bool good)
 {
 	eng->get_on_map_delegate().remove(this);	// mark the delegate to be removed
@@ -326,20 +423,7 @@ void EditorDoc::on_map_load_return(bool good)
 		// this will call on_map_load_return again, sort of an infinite loop risk, but should always be valid with "__empty__"
 	}
 	else {
-		assert(!gui);
-		gui = eng->get_level()->spawn_entity()->create_component<EditorUILayout>();
-		printf("%lld\n", (uint64_t)&gui->mouse_down_delegate);
-		gui->set_owner_dont_serialize_or_edit(true);
-		gui->set_focus();
-		gui->key_down_delegate.add(this, &EditorDoc::on_key_down);
-		gui->mouse_down_delegate.add(this, &EditorDoc::on_mouse_down);
-		ASSERT(gui->mouse_down_delegate.get_head());
-		gui->mouse_drag_delegate.add(this, &EditorDoc::on_mouse_drag);
-		gui->wheel_delegate.add(this, &EditorDoc::on_mouse_wheel);
-		gui->key_down_delegate.add(command_mgr.get(), &UndoRedoSystem::on_key_event);
-		ASSERT(gui->mouse_down_delegate.get_head());
-
-
+		
 		if (is_editing_prefab()) {
 
 			// marks the templated level objects as dont serialize or edit
@@ -382,61 +466,15 @@ void EditorDoc::on_map_load_return(bool good)
 		on_start.invoke();
 	}
 }
-bool EditorDoc::open_document_internal(const char* levelname, const char* arg)
-{
-	editing_prefab_ptr = nullptr;
-
-	// schema vs level edit switch
-	if (strcmp(arg, "prefab") == 0)
-		edit_category = EditCategory::EDIT_PREFAB;
-	else
-		edit_category = EditCategory::EDIT_SCENE;
-
-	sys_print(Debug, "Edit mode: %s", (edit_category == EDIT_PREFAB) ? "Prefab" : "Scene");
-
-	file_id_start = 0;
-
-	if (is_editing_scene()) {
-		bool needs_new_doc = true;
-		if (strlen(levelname) != 0) {
-			eng->open_level(levelname);	// queues load
-			needs_new_doc = false;
-		}
-
-		if (needs_new_doc) {
-			// uses the newmap template to load
-			const char* name = g_editor_newmap_template.get_string();
-			sys_print(Debug, "creating new map using template map: %s\n", name);
-			set_empty_doc();
+#endif
 
 
-			eng->open_level(name);	// queues load
-		}
-	}
-	else {
-		// editing prefab
-		// wait for level to return
-
-		const char* name = g_editor_newmap_template.get_string();
-		sys_print(Debug, "creating new map using template map (for prefab): %s\n", name);
-		eng->open_level(name);	// queues load of template map
-	}
-	eng->get_on_map_delegate().add(this, &EditorDoc::on_map_load_return);
-
-	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  leveldock.ini");
-
-	return true;
-}
-
-void EditorDoc::close_internal()
-{
+EditorDoc::~EditorDoc() {
 	// level will get unloaded in the main loop
 	sys_print(Debug, "deleting map file for editor...\n");
 	command_mgr->clear_all();
 	on_close.invoke();
 	gui = nullptr;
-	// close the level document, its already been saved at this point
-	eng->leave_level();
 }
 
 
@@ -1539,7 +1577,7 @@ void EdPropertyGrid::refresh_grid()
 
 	if (ss->has_only_one_selected()) {
 		auto entity = ss->get_only_one_selected();
-		printf("adding to grid: %s\n", entity->get_type().classname);
+		sys_print(Debug,"EdPropertyGrid::refresh_grid: adding to grid: %s\n", entity->get_type().classname);
 
 		auto ti = &entity->get_type();
 		while (ti) {
@@ -1563,7 +1601,7 @@ void EdPropertyGrid::refresh_grid()
 
 
 			auto c = eng->get_object(selected_component)->cast_to<Component>();
-			printf("adding to grid: %s\n", c->get_type().classname);
+			sys_print(Debug, "EdPropertyGrid::refresh_grid: adding to grid: %s\n", c->get_type().classname);
 
 			ASSERT(c);
 			ti = &c->get_type();
@@ -1622,22 +1660,6 @@ void EditorDoc::set_camera_target_to_sel()
 			camera.set_orbit_target(pos, radius);
 		}
 	}
-}
-EditorDoc::EditorDoc() {
-
-	command_mgr = std::make_unique<UndoRedoSystem>();
-
-	command_mgr->on_command_execute_or_undo.add(this, [&]() {
-		set_has_editor_changes();
-		});
-
-	selection_state = std::make_unique<SelectionState>(*this);
-	prop_editor = std::make_unique<EdPropertyGrid>(*this, grid_factory);
-	manipulate = std::make_unique<ManipulateTransformTool>(*this);
-	outliner = std::make_unique<ObjectOutliner>(*this);
-
-	PropertyFactoryUtil::register_basic(grid_factory);
-	PropertyFactoryUtil::register_editor(*this, grid_factory);
 }
 
 extern void export_scene_model();
@@ -1724,14 +1746,14 @@ void EditorUILayout::on_dragging(int x, int y) {
 
 void EditorUILayout::paint(UIBuilder& builder) {
 
-	cube->rotation_matrix = (glm::mat3)ed_doc.vs_setup.view;
+	cube->rotation_matrix = (glm::mat3)doc->vs_setup.view;
 
 	int x, y;
 	SDL_GetMouseState(&x, &y);
 	bool do_mouse_click = mouse_clicked && button_clicked == 1;
 	mouse_clicked = false;
 
-	if (ed_doc.selection_state->has_any_selected() && (ed_doc.manipulate->is_hovered() || ed_doc.manipulate->is_using()))
+	if (doc->selection_state->has_any_selected() && (doc->manipulate->is_hovered() || doc->manipulate->is_using()))
 		do_mouse_click = false;
 
 	if (!editor_draw_name_text.get_bool())
@@ -1750,17 +1772,17 @@ void EditorUILayout::paint(UIBuilder& builder) {
 	auto& all_objs = eng->get_level()->get_all_objects();
 	for (auto o : all_objs) {
 		if (Entity* e = o->cast_to<Entity>()) {
-			if (!this_is_a_serializeable_object(e, ed_doc.get_editing_prefab()))
+			if (!this_is_a_serializeable_object(e, doc->get_editing_prefab()))
 				continue;
 
 
 			obj ob;
-			glm::vec3 todir = glm::vec3(e->get_ws_position()) - ed_doc.vs_setup.origin;
+			glm::vec3 todir = glm::vec3(e->get_ws_position()) - doc->vs_setup.origin;
 			float dist = glm::dot(todir, todir);
 			if (dist > 20.0 * 20.0)
 				continue;
 			ob.e = e;
-			glm::vec4 pos = ed_doc.vs_setup.viewproj * glm::vec4(e->get_ws_position(), 1.0);
+			glm::vec4 pos = doc->vs_setup.viewproj * glm::vec4(e->get_ws_position(), 1.0);
 			ob.pos = pos / pos.w;
 
 			if (ob.pos.z < 0)
@@ -1793,7 +1815,7 @@ void EditorUILayout::paint(UIBuilder& builder) {
 		const int icon_size = 16;
 		InlineVec<Texture*, 6> icons;
 		auto e = o.e;
-		if (e->is_root_of_prefab && e->what_prefab != ed_doc.get_editing_prefab()) {
+		if (e->is_root_of_prefab && e->what_prefab != doc->get_editing_prefab()) {
 			const char* s = "eng/editor/prefab_p.png";
 			auto tex = g_assets.find_global_sync<Texture>(s);
 			icons.push_back(tex.get());
@@ -1846,13 +1868,13 @@ void EditorUILayout::paint(UIBuilder& builder) {
 	}
 	if (clicked) {
 		if (ImGui::GetIO().KeyShift) {
-			ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::ADD_SELECT, clicked, true);
+			doc->do_mouse_selection(EditorDoc::MouseSelectionAction::ADD_SELECT, clicked, true);
 		}
 		else if (ImGui::GetIO().KeyCtrl) {
-			ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::UNSELECT, clicked, true);
+			doc->do_mouse_selection(EditorDoc::MouseSelectionAction::UNSELECT, clicked, true);
 		}
 		else {
-			ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::SELECT_ONLY, clicked, true);
+			doc->do_mouse_selection(EditorDoc::MouseSelectionAction::SELECT_ONLY, clicked, true);
 		}
 	}
 	else {

@@ -57,7 +57,12 @@ public:
 class WriteSerializerBackendJson : public Serializer
 {
 public:
-	WriteSerializerBackendJson(IMakePathForObject& pathmaker, ClassBase& obj_to_serialize);
+	WriteSerializerBackendJson(const char* debug_tag, IMakePathForObject& pathmaker, ClassBase& obj_to_serialize);
+
+	const char* debug_tag = "";
+	const char* get_debug_tag() final {
+		return debug_tag;
+	}
 
 	nlohmann::json* get_root_object() {
 		nlohmann::json* objs = get_objects_object();
@@ -261,8 +266,13 @@ class IAssetLoadingInterface;
 class ReadSerializerBackendJson : public Serializer
 {
 public:
-	ReadSerializerBackendJson(const std::string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader);
+	ReadSerializerBackendJson(const char* debug_tag, const std::string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader);
 	
+	const char* debug_tag = "";
+	const char* get_debug_tag() final {
+		return debug_tag;
+	}
+
 	// expects a second file
 	void insert_nested_object(string path, ClassBase* obj);
 

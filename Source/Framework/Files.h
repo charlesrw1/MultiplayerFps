@@ -63,6 +63,8 @@ public:
 		GAME_DIR = 0,	// searches engine dir and game_dir
 		ENGINE_DIR = 1,	// root engine dir
 		USER_DIR = 2,	// the save folder location for users
+
+		SHADER_CACHE = 3,
 	};
 
 	static void init();

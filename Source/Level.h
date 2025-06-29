@@ -17,12 +17,13 @@ class SerializedSceneFile;
 class BaseUpdater;
 struct ClassTypeInfo;
 class Component;
+using std::string;
 class Level
 {
 public:
 	// constructed in GameEngineLocal::on_map_change_callback
-	Level(uptr<SceneAsset> source, bool is_editor);
-	void start();	// called right after ctor
+	Level(bool is_editor);
+	void start(SceneAsset* source);	// called right after ctor
 	~Level();
 	void insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids = nullptr); // was bool assign_new_ids=false
 	// ends the level
@@ -49,8 +50,8 @@ public:
 	BaseUpdater* get_entity(uint64_t handle) {
 		return all_world_ents.find(handle);
 	}
-	SceneAsset* get_source_asset() const {
-		return source_asset.get();
+	string get_source_asset_name() const {
+		return sourceAssetName;
 	}
 	bool is_editor_level() const {
 		return b_is_editor_level;
@@ -61,7 +62,7 @@ public:
 	// appends object to list that will be destroyed at end of frame, instead of instantly
 	void queue_deferred_delete(BaseUpdater* e);
 private:
-	uptr<SceneAsset> source_asset = nullptr;
+	string sourceAssetName;
 	// all entities/components in the map
 	hash_map<BaseUpdater*> all_world_ents;
 	hash_set<Component> tick_list;

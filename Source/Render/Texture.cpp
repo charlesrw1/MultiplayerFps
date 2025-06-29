@@ -24,7 +24,7 @@
 extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*);
 
 #ifdef EDITOR_BUILD
-extern IEditorTool* g_texture_editor_tool;
+//extern IEditorTool* g_texture_editor_tool;
 class TextureAssetMetadata : public AssetMetadata
 {
 public:
@@ -53,7 +53,7 @@ public:
 		filepaths.push_back("_black");
 		filepaths.push_back("_flat_normal");
 	}
-	virtual IEditorTool* tool_to_edit_me() const override { return g_texture_editor_tool; }
+	//virtual IEditorTool* tool_to_edit_me() const override { return g_texture_editor_tool; }
 	bool show_tool_in_toolbar() const override {
 		return false;
 	}
@@ -600,7 +600,9 @@ Texture* Texture::install_system(const std::string& path)
 	return t;
 }
 Texture::Texture() {}
-Texture::~Texture() {}
+Texture::~Texture() {
+	assert(gl_id == 0);
+}
 
 
 void benchmark_run()

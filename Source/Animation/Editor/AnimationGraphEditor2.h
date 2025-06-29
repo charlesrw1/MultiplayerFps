@@ -329,6 +329,11 @@ inline NodeMenu::~NodeMenu() {}
 class AnimationGraphEditorNew : public EditorTool3d
 {
 public:
+	AnimationGraphEditorNew(opt<string> path);
+	~AnimationGraphEditorNew();
+
+	uptr<CreateEditorAsync> create_command_to_load_back() final { return nullptr; }
+
 	EditorNodeGraph& get_graph() {
 		assert(graph);
 		return *graph.get();
@@ -344,7 +349,6 @@ public:
 	MulticastDelegate<> on_changed_graph_classes;
 	MulticastDelegate<> on_node_changes;
 	MulticastDelegate<> on_selection_change;
-
 
 	void add_command(Command* command);
 	bool is_node_selected(Base_EdNode& node) const {
@@ -373,11 +377,11 @@ private:
 	void draw_layer_window();
 
 	void post_map_load_callback() override{}
-	void init() override;
-	void close_internal() override;
+	void init();
+	void close_internal();
 	void tick(float dt) override;
 	void hook_menu_bar() override;
-	bool can_save_document() override;
+	bool can_save_document();
 	void imgui_draw() override;
 	bool save_document_internal() override;
 	const ClassTypeInfo& get_asset_type_info() const override;

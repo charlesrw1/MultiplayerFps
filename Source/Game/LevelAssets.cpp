@@ -8,14 +8,91 @@
 #include "LevelSerialization/SerializationAPI.h"
 
 #include "Framework/ReflectionProp.h"
-
-
-
+#include "EngineSystemCommands.h"
+#include "LevelEditor/EditorDocLocal.h"
+using std::make_unique;
 #ifdef EDITOR_BUILD
 class IEditorTool;
 
+extern ConfigVar g_editor_newmap_template;
+
+class CreateLevelEditorAync : public CreateEditorAsync {
+public:
+	CreateLevelEditorAync(opt<string> assetPath) : assetPath(assetPath) {}
+	void execute(Callback callback) final {
+		uptr<OpenMapCommand> cmd;
+		const bool wants_new_map = !assetPath.has_value();
+		if (wants_new_map) {
+			cmd = make_unique<OpenMapCommand>(g_editor_newmap_template.get_string(), false/* for editor */);
+		}
+		else {
+			cmd = make_unique<OpenMapCommand>(assetPath, false/* for editor */);
+		}
+		const opt<string> assetPath = this->assetPath;
+		cmd->callback = [callback, assetPath](OpenMapReturnCode code) {
+			if (code == OpenMapReturnCode::Success) {
+				assert(eng->get_level());
+				uptr<EditorDoc> editorDoc(EditorDoc::create_scene(assetPath));
+				callback(std::move(editorDoc));
+			}
+			else {
+				sys_print(Warning, "CreateLevelEditorAync::execute: failed to load map (%s)\n",assetPath.value_or("<unnamed>").c_str());
+				callback(nullptr);
+			}
+		};
+		Cmd_Manager::inst->append_cmd(std::move(cmd));
+	}
+	string get_tab_name() final {
+		return assetPath.value_or("UnnamedMap");
+	}
+	opt<string> get_asset_name() final {
+		return assetPath;
+	}
+
+	opt<string> assetPath;
+};
+
+class CreatPrefabEditorAync : public CreateEditorAsync {
+public:
+	CreatPrefabEditorAync(opt<string> assetPath) : assetPath(assetPath) {}
+	void execute(Callback callback) final {
+		opt<string> assetPath = this->assetPath;
+		string newmap_template = g_editor_newmap_template.get_string();
+		uptr<OpenMapCommand> cmd = make_unique<OpenMapCommand>(newmap_template, false/* for editor */);
+		cmd->callback = [callback, assetPath](OpenMapReturnCode code) {
+			uptr<EditorDoc> editorDoc;
+			if (code==OpenMapReturnCode::Success) {
+				assert(eng->get_level());
+				if (assetPath.has_value()) {
+					PrefabAsset* prefab = g_assets.find_sync<PrefabAsset>(assetPath.value()).get();
+					if(prefab)
+						editorDoc.reset(EditorDoc::create_prefab(prefab));
+				}
+				else {
+					editorDoc.reset(EditorDoc::create_prefab(nullptr));
+				}
+			}
+			else {
+				sys_print(Warning, "CreatPrefabEditorAync::execute: failed to load map (%s)\n", assetPath.value_or("<unnamed>").c_str());
+			}
+
+			callback(std::move(editorDoc));
+		};
+		Cmd_Manager::inst->append_cmd(std::move(cmd));
+	}
+	string get_tab_name() final {
+		return assetPath.value_or("UnnamedPrefab");
+	}
+	opt<string> get_asset_name() final {
+		return assetPath;
+	}
+	opt<string> assetPath;
+};
+
+
+
 extern IEditorTool* level_editor_factory();
-extern IEditorTool* g_editor_doc;
+//extern IEditorTool* g_editor_doc;
 class MapAssetMetadata : public AssetMetadata
 {
 public:
@@ -37,13 +114,18 @@ public:
 
 	virtual bool assets_are_filepaths()  const { return true; }
 
-	IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
+	//IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &SceneAsset::StaticType; }
 
 	const char* get_arg_for_editortool() const { return "scene"; }
 
+	uptr<CreateEditorAsync> create_create_tool_to_edit(opt<string> assetPath) const { 
+		return make_unique<CreateLevelEditorAync>(assetPath); 
+	}
+
 };
+
 static AutoRegisterAsset<MapAssetMetadata> map_register_0987;
 
 class PrefabAssetMetadata : public AssetMetadata
@@ -66,16 +148,21 @@ public:
 
 	virtual bool assets_are_filepaths()  const { return true; }
 
-	IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
+	//IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &PrefabAsset::StaticType; }
 
 	const char* get_arg_for_editortool() const { return "prefab"; }
+
+	uptr<CreateEditorAsync> create_create_tool_to_edit(opt<string> assetPath) const {
+		return make_unique<CreatPrefabEditorAync>(assetPath);
+	}
 };
 static AutoRegisterAsset<PrefabAssetMetadata> prefab_register_0987;
 #endif
 
 SceneAsset::~SceneAsset() {
+	sys_print(Debug, "~SceneAsset: %s\n", get_name().c_str());
 }
 SceneAsset::SceneAsset(){
 
@@ -109,9 +196,7 @@ bool SceneAsset::load_asset(IAssetLoadingInterface* load)
 	text = std::string(fileptr->size(), ' ');
 	fileptr->read((void*)text.data(), text.size());
 	try {
-		double start = GetTime();
-		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text, load,nullptr));
-		printf("level time: %f\n", GetTime() - start);
+		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(get_name().c_str(), text, load,nullptr));
 	}
 	catch (int) {
 		sys_print(Error, "error loading SceneAsset %s\n", path.c_str());
@@ -122,6 +207,7 @@ bool SceneAsset::load_asset(IAssetLoadingInterface* load)
 }
 
 PrefabAsset::~PrefabAsset() {
+	sys_print(Debug, "~PrefabAsset: %s\n", get_name().c_str());
 }
 
 bool PrefabAsset::load_asset(IAssetLoadingInterface* load)
@@ -136,7 +222,7 @@ bool PrefabAsset::load_asset(IAssetLoadingInterface* load)
 	text = std::string(fileptr->size(), ' ');
 	fileptr->read((void*)text.data(), text.size());
 	try {
-		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(text,load, this));
+		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(get_name().c_str(),text,load, this));
 		// add instance ids here for diff'ing entity references
 		uint64_t id = 1ull << 63ull;
 		for (auto& obj : sceneFile->get_objects()) {
@@ -157,7 +243,7 @@ void PrefabAsset::uninstall()
 	if (!sceneFile)
 		return;
 
-	sys_print(Debug, "prefab uninstalled %s\n", get_name().c_str());
+	//sys_print(Debug, "prefab uninstalled %s\n", get_name().c_str());
 	for (auto& o : sceneFile->get_objects())
 		delete o.second;
 	sceneFile.reset(nullptr);
@@ -169,17 +255,14 @@ void PrefabAsset::sweep_references(IAssetLoadingInterface* load) const
 {
 	if (!sceneFile)
 		return;
-
-	sys_print(Debug, "prefab sweep ref %s\n", get_name().c_str());
-	{
-		for (auto& obj : sceneFile->get_objects()) {
-			check_object_for_asset_ptr(obj.second, load);
-		}
+	sys_print(Debug, "PrefabAsset::sweep_references: %s\n", get_name().c_str());
+	for (auto& obj : sceneFile->get_objects()) {
+		check_object_for_asset_ptr(obj.second, load);
 	}
 }
 void PrefabAsset::move_construct(IAsset* other)
 {
-	sys_print(Debug, "prefab move construct %s\n", get_name().c_str());
+	sys_print(Debug, "PrefabAsset::move_construct: %s\n", get_name().c_str());
 	if (sceneFile.get()) {
 		PrefabAsset::uninstall();
 	}

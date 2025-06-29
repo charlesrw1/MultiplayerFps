@@ -174,7 +174,7 @@ void SkylightComponent::start() {
 }
 void SkylightComponent::end() {
 	idraw->get_scene()->remove_skylight(handle);
-	delete mytexture;
+	//delete mytexture;
 	mytexture = nullptr;
 }
 void SkylightComponent::on_sync_render_data()

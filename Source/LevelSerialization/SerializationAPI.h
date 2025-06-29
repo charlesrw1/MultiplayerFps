@@ -58,7 +58,7 @@ private:
 // * any EntHandle  are set to POINTERS! after setting instance handles, go through obj_with_extern_references and update handles to integer values
 // * needs init to be called
 class IAssetLoadingInterface;
-UnserializedSceneFile unserialize_entities_from_text(const std::string& text, IAssetLoadingInterface* load, PrefabAsset* opt_source_prefab);
+UnserializedSceneFile unserialize_entities_from_text(const char* debug_tag, const std::string& text, IAssetLoadingInterface* load, PrefabAsset* opt_source_prefab);
 
 class SerializedSceneFile
 {
@@ -83,7 +83,7 @@ public:
 // * if root component is selectd, then entity is selected
 // * prefab: if provided, then will serialize like a prefab, with root heirarchy
 
-SerializedSceneFile serialize_entities_to_text(const std::vector<Entity*>& input_objs, PrefabAsset* opt_prefab = nullptr);
+SerializedSceneFile serialize_entities_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs, PrefabAsset* opt_prefab = nullptr);
 
 
 // helper utils for editor

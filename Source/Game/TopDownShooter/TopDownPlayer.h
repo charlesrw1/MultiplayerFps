@@ -209,25 +209,29 @@ public:
 
 			TopDownUtil::enable_ragdoll_shared(get_owner(), last_ws, ragdoll_enabled);
 
-			if (!ragdoll_enabled) {
-				int index = get_owner()->get_cached_mesh_component()->get_index_of_bone(StringName("mixamorig:Hips"));
-				glm::mat4 ws = get_ws_transform() * get_owner()->get_cached_mesh_component()->get_animator()->get_global_bonemats().at(index);	//root
-				glm::vec3 pos = ws[3];
-				pos.y = 0;
-				get_owner()->set_ws_position(pos);
-				ccontroller->set_position(pos);
-				get_owner()->get_cached_mesh_component()->get_animator()->set_update_owner_position_to_root(false);
-			}
-			else {
-				get_owner()->get_cached_mesh_component()->get_animator()->set_update_owner_position_to_root(true);
-				//set_ws_transform(glm::mat4(1.f));
+			MeshComponent* mesh = get_owner()->get_cached_mesh_component();
+			if (mesh && mesh->get_animator()) {
+				AnimatorObject* animator = mesh->get_animator();
+				if (!ragdoll_enabled) {
+					int index = mesh->get_index_of_bone(StringName("mixamorig:Hips"));
+					glm::mat4 ws = get_ws_transform() * animator->get_global_bonemats().at(index);	//root
+					glm::vec3 pos = ws[3];
+					pos.y = 0;
+					get_owner()->set_ws_position(pos);
+					ccontroller->set_position(pos);
+					animator->set_update_owner_position_to_root(false);
+				}
+				else {
+					animator->set_update_owner_position_to_root(true);
+					//set_ws_transform(glm::mat4(1.f));
+				}
 			}
 		}
 
 
 		if (shoot_cooldown > 0.0)shoot_cooldown -= eng->get_dt();
 
-		if(Input::is_mouse_down(0))
+		if(Input::is_mouse_down(0) || Input::get_con_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT)>0.5)
 			shoot_gun();
 
 		if (has_had_update) {
@@ -257,10 +261,18 @@ public:
 		}
 
 		glm::vec2 move = {};
-		if (Input::is_key_down(SDL_SCANCODE_W)) move.y += 1;
-		if (Input::is_key_down(SDL_SCANCODE_S)) move.y -= 1;
-		if (Input::is_key_down(SDL_SCANCODE_A)) move.x += 1;
-		if (Input::is_key_down(SDL_SCANCODE_D)) move.x -= 1;
+		if (Input::is_key_down(SDL_SCANCODE_W)) 
+			move.y += 1;
+		if (Input::is_key_down(SDL_SCANCODE_S)) 
+			move.y -= 1;
+		if (Input::is_key_down(SDL_SCANCODE_A))
+			move.x += 1;
+		if (Input::is_key_down(SDL_SCANCODE_D))
+			move.x -= 1;
+
+		move.x += Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX);
+		move.y += Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY);
+
 
 		float len = glm::length(move);
 		if (len > 1.0)

@@ -9,7 +9,7 @@
 #include "Framework/ReflectionProp.h"
 
 class IEditorTool;
-extern IEditorTool* g_dataclass_editor;	// defined in MiscEditors/DataClassEditor.h
+//extern IEditorTool* g_dataclass_editor;	// defined in MiscEditors/DataClassEditor.h
 
 
 
@@ -32,7 +32,7 @@ public:
 		return "DataClass";
 	}
 
-	virtual IEditorTool* tool_to_edit_me() const override { return g_dataclass_editor; }
+	//virtual IEditorTool* tool_to_edit_me() const override { return g_dataclass_editor; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &DataClass::StaticType; }
 };

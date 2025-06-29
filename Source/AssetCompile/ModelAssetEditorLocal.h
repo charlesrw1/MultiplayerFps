@@ -29,7 +29,7 @@ public:
 
 	void post_map_load_callback() override;
 
-	virtual void close_internal() override;
+	virtual void close_internal();
 	virtual bool save_document_internal() override;
 	void imgui_draw() override;
 

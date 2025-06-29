@@ -81,6 +81,21 @@ void Entity::set_hidden_in_editor(bool b)
 	for (int i = 0; i < all_components.size(); i++)
 		all_components[i]->sync_render_data();
 }
+void Entity::check_for_transform_nans()
+{
+	if (position.x != position.x || position.y != position.y || position.z != position.z) {
+		sys_print(Warning, "detected NaN in entity position\n");
+		position = glm::vec3(0.f);
+	}
+	if (rotation.x != rotation.x || rotation.y != rotation.y || rotation.z != rotation.z || rotation.w != rotation.w) {
+		sys_print(Warning, "detected NaN in entity rotation\n");
+		rotation = glm::quat();
+	}
+	if (scale.x != scale.x || scale.y != scale.y || scale.z != scale.z) {
+		sys_print(Warning, "detected NaN in entity scale\n");
+		scale = glm::vec3(1.f);
+	}
+}
 bool Entity::get_is_any_selected_in_editor() const {
 	if (get_selected_in_editor())
 		return true;
@@ -136,6 +151,7 @@ void Entity::initialize_internal()
 	ASSERT(init_state == initialization_state::HAS_ID);
 	if(!start_disabled || eng->is_editor_level())
 		init_state = initialization_state::CALLED_START;
+	check_for_transform_nans();
 }
 
 
@@ -398,12 +414,14 @@ glm::mat4 Entity::get_ls_transform() const
 }
 void Entity::set_ls_transform(const glm::mat4& transform) {
 	decompose_transform(transform, position, rotation, scale);
+	check_for_transform_nans();
 	post_change_transform_R();
 }
 void Entity::set_ls_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale) {
 	position = v;
 	rotation = q;
 	this->scale = scale;
+	check_for_transform_nans();
 	post_change_transform_R();
 }
 void Entity::set_ls_euler_rotation(glm::vec3 euler) {

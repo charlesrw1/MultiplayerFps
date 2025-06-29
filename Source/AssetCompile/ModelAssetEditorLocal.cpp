@@ -22,8 +22,8 @@
 #include "Game/Entity.h"
 #include "Level.h"
 
-static ModelEditorTool g_model_editor_static;
-IEditorTool* g_model_editor = &g_model_editor_static;
+//static ModelEditorTool g_model_editor_static;
+//IEditorTool* g_model_editor = &g_model_editor_static;
 
 
 

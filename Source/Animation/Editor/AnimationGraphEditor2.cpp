@@ -9,8 +9,8 @@
 #include "ClipNode.h"
 
 using std::make_unique;
-AnimationGraphEditorNew animgraphnew;
-IEditorTool* g_anim_ed_graph = &animgraphnew;
+//AnimationGraphEditorNew animgraphnew;
+//IEditorTool* g_anim_ed_graph = &animgraphnew;
 extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 
 static ImNodesPinShape push_and_get_pin_type(const GraphPinType::Enum& type, bool selected)
@@ -57,6 +57,13 @@ void GraphTabManager::handle_link_changes()
 	if (ImNodes::IsLinkDestroyed(&link_id)) {
 		editor.add_command(new RemoveGraphObjectsCommand(editor, { link_id }, {}));
 	}
+}
+
+AnimationGraphEditorNew::AnimationGraphEditorNew(opt<string> assetPath) {
+	init();
+	// try loading assetPath, throw on failure
+	assert(eng->get_level());
+
 }
 
 void AnimationGraphEditorNew::init()
@@ -414,8 +421,9 @@ void AnimationGraphEditorNew::dup_selected()
 	add_command(new DuplicateNodesCommand(*this, node_ids));
 }
 
-void AnimationGraphEditorNew::close_internal()
+AnimationGraphEditorNew::~AnimationGraphEditorNew()
 {
+
 }
 
 void AnimationGraphEditorNew::tick(float dt)
@@ -1062,7 +1070,7 @@ void EditorNodeGraph::remove_node(GraphNodeHandle handle) {
 			GraphCommandUtil::remove_link(linkwithnode.link, *this);
 			if (node->links.size() >= size) {
 				// didnt delte?
-				printf("link didn't delete\n");
+				sys_print(Warning, "EditorNodeGraph::remove_node: link didn't delete\n");
 				node->links.pop_back();
 			}
 			assert(node->links.size() < size);
@@ -1071,7 +1079,7 @@ void EditorNodeGraph::remove_node(GraphNodeHandle handle) {
 	}
 	auto layer = get_layer(node->layer);
 	if (!layer) {
-		sys_print(Warning, "nodes layer not found %d\n", node->layer.id);
+		sys_print(Warning, "EditorNodeGraph::remove_node: nodes layer not found %d\n", node->layer.id);
 	}
 	else {
 		layer->remove_node(*node);
@@ -1084,7 +1092,10 @@ void EditorNodeGraph::remove_node(GraphNodeHandle handle) {
 	delete node;
 }
 void EditorNodeGraph::insert_new_node(Base_EdNode& node, GraphLayerHandle layer, opt<glm::vec2> pos) {
-	printf("insert new node\n");
+
+	sys_print(Debug, "EditorNodeGraph::insert_new_node\n");
+
+
 	auto layerptr = get_layer(layer);
 	assert(layerptr);
 	node.self = GraphNodeHandle(get_next_id());
@@ -1288,7 +1299,7 @@ void EditorNodeGraph::insert_nodes_with_new_id(SerializeGraphContainer& containe
 				l.link.output = GraphPortHandle::make(old_id_to_new_id.find(out.id)->second, l.link.output.get_index(), true);
 			}
 			else {
-				printf("removing link not found\n");
+				sys_print(Debug, "insert_nodes_with_new_id: removing link not found\n");
 				if (l.opt_link_node.is_valid())
 					remove_node(l.opt_link_node);
 				n->links.erase(n->links.begin() + i);
@@ -1347,7 +1358,7 @@ GraphPropertyWindow::GraphPropertyWindow(AnimationGraphEditorNew& editor)
 }
 void GraphPropertyWindow::update_property_window()
 {
-	printf("clear grid\n");
+	sys_print(Debug, "GraphPropertyWindow: clear grid\n");
 	grid.clear_all();
 	Base_EdNode* node = ed.get_selected_node();
 	if (!node) {
@@ -1439,7 +1450,7 @@ public:
 uptr<SerializeGraphContainer> SerializeGraphUtils::unserialize(const string& text, const NodePrototypes& p)
 {
 	MakeObjectFromAnimNode objmaker(p);
-	ReadSerializerBackendJson writer(text, objmaker, *AssetDatabase::loader);
+	ReadSerializerBackendJson writer("read_graph",text, objmaker, *AssetDatabase::loader);
 	ClassBase* rootobj = writer.get_root_obj();
 	if (rootobj&&rootobj->cast_to<SerializeGraphContainer>()) {
 		return uptr<SerializeGraphContainer>(rootobj->cast_to<SerializeGraphContainer>());
@@ -1452,7 +1463,7 @@ uptr<SerializeGraphContainer> SerializeGraphUtils::unserialize(const string& tex
 string SerializeGraphUtils::serialize_to_string(SerializeGraphContainer& container, EditorNodeGraph& graph, const NodePrototypes& p)
 {
 	MakePathForAnimNode pathmaker(p);
-	WriteSerializerBackendJson writer(pathmaker,container);
+	WriteSerializerBackendJson writer("serialize_graph",pathmaker, container);
 	return writer.get_output().dump();
 }
 
@@ -1465,7 +1476,7 @@ SerializeGraphContainer SerializeGraphUtils::make_container_from_handles(vector<
 		handles.pop_back();
 		Base_EdNode* e = graph.get_node(h);
 		if (!e) {
-			LOG_WARN("no node");
+			sys_print(Warning, "SerializeGraphUtils::make_container_from_handles: node was null\n");
 			continue;
 		}
 		if (SetUtil::contains(container.nodes, e))

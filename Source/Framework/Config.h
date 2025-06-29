@@ -2,6 +2,10 @@
 #define CONFIG_H
 #include "Framework/Util.h"
 #include <string>
+#include <memory>
+template<typename T>
+using uptr = std::unique_ptr<T>;
+using std::string;
 
 enum CVarFlags
 {
@@ -120,6 +124,14 @@ enum class Cmd_Execute_Mode
 	APPEND,
 };
 
+
+class SystemCommand {
+public:
+	virtual ~SystemCommand() {}
+	virtual void execute() = 0;
+	virtual string to_string() = 0;
+};
+
 class Cmd_Manager
 {
 public:
@@ -131,6 +143,7 @@ public:
 	virtual void append_cmd(const std::string& msg) = 0;
 	virtual void execute_cmd(const std::string& msg) = 0;
 
+	virtual void append_cmd(uptr<SystemCommand> command) = 0;
 
 	virtual void execute_file(Cmd_Execute_Mode mode, const char* path) = 0;
 	virtual void execute_buffer() = 0;

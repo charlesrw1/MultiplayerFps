@@ -191,7 +191,7 @@ ShaderResult Shader::compile_vert_frag_single_file(
 	std::string fragment_source = get_source(shared_path, defines_with_directive+"\n#define _FRAGMENT_SHADER\n#line 0\n",false);
 
 	if (vertex_source.empty() || fragment_source.empty()) {
-		sys_print(Error, "Parse fail single file %s\n", shared_path);
+		sys_print(Error, "Shader::compile_vert_frag_single_file: Parse fail single file %s\n", shared_path.c_str());
 		return ShaderResult::SHADER_PARSE_FAIL;
 	}
 

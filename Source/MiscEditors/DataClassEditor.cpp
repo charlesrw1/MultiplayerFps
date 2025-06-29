@@ -9,8 +9,8 @@
 #include "Render/DrawPublic.h"	// for dummy View_Setup
 #include "LevelEditor/PropertyEditors.h"
 
-static DataClassEditor g_dced_local;
-IEditorTool* g_dataclass_editor=&g_dced_local;
+//static DataClassEditor g_dced_local;
+//IEditorTool* g_dataclass_editor=&g_dced_local;
 
 
 DataClassEditor::DataClassEditor() : grid(factory)
@@ -25,7 +25,7 @@ bool DataClassEditor::open_document_internal(const char* name, const char* arg)
 
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini DataClassEditor.ini");
 
-	eng->leave_level();
+	//eng->leave_level();
 
 	// loading a file
 	if (has_extension(name, "dc")) {

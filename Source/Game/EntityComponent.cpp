@@ -64,11 +64,13 @@ void Component::serialize(Serializer& s)
 	s.serialize_class_reference<Entity>("owner", owner);
 	if (s.is_loading()) {
 		if (owner) {
-			if (this->entity_owner) {
-				LOG_WARN("already have owner from unserialize");
+			if (this->entity_owner && this->entity_owner == owner) {
+				sys_print(Warning, "Component::serialize(%s): owner tried setting same owner twice? (type=%s,selfid=%d,cur_owner=%d)\n", s.get_debug_tag(), get_type().classname, unique_file_id, this->entity_owner->unique_file_id);
+			}
+			else if (this->entity_owner) {
+				sys_print(Warning, "Component::serialize(%s): tried settings 2 owners. (type=%s,selfid=%d,cur_owner=%d,set_owner=%d)\n", s.get_debug_tag(), get_type().classname, unique_file_id, this->entity_owner->unique_file_id, owner->unique_file_id);
 			}
 			else {
-				//throw std::runtime_error("Component without owner");
 				owner->add_component_from_unserialization(this);
 				assert(this->entity_owner == owner);
 			}

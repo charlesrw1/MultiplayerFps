@@ -241,6 +241,8 @@ public:
 
 	guiEditorCube* cube = nullptr;
 	guiText* tool_text = nullptr;
+
+	EditorDoc* doc = nullptr;
 };
 
 
@@ -475,12 +477,17 @@ class Model;
 class EditorDoc : public IEditorTool
 {
 public:
-	EditorDoc();
+	static EditorDoc* create_scene(opt<string> scenePath);
+	static EditorDoc* create_prefab(PrefabAsset* prefab);
 
-	void init() final;
-	bool can_save_document() final { return true; }
-	bool open_document_internal(const char* levelname, const char* arg) final;
-	void close_internal() final;
+	~EditorDoc();
+	EditorDoc& operator=(const EditorDoc& other) = delete;
+	EditorDoc(const EditorDoc& other) = delete;
+
+	void init_new();
+
+	uptr<CreateEditorAsync> create_command_to_load_back() { return nullptr; }
+
 	bool save_document_internal() final;
 	void hook_menu_bar() final;
 	void hook_imgui_newframe() final {
@@ -515,7 +522,6 @@ public:
 		if(!using_ortho && camera.can_take_input())
 			camera.scroll_callback(wheel.y);
 	}
-	void on_map_load_return(bool good);
 
 	void duplicate_selected_and_select_them();
 
@@ -565,8 +571,8 @@ public:
 	PrefabAsset* get_editing_prefab() const {
 		if (!is_editing_prefab()) 
 			return nullptr;
-		ASSERT(editing_prefab_ptr);
-		return editing_prefab_ptr;
+		ASSERT(uniqueTemporaryPrefab);
+		return uniqueTemporaryPrefab.get();
 	}
 	void validate_prefab();
 	Entity* get_prefab_root_entity();
@@ -622,6 +628,11 @@ public:
 
 	void set_camera_target_to_sel();
 private:
+	EditorDoc();
+	void init_for_prefab(PrefabAsset* prefab);
+	void init_for_scene(opt<string> scenePath);
+
+
 	int get_next_file_id() {
 		return ++file_id_start;
 	}
@@ -634,9 +645,12 @@ private:
 	void* active_eyedropper_user_id = nullptr;	// for id purposes only
 
 	EditCategory edit_category = EditCategory::EDIT_SCENE;
-	PrefabAsset* editing_prefab_ptr = nullptr;
+	uptr<PrefabAsset> uniqueTemporaryPrefab;
+
 	FnFactory<IPropertyEditor> grid_factory;
 	uptr<ConsoleCmdGroup> cmds;
+
+	opt<string> assetName;
 };
 
 #endif

@@ -122,6 +122,7 @@ public:
 #endif
 	// fixme
 	bool get_prefab_editable() const { return prefab_editable; }
+	void check_for_transform_nans();
 private:
 	// components created either in code or defined in schema or created per instance
 	std::vector<Component*> all_components;

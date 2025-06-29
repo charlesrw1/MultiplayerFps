@@ -13,8 +13,7 @@
 
 Level::~Level()
 {
-	if (!source_asset)
-		printf("closing level without calling close_level\n");
+	assert(all_world_ents.num_used == 0);
 }
 
 void Level::update_level()
@@ -89,6 +88,8 @@ Entity* Level::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti)
 	return ec;
 }
 
+ConfigVar log_destroy_game_objects("log_destroy_game_objects", "1", CVAR_BOOL, "");
+
 Entity* Level::spawn_entity()
 {
 	auto& ti = Entity::StaticType;
@@ -112,7 +113,10 @@ void Level::destroy_entity(Entity* e)
 	if (!e) 
 		return;
 	uint64_t id = e->get_instance_id();
-	sys_print(Debug, "removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
+
+	if(log_destroy_game_objects.get_bool())
+		sys_print(Debug, "removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
+
 	e->destroy_internal();
 	delete e;
 	// remove from hashmap
@@ -131,7 +135,8 @@ void Level::destroy_component(Component* ec)
 	wants_sync_update.remove(ec);
 
 	uint64_t id = ec->get_instance_id();
-	sys_print(Debug,"removing eComponent (handle:%llu,class:%s)\n", id, ec->get_type().classname);
+	if (log_destroy_game_objects.get_bool())
+		sys_print(Debug,"removing eComponent (handle:%llu,class:%s)\n", id, ec->get_type().classname);
 	ec->destroy_internal();
 	delete ec;
 	// remove from hashmap
@@ -144,20 +149,22 @@ void Level::destroy_component(Component* ec)
 	all_world_ents.remove(id);
 }
 
-Level::Level(uptr<SceneAsset> source, bool is_editor) 
+Level::Level(bool is_editor) 
 	: all_world_ents(4/*2^4*/), tick_list(4), wants_sync_update(4)
 {
-	ASSERT(source);
-
-	source_asset = std::move(source);
 	b_is_editor_level = is_editor;
 }
-void Level::start()
+void Level::start(SceneAsset* source)
 {
-	if (source_asset->sceneFile) {
-		insert_unserialized_entities_into_level(*source_asset->sceneFile);
-		source_asset->sceneFile.reset();
+	if (source)
+		sourceAssetName = source->get_name();
+	else
+		sourceAssetName = "<unnamed level>";
+	if (source && source->sceneFile) {
+		insert_unserialized_entities_into_level(*source->sceneFile);
+		source->sceneFile.reset();
 	}
+		
 }
 
 void Level::remove_from_update_list(Component* ec) {
@@ -238,73 +245,74 @@ void Level::close_level()
 	}
 	ASSERT(all_world_ents.num_used == 0);
 	all_world_ents.clear_all();
-	source_asset.reset(nullptr);	// deletes level
 }
 #include "Framework/Log.h"
 void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids) // was bool assign_new_ids=false
 {
+	const char* reassign_id_str = print_get_bool_string(reassign_ids != nullptr);
+	sys_print(Debug, "Level::insert_unserialized_entities_into_level: (level=%s) (reassign_ids=%s) (objs=%d)\n", sourceAssetName.c_str(), reassign_id_str,(int)scene.all_objs.size());
+
 	auto& objs = scene.get_objects();
-	{
-		if(reassign_ids) {
-			for (auto& o : objs) {
-				ASSERT(o.second);
-				auto& path = o.first;
-				auto idfind = reassign_ids->path_to_instance_handle.find(path);
-				uint64_t id_to_use = 0;
-				if (idfind != reassign_ids->path_to_instance_handle.end()) {
-					id_to_use = idfind->second;
-				}
-				else {
-					LOG_WARN("couldnt find id");
-					id_to_use = get_next_id_and_increment();
-				}
-				ASSERT(id_to_use != 0);
-				ASSERT(all_world_ents.find(id_to_use) == nullptr);
-
-				o.second->post_unserialization(id_to_use);
-				all_world_ents.insert(o.second->get_instance_id(), o.second);
-			}
-		}
-		else {
-			for (auto& o : objs) {
-				ASSERT(o.second);
-				o.second->post_unserialization(get_next_id_and_increment());
-				ASSERT(all_world_ents.find(o.second->get_instance_id()) == nullptr);
-				all_world_ents.insert(o.second->get_instance_id(), o.second);
-			}
-		}
-		scene.unserialize_post_assign_ids();
-
-		// dont call enable, will be manually activated
-		if (scene.get_root_entity() && scene.get_root_entity()->start_disabled && !is_editor_level())
-			return;
-
+	if(reassign_ids) {
 		for (auto& o : objs) {
+			ASSERT(o.second);
+			auto& path = o.first;
+			auto idfind = reassign_ids->path_to_instance_handle.find(path);
+			uint64_t id_to_use = 0;
+			if (idfind != reassign_ids->path_to_instance_handle.end()) {
+				id_to_use = idfind->second;
+			}
+			else {
+				sys_print(Warning, "Level::insert_unserialized_entities_into_level: couldnt find id in reassign_ids (%lld)\n", id_to_use);
+				id_to_use = get_next_id_and_increment();
+			}
+			ASSERT(id_to_use != 0);
+			ASSERT(all_world_ents.find(id_to_use) == nullptr);
+
+			o.second->post_unserialization(id_to_use);
+			all_world_ents.insert(o.second->get_instance_id(), o.second);
+		}
+	}
+	else {
+		for (auto& o : objs) {
+			ASSERT(o.second);
+			o.second->post_unserialization(get_next_id_and_increment());
+			ASSERT(all_world_ents.find(o.second->get_instance_id()) == nullptr);
+			all_world_ents.insert(o.second->get_instance_id(), o.second);
+		}
+	}
+	scene.unserialize_post_assign_ids();
+
+	// dont call enable, will be manually activated
+	if (scene.get_root_entity() && scene.get_root_entity()->start_disabled && !is_editor_level())
+		return;
+
+	for (auto& o : objs) {
+		auto ent = o.second;
+		if (Entity* e = ent->cast_to<Entity>())
+			e->initialize_internal(); // just sets init_state => CALLED_START
+		else if (Component* ec = ent->cast_to<Component>()) {
+			if (!ec->get_owner()) {
+				const char* type = ec->get_type().classname;
+				sys_print(Error, "Level::insert_unserialized_entities_into_level: component witout owner (type=%s,id=%lld)\n",type,ec->get_instance_id());
+				ASSERT(ec->get_instance_id() != 0);
+				all_world_ents.remove(ec->get_instance_id());
+				delete ec;
+				objs[o.first] = nullptr;
+			}
+			else {
+				ec->initialize_internal_step1();
+			}
+		}
+		else
+			ASSERT(!"Non Eentity/Component?");
+	}
+
+	for (auto& o : objs) {
+		if (o.second) {
 			auto ent = o.second;
-			if (Entity* e = ent->cast_to<Entity>())
-				e->initialize_internal(); // just sets init_state => CALLED_START
-			else if (Component* ec = ent->cast_to<Component>()) {
-				if (!ec->get_owner()) {
-					sys_print(Error, "component witout owner");
-					ASSERT(ec->get_instance_id() != 0);
-					all_world_ents.remove(ec->get_instance_id());
-					delete ec;
-					objs[o.first] = nullptr;
-				}
-				else {
-					ec->initialize_internal_step1();
-				}
-			}
-			else
-				ASSERT(0);
-		}
-
-		for (auto& o : objs) {
-			if (o.second) {
-				auto ent = o.second;
-				if (Component* ec = ent->cast_to<Component>())
-					ec->initialize_internal_step2();
-			}
+			if (Component* ec = ent->cast_to<Component>())
+				ec->initialize_internal_step2();
 		}
 	}
 }
@@ -324,23 +332,30 @@ void Level::add_and_init_created_runtime_component(Component* c)
 DeferredSpawnScopePrefab Level::spawn_prefab_deferred(Entity*& out, const PrefabAsset* asset)
 {
 	if (!asset) {
-		sys_print(Warning, "spawn_prefab_deferred with nullptr\n");
+		sys_print(Warning, "Level::spawn_prefab_deferred: null prefab\n");
 		return DeferredSpawnScopePrefab(nullptr);
 	}
-	auto unserialized_scene = unserialize_entities_from_text(asset->text,nullptr, const_cast<PrefabAsset*>(asset)/* fixme */);
+	auto unserialized_scene = unserialize_entities_from_text("unserialize_prefab",asset->text, nullptr, const_cast<PrefabAsset*>(asset)/* fixme */);
 	out = unserialized_scene.get_root_entity();
+	if (!out) {
+		sys_print(Warning, "Level::spawn_prefab_deferred: null root object\n");
+		return DeferredSpawnScopePrefab(nullptr);
+	}
 	return DeferredSpawnScopePrefab(new UnserializedSceneFile(std::move(unserialized_scene)));
 }
 
 
 Entity* Level::spawn_prefab(const PrefabAsset* asset)
 {
-	if (!asset){
-		sys_print(Warning, "spawn_prefab with nullptr\n");
+	if (!asset||asset->did_load_fail()){
+		sys_print(Warning, "Level::spawn_prefab: null asset\n");
 		return nullptr;
 	}
-
-	auto unserialized_scene = unserialize_entities_from_text(asset->text,nullptr, const_cast<PrefabAsset*>(asset) /* fixme */);
+	auto unserialized_scene = unserialize_entities_from_text("unserialize_prefab",asset->text, nullptr, const_cast<PrefabAsset*>(asset) /* fixme */);
+	if (!unserialized_scene.get_root_entity()) {
+		sys_print(Warning, "Level::spawn_prefab: root of prefab is null\n");
+		return nullptr;
+	}
 	unserialized_scene.get_root_entity()->is_root_of_prefab = true;
 	insert_unserialized_entities_into_level(unserialized_scene, nullptr);
 	return unserialized_scene.get_root_entity();
@@ -350,5 +365,8 @@ void Level::queue_deferred_delete(BaseUpdater* e)
 {
 	if (!e) 
 		return;
+	if (log_destroy_game_objects.get_bool()) {
+		sys_print(Debug, "Level::queue_deferred_delete: (%lld)", e->get_instance_id());
+	}
 	deferred_delete_list.insert(e->get_instance_id());
 }

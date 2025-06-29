@@ -21,10 +21,10 @@ public:
 	// use get_doc_name to get the name
 	virtual void post_map_load_callback() = 0;
 
-	bool open_document_internal(const char* name, const char* arg) override final;
+	bool open_document_internal(const char* name, const char* arg) ;
 
 	// call up to this in your close_internal! EditorTool3d::close_internal();
-	void close_internal() override;
+	void close_internal() ;
 private:
 	void map_callback(bool good);
 

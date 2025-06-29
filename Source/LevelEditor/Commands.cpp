@@ -81,7 +81,7 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<Enti
 void RemoveEntitiesCommand::undo() {
 	ASSERT(is_valid());
 
-	auto restored = unserialize_entities_from_text(scene->text, AssetDatabase::loader,nullptr);
+	auto restored = unserialize_entities_from_text("remove_entities",scene->text, AssetDatabase::loader, nullptr);
 	auto& extern_parents = scene->extern_parents;
 	for (auto& ep : extern_parents) {
 		auto e = restored.get_objects().find(ep.child_path);
@@ -591,7 +591,7 @@ DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vecto
 }
 
 void DuplicateEntitiesCommand::execute() {
-	UnserializedSceneFile duplicated = unserialize_entities_from_text(scene->text, AssetDatabase::loader,ed_doc.get_editing_prefab());
+	UnserializedSceneFile duplicated = unserialize_entities_from_text("duplicate_entities",scene->text, AssetDatabase::loader, ed_doc.get_editing_prefab());
 
 	auto& extern_parents = scene->extern_parents;
 	for (auto ep : extern_parents) {
@@ -675,7 +675,7 @@ std::unique_ptr<SerializedSceneFile> CommandSerializeUtil::serialize_entities_te
 	ed_doc.validate_fileids_before_serialize();
 
 
-	return std::make_unique<SerializedSceneFile>(serialize_entities_to_text(ents, ed_doc.get_editing_prefab()));
+	return std::make_unique<SerializedSceneFile>(serialize_entities_to_text("Command::serialize_entities_text", ents, ed_doc.get_editing_prefab()));
 }
 
 void RemoveComponentCommand::execute() {

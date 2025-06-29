@@ -28,8 +28,8 @@
 
 #include "Game/Entity.h"
 
-static AnimationEditorTool g_animseq_editor_static;
-IEditorTool* g_animseq_editor = &g_animseq_editor_static;
+//static AnimationEditorTool g_animseq_editor_static;
+//IEditorTool* g_animseq_editor = &g_animseq_editor_static;
 
 
 void AnimationEditorTool::tick(float dt)
@@ -58,11 +58,11 @@ void AnimationEditorTool::imgui_draw()
 
 EditModelAnimations::EditModelAnimations(const FnFactory<IPropertyEditor>& factory) : eventdetails(factory)
 {
-	g_animseq_editor_static.on_close.add(this, &EditModelAnimations::on_quit);
-	g_animseq_editor_static.on_pre_save.add(this, &EditModelAnimations::on_presave);
-	g_animseq_editor_static.on_post_save.add(this, &EditModelAnimations::on_postsave);
-
-	g_animseq_editor_static.on_start.add(this, &EditModelAnimations::on_start);
+	//g_animseq_editor_static.on_close.add(this, &EditModelAnimations::on_quit);
+	//g_animseq_editor_static.on_pre_save.add(this, &EditModelAnimations::on_presave);
+	//g_animseq_editor_static.on_post_save.add(this, &EditModelAnimations::on_postsave);
+	//
+	//g_animseq_editor_static.on_start.add(this, &EditModelAnimations::on_start);
 }
 
 
@@ -73,6 +73,7 @@ void EditModelAnimations::on_postsave()
 }
 void EditModelAnimations::on_presave()
 {
+#if 0
 	auto& c = *g_animseq_editor_static.animImportSettings;
 
 	auto& e = curveedit.get_event_array();
@@ -95,6 +96,7 @@ void EditModelAnimations::on_presave()
 	selected_event_item = nullptr;
 	curveedit.clear_all();
 	eventdetails.clear_all();
+#endif
 }
 
 void EditModelAnimations::on_quit()
@@ -123,12 +125,13 @@ static void context_menu_callback(CurveEditorImgui* ptr) {
 
 void EditModelAnimations::on_start()
 {
+#if 0
 	CURRENT_TIME = 0.0;
 	curveedit.clear_all();
 	selected_event_item = nullptr;
 	curveedit.callback = context_menu_callback;
 
-	auto seq = g_animseq_editor_static.sequence;
+	auto seq = sequence;
 
 	curveedit.max_x_value = seq->seq->num_frames;
 
@@ -148,6 +151,7 @@ void EditModelAnimations::on_start()
 		curveedit.add_curve(c);
 	}
 	c.events.clear();
+#endif
 }
 void EditModelAnimations::draw_imgui()
 {
@@ -307,7 +311,7 @@ bool AnimationEditorTool::save_document_internal()
 	else {
 
 		g_assets.reload_sync(outputModel);
-		g_animseq_editor_static.on_post_save.invoke();
+		on_post_save.invoke();
 
 	//	g_assets.reload_sync(outputModel);
 	}

@@ -40,7 +40,7 @@ ModelMan g_modelMgr;
 
 
 #ifdef EDITOR_BUILD
-extern IEditorTool* g_model_editor;	// defined in AssetCompile/ModelAssetEditorLocal.h
+//extern IEditorTool* g_model_editor;	// defined in AssetCompile/ModelAssetEditorLocal.h
 class ModelAssetMetadata : public AssetMetadata
 {
 public:
@@ -59,7 +59,7 @@ public:
 		return "Model";
 	}
 
-	virtual IEditorTool* tool_to_edit_me() const override { return g_model_editor; }
+	//virtual IEditorTool* tool_to_edit_me() const override { return g_model_editor; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Model::StaticType; }
 };
@@ -67,7 +67,11 @@ public:
 REGISTER_ASSETMETADATA_MACRO(ModelAssetMetadata);
 #endif
 
-Model::~Model() {}
+Model::~Model() {
+	if (get_name() == "eng/cube.cmdl") {
+		printf("");
+	}
+}
 Model::Model() {}
 
 static const int MODEL_FORMAT_VERSION = 13;
@@ -138,7 +142,7 @@ int Model::bone_for_name(StringName name) const
 
 void ModelMan::compact_memory()
 {
-	sys_print(Debug, "compacting vertex buffer...\n");
+	sys_print(Debug, "ModelMan::compact_memory\n");
 	std::vector<Model*> models;
 	models.reserve(all_models.num_used);
 	for (auto m : all_models) {
@@ -245,13 +249,13 @@ void MainVbIbAllocator::print_usage() const
 
 		int used_elements = b.used_total / element_size;
 		int allocated_elements = b.allocated / element_size;
-		sys_print(Debug, "%s: %d/%d (%.1f%%) (bytes:%d) (%d:%d)\n", name, used_elements, allocated_elements, used_percentage, b.used_total, b.tail, b.head);
+		sys_print(Info, "	%s: %d/%d (%.1f%%) (bytes:%d) (%d:%d)\n", name, used_elements, allocated_elements, used_percentage, b.used_total, b.tail, b.head);
 
 	};
-	sys_print(Info, "---- MainVbIbAllocator::print_usage ----\n");
+	sys_print(Info, "MainVbIbAllocator::print_usage\n");
 
-	print_facts("Index buffer", ibuffer, MODEL_BUFFER_INDEX_TYPE_SIZE);
-	print_facts("Vertex buffer", vbuffer, sizeof(ModelVertex));
+	print_facts("IndexBuffer", ibuffer, MODEL_BUFFER_INDEX_TYPE_SIZE);
+	print_facts("VertexBuffer", vbuffer, sizeof(ModelVertex));
 }
 void ModelMan::print_usage() const
 {
@@ -600,11 +604,8 @@ bool Model::load_asset(IAssetLoadingInterface* loading) {
 #endif
 
 	bool good = load_internal(loading);
-
 	if (good)
 		return true;
-
-	printf("failed to load model into memory\n");
 	return false;
 }
 void Model::move_construct(IAsset* _src)
@@ -779,10 +780,12 @@ bool ModelMan::upload_model(Model* mesh)
 
 
 	mesh->uid = cur_mesh_id++;
-	sys_print(Debug, "uploading mode: %s\n", mesh->get_name().c_str());
+	//sys_print(Debug, "uploading mode: %s\n", mesh->get_name().c_str());
 
-	if (mesh->parts.size() == 0)
+	if (mesh->parts.size() == 0) {
+		sys_print(Warning, "ModelMan::upload_model: model has not parts (%d)\n", mesh->get_name().c_str());
 		return false;
+	}
 
 
 	size_t indiciesbufsize{};

@@ -534,6 +534,8 @@
     <ClInclude Include="Source\Framework\RingBuffer.h" />
     <ClInclude Include="Source\LevelEditor\TagManager.h" />
     <ClInclude Include="Source\IntegrationTest.h" />
+    <ClInclude Include="Source\EngineEditorState.h" />
+    <ClInclude Include="Source\EngineSystemCommands.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -709,6 +711,7 @@
     <ClCompile Include="Source\UI\Widgets\Layouts.cpp" />
     <ClCompile Include="Source\UI\Widgets\EditorCube.cpp" />
     <ClCompile Include="Source\IntegrationTest.cpp" />
+    <ClCompile Include="Source\EngineEditorState.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

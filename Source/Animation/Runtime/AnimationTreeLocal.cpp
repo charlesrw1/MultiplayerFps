@@ -1,7 +1,83 @@
 
 #include "Framework/AddClassToFactory.h"
 #include "Assets/AssetRegistry.h"
-extern IEditorTool* g_anim_ed_graph;
+
+#include "Animation/Editor/AnimationGraphEditor2.h"
+#include "Game/Components/MeshComponent.h"
+#include "GameEnginePublic.h"
+#include "Assets/AssetDatabase.h"
+#include "Level.h"
+#include "Game/Entity.h"
+#include "Game/EntityComponent.h"
+#include "Render/ModelManager.h"
+#include "Game/Components/LightComponents.h"
+#include "Render/MaterialPublic.h"
+
+void post_load_map_callback_generic()
+{
+	auto dome = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
+	dome->set_model(g_assets.find_sync<Model>("eng/skydome.cmdl").get());
+	dome->get_owner()->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
+	dome->set_is_skybox(true);	// FIXME
+	dome->set_casts_shadows(false);
+	//dome->Mesh->set_material_override(g_assets.find_sync<MaterialInstance>(ed_default_sky_material.get_string()).get());
+
+	auto plane = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
+	plane->set_model(g_modelMgr.get_default_plane_model());
+	plane->get_owner()->set_ws_transform({}, {}, glm::vec3(20.f));
+	plane->set_material_override((g_assets.find_sync<MaterialInstance>("eng/defaultWhite.mi").get()));
+
+	auto sun = eng->get_level()->spawn_entity()->create_component<SunLightComponent>();
+	sun->intensity = 2.0;
+	sun->visible = true;
+	sun->log_lin_lerp_factor = 0.7;
+	sun->max_shadow_dist = 40.0;
+	sun->get_owner()->set_ls_euler_rotation(glm::vec3(-glm::radians(10.f), glm::radians(15.f), 0.f));
+	auto skylight = eng->get_level()->spawn_entity()->create_component<SkylightComponent>();
+
+}
+#include "EngineSystemCommands.h"
+
+class CreateAnimEditorAsync : public CreateEditorAsync {
+public:
+	CreateAnimEditorAsync(opt<string> asset) : asset(asset) {}
+
+	// Inherited via CreateEditorAsync
+	virtual void execute(Callback callback) override {
+		auto cmd = std::make_unique<OpenMapCommand>(std::nullopt, false);
+		opt<string> myAsset = this->asset;
+		cmd->callback = [callback,myAsset](OpenMapReturnCode code) {
+			if (code == OpenMapReturnCode::Success) {
+				assert(eng->get_level());
+				post_load_map_callback_generic();	// spawns default things
+				try {
+					uptr<AnimationGraphEditorNew> ed(new AnimationGraphEditorNew(myAsset));
+					callback(std::move(ed));
+				}
+				catch (...) {
+					callback(nullptr);
+				}
+			}
+			else {
+				callback(nullptr);
+			}
+		};
+		Cmd_Manager::inst->append_cmd(std::move(cmd));
+	}
+
+	virtual string get_tab_name() override
+	{
+		return string();
+	}
+
+	virtual opt<string> get_asset_name() override
+	{
+		return opt<string>();
+	}
+	opt<string> asset;
+};
+
+//extern IEditorTool* g_anim_ed_graph;
 #ifdef EDITOR_BUILD
 class AnimGraphAssetMeta : public AssetMetadata
 {
@@ -23,7 +99,12 @@ public:
 
 	virtual bool assets_are_filepaths() const { return true; }
 
-	virtual IEditorTool* tool_to_edit_me() const { return g_anim_ed_graph; }
+	uptr<CreateEditorAsync> create_create_tool_to_edit(opt<string> assetPath) const {
+		return std::make_unique<CreateAnimEditorAsync>(assetPath);
+	}
+
+
+	//virtual IEditorTool* tool_to_edit_me() const { return g_anim_ed_graph; }
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Animation_Tree_CFG::StaticType; }
 };
 REGISTER_ASSETMETADATA_MACRO(AnimGraphAssetMeta);

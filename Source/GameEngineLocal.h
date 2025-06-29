@@ -9,12 +9,12 @@
 
 #include "GameEnginePublic.h"
 #include "Framework/MulticastDelegate.h"
-
+#include <unordered_set>
 #include "Level.h"
 
 class GUIFullscreen;
 class OnScreenLog;
-
+using std::unordered_set;
 using glm::vec3;
 class IEditorTool;
 class Player;
@@ -31,6 +31,7 @@ class UIControl;
 struct SceneDrawParamsEx;
 struct View_Setup;
 class IntegrationTester;
+class EditorState;
 class GameEngineLocal : public GameEnginePublic
 {
 public:
@@ -73,9 +74,6 @@ public:
 	SDL_Window* get_os_window() final {
 		return window;
 	}
-	IEditorTool* get_current_tool() const final {
-		return active_tool;
-	}
 	ImGuiContext* get_imgui_context() const final {
 		return imgui_context;
 	}
@@ -85,9 +83,6 @@ public:
 	void login_new_player(uint32_t index) final;
 	void logout_player(uint32_t index) final;
 
-	void leave_level() final;
-	void open_level(string levelname) final;
-	void connect_to(string address) final;
 
 	bool is_editor_level() const  final {
 		/* this passes when you are in the loading phase or past the loading phase */
@@ -96,7 +91,6 @@ public:
 	}
 
 	glm::ivec2 get_game_viewport_size() const final;	// either full window or sub window
-	Engine_State get_state() const final { return state; }
 	MulticastDelegate<bool>& get_on_map_delegate() final {
 		return on_map_load_return;
 	}
@@ -112,24 +106,19 @@ public:
 	void get_draw_params(SceneDrawParamsEx& param, View_Setup& setup);
 	bool game_thread_update();
 	void loop();
-	bool state_machine_update();
 
 	// state relevant functions
 	void set_tick_rate(float tick_rate);
 
 	bool is_in_game() const {
-		return state == Engine_State::Game;
+		return get_level() != nullptr;
 	}
 
 #ifdef EDITOR_BUILD
-	bool is_in_an_editor_state() const { return get_current_tool() != nullptr; }
-	void change_editor_state(IEditorTool* next_tool, const char* arg, const char* file = "");
 #else
 	bool is_in_an_editor_state() const { return false; }
 #endif
 
-	void execute_map_change();
-	void on_map_change_callback(bool is_for_editor, SceneAsset* loadedLevel);
 
 	void stop_game();
 	void spawn_starting_players(bool initial);
@@ -153,7 +142,6 @@ public:
 	OnScreenLog* gui_log{};
 
 	string queued_mapname;
-	bool is_waiting_on_load_level_callback = false;
 	bool is_loading_editor_level = false;
 	std::unique_ptr<Level> level= nullptr;
 
@@ -173,23 +161,30 @@ public:
 	char** argv = nullptr;
 
 	uptr<ConsoleCmdGroup> commands;
-	uptr<IntegrationTester> tester;
 #ifdef EDITOR_BUILD
 	// stores state changes to enable forwards/backwards when editing
 	// like ["start_ed Map mymap", "map mymap"]
 	std::vector<std::string> engine_map_state_history;
 	std::vector<std::string> engine_map_state_future;
 #endif
+
+	void set_tester(IntegrationTester* tester, bool headless_mode);
+
+	void insert_this_map_as_level(SceneAsset*& asset, bool is_for_playing);
+	uptr<EditorState> editorState;
+	bool is_waiting_on_map_load = false;
 private:
+
+	uptr<IntegrationTester> tester;
 	// when game goes into focus mode, the mouse position is saved so it can be reset when exiting focus mode
 	int saved_mouse_x=0, saved_mouse_y=0;
 	// focused= mouse is captured, assumes relative inputs are being taken, otherwise cursor is shown
 	bool game_focused = false;
 
-	Engine_State state = Engine_State::Idle;
-	IEditorTool* active_tool = nullptr;
+
 
 	bool is_hosting_game = false;
+	bool headless_mode = false;
 
 	void init_sdl_window();
 	void key_event(SDL_Event event);

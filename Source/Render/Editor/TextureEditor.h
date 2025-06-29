@@ -34,8 +34,8 @@ public:
 
 	// Inherited via IEditorTool
 	virtual const ClassTypeInfo& get_asset_type_info() const override;
-	virtual bool open_document_internal(const char* name, const char* arg) override;
-	virtual void close_internal() override;
+	virtual bool open_document_internal(const char* name, const char* arg);
+	virtual void close_internal();
 	virtual bool save_document_internal() override;
 	const char* get_save_file_extension() const {
 		return "dds";

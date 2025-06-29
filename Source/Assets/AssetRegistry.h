@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include "Framework/ConsoleCmdGroup.h"
 #include "IAsset.h"
+#include "EngineEditorState.h"
 
 // All assets that you want showing in the asset browser should be registered here
 
@@ -27,6 +28,8 @@ public:
 
 	// return <AssetName>::StaticType
 	virtual const ClassTypeInfo* get_asset_class_type() const { return nullptr; }
+
+	virtual uptr<CreateEditorAsync> create_create_tool_to_edit(opt<string> assetPath) const { return nullptr; }
 
 	// fills extra assets
 	virtual void fill_extra_assets(std::vector<std::string>& out) const {}

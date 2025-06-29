@@ -22,9 +22,9 @@
 MaterialManagerLocal matman;
 MaterialManagerPublic* imaterials = &matman;
 
-extern IEditorTool* g_mateditor;
+//extern IEditorTool* g_mateditor;
 
-static ConfigVar material_print_debug("material_print_debug", "1", CVAR_DEV | CVAR_BOOL, "");
+ConfigVar material_print_debug("material_print_debug", "1", CVAR_DEV | CVAR_BOOL, "");
 
 
 
@@ -44,7 +44,7 @@ public:
 	virtual bool assets_are_filepaths() const override { return true; }
 
 	virtual const ClassTypeInfo* get_asset_class_type()  const override { return &MaterialInstance::StaticType; }
-	IEditorTool* tool_to_edit_me() const override { return g_mateditor;  }
+	//IEditorTool* tool_to_edit_me() const override { return g_mateditor;  }
 };
 
 REGISTER_ASSETMETADATA_MACRO(MaterialAssetMetadata);
@@ -143,7 +143,8 @@ program_handle MaterialManagerLocal::get_mat_shader(
 	key.debug = debug_mode;
 
 	program_handle handle = mat_table.lookup(key);
-	if (handle != -1) return handle;
+	if (handle != -1) 
+		return handle;
 	return compile_mat_shader(mm->self, key);	// dynamic compilation ...
 }
 
@@ -308,16 +309,16 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file, IAssetLoad
 
 		init_from(parent.get());
 		assert(masterMaterial);
-
+		assert(params.size() == masterMaterial->param_defs.size());
 		while (in.read_string(tok) && !in.is_eof()) {
 			if (tok.cmp("VAR")) {
-
 				in.read_string(tok);
 				std::string paramname = to_std_string_sv(tok);
 				int index = 0;
 				auto ptr = masterMaterial->find_definition(paramname, index);
 				if (!ptr)
 					throw MasterMaterialExcept("Couldnt find parent parameter: " + paramname);
+				assert(index < params.size()&&index>=0);
 				auto& myparam = params[index];
 
 				switch (ptr->default_value.type)
@@ -355,8 +356,13 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file, IAssetLoad
 				case MatParamType::ConstTexture2D:
 				{
 					in.read_string(tok);
-					auto tex = loading->load_asset(&Texture::StaticType, to_std_string_sv(tok));
+					string s = to_std_string_sv(tok);
+					auto tex = loading->load_asset(&Texture::StaticType, s);
 					myparam.tex_ptr = tex->cast_to<Texture>();
+					if (!myparam.tex_ptr) {
+						sys_print(Error, "MaterialImpl::load_instance: texture not found: %s\n", s.c_str());
+						throw MasterMaterialExcept("Texture not found: " + s);
+					}
 					assert(myparam.tex_ptr);
 				}break;
 
@@ -374,7 +380,7 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file, IAssetLoad
 	}
 }
 
-bool  MaterialImpl::load_from_file(MaterialInstance* self, IAssetLoadingInterface* loading)
+bool MaterialImpl::load_from_file(MaterialInstance* self, IAssetLoadingInterface* loading)
 {
 	this->self = self;
 	const auto& name = self->get_name();
@@ -396,6 +402,17 @@ bool  MaterialImpl::load_from_file(MaterialInstance* self, IAssetLoadingInterfac
 	}
 	return true;
 }
+extern ConfigVar developer_mode;
+
+const MaterialParameterDefinition* MasterMaterialImpl::find_definition(const std::string& str, int& index) const {
+	for (int i = 0; i < param_defs.size(); i++)
+		if (param_defs[i].name == str) {
+			index = i;
+			return &param_defs[i];
+		}
+	return nullptr;
+}
+
 void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file, IAssetLoadingInterface* loading)
 {
 
@@ -584,10 +601,28 @@ void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 	num_texture_bindings = tex_ofs;
 
 #ifdef EDITOR_BUILD
-	auto str = create_glsl_shader(vs_code, fs_code, inst_dats);
-	auto out_glsl_path = strip_extension(fullpath) + "_shader.glsl";
-	auto outfile = FileSys::open_write_game(out_glsl_path.c_str());
-	outfile->write(str.data(), str.size());
+	// material compilation, outputs a glsl file
+	// i have another layer beneath this  (in Prog_Man) that compiles the glsl to a platform binary (which is cached), but that 
+	// layer depends on dynamic usage state like if its an animator object, editor mode, etc.
+	// so it has to be done there.
+	// also this only looks at the timestamp of the .mm file, not the master file or includes
+	// so have to clean out .glsl files if you change includes/master
+	if (developer_mode.get_bool()) {
+		auto out_glsl_path = strip_extension(fullpath) + "_shader.glsl";
+		auto outGlslFile = FileSys::open_read_game(out_glsl_path);
+		if (!outGlslFile || outGlslFile->get_timestamp() < file->get_timestamp()) {
+			sys_print(Debug, "MasterMaterialImpl::load_from_file: updating .glsl because its out of date (%s)\n", out_glsl_path.c_str());
+			string outStr = create_glsl_shader(vs_code, fs_code, inst_dats);
+			outGlslFile.reset(); // close it
+			outGlslFile = FileSys::open_write_game(out_glsl_path);
+			if (!outGlslFile) {
+				sys_print(Error, "MasterMaterialImpl::load_from_file: couldn't open file to write .glsl file (%s)\n", out_glsl_path.c_str());
+			}
+			else {
+				outGlslFile->write(outStr.data(), outStr.size());
+			}
+		}
+	}
 #endif
 }
 

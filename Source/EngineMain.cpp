@@ -50,8 +50,8 @@
 #include "Framework/Jobs.h"
 #include "EditorPopups.h"
 #include "IntegrationTest.h"
-
-
+#include "EngineEditorState.h"
+#include "EngineSystemCommands.h"
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
@@ -59,6 +59,14 @@ GameEnginePublic* eng = &eng_local;
 static double program_time_start;
 ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "Cfg", CVAR_DEV, "what folder to save .ini and other editor cfg to");
 
+double GetTime()
+{
+	return SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
+}
+double TimeSinceStart()
+{
+	return GetTime() - program_time_start;
+}
 
 struct Debug_Shape
 {
@@ -114,6 +122,8 @@ public:
 	void draw();
 	void print(const char* fmt, ...);
 	void print_args(const char* fmt, va_list list);
+
+	vector<string> bufferedLines;
 	vector<string> lines;
 	vector<string> history;
 	int history_index = -1;
@@ -147,14 +157,15 @@ char* string_format(const char* fmt, ...) {
 
 void Quit()
 {
-	sys_print(Info, "Quiting...\n");
+	sys_print(Info, "Quiting... (runtime %f)\n", TimeSinceStart());
 	eng_local.cleanup();
 	exit(0);
 }
 
 ConfigVar loglevel("loglevel", "4", CVAR_INTEGER, "(0=disable,4=all)", 0, 4);
-
-
+ConfigVar colorLog("colorLog", "1", CVAR_BOOL, "");
+extern ConfigVar log_destroy_game_objects;
+extern ConfigVar log_all_asset_loads;
 
 void sys_print(LogType type, const char* fmt, ...)
 {
@@ -164,29 +175,31 @@ void sys_print(LogType type, const char* fmt, ...)
 	va_list args;
 	va_start(args, fmt);
 	
-	int len = strlen(fmt);
-	bool print_end = true;
-	if (type == LogType::Error) {
-		printf("\033[91m");
+	bool print_end = false;
+	if (colorLog.get_bool()) {
+		int len = strlen(fmt);
+		print_end = true;
+		if (type == LogType::Error) {
+			printf("\033[91m");
+		}
+		else if (type == LogType::Warning) {
+			printf("\033[33m");
+		}
+		else if (type == LogType::Debug) {
+			printf("\033[32m");
+		}
+		else if (len >= 1 && fmt[0] == '>') {
+			printf("\033[35m");
+			char buf[1024];
+			vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
+			buf[IM_ARRAYSIZE(buf) - 1] = 0;
+			eng->log_to_fullscreen_gui(Debug, buf);
+		}
+		else
+			print_end = false;
 	}
-	else if (type==LogType::Warning) {
-		printf("\033[33m");
-	}
-	else if (type==LogType::Debug) {
-		printf("\033[32m");
-	}
-	else if (len >= 1 && fmt[0] == '>') {
-		printf("\033[35m");
-		char buf[1024];
-		vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
-		buf[IM_ARRAYSIZE(buf) - 1] = 0;
-		eng->log_to_fullscreen_gui(Debug, buf);
-	}
-	else
-		print_end = false;
 
 
-	std::lock_guard<std::mutex> printLock(printMutex);
 	vprintf(fmt, args);
 	dbg_console.print_args(fmt, args);
 	va_end(args);
@@ -217,14 +230,7 @@ void Fatalf(const char* format, ...)
 	}
 	exit(-1);
 }
-double GetTime()
-{
-	return SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
-}
-double TimeSinceStart()
-{
-	return GetTime() - program_time_start;
-}
+
 
 
 void GameEngineLocal::log_to_fullscreen_gui(LogType type, const char* msg)
@@ -384,18 +390,11 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 	}
 }
 
-void GameEngineLocal::connect_to(string address)
-{
-	ASSERT(0);
-	///travel_to_engine_state(Engine_State::Loading, "connecting to another server");
-
-	sys_print(Info, "Connecting to server %s\n", address.c_str());
-	//cl->connect(address);
-}
 #include "EditorPopupTemplate.h"
 
 #ifdef EDITOR_BUILD
 //TOGGLE_PLAY_EDIT_MAP
+#if 0
 void toggle_play_edit_map(const Cmd_Args& args)
 {
 	if (!eng->is_editor_level()) {
@@ -427,6 +426,8 @@ void toggle_play_edit_map(const Cmd_Args& args)
 			sys_print(Error, "no valid map");
 	}
 }
+#endif
+
 #if 0
 DECLARE_ENGINE_CMD(EDITOR_BACK_ONE_PAGE)
 {
@@ -451,6 +452,7 @@ DECLARE_ENGINE_CMD(EDITOR_FORWARD_ONE_PAGE)
 	eng_local.engine_map_state_history.pop_back();	// will get appended again
 }
 #endif
+#if 0
 
 void close_editor(const Cmd_Args& args)
 {
@@ -461,7 +463,28 @@ void close_editor(const Cmd_Args& args)
 	}
 	eng_local.change_editor_state(nullptr,"");
 }
+#endif
 
+void OpenEditorToolCommand::execute()
+{
+	sys_print(Debug, "OpenEditorToolCommand::execute\n");
+	const AssetMetadata* metadata = AssetRegistrySystem::get().find_for_classtype(&assetType);
+	if (metadata) {
+		auto creationTool = metadata->create_create_tool_to_edit(assetName);
+		if (creationTool) {
+			eng_local.editorState->open_tool(std::move(creationTool), true, callback);
+			return;
+		}
+		else {
+			sys_print(Warning, "OpenEditorToolCommand::execute: no creation tool\n");
+		}
+	}
+	else {
+		sys_print(Warning, "OpenEditorToolCommand::execute: couldnt find asset metadata\n");
+	}
+	callback(false);
+
+}
 
 void start_editor(const Cmd_Args& args)
 {
@@ -471,14 +494,28 @@ void start_editor(const Cmd_Args& args)
 		return;
 	}
 
-	if (eng_local.is_waiting_on_load_level_callback) {
-		sys_print(Error, "start_ed but waiting on an async map load call (%s), skipping.\n",eng_local.queued_mapname.c_str());
-		return;
-	}
+	//if (eng_local.is_wa) {
+	//	sys_print(Error, "start_ed but waiting on an async map load call (%s), skipping.\n",eng_local.queued_mapname.c_str());
+	//	return;
+	//}
 
 	std::string edit_type = args.at(1);
 	const AssetMetadata* metadata = AssetRegistrySystem::get().find_type(edit_type.c_str());
+	if (metadata) {
+		opt<string> asset;
+		if (args.size() >= 3)
+			asset = args.at(2);
+
+		auto creationTool = metadata->create_create_tool_to_edit(asset);
+		if (creationTool) {
+			eng_local.editorState->open_tool(std::move(creationTool), true, [](bool b) {});
+		}
+	}
+
+	return;
+#if 0
 	if (metadata && metadata->tool_to_edit_me()) {
+
 		const char* file_to_open = "";	// make a new map
 		if (args.size() == 3)
 			file_to_open = args.at(2);
@@ -512,6 +549,7 @@ void start_editor(const Cmd_Args& args)
 		sys_print(Error, "unknown editor\n");
 		sys_print(Info, usage_str);
 	}
+#endif
 }
 
 #endif
@@ -524,7 +562,11 @@ static void disable_imgui_docking()
 	ImGui::GetIO().ConfigFlags &= ~(ImGuiConfigFlags_DockingEnable);
 }
 
+
+
+
 #ifdef EDITOR_BUILD
+#if 0
 void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg, const char* file)
 {
 	const char* str = string_format("%s:%s -> %s:%s",
@@ -555,6 +597,7 @@ void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg
 	if (!active_tool)
 		disable_imgui_docking();
 }
+#endif
 #endif
 
 
@@ -629,16 +672,79 @@ void bind_key(const Cmd_Args& args)
 	}
 }
 
-class EngineCommandBuilder
-{
-public:
-	static string create_change_map(const string& map, bool force_change) {
-		string out = "map ";
-		if (force_change) out += "f ";
-		out += map;
-		return out;
+
+
+extern void init_log_gui();
+using std::make_unique;
+void GameEngineLocal::insert_this_map_as_level(SceneAsset*& loadedLevel, bool is_for_playing) {
+	assert(is_waiting_on_map_load);
+	is_waiting_on_map_load = false;
+
+	string mapname = loadedLevel ? loadedLevel->get_name() : "<new level>";
+	sys_print(Info, "Changing map: %s (for_playing=%s)\n", mapname.c_str(), print_get_bool_string(is_for_playing));
+
+	if (editorState->has_tool())
+		editorState->hide();
+	assert(!editorState->get_tool());
+	if (level) {
+		stop_game();
+		assert(!level);
 	}
-};
+	if(loadedLevel)
+		g_assets.remove_system_reference(loadedLevel);	// remove it, just do it.
+	uptr<SceneAsset> unique_scene(loadedLevel);	// now its a unique ptr
+	loadedLevel = nullptr;	// set caller to null since this deletes the sceneasset :)
+
+	g_modelMgr.compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
+	time = 0.0;
+	set_tick_rate(60.f);
+	// constructor initializes level state
+	level = make_unique<Level>(!is_for_playing);
+	level->start(unique_scene.get());	// scene will then get destroyed
+	idraw->on_level_start();
+	init_log_gui();
+	on_map_load_return.invoke(true);
+	wants_gc_flag = true;	// signal for a gc
+	sys_print(Info, "changed state to Engine_State::Game\n");
+}
+void OpenMapCommand::execute()
+{
+	sys_print(Debug, "OpenMapCommand::execute\n");
+	if (eng_local.is_waiting_on_map_load) {
+		sys_print(Warning,"OpenMapCommand::execute(%s): already waiting on another OpenMapCommand\n", map_name.value_or("<empty>").c_str());
+		callback(OpenMapReturnCode::AlreadyLoadingMap);
+	}
+	else if (map_name.has_value()) {
+		function<void(OpenMapReturnCode)> callback = this->callback;
+		bool is_for_playing = this->is_for_playing;
+		string mapname = map_name.value_or("<unnamed>");
+		eng_local.is_waiting_on_map_load = true;
+		g_assets.find_async<SceneAsset>(map_name.value(),
+			[callback, is_for_playing, mapname](GenericAssetPtr ptr) {
+				SceneAsset* level = (ptr) ? ptr.cast_to<SceneAsset>().get() : nullptr;
+				// level loaded
+				const bool level_is_valid = level != nullptr;
+				if (level_is_valid) {
+					eng_local.insert_this_map_as_level(level, is_for_playing);
+				}
+				else {
+					assert(eng_local.is_waiting_on_map_load);
+					sys_print(Warning, "OpenMapCommand::execute(%s): failed to load\n", mapname.c_str());
+					eng_local.is_waiting_on_map_load = false;
+				}
+				assert(!eng_local.is_waiting_on_map_load);
+				auto code = level_is_valid ? OpenMapReturnCode::Success : OpenMapReturnCode::FailedToLoad;
+				callback(code);
+			});
+	}
+	else {
+		eng_local.is_waiting_on_map_load = true;
+		SceneAsset* asset = nullptr;	
+		eng_local.insert_this_map_as_level(asset, this->is_for_playing);
+		assert(!eng_local.is_waiting_on_map_load);
+		callback(OpenMapReturnCode::Success);
+	}
+}
 
 #include "EditorPopupTemplate.h"
 // open a map for playing
@@ -649,36 +755,19 @@ void start_map(const Cmd_Args& args)
 		return;
 	}
 
-	if (eng_local.is_waiting_on_load_level_callback) {
-		sys_print(Error, "map called but already waiting on another async map load (%s), skipping.\n", eng_local.queued_mapname.c_str());
-		return;
-	}
+	//if (eng_local.is_waiting_on_load_level_callback) {
+	//	sys_print(Error, "map called but already waiting on another async map load (%s), skipping.\n", eng_local.queued_mapname.c_str());
+	//	return;
+	//}
+
 	bool force_change = false;
 	for (int i = 1; i < args.size() - 1; i++) {
 		if (strcmp(args.at(i), "f") == 0)
 			force_change = true;
 	}
 	const int map_idx = args.size() - 1;
-
-#ifdef EDITOR_BUILD
-	std::string what_map = args.at(map_idx);
-	auto close_editor_func = [what_map]() {
-		sys_print(Warning, "starting game so closing any editors\n");
-		eng_local.change_editor_state(nullptr, "");
-		eng->open_level(what_map);
-	};
-
-	if (eng->get_current_tool() != nullptr) {
-		if (force_change)
-			close_editor_func();
-		else
-			eng->get_current_tool()->try_close(close_editor_func);
-	}
-	else 
-#endif
-	{
-		eng->open_level(args.at(map_idx));
-	}
+	auto cmd = make_unique<OpenMapCommand>(args.at(map_idx), true);
+	Cmd_Manager::inst->append_cmd(std::move(cmd));
 }
 extern ConfigVar g_entry_level;
 // start game from the entry map
@@ -748,9 +837,9 @@ void GameEngineLocal::add_commands()
 	commands->add("IMPORT_TEX", IMPORT_TEX);
 	commands->add("COMPILE_TEX", COMPILE_TEX);
 	commands->add("print_assets", [](const Cmd_Args&) { g_assets.print_usage(); });
-	commands->add("TOGGLE_PLAY_EDIT_MAP", toggle_play_edit_map);
+	//commands->add("TOGGLE_PLAY_EDIT_MAP", toggle_play_edit_map);
 	commands->add("start_ed", start_editor);
-	commands->add("close_ed", close_editor);
+	//commands->add("close_ed", close_editor);
 	commands->add("load_imgui_ini", load_imgui_ini);
 	commands->add("dump_imgui_ini", dump_imgui_ini);
 	commands->add("reload_shaders", [](const Cmd_Args&) { idraw->reload_shaders(); } );
@@ -802,11 +891,8 @@ void GameEngineLocal::add_commands()
 		Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, args.at(1));
 		});
 	commands->add("goto_entry_map", [](const Cmd_Args& args) {
-		if (args.size() != 1) {
-			sys_print(Info, "usage: goto_entry_map");
-			return;
-		}
-		Cmd_Manager::inst->execute_cmd(EngineCommandBuilder::create_change_map(g_entry_level.get_string(), false));
+		auto cmd = make_unique<OpenMapCommand>(g_entry_level.get_string(), true);
+		Cmd_Manager::inst->append_cmd(std::move(cmd));
 		});
 	commands->add("quit", [](const Cmd_Args& args) { Quit(); });
 	commands->add("map", start_map);
@@ -824,52 +910,253 @@ void GameEngineLocal::add_commands()
 
 void test_integration_1(IntegrationTester& tester)
 {
-	sys_print(Info, "HELLO WORLD\n");
-	bool res = tester.wait_delegate(eng_local.on_map_load_return);
-	tester.checkTrue(!res, "Must have loaded map");
-	float time = GetTime();
-	tester.wait_ticks(1);
-	tester.wait_time(2.0);
-	float now = GetTime();
-	sys_print(Info, "Diff %f\n", now - time);
-	tester.wait_time(3.0);
 }
+#if 0
+#include <variant>
+using std::variant;
+template<typename T>
+class FutureExpc
+{
+public:
+	FutureExpc(T data) : value(data) {}
+	FutureExpc(std::exception_ptr except) : value(except) {}
+	T get() {
+		return std::visit(ValueOrThrow{}, value);
+	}
+private:
+	struct ValueOrThrow {
+		T operator()(const T& val) const { return val; }
+		T operator()(const std::exception_ptr& ex) const { std::rethrow_exception(ex); }
+	};
+	variant<std::exception_ptr, T> value;
+};
+
+
+class AssetLoadError : public std::runtime_error {
+public:
+	AssetLoadError() : std::runtime_error("Asset load error.") {}
+};
+using AsyncAssetLoadResult = FutureExpc<IAsset*>;
+
+void load_asset_new(AsyncAssetLoadResult result) {
+	try {
+		IAsset* asset = result.get();
+	}
+	catch (AssetLoadError er) {
+		printf("%s", er.what());
+	}
+}
+
+
+class ChangeMapCommand {
+public:
+	ChangeMapCommand(const string& map, bool force_change, function<void(FutureExpc<Level*>)> callback);
+};
+class StartPlayMapCommand {
+public:
+	StartPlayMapCommand(const string& map, bool force_change, function<void(FutureExpc<Level*>)> callback);
+};
+// start_ed Tool Asset
+
+// for level editor to be valid:
+// must have the level loaded
+// 
+// loading a prefab, load the level and the prefab in the callback
+// then inserts them into the level
+
+// change level command while editor is open
+// issues a close editor command
+
+class StartEditorCommand {
+public:
+	StartEditorCommand(const string& map, bool force_change, function<void(FutureExpc<IEditorTool*>)> callback);
+};
+class OpenEmptyMapCommand {
+public:
+};
+
+
+// EditorTools have a method to create a CreateEditorCommand to put them back in the right state
+// CreateCommands can have multiple constructors
+// For example, one to create with a new map, one for existing map, one for putting back into old state
+// These commands set up required state like loading maps etc. for the editors
+class CreateEditorCommand {
+public:
+	virtual ~CreateEditorCommand() {}
+	using Callback = function<void(FutureExpc<uptr<IEditorTool>>)>;
+	virtual void execute(Callback callback) = 0;
+};
+class CreateLevelEditorCommand : public CreateEditorCommand {
+public:
+	CreateLevelEditorCommand();	// create empty map
+	CreateLevelEditorCommand(const string& mapname);	// create from map
+	CreateLevelEditorCommand(IEditorTool& existing);	// creates from existing state	
+	void execute(Callback callback) {
+		// step 1, load the map
+		auto cmd = new ChangeMapCommand(mapname, true, [callback](FutureExpc<Level*> res) {
+			uptr<IEditorTool> tool;
+			try {
+				Level* l = res.get();
+				assert(l);
+				// create editor tool
+			}
+			catch (...) {
+
+			}
+			// execute callback, could be a null tool
+			callback(FutureExpc(std::move(tool)));
+		});
+		// add cmd to system
+	}
+	string mapname;
+};
+#endif
+
+// multiple map workflow:
+//		root_map,level0,(map0|map1|map2)
+
+// map "map" -> PlayMap()
+//		starts an async load,
+//		then issues callback, then closes level
+//		
+//	 closes down cur level and editor state
+//		
+// 
+// open_map "map" -> OpenMap()
+//		all it does is open a map, unloads existing
+// 
+// open_empty_map -> OpenMap()
+//		opens empty map
+//
+// close_map -> CloseMap()
+//		all it does is close the map
+//
+// start_ed -> StartEditorCommand()
+//		opens an editor in the editor state
+//
+// close_ed_tab -> CloseEditorTab()
+//		closes the current editor tab
+//
+// save_ed -> SaveEditorTab()
+// close_all_ed_tabs -> Close
+
+MulticastDelegate<> tempMD;
 void test_integration_2(IntegrationTester& tester)
 {
+	
 	sys_print(Info, "HELLO WORLD\n");
-	Cmd_Manager::inst->append_cmd(EngineCommandBuilder::create_change_map("top_down/map0.tmap", true));// Cmd_Execute_Mode::APPEND, "map top_down/map0.tmap");
+	auto open_map_state = [&](string name) {
+		double start = GetTime();
+
+		auto cmd = make_unique<OpenMapCommand>(name, true);
+		cmd->callback = [start](OpenMapReturnCode code) {
+			double now = GetTime();
+			printf("---TIME %f\n", float(now - start));
+			tempMD.invoke();
+		};
+		Cmd_Manager::inst->append_cmd(std::move(cmd));
+		tester.wait_delegate(tempMD);
+	};
+
+	auto get_rand_ticks = [&]() -> int {
+		float f = tester.get_rand().RandF(0, 1);
+		if (f < 0.2) return 0;
+		if (f < 0.5) return 1;
+		return tester.get_rand().RandI(2, 50);
+	};
+
+	//open_map_state("top_down/map0.tmap");
+	//tester.checkTrue(eng->get_level(),"");
+	//tester.wait_time(2.0);
+	//
+	auto open_editor_state = [&](const ClassTypeInfo& type, opt<string> map, bool wait = true, bool should_fail=false) {
+		double start = GetTime();
+		auto edCmd = make_unique<OpenEditorToolCommand>(type, map, true);
+		edCmd->callback = [start,&tester,should_fail](bool b) {
+			double now = GetTime();
+			printf("---TIME %f\n", float(now - start));
+			tester.checkTrue(!should_fail == b,"expected ed test wrong");
+			tempMD.invoke();
+		};
+		Cmd_Manager::inst->append_cmd(std::move(edCmd));
+		if(wait)
+			tester.wait_delegate(tempMD);
+	};
+
+	open_editor_state(SceneAsset::StaticType, "top_down/map0.tmap",false,false);
+	//tester.checkTrue(eng_local.editorState->has_tool(),"");
+	//tester.wait_ticks(get_rand_ticks());
+	//tester.wait_time(0.2);
+	open_editor_state(PrefabAsset::StaticType, std::nullopt,false,true);
+	tester.wait_time(2.0);
+	//tester.checkTrue(eng_local.editorState->has_tool(), "");
+	tester.wait_ticks(get_rand_ticks());
+	open_map_state("top_down/map0.tmap");
+	tester.wait_ticks(get_rand_ticks());
+	open_map_state("car/testmap.tmap");
+	tester.wait_ticks(get_rand_ticks());
+	open_editor_state(SceneAsset::StaticType, std::nullopt,false);
+	//tester.checkTrue(eng_local.editorState->has_tool(), "");
+	//tester.wait_ticks(get_rand_ticks());
+	open_editor_state(Animation_Tree_CFG::StaticType, std::nullopt,false,true);
+	//tester.wait_delegate(tempMD);
+	//tester.checkTrue(eng_local.editorState->has_tool(), "expected tool open");
+	//tester.wait_ticks(60);
+	open_editor_state(Animation_Tree_CFG::StaticType, std::nullopt,false,true);
+	tester.wait_time(2.0);
+	return;
+
+//	Cmd_Manager::inst->append_cmd(EngineCommandBuilder::create_change_map("top_down/map0.tmap", true));// Cmd_Execute_Mode::APPEND, "map top_down/map0.tmap");
 	bool changeSuccesful = tester.wait_delegate(eng_local.on_map_load_return);
 	tester.checkTrue(changeSuccesful, "map change worked");
 
-	MulticastDelegate<> temp;
-	g_assets.find_async<PrefabAsset>("myprefabblah.pfb", [&temp](GenericAssetPtr) {
-		temp.invoke();
+	g_assets.find_async<PrefabAsset>("myprefabblah.pfb", [](GenericAssetPtr) {
+		tempMD.invoke();
 		});
-	tester.wait_delegate(temp);
+	tester.wait_delegate(tempMD);
 	tester.wait_ticks(1);
 	tester.checkTrue(!EditorPopupManager::inst->has_popup_open(), "no popup after changing map");
 	tester.checkTrue(!eng->is_editor_level(), "not editor level");
-	tester.checkTrue(!eng_local.is_in_an_editor_state(), "not editor state");
-	tester.wait_time(1.0);
-	eng_local.leave_level();
+	//tester.checkTrue(!eng_local.is_in_an_editor_state(), "not editor state");
+	tester.wait_time(0.1);
+//	eng_local.leave_level();
 	tester.wait_ticks(1);
 	tester.checkTrue(!eng->get_level(), "");
-	tester.wait_time(1.0);
+	tester.wait_time(0.1);
 	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "start_ed Map top_down/map0.tmap");
 	bool res = tester.wait_delegate(eng_local.on_map_load_return);
 	tester.checkTrue(res, "Must have opened editor");
-	tester.wait_time(2.0);
+	Level* l = eng->get_level();
+	const bool conditions = l && l->is_editor_level() && l->get_source_asset_name() == "top_down/map0.tmap";
+	tester.checkTrue(conditions, "level opened properly");
+//	tester.checkTrue(eng_local.get_current_tool(), "editor opened properly");
+	tester.wait_time(0.1);
+
+	//load_asset_new(std::make_exception_ptr(AssetLoadError()));
 }
 
-
+void GameEngineLocal::set_tester(IntegrationTester* tester, bool headless_mode) {
+	this->tester.reset(tester);
+	this->headless_mode = headless_mode;
+}
+extern ConfigVar developer_mode;
+extern ConfigVar log_shader_compiles;
+extern ConfigVar material_print_debug;
 int game_engine_main(int argc, char** argv)
 {
+	material_print_debug.set_bool(false);
+	developer_mode.set_bool(false);
+	log_shader_compiles.set_bool(false);
+	loglevel.set_integer(0);
 	eng_local.init(argc,argv);
-	
-	//vector<IntTestCase> tests;
-	//tests.push_back({ test_integration_1, "myTest" });
-	//tests.push_back({ test_integration_2, "myTest2" });
-	//eng_local.tester = std::make_unique<IntegrationTester>(true, tests);
+	loglevel.set_integer(4);
+	log_all_asset_loads.set_bool(false);
+	log_destroy_game_objects.set_bool(false);
+
+	vector<IntTestCase> tests;
+	tests.push_back({ test_integration_1, "myTest" });
+	tests.push_back({ test_integration_2, "myTest2" });
+	eng_local.set_tester(new IntegrationTester(true, tests), false);
 
 	eng_local.loop();
 	eng_local.cleanup();
@@ -914,18 +1201,6 @@ ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL, "enables d
 ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop", 0.0001, 5.0);
 
 
-void GameEngineLocal::open_level(string nextname)
-{
-	// level will get loaded in next ::loop()
-	queued_mapname = nextname;
-	state = Engine_State::Loading;
-}
-
-void GameEngineLocal::leave_level()
-{
-	// current map gets unloaded in next ::loop()
-	state = Engine_State::Idle;
-}
 
 static void init_log_gui()
 {
@@ -938,75 +1213,6 @@ static void init_log_gui()
 
 }
 
-void GameEngineLocal::on_map_change_callback(bool this_is_for_editor, SceneAsset* loadedLevel)
-{
-	sys_print(Info, "on_map_change_callback %s\n",(loadedLevel)?loadedLevel->get_name().c_str():"<nullptr>");
-	ASSERT(!level);
-	ASSERT(is_waiting_on_load_level_callback);
-	is_waiting_on_load_level_callback = false;
-	is_loading_editor_level = false;
-	if (!loadedLevel) {
-		sys_print(Error, "couldn't load map !!!\n");
-		state = Engine_State::Idle;
-		on_map_load_return.invoke(false);
-		return;
-	}
-
-	g_assets.remove_system_reference(loadedLevel);	// remove it, just do it.
-	uptr<SceneAsset> unique_scene;	// now its a unique ptr
-	unique_scene.reset(loadedLevel);
-
-	g_modelMgr.compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
-
-	time = 0.0;
-	set_tick_rate(60.f);
-	// constructor initializes level state
-	level = std::make_unique<Level>(std::move(unique_scene), this_is_for_editor);
-	level->start();
-	idraw->on_level_start();
-	state = Engine_State::Game;
-	init_log_gui();
-	on_map_load_return.invoke(true);
-	wants_gc_flag = true;	// signal for a gc
-
-	sys_print(Info, "changed state to Engine_State::Game\n");
-}
-
-void GameEngineLocal::execute_map_change()
-{
-	sys_print(Info, "-------- Map Change: %s --------\n", queued_mapname.c_str());
-	// free current map
-	stop_game();
-	ASSERT(!level);
-	on_begin_map_change.invoke();
-
-	// try loading map
-#ifdef EDITOR_BUILD
-	const bool this_is_for_editor = is_in_an_editor_state();
-#else
-	const bool this_is_for_editor = false;
-#endif
-	is_loading_editor_level = this_is_for_editor;	// set temporary variable
-
-	ASSERT(!is_waiting_on_load_level_callback);
-	is_waiting_on_load_level_callback = true;	// flipped to false in on_map_change_callback
-
-	// special name to create a map
-	if (this_is_for_editor && queued_mapname == "__empty__") {	
-		// not memory leak, gets put into a unique ptr
-		SceneAsset* temp = new SceneAsset;
-		on_map_change_callback(true /* == this_is_for_editor */, temp);
-	}
-	else {
-		g_assets.find_async<SceneAsset>(queued_mapname, 
-			[this, this_is_for_editor](GenericAssetPtr ptr) {
-				auto level = (ptr)?ptr.cast_to<SceneAsset>():nullptr;
-				this->on_map_change_callback(this_is_for_editor, level.get());
-			});
-		// goto idle while waint for loading to finish
-		state = Engine_State::Idle;
-	}
-}
 
 void GameEngineLocal::spawn_starting_players(bool initial)
 {
@@ -1016,10 +1222,10 @@ void GameEngineLocal::spawn_starting_players(bool initial)
 
 void GameEngineLocal::set_tick_rate(float tick_rate)
 {
-	if (state == Engine_State::Game) {
-		sys_print(Warning, "Can't change tick rate while running\n");
-		return;
-	}
+//	if (state == Engine_State::Game) {
+	//	sys_print(Warning, "Can't change tick rate while running\n");
+	//	return;
+//	}
 	tick_interval = 1.0 / tick_rate;
 }
 
@@ -1084,8 +1290,9 @@ void GameEngineLocal::key_event(SDL_Event event)
 void GameEngineLocal::cleanup()
 {
 #ifdef EDITOR_BUILD
-	if (get_current_tool())
-		get_current_tool()->close();
+	assert(0);
+	//if (get_current_tool())
+	//	get_current_tool()->close();
 #endif
 	isound->cleanup();
 
@@ -1179,7 +1386,7 @@ Debug_Interface* Debug_Interface::get()
 bool GameEngineLocal::is_drawing_to_window_viewport() const
 {
 #ifdef EDITOR_BUILD
-	return is_in_an_editor_state();
+	return editorState->has_tool();// is_in_an_editor_state();
 #else
 	return false;
 #endif
@@ -1211,9 +1418,9 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 
 #ifdef EDITOR_BUILD
 	// draw tool interface if its active
-	if (is_in_an_editor_state()) {
-		dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode, get_current_tool());
-		get_current_tool()->draw_imgui_public();
+	if (editorState->has_tool()) {
+		dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode, editorState->get_tool());
+		editorState->imgui_draw();
 		AssetBrowser::inst->imgui_draw();
 	}
 #endif
@@ -1224,21 +1431,22 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 
 #ifdef EDITOR_BUILD
 	// will only be true if in a tool state
-	if (is_drawing_to_window_viewport() && eng->get_state()==Engine_State::Game) {
+	if (is_drawing_to_window_viewport() && eng->get_level()) {
 
 		uint32_t flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoNav;
 		if (scene_hovered)
 			flags |=  ImGuiWindowFlags_NoMove;
 
-		if (is_in_an_editor_state() && get_current_tool()->wants_scene_viewport_menu_bar())
+		if (editorState->has_tool() && editorState->wants_scene_viewport_menu_bar())
 			flags |= ImGuiWindowFlags_MenuBar;
 
 		bool next_focus = false;
 		//ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 		if (ImGui::Begin("Scene viewport",nullptr, flags)) {
 
-			if (is_in_an_editor_state())
-				get_current_tool()->hook_pre_scene_viewport_draw();
+			if (editorState->has_tool())
+				editorState->hook_pre_viewport();
+				//get_current_tool()->hook_pre_scene_viewport_draw();
 
 			auto size = ImGui::GetWindowSize();
 			size.y -= 50;
@@ -1263,8 +1471,8 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 			next_focus = focused_window && ImGui::GetIO().MouseDown[1];
 
 			// hook tool for drag and drop stuff
-			if (is_in_an_editor_state())
-				get_current_tool()->hook_scene_viewport_draw();
+			if (editorState->has_tool())
+				editorState->hook_viewport();
 		}
 		if (Input::is_con_button_down(SDL_CONTROLLER_BUTTON_A))
 			next_focus = true;
@@ -1298,21 +1506,21 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 	vs_for_gui.height = viewport.y;
 
 
-	if (state == Engine_State::Loading || state == Engine_State::Idle) {
+	if (!eng->get_level()) {
 		// draw loading ui etc.
 		params.draw_world = false;
 		setup = vs_for_gui;
-		if (get_current_tool() != nullptr)
+		if (editorState->has_tool())
 			params.is_editor = true;
 		//idraw->scene_draw(params, vs_for_gui, get_gui());
 	}
-	else if (state == Engine_State::Game) {
+	else  {
 
 #ifdef EDITOR_BUILD
 		// draw general ui
-		if (get_current_tool() != nullptr) {
+		if (editorState->has_tool()) {
 			params.is_editor = true;	// draw to the id buffer for mouse picking
-			auto vs = get_current_tool()->get_vs();
+			auto vs = editorState->get_vs();
 
 			// fixme
 			isound->set_listener_position(vs->origin, glm::normalize(glm::cross(vs->front, glm::vec3(0, 1, 0))));
@@ -1443,6 +1651,7 @@ void GameEngineLocal::init_sdl_window()
 }
 
 
+using std::make_unique;
 
 ImFont* global_big_imgui_font = nullptr;
 
@@ -1453,33 +1662,50 @@ void GameEngineLocal::init(int argc, char** argv)
 
 	sys_print(Info, "--------- Initializing Engine ---------\n");
 
-	float start = GetTime();
 	program_time_start = GetTime();
+	double start = GetTime();
+	auto print_time = [&](const char* msg) {
+		double now = GetTime();
+		//printf("-----TIME %s %f\n", msg, float(now - start));
+		start = now;
+	};
+
 	Cmd_Manager::inst = Cmd_Manager::create();
 	add_commands();
+	print_time("init commands");
 
 	// must come first
 	ClassBase::init_class_reflection_system();
+	print_time("init class system");
+
 
 	level = nullptr;
 	tick_interval = 1.0 / 60.0;
-	state = Engine_State::Idle;
 	is_hosting_game = false;
 	//sv.reset( new Server );
 	//cl.reset( new Client );
 
 	init_sdl_window();
+	print_time("init sdl window");
+
 
 	Profiler::init();
 
 	FileSys::init();
 	g_assets.init();
+	print_time("asset init");
+
 
 	JobSystem::inst = new JobSystem();// spawns worker threads
+	print_time("job sys init");
 
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
 	AssetBrowser::inst = new AssetBrowser();
+	editorState = make_unique<EditorState>();
+
+	print_time("asset reg and browser init");
+
 #endif
 	g_scriptMgr->init();
 
@@ -1488,10 +1714,16 @@ void GameEngineLocal::init(int argc, char** argv)
 	EditorPopupManager::inst = new EditorPopupManager();
 
 	g_physics.init();
+	print_time("physics init");
+
 	//network_init();
 	// renderer init
 	idraw->init();
+	print_time("draw init");
+
 	imaterials->init();
+	print_time("mat init");
+
 	g_fonts.init();
 	g_guiSystem->init();
 	isound->init();
@@ -1506,15 +1738,20 @@ void GameEngineLocal::init(int argc, char** argv)
 	ImGui::SetCurrentContext(imgui_context);
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init();
+	print_time("imgui init");
+
 	auto path = FileSys::get_full_path_from_game_path("Inconsolata-Bold.ttf");
 	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
 	global_big_imgui_font = ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 24.0);
 	ImGui::GetIO().Fonts->Build();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	print_time("imgui font");
+
 
 	Cmd_Manager::inst->set_set_unknown_variables(true);
 	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
-	
+	print_time("execute vars");
+
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
 	for (int i = 1; i < argc; i++)
@@ -1551,11 +1788,24 @@ void GameEngineLocal::init(int argc, char** argv)
 	SDL_SetWindowPosition(window, startx, starty);
 	SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
 	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "init.txt");
+	print_time("execute init file");
+
 
 	// not in editor and no queued map, load the entry point
-	if (!is_in_an_editor_state() && get_state() != Engine_State::Loading) {
-		open_level(g_entry_level.get_string());
-	}
+
+
+
+	//if (!is_in_an_editor_state() && get_state() != Engine_State::Loading) {
+	//	auto cmd = make_unique<OpenMapCommand>(g_entry_level.get_string(), true);
+	//	cmd->callback = [](SceneAsset* b) {
+	//		if (!b) {
+	//			Quit();
+	//		}
+	//	};
+	//	Cmd_Manager::inst->append_cmd(std::move(cmd));
+	//
+	//	//open_level(g_entry_level.get_string());
+	//}
 
 	TIMESTAMP("execute startup");
 }
@@ -1595,9 +1845,6 @@ void GameEngineLocal::game_update_tick()
 
 	for (int i = 0; i < 1; i++) {
 		fixed_update(tick_interval);
-
-		if (state != Engine_State::Game)
-			break;
 	}
 
 	// call level update
@@ -1618,18 +1865,15 @@ void GameEngineLocal::stop_game()
 	if (!map_spawned())
 		return;
 
-	const char* str = (level->get_source_asset()) ? level->get_source_asset()->get_name().c_str() : "<empty>";
-	sys_print(Info,"-------- Clearing Map (%s) --------\n", str);
-
-	ASSERT(level);
-
+	assert(level);
+	string name = level->get_source_asset_name();
+	sys_print(Info,"Clearing Map (%s)\n", name.c_str());
+	on_leave_level.invoke();
 	idraw->on_level_end();
-
 	gui_log = nullptr;
 	level->close_level();
 	level.reset();
 
-	on_leave_level.invoke();
 
 
 	// clear any debug shapes
@@ -1638,23 +1882,15 @@ void GameEngineLocal::stop_game()
 
 bool GameEngineLocal::game_thread_update()
 {
-	if (state == Engine_State::Game) {
+	if(level)
 		game_update_tick();
-		if (state != Engine_State::Game)
-			return false;	// goto next frame (to exit or change map)
-	}
-
+	
 #ifdef EDITOR_BUILD
-	if (is_in_an_editor_state()) {
-		get_current_tool()->tick(frame_time);
-	}
+	if (editorState)
+		editorState->tick(frame_time);
 #endif
 
 	isound->tick(frame_time);
-
-
-	// draw imgui here
-	// draw ui
 
 	return true;
 }
@@ -1679,33 +1915,9 @@ void game_update_job(uintptr_t user)
 	g_guiSystem->paint();
 }
 
-// seperate function so tester can access it
-bool GameEngineLocal::state_machine_update()
-{
-	// update state
-	switch (state)
-	{
-	case Engine_State::Idle:
-		if (map_spawned()) {	// map is spawned, unload it
-			stop_game();
-			return true;			// goto next frame
-		}
-		break;
-	case Engine_State::Loading:
-		execute_map_change();
-		return true; // goto next frame
-		break;
-	case Engine_State::Game:	// handled in game_thread_update()
-		break;
-	};
-
-	return false;
-}
-
-
 void GameEngineLocal::loop()
 {
-	auto frame_start = [&]() -> bool
+	auto frame_start = [&]()
 	{
 		ZoneScopedN("frame_start");
 		// reset cursor if in relative mode
@@ -1756,11 +1968,12 @@ void GameEngineLocal::loop()
 		Input::inst->tick();
 		g_guiSystem->post_handle_events();
 		g_guiSystem->think();
-		Cmd_Manager::get()->execute_buffer();
-		return state_machine_update();
+
+		// Update the messsage queue! does level changing etc.
+		Cmd_Manager::inst->execute_buffer();
 	};
 
-	auto do_overlapped_update = [&](bool& shouldDrawNext, SceneDrawParamsEx& drawparamsNext, View_Setup& setupNext)
+	auto do_overlapped_update = [&](bool& shouldDrawNext, SceneDrawParamsEx& drawparamsNext, View_Setup& setupNext, const bool skip_rendering)
 	{
 		ZoneScopedN("OverlappedUpdate");
 		CPUSCOPESTART(OverlappedUpdate);
@@ -1769,10 +1982,12 @@ void GameEngineLocal::loop()
 		JobCounter* gameupdatecounter{};
 		JobSystem::inst->add_job(game_update_job,uintptr_t(&out), gameupdatecounter);
 
-		if (!shouldDrawNext) {
-			drawparamsNext.draw_world = drawparamsNext.draw_ui = false;
+		if (!skip_rendering) {
+			if (!shouldDrawNext) {
+				drawparamsNext.draw_world = drawparamsNext.draw_ui = false;
+			}
+			idraw->scene_draw(drawparamsNext, setupNext);
 		}
-		idraw->scene_draw(drawparamsNext, setupNext);
 		JobSystem::inst->wait_and_free_counter(gameupdatecounter);// wait for game update to finish while render is on this thread
 
 		shouldDrawNext = out.drawOut;
@@ -1782,17 +1997,24 @@ void GameEngineLocal::loop()
 
 	// This happens on main thread
 	// I could double buffer draw data so ImGui can update on game thread and render simultaneously
-	auto imgui_render = [&]()
+	auto imgui_render = [&](const bool skip_rendering)
 	{
 		ZoneScopedN("ImguiDraw");
 
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 		ImGui::Render();
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		if (!skip_rendering) {
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		}
 	};
 	auto imgui_update = [&]()
 	{
 		ZoneScopedN("ImGuiUpdate");
+
+		if (editorState && editorState->has_tool())
+			enable_imgui_docking();
+		else
+			disable_imgui_docking();
 
 		// draw imgui interfaces
 		// if a tool is active, game screen gets drawn to an imgui viewport
@@ -1800,8 +2022,8 @@ void GameEngineLocal::loop()
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui::NewFrame();
 #ifdef EDITOR_BUILD
-		if (get_current_tool())
-			get_current_tool()->hook_imgui_newframe();
+		if (editorState)
+			editorState->imgui_hook_new_frame();
 #endif
 		draw_any_imgui_interfaces();
 	};
@@ -1812,8 +2034,7 @@ void GameEngineLocal::loop()
 		DebugShapeCtx::get().update(frame_time);
 		g_assets.tick_asyncs();	// tick async loaded assets, this will call the async load_map callback
 #ifdef EDITOR_BUILD
-		// update hot reloading
-		AssetRegistrySystem::get().update();
+		AssetRegistrySystem::get().update(); 		// update hot reloading
 #endif
 		if (get_level())
 			get_level()->sync_level_render_data();
@@ -1821,12 +2042,12 @@ void GameEngineLocal::loop()
 		g_physics.sync_render_data();		
 		idraw->sync_update();
 	};
-	auto wait_for_swap = [&]()
+	auto wait_for_swap = [&](const bool skip_rendering)
 	{
 		ZoneScopedN("SwapWindow");
 		CPUSCOPESTART(SwapWindow);
-
-		SDL_GL_SwapWindow(window);
+		if(!skip_rendering)
+			SDL_GL_SwapWindow(window);
 	};
 
 	double last = GetTime() - 0.1;
@@ -1837,6 +2058,8 @@ void GameEngineLocal::loop()
 
 	for (;;)
 	{
+		const bool skip_rendering = headless_mode;
+
 		// update time
 		const double now = GetTime();
 		double dt = now - last;
@@ -1854,15 +2077,10 @@ void GameEngineLocal::loop()
 
 
 		// update input, console cmd buffer
-		const bool should_skip = frame_start();
-		if (should_skip) {
-			// hacky, do a sync update here to refresh assets etc
-			do_sync_update();
-			continue;
-		}
+		frame_start();
 
 		// overlapped update (game+render)
-		do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext);
+		do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering);
 
 		if (wants_gc_flag) {
 			do_asset_gc();
@@ -1871,15 +2089,14 @@ void GameEngineLocal::loop()
 
 		// sync period
 		imgui_update();	// fixme
-		imgui_render();
+		imgui_render(skip_rendering);
 		do_sync_update();
-		wait_for_swap();	// wait for swap last
+		wait_for_swap(skip_rendering);	// wait for swap last
 
 		FrameMark;	// tracy profiling
 		Profiler::end_frame_tick(frame_time);	// my crappy profilier
 	}
 }
-
 
 int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 {
@@ -1925,36 +2142,42 @@ void Debug_Console::draw()
 {
 	{
 		std::lock_guard<std::mutex> printLock(printMutex);
-
-		ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
-		if (!ImGui::Begin("Console")) {
-			ImGui::End();
-			return;
-		}
-		const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
-		if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false, ImGuiWindowFlags_HorizontalScrollbar))
-		{
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
-			for (int i = 0; i < lines.size(); i++)
-			{
-				Color32 color;
-				bool has_color = false;
-				if (!lines[i].empty() && lines[i][0] == '>') { color = { 136,23,152 }; has_color = true; }
-				if (has_color)
-					ImGui::PushStyleColor(ImGuiCol_Text, color.to_uint());
-				ImGui::TextUnformatted(lines[i].c_str());
-				if (has_color)
-					ImGui::PopStyleColor();
-			}
-			if (scroll_to_bottom || (auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
-				ImGui::SetScrollHereY(1.0f);
-			scroll_to_bottom = false;
-
-			ImGui::PopStyleVar();
-		}
-		ImGui::EndChild();
-		ImGui::Separator();
+		for (auto& l : bufferedLines)
+			lines.push_back(std::move(l));
+		bufferedLines.clear();
 	}
+	if (lines.size() > 1000)
+		lines.clear();
+
+	ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
+	if (!ImGui::Begin("Console")) {
+		ImGui::End();
+		return;
+	}
+	const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
+	if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false, ImGuiWindowFlags_HorizontalScrollbar))
+	{
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
+		for (int i = 0; i < lines.size(); i++)
+		{
+			Color32 color;
+			bool has_color = false;
+			if (!lines[i].empty() && lines[i][0] == '>') { color = { 136,23,152 }; has_color = true; }
+			if (has_color)
+				ImGui::PushStyleColor(ImGuiCol_Text, color.to_uint());
+			ImGui::TextUnformatted(lines[i].c_str());
+			if (has_color)
+				ImGui::PopStyleColor();
+		}
+		if (scroll_to_bottom || (auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
+			ImGui::SetScrollHereY(1.0f);
+		scroll_to_bottom = false;
+
+		ImGui::PopStyleVar();
+	}
+	ImGui::EndChild();
+	ImGui::Separator();
+
 	// Command-line
 	bool reclaim_focus = false;
 	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | 
@@ -1989,25 +2212,25 @@ void Debug_Console::draw()
 }
 void Debug_Console::print_args(const char* fmt, va_list args)
 {
-	if (lines.size() > 1000)
-		lines.clear();
-
+	std::lock_guard<std::mutex> printLock(printMutex);
 
 	char buf[1024];
 	vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
 	buf[IM_ARRAYSIZE(buf) - 1] = 0;
-	lines.push_back(buf);
+	bufferedLines.push_back(buf);
 }
 
 void Debug_Console::print(const char* fmt, ...)
 {
+	std::lock_guard<std::mutex> printLock(printMutex);
+
 	char buf[1024];
 	va_list args;
 	va_start(args, fmt);
 	vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
 	buf[IM_ARRAYSIZE(buf) - 1] = 0;
 	va_end(args);
-	lines.push_back(buf);
+	bufferedLines.push_back(buf);
 }
 
 
@@ -2149,20 +2372,22 @@ void DebugShapeCtx::fixed_update_start()
 #include "Framework/PropertyUtil.h"//
 void GameEngineLocal::do_asset_gc()
 {
-	if (!get_level())
-		return;
-	printf("Starting GC...\n");
+	//return;
+	sys_print(Debug, "GameEngineLocal::do_asset_gc\n");
 	auto start = GetTime();
 	g_assets.mark_unreferences();
-	auto& objs = level->get_all_objects();
-	for (auto o : objs) {
-		check_object_for_asset_ptr(o, AssetDatabase::loader);
-		Entity* e = o->cast_to<Entity>();
-		if (e&&e->what_prefab) {
-			AssetDatabase::loader->touch_asset(e->what_prefab);
+	if (get_level()) {
+		auto& objs = level->get_all_objects();
+		for (auto o : objs) {
+			check_object_for_asset_ptr(o, AssetDatabase::loader);
+			Entity* e = o->cast_to<Entity>();
+			if (e && e->what_prefab) {
+				AssetDatabase::loader->touch_asset(e->what_prefab);
+			}
 		}
 	}
 	g_assets.remove_unreferences();
 	auto end = GetTime();
-	printf("gc in %f(ms)\n",(end-start)*1000.0);
+
+	sys_print(Debug, "/GameEngineLocal::do_asset_gc: finished in %f(ms)\n",float(end-start)*1000.f);
 }

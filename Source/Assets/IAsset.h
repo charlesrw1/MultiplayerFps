@@ -48,7 +48,9 @@ public:
 		this->path = path;
 	}
 #endif
-
+	bool is_this_globally_referenced() const {
+		return is_system;
+	}
 protected:
 
 private:
@@ -86,9 +88,6 @@ private:
 		return false;
 	}
 
-	bool is_this_globally_referenced() const {
-		return is_system;
-	}
 	// this is only called on the main thread
 	void set_not_loaded_main_thread() {
 		is_loaded = has_run_post_load = false;
