@@ -97,6 +97,8 @@ def output_macro_for_prop(cpptype:CppType,name:str,flags:str,offset:str,custom_t
         #return f'make_struct_property({name_offset_flags}, "ClassTypePtr", {type_of_template}.classname)'
         #return f"REG_CLASSTYPE_PTR({name},{flags})"
         return f'make_classtypeinfo_property({name_offset_flags},{tooltip},&{type_of_template})'
+    elif type == STRINGNAME_TYPE:
+         return f"make_stringname_property({name_offset_flags},{tooltip})"
     else:
         print(f"Unknown type {name} {type}")
         assert(0)
@@ -184,6 +186,8 @@ def write_one_property_generic(type:CppType, name_offset_flags_tooltip:str, prop
         return f"make_handle_ptr_property({noft_and_type})"
     elif type.type == CLASSTYPEINFO_TYPE:
         return f"make_classtype_property({noft_and_type})"
+    elif type.type == STRINGNAME_TYPE:
+         return f"make_stringname_property({name_offset_flags_tooltip})"
     return ""
 
 def write_properties(newclass:ClassDef) -> str:

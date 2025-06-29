@@ -44,6 +44,7 @@ UNIQUE_PTR_TYPE = 53 # std::uniqueptr to a class type
 RAW_PTR_TYPE = 54
 
 CLASSTYPEINFO_TYPE = 60
+STRINGNAME_TYPE = 61
 
 OTHER_CLASS_TYPE = 100
 
@@ -266,6 +267,7 @@ STANDARD_CPP_TYPES: dict[str, int] = {
     "ClassTypeInfo" : CLASSTYPEINFO_TYPE,
     "ClassTypePtr" : CLASSTYPEINFO_TYPE,
 
+    "StringName" : STRINGNAME_TYPE,
 
     "float": FLOAT_TYPE,
     "bool": BOOL_TYPE,
