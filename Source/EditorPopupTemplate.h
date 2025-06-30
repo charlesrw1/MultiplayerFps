@@ -16,4 +16,10 @@ public:
 		const std::string& title,
 		const std::string& desc
 	);
+
+	static void create_file_save_as(
+		EditorPopupManager* mgr,
+		function<void(string)> on_save,
+		string extension	// without dot
+		);
 };

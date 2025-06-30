@@ -17,31 +17,18 @@ Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, co
 
 void UnserializedSceneFile::delete_objs()
 {
-	for (auto& o : all_objs)
-		delete o.second;
-	all_objs.clear();
+	for (auto& o : all_obj_vec)
+		delete o;
+	all_obj_vec.clear();
 }
 
-BaseUpdater* UnserializedSceneFile::find(const std::string& path)
+BaseUpdater* UnserializedSceneFile::find(int fileId)
 {
-	auto find = all_objs.find(path);
-	return find == all_objs.end() ? nullptr : find->second;
+	auto find = file_id_to_obj.find(fileId);
+	return find == file_id_to_obj.end() ? nullptr : find->second;
 }
 
-void UnserializedSceneFile::add_components_and_children_from_entity_R(const std::string& path, Entity* e, Entity* source)
-{
-	for (auto& c : e->all_components)
-	{
-		auto cpath = path + "~" + std::to_string(c->unique_file_id);
-		all_objs.insert({ cpath,c });
-	}
-	for (auto& child : e->get_children())
-	{
-		auto cpath = path + "~" + std::to_string(child->unique_file_id);
-		all_objs.insert({ cpath, child });
-		add_components_and_children_from_entity_R(cpath+"/", child, source);
-	}
-}
+
 
 uint32_t parse_fileid(const std::string& path)
 {
@@ -103,14 +90,15 @@ void check_props_for_entityptr(void* inst, const PropertyInfoList* list)
 
 void UnserializedSceneFile::unserialize_post_assign_ids()
 {
-	for (auto& obj : all_objs) {
-		if (!obj.second)
+	for (auto& obj : all_obj_vec) {
+		if (!obj)
 			continue;
-		auto type = &obj.second->get_type();
+		assert(obj->get_instance_id() != 0);
+		auto type = &obj->get_type();
 		while (type) {
 			auto props = type->props;
 			if(props)
-				check_props_for_entityptr(obj.second, props);
+				check_props_for_entityptr(obj, props);
 			type = type->super_typeinfo;
 		}
 	}

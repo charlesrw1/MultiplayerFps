@@ -151,6 +151,11 @@ public:
 
 	bool show_console = false;
 	bool dedicated_server = false;
+
+
+	void set_wants_gc() {
+		wants_gc_flag = true;
+	}
 	bool wants_gc_flag = false;
 
 	bool is_drawing_to_window_viewport() const;

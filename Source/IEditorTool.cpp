@@ -131,17 +131,6 @@ void IEditorTool::close()
 
 bool IEditorTool::save()
 {
-	//if (!can_save_document()) {
-	//	sys_print(Error, "cant save graph while playing\n");
-	//	return false;
-	//}
-	if (!current_document_has_path()) {
-		open_save_popup = true;
-		return false;
-	}
-
-	has_editor_changes = false;
-	set_window_title();
 
 	return save_document_internal();
 }

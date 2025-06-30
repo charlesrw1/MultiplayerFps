@@ -39,12 +39,11 @@ public:
 						head = ptr->next;
 					delete ptr;
 				}
-				return;
 			}
 			prev = ptr;
 			ptr = ptr->next;
 		}
-		printf("no matching key\n");
+		//printf("no matching key\n");
 	}
 	void invoke(Args... args) {
 		Item* prev = nullptr;
@@ -53,6 +52,7 @@ public:
 		{
 			ptr->in_func = true;
 			ptr->func(args...);
+			ptr->in_func = false;
 			Item* next = ptr->next;
 			if (ptr->wants_delete) {
 				if (prev)

@@ -11,6 +11,7 @@
 #include "Framework/Hashset.h"
 #include "Framework/Hashmap.h"
 #include "Framework/Files.h"
+#include "Framework/MapUtil.h"
 
 using std::string;
 using std::unordered_map;
@@ -664,6 +665,15 @@ public:
 			return a;
 		}
 	}
+	void reload_asset_sync(IAsset* asset) {
+		assert(asset);
+
+		function<void(GenericAssetPtr)> func;
+		reload_asset_async(asset, asset->is_system, func);
+		backend.finish_all_jobs();
+		backend.combine_asset_tables(allAssets);
+		// guaranteed that job is finished by now
+	}
 
 	void mark_assets_as_unreferenced()
 	{
@@ -766,6 +776,9 @@ public:
 		sys_print(Info, "quitting asset loader\n");
 		backend.signal_end_work();
 	}
+	bool is_asset_loaded(const string& path) {
+		return MapUtil::contains(allAssets, path);
+	}
 private:
 	IAsset* find_in_all_assets(const string& str) {
 		auto f= allAssets.find(str);
@@ -834,13 +847,17 @@ void AssetDatabase::remove_system_reference(IAsset* asset)
 	asset->is_system = false;
 	impl->remove_asset_direct(asset);
 }
+bool AssetDatabase::is_asset_loaded(const std::string& path)
+{
+	return impl->is_asset_loaded(path);
+}
 void AssetDatabase::mark_unreferences()
 {
 	impl->mark_assets_as_unreferenced();
 }
 void AssetDatabase::reload_sync(IAsset* asset)
 {
-	//impl->reload_asset_sync(asset);
+	impl->reload_asset_sync(asset);
 }
 void AssetDatabase::reload_async(IAsset* asset, std::function<void(GenericAssetPtr)> callback)
 {

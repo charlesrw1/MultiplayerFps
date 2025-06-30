@@ -65,6 +65,7 @@ public:
 #ifdef EDITOR_BUILD
 	Entity* editor_spawn_prefab_but_dont_set_spawned_by(const PrefabAsset* asset);
 #endif
+	void validate();
 private:
 	static void set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file);
 	Entity* spawn_prefab_shared(const PrefabAsset* asset, bool set_vars);

@@ -288,6 +288,20 @@ std::string FileSys::get_game_path_from_full_path(const std::string& fullpath) {
 	return fullpath.substr(gamedir.size());
 }
 
+bool FileSys::delete_game_file(std::string filepath)
+{
+	auto fullpath = get_full_path_from_game_path(filepath);
+	sys_print(Debug, "FileSys::delete_game_file: %s\n", fullpath.c_str());
+	if (DeleteFileA(fullpath.c_str())) {
+		sys_print(Info, "Deleted file %s\n", fullpath.c_str());
+		return true;
+	}
+	else {
+		sys_print(Error, "FileSys::delete_game_file: failed to delete %s\n", fullpath.c_str());
+		return false;
+	}
+}
+
 void FileSys::init()
 {
 	sys_print(Info, "------ FileSys init ------\n");

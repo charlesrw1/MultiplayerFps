@@ -132,6 +132,18 @@ void Entity::check_for_transform_nans()
 		scale = glm::vec3(1.f);
 	}
 }
+void Entity::validate_check()
+{
+	assert(get_instance_id() != 0);
+	assert(eng->get_object(get_instance_id()) == this);
+	for (auto c : children)
+		c->validate_check();
+	for (auto comp : all_components){
+		assert(comp->get_instance_id() != 0);
+		assert(eng->get_object(comp->get_instance_id()) == comp);
+	}
+
+}
 bool Entity::get_is_any_selected_in_editor() const {
 	if (get_selected_in_editor())
 		return true;

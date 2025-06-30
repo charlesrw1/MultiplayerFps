@@ -37,6 +37,7 @@ ObjectOutliner::Node::Node(ObjectOutliner* oo, Entity* initfrom, const std::vect
 	did_pass_filter = OONameFilter::does_entity_pass(filter, initfrom);
 	assert(oo->should_draw_this(initfrom));
 	ptr = initfrom->get_self_ptr();
+	assert(ptr.get());
 	auto& children = initfrom->get_children();
 	bool do_any_children_pass = false;
 
@@ -119,6 +120,8 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 	ImGui::SameLine();
 	auto n = node;
 	Entity* node_entity = n->ptr.get();
+	assert(node_entity || !node->parent);
+
 	const bool is_root_node = node_entity == nullptr;
 	ImGui::PushID(n);
 	{

@@ -113,7 +113,7 @@ void Level::destroy_entity(Entity* e)
 	if (!e) 
 		return;
 	uint64_t id = e->get_instance_id();
-
+	assert(id != 0);
 	if(log_destroy_game_objects.get_bool())
 		sys_print(Debug, "removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
 
@@ -135,6 +135,7 @@ void Level::destroy_component(Component* ec)
 	wants_sync_update.remove(ec);
 
 	uint64_t id = ec->get_instance_id();
+	assert(id != 0);
 	if (log_destroy_game_objects.get_bool())
 		sys_print(Debug,"removing eComponent (handle:%llu,class:%s)\n", id, ec->get_type().classname);
 	ec->destroy_internal();
@@ -247,44 +248,74 @@ void Level::close_level()
 	all_world_ents.clear_all();
 }
 #include "Framework/Log.h"
+#include "Framework/MapUtil.h"
 void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids) // was bool assign_new_ids=false
 {
 	const char* reassign_id_str = print_get_bool_string(reassign_ids != nullptr);
-	sys_print(Debug, "Level::insert_unserialized_entities_into_level: (level=%s) (reassign_ids=%s) (objs=%d)\n", sourceAssetName.c_str(), reassign_id_str,(int)scene.all_objs.size());
+	sys_print(Debug, "Level::insert_unserialized_entities_into_level: (level=%s) (reassign_ids=%s) (objs=%d)\n", sourceAssetName.c_str(), reassign_id_str,(int)scene.all_obj_vec.size());
 
-	auto& objs = scene.get_objects();
+	auto& objs = scene.all_obj_vec;
+
+	std::unordered_set<BaseUpdater*> ObjsTest;
+	std::unordered_set<int> fileIds;
+	for (auto o : objs) {
+		SetUtil::insert_test_exists(ObjsTest,o);
+		if (o->unique_file_id != 0)
+			SetUtil::insert_test_exists(fileIds, o->unique_file_id);
+	}
+
 	if(reassign_ids) {
+		std::unordered_set<uint64_t> found;
+		for (auto[fileid,eng_handle] : reassign_ids->path_to_instance_handle) {
+			SetUtil::insert_test_exists(found, eng_handle);
+		}
 		for (auto& o : objs) {
-			ASSERT(o.second);
-			auto& path = o.first;
-			auto idfind = reassign_ids->path_to_instance_handle.find(path);
+			ASSERT(o);
+			assert(o->get_instance_id() == 0);
+			int pathFileId = o->unique_file_id;
 			uint64_t id_to_use = 0;
-			if (idfind != reassign_ids->path_to_instance_handle.end()) {
-				id_to_use = idfind->second;
+			if (pathFileId != 0) {
+				auto idfind = reassign_ids->path_to_instance_handle.find(pathFileId);
+				if (idfind != reassign_ids->path_to_instance_handle.end()) {
+					id_to_use = idfind->second;
+
+					if (id_to_use == 0) {
+						sys_print(Warning, "Level::insert_unserialized_entities_into_level: reassign_ids->path_to_instance_handle returned 0 for fileid=(%lld)\n", pathFileId);
+					}
+				}
 			}
-			else {
+			if(id_to_use==0) {
 				//sys_print(Warning, "Level::insert_unserialized_entities_into_level: couldnt find id in reassign_ids (%lld)\n", id_to_use);
 				id_to_use = get_next_id_and_increment();
 			}
 			ASSERT(id_to_use != 0);
+			auto ent = all_world_ents.find(id_to_use);
 			ASSERT(all_world_ents.find(id_to_use) == nullptr);
 
-			o.second->post_unserialization(id_to_use);
-			all_world_ents.insert(o.second->get_instance_id(), o.second);
+			o->post_unserialization(id_to_use);
+			assert(o->get_instance_id() == id_to_use);
+			all_world_ents.insert(o->get_instance_id(), o);
 		}
 	}
 	else {
 		for (auto& o : objs) {
-			ASSERT(o.second);
-			o.second->post_unserialization(get_next_id_and_increment());
-			ASSERT(all_world_ents.find(o.second->get_instance_id()) == nullptr);
-			all_world_ents.insert(o.second->get_instance_id(), o.second);
+			ASSERT(o);
+			assert(o->get_instance_id() == 0);
+
+			o->post_unserialization(get_next_id_and_increment());
+			ASSERT(all_world_ents.find(o->get_instance_id()) == nullptr);
+			assert(o->get_instance_id() != 0);
+			all_world_ents.insert(o->get_instance_id(), o);
 		}
 	}
+	
+	validate();
 	scene.unserialize_post_assign_ids();
 
-	for (auto& o : objs) {
-		auto ent = o.second;
+	for (int i = 0; i < objs.size();i++) {
+		BaseUpdater* o = objs[i];
+		assert(o->get_instance_id() != 0);
+		auto ent = o;
 		if (Entity* e = ent->cast_to<Entity>())
 			e->initialize_internal(); // just sets init_state => CALLED_START
 		else if (Component* ec = ent->cast_to<Component>()) {
@@ -294,7 +325,7 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 				ASSERT(ec->get_instance_id() != 0);
 				all_world_ents.remove(ec->get_instance_id());
 				delete ec;
-				objs[o.first] = nullptr;
+				objs[i] = nullptr;
 			}
 			else {
 				ec->initialize_internal_step1();
@@ -305,8 +336,9 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 	}
 
 	for (auto& o : objs) {
-		if (o.second) {
-			auto ent = o.second;
+		if (o) {
+			assert(o->get_instance_id() != 0);
+			auto ent = o;
 			if (Component* ec = ent->cast_to<Component>())
 				ec->initialize_internal_step2();
 		}
@@ -364,12 +396,20 @@ Entity* Level::editor_spawn_prefab_but_dont_set_spawned_by(const PrefabAsset* as
 	return spawn_prefab_shared(asset, false);
 }
 
+void Level::validate()
+{
+	for (auto o : all_world_ents) {
+		if (auto e = o->cast_to<Entity>())
+			e->validate_check();
+	}
+}
+
 void Level::set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file)
 {
-	for (auto& o : file.all_objs) {
-		if (o.second != &root) {
-			assert(o.second);
-			if (auto as_ent = o.second->cast_to<Entity>()) {
+	for (auto& o : file.all_obj_vec) {
+		if (o != &root) {
+			assert(o);
+			if (auto as_ent = o->cast_to<Entity>()) {
 				as_ent->set_spawned_by_prefab();
 			}
 		}

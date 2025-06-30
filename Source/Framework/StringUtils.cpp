@@ -130,3 +130,21 @@ string StringUtils::get_directory(const string& input)
 	if (find == 0) return "";
 	return input.substr(0, find);
 }
+
+std::string StringUtils::alphanumeric_hash(const std::string& input) {
+	// Basic hash computation (FNV-1a hash)
+	uint64_t hash = 14695981039346656037ULL;
+	for (char c : input) {
+		hash ^= static_cast<unsigned char>(c);
+		hash *= 1099511628211ULL;
+	}
+	// Encode using base36 (0-9, a-z) to ensure only alphanumerics
+	const char* chars = "0123456789abcdefghijklmnopqrstuvwxyz";
+	std::string result;
+	while (hash > 0) {
+		result.insert(result.begin(), chars[hash % 36]);
+		hash /= 36;
+	}
+
+	return result;
+}

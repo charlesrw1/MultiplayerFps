@@ -491,7 +491,7 @@ public:
 	EditorDoc(const EditorDoc& other) = delete;
 
 	void init_new();
-
+	void set_document_path(string newAssetName);
 	uptr<CreateEditorAsync> create_command_to_load_back() { return nullptr; }
 
 	bool save_document_internal() final;

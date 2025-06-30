@@ -180,8 +180,8 @@ void SceneAsset::uninstall() {
 
 	if (sceneFile.get()) {
 		sys_print(Warning, "scene asset with non-null scenefile\n");
-		for (auto& o : sceneFile->get_objects())
-			delete o.second;
+		for (auto& o : sceneFile->all_obj_vec)
+			delete o;
 		sceneFile.reset(nullptr);
 	}
 }
@@ -253,9 +253,9 @@ bool PrefabAsset::load_asset(IAssetLoadingInterface* load)
 
 		// add instance ids here for diff'ing entity references
 		uint64_t id = 1ull << 62ull;
-		for (auto& obj : sceneFile->get_objects()) {
-			obj.second->post_unserialization(++id);
-			instance_ids_for_diffing.insert(id, obj.second);
+		for (auto& obj : sceneFile->all_obj_vec) {
+			obj->post_unserialization(++id);
+			instance_ids_for_diffing.insert(id, obj);
 		}
 		sceneFile->unserialize_post_assign_ids();
 	}
@@ -273,8 +273,8 @@ void PrefabAsset::uninstall()
 		return;
 
 	//sys_print(Debug, "prefab uninstalled %s\n", get_name().c_str());
-	for (auto& o : sceneFile->get_objects())
-		delete o.second;
+	for (auto& o : sceneFile->all_obj_vec)
+		delete o;
 	sceneFile.reset(nullptr);
 }
 
@@ -285,8 +285,8 @@ void PrefabAsset::sweep_references(IAssetLoadingInterface* load) const
 	if (!sceneFile)
 		return;
 	sys_print(Debug, "PrefabAsset::sweep_references: %s\n", get_name().c_str());
-	for (auto& obj : sceneFile->get_objects()) {
-		check_object_for_asset_ptr(obj.second, load);
+	for (auto& obj : sceneFile->all_obj_vec) {
+		check_object_for_asset_ptr(obj, load);
 	}
 }
 void PrefabAsset::move_construct(IAsset* other)

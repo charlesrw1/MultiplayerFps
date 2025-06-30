@@ -92,7 +92,9 @@ std::vector<Entity*> root_objects_to_write(const std::vector<Entity*>& input_obj
 void add_to_extern_parents(const BaseUpdater* obj, const BaseUpdater* parent, const PrefabAsset* for_prefab, SerializedSceneFile& output)
 {
 	SerializedSceneFile::external_parent ext;
-	ext.child_path = std::to_string(obj->unique_file_id);
+	assert(obj->unique_file_id != 0);
+	ext.child_id = obj->unique_file_id;
+	//ext.child_path = std::to_string(obj->unique_file_id);
 	ext.external_parent_handle = parent->get_instance_id();
 	output.extern_parents.push_back(ext);
 }

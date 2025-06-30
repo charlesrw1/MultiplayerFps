@@ -104,9 +104,9 @@ void RemoveEntitiesCommand::undo() {
 	auto restored = unserialize_entities_from_text("remove_entities_undo",scene->text, AssetDatabase::loader);
 	auto& extern_parents = scene->extern_parents;
 	for (auto& ep : extern_parents) {
-		auto e = restored.get_objects().find(ep.child_path);
+		auto e = restored.file_id_to_obj.find(ep.child_id);
 		ASSERT(e->second->is_a<Entity>());
-		if (e != restored.get_objects().end()) {
+		if (e != restored.file_id_to_obj.end()) {
 			EntityPtr parent(ep.external_parent_handle);
 			if (parent.get()) {
 				auto ent = (Entity*)e->second;
@@ -121,9 +121,7 @@ void RemoveEntitiesCommand::undo() {
 
 	ed_doc.insert_unserialized_into_scene(restored, scene.get());
 	//eng->get_level()->insert_unserialized_entities_into_level(restored, scene.get());	// pass in scene so handles get set to what they were
-	auto& objs = restored.get_objects();
-	std::unordered_set<BaseUpdater*> restored_ptrs;
-	for (auto& o : objs) SetUtil::insert_test_exists(restored_ptrs, o.second);// restored_ptrs.insert(o.second);
+	auto& objs = restored.file_id_to_obj;
 
 	for (SavedCreateObj c : removed_objs) {
 		BaseUpdater* obj = eng->get_level()->get_entity(c.eng_handle);
@@ -588,8 +586,8 @@ void DuplicateEntitiesCommand::execute() {
 
 	auto& extern_parents = scene->extern_parents;
 	for (auto ep : extern_parents) {
-		auto e = duplicated.get_objects().find(ep.child_path);
-		if (e != duplicated.get_objects().end()) {
+		auto e = duplicated.file_id_to_obj.find(ep.child_id);
+		if (e != duplicated.file_id_to_obj.end()) {
 			ASSERT(e->second->is_a<Entity>());
 			EntityPtr parent(ep.external_parent_handle);
 			if (parent.get()) {
@@ -614,7 +612,7 @@ void DuplicateEntitiesCommand::execute() {
 
 
 	handles.clear();
-	auto& objs = duplicated.get_objects();
+	auto& objs = duplicated.file_id_to_obj;
 	for (auto& o : objs) {
 		if (auto e = o.second->cast_to<Entity>())
 		{

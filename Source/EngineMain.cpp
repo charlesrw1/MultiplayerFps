@@ -1045,6 +1045,185 @@ public:
 #include "LevelEditor/Commands.h"
 MulticastDelegate<> tempMD;
 
+
+class EditorIntTesterUtil {
+public:
+	static void open_map_state(IntegrationTester& tester, opt<string> mapname) {
+		double start = GetTime();
+		auto cmd = make_unique<OpenMapCommand>(mapname, true);
+		bool finished = false;
+		cmd->callback = [start,&finished](OpenMapReturnCode code) {
+			double now = GetTime();
+			finished = true;
+			printf("---TIME %f\n", float(now - start));
+			tempMD.invoke();
+		};
+		Cmd_Manager::inst->append_cmd(std::move(cmd));
+		tempMD.remove(&tester);
+		if (!finished) {
+			tester.wait_delegate(tempMD);
+			tester.wait_ticks(1);
+		}
+	}
+	static void open_editor_state(IntegrationTester& tester, const ClassTypeInfo& type, opt<string> map) {
+		open_editor_state_shared(tester, type, map, true);
+	}
+	static void open_editor_state_dont_wait(IntegrationTester& tester, const ClassTypeInfo& type, opt<string> map) {
+		open_editor_state_shared(tester, type, map, false);
+	}
+	static void open_editor_state_shared(IntegrationTester& tester, const ClassTypeInfo& type, opt<string> map, bool wait) {
+		bool should_fail = false;
+		double start = GetTime();
+		auto edCmd = make_unique<OpenEditorToolCommand>(type, map, true);
+		bool finished = false;
+		edCmd->callback = [start, &tester, &finished,should_fail](bool b) {
+			double now = GetTime();
+			sys_print(Debug, "open_editor_state_shared: wait delegate calling\n");
+
+			tester.checkTrue(!should_fail == b, "expected ed test wrong");
+			finished = true;
+			tempMD.invoke();
+		};
+		Cmd_Manager::inst->append_cmd(std::move(edCmd));
+		tempMD.remove(&tester);
+		sys_print(Debug, "adding wait delegate\n");
+		if (!finished && wait) {
+			tester.wait_delegate(tempMD);
+			tester.wait_ticks(1);
+		}
+	}
+	static EditorDoc& open_map_editor(IntegrationTester& tester, const ClassTypeInfo& type, opt<string> map) {
+		EditorDoc* document = nullptr;
+		EditorDoc::on_creation.add(&tester, [&](EditorDoc* ptr) {
+			document = ptr;
+			EditorDoc::on_creation.remove(&tester);
+			});
+		open_editor_state(tester, type, map);
+		tester.checkTrue(document, "");
+		tester.wait_ticks(1);
+		return *document;
+	}
+	static void run_command(IntegrationTester& tester, EditorDoc& doc,Command* ptr, bool want_success = true) {
+		opt<bool> res;
+		doc.command_mgr->add_command_with_execute_callback(ptr, [&res](bool b) {
+			res = b;
+			});
+		tester.wait_ticks(1);
+		tester.checkTrue(res.has_value(), "command wasnt executed?");
+		tester.checkTrue(res.value() == want_success, "mismatch command expected sucess");
+	}
+	static void remove_file(string path);
+
+	static Entity* find_with_name(string s) {
+		auto l = eng->get_level();
+		if (!l) return nullptr;
+		for (auto e : l->get_all_objects()) {
+			if (auto as_ent = e->cast_to<Entity>()) {
+				if (as_ent->get_editor_name() == s)
+					return as_ent;
+			}
+		}
+		return nullptr;
+	}
+};
+
+
+void test_loading_prefab_without_component(IntegrationTester& tester)
+{
+	const string prefabPath = "EditorTestInvalidPfbComponent.pfb";
+	EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, PrefabAsset::StaticType, prefabPath);
+	Entity* root = doc.get_prefab_root_entity();
+	tester.checkTrue(root, "");
+}
+
+// What this does: creates a prefab object. creates a map with the prefab. deletes prefab from disk. tries loading the map again.
+// checks that map load fails gracefully.
+// put prefab back to disk. 
+// load map again.
+// check validity.
+void test_loading_invalid_prefab(IntegrationTester& tester)
+{
+	const string prefabPath = "EditorTestInvalidPfb.pfb";
+	const string mapPath = "EditorTestInvalidPfb.tmap";
+
+	auto create_pfb_cmds = [&]() {
+		EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, PrefabAsset::StaticType, std::nullopt);
+		Entity* root = doc.get_prefab_root_entity();
+		tester.checkTrue(root, "");
+		auto cmd = new CreateStaticMeshCommand(doc, "eng/cube.cmdl", {});
+		EditorIntTesterUtil::run_command(tester, doc, cmd);
+		tester.checkTrue(root->get_children().size() == 1, "");
+		tester.checkTrue(cmd->handle.get() && cmd->handle.get()->get_parent() == root, "");
+		doc.set_document_path(prefabPath);
+		tester.checkTrue(doc.save(), "");
+		PrefabAsset* pfb = g_assets.find_sync<PrefabAsset>(prefabPath).get();
+		tester.checkTrue(pfb && pfb->sceneFile->all_obj_vec.size() == 3, "");
+	};
+
+	// create prefab
+	create_pfb_cmds();
+	// create map
+	{
+		EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, std::nullopt);
+		auto cmd = new CreatePrefabCommand(doc, prefabPath, {});
+		EditorIntTesterUtil::run_command(tester, doc, cmd);
+		tester.checkTrue(cmd->handle.get() && cmd->handle->get_object_prefab().get_name() == prefabPath, "");
+		cmd->handle->set_editor_name("OBJECT");
+		doc.set_document_path(mapPath);
+		tester.checkTrue(doc.save(), "");
+	}
+	{
+		// close editor
+		EditorIntTesterUtil::open_map_state(tester, std::nullopt);
+		tester.checkTrue(eng->get_level(), "");
+		tester.checkTrue(!eng_local.editorState->get_tool(), "");
+
+	}
+	{
+		// remove from disk
+		tester.checkTrue(FileSys::delete_game_file(prefabPath), "failed to delete");
+		eng_local.set_wants_gc();
+		tester.wait_ticks(2);
+		tester.checkTrue(!g_assets.is_asset_loaded(prefabPath),"failed to unload pfb");
+	}
+	{
+		// load the map again
+		EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, mapPath);
+		Entity* obj = EditorIntTesterUtil::find_with_name("OBJECT");
+		tester.checkTrue(obj, "");
+		tester.checkTrue(obj->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab, "");
+		tester.checkTrue(obj->get_object_prefab().get_name()==prefabPath, "");
+		tester.checkTrue(obj->get_children().size() == 0, "");
+		// try some operations
+
+		auto dupCmd = new DuplicateEntitiesCommand(doc, { EntityPtr(obj->get_instance_id()) });
+		EditorIntTesterUtil::run_command(tester, doc, dupCmd);
+		tester.checkTrue(dupCmd->handles.size()==1&&dupCmd->handles.at(0).get(), "");
+		auto dupObj = dupCmd->handles.at(0).get();
+		tester.checkTrue(dupObj->get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab, "");
+		tester.checkTrue(dupObj->get_object_prefab().get_name()==prefabPath, "");
+		doc.save();
+	}
+	{
+		// load the map again 2, after saving it
+		EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, mapPath);
+		Entity* obj = EditorIntTesterUtil::find_with_name("OBJECT");
+		tester.checkTrue(obj, "");
+	}
+	// create the pfb again...
+	create_pfb_cmds();
+	// load the map x3
+	{
+		PrefabAsset* pfb = g_assets.find_sync<PrefabAsset>(prefabPath).get();
+		tester.checkTrue(pfb,"");
+
+		EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, mapPath);
+		Entity* obj = EditorIntTesterUtil::find_with_name("OBJECT");
+		tester.checkTrue(obj, "");
+		tester.checkTrue(obj->get_children().size() == 1, "");
+	}
+}
+
 void test_integration_2(IntegrationTester& tester)
 {
 	
@@ -1194,6 +1373,8 @@ int game_engine_main(int argc, char** argv)
 	vector<IntTestCase> tests;
 	tests.push_back({ test_integration_1, "myTest" });
 	tests.push_back({ test_integration_2, "myTest2" });
+	tests.push_back({ test_loading_prefab_without_component, "test_loading_prefab_without_component" });
+	tests.push_back({ test_loading_invalid_prefab, "test_loading_invalid_prefab" });
 	eng_local.set_tester(new IntegrationTester(true, tests), false);
 
 	eng_local.loop();
@@ -1460,6 +1641,7 @@ void GameEngineLocal::draw_any_imgui_interfaces()
 		dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode, editorState->get_tool());
 		editorState->imgui_draw();
 		AssetBrowser::inst->imgui_draw();
+		editorState->draw_tab_window();
 	}
 #endif
 

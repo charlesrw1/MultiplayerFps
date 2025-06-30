@@ -266,7 +266,7 @@ void ReadSerializerBackendJson::load_shared()
 	serialize_dict("objs");
 	for (auto& p : path_to_objs) {
 		if (!p.second) {
-			LOG_WARN("null obj in objs");
+			sys_print(Warning, "ReadSerializerBackendJson(%s): null object (path=%s)\n", get_debug_tag(), p.first.c_str());
 			continue;
 		}
 
@@ -274,8 +274,13 @@ void ReadSerializerBackendJson::load_shared()
 			assert(!current_root_path);
 			current_root_path = &p.first;
 			p.second->serialize(*this);
-			for (auto p : ClassPropPtr(p.second)) {
-				serialize_property(p);
+			for (PropertyPtr property : ClassPropPtr(p.second)) {
+				try {
+					serialize_property(property);
+				}
+				catch (...) {
+					sys_print(Error, "ReadSerializerBackendJson(%s): error serializing property %s for class %s\n",get_debug_tag(), property.get_name(),p.second->get_type().classname);
+				}
 			}
 			current_root_path = nullptr;
 			end_obj();

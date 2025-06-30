@@ -140,7 +140,7 @@ void EditorDoc::validate_fileids_before_serialize()
 void EditorDoc::init_new()
 {
 	sys_print(Debug, "Edit mode: %s", (edit_category == EDIT_PREFAB) ? "Prefab" : "Scene");
-
+	eng->get_level()->validate();
 	command_mgr = std::make_unique<UndoRedoSystem>();
 
 	command_mgr->on_command_execute_or_undo.add(this, [&]() {
@@ -204,42 +204,74 @@ void EditorDoc::init_new()
 	gui->key_down_delegate.add(command_mgr.get(), &UndoRedoSystem::on_key_event);
 	ASSERT(gui->mouse_down_delegate.get_head());
 }
+void EditorDoc::set_document_path(string newAssetName)
+{
+	if (newAssetName.empty()) {
+		sys_print(Warning, "set_document_path: empty path\n");
+		return;
+	}
+	if (assetName.has_value()) {
+		sys_print(Warning, "EditorDoc::set_document_path: already has path, skipping\n");
+		return;
+	}
+	this->assetName = newAssetName;
+}
 #include "LevelSerialization/SerializeNew.h"
+#include "EditorPopupTemplate.h"
+#include "Framework/StringUtils.h"
 bool EditorDoc::save_document_internal()
 {
-	if (!get_is_open() || !eng->get_level()) {
-		sys_print(Warning, "save_document_internal but level editor not open\n");
+	if (assetName.has_value() && assetName.value().empty()) {
+		sys_print(Warning, "EditorDoc::save_document_internal has an empty name?\n");
+		assetName = std::nullopt;
+	}
+	if (!assetName.has_value()) {
+		PopupTemplate::create_file_save_as(EditorPopupManager::inst, [&](string path) {
+			sys_print(Debug, "EditorDoc::save_document_internal: popup returned with path %s\n", path.c_str());
+			this->set_document_path(path);
+			save_document_internal();
+			}, get_save_file_extension());
+		sys_print(Debug, "EditorDoc::save_document_internal: no path to save, so adding popup\n");
 		return false;
 	}
-
+	assert(eng->get_level());
 	eng->log_to_fullscreen_gui(Info, "Saving");
-
-	sys_print(Info, "saving map document\n");
-
+	sys_print(Info, "Saving Scene/Prefab (%s)...\n",assetName.value_or("<new>").c_str());
 	auto& all_objs = eng->get_level()->get_all_objects();
-
 	validate_fileids_before_serialize();
-
 	std::vector<Entity*> all_ents;
 	for (auto o : all_objs)
 		if (auto e = o->cast_to<Entity>())
 			all_ents.push_back(e);
-
-
 	string debug_tag = "saving:" + assetName.value_or("<new>");
 	auto serialized = serialize_entities_to_text(debug_tag.c_str(),all_ents);
 	//NewSerialization::serialize_to_text(all_ents, pa);
+	assert(assetName.has_value());
+	const string path = assetName.value();
 
-	auto path = get_doc_name();
-	{
-		auto outfile = FileSys::open_write_game(path.c_str());
-		outfile->write(serialized.text.c_str(), serialized.text.size());
+	auto outfile = FileSys::open_write_game(path.c_str());
+	if (!outfile) {
+		sys_print(Error, "EditorDoc::save_document_internal: couldnt write to output file! Writing recovery file.\n");
+		string recovery_path = "recovery_"+StringUtils::alphanumeric_hash(assetName.value());
+		outfile = FileSys::open_write_game(recovery_path.c_str());
+		if (!outfile) {
+			sys_print(Error, "EditorDoc::save_document_internal: couldnt write recovery file :(\n");
+		}
+		else {
+			sys_print(Info, "Writing recovery file for %s: %s\n", assetName.value().c_str(), recovery_path.c_str());
+			outfile->write(serialized.text.c_str(), serialized.text.size());
+		}
 	}
-	sys_print(Info, "Wrote out to %s\n", path.c_str());
+	else {
+		outfile->write(serialized.text.c_str(), serialized.text.size());
+		sys_print(Info, "Wrote Map/Prefab out to %s\n", path.c_str());
+		outfile->close();
+	}
 
-	//if (is_editing_prefab()&&!pa->get_name().empty()) {
-	//	g_assets.reload_async(pa, [](GenericAssetPtr) {printf("reload finished prefab\n"); });
-	//}
+	if (is_editing_prefab()) {
+		PrefabAsset* pfb = g_assets.find_sync<PrefabAsset>(path).get();
+		g_assets.reload_sync<PrefabAsset>(pfb);
+	}
 
 	return true;
 }
@@ -1933,7 +1965,7 @@ void EditorDoc::remove_scene_object(BaseUpdater* u)
 void EditorDoc::insert_unserialized_into_scene(UnserializedSceneFile& file, SerializedSceneFile* scene)
 {
 	if (!scene) {	// means assign new ids
-		for (auto& [path, e] : file.get_objects()) {
+		for (auto& [path, e] : file.file_id_to_obj) {
 			if(!is_this_object_inherited(e))
 				e->unique_file_id = get_next_file_id();
 			else {

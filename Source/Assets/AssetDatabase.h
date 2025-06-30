@@ -42,6 +42,7 @@ public:
 	// will set the lifetime to global until removed
 	void install_system_asset(IAsset* assetPtr, const std::string& name);
 	void remove_system_reference(IAsset* asset);
+	bool is_asset_loaded(const std::string& path);
 
 	// sync asset loading
 	template<typename T>

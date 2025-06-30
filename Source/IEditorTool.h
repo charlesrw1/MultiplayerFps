@@ -43,9 +43,7 @@ public:
 	const std::string& get_doc_name() const { return name; }
 	virtual const ClassTypeInfo& get_asset_type_info() const = 0;
 	
-	bool get_is_open() const {
-		return is_open;
-	}
+
 	bool get_has_editor_changes() const {
 		return has_editor_changes;
 	}
@@ -80,9 +78,7 @@ private:
 	bool has_editor_changes = false;
 
 	std::string name = "";
-	bool is_initialized = false;
 	bool open_open_popup = false;
 	bool open_save_popup = false;
-	bool is_open = false;
 };
 #endif

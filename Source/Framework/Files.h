@@ -119,4 +119,5 @@ public:
 		return get_path(where) + ("/" + relative);
 	}
 	static std::string get_game_path_from_full_path(const std::string& fullpath);
+	static bool delete_game_file(std::string filepath);
 };

@@ -80,61 +80,66 @@ T* cast_to(ClassBase* ptr) {
 
 ClassBase* MakeObjectForPathNew::create_from_name(ReadSerializerBackendJson& s, const string& str, const string& parent_path)
 {
+
 	//assert(0);
 	auto ext = StringUtils::get_extension(str);
 	if (ext == ".pfb") {
 		PrefabAsset* pfb = cast_to<PrefabAsset>(load.load_asset(&PrefabAsset::StaticType, str));
+		
+		// this shouldnt happen ever but...
+		if (!pfb) {
+			sys_print(Error, "MakeObjectForPathNew::create_from_name: %s didnt even return ptr?\n", str.c_str());
+			return nullptr;
+		}
+
+		auto set_pfb_root_vars = [&](Entity& root) {
+			root.set_root_object_prefab(*pfb);
+			//root.unique_file_id = parse_fileid(parent_path);
+		};
+
+		auto make_fake_pfb_root = [&]() -> Entity* {
+			sys_print(Debug, "make_fake_pfb_root\n");
+			Entity* root = new Entity();
+			set_pfb_root_vars(*root);
+			assert(root->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
+			return root;
+
+		};
 		if (pfb && !pfb->did_load_fail()) {
 			sys_print(Debug, "MakeObjectForPathNew::create_from_name(%s): instancing prefab\n",s.get_debug_tag());
 
-			string debug_tag = s.get_debug_tag() + string("/") + pfb->get_name();
-			UnserializedSceneFile out = pfb->unserialize(&load);// unserialize_entities_from_json(debug_tag.c_str(), *pfb->halfUnserialized, &load);
+			UnserializedSceneFile pfbOut = pfb->unserialize(&load);// unserialize_entities_from_json(debug_tag.c_str(), *pfb->halfUnserialized, &load);
 			//out.get_
-			Entity* root_of_prefab = out.get_root_entity();
-			if (!root_of_prefab) {
-				sys_print(Warning, "MakeObjectForPathNew::create_from_name(%s): instanced prefab didnt have root?\n",s.get_debug_tag());
-				out.delete_objs();
+			Entity* root_of_prefab = pfbOut.get_root_entity();
+			if (!root_of_prefab || pfbOut.num_roots != 1) {
+				sys_print(Warning, "MakeObjectForPathNew::create_from_name(%s): instanced prefab (%s) didnt have root?\n",s.get_debug_tag(),pfb->get_name().c_str());
+				pfbOut.delete_objs();
+				return make_fake_pfb_root();
 			}
 			else {
-				unordered_map<string,BaseUpdater*>& objs = out.get_objects();
-				for (auto& [objpath,objptr] : objs) {
-					if (objptr == root_of_prefab) {
-						continue;
+				for (auto obj : pfbOut.all_obj_vec) {
+					if (obj != root_of_prefab) {// root is added later
+						out.all_obj_vec.push_back(obj);
+						auto as_ent = obj->cast_to<Entity>();
+						if (as_ent)
+							as_ent->set_spawned_by_prefab();
 					}
-					assert(objptr);
-					if (auto as_ent = objptr->cast_to<Entity>()) {
-						as_ent->set_spawned_by_prefab();
-					}
-					string str = "";
-					auto find = objpath.find("/");
-					if (find == string::npos) {
-						sys_print(Warning, "MakeObjectForPathNew::create_from_name(%s): sub object missing '/' (%s)\n", s.get_debug_tag(), objpath.c_str());
-						str = objpath;
-					}
-					else {
-						str = objpath.substr(find + 1);
-					}
-					s.insert_nested_object(parent_path + "/" + str, objptr);
 				}
-				objs.clear();
-				root_of_prefab->set_root_object_prefab(*pfb);
-
-				//root_of_prefab->set_nested_owner_prefab(this->prefab);
-				root_of_prefab->unique_file_id = parse_fileid(parent_path);
-
-				//assert(root_of_prefab->what_prefab == pfb);	// should have been set in unserialize
+				set_pfb_root_vars(*root_of_prefab);
+				return root_of_prefab;
 			}
-			return root_of_prefab;
 		}
 		else {
 			sys_print(Error, "MakeObjectForPathNew::create_from_name(%s): prefab load failed (%s)\n",s.get_debug_tag(), str.c_str());
-			return nullptr;
+			
+			return make_fake_pfb_root();
 		}
-		return nullptr;
 	}
 	else {
 		return ClassBase::create_class<ClassBase>(str.c_str());
 	}
+
+	return nullptr;
 }
 
 void SerializeEntitiesContainer::serialize(Serializer& s)
@@ -166,15 +171,7 @@ void SerializeEntitiesContainer::serialize(Serializer& s)
 	s.end_obj();
 }
 
-// level=multiple roots, prefab=single root
-// World
-//	Level0/
-//		Object
-//		Prefab
-//			Object
-//		
-//	Level1/
-//		
+#include "Framework/MapUtil.h"
 void NewSerialization::unserialize_shared(const char* debug_tag, UnserializedSceneFile& outfile, ReadSerializerBackendJson& reader)
 {
 	SerializeEntitiesContainer* rootobj = reader.get_root_obj()->cast_to<SerializeEntitiesContainer>();
@@ -192,18 +189,61 @@ void NewSerialization::unserialize_shared(const char* debug_tag, UnserializedSce
 			sys_print(Warning, "unserialize_from_text(%s): no path\n", debug_tag);
 			continue;
 		}
-		if (this_is_a_serializeable_object(obj))
+		if (auto as_ec = obj->cast_to<Component>()) {
+			if (!as_ec->get_owner()) {
+				sys_print(Warning, "unserialize_from_text(%s): component (%s) wasnt parented, deleting it (%s)\n", debug_tag,as_ec->get_type().classname,path->c_str());
+				reader.path_to_objs.erase(*path);
+				delete as_ec;
+				continue;
+			}
+		}
+		//assert(obj->unique_file_id == 0);
+		//assert(obj->)
+		//assert(this_is_a_serializeable_object(obj));
+		//if (this_is_a_serializeable_object(obj))
 			obj->unique_file_id = parse_fileid(*path);
+			MapUtil::insert_test_exists(outfile.file_id_to_obj,obj->unique_file_id, obj);
+			outfile.all_obj_vec.push_back(obj);
+		//else
+		//	obj->unique_file_id = 0;
+
 		Entity* e = obj->cast_to<Entity>();
 		if (e && !e->get_parent()) {
 			roots.push_back(e);
 		}
 	}
-	for (auto& [path, obj] : reader.path_to_objs) {
-		auto bu = obj->cast_to<BaseUpdater>();
-		if (bu)
-			outfile.get_objects().insert({ path,bu });
+	for (auto& obj : outfile.all_obj_vec) {
+		if (!this_is_a_serializeable_object(obj))
+			obj->unique_file_id = 0;
 	}
+	std::unordered_map<int, BaseUpdater*> fileIds;
+	for (auto& obj : outfile.all_obj_vec) {
+		if (obj->unique_file_id) {
+			MapUtil::insert_test_exists(fileIds, obj->unique_file_id, obj);
+		}
+	}
+
+
+#ifdef _DEBUG
+	std::unordered_set<BaseUpdater*> inSet;
+	for (auto obj : outfile.all_obj_vec) 
+		SetUtil::insert_test_exists(inSet,obj);
+	auto check_that_objects_are_added_R = [](auto&& self, std::unordered_set<BaseUpdater*>& inSet,Entity* e) -> void {
+		assert(SetUtil::contains(inSet, (BaseUpdater*)e));
+		for (auto c : e->get_children()) {
+			self(self, inSet, c);
+		}
+		for (auto c : e->get_components()) {
+			assert(SetUtil::contains(inSet, (BaseUpdater*)c));
+		}
+	};
+	for (auto obj : outfile.all_obj_vec) {
+		if (auto as_ent = obj->cast_to<Entity>()) {
+			if (!as_ent->get_parent())
+				check_that_objects_are_added_R(check_that_objects_are_added_R, inSet, as_ent);
+		}
+	}
+#endif
 
 	outfile.num_roots = (int)roots.size();
 
@@ -271,7 +311,8 @@ void NewSerialization::add_objects_to_write(const char* debug_tag, SerializeEnti
 void add_to_extern_parents_new(const BaseUpdater* obj, const BaseUpdater* parent,SerializedSceneFile& output)
 {
 	SerializedSceneFile::external_parent ext;
-	ext.child_path = build_path_for_object_new(*obj);
+	assert(obj->unique_file_id != 0);
+	ext.child_id = obj->unique_file_id;// = build_path_for_object_new(*obj);
 	ext.external_parent_handle = parent->get_instance_id();
 	output.extern_parents.push_back(ext);
 }
@@ -287,15 +328,15 @@ void NewSerialization::add_objects_to_container(const char* debug_tag, const std
 	}
 }
 
-static void add_paths_to_put_back(Entity& e, MakePathForObjectNew& pathmaker, unordered_map<string, uint64_t>& path_to_handle)
+static void add_paths_to_put_back(Entity& e, MakePathForObjectNew& pathmaker, unordered_map<int, uint64_t>& path_to_handle)
 {
 	if (!this_is_a_serializeable_object((BaseUpdater*)&e))
 		return;
 	if (e.unique_file_id == 0)
 		return;
 
-	string makepath = pathmaker.make_path(&e).path;
-	MapUtil::insert_test_exists(path_to_handle, makepath, e.get_instance_id());
+	int uniqueFileId = e.unique_file_id;
+	MapUtil::insert_test_exists(path_to_handle, uniqueFileId, e.get_instance_id());
 	for (auto child : e.get_children())
 		add_paths_to_put_back(*child, pathmaker, path_to_handle);
 	for (auto c : e.get_components()) {
@@ -303,11 +344,11 @@ static void add_paths_to_put_back(Entity& e, MakePathForObjectNew& pathmaker, un
 			continue;
 		if (!this_is_a_serializeable_object(c))
 			return;
-		string cmakepath = pathmaker.make_path(c).path;
-		MapUtil::insert_test_exists(path_to_handle, cmakepath, c->get_instance_id());
+		int cUniqueFileId = c->unique_file_id;
+		MapUtil::insert_test_exists(path_to_handle, cUniqueFileId, c->get_instance_id());
 	}
 }
-static void add_paths_from_container(const std::vector<Entity*>& input_objs, MakePathForObjectNew& pathmaker, unordered_map<string,uint64_t>& path_to_handle)
+static void add_paths_from_container(const std::vector<Entity*>& input_objs, MakePathForObjectNew& pathmaker, unordered_map<int,uint64_t>& path_to_handle)
 {
 	auto roots = root_objects_to_write(input_objs);
 	for (auto o : roots) {

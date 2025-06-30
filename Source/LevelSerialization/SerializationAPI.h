@@ -17,18 +17,18 @@ public:
 	UnserializedSceneFile() = default;
 	~UnserializedSceneFile() = default;
 	UnserializedSceneFile(UnserializedSceneFile&& other) {
-		all_objs = std::move(other.all_objs);
+		all_obj_vec = std::move(other.all_obj_vec);
+		file_id_to_obj = std::move(other.file_id_to_obj);
+
 		root_entity = other.root_entity;
+		num_roots = other.num_roots;
 	}
 	UnserializedSceneFile& operator=(const UnserializedSceneFile&) = delete;
 	UnserializedSceneFile(const UnserializedSceneFile&) = delete;
 
-	BaseUpdater* find(const std::string& path);
+	BaseUpdater* find(int fileId);
 	void delete_objs();
 
-	std::unordered_map<std::string, BaseUpdater*>& get_objects() {
-		return all_objs;
-	}
 	Entity* get_root_entity() const {
 		return root_entity;
 	}
@@ -38,11 +38,13 @@ public:
 
 	void unserialize_post_assign_ids();
 
+	std::vector<BaseUpdater*> all_obj_vec;
+	std::unordered_map<int, BaseUpdater*> file_id_to_obj;
+
 	Entity* root_entity = nullptr;
 	int num_roots = 0;
 private:
 	void add_components_and_children_from_entity_R(const std::string& path, Entity* e, Entity* source);
-	std::unordered_map<std::string, BaseUpdater*> all_objs;	// fileID/.../fileID -> entity/component
 	friend class Level;
 };
 
@@ -66,13 +68,13 @@ public:
 	std::string text;
 
 	// for putting back serialized data into the scene
-	// serialized text references paths ("205/1"), handles are for locating instances in scene
-	std::unordered_map<std::string, uint64_t> path_to_instance_handle;
+	std::unordered_map<int, uint64_t> path_to_instance_handle;
 
 	// list of parents that didnt get serialized with set, for putting back in scene
 	struct external_parent {
 		uint64_t external_parent_handle;
-		std::string child_path;
+		int child_id = 0;
+		//std::string child_path;
 	};
 	std::vector<external_parent> extern_parents;
 };

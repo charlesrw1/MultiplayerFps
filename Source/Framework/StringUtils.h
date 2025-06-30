@@ -19,4 +19,5 @@ public:
 	static std::string to_lower(const std::string& s);
 	static bool starts_with(const std::string& str, const std::string& what);
 	static string get_directory(const string& path);
+	static std::string alphanumeric_hash(const std::string& input);
 };

@@ -286,30 +286,14 @@ void Program_Manager::recompile_all()
 	for (int i = 0; i < programs.size(); i++)
 		recompile(programs[i]);
 }
-
-std::string alphanumeric_hash(const std::string& input) {
-	// Basic hash computation (FNV-1a hash)
-	uint64_t hash = 14695981039346656037ULL;
-	for (char c : input) {
-		hash ^= static_cast<unsigned char>(c);
-		hash *= 1099511628211ULL;
-	}
-	// Encode using base36 (0-9, a-z) to ensure only alphanumerics
-	const char* chars = "0123456789abcdefghijklmnopqrstuvwxyz";
-	std::string result;
-	while (hash > 0) {
-		result.insert(result.begin(), chars[hash % 36]);
-		hash /= 36;
-	}
-
-	return result;
-}
+#include "Framework/StringUtils.h"
+#include "Framework/BinaryReadWrite.h"
+//
 string compute_hash_for_program_def(Program_Manager::program_def& def)
 {
 	string inp = def.vert + def.frag+def.geo+def.defines;
-	return alphanumeric_hash(inp);
+	return StringUtils::alphanumeric_hash(inp);
 }
-#include "Framework/BinaryReadWrite.h"
 
 ConfigVar log_shader_compiles("log_shader_compiles", "1", CVAR_BOOL, "");
 void Program_Manager::recompile(program_def& def) {

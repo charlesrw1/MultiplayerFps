@@ -134,6 +134,7 @@ public:
 	EntityPrefabSpawnType get_object_prefab_spawn_type() const;
 #endif
 	void check_for_transform_nans();
+	void validate_check();
 private:
 	// components created either in code or defined in schema or created per instance
 	std::vector<Component*> all_components;

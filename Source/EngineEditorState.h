@@ -22,6 +22,7 @@ public:
 	virtual string get_tab_name() = 0;
 	virtual opt<string> get_asset_name() = 0;
 };
+class Texture;
 struct View_Setup;
 class EditorState {
 public:
@@ -44,6 +45,7 @@ public:
 	void tick(float dt);
 	void imgui_hook_new_frame();
 	void imgui_draw();
+	void draw_tab_window();
 	
 	void select_tab(int index);
 
@@ -85,4 +87,5 @@ private:
 	}
 	opt<int> last_tab;
 	vector<Tab> tabs;
+	const Texture* redCrossIcon = nullptr;
 };
