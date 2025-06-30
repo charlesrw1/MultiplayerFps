@@ -45,7 +45,7 @@ private:
 	vector<IntTestCase> testcases;
 	bool abort_because_waited_too_long = false;
 	float time_waiting_on_delegate = 0.0;
-	float delgate_timeout_max = 100.0;
+	float delgate_timeout_max = 2.0;
 	bool waiting_on_delegate = false;
 	int waiting_ticks = 0;
 	float waiting_time = 0.0;

@@ -10,7 +10,7 @@
 class Command
 {
 public:
-	virtual ~Command() {}
+	virtual ~Command() { sys_print(Debug, "~Command\n"); }
 	virtual void execute() = 0;
 	virtual void undo() = 0;
 	virtual std::string to_string() = 0;

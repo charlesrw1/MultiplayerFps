@@ -1113,7 +1113,9 @@ public:
 		tester.checkTrue(res.value() == want_success, "mismatch command expected sucess");
 	}
 	static void remove_file(string path);
-
+	static void undo_cmd(EditorDoc& doc) {
+		doc.command_mgr->undo();
+	}
 	static Entity* find_with_name(string s) {
 		auto l = eng->get_level();
 		if (!l) return nullptr;
@@ -1127,6 +1129,76 @@ public:
 	}
 };
 
+#include "Game/Components/PhysicsComponents.h"
+
+void test_opening_prefab_as_map(IntegrationTester& tester)
+{
+	const string prefabPath = "EditorTestValidPfb.pfb";
+	EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, prefabPath);
+}
+
+void test_remove_and_undo_pfb(IntegrationTester& tester)
+{
+	const string prefabPath = "EditorTestValidPfb.pfb";
+	EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, std::nullopt);
+	auto spawnPfb = new CreatePrefabCommand(doc, prefabPath, {});
+	EditorIntTesterUtil::run_command(tester, doc, spawnPfb);
+	auto preHandle = spawnPfb->handle;
+	tester.checkTrue(preHandle.get(), "");
+	auto removeCmd = new RemoveEntitiesCommand(doc, { preHandle });
+	EditorIntTesterUtil::run_command(tester, doc, removeCmd);
+	tester.checkTrue(!preHandle.get(), "");
+	EditorIntTesterUtil::undo_cmd(doc);
+	tester.checkTrue(preHandle.get(), "");
+	auto instPfb = new InstantiatePrefabCommand(doc, preHandle.get());
+	EditorIntTesterUtil::run_command(tester, doc, instPfb);
+	tester.checkTrue(preHandle.get() && preHandle->get_object_prefab_spawn_type() == EntityPrefabSpawnType::None, "");
+	EditorIntTesterUtil::undo_cmd(doc);
+	tester.checkTrue(preHandle.get() && preHandle->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab, "");
+
+	auto dupPfb = new DuplicateEntitiesCommand(doc, {preHandle});
+	EditorIntTesterUtil::run_command(tester, doc, dupPfb);
+	tester.checkTrue(dupPfb->handles.size() == 1, "");
+	EntityPtr dupEntHandle = dupPfb->handles.at(0);
+	tester.checkTrue(dupEntHandle && dupEntHandle->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab, "");
+
+	auto parentCmd = new ParentToCommand(doc, { dupEntHandle.get() }, preHandle.get(), false, false);
+	EditorIntTesterUtil::run_command(tester, doc, parentCmd);
+	auto delCmd2 = new RemoveEntitiesCommand(doc, { preHandle });
+	EditorIntTesterUtil::run_command(tester, doc, delCmd2);
+	tester.checkTrue(!dupEntHandle.get(), "");
+	EditorIntTesterUtil::undo_cmd(doc);
+	tester.checkTrue(dupEntHandle.get(), "");
+	tester.checkTrue(dupEntHandle && dupEntHandle->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab, "");
+	auto delCmd3 = new RemoveEntitiesCommand(doc, { dupEntHandle });
+	EditorIntTesterUtil::run_command(tester, doc, delCmd3);
+	EditorIntTesterUtil::undo_cmd(doc);
+	tester.checkTrue(dupEntHandle.get(), "");
+	tester.checkTrue(dupEntHandle->get_parent() == preHandle.get(), "");
+}
+
+void test_editor_entity_ptr(IntegrationTester& tester)
+{
+	EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, std::nullopt);
+	auto createJoint1 = new CreateCppClassCommand(doc, AdvancedJointComponent::StaticType.classname, {}, {},true);
+	EditorIntTesterUtil::run_command(tester, doc, createJoint1);
+	auto createObj = new CreateCppClassCommand(doc, "Entity", {}, {}, false);
+	EditorIntTesterUtil::run_command(tester, doc, createObj);
+
+	tester.checkTrue(createJoint1->handle, "");
+	tester.checkTrue(createObj->handle, "");
+	auto joint1 = createJoint1->handle->get_component<AdvancedJointComponent>();
+	tester.checkTrue(joint1, "");
+	joint1->set_target(createObj->handle.get());
+	EntityPtr j1Owner = joint1->get_owner()->get_self_ptr();
+
+	auto dup = new DuplicateEntitiesCommand(doc, { j1Owner,createObj->handle });
+	EditorIntTesterUtil::run_command(tester, doc, dup);
+	tester.checkTrue(dup->handles.size() == 2, "");
+	auto j = dup->handles.at(0)->get_component<AdvancedJointComponent>();
+	tester.checkTrue(j, "");
+	tester.checkTrue(j->get_target() && j->get_target() == dup->handles.at(1).get(), "");
+}
 
 void test_loading_prefab_without_component(IntegrationTester& tester)
 {
@@ -1373,8 +1445,12 @@ int game_engine_main(int argc, char** argv)
 	vector<IntTestCase> tests;
 	tests.push_back({ test_integration_1, "myTest" });
 	tests.push_back({ test_integration_2, "myTest2" });
+	tests.push_back({ test_opening_prefab_as_map, "test_opening_prefab_as_map" });
 	tests.push_back({ test_loading_prefab_without_component, "test_loading_prefab_without_component" });
 	tests.push_back({ test_loading_invalid_prefab, "test_loading_invalid_prefab" });
+	tests.push_back({ test_remove_and_undo_pfb, "test_remove_and_undo_pfb" });
+	tests.push_back({ test_editor_entity_ptr, "test_editor_entity_ptr" });
+
 	eng_local.set_tester(new IntegrationTester(true, tests), false);
 
 	eng_local.loop();

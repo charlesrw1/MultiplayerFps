@@ -38,6 +38,8 @@ public:
 					else
 						head = ptr->next;
 					delete ptr;
+					ptr = prev?prev->next:head;
+					continue;
 				}
 			}
 			prev = ptr;
