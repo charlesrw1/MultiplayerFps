@@ -19,11 +19,9 @@ public:
 	UnserializedSceneFile(UnserializedSceneFile&& other) {
 		all_objs = std::move(other.all_objs);
 		root_entity = other.root_entity;
-		loaded_old_way = other.loaded_old_way;
 	}
 	UnserializedSceneFile& operator=(const UnserializedSceneFile&) = delete;
 	UnserializedSceneFile(const UnserializedSceneFile&) = delete;
-
 
 	BaseUpdater* find(const std::string& path);
 	void delete_objs();
@@ -40,10 +38,10 @@ public:
 
 	void unserialize_post_assign_ids();
 
-	bool loaded_old_way = false;
+	Entity* root_entity = nullptr;
+	int num_roots = 0;
 private:
 	void add_components_and_children_from_entity_R(const std::string& path, Entity* e, Entity* source);
-	Entity* root_entity = nullptr;
 	std::unordered_map<std::string, BaseUpdater*> all_objs;	// fileID/.../fileID -> entity/component
 	friend class Level;
 };

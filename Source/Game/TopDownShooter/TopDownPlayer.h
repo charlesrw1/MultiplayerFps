@@ -70,6 +70,26 @@ public:
 	REF AssetPtr<PrefabAsset> special_projectile;	// what projectile to spawn
 	REF std::vector<float> values;
 };
+#include "MiscEditors/DataClass.h"
+
+class TopDownWeaponDataNew : public Component
+{
+public:
+	CLASS_BODY(TopDownWeaponDataNew);
+
+	REF std::string name;
+	REF Model* model = nullptr;
+	REF int damage = 0; // damage per shot
+	REF float fire_rate = 1.f;	// per second
+	REF int type = 0;	// 0 = rifle, 1 = shotgun
+	REF int pellets = 0;	// for shotgun
+	REF float accuracy = 1.f;
+	REF float bullet_speed = 20.f;
+	REF PrefabAsset* special_projectile = nullptr;	// what projectile to spawn
+	REF std::vector<float> values;
+};
+
+
 
 
 using std::unordered_map;
@@ -84,11 +104,13 @@ public:
 	CLASS_BODY(TopDownPlayer);
 	REF MyStruct numbers;
 	REF std::vector<int> myarray = { 0,5,10,15 };
-
-	REF AssetPtr<PrefabAsset> shotgunSoundAsset;
-	REF AssetPtr<AnimationSeqAsset> runToStart;
-	REF AssetPtr<AnimationSeqAsset> idleToRun;
+	REF AnimationSeqAsset* runToStar = nullptr;
+	REF AnimationSeqAsset* idleToRun = nullptr;
 	SoundComponent* cachedShotgunSound = nullptr;
+	REF PrefabAsset* particlePrefab = nullptr;
+	REF PrefabAsset* shotgunSoundAsset = nullptr;
+	REF AnimationSeqAsset* jumpAnim = nullptr;
+
 
 	TopDownPlayer() {
 		set_ticking(true);
@@ -112,8 +134,10 @@ public:
 			ASSERT(CameraComponent::get_scene_camera() == the_camera);
 		}
 
-		shotgunSoundAsset = g_assets.find_sync<PrefabAsset>("top_down/shotgun_sound.pfb");
-		cachedShotgunSound = eng->get_level()->spawn_prefab(shotgunSoundAsset.get())->get_component<SoundComponent>();
+		shotgunSoundAsset = g_assets.find_sync<PrefabAsset>("top_down/shotgun_sound.pfb").get();
+		if(!shotgunSoundAsset->did_load_fail())
+			cachedShotgunSound = eng->get_level()->spawn_prefab(shotgunSoundAsset)->get_component<SoundComponent>();
+
 
 		ccontroller = std::make_unique<CharacterController>(capsule);
 		ccontroller->set_position(get_ws_position());

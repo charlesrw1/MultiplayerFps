@@ -6,7 +6,7 @@
 #include "GameEnginePublic.h"
 #include <stdexcept>
 #include "Framework/MulticastDelegate.h"
-
+#include <functional>
 class Command
 {
 public:
@@ -24,8 +24,8 @@ public:
 	UndoRedoSystem();
 	~UndoRedoSystem() {
 		clear_all();
-		for (auto c : queued_commands)
-			delete c;
+		for (auto& c : queued_commands)
+			delete c.c;
 		queued_commands.clear();
 	}
 
@@ -36,14 +36,21 @@ public:
 	int execute_queued_commands();
 
 	void add_command(Command* c) {
-		queued_commands.push_back(c);
+		queued_commands.push_back({ c });
 	}
+	void add_command_with_execute_callback(Command* c, std::function<void(bool)> callback) {
+		queued_commands.push_back({ c, callback });
+	}
+
 	void undo();
 
 
 	MulticastDelegate<> on_command_execute_or_undo;
-
-	std::vector<Command*> queued_commands;
+	struct Queued {
+		Command* c = nullptr;
+		std::function<void(bool)> func;
+	};
+	std::vector<Queued> queued_commands;
 
 	const int HIST_SIZE = 128;
 	int index = 0;

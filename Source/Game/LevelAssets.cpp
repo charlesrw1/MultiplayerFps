@@ -235,7 +235,7 @@ bool PrefabAsset::load_asset(IAssetLoadingInterface* load)
 	auto& path = get_name();
 	auto fileptr = FileSys::open_read_game(path.c_str());
 	if (!fileptr) {
-		sys_print(Error, "couldn't open scene %s\n", path.c_str());
+		sys_print(Error, "PrefabAsset::load_asset: couldn't open scene %s\n", path.c_str());
 		return false;
 	}
 	string textForm = std::string(fileptr->size(), ' ');
@@ -247,9 +247,12 @@ bool PrefabAsset::load_asset(IAssetLoadingInterface* load)
 		halfUnserialized = make_unique<SerializedForDiffing>();
 		halfUnserialized->jsonObj = nlohmann::json::parse(textForm);
 		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize(load));
+		if (sceneFile->num_roots != 1) {
+			sys_print(Error, "PrefabAsset::load_asset: prefab doesnt have 1 root, has: %d\n", sceneFile->num_roots);
+		}
 
 		// add instance ids here for diff'ing entity references
-		uint64_t id = 1ull << 63ull;
+		uint64_t id = 1ull << 62ull;
 		for (auto& obj : sceneFile->get_objects()) {
 			obj.second->post_unserialization(++id);
 			instance_ids_for_diffing.insert(id, obj.second);
@@ -257,7 +260,7 @@ bool PrefabAsset::load_asset(IAssetLoadingInterface* load)
 		sceneFile->unserialize_post_assign_ids();
 	}
 	catch (...) {
-		sys_print(Error, "error loading PrefabAsset %s\n", path.c_str());
+		sys_print(Error, "PrefabAsset::load_asset: error %s\n", path.c_str());
 		return false;
 	}
 	assert(halfUnserialized);

@@ -330,16 +330,22 @@ void EditorDoc::validate_prefab()
 }
 #include "EditorPopupTemplate.h"
 
+MulticastDelegate<EditorDoc*> EditorDoc::on_creation;
+MulticastDelegate<EditorDoc*> EditorDoc::on_deletion;
+
+
 EditorDoc* EditorDoc::create_prefab(PrefabAsset* prefab)
 {
 	EditorDoc* out = new EditorDoc();
 	out->init_for_prefab(prefab);
+	EditorDoc::on_creation.invoke(out);
 	return out;
 }
 EditorDoc* EditorDoc::create_scene(opt<string> scene)
 {
 	EditorDoc* out = new EditorDoc();
 	out->init_for_scene(scene);
+	EditorDoc::on_creation.invoke(out);
 	return out;
 }
 void EditorDoc::init_for_prefab(PrefabAsset* prefab) {
@@ -465,6 +471,8 @@ EditorDoc::~EditorDoc() {
 	command_mgr->clear_all();
 	on_close.invoke();
 	gui = nullptr;
+
+	EditorDoc::on_deletion.invoke(this);
 }
 
 
@@ -1398,7 +1406,7 @@ void EdPropertyGrid::draw_components(Entity* entity)
 		if (!c->dont_serialize_or_edit)
 			draw_component(entity, c);
 }
-
+#include "Framework/StringUtils.h"
 
 void EdPropertyGrid::draw()
 {
@@ -1450,29 +1458,46 @@ void EdPropertyGrid::draw()
 			if (ImGui::Button("Add Component")) {
 				ImGui::OpenPopup("addcomponentpopup");
 			}
+			ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(300, 500));
 			if (ImGui::BeginPopup("addcomponentpopup")) {
+				if (component_set_keyboard_focus) {
+					ImGui::SetKeyboardFocusHere();
+					component_set_keyboard_focus = false;
+				}
+				if (ImGui::InputText("##text", (char*)component_filter.c_str(), component_filter.size() + 1, ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &component_filter)) {
+					component_filter = component_filter.c_str();
+				}
+				const string filter_lower = StringUtils::to_lower(component_filter);
 				auto iter = ClassBase::get_subclasses<Component>();
 				for (; !iter.is_end(); iter.next()) {
-					if (iter.get_type()->default_class_object) {
-						const char* s = ((Component*)iter.get_type()->default_class_object)->get_editor_outliner_icon();
-						if (*s) {
-							auto tex = g_assets.find_global_sync<Texture>(s);
-							if (tex) {
-								ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
-								ImGui::SameLine(0, 0);
+					string lower = StringUtils::to_lower(iter.get_type()->classname);
+					if (component_filter.empty()||lower.find(filter_lower) != string::npos) {
+						if (iter.get_type()->default_class_object) {
+							const char* s = ((Component*)iter.get_type()->default_class_object)->get_editor_outliner_icon();
+
+							if (*s) {
+								auto tex = g_assets.find_global_sync<Texture>(s);
+								if (tex) {
+									ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
+									ImGui::SameLine(0, 0);
+								}
 							}
 						}
-					}
-					if (ImGui::Selectable(iter.get_type()->classname)) {
+						if (ImGui::Selectable(iter.get_type()->classname)) {
 
-						ed_doc.command_mgr->add_command(new CreateComponentCommand(ed_doc,
-							ent, iter.get_type()
-						));
+							ed_doc.command_mgr->add_command(new CreateComponentCommand(ed_doc,
+								ent, iter.get_type()
+							));
 
-						ImGui::CloseCurrentPopup();
+							ImGui::CloseCurrentPopup();
+						}
 					}
 				}
 				ImGui::EndPopup();
+			}
+			else {
+				component_set_keyboard_focus = true;
+				component_filter.clear();
 			}
 
 

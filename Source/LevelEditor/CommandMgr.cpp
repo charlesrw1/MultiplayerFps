@@ -23,17 +23,21 @@ void UndoRedoSystem::clear_all() {
 int UndoRedoSystem::execute_queued_commands() {
 
 	int errored_command_count = 0;
-	for (auto c : queued_commands) {
+	for (auto&[c,callback] : queued_commands) {
 		
 		if (!c->is_valid()) {
-			sys_print(Warning, "command not valid %s\n", c->to_string().c_str());
+			sys_print(Warning, "execute_queued_commands: command not valid %s\n", c->to_string().c_str());
+			if(callback)
+				callback(false);
 			delete c;
 			errored_command_count++;
 			continue;
 		}
-		sys_print(Debug, "Executing: %s\n", c->to_string().c_str());
+		sys_print(Debug, "execute_queued_commands: executing: %s\n", c->to_string().c_str());
 		try {
 			c->execute();
+			if(callback)
+				callback(true);
 
 			if (hist[index]) {
 				delete hist[index];
@@ -44,16 +48,18 @@ int UndoRedoSystem::execute_queued_commands() {
 			eng->log_to_fullscreen_gui(Info, c->to_string().c_str());
 		}
 		catch (std::runtime_error er) {
-			sys_print(Error, "Executing command failed: %s\n", er.what());
+			sys_print(Error, "execute_queued_commands: command threw exception: %s\n", er.what());
 			errored_command_count++;
+
+			if (callback)
+				callback(false);
 			delete c;
 		}
 	}
-
-	if (!queued_commands.empty())
-		on_command_execute_or_undo.invoke();
-
+	bool had_commands = !queued_commands.empty();
 	queued_commands.clear();
+	if (had_commands)
+		on_command_execute_or_undo.invoke();
 
 	return errored_command_count;
 }

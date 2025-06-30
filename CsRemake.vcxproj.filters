@@ -537,6 +537,7 @@
     <ClInclude Include="Source\EngineEditorState.h" />
     <ClInclude Include="Source\EngineSystemCommands.h" />
     <ClInclude Include="Source\Framework\SerializedForDiffing.h" />
+    <ClInclude Include="Source\Framework\NodeMenuItem.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

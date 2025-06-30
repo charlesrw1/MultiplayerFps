@@ -180,23 +180,21 @@ void NewSerialization::unserialize_shared(const char* debug_tag, UnserializedSce
 	SerializeEntitiesContainer* rootobj = reader.get_root_obj()->cast_to<SerializeEntitiesContainer>();
 
 	assert(rootobj);	//fixme
-
+	
 	vector<Entity*> roots;
-	for (auto obj : rootobj->objects) {
+	for (BaseUpdater* obj : rootobj->objects) {
 		if (!obj) {
 			sys_print(Warning, "unserialize_from_text(%s): obj is null\n", debug_tag);
 			continue;
 		}
-		auto path = reader.get_path_for_object(*obj);
+		const string* path = reader.get_path_for_object(*obj);
 		if (!path) {
 			sys_print(Warning, "unserialize_from_text(%s): no path\n", debug_tag);
 			continue;
 		}
-
 		if (this_is_a_serializeable_object(obj))
 			obj->unique_file_id = parse_fileid(*path);
-
-		auto e = obj->cast_to<Entity>();
+		Entity* e = obj->cast_to<Entity>();
 		if (e && !e->get_parent()) {
 			roots.push_back(e);
 		}
@@ -207,15 +205,14 @@ void NewSerialization::unserialize_shared(const char* debug_tag, UnserializedSce
 			outfile.get_objects().insert({ path,bu });
 	}
 
+	outfile.num_roots = (int)roots.size();
+
 	if (!roots.empty()) {
 		outfile.set_root_entity(roots[0]);
-		if (roots.size() > 1)
-			sys_print(Warning, "unserialize_from_text(%s): more than 1 root (found %d)\n", debug_tag, (int)roots.size());
 	}
 	else {
 		sys_print(Warning, "unserialize_from_text(%s): found no roots\n", debug_tag);
 	}
-	//printf("finished prefab\n");
 
 	delete rootobj;
 }
@@ -292,9 +289,9 @@ void NewSerialization::add_objects_to_container(const char* debug_tag, const std
 
 static void add_paths_to_put_back(Entity& e, MakePathForObjectNew& pathmaker, unordered_map<string, uint64_t>& path_to_handle)
 {
-	if (e.unique_file_id == 0)
+	if (!this_is_a_serializeable_object((BaseUpdater*)&e))
 		return;
-	if (e.dont_serialize_or_edit)
+	if (e.unique_file_id == 0)
 		return;
 
 	string makepath = pathmaker.make_path(&e).path;
@@ -304,8 +301,8 @@ static void add_paths_to_put_back(Entity& e, MakePathForObjectNew& pathmaker, un
 	for (auto c : e.get_components()) {
 		if (c->unique_file_id == 0)
 			continue;
-		if (c->dont_serialize_or_edit)
-			continue;
+		if (!this_is_a_serializeable_object(c))
+			return;
 		string cmakepath = pathmaker.make_path(c).path;
 		MapUtil::insert_test_exists(path_to_handle, cmakepath, c->get_instance_id());
 	}

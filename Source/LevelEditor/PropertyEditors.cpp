@@ -17,14 +17,18 @@
 #include "Animation/Editor/Blendspace_nodes.h"
 #include "Render/Editor/MaterialEditorLocal.h"
 #include "Animation/Runtime/Statemachine_cfg.h"
-
 #include "imgui_internal.h"
-
+#include "MiscEditors/DataClass.h"
 bool SharedAssetPropertyEditor::internal_update() {
+	assert(prop->class_type && prop->type == core_type_id::AssetPtr || prop->type == core_type_id::SoftAssetPtr);
 	if (!has_init) {
 		has_init = true;
 		asset_str = get_str();
-		metadata = AssetRegistrySystem::get().find_for_classtype(prop->class_type);
+
+		if(prop->class_type->is_a(DataClass::StaticType))
+			metadata = AssetRegistrySystem::get().find_for_classtype(&DataClass::StaticType);
+		else
+			metadata = AssetRegistrySystem::get().find_for_classtype(prop->class_type);
 	}
 	if (!metadata) {
 		ImGui::Text("Asset has no metadata: %s\n", prop->class_type->classname);
@@ -68,8 +72,9 @@ bool SharedAssetPropertyEditor::internal_update() {
 		ImGui::BeginTooltip();
 		if (is_soft_editor())
 			ImGui::Text(string_format("SoftAssetPtr: Drag and drop %s asset here", metadata->get_type_name().c_str()));
-		else
+		else {
 			ImGui::Text(string_format("Drag and drop %s asset here", metadata->get_type_name().c_str()));
+		}
 		ImGui::EndTooltip();
 
 
@@ -788,7 +793,10 @@ EntityBoneParentStringEditor::~EntityBoneParentStringEditor() {
 
 bool EntityBoneParentStringEditor::internal_update()
 {
+	// cursed!
 	Entity* self = (Entity*)instance;
+
+
 	if (!has_init) {
 		Entity* parent = self->get_parent();
 		if (parent) {
@@ -802,8 +810,10 @@ bool EntityBoneParentStringEditor::internal_update()
 				}
 			}
 		}
+		EntityBoneParentString* val = PropertyPtr(prop, instance).as_struct().get_struct<EntityBoneParentString>();
+		assert(val);
 		has_init = true;
-		StringName* myName = (StringName*)prop->get_ptr(instance);
+		StringName* myName = &val->name;
 		if (!myName->is_null())
 			str = myName->get_c_str();
 	}
@@ -815,21 +825,39 @@ bool EntityBoneParentStringEditor::internal_update()
 
 	bool has_update = false;
 
-
 	const char* preview = (!str.empty()) ? str.c_str() : "<empty>";
 	if (ImGui::BeginCombo("##combocalsstype", preview)) {
+
+		if (set_keyboard_focus) {
+			ImGui::SetKeyboardFocusHere();
+			set_keyboard_focus = false;
+		}
+		if (ImGui::InputText("##text", (char*)node_menu_filter_buf.c_str(), node_menu_filter_buf.size() + 1, ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &node_menu_filter_buf)) {
+			node_menu_filter_buf = node_menu_filter_buf.c_str();
+		}
+
+		if (ImGui::Selectable("<empty>", str.empty())) {
+			self->set_parent_bone(StringName());
+			str.clear();
+			has_update = true;
+		}
+		auto filter_lower = StringUtils::to_lower(node_menu_filter_buf);
 		for (auto& option : options) {
-
-			if (ImGui::Selectable(option.c_str(),
-				str == option
-			)) {
-				self->set_parent_bone(StringName(option.c_str()));
-				str = option;
-				has_update = true;
+			string lower = StringUtils::to_lower(option);
+			if (filter_lower.empty() || lower.find(filter_lower) != string::npos) {
+				if (ImGui::Selectable(option.c_str(),
+					str == option
+				)) {
+					self->set_parent_bone(StringName(option.c_str()));
+					str = option;
+					has_update = true;
+				}
 			}
-
 		}
 		ImGui::EndCombo();
+	}
+	else {
+		set_keyboard_focus = true;
 	}
 
 	return has_update;

@@ -159,6 +159,9 @@ private:
 	EditorDoc& ed_doc;
 	PropertyGrid grid;
 	const FnFactory<IPropertyEditor>& factory;
+
+	string component_filter;
+	bool component_set_keyboard_focus = true;
 };
 
 class OrthoCamera
@@ -477,6 +480,9 @@ class Model;
 class EditorDoc : public IEditorTool
 {
 public:
+	static MulticastDelegate<EditorDoc*> on_creation;
+	static MulticastDelegate<EditorDoc*> on_deletion;
+
 	static EditorDoc* create_scene(opt<string> scenePath);
 	static EditorDoc* create_prefab(PrefabAsset* prefab);
 

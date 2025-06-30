@@ -446,6 +446,15 @@ def parse_type_from_tokens(idx: int, tokens:list[str], typenames: dict[str, Clas
             raise RuntimeError("double pointer, not allowed")
         is_reference = True
         idx += 1
+
+    if is_pointer and base_type==OTHER_CLASS_TYPE and (not base_typename is None) and ClassDef.is_self_derived_from(base_typename,typenames["IAsset"]):
+        print(f"Found a raw IAsset derived pointer, setting to AssetPtr... ({base})")
+        template_args.append(CppType(base,None,OTHER_CLASS_TYPE,None,False,False))
+        base_type = ASSET_PTR_TYPE
+        base_typename = None
+
+
+
     return CppType(base, base_typename,base_type, template_args, const_local, is_pointer), idx
 
 def parse_type(string: str, typenames: dict[str, ClassDef]) -> CppType:

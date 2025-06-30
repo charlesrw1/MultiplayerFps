@@ -68,3 +68,4 @@ public:
 	T* ptr = nullptr;
 };
 using GenericAssetPtr = AssetPtr<IAsset>;
+static_assert(sizeof(GenericAssetPtr) == sizeof(IAsset*), "AssetPtr<> must be the same size as an IAsset*");

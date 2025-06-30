@@ -263,7 +263,7 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 				id_to_use = idfind->second;
 			}
 			else {
-				sys_print(Warning, "Level::insert_unserialized_entities_into_level: couldnt find id in reassign_ids (%lld)\n", id_to_use);
+				//sys_print(Warning, "Level::insert_unserialized_entities_into_level: couldnt find id in reassign_ids (%lld)\n", id_to_use);
 				id_to_use = get_next_id_and_increment();
 			}
 			ASSERT(id_to_use != 0);

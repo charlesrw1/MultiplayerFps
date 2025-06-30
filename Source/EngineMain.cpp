@@ -1041,7 +1041,10 @@ public:
 // save_ed -> SaveEditorTab()
 // close_all_ed_tabs -> Close
 
+#include "LevelEditor/EditorDocLocal.h"
+#include "LevelEditor/Commands.h"
 MulticastDelegate<> tempMD;
+
 void test_integration_2(IntegrationTester& tester)
 {
 	
@@ -1083,8 +1086,40 @@ void test_integration_2(IntegrationTester& tester)
 		if(wait)
 			tester.wait_delegate(tempMD);
 	};
-
+	EditorDoc* document = nullptr;
+	EditorDoc::on_creation.add(&tester, [&](EditorDoc* ptr) {
+		document = ptr;
+		EditorDoc::on_creation.remove(&tester);
+		});
 	open_editor_state(SceneAsset::StaticType, "top_down/map0.tmap",true,false);
+	tester.checkTrue(document,"");
+	tester.wait_ticks(1);
+
+	auto run_command_and_get_good = [&](Command* ptr) -> bool {
+		opt<bool> res;
+		document->command_mgr->add_command_with_execute_callback(ptr, [&res](bool b) {
+				res = b;
+			});
+		tester.wait_ticks(1);
+		tester.checkTrue(res.has_value(), "command wasnt executed?");
+		return res.value();
+	};
+
+
+	CreatePrefabCommand* cmd = new CreatePrefabCommand(*document, "top_down/player.pfb", glm::mat4(1.f));
+	tester.checkTrue(run_command_and_get_good(cmd),"");
+	DuplicateEntitiesCommand* dup = new DuplicateEntitiesCommand(*document, { cmd->handle });
+	tester.checkTrue(run_command_and_get_good(dup), "");
+	RemoveEntitiesCommand* rem = new RemoveEntitiesCommand(*document, dup->handles);
+	tester.checkTrue(rem->handles.size() == 1, "has 1 handle");
+	EntityPtr handle = rem->handles.at(0);
+	tester.checkTrue(run_command_and_get_good(rem), "");
+	tester.checkTrue(!handle.get(),"removed correctly");
+	document->command_mgr->undo();
+	tester.checkTrue(handle.get(), "undo removed correctly");
+
+
+
 	tester.wait_time(200.0);
 
 	//tester.checkTrue(eng_local.editorState->has_tool(),"");
