@@ -39,7 +39,7 @@ extern ConfigVar enable_bloom;
 extern ConfigVar enable_volumetric_fog;
 extern ConfigVar enable_ssao;
 extern ConfigVar use_halfres_reflections;
-
+class RenderWindowBackendLocal;
 struct Texture3d
 {
 	glm::ivec3 size;
@@ -557,7 +557,7 @@ public:
 		return device.get_prog_man();
 	}
 private:
-
+	RenderWindowBackendLocal* windowDrawer = nullptr;
 
 
 	void upload_ubo_view_constants(const View_Setup& view, bufferhandle ubo, bool wireframe_secondpass = false);

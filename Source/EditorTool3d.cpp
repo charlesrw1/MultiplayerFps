@@ -13,16 +13,17 @@
 #include "Game/Entity.h"
 #include "Game/Components/LightComponents.h"
 #include "Input/InputSystem.h"
+#include "UI/GUISystemPublic.h"
 extern ConfigVar ed_default_sky_material;
 
 void EditorTool3d::tick(float dt)
 {
-	auto window_sz = eng->get_game_viewport_size();
+	auto window_sz = UiSystem::inst->get_vp_rect().get_size();
 	float aratio = (float)window_sz.y / window_sz.x;
 	const float fov = glm::radians(70.f);
 	{
 		int x = 0, y = 0;
-		if (eng->is_game_focused()) {
+		if (UiSystem::inst->is_game_capturing_mouse()) {
 			camera.update_from_input(window_sz.x,window_sz.y, aratio,fov);
 		}
 	}

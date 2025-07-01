@@ -1,5 +1,6 @@
 #include "SharedFuncs.h"
 
+#if 0
 class LayoutUtils
 {
 public:
@@ -132,3 +133,4 @@ void update_child_positions_flow(guiBase* me, int axis, int start)
 		cursor[axis] = out_corner[axis] + out_sz[axis];
 	}
 }
+#endif

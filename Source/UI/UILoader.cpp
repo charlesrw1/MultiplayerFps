@@ -11,9 +11,6 @@
 #include "GUISystemPublic.h"
 
 
-// global
-GuiFontLoader g_fonts;
-
 #ifdef EDITOR_BUILD
 class FontAssetMetadata : public AssetMetadata
 {
@@ -128,12 +125,3 @@ bool GuiFont::load_asset(IAssetLoadingInterface* load)
 #include "GameEnginePublic.h"
 
 #include "Render/MaterialPublic.h"
-void GuiFontLoader::init()
-{
-	defaultFont = g_assets.find_global_sync<GuiFont>("eng/sengo24.fnt");
-	if (!defaultFont)
-		Fatalf("couldnt load default font");
-	fontDefaultMat = g_assets.find_global_sync<MaterialInstance>("eng/fontDefault.mm");
-	if (!fontDefaultMat)
-		Fatalf("couldnt load default font material");
-}

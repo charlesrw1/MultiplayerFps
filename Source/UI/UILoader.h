@@ -44,16 +44,3 @@ public:
 	}
 	void sweep_references(IAssetLoadingInterface*) const override;
 };
-class GuiFontLoader
-{
-public:
-
-	void init();
-	const GuiFont* get_default_font() const { return defaultFont.get(); }
-
-	AssetPtr<MaterialInstance> fontDefaultMat;
-	AssetPtr<GuiFont> defaultFont{};
-};
-// just for default fonts, they could go elsewhere
-extern GuiFontLoader g_fonts;
-

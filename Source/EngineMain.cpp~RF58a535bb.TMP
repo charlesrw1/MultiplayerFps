@@ -52,9 +52,6 @@
 #include "IntegrationTest.h"
 #include "EngineEditorState.h"
 #include "EngineSystemCommands.h"
-#include "DebugConsole.h"
-
-Debug_Console* Debug_Console::inst = nullptr;
 
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
@@ -70,23 +67,6 @@ double TimeSinceStart()
 {
 	return GetTime() - program_time_start;
 }
-
-#include "Animation/SkeletonData.h"
-void add_player_model_events(MSkeleton* skel) {
-	if (auto runClip = skel->find_clip("RUN")) {
-		runClip->directplayopt.slotname = StringName("TheSlot");
-	}
-}
-
-void add_events_test(Model* model) {
-	if (model->get_name() == "SWAT_model.cmdl") {
-		auto skel = model->get_skel();
-		if (skel) {
-			add_player_model_events(skel);
-		}
-	}
-}
-
 
 struct Debug_Shape
 {
@@ -131,6 +111,28 @@ private:
 	MeshBuilder mb;
 };
 //
+class Debug_Console
+{
+public:
+	static const int INPUT_BUFFER_SIZE = 256;
+	Debug_Console() {
+		memset(input_buffer, 0, sizeof input_buffer);
+	}
+	void init();
+	void draw();
+	void print(const char* fmt, ...);
+	void print_args(const char* fmt, va_list list);
+
+	vector<string> bufferedLines;
+	vector<string> lines;
+	vector<string> history;
+	int history_index = -1;
+	bool auto_scroll = true;
+	bool scroll_to_bottom = false;
+	bool set_keyboard_focus = false;
+	char input_buffer[INPUT_BUFFER_SIZE];
+};
+static Debug_Console dbg_console;
 
 #include <mutex>
 static std::mutex printMutex;	// fixme
@@ -164,6 +166,7 @@ ConfigVar loglevel("loglevel", "4", CVAR_INTEGER, "(0=disable,4=all)", 0, 4);
 ConfigVar colorLog("colorLog", "1", CVAR_BOOL, "");
 extern ConfigVar log_destroy_game_objects;
 extern ConfigVar log_all_asset_loads;
+
 void sys_print(LogType type, const char* fmt, ...)
 {
 	if ((int(type)) > loglevel.get_integer())
@@ -198,7 +201,7 @@ void sys_print(LogType type, const char* fmt, ...)
 
 
 	vprintf(fmt, args);
-	Debug_Console::inst->print_args(fmt, args);
+	dbg_console.print_args(fmt, args);
 	va_end(args);
 
 	if (print_end)
@@ -211,7 +214,7 @@ void sys_vprint(const char* fmt, va_list args)
 	std::lock_guard<std::mutex> printLock(printMutex);
 
 	vprintf(fmt, args);
-	Debug_Console::inst->print_args(fmt, args);
+	dbg_console.print_args(fmt, args);
 }
 
 void Fatalf(const char* format, ...)
@@ -261,7 +264,7 @@ glm::mat4 User_Camera::get_view_matrix() const {
 	return glm::lookAt(position, position + front, up);
 }
 bool User_Camera::can_take_input() const {
-	return orbit_mode || UiSystem::inst->is_game_capturing_mouse();
+	return orbit_mode || eng->is_game_focused();
 }
 
 
@@ -691,7 +694,7 @@ void GameEngineLocal::insert_this_map_as_level(SceneAsset*& loadedLevel, bool is
 	level = make_unique<Level>(!is_for_playing);
 	level->start(unique_scene.get());	// scene will then get destroyed
 	idraw->on_level_start();
-	//init_log_gui();
+	init_log_gui();
 	on_map_load_return.invoke(true);
 	wants_gc_flag = true;	// signal for a gc
 	sys_print(Info, "changed state to Engine_State::Game\n");
@@ -723,8 +726,7 @@ void OpenMapCommand::execute()
 				}
 				assert(!eng_local.is_waiting_on_map_load);
 				auto code = level_is_valid ? OpenMapReturnCode::Success : OpenMapReturnCode::FailedToLoad;
-				if(callback)
-					callback(code);
+				callback(code);
 			});
 	}
 	else {
@@ -1197,16 +1199,6 @@ void test_loading_prefab_without_component(IntegrationTester& tester)
 	tester.checkTrue(root, "");
 }
 
-void test_state(IntegrationTester& tester)
-{
-	const string prefabPath = "EditorTestInvalidPfbComponent.pfb";
-	EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, PrefabAsset::StaticType, std::nullopt);
-	Entity* root = doc.get_prefab_root_entity();
-	tester.checkTrue(root, "");
-	EditorIntTesterUtil::run_command(tester, doc, new CreateStaticMeshCommand(doc, "SWAT_model.cmdl", {}));
-	tester.wait_time(200.0);
-}
-
 // What this does: creates a prefab object. creates a map with the prefab. deletes prefab from disk. tries loading the map again.
 // checks that map load fails gracefully.
 // put prefab back to disk. 
@@ -1433,7 +1425,7 @@ extern ConfigVar material_print_debug;
 int game_engine_main(int argc, char** argv)
 {
 	material_print_debug.set_bool(false);
-	developer_mode.set_bool(true);
+	developer_mode.set_bool(false);
 	log_shader_compiles.set_bool(false);
 	loglevel.set_integer(0);
 	eng_local.init(argc,argv);
@@ -1444,7 +1436,6 @@ int game_engine_main(int argc, char** argv)
 	vector<IntTestCase> tests;
 	tests.push_back({ test_integration_1, "myTest" });
 	tests.push_back({ test_integration_2, "myTest2" });
-	tests.push_back({ test_state, "test_state" });
 	tests.push_back({ test_opening_prefab_as_map, "test_opening_prefab_as_map" });
 	tests.push_back({ test_loading_prefab_without_component, "test_loading_prefab_without_component" });
 	tests.push_back({ test_loading_invalid_prefab, "test_loading_invalid_prefab" });
@@ -1497,7 +1488,16 @@ ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in up
 
 
 
+static void init_log_gui()
+{
+	ASSERT(eng_local.get_level());
+	auto f = eng->get_level()->spawn_entity()->create_component<guiFullscreen>();
+	f->recieve_mouse = guiMouseFilter::Ignore;
+	f->set_owner_dont_serialize_or_edit(true);
+	eng_local.gui_log = f->get_owner()->create_child_entity()->create_component<OnScreenLog>();
+	eng_local.gui_log->set_owner_dont_serialize_or_edit(true);
 
+}
 
 
 void GameEngineLocal::spawn_starting_players(bool initial)
@@ -1515,12 +1515,34 @@ void GameEngineLocal::set_tick_rate(float tick_rate)
 	tick_interval = 1.0 / tick_rate;
 }
 
+void GameEngineLocal::set_game_focused(bool focused)
+{
+	if (focused == game_focused)
+		return;
+
+	if (focused) {
+		// reset deltas
+		SDL_GetRelativeMouseState(nullptr, nullptr);
+		SDL_GetMouseState(&saved_mouse_x, &saved_mouse_y);
+		SDL_SetRelativeMouseMode(SDL_TRUE);
+	}
+	else {
+		SDL_SetRelativeMouseMode(SDL_FALSE);
+	}
+	game_focused = focused;
+}
 
 void GameEngineLocal::key_event(SDL_Event event)
 {
 	if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
 		show_console = !show_console;
 		//console.set_keyboard_focus = show_console;
+	}
+
+	const bool is_in_game_level = eng->get_level() && !eng->is_editor_level();
+	if (!is_in_game_level && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse) {
+		set_game_focused(false);
+		return;
 	}
 
 	if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && ImGui::GetIO().WantCaptureKeyboard)
@@ -1536,6 +1558,17 @@ void GameEngineLocal::key_event(SDL_Event event)
 		if (keybinds != nullptr) {
 			for(string& k : *keybinds)
 				Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, k.c_str());
+		}
+	}
+	// when drawing to windowed viewport, handle game_focused during drawing
+	else if (event.type == SDL_MOUSEBUTTONDOWN) {
+		if (!is_in_game_level && event.button.button == 3 && !is_drawing_to_window_viewport()) {
+			set_game_focused(true);
+		}
+	}
+	else if (event.type == SDL_MOUSEBUTTONUP) {
+		if (!is_in_game_level && event.button.button == 3 && !is_drawing_to_window_viewport()) {
+			set_game_focused(false);
 		}
 	}
 }
@@ -1826,7 +1859,6 @@ void GameEngineLocal::init(int argc, char** argv)
 		start = now;
 	};
 
-	Debug_Console::inst = new Debug_Console;
 	Cmd_Manager::inst = Cmd_Manager::create();
 	add_commands();
 	print_time("init commands");
@@ -1881,12 +1913,11 @@ void GameEngineLocal::init(int argc, char** argv)
 	imaterials->init();
 	print_time("mat init");
 
+	g_fonts.init();
+
 	isound->init();
 	g_modelMgr.init();
 	g_gameAnimationMgr.init();
-
-	Model::on_model_loaded.add(this, [](Model* mod) { add_events_test(mod); });
-
 	//cl->init();
 	//sv->init();
 	imgui_context = ImGui::CreateContext();
@@ -2068,6 +2099,9 @@ void game_update_job(uintptr_t user)
 	//return;
 	// update particles, doesnt draw, only builds meshes FIXME
 	ParticleMgr::get().draw(out->vsOut);
+
+	// paint the UI
+	UiSystem::inst->paint();
 }
 
 void GameEngineLocal::loop()
@@ -2111,16 +2145,17 @@ void GameEngineLocal::loop()
 			default:
 				break;
 			}
-			//if (!is_game_focused()) {
-			//	if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) && ImGui::GetIO().WantCaptureKeyboard)
-			//		continue;
-			//	if (!scene_hovered && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse)
-			//		continue;
-			//}
-			//g_guiSystem->handle_event(event);
+			if (!is_game_focused()) {
+				if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) && ImGui::GetIO().WantCaptureKeyboard)
+					continue;
+				if (!scene_hovered && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse)
+					continue;
+			}
+			g_guiSystem->handle_event(event);
 		}
 		Input::inst->tick();
 		UiSystem::inst->update();
+
 		// Update the messsage queue! does level changing etc.
 		Cmd_Manager::inst->execute_buffer();
 	};
@@ -2162,6 +2197,7 @@ void GameEngineLocal::loop()
 	auto imgui_update = [&]()
 	{
 		ZoneScopedN("ImGuiUpdate");
+
 		UiSystem::inst->draw_imgui_interfaces(editorState.get());
 	};
 
@@ -2175,7 +2211,7 @@ void GameEngineLocal::loop()
 #endif
 		if (get_level())
 			get_level()->sync_level_render_data();
-		UiSystem::inst->sync_to_renderer();
+		g_guiSystem->sync_to_renderer();
 		g_physics.sync_render_data();		
 		idraw->sync_update();
 	};
@@ -2237,7 +2273,7 @@ void GameEngineLocal::loop()
 
 int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 {
-	Debug_Console* console = (Debug_Console * )data->UserData;
+	Debug_Console* console = &dbg_console;
 	if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory) {
 		if (data->EventKey == ImGuiKey_UpArrow) {
 			if (console->history_index == -1) {
@@ -2369,6 +2405,7 @@ void Debug_Console::print(const char* fmt, ...)
 	va_end(args);
 	bufferedLines.push_back(buf);
 }
+
 
 
 // SDL_CONTROLLER_AXIS_LEFTX = 0

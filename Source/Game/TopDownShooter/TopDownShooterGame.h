@@ -25,6 +25,7 @@
 #include "Game/GameSingleton.h"
 
 #include "Game/EntityComponent.h"
+#include "UI/GUISystemPublic.h"
 
 class TopDownGameManager : public Component
 {
@@ -208,7 +209,7 @@ public:
 	{
 		Ray r;
 
-		auto size = eng->get_game_viewport_size();
+		auto size = UiSystem::inst->get_vp_rect().get_size();
 
 		glm::vec3 ndc = glm::vec3(float(mx) / size.x, float(my) / size.y, 0);
 		ndc = ndc * 2.f - 1.f;

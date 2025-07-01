@@ -90,12 +90,9 @@ public:
 		return is_loading_editor_level || (get_level() && get_level()->is_editor_level());
 	}
 
-	glm::ivec2 get_game_viewport_size() const final;	// either full window or sub window
 	MulticastDelegate<bool>& get_on_map_delegate() final {
 		return on_map_load_return;
 	}
-	bool is_game_focused() const final { return game_focused; }
-	void set_game_focused(bool focus) final;
 	bool is_host() const final { return true; }
 
 // local functions
@@ -160,8 +157,6 @@ public:
 
 	bool is_drawing_to_window_viewport() const;
 
-	glm::ivec2 window_viewport_size = glm::ivec2(1200,800);
-
 	int argc = 0;
 	char** argv = nullptr;
 
@@ -181,10 +176,7 @@ public:
 private:
 
 	uptr<IntegrationTester> tester;
-	// when game goes into focus mode, the mouse position is saved so it can be reset when exiting focus mode
-	int saved_mouse_x=0, saved_mouse_y=0;
-	// focused= mouse is captured, assumes relative inputs are being taken, otherwise cursor is shown
-	bool game_focused = false;
+
 
 
 

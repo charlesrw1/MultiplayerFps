@@ -87,6 +87,8 @@ void Material_Shader_Table::recompile_for_material(MasterMaterialImpl* mat)
 	// do one default shader compile so we can aproximately tell if the shader is actually invalid and shouldnt be used
 	program_handle default_h = matman.get_mat_shader(false, nullptr, mat->self, false, false, false, false);
 	mat->is_compilied_shader_valid = !draw.get_prog_man().did_shader_fail(default_h);
+	if (!mat->is_compilied_shader_valid)
+		sys_print(Error, "recompile_for_material: material is invalid %s\n", mat->self->get_name().c_str());
 }
 
 program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* mat, shader_key key)

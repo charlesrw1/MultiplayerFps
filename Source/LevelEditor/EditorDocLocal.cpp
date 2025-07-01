@@ -62,9 +62,13 @@ glm::vec3 EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
 {
 	Ray r;
 	// get ui size
-	const auto size = gui->ws_position;
-	const int wx = gui->ws_size.x;
-	const int wy = gui->ws_size.y;
+
+	const auto viewport_size = UiSystem::inst->get_vp_rect().get_size();
+	const auto viewport_pos = UiSystem::inst->get_vp_rect().get_pos();
+
+	const auto size = viewport_size;
+	const int wx = viewport_pos.x;
+	const int wy = viewport_pos.y;
 	const float aratio = float(wy) / wx;
 	glm::vec3 ndc = glm::vec3(float(mx - size.x) / wx, float(my - size.y) / wy, 0);
 	ndc = ndc * 2.f - 1.f;
@@ -144,7 +148,7 @@ void EditorDoc::init_new()
 	command_mgr = std::make_unique<UndoRedoSystem>();
 
 	dragger.on_drag_end.add(this,[this](Rect2d rect) {
-		auto newRect = gui->convert_rect(rect);
+		auto newRect = gui.convert_rect(rect);
 		auto selection = idraw->mouse_box_select_for_editor(newRect.x, newRect.y, newRect.w, newRect.h);
 		auto type = MouseSelectionAction::ADD_SELECT;
 		if (Input::is_shift_down())
@@ -214,15 +218,15 @@ void EditorDoc::init_new()
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  leveldock.ini");
 
 	assert(eng->get_level());
-	assert(!gui);
-	gui = eng->get_level()->spawn_entity()->create_component<EditorUILayout>();
-	gui->doc = this;
-	gui->set_owner_dont_serialize_or_edit(true);
-	gui->set_focus();
-	gui->key_down_delegate.add(this, &EditorDoc::on_key_down);
-	gui->mouse_drag_delegate.add(this, &EditorDoc::on_mouse_drag);
-	gui->wheel_delegate.add(this, &EditorDoc::on_mouse_wheel);
-	gui->key_down_delegate.add(command_mgr.get(), &UndoRedoSystem::on_key_event);
+	
+	//gui = eng->get_level()->spawn_entity()->create_component<EditorUILayout>();
+	//gui->doc = this;
+	//gui->set_owner_dont_serialize_or_edit(true);
+	//gui->set_focus();
+	//gui->key_down_delegate.add(this, &EditorDoc::on_key_down);
+	//gui->mouse_drag_delegate.add(this, &EditorDoc::on_mouse_drag);
+	//gui->wheel_delegate.add(this, &EditorDoc::on_mouse_wheel);
+	//gui->key_down_delegate.add(command_mgr.get(), &UndoRedoSystem::on_key_event);
 }
 void EditorDoc::set_document_path(string newAssetName)
 {
@@ -332,11 +336,11 @@ void EditorDoc::enable_entity_eyedropper_mode(void* id) {
 	eng->log_to_fullscreen_gui(Debug, "entering eyedropper mode...");
 	active_eyedropper_user_id = id;
 	eye_dropper_active = true;
-	gui->tool_text->hidden = false;
-	gui->tool_text->text = "EYEDROPPER ACTIVE (esc to exit)";
-	gui->tool_text->color = { 255,128,128 };
-	gui->tool_text->use_desired_size = true;
-	gui->tool_text->pivot = guiAnchor::Center;
+	//gui->tool_text->hidden = false;
+	//gui->tool_text->text = "EYEDROPPER ACTIVE (esc to exit)";
+	//gui->tool_text->color = { 255,128,128 };
+	//gui->tool_text->use_desired_size = true;
+	//gui->tool_text->pivot = guiAnchor::Center;
 
 }
 void EditorDoc::exit_eyedropper_mode() {
@@ -345,7 +349,7 @@ void EditorDoc::exit_eyedropper_mode() {
 		eye_dropper_active = false;
 		active_eyedropper_user_id = nullptr;
 
-		gui->tool_text->hidden = true;
+		//gui->tool_text->hidden = true;
 	}
 }
 void EditorDoc::validate_prefab()
@@ -522,7 +526,6 @@ EditorDoc::~EditorDoc() {
 	sys_print(Debug, "deleting map file for editor...\n");
 	command_mgr->clear_all();
 	on_close.invoke();
-	gui = nullptr;
 
 	EditorDoc::on_deletion.invoke(this);
 }
@@ -539,13 +542,13 @@ ConfigVar ed_rotation_snap_exp("ed_rotation_snap_exp", "3", CVAR_FLOAT, "editor 
 ConfigVar ed_scale_snap("ed_scale_snap", "15.0", CVAR_FLOAT, "what editor scale snap", 0.1, 360);
 ConfigVar ed_scale_snap_exp("ed_scale_snap_exp", "3", CVAR_FLOAT, "editor scale snap increment exponent", 1, 10);
 
-void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
+void ManipulateTransformTool::check_input()
 {
-	if (eng->is_game_focused() || !ed_doc.selection_state->has_any_selected())
+	if (UiSystem::inst->is_game_capturing_mouse() || !ed_doc.selection_state->has_any_selected())
 		return;
-	uint32_t scancode = key.keysym.scancode;
-	bool has_shift = key.keysym.mod & KMOD_SHIFT;
-	if (scancode == SDL_SCANCODE_R) {
+
+	const bool has_shift = Input::is_shift_down();
+	if (Input::was_key_pressed(SDL_SCANCODE_R)) {
 
 		reset_group_to_pre_transform();
 
@@ -553,7 +556,7 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 
 		set_force_gizmo_on(true);
 	}
-	else if (scancode == SDL_SCANCODE_G) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_G)) {
 
 		reset_group_to_pre_transform();
 
@@ -561,28 +564,28 @@ void ManipulateTransformTool::on_key_down(const SDL_KeyboardEvent& key)
 
 		set_force_gizmo_on(true);
 	}
-	else if (scancode == SDL_SCANCODE_X && get_force_gizmo_on()) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_X) && get_force_gizmo_on()) {
 		reset_group_to_pre_transform();
 		if (has_shift)
 			axis_mask = 2 | 4;
 		else
 			axis_mask = 1;
 	}
-	else if (scancode == SDL_SCANCODE_Y && get_force_gizmo_on()) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_Y) && get_force_gizmo_on()) {
 		reset_group_to_pre_transform();
 		if (has_shift)
 			axis_mask = 1 | 4;
 		else
 			axis_mask = 2;
 	}
-	else if (scancode == SDL_SCANCODE_Z && get_force_gizmo_on()) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_Z) && get_force_gizmo_on()) {
 		reset_group_to_pre_transform();
 		if (has_shift)
 			axis_mask = 1 | 2;
 		else
 			axis_mask = 4;
 	}
-	else if (scancode == SDL_SCANCODE_S) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_S)) {
 		reset_group_to_pre_transform();
 		force_operation = ImGuizmo::SCALE;
 		mode = ImGuizmo::LOCAL;	// local scaling only
@@ -631,9 +634,9 @@ void EditorDoc::on_mouse_pick()
 		return;
 
 	auto pos = Input::get_mouse_pos();
-	pos.x = pos.x - gui->ws_position.x;
-	pos.y = pos.y - gui->ws_position.y;
-	
+	const auto screen_pos = UiSystem::inst->get_vp_rect().get_pos();
+	pos = pos - screen_pos;
+
 	if (pos.x >= 0 && pos.y >= 0) {
 		auto type = MouseSelectionAction::SELECT_ONLY;
 		assert(Input::is_shift_down() == ImGui::GetIO().KeyShift);
@@ -768,7 +771,7 @@ AddToDebugMenu myfuncs("edbox test", some_funcs);
 void EditorDoc::tick(float dt)
 {
 
-	auto window_sz = eng->get_game_viewport_size();
+	auto window_sz = UiSystem::inst->get_vp_rect().get_size();
 	float aratio = (float)window_sz.y / window_sz.x;
 	float fov = glm::radians(g_fov.get_float());
 
@@ -776,7 +779,7 @@ void EditorDoc::tick(float dt)
 
 
 	{
-		camera.orbit_mode = Input::is_mouse_down(1) && !eng->is_game_focused();
+		camera.orbit_mode = Input::is_mouse_down(1) && !UiSystem::inst->is_game_capturing_mouse();
 
 		{
 			if (using_ortho && ortho_camera.can_take_input())
@@ -924,7 +927,6 @@ void ManipulateTransformTool::on_close() {
 void ManipulateTransformTool::on_open() {
 	state = IDLE;
 	world_space_of_selected.clear();
-	ed_doc.gui->key_down_delegate.add(this, &ManipulateTransformTool::on_key_down);
 }
 void ManipulateTransformTool::on_component_deleted(Component* ec) {
 	stop_using_custom();
@@ -1076,8 +1078,8 @@ void ManipulateTransformTool::update()
 
 	ImGuizmo::SetImGuiContext(eng->get_imgui_context());
 	ImGuizmo::SetDrawlist();
-	const auto s_pos = ed_doc.gui->ws_position;
-	const auto s_sz = ed_doc.gui->ws_size;
+	const auto s_pos = UiSystem::inst->get_vp_rect().get_pos();
+	const auto s_sz = UiSystem::inst->get_vp_rect().get_size();
 
 	ImGuizmo::SetRect(s_pos.x, s_pos.y, s_sz.x, s_sz.y);
 	ImGuizmo::Enable(true);
@@ -1120,7 +1122,7 @@ void ManipulateTransformTool::update()
 		return out;
 	};
 
-	const auto window_sz = eng->get_game_viewport_size();
+	const auto window_sz = UiSystem::inst->get_vp_rect().get_size();
 	const float aratio = (float)window_sz.y / window_sz.x;
 	const float* const view = glm::value_ptr(ed_doc.vs_setup.view);
 	const glm::mat4 friendly_proj_matrix = (ed_doc.using_ortho) ? ed_doc.ortho_camera.get_friendly_proj_matrix(aratio) : ed_doc.vs_setup.make_opengl_perspective_with_near_far();
@@ -1156,6 +1158,8 @@ void ManipulateTransformTool::update()
 
 void EditorDoc::imgui_draw()
 {
+	manipulate->check_input();
+
 	if (Input::was_mouse_pressed(0)) {
 		if (manipulate->get_force_gizmo_on()) {
 			manipulate->set_force_gizmo_on(false);
@@ -1169,6 +1173,21 @@ void EditorDoc::imgui_draw()
 			manipulate->reset_group_to_pre_transform();
 			manipulate->set_force_gizmo_on(false);
 		}
+	}
+
+	if (is_in_eyedropper_mode()) {
+		//gui->tool_text->hidden = false;
+	//gui->tool_text->text = "EYEDROPPER ACTIVE (esc to exit)";
+	//gui->tool_text->color = { 255,128,128 };
+	//gui->tool_text->use_desired_size = true;
+	//gui->tool_text->pivot = guiAnchor::Center;
+		
+		TextShape shape;
+		shape.text = "EYEDROPPER ACTIVE";
+		shape.color = { 255,128,128 };
+		shape.rect = Rect2d({ 20,20 }, { 0,0 });
+		UiSystem::inst->window.draw(shape);
+
 	}
 
 
@@ -1296,7 +1315,7 @@ void EditorDoc::hook_scene_viewport_draw()
 
 			int x, y;
 			SDL_GetMouseState(&x, &y);
-			auto size = gui->ws_position;
+			auto size = UiSystem::inst->get_vp_rect().get_pos();
 			const float scene_depth = idraw->get_scene_depth_for_editor(x - size.x, y - size.y);
 
 			glm::vec3 dir = unproject_mouse_to_ray(x, y);
@@ -1321,11 +1340,7 @@ void EditorDoc::hook_scene_viewport_draw()
 				EntityPtr parent_to;
 				{
 					const ClassTypeInfo* type = ClassBase::find_class(resource->filename.c_str());
-					if (type && type->is_a(guiBase::StaticType)) {
-						drop_transform = glm::mat4(1.f);
-						if (selection_state->has_only_one_selected())
-							parent_to = selection_state->get_only_one_selected();
-					}
+					
 				}
 				command_mgr->add_command(new CreateCppClassCommand(*this,
 					resource->filename,
@@ -1756,68 +1771,28 @@ void EditorDoc::hook_menu_bar()
 }
 
 EditorUILayout::EditorUILayout() {
-	recieve_mouse = guiMouseFilter::Block;
-	eat_scroll_event = true;
+
 }
 #include "UI/Widgets/EditorCube.h"
 
-void EditorUILayout::start() {
 
-	guiBase::start();
+#include "UI/UILoader.h"
 
-	Entity& owner = *get_owner();
-
-	tool_text = owner.create_entity_with_component<guiText>();
-	tool_text->hidden = true;
-	tool_text->anchor = guiAnchor::Center;
-	tool_text->set_ls_position({ 0,0 });
-
-	cube = owner.create_entity_with_component<guiEditorCube>();
-	cube->anchor = guiAnchor::TopLeft;
-	cube->set_ls_size({ 45,45 });
-	cube->set_ls_position({ 20,20 });
-}
-
-void EditorUILayout::on_pressed(int x, int y, int button) {
-	set_focus();
-
-	mouse_clicked = true;
-	button_clicked = button;
-	//if(!editor_draw_name_text.get_bool())
-	mouse_down_delegate.invoke(x, y, button);
-}
-
-void EditorUILayout::on_released(int x, int y, int button) {
-
-	mouse_up_delegate.invoke(x, y, button);
-}
-
-void EditorUILayout::on_key_down(const SDL_KeyboardEvent& key_event) {
-	key_down_delegate.invoke(key_event);
-}
-
-void EditorUILayout::on_key_up(const SDL_KeyboardEvent& key_event) {
-	key_up_delegate.invoke(key_event);
-}
-
-void EditorUILayout::on_mouse_scroll(const SDL_MouseWheelEvent& wheel) {
-	wheel_delegate.invoke(wheel);
-}
-
-void EditorUILayout::on_dragging(int x, int y) {
-	mouse_drag_delegate.invoke(x, y);
-}
-
-void EditorUILayout::paint(UIBuilder& builder) {
-
+void EditorUILayout::draw() {
+	RenderWindow& window = UiSystem::inst->window;
+	cube.rotation_matrix = (glm::mat3)doc->vs_setup.view;
+	cube.draw(window);
 	// paint
 	if (doc->dragger.get_is_dragging()) {
 		auto rect = doc->dragger.get_drag_rect();
-		builder.draw_solid_rect({ rect.x,rect.y }, { rect.w,rect.h }, { 200,200,200,50 });
+		//builder.draw_solid_rect({ rect.x,rect.y }, { rect.w,rect.h }, { 200,200,200,50 });
+
+		RectangleShape shape;
+		shape.rect = rect;
+		shape.color = { 200,200,200,50 };
+		window.draw(shape);
 	}
 
-
-	cube->rotation_matrix = (glm::mat3)doc->vs_setup.view;
 
 	int x, y;
 	SDL_GetMouseState(&x, &y);
@@ -1833,7 +1808,8 @@ void EditorUILayout::paint(UIBuilder& builder) {
 		return;
 
 	const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
-	if (!font) font = g_fonts.get_default_font();
+	if (!font) 
+		font = UiSystem::inst->defaultFont;
 
 	struct obj {
 		glm::vec3 pos = glm::vec3(0.f);
@@ -1908,10 +1884,15 @@ void EditorUILayout::paint(UIBuilder& builder) {
 		o.pos.y *= -1;
 		auto coordx = o.pos.x * 0.5 + 0.5;
 		auto coordy = o.pos.y * 0.5 + 0.5;
-		coordx *= this->ws_size.x;
-		coordy *= this->ws_size.y;
-		coordx += this->ws_position.x;
-		coordy += this->ws_position.y;
+
+		const auto vp_size = UiSystem::inst->get_vp_rect().get_size();
+		const auto vp_pos = UiSystem::inst->get_vp_rect().get_pos();
+
+
+		coordx *= vp_size.x;
+		coordy *= vp_size.y;
+		coordx += vp_pos.x;
+		coordy += vp_pos.y;
 		coordx -= size.w / 2;
 		coordy -= size.h / 2;
 
@@ -1927,14 +1908,32 @@ void EditorUILayout::paint(UIBuilder& builder) {
 			}
 		}
 		glm::ivec2 textofs = { 0,font->base };
-		builder.draw_solid_rect({ coordx - 3,coordy - 3 }, { size.w + 6,size.h + 6 }, color);
+
+		RectangleShape shape;
+		shape.rect = Rect2d({ coordx - 3,coordy - 3 }, { size.w + 6,size.h + 6 });
+		shape.color = color;
+		window.draw(shape);
+
+		//builder.draw_solid_rect({ coordx - 3,coordy - 3 }, { size.w + 6,size.h + 6 }, color);
 		for (int i = 0; i < icons.size(); i++) {
 			const int ofs = (i) * (icon_size + 1);
-			builder.draw_rect_with_texture({ coordx + ofs,coordy }, { icon_size,icon_size }, 1, icons[i]);
+
+			shape.rect = Rect2d({ coordx + ofs,coordy }, { icon_size,icon_size });
+			shape.texture = icons[i];
+			shape.color = COLOR_WHITE;
+			window.draw(shape);
 		}
 
-		builder.draw_text(glm::ivec2{ coordx + 1 + text_offset,coordy + 1 } + textofs, {}, font, name, COLOR_BLACK);
-		builder.draw_text(glm::ivec2{ coordx + text_offset,coordy } + textofs, {}, font, name, COLOR_WHITE);
+		TextShape tshape;
+		tshape.rect = Rect2d(glm::ivec2{ coordx + 1 + text_offset,coordy + 1 } + textofs, {});
+		tshape.font = font;
+		tshape.text = name;
+		tshape.color = COLOR_BLACK;
+		window.draw(shape);
+		tshape.rect = Rect2d(glm::ivec2{ coordx + text_offset,coordy } + textofs, {});
+		tshape.color = COLOR_WHITE;
+		window.draw(tshape);
+
 	}
 	if (clicked) {
 		if (ImGui::GetIO().KeyShift) {

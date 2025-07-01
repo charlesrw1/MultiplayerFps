@@ -36,6 +36,7 @@
 #include "Input/InputSystem.h"
 #include <variant>
 #include "LevelSerialization/SerializationAPI.h"
+#include "UI/GUISystemPublic.h"
 extern ConfigVar g_mousesens;
 
 enum TransformType
@@ -168,7 +169,7 @@ class OrthoCamera
 {
 public:
 	bool can_take_input() const {
-		return eng->is_game_focused();
+		return UiSystem::inst->is_game_capturing_mouse();
 	}
 
 	glm::vec3 position = glm::vec3(0.0);
@@ -213,45 +214,28 @@ public:
 		return glm::ortho(-width, width, -width * aspect_ratio, width * aspect_ratio,0.001f, 1000.f);
 	}
 }; 
+#include "UI/GUISystemPublic.h"
+#include "UI/Widgets/EditorCube.h"
 class guiEditorCube;
 class guiText;
-class EditorUILayout : public guiFullscreen {
+class EditorUILayout  {
 public:
-	CLASS_BODY(EditorUILayout);
-
 	EditorUILayout();
-	void start() final;
 
-	void on_pressed(int x, int y, int button) override;
-	void on_released(int x, int y, int button) override;
-	void on_key_down(const SDL_KeyboardEvent& key_event) override;
-	void on_key_up(const SDL_KeyboardEvent& key_event) override;
-	void on_mouse_scroll(const SDL_MouseWheelEvent& wheel) override;
-	void on_dragging(int x, int y) override;
-	void paint(UIBuilder& builder) override;
+	void draw();
 
-	Rect2d convert_rect(Rect2d rect) {
-		Rect2d out = rect;
-		out.x -= ws_position.x;
-		out.y -= ws_position.y;
+	Rect2d convert_rect(Rect2d screenSpaceRect) {
+		Rect2d out = screenSpaceRect;
+		auto pos = UiSystem::inst->get_vp_rect().get_pos();
+		out.x -= pos.x;
+		out.y -= pos.y;
 		return out;
 	}
 
 	bool mouse_clicked = false;
 	int button_clicked = 0;
 
-
-	MulticastDelegate<const SDL_KeyboardEvent&> key_down_delegate;
-	MulticastDelegate<const SDL_KeyboardEvent&> key_up_delegate;
-	MulticastDelegate<int, int, int> mouse_down_delegate;
-	MulticastDelegate<int, int> mouse_drag_delegate;
-
-	MulticastDelegate<int, int, int> mouse_up_delegate;
-	MulticastDelegate<const SDL_MouseWheelEvent&> wheel_delegate;
-
-	guiEditorCube* cube = nullptr;
-	guiText* tool_text = nullptr;
-
+	guiEditorCube cube;
 	EditorDoc* doc = nullptr;
 };
 
@@ -386,6 +370,7 @@ public:
 	void update();
 	bool is_hovered();
 	bool is_using();
+	void check_input();
 
 	void stop_using_custom() {
 		if (is_using_for_custom) {
@@ -440,8 +425,6 @@ public:
 private:
 	bool force_gizmo_on = false;
 
-
-	void on_key_down(const SDL_KeyboardEvent& k);
 
 	void on_close();
 	void on_open();
@@ -621,7 +604,7 @@ public:
 	std::unique_ptr<ManipulateTransformTool> manipulate;
 	std::unique_ptr<ObjectOutliner> outliner;
 
-	EditorUILayout* gui = nullptr;
+	EditorUILayout gui;
 
 	View_Setup vs_setup;
 	bool using_ortho = false;

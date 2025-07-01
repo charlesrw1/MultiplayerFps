@@ -212,6 +212,93 @@ void AnimatorObject::remove_simulating_physics_object(Entity* e)
 	simulating_physics_objects.erase(e->get_self_ptr().handle);
 }
 
+#if 0
+class Character
+{
+public:
+	bool is_jumping = false;
+	bool is_running = false;
+};
+#include "RuntimeNodesNew.h"
+
+// basic running and idle
+class atMyStatemachine : public atAnimStatemachine {
+public:
+	enum State {
+		Running,
+		Jumping,
+		Idle,
+	};
+	bool eval_global_transitions() {
+		std::unordered_set<State> transition_to_pose_from = { Running,Jumping };
+		if (SetUtil::contains(transition_to_pose_from, state) && c->is_jumping)
+			state = Idle;
+	}
+	bool is_transitioning() const;
+	float transition_time_left() const;
+	bool can_interrupt_transition() const;
+	void set_transition_params(Easing easing, float duration, bool interruptable);	// set transition params to use on next transition. prints warning when this is called, but no transitino occurs
+
+	void update(bool resetMe) final {
+		if (resetMe)	// reset state
+			state = Idle;
+		if (state == Running) {
+			set_blend_tree("debug_name",nodes.at(0));
+			if (eval_global_transitions()) {
+			}
+			ctx.duration_remaining();
+			else if (c->is_jumping)
+				state = Jumping;
+			else if (c->is_running && ctx.find_value("flMove") > 0.0)
+				state = Idle;
+		}
+	}
+	Character* c = nullptr;
+	State state = 0;
+	vector<BaseAGNode*> nodes;
+};
+
+void f()
+{
+	atClipNode* c = new atClipNode;
+	c->speedId = StringName("speed");
+	c->data.loop = true;
+	atComposePoses* blend = new atComposePoses;
+	blend->alphaId = StringName("Blend")
+	atBlendByInt* b = new atBlendByInt;
+	atMyStatemachine* sm = new atMyStatemachine;
+	sm->character = character;
+
+	atIk2Bone* ik1 = new atIk2Bone;
+	ik->bone_name = StringName("handBone");
+	ik1->inputId = blend;
+	ik1->alphaId = StringName("handIkAlpha");
+	atIk2Bone* ik2 = new atIk2Bone;
+	ik->bone_name = StringName("footBone");
+	ik2->inputId = ik1;
+	ik2->alphaId = StringName("legIkAlpha");
+
+	atModifyBone* modify = new atModifyBone;
+	modify->inputId = ik2;
+
+	return modify;
+
+	int state = 0;
+	if (state == 0) {
+		//
+		if(anim_time_left() < 0.2)
+			state = 1;
+	}
+	else if (state == 1) {
+		if(event_was_fired())
+			state = 2;
+	}
+	set_blend_tree(c);
+
+	set_transition_params();
+}
+#endif
+
 
 bool AnimatorObject::update_sync_group(int idx)
 {

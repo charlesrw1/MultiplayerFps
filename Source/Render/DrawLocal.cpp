@@ -17,7 +17,7 @@
 #include "Game/Components/ParticleMgr.h"	// FIXME
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
-#include "Render/UIDrawPublic.h"
+#include "Render/RenderWindow.h"
 #include "tracy/public/tracy/Tracy.hpp"
 #include "tracy/public/tracy/TracyOpenGL.hpp"
 
@@ -48,21 +48,30 @@ static const int MAX_TAA_SAMPLES = 16;
 ConfigVar r_taa_samples("r.taa_samples", "4", CVAR_INTEGER, "", 2, MAX_TAA_SAMPLES);
 ConfigVar r_taa_32f("r.taa_32f", "0", CVAR_BOOL, "use 32 bit scene motion buffer instead of 16 bit");
 
-
-class RendererUIBackendLocal : public RendererUIBackend
+RenderWindowBackend* RenderWindowBackend::inst = nullptr;
+class RenderWindowBackendLocal : public RenderWindowBackend
 {
 public:
-	void init() {
-	}
+	int id_counter = 1;
 
-	void update(std::vector<UIDrawCmd>& draw_calls_to_be_swapped, MeshBuilder& vertex_data, const glm::mat4& view_proj) final {
-		drawCmds.clear();
-		std::swap(draw_calls_to_be_swapped, drawCmds);
-		mb_draw_data.init_from(vertex_data);
-		this->view_proj = view_proj;
+	std::vector<UIDrawCmd> drawCmds;
+
+	handle<RenderWindow> register_window() {
+		return { 1 };
+	}
+	void update_window(handle<RenderWindow> handle, RenderWindow& data) final {
+		assert(handle.id == 1);
+		drawCmds = data.get_draw_cmds();
+		mb_draw_data.init_from(data.meshbuilder);
+		this->view_proj = data.view_mat;
+	}
+	virtual void remove_window(handle<RenderWindow> handle) final {
+		assert(handle.id == 1);
 	}
 
 	void render() {
+		return;
+
 		glBindBufferBase(GL_UNIFORM_BUFFER, 0, draw.ubo.current_frame);
 		auto& device = draw.get_device();
 		for (int i = 0; i < drawCmds.size(); i++) {
@@ -85,6 +94,8 @@ public:
 
 			assert(dc.mat->get_master_material()->usage == MaterialUsage::UI);
 
+			const GLenum mode = GL_TRIANGLES;
+
 			RenderPipelineState pipe;
 			pipe.backface_culling = true;
 			pipe.blend = dc.mat->get_master_material()->blend;
@@ -105,7 +116,7 @@ public:
 			if (dc.texOverride != nullptr)
 				device.bind_texture(0, dc.texOverride->gl_id);
 
-			glDrawElementsBaseVertex(GL_TRIANGLES, dc.index_count, GL_UNSIGNED_INT, (void*)(dc.index_start * sizeof(int)), 0);
+			glDrawElementsBaseVertex(mode, dc.index_count, GL_UNSIGNED_INT, (void*)(dc.index_start * sizeof(int)), 0);
 			
 			draw.stats.total_draw_calls++;
 		}
@@ -117,10 +128,9 @@ public:
 private:
 	glm::mat4 view_proj{};
 	MeshBuilderDD mb_draw_data;
-	std::vector<UIDrawCmd> drawCmds;
 };
-static RendererUIBackendLocal draw_ui_local;
-RendererUIBackend* idrawUi = &draw_ui_local;
+
+
 
 class TaaManager
 {
@@ -893,6 +903,8 @@ void Renderer::init()
 	}
 
 	InitGlState();
+	windowDrawer = new RenderWindowBackendLocal();
+	RenderWindowBackend::inst = windowDrawer;
 
 	mem_arena.init("Render Temp", renderer_memory_arena_size.get_integer());
 	// Init scene draw buffers
@@ -1237,6 +1249,7 @@ void Renderer::execute_render_lists(
 
 	int offset = 0;
 	for (int i = 0; i < pass.batches.size(); i++) {
+		device.reset_states();
 
 		const auto& batch = pass.batches[i];
 		const int count = list.command_count[i];
@@ -1411,7 +1424,6 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 		const bool depth_less_than = params.pass == Render_Level_Params::SHADOWMAP;	// else, GL_GREATER
 		const bool depth_testing = true;
 		//const bool depth_writes = params.pass != Render_Level_Params::TRANSLUCENT;
-
 		if(dont_use_mdi.get_bool())
 			render_lists_old_way(*params.rl, *params.rp, depth_testing,
 				force_backface_state,
@@ -2924,7 +2936,9 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		RenderPassSetup setup("composite", fbo.composite, true, true, 0, 0, view_to_use.width, view_to_use.height);
 		auto scope = device.start_render_pass(setup);
 
-		draw_ui_local.render();
+		//draw_ui_local.render();
+
+		windowDrawer->render();
 
 		if (params.output_to_screen) {
 			GPUSCOPESTART(Blit_composite_to_backbuffer);
@@ -3156,8 +3170,10 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 		{
 			// UI
-			if (params.draw_ui && !r_force_hide_ui.get_bool())
-				draw_ui_local.render();
+			if (params.draw_ui && !r_force_hide_ui.get_bool()) {
+				windowDrawer->render();
+			}
+
 		}
 		
 		debug_tex_out.draw_out();

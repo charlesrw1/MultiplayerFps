@@ -373,7 +373,10 @@ void Model::post_load() {
 	}
 	ASSERT(uid == 0);
 	g_modelMgr.upload_model(this);
+	Model::on_model_loaded.invoke(this);
 }
+
+MulticastDelegate<Model*> Model::on_model_loaded;
 
 #ifdef EDITOR_BUILD
 #include "AssetCompile/ModelCompilierLocal.h"

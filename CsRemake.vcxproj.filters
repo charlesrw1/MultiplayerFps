@@ -488,13 +488,11 @@
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
-    <ClInclude Include="Source\Render\UIDrawPublic.h" />
     <ClInclude Include="Source\Render\UniformBuffer.h" />
     <ClInclude Include="Source\Assets\AssetRegistryLocal.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
     <ClInclude Include="Source\Misc\PropTween.h" />
     <ClInclude Include="Source\Game\CarGame\CarGui.h" />
-    <ClInclude Include="Source\UI\GUISystemLocal.h" />
     <ClInclude Include="Source\UI\BaseGUI.h" />
     <ClInclude Include="Source\UI\UIBuilder.h" />
     <ClInclude Include="Source\UI\Widgets\SharedFuncs.h" />
@@ -539,6 +537,8 @@
     <ClInclude Include="Source\Framework\SerializedForDiffing.h" />
     <ClInclude Include="Source\Framework\NodeMenuItem.h" />
     <ClInclude Include="Source\Render\GpuResourceManager.h" />
+    <ClInclude Include="Source\DebugConsole.h" />
+    <ClInclude Include="Source\Render\RenderWindow.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -715,6 +715,7 @@
     <ClCompile Include="Source\UI\Widgets\EditorCube.cpp" />
     <ClCompile Include="Source\IntegrationTest.cpp" />
     <ClCompile Include="Source\EngineEditorState.cpp" />
+    <ClCompile Include="Source\Render\RenderWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

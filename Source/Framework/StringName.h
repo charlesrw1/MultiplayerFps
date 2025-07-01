@@ -20,6 +20,10 @@ public:
 	StringName(const char* name, name_hash_t hash);
 #endif
 	StringName(const StringName& other) { hash = other.hash; }
+	StringName& operator=(const StringName& other) { 
+		hash = other.hash; 
+		return *this;
+	}
 
 	bool operator==(const StringName& other) const { return hash == other.hash; }
 	bool operator!=(const StringName& other) const { return hash != other.hash; }

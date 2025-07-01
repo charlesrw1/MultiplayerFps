@@ -12,6 +12,7 @@
 #include "Framework/InlineVec.h"
 #include "Assets/IAsset.h"
 #include "Framework/MathLib.h"
+#include "Framework/MulticastDelegate.h"
 #include "Framework/Reflection2.h"
 class MaterialInstance;
 using std::string;
@@ -133,12 +134,10 @@ public:
 	uint32_t get_merged_vertex_ofs() const { return merged_vert_offset; }
 	const glm::mat4& get_root_transform() const { return skeleton_root_transform; }
 	const Bounds& get_bounds() const { return aabb; }
-	const PhysicsBodyDefinition* get_physics_body() const {
-		return collision.get();
-	}
-	const RawMeshData* get_raw_mesh_data() const {
-		return &data;
-	}
+	const PhysicsBodyDefinition* get_physics_body() const { return collision.get(); }
+	const RawMeshData* get_raw_mesh_data() const { return &data; }
+	
+	static MulticastDelegate<Model*> on_model_loaded;
 private:
 	bool load_internal(IAssetLoadingInterface* loading);
 

@@ -40,25 +40,17 @@ class ModelMan
 {
 public:
 	ModelMan();
-
 	void init();
 	void add_commands(ConsoleCmdGroup& group);
-
 	void compact_memory();
 	void print_usage() const;
-
-	vertexarrayhandle get_vao(bool animated) {
-		return animated_vao;
-	}
-
+	vertexarrayhandle get_vao(bool animated) { return animated_vao; }
 	Model* get_error_model() const { return error_model; }
 	Model* get_sprite_model() const { return _sprite; }
 	Model* get_default_plane_model() const { return defaultPlane; }
-
 	Model* get_light_dome() const { return LIGHT_DOME; }
 	Model* get_light_sphere() const { return LIGHT_SPHERE; }
 	Model* get_light_cone() const { return LIGHT_CONE; }
-
 	void add_model_to_list(Model* m);
 	void remove_model_from_list(Model* m);
 private:

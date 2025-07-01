@@ -9,12 +9,10 @@
 #include "UILoader.h"
 #include "Assets/AssetDatabase.h"
 #include "UI/UIBuilder.h"
-class OnScreenLog : public guiBase
+class OnScreenLog
 {
 public:
-	CLASS_BODY(OnScreenLog);
-
-	void paint(UIBuilder& b) final {
+	void draw(RenderWindow& b) {
 		auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
 
 		float time_now = GetTime();
@@ -52,8 +50,17 @@ public:
 			glm::ivec2 texoffset = { 0,font->base };
 			offset.x += 10;
 			offset.y += 10;
-			b.draw_text(ws_position + glm::ivec2{ 1,1 } + offset+ texoffset, ws_size, font, sv, { 0,0,0,color.a });
-			b.draw_text(ws_position+offset+ texoffset, ws_size, font, sv, color);
+			//Drawing::draw_text()
+
+			TextShape text;
+			text.rect = Rect2d(offset + texoffset, { 0,0 });
+			text.font = font;
+			text.text = sv;
+			text.color = color;
+			b.draw(text);
+
+			//b.draw(ws_position + glm::ivec2{ 1,1 } + offset+ texoffset, ws_size, font, sv, { 0,0,0,color.a });
+			//b.draw_text(ws_position+offset+ texoffset, ws_size, font, sv, color);
 			height++;
 		}
 	}

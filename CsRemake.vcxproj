@@ -110,6 +110,7 @@
     <ClCompile Include="Source\Render\EnvProbe.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />
     <ClCompile Include="Source\Render\Model.cpp" />
+    <ClCompile Include="Source\Render\RenderWindow.cpp" />
     <ClCompile Include="Source\Render\Shader.cpp" />
     <ClCompile Include="Source\Render\Shadowmap.cpp" />
     <ClCompile Include="Source\Render\Ssao.cpp" />
@@ -168,6 +169,7 @@
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\AssetRegistryLocal.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
+    <ClInclude Include="Source\DebugConsole.h" />
     <ClInclude Include="Source\EditorPopups.h" />
     <ClInclude Include="Source\EditorPopupTemplate.h" />
     <ClInclude Include="Source\EngineSystemCommands.h" />
@@ -217,7 +219,7 @@
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\GpuResourceManager.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
-    <ClInclude Include="Source\Render\UIDrawPublic.h" />
+    <ClInclude Include="Source\Render\RenderWindow.h" />
     <ClInclude Include="Source\Render\UniformBuffer.h" />
     <ClInclude Include="Source\Scripting\FunctionReflection.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
@@ -355,7 +357,6 @@
     <ClInclude Include="Source\Render\Texture.h" />
     <ClInclude Include="Source\Sound\SoundPublic.h" />
     <ClInclude Include="Source\Types.h" />
-    <ClInclude Include="Source\UI\GUISystemLocal.h" />
     <ClInclude Include="Source\UI\BaseGUI.h" />
     <ClInclude Include="Source\UI\GUISystemPublic.h" />
     <ClInclude Include="Source\UI\UIBuilder.h" />

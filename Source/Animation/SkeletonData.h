@@ -28,7 +28,7 @@ struct ScalePositionRot {
 struct SeqDirectPlayOpt {
 	float blend_time = 0.2;
 	StringName slotname;
-	Easing easing;
+	Easing easing=Easing::Linear;
 };
 struct SyncMarker {
 	StringName name;
@@ -36,7 +36,14 @@ struct SyncMarker {
 };
 struct AnimCurveData {
 	StringName name;
-	int offset = 0;	// offset in pose_data
+	struct Point {
+		glm::vec2 val = glm::vec2(0.0,0.0);
+		Easing interp=Easing::Linear;
+	};
+	void add_point(float time, float value, Easing interp) {
+		points.push_back({ {time,value},interp });
+	}
+	std::vector<Point> points;
 };
 
 class AnimationSeq
@@ -50,12 +57,17 @@ public:
 	float fps = 30.0;
 	float average_linear_velocity = 0.0;
 	bool has_rootmotion = false;
-	SeqDirectPlayOpt directplayopt;
 	// store any animation events or curves here
 	vector<uptr<AnimationEvent>> events;
 	vector<SyncMarker> syncMarkers;
 	vector<uptr<AnimDurationEvent>> durationEvents;
 	vector<AnimCurveData> curveData;
+	SeqDirectPlayOpt directplayopt;
+	// creational functions
+	void add_event(AnimationEvent* ev);
+	void add_duration_event(AnimDurationEvent* ev);
+	void add_curve(AnimCurveData& curveData);
+	void add_sync_marker(SyncMarker marker);
 
 	int get_num_keyframes_inclusive() const { return num_frames + 1; }
 	int get_num_keyframes_exclusive() const { return num_frames; }
@@ -136,6 +148,7 @@ public:
 	const glm::quat& get_bone_local_rotation(int index) const { return bone_dat[index].rot; }
 	const glm::mat4x3& get_inv_posematrix(int index) const { return bone_dat[index].invposematrix; }
 	const AnimationSeq* find_clip(const std::string& name) const;
+	AnimationSeq* find_clip(const std::string& name);
 	const BoneIndexRetargetMap* get_remap(const MSkeleton* other);
 	const BonePoseMask* find_mask(StringName name) const;
 	const std::vector<BoneData>& get_all_bones() const {

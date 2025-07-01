@@ -30,6 +30,15 @@ const AnimationSeq* MSkeleton::find_clip(const std::string& name) const
 	}
 	return nullptr;
 }
+AnimationSeq* MSkeleton::find_clip(const std::string& name)
+{
+	auto findthis = clips.find(name);
+	if (findthis != clips.end()) {
+		return findthis->second.ptr;
+	}
+	return nullptr;
+}
+
 const BoneIndexRetargetMap* MSkeleton::get_remap(const MSkeleton* other)
 {
 	if (this == other)

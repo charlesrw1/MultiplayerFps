@@ -654,8 +654,7 @@ void Player::on_foot_update()
 
  void Player::start()  {
 
-
-	 eng->set_game_focused(true);
+	 UiSystem::inst->set_game_capture_mouse(true);
 
 //
 //	 {

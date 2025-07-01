@@ -1,12 +1,14 @@
 #include "EditorCube.h"
 #include "UI/UIBuilder.h"
 #include "Framework/MeshBuilder.h"
-#include "UI/GUISystemLocal.h"
+#include "Render/RenderWindow.h"
 #include "Debug.h"
 #include "Assets/AssetDatabase.h"
 #include "Render/Texture.h"
+#include "UI/GUISystemPublic.h"
+#include "Framework/Config.h"
 ConfigVar editorcube("editorcube", "0", CVAR_BOOL, "");
-void guiEditorCube::start()
+guiEditorCube::guiEditorCube()
 {
 	const string imgs[6] = {
 		"cube_z","cube_nz","cube_nx","cube_x","cube_y","cube_ny"
@@ -17,11 +19,11 @@ void guiEditorCube::start()
 		textures.at(i) = g_assets.find_global_sync<Texture>(path).get();
 	}
 }
-void guiEditorCube::paint(UIBuilder& builder)
+void guiEditorCube::draw(RenderWindow& builder)
 {
-	auto& mb = builder.get_meshbuilder();
+	auto& mb = builder.meshbuilder;
 	auto transform_to_screen = [&](glm::vec3 in_clip) {
-		return glm::vec3((in_clip.x+1)*ws_size.x*0.5 + ws_position.x, (in_clip.y + 1) * ws_size.y*0.5 + ws_position.y, 0.0);
+		return glm::vec3((in_clip.x+1)*ws_sz.x*0.5 + ws_position.x, (in_clip.y + 1) * ws_sz.y*0.5 + ws_position.y, 0.0);
 	};
 	glm::vec3 corners[36] = {
 		// Front face (CCW order)
@@ -87,11 +89,6 @@ void guiEditorCube::paint(UIBuilder& builder)
 		}
 		mb.AddTriangle(start, start + 1, start + 2);
 		mb.AddTriangle(start+3, start + 4, start + 5);
-		builder.add_drawcall(starti, guiSystemLocal.ui_default, textures.at(i));
+		builder.add_draw_call(UiSystem::inst->get_default_ui_mat(), starti, textures.at(i));
 	}
-}
-
-void guiEditorCube::update_widget_size()
-{
-	desired_size = { ls_w,ls_h };
 }

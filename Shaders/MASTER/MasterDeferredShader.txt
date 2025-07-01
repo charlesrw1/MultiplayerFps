@@ -218,7 +218,7 @@ ___USER_FS_CODE___
 
 void main()
 {
-	FSmain();
+	//FSmain();
 #ifdef ALPHATEST
 	if(OPACITY<0.5)
 		discard;
