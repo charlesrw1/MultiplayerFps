@@ -230,6 +230,13 @@ public:
 	void on_dragging(int x, int y) override;
 	void paint(UIBuilder& builder) override;
 
+	Rect2d convert_rect(Rect2d rect) {
+		Rect2d out = rect;
+		out.x -= ws_position.x;
+		out.y -= ws_position.y;
+		return out;
+	}
+
 	bool mouse_clicked = false;
 	int button_clicked = 0;
 
@@ -472,6 +479,19 @@ private:
 
 	EditorDoc& ed_doc;
 };
+
+struct DragDetector
+{
+	MulticastDelegate<Rect2d> on_drag_end;
+	void tick();
+	bool get_is_dragging() const;
+	Rect2d get_drag_rect() const;
+private:
+	bool is_dragging = false;
+	int mouseClickX = 0;
+	int mouseClickY = 0;
+};
+
 template<class... Ts>
 struct overloads : Ts... { using Ts::operator()...; };
 class LEPlugin;
@@ -528,6 +548,7 @@ public:
 		if(!using_ortho && camera.can_take_input())
 			camera.scroll_callback(wheel.y);
 	}
+	void on_mouse_pick();
 
 	void duplicate_selected_and_select_them();
 	glm::vec3 unproject_mouse_to_ray(int mx, int my);
@@ -620,7 +641,7 @@ public:
 	MulticastDelegate<> on_start;
 	MulticastDelegate<> on_close;
 	MulticastDelegate<uint64_t> on_change_name;
-
+	DragDetector dragger;
 
 	void validate_fileids_before_serialize();
 
@@ -629,7 +650,6 @@ private:
 	EditorDoc();
 	void init_for_prefab(PrefabAsset* prefab);
 	void init_for_scene(opt<string> scenePath);
-
 
 	int get_next_file_id() {
 		return ++file_id_start;

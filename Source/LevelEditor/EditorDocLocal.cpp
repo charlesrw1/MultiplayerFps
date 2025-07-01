@@ -143,6 +143,30 @@ void EditorDoc::init_new()
 	eng->get_level()->validate();
 	command_mgr = std::make_unique<UndoRedoSystem>();
 
+	dragger.on_drag_end.add(this,[this](Rect2d rect) {
+		auto newRect = gui->convert_rect(rect);
+		auto selection = idraw->mouse_box_select_for_editor(newRect.x, newRect.y, newRect.w, newRect.h);
+		auto type = MouseSelectionAction::ADD_SELECT;
+		if (Input::is_shift_down())
+			type = MouseSelectionAction::ADD_SELECT;
+		else if (Input::is_ctrl_down())
+			type = MouseSelectionAction::UNSELECT;
+		else {
+			selection_state->clear_all_selected();
+		}
+		for (auto handle : selection) {
+			if (handle.is_valid()) {
+				auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
+				if (component_ptr) {
+					auto owner = component_ptr->get_owner();
+					ASSERT(owner);
+
+					do_mouse_selection(type, owner, true);
+				}
+			}
+		}
+		});
+
 	command_mgr->on_command_execute_or_undo.add(this, [&]() {
 		set_has_editor_changes();
 		});
@@ -193,16 +217,12 @@ void EditorDoc::init_new()
 	assert(!gui);
 	gui = eng->get_level()->spawn_entity()->create_component<EditorUILayout>();
 	gui->doc = this;
-	printf("%lld\n", (uint64_t)&gui->mouse_down_delegate);
 	gui->set_owner_dont_serialize_or_edit(true);
 	gui->set_focus();
 	gui->key_down_delegate.add(this, &EditorDoc::on_key_down);
-	gui->mouse_down_delegate.add(this, &EditorDoc::on_mouse_down);
-	ASSERT(gui->mouse_down_delegate.get_head());
 	gui->mouse_drag_delegate.add(this, &EditorDoc::on_mouse_drag);
 	gui->wheel_delegate.add(this, &EditorDoc::on_mouse_wheel);
 	gui->key_down_delegate.add(command_mgr.get(), &UndoRedoSystem::on_key_event);
-	ASSERT(gui->mouse_down_delegate.get_head());
 }
 void EditorDoc::set_document_path(string newAssetName)
 {
@@ -604,77 +624,45 @@ void EditorDoc::do_mouse_selection(MouseSelectionAction action, const Entity* e,
 		selection_state->remove_from_selection(actual_entity_to_select);
 }
 
-void EditorDoc::on_mouse_drag(int x, int y)
+
+void EditorDoc::on_mouse_pick()
 {
 	if (selection_state->has_any_selected() && (manipulate->is_hovered() || manipulate->is_using()))
 		return;
-	if (ImGui::GetIO().KeyShift) {
-		auto handle = idraw->mouse_pick_scene_for_editor(x, y);
+
+	auto pos = Input::get_mouse_pos();
+	pos.x = pos.x - gui->ws_position.x;
+	pos.y = pos.y - gui->ws_position.y;
+	
+	if (pos.x >= 0 && pos.y >= 0) {
+		auto type = MouseSelectionAction::SELECT_ONLY;
+		assert(Input::is_shift_down() == ImGui::GetIO().KeyShift);
+		if (Input::is_shift_down())
+			type = MouseSelectionAction::ADD_SELECT;
+		else if (Input::is_ctrl_down())
+			type = MouseSelectionAction::UNSELECT;
+
+		auto handle = idraw->mouse_pick_scene_for_editor(pos.x, pos.y);
 		if (handle.is_valid()) {
 			auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
 			if (component_ptr) {
 				auto owner = component_ptr->get_owner();
 				ASSERT(owner);
 
-				do_mouse_selection(MouseSelectionAction::ADD_SELECT, owner, true);
-			}
-		}
-	}
-	else if (ImGui::GetIO().KeyCtrl) {
-		auto handle = idraw->mouse_pick_scene_for_editor(x, y);
-		if (handle.is_valid()) {
-			auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
-			if (component_ptr) {
-				auto owner = component_ptr->get_owner();
-				ASSERT(owner);
-
-				do_mouse_selection(MouseSelectionAction::UNSELECT, owner, true);
-			}
-		}
-	}
-}
-void EditorDoc::on_mouse_down(int x, int y, int button)
-{
-
-
-	if (button == 1 && manipulate->get_force_gizmo_on()) {
-		manipulate->set_force_gizmo_on(false);
-		return;
-	}
-	else if (button == 3 && manipulate->get_force_gizmo_on()) {
-		manipulate->reset_group_to_pre_transform();
-		manipulate->set_force_gizmo_on(false);
-		return;
-	}
-
-	if (selection_state->has_any_selected() && (manipulate->is_hovered() || manipulate->is_using()))
-		return;
-
-	if (button == 1) {
-		auto handle = idraw->mouse_pick_scene_for_editor(x, y);
-
-		if (handle.is_valid()) {
-
-			auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
-			if (component_ptr && component_ptr->get_owner()) {
-				auto owner = component_ptr->get_owner();
-				ASSERT(owner);
-
-				if (ImGui::GetIO().KeyShift)
-					do_mouse_selection(MouseSelectionAction::ADD_SELECT, owner, true);
-				else if (ImGui::GetIO().KeyCtrl)
-					do_mouse_selection(MouseSelectionAction::UNSELECT, owner, true);
-				else
-					do_mouse_selection(MouseSelectionAction::SELECT_ONLY, owner, true);
+				do_mouse_selection(type, owner, true);
 			}
 		}
 		else {
-
-			exit_eyedropper_mode();
+			exit_eyedropper_mode();	// ?
 		}
-
 	}
 }
+
+void EditorDoc::on_mouse_drag(int x, int y)
+{
+	
+}
+
 
 void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 {
@@ -783,6 +771,8 @@ void EditorDoc::tick(float dt)
 	auto window_sz = eng->get_game_viewport_size();
 	float aratio = (float)window_sz.y / window_sz.x;
 	float fov = glm::radians(g_fov.get_float());
+
+
 
 
 	{
@@ -1166,11 +1156,29 @@ void ManipulateTransformTool::update()
 
 void EditorDoc::imgui_draw()
 {
+	if (Input::was_mouse_pressed(0)) {
+		if (manipulate->get_force_gizmo_on()) {
+			manipulate->set_force_gizmo_on(false);
+		}
+		else {
+			on_mouse_pick();
+		}
+	}
+	if (Input::was_mouse_pressed(2)) {
+		if (manipulate->get_force_gizmo_on()) {
+			manipulate->reset_group_to_pre_transform();
+			manipulate->set_force_gizmo_on(false);
+		}
+	}
+
+
 	outliner->draw();
 
 	prop_editor->draw();
 
 	IEditorTool::imgui_draw();
+
+	dragger.tick();	// tick it here cuz render thread lol
 
 	command_mgr->execute_queued_commands();
 }
@@ -1772,7 +1780,6 @@ void EditorUILayout::start() {
 
 void EditorUILayout::on_pressed(int x, int y, int button) {
 	set_focus();
-	ASSERT(mouse_down_delegate.get_head());
 
 	mouse_clicked = true;
 	button_clicked = button;
@@ -1802,6 +1809,13 @@ void EditorUILayout::on_dragging(int x, int y) {
 }
 
 void EditorUILayout::paint(UIBuilder& builder) {
+
+	// paint
+	if (doc->dragger.get_is_dragging()) {
+		auto rect = doc->dragger.get_drag_rect();
+		builder.draw_solid_rect({ rect.x,rect.y }, { rect.w,rect.h }, { 200,200,200,50 });
+	}
+
 
 	cube->rotation_matrix = (glm::mat3)doc->vs_setup.view;
 
@@ -1995,4 +2009,50 @@ Entity* EditorDoc::spawn_prefab(PrefabAsset* prefab)
 	e->unique_file_id = get_next_file_id();
 	assert(e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
 	return e;
+}
+
+void DragDetector::tick()
+{
+	if (Input::is_mouse_down(0)) {
+		if (!is_dragging) {
+			mouseClickX = Input::get_mouse_pos().x;
+			mouseClickY = Input::get_mouse_pos().y;
+			is_dragging = true;
+		}
+	}
+	else {
+		if (is_dragging) {
+			if(get_is_dragging())
+				on_drag_end.invoke(get_drag_rect());
+			is_dragging = false;
+			mouseClickX = 0;
+			mouseClickY = 0;
+		}
+	}
+}
+
+bool DragDetector::get_is_dragging() const
+{
+	if (!is_dragging) return false;
+	auto rect = get_drag_rect();
+	if (rect.w >= 2 || rect.h >= 2) {
+		return true;
+	}
+	return false;
+}
+
+Rect2d DragDetector::get_drag_rect() const
+{
+	auto pos = Input::get_mouse_pos();
+	glm::ivec2 clickPos = { mouseClickX,mouseClickY };
+	Rect2d rect;
+	auto minP = glm::min(clickPos, pos);
+	auto maxP = glm::max(clickPos, pos);
+
+	rect.x = minP.x;
+	rect.y = minP.y;
+	rect.w = maxP.x - minP.x;
+	rect.h = maxP.y - minP.y;
+
+	return rect;
 }

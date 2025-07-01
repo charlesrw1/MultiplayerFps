@@ -1,6 +1,7 @@
 #pragma once
 #include "Framework/Handle.h"
 #include <glm/glm.hpp>
+#include <vector>
 
 struct View_Setup
 {
@@ -107,29 +108,20 @@ public:
 	virtual void init() = 0;
 
 	// Game call api
-
 	virtual RenderScenePublic* get_scene() = 0;
-
-	virtual void scene_draw(
-		SceneDrawParamsEx params,
-		View_Setup view	/* camera */
-	) = 0;
+	virtual void scene_draw(SceneDrawParamsEx params, View_Setup view	/* camera */) = 0;
 	virtual void sync_update() = 0;
-
 	virtual void on_level_start() = 0;
 	virtual void on_level_end() = 0;
-	
 	virtual void bake_cubemaps() = 0;
-
 	virtual void reload_shaders() = 0;
-
 	// only used by animation editor to draw to an imgui window
 	virtual uint32_t get_composite_output_texture_handle() = 0;
-
 	// tests the output buffer from last frame and returns whatever object was drawn
 	// ONLY for level editor (requires SceneDrawParamEx::is_editor to have been true LAST frame)
 	// returns -1 on none
 	virtual handle<Render_Object> mouse_pick_scene_for_editor(int x, int y) = 0;
+	virtual std::vector<handle<Render_Object>> mouse_box_select_for_editor(int x, int y, int w, int h) = 0;
 	// test the depth buffer, returns LINEAR depth, ONLY for editor!
 	virtual float get_scene_depth_for_editor(int x, int y) = 0;
 };

@@ -366,6 +366,7 @@ public:
 		return tex.actual_output_composite; 
 	}
 	handle<Render_Object> mouse_pick_scene_for_editor(int x, int y) final;
+	std::vector<handle<Render_Object>> mouse_box_select_for_editor(int x, int y, int w, int h) final;
 	float get_scene_depth_for_editor(int x, int y) final;
 
 

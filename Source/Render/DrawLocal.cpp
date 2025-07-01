@@ -3407,46 +3407,52 @@ float Renderer::get_scene_depth_for_editor(int x, int y)
 
 handle<Render_Object> Renderer::mouse_pick_scene_for_editor(int x, int y)
 {
-	ASSERT(!eng->get_is_in_overlapped_period());
+	auto handles = mouse_box_select_for_editor(x, y, 1, 1);
+	if (handles.empty()) return { -1 };
+	return handles.at(0);
+}
 
-	// super slow garbage functions obviously
-
-	if (x < 0 || y < 0 || x >= cur_w || y >= cur_h) {
-		sys_print(Error, "invalid mouse coords for mouse_pick_scene\n");
-		return { -1 };
+std::vector<handle<Render_Object>> Renderer::mouse_box_select_for_editor(int x, int y, int w, int h)
+{
+	assert(!eng->get_is_in_overlapped_period());
+	sys_print(Debug, "Renderer::mouse_box_select_for_editor\n");
+	assert(w >= 0 && h >= 0);
+	// super DUPER slow garbage functions obviously
+	if (x < 0 || y < 0 || x >= cur_w || y >= cur_h ||x+w>=cur_w||y+h>=cur_h) {
+		sys_print(Error, "Renderer::mouse_box_select_for_editor: invalid mouse coords\n");
+		return {};
 	}
-
 	glFlush();
 	glFinish();
-
-	const size_t size = cur_h * cur_w * 4;
-	uint8_t* buffer_pixels = new uint8_t[size];
-
-	glGetTextureImage(tex.editor_id_buffer,0, GL_RGBA,GL_UNSIGNED_BYTE, size, buffer_pixels);
-
+	const int size = cur_h * cur_w * 4;
+	std::vector<uint8_t> bufferPixels(size,0);
+	glGetTextureImage(tex.editor_id_buffer, 0, GL_RGBA, GL_UNSIGNED_BYTE, size, bufferPixels.data());
 	y = cur_h - y - 1;
-
-	const size_t ofs = cur_w * y * 4 + x * 4;
-	uint8_t* ptr = &buffer_pixels[ofs];
-	uint32_t id = uint32_t(ptr[0]) | uint32_t(ptr[1]) << 8 | uint32_t(ptr[2]) << 16 | uint32_t(ptr[3]) << 24;
-	delete[] buffer_pixels;
-
-	if (id == 0xff000000) {
-		sys_print(Error,"NONE\n");
-		return { -1 };
+	std::unordered_set<int> found;
+	const int skip_pixels = 4;	// check every 4 pixels
+	for (int xCoordOfs = 0; xCoordOfs < w; xCoordOfs+= skip_pixels) {
+		for (int yCoordOfs = 0; yCoordOfs < h; yCoordOfs+= skip_pixels) {
+			const int xCoord = x + xCoordOfs;
+			const int yCoord = y - yCoordOfs;
+			assert(yCoord >= 0);
+			const int ofs = cur_w * yCoord * 4 + xCoord * 4;
+			assert(ofs >= 0 && ofs < (int)bufferPixels.size());
+			uint8_t* ptr = &bufferPixels.at(ofs);
+			uint32_t id = uint32_t(ptr[0]) | uint32_t(ptr[1]) << 8 | uint32_t(ptr[2]) << 16 | uint32_t(ptr[3]) << 24;
+			if (id != 0xff000000) {
+				uint32_t realid = id - 1;	// allow for nullptr
+				if (realid < scene.proxy_list.objects.size()) {
+					int handle_out = scene.proxy_list.objects.at(realid).handle;
+					found.insert(handle_out);
+				}
+			}
+		}
 	}
 
-	uint32_t realid = id - 1;	// allow for nullptr
-
-	if (realid >= scene.proxy_list.objects.size()) {
-		sys_print(Error, "invalid editorid\n");
-		return { -1 };
-	}
-	int handle_out = scene.proxy_list.objects.at(realid).handle;
-
-	//sys_print(Debug, "MODEL: %s\n", scene.proxy_list.objects.at(realid).type_.proxy.model->get_name().c_str());
-
-	return { handle_out };
+	std::vector<handle<Render_Object>> outObjs;
+	for (int f : found)
+		outObjs.push_back(handle<Render_Object>{f});
+	return outObjs;
 }
 
 
