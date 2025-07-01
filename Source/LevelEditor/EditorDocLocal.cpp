@@ -218,7 +218,7 @@ void EditorDoc::init_new()
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  leveldock.ini");
 
 	assert(eng->get_level());
-	
+	gui.doc = this;
 	//gui = eng->get_level()->spawn_entity()->create_component<EditorUILayout>();
 	//gui->doc = this;
 	//gui->set_owner_dont_serialize_or_edit(true);
@@ -546,6 +546,11 @@ void ManipulateTransformTool::check_input()
 {
 	if (UiSystem::inst->is_game_capturing_mouse() || !ed_doc.selection_state->has_any_selected())
 		return;
+	if (!UiSystem::inst->is_vp_focused())
+		return;
+	if (UiSystem::inst->blocking_keyboard_inputs())
+		return;
+
 
 	const bool has_shift = Input::is_shift_down();
 	if (Input::was_key_pressed(SDL_SCANCODE_R)) {
@@ -779,7 +784,7 @@ void EditorDoc::tick(float dt)
 
 
 	{
-		camera.orbit_mode = Input::is_mouse_down(1) && !UiSystem::inst->is_game_capturing_mouse();
+		camera.orbit_mode = Input::is_mouse_down(1) || Input::last_recieved_input_from_con();// && !UiSystem::inst->is_game_capturing_mouse();
 
 		{
 			if (using_ortho && ortho_camera.can_take_input())
@@ -1158,15 +1163,25 @@ void ManipulateTransformTool::update()
 
 void EditorDoc::imgui_draw()
 {
+	gui.draw();
 	manipulate->check_input();
 
-	if (Input::was_mouse_pressed(0)) {
-		if (manipulate->get_force_gizmo_on()) {
-			manipulate->set_force_gizmo_on(false);
+	if (Input::was_mouse_released(0)&&!dragger.get_is_dragging()) {
+
+		if (UiSystem::inst->blocking_mouse_inputs()) {
+			if (UiSystem::inst->is_vp_hovered()) {
+				if (manipulate->get_force_gizmo_on()) {
+					manipulate->set_force_gizmo_on(false);
+				}
+				else {
+					on_mouse_pick();
+				}
+			}
+			else
+				sys_print(Warning, "vp not focused\n");
 		}
-		else {
-			on_mouse_pick();
-		}
+		else
+			sys_print(Warning, "blocked input\n");
 	}
 	if (Input::was_mouse_pressed(2)) {
 		if (manipulate->get_force_gizmo_on()) {
@@ -1185,7 +1200,13 @@ void EditorDoc::imgui_draw()
 		TextShape shape;
 		shape.text = "EYEDROPPER ACTIVE";
 		shape.color = { 255,128,128 };
-		shape.rect = Rect2d({ 20,20 }, { 0,0 });
+		shape.with_drop_shadow = true;
+		// center it
+		Rect2d size = GuiHelpers::calc_text_size(shape.text, nullptr);
+		glm::ivec2 pos = { -size.w / 2,size.h + 5 };
+		glm::ivec2 ofs = GuiHelpers::calc_layout(pos, guiAnchor::Top, UiSystem::inst->get_vp_rect());
+		shape.rect = Rect2d(ofs, {});
+
 		UiSystem::inst->window.draw(shape);
 
 	}
@@ -1197,7 +1218,7 @@ void EditorDoc::imgui_draw()
 
 	IEditorTool::imgui_draw();
 
-	dragger.tick();	// tick it here cuz render thread lol
+	dragger.tick();
 
 	command_mgr->execute_queued_commands();
 }
@@ -1777,6 +1798,8 @@ EditorUILayout::EditorUILayout() {
 
 
 #include "UI/UILoader.h"
+ConfigVar test1("test1", "200", CVAR_INTEGER, "", 0, 256);
+ConfigVar test2("test2", "200", CVAR_INTEGER, "", 0, 256);
 
 void EditorUILayout::draw() {
 	RenderWindow& window = UiSystem::inst->window;
@@ -1786,10 +1809,14 @@ void EditorUILayout::draw() {
 	if (doc->dragger.get_is_dragging()) {
 		auto rect = doc->dragger.get_drag_rect();
 		//builder.draw_solid_rect({ rect.x,rect.y }, { rect.w,rect.h }, { 200,200,200,50 });
+		rect.x -= UiSystem::inst->get_vp_rect().get_pos().x;
+		rect.y -= UiSystem::inst->get_vp_rect().get_pos().y;
 
 		RectangleShape shape;
 		shape.rect = rect;
-		shape.color = { 200,200,200,50 };
+		Uint8 c = test1.get_integer();
+		Uint8 a = test2.get_integer();
+		shape.color = { c,c,c,a };
 		window.draw(shape);
 	}
 
@@ -1891,8 +1918,8 @@ void EditorUILayout::draw() {
 
 		coordx *= vp_size.x;
 		coordy *= vp_size.y;
-		coordx += vp_pos.x;
-		coordy += vp_pos.y;
+		//coordx += vp_pos.x;
+		//coordy += vp_pos.y;
 		coordx -= size.w / 2;
 		coordy -= size.h / 2;
 

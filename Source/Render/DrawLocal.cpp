@@ -70,7 +70,6 @@ public:
 	}
 
 	void render() {
-		return;
 
 		glBindBufferBase(GL_UNIFORM_BUFFER, 0, draw.ubo.current_frame);
 		auto& device = draw.get_device();
@@ -2713,7 +2712,6 @@ void Renderer::sync_update()
 	}
 
 	scene.execute_deferred_deletes();
-	matman.pre_render_update();
 
 	update_debug_grid();	// makes it visible/hidden
 
@@ -2760,6 +2758,8 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 	if (r_taa_32f.was_changed()) {
 		refresh_render_targets_next_frame = true;
 	}
+
+	matman.pre_render_update();
 
 	check_cubemaps_dirty();
 

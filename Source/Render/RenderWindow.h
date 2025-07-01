@@ -68,12 +68,16 @@ public:
 	void draw(TextShape text_shape);
 	const std::vector<UIDrawCmd>& get_draw_cmds() const { return drawCmds; }
 
-	glm::mat3 view_mat = glm::mat3();
+	glm::mat4 view_mat = glm::mat4();
 	Color32 clear_color = {};
 	const Texture* render_to_this = nullptr;
 	bool is_main_window = false;
 	bool wants_clear = false;
 	MeshBuilder meshbuilder;
+	void reset_verticies() {
+		meshbuilder.Begin();
+		drawCmds.clear();
+	}
 private:
 	std::vector<UIDrawCmd> drawCmds;
 };

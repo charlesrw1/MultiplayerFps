@@ -50,7 +50,7 @@ public:
 	static bool is_con_active(int idx);
 	static SDL_GameControllerType get_con_type();
 	static SDL_GameControllerType get_con_type_idx(int idx);
-
+	static bool last_recieved_input_from_con();
 	static MulticastDelegate<int /* index */, bool/* connected/disconnected */> on_con_status;
 	static MulticastDelegate<int /* controller index or -1 if keyboard */> on_any_input; // invoked on any input recieved from a device
 private:

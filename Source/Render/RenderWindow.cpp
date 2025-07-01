@@ -80,6 +80,8 @@ static void get_uvs(glm::vec2& top_left, glm::vec2& sz, int x, int y, int w, int
 }
 void RenderWindow::draw(TextShape text_shape)
 {
+	if (!text_shape.font)
+		text_shape.font = UiSystem::inst->defaultFont;
 	const int start = meshbuilder.get_i().size();
 
 	int x = text_shape.rect.x;
@@ -102,6 +104,10 @@ void RenderWindow::draw(TextShape text_shape)
 
 			glm::vec2 uv, uv_sz;
 			get_uvs(uv, uv_sz, find->second.x, find->second.y, find->second.w, find->second.h, font);
+			if (text_shape.with_drop_shadow) {
+				glm::ivec2 ofs(text_shape.drop_shadow_ofs);
+				meshbuilder.Push2dQuad(coord + ofs, sz, uv, uv_sz, text_shape.drop_shadow_color);
+			}
 			meshbuilder.Push2dQuad(coord, sz, uv, uv_sz, text_shape.color);
 			x += find->second.advance;
 		}

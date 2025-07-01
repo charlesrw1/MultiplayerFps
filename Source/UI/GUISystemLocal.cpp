@@ -121,6 +121,7 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 				ImVec2(0, 1), ImVec2(1, 0));	// this is the scene draw texture
 			auto sz = ImGui::GetItemRectSize();
 			is_viewport_hovered = ImGui::IsItemHovered();
+			is_viewport_focused = ImGui::IsWindowFocused();
 
 			// save off where the viewport is the GUI for mouse events
 			viewportRect = Rect2d(pos.x + winpos.x, pos.y + winpos.y, size.x, size.y);
@@ -152,6 +153,10 @@ void UiSystem::update() {
 		SDL_WarpMouseInWindow(eng->get_os_window(), saved_mouse_x, saved_mouse_y);
 	}
 	window.clear();	// clear the window
+	auto rect = get_vp_rect();
+	auto mat = glm::orthoZO(0.f, (float)rect.get_size().x, (float)rect.get_size().y, 0.f, -1.f, 1.f);
+	window.view_mat = mat;
+	window.reset_verticies();
 }
 
 void UiSystem::sync_to_renderer() {
@@ -160,6 +165,14 @@ void UiSystem::sync_to_renderer() {
 bool UiSystem::is_drawing_to_screen() const
 {
 	return drawing_to_screen;
+}
+bool UiSystem::is_vp_hovered() const
+{
+	return is_viewport_hovered;
+}
+bool UiSystem::is_vp_focused() const
+{
+	return is_viewport_focused;
 }
 glm::ivec2 UiSystem::convert_screen_to_vp(glm::ivec2 screen) const
 {

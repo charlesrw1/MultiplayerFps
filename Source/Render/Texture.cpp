@@ -532,7 +532,7 @@ extern ConfigVar developer_mode;
 
 bool Texture::load_asset(IAssetLoadingInterface* loading) {
 	const auto& path = get_name();
-
+	assert(path != "_white" && path != "_black");	// quick smoke test assert here, default textures should be initialized before anything else
 #ifdef EDITOR_BUILD
 	if (developer_mode.get_bool()) {
 		// this will check if a compile is needed

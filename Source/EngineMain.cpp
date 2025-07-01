@@ -261,7 +261,7 @@ glm::mat4 User_Camera::get_view_matrix() const {
 	return glm::lookAt(position, position + front, up);
 }
 bool User_Camera::can_take_input() const {
-	return orbit_mode || UiSystem::inst->is_game_capturing_mouse();
+	return orbit_mode || UiSystem::inst->is_game_capturing_mouse() || Input::last_recieved_input_from_con();
 }
 
 
@@ -272,22 +272,6 @@ void User_Camera::set_orbit_target(glm::vec3 target, float object_size)
 }
 
 
-void User_Camera::scroll_callback(int amt)
-{
-	if(orbit_mode) {
-		float lookatpointdist = dot(position - orbit_target, front);
-		glm::vec3 lookatpoint = position + front * lookatpointdist;
-		lookatpointdist += (lookatpointdist * 0.25) * amt;
-		if (abs(lookatpointdist) < 0.01)
-			lookatpointdist = 0.01;
-		position = (lookatpoint - front * lookatpointdist);
-	}
-	else {
-		move_speed += (move_speed * 0.5) * amt;
-		if (abs(move_speed) < 0.000001)
-			move_speed = 0.0001;
-	}
-}
 
 void User_Camera::update_from_input(int width, int height, float aratio, float fov)
 {
@@ -350,13 +334,19 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 		float dist = glm::length(orbit_target - position);
 
 		// panning
-		if (pan_in_orbit_model) {
-			// scale by dist, not accurate, fixme
-			
+		float x_orb = -deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX))*dist*0.2;
+		float y_orb = -deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY)) *dist*0.2;
+
+		if (pan_in_orbit_model&&!Input::last_recieved_input_from_con()) {	
+			// scale by dist, not accurate, fixme	
 			float x_s = tan(fov / 2) * dist * 0.5;
 			float y_s = x_s * aratio;
-			orbit_target = orbit_target - real_up * y_off * y_s + right * x_off * x_s;
+			x_orb += x_s * x_off;
+			y_orb += y_s * y_off;
 		}
+		orbit_target = orbit_target - real_up *  y_orb + right *  x_orb;
+
+
 
 		position = orbit_target - front * dist;
 	}
@@ -384,6 +374,24 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 		delta -= move_speed * right * deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX));
 
 		position += delta;
+	}
+
+	{
+		int scroll_amt = Input::get_mouse_scroll();
+
+		if (orbit_mode) {
+			float lookatpointdist = dot(position - orbit_target, front);
+			glm::vec3 lookatpoint = position + front * lookatpointdist;
+			lookatpointdist += (lookatpointdist * 0.25) * scroll_amt;
+			if (abs(lookatpointdist) < 0.01)
+				lookatpointdist = 0.01;
+			position = (lookatpoint - front * lookatpointdist);
+		}
+		else {
+			move_speed += (move_speed * 0.5) * scroll_amt;
+			if (abs(move_speed) < 0.000001)
+				move_speed = 0.0001;
+		}
 	}
 }
 
@@ -1437,6 +1445,7 @@ int game_engine_main(int argc, char** argv)
 	log_shader_compiles.set_bool(false);
 	loglevel.set_integer(0);
 	eng_local.init(argc,argv);
+	developer_mode.set_bool(true);
 	loglevel.set_integer(4);
 	log_all_asset_loads.set_bool(false);
 	log_destroy_game_objects.set_bool(false);
@@ -1845,24 +1854,23 @@ void GameEngineLocal::init(int argc, char** argv)
 	init_sdl_window();
 	print_time("init sdl window");
 
-
 	Profiler::init();
-
 	FileSys::init();
 	g_assets.init();
 	print_time("asset init");
 
-
 	JobSystem::inst = new JobSystem();// spawns worker threads
 	print_time("job sys init");
+
+	// renderer init
+	idraw->init();
+	print_time("draw init");
 
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
 	AssetBrowser::inst = new AssetBrowser();
 	editorState = make_unique<EditorState>();
-
 	print_time("asset reg and browser init");
-
 #endif
 	g_scriptMgr->init();
 
@@ -1873,10 +1881,6 @@ void GameEngineLocal::init(int argc, char** argv)
 	g_physics.init();
 	print_time("physics init");
 
-	//network_init();
-	// renderer init
-	idraw->init();
-	print_time("draw init");
 
 	imaterials->init();
 	print_time("mat init");
@@ -2169,7 +2173,6 @@ void GameEngineLocal::loop()
 	{
 		ZoneScopedN("SyncUpdate");
 		DebugShapeCtx::get().update(frame_time);
-		g_assets.tick_asyncs();	// tick async loaded assets, this will call the async load_map callback
 #ifdef EDITOR_BUILD
 		AssetRegistrySystem::get().update(); 		// update hot reloading
 #endif
@@ -2185,6 +2188,10 @@ void GameEngineLocal::loop()
 		CPUSCOPESTART(SwapWindow);
 		if(!skip_rendering)
 			SDL_GL_SwapWindow(window);
+	};
+
+	auto pre_update = [&]() {
+		g_assets.tick_asyncs();	// tick async loaded assets, this will call the async load_map callback
 	};
 
 	double last = GetTime() - 0.1;
@@ -2212,9 +2219,10 @@ void GameEngineLocal::loop()
 			}
 		}
 
-
-		// update input, console cmd buffer
+		// update input, console cmd buffer, could change maps etc.
 		frame_start();
+
+		pre_update();
 
 		// overlapped update (game+render)
 		do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering);

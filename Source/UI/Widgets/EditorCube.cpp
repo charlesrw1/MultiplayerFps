@@ -87,8 +87,8 @@ void guiEditorCube::draw(RenderWindow& builder)
 			vert.uv = uvs[i * 6 + j];
 			mb.AddVertex(vert);
 		}
-		mb.AddTriangle(start, start + 1, start + 2);
-		mb.AddTriangle(start+3, start + 4, start + 5);
+		mb.AddTriangle(start+2, start , start + 1);
+		mb.AddTriangle(start+5, start + 3, start + 4);
 		builder.add_draw_call(UiSystem::inst->get_default_ui_mat(), starti, textures.at(i));
 	}
 }

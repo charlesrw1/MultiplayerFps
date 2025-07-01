@@ -34,7 +34,7 @@ void post_load_map_callback_generic(bool make_plane)
 	sun->visible = true;
 	sun->log_lin_lerp_factor = 0.7;
 	sun->max_shadow_dist = 40.0;
-	sun->get_owner()->set_ls_euler_rotation(glm::vec3(-glm::radians(10.f), glm::radians(15.f), 0.f));
+	sun->get_owner()->set_ls_euler_rotation(glm::vec3(-glm::radians(45.f), glm::radians(15.f), 0.f));
 	auto skylight = eng->get_level()->spawn_entity()->create_component<SkylightComponent>();
 
 }

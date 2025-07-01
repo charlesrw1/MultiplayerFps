@@ -136,10 +136,9 @@ void Input::pre_events()
 }
 void Input::tick()
 {
-	if (recieved_input_from_this.has_value()) {
-		Input::on_any_input.invoke(*recieved_input_from_this);
-		recieved_input_from_this = std::nullopt;
-	}
+	//if (recieved_input_from_this.has_value()) {
+	//	Input::on_any_input.invoke(*recieved_input_from_this);
+	//}
 	if (devices.empty())
 		default_dev_index = std::nullopt;
 	else
@@ -190,6 +189,11 @@ SDL_GameControllerType Input::get_con_type_idx(int idx)
 	if (!device)
 		return SDL_GameControllerType::SDL_CONTROLLER_TYPE_UNKNOWN;
 	return SDL_GameControllerGetType(device);
+}
+
+bool Input::last_recieved_input_from_con()
+{
+	return inst->recieved_input_from_this.has_value() && inst->recieved_input_from_this.value() != -1;
 }
 
 

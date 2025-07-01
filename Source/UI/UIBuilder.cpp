@@ -33,37 +33,63 @@ ConfigVar ui_draw_text_bbox("ui.draw_text_bbox", "0", CVAR_BOOL | CVAR_DEV,"");
 //	
 //}
 
-Rect2d GuiHelpers::calc_text_size_no_wrap(const char* str, const GuiFont* font)
+Rect2d GuiHelpers::calc_text_size_no_wrap(std::string_view sv, const GuiFont* font)
 {
+	if (!font) font = UiSystem::inst->defaultFont;
+	assert(font);
 	int x = 0;
 	int y = -font->base;
-	while (*str) {
-		char c = *str;
+	for (char c : sv) {
 		auto find = font->character_to_glyph.find(c);
 		if (find == font->character_to_glyph.end()) {
 			x += 10;	// empty character
 		}
 		else
 			x += find->second.advance;
-
-		str++;
 	}
 	return Rect2d(0, y, x, font->lineHeight);
 }
-Rect2d GuiHelpers::calc_text_size(const char* str, const GuiFont* font, int force_width)
+glm::ivec2 GuiHelpers::calc_layout(glm::ivec2 in_pos, guiAnchor anchor, Rect2d viewport)
 {
+	auto sz = viewport.get_size();
+	switch (anchor)
+	{
+	case guiAnchor::TopLeft: return in_pos;
+		break;
+	case guiAnchor::TopRight: return { sz.x + in_pos.x, in_pos.y };
+		break;
+	case guiAnchor::BotLeft: return { in_pos.x,sz.y + in_pos.y };
+		break;
+	case guiAnchor::BotRight: return { sz.x + in_pos.x,sz.y + in_pos.y };
+		break;
+	case guiAnchor::Center: return { in_pos.x+sz.x/2,sz.y/2 + in_pos.y };
+		break;
+	case guiAnchor::Top: return { in_pos.x + sz.x / 2,in_pos.y };
+		break;
+	case guiAnchor::Bottom: return { in_pos.x + sz.x / 2,in_pos.y  + sz.y};
+		break;
+	case guiAnchor::Right: return { in_pos.x + sz.x,in_pos.y + sz.y/2 };
+		break;
+	case guiAnchor::Left:  return { in_pos.x ,in_pos.y + sz.y / 2 };
+		break;
+	default: return in_pos;
+		break;
+	}
+}
+Rect2d GuiHelpers::calc_text_size(std::string_view sv, const GuiFont* font, int force_width)
+{
+	if (!font) font = UiSystem::inst->defaultFont;
 	ASSERT(font);
 
 	if (force_width == -1)
-		return calc_text_size_no_wrap(str, font);
+		return calc_text_size_no_wrap(sv, font);
 
 	std::string currentLine;
 	std::string currentWord;
 
 	int x = 0;
 	int y = -font->base;
-	while (*(str++)) {
-		char c = *str;
+	for (char c : sv) {
 		if (c == ' ' || c == '\n') {
 			auto sz = calc_text_size_no_wrap((currentLine + currentWord).c_str(), font);
 			if (sz.w > force_width)
