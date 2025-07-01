@@ -20,7 +20,7 @@
 #include "Physics/ChannelsAndPresets.h"
 
 
-#include "MiscEditors/DataClass.h"
+
 #include "Framework/ClassTypePtr.h"
 #include "Render/Texture.h"
 

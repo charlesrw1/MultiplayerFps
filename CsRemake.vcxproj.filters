@@ -426,8 +426,6 @@
     <ClInclude Include="Source\Game\Components\DecalComponent.h" />
     <ClInclude Include="Source\Game\Components\PhysicsComponents.h" />
     <ClInclude Include="Source\Game\Components\BillboardComponent.h" />
-    <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
-    <ClInclude Include="Source\MiscEditors\DataClass.h" />
     <ClInclude Include="Source\Sound\SoundLocal.h">
       <Filter>Source\Sound</Filter>
     </ClInclude>
@@ -605,8 +603,6 @@
     <ClCompile Include="Source\Render\Meshlet.cpp" />
     <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
-    <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
-    <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelAsset2.cpp" />

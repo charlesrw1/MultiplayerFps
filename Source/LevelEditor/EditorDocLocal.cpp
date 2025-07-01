@@ -546,10 +546,10 @@ void ManipulateTransformTool::check_input()
 {
 	if (UiSystem::inst->is_game_capturing_mouse() || !ed_doc.selection_state->has_any_selected())
 		return;
-	if (!UiSystem::inst->is_vp_focused())
+	if (!UiSystem::inst->is_vp_hovered())
 		return;
-	if (UiSystem::inst->blocking_keyboard_inputs())
-		return;
+	//if (UiSystem::inst->blocking_keyboard_inputs())
+	//	return;
 
 
 	const bool has_shift = Input::is_shift_down();
@@ -672,12 +672,45 @@ void EditorDoc::on_mouse_drag(int x, int y)
 }
 
 
-void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
+void EditorDoc::check_inputs()
 {
-	uint32_t scancode = key.keysym.scancode;
-	bool has_shift = key.keysym.mod & KMOD_SHIFT;
+	if (UiSystem::inst->is_game_capturing_mouse())
+		return;
+	if (!UiSystem::inst->is_vp_hovered())
+		return;
+
+	if (Input::was_mouse_released(0) && !dragger.get_is_dragging()) {
+
+		if (UiSystem::inst->blocking_mouse_inputs()) {
+			if (UiSystem::inst->is_vp_hovered()) {
+				if (manipulate->get_force_gizmo_on()) {
+					manipulate->set_force_gizmo_on(false);
+				}
+				else {
+					on_mouse_pick();
+				}
+			}
+			else
+				sys_print(Warning, "vp not focused\n");
+		}
+		else
+			sys_print(Warning, "blocked input\n");
+	}
+	if (Input::was_mouse_pressed(2)) {
+		if (manipulate->get_force_gizmo_on()) {
+			manipulate->reset_group_to_pre_transform();
+			manipulate->set_force_gizmo_on(false);
+		}
+	}
+
+	//if (UiSystem::inst->blocking_keyboard_inputs())
+	//	return;
+
+	const bool has_shift = Input::is_shift_down();
+	const bool has_ctrl = Input::is_ctrl_down();
+
 	const float ORTHO_DIST = 20.0;
-	if (scancode == SDL_SCANCODE_DELETE) {
+	if (Input::was_key_pressed(SDL_SCANCODE_DELETE)) {
 		if (selection_state->has_any_selected()) {
 			auto selected_handles = selection_state->get_selection_as_vector();
 			if (!selected_handles.empty()) {
@@ -686,46 +719,49 @@ void EditorDoc::on_key_down(const SDL_KeyboardEvent& key)
 			}
 		}
 	}
-	else if (scancode == SDL_SCANCODE_D && has_shift) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_Z) && has_ctrl) {
+		command_mgr->undo();
+	}
+	else if (Input::was_key_pressed(SDL_SCANCODE_D) && has_shift) {
 		if (selection_state->has_any_selected()) {
 			auto selected_handles = selection_state->get_selection_as_vector();;
 			DuplicateEntitiesCommand* cmd = new DuplicateEntitiesCommand(*this, selected_handles);
 			command_mgr->add_command(cmd);
 		}
 	}
-	else if (scancode == SDL_SCANCODE_ESCAPE) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_ESCAPE)) {
 		if (is_in_eyedropper_mode())
 			exit_eyedropper_mode();
 	}
-	else if (scancode == SDL_SCANCODE_KP_5) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_5)) {
 		using_ortho = false;
 	}
-	else if (scancode == SDL_SCANCODE_KP_7 && key.keysym.mod & KMOD_CTRL) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_7) && has_ctrl) {
 		set_camera_target_to_sel();
 		using_ortho = true;
 		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, ORTHO_DIST + 50.0, 0), glm::vec3(0, -1, 0));
 	}
-	else if (scancode == SDL_SCANCODE_KP_7) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_7)) {
 		set_camera_target_to_sel();
 		using_ortho = true;
 		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, -(ORTHO_DIST + 50.0), 0), glm::vec3(0, 1, 0));
 	}
-	else if (scancode == SDL_SCANCODE_KP_3 && key.keysym.mod & KMOD_CTRL) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_3) && has_ctrl) {
 		set_camera_target_to_sel();
 		using_ortho = true;
 		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(ORTHO_DIST, 0, 0), glm::vec3(-1, 0, 0));
 	}
-	else if (scancode == SDL_SCANCODE_KP_3) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_3)) {
 		set_camera_target_to_sel();
 		using_ortho = true;
 		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(-ORTHO_DIST, 0, 0), glm::vec3(1, 0, 0));
 	}
-	else if (scancode == SDL_SCANCODE_KP_1 && key.keysym.mod & KMOD_CTRL) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_1) && has_ctrl) {
 		set_camera_target_to_sel();
 		using_ortho = true;
 		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, 0, ORTHO_DIST), glm::vec3(0, 0, -1));
 	}
-	else if (scancode == SDL_SCANCODE_KP_1) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_1)) {
 		set_camera_target_to_sel();
 		using_ortho = true;
 		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, 0, -ORTHO_DIST), glm::vec3(0, 0, 1));
@@ -1164,51 +1200,31 @@ void ManipulateTransformTool::update()
 void EditorDoc::imgui_draw()
 {
 	gui.draw();
+	check_inputs();
 	manipulate->check_input();
 
-	if (Input::was_mouse_released(0)&&!dragger.get_is_dragging()) {
-
-		if (UiSystem::inst->blocking_mouse_inputs()) {
-			if (UiSystem::inst->is_vp_hovered()) {
-				if (manipulate->get_force_gizmo_on()) {
-					manipulate->set_force_gizmo_on(false);
-				}
-				else {
-					on_mouse_pick();
-				}
-			}
-			else
-				sys_print(Warning, "vp not focused\n");
-		}
-		else
-			sys_print(Warning, "blocked input\n");
-	}
-	if (Input::was_mouse_pressed(2)) {
-		if (manipulate->get_force_gizmo_on()) {
-			manipulate->reset_group_to_pre_transform();
-			manipulate->set_force_gizmo_on(false);
-		}
-	}
-
-	if (is_in_eyedropper_mode()) {
-		//gui->tool_text->hidden = false;
-	//gui->tool_text->text = "EYEDROPPER ACTIVE (esc to exit)";
-	//gui->tool_text->color = { 255,128,128 };
-	//gui->tool_text->use_desired_size = true;
-	//gui->tool_text->pivot = guiAnchor::Center;
-		
+	int text_ofs = 0;
+	auto draw_text = [&](const char* str)  {
 		TextShape shape;
-		shape.text = "EYEDROPPER ACTIVE";
-		shape.color = { 255,128,128 };
+		shape.text = str;
+		shape.color = { 200,200,200 };
 		shape.with_drop_shadow = true;
+		shape.drop_shadow_ofs = 1;
 		// center it
 		Rect2d size = GuiHelpers::calc_text_size(shape.text, nullptr);
-		glm::ivec2 pos = { -size.w / 2,size.h + 5 };
+		glm::ivec2 pos = { -size.w / 2,size.h + text_ofs };
 		glm::ivec2 ofs = GuiHelpers::calc_layout(pos, guiAnchor::Top, UiSystem::inst->get_vp_rect());
 		shape.rect = Rect2d(ofs, {});
 
 		UiSystem::inst->window.draw(shape);
 
+		text_ofs += size.h;
+	};
+	if (is_in_eyedropper_mode()) {
+		draw_text("Eyedropper Active");
+	}
+	if (manipulate->get_is_using_for_custom()) {
+		draw_text("Manipulate Stolen");
 	}
 
 
@@ -2039,21 +2055,19 @@ Entity* EditorDoc::spawn_prefab(PrefabAsset* prefab)
 
 void DragDetector::tick()
 {
-	if (Input::is_mouse_down(0)) {
-		if (!is_dragging) {
+	if (Input::was_mouse_pressed(0)) {
+		if (!is_dragging && UiSystem::inst->is_vp_hovered()) {
 			mouseClickX = Input::get_mouse_pos().x;
 			mouseClickY = Input::get_mouse_pos().y;
 			is_dragging = true;
 		}
 	}
-	else {
-		if (is_dragging) {
-			if(get_is_dragging())
-				on_drag_end.invoke(get_drag_rect());
-			is_dragging = false;
-			mouseClickX = 0;
-			mouseClickY = 0;
-		}
+	if (!Input::is_mouse_down(0) && is_dragging) {
+		if(get_is_dragging())
+			on_drag_end.invoke(get_drag_rect());
+		is_dragging = false;
+		mouseClickX = 0;
+		mouseClickY = 0;
 	}
 }
 

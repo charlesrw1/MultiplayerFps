@@ -434,8 +434,8 @@ void CreateCppClassCommand::execute() {
 
 	if (parent_to.get())
 		ent->parent_to(parent_to.get());
-	else
-		ent->set_ws_transform(transform);
+
+	ent->set_ws_transform(transform);
 
 	handle = ent->get_self_ptr();
 	ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());

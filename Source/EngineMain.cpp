@@ -232,9 +232,6 @@ void Fatalf(const char* format, ...)
 
 void GameEngineLocal::log_to_fullscreen_gui(LogType type, const char* msg)
 {
-	if (!gui_log)
-		return;
-
 	const Color32 err = { 255, 105, 105 };
 	const Color32 warn = { 252, 224, 121 };
 	const Color32 info = COLOR_WHITE;
@@ -243,8 +240,7 @@ void GameEngineLocal::log_to_fullscreen_gui(LogType type, const char* msg)
 	if (type == LogType::Error) out = err;
 	else if (type == LogType::Warning)out = warn;
 	else if (type == LogType::Debug) out = debug;
-
-	gui_log->add_text(out, msg);
+	gui_log.add_text(out, msg);
 }
 
 static void SDLError(const char* msg)
@@ -2032,7 +2028,6 @@ void GameEngineLocal::stop_game()
 	sys_print(Info,"Clearing Map (%s)\n", name.c_str());
 	on_leave_level.invoke();
 	idraw->on_level_end();
-	gui_log = nullptr;
 	level->close_level();
 	level.reset();
 
@@ -2166,6 +2161,7 @@ void GameEngineLocal::loop()
 	auto imgui_update = [&]()
 	{
 		ZoneScopedN("ImGuiUpdate");
+		gui_log.draw(UiSystem::inst->window);
 		UiSystem::inst->draw_imgui_interfaces(editorState.get());
 	};
 

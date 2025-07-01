@@ -11,6 +11,7 @@
 #include "Framework/MulticastDelegate.h"
 #include <unordered_set>
 #include "Level.h"
+#include "UI/OnScreenLogGui.h"
 
 class GUIFullscreen;
 class OnScreenLog;
@@ -136,7 +137,7 @@ public:
 	//std::unique_ptr<Client> cl;
 	//std::unique_ptr<Server> sv;
 
-	OnScreenLog* gui_log{};
+	OnScreenLog gui_log;
 
 	string queued_mapname;
 	bool is_loading_editor_level = false;

@@ -320,8 +320,6 @@
     <ClInclude Include="Source\Input\InputSystem.h" />
     <ClInclude Include="Source\Level.h" />
     <ClInclude Include="Source\LevelSerialization\SerializationAPI.h" />
-    <ClInclude Include="Source\MiscEditors\DataClass.h" />
-    <ClInclude Include="Source\MiscEditors\DataClassEditor.h" />
     <ClInclude Include="Source\Physics\Physics2Local.h" />
     <ClInclude Include="Source\Scripting\ScriptAsset.h" />
     <ClInclude Include="Source\Scripting\ScriptComponent.h" />
@@ -423,8 +421,6 @@
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\EngineMain.cpp" />
-    <ClCompile Include="Source\MiscEditors\DataClass.cpp" />
-    <ClCompile Include="Source\MiscEditors\DataClassEditor.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\Physics\Physics2Local.cpp" />
     <ClCompile Include="Source\Render\Editor\MaterialEditorLocal.cpp" />

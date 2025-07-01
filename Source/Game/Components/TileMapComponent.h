@@ -2,7 +2,7 @@
 #include "Game/EntityComponent.h"
 #include "Render/Texture.h"
 #include "Game/SerializePtrHelpers.h"
-#include "MiscEditors/DataClass.h"
+
 #include <memory>
 #include "Framework/Rect2d.h"
 #include "Game/EntityPtr.h"

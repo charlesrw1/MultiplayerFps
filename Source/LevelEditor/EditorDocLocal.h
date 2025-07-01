@@ -496,7 +496,7 @@ public:
 	void init_new();
 	void set_document_path(string newAssetName);
 	uptr<CreateEditorAsync> create_command_to_load_back() { return nullptr; }
-
+	void check_inputs();
 	bool save_document_internal() final;
 	void hook_menu_bar() final;
 	void hook_imgui_newframe() final {
@@ -523,8 +523,7 @@ public:
 	};
 	void do_mouse_selection(MouseSelectionAction action, const Entity* e, bool select_root_most_entity);
 
-	void on_mouse_down(int x, int y, int button);
-	void on_key_down(const SDL_KeyboardEvent& k);
+
 	void on_mouse_wheel(const SDL_MouseWheelEvent& wheel) {
 		if (using_ortho && ortho_camera.can_take_input())
 			ortho_camera.scroll_callback(wheel.y);

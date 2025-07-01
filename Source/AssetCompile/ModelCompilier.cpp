@@ -894,26 +894,21 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		}
 	}
 	mdd.override_fps = is->animations_set_fps;
-	if (is->bone_rename_dataclass.get()) {
-		auto ptr = is->bone_rename_dataclass.ptr->get_obj()->cast_to<BoneRenameContainer>();
-		if (ptr) {
-			for (int i = 0; i < ptr->remap.size() - 1; i += 2) {
-				const auto& str1 = ptr->remap.at(i);
-				const auto& str2 = ptr->remap.at(size_t(i+1));
-				mdd.bone_rename.insert({ str1,str2 });
-			}
-		}
+
+	auto& boneRemap = is->bone_rename;
+	for (int i = 0; i < (int)boneRemap.remap.size() - 1; i += 2) {
+		const auto& str1 = boneRemap.remap.at(i);
+		const auto& str2 = boneRemap.remap.at(size_t(i+1));
+		mdd.bone_rename.insert({ str1,str2 });
 	}
-	if (is->bone_reparent.get()) {
-		auto ptr = is->bone_reparent.ptr->get_obj()->cast_to<BoneReparentContainer>();
-		if (ptr) {
-			for (int i = 0; i < ptr->remap.size() - 1; i += 2) {
-				const auto& str1 = ptr->remap.at(i);
-				const auto& str2 = ptr->remap.at(size_t(i + 1));
-				mdd.bone_reparent.insert({ str1,str2 });
-			}
-		}
+
+	auto& reparent = is->bone_reparent;
+	for (int i = 0; i < (int)reparent.remap.size() - 1; i += 2) {
+		const auto& str1 = reparent.remap.at(i);
+		const auto& str2 = reparent.remap.at(size_t(i + 1));
+		mdd.bone_reparent.insert({ str1,str2 });
 	}
+
 
 	for (int i = 0; i < is->animations.size(); i++) {
 		auto str = is->animations[i].clipName;
@@ -960,25 +955,56 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 
 	return mdd;
 }
-
-ModelDefData new_import_settings_to_modeldef_data(IFile* file, IAssetLoadingInterface* loading)
+#include "Framework/SerializerJson.h"
+#include "Framework/StringUtils.h"
+ModelDefData new_import_settings_to_modeldef_data(const string& mis_path, IFile* file, IAssetLoadingInterface* loading)
 {
-	DictParser dp;
-	dp.load_from_file(file);
-	StringView tok;
-	dp.read_string(tok);
+	ModelImportSettings* impSettings = nullptr;
 
-	auto is = read_object_properties<ModelImportSettings>(nullptr, dp, tok,loading);
+	std::string to_str(file->size(),' ');
+	file->read(to_str.data(), file->size());
+	if (to_str.find("!json\n") == 0) {
+		to_str = to_str.substr(6);
+		MakeObjectFromPathGeneric objmaker;
+		ReadSerializerBackendJson reader("read_modeldef", to_str, objmaker, *loading);
+		if(reader.get_root_obj()) {
+			impSettings = reader.get_root_obj()->cast_to<ModelImportSettings>();
+		}
+		if (!impSettings) {
+			throw std::runtime_error("couldn't open dict");
+		}
+	}
+	else {
+		sys_print(Debug, "new_import_settings_to_modeldef_data: loading old version %s\n", mis_path.c_str());
 
-	if (!is)
-		throw std::runtime_error("couldnt parse new class import sttings");
+		DictParser dp;
+		dp.load_from_memory(to_str.data(),to_str.size(),"read_imp");
+		StringView tok;
+		dp.read_string(tok);
+		impSettings = read_object_properties<ModelImportSettings>(nullptr, dp, tok,loading);
+		if (!impSettings)
+			throw std::runtime_error("couldnt parse new class import sttings");
 
-	ModelDefData mdd = new_import_settings_to_modeldef_data(is);
+		MakePathForGenericObj pathmaker;
+		WriteSerializerBackendJson writer("write_mis", pathmaker, *impSettings);
+		writer.get_output();
+		file->close();
 
-	delete is;
+		auto fileptr = FileSys::open_write_game(mis_path);
+		if (fileptr) {
+			sys_print(Info, "new_import_settings_to_modeldef_data: writing new MIS JSON version %s\n", mis_path.c_str());
+
+			string out = "!json\n"+writer.get_output().dump(1);
+			fileptr->write(out.data(), out.size());
+		}
+		else {
+			sys_print(Error, "new_import_settings_to_modeldef_dataL Couldnt open file to write out new version of mis %s\n", mis_path.c_str());
+		}
+	}
+	ModelDefData mdd = new_import_settings_to_modeldef_data(impSettings);
+	delete impSettings;
 	return mdd;
 }
-
 ModelDefData ModelCompileHelper::parse_definition_file(const std::string& game_path, IAssetLoadingInterface* loading) {
 	{
 		std::string pathNew = strip_extension(game_path);
@@ -987,7 +1013,9 @@ ModelDefData ModelCompileHelper::parse_definition_file(const std::string& game_p
 		if (!filenew)
 			throw std::runtime_error("couldn't open dict");
 		//
-		return new_import_settings_to_modeldef_data(filenew.get(),loading);
+
+
+		return new_import_settings_to_modeldef_data(pathNew, filenew.get(),loading);
 	}
 
 }

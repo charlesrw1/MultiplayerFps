@@ -18,17 +18,13 @@
 #include "Render/Editor/MaterialEditorLocal.h"
 #include "Animation/Runtime/Statemachine_cfg.h"
 #include "imgui_internal.h"
-#include "MiscEditors/DataClass.h"
 bool SharedAssetPropertyEditor::internal_update() {
 	assert(prop->class_type && prop->type == core_type_id::AssetPtr || prop->type == core_type_id::SoftAssetPtr);
 	if (!has_init) {
 		has_init = true;
 		asset_str = get_str();
 
-		if(prop->class_type->is_a(DataClass::StaticType))
-			metadata = AssetRegistrySystem::get().find_for_classtype(&DataClass::StaticType);
-		else
-			metadata = AssetRegistrySystem::get().find_for_classtype(prop->class_type);
+		metadata = AssetRegistrySystem::get().find_for_classtype(prop->class_type);
 	}
 	if (!metadata) {
 		ImGui::Text("Asset has no metadata: %s\n", prop->class_type->classname);

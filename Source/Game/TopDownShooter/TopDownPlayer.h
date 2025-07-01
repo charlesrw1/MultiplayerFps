@@ -55,22 +55,7 @@ public:
 	float time = 0.0;
 };
 
-class TopDownWeaponData : public ClassBase
-{
-public:
-	CLASS_BODY(TopDownWeaponData);
-	REF std::string name;
-	REF AssetPtr<Model> model;
-	REF int damage = 0; // damage per shot
-	REF float fire_rate = 1.f;	// per second
-	REF int type = 0;	// 0 = rifle, 1 = shotgun
-	REF int pellets = 0;	// for shotgun
-	REF float accuracy = 1.f;
-	REF float bullet_speed = 20.f;
-	REF AssetPtr<PrefabAsset> special_projectile;	// what projectile to spawn
-	REF std::vector<float> values;
-};
-#include "MiscEditors/DataClass.h"
+
 
 class TopDownWeaponDataNew : public Component
 {
