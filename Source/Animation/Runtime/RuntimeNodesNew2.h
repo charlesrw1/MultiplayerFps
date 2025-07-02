@@ -56,7 +56,7 @@ public:
 	vector<Sampled> events;
 };
 
-
+//
 class agClipNode;
 class agGetPoseCtx {
 public:

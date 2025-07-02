@@ -26,8 +26,6 @@
 #include "Assets/AssetRegistry.h"
 
 #include "UI/Widgets/Layouts.h"
-#include "UI/Widgets/Interactables.h"
-#include "UI/Widgets/Visuals.h"
 #include "UI/GUISystemPublic.h"
 
 #include "Game/LevelAssets.h"

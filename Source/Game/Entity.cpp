@@ -525,6 +525,7 @@ glm::mat4 Entity::get_parent_transform() const
 
 	}
 }
+bool Entity::has_parent_bone() const { return !parent_bone.name.is_null(); }
 // lazily evalutated
 const glm::mat4& Entity::get_ws_transform() {
 	if (world_transform_is_dirty) {

@@ -1,6 +1,5 @@
 #pragma once
 #include "GUISystemPublic.h"
-#include "Widgets/Visuals.h"
 
 #include <deque>
 #include <string>

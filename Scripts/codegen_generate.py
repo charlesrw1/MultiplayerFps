@@ -1,7 +1,14 @@
 from codegen_lib import *
 
+from datetime import datetime
+
+
 def write_headers(path:str, additional_includes:list[str]):
-    out = f"// **** GENERATED SOURCE FILE version:{VERSION} ****\n"
+
+    now = datetime.now()
+    timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    out = f"// **** GENERATED SOURCE FILE version:{VERSION} {timestamp_str} ****\n"
     out += f"#include \"{path}\"\n"
     out += "#include \"Framework/ReflectionProp.h\"\n"
     out += "#include \"Framework/ReflectionMacros.h\"\n"
@@ -313,7 +320,80 @@ def write_class_old(newclass : ClassDef)->str:
 
     return output
 
+def get_lua_type_string(new_type:CppType) -> str:
+    output = ""
+    type_of_template :str= ""
+    if len(new_type.template_args)>0:
+        type_of_template = new_type.template_args[0].get_raw_type_string()
+    if new_type.type == BOOL_TYPE:
+        output += "boolean"
+    elif new_type.type == INT_TYPE:
+        output += "integer"
+    elif new_type.type==FLOAT_TYPE:
+        output += "number"
+    elif new_type.type == ENUM_TYPE:
+        enumtype = new_type.typename
+        assert(enumtype!=None)
+        output += f"integer"
+    elif new_type.type == STRUCT_TYPE:
+        assert(new_type.typename!=None)
+        output += f"{new_type.typename.classname}"
+    elif new_type.type == ASSET_PTR_TYPE or new_type.type == HANDLE_PTR_TYPE:
+        output += f"{type_of_template}|nil"
+    elif new_type.type == STRING_TYPE or new_type.type == STRINGNAME_TYPE:
+        output += f"string"
+    elif new_type.type == OTHER_CLASS_TYPE:
+        assert(new_type.typename!=None)
+        output += f"{new_type.typename.classname}|nil"
+    elif new_type.type == VEC3_TYPE:
+        output += "Vec3"
+    elif new_type.type == QUAT_TYPE:
+        output += "Quat"
+    else:
+        output += "any"
+    return output
 
+def write_lua_class(newclass:ClassDef) -> str:
+    output = ""
+
+    if newclass.object_type == ClassDef.TYPE_ENUM:
+        index = 0
+        for p in newclass.properties:
+            output += (newclass.classname + "_" + p.name).upper()
+            output += " = " + str(index) + "\n"
+            index += 1
+    elif newclass.object_type == ClassDef.TYPE_CLASS or newclass.object_type == ClassDef.TYPE_STRUCT:
+        output += "---@class " + newclass.classname
+        if newclass.object_type==ClassDef.TYPE_CLASS and newclass.super_type_def != None:
+            output += " : " + newclass.super_type_def.classname
+        output += "\n"
+        for p in newclass.properties:
+            if p.new_type.type != FUNCTION_TYPE:
+                output += f"---@field {p.name} "
+                output += get_lua_type_string(p.new_type)           
+                output += "\n"
+        output +=  newclass.classname + " = {\n}\n"
+
+        for p in newclass.properties:
+            if p.new_type.type == FUNCTION_TYPE:
+                if p.return_type.type != NONE_TYPE:
+                    output += "---@return " + get_lua_type_string(p.return_type) + "\n"
+                for argType,argName in p.func_args:
+                    output += "---@param " + argName + " " + get_lua_type_string(argType) + "\n"
+                output += f"function {newclass.classname}"
+                if p.is_static:
+                    output += "."
+                else:
+                    output += ":"
+                output += f"{p.name}("
+                for _, argName in p.func_args:
+                    output += argName + ","
+                if len(p.func_args) > 0:
+                    output = output[:-1]
+                output += ") end\n"
+
+    return output
+            
 
 def write_output_file(GENERATED_DIR:str,filename:str,root:str,classes:list[ClassDef],additional_includes:list[str], typenames:dict[str,ClassDef]):
     generated_path = root + "/" + os.path.splitext(filename)[0]
@@ -328,3 +408,14 @@ def write_output_file(GENERATED_DIR:str,filename:str,root:str,classes:list[Class
             file.write(write_headers(root+"/"+filename, additional_includes))
             for c in classes:
                 file.write(write_class_old(c))
+    generated_path = generated_path[:-4] + ".lua"
+    with open(generated_path,"w") as luaFile:
+        print(f"Writing lua stubs {generated_path}")
+
+        time_now = datetime.now()
+        timestamp_str = time_now.strftime("%Y-%m-%d %H:%M:%S")
+        luaFile.write(f"--- GENERATED LUA FILE FROM C++ CLASSES v{VERSION} {timestamp_str}\n")
+
+        if len(classes)>0:
+            for c in classes:
+                luaFile.write(write_lua_class(c))

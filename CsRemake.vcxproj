@@ -122,9 +122,7 @@
     <ClCompile Include="Source\UI\UIBuilder.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />
     <ClCompile Include="Source\UI\Widgets\EditorCube.cpp" />
-    <ClCompile Include="Source\UI\Widgets\Layouts.cpp" />
     <ClCompile Include="Source\UI\Widgets\SharedFuncs.cpp" />
-    <ClCompile Include="Source\UI\Widgets\Visuals.cpp" />
     <ClInclude Include="Source\Animation\AnimationTypes.h" />
     <ClInclude Include="Source\Animation\AnimationUtil.h" />
     <ClInclude Include="Source\Animation\Editor\Optional.h" />
@@ -342,10 +340,7 @@
     <ClInclude Include="Source\UI\UIBuilder.h" />
     <ClInclude Include="Source\UI\UILoader.h" />
     <ClInclude Include="Source\UI\Widgets\EditorCube.h" />
-    <ClInclude Include="Source\UI\Widgets\Interactables.h" />
     <ClInclude Include="Source\UI\Widgets\Layouts.h" />
-    <ClInclude Include="Source\UI\Widgets\SharedFuncs.h" />
-    <ClInclude Include="Source\UI\Widgets\Visuals.h" />
   </ItemGroup>
   <ItemGroup>
     <_WildCardClCompile Include="Source\.generated\**\*.cpp" />

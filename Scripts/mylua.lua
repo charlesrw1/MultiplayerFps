@@ -1,6 +1,5 @@
 
 
-
 Prefab = {}
 
 ---@class Signal
@@ -12,7 +11,7 @@ function Signal:add(func)
     self.funcs[#self.funcs+1]=func
 end
 function Signal:call(...)
-    
+
 end
 
 ---@return Signal
@@ -149,6 +148,135 @@ function SomeEvent:triggered(obj)
     end
 end
 
+---@class agGraphCtx
+agGraphCtx = {
+
+}
+function agGraphCtx:get_float_variable(name)
+end
+---@class agClipNode
+agClipNode = {
+    looping = false,
+    syncGrouName = "",
+    syncGroupType = 0,
+}
+function agClipNode:set_speed_float()
+end
+function agClipNode:set_speed_var()
+end
+---@class agBlendNode
+agBlendNode = {
+    meshspace_blend = false
+}
+---@param value number
+function agBlendNode:set_alpha_float(value)
+end
+---@param name string
+function agBlendNode:set_alpha_var(name)
+end
+function agBlendNode:init_bone_weights(model,weight)
+end
+function agBlendNode:set_all_children_weights(model,name,weight)
+end
+function agBlendNode:set_one_bone_weight(model,name,weight)
+end
+
+---@class agStatemachineNode
+agStatemachineNode = {
+}
+---@param ctx agGraphCtx
+---@param wantsReset boolean
+function agStatemachineNode:update(ctx,wantsReset) --- override this
+end
+function agStatemachineNode:set_pose(pose) end
+function agStatemachineNode:is_transitioning() end
+function agStatemachineNode:get_transition_time_left() end
+function agStatemachineNode:set_transition_parameters(easing,blend_time) end
+
+---@class agMonsterLocoSm : agStatemachineNode
+agMonsterLocoSm = {
+    inputs = {},
+    state = 0
+}
+function agMonsterLocoSm:update(ctx,wantsReset)
+    if wantsReset then
+        self.state = 0
+    end
+    if self.state == 0 then
+        self:set_pose(self.inputs[0])
+    elseif self.state == 1 then
+        self:set_pose(self.inputs[1])
+    elseif self.state==2 then
+        self:set_pose(self.inputs[2])
+
+        if self:is_transitioning() and self:get_transition_time_left() < 0.2 then
+            self.state = 1
+        end
+    end
+end
+
+
+
+---@class agBuilder
+agBuilder = {
+}
+---@return agClipNode
+function agBuilder:create_clip(model, clipname)
+    --- returns an agClipNode
+end
+---@return agBlendNode
+function agBuilder:create_blend(input0, input1)
+    --- takes in 2 nodes and creates blend
+end
+---@return agStatemachineNode
+function agBuilder:create_statemachine(classname)
+end
+---@param root agStatemachineNode
+function agBuilder:set_root(root)
+end
+
+GameAgFactory = {
+}
+
+SYNC_OPT_DEFAULT = 0
+SYNC_OPT_LEADER = 1
+SYNC_OPT_FOLLOWER = 2
+
+---@param builder agBuilder
+function GameAgFactory:create(builder, name)
+    local clip = builder:create_clip({},"run_base")
+    clip.looping = true
+    clip.syncGrouName = "loco"
+
+    local otherClip = builder:create_clip({},"run_lean")
+
+    local blend = builder:create_blend(clip,otherClip)
+    blend:set_alpha_var("flBlending")
+    blend:init_bone_weights({}, 0.0)
+    blend:set_all_children_weights({},"mixamorig:Spine2",1)
+    
+    local idleClip = builder:create_clip({},"idle")
+    idleClip.looping = false
+    idleClip.syncGrouName = "loco"
+    idleClip.syncGroupType = SYNC_OPT_FOLLOWER
+
+    ---@type agMonsterLocoSm
+    local monSm = builder:create_statemachine(agMonsterLocoSm)
+    monSm.inputs[0] = blend
+    monSm.inputs[1] = idleClip
+    monSm.state = 0
+
+    builder:set_root(monSm)
+end
+
+
+Application = {
+}
+function Application:start()
+    
+end
+
+
 Ptr = {
     type = {}
 }
@@ -158,7 +286,7 @@ end
 
 ---@class SomeScript : Component
 SomeScript = {
-    ---@type Component
+    ---@type Component 
     target = nil
 }
 function SomeScript:start()
@@ -437,9 +565,47 @@ end
 local function find_by_class(classname)
     
 end
+
 local function find_by_tag(tag)
-    
+    ---@type Entity
+    local e = {}
+    local pos = e:get_ws_position()
+
+    local p = GameplayStatic.spawn_entity()
+
+    local prefab = PrefabAsset.load("myname.pfb")
+    local prefabEnt = GameplayStatic.spawn_prefab(prefab)
+    if prefabEnt ~= nil then
+        prefabEnt:parent_to(p)
+        local hit = GameplayStatic.cast_ray()
+        if hit.what ~= nil then
+            hit.what:destroy_deferred()
+        end
+    end
+
+
+    ---@type PhysicsBody|nil
+    local body = prefabEnt:get_component_typeinfo(PhysicsBody)
+    if body ~= nil then
+        mesh:set_model(nil)
+    end
+
+
+    GameplayStatic.change_level()
+
+    local parent = e:get_parent()
+    local v = e:get_ws_position()
+    v = v:dot(Vec3:new(1,0,0))
+    parent:set_ws_position(v)
+    local p = e:get_ws_position()
+
+    local p = e:get_parent()
+    e:parent_to(parent)
+
+
+
 end
+
 
 HitboxTag = "HitboxTag"
 
@@ -589,8 +755,11 @@ local o = Create("OtherScript")
 o.value = 0
 return o
 
+require("../Source/.generation")
 
+AnimationSeqAsset
 Level0 = {
+    variabled=0,
 
 }
 

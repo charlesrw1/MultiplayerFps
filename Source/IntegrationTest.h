@@ -32,7 +32,7 @@ public:
 	void wait_delegate(MulticastDelegate<>& delegate);
 	template<typename T>
 	T wait_delegate(MulticastDelegate<T>& delegate);
-	void checkTrue(bool b, const char* msg);
+	void checkTrue(bool b, const char* msg="");
 	~IntegrationTester();
 	Random& get_rand() { return rand; }
 private:

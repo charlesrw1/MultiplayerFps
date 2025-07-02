@@ -108,7 +108,7 @@ public:
 	void set_cached_mesh_component(MeshComponent* c) { cached_mesh_component = c; }
 	glm::mat4 get_parent_transform() const;
 	void set_parent_bone(StringName name) { parent_bone.name = name; }
-	REF bool has_parent_bone() const { return !parent_bone.name.is_null(); }
+	REF bool has_parent_bone() const;
 	REF StringName get_parent_bone() const { return parent_bone.name; }
 	//REF bool get_start_disabled() const { return start_disabled; }
 	// this function only has an effect is called before inserting the entity into the level
