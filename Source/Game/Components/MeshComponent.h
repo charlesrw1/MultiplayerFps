@@ -8,7 +8,6 @@
 
 GENERATED_CLASS_INCLUDE("Render/Model.h");
 GENERATED_CLASS_INCLUDE("Render/MaterialPublic.h");
-GENERATED_CLASS_INCLUDE("Animation/AnimationTreePublic.h");
 
 class PhysicsFilterPresetBase;
 class Model;
@@ -20,6 +19,7 @@ class MaterialInstance;
 class RigidbodyComponent;
 class MeshBuilderComponent;
 class AnimatorObject;
+struct AnimGraphConstructed;
 class MeshComponent : public Component
 {
 public:
@@ -36,18 +36,15 @@ public:
 	void on_sync_render_data() final;
 	void set_model_str(const char* model_path);
 	REF void set_model(Model* model);
-	const Model* get_model() const;
-	void set_animator_class(const ClassTypeInfo* ti);
-	REF void set_animation_graph(Animation_Tree_CFG* tree);
-	const Animation_Tree_CFG* get_animation_tree() const;
-	AnimatorInstance* get_animator_instance() const;
+	REF const Model* get_model() const;
 	AnimatorObject* get_animator() const { return animator.get(); }
+	AnimatorObject* create_animator(AnimGraphConstructed& data);
+
 	bool get_is_visible() const { return is_visible; }
 	bool get_casts_shadows() const { return cast_shadows; }
 	bool get_is_skybox() const { return is_skybox; }
-	REFLECT(name = "set_material");
-	void set_material_override(const MaterialInstance* mi);
-	const MaterialInstance* get_material_override() const;
+	REF void set_material_override(const MaterialInstance* mi);
+	REF const MaterialInstance* get_material_override() const;
 	glm::mat4 get_ls_transform_of_bone(StringName bone) const;
 	int get_index_of_bone(StringName bone) const;
 	REF void set_is_visible(bool b) {
@@ -67,7 +64,6 @@ public:
 #endif
 private:
 	REF AssetPtr<Model> model;
-	REF AssetPtr<Animation_Tree_CFG> animator_tree;
 	REF bool is_visible = true;
 	REF bool cast_shadows = true;
 	REF bool is_skybox = false;

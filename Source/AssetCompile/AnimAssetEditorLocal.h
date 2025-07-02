@@ -15,7 +15,7 @@
 #include "Framework/MulticastDelegate.h"
 class Model;
 
-class Animation_Tree_CFG;
+
 
 
 class EventSequenceItem : public SequencerEditorItem
@@ -83,7 +83,6 @@ public:
 	Entity* entity = nullptr;
 	MeshComponent* mc = nullptr;
 	Model* outputModel{};
-	std::unique_ptr<Animation_Tree_CFG> fake_tree;
 
 	PropertyGrid propGrid;
 	ModelImportSettings* importSettings = nullptr;

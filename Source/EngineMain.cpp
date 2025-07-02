@@ -1208,6 +1208,9 @@ void test_state(IntegrationTester& tester)
 	Entity* root = doc.get_prefab_root_entity();
 	tester.checkTrue(root, "");
 	EditorIntTesterUtil::run_command(tester, doc, new CreateStaticMeshCommand(doc, "SWAT_model.cmdl", {}));
+
+	EditorIntTesterUtil::open_map_state(tester, "top_down/map0.tmap");
+
 	tester.wait_time(200.0);
 }
 
@@ -1246,6 +1249,17 @@ void test_loading_invalid_prefab(IntegrationTester& tester)
 		cmd->handle->set_editor_name("OBJECT");
 		doc.set_document_path(mapPath);
 		tester.checkTrue(doc.save(), "");
+
+		// test duplicating and instantiating
+		auto dupCmd = new DuplicateEntitiesCommand(doc, { cmd->handle });
+		EditorIntTesterUtil::run_command(tester, doc, dupCmd);
+		auto isntCmd = new InstantiatePrefabCommand(doc, dupCmd->handles.at(0).get());
+		EditorIntTesterUtil::run_command(tester, doc, isntCmd);
+		tester.checkTrue(doc.save(), "");	// try saving it, tests instantiating prefab works
+		EditorIntTesterUtil::undo_cmd(doc);
+		tester.checkTrue(doc.save(), "");
+		EditorIntTesterUtil::undo_cmd(doc);
+		tester.checkTrue(doc.save(), "");
 	}
 	{
 		// close editor
@@ -1277,6 +1291,10 @@ void test_loading_invalid_prefab(IntegrationTester& tester)
 		auto dupObj = dupCmd->handles.at(0).get();
 		tester.checkTrue(dupObj->get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab, "");
 		tester.checkTrue(dupObj->get_object_prefab().get_name()==prefabPath, "");
+		auto instCmd = new InstantiatePrefabCommand(doc, dupObj);
+		EditorIntTesterUtil::run_command(tester, doc, instCmd, false);	// want failure
+
+
 		doc.save();
 	}
 	{
@@ -1390,11 +1408,7 @@ void test_integration_2(IntegrationTester& tester)
 	open_editor_state(SceneAsset::StaticType, std::nullopt,false);
 	//tester.checkTrue(eng_local.editorState->has_tool(), "");
 	//tester.wait_ticks(get_rand_ticks());
-	open_editor_state(Animation_Tree_CFG::StaticType, std::nullopt,false,true);
-	//tester.wait_delegate(tempMD);
-	//tester.checkTrue(eng_local.editorState->has_tool(), "expected tool open");
-	//tester.wait_ticks(60);
-	open_editor_state(Animation_Tree_CFG::StaticType, std::nullopt,false,true);
+
 	tester.wait_time(2.0);
 	return;
 
@@ -1456,7 +1470,9 @@ int game_engine_main(int argc, char** argv)
 	tests.push_back({ test_remove_and_undo_pfb, "test_remove_and_undo_pfb" });
 	tests.push_back({ test_editor_entity_ptr, "test_editor_entity_ptr" });
 
-	eng_local.set_tester(new IntegrationTester(true, tests), false);
+	//Cmd_Manager::inst->append_cmd(uptr<OpenMapCommand>(new OpenMapCommand("top_down/map0.tmap", true)));
+
+//	eng_local.set_tester(new IntegrationTester(true, tests), true);
 
 	eng_local.loop();
 	eng_local.cleanup();

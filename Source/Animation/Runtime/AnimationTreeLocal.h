@@ -2,10 +2,8 @@
 
 #include "Render/Model.h"
 #include "glm/glm.hpp"
-
 #include "Animation.h"
 #include "Animation/AnimationTreePublic.h"
-
 #include "Framework/MemArena.h"
 #include "Framework/InlineVec.h"
 #include "Framework/EnumDefReflection.h"
@@ -14,18 +12,12 @@
 #include "Framework/PoolAllocator.h"
 #include "Framework/ClassBase.h"
 #include "Animation/SkeletonData.h"
-
 #include "Game/SerializePtrHelpers.h"	// for AssetPtr
-
-
 #include "Animation/AnimationSeqAsset.h"
-
 #include <type_traits>
 #include <cassert>
 
 class Node_CFG;
-class Animation_Tree_CFG;
-
 struct MatrixPose
 {
 	glm::mat4 mats[256];
@@ -34,16 +26,6 @@ struct MatrixPose
 extern Pool_Allocator<Pose> g_pose_pool;
 extern Pool_Allocator<MatrixPose> g_matrix_pool;
 
-// only accepted graph values
-NEWENUM(anim_graph_value,uint8_t)
-{
-	bool_t,
-	float_t,
-	int_t,
-	vec3_t,
-	quat_t,
-};
-
 NEWENUM(rootmotion_setting, uint8_t)
 {
 	keep,
@@ -51,24 +33,6 @@ NEWENUM(rootmotion_setting, uint8_t)
 	add_velocity
 };
 
-
-inline anim_graph_value core_type_id_to_anim_graph_value(bool* good, core_type_id type)
-{
-	*good = true;
-	switch (type)
-	{
-	case core_type_id::Bool: return anim_graph_value::bool_t;
-	case core_type_id::Int8: return anim_graph_value::int_t;
-	case core_type_id::Int16: return anim_graph_value::int_t;
-	case core_type_id::Int32: return anim_graph_value::int_t;
-	case core_type_id::Float: return anim_graph_value::float_t;
-	case core_type_id::Vec3: return anim_graph_value::vec3_t;
-	case core_type_id::Quat: return anim_graph_value::quat_t;
-	default:
-		*good = false;
-		return {};
-	}
-}
 
 class BaseAGNode;
 class Animation_Tree_CFG;

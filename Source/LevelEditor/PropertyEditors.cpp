@@ -12,9 +12,7 @@
 #include "Game/Components/PhysicsComponents.h"
 #include "Game/Components/LightComponents.h"
 
-#include "Animation/Editor/AnimationGraphEditor.h"
 
-#include "Animation/Editor/Blendspace_nodes.h"
 #include "Render/Editor/MaterialEditorLocal.h"
 #include "Animation/Runtime/Statemachine_cfg.h"
 #include "imgui_internal.h"
@@ -633,53 +631,11 @@ void PropertyFactoryUtil::register_mat_editor(MaterialEditorLocal& doc, FnFactor
 	factory.add("MaterialEditParam", [&doc]() {return new MaterialParamPropEditor(doc); });
 }
 #include "Framework/PropertyPtr.h"
-#include "Animation/Editor/ClipNode.h"
-#include "Animation/Editor/AnimationGraphEditor2.h"
-class StatemachineAliasEditor : public IPropertyEditor
-{
-public:
-	StatemachineAliasEditor(AnimationGraphEditorNew& ed) :ed(ed) {
 
-	}
-	bool internal_update() final {
-		PropertyPtr ptr(prop, instance);
-		StateAliasStruct* st = ptr.as_struct().get_struct<StateAliasStruct>();
-
-		if (ImGui::Checkbox("##defaulttrue", &st->default_true)) {
-			for (auto& h : st->handles)
-				h.flag = st->default_true;
-		}
-		ImGui::SameLine();
-		ImGui::Text("DefaultTrue");
-
-		ImGui::Separator();
-
-		assert(st);
-		for (int i = 0; i < st->handles.size(); i++) {
-			auto& s = st->handles[i];
-
-			auto node = ed.get_graph().get_node(s.handle);
-			if (!node||!node->is_a<State_EdNode>())
-				continue;
-			
-			ImGui::PushID(node);
-			(ImGui::Checkbox("##box", &s.flag));
-			ImGui::PopID();
-
-			ImGui::SameLine();
-			auto asstate = node->cast_to<State_EdNode>();
-			assert(asstate);
-			ImGui::Text("%s", asstate->get_layer_title().c_str());
-		}
-		return false;
-	}
-
-	AnimationGraphEditorNew& ed;
-};
 
 void PropertyFactoryUtil::register_anim_editor2(AnimationGraphEditorNew& ed, FnFactory<IPropertyEditor>& factory)
 {
-	factory.add("StateAliasStruct", [&ed]() {return new StatemachineAliasEditor(ed); });
+	//factory.add("StateAliasStruct", [&ed]() {return new StatemachineAliasEditor(ed); });
 }
 
 // Inherited via IPropertyEditor
@@ -729,7 +685,7 @@ bool MaterialParamPropEditor::internal_update()
 
 
 #include "LevelEditor/TagManager.h"
-
+#include "Framework/StringUtils.h"
 
 EntityTagEditor::~EntityTagEditor() {
 	StringName* myName = (StringName*)prop->get_ptr(instance);

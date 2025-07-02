@@ -2,7 +2,9 @@
 #include "Framework/AddClassToFactory.h"
 #include "Assets/AssetRegistry.h"
 
-#include "Animation/Editor/AnimationGraphEditor2.h"
+#include "Framework/PoolAllocator.h"
+#include "Animation.h"
+
 #include "Game/Components/MeshComponent.h"
 #include "GameEnginePublic.h"
 #include "Assets/AssetDatabase.h"
@@ -12,6 +14,7 @@
 #include "Render/ModelManager.h"
 #include "Game/Components/LightComponents.h"
 #include "Render/MaterialPublic.h"
+#include "AnimationTreeLocal.h"
 
 void post_load_map_callback_generic(bool make_plane)
 {
@@ -39,79 +42,6 @@ void post_load_map_callback_generic(bool make_plane)
 
 }
 #include "EngineSystemCommands.h"
-
-class CreateAnimEditorAsync : public CreateEditorAsync {
-public:
-	CreateAnimEditorAsync(opt<string> asset) : asset(asset) {}
-
-	// Inherited via CreateEditorAsync
-	virtual void execute(Callback callback) override {
-		auto cmd = std::make_unique<OpenMapCommand>(std::nullopt, false);
-		opt<string> myAsset = this->asset;
-		cmd->callback = [callback,myAsset](OpenMapReturnCode code) {
-			if (code == OpenMapReturnCode::Success) {
-				assert(eng->get_level());
-				post_load_map_callback_generic(true);	// spawns default things
-				try {
-					uptr<AnimationGraphEditorNew> ed(new AnimationGraphEditorNew(myAsset));
-					callback(std::move(ed));
-				}
-				catch (...) {
-					callback(nullptr);
-				}
-			}
-			else {
-				callback(nullptr);
-			}
-		};
-		Cmd_Manager::inst->append_cmd(std::move(cmd));
-	}
-
-	virtual string get_tab_name() override
-	{
-		return string();
-	}
-
-	virtual opt<string> get_asset_name() override
-	{
-		return opt<string>();
-	}
-	opt<string> asset;
-};
-
-//extern IEditorTool* g_anim_ed_graph;
-#ifdef EDITOR_BUILD
-class AnimGraphAssetMeta : public AssetMetadata
-{
-public:
-	AnimGraphAssetMeta() {
-		extensions.push_back("ag");
-	}
-
-	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color()  const override
-	{
-		return { 152, 237, 149 };
-	}
-
-	virtual std::string get_type_name() const  override
-	{
-		return "AnimGraph";
-	}
-
-	virtual bool assets_are_filepaths() const { return true; }
-
-	uptr<CreateEditorAsync> create_create_tool_to_edit(opt<string> assetPath) const {
-		return std::make_unique<CreateAnimEditorAsync>(assetPath);
-	}
-
-
-	//virtual IEditorTool* tool_to_edit_me() const { return g_anim_ed_graph; }
-	virtual const ClassTypeInfo* get_asset_class_type() const { return &Animation_Tree_CFG::StaticType; }
-};
-REGISTER_ASSETMETADATA_MACRO(AnimGraphAssetMeta);
-#endif
-
 
 Pool_Allocator<Pose> g_pose_pool = Pool_Allocator<Pose>(100, "g_pose_pool");
 Pool_Allocator<MatrixPose> g_matrix_pool = Pool_Allocator<MatrixPose>(10,"g_matrix_pool");

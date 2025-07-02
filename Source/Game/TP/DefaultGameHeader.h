@@ -11,7 +11,3 @@
 #include "Game/EntityPtr.h"
 #include "Physics/Physics2.h"
 #include "Game/LevelAssets.h"
-template<typename T>
-inline T* class_cast(ClassBase* in) {
-	return in ? in->cast_to<T>() : nullptr;
-}

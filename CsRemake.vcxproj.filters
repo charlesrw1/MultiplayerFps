@@ -132,30 +132,6 @@
     <ClInclude Include="Source\Animation\AnimationUtil.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Animation\Editor\AnimationGraphEditor.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\Editor\AnimationGraphEditorPublic.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\Editor\Base_node.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\Editor\Basic_nodes.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\Editor\Blendspace_nodes.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\Editor\Root_node.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\Editor\State_node.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\Editor\Statemachine_node.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Animation\Runtime\Animation.h">
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
@@ -515,15 +491,7 @@
     <ClInclude Include="Source\Framework\ArenaStd.h" />
     <ClInclude Include="Source\Framework\Log.h" />
     <ClInclude Include="Source\UI\Widgets\EditorCube.h" />
-    <ClInclude Include="Source\Animation\Editor\AnimationGraphEditor2.h" />
-    <ClInclude Include="Source\Animation\Editor\GraphUtil.h" />
-    <ClInclude Include="Source\Animation\Editor\AnimCommands.h" />
-    <ClInclude Include="Source\Animation\Editor\Optional.h" />
-    <ClInclude Include="Source\Animation\Editor\Range.h" />
-    <ClInclude Include="Source\Animation\Editor\ClipNode.h" />
     <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew.h" />
-    <ClInclude Include="Source\Animation\Editor\Bttest.h" />
-    <ClInclude Include="Source\Animation\Runtime\RuntimeValueNodes.h" />
     <ClInclude Include="Source\Animation\Runtime\RuntimeNodesBase.h" />
     <ClInclude Include="Source\Framework\PropertyUtil.h" />
     <ClInclude Include="Source\MEGA.h" />
@@ -537,6 +505,8 @@
     <ClInclude Include="Source\Render\GpuResourceManager.h" />
     <ClInclude Include="Source\DebugConsole.h" />
     <ClInclude Include="Source\Render\RenderWindow.h" />
+    <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew2.h" />
+    <ClInclude Include="Source\Animation\Editor\Optional.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -626,7 +596,6 @@
     <ClCompile Include="Source\Scripting\LuaBuiltinFuncs.cpp" />
     <ClCompile Include="Source\Framework\Files.cpp" />
     <ClCompile Include="Source\Assets\AssetRegistry.cpp" />
-    <ClCompile Include="Source\Animation\Editor\AnimEdSourceFiles.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Animation.cpp" />
     <ClCompile Include="Source\Game\LevelAssets.cpp" />
     <ClCompile Include="Source\Game\Game.cpp" />
@@ -692,13 +661,11 @@
     <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
     <ClCompile Include="Source\Assets\AssetBrowser.cpp" />
     <ClCompile Include="Source\Assets\IAsset.cpp" />
-    <ClCompile Include="Source\Animation\Animation_Man.cpp" />
     <ClCompile Include="Source\Animation\AnimationSeqAsset.cpp" />
     <ClCompile Include="Source\Animation\AnimationTypes.cpp" />
     <ClCompile Include="Source\Animation\AnimationUtil.cpp" />
     <ClCompile Include="Source\Animation\SkeletonData.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp" />
-    <ClCompile Include="Source\Animation\Runtime\RuntimeValueNodes.cpp" />
     <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew.cpp" />
     <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />
@@ -712,6 +679,8 @@
     <ClCompile Include="Source\IntegrationTest.cpp" />
     <ClCompile Include="Source\EngineEditorState.cpp" />
     <ClCompile Include="Source\Render\RenderWindow.cpp" />
+    <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew2.cpp" />
+    <ClCompile Include="Source\Game\TopDownShooter\TopDownPlayer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

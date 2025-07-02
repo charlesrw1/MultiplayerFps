@@ -57,10 +57,6 @@ public:
 
 	void set_animator_class(const ClassTypeInfo* ti);
 	//REF void set_animation_graph(Animation_Tree_CFG* tree);
-	const Animation_Tree_CFG* get_animation_tree() const;
-	AnimatorInstance* get_animator_instance() const {
-		return animator.get();
-	}
 
 	bool get_is_visible() const {
 		return is_visible;

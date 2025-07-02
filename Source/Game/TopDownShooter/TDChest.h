@@ -28,11 +28,7 @@ public:
 				soundfx, 1, 1, 1, 1, {}, false, false, {}
 			);
 
-			m->get_animator()->play_animation_in_slot(
-				openanim,
-				StringName("Default"),
-				1, 0
-			);
+			m->get_animator()->play_animation(openanim);
 
 			is_open = true;
 		}
@@ -44,22 +40,3 @@ public:
 	bool is_open = false;
 };
 
-
-class ChestAnimator : public AnimatorInstance
-{
-public:
-	CLASS_BODY(ChestAnimator);
-
-	TDChest* chest = nullptr;
-
-	void on_init() override {
-		chest = get_owner()->get_component<TDChest>();
-	}
-	void on_update(float dt) override {
-		if (chest) {
-			this->chest_open = chest->is_open;
-		}
-	}
-
-	REF bool chest_open = false;
-};

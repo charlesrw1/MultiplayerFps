@@ -29,12 +29,11 @@ struct BoneReparentContainer  {
 	REF std::vector<std::string> remap;
 };
 
-class AnimImportSettings : public ClassBase {
-public:
-	CLASS_BODY(AnimImportSettings);
+struct AnimImportSettings {
+	STRUCT_BODY();
 
 	REF std::string clipName;
-	REF SoftAssetPtr<AnimationSeqAsset> otherClipToSubtract;
+	REF std::string otherClipToSubtract;
 
 	// import settings
 	REF bool hasEndCrop = false;
@@ -90,7 +89,7 @@ public:
 	REF std::vector<std::string> keepBones;						// array of bones to keep (compilier automatically prunes out unused bones)
 	REF std::vector<std::string> curveNames;					// array of strings that can be used to name custom curves for animations
 	REF std::vector<std::string> additionalAnimationGlbFiles;	// additional glb files to source animations from (will retarget)
-	std::vector<AnimImportSettings> animations;				// all animations indexed by string with import settings
+	REF std::vector<AnimImportSettings> animations;				// all animations indexed by string with import settings
 
 
 	// type=BoneRenameContainer

@@ -23,7 +23,9 @@ GameAnimationMgr g_gameAnimationMgr;
 
 #ifdef EDITOR_BUILD
 const char* MeshComponent::get_editor_outliner_icon() const {
-	return animator_tree.get() ? "eng/editor/anim_icon.png" : "eng/editor/mesh_icon.png";
+	if (model && model->get_skel())
+		return "eng/editor/anim_icon.png";
+	return "eng/editor/mesh_icon.png";
 }
 #endif
 
@@ -87,15 +89,6 @@ void MeshComponent::set_model(Model* modelnext)
 	}
 }
 
-void MeshComponent::set_animation_graph(Animation_Tree_CFG* graph)
-{
-	if (graph != animator_tree.get()) {
-		animator_tree.ptr = graph;
-		update_animator_instance();
-		sync_render_data();
-	}
-}
-
 void MeshComponent::set_material_override(const MaterialInstance* mi)
 {
 	if (eMaterialOverride.empty())
@@ -139,14 +132,14 @@ void MeshComponent::update_animator_instance()
 {
 	animator.reset();
 	auto modToUse = (model.did_fail()) ? g_modelMgr.get_error_model() : model.get();
-	if (modToUse&&modToUse->get_skel() && animator_tree.get()) {
+	if (modToUse&&modToUse->get_skel()) {
 		try {
-			AnimatorObject* c = new AnimatorObject(*modToUse, *animator_tree, get_owner());
-			animator.reset(c);
+			//AnimatorObject* c = new AnimatorObject(*modToUse, *animator_tree, get_owner());
+			//animator.reset(c);
 		}
 		catch (...) {
 			sys_print(Error, "couldnt initialize animator\n");
-			animator_tree = nullptr;
+			//animator_tree = nullptr;
 		}
 	}
 }
@@ -181,13 +174,22 @@ void MeshComponent::end()
 }
 
 const Model* MeshComponent::get_model() const { return model.get(); }
-const Animation_Tree_CFG* MeshComponent::get_animation_tree() const { return animator_tree.get(); }
 
-AnimatorInstance* MeshComponent::get_animator_instance() const {
-	if (animator.get())
-		return animator->get_instance();
-	return nullptr;
+AnimatorObject* MeshComponent::create_animator(AnimGraphConstructed& data)
+{
+	auto modToUse = (model.did_fail()) ? g_modelMgr.get_error_model() : model.get();
+	if (modToUse && modToUse->get_skel()) {
+		try {
+			AnimatorObject* c = new AnimatorObject(*modToUse, data, get_owner());
+			animator.reset(c);
+		}
+		catch (...) {
+			sys_print(Error, "MeshComponent::create_animator: couldnt initialize animator\n");
+		}
+	}
+	return animator.get();
 }
+
 
 const MaterialInstance* MeshComponent::get_material_override() const {
 	return eMaterialOverride.empty() ? nullptr : eMaterialOverride[0].get();

@@ -8,6 +8,7 @@ NEWENUM(Easing, uint8_t)
 	CubicEaseIn,
 	CubicEaseOut,
 	CubicEaseInOut,
+	Constant,
 };
 
 inline float evaluate_easing(Easing type, float t)
@@ -27,6 +28,9 @@ inline float evaluate_easing(Easing type, float t)
 	case Easing::CubicEaseInOut: {
 		float othert = -2 * t + 2;
 		return (t < 0.5) ? 4 * t * t * t : 1.0 - othert * othert * othert * 0.5;
+	}break;
+	case Easing::Constant: {
+		return 1.f;
 	}break;
 	default:
 		return t;

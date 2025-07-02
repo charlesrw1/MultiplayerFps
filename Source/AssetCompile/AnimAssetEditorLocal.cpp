@@ -236,12 +236,12 @@ void AnimationEditorTool::post_map_load_callback()
 	assert(animImportSettings);
 
 
-	auto ti = &animImportSettings->get_type();
-	while (ti) {
-		if (ti->props)
-			propGrid.add_property_list_to_grid(ti->props, animImportSettings);
-		ti = ti->super_typeinfo;
-	}
+//	auto ti = &animImportSettings->get_type();
+//	while (ti) {
+//		if (ti->props)
+//			propGrid.add_property_list_to_grid(ti->props, animImportSettings);
+//		ti = ti->super_typeinfo;
+//	}
 
 
 
@@ -256,7 +256,7 @@ void AnimationEditorTool::post_map_load_callback()
 	mc = entity->create_component<MeshComponent>();
 	mc->set_model(outputModel);
 	//fake_tree = Animation_Tree_CFG::construct_fake_tree();
-	mc->set_animation_graph(fake_tree.get());
+
 	//if (outputModel) {
 	//	mc->get_animator_instance()->set_force_seq_for_editor(sequence);
 	//}
@@ -269,7 +269,7 @@ void AnimationEditorTool::close_internal()
 
 	on_close.invoke();
 
-	fake_tree.reset();
+
 	entity = nullptr;	// get cleaned up by level
 	mc = nullptr;
 	outputModel = nullptr;

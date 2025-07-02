@@ -48,7 +48,7 @@ void UiSystem::handle_event(const SDL_Event& event)
 
 void UiSystem::draw_imgui_interfaces(EditorState* edState) {
 
-	drawing_to_screen = edState == nullptr;
+	drawing_to_screen = !edState || !edState->get_tool();
 
 	if (edState && edState->has_tool())
 		enable_imgui_docking();

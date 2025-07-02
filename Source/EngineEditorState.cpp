@@ -26,7 +26,8 @@ void EditorState::hide()
 }
 
 bool EditorState::wants_scene_viewport_menu_bar() {
-	if (curTool.get()) return curTool->wants_scene_viewport_menu_bar();
+	if (curTool.get()) 
+		return curTool->wants_scene_viewport_menu_bar();
 	return false;
 }
 

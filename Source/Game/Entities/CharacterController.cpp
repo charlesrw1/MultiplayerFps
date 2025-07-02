@@ -54,6 +54,7 @@ void CharacterController::move(const glm::vec3& disp, float dt,float min_dist, u
 	glm::vec3 current_velocity = disp / dt;
 	glm::vec3 current_pos = position;
 	glm::vec3 target_pos = position + disp;
+
 	int max_iter = 5;
 	out_ccfg_flags = 0;
 

@@ -163,7 +163,8 @@ public:
 				continue;
 
 			auto m = e->get_cached_mesh_component();
-			if (!m || !m->get_animator_instance()) continue;
+			if (!m || !m->get_animator()) 
+				continue;
 			int i = m->get_index_of_bone(c->get_parent_bone());
 			if (i == -1) continue;
 
@@ -171,6 +172,8 @@ public:
 
 			phys->set_is_enable(true);
 		}
+
+
 		e->get_cached_mesh_component()->get_animator()->set_update_owner_position_to_root(true);
 	}
 };
@@ -188,7 +191,8 @@ public:
 				continue;
 
 			auto m = e->get_cached_mesh_component();
-			if (!m || !m->get_animator_instance()) continue;
+			if (!m || !m->get_animator()) 
+				continue;
 			int i = m->get_index_of_bone(c->get_parent_bone());
 			if (i == -1) continue;
 

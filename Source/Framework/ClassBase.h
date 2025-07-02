@@ -236,3 +236,8 @@ public:
 		return ClassTypeIterator((ClassTypeInfo*)typeinfo/* remove const here, doesnt matter tho*/);
 	}
 };
+
+template<typename T>
+inline T* class_cast(ClassBase* in) {
+	return in ? in->cast_to<T>() : nullptr;
+}

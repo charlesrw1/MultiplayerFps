@@ -494,6 +494,12 @@ InstantiatePrefabCommand::InstantiatePrefabCommand(EditorDoc& ed_doc, Entity* e)
 		sys_print(Warning, "InstantiatePrefabCommand(): entity is not the root of the prefab\n");
 		return;
 	}
+	if (e->get_object_prefab().did_load_fail()) {
+		sys_print(Warning, "InstantiatePrefabCommand(): prefab failed to load, cant instantiate it\n");
+		return;
+	}
+
+
 	//if (e->get_nested_owner_prefab() != ed_doc.get_editing_prefab())
 	//	return;	// is_valid == false
 
@@ -523,6 +529,7 @@ void InstantiatePrefabCommand::execute() {
 	Entity* spawned_without_setting = eng->get_level()->editor_spawn_prefab_but_dont_set_spawned_by(&meptr->get_object_prefab());
 	for (auto c : spawned_without_setting->get_children()) {
 		assert(c->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab);
+		c->unique_file_id = 0;	// set it later
 		c->parent_to(meptr);
 		revert_these.push_back(c->get_self_ptr());
 	}

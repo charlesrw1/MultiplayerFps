@@ -15,9 +15,10 @@ using namespace glm;
 #include "Game/Entity.h"
 #include "Game/Components/GameAnimationMgr.h"
 #include "RuntimeNodesNew.h"
-#include "RuntimeValueNodes.h"
+
 #include "Debug.h"
 #include "Game/Components/GameAnimationMgr.h"
+#include "RuntimeNodesNew2.h"
 
 #define ROOT_BONE -1
 #define INVALID_ANIMATION -1
@@ -31,73 +32,30 @@ using glm::cross;
 using glm::normalize;
 
 
-class ConstructorError : public std::runtime_error {
-public:
-	ConstructorError() : std::runtime_error("Constructor error.") {}
-};
-
 AnimatorObject::~AnimatorObject() {
 	g_gameAnimationMgr.remove_from_animating_set(*this);
 }
-PoseNodeInst& AnimatorObject::get_root_node() const {
-	assert(!pose_node_insts.empty());
-	int idx = (int)pose_node_insts.size() - 1;
-	assert(pose_node_insts.at(idx));
-	return *pose_node_insts.at(idx);
+agBaseNode& AnimatorObject::get_root_node() const {
+	assert(graph.get_root());
+	return *graph.get_root();
 }
-AnimatorObject::AnimatorObject(const Model& model, const Animation_Tree_CFG& graph, Entity* ent) 
-	: model(model),cfg(graph), slots(1), simulating_physics_objects(2) {
+AnimatorObject::AnimatorObject(const Model& model, AnimGraphConstructed& ingraph, Entity* ent) 
+	: model(model),graph(ingraph), simulating_physics_objects(2) {
 	if (!model.get_skel()) {
-		sys_print(Error, "model doesnt have skeleton for AnimatorInstance\n");
+		sys_print(Error, "AnimatorObject(): model doesnt have skeleton\n");
+		throw ConstructorError();
+	}
+	if (!graph.get_root()) {
+		sys_print(Error, "AnimatorObject(): graph has no root node set\n");
 		throw ConstructorError();
 	}
 
-	slots.resize(graph.get_slot_names().size());
+	slots.resize(graph.get_slots().size());
 	for (int i = 0; i < slots.size(); i++)
-		slots[i].name = StringName(graph.get_slot_names()[i].c_str());	// set hashed name for gamecode to find
-
+		slots[i].name = slots.at(i).name;
 	this->owner = ent;
 
-
-
-	// Initialize script instance, sets pointer of AnimatorInstance for native variables
-
-	// Initialize runtime data, runtime nodes get constructed here
-	//runtime_graph_data.clear();
-	//runtime_graph_data.resize(cfg->get_num_nodes());
-
-	// Construct nodes
-	//NodeRt_Ctx ctx(this);
-	//cfg->construct_all_nodes(ctx);
-
-	animator = uptr<AnimatorInstance>(graph.allocate_animator_class());
-	if (!animator) {
-		sys_print(Error, "no animator instance\n");
-		throw ConstructorError();
-	}
-	animator->object = this;
-
-	{
-		atCreateInstContext instCtx(graph,*this);
-		auto root = instCtx.create_inst(graph.get_root_node_id());
-		if (!root) {
-			sys_print(Error, "graph has no root\n");
-			throw ConstructorError();
-		}
-		this->pose_node_insts = std::move(instCtx.created_nodes);
-		assert(root == &get_root_node());
-		get_root_node().reset();	// reset it
-	}
-
-	// Reset root node here to kick things off
-	//if (cfg->get_root_node())
-	//	cfg->get_root_node()->reset(ctx);
-
-	// Callback to inherited class
-
-
-	if (!get_is_for_editor())
-		animator->on_init();
+	get_root_node().reset();	// reset it
 
 	// Init bone arrays
 	const int bones = model.get_skel()->get_num_bones();
@@ -147,34 +105,17 @@ void AnimatorObject::update(float dt)
 	if(using_global_bonemat_double_buffer)
 		last_cached_bonemats.swap(cached_bonemats);
 
-	// callback
-	if(!get_is_for_editor())
-		animator->on_update(dt);
 
-	atGraphContext graphCtx(*this,dt);
-	atUpdateStack updateStackCtx(graphCtx,g_pose_pool);
-	auto& pose_base = updateStackCtx.pose;
+	
+	agGetPoseCtx graphCtx(*this, g_pose_pool,dt);
+	auto& pose_base = graphCtx.pose;
 
 	// call into tree
 	if (!force_animation_to_bind_pose.get_bool()) {
-		get_root_node().get_pose(updateStackCtx);
-		//get_tree()->get_root_node()->get_pose(ctx, gp_ctx);
+		get_root_node().get_pose(graphCtx);
 	}
 	else {
-#ifdef EDITOR_BUILD
-		if (force_view_seq) {
-			const BoneIndexRetargetMap* remap = nullptr;
-			if (get_skel() != force_view_seq->srcModel.get()->get_skel()) {
-				remap = model.get_skel()->get_remap(force_view_seq->srcModel.get()->get_skel());
-			}
-			util_calc_rotations(get_skel(), force_view_seq->seq, force_view_seq_time, remap, *pose_base.get());
-		}
-		else {
-#endif
-			util_set_to_bind_pose(*pose_base.get(), get_skel());
-#ifdef EDITOR_BUILD
-		}
-#endif
+		util_set_to_bind_pose(*pose_base.get(), get_skel());
 	}
 	for (int i = 0; i < active_sync_groups.size(); i++) {
 		const bool delete_group = update_sync_group(i);
@@ -198,8 +139,6 @@ void AnimatorObject::update(float dt)
 		util_localspace_to_meshspace(*pose_base, cached_bonemats, get_skel());
 	}
 
-	if(!get_is_for_editor())
-		animator->on_post_update();
 	ConcatWithInvPose();
 }
 
@@ -210,6 +149,50 @@ void AnimatorObject::add_simulating_physics_object(Entity* e)
 void AnimatorObject::remove_simulating_physics_object(Entity* e)
 {
 	simulating_physics_objects.erase(e->get_self_ptr().handle);
+}
+
+opt<float> AnimatorObject::get_curve_value(StringName name) const
+{
+	auto find = MapUtil::get_opt(curve_values, name.get_hash());
+	if (find) return *find;
+	return std::nullopt;
+}
+
+opt<float> AnimatorObject::get_float_variable(StringName name) const
+{
+	auto find = MapUtil::get_opt(blackboard, name.get_hash());
+	if (find && std::holds_alternative<float>(*find))
+		return std::get<float>(*find);
+	return std::nullopt;
+}
+
+opt<bool> AnimatorObject::get_bool_variable(StringName name) const
+{
+	auto find = MapUtil::get_opt(blackboard, name.get_hash());
+	if (find && std::holds_alternative<bool>(*find))
+		return std::get<bool>(*find);
+	return std::nullopt;
+}
+
+opt<int> AnimatorObject::get_int_variable(StringName name) const
+{
+	auto find = MapUtil::get_opt(blackboard, name.get_hash());
+	if (find && std::holds_alternative<int>(*find))
+		return std::get<int>(*find);
+	return std::nullopt;
+}
+
+opt<glm::vec3> AnimatorObject::get_vec3_variable(StringName name) const
+{
+	auto find = MapUtil::get_opt(blackboard, name.get_hash());
+	if (find && std::holds_alternative<glm::vec3>(*find))
+		return std::get<glm::vec3>(*find);
+	return std::nullopt;
+}
+
+void AnimatorObject::set_float_variable(StringName name, float f)
+{
+	blackboard[name.get_hash()] = f;
 }
 
 #if 0
@@ -415,17 +398,19 @@ SyncGroupData& AnimatorObject::find_or_create_sync_group(StringName name)
 }
 
 
-bool AnimatorObject::play_animation_in_slot(
-	const AnimationSeqAsset* seq,
-	StringName slot,
+bool AnimatorObject::play_animation(
+	const AnimationSeqAsset* seqAsset,
 	float play_speed,
 	float start_pos
 )
 {
-	if (!seq)
+	if (!seqAsset || !seqAsset->seq) {
+		sys_print(Warning, "play_animation: sequence invalid\n");
 		return false;
+	}
+	auto seq = seqAsset->seq;
 
-	auto slot_to_play_in = find_slot_with_name(slot);
+	auto slot_to_play_in = find_slot_with_name(seq->directplayopt.slotname);
 	if (!slot_to_play_in) {
 		sys_print(Warning, "no slot with name\n");
 		return false;
@@ -433,25 +418,8 @@ bool AnimatorObject::play_animation_in_slot(
 	
 	slot_to_play_in->state = DirectAnimationSlot::FadingIn;
 	slot_to_play_in->fade_percentage = 0.0;
-	slot_to_play_in->active = seq;
+	slot_to_play_in->active = seqAsset;
 	slot_to_play_in->time = 0.0;
 	slot_to_play_in->playspeed = play_speed;
-
 	return true;
 }
-
-AnimatorInstance::AnimatorInstance()
-{
-}
-
-AnimatorInstance::~AnimatorInstance()
-{
-}
-
-Entity* AnimatorInstance::get_owner() const { return object->get_owner(); }
-
-AnimatorObject* AnimatorInstance::get_obj() const { return object; }
-
-const Model* AnimatorInstance::get_model() const { return &object->get_model(); }
-
-const MSkeleton* AnimatorInstance::get_skel() const { return object->get_skel(); }

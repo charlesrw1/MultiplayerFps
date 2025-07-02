@@ -927,12 +927,15 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		acl.crop.has_crop = isa.hasEndCrop || isa.hasStartCrop;
 		acl.crop.start = isa.cropStart;
 		acl.crop.end = isa.cropEnd;
+		if (!isa.otherClipToSubtract.empty())
+			isa.makeAdditive = true;
+
 		if (isa.makeAdditive) {
-			if (!isa.otherClipToSubtract.path.empty()) {
+			if (!isa.otherClipToSubtract.empty()) {
 				acl.sub = SubtractType_Load::FromAnother;
-				auto find = isa.otherClipToSubtract.path.rfind("/");
+				auto find = isa.otherClipToSubtract.rfind("/");
 				auto ofs = find == std::string::npos ? 0 : find+1;
-				acl.subtract_clipname = isa.otherClipToSubtract.path.substr(ofs);
+				acl.subtract_clipname = isa.otherClipToSubtract.substr(ofs);
 			}
 			else {
 				acl.sub = SubtractType_Load::FromThis;

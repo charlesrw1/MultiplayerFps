@@ -1,9 +1,4 @@
 
-thirdperson 1
-
-
-#g_draw_physx_scene 31
-#g_debug_skeletons 1
 bind 1 "map top_down/map0.tmap"
 bind 2 "TOGGLE_PLAY_EDIT_MAP"
 bind 3 "start_ed Prefab fire_emit.pfb"
@@ -103,13 +98,10 @@ file_print_all_openfile_fails 0
 
 g_draw_grid 1
 
-#start_ed AnimGraph "testcharacter_a.ag"
-#start_ed Material "top_down/fake_fog.mm"
-
 bind 7 "start_ed AnimGraph beu_character.ag"
 
 loglevel 6
-developer_mode 0
+developer_mode 1
 
-#start_ed Prefab BRUH_NEST.pfb
-start_ed AnimGraph ""
+map top_down/map0.tmap
+

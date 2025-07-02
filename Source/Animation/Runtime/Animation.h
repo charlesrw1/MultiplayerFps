@@ -19,6 +19,9 @@
 #include "Animation/Runtime/RuntimeNodesBase.h"
 #include <unordered_set>
 #include <functional>
+#include <variant>
+#include "Animation/Editor/Optional.h"
+#include <stdexcept>
 using std::function;
 class atGraphContext;
 class Pose;
@@ -26,7 +29,6 @@ class Animator;
 class MSkeleton;
 class Entity;
 class AnimationSeq;
-class Animation_Tree_CFG;
 class AnimTreePoseNode;
 struct Rt_Vars_Base;
 
@@ -52,31 +54,32 @@ struct DirectAnimationSlot {
 	function<void(bool)> on_finished;
 };
 
-// subclass this to allow graph to reference variables and such
-class AnimatorObject;
-class Model;
-class Entity;
-class AnimatorInstance : public ClassBase {
+// create this through code however you want
+class agBaseNode;
+struct AnimGraphConstructed {
 public:
-	CLASS_BODY(AnimatorInstance);
-	AnimatorInstance();
-	~AnimatorInstance();
-	Entity* get_owner() const;
-	AnimatorObject* get_obj() const;
-	const Model* get_model() const;
-	const MSkeleton* get_skel() const;
-	virtual void on_init() {};
-	virtual void on_update(float dt) {}
-	virtual void on_post_update() {}
+	void set_root(agBaseNode* node) {
+		this->root = node;
+	}
+	void add_cached_pose_root(agBaseNode* node);
+	agBaseNode* get_root() const { return root; }
+	std::vector<agBaseNode*>& get_cache_nodes() { return cachePoseNodes; }
+	void add_slot_name(StringName name);
+	std::vector<StringName>& get_slots() { return slot_names; }
 private:
-	AnimatorObject* object = nullptr;
-	friend class AnimatorObject;
+	agBaseNode* root = nullptr;
+	std::vector<agBaseNode*> cachePoseNodes;
+	std::vector<StringName> slot_names;
 };
 
+class ConstructorError : public std::runtime_error {
+public:
+	ConstructorError() : std::runtime_error("Constructor error.") {}
+};
+class agClipNode;
 class AnimatorObject : public ClassBase {
 public:
-	// throws on failure
-	AnimatorObject(const Model& model, const Animation_Tree_CFG& graph, Entity* ent = nullptr);
+	AnimatorObject(const Model& model, AnimGraphConstructed& construction, Entity* ent = nullptr);
 	~AnimatorObject();
 	// Main update method
 	void update(float dt);
@@ -86,12 +89,11 @@ public:
 	const std::vector<glm::mat4x4> get_last_global_bonemats() const { return last_cached_bonemats; }
 	const Model& get_model() const { return model; }
 	const MSkeleton* get_skel() const { return model.get_skel(); }
-	const Animation_Tree_CFG& get_tree() const { return cfg; }
 	int num_bones() const { return cached_bonemats.size(); }
 	Entity* get_owner() const { return owner; }
-	bool play_animation_in_slot(const AnimationSeqAsset* seq, StringName slot, float play_speed, float start_pos);
+	bool play_animation(const AnimationSeqAsset* seq, float play_speed=1.f, float start_pos=0.f);
 	// callback: returns true if interrupted, false if not. guaranteed to fire. 
-	void play_animation_in_slot(const AnimationSeqAsset* seq, StringName slot, float play_speed, float start_pos, function<void(bool)> callback);
+	void play_animation(const AnimationSeqAsset* seq, float play_speed, float start_pos, function<void(bool)> callback);
 	void stop_animation_in_slot(StringName slot);
 	void add_simulating_physics_object(Entity* obj);
 	void remove_simulating_physics_object(Entity* obj);
@@ -100,16 +102,25 @@ public:
 	void set_matrix_palette_offset(int ofs) { matrix_palette_offset = ofs; }
 	int get_matrix_palette_offset() const { return matrix_palette_offset; }
 	bool get_is_for_editor() const { return get_owner() == nullptr; }
-	AnimatorInstance* get_instance() const { return animator.get(); }
-#ifdef EDITOR_BUILD
-	void set_force_seq_for_editor(const AnimationSeqAsset* seq) { force_view_seq = seq; }
-	void set_force_view_seq_time(float t) { force_view_seq_time = t; }
-#endif
+	opt<float> get_curve_value(StringName name) const;
+	opt<float> get_float_variable(StringName name) const;
+	opt<bool> get_bool_variable(StringName name) const;
+	opt<int> get_int_variable(StringName name) const;
+	opt<glm::vec3> get_vec3_variable(StringName name) const;
+	void set_float_variable(StringName name, float f);
+	void set_int_variable(StringName name, int f);
+	void set_bool_variable(StringName name, bool f);
+	void set_vec3_variable(StringName name, glm::vec3 f);
+	agBaseNode* find_cached_pose_node(StringName name);
+	agBaseNode& get_root_node() const;
+	SyncGroupData& find_or_create_sync_group(StringName name);
+	DirectAnimationSlot* find_slot_with_name(StringName name);
+	void add_playing_clip(agClipNode* clip) { playingClipsThisUpdate.push_back(clip); }
+	const std::vector<agClipNode*>& get_playing_clips() { return playingClipsThisUpdate; }
 private:
-#ifdef EDITOR_BUILD
-	const AnimationSeqAsset* force_view_seq{};
-	float force_view_seq_time = 0.0;
-#endif
+	std::vector<agClipNode*> playingClipsThisUpdate;
+	std::unordered_map<uint64_t, float> curve_values;
+	std::unordered_map<uint64_t, std::variant<bool, float, int, glm::vec3>> blackboard;
 	bool using_global_bonemat_double_buffer = true;
 	vector<glm::mat4> cached_bonemats;	// global bonemats
 	vector<glm::mat4> last_cached_bonemats;
@@ -117,24 +128,19 @@ private:
 	bool update_owner_position_to_root = false;
 	// owning entity, can be null for example in editor
 	Entity* owner = nullptr;
-	const Animation_Tree_CFG& cfg;
 	const Model& model;
 	RootMotionTransform root_motion;
-	vector<uptr<PoseNodeInst>> pose_node_insts;
 	std::unordered_set<uint64_t> simulating_physics_objects;
 	// active sync groups for graph
 	vector<SyncGroupData> active_sync_groups;
 	vector<DirectAnimationSlot> slots;
-	uptr<AnimatorInstance> animator;
+	AnimGraphConstructed graph;
 
 	bool update_sync_group(int idx);
 	void update_slot(int idx, float dt);
 	void update_physics_bones(const Pose& inpose);
-
-	PoseNodeInst& get_root_node() const;
-	SyncGroupData& find_or_create_sync_group(StringName name);
 	void ConcatWithInvPose();
-	DirectAnimationSlot* find_slot_with_name(StringName name);
+
 
 	friend class NodeRt_Ctx;
 	friend class EditModelAnimations;

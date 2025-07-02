@@ -26,7 +26,7 @@ public:
 
 	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override
 	{	
-		for (auto f : FileSys::find_game_files()) {
+		for (auto& f : FileSys::find_game_files()) {
 			if (get_extension(f) == ".anims") {
 				std::ifstream infile(f);
 				std::string a;

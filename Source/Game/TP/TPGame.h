@@ -44,15 +44,6 @@ public:
 	TPPlayer* player = nullptr;
 };
 
-class TPPlayerAnimator : public AnimatorInstance
-{
-public:
-	CLASS_BODY(TPPlayerAnimator);
-
-	REF bool bRunning = false;
-	REF float flLean = 0.0;
-};
-
 
 
 class TPGun
