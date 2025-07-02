@@ -3,7 +3,7 @@
 #include "Render/Model.h"
 #include "glm/glm.hpp"
 #include "Animation.h"
-#include "Animation/AnimationTreePublic.h"
+
 #include "Framework/MemArena.h"
 #include "Framework/InlineVec.h"
 #include "Framework/EnumDefReflection.h"

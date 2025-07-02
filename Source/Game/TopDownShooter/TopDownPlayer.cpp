@@ -9,15 +9,41 @@ static AnimGraphConstructed make_player_tree(const Model& model)
 	clip->set_clip(model, "run_forward_unequip");
 	clip->looping = true;
 
+	agClipNode* runUpper = new agClipNode;
+	runUpper->set_clip(model, "stand_rifle_run_n");
+	runUpper->looping = true;
+
+	agBlendMasked* masked = new agBlendMasked;
+	masked->init_mask_for_model(model, 0.f);
+	masked->set_one_bone_weight(model, "mixamorig:Spine", 0.1f);
+	masked->set_one_bone_weight(model, "mixamorig:Spine1", 0.4f);
+	masked->set_all_children_weights(model, "mixamorig:Spine2", 0.8f);
+	masked->meshspace_blend = true;
+	masked->input0 = clip;
+	masked->input1 = runUpper;
+	masked->alpha = 1.f;
+
 	agClipNode* leaning = new agClipNode;
 	leaning->set_clip(model, "RUN_LEAN_LEFT");
 
 	agAddNode* add = new agAddNode;
-	add->input0 = clip;
+	add->input0 = masked;
 	add->input1 = leaning;
 	add->alpha = StringName("flLean");
 
-	out.set_root(add);
+	agClipNode* stand = new agClipNode;
+	stand->set_clip(model, "stand_rifle_aim_l");
+	agClipNode* turn_l = new agClipNode;
+	turn_l->set_clip(model, "turn_left");
+
+	agBlendByInt* blendInt = new agBlendByInt;
+	blendInt->easing = Easing::CubicEaseOut;
+	blendInt->integer = StringName("iState");
+	blendInt->inputs.push_back(add);
+	blendInt->inputs.push_back(stand);
+	blendInt->inputs.push_back(turn_l);
+
+	out.set_root(blendInt);
 	return out;
 }
 
@@ -30,6 +56,8 @@ void TopDownPlayer::start() {
 	auto animator = mesh->create_animator(tree);
 
 	animator->set_float_variable("flLean", GetTime());
+	animator->set_int_variable("iState",0);
+
 
 
 	capsule = get_owner()->get_component<CapsuleComponent>();
@@ -41,7 +69,6 @@ void TopDownPlayer::start() {
 		ASSERT(CameraComponent::get_scene_camera() == the_camera);
 	}
 
-	shotgunSoundAsset = g_assets.find_sync<PrefabAsset>("top_down/shotgun_sound.pfb").get();
 	if (shotgunSoundAsset && !shotgunSoundAsset->did_load_fail())
 		cachedShotgunSound = eng->get_level()->spawn_prefab(shotgunSoundAsset)->get_component<SoundComponent>();
 
@@ -64,8 +91,9 @@ void TopDownPlayer::start() {
 
 void TopDownPlayer::update() {
 
-	mesh->get_animator()->set_float_variable("flLean", glm::fract(GetTime()));
-
+	mesh->get_animator()->set_float_variable("flLean", 0.f);
+	const int astate = int(GetTime() * 0.5 * g_slomo.get_float()) % 3;
+	mesh->get_animator()->set_int_variable("iState", astate);
 
 	did_move = false;
 	if (is_in_car)
@@ -80,10 +108,10 @@ void TopDownPlayer::update() {
 	}
 
 	if (Input::was_key_pressed(SDL_SCANCODE_T)) {
-		return;
+	//	return;
 		using_third_person_movement = !using_third_person_movement;
 
-		mesh->get_animator()->play_animation(jumpSeq);
+		//mesh->get_animator()->play_animation(jumpSeq);
 	}
 	if (Input::was_key_pressed(SDL_SCANCODE_Z)) {
 		ragdoll_enabled = !ragdoll_enabled;
@@ -204,7 +232,7 @@ void TopDownPlayer::update() {
 	draw_text(string_format("vel= %f", outvel.x));
 	draw_text(string_format("displacement= %f %f %f", displacement.x, displacement.y, displacement.z));
 
-
+	mesh->get_animator()->debug_print(start);
 
 
 	float angle = -atan2(-lookdir.x, lookdir.z);

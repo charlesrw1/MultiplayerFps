@@ -6,7 +6,7 @@
 #include <vector>
 #include <memory>
 #include "../AnimationTypes.h"
-#include "../AnimationTreePublic.h"
+
 #include "Render/Model.h"
 #include <vector>
 #include "Framework/Factory.h"
@@ -16,7 +16,7 @@
 #include "Animation/AnimationSeqAsset.h"
 #include "Framework/MulticastDelegate.h"
 #include "Framework/ConsoleCmdGroup.h"
-#include "Animation/Runtime/RuntimeNodesBase.h"
+
 #include <unordered_set>
 #include <functional>
 #include <variant>
@@ -39,19 +39,14 @@ struct RootMotionTransform {
 
 // direct play slots for manual animation playback
 struct DirectAnimationSlot {
-	enum State {
-		FadingIn,
-		Full,
-		FadingOut,
-	}state;
 	StringName name;
 	const AnimationSeqAsset* active = nullptr;
-	float lasttime = 0.0;
 	float time = 0.0;
-	float playspeed = 0.0;
+	float playspeed = 1.0;
 	bool apply_rootmotion = false;
-	float fade_percentage = 0.0;
 	function<void(bool)> on_finished;
+
+	float time_remaining() const;
 };
 
 // create this through code however you want
@@ -117,7 +112,20 @@ public:
 	DirectAnimationSlot* find_slot_with_name(StringName name);
 	void add_playing_clip(agClipNode* clip) { playingClipsThisUpdate.push_back(clip); }
 	const std::vector<agClipNode*>& get_playing_clips() { return playingClipsThisUpdate; }
+	
+	// when debug printing enabled
+	void debug_print(int start_y);
+	void debug_enter_node(string msg) {
+		debug_output_messages.push_back(string(cur_depth,' ')+msg);
+		cur_depth++;
+	}
+	void debug_exit_node() {
+		cur_depth--;
+	}
 private:
+	int cur_depth = 0;
+	vector<string> debug_output_messages;
+
 	std::vector<agClipNode*> playingClipsThisUpdate;
 	std::unordered_map<uint64_t, float> curve_values;
 	std::unordered_map<uint64_t, std::variant<bool, float, int, glm::vec3>> blackboard;

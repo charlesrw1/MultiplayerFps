@@ -193,7 +193,7 @@ public:
 
 	bool did_move = false;
 	bool is_jumping = false;
-	REF bool using_third_person_movement = false;
+	REF bool using_third_person_movement = true;
 	bool has_had_update = false;
 
 	glm::mat4 last_ws = glm::mat4(1.f);

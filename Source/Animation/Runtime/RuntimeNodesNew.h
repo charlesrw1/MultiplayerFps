@@ -7,10 +7,9 @@
 #include "Framework/PropertyPtr.h"
 #include "Animation/SkeletonData.h"
 #include "Animation/Runtime/Animation.h"
-#include "../AnimationTreePublic.h"
+
 #include "Framework/MapUtil.h"
 #include "Framework/PoolAllocator.h"
-#include "RuntimeNodesBase.h"
 #include <variant>
 using std::variant;
 using glm::vec3;
@@ -29,6 +28,22 @@ public:
 	float get_curve(StringName s);
 	vector<pair<StringName, float>> vals;
 };
+
+class atUpdateStack;
+class atInitContext;
+class atCreateInstContext;
+class AnimTreePoseNode : public ClassBase {
+public:
+	CLASS_BODY(AnimTreePoseNode);
+	struct Inst {
+		virtual ~Inst() {}
+		virtual void get_pose(atUpdateStack& context) {}
+		virtual void reset() {}
+	};
+	virtual Inst* create_inst(atCreateInstContext& ctx) const = 0;
+};
+using PoseNodeInst = AnimTreePoseNode::Inst;
+
 class SampledAnimEventBuffer {
 public:
 	struct Sampled {

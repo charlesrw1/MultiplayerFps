@@ -3,7 +3,6 @@
 #include "IEditorTool.h"
 #include "Render/MaterialLocal.h"
 #include "Framework/ClassBase.h"
-
 #include "Render/DrawPublic.h"
 #include "Types.h"
 #include "Framework/PropertyEd.h"
@@ -11,21 +10,18 @@
 #include "Game/SerializePtrHelpers.h"// AssetPtr
 #include "Framework/ReflectionMacros.h"
 #include "Framework/MulticastDelegate.h"
-
 #include "Render/Model.h"
 #include "Render/Texture.h"
 #include "Assets/AssetDatabase.h"
-
 #include "EditorTool3d.h"
 #include "Framework/Config.h"
 #include "GameEnginePublic.h"
 #include "Level.h"
-
-
 #include "Game/Components/MeshComponent.h"
 #include "Game/Entity.h"
 #include <string>
 #include "Framework/FnFactory.h"
+
 extern ConfigVar ed_default_sky_material;
 
 class StaticMeshEntity;

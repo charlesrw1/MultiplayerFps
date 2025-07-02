@@ -1,5 +1,6 @@
 #include "RuntimeNodesNew2.h"
 #include "Animation/AnimationUtil.h"
+#include "AnimationTreeLocal.h"
 
 void agClipNode::reset()
 {
@@ -70,6 +71,9 @@ void agClipNode::get_pose(agGetPoseCtx& ctx)
 		ctx, seq, !syncGroup.is_null(),syncGroup, syncType, looping, remap, playSpeed, anim_time, stopped_flag, nullptr);
 
 	ctx.add_playing_clip(this);
+
+	ctx.debug_enter("agClip: " + std::to_string(anim_time) + "/" + std::to_string(seq->get_duration()));
+	ctx.debug_exit();
 }
 
 void agClipNode::set_clip(const Model& m, const string& clipName)
@@ -94,6 +98,8 @@ void agBlendNode::reset()
 void agBlendNode::get_pose(agGetPoseCtx& ctx)
 {
 	const float alphaVal = alpha.get_float(ctx);
+	ctx.debug_enter("agBlend: " + std::to_string(alphaVal));
+
 	if (alphaVal <= 0.00001) {
 		input0->get_pose(ctx);
 	}
@@ -106,6 +112,7 @@ void agBlendNode::get_pose(agGetPoseCtx& ctx)
 		input1->get_pose(other);
 		util_blend(ctx.get_num_bones(), *other.pose, *ctx.pose, alphaVal);
 	}
+	ctx.debug_exit();
 }
 
 void agAddNode::reset()
@@ -117,6 +124,7 @@ void agAddNode::reset()
 void agAddNode::get_pose(agGetPoseCtx& ctx)
 {
 	const float alphaVal = alpha.get_float(ctx);
+	ctx.debug_enter("agAddNode: " + std::to_string(alphaVal));
 	if (alphaVal <= 0.00001) {
 		input0->get_pose(ctx);
 	}
@@ -126,6 +134,7 @@ void agAddNode::get_pose(agGetPoseCtx& ctx)
 		input1->get_pose(other);
 		util_add(ctx.get_num_bones(), *other.pose, *ctx.pose, alphaVal);
 	}
+	ctx.debug_exit();
 }
 
 SyncGroupData& agGetPoseCtx::find_sync_group(StringName name) const
@@ -471,4 +480,191 @@ int agGetPoseCtx::get_int_var(StringName name) const
 		return var.value();
 	sys_print(Error, "agGetPoseCtx::get_int_var: no variable exists: %s\n", name.get_c_str());
 	throw std::runtime_error("no variable exists");
+}
+
+void agBlendMasked::reset()
+{
+	input0->reset();
+	input1->reset();
+}
+
+void agBlendMasked::get_pose(agGetPoseCtx& ctx) {
+
+	float alpha_val = alpha.get_float(ctx);
+	ctx.debug_enter("agBlendMasked: " + std::to_string(alpha_val));
+	if (alpha_val <= 0.00001) {
+		input0->get_pose(ctx);
+	}
+	else {
+		agGetPoseCtx basePose(ctx);
+		input0->get_pose(basePose);
+		input1->get_pose(ctx);
+		if (meshspace_blend) {	
+			util_global_blend(&ctx.get_skeleton(), &(*basePose.pose), &(*ctx.pose), alpha_val, maskWeights);
+		}
+		else {
+			util_blend_with_mask(ctx.get_num_bones(), (*basePose.pose), (*ctx.pose), alpha_val, maskWeights);
+		}
+	}
+	ctx.debug_exit();
+}
+
+void agBlendMasked::init_mask_for_model(const Model& model, float default_weight)
+{
+	maskWeights.resize(model.get_skel()->get_num_bones(), default_weight);
+}
+
+void agBlendMasked::set_all_children_weights(const Model& model, StringName bone, float weight)
+{
+	const int myIndex = model.bone_for_name(bone);
+	if (myIndex == -1)
+		throw std::runtime_error("set_all_children_weights: invalid bone");
+	int num_bones = model.get_skel()->get_num_bones();
+	maskWeights.at(myIndex) = weight;
+	for (int i = myIndex+1; i < num_bones; i++) {
+		const int parent= model.get_skel()->get_bone_parent(i);
+		if (parent < myIndex)
+			break;
+		maskWeights.at(i) = weight;
+	}
+}
+
+void agBlendMasked::set_one_bone_weight(const Model& model, StringName bone, float weight)
+{
+	const int myIndex = model.bone_for_name(bone);
+	if (myIndex == -1)
+		throw std::runtime_error("set_all_children_weights: invalid bone");
+	maskWeights.at(myIndex) = weight;
+}
+
+void agStatemachineBase::reset()
+{
+	currentTree = nullptr;
+	curTime = 0.0;
+	if (blendingOut) {
+		g_pose_pool.free(blendingOut);
+		blendingOut = nullptr;
+	}
+}
+
+void agStatemachineBase::get_pose(agGetPoseCtx& ctx)
+{
+	if (!currentTree) {
+		update(ctx,true);
+		if (currentTree) {
+			currentTree->reset();
+		}
+		else {
+			sys_print(Error, "agStatemachineBase::reset: no tree after update?\n");
+			return;
+		}
+	}
+
+	if (blendingOut) {
+		float time_left = get_transition_time_left();
+		ctx.debug_enter("agStatemachineBase: transitoning " + std::to_string(time_left));
+	}
+	else {
+		ctx.debug_enter("agStatemachineBase");
+	}
+	currentTree->get_pose(ctx);
+	ctx.debug_exit();
+
+	// update transitions
+	if (blendingOut) {
+		float alpha = curTransitionDuration >= 0.00001 ? curTransitionTime / curTransitionDuration : 1.0f;
+		glm::clamp(alpha, 0.f, 1.f);
+		alpha = evaluate_easing(curTransition, alpha);
+		agGetPoseCtx other(ctx);
+		util_blend(ctx.get_num_bones(), *blendingOut, *ctx.pose, 1.0-alpha);	// blend the last transition pose to the cur tree
+	
+		if (curTransitionTime >= curTransitionDuration) {
+			g_pose_pool.free(blendingOut);
+			blendingOut = nullptr;
+			sys_print(Debug, "agStatemachineBase: transition end\n");
+		}
+		else {
+			curTransitionTime += ctx.dt;
+		}
+	}
+	auto preTree = currentTree;
+	update(ctx, false);
+	curTime += ctx.dt;
+	if (preTree != currentTree) {
+		curTime = 0.0;
+		curTransitionTime = 0.0;
+		currentTree->reset();
+		sys_print(Debug, "agStatemachineBase: transition\n");
+		if (blendingOut) {
+			sys_print(Debug, "agStatemachineBase: transition interrupted\n");
+		}
+		else {
+			blendingOut = g_pose_pool.allocate();
+		}
+		auto& curPose = *ctx.pose;
+		std::memcpy(blendingOut->pos, curPose.pos, sizeof(glm::vec3) * ctx.get_num_bones());
+		std::memcpy(blendingOut->q, curPose.q, sizeof(glm::quat) * ctx.get_num_bones());
+		std::memcpy(blendingOut->scale, curPose.scale, sizeof(float) * ctx.get_num_bones());
+	}
+}
+
+
+
+void agStatemachineBase::set_pose(agBaseNode* pose)
+{
+	currentTree = pose;
+}
+
+// use set_transition before a pose change to set how it transitions
+
+void agStatemachineBase::set_transition_parameters(Easing easing, float blend_time) {
+	this->curTransition = easing;
+	this->curTransitionDuration = blend_time;
+}
+
+void agSlotPlayer::update(agGetPoseCtx& ctx, bool wantsReset)
+{
+	auto slotPlayer = ctx.object.find_slot_with_name(slotName);
+	if (slotPlayer) {
+		clipPlayer.slot = slotPlayer;
+	}
+	else {
+		sys_print(Warning, "agSlotPlayer::update: no slot %s\n", slotName.get_c_str());
+		return;
+	}
+	set_transition_parameters(Easing::Linear, 0.2);
+	if (slotPlayer->active&&slotPlayer->time_remaining() > 0.2 /* start fading out */) {
+		set_pose(&clipPlayer);
+	}
+	else {
+		set_pose(input);
+	}
+}
+
+void agBlendByInt::update(agGetPoseCtx& ctx, bool wantsReset)
+{
+	if (inputs.empty()) {
+		sys_print(Error, "agBlendByInt::update: no inuts?\n");
+		throw std::runtime_error("agBlendByInt::update");
+	}
+	int index = integer.get_int(ctx);
+	if (index < 0 || index >= inputs.size()) {
+		sys_print(Warning, "agBlendByInt::update: index out of range (%d, size=%d)\n",index,(int)inputs.size());
+		index = 0;
+	}
+	set_transition_parameters(easing, blending_duration);
+	set_pose(inputs.at(index));
+}
+
+void agSlotClipInternal::reset()
+{
+	// nothing
+}
+#include "Animation.h"
+void agSlotClipInternal::get_pose(agGetPoseCtx& ctx)
+{
+	bool stopped_flag = false;
+	float time_in = slot->time;
+	get_clip_pose_shared(
+		ctx, slot->active->seq, false, {}, {}, false, nullptr, 0.0, time_in, stopped_flag, nullptr);
 }

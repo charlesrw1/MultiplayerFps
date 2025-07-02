@@ -11,7 +11,7 @@ using namespace glm;
 #include "Framework/MemArena.h"
 #include "../AnimationUtil.h"
 #include "AnimationTreeLocal.h"
-#include "../AnimationTreePublic.h"
+
 #include "Game/Entity.h"
 #include "Game/Components/GameAnimationMgr.h"
 #include "RuntimeNodesNew.h"
@@ -104,8 +104,7 @@ void AnimatorObject::update(float dt)
 	root_motion = RootMotionTransform();
 	if(using_global_bonemat_double_buffer)
 		last_cached_bonemats.swap(cached_bonemats);
-
-
+	debug_output_messages.clear();
 	
 	agGetPoseCtx graphCtx(*this, g_pose_pool,dt);
 	auto& pose_base = graphCtx.pose;
@@ -191,6 +190,11 @@ opt<glm::vec3> AnimatorObject::get_vec3_variable(StringName name) const
 }
 
 void AnimatorObject::set_float_variable(StringName name, float f)
+{
+	blackboard[name.get_hash()] = f;
+}
+
+void AnimatorObject::set_int_variable(StringName name, int f)
 {
 	blackboard[name.get_hash()] = f;
 }
@@ -282,6 +286,31 @@ void f()
 }
 #endif
 
+#include "Assets/AssetDatabase.h"
+#include "UI/UILoader.h"
+#include "Render/RenderWindow.h"
+#include "UI/GUISystemPublic.h"
+void AnimatorObject::debug_print(int start_y)
+{
+	auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+	int start = start_y;
+	auto draw_text = [&](const char* s) {
+		string str = s;
+		TextShape shape;
+		Rect2d size = GuiHelpers::calc_text_size(std::string_view(str), font);
+		shape.rect.x = 20;
+		shape.rect.y = start + size.h;
+		shape.font = font;
+		shape.color = COLOR_WHITE;
+		shape.with_drop_shadow = true;
+		shape.drop_shadow_ofs = 1;
+		shape.text = str;
+		UiSystem::inst->window.draw(shape);
+		start += size.h;
+	};
+	for (auto& msg : debug_output_messages)
+		draw_text(msg.c_str());
+}
 
 bool AnimatorObject::update_sync_group(int idx)
 {
@@ -315,28 +344,13 @@ void AnimatorObject::update_slot(int idx, float dt)
 	if (!slot.active)
 		return;
 	auto seq = slot.active;
-	float fade_duration = seq->seq->directplayopt.blend_time;
-	if (fade_duration <= 0.0001) fade_duration = 0.0001;
-	if (slot.state == DirectAnimationSlot::FadingIn) {
-		slot.fade_percentage += dt / fade_duration;
-		if (slot.fade_percentage > 1.0)
-			slot.state = DirectAnimationSlot::Full;
-		slot.time += dt;	// also update time
-		if (slot.time > seq->seq->get_duration())	// just exit out
-			slot.active = nullptr;
-	}
-	else if (slot.state == DirectAnimationSlot::Full) {
-		slot.time += dt;
-		if (slot.time > seq->seq->get_duration()) {
-			slot.time = seq->seq->get_duration() - 0.0001;
-			slot.fade_percentage = 1.0;
-			slot.state = DirectAnimationSlot::FadingOut;
+	slot.time += dt*slot.playspeed;	// also update time
+	if (slot.time > seq->seq->get_duration()) {
+		if (slot.on_finished) {
+			slot.on_finished(true);
+			slot.on_finished = {};
 		}
-	}
-	else if (slot.state == DirectAnimationSlot::FadingOut) {
-		slot.fade_percentage -= dt / fade_duration;
-		if (slot.fade_percentage < 0)
-			slot.active = nullptr;
+		slot.active = nullptr;
 	}
 }
 
@@ -416,10 +430,14 @@ bool AnimatorObject::play_animation(
 		return false;
 	}
 	
-	slot_to_play_in->state = DirectAnimationSlot::FadingIn;
-	slot_to_play_in->fade_percentage = 0.0;
+
 	slot_to_play_in->active = seqAsset;
 	slot_to_play_in->time = 0.0;
 	slot_to_play_in->playspeed = play_speed;
 	return true;
+}
+
+float DirectAnimationSlot::time_remaining() const {
+	if (!active || !active->seq) return 0.f;
+	return (active->seq->get_duration() - time)/playspeed;
 }

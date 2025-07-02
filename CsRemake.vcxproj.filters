@@ -123,9 +123,6 @@
     <ClInclude Include="Source\Framework\StringUtil.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Animation\AnimationTreePublic.h">
-      <Filter>Source\Animation</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Animation\AnimationTypes.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>
@@ -492,7 +489,6 @@
     <ClInclude Include="Source\Framework\Log.h" />
     <ClInclude Include="Source\UI\Widgets\EditorCube.h" />
     <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew.h" />
-    <ClInclude Include="Source\Animation\Runtime\RuntimeNodesBase.h" />
     <ClInclude Include="Source\Framework\PropertyUtil.h" />
     <ClInclude Include="Source\MEGA.h" />
     <ClInclude Include="Source\Framework\RingBuffer.h" />
@@ -666,7 +662,6 @@
     <ClCompile Include="Source\Animation\AnimationUtil.cpp" />
     <ClCompile Include="Source\Animation\SkeletonData.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp" />
-    <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew.cpp" />
     <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />
     <ClCompile Include="Source\UI\UIBuilder.cpp" />

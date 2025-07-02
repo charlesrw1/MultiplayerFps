@@ -32,7 +32,6 @@
     <ClCompile Include="Source\Animation\AnimationUtil.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Animation.cpp" />
     <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
-    <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew.cpp" />
     <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew2.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp" />
     <ClCompile Include="Source\Animation\SkeletonData.cpp" />
@@ -126,12 +125,10 @@
     <ClCompile Include="Source\UI\Widgets\Layouts.cpp" />
     <ClCompile Include="Source\UI\Widgets\SharedFuncs.cpp" />
     <ClCompile Include="Source\UI\Widgets\Visuals.cpp" />
-    <ClInclude Include="Source\Animation\AnimationTreePublic.h" />
     <ClInclude Include="Source\Animation\AnimationTypes.h" />
     <ClInclude Include="Source\Animation\AnimationUtil.h" />
     <ClInclude Include="Source\Animation\Editor\Optional.h" />
     <ClInclude Include="Source\Animation\Event.h" />
-    <ClInclude Include="Source\Animation\Runtime\RuntimeNodesBase.h" />
     <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew.h" />
     <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew2.h" />
     <ClInclude Include="Source\Animation\SkeletonData.h" />

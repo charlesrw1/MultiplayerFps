@@ -83,6 +83,9 @@ public:
 	int get_num_bones() const { return get_skeleton().get_num_bones(); }
 	void add_playing_clip(agClipNode* clip) { object.add_playing_clip(clip); }
 	MSkeleton& get_skeleton() const { return *object.get_model().get_skel(); }
+	void debug_enter(string msg) { object.debug_enter_node(msg); }
+	void debug_exit() { object.debug_exit_node(); }
+
 	ScopedPoolPtr<Pose> pose;
 	AnimatorObject& object;
 	//agSampledAnimEvents& events;
@@ -114,6 +117,7 @@ private:
 	float anim_time = 0.f;
 	bool has_init = false;
 };
+
 class agBlendNode : public agBaseNode {
 public:
 	void reset() final;
@@ -127,18 +131,21 @@ class agBlendMasked : public agBaseNode {
 public:
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
-
-	agBaseNode* base = nullptr;
-	agBaseNode* layered = nullptr;
+	agBaseNode* input0 = nullptr;
+	agBaseNode* input1 = nullptr;
 	ValueType alpha = 0.f;
 	bool meshspace_blend = false;
-	// mask
+
+	void init_mask_for_model(const Model& model, float default_weight);
+	void set_all_children_weights(const Model& model, StringName bone, float weight);
+	void set_one_bone_weight(const Model& model, StringName bone, float weight);
+private:
+	std::vector<float> maskWeights;
 };
 class agAddNode : public agBaseNode {
 public:
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
-
 	agBaseNode* input0 = nullptr;
 	agBaseNode* input1 = nullptr;
 	ValueType alpha = 0.f;
@@ -200,47 +207,61 @@ public:
 	ValueType vecInput = 0;
 };
 
-// a state machine. override this class to use it
+// a state machine. override this class to use it ( or use blend by int or slot )
+// flow:
+//		get_pose()
+//			evaluates current tree if not null
+//			blends cur transition if transitioning
+//			update() -> sets new tree
+//			checks for transition starts
+
 class agStatemachineBase : public agBaseNode {
 public:
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
-
-	virtual void update(bool wantsReset) = 0;
+	virtual void update(agGetPoseCtx& ctx, bool wantsReset) = 0;
 	// each update, use set_pose to set what state is active
 	void set_pose(agBaseNode* pose);
 	// use set_transition before a pose change to set how it transitions
 	void set_transition_parameters(Easing easing, float blend_time);
 	// various getters to use in your logic
-	bool is_transitioning() const;
-	float get_transition_time_left() const;
-	bool can_interrupt_transition() const;
-	float get_state_duration() const;
+	bool is_transitioning() const { return blendingOut != nullptr; }
+	float get_transition_time_left() const { return curTransitionDuration - curTransitionTime; }
+	float get_transition_percent() const { return curTransitionTime / curTransitionDuration; }
+	float get_state_duration() const { return curTime; }
 private:
+	float curTime = 0.0;
 	agBaseNode* currentTree = nullptr;
-	Pose* blendingOut = nullptr;
 	// cur transition
+	Easing curTransition{};
+	float curTransitionDuration = 0.0;
+	float curTransitionTime = 0.0;
+	Pose* blendingOut = nullptr;
 };
 
+struct DirectAnimationSlot;
+class agSlotClipInternal : public agBaseNode {
+public:
+	void reset() final;
+	void get_pose(agGetPoseCtx& ctx) final;
+	DirectAnimationSlot* slot = nullptr;
+};
 // manual playback of animation in the graph
 class agSlotPlayer : public agStatemachineBase {
 public:
-
+	void update(agGetPoseCtx& ctx, bool wantsReset) final;
 	bool updateChildrenWhenPlaying = false;
 	StringName slotName;
 	agBaseNode* input = nullptr;
 private:
+	agSlotClipInternal clipPlayer;
 	Pose* fadingOutPose = nullptr;
 };
-
 class agBlendByInt : public agStatemachineBase {
 public:
-
-
-
-	opt<int> current_input;
-	float blending_duration = 0.0;
-	float blendTime = 0.2;
+	void update(agGetPoseCtx& ctx, bool wantsReset) final;
+	Easing easing = Easing::CubicEaseIn;
+	float blending_duration = 0.5;
 	std::vector<agBaseNode*> inputs;
 	ValueType integer = 0;
 };
