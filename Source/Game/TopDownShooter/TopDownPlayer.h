@@ -121,8 +121,8 @@ public:
 
 			int count = 5;
 			for (int i = 0; i < count; i++) {
-
-				auto projectile = eng->get_level()->spawn_prefab(g_assets.find_sync<PrefabAsset>("top_down/projectile.pfb").get());
+				auto prefab = PrefabAsset::load("top_down/projectile.pfb");
+				auto projectile = eng->get_level()->spawn_prefab(prefab);
 				auto pc = projectile->get_component<ProjectileComponent>();
 				pc->ignore = capsule;
 				const float spread = 0.15;

@@ -348,7 +348,33 @@ def class_has_actual_properties(newclass : ClassDef) -> bool:
             return True
     return False
 
+
+def write_scriptable_class(newclass : ClassDef) -> str:
+    assert(newclass.scriptable)
+    output = ""
+    output += f"class ScriptImpl_{newclass.classname} : public {newclass.classname} " + " {\n"
+    output += "public:\n"
+    for f in newclass.properties:
+        if f.new_type.type==FUNCTION_TYPE and f.is_virtual:
+            output += "\t" + f.return_type.get_raw_type_string() + f" {f.name}("
+            for argType,argName in f.func_args:
+                output += argType.get_raw_type_string() + " " + argName
+                output += ", "
+            if len(f.func_args)>0:
+                output = output[:-2]
+            output += ") final {\n"
+
+
+
+            output += "\t}\n"
+
+    output += "};\n"
+    return output
+
+
+
 def write_class_old(newclass : ClassDef)->str:
+
 
     super_typeinfo_str = "nullptr"
     if newclass.super_type_def!=None: # handles case for root ClassBase
@@ -356,6 +382,9 @@ def write_class_old(newclass : ClassDef)->str:
 
     output = ""
     if newclass.object_type==ClassDef.TYPE_CLASS:
+        if newclass.scriptable:
+            output += write_scriptable_class(newclass)
+
         output += f"ClassTypeInfo {newclass.classname}::StaticType = ClassTypeInfo(\n \
                     \"{newclass.classname}\",\n \
                     {super_typeinfo_str},\n \

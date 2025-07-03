@@ -12,23 +12,22 @@ class Entity;
 class Component : public BaseUpdater
 {
 public:
-	CLASS_BODY(Component);
+	CLASS_BODY(Component, scriptable);
 	const static bool CreateDefaultObject = true;
 	virtual ~Component() override;
 	// ClassBase override
 	void serialize(Serializer& s) override;
-	virtual void pre_start() {}
-	virtual void start() {}
-	virtual void update() {}
-	virtual void end() {}
+	REF virtual void pre_start() {}
+	REF virtual void start() {}
+	REF virtual void update() {}
+	REF virtual void end() {}
 	void init_updater();
 	void shutdown_updater();
-	void set_ticking(bool shouldTick);
+	REF void set_ticking(bool shouldTick);
 	void set_call_init_in_editor(bool b) { call_init_in_editor = b; }
 	bool get_call_init_in_editor() const { return call_init_in_editor; }
-	void destroy();
-	REFLECT(name="owner",getter);
-	Entity* get_owner() const { return entity_owner; }
+	REF void destroy();
+	REF Entity* get_owner() const { return entity_owner; }
 	const glm::mat4& get_ws_transform();
 	glm::vec3 get_ws_position() { return get_ws_transform()[3]; }
 	// helper function which calls eng->get_level()->add_to_sync_render_data_list(this)
@@ -37,15 +36,6 @@ public:
 #ifdef EDITOR_BUILD
 	virtual const char* get_editor_outliner_icon() const { return ""; }
 #endif
-	REFLECT(name = "is_type");
-	bool is_type_for_script(const ClassTypeInfo* t) {
-		if (!t) return false;
-		return get_type().is_a(*t);
-	}
-	REFLECT(name = "type", getter);
-	const ClassTypeInfo* get_type_for_script() {
-		return &get_type();
-	}
 protected:
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)
 	virtual void on_changed_transform() {}

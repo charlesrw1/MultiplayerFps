@@ -1,4 +1,4 @@
---- GENERATED LUA FILE FROM C++ CLASSES v1 2025-07-02 14:47:51
+--- GENERATED LUA FILE FROM C++ CLASSES v1 2025-07-02 18:17:32
 ---@class AnimationSeqAsset : IAsset
 AnimationSeqAsset = {
 }
@@ -98,6 +98,9 @@ BoneMaskValue = {
 ---@field masks any
 SkeletonMask = {
 }
+---@class HackedAsyncAssetRegReindex : IAsset
+HackedAsyncAssetRegReindex = {
+}
 ---@class IAsset : ClassBase
 IAsset = {
 }
@@ -107,6 +110,21 @@ BoolButton = {
 ---@class ClassBase
 ClassBase = {
 }
+---@return ClassTypeInfo|nil
+function ClassBase:my_type() end
+---@return boolean
+---@param type ClassTypeInfo|nil
+function ClassBase:is_subclass_of(type) end
+---@class ClassTypeInfo : ClassBase
+ClassTypeInfo = {
+}
+---@return boolean
+---@param info ClassTypeInfo|nil
+function ClassTypeInfo:is_subclass_of(info) end
+---@return string
+function ClassTypeInfo:get_classname() end
+---@return ClassTypeInfo|nil
+function ClassTypeInfo:get_super_type() end
 CURVEPOINTTYPE_LINEAR = 0
 CURVEPOINTTYPE_CONSTANT = 1
 CURVEPOINTTYPE_SPLITTANGENTS = 2
@@ -144,11 +162,17 @@ EntityBoneParentString = {
 ---@field editor_name string
 Entity = {
 }
+function Entity:destroy() end
 ---@return Component|nil
----@param ti any
-function Entity:get_component_typeinfo(ti) end
+---@param ti ClassTypeInfo|nil
+function Entity:get_component(ti) end
 ---@return Entity|nil
 function Entity:get_parent() end
+---@return Component|nil
+---@param info ClassTypeInfo|nil
+function Entity:create_component(info) end
+---@return Entity|nil
+function Entity:create_child_entity() end
 ---@param v Vec3
 function Entity:set_ls_position(v) end
 ---@param euler Vec3
@@ -170,13 +194,15 @@ function Entity:get_parent_bone() end
 ---@class Component : BaseUpdater
 Component = {
 }
+function Component:pre_start() end
+function Component:start() end
+function Component:update() end
+function Component:end() end
+---@param shouldTick boolean
+function Component:set_ticking(shouldTick) end
+function Component:destroy() end
 ---@return Entity|nil
 function Component:get_owner() end
----@return boolean
----@param t any
-function Component:is_type_for_script(t) end
----@return any
-function Component:get_type_for_script() end
 ---@class SceneAsset : IAsset
 SceneAsset = {
 }

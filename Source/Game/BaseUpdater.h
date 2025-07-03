@@ -13,8 +13,12 @@ class BaseUpdater : public ClassBase
 {
 public:
 	CLASS_BODY(BaseUpdater);
-	static const int INVALID_FILEID = 0;
+	
+	// queues this entity/component to be destroyed at the end of the frame
+	REF void destroy_deferred();
 
+
+	static const int INVALID_FILEID = 0;
 	// Editor Data >>>>
 #ifdef EDITOR_BUILD
 	void set_editor_transient(bool transient) { dont_serialize_or_edit = transient; }
@@ -27,9 +31,6 @@ public:
 	// <<<<<<<<<<<<<<<<
 #endif
 
-	// queues this entity/component to be destroyed at the end of the frame
-	REFLECT(name="destroy");
-	void destroy_deferred();
 	void post_unserialization(uint64_t id) {
 		ASSERT(init_state == initialization_state::CONSTRUCTOR);
 		this->instance_id = id;

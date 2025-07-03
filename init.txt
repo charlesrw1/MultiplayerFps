@@ -105,3 +105,4 @@ developer_mode 1
 
 #map top_down/map0.tmap
 
+start_ed Map top_down/map0.tmap

@@ -198,7 +198,8 @@ void sys_print(LogType type, const char* fmt, ...)
 
 
 	vprintf(fmt, args);
-	Debug_Console::inst->print_args(fmt, args);
+	if(Debug_Console::inst)
+		Debug_Console::inst->print_args(fmt, args);
 	va_end(args);
 
 	if (print_end)
@@ -899,6 +900,15 @@ void GameEngineLocal::add_commands()
 		GameTagManager::get().add_tag(args.at(1));
 		});
 
+	commands->add("dump_bundle", [](const Cmd_Args& args) {
+		if (args.size() != 2) {
+			sys_print(Error, "usage: bundle name\n");
+		}
+		else {
+			g_assets.dump_loaded_assets_to_disk(args.at(1));
+		}
+		});
+
 	g_modelMgr.add_commands(*commands);
 }
 
@@ -1453,10 +1463,10 @@ int game_engine_main(int argc, char** argv)
 	material_print_debug.set_bool(false);
 	developer_mode.set_bool(true);
 	log_shader_compiles.set_bool(false);
-	loglevel.set_integer(0);
+
+	loglevel.set_integer(4);
 	eng_local.init(argc,argv);
 	developer_mode.set_bool(true);
-	loglevel.set_integer(4);
 	log_all_asset_loads.set_bool(false);
 	log_destroy_game_objects.set_bool(false);
 
@@ -1472,7 +1482,7 @@ int game_engine_main(int argc, char** argv)
 
 	//Cmd_Manager::inst->append_cmd(uptr<OpenMapCommand>(new OpenMapCommand("top_down/map0.tmap", true)));
 
-	eng_local.set_tester(new IntegrationTester(true, tests), false);
+	//eng_local.set_tester(new IntegrationTester(true, tests), false);
 
 
 	eng_local.loop();
@@ -1827,7 +1837,7 @@ void GameEngineLocal::init_sdl_window()
 
 	SDL_GL_SetSwapInterval(0);
 }
-
+#include "Assets/AssetBundle.h"
 
 using std::make_unique;
 
@@ -1845,6 +1855,7 @@ void GameEngineLocal::init(int argc, char** argv)
 	auto print_time = [&](const char* msg) {
 		double now = GetTime();
 		//printf("-----TIME %s %f\n", msg, float(now - start));
+		sys_print(Debug, "init %s in %fs\n", msg, float(now-start));
 		start = now;
 	};
 
@@ -1902,6 +1913,11 @@ void GameEngineLocal::init(int argc, char** argv)
 	g_gameAnimationMgr.init();
 
 	Model::on_model_loaded.add(this, [](Model* mod) { add_events_test(mod); });
+	print_time("init mods,sounds");
+
+	// doesnt matter if it fails, just precache loading stuff
+	g_assets.find_sync<AssetBundle>("engDefault.bundle", true);
+	print_time("load default bundle");
 
 	//cl->init();
 	//sv->init();
@@ -1981,7 +1997,8 @@ void GameEngineLocal::init(int argc, char** argv)
 	//	//open_level(g_entry_level.get_string());
 	//}
 
-	TIMESTAMP("execute startup");
+
+	sys_print(Info, "execute startup in %f\n", (float)TimeSinceStart());
 }
 
 

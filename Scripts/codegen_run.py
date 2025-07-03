@@ -9,7 +9,6 @@ def do_codegen(path:str, skip_dirs:list[str], full_rebuild:bool):
     typenames : dict[str,ClassDef] = read_typenames_from_files(skip_dirs)
 
     print("fixing pts in typenames")
-    typenames["ClassBase"] = ClassDef(["ClassBase"],ClassDef.TYPE_CLASS)
     ClassDef.fixup_types(typenames) # this will sort out parents etc
 
     end_time = time.perf_counter()

@@ -1,15 +1,17 @@
 #include "LevelAssets.h"
 #include "Assets/AssetDatabase.h"
 #include "Assets/AssetRegistry.h"
-
 #include "Framework/Files.h"
 #include "Game/BaseUpdater.h"
-
 #include "LevelSerialization/SerializationAPI.h"
-
 #include "Framework/ReflectionProp.h"
 #include "EngineSystemCommands.h"
 #include "LevelEditor/EditorDocLocal.h"
+#include "LevelSerialization/SerializeNewMakers.h"
+#include "Framework/MapUtil.h"
+#include "LevelSerialization/SerializeNew.h"
+#include "Framework/StringUtils.h"
+
 using std::make_unique;
 #ifdef EDITOR_BUILD
 class IEditorTool;
@@ -189,34 +191,48 @@ void SceneAsset::move_construct(IAsset*) {
 	sys_print(Warning, "scene asset move construct, shouldnt have happened\n");
 }
 
+void SceneAsset::post_load()
+{
+	// hmm move this to post_load on main thread because lua isnt thread safe
+	// use asset bundles to do the models,textures, etc. on an async thread
+	// this also throws on error, catch it in assets
+	double start = GetTime();
+	
+	sceneFile = std::make_unique<UnserializedSceneFile>(NewSerialization::unserialize_from_json(get_name().c_str(), *halfUnserialized, *g_assets.loader));
+	double now = GetTime();
+	sys_print(Debug, "SceneAsset::post_load: took %f\n", float(now - start));
+}
 bool SceneAsset::load_asset(IAssetLoadingInterface* load)
 {
 	auto& path = get_name();
 
 	auto fileptr = FileSys::open_read_game(path.c_str());
 	if (!fileptr) {
-		sys_print(Error, "couldn't open scene %s\n", path.c_str());
+		sys_print(Error, "SceneAsset::load_asset: couldn't open scene %s\n", path.c_str());
 		return false;
 	}
-	text = std::string(fileptr->size(), ' ');
-	fileptr->read((void*)text.data(), text.size());
+	string textForm = std::string(fileptr->size(), ' ');
+	fileptr->read((void*)textForm.data(), textForm.size());
+	if (StringUtils::starts_with(textForm, "!json\n")) {
+		textForm = textForm.substr(5);
+	}
 	try {
-		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize_entities_from_text(get_name().c_str(), text, load));
+		halfUnserialized = make_unique<SerializedForDiffing>();
+		halfUnserialized->jsonObj = nlohmann::json::parse(textForm);
 	}
-	catch (int) {
-		sys_print(Error, "error loading SceneAsset %s\n", path.c_str());
+	catch (...) {
+		sys_print(Error, "SceneAsset::load_asset: json unserialize error %s\n", path.c_str());
 		return false;
 	}
-
 	return true;
 }
 
 PrefabAsset::~PrefabAsset() {
 	sys_print(Debug, "~PrefabAsset: %s\n", get_name().c_str());
+	if (sceneFile)
+		sceneFile->delete_objs();
 }
-#include "LevelSerialization/SerializeNewMakers.h"
-#include "Framework/MapUtil.h"
-#include "LevelSerialization/SerializeNew.h"
+
 
 UnserializedSceneFile PrefabAsset::unserialize(IAssetLoadingInterface* load) const
 {
@@ -227,9 +243,8 @@ UnserializedSceneFile PrefabAsset::unserialize(IAssetLoadingInterface* load) con
 	UnserializedSceneFile out = NewSerialization::unserialize_from_json(get_name().c_str(), *halfUnserialized, *load);
 	double now = GetTime();
 	sys_print(Debug, "PrefabAsset::unserialize: took %f\n", float(now - start));
-	return std::move(out);
+	return out;
 }
-#include "Framework/StringUtils.h"
 bool PrefabAsset::load_asset(IAssetLoadingInterface* load)
 {
 	auto& path = get_name();
@@ -246,18 +261,6 @@ bool PrefabAsset::load_asset(IAssetLoadingInterface* load)
 	try {
 		halfUnserialized = make_unique<SerializedForDiffing>();
 		halfUnserialized->jsonObj = nlohmann::json::parse(textForm);
-		sceneFile = std::make_unique<UnserializedSceneFile>(unserialize(load));
-		if (sceneFile->num_roots != 1) {
-			sys_print(Error, "PrefabAsset::load_asset: prefab doesnt have 1 root, has: %d\n", sceneFile->num_roots);
-		}
-
-		// add instance ids here for diff'ing entity references
-		uint64_t id = 1ull << 62ull;
-		for (auto& obj : sceneFile->all_obj_vec) {
-			obj->post_unserialization(++id);
-			instance_ids_for_diffing.insert(id, obj);
-		}
-		sceneFile->unserialize_post_assign_ids();
 	}
 	catch (...) {
 		sys_print(Error, "PrefabAsset::load_asset: error %s\n", path.c_str());
@@ -271,10 +274,7 @@ void PrefabAsset::uninstall()
 {
 	if (!sceneFile)
 		return;
-
-	//sys_print(Debug, "prefab uninstalled %s\n", get_name().c_str());
-	for (auto& o : sceneFile->all_obj_vec)
-		delete o;
+	sceneFile->delete_objs();
 	sceneFile.reset(nullptr);
 }
 
@@ -301,4 +301,22 @@ void PrefabAsset::move_construct(IAsset* other)
 	halfUnserialized = std::move(o->halfUnserialized);
 	//text = std::move(o->text);
 	instance_ids_for_diffing = std::move(o->instance_ids_for_diffing);
+}
+PrefabAsset* PrefabAsset::load(string s) {
+	return g_assets.find_sync<PrefabAsset>(s).get();
+}
+void PrefabAsset::post_load() {
+	sceneFile = std::make_unique<UnserializedSceneFile>(unserialize(g_assets.loader));
+	if (sceneFile->num_roots != 1) {
+		sys_print(Error, "PrefabAsset::load_asset: prefab doesnt have 1 root, has: %d\n", sceneFile->num_roots);
+		throw std::runtime_error("load error");
+	}
+
+	// add instance ids here for diff'ing entity references
+	uint64_t id = 1ull << 62ull;
+	for (auto& obj : sceneFile->all_obj_vec) {
+		obj->post_unserialization(++id);
+		instance_ids_for_diffing.insert(id, obj);
+	}
+	sceneFile->unserialize_post_assign_ids();
 }

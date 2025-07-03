@@ -72,6 +72,10 @@ Model::~Model() {
 		printf("");
 	}
 }
+Model* Model::load(const std::string& path)
+{
+	return g_assets.find_sync<Model>(path).get();
+}
 Model::Model() {}
 
 static const int MODEL_FORMAT_VERSION = 13;

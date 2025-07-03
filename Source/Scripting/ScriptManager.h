@@ -5,9 +5,9 @@
 using std::string;
 using std::vector;
 using std::unordered_map;
+#include "Framework/ClassTypeInfo.h"
 
-enum class ScriptType
-{
+enum class ScriptType {
 	Nil,
 	Number,
 	Bool,
@@ -20,24 +20,19 @@ enum class ScriptType
 
 struct ScriptProperty
 {
-	string name;
-	string type_str;
 	ScriptType type_enum = ScriptType::Nil;
+	std::string_view name;
 };
 class ScriptTypeInfo
 {
 public:
 	bool is_defined = false;
-	string classname;
-	string lua_table_name;	// might be different
+	std::string_view classname;
 	ScriptTypeInfo* parent = nullptr;
 	vector<ScriptProperty> properties;
 	vector<ScriptTypeInfo*> interfaces;
-
 	string source_file;	// what file
 	int definition_line = 0;	// what line
-
-	uint64_t template_table = 0;	// lua template table
 };
 
 struct ParseProperty {
@@ -71,6 +66,21 @@ public:
 	const ScriptTypeInfo* find_type(string name) const;
 
 	unordered_map<string, ScriptTypeInfo> typeinfo;
+};
+
+class LuaClassTypeInfo : public ClassTypeInfo {
+public:
+	LuaClassTypeInfo();
+	void set_classname(string s) {
+		this->lua_classname = s;
+		this->classname = this->lua_classname.c_str();
+	}
+private:
+	string lua_classname;
+};
+class LuaScriptDef {
+public:
+	std::vector<LuaClassTypeInfo*> lua_classes;
 };
 
 // manages lua and the loaded scripts

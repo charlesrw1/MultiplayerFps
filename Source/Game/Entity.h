@@ -49,18 +49,18 @@ public:
 	// ClassBase override
 	void serialize(Serializer& s) final;
 	// destroy already reflected in BaseUpdater
-	void destroy();
+	REF void destroy();
 	template<typename T>
 	T* get_component() const { return (T*)get_component(&T::StaticType); }
-	Component* get_component(const ClassTypeInfo* ti) const;
-	Entity* get_parent() const { return parent; }
+	REF Component* get_component(const ClassTypeInfo* ti) const;
+	REF Entity* get_parent() const { return parent; }
 	// USE IN RUNTIME! use create_sub_component to setup object in the constructor
 	// this calls on_init()
 	template<typename T>
 	T* create_component();
-	Component* create_component_type(const ClassTypeInfo* info);
+	REF Component* create_component(const ClassTypeInfo* info);
 	// will also parent to this
-	Entity* create_child_entity();
+	REF Entity* create_child_entity();
 	template<typename T>
 	T* create_entity_with_component();
 	// ONLY USE in serialization!
@@ -179,7 +179,7 @@ private:
 template<typename T>
 inline T* Entity::create_component() {
 	static_assert(std::is_base_of<Component, T>::value, "Type not derived from EntityComponent");
-	return (T*)create_component_type(&T::StaticType);
+	return (T*)create_component(&T::StaticType);
 }
 
 template<typename T>

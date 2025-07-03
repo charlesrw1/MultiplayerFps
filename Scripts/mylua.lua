@@ -577,6 +577,7 @@ SCANCODE_B = 1
 
 local function find_by_tag(tag)
 
+
     if LuaInput.is_key_down(SCANCODE_A) then
         
     end
@@ -585,6 +586,22 @@ local function find_by_tag(tag)
     ---@type Entity
     local e = {}
     local pos = e:get_ws_position()
+
+    e:my_type():is_subclass_of(Entity)
+
+    ---@type MeshComponent|nil
+    local p = e:get_component(MeshComponent)
+    if p ~= nil then
+        local pfb = PrefabAsset.load("mypfb.pfb")
+        local spawned = GameplayStatic.spawn_prefab(pfb)
+        if spawned ~= nil then
+            ---@type MeshComponent
+            local pfbMesh = spawned:get_component(MeshComponent)
+            if pfbMesh ~= nil then
+                p:set_model(pfbMesh:get_model())
+            end
+        end
+    end
 
     local p = GameplayStatic.spawn_entity()
 

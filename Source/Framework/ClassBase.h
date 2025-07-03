@@ -45,7 +45,10 @@ private:
 // like REF int myvariable = 0;
 #define REF
 
-#define CLASS_BODY(classname) \
+// like reflect, this also supports arguments (in ...)
+// options:
+//		- 'scriptable' : lets this class be implemented in lua
+#define CLASS_BODY(classname, ...) \
 	using MyClassType = classname; \
 	static ClassTypeInfo StaticType; \
 	virtual const ClassTypeInfo& get_type() const { return classname::StaticType; } \
@@ -58,12 +61,9 @@ public:
 	CLASS_BODY(ClassBase);
 
 	const static bool CreateDefaultObject;	/* = false, default setting */
-
 	virtual ~ClassBase() {
 	}
-
 	virtual void serialize(Serializer& s) {}	// override to add custom serialization functionality
-
 	// cast this class to type T, returns nullptr if failed
 	template<typename T>
 	const T* cast_to() const {
@@ -73,11 +73,9 @@ public:
 	T* cast_to() {
 		return (is_a<T>() ? static_cast<T*>(this) : nullptr );
 	}
-
 	// is this class a subclass or an instance of type T
 	template<typename T>
 	bool is_a() const;
-
 	// creates a copy of class and copies serializable fields
 	ClassBase* create_copy(ClassBase* userptr = nullptr);
 
@@ -88,13 +86,9 @@ public:
 public:
 	// called by ClassTypeInfo only during static init
 	static void register_class(ClassTypeInfo* cti);
-
 	// called in main() after all classes have been reg'd
 	static void init_class_reflection_system();
-	
-	// find a ClassTypeInfo by classname string
 	static const ClassTypeInfo* find_class(const char* classname);
-	// find a ClassTypeInfo by integer id
 	static const ClassTypeInfo* find_class(int32_t id);
 
 	static bool does_class_exist(const char* classname) {
@@ -107,16 +101,26 @@ public:
 	// allocate by id
 	template<typename T>
 	static T* create_class(int16_t id);
-
 	// get all subclasses to a class excluding abstract ones
 	template<typename T>
 	static ClassTypeIterator get_subclasses() {
 		return ClassTypeIterator(&T::StaticType);
 	}
-
 	static ClassTypeIterator get_subclasses(const ClassTypeInfo* typeinfo) {
 		return ClassTypeIterator((ClassTypeInfo*)typeinfo/* remove const here, doesnt matter tho*/);
 	}
+
+	// non-const, lazy evalutation
+	int get_table_registry_id();
+	bool is_class_referenced_from_lua() const;
+private:
+	// this is used for interop with lua
+	// this is the table id returned by luaL_ref in the registry
+	// the lua table stores a ptr to this object. when the object is deleted in c++, the table's ptr is nulled
+	// for non-lua objects, this table is lazily initialized
+	// when an object first wants a reference in lua, it creates a table and sets this
+	// lua derived objects will set this on construction
+	int lua_table_id = 0;
 };
 
 template<typename T>

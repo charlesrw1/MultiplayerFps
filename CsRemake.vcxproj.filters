@@ -451,7 +451,6 @@
     <ClInclude Include="Source\Framework\SysPrint.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
-    <ClInclude Include="Source\Scripting\ScriptManager2.h" />
     <ClInclude Include="Source\Game\Components\TileMapComponent.h" />
     <ClInclude Include="Source\Framework\Jobs.h" />
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
@@ -503,6 +502,7 @@
     <ClInclude Include="Source\Scripting\ScriptFunctionCodegen.h" />
     <ClInclude Include="Source\Framework\ClassTypeInfo.h" />
     <ClInclude Include="Source\Assets\HackedReloader.h" />
+    <ClInclude Include="Source\Assets\AssetBundle.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -674,8 +674,8 @@
     <ClCompile Include="Source\Render\RenderWindow.cpp" />
     <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew2.cpp" />
     <ClCompile Include="Source\Game\TopDownShooter\TopDownPlayer.cpp" />
-    <ClCompile Include="Source\Scripting\ScriptManager2.cpp" />
     <ClCompile Include="Source\Scripting\ScriptFunctionCodegen.cpp" />
+    <ClCompile Include="Source\Assets\AssetBundle.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

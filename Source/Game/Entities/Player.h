@@ -69,7 +69,7 @@ public:
 		return HitResult();
 	}
 };
-
+//
 /// <summary>
 /// 
 /// </summary>

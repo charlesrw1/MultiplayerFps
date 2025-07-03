@@ -582,8 +582,14 @@ public:
 				}
 				if (!o->load_failed && !o->has_run_post_load) {
 					double now = GetTime();
-					o->post_load();
-					o->has_run_post_load = true;
+					try {
+						o->post_load();
+						o->has_run_post_load = true;
+					}
+					catch (...) {
+						sys_print(Error, "AssetDatabase: asset post load failed \"%s\" (type=%s) (FromJob: \"%s\")\n", o->get_name().c_str(), o->get_type().classname, job->out_object->get_name().c_str());
+						o->load_failed = true;
+					}
 					if (log_all_asset_loads.get_bool()) {
 						timings.push_back({ o->get_name(),float(GetTime() - now) });
 					}
@@ -767,6 +773,31 @@ public:
 			sys_print(Info, "%-32s|%-18s|%s|%s\n", usename.c_str(), usetype.c_str(), (type->load_failed) ? "X" : " ", "");
 		}
 	}
+	void dump_to_file(IFile* file) {
+		auto get_i = [](IAsset* a) -> int {
+			if (strcmp(a->get_type().classname, "Texture") == 0)
+				return 0;
+			else if (strcmp(a->get_type().classname, "MaterialInstance") == 0)
+				return 1;
+			else if (strcmp(a->get_type().classname, "Model") == 0)
+				return 2;
+			return 3;
+		};		
+		std::vector<std::pair<IAsset*,int>> list;
+		for (auto& [name, type] : allAssets) {	// structured bindings r cool
+			if (!type->is_loaded)
+				continue;
+			list.push_back({ type,get_i(type) });
+		}
+		// order them slightly
+		std::sort(list.begin(), list.end(), [](const std::pair<IAsset*, int>& a, const std::pair<IAsset*, int>& b) -> bool {
+			return a.second < b.second;
+			});
+		for (auto& a : list) {
+			string line = a.first->get_type().classname + string(" ") + a.first->get_name() + "\n";
+			file->write(line.data(), line.size());
+		}
+	}
 
 	// wait for job queue to be flushed
 	void finish_all_jobs() {
@@ -883,6 +914,15 @@ void AssetDatabase::remove_unreferences()
 void AssetDatabase::print_usage()
 {
 	impl->print_assets();
+}
+void AssetDatabase::dump_loaded_assets_to_disk(const std::string& path)
+{
+	sys_print(Info, "AssetDatabase::dump_loaded_assets_to_disk: %s\n", path.c_str());
+	auto file = FileSys::open_write_game(path);
+	if (!file) {
+		sys_print(Error, "AssetDatabase::dump_loaded_assets_to_disk: path couldn't open %s\n", path.c_str());
+	}
+	impl->dump_to_file(file.get());
 }
 PrimaryAssetLoadingInterface::PrimaryAssetLoadingInterface(AssetDatabaseImpl& frontend) : impl(frontend) {
 }

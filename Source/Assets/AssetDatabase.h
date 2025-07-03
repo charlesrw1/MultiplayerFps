@@ -83,8 +83,10 @@ public:
 	// checks for out of date assets and reloads them async
 	void hot_reload_assets();
 #endif
-
 	void print_usage();
+	// this creates an asset bundle essentially
+	void dump_loaded_assets_to_disk(const std::string& path);
+
 	AssetDatabase();
 	~AssetDatabase();
 private:

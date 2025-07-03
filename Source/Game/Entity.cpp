@@ -383,7 +383,7 @@ Entity::~Entity()
 	//ASSERT(all_components.empty());
 }
 
-Component* Entity::create_component_type(const ClassTypeInfo* info)
+Component* Entity::create_component(const ClassTypeInfo* info)
 {
 	ASSERT(init_state != initialization_state::CONSTRUCTOR);
 

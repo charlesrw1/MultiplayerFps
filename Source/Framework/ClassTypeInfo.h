@@ -41,6 +41,9 @@ public:
 	std::unique_ptr<SerializedForDiffing> diff_data;
 	const FunctionInfo* lua_functions = nullptr;
 	int lua_function_count = 0;
+	// allocates a scriptable version of this object
+	// it overrides virtal functions to call into lua
+	ClassBase* (*scriptable_allocate)(const ClassTypeInfo*) = nullptr;
 	// opaque pointer to hash table for props
 	const PropHashTable* prop_hash_table = nullptr;
 
@@ -48,6 +51,7 @@ public:
 	static ClassBase* default_allocate() {
 		return (ClassBase*)(new T);
 	}
+	bool is_this_scriptable() const { return scriptable_allocate; }
 
 	bool is_a(const ClassTypeInfo& other) const {
 		return id >= other.id && id <= other.last_child;

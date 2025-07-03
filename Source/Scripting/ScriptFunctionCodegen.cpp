@@ -23,6 +23,13 @@ void push_object_to_lua(lua_State* L, const ClassBase* ptrConst)
 	// find cached table, return it
 	// create cached table
 	// return
+	if (!ptr) {
+		lua_pushnil(L);
+	}
+	else {
+		// push
+		assert(0);
+	}
 }
 
 
@@ -69,9 +76,4 @@ ClassBase* get_object_from_lua(lua_State* L, int index) {
 		luaL_error(L, "expected __ptr user data in table");
 		return nullptr;
 	}
-}
-
-ClassTypeInfo* get_class_type_from_lua(lua_State* L, int index)
-{
-	return nullptr;
 }

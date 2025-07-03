@@ -15,19 +15,6 @@
 // rules:
 // * path based on source
 
-BaseUpdater* LevelSerializationContext::get_object(uint64_t handle)
-{
-	ASSERT(out&&!in);
-	bool is_from_diff = handle & (1ull << 63ull);
-	BaseUpdater* obj = nullptr;
-	if (is_from_diff) {
-		ASSERT(diffprefab)
-		obj= diffprefab->find_entity(handle);
-	}
-	else
-		obj = eng->get_level()->get_entity(handle);
-	return obj;
-}
 
 
 bool serialize_this_objects_children(const Entity* b)

@@ -4,6 +4,7 @@ import shlex
 from pathlib import Path
 
 import itertools
+from textwrap import indent
 from typing import Any, List, Optional
 
 
@@ -111,7 +112,7 @@ class ClassDef:
     TYPE_ENUM = 2
     TYPE_INTERFACE = 3
 
-    def __init__(self, name_and_bases : list[str], type:int):
+    def __init__(self, name_and_bases : list[str], type:int, scriptable : bool):
         self.source_file : str = ""
         self.source_file_line : int = 0
 
@@ -130,6 +131,8 @@ class ClassDef:
         self.properties : list[Property] = []
 
         self.tooltip = ""
+
+        self.scriptable = scriptable
 
     def find_property_for_name(self, name:str) -> Property|None:
         for p in self.properties:
@@ -338,12 +341,48 @@ def find_struct_in_typenames(line:str,file_iter:enumerate[str], typenames:dict[s
         return typenames[name]
     return None
 
+
+def parse_class_body_macro(line : str, inDef : ClassDef):
+    start_p = line.find("(")
+    end_p = line.rfind(")")
+    if start_p == -1 or end_p == -1:
+        raise Exception("expected CLASS_BODY(name,...)")
+    argstr = line[start_p+1:end_p]
+    argstr = argstr.replace(","," , ")
+    argstr = argstr.replace("="," = ")
+    tokens = shlex.split(argstr)
+    if len(tokens) == 0:
+        raise Exception("expectd classname in CLASS_BODY() for " + inDef.classname)
+    if len(tokens)>=2: # classname, ',' , ...
+        tokens = tokens[2:]
+    else:
+        return # no args
+    token_iter = iter(tokens)
+
+    try:
+        for t in token_iter:
+            if t == "scriptable":
+                print(f"found scriptable tag for {inDef.classname}")
+                inDef.scriptable = True
+            else:
+                raise Exception(f"unexpected CLASS_BODY(...) arg \"{t}\"")
+
+            next_or_final = next(token_iter, None)
+            if next_or_final == None:
+                break
+            if next_or_final!=",":
+                raise Exception("expected comma between args")
+    except StopIteration as e:
+        raise Exception("unexpected CLASS_BODY() arg end")
+
+
+
 def parse_class_from_start(line:str, file_iter:enumerate[str]) -> ClassDef|None:
     if remove_comment_from_end(line).strip().endswith(";"):  # to skip forward declares, hacky
         return None
 
     name_and_bases = parse_class_decl(line)
-    c = ClassDef(name_and_bases, ClassDef.TYPE_CLASS)
+    c = ClassDef(name_and_bases, ClassDef.TYPE_CLASS, False)
 
     # now check its really a class, expects CLASS_BODY(name) on next 1-3 lines...
     good = False
@@ -351,6 +390,7 @@ def parse_class_from_start(line:str, file_iter:enumerate[str]) -> ClassDef|None:
         _,line = next(file_iter)
         line = line.strip()
         if line.startswith(f"CLASS_BODY("):
+            parse_class_body_macro(line, c)
             good = True
             break
     if good:
@@ -370,7 +410,7 @@ def parse_struct_from_start(line:str, file_iter:enumerate[str]) -> ClassDef|None
         return None
     
     name_and_bases = parse_struct_decl(line)
-    c = ClassDef([name_and_bases],ClassDef.TYPE_STRUCT)
+    c = ClassDef([name_and_bases],ClassDef.TYPE_STRUCT, False)
 
     # now check its really a struct, expects struct_body() on next 1-3 lines...
     good = False
@@ -674,7 +714,7 @@ def read_typenames_from_text(filetext:TextIOWrapper, filepath : str) -> dict[str
             if start_p==-1 or end_p==-1:
                 continue
             enumname = line[start_p+1:comma].strip()            
-            c = ClassDef([enumname],ClassDef.TYPE_ENUM)
+            c = ClassDef([enumname],ClassDef.TYPE_ENUM, False)
             c.source_file = filepath
             c.source_file_line = line_num
             typenames[enumname] = c

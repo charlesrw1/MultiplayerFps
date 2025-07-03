@@ -2006,7 +2006,7 @@ Entity* EditorDoc::spawn_entity()
 
 Component* EditorDoc::attach_component(const ClassTypeInfo* ti, Entity* e)
 {
-	Component* c = e->create_component_type(ti);
+	Component* c = e->create_component(ti);
 	instantiate_into_scene(c);
 	return c;
 }

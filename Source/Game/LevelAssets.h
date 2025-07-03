@@ -19,11 +19,13 @@ public:
 	// IAsset overrides
 	void sweep_references(IAssetLoadingInterface* load) const override {}
 	bool load_asset(IAssetLoadingInterface* load) override;
-	void post_load() override {}
+	void post_load() override;
 	void uninstall() override;
 	void move_construct(IAsset*) override;
 
-	std::string text;
+	UnserializedSceneFile unserializeStep2();
+
+	uptr<SerializedForDiffing> halfUnserialized;
 	std::unique_ptr<UnserializedSceneFile> sceneFile;
 };
 
@@ -34,16 +36,12 @@ public:
 	PrefabAsset();
 	~PrefabAsset();
 
-	REF static PrefabAsset* load(string name) { return nullptr; }
+	REF static PrefabAsset* load(string name);
 
 	Entity& instantiate(const glm::vec3& position, const glm::quat& rot) const;
 	const Entity& get_default_object() const;
 
 	UnserializedSceneFile unserialize(IAssetLoadingInterface* load) const;
-
-	BaseUpdater* find_entity(uint64_t handle) {
-		return instance_ids_for_diffing.find(handle);
-	}
 
 	std::unique_ptr<UnserializedSceneFile> sceneFile;
 	hash_map<BaseUpdater*> instance_ids_for_diffing;
@@ -52,7 +50,7 @@ private:
 	// IAsset overrides
 	void sweep_references(IAssetLoadingInterface* load) const override;
 	bool load_asset(IAssetLoadingInterface* load) override;
-	void post_load() override {}
+	void post_load() override;
 	void uninstall() override;
 	void move_construct(IAsset*) override;
 };

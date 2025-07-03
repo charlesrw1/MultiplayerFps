@@ -603,6 +603,11 @@ Texture::Texture() {}
 Texture::~Texture() {
 	assert(gl_id == 0);
 }
+#include "Assets/AssetDatabase.h"
+Texture* Texture::load(const std::string& path)
+{
+	return g_assets.find_sync<Texture>(path).get();
+}
 
 
 void benchmark_run()

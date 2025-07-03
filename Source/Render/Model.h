@@ -108,6 +108,9 @@ public:
 	CLASS_BODY(Model);
 	Model();
 	~Model() override;
+
+	static Model* load(const std::string& path);
+
 	void uninstall() override;
 	void sweep_references(IAssetLoadingInterface* loading) const override;
 	void post_load() override;

@@ -695,6 +695,6 @@ void RemoveComponentCommand::undo() {
 		sys_print(Warning, "no entity in RemoveComponentCommand\n");
 		return;
 	}
-	auto ec = e->create_component_type(info);
+	auto ec = e->create_component(info);
 	comp_handle = ec->get_instance_id();
 }
