@@ -111,10 +111,10 @@ static void context_menu_callback(CurveEditorImgui* ptr) {
 
 	auto classes = ClassBase::get_subclasses<AnimationEvent>();
 	for (; !classes.is_end(); classes.next()) {
-		if (!classes.get_type()->allocate) continue;
+		if (!classes.get_type()->has_allocate_func()) continue;
 		bool selected = false;
 		if (ImGui::Selectable(classes.get_type()->classname, &selected)) {
-			auto ev = (AnimationEvent*)classes.get_type()->allocate();
+			auto ev = (AnimationEvent*)classes.get_type()->allocate_this_type();
 
 			ptr->add_item_from_menu(std::unique_ptr<EventSequenceItem>(new EventSequenceItem(ev)));
 			ImGui::CloseCurrentPopup();

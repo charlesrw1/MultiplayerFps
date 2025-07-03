@@ -1,4 +1,5 @@
 #include "ScriptFunctionCodegen.h"
+#include "Framework/ClassBase.h"
 
 void push_bool_to_lua(lua_State* L, bool b) {
 	lua_pushboolean(L, b);
@@ -17,21 +18,16 @@ void push_std_string_to_lua(lua_State* L, const std::string& str) {
 	lua_pushstring(L, str.c_str());
 }
 
-void push_object_to_lua(lua_State* L, const ClassBase* ptrConst)
-{
+void push_object_to_lua(lua_State* L, const ClassBase* ptrConst) {
 	ClassBase* ptr = const_cast<ClassBase*>(ptrConst);
-	// find cached table, return it
-	// create cached table
-	// return
 	if (!ptr) {
 		lua_pushnil(L);
 	}
 	else {
 		// push
-		assert(0);
+		lua_rawgeti(L, LUA_REGISTRYINDEX, ptr->get_table_registry_id());
 	}
 }
-
 
 void push_vec3_to_lua(lua_State* L, const glm::vec3& v)
 {
@@ -58,15 +54,17 @@ glm::vec3 get_vec3_from_lua(lua_State* L, int index) {
 	assert(0);
 	return {};
 }
-
+extern void stack_dump(lua_State* L);
 ClassBase* get_object_from_lua(lua_State* L, int index) {
+	stack_dump(L);
+
 	if (lua_isnil(L, index))
 		return nullptr;
 	if (!lua_istable(L, index)) {
 		luaL_error(L, "expected table in finding object to call function");
 	}
 	lua_getfield(L, index, "__ptr");
-	if (lua_isuserdata(L, -1)) {
+	if (lua_islightuserdata(L, -1)) {
 		void* ptr = lua_touserdata(L, -1);
 		lua_pop(L, 1);  // Clean up the stack
 		return (ClassBase*)ptr;

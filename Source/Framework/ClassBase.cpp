@@ -4,6 +4,7 @@
 #include "Framework/Util.h"
 #include "PropHashTable.h"
 #include "SerializedForDiffing.h"
+#include "Scripting/ScriptManager.h"
 
 const bool ClassBase::CreateDefaultObject = false;
 
@@ -20,6 +21,12 @@ std::string ClassTypeInfo::get_classname() const
 const ClassTypeInfo* ClassTypeInfo::get_super_type() const
 {
 	return super_typeinfo;
+}
+
+
+int ClassTypeInfo::get_prototype_index_table() const {
+	assert(lua_prototype_index_table != 0);
+	return lua_prototype_index_table;
 }
 
 struct TypeInfoWithExtra
@@ -58,7 +65,7 @@ static ClassRegistryData& get_registry()
 
 ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_typeinfo, 
 	GetPropsFunc_t get_props_func, CreateObjectFunc alloc, bool create_default_obj,
-	const FunctionInfo* lua_funcs, int lua_func_count)
+	const FunctionInfo* lua_funcs, int lua_func_count, CreateObjectFunc scriptAlloc, bool is_lua_obj)
 {
 	this->classname = classname;
 	this->superclassname = "";
@@ -71,9 +78,13 @@ ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_t
 	this->default_class_object = (ClassBase*)create_default_obj;
 	this->lua_functions = lua_funcs;
 	this->lua_function_count = lua_func_count;
-
-	// register this
-	ClassBase::register_class(this);
+	this->scriptable_allocate = scriptAlloc;
+	if (is_lua_obj)
+		this->default_class_object = nullptr;
+	else {
+		// register this
+		ClassBase::register_class(this);
+	}
 }
 
 ClassTypeInfo::~ClassTypeInfo()
@@ -190,8 +201,8 @@ void ClassBase::init_class_reflection_system()
 	auto& id_to_typeinfo = get_registry().id_to_typeinfo;
 	for (auto classtype : id_to_typeinfo) {
 		if (classtype->default_class_object != nullptr) {
-			if (classtype->allocate)
-				classtype->default_class_object = classtype->allocate();
+			if (classtype->has_allocate_func())
+				classtype->default_class_object = classtype->allocate_this_type();
 			else
 				classtype->default_class_object = nullptr;
 
@@ -238,11 +249,36 @@ const ClassTypeInfo* ClassBase::find_class(int32_t id)
 		return list[id];
 	return nullptr;
 }
+void ClassBase::init_class_info_for_script()
+{
+	auto& classes = get_registry().id_to_typeinfo;
+	for (auto c : classes) {
+		ScriptManager::inst->init_this_class_type(c);
+		assert(c->get_prototype_index_table()!=0);
+	}
+	for (auto c : classes) {
+		assert(c->get_prototype_index_table() != 0);
+		ScriptManager::inst->set_class_type_global(c);
+	}
+}
+int ClassBase::get_table_registry_id()
+{
+	if (lua_table_id == 0) {
+	//	sys_print(Debug, "ClassBase::get_table_registry_id\n");
+		lua_table_id = ScriptManager::inst->create_class_table_for(this);
+		assert(is_class_referenced_from_lua());
+	}
+	return lua_table_id;
+}
+bool ClassBase::is_class_referenced_from_lua() const
+{
+	return lua_table_id!=0;
+}
 #include "Assets/AssetDatabase.h"
 ClassBase* ClassBase::create_copy(ClassBase* userptr)
 {
-	ASSERT(get_type().allocate);
-	ClassBase* copied = get_type().allocate();
+	ASSERT(get_type().has_allocate_func());
+	ClassBase* copied = get_type().allocate_this_type();
 	ASSERT(copied);
 	copy_object_properties(this, copied, userptr, AssetDatabase::loader);
 	return copied;

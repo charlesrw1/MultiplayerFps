@@ -109,6 +109,7 @@ public:
 	static ClassTypeIterator get_subclasses(const ClassTypeInfo* typeinfo) {
 		return ClassTypeIterator((ClassTypeInfo*)typeinfo/* remove const here, doesnt matter tho*/);
 	}
+	static void init_class_info_for_script();
 
 	// non-const, lazy evalutation
 	int get_table_registry_id();
@@ -162,9 +163,9 @@ inline bool ClassBase::is_a() const {
 template<typename T>
 inline T* ClassBase::create_class(const char* classname) {
 	auto classinfo = find_class(classname);
-	if (!classinfo || !classinfo->allocate || !classinfo->is_a(T::StaticType))
+	if (!classinfo || !classinfo->is_a(T::StaticType))
 		return nullptr;
-	ClassBase* base = classinfo->allocate();
+	ClassBase* base = classinfo->allocate_this_type();
 	return static_cast<T*>(base);
 }
 
@@ -173,8 +174,8 @@ inline T* ClassBase::create_class(const char* classname) {
 template<typename T>
 inline T* ClassBase::create_class(int16_t id) {
 	auto classinfo = find_class(id);
-	if (!classinfo || !classinfo->allocate || !classinfo->is_a(T::StaticType))
+	if (!classinfo  || !classinfo->is_a(T::StaticType))
 		return nullptr;
-	ClassBase* base = classinfo->allocate();
+	ClassBase* base = classinfo->allocate_this_type();
 	return static_cast<T*>(base);
 }

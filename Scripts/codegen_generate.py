@@ -16,7 +16,7 @@ def write_headers(path:str, additional_includes:list[str]):
     out += "#include \"Framework/VectorReflect2.h\"\n"
     out += "#include \"Framework/EnumDefReflection.h\"\n"
     out += "#include \"Scripting/ScriptFunctionCodegen.h\"\n"
-
+    out += "#include \"Scripting/ScriptManager.h\"\n"
     for inc in additional_includes:
         out += f"#include {inc}\n"
 
@@ -299,7 +299,7 @@ def write_script_function(newclass:ClassDef, funcProp : Property) -> str:
     # get class object (or struct)
     calling_template = ""
     if not funcProp.is_static:
-        output += "\tClassBase* obj = get_object_from_lua(L,0);\n"
+        output += "\tClassBase* obj = get_object_from_lua(L,1);\n"
         output += f"\t{my_obj_type}* myObj = obj ? obj->cast_to<{my_obj_type}>() : nullptr;\n"
         # assert it
         output += "\tif(!myObj) {  assert(0); };\n" # fixme
@@ -313,13 +313,13 @@ def write_script_function(newclass:ClassDef, funcProp : Property) -> str:
         output += f"\t{calling_template}{function_name}(\n"
 
     # get args
-    argIndex = 0 
+    argIndex = 1
     for argType, argName in funcProp.func_args:
         luaIndex = argIndex
         if not funcProp.is_static:
             luaIndex = argIndex + 1
         output += "\t\t" + write_get_type_from_lua_func(argType, luaIndex)
-        if argIndex != len(funcProp.func_args) - 1:
+        if argIndex != len(funcProp.func_args):
             output += ","
         output += f" // {argName}\n"
         argIndex += 1
@@ -354,6 +354,10 @@ def write_scriptable_class(newclass : ClassDef) -> str:
     output = ""
     output += f"class ScriptImpl_{newclass.classname} : public {newclass.classname} " + " {\n"
     output += "public:\n"
+    output += f"""
+    const ClassTypeInfo* type = nullptr;
+    const ClassTypeInfo& get_type() const final {{ return *type; }}
+    """
     for f in newclass.properties:
         if f.new_type.type==FUNCTION_TYPE and f.is_virtual:
             output += "\t" + f.return_type.get_raw_type_string() + f" {f.name}("
@@ -362,17 +366,66 @@ def write_scriptable_class(newclass : ClassDef) -> str:
                 output += ", "
             if len(f.func_args)>0:
                 output = output[:-2]
-            output += ") final {\n"
+            output += ") final {"
+            # get my table
+            # find function
+            # push args
+            # get return value
+            output+= f"""
+        lua_State* L = ScriptManager::inst->get_lua_state();
+        int myTable = get_table_registry_id();
+        lua_rawgeti(L, LUA_REGISTRYINDEX, myTable);
+        lua_getfield(L,-1,\"{f.name}\");
+        bool is_func = lua_isfunction(L, -1);
+        if(is_func) {{
+            lua_pushvalue(L, -2);  // duplicate object table
+            """
+            for argType,argName in f.func_args:
+                output += "\t\t\t"+write_push_type_to_lua_func(argType,argName) + ";\n"
+            return_num = 0
+            if f.return_type.type!=NONE_TYPE:
+                return_num = 1
+            arg_count = len(f.func_args)+1 # include self parameter
+            
+            error_str = f"\"During call {newclass.classname}::{f.name}\" + std::string(\"(luatype=\")+type->classname+\"):\""
+            output+= f"""
+            if (lua_pcall(L, {arg_count}, {return_num}, 0) != LUA_OK) {{
+                const char* error = lua_tostring(L, -1);
+                printf("Lua error: %s\\n", error);
+                lua_pop(L, 1);  // pop error
 
-
+                throw LuaRuntimeError({error_str} + error);
+            }}
+            else {{\n"""
+            if return_num == 1:
+                output += f"\t\t\treturn {write_get_type_from_lua_func(f.return_type,-1)};\n"
+            else:
+                pass
+            output += "\t\t\t}\n"
+            output += "\t\t}\n\t\telse{\n"
+            output += f"\t\t\treturn {newclass.classname}::{f.name}("
+            for argType,argName in f.func_args:
+                output += argName
+                output += ", "
+            if len(f.func_args)>0:
+                output = output[:-2]
+            output += ");\n\t\t}\n"
 
             output += "\t}\n"
 
     output += "};\n"
     return output
 
-
-
+def has_any_functions(newclass:ClassDef)->bool:
+    for f in newclass.properties:
+        if f.new_type.type==FUNCTION_TYPE:
+            return True
+    return False
+def get_bool_str(b:bool)->str:
+    if b:
+        return "true"
+    else:
+        return "false"
 def write_class_old(newclass : ClassDef)->str:
 
 
@@ -382,16 +435,32 @@ def write_class_old(newclass : ClassDef)->str:
 
     output = ""
     if newclass.object_type==ClassDef.TYPE_CLASS:
+
+        output += write_class_script_functions(newclass)
+        function_str = "nullptr,0"
+        if has_any_functions(newclass):
+            output += f"FunctionInfo {newclass.classname}_function_list[] = {{"
+            count = 0
+            for f in newclass.properties:
+                if f.new_type.type==FUNCTION_TYPE:
+                    output += f"{{ \"{f.name}\",{get_bool_str(f.is_static)},{get_bool_str(f.is_virtual)}, lua_binding_{newclass.classname}_{f.name}  }},\n"
+                    count += 1
+            output = output[:-2]
+            output += "};\n"
+            function_str = f"{newclass.classname}_function_list,{count}"
+
+
+        scriptable_alloc = "nullptr"
         if newclass.scriptable:
             output += write_scriptable_class(newclass)
+            scriptable_alloc = f"get_allocate_script_impl_internal<ScriptImpl_{newclass.classname}>()"
 
         output += f"ClassTypeInfo {newclass.classname}::StaticType = ClassTypeInfo(\n \
                     \"{newclass.classname}\",\n \
                     {super_typeinfo_str},\n \
                     {newclass.classname}::get_props,\n \
                     default_class_create<{newclass.classname}>(),\n \
-                    {newclass.classname}::CreateDefaultObject\n,nullptr,0 \
-                );\n"
+                    {newclass.classname}::CreateDefaultObject,{function_str},{scriptable_alloc});\n"
     elif newclass.object_type == ClassDef.TYPE_STRUCT:
         has_serialize = does_struct_have_serialize_function(newclass)
         if has_serialize:
@@ -412,9 +481,7 @@ def write_class_old(newclass : ClassDef)->str:
 
     if newclass.object_type == ClassDef.TYPE_CLASS or newclass.object_type == ClassDef.TYPE_STRUCT:
 
-        if newclass.object_type==ClassDef.TYPE_CLASS:
-            output += write_class_script_functions(newclass)
-
+#lua_binding_{newclass.classname}_{funcProp.name}
         output += f"const PropertyInfoList* {newclass.classname}::get_props()\n"
         output += "{\n"
         if class_has_actual_properties(newclass):

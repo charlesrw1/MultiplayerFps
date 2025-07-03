@@ -1,5 +1,5 @@
 #pragma once
-
+#include "Framework/ClassBase.h"
 extern "C" {
 #include <lua.h>
 #include <lualib.h>
@@ -21,3 +21,14 @@ int64_t get_int_from_lua(lua_State* L, int index);
 std::string get_std_string_from_lua(lua_State* L, int index);
 glm::vec3 get_vec3_from_lua(lua_State* L, int index);
 ClassBase* get_object_from_lua(lua_State* L, int index);
+
+template<typename T>
+ClassBase* allocate_script_impl_internal(const ClassTypeInfo* info) {
+	T* ptr = new T();
+	ptr->type = info;
+	return (ClassBase*)ptr;
+}
+template<typename T>
+ClassTypeInfo::CreateObjectFunc get_allocate_script_impl_internal() {
+	return allocate_script_impl_internal<T>;
+}

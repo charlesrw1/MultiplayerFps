@@ -540,6 +540,30 @@ if o.type.implments[Interactable]~=nil then
     o.do_something()
 end
 
+---@class IInteractable : Component
+IInteractable = {
+}
+function IInteractable:interact()
+end
+
+---@class CrateData : Component
+CrateData = {
+}
+function CrateData:interact_with()
+    Component.update(self)
+end
+
+---@class InteractCrateImpl : IInteractable
+InteractCrateImpl = {
+    ---@type CrateData
+    myCrate = nil
+}
+function InteractCrateImpl:interact()
+    self.myCrate:interact_with()
+end
+
+
+
 ---@class MyClass : Interface2
 MyClass = {
     owner = {},
@@ -587,6 +611,8 @@ local function find_by_tag(tag)
     local e = {}
     local pos = e:get_ws_position()
 
+    e:get_parent()
+
     e:my_type():is_subclass_of(Entity)
 
     ---@type MeshComponent|nil
@@ -597,6 +623,7 @@ local function find_by_tag(tag)
         if spawned ~= nil then
             ---@type MeshComponent
             local pfbMesh = spawned:get_component(MeshComponent)
+
             if pfbMesh ~= nil then
                 p:set_model(pfbMesh:get_model())
             end

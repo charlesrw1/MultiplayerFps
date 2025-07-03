@@ -28,7 +28,7 @@ public:
 	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override {
 		auto subclasses = ClassBase::get_subclasses<Component>();
 		for (; !subclasses.is_end(); subclasses.next()) {
-			if (subclasses.get_type()->allocate) {
+			if (subclasses.get_type()->has_allocate_func()) {
 				std::string path = subclasses.get_type()->classname;
 
 				filepaths.push_back(path);

@@ -132,7 +132,7 @@ private:
 	}
 
 	IAsset* create_asset(const string& path, const ClassTypeInfo* info) {
-		auto a = info->allocate();
+		auto a = info->allocate_this_type();
 		assert(a->is_a<IAsset>());
 		IAsset* as = (IAsset*)a;
 		as->path = path;

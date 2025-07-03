@@ -311,6 +311,7 @@
     <ClInclude Include="Source\Scripting\ScriptFunctionCodegen.h" />
     <ClInclude Include="Source\Scripting\ScriptManager.h" />
     <ClInclude Include="Source\Sound\SoundComponent.h" />
+    <ClInclude Include="Source\Testheader.h" />
     <ClInclude Include="Source\UI\OnScreenLogGui.h" />
     <ClInclude Include="Source\Physics\ChannelsAndPresets.h" />
     <ClInclude Include="Source\Physics\Physics2.h" />

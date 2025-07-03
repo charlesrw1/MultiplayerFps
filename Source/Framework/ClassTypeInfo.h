@@ -5,12 +5,13 @@
 
 struct SerializedForDiffing;
 struct PropHashTable;
+class ScriptManager;
 struct FunctionInfo;
 class ClassTypeInfo : public ClassBase {
 public:
 	CLASS_BODY(ClassTypeInfo);
 
-	typedef ClassBase* (*CreateObjectFunc)();
+	typedef ClassBase* (*CreateObjectFunc)(const ClassTypeInfo*);
 	typedef const PropertyInfoList* (*GetPropsFunc_t)();
 
 	ClassTypeInfo(const char* classname,
@@ -19,7 +20,9 @@ public:
 		CreateObjectFunc alloc,
 		bool create_default_obj,
 		const FunctionInfo* func_infos,
-		int func_info_count
+		int func_info_count,
+		CreateObjectFunc scriptable_alloc=nullptr,
+		bool is_lua_obj=false
 	);
 	~ClassTypeInfo();
 
@@ -27,7 +30,6 @@ public:
 	int32_t last_child = 0;
 	const char* classname = "";
 	const char* superclassname = "";
-	ClassBase* (*allocate)() = nullptr;
 	const PropertyInfoList* props = nullptr;
 	const ClassTypeInfo* super_typeinfo = nullptr;
 
@@ -48,7 +50,7 @@ public:
 	const PropHashTable* prop_hash_table = nullptr;
 
 	template<typename T>
-	static ClassBase* default_allocate() {
+	static ClassBase* default_allocate(const ClassTypeInfo*) {
 		return (ClassBase*)(new T);
 	}
 	bool is_this_scriptable() const { return scriptable_allocate; }
@@ -59,7 +61,12 @@ public:
 	bool operator==(const ClassTypeInfo& other) const {
 		return id == other.id;
 	}
-
+	ClassBase* allocate_this_type() const {
+		return allocate ? allocate(this) : nullptr;
+	}
+	bool has_allocate_func() const {
+		return allocate != nullptr;
+	}
 
 	REFLECT();
 	bool is_subclass_of(const ClassTypeInfo* info) const;
@@ -67,6 +74,15 @@ public:
 	std::string get_classname() const;
 	REFLECT();
 	const ClassTypeInfo* get_super_type() const;
+
+	int get_prototype_index_table() const;
+protected:
+	friend class ScriptManager;
+
+	CreateObjectFunc allocate = nullptr;
+	// table that provides functions of this and inherited types
+	// used with lua tables
+	int lua_prototype_index_table = 0;
 };
 
 

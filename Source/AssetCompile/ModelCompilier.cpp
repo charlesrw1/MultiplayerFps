@@ -946,7 +946,7 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 
 		
 		for (auto& ev : isa.events) {
-			ClassBase* newEvent = ev->get_type().allocate();
+			ClassBase* newEvent = ev->get_type().allocate_this_type();
 			copy_object_properties(ev, newEvent, nullptr, AssetDatabase::loader);
 			assert(newEvent->is_a<AnimationEvent>());
 			acl.events.push_back(std::unique_ptr<AnimationEvent>((AnimationEvent*)newEvent));

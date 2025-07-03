@@ -503,6 +503,7 @@
     <ClInclude Include="Source\Framework\ClassTypeInfo.h" />
     <ClInclude Include="Source\Assets\HackedReloader.h" />
     <ClInclude Include="Source\Assets\AssetBundle.h" />
+    <ClInclude Include="Source\Testheader.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

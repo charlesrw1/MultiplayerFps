@@ -19,7 +19,11 @@ struct SDL_KeyboardEvent;
 struct SDL_MouseWheelEvent;
 class GuiSystemLocal;
 class UIBuilder;
-///
+/// <summary>
+/// 
+/// </summary>
+/// <param name=""></param>
+/// <param name=""></param>
 NEWENUM(guiAlignment,uint8_t)
 {
 	Left, 

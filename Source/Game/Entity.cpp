@@ -43,7 +43,7 @@ public:
 	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override {
 		auto subclasses = ClassBase::get_subclasses<Entity>();
 		for (; !subclasses.is_end(); subclasses.next()) {
-			if (subclasses.get_type()->allocate) {
+			if (subclasses.get_type()->has_allocate_func()) {
 				std::string path = subclasses.get_type()->classname;
 				//auto parent = subclasses.get_type();
 				//while (parent && parent != &Entity::StaticType) {
@@ -386,12 +386,20 @@ Entity::~Entity()
 Component* Entity::create_component(const ClassTypeInfo* info)
 {
 	ASSERT(init_state != initialization_state::CONSTRUCTOR);
-
-	if (!info->is_a(Component::StaticType)||!info->allocate) {
-		sys_print(Error, "create_and_attach_component_type not subclass of entity component or isnt createable\n");
+	if (!info) {
+		sys_print(Error, "Entity::create_component: null type info\n");
 		return nullptr;
 	}
-	Component* ec = (Component*)info->allocate();
+	if (!info->is_a(Component::StaticType)) {
+		sys_print(Error, "Entity::create_component: not subtype of Component %s\n",info->classname);
+		return nullptr;
+	}
+	Component* ec = (Component*)info->allocate_this_type();
+	if (!ec) {
+		sys_print(Error, "Entity::create_component: allocate returned null %s\n",info->classname);
+		return nullptr;
+	}
+
 	ASSERT(ec);
 
 	ec->entity_owner = this;

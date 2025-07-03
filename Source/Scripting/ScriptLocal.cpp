@@ -23,14 +23,7 @@ void stack_dump(lua_State* L);
 
 void* get_class_from_stack(lua_State* L, int index);
 
-ClassBase* get_object_from_lua(lua_State* L, int index, const ClassTypeInfo* expected_type)
-{
-	ClassBase* c = (ClassBase*)get_class_from_stack(L, index);
-	if (!c) return nullptr;
-	if (c->get_type().is_a(*expected_type))
-		return c;
-	return nullptr;
-}
+
 static void make_table_for_class(lua_State* L, ClassBase* c);
 static void make_table_for_gameobject(lua_State* L, BaseUpdater* c);
 

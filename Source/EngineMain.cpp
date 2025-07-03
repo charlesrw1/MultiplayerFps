@@ -53,6 +53,8 @@
 #include "EngineEditorState.h"
 #include "EngineSystemCommands.h"
 #include "DebugConsole.h"
+#include "Scripting/ScriptManager.h"
+#include "Scripting/ScriptFunctionCodegen.h"
 
 Debug_Console* Debug_Console::inst = nullptr;
 
@@ -1450,6 +1452,7 @@ void test_integration_2(IntegrationTester& tester)
 
 	//load_asset_new(std::make_exception_ptr(AssetLoadError()));
 }
+#include "Testheader.h"
 
 void GameEngineLocal::set_tester(IntegrationTester* tester, bool headless_mode) {
 	this->tester.reset(tester);
@@ -1483,7 +1486,14 @@ int game_engine_main(int argc, char** argv)
 	//Cmd_Manager::inst->append_cmd(uptr<OpenMapCommand>(new OpenMapCommand("top_down/map0.tmap", true)));
 
 	//eng_local.set_tester(new IntegrationTester(true, tests), false);
+	auto c = (InterfaceClass*)ScriptManager::inst->allocate_class("TestClass");
+	//
 
+	
+	c->buzzer();
+	int val = c->get_value("hello");
+	assert(val == 1);
+	assert(c->myStr == "hello");
 
 	eng_local.loop();
 	eng_local.cleanup();
@@ -1838,7 +1848,8 @@ void GameEngineLocal::init_sdl_window()
 	SDL_GL_SetSwapInterval(0);
 }
 #include "Assets/AssetBundle.h"
-
+#include "Framework/StringUtils.h"
+#include "Scripting/ScriptManager.h"
 using std::make_unique;
 
 ImFont* global_big_imgui_font = nullptr;
@@ -1880,11 +1891,18 @@ void GameEngineLocal::init(int argc, char** argv)
 
 	Profiler::init();
 	FileSys::init();
+	print_time("file init");
+
+
 	g_assets.init();
 	print_time("asset init");
 
 	JobSystem::inst = new JobSystem();// spawns worker threads
 	print_time("job sys init");
+
+	ScriptManager::inst = new ScriptManager();
+	ScriptManager::inst->load_script_files();
+	print_time("script init");
 
 	// renderer init
 	idraw->init();

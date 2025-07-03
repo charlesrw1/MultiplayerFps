@@ -70,8 +70,8 @@ void Level::add_to_update_list(Component* ec) {
 
 Entity* Level::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti)
 {
-	ASSERT(ti.allocate);
-	ClassBase* e = ti.allocate();	// allocate + call constructor
+	ASSERT(ti.has_allocate_func());
+	ClassBase* e = ti.allocate_this_type();	// allocate + call constructor
 	ASSERT(e);
 
 	Entity* ec = nullptr;
@@ -93,9 +93,9 @@ ConfigVar log_destroy_game_objects("log_destroy_game_objects", "1", CVAR_BOOL, "
 Entity* Level::spawn_entity()
 {
 	auto& ti = Entity::StaticType;
-	ASSERT(ti.allocate);
+	ASSERT(ti.has_allocate_func());
 
-	ClassBase* e = ti.allocate();	// allocate + call constructor
+	ClassBase* e = ti.allocate_this_type();	// allocate + call constructor
 	ASSERT(e);
 
 	auto ent = (Entity*)e;

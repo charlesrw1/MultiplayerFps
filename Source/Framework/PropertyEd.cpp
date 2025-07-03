@@ -44,7 +44,7 @@ public:
 			}
 			for (; !subclasses.is_end(); subclasses.next()) {
 
-				if (subclasses.get_type()->allocate) {
+				if (subclasses.get_type()->has_allocate_func()) {
 					if (ImGui::Selectable(subclasses.get_type()->classname,
 						subclasses.get_type() == thisType
 					)) {
@@ -61,8 +61,8 @@ public:
 			delete* uniquePtr;
 			*uniquePtr = nullptr;
 			if (thisType) {
-				assert(thisType->allocate);
-				*uniquePtr = thisType->allocate();
+				//assert(thisType->);
+				*uniquePtr = thisType->allocate_this_type();
 			}
 			
 			add_children(*uniquePtr);
