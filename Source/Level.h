@@ -15,7 +15,7 @@ class GameMode;
 class UnserializedSceneFile;
 class SerializedSceneFile;
 class BaseUpdater;
-struct ClassTypeInfo;
+class ClassTypeInfo;
 class Component;
 using std::string;
 class Level

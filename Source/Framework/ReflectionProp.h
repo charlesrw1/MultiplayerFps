@@ -35,10 +35,7 @@ enum class core_type_id : uint8_t
 	ClassTypeInfo,
 	StringName,	// hashed string
 
-	Function,	// not really a property... represents a callable function by script (call_function)
-	GetterFunc,	// a function but it can be called like a variable access, must be const and have no parameters
-	SetterFunc,	// like getter but for setting :)
-	MulticastDelegate,
+	//MulticastDelegate,
 };
 
 
@@ -135,6 +132,13 @@ struct PropertyInfo {
 			|| type == core_type_id::Enum8 || type == core_type_id::Enum16 || type == core_type_id::Enum32;
 	}
 };
+struct FunctionInfo {
+	const char* name = "";
+	bool is_static = false;
+	bool is_virtual = false;
+	int(*lua_c_function)(lua_State* state) = nullptr;
+};
+
 
 ParsedHintStr parse_hint_str_for_property(PropertyInfo* prop);
 PropertyInfo make_bool_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
@@ -154,6 +158,7 @@ PropertyInfo make_objhandleptr_property(const char* name, uint16_t offset, int f
 PropertyInfo make_classtypeinfo_property(const char* name, uint16_t offset, int flags, const char* tooltip, const ClassTypeInfo* type);
 PropertyInfo make_softassetptr_property_new(const char* name, uint16_t offset, int flags, const char* tooltip, const ClassTypeInfo* type);
 
+FunctionInfo make_lua_function_info(const char* name, bool is_static, bool is_virtual, int(*ptr)(lua_State*));
 
 struct PropertyInfoList
 {

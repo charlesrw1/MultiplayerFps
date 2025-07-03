@@ -15,7 +15,7 @@ ADD_TO_DEBUG_MENU(lean_func);
 TopDownGameManager* TopDownGameManager::instance = nullptr;
 
 #include "Game/Components/LightComponents.h"
-
+//
 float fade(float t) {
     return t * t * t * (t * (t * 6 - 15) + 10);
 }

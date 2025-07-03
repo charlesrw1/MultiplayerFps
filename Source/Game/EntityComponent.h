@@ -37,6 +37,15 @@ public:
 #ifdef EDITOR_BUILD
 	virtual const char* get_editor_outliner_icon() const { return ""; }
 #endif
+	REFLECT(name = "is_type");
+	bool is_type_for_script(const ClassTypeInfo* t) {
+		if (!t) return false;
+		return get_type().is_a(*t);
+	}
+	REFLECT(name = "type", getter);
+	const ClassTypeInfo* get_type_for_script() {
+		return &get_type();
+	}
 protected:
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)
 	virtual void on_changed_transform() {}
@@ -49,16 +58,8 @@ protected:
 	bool editor_is_selected = false;
 	bool editor_is_editor_only = false;	// set in CTOR
 #endif
+
 private:
-	REFLECT(name = "is_type");
-	bool is_type_for_script(const ClassTypeInfo* t) {
-		if (!t) return false;
-		return get_type().is_a(*t);
-	}
-	REFLECT(name = "type", getter);
-	const ClassTypeInfo* get_type_for_script() {
-		return &get_type();
-	}
 	void set_owner(Entity* e) {
 		ASSERT(entity_owner == nullptr);
 		entity_owner = e;

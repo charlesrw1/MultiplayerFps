@@ -11,7 +11,7 @@
 #include <windows.h>
 #include "AssetDatabase.h"
 #include "AssetRegistryLocal.h"
-
+#include "HackedReloader.h"
 #include "Framework/Config.h"
 #include "Assets/AssetDatabase.h"
 void TOUCH_ASSET(const Cmd_Args& args)
@@ -178,108 +178,6 @@ void AssetFilesystemNode::sort_R()
 		c.second.sort_R();
 }
 
-// too lazy, just hack the asset async loader to do this haha
-CLASS_H(HackedAsyncAssetRegReindex, IAsset)
-public:
-	void uninstall() override {
-
-	}
-	void move_construct(IAsset* other) override {
-		this->root = std::move(((HackedAsyncAssetRegReindex*)other)->root);
-	}
-	void sweep_references(IAssetLoadingInterface*) const override {
-	}
-	bool load_asset(IAssetLoadingInterface*) override {
-		std::vector<AssetOnDisk> diskAssets;
-		diskAssets.clear();
-		const int len = strlen(FileSys::get_game_path());
-		auto& all_assettypes = AssetRegistrySystem::get().all_assettypes;
-		for (int i = 0; i < all_assettypes.size(); i++)
-		{
-			auto type = all_assettypes[i].get();
-
-			bool is_filenames = type->assets_are_filepaths();
-
-			std::unordered_set<std::string> added_already;
-
-			if (is_filenames) {
-				for (const auto& file : FileSys::find_game_files()) {
-					for (int j = 0; j < type->extensions.size(); j++) {
-						if (type->extensions[j] == get_extension_no_dot(file)) {
-							if (added_already.find(file) != added_already.end())
-								continue;
-
-							AssetOnDisk aod;
-							aod.filename = file;
-							if (is_filenames) {
-								if (aod.filename.find(FileSys::get_game_path()) == 0)
-									aod.filename = aod.filename.substr(len + 1);
-							}
-							aod.type = type;
-
-							diskAssets.push_back(aod);
-
-							added_already.insert(file);
-						}
-					}
-					if (!type->pre_compilied_extension.empty()) {
-						assert(type->extensions.size() != 0);
-						if (type->pre_compilied_extension == get_extension_no_dot(file)) {
-							auto path = strip_extension(file) + "." + type->extensions.at(0);	// unsafe
-							if (added_already.find(path) == added_already.end()) {
-								AssetOnDisk aod;
-								aod.filename = path;
-								if (is_filenames) {
-									if (aod.filename.find(FileSys::get_game_path()) == 0)
-										aod.filename = aod.filename.substr(len + 1);
-								}
-								aod.type = type;
-
-								diskAssets.push_back(aod);
-
-								added_already.insert(path);
-							}
-						}
-					}
-				}
-			}
-			std::vector<std::string> extraAssets;
-			type->fill_extra_assets(extraAssets);
-			for (int j = 0; j < extraAssets.size(); j++) {
-				AssetOnDisk aod;
-				aod.filename = std::move(extraAssets[j]);
-				aod.type = type;
-				diskAssets.push_back(aod);
-			}
-		}
-
-		assert(root_to_clone);
-		root = std::make_unique< AssetFilesystemNode>(*root_to_clone.get());
-
-		root->set_is_used_to_false_R();
-		for (auto& a : diskAssets) {
-			auto& filename = a.filename;
-			std::vector<std::string> path = split(filename, '/');
-			root->add_path(a, path);
-		}
-		root->remove_unused_R();
-		root->sort_R();
-		root->set_parent_R();
-
-		return true;
-	}
-	void post_load() override {
-		is_in_loading = false;
-		AssetRegistrySystem::get().root = std::move(root);
-
-		sys_print(Debug, "AssetRegistry: finished assset reindex\n");
-	}
-	std::unique_ptr<AssetFilesystemNode> root;
-
-	static bool is_in_loading;
-	static std::unique_ptr<AssetFilesystemNode> root_to_clone;
-};
-CLASS_IMPL(HackedAsyncAssetRegReindex);
 
 bool HackedAsyncAssetRegReindex::is_in_loading = false;
 std::unique_ptr<AssetFilesystemNode> HackedAsyncAssetRegReindex::root_to_clone;
@@ -368,6 +266,95 @@ const ClassTypeInfo* AssetRegistrySystem::find_asset_type_for_ext(const std::str
 	return nullptr;
 }
 
+void HackedAsyncAssetRegReindex::move_construct(IAsset* other)  {
+	this->root = std::move(((HackedAsyncAssetRegReindex*)other)->root);
+}
 
+void HackedAsyncAssetRegReindex::post_load()  {
+	is_in_loading = false;
+	AssetRegistrySystem::get().root = std::move(root);
 
+	sys_print(Debug, "AssetRegistry: finished assset reindex\n");
+}
+HackedAsyncAssetRegReindex::~HackedAsyncAssetRegReindex() {}
+bool HackedAsyncAssetRegReindex::load_asset(IAssetLoadingInterface*)  {
+	std::vector<AssetOnDisk> diskAssets;
+	diskAssets.clear();
+	const int len = strlen(FileSys::get_game_path());
+	auto& all_assettypes = AssetRegistrySystem::get().all_assettypes;
+	for (int i = 0; i < all_assettypes.size(); i++)
+	{
+		auto type = all_assettypes[i].get();
+
+		bool is_filenames = type->assets_are_filepaths();
+
+		std::unordered_set<std::string> added_already;
+
+		if (is_filenames) {
+			for (const auto& file : FileSys::find_game_files()) {
+				for (int j = 0; j < type->extensions.size(); j++) {
+					if (type->extensions[j] == get_extension_no_dot(file)) {
+						if (added_already.find(file) != added_already.end())
+							continue;
+
+						AssetOnDisk aod;
+						aod.filename = file;
+						if (is_filenames) {
+							if (aod.filename.find(FileSys::get_game_path()) == 0)
+								aod.filename = aod.filename.substr(len + 1);
+						}
+						aod.type = type;
+
+						diskAssets.push_back(aod);
+
+						added_already.insert(file);
+					}
+				}
+				if (!type->pre_compilied_extension.empty()) {
+					assert(type->extensions.size() != 0);
+					if (type->pre_compilied_extension == get_extension_no_dot(file)) {
+						auto path = strip_extension(file) + "." + type->extensions.at(0);	// unsafe
+						if (added_already.find(path) == added_already.end()) {
+							AssetOnDisk aod;
+							aod.filename = path;
+							if (is_filenames) {
+								if (aod.filename.find(FileSys::get_game_path()) == 0)
+									aod.filename = aod.filename.substr(len + 1);
+							}
+							aod.type = type;
+
+							diskAssets.push_back(aod);
+
+							added_already.insert(path);
+						}
+					}
+				}
+			}
+		}
+		std::vector<std::string> extraAssets;
+		type->fill_extra_assets(extraAssets);
+		for (int j = 0; j < extraAssets.size(); j++) {
+			AssetOnDisk aod;
+			aod.filename = std::move(extraAssets[j]);
+			aod.type = type;
+			diskAssets.push_back(aod);
+		}
+	}
+
+	assert(root_to_clone);
+	root = std::make_unique< AssetFilesystemNode>(*root_to_clone.get());
+
+	root->set_is_used_to_false_R();
+	for (auto& a : diskAssets) {
+		auto& filename = a.filename;
+		std::vector<std::string> path = split(filename, '/');
+		root->add_path(a, path);
+	}
+	root->remove_unused_R();
+	root->sort_R();
+	root->set_parent_R();
+
+	return true;
+}
+HackedAsyncAssetRegReindex::HackedAsyncAssetRegReindex() {}
 #endif

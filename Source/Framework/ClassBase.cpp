@@ -5,7 +5,7 @@
 #include "PropHashTable.h"
 #include "SerializedForDiffing.h"
 
-ClassTypeInfo ClassBase::StaticType = ClassTypeInfo("ClassBase", nullptr, nullptr, nullptr, false);
+ClassTypeInfo ClassBase::StaticType = ClassTypeInfo("ClassBase", nullptr, nullptr, nullptr, false,nullptr,0);
 const bool ClassBase::CreateDefaultObject = false;
 const ClassTypeInfo& ClassBase::get_type() const { return ClassBase::StaticType; }
 
@@ -43,7 +43,9 @@ static ClassRegistryData& get_registry()
 }
 
 
-ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_typeinfo, GetPropsFunc_t get_props_func, CreateObjectFunc alloc, bool create_default_obj)
+ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_typeinfo, 
+	GetPropsFunc_t get_props_func, CreateObjectFunc alloc, bool create_default_obj,
+	const FunctionInfo* lua_funcs, int lua_func_count)
 {
 	this->classname = classname;
 	this->superclassname = "";
@@ -54,6 +56,8 @@ ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_t
 
 	// this gets fixed up later
 	this->default_class_object = (ClassBase*)create_default_obj;
+	this->lua_functions = lua_funcs;
+	this->lua_function_count = lua_func_count;
 
 	// register this
 	ClassBase::register_class(this);
@@ -61,6 +65,13 @@ ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_t
 
 ClassTypeInfo::~ClassTypeInfo()
 {
+}
+
+ClassTypeIterator::ClassTypeIterator(ClassTypeInfo* ti) {
+	if (ti) {
+		index = ti->id;
+		end = ti->last_child + 1;
+	}
 }
 
 const ClassTypeInfo* ClassTypeIterator::get_type() const

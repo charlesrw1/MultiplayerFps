@@ -34,7 +34,7 @@ class Schema;
 class Level;
 class OsInput;
 struct ImGuiContext;
-struct ClassTypeInfo;
+class ClassTypeInfo;
 class GuiSystemPublic;
 class GameMode;
 class BaseUpdater;

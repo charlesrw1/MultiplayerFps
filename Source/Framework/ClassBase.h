@@ -4,154 +4,12 @@
 #include <memory>
 struct PropertyInfoList;
 class ClassBase;
-
-struct SerializedForDiffing;
-struct PropHashTable;
-struct ClassTypeInfo
-{
-public:
-	typedef ClassBase* (*CreateObjectFunc)();
-	typedef const PropertyInfoList* (*GetPropsFunc_t)();
-
-	ClassTypeInfo(const char* classname, 
-		const ClassTypeInfo* super_typeinfo, 
-		GetPropsFunc_t get_prop_func, 
-		CreateObjectFunc alloc,
-		bool create_default_obj
-	);
-	~ClassTypeInfo();
-
-	int32_t id = 0;
-	int32_t last_child = 0;
-	const char* classname = "";
-	const char* superclassname = "";
-	ClassBase*(*allocate)()=nullptr;
-	const PropertyInfoList* props = nullptr;
-	const ClassTypeInfo* super_typeinfo = nullptr;
-
-	// store this, get_props might rely on other Class's typinfo being registered, so call these after init
-	GetPropsFunc_t get_props_function = nullptr;
-
-	// an allocated object of the same type
-	// use for default props etc.
-	// not every class type will have this
-	const ClassBase* default_class_object = nullptr;
-	std::unique_ptr<SerializedForDiffing> diff_data;
-
-	// opaque pointer to hash table for props
-	const PropHashTable* prop_hash_table = nullptr;
-
-	template<typename T>
-	static ClassBase* default_allocate() {
-		return (ClassBase*)(new T);
-	}
-
-	bool is_a(const ClassTypeInfo& other) const {
-		return id >= other.id && id <= other.last_child;
-	}
-	bool operator==(const ClassTypeInfo& other) const {
-		return id == other.id;
-	}
-
-private:
-
-};
-
-template<typename, typename T>
-struct has_get_props {
-	static_assert(
-		std::integral_constant<T, false>::value,
-		"Second template parameter needs to be of function type.");
-};
-
-// Specialization that does the checking
-template<typename C, typename Ret, typename... Args>
-struct has_get_props<C, Ret(Args...)> {
-private:
-	template<typename T>
-	static constexpr auto check(T*) -> typename
-		std::is_same<
-		decltype(std::declval<T>().get_props(std::declval<Args>()...)),
-		Ret    // Ensure the return type matches
-		>::type;
-
-	template<typename>
-	static constexpr std::false_type check(...);
-
-	typedef decltype(check<C>(0)) type;
-
-public:
-	static constexpr bool value = type::value;
-};
-
-
-
-template<typename T>
-ClassTypeInfo::GetPropsFunc_t get_get_props_if_it_exists() {
-	if constexpr (has_get_props<T, const PropertyInfoList*()>::value) {
-		return T::get_props;
-	}
-	else {
-		return nullptr;
-	}
-}
-
-template<typename T>
-struct is_abstract {
-private:
-	template<typename U>
-	static constexpr auto test(U*) -> decltype(U(), std::false_type());
-
-	template<typename>
-	static constexpr std::true_type test(...);
-
-public:
-	static constexpr bool value = decltype(test<T>(nullptr))::value;
-};
-
-
-// Function template to create an instance of the class if it is not abstract
-template<typename T>
-typename std::enable_if<!is_abstract<T>::value, ClassTypeInfo::CreateObjectFunc>::type default_class_create() {
-	return ClassTypeInfo::default_allocate<T>;
-}
-
-// Overload for the case when the class is abstract
-template<typename T>
-typename std::enable_if<is_abstract<T>::value, ClassTypeInfo::CreateObjectFunc>::type default_class_create() {
-	return nullptr;
-}
-
-
-#define CLASS_IMPL(classname) \
-ClassTypeInfo classname::StaticType = ClassTypeInfo( \
-	#classname, \
-	&classname::SuperClassType::StaticType, \
-	get_get_props_if_it_exists<classname>(), \
-	default_class_create<classname>(), \
-	classname::CreateDefaultObject \
-);
-
-#define CLASS_H_EXPLICIT_SUPER(classname, cpp_supername, reflected_super) \
-class classname : public cpp_supername { \
-public: \
-	using MyClassType = classname; \
-	using SuperClassType = reflected_super; \
-	static ClassTypeInfo StaticType; \
-	const ClassTypeInfo& get_type() const override { return classname::StaticType; }
-
-#define CLASS_H(classname, supername) \
-	CLASS_H_EXPLICIT_SUPER(classname, supername, supername)
+class ClassTypeInfo;
 
 
 struct ClassTypeIterator
 {
-	ClassTypeIterator(ClassTypeInfo* ti) {
-		if (ti) {
-			index = ti->id;
-			end = ti->last_child + 1;
-		}
-	}
+	ClassTypeIterator(ClassTypeInfo* ti);
 	ClassTypeIterator& next() { index++; return *this; }
 	bool is_end() const { return index >= end; }
 	const ClassTypeInfo* get_type() const;
@@ -185,9 +43,7 @@ public:
 
 	// is this class a subclass or an instance of type T
 	template<typename T>
-	bool is_a() const {
-		return get_type().is_a(T::StaticType);
-	}
+	bool is_a() const;
 
 	// creates a copy of class and copies serializable fields
 	ClassBase* create_copy(ClassBase* userptr = nullptr);
@@ -209,22 +65,10 @@ public:
 
 	// allocate a class by string
 	template<typename T>
-	static T* create_class(const char* classname) {
-		auto classinfo = find_class(classname);
-		if (!classinfo || !classinfo->allocate || !classinfo->is_a(T::StaticType))
-			return nullptr;
-		ClassBase* base = classinfo->allocate();
-		return static_cast<T*>(base);
-	}
+	static T* create_class(const char* classname);
 	// allocate by id
 	template<typename T>
-	static T* create_class(int16_t id) {
-		auto classinfo = find_class(id);
-		if (!classinfo || !classinfo->allocate || !classinfo->is_a(T::StaticType))
-			return nullptr;
-		ClassBase* base = classinfo->allocate();
-		return static_cast<T*>(base);
-	}
+	static T* create_class(int16_t id);
 
 	// get all subclasses to a class excluding abstract ones
 	template<typename T>
@@ -238,6 +82,89 @@ public:
 };
 
 template<typename T>
-inline T* class_cast(ClassBase* in) {
-	return in ? in->cast_to<T>() : nullptr;
+struct is_abstract {
+private:
+	template<typename U>
+	static constexpr auto test(U*) -> decltype(U(), std::false_type());
+
+	template<typename>
+	static constexpr std::true_type test(...);
+
+public:
+	static constexpr bool value = decltype(test<T>(nullptr))::value;
+};
+
+// see Scripts/codegen.py for the code gen tool
+
+// creates new class that will be picked by codegen tool
+// DONT make get_props() or CLASS_IMPL(x), the tool does that for you
+// use REFLECT() macros instead
+
+#define CLASS_BODY(classname) \
+	using MyClassType = classname; \
+	static ClassTypeInfo StaticType; \
+	const ClassTypeInfo& get_type() const override { return classname::StaticType; } \
+	static const PropertyInfoList* get_props();
+
+// arguments are provided as comma seperated list, dont include outer quotes
+// options:
+//		- 'hide' : dont show in editor properties
+//		- 'transient' : dont serialize this property
+//		- 'type="my_custom_type"' : tags this for use with custom serializer/editor
+//		- 'name="some name"' : provides a name override
+//		- 'hint="hint override"' : provides a hint value
+//		- 'getter' : only for functions, marks it as a getter (can be called in script like a variable access)
+//		- 'tooltip' : give a tooltip for property
+// supported types:
+//		- int, bool, float, uint32_t, int32_t, uint16_t, int16_t, int64_t, uint8_t, int8_t
+//		- glm::vec3
+//		- glm::quat
+//		- std::vector<>
+//		- std::string
+//		- MulticastDelegate<>
+//		- class functions (only if argument types are supported)
+//		- EntityPtr
+//		- AssetPtr<>
+//		- enums (reflected with NEWENUM())
+//		- Color32
+#define REFLECT(...)
+
+// additionally, you can use this as a shorthand on the same line, but you dont get any arguments
+// like REF int myvariable = 0;
+#define REF
+
+// sometimes you want forward declared class types in the header, but they need to be definied when registering 
+// them in the generated file like AssetPtr<>'s
+// use GENERATED_CLASS_INCLUDE(file) to include a file in the generated source, but not in the header
+#define GENERATED_CLASS_INCLUDE(x)
+
+#include "ClassTypeInfo.h"
+
+// is this class a subclass or an instance of type T
+
+template<typename T>
+inline bool ClassBase::is_a() const {
+	return get_type().is_a(T::StaticType);
+}
+
+// allocate a class by string
+
+template<typename T>
+inline T* ClassBase::create_class(const char* classname) {
+	auto classinfo = find_class(classname);
+	if (!classinfo || !classinfo->allocate || !classinfo->is_a(T::StaticType))
+		return nullptr;
+	ClassBase* base = classinfo->allocate();
+	return static_cast<T*>(base);
+}
+
+// allocate by id
+
+template<typename T>
+inline T* ClassBase::create_class(int16_t id) {
+	auto classinfo = find_class(id);
+	if (!classinfo || !classinfo->allocate || !classinfo->is_a(T::StaticType))
+		return nullptr;
+	ClassBase* base = classinfo->allocate();
+	return static_cast<T*>(base);
 }

@@ -34,7 +34,7 @@ public:
 	PrefabAsset();
 	~PrefabAsset();
 
-	REF static PrefabAsset* load(string name);
+	REF static PrefabAsset* load(string name) { return nullptr; }
 
 	Entity& instantiate(const glm::vec3& position, const glm::quat& rot) const;
 	const Entity& get_default_object() const;

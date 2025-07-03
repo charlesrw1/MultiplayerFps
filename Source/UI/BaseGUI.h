@@ -10,7 +10,7 @@
 #include "Framework/Rect2d.h"
 #include "Game/EntityComponent.h"
 #include "Framework/InlineVec.h"
-
+#include "Framework/EnumDefReflection.h"
 template<typename ...Args>
 class MulticastDelegate;
 
@@ -19,7 +19,7 @@ struct SDL_KeyboardEvent;
 struct SDL_MouseWheelEvent;
 class GuiSystemLocal;
 class UIBuilder;
-
+///
 NEWENUM(guiAlignment,uint8_t)
 {
 	Left, 

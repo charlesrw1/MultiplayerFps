@@ -566,7 +566,22 @@ local function find_by_class(classname)
     
 end
 
+CONTROLLER_AXIS_LEFTTRIGGER = 0
+CONTROLLER_AXIS_RIGHTTRIGGER = 1
+CONTROLLER_AXIS_LEFTX = 2
+CONTROLLER_AXIS_LEFTY = 3
+SCANCODE_A = 0
+SCANCODE_B = 1
+
+
+
 local function find_by_tag(tag)
+
+    if LuaInput.is_key_down(SCANCODE_A) then
+        
+    end
+    local val = LuaInput.get_con_axis(CONTROLLER_AXIS_LEFTX)
+
     ---@type Entity
     local e = {}
     local pos = e:get_ws_position()
@@ -583,11 +598,14 @@ local function find_by_tag(tag)
         end
     end
 
+    local myClosure = function ()
+        GameplayStatic.spawn_prefab(p)
+    end
 
     ---@type PhysicsBody|nil
     local body = prefabEnt:get_component_typeinfo(PhysicsBody)
     if body ~= nil then
-        mesh:set_model(nil)
+        body:bind_on_trigger_start(myClosure)
     end
 
 

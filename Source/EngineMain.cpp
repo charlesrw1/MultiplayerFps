@@ -42,7 +42,7 @@
 #include "LevelSerialization/SerializationAPI.h"
 #include "Render/ModelManager.h"
 #include "Framework/SysPrint.h"
-#include "Scripting/ScriptManagerPublic.h"
+
 #include "Game/Components/ParticleMgr.h"
 #include "Game/Components/GameAnimationMgr.h"
 #include "tracy/public/tracy/Tracy.hpp"
@@ -1884,7 +1884,6 @@ void GameEngineLocal::init(int argc, char** argv)
 	editorState = make_unique<EditorState>();
 	print_time("asset reg and browser init");
 #endif
-	g_scriptMgr->init();
 
 	Input::inst = new Input();
 	UiSystem::inst = new UiSystem();

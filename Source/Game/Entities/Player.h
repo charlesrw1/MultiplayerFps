@@ -53,25 +53,47 @@ struct HitResult {
 class GameplayStatic : public ClassBase {
 public:
 	CLASS_BODY(GameplayStatic);
-	REF static Entity* find_entity(string name);
-	REF static Entity* spawn_prefab(PrefabAsset* prefab);
-	REF static Entity* spawn_entity();
-	REF static void change_level();
-	REF static HitResult cast_ray();
+	REF static Entity* find_entity(string name) {
+		return nullptr;
+	}
+	REF static Entity* spawn_prefab(PrefabAsset* prefab) {
+		return nullptr;
+	}
+	REF static Entity* spawn_entity() {
+		return nullptr;
+	}
+	REF static void change_level() {
+		return;
+	}
+	REF static HitResult cast_ray() {
+		return HitResult();
+	}
 };
 
 
 class LuaInput : public ClassBase {
 public:
 	CLASS_BODY(LuaInput);
-	REF static bool is_key_down(int key);
-	REF static bool was_key_pressed(int key);
-	REF static bool was_key_released(int key);
-	REF static bool is_con_button_down(int con_button);
-	REF static float get_con_axis(int con_axis);
+	REF static bool is_key_down(int key) {
+		return false;
+	}
+	REF static bool was_key_pressed(int key) {
+		return false;
+	}
+	REF static bool was_key_released(int key) {
+		return false;
+	}
+	REF static bool is_con_button_down(int con_button) {
+		return false;
+	}
+	REF static float get_con_axis(int con_axis) {
+		return 0.0;
+	}
 };
 
-
+/// <summary>
+/// 
+/// </summary>
 class Player : public Component {
 public:
 	CLASS_BODY(Player);

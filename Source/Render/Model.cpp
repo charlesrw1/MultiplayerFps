@@ -9,7 +9,7 @@
 
 #include "Framework/Util.h"
 #include "Animation/Runtime/Animation.h"
-#include "Animation/AnimationTreePublic.h"
+
 #include "Framework/DictParser.h"
 #include "Texture.h"
 

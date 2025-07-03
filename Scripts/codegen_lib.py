@@ -264,7 +264,6 @@ STANDARD_CPP_TYPES: dict[str, int] = {
     "uptr" : UNIQUE_PTR_TYPE,
     "unique_ptr" : UNIQUE_PTR_TYPE,
     "std::unique_ptr" : UNIQUE_PTR_TYPE,
-    "ClassTypeInfo" : CLASSTYPEINFO_TYPE,
     "ClassTypePtr" : CLASSTYPEINFO_TYPE,
 
     "StringName" : STRINGNAME_TYPE,
@@ -432,6 +431,11 @@ def parse_type_from_tokens(idx: int, tokens:list[str], typenames: dict[str, Clas
             if idx < len(tokens) and tokens[idx] == ",":
                 idx += 1
         # end of template args
+
+    # hack
+    if base_type== HANDLE_PTR_TYPE and base=="EntityPtr":
+        assert(len(template_args)==0)
+        template_args.append(CppType("Entity",typenames["Entity"],OTHER_CLASS_TYPE))
 
     # skip pointer or reference
     is_pointer = False

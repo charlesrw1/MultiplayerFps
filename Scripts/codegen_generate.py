@@ -15,6 +15,8 @@ def write_headers(path:str, additional_includes:list[str]):
     out += "#include \"Scripting/FunctionReflection.h\"\n"
     out += "#include \"Framework/VectorReflect2.h\"\n"
     out += "#include \"Framework/EnumDefReflection.h\"\n"
+    out += "#include \"Scripting/ScriptFunctionCodegen.h\"\n"
+
     for inc in additional_includes:
         out += f"#include {inc}\n"
 
@@ -55,15 +57,6 @@ def output_macro_for_prop(cpptype:CppType,name:str,flags:str,offset:str,custom_t
         #return f"REG_ENTITY_PTR({name},{flags})"
         #return f'make_struct_property({name_offset_flags}, "ObjPtr", {type_of_template}.classname)'
         return f'make_objhandleptr_property({name_offset_flags},{tooltip},&{type_of_template})'
-    elif type == FUNCTION_TYPE:
-        name = nameoverride if len(nameoverride)!=0 else name
-        name = f'"{name}"'
-        if False:#fixme
-            return f"REG_GETTER_FUNCTION({name},{name})"
-        else:
-            return f"REG_FUNCTION_EXPLICIT_NAME({name},{name})"
-    elif type == MULTICAST_TYPE:
-        return f"REG_MULTICAST_DELEGATE({name})"
     elif type == VEC3_TYPE:
         return f"make_vec3_property({name_offset_flags})"
         #return f"REG_VEC3({name},{flags})"
@@ -254,6 +247,107 @@ def write_class(newclass : ClassDef):
         output += ");\n"
     return output
 
+def write_get_type_from_lua_func(newType:CppType, index:int) -> str:
+    type_of_template = ""
+    if len(newType.template_args)>0:
+        type_of_template = newType.template_args[0].get_raw_type_string()
+
+    if newType.type == BOOL_TYPE:
+        return f"get_bool_from_lua(L,{index})"
+    elif newType.type == INT_TYPE:
+        return f"get_int_from_lua(L,{index})"
+    elif newType.type == FLOAT_TYPE:
+        return f"get_float_from_lua(L,{index})"
+    elif newType.type == VEC3_TYPE:
+        return f"get_vec3_from_lua(L,{index})"
+    elif newType.type == STRING_TYPE:
+        return f"get_std_string_from_lua(L,{index})"
+    elif newType.type == ASSET_PTR_TYPE or newType.type == HANDLE_PTR_TYPE:
+        return f"class_cast<{type_of_template}>(get_object_from_lua(L,{index}))"
+    elif newType.type == OTHER_CLASS_TYPE:
+        assert(newType.typename!=None)
+        return f"class_cast<{newType.typename.classname}>(get_object_from_lua(L,{index}))"
+    return ""
+def write_push_type_to_lua_func(newType:CppType, cppVarName:str) -> str:
+    #type_of_template = ""
+   # if len(newType.template_args)>0:
+     #   type_of_template = newType.template_args[0].get_raw_type_string()
+    if newType.type == BOOL_TYPE:
+        return f"push_bool_to_lua(L,{cppVarName})"
+    elif newType.type == INT_TYPE:
+        return f"push_int_to_lua(L,{cppVarName})"
+    elif newType.type == FLOAT_TYPE:
+        return f"push_float_to_lua(L,{cppVarName})"
+    elif newType.type == VEC3_TYPE:
+        return f"push_vec3_to_lua(L,{cppVarName})"
+    elif newType.type == STRING_TYPE:
+        return f"push_std_string_from_lua(L,{cppVarName})"
+    elif newType.type == ASSET_PTR_TYPE or newType.type == HANDLE_PTR_TYPE:
+        return f"push_object_to_lua(L,{cppVarName})"
+    elif newType.type == OTHER_CLASS_TYPE:
+        assert(newType.typename!=None)
+        return f"push_object_to_lua(L,{cppVarName})"
+    return ""
+
+def write_script_function(newclass:ClassDef, funcProp : Property) -> str:
+    assert(funcProp.new_type.type==FUNCTION_TYPE)
+    my_obj_type = newclass.classname
+    function_name = funcProp.name
+
+    output = f"int lua_binding_{funcProp.name}(lua_State* L)\n"
+    output += "{\n"
+    # get class object (or struct)
+    calling_template = ""
+    if not funcProp.is_static:
+        output += "\tClassBase* obj = get_object_from_lua(L,0);\n"
+        output += f"\t{my_obj_type}* myObj = obj ? obj->cast_to<{my_obj_type}>() : nullptr;\n"
+        # assert it
+        output += "\tif(!myObj) {  assert(0); };\n" # fixme
+        # call into function
+        calling_template = f"myObj->"
+    else:
+        calling_template = f"{my_obj_type}::"
+    if funcProp.return_type.type!=NONE_TYPE:
+        output += f"\tauto return_value = {calling_template}{function_name}(\n"
+    else:
+        output += f"\t{calling_template}{function_name}(\n"
+
+    # get args
+    argIndex = 0 
+    for argType, argName in funcProp.func_args:
+        luaIndex = argIndex
+        if not funcProp.is_static:
+            luaIndex = argIndex + 1
+        output += "\t\t" + write_get_type_from_lua_func(argType, luaIndex)
+        if argIndex != len(funcProp.func_args) - 1:
+            output += ","
+        output += f" // {argName}\n"
+        argIndex += 1
+    output += "\t);\n"
+
+    if funcProp.return_type.type == NONE_TYPE:
+        output += "\treturn 0;\n"
+    else:
+        output += "\t" + write_push_type_to_lua_func(funcProp.return_type,"return_value") + ";\n"
+        output += "\treturn 1;\n"
+
+    # return if it has return value
+    output += "}\n"
+    return output
+
+def write_class_script_functions(newclass:ClassDef) -> str:
+    output = ""
+    for p in newclass.properties:
+        if p.new_type.type == FUNCTION_TYPE:
+            output += write_script_function(newclass,p)
+    return output
+
+def class_has_actual_properties(newclass : ClassDef) -> bool:
+    for p in newclass.properties:
+        if p.new_type.type != FUNCTION_TYPE and p.new_type.type != MULTICAST_TYPE:
+            return True
+    return False
+
 def write_class_old(newclass : ClassDef)->str:
     if newclass.object_type==ClassDef.TYPE_CLASS and newclass.super_type_def == None:
         return ""
@@ -265,7 +359,7 @@ def write_class_old(newclass : ClassDef)->str:
                     &{newclass.supername}::StaticType,\n \
                     {newclass.classname}::get_props,\n \
                     default_class_create<{newclass.classname}>(),\n \
-                    {newclass.classname}::CreateDefaultObject\n \
+                    {newclass.classname}::CreateDefaultObject\n,nullptr,0 \
                 );\n"
     elif newclass.object_type == ClassDef.TYPE_STRUCT:
         has_serialize = does_struct_have_serialize_function(newclass)
@@ -282,13 +376,17 @@ def write_class_old(newclass : ClassDef)->str:
             output += f"{newclass.classname}_serialize_private\n"
         else:
             output += "nullptr\n"
-        output += ");\n"
+        output += "\t);\n"
 
 
     if newclass.object_type == ClassDef.TYPE_CLASS or newclass.object_type == ClassDef.TYPE_STRUCT:
+
+        if newclass.object_type==ClassDef.TYPE_CLASS:
+            output += write_class_script_functions(newclass)
+
         output += f"const PropertyInfoList* {newclass.classname}::get_props()\n"
         output += "{\n"
-        if len(newclass.properties) > 0:
+        if class_has_actual_properties(newclass):
             for p in newclass.properties:
                 if p.new_type.type == ARRAY_TYPE:
                     prop_str = output_macro_for_prop(p.new_type.template_args[0],"","PROP_DEFAULT","0",'""','""','""','""')
@@ -299,7 +397,8 @@ def write_class_old(newclass : ClassDef)->str:
 
             output += f"    START_PROPS({newclass.classname})"
             for p in newclass.properties:
-                output += "\n\t\t" + write_prop(p,newclass) + ","
+                if p.new_type.type != FUNCTION_TYPE and p.new_type.type != MULTICAST_TYPE:
+                    output += "\n\t\t" + write_prop(p,newclass) + ","
             output=output[:-1]
             output += f"\n    END_PROPS({newclass.classname})\n"
         else:
@@ -393,7 +492,7 @@ def write_lua_class(newclass:ClassDef) -> str:
                 output += ") end\n"
 
     return output
-            
+  
 
 def write_output_file(GENERATED_DIR:str,filename:str,root:str,classes:list[ClassDef],additional_includes:list[str], typenames:dict[str,ClassDef]):
     generated_path = root + "/" + os.path.splitext(filename)[0]

@@ -16,7 +16,6 @@ extern "C" {
 #include "Framework/ReflectionMacros.h"
 #include <iostream>
 
-#include "ScriptManagerPublic.h"
 #include "Game/LevelAssets.h"
 
 void stack_dump(lua_State* L);
@@ -231,11 +230,11 @@ int object_table_access(lua_State* L);
 int classbase_table_access(lua_State* L);
 int objects_are_equal(lua_State* L);
 
+#if 0
 class ScriptManagerLocal : public ScriptManagerPublic
 {
 public:
 	void init() final {
-#if 0
 		L = luaL_newstate();
 		luaL_openlibs(L);
 		// init metatables
@@ -307,7 +306,6 @@ public:
 		}
 
 		lua_settop(L, 0);
-#endif
 	}
 	void push_global(ClassBase* c, const char* name) final {
 		if (c->is_a<BaseUpdater>())
@@ -324,10 +322,9 @@ public:
 	lua_State* L = nullptr;
 
 };
+#endif
 
 // global mgr
-static ScriptManagerLocal script_local;
-ScriptManagerPublic* g_scriptMgr = &script_local;
 
 #include "Framework/PropHashTable.h"
 static void add_delegate(lua_State* L, ClassBase* md, PropertyInfo* pi, const char* funcname)
@@ -393,17 +390,6 @@ static int multicast_sub_lua(lua_State* L)
 	return 0;
 }
 
-static PropertyInfo* find_delegate(BaseUpdater* c, StringView str)
-{
-	auto find = c->get_type().prop_hash_table->prop_table.find(str);
-	if (find == c->get_type().prop_hash_table->prop_table.end()) {
-		return nullptr;
-	}
-	if (find->second->type == core_type_id::MulticastDelegate)
-		return find->second;
-	return nullptr;
-}
-
 static int special_script_connect(lua_State* L)
 {
 	ClassBase* c = (ClassBase*)get_class_from_stack(L, 1);
@@ -415,21 +401,21 @@ static int special_script_connect(lua_State* L)
 	ClassBase* what = c;
 	auto ent = (Entity*)c;
 	StringView name(lua_tostring(L, 2));
-	auto p = find_delegate(ent,name);
+	ClassBase* p = nullptr;
 	if (!p) {
 		for (auto c : ent->get_components()) {
-			p = find_delegate(c, name);
-			if (p) {
-				what = c;
-				break;
-			}
+			//p = find_delegate(c, name);
+			//if (p) {
+			//	what = c;
+			//	break;
+			//}
 		}
 	}
 	if (!p) {
 		sys_print(Warning, "couldnt connect delegate %s %s\n", lua_tostring(L, 2), lua_tostring(L, 3));
 	}
 	else {
-		add_delegate(L, what, p, lua_tostring(L, 3));
+		//add_delegate(L, what, p, lua_tostring(L, 3));
 	}
 	return 0;
 }
@@ -613,7 +599,7 @@ void call_lua_func_internal_part1(ScriptComponent* s, const char* func_name)
 }
 bool ScriptComponent::call_function_part1(const char* func_name)
 {
-	auto L = script_local.L;
+	lua_State* L = nullptr;
 	const int start_top = lua_gettop(L);
 	if (*func_name) {
 		push_table_to_stack();
@@ -644,7 +630,7 @@ bool ScriptComponent::call_function_part1(const char* func_name)
 }
 bool ScriptComponent::call_function_part2(const char* func_name, int num_args)
 {
-	auto L = script_local.L;
+	lua_State* L = nullptr; 
 	
 	ASSERT(lua_isfunction(L, -1 - num_args));
 	ASSERT(lua_istable(L, -2 - num_args));
@@ -677,7 +663,7 @@ void call_lua_func_internal_part2(ScriptComponent* s, const char* func_name, int
 
 lua_State* get_lua_state_for_call_func()
 {
-	return script_local.L;
+	return nullptr;
 }
 
 
@@ -698,7 +684,7 @@ void ScriptComponent::editor_on_change_property()
 
 bool ScriptComponent::has_function(const char* func_name)
 {
-	auto L = script_local.L;
+	lua_State* L = nullptr;
 	push_table_to_stack();
 	lua_getfield(L,-1, func_name);
 	bool res = lua_isfunction(L, -1);
@@ -714,7 +700,7 @@ void ScriptComponent::print_my_table()
 }
 void ScriptComponent::push_table_to_stack()
 {
-	auto L = script_local.L;
+	lua_State* L = nullptr;
 	lua_rawgetp(L, LUA_REGISTRYINDEX, this);
 	if (!lua_istable(L, -1))
 		luaL_error(L, "not table for script_component");
@@ -730,7 +716,7 @@ void ScriptComponent::pre_start()
 	}
 	else {
 		if (0) {
-			auto L = script_local.L;
+			lua_State* L = nullptr;
 
 			{
 				ASSERT(lua_gettop(L) == 0);

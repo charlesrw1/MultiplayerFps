@@ -167,7 +167,7 @@ struct multicast_funcs
 #endif
 
 
-
+#if 0
 inline PropertyInfo make_delegate_prop(void* dummy, const char* name, int offset) {
    
     PropertyInfo p;
@@ -192,10 +192,5 @@ inline PropertyInfo make_function_prop_info(const char* name, int(*call_func)(lu
     p.name = name;
     return p;
 }
+#endif
 
-
-#define REG_FUNCTION(func) make_function_prop_info(#func, nullptr, 0)
-#define REG_GETTER_FUNCTION(func, fake_var_name) make_function_prop_info(fake_var_name, nullptr, 1)
-#define REG_SETTER_FUNCTION(func, fake_var_name) make_function_prop_info(fake_var_name,nullptr, 2)
-#define REG_FUNCTION_EXPLICIT_NAME(func, name) make_function_prop_info(name, nullptr, 0)
-#define REG_MULTICAST_DELEGATE(name) make_delegate_prop(nullptr,#name, offsetof(TYPE_FROM_START,name))

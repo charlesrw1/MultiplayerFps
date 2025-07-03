@@ -1,11 +1,8 @@
----@class Interface2
-Interface2 = {}
-
----@return number
-function Interface2:shoot()
+---@class Utils
+Utils = {
+    variable = 0,
+    something = Vec3:new(0,0,0)
+}
+function Utils.calc_area()
     return 0
-end
----@return string
-function Interface2:get_gun_name()
-    return ""
 end
