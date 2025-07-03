@@ -5,9 +5,22 @@
 #include "PropHashTable.h"
 #include "SerializedForDiffing.h"
 
-ClassTypeInfo ClassBase::StaticType = ClassTypeInfo("ClassBase", nullptr, nullptr, nullptr, false,nullptr,0);
 const bool ClassBase::CreateDefaultObject = false;
-const ClassTypeInfo& ClassBase::get_type() const { return ClassBase::StaticType; }
+
+bool ClassTypeInfo::is_subclass_of(const ClassTypeInfo* info) const {
+	assert(info);
+	return is_a(*info);
+}
+
+std::string ClassTypeInfo::get_classname() const
+{
+	return classname;
+}
+
+const ClassTypeInfo* ClassTypeInfo::get_super_type() const
+{
+	return super_typeinfo;
+}
 
 struct TypeInfoWithExtra
 {
@@ -77,6 +90,14 @@ ClassTypeIterator::ClassTypeIterator(ClassTypeInfo* ti) {
 const ClassTypeInfo* ClassTypeIterator::get_type() const
 {
 	return ClassBase::find_class(index);
+}
+
+const ClassTypeInfo* ClassBase::my_type() const { return &get_type(); }
+
+bool ClassBase::is_subclass_of(const ClassTypeInfo* type) const
+{
+	assert(type);
+	return get_type().is_a(*type);
 }
 
 void ClassBase::register_class(ClassTypeInfo* cti)

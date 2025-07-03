@@ -70,7 +70,9 @@ public:
 	}
 };
 
-
+/// <summary>
+/// 
+/// </summary>
 class LuaInput : public ClassBase {
 public:
 	CLASS_BODY(LuaInput);

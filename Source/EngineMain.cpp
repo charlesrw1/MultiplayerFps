@@ -1472,7 +1472,8 @@ int game_engine_main(int argc, char** argv)
 
 	//Cmd_Manager::inst->append_cmd(uptr<OpenMapCommand>(new OpenMapCommand("top_down/map0.tmap", true)));
 
-//	eng_local.set_tester(new IntegrationTester(true, tests), true);
+	eng_local.set_tester(new IntegrationTester(true, tests), false);
+
 
 	eng_local.loop();
 	eng_local.cleanup();

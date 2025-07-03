@@ -51,10 +51,8 @@ public:
 	// destroy already reflected in BaseUpdater
 	void destroy();
 	template<typename T>
-	T* get_component() const { return (T*)get_component_typeinfo(&T::StaticType); }
-	REFLECT(name="get_comp");
-	Component* get_component_typeinfo(const ClassTypeInfo* ti) const;
-	REFLECT(name="parent",getter)
+	T* get_component() const { return (T*)get_component(&T::StaticType); }
+	Component* get_component(const ClassTypeInfo* ti) const;
 	Entity* get_parent() const { return parent; }
 	// USE IN RUNTIME! use create_sub_component to setup object in the constructor
 	// this calls on_init()

@@ -18,17 +18,50 @@ private:
 	int32_t end = 0;
 };
 
+// arguments are provided as comma seperated list, dont include outer quotes
+// options:
+//		- 'hide' : dont show in editor properties
+//		- 'transient' : dont serialize this property
+//		- 'type="my_custom_type"' : tags this for use with custom serializer/editor
+//		- 'name="some name"' : provides a name override
+//		- 'hint="hint override"' : provides a hint value
+//		- 'getter' : only for functions, marks it as a getter (can be called in script like a variable access)
+//		- 'tooltip' : give a tooltip for property
+// supported types:
+//		- int, bool, float, uint32_t, int32_t, uint16_t, int16_t, int64_t, uint8_t, int8_t
+//		- glm::vec3
+//		- glm::quat
+//		- std::vector<>
+//		- std::string
+//		- MulticastDelegate<>
+//		- class functions (only if argument types are supported)
+//		- EntityPtr
+//		- AssetPtr<>
+//		- enums (reflected with NEWENUM())
+//		- Color32
+#define REFLECT(...)
+
+// additionally, you can use this as a shorthand on the same line, but you dont get any arguments
+// like REF int myvariable = 0;
+#define REF
+
+#define CLASS_BODY(classname) \
+	using MyClassType = classname; \
+	static ClassTypeInfo StaticType; \
+	virtual const ClassTypeInfo& get_type() const { return classname::StaticType; } \
+	static const PropertyInfoList* get_props();
+
 struct Serializer;
 class ClassBase
 {
 public:
-	static ClassTypeInfo StaticType;
+	CLASS_BODY(ClassBase);
+
 	const static bool CreateDefaultObject;	/* = false, default setting */
 
 	virtual ~ClassBase() {
 	}
 
-	virtual const ClassTypeInfo& get_type() const;
 	virtual void serialize(Serializer& s) {}	// override to add custom serialization functionality
 
 	// cast this class to type T, returns nullptr if failed
@@ -47,6 +80,11 @@ public:
 
 	// creates a copy of class and copies serializable fields
 	ClassBase* create_copy(ClassBase* userptr = nullptr);
+
+	REFLECT();
+	const ClassTypeInfo* my_type() const;
+	REFLECT();
+	bool is_subclass_of(const ClassTypeInfo* type) const;
 public:
 	// called by ClassTypeInfo only during static init
 	static void register_class(ClassTypeInfo* cti);
@@ -100,38 +138,6 @@ public:
 // DONT make get_props() or CLASS_IMPL(x), the tool does that for you
 // use REFLECT() macros instead
 
-#define CLASS_BODY(classname) \
-	using MyClassType = classname; \
-	static ClassTypeInfo StaticType; \
-	const ClassTypeInfo& get_type() const override { return classname::StaticType; } \
-	static const PropertyInfoList* get_props();
-
-// arguments are provided as comma seperated list, dont include outer quotes
-// options:
-//		- 'hide' : dont show in editor properties
-//		- 'transient' : dont serialize this property
-//		- 'type="my_custom_type"' : tags this for use with custom serializer/editor
-//		- 'name="some name"' : provides a name override
-//		- 'hint="hint override"' : provides a hint value
-//		- 'getter' : only for functions, marks it as a getter (can be called in script like a variable access)
-//		- 'tooltip' : give a tooltip for property
-// supported types:
-//		- int, bool, float, uint32_t, int32_t, uint16_t, int16_t, int64_t, uint8_t, int8_t
-//		- glm::vec3
-//		- glm::quat
-//		- std::vector<>
-//		- std::string
-//		- MulticastDelegate<>
-//		- class functions (only if argument types are supported)
-//		- EntityPtr
-//		- AssetPtr<>
-//		- enums (reflected with NEWENUM())
-//		- Color32
-#define REFLECT(...)
-
-// additionally, you can use this as a shorthand on the same line, but you dont get any arguments
-// like REF int myvariable = 0;
-#define REF
 
 // sometimes you want forward declared class types in the header, but they need to be definied when registering 
 // them in the generated file like AssetPtr<>'s

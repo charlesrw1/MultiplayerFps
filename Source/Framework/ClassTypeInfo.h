@@ -1,6 +1,7 @@
 #pragma once
 #include "ClassBase.h"
 #include "Reflection2.h"
+#include <string>
 
 struct SerializedForDiffing;
 struct PropHashTable;
@@ -55,8 +56,13 @@ public:
 		return id == other.id;
 	}
 
-private:
 
+	REFLECT();
+	bool is_subclass_of(const ClassTypeInfo* info) const;
+	REFLECT();
+	std::string get_classname() const;
+	REFLECT();
+	const ClassTypeInfo* get_super_type() const;
 };
 
 

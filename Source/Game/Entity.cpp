@@ -614,7 +614,7 @@ class EntityTagSerialize : public IPropertySerializer
 };
 ADDTOFACTORYMACRO_NAME(EntityTagSerialize, IPropertySerializer, "EntityTagString");
 
-Component* Entity::get_component_typeinfo(const ClassTypeInfo* ti) const {
+Component* Entity::get_component(const ClassTypeInfo* ti) const {
 	if (!ti)
 		return nullptr;
 	for (int i = 0; i < all_components.size(); i++)

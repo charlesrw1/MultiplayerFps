@@ -281,7 +281,7 @@ def write_push_type_to_lua_func(newType:CppType, cppVarName:str) -> str:
     elif newType.type == VEC3_TYPE:
         return f"push_vec3_to_lua(L,{cppVarName})"
     elif newType.type == STRING_TYPE:
-        return f"push_std_string_from_lua(L,{cppVarName})"
+        return f"push_std_string_to_lua(L,{cppVarName})"
     elif newType.type == ASSET_PTR_TYPE or newType.type == HANDLE_PTR_TYPE:
         return f"push_object_to_lua(L,{cppVarName})"
     elif newType.type == OTHER_CLASS_TYPE:
@@ -294,7 +294,7 @@ def write_script_function(newclass:ClassDef, funcProp : Property) -> str:
     my_obj_type = newclass.classname
     function_name = funcProp.name
 
-    output = f"int lua_binding_{funcProp.name}(lua_State* L)\n"
+    output = f"int lua_binding_{newclass.classname}_{funcProp.name}(lua_State* L)\n"
     output += "{\n"
     # get class object (or struct)
     calling_template = ""
@@ -349,14 +349,16 @@ def class_has_actual_properties(newclass : ClassDef) -> bool:
     return False
 
 def write_class_old(newclass : ClassDef)->str:
-    if newclass.object_type==ClassDef.TYPE_CLASS and newclass.super_type_def == None:
-        return ""
+
+    super_typeinfo_str = "nullptr"
+    if newclass.super_type_def!=None: # handles case for root ClassBase
+        super_typeinfo_str = f"&{newclass.supername}::StaticType"
 
     output = ""
     if newclass.object_type==ClassDef.TYPE_CLASS:
         output += f"ClassTypeInfo {newclass.classname}::StaticType = ClassTypeInfo(\n \
                     \"{newclass.classname}\",\n \
-                    &{newclass.supername}::StaticType,\n \
+                    {super_typeinfo_str},\n \
                     {newclass.classname}::get_props,\n \
                     default_class_create<{newclass.classname}>(),\n \
                     {newclass.classname}::CreateDefaultObject\n,nullptr,0 \
