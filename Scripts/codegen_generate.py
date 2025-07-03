@@ -588,6 +588,27 @@ def write_lua_class(newclass:ClassDef) -> str:
                 if len(p.func_args) > 0:
                     output = output[:-1]
                 output += ") end\n"
+            elif p.new_type.type == MULTICAST_TYPE:
+                # write multicast delegate setters/getters
+                # bind_{delegatename}
+                # bind
+                output += "---@param func function\n"
+                output += f"function {newclass.classname}:bind_{p.name}(func) end\n"
+                # remove
+                output += "---@param func function\n"
+                output += f"function {newclass.classname}:remove_{p.name}(func) end\n"
+                # invoker
+                count = 0
+                for t in p.new_type.template_args:
+                    output += f"---@param arg{count} {get_lua_type_string(t)}\n"
+                    count += 1
+                output += f"function {newclass.classname}:invoke_{p.name}("
+                for i in range(count):
+                    output += f"arg{i}"
+                    if i != count-1:
+                        output += ","
+                output += ") end\n"
+
 
     return output
   

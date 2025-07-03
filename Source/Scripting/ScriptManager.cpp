@@ -407,25 +407,25 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c)
 	LuaClassTypeInfo* luaInfo = (LuaClassTypeInfo*)(c);
 	auto L = ScriptManager::inst->get_lua_state();
 
-
+	const int startTop = lua_gettop(L);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, out->get_table_registry_id()); // -3
 	lua_rawgeti(L, LUA_REGISTRYINDEX, luaInfo->template_lua_table);	// -2
 	stack_dump(L);
-	int top = lua_gettop(L);
-	assert(top == 2);
+	
+	auto check_top = [&](int v) {
+		int topNow = lua_gettop(L);
+		assert(topNow == startTop + v);
+	};
+	check_top(2);
+
 
 	// Copy table1 into dst
 	lua_pushnil(L);  // first key
-
-	top = lua_gettop(L);
-	assert(top == 3);
-	stack_dump(L);
+	check_top(3);
 
 	while (lua_next(L, -2)) {
-		stack_dump(L);
 
-		int top = lua_gettop(L);
-		assert(top == 4);
+		check_top(4);
 
 		lua_pushvalue(L, -2);  // duplicate key
 		lua_insert(L, -2);     // move key below value
@@ -434,18 +434,15 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c)
 		stack_dump(L);
 		// leaves key for next lua_next
 	}
-	top = lua_gettop(L);
-	assert(top == 2);
+	check_top(2);
 	stack_dump(L);
 	sys_print(Debug, "template table");
 	dump_lua_table(L, -1);
-	top = lua_gettop(L);
-	assert(top == 2);
+	check_top(2);
 	sys_print(Debug, "output table");
 	dump_lua_table(L, -2);
 
 	lua_pop(L, 2);
-	top = lua_gettop(L);
-	assert(top == 0);
+	check_top(0);
 	return out;
 }

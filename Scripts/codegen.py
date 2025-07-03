@@ -4,7 +4,7 @@ import sys
 
 SOURCE_DIR = "/../Source/"
 DIRS_TO_SKIP = ["./.generated","./External"]
-FULL_REBUILD = False
+FULL_REBUILD = True
 if __name__ == "__main__":
     #try:
         this_dir = os.path.dirname(os.path.abspath(__file__))

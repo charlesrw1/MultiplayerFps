@@ -1500,6 +1500,7 @@ int game_engine_main(int argc, char** argv)
 	
 	return 0;
 }
+ClassWithDelegate StaticClass::myClass;
 
 // Set these in vars.txt (or init.txt) located in $ROOT
 // They function identically, but vars is preferred for const configuration and init for short term changes
