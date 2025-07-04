@@ -167,6 +167,7 @@ void EditorDoc::init_new()
 				}
 			}
 		}
+		gui.do_box_select(type);
 		});
 
 	command_mgr->on_command_execute_or_undo.add(this, [&]() {
@@ -622,11 +623,11 @@ void EditorDoc::do_mouse_selection(MouseSelectionAction action, const Entity* e,
 		return;
 
 	ASSERT(actual_entity_to_select);
-	if (action == SELECT_ONLY)
+	if (action == MouseSelectionAction::SELECT_ONLY)
 		selection_state->set_select_only_this(actual_entity_to_select);
-	else if (action == ADD_SELECT)
+	else if (action == MouseSelectionAction::ADD_SELECT)
 		selection_state->add_to_entity_selection(actual_entity_to_select);
-	else if (action == UNSELECT)
+	else if (action == MouseSelectionAction::UNSELECT)
 		selection_state->remove_from_selection(actual_entity_to_select);
 }
 
@@ -1197,8 +1198,9 @@ void ManipulateTransformTool::update()
 
 void EditorDoc::imgui_draw()
 {
-	gui.draw();
-	check_inputs();
+	bool clicked = gui.draw();
+	if(!clicked)
+		check_inputs();
 	manipulate->check_input();
 
 	int text_ofs = 0;
@@ -1232,7 +1234,7 @@ void EditorDoc::imgui_draw()
 
 	IEditorTool::imgui_draw();
 
-	dragger.tick();
+	dragger.tick(!manipulate->is_hovered()&&!manipulate->is_using());
 
 	command_mgr->execute_queued_commands();
 }
@@ -1815,7 +1817,7 @@ EditorUILayout::EditorUILayout() {
 ConfigVar test1("test1", "200", CVAR_INTEGER, "", 0, 256);
 ConfigVar test2("test2", "200", CVAR_INTEGER, "", 0, 256);
 
-void EditorUILayout::draw() {
+bool EditorUILayout::draw() {
 	RenderWindow& window = UiSystem::inst->window;
 	cube.rotation_matrix = (glm::mat3)doc->vs_setup.view;
 	cube.draw(window);
@@ -1835,48 +1837,24 @@ void EditorUILayout::draw() {
 	}
 
 
-	int x, y;
-	SDL_GetMouseState(&x, &y);
-	bool do_mouse_click = mouse_clicked && button_clicked == 1;
-	mouse_clicked = false;
+
+	bool do_mouse_click = Input::was_mouse_released(0) && UiSystem::inst->is_vp_hovered() && !doc->dragger.get_is_dragging();
+	int x = Input::get_mouse_pos().x;
+	int y = Input::get_mouse_pos().y;
+
 
 	if (doc->selection_state->has_any_selected() && (doc->manipulate->is_hovered() || doc->manipulate->is_using()))
 		do_mouse_click = false;
 
 	if (!editor_draw_name_text.get_bool())
-		return;
+		return false;
 	if (!eng->get_level())
-		return;
+		return false;
 
 	const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
 	if (!font) 
 		font = UiSystem::inst->defaultFont;
-
-	struct obj {
-		glm::vec3 pos = glm::vec3(0.f);
-		const Entity* e = nullptr;
-	};
-	std::vector<obj> objs;
-	auto& all_objs = eng->get_level()->get_all_objects();
-	for (auto o : all_objs) {
-		if (Entity* e = o->cast_to<Entity>()) {
-			if (!this_is_a_serializeable_object(e))
-				continue;
-			obj ob;
-			glm::vec3 todir = glm::vec3(e->get_ws_position()) - doc->vs_setup.origin;
-			float dist = glm::dot(todir, todir);
-			if (dist > 20.0 * 20.0)
-				continue;
-			ob.e = e;
-			glm::vec4 pos = doc->vs_setup.viewproj * glm::vec4(e->get_ws_position(), 1.0);
-			ob.pos = pos / pos.w;
-
-			if (ob.pos.z < 0)
-				continue;
-
-			objs.push_back(ob);
-		}
-	}
+	auto objs = get_objs();
 	std::sort(objs.begin(), objs.end(), [](const obj& a, const obj& b)->bool
 		{
 			return a.pos.z < b.pos.z;
@@ -1943,7 +1921,7 @@ void EditorUILayout::draw() {
 
 		if (do_mouse_click) {
 			Rect2d r(coordx - 3, coordy - 3, size.w + 6, size.h + 6);
-			if (r.is_point_inside(x, y)) {
+			if (r.is_point_inside(x-vp_pos.x, y-vp_pos.y)) {
 
 				clicked = o.e;
 			}
@@ -1977,21 +1955,126 @@ void EditorUILayout::draw() {
 
 	}
 	if (clicked) {
-		if (ImGui::GetIO().KeyShift) {
-			doc->do_mouse_selection(EditorDoc::MouseSelectionAction::ADD_SELECT, clicked, true);
+		if (Input::is_shift_down()) {
+			doc->do_mouse_selection(MouseSelectionAction::ADD_SELECT, clicked, true);
 		}
-		else if (ImGui::GetIO().KeyCtrl) {
-			doc->do_mouse_selection(EditorDoc::MouseSelectionAction::UNSELECT, clicked, true);
+		else if (Input::is_ctrl_down()) {
+			doc->do_mouse_selection(MouseSelectionAction::UNSELECT, clicked, true);
 		}
 		else {
-			doc->do_mouse_selection(EditorDoc::MouseSelectionAction::SELECT_ONLY, clicked, true);
+			doc->do_mouse_selection(MouseSelectionAction::SELECT_ONLY, clicked, true);
 		}
+		return true;
 	}
 	else {
 		//if(do_mouse_click)
 		//	mouse_down_delegate.invoke(x-ws_position.x, y-ws_position.y, button_clicked);
 	}
+	return false;
+}
 
+void EditorUILayout::do_box_select(MouseSelectionAction action)
+{
+	if (!editor_draw_name_text.get_bool())
+		return;
+	if (!eng->get_level())
+		return;
+
+	auto objs = get_objs();
+	assert(doc->dragger.get_is_dragging());
+	const auto vp_size = UiSystem::inst->get_vp_rect().get_size();
+	const auto vp_pos = UiSystem::inst->get_vp_rect().get_pos();
+	auto area = doc->dragger.get_drag_rect();
+	area.x -= vp_pos.x;
+	area.y -= vp_pos.y;
+
+	for (auto o : objs) {
+		const char* name = (o.e->get_editor_name().c_str());
+		const bool is_prefab_root = o.e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
+		if (!*name) {
+			if (is_prefab_root)
+				name = o.e->get_object_prefab().get_name().c_str();
+			else {
+				if (auto m = o.e->get_component<MeshComponent>()) {
+					if (m->get_model())
+						name = m->get_model()->get_name().c_str();
+				}
+			}
+		}
+		if (!*name) {
+			name = o.e->get_type().classname;
+		}
+		const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+		if (!font)
+			font = UiSystem::inst->defaultFont;
+		const int icon_size = 16;
+		InlineVec<Texture*, 6> icons;
+		auto e = o.e;
+		if (is_prefab_root) {
+			const char* s = "eng/editor/prefab_p.png";
+			auto tex = g_assets.find_global_sync<Texture>(s);
+			icons.push_back(tex.get());
+		}
+
+		for (auto c : o.e->get_components()) {
+			if (c->dont_serialize_or_edit_this()) continue;
+			const char* s = c->get_editor_outliner_icon();
+			if (!*s) continue;
+			auto tex = g_assets.find_global_sync<Texture>(s);
+			icons.push_back(tex.get());
+		}
+
+		auto size = GuiHelpers::calc_text_size_no_wrap(name, font);
+
+		const int text_offset = (icon_size + 1) * icons.size();
+		size.w += text_offset;
+
+
+		o.pos.y *= -1;
+		auto coordx = o.pos.x * 0.5 + 0.5;
+		auto coordy = o.pos.y * 0.5 + 0.5;
+
+
+
+		coordx *= vp_size.x;
+		coordy *= vp_size.y;
+		//coordx += vp_pos.x;
+		//coordy += vp_pos.y;
+		coordx -= size.w / 2;
+		coordy -= size.h / 2;
+
+
+		Rect2d r(coordx - 3, coordy - 3, size.w + 6, size.h + 6);
+		if(r.overlaps(area)) {
+			doc->do_mouse_selection(action, e, true);
+		}
+	}
+}
+
+std::vector<EditorUILayout::obj> EditorUILayout::get_objs()
+{
+	std::vector<obj> objs;
+	auto& all_objs = eng->get_level()->get_all_objects();
+	for (auto o : all_objs) {
+		if (Entity* e = o->cast_to<Entity>()) {
+			if (!this_is_a_serializeable_object(e))
+				continue;
+			obj ob;
+			glm::vec3 todir = glm::vec3(e->get_ws_position()) - doc->vs_setup.origin;
+			float dist = glm::dot(todir, todir);
+			if (dist > 20.0 * 20.0)
+				continue;
+			ob.e = e;
+			glm::vec4 pos = doc->vs_setup.viewproj * glm::vec4(e->get_ws_position(), 1.0);
+			ob.pos = pos / pos.w;
+
+			if (ob.pos.z < 0)
+				continue;
+
+			objs.push_back(ob);
+		}
+	}
+	return objs;
 }
 
 
@@ -2051,10 +2134,10 @@ Entity* EditorDoc::spawn_prefab(PrefabAsset* prefab)
 	return e;
 }
 
-void DragDetector::tick()
+void DragDetector::tick(bool can_start_drag)
 {
 	if (Input::was_mouse_pressed(0)) {
-		if (!is_dragging && UiSystem::inst->is_vp_hovered()) {
+		if (can_start_drag&&!is_dragging && UiSystem::inst->is_vp_hovered()) {
 			mouseClickX = Input::get_mouse_pos().x;
 			mouseClickY = Input::get_mouse_pos().y;
 			is_dragging = true;

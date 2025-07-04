@@ -66,7 +66,13 @@ public:
 		return;
 	}
 	REF static HitResult cast_ray() {
-		return HitResult();
+		HitResult out;
+		out.pos = glm::vec3(1, 0, 0);
+		out.hit = true;
+		return out;
+	}
+	REF static void send_back_result(HitResult res) {
+		printf("%f %f %f\n", res.pos.x, res.pos.y, res.pos.z);
 	}
 };
 //

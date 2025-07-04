@@ -97,6 +97,9 @@ public:
 			this->allocate = lua_class_alloc;
 		}
 	}
+	const string& get_name() {
+		return lua_classname;
+	}
 	void init_lua_type();
 private:
 	int template_lua_table = 0;
@@ -125,13 +128,16 @@ public:
 	void load_script_files();
 	void init_this_class_type(ClassTypeInfo* classTypeInfo);
 	void set_class_type_global(ClassTypeInfo* type);
+	void set_enum_global(const std::string& name, const EnumTypeInfo*);
 	int create_class_table_for(ClassBase* classTypeInfo);
+	void free_class_table(int id);
 	lua_State* get_lua_state() {
 		return lua;
 	}
 	ClassBase* allocate_class(string name);
+	void reload();
 private:
 	void initialize_class_type(const ClassTypeInfo* type);
 	lua_State* lua = nullptr;
-	std::vector<uptr<LuaClassTypeInfo>> lua_classes;
+	std::unordered_map<std::string, uptr<LuaClassTypeInfo>> lua_classes;
 };

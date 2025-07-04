@@ -74,6 +74,12 @@ public:
 	REF std::vector<float> values;
 };
 
+class PlayerAgFactory : public ClassBase {
+public:
+	CLASS_BODY(PlayerAgFactory, scriptable);
+	REF virtual void create(const Model* model, agBuilder* builder) {}
+};
+
 
 
 

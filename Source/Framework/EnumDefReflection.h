@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <string>
 #include "Framework/Util.h"
+#include <unordered_map>
 
 struct EnumIntPair {
 	EnumIntPair(const char* n, const char* d, int64_t v) 
@@ -81,4 +82,6 @@ public:
 	// ex: "MyEnum::Red", "MyEnum::Green"
 	static EnumFindResult find_enum_by_name(const char* enum_value_name);
 	static EnumFindResult find_enum_by_name(const std::string& str);
+
+	static const std::unordered_map<std::string, const EnumTypeInfo*>& get_all_enums();
 };

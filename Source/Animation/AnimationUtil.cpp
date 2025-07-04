@@ -58,10 +58,10 @@ void util_blend_with_mask(int bonecount, const Pose& a, Pose& b, float factor, c
 {
 	ASSERT(mask.size() >= bonecount);
 	for (int i = 0; i < bonecount; i++) {
-		b.q[i] = glm::slerp(b.q[i], a.q[i], factor*mask[i]);
+		b.q[i] = glm::slerp(a.q[i], b.q[i], factor*mask[i]);
 		b.q[i] = glm::normalize(b.q[i]);
-		b.pos[i] = glm::mix(b.pos[i], a.pos[i], factor*mask[i]);
-		b.scale[i] = glm::mix(b.scale[i], a.scale[i], factor * mask[i]);
+		b.pos[i] = glm::mix(a.pos[i], b.pos[i], factor*mask[i]);
+		b.scale[i] = glm::mix(a.scale[i], b.scale[i], factor * mask[i]);
 
 	}
 }

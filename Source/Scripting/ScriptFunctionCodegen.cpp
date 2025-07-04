@@ -29,11 +29,6 @@ void push_object_to_lua(lua_State* L, const ClassBase* ptrConst) {
 	}
 }
 
-void push_vec3_to_lua(lua_State* L, const glm::vec3& v)
-{
-	// make table, set x,y,z
-}
-
 bool get_bool_from_lua(lua_State* L, int index) {
 	return lua_toboolean(L, index);
 }
@@ -50,13 +45,9 @@ std::string get_std_string_from_lua(lua_State* L, int index) {
 	auto str = luaL_checkstring(L, index);
 	return std::string(str);
 }
-glm::vec3 get_vec3_from_lua(lua_State* L, int index) {
-	assert(0);
-	return {};
-}
 extern void stack_dump(lua_State* L);
 ClassBase* get_object_from_lua(lua_State* L, int index) {
-	stack_dump(L);
+	//stack_dump(L);
 
 	if (lua_isnil(L, index))
 		return nullptr;

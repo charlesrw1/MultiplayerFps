@@ -531,6 +531,14 @@ b.name = 1
 
 
 
+---@generic T : MyClass
+---@return T
+---@param arg  T
+function MyFunc(arg)
+    return ag
+end
+
+MyFunc(Interactable)
 
 o.things
 
@@ -601,6 +609,12 @@ SCANCODE_B = 1
 
 local function find_by_tag(tag)
 
+    ---@type PhysicsBody
+    local pb = nil  
+    pb:bind_on_trigger_start(function ()
+        print("BRUH")
+    end)
+    pb:
 
     if LuaInput.is_key_down(SCANCODE_A) then
         

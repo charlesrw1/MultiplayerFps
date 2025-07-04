@@ -52,13 +52,15 @@ public:
 	REF void destroy();
 	template<typename T>
 	T* get_component() const { return (T*)get_component(&T::StaticType); }
-	REF Component* get_component(const ClassTypeInfo* ti) const;
+	REFLECT(lua_generic)
+	Component* get_component(const ClassTypeInfo* ti) const;
 	REF Entity* get_parent() const { return parent; }
 	// USE IN RUNTIME! use create_sub_component to setup object in the constructor
 	// this calls on_init()
 	template<typename T>
 	T* create_component();
-	REF Component* create_component(const ClassTypeInfo* info);
+	REFLECT(lua_generic)
+	Component* create_component(const ClassTypeInfo* info);
 	// will also parent to this
 	REF Entity* create_child_entity();
 	template<typename T>

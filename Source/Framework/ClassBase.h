@@ -20,7 +20,14 @@ private:
 
 // arguments are provided as comma seperated list, dont include outer quotes
 // options:
-//		- 'hide' : dont show in editor properties
+//		Visibility: (default is visible and read+write)
+//		- 'script_hide' : dont let script read or write
+//		- 'script_read' : script can only read
+//		- 'script_write' : script_can only write
+//		- 'edit_hide'	: dont show in editor inspector
+//		- 'hide' : (edit_hide AND script_hide)
+// 
+//		- 'lua_generic' : will treat arg as a generic parameter and return that when making the lua stub file (doesnt affect runtime)
 //		- 'transient' : dont serialize this property
 //		- 'type="my_custom_type"' : tags this for use with custom serializer/editor
 //		- 'name="some name"' : provides a name override
@@ -61,8 +68,14 @@ public:
 	CLASS_BODY(ClassBase);
 
 	const static bool CreateDefaultObject;	/* = false, default setting */
-	virtual ~ClassBase() {
-	}
+	ClassBase() = default;
+	virtual ~ClassBase();
+	ClassBase& operator=(const ClassBase& other);
+	ClassBase(const ClassBase& other);
+	ClassBase(ClassBase&& other);
+
+
+
 	virtual void serialize(Serializer& s) {}	// override to add custom serialization functionality
 	// cast this class to type T, returns nullptr if failed
 	template<typename T>
@@ -114,6 +127,7 @@ public:
 	// non-const, lazy evalutation
 	int get_table_registry_id();
 	bool is_class_referenced_from_lua() const;
+	void free_table_registry_id();
 private:
 	// this is used for interop with lua
 	// this is the table id returned by luaL_ref in the registry

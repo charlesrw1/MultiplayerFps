@@ -76,11 +76,11 @@ void agClipNode::get_pose(agGetPoseCtx& ctx)
 	ctx.debug_exit();
 }
 
-void agClipNode::set_clip(const Model& m, const string& clipName)
+void agClipNode::set_clip(const Model* m, string clipName)
 {
-	assert(m.get_skel());
-	seq = m.get_skel()->find_clip(clipName);
-	clipFrom = &m;
+	assert(m->get_skel());
+	seq = m->get_skel()->find_clip(clipName);
+	clipFrom = m;
 }
 
 void agClipNode::set_clip(const AnimationSeqAsset* asset)
@@ -509,29 +509,32 @@ void agBlendMasked::get_pose(agGetPoseCtx& ctx) {
 	ctx.debug_exit();
 }
 
-void agBlendMasked::init_mask_for_model(const Model& model, float default_weight)
+void agBlendMasked::init_mask_for_model(const Model* model, float default_weight)
 {
-	maskWeights.resize(model.get_skel()->get_num_bones(), default_weight);
+	assert(model);
+	maskWeights.resize(model->get_skel()->get_num_bones(), default_weight);
 }
 
-void agBlendMasked::set_all_children_weights(const Model& model, StringName bone, float weight)
+void agBlendMasked::set_all_children_weights(const Model* model, string bone, float weight)
 {
-	const int myIndex = model.bone_for_name(bone);
+	assert(model);
+	const int myIndex = model->bone_for_name(StringName(bone.c_str()));
 	if (myIndex == -1)
 		throw std::runtime_error("set_all_children_weights: invalid bone");
-	int num_bones = model.get_skel()->get_num_bones();
+	int num_bones = model->get_skel()->get_num_bones();
 	maskWeights.at(myIndex) = weight;
 	for (int i = myIndex+1; i < num_bones; i++) {
-		const int parent= model.get_skel()->get_bone_parent(i);
+		const int parent= model->get_skel()->get_bone_parent(i);
 		if (parent < myIndex)
 			break;
 		maskWeights.at(i) = weight;
 	}
 }
 
-void agBlendMasked::set_one_bone_weight(const Model& model, StringName bone, float weight)
+void agBlendMasked::set_one_bone_weight(const Model* model, string bone, float weight)
 {
-	const int myIndex = model.bone_for_name(bone);
+	assert(model);
+	const int myIndex = model->bone_for_name(StringName(bone.c_str()));
 	if (myIndex == -1)
 		throw std::runtime_error("set_all_children_weights: invalid bone");
 	maskWeights.at(myIndex) = weight;
@@ -550,7 +553,7 @@ void agStatemachineBase::reset()
 void agStatemachineBase::get_pose(agGetPoseCtx& ctx)
 {
 	if (!currentTree) {
-		update(ctx,true);
+		update(&ctx,true);
 		if (currentTree) {
 			currentTree->reset();
 		}
@@ -588,7 +591,7 @@ void agStatemachineBase::get_pose(agGetPoseCtx& ctx)
 		}
 	}
 	auto preTree = currentTree;
-	update(ctx, false);
+	update(&ctx, false);
 	curTime += ctx.dt;
 	if (preTree != currentTree) {
 		curTime = 0.0;
@@ -622,9 +625,9 @@ void agStatemachineBase::set_transition_parameters(Easing easing, float blend_ti
 	this->curTransitionDuration = blend_time;
 }
 
-void agSlotPlayer::update(agGetPoseCtx& ctx, bool wantsReset)
+void agSlotPlayer::update(agGetPoseCtx* ctx, bool wantsReset)
 {
-	auto slotPlayer = ctx.object.find_slot_with_name(slotName);
+	auto slotPlayer = ctx->object.find_slot_with_name(slotName);
 	if (slotPlayer) {
 		clipPlayer.slot = slotPlayer;
 	}
@@ -641,13 +644,13 @@ void agSlotPlayer::update(agGetPoseCtx& ctx, bool wantsReset)
 	}
 }
 
-void agBlendByInt::update(agGetPoseCtx& ctx, bool wantsReset)
+void agBlendByInt::update(agGetPoseCtx* ctx, bool wantsReset)
 {
 	if (inputs.empty()) {
 		sys_print(Error, "agBlendByInt::update: no inuts?\n");
 		throw std::runtime_error("agBlendByInt::update");
 	}
-	int index = integer.get_int(ctx);
+	int index = integer.get_int(*ctx);
 	if (index < 0 || index >= inputs.size()) {
 		sys_print(Warning, "agBlendByInt::update: index out of range (%d, size=%d)\n",index,(int)inputs.size());
 		index = 0;

@@ -39,7 +39,7 @@ agBaseNode& AnimatorObject::get_root_node() const {
 	assert(graph.get_root());
 	return *graph.get_root();
 }
-AnimatorObject::AnimatorObject(const Model& model, AnimGraphConstructed& ingraph, Entity* ent) 
+AnimatorObject::AnimatorObject(const Model& model, agBuilder& ingraph, Entity* ent)
 	: model(model),graph(ingraph), simulating_physics_objects(2) {
 	if (!model.get_skel()) {
 		sys_print(Error, "AnimatorObject(): model doesnt have skeleton\n");
@@ -440,4 +440,17 @@ bool AnimatorObject::play_animation(
 float DirectAnimationSlot::time_remaining() const {
 	if (!active || !active->seq) return 0.f;
 	return (active->seq->get_duration() - time)/playspeed;
+}
+
+REF agBaseNode* agBuilder::alloc(const ClassTypeInfo* info)
+{
+	if (!info||!info->is_a(agBaseNode::StaticType)) {
+		sys_print(Error, "agBuilder::alloc subclass not a agBaseNode\n");
+		return nullptr;
+	}
+	return (agBaseNode*)info->alloc();
+}
+
+REF void agBuilder::set_root(agBaseNode* node) {
+	this->root = node;
 }

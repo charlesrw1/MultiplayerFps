@@ -1,3 +1,4 @@
+from numpy import typename
 from codegen_lib import *
 
 from datetime import datetime
@@ -23,7 +24,7 @@ def write_headers(path:str, additional_includes:list[str]):
     return out + "\n"
 
 
-def output_macro_for_prop(cpptype:CppType,name:str,flags:str,offset:str,custom_type:str,hint:str,nameoverride:str,tooltip:str)->str:
+def output_macro_for_prop(typenames : dict[str,ClassDef],cpptype:CppType,name:str,flags:str,offset:str,custom_type:str,hint:str,nameoverride:str,tooltip:str)->str:
     name_with_quotes = f"\"{name}\""
     name_offset_flags = f"{name_with_quotes},{offset},{flags}"
     name_offset_flags_hint = f"{name_offset_flags},{hint}"
@@ -99,9 +100,15 @@ def output_macro_for_prop(cpptype:CppType,name:str,flags:str,offset:str,custom_t
         return f'make_classtypeinfo_property({name_offset_flags},{tooltip},&{type_of_template})'
     elif type == STRINGNAME_TYPE:
          return f"make_stringname_property({name_offset_flags},{tooltip})"
-    else:
-        print(f"Unknown type {name} {type}")
-        assert(0)
+    elif type == OTHER_CLASS_TYPE:
+        base_typename = cpptype.typename
+        if cpptype.is_pointer and (not base_typename is None) and ClassDef.is_self_derived_from(base_typename,typenames["IAsset"]):
+            print(f"Found a raw IAsset derived pointer, reging prop as AssetPtr... ({base_typename.classname}, {name})")
+            return f'make_assetptr_property_new({name_offset_flags},{tooltip},&{base_typename.classname}::StaticType)'
+
+
+    print(f"Unknown type {name} {type}")
+    assert(0)
     return ""
 
 def escape_quote_characters(instr:str) -> str:
@@ -114,14 +121,14 @@ def escape_quote_characters(instr:str) -> str:
     return outstr
 
 # code gen to make macros to make templates to make code ...
-def write_prop(prop : Property,newclass:ClassDef) -> str:
+def write_prop(typenames:dict[str,ClassDef],prop : Property,newclass:ClassDef) -> str:
     prop.custom_type = f'"{prop.custom_type}"'
     prop.hint = f'"{prop.hint}"'
     prop.tooltip = f'"{escape_quote_characters(prop.tooltip)}"'
    
     offset_str = f"offsetof({newclass.classname}, {prop.name})"
 
-    return output_macro_for_prop(prop.new_type,prop.name,prop.get_flags(),offset_str,prop.custom_type,prop.hint,prop.nameoverride, prop.tooltip)
+    return output_macro_for_prop(typenames,prop.new_type,prop.name,prop.get_flags(),offset_str,prop.custom_type,prop.hint,prop.nameoverride, prop.tooltip)
 
 
 
@@ -259,7 +266,9 @@ def write_get_type_from_lua_func(newType:CppType, index:int) -> str:
     elif newType.type == FLOAT_TYPE:
         return f"get_float_from_lua(L,{index})"
     elif newType.type == VEC3_TYPE:
-        return f"get_vec3_from_lua(L,{index})"
+        return f"get_lVec3_from_lua(L,{index})"
+    elif newType.type == QUAT_TYPE:
+        return f"get_lQuat_from_lua(L,{index})"
     elif newType.type == STRING_TYPE:
         return f"get_std_string_from_lua(L,{index})"
     elif newType.type == ASSET_PTR_TYPE or newType.type == HANDLE_PTR_TYPE:
@@ -267,7 +276,17 @@ def write_get_type_from_lua_func(newType:CppType, index:int) -> str:
     elif newType.type == OTHER_CLASS_TYPE:
         assert(newType.typename!=None)
         return f"class_cast<{newType.typename.classname}>(get_object_from_lua(L,{index}))"
-    return ""
+    elif newType.type == ENUM_TYPE:
+        assert(newType.typename!=None)
+        return f"({newType.typename.classname})get_int_from_lua(L,{index})"
+    elif newType.type == STRINGNAME_TYPE:
+        return f"StringName(get_std_string_from_lua(L,{index}).c_str())"
+    elif newType.type == STRUCT_TYPE:
+        assert(newType.typename!=None)
+        return f"get_{newType.typename.classname}_from_lua(L,{index})"
+    else:
+        raise Exception(f"cant get type from lua: {newType.get_raw_type_string()}")
+
 def write_push_type_to_lua_func(newType:CppType, cppVarName:str) -> str:
     #type_of_template = ""
    # if len(newType.template_args)>0:
@@ -279,7 +298,9 @@ def write_push_type_to_lua_func(newType:CppType, cppVarName:str) -> str:
     elif newType.type == FLOAT_TYPE:
         return f"push_float_to_lua(L,{cppVarName})"
     elif newType.type == VEC3_TYPE:
-        return f"push_vec3_to_lua(L,{cppVarName})"
+        return f"push_lVec3_to_lua(L,{cppVarName})"
+    elif newType.type == QUAT_TYPE:
+        return f"push_lQuat_to_lua(L,{cppVarName})"
     elif newType.type == STRING_TYPE:
         return f"push_std_string_to_lua(L,{cppVarName})"
     elif newType.type == ASSET_PTR_TYPE or newType.type == HANDLE_PTR_TYPE:
@@ -287,6 +308,15 @@ def write_push_type_to_lua_func(newType:CppType, cppVarName:str) -> str:
     elif newType.type == OTHER_CLASS_TYPE:
         assert(newType.typename!=None)
         return f"push_object_to_lua(L,{cppVarName})"
+    elif newType.type == ENUM_TYPE:
+        return f"push_int_to_lua(L,(int64_t){cppVarName})"
+    elif newType.type == STRINGNAME_TYPE:
+        return f"push_std_string_to_lua(L,{cppVarName}.get_c_str())"
+    elif newType.type == STRUCT_TYPE:
+        assert(newType.typename!=None)
+        return f"push_{newType.typename.classname}_to_lua(L,{cppVarName})"
+    else:
+        raise Exception(f"cant push type to lua: {newType.get_raw_type_string()} {cppVarName}")
     return ""
 
 def write_script_function(newclass:ClassDef, funcProp : Property) -> str:
@@ -416,6 +446,49 @@ def write_scriptable_class(newclass : ClassDef) -> str:
     output += "};\n"
     return output
 
+def write_struct_getter_setter(newclass : ClassDef) -> str:
+    # Generates two functions:
+    # 1. push_struct_to_lua: pushes a C++ struct as a Lua table
+    # 2. get_struct_from_lua: reads a Lua table and fills a C++ struct
+
+    output = ""
+
+    # Function to push struct to Lua
+    output += f"void push_{newclass.classname}_to_lua(lua_State* L, const {newclass.classname}& value) {{\n"
+    output += "\tlua_newtable(L);\n"
+    for p in newclass.properties:
+        if p.new_type.type != FUNCTION_TYPE and p.new_type.type != MULTICAST_TYPE:
+            try:
+                toappend = ""
+                toappend += f"\tlua_pushstring(L, \"{p.name}\");\n"
+                toappend += f"\t{write_push_type_to_lua_func(p.new_type, f'value.{p.name}')};\n"
+                toappend += "\tlua_settable(L, -3);\n"
+                output += toappend
+            except Exception as e :
+                print(f"Err: write_struct_getter_setter{newclass.classname}: " + str(e.args))
+
+    output += "}\n\n"
+
+    # Function to get struct from Lua
+    output += f"{newclass.classname} get_{newclass.classname}_from_lua(lua_State* L, int index) {{\n"
+    output += f"\t{newclass.classname} result;\n"
+    for p in newclass.properties:
+        if p.new_type.type != FUNCTION_TYPE and p.new_type.type != MULTICAST_TYPE:
+            try:
+                toappend = ""
+                toappend += f"\tlua_getfield(L, index, \"{p.name}\");\n"
+                toappend += f"\tif (!lua_isnil(L, -1)) {{\n"
+                toappend += f"\t\tresult.{p.name} = {write_get_type_from_lua_func(p.new_type, -1)};\n"
+                toappend += f"\t}}\n"
+                toappend += "\tlua_pop(L, 1);\n"
+                output += toappend
+            except Exception as e :
+                print(f"Err: write_struct_getter_setter{newclass.classname}: " + str(e.args))
+    output += "\treturn result;\n"
+    output += "}\n\n"
+
+    return output
+
 def has_any_functions(newclass:ClassDef)->bool:
     for f in newclass.properties:
         if f.new_type.type==FUNCTION_TYPE:
@@ -426,7 +499,7 @@ def get_bool_str(b:bool)->str:
         return "true"
     else:
         return "false"
-def write_class_old(newclass : ClassDef)->str:
+def write_class_old(typenames:dict[str,ClassDef],newclass : ClassDef)->str:
 
 
     super_typeinfo_str = "nullptr"
@@ -462,6 +535,9 @@ def write_class_old(newclass : ClassDef)->str:
                     default_class_create<{newclass.classname}>(),\n \
                     {newclass.classname}::CreateDefaultObject,{function_str},{scriptable_alloc});\n"
     elif newclass.object_type == ClassDef.TYPE_STRUCT:
+        # write a lua getter/pusher
+        output += write_struct_getter_setter(newclass)
+
         has_serialize = does_struct_have_serialize_function(newclass)
         if has_serialize:
             output += f"static void {newclass.classname}_serialize_private(void* p, Serializer& s)\n"
@@ -487,7 +563,7 @@ def write_class_old(newclass : ClassDef)->str:
         if class_has_actual_properties(newclass):
             for p in newclass.properties:
                 if p.new_type.type == ARRAY_TYPE:
-                    prop_str = output_macro_for_prop(p.new_type.template_args[0],"","PROP_DEFAULT","0",'""','""','""','""')
+                    prop_str = output_macro_for_prop(typenames,p.new_type.template_args[0],"","PROP_DEFAULT","0",'""','""','""','""')
                     arg = p.new_type.template_args[0].get_raw_type_string()
                     callback = f"static StdVectorCallback<{arg}> vecdefnew_{p.name}({prop_str});"
                     output += f"\t{callback}\n"
@@ -496,7 +572,7 @@ def write_class_old(newclass : ClassDef)->str:
             output += f"    START_PROPS({newclass.classname})"
             for p in newclass.properties:
                 if p.new_type.type != FUNCTION_TYPE and p.new_type.type != MULTICAST_TYPE:
-                    output += "\n\t\t" + write_prop(p,newclass) + ","
+                    output += "\n\t\t" + write_prop(typenames,p,newclass) + ","
             output=output[:-1]
             output += f"\n    END_PROPS({newclass.classname})\n"
         else:
@@ -543,9 +619,9 @@ def get_lua_type_string(new_type:CppType) -> str:
         assert(new_type.typename!=None)
         output += f"{new_type.typename.classname}|nil"
     elif new_type.type == VEC3_TYPE:
-        output += "Vec3"
+        output += "lVec3"
     elif new_type.type == QUAT_TYPE:
-        output += "Quat"
+        output += "lQuat"
     else:
         output += "any"
     return output
@@ -573,10 +649,18 @@ def write_lua_class(newclass:ClassDef) -> str:
 
         for p in newclass.properties:
             if p.new_type.type == FUNCTION_TYPE:
+                if p.lua_generic and p.return_type.type != NONE_TYPE:
+                    output += f"---@generic T : {get_lua_type_string(p.return_type)}\n"
                 if p.return_type.type != NONE_TYPE:
-                    output += "---@return " + get_lua_type_string(p.return_type) + "\n"
+                    if p.lua_generic:
+                        output += "---@return T\n"
+                    else:               
+                        output += "---@return " + get_lua_type_string(p.return_type) + "\n"
                 for argType,argName in p.func_args:
-                    output += "---@param " + argName + " " + get_lua_type_string(argType) + "\n"
+                    if p.lua_generic and argType.type == OTHER_CLASS_TYPE and argType.typename != None and argType.typename.classname == "ClassTypeInfo":
+                        output += f"---@param {argName} T\n"
+                    else:
+                        output += "---@param " + argName + " " + get_lua_type_string(argType) + "\n"
                 output += f"function {newclass.classname}"
                 if p.is_static:
                     output += "."
@@ -608,6 +692,13 @@ def write_lua_class(newclass:ClassDef) -> str:
                     if i != count-1:
                         output += ","
                 output += ") end\n"
+            #else: # property type
+            #    if p.script_readable:
+            #        output += f"---@return {get_lua_type_string(p.new_type)}\n"
+            #        output += f"function {newclass.classname}:get_{p.name}() end\n"
+            #    if p.script_writable:
+            #        output += f"---@param arg {get_lua_type_string(p.new_type)}\n"
+            #        output += f"function {newclass.classname}:set_{p.name}(arg) end\n"
 
 
     return output
@@ -624,8 +715,16 @@ def write_output_file(GENERATED_DIR:str,filename:str,root:str,classes:list[Class
         print(f"Writing {generated_path}")
         if len(classes)>0:
             file.write(write_headers(root+"/"+filename, additional_includes))
+            # write struct stubs first
+            output = ""
             for c in classes:
-                file.write(write_class_old(c))
+                if c.object_type == ClassDef.TYPE_STRUCT:
+                    output += f"void push_{c.classname}_to_lua(lua_State* L, const {c.classname}& value);\n"
+                    output += f"{c.classname} get_{c.classname}_from_lua(lua_State* L, int index);\n"
+            file.write(output)
+
+            for c in classes:
+                file.write(write_class_old(typenames,c))
     generated_path = generated_path[:-4] + ".lua"
     with open(generated_path,"w") as luaFile:
         print(f"Writing lua stubs {generated_path}")

@@ -51,11 +51,19 @@ struct DirectAnimationSlot {
 
 // create this through code however you want
 class agBaseNode;
-struct AnimGraphConstructed {
+class agBuilder : public ClassBase {
 public:
-	void set_root(agBaseNode* node) {
-		this->root = node;
+	CLASS_BODY(agBuilder);
+	
+	REFLECT(lua_generic)
+	agBaseNode* alloc(const ClassTypeInfo* info);
+	REF void set_root(agBaseNode* node);
+
+	template<typename T>
+	T* alloc() {
+		return (T*)alloc(&T::StaticType);
 	}
+
 	void add_cached_pose_root(agBaseNode* node);
 	agBaseNode* get_root() const { return root; }
 	std::vector<agBaseNode*>& get_cache_nodes() { return cachePoseNodes; }
@@ -74,7 +82,7 @@ public:
 class agClipNode;
 class AnimatorObject : public ClassBase {
 public:
-	AnimatorObject(const Model& model, AnimGraphConstructed& construction, Entity* ent = nullptr);
+	AnimatorObject(const Model& model, agBuilder& construction, Entity* ent = nullptr);
 	~AnimatorObject();
 	// Main update method
 	void update(float dt);
@@ -142,7 +150,7 @@ private:
 	// active sync groups for graph
 	vector<SyncGroupData> active_sync_groups;
 	vector<DirectAnimationSlot> slots;
-	AnimGraphConstructed graph;
+	agBuilder graph;
 
 	bool update_sync_group(int idx);
 	void update_slot(int idx, float dt);

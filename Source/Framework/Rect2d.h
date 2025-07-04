@@ -28,6 +28,11 @@ struct Rect2d
 	bool is_point_inside(glm::ivec2 point) const {
 		return is_point_inside(point.x, point.y);
 	}
+	bool overlaps(Rect2d other) const {
+		return !(x + w <= other.x || other.x + other.w <= x ||
+			y + h <= other.y || other.y + other.h <= y);
+	}
+
 
 	glm::ivec2 get_size() const { return { w,h }; }
 	glm::ivec2 get_pos() const { return { x,y }; }

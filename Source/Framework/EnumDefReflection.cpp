@@ -48,6 +48,11 @@ EnumFindResult EnumRegistry::find_enum_by_name(const std::string& str) {
 	return find == name_to_idx.end() ? EnumFindResult() : find->second;
 }
 
+const std::unordered_map<std::string, const EnumTypeInfo*>& EnumRegistry::get_all_enums()
+{
+	return GlobalEnumDefMgr::get().name_to_type;
+}
+
 EnumTypeInfo::EnumTypeInfo(const char* name, const EnumIntPair* strs, size_t count) : name(name),strs(strs),str_count(count)
 {
 	EnumRegistry::register_enum(this);

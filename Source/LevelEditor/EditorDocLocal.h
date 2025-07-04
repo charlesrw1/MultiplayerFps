@@ -45,7 +45,11 @@ enum TransformType
 	ROTATION,
 	SCALE
 };
-
+enum class MouseSelectionAction {
+	SELECT_ONLY,
+	UNSELECT,
+	ADD_SELECT,
+};
 
 extern bool std_string_input_text(const char* label, std::string& str, int flags);
 const ImColor non_owner_source_color = ImColor(252, 226, 131);
@@ -222,8 +226,8 @@ class EditorUILayout  {
 public:
 	EditorUILayout();
 
-	void draw();
-
+	bool draw();
+	void do_box_select(MouseSelectionAction action);
 	Rect2d convert_rect(Rect2d screenSpaceRect) {
 		Rect2d out = screenSpaceRect;
 		auto pos = UiSystem::inst->get_vp_rect().get_pos();
@@ -231,9 +235,12 @@ public:
 		out.y -= pos.y;
 		return out;
 	}
+	struct obj {
+		glm::vec3 pos = glm::vec3(0.f);
+		const Entity* e = nullptr;
+	};
+	std::vector<EditorUILayout::obj> get_objs();
 
-	bool mouse_clicked = false;
-	int button_clicked = 0;
 
 	guiEditorCube cube;
 	EditorDoc* doc = nullptr;
@@ -466,7 +473,7 @@ private:
 struct DragDetector
 {
 	MulticastDelegate<Rect2d> on_drag_end;
-	void tick();
+	void tick(bool can_start_drag);
 	bool get_is_dragging() const;
 	Rect2d get_drag_rect() const;
 private:
@@ -516,11 +523,6 @@ public:
 		return get_doc_name().empty() ? "Maps/<unnamed map>" : "Maps/" + get_doc_name();
 	}
 
-	enum MouseSelectionAction {
-		SELECT_ONLY,
-		UNSELECT,
-		ADD_SELECT,
-	};
 	void do_mouse_selection(MouseSelectionAction action, const Entity* e, bool select_root_most_entity);
 
 

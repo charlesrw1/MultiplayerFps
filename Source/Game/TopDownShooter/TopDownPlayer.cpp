@@ -1,19 +1,20 @@
 #include "TopDownPlayer.h"
 #include "UI/UILoader.h"
 #include "Animation/Runtime/RuntimeNodesNew2.h"
+#include "Animation/Runtime/Animation.h"
 
-static AnimGraphConstructed make_player_tree(const Model& model)
+static agBuilder make_player_tree(const Model* model)
 {
-	AnimGraphConstructed out;
-	agClipNode* clip = new agClipNode;
+	agBuilder out;
+	agClipNode* clip = out.alloc<agClipNode>();
 	clip->set_clip(model, "run_forward_unequip");
 	clip->looping = true;
 
-	agClipNode* runUpper = new agClipNode;
+	agClipNode* runUpper = out.alloc<agClipNode>();
 	runUpper->set_clip(model, "stand_rifle_run_n");
 	runUpper->looping = true;
 
-	agBlendMasked* masked = new agBlendMasked;
+	agBlendMasked* masked = out.alloc<agBlendMasked>();
 	masked->init_mask_for_model(model, 0.f);
 	masked->set_one_bone_weight(model, "mixamorig:Spine", 0.1f);
 	masked->set_one_bone_weight(model, "mixamorig:Spine1", 0.4f);
@@ -23,20 +24,20 @@ static AnimGraphConstructed make_player_tree(const Model& model)
 	masked->input1 = runUpper;
 	masked->alpha = 1.f;
 
-	agClipNode* leaning = new agClipNode;
+	agClipNode* leaning = out.alloc<agClipNode>();
 	leaning->set_clip(model, "RUN_LEAN_LEFT");
 
-	agAddNode* add = new agAddNode;
+	agAddNode* add = out.alloc<agAddNode>();
 	add->input0 = masked;
 	add->input1 = leaning;
 	add->alpha = StringName("flLean");
 
-	agClipNode* stand = new agClipNode;
+	agClipNode* stand = out.alloc<agClipNode>();
 	stand->set_clip(model, "stand_rifle_aim_l");
-	agClipNode* turn_l = new agClipNode;
+	agClipNode* turn_l = out.alloc<agClipNode>();
 	turn_l->set_clip(model, "turn_left");
 
-	agBlendByInt* blendInt = new agBlendByInt;
+	agBlendByInt* blendInt = out.alloc<agBlendByInt>();
 	blendInt->easing = Easing::CubicEaseOut;
 	blendInt->integer = StringName("iState");
 	blendInt->inputs.push_back(add);
@@ -47,13 +48,19 @@ static AnimGraphConstructed make_player_tree(const Model& model)
 	return out;
 }
 
+#include "Scripting/ScriptManager.h"
 
 void TopDownPlayer::start() {
 	mesh = get_owner()->get_component<MeshComponent>();
 	assert(mesh);
 	assert(mesh->get_model()&&mesh->get_model()->get_skel());
-	auto tree = make_player_tree(*mesh->get_model());
-	auto animator = mesh->create_animator(tree);
+	//auto tree = make_player_tree(*mesh->get_model());
+	agBuilder tree;
+	auto factory = class_cast<PlayerAgFactory>(ScriptManager::inst->allocate_class("PlayerAgFactoryImpl"));
+	if (factory) {
+		factory->create(mesh->get_model(), &tree);
+	}
+	auto animator = mesh->create_animator(&tree);
 
 	animator->set_float_variable("flLean", GetTime());
 	animator->set_int_variable("iState",0);
@@ -78,15 +85,8 @@ void TopDownPlayer::start() {
 	ccontroller->capsule_height = capsule->height;
 	ccontroller->capsule_radius = capsule->radius;
 
-
-
-
-
 	velocity = {};
-
 	ccontroller->set_position(glm::vec3(0, 0.0, 0));
-
-	//eng->set_game_focused(true);
 }
 
 void TopDownPlayer::update() {
@@ -101,12 +101,6 @@ void TopDownPlayer::update() {
 
 	update_view_angles();
 
-	if (ragdoll_enabled) {
-		update_view();
-		last_ws = get_ws_transform();
-		return;
-	}
-
 	if (Input::was_key_pressed(SDL_SCANCODE_T)) {
 	//	return;
 		using_third_person_movement = !using_third_person_movement;
@@ -114,6 +108,7 @@ void TopDownPlayer::update() {
 		//mesh->get_animator()->play_animation(jumpSeq);
 	}
 	if (Input::was_key_pressed(SDL_SCANCODE_Z)) {
+		eng->log_to_fullscreen_gui(Info, "entering ragdoll");
 		ragdoll_enabled = !ragdoll_enabled;
 
 		TopDownUtil::enable_ragdoll_shared(get_owner(), last_ws, ragdoll_enabled);
@@ -136,6 +131,13 @@ void TopDownPlayer::update() {
 			}
 		}
 	}
+
+	if (ragdoll_enabled) {
+		update_view();
+		last_ws = get_ws_transform();
+		return;
+	}
+
 
 
 	if (shoot_cooldown > 0.0)shoot_cooldown -= eng->get_dt();

@@ -185,16 +185,18 @@ public:
 	{
 		auto& children = e->get_children();
 		for (auto c : children) {
-			if (c->get_tag() != StringName("Ragdoll")) continue;
+			if (c->get_tag() != StringName("Ragdoll")) 
+				continue;
 			auto phys = c->get_component<PhysicsBody>();
-			if (!phys)
+			if (!phys||phys->is_a<AdvancedJointComponent>())
 				continue;
 
 			auto m = e->get_cached_mesh_component();
 			if (!m || !m->get_animator()) 
 				continue;
 			int i = m->get_index_of_bone(c->get_parent_bone());
-			if (i == -1) continue;
+			if (i == -1) 
+				continue;
 
 			const glm::mat4& this_ws = e->get_ws_transform();
 

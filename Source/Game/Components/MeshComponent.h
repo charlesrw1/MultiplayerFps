@@ -19,7 +19,7 @@ class MaterialInstance;
 class RigidbodyComponent;
 class MeshBuilderComponent;
 class AnimatorObject;
-struct AnimGraphConstructed;
+class agBuilder;
 class MeshComponent : public Component
 {
 public:
@@ -38,7 +38,7 @@ public:
 	REF void set_model(Model* model);
 	REF const Model* get_model() const;
 	AnimatorObject* get_animator() const { return animator.get(); }
-	AnimatorObject* create_animator(AnimGraphConstructed& data);
+	AnimatorObject* create_animator(agBuilder* data);
 
 	bool get_is_visible() const { return is_visible; }
 	bool get_casts_shadows() const { return cast_shadows; }

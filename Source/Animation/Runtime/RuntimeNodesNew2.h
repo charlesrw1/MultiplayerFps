@@ -58,8 +58,9 @@ public:
 
 //
 class agClipNode;
-class agGetPoseCtx {
+class agGetPoseCtx : public ClassBase {
 public:
+	CLASS_BODY(agGetPoseCtx);
 
 	agGetPoseCtx(AnimatorObject& obj, Pool_Allocator<Pose>& allocator, float dt)
 		: object(obj), pose(allocator.allocate_scoped()), dt(dt) {
@@ -95,16 +96,22 @@ public:
 
 class agBaseNode : public ClassBase {
 public:
+	CLASS_BODY(agBaseNode);
 	virtual void reset()=0;
 	virtual void get_pose(agGetPoseCtx& ctx)=0;
 };
 struct BoneIndexRetargetMap;
 class agClipNode : public agBaseNode {
 public:
+	CLASS_BODY(agClipNode);
+
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
-	void set_clip(const Model& m, const string& clipName);
+	REF void set_clip(const Model* m, string clipName);
 	void set_clip(const AnimationSeqAsset* asset);
+	REF void set_looping(bool b) {
+		looping = b;
+	}
 
 	StringName syncGroup;
 	sync_opt syncType = sync_opt::Default;
@@ -120,8 +127,19 @@ private:
 
 class agBlendNode : public agBaseNode {
 public:
+	CLASS_BODY(agBlendNode);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
+	REF void set_inputs(agBaseNode* inp0, agBaseNode* inp1) {
+		this->input0 = inp0;
+		this->input1 = inp1;
+	}
+	REF void set_alpha_const(float f) {
+		alpha = f;
+	}
+	REF void set_alpha_var(string name) {
+		alpha = StringName(name.c_str());
+	}
 
 	agBaseNode* input0 = nullptr;
 	agBaseNode* input1 = nullptr;
@@ -129,16 +147,33 @@ public:
 };
 class agBlendMasked : public agBaseNode {
 public:
+	CLASS_BODY(agBlendMasked);
+
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
+
+	REF void set_inputs(agBaseNode* inp0, agBaseNode* inp1) {
+		this->input0 = inp0;
+		this->input1 = inp1;
+	}
+	REF void set_alpha_const(float f) {
+		alpha = f;
+	}
+	REF void set_alpha_var(string name) {
+		alpha = StringName(name.c_str());
+	}
+	REF void set_meshspace_blend(bool b) {
+		this->meshspace_blend = b;
+	}
+
 	agBaseNode* input0 = nullptr;
 	agBaseNode* input1 = nullptr;
 	ValueType alpha = 0.f;
 	bool meshspace_blend = false;
 
-	void init_mask_for_model(const Model& model, float default_weight);
-	void set_all_children_weights(const Model& model, StringName bone, float weight);
-	void set_one_bone_weight(const Model& model, StringName bone, float weight);
+	REF void init_mask_for_model(const Model* model, float default_weight);
+	REF void set_all_children_weights(const Model* model, string bone, float weight);
+	REF void set_one_bone_weight(const Model* model, string bone, float weight);
 private:
 	std::vector<float> maskWeights;
 };
@@ -168,7 +203,7 @@ private:
 	bool has_init = false;
 	int bone_idx = -1;
 	int other_bone_idx = -1;
-};
+};//
 class agModifyBone : public agBaseNode {
 public:
 	void reset() final;
@@ -217,18 +252,19 @@ public:
 
 class agStatemachineBase : public agBaseNode {
 public:
+	CLASS_BODY(agStatemachineBase);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
-	virtual void update(agGetPoseCtx& ctx, bool wantsReset) = 0;
+	REF virtual void update(agGetPoseCtx* ctx, bool wantsReset) { } // ABSTRACT CLASS
 	// each update, use set_pose to set what state is active
-	void set_pose(agBaseNode* pose);
+	REF void set_pose(agBaseNode* pose);
 	// use set_transition before a pose change to set how it transitions
-	void set_transition_parameters(Easing easing, float blend_time);
+	REF void set_transition_parameters(Easing easing, float blend_time);
 	// various getters to use in your logic
-	bool is_transitioning() const { return blendingOut != nullptr; }
-	float get_transition_time_left() const { return curTransitionDuration - curTransitionTime; }
-	float get_transition_percent() const { return curTransitionTime / curTransitionDuration; }
-	float get_state_duration() const { return curTime; }
+	REF bool is_transitioning() const { return blendingOut != nullptr; }
+	REF float get_transition_time_left() const { return curTransitionDuration - curTransitionTime; }
+	REF float get_transition_percent() const { return curTransitionTime / curTransitionDuration; }
+	REF float get_state_duration() const { return curTime; }
 private:
 	float curTime = 0.0;
 	agBaseNode* currentTree = nullptr;
@@ -249,7 +285,7 @@ public:
 // manual playback of animation in the graph
 class agSlotPlayer : public agStatemachineBase {
 public:
-	void update(agGetPoseCtx& ctx, bool wantsReset) final;
+	void update(agGetPoseCtx* ctx, bool wantsReset) final;
 	bool updateChildrenWhenPlaying = false;
 	StringName slotName;
 	agBaseNode* input = nullptr;
@@ -259,7 +295,20 @@ private:
 };
 class agBlendByInt : public agStatemachineBase {
 public:
-	void update(agGetPoseCtx& ctx, bool wantsReset) final;
+	CLASS_BODY(agBlendByInt);
+	void update(agGetPoseCtx* ctx, bool wantsReset) final;
+
+	REF void set_transition_data(Easing easing, float duration) {
+		this->easing = easing;
+		this->blending_duration = duration;
+	}
+	REF void append_input(agBaseNode* node) {
+		inputs.push_back(node);
+	}
+	REF void set_integer_var(string str) {
+		integer = StringName(str.c_str());
+	}
+
 	Easing easing = Easing::CubicEaseIn;
 	float blending_duration = 0.5;
 	std::vector<agBaseNode*> inputs;

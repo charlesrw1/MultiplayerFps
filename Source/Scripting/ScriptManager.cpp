@@ -1,7 +1,7 @@
 #include "ScriptManager.h"
 #include "Framework/StringUtils.h"
 #include "Framework/Files.h"
-
+#include "Framework/MapUtil.h"
 #include <cassert>
 
 extern "C" {
@@ -176,7 +176,10 @@ void ScriptManager::init_this_class_type(ClassTypeInfo* classTypeInfo)
 	//sys_print(Debug, "%s metatable", classTypeInfo->classname);
 	//dump_lua_table(lua, -1,0);
 	// store a reference to the metatable
+	if (classTypeInfo->lua_prototype_index_table != 0)
+		luaL_unref(lua, LUA_REGISTRYINDEX, classTypeInfo->lua_prototype_index_table);
 	classTypeInfo->lua_prototype_index_table = luaL_ref(lua, LUA_REGISTRYINDEX);
+	//sys_print(Debug, "proto index %d\n", classTypeInfo->lua_prototype_index_table);
 	height = lua_gettop(lua);
 	assert(height == 0);
 
@@ -223,18 +226,97 @@ int ScriptManager::create_class_table_for(ClassBase* type)
 	height = lua_gettop(lua);
 	assert(height == startheight +1);
 	int out = luaL_ref(lua, LUA_REGISTRYINDEX);
+	//sys_print(Debug, "obj index %d\n", out);
+
 	height = lua_gettop(lua);
 	assert(height == startheight);
 	return out;
 }
 ClassBase* ScriptManager::allocate_class(string name)
 {
-	for (auto& t : lua_classes) {
-		if (t && t->get_classname() == name) {
-			return t->allocate_this_type();//
-		}
+	auto find = MapUtil::get_opt(lua_classes, name);
+	if (find) {
+		return (*find)->allocate_this_type();
 	}
 	return nullptr;
+
+}
+void ScriptManager::set_enum_global(const std::string& name, const EnumTypeInfo* type)
+{
+	for (int i = 0; i < type->str_count; i++) {
+		auto& pair = type->strs[i];
+		std::string fullName = StringUtils::to_upper(std::string(type->name) + "_" + pair.name);
+		lua_pushinteger(lua, pair.value);
+		lua_setglobal(lua, fullName.c_str());
+	}
+}
+void ScriptManager::free_class_table(int id)
+{
+	assert(id != 0);
+	//sys_print(Debug, "free class table %d\n", id);
+
+	lua_rawgeti(lua, LUA_REGISTRYINDEX, id);
+	//stack_dump(lua);
+	//dump_lua_table(lua, -1,0);
+	lua_pushlightuserdata(lua, nullptr);
+	lua_setfield(lua, -2, "__ptr");
+	lua_pop(lua, 1);
+	luaL_unref(lua, LUA_REGISTRYINDEX, id);
+}
+void ScriptManager::reload()
+{
+	sys_print(Info, "ScriptManager::reload\n");
+	std::vector<string> files;
+	for (auto& file : FileSys::find_game_files_path("scripts/")) {
+		if (file.find("MEGA.gen.lua") != string::npos)
+			continue;
+		if (StringUtils::get_extension_no_dot(file) == "lua") {
+			sys_print(Debug, "ScriptManager::load_script_files: found lua file %s\n", file.c_str());
+			files.push_back(FileSys::get_game_path_from_full_path(file));
+		}
+	}
+	std::string fullOutput;
+	std::vector<uptr<LuaClassTypeInfo>> newClasses;
+	for (auto& strFilePath : files) {
+		auto file = FileSys::open_read_game(strFilePath);
+		if (file) {
+			string out(file->size(), ' ');
+			file->read(out.data(), out.size());
+			auto outTypes = ScriptLoadingUtil::parse_text(out);
+			fullOutput += out;
+			for (auto& t : outTypes) {
+				auto info = std::make_unique<LuaClassTypeInfo>();
+				info->set_classname(t.name);
+				info->set_superclass(t.inherited.at(0));
+				newClasses.push_back(std::move(info));
+			}
+
+			if (luaL_loadstring(lua, fullOutput.c_str()) != LUA_OK) {
+				sys_print(Error, "error loading script %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
+				lua_pop(lua, 1);
+				ASSERT(lua_gettop(lua) == 0);
+				continue;
+			}
+
+			// Execute the loaded chunk
+			if (lua_pcall(lua, 0, LUA_MULTRET, 0) != LUA_OK) {
+				fprintf(stderr, "Error executing chunk for %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
+				continue;
+			}
+
+
+		}
+	}
+	for (auto& c : newClasses) {
+		if (!MapUtil::contains(lua_classes, c->get_name())) {
+			lua_classes.insert({ c->get_name(),std::move(c) });
+		}
+	}
+	newClasses.clear();
+	lua_settop(lua, 0);
+	for (auto& [name, c] : lua_classes) {
+		c->init_lua_type();
+	}
 }
 ScriptManager* ScriptManager::inst = nullptr;
 
@@ -279,54 +361,13 @@ static void print_table_keys(lua_State* L, int index) {
 		lua_pop(L, 2);  // Remove value and copied key
 	}
 }
-
+#include "Framework/MapUtil.h"
 
 void ScriptManager::load_script_files()
 {
 	ClassBase::init_class_info_for_script();
-
 	sys_print(Debug, "ScriptManager::load_script_files\n");
-	std::vector<string> files;
-	for (auto& file : FileSys::find_game_files_path("scripts/")) {
-		if (StringUtils::get_extension_no_dot(file) == "lua") {
-			sys_print(Debug, "ScriptManager::load_script_files: found lua file %s\n",file.c_str());
-			files.push_back(FileSys::get_game_path_from_full_path(file));
-		}
-	}
-	std::string fullOutput;
-	for (auto& strFilePath : files) {
-		auto file = FileSys::open_read_game(strFilePath);
-		if (file) {
-			string out(file->size(), ' ');
-			file->read(out.data(), out.size());
-			auto outTypes = ScriptLoadingUtil::parse_text(out);
-			fullOutput += out;
-			for (auto& t : outTypes) {
-				auto info = std::make_unique<LuaClassTypeInfo>();
-				info->set_classname(t.name);
-				info->set_superclass(t.inherited.at(0));
-				lua_classes.push_back(std::move(info));
-			}
-		
-			if (luaL_loadstring(lua, fullOutput.c_str()) != LUA_OK) {
-				sys_print(Error, "error loading script %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
-				lua_pop(lua, 1);
-				ASSERT(lua_gettop(lua) == 0);
-				continue;
-			}
-
-			// Execute the loaded chunk
-			if (lua_pcall(lua, 0, LUA_MULTRET, 0) != LUA_OK) {
-				fprintf(stderr, "Error executing chunk for %s: %s\n",strFilePath.c_str(), lua_tostring(lua, -1));
-				continue;
-			}
-
-
-		}
-	}
-	for (auto& c : lua_classes) {
-		c->init_lua_type();
-	}
+	reload();
 }
 
 LuaClassTypeInfo::LuaClassTypeInfo() : ClassTypeInfo("lua_class_empty",nullptr,nullptr,nullptr,false,nullptr,0,nullptr,true)
@@ -386,18 +427,33 @@ static void dump_lua_table(lua_State* L, int index, int depth = 0) {
 }
 void LuaClassTypeInfo::init_lua_type()
 {
-	assert(template_lua_table == 0);
+	//assert(template_lua_table == 0);
 	auto L = ScriptManager::inst->get_lua_state();
+	assert(lua_gettop(L) == 0);
 	lua_getglobal(L, lua_classname.c_str());
-	assert(!lua_isnil(L, -1));
-	//stack_dump(L);
-	template_lua_table = luaL_ref(L, LUA_REGISTRYINDEX);
-	int top = lua_gettop(L);
-	assert(top == 0);
-	lua_pushnil(L);
-	lua_setglobal(L, lua_classname.c_str());
-	ScriptManager::inst->init_this_class_type(this);
-	ScriptManager::inst->set_class_type_global(this);
+	assert(lua_gettop(L) == 1);
+	if (lua_isnil(L, -1)) {
+		// class not found
+		sys_print(Warning, "LuaClassTypeInfo::init_lua_type: class not found %s\n", lua_classname.c_str());
+	}
+	else {
+		assert(lua_gettop(L) == 1);
+		if (template_lua_table != 0)
+			luaL_unref(L, LUA_REGISTRYINDEX, template_lua_table);
+		assert(lua_gettop(L) == 1);
+		template_lua_table = luaL_ref(L, LUA_REGISTRYINDEX);
+		//sys_print(Debug, "template index %d\n", template_lua_table);
+
+		assert(lua_gettop(L) == 0);
+		lua_pushnil(L);
+		lua_setglobal(L, lua_classname.c_str());
+		assert(lua_gettop(L) == 0);
+		free_table_registry_id();	// free it if it exists
+		assert(lua_gettop(L) == 0);
+		ScriptManager::inst->init_this_class_type(this);
+		assert(lua_gettop(L) == 0);
+		ScriptManager::inst->set_class_type_global(this);
+	}
 }
 
 ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c)
@@ -410,7 +466,7 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c)
 	const int startTop = lua_gettop(L);
 	lua_rawgeti(L, LUA_REGISTRYINDEX, out->get_table_registry_id()); // -3
 	lua_rawgeti(L, LUA_REGISTRYINDEX, luaInfo->template_lua_table);	// -2
-	stack_dump(L);
+	//stack_dump(L);
 	
 	auto check_top = [&](int v) {
 		int topNow = lua_gettop(L);
@@ -429,18 +485,18 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c)
 
 		lua_pushvalue(L, -2);  // duplicate key
 		lua_insert(L, -2);     // move key below value
-		stack_dump(L);
+		//stack_dump(L);
 		lua_settable(L, -5);   // dst[key] = value
-		stack_dump(L);
+		//stack_dump(L);
 		// leaves key for next lua_next
 	}
 	check_top(2);
-	stack_dump(L);
-	sys_print(Debug, "template table");
-	dump_lua_table(L, -1);
+	//stack_dump(L);
+	//sys_print(Debug, "template table");
+	//dump_lua_table(L, -1);
 	check_top(2);
-	sys_print(Debug, "output table");
-	dump_lua_table(L, -2);
+	//sys_print(Debug, "output table");
+	//dump_lua_table(L, -2);
 
 	lua_pop(L, 2);
 	check_top(0);

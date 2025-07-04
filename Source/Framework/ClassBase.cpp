@@ -249,6 +249,7 @@ const ClassTypeInfo* ClassBase::find_class(int32_t id)
 		return list[id];
 	return nullptr;
 }
+#include "Framework/StringUtils.h"
 void ClassBase::init_class_info_for_script()
 {
 	auto& classes = get_registry().id_to_typeinfo;
@@ -259,6 +260,10 @@ void ClassBase::init_class_info_for_script()
 	for (auto c : classes) {
 		assert(c->get_prototype_index_table() != 0);
 		ScriptManager::inst->set_class_type_global(c);
+	}
+	auto& all_enums = EnumRegistry::get_all_enums();
+	for (auto& [enumName, enumType] : all_enums) {
+		ScriptManager::inst->set_enum_global(enumName,enumType);
 	}
 }
 int ClassBase::get_table_registry_id()
@@ -274,7 +279,33 @@ bool ClassBase::is_class_referenced_from_lua() const
 {
 	return lua_table_id!=0;
 }
+void ClassBase::free_table_registry_id()
+{
+	if (lua_table_id != 0) {
+		ScriptManager::inst->free_class_table(lua_table_id);
+		lua_table_id = 0;
+	}
+}
 #include "Assets/AssetDatabase.h"
+ClassBase::~ClassBase()
+{
+	free_table_registry_id();
+}
+// dont move or set the lua_table_id. its lazily evaluated, so it will create itself when needed
+ClassBase& ClassBase::operator=(const ClassBase& other)
+{
+	// TODO: insert return statement here
+	return *this;
+}
+ClassBase::ClassBase(const ClassBase& other)
+{
+	return;
+}
+ClassBase::ClassBase(ClassBase&& other)
+{
+	return;
+}
+
 ClassBase* ClassBase::create_copy(ClassBase* userptr)
 {
 	ASSERT(get_type().has_allocate_func());

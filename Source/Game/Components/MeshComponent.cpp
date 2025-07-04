@@ -174,12 +174,13 @@ void MeshComponent::end()
 
 const Model* MeshComponent::get_model() const { return model.get(); }
 
-AnimatorObject* MeshComponent::create_animator(AnimGraphConstructed& data)
+AnimatorObject* MeshComponent::create_animator(agBuilder* data)
 {
+	assert(data);
 	auto modToUse = (model.did_fail()) ? g_modelMgr.get_error_model() : model.get();
 	if (modToUse && modToUse->get_skel()) {
 		try {
-			AnimatorObject* c = new AnimatorObject(*modToUse, data, get_owner());
+			AnimatorObject* c = new AnimatorObject(*modToUse, *data, get_owner());
 			animator.reset(c);
 		}
 		catch (...) {

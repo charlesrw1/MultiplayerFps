@@ -910,6 +910,9 @@ void GameEngineLocal::add_commands()
 			g_assets.dump_loaded_assets_to_disk(args.at(1));
 		}
 		});
+	commands->add("reload_script",[](const Cmd_Args& args) {
+		ScriptManager::inst->reload();
+		});
 
 	g_modelMgr.add_commands(*commands);
 }
@@ -1464,7 +1467,7 @@ extern ConfigVar material_print_debug;
 int game_engine_main(int argc, char** argv)
 {
 	material_print_debug.set_bool(false);
-	developer_mode.set_bool(true);
+	developer_mode.set_bool(false);
 	log_shader_compiles.set_bool(false);
 
 	loglevel.set_integer(4);

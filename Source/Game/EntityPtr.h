@@ -8,13 +8,18 @@ class obj
 {
 public:
 	obj() {}
-	explicit obj(const T* e) {
+	obj(const T* e) {
 		if (e)
 			handle = e->get_instance_id();
 		else
 			handle = 0;
 	}
 	explicit obj(uint64_t handle) : handle(handle) {}
+
+	// implicit conversion to T*
+	operator T* () const {
+		return get();
+	}
 
 
 	bool is_valid() const { return get() != nullptr; }

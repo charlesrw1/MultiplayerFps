@@ -80,6 +80,9 @@ class Property:
         self.nameoverride = ""
         self.transient = False
         self.hide = False
+        self.script_readable = True
+        self.script_writable = True
+        self.lua_generic = False
 
         # or return type
         self.new_type : CppType
@@ -189,6 +192,21 @@ def parse_reflect_macro(line : str) -> Property:
                 current_prop.transient = True
             elif t=="hide":
                 current_prop.hide = True
+                current_prop.script_readable = False
+                current_prop.script_writable = False
+            elif t=="script_read":
+                current_prop.script_readable = True
+                current_prop.script_writable = False
+            elif t=="script_write":
+                current_prop.script_readable = False
+                current_prop.script_writable = True
+            elif t=="edit_hide":
+                current_prop.hide = True
+            elif t=="script_hide":
+                current_prop.script_readable = False
+                current_prop.script_writable = False
+            elif t=="lua_generic":
+                current_prop.lua_generic = True
             elif t=="tooltip":
                 if next(token_iter) != "=":
                     raise Exception("expected '=' after 'type'")
@@ -490,14 +508,6 @@ def parse_type_from_tokens(idx: int, tokens:list[str], typenames: dict[str, Clas
             raise RuntimeError("double pointer, not allowed")
         is_reference = True
         idx += 1
-
-    if is_pointer and base_type==OTHER_CLASS_TYPE and (not base_typename is None) and ClassDef.is_self_derived_from(base_typename,typenames["IAsset"]):
-        print(f"Found a raw IAsset derived pointer, setting to AssetPtr... ({base})")
-        template_args.append(CppType(base,None,OTHER_CLASS_TYPE,None,False,False))
-        base_type = ASSET_PTR_TYPE
-        base_typename = None
-
-
 
     return CppType(base, base_typename,base_type, template_args, const_local, is_pointer), idx
 

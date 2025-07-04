@@ -130,9 +130,9 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
 			if (node_entity) {
 				if (ImGui::GetIO().KeyShift)
-					ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::ADD_SELECT, node_entity, false);
+					ed_doc.do_mouse_selection(MouseSelectionAction::ADD_SELECT, node_entity, false);
 				else
-					ed_doc.do_mouse_selection(EditorDoc::MouseSelectionAction::SELECT_ONLY, node_entity, false);
+					ed_doc.do_mouse_selection(MouseSelectionAction::SELECT_ONLY, node_entity, false);
 			}
 			else
 				ed_doc.selection_state->clear_all_selected();
@@ -341,7 +341,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 	ImGui::TableNextColumn();
 
 	if (node_entity) {
-		ImGui::TextColored(ImVec4(0.7, 0.7, 0.7, 1), "%lld", node_entity->get_instance_id());
+		ImGui::TextColored(ImVec4(0.7, 0.7, 0.7, 1), "%d", node_entity->unique_file_id);
 	}
 	ImGui::TableNextColumn();
 

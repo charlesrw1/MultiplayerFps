@@ -5,8 +5,6 @@
 class IAsset;
 struct Serializer
 {
-	STRUCT_BODY();
-
 	Serializer() {}
 	virtual bool serialize_dict(const char* tag)=0;
 	virtual bool serialize_dict_ar() = 0;

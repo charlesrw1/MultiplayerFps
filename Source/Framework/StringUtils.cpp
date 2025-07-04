@@ -117,6 +117,15 @@ std::string StringUtils::to_lower(const std::string& s) {
 	return out;
 }
 
+std::string StringUtils::to_upper(const std::string& s)
+{//
+	std::string out;
+	out.reserve(s.size());
+	for (auto c : s)
+		out.push_back(toupper(c));
+	return out;
+}
+
 bool StringUtils::starts_with(const std::string& str, const std::string& what)
 {
 	auto find = str.find(what);
