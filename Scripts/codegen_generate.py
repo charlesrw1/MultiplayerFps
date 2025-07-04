@@ -281,6 +281,10 @@ def write_get_type_from_lua_func(newType:CppType, index:int) -> str:
         return f"({newType.typename.classname})get_int_from_lua(L,{index})"
     elif newType.type == STRINGNAME_TYPE:
         return f"StringName(get_std_string_from_lua(L,{index}).c_str())"
+    elif newType.type == ARRAY_TYPE:
+        assert(len(newType.template_args)==1)
+        type_of_template = newType.template_args[0].get_raw_type_string()
+        return f"get_std_vector_from_lua<{type_of_template}>(L,{index},[&]() -> {type_of_template} {{  return {write_get_type_from_lua_func(newType.template_args[0],-1)}; }})"
     elif newType.type == STRUCT_TYPE:
         assert(newType.typename!=None)
         return f"get_{newType.typename.classname}_from_lua(L,{index})"
@@ -312,6 +316,10 @@ def write_push_type_to_lua_func(newType:CppType, cppVarName:str) -> str:
         return f"push_int_to_lua(L,(int64_t){cppVarName})"
     elif newType.type == STRINGNAME_TYPE:
         return f"push_std_string_to_lua(L,{cppVarName}.get_c_str())"
+    elif newType.type == ARRAY_TYPE:
+        assert(len(newType.template_args)==1)
+        type_of_template = newType.template_args[0].get_raw_type_string()
+        return f"push_std_vector_to_lua(L,{cppVarName},[&]({type_of_template} val) {{  {write_push_type_to_lua_func(newType.template_args[0],'val')}; }})"
     elif newType.type == STRUCT_TYPE:
         assert(newType.typename!=None)
         return f"push_{newType.typename.classname}_to_lua(L,{cppVarName})"
@@ -405,7 +413,8 @@ def write_scriptable_class(newclass : ClassDef) -> str:
         lua_State* L = ScriptManager::inst->get_lua_state();
         int myTable = get_table_registry_id();
         lua_rawgeti(L, LUA_REGISTRYINDEX, myTable);
-        lua_getfield(L,-1,\"{f.name}\");
+        lua_pushstring(L, \"{f.name}\");
+        lua_rawget(L, -2); // use raw get to not look in __index
         bool is_func = lua_isfunction(L, -1);
         if(is_func) {{
             lua_pushvalue(L, -2);  // duplicate object table

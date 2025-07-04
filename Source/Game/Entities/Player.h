@@ -74,6 +74,10 @@ public:
 	REF static void send_back_result(HitResult res) {
 		printf("%f %f %f\n", res.pos.x, res.pos.y, res.pos.z);
 	}
+	REF static std::vector<Entity*> get_ents() {
+		return {};
+	}
+	REF static vector<Component*> find_components_of_class(const ClassTypeInfo* info);
 };
 //
 /// <summary>
@@ -97,6 +101,7 @@ public:
 	REF static float get_con_axis(int con_axis) {
 		return 0.0;
 	}
+
 };
 
 /// <summary>
@@ -130,7 +135,7 @@ public:
 	// Entity overrides
 	void update() final;
 	void start() final;
-	void end() final;
+	void stop() final;
 
 	void on_jump_callback();
 public:

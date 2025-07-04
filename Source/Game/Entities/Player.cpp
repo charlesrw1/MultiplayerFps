@@ -708,7 +708,7 @@ void Player::on_foot_update()
 	 get_owner()->set_ws_position(glm::vec3(0, 0, 0.5));
 	 get_owner()->parent_to(bike->get_owner());
 }
- void Player::end() {
+ void Player::stop() {
  }
 
  Player::~Player() {
@@ -734,4 +734,17 @@ void Player::on_foot_update()
 	// player_capsule->radius = 0.3;
 
 	 set_ticking(true);
+ }
+
+ REF vector<Component*> GameplayStatic::find_components_of_class(const ClassTypeInfo* info) {
+	 assert(info && info->is_a(Component::StaticType));
+	 double now = GetTime();
+	 auto& all = eng->get_level()->get_all_objects();
+	 vector<Component*> out;
+	 for (auto e : all)
+		 if (e->get_type().is_a(*info))
+			 out.push_back((Component*)e);
+	 double end = GetTime();
+	 printf("find_components_of_class: took %f\n", float(end - now));
+	 return out;
  }

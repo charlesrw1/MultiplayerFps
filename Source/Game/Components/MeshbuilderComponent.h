@@ -20,7 +20,7 @@ public:
 	void start() override {
 		sync_render_data();
 	}
-	void end() override {
+	void stop() override {
 		idraw->get_scene()->remove_meshbuilder(editor_mb_handle);
 	}
 	void on_changed_transform() override {

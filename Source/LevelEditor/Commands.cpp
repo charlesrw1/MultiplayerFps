@@ -447,6 +447,9 @@ void CreateCppClassCommand::undo() {
 
 	auto ent = handle.get();
 	ed_doc.remove_scene_object(ent);
+	if (ed_doc.selection_state->is_entity_selected(ent)) {
+		ed_doc.selection_state->clear_all_selected();
+	}
 	//auto level = eng->get_level();
 	//level->destroy_entity(ent);
 	ed_doc.post_node_changes.invoke();

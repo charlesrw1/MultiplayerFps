@@ -16,7 +16,7 @@ public:
 	~BillboardComponent();
 
 	void start() final;
-	void end() final;
+	void stop() final;
 	void editor_on_change_property() final;
 	void on_changed_transform() final;
 	void on_sync_render_data() final;

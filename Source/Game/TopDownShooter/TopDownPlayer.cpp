@@ -211,7 +211,6 @@ void TopDownPlayer::update() {
 	}
 	glm::vec3 displacement = (move_front * move.y + move_side * move.x) * move_speed * dt;
 	ccontroller->move(displacement, dt, 0.005f, flags, outvel);
-	auto mypos = get_ws_position() + displacement;
 
 	auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
 	int start = 10;
@@ -219,8 +218,10 @@ void TopDownPlayer::update() {
 		string str = s;
 		TextShape shape;
 		Rect2d size = GuiHelpers::calc_text_size(std::string_view(str), font);
-		shape.rect.x = 20;
-		shape.rect.y = start+size.h;
+		glm::ivec2 ofs = GuiHelpers::calc_layout({ -100,-10 }, guiAnchor::Center, UiSystem::inst->get_vp_rect());
+
+		shape.rect.x = ofs.x;
+		shape.rect.y = ofs.y + size.h + start;
 		shape.font = font;
 		shape.color = COLOR_WHITE;
 		shape.with_drop_shadow = true;
@@ -242,7 +243,7 @@ void TopDownPlayer::update() {
 
 
 	last_ws = get_ws_transform();
-	get_owner()->set_ws_transform(mypos, q, get_owner()->get_ls_scale());
+	get_owner()->set_ws_transform(ccontroller->get_character_pos(), q, get_owner()->get_ls_scale());
 
 	has_had_update = true;
 

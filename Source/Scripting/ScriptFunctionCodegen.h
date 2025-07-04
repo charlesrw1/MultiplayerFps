@@ -122,3 +122,34 @@ template<typename T>
 ClassTypeInfo::CreateObjectFunc get_allocate_script_impl_internal() {
 	return allocate_script_impl_internal<T>;
 }
+
+template<typename T, typename FUNCTOR>
+void push_std_vector_to_lua(lua_State* L,const std::vector<T>& v, FUNCTOR&& func) {
+	lua_newtable(L);
+	for (int i = 0; i < v.size(); i++) {
+		func(v[i]);
+		lua_seti(L, -2, i + 1);
+	}
+}//
+template<typename T,typename FUNCTOR>
+std::vector<T> get_std_vector_from_lua(lua_State* L, int index, FUNCTOR&& func) {
+	std::vector<T> result;
+	if (!lua_istable(L, index)) {
+		lua_error(L);
+		return result;
+	}
+	if (index < 0)
+		index = lua_gettop(L) + index + 1;
+	lua_Integer i = 1;
+	while (true) {
+		lua_geti(L, index, i);
+		if (lua_isnil(L, -1)) {
+			lua_pop(L, 1);
+			break; 
+		}
+		result.push_back(func());
+		lua_pop(L, 1); // remove value
+		++i;
+	}
+	return result;
+}

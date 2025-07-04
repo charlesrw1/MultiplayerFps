@@ -33,8 +33,6 @@
 #include "LevelEditor/Commands.h"
 #include "Framework/Rect2d.h"
 
-#include "Scripting/ScriptAsset.h"
-
 #include "Framework/AddClassToFactory.h"
 
 #include "Game/EntityComponent.h"
@@ -64,9 +62,9 @@ glm::vec3 EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
 	const auto viewport_size = UiSystem::inst->get_vp_rect().get_size();
 	const auto viewport_pos = UiSystem::inst->get_vp_rect().get_pos();
 
-	const auto size = viewport_size;
-	const int wx = viewport_pos.x;
-	const int wy = viewport_pos.y;
+	const auto size = viewport_pos;
+	const int wx = viewport_size.x;
+	const int wy = viewport_size.y;
 	const float aratio = float(wy) / wx;
 	glm::vec3 ndc = glm::vec3(float(mx - size.x) / wx, float(my - size.y) / wy, 0);
 	ndc = ndc * 2.f - 1.f;
@@ -589,7 +587,7 @@ void ManipulateTransformTool::check_input()
 		else
 			axis_mask = 4;
 	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_S)) {
+	else if (Input::was_key_pressed(SDL_SCANCODE_S)&&!Input::is_ctrl_down()) {
 		reset_group_to_pre_transform();
 		force_operation = ImGuizmo::SCALE;
 		mode = ImGuizmo::LOCAL;	// local scaling only
@@ -720,6 +718,9 @@ void EditorDoc::check_inputs()
 	}
 	else if (Input::was_key_pressed(SDL_SCANCODE_Z) && has_ctrl) {
 		command_mgr->undo();
+	}
+	else if (Input::was_key_pressed(SDL_SCANCODE_S) && has_ctrl) {
+		save();
 	}
 	else if (Input::was_key_pressed(SDL_SCANCODE_D) && has_shift) {
 		if (selection_state->has_any_selected()) {
@@ -1479,6 +1480,8 @@ void EdPropertyGrid::draw_components(Entity* entity)
 		ImGui::SameLine();
 
 		const char* s = ec->get_editor_outliner_icon();
+		if (ec->get_type().get_is_lua_class())
+			s = "eng/editor/script_lua.png";
 		if (*s) {
 			auto tex = g_assets.find_global_sync<Texture>(s);
 			if (tex) {
@@ -1564,15 +1567,18 @@ void EdPropertyGrid::draw()
 				for (; !iter.is_end(); iter.next()) {
 					string lower = StringUtils::to_lower(iter.get_type()->classname);
 					if (component_filter.empty()||lower.find(filter_lower) != string::npos) {
+						const char* s = "";
 						if (iter.get_type()->default_class_object) {
-							const char* s = ((Component*)iter.get_type()->default_class_object)->get_editor_outliner_icon();
+							s = ((Component*)iter.get_type()->default_class_object)->get_editor_outliner_icon();
 
-							if (*s) {
-								auto tex = g_assets.find_global_sync<Texture>(s);
-								if (tex) {
-									ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
-									ImGui::SameLine(0, 0);
-								}
+						}
+						if (iter.get_type()->get_is_lua_class())
+							s = "eng/editor/script_lua.png";
+						if (*s) {
+							auto tex = g_assets.find_global_sync<Texture>(s);
+							if (tex) {
+								ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
+								ImGui::SameLine(0, 0);
 							}
 						}
 						if (ImGui::Selectable(iter.get_type()->classname)) {
@@ -1676,10 +1682,10 @@ EdPropertyGrid::EdPropertyGrid(EditorDoc& ed_doc, const FnFactory<IPropertyEdito
 {
 	auto& ss = ed_doc.selection_state;
 	ss->on_selection_changed.add(this, &EdPropertyGrid::refresh_grid);
+	ed_doc.post_node_changes.add(this, &EdPropertyGrid::refresh_grid);
 	ed_doc.on_close.add(this, &EdPropertyGrid::on_close);
 	ed_doc.on_component_deleted.add(this, &EdPropertyGrid::on_ec_deleted);
 	ed_doc.on_component_created.add(this, &EdPropertyGrid::on_select_component);
-
 }
 
 void EdPropertyGrid::refresh_grid()
@@ -1691,7 +1697,7 @@ void EdPropertyGrid::refresh_grid()
 	if (!ss->has_any_selected())
 		return;
 
-	if (ss->has_only_one_selected()) {
+	if (ss->has_only_one_selected() && ss->get_only_one_selected() /* can return null...*/) {
 		auto entity = ss->get_only_one_selected();
 		assert(entity);
 		sys_print(Debug,"EdPropertyGrid::refresh_grid: adding to grid: %s\n", entity->get_type().classname);
@@ -1846,8 +1852,6 @@ bool EditorUILayout::draw() {
 	if (doc->selection_state->has_any_selected() && (doc->manipulate->is_hovered() || doc->manipulate->is_using()))
 		do_mouse_click = false;
 
-	if (!editor_draw_name_text.get_bool())
-		return false;
 	if (!eng->get_level())
 		return false;
 
@@ -1885,14 +1889,22 @@ bool EditorUILayout::draw() {
 			auto tex = g_assets.find_global_sync<Texture>(s);
 			icons.push_back(tex.get());
 		}
-
+		bool found_script = false;
 		for (auto c : o.e->get_components()) {
-			if (c->dont_serialize_or_edit_this()) continue;
+			if (c->dont_serialize_or_edit_this()) 
+				continue;
 			const char* s = c->get_editor_outliner_icon();
-			if (!*s) continue;
+			if (c->get_type().get_is_lua_class()) {
+				found_script = true;
+				s = "eng/editor/script_lua.png";
+			}
+			if (!*s) 
+				continue;
 			auto tex = g_assets.find_global_sync<Texture>(s);
 			icons.push_back(tex.get());
 		}
+		if(!(found_script||editor_draw_name_text.get_bool()))
+			continue;
 
 		auto size = GuiHelpers::calc_text_size_no_wrap(name, font);
 

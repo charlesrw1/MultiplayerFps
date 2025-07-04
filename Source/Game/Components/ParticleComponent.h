@@ -33,7 +33,7 @@ public:
 	}
 	void start() final;
 	void update() final;
-	void end() final;
+	void stop() final;
 	void on_changed_transform() final {
 		sync_render_data();
 	}

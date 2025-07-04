@@ -435,8 +435,6 @@
     <ClInclude Include="Source\Game\Components\ParticleComponent.h" />
     <ClInclude Include="Source\Framework\Hashset.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
-    <ClInclude Include="Source\Scripting\ScriptAsset.h" />
-    <ClInclude Include="Source\Scripting\ScriptComponent.h" />
     <ClInclude Include="Source\Scripting\FunctionReflection.h" />
     <ClInclude Include="Source\Game\EntityPtr.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
@@ -504,6 +502,7 @@
     <ClInclude Include="Source\Assets\HackedReloader.h" />
     <ClInclude Include="Source\Assets\AssetBundle.h" />
     <ClInclude Include="Source\Testheader.h" />
+    <ClInclude Include="Source\Game\Components\GraphCurveComponent.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -583,14 +582,11 @@
     <ClCompile Include="Source\Game\EntityTest.cpp" />
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
-    <ClCompile Include="Source\Scripting\ScriptLocal.cpp" />
-    <ClCompile Include="Source\Scripting\ScriptAsset.cpp" />
     <ClCompile Include="Source\Sound\SoundComponent.cpp" />
     <ClCompile Include="Source\External\tracy\public\TracyClient.cpp" />
     <ClCompile Include="Source\EditorPopups.cpp" />
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
-    <ClCompile Include="Source\Scripting\LuaBuiltinFuncs.cpp" />
     <ClCompile Include="Source\Framework\Files.cpp" />
     <ClCompile Include="Source\Assets\AssetRegistry.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Animation.cpp" />
@@ -677,6 +673,7 @@
     <ClCompile Include="Source\Game\TopDownShooter\TopDownPlayer.cpp" />
     <ClCompile Include="Source\Scripting\ScriptFunctionCodegen.cpp" />
     <ClCompile Include="Source\Assets\AssetBundle.cpp" />
+    <ClCompile Include="Source\Game\Components\GraphCurveComponent.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

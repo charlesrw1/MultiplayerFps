@@ -26,8 +26,6 @@ public:
 	);
 	~ClassTypeInfo();
 
-	int32_t id = 0;
-	int32_t last_child = 0;
 	const char* classname = "";
 	const char* superclassname = "";
 	const PropertyInfoList* props = nullptr;
@@ -78,11 +76,15 @@ public:
 	ClassBase* alloc() const {
 		return allocate_this_type();
 	}
-
 	int get_prototype_index_table() const;
+	static void set_typenum_R(TypeInfoWithExtra* node);
+	bool get_is_lua_class() const { return is_lua_implemented; }
 protected:
+	friend struct ClassTypeIterator;
 	friend class ScriptManager;
-
+	bool is_lua_implemented = false;
+	int32_t id = 0;
+	int32_t last_child = 0;
 	CreateObjectFunc allocate = nullptr;
 	// table that provides functions of this and inherited types
 	// used with lua tables

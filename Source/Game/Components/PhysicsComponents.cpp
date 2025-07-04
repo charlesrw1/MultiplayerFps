@@ -209,7 +209,7 @@ void PhysicsBody::start()
 	update_bone_parent_animator();
 }
 
-void PhysicsBody::end()
+void PhysicsBody::stop()
 {
 	if (editor_shape_id != 0) {
 		auto shapeptr = eng->get_level()->get_entity(editor_shape_id);
@@ -610,11 +610,11 @@ void PhysicsJointComponent::set_target(Entity* e)
 	}
 }
 
-void PhysicsJointComponent::end()
+void PhysicsJointComponent::stop()
 {
 	if (editor_meshbuilder)
 		editor_meshbuilder->destroy();
-	PhysicsBody::end();
+	PhysicsBody::stop();
 }
 
 PhysicsBody* PhysicsJointComponent::get_owner_physics() {

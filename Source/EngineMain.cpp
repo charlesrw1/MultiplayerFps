@@ -1467,7 +1467,7 @@ extern ConfigVar material_print_debug;
 int game_engine_main(int argc, char** argv)
 {
 	material_print_debug.set_bool(false);
-	developer_mode.set_bool(false);
+	developer_mode.set_bool(true);
 	log_shader_compiles.set_bool(false);
 
 	loglevel.set_integer(4);
@@ -1489,7 +1489,7 @@ int game_engine_main(int argc, char** argv)
 	//Cmd_Manager::inst->append_cmd(uptr<OpenMapCommand>(new OpenMapCommand("top_down/map0.tmap", true)));
 
 	//eng_local.set_tester(new IntegrationTester(true, tests), false);
-	auto c = (InterfaceClass*)ScriptManager::inst->allocate_class("TestClass");
+	auto c = ClassBase::create_class<InterfaceClass>("TestClassI");
 	//
 
 	
@@ -1589,7 +1589,7 @@ void GameEngineLocal::key_event(SDL_Event event)
 void GameEngineLocal::cleanup()
 {
 #ifdef EDITOR_BUILD
-	assert(0);
+	//assert(0);
 	//if (get_current_tool())
 	//	get_current_tool()->close();
 #endif
@@ -1880,7 +1880,7 @@ void GameEngineLocal::init(int argc, char** argv)
 	print_time("init commands");
 
 	// must come first
-	ClassBase::init_class_reflection_system();
+	ClassBase::init_classes_startup();
 	print_time("init class system");
 
 

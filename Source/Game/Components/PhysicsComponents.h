@@ -38,7 +38,7 @@ public:
 
 	void pre_start() override;
 	void start() override;
-	void end() override;
+	void stop() override;
 	void update() override;
 	void on_changed_transform() override;
 
@@ -230,7 +230,7 @@ public:
 	~PhysicsJointComponent();
 
 	void start() final;
-	void end() final;
+	void stop() final;
 	void on_changed_transform() override;
 	void editor_on_change_property() override;
 

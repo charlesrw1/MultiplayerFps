@@ -61,7 +61,7 @@ void SpotLightComponent::on_sync_render_data()
 
 
 
-void SpotLightComponent::end()
+void SpotLightComponent::stop()
 {
 	idraw->get_scene()->remove_light(light_handle);
 	auto e = eng->get_object(editor_billboard);
@@ -99,7 +99,7 @@ void PointLightComponent::start()
 	sync_render_data();
 }
 
-void PointLightComponent::end()
+void PointLightComponent::stop()
 {
 	idraw->get_scene()->remove_light(light_handle);
 	auto e = eng->get_object(editor_billboard);
@@ -143,7 +143,7 @@ void SunLightComponent::start()
 	sync_render_data();
 }
 
-void SunLightComponent::end()
+void SunLightComponent::stop()
 {
 	idraw->get_scene()->remove_sun(light_handle);
 
@@ -172,7 +172,7 @@ void SkylightComponent::start() {
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 	}
 }
-void SkylightComponent::end() {
+void SkylightComponent::stop() {
 	idraw->get_scene()->remove_skylight(handle);
 	//delete mytexture;
 	mytexture = nullptr;
@@ -246,7 +246,7 @@ void CubemapComponent::update_editormeshbuilder()
 	editor_meshbuilder->mb.PushLineBox(boxmin, boxmax, COLOR_GREEN);
 	editor_meshbuilder->mb.End();
 }
-void CubemapComponent::end() {
+void CubemapComponent::stop() {
 	idraw->get_scene()->remove_reflection_volume(handle);
 	delete mytexture;
 	mytexture = nullptr;

@@ -45,7 +45,7 @@ void DecalComponent::on_sync_render_data()
 	rd.material = material.get();
 	idraw->get_scene()->update_decal(handle, rd);
 }
-void DecalComponent::end() {
+void DecalComponent::stop() {
 	idraw->get_scene()->remove_decal(handle);
 }
 void DecalComponent::on_changed_transform() {

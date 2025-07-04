@@ -57,7 +57,7 @@ public:
 		handle = idraw->get_scene()->get_terrain_interface()->register_terrain(rt);
 	}
 	// called when component is being removed, remove all handles
-	void end() final {
+	void stop() final {
 		idraw->get_scene()->get_terrain_interface()->remove_terrain(handle);
 	}
 

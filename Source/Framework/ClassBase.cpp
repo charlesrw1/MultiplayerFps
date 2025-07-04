@@ -36,15 +36,12 @@ struct TypeInfoWithExtra
 	TypeInfoWithExtra* child = nullptr;
 	TypeInfoWithExtra* next = nullptr;
 	bool has_initialized = false;
-
 	void set_parent(TypeInfoWithExtra* owner) {
 		ASSERT(owner);
 		
 		this->next = owner->child;
 		owner->child = this;
 	}
-
-
 	void init();
 };
 
@@ -111,21 +108,54 @@ bool ClassBase::is_subclass_of(const ClassTypeInfo* type) const
 	return get_type().is_a(*type);
 }
 
+void ClassBase::unregister_class(ClassTypeInfo* type)
+{
+	auto& string_to_typeinfo = get_registry().string_to_typeinfo;
+	std::string cn_str = type->classname;
+	auto find = string_to_typeinfo.find(cn_str);
+	if (find == string_to_typeinfo.end()) {
+		sys_print(Warning, "ClassBase::unregister_class: not registered: %s\n", type->classname);
+	}
+	else {
+		string_to_typeinfo.erase(cn_str);
+	}
+}
+
 void ClassBase::register_class(ClassTypeInfo* cti)
 {
-	if (get_registry().initialzed)
-		Fatalf("!!! RegisterClass called outside of static initialization\n");
+	//if (get_registry().initialzed)
+	//	Fatalf("!!! RegisterClass called outside of static initialization\n");
 	if (!cti->super_typeinfo && cti != &ClassBase::StaticType)
 		Fatalf("!!! RegisterClass called without a super class, parent to ClassBase if its a root class");
 
 	auto& string_to_typeinfo = get_registry().string_to_typeinfo;
-
 	std::string cn_str = cti->classname;
 	auto find = string_to_typeinfo.find(cn_str);
 	if (find != string_to_typeinfo.end())
 		Fatalf("!!! RegisterClass two classes defined for %s", cn_str.c_str());
 	string_to_typeinfo.insert({ cn_str,TypeInfoWithExtra(cti) });
 }
+
+void ClassBase::post_changes_class_init()
+{
+	get_registry().id_to_typeinfo.clear();
+	// create class tree graph
+	for (auto& class_ : get_registry().string_to_typeinfo) {
+		class_.second.child = nullptr;
+		class_.second.next = nullptr;
+		class_.second.has_initialized = false;
+	}
+	for (auto& class_ : get_registry().string_to_typeinfo) {
+		class_.second.init();
+	}
+
+	// now every class is initialized and a tree exists, set everyones ids
+	auto root_class = get_registry().string_to_typeinfo.find(ClassBase::StaticType.classname);
+	ASSERT(root_class != get_registry().string_to_typeinfo.end());
+	ClassTypeInfo::set_typenum_R(&root_class->second);
+}
+
+
 
 void TypeInfoWithExtra::init()
 {
@@ -150,7 +180,7 @@ void TypeInfoWithExtra::init()
 	has_initialized = true;
 }
 
-static void set_typenum_R(TypeInfoWithExtra* node)
+void ClassTypeInfo::set_typenum_R(TypeInfoWithExtra* node)
 {
 	node->typeinfo->id = get_registry().id_to_typeinfo.size();
 	get_registry().id_to_typeinfo.push_back(node->typeinfo);
@@ -166,23 +196,14 @@ static void set_typenum_R(TypeInfoWithExtra* node)
 }
 
 
-void ClassBase::init_class_reflection_system()
+void ClassBase::init_classes_startup()
 {
-	// create class tree graph
-	for (auto& class_ : get_registry().string_to_typeinfo) {
-		class_.second.init();
-	}
-
-	// now every class is initialized and a tree exists, set everyones ids
-	auto root_class = get_registry().string_to_typeinfo.find(ClassBase::StaticType.classname);
-	ASSERT(root_class != get_registry().string_to_typeinfo.end());
-	set_typenum_R(&root_class->second);
+	post_changes_class_init();
 
 	// now call get props functions
 	for (auto& classtype : get_registry().id_to_typeinfo) {
 		if (classtype->get_props_function) {
 			classtype->props = classtype->get_props_function();
-			
 		}
 		PropHashTable* table = new PropHashTable;
 		if (classtype->super_typeinfo)

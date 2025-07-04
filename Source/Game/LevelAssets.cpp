@@ -28,7 +28,7 @@ public:
 		uptr<OpenMapCommand> cmd;
 		const bool wants_new_map = !assetPath.has_value();
 		if (wants_new_map) {
-			cmd = make_unique<OpenMapCommand>(g_editor_newmap_template.get_string(), false/* for editor */);
+			cmd = make_unique<OpenMapCommand>(std::nullopt, false/* for editor */);
 		}
 		else {
 			cmd = make_unique<OpenMapCommand>(assetPath, false/* for editor */);

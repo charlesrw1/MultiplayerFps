@@ -27,7 +27,7 @@ void BillboardComponent::start() {
 
 	sync_render_data();
 }
-void BillboardComponent::end() {
+void BillboardComponent::stop() {
 	idraw->get_scene()->remove_obj(handle);
 }
 void BillboardComponent::on_changed_transform() {

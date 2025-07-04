@@ -62,6 +62,7 @@ private:
 	static const PropertyInfoList* get_props();
 
 struct Serializer;
+struct TypeInfoWithExtra;
 class ClassBase
 {
 public:
@@ -97,10 +98,15 @@ public:
 	REFLECT();
 	bool is_subclass_of(const ClassTypeInfo* type) const;
 public:
+	static void unregister_class(ClassTypeInfo* type);
 	// called by ClassTypeInfo only during static init
 	static void register_class(ClassTypeInfo* cti);
+	// called when reloading classes from script
+	static void post_changes_class_init();
 	// called in main() after all classes have been reg'd
-	static void init_class_reflection_system();
+	static void init_classes_startup();
+
+
 	static const ClassTypeInfo* find_class(const char* classname);
 	static const ClassTypeInfo* find_class(int32_t id);
 
@@ -129,6 +135,7 @@ public:
 	bool is_class_referenced_from_lua() const;
 	void free_table_registry_id();
 private:
+
 	// this is used for interop with lua
 	// this is the table id returned by luaL_ref in the registry
 	// the lua table stores a ptr to this object. when the object is deleted in c++, the table's ptr is nulled

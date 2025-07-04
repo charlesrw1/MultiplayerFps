@@ -4,10 +4,8 @@
 #include "Assets/AssetDatabase.h"
 #include "Game/Components/MeshComponent.h"
 #include <memory>
-
 #include "Game/BaseUpdater.h"
 #include "LevelSerialization/SerializationAPI.h"
-#include "Scripting/ScriptComponent.h"
 #include "Game/EntityPtr.h"
 
 class CommandSerializeUtil

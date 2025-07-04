@@ -78,6 +78,7 @@
     <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
     <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
     <ClCompile Include="Source\Game\Components\DecalComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\GraphCurveComponent.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents.cpp" />
     <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp" />
     <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
@@ -116,7 +117,6 @@
     <ClCompile Include="Source\Render\TerrainComponent.cpp" />
     <ClCompile Include="Source\Render\Texture.cpp" />
     <ClCompile Include="Source\Render\Volumetricfog.cpp" />
-    <ClCompile Include="Source\Scripting\LuaBuiltinFuncs.cpp" />
     <ClCompile Include="Source\Scripting\ScriptFunctionCodegen.cpp" />
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
     <ClCompile Include="Source\UI\BaseGUI.cpp" />
@@ -184,6 +184,7 @@
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
     <ClInclude Include="Source\Game\CarGame\CarGame.h" />
     <ClInclude Include="Source\Game\CarGame\CarGui.h" />
+    <ClInclude Include="Source\Game\Components\GraphCurveComponent.h" />
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
     <ClInclude Include="Source\Game\Components\TileMapComponent.h" />
@@ -306,8 +307,6 @@
     <ClInclude Include="Source\Level.h" />
     <ClInclude Include="Source\LevelSerialization\SerializationAPI.h" />
     <ClInclude Include="Source\Physics\Physics2Local.h" />
-    <ClInclude Include="Source\Scripting\ScriptAsset.h" />
-    <ClInclude Include="Source\Scripting\ScriptComponent.h" />
     <ClInclude Include="Source\Scripting\ScriptFunctionCodegen.h" />
     <ClInclude Include="Source\Scripting\ScriptManager.h" />
     <ClInclude Include="Source\Sound\SoundComponent.h" />
@@ -413,8 +412,6 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Source\Render\Meshlet.cpp" />
-    <ClCompile Include="Source\Scripting\ScriptAsset.cpp" />
-    <ClCompile Include="Source\Scripting\ScriptLocal.cpp" />
     <ClCompile Include="Source\Sound\SoundComponent.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
     <ClInclude Include="Source\Sound\SoundLocal.h" />

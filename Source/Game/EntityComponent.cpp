@@ -115,7 +115,7 @@ void Component::deactivate_internal()
 {
 	ASSERT(init_state == initialization_state::CALLED_START);
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
-		end();
+		stop();
 		shutdown_updater();
 	}
 	init_state = initialization_state::HAS_ID;

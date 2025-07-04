@@ -17,7 +17,7 @@ public:
 		return scene_camera;
 	}
 	void start() override;
-	void end() override;
+	void stop() override;
 	void on_changed_transform() override {
 		if(eng->is_editor_level())
 			update_meshbuilder();

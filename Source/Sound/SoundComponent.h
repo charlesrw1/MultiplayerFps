@@ -13,7 +13,7 @@ public:
 
     SoundComponent();
     void start() override;
-    void end() override;
+    void stop() override;
     void update() override;
     void editor_on_change_property() override;
     void on_changed_transform() override;

@@ -19,7 +19,7 @@ public:
 	SpotLightComponent();
 	~SpotLightComponent() override;
 	void start() final;
-	void end() final;
+	void stop() final;
 	void on_sync_render_data() final;
 	void on_changed_transform() final {
 		sync_render_data();
@@ -50,7 +50,7 @@ public:
 	CLASS_BODY(PointLightComponent);
 	PointLightComponent();
 	void start() final;
-	void end() final;
+	void stop() final;
 	void on_sync_render_data() final;
 	void on_changed_transform() final {
 		sync_render_data();
@@ -82,7 +82,7 @@ public:
 	SunLightComponent();
 	~SunLightComponent() final;
 	void start() final;
-	void end() final;
+	void stop() final;
 	void on_changed_transform() final {
 		sync_render_data();
 	}
@@ -118,7 +118,7 @@ public:
 		set_call_init_in_editor(true);
 	}
 	void start() final;
-	void end() final;
+	void stop() final;
 	void on_sync_render_data() final;
 	void editor_on_change_property() final;
 	REFLECT(transient)
@@ -143,7 +143,7 @@ public:
 		set_call_init_in_editor(true);
 	}
 	void start() final;
-	void end() final;
+	void stop() final;
 	void on_changed_transform() final {
 		update_editormeshbuilder();
 	}

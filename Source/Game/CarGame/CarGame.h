@@ -36,7 +36,7 @@ public:
 		ASSERT(!instance);
 		instance = this;
 	}
-	void end() {
+	void stop() {
 		instance = nullptr;
 	}
 	Entity* thecar = nullptr;
@@ -81,7 +81,7 @@ public:
 			wheel_angles[i] = 0;
 		}
 	}
-	void end() {
+	void stop() {
 	}
 	void update() override;
 
@@ -168,7 +168,7 @@ public:
 	}
 	//
 	void update();
-	void end() {
+	void stop() {
 	}
 
 	float set_steer_angle = 0.0;

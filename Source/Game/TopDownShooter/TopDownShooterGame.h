@@ -42,7 +42,7 @@ public:
 		the_player = eng->get_level()->spawn_prefab(player_prefab.get());
 	}
 	void update() {}
-	void end() {
+	void stop() {
 		ASSERT(instance == this);
 		instance = nullptr;
 	}
@@ -307,7 +307,7 @@ public:
 		get_owner()->set_ws_transform(ccontroller->get_character_pos(), q, get_owner()->get_ls_scale());
 
 	}
-	void end() {
+	void stop() {
 
 	}
 

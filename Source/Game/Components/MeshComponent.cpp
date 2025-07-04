@@ -165,7 +165,7 @@ void MeshComponent::update()
 
 }
 
-void MeshComponent::end()
+void MeshComponent::stop()
 {
 	get_owner()->set_cached_mesh_component(nullptr);
 	idraw->get_scene()->remove_obj(draw_handle);

@@ -20,7 +20,7 @@ public:
 		arrowModel = g_assets.find_global_sync<Model>("arrowModel.cmdl");
 		sync_render_data();
 	}
-	void end() override {
+	void stop() override {
 		idraw->get_scene()->remove_obj(handle);
 	}
 	void on_changed_transform() override {

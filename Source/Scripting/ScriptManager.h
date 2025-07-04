@@ -92,8 +92,6 @@ public:
 			this->super_typeinfo = find;
 			this->superclassname = find->classname;
 			this->lua_prototype_index_table = find->get_prototype_index_table();
-			this->id = find->id;
-			this->last_child = this->id;
 			this->allocate = lua_class_alloc;
 		}
 	}

@@ -29,7 +29,7 @@ void ParticleComponent::start()
 
 	sync_render_data();
 }
-void ParticleComponent::end()
+void ParticleComponent::stop()
 {
 	idraw->get_scene()->remove_particle_obj(obj);
 	ParticleMgr::get().unregister_this(this);

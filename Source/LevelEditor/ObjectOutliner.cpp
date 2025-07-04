@@ -120,7 +120,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 	ImGui::SameLine();
 	auto n = node;
 	Entity* node_entity = n->ptr.get();
-	assert(node_entity || !node->parent);
+	//assert(node_entity || !node->parent);
 
 	const bool is_root_node = node_entity == nullptr;
 	ImGui::PushID(n);

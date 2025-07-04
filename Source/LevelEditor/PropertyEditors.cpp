@@ -599,6 +599,21 @@ bool CodeBlockPropEditor::internal_update()
 	return false;
 }
 
+#include "Framework/CurveEditorImgui.h"
+class GraphCurveEditor : public IPropertyEditor {
+public:
+	bool internal_update() final {
+		editor.draw();
+		return false;
+	}
+	virtual int extra_row_count() { return 0; }
+	virtual bool can_reset() { return false; }
+	virtual void reset_value() {
+	}
+	CurveEditorImgui editor;
+};
+
+
 void PropertyFactoryUtil::register_basic(FnFactory<IPropertyEditor>& factory)
 {
 	factory.add("BoolButton", []() {return new ButtonPropertyEditor; });
@@ -606,6 +621,8 @@ void PropertyFactoryUtil::register_basic(FnFactory<IPropertyEditor>& factory)
 	factory.add("AssetPtr", []() {return new AssetPropertyEditor; });
 	factory.add("SoftAssetPtr", []() {return new SoftAssetPropertyEditor; });
 	factory.add("ClassTypePtr", []() {return new ClassTypePtrPropertyEditor; });
+	factory.add("GraphCurve", []() {return new GraphCurveEditor; });
+
 
 	factory.add("code_block", []() {return new CodeBlockPropEditor; });
 

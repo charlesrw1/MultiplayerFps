@@ -1,7 +1,6 @@
 #pragma once
 
 #include "DefaultGameHeader.h"
-#include "Scripting/ScriptComponent.h"
 #include "Game/Components/CameraComponent.h"
 #include "Input/InputSystem.h"
 #include "Input/InputAction.h"
@@ -88,7 +87,7 @@ public:
 
 	}
 
-	void end() override {
+	void stop() override {
 
 	}
 };

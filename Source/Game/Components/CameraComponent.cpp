@@ -27,7 +27,7 @@ void CameraComponent::start()
 		update_meshbuilder();
 	}
 }
-void CameraComponent::end()
+void CameraComponent::stop()
 {
 	if (editor_mbview)
 		editor_mbview->destroy();

@@ -66,7 +66,7 @@ public:
 
 	void pre_start() final {}
 	void start() final {}
-	void end() final {}
+	void stop() final {}
 	void generate() final {}
 	AssetPtr<Texture> texture;
 	int rows_x = 0;

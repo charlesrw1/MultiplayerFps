@@ -20,7 +20,7 @@ public:
 	REF virtual void pre_start() {}
 	REF virtual void start() {}
 	REF virtual void update() {}
-	REF virtual void end() {}
+	REF virtual void stop() {}
 	void init_updater();
 	void shutdown_updater();
 	REF void set_ticking(bool shouldTick);

@@ -47,7 +47,7 @@ void SoundComponent::start()
 	}
 	set_ticking(false);
 }
-void SoundComponent::end()
+void SoundComponent::stop()
 {
 	if (player) {
 		isound->remove_sound_player(player);

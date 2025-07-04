@@ -309,6 +309,7 @@ void ScriptManager::reload()
 	}
 	for (auto& c : newClasses) {
 		if (!MapUtil::contains(lua_classes, c->get_name())) {
+			ClassBase::register_class(c.get());
 			lua_classes.insert({ c->get_name(),std::move(c) });
 		}
 	}
@@ -317,6 +318,7 @@ void ScriptManager::reload()
 	for (auto& [name, c] : lua_classes) {
 		c->init_lua_type();
 	}
+	ClassBase::post_changes_class_init();
 }
 ScriptManager* ScriptManager::inst = nullptr;
 
@@ -372,6 +374,7 @@ void ScriptManager::load_script_files()
 
 LuaClassTypeInfo::LuaClassTypeInfo() : ClassTypeInfo("lua_class_empty",nullptr,nullptr,nullptr,false,nullptr,0,nullptr,true)
 {
+	this->is_lua_implemented = true;
 }
 
 LuaClassTypeInfo::~LuaClassTypeInfo()
@@ -501,4 +504,42 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c)
 	lua_pop(L, 2);
 	check_top(0);
 	return out;
+}
+static void stack_dump(lua_State* L) {
+	int top = lua_gettop(L);  // Get the index of the top element
+
+	printf("Stack Dump:\n");
+	for (int i = 1; i <= top; i++) {
+		int type = lua_type(L, i);
+		switch (type) {
+		case LUA_TSTRING:
+			printf("%d: '%s'\n", i, lua_tostring(L, i));
+			break;
+		case LUA_TBOOLEAN:
+			printf("%d: %s\n", i, lua_toboolean(L, i) ? "true" : "false");
+			break;
+		case LUA_TNUMBER:
+			printf("%d: %g\n", i, lua_tonumber(L, i));
+			break;
+		case LUA_TTABLE:
+			printf("%d: Table\n", i);
+			break;
+		case LUA_TFUNCTION:
+			printf("%d: Function\n", i);
+			break;
+		case LUA_TLIGHTUSERDATA:
+			printf("%d: Light Userdata\n", i);
+			break;
+		case LUA_TUSERDATA:
+			printf("%d: Userdata\n", i);
+			break;
+		case LUA_TNIL:
+			printf("%d: nil\n", i);
+			break;
+		default:
+			printf("%d: Unknown\n", i);
+			break;
+		}
+	}
+	printf("\n");
 }
