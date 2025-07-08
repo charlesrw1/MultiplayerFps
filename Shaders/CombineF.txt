@@ -124,7 +124,7 @@ void main()
 	
 	//both = reinhard_extended_luminance(both, 1.0);
 	both = aces_approx(both*0.7);
-	
+	//both = uncharted2_filmic(both);
 	vec3 srgb = pow(both,vec3(1/2.2));
 	//srgb = color_contrast(srgb, 0.95);
 	//srgb = color_filter(srgb, vec3(1.0,0.92,0.8));

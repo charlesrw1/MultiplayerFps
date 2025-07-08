@@ -231,8 +231,7 @@ void IMPORT_MODEL_FUNC(const Cmd_Args& args)
 	ModelCompilier::compile(savepath.c_str(), AssetDatabase::loader);
 }
 #endif
-#include "Framework/StringUtils.h"
-void export_one_model(const Model& model, const char* export_path);
+
 
 void ModelMan::add_commands(ConsoleCmdGroup& group)
 {
@@ -241,20 +240,6 @@ void ModelMan::add_commands(ConsoleCmdGroup& group)
 
 #ifdef EDITOR_BUILD
 	group.add("IMPORT_MODEL", IMPORT_MODEL_FUNC);
-	group.add("export_model", [](const Cmd_Args & args) {
-		if (args.size() != 2) {
-			sys_print(Error, "usage: export_model <model>\n");
-			return;
-		}
-		auto mod = Model::load(args.at(1));
-		if (!mod) {
-			sys_print(Error, "model doesn't exist\n");
-			return;
-		}
-		auto outPath = StringUtils::alphanumeric_hash(args.at(1))+".glb";
-		sys_print(Info, "writing out to %s\n", outPath.c_str());
-		export_one_model(*mod, outPath.c_str());
-	});
 	group.add("print_bones", [](const Cmd_Args& args) {
 		if (args.size() != 2) {
 			sys_print(Error, "usage: print_bones <model>\n");
@@ -293,10 +278,11 @@ void ModelMan::add_commands(ConsoleCmdGroup& group)
 		}
 		auto skel = mod->get_skel();
 		auto& clips = skel->get_all_clips();
-		sys_print(Info, "numClips=%d\n", int(clips.size()));
-		for (auto&[name,seq] : clips) {
-			sys_print(Info, "%s (duration=%f) (additive=%d)\n", name.c_str(),seq.ptr->duration, int(seq.ptr->is_additive_clip));
+		sys_print(Info, "numClips=%d\n", int(bones.size()));
+		for (int i = 0; i < bones.size(); i++) {
+			sys_print(Info, "%s = %d (parent=%d)\n", bones[i].strname.c_str(), i, int(bones[i].parent));
 		}
+
 		});
 	group.add("model_info", [](const Cmd_Args& args) {
 		if (args.size() != 2) {

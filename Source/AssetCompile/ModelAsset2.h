@@ -46,30 +46,6 @@ struct AnimImportSettings {
 	REF bool removeLinearVelocity = false;	// if true, then subtracts linear_velocity*t from each position
 	REF bool enableRootMotion = false;		// if true, then marks clip for root motion, note that you shouldnt use removeLinearVelocity or setRootToFirstPose
 	REF bool setRootToFirstPose = false;	// if true, then sets all root poses to first frame
-
-	std::vector<AnimationEvent*> events;
-	std::vector<EditingCurve> curves;
-
-	//static const PropertyInfoList* get_props() {
-	//	//MAKE_VECTORCALLBACK_ATOM(std::unique_ptr<AnimationEvent>, events);
-	//	MAKE_VECTORCALLBACK(EditingCurve, curves);
-	//	START_PROPS(AnimImportSettings)
-	//		REG_STDSTRING(clipName, PROP_SERIALIZE),
-	//		REG_BOOL(hasStartCrop, PROP_DEFAULT, "0"),
-	//		REG_INT(cropStart, PROP_DEFAULT, "0"),
-	//		REG_BOOL(hasEndCrop,PROP_DEFAULT,"0"),
-	//		REG_INT(cropEnd, PROP_DEFAULT, "20000"),
-	//		REG_BOOL(fixLoop, PROP_DEFAULT, "0"),
-	//		REG_BOOL(makeAdditive, PROP_DEFAULT, "0"),
-	//		REG_BOOL(additiveFromSelf, PROP_DEFAULT, "0"),
-	//		REG_BOOL(removeLinearVelocity,PROP_DEFAULT,"0"),
-	//		REG_BOOL(enableRootMotion,PROP_DEFAULT,"0"),
-	//		REG_BOOL(setRootToFirstPose,PROP_DEFAULT,"0"),
-	//		REG_SOFT_ASSET_PTR(otherClipToSubtract,PROP_DEFAULT),
-	//		REG_STDVECTOR(curves,PROP_SERIALIZE),
-	//		//REG_STDVECTOR(events,PROP_SERIALIZE),
-	//	END_PROPS(AnimImportSettings)
-	//}
 };
 
 
@@ -91,6 +67,9 @@ public:
 	REF std::vector<std::string> additionalAnimationGlbFiles;	// additional glb files to source animations from (will retarget)
 	REF std::vector<AnimImportSettings> animations;				// all animations indexed by string with import settings
 
+	REF int lightmapSizeX = 0;
+	REF int lightmapSizeY = 0;
+	REF bool withLightmap = false;
 
 	// type=BoneRenameContainer
 	// this renames bones in this asset using this dataclass

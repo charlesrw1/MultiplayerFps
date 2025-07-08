@@ -104,11 +104,8 @@ class Render_Pass
 {
 public:
 	Render_Pass(pass_type type);
-
 	void make_batches(Render_Scene& scene);
-
 	void merge_static_to_dynamic(bool* vis_array, int8_t* lod_array, Free_List<ROP_Internal>& proxy_list);
-
 	void add_object(
 		const Render_Object& proxy,
 		handle<Render_Object> handle,
@@ -133,23 +130,14 @@ public:
 		int submesh,
 		int layer, bool is_editor_mode);
 
-	void clear() {
-		objects.clear();
-	}
-	void clear_static() {
-		cached_static_objects.clear();
-	}
-
+	void clear() { objects.clear();}
+	void clear_static() { cached_static_objects.clear(); }
 	const pass_type type{};					// modifies batching+sorting logic
-
-
 	std::vector<Pass_Object> objects;		// geometry + material id + object id
 	std::vector<Pass_Object> cached_static_objects;	// copied into objects
-
 	std::vector<Mesh_Batch> mesh_batches;	// glDrawElementsIndirect()
 	std::vector<Multidraw_Batch> batches;	// glMultiDrawElementsIndirect()
 };
-
 // RenderObject internal data
 struct ROP_Internal
 {
@@ -160,21 +148,15 @@ struct ROP_Internal
 	bool is_static = true;
 	bool has_init = false;
 };
-
 // RenderLight internal data
-struct RL_Internal
-{
+struct RL_Internal{
 	Render_Light light;
 	// stuff like shadowmap indicies etc.
 	int shadow_array_index = -1;
 };
-
-struct RDecal_Internal
-{
+struct RDecal_Internal{
 	Render_Decal decal;
 };
-
-
 struct Render_Lists
 {
 	void init(uint32_t drawidsz, uint32_t instbufsz);
@@ -293,8 +275,11 @@ public:
 			return;
 		}
 		statics_meshes_are_dirty = true;
-		if(handle.is_valid())
+		if (handle.is_valid()) {
+			const bool was_static = proxy_list.get(handle.id).is_static;
 			proxy_list.free(handle.id);
+			statics_meshes_are_dirty |= was_static;
+		}
 		handle = { -1 };
 	}
 	const Render_Object& get(handle<Render_Object> handle) {
@@ -567,16 +552,12 @@ public:
 				ASSERT(!"no type defined for queued delete render");
 			}
 		}
-		if(!queued_deletes.empty())
-			statics_meshes_are_dirty = true;
 		queued_deletes.clear();
 	}
 
 	void build_scene_data(bool skybox_only, bool is_for_editor);
 	void refresh_static_mesh_data(bool is_for_editor);
-
 	RSunInternal* get_main_directional_light();
-
 	TerrainInterfacePublic* get_terrain_interface() override;
 	std::unique_ptr<TerrainInterfaceLocal> terrain_interface;
 
@@ -588,7 +569,6 @@ public:
 	Render_Pass transparent_pass;
 	Render_Pass editor_sel_pass;
 	Render_Pass shadow_pass;	// all shadow casting objects
-
 	Render_Lists gbuffer_rlist;
 	Render_Lists transparent_rlist;
 	std::vector<Render_Lists> cascades_rlists;	// lists specific to each cascade, culled

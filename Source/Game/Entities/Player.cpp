@@ -628,7 +628,7 @@ void Player::on_foot_update()
 	
 	velocity.y -= 10.0 * eng->get_dt();
 
-	uint32_t flags = 0;
+	int flags = 0;
 
 	glm::vec3 out_vel;
 	ccontroller->move(velocity*(float)eng->get_dt(), eng->get_dt(), 0.001f, flags, out_vel);
@@ -736,7 +736,7 @@ void Player::on_foot_update()
 	 set_ticking(true);
  }
 
- REF vector<Component*> GameplayStatic::find_components_of_class(const ClassTypeInfo* info) {
+ vector<Component*> GameplayStatic::find_components(const ClassTypeInfo* info) {
 	 assert(info && info->is_a(Component::StaticType));
 	 double now = GetTime();
 	 auto& all = eng->get_level()->get_all_objects();
@@ -747,4 +747,16 @@ void Player::on_foot_update()
 	 double end = GetTime();
 	 printf("find_components_of_class: took %f\n", float(end - now));
 	 return out;
+ }
+ Entity* GameplayStatic::find_by_name(string name) {
+	 return eng->get_level()->find_initial_entity_by_name(name);
+ }
+
+ Entity* GameplayStatic::spawn_prefab(PrefabAsset* prefab)
+ {
+	 return eng->get_level()->spawn_prefab(prefab);
+ }
+ Entity* GameplayStatic::spawn_entity()
+ {
+	 return eng->get_level()->spawn_entity();
  }

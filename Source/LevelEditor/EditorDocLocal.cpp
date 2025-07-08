@@ -1785,8 +1785,8 @@ void EditorDoc::set_camera_target_to_sel()
 	}
 }
 
-extern void export_scene_model();
-
+extern void export_godot_scene(const std::string& base_export_path);
+extern void export_level_scene();
 void EditorDoc::hook_menu_bar()
 {
 	if (ImGui::BeginMenu("Plugins")) {
@@ -1807,7 +1807,11 @@ void EditorDoc::hook_menu_bar()
 	}
 	if (ImGui::BeginMenu("Commands")) {
 		if (ImGui::MenuItem("Export as .glb")) {
-			export_scene_model();
+			export_level_scene();
+		}
+		if (ImGui::MenuItem("Export godot")) {
+			string path = "C:/Users/charl/Documents/lightmapexporter/";
+			export_godot_scene(path);
 		}
 		ImGui::EndMenu();
 	}

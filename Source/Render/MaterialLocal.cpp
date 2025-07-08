@@ -25,7 +25,7 @@ MaterialManagerPublic* imaterials = &matman;
 //extern IEditorTool* g_mateditor;
 
 ConfigVar material_print_debug("material_print_debug", "1", CVAR_DEV | CVAR_BOOL, "");
-
+#include "Editor/MaterialEditorLocal.h"
 
 
 #ifdef EDITOR_BUILD
@@ -44,6 +44,9 @@ public:
 	virtual bool assets_are_filepaths() const override { return true; }
 
 	virtual const ClassTypeInfo* get_asset_class_type()  const override { return &MaterialInstance::StaticType; }
+	uptr<CreateEditorAsync> create_create_tool_to_edit(opt<string> assetPath) const { 
+		return std::make_unique<OpenMaterialEditor>(assetPath); 
+	}
 	//IEditorTool* tool_to_edit_me() const override { return g_mateditor;  }
 };
 
@@ -155,6 +158,11 @@ program_handle MaterialManagerLocal::get_mat_shader(
 const MasterMaterialImpl* MaterialInstance::get_master_material() const
 {
 	return impl->masterMaterial;
+}
+
+bool MaterialInstance::is_this_a_master_material() const
+{
+	return impl&&impl->masterMaterial;
 }
 
 bool MaterialInstance::load_asset(IAssetLoadingInterface* loading)
@@ -284,6 +292,11 @@ MaterialInstance::~MaterialInstance()
 		matman.free_dynamic_material(this);
 	}
 
+}
+
+MaterialInstance* MaterialInstance::load(const std::string& path)
+{
+	return g_assets.find_sync<MaterialInstance>(path).get();
 }
 
 void MaterialImpl::load_instance(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading)

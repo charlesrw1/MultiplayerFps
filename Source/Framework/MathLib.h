@@ -3,6 +3,7 @@
 
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
+#include "Framework/Util.h"
 
 inline glm::vec3 AnglesToVector(float pitch, float yaw) {
 	return glm::vec3(cos(yaw) * cos(pitch), sin(pitch), sin(yaw) * cos(pitch));
@@ -27,7 +28,15 @@ inline float linearize_depth(float d, float zNear, float zFar)
 	float z_n = 2.0 * d - 1.0;
 	return 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
 }
-
+inline glm::vec4 color32_to_vec4(Color32 c) {
+	return glm::vec4(c.r / 255.0, c.g / 255.0, c.b / 255.0, c.a / 255.0);
+}
+inline glm::vec4 colorvec_srgb_to_linear(const glm::vec4& color) {
+	auto to_linear = [](float x) {
+		return glm::pow(x, 2.2f);
+	};
+	return glm::vec4(to_linear(color.x), to_linear(color.y), to_linear(color.z), color.w/* dont correct w?*/);
+}
 
 
 // smoothing = [0,1] where 0 is no smoothing and 1.0 is max smoothing 

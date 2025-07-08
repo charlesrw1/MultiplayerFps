@@ -294,7 +294,7 @@ public:
 		facing_dir = to_dir;
 
 		float dt = eng->get_dt();
-		uint32_t flags = 0;
+		int flags = 0;
 		glm::vec3 outvel;
 		float move_speed = 3.0;
 		ccontroller->move(glm::vec3(to_dir.x, 0, to_dir.z) * move_speed * dt, dt, 0.005f, flags, outvel);

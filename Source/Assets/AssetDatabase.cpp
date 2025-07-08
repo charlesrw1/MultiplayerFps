@@ -50,6 +50,7 @@ struct AsyncQueuedJob
 	IAsset* out_object = nullptr;
 	vector<IAsset*> other_assets;
 	vector<double> other_load_times;
+	vector<IAsset*> reloaded_also;
 };
 
 class SubAssetLoadingInterface : public IAssetLoadingInterface
@@ -282,7 +283,7 @@ void AssetBackend::execute_job(AsyncQueuedJob* job)
 
 		// force create it
 		job->out_object = force_create_asset(job->path,job->info,job->is_system_asset);
-		job->other_assets.push_back(job->out_object);
+		job->reloaded_also.push_back(job->out_object);
 
 		// do the dependents
 		std::vector<IAsset*> reload_queue;
@@ -296,7 +297,7 @@ void AssetBackend::execute_job(AsyncQueuedJob* job)
 			reload_queue.erase(reload_queue.begin());
 			add_dependents_to_reload_queue(a);
 			auto out = force_create_asset(a->path, &a->get_type(),false);
-			job->other_assets.push_back(out);
+			job->reloaded_also.push_back(out);
 		}
 
 		// by now, the reloaded object and all of its dependents are reloaded and added to the local table and the out objects
@@ -304,7 +305,7 @@ void AssetBackend::execute_job(AsyncQueuedJob* job)
 		// note that reloaded dependent objects are dependent on the reloaded asset. so must use care in move function to solve this
 	
 		assert(job->out_object);
-		assert(job->other_assets.size()>=1);
+		//assert(job->other_assets.size()>=1);
 		assert(!job->out_object->has_run_post_load);
 	}
 	else
@@ -542,21 +543,25 @@ public:
 			assert(job->out_object);
 			if (job->force_reload) {
 				// objects are added in order of dependence
-				for (auto o : job->other_assets) {
+				for (auto o : job->reloaded_also) {
 					assert(o);
 					assert(!o->has_run_post_load);
 					auto existing = find_in_all_assets(o->path);
-					assert(existing);
-					existing->move_construct(o);	// construct it, dont delete yet
+					assert(existing != o);
+					if (!o->load_failed) {
+						assert(existing);
+						existing->move_construct(o);	// construct it, dont delete yet
+					}
 					post_move_construct(existing, o);
 				}
 				// now do deletes and move the existing into the finished so it runs post load
-				for (int i = 0; i < job->other_assets.size(); i++) {
-					auto o = job->other_assets[i];
+				for (int i = 0; i < job->reloaded_also.size(); i++) {
+					auto o = job->reloaded_also[i];
 					auto existing = find_in_all_assets(o->path);
 					assert(existing);
+					assert(existing != o);
 					delete o;	// delete the reloaded copy
-					job->other_assets[i] = existing;
+					job->other_assets.push_back(existing);
 				}
 				job->out_object = job->other_assets.at(0);	// first object
 			}

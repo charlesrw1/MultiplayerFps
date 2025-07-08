@@ -129,6 +129,9 @@ public:
 	int get_num_lods() const { return lods.size(); }
 	const MeshLod& get_lod(int index) const { return lods[index]; }
 	const MaterialInstance* get_material(int index) const { return materials[index]; }
+	int get_num_materials() const { return materials.size(); }
+	glm::ivec2 get_lightmap_size() const { return glm::ivec2(lightmapX,lightmapY); }
+
 	bool has_lightmap_coords() const;
 	bool has_colors() const;
 	bool has_bones() const;
@@ -148,7 +151,7 @@ private:
 	InlineVec<MeshLod, 2> lods;
 	vector<Submesh> parts;
 	Bounds aabb;
-	glm::vec4 bounding_sphere;
+	glm::vec4 bounding_sphere=glm::vec4(0.f);
 	uint32_t merged_index_pointer = 0;	// in bytes
 	uint32_t merged_vert_offset = 0;
 	RawMeshData data;
@@ -159,6 +162,10 @@ private:
 	vector<ModelTag> tags;
 	vector<const MaterialInstance*> materials;
 	glm::mat4 skeleton_root_transform = glm::mat4(1.f);
+	bool isLightmapped = false;
+	int16_t lightmapX = 0;
+	int16_t lightmapY = 0;
+
 	friend class ModelMan;
 	friend class ModelCompileHelper;
 	friend class ModelEditorTool;

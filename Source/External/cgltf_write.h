@@ -657,20 +657,20 @@ static void cgltf_write_material(cgltf_write_context* context, const cgltf_mater
 		context->extension_flags |= CGLTF_EXTENSION_FLAG_MATERIALS_IRIDESCENCE;
 	}
 
-	if (material->has_diffuse_transmission)
-	{
-		context->extension_flags |= CGLTF_EXTENSION_FLAG_MATERIALS_DIFFUSE_TRANSMISSION;
-	}
+	//if (material->has_diffuse_transmission)
+	//{
+	//	context->extension_flags |= CGLTF_EXTENSION_FLAG_MATERIALS_DIFFUSE_TRANSMISSION;
+	//}
 
 	if (material->has_anisotropy)
 	{
 		context->extension_flags |= CGLTF_EXTENSION_FLAG_MATERIALS_ANISOTROPY;
 	}
 
-	if (material->has_dispersion)
-	{
-		context->extension_flags |= CGLTF_EXTENSION_FLAG_MATERIALS_DISPERSION;
-	}
+	//if (material->has_dispersion)
+	//{
+	//	context->extension_flags |= CGLTF_EXTENSION_FLAG_MATERIALS_DISPERSION;
+	//}
 
 	if (material->has_pbr_metallic_roughness)
 	{
@@ -687,7 +687,7 @@ static void cgltf_write_material(cgltf_write_context* context, const cgltf_mater
 		cgltf_write_line(context, "}");
 	}
 
-	if (material->unlit || material->has_pbr_specular_glossiness || material->has_clearcoat || material->has_ior || material->has_specular || material->has_transmission || material->has_sheen || material->has_volume || material->has_emissive_strength || material->has_iridescence || material->has_anisotropy || material->has_dispersion || material->has_diffuse_transmission)
+	if (material->unlit || material->has_pbr_specular_glossiness || material->has_clearcoat || material->has_ior || material->has_specular || material->has_transmission || material->has_sheen || material->has_volume || material->has_emissive_strength || material->has_iridescence || material->has_anisotropy)
 	{
 		cgltf_write_line(context, "\"extensions\": {");
 		if (material->has_clearcoat)
@@ -798,19 +798,19 @@ static void cgltf_write_material(cgltf_write_context* context, const cgltf_mater
 			CGLTF_WRITE_TEXTURE_INFO("iridescenceThicknessTexture", params->iridescence_thickness_texture);
 			cgltf_write_line(context, "}");
 		}
-		if (material->has_diffuse_transmission)
-		{
-			const cgltf_diffuse_transmission* params = &material->diffuse_transmission;
-			cgltf_write_line(context, "\"KHR_materials_diffuse_transmission\": {");
-			CGLTF_WRITE_TEXTURE_INFO("diffuseTransmissionTexture", params->diffuse_transmission_texture);
-			cgltf_write_floatprop(context, "diffuseTransmissionFactor", params->diffuse_transmission_factor, 0.f);
-			if (cgltf_check_floatarray(params->diffuse_transmission_color_factor, 3, 1.f))
-			{
-				cgltf_write_floatarrayprop(context, "diffuseTransmissionColorFactor", params->diffuse_transmission_color_factor, 3);
-			}
-			CGLTF_WRITE_TEXTURE_INFO("diffuseTransmissionColorTexture", params->diffuse_transmission_color_texture);
-			cgltf_write_line(context, "}");
-		}
+		//if (material->has_diffuse_transmission)
+		//{
+		//	const cgltf_diffuse_transmission* params = &material->diffuse_transmission;
+		//	cgltf_write_line(context, "\"KHR_materials_diffuse_transmission\": {");
+		//	CGLTF_WRITE_TEXTURE_INFO("diffuseTransmissionTexture", params->diffuse_transmission_texture);
+		//	cgltf_write_floatprop(context, "diffuseTransmissionFactor", params->diffuse_transmission_factor, 0.f);
+		//	if (cgltf_check_floatarray(params->diffuse_transmission_color_factor, 3, 1.f))
+		//	{
+		//		cgltf_write_floatarrayprop(context, "diffuseTransmissionColorFactor", params->diffuse_transmission_color_factor, 3);
+		//	}
+		//	CGLTF_WRITE_TEXTURE_INFO("diffuseTransmissionColorTexture", params->diffuse_transmission_color_texture);
+		//	cgltf_write_line(context, "}");
+		//}
 		if (material->has_anisotropy)
 		{
 			cgltf_write_line(context, "\"KHR_materials_anisotropy\": {");
@@ -820,13 +820,13 @@ static void cgltf_write_material(cgltf_write_context* context, const cgltf_mater
 			CGLTF_WRITE_TEXTURE_INFO("anisotropyTexture", params->anisotropy_texture);
 			cgltf_write_line(context, "}");
 		}
-		if (material->has_dispersion)
-		{
-			cgltf_write_line(context, "\"KHR_materials_dispersion\": {");
-			const cgltf_dispersion* params = &material->dispersion;
-			cgltf_write_floatprop(context, "dispersion", params->dispersion, 0.f);
-			cgltf_write_line(context, "}");
-		}
+		//if (material->has_dispersion)
+		//{
+		//	cgltf_write_line(context, "\"KHR_materials_dispersion\": {");
+		//	const cgltf_dispersion* params = &material->dispersion;
+		//	cgltf_write_floatprop(context, "dispersion", params->dispersion, 0.f);
+		//	cgltf_write_line(context, "}");
+		//}
 		cgltf_write_line(context, "}");
 	}
 
@@ -860,7 +860,7 @@ static void cgltf_write_texture(cgltf_write_context* context, const cgltf_textur
 	CGLTF_WRITE_IDXPROP("source", texture->image, context->data->images);
 	CGLTF_WRITE_IDXPROP("sampler", texture->sampler, context->data->samplers);
 
-	if (texture->has_basisu || texture->has_webp)
+	if (texture->has_basisu)
 	{
 		cgltf_write_line(context, "\"extensions\": {");
 		if (texture->has_basisu)
@@ -870,13 +870,13 @@ static void cgltf_write_texture(cgltf_write_context* context, const cgltf_textur
 			CGLTF_WRITE_IDXPROP("source", texture->basisu_image, context->data->images);
 			cgltf_write_line(context, "}");
 		}
-		if (texture->has_webp)
-		{
-			context->extension_flags |= CGLTF_EXTENSION_FLAG_TEXTURE_WEBP;
-			cgltf_write_line(context, "\"EXT_texture_webp\": {");
-			CGLTF_WRITE_IDXPROP("source", texture->webp_image, context->data->images);
-			cgltf_write_line(context, "}");
-		}
+		//if (texture->has_webp)
+		//{
+		//	context->extension_flags |= CGLTF_EXTENSION_FLAG_TEXTURE_WEBP;
+		//	cgltf_write_line(context, "\"EXT_texture_webp\": {");
+		//	CGLTF_WRITE_IDXPROP("source", texture->webp_image, context->data->images);
+		//	cgltf_write_line(context, "}");
+		//}
 		cgltf_write_line(context, "}");
 	}
 	cgltf_write_extras(context, &texture->extras);

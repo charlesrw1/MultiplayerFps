@@ -76,10 +76,3 @@ const BoneIndexRetargetMap* MSkeleton::get_remap(const MSkeleton* other)
 	return remaps.back().get();
 }
 
-const BonePoseMask* MSkeleton::find_mask(StringName name) const {
-	for (int i = 0; i < masks.size(); i++) {
-		if (masks[i].idname == name)
-			return &masks[i];
-	}
-	return nullptr;
-}

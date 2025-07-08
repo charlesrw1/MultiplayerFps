@@ -14,7 +14,7 @@
 
 
 #include "Render/Editor/MaterialEditorLocal.h"
-#include "Animation/Runtime/Statemachine_cfg.h"
+
 #include "imgui_internal.h"
 bool SharedAssetPropertyEditor::internal_update() {
 	assert(prop->class_type && prop->type == core_type_id::AssetPtr || prop->type == core_type_id::SoftAssetPtr);
@@ -759,7 +759,7 @@ EntityBoneParentStringEditor::~EntityBoneParentStringEditor() {
 	StringName* myName = (StringName*)prop->get_ptr(instance);
 	*myName = StringName(str.c_str());
 }
-
+#include "Animation/SkeletonData.h"
 bool EntityBoneParentStringEditor::internal_update()
 {
 	// cursed!

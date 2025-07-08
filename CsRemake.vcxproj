@@ -33,8 +33,12 @@
     <ClCompile Include="Source\Animation\Runtime\Animation.cpp" />
     <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew2.cpp" />
-    <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp" />
     <ClCompile Include="Source\Animation\SkeletonData.cpp" />
+    <ClCompile Include="Source\AssetCompile\write_gltf.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Source\Assets\AssetBrowser.cpp" />
     <ClCompile Include="Source\Assets\AssetBundle.cpp" />
     <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
@@ -101,7 +105,13 @@
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
     <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp" />
-    <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
+    <ClCompile Include="Source\LevelEditor\SceneExport.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MaxSpeed</Optimization>
+      <BasicRuntimeChecks Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Default</BasicRuntimeChecks>
+    </ClCompile>
     <ClCompile Include="Source\LevelSerialization\SerializationAPI.cpp" />
     <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
@@ -136,11 +146,11 @@
     <ClInclude Include="Source\Animation\Runtime\AnimationTreeLocal.h" />
     <ClInclude Include="Source\Animation\Runtime\Easing.h" />
     <ClInclude Include="Source\Animation\Runtime\Percentage.h" />
-    <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h" />
     <ClInclude Include="Source\Animation\Runtime\SyncTime.h" />
     <ClInclude Include="Source\AssetCompile\AnimAssetEditorLocal.h" />
     <ClInclude Include="Source\Animation\AnimationSeqAsset.h" />
     <ClInclude Include="Source\AssetCompile\Compiliers.h" />
+    <ClInclude Include="Source\AssetCompile\GltfExport.h" />
     <ClInclude Include="Source\AssetCompile\ModelAsset2.h" />
     <ClInclude Include="Source\AssetCompile\ModelAssetEditorLocal.h" />
     <ClInclude Include="Source\AssetCompile\ModelCompilierLocal.h" />
@@ -186,6 +196,7 @@
     <ClInclude Include="Source\Game\CarGame\CarGui.h" />
     <ClInclude Include="Source\Game\Components\GraphCurveComponent.h" />
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
+    <ClInclude Include="Source\Game\Components\NavComps.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
     <ClInclude Include="Source\Game\Components\TileMapComponent.h" />
     <ClInclude Include="Source\Game\EntityPtr.h" />
@@ -352,7 +363,11 @@
     <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelAsset2.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelAssetEditorLocal.cpp" />
-    <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp" />
+    <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp" />
     <ClCompile Include="Source\Assets\CurveAsset.cpp" />
     <ClCompile Include="Source\External\tracy\public\TracyClient.cpp">

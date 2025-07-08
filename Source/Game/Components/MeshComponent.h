@@ -62,6 +62,7 @@ public:
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final;
 #endif
+
 private:
 	REF AssetPtr<Model> model;
 	REF bool is_visible = true;

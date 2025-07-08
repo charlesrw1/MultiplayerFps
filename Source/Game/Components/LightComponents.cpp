@@ -18,22 +18,25 @@
 
 ////
 
-
+glm::vec4 get_color_light_value(Color32 c, float intensity) {
+	auto vec = color32_to_vec4(c);
+	auto linear = colorvec_srgb_to_linear(vec);
+	return linear * PI * intensity;
+}
 
 void SpotLightComponent::start()
 {
 	if (eng->is_editor_level())
 	{
-		auto b = get_owner()->create_component<BillboardComponent>();
-		b->set_texture(default_asset_load<Texture>("icon/_nearest/flashlight.png"));
-		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
-
+		auto billboard = get_owner()->create_component<BillboardComponent>();
+		billboard->set_texture(default_asset_load<Texture>("icon/_nearest/flashlight.png"));
+		billboard->dont_serialize_or_edit = true;	// editor only item, dont serialize
 		auto arrow_obj = get_owner()->create_child_entity();
 		arrow_obj->dont_serialize_or_edit = true;
-		arrow_obj->create_component<ArrowComponent>();
+		auto arrow_comp = arrow_obj->create_component<ArrowComponent>();
 		arrow_obj->set_ls_transform(glm::vec3(0,0,0.4), {}, glm::vec3(0.25f));
-		editor_arrow = arrow_obj->get_instance_id();
-		editor_billboard = b->get_instance_id();
+		editor_arrow = arrow_comp;
+		editor_billboard = billboard;
 	}
 
 	sync_render_data();
@@ -44,8 +47,8 @@ void SpotLightComponent::on_sync_render_data()
 		light_handle = idraw->get_scene()->register_light();
 
 	Render_Light light;
-	light.color = glm::vec3(color.r, color.g, color.b) * (intensity / 255.f);
-	light.projected_texture = cookie_asset.get();
+	light.color = get_color_light_value(color, intensity);// glm::vec3(color.r, color.g, color.b)* (intensity / 255.f)* PI;
+	light.projected_texture = const_cast<Texture*>(cookie_asset);
 	light.conemax = cone_angle;
 	light.conemin = inner_cone;
 	light.radius = radius;
@@ -64,12 +67,12 @@ void SpotLightComponent::on_sync_render_data()
 void SpotLightComponent::stop()
 {
 	idraw->get_scene()->remove_light(light_handle);
-	auto e = eng->get_object(editor_billboard);
-	if (e)
-		((Component*)e)->destroy();
-	e = eng->get_object(editor_arrow);
-	if (e)
-		((Component*)e)->destroy();
+	if (auto b = editor_billboard.get()) {
+		b->destroy();
+	}
+	if (auto arrow = editor_arrow.get()) {
+		arrow->get_owner()->destroy_deferred();
+	}
 }
 
 
@@ -79,7 +82,7 @@ void PointLightComponent::on_sync_render_data()
 	if (!light_handle.is_valid())
 		light_handle = idraw->get_scene()->register_light();
 	Render_Light light;
-	light.color = glm::vec3(color.r, color.g, color.b) * (intensity / 255.f);
+	light.color = get_color_light_value(color, intensity);// glm::vec3(color.r, color.g, color.b)* (intensity / 255.f)* PI;
 	light.radius = radius;
 	light.is_spotlight = false;
 	auto& transform = get_owner()->get_ws_transform();
@@ -112,7 +115,7 @@ void SunLightComponent::on_sync_render_data()
 	if (!light_handle.is_valid())
 		light_handle = idraw->get_scene()->register_sun();
 	Render_Sun light;
-	light.color = glm::vec3(color.r, color.g, color.b) * (intensity / 255.f);
+	light.color = get_color_light_value(color, intensity);// glm::vec3(color.r, color.g, color.b)* (intensity / 255.f)* PI;
 	light.fit_to_scene = fit_to_scene;
 	light.log_lin_lerp_factor = log_lin_lerp_factor;
 	light.z_dist_scaling = z_dist_scaling;

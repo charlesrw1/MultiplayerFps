@@ -150,18 +150,19 @@ public:
 	const AnimationSeq* find_clip(const std::string& name) const;
 	AnimationSeq* find_clip(const std::string& name);
 	const BoneIndexRetargetMap* get_remap(const MSkeleton* other);
-	const BonePoseMask* find_mask(StringName name) const;
 	const std::vector<BoneData>& get_all_bones() const {
 		return bone_dat;
 	}
-private:
-	std::vector<BonePoseMask> masks;
-	std::vector<std::unique_ptr<BoneIndexRetargetMap>> remaps;
-	std::vector<BoneData> bone_dat;
-	std::vector<int16_t> mirroring_table;
+	int get_num_animations() const { return clips.size(); }
 	struct refed_clip {
 		AnimationSeq* ptr = nullptr;
 	};
+	const std::unordered_map<std::string, refed_clip>& get_all_clips() const { return clips; }
+private:
+	std::vector<std::unique_ptr<BoneIndexRetargetMap>> remaps;
+	std::vector<BoneData> bone_dat;
+	std::vector<int16_t> mirroring_table;
+
 	std::unordered_map<std::string, refed_clip> clips;
 
 	friend class Animation_Tree_Manager;

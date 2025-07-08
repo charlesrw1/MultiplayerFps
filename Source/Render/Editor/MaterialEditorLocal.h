@@ -21,151 +21,55 @@
 #include "Game/Entity.h"
 #include <string>
 #include "Framework/FnFactory.h"
-
+#include "EngineSystemCommands.h"
 extern ConfigVar ed_default_sky_material;
+
+class OpenMaterialEditor : public CreateEditorAsync {
+public:
+	OpenMaterialEditor(opt<string> assetName) : assetName(assetName) {}
+	void execute(Callback callback) final;
+	string get_tab_name() final {
+		return assetName.value_or("<empty>");
+	}
+	opt<string> get_asset_name() final {
+		return assetName;
+	}
+	opt<string> assetName;
+};
+
+class MaterialEdSettings : public ClassBase {
+public:
+	CLASS_BODY(MaterialEdSettings);
+	REF Model* outputModel = nullptr;
+	REF MaterialInstance* parent = nullptr;
+};
 
 class StaticMeshEntity;
 class MaterialEditorLocal : public EditorTool3d
 {
 public:
 	using MyClassType = MaterialEditorLocal;	// to work with REG_ASSET_PTR macros (they expect a ClassBase which has this defined, otherwise they work fine)
-	MaterialEditorLocal();
-
-
-	virtual void init() {
-	}
-	const char* get_save_file_extension() const {
-		return "mi";
-	}
+	MaterialEditorLocal(opt<string> assetName);
+	~MaterialEditorLocal();
+	virtual void init() { }
+	uptr<CreateEditorAsync> create_command_to_load_back() final { return nullptr; }
+	const char* get_save_file_extension() const { return "mi"; }
 	const ClassTypeInfo& get_asset_type_info() const override { return MaterialInstance::StaticType; }
 	virtual void close_internal();
 	virtual bool save_document_internal() override;
-	void imgui_draw() override
-	{
-		if (ImGui::Begin("Material Editor Window")) {
-			myPropGrid.update();
-			if (myPropGrid.rows_had_changes) {
-				if (outputEntity)
-					outputEntity->set_model(model.get());
-				//if (skyEntity) {
-				//	skyEntity->Mesh->set_material_override(skyMaterial.get());
-				//	
-				//	// refresh the skylight, do this better tbh
-				//	eng->remove_entity(skylightEntity);
-				//	skylightEntity = eng->spawn_entity_from_classtype(ClassBase::find_class("SkylightEntity"));
-				//}
-			}
-			materialParamGrid.update();
-			if (materialParamGrid.rows_had_changes) {
-				matman.add_to_dirty_list(dynamicMat.get());
-			}
-		}
-		ImGui::End();
-
-		IEditorTool::imgui_draw();
-		if (outputEntity)
-			outputEntity->sync_render_data();
+	void imgui_draw() override;
+	void post_map_load_callback() override;
+	void set_document_path(const std::string& s) {
+		assetName = s;
 	}
-#if 0
-	void draw_menu_bar() override
-	{
-		if (ImGui::BeginMenuBar())
-		{
-			if (ImGui::BeginMenu("File"))
-			{
-				if (ImGui::MenuItem("New")) {
-					std::string cmd = "open Material ";
-					cmd += dynamicMat->get_name();
+	MaterialEdSettings settings;
 
-					Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, cmd.c_str());
-				}
-				if (ImGui::MenuItem("Save", "Ctrl+S")) {
-					save();
-				}
-
-				ImGui::EndMenu();
-			}
-
-			ImGui::EndMenuBar();
-		}
-	}
-#endif
-
-	static PropertyInfoList* get_props() {
-		return nullptr;
-		//START_PROPS(MaterialEditorLocal)
-		//	REG_ASSET_PTR(model,PROP_DEFAULT),
-		//END_PROPS(MaterialEditorLocal)
-	}
-
-	void post_map_load_callback() override {
-		Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini MaterialEditor.ini");
-
-		assert(!dynamicMat);
-		assert(!outputEntity);
-
-		auto skydomeModel = g_assets.find_sync<Model>("eng/skydome.cmdl");
-		auto skyMat = g_assets.find_global_sync<MaterialInstance>(ed_default_sky_material.get_string());
-		model.ptr = skydomeModel.get();
-
-
-		auto mat = g_assets.find_sync<MaterialInstance>(get_doc_name());
-		if (!mat) {
-			sys_print(Error, "couldnt open material %s\n", get_doc_name().c_str());
-			Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "close_ed");
-			return;
-		}
-
-		parentMat = (MaterialInstance*)mat.get();
-		if (parentMat->impl->masterImpl)
-			set_empty_doc();
-		dynamicMat = imaterials->create_dynmaic_material(mat.get());
-		assert(dynamicMat);
-
-
-		// context params (model changes)
-		myPropGrid.add_property_list_to_grid(get_props(), this);
-
-		// material params
-		propInfosForMats.clear();
-		MaterialInstance* mLocal = (MaterialInstance*)dynamicMat.get();
-		auto& paramDefs = mLocal->get_master_material()->param_defs;
-		for (int i = 0; i < paramDefs.size(); i++) {
-			auto& def = paramDefs[i];
-			auto type = def.default_value.type;
-			if (type == MatParamType::Bool || type == MatParamType::Float || type == MatParamType::Texture2D || type == MatParamType::Vector)
-			{
-				PropertyInfo pi;
-				pi.offset = i;
-				pi.name = def.name.c_str();
-				pi.custom_type_str = "MaterialEditParam";
-				pi.flags = PROP_DEFAULT;
-				pi.type = core_type_id::Struct;
-				propInfosForMats.push_back(pi);
-			}
-		}
-		propInfoListForMats.count = propInfosForMats.size();
-		propInfoListForMats.list = propInfosForMats.data();
-		propInfoListForMats.type_name = dynamicMat->get_master_material()->self->get_name().c_str();
-		materialParamGrid.add_property_list_to_grid(&propInfoListForMats, this);
-
-		outputEntity = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
-		outputEntity->set_model(model.get());
-		outputEntity->get_owner()->set_ws_transform(glm::vec3(0, 1, 0), {}, glm::vec3(1.f));
-		outputEntity->set_material_override(dynamicMat.get());
-	}
-
-	AssetPtr<Model> model;
 	FnFactory<IPropertyEditor> factory;
-	PropertyGrid myPropGrid;	// model,parent
-	PropertyGrid materialParamGrid; // material params
-	std::vector<PropertyInfo> propInfosForMats;	// immutable!!
-	PropertyInfoList propInfoListForMats;
-
-	MeshComponent* outputEntity = nullptr;
+	PropertyGrid myPropGrid;	// settings
 
 	// dynamic material to edit params into
-	MaterialInstance* parentMat = nullptr;
 	DynamicMatUniquePtr dynamicMat = nullptr;
+	MeshComponent* outputEntity = nullptr;
+	opt<string> assetName;
 };
 #endif

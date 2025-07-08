@@ -5,8 +5,10 @@
 #include "Framework/Reflection2.h"
 #include "Framework/StructReflection.h"
 #include "Framework/BoolButton.h"
-
+#include "Game/EntityPtr.h"
 GENERATED_CLASS_INCLUDE("Render/Texture.h");
+
+glm::vec4 get_color_light_value(Color32 c, float intensity);
 
 class Texture;
 struct Render_Light;
@@ -32,16 +34,17 @@ public:
 		return "eng/editor/light.png";
 	}
 #endif
+
 	REF Color32 color = COLOR_WHITE;
 	REF float intensity = 1.f;
 	REF float radius = 20.f;
 	REF float cone_angle = 45.0;
 	REF float inner_cone = 40.0;
-	REF AssetPtr<Texture> cookie_asset;
+	REF const Texture* cookie_asset = nullptr;
 	REF bool visible = true;
 	handle<Render_Light> light_handle;
-	uint64_t editor_billboard = 0;
-	uint64_t editor_arrow = 0;
+	obj<BillboardComponent> editor_billboard;
+	obj<ArrowComponent> editor_arrow;
 };
 
 class PointLightComponent : public Component

@@ -631,6 +631,9 @@ def get_lua_type_string(new_type:CppType) -> str:
         output += "lVec3"
     elif new_type.type == QUAT_TYPE:
         output += "lQuat"
+    elif new_type.type == ARRAY_TYPE:
+        assert(len(new_type.template_args)==1)
+        output += get_lua_type_string(new_type.template_args[0])+"[]"
     else:
         output += "any"
     return output

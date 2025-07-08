@@ -195,9 +195,6 @@
     <ClInclude Include="Source\Debug.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Animation\Runtime\Statemachine_cfg.h">
-      <Filter>Source\Animation\Runtime</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Animation\Runtime\Percentage.h">
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
@@ -503,6 +500,8 @@
     <ClInclude Include="Source\Assets\AssetBundle.h" />
     <ClInclude Include="Source\Testheader.h" />
     <ClInclude Include="Source\Game\Components\GraphCurveComponent.h" />
+    <ClInclude Include="Source\Game\Components\NavComps.h" />
+    <ClInclude Include="Source\AssetCompile\GltfExport.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -658,7 +657,6 @@
     <ClCompile Include="Source\Animation\AnimationTypes.cpp" />
     <ClCompile Include="Source\Animation\AnimationUtil.cpp" />
     <ClCompile Include="Source\Animation\SkeletonData.cpp" />
-    <ClCompile Include="Source\Animation\Runtime\Statemachine_cfg.cpp" />
     <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />
     <ClCompile Include="Source\UI\UIBuilder.cpp" />
@@ -674,6 +672,7 @@
     <ClCompile Include="Source\Scripting\ScriptFunctionCodegen.cpp" />
     <ClCompile Include="Source\Assets\AssetBundle.cpp" />
     <ClCompile Include="Source\Game\Components\GraphCurveComponent.cpp" />
+    <ClCompile Include="Source\AssetCompile\write_gltf.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

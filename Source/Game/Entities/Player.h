@@ -53,15 +53,9 @@ struct HitResult {
 class GameplayStatic : public ClassBase {
 public:
 	CLASS_BODY(GameplayStatic);
-	REF static Entity* find_entity(string name) {
-		return nullptr;
-	}
-	REF static Entity* spawn_prefab(PrefabAsset* prefab) {
-		return nullptr;
-	}
-	REF static Entity* spawn_entity() {
-		return nullptr;
-	}
+
+	REF static Entity* spawn_prefab(PrefabAsset* prefab);
+	REF static Entity* spawn_entity();
 	REF static void change_level() {
 		return;
 	}
@@ -74,10 +68,18 @@ public:
 	REF static void send_back_result(HitResult res) {
 		printf("%f %f %f\n", res.pos.x, res.pos.y, res.pos.z);
 	}
-	REF static std::vector<Entity*> get_ents() {
-		return {};
+
+	REF static vector<Component*> find_components(const ClassTypeInfo* info);
+	REF static Entity* find_by_name(string name);
+	REF static float get_dt() {
+		return eng->get_dt();
 	}
-	REF static vector<Component*> find_components_of_class(const ClassTypeInfo* info);
+	REF static float get_time() {
+		return eng->get_game_time();
+	}
+	REF static void sodf(std::vector<int> nums) {
+		printf("");
+	}
 };
 //
 /// <summary>

@@ -25,6 +25,10 @@ class BVH
 public:
 	static BVH build(const std::vector<Bounds>& bounds, int max_per_node, PartitionStrategy strat);
 
+
+	void find(glm::vec3 point, std::vector<int>& outIdx);
+
 	std::vector<BVHNode> nodes;
 	std::vector<int> indicies;
 };
+

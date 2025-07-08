@@ -7,7 +7,7 @@
 #include "Framework/InlineVec.h"
 #include "DeferredSpawnScope.h"
 #include "Framework/ConsoleCmdGroup.h"
-
+#include "Game/EntityPtr.h"
 class SceneAsset;
 class PrefabAsset;
 class Entity;
@@ -66,11 +66,13 @@ public:
 	Entity* editor_spawn_prefab_but_dont_set_spawned_by(const PrefabAsset* asset);
 #endif
 	void validate();
+	Entity* find_initial_entity_by_name(const string& name) const;
 private:
+	void insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids, bool addSpawnNames);
 	static void set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file);
 	Entity* spawn_prefab_shared(const PrefabAsset* asset, bool set_vars);
-
 	string sourceAssetName;
+	std::unordered_map<string, obj<Entity>> spawnNameToEntity;
 	// all entities/components in the map
 	hash_map<BaseUpdater*> all_world_ents;
 	hash_set<Component> tick_list;

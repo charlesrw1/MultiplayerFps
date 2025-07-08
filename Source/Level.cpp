@@ -162,7 +162,7 @@ void Level::start(SceneAsset* source)
 	else
 		sourceAssetName = "<unnamed level>";
 	if (source && source->sceneFile) {
-		insert_unserialized_entities_into_level(*source->sceneFile);
+		insert_unserialized_entities_into_level_internal(*source->sceneFile,nullptr,true);
 		source->sceneFile.reset();
 	}
 		
@@ -249,7 +249,10 @@ void Level::close_level()
 }
 #include "Framework/Log.h"
 #include "Framework/MapUtil.h"
-void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids) // was bool assign_new_ids=false
+void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids) {
+	insert_unserialized_entities_into_level_internal(scene, reassign_ids, false);
+}
+void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids, bool addSpawnNames) // was bool assign_new_ids=false
 {
 	const char* reassign_id_str = print_get_bool_string(reassign_ids != nullptr);
 	sys_print(Debug, "Level::insert_unserialized_entities_into_level: (level=%s) (reassign_ids=%s) (objs=%d)\n", sourceAssetName.c_str(), reassign_id_str,(int)scene.all_obj_vec.size());
@@ -308,10 +311,16 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 			all_world_ents.insert(o->get_instance_id(), o);
 		}
 	}
-	
 	validate();
 	scene.unserialize_post_assign_ids();
-
+	if (addSpawnNames) {
+		for (auto& e : objs) {
+			if (auto as_ent = e->cast_to<Entity>()) {
+				if (!as_ent->editor_name.empty())
+					spawnNameToEntity.insert({ as_ent->editor_name,as_ent->get_self_ptr() });
+			}
+		}
+	}
 	for (int i = 0; i < objs.size();i++) {
 		BaseUpdater* o = objs[i];
 		assert(o->get_instance_id() != 0);
@@ -402,6 +411,11 @@ void Level::validate()
 		if (auto e = o->cast_to<Entity>())
 			e->validate_check();
 	}
+}
+
+Entity* Level::find_initial_entity_by_name(const string& name) const
+{
+	return MapUtil::get_or(spawnNameToEntity,name,EntityPtr()).get();
 }
 
 void Level::set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file)

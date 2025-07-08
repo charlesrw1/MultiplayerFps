@@ -21,6 +21,8 @@ public:
 	virtual ~MaterialInstance() override;
 	MaterialInstance& operator=(MaterialInstance&& other) = default;
 
+	static MaterialInstance* load(const std::string& path);
+
 	// ONLY valid for dynamic materials! (is_this_a_dynamic_material())
 	void set_float_parameter(StringName name, float f);
 	void set_bool_parameter(StringName name, bool b);
@@ -30,6 +32,7 @@ public:
 
 	const MasterMaterialImpl* get_master_material() const;
 	bool is_this_a_dynamic_material() const;
+	bool is_this_a_master_material() const;
 
 	// IAsset interface
 	void uninstall();

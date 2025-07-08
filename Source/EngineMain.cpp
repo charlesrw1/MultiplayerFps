@@ -1466,7 +1466,7 @@ extern ConfigVar log_shader_compiles;
 extern ConfigVar material_print_debug;
 int game_engine_main(int argc, char** argv)
 {
-	material_print_debug.set_bool(false);
+	material_print_debug.set_bool(true);
 	developer_mode.set_bool(true);
 	log_shader_compiles.set_bool(false);
 

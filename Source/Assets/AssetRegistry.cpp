@@ -184,7 +184,7 @@ std::unique_ptr<AssetFilesystemNode> HackedAsyncAssetRegReindex::root_to_clone;
 
 static HANDLE directoryChangeHandle = 0;
 static HackedAsyncAssetRegReindex* hackedAsset = nullptr;
-
+#include "Framework/StringUtils.h"
 void AssetRegistrySystem::init()
 {
 	directoryChangeHandle = FindFirstChangeNotificationA(
@@ -204,7 +204,23 @@ void AssetRegistrySystem::init()
 	consoleCommands->add("sys.ls", SYS_LS_CMD);
 	consoleCommands->add("sys.print_deps", SYS_PRINT_DEPS_CMD);
 	consoleCommands->add("sys.print_refs", SYS_PRINT_REFS_CMD);
-	consoleCommands->add("TOUCH_ASSET", TOUCH_ASSET);
+	consoleCommands->add("touch_asset", TOUCH_ASSET);
+	consoleCommands->add("reload_asset", [this](const Cmd_Args& args) {
+		if (args.size() != 2) {
+			sys_print(Error, "expected: reload_asset <name>\n");
+			return;
+		}
+		auto assetType = find_asset_type_for_ext(StringUtils::get_extension_no_dot(args.at(1)));
+		if (!assetType) {
+			sys_print(Error, "couldn't find asset type for asset\n");
+			return;
+		}
+		const bool was_loaded = g_assets.is_asset_loaded(args.at(1));
+		auto asset = g_assets.find_sync(args.at(1), assetType);
+		if (was_loaded) {
+			g_assets.reload_sync(asset);
+		}
+		});
 }
 
 void AssetRegistrySystem::update()

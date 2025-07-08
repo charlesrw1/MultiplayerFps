@@ -193,7 +193,7 @@ void TopDownPlayer::update() {
 	if (len > 0.01)
 		did_move = true;
 	float dt = eng->get_dt();
-	uint32_t flags = 0;
+	int flags = 0;
 	glm::vec3 outvel;
 
 	glm::vec3 move_front = glm::vec3(0, 0, 1);

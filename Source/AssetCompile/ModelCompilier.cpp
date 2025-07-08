@@ -31,7 +31,7 @@
 // MODEL FORMAT:
 // HEADER
 // int magic 'C' 'M' 'D' 'L'
-static const int MODEL_VERSION = 13;
+static const int MODEL_VERSION = 14;
 // int version XXX
 // 
 // mat4 root_transform
@@ -206,6 +206,9 @@ struct LODMesh
 
 	bool has_normals() const {
 		return (attribute_mask & (1 << CMA_NORMAL));
+	}
+	bool has_attribute(CompilierModelAttributes at) const {
+		return (attribute_mask & (1 << at));
 	}
 
 	ShapeType_e shape_type = ShapeType_e::None;
@@ -863,6 +866,11 @@ static Animation_Set* load_animation_set_for_gltf_skin(cgltf_data* data, cgltf_s
 ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 {
 	ModelDefData mdd;
+	mdd.isLightmapped = is->withLightmap;
+	mdd.lightmapSizeX = is->lightmapSizeX;
+	mdd.lightmapSizeY = is->lightmapSizeY;
+
+
 	mdd.model_source = is->srcGlbFile;
 	for (int i = 0; i < is->lodScreenSpaceSizes.size(); i++) {
 		LODDef lodd;
@@ -911,10 +919,9 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 
 
 	for (int i = 0; i < is->animations.size(); i++) {
-		auto str = is->animations[i].clipName;
+		string& str = is->animations[i].clipName;
 		auto& isa = is->animations[i];
 		AnimationClip_Load acl;
-		acl.curves = isa.curves;
 		acl.fixloop = isa.fixLoop;
 		acl.setRootToFirstFrame = isa.setRootToFirstPose;
 		acl.enableRootMotion = isa.enableRootMotion;
@@ -943,14 +950,6 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		}
 		else
 			acl.sub = SubtractType_Load::None;
-
-		
-		for (auto& ev : isa.events) {
-			ClassBase* newEvent = ev->get_type().allocate_this_type();
-			copy_object_properties(ev, newEvent, nullptr, AssetDatabase::loader);
-			assert(newEvent->is_a<AnimationEvent>());
-			acl.events.push_back(std::unique_ptr<AnimationEvent>((AnimationEvent*)newEvent));
-		}
 
 		mdd.str_to_clip_def.insert({ str,std::move(acl) });
 	}
@@ -2131,15 +2130,6 @@ void ModelCompileHelper::append_animation_seq_to_list(
 		}
 	}
 
-	// Output any events
-	if (definition) {
-		for (auto& ev : definition->events) {
-			auto copy = ev->create_copy();
-			ASSERT(copy->is_a<AnimationEvent>());
-			out_seq.events.push_back(std::unique_ptr<AnimationEvent>(copy->cast_to<AnimationEvent>()));
-		}
-	}
-
 
 	final_->add_sequence(source.get_animation_name(), std::move(out_seq));
 }
@@ -2379,6 +2369,9 @@ struct FinalModelData
 	std::vector<std::string> material_names;
 	Bounds AABB;
 	std::vector<ModelTag> tags;
+	bool isLightmapped = false;
+	int lightmapX = 0;
+	int lightmapY = 0;
 };
 
 ModelVertex fatvert_to_mv_skinned(const FATVertex& v, const glm::mat4& transform, const glm::mat3& normal_tr)
@@ -2413,6 +2406,41 @@ ModelVertex fatvert_to_mv_skinned(const FATVertex& v, const glm::mat4& transform
 
 	return mv;
 }
+ModelVertex fatvert_to_mv_lightmapped(const FATVertex& v, const glm::mat4& transform, const glm::mat3& normal_tr)
+{
+	ModelVertex mv;
+	mv.pos = v.position;
+	mv.pos = transform * glm::vec4(v.position, 1.0);
+	mv.uv = v.uv;
+
+	// quantize
+	glm::vec3 normal = normal_tr * v.normal;
+	normal = glm::normalize(normal);
+	for (int i = 0; i < 3; i++) {
+		mv.normal[i] = normal[i] * INT16_MAX;
+	}
+	glm::vec3 tangent = normal_tr * v.tangent;
+	tangent = glm::normalize(tangent);
+	for (int i = 0; i < 3; i++) {
+		mv.tangent[i] = tangent[i] * INT16_MAX;
+	}
+	int as_uintX = v.uv2.x * UINT16_MAX;
+	int as_uintY = v.uv2.y * UINT16_MAX;
+	as_uintX = glm::clamp(as_uintX,0, (int)UINT16_MAX);
+	as_uintY = glm::clamp(as_uintY, 0, (int)UINT16_MAX);
+
+
+	mv.color[0] = (as_uintX & 0xFF);
+	mv.color[1] = (as_uintX >>8)&0xFF;
+	mv.color[2] = (as_uintY & 0xFF);
+	mv.color[3] = (as_uintY >> 8) & 0xFF;
+	for (int i = 0; i < 4; i++) {
+		mv.color2[i] = int(v.color[i] * 255.0);
+	}
+	return mv;
+}
+
+
 #include "physx/cooking/PxCooking.h"
 FinalPhysicsData create_final_physics_data(
 	const std::vector<std::string>& final_mat_names,
@@ -2541,8 +2569,16 @@ Submesh make_final_submesh_from_existing(
 	}
 	const int vertex_start = in.base_vertex;
 	const int new_vertex_start = finalmod.verticies.size();
-	for (int i = 0; i < in.vertex_count; i++) {
-		finalmod.verticies.push_back(fatvert_to_mv_skinned(compile.verticies[vertex_start + i], transform, normal_tr));
+
+	if (finalmod.isLightmapped) {
+		for (int i = 0; i < in.vertex_count; i++) {
+			finalmod.verticies.push_back(fatvert_to_mv_lightmapped(compile.verticies[vertex_start + i], transform, normal_tr));
+		}
+	}
+	else {
+		for (int i = 0; i < in.vertex_count; i++) {
+			finalmod.verticies.push_back(fatvert_to_mv_skinned(compile.verticies[vertex_start + i], transform, normal_tr));
+		}
 	}
 
 	out.base_vertex = new_vertex_start;
@@ -2552,6 +2588,7 @@ Submesh make_final_submesh_from_existing(
 }
 
 FinalModelData create_final_model_data(
+	const FinalSkeletonOutput* skel,
 	const std::vector<std::string>& final_mat_names, 
 	const std::vector<bool>& mat_is_used,
 
@@ -2580,6 +2617,24 @@ FinalModelData create_final_model_data(
 		if (def.loddefs[i].lod_num >= num_actual_lods) continue;
 		lods_to_def[def.loddefs[i].lod_num] = i;
 	}
+	final_mod.isLightmapped = false;
+	if (def.isLightmapped) {
+		if (skel != nullptr) {
+			sys_print(Warning, "create_final_model_data: %s isLightmapped not compatible with a skeletal mesh.\n", def.model_source.c_str());
+		}
+		else {
+			final_mod.isLightmapped = true;
+			final_mod.lightmapX = def.lightmapSizeX;
+			final_mod.lightmapY = def.lightmapSizeY;
+			if (def.lightmapSizeX == 0||def.lightmapSizeY==0) {
+				if (def.lightmapSizeX == 0) 
+					final_mod.lightmapX = 16;
+				if (def.lightmapSizeY == 0) 
+					final_mod.lightmapY = 16;
+				sys_print(Warning, "create_final_model_data: %s lightmapSize was 0, setting to default 16.\n", def.model_source.c_str());
+			}
+		}
+	}
 
 	Bounds total_bounds;
 	// sort
@@ -2588,7 +2643,7 @@ FinalModelData create_final_model_data(
 
 		if (i != 0) {
 			if (lods_to_def[i] == -1) {
-				sys_print(Error, "mesh has LOD_%d parts, but distance wasn't definied in .def, skipping...\n", i);
+				sys_print(Error, "create_final_model_data: mesh has LOD_%d parts, but distance wasn't definied in .def, skipping...\n", i);
 				continue;
 			}
 			out_lod.end_percentage = def.loddefs[lods_to_def[i]].distance;
@@ -2603,6 +2658,10 @@ FinalModelData create_final_model_data(
 				continue;
 
 			const LODMesh& lm = lod.mesh_nodes[j];
+
+			if (final_mod.isLightmapped && !lm.has_attribute(CMA_UV2)) {
+				sys_print(Warning, "create_final_model_data: isLightmapped=true but mesh doesnt have UV2? %s\n", def.model_source.c_str());
+			}
 
 			glm::mat4 transform = lm.ref.globaltransform;
 			if (lm.has_bones())
@@ -2650,6 +2709,10 @@ bool write_out_compilied_model(const std::string& gamepath, const FinalModelData
 	FileWriter out;
 	out.write_int32('CMDL');
 	out.write_int32(MODEL_VERSION);
+
+	out.write_byte(model->isLightmapped);
+	out.write_int32(model->lightmapX);
+	out.write_int32(model->lightmapY);
 
 	glm::mat4 roottransform = glm::mat4(1.0);
 	if (skel)
@@ -2771,13 +2834,13 @@ bool write_out_compilied_model(const std::string& gamepath, const FinalModelData
 				(uint8_t*)seq.second.pose_data.data(), 
 				seq.second.pose_data.size() * sizeof(float));
 
-			out.write_int32(seq.second.events.size());
-			for (int i = 0; i < seq.second.events.size(); i++) {
-				auto ev = seq.second.events[i].get();
-				DictWriter writer;
-				write_object_properties(ev,nullptr, writer);
-				out.write_string(writer.get_output());
-			}
+			//out.write_int32(seq.second.events.size());
+			//for (int i = 0; i < seq.second.events.size(); i++) {
+			//	auto ev = seq.second.events[i].get();
+			//	DictWriter writer;
+			//	write_object_properties(ev,nullptr, writer);
+			//	out.write_string(writer.get_output());
+			//}
 		}
 		animation_size = out.tell()-marker;
 
@@ -2794,12 +2857,12 @@ bool write_out_compilied_model(const std::string& gamepath, const FinalModelData
 			);
 		}
 
-		out.write_int32(skel->masks.size());
-		for (int i = 0; i < skel->masks.size(); i++) {
-			out.write_string(skel->masks[i].strname);
-			assert(skel->masks[i].weight.size() == skel->bones.size());
-			out.write_bytes_ptr((uint8_t*)skel->masks[i].weight.data(), skel->bones.size() * sizeof(float));
-		}
+		//out.write_int32(skel->masks.size());
+		//for (int i = 0; i < skel->masks.size(); i++) {
+		//	out.write_string(skel->masks[i].strname);
+		//	assert(skel->masks[i].weight.size() == skel->bones.size());
+		//	out.write_bytes_ptr((uint8_t*)skel->masks[i].weight.data(), skel->bones.size() * sizeof(float));
+		//}
 
 		out.write_int32('E');
 	}
@@ -2873,7 +2936,10 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 		def
 	);
 
+
+
 	const FinalModelData final_model = create_final_model_data(
+		final_skeleton.get(),
 		final_material_names, 
 		post_traverse.meshout.material_is_used, 
 		post_traverse.mcd, 
@@ -2999,4 +3065,5 @@ bool ModelCompilier::compile(const char* game_path, IAssetLoadingInterface* load
 
 	return ModelCompileHelper::compile_model(game_path, def);
 }
+
 #endif

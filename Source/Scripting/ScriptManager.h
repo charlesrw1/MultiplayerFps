@@ -20,102 +20,39 @@ enum class ScriptType {
 	Color,
 	Ptr,
 };
-
-struct ScriptProperty
-{
-	ScriptType type_enum = ScriptType::Nil;
-	std::string_view name;
-};
-class ScriptTypeInfo
-{
-public:
-	bool is_defined = false;
-	std::string_view classname;
-	ScriptTypeInfo* parent = nullptr;
-	vector<ScriptProperty> properties;
-	vector<ScriptTypeInfo*> interfaces;
-	string source_file;	// what file
-	int definition_line = 0;	// what line
-};
-
 struct ParseProperty {
 	string name;
 	string type_str;
 };
-
 struct ParseType {
 	string name;
 	vector<string> inherited;
 	vector<ParseProperty> props;
 };
-
-struct ParseOutput {
-	string all_code;
-	unordered_map<string, ScriptTypeInfo> types;
-};
-
 // parses the script
-class ScriptLoadingUtil
-{
+class ScriptLoadingUtil {
 public:
 	static vector<ParseType> parse_text(string text);
-	static unordered_map<string, ScriptTypeInfo> load_types(const std::vector<string>& files);
-	static vector<string> collect_script_files(string root);
-};
-
-class ScriptTypeManager
-{
-public:
-	const ScriptTypeInfo* find_type(string name) const;
-
-	unordered_map<string, ScriptTypeInfo> typeinfo;
 };
 
 class LuaClassTypeInfo : public ClassTypeInfo {
 public:
 	LuaClassTypeInfo();
 	~LuaClassTypeInfo();
-
-	void set_classname(string s) {
-		this->lua_classname = s;
-		this->classname = this->lua_classname.c_str();
-	}
-	void set_superclass(string s) {
-		auto find = ClassBase::find_class(s.c_str());
-		if (!find) {
-			sys_print(Error, "LuaClassTypeInfo: no super type %s\n", s.c_str());
-		}
-		else if (!find->scriptable_allocate) {
-			sys_print(Error, "LuaClassTypeInfo: super type isnt scriptable %s\n", s.c_str());
-		}
-		else {
-			this->super_typeinfo = find;
-			this->superclassname = find->classname;
-			this->lua_prototype_index_table = find->get_prototype_index_table();
-			this->allocate = lua_class_alloc;
-		}
-	}
-	const string& get_name() {
-		return lua_classname;
-	}
+	void set_classname(string s);
+	bool set_superclass(string s);
+	const string& get_name();
 	void init_lua_type();
 private:
 	int template_lua_table = 0;
 	static ClassBase* lua_class_alloc(const ClassTypeInfo* c);
 	string lua_classname;
 };
-class LuaScriptDef {
-public:
-	std::vector<LuaClassTypeInfo*> lua_classes;
-};
-
-
 class LuaRuntimeError : public std::runtime_error {
 public:
 	LuaRuntimeError(std::string msg) : std::runtime_error("LuaError: " + msg) {
 	}
 };
-
 struct lua_State;
 class ScriptManager
 {

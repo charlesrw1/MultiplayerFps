@@ -58,8 +58,8 @@ struct Bin
 };
 static const int NUM_BINS = 20;
 
-#ifndef  _DEBUG 
 #define SAH
+#ifndef  _DEBUG 
 #endif // ! _DEBUG 
 
 void BVHBuilder::build_R(int start, int end, int node_number)

@@ -1,0 +1,7 @@
+[gd_scene format=4]
+[ext_resource type="PackedScene" path="mbak5d5ydfua.glb" id="mbak5d5ydfua"]
+[node name="Node3D" type="Node3D"]
+[node name = "mesh_1700" parent="." instance=ExtResource("mbak5d5ydfua")]
+transform = Transform3D(1.000000,0.000000,0.000000,0.000000,1.000000,0.000000,0.000000,0.000000,1.000000,24.939104,0.551449,-1.654347)
+[node name="light" type="OmniLight3D" parent="."]
+transform = Transform3D(1.000000,0.000000,0.000000,0.000000,1.000000,0.000000,0.000000,0.000000,1.000000,-6.557107,3.018741,-4.875607)

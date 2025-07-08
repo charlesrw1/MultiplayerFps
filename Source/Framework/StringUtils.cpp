@@ -105,8 +105,8 @@ void StringUtils::get_filename(std::string& file)
 	auto find = file.rfind('/');
 	if (find != std::string::npos) {
 		file = file.substr(find + 1);
-		remove_extension(file);
 	}
+	remove_extension(file);
 }
 
 std::string StringUtils::to_lower(const std::string& s) {

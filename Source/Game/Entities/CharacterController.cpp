@@ -43,7 +43,7 @@ static glm::vec3 collision_response(const glm::vec3& current_direction, const gl
 	return out;
 }
 
-void CharacterController::move(const glm::vec3& disp, float dt,float min_dist, uint32_t& out_ccfg_flags, glm::vec3& out_velocity)
+void CharacterController::move(const glm::vec3& disp, float dt,float min_dist, int& out_ccfg_flags, glm::vec3& out_velocity)
 {
 	const float actual_half_height = capsule_height * 0.5 - capsule_radius;
 	vertical_capsule_def_t shape_def;

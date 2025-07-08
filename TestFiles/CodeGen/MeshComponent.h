@@ -20,10 +20,6 @@ class MaterialInstance;
 class RigidbodyComponent;
 class MeshBuilderComponent;
 
-struct Serializer
-{
-	STRUCT_BODY()
-};
 
 struct SomeStruct
 {
@@ -46,7 +42,7 @@ public:
 	void pre_start() final;
 	void start() final;
 	void update() final;
-	void end() final;
+	void stop() final;
 	void on_changed_transform() final;
 	void editor_on_change_property() final;
 	void on_sync_render_data() final;

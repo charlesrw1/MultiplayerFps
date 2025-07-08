@@ -122,22 +122,6 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text)
 	return out;
 }
 
-unordered_map<string, ScriptTypeInfo> ScriptLoadingUtil::load_types(const std::vector<string>& files)
-{
-	return {};
-}
-
-vector<string> ScriptLoadingUtil::collect_script_files(string root)
-{
-	vector<string> out;
-	auto tree = FileSys::find_files(root.c_str());
-	for (auto& file : tree) {
-		if (StringUtils::get_extension_no_dot(file) == "lua")
-			out.push_back(file);
-	}
-	return out;
-}
-
 ScriptManager::ScriptManager()
 {
 	lua = luaL_newstate();
@@ -285,10 +269,13 @@ void ScriptManager::reload()
 			auto outTypes = ScriptLoadingUtil::parse_text(out);
 			fullOutput += out;
 			for (auto& t : outTypes) {
-				auto info = std::make_unique<LuaClassTypeInfo>();
-				info->set_classname(t.name);
-				info->set_superclass(t.inherited.at(0));
-				newClasses.push_back(std::move(info));
+				if (t.inherited.size() > 0) {
+					auto info = std::make_unique<LuaClassTypeInfo>();
+					info->set_classname(t.name);
+					bool b = info->set_superclass(t.inherited.at(0));
+					if(b)
+						newClasses.push_back(std::move(info));
+				}
 			}
 
 			if (luaL_loadstring(lua, fullOutput.c_str()) != LUA_OK) {
@@ -379,6 +366,34 @@ LuaClassTypeInfo::LuaClassTypeInfo() : ClassTypeInfo("lua_class_empty",nullptr,n
 
 LuaClassTypeInfo::~LuaClassTypeInfo()
 {
+}
+
+inline void LuaClassTypeInfo::set_classname(string s) {
+	this->lua_classname = s;
+	this->classname = this->lua_classname.c_str();
+}
+
+inline bool LuaClassTypeInfo::set_superclass(string s) {
+	auto find = ClassBase::find_class(s.c_str());
+	if (!find) {
+		sys_print(Error, "LuaClassTypeInfo: no super type %s\n", s.c_str());
+		return false;
+	}
+	else if (!find->scriptable_allocate) {
+		sys_print(Error, "LuaClassTypeInfo: super type isnt scriptable %s\n", s.c_str());
+		return false;
+	}
+	else {
+		this->super_typeinfo = find;
+		this->superclassname = find->classname;
+		this->lua_prototype_index_table = find->get_prototype_index_table();
+		this->allocate = lua_class_alloc;
+		return true;
+	}
+}
+
+inline const string& LuaClassTypeInfo::get_name() {
+	return lua_classname;
 }
 
 extern void stack_dump(lua_State* L);

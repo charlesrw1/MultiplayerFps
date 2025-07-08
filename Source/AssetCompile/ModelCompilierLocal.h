@@ -49,8 +49,6 @@ struct AnimationClip_Load
 	bool enableRootMotion = false;
 	bool setRootToFirstFrame = false;
 
-	std::vector<std::unique_ptr<AnimationEvent>> events;
-	std::vector<EditingCurve> curves;
 
 	// if non empty, then set origin of clip to this
 	std::string make_relative_to_locator;
@@ -88,7 +86,9 @@ struct WeightlistDef
 class ModelDefData
 {
 public:
-
+	bool isLightmapped = false;
+	int lightmapSizeX = 0;
+	int lightmapSizeY = 0;
 
 	std::string model_source;
 	uint64_t timestamp_of_def = 0;

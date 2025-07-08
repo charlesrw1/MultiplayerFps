@@ -2262,7 +2262,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 				for (int j = pstart; j < pend; j++) {
 					auto& part = proxy.model->get_part(j);
 
-					const MaterialInstance* mat = (MaterialInstance*)proxy.model->get_material(part.material_idx);
+					const MaterialInstance* mat = proxy.model->get_material(part.material_idx);
 					if (obj.type_.proxy.mat_override)
 						mat = (MaterialInstance*)obj.type_.proxy.mat_override;
 					if (!mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
@@ -2368,10 +2368,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 
 }
 
-static glm::vec4 color32_to_vec4(Color32 color)
-{
-	return glm::vec4(color.r, color.g, color.b, color.a) / 255.f;
-}
 
 void Renderer::draw_meshbuilders()
 {
