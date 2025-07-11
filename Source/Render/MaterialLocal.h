@@ -32,7 +32,8 @@ enum class blend_state : uint8_t
 {
 	OPAQUE,
 	BLEND,
-	ADD
+	ADD,
+	MULT
 };
 
 // Parameter types
@@ -71,7 +72,9 @@ struct MaterialParameterValue
 		type = MatParamType::Texture2D;
 	}
 	MaterialParameterValue() = default;
-
+	bool is_texture() const {
+		return type == MatParamType::Texture2D;
+	}
 	MatParamType type = MatParamType::Empty;
 	union {
 		glm::vec4 vector;
@@ -157,6 +160,14 @@ public:
 	void load_instance(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
 	void load_master(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
 	void post_load(MaterialInstance* self);
+	MaterialParameterValue* find_parameter(StringName name) {
+		for (int i = 0; i < masterMaterial->param_defs.size(); i++) {
+			if (masterMaterial->param_defs[i].hashed_name == name) {
+				return &params.at(i);
+			}
+		}
+		return nullptr;
+	}
 
 	MaterialInstance* self = nullptr;
 	bool is_dynamic_material = false;
@@ -169,6 +180,7 @@ public:
 	int gpu_buffer_offset = INVALID_MAPPING;	// offset in buffer if uploaded (the buffer is uint's so byte = buffer_offset*4)
 	int dirty_buffer_index = -1;	// if not -1, then its sitting in a queue already
 	bool has_called_post_load_already = false;
+
 
 	friend class MaterialManagerLocal;
 	friend class MaterialLodJob;
@@ -189,14 +201,16 @@ struct shader_key
 		editor_id = 0;
 		dither = 0;
 		debug = 0;
+		is_lightmapped = 0;
 	}
 
-	uint32_t material_id : 27;
+	uint32_t material_id : 26;
 	uint32_t animated : 1;
 	uint32_t editor_id : 1;
 	uint32_t depth_only : 1;
 	uint32_t dither : 1;
 	uint32_t debug : 1;
+	uint32_t is_lightmapped : 1;
 
 	uint32_t as_uint32() const {
 		return *((uint32_t*)this);
@@ -250,6 +264,7 @@ public:
 
 
 	program_handle get_mat_shader(
+		bool is_lightmapped,
 		bool is_animated, 
 		const Model* mod, 
 		const MaterialInstance* gs, 

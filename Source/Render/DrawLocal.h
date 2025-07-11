@@ -376,7 +376,7 @@ public:
 	void render_level_to_target(const Render_Level_Params& params);
 	void render_particles();
 
-	void accumulate_gbuffer_lighting();
+	void accumulate_gbuffer_lighting(bool is_cubemap_view);
 	void deferred_decal_pass();
 
 	void create_shaders();

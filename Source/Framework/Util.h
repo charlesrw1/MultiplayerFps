@@ -22,7 +22,8 @@ enum LogType
 	Error,
 	Warning,
 	Info,
-	Debug
+	Debug,
+	LtConsoleCommand,	// special
 };
 
 void Fatalf(const char* format, ...);
@@ -37,6 +38,10 @@ inline const char* print_get_bool_string(bool b) {
 
 struct Color32
 {
+	Color32() = default;
+	Color32(unsigned int c);
+	Color32(int r, int g, int b, int a=0xff);
+
 	uint8_t r = 0;
 	uint8_t g = 0;
 	uint8_t b = 0;
@@ -46,13 +51,13 @@ struct Color32
 		return *(uint32_t*)this;
 	}
 };
-#define COLOR_WHITE Color32{0xff,0xff,0xff,0xff}
-#define COLOR_BLACK Color32{0,0,0,0xff}
-#define COLOR_BLUE Color32{0,0,0xff,0xff}
-#define COLOR_RED Color32{0xff,0,0,0xff}
-#define COLOR_GREEN Color32{0,0xff,0,0xff}
-#define COLOR_PINK Color32{0xff,0,0xff,0xff}
-#define COLOR_CYAN Color32{0,0xff,0xff,0xff}
+#define COLOR_WHITE Color32(0xff,0xff,0xff,0xff)
+#define COLOR_BLACK Color32(0,0,0,0xff)
+#define COLOR_BLUE Color32(0,0,0xff,0xff)
+#define COLOR_RED Color32(0xff,0,0,0xff)
+#define COLOR_GREEN Color32(0,0xff,0,0xff)
+#define COLOR_PINK Color32(0xff,0,0xff,0xff)
+#define COLOR_CYAN Color32(0,0xff,0xff,0xff)
 
 
 struct Buffer

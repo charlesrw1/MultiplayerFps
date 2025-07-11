@@ -555,7 +555,6 @@
     <ClCompile Include="Source\Game\GameAnimEvents.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Assets\CurveAsset.cpp" />
     <ClCompile Include="Source\IEditorTool.cpp">
       <Filter>Source\Asset</Filter>
     </ClCompile>
@@ -673,6 +672,7 @@
     <ClCompile Include="Source\Assets\AssetBundle.cpp" />
     <ClCompile Include="Source\Game\Components\GraphCurveComponent.cpp" />
     <ClCompile Include="Source\AssetCompile\write_gltf.cpp" />
+    <ClCompile Include="Source\External\miniz.c" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

@@ -10,7 +10,7 @@
 
 #include "Framework/ReflectionProp.h"
 #include "Framework/DictWriter.h"
-
+#include "stb_image.h"
 
 void IMPORT_TEX(const Cmd_Args& args)
 {
@@ -31,8 +31,8 @@ void IMPORT_TEX(const Cmd_Args& args)
 	assert(outfile);
 	outfile->write(out.get_output().data(), out.get_output().size());
 	outfile->close();
-
-	compile_texture_asset(strip_extension(gamepath) + ".dds", AssetDatabase::loader);
+	Color32 dummy;
+	compile_texture_asset(strip_extension(gamepath) + ".dds", AssetDatabase::loader,dummy);
 }
 #include "AssetCompile/Someutils.h"
 void IMPORT_TEX_FOLDER(const Cmd_Args& args)
@@ -71,8 +71,8 @@ void IMPORT_TEX_FOLDER(const Cmd_Args& args)
 			assert(outfile);
 			outfile->write(out.get_output().data(), out.get_output().size());
 			outfile->close();
-
-			compile_texture_asset(strip_extension(gamepath) + ".dds",AssetDatabase::loader);
+			Color32 dummy;
+			compile_texture_asset(strip_extension(gamepath) + ".dds",AssetDatabase::loader,dummy);
 
 		}
 	}
@@ -85,11 +85,12 @@ void COMPILE_TEX(const Cmd_Args& args)
 		sys_print(Error, "usage COMPILE_TEX <.dds>");
 		return;
 	}
-	compile_texture_asset(args.at(1), AssetDatabase::loader);
+	Color32 dummy;
+	compile_texture_asset(args.at(1), AssetDatabase::loader,dummy);
 }
 
 #define WITH_TEXTURE_COMPILE
-bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* loading)
+bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* loading, Color32& outColor)
 {
 #ifdef WITH_TEXTURE_COMPILE
 	sys_print(Info,"Compiling texture asset %s\n", gamepath.c_str());
@@ -101,15 +102,6 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 			sys_print(Warning, "couldn't find texture import settings file\n");
 			return false;
 		}
-		bool needsCompile = texfile == nullptr;
-		if (!needsCompile) {
-			needsCompile = texfile->get_timestamp() < tisfile->get_timestamp();
-		}
-		if (!needsCompile) {
-			sys_print(Info,"skipping compile\n");
-			return true;
-		}
-
 		DictParser in;
 		in.load_from_file(tisfile.get());
 
@@ -118,7 +110,65 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 			sys_print(Error, "couldnt parse texture import settings\n");
 			return false;
 		}
+		outColor = tis->simplifiedColor;
+
+		bool needsCompile = texfile == nullptr;
+		if (!needsCompile) {
+			needsCompile = texfile->get_timestamp() < tisfile->get_timestamp();
+		}
+		if (!needsCompile) {
+			sys_print(Info,"skipping compile\n");
+			return true;
+		}
 	}
+
+	{
+		auto imageFile = FileSys::open_read_game(tis->src_file);
+		if (imageFile) {
+			std::vector<char> data;
+			data.resize(imageFile->size());
+			imageFile->read(data.data(), data.size());
+			int outX=0, outY=0;
+			int channels=0;
+			double sum[4] = { 0.0,0.0,0.0,0.0 };
+			auto outData = stbi_load_from_memory((uint8_t*)data.data(), data.size(), &outX, &outY, &channels, 4/* require 4 channels*/);
+			if (outData) {
+				for (int y = 0; y < outY; y++) {
+					for (int x = 0; x < outX; x++) {
+						uint8_t* ptr = &outData[(y * outX  + x) * 4];
+						sum[0] += ptr[0] / 255.0;
+						sum[1] += ptr[1] / 255.0;
+						sum[2] += ptr[2] / 255.0;
+						sum[3] += ptr[3] / 255.0;
+					}
+				}
+				stbi_image_free(outData);
+				int pixelCount = outX * outY;
+				for (int i = 0; i < 4; i++) 
+					sum[i] /= double(pixelCount);
+				sys_print(Debug, "compile_texture_asset: average: %f %f %f\n", float(sum[0]), float(sum[1]), float(sum[2]));
+				
+				tis->simplifiedColor.r = sum[0] * 255.0;
+				tis->simplifiedColor.g = sum[1] * 255.0;
+				tis->simplifiedColor.b = sum[2] * 255.0;
+				tis->simplifiedColor.a = sum[3] * 255.0;
+
+				DictWriter out;
+				write_object_properties(tis, nullptr, out);
+				auto outfile = FileSys::open_write_game(strip_extension(gamepath) + ".tis");
+				assert(outfile);
+				outfile->write(out.get_output().data(), out.get_output().size());
+				outfile->close();
+			}
+			else {
+				sys_print(Warning, "compile_texture_asset: stb parse error for source file %s\n", tis->src_file.c_str());
+			}
+		}
+		else {
+			sys_print(Warning, "compile_texture_asset: couldnt open source file %s\n", tis->src_file.c_str());
+		}
+	}
+
 
 	std::string parentDir = FileSys::get_full_path_from_game_path(gamepath);
 	auto findSlash = parentDir.rfind('/');

@@ -230,6 +230,7 @@ enum class RenderObjectTypes
 	Reflection,
 	Meshbuilder,
 	Fog,
+	Lightmap,
 };
 
 struct QueuedRenderObjectDelete
@@ -378,13 +379,30 @@ public:
 		handle = { -1 };
 	}
 	handle<Render_Reflection_Volume> register_reflection_volume() override {
-		return { -1 };
+		return { reflection_volumes.make_new() };
 	}
 	void update_reflection_volume(handle<Render_Reflection_Volume> handle, const Render_Reflection_Volume& sun) override {
-
+		ASSERT(!eng->get_is_in_overlapped_period());
+		if (!handle.is_valid())
+			return;
+		reflection_volumes.get(handle.id) = sun;
+		reflection_volumes.get(handle.id).wants_update = true;
 	}
 	void remove_reflection_volume(handle<Render_Reflection_Volume>& handle)override {
-
+		if (eng->get_is_in_overlapped_period()) {
+			add_to_queued_deletes(handle.id, RenderObjectTypes::Skylight);
+			handle = { -1 };
+			return;
+		}
+		if (!handle.is_valid())
+			return;
+		auto vol = reflection_volumes.get(handle.id).generated_cube;
+		if (vol) {
+			vol->uninstall();
+			delete vol;
+		}
+		reflection_volumes.free(handle.id);
+		handle = { -1 };
 	}
 	handle<Render_Skylight> register_skylight() override {
 		ASSERT(!eng->get_is_in_overlapped_period());
@@ -502,6 +520,37 @@ public:
 		}
 		handle = { -1 };
 	}
+	handle<Lightmap_Object> register_lightmap() final {
+		if (has_lightmap) {
+			sys_print(Warning, "RenderScene::register_lightmap: already has lightmap, this handle is now empty\n");
+			return { -1 };
+		}
+		has_lightmap = true;
+		return { 0 };
+	}
+	void update_lightmap(handle<Lightmap_Object> lightmap, const Lightmap_Object& obj) final {
+		assert(!eng->get_is_in_overlapped_period());
+		if (!lightmap.is_valid()) {
+			sys_print(Warning, "RenderScene::update_lightmap: invalid lightmap handle\n");
+			return;
+		}
+		assert(lightmap.id == 0);
+		assert(has_lightmap);
+		lightmapObj = obj;
+	}
+	void remove_lightmap(handle<Lightmap_Object> handle) final {
+		if (!handle.is_valid()) {
+			return;
+		}
+		if (eng->get_is_in_overlapped_period()) {
+			add_to_queued_deletes(handle.id, RenderObjectTypes::Lightmap);
+		}
+		else if (handle.is_valid()) {
+			has_lightmap = false;
+			lightmapObj = Lightmap_Object();
+		}
+		handle = { -1 };
+	}
 
 	void add_to_queued_deletes(int id, RenderObjectTypes type)
 	{
@@ -548,6 +597,10 @@ public:
 				handle<RenderFog> h{ qd.handle };
 				remove_fog(h);
 			}break;
+			case RenderObjectTypes::Lightmap: {
+				handle<Lightmap_Object> h{ qd.handle };
+				remove_lightmap(h);
+			}break;
 			default:
 				ASSERT(!"no type defined for queued delete render");
 			}
@@ -589,6 +642,8 @@ public:
 	bufferhandle gpu_skinned_mats_buffer = 0;
 	bufferhandle gpu_render_instance_buffer = 0;
 
+	bool has_lightmap = false;
+	Lightmap_Object lightmapObj;
 
 	Free_List<ROP_Internal> proxy_list;
 	Free_List<MeshbuilderObj_Internal> meshbuilder_objs;

@@ -11,7 +11,7 @@ void SoundComponent::update_ed_mesh()
 	editor_mesh->mb.Begin();
 	if (attenuate) {
 		if(minRadius>0.0001)
-			editor_mesh->mb.AddLineSphere({}, minRadius, { 100,100,255 });
+			editor_mesh->mb.AddLineSphere({}, minRadius, Color32( 100,100,255 ));
 		editor_mesh->mb.AddLineSphere({}, maxRadius, COLOR_WHITE);
 	}
 	editor_mesh->mb.End();

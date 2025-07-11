@@ -89,6 +89,7 @@ public:
 	bool isLightmapped = false;
 	int lightmapSizeX = 0;
 	int lightmapSizeY = 0;
+	bool worldLmMerge = false;
 
 	std::string model_source;
 	uint64_t timestamp_of_def = 0;

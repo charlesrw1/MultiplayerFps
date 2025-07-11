@@ -51,6 +51,7 @@
     <ClCompile Include="Source\EditorPopups.cpp" />
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
     <ClCompile Include="Source\EngineEditorState.cpp" />
+    <ClCompile Include="Source\External\miniz.c" />
     <ClCompile Include="Source\Framework\BVHBuild.cpp" />
     <ClCompile Include="Source\Framework\ClassBase.cpp" />
     <ClCompile Include="Source\Framework\ClassTypePtr.cpp" />
@@ -125,7 +126,9 @@
     <ClCompile Include="Source\Render\Shadowmap.cpp" />
     <ClCompile Include="Source\Render\Ssao.cpp" />
     <ClCompile Include="Source\Render\TerrainComponent.cpp" />
-    <ClCompile Include="Source\Render\Texture.cpp" />
+    <ClCompile Include="Source\Render\Texture.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Source\Render\Volumetricfog.cpp" />
     <ClCompile Include="Source\Scripting\ScriptFunctionCodegen.cpp" />
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
@@ -369,7 +372,6 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp" />
-    <ClCompile Include="Source\Assets\CurveAsset.cpp" />
     <ClCompile Include="Source\External\tracy\public\TracyClient.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>

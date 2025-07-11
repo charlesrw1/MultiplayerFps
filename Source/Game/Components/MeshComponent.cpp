@@ -26,6 +26,17 @@ const char* MeshComponent::get_editor_outliner_icon() const {
 		return "eng/editor/anim_icon.png";
 	return "eng/editor/mesh_icon.png";
 }
+void MeshComponent::set_lightmapped(LightmapCoords coords)
+{
+	lightmapped = true;
+	this->lmCoords = coords;
+	sync_render_data();
+}
+void MeshComponent::set_not_lightmapped()
+{
+	lightmapped = false;
+	sync_render_data();
+}
 #endif
 
 MeshComponent::~MeshComponent()
@@ -122,6 +133,11 @@ void MeshComponent::on_sync_render_data()
 		obj.animator_bone_ofs = animator->get_matrix_palette_offset();
 	if (!eMaterialOverride.empty())
 		obj.mat_override = eMaterialOverride[0].get();
+	if (lightmapped) {
+		obj.lightmapped = true;
+		obj.lightmap_coord = lmCoords.to_vec4();
+	}
+
 	idraw->get_scene()->update_obj(draw_handle, obj);
 }
 

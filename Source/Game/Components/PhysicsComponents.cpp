@@ -255,7 +255,7 @@ void CapsuleComponent::add_actor_shapes() {
 	add_vertical_capsule_to_actor(glm::vec3(0, height_offset, 0), height, radius);
 }
 
-static Color32 mb_color = { 86, 150, 252 };
+static Color32 mb_color = Color32( 86, 150, 252 );
 
 void CapsuleComponent::add_editor_shapes() {
 	auto mb = get_editor_meshbuilder();

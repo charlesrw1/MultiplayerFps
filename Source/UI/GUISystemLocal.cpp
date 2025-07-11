@@ -91,6 +91,8 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 		Debug_Console::inst->draw();
 	
 #ifdef EDITOR_BUILD
+
+
 	// will only be true if in a tool state
 	if (!is_drawing_to_screen() && eng->get_level()) {
 
@@ -102,6 +104,11 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 			flags |= ImGuiWindowFlags_MenuBar;
 
 		if (ImGui::Begin("Scene viewport", nullptr, flags)) {
+
+			if (set_focus_to_viewport_next_tick) {
+				ImGui::SetWindowFocus();
+				set_focus_to_viewport_next_tick = false;
+			}
 
 			if (editorState->has_tool())
 				editorState->hook_pre_viewport();
@@ -145,6 +152,8 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 		ImGui::ShowDemoWindow();
 
 	ImGui::PopStyleColor(2);//framebg
+
+	set_focus_to_viewport_next_tick = false;
 }
 
 void UiSystem::update() {
@@ -194,6 +203,11 @@ void UiSystem::set_game_capture_mouse(bool b) {
 }
 bool UiSystem::is_game_capturing_mouse() const {
 	return game_focused;
+}
+
+void UiSystem::set_focus_to_viewport()
+{
+	set_focus_to_viewport_next_tick = true;
 }
 
 

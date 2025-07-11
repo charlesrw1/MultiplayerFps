@@ -216,7 +216,6 @@ std::pair<std::string,bool> write_field_type(bool write_name, core_type_id type,
 		}
 		value_str = string_format("%lld", prop.get_int(ptr));
 		break;
-
 	case core_type_id::Float:
 		if (diff_ptr) {
 			float mine = prop.get_float(ptr);

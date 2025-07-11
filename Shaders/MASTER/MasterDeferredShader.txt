@@ -33,8 +33,12 @@ layout (location = 1) in vec2 VS_IN_TexCoord;
 layout (location = 2) in vec3 VS_IN_Normal;
 layout (location = 3) in vec3 VS_IN_Tangent;
 
+#ifdef LIGHTMAPPED
+layout (location = 4) in vec2 VS_IN_LightmapCoord;
+#else
 layout (location = 4) in ivec4 VS_IN_BoneIndicies;
 layout (location = 5) in vec4 VS_IN_BoneWeights;
+#endif // !LIGHTMAPPED
 
 
 flat out uint FS_IN_Objid;
@@ -45,8 +49,10 @@ out vec2 FS_IN_Texcoord;
 out vec3 FS_IN_BoneColor;
 out vec4 FS_IN_NDC;
 out vec4 FS_IN_PrevNDC;// for motion vectors
-
 out mat3 FS_IN_TBN;
+#ifdef LIGHTMAPPED
+out vec2 FS_IN_LightmapCoord;
+#endif
 
 vec3 randColor(int number){
     return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
@@ -164,6 +170,9 @@ void main()
 
 	gl_Position = FS_IN_NDC;
 	FS_IN_Texcoord = VS_IN_TexCoord;
+#ifdef LIGHTMAPPED
+	FS_IN_LightmapCoord = VS_IN_LightmapCoord;
+#endif	// !LIGHTMAPPED
 }
 
 #endif // _VERTEX_SHADER
@@ -192,7 +201,7 @@ in vec2 FS_IN_Texcoord;
 in vec3 FS_IN_BoneColor;
 in vec4 FS_IN_NDC;
 in vec4 FS_IN_PrevNDC;
-
+in vec2 FS_IN_LightmapCoord;
 
 
 in mat3 FS_IN_TBN;
@@ -200,6 +209,10 @@ in mat3 FS_IN_TBN;
 vec3 randColor(uint number){
     return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
 }
+
+#ifdef LIGHTMAPPED
+layout(binding = 20) uniform sampler2D _LightmapTexture;		// lightmap texture
+#endif
 
 // standard outputs
 vec3 BASE_COLOR = vec3(0.0);	// albedo
@@ -230,18 +243,28 @@ void main()
 		SCENE_OUT_Color = vec4(EMISSIVE,OPACITY);
 
 	#else
-		GBUFFER_OUT_Albedo_AO = vec4(BASE_COLOR*AOMAP, AOMAP);
-		GBUFFER_OUT_M_R_Custom_Matid = vec4(METALLIC,ROUGHNESS,0,float(_MATERIAL_TYPE)/255.0);
-		GBUFFER_OUT_Emissive = vec4(EMISSIVE,1.0);
-		
 		vec3 Normalized_IN_N = normalize(FS_IN_Normal);
-		
 		// World space normal
 		vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
 		Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
-
 		GBUFFER_OUT_Normal = Final_Normal;
 		
+		GBUFFER_OUT_Albedo_AO = vec4(BASE_COLOR*AOMAP, AOMAP);
+		GBUFFER_OUT_M_R_Custom_Matid = vec4(METALLIC,ROUGHNESS,0,float(_MATERIAL_TYPE)/255.0);
+		
+	#ifdef LIGHTMAPPED
+		vec4 uvoffsets = g_objects[FS_IN_Objid].colorval;
+		vec2 lightmap_offset = uvoffsets.xy;
+		vec2 lightmap_scale = uvoffsets.zw;
+		vec2 lm_coord = FS_IN_LightmapCoord * lightmap_scale + lightmap_offset;
+		vec3 color = texture(_LightmapTexture,lm_coord).rgb;
+		EMISSIVE += color;	// sample lightmap
+	#else
+	if(_MATERIAL_TYPE != MATERIAL_TYPE_UNLIT)
+		EMISSIVE += vec3(0.1);	// FIXME const ambient. change to probes
+	#endif
+		
+		GBUFFER_OUT_Emissive = vec4(EMISSIVE,1.0);
 		
 		// Motion vectors
 		{

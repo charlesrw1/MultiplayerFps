@@ -418,6 +418,15 @@ Entity* Level::find_initial_entity_by_name(const string& name) const
 	return MapUtil::get_or(spawnNameToEntity,name,EntityPtr()).get();
 }
 
+Component* Level::find_first_component(const ClassTypeInfo* type) const
+{
+	for (auto o : all_world_ents) {
+		if (o->is_a<Component>() && o->get_type().is_a(*type))
+			return (Component*)o;
+	}
+	return nullptr;
+}
+
 void Level::set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file)
 {
 	for (auto& o : file.all_obj_vec) {

@@ -352,7 +352,7 @@ public:
 	}
 	void execute_string(const char* command_string) {
 
-		sys_print(Info, "> %s\n", command_string);
+		sys_print(LtConsoleCommand, "> %s\n", command_string);
 
 		Cmd_Args args;
 		std::string command = command_string;

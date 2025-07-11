@@ -7,7 +7,7 @@
 #include "GltfExport.h"
 #include "Framework/StringUtils.h"
 
-bool export_to_gltf(const std::vector<ExportVertex>& vertices, const std::vector<uint32_t>& indices, const char* output_path) {
+bool export_to_gltf(const std::vector<Part>& parts, const std::vector<ExportVertex>& vertices, const std::vector<uint32_t>& indices, const char* output_path) {
     cgltf_data data = {};
     data.file_type = cgltf_file_type_gltf;
     data.asset.version = const_cast<char*>("2.0");
@@ -57,80 +57,114 @@ bool export_to_gltf(const std::vector<ExportVertex>& vertices, const std::vector
     data.buffer_views = views;
     data.buffer_views_count = 2;
 
-    // Create accessors
-    cgltf_accessor accessors[5] = {};
+    cgltf_accessor* accessors = new cgltf_accessor[5 * parts.size()];
+    memset(accessors, 0, sizeof(cgltf_accessor) * 5 * parts.size());
 
-    // POSITION accessor
-    accessors[0].buffer_view = &views[0];
-    accessors[0].component_type = cgltf_component_type_r_32f;
-    accessors[0].type = cgltf_type_vec3;
-    accessors[0].count = vertices.size();
-    accessors[0].offset = 0; // position is first in ExportVertex
-    accessors[0].stride = sizeof(ExportVertex);
+    cgltf_primitive* primitives = new cgltf_primitive[parts.size()];
+    memset(primitives, 0, sizeof(cgltf_primitive) * parts.size());
 
-    // NORMAL accessor
-    accessors[1].buffer_view = &views[0];
-    accessors[1].component_type = cgltf_component_type_r_32f;
-    accessors[1].type = cgltf_type_vec3;
-    accessors[1].count = vertices.size();
-    accessors[1].offset = sizeof(glm::vec3); // normal follows position
-    accessors[1].stride = sizeof(ExportVertex);
+    cgltf_attribute* attributes = new cgltf_attribute[4 * parts.size()];
+    memset(attributes, 0, sizeof(cgltf_attribute) * 4 * parts.size());
 
-    // UV accessor
-    accessors[2].buffer_view = &views[0];
-    accessors[2].component_type = cgltf_component_type_r_32f;
-    accessors[2].type = cgltf_type_vec2;
-    accessors[2].count = vertices.size();
-    accessors[2].offset = sizeof(glm::vec3)+sizeof(glm::vec3); // normal follows position
-    accessors[2].stride = sizeof(ExportVertex);
-
-    // UV2 accessor
-    accessors[3].buffer_view = &views[0];
-    accessors[3].component_type = cgltf_component_type_r_32f;
-    accessors[3].type = cgltf_type_vec2;
-    accessors[3].count = vertices.size();
-    accessors[3].offset = sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2); // normal follows position
-    accessors[3].stride = sizeof(ExportVertex);
-
-
-    // INDEX accessor
-    accessors[4].buffer_view = &views[1];
-    accessors[4].component_type = cgltf_component_type_r_32u;
-    accessors[4].type = cgltf_type_scalar;
-    accessors[4].count = indices.size();
-    accessors[4].offset = 0;
+    cgltf_material* materials = new cgltf_material[parts.size()];
+    memset(materials, 0, sizeof(cgltf_material) * parts.size());
 
     data.accessors = accessors;
-    data.accessors_count = 5;
+    data.accessors_count = 5 * parts.size();
+    data.materials = materials;
+    data.materials_count = parts.size();
 
-    // Create primitive
-    cgltf_primitive primitive = {};
-    primitive.attributes = new cgltf_attribute[4];
-    primitive.attributes[0].name = const_cast<char*>("POSITION");
-    primitive.attributes[0].type = cgltf_attribute_type_position;
-    primitive.attributes[0].data = &accessors[0];
+    for (int i = 0; i < parts.size(); i++) {
+        auto& part = parts[i];
+        // Create accessors
+        //cgltf_accessor accessors[5] = {};
+        int a_ofs = i * 5;
+        const int vert_ofs = part.vert_ofs * sizeof(ExportVertex);
+        const int index_ofs = part.index_ofs * sizeof(uint32_t);
+        // POSITION accessor
+        accessors[a_ofs].buffer_view = &views[0];
+        accessors[a_ofs].component_type = cgltf_component_type_r_32f;
+        accessors[a_ofs].type = cgltf_type_vec3;
+        accessors[a_ofs].count = part.vert_count;// vertices.size();
+        accessors[a_ofs].offset = vert_ofs; // position is first in ExportVertex
+        accessors[a_ofs].stride = sizeof(ExportVertex);
 
-    primitive.attributes[1].name = const_cast<char*>("NORMAL");
-    primitive.attributes[1].type = cgltf_attribute_type_normal;
-    primitive.attributes[1].data = &accessors[1];
+        // NORMAL accessor
+        accessors[a_ofs+1].buffer_view = &views[0];
+        accessors[a_ofs+1].component_type = cgltf_component_type_r_32f;
+        accessors[a_ofs+1].type = cgltf_type_vec3;
+        accessors[a_ofs+1].count = part.vert_count;
+        accessors[a_ofs+1].offset = vert_ofs+sizeof(glm::vec3); // normal follows position
+        accessors[a_ofs+1].stride = sizeof(ExportVertex);
 
-    primitive.attributes[2].name = const_cast<char*>("TEXCOORD_0");
-    primitive.attributes[2].type = cgltf_attribute_type_texcoord;
-    primitive.attributes[2].data = &accessors[2];
+        // UV accessor
+        accessors[a_ofs+2].buffer_view = &views[0];
+        accessors[a_ofs+2].component_type = cgltf_component_type_r_32f;
+        accessors[a_ofs+2].type = cgltf_type_vec2;
+        accessors[a_ofs+2].count = part.vert_count;
+        accessors[a_ofs+2].offset = vert_ofs+sizeof(glm::vec3) + sizeof(glm::vec3); // normal follows position
+        accessors[a_ofs+2].stride = sizeof(ExportVertex);
 
-    primitive.attributes[3].name = const_cast<char*>("TEXCOORD_1");
-    primitive.attributes[3].type = cgltf_attribute_type_texcoord;
-    primitive.attributes[3].data = &accessors[3];
+        // UV2 accessor
+        accessors[a_ofs+3].buffer_view = &views[0];
+        accessors[a_ofs+3].component_type = cgltf_component_type_r_32f;
+        accessors[a_ofs+3].type = cgltf_type_vec2;
+        accessors[a_ofs+3].count = part.vert_count;
+        accessors[a_ofs+3].offset = vert_ofs + sizeof(glm::vec3) + sizeof(glm::vec3) + sizeof(glm::vec2); // normal follows position
+        accessors[a_ofs+3].stride = sizeof(ExportVertex);
 
-    primitive.attributes_count = 4;
-    primitive.indices = &accessors[4];
-    primitive.type = cgltf_primitive_type_triangles;
+
+        // INDEX accessor
+        accessors[a_ofs+4].buffer_view = &views[1];
+        accessors[a_ofs+4].component_type = cgltf_component_type_r_32u;
+        accessors[a_ofs+4].type = cgltf_type_scalar;
+        accessors[a_ofs+4].count = part.index_count;
+        accessors[a_ofs+4].offset = index_ofs;
+
+
+        // Create primitive
+        cgltf_primitive* primitive = &primitives[i];
+
+        primitive->material = &materials[i];
+        auto& mat = materials[i];
+        mat.name = const_cast<char*>("Material");
+        mat.has_pbr_metallic_roughness = true;
+        mat.pbr_metallic_roughness.base_color_factor[0] = part.materialAlbedo.r/255.0;
+        mat.pbr_metallic_roughness.base_color_factor[1] =  part.materialAlbedo.g/255.0;
+        mat.pbr_metallic_roughness.base_color_factor[2] =  part.materialAlbedo.b/255.0;
+        mat.pbr_metallic_roughness.base_color_factor[3] = 1.0f;
+        mat.pbr_metallic_roughness.metallic_factor = 0.0;
+        mat.pbr_metallic_roughness.roughness_factor = 1.0;
+
+
+
+        primitive->attributes = &attributes[i * 4];
+        primitive->attributes[0].name = const_cast<char*>("POSITION");
+        primitive->attributes[0].type = cgltf_attribute_type_position;
+        primitive->attributes[0].data = &accessors[a_ofs+0];
+
+        primitive->attributes[1].name = const_cast<char*>("NORMAL");
+        primitive->attributes[1].type = cgltf_attribute_type_normal;
+        primitive->attributes[1].data = &accessors[a_ofs+1];
+
+        primitive->attributes[2].name = const_cast<char*>("TEXCOORD_0");
+        primitive->attributes[2].type = cgltf_attribute_type_texcoord;
+        primitive->attributes[2].data = &accessors[a_ofs+2];
+
+        primitive->attributes[3].name = const_cast<char*>("TEXCOORD_1");
+        primitive->attributes[3].type = cgltf_attribute_type_texcoord;
+        primitive->attributes[3].data = &accessors[a_ofs+3];
+
+        primitive->attributes_count = 4;
+        primitive->indices = &accessors[a_ofs+4];
+        primitive->type = cgltf_primitive_type_triangles;
+    }
 
     // Create mesh
     cgltf_mesh mesh = {};
     mesh.name = const_cast<char*>("Mesh");
-    mesh.primitives = &primitive;
-    mesh.primitives_count = 1;
+    mesh.primitives = primitives;
+    mesh.primitives_count = parts.size();
 
     data.meshes = &mesh;
     data.meshes_count = 1;
@@ -154,7 +188,10 @@ bool export_to_gltf(const std::vector<ExportVertex>& vertices, const std::vector
     // Write .gltf file
     cgltf_options options = {};
     if (cgltf_write_file(&options, output_path, &data) != cgltf_result_success) {
-        delete[] primitive.attributes;
+        delete[] attributes;
+        delete[] primitives;
+        delete[] accessors;
+        delete[] materials;
         return false;
     }
 
@@ -163,6 +200,9 @@ bool export_to_gltf(const std::vector<ExportVertex>& vertices, const std::vector
     bin_file.write(reinterpret_cast<const char*>(buffer_data.data()), buffer_data.size());
     bin_file.close();
 
-    delete[] primitive.attributes;
+    delete[] attributes;
+    delete[] primitives;
+    delete[] accessors;
+    delete[] materials;
     return true;
 }

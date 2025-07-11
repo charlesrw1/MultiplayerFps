@@ -25,6 +25,7 @@ const int NORMAL_LOC    = 2;
 const int TANGENT_LOC   = 3;
 const int JOINT_LOC		= 4;
 const int WEIGHT_LOC	= 5;
+const int LIGHTMAPCOORD_LOC = 4;
 
 //const int COLOR_LOC = 5;
 //const int UV2_LOC = 6;
@@ -35,7 +36,7 @@ struct ModelVertex
 	glm::vec2 uv;
 	int16_t normal[3];
 	int16_t tangent[3];
-	uint8_t color[4];	// or bone index
+	uint8_t color[4];	// or bone index (or lightmap coord, normalized uint16[2])
 	uint8_t color2[4];	// or bone weight
 };
 static_assert(sizeof(ModelVertex) == 40, "vertex size wrong");
@@ -142,8 +143,13 @@ public:
 	const Bounds& get_bounds() const { return aabb; }
 	const PhysicsBodyDefinition* get_physics_body() const { return collision.get(); }
 	const RawMeshData* get_raw_mesh_data() const { return &data; }
-	
 	static MulticastDelegate<Model*> on_model_loaded;
+	enum class LightmapType {
+		None=0,	// no lightmaps
+		Lightmapped=1,	// individual lightmaps
+		WorldMerged=2	// all WorldMerged get turned into one lightmap. prevents seams on floors/walls stuff
+	};
+	LightmapType get_lightmap_type() const { return isLightmapped; }
 private:
 	bool load_internal(IAssetLoadingInterface* loading);
 
@@ -162,7 +168,7 @@ private:
 	vector<ModelTag> tags;
 	vector<const MaterialInstance*> materials;
 	glm::mat4 skeleton_root_transform = glm::mat4(1.f);
-	bool isLightmapped = false;
+	LightmapType isLightmapped = LightmapType::None;
 	int16_t lightmapX = 0;
 	int16_t lightmapY = 0;
 

@@ -202,7 +202,7 @@ bool ArchiveFile::open(const char* archive_path)
 
 IFilePtr open_read_dir(const std::string& root, const std::string& relative)
 {
-	auto fullpath = root + "/" + relative;
+	auto fullpath = (root.empty())?relative:(root + "/" + relative);
 	OSFile* file = new OSFile;
 	file->init(fullpath.c_str());
 	if (file->handle_is_valid())
@@ -235,6 +235,9 @@ IFilePtr FileSys::open_read(const char* p, WhereEnum flags)
 	}
 	else if (flags == FileSys::SHADER_CACHE) {
 		return open_read_dir("ShaderCache", p);
+	}
+	else if (flags == FileSys::FULL_SYSTEM) {
+		return open_read_dir("",p);
 	}
 
 	assert(0);

@@ -70,6 +70,7 @@ public:
 	REF int lightmapSizeX = 0;
 	REF int lightmapSizeY = 0;
 	REF bool withLightmap = false;
+	REF bool worldLmMerge = false;
 
 	// type=BoneRenameContainer
 	// this renames bones in this asset using this dataclass

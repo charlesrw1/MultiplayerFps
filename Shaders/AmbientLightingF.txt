@@ -112,15 +112,11 @@ vec3 pbr_calculate(vec3 worldspace, vec3 Albedo, float Roughness, float Metalnes
 	F0 = mix(F0,Albedo,Metalness);
 	
 	vec3 F = FresnelSchlickRougness(max(dot(Normal,V),0.0),F0,Roughness);
-
-	vec3 irradiance = EvaluateAmbientCube(Normal);
-
-	vec3 diffuse_light = irradiance*Albedo;
 	
 	vec3 kS = F;
 	vec3 kD = (1.0-kS)*(1.0-Metalness);
 	
-	vec3 ambient =(kD*diffuse_light);
+	vec3 ambient =(kD*Albedo);
 	return ambient;
 }
 
@@ -130,10 +126,12 @@ vec3 pbr_calculate(vec3 worldspace, vec3 Albedo, float Roughness, float Metalnes
 
 void main()
 {
-	vec2 uv = vec2(gl_FragCoord.xy) / vec2(g.viewport_size.xy);
 	//
+	
+	vec2 uv = vec2(gl_FragCoord.xy) / vec2(g.viewport_size.xy);
 	vec4 metal_rough = texture(GBUFFER2,uv);
 	vec4 albedo = texture(GBUFFER1,uv);
+	
 	vec4 depth_tex = texture(DEPTH,uv);
 	vec4 normal_t = texture(GBUFFER0,uv);
 	
@@ -144,9 +142,7 @@ void main()
 	float ssao_value = texture(SSAOBlurred, uv).r;
 	
 	float depth_value = depth_tex.r;
-	
 	vec3 worldspace = WorldPosFromDepth(uv, depth_value);
-	
 	vec3 out_color = pbr_calculate(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz) * ssao_value;
 	
 	FS_OUT_Color = vec4(out_color,1.0);

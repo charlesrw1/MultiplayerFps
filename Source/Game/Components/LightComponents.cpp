@@ -16,6 +16,7 @@
 
 #include "GameEnginePublic.h"
 
+#include <filesystem>
 ////
 
 glm::vec4 get_color_light_value(Color32 c, float intensity) {
@@ -211,6 +212,9 @@ SunLightComponent::SunLightComponent() {
 	set_call_init_in_editor(true);
 }
 #include "Game/Components/MeshbuilderComponent.h"
+#include "Render/MaterialPublic.h"
+#include "MeshComponent.h"
+#include "Level.h"
 void CubemapComponent::start() {
 	mytexture = new Texture;
 
@@ -219,8 +223,17 @@ void CubemapComponent::start() {
 		editor_meshbuilder->dont_serialize_or_edit = true;
 		editor_meshbuilder->use_background_color = true;
 		editor_meshbuilder->use_transform = false;
+
+		auto meshEntity = eng->get_level()->spawn_entity();
+		auto mesh = meshEntity->create_component<MeshComponent>();
+		mesh->set_model(Model::load("eng/LIGHT_SPHERE.cmdl"));
+		mesh->set_material_override(MaterialInstance::load("top_down/gray_metal.mi"));
+		meshEntity->dont_serialize_or_edit = true;
+		this->editor_mesh = meshEntity;
+
 		update_editormeshbuilder();
 	}
+	on_changed_transform();
 
 	sync_render_data();
 }
@@ -251,11 +264,14 @@ void CubemapComponent::update_editormeshbuilder()
 }
 void CubemapComponent::stop() {
 	idraw->get_scene()->remove_reflection_volume(handle);
-	delete mytexture;
+	//delete mytexture;
 	mytexture = nullptr;
 	if (editor_meshbuilder) {
 		editor_meshbuilder->destroy();
 		editor_meshbuilder = nullptr;
+	}
+	if (editor_mesh.get()) {
+		editor_mesh.get()->destroy();
 	}
 }
 void CubemapComponent::editor_on_change_property() {
@@ -263,6 +279,12 @@ void CubemapComponent::editor_on_change_property() {
 		sync_render_data();
 	}
 	update_editormeshbuilder();
+}
+void CubemapComponent::on_changed_transform() {
+	update_editormeshbuilder();
+	if (editor_mesh.get()) {
+		editor_mesh->set_ws_position(get_ws_position());
+	}
 }
 
 
@@ -291,3 +313,109 @@ class CubemapAnchorSerializer : public IPropertySerializer
 	}
 };
 ADDTOFACTORYMACRO_NAME(CubemapAnchorSerializer, IPropertySerializer, "CubemapAnchor");
+#include "Framework/Files.h"
+void LightmapComponent::start()
+{
+	sync_render_data();
+}
+
+void LightmapComponent::stop()
+{
+	if (handle.is_valid())
+		idraw->get_scene()->remove_lightmap(handle);
+}
+extern void export_godot_scene(const std::string& base_export_path);
+#include <fstream>
+#include "Framework/StringUtils.h"
+#include "Level.h"
+#include "MeshComponent.h"
+#include "Framework/MapUtil.h"
+// hack fixme stuff etc
+void LightmapComponent::editor_on_change_property()
+{
+	if (bakeLightmaps.check_and_swap()) {
+		do_export();
+	}
+	if (importBaked.check_and_swap()) {
+		do_import();
+	}
+}
+
+void LightmapComponent::on_sync_render_data()
+{
+	if (!handle.is_valid())
+		handle = idraw->get_scene()->register_lightmap();
+	Lightmap_Object obj;
+	obj.lightmap_texture = lightmapTexture;
+	idraw->get_scene()->update_lightmap(handle, obj);
+}
+
+void LightmapComponent::do_export()
+{
+	string expPath = "C:/Users/charl/Documents/lightmapexporter/";
+	export_godot_scene(expPath);
+}
+
+void LightmapComponent::do_import()
+{
+	namespace fs = std::filesystem;
+	string sourcePath = "C:/Users/charl/Documents/lightmapexporter/lightmap_root_scene.exr";
+	string gamePath = FileSys::get_game_path();
+	fs::path source = sourcePath;
+	fs::path target_dir = gamePath;
+
+	// Ensure the target directory exists
+	fs::create_directories(target_dir);
+
+	// Compose full target path
+	fs::path target = target_dir / source.filename();
+
+	// Copy the file
+	fs::copy_file(source, target, fs::copy_options::overwrite_existing);
+
+	lightmapTexture = Texture::load("lightmap_root_scene.exr");
+	if (lightmapTexture) {
+		g_assets.reload_sync<Texture>(lightmapTexture);
+	}
+
+	//OUT_LIGHTMAP_BAKED.txt
+	string bakedPath = "C:/Users/charl/Documents/lightmapexporter/OUT_LIGHTMAP_BAKED.txt";
+
+
+	std::unordered_map<int, MeshComponent*> found;
+	auto& all_objs = eng->get_level()->get_all_objects();
+	for (auto o : all_objs) {
+		if (auto as_mesh = o->cast_to<MeshComponent>()) {
+			as_mesh->set_not_lightmapped();
+			if (as_mesh->unique_file_id != 0)
+				MapUtil::insert_test_exists(found, as_mesh->unique_file_id, as_mesh);
+		}
+	}
+
+	std::ifstream infile(bakedPath);
+	std::string str;
+	while (std::getline(infile, str)) {
+		if (str.empty()) continue;
+		auto split = StringUtils::split(str);
+		if (split.empty()) {
+			sys_print(Warning, "LightmapComponent: didnt get 5 args in line\n");
+			continue;
+		}
+		if (split.at(0) == "mesh") {
+			int uid = std::stoi(split.at(1));
+			float x = std::stof(split.at(2));
+			float y = std::stof(split.at(3));
+			float xofs = std::stof(split.at(4));
+			float yofs = std::stof(split.at(5));
+
+			auto find = MapUtil::get_or(found, uid, (MeshComponent*)nullptr);
+			if (!find) {
+				sys_print(Warning, "LightmapComponent: couldnt find obj with id %d\n", uid);
+				continue;
+			}
+			LightmapCoords coords{ x,y,xofs,yofs };
+			find->set_lightmapped(coords);
+		}
+	}
+	sync_render_data();
+}

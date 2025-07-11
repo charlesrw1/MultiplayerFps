@@ -32,15 +32,13 @@ struct AsyncQueuedJob
 	}
 
 	void validate() {
-		assert(is_hot_reload || (!path.empty()&&info));	// either has path or is hot reload
-		assert(!(is_hot_reload && force_reload));// cant be both hot reload and force reload
+		assert((!path.empty()&&info));	// either has path or is hot reload
 	}
 
 	const ClassTypeInfo* info = nullptr;
 	string path;
 	bool is_system_asset = false;
 	bool force_reload = false;
-	bool is_hot_reload = false;
 	std::function<void(GenericAssetPtr)> callback;
 	// for debugging
 	double creation_start_time = 0.0;
@@ -262,11 +260,7 @@ void AssetBackend::execute_job(AsyncQueuedJob* job)
 {
 	job->validate();
 
-	if (job->is_hot_reload)
-	{
-		assert(0);
-	}
-	else if (job->force_reload)
+	if (job->force_reload)
 	{
 		IAsset* existing = find_in_global(job->path);
 		assert(existing);	// has to be existing
@@ -855,12 +849,7 @@ private:
 };
 
 
-#ifdef EDITOR_BUILD
-void AssetDatabase::hot_reload_assets()
-{
-	impl->hot_reload_assets();
-}
-#endif
+
 void AssetDatabase::init() {
 	// init the loader thread
 	impl = std::make_unique<AssetDatabaseImpl>();

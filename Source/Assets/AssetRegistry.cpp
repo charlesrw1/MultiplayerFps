@@ -31,6 +31,20 @@ void TOUCH_ASSET(const Cmd_Args& args)
 	}
 }
 
+#include <chrono>
+int64_t filetime_to_unix_seconds(uint64_t filetime) {
+	// Epoch difference between Jan 1, 1601 and Jan 1, 1970 in 100-ns units
+	constexpr uint64_t EPOCH_DIFF_100NS = 116444736000000000ULL;
+
+	// Convert FILETIME (100-ns intervals) to seconds since Unix epoch
+	uint64_t ticks_since_unix_epoch_100ns = filetime - EPOCH_DIFF_100NS;
+	return static_cast<int64_t>(ticks_since_unix_epoch_100ns / 10'000'000ULL);
+}
+int64_t get_unix_time_seconds() {
+	return std::chrono::duration_cast<std::chrono::seconds>(
+		std::chrono::system_clock::now().time_since_epoch()
+		).count();
+}
 
 
 // Ill just put this code here
@@ -149,7 +163,7 @@ AssetRegistrySystem& AssetRegistrySystem::get()
 	return inst;
 }
 
-ConfigVar asset_registry_reindex_period("asset_registry_reindex_period", "2", CVAR_DEV | CVAR_INTEGER, "time in seconds of registry reindexing");
+ConfigVar asset_registry_reindex_period("asset_registry_reindex_period", "4", CVAR_DEV | CVAR_INTEGER, "time in seconds of registry reindexing");
 
 static std::vector<std::string> split(const std::string& str, char delimiter) {
 	std::vector<std::string> tokens;
@@ -187,6 +201,8 @@ static HackedAsyncAssetRegReindex* hackedAsset = nullptr;
 #include "Framework/StringUtils.h"
 void AssetRegistrySystem::init()
 {
+	last_time_check = get_unix_time_seconds();
+
 	directoryChangeHandle = FindFirstChangeNotificationA(
 		".\\",		 // directory to watch 
 		TRUE,                         //  watch subtree 
@@ -222,7 +238,12 @@ void AssetRegistrySystem::init()
 		}
 		});
 }
-
+#include "Game/LevelAssets.h"
+#include "Sound/SoundPublic.h"
+#include "Render/Texture.h"
+#include "Render/MaterialPublic.h"
+#include "Render/Model.h"
+#include "Scripting/ScriptManager.h"
 void AssetRegistrySystem::update()
 {
 	double time_now = TimeSinceStart();
@@ -244,10 +265,74 @@ void AssetRegistrySystem::update()
 		}
 
 		ASSERT(status == WAIT_OBJECT_0);
-		sys_print(Debug, "reindexing assets %f %f\n",time_now, time_now-last_reindex_time);
-		reindex_all_assets();
-		g_assets.hot_reload_assets();
+		
+		bool wants_reindex = false;
+		// just do the stupid way
+		for (const string& file : FileSys::find_game_files()) {
+			auto gamepath = FileSys::get_game_path_from_full_path(file);
+			auto filePtr = FileSys::open_read_game(gamepath);
+			if (!filePtr)
+				continue;
+			int64_t in_unix_time = filetime_to_unix_seconds(filePtr->get_timestamp());
+			filePtr->close();
+			if (in_unix_time >= last_time_check) {
+				// reload
+				sys_print(Info, "found new asset %s\n", gamepath.c_str());
+				auto ext = StringUtils::get_extension_no_dot(gamepath);
+				const bool prev = wants_reindex;
+				wants_reindex = true;
+				if (ext == "mm" || ext=="mi") {
+					if (g_assets.is_asset_loaded(gamepath)) {
+						auto asset = g_assets.find_sync<MaterialInstance>(gamepath);
+						g_assets.reload_sync<MaterialInstance>(asset);
+					}
+				}
+				else if (ext == "mis"||ext=="glb") {
+					StringUtils::remove_extension(gamepath);
+					gamepath += ".cmdl";
+					if (g_assets.is_asset_loaded(gamepath)) {
+						auto asset = g_assets.find_sync<Model>(gamepath);
+						g_assets.reload_sync<Model>(asset);
+					}
+				}
+				else if (ext == "png"||ext=="jpg"||ext=="tis") {
+					StringUtils::remove_extension(gamepath);
+					gamepath += ".dds";
+					if (g_assets.is_asset_loaded(gamepath)) {
+						auto asset = g_assets.find_sync<Texture>(gamepath);
+						g_assets.reload_sync<Texture>(asset);
+					}
+				}
+				else if (ext == "pfb") {
+					if (g_assets.is_asset_loaded(gamepath)) {
+						auto asset = g_assets.find_sync<PrefabAsset>(gamepath);
+						g_assets.reload_sync<PrefabAsset>(asset);
+					}
+				}
+				else if (ext == "wav") {
+					if (g_assets.is_asset_loaded(gamepath)) {
+						auto asset = g_assets.find_sync<SoundFile>(gamepath);
+						g_assets.reload_sync<SoundFile>(asset);
+					}
+				}
+				else if (ext == "lua") {
+					ScriptManager::inst->reload();
+				}
+				else if (ext == "tmap") {
+					//...
+				}
+				else {
+					wants_reindex = prev;
+				}
+			}
+		}
+		last_time_check = get_unix_time_seconds();
 		last_reindex_time = time_now;
+
+		if (wants_reindex) {
+			sys_print(Debug, "reindexing assets %f %f\n", time_now, time_now - last_reindex_time);
+			reindex_all_assets();
+		}
 
 		if (FindNextChangeNotification(directoryChangeHandle) == FALSE) {
 			sys_print(Error, "FindNextChangeNotification failed: %d\n", GetLastError());

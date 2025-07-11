@@ -31,6 +31,10 @@ public:
 
 	virtual uptr<CreateEditorAsync> create_create_tool_to_edit(opt<string> assetPath) const { return nullptr; }
 
+	virtual void draw_browser_menu(const string& assetPath) const {
+
+	}
+
 	// fills extra assets
 	virtual void fill_extra_assets(std::vector<std::string>& out) const {}
 
@@ -86,6 +90,7 @@ private:
 	std::unique_ptr<AssetFilesystemNode> root;
 	std::vector<std::unique_ptr<AssetMetadata>> all_assettypes;
 	double last_reindex_time = 0.f;
+	int64_t last_time_check = 0;
 	friend class HackedAsyncAssetRegReindex;
 };
 

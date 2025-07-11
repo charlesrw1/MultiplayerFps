@@ -12,7 +12,7 @@
 #include "LevelEditor/PropertyEditors.h"
 #include "Framework/FnFactory.h"
 
-extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*);
+extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*,Color32&);
 
 
 class TextureImportSettings : public ClassBase {
@@ -23,6 +23,8 @@ public:
 	REF std::string src_file;	// relative filepath, must be in same directory
 	REF bool is_normalmap = false;
 	REF bool is_srgb = false;
+
+	REF Color32 simplifiedColor = COLOR_BLACK;
 };
 
 class TextureEditorTool : public IEditorTool

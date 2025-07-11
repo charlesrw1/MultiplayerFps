@@ -101,7 +101,7 @@ public:
 			pipe.cull_front_face = false;
 			pipe.depth_testing = false;
 			pipe.depth_writes = false;
-			pipe.program = matman.get_mat_shader(false, nullptr,
+			pipe.program = matman.get_mat_shader(false,false, nullptr,
 				dc.mat, false, false, false, false);
 			pipe.vao = mb_draw_data.VAO;
 			
@@ -476,6 +476,11 @@ void OpenglRenderDevice::set_blend_state(blend_state blend)
 			if (invalid || blending == blend_state::OPAQUE)
 				glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		}
+		else if (blend == blend_state::MULT) {
+			if (invalid || blending == blend_state::OPAQUE)
+				glEnable(GL_BLEND);
+			glBlendFunc(GL_DST_COLOR, GL_ZERO);
 		}
 		blending = blend;
 		set_bit_valid(BLENDING_BIT);
@@ -865,6 +870,10 @@ void Renderer::create_default_textures()
 
 	auto white_tex = Texture::install_system("_white");
 	auto black_tex = Texture::install_system("_black");
+	white_tex->hasSimplifiedColor = true;
+	white_tex->simplifiedColor = COLOR_WHITE;
+	black_tex->hasSimplifiedColor = true;
+	black_tex->simplifiedColor = COLOR_BLACK;
 	auto flat_normal = Texture::install_system("_flat_normal");
 
 	white_tex->update_specs(white_texture.gl_id, 1, 1, 3, {});
@@ -1242,9 +1251,17 @@ void Renderer::execute_render_lists(
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 
+
+	if (scene.has_lightmap&&scene.lightmapObj.lightmap_texture) {
+		auto texture = scene.lightmapObj.lightmap_texture;
+		bind_texture(20/* FIXME, defined to be bound at spot 20,*/, texture->gl_id);
+	}
+	else {
+		bind_texture(20/* FIXME, defined to be bound at spot 20,*/, black_texture.gl_id);
+	}
+
 	auto& device = get_device();
 
-	vertexarrayhandle vao = g_modelMgr.get_vao(true);
 
 	int offset = 0;
 	for (int i = 0; i < pass.batches.size(); i++) {
@@ -1259,11 +1276,12 @@ void Renderer::execute_render_lists(
 		const blend_state blend = (blend_state)batch_key.blending;
 		const bool show_backface = batch_key.backface;
 		const uint32_t layer = batch_key.layer;
-		const int format = batch_key.vao;
+		const VaoType vaoType = (VaoType)batch_key.vao;
+		const vertexarrayhandle vaoHandle = g_modelMgr.get_vao(vaoType);
 
 		RenderPipelineState state;
 		state.program = program;
-		state.vao = vao;
+		state.vao = vaoHandle;
 		state.backface_culling = !show_backface&&!force_show_backfaces;
 		state.blend = blend;
 		state.depth_testing = depth_test_enabled;
@@ -1310,10 +1328,18 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass,
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, list.glinstance_to_instance);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
 
+	if (scene.has_lightmap && scene.lightmapObj.lightmap_texture) {
+		auto texture = scene.lightmapObj.lightmap_texture;
+		bind_texture(20/* FIXME, defined to be bound at spot 20,*/, texture->gl_id);
+	}
+	else {
+		bind_texture(20/* FIXME, defined to be bound at spot 20,*/, black_texture.gl_id);
+	}
+
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 
 	int offset = 0;
-	vertexarrayhandle vao = g_modelMgr.get_vao(true);
+	//vertexarrayhandle vao = g_modelMgr.get_vao(true);
 	for (int i = 0; i < pass.batches.size(); i++) {
 		
 		const auto& batch = pass.batches[i];
@@ -1326,10 +1352,12 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass,
 		const bool show_backface = batch_key.backface;
 		const uint32_t layer = batch_key.layer;
 		const int format = batch_key.vao;
+		const VaoType vaoType = (VaoType)batch_key.vao;
+		const vertexarrayhandle vaoHandle = g_modelMgr.get_vao(vaoType);
 
 		RenderPipelineState state;
 		state.program = program;
-		state.vao = vao;
+		state.vao = vaoHandle;
 		state.backface_culling = !show_backface && !force_show_backfaces;
 		state.blend = blend;
 		state.depth_testing = depth_test_enabled;
@@ -1457,7 +1485,7 @@ void Renderer::render_particles()
 			continue;
 
 		RenderPipelineState state;
-		state.program = matman.get_mat_shader(false, nullptr, mat, false, false, false, false); ;
+		state.program = matman.get_mat_shader(false,false, nullptr, mat, false, false, false, false); ;
 		state.vao = p.dd.VAO;// meshbuilder->VAO;
 		state.backface_culling = mat->get_master_material()->backface;
 		state.blend = mat->get_master_material()->blend;
@@ -1500,6 +1528,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 	draw_call_key key;
 
 	key.shader = matman.get_mat_shader(
+		proxy.lightmapped,
 		proxy.animator_bone_ofs!=-1, 
 		proxy.model, material, 
 		(type == pass_type::DEPTH),
@@ -1512,7 +1541,12 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 	key.blending = (uint64_t)mm->blend;
 	key.backface = mm->backface;
 	key.texture = material->impl->unique_id;
-	key.vao = 0;// (uint64_t)proxy.mesh->format;
+
+	VaoType theVaoType = VaoType::Animated;
+	if (proxy.lightmapped)
+		theVaoType = VaoType::Lightmapped;
+
+	key.vao = (int)theVaoType;
 	key.mesh = proxy.model->get_uid();
 	key.layer = layer;
 	key.distance = camera_dist;
@@ -2064,6 +2098,7 @@ void set_gpu_objects_data_job(uintptr_t p)
 			gpu_objects[i].prev_anim_mat_offset = gpu_objects[i].anim_mat_offset;
 		else
 			gpu_objects[i].prev_anim_mat_offset = prev_bone_buffer_offset + obj.type_.prev_bone_ofs;
+		gpu_objects[i].colorval = proxy.lightmap_coord;
 		gpu_objects[i].flags = 0;
 	}
 }
@@ -2444,7 +2479,7 @@ void update_debug_grid()
 ConfigVar debug_sun_shadow("r.debug_csm", "0", CVAR_BOOL | CVAR_DEV,"debug csm shadow rendering");
 ConfigVar debug_specular_reflection("r.debug_specular", "0", CVAR_BOOL | CVAR_DEV, "debug specular lighting");
 
-void Renderer::accumulate_gbuffer_lighting()
+void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 {
 	ZoneScoped;
 	GPUSCOPESTART(accumulate_gbuffer_lighting);
@@ -2456,7 +2491,7 @@ void Renderer::accumulate_gbuffer_lighting()
 	Model* LIGHT_CONE = g_modelMgr.get_light_cone();
 	Model* LIGHT_SPHERE = g_modelMgr.get_light_sphere();
 	Model* LIGHT_DOME = g_modelMgr.get_light_dome();
-	vertexarrayhandle vao = g_modelMgr.get_vao(true);
+	vertexarrayhandle vao = g_modelMgr.get_vao(VaoType::Animated);
 	{
 		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
 
@@ -2543,36 +2578,54 @@ void Renderer::accumulate_gbuffer_lighting()
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
 
-	if (!scene.skylights.empty() && !scene.skylights.front().skylight.wants_update) {
-		auto& skylight = scene.skylights.front();
-
+	{
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
 		state.program = prog.ambient_accumulation;
-		state.blend = blend_state::ADD;
+		state.blend = blend_state::MULT;
 		state.depth_testing = false;
 		state.depth_writes = false;
 		device.set_pipeline(state);
-
 
 		bind_texture(0, tex.scene_gbuffer0);
 		bind_texture(1, tex.scene_gbuffer1);
 		bind_texture(2, tex.scene_gbuffer2);
 		bind_texture(3, tex.scene_depth);
-		bind_texture(4, ssao.texture.result);
+		const texhandle ssao_tex = (is_cubemap_view) ? white_texture.gl_id : ssao.texture.result;	// skip ssao in cubemap view
+		bind_texture(4, ssao_tex);
 
-		for(int i=0;i<6;i++)
-			shader().set_vec3(string_format("AmbientCube[%d]",i), skylight.ambientCube[i]);
-
+		for (int i = 0; i < 6; i++)
+			shader().set_vec3(string_format("AmbientCube[%d]", i), glm::vec3(0.f));
 		// fullscreen shader, no vao used
 		glDrawArrays(GL_TRIANGLES, 0, 3);
+	}
 
+	const Texture* reflectionProbeTex = nullptr;
+	if (!scene.skylights.empty() && !scene.skylights.front().skylight.wants_update) {
+		auto& skylight = scene.skylights.front();
+		reflectionProbeTex = skylight.skylight.generated_cube;
+	}
+	auto& vols = scene.reflection_volumes.objects;
+	for (int i = 0; i < vols.size(); i++) {
+		auto& vol = vols[i].type_;
+		if (vol.wants_update||!vol.generated_cube)
+			continue;
+		Bounds b(vol.boxmin, vol.boxmax);
+		if (b.inside(view_to_use.origin,0.0))
+			reflectionProbeTex = vol.generated_cube;
+	}
 
+	if (reflectionProbeTex&& !is_cubemap_view) {
+		RenderPipelineState state;
+		state.vao = get_empty_vao();
 		state.program = prog.reflection_accumulation;
+		state.blend = blend_state::ADD;
+		state.depth_testing = false;
+		state.depth_writes = false;
 		device.set_pipeline(state);
 
-		bind_texture(4, skylight.skylight.generated_cube->gl_id);
-		bind_texture(5, EnviornmentMapHelper::get().integrator.get_texture());
+		bind_texture(5, reflectionProbeTex->gl_id);
+		bind_texture(6, EnviornmentMapHelper::get().integrator.get_texture());
 
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
@@ -2655,7 +2708,7 @@ void Renderer::deferred_decal_pass()
 
 	bind_texture(20/* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/, tex.scene_depth);
 
-	vertexarrayhandle vao = g_modelMgr.get_vao(true);
+	vertexarrayhandle vao = g_modelMgr.get_vao(VaoType::Animated);
 
 	for (int i = 0; i < scene.decal_list.objects.size(); i++) {
 		auto& obj = scene.decal_list.objects[i].type_.decal;
@@ -2665,7 +2718,7 @@ void Renderer::deferred_decal_pass()
 		if (l->get_master_material()->usage != MaterialUsage::Decal)
 			continue;
 
-		program_handle program = matman.get_mat_shader(false, nullptr, l, false, false, false, false);
+		program_handle program = matman.get_mat_shader(false,false, nullptr, l, false, false, false, false);
 
 		RenderPipelineState state;
 		state.depth_testing = false;
@@ -2876,12 +2929,26 @@ void Renderer::check_cubemaps_dirty()
 	GPUFUNCTIONSTART;
 
 	if (!scene.skylights.empty() && (scene.skylights[0].skylight.wants_update|| force_render_cubemaps.get_bool())) {
-		sys_print(Debug,"rendering skylight cubemap\n");
-		force_render_cubemaps.set_bool(false);
+		sys_print(Debug,"check_cubemaps_dirty:rendering skylight cubemap\n");
 		auto& skylight = scene.skylights[0];
 		update_cubemap_specular_irradiance(skylight.ambientCube, (Texture*)skylight.skylight.generated_cube, glm::vec3(0.f), true);
 		skylight.skylight.wants_update = false;
+
+		auto up = colorvec_linear_to_srgb(glm::vec4(skylight.ambientCube[2],0.0));
+		auto down = colorvec_linear_to_srgb(glm::vec4(skylight.ambientCube[3], 0.0));
+
+		sys_print(Info, "skylight cubemap up/down irrad: (%f %f %f) (%f %f %f)\n", up.x, up.y, up.z, down.x, down.y, down.z);
 	}
+	auto& vols = scene.reflection_volumes.objects;
+	for (int i = 0; i < vols.size(); i++) {
+		auto& vol = vols[i].type_;
+		if (vol.wants_update||force_render_cubemaps.get_bool()) {
+			sys_print(Debug, "check_cubemaps_dirty:rendering reflection vol cubemap\n");
+			update_cubemap_specular_irradiance(vol.ambientCube, vol.generated_cube, vol.probe_position, false);
+			vol.wants_update = false;
+		}
+	}
+	force_render_cubemaps.set_bool(false);
 }
 ConfigVar r_no_postprocess("r.skip_pp", "0", CVAR_BOOL | CVAR_DEV,"disable post processing");
 ConfigVar r_devicecycle("r.devicecycle", "0", CVAR_INTEGER | CVAR_DEV, "", 0, 10);
@@ -3011,7 +3078,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		ssao.render();
 
 	if(r_debug_mode.get_integer() == 0 && !params.skybox_only)
-		accumulate_gbuffer_lighting();
+		accumulate_gbuffer_lighting(params.is_cubemap_view);
 
 
 	//draw_height_fog();
@@ -3215,7 +3282,7 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 		auto mat = postProcessMats[i];
 
 		RenderPipelineState state;
-		state.program = matman.get_mat_shader(false, nullptr, mat, false, false, false, false);
+		state.program = matman.get_mat_shader(false,false, nullptr, mat, false, false, false, false);
 		state.blend = mat->get_master_material()->blend;
 		state.depth_testing = state.depth_writes = false;
 		state.vao = get_empty_vao();

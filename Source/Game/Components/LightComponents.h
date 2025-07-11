@@ -126,7 +126,14 @@ public:
 	void editor_on_change_property() final;
 	REFLECT(transient)
 	BoolButton recapture_skylight;	// Recapture
+	
 	Texture* mytexture = nullptr;
+	
+	REFLECT();
+	bool enableBakedAmbient = false;
+	glm::vec3 skyTop = glm::vec3(0.f);
+	glm::vec3 skyBottom = glm::vec3(0.f);
+
 	handle<Render_Skylight> handle;
 };
 
@@ -147,9 +154,7 @@ public:
 	}
 	void start() final;
 	void stop() final;
-	void on_changed_transform() final {
-		update_editormeshbuilder();
-	}
+	void on_changed_transform() final;
 	void editor_on_change_property() final;
 	void on_sync_render_data() final;
 
@@ -161,4 +166,29 @@ private:
 	handle<Render_Reflection_Volume> handle;
 	Texture* mytexture = nullptr;
 	MeshBuilderComponent* editor_meshbuilder = nullptr;
+	obj<Entity> editor_mesh;
+};
+struct Lightmap_Object;
+class LightmapComponent : public Component {
+public:
+	CLASS_BODY(LightmapComponent);
+	LightmapComponent() {
+		set_call_init_in_editor(true);
+	}
+	void start() final;
+	void stop() final;
+	void editor_on_change_property() final;
+	void on_sync_render_data() final;
+	void do_export();
+	void do_import();
+private:
+	REFLECT(hide);
+	Texture* lightmapTexture=nullptr;
+	// Export For Baking
+	REFLECT(transient)
+	BoolButton bakeLightmaps;
+	// Import From Baking
+	REFLECT(transient)
+	BoolButton importBaked;
+	handle<Lightmap_Object> handle;
 };

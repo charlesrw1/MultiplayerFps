@@ -44,7 +44,7 @@ struct Render_Reflection_Volume;
 struct Render_Skylight;
 class TerrainInterfacePublic;
 struct RenderFog;
-
+struct Lightmap_Object;
 class MeshBuilder;
 class IEditorTool;
 class UIControl;
@@ -99,6 +99,10 @@ public:
 	virtual handle<Particle_Object> register_particle_obj() = 0;
 	virtual void update_particle_obj(handle<Particle_Object> handle, const Particle_Object& mbobj) = 0;
 	virtual void remove_particle_obj(handle<Particle_Object>& handle) = 0;
+
+	virtual handle<Lightmap_Object> register_lightmap() = 0;
+	virtual void update_lightmap(handle<Lightmap_Object> handle, const Lightmap_Object& lm) = 0;
+	virtual void remove_lightmap(handle<Lightmap_Object> obj) = 0;
 };
 
 class GuiSystemPublic;

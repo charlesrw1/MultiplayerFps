@@ -7,7 +7,7 @@
 #include "Framework/StringName.h"
 #include "glm/glm.hpp"
 #include "DynamicMaterialPtr.h"
-
+#include "Framework/ConsoleCmdGroup.h"
 
 class MasterMaterialImpl;
 class Texture;
@@ -41,13 +41,17 @@ public:
 	void sweep_references(IAssetLoadingInterface* loading) const;
 	void move_construct(IAsset* other);
 
-
 	std::unique_ptr<MaterialImpl> impl;
 protected:
 	friend class MaterialManagerLocal;
 };
 
 
+class IBakedLightingValuesFactory : public ClassBase {
+public:
+	CLASS_BODY(IBakedLightingValuesFactory);
+	virtual bool get_baked_values(const MaterialInstance* instance, Color32& out_albedo, Color32& out_emissive) = 0;
+};
 
 class MaterialManagerPublic 
 {
@@ -61,7 +65,7 @@ public:
 	const MaterialInstance* get_fallback() const { return fallback; }
 	const MaterialInstance* get_default_billboard() const { return defaultBillboard; }
 protected:
-
+	uptr<IBakedLightingValuesFactory> bakedFactory;
 	const MaterialInstance* defaultBillboard = nullptr;
 	const MaterialInstance* fallback = nullptr;
 };

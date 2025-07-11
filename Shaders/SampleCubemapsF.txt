@@ -14,8 +14,11 @@ layout(binding = 1) uniform sampler2D GBUFFER1;		// albedo, ao
 layout(binding = 2) uniform sampler2D GBUFFER2;		// metallic,roughness, custom, matid
 layout(binding = 3) uniform sampler2D DEPTH;		// depth texture (writes disabled)
 
-layout(binding = 4) uniform samplerCube Skylight;
-layout(binding = 5) uniform sampler2D PBR_brdflut;
+
+layout(binding = 4) uniform sampler2D SSAOBlurred;
+
+layout(binding = 5) uniform samplerCube Skylight;
+layout(binding = 6) uniform sampler2D PBR_brdflut;
 
 #include "SharedGpuTypes.txt"
 #include "LightingShared.txt"
@@ -120,6 +123,7 @@ void main()
 	vec4 albedo = texture(GBUFFER1,uv);
 	vec4 depth_tex = texture(DEPTH,uv);
 	vec4 normal_t = texture(GBUFFER0,uv);
+	float ao = texture(SSAOBlurred,uv).r;
 	
 	uint type = get_gbuffer_material_type(metal_rough);
 	if(type==MATERIAL_TYPE_UNLIT)
@@ -131,7 +135,7 @@ void main()
 	
 	vec3 worldspace = WorldPosFromDepth(uv, depth_value);
 	
-	vec3 out_color = pbr_calculate(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz);
+	vec3 out_color = pbr_calculate(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz)*ao;
 	
 	FS_OUT_Color = vec4(out_color,1.0);
 }

@@ -11,8 +11,7 @@ class MaterialInstance;
 class Entity;
 class Model;
 class Component;
-struct Render_Object
-{
+struct Render_Object {
 	Render_Object() {
 		visible = true;
 		shadow_caster = true;
@@ -22,12 +21,12 @@ struct Render_Object
 		dither = false;
 		opposite_dither = false;
 		is_skybox = false;
+		lightmapped = false;
 	}
 
 	Model* model = nullptr;
 	MaterialInstance* mat_override = nullptr;
 	int animator_bone_ofs = -1;
-
 	bool visible : 1;
 	bool shadow_caster : 1;
 	bool viewmodel_layer : 1;
@@ -36,22 +35,20 @@ struct Render_Object
 	bool dither : 1;
 	bool opposite_dither : 1;
 	bool is_skybox : 1;	// if true, then this is included in the global skylight reflection probe
-
+	bool lightmapped : 1;
 	// for debugging only (also editor uses this for picking)
 	const Component* owner = nullptr;
-
 	glm::mat4 transform = glm::mat4(1.f);
+	glm::vec4 lightmap_coord = glm::vec4(0.f);
 };
 
 class MeshBuilder;
-struct MeshBuilder_Object
-{
+struct MeshBuilder_Object {
 	MeshBuilder_Object() {
 		visible = false;
 		depth_tested = true;
 		use_background_color = false;
 	}
-
 	const Component* owner = nullptr;
 	MeshBuilder* meshbuilder = nullptr;
 	MaterialInstance* material = nullptr;
@@ -62,8 +59,7 @@ struct MeshBuilder_Object
 	glm::mat4 transform = glm::mat4(1.f);
 };
 
-struct Particle_Object
-{
+struct Particle_Object {
 	Particle_Object() {
 
 	}
@@ -71,4 +67,8 @@ struct Particle_Object
 	MeshBuilder* meshbuilder = nullptr;
 	MaterialInstance* material = nullptr;
 	glm::mat4 transform = glm::mat4(1.f);
+};
+class Texture;
+struct Lightmap_Object {
+	const Texture* lightmap_texture = nullptr;
 };

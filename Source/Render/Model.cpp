@@ -51,7 +51,7 @@ public:
 	// Inherited via AssetMetadata
 	virtual Color32 get_browser_color() const  override
 	{
-		return { 20, 125, 245 };
+		return Color32(20, 125, 245);
 	}
 
 	virtual std::string get_type_name() const  override
@@ -116,7 +116,7 @@ void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 
 bool Model::has_lightmap_coords() const
 {
-	return isLightmapped;
+	return isLightmapped != Model::LightmapType::None;
 }
 
 bool Model::has_bones() const
@@ -325,12 +325,21 @@ void ModelMan::add_commands(ConsoleCmdGroup& group)
 			}
 		}
 		sys_print(Info, "]\n");
-		sys_print(Info, "isLightmapped = %d\n", int(mod->has_lightmap_coords()));
+		sys_print(Info, "isLightmapped = %d\n", int(mod->get_lightmap_type()));
 		sys_print(Info, "lightmapSize = %d %d\n", mod->get_lightmap_size().x, mod->get_lightmap_size().y);
-		sys_print(Info, "numLods = %d\n", mod->get_num_lods());
 		sys_print(Info, "hasCollision = %d\n", int(mod->get_physics_body()!=nullptr));
-		sys_print(Info, "numVerticies = %d\n", int(mod->get_raw_mesh_data()->get_num_verticies(0)));
-		sys_print(Info, "numIndicies = %d\n", int(mod->get_raw_mesh_data()->get_num_indicies(0)));
+		sys_print(Info, "numLods(%d) = [\n", mod->get_num_lods());
+		for (int i = 0; i < mod->get_num_lods(); i++) {
+			auto& lod = mod->get_lod(i);
+			int totalV = 0;
+			int totalI = 0;
+			for (int p = 0; p < lod.part_count; p++) {
+				totalV += mod->get_part(p + lod.part_ofs).vertex_count;
+				totalI += mod->get_part(p + lod.part_ofs).element_count / MODEL_BUFFER_INDEX_TYPE_SIZE;
+			}
+			sys_print(Info, "\t[%d] verts=%d indicies=%d parts=%d fade=%f\n", i, totalV, totalI, lod.part_count, lod.end_percentage);
+		}
+		sys_print(Info, "]\n");
 		});
 
 #endif
@@ -512,7 +521,9 @@ bool Model::load_internal(IAssetLoadingInterface* loading)
 		sys_print(Error, "out of date format\n");
 		return false;
 	}
-	isLightmapped = (bool)read.read_byte();
+	uint8_t isLightmappedByte = read.read_byte();
+	assert(isLightmappedByte >= 0 && isLightmappedByte <= 2);
+	isLightmapped = (Model::LightmapType)isLightmappedByte;
 	lightmapX = (int16_t)read.read_int32();
 	lightmapY = (int16_t)read.read_int32();
 
@@ -707,7 +718,9 @@ void Model::move_construct(IAsset* _src)
 	tags = std::move(src->tags);
 	materials = std::move(src->materials);
 	skeleton_root_transform = src->skeleton_root_transform;
-
+	isLightmapped = src->isLightmapped;
+	lightmapX = src->lightmapX;
+	lightmapY = src->lightmapY;
 	src->uninstall();
 }
 
@@ -743,31 +756,58 @@ void ModelMan::init()
 {
 	allocator.init(STATIC_INDEX_SIZE, STATIC_VERTEX_SIZE);
 
-	glGenVertexArrays(1, &animated_vao);
-	glBindVertexArray(animated_vao);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, allocator.ibuffer.handle);
-	glBindBuffer(GL_ARRAY_BUFFER, allocator.vbuffer.handle);
+	{
+		glGenVertexArrays(1, &animated_vao);
+		glBindVertexArray(animated_vao);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, allocator.ibuffer.handle);
+		glBindBuffer(GL_ARRAY_BUFFER, allocator.vbuffer.handle);
 
-	// POSITION
-	glVertexAttribPointer(POSITION_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, pos));
-	glEnableVertexAttribArray(POSITION_LOC);
-	// UV
-	glVertexAttribPointer(UV_LOC, 2, GL_FLOAT, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, uv));
-	glEnableVertexAttribArray(UV_LOC);
-	// NORMAL
-	glVertexAttribPointer(NORMAL_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, normal[0]));
-	glEnableVertexAttribArray(NORMAL_LOC);
-	// Tangent
-	glVertexAttribPointer(TANGENT_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, tangent[0]));
-	glEnableVertexAttribArray(TANGENT_LOC);
-	// Bone index
-	glVertexAttribIPointer(JOINT_LOC, 4, GL_UNSIGNED_BYTE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color[0]));
-	glEnableVertexAttribArray(JOINT_LOC);
-	// Bone weight
-	glVertexAttribPointer(WEIGHT_LOC, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color2[0]));
-	glEnableVertexAttribArray(WEIGHT_LOC);
+		// POSITION
+		glVertexAttribPointer(POSITION_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, pos));
+		glEnableVertexAttribArray(POSITION_LOC);
+		// UV
+		glVertexAttribPointer(UV_LOC, 2, GL_FLOAT, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, uv));
+		glEnableVertexAttribArray(UV_LOC);
+		// NORMAL
+		glVertexAttribPointer(NORMAL_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, normal[0]));
+		glEnableVertexAttribArray(NORMAL_LOC);
+		// Tangent
+		glVertexAttribPointer(TANGENT_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, tangent[0]));
+		glEnableVertexAttribArray(TANGENT_LOC);
+		// Bone index
+		glVertexAttribIPointer(JOINT_LOC, 4, GL_UNSIGNED_BYTE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color[0]));
+		glEnableVertexAttribArray(JOINT_LOC);
+		// Bone weight
+		glVertexAttribPointer(WEIGHT_LOC, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color2[0]));
+		glEnableVertexAttribArray(WEIGHT_LOC);
 
-	glBindVertexArray(0);
+		glBindVertexArray(0);
+	}
+	{
+
+		glGenVertexArrays(1, &lightmapped_vao);
+		glBindVertexArray(lightmapped_vao);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, allocator.ibuffer.handle);
+		glBindBuffer(GL_ARRAY_BUFFER, allocator.vbuffer.handle);
+
+		// POSITION
+		glVertexAttribPointer(POSITION_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, pos));
+		glEnableVertexAttribArray(POSITION_LOC);
+		// UV
+		glVertexAttribPointer(UV_LOC, 2, GL_FLOAT, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, uv));
+		glEnableVertexAttribArray(UV_LOC);
+		// NORMAL
+		glVertexAttribPointer(NORMAL_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, normal[0]));
+		glEnableVertexAttribArray(NORMAL_LOC);
+		// Tangent
+		glVertexAttribPointer(TANGENT_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, tangent[0]));
+		glEnableVertexAttribArray(TANGENT_LOC);
+		// LIGHTMAPCOORD_LOC
+		glVertexAttribPointer(LIGHTMAPCOORD_LOC, 4, GL_UNSIGNED_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color[0]));
+		glEnableVertexAttribArray(LIGHTMAPCOORD_LOC);
+	
+		glBindVertexArray(0);
+	}
 
 
 	create_default_models();

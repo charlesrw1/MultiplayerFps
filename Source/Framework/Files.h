@@ -65,6 +65,7 @@ public:
 		USER_DIR = 2,	// the save folder location for users
 
 		SHADER_CACHE = 3,
+		FULL_SYSTEM
 	};
 
 	static void init();

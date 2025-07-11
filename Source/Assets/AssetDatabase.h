@@ -79,10 +79,7 @@ public:
 
 	// reloads an asset and all dependent objects, then move constructs them into the original asset
 	void reload_async(IAsset* asset, std::function<void(GenericAssetPtr)> callback);
-#ifdef EDITOR_BUILD
-	// checks for out of date assets and reloads them async
-	void hot_reload_assets();
-#endif
+
 	void print_usage();
 	// this creates an asset bundle essentially
 	void dump_loaded_assets_to_disk(const std::string& path);

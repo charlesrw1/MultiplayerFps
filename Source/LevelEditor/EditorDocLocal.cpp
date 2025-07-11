@@ -1784,7 +1784,7 @@ void EditorDoc::set_camera_target_to_sel()
 		}
 	}
 }
-
+#include "Game/Components/LightComponents.h"
 extern void export_godot_scene(const std::string& base_export_path);
 extern void export_level_scene();
 void EditorDoc::hook_menu_bar()
@@ -1812,6 +1812,24 @@ void EditorDoc::hook_menu_bar()
 		if (ImGui::MenuItem("Export godot")) {
 			string path = "C:/Users/charl/Documents/lightmapexporter/";
 			export_godot_scene(path);
+		}
+		if (ImGui::MenuItem("Import lightmap from baking")) {
+			LightmapComponent* lm = (LightmapComponent*)eng->get_level()->find_first_component(&LightmapComponent::StaticType);
+			if (lm) {
+				lm->do_import();
+			}
+			else {
+				sys_print(Error, "no lightmap object in scene, add a LightmapComponent\n");
+			}
+		}
+		if (ImGui::MenuItem("Export for lightmap bake")) {
+			LightmapComponent* lm = (LightmapComponent*)eng->get_level()->find_first_component(&LightmapComponent::StaticType);
+			if (lm) {
+				lm->do_export();
+			}
+			else {
+				sys_print(Error, "no lightmap object in scene, add a LightmapComponent\n");
+			}
 		}
 		ImGui::EndMenu();
 	}

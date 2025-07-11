@@ -42,7 +42,7 @@ public:
 
 	void set_game_capture_mouse(bool b);
 	bool is_game_capturing_mouse() const;
-
+	void set_focus_to_viewport();
 	void pre_events();
 	void handle_event(const SDL_Event& event);
 	void update();
@@ -64,4 +64,6 @@ private:
 	// focused= mouse is captured, assumes relative inputs are being taken, otherwise cursor is shown
 	bool game_focused = false;
 	bool drawing_to_screen = true;
+
+	bool set_focus_to_viewport_next_tick = false;
 };

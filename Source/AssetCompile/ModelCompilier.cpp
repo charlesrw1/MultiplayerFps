@@ -869,7 +869,9 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 	mdd.isLightmapped = is->withLightmap;
 	mdd.lightmapSizeX = is->lightmapSizeX;
 	mdd.lightmapSizeY = is->lightmapSizeY;
-
+	mdd.worldLmMerge = is->worldLmMerge;
+	if (mdd.worldLmMerge)
+		mdd.isLightmapped = true;
 
 	mdd.model_source = is->srcGlbFile;
 	for (int i = 0; i < is->lodScreenSpaceSizes.size(); i++) {
@@ -2369,7 +2371,11 @@ struct FinalModelData
 	std::vector<std::string> material_names;
 	Bounds AABB;
 	std::vector<ModelTag> tags;
-	bool isLightmapped = false;
+
+	bool get_is_lightmapped_bool() const {
+		return isLightmapped != Model::LightmapType::None;
+	}
+	Model::LightmapType isLightmapped = Model::LightmapType::None;
 	int lightmapX = 0;
 	int lightmapY = 0;
 };
@@ -2570,7 +2576,7 @@ Submesh make_final_submesh_from_existing(
 	const int vertex_start = in.base_vertex;
 	const int new_vertex_start = finalmod.verticies.size();
 
-	if (finalmod.isLightmapped) {
+	if (finalmod.get_is_lightmapped_bool()) {
 		for (int i = 0; i < in.vertex_count; i++) {
 			finalmod.verticies.push_back(fatvert_to_mv_lightmapped(compile.verticies[vertex_start + i], transform, normal_tr));
 		}
@@ -2617,13 +2623,17 @@ FinalModelData create_final_model_data(
 		if (def.loddefs[i].lod_num >= num_actual_lods) continue;
 		lods_to_def[def.loddefs[i].lod_num] = i;
 	}
-	final_mod.isLightmapped = false;
+	final_mod.isLightmapped = Model::LightmapType::None;
 	if (def.isLightmapped) {
 		if (skel != nullptr) {
 			sys_print(Warning, "create_final_model_data: %s isLightmapped not compatible with a skeletal mesh.\n", def.model_source.c_str());
 		}
 		else {
-			final_mod.isLightmapped = true;
+			if (def.worldLmMerge)
+				final_mod.isLightmapped = Model::LightmapType::WorldMerged;
+			else
+				final_mod.isLightmapped = Model::LightmapType::Lightmapped;
+
 			final_mod.lightmapX = def.lightmapSizeX;
 			final_mod.lightmapY = def.lightmapSizeY;
 			if (def.lightmapSizeX == 0||def.lightmapSizeY==0) {
@@ -2659,7 +2669,7 @@ FinalModelData create_final_model_data(
 
 			const LODMesh& lm = lod.mesh_nodes[j];
 
-			if (final_mod.isLightmapped && !lm.has_attribute(CMA_UV2)) {
+			if (final_mod.get_is_lightmapped_bool() && !lm.has_attribute(CMA_UV2)) {
 				sys_print(Warning, "create_final_model_data: isLightmapped=true but mesh doesnt have UV2? %s\n", def.model_source.c_str());
 			}
 
@@ -2710,7 +2720,7 @@ bool write_out_compilied_model(const std::string& gamepath, const FinalModelData
 	out.write_int32('CMDL');
 	out.write_int32(MODEL_VERSION);
 
-	out.write_byte(model->isLightmapped);
+	out.write_byte((uint8_t)model->isLightmapped);
 	out.write_int32(model->lightmapX);
 	out.write_int32(model->lightmapY);
 

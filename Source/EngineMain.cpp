@@ -161,6 +161,20 @@ void Quit()
 	eng_local.cleanup();
 	exit(0);
 }
+inline Color32 get_color_of_print(LogType type) {
+
+	const Color32 err = { 255, 105, 105 };
+	const Color32 warn = { 252, 224, 121 };
+	const Color32 info = COLOR_WHITE;
+	const Color32 debug = { 136, 161, 252 };
+	const Color32 consolePrint = { 136,23,152 };
+	Color32 out = info;
+	if (type == LogType::Error) out = err;
+	else if (type == LogType::Warning)out = warn;
+	else if (type == LogType::Debug) out = debug;
+	else if (type == LogType::LtConsoleCommand) out = consolePrint;
+	return out;
+}
 
 ConfigVar loglevel("loglevel", "4", CVAR_INTEGER, "(0=disable,4=all)", 0, 4);
 ConfigVar colorLog("colorLog", "1", CVAR_BOOL, "");
@@ -176,7 +190,6 @@ void sys_print(LogType type, const char* fmt, ...)
 	
 	bool print_end = false;
 	if (colorLog.get_bool()) {
-		int len = strlen(fmt);
 		print_end = true;
 		if (type == LogType::Error) {
 			printf("\033[91m");
@@ -187,12 +200,12 @@ void sys_print(LogType type, const char* fmt, ...)
 		else if (type == LogType::Debug) {
 			printf("\033[32m");
 		}
-		else if (len >= 1 && fmt[0] == '>') {
+		else if (type == LogType::LtConsoleCommand) {
 			printf("\033[35m");
 			char buf[1024];
 			vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
 			buf[IM_ARRAYSIZE(buf) - 1] = 0;
-			eng->log_to_fullscreen_gui(Debug, buf);
+			eng->log_to_fullscreen_gui(LtConsoleCommand, buf);
 		}
 		else
 			print_end = false;
@@ -201,7 +214,7 @@ void sys_print(LogType type, const char* fmt, ...)
 
 	vprintf(fmt, args);
 	if(Debug_Console::inst)
-		Debug_Console::inst->print_args(fmt, args);
+		Debug_Console::inst->print_args(get_color_of_print(type),fmt, args);
 	va_end(args);
 
 	if (print_end)
@@ -214,7 +227,7 @@ void sys_vprint(const char* fmt, va_list args)
 	std::lock_guard<std::mutex> printLock(printMutex);
 
 	vprintf(fmt, args);
-	Debug_Console::inst->print_args(fmt, args);
+	Debug_Console::inst->print_args(get_color_of_print(Info),fmt, args);
 }
 
 void Fatalf(const char* format, ...)
@@ -235,15 +248,7 @@ void Fatalf(const char* format, ...)
 
 void GameEngineLocal::log_to_fullscreen_gui(LogType type, const char* msg)
 {
-	const Color32 err = { 255, 105, 105 };
-	const Color32 warn = { 252, 224, 121 };
-	const Color32 info = COLOR_WHITE;
-	const Color32 debug = { 136, 161, 252 };
-	Color32 out = info;
-	if (type == LogType::Error) out = err;
-	else if (type == LogType::Warning)out = warn;
-	else if (type == LogType::Debug) out = debug;
-	gui_log.add_text(out, msg);
+	gui_log.add_text(get_color_of_print(type), msg);
 }
 
 static void SDLError(const char* msg)
@@ -1466,6 +1471,7 @@ extern ConfigVar log_shader_compiles;
 extern ConfigVar material_print_debug;
 int game_engine_main(int argc, char** argv)
 {
+
 	material_print_debug.set_bool(true);
 	developer_mode.set_bool(true);
 	log_shader_compiles.set_bool(false);
@@ -1566,7 +1572,13 @@ void GameEngineLocal::key_event(SDL_Event event)
 {
 	if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
 		show_console = !show_console;
-		//console.set_keyboard_focus = show_console;
+
+		if (!UiSystem::inst->is_vp_focused()&&Debug_Console::inst->get_is_console_focused()) {
+			UiSystem::inst->set_focus_to_viewport();
+		}
+		else {
+			Debug_Console::inst->toggle_set_focus();
+		}
 	}
 
 	if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && ImGui::GetIO().WantCaptureKeyboard)
@@ -1593,6 +1605,10 @@ void GameEngineLocal::cleanup()
 	//if (get_current_tool())
 	//	get_current_tool()->close();
 #endif
+	if (level) {
+		stop_game();
+	}
+
 	isound->cleanup();
 
 	g_assets.quit();
@@ -2357,13 +2373,19 @@ void Debug_Console::draw()
 		for (int i = 0; i < lines.size(); i++)
 		{
 			Color32 color;
-			bool has_color = false;
-			if (!lines[i].empty() && lines[i][0] == '>') { color = { 136,23,152 }; has_color = true; }
-			if (has_color)
-				ImGui::PushStyleColor(ImGuiCol_Text, color.to_uint());
-			ImGui::TextUnformatted(lines[i].c_str());
-			if (has_color)
-				ImGui::PopStyleColor();
+	
+			auto& line = lines[i];
+			auto& lineStr = line.line;
+			auto lineColor = line.color;
+
+			//if (!lines[i].empty() && lines[i][0] == '>') { 
+			//	color = { 136,23,152 }; 
+			//	has_color = true; 
+			//}
+
+			ImGui::PushStyleColor(ImGuiCol_Text, lineColor.to_uint());
+			ImGui::TextUnformatted(lineStr.c_str());
+			ImGui::PopStyleColor();
 		}
 		if (scroll_to_bottom || (auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
 			ImGui::SetScrollHereY(1.0f);
@@ -2378,12 +2400,8 @@ void Debug_Console::draw()
 	bool reclaim_focus = false;
 	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | 
 		ImGuiInputTextFlags_EscapeClearsAll | ImGuiInputTextFlags_CallbackHistory | ImGuiInputTextFlags_CallbackCompletion;
-	if (set_keyboard_focus) {
-		ImGui::SetKeyboardFocusHere();
-		set_keyboard_focus = false;
-	}
 
-	if (ImGui::InputText("Input", input_buffer, IM_ARRAYSIZE(input_buffer), input_text_flags, debug_console_text_callback, this))
+	if (ImGui::InputText("##Input", input_buffer, IM_ARRAYSIZE(input_buffer), input_text_flags, debug_console_text_callback, this))
 	{
 		char* s = input_buffer;
 		if (s[0]) {
@@ -2398,25 +2416,30 @@ void Debug_Console::draw()
 		s[0] = 0;
 		reclaim_focus = true;
 	}
+	is_console_focused = ImGui::IsItemFocused();
 
-	// Auto-focus on window apparition
 	ImGui::SetItemDefaultFocus();
-	if (reclaim_focus)
-		ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
 
+	if (reclaim_focus||wants_toggle_set_focus) {
+		ImGui::SetKeyboardFocusHere(-1);
+		wants_toggle_set_focus = false;
+	}
 	ImGui::End();
 }
-void Debug_Console::print_args(const char* fmt, va_list args)
+void Debug_Console::print_args(Color32 color, const char* fmt, va_list args)
 {
 	std::lock_guard<std::mutex> printLock(printMutex);
 
 	char buf[1024];
 	vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
 	buf[IM_ARRAYSIZE(buf) - 1] = 0;
-	bufferedLines.push_back(buf);
+	LineAndColor lc;
+	lc.color = color;
+	lc.line = buf;
+	bufferedLines.push_back(lc);
 }
 
-void Debug_Console::print(const char* fmt, ...)
+void Debug_Console::print(Color32 color, const char* fmt, ...)
 {
 	std::lock_guard<std::mutex> printLock(printMutex);
 
@@ -2426,7 +2449,10 @@ void Debug_Console::print(const char* fmt, ...)
 	vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
 	buf[IM_ARRAYSIZE(buf) - 1] = 0;
 	va_end(args);
-	bufferedLines.push_back(buf);
+	LineAndColor lc;
+	lc.color = color;
+	lc.line = buf;
+	bufferedLines.push_back(lc);
 }
 
 

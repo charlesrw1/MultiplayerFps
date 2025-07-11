@@ -61,6 +61,10 @@ public:
 	texhandle gl_id = 0;
 	bool is_resident = false;
 	bindlesstexhandle bindless_handle = 0;
+#ifdef EDITOR_BUILD
+	bool hasSimplifiedColor = false;
+	Color32 simplifiedColor = COLOR_WHITE;
+#endif
 
 	// used for system textures
 	void update_specs(texhandle handle, int w, int h, int channels, Texture_Format fmt) {

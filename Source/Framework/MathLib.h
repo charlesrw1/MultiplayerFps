@@ -37,6 +37,13 @@ inline glm::vec4 colorvec_srgb_to_linear(const glm::vec4& color) {
 	};
 	return glm::vec4(to_linear(color.x), to_linear(color.y), to_linear(color.z), color.w/* dont correct w?*/);
 }
+inline glm::vec4 colorvec_linear_to_srgb(const glm::vec4& color) {
+	auto to_srgb = [](float x) {
+		return glm::pow(x, 1.0/2.2f);
+	};
+	return glm::vec4(to_srgb(color.x), to_srgb(color.y), to_srgb(color.z), color.w/* dont correct w?*/);
+}
+
 
 
 // smoothing = [0,1] where 0 is no smoothing and 1.0 is max smoothing 

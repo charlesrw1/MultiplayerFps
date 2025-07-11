@@ -5,7 +5,7 @@
 #include "Framework/Reflection2.h"
 #include <vector>
 #include <memory>
-
+#include "Framework/StructReflection.h"
 GENERATED_CLASS_INCLUDE("Render/Model.h");
 GENERATED_CLASS_INCLUDE("Render/MaterialPublic.h");
 
@@ -20,6 +20,18 @@ class RigidbodyComponent;
 class MeshBuilderComponent;
 class AnimatorObject;
 class agBuilder;
+
+struct LightmapCoords {
+	STRUCT_BODY();
+	glm::vec4 to_vec4() const {
+		return glm::vec4(x, y, xofs, yofs);
+	}
+	REF float x = 0;
+	REF float y = 0;
+	REF float xofs = 0;
+	REF float yofs = 0;
+};
+
 class MeshComponent : public Component
 {
 public:
@@ -61,6 +73,8 @@ public:
 	}
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final;
+	void set_lightmapped(LightmapCoords coords);
+	void set_not_lightmapped();
 #endif
 
 private:
@@ -68,6 +82,11 @@ private:
 	REF bool is_visible = true;
 	REF bool cast_shadows = true;
 	REF bool is_skybox = false;
+	REFLECT(hide);
+	bool lightmapped = false;
+	REFLECT(hide);
+	LightmapCoords lmCoords;
+
 	REF std::vector<AssetPtr<MaterialInstance>> eMaterialOverride;
 	std::unique_ptr<AnimatorObject> animator;
 	handle<Render_Object> draw_handle;

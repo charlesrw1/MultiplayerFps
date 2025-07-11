@@ -16,12 +16,14 @@
 #include "AssetCompile/Someutils.h"
 #include "Assets/AssetDatabase.h"
 #include "Framework/Config.h"
+#undef APIENTRY
+#define TINYEXR_IMPLEMENTATION
 
-
-
+#include "tinyexr.h"
+#undef APIENTRY
 
 // TextureEditor.cpp
-extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*);
+extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*,Color32& outColor);
 
 #ifdef EDITOR_BUILD
 //extern IEditorTool* g_texture_editor_tool;
@@ -489,9 +491,10 @@ Texture_Format to_format(int n, bool isfloat)
 	return TEXFMT_RGB8;
 }
 
-
+#include "GameEnginePublic.h"
 void Texture::move_construct(IAsset* _src)
 {
+	assert(!eng->get_is_in_overlapped_period());
 	Texture* src = (Texture*)_src;
 	uninstall();
 	width = src->width;
@@ -500,8 +503,12 @@ void Texture::move_construct(IAsset* _src)
 	channels = src->channels;
 	type = src->type;
 	format = src->format;
-
+	loaddata = std::move(src->loaddata);
 	src->gl_id = 0;	// dont uninstall it since were just stealing it
+#ifdef EDITOR_BUILD
+	simplifiedColor = src->simplifiedColor;
+	hasSimplifiedColor = src->hasSimplifiedColor;
+#endif
 }
 void Texture::post_load() {
 	if (did_load_fail())
@@ -532,11 +539,13 @@ extern ConfigVar developer_mode;
 
 bool Texture::load_asset(IAssetLoadingInterface* loading) {
 	const auto& path = get_name();
-	assert(path != "_white" && path != "_black");	// quick smoke test assert here, default textures should be initialized before anything else
+	assert(path != "_white" && path != "_black");	// quick assert here, default textures should be initialized before anything else
 #ifdef EDITOR_BUILD
 	if (developer_mode.get_bool()) {
 		// this will check if a compile is needed
-		compile_texture_asset(path,loading);
+		bool good = compile_texture_asset(path,loading,this->simplifiedColor);
+		if (good)
+			this->hasSimplifiedColor = true;
 	}
 #endif
 
@@ -569,6 +578,19 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 		data = stbi_loadf_from_memory(filedata.data(), filedata.size(), &x, &y, &channels, 0);
 		filedata = {};
 		is_float = true;
+	}
+	else if (path.find(".exr") != std::string::npos) {
+		float* out_data = nullptr;
+		const char* err = nullptr;
+		int res = LoadEXRFromMemory(&out_data, &x, &y, filedata.data(), filedata.size(), &err);
+		if (res != TINYEXR_SUCCESS) {
+			sys_print(Error, "Texture::load_asset: couldnt load .exr: %s\n", err ? err : "<unknown>");
+			return false;
+		}
+		is_float = true;
+		channels = 4;
+		filedata = {};
+		data = out_data;
 	}
 	else {
 		data = stbi_load_from_memory(filedata.data(), filedata.size(), &x, &y, &channels, 0);

@@ -36,6 +36,10 @@ private:
 	int append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target);
 };
 #include "Framework/ConsoleCmdGroup.h"
+enum class VaoType {
+	Animated,
+	Lightmapped
+};
 class ModelMan
 {
 public:
@@ -44,7 +48,12 @@ public:
 	void add_commands(ConsoleCmdGroup& group);
 	void compact_memory();
 	void print_usage() const;
-	vertexarrayhandle get_vao(bool animated) { return animated_vao; }
+	vertexarrayhandle get_vao(VaoType type) { 
+		if (type == VaoType::Animated)
+			return animated_vao;
+		else
+			return lightmapped_vao;
+	}
 	Model* get_error_model() const { return error_model; }
 	Model* get_sprite_model() const { return _sprite; }
 	Model* get_default_plane_model() const { return defaultPlane; }
@@ -72,6 +81,8 @@ private:
 	bool upload_model(Model* m);
 
 	vertexarrayhandle animated_vao;
+	vertexarrayhandle lightmapped_vao;
+
 	//vertexarrayhandle static_vao;
 	MainVbIbAllocator allocator;
 

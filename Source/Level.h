@@ -67,6 +67,7 @@ public:
 #endif
 	void validate();
 	Entity* find_initial_entity_by_name(const string& name) const;
+	Component* find_first_component(const ClassTypeInfo* type) const;
 private:
 	void insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids, bool addSpawnNames);
 	static void set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file);

@@ -15,3 +15,14 @@ void handle_assert_internal(const char* cond)
 	std::abort();
 #endif // WITH_TEST_ASSERT
 }
+
+Color32::Color32(unsigned int c) {
+	r = c & 0xff;
+	g = (c >> 8) & 0xff;
+	b = (c >> 16) & 0xff;
+	a = (c >> 24) & 0xff;
+}
+
+Color32::Color32(int r, int g, int b, int a) : r(r),g(g),b(b),a(a)
+{
+}
