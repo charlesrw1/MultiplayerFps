@@ -211,6 +211,8 @@ bool SceneAsset::load_asset(IAssetLoadingInterface* load)
 		sys_print(Error, "SceneAsset::load_asset: couldn't open scene %s\n", path.c_str());
 		return false;
 	}
+	double start = GetTime();
+
 	string textForm = std::string(fileptr->size(), ' ');
 	fileptr->read((void*)textForm.data(), textForm.size());
 	if (StringUtils::starts_with(textForm, "!json\n")) {
@@ -224,6 +226,9 @@ bool SceneAsset::load_asset(IAssetLoadingInterface* load)
 		sys_print(Error, "SceneAsset::load_asset: json unserialize error %s\n", path.c_str());
 		return false;
 	}
+
+	double now = GetTime();
+	sys_print(Debug, "SceneAsset::load_asset: took %f\n", float(now - start));
 	return true;
 }
 

@@ -75,6 +75,7 @@ public:
 	const char* get_editor_outliner_icon() const final;
 	void set_lightmapped(LightmapCoords coords);
 	void set_not_lightmapped();
+	void set_static_probe_lit(int index);
 #endif
 
 private:
@@ -86,6 +87,8 @@ private:
 	bool lightmapped = false;
 	REFLECT(hide);
 	LightmapCoords lmCoords;
+	REFLECT(hide);
+	bool static_probe_lit = false;
 
 	REF std::vector<AssetPtr<MaterialInstance>> eMaterialOverride;
 	std::unique_ptr<AnimatorObject> animator;

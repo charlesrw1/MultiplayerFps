@@ -6,7 +6,12 @@
 #include "glm/gtx/quaternion.hpp"
 
 GENERATED_CLASS_INCLUDE("Game/Entity.h");
-
+class IComponentEditorUi {
+public:
+	virtual ~IComponentEditorUi() {}
+	// return true if mouse is grabbed
+	virtual bool draw() { return false; }
+};
 struct PropertyInfoList;
 class Entity;
 class Component : public BaseUpdater
@@ -35,6 +40,7 @@ public:
 	void set_owner_dont_serialize_or_edit(bool b);
 #ifdef EDITOR_BUILD
 	virtual const char* get_editor_outliner_icon() const { return ""; }
+	virtual std::unique_ptr<IComponentEditorUi> create_editor_ui() { return nullptr; }
 #endif
 protected:
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)

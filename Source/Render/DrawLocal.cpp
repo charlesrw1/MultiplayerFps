@@ -482,6 +482,16 @@ void OpenglRenderDevice::set_blend_state(blend_state blend)
 				glEnable(GL_BLEND);
 			glBlendFunc(GL_DST_COLOR, GL_ZERO);
 		}
+		else if (blend == blend_state::SCREEN) {
+			if (invalid || blending == blend_state::OPAQUE)
+				glEnable(GL_BLEND);
+			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
+		}
+		else if (blend == blend_state::PREMULT_BLEND) {
+			if (invalid || blending == blend_state::OPAQUE)
+				glEnable(GL_BLEND);
+			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		}
 		blending = blend;
 		set_bit_valid(BLENDING_BIT);
 		activeStats.blend_changes++;
@@ -638,6 +648,7 @@ void Renderer::create_shaders()
 	prog.mdi_testing = prog_man.create_raster("SimpleMeshV.txt", "UnlitF.txt", "MDI");
 
 	prog.light_accumulation = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt");
+	prog.light_accumulation_shadowed = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt","SHADOWED");
 	prog.sunlight_accumulation = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt");
 	prog.sunlight_accumulation_debug = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt","DEBUG");
 
@@ -981,6 +992,8 @@ void Renderer::init()
 				sys_print(Error, "output_texture: couldn't find texture %s\n", texture_name);
 			}
 		});
+
+	spotShadows = std::make_unique<ShadowMapManager>();
 
 }
 
@@ -1446,7 +1459,7 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 		//*if (params.pass != Render_Level_Params::SHADOWMAP)
 		//*	glDepthFunc(GL_GREATER);
 
-		const bool force_backface_state = params.pass == Render_Level_Params::SHADOWMAP;
+		const bool force_backface_state = params.pass == Render_Level_Params::SHADOWMAP || r_debug_mode.get_integer()!=0;
 
 		const bool depth_less_than = params.pass == Render_Level_Params::SHADOWMAP;	// else, GL_GREATER
 		const bool depth_testing = true;
@@ -1897,6 +1910,7 @@ void Render_Scene::init()
 	cascades_rlists.resize(4);
 	for (auto& c : cascades_rlists)
 		c.init(0, 0);
+	spotLightShadowList.init(0, 0);
 
 	glCreateBuffers(1, &gpu_render_instance_buffer);
 	glCreateBuffers(1, &gpu_skinned_mats_buffer);
@@ -2053,6 +2067,51 @@ void cull_shadow_objects_job(uintptr_t user)
 	cull_objects(f, d->visarray, d->count, objs);
 }
 
+void cull_spot_shadow_objects_job(handle<Render_Light> lightId, bool* visArray, int visArraySize, bool& any_dynamic_found)
+{
+	ZoneScopedN("cull_spot_shadow_objects_job");
+	auto& light = draw.scene.light_list.get(lightId.id);
+	auto& p = light.light.position;
+	auto& n = light.light.normal;
+
+	Frustum frustum;
+	View_Setup setup;
+	glm::vec3 up = glm::vec3(0, 1, 0);
+	if (glm::abs(glm::dot(up, n)) > 0.999) 
+		up = glm::vec3(1, 0, 0);
+	setup.view = glm::lookAt(p, p+n,up);
+	setup.origin = p;
+	setup.width = setup.height = 1;	//aratio=1
+	setup.fov = glm::radians(light.light.conemax) * 2.0;
+	build_a_frustum_for_perspective(frustum,setup,nullptr);
+
+	glm::vec4 backplane = glm::vec4(n, 0.0);
+	backplane.w = -glm::dot(n, p + n * light.light.radius);
+
+	auto& objs = draw.scene.proxy_list.objects;
+
+	assert(visArraySize == objs.size());
+	for (int i = 0; i < objs.size(); i++) {
+		const auto& obj = objs[i].type_;
+		const glm::vec3& center = glm::vec3(obj.bounding_sphere_and_radius);
+		const float& radius = obj.bounding_sphere_and_radius.w;
+
+		int res = 0;
+		res += (glm::dot(glm::vec3(frustum.top_plane), center) + frustum.top_plane.w >= -radius) ? 1 : 0;
+		res += (glm::dot(glm::vec3(frustum.bot_plane), center) + frustum.bot_plane.w >= -radius) ? 1 : 0;
+		res += (glm::dot(glm::vec3(frustum.left_plane), center) + frustum.left_plane.w >= -radius) ? 1 : 0;
+		res += (glm::dot(glm::vec3(frustum.right_plane), center) + frustum.right_plane.w >= -radius) ? 1 : 0;
+		res += (glm::dot(glm::vec3(backplane), center) + backplane.w >= -radius) ? 1 : 0;
+
+		visArray[i] = res == 5;
+		visArray[i] = true;
+	}
+
+	// fixme
+	any_dynamic_found = true;
+}
+
+
 
 void calc_lod_job(uintptr_t user)
 {
@@ -2100,6 +2159,42 @@ void set_gpu_objects_data_job(uintptr_t p)
 			gpu_objects[i].prev_anim_mat_offset = prev_bone_buffer_offset + obj.type_.prev_bone_ofs;
 		gpu_objects[i].colorval = proxy.lightmap_coord;
 		gpu_objects[i].flags = 0;
+
+		bool needs_flat = !proxy.static_probe_lit&&!proxy.lightmapped;
+		if (proxy.static_probe_lit) {
+			int index = int(proxy.lightmap_coord.x)*6;
+			if (index >= 0 && index < draw.scene.lightmapObj.staticAmbientCubeProbes.size()) {
+				auto& probes = draw.scene.lightmapObj.staticAmbientCubeProbes;
+				glm::vec3 a0 = probes.at(index);
+				glm::vec3 a1 = probes.at(index+1);
+				glm::vec3 a2 = probes.at(index+2);
+				glm::vec3 a3 = probes.at(index+3);
+				glm::vec3 a4 = probes.at(index+4);
+				glm::vec3 a5 = probes.at(index+5);
+				gpu_objects[i].ambientCube0 = glm::vec4(a0,0.0);
+				gpu_objects[i].ambientCube1 = glm::vec4(a1, 0.0);
+				gpu_objects[i].ambientCube2 = glm::vec4(a2, 0.0);
+				gpu_objects[i].ambientCube3 = glm::vec4(a3, 0.0);
+				gpu_objects[i].ambientCube4 = glm::vec4(a4, 0.0);
+				gpu_objects[i].ambientCube5 = glm::vec4(a5, 0.0);
+			}
+			else
+				needs_flat = true;
+		}
+		if (needs_flat) {
+			glm::vec3 ambientCube[6];
+			glm::vec3 pos = proxy.transform[3];
+			if(proxy.model)
+				pos = proxy.transform * glm::vec4( proxy.model->get_bounds().get_center(),1.0);
+			draw.scene.evaluate_lighting_at_position(pos, ambientCube);
+
+			gpu_objects[i].ambientCube0 = glm::vec4(ambientCube[1],0.f);
+			gpu_objects[i].ambientCube1 = glm::vec4(ambientCube[0],0.f);
+			gpu_objects[i].ambientCube2 = glm::vec4(ambientCube[3],0.f);
+			gpu_objects[i].ambientCube3 = glm::vec4(ambientCube[2],0.f);
+			gpu_objects[i].ambientCube4 = glm::vec4(ambientCube[5],0.f);
+			gpu_objects[i].ambientCube5 = glm::vec4(ambientCube[4],0.f);
+		}
 	}
 }
 
@@ -2216,6 +2311,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	bool* cascade_vis[4] = { nullptr,nullptr,nullptr,nullptr };
 	for(int i=0;i<4;i++)
 		cascade_vis[i] = (bool*)draw.get_arena().alloc_bottom(sizeof(bool) * visible_count);
+	
+
 	auto marker = draw.get_arena().get_bottom_marker();
 	bool* visible_array = (bool*)draw.get_arena().alloc_bottom(sizeof(bool) * visible_count);
 	int8_t* lod_to_render_array = (int8_t*)draw.get_arena().alloc_bottom(sizeof(int8_t) * visible_count);
@@ -2328,14 +2425,10 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		{
 			ZoneScopedN("MergeStaticWithDynamic");
 			if (!skybox_only) {
-				JobCounter* mergeshadowcounter{};
-				JobSystem::inst->add_job(merge_shadow_list_job,uintptr_t(lod_to_render_array), mergeshadowcounter);
-
+				draw.scene.shadow_pass.merge_static_to_dynamic(nullptr, lod_to_render_array, draw.scene.proxy_list);
 				editor_sel_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
 				gbuffer_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
 				transparent_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
-
-				JobSystem::inst->wait_and_free_counter(mergeshadowcounter);
 			}
 		}
 
@@ -2375,6 +2468,25 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		for (int i = 0; i < 4; i++) {
 			shadowlistdecl[i].func(shadowlistdecl[i].funcarg);
 		}
+
+
+		{
+			std::vector<handle<Render_Light>> lightsToCalcShadow;
+			draw.spotShadows->get_lights_to_render(lightsToCalcShadow);
+			// tbh just do it here whatev
+			if (!lightsToCalcShadow.empty()) {
+				bool* spot_visible_array = (bool*)draw.get_arena().alloc_bottom(sizeof(bool) * visible_count);
+				for (int i = 0; i < lightsToCalcShadow.size(); i++) {
+					bool any_dynamic_found = false;
+					cull_spot_shadow_objects_job(lightsToCalcShadow[i], spot_visible_array, visible_count, any_dynamic_found);
+					build_cascade_cpu(spotLightShadowList, draw.scene.shadow_pass,
+						draw.scene.proxy_list,
+						spot_visible_array);
+					draw.spotShadows->do_render(spotLightShadowList, lightsToCalcShadow[i], any_dynamic_found);
+				}
+			}
+		}
+
 		//jobs::add_jobs(shadowlistdecl, 4, shadowlistcounter);
 
 
@@ -2478,22 +2590,50 @@ void update_debug_grid()
 
 ConfigVar debug_sun_shadow("r.debug_csm", "0", CVAR_BOOL | CVAR_DEV,"debug csm shadow rendering");
 ConfigVar debug_specular_reflection("r.debug_specular", "0", CVAR_BOOL | CVAR_DEV, "debug specular lighting");
-
+ConfigVar r_no_indirect("r.no_indirect", "0", CVAR_BOOL, "");
 void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 {
 	ZoneScoped;
 	GPUSCOPESTART(accumulate_gbuffer_lighting);
 
 	const auto& view_to_use = current_frame_view;
+
 	RenderPassSetup setup("gbuffer-lighting", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
 	auto scope = device.start_render_pass(setup);
+	const texhandle ssao_tex = (is_cubemap_view) ? white_texture.gl_id : ssao.texture.result;	// skip ssao in cubemap view
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
+
+	device.reset_states();
+	if(!r_no_indirect.get_bool())
+	{
+		RenderPipelineState state;
+		state.vao = get_empty_vao();
+		state.program = prog.ambient_accumulation;
+		state.blend = blend_state::MULT;
+		state.depth_testing = false;
+		state.depth_writes = false;
+		device.set_pipeline(state);
+
+		bind_texture(0, tex.scene_gbuffer0);
+		bind_texture(1, tex.scene_gbuffer1);
+		bind_texture(2, tex.scene_gbuffer2);
+		bind_texture(3, tex.scene_depth);
+		bind_texture(4, ssao_tex);
+
+		for (int i = 0; i < 6; i++)
+			shader().set_vec3(string_format("AmbientCube[%d]", i), glm::vec3(0.f));
+		// fullscreen shader, no vao used
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+	}
+	device.reset_states();
+
+
 
 	Model* LIGHT_CONE = g_modelMgr.get_light_cone();
 	Model* LIGHT_SPHERE = g_modelMgr.get_light_sphere();
 	Model* LIGHT_DOME = g_modelMgr.get_light_dome();
 	vertexarrayhandle vao = g_modelMgr.get_vao(VaoType::Animated);
 	{
-		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
 
 		RenderPipelineState state;
 		state.vao = vao;
@@ -2510,6 +2650,10 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		bind_texture(1, tex.scene_gbuffer1);
 		bind_texture(2, tex.scene_gbuffer2);
 		bind_texture(3, tex.scene_depth);
+
+		// spot shadow atlas
+		bind_texture(4, spotShadows->get_atlas().get_atlas_texture());
+
 
 		for (auto& light_pair : scene.light_list.objects) {
 			auto& light = light_pair.type_.light;
@@ -2529,6 +2673,15 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 			cmd.primCount = 1;
 			cmd.baseInstance = 0;
 
+			if (light.casts_shadow_mode != 0) {
+				state.program = prog.light_accumulation_shadowed;
+			}
+			else {
+				state.program = prog.light_accumulation;
+			}
+			device.set_pipeline(state);
+
+
 			shader().set_mat4("Model", ModelTransform);
 			shader().set_vec3("position", light.position);
 			shader().set_float("radius", light.radius);
@@ -2538,6 +2691,15 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 			shader().set_vec3("spot_normal",light.normal);
 			shader().set_vec3("color", light.color);
 
+			if (light.casts_shadow_mode != 0) {
+				shader().set_mat4("shadow_view_proj", light_pair.type_.lightViewProj);
+				Rect2d rect = spotShadows->get_atlas().get_atlas_rect(light_pair.type_.shadow_array_handle);
+				glm::ivec2 atlas_size = spotShadows->get_atlas().get_size();
+				//xy is scale, zw is offset
+				glm::vec4 as_vec4 = glm::vec4(float(rect.w) / atlas_size.x, float(rect.h) / atlas_size.y,
+					float(rect.x) / atlas_size.x, float(rect.y) / atlas_size.y);
+				shader().set_vec4("shadow_atlas_offset", as_vec4);
+			}
 
 			glMultiDrawElementsIndirect(
 				GL_TRIANGLES,
@@ -2578,27 +2740,6 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
 
-	{
-		RenderPipelineState state;
-		state.vao = get_empty_vao();
-		state.program = prog.ambient_accumulation;
-		state.blend = blend_state::MULT;
-		state.depth_testing = false;
-		state.depth_writes = false;
-		device.set_pipeline(state);
-
-		bind_texture(0, tex.scene_gbuffer0);
-		bind_texture(1, tex.scene_gbuffer1);
-		bind_texture(2, tex.scene_gbuffer2);
-		bind_texture(3, tex.scene_depth);
-		const texhandle ssao_tex = (is_cubemap_view) ? white_texture.gl_id : ssao.texture.result;	// skip ssao in cubemap view
-		bind_texture(4, ssao_tex);
-
-		for (int i = 0; i < 6; i++)
-			shader().set_vec3(string_format("AmbientCube[%d]", i), glm::vec3(0.f));
-		// fullscreen shader, no vao used
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-	}
 
 	const Texture* reflectionProbeTex = nullptr;
 	if (!scene.skylights.empty() && !scene.skylights.front().skylight.wants_update) {
@@ -2623,7 +2764,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		state.depth_testing = false;
 		state.depth_writes = false;
 		device.set_pipeline(state);
-
+		bind_texture(4, ssao_tex);
 		bind_texture(5, reflectionProbeTex->gl_id);
 		bind_texture(6, EnviornmentMapHelper::get().integrator.get_texture());
 
@@ -2725,6 +2866,7 @@ void Renderer::deferred_decal_pass()
 		state.depth_writes = false;
 		state.program = program;
 		state.vao = vao;
+		state.blend = l->get_master_material()->blend;
 		device.set_pipeline(state);
 
 		glm::mat4 ModelTransform = obj.transform;
@@ -2809,7 +2951,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 	}
 
 	matman.pre_render_update();
-
+	spotShadows->update();
 	check_cubemaps_dirty();
 
 	const bool temp_disable_taa = view.is_ortho;	// ortho view doesnt work with TAA
@@ -2928,6 +3070,8 @@ void Renderer::check_cubemaps_dirty()
 {
 	GPUFUNCTIONSTART;
 
+	bool had_changes = false;
+	double start = GetTime();
 	if (!scene.skylights.empty() && (scene.skylights[0].skylight.wants_update|| force_render_cubemaps.get_bool())) {
 		sys_print(Debug,"check_cubemaps_dirty:rendering skylight cubemap\n");
 		auto& skylight = scene.skylights[0];
@@ -2938,17 +3082,25 @@ void Renderer::check_cubemaps_dirty()
 		auto down = colorvec_linear_to_srgb(glm::vec4(skylight.ambientCube[3], 0.0));
 
 		sys_print(Info, "skylight cubemap up/down irrad: (%f %f %f) (%f %f %f)\n", up.x, up.y, up.z, down.x, down.y, down.z);
+		had_changes = true;
 	}
 	auto& vols = scene.reflection_volumes.objects;
 	for (int i = 0; i < vols.size(); i++) {
 		auto& vol = vols[i].type_;
 		if (vol.wants_update||force_render_cubemaps.get_bool()) {
 			sys_print(Debug, "check_cubemaps_dirty:rendering reflection vol cubemap\n");
-			update_cubemap_specular_irradiance(vol.ambientCube, vol.generated_cube, vol.probe_position, false);
+			glm::vec3 dummy[6];
+			update_cubemap_specular_irradiance(dummy, vol.generated_cube, vol.probe_position, false);
 			vol.wants_update = false;
+			had_changes = true;
 		}
 	}
 	force_render_cubemaps.set_bool(false);
+
+	if (had_changes) {
+		double now = GetTime();
+		sys_print(Debug, "Renderer::check_cubemaps_dirty: time %f\n", float(now - start));
+	}
 }
 ConfigVar r_no_postprocess("r.skip_pp", "0", CVAR_BOOL | CVAR_DEV,"disable post processing");
 ConfigVar r_devicecycle("r.devicecycle", "0", CVAR_INTEGER | CVAR_DEV, "", 0, 10);
@@ -3390,6 +3542,39 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 		float radius = sphere.w* max_scale;
 		in.bounding_sphere_and_radius = glm::vec4(glm::vec3(center), radius);
 	}
+}
+
+void Render_Scene::update_light(handle<Render_Light> handle, const Render_Light& proxy) {
+	ASSERT(!eng->get_is_in_overlapped_period());
+	auto& l = light_list.get(handle.id);
+	l.light = proxy;
+	l.updated_this_frame = true;
+
+	if (l.light.casts_shadow_mode != 0 && l.light.is_spotlight) {
+		auto& p = l.light.position;
+		auto& n = l.light.normal;
+		glm::vec3 up = glm::vec3(0, 1, 0);
+		if (glm::abs(glm::dot(up, n)) > 0.999)
+			up = glm::vec3(1, 0, 0);
+		auto viewMat = glm::lookAt(p, p + n, up);
+		float fov = glm::radians(l.light.conemax) * 2.0;
+		auto proj = glm::perspective(fov, 1.0f, 0.01f, 100.0f);
+		l.lightViewProj = proj * viewMat;
+	}
+
+}
+
+void Render_Scene::remove_light(handle<Render_Light>& handle) {
+	if (eng->get_is_in_overlapped_period()) {
+		add_to_queued_deletes(handle.id, RenderObjectTypes::Light);
+		handle = { -1 };
+		return;
+	}
+	if (!handle.is_valid())
+		return;
+	draw.spotShadows->on_remove_light(handle);
+	light_list.free(handle.id);
+	handle = { -1 };
 }
 
 

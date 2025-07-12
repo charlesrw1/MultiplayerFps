@@ -84,6 +84,10 @@ public:
 	// this creates an asset bundle essentially
 	void dump_loaded_assets_to_disk(const std::string& path);
 
+#ifdef EDITOR_BUILD
+	void get_assets_of_type(std::vector<IAsset*>& out, const ClassTypeInfo* type);
+#endif
+
 	AssetDatabase();
 	~AssetDatabase();
 private:

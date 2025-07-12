@@ -161,11 +161,13 @@ void Level::start(SceneAsset* source)
 		sourceAssetName = source->get_name();
 	else
 		sourceAssetName = "<unnamed level>";
+	double start = GetTime();
 	if (source && source->sceneFile) {
 		insert_unserialized_entities_into_level_internal(*source->sceneFile,nullptr,true);
 		source->sceneFile.reset();
 	}
-		
+	double end = GetTime();
+	sys_print(Debug, "Level::start: took %f\n", float(end - start));
 }
 
 void Level::remove_from_update_list(Component* ec) {

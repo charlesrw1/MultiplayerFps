@@ -51,6 +51,7 @@ static agBuilder make_player_tree(const Model* model)
 #include "Scripting/ScriptManager.h"
 
 void TopDownPlayer::start() {
+	
 	mesh = get_owner()->get_component<MeshComponent>();
 	assert(mesh);
 	assert(mesh->get_model()&&mesh->get_model()->get_skel());

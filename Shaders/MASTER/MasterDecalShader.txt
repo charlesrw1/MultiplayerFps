@@ -50,9 +50,9 @@ void main()
 	local_tangent = VS_IN_Tangent;
 
 	FS_IN_FragPos = vec3(Model * vec4(local_pos,1.0));
-    FS_IN_Normal = mat3(transpose(InverseModel))*normalize(local_normal);
+    FS_IN_Normal = vec3(Model[2]);//mat3(transpose(InverseModel))*normalize(local_normal);
 	
-	vec3 world_tangent = mat3(transpose(InverseModel))*normalize(local_tangent);
+	vec3 world_tangent = vec3(Model[1]);// mat3(transpose(InverseModel))*normalize(local_tangent);
 	vec3 world_bitangent = cross(FS_IN_Normal, world_tangent);
 	
 	FS_IN_TBN = mat3(
@@ -69,9 +69,16 @@ void main()
 
 #ifdef _FRAGMENT_SHADER
 
-//layout (location = 0) out vec3 GBUFFER_OUT_Normal;
-layout (location = 1) out vec4 GBUFFER_OUT_Albedo_AO;		
+layout (location = 1) out vec4 GBUFFER_OUT_Albedo_AO;
+#ifdef DECAL_EMISSIVE_WRITE		
 layout (location = 3) out vec4 GBUFFER_OUT_Emissive;
+#endif
+#ifdef DECAL_NORMAL_WRITE
+layout (location = 0) out vec3 GBUFFER_OUT_Normal;
+#endif
+#ifdef DECAL_ROUGHMETAL_WRITE
+layout (location = 2) out vec4 GBUFFER_OUT_M_R_Custom_Matid;
+#endif
 
 layout(binding = 20) uniform sampler2D DEPTH;		// depth texture (writes disabled)
 
@@ -101,10 +108,11 @@ vec2 FS_IN_Texcoord;
 
 // standard outputs for decals
 vec3 BASE_COLOR = vec3(0.0);	// albedo
-float ROUGHNESS = 0.5;
 vec3 EMISSIVE = vec3(0.0);		// emissive color, added after lighting (also main input for unlit)
 vec3 NORMALMAP = vec3(0.5,0.5,1.0);		// tangent space normal map
 float OPACITY = 1.0;					// opacity, for alpha test
+float ROUGHNESS = 0.5;
+float METALLIC = 0.0;
 
 // Decal specific inputs
 vec3 FS_DecalFragPos;
@@ -139,19 +147,28 @@ void main()
 	// call to user code
 	FSmain();
 	
+	#ifdef ALPHATEST
 	// decals wants to discard
 	if(OPACITY < 0.5)
 		discard;
+	#endif	// !ALPHATEST
 	
-	GBUFFER_OUT_Albedo_AO = vec4(BASE_COLOR*val,0.0);//vec4(vec3(-proj.z),0.0);//vec2(FS_IN_Texcoord)*val,0.0, 0.0);
+	GBUFFER_OUT_Albedo_AO = vec4(BASE_COLOR,OPACITY);//vec4(vec3(-proj.z),0.0);//vec2(FS_IN_Texcoord)*val,0.0, 0.0);
+	#ifdef DECAL_EMISSIVE_WRITE
 	GBUFFER_OUT_Emissive = vec4(EMISSIVE,0.0);
-
+	#endif
+	#ifdef DECAL_NORMAL_WRITE
 	vec3 Normalized_IN_N = normalize(FS_IN_Normal);
 	
 	// World space normal
 	vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
 	Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
-	//GBUFFER_OUT_Normal = Final_Normal;
+	GBUFFER_OUT_Normal = Final_Normal;
+	#endif
+	
+	#ifdef DECAL_ROUGHMETAL_WRITE
+	GBUFFER_OUT_M_R_Custom_Matid=vec4(METALLIC,ROUGHNESS,0,OPACITY);
+	#endif
 }
 
 #endif // _FRAGMENT_SHADER

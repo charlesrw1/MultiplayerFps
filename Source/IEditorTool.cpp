@@ -255,53 +255,26 @@ void IEditorTool::draw_imgui_public()
 	imgui_draw();
 	draw_popups_for_editor(open_open_popup, open_save_popup, name, this, FileSys::get_game_path());
 }
-
+#include "EngineSystemCommands.h"
+#include "Game/LevelAssets.h"
 void IEditorTool::draw_menu_bar()
 {
 	if (ImGui::BeginMenuBar())
 	{
 		if (ImGui::BeginMenu("File"))
 		{
-			if (has_create_new_menu_item()) {
-				if (ImGui::MenuItem("New")) {
-					//open("");
-
-					//Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, "start_ed Map \"\"");
-					auto metadata = AssetRegistrySystem::get().find_for_classtype(&get_asset_type_info());
-					assert(metadata);
-					char* command = string_format("start_ed %s \"\"", metadata->get_type_name().c_str());;
-					Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, command);
-				}
-			}
-			if (ImGui::MenuItem("Open", "Ctrl+O")) {
-				open_the_open_popup();
-
-			}
 			if (ImGui::MenuItem("Save", "Ctrl+S")) {
 				save();
+			}
+			if (ImGui::MenuItem("New map")) {
+				Cmd_Manager::inst->append_cmd(std::make_unique<OpenEditorToolCommand>(SceneAsset::StaticType, std::nullopt, true));
+			}
+			if (ImGui::MenuItem("New prefab")) {
+				Cmd_Manager::inst->append_cmd(std::make_unique<OpenEditorToolCommand>(PrefabAsset::StaticType, std::nullopt, true));
 			}
 
 			hook_menu_bar_file_menu();
 
-			ImGui::EndMenu();
-		}
-		if (ImGui::BeginMenu("Tools")) {
-
-			auto& types = AssetRegistrySystem::get().get_types();
-
-			for (int i = 0; i < types.size(); i++) {
-				auto& type = types[i];
-				if (type->tool_to_edit_me() && type->show_tool_in_toolbar()) {
-					std::string name = type->get_type_name();
-					ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(type->get_browser_color().to_uint()));
-					if (ImGui::MenuItem(name.c_str())) {
-						const char* command = string_format("start_ed %s \"\"", type->get_type_name().c_str());;
-						Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, command);
-					}
-					ImGui::PopStyleColor();
-				}
-
-			}
 			ImGui::EndMenu();
 		}
 

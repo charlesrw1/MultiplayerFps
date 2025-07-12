@@ -165,7 +165,7 @@ program_handle MaterialManagerLocal::get_mat_shader(
 
 const MasterMaterialImpl* MaterialInstance::get_master_material() const
 {
-	return impl->masterMaterial;
+	return impl->get_master_impl();
 }
 
 bool MaterialInstance::is_this_a_master_material() const
@@ -195,7 +195,7 @@ bool MaterialInstance::load_asset(IAssetLoadingInterface* loading)
 void MaterialInstance::sweep_references(IAssetLoadingInterface* loading)const {
 	if (!impl)
 		return;
-	loading->touch_asset(impl->parentMatInstance.get_unsafe());
+	loading->touch_asset(impl->masterMaterial);
 	for (int i = 0; i < impl->params.size(); i++) {
 		auto& p = impl->params[i];
 		if (p.type == MatParamType::Texture2D || p.type == MatParamType::ConstTexture2D) {
@@ -209,10 +209,10 @@ void MaterialInstance::uninstall()
 
 #ifdef EDITOR_BUILD
 	if (impl && impl->masterMaterial)
-		impl->masterMaterial->self->reload_dependents.erase(this);
+		impl->masterMaterial->reload_dependents.erase(this);
 #endif
-
 	matman.free_material_instance(this);
+	impl.reset();
 }
 void MaterialInstance::post_load()
 {
@@ -224,28 +224,43 @@ void MaterialInstance::post_load()
 		impl->post_load(this);
 		impl->has_called_post_load_already = true;
 #ifdef EDITOR_BUILD
-		if (impl->masterMaterial->self != this)
-			impl->masterMaterial->self->reload_dependents.insert(this);
+		if (impl->masterMaterial != this)
+			impl->masterMaterial->reload_dependents.insert(this);
 #endif
 	}
 }
+
+// BLECH!!
 void MaterialInstance::move_construct(IAsset* _other)
 {
 	auto other = (MaterialInstance*)_other;
 	//uninstall();	// fixme: unsafe for materials already referencing us
 #ifdef EDITOR_BUILD
-	other->impl->masterMaterial->self->reload_dependents.erase(other);
+	//if (impl->masterMaterial->self != this)
+	//	impl->masterMaterial->self->reload_dependents.erase(this);
+
+	other->impl->masterMaterial->reload_dependents.erase(other);
 	other->reload_dependents = std::move(this->reload_dependents);
 #endif
+	auto myParentMat = impl->masterMaterial;
 	*this = std::move(*other);
-	this->impl->self = this;
-	assert(impl->masterMaterial);
-	if(impl->masterImpl)
-		this->impl->masterImpl->self = this;
+	impl->self = this;
+
+	if (impl->masterImpl) {
+		impl->masterImpl->self = this;
+		impl->masterMaterial = this;
+	}
+	else {
+	
+		MaterialInstance* newParent = g_assets.find_sync<MaterialInstance>(impl->masterMaterial->get_name()).get();
+		assert(newParent);
+		impl->masterMaterial = newParent;
+		assert(impl->masterMaterial);
+	}
 
 #ifdef EDITOR_BUILD
-	if(impl->masterMaterial->self!=this)
-		impl->masterMaterial->self->reload_dependents.insert(this);
+	if(impl->masterMaterial!=this)
+		impl->masterMaterial->reload_dependents.insert(this);
 #endif
 }
 
@@ -266,14 +281,13 @@ void MaterialImpl::post_load(MaterialInstance* self)
 void MaterialImpl::init_from(const MaterialInstance* parent)
 {
 	auto parent_master = parent->get_master_material();
-	parentMatInstance.ptr = (MaterialInstance*)parent;
+	masterMaterial = (MaterialInstance*)parent;
 	
 
 	params.resize(parent_master->param_defs.size());
 	for (int i = 0; i < parent_master->param_defs.size(); i++)
 		params[i] = parent->impl->params[i];
 	texture_bindings.resize(parent_master->num_texture_bindings, nullptr);
-	masterMaterial = parent_master;
 }
 
 void MaterialImpl::load_master(MaterialInstance* self, IFile* file,IAssetLoadingInterface* loading)
@@ -281,13 +295,13 @@ void MaterialImpl::load_master(MaterialInstance* self, IFile* file,IAssetLoading
 	masterImpl = std::make_unique<MasterMaterialImpl>();
 	masterImpl->self = self;
 	masterImpl->load_from_file(self->get_name(), file,loading);
+	masterMaterial = self;
 	
 	// init default instance, textures get filled in the dirty list
 	params.resize(masterImpl->param_defs.size());
 	for (int i = 0; i < masterImpl->param_defs.size(); i++)
 		params[i] = masterImpl->param_defs[i].default_value;
 	texture_bindings.resize(masterImpl->num_texture_bindings, nullptr);
-	masterMaterial = masterImpl.get();
 }
 
 MaterialInstance::MaterialInstance()
@@ -300,7 +314,27 @@ MaterialInstance::~MaterialInstance()
 	if (impl&&impl->is_dynamic_material) {
 		matman.free_dynamic_material(this);
 	}
+#ifdef _DEBUG
+	std::vector<IAsset*> mats;
+	g_assets.get_assets_of_type(mats, &MaterialInstance::StaticType);
+	for (auto mat : mats) {
+		if (mat == this) continue;
+		assert(mat);
+		auto matPtr = (MaterialInstance*)mat;
+		if (!matPtr->impl) continue;
+		assert(!impl||matPtr->impl->masterMaterial !=this);
+	}
+	std::vector<IAsset*> mods;
+	g_assets.get_assets_of_type(mods, &Model::StaticType);
+	for (auto mod : mods) {
+		auto modPtr = (Model*)mod;
+		assert(mod);
 
+		for (int i = 0; i < modPtr->get_num_materials(); i++) {
+			assert(modPtr->get_material(i) != this);
+		}
+	}
+#endif
 }
 
 MaterialInstance* MaterialInstance::load(const std::string& path)
@@ -333,13 +367,14 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file, IAssetLoad
 
 		init_from(parent.get());
 		assert(masterMaterial);
-		assert(params.size() == masterMaterial->param_defs.size());
+		auto masterMat = get_master_impl();
+		assert(params.size() == masterMat->param_defs.size());
 		while (in.read_string(tok) && !in.is_eof()) {
 			if (tok.cmp("VAR")) {
 				in.read_string(tok);
 				std::string paramname = to_std_string_sv(tok);
 				int index = 0;
-				auto ptr = masterMaterial->find_definition(paramname, index);
+				auto ptr = masterMat->find_definition(paramname, index);
 				if (!ptr)
 					throw MasterMaterialExcept("Couldnt find parent parameter: " + paramname);
 				assert(index < params.size()&&index>=0);
@@ -522,13 +557,25 @@ void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 					alpha_tested = parse_options({ "false","true" });
 				}
 				else if (tok.cmp("BlendMode")) {
-					blend = (blend_state)parse_options({ "Opaque","Blend","Add" });
+					blend = (blend_state)parse_options({ "Opaque","Blend","Add","Mult","Screen","PreMult"});
 				}
 				else if (tok.cmp("LightingMode")) {
 					light_mode = (LightingMode)parse_options({ "Lit","Unlit" });
 				}
 				else if (tok.cmp("ShowBackfaces")) {
 					backface = parse_options({ "false","true" });
+				}
+				else if (tok.cmp("WriteAlbedo")) {
+					decal_affect_albedo = true;
+				}
+				else if (tok.cmp("WriteNormal")) {
+					decal_affect_normal = true;
+				}
+				else if (tok.cmp("WriteEmissive")) {
+					decal_affect_emissive = true;
+				}
+				else if (tok.cmp("WriteRoughMetal")) {
+					decal_affect_roughmetal = true;
 				}
 				else
 					throw MasterMaterialExcept("Unknown OPT " + to_std_string_sv(tok));
@@ -748,6 +795,18 @@ std::string MasterMaterialImpl::create_glsl_shader(
 	else if (usage == MaterialUsage::Particle)
 		master_shader_path = "MASTER/MasterParticleShader.txt";
 
+	// handle defines here?
+	if (usage == MaterialUsage::Decal) {
+		if (decal_affect_albedo)
+			masterShader += "#define DECAL_ALBEDO_WRITE\n";
+		if(decal_affect_emissive)
+			masterShader += "#define DECAL_EMISSIVE_WRITE\n";
+		if (decal_affect_normal)
+			masterShader += "#define DECAL_NORMAL_WRITE\n";
+		if (decal_affect_roughmetal)
+			masterShader += "#define DECAL_ROUGHMETAL_WRITE\n";
+	}
+
 	try {
 		read_and_add_recursive(master_shader_path, masterShader);
 	}
@@ -954,6 +1013,7 @@ void MaterialManagerLocal::pre_render_update()
 		glNamedBufferSubData(gpuMaterialBuffer, mat->impl->gpu_buffer_offset * sizeof(uint), MATERIAL_SIZE, data_to_upload);
 
 	}
+
 	dirty_list.clear();
 }
 

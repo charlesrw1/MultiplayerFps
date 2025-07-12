@@ -131,6 +131,11 @@ private:
 	}
 
 	IAsset* create_asset(const string& path, const ClassTypeInfo* info) {
+		auto as = create_asset_no_add(path, info);
+		MapUtil::insert_test_exists(local_asset_loads, path, as);
+		return as;
+	}
+	IAsset* create_asset_no_add(const string& path, const ClassTypeInfo* info) {
 		auto a = info->allocate_this_type();
 		assert(a->is_a<IAsset>());
 		IAsset* as = (IAsset*)a;
@@ -142,10 +147,9 @@ private:
 		if (f)
 			as->asset_load_time = f->get_timestamp();
 #endif
-
-		local_asset_loads.insert({ path,as});
 		return as;
 	}
+
 
 	bool is_in_job = false;
 	bool stop_processing = false;
@@ -277,6 +281,7 @@ void AssetBackend::execute_job(AsyncQueuedJob* job)
 
 		// force create it
 		job->out_object = force_create_asset(job->path,job->info,job->is_system_asset);
+		assert(existing != job->out_object);
 		job->reloaded_also.push_back(job->out_object);
 
 		// do the dependents
@@ -555,6 +560,13 @@ public:
 					assert(existing);
 					assert(existing != o);
 					delete o;	// delete the reloaded copy
+
+				#ifdef _DEBUG
+					for (auto& [_, ptr] : allAssets) {
+						assert(ptr != o);
+					}
+				#endif
+
 					job->other_assets.push_back(existing);
 				}
 				job->out_object = job->other_assets.at(0);	// first object
@@ -671,7 +683,8 @@ public:
 		}
 	}
 	void reload_asset_sync(IAsset* asset) {
-		assert(asset);
+		if (!asset)
+			return;
 
 		function<void(GenericAssetPtr)> func;
 		reload_asset_async(asset, asset->is_system, func);
@@ -700,6 +713,8 @@ public:
 
 		GcMarkingInterface marking;
 		for (auto& asset : allAssets) {
+			if (!asset.second)
+				continue;
 			if (asset.second->gc == IAsset::Gray) {
 				marking.marklist.push_back(asset.second);
 			}
@@ -707,6 +722,8 @@ public:
 		while (!marking.marklist.empty()) {
 			IAsset* back = marking.marklist.back();
 			marking.marklist.pop_back();
+			if (!back)
+				continue;
 			back->sweep_references(&marking);
 			back->gc = IAsset::Black;
 		}
@@ -722,6 +739,12 @@ public:
 		}
 		for (auto i : remove_these) {
 			allAssets.erase(i->get_name());
+#ifdef _DEBUG
+			for (auto& [_, ptr] : allAssets) {
+				assert(ptr != i);
+			}
+#endif
+
 			delete i;
 		}
 	}
@@ -808,6 +831,12 @@ public:
 	}
 	bool is_asset_loaded(const string& path) {
 		return MapUtil::contains(allAssets, path);
+	}
+	void get_assets_of_type(std::vector<IAsset*>& out, const ClassTypeInfo* type) {
+		for (auto& [path, ptr] : allAssets) {
+			if (ptr->get_type().is_a(*type))
+				out.push_back(ptr);
+		}
 	}
 private:
 	IAsset* find_in_all_assets(const string& str) {
@@ -917,6 +946,10 @@ void AssetDatabase::dump_loaded_assets_to_disk(const std::string& path)
 		sys_print(Error, "AssetDatabase::dump_loaded_assets_to_disk: path couldn't open %s\n", path.c_str());
 	}
 	impl->dump_to_file(file.get());
+}
+void AssetDatabase::get_assets_of_type(std::vector<IAsset*>& out, const ClassTypeInfo* type)
+{
+	impl->get_assets_of_type(out, type);
 }
 PrimaryAssetLoadingInterface::PrimaryAssetLoadingInterface(AssetDatabaseImpl& frontend) : impl(frontend) {
 }

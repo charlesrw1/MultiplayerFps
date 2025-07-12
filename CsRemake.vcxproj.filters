@@ -673,6 +673,7 @@
     <ClCompile Include="Source\Game\Components\GraphCurveComponent.cpp" />
     <ClCompile Include="Source\AssetCompile\write_gltf.cpp" />
     <ClCompile Include="Source\External\miniz.c" />
+    <ClCompile Include="Source\Render\RenderExtra.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

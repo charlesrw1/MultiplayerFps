@@ -12,7 +12,9 @@ struct Render_Reflection_Volume
 	glm::vec3 boxmax = glm::vec3(0.f);
 	bool wants_update = false;
 	Texture* generated_cube = nullptr;
-	glm::vec3 ambientCube[6];
+	// manually set by baker, for reasons...
+	//glm::vec3 ambientCube[6];
+	int probe_ofs = -1;
 };
 
 // sky reflection and ambient

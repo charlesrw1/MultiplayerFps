@@ -152,7 +152,9 @@ struct ROP_Internal
 struct RL_Internal{
 	Render_Light light;
 	// stuff like shadowmap indicies etc.
-	int shadow_array_index = -1;
+	int shadow_array_handle = -1;
+	bool updated_this_frame = false;
+	glm::mat4 lightViewProj = glm::mat4(1.f);
 };
 struct RDecal_Internal{
 	Render_Decal decal;
@@ -251,7 +253,6 @@ struct ParticleObj_Internal
 };
 
 
-
 class TerrainInterfaceLocal;
 class Render_Scene : public RenderScenePublic
 {
@@ -293,22 +294,8 @@ public:
 		//update_light(handle, proxy);
 		return handle;
 	}
-	void update_light(handle<Render_Light> handle, const Render_Light& proxy) override {
-		ASSERT(!eng->get_is_in_overlapped_period());
-		auto& l = light_list.get(handle.id);
-		l.light = proxy;
-	}
-	void remove_light(handle<Render_Light>& handle) override {
-		if (eng->get_is_in_overlapped_period()) {
-			add_to_queued_deletes(handle.id, RenderObjectTypes::Light);
-			handle = { -1 };
-			return;
-		}
-		if (!handle.is_valid())
-			return;
-		light_list.free(handle.id);
-		handle = { -1 };
-	}
+	void update_light(handle<Render_Light> handle, const Render_Light& proxy) override;
+	void remove_light(handle<Render_Light>& handle) override;
 
 	handle<Render_Decal> register_decal() override {
 		ASSERT(!eng->get_is_in_overlapped_period());
@@ -528,7 +515,7 @@ public:
 		has_lightmap = true;
 		return { 0 };
 	}
-	void update_lightmap(handle<Lightmap_Object> lightmap, const Lightmap_Object& obj) final {
+	void update_lightmap(handle<Lightmap_Object> lightmap, Lightmap_Object& obj) final {
 		assert(!eng->get_is_in_overlapped_period());
 		if (!lightmap.is_valid()) {
 			sys_print(Warning, "RenderScene::update_lightmap: invalid lightmap handle\n");
@@ -536,7 +523,7 @@ public:
 		}
 		assert(lightmap.id == 0);
 		assert(has_lightmap);
-		lightmapObj = obj;
+		lightmapObj = std::move(obj);
 	}
 	void remove_lightmap(handle<Lightmap_Object> handle) final {
 		if (!handle.is_valid()) {
@@ -608,6 +595,32 @@ public:
 		queued_deletes.clear();
 	}
 
+	void evaluate_lighting_at_position(const glm::vec3& pos, glm::vec3* ambientCubeOut /* expects size 6 vector*/) const {
+		auto& vols = reflection_volumes.objects;
+		if (has_lightmap) {
+			for (auto& [_, vol] : vols) {
+				if (vol.wants_update || vol.probe_ofs == -1)
+					continue;
+				Bounds b(vol.boxmin, vol.boxmax);
+				if (b.inside(pos, 0)) {
+					auto& probes = lightmapObj.staticAmbientCubeProbes;
+					for (int i = 0; i < 6; i++)
+						ambientCubeOut[i] = probes.at(vol.probe_ofs * 6 + i);
+					return;	// early out
+				}
+			}
+		}
+		// hasnt found yet
+		if (!skylights.empty()&&!skylights.at(0).skylight.wants_update) {
+			for (int i = 0; i < 6; i++)
+				ambientCubeOut[i] = skylights.at(0).ambientCube[i];
+			return;
+		}
+		// set to constant
+		for (int i = 0; i < 6; i++)
+			ambientCubeOut[i] = glm::vec3(0.1);
+	}
+
 	void build_scene_data(bool skybox_only, bool is_for_editor);
 	void refresh_static_mesh_data(bool is_for_editor);
 	RSunInternal* get_main_directional_light();
@@ -626,6 +639,8 @@ public:
 	Render_Lists transparent_rlist;
 	std::vector<Render_Lists> cascades_rlists;	// lists specific to each cascade, culled
 	Render_Lists editor_sel_rlist;
+	Render_Lists spotLightShadowList;
+
 
 	int get_front_bone_buffer_offset() const {
 		return gpu_skinned_mats_using_front_buffer ? 0 : gpu_skinned_mats_buffer_size / 2;
@@ -644,6 +659,7 @@ public:
 
 	bool has_lightmap = false;
 	Lightmap_Object lightmapObj;
+
 
 	Free_List<ROP_Internal> proxy_list;
 	Free_List<MeshbuilderObj_Internal> meshbuilder_objs;

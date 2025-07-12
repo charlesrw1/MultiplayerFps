@@ -16,6 +16,13 @@ struct Object_Instance
 	uint flags;	// INSTANCE_x
 	uint colorval2;
 	uint prev_anim_mat_offset;
+	vec4 ambientCube0;
+	vec4 ambientCube1;
+	vec4 ambientCube2;
+	vec4 ambientCube3;
+	vec4 ambientCube4;
+	vec4 ambientCube5;
+	
 };
 
 // flags for 'bitmask_flags'

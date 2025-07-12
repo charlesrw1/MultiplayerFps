@@ -62,3 +62,21 @@ void DecalComponent::set_material(const MaterialInstance* mat)
 	material.ptr = (MaterialInstance*)mat;
 	sync_render_data();
 }
+#include "UI/GUISystemPublic.h"
+class DecalComponentEditorUi : public IComponentEditorUi {
+public:
+	DecalComponentEditorUi(DecalComponent* decal) : decal(decal) {
+
+	}
+	DecalComponent* decal = nullptr;
+	bool draw() final {
+		auto& window = UiSystem::inst->window;
+		//window.draw()
+
+		return false;
+	}
+};
+std::unique_ptr<IComponentEditorUi> DecalComponent::create_editor_ui()
+{
+	return std::make_unique<DecalComponentEditorUi>(this);
+}

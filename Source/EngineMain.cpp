@@ -713,15 +713,17 @@ void OpenMapCommand::execute()
 	sys_print(Debug, "OpenMapCommand::execute\n");
 	if (eng_local.is_waiting_on_map_load) {
 		sys_print(Warning,"OpenMapCommand::execute(%s): already waiting on another OpenMapCommand\n", map_name.value_or("<empty>").c_str());
-		callback(OpenMapReturnCode::AlreadyLoadingMap);
+		if(callback)
+			callback(OpenMapReturnCode::AlreadyLoadingMap);
 	}
 	else if (map_name.has_value()) {
 		function<void(OpenMapReturnCode)> callback = this->callback;
 		bool is_for_playing = this->is_for_playing;
 		string mapname = map_name.value_or("<unnamed>");
 		eng_local.is_waiting_on_map_load = true;
+		double start_time = GetTime();
 		g_assets.find_async<SceneAsset>(map_name.value(),
-			[callback, is_for_playing, mapname](GenericAssetPtr ptr) {
+			[start_time,callback, is_for_playing, mapname](GenericAssetPtr ptr) {
 				SceneAsset* level = (ptr) ? ptr.cast_to<SceneAsset>().get() : nullptr;
 				// level loaded
 				const bool level_is_valid = level != nullptr;
@@ -735,6 +737,9 @@ void OpenMapCommand::execute()
 				}
 				assert(!eng_local.is_waiting_on_map_load);
 				auto code = level_is_valid ? OpenMapReturnCode::Success : OpenMapReturnCode::FailedToLoad;
+				double now = GetTime();
+				sys_print(Debug, "OpenMapCommand::execute: took %f\n", float(now - start_time));
+
 				if(callback)
 					callback(code);
 			});
@@ -1473,14 +1478,15 @@ int game_engine_main(int argc, char** argv)
 {
 
 	material_print_debug.set_bool(true);
-	developer_mode.set_bool(true);
+	developer_mode.set_bool(false);
 	log_shader_compiles.set_bool(false);
 
-	loglevel.set_integer(4);
+	loglevel.set_integer(1);
 	eng_local.init(argc,argv);
-	developer_mode.set_bool(true);
+	developer_mode.set_bool(false);
 	log_all_asset_loads.set_bool(false);
 	log_destroy_game_objects.set_bool(false);
+	loglevel.set_integer(1);
 
 	vector<IntTestCase> tests;
 	tests.push_back({ test_integration_1, "myTest" });
@@ -1605,6 +1611,8 @@ void GameEngineLocal::cleanup()
 	//if (get_current_tool())
 	//	get_current_tool()->close();
 #endif
+	if (editorState)
+		editorState.reset();
 	if (level) {
 		stop_game();
 	}

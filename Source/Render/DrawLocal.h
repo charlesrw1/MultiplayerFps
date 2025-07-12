@@ -426,7 +426,7 @@ public:
 		program_handle tex_debug_2d_array{};
 		program_handle tex_debug_cubemap{};
 
-
+		program_handle light_accumulation_shadowed{};
 		program_handle light_accumulation{};
 		program_handle sunlight_accumulation{};
 		program_handle sunlight_accumulation_debug{};
@@ -445,6 +445,9 @@ public:
 		fbohandle composite{};
 
 		fbohandle gbuffer{};	// 4 MRT (gbuffer0-2, scene_color)
+
+
+
 		fbohandle forward_render{};	// scene_color, use for translucents
 
 		fbohandle editorSelectionDepth{};	// just a depth buffer for the editor to draw selected objs into
@@ -542,6 +545,7 @@ public:
 	SSAO_System ssao;
 	CascadeShadowMapSystem shadowmap;
 	Volumetric_Fog_System volfog;
+	std::unique_ptr<ShadowMapManager> spotShadows;
 
 	DebuggingTextureOutput debug_tex_out;
 

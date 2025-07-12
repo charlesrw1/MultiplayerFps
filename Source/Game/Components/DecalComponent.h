@@ -26,6 +26,7 @@ public:
 	const char* get_editor_outliner_icon() const final {
 		return "eng/editor/decal.png";
 	}
+	std::unique_ptr<IComponentEditorUi> create_editor_ui() final;
 #endif
 private:
 	REFLECT();

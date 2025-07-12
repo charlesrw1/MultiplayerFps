@@ -42,49 +42,53 @@ public:
 	void compute();
 };
 
-// shadowmap manager
-// manages: 
-// allocation of shadowmap
-// when to update
-// strategies:
-// dont update if light is out of view frustum
-// remove from allocation if further than max shadow distance
-// if static, only update once
 
-class SpotlightShadowManager
-{
+// manages an atlas for spotlight shadows
+// atlas size=1024x1024
+// big shadow = 512x512
+// medium = 256x256
+// small = 128x128
+// small shadows are half that
+#include "Framework/Rect2d.h"
+class Texture;
+class ShadowMapAtlas {
 public:
-	const int MAX_SHADOWS = 8;
-
-	void init();
+	ShadowMapAtlas();
+	int allocate(int8_t size);
+	void free(int handle);
+	Rect2d get_atlas_rect(int handle);
+	texhandle get_atlas_texture();
+	glm::ivec2 get_size() {
+		return atlas_size;
+	}
+private:
+	struct Available {
+		Rect2d rect;
+		int8_t quality = 0;
+		bool used = false;
+	};
+	std::vector<Available> rects;
+	glm::ivec2 atlas_size = { 0,0 };
+	texhandle atlas_texture=0;
+	Texture* vtsHandle = nullptr;
+};
+#include "Render_Light.h"
+// total abstraction garbage
+struct Render_Lists;
+class ShadowMapManager {
+public:
+	ShadowMapManager();
 	void update();
-	void remove_light(handle<Render_Light> handle) {
-		for (int i = 0; i < slots_used.size(); i++) {
-			if (slots_used[i].id == handle.id) {
-				slots_used[i].id = -1;
-				num_used--;
-				return;
-			}
-		}
+	void get_lights_to_render(std::vector<handle<Render_Light>>& vec);
+	void do_render(Render_Lists& list, handle<Render_Light> handle, bool any_dynamic_in_frustum);
+	void on_remove_light(handle<Render_Light> h);
+	ShadowMapAtlas& get_atlas() {
+		return atlas;
 	}
-	void make_render_targets();
-
-	int find_index(handle<Render_Light> handle) {
-		for (int i = 0; i < slots_used.size(); i++) {
-			if (slots_used[i].id == handle.id) {
-				return i;
-			}
-		}
-		return -1;
-	}
-
-	struct textures {
-		texhandle shadow_array{};
-		Texture* shadow_vts_handle = nullptr;
-	}tex;
-
-	int num_used = 0;
-	std::vector<handle<Render_Light>> slots_used;
+private:
+	ShadowMapAtlas atlas;
+	fbohandle shadow_fbo = 0;
+	bufferhandle frame_view = 0;
 };
 
 class CascadeShadowMapSystem
@@ -186,7 +190,7 @@ public:
 
 	struct params {
 		float radius = 0.4;
-		float intensity = 2.5;
+		float intensity = 1.5;
 		float bias = 0.1;
 		float blur_sharpness = 3.0;
 	}tweak;

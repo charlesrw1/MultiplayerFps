@@ -35,6 +35,17 @@ void MeshComponent::set_lightmapped(LightmapCoords coords)
 void MeshComponent::set_not_lightmapped()
 {
 	lightmapped = false;
+	static_probe_lit = false;
+	sync_render_data();
+}
+void MeshComponent::set_static_probe_lit(int index)
+{
+	if (lightmapped) {
+		sys_print(Warning, "MeshComponent::set_static_probe_lit: already ligtmapped?\n");
+		lightmapped = false;
+	}
+	static_probe_lit = true;
+	lmCoords.x = float(index);
 	sync_render_data();
 }
 #endif
@@ -135,6 +146,10 @@ void MeshComponent::on_sync_render_data()
 		obj.mat_override = eMaterialOverride[0].get();
 	if (lightmapped) {
 		obj.lightmapped = true;
+		obj.lightmap_coord = lmCoords.to_vec4();
+	}
+	else if (static_probe_lit) {
+		obj.static_probe_lit = true;
 		obj.lightmap_coord = lmCoords.to_vec4();
 	}
 

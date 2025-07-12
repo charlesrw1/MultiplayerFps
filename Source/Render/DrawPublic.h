@@ -101,7 +101,7 @@ public:
 	virtual void remove_particle_obj(handle<Particle_Object>& handle) = 0;
 
 	virtual handle<Lightmap_Object> register_lightmap() = 0;
-	virtual void update_lightmap(handle<Lightmap_Object> handle, const Lightmap_Object& lm) = 0;
+	virtual void update_lightmap(handle<Lightmap_Object> handle, Lightmap_Object& lm) = 0;
 	virtual void remove_lightmap(handle<Lightmap_Object> obj) = 0;
 };
 

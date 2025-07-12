@@ -16,8 +16,9 @@ struct Render_Light
 	float conemax = 45.f;
 	float shadow_bias = 0.01;
 
-	bool casts_shadow = false;
-	bool cast_static_only = false;	// will not update in realtime, just once for static
+	int8_t casts_shadow_mode = 0;	//0=no,1=dynamic updates,2=static shadows
+	int8_t casts_shadow_size = 0;	//0=small,1=medium,2=big
+
 	bool is_spotlight = false;
 
 	// light cookie texture

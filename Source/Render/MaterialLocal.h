@@ -28,12 +28,18 @@ enum class MaterialUsage : uint8_t
 	Particle,
 };
 
+
+
 enum class blend_state : uint8_t
 {
 	OPAQUE,
 	BLEND,
 	ADD,
-	MULT
+	MULT,
+
+	// just for fun testing
+	SCREEN,
+	PREMULT_BLEND,
 };
 
 // Parameter types
@@ -107,12 +113,14 @@ struct InstanceData
 class MasterMaterialImpl
 {
 public:
-	MasterMaterialImpl() {}
+	MasterMaterialImpl() {
+	
+	}
 	~MasterMaterialImpl() {
 		sys_print(Debug, "~MasterMaterialImpl: %s\n", self->get_name().c_str());
 	}
 	const MaterialParameterDefinition* find_definition(const std::string& str, int& index) const;
-	bool is_translucent() const { return blend == blend_state::ADD || blend == blend_state::BLEND; }
+	bool is_translucent() const { return blend != blend_state::OPAQUE; }
 	bool render_in_forward_pass() const { return is_translucent(); }
 	bool is_alphatested() const { return alpha_tested; }
 	void load_from_file(const std::string& fullpath, IFile* file, IAssetLoadingInterface* loading);
@@ -142,6 +150,12 @@ public:
 	int material_id = 0;
 	bool is_compilied_shader_valid = false;
 
+	// decal options
+	bool decal_affect_albedo = false;
+	bool decal_affect_normal = false;
+	bool decal_affect_roughmetal = false;
+	bool decal_affect_emissive = false;
+
 	friend class MaterialManagerLocal;
 	friend class MaterialLodJob;
 };
@@ -161,19 +175,25 @@ public:
 	void load_master(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
 	void post_load(MaterialInstance* self);
 	MaterialParameterValue* find_parameter(StringName name) {
-		for (int i = 0; i < masterMaterial->param_defs.size(); i++) {
-			if (masterMaterial->param_defs[i].hashed_name == name) {
+		auto master = get_master_impl();
+		assert(master);
+		for (int i = 0; i < master->param_defs.size(); i++) {
+			if (master->param_defs[i].hashed_name == name) {
 				return &params.at(i);
 			}
 		}
 		return nullptr;
 	}
 
+	MasterMaterialImpl* get_master_impl() const {
+		assert(masterMaterial);
+		return masterMaterial->impl ? masterMaterial->impl->masterImpl.get() : nullptr;
+	}
+
 	MaterialInstance* self = nullptr;
 	bool is_dynamic_material = false;
 	int unique_id = 0;	// unique id of this material instance (always valid)
-	AssetPtr<MaterialInstance> parentMatInstance;
-	const MasterMaterialImpl* masterMaterial = nullptr;	// this points to what master material this is instancing (valid on every material!)
+	MaterialInstance* masterMaterial = nullptr;	// this points to what master material this is instancing (valid on every material!)
 	std::unique_ptr<MasterMaterialImpl> masterImpl;	// if this material instance is a default instance of a master material, this is filled
 	std::vector<const Texture*> texture_bindings;
 	std::vector<MaterialParameterValue> params;

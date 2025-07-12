@@ -121,6 +121,7 @@
     <ClCompile Include="Source\Render\EnvProbe.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />
     <ClCompile Include="Source\Render\Model.cpp" />
+    <ClCompile Include="Source\Render\RenderExtra.cpp" />
     <ClCompile Include="Source\Render\RenderWindow.cpp" />
     <ClCompile Include="Source\Render\Shader.cpp" />
     <ClCompile Include="Source\Render\Shadowmap.cpp" />

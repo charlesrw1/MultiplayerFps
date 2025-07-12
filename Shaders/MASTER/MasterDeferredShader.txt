@@ -229,6 +229,19 @@ float AOMAP = 1.0;						// small detail ao map
 ___USER_FS_CODE___
 // ********** END USER CODE **********
 
+vec3 EvaluateAmbientCube(vec3 worldNormal)
+{
+	vec3 AmbientX = worldNormal.x < 0.0 ? vec3(g_objects[FS_IN_Objid].ambientCube0) : vec3(g_objects[FS_IN_Objid].ambientCube1);
+	vec3 AmbientY = worldNormal.y < 0.0 ? vec3(g_objects[FS_IN_Objid].ambientCube2) : vec3(g_objects[FS_IN_Objid].ambientCube3);
+	vec3 AmbientZ = worldNormal.z < 0.0 ? vec3(g_objects[FS_IN_Objid].ambientCube4) : vec3(g_objects[FS_IN_Objid].ambientCube5);
+	
+	vec3 nSquared = worldNormal * worldNormal;
+	vec3 linearColor = nSquared.x * AmbientX +
+	nSquared.y * AmbientY +
+	nSquared.z * AmbientZ;
+	return linearColor;
+}
+
 void main()
 {
 	FSmain();
@@ -260,8 +273,11 @@ void main()
 		vec3 color = texture(_LightmapTexture,lm_coord).rgb;
 		EMISSIVE += color;	// sample lightmap
 	#else
-	if(_MATERIAL_TYPE != MATERIAL_TYPE_UNLIT)
-		EMISSIVE += vec3(0.1);	// FIXME const ambient. change to probes
+	if(_MATERIAL_TYPE != MATERIAL_TYPE_UNLIT) {
+	
+		EMISSIVE += EvaluateAmbientCube(Final_Normal);
+	}
+	//	EMISSIVE += vec3(0.1);	// FIXME const ambient. change to probes
 	#endif
 		
 		GBUFFER_OUT_Emissive = vec4(EMISSIVE,1.0);

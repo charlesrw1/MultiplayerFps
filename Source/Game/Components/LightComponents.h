@@ -6,9 +6,18 @@
 #include "Framework/StructReflection.h"
 #include "Framework/BoolButton.h"
 #include "Game/EntityPtr.h"
+#include "Framework/EnumDefReflection.h"
+
 GENERATED_CLASS_INCLUDE("Render/Texture.h");
 
 glm::vec4 get_color_light_value(Color32 c, float intensity);
+
+NEWENUM(ShadowMode, int8_t)
+{
+	Disabled,
+	Realtime,	// shadows update when nessecary
+	Static,	// shadows update only once
+};
 
 class Texture;
 struct Render_Light;
@@ -26,10 +35,12 @@ public:
 	void on_changed_transform() final {
 		sync_render_data();
 	}
+#ifdef EDITOR_BUILD
 	void editor_on_change_property() final {
 		sync_render_data();
+		if (shadow_size < 0)shadow_size = 0;
+		else if (shadow_size > 2)shadow_size = 2;
 	}
-#ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
 		return "eng/editor/light.png";
 	}
@@ -42,6 +53,9 @@ public:
 	REF float inner_cone = 40.0;
 	REF const Texture* cookie_asset = nullptr;
 	REF bool visible = true;
+	REF ShadowMode shadow = ShadowMode::Disabled;
+	REF int8_t shadow_size = 0;	// 0=small,1=medium,2=big
+
 	handle<Render_Light> light_handle;
 	obj<BillboardComponent> editor_billboard;
 	obj<ArrowComponent> editor_arrow;
@@ -83,7 +97,7 @@ public:
 	CLASS_BODY(SunLightComponent);
 
 	SunLightComponent();
-	~SunLightComponent() final;
+	~SunLightComponent();
 	void start() final;
 	void stop() final;
 	void on_changed_transform() final {
@@ -161,7 +175,18 @@ public:
 	REFLECT(transient)
 	BoolButton recapture;	// Recapture
 	REF CubemapAnchor anchor;
+
+	void set_baked_probe_ofs(int ofs) {
+		this->probe_ofs = ofs;
+		sync_render_data();
+	}
+	glm::vec3 get_probe_pos()  {
+		return get_ws_transform() * glm::vec4(anchor.p, 1.0);
+	}
 private:
+	REFLECT(hide);
+	int probe_ofs = -1;
+
 	void update_editormeshbuilder();
 	handle<Render_Reflection_Volume> handle;
 	Texture* mytexture = nullptr;
@@ -191,4 +216,10 @@ private:
 	REFLECT(transient)
 	BoolButton importBaked;
 	handle<Lightmap_Object> handle;
+
+	std::unordered_map<int, int> lmProbeToObj;
+
+	// FIXME
+	REFLECT(hide);
+	std::vector<glm::vec3> bakedProbes;
 };
