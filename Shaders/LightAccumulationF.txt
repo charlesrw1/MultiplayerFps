@@ -170,7 +170,7 @@ float sample_shadow(vec3 WorldSpace)
 							).r; 
 				shadow += (depth_light_space - bias) > pcf_depth ? 1.0 : 0.0;
 			#else	// Bilinear filtered, looks nice
-					shadow += texture(shadow_map_atlas,vec3(proj_coords.xy + vec2(x, y) * texelSize, (depth_light_space-bias)));
+					shadow += texture(shadow_map_atlas,vec3(proj_coords.xy + vec2(x, y) * texelSize, (depth_light_space-0.0)));
 			#endif
 		}    
 	}

@@ -2085,8 +2085,8 @@ void cull_spot_shadow_objects_job(handle<Render_Light> lightId, bool* visArray, 
 	setup.fov = glm::radians(light.light.conemax) * 2.0;
 	build_a_frustum_for_perspective(frustum,setup,nullptr);
 
-	glm::vec4 backplane = glm::vec4(n, 0.0);
-	backplane.w = -glm::dot(n, p + n * light.light.radius);
+	glm::vec4 backplane = glm::vec4(-n, 0.0);
+	backplane.w = glm::dot(n, p + n * light.light.radius);
 
 	auto& objs = draw.scene.proxy_list.objects;
 
@@ -2104,7 +2104,7 @@ void cull_spot_shadow_objects_job(handle<Render_Light> lightId, bool* visArray, 
 		res += (glm::dot(glm::vec3(backplane), center) + backplane.w >= -radius) ? 1 : 0;
 
 		visArray[i] = res == 5;
-		visArray[i] = true;
+		//visArray[i] = true;
 	}
 
 	// fixme
@@ -3558,7 +3558,7 @@ void Render_Scene::update_light(handle<Render_Light> handle, const Render_Light&
 			up = glm::vec3(1, 0, 0);
 		auto viewMat = glm::lookAt(p, p + n, up);
 		float fov = glm::radians(l.light.conemax) * 2.0;
-		auto proj = glm::perspective(fov, 1.0f, 0.01f, 100.0f);
+		auto proj = glm::perspectiveRH_ZO(fov, 1.0f, 0.01f, l.light.radius);
 		l.lightViewProj = proj * viewMat;
 	}
 

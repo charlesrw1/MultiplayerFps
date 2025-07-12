@@ -41,8 +41,10 @@ ShadowMapAtlas::ShadowMapAtlas() {
 
 int ShadowMapAtlas::allocate(int8_t size) {
 	for (int i = 0; i < rects.size(); i++) {
-		if (!rects[i].used)
+		if (!rects[i].used) {
+			rects[i].used = true;
 			return i;
+		}
 	}
 	return -1;
 }
@@ -124,14 +126,16 @@ void ShadowMapManager::do_render(Render_Lists& list, handle<Render_Light> handle
 		//rect.w = 512;
 		//rect.h = 512;
 		device.set_viewport(rect.x,rect.y,rect.w,rect.h);
+		glEnable(GL_SCISSOR_TEST);
+		glScissor(rect.x, rect.y, rect.w, rect.h);
 		device.clear_framebuffer(true, true, 1.f/* depth value of 1.f to clear*/);
-
+		glDisable(GL_SCISSOR_TEST);
 
 		View_Setup viewSetup;
 		viewSetup.width = rect.w;
 		viewSetup.height = rect.h;
 		viewSetup.near = 0.01;
-		viewSetup.far = 100.0;
+		viewSetup.far = light.light.radius;
 		viewSetup.viewproj = light.lightViewProj;
 		//viewSetup.view = setup.proj = mat4(1);	// unused
 
