@@ -85,6 +85,9 @@ struct Render_Level_Params {
 
 	bool upload_constants = false;
 	bufferhandle provied_constant_buffer = 0;
+
+	// for cascade shadow map ortho!
+	bool wants_non_reverse_z = false;
 };
 
 
@@ -169,6 +172,9 @@ struct Render_Stats {
 	int blend_changes = 0;
 	int framebuffer_changes = 0;
 	int framebuffer_clears = 0;
+
+	int shadow_objs = 0;
+	int shadow_lights = 0;
 };
 
 // this caches programs

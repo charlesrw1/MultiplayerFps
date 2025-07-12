@@ -51,7 +51,7 @@ static agBuilder make_player_tree(const Model* model)
 #include "Scripting/ScriptManager.h"
 
 void TopDownPlayer::start() {
-	
+
 	mesh = get_owner()->get_component<MeshComponent>();
 	assert(mesh);
 	assert(mesh->get_model()&&mesh->get_model()->get_skel());
@@ -104,6 +104,7 @@ void TopDownPlayer::update() {
 
 	if (Input::was_key_pressed(SDL_SCANCODE_T)) {
 	//	return;
+		
 		using_third_person_movement = !using_third_person_movement;
 
 		//mesh->get_animator()->play_animation(jumpSeq);

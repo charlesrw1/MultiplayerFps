@@ -113,22 +113,31 @@ vec3 color_contrast (vec3 color, float amt) {
 	return (color - ACEScc_MIDGRAY) * amt + ACEScc_MIDGRAY;
 }
 
-
+uniform float contrast_tweak = 1.0;
+uniform float saturation_tweak = 1.0;
+uniform int tonemap_type = 0;
+uniform float exposure = 1.0;
+uniform float max_white = 1.0;
+uniform float bloom_lerp = 0.05;
+uniform vec3 tint_tweak = vec3(1.0);
 void main()
 {
 	vec3 scene = texture(scene_lit, texCoord).rgb;
 	vec3 bloom_add = texture(bloom, texCoord).rgb;
 	vec3 dirt = texture(lens_dirt, texCoord).rgb;
+	vec3 both = mix(scene,bloom_add+scene,bloom_lerp);
+	both *= exposure;
 	
-	vec3 both = mix(scene,bloom_add+scene,0.05);
-	
-	//both = reinhard_extended_luminance(both, 1.0);
-	//both = aces_approx(both*0.7);
-	//both = uncharted2_filmic(both);
+	if(tonemap_type==1)
+		both = reinhard_extended_luminance(both,max_white);
+	else if(tonemap_type==2)
+		both = aces_approx(both);
+	else if(tonemap_type==3)
+		both = uncharted2_filmic(both);
 	vec3 srgb = pow(both,vec3(1/2.2));
-	//srgb = color_contrast(srgb, 0.95);
-	//srgb = color_filter(srgb, vec3(1.0,0.92,0.8));
-	//srgb = saturation_color_grade(srgb, 1.1);
+	srgb = color_filter(srgb, tint_tweak);
+	srgb = color_contrast(srgb,contrast_tweak);
+	srgb = saturation_color_grade(srgb, saturation_tweak);
 	
 	
 	//srgb = contrast(srgb, vec3(1.1));

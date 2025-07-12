@@ -61,6 +61,7 @@ public:
 	}
 	void update_window(handle<RenderWindow> handle, RenderWindow& data) final {
 		assert(handle.id == 1);
+		//return;
 		drawCmds = data.get_draw_cmds();
 		mb_draw_data.init_from(data.meshbuilder);
 		this->view_proj = data.view_mat;
@@ -70,7 +71,7 @@ public:
 	}
 
 	void render() {
-
+		//return;
 		glBindBufferBase(GL_UNIFORM_BUFFER, 0, draw.ubo.current_frame);
 		auto& device = draw.get_device();
 		for (int i = 0; i < drawCmds.size(); i++) {
@@ -789,6 +790,11 @@ void imgui_stat_hook()
 	ImGui::Text("Vao binds: %d", draw.stats.vertex_array_changes);
 	ImGui::Text("Blend changes: %d", draw.stats.blend_changes);
 
+	ImGui::Text("shadow objs: %d", draw.stats.shadow_objs);
+	ImGui::Text("shadow lights: %d", draw.stats.shadow_lights);
+
+
+
 	ImGui::Text("opaque batches: %d", (int)draw.scene.gbuffer_pass.batches.size());
 	ImGui::Text("depth batches: %d", (int)draw.scene.shadow_pass.batches.size());
 	ImGui::Text("transparent batches: %d", (int)draw.scene.transparent_pass.batches.size());
@@ -1444,7 +1450,7 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 	//*
 	//*}
 
-	if (params.pass == Render_Level_Params::SHADOWMAP) {
+	if (params.pass == Render_Level_Params::SHADOWMAP ) {
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		glPolygonOffset(shadowmap.tweak.poly_factor, shadowmap.tweak.poly_units);
 		//*glCullFace(GL_FRONT);
@@ -1461,7 +1467,7 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 
 		const bool force_backface_state = params.pass == Render_Level_Params::SHADOWMAP || r_debug_mode.get_integer()!=0;
 
-		const bool depth_less_than = params.pass == Render_Level_Params::SHADOWMAP;	// else, GL_GREATER
+		const bool depth_less_than = params.wants_non_reverse_z;// params.pass == Render_Level_Params::SHADOWMAP;	// else, GL_GREATER
 		const bool depth_testing = true;
 		//const bool depth_writes = params.pass != Render_Level_Params::TRANSLUCENT;
 		if(dont_use_mdi.get_bool())
@@ -2091,6 +2097,7 @@ void cull_spot_shadow_objects_job(handle<Render_Light> lightId, bool* visArray, 
 	auto& objs = draw.scene.proxy_list.objects;
 
 	assert(visArraySize == objs.size());
+	int count = 0;
 	for (int i = 0; i < objs.size(); i++) {
 		const auto& obj = objs[i].type_;
 		const glm::vec3& center = glm::vec3(obj.bounding_sphere_and_radius);
@@ -2104,8 +2111,11 @@ void cull_spot_shadow_objects_job(handle<Render_Light> lightId, bool* visArray, 
 		res += (glm::dot(glm::vec3(backplane), center) + backplane.w >= -radius) ? 1 : 0;
 
 		visArray[i] = res == 5;
+		count += visArray[i];
+
 		//visArray[i] = true;
 	}
+	draw.stats.shadow_objs += count;
 
 	// fixme
 	any_dynamic_found = true;
@@ -2473,6 +2483,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		{
 			std::vector<handle<Render_Light>> lightsToCalcShadow;
 			draw.spotShadows->get_lights_to_render(lightsToCalcShadow);
+			draw.stats.shadow_lights += lightsToCalcShadow.size();
 			// tbh just do it here whatev
 			if (!lightsToCalcShadow.empty()) {
 				bool* spot_visible_array = (bool*)draw.get_arena().alloc_bottom(sizeof(bool) * visible_count);
@@ -2690,7 +2701,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 			shader().set_float("spot_angle", cos(glm::radians(light.conemax)));
 			shader().set_vec3("spot_normal",light.normal);
 			shader().set_vec3("color", light.color);
-
+			shader().set_float("uEpsilon", shadowmap.tweak.epsilon * 0.01f);
 			if (light.casts_shadow_mode != 0) {
 				shader().set_mat4("shadow_view_proj", light_pair.type_.lightViewProj);
 				Rect2d rect = spotShadows->get_atlas().get_atlas_rect(light_pair.type_.shadow_array_handle);
@@ -3112,6 +3123,7 @@ static float taa_doc_mult = 80.0;
 static float taa_doc_vel_bias = 0.001;
 static float taa_doc_bias = 0.2;
 static float taa_doc_pow = 0.15;
+
 void taa_menu()
 {
 	ImGui::DragFloat("taa_doc_mult", &taa_doc_mult, 0.1, 1, 100);
@@ -3120,6 +3132,29 @@ void taa_menu()
 	ImGui::DragFloat("taa_doc_pow", &taa_doc_pow, 0.01, 0, 1);
 }
 ADD_TO_DEBUG_MENU(taa_menu);
+static float pp_contrast = 1.0;
+static float pp_saturation = 1.0;
+static float pp_exposure = 1.0;
+static float pp_bloom_add = 0.05;
+static glm::vec3 pp_color_tint = glm::vec3(1.f);
+static int pp_tonemap_type = 0;
+
+
+
+
+void post_process_menu()
+{
+	if (ImGui::InputInt("pp_tonemap_type", &pp_tonemap_type)) {
+		pp_tonemap_type = glm::clamp(pp_tonemap_type, 0, 3);
+	}
+	ImGui::DragFloat("pp_contrast", &pp_contrast,0.01);
+	ImGui::DragFloat("pp_saturation", &pp_saturation,0.01);
+	ImGui::DragFloat("pp_exposure", &pp_exposure, 0.01);
+	ImGui::DragFloat("pp_bloom_add", &pp_bloom_add, 0.0001);
+
+}
+ADD_TO_DEBUG_MENU(post_process_menu);
+
 
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 {
@@ -3367,6 +3402,17 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 			bind_texture(0, scene_color_handle);
 			bind_texture(1, bloom_tex);
 			bind_texture(2, lens_dirt->gl_id);
+
+			shader().set_int("tonemap_type", pp_tonemap_type);
+			shader().set_float("contrast_tweak", pp_contrast);
+			shader().set_float("saturation_tweak", pp_saturation);
+			shader().set_float("bloom_lerp", pp_bloom_add);
+			shader().set_float("exposure", pp_exposure);
+
+
+
+
+
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 		}
 		{
@@ -3543,7 +3589,7 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 		in.bounding_sphere_and_radius = glm::vec4(glm::vec3(center), radius);
 	}
 }
-
+ConfigVar r_spot_near("r_spot_near", "0.1", CVAR_FLOAT, "", 0, 2);
 void Render_Scene::update_light(handle<Render_Light> handle, const Render_Light& proxy) {
 	ASSERT(!eng->get_is_in_overlapped_period());
 	auto& l = light_list.get(handle.id);
@@ -3558,7 +3604,10 @@ void Render_Scene::update_light(handle<Render_Light> handle, const Render_Light&
 			up = glm::vec3(1, 0, 0);
 		auto viewMat = glm::lookAt(p, p + n, up);
 		float fov = glm::radians(l.light.conemax) * 2.0;
-		auto proj = glm::perspectiveRH_ZO(fov, 1.0f, 0.01f, l.light.radius);
+		auto proj = glm::perspectiveRH_ZO(fov, 1.0f, l.light.radius, r_spot_near.get_float());
+		//proj[2][2] *= -1.0f;	// reverse z // [1,0]
+		//proj[3][2] *= -1.0f;
+
 		l.lightViewProj = proj * viewMat;
 	}
 

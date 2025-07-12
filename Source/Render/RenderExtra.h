@@ -124,7 +124,8 @@ public:
 		float max_shadow_dist = 80.f;
 		float epsilon = 0.008f;
 		float poly_units = 4;
-		float poly_factor = 1.1;
+		// = 1.1
+		float poly_factor = -3.4;
 		float z_dist_scaling = 1.f;
 		int quality = 2;
 	}tweak;

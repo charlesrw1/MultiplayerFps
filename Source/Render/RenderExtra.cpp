@@ -2,9 +2,9 @@
 #include "Render/DrawLocal.h"
 
 ConfigVar shadow_map_quality("r.shadow_map_quality", "0", CVAR_INTEGER, "", 0, 1);
-
+ConfigVar r_shadows("r.shadows", "1", CVAR_BOOL, "");
 ShadowMapAtlas::ShadowMapAtlas() {
-	int size = 512;
+	int size = 1024;
 	if (shadow_map_quality.get_integer())
 		size = 2048;
 	atlas_size = { size,size };
@@ -17,7 +17,7 @@ ShadowMapAtlas::ShadowMapAtlas() {
 	glTextureParameteri(atlas_texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTextureParameteri(atlas_texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	glTextureParameteri(atlas_texture, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-	glTextureParameteri(atlas_texture, GL_TEXTURE_COMPARE_FUNC, GL_GREATER);
+	glTextureParameteri(atlas_texture, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
 	glTextureParameteri(atlas_texture, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	glTextureParameteri(atlas_texture, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 
@@ -102,16 +102,20 @@ void ShadowMapManager::get_lights_to_render(std::vector<handle<Render_Light>>& v
 
 		const bool was_updated = l.updated_this_frame;
 		if (casts_shadow) {
-			vec.push_back({ handle });
+			if((l.light.casts_shadow_mode==2&&was_updated) || l.light.casts_shadow_mode==1)
+				vec.push_back({ handle });
 		}
 		l.updated_this_frame = false;
 	}
 
 
 }
-
+extern ConfigVar r_spot_near;
 void ShadowMapManager::do_render(Render_Lists& list, handle<Render_Light> handle, bool any_dynamic_in_frustum)
 {
+	if (!r_shadows.get_bool())
+		return;
+
 	// render, update dynamic in furstum flag
 	auto& light = draw.scene.light_list.get(handle.id);
 	
@@ -128,13 +132,13 @@ void ShadowMapManager::do_render(Render_Lists& list, handle<Render_Light> handle
 		device.set_viewport(rect.x,rect.y,rect.w,rect.h);
 		glEnable(GL_SCISSOR_TEST);
 		glScissor(rect.x, rect.y, rect.w, rect.h);
-		device.clear_framebuffer(true, true, 1.f/* depth value of 1.f to clear*/);
+		device.clear_framebuffer(true, true, 0.f/* depth value of 0.f to clear*/);
 		glDisable(GL_SCISSOR_TEST);
 
 		View_Setup viewSetup;
 		viewSetup.width = rect.w;
 		viewSetup.height = rect.h;
-		viewSetup.near = 0.01;
+		viewSetup.near = r_spot_near.get_float();
 		viewSetup.far = light.light.radius;
 		viewSetup.viewproj = light.lightViewProj;
 		//viewSetup.view = setup.proj = mat4(1);	// unused

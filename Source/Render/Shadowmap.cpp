@@ -16,6 +16,8 @@ void shadow_map_tweaks()
 	ImGui::DragFloat("punit", &tweak.poly_units, 0.01);
 	ImGui::DragFloat("zscale", &tweak.z_dist_scaling, 0.01);
 
+
+
 }
 ConfigVar r_spotlight_shadow_fade_radius("r.spotlight_shadow_fade_radius", "5.0", CVAR_FLOAT, "dist to fade out spot light shadows", 0, 100);
 ConfigVar r_spotlight_shadow_quality("r.spotlight_shadow_quality", "1", CVAR_INTEGER, "quality of spotlight shadow 0,1,2", 0, 2);
@@ -169,6 +171,7 @@ void CascadeShadowMapSystem::update()
 
 			params.provied_constant_buffer = ubo.frame_view[i];
 			params.upload_constants = true;
+			params.wants_non_reverse_z = true;
 
 			draw.render_level_to_target(params);
 		}
