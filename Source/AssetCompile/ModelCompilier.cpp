@@ -866,6 +866,7 @@ static Animation_Set* load_animation_set_for_gltf_skin(cgltf_data* data, cgltf_s
 ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 {
 	ModelDefData mdd;
+	mdd.use_mesh_as_collision = is->meshAsCollision;
 	mdd.isLightmapped = is->withLightmap;
 	mdd.lightmapSizeX = is->lightmapSizeX;
 	mdd.lightmapSizeY = is->lightmapSizeY;
@@ -961,6 +962,8 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 }
 #include "Framework/SerializerJson.h"
 #include "Framework/StringUtils.h"
+extern void write_model_import_settings(ModelImportSettings* mis, const std::string& savepath);
+
 ModelDefData new_import_settings_to_modeldef_data(const string& mis_path, IFile* file, IAssetLoadingInterface* loading)
 {
 	ModelImportSettings* impSettings = nullptr;
@@ -989,21 +992,8 @@ ModelDefData new_import_settings_to_modeldef_data(const string& mis_path, IFile*
 		if (!impSettings)
 			throw std::runtime_error("couldnt parse new class import sttings");
 
-		MakePathForGenericObj pathmaker;
-		WriteSerializerBackendJson writer("write_mis", pathmaker, *impSettings);
-		writer.get_output();
-		file->close();
 
-		auto fileptr = FileSys::open_write_game(mis_path);
-		if (fileptr) {
-			sys_print(Info, "new_import_settings_to_modeldef_data: writing new MIS JSON version %s\n", mis_path.c_str());
-
-			string out = "!json\n"+writer.get_output().dump(1);
-			fileptr->write(out.data(), out.size());
-		}
-		else {
-			sys_print(Error, "new_import_settings_to_modeldef_dataL Couldnt open file to write out new version of mis %s\n", mis_path.c_str());
-		}
+		write_model_import_settings(impSettings, mis_path);
 	}
 	ModelDefData mdd = new_import_settings_to_modeldef_data(impSettings);
 	delete impSettings;
@@ -2457,8 +2447,28 @@ FinalPhysicsData create_final_physics_data(
 )
 {
 	FinalPhysicsData out;
+	auto physicsNodeCopy = compile.physics_nodes;
+	if (def.use_mesh_as_collision) {
+		if (!compile.lod_where.empty()) {
+			sys_print(Info, "create_final_physics_data: using tri mesh as collision mesh\n");
+			auto& s = compile.lod_where.back();
+			if (s.mesh_nodes.size() >= 1) {
+				if(s.mesh_nodes.size()>1) 
+					sys_print(Warning, "create_final_physics_data: using tri mesh as collision mesh, more than one mesh in lod. using first\n");
+				LODMesh node = s.mesh_nodes.at(0);
+				node.shape_type = ShapeType_e::MeshShape;
+				physicsNodeCopy.push_back(node);
+			}
+			else {
+				sys_print(Warning, "create_final_physics_data: no nodes to use in last lod for 'use_mesh_as_collision'\n");
+			}
+		}
+		else {
+			sys_print(Warning, "create_final_physics_data: cant use tri mesh as collision mesh, no lods\n");
+		}
+	}
 
-	for (auto& p : compile.physics_nodes) {
+	for (auto& p : physicsNodeCopy) {
 		switch (p.shape_type) {
 		case ShapeType_e::ConvexShape:
 		{

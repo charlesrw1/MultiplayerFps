@@ -72,6 +72,8 @@ public:
 	REF bool withLightmap = false;
 	REF bool worldLmMerge = false;
 
+	REF bool meshAsCollision = false;
+
 	// type=BoneRenameContainer
 	// this renames bones in this asset using this dataclass
 	// each entry in the array is "my_current_bone renamed_bone", with a space in between

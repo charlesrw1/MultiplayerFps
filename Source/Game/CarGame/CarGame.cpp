@@ -177,6 +177,12 @@ void CarDriver::update() {
 	float steer = Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX);
 	float accel_val = Input::get_con_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
 	float deccel_val = Input::get_con_axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT);
+	if (Input::is_key_down(SDL_SCANCODE_A))
+		steer -= 1;
+	if (Input::is_key_down(SDL_SCANCODE_D))
+		steer -= 1;
+	if (Input::is_key_down(SDL_SCANCODE_W))
+		accel_val = 1;
 
 	if (Input::was_con_button_pressed(SDL_CONTROLLER_BUTTON_A))
 		top_view = !top_view;

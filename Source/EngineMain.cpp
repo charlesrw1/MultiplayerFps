@@ -844,7 +844,16 @@ void GameEngineLocal::add_commands()
 	commands->add("IMPORT_TEX", IMPORT_TEX);
 	commands->add("COMPILE_TEX", COMPILE_TEX);
 	commands->add("print_assets", [](const Cmd_Args&) { g_assets.print_usage(); });
-	//commands->add("TOGGLE_PLAY_EDIT_MAP", toggle_play_edit_map);
+	commands->add("TOGGLE_PLAY_EDIT_MAP", [this](const Cmd_Args&) {
+		if (!get_level()) 
+			return;
+		if (get_level()->is_editor_level()) {
+			Cmd_Manager::inst->append_cmd(std::make_unique<OpenMapCommand>(get_level()->get_source_asset_name(), true));
+		}
+		else {
+			Cmd_Manager::inst->append_cmd(std::make_unique<OpenEditorToolCommand>(SceneAsset::StaticType,get_level()->get_source_asset_name(), true));
+		}
+		});
 	commands->add("start_ed", start_editor);
 	//commands->add("close_ed", close_editor);
 	commands->add("load_imgui_ini", load_imgui_ini);
@@ -1478,15 +1487,15 @@ int game_engine_main(int argc, char** argv)
 {
 
 	material_print_debug.set_bool(true);
-	developer_mode.set_bool(false);
+	developer_mode.set_bool(true);
 	log_shader_compiles.set_bool(false);
 
-	loglevel.set_integer(1);
+	loglevel.set_integer(4);
 	eng_local.init(argc,argv);
-	developer_mode.set_bool(false);
+	developer_mode.set_bool(true);
 	log_all_asset_loads.set_bool(false);
 	log_destroy_game_objects.set_bool(false);
-	loglevel.set_integer(1);
+	//loglevel.set_integer(1);
 
 	vector<IntTestCase> tests;
 	tests.push_back({ test_integration_1, "myTest" });

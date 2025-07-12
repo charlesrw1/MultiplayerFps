@@ -351,9 +351,6 @@
     <ClInclude Include="Source\Render\DrawTypedefs.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\ProgramCaching.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Game\Entities\PlayerAnimDriver.h">
       <Filter>Source\Game</Filter>
     </ClInclude>

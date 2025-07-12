@@ -206,6 +206,24 @@ void ModelMan::compact_memory()
 #include <fstream>
 #include "Framework/ReflectionProp.h"
 #include "Framework/DictWriter.h"
+#include "Framework/SerializerJson.h"
+
+void write_model_import_settings(ModelImportSettings* mis, const std::string& savepath) {
+
+	MakePathForGenericObj pathmaker;
+	WriteSerializerBackendJson writer("write_mis", pathmaker, *mis, true);
+
+	auto fileptr = FileSys::open_write_game(savepath);
+	if (fileptr) {
+		sys_print(Info, "new_import_settings_to_modeldef_data: writing new MIS JSON version %s\n", savepath.c_str());
+
+		string out = "!json\n" + writer.get_output().dump(1);
+		fileptr->write(out.data(), out.size());
+	}
+	else {
+		sys_print(Error, "new_import_settings_to_modeldef_dataL Couldnt open file to write out new version of mis %s\n", savepath.c_str());
+	}
+}
 void IMPORT_MODEL_FUNC(const Cmd_Args& args)
 {
 	if (args.size() != 2) {
@@ -214,22 +232,34 @@ void IMPORT_MODEL_FUNC(const Cmd_Args& args)
 	}
 
 	auto savepath = strip_extension(args.at(1)) + ".mis";
-
-
 	ModelImportSettings mis;
 	mis.srcGlbFile = args.at(1);
-
-
-	DictWriter dw;
-	write_object_properties(&mis, nullptr, dw);
-
-	// save as text
-	auto outfile = FileSys::open_write_game(savepath);
-	outfile->write(dw.get_output().data(), dw.get_output().size());
-	outfile->close();
-
+	write_model_import_settings(&mis, savepath);
+	
 	ModelCompilier::compile(savepath.c_str(), AssetDatabase::loader);
 }
+void import_model_lightmapped(const Cmd_Args& args)
+{
+	if (args.size() != 4) {
+		sys_print(Error, "usage: import_model_lightmapped <.glb path> <lm x> <lm y>");
+		return;
+	}
+	try {
+		auto savepath = strip_extension(args.at(1)) + ".mis";
+		ModelImportSettings mis;
+		mis.srcGlbFile = args.at(1);
+		mis.withLightmap = true;
+		mis.lightmapSizeX = std::stoi(args.at(2));
+		mis.lightmapSizeY = std::stoi(args.at(3));
+		write_model_import_settings(&mis, savepath);
+		ModelCompilier::compile(savepath.c_str(), AssetDatabase::loader);
+	}
+	catch (...) {
+		sys_print(Error, "usage: import_model_lightmapped err\n");
+	}
+}
+
+
 #endif
 #include "Framework/StringUtils.h"
 void export_one_model(const Model& model, const char* export_path);
@@ -241,6 +271,8 @@ void ModelMan::add_commands(ConsoleCmdGroup& group)
 
 #ifdef EDITOR_BUILD
 	group.add("IMPORT_MODEL", IMPORT_MODEL_FUNC);
+	group.add("import_model_lightmapped", import_model_lightmapped);
+
 	group.add("export_model", [](const Cmd_Args & args) {
 		if (args.size() != 2) {
 			sys_print(Error, "usage: export_model <model>\n");
@@ -458,7 +490,7 @@ void Model::uninstall()
 	parts.clear();
 	merged_index_pointer = merged_vert_offset = 0;
 	data = RawMeshData();	// so destructor gets called and memory is freed
-	skel.reset(nullptr);
+	//skel.reset(nullptr);	// dont uninstall because of pointers...
 	collision.reset();
 	tags.clear();
 	materials.clear();
@@ -700,11 +732,14 @@ bool Model::load_asset(IAssetLoadingInterface* loading) {
 }
 void Model::move_construct(IAsset* _src)
 {
+	const bool had_skel = skel != nullptr;
 	uninstall();
+	assert(had_skel == (skel != nullptr));
+
 	ASSERT(this->uid == 0);
-
-
 	Model* src = _src->cast_to<Model>();
+	assert(src);
+
 	for (int i = 0; i < src->lods.size(); i++)
 		this->lods.push_back(src->lods[i]);
 	parts = std::move(src->parts);
@@ -713,8 +748,19 @@ void Model::move_construct(IAsset* _src)
 	aabb = src->aabb;
 	bounding_sphere = src->bounding_sphere;
 	data = std::move(src->data);
-	skel = std::move(src->skel);
+	
+	if (bool(skel) != bool(src->skel)) {
+		throw std::runtime_error("Model::move_construct: cant reaload a model to a skeletal model or vice versa. restart the game.\n");
+	}
+	if (skel) {
+		assert(src->skel);
+		skel->move_construct(*src->skel);
+	}
+	if (collision) {
+		collision->uninstall_shapes();
+	}
 	collision = std::move(src->collision);
+
 	tags = std::move(src->tags);
 	materials = std::move(src->materials);
 	skeleton_root_transform = src->skeleton_root_transform;

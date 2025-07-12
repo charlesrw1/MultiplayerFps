@@ -137,40 +137,61 @@ void WriteSerializerBackendJson::write_actual_class(ClassBase* ptr, const string
 	}
 }
 
-WriteSerializerBackendJson::WriteSerializerBackendJson(const char* debug_tag, IMakePathForObject& pathmaker, ClassBase& obj_to_serialize) 
-	: pathmaker(pathmaker), debug_tag(debug_tag)
+WriteSerializerBackendJson::WriteSerializerBackendJson(const char* debug_tag, IMakePathForObject& pathmaker, ClassBase& obj_to_serialize, bool serialize_single_object) 
+	: pathmaker(pathmaker), debug_tag(debug_tag),serialize_single_object(serialize_single_object)
 {
-	stack.push_back(&obj);
-	{
-		ClassBase* ptr = &obj_to_serialize;
-		serialize_class("root", ClassBase::StaticType, ptr);
-	}
-	serialize_dict("objs");
-	while (!write_queue.empty()) {
-		ClassBase* obj = write_queue.back();
-		write_queue.pop_back();
-		const string path = pathmaker.make_path(obj).path;
-		assert(MapUtil::contains(paths_to_objects, path));
-		if(!paths_to_objects.find(path)->second.has_been_written)
-			write_actual_class(obj,path);
-		paths_to_objects[path].has_been_written = true;
-	}
-	end_obj();
-
-	int dummysz{};
-	serialize_array("paths", dummysz);
-	for (auto& o : paths_to_objects) {
-		const bool is_valid = o.second.has_been_written && !o.second.is_from_sub_object;
-		if (is_valid) {
-			serialize_array_ar(dummysz);
-			string path = o.first;
-			serialize_ar(path);
-			auto type = pathmaker.make_type_name(o.second.o);
-			serialize_ar(type);
-			end_obj();
+	if (!serialize_single_object) {
+		stack.push_back(&obj);
+		{
+			ClassBase* ptr = &obj_to_serialize;
+			serialize_class("root", ClassBase::StaticType, ptr);
 		}
+		serialize_dict("objs");
+		while (!write_queue.empty()) {
+			ClassBase* obj = write_queue.back();
+			write_queue.pop_back();
+			const string path = pathmaker.make_path(obj).path;
+			assert(MapUtil::contains(paths_to_objects, path));
+			if (!paths_to_objects.find(path)->second.has_been_written)
+				write_actual_class(obj, path);
+			paths_to_objects[path].has_been_written = true;
+		}
+		end_obj();
+
+		int dummysz{};
+		serialize_array("paths", dummysz);
+		for (auto& o : paths_to_objects) {
+			const bool is_valid = o.second.has_been_written && !o.second.is_from_sub_object;
+			if (is_valid) {
+				serialize_array_ar(dummysz);
+				string path = o.first;
+				serialize_ar(path);
+				auto type = pathmaker.make_type_name(o.second.o);
+				serialize_ar(type);
+				end_obj();
+			}
+		}
+		end_obj();
 	}
-	end_obj();
+	else {
+		stack.push_back({ &obj });
+		ClassBase* ptr = &obj_to_serialize;
+		assert(!currently_writing_class);
+		currently_writing_class = ptr;
+		string className = ptr->get_type().classname;
+		serialize("__classname", className);
+		ptr->serialize(*this);
+		for (auto p : ClassPropPtr(ptr)) {
+			serialize_property(p);
+		}
+		currently_writing_class = nullptr;
+		// now diff it
+		auto diff = pathmaker.find_diff_for_obj(ptr);
+		if (diff) {
+			(*stack.back().ptr) = JsonSerializerUtil::diff_json(*diff, (*stack.back().ptr));
+		}
+		stack.pop_back();
+	}
 }
 
 bool WriteSerializerBackendJson::serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr)
@@ -231,62 +252,91 @@ ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, nloh
 
 void ReadSerializerBackendJson::load_shared()
 {
-	stack.push_back(obj);
-	int sz = 0;
-	if (serialize_array("paths", sz)) {
-		for (int i = 0; i < sz; i++) {
-			int count = 0;
-			serialize_array_ar(count);
-			if (count != 2) {
-				LOG_WARN("expected 2-tuple in paths");
+	if (obj->contains("__classname")) {
+		stack.push_back(obj);
+		// load single
+		string classname;
+		serialize("__classname", classname);
+		ClassBase* obj = objmaker.create_from_name(*this, classname, "");
+		if (!obj) {
+			throw std::runtime_error("ReadSerializerBackendJson::load_shared: no object of name: " + classname);
+		}
+		this->rootobj = obj;
+		assert(!current_root_path);
+		string rootPath = "";
+		current_root_path = &rootPath;
+		obj->serialize(*this);
+		for (PropertyPtr property : ClassPropPtr(obj)) {
+			try {
+				serialize_property(property);
+			}
+			catch (...) {
+				sys_print(Error, "ReadSerializerBackendJson(%s): error serializing property %s for class %s\n", get_debug_tag(), property.get_name(),obj->get_type().classname);
+			}
+		}
+		current_root_path = nullptr;
+		stack.pop_back();
+		assert(stack.empty());
+	}
+	else {
+
+		stack.push_back(obj);
+		int sz = 0;
+		if (serialize_array("paths", sz)) {
+			for (int i = 0; i < sz; i++) {
+				int count = 0;
+				serialize_array_ar(count);
+				if (count != 2) {
+					LOG_WARN("expected 2-tuple in paths");
+					continue;
+				}
+				string path;
+				string type;
+				serialize_ar(path);
+				serialize_ar(type);
+				ClassBase* obj = objmaker.create_from_name(*this, type, path);
+
+				if (!obj) {
+					LOG_WARN("null obj from creation");
+					// fallthrough
+				}
+
+				MapUtil::insert_test_exists(path_to_objs, path, obj);
+				if (obj)
+					MapUtil::insert_test_exists(obj_to_path, obj, path);
+
+				end_obj();
+			}
+			end_obj();
+		}
+
+		serialize_class("root", ClassBase::StaticType, rootobj);
+
+		serialize_dict("objs");
+		for (auto& p : path_to_objs) {
+			if (!p.second) {
+				sys_print(Warning, "ReadSerializerBackendJson(%s): null object (path=%s)\n", get_debug_tag(), p.first.c_str());
 				continue;
 			}
-			string path;
-			string type;
-			serialize_ar(path);
-			serialize_ar(type);
-			ClassBase* obj = objmaker.create_from_name(*this, type, path);
 
-			if (!obj) {
-				LOG_WARN("null obj from creation");
-				// fallthrough
+			if (serialize_dict(p.first.c_str())) {
+				assert(!current_root_path);
+				current_root_path = &p.first;
+				p.second->serialize(*this);
+				for (PropertyPtr property : ClassPropPtr(p.second)) {
+					try {
+						serialize_property(property);
+					}
+					catch (...) {
+						sys_print(Error, "ReadSerializerBackendJson(%s): error serializing property %s for class %s\n", get_debug_tag(), property.get_name(), p.second->get_type().classname);
+					}
+				}
+				current_root_path = nullptr;
+				end_obj();
 			}
-
-			MapUtil::insert_test_exists(path_to_objs, path, obj);
-			if (obj)
-				MapUtil::insert_test_exists(obj_to_path, obj, path);
-
-			end_obj();
 		}
 		end_obj();
 	}
-
-	serialize_class("root", ClassBase::StaticType, rootobj);
-
-	serialize_dict("objs");
-	for (auto& p : path_to_objs) {
-		if (!p.second) {
-			sys_print(Warning, "ReadSerializerBackendJson(%s): null object (path=%s)\n", get_debug_tag(), p.first.c_str());
-			continue;
-		}
-
-		if (serialize_dict(p.first.c_str())) {
-			assert(!current_root_path);
-			current_root_path = &p.first;
-			p.second->serialize(*this);
-			for (PropertyPtr property : ClassPropPtr(p.second)) {
-				try {
-					serialize_property(property);
-				}
-				catch (...) {
-					sys_print(Error, "ReadSerializerBackendJson(%s): error serializing property %s for class %s\n",get_debug_tag(), property.get_name(),p.second->get_type().classname);
-				}
-			}
-			current_root_path = nullptr;
-			end_obj();
-		}
-	}
-	end_obj();
 }
 
 ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, const string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)

@@ -79,6 +79,7 @@ public:
 	PhysicsBodyDefinition() = default;
 	PhysicsBodyDefinition& operator=(const PhysicsBodyDefinition& other) = delete;
 	PhysicsBodyDefinition(const PhysicsBodyDefinition& other) = delete;
+	void uninstall_shapes();
 
 	std::vector<physics_shape_def> shapes;
 };

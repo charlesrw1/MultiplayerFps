@@ -91,6 +91,8 @@ public:
 	int lightmapSizeY = 0;
 	bool worldLmMerge = false;
 
+	bool use_mesh_as_collision = false;
+
 	std::string model_source;
 	uint64_t timestamp_of_def = 0;
 

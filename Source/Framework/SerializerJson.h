@@ -57,19 +57,26 @@ public:
 class WriteSerializerBackendJson : public Serializer
 {
 public:
-	WriteSerializerBackendJson(const char* debug_tag, IMakePathForObject& pathmaker, ClassBase& obj_to_serialize);
+	WriteSerializerBackendJson(const char* debug_tag, IMakePathForObject& pathmaker, ClassBase& obj_to_serialize, bool serialize_single_object=false);
 
+	const bool serialize_single_object = false;
 	const char* debug_tag = "";
 	const char* get_debug_tag() final {
 		return debug_tag;
 	}
 
 	nlohmann::json* get_root_object() {
+		if (serialize_single_object)
+			return &obj;
+
 		nlohmann::json* objs = get_objects_object();
-		if (!objs) return nullptr;
-		if (!obj.contains("root")) return nullptr;
+		if (!objs) 
+			return nullptr;
+		if (!obj.contains("root")) 
+			return nullptr;
 		std::string rootpath = obj["root"];
-		if (!objs->contains(rootpath)) return nullptr;
+		if (!objs->contains(rootpath)) 
+			return nullptr;
 		return &(*objs)[rootpath];
 	}
 	nlohmann::json* get_objects_object() {

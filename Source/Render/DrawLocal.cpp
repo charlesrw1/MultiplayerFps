@@ -1534,7 +1534,7 @@ void Renderer::render_particles()
 
 
 Render_Pass::Render_Pass(pass_type type) : type(type) {}
-
+ConfigVar r_ignore_depth_shader("r_ignore_depth_shader", "0", CVAR_BOOL|CVAR_DEV, "");
 draw_call_key Render_Pass::create_sort_key_from_obj(
 	const Render_Object& proxy, 
 	const MaterialInstance* material,
@@ -1546,11 +1546,18 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 {
 	draw_call_key key;
 
+#ifdef _DEBUG
+	const bool is_depth = !r_ignore_depth_shader.get_bool() && (type == pass_type::DEPTH);
+#else
+	const bool is_depth = type == pass_type::DEPTH;
+#endif
+	
+
 	key.shader = matman.get_mat_shader(
 		proxy.lightmapped,
 		proxy.animator_bone_ofs!=-1, 
 		proxy.model, material, 
-		(type == pass_type::DEPTH),
+		is_depth,
 		false,
 		is_editor_mode,
 		r_debug_mode.get_integer()!=0
@@ -2444,7 +2451,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	{
 		ZoneScopedN("MakeBatchesAndUploadGpuData");
 
-		// kick off gbuffer pass, but do the rest on this thread
+		// start gbuffer pass, but do the rest on this thread
 		JobCounter* c{};
 		JobSystem::inst->add_job(make_batches_job,uintptr_t(&gbuffer_pass), c);
 		JobSystem::inst->add_job(make_batches_job, uintptr_t(&shadow_pass), c);

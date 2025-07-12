@@ -12,6 +12,26 @@
 #include "Framework/DictWriter.h"
 #include "stb_image.h"
 
+#include "Framework/SerializerJson.h"
+
+
+void write_texture_import_settings(TextureImportSettings* tis, const std::string& path)
+{
+	MakePathForGenericObj pathmaker;
+	WriteSerializerBackendJson writer("write_mis", pathmaker, *tis, true);
+
+	auto fileptr = FileSys::open_write_game(path);
+	if (fileptr) {
+		sys_print(Debug, "write_texture_import_settings: writing new MIS JSON version %s\n", path.c_str());
+		string out = "!json\n" + writer.get_output().dump(1);
+		fileptr->write(out.data(), out.size());
+	}
+	else {
+		sys_print(Error, "write_texture_import_settings Couldnt open file to write out new version of mis %s\n", path.c_str());
+	}
+}
+
+
 void IMPORT_TEX(const Cmd_Args& args)
 {
 	if (args.size() != 2) {
@@ -24,15 +44,12 @@ void IMPORT_TEX(const Cmd_Args& args)
 	tis.src_file = gamepath;
 	if (findSlash != std::string::npos)
 		tis.src_file = gamepath.substr(findSlash+1);
-	
-	DictWriter out;
-	write_object_properties(&tis, nullptr, out);
-	auto outfile = FileSys::open_write_game(strip_extension(gamepath) + ".tis");
-	assert(outfile);
-	outfile->write(out.get_output().data(), out.get_output().size());
-	outfile->close();
+
+	auto path = strip_extension(gamepath) + ".tis";
+	write_texture_import_settings(&tis, path);
+
 	Color32 dummy;
-	compile_texture_asset(strip_extension(gamepath) + ".dds", AssetDatabase::loader,dummy);
+	compile_texture_asset(path, AssetDatabase::loader,dummy);
 }
 #include "AssetCompile/Someutils.h"
 void IMPORT_TEX_FOLDER(const Cmd_Args& args)
@@ -65,14 +82,11 @@ void IMPORT_TEX_FOLDER(const Cmd_Args& args)
 			if (gamepath.find("normal")!=std::string::npos || gamepath.find("Normal") != std::string::npos||gamepath.find("NRM")!=std::string::npos)
 				tis.is_normalmap = true;
 
-			DictWriter out;
-			write_object_properties(&tis, nullptr, out);
-			auto outfile = FileSys::open_write_game(strip_extension(gamepath) + ".tis");
-			assert(outfile);
-			outfile->write(out.get_output().data(), out.get_output().size());
-			outfile->close();
+			auto path = strip_extension(gamepath) + ".tis";
+			write_texture_import_settings(&tis, path);
+
 			Color32 dummy;
-			compile_texture_asset(strip_extension(gamepath) + ".dds",AssetDatabase::loader,dummy);
+			compile_texture_asset(path,AssetDatabase::loader,dummy);
 
 		}
 	}
@@ -102,19 +116,38 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 			sys_print(Warning, "couldn't find texture import settings file\n");
 			return false;
 		}
-		DictParser in;
-		in.load_from_file(tisfile.get());
+		std::string to_str(tisfile->size(), ' ');
+		tisfile->read(to_str.data(), tisfile->size());
+		uint64_t tisFileTimeStamp = tisfile->get_timestamp();
+		tisfile->close();
 
-		tis = read_object_properties_no_input_tok<TextureImportSettings>(nullptr, in,loading);
+		if (to_str.find("!json\n") == 0) {
+			to_str = to_str.substr(6);
+			MakeObjectFromPathGeneric objmaker;
+			ReadSerializerBackendJson reader("compile_texture_asset", to_str, objmaker, *loading);
+			if (reader.get_root_obj()) {
+				tis = reader.get_root_obj()->cast_to<TextureImportSettings>();
+			}
+		}
+		else {
+			DictParser in;
+			in.load_from_memory(to_str.data(), to_str.size(), "");
+			tis = read_object_properties_no_input_tok<TextureImportSettings>(nullptr, in, loading);
+			if (tis) {
+				write_texture_import_settings(tis, strip_extension(gamepath) + ".tis");
+			}
+		}
+
 		if (!tis) {
 			sys_print(Error, "couldnt parse texture import settings\n");
 			return false;
 		}
+
 		outColor = tis->simplifiedColor;
 
 		bool needsCompile = texfile == nullptr;
 		if (!needsCompile) {
-			needsCompile = texfile->get_timestamp() < tisfile->get_timestamp();
+			needsCompile = texfile->get_timestamp() < tisFileTimeStamp;
 		}
 		if (!needsCompile) {
 			sys_print(Info,"skipping compile\n");
@@ -153,12 +186,7 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 				tis->simplifiedColor.b = sum[2] * 255.0;
 				tis->simplifiedColor.a = sum[3] * 255.0;
 
-				DictWriter out;
-				write_object_properties(tis, nullptr, out);
-				auto outfile = FileSys::open_write_game(strip_extension(gamepath) + ".tis");
-				assert(outfile);
-				outfile->write(out.get_output().data(), out.get_output().size());
-				outfile->close();
+				write_texture_import_settings(tis, strip_extension(gamepath) + ".tis");
 			}
 			else {
 				sys_print(Warning, "compile_texture_asset: stb parse error for source file %s\n", tis->src_file.c_str());

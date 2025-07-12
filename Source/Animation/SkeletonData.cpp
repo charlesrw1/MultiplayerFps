@@ -2,8 +2,27 @@
 #include "AnimationUtil.h"
 
 MSkeleton::~MSkeleton() {
-	for (auto clip : clips) {
+	for (auto& clip : clips) {
 		delete clip.second.ptr;
+	}
+}
+void MSkeleton::move_construct(MSkeleton& other)
+{
+	//fixme: edge case where you reload a model with more/less bones but have leftover stale animations from prev
+	remaps = std::move(other.remaps);
+	mirroring_table = std::move(other.mirroring_table);
+	bone_dat = std::move(other.bone_dat);
+	for (auto& [anim_name, clip] : other.clips) {
+		assert(clip.ptr);
+		auto findMe = clips.find(anim_name);
+		if (findMe != clips.end()) {
+			assert(findMe->second.ptr);
+			*findMe->second.ptr = std::move(*clip.ptr);	// move construct it
+		}
+		else {
+			clips.insert({ anim_name,clip });
+			clip.ptr = nullptr;	// steal it
+		}
 	}
 }
 bool MSkeleton::is_skeleton_the_same(const MSkeleton& other) const {

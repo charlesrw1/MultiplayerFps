@@ -394,19 +394,23 @@ static Color32 randcolor32(uint32_t number)
 	  update_debug_physics_shapes();
   }
 
-
+  void PhysicsBodyDefinition::uninstall_shapes()
+  {
+	  for (auto& s : shapes) {
+		  if (s.shape == ShapeType_e::ConvexShape) {
+			  if (s.convex_mesh)
+				  s.convex_mesh->release();
+		  }
+		  else if (s.shape == ShapeType_e::MeshShape) {
+			  if (s.tri_mesh)
+				  s.tri_mesh->release();
+		  }
+	  }
+	  shapes.clear();
+  }
 PhysicsBodyDefinition::~PhysicsBodyDefinition()
 {
-	for (auto& s : shapes) {
-		if (s.shape == ShapeType_e::ConvexShape) { 
-			if (s.convex_mesh)			  
-				s.convex_mesh->release(); 
-		}
-		else if (s.shape == ShapeType_e::MeshShape) { 
-			if (s.tri_mesh)			  
-				s.tri_mesh->release(); 
-		}
-	}
+	uninstall_shapes();
 }
 bool PhysicsManImpl::load_physics_into_shape(BinaryReader& reader, physics_shape_def& def) {
 	if (def.shape != ShapeType_e::ConvexShape && def.shape != ShapeType_e::MeshShape)	return true;

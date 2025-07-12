@@ -329,7 +329,6 @@
     <ClInclude Include="Source\Render\Frustum.h" />
     <ClInclude Include="Source\Render\Meshlet.h" />
     <ClInclude Include="Source\Render\Model.h" />
-    <ClInclude Include="Source\Render\ProgramCaching.h" />
     <ClInclude Include="Source\Render\RenderFog.h" />
     <ClInclude Include="Source\Render\MaterialLocal.h" />
     <ClInclude Include="Source\Render\MaterialPublic.h" />

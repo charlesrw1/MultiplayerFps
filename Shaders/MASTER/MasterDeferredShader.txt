@@ -134,23 +134,24 @@ void main()
 	VSmain();
 	
 	FS_IN_FragPos = FS_IN_FragPos + WORLD_POSITION_OFFSET;
-	
-	mat3 normal_matrix;
-	if(bool(g_objects[obj_index].flags & INSTANCE_NON_UNIFORM_SCALE)) {
-		normal_matrix = transpose(inverse(mat3(ObjModelMatrix)));
-	}
-	else {
-		normal_matrix = mat3(ObjModelMatrix);
-	}
-	
-    FS_IN_Normal = normal_matrix*normalize(local_normal);
-	vec3 world_tangent = normal_matrix*normalize(local_tangent);
+	#ifndef DEPTH_ONLY
+		mat3 normal_matrix;
+		if(bool(g_objects[obj_index].flags & INSTANCE_NON_UNIFORM_SCALE)) {
+			normal_matrix = transpose(inverse(mat3(ObjModelMatrix)));
+		}
+		else {
+			normal_matrix = mat3(ObjModelMatrix);
+		}
+		
+		FS_IN_Normal = normal_matrix*normalize(local_normal);
+		vec3 world_tangent = normal_matrix*normalize(local_tangent);
 
-	vec3 world_bitangent = cross(FS_IN_Normal, world_tangent);
-	FS_IN_TBN = mat3(
-	normalize(local_tangent  ), 
-	normalize(world_bitangent), 
-	normalize(FS_IN_Normal   ));
+		vec3 world_bitangent = cross(FS_IN_Normal, world_tangent);
+		FS_IN_TBN = mat3(
+		normalize(local_tangent  ), 
+		normalize(world_bitangent), 
+		normalize(FS_IN_Normal   ));
+	#endif // DEPTH_ONLY
     
     FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
 	
@@ -244,13 +245,21 @@ vec3 EvaluateAmbientCube(vec3 worldNormal)
 
 void main()
 {
+#ifdef DEPTH_ONLY
+// in depth only, call into fsmain for alpha testing, otherwise no.
+#ifdef ALPHATEST
+	FSmain();
+	if(OPACITY<0.5)
+		discard;
+#endif
+
+#else	// DEPTH_ONLY
+
 	FSmain();
 #ifdef ALPHATEST
 	if(OPACITY<0.5)
 		discard;
 #endif // ALPHATEST
-
-#ifndef DEPTH_ONLY
 
 	#ifdef FORWARD_SHADER
 		SCENE_OUT_Color = vec4(EMISSIVE,OPACITY);
