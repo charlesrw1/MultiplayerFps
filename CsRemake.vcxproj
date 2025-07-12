@@ -126,7 +126,6 @@
     <ClCompile Include="Source\Render\Shader.cpp" />
     <ClCompile Include="Source\Render\Shadowmap.cpp" />
     <ClCompile Include="Source\Render\Ssao.cpp" />
-    <ClCompile Include="Source\Render\TerrainComponent.cpp" />
     <ClCompile Include="Source\Render\Texture.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
     </ClCompile>
@@ -151,12 +150,10 @@
     <ClInclude Include="Source\Animation\Runtime\Easing.h" />
     <ClInclude Include="Source\Animation\Runtime\Percentage.h" />
     <ClInclude Include="Source\Animation\Runtime\SyncTime.h" />
-    <ClInclude Include="Source\AssetCompile\AnimAssetEditorLocal.h" />
     <ClInclude Include="Source\Animation\AnimationSeqAsset.h" />
     <ClInclude Include="Source\AssetCompile\Compiliers.h" />
     <ClInclude Include="Source\AssetCompile\GltfExport.h" />
     <ClInclude Include="Source\AssetCompile\ModelAsset2.h" />
-    <ClInclude Include="Source\AssetCompile\ModelAssetEditorLocal.h" />
     <ClInclude Include="Source\AssetCompile\ModelCompilierLocal.h" />
     <ClInclude Include="Source\AssetCompile\SkeletonAsset.h" />
     <ClInclude Include="Source\AssetCompile\Someutils.h" />
@@ -215,10 +212,7 @@
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Source\LevelSerialization\SerializeNewMakers.h" />
     <ClInclude Include="Source\MEGA.h" />
-    <ClInclude Include="Source\Misc\PropTween.h" />
-    <ClInclude Include="Source\Navigation\Navigation.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
-    <ClInclude Include="Source\Render\GpuResourceManager.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Render\RenderWindow.h" />
     <ClInclude Include="Source\Render\UniformBuffer.h" />
@@ -228,7 +222,6 @@
     <ClInclude Include="Source\Game\Components\CameraComponent.h" />
     <ClInclude Include="Source\Game\Components\ParticleComponent.h" />
     <ClInclude Include="Source\DeferredSpawnScope.h" />
-    <ClInclude Include="Source\EditorTool3d.h" />
     <ClInclude Include="Source\Framework\Guid.h" />
     <ClInclude Include="Source\Framework\ScopedBoolean.h" />
     <ClInclude Include="Source\Framework\UniquePtrReflection.h" />
@@ -282,7 +275,6 @@
     <ClInclude Include="Source\Framework\FreeList.h" />
     <ClInclude Include="Source\Framework\Handle.h" />
     <ClCompile Include="Source\DeferredSpawnScope.cpp" />
-    <ClCompile Include="Source\EditorTool3d.cpp" />
     <ClInclude Include="Source\Framework\InlineVec.h" />
     <ClInclude Include="Source\Framework\MathLib.h" />
     <ClInclude Include="Source\Framework\MemArena.h" />
@@ -332,7 +324,6 @@
     <ClInclude Include="Source\Render\DrawLocal.h" />
     <ClInclude Include="Source\Render\DrawPublic.h" />
     <ClInclude Include="Source\Render\DrawTypedefs.h" />
-    <ClInclude Include="Source\Render\Editor\MaterialEditorLocal.h" />
     <ClInclude Include="Source\Render\Editor\TextureEditor.h" />
     <ClInclude Include="Source\Render\EnvProbe.h" />
     <ClInclude Include="Source\Render\Frustum.h" />
@@ -350,8 +341,6 @@
     <ClInclude Include="Source\Render\Render_Sun.h" />
     <ClInclude Include="Source\Render\Render_Volumes.h" />
     <ClInclude Include="Source\Render\Shader.h" />
-    <ClInclude Include="Source\Render\TerrainInterfaceLocal.h" />
-    <ClInclude Include="Source\Render\TerrainPublic.h" />
     <ClInclude Include="Source\Render\Texture.h" />
     <ClInclude Include="Source\Sound\SoundPublic.h" />
     <ClInclude Include="Source\Types.h" />
@@ -364,9 +353,7 @@
   </ItemGroup>
   <ItemGroup>
     <_WildCardClCompile Include="Source\.generated\**\*.cpp" />
-    <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelAsset2.cpp" />
-    <ClCompile Include="Source\AssetCompile\ModelAssetEditorLocal.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
@@ -423,7 +410,6 @@
     <ClCompile Include="Source\EngineMain.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\Physics\Physics2Local.cpp" />
-    <ClCompile Include="Source\Render\Editor\MaterialEditorLocal.cpp" />
     <ClCompile Include="Source\Render\Editor\TextureEditor.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>

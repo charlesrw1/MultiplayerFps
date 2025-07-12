@@ -255,9 +255,6 @@
     <ClInclude Include="Source\External\ImGuizmo.h">
       <Filter>Source\External</Filter>
     </ClInclude>
-    <ClInclude Include="Source\AssetCompile\ModelAssetEditorLocal.h">
-      <Filter>Source\AssetCompile</Filter>
-    </ClInclude>
     <ClInclude Include="Source\AssetCompile\ModelCompilierLocal.h">
       <Filter>Source\AssetCompile</Filter>
     </ClInclude>
@@ -278,9 +275,6 @@
     </ClInclude>
     <ClInclude Include="Source\Render\MaterialLocal.h">
       <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\Editor\MaterialEditorLocal.h">
-      <Filter>Source\Render\Editor</Filter>
     </ClInclude>
     <ClInclude Include="Source\Game\EntityComponent.h">
       <Filter>Source\Game</Filter>
@@ -342,12 +336,6 @@
     <ClInclude Include="Source\Render\RenderExtra.h">
       <Filter>Source\Render\Public</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\TerrainPublic.h">
-      <Filter>Source\Render\Public</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\TerrainInterfaceLocal.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Sound\SoundPublic.h">
       <Filter>Source\Sound</Filter>
     </ClInclude>
@@ -401,7 +389,6 @@
     <ClInclude Include="Source\Game\SoftAssetPtr.h" />
     <ClInclude Include="Source\AssetCompile\SkeletonAsset.h" />
     <ClInclude Include="Source\AssetCompile\ModelAsset2.h" />
-    <ClInclude Include="Source\AssetCompile\AnimAssetEditorLocal.h" />
     <ClInclude Include="Source\Animation\AnimationSeqAsset.h" />
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Game\BaseUpdater.h" />
@@ -410,7 +397,6 @@
     <ClInclude Include="Source\Input\InputAction.h" />
     <ClInclude Include="Source\Input\InputShared.h" />
     <ClInclude Include="Source\Input\InputSystem.h" />
-    <ClInclude Include="Source\EditorTool3d.h" />
     <ClInclude Include="Source\Render\Editor\TextureEditor.h" />
     <ClInclude Include="Source\Framework\Guid.h" />
     <ClInclude Include="Source\Framework\ScopedBoolean.h" />
@@ -441,7 +427,6 @@
     <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
-    <ClInclude Include="Source\Navigation\Navigation.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TDChest.h" />
     <ClInclude Include="Source\Framework\SysPrint.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
@@ -454,7 +439,6 @@
     <ClInclude Include="Source\Render\UniformBuffer.h" />
     <ClInclude Include="Source\Assets\AssetRegistryLocal.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
-    <ClInclude Include="Source\Misc\PropTween.h" />
     <ClInclude Include="Source\Game\CarGame\CarGui.h" />
     <ClInclude Include="Source\UI\BaseGUI.h" />
     <ClInclude Include="Source\UI\UIBuilder.h" />
@@ -489,7 +473,6 @@
     <ClInclude Include="Source\EngineSystemCommands.h" />
     <ClInclude Include="Source\Framework\SerializedForDiffing.h" />
     <ClInclude Include="Source\Framework\NodeMenuItem.h" />
-    <ClInclude Include="Source\Render\GpuResourceManager.h" />
     <ClInclude Include="Source\DebugConsole.h" />
     <ClInclude Include="Source\Render\RenderWindow.h" />
     <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew2.h" />
@@ -549,9 +532,6 @@
     <ClCompile Include="Source\External\ImGuizmo.cpp">
       <Filter>Source\External</Filter>
     </ClCompile>
-    <ClCompile Include="Source\AssetCompile\ModelAssetEditorLocal.cpp">
-      <Filter>Source\AssetCompile</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Game\GameAnimEvents.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
@@ -570,10 +550,7 @@
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelAsset2.cpp" />
-    <ClCompile Include="Source\AssetCompile\AnimAssetEditorLocal.cpp" />
-    <ClCompile Include="Source\Render\Editor\MaterialEditorLocal.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
-    <ClCompile Include="Source\EditorTool3d.cpp" />
     <ClCompile Include="Source\Render\Editor\TextureEditor.cpp" />
     <ClCompile Include="Source\Input\InputAction.cpp" />
     <ClCompile Include="Source\DeferredSpawnScope.cpp" />
@@ -625,7 +602,6 @@
     <ClCompile Include="Source\Render\Shader.cpp" />
     <ClCompile Include="Source\Render\Shadowmap.cpp" />
     <ClCompile Include="Source\Render\Ssao.cpp" />
-    <ClCompile Include="Source\Render\TerrainComponent.cpp" />
     <ClCompile Include="Source\Render\Texture.cpp" />
     <ClCompile Include="Source\Render\Volumetricfog.cpp" />
     <ClCompile Include="Source\Framework\Util.cpp" />

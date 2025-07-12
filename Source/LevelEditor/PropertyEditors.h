@@ -153,20 +153,6 @@ public:
 	AnimationGraphEditor& editor;
 };
 
-class MaterialParamPropEditor : public IPropertyEditor
-{
-public:
-	MaterialParamPropEditor(MaterialEditorLocal& editor) : editor(editor) {}
-
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-
-	// cursed moment
-	PropertyInfo pi;
-	bool has_init = false;
-	std::unique_ptr<IPropertyEditor> internalEditor;
-	MaterialEditorLocal& editor;
-};
 
 
 class EntityBoneParentStringEditor : public IPropertyEditor

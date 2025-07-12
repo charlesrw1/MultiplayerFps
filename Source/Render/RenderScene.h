@@ -624,8 +624,7 @@ public:
 	void build_scene_data(bool skybox_only, bool is_for_editor);
 	void refresh_static_mesh_data(bool is_for_editor);
 	RSunInternal* get_main_directional_light();
-	TerrainInterfacePublic* get_terrain_interface() override;
-	std::unique_ptr<TerrainInterfaceLocal> terrain_interface;
+
 
 	bool statics_meshes_are_dirty = false;
 	bool static_cache_built_for_editor = false;

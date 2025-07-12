@@ -11,7 +11,7 @@
 #include "Animation/Runtime/Animation.h"
 #include "Debug.h"
 #include <SDL2/SDL.h>
-#include "Render/TerrainInterfaceLocal.h"
+
 #include "UI/GUISystemPublic.h"	// for GuiSystemPublic::paint
 #include "Assets/AssetDatabase.h"
 #include "Game/Components/ParticleMgr.h"	// FIXME
@@ -1924,9 +1924,6 @@ void Render_Scene::init()
 	gpu_skinned_mats_buffer_size = r_skinned_mats_bone_buffer_size.get_integer();
 	glNamedBufferData(gpu_skinned_mats_buffer, gpu_skinned_mats_buffer_size * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
 
-
-	terrain_interface = std::make_unique<TerrainInterfaceLocal>();
-	terrain_interface->init();
 }
 
 glm::vec4 to_vec4(Color32 color) {
@@ -3240,9 +3237,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 			render_level_to_target(cmdparams);
 		}
-		
-		if(r_drawterrain.get_bool() && !params.skybox_only)
-			scene.terrain_interface->draw_to_gbuffer(params.is_editor, r_debug_mode.get_integer()!=0);
+	
 	};
 
 	if (is_wireframe_mode) {
@@ -3538,14 +3533,10 @@ static void get_view_mat(int idx, glm::vec3 pos, glm::mat4& view, glm::vec3& fro
 }
 
 
-RSunInternal* Render_Scene::get_main_directional_light()
-{
+RSunInternal* Render_Scene::get_main_directional_light() {
 	if (!suns.empty())
 		return &suns.at(suns.size() - 1);
 	return nullptr;
-}
-TerrainInterfacePublic* Render_Scene::get_terrain_interface() { 
-	return terrain_interface.get(); 
 }
 Render_Scene::~Render_Scene() {}
 

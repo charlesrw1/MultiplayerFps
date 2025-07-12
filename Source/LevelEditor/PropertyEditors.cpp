@@ -13,7 +13,6 @@
 #include "Game/Components/LightComponents.h"
 
 
-#include "Render/Editor/MaterialEditorLocal.h"
 
 #include "imgui_internal.h"
 bool SharedAssetPropertyEditor::internal_update() {
@@ -645,7 +644,6 @@ void PropertyFactoryUtil::register_anim_editor(AnimationGraphEditor& doc, FnFact
 }
 void PropertyFactoryUtil::register_mat_editor(MaterialEditorLocal& doc, FnFactory<IPropertyEditor>& factory)
 {
-	factory.add("MaterialEditParam", [&doc]() {return new MaterialParamPropEditor(doc); });
 }
 #include "Framework/PropertyPtr.h"
 
@@ -656,47 +654,6 @@ void PropertyFactoryUtil::register_anim_editor2(AnimationGraphEditorNew& ed, FnF
 }
 
 // Inherited via IPropertyEditor
-
-bool MaterialParamPropEditor::internal_update()
-{
-	if (!has_init) {
-		auto& factory = editor.factory;
-
-		const int index = prop->offset;
-		MaterialEditorLocal* mLocal = &editor;
-		auto& paramDef = mLocal->dynamicMat->get_master_material()->param_defs.at(index);
-		MaterialInstance* mInstLocal = (MaterialInstance*)mLocal->dynamicMat.get();
-		auto& param = mInstLocal->impl->params.at(index);
-		pi.name = paramDef.name.c_str();
-		pi.offset = offsetof(MaterialParameterValue, tex_ptr);
-		if (param.type == MatParamType::Bool) {
-			pi.type = core_type_id::Bool;
-			internalEditor = std::make_unique<BooleanEditor>(&param, &pi);
-		}
-		else if (param.type == MatParamType::Float) {
-			pi.type = core_type_id::Float;
-			internalEditor = std::make_unique<FloatEditor>(&param, &pi);
-		}
-		else if (param.type == MatParamType::Vector) {
-			pi.type = core_type_id::Int32;
-			auto ed = factory.create("ColorUint");
-			assert(ed);
-			internalEditor = std::unique_ptr<IPropertyEditor>(ed);
-			internalEditor->post_construct_for_custom_type(&param, &pi, nullptr);
-		}
-		else if (param.type == MatParamType::Texture2D) {
-			pi = make_assetptr_property_new(paramDef.name.c_str(), pi.offset, PROP_DEFAULT, "", &Texture::StaticType);// (AssetPtr<Texture>*)(0));
-			auto ed = factory.create(pi.custom_type_str/*AssetPtr*/);
-			assert(ed);
-			internalEditor = std::unique_ptr<IPropertyEditor>(ed);
-			internalEditor->post_construct_for_custom_type(&param, &pi, nullptr);
-		}
-		has_init = true;
-	}
-	if (!internalEditor)
-		return false;
-	return internalEditor->internal_update();
-}
 
 // Inherited via IPropertyEditor
 
@@ -759,6 +716,7 @@ EntityBoneParentStringEditor::~EntityBoneParentStringEditor() {
 	StringName* myName = (StringName*)prop->get_ptr(instance);
 	*myName = StringName(str.c_str());
 }
+#include "Game/Components/MeshComponent.h"
 #include "Animation/SkeletonData.h"
 bool EntityBoneParentStringEditor::internal_update()
 {

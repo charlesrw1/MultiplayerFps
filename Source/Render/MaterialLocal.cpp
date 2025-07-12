@@ -26,7 +26,7 @@ MaterialManagerPublic* imaterials = &matman;
 //extern IEditorTool* g_mateditor;
 
 ConfigVar material_print_debug("material_print_debug", "1", CVAR_DEV | CVAR_BOOL, "");
-#include "Editor/MaterialEditorLocal.h"
+
 
 
 #ifdef EDITOR_BUILD
@@ -45,9 +45,7 @@ public:
 	virtual bool assets_are_filepaths() const override { return true; }
 
 	virtual const ClassTypeInfo* get_asset_class_type()  const override { return &MaterialInstance::StaticType; }
-	uptr<CreateEditorAsync> create_create_tool_to_edit(opt<string> assetPath) const { 
-		return std::make_unique<OpenMaterialEditor>(assetPath); 
-	}
+
 	void draw_browser_menu(const string& path)const final {
 
 	}

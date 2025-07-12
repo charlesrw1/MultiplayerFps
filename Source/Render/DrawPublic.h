@@ -88,8 +88,6 @@ public:
 	virtual void update_fog(handle<RenderFog> handle, const RenderFog& fog) = 0;
 	virtual void remove_fog(handle<RenderFog>& handle) = 0;
 
-	virtual TerrainInterfacePublic* get_terrain_interface() = 0;
-
 
 	// Debug line renderer handles
 	virtual handle<MeshBuilder_Object> register_meshbuilder() = 0;
