@@ -804,6 +804,19 @@ std::string MasterMaterialImpl::create_glsl_shader(
 		if (decal_affect_roughmetal)
 			masterShader += "#define DECAL_ROUGHMETAL_WRITE\n";
 	}
+	if (is_alphatested()) {
+		masterShader += "#define ALPHATEST\n";
+	}
+	if (blend != blend_state::OPAQUE) {
+		masterShader+= "#define FORWARD_SHADER\n";
+		if (light_mode == LightingMode::Lit) {
+			masterShader += "#define FORWARD_LIT\n";
+		}
+
+	}
+
+
+
 
 	try {
 		read_and_add_recursive(master_shader_path, masterShader);
@@ -892,6 +905,7 @@ std::string MasterMaterialImpl::create_glsl_shader(
 	else
 		actual_fs_code += "MATERIAL_TYPE_UNLIT;\n";
 
+
 	if (!fs_code.empty()) {
 		autogen_code("FS",actual_fs_code, fs_code);
 	}
@@ -902,13 +916,6 @@ std::string MasterMaterialImpl::create_glsl_shader(
 	replace(masterShader, "___USER_VS_CODE___", actual_vs_code);
 	replace(masterShader, "___USER_FS_CODE___", actual_fs_code);
 
-	if (is_alphatested())
-		masterShader.insert(0,
-			"#define ALPHATEST\n");
-	if (blend != blend_state::OPAQUE)
-		masterShader.insert(0,
-			"#define FORWARD_SHADER\n"
-		);
 
 	masterShader.insert(0, 
 		"// ***********************************\n"

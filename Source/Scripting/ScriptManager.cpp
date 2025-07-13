@@ -247,9 +247,58 @@ void ScriptManager::free_class_table(int id)
 	lua_pop(lua, 1);
 	luaL_unref(lua, LUA_REGISTRYINDEX, id);
 }
-void ScriptManager::reload()
+void ScriptManager::check_for_reload() {
+	if (had_changes) {
+		lua_settop(lua, 0);
+		for (auto& [name, c] : lua_classes) {
+			c->init_lua_type();
+		}
+		ClassBase::post_changes_class_init();
+		had_changes = false;
+	}
+}
+void ScriptManager::reload_one_file(const std::string& strFilePath)
 {
-	sys_print(Info, "ScriptManager::reload\n");
+	auto file = FileSys::open_read_game(strFilePath);
+	std::vector<uptr<LuaClassTypeInfo>> newClasses;
+	if (file) {
+		string out(file->size(), ' ');
+		file->read(out.data(), out.size());
+		auto outTypes = ScriptLoadingUtil::parse_text(out);
+		for (auto& t : outTypes) {
+			if (t.inherited.size() > 0) {
+				auto info = std::make_unique<LuaClassTypeInfo>();
+				info->set_classname(t.name);
+				bool b = info->set_superclass(t.inherited.at(0));
+				if (b)
+					newClasses.push_back(std::move(info));
+			}
+		}
+		had_changes = true;
+
+		if (luaL_loadstring(lua, out.c_str()) != LUA_OK) {
+			sys_print(Error, "error loading script %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
+			lua_pop(lua, 1);
+			ASSERT(lua_gettop(lua) == 0);
+			return;
+		}
+
+		// Execute the loaded chunk
+		if (lua_pcall(lua, 0, LUA_MULTRET, 0) != LUA_OK) {
+			fprintf(stderr, "Error executing chunk for %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
+			return;
+		}
+	}
+	for (auto& c : newClasses) {
+		if (!MapUtil::contains(lua_classes, c->get_name())) {
+			ClassBase::register_class(c.get());
+			lua_classes.insert({ c->get_name(),std::move(c) });
+		}
+	}
+}
+void ScriptManager::reload_all_scripts()
+{
+	sys_print(Info, "ScriptManager::reload_all_scripts\n");
 	std::vector<string> files;
 	for (auto& file : FileSys::find_game_files_path("scripts/")) {
 		if (file.find("MEGA.gen.lua") != string::npos)
@@ -259,53 +308,11 @@ void ScriptManager::reload()
 			files.push_back(FileSys::get_game_path_from_full_path(file));
 		}
 	}
-	std::string fullOutput;
-	std::vector<uptr<LuaClassTypeInfo>> newClasses;
 	for (auto& strFilePath : files) {
-		auto file = FileSys::open_read_game(strFilePath);
-		if (file) {
-			string out(file->size(), ' ');
-			file->read(out.data(), out.size());
-			auto outTypes = ScriptLoadingUtil::parse_text(out);
-			fullOutput += out;
-			for (auto& t : outTypes) {
-				if (t.inherited.size() > 0) {
-					auto info = std::make_unique<LuaClassTypeInfo>();
-					info->set_classname(t.name);
-					bool b = info->set_superclass(t.inherited.at(0));
-					if(b)
-						newClasses.push_back(std::move(info));
-				}
-			}
-
-			if (luaL_loadstring(lua, fullOutput.c_str()) != LUA_OK) {
-				sys_print(Error, "error loading script %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
-				lua_pop(lua, 1);
-				ASSERT(lua_gettop(lua) == 0);
-				continue;
-			}
-
-			// Execute the loaded chunk
-			if (lua_pcall(lua, 0, LUA_MULTRET, 0) != LUA_OK) {
-				fprintf(stderr, "Error executing chunk for %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
-				continue;
-			}
-
-
-		}
+		reload_one_file(strFilePath);
 	}
-	for (auto& c : newClasses) {
-		if (!MapUtil::contains(lua_classes, c->get_name())) {
-			ClassBase::register_class(c.get());
-			lua_classes.insert({ c->get_name(),std::move(c) });
-		}
-	}
-	newClasses.clear();
-	lua_settop(lua, 0);
-	for (auto& [name, c] : lua_classes) {
-		c->init_lua_type();
-	}
-	ClassBase::post_changes_class_init();
+	had_changes = true;
+	check_for_reload();
 }
 ScriptManager* ScriptManager::inst = nullptr;
 
@@ -356,7 +363,7 @@ void ScriptManager::load_script_files()
 {
 	ClassBase::init_class_info_for_script();
 	sys_print(Debug, "ScriptManager::load_script_files\n");
-	reload();
+	reload_all_scripts();
 }
 
 LuaClassTypeInfo::LuaClassTypeInfo() : ClassTypeInfo("lua_class_empty",nullptr,nullptr,nullptr,false,nullptr,0,nullptr,true)

@@ -172,7 +172,7 @@ void CascadeShadowMapSystem::update()
 			params.provied_constant_buffer = ubo.frame_view[i];
 			params.upload_constants = true;
 			params.wants_non_reverse_z = true;
-
+			params.offset_poly_units = 1;
 			draw.render_level_to_target(params);
 		}
 	}

@@ -641,6 +641,24 @@ public:
 	Render_Lists spotLightShadowList;
 
 
+	const Texture* get_reflection_probe_for_render(const glm::vec3& vieworigin) {
+		const Texture* reflectionProbeTex = nullptr;
+		if (!skylights.empty() && !skylights.front().skylight.wants_update) {
+			auto& skylight = skylights.front();
+			reflectionProbeTex = skylight.skylight.generated_cube;
+		}
+		auto& vols = reflection_volumes.objects;
+		for (int i = 0; i < vols.size(); i++) {
+			auto& vol = vols[i].type_;
+			if (vol.wants_update || !vol.generated_cube)
+				continue;
+			Bounds b(vol.boxmin, vol.boxmax);
+			if (b.inside(vieworigin, 0.0))
+				reflectionProbeTex = vol.generated_cube;
+		}
+		return reflectionProbeTex;
+	}
+
 	int get_front_bone_buffer_offset() const {
 		return gpu_skinned_mats_using_front_buffer ? 0 : gpu_skinned_mats_buffer_size / 2;
 	}

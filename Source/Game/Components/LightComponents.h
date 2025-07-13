@@ -51,6 +51,7 @@ public:
 	REF float radius = 20.f;
 	REF float cone_angle = 45.0;
 	REF float inner_cone = 40.0;
+	// only works with shadows on. projects a square, mask texture to use to attenuate the light. this disables "inner_cone" attenuation
 	REF const Texture* cookie_asset = nullptr;
 	REF bool visible = true;
 	REF ShadowMode shadow = ShadowMode::Disabled;

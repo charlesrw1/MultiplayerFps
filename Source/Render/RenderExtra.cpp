@@ -152,7 +152,7 @@ void ShadowMapManager::do_render(Render_Lists& list, handle<Render_Light> handle
 
 		params.provied_constant_buffer = frame_view;
 		params.upload_constants = true;
-
+		params.offset_poly_units = -3;
 		draw.render_level_to_target(params);
 	}
 }

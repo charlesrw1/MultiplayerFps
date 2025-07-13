@@ -243,6 +243,45 @@ vec3 EvaluateAmbientCube(vec3 worldNormal)
 	return linearColor;
 }
 
+#ifdef FORWARD_LIT
+layout(binding = 19) uniform samplerCube Skylight;
+layout(binding = 18) uniform sampler2D PBR_brdflut;
+vec3 FresnelSchlickRougness(float cosTheta, vec3 F0, float roughness)
+{
+	 return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+float SchlickFresnel(float u) {
+	float m = 1.0 - u;
+	float m2 = m * m;
+	return m2 * m2 * m;
+}
+
+vec4 pbr_calculate_transparent(vec3 worldspace, vec3 Albedo, float Transmission, float Roughness, vec3 Normal)
+{
+	float Metalness = 0.0;
+	vec3 view_pos = g.viewpos_time.xyz;
+	vec3 view_front = g.viewfront.xyz;
+	vec3 V = normalize(view_pos-worldspace);
+	vec3 R = reflect(-V,Normal);
+	vec3 F0 = vec3(0.04);
+	F0 = mix(F0,Albedo,Metalness);	
+	const float MAX_REFLECTION_LOD = 7.0;
+	float fresnel_factor = clamp(SchlickFresnel(max(dot(Normal,V),0.0)),0.0,1.0);
+	vec3 prefiltered_color = textureLod(Skylight,vec3(R), Roughness*MAX_REFLECTION_LOD).rgb;
+	vec3 F = FresnelSchlickRougness(max(dot(Normal,V),0.0),F0,Roughness);
+	vec2 env_brdf = texture(PBR_brdflut,vec2(max(dot(Normal,V),0.0),Roughness)).rg;	
+	vec3 specular = prefiltered_color*(F*env_brdf.x+env_brdf.y);
+
+	float a = mix(0.05,1.0,Transmission);
+	float alphaOut = mix(fresnel_factor,1.0,a);
+	float specularMult = 0.5 / sqrt(alphaOut);
+	vec3 base = Albedo;
+	
+	
+	return vec4(Albedo + prefiltered_color * specularMult,alphaOut);
+}
+#endif
+
 void main()
 {
 #ifdef DEPTH_ONLY
@@ -262,8 +301,15 @@ void main()
 #endif // ALPHATEST
 
 	#ifdef FORWARD_SHADER
-		SCENE_OUT_Color = vec4(EMISSIVE,OPACITY);
-
+		#ifdef FORWARD_LIT
+			vec3 Normalized_IN_N = normalize(FS_IN_Normal);
+			// World space normal
+			vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
+			Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
+			SCENE_OUT_Color = pbr_calculate_transparent(FS_IN_FragPos,BASE_COLOR,OPACITY,ROUGHNESS,Final_Normal);		
+		#else
+			SCENE_OUT_Color = vec4(EMISSIVE,OPACITY);
+		#endif
 	#else
 		vec3 Normalized_IN_N = normalize(FS_IN_Normal);
 		// World space normal

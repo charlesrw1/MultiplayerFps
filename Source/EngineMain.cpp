@@ -930,7 +930,7 @@ void GameEngineLocal::add_commands()
 		}
 		});
 	commands->add("reload_script",[](const Cmd_Args& args) {
-		ScriptManager::inst->reload();
+		ScriptManager::inst->reload_all_scripts();
 		});
 
 	g_modelMgr.add_commands(*commands);
@@ -2259,6 +2259,7 @@ void GameEngineLocal::loop()
 		DebugShapeCtx::get().update(frame_time);
 #ifdef EDITOR_BUILD
 		AssetRegistrySystem::get().update(); 		// update hot reloading
+		ScriptManager::inst->check_for_reload();	// do this here? this does script reloading stuff
 #endif
 		if (get_level())
 			get_level()->sync_level_render_data();

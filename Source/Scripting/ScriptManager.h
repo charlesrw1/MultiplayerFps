@@ -60,6 +60,7 @@ public:
 	static ScriptManager* inst;
 	ScriptManager();
 	~ScriptManager();
+	void check_for_reload();
 	void load_script_files();
 	void init_this_class_type(ClassTypeInfo* classTypeInfo);
 	void set_class_type_global(ClassTypeInfo* type);
@@ -70,8 +71,10 @@ public:
 		return lua;
 	}
 	ClassBase* allocate_class(string name);
-	void reload();
+	void reload_all_scripts();
+	void reload_one_file(const string& fileName);
 private:
+	bool had_changes = false;
 	void initialize_class_type(const ClassTypeInfo* type);
 	lua_State* lua = nullptr;
 	std::unordered_map<std::string, uptr<LuaClassTypeInfo>> lua_classes;

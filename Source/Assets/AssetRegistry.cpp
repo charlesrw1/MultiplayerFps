@@ -316,7 +316,7 @@ void AssetRegistrySystem::update()
 					}
 				}
 				else if (ext == "lua") {
-					ScriptManager::inst->reload();
+					ScriptManager::inst->reload_one_file(gamepath);
 				}
 				else if (ext == "tmap") {
 					//...

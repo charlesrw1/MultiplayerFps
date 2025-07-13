@@ -190,10 +190,10 @@ public:
 	}ubo;
 
 	struct params {
-		float radius = 0.4;
+		float radius = 0.3;
 		float intensity = 1.5;
 		float bias = 0.1;
-		float blur_sharpness = 3.0;
+		float blur_sharpness = 20.0;
 	}tweak;
 
 	gpu::HBAOData data = {};

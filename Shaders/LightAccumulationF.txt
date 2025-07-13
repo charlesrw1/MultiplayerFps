@@ -31,6 +31,8 @@ uniform vec3 color=vec3(300.0);
 uniform float radius;
 
 layout(binding = 4) uniform sampler2DShadow shadow_map_atlas;
+layout(binding = 5) uniform sampler2D light_cookie;
+
 uniform mat4 shadow_view_proj;
 uniform vec4 shadow_atlas_offset;
 
@@ -147,10 +149,11 @@ float sample_shadow(vec3 WorldSpace)
 	proj_coords.xy=proj_coords.xy*0.5+0.5;
 	float depth_light_space=proj_coords.z;
 	if(depth_light_space<0.0)
-		return 1.0;
+		return 0.0;
 	
 	// adjust to atlas pos
 	// proj_coords is [0,1]
+	vec2 coords_no_atlas = proj_coords.xy;
 	proj_coords.xy = proj_coords.xy*shadow_atlas_offset.xy + shadow_atlas_offset.zw;
 
 	float bias = uEpsilon;
@@ -175,8 +178,15 @@ float sample_shadow(vec3 WorldSpace)
 		}    
 	}
 	shadow /= 9.0;
+#ifdef COOKIE
+	if(coords_no_atlas.x<0||coords_no_atlas.x>=1||coords_no_atlas.y<0||coords_no_atlas.y>=1)
+		return 0.0;
 
+	float cookie_val = texture(light_cookie,coords_no_atlas).r;
+	return (1.0-shadow)*cookie_val;
+#else
 	return 1.0-shadow;
+#endif
 }
 
 
@@ -209,11 +219,12 @@ void main()
 	
 	if(is_spot_light) {
 		float angle = dot(-L, spot_normal);
+	#ifndef COOKIE
 		attenuation *= clamp((-spot_angle+angle) / (spot_inner-spot_angle), 0.0, 1.0);    
-		
-		#ifdef SHADOWED
-			attenuation *= sample_shadow(worldspace);
-		#endif
+	#endif
+	#ifdef SHADOWED
+		attenuation *= sample_shadow(worldspace);
+	#endif
 		
 	}
 	

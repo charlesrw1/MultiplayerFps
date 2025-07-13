@@ -71,6 +71,7 @@ struct Render_Level_Params {
 
 	View_Setup view;
 
+	float offset_poly_units = 1.1;
 
 	Render_Lists* rl = nullptr;
 	Render_Pass* rp = nullptr;
@@ -432,6 +433,7 @@ public:
 		program_handle tex_debug_2d_array{};
 		program_handle tex_debug_cubemap{};
 
+		program_handle light_accumulation_shadow_cookie{};
 		program_handle light_accumulation_shadowed{};
 		program_handle light_accumulation{};
 		program_handle sunlight_accumulation{};

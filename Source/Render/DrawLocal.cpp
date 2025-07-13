@@ -650,6 +650,8 @@ void Renderer::create_shaders()
 
 	prog.light_accumulation = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt");
 	prog.light_accumulation_shadowed = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt","SHADOWED");
+	prog.light_accumulation_shadow_cookie = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt", "SHADOWED,COOKIE");
+
 	prog.sunlight_accumulation = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt");
 	prog.sunlight_accumulation_debug = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt","DEBUG");
 
@@ -1452,12 +1454,22 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 
 	if (params.pass == Render_Level_Params::SHADOWMAP ) {
 		glEnable(GL_POLYGON_OFFSET_FILL);
-		glPolygonOffset(shadowmap.tweak.poly_factor, shadowmap.tweak.poly_units);
+		glPolygonOffset(params.offset_poly_units, 4/* this does nothing?*/);
 		//*glCullFace(GL_FRONT);
 		//*glDisable(GL_CULL_FACE);
 	}
 
-
+	if (params.pass == Render_Level_Params::FORWARD_PASS) {
+		// fixme, for lit transparents
+		const Texture* reflectionProbeTex = scene.get_reflection_probe_for_render(params.view.origin);
+		if(reflectionProbeTex)
+			bind_texture(19, reflectionProbeTex->gl_id);
+		else {
+			// uh...
+			bind_texture(19, black_texture.gl_id);//expects a cubemap...
+		}
+		bind_texture(18, EnviornmentMapHelper::get().integrator.get_texture());
+	}
 
 
 	{
@@ -2689,7 +2701,10 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 			cmd.baseInstance = 0;
 
 			if (light.casts_shadow_mode != 0) {
-				state.program = prog.light_accumulation_shadowed;
+				if(light.projected_texture)
+					state.program = prog.light_accumulation_shadow_cookie;
+				else
+					state.program = prog.light_accumulation_shadowed;
 			}
 			else {
 				state.program = prog.light_accumulation;
@@ -2714,6 +2729,9 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 				glm::vec4 as_vec4 = glm::vec4(float(rect.w) / atlas_size.x, float(rect.h) / atlas_size.y,
 					float(rect.x) / atlas_size.x, float(rect.y) / atlas_size.y);
 				shader().set_vec4("shadow_atlas_offset", as_vec4);
+
+				if (light.projected_texture)
+					device.bind_texture(5, light.projected_texture->gl_id);
 			}
 
 			glMultiDrawElementsIndirect(
@@ -2756,20 +2774,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 	}
 
 
-	const Texture* reflectionProbeTex = nullptr;
-	if (!scene.skylights.empty() && !scene.skylights.front().skylight.wants_update) {
-		auto& skylight = scene.skylights.front();
-		reflectionProbeTex = skylight.skylight.generated_cube;
-	}
-	auto& vols = scene.reflection_volumes.objects;
-	for (int i = 0; i < vols.size(); i++) {
-		auto& vol = vols[i].type_;
-		if (vol.wants_update||!vol.generated_cube)
-			continue;
-		Bounds b(vol.boxmin, vol.boxmax);
-		if (b.inside(view_to_use.origin,0.0))
-			reflectionProbeTex = vol.generated_cube;
-	}
+	const Texture* reflectionProbeTex = scene.get_reflection_probe_for_render(view_to_use.origin);
 
 	if (reflectionProbeTex&& !is_cubemap_view) {
 		RenderPipelineState state;
