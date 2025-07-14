@@ -105,7 +105,7 @@ class MapAssetMetadata : public AssetMetadata
 public:
 	MapAssetMetadata() {
 		extensions.push_back("tmap");
-		extensions.push_back("bmap");
+
 	}
 
 	// Inherited via AssetMetadata
@@ -119,13 +119,11 @@ public:
 		return "Map";
 	}
 
-	virtual bool assets_are_filepaths()  const { return true; }
-
 	//IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &SceneAsset::StaticType; }
 
-	const char* get_arg_for_editortool() const { return "scene"; }
+
 
 	uptr<CreateEditorAsync> create_create_tool_to_edit(opt<string> assetPath) const { 
 		return make_unique<CreateLevelEditorAync>(assetPath); 
@@ -153,13 +151,10 @@ public:
 		return "Prefab";
 	}
 
-	virtual bool assets_are_filepaths()  const { return true; }
-
 	//IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &PrefabAsset::StaticType; }
 
-	const char* get_arg_for_editortool() const { return "prefab"; }
 
 	uptr<CreateEditorAsync> create_create_tool_to_edit(opt<string> assetPath) const {
 		return make_unique<CreatPrefabEditorAync>(assetPath);

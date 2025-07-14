@@ -42,7 +42,6 @@ public:
 	virtual Color32 get_browser_color()  const override { return Color32( 219, 189, 68 ); }
 	virtual std::string get_type_name()  const override { return "Material"; }
 
-	virtual bool assets_are_filepaths() const override { return true; }
 
 	virtual const ClassTypeInfo* get_asset_class_type()  const override { return &MaterialInstance::StaticType; }
 

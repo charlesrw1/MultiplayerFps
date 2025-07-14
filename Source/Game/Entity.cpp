@@ -58,8 +58,6 @@ public:
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Entity::StaticType; }
 
-
-	virtual bool assets_are_filepaths() const { return false; }
 };
 REGISTER_ASSETMETADATA_MACRO(EntityTypeMetadata);
 #endif

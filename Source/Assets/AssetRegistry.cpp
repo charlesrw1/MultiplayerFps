@@ -72,16 +72,18 @@ static std::string get_valid_asset_types_glob() {
 	out += " --glob \"*.mis\" ";	// model import settings
 	out += " --glob \"*.tis\" ";	// texture import settings
 
+	out += " --glob \"*.tmap\" ";
+	out += " --glob \"*.pfb\" ";
+	out += " --glob \"*.lua\" ";
+	out += " --glob \"*.mm\" ";
+	out += " --glob \"*.mi\" ";
+
+
+	std::vector<const char*> exts = { "tmap","pfb","lua","mm","mi" };
+
 	auto& types = AssetRegistrySystem::get().get_types();
-	for (auto& t : types) {
-		if (!t->assets_are_filepaths()) continue;
-		// hacky stuff, these are binary formats
-		if (t->get_asset_class_type() == &Texture::StaticType) continue;
-		if (t->get_asset_class_type() == &Model::StaticType) continue;
-		if (t->get_asset_class_type() == &SoundFile::StaticType) continue;
-		for (auto& ext : t->extensions) {
-			out += " --glob \"*." + ext + "\" ";
-		}
+	for (auto& ext : exts) {
+		out += " --glob \"*." + std::string(ext) + "\" ";
 	}
 	return out;
 }
@@ -89,12 +91,9 @@ static std::string get_asset_references_pattern() {
 	std::string out;
 	out += ".mis\\b|.tis\\b";
 	auto& types = AssetRegistrySystem::get().get_types();
-	for (auto& t : types) {
-		if (!t->assets_are_filepaths()) continue;
-		// hacky stuff, these are binary formats
-		for (auto& ext : t->extensions) {
-			out += "|." + ext + "\\b";
-		}
+	std::vector<const char*> exts = { "tmap","pfb","lua","mm","mi","cmdl","dds","wav"};
+	for (auto& ext : exts) {
+		out += "|." + std::string(ext) + "\\b";
 	}
 	return out;
 }
@@ -163,7 +162,7 @@ AssetRegistrySystem& AssetRegistrySystem::get()
 	return inst;
 }
 
-ConfigVar asset_registry_reindex_period("asset_registry_reindex_period", "4", CVAR_DEV | CVAR_INTEGER, "time in seconds of registry reindexing");
+ConfigVar asset_registry_reindex_period("asset_registry_reindex_period", "20", CVAR_DEV | CVAR_FLOAT, "time in seconds of registry reindexing");
 
 static std::vector<std::string> split(const std::string& str, char delimiter) {
 	std::vector<std::string> tokens;
@@ -193,11 +192,10 @@ void AssetFilesystemNode::sort_R()
 }
 
 
-bool HackedAsyncAssetRegReindex::is_in_loading = false;
-std::unique_ptr<AssetFilesystemNode> HackedAsyncAssetRegReindex::root_to_clone;
+
 
 static HANDLE directoryChangeHandle = 0;
-static HackedAsyncAssetRegReindex* hackedAsset = nullptr;
+
 #include "Framework/StringUtils.h"
 void AssetRegistrySystem::init()
 {
@@ -211,8 +209,7 @@ void AssetRegistrySystem::init()
 	if (directoryChangeHandle == INVALID_HANDLE_VALUE) {
 		Fatalf("ERROR: AssetRegistrySystem::init: FindFirstChangeNotificationA failed: %s\n", GetLastError());
 	}
-	hackedAsset = new HackedAsyncAssetRegReindex();
-	g_assets.install_system_asset(hackedAsset, "_hackedAsset");
+
 
 	reindex_all_assets();
 
@@ -244,8 +241,96 @@ void AssetRegistrySystem::init()
 #include "Render/MaterialPublic.h"
 #include "Render/Model.h"
 #include "Scripting/ScriptManager.h"
+#include <future>
+using ChangedPaths = std::vector<std::string>;
+std::vector<std::string> async_launch_check_filesystem_changes(int64_t last_time_check) {
+	std::vector<std::string> out;
+	for (const string& file : FileSys::find_game_files()) {
+		auto gamepath = FileSys::get_game_path_from_full_path(file);
+		auto filePtr = FileSys::open_read_game(gamepath);
+		if (!filePtr)
+			continue;
+		int64_t in_unix_time = filetime_to_unix_seconds(filePtr->get_timestamp());
+		filePtr->close();
+		if (in_unix_time >= last_time_check) {
+			out.push_back(gamepath);
+		}
+	}
+	return out;
+}
+static std::future<ChangedPaths> future_changed_paths;
+static bool is_waiting_on_future = false;
+
+bool update_on_changed_paths(ChangedPaths changes) {
+
+	bool wants_reindex = false;
+	// just do the stupid way
+	for (string& gamepath : changes) {
+
+		// reload
+		sys_print(Info, "found new asset %s\n", gamepath.c_str());
+		auto ext = StringUtils::get_extension_no_dot(gamepath);
+		const bool prev = wants_reindex;
+		wants_reindex = true;
+		if (ext == "mm" || ext == "mi") {
+			if (g_assets.is_asset_loaded(gamepath)) {
+				auto asset = g_assets.find_sync<MaterialInstance>(gamepath);
+				g_assets.reload_sync<MaterialInstance>(asset);
+			}
+		}
+		else if (ext == "mis" || ext == "glb") {
+			StringUtils::remove_extension(gamepath);
+			gamepath += ".cmdl";
+			if (g_assets.is_asset_loaded(gamepath)) {
+				auto asset = g_assets.find_sync<Model>(gamepath);
+				g_assets.reload_sync<Model>(asset);
+			}
+		}
+		else if (ext == "png" || ext == "jpg" || ext == "tis") {
+			StringUtils::remove_extension(gamepath);
+			gamepath += ".dds";
+			if (g_assets.is_asset_loaded(gamepath)) {
+				auto asset = g_assets.find_sync<Texture>(gamepath);
+				g_assets.reload_sync<Texture>(asset);
+			}
+		}
+		else if (ext == "pfb") {
+			if (g_assets.is_asset_loaded(gamepath)) {
+				auto asset = g_assets.find_sync<PrefabAsset>(gamepath);
+				g_assets.reload_sync<PrefabAsset>(asset);
+			}
+		}
+		else if (ext == "wav") {
+			if (g_assets.is_asset_loaded(gamepath)) {
+				auto asset = g_assets.find_sync<SoundFile>(gamepath);
+				g_assets.reload_sync<SoundFile>(asset);
+			}
+		}
+		else if (ext == "lua") {
+			ScriptManager::inst->reload_one_file(gamepath);
+		}
+		else if (ext == "tmap") {
+			//...
+		}
+		else {
+			wants_reindex = prev;
+		}
+	}
+	return wants_reindex;
+}
+
 void AssetRegistrySystem::update()
 {
+	if (is_waiting_on_future) {
+		if (future_changed_paths.wait_for(std::chrono::milliseconds(1)) == std::future_status::ready) {
+			ChangedPaths changes = future_changed_paths.get();
+			bool wants_reindex = update_on_changed_paths(changes);
+			if (wants_reindex)
+				reindex_all_assets();
+			is_waiting_on_future = false;
+		}
+	}
+
 	double time_now = TimeSinceStart();
 	{
 		auto status = WaitForMultipleObjects(1, &directoryChangeHandle, TRUE, 0);
@@ -255,88 +340,28 @@ void AssetRegistrySystem::update()
 			sys_print(Error, "WaitForMultipleObjects failed: %s\n", GetLastError());
 			return;
 		}
-		if (time_now - last_reindex_time <= (double)asset_registry_reindex_period.get_integer()) {
+		sys_print(Debug, "status == WAIT_OBJECT_0 (%f) (%f)\n",float(time_now), float(last_reindex_time));
+		const float period = 5.0;
+		if ((time_now - last_reindex_time) <= period || is_waiting_on_future) {
 			if (FindNextChangeNotification(directoryChangeHandle) == FALSE) {
 				sys_print(Error, "FindNextChangeNotification failed: %d\n", GetLastError());
 			}
-			sys_print(Debug, "skip reindex%f %f\n", time_now, time_now - last_reindex_time);
+			sys_print(Debug, "skip reindex %f %f\n", float(time_now), float(time_now - last_reindex_time));
 			return;
-
 		}
 
 		ASSERT(status == WAIT_OBJECT_0);
-		
-		bool wants_reindex = false;
-		// just do the stupid way
-		for (const string& file : FileSys::find_game_files()) {
-			auto gamepath = FileSys::get_game_path_from_full_path(file);
-			auto filePtr = FileSys::open_read_game(gamepath);
-			if (!filePtr)
-				continue;
-			int64_t in_unix_time = filetime_to_unix_seconds(filePtr->get_timestamp());
-			filePtr->close();
-			if (in_unix_time >= last_time_check) {
-				// reload
-				sys_print(Info, "found new asset %s\n", gamepath.c_str());
-				auto ext = StringUtils::get_extension_no_dot(gamepath);
-				const bool prev = wants_reindex;
-				wants_reindex = true;
-				if (ext == "mm" || ext=="mi") {
-					if (g_assets.is_asset_loaded(gamepath)) {
-						auto asset = g_assets.find_sync<MaterialInstance>(gamepath);
-						g_assets.reload_sync<MaterialInstance>(asset);
-					}
-				}
-				else if (ext == "mis"||ext=="glb") {
-					StringUtils::remove_extension(gamepath);
-					gamepath += ".cmdl";
-					if (g_assets.is_asset_loaded(gamepath)) {
-						auto asset = g_assets.find_sync<Model>(gamepath);
-						g_assets.reload_sync<Model>(asset);
-					}
-				}
-				else if (ext == "png"||ext=="jpg"||ext=="tis") {
-					StringUtils::remove_extension(gamepath);
-					gamepath += ".dds";
-					if (g_assets.is_asset_loaded(gamepath)) {
-						auto asset = g_assets.find_sync<Texture>(gamepath);
-						g_assets.reload_sync<Texture>(asset);
-					}
-				}
-				else if (ext == "pfb") {
-					if (g_assets.is_asset_loaded(gamepath)) {
-						auto asset = g_assets.find_sync<PrefabAsset>(gamepath);
-						g_assets.reload_sync<PrefabAsset>(asset);
-					}
-				}
-				else if (ext == "wav") {
-					if (g_assets.is_asset_loaded(gamepath)) {
-						auto asset = g_assets.find_sync<SoundFile>(gamepath);
-						g_assets.reload_sync<SoundFile>(asset);
-					}
-				}
-				else if (ext == "lua") {
-					ScriptManager::inst->reload_one_file(gamepath);
-				}
-				else if (ext == "tmap") {
-					//...
-				}
-				else {
-					wants_reindex = prev;
-				}
-			}
-		}
+
+		future_changed_paths = std::async(std::launch::async, async_launch_check_filesystem_changes, last_time_check);
+		is_waiting_on_future = true;
+
 		last_time_check = get_unix_time_seconds();
 		last_reindex_time = time_now;
-
-		if (wants_reindex) {
-			sys_print(Debug, "reindexing assets %f %f\n", time_now, time_now - last_reindex_time);
-			reindex_all_assets();
-		}
-
 		if (FindNextChangeNotification(directoryChangeHandle) == FALSE) {
 			sys_print(Error, "FindNextChangeNotification failed: %d\n", GetLastError());
 		}
+
+		sys_print(Debug, "AssetRegistrySystem::update: time %f\n", float(TimeSinceStart()-time_now));
 
 	}
 }
@@ -345,20 +370,19 @@ void AssetRegistrySystem::update()
 void AssetRegistrySystem::reindex_all_assets()
 {
 	using HA = HackedAsyncAssetRegReindex;
-	if (!HA::is_in_loading) {
-		if (root.get())
-			HA::root_to_clone = std::make_unique<AssetFilesystemNode>(*root.get());
-		else
-			HA::root_to_clone = std::make_unique<AssetFilesystemNode>();
-		HA::is_in_loading = true;
-		g_assets.reload_async(hackedAsset, [](GenericAssetPtr) {
-			});
-	}
+	if (!root.get()) 
+		root = std::make_unique<AssetFilesystemNode>();
+	HackedAsyncAssetRegReindex blahblah;
+	double now = GetTime();
+	blahblah.load_asset(nullptr,*root.get());
+	blahblah.post_load();
+	sys_print(Debug, "AssetRegistry: finished assset reindex in %f\n",float(GetTime()-now));
 }
 
 
 const ClassTypeInfo* AssetRegistrySystem::find_asset_type_for_ext(const std::string& ext)
 {
+
 	for (auto& type : all_assettypes) {
 		for (auto& ext_ : type->extensions)
 			if (ext_ == ext)
@@ -367,71 +391,59 @@ const ClassTypeInfo* AssetRegistrySystem::find_asset_type_for_ext(const std::str
 	return nullptr;
 }
 
-void HackedAsyncAssetRegReindex::move_construct(IAsset* other)  {
-	this->root = std::move(((HackedAsyncAssetRegReindex*)other)->root);
-}
 
 void HackedAsyncAssetRegReindex::post_load()  {
-	is_in_loading = false;
 	AssetRegistrySystem::get().root = std::move(root);
-
-	sys_print(Debug, "AssetRegistry: finished assset reindex\n");
 }
-HackedAsyncAssetRegReindex::~HackedAsyncAssetRegReindex() {}
-bool HackedAsyncAssetRegReindex::load_asset(IAssetLoadingInterface*)  {
+#include "Framework/MapUtil.h"
+bool HackedAsyncAssetRegReindex::load_asset(IAssetLoadingInterface*, AssetFilesystemNode& rootToClone)  {
 	std::vector<AssetOnDisk> diskAssets;
-	diskAssets.clear();
-	const int len = strlen(FileSys::get_game_path());
 	auto& all_assettypes = AssetRegistrySystem::get().all_assettypes;
-	for (int i = 0; i < all_assettypes.size(); i++)
-	{
-		auto type = all_assettypes[i].get();
+	AssetMetadata* texMetadata = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("Texture"));
+	AssetMetadata* modelMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("Model"));
+	AssetMetadata* pfbMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("PrefabAsset"));
+	AssetMetadata* matMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("MaterialInstance"));
+	AssetMetadata* mapMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("SceneAsset"));
+	AssetMetadata* soundMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("SoundFile"));
+	AssetMetadata* fontMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("GuiFont"));
 
-		bool is_filenames = type->assets_are_filepaths();
-
-		std::unordered_set<std::string> added_already;
-
-		if (is_filenames) {
-			for (const auto& file : FileSys::find_game_files()) {
-				for (int j = 0; j < type->extensions.size(); j++) {
-					if (type->extensions[j] == get_extension_no_dot(file)) {
-						if (added_already.find(file) != added_already.end())
-							continue;
-
-						AssetOnDisk aod;
-						aod.filename = file;
-						if (is_filenames) {
-							if (aod.filename.find(FileSys::get_game_path()) == 0)
-								aod.filename = aod.filename.substr(len + 1);
-						}
-						aod.type = type;
-
-						diskAssets.push_back(aod);
-
-						added_already.insert(file);
-					}
-				}
-				if (!type->pre_compilied_extension.empty()) {
-					assert(type->extensions.size() != 0);
-					if (type->pre_compilied_extension == get_extension_no_dot(file)) {
-						auto path = strip_extension(file) + "." + type->extensions.at(0);	// unsafe
-						if (added_already.find(path) == added_already.end()) {
-							AssetOnDisk aod;
-							aod.filename = path;
-							if (is_filenames) {
-								if (aod.filename.find(FileSys::get_game_path()) == 0)
-									aod.filename = aod.filename.substr(len + 1);
-							}
-							aod.type = type;
-
-							diskAssets.push_back(aod);
-
-							added_already.insert(path);
-						}
-					}
-				}
-			}
+	for (const auto& file : FileSys::find_game_files()) {
+		auto ext = get_extension_no_dot(file);
+		auto gamepath = FileSys::get_game_path_from_full_path(file);
+		AssetOnDisk aod;
+		aod.filename = std::move(gamepath);
+		if (ext == "hdr" || ext == "dds") {
+			aod.type = texMetadata;
+			diskAssets.push_back(aod);
 		}
+		else if (ext == "tmap") {
+			aod.type = mapMeta;
+			diskAssets.push_back(aod);
+		}
+		else if (ext == "pfb") {
+			aod.type = pfbMeta;
+			diskAssets.push_back(aod);
+		}
+		else if (ext == "mm" || ext == "mi") {
+			aod.type = matMeta;
+			diskAssets.push_back(aod);
+		}
+		else if (ext == "cmdl") {
+			aod.type = modelMeta;
+			diskAssets.push_back(aod);
+		}
+		else if (ext == "wav") {
+			aod.type = soundMeta;
+			diskAssets.push_back(aod);
+		}
+		else if (ext == "fnt") {
+			aod.type = fontMeta;
+			diskAssets.push_back(aod);
+		}
+	}
+
+	for (int i = 0; i < all_assettypes.size(); i++){
+		auto type = all_assettypes[i].get();
 		std::vector<std::string> extraAssets;
 		type->fill_extra_assets(extraAssets);
 		for (int j = 0; j < extraAssets.size(); j++) {
@@ -442,8 +454,7 @@ bool HackedAsyncAssetRegReindex::load_asset(IAssetLoadingInterface*)  {
 		}
 	}
 
-	assert(root_to_clone);
-	root = std::make_unique< AssetFilesystemNode>(*root_to_clone.get());
+	root = std::make_unique< AssetFilesystemNode>(rootToClone);
 
 	root->set_is_used_to_false_R();
 	for (auto& a : diskAssets) {
@@ -457,5 +468,5 @@ bool HackedAsyncAssetRegReindex::load_asset(IAssetLoadingInterface*)  {
 
 	return true;
 }
-HackedAsyncAssetRegReindex::HackedAsyncAssetRegReindex() {}
+
 #endif

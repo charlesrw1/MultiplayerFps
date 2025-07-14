@@ -46,7 +46,6 @@ class ModelAssetMetadata : public AssetMetadata
 public:
 	ModelAssetMetadata() {
 		extensions.push_back("cmdl");
-		pre_compilied_extension ="mis" ;
 	}
 	// Inherited via AssetMetadata
 	virtual Color32 get_browser_color() const  override

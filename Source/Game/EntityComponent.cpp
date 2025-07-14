@@ -36,7 +36,7 @@ public:
 		}
 	}
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Component::StaticType; }
-	virtual bool assets_are_filepaths() const { return false; }
+
 };
 REGISTER_ASSETMETADATA_MACRO(ComponentTypeMetadata);
 #endif

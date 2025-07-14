@@ -40,10 +40,7 @@ public:
 	//virtual IEditorTool* tool_to_edit_me() const override {
 	//	return g_animseq_editor; 
 	//}
-	bool show_tool_in_toolbar() const override {
-		return false;
-	}
-	virtual bool assets_are_filepaths() const override { return false; }
+
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &AnimationSeqAsset::StaticType; }
 };

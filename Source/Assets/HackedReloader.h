@@ -2,22 +2,11 @@
 #include "Framework/ClassBase.h"
 #include "IAsset.h"
 
-// too lazy, just hack the asset async loader to do this
 struct AssetFilesystemNode;
-class HackedAsyncAssetRegReindex : public IAsset {
+class HackedAsyncAssetRegReindex  {
 public:
-	CLASS_BODY(HackedAsyncAssetRegReindex);
-	HackedAsyncAssetRegReindex();
-	~HackedAsyncAssetRegReindex();
-	void uninstall() override {
-
-	}
-	void move_construct(IAsset* other) override;
-
-	bool load_asset(IAssetLoadingInterface*) override;
-	void post_load() override;
+	bool load_asset(IAssetLoadingInterface*, AssetFilesystemNode& rootToClone);
+	void post_load();
 	std::unique_ptr<AssetFilesystemNode> root;
 
-	static bool is_in_loading;
-	static std::unique_ptr<AssetFilesystemNode> root_to_clone;
 };

@@ -71,20 +71,7 @@ bool SharedAssetPropertyEditor::internal_update() {
 		ImGui::EndTooltip();
 
 
-		if (ImGui::GetIO().MouseDoubleClicked[0]) {
-			if (metadata->tool_to_edit_me()) {
-				std::string cmdstr = "start_ed ";
-				cmdstr += '"';
-				cmdstr += metadata->get_type_name();
-				cmdstr += '"';
-				cmdstr += " ";
-				cmdstr += '"';
-				cmdstr += asset_str.c_str();
-				cmdstr += '"';
-				Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, cmdstr.c_str());
-			}
-		}
-		else if (ImGui::GetIO().MouseClicked[0]) {
+		if (ImGui::GetIO().MouseClicked[0]) {
 			AssetBrowser::inst->filter_all();
 			AssetBrowser::inst->unset_filter(1 << metadata->self_index);
 		}
