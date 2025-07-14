@@ -201,12 +201,15 @@ public:
 	LightmapComponent() {
 		set_call_init_in_editor(true);
 	}
+	~LightmapComponent();
 	void start() final;
 	void stop() final;
 	void editor_on_change_property() final;
 	void on_sync_render_data() final;
 	void do_export();
 	void do_import();
+
+	void serialize(Serializer& s) final;
 private:
 	REFLECT(hide);
 	Texture* lightmapTexture=nullptr;
@@ -218,9 +221,9 @@ private:
 	BoolButton importBaked;
 	handle<Lightmap_Object> handle;
 
+	// this is just used for import/exporting, not saved or used at runtime
 	std::unordered_map<int, int> lmProbeToObj;
 
-	// FIXME
-	REFLECT(hide);
+	// serialized with map in serialize()
 	std::vector<glm::vec3> bakedProbes;
 };

@@ -80,6 +80,7 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<Enti
 	if (!is_valid_flag)
 		return;
 
+	ed_doc.validate_fileids_before_serialize();
 	std::unordered_set<BaseUpdater*> seen;
 	for (EntityPtr e : handles) {
 		Entity* ent = e.get();
@@ -383,26 +384,20 @@ void CreateStaticMeshCommand::execute() {
 	ed_doc.post_node_changes.invoke();
 
 
-	g_assets.find_async<Model>(modelname.c_str(), [the_handle = ent->get_instance_id()](GenericAssetPtr p) {
-		if (p) {
-			auto modelP = p.cast_to<Model>();
-
-			if (modelP) {
-				auto ent = eng->get_entity(the_handle);
-				if (ent) {
-					auto mesh_ent = ent->cast_to<Entity>();
-					ASSERT(mesh_ent);
-					auto firstmesh = mesh_ent->get_component<MeshComponent>();
-					if (firstmesh)
-						firstmesh->set_model(modelP.get());
-					else
-						sys_print(Warning, "CreateStaticMeshCommand couldnt find mesh component\n");
-				}
-				else
-					sys_print(Warning, "CreateStaticMeshCommand: ent handle invalid in async callback\n");
-			}
+	Model* modelP = g_assets.find_sync<Model>(modelname).get();
+	if (modelP) {
+		if (ent) {
+			auto mesh_ent = ent->cast_to<Entity>();
+			ASSERT(mesh_ent);
+			auto firstmesh = mesh_ent->get_component<MeshComponent>();
+			if (firstmesh)
+				firstmesh->set_model(modelP);
+			else
+				sys_print(Warning, "CreateStaticMeshCommand couldnt find mesh component\n");
 		}
-	});
+		else
+			sys_print(Warning, "CreateStaticMeshCommand: ent handle invalid in async callback\n");
+	}
 }
 
 CreateCppClassCommand::CreateCppClassCommand(EditorDoc& ed_doc, const std::string& cppclassname, const glm::mat4& transform, EntityPtr parent, bool is_component) 

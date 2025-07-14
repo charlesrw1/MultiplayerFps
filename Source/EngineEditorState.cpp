@@ -6,10 +6,7 @@
 #include "Render/Texture.h"
 EditorState::EditorState()
 {
-	g_assets.find_async<Texture>("eng/editor/red_cross.png", [&](GenericAssetPtr ptr) {
-		if (auto tex = ptr.cast_to<Texture>())
-			this->redCrossIcon = tex.get();
-		},true);
+	this->redCrossIcon = g_assets.find_sync<Texture>("eng/editor/red_cross.png", true).get();// [&](GenericAssetPtr ptr) {
 }
 
 EditorState::~EditorState()
@@ -53,6 +50,8 @@ void EditorState::open_tool(uptr<CreateEditorAsync> creation, bool set_active, f
 		if (curTool&&arg) {
 			sys_print(Debug, "EditorState::open_tool: replacing current tool\n");
 		}
+		set_tab_open(arg->get_doc_name());
+
 		this->curTool = std::move(arg);
 		if(callback)
 			callback(this->curTool != nullptr);
@@ -95,16 +94,16 @@ void EditorState::draw_tab_window()
 			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
 			ImGui::TableSetupColumn("X", ImGuiTableColumnFlags_WidthFixed, 15.f, 0);
 
-			if (curTool) {
-
+			for (int i = 0; i < tabs.size(); i++) {
+				auto& t = tabs[i];
 				ImGui::TableNextRow();
 				ImGui::TableNextColumn();
-				if (ImGui::Selectable("##selectednode", true,0, ImVec2(0, 0))) {
+				if (ImGui::Selectable("##selectednode", t.is_active,0, ImVec2(0, 0))) {
 					
 				}
 				ImGui::SameLine();
 				ImGui::SameLine();
-				ImGui::Text(curTool->get_asset_type_info().classname);
+				ImGui::Text(t.assetName.c_str());
 				ImGui::TableNextColumn();
 				if (redCrossIcon) {
 					const int sz = redCrossIcon->width;
@@ -114,7 +113,9 @@ void EditorState::draw_tab_window()
 					}
 					ImGui::PopStyleColor();
 				}
+
 			}
+
 			ImGui::EndTable();
 		}
 	}

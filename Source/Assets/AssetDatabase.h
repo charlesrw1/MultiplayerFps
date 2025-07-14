@@ -36,8 +36,6 @@ public:
 	void tick_update(float max_time);	// if an async load is happening, updates it. also calls post loads. stays under max_time 
 
 
-	// update any async resource requests that have finished, executes callbacks, calls post_load (ie to upload GPU resources)
-	void tick_asyncs();	
 	// wait for everything to finish, then tick_async
 	void finish_all_jobs();
 	// garbage collection. after marking unrefernces, use IAssetLoadingInterface to touch objects.
@@ -64,29 +62,11 @@ public:
 	}
 	GenericAssetPtr find_sync(const std::string& path, const ClassTypeInfo* classType, bool system_asset = false);
 
-	// async asset loading. callback is called in tick_async()
-	template<typename T>
-	void find_global_async(const std::string& path, std::function<void(GenericAssetPtr)> callback) {
-		static_assert(std::is_base_of<IAsset, T>::value, "find_global_async type must derive from IAsset");
-		find_async(path, &T::StaticType, std::move(callback), true);
-	}
-	template<typename T>
-	void find_async(const std::string& path, std::function<void(GenericAssetPtr)> callback, bool is_system=false) {
-		static_assert(std::is_base_of<IAsset, T>::value, "find_async type must derive from IAsset");
-		find_async(path, &T::StaticType, std::move(callback), is_system);
-	}
-	void find_async(const std::string& path, const ClassTypeInfo* classType, std::function<void(GenericAssetPtr)> callback, bool is_system = false);
-
-
 	template<typename T>
 	void reload_sync(AssetPtr<T> asset) {
 		return reload_sync(asset.get_unsafe());
 	}
 	void reload_sync(IAsset* asset);
-
-	// reloads an asset and all dependent objects, then move constructs them into the original asset
-	void reload_async(IAsset* asset, std::function<void(GenericAssetPtr)> callback);
-
 	void print_usage();
 	// this creates an asset bundle essentially
 	void dump_loaded_assets_to_disk(const std::string& path);

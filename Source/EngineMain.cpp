@@ -1458,10 +1458,10 @@ void test_integration_2(IntegrationTester& tester)
 	bool changeSuccesful = tester.wait_delegate(eng_local.on_map_load_return);
 	tester.checkTrue(changeSuccesful, "map change worked");
 
-	g_assets.find_async<PrefabAsset>("myprefabblah.pfb", [](GenericAssetPtr) {
-		tempMD.invoke();
-		});
-	tester.wait_delegate(tempMD);
+	g_assets.find_sync<PrefabAsset>("myprefabblah.pfb");// [](GenericAssetPtr) {
+		//tempMD.invoke();
+		//});
+	//tester.wait_delegate(tempMD);
 	tester.wait_ticks(1);
 	tester.checkTrue(!EditorPopupManager::inst->has_popup_open(), "no popup after changing map");
 	tester.checkTrue(!eng->is_editor_level(), "not editor level");
@@ -2284,7 +2284,7 @@ void GameEngineLocal::loop()
 	};
 
 	auto pre_update = [&]() {
-		g_assets.tick_asyncs();	// tick async loaded assets, this will call the async load_map callback
+		
 	};
 
 	double last = GetTime() - 0.1;

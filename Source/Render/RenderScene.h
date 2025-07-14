@@ -597,13 +597,13 @@ public:
 
 	void evaluate_lighting_at_position(const glm::vec3& pos, glm::vec3* ambientCubeOut /* expects size 6 vector*/) const {
 		auto& vols = reflection_volumes.objects;
+		auto& probes = lightmapObj.staticAmbientCubeProbes;
 		if (has_lightmap) {
 			for (auto& [_, vol] : vols) {
-				if (vol.wants_update || vol.probe_ofs == -1)
+				if (vol.wants_update || vol.probe_ofs == -1 || (vol.probe_ofs*6+5) >= (int)probes.size())
 					continue;
 				Bounds b(vol.boxmin, vol.boxmax);
 				if (b.inside(pos, 0)) {
-					auto& probes = lightmapObj.staticAmbientCubeProbes;
 					for (int i = 0; i < 6; i++)
 						ambientCubeOut[i] = probes.at(vol.probe_ofs * 6 + i);
 					return;	// early out

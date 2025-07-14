@@ -22,6 +22,7 @@ public:
 	virtual string get_tab_name() = 0;
 	virtual opt<string> get_asset_name() = 0;
 };
+class ClassTypeInfo;
 class Texture;
 struct View_Setup;
 class EditorState {
@@ -54,38 +55,29 @@ public:
 	MulticastDelegate<> on_unhide;
 private:
 	uptr<IEditorTool> curTool;
-
-	// states:
-	// open (tabs or no tabs)
-	// closed. not being drawn (but maybe background tabs)
-
-	// list of tabs
-	struct ClosedTab {
-		uptr<CreateEditorAsync> creationCmd;
-	};
-	struct OpenedTab {
-		uptr<IEditorTool> tool = nullptr;
-	};
-	using Tab = variant<OpenedTab, ClosedTab>;
-
-	void validate() {
-		assert(!last_tab.has_value() || !(last_tab.value() >= tabs.size() || last_tab.value() < 0));
-		struct VisitTab {
-			opt<bool> operator()(const OpenedTab& val) const { 
-				if (!val.tool) return std::nullopt;
-				return true; 
+	void set_tab_open(string name) {
+		bool found = false;
+		for (auto& t : tabs) {
+			if (t.assetName == name) {
+				found = true;
+				t.is_active = true;
 			}
-			opt<bool> operator()(const ClosedTab& ex) const { return false; }
-		};
-		bool found_open = false;
-		for (auto& tab : tabs) {
-			const opt<bool> open = std::visit(VisitTab{}, tab);
-			assert(open.has_value());
-			assert(!(*open) || !found_open);
-			found_open = true;
+			else {
+				t.is_active = false;
+			}
+		}
+		if (!found) {
+			tabs.push_back({});
+			tabs.back().assetName = name;
+			tabs.back().is_active = true;
 		}
 	}
-	opt<int> last_tab;
-	vector<Tab> tabs;
+	struct TabItem {
+		string itemName;
+		const ClassTypeInfo* assetType = nullptr;
+		string assetName;
+		bool is_active = false;
+	};
+	vector<TabItem> tabs;
 	const Texture* redCrossIcon = nullptr;
 };

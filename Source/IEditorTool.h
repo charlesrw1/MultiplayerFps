@@ -40,12 +40,15 @@ public:
 
 	// the name of the document
 // the full path of the document is ($ENGINE_ROOT)+"get_save_root_dir() + name"
-	const std::string& get_doc_name() const { return name; }
+	virtual std::string get_doc_name() const { return ""; }
 	virtual const ClassTypeInfo& get_asset_type_info() const = 0;
 	
 
 	bool get_has_editor_changes() const {
 		return has_editor_changes;
+	}
+	void clear_editor_changes() {
+		has_editor_changes = false;
 	}
 	void set_has_editor_changes();
 protected:
@@ -58,11 +61,8 @@ protected:
 	// called every frame to make imgui calls
 	virtual void imgui_draw() {}
 
-	bool current_document_has_path() const { return !name.empty(); }
 
-	void set_empty_doc() { // sets the name to empty, will open a popup to save later
-		name = "";
-	}
+	void set_window_title();
 private:
 
 
@@ -70,15 +70,9 @@ private:
 	// when called, assert otherwise
 	// return wether the document could compile+save properly
 	virtual bool save_document_internal() = 0;
-	void set_window_title();
-	void open_the_open_popup() {
-		open_open_popup = true;
-	}
+
 
 	bool has_editor_changes = false;
 
-	std::string name = "";
-	bool open_open_popup = false;
-	bool open_save_popup = false;
 };
 #endif

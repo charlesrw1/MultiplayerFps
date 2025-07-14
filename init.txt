@@ -56,7 +56,7 @@ bind "C" Ctrl "anim.copy"
 bind "V" Ctrl "anim.paste"
 
 
-
+godot_lightmap_engine_path "C:/Users/charl/Documents/lightmapexporter/"
 
 bind J "toggle r.taa"
 bind K "toggle r.taa_flicker_remove"

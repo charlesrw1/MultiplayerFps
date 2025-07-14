@@ -21,4 +21,6 @@ public:
 	static bool starts_with(const std::string& str, const std::string& what);
 	static string get_directory(const string& path);
 	static std::string alphanumeric_hash(const std::string& input);
+	static std::string base64_encode(const std::vector<uint8_t>& data);
+	static std::vector<uint8_t> base64_decode(const std::string& input);
 };

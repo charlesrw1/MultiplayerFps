@@ -355,9 +355,13 @@ void LightmapComponent::on_sync_render_data()
 	idraw->get_scene()->update_lightmap(handle, obj);
 }
 
+// this is the path to the data directory used by godot when you export/import lightmap bakes
+// like: "C:/Users/charl/Documents/lightmapexporter/"
+ConfigVar godot_lightmap_engine_path("godot_lightmap_engine_path", "", 0, "");
+
 void LightmapComponent::do_export()
 {
-	string expPath = "C:/Users/charl/Documents/lightmapexporter/";
+	string expPath = godot_lightmap_engine_path.get_string();// "C:/Users/charl/Documents/lightmapexporter/";
 	export_godot_scene(expPath);
 
 	string probeInputPath = expPath + "LM_PROBE_POSITIONS_INPUT.txt";
@@ -426,27 +430,32 @@ ConfigVar lightmapShTweakSh("lightmapShTweakSh", "0.5", CVAR_FLOAT, "");
 void LightmapComponent::do_import()
 {
 	namespace fs = std::filesystem;
-	string sourcePath = "C:/Users/charl/Documents/lightmapexporter/lightmap_root_scene.exr";
+	string sourcePath = string(godot_lightmap_engine_path.get_string()) + "lightmap_root_scene.exr";
 	string gamePath = FileSys::get_game_path();
 	fs::path source = sourcePath;
 	fs::path target_dir = gamePath;
 
-	// Ensure the target directory exists
-	fs::create_directories(target_dir);
+	// get the filename to use:
+	string filename = eng->get_level()->get_source_asset_name();
+	StringUtils::remove_extension(filename);
+	filename += "_lightmap_baked.exr";
+	fs::path target = gamePath+"/"+filename;
 
-	// Compose full target path
-	fs::path target = target_dir / source.filename();
+	//fs::create_directories(target_dir);
+	//fs::path target = target_dir / source.filename();
 
-	// Copy the file
 	fs::copy_file(source, target, fs::copy_options::overwrite_existing);
 
-	lightmapTexture = Texture::load("lightmap_root_scene.exr");
+	lightmapTexture = Texture::load(filename);
 	if (lightmapTexture) {
 		g_assets.reload_sync<Texture>(lightmapTexture);
 	}
+	else {
+		sys_print(Warning, "LightmapComponent::do_import: failed to texture load?\n");
+	}
 
 	//OUT_LIGHTMAP_BAKED.txt
-	string bakedPath = "C:/Users/charl/Documents/lightmapexporter/OUT_LIGHTMAP_BAKED.txt";
+	string bakedPath = string(godot_lightmap_engine_path.get_string()) +  "OUT_LIGHTMAP_BAKED.txt";
 
 
 	std::unordered_map<int, Component*> found;
@@ -549,4 +558,45 @@ void LightmapComponent::do_import()
 		}
 	}
 	sync_render_data();
+}
+#include "Framework/Serializer.h"
+
+
+LightmapComponent::~LightmapComponent() {
+
+}
+
+void LightmapComponent::serialize(Serializer& s)
+{
+	Component::serialize(s);
+
+	const char* const baked_tag = "lmProbeBin";
+
+	if (s.is_loading()) {
+		std::string outData;
+		if (s.serialize(baked_tag, outData)) {
+			auto data = StringUtils::base64_decode(outData);
+			if ((data.size() % sizeof(glm::vec3)) != 0) {
+				sys_print(Error, "LightmapComponent::serialize: unserialized bin data bad size?\n");
+			}
+			else {
+				const int vec3Count = data.size() / sizeof(glm::vec3);
+				bakedProbes.clear();
+				bakedProbes.resize(vec3Count);
+				for (int i = 0; i < vec3Count; i++) {
+					bakedProbes.at(i) = *(glm::vec3*)(&data.at(i * sizeof(glm::vec3)));
+				}
+			}
+		}
+	}
+	else {
+		std::vector<uint8_t> outData;
+		outData.resize(bakedProbes.size() * sizeof(glm::vec3));
+		for (int i = 0; i < bakedProbes.size(); i++) {
+			glm::vec3* outPtr = (glm::vec3*)&outData.at(i * sizeof(glm::vec3));
+			*outPtr = bakedProbes.at(i);
+		}
+		std::string encoded = StringUtils::base64_encode(outData);
+		s.serialize(baked_tag, encoded);
+	}
 }

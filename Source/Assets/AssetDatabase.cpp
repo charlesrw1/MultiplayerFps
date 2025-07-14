@@ -282,10 +282,7 @@ void AssetDatabase::finish_all_jobs()
 {
 	//impl->finish_all_jobs();
 }
-void AssetDatabase::tick_asyncs() {
 
-	impl->tick_asyncs_standard();
-}
 void AssetDatabase::remove_system_reference(IAsset* asset)
 {
 	//asset->is_system = false;
@@ -303,11 +300,7 @@ void AssetDatabase::reload_sync(IAsset* asset)
 {
 	impl->reload_asset_sync(asset);
 }
-void AssetDatabase::reload_async(IAsset* asset, std::function<void(GenericAssetPtr)> callback)
-{
-	impl->reload_asset_sync(asset);
-	callback(asset);
-}
+
 void AssetDatabase::install_system_asset(IAsset* assetPtr, const std::string& name)
 {
 	impl->install_system_direct(assetPtr, name);
@@ -316,12 +309,7 @@ GenericAssetPtr AssetDatabase::find_sync(const std::string& path, const ClassTyp
 {
 	return impl->load_asset_sync(path,classType,is_system);
 }
-void AssetDatabase::find_async(const std::string& path, const ClassTypeInfo* classType, std::function<void(GenericAssetPtr)> callback, bool is_system)
-{
-	auto out = impl->load_asset_sync(path, classType, is_system);
-	callback(out);
-	//impl->load_asset_async(path, classType, is_system, callback);
-}
+
 
 void AssetDatabase::remove_unreferences()
 {

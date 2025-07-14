@@ -672,6 +672,10 @@ public:
 	void validate_fileids_before_serialize();
 
 	void set_camera_target_to_sel();
+
+	string get_doc_name()const  final {
+		return assetName.value_or("<unnamed>");
+	}
 private:
 	EditorDoc();
 	void init_for_prefab(PrefabAsset* prefab);

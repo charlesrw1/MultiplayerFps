@@ -24,15 +24,7 @@ void IEditorTool::set_window_title()
 {
 	auto metadata = AssetRegistrySystem::get().find_for_classtype(&get_asset_type_info());
 	assert(metadata);
-	const char* window_name = "unnamed";
-	if (current_document_has_path())
-		window_name = this->name.c_str();
-
-	if (has_editor_changes)
-		window_name = string_format("%s*", window_name);
-
-	const char* name = string_format("%s Editor: %s\n", metadata->get_type_name().c_str(), window_name);
-
+	const char* name = string_format("%s Editor: %s%s\n", metadata->get_type_name().c_str(), get_doc_name().c_str(), has_editor_changes?"*":"");
 	SDL_SetWindowTitle(eng->get_os_window(), name);
 }
 #if 0
@@ -253,7 +245,6 @@ static void draw_popups_for_editor(bool& open_open_popup, bool& open_save_popup,
 void IEditorTool::draw_imgui_public()
 {
 	imgui_draw();
-	draw_popups_for_editor(open_open_popup, open_save_popup, name, this, FileSys::get_game_path());
 }
 #include "EngineSystemCommands.h"
 #include "Game/LevelAssets.h"

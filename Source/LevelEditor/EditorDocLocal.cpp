@@ -139,6 +139,8 @@ void EditorDoc::validate_fileids_before_serialize()
 #include "PropertyEditors.h"
 void EditorDoc::init_new()
 {
+	clear_editor_changes();
+
 	sys_print(Debug, "Edit mode: %s", (edit_category == EDIT_PREFAB) ? "Prefab" : "Scene");
 	eng->get_level()->validate();
 	command_mgr = std::make_unique<UndoRedoSystem>();
@@ -271,6 +273,7 @@ bool EditorDoc::save_document_internal()
 		sys_print(Debug, "EditorDoc::save_document_internal: no path to save, so adding popup\n");
 		return false;
 	}
+
 	assert(eng->get_level());
 	eng->log_to_fullscreen_gui(Info, "Saving");
 	sys_print(Info, "Saving Scene/Prefab (%s)...\n",assetName.value_or("<new>").c_str());
@@ -309,6 +312,9 @@ bool EditorDoc::save_document_internal()
 		PrefabAsset* pfb = g_assets.find_sync<PrefabAsset>(path).get();
 		g_assets.reload_sync<PrefabAsset>(pfb);
 	}
+
+	clear_editor_changes();
+	set_window_title();
 
 	return true;
 }
@@ -446,6 +452,8 @@ void EditorDoc::init_for_prefab(PrefabAsset* prefab) {
 
 	validate_fileids_before_serialize();
 	on_start.invoke();
+
+	set_window_title();
 }
 void EditorDoc::init_for_scene(opt<string> scene) {
 	edit_category = EditCategory::EDIT_SCENE;
@@ -460,6 +468,8 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 	}
 
 	on_start.invoke();
+	set_window_title();
+
 }
 
 EditorDoc::EditorDoc() {
@@ -1853,10 +1863,6 @@ void EditorDoc::hook_menu_bar()
 	if (ImGui::BeginMenu("Commands")) {
 		if (ImGui::MenuItem("Export as .glb")) {
 			export_level_scene();
-		}
-		if (ImGui::MenuItem("Export godot")) {
-			string path = "C:/Users/charl/Documents/lightmapexporter/";
-			export_godot_scene(path);
 		}
 		if (ImGui::MenuItem("Import lightmap from baking")) {
 			LightmapComponent* lm = (LightmapComponent*)eng->get_level()->find_first_component(&LightmapComponent::StaticType);

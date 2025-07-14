@@ -157,3 +157,51 @@ std::string StringUtils::alphanumeric_hash(const std::string& input) {
 
 	return result;
 }
+
+// copy pasted crap
+
+std::string StringUtils::base64_encode(const std::vector<uint8_t>& data) {
+	static const char* table =
+		"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+	std::string encoded;
+	size_t val = 0;
+	int valb = -6;
+	for (uint8_t c : data) {
+		val = (val << 8) + c;
+		valb += 8;
+		while (valb >= 0) {
+			encoded.push_back(table[(val >> valb) & 0x3F]);
+			valb -= 6;
+		}
+	}
+	if (valb > -6) encoded.push_back(table[((val << 8) >> (valb + 8)) & 0x3F]);
+	while (encoded.size() % 4) encoded.push_back('=');
+	return encoded;
+}
+
+std::vector<uint8_t> StringUtils::base64_decode(const std::string& input) {
+	static const int lookup[] = {
+		62, -1, -1, -1, 63, // + /
+		52, 53, 54, 55, 56, 57, 58, 59, 60, 61, // 0–9
+		-1, -1, -1, -1, -1, -1, -1,
+		0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, // A–Z
+		-1, -1, -1, -1, -1, -1,
+		26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51 // a–z
+	};
+	std::vector<uint8_t> output;
+	int val = 0, valb = -8;
+	for (char c : input) {
+		if (c == '=' || c < '+' || c > 'z') break;
+		int idx = c - '+';
+		if (idx < 0 || idx >= sizeof(lookup) / sizeof(int)) continue;
+		int decoded = lookup[idx];
+		if (decoded == -1) continue;
+		val = (val << 6) + decoded;
+		valb += 6;
+		if (valb >= 0) {
+			output.push_back((val >> valb) & 0xFF);
+			valb -= 8;
+		}
+	}
+	return output;
+}
