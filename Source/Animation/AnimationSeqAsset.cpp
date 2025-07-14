@@ -66,9 +66,7 @@ bool AnimationSeqAsset::load_asset(IAssetLoadingInterface* load)
 	if (srcModel && srcModel->get_skel()) {
 		seq = srcModel->get_skel()->find_clip(animName);
 
-#ifdef EDITOR_BUILD
-		srcModel->reload_dependents.insert(this);
-#endif
+
 
 		return true;
 	}
@@ -76,26 +74,13 @@ bool AnimationSeqAsset::load_asset(IAssetLoadingInterface* load)
 		return false;
 }
 
-void AnimationSeqAsset::sweep_references(IAssetLoadingInterface* load) const
-{
-	load->touch_asset(srcModel.get_unsafe());
 
-}
 void AnimationSeqAsset::move_construct(IAsset* _other) {
 	auto other = (AnimationSeqAsset*)_other;
-#ifdef EDITOR_BUILD
-	if (other->srcModel.get()) {
-		other->srcModel->reload_dependents.erase(other);
-		other->srcModel->reload_dependents.insert(this);
-	}
-#endif
+
 	*this = std::move(*other);
 }
 void AnimationSeqAsset::uninstall()
 {
-#ifdef EDITOR_BUILD
-	if (srcModel) {
-		srcModel->reload_dependents.erase(this);
-	}
-#endif
+
 }

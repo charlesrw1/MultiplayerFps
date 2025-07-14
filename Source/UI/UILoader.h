@@ -42,5 +42,4 @@ public:
 		GuiFont* other = (GuiFont*)_other;
 		*this = std::move(*other);
 	}
-	void sweep_references(IAssetLoadingInterface*) const override;
 };

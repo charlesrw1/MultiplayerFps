@@ -5,7 +5,6 @@ class AssetBundle : public IAsset {
 public:
 	CLASS_BODY(AssetBundle);
 	bool load_asset(IAssetLoadingInterface* loading) final;
-	void sweep_references(IAssetLoadingInterface* loading) const final;
 	void post_load() final {}
 	void uninstall() final {}
 	void move_construct(IAsset* other) final {

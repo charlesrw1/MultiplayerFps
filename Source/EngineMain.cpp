@@ -722,27 +722,35 @@ void OpenMapCommand::execute()
 		string mapname = map_name.value_or("<unnamed>");
 		eng_local.is_waiting_on_map_load = true;
 		double start_time = GetTime();
-		g_assets.find_async<SceneAsset>(map_name.value(),
-			[start_time,callback, is_for_playing, mapname](GenericAssetPtr ptr) {
-				SceneAsset* level = (ptr) ? ptr.cast_to<SceneAsset>().get() : nullptr;
-				// level loaded
-				const bool level_is_valid = level != nullptr;
-				if (level_is_valid) {
-					eng_local.insert_this_map_as_level(level, is_for_playing);
-				}
-				else {
-					assert(eng_local.is_waiting_on_map_load);
-					sys_print(Warning, "OpenMapCommand::execute(%s): failed to load\n", mapname.c_str());
-					eng_local.is_waiting_on_map_load = false;
-				}
-				assert(!eng_local.is_waiting_on_map_load);
-				auto code = level_is_valid ? OpenMapReturnCode::Success : OpenMapReturnCode::FailedToLoad;
-				double now = GetTime();
-				sys_print(Debug, "OpenMapCommand::execute: took %f\n", float(now - start_time));
 
-				if(callback)
-					callback(code);
-			});
+		uptr<SceneAsset> scene = std::make_unique<SceneAsset>();
+		scene->editor_set_newly_made_path(mapname);
+		bool success = scene->load_asset(g_assets.loader);
+		if (success) {
+			try {
+				scene->post_load();
+			}
+			catch (...) {
+				success = false;
+			}
+		}
+
+		if (success) {
+			auto scenePtr = scene.release();
+			eng_local.insert_this_map_as_level(scenePtr, is_for_playing);
+		}
+		else {
+			assert(eng_local.is_waiting_on_map_load);
+			sys_print(Warning, "OpenMapCommand::execute(%s): failed to load\n", mapname.c_str());
+			eng_local.is_waiting_on_map_load = false;
+		}
+		assert(!eng_local.is_waiting_on_map_load);
+		auto code = success ? OpenMapReturnCode::Success : OpenMapReturnCode::FailedToLoad;
+		double now = GetTime();
+		sys_print(Debug, "OpenMapCommand::execute: took %f\n", float(now - start_time));
+
+		if (callback)
+			callback(code);
 	}
 	else {
 		eng_local.is_waiting_on_map_load = true;
@@ -2618,22 +2626,5 @@ void DebugShapeCtx::fixed_update_start()
 #include "Framework/PropertyUtil.h"//
 void GameEngineLocal::do_asset_gc()
 {
-	//return;
-	sys_print(Debug, "GameEngineLocal::do_asset_gc\n");
-	auto start = GetTime();
-	g_assets.mark_unreferences();
-	if (get_level()) {
-		auto& objs = level->get_all_objects();
-		for (auto o : objs) {
-			check_object_for_asset_ptr(o, AssetDatabase::loader);
-			Entity* e = o->cast_to<Entity>();
-			if (e && e->get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab) {
-				AssetDatabase::loader->touch_asset(&e->get_object_prefab());
-			}
-		}
-	}
-	g_assets.remove_unreferences();
-	auto end = GetTime();
-
-	sys_print(Debug, "/GameEngineLocal::do_asset_gc: finished in %f(ms)\n",float(end-start)*1000.f);
+	
 }

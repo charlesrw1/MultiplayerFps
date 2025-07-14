@@ -25,6 +25,13 @@ void MSkeleton::move_construct(MSkeleton& other)
 		}
 	}
 }
+void MSkeleton::uninstall()
+{
+	for (auto& [c, clip] : clips) {
+		*clip.ptr = AnimationSeq();
+	}
+
+}
 bool MSkeleton::is_skeleton_the_same(const MSkeleton& other) const {
 	if (get_num_bones() != other.get_num_bones())
 		return false;

@@ -62,12 +62,12 @@ public:
 	virtual void pre_render_update() = 0;
 	// same shader, may change this in future (depth shaders get ifdef'd anyways)
 	const MaterialInstance* get_shared_depth() const { return fallback; }
-	const MaterialInstance* get_fallback() const { return fallback; }
-	const MaterialInstance* get_default_billboard() const { return defaultBillboard; }
+	MaterialInstance* get_fallback() const { return fallback; }
+	MaterialInstance* get_default_billboard() const { return defaultBillboard; }
 protected:
 	uptr<IBakedLightingValuesFactory> bakedFactory;
-	const MaterialInstance* defaultBillboard = nullptr;
-	const MaterialInstance* fallback = nullptr;
+	MaterialInstance* defaultBillboard = nullptr;
+	MaterialInstance* fallback = nullptr;
 };
 
 extern MaterialManagerPublic* imaterials;

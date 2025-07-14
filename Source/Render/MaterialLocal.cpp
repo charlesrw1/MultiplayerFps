@@ -203,12 +203,7 @@ void MaterialInstance::sweep_references(IAssetLoadingInterface* loading)const {
 }
 void MaterialInstance::uninstall()
 {
-	// materials cant be uninstalled
-
-#ifdef EDITOR_BUILD
-	if (impl && impl->masterMaterial)
-		impl->masterMaterial->reload_dependents.erase(this);
-#endif
+	matman.remove_from_dirty_list_if_it_is(this);
 	matman.free_material_instance(this);
 	impl.reset();
 }
@@ -221,10 +216,6 @@ void MaterialInstance::post_load()
 		assert(impl->masterMaterial);
 		impl->post_load(this);
 		impl->has_called_post_load_already = true;
-#ifdef EDITOR_BUILD
-		if (impl->masterMaterial != this)
-			impl->masterMaterial->reload_dependents.insert(this);
-#endif
 	}
 }
 
@@ -233,17 +224,11 @@ void MaterialInstance::move_construct(IAsset* _other)
 {
 	auto other = (MaterialInstance*)_other;
 	//uninstall();	// fixme: unsafe for materials already referencing us
-#ifdef EDITOR_BUILD
-	//if (impl->masterMaterial->self != this)
-	//	impl->masterMaterial->self->reload_dependents.erase(this);
 
-	other->impl->masterMaterial->reload_dependents.erase(other);
-	other->reload_dependents = std::move(this->reload_dependents);
-#endif
 	auto myParentMat = impl->masterMaterial;
 	*this = std::move(*other);
 	impl->self = this;
-
+	impl->dirty_buffer_index = -1;
 	if (impl->masterImpl) {
 		impl->masterImpl->self = this;
 		impl->masterMaterial = this;
@@ -256,10 +241,19 @@ void MaterialInstance::move_construct(IAsset* _other)
 		assert(impl->masterMaterial);
 	}
 
-#ifdef EDITOR_BUILD
-	if(impl->masterMaterial!=this)
-		impl->masterMaterial->reload_dependents.insert(this);
-#endif
+	std::vector<IAsset*> ar;
+	g_assets.get_assets_of_type(ar, &MaterialInstance::StaticType);
+	for (auto a : ar) {
+		if (a == this) 
+			continue;
+		MaterialInstance* mi = (MaterialInstance*)a;
+		if (mi->impl && mi->impl->masterMaterial == this) {
+			g_assets.reload_sync(mi);
+		}
+	}
+
+//	other->uninstall();
+
 }
 
 

@@ -13,8 +13,7 @@ public:
 
 	}
 	void move_construct(IAsset* other) override;
-	void sweep_references(IAssetLoadingInterface*) const override {
-	}
+
 	bool load_asset(IAssetLoadingInterface*) override;
 	void post_load() override;
 	std::unique_ptr<AssetFilesystemNode> root;

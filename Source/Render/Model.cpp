@@ -491,20 +491,21 @@ void Model::uninstall()
 	merged_index_pointer = merged_vert_offset = 0;
 	data = RawMeshData();	// so destructor gets called and memory is freed
 	//skel.reset(nullptr);	// dont uninstall because of pointers...
+	if (skel) {
+		skel->uninstall();
+	}
 	collision.reset();
 	tags.clear();
+	//for (auto mat : materials) {
+	//	mat->dec_ref_count_and_uninstall_if_zero();
+	//}
 	materials.clear();
 	uid = 0;	// reset the UID
 
 	g_modelMgr.remove_model_from_list(this);
 }
 
-void Model::sweep_references(IAssetLoadingInterface* loading) const {
-	for (int i = 0; i < materials.size(); i++) {
-		auto mat = materials[i];
-		loading->touch_asset(mat);
-	}
-}
+
 void Model::post_load() {
 	if (did_load_fail()) {
 		return;
@@ -516,21 +517,11 @@ void Model::post_load() {
 
 MulticastDelegate<Model*> Model::on_model_loaded;
 
-#ifdef EDITOR_BUILD
-#include "AssetCompile/ModelCompilierLocal.h"
-bool Model::check_import_files_for_out_of_data() const
-{
-	ModelDefData defdat;
-	std::string model_def = strip_extension(get_name().c_str());
-	model_def += ".mis";
-	return ModelCompilier::does_model_need_compile(model_def.c_str(), defdat, false, nullptr);
-}
-#else
-bool Model::check_import_files_for_out_of_data() const {
-	return false;
-}
 
-#endif
+#include "AssetCompile/ModelCompilierLocal.h"
+
+
+
 
 // Format definied in ModelCompilier.cpp
 bool Model::load_internal(IAssetLoadingInterface* loading)
@@ -595,7 +586,7 @@ bool Model::load_internal(IAssetLoadingInterface* loading)
 
 		if (!materials[i]->is_valid_to_use()) {
 			sys_print(Error, "model doesn't have material %s\n", buffer.c_str());
-			materials.back() = imaterials->get_fallback();
+			materials.back() = const_cast<MaterialInstance*>(imaterials->get_fallback());
 		}
 	}
 
@@ -730,14 +721,14 @@ bool Model::load_asset(IAssetLoadingInterface* loading) {
 		return true;
 	return false;
 }
+
 void Model::move_construct(IAsset* _src)
 {
 	const bool had_skel = skel != nullptr;
 	uninstall();
 	assert(had_skel == (skel != nullptr));
-
+	Model* src = (Model*)_src;
 	ASSERT(this->uid == 0);
-	Model* src = _src->cast_to<Model>();
 	assert(src);
 
 	for (int i = 0; i < src->lods.size(); i++)

@@ -285,15 +285,7 @@ void PrefabAsset::uninstall()
 
 #include "Framework/PropertyUtil.h"
 
-void PrefabAsset::sweep_references(IAssetLoadingInterface* load) const
-{
-	if (!sceneFile)
-		return;
-	sys_print(Debug, "PrefabAsset::sweep_references: %s\n", get_name().c_str());
-	for (auto& obj : sceneFile->all_obj_vec) {
-		check_object_for_asset_ptr(obj, load);
-	}
-}
+
 void PrefabAsset::move_construct(IAsset* other)
 {
 	sys_print(Debug, "PrefabAsset::move_construct: %s\n", get_name().c_str());

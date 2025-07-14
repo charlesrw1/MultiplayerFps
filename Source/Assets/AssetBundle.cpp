@@ -29,8 +29,3 @@ bool AssetBundle::load_asset(IAssetLoadingInterface* loading)
 	return true;
 }
 
-void AssetBundle::sweep_references(IAssetLoadingInterface* loading) const
-{
-	for (auto asset : assets)
-		loading->touch_asset(asset);
-}

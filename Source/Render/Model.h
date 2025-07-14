@@ -113,11 +113,10 @@ public:
 	static Model* load(const std::string& path);
 
 	void uninstall() override;
-	void sweep_references(IAssetLoadingInterface* loading) const override;
 	void post_load() override;
 	bool load_asset(IAssetLoadingInterface* loading) override;
-	void move_construct(IAsset* src) override;
-	bool check_import_files_for_out_of_data() const override;
+	void move_construct(IAsset* other) override;
+
 	int get_uid() const { return uid; }
 	int bone_for_name(StringName name) const;
 	const glm::vec4& get_bounding_sphere() const { return bounding_sphere; }
@@ -166,7 +165,7 @@ private:
 	// collision geometry, if null, then the aabb of the model will be used if the object is used as collision
 	unique_ptr<PhysicsBodyDefinition> collision;
 	vector<ModelTag> tags;
-	vector<const MaterialInstance*> materials;
+	vector<MaterialInstance*> materials;
 	glm::mat4 skeleton_root_transform = glm::mat4(1.f);
 	LightmapType isLightmapped = LightmapType::None;
 	int16_t lightmapX = 0;

@@ -17,6 +17,7 @@ public:
 
 class AssetDatabaseImpl;
 
+
 class AssetDatabase
 {
 public:
@@ -28,6 +29,12 @@ public:
 	void quit();
 
 	void reset_testing();
+
+	void clear_used_flags();
+	void load_asset_bundle_sync();
+	void load_asset_bundle_async();
+	void tick_update(float max_time);	// if an async load is happening, updates it. also calls post loads. stays under max_time 
+
 
 	// update any async resource requests that have finished, executes callbacks, calls post_load (ie to upload GPU resources)
 	void tick_asyncs();	

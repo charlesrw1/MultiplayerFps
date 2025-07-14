@@ -44,7 +44,6 @@ public:
 	static Texture* load(const std::string& path);
 
 	void uninstall() override;
-	void sweep_references(IAssetLoadingInterface* loading) const override {}
 	void post_load() override;
 	bool load_asset(IAssetLoadingInterface* loading) override;
 	void move_construct(IAsset* src) override;

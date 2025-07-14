@@ -134,6 +134,7 @@ public:
 	MSkeleton() = default;
 	~MSkeleton();
 	void move_construct(MSkeleton& other);
+	void uninstall();
 
 	bool is_skeleton_the_same(const MSkeleton& other) const;
 	int get_num_bones() const { return (int)bone_dat.size(); }

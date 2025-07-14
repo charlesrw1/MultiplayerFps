@@ -17,7 +17,6 @@ public:
 	SceneAsset();
 	~SceneAsset();
 	// IAsset overrides
-	void sweep_references(IAssetLoadingInterface* load) const override {}
 	bool load_asset(IAssetLoadingInterface* load) override;
 	void post_load() override;
 	void uninstall() override;
@@ -48,7 +47,6 @@ public:
 	uptr<SerializedForDiffing> halfUnserialized;
 private:
 	// IAsset overrides
-	void sweep_references(IAssetLoadingInterface* load) const override;
 	bool load_asset(IAssetLoadingInterface* load) override;
 	void post_load() override;
 	void uninstall() override;
