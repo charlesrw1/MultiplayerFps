@@ -96,10 +96,12 @@ void Component::shutdown_updater()
 void Component::activate_internal_step1()
 {
 	ASSERT(init_state == initialization_state::HAS_ID);
+
+	// set it up here first
+	init_state = initialization_state::CALLED_PRE_START;
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
 		pre_start();
 	}
-	init_state = initialization_state::CALLED_PRE_START;
 }
 void Component::activate_internal_step2()
 {
@@ -113,7 +115,8 @@ void Component::activate_internal_step2()
 
 void Component::deactivate_internal()
 {
-	ASSERT(init_state == initialization_state::CALLED_START);
+	// can call stop after a pre_start()
+	ASSERT(init_state == initialization_state::CALLED_START||init_state==initialization_state::CALLED_PRE_START);
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
 		stop();
 		shutdown_updater();
@@ -128,7 +131,8 @@ void Component::destroy()
 }
 void Component::sync_render_data()
 {
-	if(init_state!=initialization_state::CONSTRUCTOR)
+	// changed to start or pre_start
+	if(init_state == initialization_state::CALLED_START || init_state == initialization_state::CALLED_PRE_START)
 		eng->get_level()->add_to_sync_render_data_list(this);
 }
 
@@ -143,7 +147,7 @@ void Component::initialize_internal_step2()
 
 void Component::destroy_internal()
 {
-	if(init_state==initialization_state::CALLED_START)
+	if(init_state==initialization_state::CALLED_START||init_state==initialization_state::CALLED_PRE_START)
 		deactivate_internal();
 	ASSERT(entity_owner);
 	entity_owner->remove_this_component_internal(this);

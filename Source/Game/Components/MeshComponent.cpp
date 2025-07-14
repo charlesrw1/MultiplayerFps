@@ -301,3 +301,23 @@ void GameAnimationMgr::update_animating()
 		}
 	}
 }
+
+void AnimPreviewComponent::pre_start()
+{
+}
+
+void AnimPreviewComponent::start()
+{
+}
+
+void AnimPreviewComponent::update()
+{
+}
+
+void AnimPreviewComponent::stop()
+{
+}
+
+void AnimPreviewComponent::editor_on_change_property()
+{
+}

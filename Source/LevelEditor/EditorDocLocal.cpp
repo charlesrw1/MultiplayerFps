@@ -185,6 +185,22 @@ void EditorDoc::init_new()
 	outliner->init();
 
 	cmds = ConsoleCmdGroup::create("");
+	cmds->add("create_folder", [this](const Cmd_Args& args) {
+		if (args.size() != 2)
+			return;
+		auto level = eng->get_level();
+		assert(level);
+		auto find = (EditorMapDataComponent*)level->find_first_component(&EditorMapDataComponent::StaticType);
+		if (find) {
+			auto newF = find->add_folder();
+			if (newF) {
+				newF->folderName = args.at(1);
+			}
+			post_node_changes.invoke();	// refresh stuff
+		}
+
+		});
+
 	cmds->add("SET_ORBIT_TARGET", [this](const Cmd_Args&) {
 		set_camera_target_to_sel();
 		});
@@ -765,6 +781,35 @@ void EditorDoc::check_inputs()
 		set_camera_target_to_sel();
 		using_ortho = true;
 		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, 0, -ORTHO_DIST), glm::vec3(0, 0, 1));
+	}
+	else if (Input::was_key_pressed(SDL_SCANCODE_A)) {
+		// select all objects
+		auto& objs = eng->get_level()->get_all_objects();
+		std::vector<EntityPtr> selectThese;
+		for (auto o : objs) {
+			if (auto as_ent = o->cast_to<Entity>()) {
+				if (as_ent->get_hidden_in_editor())
+					continue;
+				selectThese.push_back(as_ent);
+			}
+		}
+		selection_state->add_entities_to_selection(selectThese);
+	}
+	else if (Input::was_key_pressed(SDL_SCANCODE_I) && has_ctrl) {
+		// invert selection
+		auto& objs = eng->get_level()->get_all_objects();
+		std::vector<EntityPtr> selectThese;
+		for (auto o : objs) {
+			if (auto as_ent = o->cast_to<Entity>()) {
+				if (as_ent->get_hidden_in_editor())
+					continue;
+				if (!selection_state->is_entity_selected(as_ent)) {
+					selectThese.push_back(as_ent);
+				}
+			}
+		}
+		selection_state->clear_all_selected();
+		selection_state->add_entities_to_selection(selectThese);
 	}
 }
 

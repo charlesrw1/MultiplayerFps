@@ -132,6 +132,8 @@ public:
 	void set_root_object_prefab(const PrefabAsset& asset);
 	void set_prefab_no_owner_after_being_root();
 	EntityPrefabSpawnType get_object_prefab_spawn_type() const;
+	int8_t get_folder_id() const { return editor_folder; }
+	void set_folder_id(int8_t i) { editor_folder = i; }
 #endif
 	void check_for_transform_nans();
 	void validate_check();
@@ -153,6 +155,8 @@ private:
 	bool hidden_in_editor = false;
 	const PrefabAsset* what_prefab = nullptr;
 	bool spawned_by_prefab = false;
+	REFLECT(hide);
+	int8_t editor_folder = 0;
 #endif
 	bool world_transform_is_dirty = true;
 	bool is_top_level = false;	// if true, then local space is considered the world space transform, even if a parent exists
@@ -175,6 +179,7 @@ private:
 	friend class DeferredSpawnScope;
 	friend class EdPropertyGrid;
 	friend class SerializeTestWorkbench;
+	friend class ObjectOutliner;
 };
 
 template<typename T>

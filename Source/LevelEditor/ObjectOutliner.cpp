@@ -5,7 +5,7 @@
 #include "Framework/Files.h"
 #include "Framework/MyImguiLib.h"
 #include "ObjectOutlineFilter.h"
-
+#include "EditorFolderComponent.h"
 ObjectOutliner::~ObjectOutliner() {
 
 }
@@ -16,15 +16,51 @@ void ObjectOutliner::rebuild_tree() {
 	auto the_filter = OONameFilter::parse_into_and_ors(filter->get_filter());
 
 	rootnode = std::make_unique<Node>();
+
+	auto folder = (EditorMapDataComponent*)eng->get_level()->find_first_component(&EditorMapDataComponent::StaticType);
+	if (!folder) {
+		auto newEnt = ed_doc.spawn_entity();
+		folder = (EditorMapDataComponent*)ed_doc.attach_component(&EditorMapDataComponent::StaticType, newEnt);
+	}
+	assert(folder);
+	cachedContainer = folder;
+
+	std::unordered_map<int, Node*> folderNodes;
+	for (auto& f : folder->get_folders()) {
+		auto folderNode = std::make_unique<Node>();
+		folderNode->is_folder = true;
+		folderNode->folderid = f.id;
+		folderNode->is_folder_open = f.is_folder_open;
+		folderNodes.insert({ int(f.id),folderNode.get() });
+		rootnode->add_child(std::move(folderNode));
+		num_nodes++;	// badbadbad
+	}
+
 	auto level = eng->get_level();
 	auto& all_objs = level->get_all_objects();
 	for (auto ent : all_objs) {
 		if (Entity* e = ent->cast_to<Entity>()) {
 			if (!e->get_parent() && should_draw_this(e)) {
-				rootnode->add_child(std::make_unique<Node>(this, e, the_filter));
-			
-				if (!rootnode->children.back()->is_visible) {
-					rootnode->children.pop_back();
+
+				int8_t folderId = e->editor_folder;
+				auto addNodeToThis = rootnode.get();
+
+				if (folderId != 0) {
+					auto findFolder = MapUtil::get_or(folderNodes, int(folderId), (Node*)nullptr);
+					if (!findFolder) {
+						e->editor_folder = 0;
+					}
+					else {
+						// skip if closed and filter empty
+						if (!findFolder->is_folder_open && the_filter.empty())
+							continue;
+
+						addNodeToThis = findFolder;
+					}
+				}
+				addNodeToThis->add_child(std::make_unique<Node>(this, e, the_filter));	
+				if (!addNodeToThis->children.back()->is_visible) {
+					addNodeToThis->children.pop_back();
 					num_nodes--;
 				}
 			}
@@ -32,6 +68,27 @@ void ObjectOutliner::rebuild_tree() {
 	}
 	rootnode->sort_children();
 
+}
+void ObjectOutliner::do_recursive_select(Entity* a, Entity* b) {
+
+	auto recurse = [](auto&& self, Node* node, bool found_yet, Entity* a, Entity* b, EditorDoc& ed_doc) -> bool {
+
+		if (node->ptr.get() == a || node->ptr.get() == b) {
+			found_yet = !found_yet;
+			ed_doc.selection_state->add_to_entity_selection(node->ptr);
+		}
+		else if (found_yet && node->ptr.get()) {
+			ed_doc.selection_state->add_to_entity_selection(node->ptr);
+		}
+
+		for (auto& c : node->children) {
+			found_yet = self(self, c.get(), found_yet, a, b, ed_doc);
+		}
+		return found_yet;
+	};
+	if (rootnode.get()) {
+		recurse(recurse, rootnode.get(), false, a, b, ed_doc);
+	}
 }
 ObjectOutliner::Node::Node(ObjectOutliner* oo, Entity* initfrom, const std::vector<std::vector<std::string>>& filter) {
 	did_pass_filter = OONameFilter::does_entity_pass(filter, initfrom);
@@ -86,6 +143,9 @@ void ObjectOutliner::init()
 {
 	hidden = g_assets.find_global_sync<Texture>("eng/editor/hidden.png");
 	visible = g_assets.find_global_sync<Texture>("eng/editor/visible.png");
+
+	folderOpen = g_assets.find_global_sync<Texture>("eng/editor/folder_open.png").get();
+	folderClosed = g_assets.find_global_sync<Texture>("eng/editor/folder_closed.png").get();
 }
 
 bool ObjectOutliner::IteratorDraw::step()
@@ -108,6 +168,10 @@ bool ObjectOutliner::IteratorDraw::step()
 	return true;
 }
 
+template<class... Ts> struct overloaded : Ts... { using Ts::operator()...; };
+template<class... Ts> overloaded(Ts...)->overloaded<Ts...>;
+
+
 static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e);
 void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 {
@@ -123,169 +187,117 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 	//assert(node_entity || !node->parent);
 
 	const bool is_root_node = node_entity == nullptr;
+
+	auto get_folder = [&]() -> EditorFolder* {
+		auto getContainer = oo->cachedContainer.get();
+		if (!getContainer)
+			return nullptr;
+		return getContainer->lookup_for_id(n->folderid);
+	};
+
+
 	ImGui::PushID(n);
 	{
 		const bool item_is_selected = ed_doc.selection_state->is_entity_selected(n->ptr);
 		ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 		if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
 			if (node_entity) {
-				if (ImGui::GetIO().KeyShift)
+				const bool has_selection_already = ed_doc.selection_state->has_any_selected();
+
+				if (ImGui::GetIO().KeyShift && has_selection_already) {
+					auto vec = ed_doc.selection_state->get_selection_as_vector();
+					auto first = vec.at(0);
+					oo->do_recursive_select(first.get(), node_entity);
+				}
+				else if (ImGui::GetIO().KeyCtrl) {
 					ed_doc.do_mouse_selection(MouseSelectionAction::ADD_SELECT, node_entity, false);
-				else
+				}
+				else {
 					ed_doc.do_mouse_selection(MouseSelectionAction::SELECT_ONLY, node_entity, false);
+				}
 			}
-			else
+			else if (n->is_folder) {
+				auto fObj = get_folder();
+				if (fObj) {
+					auto do_selection = [&]() {
+						auto& objs = eng->get_level()->get_all_objects();
+						std::vector<EntityPtr> selectThese;
+						for (auto obj : objs) {
+							if (auto as_ent = obj->cast_to<Entity>()) {
+								if (as_ent->get_folder_id() == fObj->id)
+									selectThese.push_back(as_ent);
+							}
+						}
+						ed_doc.selection_state->add_entities_to_selection(selectThese);
+					};
+
+					if (ImGui::GetIO().KeyCtrl) {
+						do_selection();
+					}
+					else {
+						ed_doc.selection_state->clear_all_selected();
+						do_selection();
+					}
+				}
+			}
+			else {
 				ed_doc.selection_state->clear_all_selected();
+			}
 		}
 
-		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[1] && node_entity) {
+		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[1] && (n->ptr||n->is_folder)) {
 			ImGui::OpenPopup("outliner_ctx_menu");
-			ed_doc.selection_state->add_to_entity_selection(n->ptr);
-			oo->contextMenuHandle = n->ptr;
-			ASSERT(n->ptr.get() == node_entity);
+			if(node_entity) {
+				ed_doc.selection_state->add_to_entity_selection(n->ptr);
+				oo->contextMenuHandle = n->ptr;
+				ASSERT(n->ptr.get() == node_entity);
+			}
+			else {
+				oo->contextMenuHandle = FolderId{ n->folderid };
+			}
 		}
 		if (ImGui::BeginPopup("outliner_ctx_menu")) {
 
-			if (oo->contextMenuHandle.get() == nullptr) {
-				oo->contextMenuHandle = EntityPtr(nullptr);
-				ImGui::CloseCurrentPopup();
-			}
-			else {
-
-				Entity* const context_menu_entity = oo->contextMenuHandle.get();
-
-				auto parent_to_shared = [&](Entity* me, bool create_new_parent) {
-					auto& ents = ed_doc.selection_state->get_selection();
-					std::vector<Entity*> ptrs;
-					for (auto& ehandle : ents) {
-						EntityPtr ptr(ehandle);
-						if (ptr.get() == me) continue;
-						ptrs.push_back(ptr.get());
-					}
-					ed_doc.command_mgr->add_command(new ParentToCommand(ed_doc, ptrs, me, create_new_parent, false));
-
-					oo->contextMenuHandle = EntityPtr(nullptr);
-				};
-				auto remove_parent_of_selection = [&](bool delete_parent) {
-
-					auto& ents = ed_doc.selection_state->get_selection();
-					std::vector<Entity*> ptrs;
-					for (auto& ehandle : ents) {
-						EntityPtr ptr(ehandle);
-						ptrs.push_back(ptr.get());
-					}
-
-					ed_doc.command_mgr->add_command(new ParentToCommand(ed_doc, ptrs, nullptr, false, delete_parent));
-
-					oo->contextMenuHandle = EntityPtr(nullptr);
-				};
-
-				if (ImGui::MenuItem("Parent To This")) {
-					parent_to_shared(context_menu_entity, false);
-					ImGui::CloseCurrentPopup();
-				}
-
-				if (ImGui::MenuItem("Remove Parent")) {
-					remove_parent_of_selection(false);
-					ImGui::CloseCurrentPopup();
-				}
-				if (ImGui::MenuItem("Parent Selection To New Entity")) {
-					parent_to_shared(nullptr, true);
-					ImGui::CloseCurrentPopup();
-				}
-
-				ImGui::Separator();
-				if (ImGui::MenuItem("Add sibling entity")) {
-					ed_doc.command_mgr->add_command(new CreateCppClassCommand(ed_doc, "Entity", context_menu_entity->get_ws_transform(), EntityPtr(context_menu_entity->get_parent()), false));
-					oo->contextMenuHandle = EntityPtr(nullptr);
-					ImGui::CloseCurrentPopup();
-				}
-				if (ImGui::MenuItem("Add child entity")) {
-					ed_doc.command_mgr->add_command(new CreateCppClassCommand(ed_doc, "Entity", glm::mat4(1), context_menu_entity->get_self_ptr(), false));
-					oo->contextMenuHandle = EntityPtr(nullptr);
-					ImGui::CloseCurrentPopup();
-				}
-
-				if (context_menu_entity->get_parent()) {
-					ImGui::Separator();
-
-					bool make_cmd = false;
-					MovePositionInHierarchy::Cmd c{};
-					if (ImGui::MenuItem("Move next")) {
-						make_cmd = true;
-						c = MovePositionInHierarchy::Cmd::Next;
-					}
-					if (ImGui::MenuItem("Move prev")) {
-						make_cmd = true;
-						c = MovePositionInHierarchy::Cmd::Prev;
-					}
-					if (ImGui::MenuItem("Move first")) {
-						make_cmd = true;
-						c = MovePositionInHierarchy::Cmd::First;
-					}
-					if (ImGui::MenuItem("Move last")) {
-						make_cmd = true;
-						c = MovePositionInHierarchy::Cmd::Last;
-					}
-
-					if (make_cmd) {
-						ed_doc.command_mgr->add_command(new MovePositionInHierarchy(ed_doc, context_menu_entity, c));
-						ImGui::CloseCurrentPopup();
-					}
-				}
-
-				ImGui::Separator();
-
-				const bool is_entity_root_of_prefab = context_menu_entity && context_menu_entity->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
-				if (is_entity_root_of_prefab) {
-					if (ImGui::MenuItem("Select prefab in browser")) {
-						AssetBrowser::inst->set_selected(context_menu_entity->get_object_prefab().get_name());
-						ImGui::CloseCurrentPopup();
-					}
-					ImGui::Separator();
-				}
-
-				if (ImGui::MenuItem("Instantiate prefab", nullptr, nullptr, is_entity_root_of_prefab)) {
-					ed_doc.command_mgr->add_command(new InstantiatePrefabCommand(ed_doc, context_menu_entity));
-					oo->contextMenuHandle = EntityPtr(nullptr);
-					ImGui::CloseCurrentPopup();
-				}
-
-				const bool branch_as_prefab_enabled = ed_doc.selection_state->num_entities_selected() == 1;
-				if (ImGui::MenuItem("Save branch as prefab", nullptr, nullptr, branch_as_prefab_enabled)) {
-					save_off_branch_as_scene(ed_doc, context_menu_entity);
-					ImGui::CloseCurrentPopup();
-				}
-
-
-				ImGui::Separator();
-				ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
-				if (ImGui::MenuItem("Dissolve As Parent")) {
-					ASSERT(context_menu_entity);
-					auto& children = context_menu_entity->get_children();
-
-					if (!children.empty())
-						remove_parent_of_selection(true);
-					else
-						ed_doc.command_mgr->add_command(new RemoveEntitiesCommand(ed_doc, { n->ptr }));
-
-					ImGui::CloseCurrentPopup();
-				}
-				if (ImGui::MenuItem("Delete")) {
-					ed_doc.command_mgr->add_command(new RemoveEntitiesCommand(ed_doc, { n->ptr }));
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::PopStyleColor(1);
-
-			}
+			std::visit(overloaded{
+				[&](EntityPtr ptr) {this->draw_entity_context_menu(ptr,ed_doc); },
+				[&](FolderId folder) { this->draw_folder_context_menu(folder,ed_doc); },
+				[](std::monostate) {  }
+				}, oo->contextMenuHandle);
 
 			ImGui::EndPopup();
 		}
 	}
 
-	ImGui::SameLine();
 
-	if (!node_entity) {
+	ImGui::SameLine();
+	if (n->is_folder) {
+		auto getContainer = oo->cachedContainer.get();
+		bool print_bad = true;
+		if (getContainer) {
+			auto folderObj = getContainer->lookup_for_id(n->folderid);
+			if (folderObj) {
+
+				auto tex = (folderObj->is_folder_open) ? oo->folderOpen : oo->folderClosed;
+				if (tex) {
+					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+					if(ImGui::ImageButton(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height))) {
+						folderObj->is_folder_open = !folderObj->is_folder_open;
+						oo->refresh_flag = true;	// refresh after
+					}
+					ImGui::PopStyleColor();
+					ImGui::SameLine(0, 5);
+				}
+
+				auto& name = folderObj->folderName;
+				ImGui::TextColored(ImColor(240,165,60), "%s\n", name.c_str());
+				print_bad = false;
+			}
+		}
+		if (print_bad) {
+			ImGui::Text("<bad folder>\n");
+		}
+	}
+	else if (!node_entity) {
 		ImGui::Text("%s",ed_doc.get_name().c_str());
 	}
 	else {
@@ -360,6 +372,25 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 				e->set_hidden_in_editor(!e->get_hidden_in_editor());
 			}
 		}
+		else if (n->is_folder) {
+			auto getContainer = oo->cachedContainer.get();
+			if (getContainer) {
+				auto folderObj = getContainer->lookup_for_id(n->folderid);
+				if (folderObj) {
+					auto img = (folderObj->is_hidden) ? oo->hidden : oo->visible;
+					ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
+					if (ImGui::ImageButton(ImTextureID(uint64_t(img->gl_id)), ImVec2(16, 16))) {
+						folderObj->is_hidden = !folderObj->is_hidden;
+						for (auto obj : eng->get_level()->get_all_objects()) {
+							if (auto as_ent = obj->cast_to<Entity>()) {
+								if(as_ent->get_folder_id()==folderObj->id)
+									as_ent->set_hidden_in_editor(folderObj->is_hidden);
+							}
+						}
+					}
+				}
+			}
+		}
 		else {
 			auto img = oo->hidden;
 			ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
@@ -371,6 +402,191 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 	ImGui::PopStyleColor(3);
 
 	ImGui::PopID();
+}
+
+void ObjectOutliner::IteratorDraw::draw_folder_context_menu(ObjectOutliner::FolderId folder, EditorDoc& ed_doc) {
+	auto container = oo->cachedContainer.get();
+	if (!container) {
+		oo->contextMenuHandle = std::monostate();// EntityPtr(nullptr);
+		ImGui::CloseCurrentPopup();
+		return;
+	}
+	auto fObj = container->lookup_for_id(folder.id);
+	if (!fObj) {
+		oo->contextMenuHandle = std::monostate();// EntityPtr(nullptr);
+		ImGui::CloseCurrentPopup();
+		return;
+	}
+
+	if (ImGui::MenuItem("Set Folder")) {
+		//SetFolderCommand
+		auto& ents = ed_doc.selection_state->get_selection();
+		std::vector<EntityPtr> ptrs;
+		for (auto& ehandle : ents) {
+			EntityPtr ptr(ehandle);
+			ptrs.push_back(ptr);
+		}
+		ed_doc.command_mgr->add_command(new SetFolderCommand(ed_doc, ptrs,fObj->id));
+
+		oo->contextMenuHandle = std::monostate();
+		ImGui::CloseCurrentPopup();
+		return;
+	}
+	if (ImGui::MenuItem("Select Objects")) {
+		ed_doc.selection_state->clear_all_selected();
+		auto& objs = eng->get_level()->get_all_objects();
+		for (auto obj : objs) {
+			if (auto as_ent = obj->cast_to<Entity>()) {
+				if (as_ent->get_folder_id() == fObj->id)
+					ed_doc.selection_state->add_to_entity_selection(as_ent);
+			}
+		}
+		oo->contextMenuHandle = std::monostate();
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::Separator();
+	ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
+	if (ImGui::MenuItem("Remove Folder")) {
+		container->remove_folder(fObj->id);
+		fObj = nullptr;
+		oo->contextMenuHandle = std::monostate();
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::PopStyleColor();
+}
+
+void ObjectOutliner::IteratorDraw::draw_entity_context_menu(EntityPtr ptr, EditorDoc& ed_doc) {
+	Entity* const context_menu_entity = ptr.get();
+
+	if (context_menu_entity == nullptr) {
+		oo->contextMenuHandle = std::monostate();// EntityPtr(nullptr);
+		ImGui::CloseCurrentPopup();
+		return;
+	}
+
+
+	auto parent_to_shared = [&](Entity* me, bool create_new_parent) {
+		auto& ents = ed_doc.selection_state->get_selection();
+		std::vector<Entity*> ptrs;
+		for (auto& ehandle : ents) {
+			EntityPtr ptr(ehandle);
+			if (ptr.get() == me) continue;
+			ptrs.push_back(ptr.get());
+		}
+		ed_doc.command_mgr->add_command(new ParentToCommand(ed_doc, ptrs, me, create_new_parent, false));
+
+		oo->contextMenuHandle = EntityPtr(nullptr);
+	};
+	auto remove_parent_of_selection = [&](bool delete_parent) {
+
+		auto& ents = ed_doc.selection_state->get_selection();
+		std::vector<Entity*> ptrs;
+		for (auto& ehandle : ents) {
+			EntityPtr ptr(ehandle);
+			ptrs.push_back(ptr.get());
+		}
+
+		ed_doc.command_mgr->add_command(new ParentToCommand(ed_doc, ptrs, nullptr, false, delete_parent));
+
+		oo->contextMenuHandle = EntityPtr(nullptr);
+	};
+
+	if (ImGui::MenuItem("Parent To This")) {
+		parent_to_shared(context_menu_entity, false);
+		ImGui::CloseCurrentPopup();
+	}
+
+	if (ImGui::MenuItem("Remove Parent")) {
+		remove_parent_of_selection(false);
+		ImGui::CloseCurrentPopup();
+	}
+	if (ImGui::MenuItem("Parent Selection To New Entity")) {
+		parent_to_shared(nullptr, true);
+		ImGui::CloseCurrentPopup();
+	}
+
+	ImGui::Separator();
+	if (ImGui::MenuItem("Add sibling entity")) {
+		ed_doc.command_mgr->add_command(new CreateCppClassCommand(ed_doc, "Entity", context_menu_entity->get_ws_transform(), EntityPtr(context_menu_entity->get_parent()), false));
+		oo->contextMenuHandle = EntityPtr(nullptr);
+		ImGui::CloseCurrentPopup();
+	}
+	if (ImGui::MenuItem("Add child entity")) {
+		ed_doc.command_mgr->add_command(new CreateCppClassCommand(ed_doc, "Entity", glm::mat4(1), context_menu_entity->get_self_ptr(), false));
+		oo->contextMenuHandle = EntityPtr(nullptr);
+		ImGui::CloseCurrentPopup();
+	}
+
+	if (context_menu_entity->get_parent()) {
+		ImGui::Separator();
+
+		bool make_cmd = false;
+		MovePositionInHierarchy::Cmd c{};
+		if (ImGui::MenuItem("Move next")) {
+			make_cmd = true;
+			c = MovePositionInHierarchy::Cmd::Next;
+		}
+		if (ImGui::MenuItem("Move prev")) {
+			make_cmd = true;
+			c = MovePositionInHierarchy::Cmd::Prev;
+		}
+		if (ImGui::MenuItem("Move first")) {
+			make_cmd = true;
+			c = MovePositionInHierarchy::Cmd::First;
+		}
+		if (ImGui::MenuItem("Move last")) {
+			make_cmd = true;
+			c = MovePositionInHierarchy::Cmd::Last;
+		}
+
+		if (make_cmd) {
+			ed_doc.command_mgr->add_command(new MovePositionInHierarchy(ed_doc, context_menu_entity, c));
+			ImGui::CloseCurrentPopup();
+		}
+	}
+
+	ImGui::Separator();
+
+	const bool is_entity_root_of_prefab = context_menu_entity && context_menu_entity->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
+	if (is_entity_root_of_prefab) {
+		if (ImGui::MenuItem("Select prefab in browser")) {
+			AssetBrowser::inst->set_selected(context_menu_entity->get_object_prefab().get_name());
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::Separator();
+	}
+
+	if (ImGui::MenuItem("Instantiate prefab", nullptr, nullptr, is_entity_root_of_prefab)) {
+		ed_doc.command_mgr->add_command(new InstantiatePrefabCommand(ed_doc, context_menu_entity));
+		oo->contextMenuHandle = EntityPtr(nullptr);
+		ImGui::CloseCurrentPopup();
+	}
+
+	const bool branch_as_prefab_enabled = ed_doc.selection_state->num_entities_selected() == 1;
+	if (ImGui::MenuItem("Save branch as prefab", nullptr, nullptr, branch_as_prefab_enabled)) {
+		save_off_branch_as_scene(ed_doc, context_menu_entity);
+		ImGui::CloseCurrentPopup();
+	}
+
+
+	ImGui::Separator();
+	ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
+	if (ImGui::MenuItem("Dissolve As Parent")) {
+		ASSERT(context_menu_entity);
+		auto& children = context_menu_entity->get_children();
+
+		if (!children.empty())
+			remove_parent_of_selection(true);
+		else
+			ed_doc.command_mgr->add_command(new RemoveEntitiesCommand(ed_doc, { context_menu_entity }));
+
+		ImGui::CloseCurrentPopup();
+	}
+	if (ImGui::MenuItem("Delete")) {
+		ed_doc.command_mgr->add_command(new RemoveEntitiesCommand(ed_doc, { context_menu_entity }));
+		ImGui::CloseCurrentPopup();
+	}
+	ImGui::PopStyleColor(1);
 }
 
 bool ObjectOutliner::should_draw_this(Entity* e) const
@@ -446,6 +662,11 @@ void ObjectOutliner::draw()
 	ImGui::End();
 
 	setScrollHere = EntityPtr();
+
+	if (refresh_flag) {
+		rebuild_tree();
+		refresh_flag = false;
+	}
 }
 
 

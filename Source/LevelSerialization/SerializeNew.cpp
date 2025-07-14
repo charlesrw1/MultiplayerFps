@@ -409,9 +409,11 @@ static void validate_container(SerializeEntitiesContainer& con, SerializedSceneF
 #endif
 }
 
-
+#include "Framework/SerializerBinary.h"
 SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs)
 {
+	double now = GetTime();
+
 	SerializedSceneFile out;
 	SerializeEntitiesContainer container;
 	add_objects_to_container(debug_tag,input_objs, container, out);
@@ -422,6 +424,13 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 
 	WriteSerializerBackendJson writer(debug_tag, pathmaker,container);
 	out.text = "!json\n"+writer.get_output().dump(1);
+
+	sys_print(Debug, "NewSerialization::serialize_to_text: took %f\n", float(GetTime() - now));
 	//std::cout << out.text << '\n';
+	now = GetTime();
+	BinaryWriterBackend binWrite(container);
+	sys_print(Debug, "NewSerialization::serialize_to_text binary: took %f\n", float(GetTime() - now));
+	sys_print(Debug, "NewSerialization: bin size: %d\n", int(binWrite.writer.get_size()));
+
 	return out;
 }

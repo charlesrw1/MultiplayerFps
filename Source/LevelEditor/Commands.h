@@ -330,4 +330,38 @@ public:
 	const ClassTypeInfo* info = nullptr;
 };
 
+class SetFolderCommand : public Command {
+public:
+	EditorDoc& ed_doc;
+	SetFolderCommand(EditorDoc& ed_doc, std::vector<EntityPtr> ptrs, int folderId) : ed_doc(ed_doc) {
+		this->ptrs = ptrs;
+		this->setTo = folderId;
+	}
+	void execute() final {
+		prevIds.clear();
+		prevIds.resize(ptrs.size());
+		for (int i = 0; i < ptrs.size();i++) {
+			auto ent = ptrs[i].get();
+			if (ent) {
+				prevIds.at(i) = ent->get_folder_id();
+				ent->set_folder_id(setTo);
+			}
+		}
+	}
+	void undo() final {
+		for (int i = 0; i < ptrs.size(); i++) {
+			auto ent = ptrs[i].get();
+			if (ent) {
+				ent->set_folder_id(prevIds.at(i));
+			}
+		}
+	}
+	std::string to_string() final {
+		return "SetFolderCommand";
+	}
+	std::vector<EntityPtr> ptrs;
+	std::vector<int8_t> prevIds;
+	int setTo = 0;
+};
+
 #endif

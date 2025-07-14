@@ -135,6 +135,7 @@ void Level::destroy_component(Component* ec)
 	wants_sync_update.remove(ec);
 
 	uint64_t id = ec->get_instance_id();
+	int uid = ec->unique_file_id;
 	assert(id != 0);
 	if (log_destroy_game_objects.get_bool())
 		sys_print(Debug,"removing eComponent (handle:%llu,class:%s)\n", id, ec->get_type().classname);

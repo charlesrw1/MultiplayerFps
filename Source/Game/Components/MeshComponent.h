@@ -96,3 +96,23 @@ private:
 
 	void update_animator_instance();
 };
+
+// hack for property grid ui
+struct AnimPreviewInfoUi {
+	STRUCT_BODY();
+};
+
+// this is just for previewing in the editor, use AnimatorObject on the MeshComponent for actual animation
+class AnimationSeqAsset;
+class AnimPreviewComponent : public Component {
+public:
+	CLASS_BODY(AnimPreviewComponent);
+	void pre_start() final;
+	void start() final;
+	void update() final;
+	void stop() final;
+	void editor_on_change_property() final;
+private:
+	REF const AnimationSeqAsset* asset = nullptr;
+	REF AnimPreviewInfoUi info;
+};

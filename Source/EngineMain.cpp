@@ -1487,13 +1487,13 @@ int game_engine_main(int argc, char** argv)
 {
 
 	material_print_debug.set_bool(true);
-	developer_mode.set_bool(true);
+	developer_mode.set_bool(false);
 	log_shader_compiles.set_bool(false);
-
+	log_all_asset_loads.set_bool(true);
 	loglevel.set_integer(4);
 	eng_local.init(argc,argv);
 	developer_mode.set_bool(true);
-	log_all_asset_loads.set_bool(false);
+	//log_all_asset_loads.set_bool(false);
 	log_destroy_game_objects.set_bool(false);
 	//loglevel.set_integer(1);
 
@@ -1514,10 +1514,10 @@ int game_engine_main(int argc, char** argv)
 	//
 
 	
-	c->buzzer();
-	int val = c->get_value("hello");
-	assert(val == 1);
-	assert(c->myStr == "hello");
+	//c->buzzer();
+	//int val = c->get_value("hello");
+	//assert(val == 1);
+	//assert(c->myStr == "hello");
 
 	eng_local.loop();
 	eng_local.cleanup();
@@ -2287,44 +2287,51 @@ void GameEngineLocal::loop()
 
 	for (;;)
 	{
-		const bool skip_rendering = headless_mode;
+		try {
+			const bool skip_rendering = headless_mode;
 
-		// update time
-		const double now = GetTime();
-		double dt = now - last;
-		last = now;
-		if (dt > 0.1)
-			dt = 0.1;
-		frame_time = dt;
+			// update time
+			const double now = GetTime();
+			double dt = now - last;
+			last = now;
+			if (dt > 0.1)
+				dt = 0.1;
+			frame_time = dt;
 
-		if (tester) {
-			bool res = tester->tick(dt);
-			if (res) {
-				Quit();
+			if (tester) {
+				bool res = tester->tick(dt);
+				if (res) {
+					Quit();
+				}
 			}
+
+			// update input, console cmd buffer, could change maps etc.
+			frame_start();
+
+			pre_update();
+
+			// overlapped update (game+render)
+			do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering);
+
+			if (wants_gc_flag) {
+				do_asset_gc();
+				wants_gc_flag = false;
+			}
+
+			// sync period
+			imgui_update();	// fixme
+			imgui_render(skip_rendering);
+			do_sync_update();
+			wait_for_swap(skip_rendering);	// wait for swap last
+
+			FrameMark;	// tracy profiling
+			Profiler::end_frame_tick(frame_time);	// my crappy profilier
 		}
-
-		// update input, console cmd buffer, could change maps etc.
-		frame_start();
-
-		pre_update();
-
-		// overlapped update (game+render)
-		do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering);
-
-		if (wants_gc_flag) {
-			do_asset_gc();
-			wants_gc_flag = false;
+		catch (LuaRuntimeError luaErr) {
+			sys_print(Error, "loop: caught LuaRuntimeError: %s\n", luaErr.what());
+			string msg = string_format("LuaRuntimeError %s\n", luaErr.what());
+			eng->log_to_fullscreen_gui(Error, msg.c_str());
 		}
-
-		// sync period
-		imgui_update();	// fixme
-		imgui_render(skip_rendering);
-		do_sync_update();
-		wait_for_swap(skip_rendering);	// wait for swap last
-
-		FrameMark;	// tracy profiling
-		Profiler::end_frame_tick(frame_time);	// my crappy profilier
 	}
 }
 

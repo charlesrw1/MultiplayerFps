@@ -482,6 +482,8 @@
     <ClInclude Include="Source\Game\Components\GraphCurveComponent.h" />
     <ClInclude Include="Source\Game\Components\NavComps.h" />
     <ClInclude Include="Source\AssetCompile\GltfExport.h" />
+    <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h" />
+    <ClInclude Include="Source\Framework\SerializerBinary.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -647,6 +649,7 @@
     <ClCompile Include="Source\AssetCompile\write_gltf.cpp" />
     <ClCompile Include="Source\External\miniz.c" />
     <ClCompile Include="Source\Render\RenderExtra.cpp" />
+    <ClCompile Include="Source\Framework\SerializerBinary.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

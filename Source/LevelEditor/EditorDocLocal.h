@@ -37,6 +37,7 @@
 #include <variant>
 #include "LevelSerialization/SerializationAPI.h"
 #include "UI/GUISystemPublic.h"
+#include "EditorFolderComponent.h"
 extern ConfigVar g_mousesens;
 
 enum TransformType
@@ -94,15 +95,38 @@ private:
 		}
 		void sort_children() {
 			std::sort(children.begin(), children.end(), [](const uptr<Node>& a, const uptr<Node>& b)->bool {
-				return to_lower(a->ptr->get_editor_name()) < to_lower(b->ptr->get_editor_name());
+				// folders come first
+				if (a->is_folder == b->is_folder) {
+					if (a->is_folder) {
+						return a->folderid < b->folderid;
+					}
+					else {
+						assert(a->ptr && b->ptr);
+						return to_lower(a->ptr->get_editor_name()) < to_lower(b->ptr->get_editor_name());
+					}
+				}
+				else {
+					if (a->is_folder)
+						return true;
+					else
+						return false;
+				}
 				});
 		}
+		bool is_folder = false;
+		int8_t folderid = 0;
+		bool is_folder_open = true;
+
 		bool is_visible = true;
 		bool did_pass_filter = false;
 		EntityPtr ptr;
 		Node* parent = nullptr;
 		std::vector<uptr<Node>> children;
 	};
+	struct FolderId {
+		int8_t id = 0;
+	};
+
 	struct IteratorDraw {
 		IteratorDraw(ObjectOutliner* oo, Node* n) : oo(oo), node(n) {}
 		bool step();
@@ -111,11 +135,21 @@ private:
 			return node;
 		}
 	private:
+		void draw_folder_context_menu(ObjectOutliner::FolderId folder, EditorDoc& ed_doc);
+		void draw_entity_context_menu(EntityPtr ptr, EditorDoc& ed_doc);
+
+
 		ObjectOutliner* oo = nullptr;
 		std::vector<int> child_stack;
 		int child_index = 0;
 		Node* node = nullptr;
 	};
+
+	void do_recursive_select(Entity* a, Entity* b);
+
+	bool refresh_flag = false;
+
+	obj<EditorMapDataComponent> cachedContainer;
 	EditorDoc& ed_doc;
 	friend struct IteratorDraw;
 	EntityPtr setScrollHere;
@@ -124,7 +158,10 @@ private:
 	uptr<OONameFilter> filter;
 	AssetPtr<Texture> visible;
 	AssetPtr<Texture> hidden;
-	EntityPtr contextMenuHandle;
+	Texture* folderOpen = nullptr;
+	Texture* folderClosed = nullptr;
+
+	variant<EntityPtr, FolderId, std::monostate> contextMenuHandle;
 };
 
 class EdPropertyGrid
@@ -281,20 +318,25 @@ public:
 		return out;
 	}
 
-	void add_to_entity_selection(EntityPtr ptr) {
-		ASSERT(eng->get_object(ptr.handle) && eng->get_object(ptr.handle)->is_a<Entity>());
-
-
-		bool already_selected = is_entity_selected(ptr);
-		if (!already_selected) {
-			auto e = eng->get_entity(ptr.handle);
-			e->selected_in_editor = true;
-			e->set_ws_transform(e->get_ws_transform());
-
-			selected_entity_handles.insert(ptr.handle);
-
+	void add_entities_to_selection(const std::vector<EntityPtr>& ptrs) {
+		bool had_changes = false;
+		for (EntityPtr ptr : ptrs) {
+			ASSERT(eng->get_object(ptr.handle) && eng->get_object(ptr.handle)->is_a<Entity>());
+			bool already_selected = is_entity_selected(ptr);
+			if (!already_selected) {
+				auto e = eng->get_entity(ptr.handle);
+				e->selected_in_editor = true;
+				e->set_ws_transform(e->get_ws_transform());
+				selected_entity_handles.insert(ptr.handle);
+				had_changes = true;
+			}
+		}
+		if (had_changes) {
 			on_selection_changed.invoke();
 		}
+	}
+	void add_to_entity_selection(EntityPtr ptr) {
+		add_entities_to_selection({ ptr });
 	}
 	void add_to_entity_selection(const Entity* e) {
 		return add_to_entity_selection(e->get_self_ptr());

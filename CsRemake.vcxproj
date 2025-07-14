@@ -74,7 +74,12 @@
     <ClCompile Include="Source\Framework\ReflectionProp.cpp" />
     <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
     <ClCompile Include="Source\Framework\Serializer.cpp" />
-    <ClCompile Include="Source\Framework\SerializerJson.cpp" />
+    <ClCompile Include="Source\Framework\SerializerBinary.cpp" />
+    <ClCompile Include="Source\Framework\SerializerJson.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <BasicRuntimeChecks Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Default</BasicRuntimeChecks>
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MaxSpeed</Optimization>
+    </ClCompile>
     <ClCompile Include="Source\Framework\StringName.cpp" />
     <ClCompile Include="Source\Framework\StringUtils.cpp" />
     <ClCompile Include="Source\Framework\Util.cpp" />
@@ -186,6 +191,7 @@
     <ClInclude Include="Source\Framework\RingBuffer.h" />
     <ClInclude Include="Source\Framework\SerializedForDiffing.h" />
     <ClInclude Include="Source\Framework\Serializer.h" />
+    <ClInclude Include="Source\Framework\SerializerBinary.h" />
     <ClInclude Include="Source\Framework\SerializerJson.h" />
     <ClInclude Include="Source\Framework\SerializerOldDict.h" />
     <ClInclude Include="Source\Framework\StringUtils.h" />
@@ -206,6 +212,7 @@
     <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\IntegrationTest.h" />
+    <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h" />
     <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h" />
     <ClInclude Include="Source\LevelEditor\PropertyEditors.h" />
     <ClInclude Include="Source\LevelEditor\TagManager.h" />

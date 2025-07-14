@@ -277,9 +277,10 @@ void ScriptManager::reload_one_file(const std::string& strFilePath)
 		had_changes = true;
 
 		if (luaL_loadstring(lua, out.c_str()) != LUA_OK) {
-			sys_print(Error, "error loading script %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
+			sys_print(Error, "ScriptManager: error loading script %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
 			lua_pop(lua, 1);
-			ASSERT(lua_gettop(lua) == 0);
+			lua_settop(lua, 0);
+			//ASSERT(lua_gettop(lua) == 0);
 			return;
 		}
 
