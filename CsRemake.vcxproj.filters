@@ -484,6 +484,7 @@
     <ClInclude Include="Source\AssetCompile\GltfExport.h" />
     <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h" />
     <ClInclude Include="Source\Framework\SerializerBinary.h" />
+    <ClInclude Include="Source\Framework\Range.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

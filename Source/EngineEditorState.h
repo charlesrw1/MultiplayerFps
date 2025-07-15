@@ -8,6 +8,7 @@
 #include <cassert>
 #include <functional>
 #include "Framework/MulticastDelegate.h"
+#include "Framework/Range.h"
 
 using std::variant;
 using std::vector;
@@ -72,11 +73,20 @@ private:
 			tabs.back().is_active = true;
 		}
 	}
+	opt<int> get_active_index() {
+		for (auto [i, tab] : IPairs(tabs)) {
+			if (tab->is_active)
+				return i;
+		}
+		return std::nullopt;
+	}
+
 	struct TabItem {
 		string itemName;
 		const ClassTypeInfo* assetType = nullptr;
 		string assetName;
 		bool is_active = false;
+		uptr<CreateEditorAsync> factoryTool;
 	};
 	vector<TabItem> tabs;
 	const Texture* redCrossIcon = nullptr;

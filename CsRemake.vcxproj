@@ -187,6 +187,7 @@
     <ClInclude Include="Source\Framework\NodeMenuItem.h" />
     <ClInclude Include="Source\Framework\PropertyPtr.h" />
     <ClInclude Include="Source\Framework\PropertyUtil.h" />
+    <ClInclude Include="Source\Framework\Range.h" />
     <ClInclude Include="Source\Framework\Reflection2.h" />
     <ClInclude Include="Source\Framework\RingBuffer.h" />
     <ClInclude Include="Source\Framework\SerializedForDiffing.h" />

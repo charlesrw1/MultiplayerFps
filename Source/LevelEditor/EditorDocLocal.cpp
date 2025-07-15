@@ -875,7 +875,7 @@ void EditorDoc::tick(float dt)
 
 
 	{
-		camera.orbit_mode = Input::is_mouse_down(1) || Input::last_recieved_input_from_con();// && !UiSystem::inst->is_game_capturing_mouse();
+		camera.orbit_mode = (Input::is_mouse_down(1)&&UiSystem::inst->is_vp_focused()) || Input::last_recieved_input_from_con();// && !UiSystem::inst->is_game_capturing_mouse();
 
 		{
 			if (using_ortho && ortho_camera.can_take_input())

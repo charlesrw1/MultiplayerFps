@@ -46,6 +46,14 @@ struct lTransform {
 	REF lQuat rot;
 };
 
+struct lRect {
+	STRUCT_BODY();
+	REF float x = 0;
+	REF float y = 0;
+	REF float w = 0;
+	REF float h = 0;
+};
+
 // its not the best, but its simple ;)
 class lMath : public ClassBase{
 public:
