@@ -82,6 +82,8 @@ public:
 class agClipNode;
 class AnimatorObject : public ClassBase {
 public:
+	CLASS_BODY(AnimatorObject);
+
 	AnimatorObject(const Model& model, agBuilder& construction, Entity* ent = nullptr);
 	~AnimatorObject();
 	// Main update method
@@ -110,8 +112,8 @@ public:
 	opt<bool> get_bool_variable(StringName name) const;
 	opt<int> get_int_variable(StringName name) const;
 	opt<glm::vec3> get_vec3_variable(StringName name) const;
-	void set_float_variable(StringName name, float f);
-	void set_int_variable(StringName name, int f);
+	REF void set_float_variable(StringName name, float f);
+	REF void set_int_variable(StringName name, int f);
 	void set_bool_variable(StringName name, bool f);
 	void set_vec3_variable(StringName name, glm::vec3 f);
 	agBaseNode* find_cached_pose_node(StringName name);

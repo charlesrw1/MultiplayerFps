@@ -308,6 +308,11 @@ void Entity::parent_to(Entity* other)
 	invalidate_transform(nullptr);
 }
 
+void Entity::transform_look_at(glm::vec3 pos, glm::vec3 look_pos)
+{
+	set_ws_transform(glm::inverse(glm::lookAt(pos, look_pos, glm::vec3(0, 1, 0))));
+}
+
 
 void Entity::remove_this_component_internal(Component* component_to_remove)
 {
@@ -566,6 +571,16 @@ glm::vec3 Entity::get_ws_scale() {
 }
 
 void Entity::set_ws_position(glm::vec3 v) { set_ws_transform(v, get_ws_rotation(), get_ws_scale()); }
+
+void Entity::set_ws_position_rotation(glm::vec3 pos, glm::quat rot)
+{
+	set_ws_transform(pos, rot, get_ws_scale());	//fixme
+}
+
+void Entity::set_ls_position_rotation(glm::vec3 pos, glm::quat rot)
+{
+	set_ls_transform(pos, rot, get_ls_scale());
+}
 
 void Entity::set_is_top_level(bool b)
 {

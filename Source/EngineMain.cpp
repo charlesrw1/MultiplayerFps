@@ -234,13 +234,9 @@ void Fatalf(const char* format, ...)
 {
 	va_list list;
 	va_start(list, format);
-	sys_vprint(format, list);
+	vprintf(format, list);
 	va_end(list);
 	fflush(stdout);
-	{
-		std::lock_guard<std::mutex> printLock(printMutex);
-		eng_local.cleanup();
-	}
 	exit(-1);
 }
 
@@ -477,6 +473,13 @@ void close_editor(const Cmd_Args& args)
 void OpenEditorToolCommand::execute()
 {
 	sys_print(Debug, "OpenEditorToolCommand::execute\n");
+
+	if (!eng_local.editorState) {
+		sys_print(Error, "OpenEditorToolCommand: didnt launch in editor mode, use 'is_editor_app 1' in cfg or command line\n");
+		return;
+	}
+
+
 	const AssetMetadata* metadata = AssetRegistrySystem::get().find_for_classtype(&assetType);
 	if (metadata) {
 		auto creationTool = metadata->create_create_tool_to_edit(assetName);
@@ -498,6 +501,11 @@ void OpenEditorToolCommand::execute()
 
 void start_editor(const Cmd_Args& args)
 {
+	if (!eng_local.editorState) {
+		sys_print(Error, "start_ed: didnt launch in editor mode, use 'is_editor_app 1' in cfg or command line\n");
+		return;
+	}
+
 	static const char* usage_str = "Usage: starteditor [Map,AnimGraph,Model,<asset metadata typename>] <file>\n";
 	if (args.size() != 2 && args.size()!=3) {
 		sys_print(Info, usage_str);
@@ -684,28 +692,27 @@ void GameEngineLocal::insert_this_map_as_level(SceneAsset*& loadedLevel, bool is
 	string mapname = loadedLevel ? loadedLevel->get_name() : "<new level>";
 	sys_print(Info, "Changing map: %s (for_playing=%s)\n", mapname.c_str(), print_get_bool_string(is_for_playing));
 
-	if (editorState->has_tool())
+	if (editorState && editorState->has_tool()) {
 		editorState->hide();
-	assert(!editorState->get_tool());
+		assert(!editorState->get_tool());
+	}
 	if (level) {
 		stop_game();
 		assert(!level);
 	}
-	if(loadedLevel)
-		g_assets.remove_system_reference(loadedLevel);	// remove it, just do it.
 	uptr<SceneAsset> unique_scene(loadedLevel);	// now its a unique ptr
 	loadedLevel = nullptr;	// set caller to null since this deletes the sceneasset :)
 
 	g_modelMgr.compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
 	time = 0.0;
 	set_tick_rate(60.f);
-	// constructor initializes level state
 	level = make_unique<Level>(!is_for_playing);
 	level->start(unique_scene.get());	// scene will then get destroyed
 	idraw->on_level_start();
-	//init_log_gui();
-	on_map_load_return.invoke(true);
-	wants_gc_flag = true;	// signal for a gc
+
+	if (app) {
+		app->on_map_changed();
+	}
 	sys_print(Info, "changed state to Engine_State::Game\n");
 }
 void OpenMapCommand::execute()
@@ -762,31 +769,6 @@ void OpenMapCommand::execute()
 }
 
 #include "EditorPopupTemplate.h"
-// open a map for playing
-void start_map(const Cmd_Args& args)
-{
-	if (args.size() < 2) {
-		sys_print(Info, "usage: map <opt> <map name>");
-		return;
-	}
-
-	//if (eng_local.is_waiting_on_load_level_callback) {
-	//	sys_print(Error, "map called but already waiting on another async map load (%s), skipping.\n", eng_local.queued_mapname.c_str());
-	//	return;
-	//}
-
-	bool force_change = false;
-	for (int i = 1; i < args.size() - 1; i++) {
-		if (strcmp(args.at(i), "f") == 0)
-			force_change = true;
-	}
-	const int map_idx = args.size() - 1;
-	auto cmd = make_unique<OpenMapCommand>(args.at(map_idx), true);
-	Cmd_Manager::inst->append_cmd(std::move(cmd));
-}
-extern ConfigVar g_entry_level;
-// start game from the entry map
-
 
 static void inc_or_dec_int_var(ConfigVar* var, bool decrement)
 {
@@ -805,8 +787,6 @@ static void inc_or_dec_int_var(ConfigVar* var, bool decrement)
 	var->set_integer(next);
 	sys_print(Info, "%s = %s\n", var->get_name(), var->get_string());
 }
-
-
 
 void dump_imgui_ini(const Cmd_Args& args)
 {
@@ -914,12 +894,8 @@ void GameEngineLocal::add_commands()
 		}
 		Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, args.at(1));
 		});
-	commands->add("goto_entry_map", [](const Cmd_Args& args) {
-		auto cmd = make_unique<OpenMapCommand>(g_entry_level.get_string(), true);
-		Cmd_Manager::inst->append_cmd(std::move(cmd));
-		});
 	commands->add("quit", [](const Cmd_Args& args) { Quit(); });
-	commands->add("map", start_map);
+
 	commands->add("bind", bind_key);
 	commands->add("REG_GAME_TAG", [](const Cmd_Args& args) {
 		if (args.size() != 2) {
@@ -1313,7 +1289,6 @@ void test_loading_invalid_prefab(IntegrationTester& tester)
 	{
 		// remove from disk
 		tester.checkTrue(FileSys::delete_game_file(prefabPath), "failed to delete");
-		eng_local.set_wants_gc();
 		tester.wait_ticks(2);
 		tester.checkTrue(!g_assets.is_asset_loaded(prefabPath),"failed to unload pfb");
 	}
@@ -1455,8 +1430,8 @@ void test_integration_2(IntegrationTester& tester)
 	return;
 
 //	Cmd_Manager::inst->append_cmd(EngineCommandBuilder::create_change_map("top_down/map0.tmap", true));// Cmd_Execute_Mode::APPEND, "map top_down/map0.tmap");
-	bool changeSuccesful = tester.wait_delegate(eng_local.on_map_load_return);
-	tester.checkTrue(changeSuccesful, "map change worked");
+	//bool changeSuccesful = tester.wait_delegate(eng_local.on_map_load_return);
+	//tester.checkTrue(changeSuccesful, "map change worked");
 
 	g_assets.find_sync<PrefabAsset>("myprefabblah.pfb");// [](GenericAssetPtr) {
 		//tempMD.invoke();
@@ -1472,8 +1447,8 @@ void test_integration_2(IntegrationTester& tester)
 	tester.checkTrue(!eng->get_level(), "");
 	tester.wait_time(0.1);
 	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "start_ed Map top_down/map0.tmap");
-	bool res = tester.wait_delegate(eng_local.on_map_load_return);
-	tester.checkTrue(res, "Must have opened editor");
+//	bool res = tester.wait_delegate(eng_local.on_map_load_return);
+//	tester.checkTrue(res, "Must have opened editor");
 	Level* l = eng->get_level();
 	const bool conditions = l && l->is_editor_level() && l->get_source_asset_name() == "top_down/map0.tmap";
 	tester.checkTrue(conditions, "level opened properly");
@@ -1495,7 +1470,7 @@ int game_engine_main(int argc, char** argv)
 {
 
 	material_print_debug.set_bool(true);
-	developer_mode.set_bool(false);
+	developer_mode.set_bool(true);
 	log_shader_compiles.set_bool(false);
 	log_all_asset_loads.set_bool(true);
 	loglevel.set_integer(4);
@@ -1534,16 +1509,6 @@ int game_engine_main(int argc, char** argv)
 }
 ClassWithDelegate StaticClass::myClass;
 
-// Set these in vars.txt (or init.txt) located in $ROOT
-// They function identically, but vars is preferred for const configuration and init for short term changes
-// init.txt is ran after vars.txt, so it will overwrite
-
-// The entry point of the game! (not used in the editor)
-// Takes in a string of the level to start with on the final game
-// Should look like: "mylevel.tmap" for $ROOT/gamedat/mylevel.tmap
-ConfigVar g_entry_level("g_entry_level", "", CVAR_DEV, "the entry point of the game, this takes in a level filepath");
-
-ConfigVar g_gamemain_class("g_gamemain_class", "GameMain", CVAR_DEV, "the default gamemain class of the program");
 ConfigVar g_project_name("g_project_name", "CsRemakeEngine", CVAR_DEV, "the project name of the game, used for save file folders");
 
 ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, "", 0.0, 1.0);
@@ -1574,12 +1539,6 @@ ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in up
 
 
 
-
-void GameEngineLocal::spawn_starting_players(bool initial)
-{
-	// fixme for multiplayer, spawn in clients that are connected to server ex on restart
-	login_new_player(0);	// player 0
-}
 
 void GameEngineLocal::set_tick_rate(float tick_rate)
 {
@@ -1632,6 +1591,11 @@ void GameEngineLocal::cleanup()
 		editorState.reset();
 	if (level) {
 		stop_game();
+	}
+	
+	if (app) {
+		app->stop();
+		app.reset();
 	}
 
 	isound->cleanup();
@@ -1749,70 +1713,60 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 	vs_for_gui.height = viewport.y;
 
 
-	if (!eng->get_level()) {
-		// draw loading ui etc.
-		params.draw_world = false;
-		setup = vs_for_gui;
-		if (editorState->has_tool())
-			params.is_editor = true;
-		//idraw->scene_draw(params, vs_for_gui, get_gui());
-	}
-	else  {
-
 #ifdef EDITOR_BUILD
-		// draw general ui
-		if (editorState->has_tool()) {
-			params.is_editor = true;	// draw to the id buffer for mouse picking
-			auto vs = editorState->get_vs();
+	// draw general ui
+	if (editorState&&editorState->has_tool()) {
+		params.is_editor = true;	// draw to the id buffer for mouse picking
+		auto vs = editorState->get_vs();
+
+		// fixme
+		isound->set_listener_position(vs->origin, glm::normalize(glm::cross(vs->front, glm::vec3(0, 1, 0))));
+
+		if (!vs) {
+			params.draw_world = false;
+			vs = &vs_for_gui;
+		}
+		setup = *vs;
+		//idraw->scene_draw(params, *vs, get_gui());
+	}
+	else
+#endif
+	{
+		params=SceneDrawParamsEx(time, frame_time);
+		params.output_to_screen = UiSystem::inst->is_drawing_to_screen();
+		View_Setup vs_for_gui;
+		auto viewport = UiSystem::inst->get_vp_rect().get_size();
+		vs_for_gui.width = viewport.x;
+		vs_for_gui.height = viewport.y;
+
+		CameraComponent* scene_camera = CameraComponent::get_scene_camera();
+
+		// no camera
+		if (!scene_camera) {
+			params.draw_world = false;
+			params.draw_ui = true;
+			setup = vs_for_gui;
+		}
+		else {
+
+
+			glm::mat4 view;
+			float fov = 60.f;
+			scene_camera->get_view(view, fov);
+
+			glm::mat4 in = glm::inverse(view);
+			auto pos = in[3];
+			auto front = -in[2];
+			View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
+			scene_camera->last_vs = vs;
+			setup = vs;
 
 			// fixme
-			isound->set_listener_position(vs->origin, glm::normalize(glm::cross(vs->front, glm::vec3(0, 1, 0))));
-
-			if (!vs) {
-				params.draw_world = false;
-				vs = &vs_for_gui;
-			}
-			setup = *vs;
-			//idraw->scene_draw(params, *vs, get_gui());
+			isound->set_listener_position(vs.origin, in[1]);
 		}
-		else
-#endif
-		{
-			params=SceneDrawParamsEx(time, frame_time);
-			params.output_to_screen = UiSystem::inst->is_drawing_to_screen();
-			View_Setup vs_for_gui;
-			auto viewport = UiSystem::inst->get_vp_rect().get_size();
-			vs_for_gui.width = viewport.x;
-			vs_for_gui.height = viewport.y;
-
-			CameraComponent* scene_camera = CameraComponent::get_scene_camera();
-
-			// no camera
-			if (!scene_camera) {
-				params.draw_world = false;
-				params.draw_ui = true;
-				setup = vs_for_gui;
-			}
-			else {
-
-
-				glm::mat4 view;
-				float fov = 60.f;
-				scene_camera->get_view(view, fov);
-
-				glm::mat4 in = glm::inverse(view);
-				auto pos = in[3];
-				auto front = -in[2];
-				View_Setup vs = View_Setup(view, glm::radians(fov), 0.01, 100.0, viewport.x, viewport.y);
-				scene_camera->last_vs = vs;
-				setup = vs;
-
-				// fixme
-				isound->set_listener_position(vs.origin, in[1]);
-			}
 		
-		}
 	}
+
 }
 
 // RH, reverse Z, infinite far plane perspective matrix
@@ -1899,6 +1853,9 @@ using std::make_unique;
 
 ImFont* global_big_imgui_font = nullptr;
 
+ConfigVar is_editor_app("is_editor_app", "0", CVAR_BOOL, "");
+extern ConfigVar g_application_class;
+
 void GameEngineLocal::init(int argc, char** argv)
 {
 	this->argc = argc;
@@ -1928,8 +1885,6 @@ void GameEngineLocal::init(int argc, char** argv)
 	level = nullptr;
 	tick_interval = 1.0 / 60.0;
 	is_hosting_game = false;
-	//sv.reset( new Server );
-	//cl.reset( new Client );
 
 	init_sdl_window();
 	print_time("init sdl window");
@@ -1938,6 +1893,9 @@ void GameEngineLocal::init(int argc, char** argv)
 	FileSys::init();
 	print_time("file init");
 
+	Cmd_Manager::inst->set_set_unknown_variables(true);
+	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
+	print_time("execute vars file");
 
 	g_assets.init();
 	print_time("asset init");
@@ -1953,12 +1911,6 @@ void GameEngineLocal::init(int argc, char** argv)
 	idraw->init();
 	print_time("draw init");
 
-#ifdef EDITOR_BUILD
-	AssetRegistrySystem::get().init();
-	AssetBrowser::inst = new AssetBrowser();
-	editorState = make_unique<EditorState>();
-	print_time("asset reg and browser init");
-#endif
 
 	Input::inst = new Input();
 	UiSystem::inst = new UiSystem();
@@ -1973,17 +1925,16 @@ void GameEngineLocal::init(int argc, char** argv)
 
 	isound->init();
 	g_modelMgr.init();
-	g_gameAnimationMgr.init();
+	GameAnimationMgr::inst = new GameAnimationMgr;
+	ParticleMgr::inst = new ParticleMgr;
 
 	Model::on_model_loaded.add(this, [](Model* mod) { add_events_test(mod); });
 	print_time("init mods,sounds");
 
 	// doesnt matter if it fails, just precache loading stuff
-	g_assets.find_sync<AssetBundle>("engDefault.bundle", true);
+	g_assets.find_sync<AssetBundle>("eng/default_bundle.bundle", true);
 	print_time("load default bundle");
 
-	//cl->init();
-	//sv->init();
 	imgui_context = ImGui::CreateContext();
 	DebugShapeCtx::get().init();
 	TIMESTAMP("init everything");
@@ -1993,17 +1944,12 @@ void GameEngineLocal::init(int argc, char** argv)
 	ImGui_ImplOpenGL3_Init();
 	print_time("imgui init");
 
-	auto path = FileSys::get_full_path_from_game_path("Inconsolata-Bold.ttf");
+	auto path = FileSys::get_full_path_from_game_path("eng/inconsolata_bold.ttf");
 	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
 	global_big_imgui_font = ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 24.0);
 	ImGui::GetIO().Fonts->Build();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	print_time("imgui font");
-
-
-	Cmd_Manager::inst->set_set_unknown_variables(true);
-	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
-	print_time("execute vars");
 
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
@@ -2037,36 +1983,50 @@ void GameEngineLocal::init(int argc, char** argv)
 			Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, cmd.c_str());
 		}
 	}
-	Cmd_Manager::inst->set_set_unknown_variables(false);
 	SDL_SetWindowPosition(window, startx, starty);
 	SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
-	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "init.txt");
-	print_time("execute init file");
 
 
 	// not in editor and no queued map, load the entry point
 
+	
+#ifdef EDITOR_BUILD
+	AssetRegistrySystem::get().init();
+	
+	auto start_game = [&]() {
+		sys_print(Info, "starting game...\n");
+		Application* a = ClassBase::create_class<Application>(g_application_class.get_string());
+		if (!a) {
+			Fatalf("Engine::init: application class not found %s\n", g_application_class.get_string());
+		}
+		app.reset(a);
+		Input::on_con_status.add(a, [this](int i, bool b) {
+			app->on_controller_status(i, b);
+			});
 
+		app->start();
+	};
+	if (is_editor_app.get_bool()) {
+		AssetBrowser::inst = new AssetBrowser();
+		editorState = make_unique<EditorState>();
+		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+		print_time("asset reg and browser init");
+	}
+	else {
+		start_game();
+	}
+#else
+	start_game();
+#endif
 
-	//if (!is_in_an_editor_state() && get_state() != Engine_State::Loading) {
-	//	auto cmd = make_unique<OpenMapCommand>(g_entry_level.get_string(), true);
-	//	cmd->callback = [](SceneAsset* b) {
-	//		if (!b) {
-	//			Quit();
-	//		}
-	//	};
-	//	Cmd_Manager::inst->append_cmd(std::move(cmd));
-	//
-	//	//open_level(g_entry_level.get_string());
-	//}
-
+	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "init.txt");
+	print_time("execute init");
+	Cmd_Manager::inst->set_set_unknown_variables(false);
 
 	sys_print(Info, "execute startup in %f\n", (float)TimeSinceStart());
 }
-
-
+ConfigVar g_application_class("g_application_class", "Application", CVAR_DEV, "");
 ConfigVar with_threading("with_threading", "1", CVAR_BOOL | CVAR_DEV, "");
-
 
 void GameEngineLocal::game_update_tick()
 {
@@ -2080,7 +2040,11 @@ void GameEngineLocal::game_update_tick()
 	};
 	auto update = [&](double dt) {
 		ZoneScopedN("update");
+		CPUSCOPESTART(game_update_tick_update);
 		level->update_level();
+		if (app)
+			app->update();
+		GameAnimationMgr::inst->update_animating();
 	};
 	const double dt = frame_time;
 
@@ -2103,8 +2067,6 @@ void GameEngineLocal::game_update_tick()
 
 	// call level update
 	update(frame_time);
-
-	g_gameAnimationMgr.update_animating();
 
 	time += frame_time;
 
@@ -2135,14 +2097,20 @@ void GameEngineLocal::stop_game()
 
 bool GameEngineLocal::game_thread_update()
 {
-	if(level)
-		game_update_tick();
-	
+	try {
+		if (level)
+			game_update_tick();
 #ifdef EDITOR_BUILD
-	if (editorState)
-		editorState->tick(frame_time);
+		if (editorState)
+			editorState->tick(frame_time);
 #endif
-
+	}
+	catch (LuaRuntimeError luaErr) {
+		sys_print(Error, "game_thread_update: caught LuaRuntimeError: %s\n", luaErr.what());
+		string msg = string_format("LuaRuntimeError %s\n", luaErr.what());
+		eng->log_to_fullscreen_gui(Error, msg.c_str());
+	}
+	
 	isound->tick(frame_time);
 
 	return true;
@@ -2156,13 +2124,15 @@ struct GameUpdateOuput {
 void game_update_job(uintptr_t user)
 {
 	ZoneScopedN("GameThreadUpdate");
+	CPUFUNCTIONSTART;
+
 	//printf("abc\n");
 	auto out = (GameUpdateOuput*)user;
 	out->drawOut = eng_local.game_thread_update();
 	eng_local.get_draw_params(out->paramsOut, out->vsOut);
 	//return;
 	// update particles, doesnt draw, only builds meshes FIXME
-	ParticleMgr::get().draw(out->vsOut);
+	ParticleMgr::inst->draw(out->vsOut);
 }
 
 void GameEngineLocal::loop()
@@ -2226,16 +2196,16 @@ void GameEngineLocal::loop()
 		CPUSCOPESTART(OverlappedUpdate);
 		BooleanScope scope(b_is_in_overlapped_period);
 		GameUpdateOuput out;
-		JobCounter* gameupdatecounter{};
-		JobSystem::inst->add_job(game_update_job,uintptr_t(&out), gameupdatecounter);
-
+		//JobCounter* gameupdatecounter{};
+		//JobSystem::inst->add_job(game_update_job,uintptr_t(&out), gameupdatecounter);
+		game_update_job(uintptr_t(&out));
 		if (!skip_rendering) {
 			if (!shouldDrawNext) {
 				drawparamsNext.draw_world = drawparamsNext.draw_ui = false;
 			}
 			idraw->scene_draw(drawparamsNext, setupNext);
 		}
-		JobSystem::inst->wait_and_free_counter(gameupdatecounter);// wait for game update to finish while render is on this thread
+		//JobSystem::inst->wait_and_free_counter(gameupdatecounter);// wait for game update to finish while render is on this thread
 
 		shouldDrawNext = out.drawOut;
 		drawparamsNext = out.paramsOut;
@@ -2320,11 +2290,6 @@ void GameEngineLocal::loop()
 
 			// overlapped update (game+render)
 			do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering);
-
-			if (wants_gc_flag) {
-				do_asset_gc();
-				wants_gc_flag = false;
-			}
 
 			// sync period
 			imgui_update();	// fixme
@@ -2620,11 +2585,4 @@ void DebugShapeCtx::update(float dt)
 void DebugShapeCtx::fixed_update_start()
 {
 	one_frame_fixedupdate.clear();
-}
-
-// yeah its slow :)
-#include "Framework/PropertyUtil.h"//
-void GameEngineLocal::do_asset_gc()
-{
-	
 }

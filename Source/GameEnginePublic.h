@@ -5,6 +5,7 @@
 #include "glm/glm.hpp"
 #include "DeferredSpawnScope.h"
 #include "Framework/ScopedBoolean.h"
+#include "Framework/ClassBase.h"
 extern ConfigVar g_thirdperson;
 extern ConfigVar g_fov;
 extern ConfigVar g_mousesens;
@@ -17,7 +18,6 @@ extern ConfigVar g_window_w;
 extern ConfigVar g_window_h;
 extern ConfigVar g_window_fullscreen;
 extern ConfigVar g_host_port;
-
 
 
 template<typename... Args>
@@ -38,30 +38,37 @@ class ClassTypeInfo;
 class GuiSystemPublic;
 class GameMode;
 class BaseUpdater;
+
+class Application : public ClassBase {
+public:
+	CLASS_BODY(Application, scriptable);
+
+	REF virtual void start() {}
+	REF virtual void update() {}
+	REF virtual void stop() {}
+	REF virtual void on_map_changed() {}
+
+	// misc callbacks
+	REF virtual void on_controller_status(int index, bool connected) {}
+};
+
 class GameEnginePublic
 {
 public:
-	virtual GameMode* get_gamemode() const = 0;
+	virtual Application* get_app() const = 0;
 	virtual Level* get_level() const = 0;
 	virtual Entity* get_entity(uint64_t handle) = 0;
 	virtual BaseUpdater* get_object(uint64_t handle) = 0;
-	virtual Entity* get_local_player() = 0;
-	virtual Entity* get_player_slot(uint32_t index) = 0;
-	virtual uint32_t get_local_player_slot() = 0;
+
 	virtual Client* get_client() = 0;
 	virtual Server* get_server() = 0;
 	virtual SDL_Window* get_os_window() = 0;
-
 
 	virtual ImGuiContext* get_imgui_context() const = 0;
 	virtual bool is_host() const = 0;
 	virtual bool is_editor_level() const = 0;
 
 	virtual void log_to_fullscreen_gui(LogType type, const char* msg) = 0;
-
-
-	virtual void login_new_player(uint32_t index) = 0;
-	virtual void logout_player(uint32_t index) = 0;
 
 	double get_game_time() const {
 		return time;
@@ -86,10 +93,6 @@ public:
 	void set_game_time(double newtime) {
 		time = newtime;
 	}
-
-	// callbacks
-	virtual MulticastDelegate<bool>& get_on_map_delegate() = 0;	// called after a map was loaded (both editor and game, called after gamemode.init)protected:
-
 	double time = 0.0;			// this is essentially tick*tick_interval +- smoothing on client
 	double frame_time = 0.0;	// total frame time of program
 	double frame_remainder = 0.0;	// frame time accumulator

@@ -64,6 +64,7 @@ inline PxTransform glm_to_physx(const glm::mat4& mI)
 	));
 }
 
+
 class MyPhysicsCallback;
 class PhysicsManImpl
 {
@@ -81,15 +82,14 @@ public:
 		uint32_t collision_channel_mask = UINT32_MAX);
 
 	bool overlap_shared(
+		overlap_query_result& out,
 		physx::PxGeometry& geom,
 		const glm::vec3& start,
-		uint32_t mask)
-	{
-		physx::PxOverlapBuffer overlap;
-		physx::PxTransform local(glm_to_physx(start));
-		bool status = scene->overlap(geom, local, overlap);
-		return status;
-	}
+		uint32_t mask);
+
+
+
+
 
 	physx::PxScene* get_physx_scene() { return scene; }
 

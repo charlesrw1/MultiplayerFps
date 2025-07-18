@@ -28,6 +28,18 @@ class MeshBuilderComponent;
 class BillboardComponent;
 class Model;
 
+// hack bs to work with script fixme
+struct PhysicsBodyEventArg {
+	STRUCT_BODY();
+	REF obj<Entity> who;
+	REF bool entered_trigger = false;	// false = left
+};
+class IPhysicsEventCallback  : public ClassBase {
+public:
+	CLASS_BODY(IPhysicsEventCallback,scriptable);
+	REF virtual void on_event(PhysicsBodyEventArg event) {}
+};
+
 class PhysicsBody : public Component
 {
 public:
@@ -42,37 +54,38 @@ public:
 	void update() override;
 	void on_changed_transform() override;
 
-	bool get_is_kinematic() const { return !is_static && !simulate_physics; }
+	REF bool get_is_kinematic() const { return !is_static && !simulate_physics; }
 	void set_is_kinematic(bool kinematic);
 
-	bool get_is_simulating() const { return simulate_physics; }
-	void set_is_simulating(bool is_simulating);
+	REF bool get_is_simulating() const { return simulate_physics; }
+	REF void set_is_simulating(bool is_simulating);
 
-	bool get_is_static() const { return is_static; }
-	void set_is_static(bool is_static);
+	REF bool get_is_static() const { return is_static; }
+	REF void set_is_static(bool is_static);
 
-	bool get_is_enabled() const { return enabled; }
-	void set_is_enable(bool enable);
+	REF bool get_is_enabled() const { return enabled; }
+	REF void set_is_enable(bool enable);
 
-	bool get_is_trigger() const { return is_trigger; }
-	void set_is_trigger(bool is_trig);
+	REF bool get_is_trigger() const { return is_trigger; }
+	REF void set_is_trigger(bool is_trig);
 
-	void set_send_overlap(bool send_overlap);
-	void set_send_hit(bool send_hit);
+	REF void set_send_overlap(bool send_overlap);
+	REF void set_send_hit(bool send_hit);
 
-	PhysicsLayer get_physics_layer() const {
+	REF PL get_physics_layer() const {
 		return physics_layer;
 	}
-	void set_physics_layer(PhysicsLayer l);
+	REF void set_physics_layer(PL l);
 
 	glm::mat4 get_transform() const;
 
 	// valid for dynamic actors only
 	glm::vec3 get_linear_velocity() const;
-	void set_linear_velocity(const glm::vec3& v);
-	void set_angular_velocity(const glm::vec3& v);
-	void apply_impulse(const glm::vec3& worldspace, const glm::vec3& impulse);
-	void apply_force(const glm::vec3& worldspace, const glm::vec3& force);
+	REF void set_linear_velocity(const glm::vec3& v);
+	REF void set_angular_velocity(const glm::vec3& v);
+	REF void apply_impulse(const glm::vec3& worldspace, const glm::vec3& impulse);
+	REF void apply_force(const glm::vec3& worldspace, const glm::vec3& force);
+
 	float get_mass() const;
 	void set_objects_mass(float mass);
 	void set_objects_density(float density);
@@ -83,12 +96,14 @@ public:
 	physx::PxRigidActor* get_physx_actor() const {
 		return physxActor;
 	}
+	
+	// allocate but DO NOT FREE IPhysicsEventCallback. ownership is taken
+	// this is for lua code, c++ use on_trigger. bs fixme etc
+	// 
+	// see add_physics_callback and PhysicsEventCallbackImpl in lua for usage
+	REF void add_triggered_callback(IPhysicsEventCallback* callback);
 
-	// event delegates
-	REFLECT();
-	MulticastDelegate<PhysicsBody*> on_trigger_start;
-	MulticastDelegate<PhysicsBody*> on_trigger_end;
-	MulticastDelegate<PhysicsBody*, glm::vec3 /* point */, glm::vec3/* normal */> on_collide;
+	MulticastDelegate<PhysicsBodyEventArg> on_trigger;
 protected:
 	void add_model_shape_to_actor(const Model* m);
 	void add_sphere_shape_to_actor(const glm::vec3& pos, float radius);
@@ -96,9 +111,12 @@ protected:
 	void add_box_shape_to_actor(const glm::mat4& localTransform, const glm::vec3& halfExtents);
 	void update_mass();
 
+	void on_shape_changes();
 
 	MeshBuilderComponent* get_editor_meshbuilder() const;
 private:
+	void on_actor_type_change();
+
 	void force_set_transform(const glm::mat4& m);
 
 	void update_bone_parent_animator();
@@ -159,6 +177,13 @@ public:
 		return get_is_simulating() ? "eng/editor/phys_capsule_simulate.png" : "eng/editor/phys_capsule.png";
 	}
 #endif
+	REF void set_data(float height, float radius, float height_ofs) {
+		this->height = height;
+		this->radius = radius;
+		this->height_offset = height_ofs;
+		on_shape_changes();
+	}
+
 	REF float height = 2.f;
 	REF float radius = 0.5;
 	REF float height_offset = 0.0;
@@ -194,6 +219,11 @@ public:
 		return get_is_simulating() ? "eng/editor/phys_sphere_simulate.png" : "eng/editor/phys_sphere.png";
 	}
 #endif
+
+	REF void set_radius(float r) {
+		this->radius = r;
+		on_shape_changes();
+	}
 
 	REFLECT();
 	float radius = 1.f;

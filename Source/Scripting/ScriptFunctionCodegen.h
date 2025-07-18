@@ -12,6 +12,9 @@ extern "C" {
 #include "Framework/StructReflection.h"
 #include "Framework/ClassBase.h"
 #include "Animation/Runtime/Easing.h"
+#include "Framework/Rect2d.h"
+#include "Framework/MathLib.h"
+
 struct lVec3 {
 	STRUCT_BODY();
 	lVec3() = default;
@@ -48,6 +51,22 @@ struct lTransform {
 
 struct lRect {
 	STRUCT_BODY();
+	lRect() = default;
+	lRect(const Rect2d& rect) {
+		x = rect.x;
+		y = rect.y;
+		w = rect.w;
+		h = rect.h;
+	}
+	Rect2d to_rect2d() const {
+		Rect2d out;
+		out.x = x;
+		out.y = y;
+		out.w = w;
+		out.h = h;
+		return out;
+	}
+
 	REF float x = 0;
 	REF float y = 0;
 	REF float w = 0;
@@ -106,6 +125,37 @@ public:
 	REF static float eval_easing(Easing easing, float t) {
 		return evaluate_easing(easing, t);
 	}
+
+	REF static float damp_float(float a, float b, float smoothing, float dt) {
+		return damp_dt_independent<float>(a, b, smoothing, dt);
+	}
+	REF static lVec3 damp_vector(const lVec3& a, const lVec3& b, float smoothing, float dt) {
+		return damp_dt_independent<glm::vec3>(glm::vec3(a), glm::vec3(b), smoothing, dt);
+	}
+	REF static lQuat damp_quat(const lQuat& a, const lQuat& b, float smoothing, float dt) {
+		return damp_dt_independent<glm::quat>(glm::quat(a), glm::quat(b), smoothing, dt);
+	}
+
+	// in radians
+	REF static glm::vec3 angles_to_vector(float pitch, float yaw) {
+		return AnglesToVector(pitch, yaw);
+	}
+	REF static float fmod(float f, float m) {
+		return std::fmodf(f, m);
+	}
+	REF static float atan2f(float y, float x) {
+		return std::atan2f(y, x);
+	}
+	// returns pitch in x, yaw in y. radians
+	REF static glm::vec3 vector_to_angles(glm::vec3 v) {
+		glm::vec3 out{};
+		::vector_to_angles(v, out.x, out.y);	// name clashing, source this fram Framework/Mathlib.h
+		return out;
+	}
+	REF static float pow(float x, float p) {
+		return std::powf(x, p);
+	}
+
 };
 
 class ClassBase;

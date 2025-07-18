@@ -11,7 +11,7 @@
 #include <direct.h>
 #include "Config.h"
 
-static ConfigVar g_project_base("g_project_base", "Data", CVAR_DEV, "what folder to search for assets in");
+ConfigVar g_project_base("g_project_base", "Data", CVAR_DEV, "what folder to search for assets in");
 static ConfigVar g_user_save_dir("g_user_save_dir", "User", CVAR_DEV, "what folder to save user config/settings to");
 
 static ConfigVar file_print_all_openfile_fails("file_print_all_openfile_fails", "0", CVAR_DEV | CVAR_BOOL, "prints an error log for all CreateFile errors");
@@ -19,8 +19,8 @@ static ConfigVar file_print_all_openfile_fails("file_print_all_openfile_fails", 
 class OSFile : public IFile
 {
 public:
-	virtual ~OSFile() override {
-		close();
+	virtual ~OSFile() {
+		OSFile::close();
 	}
 
 	void init(const char* path) {
@@ -40,7 +40,7 @@ public:
 	}
 
 	// Inherited via IFile
-	virtual void close() override
+	virtual void close() final
 	{
 		if (winhandle != INVALID_HANDLE_VALUE)
 			CloseHandle(winhandle);
@@ -304,7 +304,23 @@ bool FileSys::delete_game_file(std::string filepath)
 		return false;
 	}
 }
+// stick it here for windows.h
+void start_play_process() {
 
+	const std::string pathToProcess = "./x64/Debug/App.exe";
+
+	std::string commandLine = pathToProcess + " -is_editor_app  0";
+
+	STARTUPINFOA startup = {};
+	PROCESS_INFORMATION out = {};
+
+
+	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup, &out)) {
+		sys_print(Error, "start_play_process: couldn't create process\n");
+	}
+	CloseHandle(out.hProcess);
+	CloseHandle(out.hThread);
+}
 void FileSys::init()
 {
 	sys_print(Info, "------ FileSys init ------\n");

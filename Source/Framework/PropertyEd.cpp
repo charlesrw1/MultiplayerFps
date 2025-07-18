@@ -266,7 +266,7 @@ void IGridRow::update(PropertyGrid* parentGrid,float header_ofs)
 		ImGui::TableNextColumn();
 		if (has_reset_button())
 		{
-			auto reset_img = g_assets.find_global_sync<Texture>("icon/undo.png");
+			auto reset_img = g_assets.find_global_sync<Texture>("eng/icon/undo.png");
 			if (ImGui::ImageButton(ImTextureID(uint64_t(reset_img->gl_id)), ImVec2(14, 14))) {
 				on_reset();
 				parentGrid->set_rows_had_changes();
@@ -622,11 +622,11 @@ bool ArrayRow::draw_row_controls()
 	if (header && !header->can_edit_array())
 		return false;
 	bool ret = false;
-	auto trashimg = g_assets.find_global_sync<Texture>("icon/trash.png");
-	auto addimg = g_assets.find_global_sync<Texture>("icon/plus.png");
+	auto trashimg = g_assets.find_global_sync<Texture>("eng/icon/trash.png");
+	auto addimg = g_assets.find_global_sync<Texture>("eng/icon/plus.png");
 
-	auto visible_icon = g_assets.find_global_sync<Texture>("icon/visible.png");
-	auto hidden_icon = g_assets.find_global_sync<Texture>("icon/hidden.png");
+	auto visible_icon = g_assets.find_global_sync<Texture>("eng/icon/visible.png");
+	auto hidden_icon = g_assets.find_global_sync<Texture>("eng/icon/hidden.png");
 
 	bool are_any_open = are_any_nodes_open();
 
@@ -918,9 +918,9 @@ bool ArrayRow::draw_row_controls()
 	 bool canmoveup = row_index > 0;
 	 bool canmovedown = (row_index != array_->get_size() - 1);
 
-	 auto moveup = g_assets.find_global_sync<Texture>("icon/moveup.png");
-	 auto movedown = g_assets.find_global_sync<Texture>("icon/movedown.png");
-	 auto trash1 = g_assets.find_global_sync<Texture>("icon/trash1.png");
+	 auto moveup = g_assets.find_global_sync<Texture>("eng/icon/moveup.png");
+	 auto movedown = g_assets.find_global_sync<Texture>("eng/icon/movedown.png");
+	 auto trash1 = g_assets.find_global_sync<Texture>("eng/icon/trash1.png");
 
 
 	 ImGui::PushStyleColor(ImGuiCol_Button, 0);

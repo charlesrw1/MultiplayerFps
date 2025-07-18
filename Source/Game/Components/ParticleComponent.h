@@ -8,7 +8,7 @@
 #include "Framework/ReflectionMacros.h"
 #include "Game/SerializePtrHelpers.h"
 
-// todo: make this an asset instead
+// fixme: these arent optimized really
 
 struct ParticleDef
 {
@@ -95,4 +95,46 @@ private:
 	Random r;
 
 	glm::vec3 last_pos = glm::vec3(0.f);
+};
+
+class TrailComponent : public Component {
+public:
+	CLASS_BODY(TrailComponent);
+	TrailComponent() {
+		set_call_init_in_editor(true);
+	}
+	void start() final;
+	void stop() final;
+	void on_changed_transform() final;
+	void on_sync_render_data() final;
+	void draw(const glm::vec3& side, const glm::vec3& up, const glm::vec3& front);
+
+	REF void set_width(float w, bool use_camera_up) {
+		this->width = w;
+		this->use_camera_up = use_camera_up;
+	}
+	REF void set_history(int max, float dt) {
+		this->history_dt = dt;
+		this->max_history = max;
+	}
+	REF void set_material(MaterialInstance* m) {
+		this->material = m;
+	}
+
+	REF MaterialInstance* material = nullptr;
+	bool inherit_transform = false;
+	REF int max_history = 20;
+	REF float history_dt = 0.1;	// every X seconds, take a sample
+	REF float width = 1.0;
+	REF bool use_camera_up = true;
+
+	float last_sample_time = 0.0;
+
+	handle<Particle_Object> obj;
+	MeshBuilder builder;
+	struct PosEntry {
+		glm::vec3 pos{};
+		glm::vec3 up{};
+	};
+	std::vector<PosEntry> pos_history;
 };

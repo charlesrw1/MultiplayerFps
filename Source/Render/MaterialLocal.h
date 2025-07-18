@@ -190,6 +190,7 @@ public:
 		return masterMaterial->impl ? masterMaterial->impl->masterImpl.get() : nullptr;
 	}
 
+
 	MaterialInstance* self = nullptr;
 	bool is_dynamic_material = false;
 	int unique_id = 0;	// unique id of this material instance (always valid)
@@ -200,7 +201,6 @@ public:
 	int gpu_buffer_offset = INVALID_MAPPING;	// offset in buffer if uploaded (the buffer is uint's so byte = buffer_offset*4)
 	int dirty_buffer_index = -1;	// if not -1, then its sitting in a queue already
 	bool has_called_post_load_already = false;
-
 
 	friend class MaterialManagerLocal;
 	friend class MaterialLodJob;
@@ -260,26 +260,27 @@ public:
 
 	// public interface
 	void pre_render_update() override;	// material buffer updates
-
+	int outstanding_dynamic_mats = 0;	// to check for mem leaks
 	DynamicMatUniquePtr create_dynmaic_material(const MaterialInstance* material) final {
+		return DynamicMatUniquePtr(create_dynmaic_material_unsafier(material));
+	}
+	MaterialInstance* create_dynmaic_material_unsafier(const MaterialInstance* material) {
 		assert(material);
 		MaterialInstance* dynamicMat = new MaterialInstance();
-
 		dynamicMat->impl = std::make_unique<MaterialImpl>();
 		dynamicMat->impl->self = dynamicMat;
 		dynamicMat->impl->init_from(material);
 		dynamicMat->impl->is_dynamic_material = true;
 		dynamicMat->impl->post_load(dynamicMat);	// add to dirty list, set material id
-
 		dynamicMat->set_loaded_manually_unsafe("%_DM_%");
-
-
-		return DynamicMatUniquePtr(dynamicMat);
+		outstanding_dynamic_mats += 1;
+		return dynamicMat;
 	}
 	void free_dynamic_material(MaterialInstance* mat) {
-		if (!mat) return;
-	
+		if (!mat) 
+			return;
 		queued_dynamic_mats_to_delete.push_back(mat);
+		outstanding_dynamic_mats -= 1;
 	}
 
 

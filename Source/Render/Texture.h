@@ -41,7 +41,7 @@ public:
 	Texture();
 	~Texture();
 
-	static Texture* load(const std::string& path);
+	REF static Texture* load(const std::string& path);
 
 	void uninstall() override;
 	void post_load() override;

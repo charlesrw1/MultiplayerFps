@@ -50,11 +50,6 @@ void UiSystem::draw_imgui_interfaces(EditorState* edState) {
 
 	drawing_to_screen = !edState || !edState->get_tool();
 
-	if (edState && edState->has_tool())
-		enable_imgui_docking();
-	else
-		disable_imgui_docking();
-
 	// draw imgui interfaces
 	// if a tool is active, game screen gets drawn to an imgui viewport
 	ImGui_ImplSDL2_NewFrame();
@@ -190,6 +185,7 @@ glm::ivec2 UiSystem::convert_screen_to_vp(glm::ivec2 screen) const
 void UiSystem::set_game_capture_mouse(bool b) {
 	if (b == game_focused)
 		return;
+	game_focused = b;
 	if (game_focused) {
 		// reset deltas
 		SDL_GetRelativeMouseState(nullptr, nullptr);
@@ -199,7 +195,6 @@ void UiSystem::set_game_capture_mouse(bool b) {
 	else {
 		SDL_SetRelativeMouseMode(SDL_FALSE);
 	}
-	game_focused = b;
 }
 bool UiSystem::is_game_capturing_mouse() const {
 	return game_focused;

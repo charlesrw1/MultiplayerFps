@@ -43,7 +43,16 @@ public:
 	bool set_superclass(string s);
 	const string& get_name();
 	void init_lua_type();
+	bool get_and_clear_had_changes() {
+		bool b = had_changes;
+		had_changes = false;
+		return b;
+	}
+	void set_had_changes() {
+		had_changes = true;
+	}
 private:
+	bool had_changes = false;
 	int template_lua_table = 0;
 	static ClassBase* lua_class_alloc(const ClassTypeInfo* c);
 	string lua_classname;

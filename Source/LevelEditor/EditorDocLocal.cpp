@@ -480,7 +480,6 @@ EditorDoc::EditorDoc() {
 #if 0
 void EditorDoc::on_map_load_return(bool good)
 {
-	eng->get_on_map_delegate().remove(this);	// mark the delegate to be removed
 
 	if (good && (!get_is_open() || !eng->get_level())) {
 		sys_print(Warning, "on_map_load_return but level editor not open\n");
@@ -1842,6 +1841,8 @@ void EditorDoc::set_camera_target_to_sel()
 #include "Game/Components/LightComponents.h"
 extern void export_godot_scene(const std::string& base_export_path);
 extern void export_level_scene();
+extern void start_play_process();
+
 void EditorDoc::hook_menu_bar()
 {
 	if (ImGui::BeginMenu("Plugins")) {
@@ -1864,6 +1865,7 @@ void EditorDoc::hook_menu_bar()
 		if (ImGui::MenuItem("Export as .glb")) {
 			export_level_scene();
 		}
+		ImGui::Separator();
 		if (ImGui::MenuItem("Import lightmap from baking")) {
 			LightmapComponent* lm = (LightmapComponent*)eng->get_level()->find_first_component(&LightmapComponent::StaticType);
 			if (lm) {
@@ -1882,6 +1884,11 @@ void EditorDoc::hook_menu_bar()
 				sys_print(Error, "no lightmap object in scene, add a LightmapComponent\n");
 			}
 		}
+		ImGui::Separator();
+		if (ImGui::MenuItem("Play")) {
+			start_play_process();
+		}
+
 		ImGui::EndMenu();
 	}
 }

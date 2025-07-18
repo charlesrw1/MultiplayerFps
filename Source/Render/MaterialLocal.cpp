@@ -169,6 +169,10 @@ bool MaterialInstance::is_this_a_master_material() const
 {
 	return impl&&impl->masterMaterial;
 }
+bool MaterialInstance::is_this_a_dynamic_material() const
+{
+	return impl && impl->is_dynamic_material;
+}
 
 bool MaterialInstance::load_asset(IAssetLoadingInterface* loading)
 {
@@ -331,6 +335,16 @@ MaterialInstance::~MaterialInstance()
 MaterialInstance* MaterialInstance::load(const std::string& path)
 {
 	return g_assets.find_sync<MaterialInstance>(path).get();
+}
+
+MaterialInstance* MaterialInstance::alloc_dynamic_mat(MaterialInstance* from)
+{
+	return matman.create_dynmaic_material_unsafier(from);
+}
+
+void MaterialInstance::free_dynamic_mat(MaterialInstance* mat)
+{
+	return matman.free_dynamic_material(mat);
 }
 
 void MaterialImpl::load_instance(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading)
@@ -1013,6 +1027,22 @@ void MaterialManagerLocal::pre_render_update()
 	}
 
 	dirty_list.clear();
+}
+
+void MaterialInstance::set_float_parameter(StringName name, float f)
+{
+	auto master = get_master_material();
+	auto& params = impl->params;
+	const int count = master->param_defs.size();
+	for (int i = 0; i < count; i++) {
+		if (master->param_defs[i].default_value.type == MatParamType::Float &&
+			master->param_defs[i].hashed_name == name) {
+			params[i].scalar = f;
+			matman.add_to_dirty_list(this);
+			return;
+		}
+	}
+	sys_print(Error, "couldnt find parameter for set_tex_parameter\n");
 }
 
 void MaterialInstance::set_tex_parameter(StringName name, const Texture* t)

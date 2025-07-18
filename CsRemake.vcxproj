@@ -139,6 +139,7 @@
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
     <ClCompile Include="Source\UI\BaseGUI.cpp" />
     <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
+    <ClCompile Include="Source\UI\GUISystemPublic.cpp" />
     <ClCompile Include="Source\UI\UIBuilder.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />
     <ClCompile Include="Source\UI\Widgets\EditorCube.cpp" />
@@ -182,6 +183,7 @@
     <ClInclude Include="Source\Framework\FnFactory.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
     <ClInclude Include="Source\Framework\Log.h" />
+    <ClInclude Include="Source\Framework\LuaColor.h" />
     <ClInclude Include="Source\Framework\MapUtil.h" />
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
     <ClInclude Include="Source\Framework\NodeMenuItem.h" />

@@ -3,8 +3,10 @@
 #include "Render/RenderWindow.h"
 #include "Framework/MeshBuilder.h"
 #include "BaseGUI.h"
+#include "Scripting/ScriptFunctionCodegen.h"
 union SDL_Event;
 
+#include "Framework/LuaColor.h"
 
 // RenderWindow
 //		handle<MeshBuilder>
@@ -18,6 +20,21 @@ union SDL_Event;
 //		sync to renderer behind the scenes
 
 // can use MeshBuilderObj in RenderWindow or as a 3d object
+
+
+class Canvas : public ClassBase {
+public:
+	CLASS_BODY(Canvas);
+	REF static void draw_text(std::string str, int x, int y);
+	REF static lRect calc_text_size(std::string str);
+	REF static void draw_rect(lRect rect, Texture* texture, lColor color);
+	REF static lRect get_window_rect();
+
+	REF static void set_window_fullscreen(bool is_fullscreen);
+	REF static void set_window_title(std::string name);
+	REF static void set_window_capture_mouse(bool capturing_mouse);
+};
+
 
 class EditorState;
 class MaterialInstance;

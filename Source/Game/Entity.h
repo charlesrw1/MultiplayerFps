@@ -84,11 +84,16 @@ public:
 	glm::quat get_ws_rotation();
 	REF glm::vec3 get_ws_scale();
 	REF void set_ws_position(glm::vec3 v);
+	REF void set_ws_position_rotation(glm::vec3 pos, glm::quat rot);
+	REF void set_ls_position_rotation(glm::vec3 pos, glm::quat rot);
 	void set_ws_rotation(const glm::quat& q) { set_ws_transform(get_ws_position(), q, get_ws_scale()); }
 	void set_ws_scale(const glm::vec3& s) { set_ws_transform(get_ws_position(), get_ws_rotation(), s); }
 	// parent the root component of this to another entity
 	// can use nullptr to unparent
 	REF void parent_to(Entity* parentEntity);
+
+	REF void transform_look_at(glm::vec3 pos, glm::vec3 look_pos);
+
 	void move_child_entity_index(Entity* who, int move_to);
 	int get_child_entity_index(Entity* who) const;
 	const std::vector<Component*>& get_components() const { return all_components; }
@@ -107,7 +112,7 @@ public:
 	MeshComponent* get_cached_mesh_component() const { return cached_mesh_component; }
 	void set_cached_mesh_component(MeshComponent* c) { cached_mesh_component = c; }
 	glm::mat4 get_parent_transform() const;
-	void set_parent_bone(StringName name) { parent_bone.name = name; }
+	REF void set_parent_bone(StringName name) { parent_bone.name = name; }
 	REF bool has_parent_bone() const;
 	REF StringName get_parent_bone() const { return parent_bone.name; }
 	//REF bool get_start_disabled() const { return start_disabled; }

@@ -79,6 +79,17 @@ void PhysicsBody::enable_with_initial_transforms(const glm::mat4& t0, const glm:
 	set_ticking(true);
 }
 
+void PhysicsBody::add_triggered_callback(IPhysicsEventCallback* callback)
+{
+	std::shared_ptr<IPhysicsEventCallback> ptr(callback);
+	IPhysicsEventCallback* key = ptr.get();
+	std::function<void(PhysicsBodyEventArg)> func =
+		[moved_ptr = std::move(ptr)](PhysicsBodyEventArg arg) {
+		moved_ptr->on_event(arg);
+	};
+	on_trigger.add(key, func);
+}
+
 
 void PhysicsBody::update()
 {
@@ -111,18 +122,36 @@ void PhysicsBody::set_angular_velocity(const glm::vec3& v)
 }
 
 // Initialization done in pre_start now to let joint initialization work properly in start()
-
-void PhysicsBody::pre_start()
+void PhysicsBody::on_shape_changes()
 {
-	if (eng->is_editor_level()) 
+	if (!physxActor) 
 		return;
+	// clear shapes
+	const PxU32 shapeCount = physxActor->getNbShapes();
+	if (shapeCount != 0) {
+		std::vector<PxShape*> shapes(shapeCount);
+		physxActor->getShapes(shapes.data(), shapeCount);
+		for (int i = 0; i < shapes.size();i++) {
+			auto shape = shapes[i];
+			physxActor->detachShape(*shape);
+			//shape->release();
+		}
+	}
 
-	ASSERT(editor_shape_id==0);
+	// call down to derived
+	add_actor_shapes();
+	update_mass();
+}
+void PhysicsBody::on_actor_type_change()
+{
+	if (physxActor) {
+		physics_local_impl->scene->removeActor(*(physx::PxActor*)physxActor);
+		physxActor->userData = nullptr;	// cursed moment, get a stale pointer in onTrigger after actor has been removed (?), set it null here to avoid that
+		physxActor->release();
+		physxActor = nullptr;
+	}
 
 	auto& initial_transform = get_ws_transform();
-
-	ASSERT(!has_initialized());
-
 	auto factory = physics_local_impl->physics_factory;
 	if (is_static) {
 		PxTransform t = glm_to_physx(initial_transform);
@@ -138,24 +167,32 @@ void PhysicsBody::pre_start()
 		auto dyn = (PxRigidDynamic*)physxActor;
 		dyn->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, !this->simulate_physics);
 	}
-	assert(has_initialized());
 
 	physics_local_impl->scene->addActor(*physxActor);
-
 	physxActor->userData = this;
-
 	physxActor->setActorFlag(physx::PxActorFlag::eSEND_SLEEP_NOTIFIES, true);
 	physxActor->setActorFlag(physx::PxActorFlag::eDISABLE_SIMULATION, !enabled);
 
-	// call down to derived
-	add_actor_shapes();
+	assert(has_initialized());
+
+	on_shape_changes();
+}
+void PhysicsBody::pre_start()
+{
+	if (eng->is_editor_level()) 
+		return;
+
+	ASSERT(editor_shape_id==0);
+	ASSERT(!has_initialized());
+	on_actor_type_change();
+	ASSERT(has_initialized());
+
 
 	set_ticking(false);
 	// latch physics interpolation
 	next_position = get_owner()->get_ls_position();
 	next_rot = get_owner()->get_ls_rotation();
 
-	update_mass();
 
 	if (get_is_simulating()) {
 		auto& ws = get_ws_transform();
@@ -439,6 +476,7 @@ void PhysicsBody::add_box_shape_to_actor(const glm::mat4& localTransform, const 
 	auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,
 		boxGeom, *physics_local_impl->default_material);
 
+
 	set_shape_flags(shape);
 }
 
@@ -542,8 +580,10 @@ void PhysicsBody::set_send_hit(bool send_hit) {
 }
 void PhysicsBody::set_is_static(bool is_static)
 {
-	this->is_static = is_static;
-	
+	if (this->is_static != is_static) {
+		this->is_static = is_static;
+		on_actor_type_change();
+	}
 }
 
 

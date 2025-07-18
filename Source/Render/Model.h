@@ -110,7 +110,9 @@ public:
 	Model();
 	~Model() override;
 
-	static Model* load(const std::string& path);
+	REF static Model* load(std::string path);
+	//static Model* load(const std::string& path);
+
 
 	void uninstall() override;
 	void post_load() override;

@@ -97,6 +97,12 @@ public:
 	const ClassTypeInfo* my_type() const;
 	REFLECT();
 	bool is_subclass_of(const ClassTypeInfo* type) const;
+
+	// you really should never use these, manual memory management from lua
+	REFLECT(lua_generic);
+	static ClassBase* alloc(const ClassTypeInfo* type);
+	REFLECT();
+	static void free(ClassBase* ptr);
 public:
 	static void unregister_class(ClassTypeInfo* type);
 	// called by ClassTypeInfo only during static init

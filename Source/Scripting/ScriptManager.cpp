@@ -150,7 +150,7 @@ void ScriptManager::init_this_class_type(ClassTypeInfo* classTypeInfo)
 		}
 		type = const_cast<ClassTypeInfo*>(type->super_typeinfo);
 	}
-	//sys_print(Debug, "%s __index", classTypeInfo->classname);
+//	sys_print(Debug, "%s __index", classTypeInfo->classname);
 	//dump_lua_table(lua, -1,0);
 
 	height = lua_gettop(lua);
@@ -251,7 +251,8 @@ void ScriptManager::check_for_reload() {
 	if (had_changes) {
 		lua_settop(lua, 0);
 		for (auto& [name, c] : lua_classes) {
-			c->init_lua_type();
+			if(c->get_and_clear_had_changes())
+				c->init_lua_type();
 		}
 		ClassBase::post_changes_class_init();
 		had_changes = false;
@@ -293,7 +294,11 @@ void ScriptManager::reload_one_file(const std::string& strFilePath)
 	for (auto& c : newClasses) {
 		if (!MapUtil::contains(lua_classes, c->get_name())) {
 			ClassBase::register_class(c.get());
+			c->set_had_changes();
 			lua_classes.insert({ c->get_name(),std::move(c) });
+		}
+		else {
+			lua_classes[c->get_name()]->set_had_changes();
 		}
 	}
 }
@@ -301,8 +306,8 @@ void ScriptManager::reload_all_scripts()
 {
 	sys_print(Info, "ScriptManager::reload_all_scripts\n");
 	std::vector<string> files;
-	for (auto& file : FileSys::find_game_files_path("scripts/")) {
-		if (file.find("MEGA.gen.lua") != string::npos)
+	for (auto& file : FileSys::find_game_files_path("scripts")) {
+		if (file.find("lua_stubs.lua") != string::npos)
 			continue;
 		if (StringUtils::get_extension_no_dot(file) == "lua") {
 			sys_print(Debug, "ScriptManager::load_script_files: found lua file %s\n", file.c_str());
@@ -464,6 +469,9 @@ void LuaClassTypeInfo::init_lua_type()
 	}
 	else {
 		assert(lua_gettop(L) == 1);
+		//sys_print(Debug, "lua actual table %s\n", lua_classname.c_str());
+		//dump_lua_table(L, -1);
+
 		if (template_lua_table != 0)
 			luaL_unref(L, LUA_REGISTRYINDEX, template_lua_table);
 		assert(lua_gettop(L) == 1);

@@ -340,7 +340,7 @@ def write_script_function(newclass:ClassDef, funcProp : Property) -> str:
         output += "\tClassBase* obj = get_object_from_lua(L,1);\n"
         output += f"\t{my_obj_type}* myObj = obj ? obj->cast_to<{my_obj_type}>() : nullptr;\n"
         # assert it
-        output += "\tif(!myObj) {  assert(0); };\n" # fixme
+        output += f'\tif(!myObj) {{  luaL_error(L,"null dereference for object calling {newclass.classname}::{funcProp.name}");  }}\n'# fixme
         # call into function
         calling_template = f"myObj->"
     else:
@@ -716,7 +716,7 @@ def write_lua_class(newclass:ClassDef) -> str:
     return output
   
 
-def write_output_file(GENERATED_DIR:str,filename:str,root:str,classes:list[ClassDef],additional_includes:list[str], typenames:dict[str,ClassDef]):
+def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,classes:list[ClassDef],additional_includes:list[str], typenames:dict[str,ClassDef]):
     generated_path = root + "/" + os.path.splitext(filename)[0]
     if generated_path[0]=='.':
         generated_path=generated_path[2:]
@@ -737,9 +737,11 @@ def write_output_file(GENERATED_DIR:str,filename:str,root:str,classes:list[Class
 
             for c in classes:
                 file.write(write_class_old(typenames,c))
-    generated_path = generated_path[:-4] + ".lua"
-    with open(generated_path,"w") as luaFile:
-        print(f"Writing lua stubs {generated_path}")
+
+
+    lua_stub_path = LUA_GEN_DIR + "/lua_stubs.lua"
+    with open(lua_stub_path,"w") as luaFile:
+        print(f"Writing lua stubs {lua_stub_path}")
 
         time_now = datetime.now()
         timestamp_str = time_now.strftime("%Y-%m-%d %H:%M:%S")

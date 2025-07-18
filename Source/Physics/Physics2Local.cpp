@@ -91,20 +91,21 @@ bool PhysicsManager::sweep_sphere(
 	return impl->sweep_shared(out, geom, start, dir, length,ignore, channel_mask);
 }
 bool PhysicsManager::capsule_is_overlapped(
+	overlap_query_result& out,
 	const vertical_capsule_def_t& capsule,
 	const glm::vec3& start,
 	uint32_t mask) {
 	auto geom = physx::PxCapsuleGeometry(capsule.radius, capsule.half_height);
-	return impl->overlap_shared(geom, start, mask);
+	return impl->overlap_shared(out,geom, start, mask);
 
 }
 bool PhysicsManager::sphere_is_overlapped(
-	world_query_result& out,
+	overlap_query_result& out,
 	float radius,
 	const glm::vec3& start,
 	uint32_t mask) {
 	auto geom = physx::PxSphereGeometry(radius);
-	return impl->overlap_shared(geom, start, mask);
+	return impl->overlap_shared(out,geom, start, mask);
 }
 void PhysicsManager::simulate_and_fetch(float dt)
 {
@@ -260,14 +261,11 @@ static Color32 randcolor32(uint32_t number)
 		 ZoneScoped;
 
 		 for (auto& p : triggered_pairs) {
-			if (p.is_start) {
-				 //sys_print(Debug, "trigger found\n");
-				 p.trigger->on_trigger_start.invoke(p.other);
-			 }
-			 else {
-				 //sys_print(Debug, "trigger lost\n");
-				  p.trigger->on_trigger_end.invoke(p.other);
-			 }
+			PhysicsBodyEventArg arg;
+			arg.entered_trigger = p.is_start;
+			if (p.other)
+				arg.who = p.other->get_owner();
+			p.trigger->on_trigger.invoke(arg);
 		 }
 		 triggered_pairs.clear();
 	 }
@@ -481,4 +479,32 @@ void PhysicsManImpl::update_debug_physics_shapes()
 	//	debug_mesh_handle = idraw->get_scene()->register_meshbuilder(o);
 	//else
 	//	idraw->get_scene()->update_meshbuilder(debug_mesh_handle, o);
+}
+bool PhysicsManImpl::overlap_shared(
+	overlap_query_result& out,
+	physx::PxGeometry& geom,
+	const glm::vec3& start,
+	uint32_t channel_mask)
+{
+	//MyPhysicsQueryFilter query_filter(ignore);
+	PxQueryFilterData filter;
+	filter.data.word0 = channel_mask;
+	//if (ignore)
+	//	filter.flags |= PxQueryFlag::ePREFILTER;
+
+	const int MAX_HITS = 32;
+	physx::PxOverlapHit hitBuffer[MAX_HITS];
+	physx::PxOverlapBuffer overlap(hitBuffer,MAX_HITS);
+
+	physx::PxTransform local(glm_to_physx(start));
+	bool status = scene->overlap(geom, local, overlap,filter,nullptr,nullptr);
+	
+	for (int i = 0; i < (int)overlap.nbTouches; i++) {
+		physx::PxOverlapHit& hit = overlap.touches[i];
+		if (hit.actor && hit.actor->userData) {
+			out.overlaps.push_back((PhysicsBody*)hit.actor->userData);
+		}
+	}
+	
+	return status;
 }

@@ -4,19 +4,6 @@
 #include "Render/DrawPublic.h"
 #include "Physics/Physics2.h"
 
-void GameEngineLocal::login_new_player(uint32_t index) {
-
-	ASSERT(0);
-	sys_print(Debug,"making client %d\n", index);
-	ASSERT(level);
-	
-}
-void GameEngineLocal::logout_player(uint32_t index) {
-	sys_print(Debug,"removing client %d\n", index);
-	ASSERT(level);
-	level->destroy_entity(get_player_slot(index));
-}
-
 
 
 static float mid_lerp(float min, float max, float mid_val)

@@ -50,21 +50,20 @@ struct HitResult {
 	REF bool hit = false;
 };
 
+
+#include "EngineSystemCommands.h"
+#include "../Level.h"
 class GameplayStatic : public ClassBase {
 public:
 	CLASS_BODY(GameplayStatic);
 
 	REF static Entity* spawn_prefab(PrefabAsset* prefab);
 	REF static Entity* spawn_entity();
-	REF static void change_level() {
-		return;
-	}
-	REF static HitResult cast_ray() {
-		HitResult out;
-		out.pos = glm::vec3(1, 0, 0);
-		out.hit = true;
-		return out;
-	}
+
+	REF static HitResult cast_ray(glm::vec3 start, glm::vec3 end, int channel_mask, PhysicsBody* ignore_this);
+
+	REF static int get_collision_mask_for_physics_layer(PL physics_layer);
+
 	REF static void send_back_result(HitResult res) {
 		printf("%f %f %f\n", res.pos.x, res.pos.y, res.pos.z);
 	}
@@ -77,34 +76,103 @@ public:
 	REF static float get_time() {
 		return eng->get_game_time();
 	}
-	REF static void sodf(std::vector<int> nums) {
-		printf("");
+
+	REF static void change_level(string mapname) {
+		Cmd_Manager::inst->append_cmd(uptr<SystemCommand>(new OpenMapCommand(mapname, true)));
 	}
+
+	REF static string get_current_level_name() {
+		if (!eng->get_level())
+			return "";
+		return eng->get_level()->get_source_asset_name();
+	}
+	REF static std::vector<obj<Entity>> sphere_overlap(glm::vec3 center, float radius, int channel_mask);
+
+	REF static void reset_debug_text_height();
+	REF static void debug_text(string s);
+	REF static void debug_sphere(glm::vec3 center, float radius, float life, const lColor& color);
+
+	// kind of hack bs till i work it out better
+	// basically nil tables are null and can be checked, but when an object is deleted, the _ptr field int he table is nullptr'd, but the table is non-nil
+	// i dont think you can check _ptr in lua since its userdata. so this will get the ClassBase* which does the nil and _ptr null check etc. 
+	REF static bool is_null(ClassBase* e) {
+		return e == nullptr;
+	}
+
 };
+#include "Input/InputSystem.h"
 //
 /// <summary>
 /// 
 /// </summary>
-class LuaInput : public ClassBase {
-public:
-	CLASS_BODY(LuaInput);
-	REF static bool is_key_down(int key) {
-		return false;
+/// 
+/// 
+#include "UI/GUISystemPublic.h"
+
+struct lVec2 {
+	STRUCT_BODY();
+	lVec2() = default;
+	lVec2(const glm::ivec2& v) {
+		x = v.x;
+		y = v.y;
 	}
-	REF static bool was_key_pressed(int key) {
-		return false;
-	}
-	REF static bool was_key_released(int key) {
-		return false;
-	}
-	REF static bool is_con_button_down(int con_button) {
-		return false;
-	}
-	REF static float get_con_axis(int con_axis) {
-		return 0.0;
+	lVec2(const glm::vec2& v) {
+		x = v.x;
+		y = v.y;
 	}
 
+	REF float x = 0;
+	REF float y = 0;
 };
+class lInput : public ClassBase {
+public:
+	CLASS_BODY(lInput);
+	REF static bool is_key_down(int key) {
+		return Input::is_key_down(SDL_Scancode(key));
+	}
+	REF static bool was_key_pressed(int key) {
+		return Input::was_key_pressed(SDL_Scancode(key));
+	}
+	REF static bool was_key_released(int key) {
+		return Input::was_key_released(SDL_Scancode(key));
+	}
+	REF static bool is_con_button_down(int con_button) {
+		return Input::is_con_button_down(SDL_GameControllerButton(con_button));
+	}
+	REF static bool was_con_button_pressed(int con_button) {
+		return Input::was_con_button_pressed(SDL_GameControllerButton(con_button));
+	}
+	REF static bool was_con_button_released(int con_button) {
+		return Input::was_con_button_released(SDL_GameControllerButton(con_button));
+	}
+	REF static float get_con_axis(int con_axis) {
+		return Input::get_con_axis(SDL_GameControllerAxis(con_axis));
+	}
+	REF static bool is_any_con_active() {
+		return Input::is_any_con_active();
+	}
+	REF static bool is_mouse_down(int button) {
+		return Input::is_mouse_down(button);
+	}
+	REF static bool was_mouse_pressed(int button) {
+		return Input::was_mouse_pressed(button);
+	}
+	REF static bool was_mouse_released(int button) {
+		return Input::was_mouse_released(button);
+	}
+	REF static lVec2 get_mouse_delta() {
+		return Input::get_mouse_delta();
+	}
+	REF static lVec2 get_mouse_pos() {
+		return Input::get_mouse_pos();
+	}
+	REF static void set_capture_mouse(bool b) {
+		UiSystem::inst->set_game_capture_mouse(b);
+	}
+};
+
+
+
 
 /// <summary>
 /// 
@@ -183,7 +251,6 @@ private:
 	glm::vec3 get_look_vec() {
 		return AnglesToVector(view_angles.x, view_angles.y);
 	}
-
 };
 
 #endif // !PLAYERMOVE_H

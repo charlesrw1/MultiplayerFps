@@ -30,7 +30,7 @@ void SpotLightComponent::start()
 	if (eng->is_editor_level())
 	{
 		auto billboard = get_owner()->create_component<BillboardComponent>();
-		billboard->set_texture(default_asset_load<Texture>("icon/_nearest/flashlight.png"));
+		billboard->set_texture(default_asset_load<Texture>("eng/icon/_nearest/flashlight.png"));
 		billboard->dont_serialize_or_edit = true;	// editor only item, dont serialize
 		auto arrow_obj = get_owner()->create_child_entity();
 		arrow_obj->dont_serialize_or_edit = true;
@@ -98,7 +98,7 @@ void PointLightComponent::start()
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_component<BillboardComponent>();
-		b->set_texture(default_asset_load<Texture>("icon/pointBig.png"));
+		b->set_texture(default_asset_load<Texture>("eng/icon/pointBig.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 		editor_billboard = b->get_instance_id();
 	}
@@ -137,7 +137,7 @@ void SunLightComponent::start()
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_component<BillboardComponent>();
-		b->set_texture(default_asset_load<Texture>("icon/_nearest/sun.png"));
+		b->set_texture(default_asset_load<Texture>("eng/icon/_nearest/sun.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 
 		auto s = get_owner()->create_component<ArrowComponent>();
@@ -174,7 +174,7 @@ void SkylightComponent::start() {
 
 	if (eng->is_editor_level()) {
 		auto b = get_owner()->create_component<BillboardComponent>();
-		b->set_texture(default_asset_load<Texture>("icon/_nearest/skylight.png"));
+		b->set_texture(default_asset_load<Texture>("eng/icon/_nearest/skylight.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 	}
 }

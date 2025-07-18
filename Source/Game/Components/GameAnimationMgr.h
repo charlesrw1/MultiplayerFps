@@ -7,9 +7,11 @@ class AnimatorObject;
 class GameAnimationMgr
 {
 public:
+	static GameAnimationMgr* inst;
+	
 	GameAnimationMgr();
 	~GameAnimationMgr();
-	void init();
+
 	void update_animating();	// blocking
 	void add_to_animating_set(AnimatorObject& mc);
 	void remove_from_animating_set(AnimatorObject& mc);
@@ -26,4 +28,3 @@ private:
 	int matricies_allocated = 0;
 	int matricies_used = 0;
 };
-extern GameAnimationMgr g_gameAnimationMgr;

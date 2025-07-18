@@ -2,7 +2,7 @@ from codegen_lib import *
 import codegen_generate as generate
 import time
 
-def do_codegen(path:str, skip_dirs:list[str], full_rebuild:bool):
+def do_codegen(lua_output_path : str, path:str, skip_dirs:list[str], full_rebuild:bool):
 
     print(f"Starting codegen script... fullrebuild={full_rebuild}")
     start_time = time.perf_counter()
@@ -50,7 +50,7 @@ def do_codegen(path:str, skip_dirs:list[str], full_rebuild:bool):
 
     #for o in output_files:
     #   generate.write_output_file(GENERATED_ROOT,o.filename,o.root,o.classes,o.additional_includes, typenames)
-    generate.write_output_file(GENERATED_ROOT,"MEGA.h",".",mega_output.classes,mega_output.additional_includes,typenames)
+    generate.write_output_file(lua_output_path, GENERATED_ROOT,"MEGA.h",".",mega_output.classes,mega_output.additional_includes,typenames)
 
     end_time = time.perf_counter()
     elapsed_time = (end_time - start_time) * 1000  # Convert to milliseconds

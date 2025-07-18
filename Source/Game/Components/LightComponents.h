@@ -7,6 +7,7 @@
 #include "Framework/BoolButton.h"
 #include "Game/EntityPtr.h"
 #include "Framework/EnumDefReflection.h"
+#include "Framework/LuaColor.h"
 
 GENERATED_CLASS_INCLUDE("Render/Texture.h");
 
@@ -45,6 +46,28 @@ public:
 		return "eng/editor/light.png";
 	}
 #endif
+	REF void set_color(lColor color, float intensity) {
+		this->color = color.to_color32();
+		this->intensity = intensity;
+	}
+	REF void set_radius(float r) {
+		this->radius = r;
+	}
+	REF void set_visible(bool b) {
+		this->visible = b;
+	}
+	REF void set_cone(float angle, float inner_angle) {
+		this->cone_angle = angle;
+		this->inner_cone = inner_angle;
+	}
+	REF void set_shadows(bool b) {
+		shadow = (b) ? ShadowMode::Realtime : ShadowMode::Disabled;
+	}
+	REF void set_cookie(const Texture* t) {
+		this->cookie_asset = t;
+	}
+
+
 
 	REF Color32 color = COLOR_WHITE;
 	REF float intensity = 1.f;
@@ -82,6 +105,17 @@ public:
 		return "eng/editor/light.png";
 	}
 #endif
+	REF void set_color(lColor color, float intensity) {
+		this->color = color.to_color32();
+		this->intensity = intensity;
+	}
+	REF void set_radius(float r) {
+		this->radius = r;
+	}
+	REF void set_visible(bool b) {
+		this->visible = b;
+	}
+
 
 	REF Color32 color = COLOR_WHITE;
 	REF float intensity = 1.f;

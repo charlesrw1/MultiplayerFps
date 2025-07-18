@@ -108,6 +108,19 @@ bool ClassBase::is_subclass_of(const ClassTypeInfo* type) const
 	return get_type().is_a(*type);
 }
 
+ClassBase* ClassBase::alloc(const ClassTypeInfo* type)
+{
+	assert(type);
+	return type->alloc();
+}
+
+void ClassBase::free(ClassBase* ptr)
+{
+	if (!ptr)
+		return;
+	delete ptr;
+}
+
 void ClassBase::unregister_class(ClassTypeInfo* type)
 {
 	auto& string_to_typeinfo = get_registry().string_to_typeinfo;

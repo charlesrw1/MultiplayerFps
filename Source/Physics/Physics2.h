@@ -99,6 +99,9 @@ struct world_query_result
 	bool had_initial_overlap = false;
 	float distance = 0.0;
 };
+struct overlap_query_result {
+	InlineVec<PhysicsBody*, 8> overlaps;
+};
 
 
 using TraceIgnoreVec = InlineVec<PhysicsBody*, 4>;
@@ -132,11 +135,12 @@ public:
 		const TraceIgnoreVec* ignore = nullptr
 	);
 	bool capsule_is_overlapped(
+		overlap_query_result& out,
 		const vertical_capsule_def_t& capsule,
 		const glm::vec3& start,
 		uint32_t channel_mask);
 	bool sphere_is_overlapped(
-		world_query_result& out,
+		overlap_query_result& out,
 		float radius,
 		const glm::vec3& start,
 		uint32_t channel_mask);

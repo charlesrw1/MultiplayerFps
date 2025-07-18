@@ -18,7 +18,8 @@
 #include "Framework/Jobs.h"
 #include "tracy/public/tracy/Tracy.hpp"
 
-GameAnimationMgr g_gameAnimationMgr;
+
+GameAnimationMgr* GameAnimationMgr::inst = nullptr;
 
 #ifdef EDITOR_BUILD
 const char* MeshComponent::get_editor_outliner_icon() const {
@@ -228,13 +229,12 @@ const MaterialInstance* MeshComponent::get_material_override() const {
 
 static ConfigVar animation_bonemat_arena_size("animation_bonemat_arena_size", "15000", CVAR_DEV | CVAR_INTEGER | CVAR_READONLY, "arena size of animation bone matricies in matrix size (64)", 0, FLT_MAX);
 
-GameAnimationMgr::GameAnimationMgr() : animating_meshcomponents(4) {
 
-}
 GameAnimationMgr::~GameAnimationMgr()
 {
+	delete[]matricies;
 }
-void GameAnimationMgr::init()
+GameAnimationMgr::GameAnimationMgr() : animating_meshcomponents(4)
 {
 	matricies_allocated = animation_bonemat_arena_size.get_integer();
 	matricies = new glm::mat4[matricies_allocated];

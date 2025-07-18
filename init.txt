@@ -56,8 +56,6 @@ bind "C" Ctrl "anim.copy"
 bind "V" Ctrl "anim.paste"
 
 
-godot_lightmap_engine_path "C:/Users/charl/Documents/lightmapexporter/"
-
 bind J "toggle r.taa"
 bind K "toggle r.taa_flicker_remove"
 bind L "toggle r.disable_animated_velocity_vector"
@@ -103,6 +101,5 @@ bind 7 "start_ed AnimGraph beu_character.ag"
 loglevel 6
 developer_mode 1
 
-#map top_down/map0.tmap
+start_ed Map "bike_empty.tmap"
 
-start_ed Map top_down/map0.tmap

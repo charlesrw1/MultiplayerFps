@@ -195,14 +195,17 @@ void AssetFilesystemNode::sort_R()
 
 
 static HANDLE directoryChangeHandle = 0;
-
+extern ConfigVar g_project_base;
 #include "Framework/StringUtils.h"
 void AssetRegistrySystem::init()
 {
+
+	string dir = g_project_base.get_string();
+
 	last_time_check = get_unix_time_seconds();
 
 	directoryChangeHandle = FindFirstChangeNotificationA(
-		".\\",		 // directory to watch 
+		dir.c_str(),		 // directory to watch 
 		TRUE,                         //  watch subtree 
 		FILE_NOTIFY_CHANGE_LAST_WRITE); 
 

@@ -18,10 +18,11 @@ struct MyStruct
 };
 
 
-class CameraShake
-{
+class CameraShake : public Component {
 public:
-	glm::vec3 evaluate(glm::vec3 pos, glm::vec3 front, float dt) {
+	CLASS_BODY(CameraShake);
+
+	REF glm::vec3 evaluate(glm::vec3 pos, glm::vec3 front, float dt) {
 		if (time < total_time) {
 			glm::vec3 left = glm::normalize(glm::cross(front, glm::vec3(0, 1, 0)));
 			glm::vec3 up = glm::cross(left, front);
@@ -35,10 +36,12 @@ public:
 
 
 	}
-	void start(float intensity = 0.1) {
+	REF void start_shake(float intensity, float total_time) {
 		this->intensity = intensity;
+		this->total_time = total_time;
 		time = 0.0;
 	}
+private:
 	float eval_func(float t) {
 		return sin(1.1 * t + 0.1) + 2.0 * sin(2.6 * t - 0.8) + sin(0.1 * t + 0.2) + 3.0 * sin(0.6 * t - 1.0);
 	}
@@ -146,7 +149,7 @@ public:
 				pc->get_owner()->set_ws_transform(get_ws_position() + glm::vec3(0, 0.5, 0), glm::quat_cast(rotationMatrix), pc->get_owner()->get_ls_scale());
 			}
 
-			shake.start(0.08);
+			shake.start_shake(0.08,0.25);
 			shoot_cooldown = 0.8;
 
 			cachedShotgunSound->play_one_shot_at_pos(get_ws_position());

@@ -863,29 +863,17 @@ void Renderer::create_default_textures()
 	const uint8_t bdata[] = { 0x0,0x0,0x0 };
 	const uint8_t normaldata[] = { 128,128,255,255 };
 
-	glCreateTextures(GL_TEXTURE_2D, 1, &white_texture.gl_id);
-	glTextureStorage2D(white_texture.gl_id, 1, GL_RGB8, 1, 1);
-	glTextureSubImage2D(white_texture.gl_id, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, wdata);
-	glTextureParameteri(white_texture.gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTextureParameteri(white_texture.gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glGenerateTextureMipmap(white_texture.gl_id);
-
-	glCreateTextures(GL_TEXTURE_2D, 1, &black_texture.gl_id);
-	glTextureStorage2D(black_texture.gl_id, 1, GL_RGB8, 1, 1);
-	glTextureSubImage2D(black_texture.gl_id, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, bdata);
-	glTextureParameteri(black_texture.gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTextureParameteri(black_texture.gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glGenerateTextureMipmap(black_texture.gl_id);
-
-	glCreateTextures(GL_TEXTURE_2D, 1, &flat_normal_texture.gl_id);
-	glTextureStorage2D(flat_normal_texture.gl_id, 1, GL_RGB8, 1, 1);
-	glTextureSubImage2D(flat_normal_texture.gl_id, 0, 0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, normaldata);
-	glTextureParameteri(flat_normal_texture.gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTextureParameteri(flat_normal_texture.gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glGenerateTextureMipmap(flat_normal_texture.gl_id);
-
-	// this is sort of leaking memory but not really, these are persitant over lifetime of program
-	// anybody (like materials) can reference them with strings which is the point
+	auto create_defeault = [](texhandle* handle, const uint8_t* data) -> void{
+		glCreateTextures(GL_TEXTURE_2D, 1, handle);
+		glTextureStorage2D(*handle, 1, GL_RGB8, 1, 1);
+		glTextureSubImage2D(*handle, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, data);
+		glTextureParameteri(*handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTextureParameteri(*handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glGenerateTextureMipmap(*handle);
+	};
+	create_defeault(&white_texture.gl_id, wdata);
+	create_defeault(&black_texture.gl_id, bdata);
+	create_defeault(&flat_normal_texture.gl_id, normaldata);
 
 	auto white_tex = Texture::install_system("_white");
 	auto black_tex = Texture::install_system("_black");
@@ -899,7 +887,7 @@ void Renderer::create_default_textures()
 	black_tex->update_specs(black_texture.gl_id, 1, 1, 3, {});
 	flat_normal->update_specs(flat_normal_texture.gl_id, 1, 1, 3, {});
 
-	// create the "virtual texture system" handles so materials/debuging can reference these
+	// create the "virtual texture system" handles so materials/debuging can reference these like a normal texture
 	tex.bloom_vts_handle = Texture::install_system("_bloom_result");
 	tex.scene_color_vts_handle = Texture::install_system("_scene_color");
 	tex.scene_depth_vts_handle = Texture::install_system("_scene_depth");
@@ -944,7 +932,8 @@ void Renderer::init()
 	volfog.init();
 	shadowmap.init();
 	ssao.init();
-	lens_dirt = g_assets.find_global_sync<Texture>("lens_dirt.jpg").get();
+	lens_dirt = g_assets.find_global_sync<Texture>("eng/lens_dirt_fine.png").get();
+
 
 	glGenVertexArrays(1, &vao.default_);
 	glCreateBuffers(1, &buf.default_vb);
@@ -1322,7 +1311,6 @@ void Renderer::execute_render_lists(
 
 		const GLenum index_type = MODEL_INDEX_TYPE_GL;
 
-		#pragma warning(disable : 4312)	// (void*) casting
 		glMultiDrawElementsIndirect(
 			GL_TRIANGLES,
 			index_type,
@@ -1330,7 +1318,6 @@ void Renderer::execute_render_lists(
 			count,
 			sizeof(gpu::DrawElementsIndirectCommand)
 		);
-		#pragma warning(default : 4312)
 
 		offset += count;
 
@@ -2940,15 +2927,17 @@ void Renderer::sync_update()
 	// For TAA, double buffer bones
 
 	scene.flip_bone_buffers();
+	auto mgr = GameAnimationMgr::inst;
+	assert(mgr);
 
-	if (g_gameAnimationMgr.get_num_matricies_used() > scene.gpu_skinned_mats_buffer_size / 2)
+	if (mgr->get_num_matricies_used() > scene.gpu_skinned_mats_buffer_size / 2)
 		Fatalf("out of animated buffer memory\n");
 
 	glNamedBufferSubData(
 		scene.gpu_skinned_mats_buffer,
 		scene.get_front_bone_buffer_offset() * sizeof(glm::mat4),
-		sizeof(glm::mat4) * g_gameAnimationMgr.get_num_matricies_used(),
-		g_gameAnimationMgr.get_bonemat_ptr(0)
+		sizeof(glm::mat4) * mgr->get_num_matricies_used(),
+		mgr->get_bonemat_ptr(0)
 	);
 }
 

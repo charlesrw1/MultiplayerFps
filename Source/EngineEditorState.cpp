@@ -4,8 +4,11 @@
 #include "imgui.h"
 #include "Assets/AssetDatabase.h"
 #include "Render/Texture.h"
-EditorState::EditorState()
-{
+#include "Framework/Config.h"
+#include "EngineSystemCommands.h"
+#include "Game/LevelAssets.h"
+
+EditorState::EditorState(){
 	this->redCrossIcon = g_assets.find_sync<Texture>("eng/editor/red_cross.png", true).get();// [&](GenericAssetPtr ptr) {
 }
 
@@ -46,11 +49,10 @@ void EditorState::open_tool(uptr<CreateEditorAsync> creation, bool set_active, f
 	creation->execute([this, callback](uptr<IEditorTool> arg) {
 		if (!arg)
 			sys_print(Warning, "EditorState::open_tool: creation returned null\n");
-
-		if (curTool&&arg) {
+		if (curTool&&arg)
 			sys_print(Debug, "EditorState::open_tool: replacing current tool\n");
-		}
-		set_tab_open(arg->get_doc_name());
+		if(arg)
+			set_tab_open(arg->get_doc_name());
 
 		this->curTool = std::move(arg);
 		if(callback)
@@ -69,6 +71,9 @@ void EditorState::tick(float dt)
 {
 	if (curTool)
 		curTool->tick(dt);
+	else {
+		Cmd_Manager::inst->append_cmd(uptr<SystemCommand>(new OpenEditorToolCommand(SceneAsset::StaticType, std::nullopt, true)));
+	}
 }
 
 void EditorState::imgui_hook_new_frame()

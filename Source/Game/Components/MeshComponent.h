@@ -49,8 +49,10 @@ public:
 	void set_model_str(const char* model_path);
 	REF void set_model(Model* model);
 	REF const Model* get_model() const;
-	AnimatorObject* get_animator() const { return animator.get(); }
-	AnimatorObject* create_animator(agBuilder* data);
+	REF AnimatorObject* get_animator() const { 
+		return animator.get(); 
+	}
+	REF AnimatorObject* create_animator(agBuilder* data);
 
 	bool get_is_visible() const { return is_visible; }
 	bool get_casts_shadows() const { return cast_shadows; }

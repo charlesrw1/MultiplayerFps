@@ -20,3 +20,13 @@ view.sens 0.005
 g_entry_level "mainMenuMap.tmap"
 ed_default_sky_material "indoorHdriSky"
 g_project_name DevEngine
+
+#project vars
+godot_lightmap_engine_path "C:/Users/charl/Documents/lightmapexporter/"
+g_project_base "Data"
+
+g_application_class "MyApp"
+
+is_editor_app 1
+
+g_draw_grid 0

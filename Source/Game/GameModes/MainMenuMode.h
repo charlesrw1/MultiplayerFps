@@ -16,7 +16,6 @@ public:
 		layout = new GUIFullscreen;
 		layout->add_this(loadText);
 
-		eng->get_on_map_delegate().add(this, &GameTransitionUI::close);
 	}
 	static GameTransitionUI& get() {
 		static GameTransitionUI inst;

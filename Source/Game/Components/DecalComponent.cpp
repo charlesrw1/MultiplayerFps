@@ -22,7 +22,7 @@ void DecalComponent::start() {
 	if (eng->is_editor_level())
 	{
 		auto b = get_owner()->create_component<BillboardComponent>();
-		b->set_texture(g_assets.find_sync<Texture>("icon/_nearest/decal.png"));
+		b->set_texture(Texture::load("eng/icon/_nearest/decal.png"));
 		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 		auto a = get_owner()->create_component<ArrowComponent>();
 		a->dont_serialize_or_edit = true;

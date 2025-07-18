@@ -5,6 +5,8 @@
 
 // comment 6
 
+ParticleMgr* ParticleMgr::inst = nullptr;
+
 void ParticleComponent::on_sync_render_data()
 {
 	if(!obj.is_valid())
@@ -20,7 +22,7 @@ void ParticleComponent::start()
 {
 	
 	r.state = wang_hash((uint32_t)get_instance_id());
-	ParticleMgr::get().register_this(this);
+	ParticleMgr::inst->register_this(this);
 
 	is_playing = true;
 	start_time = eng->get_game_time();
@@ -32,7 +34,7 @@ void ParticleComponent::start()
 void ParticleComponent::stop()
 {
 	idraw->get_scene()->remove_particle_obj(obj);
-	ParticleMgr::get().unregister_this(this);
+	ParticleMgr::inst->unregister_this(this);
 	active_particles.clear();
 }
 static bool is_between(float x, float y, float value)
@@ -203,4 +205,88 @@ void ParticleMgr::draw(const View_Setup& vs)
 	
 	for (auto c : all_components)
 		c->draw(invview[1],invview[0],invview[2]);
+	for (auto t : all_trails)
+		t->draw(invview[1], invview[0], invview[2]);
+}
+
+void TrailComponent::start()
+{
+	set_ticking(false);
+	ParticleMgr::inst->register_this(this);
+	sync_render_data();
+}
+
+void TrailComponent::stop()
+{
+	ParticleMgr::inst->unregister_this(this);
+	idraw->get_scene()->remove_particle_obj(obj);
+}
+
+void TrailComponent::on_changed_transform()
+{
+	sync_render_data();
+}
+
+void TrailComponent::on_sync_render_data()
+{
+	if (!obj.is_valid())
+		obj = idraw->get_scene()->register_particle_obj();
+	Particle_Object o{};
+	o.meshbuilder = &builder;
+	o.material = material;
+	o.owner = this;
+
+	o.transform = (inherit_transform) ? get_ws_transform() : glm::mat4(1.f);
+	idraw->get_scene()->update_particle_obj(obj, o);
+}
+
+void TrailComponent::draw(const glm::vec3& side, const glm::vec3& up, const glm::vec3& front)
+{
+	// get position
+	const glm::mat4& transform = get_ws_transform();
+	const float t = eng->get_game_time();
+	const float dt = eng->get_dt();
+	if (t > last_sample_time + history_dt) {
+		PosEntry entry{ transform[3],transform[2] };
+		// just do the stupid thing, fixme ringbuffer
+		if (pos_history.size() >= max_history) {
+			pos_history.erase(pos_history.begin());
+		}
+		pos_history.push_back(entry);
+		last_sample_time = t;
+	}
+
+	builder.Begin();
+	for (int i = 0; i < (int)pos_history.size(); i++) {
+		auto& entry = pos_history[i];
+		if (i+1 == (int)pos_history.size()) {
+			entry.pos = transform[3];
+		}
+
+
+		const glm::vec3& upVec = (use_camera_up) ? up : entry.up;
+		float len_alpha = 0.0;
+		{
+			int sz = pos_history.size();
+			int len_minus_one = std::max(sz - 1, 1);
+			len_alpha = float(i) / len_minus_one;
+		}
+		float widthToUse = width * len_alpha;
+
+
+		int base = builder.GetBaseVertex();
+		MbVertex v;
+		v.position = entry.pos+ upVec * widthToUse;
+		v.uv = glm::vec2(0, len_alpha);
+		builder.AddVertex(v);
+		v.position = entry.pos - upVec * widthToUse;
+		v.uv = glm::vec2(1, len_alpha);
+		builder.AddVertex(v);
+
+		// if last entry, skip. (quad was added in prev iteration)
+		if (i + 1 != (int)pos_history.size()) {
+			builder.AddQuad(base, base + 2, base + 3, base + 1);
+		}
+	}
+	builder.End();
 }

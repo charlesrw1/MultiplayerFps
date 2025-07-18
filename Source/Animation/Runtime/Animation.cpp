@@ -33,7 +33,7 @@ using glm::normalize;
 
 
 AnimatorObject::~AnimatorObject() {
-	g_gameAnimationMgr.remove_from_animating_set(*this);
+	GameAnimationMgr::inst->remove_from_animating_set(*this);
 }
 agBaseNode& AnimatorObject::get_root_node() const {
 	assert(graph.get_root());
@@ -66,7 +66,7 @@ AnimatorObject::AnimatorObject(const Model& model, agBuilder& ingraph, Entity* e
 	auto pose = g_pose_pool.allocate_scoped();
 	util_set_to_bind_pose(*pose.get(), get_skel());
 	util_localspace_to_meshspace(*pose.get(), cached_bonemats, get_skel());
-	g_gameAnimationMgr.add_to_animating_set(*this);
+	GameAnimationMgr::inst->add_to_animating_set(*this);
 }
 
 void AnimatorObject::ConcatWithInvPose()
@@ -74,7 +74,7 @@ void AnimatorObject::ConcatWithInvPose()
 	ASSERT(get_skel());
 
 	auto skel = get_skel();
-	glm::mat4* matrix_palette = g_gameAnimationMgr.get_bonemat_ptr(get_matrix_palette_offset());
+	glm::mat4* matrix_palette = GameAnimationMgr::inst->get_bonemat_ptr(get_matrix_palette_offset());
 	for (int i = 0; i < skel->get_num_bones(); i++) {
 
 		matrix_palette[i] = cached_bonemats[i] * (glm::mat4)skel->get_inv_posematrix(i);

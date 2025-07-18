@@ -71,7 +71,7 @@ Model::~Model() {
 		printf("");
 	}
 }
-Model* Model::load(const std::string& path)
+Model* Model::load(std::string path)
 {
 	return g_assets.find_sync<Model>(path).get();
 }

@@ -751,12 +751,72 @@ void Player::on_foot_update()
  Entity* GameplayStatic::find_by_name(string name) {
 	 return eng->get_level()->find_initial_entity_by_name(name);
  }
+#include "UI/UILoader.h"
+static int GameplayStatic_debug_text_start = 10;
+ void GameplayStatic::reset_debug_text_height()
+ {
+	 GameplayStatic_debug_text_start = 10;
+ }
+
+ void GameplayStatic::debug_text(string text)
+ {
+	 auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+	 auto draw_text = [&](const char* s) {
+		 string str = s;
+		 TextShape shape;
+		 Rect2d size = GuiHelpers::calc_text_size(std::string_view(str), font);
+		 glm::ivec2 ofs = GuiHelpers::calc_layout({ -100,-10 }, guiAnchor::Center, UiSystem::inst->get_vp_rect());
+
+		 shape.rect.x = ofs.x;
+		 shape.rect.y = ofs.y + size.h + GameplayStatic_debug_text_start;
+		 shape.font = font;
+		 shape.color = COLOR_WHITE;
+		 shape.with_drop_shadow = true;
+		 shape.drop_shadow_ofs = 1;
+		 shape.text = str;
+		 UiSystem::inst->window.draw(shape);
+		 GameplayStatic_debug_text_start += size.h;
+	 };
+	 draw_text(text.c_str());
+ }
 
  Entity* GameplayStatic::spawn_prefab(PrefabAsset* prefab)
  {
 	 return eng->get_level()->spawn_prefab(prefab);
  }
+ int GameplayStatic::get_collision_mask_for_physics_layer(PL physics_layer) {
+	 return (int)::get_collision_mask_for_physics_layer(physics_layer);
+ }
  Entity* GameplayStatic::spawn_entity()
  {
 	 return eng->get_level()->spawn_entity();
+ }
+ HitResult GameplayStatic::cast_ray(glm::vec3 start, glm::vec3 end, int channel_mask, PhysicsBody* ignore_this) {
+	 HitResult out;
+	 world_query_result res;
+	 TraceIgnoreVec ignore;
+	 if (ignore_this)
+		 ignore.push_back(ignore_this);
+
+	 g_physics.trace_ray(res, start, end, &ignore, channel_mask);
+	 out.hit = res.component != nullptr;
+	 if (res.component) {
+		 out.pos = res.hit_pos;
+		 out.what = res.component->get_owner();
+	 }
+	 return out;
+ }
+ std::vector<obj<Entity>> GameplayStatic::sphere_overlap(glm::vec3 center, float radius, int channel_mask)
+ {
+	 std::vector<obj<Entity>> outVec;
+	 overlap_query_result res;
+	 g_physics.sphere_is_overlapped(res, radius, center, channel_mask);
+	 for (int i = 0; i < res.overlaps.size(); i++) {
+		 outVec.push_back(res.overlaps[i]->get_owner());
+	 }
+	 return outVec;
+ }
+ void GameplayStatic::debug_sphere(glm::vec3 center, float r, float life, const lColor& color)
+ {
+	 Debug::add_sphere(center, r, color.to_color32(), life);
  }

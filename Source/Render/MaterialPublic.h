@@ -21,17 +21,19 @@ public:
 	virtual ~MaterialInstance() override;
 	MaterialInstance& operator=(MaterialInstance&& other) = default;
 
-	static MaterialInstance* load(const std::string& path);
+	REF static MaterialInstance* load(const std::string& path);
+
+	// aight this is unsafe as crap, but whatever. for lua
+	// dynamic materials, can set parameters through code
+	REF static MaterialInstance* alloc_dynamic_mat(MaterialInstance* from);
+	REF static void free_dynamic_mat(MaterialInstance* mat);
 
 	// ONLY valid for dynamic materials! (is_this_a_dynamic_material())
-	void set_float_parameter(StringName name, float f);
-	void set_bool_parameter(StringName name, bool b);
-	void set_vec_parameter(StringName name, Color32 c);
-	void set_fvec_parameter(StringName name, glm::vec4 v4);
-	void set_tex_parameter(StringName name, const Texture* t);
+	REF void set_float_parameter(StringName name, float f);
+	REF void set_tex_parameter(StringName name, const Texture* t);
 
+	REF bool is_this_a_dynamic_material() const;
 	const MasterMaterialImpl* get_master_material() const;
-	bool is_this_a_dynamic_material() const;
 	bool is_this_a_master_material() const;
 
 	// IAsset interface

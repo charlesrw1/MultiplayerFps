@@ -33,13 +33,17 @@ struct SceneDrawParamsEx;
 struct View_Setup;
 class IntegrationTester;
 class EditorState;
+
+
+
+
 class GameEngineLocal : public GameEnginePublic
 {
 public:
 	GameEngineLocal();
 
 	// Public Interface
-	GameMode* get_gamemode() const final {
+	Application* get_app() const final {
 		return nullptr;
 	}
 	Level* get_level() const final {
@@ -54,18 +58,7 @@ public:
 		ASSERT(get_level());
 		return level->get_entity(handle);
 	}
-	Entity* get_local_player() final {
-		ASSERT(get_level());
-		return nullptr;
-	}
-	Entity* get_player_slot(uint32_t index) final {
-		// fixme:
-		if (index == 0) return get_local_player();
-		else return nullptr;
-	}
-	uint32_t get_local_player_slot() final {
-		return 0;
-	}
+
 	Client* get_client() final {
 		return nullptr;// cl.get();
 	}
@@ -81,8 +74,6 @@ public:
 
 	void log_to_fullscreen_gui(LogType type, const char* msg) final;
 
-	void login_new_player(uint32_t index) final;
-	void logout_player(uint32_t index) final;
 
 
 	bool is_editor_level() const  final {
@@ -91,9 +82,6 @@ public:
 		return is_loading_editor_level || (get_level() && get_level()->is_editor_level());
 	}
 
-	MulticastDelegate<bool>& get_on_map_delegate() final {
-		return on_map_load_return;
-	}
 	bool is_host() const final { return true; }
 
 // local functions
@@ -124,7 +112,6 @@ public:
 	// Host functions
 
 	MulticastDelegate<> on_begin_map_change;
-	MulticastDelegate<bool> on_map_load_return;
 	MulticastDelegate<> on_leave_level;
 	MulticastDelegate<> on_leave_editor;
 	MulticastDelegate<IEditorTool*> on_enter_editor;
@@ -134,27 +121,16 @@ public:
 
 	bool map_spawned() { return level != nullptr; }
 
-	//std::unique_ptr<Client> cl;
-	//std::unique_ptr<Server> sv;
-
 	OnScreenLog gui_log;
-
 	string queued_mapname;
 	bool is_loading_editor_level = false;
 	std::unique_ptr<Level> level= nullptr;
-
+	std::unique_ptr<Application> app;
 	ImGuiContext* imgui_context = nullptr;
 	SDL_Window* window = nullptr;
 	SDL_GLContext gl_context = nullptr;
-
 	bool show_console = false;
 	bool dedicated_server = false;
-
-
-	void set_wants_gc() {
-		wants_gc_flag = true;
-	}
-	bool wants_gc_flag = false;
 
 	bool is_drawing_to_window_viewport() const;
 
@@ -175,22 +151,14 @@ public:
 	uptr<EditorState> editorState;
 	bool is_waiting_on_map_load = false;
 private:
-
 	uptr<IntegrationTester> tester;
-
-
-
 
 	bool is_hosting_game = false;
 	bool headless_mode = false;
-
 	void init_sdl_window();
 	void key_event(SDL_Event event);
-
 	void draw_any_imgui_interfaces();
-
 	void game_update_tick();
-	void do_asset_gc();
 
 	friend class Ent_Iterator;
 
