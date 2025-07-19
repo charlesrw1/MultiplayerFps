@@ -780,6 +780,11 @@ static int GameplayStatic_debug_text_start = 10;
 	 draw_text(text.c_str());
  }
 
+ void GameplayStatic::debug_line_normal(glm::vec3 p, glm::vec3 n, float len, float life, const lColor& color)
+ {
+	 Debug::add_line(p, p + n * len, color.to_color32(), life);
+ }
+
  Entity* GameplayStatic::spawn_prefab(PrefabAsset* prefab)
  {
 	 return eng->get_level()->spawn_prefab(prefab);
@@ -803,6 +808,7 @@ static int GameplayStatic_debug_text_start = 10;
 	 if (res.component) {
 		 out.pos = res.hit_pos;
 		 out.what = res.component->get_owner();
+		 out.normal = res.hit_normal;
 	 }
 	 return out;
  }

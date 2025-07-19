@@ -207,6 +207,8 @@ void ParticleMgr::draw(const View_Setup& vs)
 		c->draw(invview[1],invview[0],invview[2]);
 	for (auto t : all_trails)
 		t->draw(invview[1], invview[0], invview[2]);
+	for (auto t : all_beams)
+		t->draw(invview[1], invview[0], invview[2]);
 }
 
 void TrailComponent::start()
@@ -289,4 +291,160 @@ void TrailComponent::draw(const glm::vec3& side, const glm::vec3& up, const glm:
 		}
 	}
 	builder.End();
+}
+
+void BeamComponent::start()
+{
+	set_ticking(false);
+	ParticleMgr::inst->register_this(this);
+	sync_render_data();
+}
+
+void BeamComponent::stop()
+{
+	ParticleMgr::inst->unregister_this(this);
+	idraw->get_scene()->remove_particle_obj(obj);
+}
+
+void BeamComponent::on_changed_transform()
+{
+	sync_render_data();
+}
+
+void BeamComponent::on_sync_render_data()
+{
+	if (!obj.is_valid())
+		obj = idraw->get_scene()->register_particle_obj();
+	Particle_Object o{};
+	o.meshbuilder = &builder;
+	o.material = material;
+	o.owner = this;
+	o.transform = glm::mat4(1.f);
+	idraw->get_scene()->update_particle_obj(obj, o);
+}
+
+ConfigVar rope_adjust("rope_adjust", "1", CVAR_FLOAT, "");
+ConfigVar rope_grav("rope_grav", "1", CVAR_FLOAT|CVAR_UNBOUNDED, "");
+ConfigVar remove_rope_vel("remove_rope_vel", "0.99", CVAR_FLOAT, "");
+
+void BeamComponent::draw(const glm::vec3& side, const glm::vec3& up, const glm::vec3& front)
+{
+	if (!is_visible) {
+		// fixme
+		builder.Begin();
+		builder.End();
+		return;
+	}
+
+	if (sample_points_sz < 2)
+		return;
+	opt<glm::vec3> target_pos = get_target_pos();
+	if (!target_pos.has_value())
+		return;
+	glm::vec3 my_pos = get_owner()->get_ws_position();
+	float dt = eng->get_dt();
+	points.resize(sample_points_sz);
+	const float rope_length = glm::length(my_pos - target_pos.value());
+	const float node_rest_length = (rope_length / std::max(int(points.size()) - 1, 1))* rope_adjust.get_float();
+
+	points.at(0).velocity = (my_pos-points.at(0).pos) / dt;
+	points.at(0).pos = my_pos;
+	const int last_point = (int)points.size() - 1;
+	points.at(last_point).velocity = (*target_pos - points.at(last_point).pos) / dt;
+	points.at(last_point).pos = *target_pos;
+	const int steps = 1;
+	dt /= steps;
+	for (int step = 0; step < steps; step++) {
+		for (int i = 0; i + 1 < points.size(); i++) {
+			auto& point = points[i];
+			auto& point2 = points[i + 1];
+			glm::vec3 delta = point.pos - point2.pos;
+			float dist = glm::length(delta);
+			glm::vec3 dir = delta;
+			if (dist >= 0.001)
+				dir /= dist;
+
+
+			float stiff_mult = 1.0;
+			float damp_mult = 1.0;
+
+			glm::vec3 force = -stiff * (dist - node_rest_length) * dir * stiff_mult;
+			glm::vec3 vel_diff = point.velocity - point2.velocity;
+			force -= dir * damp * dot(vel_diff, dir) * damp_mult;
+
+			const float rope_gravity_val = 9.0 * rope_grav.get_float();
+			if (i != 0) {
+				point.velocity += force * dt;
+
+				if (apply_gravity)
+					point.velocity.y -= rope_gravity_val * dt;
+
+				point.velocity *= remove_rope_vel.get_float();
+			}
+			if (i + 1 != int(points.size())) {
+				point2.velocity -= force * dt;
+				point2.velocity *= remove_rope_vel.get_float();
+
+			}
+		}
+		for (int i = 1; i + 1 < points.size(); i++) {
+			points[i].pos += points[i].velocity * dt;
+		}
+	}
+
+	builder.Begin();
+	for (int i = 0; i < (int)points.size(); i++) {
+		auto& entry = points[i];
+
+		const glm::vec3& upVec = up;
+		float len_alpha = 0.0;
+		{
+			int sz = points.size();
+			int len_minus_one = std::max(sz - 1, 1);
+			len_alpha = float(i) / len_minus_one;
+		}
+		float widthToUse = width;// *len_alpha;
+
+
+		int base = builder.GetBaseVertex();
+		MbVertex v;
+		v.position = entry.pos + upVec * widthToUse;
+		v.uv = glm::vec2(0, len_alpha);
+		builder.AddVertex(v);
+		v.position = entry.pos - upVec * widthToUse;
+		v.uv = glm::vec2(1, len_alpha);
+		builder.AddVertex(v);
+
+		// if last entry, skip. (quad was added in prev iteration)
+		if (i + 1 != (int)points.size()) {
+			builder.AddQuad(base, base + 2, base + 3, base + 1);
+		}
+	}
+	builder.End();
+}
+
+void BeamComponent::reset()
+{
+	if (sample_points_sz < 2)
+		return;
+	opt<glm::vec3> target_pos = get_target_pos();
+	if (!target_pos.has_value())
+		return;
+	glm::vec3 my_pos = get_owner()->get_ws_position();
+	float dt = eng->get_dt();
+	points.resize(sample_points_sz);
+	const float rope_length = glm::length(my_pos - target_pos.value());
+	const float node_rest_length = (rope_length / std::max(int(points.size()) - 1, 1)) * rope_adjust.get_float();
+
+	points.at(0).velocity = (my_pos - points.at(0).pos) / dt;
+	points.at(0).pos = my_pos;
+	const int last_point = (int)points.size() - 1;
+	points.at(last_point).velocity = (*target_pos - points.at(last_point).pos) / dt;
+	points.at(last_point).pos = *target_pos;
+
+	for (int i = 1; i+1 < points.size(); i++) {
+		float alpha = float(i) / float(sample_points_sz - 1);
+		points[i].pos = glm::mix(my_pos, *target_pos, alpha);
+		points[i].velocity = glm::vec3(0.f);
+	}
 }

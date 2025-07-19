@@ -47,6 +47,7 @@ struct HitResult {
 	STRUCT_BODY();
 	REF obj<Entity> what;
 	REF glm::vec3 pos;
+	REF glm::vec3 normal;
 	REF bool hit = false;
 };
 
@@ -91,6 +92,7 @@ public:
 	REF static void reset_debug_text_height();
 	REF static void debug_text(string s);
 	REF static void debug_sphere(glm::vec3 center, float radius, float life, const lColor& color);
+	REF static void debug_line_normal(glm::vec3 p, glm::vec3 n, float len, float life, const lColor& color);
 
 	// kind of hack bs till i work it out better
 	// basically nil tables are null and can be checked, but when an object is deleted, the _ptr field int he table is nullptr'd, but the table is non-nil

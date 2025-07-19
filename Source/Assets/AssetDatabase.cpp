@@ -47,65 +47,6 @@ public:
 	}
 
 	void tick_asyncs_standard() {
-	
-			//if (log_all_asset_loads.get_bool()) {
-			//	const double time_since_creation = GetTime() - job->creation_start_time;
-			//	sys_print(Debug, "finalize job %s resource %s (%f %f)\n", job->out_object->get_type().classname, job->out_object->get_name().c_str(), float(job->load_time), float(time_since_creation));
-			//}
-			//assert(allAssets.find(job->path) != allAssets.end());
-			//assert(job->out_object);
-		
-			
-			//if (log_all_asset_loads.get_bool() && job->other_assets.size() == job->other_load_times.size()) {
-			//	vector<int> nums(job->other_assets.size());
-			//	for (int i = 0; i < nums.size(); i++) nums[i] = i;
-			//	std::sort(nums.begin(), nums.end(), [&](int l, int r) {
-			//		return job->other_load_times[l] > job->other_load_times[r];
-			//		});
-			//	for (int i = 0; i < job->other_assets.size(); i++) {
-			//		auto o = job->other_assets[nums[i]];
-			//		double t = job->other_load_times[nums[i]];
-			//		sys_print(Debug, "	subasset %s (%f)\n", o->get_name().c_str(), float(t));
-			//	}
-			//}
-
-			//double pre_post_load = GetTime();
-			//vector<std::pair<string, float>> timings;
-			//for (auto o : job->other_assets) {
-			//	if (o->load_failed) {
-			//		sys_print(Error, "AssetDatabase: asset failed to load \"%s\" (type=%s) (FromJob: \"%s\")\n", o->get_name().c_str(),o->get_type().classname, job->out_object->get_name().c_str());
-			//	}
-			//	if (!o->load_failed && !o->has_run_post_load) {
-			//		double now = GetTime();
-			//		try {
-			//			o->post_load();
-			//			o->has_run_post_load = true;
-			//		}
-			//		catch (...) {
-			//			sys_print(Error, "AssetDatabase: asset post load failed \"%s\" (type=%s) (FromJob: \"%s\")\n", o->get_name().c_str(), o->get_type().classname, job->out_object->get_name().c_str());
-			//			o->load_failed = true;
-			//		}
-			//		if (log_all_asset_loads.get_bool()) {
-			//			timings.push_back({ o->get_name(),float(GetTime() - now) });
-			//		}
-			//	}
-			//}
-			
-
-			//if (log_all_asset_loads.get_bool()) {
-			//	std::sort(timings.begin(), timings.end(), [](const std::pair<string, float>& l, const std::pair<string, float>& r) {
-			//		return l.second > r.second;
-			//		});
-			//	for (auto& t : timings) {
-			//		sys_print(Debug, "		PostLoad(%s) took %fs\n",t.first.c_str(), t.second);
-			//	}
-			//	sys_print(Debug, "	took %f to run post_loads\n", float(GetTime() - pre_post_load));
-			//}
-
-			//if(job->callback)
-			//	job->callback(job->out_object);
-			//job = backend.pop_finished_job();
-	
 	}
 
 	IAsset* load_asset_sync(const std::string& str, const ClassTypeInfo* type, bool is_system)
@@ -341,6 +282,8 @@ IAsset* PrimaryAssetLoadingInterface::load_asset(const ClassTypeInfo* type, stri
 void PrimaryAssetLoadingInterface::touch_asset(const IAsset* asset)
 {
 	assert(0);
+	std::shared_ptr<IAsset> ptr;
+
 }
 
 IAssetLoadingInterface* AssetDatabase::loader=nullptr;

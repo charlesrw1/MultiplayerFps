@@ -73,6 +73,12 @@ struct lRect {
 	REF float h = 0;
 };
 
+struct lVec3Pair {
+	STRUCT_BODY();
+	REF glm::vec3 side=glm::vec3(0.f);
+	REF glm::vec3 up=glm::vec3(0.f);
+};
+
 // its not the best, but its simple ;)
 class lMath : public ClassBase{
 public:
@@ -125,6 +131,21 @@ public:
 	REF static float eval_easing(Easing easing, float t) {
 		return evaluate_easing(easing, t);
 	}
+	REF static lQuat quat_mult(const lQuat& q1, const lQuat& q2) {
+		return glm::quat(q1) * glm::quat(q2);
+	}
+	REF static lQuat quat_inv(const lQuat& q) {
+		return glm::inverse(glm::quat(q));
+	}
+
+	REF static lQuat quat_delta(const lQuat& from, const lQuat& to) {
+		return glm::quat(to) * glm::inverse(glm::quat(from));
+	}
+	REF static lVec3 quat_multv(const lQuat& q, const lVec3& v) {
+		return glm::quat(q) * glm::vec3(v);
+	}
+
+
 
 	REF static float damp_float(float a, float b, float smoothing, float dt) {
 		return damp_dt_independent<float>(a, b, smoothing, dt);
@@ -154,6 +175,18 @@ public:
 	}
 	REF static float pow(float x, float p) {
 		return std::powf(x, p);
+	}
+
+	REF static lVec3Pair make_orthogonal_vectors(glm::vec3 v) {
+		glm::vec3 up(0, 1, 0);
+		if (glm::dot(v, up) > 0.999) {
+			up = glm::vec3(1, 0, 0);
+		}
+		glm::vec3 side = glm::cross(v, up);
+		lVec3Pair out;
+		out.up = glm::cross(side, v);
+		out.side = side;
+		return out;
 	}
 
 };

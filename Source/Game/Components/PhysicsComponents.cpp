@@ -154,7 +154,12 @@ void PhysicsBody::on_actor_type_change()
 	auto& initial_transform = get_ws_transform();
 	auto factory = physics_local_impl->physics_factory;
 	if (is_static) {
-		PxTransform t = glm_to_physx(initial_transform);
+		glm::vec3 p, s;
+		glm::quat q;
+		decompose_transform(initial_transform, p, q, s);
+		PxTransform t = {};// = glm_to_physx(initial_transform);
+		t.p = glm_to_physx(p);
+		t.q = glm_to_physx(q);
 		t.q.normalize();
 
 		physxActor = factory->createRigidStatic(t);

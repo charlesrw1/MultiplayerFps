@@ -34,6 +34,8 @@ struct PhysicsBodyEventArg {
 	REF obj<Entity> who;
 	REF bool entered_trigger = false;	// false = left
 };
+
+
 class IPhysicsEventCallback  : public ClassBase {
 public:
 	CLASS_BODY(IPhysicsEventCallback,scriptable);
@@ -80,15 +82,15 @@ public:
 	glm::mat4 get_transform() const;
 
 	// valid for dynamic actors only
-	glm::vec3 get_linear_velocity() const;
+	REF glm::vec3 get_linear_velocity() const;
 	REF void set_linear_velocity(const glm::vec3& v);
 	REF void set_angular_velocity(const glm::vec3& v);
 	REF void apply_impulse(const glm::vec3& worldspace, const glm::vec3& impulse);
 	REF void apply_force(const glm::vec3& worldspace, const glm::vec3& force);
 
-	float get_mass() const;
-	void set_objects_mass(float mass);
-	void set_objects_density(float density);
+	REF float get_mass() const;
+	//REF void set_objects_mass(float mass);
+	//REF void set_objects_density(float density);
 	void set_transform(const glm::mat4& transform, bool teleport = false);
 
 	void enable_with_initial_transforms(const glm::mat4& t0, const glm::mat4& t1, float dt);

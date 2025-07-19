@@ -138,3 +138,67 @@ public:
 	};
 	std::vector<PosEntry> pos_history;
 };
+#include "Game/EntityPtr.h"
+#include "Animation/Editor/Optional.h"
+#include "Game/Entity.h"
+// almost like a trail
+class BeamComponent : public Component {
+public:
+	CLASS_BODY(BeamComponent);
+	BeamComponent() {
+		set_call_init_in_editor(true);
+	}
+	void start() final;
+	void stop() final;
+	void on_changed_transform() final;
+	void on_sync_render_data() final;
+	void draw(const glm::vec3& side, const glm::vec3& up, const glm::vec3& front);
+
+	REF void set_vars(bool gravity, bool use_target, float stiff, float damp, float width, MaterialInstance* material, int sample_points) {
+		this->apply_gravity = gravity;
+		this->use_target_entity = use_target;
+		this->stiff = stiff;
+		this->damp = damp;
+		this->width = width;
+		this->material = material;
+		this->sample_points_sz = sample_points;
+	}
+	REF void set_target_pos(glm::vec3 p) {
+		this->world_pos_target = p;
+	}
+	REF void reset();
+	REF void set_visible(bool b) {
+		is_visible = b;
+		sync_render_data();
+	}
+	REF bool is_visible = false;
+	REF bool apply_gravity = false;
+	REF bool use_target_entity = false;
+	REF EntityPtr target;
+	REF glm::vec3 world_pos_target = glm::vec3(0.f);
+	REF float stiff = 1.0;
+	REF float damp = 1.0;
+	REF float width = 1.0;
+	REF float triangle_alpha_fade = 1.0;
+	opt<glm::vec3> get_target_pos() const {
+		if (use_target_entity) {
+			Entity* e = target.get();
+			if (!e) {
+				return std::nullopt;
+			}
+			return e->get_ws_position();
+		}
+		return world_pos_target;
+	}
+
+	REF MaterialInstance* material = nullptr;
+	REF int sample_points_sz = 20;
+
+	MeshBuilder builder;
+	struct Positions {
+		glm::vec3 pos{};
+		glm::vec3 velocity{};
+	};
+	handle<Particle_Object> obj;
+	std::vector<Positions> points;
+};

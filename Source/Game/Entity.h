@@ -72,21 +72,24 @@ public:
 	void set_ls_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
 	REF void set_ls_position(glm::vec3 v);
 	REF void set_ls_euler_rotation(glm::vec3 euler);
+	REF void set_ls_rotation(glm::quat quat);
 	REF void set_ls_scale(glm::vec3 scale);
 	glm::mat4 get_ls_transform() const;
-	glm::vec3 get_ls_position() const { return position; }
-	glm::vec3 get_ls_scale() const { return scale; }
-	glm::quat get_ls_rotation() const { return rotation; }
+	REF glm::vec3 get_ls_position() const { return position; }
+	REF glm::vec3 get_ls_scale() const { return scale; }
+	REF glm::quat get_ls_rotation() const { return rotation; }
 	void set_ws_transform(const glm::mat4& transform);
 	void set_ws_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
 	const glm::mat4& get_ws_transform();
 	REF glm::vec3 get_ws_position();
-	glm::quat get_ws_rotation();
+	REF glm::quat get_ws_rotation();
 	REF glm::vec3 get_ws_scale();
 	REF void set_ws_position(glm::vec3 v);
 	REF void set_ws_position_rotation(glm::vec3 pos, glm::quat rot);
 	REF void set_ls_position_rotation(glm::vec3 pos, glm::quat rot);
-	void set_ws_rotation(const glm::quat& q) { set_ws_transform(get_ws_position(), q, get_ws_scale()); }
+	REF void set_ws_rotation(glm::quat q) { 
+		set_ws_transform(get_ws_position(), q, get_ws_scale());
+	}
 	void set_ws_scale(const glm::vec3& s) { set_ws_transform(get_ws_position(), get_ws_rotation(), s); }
 	// parent the root component of this to another entity
 	// can use nullptr to unparent

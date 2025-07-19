@@ -3,6 +3,7 @@
 struct View_Setup;
 class ParticleComponent;
 class TrailComponent;
+class BeamComponent;
 class ParticleMgr
 {
 public:
@@ -22,8 +23,16 @@ public:
 	void unregister_this(TrailComponent* t) {
 		all_trails.remove(t);
 	}
+	void register_this(BeamComponent* t) {
+		all_beams.insert(t);
+	}
+	void unregister_this(BeamComponent* t) {
+		all_beams.remove(t);
+	}
 private:
 	hash_set<ParticleComponent> all_components;
 	hash_set<TrailComponent> all_trails;
+	hash_set<BeamComponent> all_beams;
+
 
 };

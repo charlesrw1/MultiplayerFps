@@ -312,7 +312,9 @@ void Entity::transform_look_at(glm::vec3 pos, glm::vec3 look_pos)
 {
 	set_ws_transform(glm::inverse(glm::lookAt(pos, look_pos, glm::vec3(0, 1, 0))));
 }
-
+void Entity::set_ls_rotation(glm::quat q) {
+	set_ls_transform(get_ls_position(), q, get_ls_scale());
+}
 
 void Entity::remove_this_component_internal(Component* component_to_remove)
 {
