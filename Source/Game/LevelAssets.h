@@ -28,6 +28,17 @@ public:
 	std::unique_ptr<UnserializedSceneFile> sceneFile;
 };
 
+class IPrefabFactory : public ClassBase{
+public:
+	CLASS_BODY(IPrefabFactory, scriptable);
+	REF virtual void start() {}
+	REF virtual bool create(Entity* e, string name) { return false; }
+	REF void define_prefab(string s) {
+		defined_prefabs.insert(s);
+	}
+	std::unordered_set<std::string> defined_prefabs;
+};
+
 struct SceneSerialized;
 class PrefabAsset : public IAsset {
 public:
@@ -36,19 +47,17 @@ public:
 	~PrefabAsset();
 
 	REF static PrefabAsset* load(string name);
+	// fixme refactoring
 
-	Entity& instantiate(const glm::vec3& position, const glm::quat& rot) const;
-	const Entity& get_default_object() const;
+	void finish_prefab_setup(Entity* me) const;
 
-	UnserializedSceneFile unserialize(IAssetLoadingInterface* load) const;
-
-	std::unique_ptr<UnserializedSceneFile> sceneFile;
-	hash_map<BaseUpdater*> instance_ids_for_diffing;
-	uptr<SerializedForDiffing> halfUnserialized;
+	static void init_prefab_factory();
+	static IPrefabFactory* factory;
 private:
 	// IAsset overrides
 	bool load_asset(IAssetLoadingInterface* load) override;
 	void post_load() override;
 	void uninstall() override;
 	void move_construct(IAsset*) override;
+
 };

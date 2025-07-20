@@ -247,6 +247,7 @@ void ScriptManager::free_class_table(int id)
 	lua_pop(lua, 1);
 	luaL_unref(lua, LUA_REGISTRYINDEX, id);
 }
+#include "Game/LevelAssets.h"
 void ScriptManager::check_for_reload() {
 	if (had_changes) {
 		lua_settop(lua, 0);
@@ -256,6 +257,8 @@ void ScriptManager::check_for_reload() {
 		}
 		ClassBase::post_changes_class_init();
 		had_changes = false;
+
+		PrefabAsset::init_prefab_factory();
 	}
 }
 void ScriptManager::reload_one_file(const std::string& strFilePath)

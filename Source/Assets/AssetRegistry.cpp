@@ -73,13 +73,12 @@ static std::string get_valid_asset_types_glob() {
 	out += " --glob \"*.tis\" ";	// texture import settings
 
 	out += " --glob \"*.tmap\" ";
-	out += " --glob \"*.pfb\" ";
 	out += " --glob \"*.lua\" ";
 	out += " --glob \"*.mm\" ";
 	out += " --glob \"*.mi\" ";
 
 
-	std::vector<const char*> exts = { "tmap","pfb","lua","mm","mi" };
+	std::vector<const char*> exts = { "tmap","lua","mm","mi" };
 
 	auto& types = AssetRegistrySystem::get().get_types();
 	for (auto& ext : exts) {
@@ -91,7 +90,7 @@ static std::string get_asset_references_pattern() {
 	std::string out;
 	out += ".mis\\b|.tis\\b";
 	auto& types = AssetRegistrySystem::get().get_types();
-	std::vector<const char*> exts = { "tmap","pfb","lua","mm","mi","cmdl","dds","wav"};
+	std::vector<const char*> exts = { "tmap","lua","mm","mi","cmdl","dds","wav"};
 	for (auto& ext : exts) {
 		out += "|." + std::string(ext) + "\\b";
 	}
@@ -404,7 +403,6 @@ bool HackedAsyncAssetRegReindex::load_asset(IAssetLoadingInterface*, AssetFilesy
 	auto& all_assettypes = AssetRegistrySystem::get().all_assettypes;
 	AssetMetadata* texMetadata = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("Texture"));
 	AssetMetadata* modelMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("Model"));
-	AssetMetadata* pfbMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("PrefabAsset"));
 	AssetMetadata* matMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("MaterialInstance"));
 	AssetMetadata* mapMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("SceneAsset"));
 	AssetMetadata* soundMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("SoundFile"));
@@ -421,10 +419,6 @@ bool HackedAsyncAssetRegReindex::load_asset(IAssetLoadingInterface*, AssetFilesy
 		}
 		else if (ext == "tmap") {
 			aod.type = mapMeta;
-			diskAssets.push_back(aod);
-		}
-		else if (ext == "pfb") {
-			aod.type = pfbMeta;
 			diskAssets.push_back(aod);
 		}
 		else if (ext == "mm" || ext == "mi") {

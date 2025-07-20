@@ -20,22 +20,6 @@ void validate_remove_entities(EditorDoc& ed_doc, std::vector<EntityPtr>& input)
 	if (had_errors)
 		eng->log_to_fullscreen_gui(Error, "Cant remove inherited entities");
 	had_errors = false;
-	if (ed_doc.is_editing_prefab()) {
-		auto root = ed_doc.get_prefab_root_entity();
-		if (root) {
-			for (int i = 0; i < input.size(); i++) {
-				auto e = input[i];
-				if (e.get() == root) {
-					had_errors = true;
-					input.erase(input.begin() + i);
-					i--;
-				}
-			}
-		}
-
-		if (had_errors)
-			eng->log_to_fullscreen_gui(Error, "Cant remove root prefab entity");
-	}
 }
 #include "LevelSerialization/SerializationAPI.h"
 static void add_to_remove_list_R(vector<SavedCreateObj>& objs, Entity* e, std::unordered_set<BaseUpdater*>& seen)
@@ -174,18 +158,6 @@ ParentToCommand::ParentToCommand(EditorDoc& ed_doc, std::vector<Entity*> ents, E
 			is_valid_flag = false;
 	}
 
-
-	if (!parent_to) {
-		if (ed_doc.is_editing_prefab()) {
-			if (create_new_parent) {
-				is_valid_flag = false;
-				return;
-			}
-
-			parent_to = ed_doc.get_prefab_root_entity();
-			assert(parent_to);
-		}
-	}
 
 	auto validate = [&]() -> bool {
 		if (ents.empty())
@@ -328,12 +300,6 @@ CreatePrefabCommand::CreatePrefabCommand(EditorDoc& ed_doc, const std::string& p
 	this->transform = transform;
 	this->parent_to = parent;
 
-	if (ed_doc.is_editing_prefab()) {
-		auto root = ed_doc.get_prefab_root_entity();
-		if (root)
-			this->parent_to = root->get_self_ptr();
-	}
-
 }
 
 void CreatePrefabCommand::execute() {
@@ -361,11 +327,6 @@ CreateStaticMeshCommand::CreateStaticMeshCommand(EditorDoc& ed_doc, const std::s
 	this->modelname = modelname;
 	this->parent_to = parent;
 
-	if (ed_doc.is_editing_prefab()) {
-		auto root = ed_doc.get_prefab_root_entity();
-		if (root)
-			this->parent_to = root->get_self_ptr();
-	}
 }
 
 void CreateStaticMeshCommand::execute() {
@@ -409,12 +370,6 @@ CreateCppClassCommand::CreateCppClassCommand(EditorDoc& ed_doc, const std::strin
 	this->transform = transform;
 	this->parent_to = parent;
 	is_component_type = is_component;
-
-	if (ed_doc.is_editing_prefab()) {
-		auto root = ed_doc.get_prefab_root_entity();
-		if (root && !this->parent_to)
-			this->parent_to = root->get_self_ptr();
-	}
 }
 
 void CreateCppClassCommand::execute() {
@@ -485,99 +440,13 @@ void TransformCommand::execute() {
 	ed_doc.selection_state->on_selection_changed.invoke();//hack
 }
 
-InstantiatePrefabCommand::InstantiatePrefabCommand(EditorDoc& ed_doc, Entity* e) 
-	:ed_doc(ed_doc)
-{
-	if (e->get_object_prefab_spawn_type()!=EntityPrefabSpawnType::RootOfPrefab) {
-		sys_print(Warning, "InstantiatePrefabCommand(): entity is not the root of the prefab\n");
-		return;
-	}
-	if (e->get_object_prefab().did_load_fail()) {
-		sys_print(Warning, "InstantiatePrefabCommand(): prefab failed to load, cant instantiate it\n");
-		return;
-	}
-
-
-	//if (e->get_nested_owner_prefab() != ed_doc.get_editing_prefab())
-	//	return;	// is_valid == false
-
-	me = e->get_self_ptr();
-	asset = &e->get_object_prefab();
-
-
-	//if (me->creator_source)
-	//	creator_source = me->creator_source->get_self_ptr();
-}
-
-
-void InstantiatePrefabCommand::execute() {
-	ASSERT(revert_these.size() == 0);
-	Entity* meptr = me.get();
-	assert(meptr);
-	ASSERT(me->get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab);
-	for (int i = 0; i < meptr->get_children().size(); i++) {
-		auto c = meptr->get_children().at(i);
-		if (c->get_object_prefab_spawn_type() == EntityPrefabSpawnType::SpawnedByPrefab) {
-			const int pre = meptr->get_children().size();
-			c->destroy();
-			assert(meptr->get_children().size() + 1 == pre);
-			i--;
-		}
-	}
-	Entity* spawned_without_setting = eng->get_level()->editor_spawn_prefab_but_dont_set_spawned_by(&meptr->get_object_prefab());
-	for (auto c : spawned_without_setting->get_children()) {
-		assert(c->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab);
-		c->unique_file_id = 0;	// set it later
-		c->parent_to(meptr);
-		revert_these.push_back(c->get_self_ptr());
-	}
-	spawned_without_setting->destroy();
-	spawned_without_setting = nullptr;
-	me->set_prefab_no_owner_after_being_root();
-	assert(me->get_object_prefab_spawn_type() == EntityPrefabSpawnType::None);
-
-	ed_doc.post_node_changes.invoke();
-}
-
-void InstantiatePrefabCommand::undo() {
-	if (!me) {
-		sys_print(Warning, "couldnt undo instantiate prefab command\n");
-		return;
-	}
-	for (auto& revert_me : revert_these) {
-		Entity* e = revert_me.get();
-		if (!e) {
-			sys_print(Warning, "InstantiatePrefabCommand::undo: couldnt find handle to revet %lld\n", revert_me.handle);
-		}
-		else {
-			e->set_spawned_by_prefab();
-			assert(e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::SpawnedByPrefab);
-		}
-	}
-	revert_these.clear();
-	assert(asset);
-	me->set_root_object_prefab(*asset);
-	assert(me->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
-
-	ed_doc.post_node_changes.invoke();
-}
-
 DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles) 
 	:ed_doc(ed_doc)
 {
 
 	if (handles.empty())
 		is_valid_flag = false;
-	if (ed_doc.is_editing_prefab()) {
-		auto root = ed_doc.get_prefab_root_entity();
-		for (auto h : handles) {
-			if (h.get() == root) {
-				sys_print(Warning, "cant duplicate root in prefab mode\n");
-				is_valid_flag = false;
-				return;
-			}
-		}
-	}
+	
 	if (!is_valid_flag)
 		return;
 

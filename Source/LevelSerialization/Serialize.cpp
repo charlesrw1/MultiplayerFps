@@ -21,8 +21,6 @@ bool serialize_this_objects_children(const Entity* b)
 {
 	if (b->dont_serialize_or_edit)
 		return false;
-	if (b->get_object_prefab_spawn_type() != EntityPrefabSpawnType::None)
-		return false;
 	return true;
 }
 

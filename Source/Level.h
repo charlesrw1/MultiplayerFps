@@ -38,7 +38,6 @@ public:
 	void destroy_entity(Entity* e);
 	void destroy_component(Component* e);
 	Entity* spawn_prefab(const PrefabAsset* asset);
-	DeferredSpawnScopePrefab spawn_prefab_deferred(Entity*& out, const PrefabAsset* asset);
 	Entity* spawn_entity();
 	template<typename T>
 	DeferredSpawnScope spawn_entity_class_deferred(T*& ptrOut) {

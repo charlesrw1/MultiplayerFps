@@ -54,12 +54,26 @@ struct HitResult {
 
 #include "EngineSystemCommands.h"
 #include "../Level.h"
+#include "Sound/SoundPublic.h"
 class GameplayStatic : public ClassBase {
 public:
 	CLASS_BODY(GameplayStatic);
 
 	REF static Entity* spawn_prefab(PrefabAsset* prefab);
 	REF static Entity* spawn_entity();
+	
+	// spatialize=R/L ear panning
+	// attenuation=distance attenuation
+	REF static void play_spatial_sound_ex(glm::vec3 pos, SoundFile* sound, float min_rad, float max_rad, SndAtn attenuation, bool attenuate, bool spatialize) {
+		isound->play_sound(sound, 1, 1, min_rad, max_rad, attenuation, attenuate, spatialize, pos);
+	}
+	REF static void play_spatial_sound(glm::vec3 pos, SoundFile* sound, float min_rad, float max_rad, SndAtn attenuation) {
+		play_spatial_sound_ex(pos, sound, min_rad, max_rad, attenuation, true, true);
+	}
+	REF static void play_simple_sound(SoundFile* sound) {
+		isound->play_sound(sound, 1, 1, 0, 0, {}, false, false, {});
+	}
+
 
 	REF static HitResult cast_ray(glm::vec3 start, glm::vec3 end, int channel_mask, PhysicsBody* ignore_this);
 

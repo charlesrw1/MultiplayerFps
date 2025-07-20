@@ -340,14 +340,7 @@ public:
 
 	REFLECT();
 	void enable_object() {
-		Entity* e{};
-		float ofs = 0.0;
-		for (int i = 0; i < 1; i++)
-		{
-			auto scope = eng->get_level()->spawn_prefab_deferred(e, prefab.get());
-			e->set_ws_position(get_ws_position() + glm::vec3(0, ofs, 0));
-			ofs += 1.5;
-		}
+		
 	}
 
 	REF AssetPtr<PrefabAsset> prefab;
@@ -363,14 +356,7 @@ public:
 	}
 	void update() final {
 		//return;
-		if (eng->get_game_time() >= last_spawn + spawn_interval) {
-			for (int i = 0; i < 1; i++) {
-				Entity* e = nullptr;
-				auto scope = eng->get_level()->spawn_prefab_deferred(e, prefab.get());
-				e->set_ws_position(get_ws_position() +glm::vec3(i%5,0,i/5));
-				last_spawn = eng->get_game_time();
-			}
-		}
+		
 	}
 	float last_spawn = 0.0;
 

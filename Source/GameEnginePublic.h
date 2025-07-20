@@ -51,8 +51,9 @@ public:
 	// misc callbacks
 	REF virtual void on_controller_status(int index, bool connected) {}
 
-	// other stuff that should go elsewhere tbh
-	REF virtual bool has_prefab_defined(const string& str) {}
+	// should go elsewhere tbh
+	REF virtual bool create_prefab(Entity* object, string prefab_str) { return false; }
+
 };
 
 class GameEnginePublic

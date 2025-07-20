@@ -169,27 +169,7 @@ public:
 	};
 	std::vector<pre_and_post> transforms;
 };
-class InstantiatePrefabCommand : public Command
-{
-public:
-	EditorDoc& ed_doc;
-	InstantiatePrefabCommand(EditorDoc& ed_doc, Entity* e);
 
-	bool is_valid() final {
-		return asset != nullptr;
-	}
-
-
-	void execute() final;
-	void undo() final;
-	std::string to_string() final {
-		return "Instantiate Prefab";
-	}
-
-	std::vector<EntityPtr> revert_these;
-	EntityPtr me;
-	const PrefabAsset* asset = nullptr;
-};
 
 class DuplicateEntitiesCommand : public Command
 {

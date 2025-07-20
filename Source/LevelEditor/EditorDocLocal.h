@@ -536,7 +536,6 @@ public:
 	static MulticastDelegate<EditorDoc*> on_deletion;
 
 	static EditorDoc* create_scene(opt<string> scenePath);
-	static EditorDoc* create_prefab(PrefabAsset* prefab);
 
 	~EditorDoc();
 	EditorDoc& operator=(const EditorDoc& other) = delete;
@@ -580,13 +579,11 @@ public:
 	glm::vec3 unproject_mouse_to_ray(int mx, int my);
 
 	const char* get_save_file_extension() const {
-		if (is_editing_prefab()) return "pfb";
-		else return "tmap";
+		return "tmap";
 	}
 
 	enum EditCategory {
 		EDIT_SCENE,
-		EDIT_PREFAB,
 	};
 
 	bool is_this_object_not_inherited(const BaseUpdater* b) const {
@@ -600,12 +597,6 @@ public:
 		assert(b);
 		if (is_this_object_inherited(b)) // cant delete inherited objects
 			return false;
-		if (is_editing_prefab()) {
-			auto ent = b->cast_to<Entity>();
-			if (ent && ent == get_prefab_root_entity()) {
-				return false;
-			}
-		}
 		return true;	// else can delete
 	}
 	bool is_in_eyedropper_mode() const {
@@ -616,11 +607,9 @@ public:
 	void* get_active_eyedropper_user_id() {
 		return active_eyedropper_user_id;
 	}
-	bool is_editing_prefab() const { return edit_category == EditCategory::EDIT_PREFAB; }
-	bool is_editing_scene() const { return edit_category == EditCategory::EDIT_SCENE; }
-	
-	void validate_prefab();
-	Entity* get_prefab_root_entity();
+
+	bool is_editing_scene() const { return true; }
+
 	string get_name();
 
 	bool local_transform = false;

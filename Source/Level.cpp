@@ -329,7 +329,7 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 		assert(o->get_instance_id() != 0);
 		auto ent = o;
 		if (Entity* e = ent->cast_to<Entity>())
-			e->initialize_internal(); // just sets init_state => CALLED_START
+			e->initialize_internal(); // just sets init_state => CALLED_START. also does prefab setup
 		else if (Component* ec = ent->cast_to<Component>()) {
 			if (!ec->get_owner()) {
 				const char* type = ec->get_type().classname;
@@ -367,24 +367,6 @@ void Level::add_and_init_created_runtime_component(Component* c)
 
 	c->initialize_internal_step1();
 	c->initialize_internal_step2();
-}
-
-
-DeferredSpawnScopePrefab Level::spawn_prefab_deferred(Entity*& out, const PrefabAsset* asset)
-{
-	if (!asset) {
-		sys_print(Warning, "Level::spawn_prefab_deferred: null prefab\n");
-		return DeferredSpawnScopePrefab(nullptr);
-	}
-	auto unserialized_scene = asset->unserialize(nullptr);// unserialize_entities_from_text("unserialize_prefab", asset->text, nullptr);
-	out = unserialized_scene.get_root_entity();
-	if (!out) {
-		sys_print(Warning, "Level::spawn_prefab_deferred: null root object\n");
-		unserialized_scene.delete_objs();
-		return DeferredSpawnScopePrefab(nullptr);
-	}
-	set_prefab_spawned(*out, *asset, unserialized_scene);
-	return DeferredSpawnScopePrefab(new UnserializedSceneFile(std::move(unserialized_scene)));
 }
 
 
@@ -449,18 +431,15 @@ Entity* Level::spawn_prefab_shared(const PrefabAsset* asset, bool set_vars)
 		sys_print(Warning, "Level::spawn_prefab: null asset\n");
 		return nullptr;
 	}
-	auto unserialized_scene = asset->unserialize(nullptr);// unserialize_entities_from_text("unserialize_prefab", asset->text, nullptr);
-	auto root = unserialized_scene.get_root_entity();
-	if (!root) {
-		sys_print(Warning, "Level::spawn_prefab: root of prefab is null\n");
-		unserialized_scene.delete_objs();
-		return nullptr;
+	Entity* root = new Entity;
+	if (set_vars) {
+		root->set_root_object_prefab(*asset);
 	}
-	if(set_vars)
-		set_prefab_spawned(*root, *asset, unserialized_scene);
 	else {
 		assert(root->get_object_prefab_spawn_type() == EntityPrefabSpawnType::None);
 	}
-	insert_unserialized_entities_into_level(unserialized_scene, nullptr);
-	return unserialized_scene.get_root_entity();
+	insert_new_native_entity_into_hashmap_R(root);
+	initialize_new_entity_safe(root);
+
+	return root;
 }

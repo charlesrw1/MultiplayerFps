@@ -17,6 +17,10 @@ struct Mix_Chunk;
 class SoundFile : public IAsset {
 public:
     CLASS_BODY(SoundFile);
+    REF static SoundFile* load(std::string path);
+    REF float get_duration() {
+        return duration;
+    }
 private:
     Mix_Chunk* internal_data = nullptr;
     float duration = 0.0;

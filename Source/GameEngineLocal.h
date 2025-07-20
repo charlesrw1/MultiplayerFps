@@ -36,7 +36,6 @@ class EditorState;
 
 
 
-
 class GameEngineLocal : public GameEnginePublic
 {
 public:

@@ -556,11 +556,6 @@ void ObjectOutliner::IteratorDraw::draw_entity_context_menu(EntityPtr ptr, Edito
 		ImGui::Separator();
 	}
 
-	if (ImGui::MenuItem("Instantiate prefab", nullptr, nullptr, is_entity_root_of_prefab)) {
-		ed_doc.command_mgr->add_command(new InstantiatePrefabCommand(ed_doc, context_menu_entity));
-		oo->contextMenuHandle = EntityPtr(nullptr);
-		ImGui::CloseCurrentPopup();
-	}
 
 	const bool branch_as_prefab_enabled = ed_doc.selection_state->num_entities_selected() == 1;
 	if (ImGui::MenuItem("Save branch as prefab", nullptr, nullptr, branch_as_prefab_enabled)) {

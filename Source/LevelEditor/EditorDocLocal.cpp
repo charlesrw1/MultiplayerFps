@@ -105,26 +105,7 @@ void EditorDoc::validate_fileids_before_serialize()
 {
 	auto level = eng->get_level();
 	auto& objs = level->get_all_objects();
-	if (edit_category == EditCategory::EDIT_PREFAB) {
-		Entity* root = nullptr;
-		for (auto o : objs) {
-			auto ent = o->cast_to<Entity>();
-			if (ent && !ent->get_parent() && !ent->dont_serialize_or_edit) {
-				if (!root)
-					root = ent;
-				else {
-					sys_print(Warning, "found an object not parented to root, parenting to first found\n");
-					ent->parent_to(root);
-				}
-			}
-		}
-		if (!root) {
-			sys_print(Warning, "prefab has no root??, making one\n");
-			level->spawn_entity();
-		}
-		validate_prefab();	// idk just run this agian
-	}
-
+	
 
 	// first find max
 	for (auto o : objs)
@@ -141,7 +122,7 @@ void EditorDoc::init_new()
 {
 	clear_editor_changes();
 
-	sys_print(Debug, "Edit mode: %s", (edit_category == EDIT_PREFAB) ? "Prefab" : "Scene");
+	sys_print(Debug, "Edit mode: %s", "Scene");
 	eng->get_level()->validate();
 	command_mgr = std::make_unique<UndoRedoSystem>();
 
@@ -308,48 +289,17 @@ bool EditorDoc::save_document_internal()
 		outfile->close();
 	}
 
-	if (is_editing_prefab()) {
-		PrefabAsset* pfb = g_assets.find_sync<PrefabAsset>(path).get();
-		g_assets.reload_sync<PrefabAsset>(pfb);
-	}
-
 	clear_editor_changes();
 	set_window_title();
 
 	return true;
 }
-Entity* EditorDoc::get_prefab_root_entity()
-{
-	ASSERT(is_editing_prefab());
-	Entity* root = nullptr;
-	auto level = eng->get_level();
-	auto& objs = level->get_all_objects();
-	for (auto o : objs) {
-		if (auto e = o->cast_to<Entity>()) {
-			if (e->dont_serialize_or_edit)
-				continue;
-			if (!e->get_parent()) {
-				assert(e->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab);
-				if (root) {
-					sys_print(Warning, "EditorDoc::get_prefab_root_entity: multiple roots found\n");
-				}
-				root =  e;
-			}
-		}
-	}
-	if (!root) {
-		sys_print(Warning, "couldnt get root of prefab??\n");
-	}
-	return root;
-}
+
 string EditorDoc::get_name() {
 	string name = get_doc_name();
 	if (name.empty()) 
 		name = "<unnamed>";
-	if (is_editing_prefab())
-		return "Prefab: " + name;
-	else
-		return "Scene: " + name;
+	return "Scene: " + name;
 }
 void EditorDoc::enable_entity_eyedropper_mode(void* id) {
 	eng->log_to_fullscreen_gui(Debug, "entering eyedropper mode...");
@@ -371,51 +321,13 @@ void EditorDoc::exit_eyedropper_mode() {
 		//gui->tool_text->hidden = true;
 	}
 }
-void EditorDoc::validate_prefab()
-{
-	ASSERT(is_editing_prefab());
-	Entity* root = nullptr;
-	auto level = eng->get_level();
-	auto& objs = level->get_all_objects();
-	std::vector<Entity*> deleteList;
-	for (auto o : objs) {
-		if (auto e = o->cast_to<Entity>()) {
-			if (e->dont_serialize_or_edit)
-				continue;
-			if (!e->get_parent()) {
-				if (root) {
-					deleteList.push_back(e);
-				}
-				else
-					root = e;
-			}
-		}
-	}
-	if (!deleteList.empty()) {
-		eng->log_to_fullscreen_gui(Error, "Prefab had extra root entities, deleting\n");
-		for (auto e : deleteList)
-			e->destroy();
-	}
-	if (!root) {
-		sys_print(Debug, "prefab had no root\n");
-		root = spawn_entity();
-	}
-	assert(root->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab);
 
-}
 #include "EditorPopupTemplate.h"
 
 MulticastDelegate<EditorDoc*> EditorDoc::on_creation;
 MulticastDelegate<EditorDoc*> EditorDoc::on_deletion;
 
 
-EditorDoc* EditorDoc::create_prefab(PrefabAsset* prefab)
-{
-	EditorDoc* out = new EditorDoc();
-	out->init_for_prefab(prefab);
-	EditorDoc::on_creation.invoke(out);
-	return out;
-}
 EditorDoc* EditorDoc::create_scene(opt<string> scene)
 {
 	EditorDoc* out = new EditorDoc();
@@ -423,38 +335,7 @@ EditorDoc* EditorDoc::create_scene(opt<string> scene)
 	EditorDoc::on_creation.invoke(out);
 	return out;
 }
-void EditorDoc::init_for_prefab(PrefabAsset* prefab) {
-	edit_category = EditCategory::EDIT_PREFAB;
-	init_new();
-	// marks the templated level objects as dont serialize or edit
-	auto level = eng->get_level();
-	auto& objs = level->get_all_objects();
-	for (auto o : objs) {
-		o->dont_serialize_or_edit = true;
-	}
-	if (prefab) {
-		Entity* root = eng->get_level()->editor_spawn_prefab_but_dont_set_spawned_by(prefab);
-		if (!root) {
-			sys_print(Warning, "EditorDoc::init_for_prefab: prefab does not have a root, creating one.\n");
-			root = spawn_entity(); 
-		}
-		assert(root);
-		assert(root->get_object_prefab_spawn_type() == EntityPrefabSpawnType::None);
-		assetName = prefab->get_name();
-	}
-	else {
-		assetName = std::nullopt;
-		auto root = spawn_entity();
-	}
-	assert(get_prefab_root_entity());
 
-	validate_prefab();
-
-	validate_fileids_before_serialize();
-	on_start.invoke();
-
-	set_window_title();
-}
 void EditorDoc::init_for_scene(opt<string> scene) {
 	edit_category = EditCategory::EDIT_SCENE;
 	init_new();
@@ -623,8 +504,9 @@ void ManipulateTransformTool::check_input()
 const Entity* select_outermost_entity(const Entity* in) {
 	const Entity* sel = in;
 	while (sel) {
-		if (sel->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab)
+		if (!sel->dont_serialize_or_edit) {
 			break;
+		}
 		sel = sel->get_parent();
 	}
 	return sel;
@@ -636,14 +518,16 @@ void EditorDoc::do_mouse_selection(MouseSelectionAction action, const Entity* e,
 	if (select_rootmost_entity) {
 		actual_entity_to_select = select_outermost_entity(actual_entity_to_select);
 	}
+	if (!actual_entity_to_select)
+		return;
+
 	if (is_in_eyedropper_mode()) {
 		sys_print(Debug, "eyedrop!\n");
 		on_eyedropper_callback.invoke(actual_entity_to_select);
 		exit_eyedropper_mode();
 		return;
 	}
-	if (e->dont_serialize_or_edit)
-		return;
+
 
 	ASSERT(actual_entity_to_select);
 	if (action == MouseSelectionAction::SELECT_ONLY)
@@ -1594,10 +1478,6 @@ void EdPropertyGrid::draw()
 		}
 		else if (!ss->has_only_one_selected()) {
 			ImGui::Text("Select 1 entity to see components\n");
-			selected_component = 0;
-		}
-		else if (ss->get_only_one_selected().get() && !serialize_this_objects_children(ss->get_only_one_selected().get())) {
-			ImGui::Text("Prefab instance is not editable.\nMake it editable through the context menu.");
 			selected_component = 0;
 		}
 		else {

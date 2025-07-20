@@ -172,13 +172,19 @@ void Entity::set_active_R(Entity* e, bool b, bool step1)
 		set_active_R(c, b, step1);
 }
 
-
+#include "LevelAssets.h"
 
 void Entity::initialize_internal()
 {
 	ASSERT(init_state == initialization_state::HAS_ID);
 	init_state = initialization_state::CALLED_START;
 	check_for_transform_nans();
+
+
+	if (what_prefab) {
+		assert(get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
+		what_prefab->finish_prefab_setup(this);
+	}
 }
 
 

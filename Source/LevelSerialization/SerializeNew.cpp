@@ -108,6 +108,8 @@ ClassBase* MakeObjectForPathNew::create_from_name(ReadSerializerBackendJson& s, 
 		if (pfb && !pfb->did_load_fail()) {
 			sys_print(Debug, "MakeObjectForPathNew::create_from_name(%s): instancing prefab\n",s.get_debug_tag());
 
+			return make_fake_pfb_root();
+#if 0
 			UnserializedSceneFile pfbOut = pfb->unserialize(&load);// unserialize_entities_from_json(debug_tag.c_str(), *pfb->halfUnserialized, &load);
 			//out.get_
 			Entity* root_of_prefab = pfbOut.get_root_entity();
@@ -128,6 +130,7 @@ ClassBase* MakeObjectForPathNew::create_from_name(ReadSerializerBackendJson& s, 
 				set_pfb_root_vars(*root_of_prefab);
 				return root_of_prefab;
 			}
+#endif
 		}
 		else {
 			sys_print(Error, "MakeObjectForPathNew::create_from_name(%s): prefab load failed (%s)\n",s.get_debug_tag(), str.c_str());
@@ -170,6 +173,10 @@ void SerializeEntitiesContainer::serialize(Serializer& s)
 	//}
 	s.end_obj();
 }
+
+// factory method for components
+// factory method for prefabs
+// both defined in lua
 
 #include "Framework/MapUtil.h"
 void NewSerialization::unserialize_shared(const char* debug_tag, UnserializedSceneFile& outfile, ReadSerializerBackendJson& reader)
@@ -365,48 +372,7 @@ static void add_paths_from_container(const std::vector<Entity*>& input_objs, Mak
 // also checks for fully unique ids.
 
 static void validate_container(SerializeEntitiesContainer& con, SerializedSceneFile& out) {
-#if 0
-	for (auto o : con.objects) {
-		Entity* as_ent = o->cast_to<Entity>();
-		if (PrefabToolsUtil::is_part_of_a_prefab(*o)) {
-			auto outerEntity = PrefabToolsUtil::get_outer_prefab(*o);
-			if (outerEntity) {
-				if (!SetUtil::contains(con.objects, (BaseUpdater*)outerEntity))
-					throw SerializeInputError("Part of prefab doesnt have parenet");
-			}
-			PrefabAsset* thePrefab = o->what_prefab;
-			if (thePrefab != for_prefab) {
-				MakePathForObjectNew pathmaker(thePrefab);
-				if (as_ent&&PrefabToolsUtil::am_i_the_root_prefab_node_for_this_prefab(*as_ent, thePrefab)) {
-					for (auto& [path, ptr] : thePrefab->sceneFile->get_objects()) {
-						const auto mypath = pathmaker.make_path(as_ent).path;
-						if (ptr == thePrefab->sceneFile->get_root_entity())
-							continue;
-						{
-							string usedPath = path;
-							auto loc = path.find('/');
-							if (loc != path.npos) {
-								usedPath = path.substr(loc + 1);
-							}
-							usedPath = mypath + "/" + usedPath;
-							// find it
-							if(!MapUtil::contains(out.path_to_instance_handle,usedPath))
-								throw SerializeInputError("Part of prefab template is missing\n");
-						}
 
-					}
-				}
-				else {
-					assert(outerEntity);
-					auto pathInPfb = to_string(outerEntity->unique_file_id) + "/" + to_string(o->unique_file_id);
-					if (!thePrefab->sceneFile->find(pathInPfb)) {
-						throw SerializeInputError("Prefab object not part of template?");
-					}
-				}
-			}
-		}
-	}
-#endif
 }
 
 #include "Framework/SerializerBinary.h"
