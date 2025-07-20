@@ -19,7 +19,8 @@ bool AssetBundle::load_asset(IAssetLoadingInterface* loading)
 		if (toks.size() == 2) {
 			auto class_type = ClassBase::find_class(toks.at(0).c_str());
 			if (class_type&&class_type->is_a(IAsset::StaticType)) {
-				assets.push_back(loading->load_asset(class_type, toks.at(1)));
+				auto asset = g_assets.find_sync_sptr(toks.at(1), class_type);
+				assets.push_back(asset);
 			}
 			else {
 				sys_print(Error, "AssetBundle::load_asset: no IAsset type %s\n", toks.at(0).c_str());

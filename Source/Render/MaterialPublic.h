@@ -54,6 +54,9 @@ public:
 	CLASS_BODY(IBakedLightingValuesFactory);
 	virtual bool get_baked_values(const MaterialInstance* instance, Color32& out_albedo, Color32& out_emissive) = 0;
 };
+#include <memory>
+template<typename T>
+using sptr = std::shared_ptr<T>;
 
 class MaterialManagerPublic 
 {
@@ -63,13 +66,15 @@ public:
 	virtual DynamicMatUniquePtr create_dynmaic_material(const MaterialInstance* material) = 0;
 	virtual void pre_render_update() = 0;
 	// same shader, may change this in future (depth shaders get ifdef'd anyways)
-	const MaterialInstance* get_shared_depth() const { return fallback; }
-	MaterialInstance* get_fallback() const { return fallback; }
-	MaterialInstance* get_default_billboard() const { return defaultBillboard; }
+	MaterialInstance* get_shared_depth() { return fallback.get(); }
+	MaterialInstance* get_fallback() { return fallback.get(); }
+	MaterialInstance* get_default_billboard() { return defaultBillboard.get(); }
+	sptr<MaterialInstance> get_fallback_sptr() { return fallback; }
+	sptr<MaterialInstance> get_default_billboard_sptr() { return defaultBillboard; }
 protected:
 	uptr<IBakedLightingValuesFactory> bakedFactory;
-	MaterialInstance* defaultBillboard = nullptr;
-	MaterialInstance* fallback = nullptr;
+	sptr<MaterialInstance> defaultBillboard = nullptr;
+	sptr<MaterialInstance> fallback = nullptr;
 };
 
 extern MaterialManagerPublic* imaterials;

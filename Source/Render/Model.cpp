@@ -580,12 +580,11 @@ bool Model::load_internal(IAssetLoadingInterface* loading)
 		read.read_string(buffer);
 
 		//materials.push_back(imaterials->find_material_instance(buffer.c_str()));
-		auto mat = loading->load_asset(&MaterialInstance::StaticType, buffer);
-		materials[i] = mat->cast_to<MaterialInstance>();
+		materials[i] = g_assets.find_sync_sptr<MaterialInstance>(buffer);// loading->load_asset(&MaterialInstance::StaticType, buffer);
 
 		if (!materials[i]->is_valid_to_use()) {
 			sys_print(Error, "model doesn't have material %s\n", buffer.c_str());
-			materials.back() = const_cast<MaterialInstance*>(imaterials->get_fallback());
+			materials.back() = imaterials->get_fallback_sptr();
 		}
 	}
 
@@ -868,7 +867,7 @@ void ModelMan::create_default_models()
 	_sprite = new Model;
 	_sprite->aabb = Bounds(glm::vec3(-0.5), glm::vec3(0.5));
 	_sprite->bounding_sphere = bounds_to_sphere(_sprite->aabb);
-	_sprite->materials.push_back(imaterials->get_fallback());
+	_sprite->materials.push_back(imaterials->get_fallback_sptr());
 	{
 		ModelVertex corners[4];
 		corners[0].pos = glm::vec3(0.5, 0.5, 0.0);

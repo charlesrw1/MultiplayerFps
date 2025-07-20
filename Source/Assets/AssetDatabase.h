@@ -63,6 +63,17 @@ public:
 	GenericAssetPtr find_sync(const std::string& path, const ClassTypeInfo* classType, bool system_asset = false);
 
 	template<typename T>
+	std::shared_ptr<T> find_sync_sptr(const string& path, bool system_asset= false) {
+		auto ptr = find_sync_sptr(path, &T::StaticType, system_asset);
+		if (ptr&&ptr->cast_to<T>()) {
+
+			return std::static_pointer_cast<T>(ptr);
+		}
+		return nullptr;
+	}
+	std::shared_ptr<IAsset> find_sync_sptr(const string& path, const ClassTypeInfo* classType, bool system_asset = false);
+
+	template<typename T>
 	void reload_sync(AssetPtr<T> asset) {
 		return reload_sync(asset.get_unsafe());
 	}
@@ -78,7 +89,7 @@ public:
 	AssetDatabase();
 	~AssetDatabase();
 private:
-	std::unique_ptr<AssetDatabaseImpl> impl;
+	AssetDatabaseImpl* impl=nullptr;
 };
 
 extern AssetDatabase g_assets;

@@ -209,13 +209,13 @@ Color32 get_color_of_material_for_export(const MaterialInstance* m) {
     if (!master->self) return COLOR_PINK;
     if (master->self->get_name() == "eng/fallback.mm") {
         auto p = impl->find_parameter(StringName("BaseColor"));
-        if (!p||!p->tex_ptr||!p->is_texture()) return COLOR_PINK;
-        return p->tex_ptr->simplifiedColor;
+        if (!p||!p->tex) return COLOR_PINK;
+        return p->tex->simplifiedColor;
     }
     if (master->self->get_name() == "defaultPBR.mm") {
         auto p = impl->find_parameter(StringName("Albedo"));
-        if (!p || !p->tex_ptr || !p->is_texture()) return COLOR_PINK;
-        auto texColor = color32_to_vec4(p->tex_ptr->simplifiedColor);
+        if (!p || !p->tex) return COLOR_PINK;
+        auto texColor = color32_to_vec4(p->tex->simplifiedColor);
         auto c = impl->find_parameter(StringName("colorMult"));
         if (!c || c->type != MatParamType::Vector) return COLOR_PINK;
         auto multColor = color32_to_vec4(c->color32);

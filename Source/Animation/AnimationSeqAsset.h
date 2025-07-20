@@ -13,14 +13,12 @@ class AnimationSeq;
 class AnimationSeqAsset : public IAsset {
 public:
 	CLASS_BODY(AnimationSeqAsset);
-
 	void uninstall() override;
 	void post_load() override {}
 	bool load_asset(IAssetLoadingInterface* load) override;
 	void move_construct(IAsset* _other) override;
-
 	// get_name() is the animation name
-	AssetPtr<Model> srcModel;
+	std::shared_ptr<Model> srcModel;
 	const AnimationSeq* seq = nullptr;
 	friend class AnimationSeqLoader;
 };

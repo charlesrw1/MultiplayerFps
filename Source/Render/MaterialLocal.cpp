@@ -179,7 +179,7 @@ bool MaterialInstance::load_asset(IAssetLoadingInterface* loading)
 	if (!impl) {
 		impl = std::make_unique<MaterialImpl>();
 		bool good = impl->load_from_file(this,loading);
-		assert(!good || impl && impl->masterMaterial);
+		assert(!good || impl && impl->is_valid());
 		
 		if (!good)
 			impl.reset();
@@ -196,13 +196,6 @@ bool MaterialInstance::load_asset(IAssetLoadingInterface* loading)
 void MaterialInstance::sweep_references(IAssetLoadingInterface* loading)const {
 	if (!impl)
 		return;
-	loading->touch_asset(impl->masterMaterial);
-	for (int i = 0; i < impl->params.size(); i++) {
-		auto& p = impl->params[i];
-		if (p.type == MatParamType::Texture2D || p.type == MatParamType::ConstTexture2D) {
-			loading->touch_asset(p.tex_ptr);
-		}
-	}
 }
 void MaterialInstance::uninstall()
 {
@@ -216,7 +209,7 @@ void MaterialInstance::post_load()
 		return;
 	assert(impl);
 	if (!impl->has_called_post_load_already) {
-		assert(impl->masterMaterial);
+		assert(impl->is_valid());
 		impl->post_load(this);
 		impl->has_called_post_load_already = true;
 	}
@@ -228,20 +221,19 @@ void MaterialInstance::move_construct(IAsset* _other)
 	auto other = (MaterialInstance*)_other;
 	//uninstall();	// fixme: unsafe for materials already referencing us
 
-	auto myParentMat = impl->masterMaterial;
+	std::shared_ptr<MaterialInstance> myParentMat = impl->masterMaterial;
 	*this = std::move(*other);
 	impl->self = this;
 	impl->dirty_buffer_index = -1;
 	if (impl->masterImpl) {
 		impl->masterImpl->self = this;
-		impl->masterMaterial = this;
 	}
 	else {
 	
-		MaterialInstance* newParent = g_assets.find_sync<MaterialInstance>(impl->masterMaterial->get_name()).get();
+		std::shared_ptr<MaterialInstance> newParent = g_assets.find_sync_sptr<MaterialInstance>(impl->masterMaterial->get_name());
 		assert(newParent);
 		impl->masterMaterial = newParent;
-		assert(impl->masterMaterial);
+		assert(impl->is_valid());
 	}
 
 	std::vector<IAsset*> ar;
@@ -250,13 +242,28 @@ void MaterialInstance::move_construct(IAsset* _other)
 		if (a == this) 
 			continue;
 		MaterialInstance* mi = (MaterialInstance*)a;
-		if (mi->impl && mi->impl->masterMaterial == this) {
+		if (mi->impl && mi->impl->masterMaterial.get() == this) {
 			g_assets.reload_sync(mi);
 		}
 	}
 
 //	other->uninstall();
 
+}
+MaterialInstance* MaterialManagerLocal::create_dynmaic_material_unsafier(const MaterialInstance* material) {
+	assert(material);
+	// more bs crap
+	std::shared_ptr<MaterialInstance> as_sptr = g_assets.find_sync_sptr<MaterialInstance>(material->get_name());
+
+	MaterialInstance* dynamicMat = new MaterialInstance();
+	dynamicMat->impl = std::make_unique<MaterialImpl>();
+	dynamicMat->impl->self = dynamicMat;
+	dynamicMat->impl->init_from(as_sptr);
+	dynamicMat->impl->is_dynamic_material = true;
+	dynamicMat->impl->post_load(dynamicMat);	// add to dirty list, set material id
+	dynamicMat->set_loaded_manually_unsafe("%_DM_%");
+	outstanding_dynamic_mats += 1;
+	return dynamicMat;
 }
 
 
@@ -273,12 +280,10 @@ void MaterialImpl::post_load(MaterialInstance* self)
 	matman.add_to_dirty_list(self);
 }
 
-void MaterialImpl::init_from(const MaterialInstance* parent)
+void MaterialImpl::init_from(const std::shared_ptr<MaterialInstance>& parent)
 {
 	auto parent_master = parent->get_master_material();
-	masterMaterial = (MaterialInstance*)parent;
-	
-
+	masterMaterial = parent;
 	params.resize(parent_master->param_defs.size());
 	for (int i = 0; i < parent_master->param_defs.size(); i++)
 		params[i] = parent->impl->params[i];
@@ -290,7 +295,6 @@ void MaterialImpl::load_master(MaterialInstance* self, IFile* file,IAssetLoading
 	masterImpl = std::make_unique<MasterMaterialImpl>();
 	masterImpl->self = self;
 	masterImpl->load_from_file(self->get_name(), file,loading);
-	masterMaterial = self;
 	
 	// init default instance, textures get filled in the dirty list
 	params.resize(masterImpl->param_defs.size());
@@ -317,7 +321,7 @@ MaterialInstance::~MaterialInstance()
 		assert(mat);
 		auto matPtr = (MaterialInstance*)mat;
 		if (!matPtr->impl) continue;
-		assert(!impl||matPtr->impl->masterMaterial !=this);
+		assert(!impl||matPtr->impl->masterMaterial.get() !=this);
 	}
 	std::vector<IAsset*> mods;
 	g_assets.get_assets_of_type(mods, &Model::StaticType);
@@ -365,12 +369,12 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file, IAssetLoad
 			throw MasterMaterialExcept("Expceted PARENT ...");
 		}
 		std::string parent_mat = to_std_string_sv(tok);
-		auto mat = loading->load_asset(&MaterialInstance::StaticType, parent_mat);
-		AssetPtr<MaterialInstance> parent = mat->cast_to<MaterialInstance>();
+		auto parent = g_assets.find_sync_sptr<MaterialInstance>(parent_mat);// loading->load_asset(&MaterialInstance::StaticType, parent_mat);
+	//	AssetPtr<MaterialInstance> parent = mat->cast_to<MaterialInstance>();
 		if (!parent)
 			throw MasterMaterialExcept("Couldnt find parent material" + fullpath);
 
-		init_from(parent.get());
+		init_from(parent);
 		assert(masterMaterial);
 		auto masterMat = get_master_impl();
 		assert(params.size() == masterMat->param_defs.size());
@@ -417,17 +421,16 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file, IAssetLoad
 					myparam.vector = v;
 				}break;
 				case MatParamType::Texture2D:
-				case MatParamType::ConstTexture2D:
 				{
 					in.read_string(tok);
 					string s = to_std_string_sv(tok);
-					auto tex = loading->load_asset(&Texture::StaticType, s);
-					myparam.tex_ptr = tex->cast_to<Texture>();
-					if (!myparam.tex_ptr) {
+					//auto tex = loading->load_asset(&Texture::StaticType, s);
+					myparam.tex = g_assets.find_sync_sptr<Texture>(s);// tex->cast_to<Texture>();
+					if (!myparam.tex) {
 						sys_print(Error, "MaterialImpl::load_instance: texture not found: %s\n", s.c_str());
 						throw MasterMaterialExcept("Texture not found: " + s);
 					}
-					assert(myparam.tex_ptr);
+					assert(myparam.tex);
 				}break;
 
 				default:
@@ -539,12 +542,10 @@ void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 					def.default_value.vector = v;
 				}break;
 				case MatParamType::Texture2D:
-				case MatParamType::ConstTexture2D:
 				{
 					in.read_string(tok);
-					auto tex = loading->load_asset(&Texture::StaticType, to_std_string_sv(tok));
-					def.default_value.tex_ptr = tex->cast_to<Texture>();
-					assert(def.default_value.tex_ptr);
+					def.default_value.tex = g_assets.find_sync_sptr<Texture>(to_std_string_sv(tok));
+					assert(def.default_value.tex);
 				}break;
 
 				default:
@@ -662,7 +663,6 @@ void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 			pd.offset += 1;
 			break;
 		case MatParamType::Texture2D:
-		case MatParamType::ConstTexture2D:
 			pd.offset = tex_ofs++;
 			break;
 		default:
@@ -838,8 +838,7 @@ std::string MasterMaterialImpl::create_glsl_shader(
 
 		actual_code += "// Texture defs\n";
 		for (int i = 0; i < param_defs.size(); i++) {
-			if (param_defs[i].default_value.type == MatParamType::Texture2D ||
-				param_defs[i].default_value.type == MatParamType::ConstTexture2D) {
+			if (param_defs[i].default_value.type == MatParamType::Texture2D) {
 				int index = param_defs[i].offset;
 				ASSERT(index >= 0 && index < 32);
 
@@ -857,7 +856,7 @@ std::string MasterMaterialImpl::create_glsl_shader(
 		for (int i = 0; i < param_defs.size(); i++) {
 			auto& def = param_defs[i];
 			auto type = def.default_value.type;
-			if (type == MatParamType::Texture2D || type == MatParamType::ConstTexture2D)
+			if (type == MatParamType::Texture2D)
 				continue;
 
 			const uint32_t UINT_OFS = def.offset / 4;
@@ -949,15 +948,15 @@ void MaterialManagerLocal::init() {
 	materialBufferSize = MATERIAL_SIZE * MAX_MATERIALS;
 	materialBitmapAllocator.resize(MAX_MATERIALS/64	/* 64 bit bitmask */, 0);
 
-	fallback = g_assets.find_global_sync<MaterialInstance>("eng/fallback.mm").get();
+	fallback = g_assets.find_sync_sptr<MaterialInstance>("eng/fallback.mm",true);
 	if (!fallback)
 		Fatalf("couldnt load the fallback master material\n");
 
-	defaultBillboard = g_assets.find_global_sync<MaterialInstance>("eng/billboardDefault.mm").get();
+	defaultBillboard = g_assets.find_sync_sptr<MaterialInstance>("eng/billboardDefault.mm",true);
 	if (!defaultBillboard)
 		Fatalf("couldnt load the default billboard material\n");
 
-	PPeditorSelectMat = g_assets.find_global_sync<MaterialInstance>("eng/defaultEditorSelect.mm").get();
+	PPeditorSelectMat = g_assets.find_sync_sptr<MaterialInstance>("eng/defaultEditorSelect.mm",true);
 	if (!PPeditorSelectMat)
 		Fatalf("couldnt load the default editor select material\n");
 }
@@ -1001,8 +1000,8 @@ void MaterialManagerLocal::pre_render_update()
 
 			auto& param = params[i];
 			auto& def = mm->param_defs[i];
-			if (param.type == MatParamType::Texture2D || param.type == MatParamType::ConstTexture2D)
-				mat->impl->texture_bindings.at(def.offset) = param.tex_ptr;
+			if (param.type == MatParamType::Texture2D)
+				mat->impl->texture_bindings.at(def.offset) = param.tex.get();
 			else {
 				if (param.type == MatParamType::Float) {
 					ASSERT(def.offset >= 0 && def.offset < MATERIAL_SIZE - 4);
@@ -1055,7 +1054,8 @@ void MaterialInstance::set_tex_parameter(StringName name, const Texture* t)
 	for (int i = 0; i < count; i++) {
 		if (master->param_defs[i].default_value.type == MatParamType::Texture2D &&
 			master->param_defs[i].hashed_name == name) {
-			params[i].tex_ptr = t;
+			// fixme
+			params[i].tex = g_assets.find_sync_sptr<Texture>(t->get_name());
 
 			matman.add_to_dirty_list(this);
 			return;

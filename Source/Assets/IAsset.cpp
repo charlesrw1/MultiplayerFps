@@ -3,4 +3,6 @@
 //
 IAsset::IAsset() 
 {}
-IAsset::~IAsset() {}
+IAsset::~IAsset() {
+	//_CrtDbgBreak();
+}

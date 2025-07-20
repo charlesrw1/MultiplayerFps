@@ -13,5 +13,5 @@ public:
 		}
 	}
 private:
-	std::vector<const IAsset*> assets;
+	std::vector<std::shared_ptr<IAsset>> assets;
 };

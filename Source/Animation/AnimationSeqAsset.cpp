@@ -58,8 +58,8 @@ bool AnimationSeqAsset::load_asset(IAssetLoadingInterface* load)
 	std::string modName = path.substr(0, pos) + ".cmdl";
 	std::string animName = path.substr(pos + 1);
 
-	auto m = load->load_asset(&Model::StaticType, modName);
-	srcModel = m->cast_to<Model>();
+	//auto m = load->load_asset(&Model::StaticType, modName);
+	srcModel = g_assets.find_sync_sptr<Model>(modName);// m->cast_to<Model>();
 	if (srcModel && srcModel->get_skel()) {
 		seq = srcModel->get_skel()->find_clip(animName);
 

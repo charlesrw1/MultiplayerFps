@@ -51,7 +51,6 @@ enum class MatParamType : uint8_t
 	Vector,		// uint8[4]
 	Bool,		// uint8
 	Texture2D,
-	ConstTexture2D,
 };
 
 // Variant for material parameters
@@ -73,24 +72,20 @@ struct MaterialParameterValue
 		this->scalar = scalar;
 		type = MatParamType::Float;
 	}
-	MaterialParameterValue(const Texture* t) {
-		this->tex_ptr = t;
+	MaterialParameterValue(std::shared_ptr<Texture> t) {
+		this->tex = std::move(t);
 		type = MatParamType::Texture2D;
 	}
 	MaterialParameterValue() = default;
-	bool is_texture() const {
-		return type == MatParamType::Texture2D;
-	}
 	MatParamType type = MatParamType::Empty;
 	union {
 		glm::vec4 vector;
 		bool boolean;
 		unsigned int color32;
 		float scalar = 0.0;
-		const Texture* tex_ptr;
 	};
+	std::shared_ptr<Texture> tex;
 };
-
 // Defines a modifiable property
 struct MaterialParameterDefinition
 {
@@ -167,9 +162,12 @@ public:
 	MaterialImpl(bool is_dynamic_mat=false)  {
 	}
 
+	bool is_valid() const {
+		return bool(masterImpl) != bool(masterMaterial);
+	}
 	bool is_this_currently_uploaded() const { return gpu_buffer_offset != INVALID_MAPPING; }
-	const std::vector<const Texture*>& get_textures() const { return texture_bindings; }
-	void init_from(const MaterialInstance* parent);
+	const std::vector<Texture*>& get_textures() const { return texture_bindings; }
+	void init_from(const std::shared_ptr<MaterialInstance>& ptr);
 	bool load_from_file(MaterialInstance* self, IAssetLoadingInterface* loading);
 	void load_instance(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
 	void load_master(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
@@ -186,18 +184,21 @@ public:
 	}
 
 	MasterMaterialImpl* get_master_impl() const {
-		assert(masterMaterial);
-		return masterMaterial->impl ? masterMaterial->impl->masterImpl.get() : nullptr;
+		assert(masterMaterial || masterImpl);
+		return masterImpl ? masterImpl.get() : masterMaterial.get()->impl->masterImpl.get();
+
+		//return masterMaterial->impl ? masterMaterial->impl->masterImpl.get() : nullptr;
 	}
 
 
 	MaterialInstance* self = nullptr;
 	bool is_dynamic_material = false;
 	int unique_id = 0;	// unique id of this material instance (always valid)
-	MaterialInstance* masterMaterial = nullptr;	// this points to what master material this is instancing (valid on every material!)
+	std::shared_ptr<MaterialInstance> masterMaterial;
 	std::unique_ptr<MasterMaterialImpl> masterImpl;	// if this material instance is a default instance of a master material, this is filled
-	std::vector<const Texture*> texture_bindings;
+	std::vector<Texture*> texture_bindings;
 	std::vector<MaterialParameterValue> params;
+
 	int gpu_buffer_offset = INVALID_MAPPING;	// offset in buffer if uploaded (the buffer is uint's so byte = buffer_offset*4)
 	int dirty_buffer_index = -1;	// if not -1, then its sitting in a queue already
 	bool has_called_post_load_already = false;
@@ -264,18 +265,7 @@ public:
 	DynamicMatUniquePtr create_dynmaic_material(const MaterialInstance* material) final {
 		return DynamicMatUniquePtr(create_dynmaic_material_unsafier(material));
 	}
-	MaterialInstance* create_dynmaic_material_unsafier(const MaterialInstance* material) {
-		assert(material);
-		MaterialInstance* dynamicMat = new MaterialInstance();
-		dynamicMat->impl = std::make_unique<MaterialImpl>();
-		dynamicMat->impl->self = dynamicMat;
-		dynamicMat->impl->init_from(material);
-		dynamicMat->impl->is_dynamic_material = true;
-		dynamicMat->impl->post_load(dynamicMat);	// add to dirty list, set material id
-		dynamicMat->set_loaded_manually_unsafe("%_DM_%");
-		outstanding_dynamic_mats += 1;
-		return dynamicMat;
-	}
+	MaterialInstance* create_dynmaic_material_unsafier(const MaterialInstance* master_material);
 	void free_dynamic_material(MaterialInstance* mat) {
 		if (!mat) 
 			return;
@@ -330,10 +320,10 @@ public:
 		return ++current_instance_id;
 	}
 	MaterialInstance* get_default_editor_sel_PP() {
-		return PPeditorSelectMat;
+		return PPeditorSelectMat.get();
 	}
 private:
-	MaterialInstance* PPeditorSelectMat = nullptr;
+	std::shared_ptr<MaterialInstance> PPeditorSelectMat = nullptr;
 	MaterialInstance* fallback_master = nullptr;
 	MaterialInstance* shared_depth_master = nullptr;
 

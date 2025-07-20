@@ -50,6 +50,9 @@ public:
 
 	// misc callbacks
 	REF virtual void on_controller_status(int index, bool connected) {}
+
+	// other stuff that should go elsewhere tbh
+	REF virtual bool has_prefab_defined(const string& str) {}
 };
 
 class GameEnginePublic

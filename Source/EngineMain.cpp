@@ -2196,6 +2196,9 @@ void GameEngineLocal::loop()
 		CPUSCOPESTART(OverlappedUpdate);
 		BooleanScope scope(b_is_in_overlapped_period);
 		GameUpdateOuput out;
+
+		// I reworked the asset system so have to disable this for now. issue is sync loading assets on game thread. otherwise everything else is threadsafe(tm).
+		// 
 		//JobCounter* gameupdatecounter{};
 		//JobSystem::inst->add_job(game_update_job,uintptr_t(&out), gameupdatecounter);
 		game_update_job(uintptr_t(&out));

@@ -27,7 +27,8 @@ public:
 	int ptSz = 20;
 	int lineHeight = 0;
 	int base = 0;
-	const Texture* font_texture{};
+	std::shared_ptr<Texture> font_texture{};
+
 	std::unordered_map<uint32_t, GuiFontGlyph> character_to_glyph;
 
 	friend class GuiFontLoader;

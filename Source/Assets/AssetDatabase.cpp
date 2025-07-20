@@ -43,10 +43,23 @@ public:
 		asset->persistent_flag = true;
 		asset->is_loaded = true;
 		asset->is_from_disk = false;
-		allAssets.insert({ name, asset });
+		std::shared_ptr<IAsset> sptr(asset);
+		allAssets.insert({ name, std::move(sptr) });
 	}
 
 	void tick_asyncs_standard() {
+	}
+
+	std::shared_ptr<IAsset> load_asset_sync_sptr(const std::string& str, const ClassTypeInfo* type, bool is_system)
+	{
+		if (str.empty())
+			return nullptr;
+		auto existing = find_in_all_assets_sptr(str);
+		if (existing) {
+			return existing;
+		}
+		load_asset_sync(str, type, is_system);
+		return find_in_all_assets_sptr(str);
 	}
 
 	IAsset* load_asset_sync(const std::string& str, const ClassTypeInfo* type, bool is_system)
@@ -69,7 +82,8 @@ public:
 			if (!existing) {
 				existing = (IAsset*)type->alloc();
 				existing->path = str;
-				allAssets.insert({ str,existing });
+				std::shared_ptr<IAsset> sptr(existing);
+				allAssets.insert({ str,sptr });
 			}
 			existing->persistent_flag |= is_system;
 			existing->is_loaded = true;
@@ -146,7 +160,7 @@ public:
 		for (auto& [name, type] : allAssets) {	// structured bindings r cool
 			if (!type->is_loaded)
 				continue;
-			list.push_back({ type,get_i(type) });
+			list.push_back({ type.get(),get_i(type.get()) });
 		}
 		// order them slightly
 		std::sort(list.begin(), list.end(), [](const std::pair<IAsset*, int>& a, const std::pair<IAsset*, int>& b) -> bool {
@@ -168,19 +182,23 @@ public:
 	void get_assets_of_type(std::vector<IAsset*>& out, const ClassTypeInfo* type) {
 		for (auto& [path, ptr] : allAssets) {
 			if (ptr->get_type().is_a(*type))
-				out.push_back(ptr);
+				out.push_back(ptr.get());
 		}
 	}
 private:
 
 	IAsset* find_in_all_assets(const string& str) {
 		auto f= allAssets.find(str);
+		return f == allAssets.end() ? nullptr : f->second.get();
+	}
+	std::shared_ptr<IAsset> find_in_all_assets_sptr(const string& str) {
+		auto f = allAssets.find(str);
 		return f == allAssets.end() ? nullptr : f->second;
 	}
 
 	// maps a path to a loaded asset
 	// this doesnt need a mutex to read
-	unordered_map<string, IAsset*> allAssets;
+	unordered_map<string, std::shared_ptr<IAsset>> allAssets;
 
 };
 
@@ -195,7 +213,10 @@ AssetDatabase::AssetDatabase() {
 
 
 }
-AssetDatabase::~AssetDatabase() {}
+AssetDatabase::~AssetDatabase() {
+	
+
+}
 AssetDatabase g_assets;
 
 class PrimaryAssetLoadingInterface : public IAssetLoadingInterface
@@ -212,7 +233,7 @@ private:
 
 void AssetDatabase::init() {
 	// init the loader thread
-	impl = std::make_unique<AssetDatabaseImpl>();
+	impl = new AssetDatabaseImpl;// dont make it a uptr because blah blah
 	AssetDatabase::loader = new PrimaryAssetLoadingInterface(*impl);
 }
 void AssetDatabase::reset_testing()
@@ -236,6 +257,10 @@ bool AssetDatabase::is_asset_loaded(const std::string& path)
 void AssetDatabase::mark_unreferences()
 {
 	//impl->mark_assets_as_unreferenced();
+}
+std::shared_ptr<IAsset> AssetDatabase::find_sync_sptr(const string& path, const ClassTypeInfo* classType, bool system_asset)
+{
+	return impl->load_asset_sync_sptr(path, classType, system_asset);
 }
 void AssetDatabase::reload_sync(IAsset* asset)
 {
@@ -279,10 +304,11 @@ IAsset* PrimaryAssetLoadingInterface::load_asset(const ClassTypeInfo* type, stri
 {
 	return impl.load_asset_sync(path, type, false);
 }
+
+
 void PrimaryAssetLoadingInterface::touch_asset(const IAsset* asset)
 {
 	assert(0);
-	std::shared_ptr<IAsset> ptr;
 
 }
 

@@ -113,8 +113,7 @@ bool GuiFont::load_asset(IAssetLoadingInterface* load)
 		character_to_glyph.insert({ id,glyph });
 	}
 	std::string texpath = StringUtils::get_directory(get_name()) + "/" + texname;
-	auto tex = load->load_asset(&Texture::StaticType, texpath);
-	font_texture = tex->cast_to<Texture>();
+	font_texture = g_assets.find_sync_sptr<Texture>(texpath);// load->load_asset(&Texture::StaticType, texpath);
 	return true;
 }
 

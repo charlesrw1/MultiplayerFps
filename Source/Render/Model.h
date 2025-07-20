@@ -130,7 +130,7 @@ public:
 	const Submesh& get_part(int index) const { return parts[index]; }
 	int get_num_lods() const { return lods.size(); }
 	const MeshLod& get_lod(int index) const { return lods[index]; }
-	const MaterialInstance* get_material(int index) const { return materials[index]; }
+	const MaterialInstance* get_material(int index) const { return materials[index].get(); }
 	int get_num_materials() const { return materials.size(); }
 	glm::ivec2 get_lightmap_size() const { return glm::ivec2(lightmapX,lightmapY); }
 
@@ -167,7 +167,7 @@ private:
 	// collision geometry, if null, then the aabb of the model will be used if the object is used as collision
 	unique_ptr<PhysicsBodyDefinition> collision;
 	vector<ModelTag> tags;
-	vector<MaterialInstance*> materials;
+	vector<std::shared_ptr<MaterialInstance>> materials;
 	glm::mat4 skeleton_root_transform = glm::mat4(1.f);
 	LightmapType isLightmapped = LightmapType::None;
 	int16_t lightmapX = 0;

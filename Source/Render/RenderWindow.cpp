@@ -114,5 +114,5 @@ void RenderWindow::draw(TextShape text_shape)
 	}
 
 	auto mat = (MaterialInstance*)UiSystem::inst->fontDefaultMat;
-	add_draw_call(mat, start, font->font_texture);
+	add_draw_call(mat, start, font->font_texture.get());
 }
