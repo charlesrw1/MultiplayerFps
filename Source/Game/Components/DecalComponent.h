@@ -20,7 +20,7 @@ public:
 	void editor_on_change_property() final;
 	void on_sync_render_data() final;
 
-	void set_material(const MaterialInstance* mat);
+	REF void set_material(const MaterialInstance* mat);
 
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {

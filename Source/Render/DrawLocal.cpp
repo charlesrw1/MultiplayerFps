@@ -2387,7 +2387,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 				handle<Render_Object> objhandle{ obj.handle };
 				auto& proxy = obj.type_.proxy;
 
-				if (!proxy.visible || !proxy.model || !proxy.model->get_is_loaded())
+				if (!proxy.visible || !proxy.model || !proxy.model->get_is_loaded()||(proxy.model->get_num_lods()==0))
 					continue;
 				
 				if (!proxy.is_skybox && skybox_only)

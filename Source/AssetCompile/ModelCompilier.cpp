@@ -867,6 +867,7 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 {
 	ModelDefData mdd;
 	mdd.use_mesh_as_collision = is->meshAsCollision;
+	mdd.use_mesh_as_cvx_collision = is->meshAsConvex;
 	mdd.isLightmapped = is->withLightmap;
 	mdd.lightmapSizeX = is->lightmapSizeX;
 	mdd.lightmapSizeY = is->lightmapSizeY;
@@ -2447,24 +2448,37 @@ FinalPhysicsData create_final_physics_data(
 )
 {
 	FinalPhysicsData out;
-	auto physicsNodeCopy = compile.physics_nodes;
+	std::vector<LODMesh> physicsNodeCopy = compile.physics_nodes;
+	if (def.use_mesh_as_collision && def.use_mesh_as_cvx_collision) {
+		sys_print(Warning, "create_final_physics_data: both use_mesh_as_collision and use_mesh_as_cvx_collision, defaulting to tri mesh\n");
+	}
+
 	if (def.use_mesh_as_collision) {
 		if (!compile.lod_where.empty()) {
 			sys_print(Info, "create_final_physics_data: using tri mesh as collision mesh\n");
 			auto& s = compile.lod_where.back();
-			if (s.mesh_nodes.size() >= 1) {
-				if(s.mesh_nodes.size()>1) 
-					sys_print(Warning, "create_final_physics_data: using tri mesh as collision mesh, more than one mesh in lod. using first\n");
-				LODMesh node = s.mesh_nodes.at(0);
+			for (auto& submesh : s.mesh_nodes) {
+				LODMesh node = submesh;
 				node.shape_type = ShapeType_e::MeshShape;
 				physicsNodeCopy.push_back(node);
-			}
-			else {
-				sys_print(Warning, "create_final_physics_data: no nodes to use in last lod for 'use_mesh_as_collision'\n");
 			}
 		}
 		else {
 			sys_print(Warning, "create_final_physics_data: cant use tri mesh as collision mesh, no lods\n");
+		}
+	}
+	else if (def.use_mesh_as_cvx_collision) {
+		if (!compile.lod_where.empty()) {
+			sys_print(Info, "create_final_physics_data: using meshes as convex\n");
+			auto& s = compile.lod_where.back();
+			for (auto& submesh : s.mesh_nodes) {
+				LODMesh node = submesh;
+				node.shape_type = ShapeType_e::ConvexShape;
+				physicsNodeCopy.push_back(node);
+			}
+		}
+		else {
+			sys_print(Warning, "create_final_physics_data: cant use mesh as convex collision mesh, no lods\n");
 		}
 	}
 

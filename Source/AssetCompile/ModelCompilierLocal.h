@@ -90,7 +90,7 @@ public:
 	int lightmapSizeX = 0;
 	int lightmapSizeY = 0;
 	bool worldLmMerge = false;
-
+	bool use_mesh_as_cvx_collision = false;
 	bool use_mesh_as_collision = false;
 
 	std::string model_source;

@@ -413,9 +413,9 @@ PhysicsBodyDefinition::~PhysicsBodyDefinition()
 bool PhysicsManImpl::load_physics_into_shape(BinaryReader& reader, physics_shape_def& def) {
 	if (def.shape != ShapeType_e::ConvexShape && def.shape != ShapeType_e::MeshShape)	return true;
 	uint32_t count = reader.read_int32();
-	uint8_t* data = new uint8_t[count];
-	reader.read_bytes_ptr(data, count);
-	physx::PxDefaultMemoryInputData inp(data, count);
+	std::vector<uint8_t> data(count);
+	reader.read_bytes_ptr(data.data(), count);
+	physx::PxDefaultMemoryInputData inp(data.data(), count);
 
 	if (def.shape == ShapeType_e::ConvexShape) {
 		def.convex_mesh = physics_factory->createConvexMesh(inp);

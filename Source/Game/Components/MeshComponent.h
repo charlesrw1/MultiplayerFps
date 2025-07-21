@@ -65,7 +65,7 @@ public:
 		is_visible = b;
 		sync_render_data();
 	}
-	void set_casts_shadows(bool b) {
+	REF void set_casts_shadows(bool b) {
 		cast_shadows = b;
 		sync_render_data();
 	}

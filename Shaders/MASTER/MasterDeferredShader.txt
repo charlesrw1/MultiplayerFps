@@ -310,7 +310,7 @@ void main()
 		vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
 		Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
 		float d = max(dot(Final_Normal,normalize(g.viewpos_time.xyz-FS_IN_FragPos)),0.0);	
-		SCENE_OUT_Color = vec4(pow((BASE_COLOR+EMISSIVE)*d,vec3(1.0/2.2)),1.0);	
+		SCENE_OUT_Color = vec4(pow((BASE_COLOR+EMISSIVE)*d,vec3(1.0/2.2)),OPACITY);	
 	#else 
 	#ifdef FORWARD_SHADER
 	

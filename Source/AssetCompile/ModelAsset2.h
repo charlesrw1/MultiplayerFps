@@ -71,7 +71,7 @@ public:
 	REF int lightmapSizeY = 0;
 	REF bool withLightmap = false;
 	REF bool worldLmMerge = false;
-
+	REF bool meshAsConvex = false;
 	REF bool meshAsCollision = false;
 
 	// type=BoneRenameContainer
