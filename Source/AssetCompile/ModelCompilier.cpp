@@ -3079,9 +3079,15 @@ bool ModelCompilier::compile(const char* game_path, IAssetLoadingInterface* load
 	sys_print(Info, "----- Compiling Model %s -----\n", game_path);
 
 	ModelDefData def;
-	bool needs_compile = does_model_need_compile(game_path,def,true,loading);
-	if (!needs_compile)
-		return true;
+	try {
+		bool needs_compile = does_model_need_compile(game_path, def, true, loading);
+		if (!needs_compile)
+			return true;
+	}
+	catch (std::runtime_error er) {
+		sys_print(Error, "ModelCompilier::compile: when model compiling %s: %s\n", game_path, er.what());
+		return true;	// skip compile
+	}
 
 	return ModelCompileHelper::compile_model(game_path, def);
 }

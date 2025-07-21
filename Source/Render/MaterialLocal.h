@@ -223,15 +223,17 @@ struct shader_key
 		dither = 0;
 		debug = 0;
 		is_lightmapped = 0;
+		is_forced_forward = 0;
 	}
 
-	uint32_t material_id : 26;
+	uint32_t material_id : 25;
 	uint32_t animated : 1;
 	uint32_t editor_id : 1;
 	uint32_t depth_only : 1;
 	uint32_t dither : 1;
 	uint32_t debug : 1;
 	uint32_t is_lightmapped : 1;
+	uint32_t is_forced_forward : 1;
 
 	uint32_t as_uint32() const {
 		return *((uint32_t*)this);
@@ -282,7 +284,8 @@ public:
 		bool depth_pass, 
 		bool dither, 
 		bool is_editor_mode,
-		bool debug_mode
+		bool debug_mode,
+		bool forced_forward
 	);
 
 	bufferhandle get_gpu_material_buffer() { return gpuMaterialBuffer; }

@@ -133,6 +133,11 @@ public:
 	void clear() { objects.clear();}
 	void clear_static() { cached_static_objects.clear(); }
 	const pass_type type{};					// modifies batching+sorting logic
+
+#ifdef EDITOR_BUILD
+	bool forced_forward = false;
+#endif
+
 	std::vector<Pass_Object> objects;		// geometry + material id + object id
 	std::vector<Pass_Object> cached_static_objects;	// copied into objects
 	std::vector<Mesh_Batch> mesh_batches;	// glDrawElementsIndirect()
@@ -639,6 +644,7 @@ public:
 	std::vector<Render_Lists> cascades_rlists;	// lists specific to each cascade, culled
 	Render_Lists editor_sel_rlist;
 	Render_Lists spotLightShadowList;
+
 
 
 	const Texture* get_reflection_probe_for_render(const glm::vec3& vieworigin) {

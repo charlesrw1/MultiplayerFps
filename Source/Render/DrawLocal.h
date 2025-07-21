@@ -349,6 +349,23 @@ public:
 
 
 const uint32_t MAX_BLOOM_MIPS = 6;
+#ifdef EDITOR_BUILD
+class ThumbnailRenderer {
+public:
+	ThumbnailRenderer(int size);
+	void render(Model* m);
+	void output_to_path(std::string path);
+private:
+	fbohandle fbo = 0;
+	texhandle color = 0;
+	texhandle depth = 0;
+	Texture* vts_handle = nullptr;
+	handle<Render_Object> object;
+	Render_Pass pass;
+	Render_Lists list;
+	int size = 0;
+};
+#endif
 
 class Renderer : public RendererPublic
 {
@@ -372,10 +389,16 @@ public:
 	uint32_t get_composite_output_texture_handle() final {
 		return tex.actual_output_composite; 
 	}
+#ifdef EDITOR_BUILD
 	handle<Render_Object> mouse_pick_scene_for_editor(int x, int y) final;
 	std::vector<handle<Render_Object>> mouse_box_select_for_editor(int x, int y, int w, int h) final;
 	float get_scene_depth_for_editor(int x, int y) final;
-
+	void editor_render_thumbnail_for(Model* model, int w, int h, std::string path) final {
+		matman.pre_render_update();	// hack fixme
+		thumbnailRenderer->render(model);
+		thumbnailRenderer->output_to_path(path);
+	}
+#endif
 
 	void check_hardware_options();
 	void create_default_textures();
@@ -571,6 +594,7 @@ public:
 private:
 	RenderWindowBackendLocal* windowDrawer = nullptr;
 
+	std::unique_ptr<ThumbnailRenderer> thumbnailRenderer;
 
 	void upload_ubo_view_constants(const View_Setup& view, bufferhandle ubo, bool wireframe_secondpass = false);
 

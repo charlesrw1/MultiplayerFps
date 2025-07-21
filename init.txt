@@ -102,4 +102,3 @@ loglevel 6
 developer_mode 1
 
 start_ed Map "bike_empty.tmap"
-

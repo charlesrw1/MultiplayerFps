@@ -4,6 +4,14 @@
 #include "Render/Texture.h"
 #include "Game/SerializePtrHelpers.h"
 #include "Framework/ConsoleCmdGroup.h"
+
+class ThumbnailManager {
+public:
+	Texture* get_thumbnail(const AssetOnDisk& asset);
+private:
+	std::unordered_map<std::string, Texture*> cache;
+};
+
 class AssetBrowser
 {
 public:
@@ -30,6 +38,7 @@ public:
 	void set_selected(const std::string& path);
 	AssetFilesystemNode* find_node_for_asset(const std::string& path) const;
 
+	void draw_browser_grid();
 
 	enum class Mode
 	{
@@ -50,11 +59,14 @@ public:
 	Texture* folder_open{};
 	Texture* folder_closed{};
 
+	bool using_grid = false;
 
 	AssetOnDisk drag_drop;
 	std::string all_lower_cast_filter_name;
 
 	uptr<ConsoleCmdGroup> commands;
+
+	ThumbnailManager thumbnails;
 };
 
 #endif

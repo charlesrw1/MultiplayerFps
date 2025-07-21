@@ -90,7 +90,7 @@ void Material_Shader_Table::recompile_for_material(MasterMaterialImpl* mat)
 		}
 	}
 	// do one default shader compile so we can aproximately tell if the shader is actually invalid and shouldnt be used
-	program_handle default_h = matman.get_mat_shader(false,false, nullptr, mat->self, false, false, false, false);
+	program_handle default_h = matman.get_mat_shader(false,false, nullptr, mat->self, false, false, false, false,false);
 	mat->is_compilied_shader_valid = !draw.get_prog_man().did_shader_fail(default_h);
 	if (!mat->is_compilied_shader_valid)
 		sys_print(Error, "recompile_for_material: material is invalid %s\n", mat->self->get_name().c_str());
@@ -111,6 +111,7 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 	if (key.depth_only) params += "DEPTH_ONLY,";
 	if (key.debug) params += "DEBUG_SHADER,";
 	if (key.is_lightmapped) params += "LIGHTMAPPED,";
+	if (key.is_forced_forward)params += "THUMBNAIL_FORWARD,";
 	if (!params.empty())params.pop_back();
 
 	if(material_print_debug.get_bool())
@@ -132,7 +133,8 @@ program_handle MaterialManagerLocal::get_mat_shader(
 	bool depth_pass,
 	bool dither,
 	bool is_editor_mode,
-	bool debug_mode)
+	bool debug_mode,
+	bool forced_forward)
 {
 	const MasterMaterialImpl* mm = mat->get_master_material();
 
@@ -145,6 +147,7 @@ program_handle MaterialManagerLocal::get_mat_shader(
 	key.dither = dither;
 	key.editor_id = is_editor_mode;
 	key.is_lightmapped = is_lightmapped;
+	key.is_forced_forward = forced_forward;
 
 #ifdef _DEBUG
 #else 

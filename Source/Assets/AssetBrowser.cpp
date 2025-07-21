@@ -160,6 +160,141 @@ static void draw_browser_tree_view(AssetBrowser* b)
 	}
 }
 
+// too much of a brainlet do the dumb thing
+void fill_big_vector(std::vector<AssetFilesystemNode*>& nodes, AssetFilesystemNode* root) {
+	if (!root)
+		return;
+	auto recurse = [](auto&& self, AssetFilesystemNode* n, std::vector<AssetFilesystemNode*>& nodes) -> void {
+		if (!n->is_folder()) {
+			assert(n->children.empty());
+			nodes.push_back(n);
+		}
+		else {
+			for (auto c : n->sorted_list) {
+				self(self, c, nodes);
+			}
+		}
+	};
+	recurse(recurse, root, nodes);
+}
+#include "Render/Model.h"
+#include "Framework/StringUtils.h"
+#include "Framework/Files.h"
+
+bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* label)
+{
+	ImVec2 pos = ImGui::GetCursorScreenPos();
+	ImVec2 label_pos = pos;
+
+	// Invisible button to handle interaction
+	ImGui::InvisibleButton(label, size);
+	bool hovered = ImGui::IsItemHovered();
+	bool pressed = ImGui::IsItemActive() && ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+
+	// Draw the image
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
+	draw_list->AddImage(texture, pos, ImVec2(pos.x + size.x, pos.y + size.y), ImVec2(0, 1), ImVec2(1, 0));
+
+	// Optional highlight on hover
+	if (hovered)
+	{
+		draw_list->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(255, 255, 255, 50));
+	}
+
+	// Draw wrapped text over image
+	float wrap_width = size.x - 10.0f; // small padding
+	ImVec2 text_pos = ImVec2(pos.x + 5.0f, pos.y + 5.0f); // small margin
+	ImGui::PushClipRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), true);
+	ImGui::PushTextWrapPos(text_pos.x + wrap_width);
+	auto shadow_pos = text_pos + ImVec2(1, 1);
+	draw_list->AddText(ImGui::GetFont(), ImGui::GetFontSize(), shadow_pos, IM_COL32(0, 0, 0, 255), label, nullptr, wrap_width);
+	draw_list->AddText(ImGui::GetFont(), ImGui::GetFontSize(), text_pos, IM_COL32(255, 255, 255, 255), label, nullptr, wrap_width);
+
+	ImGui::PopTextWrapPos();
+	ImGui::PopClipRect();
+
+	return pressed;
+}
+
+void AssetBrowser::draw_browser_grid() {
+	const int SIZE_PER = 80;
+	auto win_size = ImGui::GetWindowSize();
+	int boxes = win_size.x / SIZE_PER;
+	boxes = std::max(boxes, 1);
+
+	uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
+		ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY ;
+
+
+	std::vector<AssetFilesystemNode*> items;
+	fill_big_vector(items, AssetRegistrySystem::get().get_root_files());
+
+	const int name_filter_len = strlen(asset_name_filter);
+	if (ImGui::BeginTable("Browser", boxes, ent_list_flags))
+	{
+		for (int i = 0; i < boxes; i++) {
+			ImGui::TableSetupColumn("##blah", ImGuiTableColumnFlags_WidthStretch);
+		}
+
+		int cur_row = 0;
+		int cur_col = 0;
+
+		for (auto c : items) {
+			Texture* t = thumbnails.get_thumbnail(c->asset);
+			if (!t) 
+				continue;
+			{
+				auto& asset = c->asset;
+				if (!filter_match_case && name_filter_len > 0) {
+					std::string path = asset.filename;
+					for (int i = 0; i < path.size(); i++) path[i] = tolower(path[i]);
+					if (path.find(all_lower_cast_filter_name, 0) == std::string::npos)
+						continue;
+				}
+				else if (name_filter_len > 0) {
+					if (asset.filename.find(asset_name_filter) == std::string::npos)
+						continue;
+				}
+			}
+		
+			ImGui::PushID(c);
+			if (cur_col == 0) {
+				ImGui::TableNextRow();
+			}
+			ImGui::TableNextColumn();
+
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+		//	ImGui::ImageButton(ImTextureID(uint64_t(t->gl_id)), ImVec2(64, 64),ImVec2(0, 1), ImVec2(1, 0));
+			string only_filename = c->asset.filename;
+			StringUtils::get_filename(only_filename);
+			ImageButtonWithOverlayText(ImTextureID(uint64_t(t->gl_id)), ImVec2(64, 64), only_filename.c_str());
+			ImGui::PopStyleColor();
+			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+			{
+				drag_drop = c->asset;
+				auto ptr = &drag_drop;
+				ImGui::SetDragDropPayload("AssetBrowserDragDrop", &ptr, sizeof(AssetOnDisk*));
+
+				ImGui::TextColored(color32_to_imvec4(c->asset.type->get_browser_color()), "%s", c->asset.type->get_type_name().c_str());
+				ImGui::Text("Asset: %s", c->asset.filename.c_str());
+
+				ImGui::EndDragDropSource();
+			}
+
+			cur_col += 1;
+			if (cur_col >= boxes) {
+				cur_col = 0;
+				cur_row += 1;
+			}
+			ImGui::PopID();
+		}
+
+
+		ImGui::EndTable();
+	}
+
+}
+
 
 AssetFilesystemNode* AssetBrowser::find_node_for_asset(const std::string& path) const
 {
@@ -250,19 +385,61 @@ void AssetBrowser::imgui_draw()
 	if (ImGui::SmallButton("Close All")) {
 		AssetRegistrySystem::get().get_root_files()->set_folder_open_R(false);
 	}
-
+	ImGui::Checkbox("Grid", &using_grid);
 
 	if (!match_case) {
 		all_lower_cast_filter_name = asset_name_filter;
 		for (int i = 0; i < name_filter_len; i++)
 			all_lower_cast_filter_name[i] = tolower(all_lower_cast_filter_name[i]);
 	}
-
-	draw_browser_tree_view(this);
-
+	if (using_grid) {
+		draw_browser_grid();
+	}
+	else {
+		draw_browser_tree_view(this);
+	}
 	ImGui::End();
 
 }
+#include "Render/DrawPublic.h"
 
+#include "Framework/MapUtil.h"
+Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset)
+{
+	if (asset.type->get_asset_class_type() != &Model::StaticType)
+		return nullptr;
 
+	if (MapUtil::contains(cache, asset.filename)) {
+		return cache[asset.filename];
+	}
+	// load it
+	auto model_file = FileSys::open_read_game(asset.filename);
+	if (!model_file)
+		return nullptr;
+
+	string hashed = StringUtils::alphanumeric_hash(asset.filename);
+	string thumnail_path = ".thumbnails/" + hashed + ".png";
+	auto thumbnail_file = FileSys::open_read_game(thumnail_path);
+
+	Texture* out_t = nullptr;
+	if (!thumbnail_file || model_file->get_timestamp() > thumbnail_file->get_timestamp()) {
+		thumbnail_file.reset();
+		model_file.reset();
+
+		Model* the_model = Model::load(asset.filename);
+		if (the_model) {
+			// hmm..
+			idraw->editor_render_thumbnail_for(the_model, 64, 64, FileSys::get_full_path_from_game_path(thumnail_path));
+		}
+		out_t = Texture::load(thumnail_path);
+		//out_t = Texture::load("eng/icon/_nearest/skylight.png");
+	}
+	else {
+		thumbnail_file.reset();
+		model_file.reset();
+		out_t = Texture::load(thumnail_path);
+	}
+	cache[asset.filename] = out_t;
+	return out_t;
+}
 #endif

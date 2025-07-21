@@ -182,12 +182,16 @@ void main()
 
 #ifdef FORWARD_SHADER
 	layout (location = 0) out vec4 SCENE_OUT_Color;
+#else 
+#ifdef THUMBNAIL_FORWARD
+	layout (location = 0) out vec4 SCENE_OUT_Color;
 #else
 	layout (location = 0) out vec3 GBUFFER_OUT_Normal;
 	layout (location = 1) out vec4 GBUFFER_OUT_Albedo_AO;
 	layout (location = 2) out vec4 GBUFFER_OUT_M_R_Custom_Matid;
 	layout (location = 3) out vec4 GBUFFER_OUT_Emissive;
 	layout (location=5) out vec2 GBUFFER_OUT_MotionVector;
+#endif
 #endif
 
 #ifdef EDITOR_ID
@@ -299,8 +303,17 @@ void main()
 	if(OPACITY<0.5)
 		discard;
 #endif // ALPHATEST
-
+	
+	#ifdef THUMBNAIL_FORWARD
+		vec3 Normalized_IN_N = normalize(FS_IN_Normal);
+		// World space normal
+		vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
+		Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
+		float d = max(dot(Final_Normal,normalize(g.viewpos_time.xyz-FS_IN_FragPos)),0.0);	
+		SCENE_OUT_Color = vec4(pow((BASE_COLOR+EMISSIVE)*d,vec3(1.0/2.2)),1.0);	
+	#else 
 	#ifdef FORWARD_SHADER
+	
 		#ifdef FORWARD_LIT
 			vec3 Normalized_IN_N = normalize(FS_IN_Normal);
 			// World space normal
@@ -349,6 +362,7 @@ void main()
 		}
 		
 	
+	#endif // THUMBNAIL_FORWARD
 	#endif // FORWARD_SHADER
 
 #ifdef DEBUG_SHADER

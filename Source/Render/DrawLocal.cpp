@@ -103,7 +103,7 @@ public:
 			pipe.depth_testing = false;
 			pipe.depth_writes = false;
 			pipe.program = matman.get_mat_shader(false,false, nullptr,
-				dc.mat, false, false, false, false);
+				dc.mat, false, false, false, false,false);
 			pipe.vao = mb_draw_data.VAO;
 			
 			device.set_pipeline(pipe);
@@ -568,7 +568,7 @@ GpuRenderPassScope OpenglRenderDevice::start_render_pass(const RenderPassSetup& 
 	glViewport(setup.x, setup.y, setup.w, setup.h);
 	if (setup.clear_depth || setup.clear_color) {
 		glClearDepth(setup.clear_depth_value);
-		glClearColor(0, 0, 0, 1);
+		glClearColor(0, 0.5, 0, 1);
 		GLbitfield mask{};
 		if (setup.clear_depth)
 			mask |= GL_DEPTH_BUFFER_BIT;
@@ -992,6 +992,8 @@ void Renderer::init()
 
 	spotShadows = std::make_unique<ShadowMapManager>();
 
+
+	thumbnailRenderer = std::make_unique<ThumbnailRenderer>(64);
 }
 
 
@@ -1503,7 +1505,7 @@ void Renderer::render_particles()
 			continue;
 
 		RenderPipelineState state;
-		state.program = matman.get_mat_shader(false,false, nullptr, mat, false, false, false, false); ;
+		state.program = matman.get_mat_shader(false,false, nullptr, mat, false, false, false, false,false); ;
 		state.vao = p.dd.VAO;// meshbuilder->VAO;
 		state.backface_culling = mat->get_master_material()->backface;
 		state.blend = mat->get_master_material()->blend;
@@ -1559,7 +1561,8 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 		is_depth,
 		false,
 		is_editor_mode,
-		r_debug_mode.get_integer()!=0
+		r_debug_mode.get_integer()!=0,
+		forced_forward
 	);
 	const MasterMaterialImpl* mm = material->get_master_material();
 
@@ -1757,6 +1760,7 @@ Render_Scene::Render_Scene()
 	editor_sel_pass(pass_type::DEPTH),
 	shadow_pass(pass_type::DEPTH)
 {
+
 }
 
 void Render_Lists::init(uint32_t drawbufsz, uint32_t instbufsz)
@@ -1923,6 +1927,7 @@ void Render_Scene::init()
 	for (auto& c : cascades_rlists)
 		c.init(0, 0);
 	spotLightShadowList.init(0, 0);
+
 
 	glCreateBuffers(1, &gpu_render_instance_buffer);
 	glCreateBuffers(1, &gpu_skinned_mats_buffer);
@@ -2778,6 +2783,124 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
 }
+int write_png_wrapper(const char* filename, int w, int h, int comp, const void* data, int stride_in_bytes);
+
+ThumbnailRenderer::ThumbnailRenderer(int size) : pass(pass_type::TRANSPARENT) {
+	this->size = size;
+	pass.forced_forward = true;
+	list.init(0, 0);
+	object = draw.scene.register_obj();
+	Render_Object o;
+	o.visible = false;
+	draw.scene.update_obj(object, o);
+
+
+	auto set_default_parameters = [](uint32_t handle) {
+		glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTextureParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTextureParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTextureParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	};
+
+	auto create_and_delete_texture = [](uint32_t& texture) {
+		glCreateTextures(GL_TEXTURE_2D, 1, &texture);
+	};
+
+	auto create_and_delete_fb = [](uint32_t& framebuffer) {
+		glDeleteFramebuffers(1, &framebuffer);
+		glCreateFramebuffers(1, &framebuffer);
+	};
+	const int w = size;
+	const int h = size;
+	fbohandle fbo_handle = 0;
+	texhandle color_tex = 0;
+	texhandle depth_tex = 0;
+	{
+		glCreateFramebuffers(1, &fbo_handle);
+		glCreateTextures(GL_TEXTURE_2D, 1, &color_tex);
+		set_default_parameters(color_tex);
+		glTextureStorage2D(color_tex, 1, GL_RGBA8, w, h);
+
+		glCreateTextures(GL_TEXTURE_2D, 1, &depth_tex);
+		set_default_parameters(depth_tex);
+		glTextureStorage2D(depth_tex, 1, GL_DEPTH_COMPONENT32F, w, h);
+
+		glNamedFramebufferTexture(fbo_handle, GL_COLOR_ATTACHMENT0, color_tex, 0);
+		glNamedFramebufferTexture(fbo_handle, GL_DEPTH_ATTACHMENT, depth_tex, 0);
+		unsigned int attachments[5] = { GL_COLOR_ATTACHMENT0,0,0,0, 0 };
+		glNamedFramebufferDrawBuffers(fbo_handle, 5, attachments);
+	}
+
+	this->fbo = fbo_handle;
+	this->color = color_tex;
+	this->depth = depth_tex;
+
+	vts_handle = Texture::install_system("_test_thumbnail");
+	vts_handle->update_specs(color_tex, w, h, 4, {});
+	vts_handle->type = Texture_Type::TEXTYPE_2D;
+}
+
+ConfigVar thumbnail_fov("thumbnail_fov", "60", CVAR_FLOAT | CVAR_UNBOUNDED, "");
+
+
+void ThumbnailRenderer::render(Model* model) {
+	ASSERT(!eng->get_is_in_overlapped_period());
+	if (!model || model->get_num_lods() == 0)
+		return;
+	pass.clear();
+	auto& lod = model->get_lod(0);
+	auto& scene = draw.scene;
+	const int pstart = lod.part_ofs;
+	const int pend = pstart + lod.part_count;
+	auto& proxy = scene.proxy_list.get(object.id);
+	proxy.proxy.model = model;
+	for (int j = pstart; j < pend; j++) {
+		auto& part = model->get_part(j);
+
+		const MaterialInstance* mat = model->get_material(part.material_idx);
+		if (!mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
+			mat = matman.get_fallback();
+
+		pass.add_object(proxy.proxy, object, mat, 0, j, 0, 0, false);
+	}
+	pass.make_batches(scene);
+	build_standard_cpu(
+		list,
+		pass,
+		scene.proxy_list
+	);
+
+	const int w = size;
+	const int h = size;
+	RenderPassSetup setup("thumbnail", this->fbo, true, true, 0, 0, w, h);
+	auto scope = draw.get_device().start_render_pass(setup);
+	auto sphere = model->get_bounding_sphere();
+	const float fov_rad = glm::radians(thumbnail_fov.get_float());
+	glm::vec3 center = glm::vec3(sphere);
+	const float c_mult = 2.0 / fov_rad;
+	glm::vec3 cam_pos = center + glm::normalize(glm::vec3(1, 1, 1)) * sphere.w * c_mult;
+	View_Setup viewSetup = View_Setup(glm::lookAt(cam_pos, center, glm::vec3(0, 1, 0)), fov_rad, 0.01, 100.0, w, h);
+
+	Render_Level_Params cmdparams(
+		viewSetup,
+		&list,
+		&pass,
+		Render_Level_Params::FORWARD_PASS
+	);
+	cmdparams.upload_constants = true;
+	cmdparams.provied_constant_buffer = draw.ubo.current_frame;
+	cmdparams.draw_viewmodel = true;
+	draw.render_level_to_target(cmdparams);
+}
+
+void ThumbnailRenderer::output_to_path(std::string path) {
+	const int w = size;
+	const int h = size;
+	std::vector<unsigned char> pixels(w * h * 4); // RGBA
+	glReadBuffer(GL_COLOR_ATTACHMENT0);
+	glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+	int success = write_png_wrapper(path.c_str(), w, h, 4, pixels.data(), w * 4);
+}
 
 ConfigVar r_drawfog("r.drawfog", "1", CVAR_BOOL | CVAR_DEV, "enable/disable drawing of fog");
 
@@ -2866,7 +2989,7 @@ void Renderer::deferred_decal_pass()
 		if (l->get_master_material()->usage != MaterialUsage::Decal)
 			continue;
 
-		program_handle program = matman.get_mat_shader(false,false, nullptr, l, false, false, false, false);
+		program_handle program = matman.get_mat_shader(false,false, nullptr, l, false, false, false, false, false);
 
 		RenderPipelineState state;
 		state.depth_testing = false;
@@ -2943,7 +3066,7 @@ void Renderer::sync_update()
 
 ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV,"enable/disable drawing of terrain");
 ConfigVar r_force_hide_ui("r.force_hide_ui", "0", CVAR_BOOL,"disable ui drawing");
-
+ConfigVar test_thumbnail_model("test_thumbnail_model", "", CVAR_DEV, "");
 
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 {
@@ -3476,7 +3599,7 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 		auto mat = postProcessMats[i];
 
 		RenderPipelineState state;
-		state.program = matman.get_mat_shader(false,false, nullptr, mat, false, false, false, false);
+		state.program = matman.get_mat_shader(false,false, nullptr, mat, false, false, false, false, false);
 		state.blend = mat->get_master_material()->blend;
 		state.depth_testing = state.depth_writes = false;
 		state.vao = get_empty_vao();

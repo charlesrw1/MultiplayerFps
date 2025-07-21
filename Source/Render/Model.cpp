@@ -937,7 +937,7 @@ bool ModelMan::upload_model(Model* mesh)
 	//sys_print(Debug, "uploading mode: %s\n", mesh->get_name().c_str());
 
 	if (mesh->parts.size() == 0) {
-		sys_print(Warning, "ModelMan::upload_model: model has not parts (%d)\n", mesh->get_name().c_str());
+		sys_print(Warning, "ModelMan::upload_model: model has not parts (%s)\n", mesh->get_name().c_str());
 		return false;
 	}
 

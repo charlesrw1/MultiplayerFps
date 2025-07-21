@@ -2,6 +2,7 @@
 #include "Framework/Handle.h"
 #include <glm/glm.hpp>
 #include <vector>
+#include <string>
 
 struct View_Setup
 {
@@ -102,7 +103,7 @@ public:
 	virtual void update_lightmap(handle<Lightmap_Object> handle, Lightmap_Object& lm) = 0;
 	virtual void remove_lightmap(handle<Lightmap_Object> obj) = 0;
 };
-
+class Model;
 class GuiSystemPublic;
 class RendererPublic
 {
@@ -119,6 +120,7 @@ public:
 	virtual void reload_shaders() = 0;
 	// only used by animation editor to draw to an imgui window
 	virtual uint32_t get_composite_output_texture_handle() = 0;
+#ifdef EDITOR_BUILD
 	// tests the output buffer from last frame and returns whatever object was drawn
 	// ONLY for level editor (requires SceneDrawParamEx::is_editor to have been true LAST frame)
 	// returns -1 on none
@@ -126,6 +128,9 @@ public:
 	virtual std::vector<handle<Render_Object>> mouse_box_select_for_editor(int x, int y, int w, int h) = 0;
 	// test the depth buffer, returns LINEAR depth, ONLY for editor!
 	virtual float get_scene_depth_for_editor(int x, int y) = 0;
+	// hm.
+	virtual void editor_render_thumbnail_for(Model* model, int w, int h, std::string disk_path) = 0;
+#endif
 };
 
 extern RendererPublic* idraw;
