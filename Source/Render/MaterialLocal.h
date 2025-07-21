@@ -190,7 +190,6 @@ public:
 		//return masterMaterial->impl ? masterMaterial->impl->masterImpl.get() : nullptr;
 	}
 
-
 	MaterialInstance* self = nullptr;
 	bool is_dynamic_material = false;
 	int unique_id = 0;	// unique id of this material instance (always valid)

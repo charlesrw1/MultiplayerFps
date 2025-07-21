@@ -27,6 +27,7 @@ MaterialManagerPublic* imaterials = &matman;
 
 ConfigVar material_print_debug("material_print_debug", "1", CVAR_DEV | CVAR_BOOL, "");
 
+MulticastDelegate<MaterialInstance*> MaterialInstance::on_material_loaded;
 
 
 #ifdef EDITOR_BUILD
@@ -216,6 +217,8 @@ void MaterialInstance::post_load()
 		impl->post_load(this);
 		impl->has_called_post_load_already = true;
 	}
+
+	MaterialInstance::on_material_loaded.invoke(this);
 }
 
 // BLECH!!
@@ -253,6 +256,7 @@ void MaterialInstance::move_construct(IAsset* _other)
 //	other->uninstall();
 
 }
+
 MaterialInstance* MaterialManagerLocal::create_dynmaic_material_unsafier(const MaterialInstance* material) {
 	assert(material);
 	// more bs crap

@@ -4,6 +4,7 @@
 #include "glm/gtc/quaternion.hpp"
 #include "Framework/InlineVec.h"
 #include <vector>
+#include "Framework/ClassBase.h"
 
 namespace physx
 {
@@ -16,6 +17,7 @@ namespace physx
 	class PxConvexMesh;
 	class PxActor;
 	class PxShape;
+	class PxMaterial;
 }
 
 enum class ShapeType_e : uint8_t
@@ -101,6 +103,22 @@ struct world_query_result
 };
 struct overlap_query_result {
 	InlineVec<PhysicsBody*, 8> overlaps;
+};
+
+// never delete this!
+// might change this later. create with standard new/malloc.... :(
+// can set this to: MaterialInstances, Models, PhysicsBody components. will choose material based on that order. (PhysicsBody overrides Model, etc.)
+// otherwise chooses the default material
+class PhysicsMaterialWrapper : public ClassBase {
+public:
+	CLASS_BODY(PhysicsMaterialWrapper);
+	PhysicsMaterialWrapper();
+	~PhysicsMaterialWrapper() {
+		ASSERT(!"Dont delete physics materials!");
+	}
+	REF void set_friction(float static_f,float dynamic_f);
+	REF void set_restitution(float r);
+	physx::PxMaterial* material = nullptr;
 };
 
 

@@ -37,6 +37,9 @@ public:
 
 
 	const std::string& get_name() const { return path; }
+	REF std::string get_name_l() { return path; }
+
+
 	bool is_loaded_in_memory() const { return is_loaded; }
 	bool did_load_fail() const { return load_failed; }
 

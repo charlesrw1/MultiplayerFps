@@ -24,7 +24,6 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text)
 	PendingClass currentClass;
 	bool inClass = false;
 	string pendingType;
-
 	for (int i = 0; i < lines.size(); i++) {
 		auto line = StringUtils::strip(lines.at(i));
 		if (line.empty())

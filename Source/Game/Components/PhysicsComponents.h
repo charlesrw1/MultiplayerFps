@@ -20,7 +20,7 @@ class MeshBuilder;
 	class PxSphericalJoint;
 	class PxD6Joint;
 }
-
+class PhysicsMaterialWrapper;
 
 // wrapper around physx actors
 class PhysicsJointComponent;
@@ -105,6 +105,12 @@ public:
 	// see add_physics_callback and PhysicsEventCallbackImpl in lua for usage
 	REF void add_triggered_callback(IPhysicsEventCallback* callback);
 
+	// doesnt take ownership, physics materials have forever lifetimes, see class PhysicsMaterialWrapper
+	REF void set_material(PhysicsMaterialWrapper* material) {
+		this->material = material;
+		on_shape_changes();
+	}
+
 	MulticastDelegate<PhysicsBodyEventArg> on_trigger;
 protected:
 	void add_model_shape_to_actor(const Model* m);
@@ -152,6 +158,7 @@ private:
 	REF float density = 2.0;
 
 	physx::PxRigidActor* physxActor = nullptr;
+	PhysicsMaterialWrapper* material = nullptr;
 
 	uint64_t editor_shape_id = 0;
 

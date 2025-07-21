@@ -38,7 +38,8 @@ class ClassTypeInfo;
 class GuiSystemPublic;
 class GameMode;
 class BaseUpdater;
-
+class Model;
+class MaterialInstance;
 class Application : public ClassBase {
 public:
 	CLASS_BODY(Application, scriptable);
@@ -47,12 +48,13 @@ public:
 	REF virtual void update() {}
 	REF virtual void stop() {}
 	REF virtual void on_map_changed() {}
-
 	// misc callbacks
 	REF virtual void on_controller_status(int index, bool connected) {}
-
-	// should go elsewhere tbh
-	REF virtual bool create_prefab(Entity* object, string prefab_str) { return false; }
+	// can do asset (post?) processing here after it loads
+	// also called on asset reloads. doesnt call for textures
+	// idk i want to use these to set physics materials and setup animation events
+	REF virtual void on_post_model_load(Model* asset) {}
+	REF virtual void on_post_material_load(MaterialInstance* asset) {}
 
 };
 

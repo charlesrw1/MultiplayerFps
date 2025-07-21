@@ -57,9 +57,9 @@ void DecalComponent::editor_on_change_property() {
 
 DecalComponent::~DecalComponent() {}
 
-void DecalComponent::set_material(const MaterialInstance* mat)
+void DecalComponent::set_material(MaterialInstance* mat)
 {
-	material.ptr = (MaterialInstance*)mat;
+	material.ptr = mat;
 	sync_render_data();
 }
 #include "UI/GUISystemPublic.h"

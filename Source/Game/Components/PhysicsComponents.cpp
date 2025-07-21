@@ -410,8 +410,19 @@ void PhysicsBody::set_shape_flags(PxShape* shape)
 	shape->setQueryFilterData(filter);
 	shape->setSimulationFilterData(filter);
 }
+
 void PhysicsBody::add_model_shape_to_actor(const Model* model)
 {
+	physx::PxMaterial* material_to_use = physics_local_impl->default_material;
+	PhysicsMaterialWrapper* wrapper = this->material;
+	if(!wrapper)
+		wrapper = model->get_physics_material_to_use();
+	if (wrapper) {
+		material_to_use = wrapper->material;
+	}
+	ASSERT(material_to_use);
+
+
 	if (model->get_physics_body()) {
 		auto body = model->get_physics_body();
 		for (int i = 0; i < body->shapes.size(); i++) {
@@ -420,7 +431,7 @@ void PhysicsBody::add_model_shape_to_actor(const Model* model)
 				PxMeshScale scale;
 				scale.scale = glm_to_physx(get_owner()->get_ls_scale());
 				PxShape* aConvexShape = PxRigidActorExt::createExclusiveShape(*physxActor,
-					PxConvexMeshGeometry(shape.convex_mesh,scale), *physics_local_impl->default_material);
+					PxConvexMeshGeometry(shape.convex_mesh,scale), *material_to_use);
 				set_shape_flags(aConvexShape);
 			}
 			else if (shape.shape == ShapeType_e::MeshShape) {
@@ -428,7 +439,7 @@ void PhysicsBody::add_model_shape_to_actor(const Model* model)
 				scale.scale = glm_to_physx(get_owner()->get_ls_scale());
 
 				PxShape* tri_shape = PxRigidActorExt::createExclusiveShape(*physxActor,
-					PxTriangleMeshGeometry(shape.tri_mesh,scale), *physics_local_impl->default_material
+					PxTriangleMeshGeometry(shape.tri_mesh,scale), *material_to_use
 				);
 				set_shape_flags(tri_shape);
 			}
@@ -446,7 +457,7 @@ void PhysicsBody::add_model_shape_to_actor(const Model* model)
 
 
 		auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,
-			boxGeom, *physics_local_impl->default_material);
+			boxGeom, *material_to_use);
 
 		auto middle = (aabb.bmax + aabb.bmin) * 0.5f;
 
@@ -457,9 +468,12 @@ void PhysicsBody::add_model_shape_to_actor(const Model* model)
 }
 void PhysicsBody::add_vertical_capsule_to_actor(const glm::vec3& base, float height, float radius)
 {
+	PxMaterial* material_to_use = (this->material) ? this->material->material : physics_local_impl->default_material;
+	ASSERT(material_to_use);
+
 	auto capGeom = PxCapsuleGeometry(radius, height * 0.5 - radius);
 	auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,
-		capGeom, *physics_local_impl->default_material);
+		capGeom, *material_to_use);
 
 
 	auto localpose =  glm::translate(glm::mat4(1), base) * glm::mat4_cast(glm::angleAxis(HALFPI, glm::vec3(0,0,1)));
@@ -469,17 +483,24 @@ void PhysicsBody::add_vertical_capsule_to_actor(const glm::vec3& base, float hei
 }
 void PhysicsBody::add_sphere_shape_to_actor(const glm::vec3& pos, float radius)
 {
+	PxMaterial* material_to_use = (this->material) ? this->material->material : physics_local_impl->default_material;
+	ASSERT(material_to_use);
+
+
 	auto boxGeom = PxSphereGeometry(radius);
 	auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,
-		boxGeom, *physics_local_impl->default_material);
+		boxGeom, *material_to_use);
 	shape->setLocalPose(PxTransform(glm_to_physx(pos)));
 	set_shape_flags(shape);
 }
 void PhysicsBody::add_box_shape_to_actor(const glm::mat4& localTransform, const glm::vec3& halfExtents)
 {
+	PxMaterial* material_to_use = (this->material) ? this->material->material : physics_local_impl->default_material;
+	ASSERT(material_to_use);
+
 	auto boxGeom = PxBoxGeometry(glm_to_physx(halfExtents));
 	auto shape = PxRigidActorExt::createExclusiveShape(*physxActor,
-		boxGeom, *physics_local_impl->default_material);
+		boxGeom, *material_to_use);
 
 
 	set_shape_flags(shape);

@@ -8,11 +8,14 @@
 #include "glm/glm.hpp"
 #include "DynamicMaterialPtr.h"
 #include "Framework/ConsoleCmdGroup.h"
+#include "Framework/MulticastDelegate.h"
 
 class MasterMaterialImpl;
 class Texture;
 class IAssetLoadingInterface;
 class MaterialImpl;
+class PhysicsMaterialWrapper;
+
 class MaterialInstance : public IAsset {
 public:
 	CLASS_BODY(MaterialInstance);
@@ -43,8 +46,18 @@ public:
 	void sweep_references(IAssetLoadingInterface* loading) const;
 	void move_construct(IAsset* other);
 
+	REF void set_physics_material(PhysicsMaterialWrapper* material) {
+		this->physics_mat = material;
+	}
+	PhysicsMaterialWrapper* get_physics_material() const {
+		return physics_mat;
+	}
+
 	std::unique_ptr<MaterialImpl> impl;
+	static MulticastDelegate<MaterialInstance*> on_material_loaded;
 protected:
+	PhysicsMaterialWrapper* physics_mat = nullptr;
+
 	friend class MaterialManagerLocal;
 };
 

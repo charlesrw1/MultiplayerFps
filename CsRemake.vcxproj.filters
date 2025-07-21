@@ -428,7 +428,6 @@
     <ClInclude Include="Source\Framework\SysPrint.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
-    <ClInclude Include="Source\Game\Components\TileMapComponent.h" />
     <ClInclude Include="Source\Framework\Jobs.h" />
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />

@@ -423,7 +423,6 @@ bool PhysicsManImpl::load_physics_into_shape(BinaryReader& reader, physics_shape
 	else if (def.shape == ShapeType_e::MeshShape) {
 		def.tri_mesh = physics_factory->createTriangleMesh(inp);
 	}
-	delete[] data;
 
 	return true;
 }
@@ -507,4 +506,16 @@ bool PhysicsManImpl::overlap_shared(
 	}
 	
 	return status;
+}
+
+PhysicsMaterialWrapper::PhysicsMaterialWrapper() {
+	ASSERT(physics_local_impl);
+	material = physics_local_impl->physics_factory->createMaterial(0.5, 0.5, 0.1);
+}
+void PhysicsMaterialWrapper::set_friction(float static_f, float dynamic_f) {
+	material->setStaticFriction(static_f);
+	material->setDynamicFriction(dynamic_f);
+}
+void PhysicsMaterialWrapper::set_restitution(float r) {
+	material->setRestitution(r);
 }

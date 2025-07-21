@@ -1931,9 +1931,6 @@ void GameEngineLocal::init(int argc, char** argv)
 	Model::on_model_loaded.add(this, [](Model* mod) { add_events_test(mod); });
 	print_time("init mods,sounds");
 
-	// doesnt matter if it fails, just precache loading stuff
-	g_assets.find_sync<AssetBundle>("eng/default_bundle.bundle", true);
-	print_time("load default bundle");
 
 	imgui_context = ImGui::CreateContext();
 	DebugShapeCtx::get().init();
@@ -2003,6 +2000,18 @@ void GameEngineLocal::init(int argc, char** argv)
 		Input::on_con_status.add(a, [this](int i, bool b) {
 			app->on_controller_status(i, b);
 			});
+		//Model::on_model_loaded.add(this, [this](Model* m) {
+		//	app->on_post_model_load(m);
+		//	});
+		MaterialInstance::on_material_loaded.add(this, [this](MaterialInstance* m) {
+			try {
+				app->on_post_material_load(m);
+			}
+			catch (LuaRuntimeError er) {
+				sys_print(Error, "on_post_material_load %s\n",er.what());
+			}
+			});
+
 
 		app->start();
 	};
@@ -2022,6 +2031,10 @@ void GameEngineLocal::init(int argc, char** argv)
 	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "init.txt");
 	print_time("execute init");
 	Cmd_Manager::inst->set_set_unknown_variables(false);
+
+	// doesnt matter if it fails, just precache loading stuff
+	g_assets.find_sync<AssetBundle>("eng/default_bundle.bundle", true);
+	print_time("load default bundle");
 
 	sys_print(Info, "execute startup in %f\n", (float)TimeSinceStart());
 }

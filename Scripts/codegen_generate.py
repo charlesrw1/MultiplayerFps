@@ -442,6 +442,7 @@ def write_scriptable_class(newclass : ClassDef) -> str:
                 pass
             output += "\t\t\t}\n"
             output += "\t\t}\n\t\telse{\n"
+            output += "\t\t\tlua_pop(L,1);\n"
             output += f"\t\t\treturn {newclass.classname}::{f.name}("
             for argType,argName in f.func_args:
                 output += argName

@@ -101,6 +101,7 @@ struct MeshLod
 	int part_count = 0;
 };
 
+class PhysicsMaterialWrapper;
 class MSkeleton;
 class PhysicsBodyDefinition;
 class IAssetLoadingInterface;
@@ -151,6 +152,17 @@ public:
 		WorldMerged=2	// all WorldMerged get turned into one lightmap. prevents seams on floors/walls stuff
 	};
 	LightmapType get_lightmap_type() const { return isLightmapped; }
+
+	REF void set_physics_material(PhysicsMaterialWrapper* mat) {
+		this->physics_material = mat;
+	}
+	REF PhysicsMaterialWrapper* get_physics_material() const {
+		return this->physics_material;
+	}
+	// can return null
+	// if the model has a physics material, returns that
+	// otherwise checks the 1st render material for a physics material
+	REF PhysicsMaterialWrapper* get_physics_material_to_use() const;
 private:
 	bool load_internal(IAssetLoadingInterface* loading);
 
@@ -172,6 +184,7 @@ private:
 	LightmapType isLightmapped = LightmapType::None;
 	int16_t lightmapX = 0;
 	int16_t lightmapY = 0;
+	PhysicsMaterialWrapper* physics_material = nullptr;
 
 	friend class ModelMan;
 	friend class ModelCompileHelper;

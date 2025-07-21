@@ -522,6 +522,17 @@ MulticastDelegate<Model*> Model::on_model_loaded;
 
 
 
+PhysicsMaterialWrapper* Model::get_physics_material_to_use() const
+{
+	if (physics_material) 
+		return physics_material;
+	if (get_num_materials() > 0) {
+		// can return null here
+		return get_material(0)->get_physics_material();
+	}
+	return nullptr;
+}
+
 // Format definied in ModelCompilier.cpp
 bool Model::load_internal(IAssetLoadingInterface* loading)
 {

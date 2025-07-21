@@ -208,7 +208,6 @@
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
     <ClInclude Include="Source\Game\Components\NavComps.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
-    <ClInclude Include="Source\Game\Components\TileMapComponent.h" />
     <ClInclude Include="Source\Game\EntityPtr.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TDChest.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
