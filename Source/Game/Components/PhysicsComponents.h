@@ -260,7 +260,7 @@ struct JointAnchor
 	REF glm::quat q = glm::quat();
 };
 
-class PhysicsJointComponent : public PhysicsBody
+class PhysicsJointComponent : public Component
 {
 public:
 	CLASS_BODY(PhysicsJointComponent);
@@ -276,16 +276,27 @@ public:
 	void clear_joint() {
 		set_target(nullptr);
 	}
-	Entity* get_target() {
+	REF Entity* get_target() {
 		return target.get();
 	}
-	void set_target(Entity* e);
+	REF void set_target(Entity* e);
 
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
 		return "eng/editor/phys_joint.png";
 	}
 #endif
+
+	REF void set_joint_anchor(glm::vec3 p, glm::quat q, int axis) {
+		anchor.p = p;
+		anchor.q = q;
+		if (axis < 0 || axis>2) 
+			axis = 0;
+		local_joint_axis = axis;
+	}
+
+	// call after changing stuff
+	REF void refresh_joint();
 protected:
 
 	PhysicsBody* get_owner_physics();
@@ -306,7 +317,6 @@ protected:
 
 private:
 
-	void refresh_joint();
 };
 
 
@@ -355,11 +365,33 @@ class AdvancedJointComponent : public PhysicsJointComponent
 public:
 	CLASS_BODY(AdvancedJointComponent);
 
-	void init_joint(PhysicsBody* a, PhysicsBody* b) override;
-	physx::PxJoint* get_joint() const override;
-	void free_joint() override;
+	void init_joint(PhysicsBody* a, PhysicsBody* b) final;
+	physx::PxJoint* get_joint() const final;
+	void free_joint() final;
+	void draw_meshbuilder() final;
 
-	void draw_meshbuilder() override;
+	REF void set_translate_joint_motion(JM x, JM y, JM z) {
+		x_motion = x;
+		y_motion = y;
+		z_motion = z;
+	}
+	REF void set_rotation_joint_motion(JM x, JM y, JM z) {
+		ang_x_motion = x;
+		ang_y_motion = y;
+		ang_z_motion = z;
+	}
+	REF void set_twist_vars(float twist_min, float twist_max, float twist_damp, float twist_stiff) {
+		this->twist_limit_min = twist_min;
+		this->twist_limit_max = twist_max;
+		this->twist_damp = twist_damp;
+		this->twist_stiff = twist_stiff;
+	}
+	REF void set_cone_vars(float ang_y_limit, float ang_z_limit, float cone_damp, float cone_stiff) {
+		this->ang_y_limit = ang_y_limit;
+		this->ang_z_limit = ang_z_limit;
+		this->cone_damp = cone_damp;
+		this->cone_stiff = cone_stiff;
+	}
 
 	REF JM x_motion = JM::Locked;
 	REF JM y_motion = JM::Locked;

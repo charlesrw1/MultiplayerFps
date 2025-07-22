@@ -26,7 +26,6 @@ static void add_to_remove_list_R(vector<SavedCreateObj>& objs, Entity* e, std::u
 {
 	if (!this_is_a_serializeable_object(e))
 		return;
-	assert(e->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab);
 	if (SetUtil::contains(seen, (BaseUpdater*)e))
 		return;
 	SetUtil::insert_test_exists(seen, (BaseUpdater*)e);

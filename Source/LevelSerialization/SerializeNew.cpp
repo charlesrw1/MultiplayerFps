@@ -55,9 +55,7 @@ string MakePathForObjectNew::make_type_name(ClassBase* obj)
 			const PrefabAsset& pfb = as_ent->get_object_prefab();
 			return pfb.get_name();
 		}
-		if (as_ent->get_object_prefab_spawn_type() == EntityPrefabSpawnType::SpawnedByPrefab) {
-			sys_print(Warning, "MakePathForObjectNew::make_type_name: SpawnedByPrefab object made it through?\n");
-		}
+		
 	}
 
 	return bu->get_type().classname;

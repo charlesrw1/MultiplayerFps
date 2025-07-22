@@ -1468,7 +1468,6 @@ extern ConfigVar log_shader_compiles;
 extern ConfigVar material_print_debug;
 int game_engine_main(int argc, char** argv)
 {
-
 	material_print_debug.set_bool(true);
 	developer_mode.set_bool(true);
 	log_shader_compiles.set_bool(false);
@@ -1886,12 +1885,14 @@ void GameEngineLocal::init(int argc, char** argv)
 	tick_interval = 1.0 / 60.0;
 	is_hosting_game = false;
 
+
 	init_sdl_window();
 	print_time("init sdl window");
 
 	Profiler::init();
 	FileSys::init();
 	print_time("file init");
+
 
 	Cmd_Manager::inst->set_set_unknown_variables(true);
 	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
@@ -1985,7 +1986,6 @@ void GameEngineLocal::init(int argc, char** argv)
 
 
 	// not in editor and no queued map, load the entry point
-
 	
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();

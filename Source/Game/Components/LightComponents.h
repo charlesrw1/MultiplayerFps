@@ -9,7 +9,6 @@
 #include "Framework/EnumDefReflection.h"
 #include "Framework/LuaColor.h"
 
-GENERATED_CLASS_INCLUDE("Render/Texture.h");
 
 glm::vec4 get_color_light_value(Color32 c, float intensity);
 

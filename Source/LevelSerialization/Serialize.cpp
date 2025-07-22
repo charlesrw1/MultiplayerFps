@@ -29,11 +29,8 @@ bool this_is_a_serializeable_object(const BaseUpdater* b)
 	assert(b);
 	if (b->dont_serialize_or_edit)
 		return false;
-	if (auto as_ent = b->cast_to<Entity>()) {
-		if (as_ent->get_object_prefab_spawn_type() == EntityPrefabSpawnType::SpawnedByPrefab)
-			return false;
-	}
-	else if (auto as_comp = b->cast_to<Component>()) {
+
+	if (auto as_comp = b->cast_to<Component>()) {
 		assert(as_comp->get_owner());
 		if (!serialize_this_objects_children(as_comp->get_owner()))
 			return false;

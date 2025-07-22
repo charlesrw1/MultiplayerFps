@@ -80,38 +80,30 @@ void Entity::set_hidden_in_editor(bool b)
 		all_components[i]->sync_render_data();
 }
 const PrefabAsset& Entity::get_object_prefab() const {
-	assert(this->what_prefab && !spawned_by_prefab && get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab);
+	assert(this->what_prefab && get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab);
 	return *this->what_prefab;
 }
 void Entity::set_spawned_by_prefab() {
 	if (what_prefab)
 		what_prefab = nullptr;
-	spawned_by_prefab = true;
 	set_editor_transient(true);	// make it not editable
 }
 void Entity::set_root_object_prefab(const PrefabAsset& asset) {
 	if (what_prefab) {
 		sys_print(Warning, "Entity::set_root_object_prefab: already had prefab assigned?\n");
 	}
-	if (spawned_by_prefab)
-		sys_print(Warning, "Entity::set_root_object_prefab: spawned_by_prefab=True?\n");
-	spawned_by_prefab = false;
 	what_prefab = &asset;
 }
 void Entity::set_prefab_no_owner_after_being_root()
 {
 	assert(get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
 	what_prefab = nullptr;
-	spawned_by_prefab = false;
 	assert(get_object_prefab_spawn_type() == EntityPrefabSpawnType::None);
 }
 EntityPrefabSpawnType Entity::get_object_prefab_spawn_type() const {
 	if (what_prefab) {
-		assert(!spawned_by_prefab);
 		return EntityPrefabSpawnType::RootOfPrefab;
 	}
-	else if (spawned_by_prefab)
-		return EntityPrefabSpawnType::SpawnedByPrefab;
 	else
 		return EntityPrefabSpawnType::None;
 }
@@ -519,29 +511,37 @@ void Entity::set_ws_transform(const glm::mat4& transform)
 {
 	// want local space
 	if (has_transform_parent()) {
-		auto inv_world = glm::inverse(get_parent_transform());
+		const glm::mat4& parent_t = get_parent_transform();
+		auto inv_world = glm::inverse(parent_t);
 		glm::mat4 local = inv_world * transform;
-		decompose_transform(local, position, rotation, scale);
+		glm::vec3 newp;
+		decompose_transform(local, newp, rotation, scale);
+		if (newp.x != newp.x) {
+			sys_print(Error,"ERROR");
+		}
+		position = newp;
+
 		cached_world_transform = transform;
 	}
 	else {
 		cached_world_transform = transform;
 		decompose_transform(transform, position, rotation, scale);
 	}
+	check_for_transform_nans();
 	post_change_transform_R( false /* cached_world_transform doesnt need updating, we already have it*/);
 }
 
 glm::mat4 Entity::get_parent_transform() const
 {
-	ASSERT(get_parent());
-	if (!has_parent_bone() || !get_parent()->get_cached_mesh_component()) {
-		return get_parent()->get_ws_transform();
+	Entity* parent = get_parent();
+	ASSERT(parent);
+
+	if (!has_parent_bone() || !parent->get_cached_mesh_component()) {
+		return parent->get_ws_transform();
 	}
 	else {
-		return
-			get_parent()->get_ws_transform()
-			* get_parent()->get_cached_mesh_component()->get_ls_transform_of_bone(parent_bone.name);
-
+		MeshComponent* cached_mesh = parent->get_cached_mesh_component();
+		return parent->get_ws_transform() * cached_mesh->get_ls_transform_of_bone(parent_bone.name);
 	}
 }
 bool Entity::has_parent_bone() const { return !parent_bone.name.is_null(); }

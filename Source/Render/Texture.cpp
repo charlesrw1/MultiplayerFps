@@ -511,9 +511,31 @@ void Texture::move_construct(IAsset* _src)
 	hasSimplifiedColor = src->hasSimplifiedColor;
 #endif
 }
+ConfigVar disable_texture_loads("disable_texture_loads", "0", CVAR_BOOL | CVAR_DEV, "");
+
 void Texture::post_load() {
 	if (did_load_fail())
 		return;
+
+	if (disable_texture_loads.get_bool()) {
+		const uint8_t missing_tex[] = { 230,0,255,255,  0,0,0,255,
+										0,0,0,255,	230,0,255,255 };
+		auto create_defeault = [](texhandle* handle, const uint8_t* data) -> void {
+			glCreateTextures(GL_TEXTURE_2D, 1, handle);
+			glTextureStorage2D(*handle, 1, GL_RGBA8, 2, 2);
+			glTextureSubImage2D(*handle, 0, 0, 0, 2, 2, GL_RGBA, GL_UNSIGNED_BYTE, data);
+			glTextureParameteri(*handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTextureParameteri(*handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glGenerateTextureMipmap(*handle);
+		};
+		create_defeault(&gl_id, missing_tex);
+		width = 2;
+		height = 2;
+		type = Texture_Type::TEXTYPE_2D;
+		format = Texture_Format::TEXFMT_RGBA8;
+
+		return;
+	}
 
 	auto user = loaddata.get();
 
@@ -541,6 +563,9 @@ extern ConfigVar developer_mode;
 bool Texture::load_asset(IAssetLoadingInterface* loading) {
 	const auto& path = get_name();
 	assert(path != "_white" && path != "_black");	// quick assert here, default textures should be initialized before anything else
+	if (disable_texture_loads.get_bool())
+		return true;
+
 #ifdef EDITOR_BUILD
 	if (developer_mode.get_bool()) {
 		// this will check if a compile is needed

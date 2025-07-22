@@ -66,6 +66,11 @@ AnimatorObject::AnimatorObject(const Model& model, agBuilder& ingraph, Entity* e
 	auto pose = g_pose_pool.allocate_scoped();
 	util_set_to_bind_pose(*pose.get(), get_skel());
 	util_localspace_to_meshspace(*pose.get(), cached_bonemats, get_skel());
+	if (using_global_bonemat_double_buffer) {
+		last_cached_bonemats = cached_bonemats;
+	}
+
+
 	GameAnimationMgr::inst->add_to_animating_set(*this);
 }
 
@@ -353,6 +358,13 @@ void AnimatorObject::update_slot(int idx, float dt)
 		slot.active = nullptr;
 	}
 }
+#include "Game/Entities/Player.h"
+
+using std::string;
+using std::to_string;
+string print_vector(glm::vec3 v) {
+	return to_string(v.x) + " " + to_string(v.y) + " " + to_string(v.z);
+}
 
 void AnimatorObject::update_physics_bones(const Pose& inpose)
 {
@@ -367,19 +379,22 @@ void AnimatorObject::update_physics_bones(const Pose& inpose)
 		}
 		else
 			++it;
-
+		assert(e->get_is_top_level());
 
 		int parent = get_skel()->get_bone_index(e->get_parent_bone());
 		if (parent == -1) continue;
 		is_simulating[parent] = true;
 		cached_bonemats[parent] = e->get_ws_transform();
+
+		std::string str = std::string(e->get_parent_bone().get_c_str()) + "= " + print_vector(cached_bonemats[parent][3]);
+		GameplayStatic::debug_text(str);
 	}
 	if (update_owner_position_to_root) {
 		glm::mat4 root = cached_bonemats[0];
 		auto inv = glm::inverse(root);
 		for (int i = 0; i < num_bones(); i++) {
 			if (is_simulating[i])
-				cached_bonemats[i] = inv * cached_bonemats[i];
+				cached_bonemats[i] = inv*cached_bonemats[i];
 		}
 		owner->set_ws_transform(root);
 	}

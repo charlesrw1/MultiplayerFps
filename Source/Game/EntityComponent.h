@@ -5,7 +5,7 @@
 #include "glm/glm.hpp"
 #include "glm/gtx/quaternion.hpp"
 
-GENERATED_CLASS_INCLUDE("Game/Entity.h");
+
 class IComponentEditorUi {
 public:
 	virtual ~IComponentEditorUi() {}

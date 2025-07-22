@@ -144,6 +144,10 @@ void PhysicsBody::on_shape_changes()
 }
 void PhysicsBody::on_actor_type_change()
 {
+	if (eng->is_editor_level())
+		return;
+
+
 	if (physxActor) {
 		physics_local_impl->scene->removeActor(*(physx::PxActor*)physxActor);
 		physxActor->userData = nullptr;	// cursed moment, get a stale pointer in onTrigger after actor has been removed (?), set it null here to avoid that
@@ -228,8 +232,10 @@ void PhysicsBody::update_bone_parent_animator()
 		return;
 	if (!simulate_physics ||!enabled)
 		a->remove_simulating_physics_object(get_owner());
-	else
+	else {
+		get_owner()->set_is_top_level(true);
 		a->add_simulating_physics_object(get_owner());
+	}
 }
 
 void PhysicsBody::start()
@@ -585,7 +591,10 @@ void PhysicsBody::set_transform(const glm::mat4& transform, bool teleport)
 		}
 		else {
 			auto dyn = get_dynamic_actor();
-			dyn->setKinematicTarget(glm_to_physx(transform));
+			auto t = glm_to_physx(transform);
+			t.q.normalize();
+			
+			dyn->setKinematicTarget(t);
 		}
 	}
 }
@@ -654,7 +663,6 @@ void PhysicsJointComponent::refresh_joint()
 
 void PhysicsJointComponent::start()
 {
-	PhysicsBody::start();
 	if (eng->is_editor_level()) {
 		editor_meshbuilder = get_owner()->create_component<MeshBuilderComponent>();
 		editor_meshbuilder->dont_serialize_or_edit = true;
@@ -680,7 +688,6 @@ void PhysicsJointComponent::stop()
 {
 	if (editor_meshbuilder)
 		editor_meshbuilder->destroy();
-	PhysicsBody::stop();
 }
 
 PhysicsBody* PhysicsJointComponent::get_owner_physics() {
@@ -716,10 +723,15 @@ void PhysicsJointComponent::draw_meshbuilder()
 	world = get_target()->get_ws_transform();
 	
 }
+extern std::string print_vector(glm::vec3 v);
 
 template<typename T>
 static T* make_joint_shared(const glm::mat4& ws_transform, JointAnchor anchor, int local_joint_axis, T*(*create_func)(PxPhysics&, PxRigidActor*, const PxTransform&, PxRigidActor*, const PxTransform&), PhysicsBody* a, PhysicsBody*b)
 {
+	string msg = std::string(print_vector(ws_transform[1]));
+	eng->log_to_fullscreen_gui(Info, msg.c_str());
+	sys_print(Info, msg.c_str());
+
 	T* joint = nullptr;
 	auto my_local = get_transform_joint(anchor, local_joint_axis);
 	auto my_world = ws_transform * my_local;

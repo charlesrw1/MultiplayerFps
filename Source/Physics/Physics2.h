@@ -113,9 +113,13 @@ class PhysicsMaterialWrapper : public ClassBase {
 public:
 	CLASS_BODY(PhysicsMaterialWrapper);
 	PhysicsMaterialWrapper();
+#pragma warning(push)
+#pragma warning(disable : 4722) // "destructor never returns" warning. cause assert calls std::abort
 	~PhysicsMaterialWrapper() {
 		ASSERT(!"Dont delete physics materials!");
 	}
+#pragma warning(pop)
+
 	REF void set_friction(float static_f,float dynamic_f);
 	REF void set_restitution(float r);
 	physx::PxMaterial* material = nullptr;

@@ -115,6 +115,12 @@ public:
 		return e == nullptr;
 	}
 
+	REF static void enable_ragdoll_shared(Entity* e, bool enable);
+
+	REF static void debug_break() {
+		__debugbreak();
+	}
+
 };
 #include "Input/InputSystem.h"
 //

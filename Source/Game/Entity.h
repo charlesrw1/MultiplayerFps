@@ -22,10 +22,8 @@ struct PropertyInfoList;
 enum class EntityPrefabSpawnType : int8_t {
 	None, // default, spawned by map
 	RootOfPrefab,	// root of prefab, has prefab asset
-	SpawnedByPrefab	// spawned by prefab (can potentially be a prefab itself)
 };
 #endif
-
 
 struct EntityTagString {
 	STRUCT_BODY();
@@ -38,7 +36,6 @@ struct EntityBoneParentString {
 	REF StringName name;
 };
 
-GENERATED_CLASS_INCLUDE("Game/EntityComponent.h");
 class Entity : public BaseUpdater
 {
 public:
@@ -115,7 +112,10 @@ public:
 	MeshComponent* get_cached_mesh_component() const { return cached_mesh_component; }
 	void set_cached_mesh_component(MeshComponent* c) { cached_mesh_component = c; }
 	glm::mat4 get_parent_transform() const;
-	REF void set_parent_bone(StringName name) { parent_bone.name = name; }
+	REF void set_parent_bone(StringName name) { 
+		parent_bone.name = name; 
+		world_transform_is_dirty = true; 
+	}
 	REF bool has_parent_bone() const;
 	REF StringName get_parent_bone() const { return parent_bone.name; }
 	//REF bool get_start_disabled() const { return start_disabled; }
@@ -128,8 +128,8 @@ public:
 	StringName get_tag() const { return tag.name; }
 	bool has_tag() const { return tag.name.get_hash() != 0; }
 	void set_tag(StringName name) { tag.name = name; }
-	bool get_is_top_level() const { return is_top_level; }
-	void set_is_top_level(bool b);
+	REF bool get_is_top_level() const { return is_top_level; }
+	REF void set_is_top_level(bool b);
 	const std::string& get_editor_name() const { return editor_name; }
 	void set_editor_name(const std::string& n) { editor_name = n; }
 #ifdef EDITOR_BUILD
@@ -162,7 +162,6 @@ private:
 	bool selected_in_editor = false;
 	bool hidden_in_editor = false;
 	const PrefabAsset* what_prefab = nullptr;
-	bool spawned_by_prefab = false;
 	REFLECT(hide);
 	int8_t editor_folder = 0;
 #endif

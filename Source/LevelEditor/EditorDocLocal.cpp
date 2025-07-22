@@ -2079,7 +2079,7 @@ void EditorDoc::insert_unserialized_into_scene(UnserializedSceneFile& file, Seri
 				e->unique_file_id = get_next_file_id();
 			else {
 				auto as_ent = e->cast_to<Entity>();
-				assert(!as_ent || as_ent->get_object_prefab_spawn_type() == EntityPrefabSpawnType::SpawnedByPrefab);
+				assert(!as_ent || as_ent->get_object_prefab_spawn_type() != EntityPrefabSpawnType::RootOfPrefab);
 			}
 		}
 	}
@@ -2089,9 +2089,6 @@ void EditorDoc::insert_unserialized_into_scene(UnserializedSceneFile& file, Seri
 void EditorDoc::instantiate_into_scene(BaseUpdater* u)
 {
 	u->unique_file_id = get_next_file_id();
-	if (auto ent = u->cast_to<Entity>()) {
-		assert(ent->get_object_prefab_spawn_type() != EntityPrefabSpawnType::SpawnedByPrefab);
-	}
 }
 
 Entity* EditorDoc::spawn_prefab(PrefabAsset* prefab)

@@ -33,6 +33,11 @@ g_draw_grid 0
 
 enable_gl_debug_output 1
 
-g_draw_physx_scene 0
+g_draw_physx_scene 1
 
 g_prefab_factory ThePrefabFactory
+
+disable_texture_loads 0
+g_debug_skeletons 1
+force_animation_to_bind_pose 1
+

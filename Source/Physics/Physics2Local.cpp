@@ -54,7 +54,13 @@
 	} }
 
 
-ConfigVar g_draw_physx_scene("g_draw_physx_scene", "0", CVAR_DEV | CVAR_BOOL, "draw the physx debug scene");
+enum class PhysxSceneDrawMask {
+	Scene,
+	Joints,
+};
+// 0 = off
+ConfigVar g_draw_physx_scene("g_draw_physx_scene", "0", CVAR_DEV | CVAR_INTEGER, "draw the physx debug scene",0,3);
+
 
 
 PhysicsManImpl* physics_local_impl = nullptr;
@@ -430,7 +436,7 @@ bool PhysicsManImpl::load_physics_into_shape(BinaryReader& reader, physics_shape
 void PhysicsManager::sync_render_data()
 {
 	MeshBuilder_Object o;
-	o.visible = g_draw_physx_scene.get_bool();
+	o.visible = g_draw_physx_scene.get_integer()!=0;
 	o.transform = glm::mat4(1.f);
 	o.meshbuilder = &impl->debug_mesh;
 	o.use_background_color = true;
@@ -443,21 +449,38 @@ void PhysicsManImpl::update_debug_physics_shapes()
 {
 	ASSERT(scene);
 	static bool init = false;
-	if (!g_draw_physx_scene.get_bool()) {
+	if (g_draw_physx_scene.get_integer()==0) {
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 0.0);
 		init = false;
 		return;
 	}
 	using namespace physx;
 	if (!init) {
+		const int mask = g_draw_physx_scene.get_integer();
+		const bool draw_scene = mask & (1 << int(PhysxSceneDrawMask::Scene));
+		const bool draw_joints = mask & (1 << int(PhysxSceneDrawMask::Joints));
+
+
 		scene->setVisualizationParameter(physx::PxVisualizationParameter::eSCALE, 1.0);
 		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eCONTACT_NORMAL, 1.0);
 		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eBODY_AXES, 1.0);
-		scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0);
-		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_EDGES, 1.0);
-		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES, 1.0);
-		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LIMITS, 0.4);
+		if (draw_scene) {
+			scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES, 1.0);
+		}
+		else {
+			scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_SHAPES,0.0);
+		}
 
+		if (draw_joints) {
+			scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES, 1.0);
+			scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LIMITS, 0.4);
+		}
+		else {
+			scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES,0);
+			scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LIMITS,0);
+		}
+
+		//scene->setVisualizationParameter(physx::PxVisualizationParameter::eCOLLISION_EDGES, 1.0);
 
 
 		init = true;

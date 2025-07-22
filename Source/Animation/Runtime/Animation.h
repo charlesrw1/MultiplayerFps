@@ -74,7 +74,8 @@ private:
 	std::vector<agBaseNode*> cachePoseNodes;
 	std::vector<StringName> slot_names;
 };
-
+class RagdollComponent;
+#include "Game/EntityPtr.h"
 class ConstructorError : public std::runtime_error {
 public:
 	ConstructorError() : std::runtime_error("Constructor error.") {}
@@ -100,9 +101,12 @@ public:
 	// callback: returns true if interrupted, false if not. guaranteed to fire. 
 	void play_animation(const AnimationSeqAsset* seq, float play_speed, float start_pos, function<void(bool)> callback);
 	void stop_animation_in_slot(StringName slot);
-	void add_simulating_physics_object(Entity* obj);
-	void remove_simulating_physics_object(Entity* obj);
-	void set_update_owner_position_to_root(bool b) { update_owner_position_to_root = b; }
+	//void add_simulating_physics_object(Entity* obj);
+	//void remove_simulating_physics_object(Entity* obj);
+	//REF void set_update_owner_position_to_root(bool b) { update_owner_position_to_root = b; }
+	void set_ragdoll(RagdollComponent* ragdoll);
+
+
 	RootMotionTransform get_last_root_motion() const { return root_motion; }
 	void set_matrix_palette_offset(int ofs) { matrix_palette_offset = ofs; }
 	int get_matrix_palette_offset() const { return matrix_palette_offset; }
@@ -143,12 +147,14 @@ private:
 	vector<glm::mat4> cached_bonemats;	// global bonemats
 	vector<glm::mat4> last_cached_bonemats;
 	int matrix_palette_offset = 0;	// mesh space -> bone space -> meshspace, what the renderer consumes
-	bool update_owner_position_to_root = false;
+	//bool update_owner_position_to_root = false;
 	// owning entity, can be null for example in editor
 	Entity* owner = nullptr;
 	const Model& model;
 	RootMotionTransform root_motion;
-	std::unordered_set<uint64_t> simulating_physics_objects;
+	//std::unordered_set<uint64_t> simulating_physics_objects;
+	obj<RagdollComponent> ragdoll;
+
 	// active sync groups for graph
 	vector<SyncGroupData> active_sync_groups;
 	vector<DirectAnimationSlot> slots;

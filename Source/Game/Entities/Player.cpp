@@ -826,3 +826,48 @@ static int GameplayStatic_debug_text_start = 10;
  {
 	 Debug::add_sphere(center, r, color.to_color32(), life);
  }
+ extern string print_vector(glm::vec3 v);
+
+ void GameplayStatic::enable_ragdoll_shared(Entity* e, bool enable) {
+	 MeshComponent* mesh = e->get_cached_mesh_component();
+	 ASSERT(mesh);
+	 AnimatorObject* animator = mesh->get_animator();
+	 ASSERT(animator);
+	 animator->set_update_owner_position_to_root(true);
+	 auto& children = e->get_children();
+	 for (auto c : children) {
+
+		 auto phys = c->get_component<PhysicsBody>();
+		 if (!phys || phys->is_a<AdvancedJointComponent>())
+			 continue;
+
+		 auto m = e->get_cached_mesh_component();
+		 if (!m || !m->get_animator())
+			 continue;
+		 int i = m->get_index_of_bone(c->get_parent_bone());
+		 if (i == -1)
+			 continue;
+
+		 const glm::mat4& this_ws = e->get_ws_transform();
+
+
+
+		 if (enable) {
+			 auto cur = c->get_ls_transform();
+			 auto theFinalMat = this_ws * m->get_animator()->get_global_bonemats().at(i);
+			 string msg = std::string(c->get_parent_bone().get_c_str()) + ": " + print_vector(theFinalMat[1]);
+			 msg += " --- "+print_vector(cur[3]);
+			
+			 eng->log_to_fullscreen_gui(Info, msg.c_str());
+			 sys_print(Info, msg.c_str());
+
+			 phys->enable_with_initial_transforms(
+				 this_ws * m->get_animator()->get_last_global_bonemats().at(i) * cur,
+				 this_ws * m->get_animator()->get_global_bonemats().at(i) * cur,
+				 eng->get_dt());
+		 }
+		 else {
+			 phys->set_is_enable(false);
+		 }
+	 }
+ }

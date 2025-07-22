@@ -6,8 +6,6 @@
 #include <vector>
 #include <memory>
 #include "Framework/StructReflection.h"
-GENERATED_CLASS_INCLUDE("Render/Model.h");
-GENERATED_CLASS_INCLUDE("Render/MaterialPublic.h");
 
 class PhysicsFilterPresetBase;
 class Model;
