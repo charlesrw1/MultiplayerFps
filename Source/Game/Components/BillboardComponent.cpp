@@ -33,11 +33,13 @@ void BillboardComponent::stop() {
 void BillboardComponent::on_changed_transform() {
 	sync_render_data();
 }
+#ifdef EDITOR_BUILD
 void BillboardComponent::editor_on_change_property() {
 
 	dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
 	sync_render_data();
 }
+#endif
 void BillboardComponent::set_texture(const Texture* tex) {
 	if (tex == texture.get())
 		return;

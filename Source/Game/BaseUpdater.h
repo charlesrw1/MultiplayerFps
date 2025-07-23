@@ -20,10 +20,10 @@ public:
 
 	static const int INVALID_FILEID = 0;
 	// Editor Data >>>>
-#ifdef EDITOR_BUILD
-	void set_editor_transient(bool transient) { dont_serialize_or_edit = transient; }
-	bool dont_serialize_or_edit_this() const { return dont_serialize_or_edit; }
 	bool dont_serialize_or_edit = false;
+	void set_editor_transient(bool transient) { dont_serialize_or_edit = transient; }
+#ifdef EDITOR_BUILD
+	bool dont_serialize_or_edit_this() const { return dont_serialize_or_edit; }
 	//Entity* creator_source = nullptr;		// my creator
 	//PrefabAsset* what_prefab = nullptr;	// (optional) what prefab created this (might be differnt than owner's prefab)
 	int unique_file_id = INVALID_FILEID;			// unique id in source owner (either native c++, prefab, map)

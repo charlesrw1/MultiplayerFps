@@ -653,6 +653,7 @@
     <ClCompile Include="Source\Render\RenderExtra.cpp" />
     <ClCompile Include="Source\Framework\SerializerBinary.cpp" />
     <ClCompile Include="Source\UI\GUISystemPublic.cpp" />
+    <ClCompile Include="Source\Game\Components\RagdollComponent.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

@@ -833,7 +833,7 @@ static int GameplayStatic_debug_text_start = 10;
 	 ASSERT(mesh);
 	 AnimatorObject* animator = mesh->get_animator();
 	 ASSERT(animator);
-	 animator->set_update_owner_position_to_root(true);
+	// animator->set_update_owner_position_to_root(true);
 	 auto& children = e->get_children();
 	 for (auto c : children) {
 

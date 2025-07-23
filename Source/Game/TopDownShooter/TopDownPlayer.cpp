@@ -125,10 +125,10 @@ void TopDownPlayer::update() {
 				pos.y = 0;
 				get_owner()->set_ws_position(pos);
 				ccontroller->set_position(pos);
-				animator->set_update_owner_position_to_root(false);
+				//animator->set_update_owner_position_to_root(false);
 			}
 			else {
-				animator->set_update_owner_position_to_root(true);
+				//animator->set_update_owner_position_to_root(true);
 				//set_ws_transform(glm::mat4(1.f));
 			}
 		}

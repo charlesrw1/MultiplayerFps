@@ -95,11 +95,11 @@ public:
 	void on_changed_transform() final {
 		sync_render_data();
 	}
+	~PointLightComponent() final;
+#ifdef EDITOR_BUILD
 	void editor_on_change_property() final {
 		sync_render_data();
 	}
-	~PointLightComponent() final;
-#ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
 		return "eng/editor/light.png";
 	}
@@ -137,11 +137,11 @@ public:
 	void on_changed_transform() final {
 		sync_render_data();
 	}
+	void on_sync_render_data() final;
+#ifdef EDITOR_BUILD
 	void editor_on_change_property() final {
 		sync_render_data();
 	}
-	void on_sync_render_data() final;
-#ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
 		return "eng/editor/light.png";
 	}
@@ -171,7 +171,9 @@ public:
 	void start() final;
 	void stop() final;
 	void on_sync_render_data() final;
+#ifdef EDITOR_BUILD
 	void editor_on_change_property() final;
+#endif
 	REFLECT(transient)
 	BoolButton recapture_skylight;	// Recapture
 	
@@ -203,7 +205,10 @@ public:
 	void start() final;
 	void stop() final;
 	void on_changed_transform() final;
+#ifdef  EDITOR_BUILD
 	void editor_on_change_property() final;
+#endif //  EDITOR_BUILD
+
 	void on_sync_render_data() final;
 
 	REFLECT(transient)
@@ -237,7 +242,9 @@ public:
 	~LightmapComponent();
 	void start() final;
 	void stop() final;
+#ifdef EDITOR_BUILD
 	void editor_on_change_property() final;
+#endif
 	void on_sync_render_data() final;
 	void do_export();
 	void do_import();

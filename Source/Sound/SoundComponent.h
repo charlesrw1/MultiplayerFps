@@ -15,10 +15,10 @@ public:
     void start() override;
     void stop() override;
     void update() override;
-    void editor_on_change_property() override;
     void on_changed_transform() override;
 
 #ifdef EDITOR_BUILD
+    void editor_on_change_property() override;
     const char* get_editor_outliner_icon() const final {
         return "eng/editor/sound.png";
     }

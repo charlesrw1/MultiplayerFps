@@ -214,28 +214,6 @@ void PhysicsBody::pre_start()
 void PhysicsBody::update_bone_parent_animator()
 {
 	ASSERT(init_state != initialization_state::HAS_ID);
-
-	auto get_the_parent_animator = [&]() -> AnimatorObject* {
-		if (get_owner()->has_parent_bone()) {
-			if (get_owner()->get_parent()) {
-				auto m = get_owner()->get_parent()->get_cached_mesh_component();
-				if (m) {
-					return m->get_animator();
-				}
-			}
-		}
-		return nullptr;
-	};
-
-	auto a = get_the_parent_animator();
-	if (!a) 
-		return;
-	if (!simulate_physics ||!enabled)
-		a->remove_simulating_physics_object(get_owner());
-	else {
-		get_owner()->set_is_top_level(true);
-		a->add_simulating_physics_object(get_owner());
-	}
 }
 
 void PhysicsBody::start()
@@ -728,9 +706,9 @@ extern std::string print_vector(glm::vec3 v);
 template<typename T>
 static T* make_joint_shared(const glm::mat4& ws_transform, JointAnchor anchor, int local_joint_axis, T*(*create_func)(PxPhysics&, PxRigidActor*, const PxTransform&, PxRigidActor*, const PxTransform&), PhysicsBody* a, PhysicsBody*b)
 {
-	string msg = std::string(print_vector(ws_transform[1]));
-	eng->log_to_fullscreen_gui(Info, msg.c_str());
-	sys_print(Info, msg.c_str());
+	//string msg = std::string(print_vector(ws_transform[1]));
+//	eng->log_to_fullscreen_gui(Info, msg.c_str());
+	//sys_print(Info, msg.c_str());
 
 	T* joint = nullptr;
 	auto my_local = get_transform_joint(anchor, local_joint_axis);
@@ -796,6 +774,7 @@ void PhysicsJointComponent::on_changed_transform() {
 		editor_meshbuilder->mb.End();
 	}
 }
+#ifdef EDITOR_BUILD
 void PhysicsJointComponent::editor_on_change_property() {
 	if (editor_meshbuilder) {
 		editor_meshbuilder->mb.Begin();
@@ -803,6 +782,7 @@ void PhysicsJointComponent::editor_on_change_property() {
 		editor_meshbuilder->mb.End();
 	}
 }
+#endif
 
 
 

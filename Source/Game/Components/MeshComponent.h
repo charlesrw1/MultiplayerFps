@@ -42,7 +42,10 @@ public:
 	void update() final;
 	void stop() final;
 	void on_changed_transform() final;
+#ifdef EDITOR_BUILD
 	void editor_on_change_property() final;
+#endif // EDITOR_BUILD
+
 	void on_sync_render_data() final;
 	void set_model_str(const char* model_path);
 	REF void set_model(Model* model);
@@ -111,7 +114,9 @@ public:
 	void start() final;
 	void update() final;
 	void stop() final;
+#ifdef EDITOR_BUILD
 	void editor_on_change_property() final;
+#endif
 private:
 	REF const AnimationSeqAsset* asset = nullptr;
 	REF AnimPreviewInfoUi info;

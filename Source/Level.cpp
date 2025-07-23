@@ -135,7 +135,7 @@ void Level::destroy_component(Component* ec)
 	wants_sync_update.remove(ec);
 
 	uint64_t id = ec->get_instance_id();
-	int uid = ec->unique_file_id;
+	//int uid = ec->unique_file_id;
 	assert(id != 0);
 	if (log_destroy_game_objects.get_bool())
 		sys_print(Debug,"removing eComponent (handle:%llu,class:%s)\n", id, ec->get_type().classname);
@@ -257,12 +257,18 @@ void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene
 }
 void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids, bool addSpawnNames) // was bool assign_new_ids=false
 {
+#ifndef EDITOR_BUILD
+	assert(!reassign_ids);
+#endif // !EDITOR_BUILD
+
+
 	const char* reassign_id_str = print_get_bool_string(reassign_ids != nullptr);
 	sys_print(Debug, "Level::insert_unserialized_entities_into_level: (level=%s) (reassign_ids=%s) (objs=%d)\n", sourceAssetName.c_str(), reassign_id_str,(int)scene.all_obj_vec.size());
 
 	auto& objs = scene.all_obj_vec;
 
 	std::unordered_set<BaseUpdater*> ObjsTest;
+#ifdef EDITOR_BUILD
 	std::unordered_set<int> fileIds;
 	for (auto o : objs) {
 		SetUtil::insert_test_exists(ObjsTest,o);
@@ -303,7 +309,9 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 			all_world_ents.insert(o->get_instance_id(), o);
 		}
 	}
-	else {
+	else
+#endif
+	{
 		for (auto& o : objs) {
 			ASSERT(o);
 			assert(o->get_instance_id() == 0);
@@ -384,11 +392,12 @@ void Level::queue_deferred_delete(BaseUpdater* e)
 	}
 	deferred_delete_list.insert(e->get_instance_id());
 }
-
+#ifdef EDITOR_BUILD
 Entity* Level::editor_spawn_prefab_but_dont_set_spawned_by(const PrefabAsset* asset)
 {
 	return spawn_prefab_shared(asset, false);
 }
+#endif
 
 void Level::validate()
 {
@@ -414,6 +423,7 @@ Component* Level::find_first_component(const ClassTypeInfo* type) const
 
 void Level::set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file)
 {
+#ifdef EDITOR_BUILD
 	for (auto& o : file.all_obj_vec) {
 		if (o != &root) {
 			assert(o);
@@ -423,6 +433,7 @@ void Level::set_prefab_spawned(Entity& root, const PrefabAsset& asset, Unseriali
 		}
 	}
 	root.set_root_object_prefab(asset);
+#endif
 }
 
 Entity* Level::spawn_prefab_shared(const PrefabAsset* asset, bool set_vars)
@@ -433,7 +444,9 @@ Entity* Level::spawn_prefab_shared(const PrefabAsset* asset, bool set_vars)
 	}
 	Entity* root = new Entity;
 	if (set_vars) {
+#ifdef EDITOR_BUILD
 		root->set_root_object_prefab(*asset);
+#endif
 	}
 	else {
 		assert(root->get_object_prefab_spawn_type() == EntityPrefabSpawnType::None);

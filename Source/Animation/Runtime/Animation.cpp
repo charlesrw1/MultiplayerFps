@@ -40,7 +40,7 @@ agBaseNode& AnimatorObject::get_root_node() const {
 	return *graph.get_root();
 }
 AnimatorObject::AnimatorObject(const Model& model, agBuilder& ingraph, Entity* ent)
-	: model(model),graph(ingraph), simulating_physics_objects(2) {
+	: model(model),graph(ingraph) {
 	if (!model.get_skel()) {
 		sys_print(Error, "AnimatorObject(): model doesnt have skeleton\n");
 		throw ConstructorError();
@@ -100,7 +100,7 @@ static std::vector<int> get_indicies(const Animation_Set* set, const std::vector
 	for (auto s : strings) out.push_back(set->find(s));
 	return out;
 }
-
+#include "Game/Components/RagdollComponent.h"
 
 ConfigVar force_animation_to_bind_pose("force_animation_to_bind_pose", "0", CVAR_BOOL | CVAR_DEV, "");
 void AnimatorObject::update(float dt)
@@ -136,8 +136,8 @@ void AnimatorObject::update(float dt)
 	}
 	// add physics driven bones
 	// physics bones are in world space, wont cover every bone
-	if (simulating_physics_objects.size() > 0) {
-		update_physics_bones(*pose_base);
+	if (RagdollComponent* rd = ragdoll.get()) {
+		update_physics_bones(*pose_base,rd);
 	}
 	else {
 		util_localspace_to_meshspace(*pose_base, cached_bonemats, get_skel());
@@ -146,14 +146,6 @@ void AnimatorObject::update(float dt)
 	ConcatWithInvPose();
 }
 
-void AnimatorObject::add_simulating_physics_object(Entity* e)
-{
-	simulating_physics_objects.insert(e->get_self_ptr().handle);
-}
-void AnimatorObject::remove_simulating_physics_object(Entity* e)
-{
-	simulating_physics_objects.erase(e->get_self_ptr().handle);
-}
 
 opt<float> AnimatorObject::get_curve_value(StringName name) const
 {
@@ -366,46 +358,40 @@ string print_vector(glm::vec3 v) {
 	return to_string(v.x) + " " + to_string(v.y) + " " + to_string(v.z);
 }
 
-void AnimatorObject::update_physics_bones(const Pose& inpose)
+void AnimatorObject::update_physics_bones(const Pose& inpose, RagdollComponent* rc)
 {
+	rc->on_pre_get_bones();
 	std::vector<bool> is_simulating(num_bones(), 0);	// fixme
-
-	for (auto it = simulating_physics_objects.begin(); it != simulating_physics_objects.end();)
+	const int num_bodies = rc->get_num_bodies();
+	for (int body_index = 0;body_index < num_bodies;body_index++)
 	{
-		auto e = eng->get_entity(*it);
-		if (!e) {
-			it = simulating_physics_objects.erase(it);
-			return;
-		}
-		else
-			++it;
-		assert(e->get_is_top_level());
+		const int bone_index = rc->get_body_index(body_index);
+		glm::mat4 transform = rc->get_body_bone_transform(body_index);
 
-		int parent = get_skel()->get_bone_index(e->get_parent_bone());
-		if (parent == -1) continue;
-		is_simulating[parent] = true;
-		cached_bonemats[parent] = e->get_ws_transform();
 
-		std::string str = std::string(e->get_parent_bone().get_c_str()) + "= " + print_vector(cached_bonemats[parent][3]);
-		GameplayStatic::debug_text(str);
+		is_simulating[bone_index] = true;
+		cached_bonemats[bone_index] = transform;
+
+	//	std::string str = std::string(e->get_parent_bone().get_c_str()) + "= " + print_vector(cached_bonemats[parent][3]);
+	//	GameplayStatic::debug_text(str);
 	}
-	if (update_owner_position_to_root) {
-		glm::mat4 root = cached_bonemats[0];
-		auto inv = glm::inverse(root);
-		for (int i = 0; i < num_bones(); i++) {
-			if (is_simulating[i])
-				cached_bonemats[i] = inv*cached_bonemats[i];
-		}
-		owner->set_ws_transform(root);
-	}
-	else {
-		glm::mat4 obj_worldspace = owner->get_ws_transform();
-		auto invobj = glm::inverse(obj_worldspace);
-		for (int i = 0; i < num_bones(); i++) {
-			if (is_simulating[i])
-				cached_bonemats[i] = invobj * cached_bonemats[i];
-		}
-	}
+	//if (update_owner_position_to_root) {
+	//	glm::mat4 root = cached_bonemats[0];
+	//	auto inv = glm::inverse(root);
+	//	for (int i = 0; i < num_bones(); i++) {
+	//		if (is_simulating[i])
+	//			cached_bonemats[i] = inv*cached_bonemats[i];
+	//	}
+	//	owner->set_ws_transform(root);
+	//}
+	//else {
+	//	glm::mat4 obj_worldspace = owner->get_ws_transform();
+	//	auto invobj = glm::inverse(obj_worldspace);
+	//	for (int i = 0; i < num_bones(); i++) {
+	//		if (is_simulating[i])
+	//			cached_bonemats[i] = invobj * cached_bonemats[i];
+	//	}
+	//}
 
 	util_localspace_to_meshspace_with_physics(inpose, cached_bonemats, is_simulating, get_skel());
 }
@@ -450,6 +436,11 @@ bool AnimatorObject::play_animation(
 	slot_to_play_in->time = 0.0;
 	slot_to_play_in->playspeed = play_speed;
 	return true;
+}
+
+void AnimatorObject::set_ragdoll(RagdollComponent* ragdoll)
+{
+	this->ragdoll = ragdoll;
 }
 
 float DirectAnimationSlot::time_remaining() const {

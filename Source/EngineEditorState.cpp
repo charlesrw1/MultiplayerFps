@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "EngineEditorState.h"
 #include "IEditorTool.h"
 #include "Framework/Util.h"
@@ -126,3 +127,4 @@ void EditorState::draw_tab_window()
 	}
 	ImGui::End();
 }
+#endif

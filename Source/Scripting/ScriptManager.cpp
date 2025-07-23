@@ -576,3 +576,12 @@ static void stack_dump(lua_State* L) {
 	}
 	printf("\n");
 }
+
+void ScriptManager::update()
+{
+#ifdef EDITOR_BUILD
+	check_for_reload();
+#endif
+	lua_settop(lua, 0);// avoid stack overflow for weird stuff
+
+}

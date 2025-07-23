@@ -7,6 +7,7 @@
 #include "Assets/IAsset.h"
 #include "Framework/Reflection2.h"
 #include <memory>
+#include <vector>
 
 enum Texture_Format
 {

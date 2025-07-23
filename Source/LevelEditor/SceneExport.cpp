@@ -1,4 +1,4 @@
-
+#ifdef EDITOR_BUILD
 #include <vector>
 #include <fstream>
 #include <cstring>
@@ -314,3 +314,4 @@ void export_level_scene() {
     p.vert_ofs = 0;
     export_to_gltf({ p },verticies, indicies, "LEVEL_OUT.glb");
 }
+#endif

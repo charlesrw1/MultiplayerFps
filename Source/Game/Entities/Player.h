@@ -120,6 +120,9 @@ public:
 	REF static void debug_break() {
 		__debugbreak();
 	}
+	REF static bool is_editor() {
+		return eng->is_editor_level();
+	}
 
 };
 #include "Input/InputSystem.h"

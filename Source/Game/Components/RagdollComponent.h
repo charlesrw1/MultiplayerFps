@@ -34,6 +34,7 @@
 // now clearly thats a lot of writing for just 2 bones. youll want to make some functions to make the process of adding the bodies/joints easier.
 
 
+#include "MeshComponent.h"
 
 class RagdollComponent : public Component {
 public:
@@ -44,8 +45,19 @@ public:
 	REF void enable();
 	REF void disable();
 
+	void on_pre_get_bones();
+
+	int get_num_bodies() const {
+		return bodies.size();
+	}
+	int get_body_index(int i) {
+		return bodies.at(i).bone_index;
+	}
+	glm::mat4 get_body_bone_transform(int i);
+
 	// when adding bodies, it expects it to have a local space transform set
 	REF void add_body(StringName parented_bone, PhysicsBody* body);
+	REF void add_root_body(StringName parented_bone, PhysicsBody* body);
 private:
 	struct RagdollBody {
 		glm::vec3 bindPosePos;
@@ -54,5 +66,8 @@ private:
 		int bone_index = -1;
 		obj<PhysicsBody> ptr;
 	};
+	obj<MeshComponent> meshComponent;
 	std::vector<RagdollBody> bodies;
+	int root_body_index = -1;
+	glm::mat4 inv_root_body = glm::mat4(1);
 };

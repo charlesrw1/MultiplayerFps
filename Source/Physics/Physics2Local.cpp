@@ -472,8 +472,8 @@ void PhysicsManImpl::update_debug_physics_shapes()
 		}
 
 		if (draw_joints) {
-			scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES, 1.0);
-			scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LIMITS, 0.4);
+			//scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES, 1.0);
+			scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LIMITS,1);
 		}
 		else {
 			scene->setVisualizationParameter(physx::PxVisualizationParameter::eJOINT_LOCAL_FRAMES,0);

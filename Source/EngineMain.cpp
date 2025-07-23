@@ -2253,8 +2253,9 @@ void GameEngineLocal::loop()
 		DebugShapeCtx::get().update(frame_time);
 #ifdef EDITOR_BUILD
 		AssetRegistrySystem::get().update(); 		// update hot reloading
-		ScriptManager::inst->check_for_reload();	// do this here? this does script reloading stuff
 #endif
+		ScriptManager::inst->update();
+
 		if (get_level())
 			get_level()->sync_level_render_data();
 		UiSystem::inst->sync_to_renderer();

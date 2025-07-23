@@ -69,6 +69,7 @@ public:
 	static ScriptManager* inst;
 	ScriptManager();
 	~ScriptManager();
+	void update();
 	void check_for_reload();
 	void load_script_files();
 	void init_this_class_type(ClassTypeInfo* classTypeInfo);

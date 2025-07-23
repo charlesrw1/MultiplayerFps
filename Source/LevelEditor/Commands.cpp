@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "Commands.h"
 #include <unordered_set>
 #include "Framework/MapUtil.h"
@@ -564,3 +565,4 @@ void RemoveComponentCommand::undo() {
 	auto ec = e->create_component(info);
 	comp_handle = ec->get_instance_id();
 }
+#endif

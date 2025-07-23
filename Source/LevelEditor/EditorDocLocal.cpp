@@ -1,5 +1,5 @@
-#include "EditorDocLocal.h"
 #ifdef EDITOR_BUILD
+#include "EditorDocLocal.h"
 #include "EditorDocLocal.h"
 #include "imgui.h"
 #include "glad/glad.h"
@@ -2050,7 +2050,6 @@ std::vector<EditorUILayout::obj> EditorUILayout::get_objs()
 }
 
 
-#endif
 
 Entity* EditorDoc::spawn_entity()
 {
@@ -2146,3 +2145,6 @@ Rect2d DragDetector::get_drag_rect() const
 
 	return rect;
 }
+
+#endif
+

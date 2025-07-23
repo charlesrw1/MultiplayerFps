@@ -17,7 +17,9 @@ public:
 
 	void start() final;
 	void stop() final;
+#ifdef EDITOR_BUILD
 	void editor_on_change_property() final;
+#endif
 	void on_changed_transform() final;
 	void on_sync_render_data() final;
 	void set_texture(const Texture* tex);

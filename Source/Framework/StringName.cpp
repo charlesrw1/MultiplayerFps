@@ -3,6 +3,7 @@
 #include <unordered_map>
 
 #ifdef EDITOR_BUILD
+#endif
 static std::unordered_map<uint64_t, std::string> g_name_map;
 
 static void add_to_nametable(const char* name, name_hash_t hash)
@@ -24,7 +25,6 @@ const char* StringName::get_c_str() const
 {
 	return g_name_map.find(hash) != g_name_map.end() ? g_name_map.find(hash)->second.c_str() : "";
 }
-#endif
 
 StringName::StringName(const char* name)
 {

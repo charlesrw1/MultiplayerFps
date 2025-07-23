@@ -89,6 +89,11 @@ public:
 	REF void apply_force(const glm::vec3& worldspace, const glm::vec3& force);
 
 	REF float get_mass() const;
+	REF void set_density(float d) {
+		this->density = d;
+		on_shape_changes();
+	}
+
 	//REF void set_objects_mass(float mass);
 	//REF void set_objects_density(float density);
 	void set_transform(const glm::mat4& transform, bool teleport = false);
@@ -271,8 +276,9 @@ public:
 	void start() final;
 	void stop() final;
 	void on_changed_transform() override;
+#ifdef EDITOR_BUILD
 	void editor_on_change_property() override;
-
+#endif
 	void clear_joint() {
 		set_target(nullptr);
 	}

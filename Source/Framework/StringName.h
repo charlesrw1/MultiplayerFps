@@ -27,8 +27,8 @@ public:
 
 	bool operator==(const StringName& other) const { return hash == other.hash; }
 	bool operator!=(const StringName& other) const { return hash != other.hash; }
-#ifdef EDITOR_BUILD
 	const char* get_c_str() const;
+#ifdef EDITOR_BUILD
 #endif
 	name_hash_t get_hash() const { return hash; }
 	bool is_null() const {

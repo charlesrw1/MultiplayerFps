@@ -174,7 +174,7 @@ public:
 		}
 
 
-		e->get_cached_mesh_component()->get_animator()->set_update_owner_position_to_root(true);
+		//e->get_cached_mesh_component()->get_animator()->set_update_owner_position_to_root(true);
 	}
 };
 

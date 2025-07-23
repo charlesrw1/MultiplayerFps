@@ -162,7 +162,7 @@ private:
 
 	bool update_sync_group(int idx);
 	void update_slot(int idx, float dt);
-	void update_physics_bones(const Pose& inpose);
+	void update_physics_bones(const Pose& inpose,RagdollComponent* rd);
 	void ConcatWithInvPose();
 
 

@@ -23,9 +23,10 @@ void DecalComponent::start() {
 	{
 		auto b = get_owner()->create_component<BillboardComponent>();
 		b->set_texture(Texture::load("eng/icon/_nearest/decal.png"));
-		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+		b->set_owner_dont_serialize_or_edit(true);
 		auto a = get_owner()->create_component<ArrowComponent>();
-		a->dont_serialize_or_edit = true;
+		a->set_owner_dont_serialize_or_edit(true);
+
 	}
 
 	sync_render_data();
@@ -51,9 +52,11 @@ void DecalComponent::stop() {
 void DecalComponent::on_changed_transform() {
 	sync_render_data();
 }
+#ifdef  EDITOR_BUILD
 void DecalComponent::editor_on_change_property() {
 	sync_render_data();
 }
+#endif //  EDITOR_BUILD
 
 DecalComponent::~DecalComponent() {}
 
@@ -76,7 +79,3 @@ public:
 		return false;
 	}
 };
-std::unique_ptr<IComponentEditorUi> DecalComponent::create_editor_ui()
-{
-	return std::make_unique<DecalComponentEditorUi>(this);
-}
