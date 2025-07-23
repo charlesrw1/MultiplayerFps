@@ -134,9 +134,8 @@ public:
 	void clear_static() { cached_static_objects.clear(); }
 	const pass_type type{};					// modifies batching+sorting logic
 
-#ifdef EDITOR_BUILD
 	bool forced_forward = false;
-#endif
+
 
 	std::vector<Pass_Object> objects;		// geometry + material id + object id
 	std::vector<Pass_Object> cached_static_objects;	// copied into objects

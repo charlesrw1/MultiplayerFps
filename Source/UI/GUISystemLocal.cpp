@@ -48,7 +48,10 @@ void UiSystem::handle_event(const SDL_Event& event)
 
 void UiSystem::draw_imgui_interfaces(EditorState* edState) {
 
+	drawing_to_screen = true;
+#ifdef EDITOR_BUILD
 	drawing_to_screen = !edState || !edState->get_tool();
+#endif
 
 	// draw imgui interfaces
 	// if a tool is active, game screen gets drawn to an imgui viewport

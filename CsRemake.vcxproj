@@ -217,6 +217,7 @@
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\IntegrationTest.h" />
     <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h" />
+    <ClInclude Include="Source\LevelEditor\EditorStatic.h" />
     <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h" />
     <ClInclude Include="Source\LevelEditor\PropertyEditors.h" />
     <ClInclude Include="Source\LevelEditor\TagManager.h" />

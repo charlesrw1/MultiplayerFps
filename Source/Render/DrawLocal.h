@@ -593,8 +593,9 @@ public:
 	}
 private:
 	RenderWindowBackendLocal* windowDrawer = nullptr;
-
+#ifdef EDITOR_BUILD
 	std::unique_ptr<ThumbnailRenderer> thumbnailRenderer;
+#endif
 
 	void upload_ubo_view_constants(const View_Setup& view, bufferhandle ubo, bool wireframe_secondpass = false);
 

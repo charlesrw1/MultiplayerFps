@@ -486,6 +486,7 @@
     <ClInclude Include="Source\Framework\Range.h" />
     <ClInclude Include="Source\Framework\LuaColor.h" />
     <ClInclude Include="Source\Game\Components\RagdollComponent.h" />
+    <ClInclude Include="Source\LevelEditor\EditorStatic.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

@@ -1,6 +1,7 @@
 #pragma once
 #include "IAsset.h"
 #include <memory>
+#include <vector>
 // A collection of assets that are loaded all at once
 class AssetBundle : public IAsset {
 public:

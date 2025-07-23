@@ -57,11 +57,11 @@ public:
 		load_failed = false;
 	}
 
-#ifdef EDITOR_BUILD
+
 	void editor_set_newly_made_path(const std::string& path) {
 		this->path = path;
 	}
-#endif
+
 	bool is_this_globally_referenced() const {
 		return persistent_flag;
 	}

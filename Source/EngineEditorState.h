@@ -1,5 +1,5 @@
 #pragma once
-
+#ifdef EDITOR_BUILD
 #include "Framework/ConsoleCmdGroup.h"
 #include <string>
 #include <variant>
@@ -91,3 +91,4 @@ private:
 	vector<TabItem> tabs;
 	const Texture* redCrossIcon = nullptr;
 };
+#endif

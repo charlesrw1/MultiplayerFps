@@ -142,15 +142,15 @@ public:
 	// like ["start_ed Map mymap", "map mymap"]
 	std::vector<std::string> engine_map_state_history;
 	std::vector<std::string> engine_map_state_future;
+	uptr<IntegrationTester> tester;
+	uptr<EditorState> editorState;
 #endif
 
 	void set_tester(IntegrationTester* tester, bool headless_mode);
 
 	void insert_this_map_as_level(SceneAsset*& asset, bool is_for_playing);
-	uptr<EditorState> editorState;
 	bool is_waiting_on_map_load = false;
 private:
-	uptr<IntegrationTester> tester;
 
 	bool is_hosting_game = false;
 	bool headless_mode = false;

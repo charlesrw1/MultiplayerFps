@@ -294,6 +294,7 @@ void AssetDatabase::dump_loaded_assets_to_disk(const std::string& path)
 	}
 	impl->dump_to_file(file.get());
 }
+
 void AssetDatabase::get_assets_of_type(std::vector<IAsset*>& out, const ClassTypeInfo* type)
 {
 	impl->get_assets_of_type(out, type);

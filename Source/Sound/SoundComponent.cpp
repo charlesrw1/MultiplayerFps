@@ -66,16 +66,16 @@ void SoundComponent::play_one_shot_at_pos(const glm::vec3& v) const
 	);
 }
 
+#ifdef EDITOR_BUILD
 void SoundComponent::editor_on_change_property()
 {
-#ifdef EDITOR_BUILD
 	update_ed_mesh();
 	if (editor_test_sound.check_and_swap()) {
 		play_one_shot();
 	}
 	
-#endif
 }
+#endif
 void SoundComponent::on_changed_transform()
 {
 	if (player) {

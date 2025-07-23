@@ -242,12 +242,13 @@ public:
 	~LightmapComponent();
 	void start() final;
 	void stop() final;
+
 #ifdef EDITOR_BUILD
 	void editor_on_change_property() final;
-#endif
-	void on_sync_render_data() final;
 	void do_export();
 	void do_import();
+#endif
+	void on_sync_render_data() final;
 
 	void serialize(Serializer& s) final;
 private:

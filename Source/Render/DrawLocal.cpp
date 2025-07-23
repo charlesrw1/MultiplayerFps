@@ -877,10 +877,12 @@ void Renderer::create_default_textures()
 
 	auto white_tex = Texture::install_system("_white");
 	auto black_tex = Texture::install_system("_black");
+#ifdef EDITOR_BUILD
 	white_tex->hasSimplifiedColor = true;
 	white_tex->simplifiedColor = COLOR_WHITE;
 	black_tex->hasSimplifiedColor = true;
 	black_tex->simplifiedColor = COLOR_BLACK;
+#endif
 	auto flat_normal = Texture::install_system("_flat_normal");
 
 	white_tex->update_specs(white_texture.gl_id, 1, 1, 3, {});
@@ -992,8 +994,9 @@ void Renderer::init()
 
 	spotShadows = std::make_unique<ShadowMapManager>();
 
-
+#ifdef EDITOR_BUILD
 	thumbnailRenderer = std::make_unique<ThumbnailRenderer>(64);
+#endif
 }
 
 
@@ -2783,6 +2786,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
 }
+#ifdef EDITOR_BUILD
 int write_png_wrapper(const char* filename, int w, int h, int comp, const void* data, int stride_in_bytes);
 
 ThumbnailRenderer::ThumbnailRenderer(int size) : pass(pass_type::TRANSPARENT) {
@@ -2901,6 +2905,7 @@ void ThumbnailRenderer::output_to_path(std::string path) {
 	glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
 	int success = write_png_wrapper(path.c_str(), w, h, 4, pixels.data(), w * 4);
 }
+#endif
 
 ConfigVar r_drawfog("r.drawfog", "1", CVAR_BOOL | CVAR_DEV, "enable/disable drawing of fog");
 
@@ -3805,7 +3810,7 @@ void DebuggingTextureOutput::draw_out()
 	dd.free();
 
 }
-
+#ifdef EDITOR_BUILD
 float Renderer::get_scene_depth_for_editor(int x, int y)
 {
 	ASSERT(!eng->get_is_in_overlapped_period());
@@ -3882,7 +3887,7 @@ std::vector<handle<Render_Object>> Renderer::mouse_box_select_for_editor(int x, 
 		outObjs.push_back(handle<Render_Object>{f});
 	return outObjs;
 }
-
+#endif
 
 bool CheckGlErrorInternal_(const char* file, int line)
 {

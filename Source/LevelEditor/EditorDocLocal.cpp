@@ -1343,23 +1343,6 @@ void EditorDoc::hook_scene_viewport_draw()
 #include "EditorPopups.h"
 
 
-int imgui_std_string_resize(ImGuiInputTextCallbackData* data)
-{
-	std::string* user = (std::string*)data->UserData;
-	assert(user);
-
-	if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
-		user->resize(data->BufSize);
-		data->Buf = (char*)user->data();
-	}
-
-	return 0;
-}
-bool std_string_input_text(const char* label, std::string& str, int flags)
-{
-	return ImGui::InputText(label, (char*)str.c_str(), str.size() + 1, flags | ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &str);
-}
-
 
 
 void EdPropertyGrid::draw_components(Entity* entity)
@@ -1440,12 +1423,27 @@ void EdPropertyGrid::draw_components(Entity* entity)
 			draw_component(entity, c);
 }
 #include "Framework/StringUtils.h"
-
+extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 void EdPropertyGrid::draw()
 {
 	auto& ss = ed_doc.selection_state;
+
+	// this prevents use after free stuff
+	if (ss->has_only_one_selected()) {
+		auto selection = ss->get_only_one_selected();
+		Entity* selected_as_ent = selection.get();
+		const bool has_invalid_component = selected_component != 0 && !get_selected_component();
+		if (!selected_as_ent || has_invalid_component) {
+			sys_print(Warning, "EdPropertyGrid: ss->get_only_one_selected() returned null (rugpulled)\n");
+			ss->clear_all_selected();
+			refresh_grid();
+		}
+	}
+
+
 	if (ImGui::Begin("Properties")) {
-		if (ed_doc.selection_state->has_only_one_selected()) {
+		if (ss->has_only_one_selected()) {
+
 			grid.update();
 
 			if (grid.rows_had_changes) {
@@ -1481,8 +1479,8 @@ void EdPropertyGrid::draw()
 			selected_component = 0;
 		}
 		else {
-
 			Entity* ent = ss->get_only_one_selected().get();
+			ASSERT(ent);
 
 			if (ImGui::Button("Add Component")) {
 				ImGui::OpenPopup("addcomponentpopup");

@@ -18,12 +18,11 @@ class MeshComponent;
 class Component;
 struct PropertyInfoList;
 
-#ifdef EDITOR_BUILD
+
 enum class EntityPrefabSpawnType : int8_t {
 	None, // default, spawned by map
 	RootOfPrefab,	// root of prefab, has prefab asset
 };
-#endif
 
 struct EntityTagString {
 	STRUCT_BODY();
@@ -137,12 +136,12 @@ public:
 	void set_hidden_in_editor(bool b);
 	const PrefabAsset& get_object_prefab() const;
 	void set_spawned_by_prefab();
-	void set_root_object_prefab(const PrefabAsset& asset);
 	void set_prefab_no_owner_after_being_root();
-	EntityPrefabSpawnType get_object_prefab_spawn_type() const;
 	int8_t get_folder_id() const { return editor_folder; }
 	void set_folder_id(int8_t i) { editor_folder = i; }
 #endif
+	EntityPrefabSpawnType get_object_prefab_spawn_type() const;
+	void set_root_object_prefab(const PrefabAsset& asset);
 	void check_for_transform_nans();
 	void validate_check();
 private:
@@ -161,10 +160,10 @@ private:
 #ifdef EDITOR_BUILD
 	bool selected_in_editor = false;
 	bool hidden_in_editor = false;
+#endif
 	const PrefabAsset* what_prefab = nullptr;
 	REFLECT(hide);
 	int8_t editor_folder = 0;
-#endif
 	bool world_transform_is_dirty = true;
 	bool is_top_level = false;	// if true, then local space is considered the world space transform, even if a parent exists
 

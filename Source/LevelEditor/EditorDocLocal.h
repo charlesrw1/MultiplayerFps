@@ -181,6 +181,7 @@ private:
 	}
 	void refresh_grid();
 
+
 	uint64_t selected_component = 0;
 	uint64_t component_context_menu = 0;
 

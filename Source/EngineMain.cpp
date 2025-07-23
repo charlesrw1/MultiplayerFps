@@ -240,6 +240,23 @@ void Fatalf(const char* format, ...)
 	exit(-1);
 }
 
+int imgui_std_string_resize(ImGuiInputTextCallbackData* data)
+{
+	std::string* user = (std::string*)data->UserData;
+	assert(user);
+
+	if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+		user->resize(data->BufSize);
+		data->Buf = (char*)user->data();
+	}
+
+	return 0;
+}
+bool std_string_input_text(const char* label, std::string& str, int flags)
+{
+	return ImGui::InputText(label, (char*)str.c_str(), str.size() + 1, flags | ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &str);
+}
+
 
 
 void GameEngineLocal::log_to_fullscreen_gui(LogType type, const char* msg)
@@ -692,10 +709,12 @@ void GameEngineLocal::insert_this_map_as_level(SceneAsset*& loadedLevel, bool is
 	string mapname = loadedLevel ? loadedLevel->get_name() : "<new level>";
 	sys_print(Info, "Changing map: %s (for_playing=%s)\n", mapname.c_str(), print_get_bool_string(is_for_playing));
 
+#ifdef EDITOR_BUILD
 	if (editorState && editorState->has_tool()) {
 		editorState->hide();
 		assert(!editorState->get_tool());
 	}
+#endif
 	if (level) {
 		stop_game();
 		assert(!level);
@@ -828,10 +847,11 @@ extern void COMPILE_TEX(const Cmd_Args& args);
 void GameEngineLocal::add_commands()
 {
 	commands = ConsoleCmdGroup::create("");
+	commands->add("print_assets", [](const Cmd_Args&) { g_assets.print_usage(); });
+#ifdef EDITOR_BUILD
 	commands->add("IMPORT_TEX_FOLDER", IMPORT_TEX_FOLDER);
 	commands->add("IMPORT_TEX", IMPORT_TEX);
 	commands->add("COMPILE_TEX", COMPILE_TEX);
-	commands->add("print_assets", [](const Cmd_Args&) { g_assets.print_usage(); });
 	commands->add("TOGGLE_PLAY_EDIT_MAP", [this](const Cmd_Args&) {
 		if (!get_level()) 
 			return;
@@ -843,6 +863,8 @@ void GameEngineLocal::add_commands()
 		}
 		});
 	commands->add("start_ed", start_editor);
+#endif
+
 	//commands->add("close_ed", close_editor);
 	commands->add("load_imgui_ini", load_imgui_ini);
 	commands->add("dump_imgui_ini", dump_imgui_ini);
@@ -1051,7 +1073,7 @@ public:
 //
 // save_ed -> SaveEditorTab()
 // close_all_ed_tabs -> Close
-
+#if 0
 #include "LevelEditor/EditorDocLocal.h"
 #include "LevelEditor/Commands.h"
 MulticastDelegate<> tempMD;
@@ -1457,11 +1479,14 @@ void test_integration_2(IntegrationTester& tester)
 
 	//load_asset_new(std::make_exception_ptr(AssetLoadError()));
 }
+#endif
 #include "Testheader.h"
 
 void GameEngineLocal::set_tester(IntegrationTester* tester, bool headless_mode) {
+#ifdef EDITOR_BUILD
 	this->tester.reset(tester);
 	this->headless_mode = headless_mode;
+#endif
 }
 extern ConfigVar developer_mode;
 extern ConfigVar log_shader_compiles;
@@ -1478,7 +1503,7 @@ int game_engine_main(int argc, char** argv)
 	//log_all_asset_loads.set_bool(false);
 	log_destroy_game_objects.set_bool(false);
 	//loglevel.set_integer(1);
-
+#if 0
 	vector<IntTestCase> tests;
 	tests.push_back({ test_integration_1, "myTest" });
 	tests.push_back({ test_integration_2, "myTest2" });
@@ -1494,6 +1519,7 @@ int game_engine_main(int argc, char** argv)
 	//eng_local.set_tester(new IntegrationTester(true, tests), false);
 	auto c = ClassBase::create_class<InterfaceClass>("TestClassI");
 	//
+#endif
 
 	
 	//c->buzzer();
@@ -1585,9 +1611,9 @@ void GameEngineLocal::cleanup()
 	//assert(0);
 	//if (get_current_tool())
 	//	get_current_tool()->close();
-#endif
 	if (editorState)
 		editorState.reset();
+#endif
 	if (level) {
 		stop_game();
 	}
@@ -1987,9 +2013,6 @@ void GameEngineLocal::init(int argc, char** argv)
 
 	// not in editor and no queued map, load the entry point
 	
-#ifdef EDITOR_BUILD
-	AssetRegistrySystem::get().init();
-	
 	auto start_game = [&]() {
 		sys_print(Info, "starting game...\n");
 		Application* a = ClassBase::create_class<Application>(g_application_class.get_string());
@@ -2015,6 +2038,9 @@ void GameEngineLocal::init(int argc, char** argv)
 
 		app->start();
 	};
+#ifdef EDITOR_BUILD
+	AssetRegistrySystem::get().init();
+	
 	if (is_editor_app.get_bool()) {
 		AssetBrowser::inst = new AssetBrowser();
 		editorState = make_unique<EditorState>();
@@ -2244,7 +2270,11 @@ void GameEngineLocal::loop()
 	{
 		ZoneScopedN("ImGuiUpdate");
 		gui_log.draw(UiSystem::inst->window);
-		UiSystem::inst->draw_imgui_interfaces(editorState.get());
+		EditorState* s = nullptr;
+#ifdef EDITOR_BUILD
+		s = editorState.get();
+#endif
+		UiSystem::inst->draw_imgui_interfaces(s);
 	};
 
 	auto do_sync_update = [&]()
@@ -2293,12 +2323,14 @@ void GameEngineLocal::loop()
 				dt = 0.1;
 			frame_time = dt;
 
+#ifdef EDITOR_BUILD
 			if (tester) {
 				bool res = tester->tick(dt);
 				if (res) {
 					Quit();
 				}
 			}
+#endif
 
 			// update input, console cmd buffer, could change maps etc.
 			frame_start();

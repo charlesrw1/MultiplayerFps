@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #include "EditorDocLocal.h"
 #include "Commands.h"
 #include "Assets/AssetDatabase.h"
@@ -873,3 +874,4 @@ vector<vector<string>> OONameFilter::parse_into_and_ors(const std::string& filte
 	return result;
 
 }
+#endif

@@ -120,10 +120,7 @@ void MeshComponent::set_material_override(const MaterialInstance* mi)
 	sync_render_data();
 }
 
-void MeshComponent::editor_on_change_property()
-{
-	sync_render_data();
-}
+
 
 void MeshComponent::on_sync_render_data()
 {
@@ -317,7 +314,12 @@ void AnimPreviewComponent::update()
 void AnimPreviewComponent::stop()
 {
 }
-
+#ifdef EDITOR_BUILD
 void AnimPreviewComponent::editor_on_change_property()
 {
 }
+void MeshComponent::editor_on_change_property()
+{
+	sync_render_data();
+}
+#endif

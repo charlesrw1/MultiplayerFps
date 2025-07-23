@@ -1,6 +1,6 @@
 #pragma once
 #include "Framework/PropertyEd.h"
-
+#ifdef EDITOR_BUILD
 class EditorDoc;
 class AssetMetadata;
 class AnimationGraphEditor;
@@ -198,3 +198,4 @@ public:
 	virtual bool internal_update() override;
 	bool has_init = false;
 };
+#endif

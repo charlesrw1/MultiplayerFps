@@ -93,20 +93,7 @@ public:
 
 static AutoRegisterAsset<MapAssetMetadata> map_register_0987;
 
-//YOU ARE GARBAGE
-ConfigVar g_prefab_factory("g_prefab_factory", "", CVAR_DEV, "");
 
-void PrefabAsset::init_prefab_factory(){
-	if (PrefabAsset::factory) {
-		delete factory;
-		factory = nullptr;
-	}
-	factory = ClassBase::create_class<IPrefabFactory>(g_prefab_factory.get_string());
-	if (factory) {
-		factory->start();
-	}
-}
-IPrefabFactory* PrefabAsset::factory = nullptr;
 
 class PrefabAssetMetadata : public AssetMetadata
 {
@@ -138,6 +125,21 @@ public:
 };
 static AutoRegisterAsset<PrefabAssetMetadata> prefab_register_0987;
 #endif
+
+//YOU ARE GARBAGE
+ConfigVar g_prefab_factory("g_prefab_factory", "", CVAR_DEV, "");
+
+void PrefabAsset::init_prefab_factory() {
+	if (PrefabAsset::factory) {
+		delete factory;
+		factory = nullptr;
+	}
+	factory = ClassBase::create_class<IPrefabFactory>(g_prefab_factory.get_string());
+	if (factory) {
+		factory->start();
+	}
+}
+IPrefabFactory* PrefabAsset::factory = nullptr;
 
 SceneAsset::~SceneAsset() {
 	sys_print(Debug, "~SceneAsset: %s\n", get_name().c_str());

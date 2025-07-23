@@ -1,3 +1,4 @@
+#ifdef EDITOR_BUILD
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "PropertyEditors.h"
 #include "Framework/FnFactory.h"
@@ -808,3 +809,5 @@ bool ClassTypePtrPropertyEditor::internal_update()
 
 	return has_update;
 }
+
+#endif

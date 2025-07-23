@@ -68,7 +68,19 @@ REGISTER_ASSETMETADATA_MACRO(EntityTypeMetadata);
 Entity::Entity()
 {
 }
-
+void Entity::set_root_object_prefab(const PrefabAsset& asset) {
+	if (what_prefab) {
+		sys_print(Warning, "Entity::set_root_object_prefab: already had prefab assigned?\n");
+	}
+	what_prefab = &asset;
+}
+EntityPrefabSpawnType Entity::get_object_prefab_spawn_type() const {
+	if (what_prefab) {
+		return EntityPrefabSpawnType::RootOfPrefab;
+	}
+	else
+		return EntityPrefabSpawnType::None;
+}
 #ifdef EDITOR_BUILD
 void Entity::set_hidden_in_editor(bool b)
 {
@@ -88,25 +100,23 @@ void Entity::set_spawned_by_prefab() {
 		what_prefab = nullptr;
 	set_editor_transient(true);	// make it not editable
 }
-void Entity::set_root_object_prefab(const PrefabAsset& asset) {
-	if (what_prefab) {
-		sys_print(Warning, "Entity::set_root_object_prefab: already had prefab assigned?\n");
-	}
-	what_prefab = &asset;
-}
+
 void Entity::set_prefab_no_owner_after_being_root()
 {
 	assert(get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
 	what_prefab = nullptr;
 	assert(get_object_prefab_spawn_type() == EntityPrefabSpawnType::None);
 }
-EntityPrefabSpawnType Entity::get_object_prefab_spawn_type() const {
-	if (what_prefab) {
-		return EntityPrefabSpawnType::RootOfPrefab;
-	}
-	else
-		return EntityPrefabSpawnType::None;
+
+
+bool Entity::get_is_any_selected_in_editor() const {
+	if (get_selected_in_editor())
+		return true;
+	if (!get_parent())
+		return false;
+	return get_parent()->get_is_any_selected_in_editor();
 }
+#endif
 void Entity::check_for_transform_nans()
 {
 	if (position.x != position.x || position.y != position.y || position.z != position.z) {
@@ -128,20 +138,12 @@ void Entity::validate_check()
 	assert(eng->get_object(get_instance_id()) == this);
 	for (auto c : children)
 		c->validate_check();
-	for (auto comp : all_components){
+	for (auto comp : all_components) {
 		assert(comp->get_instance_id() != 0);
 		assert(eng->get_object(comp->get_instance_id()) == comp);
 	}
 
 }
-bool Entity::get_is_any_selected_in_editor() const {
-	if (get_selected_in_editor())
-		return true;
-	if (!get_parent())
-		return false;
-	return get_parent()->get_is_any_selected_in_editor();
-}
-#endif
 
 
 void Entity::set_active_R(Entity* e, bool b, bool step1)

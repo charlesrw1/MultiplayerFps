@@ -192,14 +192,7 @@ void SkylightComponent::on_sync_render_data()
 	sl.wants_update = true;
 	idraw->get_scene()->update_skylight(handle, sl);
 }
-#ifdef EDITOR_BUILD
-void SkylightComponent::editor_on_change_property()  {
-	if (recapture_skylight.check_and_swap()) {
-		sys_print(Debug, "recapturing skylight");
-		sync_render_data();
-	}
-}
-#endif
+
 
 #include "Game/Entity.h"
 
@@ -279,14 +272,7 @@ void CubemapComponent::stop() {
 		editor_mesh.get()->destroy();
 	}
 }
-#ifdef EDITOR_BUILD
-void CubemapComponent::editor_on_change_property() {
-	if (recapture.check_and_swap()) {
-		sync_render_data();
-	}
-	update_editormeshbuilder();
-}
-#endif
+
 void CubemapComponent::on_changed_transform() {
 	update_editormeshbuilder();
 	if (editor_mesh.get()) {
@@ -296,10 +282,7 @@ void CubemapComponent::on_changed_transform() {
 
 
 #include "Framework/AddClassToFactory.h"
-#ifdef EDITOR_BUILD
-// FIXME!
 
-#endif
 class CubemapAnchorSerializer : public IPropertySerializer
 {
 	// Inherited via IPropertySerializer
@@ -338,17 +321,6 @@ extern void export_godot_scene(const std::string& base_export_path);
 #include "MeshComponent.h"
 #include "Framework/MapUtil.h"
 // hack fixme stuff etc
-#ifdef EDITOR_BUILD
-void LightmapComponent::editor_on_change_property()
-{
-	if (bakeLightmaps.check_and_swap()) {
-		do_export();
-	}
-	if (importBaked.check_and_swap()) {
-		do_import();
-	}
-}
-#endif
 
 void LightmapComponent::on_sync_render_data()
 {
@@ -364,9 +336,33 @@ void LightmapComponent::on_sync_render_data()
 // like: "C:/Users/charl/Documents/lightmapexporter/"
 ConfigVar godot_lightmap_engine_path("godot_lightmap_engine_path", "", 0, "");
 
+#ifdef EDITOR_BUILD
+
+void CubemapComponent::editor_on_change_property() {
+	if (recapture.check_and_swap()) {
+		sync_render_data();
+	}
+	update_editormeshbuilder();
+}
+void LightmapComponent::editor_on_change_property()
+{
+	if (bakeLightmaps.check_and_swap()) {
+		do_export();
+	}
+	if (importBaked.check_and_swap()) {
+		do_import();
+	}
+}
+void SkylightComponent::editor_on_change_property() {
+	if (recapture_skylight.check_and_swap()) {
+		sys_print(Debug, "recapturing skylight");
+		sync_render_data();
+	}
+}
+
+
 void LightmapComponent::do_export()
 {
-#ifdef EDITOR_BUILD
 	string expPath = godot_lightmap_engine_path.get_string();// "C:/Users/charl/Documents/lightmapexporter/";
 	export_godot_scene(expPath);
 
@@ -409,7 +405,6 @@ void LightmapComponent::do_export()
 			probe_index += 1;
 		}
 	}
-#endif
 }
 
 glm::vec3 evaluate_sh9(const glm::vec3 dir, const glm::vec3 sh[9]) {
@@ -436,7 +431,6 @@ ConfigVar lightmapShDebug("lightmapShDebug", "0", CVAR_BOOL, "");
 ConfigVar lightmapShTweakSh("lightmapShTweakSh", "0.5", CVAR_FLOAT, "");
 void LightmapComponent::do_import()
 {
-#ifdef EDITOR_BUILD
 	namespace fs = std::filesystem;
 	string sourcePath = string(godot_lightmap_engine_path.get_string()) + "lightmap_root_scene.exr";
 	string gamePath = FileSys::get_game_path();
@@ -566,8 +560,8 @@ void LightmapComponent::do_import()
 		}
 	}
 	sync_render_data();
-#endif
 }
+#endif
 #include "Framework/Serializer.h"
 
 

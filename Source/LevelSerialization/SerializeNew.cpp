@@ -47,6 +47,10 @@ IMakePathForObject::MakePath MakePathForObjectNew::make_path(const ClassBase* to
 
 string MakePathForObjectNew::make_type_name(ClassBase* obj)
 {
+#ifndef EDITOR_BUILD
+	ASSERT(0);
+	return "";
+#else
 	const BaseUpdater* bu = obj->cast_to<BaseUpdater>();
 	if (!bu)
 		return obj->get_type().classname;
@@ -59,6 +63,7 @@ string MakePathForObjectNew::make_type_name(ClassBase* obj)
 	}
 
 	return bu->get_type().classname;
+#endif
 }
 #include "Framework/SerializedForDiffing.h"
 nlohmann::json* MakePathForObjectNew::find_diff_for_obj(ClassBase* obj)
@@ -105,30 +110,7 @@ ClassBase* MakeObjectForPathNew::create_from_name(ReadSerializerBackendJson& s, 
 		};
 		if (pfb && !pfb->did_load_fail()) {
 			sys_print(Debug, "MakeObjectForPathNew::create_from_name(%s): instancing prefab\n",s.get_debug_tag());
-
 			return make_fake_pfb_root();
-#if 0
-			UnserializedSceneFile pfbOut = pfb->unserialize(&load);// unserialize_entities_from_json(debug_tag.c_str(), *pfb->halfUnserialized, &load);
-			//out.get_
-			Entity* root_of_prefab = pfbOut.get_root_entity();
-			if (!root_of_prefab || pfbOut.num_roots != 1) {
-				sys_print(Warning, "MakeObjectForPathNew::create_from_name(%s): instanced prefab (%s) didnt have root?\n",s.get_debug_tag(),pfb->get_name().c_str());
-				pfbOut.delete_objs();
-				return make_fake_pfb_root();
-			}
-			else {
-				for (auto obj : pfbOut.all_obj_vec) {
-					if (obj != root_of_prefab) {// root is added later
-						out.all_obj_vec.push_back(obj);
-						auto as_ent = obj->cast_to<Entity>();
-						if (as_ent)
-							as_ent->set_spawned_by_prefab();
-					}
-				}
-				set_pfb_root_vars(*root_of_prefab);
-				return root_of_prefab;
-			}
-#endif
 		}
 		else {
 			sys_print(Error, "MakeObjectForPathNew::create_from_name(%s): prefab load failed (%s)\n",s.get_debug_tag(), str.c_str());
