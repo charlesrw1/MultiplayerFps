@@ -209,6 +209,7 @@ const uint DEBUG_DIFFUSE = 6;
 const uint DEBUG_SPECULAR = 7;
 const uint DEBUG_OBJID = 8;
 const uint DEBUG_LIGHTING_ONLY = 9;
+const uint DEBUG_LIGHTMAP_UV = 10;
 */
 //
 // special:

@@ -173,6 +173,7 @@ void EditorDoc::init_new()
 	prop_editor = std::make_unique<EdPropertyGrid>(*this, grid_factory);
 	manipulate = std::make_unique<ManipulateTransformTool>(*this);
 	outliner = std::make_unique<ObjectOutliner>(*this);
+	drag_drop_preview = std::make_unique<DragDropPreview>();
 
 	PropertyFactoryUtil::register_basic(grid_factory);
 	PropertyFactoryUtil::register_editor(*this, grid_factory);
@@ -354,6 +355,7 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 	else {
 		assetName = std::nullopt;
 	}
+
 
 	on_start.invoke();
 	set_window_title();
@@ -1039,6 +1041,8 @@ void EditorDoc::imgui_draw()
 	dragger.tick(!manipulate->is_hovered()&&!manipulate->is_using());
 
 	command_mgr->execute_queued_commands();
+
+	drag_drop_preview->tick();
 }
 void EditorDoc::hook_pre_scene_viewport_draw()
 {
@@ -1148,7 +1152,7 @@ void EditorDoc::hook_scene_viewport_draw()
 		//	sys_print("``` accepting\n");
 
 
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly))
 		{
 			glm::mat4 drop_transform = glm::mat4(1.f);
 
@@ -1163,35 +1167,56 @@ void EditorDoc::hook_scene_viewport_draw()
 
 			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
 
-			if (resource->type->get_asset_class_type()->is_a(Entity::StaticType)) {
-				command_mgr->add_command(new CreateCppClassCommand(*this,
-					resource->filename,
-					drop_transform, EntityPtr(), false)
-				);
-			}
-			else if (resource->type->get_asset_class_type()->is_a(Model::StaticType)) {
-				command_mgr->add_command(new CreateStaticMeshCommand(*this,
-					resource->filename,
-					drop_transform)
-				);
-			}
-			else if (resource->type->get_asset_class_type()->is_a(Component::StaticType)) {
-				EntityPtr parent_to;
-				{
-					const ClassTypeInfo* type = ClassBase::find_class(resource->filename.c_str());
-					
+			auto asset_class_type = resource->type->get_asset_class_type();
+			if (asset_class_type) {
+				if (asset_class_type->is_a(Component::StaticType)) {
+					const ClassTypeInfo* t = ClassBase::find_class(resource->filename.c_str());
+					drag_drop_preview->set_preview_component(t, drop_transform);
 				}
-				command_mgr->add_command(new CreateCppClassCommand(*this,
-					resource->filename,
-					drop_transform,
-					parent_to, true)
-				);
+				else if (asset_class_type->is_a(Model::StaticType)) {
+					Model* mod = Model::load(resource->filename);
+					drag_drop_preview->set_preview_model(mod, drop_transform);
+				}
+				else if (asset_class_type->is_a(PrefabAsset::StaticType)) {
+					PrefabAsset* mod = PrefabAsset::load(resource->filename);
+					drag_drop_preview->set_preview_prefab(mod, drop_transform);
+				}
 			}
-			else if (resource->type->get_asset_class_type()->is_a(PrefabAsset::StaticType)) {
-				command_mgr->add_command(new CreatePrefabCommand(*this,
-					resource->filename,
-					drop_transform
-				));
+
+
+
+			if (const ImGuiPayload* dummy = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")) {
+
+				if (resource->type->get_asset_class_type()->is_a(Entity::StaticType)) {
+					command_mgr->add_command(new CreateCppClassCommand(*this,
+						resource->filename,
+						drop_transform, EntityPtr(), false)
+					);
+				}
+				else if (resource->type->get_asset_class_type()->is_a(Model::StaticType)) {
+					command_mgr->add_command(new CreateStaticMeshCommand(*this,
+						resource->filename,
+						drop_transform)
+					);
+				}
+				else if (resource->type->get_asset_class_type()->is_a(Component::StaticType)) {
+					EntityPtr parent_to;
+					{
+						const ClassTypeInfo* type = ClassBase::find_class(resource->filename.c_str());
+
+					}
+					command_mgr->add_command(new CreateCppClassCommand(*this,
+						resource->filename,
+						drop_transform,
+						parent_to, true)
+					);
+				}
+				else if (resource->type->get_asset_class_type()->is_a(PrefabAsset::StaticType)) {
+					command_mgr->add_command(new CreatePrefabCommand(*this,
+						resource->filename,
+						drop_transform
+					));
+				}
 			}
 
 		}
@@ -1210,8 +1235,12 @@ void EditorDoc::hook_scene_viewport_draw()
 void EdPropertyGrid::draw_components(Entity* entity)
 {
 	ASSERT(selected_component != 0);
-	ASSERT(eng->get_object(selected_component)->is_a<Component>());
-	ASSERT(eng->get_object(selected_component)->cast_to<Component>()->entity_owner == entity);
+
+	BaseUpdater* selectedC = eng->get_object(selected_component);
+	ASSERT(selectedC);
+	ASSERT(selectedC->is_a<Component>());
+	ASSERT(((Component*)selectedC)->entity_owner == entity);
+
 
 	auto draw_component = [&](Entity* e, Component* ec) {
 		ASSERT(ec && e && ec->get_owner() == e);
@@ -1288,6 +1317,8 @@ void EdPropertyGrid::draw_components(Entity* entity)
 
 void EdPropertyGrid::draw()
 {
+
+
 	auto& ss = ed_doc.selection_state;
 
 	// this prevents use after free stuff
@@ -1961,4 +1992,108 @@ Rect2d DragDetector::get_drag_rect() const
 }
 
 #endif
+#include "Render/MaterialPublic.h"
+void DragDropPreview::set_preview_model(Model* m, const glm::mat4& where) {
 
+	had_state_set = true;
+	if (!(state == State::PreviewModel && preview_model == m)) {
+		state = State::PreviewModel;
+		preview_model = m;
+		delete_obj();
+		Entity* e = eng->get_level()->spawn_entity();
+		e->dont_serialize_or_edit = true;
+		auto mesh = e->create_component<MeshComponent>();
+		mesh->set_model(m);
+		mesh->set_material_override(MaterialInstance::load("trigger_zone.mm"));
+		obj_ptr = e;
+		fixup_entity();
+
+	}
+	if (obj_ptr) {
+		obj_ptr->set_ws_transform(where);
+	}
+}
+
+void DragDropPreview::set_preview_component(const ClassTypeInfo* t, const glm::mat4& where) {
+
+	if (!t || !t->is_a(Component::StaticType)) {
+		sys_print(Warning, "set_preview_component: not a Component subtype\n");
+		return;
+	}
+	had_state_set = true;
+	if (!(state == State::PreviewComponent && preview_comp == t)) {
+		state = State::PreviewComponent;
+		preview_comp = t;
+		delete_obj();
+		Entity* e = eng->get_level()->spawn_entity();
+		e->dont_serialize_or_edit = true;
+		e->create_component(t);
+		obj_ptr = e;
+		fixup_entity();
+
+	}
+	if (obj_ptr) {
+		obj_ptr->set_ws_transform(where);
+	}
+}
+
+void DragDropPreview::set_preview_prefab(PrefabAsset* pfb, const glm::mat4& where) {
+	if (!pfb) {
+		return;
+	}
+	had_state_set = true;
+	if (!(state == State::PreviewPrefab && preview_pfb == pfb)) {
+		state = State::PreviewPrefab;
+		preview_pfb = pfb;
+		delete_obj();
+		Entity* e = eng->get_level()->spawn_prefab(pfb);
+		e->dont_serialize_or_edit = true;
+		obj_ptr = e;
+		fixup_entity();
+	}
+	if (obj_ptr) {
+		obj_ptr->set_ws_transform(where);
+	}
+}
+
+void DragDropPreview::tick() {
+	if (!had_state_set) {
+		delete_obj();
+		state = State::None;
+		assert(!obj_ptr);
+	}
+	else {
+		had_state_set = false;
+	}
+}
+#include "Game/Components/ArrowComponent.h"
+#include "Game/Components/BillboardComponent.h"
+void DragDropPreview::fixup_entity()
+{
+	auto set_r = [](auto&& self, Entity* e)->void {
+		for (Component* c : e->get_components()) {
+			if (auto mesh = c->cast_to<MeshComponent>()) {
+				mesh->set_material_override(MaterialInstance::load("trigger_zone.mm"));
+			}
+			if (auto arrow = c->cast_to<ArrowComponent>()) {
+				arrow->visible = false;
+			}
+			if (auto bb = c->cast_to<BillboardComponent>()) {
+				bb->set_is_visible(false);
+			}
+		}
+		for (Entity* c : e->get_children()) {
+			self(self, c);
+		}
+	};
+	if (obj_ptr)
+		set_r(set_r, obj_ptr.get());
+}
+
+void DragDropPreview::delete_obj() {
+	Entity* e = obj_ptr.get();
+	if (e) {
+		e->destroy_deferred();
+	}
+	obj_ptr = nullptr;
+}

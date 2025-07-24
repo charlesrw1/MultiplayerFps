@@ -23,9 +23,9 @@ void DecalComponent::start() {
 	{
 		auto b = get_owner()->create_component<BillboardComponent>();
 		b->set_texture(Texture::load("eng/icon/_nearest/decal.png"));
-		b->set_owner_dont_serialize_or_edit(true);
+		b->dont_serialize_or_edit=true;
 		auto a = get_owner()->create_component<ArrowComponent>();
-		a->set_owner_dont_serialize_or_edit(true);
+		a->dont_serialize_or_edit=true;
 
 	}
 

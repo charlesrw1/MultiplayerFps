@@ -387,6 +387,8 @@ void CreateCppClassCommand::execute() {
 
 	ent->set_ws_transform(transform);
 
+	ASSERT(!ent->dont_serialize_or_edit);
+
 	handle = ent->get_self_ptr();
 	ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
 	ed_doc.on_entity_created.invoke(handle);

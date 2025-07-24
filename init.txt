@@ -30,6 +30,7 @@ bind F5 "r.debug_mode 2"
 bind F6 "r.debug_mode 6"
 bind F7 "r.debug_mode 7"
 bind F8 "r.debug_mode 8"
+bind F9 "r.debug_mode 10"
 
 bind F11 "toggle vid.fullscreen"
 

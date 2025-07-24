@@ -967,7 +967,7 @@ void MaterialManagerLocal::init() {
 	if (!PPeditorSelectMat)
 		Fatalf("couldnt load the default editor select material\n");
 }
-
+#include <array>
 void MaterialManagerLocal::pre_render_update()
 {
 	if (queued_dynamic_mats_to_delete.size() > 0 && material_print_debug.get_bool()) {
@@ -996,8 +996,7 @@ void MaterialManagerLocal::pre_render_update()
 			ASSERT(gpu_buffer_offset >= 0 && gpu_buffer_offset < materialBufferSize/4);
 		}
 
-		uint8_t data_to_upload[MATERIAL_SIZE];
-		memset(data_to_upload, 0, MATERIAL_SIZE);
+		std::array<std::byte, MATERIAL_SIZE> data_to_upload = {};
 
 		auto mm = mat->get_master_material();
 		ASSERT(mm);
@@ -1012,15 +1011,15 @@ void MaterialManagerLocal::pre_render_update()
 			else {
 				if (param.type == MatParamType::Float) {
 					ASSERT(def.offset >= 0 && def.offset < MATERIAL_SIZE - 4);
-					memcpy(data_to_upload+def.offset, &param.scalar, sizeof(float));
+					memcpy(data_to_upload.data()+def.offset, &param.scalar, sizeof(float));
 				}
 				else if (param.type == MatParamType::FloatVec) {
 					ASSERT(def.offset >= 0 && def.offset < MATERIAL_SIZE - sizeof(glm::vec4));
-					memcpy(data_to_upload+def.offset, &param.vector, sizeof(glm::vec4));
+					memcpy(data_to_upload.data()+def.offset, &param.vector, sizeof(glm::vec4));
 				}
 				else if (param.type == MatParamType::Vector) {
 					ASSERT(def.offset >= 0 && def.offset < MATERIAL_SIZE - sizeof(Color32));
-					memcpy(data_to_upload+def.offset, &param.color32, sizeof(Color32));
+					memcpy(data_to_upload.data()+def.offset, &param.color32, sizeof(Color32));
 				}
 				else
 					ASSERT(0);
@@ -1028,7 +1027,7 @@ void MaterialManagerLocal::pre_render_update()
 		}
 
 		// update the buffer
-		glNamedBufferSubData(gpuMaterialBuffer, mat->impl->gpu_buffer_offset * sizeof(uint), MATERIAL_SIZE, data_to_upload);
+		glNamedBufferSubData(gpuMaterialBuffer, mat->impl->gpu_buffer_offset * sizeof(uint), data_to_upload.size(), data_to_upload.data());
 
 	}
 

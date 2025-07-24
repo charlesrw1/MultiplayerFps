@@ -217,6 +217,16 @@ vec3 randColor(uint number){
 
 #ifdef LIGHTMAPPED
 layout(binding = 20) uniform sampler2D _LightmapTexture;		// lightmap texture
+
+#ifdef DEBUG_SHADER
+vec3 get_checker_lightmap_uv(vec2 uv) {
+    ivec2 texSize = textureSize(_LightmapTexture, 0);
+    ivec2 texelCoords = ivec2(floor(uv * vec2(texSize)));
+    bool isEven = (texelCoords.x + texelCoords.y) % 2 == 0;
+    return isEven ? vec3(1.0) : vec3(0.0); // white and black
+}
+#endif
+
 #endif
 
 // standard outputs
@@ -369,7 +379,7 @@ void main()
 	#ifndef FORWARD_SHADER
 		float normal_mult_debug = 1.0;
 		if((g.flags & 2)!=0)
-			normal_mult_debug = max(dot(Final_Normal,normalize(g.viewpos_time.xyz-FS_IN_FragPos)),0.0);
+			normal_mult_debug = max(dot(Final_Normal,normalize(g.viewpos_time.xyz-FS_IN_FragPos)),0.08);
 		if(g.debug_options == DEBUG_OBJID)
 			GBUFFER_OUT_Emissive.rgb = randColor(FS_IN_Objid)*normal_mult_debug;
 		else if(g.debug_options == DEBUG_MATID)
@@ -383,6 +393,16 @@ void main()
 				GBUFFER_OUT_Emissive = vec4(0.0,0.5,0.5,1.0);
 			else	// first pass (black)
 				GBUFFER_OUT_Emissive = vec4(0,0,0,1.0);
+		}
+		else if(g.debug_options==DEBUG_LIGHTMAP_UV) {
+			#ifdef LIGHTMAPPED
+			float alpha = get_checker_lightmap_uv(lm_coord).r;
+			vec3 my_obj_id_color = randColor(FS_IN_Objid)*normal_mult_debug;
+			vec3 lm_debug_color = mix(my_obj_id_color,my_obj_id_color*0.4,alpha);
+			GBUFFER_OUT_Emissive=vec4(lm_debug_color,1);
+			#else
+			GBUFFER_OUT_Emissive = vec4(0,0,0,1);
+			#endif	
 		}
 		
 	#endif	// FORWARD_SHADER

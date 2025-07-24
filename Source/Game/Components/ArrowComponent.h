@@ -32,7 +32,7 @@ public:
 		Render_Object obj;
 		obj.model = arrowModel.get();
 		obj.transform = get_ws_transform();
-		obj.visible = true;
+		obj.visible = visible;
 #ifdef  EDITOR_BUILD
 		obj.visible &= !get_owner()->get_hidden_in_editor();
 		obj.outline = get_owner()->get_is_any_selected_in_editor();
@@ -40,6 +40,7 @@ public:
 		obj.owner = this;
 		idraw->get_scene()->update_obj(handle, obj);
 	}
+	bool visible = true;
 private:
 	AssetPtr<Model> arrowModel;
 	handle<Render_Object> handle;

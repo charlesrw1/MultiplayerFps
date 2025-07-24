@@ -99,7 +99,7 @@ void PointLightComponent::start()
 	{
 		auto b = get_owner()->create_component<BillboardComponent>();
 		b->set_texture(default_asset_load<Texture>("eng/icon/pointBig.png"));
-		b->set_owner_dont_serialize_or_edit(true);	// editor only item, dont serialize
+		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
 		editor_billboard = b->get_instance_id();
 	}
 	sync_render_data();
