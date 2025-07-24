@@ -182,64 +182,8 @@ struct Prop_Flag_Overrides;
 class IAssetLoadingInterface;
 class BinaryReader;
 class FileWriter;
-void write_properties_with_diff(const PropertyInfoList& list, void* ptr, const void* diff_class, DictWriter& out, ClassBase* user = nullptr);
-void write_properties(const PropertyInfoList& list, void* ptr, DictWriter& out, ClassBase* user = nullptr);
-std::pair<StringView, bool> read_properties(const PropertyInfoList& list, void* ptr, DictParser& in, StringView first_token, ClassBase* user, IAssetLoadingInterface* load);
-std::pair<StringView, bool> read_multi_properties(std::vector<PropertyListInstancePair>& lists,  DictParser& in, StringView first_token, ClassBase* user, IAssetLoadingInterface* load);
-std::pair<StringView, bool> read_props_to_object(ClassBase* dest_obj, const ClassTypeInfo* typeinfo, DictParser& in, StringView first_token, IAssetLoadingInterface* load, ClassBase* user = nullptr);
-void copy_properties(std::vector<const PropertyInfoList*> lists,  void* from, void* to, ClassBase* user, IAssetLoadingInterface* load);
-void read_props_to_object_binary(ClassBase* dest_obj, const ClassTypeInfo* typeinfo, BinaryReader& in, ClassBase* userptr);
-void write_properties_with_diff_binary(const PropertyInfoList& list, void* ptr, const void* diff_class, FileWriter& out, ClassBase* userptr);
-
-void copy_object_properties(ClassBase* from, ClassBase* to, ClassBase* userptr, IAssetLoadingInterface* load);
-void write_object_properties(ClassBase* obj, ClassBase* userptr, DictWriter& out);
 
 
-template<typename BASE>
-inline BASE* read_object_properties(
-	ClassBase* userptr,
-	DictParser& in,
-	StringView tok, IAssetLoadingInterface* load
-)
-{
-	if (!in.check_item_start(tok))
-		return nullptr;
-	in.read_string(tok);
-	if (!tok.cmp("type"))	// if the item is SUPPOSED to be nullptr, then that occurs here (as it will be a cmp with '}')
-		return nullptr;
-	in.read_string(tok);
-	BASE* obj = ClassBase::create_class<BASE>(tok.to_stack_string().c_str());
-	if (!obj)
-		return nullptr;
-
-	std::vector<PropertyListInstancePair> props;
-	const ClassTypeInfo* typeinfo = &obj->get_type();
-	while (typeinfo) {
-		if (typeinfo->props)
-			props.push_back({ typeinfo->props, obj });
-		typeinfo = typeinfo->super_typeinfo;
-	}
-
-	auto ret = read_multi_properties(props, in, {}, userptr, load);
-	tok = ret.first;
-
-	if (!ret.second || !in.check_item_end(tok)) {
-		delete obj;
-		return nullptr;
-	}
-	return obj;
-}
-
-template<typename BASE>
-inline BASE* read_object_properties_no_input_tok(
-	ClassBase* userptr,
-	DictParser& in,
-	IAssetLoadingInterface* load)
-{
-	StringView tok;
-	in.read_string(tok);
-	return read_object_properties<BASE>(userptr, in, tok, load);
-}
 
 class IListCallback
 {

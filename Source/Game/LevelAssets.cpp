@@ -164,6 +164,8 @@ void SceneAsset::move_construct(IAsset*) {
 	sys_print(Warning, "scene asset move construct, shouldnt have happened\n");
 }
 
+
+
 void SceneAsset::post_load()
 {
 	// hmm move this to post_load on main thread because lua isnt thread safe
@@ -171,7 +173,9 @@ void SceneAsset::post_load()
 	// this also throws on error, catch it in assets
 	double start = GetTime();
 	
+
 	sceneFile = std::make_unique<UnserializedSceneFile>(NewSerialization::unserialize_from_json(get_name().c_str(), *halfUnserialized, *g_assets.loader));
+
 	double now = GetTime();
 	sys_print(Debug, "SceneAsset::post_load: took %f\n", float(now - start));
 }

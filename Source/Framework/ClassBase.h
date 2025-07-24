@@ -90,8 +90,6 @@ public:
 	// is this class a subclass or an instance of type T
 	template<typename T>
 	bool is_a() const;
-	// creates a copy of class and copies serializable fields
-	ClassBase* create_copy(ClassBase* userptr = nullptr);
 
 	REFLECT();
 	const ClassTypeInfo* my_type() const;

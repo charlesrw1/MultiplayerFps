@@ -130,12 +130,7 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 			}
 		}
 		else {
-			DictParser in;
-			in.load_from_memory(to_str.data(), to_str.size(), "");
-			tis = read_object_properties_no_input_tok<TextureImportSettings>(nullptr, in, loading);
-			if (tis) {
-				write_texture_import_settings(tis, strip_extension(gamepath) + ".tis");
-			}
+			sys_print(Warning, "OLD TIS FORMAT\n");
 		}
 
 		if (!tis) {

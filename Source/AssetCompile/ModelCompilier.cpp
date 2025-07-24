@@ -983,18 +983,10 @@ ModelDefData new_import_settings_to_modeldef_data(const string& mis_path, IFile*
 		}
 	}
 	else {
-		sys_print(Debug, "new_import_settings_to_modeldef_data: loading old version %s\n", mis_path.c_str());
-
-		DictParser dp;
-		dp.load_from_memory(to_str.data(),to_str.size(),"read_imp");
-		StringView tok;
-		dp.read_string(tok);
-		impSettings = read_object_properties<ModelImportSettings>(nullptr, dp, tok,loading);
-		if (!impSettings)
-			throw std::runtime_error("couldnt parse new class import sttings");
-
-
-		write_model_import_settings(impSettings, mis_path);
+		sys_print(Warning, "new_import_settings_to_modeldef_data: loading old version %s\n", mis_path.c_str());
+		if (!impSettings) {
+			throw std::runtime_error("couldn't open dict");
+		}
 	}
 	ModelDefData mdd = new_import_settings_to_modeldef_data(impSettings);
 	delete impSettings;

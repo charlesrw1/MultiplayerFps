@@ -268,7 +268,7 @@ public:
 	FloatEditor(void* inst, PropertyInfo* prop) { 
 		this->instance = inst;
 		this->prop = prop;
-		hint_str = parse_hint_str_for_property(prop); 
+		//hint_str = parse_hint_str_for_property(prop); 
 	}
 
 	// Inherited via IPropertyEditor
@@ -290,7 +290,7 @@ public:
 	IntegerEditor(void* inst, PropertyInfo* prop)  { 
 		this->instance = inst;
 		this->prop = prop;
-		hint_str = parse_hint_str_for_property(prop);
+		//hint_str = parse_hint_str_for_property(prop);
 	}
 
 
@@ -311,7 +311,7 @@ public:
 	EnumEditor(void* inst, PropertyInfo* prop) { 
 		this->instance = inst;
 		this->prop = prop;
-		hint_str = parse_hint_str_for_property(prop); 
+		//hint_str = parse_hint_str_for_property(prop); 
 	}
 
 	// Inherited via IPropertyEditor
@@ -331,7 +331,7 @@ public:
 	BooleanEditor(void* inst, PropertyInfo* prop) { 
 		this->instance = inst;
 		this->prop = prop;
-		hint_str = parse_hint_str_for_property(prop);
+		//hint_str = parse_hint_str_for_property(prop);
 	}
 
 	// Inherited via IPropertyEditor

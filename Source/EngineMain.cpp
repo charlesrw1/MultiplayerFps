@@ -55,6 +55,13 @@
 #include "DebugConsole.h"
 #include "Scripting/ScriptManager.h"
 #include "Scripting/ScriptFunctionCodegen.h"
+#include "Assets/AssetBundle.h"
+#include "Framework/StringUtils.h"
+#include "Scripting/ScriptManager.h"
+#include "LevelEditor/TagManager.h"
+#include "EditorPopupTemplate.h"
+#include "Animation/SkeletonData.h"
+#include <mutex>
 
 Debug_Console* Debug_Console::inst = nullptr;
 
@@ -62,7 +69,40 @@ GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
 
 static double program_time_start;
+
+extern ConfigVar log_destroy_game_objects;
+extern ConfigVar log_all_asset_loads;
+extern ConfigVar developer_mode;
+extern ConfigVar log_shader_compiles;
+extern ConfigVar material_print_debug;
+extern ConfigVar g_project_name;
 ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "Cfg", CVAR_DEV, "what folder to save .ini and other editor cfg to");
+ConfigVar loglevel("loglevel", "4", CVAR_INTEGER, "(0=disable,4=all)", 0, 4);
+ConfigVar colorLog("colorLog", "1", CVAR_BOOL, "");
+ConfigVar g_application_class("g_application_class", "Application", CVAR_DEV, "");
+ConfigVar with_threading("with_threading", "1", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar is_editor_app("is_editor_app", "0", CVAR_BOOL, "");
+ConfigVar g_drawconsole("drawconsole", "0", CVAR_BOOL, "draw the console");
+ConfigVar g_project_name("g_project_name", "CsRemakeEngine", CVAR_DEV, "the project name of the game, used for save file folders");
+ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, "", 0.0, 1.0);
+ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, "", 10.0, 110.0);
+ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL, "");
+ConfigVar g_fakemovedebug("fakemovedebug", "0", CVAR_INTEGER, "", 0, 2);
+ConfigVar g_drawimguidemo("g_drawimguidemo", "0", CVAR_BOOL, "");
+ConfigVar g_debug_skeletons("g_debug_skeletons", "0", CVAR_BOOL, "draw skeletons of active animated renderables");
+ConfigVar g_draw_grid("g_draw_grid", "0", CVAR_BOOL, "draw a debug grid around the origin");
+ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, "size of g_draw_grid", 0.01, 10);
+// defualt sky material to use for editors like materials/models/etc.
+ConfigVar ed_default_sky_material("ed_default_sky_material", "eng/hdriSky.mm", CVAR_DEV, "default sky material used for editors");
+ConfigVar g_drawdebugmenu("g_drawdebugmenu", "0", CVAR_BOOL, "draw the debug menu");
+ConfigVar g_window_w("vid.width", "1200", CVAR_INTEGER, "", 1, 4000);
+ConfigVar g_window_h("vid.height", "800", CVAR_INTEGER, "", 1, 4000);
+ConfigVar g_window_fullscreen("vid.fullscreen", "0", CVAR_BOOL, "");
+ConfigVar g_host_port("net.hostport", "47000", CVAR_INTEGER | CVAR_READONLY, "", 0, UINT16_MAX);
+ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL, "enables dev mode features like compiling assets when loading");
+ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop", 0.0001, 5.0);
+
 
 double GetTime()
 {
@@ -73,7 +113,6 @@ double TimeSinceStart()
 	return GetTime() - program_time_start;
 }
 
-#include "Animation/SkeletonData.h"
 void add_player_model_events(MSkeleton* skel) {
 	if (auto runClip = skel->find_clip("RUN")) {
 		runClip->directplayopt.slotname = StringName("TheSlot");
@@ -134,7 +173,7 @@ private:
 };
 //
 
-#include <mutex>
+
 static std::mutex printMutex;	// fixme
 
 char* string_format(const char* fmt, ...) {
@@ -176,10 +215,6 @@ inline Color32 get_color_of_print(LogType type) {
 	return out;
 }
 
-ConfigVar loglevel("loglevel", "4", CVAR_INTEGER, "(0=disable,4=all)", 0, 4);
-ConfigVar colorLog("colorLog", "1", CVAR_BOOL, "");
-extern ConfigVar log_destroy_game_objects;
-extern ConfigVar log_all_asset_loads;
 void sys_print(LogType type, const char* fmt, ...)
 {
 	if ((int(type)) > loglevel.get_integer())
@@ -272,7 +307,7 @@ static void SDLError(const char* msg)
 }
 
 
-extern ConfigVar g_project_name;
+
 
 glm::mat4 User_Camera::get_view_matrix() const {
 	return glm::lookAt(position, position + front, up);
@@ -412,7 +447,6 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 	}
 }
 
-#include "EditorPopupTemplate.h"
 
 #ifdef EDITOR_BUILD
 //TOGGLE_PLAY_EDIT_MAP
@@ -787,7 +821,6 @@ void OpenMapCommand::execute()
 	}
 }
 
-#include "EditorPopupTemplate.h"
 
 static void inc_or_dec_int_var(ConfigVar* var, bool decrement)
 {
@@ -837,7 +870,6 @@ void load_imgui_ini(const Cmd_Args& args)
 
 	ImGui::LoadIniSettingsFromDisk(path.c_str());
 }
-#include "LevelEditor/TagManager.h"
 
 // tech debt nonsense
 extern void IMPORT_TEX_FOLDER(const Cmd_Args& args);
@@ -1488,9 +1520,8 @@ void GameEngineLocal::set_tester(IntegrationTester* tester, bool headless_mode) 
 	this->headless_mode = headless_mode;
 #endif
 }
-extern ConfigVar developer_mode;
-extern ConfigVar log_shader_compiles;
-extern ConfigVar material_print_debug;
+
+
 int game_engine_main(int argc, char** argv)
 {
 	material_print_debug.set_bool(true);
@@ -1521,7 +1552,7 @@ int game_engine_main(int argc, char** argv)
 	//
 #endif
 
-	
+
 	//c->buzzer();
 	//int val = c->get_value("hello");
 	//assert(val == 1);
@@ -1534,31 +1565,6 @@ int game_engine_main(int argc, char** argv)
 }
 ClassWithDelegate StaticClass::myClass;
 
-ConfigVar g_project_name("g_project_name", "CsRemakeEngine", CVAR_DEV, "the project name of the game, used for save file folders");
-
-ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, "", 0.0, 1.0);
-ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, "", 10.0, 110.0);
-ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL,"");
-ConfigVar g_fakemovedebug("fakemovedebug", "0", CVAR_INTEGER,"", 0, 2);
-ConfigVar g_drawimguidemo("g_drawimguidemo", "0", CVAR_BOOL,"");
-ConfigVar g_debug_skeletons("g_debug_skeletons", "0", CVAR_BOOL,"draw skeletons of active animated renderables");
-ConfigVar g_draw_grid("g_draw_grid", "0", CVAR_BOOL,"draw a debug grid around the origin");
-ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, "size of g_draw_grid", 0.01,10);
-
-// defualt sky material to use for editors like materials/models/etc.
-ConfigVar ed_default_sky_material("ed_default_sky_material", "eng/hdriSky.mm", CVAR_DEV, "default sky material used for editors");
-
-ConfigVar g_drawdebugmenu("g_drawdebugmenu","0",CVAR_BOOL, "draw the debug menu");
-
-ConfigVar g_window_w("vid.width","1200",CVAR_INTEGER,"",1,4000);
-ConfigVar g_window_h("vid.height", "800", CVAR_INTEGER, "",1, 4000);
-ConfigVar g_window_fullscreen("vid.fullscreen", "0",CVAR_BOOL,"");
-ConfigVar g_host_port("net.hostport","47000",CVAR_INTEGER|CVAR_READONLY,"",0,UINT16_MAX);
-ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV,"");
-
-ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL, "enables dev mode features like compiling assets when loading");
-
-ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop", 0.0001, 5.0);
 
 
 
@@ -1720,7 +1726,6 @@ bool GameEngineLocal::is_drawing_to_window_viewport() const
 
 static bool scene_hovered = false;
 
-ConfigVar g_drawconsole("drawconsole", "0", CVAR_BOOL, "draw the console");
 #include "Framework/MyImguiLib.h"
 void GameEngineLocal::draw_any_imgui_interfaces()
 {
@@ -1871,15 +1876,12 @@ void GameEngineLocal::init_sdl_window()
 
 	SDL_GL_SetSwapInterval(0);
 }
-#include "Assets/AssetBundle.h"
-#include "Framework/StringUtils.h"
-#include "Scripting/ScriptManager.h"
+
+
 using std::make_unique;
 
 ImFont* global_big_imgui_font = nullptr;
 
-ConfigVar is_editor_app("is_editor_app", "0", CVAR_BOOL, "");
-extern ConfigVar g_application_class;
 
 void GameEngineLocal::init(int argc, char** argv)
 {
@@ -2064,8 +2066,6 @@ void GameEngineLocal::init(int argc, char** argv)
 
 	sys_print(Info, "execute startup in %f\n", (float)TimeSinceStart());
 }
-ConfigVar g_application_class("g_application_class", "Application", CVAR_DEV, "");
-ConfigVar with_threading("with_threading", "1", CVAR_BOOL | CVAR_DEV, "");
 
 void GameEngineLocal::game_update_tick()
 {
@@ -2503,59 +2503,6 @@ void Debug_Console::print(Color32 color, const char* fmt, ...)
 }
 
 
-// SDL_CONTROLLER_AXIS_LEFTX = 0
-// SDL_CONTROLLER_AXIS_LEFTY = 1
-
-void update_char() {
-	SDL_GameControllerAxis moveAxisX = SDL_CONTROLLER_AXIS_LEFTX;
-	SDL_GameControllerAxis moveAxisY = SDL_CONTROLLER_AXIS_LEFTY;
-	if (Input::is_shift_down() && Input::is_alt_down() && Input::is_mouse_down(0)) {
-		
-	}
-	bool send_nav_next = false;
-
-	static float next_time = 0.0;
-	if (Input::is_any_con_active()) {
-		const bool down = Input::is_con_button_down(SDL_CONTROLLER_BUTTON_DPAD_RIGHT);
-		if (!down) {
-			next_time = 0.0;
-		}
-		else if (down && GetTime() > next_time) {
-			send_nav_next = true;
-			next_time = GetTime() + 0.4;
-		}
-	}
-
-	vec2 move{};
-	move.x = Input::get_con_axis(moveAxisX);
-	move.y = Input::get_con_axis(moveAxisY);
-
-	const bool INVERT_Y = false;
-	if (INVERT_Y)
-		move.y = -move.y;
-	const float SENS = 0.01;
-	move *= SENS;
-	const float DEADZONE = 0.1;
-	if (glm::abs(move.y) < DEADZONE)move.y = 0;
-	if (glm::abs(move.x) < DEADZONE)move.x = 0;
-	if (glm::length(move) > 1)
-		move = move / glm::length(move);
-
-	bool wants_shoot = false;
-	if (Input::is_mouse_down(0))
-		wants_shoot = true;
-	if (Input::get_con_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 0.5)
-		wants_shoot = true;
-
-
-	Input::is_con_button_down(SDL_CONTROLLER_BUTTON_A);
-
-	if(Input::is_key_down(SDL_SCANCODE_W)) {
-
-	}
-
-
-}
 void Debug::add_line(glm::vec3 f, glm::vec3 to, Color32 color, float duration, bool fixedupdate)
 {
 	Debug_Shape shape;

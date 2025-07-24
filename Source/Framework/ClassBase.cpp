@@ -339,12 +339,3 @@ ClassBase::ClassBase(ClassBase&& other)
 {
 	return;
 }
-
-ClassBase* ClassBase::create_copy(ClassBase* userptr)
-{
-	ASSERT(get_type().has_allocate_func());
-	ClassBase* copied = get_type().allocate_this_type();
-	ASSERT(copied);
-	copy_object_properties(this, copied, userptr, AssetDatabase::loader);
-	return copied;
-}

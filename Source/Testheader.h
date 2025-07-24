@@ -23,6 +23,9 @@ public:
 		return &myClass;
 	}
 
+	REF static int get_int() {
+		return 10;
+	}
 	static ClassWithDelegate myClass;
 };
 //

@@ -115,44 +115,6 @@ public:
 };
 
 
-class FindAnimGraphVariableProp : public IPropertyEditor
-{
-public:
-	FindAnimGraphVariableProp(AnimationGraphEditor& editor) : editor(editor) {}
-	virtual bool internal_update() override;
-	AnimationGraphEditor& editor;
-};
-
-class FindAnimationClipPropertyEditor : public IPropertyEditor
-{
-public:
-	FindAnimationClipPropertyEditor(AnimationGraphEditor& editor) : editor(editor) {}
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-	AnimationGraphEditor& editor;
-};
-
-class AgBoneFinder : public IPropertyEditor
-{
-public:
-	AgBoneFinder(AnimationGraphEditor& editor);
-
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-	bool no_model = false;
-	// copy in as std strings, could be c_strs but that opens up more room for bugs
-	std::vector<std::string> bones;
-	AnimationGraphEditor& editor;
-};
-
-class BlendspaceGridEd : public IPropertyEditor
-{
-public:
-	BlendspaceGridEd(AnimationGraphEditor& editor) : editor(editor) {}
-	virtual bool internal_update() override;
-	AnimationGraphEditor& editor;
-};
-
 
 
 class EntityBoneParentStringEditor : public IPropertyEditor
@@ -165,7 +127,7 @@ public:
 	bool has_init = false;
 	std::vector<std::string> options;
 	bool set_keyboard_focus = true;
-	string node_menu_filter_buf;
+	std::string node_menu_filter_buf;
 };
 class EntityTagEditor : public IPropertyEditor
 {

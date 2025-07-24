@@ -72,7 +72,6 @@
     <ClCompile Include="Source\Framework\PropertyEd.cpp" />
     <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
     <ClCompile Include="Source\Framework\ReflectionProp.cpp" />
-    <ClCompile Include="Source\Framework\ReflectionSerializationBin.cpp" />
     <ClCompile Include="Source\Framework\Serializer.cpp" />
     <ClCompile Include="Source\Framework\SerializerBinary.cpp" />
     <ClCompile Include="Source\Framework\SerializerJson.cpp">

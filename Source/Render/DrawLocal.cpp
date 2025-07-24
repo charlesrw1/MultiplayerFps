@@ -682,7 +682,7 @@ void Renderer::reload_shaders()
 }
 
 ConfigVar r_taa_jitter_test("r.taa_jitter_test", "0", CVAR_INTEGER,"", 0, 4);
-
+ConfigVar r_normal_shaded_debug("r.normal_shaded_debug", "1", CVAR_BOOL, "");
 void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, bufferhandle ubo, bool wireframe_secondpass)
 {
 	gpu::Ubo_View_Constants_Struct constants;
@@ -730,6 +730,9 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, bufferha
 	constants.flags = 0;
 	if (wireframe_secondpass)
 		constants.flags |= (1 << 0);
+	if (r_normal_shaded_debug.get_bool()) {
+		constants.flags |= (1 << 1);
+	}
 
 
 	glNamedBufferData(ubo, sizeof(gpu::Ubo_View_Constants_Struct), &constants, GL_DYNAMIC_DRAW);

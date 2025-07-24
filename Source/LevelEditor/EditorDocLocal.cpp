@@ -5,50 +5,64 @@
 #include "glad/glad.h"
 #include "glm/gtx/euler_angles.hpp"
 #include "External/ImGuizmo.h"
-
 #include "Framework/MeshBuilder.h"
-
 #include "Framework/Files.h"
 #include "Framework/MyImguiLib.h"
 #include "Framework/DictWriter.h"
-
 #include "Physics/Physics2.h"
-
 #include "Debug.h"
 #include <algorithm>
 #include <stdexcept>
 #include <fstream>
-
 #include "Render/DrawPublic.h"
 #include "Render/Texture.h"
-
 #include "AssetCompile/Someutils.h"// string stuff
 #include "Assets/AssetRegistry.h"
-
 #include "UI/Widgets/Layouts.h"
 #include "UI/GUISystemPublic.h"
-
 #include "Game/LevelAssets.h"
-
 #include "LevelEditor/Commands.h"
 #include "Framework/Rect2d.h"
-
 #include "Framework/AddClassToFactory.h"
-
 #include "Game/EntityComponent.h"
-
-
 #include "UI/UIBuilder.h"
+#include "PropertyEditors.h"
+#include "LevelSerialization/SerializeNew.h"
+#include "EditorPopupTemplate.h"
+#include "Framework/StringUtils.h"
+#include "EditorPopupTemplate.h"
+#include "UI/Widgets/EditorCube.h"
+#include "UI/UILoader.h"
+#include "PropertyEditors.h"
+#include "Game/Components/LightComponents.h"
+#include "Framework/StringUtils.h"
+#include "EditorPopups.h"
+#include <glm/gtc/type_ptr.hpp>
+#include "Input/InputSystem.h"
 
 
+MulticastDelegate<EditorDoc*> EditorDoc::on_creation;
+MulticastDelegate<EditorDoc*> EditorDoc::on_deletion;
 
 ConfigVar g_editor_newmap_template("g_editor_newmap_template", "eng/template_map.tmap", CVAR_DEV, "whenever a new map is created, it will use this map as a template");
 ConfigVar editor_draw_name_text("editor_draw_name_text", "0", CVAR_BOOL, "draw text above every entities head in editor");
 ConfigVar editor_draw_name_text_alpha("editor_draw_name_text_alpha", "150", CVAR_INTEGER, "", 0, 255);
-
+ConfigVar ed_has_snap("ed_has_snap", "0", CVAR_BOOL, "");
+ConfigVar ed_translation_snap("ed_translation_snap", "0.2", CVAR_FLOAT, "what editor translation snap", 0.1, 128);
+ConfigVar ed_translation_snap_exp("ed_translation_snap_exp", "10", CVAR_FLOAT, "editor translation snap increment exponent", 1, 10);
+ConfigVar ed_rotation_snap("ed_rotation_snap", "15.0", CVAR_FLOAT, "what editor rotation snap (degrees)", 0.1, 360);
+ConfigVar ed_rotation_snap_exp("ed_rotation_snap_exp", "3", CVAR_FLOAT, "editor rotation snap increment exponent", 1, 10);
+ConfigVar ed_scale_snap("ed_scale_snap", "1.0", CVAR_FLOAT, "what editor scale snap", 0.1, 360);
+ConfigVar ed_scale_snap_exp("ed_scale_snap_exp", "3", CVAR_FLOAT, "editor scale snap increment exponent", 1, 10);
+ConfigVar ed_force_guizmo("ed.force_guizmo", "0", CVAR_BOOL, "");
+ConfigVar test1("test1", "200", CVAR_INTEGER, "", 0, 256);
+ConfigVar test2("test2", "200", CVAR_INTEGER, "", 0, 256);
 
 extern bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAsset* for_prefab);
-
+extern void export_godot_scene(const std::string& base_export_path);
+extern void export_level_scene();
+extern void start_play_process();
+extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 
 static std::string to_string(StringView view) {
 	return std::string(view.str_start, view.str_len);
@@ -117,7 +131,7 @@ void EditorDoc::validate_fileids_before_serialize()
 			o->unique_file_id = get_next_file_id();
 	}
 }
-#include "PropertyEditors.h"
+
 void EditorDoc::init_new()
 {
 	clear_editor_changes();
@@ -236,9 +250,7 @@ void EditorDoc::set_document_path(string newAssetName)
 	}
 	this->assetName = newAssetName;
 }
-#include "LevelSerialization/SerializeNew.h"
-#include "EditorPopupTemplate.h"
-#include "Framework/StringUtils.h"
+
 bool EditorDoc::save_document_internal()
 {
 	if (assetName.has_value() && assetName.value().empty()) {
@@ -322,11 +334,6 @@ void EditorDoc::exit_eyedropper_mode() {
 	}
 }
 
-#include "EditorPopupTemplate.h"
-
-MulticastDelegate<EditorDoc*> EditorDoc::on_creation;
-MulticastDelegate<EditorDoc*> EditorDoc::on_deletion;
-
 
 EditorDoc* EditorDoc::create_scene(opt<string> scene)
 {
@@ -358,71 +365,6 @@ EditorDoc::EditorDoc() {
 }
 
 
-#if 0
-void EditorDoc::on_map_load_return(bool good)
-{
-
-	if (good && (!get_is_open() || !eng->get_level())) {
-		sys_print(Warning, "on_map_load_return but level editor not open\n");
-		return;
-	}
-
-	if (!good) {
-		sys_print(Warning, "failed to load editor map\n");
-		PopupTemplate::create_basic_okay(
-			EditorPopupManager::inst,
-			"Error",
-			"Couldn't load map: " + get_doc_name()
-		);
-		eng->open_level("__empty__");
-		// this will call on_map_load_return again, sort of an infinite loop risk, but should always be valid with "__empty__"
-	}
-	else {
-		
-		if (is_editing_prefab()) {
-
-			// marks the templated level objects as dont serialize or edit
-			auto level = eng->get_level();
-			auto& objs = level->get_all_objects();
-			for (auto o : objs) {
-				o->dont_serialize_or_edit = true;
-			}
-
-			if (!get_doc_name().empty()) {
-				editing_prefab_ptr = g_assets.find_sync<PrefabAsset>(get_doc_name()).get();
-				if (!editing_prefab_ptr) {
-					PopupTemplate::create_basic_okay(
-						EditorPopupManager::inst,
-						"Error",
-						"Couldn't load prefab: " + get_doc_name()
-					);
-					eng->log_to_fullscreen_gui(Error, "Couldnt load prefab");
-					set_empty_doc();
-				}
-				else
-					eng->get_level()->spawn_prefab(editing_prefab_ptr);
-			}
-
-			if (!editing_prefab_ptr) {
-				editing_prefab_ptr = new PrefabAsset;
-				g_assets.install_system_asset(editing_prefab_ptr, "!EMPTY");
-			}
-			ASSERT(editing_prefab_ptr);
-
-			if (get_doc_name().empty())
-				spawn_entity();// spawn empty prefab entity
-
-			validate_prefab();
-		}
-
-		validate_fileids_before_serialize();
-
-
-		on_start.invoke();
-	}
-}
-#endif
-
 
 EditorDoc::~EditorDoc() {
 	// level will get unloaded in the main loop
@@ -433,17 +375,6 @@ EditorDoc::~EditorDoc() {
 	EditorDoc::on_deletion.invoke(this);
 }
 
-
-ConfigVar ed_has_snap("ed_has_snap", "0", CVAR_BOOL, "");
-
-ConfigVar ed_translation_snap("ed_translation_snap", "0.2", CVAR_FLOAT, "what editor translation snap", 0.1, 128);
-ConfigVar ed_translation_snap_exp("ed_translation_snap_exp", "10", CVAR_FLOAT, "editor translation snap increment exponent", 1, 10);
-
-ConfigVar ed_rotation_snap("ed_rotation_snap", "15.0", CVAR_FLOAT, "what editor rotation snap (degrees)", 0.1, 360);
-ConfigVar ed_rotation_snap_exp("ed_rotation_snap_exp", "3", CVAR_FLOAT, "editor rotation snap increment exponent", 1, 10);
-
-ConfigVar ed_scale_snap("ed_scale_snap", "15.0", CVAR_FLOAT, "what editor scale snap", 0.1, 360);
-ConfigVar ed_scale_snap_exp("ed_scale_snap_exp", "3", CVAR_FLOAT, "editor scale snap increment exponent", 1, 10);
 
 void ManipulateTransformTool::check_input()
 {
@@ -733,20 +664,6 @@ Bounds transform_bounds(glm::mat4 transform, Bounds b)
 	return out;
 }
 
-void some_funcs()
-{
-	//auto gedlayout = ed_doc.gui.get();
-	//ImGui::DragInt2("box pos", &gedlayout->test->ls_position.x, 1.f, -1000, 1000);
-	//auto& a = gedlayout->test->anchor;
-	//int x[2] = { a.positions[0][0],a.positions[1][1] };
-	//ImGui::SliderInt2("anchor", x, 0, 255);
-	//a.positions[0][0] = x[0];
-	//a.positions[0][1] = x[0];
-	//a.positions[1][0] = x[1];
-	//a.positions[1][1] = x[1];
-}
-AddToDebugMenu myfuncs("edbox test", some_funcs);
-#include "Input/InputSystem.h"
 void EditorDoc::tick(float dt)
 {
 
@@ -828,39 +745,6 @@ void EditorDoc::transform_tool_update()
 	bool yandz = yaxis && zaxis;
 	bool zandx = zaxis && xaxis;
 
-#if  0
-	Ray r;
-	cast_ray_into_world(&r);	// just using this to get the unprojected ray :/
-	bool good2 = true;
-	glm::vec3 intersect_point = glm::vec3(0.f);
-	if (xandy) {
-		bool good = line_plane_intersect(r, planes[0], planed[0], intersect_point);
-		if (!good) line_plane_intersect(r, planes[1], planed[1], intersect_point);
-		intersect_point = project_onto_line(transform_tool_origin, transform_tool_origin + planes[2], intersect_point);
-	}
-	else if (yandz) {
-		bool good = line_plane_intersect(r, planes[1], planed[1], intersect_point);
-		if (!good) line_plane_intersect(r, planes[2], planed[2], intersect_point);
-		intersect_point = project_onto_line(transform_tool_origin, transform_tool_origin + planes[0], intersect_point);
-	}
-	else if (zandx) {
-		bool good = line_plane_intersect(r, planes[2], planed[2], intersect_point);
-		if (!good) line_plane_intersect(r, planes[0], planed[0], intersect_point);
-		intersect_point = project_onto_line(transform_tool_origin, transform_tool_origin + planes[1], intersect_point);
-	}
-	else if (xaxis) {
-		good2 = line_plane_intersect(r, planes[0], planed[0], intersect_point);
-	}
-	else if (yaxis) {
-		good2 = line_plane_intersect(r, planes[1], planed[1], intersect_point);
-	}
-	else if (zaxis) {
-		good2 = line_plane_intersect(r, planes[2], planed[2], intersect_point);
-	}
-#endif
-
-	//if(good2)
-	//	selected_node->position = intersect_point;
 
 }
 
@@ -870,7 +754,6 @@ uint32_t color_to_uint(Color32 c) {
 }
 
 
-#include <glm/gtc/type_ptr.hpp>
 bool ManipulateTransformTool::is_hovered()
 {
 	return ImGuizmo::IsOver();
@@ -1029,26 +912,6 @@ void ManipulateTransformTool::end_drag() {
 	}
 	update_pivot_and_cached();
 }
-
-// ie: snap = base
-//	on_increment()
-//		snap = snap * exp
-// on_decrement()
-//		snap = snap / mult
-
-ConfigVar ed_force_guizmo("ed.force_guizmo", "0", CVAR_BOOL, "");
-
-
-
-// bool force_gizmo = on/off
-// G -> force gizmo on, type = translate
-// R -> force gizmo on, type = rotation
-// X -> if force gizmo on, set mask to x
-// Y,Z ...
-// mouse 1 click -> force gizmo off
-// mouse 2 click -> force gizmo off, reset
-
-
 
 void ManipulateTransformTool::update()
 {
@@ -1340,7 +1203,6 @@ void EditorDoc::hook_scene_viewport_draw()
 
 }
 
-#include "EditorPopups.h"
 
 
 
@@ -1422,8 +1284,8 @@ void EdPropertyGrid::draw_components(Entity* entity)
 		if (!c->dont_serialize_or_edit)
 			draw_component(entity, c);
 }
-#include "Framework/StringUtils.h"
-extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
+
+
 void EdPropertyGrid::draw()
 {
 	auto& ss = ed_doc.selection_state;
@@ -1677,30 +1539,7 @@ SelectionState::SelectionState(EditorDoc& ed_doc)
 }
 
 
-#if 0
-DECLARE_ENGINE_CMD(STRESS_TEST)
-{
-	static int counter = 0;
-	const int size = 10;
-	auto model = g_assets.find_sync<Model>("wall2x2.cmdl");
-	for (int z = 0; z < size; z++) {
-		for (int y = 0; y < size; y++) {
-			for (int x = 0; x < size; x++) {
-				glm::vec3 p(x, y, z + counter * size);
-				glm::mat4 transform = glm::translate(glm::mat4(1), p * 2.0f);
 
-				auto ent = eng->get_level()->spawn_entity();
-				ent->create_component<MeshComponent>()->set_model(model.get());
-				ent->set_ws_transform(transform);
-
-			}
-		}
-	}
-	counter++;
-}
-#endif
-
-#include "PropertyEditors.h"
 void EditorDoc::set_camera_target_to_sel()
 {
 	if(selection_state->has_only_one_selected()) {
@@ -1716,29 +1555,11 @@ void EditorDoc::set_camera_target_to_sel()
 		}
 	}
 }
-#include "Game/Components/LightComponents.h"
-extern void export_godot_scene(const std::string& base_export_path);
-extern void export_level_scene();
-extern void start_play_process();
+
 
 void EditorDoc::hook_menu_bar()
 {
-	if (ImGui::BeginMenu("Plugins")) {
-
-		if (ImGui::MenuItem("<none>")) {
-			set_plugin(nullptr);
-		}
-
-		//auto iter = ClassBase::get_subclasses<LEPlugin>();
-		//for (; !iter.is_end(); iter.next()) {
-		//	auto type = iter.get_type();
-		//	if (ImGui::MenuItem(type->classname)) {
-		//		set_plugin(type);
-		//	}
-		//
-		//}
-		ImGui::EndMenu();
-	}
+	
 	if (ImGui::BeginMenu("Commands")) {
 		if (ImGui::MenuItem("Export as .glb")) {
 			export_level_scene();
@@ -1774,12 +1595,7 @@ void EditorDoc::hook_menu_bar()
 EditorUILayout::EditorUILayout() {
 
 }
-#include "UI/Widgets/EditorCube.h"
 
-
-#include "UI/UILoader.h"
-ConfigVar test1("test1", "200", CVAR_INTEGER, "", 0, 256);
-ConfigVar test2("test2", "200", CVAR_INTEGER, "", 0, 256);
 
 bool EditorUILayout::draw() {
 	RenderWindow& window = UiSystem::inst->window;
