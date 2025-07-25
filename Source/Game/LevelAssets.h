@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include "Framework/ConsoleCmdGroup.h"
 #include "Framework/SerializedForDiffing.h"
+#include <unordered_set>
 
 class BaseUpdater;
 class UnserializedSceneFile;

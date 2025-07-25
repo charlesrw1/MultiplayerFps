@@ -6,7 +6,7 @@
 #include "Framework/ReflectionProp.h"
 #include "Framework/ArrayReflection.h"
 #include "Framework/StructReflection.h"
-// Decided to make these plain DataClass objects instead of IAssets for simplicity
+
 using std::string;
 struct BoneMirror {
 	STRUCT_BODY();

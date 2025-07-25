@@ -43,7 +43,7 @@ public:
 
 	// Public Interface
 	Application* get_app() const final {
-		return nullptr;
+		return app.get();
 	}
 	Level* get_level() const final {
 		return level.get();
@@ -117,7 +117,6 @@ public:
 public:
 	void add_commands();
 	void set_keybind(SDL_Scancode code, uint16_t keymod, std::string bind);
-
 	bool map_spawned() { return level != nullptr; }
 
 	OnScreenLog gui_log;

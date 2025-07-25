@@ -9,6 +9,9 @@ class Model;
 using std::vector;
 using std::unique_ptr;
 
+
+// AnimChannel,KeyframeBase and Animation are OLD formats. However, I use them in the Model compilier so they are still kept around
+
 struct AnimChannel
 {
 	int num_positions = 0;

@@ -694,28 +694,3 @@ void benchmark_run()
 #endif
 
 }
-
-#if 0
-Texture* TextureMan::create_texture_from_memory(const char* name, const uint8_t* data, int data_len, bool flipy)
-{
-	auto find = textures.find(name);
-	if (find != textures.end())
-		return find->second;
-	Texture* t = new Texture;
-	textures[name] = t;
-	t->path = name;
-
-	int width, height, channels;
-	stbi_set_flip_vertically_on_load(flipy);
-	uint8_t* imgdat = stbi_load_from_memory(data, data_len, &width, &height, &channels, 0);
-	if (!imgdat) {
-		printf("Couldn't load from memory: %s", name);
-		return nullptr;
-	}
-
-	bool good = make_from_data(t, width, height, (void*)imgdat, to_format(channels, false));
-	stbi_image_free((void*)imgdat);
-
-	return t;
-}
-#endif

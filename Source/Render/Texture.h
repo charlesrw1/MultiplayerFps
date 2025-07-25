@@ -59,8 +59,6 @@ public:
 	bool has_mips = false;
 	bool is_float = false;
 	texhandle gl_id = 0;
-	bool is_resident = false;
-	bindlesstexhandle bindless_handle = 0;
 #ifdef EDITOR_BUILD
 	bool hasSimplifiedColor = false;
 	Color32 simplifiedColor = COLOR_WHITE;

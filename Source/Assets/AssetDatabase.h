@@ -21,8 +21,6 @@ class AssetDatabaseImpl;
 class AssetDatabase
 {
 public:
-	// loading interface for the public. this will do a sync load internally.
-	// a different IAssetLoadingInterface is used on the loader thread, but you dont have to care about that.
 	static IAssetLoadingInterface* loader;
 
 	void init();

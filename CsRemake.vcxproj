@@ -295,14 +295,12 @@
     <ClInclude Include="Source\Framework\PersistentlyMappedBuffer.h" />
     <ClInclude Include="Source\Framework\PoolAllocator.h" />
     <ClInclude Include="Source\Framework\PropertyEd.h" />
-    <ClInclude Include="Source\Framework\PropHashTable.h" />
     <ClInclude Include="Source\Framework\Rect2d.h" />
     <ClInclude Include="Source\Framework\ReflectionProp.h" />
     <ClInclude Include="Source\Framework\ReflectionMacros.h" />
     <ClInclude Include="Source\Framework\ArrayReflection.h" />
     <ClInclude Include="Source\Framework\StringName.h" />
     <ClInclude Include="Source\Framework\StringUtil.h" />
-    <ClInclude Include="Source\Framework\SubclassType.h" />
     <ClInclude Include="Source\Framework\Util.h" />
     <ClInclude Include="Source\GameEnginePublic.h" />
     <ClInclude Include="Source\Game\Entities\BikeEntity.h" />
@@ -310,8 +308,6 @@
     <ClInclude Include="Source\Game\Entities\CharacterController.h" />
     <ClInclude Include="Source\Game\Entity.h" />
     <ClInclude Include="Source\Game\EntityComponent.h" />
-    <ClInclude Include="Source\Game\GameAnimEvents.h" />
-    <ClInclude Include="Source\Game\GameSingleton.h" />
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Game\Entities\Player.h" />
     <ClInclude Include="Source\Game\Entities\PlayerAnimDriver.h" />
@@ -319,8 +315,6 @@
     <ClInclude Include="Source\GameEngineLocal.h" />
     <ClInclude Include="Source\Game\SoftAssetPtr.h" />
     <ClInclude Include="Source\IEditorTool.h" />
-    <ClInclude Include="Source\Input\InputAction.h" />
-    <ClInclude Include="Source\Input\InputShared.h" />
     <ClInclude Include="Source\Input\InputSystem.h" />
     <ClInclude Include="Source\Level.h" />
     <ClInclude Include="Source\LevelSerialization\SerializationAPI.h" />
@@ -363,7 +357,6 @@
   </ItemGroup>
   <ItemGroup>
     <_WildCardClCompile Include="Source\.generated\**\*.cpp" />
-    <ClCompile Include="Source\AssetCompile\ModelAsset2.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
@@ -409,12 +402,10 @@
     <ClCompile Include="Source\External\ImSequencer.cpp" />
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
     <ClCompile Include="Source\Game\Components\FogComponent.cpp" />
-    <ClCompile Include="Source\Game\GameAnimEvents.cpp" />
     <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp" />
     <ClCompile Include="Source\Game\EntityTest.cpp" />
     <ClCompile Include="Source\IEditorTool.cpp" />
-    <ClCompile Include="Source\Input\InputAction.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\EngineMain.cpp" />

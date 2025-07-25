@@ -2,7 +2,6 @@
 #include <unordered_map>
 #include <vector>
 #include "Framework/Util.h"
-#include "PropHashTable.h"
 #include "SerializedForDiffing.h"
 #include "Scripting/ScriptManager.h"
 
@@ -218,18 +217,6 @@ void ClassBase::init_classes_startup()
 		if (classtype->get_props_function) {
 			classtype->props = classtype->get_props_function();
 		}
-		PropHashTable* table = new PropHashTable;
-		if (classtype->super_typeinfo)
-			table->prop_table = classtype->super_typeinfo->prop_hash_table->prop_table;	// copy parents hashtable
-		// write the keys
-		if (classtype->props) {
-			for (int i = 0; i < classtype->props->count; i++) {
-				auto& prop = classtype->props->list[i];
-				StringView prop_name_as_sv(prop.name);
-				table->prop_table.insert({ prop_name_as_sv, &prop });
-			}
-		}
-		classtype->prop_hash_table = table;
 	}
 	// now call default constructors
 	auto& id_to_typeinfo = get_registry().id_to_typeinfo;

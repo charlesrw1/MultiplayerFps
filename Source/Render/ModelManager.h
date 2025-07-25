@@ -75,17 +75,12 @@ private:
 	Model* defaultPlane = nullptr;
 
 	void create_default_models();
-
 	void set_v_attributes();
-
 	bool upload_model(Model* m);
 
-	vertexarrayhandle animated_vao;
-	vertexarrayhandle lightmapped_vao;
-
-	//vertexarrayhandle static_vao;
+	vertexarrayhandle animated_vao=0;
+	vertexarrayhandle lightmapped_vao=0;
 	MainVbIbAllocator allocator;
-
 	int cur_mesh_id = 1;
 
 	friend class Model;

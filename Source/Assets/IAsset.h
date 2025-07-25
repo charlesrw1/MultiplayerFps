@@ -5,25 +5,6 @@
 #include "Framework/ClassBase.h"
 #include "Framework/Reflection2.h"
 
-#ifdef EDITOR_BUILD
-#include <unordered_set>
-#endif
-
-// references:
-// to know when to load unload assets reference counting is used. however, its not done per entity etc. its manually done
-// load a map -> loads all the data but doesnt inc reference
-
-// textures: special case
-// textures are loaded after everything else, since they take up more memory
-// so load_asset_bundle({model})
-//			load_model()
-				//load_mat()
-//					load_tex() (queues till end)
-//
-
-// Base asset class
-// Override to add a new resource that can be used by the game
-// See AssetMetadata in AssetRegistry.h to allow for searching for the asset in the asset browser
 class GcMarkingInterface;
 class IAssetLoadingInterface;
 class PrimaryAssetLoadingInterface;
@@ -97,10 +78,6 @@ private:
 		is_loaded = false;
 	}
 
-	// is_loaded is sometimes thread safe (inside a load job it is safe. when an asset is publically outside of the AssetDatabase, it is always safe.)
-	// it is not safe inside the AssetDatabase when this asset's "has_run_post_load" is false (since an async might be writing to is_loaded)
-	// has_run_post_load is always thread safe as its only called on the main thread
-
 	int internal_reference_count = 0;
 	std::string path;				// filepath or name of asset
 	bool load_failed = false;		// did the asset fail to load
@@ -109,9 +86,6 @@ private:
 	bool persistent_flag = false;
 	bool used_flag = false;
 
-#ifdef EDITOR_BUILD
-	uint64_t asset_load_time = 0;
-#endif
 
 	friend class AssetDatabaseImpl;
 	friend class LoadJob;

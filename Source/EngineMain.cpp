@@ -2174,6 +2174,51 @@ void game_update_job(uintptr_t user)
 	ParticleMgr::inst->draw(out->vsOut);
 }
 
+struct NetObj {
+	int net_id = 0;
+	int net_type = 0;
+};
+class NetBuffer {
+public:
+};
+
+class LLNetworkSystemCallbacks {
+public:
+	virtual void on_new_object(handle<NetObj> no) = 0;
+	virtual void on_net_message(NetBuffer& buffer) = 0;
+	virtual void on_conn_change() = 0;
+};
+
+class LlNetworkSystem {
+public:
+	handle<NetObj> register_net_obj();
+	// connect to server
+	//		with callback set
+	// spawn server
+	//		on client connect callback
+	//			approve/deny
+	//			send map info
+	//				
+	//			
+
+};
+
+// [Game]
+// Game code
+// Game net manager
+// [Engine]
+// LlNetworkSystem
+
+// LlNetworkSystem not aware of Entities/Components. Just does replication, message sending, client/server connections.
+// Game net manager is user provided (can provide a base implmentation).
+// It maps the LlNetworkSystem to the gameplay. For example, "net_id" will likely map to a Component. "net_type" maps to a prefab type, for example.
+// Game net manager also manages recieving net messages and determines if it has permissions.
+
+
+
+
+
+
 void GameEngineLocal::loop()
 {
 	auto frame_start = [&]()

@@ -14,24 +14,12 @@ class AnimationEvent : public ClassBase {
 public:
 	CLASS_BODY(AnimationEvent);
 	~AnimationEvent() {}
-
-	virtual Color32 get_editor_color() { return COLOR_BLUE; }
-
-	// if true, then event has a duration from [frame,frame+frame_duration]
-	// on_event is called on enter and on_end is guaranteed to call on exit
-	virtual bool is_duration_event() const { return false; }
-	virtual void on_event(Animator* animator) = 0;
-	virtual void on_end(Animator* animator) {}
-
+	virtual void on_event(AnimatorObject* animator) {}
 	int get_frame() const { return frame; }
-	int get_duration() const { return frame_duration; }
-
 private:
 	friend class AnimationEventGetter;
 	friend class EditModelAnimations;
-	REF int frame = 0;
-	REF int frame_duration = 0;
-	REF int16_t editor_layer = 0;	// hacky, stores what layer it is in the editor for persistance
+	int frame = 0;
 };
 
 class AnimDurationEvent : public ClassBase {
@@ -43,7 +31,6 @@ public:
 	virtual void on_end(AnimatorObject* animator) const {}
 	int get_end_frame() const { return frame_begin + frame_duration; }
 
-	REF int frame_begin = 0;
-	REF int frame_duration = 0;
-	REF int16_t editor_layer = 0;
+	int frame_begin = 0;
+	int frame_duration = 0;
 };

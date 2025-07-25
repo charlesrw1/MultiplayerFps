@@ -4,7 +4,6 @@
 #include <string>
 
 struct SerializedForDiffing;
-struct PropHashTable;
 class ScriptManager;
 struct FunctionInfo;
 class ClassTypeInfo : public ClassBase {
@@ -44,8 +43,6 @@ public:
 	// allocates a scriptable version of this object
 	// it overrides virtal functions to call into lua
 	ClassBase* (*scriptable_allocate)(const ClassTypeInfo*) = nullptr;
-	// opaque pointer to hash table for props
-	const PropHashTable* prop_hash_table = nullptr;
 
 	template<typename T>
 	static ClassBase* default_allocate(const ClassTypeInfo*) {
