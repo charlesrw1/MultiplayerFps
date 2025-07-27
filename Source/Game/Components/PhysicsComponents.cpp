@@ -861,20 +861,3 @@ void AdvancedJointComponent::draw_meshbuilder()
 // FIXME!
 
 #endif
-class AnchorJointSerializer : public IPropertySerializer
-{
-	// Inherited via IPropertySerializer
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
-	{
-		const JointAnchor* j = (const JointAnchor*)info.get_ptr(inst);
-		return string_format("%f %f %f %f %f %f %f", j->p.x, j->p.y, j->p.z, j->q.w, j->q.x, j->q.y, j->q.z);
-	}
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user,IAssetLoadingInterface*) override
-	{
-		JointAnchor* j = (JointAnchor*)info.get_ptr(inst);
-		std::string to_str(token.str_start, token.str_len);
-		int args = sscanf(to_str.c_str(), "%f %f %f %f %f %f %f", &j->p.x, &j->p.y, &j->p.z, &j->q.w, &j->q.x, &j->q.y, &j->q.z);
-		if (args != 7) sys_print(Warning, "Anchor joint unserializer fail\n");
-	}
-};
-ADDTOFACTORYMACRO_NAME(AnchorJointSerializer, IPropertySerializer, "JointAnchor");

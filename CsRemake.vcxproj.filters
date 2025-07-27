@@ -541,7 +541,6 @@
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Render\Editor\TextureEditor.cpp" />
     <ClCompile Include="Source\DeferredSpawnScope.cpp" />
-    <ClCompile Include="Source\Game\EntityTest.cpp" />
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClCompile Include="Source\Sound\SoundComponent.cpp" />

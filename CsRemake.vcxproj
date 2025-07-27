@@ -404,7 +404,6 @@
     <ClCompile Include="Source\Game\Components\FogComponent.cpp" />
     <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp" />
-    <ClCompile Include="Source\Game\EntityTest.cpp" />
     <ClCompile Include="Source\IEditorTool.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level.cpp" />

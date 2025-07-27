@@ -86,6 +86,9 @@ private:
 	REF bool is_visible = true;
 	REF bool cast_shadows = true;
 	REF bool is_skybox = false;
+	// If true, then it will check the model for collision. If the model has collision and there isnt a meshcomponent already, then it all create one.
+	// This only works on level load
+	REF bool add_collision_if_available = true;
 	REFLECT(hide);
 	bool lightmapped = false;
 	REFLECT(hide);

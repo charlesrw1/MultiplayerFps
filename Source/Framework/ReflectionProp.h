@@ -204,14 +204,3 @@ private:
 	PropertyInfo StaticProp;
 	PropertyInfoList StaticList;
 };
-
-
-class IAssetLoadingInterface;
-class IPropertySerializer
-{
-public:
-	static Factory<std::string, IPropertySerializer>& get_factory();
-
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) = 0;
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user, IAssetLoadingInterface* load) = 0;
-};

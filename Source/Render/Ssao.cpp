@@ -12,7 +12,7 @@ void draw_hbao_menu()
 {
 	ImGui::DragFloat("radius", &draw.ssao.tweak.radius, 0.05, 0.f);
 	ImGui::DragFloat("sharpness", &draw.ssao.tweak.blur_sharpness, 0.05, 0);
-	ImGui::DragFloat("bias", &draw.ssao.tweak.bias, 0.05, 0);
+	ImGui::DragFloat("bias", &draw.ssao.tweak.bias, 0.001,0, 0.999);
 	ImGui::DragFloat("intensity", &draw.ssao.tweak.intensity, 0.05, 0);
 }
 

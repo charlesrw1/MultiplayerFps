@@ -48,6 +48,12 @@ static const int MAX_TAA_SAMPLES = 16;
 ConfigVar r_taa_samples("r.taa_samples", "4", CVAR_INTEGER, "", 2, MAX_TAA_SAMPLES);
 ConfigVar r_taa_32f("r.taa_32f", "0", CVAR_BOOL, "use 32 bit scene motion buffer instead of 16 bit");
 
+// basically:
+// diffuse_ao = pow(ao, ssao.intensity)
+// specular_ao = pow(diffuse_ao,r_specular_ao_intensity)
+
+ConfigVar r_specular_ao_intensity("r.specular_ao_intensity", "2", CVAR_FLOAT | CVAR_UNBOUNDED, "");
+
 RenderWindowBackend* RenderWindowBackend::inst = nullptr;
 class RenderWindowBackendLocal : public RenderWindowBackend
 {
@@ -789,24 +795,27 @@ void debug_message_callback(GLenum source, GLenum type, GLuint id,
 
 void imgui_stat_hook()
 {
-	ImGui::Text("Draw calls: %d", draw.stats.total_draw_calls);
-	ImGui::Text("Total tris: %d", draw.stats.tris_drawn);
-	ImGui::Text("Texture binds: %d", draw.stats.texture_binds);
-	ImGui::Text("Shader binds: %d", draw.stats.program_changes);
-	ImGui::Text("Vao binds: %d", draw.stats.vertex_array_changes);
-	ImGui::Text("Blend changes: %d", draw.stats.blend_changes);
-
-	ImGui::Text("shadow objs: %d", draw.stats.shadow_objs);
-	ImGui::Text("shadow lights: %d", draw.stats.shadow_lights);
-
-
-
-	ImGui::Text("opaque batches: %d", (int)draw.scene.gbuffer_pass.batches.size());
-	ImGui::Text("depth batches: %d", (int)draw.scene.shadow_pass.batches.size());
-	ImGui::Text("transparent batches: %d", (int)draw.scene.transparent_pass.batches.size());
-
-	ImGui::Text("total objects: %d", (int)draw.scene.proxy_list.objects.size());
-	ImGui::Text("opaque mesh batches: %d", (int)draw.scene.gbuffer_pass.mesh_batches.size());
+	auto& stats = draw.stats;
+	ImGui::Text("Draw calls: %d", stats.total_draw_calls);
+	ImGui::Text("Total tris: %d", stats.tris_drawn);
+	ImGui::Text("Texture binds: %d", stats.texture_binds);
+	ImGui::Text("Shader binds: %d", stats.program_changes);
+	ImGui::Text("Vao binds: %d", stats.vertex_array_changes);
+	ImGui::Text("Blend changes: %d", stats.blend_changes);
+	ImGui::Separator();
+	ImGui::Text("shadow objs: %d", stats.shadow_objs);
+	ImGui::Text("shadow lights: %d", stats.shadow_lights);
+	ImGui::Separator();
+	auto& scene = draw.scene;
+	ImGui::Text("depth batches: %d", (int)scene.shadow_pass.batches.size());
+	ImGui::Text("depth mesh batches: %d", (int)scene.shadow_pass.mesh_batches.size());
+	ImGui::Text("transparent batches: %d", (int)scene.transparent_pass.batches.size());
+	ImGui::Text("opaque batches: %d", (int)scene.gbuffer_pass.batches.size());
+	ImGui::Text("opaque mesh batches: %d", (int)scene.gbuffer_pass.mesh_batches.size());
+	ImGui::Separator();
+	ImGui::Text("total objects: %d", (int)scene.proxy_list.objects.size());
+	ImGui::Text("total lights: %d", (int)scene.light_list.objects.size());
+	ImGui::Text("total decals: %d", (int)scene.decal_list.objects.size());
 }
 
 void Renderer::check_hardware_options()
@@ -2626,7 +2635,8 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 
 	RenderPassSetup setup("gbuffer-lighting", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
 	auto scope = device.start_render_pass(setup);
-	const texhandle ssao_tex = (is_cubemap_view) ? white_texture.gl_id : ssao.texture.result;	// skip ssao in cubemap view
+	const bool wants_ssao = !is_cubemap_view && enable_ssao.get_bool();
+	const texhandle ssao_tex = (wants_ssao) ? ssao.texture.result : white_texture.gl_id;	// skip ssao in cubemap view
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
 
 	device.reset_states();
@@ -2786,6 +2796,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		bind_texture(4, ssao_tex);
 		bind_texture(5, reflectionProbeTex->gl_id);
 		bind_texture(6, EnviornmentMapHelper::get().integrator.get_texture());
+		shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
 
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}

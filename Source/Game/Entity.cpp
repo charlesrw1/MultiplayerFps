@@ -605,45 +605,10 @@ void Entity::invalidate_transform(Component* skipthis)
 
 
 
-class EntityBoneParentStringSerialize : public IPropertySerializer
-{
-	// Inherited via IPropertySerializer
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
-	{
-		const StringName* ptr_prop = (const StringName*)info.get_ptr(inst);
-		return ptr_prop->get_c_str();
-	}
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user,IAssetLoadingInterface*) override
-	{
-		const StringName* ptr_prop = (const StringName*)info.get_ptr(inst);
-		std::string to_str(token.str_start, token.str_len);
-		Entity* e = (Entity*)inst;
-		e->set_parent_bone(StringName(to_str.c_str()));
-	}
-};
-ADDTOFACTORYMACRO_NAME(EntityBoneParentStringSerialize, IPropertySerializer, "EntityBoneParentString");
-
 #ifdef EDITOR_BUILD
 
 
 #endif
-class EntityTagSerialize : public IPropertySerializer
-{
-	// Inherited via IPropertySerializer
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
-	{
-		const StringName* ptr_prop = (const StringName*)info.get_ptr(inst);
-		return ptr_prop->get_c_str();
-	}
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user, IAssetLoadingInterface*) override
-	{
-		const StringName* ptr_prop = (const StringName*)info.get_ptr(inst);
-		std::string to_str(token.str_start, token.str_len);
-		Entity* e = (Entity*)inst;
-		e->set_tag(StringName(to_str.c_str()));
-	}
-};
-ADDTOFACTORYMACRO_NAME(EntityTagSerialize, IPropertySerializer, "EntityTagString");
 
 Component* Entity::get_component(const ClassTypeInfo* ti) const {
 	if (!ti)

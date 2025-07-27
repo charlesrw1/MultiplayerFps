@@ -17,7 +17,7 @@
 #include "Debug.h"
 #include "Framework/Jobs.h"
 #include "tracy/public/tracy/Tracy.hpp"
-
+#include "PhysicsComponents.h"
 
 GameAnimationMgr* GameAnimationMgr::inst = nullptr;
 
@@ -178,6 +178,13 @@ void MeshComponent::pre_start()
 	update_animator_instance();
 	sync_render_data();
 	set_ticking(false);
+
+	if (!eng->is_editor_level() && add_collision_if_available && model && model->get_physics_body()) {
+		MeshColliderComponent* existing = get_owner()->get_component<MeshColliderComponent>();
+		if (!existing) {
+			get_owner()->create_component<MeshColliderComponent>();
+		}
+	}
 }
 
 void MeshComponent::start()

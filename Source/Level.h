@@ -79,6 +79,7 @@ private:
 	// last instance id, incremented to add objs
 	uint64_t last_id = 0;
 	ScopedBooleanValue b_is_in_update_tick;
+	ScopedBooleanValue b_is_in_level_startup;
 	std::vector<Component*> wantsToAddToUpdate;
 	hash_set<Component> wants_sync_update;
 	std::unordered_set<uint64_t> deferred_delete_list;

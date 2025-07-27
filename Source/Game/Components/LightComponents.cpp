@@ -281,28 +281,9 @@ void CubemapComponent::on_changed_transform() {
 }
 
 
-#include "Framework/AddClassToFactory.h"
 
-class CubemapAnchorSerializer : public IPropertySerializer
-{
-	// Inherited via IPropertySerializer
-	virtual std::string serialize(DictWriter& out, const PropertyInfo& info, const void* inst, ClassBase* user) override
-	{
-		const CubemapAnchor* j = (const CubemapAnchor*)info.get_ptr(inst);
-		return string_format("%f %f %f %d", j->p.x, j->p.y, j->p.z,(int)j->worldspace);
-	}
-	virtual void unserialize(DictParser& in, const PropertyInfo& info, void* inst, StringView token, ClassBase* user,IAssetLoadingInterface*) override
-	{
-		CubemapAnchor* j = (CubemapAnchor*)info.get_ptr(inst);
-		std::string to_str(token.str_start, token.str_len);
-		int d = 0;
-		int args = sscanf(to_str.c_str(), "%f %f %f %d", &j->p.x, &j->p.y, &j->p.z,&d);
-		j->worldspace = bool(d);
-		if (args != 4) 
-			sys_print(Warning, "Anchor joint unserializer fail\n");
-	}
-};
-ADDTOFACTORYMACRO_NAME(CubemapAnchorSerializer, IPropertySerializer, "CubemapAnchor");
+
+
 #include "Framework/Files.h"
 void LightmapComponent::start()
 {

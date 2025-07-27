@@ -8,20 +8,6 @@ union SDL_Event;
 
 #include "Framework/LuaColor.h"
 
-// RenderWindow
-//		handle<MeshBuilder>
-//		draw commands
-// 1 main renderWindow for the applicaton
-// can also create seperate ones for custom FX or whatever
-
-
-// MeshBuilderObj
-//		add_veriticies etc
-//		sync to renderer behind the scenes
-
-// can use MeshBuilderObj in RenderWindow or as a 3d object
-
-
 class Canvas : public ClassBase {
 public:
 	CLASS_BODY(Canvas);
