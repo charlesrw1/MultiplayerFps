@@ -21,6 +21,8 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include "tracy/public/tracy/TracyOpenGL.hpp"
 
+#include "IGraphsDevice.h"
+
 const GLenum MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT;
 
 //#pragma optimize("", off)
@@ -32,6 +34,7 @@ extern ConfigVar g_window_fullscreen;
 Renderer draw;
 RendererPublic* idraw = &draw;
 
+// HOLY CONFIG VARS
 ConfigVar enable_vsync("r.enable_vsync","1",CVAR_BOOL,"enable/disable vsync");
 ConfigVar shadow_quality_setting("r.shadow_setting","0",CVAR_INTEGER,"csm shadow quality",0,3);
 ConfigVar enable_bloom("r.bloom","1",CVAR_BOOL,"enable/disable bloom");
@@ -53,6 +56,40 @@ ConfigVar r_taa_32f("r.taa_32f", "0", CVAR_BOOL, "use 32 bit scene motion buffer
 // specular_ao = pow(diffuse_ao,r_specular_ao_intensity)
 
 ConfigVar r_specular_ao_intensity("r.specular_ao_intensity", "2", CVAR_FLOAT | CVAR_UNBOUNDED, "");
+ConfigVar r_debug_skip_build_scene_data("r.debug_skip_build_scene_data", "0", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar r_skip_gbuffer("r_skip_gbuffer", "0", CVAR_BOOL, "");
+
+
+ConfigVar force_render_cubemaps("r.force_cubemap_render", "0", CVAR_BOOL | CVAR_DEV, "force cubemaps to re-render, treated like a flag and not a setting");
+
+ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV, "enable/disable drawing of terrain");
+ConfigVar r_force_hide_ui("r.force_hide_ui", "0", CVAR_BOOL, "disable ui drawing");
+ConfigVar test_thumbnail_model("test_thumbnail_model", "", CVAR_DEV, "");
+
+ConfigVar r_drawdecals("r.drawdecals", "1", CVAR_BOOL | CVAR_DEV, "enable/disable drawing of decals");
+
+ConfigVar thumbnail_fov("thumbnail_fov", "60", CVAR_FLOAT | CVAR_UNBOUNDED, "");
+
+ConfigVar debug_sun_shadow("r.debug_csm", "0", CVAR_BOOL | CVAR_DEV, "debug csm shadow rendering");
+ConfigVar debug_specular_reflection("r.debug_specular", "0", CVAR_BOOL | CVAR_DEV, "debug specular lighting");
+ConfigVar r_no_indirect("r.no_indirect", "0", CVAR_BOOL, "");
+
+ConfigVar r_no_meshbuilders("r_no_meshbuilders", "0", CVAR_BOOL | CVAR_DEV, "");
+// 128 bones * 100 characters * 2 (double bffer) =  
+ConfigVar r_skinned_mats_bone_buffer_size("r.skinned_mats_bone_buffer_size", "25600", CVAR_INTEGER | CVAR_UNBOUNDED | CVAR_READONLY, "");
+
+ConfigVar r_better_depth_batching("r.better_depth_batching", "1", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar r_no_batching("r.no_batching", "0", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar r_ignore_depth_shader("r_ignore_depth_shader", "0", CVAR_BOOL | CVAR_DEV, "");
+
+ConfigVar enable_gl_debug_output("enable_gl_debug_output", "1", CVAR_BOOL, "");
+ConfigVar r_taa_jitter_test("r.taa_jitter_test", "0", CVAR_INTEGER, "", 0, 4);
+ConfigVar r_normal_shaded_debug("r.normal_shaded_debug", "1", CVAR_BOOL, "");
+ConfigVar log_shader_compiles("log_shader_compiles", "1", CVAR_BOOL, "");
+
+ConfigVar r_debug_mode("r.debug_mode", "0", CVAR_INTEGER | CVAR_DEV, "render debug mode, see Draw.cpp for DEBUG_x values, 0 to disable", 0, 200);
+
+ConfigVar r_drawfog("r.drawfog", "1", CVAR_BOOL | CVAR_DEV, "enable/disable drawing of fog");
 
 RenderWindowBackend* RenderWindowBackend::inst = nullptr;
 class RenderWindowBackendLocal : public RenderWindowBackend
@@ -221,9 +258,6 @@ const uint DEBUG_LIGHTMAP_UV = 10;
 // special:
 static const int DEBUG_OUTLINED = 100;//uses objID
 
-ConfigVar r_debug_mode("r.debug_mode", "0", CVAR_INTEGER | CVAR_DEV,"render debug mode, see Draw.cpp for DEBUG_x values, 0 to disable", 0, 200);
-
-
 void Renderer::InitGlState()
 {
 	glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
@@ -312,7 +346,8 @@ string compute_hash_for_program_def(Program_Manager::program_def& def)
 	return StringUtils::alphanumeric_hash(inp);
 }
 
-ConfigVar log_shader_compiles("log_shader_compiles", "1", CVAR_BOOL, "");
+
+
 void Program_Manager::recompile(program_def& def) {
 	double start = GetTime();
 	recompile_do(def);
@@ -666,7 +701,7 @@ void Renderer::create_shaders()
 	prog.reflection_accumulation = prog_man.create_raster("fullscreenquad.txt", "SampleCubemapsF.txt");
 
 	prog.height_fog = prog_man.create_raster("fullscreenquad.txt", "HeightFogF.txt");
-
+	//prog_man.create_single_file()
 	// volumetric fog shaders
 	Shader::compute_compile(&volfog.prog.lightcalc, "VfogScatteringC.txt");
 	Shader::compute_compile(&volfog.prog.raymarch, "VfogRaymarchC.txt");
@@ -688,8 +723,7 @@ void Renderer::reload_shaders()
 
 }
 
-ConfigVar r_taa_jitter_test("r.taa_jitter_test", "0", CVAR_INTEGER,"", 0, 4);
-ConfigVar r_normal_shaded_debug("r.normal_shaded_debug", "1", CVAR_BOOL, "");
+
 void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, bufferhandle ubo, bool wireframe_secondpass)
 {
 	gpu::Ubo_View_Constants_Struct constants;
@@ -816,6 +850,8 @@ void imgui_stat_hook()
 	ImGui::Text("total objects: %d", (int)scene.proxy_list.objects.size());
 	ImGui::Text("total lights: %d", (int)scene.light_list.objects.size());
 	ImGui::Text("total decals: %d", (int)scene.decal_list.objects.size());
+	ImGui::Text("total meshbuilders: %d", (int)scene.meshbuilder_objs.objects.size());
+
 }
 
 void Renderer::check_hardware_options()
@@ -915,11 +951,12 @@ void Renderer::create_default_textures()
 	tex.scene_motion_vts_handle = Texture::install_system("_scene_motion");
 }
 
-ConfigVar enable_gl_debug_output("enable_gl_debug_output", "1", CVAR_BOOL, "");
-
 void Renderer::init()
 {
 	sys_print(Info, "--------- Initializing Renderer ---------\n");
+
+	IGraphicsDevice::inst = IGraphicsDevice::create_opengl_device();
+
 
 	// Check hardware settings like extension availibility
 	check_hardware_options();
@@ -985,6 +1022,29 @@ void Renderer::init()
 		if (!debug_tex_out.output_tex) {
 			sys_print(Error, "output_texture: couldn't find texture %s\n", texture_name);
 		}	
+		});
+	consoleCommands->add("test_mode", [this](const Cmd_Args& args) {
+		if (args.size() != 2)return;
+		int i = atoi(args.at(1));
+		if (i == 0) {
+			dont_use_mdi.set_bool(false);
+			r_no_batching.set_bool(false);
+			r_better_depth_batching.set_bool(true);
+			r_debug_skip_build_scene_data.set_bool(false);
+		}
+		if (i == 1) {
+			dont_use_mdi.set_bool(true);
+			r_no_batching.set_bool(true);
+			r_better_depth_batching.set_bool(true);
+			r_debug_skip_build_scene_data.set_bool(false);
+		}
+		if (i == 2) {
+			dont_use_mdi.set_bool(true);
+			r_no_batching.set_bool(true);
+			r_better_depth_batching.set_bool(true);
+			r_debug_skip_build_scene_data.set_bool(true);
+		}
+		
 		});
 	consoleCommands->add("otex", [this](const Cmd_Args& args){
 			static const char* usage_str = "Usage: otex <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
@@ -1264,6 +1324,71 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 	device.reset_states();
 }
 
+inline void setup_batch(Render_Lists& list,
+	Render_Pass& pass,
+	bool depth_test_enabled,
+	bool force_show_backfaces,
+	bool depth_less_than_op, const int i, const int offset) 
+{
+	const auto& batch = pass.batches[i];
+	const auto& mesh_batch = pass.mesh_batches[batch.first];
+
+	const MaterialInstance* mat = (MaterialInstance*)mesh_batch.material;
+	const draw_call_key batch_key = pass.objects[mesh_batch.first].sort_key;
+	const program_handle program = (program_handle)batch_key.shader;
+	const blend_state blend = (blend_state)batch_key.blending;
+	const bool show_backface = batch_key.backface;
+	const uint32_t layer = batch_key.layer;
+	const VaoType vaoType = (VaoType)batch_key.vao;
+	IGraphicsVertexInput* vao_ptr = g_modelMgr.get_vao_ptr(vaoType);
+
+	RenderPipelineState state;
+	state.program = program;
+	state.vao = vao_ptr->get_internal_handle();
+	state.backface_culling = !show_backface && !force_show_backfaces;
+	state.blend = blend;
+	state.depth_testing = depth_test_enabled;
+	//state.depth_writes = depth_write_enabled;
+	state.depth_writes = !mat->get_master_material()->is_translucent();
+	state.depth_less_than = depth_less_than_op;
+	draw.get_device().set_pipeline(state);
+
+
+	draw.shader().set_int("indirect_material_offset", offset);
+
+	auto& textures = mat->impl->get_textures();
+
+	for (int i = 0; i < textures.size(); i++) {
+		Texture* t = textures[i];
+		uint32_t id = t->gl_id;
+		if (t->gpu_ptr) {
+			id = t->gpu_ptr->get_internal_handle();
+		}
+		draw.bind_texture(i, id);
+	}
+}
+inline void setup_execute_render_lists(Render_Lists& list,Render_Pass& pass) {
+	auto& scene = draw.scene;
+	
+	IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_render_instance_buffer);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, material_buffer->get_internal_handle());
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, list.glinstance_to_instance);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+
+
+	if (scene.has_lightmap && scene.lightmapObj.lightmap_texture) {
+		auto texture = scene.lightmapObj.lightmap_texture;
+		draw.bind_texture(20/* FIXME, defined to be bound at spot 20,*/, texture->gl_id);
+	}
+	else {
+		draw.bind_texture(20/* FIXME, defined to be bound at spot 20,*/, draw.black_texture.gl_id);
+	}
+
+}
 
 void Renderer::execute_render_lists(
 	Render_Lists& list, 
@@ -1272,60 +1397,11 @@ void Renderer::execute_render_lists(
 	bool force_show_backfaces,
 	bool depth_less_than_op)
 {
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_render_instance_buffer);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, matman.get_gpu_material_buffer());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, list.glinstance_to_instance);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-
-
-	if (scene.has_lightmap&&scene.lightmapObj.lightmap_texture) {
-		auto texture = scene.lightmapObj.lightmap_texture;
-		bind_texture(20/* FIXME, defined to be bound at spot 20,*/, texture->gl_id);
-	}
-	else {
-		bind_texture(20/* FIXME, defined to be bound at spot 20,*/, black_texture.gl_id);
-	}
-
-	auto& device = get_device();
-
-
+	setup_execute_render_lists(list, pass);
 	int offset = 0;
 	for (int i = 0; i < pass.batches.size(); i++) {
-		device.reset_states();
-
-		const auto& batch = pass.batches[i];
+		setup_batch(list, pass, depth_test_enabled, force_show_backfaces, depth_less_than_op, i, offset);
 		const int count = list.command_count[i];
-
-		const MaterialInstance* mat = (MaterialInstance*)pass.mesh_batches[pass.batches[i].first].material;
-		const draw_call_key batch_key = pass.objects[pass.mesh_batches[pass.batches[i].first].first].sort_key;
-		const program_handle program = (program_handle)batch_key.shader;
-		const blend_state blend = (blend_state)batch_key.blending;
-		const bool show_backface = batch_key.backface;
-		const uint32_t layer = batch_key.layer;
-		const VaoType vaoType = (VaoType)batch_key.vao;
-		const vertexarrayhandle vaoHandle = g_modelMgr.get_vao(vaoType);
-
-		RenderPipelineState state;
-		state.program = program;
-		state.vao = vaoHandle;
-		state.backface_culling = !show_backface&&!force_show_backfaces;
-		state.blend = blend;
-		state.depth_testing = depth_test_enabled;
-		//state.depth_writes = depth_write_enabled;
-		state.depth_writes = !mat->get_master_material()->is_translucent();
-		state.depth_less_than = depth_less_than_op;
-		device.set_pipeline(state);
-
-
-		shader().set_int("indirect_material_offset", offset);
-
-		auto& textures = mat->impl->get_textures();
-
-		for (int i = 0; i < textures.size(); i++) {
-			bind_texture(i, textures[i]->gl_id);
-		}
 
 		const GLenum index_type = MODEL_INDEX_TYPE_GL;
 
@@ -1348,58 +1424,14 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass,
 	bool force_show_backfaces,
 	bool depth_less_than_op)
 {
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_render_instance_buffer);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, matman.get_gpu_material_buffer());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, list.glinstance_to_instance);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
-
-	if (scene.has_lightmap && scene.lightmapObj.lightmap_texture) {
-		auto texture = scene.lightmapObj.lightmap_texture;
-		bind_texture(20/* FIXME, defined to be bound at spot 20,*/, texture->gl_id);
-	}
-	else {
-		bind_texture(20/* FIXME, defined to be bound at spot 20,*/, black_texture.gl_id);
-	}
-
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-
+	setup_execute_render_lists(list, pass);
 	int offset = 0;
-	//vertexarrayhandle vao = g_modelMgr.get_vao(true);
 	for (int i = 0; i < pass.batches.size(); i++) {
-		
-		const auto& batch = pass.batches[i];
+		setup_batch(list, pass, depth_test_enabled, force_show_backfaces, depth_less_than_op, i, offset);
+
 		const int count = list.command_count[i];
-
-		const MaterialInstance* mat = (MaterialInstance*)pass.mesh_batches[pass.batches[i].first].material;
-		const draw_call_key batch_key = pass.objects[pass.mesh_batches[pass.batches[i].first].first].sort_key;
-		const program_handle program = (program_handle)batch_key.shader;
-		const blend_state blend = (blend_state)batch_key.blending;
-		const bool show_backface = batch_key.backface;
-		const uint32_t layer = batch_key.layer;
-		const int format = batch_key.vao;
-		const VaoType vaoType = (VaoType)batch_key.vao;
-		const vertexarrayhandle vaoHandle = g_modelMgr.get_vao(vaoType);
-
-		RenderPipelineState state;
-		state.program = program;
-		state.vao = vaoHandle;
-		state.backface_culling = !show_backface && !force_show_backfaces;
-		state.blend = blend;
-		state.depth_testing = depth_test_enabled;
-		//state.depth_writes = depth_write_enabled;
-		state.depth_writes = !mat->get_master_material()->is_translucent();
-		state.depth_less_than = depth_less_than_op;
-		device.set_pipeline(state);
-
-		shader().set_int("indirect_material_offset", offset);
-		const auto& textures = mat->impl->get_textures();
-		for (int i = 0; i < textures.size(); i++) {
-			bind_texture(i, textures[i]->gl_id);
-		}
+		const auto& batch = pass.batches[i];
 		const GLenum index_type = MODEL_INDEX_TYPE_GL;
-
-
 		for (int dc = 0; dc < batch.count; dc++) {
 			auto& cmd = list.commands[offset + dc];
 
@@ -1417,7 +1449,6 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass,
 		}
 
 		offset += count;
-
 	}
 }
 
@@ -1487,16 +1518,18 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 		const bool depth_less_than = params.wants_non_reverse_z;// params.pass == Render_Level_Params::SHADOWMAP;	// else, GL_GREATER
 		const bool depth_testing = true;
 		//const bool depth_writes = params.pass != Render_Level_Params::TRANSLUCENT;
-		if(dont_use_mdi.get_bool())
-			render_lists_old_way(*params.rl, *params.rp, depth_testing,
-				force_backface_state,
-				depth_less_than);
-		else
-			execute_render_lists(*params.rl, *params.rp, 
+		if (dont_use_mdi.get_bool()) {
+			render_lists_old_way(*params.rl, *params.rp,
 				depth_testing,
 				force_backface_state,
-				depth_less_than
-				);
+				depth_less_than);
+		}
+		else {
+			execute_render_lists(*params.rl, *params.rp,
+				depth_testing,
+				force_backface_state,
+				depth_less_than);
+		}
 
 	}
 
@@ -1551,7 +1584,7 @@ void Renderer::render_particles()
 
 
 Render_Pass::Render_Pass(pass_type type) : type(type) {}
-ConfigVar r_ignore_depth_shader("r_ignore_depth_shader", "0", CVAR_BOOL|CVAR_DEV, "");
+
 draw_call_key Render_Pass::create_sort_key_from_obj(
 	const Render_Object& proxy, 
 	const MaterialInstance* material,
@@ -1584,7 +1617,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 
 	key.blending = (uint64_t)mm->blend;
 	key.backface = mm->backface;
-	key.texture = material->impl->unique_id;
+	key.texture = material->impl->texture_id_hash;
 
 	VaoType theVaoType = VaoType::Animated;
 	if (proxy.lightmapped)
@@ -1643,6 +1676,7 @@ void Render_Pass::add_static_object(
 		cached_static_objects.push_back(obj);
 }
 
+
 #include <iterator>
 void Render_Pass::make_batches(Render_Scene& scene)
 {
@@ -1676,7 +1710,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 		return;
 
 	{
-		const auto& functor = [](int first, Pass_Object* po, const Render_Object* rop) -> Mesh_Batch
+		auto functor = [](int first, Pass_Object* po, const Render_Object* rop) -> Mesh_Batch
 		{
 			Mesh_Batch batch;
 			batch.first = first;
@@ -1688,8 +1722,10 @@ void Render_Pass::make_batches(Render_Scene& scene)
 			return batch;
 		};
 
+		const bool no_batching_dbg = r_no_batching.get_bool();
+
 		// build mesh batches first
-		Pass_Object* batch_obj = &objects[0];
+		Pass_Object* batch_obj = &objects.at(0);
 		const Render_Object* batch_proxy = &scene.get(batch_obj->render_obj);
 		Mesh_Batch batch = functor(0, batch_obj, batch_proxy);
 		batch_obj->batch_idx = 0;
@@ -1697,9 +1733,9 @@ void Render_Pass::make_batches(Render_Scene& scene)
 		for (int i = 1; i < objects.size(); i++) {
 			Pass_Object* this_obj = &objects[i];
 			const Render_Object* this_proxy = &scene.get(this_obj->render_obj);
-			bool can_be_merged
-				= this_obj->sort_key.as_uint64() == batch_obj->sort_key.as_uint64()
-				&& this_obj->submesh_index == batch_obj->submesh_index && type != pass_type::TRANSPARENT;	// dont merge transparent meshes into instances
+			const bool sort_key_equal = this_obj->sort_key.as_uint64() == batch_obj->sort_key.as_uint64();
+			const bool same_submesh = this_obj->submesh_index == batch_obj->submesh_index;
+			const bool can_be_merged = !no_batching_dbg&&sort_key_equal && same_submesh && type != pass_type::TRANSPARENT;	// dont merge transparent meshes into instances
 			if (can_be_merged)
 				batch.count++;
 			else {
@@ -1720,6 +1756,9 @@ void Render_Pass::make_batches(Render_Scene& scene)
 	Mesh_Batch* mesh_batch = &mesh_batches[0];
 	Pass_Object* batch_obj = &objects[mesh_batch->first];
 	const Render_Object* batch_proxy = &scene.get(batch_obj->render_obj);
+
+	const bool use_better_depth_batching = r_better_depth_batching.get_bool();
+
 	for (int i = 1; i < mesh_batches.size(); i++)
 	{
 		Mesh_Batch* this_batch = &mesh_batches[i];
@@ -1735,20 +1774,20 @@ void Render_Pass::make_batches(Render_Scene& scene)
 		bool same_other_state = batch_obj->sort_key.blending == this_obj->sort_key.blending 
 			&& batch_obj->sort_key.backface == this_obj->sort_key.blending;
 
-		//if (type == pass_type::OPAQUE || type == pass_type::TRANSPARENT) {
+		if (type == pass_type::OPAQUE || type == pass_type::TRANSPARENT || !use_better_depth_batching) {
 			if (same_vao && same_material && same_other_state && same_shader && same_layer)
 				batch_this = true;	// can batch with different meshes
 			else
 				batch_this = false;
 
-		//}
-		//else if (type == pass_type::DEPTH){
-		//	// can batch across texture changes as long as its not alpha tested
-		//	if (same_shader && same_vao && same_other_state && !this_batch->material->alpha_tested)
-		//		batch_this = true;
-		//	else
-		//		batch_this = false;
-		//}
+		}
+		else {// pass==DEPTH
+			// can batch across texture changes as long as its not alpha tested
+			if (same_shader && same_vao && same_other_state && !this_batch->material->impl->get_master_impl()->is_alphatested())
+				batch_this = true;
+			else
+				batch_this = false;
+		}
 
 		if (batch_this) {
 			batch.count += 1;
@@ -1930,8 +1969,6 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 	draw.get_arena().free_bottom_to_marker(marker);
 }
 
-// 128 bones * 100 characters * 2 (double bffer) =  
-ConfigVar r_skinned_mats_bone_buffer_size("r.skinned_mats_bone_buffer_size", "25600", CVAR_INTEGER | CVAR_UNBOUNDED | CVAR_READONLY, "");
 
 void Render_Scene::init()
 {
@@ -2324,10 +2361,12 @@ void Render_Scene::refresh_static_mesh_data(bool build_for_editor)
 		}
 	}
 }
+
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 {
 	ZoneScoped;
-
+	if (r_debug_skip_build_scene_data.get_bool())
+		return;
 	if (static_cache_built_for_editor != build_for_editor)
 		statics_meshes_are_dirty = true;
 	if(static_cache_built_for_debug!=(r_debug_mode.get_integer() != 0))
@@ -2550,9 +2589,11 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 
 }
 
-
 void Renderer::draw_meshbuilders()
 {
+	if (r_no_meshbuilders.get_bool())
+		return;
+
 	auto& mbFL = scene.meshbuilder_objs;
 	auto& mbObjs = scene.meshbuilder_objs.objects;
 	for (auto& mbPair : mbObjs)
@@ -2561,6 +2602,8 @@ void Renderer::draw_meshbuilders()
 		if (!mb.visible)
 			continue;
 		auto& dd = mbPair.type_.dd;
+		if (dd.num_indicies == 0)	// this check ...
+			continue;
 		if (mb.use_background_color) {
 			RenderPipelineState state;
 			state.program = prog.simple_solid_color;
@@ -2623,9 +2666,6 @@ void update_debug_grid()
 	idraw->get_scene()->update_meshbuilder(debug_grid_handle, mbo);
 }
 
-ConfigVar debug_sun_shadow("r.debug_csm", "0", CVAR_BOOL | CVAR_DEV,"debug csm shadow rendering");
-ConfigVar debug_specular_reflection("r.debug_specular", "0", CVAR_BOOL | CVAR_DEV, "debug specular lighting");
-ConfigVar r_no_indirect("r.no_indirect", "0", CVAR_BOOL, "");
 void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 {
 	ZoneScoped;
@@ -2859,8 +2899,6 @@ ThumbnailRenderer::ThumbnailRenderer(int size) : pass(pass_type::TRANSPARENT) {
 	vts_handle->type = Texture_Type::TEXTYPE_2D;
 }
 
-ConfigVar thumbnail_fov("thumbnail_fov", "60", CVAR_FLOAT | CVAR_UNBOUNDED, "");
-
 
 void ThumbnailRenderer::render(Model* model) {
 	ASSERT(!eng->get_is_in_overlapped_period());
@@ -2922,8 +2960,6 @@ void ThumbnailRenderer::output_to_path(std::string path) {
 }
 #endif
 
-ConfigVar r_drawfog("r.drawfog", "1", CVAR_BOOL | CVAR_DEV, "enable/disable drawing of fog");
-
 void Renderer::draw_height_fog()
 {
 	return;
@@ -2972,7 +3008,6 @@ void Renderer::draw_height_fog()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-ConfigVar r_drawdecals("r.drawdecals", "1", CVAR_BOOL | CVAR_DEV,"enable/disable drawing of decals");
 void Renderer::deferred_decal_pass()
 {
 	GPUFUNCTIONSTART;
@@ -3084,9 +3119,6 @@ void Renderer::sync_update()
 	);
 }
 
-ConfigVar r_drawterrain("r.drawterrain", "1", CVAR_BOOL | CVAR_DEV,"enable/disable drawing of terrain");
-ConfigVar r_force_hide_ui("r.force_hide_ui", "0", CVAR_BOOL,"disable ui drawing");
-ConfigVar test_thumbnail_model("test_thumbnail_model", "", CVAR_DEV, "");
 
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 {
@@ -3215,8 +3247,6 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 	helper.compute_specular_new(cubemap);
 	helper.compute_irradiance_new(cubemap, ambientCube);
 }
-
-ConfigVar force_render_cubemaps("r.force_cubemap_render", "0", CVAR_BOOL | CVAR_DEV, "force cubemaps to re-render, treated like a flag and not a setting");
 
 void Renderer::check_cubemaps_dirty()
 {
@@ -3355,7 +3385,12 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 	// main level render
 
+
 	auto gbuffer_pass = [&](bool is_wireframe = false, bool wireframe_secondpass = false) {
+		if (r_skip_gbuffer.get_bool())
+			return;
+
+
 		const auto& view_to_use = current_frame_view;
 
 		const bool clear_framebuffer = (!is_wireframe || !wireframe_secondpass);
@@ -3397,6 +3432,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 	//device.reset_states();
 	
+
 	deferred_decal_pass();
 		//device.reset_states();
 

@@ -35,7 +35,7 @@ enum Texture_Type
 };
 
 
-
+class IGraphicsTexture;
 class Texture : public IAsset {
 public:
 	CLASS_BODY(Texture);
@@ -59,6 +59,8 @@ public:
 	bool has_mips = false;
 	bool is_float = false;
 	texhandle gl_id = 0;
+	IGraphicsTexture* gpu_ptr = nullptr;
+
 #ifdef EDITOR_BUILD
 	bool hasSimplifiedColor = false;
 	Color32 simplifiedColor = COLOR_WHITE;

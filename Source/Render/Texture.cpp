@@ -22,6 +22,8 @@
 #include "tinyexr.h"
 #undef APIENTRY
 
+#include "IGraphsDevice.h"
+
 // TextureEditor.cpp
 extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*,Color32& outColor);
 #ifdef EDITOR_BUILD
@@ -321,6 +323,40 @@ struct DDS_HEADER_DXT10
 	uint32_t        miscFlags2; // see DDS_MISC_FLAGS2
 };
 
+static GraphicsTextureFormat load_format_to_graphics_format(Texture_Format fmt) {
+	switch (fmt)
+	{
+	case TEXFMT_RGBA8: return GraphicsTextureFormat::rgba8;
+		break;
+	case TEXFMT_RGB8:  return GraphicsTextureFormat::rgb8;
+		break;
+	case TEXFMT_RG8:  return GraphicsTextureFormat::rg8;
+		break;
+	case TEXFMT_R8:  return GraphicsTextureFormat::r8;
+		break;
+	case TEXFMT_RGBA16F:  return GraphicsTextureFormat::rgba16f;
+		break;
+	case TEXFMT_RGB16F:  return GraphicsTextureFormat::rgb16f;
+		break;
+	case TEXFMT_RGBA8_DXT5:  return GraphicsTextureFormat::bc3;
+		break;
+	case TEXFMT_RGB8_DXT1:  return GraphicsTextureFormat::bc1;
+		break;
+	case TEXFMT_RGBA8_DXT1:  return GraphicsTextureFormat::bc1;
+		break;
+	case TEXFMT_BC4:  return GraphicsTextureFormat::bc4;
+		break;
+	case TEXFMT_BC5:  return GraphicsTextureFormat::bc5;
+		break;
+	case TEXFMT_BC6:  return GraphicsTextureFormat::bc6;
+		break;
+	default:
+		break;
+	}
+	assert(0 && "load_format_to_graphics_format: not defined");
+	return GraphicsTextureFormat::rgba8;
+}
+
 static void make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat);
 static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 {
@@ -382,6 +418,16 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 	bool compressed;
 	texture_format_to_gl(input_format, &format, &internal_format, &type, &compressed);
 
+	auto create_gpu_texture = [&]() {
+		CreateTextureArgs args;
+		args.width = input_width;
+		args.height = input_height;
+		args.num_mip_maps = numMipmaps;
+		args.format = load_format_to_graphics_format(input_format);
+		return IGraphicsDevice::inst->create_texture(args);
+	};
+	output->gpu_ptr = create_gpu_texture();
+
 	glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
 	glTextureStorage2D(output->gl_id, numMipmaps, internal_format, input_width, input_height);
 
@@ -404,6 +450,8 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 			glCompressedTextureSubImage2D(output->gl_id,i, 0, 0, ux, uy, internal_format, size, data_ptr);
 		else
 			glTextureSubImage2D(output->gl_id, i, 0, 0, ux, uy, format, type, data_ptr);
+
+		output->gpu_ptr->sub_image_upload(i, 0, 0, ux, uy, size, data_ptr);
 
 		data_ptr += size;
 		ux /= 2;

@@ -48,7 +48,9 @@ out vec3 FS_IN_Normal;
 out vec2 FS_IN_Texcoord;
 out vec3 FS_IN_BoneColor;
 out vec4 FS_IN_NDC;
+#ifndef NO_TAA
 out vec4 FS_IN_PrevNDC;// for motion vectors
+#endif
 out mat3 FS_IN_TBN;
 #ifdef LIGHTMAPPED
 out vec2 FS_IN_LightmapCoord;
@@ -156,6 +158,7 @@ void main()
     FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
 	
 	#ifndef DEPTH_ONLY
+	#ifndef NO_TAA
 	{
 		// calc last position for motion vectors
 		#ifdef ANIMATED
@@ -167,6 +170,7 @@ void main()
 		vec4 lastfrag_pos = g_objects[obj_index].prev_model*vec4(prev_local_pos,1.0) + vec4(WORLD_POSITION_OFFSET,0.0);	// hack for WPO,not right
 		FS_IN_PrevNDC = g.prev_viewproj * vec4(lastfrag_pos.xyz,1.0);
 	}
+	#endif
 	#endif
 
 	gl_Position = FS_IN_NDC;
@@ -205,7 +209,9 @@ in vec3 FS_IN_Normal;
 in vec2 FS_IN_Texcoord;
 in vec3 FS_IN_BoneColor;
 in vec4 FS_IN_NDC;
+#ifndef NO_TAA
 in vec4 FS_IN_PrevNDC;
+#endif
 in vec2 FS_IN_LightmapCoord;
 
 
@@ -361,6 +367,7 @@ void main()
 		GBUFFER_OUT_Emissive = vec4(EMISSIVE,1.0);
 		
 		// Motion vectors
+		#ifndef NO_TAA
 		{
 			vec2 prev_position = FS_IN_PrevNDC.xy / FS_IN_PrevNDC.w;
 			vec2 cur_position = FS_IN_NDC.xy / FS_IN_NDC.w;
@@ -370,6 +377,7 @@ void main()
 			
 			GBUFFER_OUT_MotionVector = ss_velocity;
 		}
+		#endif
 		
 	
 	#endif // THUMBNAIL_FORWARD

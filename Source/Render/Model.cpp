@@ -81,7 +81,7 @@ static const int MODEL_FORMAT_VERSION = 14;
 
 static const int STATIC_VERTEX_SIZE = 1'000'000;
 static const int STATIC_INDEX_SIZE = 3'000'000;
-
+#include "IGraphsDevice.h"
 void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 {
 	assert(ibuffer.handle == 0 && vbuffer.handle == 0);
@@ -96,7 +96,12 @@ void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 	vbuffer.tail = 0;
 	vbuffer.head = 0;
 
+	CreateBufferArgs args;
+	args.flags = BUFFER_USE_AS_VB;
+	args.size = sizeof(ModelVertex) * STATIC_VERTEX_SIZE;
+	vbuffer.ptr = IGraphicsDevice::inst->create_buffer(args);
 
+	
 
 	const int index_size = MODEL_BUFFER_INDEX_TYPE_SIZE;
 	glGenBuffers(1, &ibuffer.handle);
@@ -108,6 +113,12 @@ void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 	ibuffer.used_total = 0;
 	ibuffer.tail = 0;
 	ibuffer.head = 0;
+
+	args.flags = BUFFER_USE_AS_IB;
+	args.size = index_size * STATIC_INDEX_SIZE;
+	ibuffer.ptr = IGraphicsDevice::inst->create_buffer(args);
+
+
 
 	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -406,12 +417,7 @@ int MainVbIbAllocator::append_to_v_buffer(const uint8_t* data, size_t size) {
 int MainVbIbAllocator::append_to_i_buffer(const uint8_t* data, size_t size) {
 	return append_buf_shared(data, size, "Index", ibuffer, GL_ELEMENT_ARRAY_BUFFER);
 }
-int MainVbIbAllocator::move_append_v_buffer(int ofs, int size) {
-	return move_append_buf_shared(ofs, size, "Vertex", vbuffer, GL_ARRAY_BUFFER);
-}
-int MainVbIbAllocator::move_append_i_buffer(int ofs, int size) {
-	return move_append_buf_shared(ofs, size, "Index", ibuffer, GL_ELEMENT_ARRAY_BUFFER);
-}
+
 
 int MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target)
 {
@@ -438,33 +444,9 @@ int MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const
 
 	glBindBuffer(target, buf.handle);
 	glBufferSubData(target, where_to_append, size, data);
-	buf.used_total += size;
-	buf.head = where_to_append + size;
-	return where_to_append;
-}
-int MainVbIbAllocator::move_append_buf_shared(int ofs, int size, const char* name, buffer& buf, uint32_t target)
-{
-	auto out_of_memory = [&]() {
-		sys_print(Error, "%s buffer overflow %d/%d !!!\n", name, int(size + buf.used_total), int(buf.allocated));
-		std::fflush(stdout);
-		std::abort();
-	};
-	int where_to_append = buf.head;
-	if (buf.head >= buf.tail) {
-		if (buf.head + size > buf.allocated) {
-			if (size > buf.tail) {
-				out_of_memory();
-			}
-			where_to_append = 0;
-		}
-	}
-	else {
-		if (buf.head + size > buf.tail) {
-			out_of_memory();
-		}
-	}
-	glBindBuffer(target, buf.handle);
-	glCopyBufferSubData(target, target, ofs, where_to_append, size);
+
+	buf.ptr->sub_upload(data, size, where_to_append);
+
 	buf.used_total += size;
 	buf.head = where_to_append + size;
 	return where_to_append;
@@ -803,6 +785,24 @@ void ModelMan::init()
 	allocator.init(STATIC_INDEX_SIZE, STATIC_VERTEX_SIZE);
 
 	{
+		using gvat = GraphicsVertexAttribType;
+		const int stride = sizeof(ModelVertex);
+
+		CreateVertexInputArgs args;
+		args.index = allocator.ibuffer.ptr;
+		args.vertex = allocator.vbuffer.ptr;
+		args.index_type = VertexInputIndexType::uint16;
+		auto animated_layout = {
+			VertexLayout(POSITION_LOC,3,gvat::float32,stride,offsetof(ModelVertex, pos)),
+			VertexLayout(UV_LOC,2,gvat::float32,stride,offsetof(ModelVertex, uv)),
+			VertexLayout(NORMAL_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, normal[0])),
+			VertexLayout(TANGENT_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, tangent[0])),
+			VertexLayout(JOINT_LOC,4,gvat::u8,stride,offsetof(ModelVertex, color[0])),
+			VertexLayout(WEIGHT_LOC,4,gvat::u8_normalized,stride,offsetof(ModelVertex, color2[0])),
+		};
+		args.layout = animated_layout;
+		animated_vertex_input = IGraphicsDevice::inst->create_vertex_input(args);
+
 		glGenVertexArrays(1, &animated_vao);
 		glBindVertexArray(animated_vao);
 		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, allocator.ibuffer.handle);
@@ -830,6 +830,24 @@ void ModelMan::init()
 		glBindVertexArray(0);
 	}
 	{
+
+		using gvat = GraphicsVertexAttribType;
+		const int stride = sizeof(ModelVertex);
+
+		CreateVertexInputArgs args;
+		args.index = allocator.ibuffer.ptr;
+		args.vertex = allocator.vbuffer.ptr;
+		args.index_type = VertexInputIndexType::uint16;
+		auto lightmapped_layout = {
+			VertexLayout(POSITION_LOC,3,gvat::float32,stride,offsetof(ModelVertex, pos)),
+			VertexLayout(UV_LOC,2,gvat::float32,stride,offsetof(ModelVertex, uv)),
+			VertexLayout(NORMAL_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, normal[0])),
+			VertexLayout(TANGENT_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, tangent[0])),
+			VertexLayout(LIGHTMAPCOORD_LOC,2,gvat::u16_normalized,stride,offsetof(ModelVertex, color[0])),
+		};
+		args.layout = lightmapped_layout;
+		lightmapped_vertex_input = IGraphicsDevice::inst->create_vertex_input(args);
+
 
 		glGenVertexArrays(1, &lightmapped_vao);
 		glBindVertexArray(lightmapped_vao);

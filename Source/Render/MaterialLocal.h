@@ -29,7 +29,6 @@ enum class MaterialUsage : uint8_t
 };
 
 
-
 enum class blend_state : uint8_t
 {
 	OPAQUE,
@@ -39,7 +38,7 @@ enum class blend_state : uint8_t
 
 	// just for fun testing
 	SCREEN,
-	PREMULT_BLEND,
+	PREMULT_BLEND
 };
 
 // Parameter types
@@ -192,7 +191,9 @@ public:
 
 	MaterialInstance* self = nullptr;
 	bool is_dynamic_material = false;
-	int unique_id = 0;	// unique id of this material instance (always valid)
+
+	int texture_id_hash = 0;
+
 	std::shared_ptr<MaterialInstance> masterMaterial;
 	std::unique_ptr<MasterMaterialImpl> masterImpl;	// if this material instance is a default instance of a master material, this is filled
 	std::vector<Texture*> texture_bindings;
@@ -252,8 +253,72 @@ public:
 
 	std::unordered_map<uint32_t, program_handle> shader_key_to_program_handle;
 };
+#include "Framework/InlineVec.h"
+#include "Framework/MapUtil.h"
+#include "Animation/Editor/Optional.h"
+class TextureBindingHasher {
+public:
+	int get_texture_hash_id_for_material(MaterialImpl* mat) {
+		if (mat->texture_bindings.empty())
+			return NO_TEXTURE_ID;
+		opt<int> existing = find_existing(mat->texture_bindings);
+		if (existing.has_value())
+			return *existing;
+		return insert_new(mat->texture_bindings);
+	}
+private:
+	static const int NO_TEXTURE_ID = 0;
+	struct HashItem {
+		InlineVec<Texture*, 6> textures;
+		int id = 0;
+	};
+	using HashItemVec = InlineVec<HashItem, 1>;
 
+	static bool are_arrays_equal(const InlineVec<Texture*, 6>& v1, const std::vector<Texture*>& v2) {
+		if (v1.size() != v2.size())
+			return false;
+		for (int i = 0; i < v1.size(); i++){
+			if (v1[i] != v2[i])
+				return false;
+		}
+		return true;
+	}
 
+	int insert_new(const std::vector<Texture*> bindings) {
+		assert(!bindings.empty());
+		Texture* first = bindings.at(0);
+		assert(first);
+		const int this_id = current_texture_hash_id++;
+		HashItem item;
+		item.id = this_id;
+		for (auto t : bindings)
+			item.textures.push_back(t);
+		table[first].push_back(item);	// inserts into table if doesnt exist, then push_back()
+		return this_id;
+	}
+
+	opt<int> find_existing(const std::vector<Texture*> bindings) {
+		if (bindings.empty()) 
+			return NO_TEXTURE_ID;
+		Texture* first = bindings.at(0);
+		assert(first);
+		const HashItemVec* items = MapUtil::get_opt(table, first);
+		if (items) {
+			for (int i = 0; i < items->size(); i++) {
+				const HashItem* item = &(*items)[i];
+				const bool are_equal = are_arrays_equal(item->textures, bindings);
+				if (are_equal)
+					return item->id;
+			}
+		}
+		return std::nullopt;
+	}
+
+	std::unordered_map<Texture*, HashItemVec> table;
+	int current_texture_hash_id = 1;
+};
+
+class IGraphicsBuffer;
 class Model;
 class MaterialManagerLocal : public MaterialManagerPublic
 {
@@ -287,7 +352,10 @@ public:
 		bool forced_forward
 	);
 
-	bufferhandle get_gpu_material_buffer() { return gpuMaterialBuffer; }
+	IGraphicsBuffer* get_gpu_material_buffer() { 
+		return gpuMatBufferPtr;
+		//return gpuMaterialBuffer; 
+	}
 	void add_to_dirty_list(MaterialInstance* mat) {
 		if (mat->impl->dirty_buffer_index == -1) {
 			dirty_list.push_back(mat);
@@ -318,13 +386,12 @@ public:
 	int get_next_master_id() {
 		return ++current_master_id;
 	}
-	int get_next_instance_id() {
-		return ++current_instance_id;
-	}
+
 	MaterialInstance* get_default_editor_sel_PP() {
 		return PPeditorSelectMat.get();
 	}
 private:
+
 	std::shared_ptr<MaterialInstance> PPeditorSelectMat = nullptr;
 	MaterialInstance* fallback_master = nullptr;
 	MaterialInstance* shared_depth_master = nullptr;
@@ -335,8 +402,10 @@ private:
 	Material_Shader_Table mat_table;
 
 	// global material buffer, all parameters get stuff in here and accessed by shaders
-	bufferhandle gpuMaterialBuffer = 0;
+	//bufferhandle gpuMaterialBuffer = 0;
 	int materialBufferSize = 0;
+	IGraphicsBuffer* gpuMatBufferPtr = nullptr;
+
 
 	// bitmap allocator for materials
 	std::vector<uint64_t> materialBitmapAllocator;
@@ -364,9 +433,8 @@ private:
 		return  0;
 	}
 
-
 	int current_master_id = 0;
-	int current_instance_id = 0;
+	TextureBindingHasher binding_hasher;
 };
 
 extern MaterialManagerLocal matman;

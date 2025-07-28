@@ -1,5 +1,7 @@
 #pragma once
 
+
+
 #include "Assets/IAsset.h"
 #include "DrawTypedefs.h"
 #include <memory>
@@ -15,6 +17,7 @@ class Texture;
 class IAssetLoadingInterface;
 class MaterialImpl;
 class PhysicsMaterialWrapper;
+
 
 class MaterialInstance : public IAsset {
 public:

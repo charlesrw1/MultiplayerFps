@@ -126,6 +126,7 @@
     <ClCompile Include="Source\Render\EnvProbe.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />
     <ClCompile Include="Source\Render\Model.cpp" />
+    <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
     <ClCompile Include="Source\Render\RenderExtra.cpp" />
     <ClCompile Include="Source\Render\RenderWindow.cpp" />
     <ClCompile Include="Source\Render\Shader.cpp" />
@@ -224,6 +225,7 @@
     <ClInclude Include="Source\LevelSerialization\SerializeNewMakers.h" />
     <ClInclude Include="Source\MEGA.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
+    <ClInclude Include="Source\Render\IGraphsDevice.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Render\RenderWindow.h" />
     <ClInclude Include="Source\Render\UniformBuffer.h" />
@@ -563,7 +565,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/bigobj
@@ -590,7 +592,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)Source\External;$(ProjectDir)Source;$(ProjectDir)steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -618,7 +620,7 @@
       <Optimization>MaxSpeed</Optimization>
       <TreatWarningAsError>true</TreatWarningAsError>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
       <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>

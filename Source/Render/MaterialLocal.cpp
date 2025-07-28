@@ -15,6 +15,7 @@
 
 #include "glad/glad.h"
 
+#include "IGraphsDevice.h"
 #include "Assets/AssetRegistry.h"
 #include "Assets/AssetDatabase.h"
 #include "Framework/StringUtils.h"
@@ -283,7 +284,6 @@ void MaterialImpl::post_load(MaterialInstance* self)
 		masterImpl->material_id = matman.get_next_master_id();
 		ASSERT(masterImpl->self == self);
 	}
-	unique_id = matman.get_next_instance_id();
 	matman.add_to_dirty_list(self);
 }
 
@@ -946,12 +946,20 @@ void MaterialManagerLocal::on_reload_shader_invoke()
 
 }
 
-
 void MaterialManagerLocal::init() {
 	draw.on_reload_shaders.add(this, &MaterialManagerLocal::on_reload_shader_invoke);
 
-	glCreateBuffers(1, &gpuMaterialBuffer);
-	glNamedBufferStorage(gpuMaterialBuffer, MATERIAL_SIZE * MAX_MATERIALS, nullptr, GL_DYNAMIC_STORAGE_BIT);
+	//glCreateBuffers(1, &gpuMaterialBuffer);
+	//glNamedBufferStorage(gpuMaterialBuffer, MATERIAL_SIZE * MAX_MATERIALS, nullptr, GL_DYNAMIC_STORAGE_BIT);
+
+	auto create_buffer = [&]() {
+		CreateBufferArgs args;
+		args.size = MATERIAL_SIZE * MAX_MATERIALS;
+		args.flags = GraphicsBufferUseFlags(BUFFER_USE_DYNAMIC | BUFFER_USE_AS_STORAGE_READ);
+		return IGraphicsDevice::inst->create_buffer(args);
+	};
+	gpuMatBufferPtr = create_buffer();
+
 	materialBufferSize = MATERIAL_SIZE * MAX_MATERIALS;
 	materialBitmapAllocator.resize(MAX_MATERIALS/64	/* 64 bit bitmask */, 0);
 
@@ -1025,9 +1033,15 @@ void MaterialManagerLocal::pre_render_update()
 					ASSERT(0);
 			}
 		}
+		// compute hasher after texture update stuff. fixme dont recompute if didint change texture
+		mat->impl->texture_id_hash = binding_hasher.get_texture_hash_id_for_material(mat->impl.get());
 
+
+		const int offset = mat->impl->gpu_buffer_offset * sizeof(uint);
 		// update the buffer
-		glNamedBufferSubData(gpuMaterialBuffer, mat->impl->gpu_buffer_offset * sizeof(uint), data_to_upload.size(), data_to_upload.data());
+	//	glNamedBufferSubData(gpuMaterialBuffer, offset, data_to_upload.size(), data_to_upload.data());
+
+		gpuMatBufferPtr->sub_upload(data_to_upload.data(), data_to_upload.size(), offset);
 
 	}
 

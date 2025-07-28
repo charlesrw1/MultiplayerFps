@@ -4,7 +4,7 @@
 
 // use 16 bit indicies
 const int MODEL_BUFFER_INDEX_TYPE_SIZE = sizeof(uint16_t);
-
+class IGraphicsBuffer;
 class MainVbIbAllocator
 {
 public:
@@ -14,11 +14,10 @@ public:
 
 	int append_to_v_buffer(const uint8_t* data, size_t size);
 	int append_to_i_buffer(const uint8_t* data, size_t size);
-	int move_append_v_buffer(int ofs, int size);
-	int move_append_i_buffer(int ofs, int size);
 
 
 	struct buffer {
+		IGraphicsBuffer* ptr = nullptr;
 		bufferhandle handle = 0;
 		int allocated = 0;
 
@@ -32,7 +31,6 @@ public:
 	buffer ibuffer;
 
 private:
-	int move_append_buf_shared(int ofs, int size, const char* name, buffer& buf, uint32_t target);
 	int append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target);
 };
 #include "Framework/ConsoleCmdGroup.h"
@@ -40,6 +38,7 @@ enum class VaoType {
 	Animated,
 	Lightmapped
 };
+class IGraphicsVertexInput;
 class ModelMan
 {
 public:
@@ -54,6 +53,13 @@ public:
 		else
 			return lightmapped_vao;
 	}
+	IGraphicsVertexInput* get_vao_ptr(VaoType type) {
+		if (type == VaoType::Animated)
+			return animated_vertex_input;
+		else
+			return lightmapped_vertex_input;
+	}
+
 	Model* get_error_model() const { return error_model; }
 	Model* get_sprite_model() const { return _sprite; }
 	Model* get_default_plane_model() const { return defaultPlane; }
@@ -80,6 +86,11 @@ private:
 
 	vertexarrayhandle animated_vao=0;
 	vertexarrayhandle lightmapped_vao=0;
+
+	IGraphicsVertexInput* animated_vertex_input = nullptr;
+	IGraphicsVertexInput* lightmapped_vertex_input = nullptr;
+
+
 	MainVbIbAllocator allocator;
 	int cur_mesh_id = 1;
 

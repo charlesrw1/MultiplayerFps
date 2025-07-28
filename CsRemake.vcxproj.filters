@@ -477,6 +477,7 @@
     <ClInclude Include="Source\Framework\LuaColor.h" />
     <ClInclude Include="Source\Game\Components\RagdollComponent.h" />
     <ClInclude Include="Source\LevelEditor\EditorStatic.h" />
+    <ClInclude Include="Source\Render\IGraphsDevice.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -638,6 +639,7 @@
     <ClCompile Include="Source\Framework\SerializerBinary.cpp" />
     <ClCompile Include="Source\UI\GUISystemPublic.cpp" />
     <ClCompile Include="Source\Game\Components\RagdollComponent.cpp" />
+    <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
