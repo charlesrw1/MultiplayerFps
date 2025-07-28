@@ -6,7 +6,7 @@
 #include <random>
 
 #include "Assets/AssetDatabase.h"
-
+#include "IGraphsDevice.h"
 
 void draw_hbao_menu()
 {
@@ -319,7 +319,7 @@ void SSAO_System::render()
 		shader.set_float("zNear", near);
 
 
-		glBindTextureUnit(0, draw.tex.scene_depth);
+		glBindTextureUnit(0, draw.tex.scene_depth->get_internal_handle());
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
 		glCheckError();

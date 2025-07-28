@@ -67,17 +67,7 @@ void EnviornmentMapHelper::init()
     -0.5f,  0.5f, -0.5f,
     };
 
-    RenderPassState state;
-    CreateTextureArgs depth_args;
-    depth_args.format = GraphicsTextureFormat::depth24f;
-    depth_args.width = depth_args.height = CUBEMAP_SIZE;
-    IGraphicsTexture* depth = IGraphicsDevice::inst->create_texture(depth_args);
-    RenderPassState pass;
-    pass.depth_info = depth;
-    IGraphicsDevice::inst->set_render_pass(pass);
 
-    CreateVertexInputArgs vert_input;
-    IGraphicsDevice::inst->create_vertex_input()
 
 
     glGenFramebuffers(1, &fbo);

@@ -424,6 +424,7 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 		args.height = input_height;
 		args.num_mip_maps = numMipmaps;
 		args.format = load_format_to_graphics_format(input_format);
+		args.sampler_type = GraphicsSamplerType::AnisotropyDefault;
 		return IGraphicsDevice::inst->create_texture(args);
 	};
 	output->gpu_ptr = create_gpu_texture();
@@ -688,6 +689,13 @@ void Texture::uninstall()
 		width = height = 0;
 		gl_id = 0;
 	}
+}
+void Texture::update_specs_ptr(IGraphicsTexture* ptr, int w, int h, int channels, Texture_Format fmt) {
+	this->gl_id = ptr->get_internal_handle();
+	this->width = w;
+	this->height = h;
+	this->channels = channels;
+	this->format = fmt;
 }
 Texture* Texture::install_system(const std::string& path)
 {

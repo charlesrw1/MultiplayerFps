@@ -74,6 +74,7 @@ public:
 		this->channels = channels;
 		this->format = fmt;
 	}
+	void update_specs_ptr(IGraphicsTexture* ptr, int w, int h, int channels, Texture_Format fmt);
 
 	static Texture* install_system(const std::string& path);
 	static int get_mip_map_count(int width, int height){

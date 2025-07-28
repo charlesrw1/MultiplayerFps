@@ -1,3 +1,4 @@
+#if 1
 #include "IGraphsDevice.h"
 #include <unordered_set>
 #include <optional>
@@ -148,6 +149,8 @@ public:
 			break;
 		case GraphicsTextureFormat::rg32f: return GL_RG;
 			break;
+		case GraphicsTextureFormat::r11f_g11f_b10f: return GL_RGB;
+			break;
 		case GraphicsTextureFormat::bc1:
 		case GraphicsTextureFormat::bc3:
 		case GraphicsTextureFormat::bc4:
@@ -200,11 +203,40 @@ public:
 			break;
 		case GraphicsTextureFormat::depth24stencil8: return GL_DEPTH24_STENCIL8;
 			break;
+		case GraphicsTextureFormat::r11f_g11f_b10f: return GL_R11F_G11F_B10F;
 		default:
 			break;
 		}
 		ASSERT(0&&"OpenGLTextureImpl: unknown texture format");
 		return GL_RGB8;
+	}
+	static GLenum filter_to_gl(GraphicsFilterType type) {
+		switch (type)
+		{
+		case GraphicsFilterType::Linear: return GL_LINEAR;
+			break;
+		case GraphicsFilterType::Nearest: return GL_NEAREST;
+			break;
+		case GraphicsFilterType::MipmapLinear: return GL_LINEAR_MIPMAP_LINEAR;
+			break;
+		default:
+			break;
+		}
+		ASSERT(0 && "filter_to_gl not defined");
+		return 0;
+	}
+	static GLenum wrap_to_gl(GraphicsTextureEdge type) {
+		switch (type)
+		{
+		case GraphicsTextureEdge::Repeat: return GL_REPEAT;
+			break;
+		case GraphicsTextureEdge::Clamp: return GL_CLAMP_TO_EDGE;
+			break;
+		default:
+			break;
+		}
+		ASSERT(0 && "wrap_to_gl not defined");
+		return 0;
 	}
 
 	OpenGLTextureImpl(const CreateTextureArgs& args) {
@@ -215,6 +247,39 @@ public:
 		my_fmt = args.format;
 		internal_format_gl = to_format(args.format);
 		glTextureStorage2D(id, args.num_mip_maps, internal_format_gl, x, y);
+
+		switch (args.sampler_type)
+		{
+		case GraphicsSamplerType::AnisotropyDefault:
+			glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTextureParameteri(id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
+			break;
+		case GraphicsSamplerType::LinearDefault:
+			glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			break;
+		case GraphicsSamplerType::NearestDefault:
+			glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			break;
+		case GraphicsSamplerType::LinearClamped:
+			glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTextureParameteri(id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			break;
+		case GraphicsSamplerType::NearestClamped:
+			glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glTextureParameteri(id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			break;
+		case GraphicsSamplerType::Shadowmap:
+			break;
+		default:
+			break;
+		}
 	}
 	~OpenGLTextureImpl() override {
 		glDeleteTextures(1, &id);
@@ -256,6 +321,7 @@ public:
 			gtf::rg32f,
 			gtf::depth24f,
 			gtf::depth32f,
+			gtf::r11f_g11f_b10f,
 		};
 		for (auto t : types) {
 			if (t == my_fmt) return true;
@@ -466,3 +532,4 @@ private:
 IGraphicsDevice* IGraphicsDevice::create_opengl_device() {
 	return new OpenGLDeviceImpl();
 }
+#endif

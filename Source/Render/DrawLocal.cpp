@@ -354,86 +354,89 @@ void Program_Manager::recompile(program_def& def) {
 	if(log_shader_compiles.get_bool())
 		sys_print(Debug, "Program_Manager::recompile: compiled/loaded %s in %f\n", def.vert.c_str(), time);
 }
+void Program_Manager::recompile_shared(program_def& def)
+{
+	string hashed_path = compute_hash_for_program_def(def) + ".bin";
+	auto binFile = FileSys::open_read(hashed_path.c_str(), FileSys::SHADER_CACHE);
+	auto shaderFile = FileSys::open_read_engine(def.vert.c_str());
+	if (shaderFile && binFile) {
+		if (shaderFile->get_timestamp() <= binFile->get_timestamp()) {
+			if (log_shader_compiles.get_bool())
+				sys_print(Debug, "Program_Manager::recompile: loading cached binary: %s\n", hashed_path.data());
 
+			// load cached binary
+			BinaryReader reader(binFile.get());
+			auto sourceType = reader.read_int32();
+			auto len = reader.read_int32();
+			vector<uint8_t> bytes(len, 0);
+			reader.read_bytes_ptr(bytes.data(), bytes.size());
+
+			if (def.shader_obj.ID != 0) {
+				glDeleteProgram(def.shader_obj.ID);
+			}
+			def.shader_obj.ID = glCreateProgram();
+			glProgramBinary(def.shader_obj.ID, sourceType, bytes.data(), bytes.size());
+			glValidateProgram(def.shader_obj.ID);
+
+			GLint success = 0;
+			glGetProgramiv(def.shader_obj.ID, GL_LINK_STATUS, &success);
+			if (success == GL_FALSE) {
+				GLint logLength = 0;
+				glGetProgramiv(def.shader_obj.ID, GL_INFO_LOG_LENGTH, &logLength);
+				std::vector<GLchar> log(logLength);
+				glGetProgramInfoLog(def.shader_obj.ID, logLength, nullptr, log.data());
+				sys_print(Error, "Program_Manager::recompile: loading binary failed: %s\n", log.data());
+			}
+			else {
+				return;	// done
+			}
+		}
+	}
+	binFile.reset();
+
+	// fail path
+	def.compile_failed = Shader::compile_vert_frag_single_file(&def.shader_obj, def.vert, def.defines) != ShaderResult::SHADER_SUCCESS;
+
+	if (!def.compile_failed) {
+		const auto program = def.shader_obj.ID;
+		GLint length = 0;
+		glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
+		if (log_shader_compiles.get_bool())
+			sys_print(Debug, "Program_Manager::recompile: saving cached binary: %s\n", hashed_path.data());
+		vector<uint8_t> bytes(length, 0);
+		GLenum outType = 0;
+		glGetProgramBinary(def.shader_obj.ID, bytes.size(), nullptr, &outType, bytes.data());
+		FileWriter writer(bytes.size() + 8);
+		writer.write_int32(outType);
+		writer.write_int32(bytes.size());
+		writer.write_bytes_ptr(bytes.data(), bytes.size());
+		auto outFile = FileSys::open_write(hashed_path.c_str(), FileSys::SHADER_CACHE);
+		if (outFile) {
+			outFile->write(writer.get_buffer(), writer.get_size());
+		}
+		else {
+			sys_print(Error, "Program_Manager::recompile: couldnt open file to write program binary: %s\n", hashed_path.data());
+		}
+	}
+}
 
 void Program_Manager::recompile_do(program_def& def)
 {
 	// look in shader cache, only for "shared shaders" now, these are the main materials so whatev
 	if(def.is_shared() && !def.is_tesselation)
 	{
-		if (!def.program) {
-			CreateProgramArgs args;
-			args.file_name = def.vert;
-			args.defines = def.defines;
-			def.program = IGraphicsDevice::inst->create_program(args);
-			def.shader_obj.ID = def.program->get_internal_handle();
-			def.compile_failed = false;
-		}
-
-		//string hashed_path = compute_hash_for_program_def(def) + ".bin";
-		//auto binFile = FileSys::open_read(hashed_path.c_str(), FileSys::SHADER_CACHE);
-		//auto shaderFile = FileSys::open_read_engine(def.vert.c_str());
-		//if (shaderFile && binFile) {
-		//	if (shaderFile->get_timestamp() <= binFile->get_timestamp()) {
-		//		if(log_shader_compiles.get_bool())
-		//			sys_print(Debug, "Program_Manager::recompile: loading cached binary: %s\n", hashed_path.data());
-		//
-		//		// load cached binary
-		//		BinaryReader reader(binFile.get());
-		//		auto sourceType = reader.read_int32();
-		//		auto len = reader.read_int32();
-		//		vector<uint8_t> bytes(len,0);
-		//		reader.read_bytes_ptr(bytes.data(), bytes.size());
-		//
-		//		if (def.shader_obj.ID != 0) {
-		//			glDeleteProgram(def.shader_obj.ID);
-		//		}
-		//		def.shader_obj.ID=glCreateProgram();
-		//		glProgramBinary(def.shader_obj.ID, sourceType, bytes.data(), bytes.size());
-		//		glValidateProgram(def.shader_obj.ID);
-		//
-		//		GLint success = 0;
-		//		glGetProgramiv(def.shader_obj.ID, GL_LINK_STATUS, &success);
-		//		if (success == GL_FALSE) {
-		//			GLint logLength = 0;
-		//			glGetProgramiv(def.shader_obj.ID, GL_INFO_LOG_LENGTH, &logLength);
-		//			std::vector<GLchar> log(logLength);
-		//			glGetProgramInfoLog(def.shader_obj.ID, logLength, nullptr, log.data());
-		//			sys_print(Error, "Program_Manager::recompile: loading binary failed: %s\n", log.data());
-		//		}
-		//		else {
-		//			return;	// done
-		//		}
-		//	}
-		//}
-		//binFile.reset();
-		//
-		//// fail path
-		//def.compile_failed = Shader::compile_vert_frag_single_file(&def.shader_obj, def.vert, def.defines) != ShaderResult::SHADER_SUCCESS;
-		//
-		//if (!def.compile_failed) {
-		//	const auto program = def.shader_obj.ID;
-		//	GLint length = 0;
-		//	glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
-		//	if(log_shader_compiles.get_bool())
-		//		sys_print(Debug, "Program_Manager::recompile: saving cached binary: %s\n", hashed_path.data());
-		//	vector<uint8_t> bytes(length, 0);
-		//	GLenum outType = 0;
-		//	glGetProgramBinary(def.shader_obj.ID, bytes.size(),nullptr, &outType, bytes.data());
-		//	FileWriter writer(bytes.size()+8);
-		//	writer.write_int32(outType);
-		//	writer.write_int32(bytes.size());
-		//	writer.write_bytes_ptr(bytes.data(), bytes.size());
-		//	auto outFile = FileSys::open_write(hashed_path.c_str(), FileSys::SHADER_CACHE);
-		//	if (outFile) {
-		//		outFile->write(writer.get_buffer(), writer.get_size());
-		//	}
-		//	else {
-		//		sys_print(Error, "Program_Manager::recompile: couldnt open file to write program binary: %s\n", hashed_path.data());
-		//	}
+		//if (!def.program) {
+		//	CreateProgramArgs args;
+		//	args.file_name = def.vert;
+		//	args.defines = def.defines;
+		//	def.program = IGraphicsDevice::inst->create_program(args);
+		//	def.shader_obj.ID = def.program->get_internal_handle();
+		//	def.compile_failed = false;
 		//}
 
-		return;	
+
+		recompile_shared(def);
+		return;
 	}
 
 	if (def.is_compute) {
@@ -1089,99 +1092,120 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	auto set_default_parameters = [](uint32_t handle) {
-		glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTextureParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTextureParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTextureParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	};
-
-	auto create_and_delete_texture = [](uint32_t& texture) {
-		glDeleteTextures(1, &texture);
-		glCreateTextures(GL_TEXTURE_2D, 1, &texture);
-	};
 
 	auto create_and_delete_fb = [](uint32_t & framebuffer) {
 		glDeleteFramebuffers(1, &framebuffer);
 		glCreateFramebuffers(1, &framebuffer);
 	};
 
+	auto delete_and_create_texture = [&](IGraphicsTexture*& ptr, GraphicsTextureFormat format) {
+		if (ptr) {
+			ptr->release();
+		}
+		CreateTextureArgs args;
+		args.format = format;
+		args.num_mip_maps = 1;
+		args.width = s_w;
+		args.height = s_h;
+		args.sampler_type = GraphicsSamplerType::NearestClamped;
+		ptr = IGraphicsDevice::inst->create_texture(args);
+	};
+
+	using gtf = GraphicsTextureFormat;
+	delete_and_create_texture(tex.scene_color, gtf::rgb16f);
 
 	// Main accumulation buffer, 16 bit color
-	create_and_delete_texture(tex.scene_color);
-	glTextureStorage2D(tex.scene_color, 1, GL_RGB16F, s_w, s_h);
-	set_default_parameters(tex.scene_color);
+	//create_and_delete_texture(tex.scene_color);
+	//glTextureStorage2D(tex.scene_color, 1, GL_RGB16F, s_w, s_h);
+	//set_default_parameters(tex.scene_color);
 
 	// last frame, for TAA
-	create_and_delete_texture(tex.last_scene_color);
-	glTextureStorage2D(tex.last_scene_color, 1, GL_RGB16F, s_w, s_h);
-	set_default_parameters(tex.last_scene_color);
+	delete_and_create_texture(tex.last_scene_color, gtf::rgb16f);
+	//create_and_delete_texture(tex.last_scene_color);
+	//glTextureStorage2D(tex.last_scene_color, 1, GL_RGB16F, s_w, s_h);
+	//set_default_parameters(tex.last_scene_color);
 
 	// Main scene depth
-	create_and_delete_texture(tex.scene_depth);
-	glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH_COMPONENT32F, s_w, s_h);
-	set_default_parameters(tex.scene_depth);
+	delete_and_create_texture(tex.scene_depth, gtf::depth32f);
+	//create_and_delete_texture(tex.scene_depth);
+	//glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH_COMPONENT32F, s_w, s_h);
+	//set_default_parameters(tex.scene_depth);
 
 	// for mouse picking
-	create_and_delete_texture(tex.editor_id_buffer);
-	glTextureStorage2D(tex.editor_id_buffer, 1, GL_RGBA8, s_w, s_h);
-	set_default_parameters(tex.editor_id_buffer);
+	delete_and_create_texture(tex.editor_id_buffer, gtf::rgba8);
+
+	//create_and_delete_texture(tex.editor_id_buffer);
+	//glTextureStorage2D(tex.editor_id_buffer, 1, GL_RGBA8, s_w, s_h);
+	//set_default_parameters(tex.editor_id_buffer);
 
 	// Create forward render framebuffer
 	// Transparents and other immediate stuff get rendered to this
 	create_and_delete_fb(fbo.forward_render);
-	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
-	glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_ATTACHMENT, tex.scene_depth, 0);
+	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
+	glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_ATTACHMENT, tex.scene_depth->get_internal_handle(), 0);
 	//glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer, 0);
 
 	unsigned int attachments[5] = { GL_COLOR_ATTACHMENT0,0,0,0, 0 };
 	glNamedFramebufferDrawBuffers(fbo.forward_render, 5, attachments);
 
 	// Editor selection
-	create_and_delete_texture(tex.editor_selection_depth_buffer);
-	glTextureStorage2D(tex.editor_selection_depth_buffer, 1, GL_DEPTH_COMPONENT32F, s_w, s_h);
-	set_default_parameters(tex.editor_selection_depth_buffer);
+	delete_and_create_texture(tex.editor_selection_depth_buffer, gtf::depth32f);
+	//create_and_delete_texture(tex.editor_selection_depth_buffer);
+	//glTextureStorage2D(tex.editor_selection_depth_buffer, 1, GL_DEPTH_COMPONENT32F, s_w, s_h);
+	//set_default_parameters(tex.editor_selection_depth_buffer);
 
 	create_and_delete_fb(fbo.editorSelectionDepth);
-	glNamedFramebufferTexture(fbo.editorSelectionDepth, GL_DEPTH_ATTACHMENT, tex.editor_selection_depth_buffer, 0);
+	glNamedFramebufferTexture(fbo.editorSelectionDepth, GL_DEPTH_ATTACHMENT, tex.editor_selection_depth_buffer->get_internal_handle(), 0);
 
 	
 	// Gbuffer textures
 	// See the comment above these var's decleration in DrawLocal.h for details
-	create_and_delete_texture(tex.scene_gbuffer0);
-	glTextureStorage2D(tex.scene_gbuffer0, 1, GL_RGB16F, s_w, s_h);
-	set_default_parameters(tex.scene_gbuffer0);
+	delete_and_create_texture(tex.scene_gbuffer0, gtf::rgb16f);
+	//create_and_delete_texture(tex.scene_gbuffer0);
+	//glTextureStorage2D(tex.scene_gbuffer0, 1, GL_RGB16F, s_w, s_h);
+	//set_default_parameters(tex.scene_gbuffer0);
 
-	create_and_delete_texture(tex.scene_gbuffer1);
-	glTextureStorage2D(tex.scene_gbuffer1, 1, GL_RGBA8, s_w, s_h);
-	set_default_parameters(tex.scene_gbuffer1);
+	
+	delete_and_create_texture(tex.scene_gbuffer1, gtf::rgba8);
 
-	create_and_delete_texture(tex.scene_gbuffer2);
-	glTextureStorage2D(tex.scene_gbuffer2, 1, GL_RGBA8, s_w, s_h);
-	set_default_parameters(tex.scene_gbuffer2);
+	//create_and_delete_texture(tex.scene_gbuffer1);
+//	glTextureStorage2D(tex.scene_gbuffer1, 1, GL_RGBA8, s_w, s_h);
+	//set_default_parameters(tex.scene_gbuffer1);
+
+	delete_and_create_texture(tex.scene_gbuffer2, gtf::rgba8);
+
+//	create_and_delete_texture(tex.scene_gbuffer2);
+//	glTextureStorage2D(tex.scene_gbuffer2, 1, GL_RGBA8, s_w, s_h);
+	//set_default_parameters(tex.scene_gbuffer2);
 
 
-	const GLenum scene_motion_format = (r_taa_32f.get_bool()) ? GL_RG32F : GL_RG16F;
+	//const GLenum scene_motion_format = (r_taa_32f.get_bool()) ? GL_RG32F : GL_RG16F;
+	const gtf scene_motion_format = (r_taa_32f.get_bool()) ? gtf::rg32f : gtf::rg16f;
 
-	create_and_delete_texture(tex.scene_motion);
-	glTextureStorage2D(tex.scene_motion, 1, scene_motion_format, s_w, s_h);
-	set_default_parameters(tex.scene_motion);
 
-	create_and_delete_texture(tex.last_scene_motion);
-	glTextureStorage2D(tex.last_scene_motion, 1, scene_motion_format, s_w, s_h);
-	set_default_parameters(tex.last_scene_motion);
+	delete_and_create_texture(tex.scene_motion, scene_motion_format);
+	//create_and_delete_texture(tex.scene_motion);
+	//glTextureStorage2D(tex.scene_motion, 1, scene_motion_format, s_w, s_h);
+	//set_default_parameters(tex.scene_motion);
+
+	delete_and_create_texture(tex.last_scene_motion, scene_motion_format);
+	//create_and_delete_texture(tex.last_scene_motion);
+	//glTextureStorage2D(tex.last_scene_motion, 1, scene_motion_format, s_w, s_h);
+	//set_default_parameters(tex.last_scene_motion);
 
 
 	// Create Gbuffer
 	// outputs to 4 render targets: gbuffer 0,1,2 and scene_color for emissives
 	create_and_delete_fb(fbo.gbuffer);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_DEPTH_ATTACHMENT, tex.scene_depth, 0);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT0, tex.scene_gbuffer0, 0);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT1, tex.scene_gbuffer1, 0);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT2, tex.scene_gbuffer2, 0);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color, 0);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer, 0);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion, 0);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_DEPTH_ATTACHMENT, tex.scene_depth->get_internal_handle(), 0);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT0, tex.scene_gbuffer0->get_internal_handle(), 0);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT1, tex.scene_gbuffer1->get_internal_handle(), 0);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT2, tex.scene_gbuffer2->get_internal_handle(), 0);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color->get_internal_handle(), 0);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer->get_internal_handle(), 0);
+	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion->get_internal_handle(), 0);
+
+
 
 	const uint32_t gbuffer_attach_count = 6;
 	unsigned int gbuffer_attachments[gbuffer_attach_count] = { 
@@ -1196,32 +1220,36 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	// Composite textures
 	create_and_delete_fb(fbo.composite);
-	create_and_delete_texture(tex.output_composite);
-	create_and_delete_texture(tex.output_composite_2);
-	glTextureStorage2D(tex.output_composite, 1, GL_RGB8, s_w, s_h);
-	glTextureStorage2D(tex.output_composite_2, 1, GL_RGB8, s_w, s_h);
-	set_default_parameters(tex.output_composite);
-	set_default_parameters(tex.output_composite_2);
-	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite, 0);
+	delete_and_create_texture(tex.output_composite, gtf::rgb8);
+	delete_and_create_texture(tex.output_composite_2, gtf::rgb8);
+
+
+	//create_and_delete_texture(tex.output_composite);
+	//create_and_delete_texture(tex.output_composite_2);
+	//glTextureStorage2D(tex.output_composite, 1, GL_RGB8, s_w, s_h);
+	//glTextureStorage2D(tex.output_composite_2, 1, GL_RGB8, s_w, s_h);
+	//set_default_parameters(tex.output_composite);
+	//set_default_parameters(tex.output_composite_2);
+	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite->get_internal_handle(), 0);
 
 
 	// write to scene gbuffer0 for taa resolve
 	create_and_delete_fb(fbo.taa_resolve);
-	glNamedFramebufferTexture(fbo.taa_resolve, GL_COLOR_ATTACHMENT0, tex.scene_gbuffer0, 0);
+	glNamedFramebufferTexture(fbo.taa_resolve, GL_COLOR_ATTACHMENT0, tex.scene_gbuffer0->get_internal_handle(), 0);
 	create_and_delete_fb(fbo.taa_blit);
 
 	cur_w = s_w;
 	cur_h = s_h;
 
 	// Update vts handles
-	tex.scene_color_vts_handle->update_specs(tex.scene_color, s_w, s_h, 4, {});
-	tex.scene_depth_vts_handle->update_specs(tex.scene_depth, s_w, s_h, 4, {});
-	tex.gbuffer0_vts_handle->update_specs(tex.scene_gbuffer0, s_w, s_h, 3, {});
-	tex.gbuffer1_vts_handle->update_specs(tex.scene_gbuffer1, s_w, s_h, 3, {});
-	tex.gbuffer2_vts_handle->update_specs(tex.scene_gbuffer2, s_w, s_h, 3, {});
-	tex.editorid_vts_handle->update_specs(tex.editor_id_buffer, s_w, s_h, 4, {});
-	tex.editorSel_vts_handle->update_specs(tex.editor_selection_depth_buffer, s_w, s_h, 4, {});
-	tex.scene_motion_vts_handle->update_specs(tex.scene_motion, s_w, s_h, 2, {});
+	tex.scene_color_vts_handle->update_specs_ptr(tex.scene_color, s_w, s_h, 4, {});
+	tex.scene_depth_vts_handle->update_specs_ptr(tex.scene_depth, s_w, s_h, 4, {});
+	tex.gbuffer0_vts_handle->update_specs_ptr(tex.scene_gbuffer0, s_w, s_h, 3, {});
+	tex.gbuffer1_vts_handle->update_specs_ptr(tex.scene_gbuffer1, s_w, s_h, 3, {});
+	tex.gbuffer2_vts_handle->update_specs_ptr(tex.scene_gbuffer2, s_w, s_h, 3, {});
+	tex.editorid_vts_handle->update_specs_ptr(tex.editor_id_buffer, s_w, s_h, 4, {});
+	tex.editorSel_vts_handle->update_specs_ptr(tex.editor_selection_depth_buffer, s_w, s_h, 4, {});
+	tex.scene_motion_vts_handle->update_specs_ptr(tex.scene_motion, s_w, s_h, 2, {});
 
 	// Also update bloom buffers (this can be elsewhere)
 	init_bloom_buffers();
@@ -1233,32 +1261,45 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 void Renderer::init_bloom_buffers()
 {
 	glDeleteFramebuffers(1, &fbo.bloom);
-	if(tex.number_bloom_mips>0)
-		glDeleteTextures(tex.number_bloom_mips, tex.bloom_chain);
+	//if(tex.number_bloom_mips>0)
+	//	glDeleteTextures(tex.number_bloom_mips, tex.bloom_chain);
 	glCreateFramebuffers(1, &fbo.bloom);
 	
 	int x = cur_w / 2;
 	int y = cur_h / 2;
 	tex.number_bloom_mips = glm::min((int)MAX_BLOOM_MIPS, Texture::get_mip_map_count(x, y));
-	glCreateTextures(GL_TEXTURE_2D, tex.number_bloom_mips, tex.bloom_chain);
+	//glCreateTextures(GL_TEXTURE_2D, tex.number_bloom_mips, tex.bloom_chain);
 
 	float fx = x;
 	float fy = y;
 	for (int i = 0; i < tex.number_bloom_mips; i++) {
-		tex.bloom_chain_isize[i] = { x,y };
-		tex.bloom_chain_size[i] = { fx,fy };
-		glTextureStorage2D(tex.bloom_chain[i], 1, GL_R11F_G11F_B10F, x, y);
-		glTextureParameteri(tex.bloom_chain[i], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTextureParameteri(tex.bloom_chain[i], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTextureParameteri(tex.bloom_chain[i], GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTextureParameteri(tex.bloom_chain[i], GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		auto& bc = tex.bloom_chain[i];
+
+		CreateTextureArgs args;
+		args.width = x;
+		args.height = y;
+		args.format = GraphicsTextureFormat::r11f_g11f_b10f;
+		args.num_mip_maps = 1;
+		args.sampler_type = GraphicsSamplerType::LinearClamped;
+		if (bc.texture)
+			bc.texture->release();
+		bc.texture = IGraphicsDevice::inst->create_texture(args);
+
+		bc.isize = { x,y };
+		bc.fsize = { fx,fy };
+		//glTextureStorage2D(tex.bloom_chain[i], 1, GL_R11F_G11F_B10F, x, y);
+		//glTextureParameteri(tex.bloom_chain[i], GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		//glTextureParameteri(tex.bloom_chain[i], GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		//glTextureParameteri(tex.bloom_chain[i], GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		//glTextureParameteri(tex.bloom_chain[i], GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		x /= 2;
 		y /= 2;
 		fx *= 0.5;
 		fy *= 0.5;
 	}
 
-	tex.bloom_vts_handle->update_specs(tex.bloom_chain[0], cur_w / 2, cur_h / 2, 3, {});
+	tex.bloom_vts_handle->update_specs_ptr(tex.bloom_chain[0].texture, cur_w / 2, cur_h / 2, 3, {});
+
 }
 
 void Renderer::render_bloom_chain(texhandle scene_color_handle)
@@ -1292,12 +1333,14 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 		glClearColor(0, 0, 0, 1);
 		for (int i = 0; i < tex.number_bloom_mips; i++)
 		{
-			glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0, tex.bloom_chain[i], 0);
+			auto& bc = tex.bloom_chain[i];
+
+			glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0,bc.texture->get_internal_handle(), 0);
 
 			shader().set_vec2("srcResolution", vec2(src_x, src_y));
 			shader().set_int("mipLevel", i);
-			src_x = tex.bloom_chain_size[i].x;
-			src_y = tex.bloom_chain_size[i].y;
+			src_x = bc.fsize.x;
+			src_y = bc.fsize.y;
 
 			device.set_viewport(0, 0, src_x, src_y);
 			device.clear_framebuffer(false, true/* clear color*/);
@@ -1305,7 +1348,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 
-			glBindTextureUnit(0, tex.bloom_chain[i]);
+			glBindTextureUnit(0, bc.texture->get_internal_handle());
 		}
 	}
 
@@ -1319,12 +1362,14 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 
 		for (int i = tex.number_bloom_mips - 1; i > 0; i--)
 		{
-			glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0, tex.bloom_chain[i - 1], 0);
+			auto& bc = tex.bloom_chain[i-1];
 
-			vec2 destsize = tex.bloom_chain_size[i - 1];
+			glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0, bc.texture->get_internal_handle(), 0);
+
+			vec2 destsize =  bc.fsize;
 			device.set_viewport(0, 0, destsize.x, destsize.y);
 
-			glBindTextureUnit(0, tex.bloom_chain[i]);
+			glBindTextureUnit(0, bc.texture->get_internal_handle());
 			shader().set_float("filterRadius", 0.0001f);
 
 			glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -2695,10 +2740,10 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		state.depth_writes = false;
 		device.set_pipeline(state);
 
-		bind_texture(0, tex.scene_gbuffer0);
-		bind_texture(1, tex.scene_gbuffer1);
-		bind_texture(2, tex.scene_gbuffer2);
-		bind_texture(3, tex.scene_depth);
+		bind_texture_ptr(0, tex.scene_gbuffer0);
+		bind_texture_ptr(1, tex.scene_gbuffer1);
+		bind_texture_ptr(2, tex.scene_gbuffer2);
+		bind_texture_ptr(3, tex.scene_depth);
 		bind_texture(4, ssao_tex);
 
 		for (int i = 0; i < 6; i++)
@@ -2727,10 +2772,10 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		device.set_pipeline(state);
 
 
-		bind_texture(0, tex.scene_gbuffer0);
-		bind_texture(1, tex.scene_gbuffer1);
-		bind_texture(2, tex.scene_gbuffer2);
-		bind_texture(3, tex.scene_depth);
+		bind_texture_ptr(0, tex.scene_gbuffer0);
+		bind_texture_ptr(1, tex.scene_gbuffer1);
+		bind_texture_ptr(2, tex.scene_gbuffer2);
+		bind_texture_ptr(3, tex.scene_depth);
 
 		// spot shadow atlas
 		bind_texture(4, spotShadows->get_atlas().get_atlas_texture());
@@ -2811,10 +2856,10 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		state.depth_writes = false;
 		device.set_pipeline(state);
 
-		bind_texture(0, tex.scene_gbuffer0);
-		bind_texture(1, tex.scene_gbuffer1);
-		bind_texture(2, tex.scene_gbuffer2);
-		bind_texture(3, tex.scene_depth);
+		bind_texture_ptr(0, tex.scene_gbuffer0);
+		bind_texture_ptr(1, tex.scene_gbuffer1);
+		bind_texture_ptr(2, tex.scene_gbuffer2);
+		bind_texture_ptr(3, tex.scene_depth);
 		bind_texture(4, draw.shadowmap.texture.shadow_array);
 		glBindBufferBase(GL_UNIFORM_BUFFER, 8, draw.shadowmap.ubo.info);
 
@@ -2993,7 +3038,7 @@ void Renderer::draw_height_fog()
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-	bind_texture(3, tex.scene_depth);
+	bind_texture_ptr(3, tex.scene_depth);
 
 	// fullscreen shader, no vao used
 	glBindVertexArray(vao.default_);
@@ -3037,7 +3082,7 @@ void Renderer::deferred_decal_pass()
 	cmd.primCount = 1;
 	cmd.baseInstance = 0;
 
-	bind_texture(20/* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/, tex.scene_depth);
+	bind_texture_ptr(20/* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/, tex.scene_depth);
 
 	vertexarrayhandle vao = g_modelMgr.get_vao(VaoType::Animated);
 
@@ -3164,12 +3209,12 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 		std::swap(tex.last_scene_color, tex.scene_color);
 		std::swap(tex.last_scene_motion, tex.scene_motion);
 
-		tex.scene_color_vts_handle->update_specs(tex.scene_color, cur_w, cur_h, 3, {});
-		tex.scene_motion_vts_handle->update_specs(tex.scene_motion, cur_w, cur_h, 2, {});
+		tex.scene_color_vts_handle->update_specs_ptr(tex.scene_color, cur_w, cur_h, 3, {});
+		tex.scene_motion_vts_handle->update_specs_ptr(tex.scene_motion, cur_w, cur_h, 2, {});
 
-		glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
-		glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color, 0);
-		glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion, 0);
+		glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
+		glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color->get_internal_handle(), 0);
+		glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion->get_internal_handle(), 0);
 	}
 }
 
@@ -3515,7 +3560,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		//if (wants_disable)
 		//	sys_print(Debug, "disabled taa this frame\n");
 		if (!r_taa_enabled.get_bool()||wants_disable) {
-			return tex.scene_color;
+			return tex.scene_color->get_internal_handle();
 		}
 
 		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
@@ -3537,19 +3582,19 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		shader().set_float("doc_pow", taa_doc_pow);
 		shader().set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
 
-		bind_texture(0, tex.scene_color);
-		bind_texture(1, tex.last_scene_color);
-		bind_texture(2, tex.scene_depth);
-		bind_texture(3, tex.scene_motion);
-		bind_texture(4, tex.last_scene_motion);
+		bind_texture_ptr(0, tex.scene_color);
+		bind_texture_ptr(1, tex.last_scene_color);
+		bind_texture_ptr(2, tex.scene_depth);
+		bind_texture_ptr(3, tex.scene_motion);
+		bind_texture_ptr(4, tex.last_scene_motion);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
-		glNamedFramebufferTexture(fbo.taa_blit, GL_COLOR_ATTACHMENT0, tex.scene_color, 0);
+		glNamedFramebufferTexture(fbo.taa_blit, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
 		glBlitNamedFramebuffer(fbo.taa_resolve, fbo.taa_blit, 0, 0, cur_w, cur_h,
 			0, 0, cur_w, cur_h, GL_COLOR_BUFFER_BIT,
 			GL_NEAREST);
 
-		return tex.scene_color;
+		return tex.scene_color->get_internal_handle();
 	};
 	const texhandle scene_color_handle = taa_resolve_pass();
 
@@ -3576,7 +3621,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 			state.vao = get_empty_vao();
 			device.set_pipeline(state);
 
-			uint32_t bloom_tex = tex.bloom_chain[0];
+			uint32_t bloom_tex = tex.bloom_chain[0].texture->get_internal_handle();
 			if (!enable_bloom.get_bool())
 				bloom_tex = black_texture.gl_id;
 			bind_texture(0, scene_color_handle);
@@ -3632,7 +3677,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		);
 	}
 
-	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite, 0);
+	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite->get_internal_handle(), 0);
 }
 
 
@@ -3654,8 +3699,8 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 	for (int i = 0; i < postProcessMats.size(); i++) {
 		if (!postProcessMats[i])
 			continue;
-		glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderToTexture, 0);
-		tex.postProcessInput_vts_handle->update_specs(renderFromTexture, cur_w, cur_h, 3, {});
+		glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderToTexture->get_internal_handle(), 0);
+		tex.postProcessInput_vts_handle->update_specs_ptr(renderFromTexture, cur_w, cur_h, 3, {});
 
 		auto mat = postProcessMats[i];
 
@@ -3684,7 +3729,7 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 		renderToTexture = temp;
 	}
 
-	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderFromTexture, 0);
+	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderFromTexture->get_internal_handle(), 0);
 }
 
 
@@ -3883,7 +3928,7 @@ float Renderer::get_scene_depth_for_editor(int x, int y)
 	const size_t size = cur_h * cur_w;
 	float* buffer_pixels = new float[size];
 
-	glGetTextureImage(tex.scene_depth, 0, GL_DEPTH_COMPONENT, GL_FLOAT, size*sizeof(float), buffer_pixels);
+	glGetTextureImage(tex.scene_depth->get_internal_handle(), 0, GL_DEPTH_COMPONENT, GL_FLOAT, size*sizeof(float), buffer_pixels);
 
 	y = cur_h - y - 1;
 
@@ -3915,7 +3960,7 @@ std::vector<handle<Render_Object>> Renderer::mouse_box_select_for_editor(int x, 
 	glFinish();
 	const int size = cur_h * cur_w * 4;
 	std::vector<uint8_t> bufferPixels(size,0);
-	glGetTextureImage(tex.editor_id_buffer, 0, GL_RGBA, GL_UNSIGNED_BYTE, size, bufferPixels.data());
+	glGetTextureImage(tex.editor_id_buffer->get_internal_handle(), 0, GL_RGBA, GL_UNSIGNED_BYTE, size, bufferPixels.data());
 	y = cur_h - y - 1;
 	std::unordered_set<int> found;
 	const int skip_pixels = 4;	// check every 4 pixels

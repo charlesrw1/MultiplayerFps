@@ -1,5 +1,5 @@
 #pragma once
-
+#if 1
 #include "MaterialPublic.h"
 #include <span>
 #include <string_view>
@@ -71,11 +71,13 @@ enum class GraphicsTextureFormat {
 	depth24f,
 	depth32f,
 	depth24stencil8,
+	r11f_g11f_b10f,
 };
 
 enum class GraphicsFilterType : int8_t {
 	Linear,
-	Nearest
+	Nearest,
+	MipmapLinear,
 };
 enum class GraphicsTextureEdge : int8_t {
 	Repeat,
@@ -184,23 +186,24 @@ struct CreateProgramArgs {
 	std::string_view defines;	// comma seperated list
 };
 
-
-struct CreateSamplerArgs {
-	GraphicsFilterType min_filter = GraphicsFilterType::Linear;
-	GraphicsFilterType max_filter = GraphicsFilterType::Linear;
-	GraphicsFilterType mipmap_filter = GraphicsFilterType::Linear;
-	GraphicsTextureEdge u_edge = GraphicsTextureEdge::Repeat;
-	GraphicsTextureEdge v_edge = GraphicsTextureEdge::Repeat;
-	GraphicsTextureEdge w_edge = GraphicsTextureEdge::Repeat;
+enum class GraphicsSamplerType {
+	AnisotropyDefault,
+	LinearDefault,
+	NearestDefault,
+	NearestClamped,
+	LinearClamped,
+	Shadowmap
 };
+
+
 struct CreateTextureArgs {
 	GraphicsTextureType type = GraphicsTextureType::t2D;
 	GraphicsTextureFormat format = GraphicsTextureFormat::rgba8;
 	int width = 0;
 	int height = 0;
-	int num_mip_maps = 0;
+	int num_mip_maps = 1;
 	int depth_3d = 0;
-	CreateSamplerArgs sampler_args;
+	GraphicsSamplerType sampler_type=GraphicsSamplerType::AnisotropyDefault;
 };
 
 struct CreateBufferArgs {
@@ -243,3 +246,4 @@ public:
 	virtual IGraphicsBuffer* create_buffer(const CreateBufferArgs& args) = 0;
 	virtual IGraphicsVertexInput* create_vertex_input(const CreateVertexInputArgs& args) = 0;
 };
+#endif

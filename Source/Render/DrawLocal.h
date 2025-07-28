@@ -23,6 +23,8 @@
 #include "Render/MaterialLocal.h"
 #include "Render/RenderScene.h"
 #include "Framework/ConsoleCmdGroup.h"
+#include <array>
+#include "IGraphsDevice.h"
 
 class MeshPart;
 class Model;
@@ -211,7 +213,6 @@ public:
 
 		bool is_shared() const { return !vert.empty() && frag.empty()&& !is_compute; }
 		Shader shader_obj;
-		IGraphicsProgram* program = nullptr;
 	};
 	std::vector<program_def> programs;
 
@@ -222,6 +223,7 @@ public:
 			sys_print(Warning, "Program_Manager::recompile: handle out of range\n");
 	}
 private:
+	void recompile_shared(program_def& def);
 	void recompile(program_def& def);
 	void recompile_do(program_def& def);
 
@@ -389,7 +391,8 @@ public:
 	RenderScenePublic* get_scene() override { return &scene; }
 	void bake_cubemaps() final {}
 	uint32_t get_composite_output_texture_handle() final {
-		return tex.actual_output_composite; 
+		assert(tex.actual_output_composite);
+		return tex.actual_output_composite->get_internal_handle(); 
 	}
 #ifdef EDITOR_BUILD
 	handle<Render_Object> mouse_pick_scene_for_editor(int x, int y) final;
@@ -488,16 +491,16 @@ public:
 
 
 	struct textures {
-		texhandle scene_color{};
-		texhandle last_scene_color{};
-		texhandle scene_depth{};
+		IGraphicsTexture* scene_color{};
+		IGraphicsTexture* last_scene_color{};
+		IGraphicsTexture* scene_depth{};
 
-		texhandle scene_gbuffer0{};	// also used to resolve TAA into since its rgbf16
-		texhandle scene_gbuffer1{};
-		texhandle scene_gbuffer2{};
+		IGraphicsTexture* scene_gbuffer0{};	// also used to resolve TAA into since its rgbf16
+		IGraphicsTexture* scene_gbuffer1{};
+		IGraphicsTexture* scene_gbuffer2{};
 
-		texhandle scene_motion{};
-		texhandle last_scene_motion{};
+		IGraphicsTexture* scene_motion{};
+		IGraphicsTexture* last_scene_motion{};
 
 
 		// ----------------------------------------------------------------------------------
@@ -512,21 +515,24 @@ public:
 		// Scene color: RGBA16
 		// Storing normals in rgb16f, can/should optimize this down later
 
-		texhandle scene_custom_depthstencil{};
-		texhandle editor_selection_depth_buffer{};
-		texhandle editor_id_buffer{};
+		IGraphicsTexture* scene_custom_depthstencil{};
+		IGraphicsTexture* editor_selection_depth_buffer{};
+		IGraphicsTexture* editor_id_buffer{};
 
 
 		//texhandle reflected_color{};
 		//texhandle reflected_depth{};
 		
-		texhandle output_composite{};
-		texhandle output_composite_2{};
-		texhandle actual_output_composite{};
+		IGraphicsTexture* output_composite{};
+		IGraphicsTexture* output_composite_2{};
+		IGraphicsTexture* actual_output_composite{};
 
-		texhandle bloom_chain[MAX_BLOOM_MIPS];
-		glm::ivec2 bloom_chain_isize[MAX_BLOOM_MIPS];
-		glm::vec2 bloom_chain_size[MAX_BLOOM_MIPS];
+		struct BloomChain {
+			IGraphicsTexture* texture = nullptr;
+			glm::ivec2 isize = {};
+			glm::vec2 fsize = glm::vec2(0.0);
+		};
+		std::array<BloomChain, MAX_BLOOM_MIPS> bloom_chain = {};
 		int number_bloom_mips = 0;
 
 		// "virtual texture system" handles, does that even make sense?
@@ -566,6 +572,11 @@ public:
 
 	void bind_vao(uint32_t vao);
 	void bind_texture(int bind, int id);
+	void bind_texture_ptr(int bind, IGraphicsTexture* ptr) {
+		assert(ptr);
+		bind_texture(bind, ptr->get_internal_handle());
+	}
+
 	void set_shader(program_handle handle);
 	void set_blend_state(blend_state blend);
 	void set_show_backfaces(bool show_backfaces);
