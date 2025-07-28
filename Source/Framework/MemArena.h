@@ -4,12 +4,23 @@
 #include <cstdio>
 #include <cstdlib>
 #include "Framework/Util.h"
-
+#include <span>
 class Memory_Arena
 {
 public:
-	void init(const char* name, uint32_t size);
-	void shutdown();
+	void init(const char* name, int64_t size);
+
+	Memory_Arena() = default;
+	~Memory_Arena() {
+		delete buffer;
+		buffer = nullptr;
+		bottom_pointer = top_pointer = 0;
+		buffer_len = 0;
+	}
+	Memory_Arena(const Memory_Arena& other) = delete;
+	Memory_Arena& operator=(const Memory_Arena& other) = delete;
+	Memory_Arena(Memory_Arena&& other) = delete;
+
 
 	void free_top() {
 		top_pointer = (uintptr_t)buffer + buffer_len;
@@ -19,8 +30,27 @@ public:
 		bottom_pointer = (uintptr_t)buffer;
 	}
 
-	void* alloc_top(uint32_t size);
-	void* alloc_bottom(uint32_t size);
+	void* alloc_top(int64_t size);
+	void* alloc_bottom(int64_t size);
+
+	template<typename T>
+	T* alloc_top_type(int count) {
+		return (T*)alloc_top(count * sizeof(T));
+	}
+	template<typename T>
+	T* alloc_bottom_type(int count) {
+		return (T*)alloc_bottom(count * sizeof(T));
+	}
+	template<typename T>
+	std::span<T> alloc_top_span(int count) {
+		std::span<T> out(alloc_top_type<T>(count), count);
+		return out;
+	}
+	template<typename T>
+	std::span<T> alloc_bottom_span(int count) {
+		std::span<T> out(alloc_bottom_type<T>(count), count);
+		return out;
+	}
 
 	uintptr_t get_top_marker() {
 		return top_pointer;
@@ -35,14 +65,15 @@ public:
 		bottom_pointer = mark;
 	}
 
+private:
 	const char* debug_name = "";
 	uintptr_t bottom_pointer = 0;
 	uintptr_t top_pointer = 0;
 	uint8_t* buffer = nullptr;
-	uint32_t buffer_len = 0;
+	int64_t buffer_len = 0;
 };
 
-inline void Memory_Arena::init(const char* name, uint32_t size)
+inline void Memory_Arena::init(const char* name, int64_t size)
 {
 	ASSERT(buffer == nullptr);
 	debug_name = name;
@@ -51,13 +82,7 @@ inline void Memory_Arena::init(const char* name, uint32_t size)
 	top_pointer = (uintptr_t)buffer + size;
 	buffer_len = size;
 }
-inline void Memory_Arena::shutdown()
-{
-	delete buffer;
-	buffer = nullptr;
-	bottom_pointer = top_pointer = 0;
-	buffer_len = 0;
-}
+
 
 inline uintptr_t align_backward(uintptr_t ptr)
 {
@@ -65,7 +90,7 @@ inline uintptr_t align_backward(uintptr_t ptr)
 	return ptr - modulo;
 }
 
-inline void* Memory_Arena::alloc_top(uint32_t size)
+inline void* Memory_Arena::alloc_top(int64_t size)
 {
 	uintptr_t ret = align_backward(top_pointer - size);
 
@@ -87,7 +112,7 @@ inline uintptr_t align_forward(uintptr_t ptr)
 	return ptr;
 }
 
-inline void* Memory_Arena::alloc_bottom(uint32_t size)
+inline void* Memory_Arena::alloc_bottom(int64_t size)
 {
 	uintptr_t ret = align_forward(bottom_pointer);
 

@@ -20,7 +20,7 @@
 #include "Render/RenderWindow.h"
 #include "tracy/public/tracy/Tracy.hpp"
 #include "tracy/public/tracy/TracyOpenGL.hpp"
-
+#include "Framework/ArenaAllocator.h"
 #include "IGraphsDevice.h"
 
 const GLenum MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT;
@@ -145,8 +145,7 @@ public:
 			pipe.cull_front_face = false;
 			pipe.depth_testing = false;
 			pipe.depth_writes = false;
-			pipe.program = matman.get_mat_shader(false,false, nullptr,
-				dc.mat, false, false, false, false,false);
+			pipe.program = matman.get_mat_shader(nullptr,dc.mat,0);
 			pipe.vao = mb_draw_data.VAO;
 			
 			device.set_pipeline(pipe);
@@ -362,68 +361,77 @@ void Program_Manager::recompile_do(program_def& def)
 	// look in shader cache, only for "shared shaders" now, these are the main materials so whatev
 	if(def.is_shared() && !def.is_tesselation)
 	{
-		string hashed_path = compute_hash_for_program_def(def) + ".bin";
-		auto binFile = FileSys::open_read(hashed_path.c_str(), FileSys::SHADER_CACHE);
-		auto shaderFile = FileSys::open_read_engine(def.vert.c_str());
-		if (shaderFile && binFile) {
-			if (shaderFile->get_timestamp() <= binFile->get_timestamp()) {
-				if(log_shader_compiles.get_bool())
-					sys_print(Debug, "Program_Manager::recompile: loading cached binary: %s\n", hashed_path.data());
-
-				// load cached binary
-				BinaryReader reader(binFile.get());
-				auto sourceType = reader.read_int32();
-				auto len = reader.read_int32();
-				vector<uint8_t> bytes(len,0);
-				reader.read_bytes_ptr(bytes.data(), bytes.size());
-
-				if (def.shader_obj.ID != 0) {
-					glDeleteProgram(def.shader_obj.ID);
-				}
-				def.shader_obj.ID=glCreateProgram();
-				glProgramBinary(def.shader_obj.ID, sourceType, bytes.data(), bytes.size());
-				glValidateProgram(def.shader_obj.ID);
-
-				GLint success = 0;
-				glGetProgramiv(def.shader_obj.ID, GL_LINK_STATUS, &success);
-				if (success == GL_FALSE) {
-					GLint logLength = 0;
-					glGetProgramiv(def.shader_obj.ID, GL_INFO_LOG_LENGTH, &logLength);
-					std::vector<GLchar> log(logLength);
-					glGetProgramInfoLog(def.shader_obj.ID, logLength, nullptr, log.data());
-					sys_print(Error, "Program_Manager::recompile: loading binary failed: %s\n", log.data());
-				}
-				else {
-					return;	// done
-				}
-			}
+		if (!def.program) {
+			CreateProgramArgs args;
+			args.file_name = def.vert;
+			args.defines = def.defines;
+			def.program = IGraphicsDevice::inst->create_program(args);
+			def.shader_obj.ID = def.program->get_internal_handle();
+			def.compile_failed = false;
 		}
-		binFile.reset();
 
-		// fail path
-		def.compile_failed = Shader::compile_vert_frag_single_file(&def.shader_obj, def.vert, def.defines) != ShaderResult::SHADER_SUCCESS;
-	
-		if (!def.compile_failed) {
-			const auto program = def.shader_obj.ID;
-			GLint length = 0;
-			glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
-			if(log_shader_compiles.get_bool())
-				sys_print(Debug, "Program_Manager::recompile: saving cached binary: %s\n", hashed_path.data());
-			vector<uint8_t> bytes(length, 0);
-			GLenum outType = 0;
-			glGetProgramBinary(def.shader_obj.ID, bytes.size(),nullptr, &outType, bytes.data());
-			FileWriter writer(bytes.size()+8);
-			writer.write_int32(outType);
-			writer.write_int32(bytes.size());
-			writer.write_bytes_ptr(bytes.data(), bytes.size());
-			auto outFile = FileSys::open_write(hashed_path.c_str(), FileSys::SHADER_CACHE);
-			if (outFile) {
-				outFile->write(writer.get_buffer(), writer.get_size());
-			}
-			else {
-				sys_print(Error, "Program_Manager::recompile: couldnt open file to write program binary: %s\n", hashed_path.data());
-			}
-		}
+		//string hashed_path = compute_hash_for_program_def(def) + ".bin";
+		//auto binFile = FileSys::open_read(hashed_path.c_str(), FileSys::SHADER_CACHE);
+		//auto shaderFile = FileSys::open_read_engine(def.vert.c_str());
+		//if (shaderFile && binFile) {
+		//	if (shaderFile->get_timestamp() <= binFile->get_timestamp()) {
+		//		if(log_shader_compiles.get_bool())
+		//			sys_print(Debug, "Program_Manager::recompile: loading cached binary: %s\n", hashed_path.data());
+		//
+		//		// load cached binary
+		//		BinaryReader reader(binFile.get());
+		//		auto sourceType = reader.read_int32();
+		//		auto len = reader.read_int32();
+		//		vector<uint8_t> bytes(len,0);
+		//		reader.read_bytes_ptr(bytes.data(), bytes.size());
+		//
+		//		if (def.shader_obj.ID != 0) {
+		//			glDeleteProgram(def.shader_obj.ID);
+		//		}
+		//		def.shader_obj.ID=glCreateProgram();
+		//		glProgramBinary(def.shader_obj.ID, sourceType, bytes.data(), bytes.size());
+		//		glValidateProgram(def.shader_obj.ID);
+		//
+		//		GLint success = 0;
+		//		glGetProgramiv(def.shader_obj.ID, GL_LINK_STATUS, &success);
+		//		if (success == GL_FALSE) {
+		//			GLint logLength = 0;
+		//			glGetProgramiv(def.shader_obj.ID, GL_INFO_LOG_LENGTH, &logLength);
+		//			std::vector<GLchar> log(logLength);
+		//			glGetProgramInfoLog(def.shader_obj.ID, logLength, nullptr, log.data());
+		//			sys_print(Error, "Program_Manager::recompile: loading binary failed: %s\n", log.data());
+		//		}
+		//		else {
+		//			return;	// done
+		//		}
+		//	}
+		//}
+		//binFile.reset();
+		//
+		//// fail path
+		//def.compile_failed = Shader::compile_vert_frag_single_file(&def.shader_obj, def.vert, def.defines) != ShaderResult::SHADER_SUCCESS;
+		//
+		//if (!def.compile_failed) {
+		//	const auto program = def.shader_obj.ID;
+		//	GLint length = 0;
+		//	glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
+		//	if(log_shader_compiles.get_bool())
+		//		sys_print(Debug, "Program_Manager::recompile: saving cached binary: %s\n", hashed_path.data());
+		//	vector<uint8_t> bytes(length, 0);
+		//	GLenum outType = 0;
+		//	glGetProgramBinary(def.shader_obj.ID, bytes.size(),nullptr, &outType, bytes.data());
+		//	FileWriter writer(bytes.size()+8);
+		//	writer.write_int32(outType);
+		//	writer.write_int32(bytes.size());
+		//	writer.write_bytes_ptr(bytes.data(), bytes.size());
+		//	auto outFile = FileSys::open_write(hashed_path.c_str(), FileSys::SHADER_CACHE);
+		//	if (outFile) {
+		//		outFile->write(writer.get_buffer(), writer.get_size());
+		//	}
+		//	else {
+		//		sys_print(Error, "Program_Manager::recompile: couldnt open file to write program binary: %s\n", hashed_path.data());
+		//	}
+		//}
 
 		return;	
 	}
@@ -973,7 +981,7 @@ void Renderer::init()
 	windowDrawer = new RenderWindowBackendLocal();
 	RenderWindowBackend::inst = windowDrawer;
 
-	mem_arena.init("Render Temp", renderer_memory_arena_size.get_integer());
+	mem_arena.init("RenderTemp", renderer_memory_arena_size.get_integer());
 	// Init scene draw buffers
 	scene.init();
 	create_shaders();
@@ -1266,6 +1274,8 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 	RenderPassSetup setup("bloompass", fbo.bloom, false, false, 0, 0, cur_w, cur_h);
 	auto scope = device.start_render_pass(setup);
 
+	///IGraphicsDevice* device = IGraphicsDevice::inst;
+
 	{
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
@@ -1554,7 +1564,7 @@ void Renderer::render_particles()
 			continue;
 
 		RenderPipelineState state;
-		state.program = matman.get_mat_shader(false,false, nullptr, mat, false, false, false, false,false); ;
+		state.program = matman.get_mat_shader(nullptr, mat,0);
 		state.vao = p.dd.VAO;// meshbuilder->VAO;
 		state.backface_culling = mat->get_master_material()->backface;
 		state.blend = mat->get_master_material()->blend;
@@ -1602,16 +1612,30 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 	const bool is_depth = type == pass_type::DEPTH;
 #endif
 	
+	int flags = 0;
+	// do some if/else here to cut back on permutation insanity. depth only doesnt care about lightmap,taa,editor_id, or debug
+	if (proxy.animator_bone_ofs != -1 && proxy.model && proxy.model->has_bones())
+		flags |= MSF_ANIMATED;
+	if (is_depth) {
+		flags |= MSF_DEPTH_ONLY;
+	}
+	else if (forced_forward) {
+		flags |= MSF_IS_FORCED_FORWARD;
+	}
+	else {
+		if (proxy.lightmapped)
+			flags |= MSF_LIGHTMAPPED;
+		if (is_editor_mode)
+			flags |= MSF_EDITOR_ID;
+		if (!r_taa_enabled.get_bool())
+			flags |= MSF_NO_TAA;
+		if (r_debug_mode.get_integer() != 0)
+			flags |= MSF_DEBUG;
+	}
 
 	key.shader = matman.get_mat_shader(
-		proxy.lightmapped,
-		proxy.animator_bone_ofs!=-1, 
 		proxy.model, material, 
-		is_depth,
-		false,
-		is_editor_mode,
-		r_debug_mode.get_integer()!=0,
-		forced_forward
+		flags
 	);
 	const MasterMaterialImpl* mm = material->get_master_material();
 
@@ -1834,12 +1858,11 @@ static void build_standard_cpu(
 	// first build the lists
 	list.build_from(src, proxy_list);
 
-	auto& arena = draw.get_arena();
-	const auto marker = arena.get_bottom_marker();
-
+	auto& memArena = draw.get_arena();
+	ArenaScope memScope(memArena);
 
 	const int objCount = src.objects.size();
-	uint32_t* glinstance_to_instance = (uint32_t*)arena.alloc_bottom(sizeof(uint32_t) * objCount);
+	uint32_t* glinstance_to_instance = memArena.alloc_bottom_type<uint32_t>(objCount);
 
 	for (int objIndex = 0; objIndex < objCount; objIndex++) {
 		auto& obj = src.objects[objIndex];
@@ -1853,10 +1876,6 @@ static void build_standard_cpu(
 
 	glNamedBufferData(list.glinstance_to_instance, sizeof(uint32_t) * objCount, nullptr, GL_DYNAMIC_DRAW);
 	glNamedBufferSubData(list.glinstance_to_instance, 0, sizeof(uint32_t) * objCount, glinstance_to_instance);
-
-
-	arena.free_bottom_to_marker(marker);
-
 }
 
 static void build_cascade_cpu(
@@ -1869,12 +1888,11 @@ static void build_cascade_cpu(
 	// first build the lists
 	shadowlist.build_from(shadowpass, proxy_list);
 
-	auto& arena = draw.get_arena();
-	const auto marker = arena.get_bottom_marker();
-
+	auto& memArena = draw.get_arena();
+	ArenaScope memScope(memArena);
 
 	const int objCount = shadowpass.objects.size();
-	uint32_t* glinstance_to_instance = (uint32_t*)arena.alloc_bottom(sizeof(uint32_t) * objCount);
+	uint32_t* glinstance_to_instance = memArena.alloc_bottom_type<uint32_t>(objCount);
 
 	for (int objIndex = 0; objIndex < objCount; objIndex++) {
 		auto& obj = shadowpass.objects[objIndex];
@@ -1893,9 +1911,6 @@ static void build_cascade_cpu(
 
 	glNamedBufferData(shadowlist.glinstance_to_instance, sizeof(uint32_t) * objCount, nullptr, GL_DYNAMIC_DRAW);
 	glNamedBufferSubData(shadowlist.glinstance_to_instance, 0, sizeof(uint32_t) * objCount, glinstance_to_instance);
-
-
-	arena.free_bottom_to_marker(marker);
 }
 
 void Render_Pass::merge_static_to_dynamic(bool* vis_array, int8_t* lod_array, Free_List<ROP_Internal>& objs)
@@ -1920,12 +1935,14 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 
 	const int max_draw_to_materials = 20000;
 
-	auto marker = draw.get_arena().get_bottom_marker();
-	uint32_t* draw_to_material = (uint32_t*)draw.get_arena().alloc_bottom(sizeof(uint32_t) * src.mesh_batches.size());
+	auto& memArena = draw.get_arena();
+	ArenaScope scope(memArena);
+
+	uint32_t* draw_to_material = memArena.alloc_bottom_type<uint32_t>(src.mesh_batches.size());
 	int draw_to_material_index = 0;
 
 	int base_instance = 0;
-
+	int new_verts_drawn = 0;
 	for (int i = 0; i < src.batches.size(); i++) {
 		Multidraw_Batch& mdb = src.batches[i];
 
@@ -1957,7 +1974,7 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 			assert(draw_to_material_index < src.mesh_batches.size());
 			draw_to_material[draw_to_material_index++] = batch_material->impl->gpu_buffer_offset;
 
-			draw.stats.tris_drawn += meshb.count * cmd.count / 3;
+			new_verts_drawn += meshb.count * cmd.count;
 		}
 
 		command_count.push_back(mdb.count);
@@ -1966,7 +1983,7 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 
 	glNamedBufferData(gldrawid_to_submesh_material, sizeof(uint32_t) * draw_to_material_index, draw_to_material, GL_DYNAMIC_DRAW);
 
-	draw.get_arena().free_bottom_to_marker(marker);
+	draw.stats.tris_drawn += new_verts_drawn / 3;
 }
 
 
@@ -2372,7 +2389,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	if(static_cache_built_for_debug!=(r_debug_mode.get_integer() != 0))
 		statics_meshes_are_dirty = true;
 
-
+	auto& memArena = draw.get_arena();
+	ArenaScope scope(memArena);
 
 	// clear objects
 	gbuffer_pass.clear();
@@ -2383,13 +2401,11 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	const int visible_count = proxy_list.objects.size();
 	bool* cascade_vis[4] = { nullptr,nullptr,nullptr,nullptr };
 	for(int i=0;i<4;i++)
-		cascade_vis[i] = (bool*)draw.get_arena().alloc_bottom(sizeof(bool) * visible_count);
+		cascade_vis[i] = memArena.alloc_bottom_type<bool>(visible_count);
 	
+	bool* visible_array = memArena.alloc_bottom_type<bool>(visible_count);
+	int8_t* lod_to_render_array = memArena.alloc_bottom_type<int8_t>(visible_count);
 
-	auto marker = draw.get_arena().get_bottom_marker();
-	bool* visible_array = (bool*)draw.get_arena().alloc_bottom(sizeof(bool) * visible_count);
-	int8_t* lod_to_render_array = (int8_t*)draw.get_arena().alloc_bottom(sizeof(int8_t) * visible_count);
-	//
 	{
 		//CPUSCOPESTART(cpu_object_cull);
 		ZoneScopedN("SetupThreaded");
@@ -2428,92 +2444,94 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		JobSystem::inst->wait_and_free_counter(cullAndLodCounter);
 	}
 	const size_t num_ren_objs = proxy_list.objects.size();
-	auto gpu_objects = (gpu::Object_Instance*)draw.get_arena().alloc_bottom(sizeof(gpu::Object_Instance) * num_ren_objs);
+	gpu::Object_Instance* gpu_objects = memArena.alloc_bottom_type<gpu::Object_Instance>(num_ren_objs);
 	ASSERT(gpu_objects);
 	JobCounter* gpu_obj_set_cntr{};
 	JobSystem::inst->add_job(set_gpu_objects_data_job, uintptr_t(gpu_objects), gpu_obj_set_cntr);
 
-	{
+	auto add_objects_to_passes = [&]() {
 		ZoneScopedN("Traversal");
-		{
-			ZoneScopedN("LoopObjects");
-			for (int i = 0; i < proxy_list.objects.size(); i++) {
-				auto& obj = proxy_list.objects[i];
-				handle<Render_Object> objhandle{ obj.handle };
-				auto& proxy = obj.type_.proxy;
+		ZoneScopedN("LoopObjects");
+		for (int i = 0; i < proxy_list.objects.size(); i++) {
+			auto& obj = proxy_list.objects[i];
+			handle<Render_Object> objhandle{ obj.handle };
+			auto& proxy = obj.type_.proxy;
 
-				if (!proxy.visible || !proxy.model || !proxy.model->get_is_loaded()||(proxy.model->get_num_lods()==0))
-					continue;
-				
-				if (!proxy.is_skybox && skybox_only)
-					continue;
-				if (obj.type_.is_static)	// only dynamic objects passthrough
-					continue;
+			if (!proxy.visible || !proxy.model || !proxy.model->get_is_loaded() || (proxy.model->get_num_lods() == 0))
+				continue;
 
-				const bool is_visible = visible_array[i];
-				const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
+			if (!proxy.is_skybox && skybox_only)
+				continue;
+			if (obj.type_.is_static)	// only dynamic objects passthrough
+				continue;
 
-				if (!is_visible && !casts_shadow)
-					continue;
+			const bool is_visible = visible_array[i];
+			const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
 
-				const int LOD_index = lod_to_render_array[i];
+			if (!is_visible && !casts_shadow)
+				continue;
 
-				auto model = proxy.model;
-				const auto& lod = model->get_lod(LOD_index);
+			const int LOD_index = lod_to_render_array[i];
 
-				const int pstart = lod.part_ofs;
-				const int pend = pstart + lod.part_count;
+			auto model = proxy.model;
+			const auto& lod = model->get_lod(LOD_index);
 
-				for (int j = pstart; j < pend; j++) {
-					auto& part = proxy.model->get_part(j);
+			const int pstart = lod.part_ofs;
+			const int pend = pstart + lod.part_count;
 
-					const MaterialInstance* mat = proxy.model->get_material(part.material_idx);
-					if (obj.type_.proxy.mat_override)
-						mat = (MaterialInstance*)obj.type_.proxy.mat_override;
-					if (!mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
-						mat = matman.get_fallback();
-					const MasterMaterialImpl* mm = mat->get_master_material();
+			for (int j = pstart; j < pend; j++) {
+				auto& part = proxy.model->get_part(j);
 
-					if (mm->render_in_forward_pass()) {
-						if (is_visible)
-							transparent_pass.add_object(proxy, objhandle, mat, 0/* fixme sorting distance */, j, LOD_index, 0, build_for_editor);
-						if (!mm->is_translucent() && casts_shadow)
-							shadow_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
-					}
-					else {
-						if (casts_shadow)
-							shadow_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
-						if (is_visible)
-							gbuffer_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
-					}
+				const MaterialInstance* mat = proxy.model->get_material(part.material_idx);
+				if (obj.type_.proxy.mat_override)
+					mat = (MaterialInstance*)obj.type_.proxy.mat_override;
+				if (!mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
+					mat = matman.get_fallback();
+				const MasterMaterialImpl* mm = mat->get_master_material();
+
+				if (mm->render_in_forward_pass()) {
+					if (is_visible)
+						transparent_pass.add_object(proxy, objhandle, mat, 0/* fixme sorting distance */, j, LOD_index, 0, build_for_editor);
+					if (!mm->is_translucent() && casts_shadow)
+						shadow_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
+				}
+				else {
+					if (casts_shadow)
+						shadow_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
+					if (is_visible)
+						gbuffer_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
+				}
 
 #ifdef EDITOR_BUILD
-					if (obj.type_.proxy.outline && is_visible) {
-						editor_sel_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
-					}
-#endif
+				if (obj.type_.proxy.outline && is_visible) {
+					editor_sel_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
 				}
+#endif
 			}
 		}
-		{
-			ZoneScopedN("MergeStaticWithDynamic");
-			if (!skybox_only) {
-				draw.scene.shadow_pass.merge_static_to_dynamic(nullptr, lod_to_render_array, draw.scene.proxy_list);
-				editor_sel_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
-				gbuffer_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
-				transparent_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
-			}
+	};
+	add_objects_to_passes();
+		
+	auto merge_static_and_dynamic = [&]() {
+		ZoneScopedN("MergeStaticWithDynamic");
+		if (!skybox_only) {
+			draw.scene.shadow_pass.merge_static_to_dynamic(nullptr, lod_to_render_array, draw.scene.proxy_list);
+			editor_sel_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
+			gbuffer_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
+			transparent_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
 		}
+	};
+	merge_static_and_dynamic();
 
-
-	}
-	{
+	auto make_batches_for_passes = [&]() {
 		ZoneScopedN("MakeBatchesAndUploadGpuData");
 
 		// start gbuffer pass, but do the rest on this thread
-		JobCounter* c{};
-		JobSystem::inst->add_job(make_batches_job,uintptr_t(&gbuffer_pass), c);
-		JobSystem::inst->add_job(make_batches_job, uintptr_t(&shadow_pass), c);
+		//JobCounter* c{};
+		//JobSystem::inst->add_job(make_batches_job,uintptr_t(&gbuffer_pass), c);
+		//JobSystem::inst->add_job(make_batches_job, uintptr_t(&shadow_pass), c);
+		gbuffer_pass.make_batches(*this);
+		shadow_pass.make_batches(*this);
 		transparent_pass.make_batches(*this);
 		editor_sel_pass.make_batches(*this);
 
@@ -2522,34 +2540,35 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 			ZoneScopedN("UploadGpuData");
 			glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs, gpu_objects, GL_DYNAMIC_DRAW);
 		}
+	};
+	make_batches_for_passes();
 
-		JobSystem::inst->wait_and_free_counter(c);
-	}
-	{
+
+	auto make_render_lists = [&]() {
 		ZoneScopedN("MakeRenderLists");
 
-		// kick off the shadow passes, but do rest locally
-		JobCounter* shadowlistcounter{};
-		JobDecl shadowlistdecl[4];
-		MakeShadowRenderListParam params[4];
-		for (int i = 0; i < 4; i++) {
-			params[i].visarray = cascade_vis[i];
-			params[i].index = i;
-			shadowlistdecl[i].func = make_shadow_render_list_job;
-			shadowlistdecl[i].funcarg = uintptr_t(&params[i]);
-		}
-		for (int i = 0; i < 4; i++) {
-			shadowlistdecl[i].func(shadowlistdecl[i].funcarg);
-		}
+		auto make_shadow_render_lists = [&]() {
+			JobDecl shadowlistdecl[4];
+			MakeShadowRenderListParam params[4];
+			for (int i = 0; i < 4; i++) {
+				params[i].visarray = cascade_vis[i];
+				params[i].index = i;
+				shadowlistdecl[i].func = make_shadow_render_list_job;
+				shadowlistdecl[i].funcarg = uintptr_t(&params[i]);
+			}
+			for (int i = 0; i < 4; i++) {
+				shadowlistdecl[i].func(shadowlistdecl[i].funcarg);
+			}
+		};
+		make_shadow_render_lists();
 
-
-		{
+		auto update_spotlight_shadows = [&]() {
 			std::vector<handle<Render_Light>> lightsToCalcShadow;
 			draw.spotShadows->get_lights_to_render(lightsToCalcShadow);
 			draw.stats.shadow_lights += lightsToCalcShadow.size();
 			// tbh just do it here whatev
 			if (!lightsToCalcShadow.empty()) {
-				bool* spot_visible_array = (bool*)draw.get_arena().alloc_bottom(sizeof(bool) * visible_count);
+				bool* spot_visible_array = memArena.alloc_bottom_type<bool>(visible_count);
 				for (int i = 0; i < lightsToCalcShadow.size(); i++) {
 					bool any_dynamic_found = false;
 					cull_spot_shadow_objects_job(lightsToCalcShadow[i], spot_visible_array, visible_count, any_dynamic_found);
@@ -2559,33 +2578,19 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 					draw.spotShadows->do_render(spotLightShadowList, lightsToCalcShadow[i], any_dynamic_found);
 				}
 			}
-		}
+		};
+		update_spotlight_shadows();
 
-		//jobs::add_jobs(shadowlistdecl, 4, shadowlistcounter);
+
+		build_standard_cpu(gbuffer_rlist, gbuffer_pass, proxy_list);
+		build_standard_cpu(transparent_rlist, transparent_pass, proxy_list);
+		build_standard_cpu(editor_sel_rlist, editor_sel_pass, proxy_list);
+
+	};
+	make_render_lists();
 
 
-		build_standard_cpu(
-			gbuffer_rlist,
-			gbuffer_pass,
-			proxy_list
-		);
-		
-		build_standard_cpu(
-			transparent_rlist,
-			transparent_pass,
-			proxy_list
-		);
-
-		build_standard_cpu(
-			editor_sel_rlist,
-			editor_sel_pass,
-			proxy_list
-		);
-
-		//jobs::wait_and_free_counter(shadowlistcounter);
-	}
-
-	draw.get_arena().free_bottom();
+	memArena.free_bottom();
 
 }
 
@@ -3044,7 +3049,7 @@ void Renderer::deferred_decal_pass()
 		if (l->get_master_material()->usage != MaterialUsage::Decal)
 			continue;
 
-		program_handle program = matman.get_mat_shader(false,false, nullptr, l, false, false, false, false, false);
+		program_handle program = matman.get_mat_shader(nullptr, l, 0);
 
 		RenderPipelineState state;
 		state.depth_testing = false;
@@ -3655,7 +3660,7 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 		auto mat = postProcessMats[i];
 
 		RenderPipelineState state;
-		state.program = matman.get_mat_shader(false,false, nullptr, mat, false, false, false, false, false);
+		state.program = matman.get_mat_shader(nullptr, mat,0);
 		state.blend = mat->get_master_material()->blend;
 		state.depth_testing = state.depth_writes = false;
 		state.vao = get_empty_vao();

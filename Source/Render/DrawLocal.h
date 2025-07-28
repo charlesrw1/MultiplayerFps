@@ -179,6 +179,7 @@ struct Render_Stats {
 };
 
 // this caches programs
+class IGraphicsProgram;
 class Program_Manager
 {
 public:
@@ -210,6 +211,7 @@ public:
 
 		bool is_shared() const { return !vert.empty() && frag.empty()&& !is_compute; }
 		Shader shader_obj;
+		IGraphicsProgram* program = nullptr;
 	};
 	std::vector<program_def> programs;
 

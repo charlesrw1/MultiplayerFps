@@ -37,7 +37,7 @@ void SSAO_System::init()
 
 	std::mt19937 rmt;
 
-	float numDir = 8;  // keep in sync to glsl
+	const float numDir = 8;  // keep in sync to glsl
 
 	signed short hbaoRandomShort[RANDOM_ELEMENTS * 4];
 

@@ -32,7 +32,7 @@ struct ArenaScope
             return arena.alloc_top(size);
     }
 private:
-    Type where = Type::BOTTOM;
+    const Type where = Type::BOTTOM;
     uintptr_t marker = 0;
     Memory_Arena& arena;
 };

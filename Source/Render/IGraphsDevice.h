@@ -106,7 +106,9 @@ public:
 
 class IGraphicsProgram {
 public:
+	virtual ~IGraphicsProgram() {}
 	virtual void release() = 0;
+	virtual uint32_t get_internal_handle() = 0;
 };
 
 // like a VAO in opengl.
@@ -139,7 +141,7 @@ struct GraphicsPipelineState {
 	//blend_state blend = blend_state::OPAQUE;
 	GraphicsPrimitiveType primitive = GraphicsPrimitiveType::Triangles;
 	IGraphicsProgram* program = nullptr;
-	IGraphicsVertexInput* vao = nullptr;
+	IGraphicsVertexInput* vertex_input = nullptr;
 };
 
 

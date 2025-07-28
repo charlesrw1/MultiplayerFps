@@ -213,27 +213,31 @@ namespace gpu {
 }
 
 
+// master shader flags are #ifdef defines in the shader. compilied seperately
+enum master_shader_flags {
+	MSF_ANIMATED = 1,
+	MSF_EDITOR_ID = 2,
+	MSF_DEPTH_ONLY = 4,
+	MSF_DITHER = 8,
+	MSF_DEBUG = 16,
+	MSF_LIGHTMAPPED = 32,
+	MSF_IS_FORCED_FORWARD = 64,
+	MSF_NO_TAA = 128
+};
+
 struct shader_key
 {
 	shader_key() {
 		material_id = 0;
-		depth_only = 0;
-		animated = 0;
-		editor_id = 0;
-		dither = 0;
-		debug = 0;
-		is_lightmapped = 0;
-		is_forced_forward = 0;
+		msf_flags = 0;
+	}
+	bool has_flag(master_shader_flags f) {
+		return (int(msf_flags) & f);
 	}
 
-	uint32_t material_id : 25;
-	uint32_t animated : 1;
-	uint32_t editor_id : 1;
-	uint32_t depth_only : 1;
-	uint32_t dither : 1;
-	uint32_t debug : 1;
-	uint32_t is_lightmapped : 1;
-	uint32_t is_forced_forward : 1;
+	uint32_t material_id : 24;
+	uint32_t msf_flags : 8;
+
 
 	uint32_t as_uint32() const {
 		return *((uint32_t*)this);
@@ -341,7 +345,12 @@ public:
 
 
 	program_handle get_mat_shader(
-		bool is_lightmapped,
+		const Model* mod, 
+		const MaterialInstance* gs, 
+		int flags // MSF_X
+	);
+	/*
+	bool is_lightmapped,
 		bool is_animated, 
 		const Model* mod, 
 		const MaterialInstance* gs, 
@@ -350,7 +359,8 @@ public:
 		bool is_editor_mode,
 		bool debug_mode,
 		bool forced_forward
-	);
+	
+	*/
 
 	IGraphicsBuffer* get_gpu_material_buffer() { 
 		return gpuMatBufferPtr;
