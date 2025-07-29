@@ -281,7 +281,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 				auto tex = (folderObj->is_folder_open) ? oo->folderOpen : oo->folderClosed;
 				if (tex) {
 					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-					if(ImGui::ImageButton(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height))) {
+					if (my_imgui_image_button(tex, tex->get_size().x)) {
 						folderObj->is_folder_open = !folderObj->is_folder_open;
 						oo->refresh_flag = true;	// refresh after
 					}
@@ -323,7 +323,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 			const char* s = "eng/editor/prefab_p.png";
 			auto tex = g_assets.find_global_sync<Texture>(s);
 			if (tex) {
-				ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
+				my_imgui_image(tex, -1);
 				ImGui::SameLine(0, 0);
 			}
 		}
@@ -334,7 +334,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 			if (!*s) continue;
 			auto tex = g_assets.find_global_sync<Texture>(s);
 			if (tex) {
-				ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
+				my_imgui_image(tex, -1);
 				ImGui::SameLine(0, 0);
 			}
 		}
@@ -369,7 +369,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 		if (e) {
 			auto img = (e->get_hidden_in_editor()) ? oo->hidden : oo->visible;
 			ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
-			if (ImGui::ImageButton(ImTextureID(uint64_t(img->gl_id)), ImVec2(16, 16))) {
+			if (my_imgui_image_button(img, 16)) {
 				e->set_hidden_in_editor(!e->get_hidden_in_editor());
 			}
 		}
@@ -380,7 +380,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 				if (folderObj) {
 					auto img = (folderObj->is_hidden) ? oo->hidden : oo->visible;
 					ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
-					if (ImGui::ImageButton(ImTextureID(uint64_t(img->gl_id)), ImVec2(16, 16))) {
+					if (my_imgui_image_button(img, 16)) {
 						folderObj->is_hidden = !folderObj->is_hidden;
 						for (auto obj : eng->get_level()->get_all_objects()) {
 							if (auto as_ent = obj->cast_to<Entity>()) {
@@ -395,7 +395,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 		else {
 			auto img = oo->hidden;
 			ImGui::SetCursorPosY(ImGui::GetCursorPosY() - 4.0);
-			if (ImGui::ImageButton(ImTextureID(uint64_t(img->gl_id)), ImVec2(16, 16), ImVec2(), ImVec2(), -1, ImVec4(), ImVec4(0, 0, 0, 0))) {
+			if (ImGui::ImageButton(ImTextureID(uint64_t(img->get_internal_render_handle())), ImVec2(16, 16), ImVec2(), ImVec2(), -1, ImVec4(), ImVec4(0, 0, 0, 0))) {
 
 			}
 		}

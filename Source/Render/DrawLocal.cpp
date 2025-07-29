@@ -154,9 +154,9 @@ public:
 
 			auto& texs = dc.mat->impl->get_textures();
 			for (int i = 0; i < texs.size(); i++)
-				device.bind_texture(i, texs[i]->gl_id);
+				device.bind_texture_ptr(i, texs[i]->gpu_ptr);
 			if (dc.texOverride != nullptr)
-				device.bind_texture(0, dc.texOverride->gl_id);
+				device.bind_texture_ptr(0, dc.texOverride->gpu_ptr);
 
 			glDrawElementsBaseVertex(mode, dc.index_count, GL_UNSIGNED_INT, (void*)(dc.index_start * sizeof(int)), 0);
 			
@@ -919,21 +919,22 @@ void Renderer::check_hardware_options()
 
 void Renderer::create_default_textures()
 {
-	const uint8_t wdata[] = { 0xff,0xff,0xff };
-	const uint8_t bdata[] = { 0x0,0x0,0x0 };
+	const uint8_t wdata[] = { 0xff,0xff,0xff,255 };
+	const uint8_t bdata[] = { 0x0,0x0,0x0,255 };
 	const uint8_t normaldata[] = { 128,128,255,255 };
 
-	auto create_defeault = [](texhandle* handle, const uint8_t* data) -> void{
-		glCreateTextures(GL_TEXTURE_2D, 1, handle);
-		glTextureStorage2D(*handle, 1, GL_RGB8, 1, 1);
-		glTextureSubImage2D(*handle, 0, 0, 0, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, data);
-		glTextureParameteri(*handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTextureParameteri(*handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glGenerateTextureMipmap(*handle);
+	auto create_defeault = [](IGraphicsTexture*& handle, const uint8_t* data) -> void{
+		CreateTextureArgs args;
+		args.width = args.height = 1;
+		args.num_mip_maps = 1;
+		args.sampler_type = GraphicsSamplerType::LinearDefault;
+		args.format = GraphicsTextureFormat::rgba8;
+		handle = IGraphicsDevice::inst->create_texture(args);
+		handle->sub_image_upload(0, 0, 0, 1, 1, sizeof(uint8_t) * 4, data);
 	};
-	create_defeault(&white_texture.gl_id, wdata);
-	create_defeault(&black_texture.gl_id, bdata);
-	create_defeault(&flat_normal_texture.gl_id, normaldata);
+	create_defeault(white_texture, wdata);
+	create_defeault(black_texture, bdata);
+	create_defeault(flat_normal_texture, normaldata);
 
 	auto white_tex = Texture::install_system("_white");
 	auto black_tex = Texture::install_system("_black");
@@ -945,9 +946,9 @@ void Renderer::create_default_textures()
 #endif
 	auto flat_normal = Texture::install_system("_flat_normal");
 
-	white_tex->update_specs(white_texture.gl_id, 1, 1, 3, {});
-	black_tex->update_specs(black_texture.gl_id, 1, 1, 3, {});
-	flat_normal->update_specs(flat_normal_texture.gl_id, 1, 1, 3, {});
+	white_tex->update_specs_ptr(white_texture);
+	black_tex->update_specs_ptr(black_texture);
+	flat_normal->update_specs_ptr(flat_normal_texture);
 
 	// create the "virtual texture system" handles so materials/debuging can reference these like a normal texture
 	tex.bloom_vts_handle = Texture::install_system("_bloom_result");
@@ -1009,11 +1010,13 @@ void Renderer::init()
 
 	on_level_start();
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);
-	auto brdf_lut = Texture::install_system("_brdf_lut");
-	brdf_lut->gl_id = EnviornmentMapHelper::get().integrator.lut_id;
-	brdf_lut->width = EnviornmentMapHelper::BRDF_PREINTEGRATE_LUT_SIZE;
-	brdf_lut->height = EnviornmentMapHelper::BRDF_PREINTEGRATE_LUT_SIZE;
-	brdf_lut->type = Texture_Type::TEXTYPE_2D;
+	//auto brdf_lut = Texture::install_system("_brdf_lut");
+	//brdf_lut->gl_id = EnviornmentMapHelper::get().integrator.lut_id;
+	//brdf_lut->width = EnviornmentMapHelper::BRDF_PREINTEGRATE_LUT_SIZE;
+	//brdf_lut->height = EnviornmentMapHelper::BRDF_PREINTEGRATE_LUT_SIZE;
+	//brdf_lut->type = Texture_Type::TEXTYPE_2D;
+	//FIXME
+
 	consoleCommands = ConsoleCmdGroup::create("");
 	consoleCommands->add("cot", [this](const Cmd_Args& args) { debug_tex_out.output_tex = nullptr; });
 	consoleCommands->add("ot", [this](const Cmd_Args& args) { 
@@ -1092,16 +1095,14 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-
 	auto create_and_delete_fb = [](uint32_t & framebuffer) {
 		glDeleteFramebuffers(1, &framebuffer);
 		glCreateFramebuffers(1, &framebuffer);
 	};
 
 	auto delete_and_create_texture = [&](IGraphicsTexture*& ptr, GraphicsTextureFormat format) {
-		if (ptr) {
-			ptr->release();
-		}
+		safe_release(ptr);
+
 		CreateTextureArgs args;
 		args.format = format;
 		args.num_mip_maps = 1;
@@ -1242,14 +1243,14 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	cur_h = s_h;
 
 	// Update vts handles
-	tex.scene_color_vts_handle->update_specs_ptr(tex.scene_color, s_w, s_h, 4, {});
-	tex.scene_depth_vts_handle->update_specs_ptr(tex.scene_depth, s_w, s_h, 4, {});
-	tex.gbuffer0_vts_handle->update_specs_ptr(tex.scene_gbuffer0, s_w, s_h, 3, {});
-	tex.gbuffer1_vts_handle->update_specs_ptr(tex.scene_gbuffer1, s_w, s_h, 3, {});
-	tex.gbuffer2_vts_handle->update_specs_ptr(tex.scene_gbuffer2, s_w, s_h, 3, {});
-	tex.editorid_vts_handle->update_specs_ptr(tex.editor_id_buffer, s_w, s_h, 4, {});
-	tex.editorSel_vts_handle->update_specs_ptr(tex.editor_selection_depth_buffer, s_w, s_h, 4, {});
-	tex.scene_motion_vts_handle->update_specs_ptr(tex.scene_motion, s_w, s_h, 2, {});
+	tex.scene_color_vts_handle->update_specs_ptr(tex.scene_color);
+	tex.scene_depth_vts_handle->update_specs_ptr(tex.scene_depth);
+	tex.gbuffer0_vts_handle->update_specs_ptr(tex.scene_gbuffer0);
+	tex.gbuffer1_vts_handle->update_specs_ptr(tex.scene_gbuffer1);
+	tex.gbuffer2_vts_handle->update_specs_ptr(tex.scene_gbuffer2);
+	tex.editorid_vts_handle->update_specs_ptr(tex.editor_id_buffer);
+	tex.editorSel_vts_handle->update_specs_ptr(tex.editor_selection_depth_buffer);
+	tex.scene_motion_vts_handle->update_specs_ptr(tex.scene_motion);
 
 	// Also update bloom buffers (this can be elsewhere)
 	init_bloom_buffers();
@@ -1281,8 +1282,7 @@ void Renderer::init_bloom_buffers()
 		args.format = GraphicsTextureFormat::r11f_g11f_b10f;
 		args.num_mip_maps = 1;
 		args.sampler_type = GraphicsSamplerType::LinearClamped;
-		if (bc.texture)
-			bc.texture->release();
+		safe_release(bc.texture);
 		bc.texture = IGraphicsDevice::inst->create_texture(args);
 
 		bc.isize = { x,y };
@@ -1298,7 +1298,7 @@ void Renderer::init_bloom_buffers()
 		fy *= 0.5;
 	}
 
-	tex.bloom_vts_handle->update_specs_ptr(tex.bloom_chain[0].texture, cur_w / 2, cur_h / 2, 3, {});
+	tex.bloom_vts_handle->update_specs_ptr(tex.bloom_chain[0].texture);
 
 }
 
@@ -1415,7 +1415,7 @@ inline void setup_batch(Render_Lists& list,
 
 	for (int i = 0; i < textures.size(); i++) {
 		Texture* t = textures[i];
-		uint32_t id = t->gl_id;
+		uint32_t id = 0;// t->gl_id;
 		if (t->gpu_ptr) {
 			id = t->gpu_ptr->get_internal_handle();
 		}
@@ -1437,10 +1437,10 @@ inline void setup_execute_render_lists(Render_Lists& list,Render_Pass& pass) {
 
 	if (scene.has_lightmap && scene.lightmapObj.lightmap_texture) {
 		auto texture = scene.lightmapObj.lightmap_texture;
-		draw.bind_texture(20/* FIXME, defined to be bound at spot 20,*/, texture->gl_id);
+		draw.bind_texture_ptr(20/* FIXME, defined to be bound at spot 20,*/, texture->gpu_ptr);
 	}
 	else {
-		draw.bind_texture(20/* FIXME, defined to be bound at spot 20,*/, draw.black_texture.gl_id);
+		draw.bind_texture_ptr(20/* FIXME, defined to be bound at spot 20,*/, draw.black_texture);
 	}
 
 }
@@ -1554,10 +1554,10 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 		// fixme, for lit transparents
 		const Texture* reflectionProbeTex = scene.get_reflection_probe_for_render(params.view.origin);
 		if(reflectionProbeTex)
-			bind_texture(19, reflectionProbeTex->gl_id);
+			bind_texture_ptr(19, reflectionProbeTex->gpu_ptr);
 		else {
 			// uh...
-			bind_texture(19, black_texture.gl_id);//expects a cubemap...
+			bind_texture_ptr(19, black_texture);//expects a cubemap...
 		}
 		bind_texture(18, EnviornmentMapHelper::get().integrator.get_texture());
 	}
@@ -1624,9 +1624,11 @@ void Renderer::render_particles()
 
 		auto& textures = mat->impl->get_textures();
 		for (int i = 0; i < textures.size(); i++) {
-			auto tex = textures[i];
-			tex = tex ? tex : &white_texture;
-			bind_texture(i, tex->gl_id);
+			Texture* tex = textures[i];
+			IGraphicsTexture* gfx_tex = white_texture;
+			if (tex) 
+				gfx_tex = tex->gpu_ptr;
+			bind_texture_ptr(i, gfx_tex);
 		}
 
 		glDrawElements(GL_TRIANGLES, p.dd.num_indicies, GL_UNSIGNED_INT, (void*)0);
@@ -2737,7 +2739,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 
 	//auto scope = device.start_render_pass(setup);
 	const bool wants_ssao = !is_cubemap_view && enable_ssao.get_bool();
-	const texhandle ssao_tex = (wants_ssao) ? ssao.texture.result : white_texture.gl_id;	// skip ssao in cubemap view
+	const texhandle ssao_tex = (wants_ssao) ? ssao.texture.result : white_texture->get_internal_handle();	// skip ssao in cubemap view
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
 
 	device.reset_states();
@@ -2841,7 +2843,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 				shader().set_vec4("shadow_atlas_offset", as_vec4);
 
 				if (light.projected_texture)
-					device.bind_texture(5, light.projected_texture->gl_id);
+					device.bind_texture_ptr(5, light.projected_texture->gpu_ptr);
 			}
 
 			glMultiDrawElementsIndirect(
@@ -2895,7 +2897,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		state.depth_writes = false;
 		device.set_pipeline(state);
 		bind_texture(4, ssao_tex);
-		bind_texture(5, reflectionProbeTex->gl_id);
+		bind_texture_ptr(5, reflectionProbeTex->gpu_ptr);
 		bind_texture(6, EnviornmentMapHelper::get().integrator.get_texture());
 		shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
 
@@ -2956,7 +2958,7 @@ ThumbnailRenderer::ThumbnailRenderer(int size) : pass(pass_type::TRANSPARENT) {
 	this->depth = depth_tex;
 
 	vts_handle = Texture::install_system("_test_thumbnail");
-	vts_handle->update_specs(color_tex, w, h, 4, {});
+	//vts_handle->update_specs(color_tex, w, h, 4, {});
 	vts_handle->type = Texture_Type::TEXTYPE_2D;
 }
 
@@ -3138,7 +3140,7 @@ void Renderer::deferred_decal_pass()
 
 		auto& texs = l->impl->get_textures();
 		for (int j = 0; j < texs.size(); j++)
-			bind_texture(j, texs[j]->gl_id);
+			bind_texture_ptr(j, texs[j]->gpu_ptr);
 
 		glMultiDrawElementsIndirect(
 			GL_TRIANGLES,
@@ -3232,8 +3234,8 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 		std::swap(tex.last_scene_color, tex.scene_color);
 		std::swap(tex.last_scene_motion, tex.scene_motion);
 
-		tex.scene_color_vts_handle->update_specs_ptr(tex.scene_color, cur_w, cur_h, 3, {});
-		tex.scene_motion_vts_handle->update_specs_ptr(tex.scene_motion, cur_w, cur_h, 2, {});
+		tex.scene_color_vts_handle->update_specs_ptr(tex.scene_color);
+		tex.scene_motion_vts_handle->update_specs_ptr(tex.scene_motion);
 
 	//	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
 	//	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color->get_internal_handle(), 0);
@@ -3249,7 +3251,7 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 	const int num_mips = Texture::get_mip_map_count(specular_cubemap_size, specular_cubemap_size);
 	assert(cubemap);
 	//static Texture* somthing = nullptr;
-	if (cubemap->gl_id == 0) {	// not created yet
+	if (!cubemap->gpu_ptr) {	// not created yet
 		CreateTextureArgs args;
 		args.format = GraphicsTextureFormat::rgb16f;
 		args.type = GraphicsTextureType::tCubemap;
@@ -3257,7 +3259,6 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 		args.num_mip_maps = num_mips;
 		args.width = args.height = specular_cubemap_size;
 		cubemap->gpu_ptr = IGraphicsDevice::inst->create_texture(args);
-		cubemap->gl_id = cubemap->gpu_ptr->get_internal_handle();
 		//glCreateTextures(GL_TEXTURE_CUBE_MAP, 1, &cubemap->gl_id);
 		//glTextureStorage2D(cubemap->gl_id, num_mips, GL_RGB16F, specular_cubemap_size, specular_cubemap_size);	
 		//glTextureParameteri(cubemap->gl_id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -3267,7 +3268,7 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 		//glTextureParameteri(cubemap->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 		cubemap->type = Texture_Type::TEXTYPE_CUBEMAP;
-		cubemap->width = cubemap->height = specular_cubemap_size;
+	//	cubemap->width = cubemap->height = specular_cubemap_size;
 
 		auto set_default_parameters = [](uint32_t handle) {
 			glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -3699,12 +3700,12 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 			state.vao = get_empty_vao();
 			device.set_pipeline(state);
 
-			uint32_t bloom_tex = tex.bloom_chain[0].texture->get_internal_handle();
+			IGraphicsTexture* bloom_tex = tex.bloom_chain[0].texture;
 			if (!enable_bloom.get_bool())
-				bloom_tex = black_texture.gl_id;
+				bloom_tex = black_texture;
 			bind_texture(0, scene_color_handle);
-			bind_texture(1, bloom_tex);
-			bind_texture(2, lens_dirt->gl_id);
+			bind_texture_ptr(1, bloom_tex);
+			bind_texture_ptr(2, lens_dirt->gpu_ptr);
 
 			shader().set_int("tonemap_type", pp_tonemap_type);
 			shader().set_float("contrast_tweak", pp_contrast);
@@ -3778,7 +3779,7 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 		if (!postProcessMats[i])
 			continue;
 		glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderToTexture->get_internal_handle(), 0);
-		tex.postProcessInput_vts_handle->update_specs_ptr(renderFromTexture, cur_w, cur_h, 3, {});
+		tex.postProcessInput_vts_handle->update_specs_ptr(renderFromTexture);
 
 		auto mat = postProcessMats[i];
 
@@ -3793,7 +3794,7 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 		auto& texs = mat->impl->get_textures();
 
 		for (int i = 0; i < texs.size(); i++) {
-			bind_texture(i, texs[i]->gl_id);
+			bind_texture_ptr(i, texs[i]->gpu_ptr);
 		}
 
 
@@ -3931,7 +3932,7 @@ void DebuggingTextureOutput::draw_out()
 {
 	if (!output_tex)
 		return;
-	if (output_tex->gl_id == 0) {
+	if (!output_tex->gpu_ptr) {
 		sys_print(Error, "DebuggingTextureOutput has invalid texture\n");
 		output_tex = nullptr;
 		return;
@@ -3954,9 +3955,9 @@ void DebuggingTextureOutput::draw_out()
 		output_tex = nullptr;
 		return;
 	}
-
-	const int w = output_tex->width;
-	const int h = output_tex->height;
+	const auto size_img = output_tex->gpu_ptr->get_size();
+	const int w = size_img.x;
+	const int h = size_img.y;
 
 	const float cur_w = draw.get_current_frame_vs().width;
 	const float cur_h = draw.get_current_frame_vs().height;
@@ -3973,7 +3974,7 @@ void DebuggingTextureOutput::draw_out()
 		-1.f
 		: mip);
 
-	draw.bind_texture(0,  output_tex->gl_id);
+	draw.bind_texture_ptr(0,  output_tex->gpu_ptr);
 
 	glm::vec2 upper_left = glm::vec2(0, 1);
 	glm::vec2 size = glm::vec2(1, -1);

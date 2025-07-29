@@ -429,8 +429,8 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 	};
 	output->gpu_ptr = create_gpu_texture();
 
-	glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
-	glTextureStorage2D(output->gl_id, numMipmaps, internal_format, input_width, input_height);
+	//glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
+	//glTextureStorage2D(output->gl_id, numMipmaps, internal_format, input_width, input_height);
 
 	int ux = input_width;
 	int uy = input_height;
@@ -447,10 +447,10 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 			size = ux*uy* int(header->ddspf.RGBBitCount / 8);
 		}
 		
-		if (compressed)
-			glCompressedTextureSubImage2D(output->gl_id,i, 0, 0, ux, uy, internal_format, size, data_ptr);
-		else
-			glTextureSubImage2D(output->gl_id, i, 0, 0, ux, uy, format, type, data_ptr);
+		//if (compressed)
+		//	glCompressedTextureSubImage2D(output->gl_id,i, 0, 0, ux, uy, internal_format, size, data_ptr);
+		//else
+		//	glTextureSubImage2D(output->gl_id, i, 0, 0, ux, uy, format, type, data_ptr);
 
 		output->gpu_ptr->sub_image_upload(i, 0, 0, ux, uy, size, data_ptr);
 
@@ -461,12 +461,10 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 		if (uy < 1)uy = 1;
 	}
 
-	glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
+	//glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	//glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
 
-	output->width = input_width;
-	output->height = input_height;
 	output->format = input_format;
 
 	return true;
@@ -475,7 +473,7 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 
 static void make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat, bool nearest_filtered = false)
 {
-	glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
+	//glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
 
 	int x_real = x;
 	int y_real = y;
@@ -486,7 +484,11 @@ static void make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 		args.height = y;
 		args.num_mip_maps = num_mip_maps;
 		args.format = load_format_to_graphics_format(informat);
-		args.sampler_type = GraphicsSamplerType::AnisotropyDefault;
+		args.type = GraphicsTextureType::t2D;
+		if (nearest_filtered)
+			args.sampler_type = GraphicsSamplerType::NearestDefault;
+		else
+			args.sampler_type = GraphicsSamplerType::AnisotropyDefault;
 		return IGraphicsDevice::inst->create_texture(args);
 	};
 	output->gpu_ptr = create_gpu_texture();
@@ -503,29 +505,34 @@ static void make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 			(informat == TEXFMT_RGBA8_DXT5 ? 16 : 8);
 	}
 
-	glTextureStorage2D(output->gl_id, num_mip_maps, internal_format, x, y);
+	//glTextureStorage2D(output->gl_id, num_mip_maps, internal_format, x, y);
 	assert(x == x_real && y == y_real);
-	if (compressed)
-		glCompressedTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, internal_format, size, data);
-	else
-		glTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, format, type, data);
+	//if (compressed)
+	//	glCompressedTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, internal_format, size, data);
+	//else
+	//	glTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, format, type, data);
 
+	output->gpu_ptr->sub_image_upload(0, 0, 0, x, y, size, data);
 	if (!nearest_filtered) {
-
-		glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
-		glGenerateTextureMipmap(output->gl_id);
+		// fixme
+		glGenerateTextureMipmap(output->gpu_ptr->get_internal_handle());
 	}
-	else {
-		glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	}
+	//if (!nearest_filtered) {
+	//
+	//	glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	//	glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//	glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
+	//	glGenerateTextureMipmap(output->gl_id);
+	//}
+	//else {
+	//	glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	//	glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	//}
 
 	glCheckError();
 
-	output->width = x;
-	output->height = y;
+	//output->width = x;
+	//output->height = y;
 	output->format = informat;
 }
 
@@ -558,18 +565,27 @@ void Texture::move_construct(IAsset* _src)
 	assert(!eng->get_is_in_overlapped_period());
 	Texture* src = (Texture*)_src;
 	uninstall();
-	width = src->width;
-	height = src->height;
-	gl_id = src->gl_id;
-	channels = src->channels;
+	gpu_ptr = src->gpu_ptr;
 	type = src->type;
 	format = src->format;
 	loaddata = std::move(src->loaddata);
-	src->gl_id = 0;	// dont uninstall it since were just stealing it
+	src->gpu_ptr = nullptr;	// dont uninstall it since were just stealing it
 #ifdef EDITOR_BUILD
 	simplifiedColor = src->simplifiedColor;
 	hasSimplifiedColor = src->hasSimplifiedColor;
 #endif
+}
+glm::ivec2 Texture::get_size() const {
+	if (gpu_ptr) {
+		return gpu_ptr->get_size();
+	}
+	return {};
+}
+texhandle Texture::get_internal_render_handle() const
+{
+	if (gpu_ptr)
+		return gpu_ptr->get_internal_handle();
+	return 0;
 }
 ConfigVar disable_texture_loads("disable_texture_loads", "0", CVAR_BOOL | CVAR_DEV, "");
 
@@ -580,17 +596,20 @@ void Texture::post_load() {
 	if (disable_texture_loads.get_bool()) {
 		const uint8_t missing_tex[] = { 230,0,255,255,  0,0,0,255,
 										0,0,0,255,	230,0,255,255 };
-		auto create_defeault = [](texhandle* handle, const uint8_t* data) -> void {
-			glCreateTextures(GL_TEXTURE_2D, 1, handle);
-			glTextureStorage2D(*handle, 1, GL_RGBA8, 2, 2);
-			glTextureSubImage2D(*handle, 0, 0, 0, 2, 2, GL_RGBA, GL_UNSIGNED_BYTE, data);
-			glTextureParameteri(*handle, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			glTextureParameteri(*handle, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			glGenerateTextureMipmap(*handle);
+		auto create_defeault = [](IGraphicsTexture*& handle, const uint8_t* data) -> void {
+			CreateTextureArgs args;
+			args.num_mip_maps = 1;
+			args.width = 2;
+			args.height = 2;
+			args.format = GraphicsTextureFormat::rgba8;
+			args.sampler_type = GraphicsSamplerType::LinearDefault;
+
+
+			handle = IGraphicsDevice::inst->create_texture(args);
+			handle->sub_image_upload(0, 0, 0, 2, 2, sizeof(uint8_t) * 4 * 4, data);
 		};
-		create_defeault(&gl_id, missing_tex);
-		width = 2;
-		height = 2;
+		create_defeault(gpu_ptr, missing_tex);
+
 		type = Texture_Type::TEXTYPE_2D;
 		format = Texture_Format::TEXFMT_RGBA8;
 
@@ -603,12 +622,11 @@ void Texture::post_load() {
 	int& y = user->y;
 	auto& data = user->data;
 	auto& filedata = user->filedata;
-	auto& is_float = user->is_float;
 
 	if (user->isDDSFile)
 		load_dds_file(this, filedata.data(), filedata.size());
 	else
-		make_from_data(this, x, y, data, to_format(channels, is_float), user->wantsNearestFiltering);
+		make_from_data(this, x, y, data, to_format(user->channels, user->is_float), user->wantsNearestFiltering);
 
 	if (data)
 		stbi_image_free(data);
@@ -648,6 +666,7 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 	auto& data = user->data;
 	auto& filedata = user->filedata;
 	auto& is_float = user->is_float;
+	auto& channels = user->channels;
 
 	if (path.find("/_nearest")!=std::string::npos)
 		user->wantsNearestFiltering = true;	// hack moment
@@ -695,22 +714,10 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 
 void Texture::uninstall()
 {
-	if (gpu_ptr) {
-		gpu_ptr->release();
-		gpu_ptr = nullptr;
-	}
-	if (gl_id != 0) {
-		glDeleteTextures(1, &gl_id);
-		width = height = 0;
-		gl_id = 0;
-	}
+	safe_release(gpu_ptr);
 }
-void Texture::update_specs_ptr(IGraphicsTexture* ptr, int w, int h, int channels, Texture_Format fmt) {
-	this->gl_id = ptr->get_internal_handle();
-	this->width = w;
-	this->height = h;
-	this->channels = channels;
-	this->format = fmt;
+void Texture::update_specs_ptr(IGraphicsTexture* ptr) {
+	this->gpu_ptr = ptr;
 }
 Texture* Texture::install_system(const std::string& path)
 {

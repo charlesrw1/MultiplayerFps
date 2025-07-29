@@ -18,8 +18,7 @@ ShadowMapAtlas::ShadowMapAtlas() {
 	args.format = GraphicsTextureFormat::depth32f;
 	args.type = GraphicsTextureType::t2D;
 	args.sampler_type = GraphicsSamplerType::AtlasShadowmap;
-	if (atlas)
-		atlas->release();
+	safe_release(atlas);
 	atlas = IGraphicsDevice::inst->create_texture(args);
 
 	//glDeleteTextures(1, &atlas_texture);
@@ -32,7 +31,7 @@ ShadowMapAtlas::ShadowMapAtlas() {
 	//glTextureParameteri(atlas_texture, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 	//glTextureParameteri(atlas_texture, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 
-	vtsHandle->update_specs_ptr(atlas, size, size, 1, {});
+	vtsHandle->update_specs_ptr(atlas);
 
 	// add the rects
 	const int subCount = 4;

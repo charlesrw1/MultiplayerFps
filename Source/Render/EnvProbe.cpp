@@ -99,12 +99,15 @@ void EnviornmentMapHelper::compute_specular_new(
     Texture* t	// in-out cubemap, scene drawn to mip level 0
 )
 {
+    const uint32_t temp_id = t->gpu_ptr->get_internal_handle();
+    const glm::ivec2 size_vec = t->gpu_ptr->get_size();
+
     assert(t);
-    int size = t->width;
+    int size = size_vec.x;
     const int num_mips = Texture::get_mip_map_count(size, size);
 
-    glTextureParameteri(t->gl_id, GL_TEXTURE_BASE_LEVEL, 0);
-    glTextureParameteri(t->gl_id, GL_TEXTURE_MAX_LEVEL, 0);
+    glTextureParameteri(temp_id, GL_TEXTURE_BASE_LEVEL, 0);
+    glTextureParameteri(temp_id, GL_TEXTURE_MAX_LEVEL, 0);
 
 
     //*glDepthMask(GL_FALSE);
@@ -135,7 +138,7 @@ void EnviornmentMapHelper::compute_specular_new(
 
 
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, t->gl_id);   // bind texture, mip reading is limited to highest
+        glBindTexture(GL_TEXTURE_CUBE_MAP, temp_id);   // bind texture, mip reading is limited to highest
 
         //*prefilter_specular_new.use();
 
@@ -167,8 +170,8 @@ void EnviornmentMapHelper::compute_specular_new(
         }
     }
 
-    glTextureParameteri(t->gl_id, GL_TEXTURE_BASE_LEVEL, 0);
-    glTextureParameteri(t->gl_id, GL_TEXTURE_MAX_LEVEL, num_mips);
+    glTextureParameteri(temp_id, GL_TEXTURE_BASE_LEVEL, 0);
+    glTextureParameteri(temp_id, GL_TEXTURE_MAX_LEVEL, num_mips);
 
    // glDeleteFramebuffers(1, &temp_fbo);
 
@@ -186,6 +189,10 @@ void EnviornmentMapHelper::compute_irradiance_new(Texture* t, // in cubemap, sce
     glm::vec3 ambient_cube[6]		// out 6 vec3s representing irradiance of cubemap
 )
 {
+    const uint32_t temp_id_input = t->gpu_ptr->get_internal_handle();
+    const glm::ivec2 size_vec = t->gpu_ptr->get_size();
+
+
     texhandle temp_tex{};
     const uint32_t irrad_size = 16;
 
@@ -201,7 +208,7 @@ void EnviornmentMapHelper::compute_irradiance_new(Texture* t, // in cubemap, sce
    //* prefilter_irradiance.use();
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, t->gl_id);   // bind the read cubemap, mip0 is the original scene render
+    glBindTexture(GL_TEXTURE_CUBE_MAP, temp_id_input);   // bind the read cubemap, mip0 is the original scene render
 
     fbohandle temp_fbo{};
     glCreateFramebuffers(1, &temp_fbo);
@@ -321,7 +328,7 @@ void BRDFIntegration::drawdebug()
     s.use();
     Texture* t = mats.find_texture("frog.jpg");
     glCheckError();
-    glBindTexture(GL_TEXTURE_2D, t->gl_id);
+    glBindTexture(GL_TEXTURE_2D, t->get_internal_render_handle());
     glCheckError();
     s.set_mat4("Model", mat4(1));
     glCheckError();

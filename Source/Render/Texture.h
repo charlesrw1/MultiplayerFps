@@ -49,16 +49,16 @@ public:
 	bool load_asset(IAssetLoadingInterface* loading) override;
 	void move_construct(IAsset* src) override;
 
+	glm::ivec2 get_size() const;
+	texhandle get_internal_render_handle() const;
 
-	int width = 0;
-	int height = 0;
-	int channels = 0;
+
 	Texture_Type type = Texture_Type::TEXTYPE_2D;
 	Texture_Format format{};
 	bool no_filtering = false;
 	bool has_mips = false;
 	bool is_float = false;
-	texhandle gl_id = 0;
+
 	IGraphicsTexture* gpu_ptr = nullptr;
 
 #ifdef EDITOR_BUILD
@@ -67,14 +67,7 @@ public:
 #endif
 
 	// used for system textures
-	void update_specs(texhandle handle, int w, int h, int channels, Texture_Format fmt) {
-		this->gl_id = handle;
-		this->width = w;
-		this->height = h;
-		this->channels = channels;
-		this->format = fmt;
-	}
-	void update_specs_ptr(IGraphicsTexture* ptr, int w, int h, int channels, Texture_Format fmt);
+	void update_specs_ptr(IGraphicsTexture* ptr);
 
 	static Texture* install_system(const std::string& path);
 	static int get_mip_map_count(int width, int height){

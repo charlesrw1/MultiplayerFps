@@ -1047,7 +1047,7 @@ void EditorDoc::imgui_draw()
 void EditorDoc::hook_pre_scene_viewport_draw()
 {
 	auto get_icon = [](std::string str) -> ImTextureID {
-		return ImTextureID(uint64_t(g_assets.find_global_sync<Texture>("eng/editor/" + str).get()->gl_id));
+		return ImTextureID(uint64_t(g_assets.find_global_sync<Texture>("eng/editor/" + str).get()->get_internal_render_handle()));
 	};
 	auto magnet_on = get_icon("magnet_on.png");
 	auto magnet_off = get_icon("magnet_off.png");
@@ -1297,7 +1297,7 @@ void EdPropertyGrid::draw_components(Entity* entity)
 		if (*s) {
 			auto tex = g_assets.find_global_sync<Texture>(s);
 			if (tex) {
-				ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
+				my_imgui_image(tex, -1);
 				ImGui::SameLine(0, 0);
 			}
 		}
@@ -1402,7 +1402,7 @@ void EdPropertyGrid::draw()
 						if (*s) {
 							auto tex = g_assets.find_global_sync<Texture>(s);
 							if (tex) {
-								ImGui::Image(ImTextureID(uint64_t(tex->gl_id)), ImVec2(tex->width, tex->height));
+								my_imgui_image(tex, -1);
 								ImGui::SameLine(0, 0);
 							}
 						}

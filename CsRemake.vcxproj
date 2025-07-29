@@ -64,10 +64,10 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
+    <ClCompile Include="Source\Framework\GlBufferLock.cpp" />
     <ClCompile Include="Source\Framework\Jobs.cpp" />
     <ClCompile Include="Source\Framework\MeshBuilder.cpp" />
     <ClCompile Include="Source\Framework\MyImguiLib.cpp" />
-    <ClCompile Include="Source\Framework\PersistentlyMappedBuffer.cpp" />
     <ClCompile Include="Source\Framework\Profilier.cpp" />
     <ClCompile Include="Source\Framework\PropertyEd.cpp" />
     <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
@@ -182,6 +182,7 @@
     <ClInclude Include="Source\Framework\ClassTypeInfo.h" />
     <ClInclude Include="Source\Framework\ConsoleCmdGroup.h" />
     <ClInclude Include="Source\Framework\FnFactory.h" />
+    <ClInclude Include="Source\Framework\GlBufferLock.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
     <ClInclude Include="Source\Framework\Log.h" />
     <ClInclude Include="Source\Framework\LuaColor.h" />
@@ -294,7 +295,6 @@
     <ClInclude Include="Source\Framework\MeshBuilder.h" />
     <ClInclude Include="Source\Framework\MulticastDelegate.h" />
     <ClInclude Include="Source\Framework\MyImguiLib.h" />
-    <ClInclude Include="Source\Framework\PersistentlyMappedBuffer.h" />
     <ClInclude Include="Source\Framework\PoolAllocator.h" />
     <ClInclude Include="Source\Framework\PropertyEd.h" />
     <ClInclude Include="Source\Framework\Rect2d.h" />

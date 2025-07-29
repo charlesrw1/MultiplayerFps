@@ -125,7 +125,7 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 			//	ImGui::TreePop();
 			ImGui::SameLine();
 			auto t = node->folder_is_open ? b->folder_open : b->folder_closed;
-			ImGui::Image(ImTextureID(uint64_t(t->gl_id)), ImVec2(t->width, t->height));
+			my_imgui_image(t, -1);
 			ImGui::SameLine();
 			ImGui::Text(node->name.c_str());
 
@@ -264,10 +264,10 @@ void AssetBrowser::draw_browser_grid() {
 			ImGui::TableNextColumn();
 
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-		//	ImGui::ImageButton(ImTextureID(uint64_t(t->gl_id)), ImVec2(64, 64),ImVec2(0, 1), ImVec2(1, 0));
+		//	ImGui::ImageButton(ImTextureID(uint64_t(t->get_internal_render_handle())), ImVec2(64, 64),ImVec2(0, 1), ImVec2(1, 0));
 			string only_filename = c->asset.filename;
 			StringUtils::get_filename(only_filename);
-			ImageButtonWithOverlayText(ImTextureID(uint64_t(t->gl_id)), ImVec2(64, 64), only_filename.c_str());
+			ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())), ImVec2(64, 64), only_filename.c_str());
 			ImGui::PopStyleColor();
 			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
 			{

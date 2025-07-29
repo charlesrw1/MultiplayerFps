@@ -183,10 +183,11 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	this->width = width;
 	this->height = height;
 
-	texture.blur_vts_handle->update_specs(texture.result, width, height, 2, {});
-	texture.result_vts_handle->update_specs(texture.blur, width, height, 2, {});
-	texture.view_normal_vts_handle->update_specs(texture.viewnormal, width, height, 4, {});
-	texture.linear_depth_vts_handle->update_specs(texture.depthlinear, width, height, 4, {});
+	// FIXME
+	//texture.blur_vts_handle->update_specs(texture.result, width, height, 2, {});
+	//texture.result_vts_handle->update_specs(texture.blur, width, height, 2, {});
+	//texture.view_normal_vts_handle->update_specs(texture.viewnormal, width, height, 4, {});
+	//texture.linear_depth_vts_handle->update_specs(texture.depthlinear, width, height, 4, {});
 }
 
 #define USE_AO_LAYERED_SINGLEPASS 2

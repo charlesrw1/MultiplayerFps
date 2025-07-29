@@ -49,16 +49,14 @@ void CascadeShadowMapSystem::make_csm_rendertargets()
 	args.depth_3d = 4;
 	args.num_mip_maps = 1;
 	args.sampler_type = GraphicsSamplerType::CsmShadowmap;
-
-	if (texture.shadow_array)
-		texture.shadow_array->release();
+	safe_release(texture.shadow_array);
 	texture.shadow_array = IGraphicsDevice::inst->create_texture(args);
 
 	//glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.shadow_array);
 	//glTextureStorage3D(texture.shadow_array, 1, GL_DEPTH_COMPONENT32F, csm_resolution, csm_resolution, 4);
 
 
-	texture.shadow_vts_handle->update_specs_ptr(texture.shadow_array, csm_resolution, csm_resolution, 1, {});
+	texture.shadow_vts_handle->update_specs_ptr(texture.shadow_array);
 }
 
 

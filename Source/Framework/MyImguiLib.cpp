@@ -132,8 +132,27 @@ bool MyImDrawBlendSpace(
 }
 
 #include "IEditorTool.h"
-
+#include "Render/Texture.h"
 #ifdef EDITOR_BUILD
+bool my_imgui_image_button(const Texture* t, int size)
+{
+    ImVec2 sz_to_use(size, size);
+    if (size == -1) {
+        auto s = t->get_size();
+        sz_to_use = ImVec2(s.x, s.y);
+    }
+
+    return (ImGui::ImageButton(ImTextureID(uint64_t(t->get_internal_render_handle())), sz_to_use));
+}
+void my_imgui_image(const Texture* t, int size)
+{
+    ImVec2 sz_to_use(size, size);
+    if (size == -1) {
+        auto s = t->get_size();
+        sz_to_use = ImVec2(s.x, s.y);
+    }
+    ImGui::Image(ImTextureID(uint64_t(t->get_internal_render_handle())), sz_to_use);
+}
 ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags dockspace_flags,IEditorTool* tool, const ImGuiWindowClass* window_class)
 {
     using namespace ImGui;

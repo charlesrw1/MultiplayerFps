@@ -68,8 +68,9 @@ void RenderWindow::draw(RectangleShape rect_shape)
 
 static void get_uvs(glm::vec2& top_left, glm::vec2& sz, int x, int y, int w, int h, const GuiFont* f)
 {
-	const int tw = f->font_texture->width;
-	const int th = f->font_texture->height;
+	auto size = f->font_texture->get_size();
+	const int tw = size.x;
+	const int th = size.y;
 	const float wf = w / (float)tw;
 	const float hf = h / (float)th;
 	const float xf = x / (float)tw;

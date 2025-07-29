@@ -168,7 +168,7 @@ bool EntityPtrAssetEditor::internal_update() {
 
 	ImGui::PushStyleColor(ImGuiCol_Button, color32_to_imvec4({ 51, 10, 74,200 }));
 	auto eyedropper = g_assets.find_global_sync<Texture>("eng/icon/eyedrop.png");
-	if (ImGui::ImageButton((ImTextureID)uint64_t(eyedropper->gl_id), ImVec2(16, 16))) {
+	if(my_imgui_image_button(eyedropper,16)){
 		editor.enable_entity_eyedropper_mode(this);
 	}
 	ImGui::PopStyleColor();

@@ -359,7 +359,16 @@ public:
 		}
 		return false;
 	}
-
+	glm::ivec2 get_size() const override {
+		return { width,height };
+	}
+	GraphicsTextureFormat get_texture_format() const override {
+		return my_fmt;
+	}
+	GraphicsTextureType get_texture_type() const override {
+		return my_type;
+	}
+	GraphicsTextureType my_type{};
 	GraphicsTextureFormat my_fmt{};
 	GLenum internal_format_gl{};
 	int width = 0;
@@ -644,9 +653,9 @@ public:
 	void draw_elements(int ofs, int count) override
 	{
 	}
-	void multidraw_elements_indirect(IGraphicsBuffer* buffer, int ofs, int count) override
+	void multi_draw_elements_indirect(IGraphicsBuffer* buffer, int ofs, int count) override
 	{
-
+		
 	}
 	void bind_storage_buffers(int start, std::span<IGraphicsBuffer* const> buffers) override
 	{

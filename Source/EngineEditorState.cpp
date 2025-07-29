@@ -8,7 +8,7 @@
 #include "Framework/Config.h"
 #include "EngineSystemCommands.h"
 #include "Game/LevelAssets.h"
-
+#include "Framework/MyImguiLib.h"
 EditorState::EditorState(){
 	this->redCrossIcon = g_assets.find_sync<Texture>("eng/editor/red_cross.png", true).get();// [&](GenericAssetPtr ptr) {
 }
@@ -112,9 +112,8 @@ void EditorState::draw_tab_window()
 				ImGui::Text(t.assetName.c_str());
 				ImGui::TableNextColumn();
 				if (redCrossIcon) {
-					const int sz = redCrossIcon->width;
 					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5, 0.5, 0.5, 1));
-					if(ImGui::ImageButton(ImTextureID(uintptr_t(redCrossIcon->gl_id)), ImVec2(sz, sz))) {
+					if(my_imgui_image_button(redCrossIcon,-1)){//if(ImGui::ImageButton(ImTextureID(uintptr_t(redCrossIcon->get_internal_render_handle())), ImVec2(sz, sz))) {
 
 					}
 					ImGui::PopStyleColor();

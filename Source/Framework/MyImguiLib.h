@@ -26,5 +26,10 @@ namespace ImGui {
 		const ImVec2& rangeMax = ImVec2(1, 1));
 };
 
+class Texture;
+bool my_imgui_image_button(const Texture* t, int size);
+void my_imgui_image(const Texture* t, int size);
+
+
 class IEditorTool;
 ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags dockspace_flags, IEditorTool* tool, const ImGuiWindowClass* window_class = nullptr);

@@ -48,13 +48,13 @@ enum class VertexInputIndexType : int8_t {
 	uint32
 };
 
-enum class GraphicsTextureType {
+enum class GraphicsTextureType : int8_t {
 	t2D,
 	t2DArray,
 	t3D,
 	tCubemap,
 };
-enum class GraphicsTextureFormat {
+enum class GraphicsTextureFormat : int8_t {
 	r8,
 	rg8,
 	rgb8,
@@ -88,14 +88,24 @@ enum class GraphicsTextureEdge : int8_t {
 };
 
 
+template<typename T>
+inline void safe_release(T*& ptr) {
+	if (ptr) {
+		ptr->release();
+		ptr = nullptr;
+	}
+}
+
 class IGraphicsTexture {
 public:
 	virtual ~IGraphicsTexture() {}
 	virtual void sub_image_upload(int layer, int x, int y, int w, int h, int size, const void* data) = 0;
 	virtual void release() = 0;
-
 	virtual uint32_t get_internal_handle() = 0;
 
+	virtual glm::ivec2 get_size() const = 0;
+	virtual GraphicsTextureFormat get_texture_format() const = 0;
+	virtual GraphicsTextureType get_texture_type() const = 0;
 };
 
 // used for vertex,index,uniform, and shader storage buffers
@@ -275,7 +285,7 @@ public:
 
 	virtual void draw_arrays(int offset, int count) = 0;
 	virtual void draw_elements(int offset, int count) = 0;
-	virtual void multidraw_elements_indirect(IGraphicsBuffer* buffer, int offset, int count) = 0;
+	virtual void multi_draw_elements_indirect(IGraphicsBuffer* buffer, int offset, int count) = 0;
 
 	virtual void bind_storage_buffers(int start, std::span<IGraphicsBuffer* const> buffers) = 0;
 	virtual void bind_textures(int start, std::span<IGraphicsTexture* const> textures) = 0;

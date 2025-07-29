@@ -278,6 +278,10 @@ public:
 	void clear_framebuffer(bool clear_depth, bool clear_color, float depth_value = 0.f);
 
 	void bind_texture(int bind, int id);
+	void bind_texture_ptr(int bind, IGraphicsTexture* ptr) {
+		if(ptr)
+			bind_texture(bind, ptr->get_internal_handle());
+	}
 	void set_shader(program_handle handle);
 private:
 	void set_vao(vertexarrayhandle vao);
@@ -435,9 +439,9 @@ public:
 	Memory_Arena& get_arena() { return mem_arena; }
 	
 	// default textuers
-	Texture white_texture;
-	Texture black_texture;
-	Texture flat_normal_texture;
+	IGraphicsTexture* white_texture{};
+	IGraphicsTexture* black_texture{};
+	IGraphicsTexture* flat_normal_texture{};
 
 	struct programs
 	{
@@ -567,8 +571,8 @@ public:
 	void bind_vao(uint32_t vao);
 	void bind_texture(int bind, int id);
 	void bind_texture_ptr(int bind, IGraphicsTexture* ptr) {
-		assert(ptr);
-		bind_texture(bind, ptr->get_internal_handle());
+		if(ptr)
+			bind_texture(bind, ptr->get_internal_handle());
 	}
 
 	void set_shader(program_handle handle);

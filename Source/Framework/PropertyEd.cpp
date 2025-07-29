@@ -3,6 +3,7 @@
 #include "imgui.h"
 #include "Assets/AssetDatabase.h"
 #include "FnFactory.h"
+#include "MyImguiLib.h"
 
 static uint32_t color32_to_uint(Color32 color) {
 	return *(uint32_t*)&color;
@@ -267,7 +268,7 @@ void IGridRow::update(PropertyGrid* parentGrid,float header_ofs)
 		if (has_reset_button())
 		{
 			auto reset_img = g_assets.find_global_sync<Texture>("eng/icon/undo.png");
-			if (ImGui::ImageButton(ImTextureID(uint64_t(reset_img->gl_id)), ImVec2(14, 14))) {
+			if (my_imgui_image_button(reset_img, 14)) {
 				on_reset();
 				parentGrid->set_rows_had_changes();
 			}
@@ -637,7 +638,7 @@ bool ArrayRow::draw_row_controls()
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
 
 #pragma warning(disable : 4312)
-	if (ImGui::ImageButton(ImTextureID(addimg->gl_id), ImVec2(16, 16))) {
+	if (my_imgui_image_button(addimg, 16)) {
 		ret = true;
 		clear_children();
 		prop->list_ptr->resize(list_instance_ptr, prop->list_ptr->get_size(list_instance_ptr) + 1);	// might invalidate childrens ptrs, so refresh
@@ -648,7 +649,7 @@ bool ArrayRow::draw_row_controls()
 
 	if (!header || header->has_delete_all()) {
 		ImGui::BeginDisabled(child_rows.empty());
-		if (ImGui::ImageButton(ImTextureID(trashimg->gl_id), ImVec2(16, 16))) {
+		if (my_imgui_image_button(trashimg, 16)) {
 			ret = true;
 			clear_children();
 			prop->list_ptr->resize(list_instance_ptr, 0);
@@ -660,12 +661,12 @@ bool ArrayRow::draw_row_controls()
 	set_next_state = next_state::keep;
 
 	if (are_any_open) {
-		if (ImGui::ImageButton(ImTextureID(visible_icon->gl_id), ImVec2(16, 16))) {
+		if (my_imgui_image_button(visible_icon, 16)) {
 			set_next_state = next_state::hidden;
 		}
 	}
 	else {
-		if (ImGui::ImageButton(ImTextureID(hidden_icon->gl_id), ImVec2(16, 16))) {
+		if(my_imgui_image_button(hidden_icon,16)) {
 			set_next_state = next_state::visible;
 		}
 	}
@@ -929,18 +930,18 @@ bool ArrayRow::draw_row_controls()
 
 #pragma warning(disable : 4312)
 	 ImGui::BeginDisabled(!canmoveup);
-	 if (ImGui::ImageButton((ImTextureID)moveup->gl_id, ImVec2(16, 16))) {
+	 if(my_imgui_image_button(moveup,16)) {
 		 array_->moveup_index(row_index);
 	 }
 	 ImGui::EndDisabled();
 	 ImGui::SameLine();
 	 ImGui::BeginDisabled(!canmovedown);
-	 if (ImGui::ImageButton((ImTextureID)movedown->gl_id, ImVec2(16, 16))) {
+	 if (my_imgui_image_button(movedown, 16)) {
 		 array_->movedown_index(row_index);
 	 }
 	 ImGui::EndDisabled();
 	 ImGui::SameLine();
-	 if (ImGui::ImageButton((ImTextureID)trash1->gl_id, ImVec2(16, 16))) {
+	 if (my_imgui_image_button(trash1, 16)) {
 		 array_->delete_index(row_index);
 	 }
 

@@ -231,9 +231,6 @@
     <ClInclude Include="Source\LevelEditor\EditorDocLocal.h">
       <Filter>Source\LevelEditor</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\PersistentlyMappedBuffer.h">
-      <Filter>Source\Framework\Render</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Framework\MeshBuilder.h">
       <Filter>Source\Framework\Render</Filter>
     </ClInclude>
@@ -478,6 +475,7 @@
     <ClInclude Include="Source\Game\Components\RagdollComponent.h" />
     <ClInclude Include="Source\LevelEditor\EditorStatic.h" />
     <ClInclude Include="Source\Render\IGraphsDevice.h" />
+    <ClInclude Include="Source\Framework\GlBufferLock.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -600,7 +598,6 @@
     <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
     <ClCompile Include="Source\Framework\PropertyEd.cpp" />
     <ClCompile Include="Source\Framework\Profilier.cpp" />
-    <ClCompile Include="Source\Framework\PersistentlyMappedBuffer.cpp" />
     <ClCompile Include="Source\Framework\MyImguiLib.cpp" />
     <ClCompile Include="Source\Framework\MeshBuilder.cpp" />
     <ClCompile Include="Source\Framework\Jobs.cpp" />
@@ -640,6 +637,7 @@
     <ClCompile Include="Source\UI\GUISystemPublic.cpp" />
     <ClCompile Include="Source\Game\Components\RagdollComponent.cpp" />
     <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
+    <ClCompile Include="Source\Framework\GlBufferLock.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
