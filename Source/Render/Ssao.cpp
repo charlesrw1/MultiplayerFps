@@ -78,7 +78,7 @@ Shader make_program(const char* vert, const char* frag, const std::string& defin
 void SSAO_System::reload_shaders()
 {
 	auto& prog_man = draw.get_prog_man();
-	prog.hbao_calc= prog_man.create_raster_geo( "fullscreenquad.txt", "hbao/hbao.txt", "hbao/hbaoG.txt", {});
+	prog.hbao_calc= prog_man.create_raster( "fullscreenquad.txt", "hbao/hbao.txt");
 	prog.hbao_blur = prog_man.create_raster("fullscreenquad.txt", "hbao/hbaoblur.txt");
 	prog.hbao_deinterleave = prog_man.create_raster("fullscreenquad.txt", "hbao/hbaodeinterleave.txt");
 	prog.hbao_reinterleave = prog_man.create_raster("fullscreenquad.txt", "hbao/hbaoreinterleave.txt");
@@ -185,7 +185,7 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	glTextureParameteri(texture.resultarray, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	glCreateFramebuffers(1, &fbo.hbao2_calc);
-	glNamedFramebufferTexture(fbo.hbao2_calc, GL_COLOR_ATTACHMENT0, texture.resultarray, 0);
+	//glNamedFramebufferTexture(fbo.hbao2_calc, GL_COLOR_ATTACHMENT0, texture.resultarray, 0);
 
 	// render viewspace normals and linear depth
 	// deinterleave
@@ -389,16 +389,21 @@ void SSAO_System::render()
 		device.set_pipeline(state);
 		auto shader = device.shader();
 
-		//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_calc);
-		//*glViewport(0, 0, quarterWidth, quarterHeight);
-		glBindTextureUnit(0, texture.deptharray);
-		glBindTextureUnit(1, texture.viewnormal);
+		for (int i = 0; i < RANDOM_ELEMENTS; i++) {
+			shader.set_uint("primitive_id_custom", i);
+			glNamedFramebufferTextureLayer(fbo.hbao2_calc, GL_COLOR_ATTACHMENT0, texture.resultarray, 0, i);
 
-		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.data);
+			//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_calc);
+			//*glViewport(0, 0, quarterWidth, quarterHeight);
+			glBindTextureUnit(0, texture.deptharray);
+			glBindTextureUnit(1, texture.viewnormal);
 
-		//prog.hbao_calc.use();
+			glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.data);
 
-		glDrawArrays(GL_TRIANGLES, 0, 3 * RANDOM_ELEMENTS);
+			//prog.hbao_calc.use();
+
+			glDrawArrays(GL_TRIANGLES, 0, 3);
+		}
 	}
 
 	{

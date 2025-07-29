@@ -192,7 +192,8 @@ enum class GraphicsSamplerType {
 	NearestDefault,
 	NearestClamped,
 	LinearClamped,
-	Shadowmap
+	CsmShadowmap,
+	AtlasShadowmap,
 };
 
 

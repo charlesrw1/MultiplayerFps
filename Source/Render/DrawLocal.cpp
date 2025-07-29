@@ -2860,7 +2860,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		bind_texture_ptr(1, tex.scene_gbuffer1);
 		bind_texture_ptr(2, tex.scene_gbuffer2);
 		bind_texture_ptr(3, tex.scene_depth);
-		bind_texture(4, draw.shadowmap.texture.shadow_array);
+		bind_texture_ptr(4, draw.shadowmap.texture.shadow_array);
 		glBindBufferBase(GL_UNIFORM_BUFFER, 8, draw.shadowmap.ubo.info);
 
 		shader().set_vec3("uSunDirection", sun_internal->sun.direction);

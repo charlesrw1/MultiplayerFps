@@ -41,20 +41,26 @@ void CascadeShadowMapSystem::make_csm_rendertargets()
 	tweak.quality = 3;
 	csm_resolution = csm_resolutions[(int)tweak.quality];
 
-	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.shadow_array);
-	glTextureStorage3D(texture.shadow_array, 1, GL_DEPTH_COMPONENT32F, csm_resolution, csm_resolution, 4);
-	glTextureParameteri(texture.shadow_array, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTextureParameteri(texture.shadow_array, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTextureParameteri(texture.shadow_array, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-	glTextureParameteri(texture.shadow_array, GL_TEXTURE_COMPARE_FUNC, GL_GREATER);
-	glTextureParameteri(texture.shadow_array, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTextureParameteri(texture.shadow_array, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
-	float bordercolor[] = { 1.0,1.0,1.0,1.0 };
-	glTextureParameterfv(texture.shadow_array, GL_TEXTURE_BORDER_COLOR, bordercolor);
+	CreateTextureArgs args;
+	args.format = GraphicsTextureFormat::depth32f;
+	args.type = GraphicsTextureType::t2DArray;
+	args.width = csm_resolution;
+	args.height = csm_resolution;
+	args.depth_3d = 4;
+	args.num_mip_maps = 1;
+	args.sampler_type = GraphicsSamplerType::CsmShadowmap;
+
+	if (texture.shadow_array)
+		texture.shadow_array->release();
+	texture.shadow_array = IGraphicsDevice::inst->create_texture(args);
+
+	//glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.shadow_array);
+	//glTextureStorage3D(texture.shadow_array, 1, GL_DEPTH_COMPONENT32F, csm_resolution, csm_resolution, 4);
+
 
 	glCreateFramebuffers(1, &fbo.shadow);
 
-	texture.shadow_vts_handle->update_specs(texture.shadow_array, csm_resolution, csm_resolution, 1, {});
+	texture.shadow_vts_handle->update_specs_ptr(texture.shadow_array, csm_resolution, csm_resolution, 1, {});
 }
 
 
@@ -90,7 +96,6 @@ void CascadeShadowMapSystem::update()
 	//}
 
 	if (targets_dirty) {
-		glDeleteTextures(1, &texture.shadow_array);
 		glDeleteFramebuffers(1, &fbo.shadow);
 		make_csm_rendertargets();
 		targets_dirty = false;
@@ -148,7 +153,7 @@ void CascadeShadowMapSystem::update()
 
 		for (int i = 0; i < 4; i++) {
 
-			glNamedFramebufferTextureLayer(fbo.shadow, GL_DEPTH_ATTACHMENT, texture.shadow_array, 0, i);
+			glNamedFramebufferTextureLayer(fbo.shadow, GL_DEPTH_ATTACHMENT, texture.shadow_array->get_internal_handle(), 0, i);
 
 			device.set_viewport(0, 0, csm_resolution, csm_resolution);
 			device.clear_framebuffer(true, true, 1.f/* depth value of 1.f to clear*/);

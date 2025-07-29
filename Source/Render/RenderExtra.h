@@ -69,7 +69,7 @@ private:
 	};
 	std::vector<Available> rects;
 	glm::ivec2 atlas_size = { 0,0 };
-	texhandle atlas_texture=0;
+	IGraphicsTexture* atlas = nullptr;
 	Texture* vtsHandle = nullptr;
 };
 #include "Render_Light.h"
@@ -111,7 +111,7 @@ public:
 	}fbo;
 
 	struct textures {
-		texhandle shadow_array;
+		IGraphicsTexture* shadow_array=nullptr;
 
 		Texture* shadow_vts_handle = nullptr;
 	}texture;

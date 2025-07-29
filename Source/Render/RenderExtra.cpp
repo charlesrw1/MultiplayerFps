@@ -11,17 +11,28 @@ ShadowMapAtlas::ShadowMapAtlas() {
 	vtsHandle = Texture::install_system("_spto_shadow");
 	vtsHandle->type = Texture_Type::TEXTYPE_2D;
 
-	glDeleteTextures(1, &atlas_texture);
-	glCreateTextures(GL_TEXTURE_2D, 1, &atlas_texture);
-	glTextureStorage2D(atlas_texture, 1, GL_DEPTH_COMPONENT32F, size, size);
-	glTextureParameteri(atlas_texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTextureParameteri(atlas_texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTextureParameteri(atlas_texture, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
-	glTextureParameteri(atlas_texture, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
-	glTextureParameteri(atlas_texture, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
-	glTextureParameteri(atlas_texture, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	CreateTextureArgs args;
+	args.width = size;
+	args.height = size;
+	args.num_mip_maps = 1;
+	args.format = GraphicsTextureFormat::depth32f;
+	args.type = GraphicsTextureType::t2D;
+	args.sampler_type = GraphicsSamplerType::AtlasShadowmap;
+	if (atlas)
+		atlas->release();
+	atlas = IGraphicsDevice::inst->create_texture(args);
 
-	vtsHandle->update_specs(atlas_texture, size, size, 1, {});
+	//glDeleteTextures(1, &atlas_texture);
+	//glCreateTextures(GL_TEXTURE_2D, 1, &atlas_texture);
+	//glTextureStorage2D(atlas_texture, 1, GL_DEPTH_COMPONENT32F, size, size);
+	//glTextureParameteri(atlas_texture, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	//glTextureParameteri(atlas_texture, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glTextureParameteri(atlas_texture, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+	//glTextureParameteri(atlas_texture, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
+	//glTextureParameteri(atlas_texture, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	//glTextureParameteri(atlas_texture, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+	vtsHandle->update_specs_ptr(atlas, size, size, 1, {});
 
 	// add the rects
 	const int subCount = 4;
@@ -65,7 +76,7 @@ Rect2d ShadowMapAtlas::get_atlas_rect(int handle) {
 }
 
 texhandle ShadowMapAtlas::get_atlas_texture() {
-	return atlas_texture;
+	return atlas->get_internal_handle();
 }
 
 ShadowMapManager::ShadowMapManager()

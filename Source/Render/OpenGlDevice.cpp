@@ -246,7 +246,12 @@ public:
 		const int y = args.height;
 		my_fmt = args.format;
 		internal_format_gl = to_format(args.format);
-		glTextureStorage2D(id, args.num_mip_maps, internal_format_gl, x, y);
+		if (args.type == GraphicsTextureType::t2DArray) {
+			glTextureStorage3D(id, args.num_mip_maps, internal_format_gl, x, y,args.depth_3d);
+		}
+		else {
+			glTextureStorage2D(id, args.num_mip_maps, internal_format_gl, x, y);
+		}
 
 		switch (args.sampler_type)
 		{
@@ -275,8 +280,23 @@ public:
 			glTextureParameteri(id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 			break;
-		case GraphicsSamplerType::Shadowmap:
-			break;
+		case GraphicsSamplerType::CsmShadowmap: {
+			glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTextureParameteri(id, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+			glTextureParameteri(id, GL_TEXTURE_COMPARE_FUNC, GL_GREATER);
+			glTextureParameteri(id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+			glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+			float bordercolor[] = { 1.0,1.0,1.0,1.0 };
+			glTextureParameterfv(id, GL_TEXTURE_BORDER_COLOR, bordercolor);
+		}break;
+		case GraphicsSamplerType::AtlasShadowmap: 
+			glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTextureParameteri(id, GL_TEXTURE_COMPARE_MODE, GL_COMPARE_REF_TO_TEXTURE);
+			glTextureParameteri(id, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
+			glTextureParameteri(id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+			glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 		default:
 			break;
 		}
