@@ -3448,6 +3448,21 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		RenderPassSetup setup("gbuffer", fbo.gbuffer, clear_framebuffer,clear_framebuffer, 0, 0, view_to_use.width, view_to_use.height);
 		auto scope = device.start_render_pass(setup);
 
+		RenderPassState setup2;
+		auto color_targets = {
+			ColorTargetInfo(tex.scene_gbuffer0),
+			ColorTargetInfo(tex.scene_gbuffer1),
+			ColorTargetInfo(tex.scene_gbuffer2),
+			ColorTargetInfo(tex.scene_color),
+			ColorTargetInfo(tex.editor_id_buffer),
+			ColorTargetInfo(tex.scene_motion),
+		};
+		setup2.color_infos = color_targets;
+		setup2.depth_info = tex.scene_depth;
+		setup2.set_clear_both(clear_framebuffer);
+		IGraphicsDevice::inst->set_render_pass(setup2);
+		IGraphicsDevice::inst->end_render_pass();
+
 		{
 			GPUSCOPESTART(GbufferPass);
 

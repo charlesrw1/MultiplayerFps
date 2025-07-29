@@ -105,10 +105,6 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 		glDeleteTextures(1, &texture.deptharray);
 
 
-		for (int i = 0; i < RANDOM_ELEMENTS; i++) {
-			glDeleteTextures(1, &texture.depthview[i]);
-		}
-
 		glDeleteTextures(1, &texture.resultarray);
 
 
@@ -166,16 +162,7 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	glTextureParameteri(texture.deptharray, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTextureParameteri(texture.deptharray, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	for (int i = 0; i < RANDOM_ELEMENTS; i++) {
-		glGenTextures(1, &texture.depthview[i]);
-		glTextureView(texture.depthview[i], GL_TEXTURE_2D, texture.deptharray, GL_R32F, 0, 1, i, 1);
-		glBindTexture(GL_TEXTURE_2D, texture.depthview[i]);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	}
-
+	
 
 	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.resultarray);
 	glTextureStorage3D(texture.resultarray, 1, GL_RG16F, quarterWidth, quarterHeight, RANDOM_ELEMENTS);
@@ -371,8 +358,12 @@ void SSAO_System::render()
 				data.InvFullResolution.y
 			));
 
-			for (int layer = 0; layer < NUM_MRT; layer++)
-				glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, texture.depthview[i + layer], 0);
+			for (int layer = 0; layer < NUM_MRT; layer++) {
+				glNamedFramebufferTextureLayer(fbo.hbao2_deinterleave, GL_COLOR_ATTACHMENT0 + layer,
+					texture.deptharray, 0, i+layer);
+			}
+				//glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, texture.depthview[i + layer], 0);
+			
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 		}
 	}

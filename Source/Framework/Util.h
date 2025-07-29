@@ -9,6 +9,7 @@ void handle_assert_internal(const char* msg);
 	do { if(!(x)) {	\
 		handle_assert_internal(#x); \
 	} }while (0);
+
 #else
 #define ASSERT(x)
 #endif

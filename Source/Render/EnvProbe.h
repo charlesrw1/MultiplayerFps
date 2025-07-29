@@ -5,7 +5,7 @@
 #include "Framework/Util.h"
 #include <string>
 #include "Texture.h"
-
+#include "IGraphsDevice.h"
 class EnvCubemap
 {
 public:
@@ -65,6 +65,9 @@ private:
 
 	uint32_t fbo,rbo;
 	uint32_t vbo, vao;
+
+	IGraphicsBuffer* vertex_buffer{};
+	IGraphicsVertexInput* vertex_input{};
 };
 
 

@@ -204,7 +204,8 @@ public:
 		case GraphicsTextureFormat::depth24stencil8: return GL_DEPTH24_STENCIL8;
 			break;
 		case GraphicsTextureFormat::r11f_g11f_b10f: return GL_R11F_G11F_B10F;
-		default:
+			break;
+		case GraphicsTextureFormat::rgba16_snorm: return GL_RGBA16_SNORM;
 			break;
 		}
 		ASSERT(0&&"OpenGLTextureImpl: unknown texture format");
@@ -219,8 +220,7 @@ public:
 			break;
 		case GraphicsFilterType::MipmapLinear: return GL_LINEAR_MIPMAP_LINEAR;
 			break;
-		default:
-			break;
+
 		}
 		ASSERT(0 && "filter_to_gl not defined");
 		return 0;
@@ -342,6 +342,7 @@ public:
 			gtf::depth24f,
 			gtf::depth32f,
 			gtf::r11f_g11f_b10f,
+			gtf::rgba16_snorm,
 		};
 		for (auto t : types) {
 			if (t == my_fmt) return true;
@@ -482,8 +483,10 @@ public:
 class OpenGLDeviceImpl : public IGraphicsDevice
 {
 public:
-	OpenGLDeviceImpl() {
+	fbohandle shared_framebuffer = 0;
 
+	OpenGLDeviceImpl() {
+		glGenFramebuffers(1, &shared_framebuffer);
 	}
 	~OpenGLDeviceImpl() override {
 
@@ -499,6 +502,34 @@ public:
 	void set_render_pass(const RenderPassState& state) override {
 		assert(!cur_pass.has_value());
 		cur_pass = state;
+
+		glBindFramebuffer(GL_FRAMEBUFFER, shared_framebuffer);
+		for (int i = 0; i < state.color_infos.size(); i++) {
+			const ColorTargetInfo& info = state.color_infos[i];
+			OpenGLTextureImpl* texture = (OpenGLTextureImpl*)info.texture;
+			if (info.layer == -1)
+				glNamedFramebufferTexture(shared_framebuffer, GL_COLOR_ATTACHMENT0 + i, texture->id, info.mip);
+			else
+				glNamedFramebufferTextureLayer(shared_framebuffer, GL_COLOR_ATTACHMENT0 + i, texture->id, info.mip, info.layer);
+
+		}
+
+		const int max_attachments = 32;
+		std::array<unsigned int,max_attachments> gbuffer_attachments;
+		for (int i = 0; i < state.color_infos.size(); i++)
+			gbuffer_attachments[i] = GL_COLOR_ATTACHMENT0 + i;
+		glNamedFramebufferDrawBuffers(shared_framebuffer, state.color_infos.size(), gbuffer_attachments.data());
+
+
+		if (state.depth_info) {
+			OpenGLTextureImpl* texture = (OpenGLTextureImpl*)state.depth_info;
+			glNamedFramebufferTexture(shared_framebuffer, GL_DEPTH_ATTACHMENT, texture->id, state.depth_layer);
+		}
+		else {
+			glNamedFramebufferTexture(shared_framebuffer, GL_DEPTH_ATTACHMENT,0,0);
+		}
+
+
 	}
 	void end_render_pass() override {
 		assert(cur_pass.has_value());

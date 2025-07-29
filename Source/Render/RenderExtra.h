@@ -177,7 +177,6 @@ public:
 		texhandle depthlinear = 0;
 		texhandle deptharray = 0;
 		texhandle resultarray = 0;
-		texhandle depthview[RANDOM_ELEMENTS];
 
 		Texture* result_vts_handle = nullptr;
 		Texture* blur_vts_handle = nullptr;

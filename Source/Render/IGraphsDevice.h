@@ -3,6 +3,7 @@
 #include "MaterialPublic.h"
 #include <span>
 #include <string_view>
+#include <optional>
 enum BindingBits {
 	BINDING_FRAGMENT=1,
 	BINDING_VERTEX=2,
@@ -30,6 +31,7 @@ enum class GraphicsDeviceType {
 	Unknown,
 	OpenGl,
 	Vulkan,
+	Directx11,
 	Directx12,
 	Metal,
 };
@@ -72,6 +74,7 @@ enum class GraphicsTextureFormat {
 	depth32f,
 	depth24stencil8,
 	r11f_g11f_b10f,
+	rgba16_snorm,
 };
 
 enum class GraphicsFilterType : int8_t {
@@ -124,9 +127,28 @@ public:
 };
 
 
+struct ColorTargetInfo {
+	ColorTargetInfo(IGraphicsTexture* texture, int layer = -1, int mip = 0) {
+		assert(texture);
+		this->texture = texture;
+		this->layer = layer;
+		this->mip = mip;
+	}
+
+	IGraphicsTexture* texture = nullptr;
+	int layer = -1;
+	int mip = 0;
+};
+
 struct RenderPassState {
-	std::span<IGraphicsTexture* const> color_infos;
+	std::span<const ColorTargetInfo> color_infos;
 	IGraphicsTexture* depth_info = nullptr;
+	int depth_layer = 0;
+
+	void set_clear_both(bool b) {
+		wants_color_clear = wants_depth_clear = b;
+	}
+
 	bool wants_color_clear = false;
 	bool wants_depth_clear = false;
 	float clear_depth = 0.0;

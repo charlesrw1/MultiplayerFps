@@ -67,7 +67,17 @@ void EnviornmentMapHelper::init()
     -0.5f,  0.5f, -0.5f,
     };
 
-
+    CreateBufferArgs bargs;
+    bargs.flags = BUFFER_USE_AS_VB;
+    vertex_buffer = IGraphicsDevice::inst->create_buffer(bargs);
+    vertex_buffer->upload(cube_verts, sizeof(cube_verts));
+    auto cube_layout = {
+        VertexLayout(0,3,GraphicsVertexAttribType::float32,3 * sizeof(float),0)
+    };
+    CreateVertexInputArgs vargs;
+    vargs.vertex = vertex_buffer;
+    vargs.layout = cube_layout;
+    vertex_input = IGraphicsDevice::inst->create_vertex_input(vargs);
 
 
     glGenFramebuffers(1, &fbo);
@@ -134,7 +144,7 @@ void EnviornmentMapHelper::compute_specular_new(
 
         RenderPipelineState state;
         state.depth_testing = state.depth_testing = false;
-        state.vao = vao;
+        state.vao = vertex_input->get_internal_handle();
         state.backface_culling = false;
         state.program = prefilter_specular_new;
         device.set_pipeline(state);
