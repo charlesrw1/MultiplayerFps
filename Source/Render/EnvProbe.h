@@ -63,9 +63,6 @@ private:
 	program_handle prefilter_irradiance;
 	program_handle prefilter_specular_new;
 
-	uint32_t fbo,rbo;
-	uint32_t vbo, vao;
-
 	IGraphicsBuffer* vertex_buffer{};
 	IGraphicsVertexInput* vertex_input{};
 };

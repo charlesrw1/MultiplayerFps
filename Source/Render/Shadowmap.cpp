@@ -58,8 +58,6 @@ void CascadeShadowMapSystem::make_csm_rendertargets()
 	//glTextureStorage3D(texture.shadow_array, 1, GL_DEPTH_COMPONENT32F, csm_resolution, csm_resolution, 4);
 
 
-	glCreateFramebuffers(1, &fbo.shadow);
-
 	texture.shadow_vts_handle->update_specs_ptr(texture.shadow_array, csm_resolution, csm_resolution, 1, {});
 }
 
@@ -96,7 +94,6 @@ void CascadeShadowMapSystem::update()
 	//}
 
 	if (targets_dirty) {
-		glDeleteFramebuffers(1, &fbo.shadow);
 		make_csm_rendertargets();
 		targets_dirty = false;
 	}
@@ -140,7 +137,7 @@ void CascadeShadowMapSystem::update()
 			upload_data.far_planes[i] = farplanes[i];
 		}
 
-		glNamedBufferData(ubo.info, sizeof Shadowmap_Csm_Ubo_Struct, &upload_data, GL_DYNAMIC_DRAW);
+		glNamedBufferData(ubo.info, sizeof(Shadowmap_Csm_Ubo_Struct), &upload_data, GL_DYNAMIC_DRAW);
 	}
 	// now setup scene for rendering
 	//glBindFramebuffer(GL_FRAMEBUFFER, fbo.shadow);
@@ -148,12 +145,19 @@ void CascadeShadowMapSystem::update()
 		GPUSCOPESTART(RENDER_CSM_LAYERS);
 
 		auto& device = draw.get_device();
-		RenderPassSetup setup("shadowmap", fbo.shadow, false, false /* clear it below */, 0, 0, csm_resolution, csm_resolution);
-		auto scope = device.start_render_pass(setup);
+		//RenderPassSetup setup("shadowmap", fbo.shadow, false, false /* clear it below */, 0, 0, csm_resolution, csm_resolution);
+		//auto scope = device.start_render_pass(setup);
 
 		for (int i = 0; i < 4; i++) {
 
-			glNamedFramebufferTextureLayer(fbo.shadow, GL_DEPTH_ATTACHMENT, texture.shadow_array->get_internal_handle(), 0, i);
+			RenderPassState state;
+			state.depth_info = texture.shadow_array;
+			state.depth_layer = i;
+			state.clear_depth_val = 1.f;
+			state.wants_depth_clear = true;
+			IGraphicsDevice::inst->set_render_pass(state);
+
+			//glNamedFramebufferTextureLayer(fbo.shadow, GL_DEPTH_ATTACHMENT, texture.shadow_array->get_internal_handle(), 0, i);
 
 			device.set_viewport(0, 0, csm_resolution, csm_resolution);
 			device.clear_framebuffer(true, true, 1.f/* depth value of 1.f to clear*/);

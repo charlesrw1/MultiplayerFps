@@ -18,7 +18,6 @@ public:
 
 	struct buffer {
 		IGraphicsBuffer* ptr = nullptr;
-		bufferhandle handle = 0;
 		int allocated = 0;
 
 		int used_total = 0;
@@ -47,12 +46,7 @@ public:
 	void add_commands(ConsoleCmdGroup& group);
 	void compact_memory();
 	void print_usage() const;
-	vertexarrayhandle get_vao(VaoType type) { 
-		if (type == VaoType::Animated)
-			return animated_vao;
-		else
-			return lightmapped_vao;
-	}
+
 	IGraphicsVertexInput* get_vao_ptr(VaoType type) {
 		if (type == VaoType::Animated)
 			return animated_vertex_input;
@@ -83,9 +77,6 @@ private:
 	void create_default_models();
 	void set_v_attributes();
 	bool upload_model(Model* m);
-
-	vertexarrayhandle animated_vao=0;
-	vertexarrayhandle lightmapped_vao=0;
 
 	IGraphicsVertexInput* animated_vertex_input = nullptr;
 	IGraphicsVertexInput* lightmapped_vertex_input = nullptr;

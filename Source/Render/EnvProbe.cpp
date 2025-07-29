@@ -78,27 +78,8 @@ void EnviornmentMapHelper::init()
     vargs.vertex = vertex_buffer;
     vargs.layout = cube_layout;
     vertex_input = IGraphicsDevice::inst->create_vertex_input(vargs);
-
-
-    glGenFramebuffers(1, &fbo);
-    glGenRenderbuffers(1, &rbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, CUBEMAP_SIZE, CUBEMAP_SIZE);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
-
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        printf("Framebuffer not complete!\n");
+ 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    glGenBuffers(1, &vbo);
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cube_verts), cube_verts, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
 
     cubemap_projection = glm::perspective(glm::radians(90.f), 1.f, 0.1f, 100.f);
     cubemap_views[0] = glm::lookAt(vec3(0), vec3(1, 0, 0), vec3(0, -1, 0));
@@ -132,15 +113,15 @@ void EnviornmentMapHelper::compute_specular_new(
     //*glBindVertexArray(vao);
     //*glDisable(GL_CULL_FACE);
 
-    fbohandle temp_fbo{};
-    glCreateFramebuffers(1, &temp_fbo);
 
     auto& device = draw.get_device();
     device.reset_states();
 
     {
-        RenderPassSetup setup("compute_specular_new", temp_fbo, false, false, 0, 0, size, size);
-        auto scope = device.start_render_pass(setup);
+        //RenderPassSetup setup("compute_specular_new", temp_fbo, false, false, 0, 0, size, size);
+        //auto scope = device.start_render_pass(setup);
+
+
 
         RenderPipelineState state;
         state.depth_testing = state.depth_testing = false;
@@ -163,15 +144,23 @@ void EnviornmentMapHelper::compute_specular_new(
             size >>= 1;
 
             //glViewport(0, 0, size, size);
-            device.set_viewport(0, 0, size, size);
             float roughness = (float)mip / (MAX_MIP_ROUGHNESS - 1);
             shader.set_float("roughness", roughness);
 
             for (int i = 0; i < 6; i++) {
+                RenderPassState pass;
+                assert(t->gpu_ptr);
+                auto color_infos = {
+                    ColorTargetInfo(t->gpu_ptr,i,mip)
+                };
+                pass.color_infos = color_infos;
+                IGraphicsDevice::inst->set_render_pass(pass);
+                device.set_viewport(0, 0, size, size);
+
                 shader.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
                 //glFramebufferTexture2D(temp_fbo, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cm_id, mip);
 
-                glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, t->gl_id, mip, i);
+               // glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, t->gl_id, mip, i);
 
                 glDrawArrays(GL_TRIANGLES, 0, 36);
             }
@@ -181,7 +170,7 @@ void EnviornmentMapHelper::compute_specular_new(
     glTextureParameteri(t->gl_id, GL_TEXTURE_BASE_LEVEL, 0);
     glTextureParameteri(t->gl_id, GL_TEXTURE_MAX_LEVEL, num_mips);
 
-    glDeleteFramebuffers(1, &temp_fbo);
+   // glDeleteFramebuffers(1, &temp_fbo);
 
     device.reset_states();
 
@@ -228,7 +217,7 @@ void EnviornmentMapHelper::compute_irradiance_new(Texture* t, // in cubemap, sce
         state.program = prefilter_irradiance;
         state.depth_testing = state.depth_writes = false;
         state.backface_culling = false;
-        state.vao = vao;
+        state.vao = vertex_input->get_internal_handle();
         device.set_pipeline(state);
         auto shader = device.shader();
 

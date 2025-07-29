@@ -238,12 +238,14 @@ public:
 		ASSERT(0 && "wrap_to_gl not defined");
 		return 0;
 	}
-
+	OpenGLTextureImpl() = default;
 	OpenGLTextureImpl(const CreateTextureArgs& args) {
 		auto type = to_type(args.type);
 		glCreateTextures(type, 1, &id);
 		const int x = args.width;
 		const int y = args.height;
+		this->width = args.width;
+		this->height = args.height;
 		my_fmt = args.format;
 		internal_format_gl = to_format(args.format);
 		if (args.type == GraphicsTextureType::t2DArray) {
@@ -297,6 +299,14 @@ public:
 			glTextureParameteri(id, GL_TEXTURE_COMPARE_FUNC, GL_LESS);
 			glTextureParameteri(id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
 			glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+			break;
+		case GraphicsSamplerType::CubemapDefault:
+			glTextureParameteri(id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glTextureParameteri(id, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+			glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			break;
 		default:
 			break;
 		}
@@ -352,6 +362,8 @@ public:
 
 	GraphicsTextureFormat my_fmt{};
 	GLenum internal_format_gl{};
+	int width = 0;
+	int height = 0;
 };
 class OpenGLBufferImpl : public IGraphicsBuffer {
 public:
@@ -479,14 +491,24 @@ public:
 	VertexInputIndexType index_type{};
 	uint32 vao_id = 0;
 };
-
+ConfigVar use_multiple_fbos("use_multiple_fbos", "1", CVAR_BOOL, "");
 class OpenGLDeviceImpl : public IGraphicsDevice
 {
 public:
+
+	fbohandle get_next_fbo() {
+		return shared_framebuffer;
+	}
+
+
 	fbohandle shared_framebuffer = 0;
+	fbohandle shared_framebuffer_2 = 0;
+
+	OpenGLTextureImpl swapchain_fake_img;
 
 	OpenGLDeviceImpl() {
 		glGenFramebuffers(1, &shared_framebuffer);
+		glGenFramebuffers(1, &shared_framebuffer_2);
 	}
 	~OpenGLDeviceImpl() override {
 
@@ -499,41 +521,111 @@ public:
 	void set_pipeline(const GraphicsPipelineState& state) override
 	{
 	}
-	void set_render_pass(const RenderPassState& state) override {
-		assert(!cur_pass.has_value());
-		cur_pass = state;
-
-		glBindFramebuffer(GL_FRAMEBUFFER, shared_framebuffer);
+	void set_framebuffer_with_info(const RenderPassState& state, fbohandle framebuffer_to_use, int& min_width, int& min_height) {
+		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_to_use);
 		for (int i = 0; i < state.color_infos.size(); i++) {
 			const ColorTargetInfo& info = state.color_infos[i];
 			OpenGLTextureImpl* texture = (OpenGLTextureImpl*)info.texture;
+			assert(texture != &swapchain_fake_img);
 			if (info.layer == -1)
-				glNamedFramebufferTexture(shared_framebuffer, GL_COLOR_ATTACHMENT0 + i, texture->id, info.mip);
+				glNamedFramebufferTexture(framebuffer_to_use, GL_COLOR_ATTACHMENT0 + i, texture->id, info.mip);
 			else
-				glNamedFramebufferTextureLayer(shared_framebuffer, GL_COLOR_ATTACHMENT0 + i, texture->id, info.mip, info.layer);
-
+				glNamedFramebufferTextureLayer(framebuffer_to_use, GL_COLOR_ATTACHMENT0 + i, texture->id, info.mip, info.layer);
+			min_width = std::min(texture->width, min_width);
+			min_height = std::min(texture->height, min_height);
 		}
 
 		const int max_attachments = 32;
-		std::array<unsigned int,max_attachments> gbuffer_attachments;
+		std::array<unsigned int, max_attachments> gbuffer_attachments;
 		for (int i = 0; i < state.color_infos.size(); i++)
 			gbuffer_attachments[i] = GL_COLOR_ATTACHMENT0 + i;
-		glNamedFramebufferDrawBuffers(shared_framebuffer, state.color_infos.size(), gbuffer_attachments.data());
+		glNamedFramebufferDrawBuffers(framebuffer_to_use, state.color_infos.size(), gbuffer_attachments.data());
 
 
 		if (state.depth_info) {
 			OpenGLTextureImpl* texture = (OpenGLTextureImpl*)state.depth_info;
-			glNamedFramebufferTexture(shared_framebuffer, GL_DEPTH_ATTACHMENT, texture->id, state.depth_layer);
+			assert(texture != &swapchain_fake_img);
+
+			if(state.depth_layer==-1)
+				glNamedFramebufferTexture(framebuffer_to_use, GL_DEPTH_ATTACHMENT, texture->id, 0);
+			else
+				glNamedFramebufferTextureLayer(framebuffer_to_use, GL_DEPTH_ATTACHMENT, texture->id,0, state.depth_layer);
+			min_width = std::min(texture->width, min_width);
+			min_height = std::min(texture->height, min_height);
 		}
 		else {
-			glNamedFramebufferTexture(shared_framebuffer, GL_DEPTH_ATTACHMENT,0,0);
+			glNamedFramebufferTexture(framebuffer_to_use, GL_DEPTH_ATTACHMENT, 0, 0);
+		}
+	}
+
+	void set_render_pass(const RenderPassState& state) override {
+		cur_pass = state;
+
+		int min_width = 100'000;
+		int min_height = 100'000;
+
+		if (!state.depth_info && state.color_infos.size() == 1 && state.color_infos[0].texture == &swapchain_fake_img) {
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
+		else {
+			set_framebuffer_with_info(state, get_next_fbo(), min_width, min_height);
 		}
 
+		glViewport(0, 0, min_width, min_height);
+		if (state.wants_color_clear || state.wants_depth_clear) {
+			glClearDepth(state.clear_depth_val);
+			glClearColor(0, 0.5, 0, 1);
+			GLbitfield mask{};
+			if (state.wants_depth_clear)
+				mask |= GL_DEPTH_BUFFER_BIT;
+			if (state.wants_color_clear)
+				mask |= GL_COLOR_BUFFER_BIT;
+
+			//set_depth_write_enabled(true);	// ugh: glDepthMask applies to glClear also
+			glDepthMask(GL_TRUE);
+			glClear(mask);
+			//activeStats.framebuffer_clears++;
+		}
+		//activeStats.framebuffer_changes++;
 
 	}
-	void end_render_pass() override {
-		assert(cur_pass.has_value());
-		cur_pass = std::nullopt;
+	
+
+
+	void blit_textures(const GraphicsBlitInfo& info) override {
+		
+		fbohandle src_fbo = shared_framebuffer;
+		fbohandle dest_fbo = shared_framebuffer_2;
+		{
+			int dummyx = 0, dummyy = 0;
+			RenderPassState fake1;
+			auto colors1 = {
+				ColorTargetInfo(info.src.texture,info.src.layer,info.src.mip)
+			};
+			fake1.color_infos = colors1;
+			set_framebuffer_with_info(fake1, src_fbo, dummyx, dummyy);
+
+			if (info.dest.texture == &swapchain_fake_img) {
+				dest_fbo = 0;	// backbuffer
+			}
+			else {
+				RenderPassState fake2;
+				auto colors2 = {
+					ColorTargetInfo(info.dest.texture,info.dest.layer,info.dest.mip)
+				};
+				fake2.color_infos = colors2;
+				set_framebuffer_with_info(fake2, dest_fbo, dummyx, dummyy);
+			}
+		}
+
+		glBlitNamedFramebuffer(src_fbo, dest_fbo,
+			info.src.x,info.src.y,info.src.w,info.src.h,info.dest.x,info.dest.y,info.dest.w,info.dest.h,
+			GL_COLOR_BUFFER_BIT,
+			OpenGLTextureImpl::filter_to_gl(info.filter));
+	}
+
+	IGraphicsTexture* get_swapchain_texture() override {
+		return &swapchain_fake_img;
 	}
 
 	void set_viewport(int x, int y, int w, int h) override
@@ -547,18 +639,27 @@ public:
 	}
 	void draw_arrays(int ofs, int count) override
 	{
+		
 	}
 	void draw_elements(int ofs, int count) override
 	{
 	}
 	void multidraw_elements_indirect(IGraphicsBuffer* buffer, int ofs, int count) override
 	{
+
 	}
-	void bind_storage_buffers(std::span<IGraphicsBuffer* const> buffers) override
+	void bind_storage_buffers(int start, std::span<IGraphicsBuffer* const> buffers) override
 	{
+		int index = start;
+		for (IGraphicsBuffer* bufferOpaque : buffers) {
+			OpenGLBufferImpl* buffer = (OpenGLBufferImpl*)bufferOpaque;
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, index, buffer->id);
+			index += 1;
+		}
 	}
-	void bind_textures(std::span<IGraphicsTexture* const> textures) override
+	void bind_textures(int start, std::span<IGraphicsTexture* const> textures) override
 	{
+		
 	}
 	IGraphicsProgram* create_program(const CreateProgramArgs& args) override
 	{

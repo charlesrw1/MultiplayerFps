@@ -75,13 +75,12 @@ Rect2d ShadowMapAtlas::get_atlas_rect(int handle) {
 	return rects.at(handle).rect;
 }
 
-texhandle ShadowMapAtlas::get_atlas_texture() {
-	return atlas->get_internal_handle();
+IGraphicsTexture* ShadowMapAtlas::get_atlas_texture() {
+	return atlas;
 }
 
 ShadowMapManager::ShadowMapManager()
 {
-	glCreateFramebuffers(1, &shadow_fbo);
 	glCreateBuffers(1, &frame_view);
 }
 
@@ -132,9 +131,14 @@ void ShadowMapManager::do_render(Render_Lists& list, handle<Render_Light> handle
 	
 	{
 		auto& device = draw.get_device();
-		RenderPassSetup setup("shadowmap", shadow_fbo, false, false /* clear it below */, 0, 0, 100, 100/* dummy vals*/);
-		auto scope = device.start_render_pass(setup);
-		glNamedFramebufferTexture(shadow_fbo, GL_DEPTH_ATTACHMENT, atlas.get_atlas_texture(), 0);
+		//RenderPassSetup setup("shadowmap", shadow_fbo, false, false /* clear it below */, 0, 0, 100, 100/* dummy vals*/);
+		//auto scope = device.start_render_pass(setup);
+		//glNamedFramebufferTexture(shadow_fbo, GL_DEPTH_ATTACHMENT, atlas.get_atlas_texture(), 0);
+		
+		RenderPassState pass_setup;
+		pass_setup.depth_info = atlas.get_atlas_texture();
+		IGraphicsDevice::inst->set_render_pass(pass_setup);
+
 
 		assert(light.shadow_array_handle != -1);
 		Rect2d rect = atlas.get_atlas_rect(light.shadow_array_handle);

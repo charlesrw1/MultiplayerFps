@@ -84,13 +84,8 @@ static const int STATIC_INDEX_SIZE = 3'000'000;
 #include "IGraphsDevice.h"
 void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 {
-	assert(ibuffer.handle == 0 && vbuffer.handle == 0);
+	
 
-	glGenBuffers(1, &vbuffer.handle);
-	glBindBuffer(GL_ARRAY_BUFFER, vbuffer.handle);
-	glBufferData(GL_ARRAY_BUFFER,
-		sizeof(ModelVertex) * STATIC_VERTEX_SIZE /* size */,
-		nullptr, GL_STATIC_DRAW);
 	vbuffer.allocated = sizeof(ModelVertex) * STATIC_VERTEX_SIZE;
 	vbuffer.used_total = 0;
 	vbuffer.tail = 0;
@@ -104,11 +99,6 @@ void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 	
 
 	const int index_size = MODEL_BUFFER_INDEX_TYPE_SIZE;
-	glGenBuffers(1, &ibuffer.handle);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibuffer.handle);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-		index_size * STATIC_INDEX_SIZE /* size */,
-		nullptr, GL_STATIC_DRAW);
 	ibuffer.allocated = index_size * STATIC_INDEX_SIZE;
 	ibuffer.used_total = 0;
 	ibuffer.tail = 0;
@@ -120,8 +110,6 @@ void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 
 
 
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
 bool Model::has_lightmap_coords() const
@@ -441,9 +429,6 @@ int MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const
 			out_of_memory();
 		}
 	}
-
-	glBindBuffer(target, buf.handle);
-	glBufferSubData(target, where_to_append, size, data);
 
 	buf.ptr->sub_upload(data, size, where_to_append);
 
@@ -770,14 +755,7 @@ bool ModelMan::append_to_buffer(Gpu_Buffer& buf,  char* input_data, uint32_t inp
 
 void ModelMan::set_v_attributes()
 {
-	assert(allocator.vbuffer.handle != 0);
-
-	glBindBuffer(GL_ARRAY_BUFFER, allocator.vbuffer.handle);
-
-
-
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	
 }
 
 void ModelMan::init()
@@ -802,35 +780,8 @@ void ModelMan::init()
 		};
 		args.layout = animated_layout;
 		animated_vertex_input = IGraphicsDevice::inst->create_vertex_input(args);
-
-		glGenVertexArrays(1, &animated_vao);
-		glBindVertexArray(animated_vao);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, allocator.ibuffer.handle);
-		glBindBuffer(GL_ARRAY_BUFFER, allocator.vbuffer.handle);
-
-		// POSITION
-		glVertexAttribPointer(POSITION_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, pos));
-		glEnableVertexAttribArray(POSITION_LOC);
-		// UV
-		glVertexAttribPointer(UV_LOC, 2, GL_FLOAT, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, uv));
-		glEnableVertexAttribArray(UV_LOC);
-		// NORMAL
-		glVertexAttribPointer(NORMAL_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, normal[0]));
-		glEnableVertexAttribArray(NORMAL_LOC);
-		// Tangent
-		glVertexAttribPointer(TANGENT_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, tangent[0]));
-		glEnableVertexAttribArray(TANGENT_LOC);
-		// Bone index
-		glVertexAttribIPointer(JOINT_LOC, 4, GL_UNSIGNED_BYTE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color[0]));
-		glEnableVertexAttribArray(JOINT_LOC);
-		// Bone weight
-		glVertexAttribPointer(WEIGHT_LOC, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color2[0]));
-		glEnableVertexAttribArray(WEIGHT_LOC);
-
-		glBindVertexArray(0);
 	}
 	{
-
 		using gvat = GraphicsVertexAttribType;
 		const int stride = sizeof(ModelVertex);
 
@@ -847,30 +798,6 @@ void ModelMan::init()
 		};
 		args.layout = lightmapped_layout;
 		lightmapped_vertex_input = IGraphicsDevice::inst->create_vertex_input(args);
-
-
-		glGenVertexArrays(1, &lightmapped_vao);
-		glBindVertexArray(lightmapped_vao);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, allocator.ibuffer.handle);
-		glBindBuffer(GL_ARRAY_BUFFER, allocator.vbuffer.handle);
-
-		// POSITION
-		glVertexAttribPointer(POSITION_LOC, 3, GL_FLOAT, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, pos));
-		glEnableVertexAttribArray(POSITION_LOC);
-		// UV
-		glVertexAttribPointer(UV_LOC, 2, GL_FLOAT, GL_FALSE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, uv));
-		glEnableVertexAttribArray(UV_LOC);
-		// NORMAL
-		glVertexAttribPointer(NORMAL_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, normal[0]));
-		glEnableVertexAttribArray(NORMAL_LOC);
-		// Tangent
-		glVertexAttribPointer(TANGENT_LOC, 3, GL_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, tangent[0]));
-		glEnableVertexAttribArray(TANGENT_LOC);
-		// LIGHTMAPCOORD_LOC
-		glVertexAttribPointer(LIGHTMAPCOORD_LOC, 4, GL_UNSIGNED_SHORT, GL_TRUE, sizeof(ModelVertex), (void*)offsetof(ModelVertex, color[0]));
-		glEnableVertexAttribArray(LIGHTMAPCOORD_LOC);
-	
-		glBindVertexArray(0);
 	}
 
 

@@ -143,7 +143,7 @@ struct ColorTargetInfo {
 struct RenderPassState {
 	std::span<const ColorTargetInfo> color_infos;
 	IGraphicsTexture* depth_info = nullptr;
-	int depth_layer = 0;
+	int depth_layer = -1;
 
 	void set_clear_both(bool b) {
 		wants_color_clear = wants_depth_clear = b;
@@ -151,7 +151,7 @@ struct RenderPassState {
 
 	bool wants_color_clear = false;
 	bool wants_depth_clear = false;
-	float clear_depth = 0.0;
+	float clear_depth_val = 0.0;
 };
 
 
@@ -216,6 +216,7 @@ enum class GraphicsSamplerType {
 	LinearClamped,
 	CsmShadowmap,
 	AtlasShadowmap,
+	CubemapDefault,
 };
 
 
@@ -234,6 +235,20 @@ struct CreateBufferArgs {
 	GraphicsBufferUseFlags flags = {};
 };
 
+struct GraphicsBlitTarget {
+	IGraphicsTexture* texture = nullptr;
+	int x = 0;
+	int y = 0;
+	int w = 0;
+	int h = 0;
+	int mip = 0;
+	int layer = -1;
+};
+struct GraphicsBlitInfo {
+	GraphicsBlitTarget src;
+	GraphicsBlitTarget dest;
+	GraphicsFilterType filter = GraphicsFilterType::Nearest;
+};
 
 class IGraphicsDevice {
 public:
@@ -243,13 +258,14 @@ public:
 	virtual ~IGraphicsDevice() {}
 
 	virtual GraphicsDeviceType get_device_type() = 0;
+	virtual IGraphicsTexture* get_swapchain_texture() = 0;
 
 	// pipelines bundle all the state you need for a draw call
 	virtual void set_pipeline(const GraphicsPipelineState& state) = 0;
 
 	// render passes describe what you are rendering to
 	virtual void set_render_pass(const RenderPassState& state) = 0;
-	virtual void end_render_pass() = 0;
+	virtual void blit_textures(const GraphicsBlitInfo& info) = 0;
 
 	// when starting a renderpass, viewport is automatically set. can also manually set it here
 	// same for scissor. starting renderpass clears scissor, can set and clear it manually also
@@ -261,8 +277,8 @@ public:
 	virtual void draw_elements(int offset, int count) = 0;
 	virtual void multidraw_elements_indirect(IGraphicsBuffer* buffer, int offset, int count) = 0;
 
-	virtual void bind_storage_buffers(std::span<IGraphicsBuffer* const> buffers) = 0;
-	virtual void bind_textures(std::span<IGraphicsTexture* const> textures) = 0;
+	virtual void bind_storage_buffers(int start, std::span<IGraphicsBuffer* const> buffers) = 0;
+	virtual void bind_textures(int start, std::span<IGraphicsTexture* const> textures) = 0;
 
 	virtual IGraphicsProgram* create_program(const CreateProgramArgs& args) = 0;
 	virtual IGraphicsTexture* create_texture(const CreateTextureArgs& args) = 0;

@@ -51,13 +51,14 @@ public:
 // small shadows are half that
 #include "Framework/Rect2d.h"
 class Texture;
+class IGraphicsTexture;
 class ShadowMapAtlas {
 public:
 	ShadowMapAtlas();
 	int allocate(int8_t size);
 	void free(int handle);
 	Rect2d get_atlas_rect(int handle);
-	texhandle get_atlas_texture();
+	IGraphicsTexture* get_atlas_texture();
 	glm::ivec2 get_size() {
 		return atlas_size;
 	}
@@ -87,7 +88,6 @@ public:
 	}
 private:
 	ShadowMapAtlas atlas;
-	fbohandle shadow_fbo = 0;
 	bufferhandle frame_view = 0;
 };
 
@@ -106,13 +106,9 @@ public:
 		bufferhandle info;
 	}ubo;
 
-	struct framebuffers {
-		fbohandle shadow;
-	}fbo;
 
 	struct textures {
 		IGraphicsTexture* shadow_array=nullptr;
-
 		Texture* shadow_vts_handle = nullptr;
 	}texture;
 

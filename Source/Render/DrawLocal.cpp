@@ -1140,13 +1140,13 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	// Create forward render framebuffer
 	// Transparents and other immediate stuff get rendered to this
-	create_and_delete_fb(fbo.forward_render);
-	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
-	glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_ATTACHMENT, tex.scene_depth->get_internal_handle(), 0);
+	//create_and_delete_fb(fbo.forward_render);
+	//glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
+	//glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_ATTACHMENT, tex.scene_depth->get_internal_handle(), 0);
 	//glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer, 0);
 
-	unsigned int attachments[5] = { GL_COLOR_ATTACHMENT0,0,0,0, 0 };
-	glNamedFramebufferDrawBuffers(fbo.forward_render, 5, attachments);
+	//unsigned int attachments[5] = { GL_COLOR_ATTACHMENT0,0,0,0, 0 };
+	//glNamedFramebufferDrawBuffers(fbo.forward_render, 5, attachments);
 
 	// Editor selection
 	delete_and_create_texture(tex.editor_selection_depth_buffer, gtf::depth32f);
@@ -1154,8 +1154,8 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	//glTextureStorage2D(tex.editor_selection_depth_buffer, 1, GL_DEPTH_COMPONENT32F, s_w, s_h);
 	//set_default_parameters(tex.editor_selection_depth_buffer);
 
-	create_and_delete_fb(fbo.editorSelectionDepth);
-	glNamedFramebufferTexture(fbo.editorSelectionDepth, GL_DEPTH_ATTACHMENT, tex.editor_selection_depth_buffer->get_internal_handle(), 0);
+	//create_and_delete_fb(fbo.editorSelectionDepth);
+	//glNamedFramebufferTexture(fbo.editorSelectionDepth, GL_DEPTH_ATTACHMENT, tex.editor_selection_depth_buffer->get_internal_handle(), 0);
 
 	
 	// Gbuffer textures
@@ -1196,27 +1196,27 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	// Create Gbuffer
 	// outputs to 4 render targets: gbuffer 0,1,2 and scene_color for emissives
-	create_and_delete_fb(fbo.gbuffer);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_DEPTH_ATTACHMENT, tex.scene_depth->get_internal_handle(), 0);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT0, tex.scene_gbuffer0->get_internal_handle(), 0);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT1, tex.scene_gbuffer1->get_internal_handle(), 0);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT2, tex.scene_gbuffer2->get_internal_handle(), 0);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color->get_internal_handle(), 0);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer->get_internal_handle(), 0);
-	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion->get_internal_handle(), 0);
-
-
-
-	const uint32_t gbuffer_attach_count = 6;
-	unsigned int gbuffer_attachments[gbuffer_attach_count] = { 
-		GL_COLOR_ATTACHMENT0,
-		GL_COLOR_ATTACHMENT1,
-		GL_COLOR_ATTACHMENT2,
-		GL_COLOR_ATTACHMENT3,
-		GL_COLOR_ATTACHMENT4,
-		GL_COLOR_ATTACHMENT5,
-	};
-	glNamedFramebufferDrawBuffers(fbo.gbuffer, gbuffer_attach_count, gbuffer_attachments);
+	//create_and_delete_fb(fbo.gbuffer);
+	//glNamedFramebufferTexture(fbo.gbuffer, GL_DEPTH_ATTACHMENT, tex.scene_depth->get_internal_handle(), 0);
+	//glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT0, tex.scene_gbuffer0->get_internal_handle(), 0);
+	//glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT1, tex.scene_gbuffer1->get_internal_handle(), 0);
+	//glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT2, tex.scene_gbuffer2->get_internal_handle(), 0);
+	//glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color->get_internal_handle(), 0);
+	//glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer->get_internal_handle(), 0);
+	//glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion->get_internal_handle(), 0);
+	//
+	//
+	//
+	//const uint32_t gbuffer_attach_count = 6;
+	//unsigned int gbuffer_attachments[gbuffer_attach_count] = { 
+	//	GL_COLOR_ATTACHMENT0,
+	//	GL_COLOR_ATTACHMENT1,
+	//	GL_COLOR_ATTACHMENT2,
+	//	GL_COLOR_ATTACHMENT3,
+	//	GL_COLOR_ATTACHMENT4,
+	//	GL_COLOR_ATTACHMENT5,
+	//};
+	//glNamedFramebufferDrawBuffers(fbo.gbuffer, gbuffer_attach_count, gbuffer_attachments);
 
 	// Composite textures
 	create_and_delete_fb(fbo.composite);
@@ -2496,7 +2496,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 
 	auto add_objects_to_passes = [&]() {
 		ZoneScopedN("Traversal");
-		ZoneScopedN("LoopObjects");
+		//ZoneScopedN("LoopObjects");
 		for (int i = 0; i < proxy_list.objects.size(); i++) {
 			auto& obj = proxy_list.objects[i];
 			handle<Render_Object> objhandle{ obj.handle };
@@ -2723,8 +2723,19 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 
 	const auto& view_to_use = current_frame_view;
 
-	RenderPassSetup setup("gbuffer-lighting", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
-	auto scope = device.start_render_pass(setup);
+	//RenderPassSetup setup("gbuffer-lighting", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
+	auto start_render_pass = [&]() {
+		auto targets = {
+			ColorTargetInfo(tex.scene_color)
+		};
+		RenderPassState rp;
+		rp.color_infos = targets;
+		IGraphicsDevice::inst->set_render_pass(rp);
+	};
+	start_render_pass();
+
+
+	//auto scope = device.start_render_pass(setup);
 	const bool wants_ssao = !is_cubemap_view && enable_ssao.get_bool();
 	const texhandle ssao_tex = (wants_ssao) ? ssao.texture.result : white_texture.gl_id;	// skip ssao in cubemap view
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
@@ -2758,7 +2769,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 	Model* LIGHT_CONE = g_modelMgr.get_light_cone();
 	Model* LIGHT_SPHERE = g_modelMgr.get_light_sphere();
 	Model* LIGHT_DOME = g_modelMgr.get_light_dome();
-	vertexarrayhandle vao = g_modelMgr.get_vao(VaoType::Animated);
+	vertexarrayhandle vao = g_modelMgr.get_vao_ptr(VaoType::Animated)->get_internal_handle();
 	{
 
 		RenderPipelineState state;
@@ -2778,7 +2789,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		bind_texture_ptr(3, tex.scene_depth);
 
 		// spot shadow atlas
-		bind_texture(4, spotShadows->get_atlas().get_atlas_texture());
+		bind_texture_ptr(4, spotShadows->get_atlas().get_atlas_texture());
 
 
 		for (auto& light_pair : scene.light_list.objects) {
@@ -3019,7 +3030,7 @@ void Renderer::draw_height_fog()
 	if (!r_drawfog.get_bool())
 		return;
 
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo.forward_render);
+	//glBindFramebuffer(GL_FRAMEBUFFER, fbo.forward_render);
 
 	set_shader(prog.height_fog);
 
@@ -3065,8 +3076,20 @@ void Renderer::deferred_decal_pass()
 	if (!r_drawdecals.get_bool())
 		return;
 	const auto& view_to_use = current_frame_view;
-	RenderPassSetup setup("decalgbuffer",fbo.gbuffer,false,false,0,0, view_to_use.width, view_to_use.height);
-	auto scope = device.start_render_pass(setup);
+	//RenderPassSetup setup("decalgbuffer",fbo.gbuffer,false,false,0,0, view_to_use.width, view_to_use.height);
+	//auto scope = device.start_render_pass(setup);
+
+	RenderPassState setup2;
+	auto color_targets = {
+		ColorTargetInfo(tex.scene_gbuffer0),
+		ColorTargetInfo(tex.scene_gbuffer1),
+		ColorTargetInfo(tex.scene_gbuffer2),
+		ColorTargetInfo(tex.scene_color),
+		ColorTargetInfo(tex.editor_id_buffer),
+		ColorTargetInfo(tex.scene_motion),
+	};
+	setup2.color_infos = color_targets;
+	IGraphicsDevice::inst->set_render_pass(setup2);
 
 
 	static Model* cube = find_global_asset_s<Model>("eng/cube.cmdl");	// cube model
@@ -3084,7 +3107,7 @@ void Renderer::deferred_decal_pass()
 
 	bind_texture_ptr(20/* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/, tex.scene_depth);
 
-	vertexarrayhandle vao = g_modelMgr.get_vao(VaoType::Animated);
+	vertexarrayhandle vao = g_modelMgr.get_vao_ptr(VaoType::Animated)->get_internal_handle();
 
 	for (int i = 0; i < scene.decal_list.objects.size(); i++) {
 		auto& obj = scene.decal_list.objects[i].type_.decal;
@@ -3212,9 +3235,9 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 		tex.scene_color_vts_handle->update_specs_ptr(tex.scene_color, cur_w, cur_h, 3, {});
 		tex.scene_motion_vts_handle->update_specs_ptr(tex.scene_motion, cur_w, cur_h, 2, {});
 
-		glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
-		glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color->get_internal_handle(), 0);
-		glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion->get_internal_handle(), 0);
+	//	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
+	//	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color->get_internal_handle(), 0);
+	//	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion->get_internal_handle(), 0);
 	}
 }
 
@@ -3227,13 +3250,21 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 	assert(cubemap);
 	//static Texture* somthing = nullptr;
 	if (cubemap->gl_id == 0) {	// not created yet
-		glCreateTextures(GL_TEXTURE_CUBE_MAP, 1, &cubemap->gl_id);
-		glTextureStorage2D(cubemap->gl_id, num_mips, GL_RGB16F, specular_cubemap_size, specular_cubemap_size);	
-		glTextureParameteri(cubemap->gl_id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTextureParameteri(cubemap->gl_id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glTextureParameteri(cubemap->gl_id, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-		glTextureParameteri(cubemap->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		glTextureParameteri(cubemap->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		CreateTextureArgs args;
+		args.format = GraphicsTextureFormat::rgb16f;
+		args.type = GraphicsTextureType::tCubemap;
+		args.sampler_type = GraphicsSamplerType::CubemapDefault;
+		args.num_mip_maps = num_mips;
+		args.width = args.height = specular_cubemap_size;
+		cubemap->gpu_ptr = IGraphicsDevice::inst->create_texture(args);
+		cubemap->gl_id = cubemap->gpu_ptr->get_internal_handle();
+		//glCreateTextures(GL_TEXTURE_CUBE_MAP, 1, &cubemap->gl_id);
+		//glTextureStorage2D(cubemap->gl_id, num_mips, GL_RGB16F, specular_cubemap_size, specular_cubemap_size);	
+		//glTextureParameteri(cubemap->gl_id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		//glTextureParameteri(cubemap->gl_id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		//glTextureParameteri(cubemap->gl_id, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+		//glTextureParameteri(cubemap->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		//glTextureParameteri(cubemap->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 		cubemap->type = Texture_Type::TEXTYPE_CUBEMAP;
 		cubemap->width = cubemap->height = specular_cubemap_size;
@@ -3258,10 +3289,6 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 	
 	auto& helper = EnviornmentMapHelper::get();
 
-	fbohandle cubemap_fbo{};
-	glCreateFramebuffers(1, &cubemap_fbo);
-	unsigned int attachments[1] = { GL_COLOR_ATTACHMENT0 };
-	glNamedFramebufferDrawBuffers(cubemap_fbo, 1, attachments);
 
 	for (int i = 0; i < 6; i++) {
 		glm::mat4 viewmat;
@@ -3282,17 +3309,26 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 		glDepthMask(GL_TRUE);// need to set this for blit operation to work
 
 		// set cubemap texture to a temp framebuffer
-		glNamedFramebufferTextureLayer(cubemap_fbo, GL_COLOR_ATTACHMENT0, cubemap->gl_id, 0/* highest mip*/, i/* face index*/);
-		//glNamedFramebufferTexture(cubemap_fbo, GL_COLOR_ATTACHMENT0, somthing->gl_id, 0);
-		// blit output to framebuffer
-		glBlitNamedFramebuffer(fbo.forward_render, cubemap_fbo,
-			0, 0, specular_cubemap_size, specular_cubemap_size,
-			0, 0, specular_cubemap_size, specular_cubemap_size,
-			GL_COLOR_BUFFER_BIT,
-			GL_NEAREST);
+		//glNamedFramebufferTextureLayer(cubemap_fbo, GL_COLOR_ATTACHMENT0, cubemap->gl_id, 0/* highest mip*/, i/* face index*/);
+		////glNamedFramebufferTexture(cubemap_fbo, GL_COLOR_ATTACHMENT0, somthing->gl_id, 0);
+		//// blit output to framebuffer
+		//glBlitNamedFramebuffer(fbo.forward_render, cubemap_fbo,
+		//	0, 0, specular_cubemap_size, specular_cubemap_size,
+		//	0, 0, specular_cubemap_size, specular_cubemap_size,
+		//	GL_COLOR_BUFFER_BIT,
+		//	GL_NEAREST);
+		
+		GraphicsBlitInfo blit;
+		blit.src.texture = tex.scene_color;
+		blit.dest.texture = cubemap->gpu_ptr;
+		blit.dest.mip = 0;
+		blit.dest.layer = i;	// face index
+		blit.src.x = blit.src.y = blit.dest.x = blit.dest.y = 0;
+		blit.src.w = blit.src.h = blit.dest.w = blit.dest.h = specular_cubemap_size;
+		IGraphicsDevice::inst->blit_textures(blit);
 	}
 
-	glDeleteFramebuffers(1, &cubemap_fbo);
+//	glDeleteFramebuffers(1, &cubemap_fbo);
 
 	helper.compute_specular_new(cubemap);
 	helper.compute_irradiance_new(cubemap, ambientCube);
@@ -3445,8 +3481,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 		const bool clear_framebuffer = (!is_wireframe || !wireframe_secondpass);
 
-		RenderPassSetup setup("gbuffer", fbo.gbuffer, clear_framebuffer,clear_framebuffer, 0, 0, view_to_use.width, view_to_use.height);
-		auto scope = device.start_render_pass(setup);
+		//RenderPassSetup setup("gbuffer", fbo.gbuffer, clear_framebuffer,clear_framebuffer, 0, 0, view_to_use.width, view_to_use.height);
+		//auto scope = device.start_render_pass(setup);
 
 		RenderPassState setup2;
 		auto color_targets = {
@@ -3461,7 +3497,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		setup2.depth_info = tex.scene_depth;
 		setup2.set_clear_both(clear_framebuffer);
 		IGraphicsDevice::inst->set_render_pass(setup2);
-		IGraphicsDevice::inst->end_render_pass();
 
 		{
 			GPUSCOPESTART(GbufferPass);
@@ -3514,8 +3549,16 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		GPUSCOPESTART(ForwardPass);
 
 		const auto& view_to_use = current_frame_view;
-		RenderPassSetup setup("transparents", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
-		auto scope = device.start_render_pass(setup);
+		//RenderPassSetup setup("transparents", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
+		//auto scope = device.start_render_pass(setup);
+
+		RenderPassState state;
+		auto color_info = {
+			ColorTargetInfo(tex.scene_color)
+		};
+		state.depth_info = tex.scene_depth;
+		IGraphicsDevice::inst->set_render_pass(state);
+
 
 		Render_Level_Params params(
 			view_to_use,
@@ -3543,9 +3586,18 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	{
 		GPUSCOPESTART(EDITORSELECT_PASS);
 
+		auto create_editor_pass = [&]() {
+			RenderPassState state;
+			state.depth_info = tex.editor_selection_depth_buffer;
+			state.wants_depth_clear = true;
+			IGraphicsDevice::inst->set_render_pass(state);
+		};
+		create_editor_pass();
+
+
 		const auto& view_to_use = current_frame_view;
-		RenderPassSetup setup("editor-id", fbo.editorSelectionDepth, false, true/* clear depth*/, 0, 0, view_to_use.width, view_to_use.height);
-		auto scope = device.start_render_pass(setup);
+		//RenderPassSetup setup("editor-id", fbo.editorSelectionDepth, false, true/* clear depth*/, 0, 0, view_to_use.width, view_to_use.height);
+		//auto scope = device.start_render_pass(setup);
 
 		Render_Level_Params params(
 			view_to_use,
@@ -3562,8 +3614,19 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	// mesh builder stuff
 	{
 		const auto& view_to_use = current_frame_view;
-		RenderPassSetup setup("meshbuilders", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
-		auto scope = device.start_render_pass(setup);
+		//RenderPassSetup setup("meshbuilders", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
+		//auto scope = device.start_render_pass(setup);
+		
+		auto start_render_pass = [&]() {
+			auto targets = {
+				ColorTargetInfo(tex.scene_color)
+			};
+			RenderPassState rp;
+			rp.color_infos = targets;
+			IGraphicsDevice::inst->set_render_pass(rp);
+		};
+		start_render_pass();
+
 		draw_meshbuilders();
 	}
 

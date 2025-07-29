@@ -391,7 +391,8 @@ public:
 	RenderScenePublic* get_scene() override { return &scene; }
 	void bake_cubemaps() final {}
 	uint32_t get_composite_output_texture_handle() final {
-		assert(tex.actual_output_composite);
+		if (!tex.actual_output_composite) return 0;
+		//assert(tex.actual_output_composite);
 		return tex.actual_output_composite->get_internal_handle(); 
 	}
 #ifdef EDITOR_BUILD
@@ -480,13 +481,6 @@ public:
 		fbohandle bloom{};
 		fbohandle composite{};
 
-		fbohandle gbuffer{};	// 4 MRT (gbuffer0-2, scene_color)
-
-
-
-		fbohandle forward_render{};	// scene_color, use for translucents
-
-		fbohandle editorSelectionDepth{};	// just a depth buffer for the editor to draw selected objs into
 	}fbo;
 
 

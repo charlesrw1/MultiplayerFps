@@ -479,6 +479,17 @@ static void make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 
 	int x_real = x;
 	int y_real = y;
+	const int num_mip_maps = Texture::get_mip_map_count(x, y);
+	auto create_gpu_texture = [&]() {
+		CreateTextureArgs args;
+		args.width = x;
+		args.height = y;
+		args.num_mip_maps = num_mip_maps;
+		args.format = load_format_to_graphics_format(informat);
+		args.sampler_type = GraphicsSamplerType::AnisotropyDefault;
+		return IGraphicsDevice::inst->create_texture(args);
+	};
+	output->gpu_ptr = create_gpu_texture();
 
 	GLenum type{};
 	GLenum internal_format{};
@@ -492,7 +503,7 @@ static void make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 			(informat == TEXFMT_RGBA8_DXT5 ? 16 : 8);
 	}
 
-	glTextureStorage2D(output->gl_id, Texture::get_mip_map_count(x, y), internal_format, x, y);
+	glTextureStorage2D(output->gl_id, num_mip_maps, internal_format, x, y);
 	assert(x == x_real && y == y_real);
 	if (compressed)
 		glCompressedTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, internal_format, size, data);
@@ -684,6 +695,10 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 
 void Texture::uninstall()
 {
+	if (gpu_ptr) {
+		gpu_ptr->release();
+		gpu_ptr = nullptr;
+	}
 	if (gl_id != 0) {
 		glDeleteTextures(1, &gl_id);
 		width = height = 0;
