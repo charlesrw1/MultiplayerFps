@@ -157,8 +157,10 @@ public:
 					device.bind_texture_ptr(i, texs[i]->gpu_ptr);
 			}break;
 			case UiDrawCmdType::SetTexture:
-				if(cmd.textureCmd.tex)
+				if (cmd.textureCmd.tex)
 					device.bind_texture_ptr(cmd.textureCmd.binding, cmd.textureCmd.tex->gpu_ptr);
+				else
+					device.bind_texture_ptr(cmd.textureCmd.binding, draw.white_texture);
 				break;
 			case UiDrawCmdType::SetModelMatrix:
 				break;
@@ -1492,26 +1494,30 @@ void Renderer::execute_render_lists(
 	int offset = 0;
 	const int DEIcmdSz = sizeof(gpu::DrawElementsIndirectCommand);
 	for (int i = 0; i < pass.batches.size(); i++) {
-		setup_batch(list, pass, depth_test_enabled, force_show_backfaces, depth_less_than_op, i, offset);
 		const int count = list.command_count[i];
+		const int incr = pass.batches[i].count;
+		if (count != 0) {
 
-		const GLenum index_type = MODEL_INDEX_TYPE_GL;
+			setup_batch(list, pass, depth_test_enabled, force_show_backfaces, depth_less_than_op, i, offset);
 
-		void* indirect_ptr = nullptr;
-		if (use_client_buffer_mdi.get_bool())
-			indirect_ptr = (void*)(list.commands.data() + offset);
-		else
-			indirect_ptr = (void*)(int64_t(offset * DEIcmdSz));
+			const GLenum index_type = MODEL_INDEX_TYPE_GL;
 
-		glMultiDrawElementsIndirect(
-			GL_TRIANGLES,
-			index_type,
-			indirect_ptr,
-			count,
-			sizeof(gpu::DrawElementsIndirectCommand)
-		);
+			void* indirect_ptr = nullptr;
+			if (use_client_buffer_mdi.get_bool())
+				indirect_ptr = (void*)(list.commands.data() + offset);
+			else
+				indirect_ptr = (void*)(int64_t(offset * DEIcmdSz));
 
-		offset += count;
+			glMultiDrawElementsIndirect(
+				GL_TRIANGLES,
+				index_type,
+				indirect_ptr,
+				count,
+				sizeof(gpu::DrawElementsIndirectCommand)
+			);
+
+		}
+		offset += incr;
 
 		stats.total_draw_calls++;
 	}
@@ -1831,7 +1837,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 			//auto& mats = rop->mats;
 			int index = rop->model->get_part(po->submesh_index).material_idx;// rop->mesh->parts.at(po->submesh_index).material_idx;
 			batch.material = po->material;
-			batch.shader_index = po->sort_key.shader;
+			//batch.shader_index = po->sort_key.shader;
 			return batch;
 		};
 
@@ -1947,11 +1953,13 @@ static void build_standard_cpu(
 	Free_List<ROP_Internal>& proxy_list
 )
 {
-	// first build the lists
-	list.build_from(src, proxy_list);
-
 	auto& memArena = draw.get_arena();
 	ArenaScope memScope(memArena);
+	std::span<uint32_t> draw_to_material = memArena.alloc_bottom_span<uint32_t>(src.mesh_batches.size());
+	
+	// first build the lists
+	list.build_from(src, proxy_list, draw_to_material);
+
 
 	const int objCount = src.objects.size();
 	uint32_t* glinstance_to_instance = memArena.alloc_bottom_type<uint32_t>(objCount);
@@ -1966,13 +1974,17 @@ static void build_standard_cpu(
 		glinstance_to_instance[ofs + precount] = proxy_list.handle_to_obj[obj.render_obj.id];
 	}
 
+
+	glNamedBufferData(list.gldrawid_to_submesh_material, sizeof(uint32_t) * draw_to_material.size(), draw_to_material.data(), GL_DYNAMIC_DRAW);
+
+
 	glNamedBufferData(list.glinstance_to_instance, sizeof(uint32_t) * objCount, glinstance_to_instance, GL_DYNAMIC_DRAW);
 
 	const int command_list_size_bytes = sizeof(gpu::DrawElementsIndirectCommand) * list.commands.size();
 	glNamedBufferData(list.gpu_command_list, command_list_size_bytes, list.commands.data(), GL_DYNAMIC_DRAW);
 }
 
-
+ConfigVar collapse_draw_calls("collapse_draw_calls", "1", CVAR_BOOL | CVAR_DEV, "");
 static void build_cascade_cpu(
 	Render_Lists& shadowlist,
 	Render_Pass& shadowpass,
@@ -1980,11 +1992,14 @@ static void build_cascade_cpu(
 	bool* visiblity
 )
 {
-	// first build the lists
-	shadowlist.build_from(shadowpass, proxy_list);
-
-	auto& memArena = draw.get_arena();
+	Memory_Arena& memArena = draw.get_arena();
 	ArenaScope memScope(memArena);
+	std::span<uint32_t> draw_to_material = memArena.alloc_bottom_span<uint32_t>(shadowpass.mesh_batches.size());
+	
+	// first build the lists
+	shadowlist.build_from(shadowpass, proxy_list, draw_to_material);
+
+
 
 	const int objCount = shadowpass.objects.size();
 	uint32_t* glinstance_to_instance = memArena.alloc_bottom_type<uint32_t>(objCount);
@@ -2003,6 +2018,37 @@ static void build_cascade_cpu(
 		// set the pointer to the Render_Object strucutre that will be found on the gpu
 		glinstance_to_instance[ofs + precount] = id;
 	}
+
+	auto collapse_commands = [](Render_Lists& list, std::span<uint32_t> draw_to_material) {
+		assert(draw_to_material.size() == list.commands.size());
+		int command_ofs = 0;
+		for (int j = 0; j < list.command_count.size(); j++) {
+			const int cmd_cnt = list.command_count[j];
+			std::span<gpu::DrawElementsIndirectCommand> sub_span(&list.commands.at(command_ofs), cmd_cnt);
+			std::span<uint32_t> sub_drawid_to_mat_span(&draw_to_material[command_ofs], cmd_cnt);
+			int new_count = 0;
+			for (int i = 0; i < cmd_cnt; i++) {
+				if (sub_span[i].primCount != 0) {
+					if (new_count != i) {
+						sub_span[new_count] = sub_span[i];
+						sub_drawid_to_mat_span[new_count] = sub_drawid_to_mat_span[i];
+					}
+					new_count += 1;
+				}
+			}
+			list.command_count[j] = new_count;
+
+			command_ofs += cmd_cnt;
+		}
+	};
+	// collapses draw calls so 0 instance calls are removed. 
+	// this only applies to shadows as gbuffer/transparent passes will always have >= 1 instances
+	// seems like a small performance win, but not really nessecary
+	if(collapse_draw_calls.get_bool())
+		collapse_commands(shadowlist,draw_to_material);
+
+
+	glNamedBufferData(shadowlist.gldrawid_to_submesh_material, sizeof(uint32_t) * draw_to_material.size(), draw_to_material.data(), GL_DYNAMIC_DRAW);
 
 	glNamedBufferData(shadowlist.glinstance_to_instance, sizeof(uint32_t) * objCount, nullptr, GL_DYNAMIC_DRAW);
 	glNamedBufferSubData(shadowlist.glinstance_to_instance, 0, sizeof(uint32_t) * objCount, glinstance_to_instance);
@@ -2024,7 +2070,7 @@ void Render_Pass::merge_static_to_dynamic(bool* vis_array, int8_t* lod_array, Fr
 }
 
 
-void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_list)
+void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_list, std::span<uint32_t> draw_to_material)
 {
 	// This function essentially just loops over all batches and creates gpu commands for them
 	// its O(n) to the number of batches, not n^2 which it kind of looks like it is
@@ -2034,10 +2080,6 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 
 	const int max_draw_to_materials = 20000;
 
-	auto& memArena = draw.get_arena();
-	ArenaScope scope(memArena);
-
-	uint32_t* draw_to_material = memArena.alloc_bottom_type<uint32_t>(src.mesh_batches.size());
 	int draw_to_material_index = 0;
 
 	int base_instance = 0;
@@ -2079,9 +2121,8 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 		command_count.push_back(mdb.count);
 	}
 
-	glNamedBufferData(gldrawid_to_submesh_material, sizeof(uint32_t) * draw_to_material_index, draw_to_material, GL_DYNAMIC_DRAW);
-
 	draw.stats.tris_drawn += new_verts_drawn / 3;
+
 }
 
 
@@ -2661,6 +2702,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		make_shadow_render_lists();
 
 		auto update_spotlight_shadows = [&]() {
+			GPUSCOPESTART(update_spotlight_shadows_scope);
+
 			std::vector<handle<Render_Light>> lightsToCalcShadow;
 			draw.spotShadows->get_lights_to_render(lightsToCalcShadow);
 			draw.stats.shadow_lights += lightsToCalcShadow.size();

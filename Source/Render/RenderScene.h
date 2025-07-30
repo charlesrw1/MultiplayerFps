@@ -32,17 +32,19 @@ struct Render_Box_Cubemap
 };
 
 
-// represents a singular call to glDrawElements() with same state and mesh, batchable
+// represents a singular call to glDrawElements() with same mesh and material instance. these can be hardware instanced
 struct Mesh_Batch
 {
 	int first = 0;	// indexes into pass.sorted_list
 	int count = 0;
 
-	int shader_index = 0;	// indexes into shader_list[]
 	const MaterialInstance* material = nullptr;
 };
 
-// represents multiple Mesh_Batch calls packaged into one glMultidrawIndirect()
+// represents multiple Mesh_Batch calls packaged into one glMultidrawElementsIndirect(). 
+// these are batched as long as pipeline state is the same like same texture bindings, 
+// same shader program. note that this can batch across material instances as long as they have the same textures since non-texture materials
+// parameters are all stored in a shared buffer.
 struct Multidraw_Batch
 {
 	int first = 0;
@@ -168,7 +170,9 @@ struct Render_Lists
 	void init(uint32_t drawidsz, uint32_t instbufsz);
 
 	void build_from(Render_Pass& src,
-		Free_List<ROP_Internal>& proxy_list);
+		Free_List<ROP_Internal>& proxy_list,
+		std::span<uint32_t> draw_to_material
+		);
 
 
 	// commands to input to glMultiDrawElementsIndirect
