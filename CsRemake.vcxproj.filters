@@ -478,7 +478,6 @@
     <ClInclude Include="Source\Framework\GlBufferLock.h" />
     <ClInclude Include="Source\Framework\GlBuffers.h" />
     <ClInclude Include="Source\Framework\SharedPtr.h" />
-    <ClInclude Include="Source\Render\GlDevice.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

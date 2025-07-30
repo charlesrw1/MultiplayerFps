@@ -228,7 +228,6 @@
     <ClInclude Include="Source\LevelSerialization\SerializeNewMakers.h" />
     <ClInclude Include="Source\MEGA.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
-    <ClInclude Include="Source\Render\GlDevice.h" />
     <ClInclude Include="Source\Render\IGraphsDevice.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Render\RenderWindow.h" />

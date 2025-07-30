@@ -15,18 +15,19 @@ void RenderWindow::set_view(int x0, int x1, int y0, int y1)
 
 void RenderWindow::add_scissor_rect(Rect2d rect)
 {
-	UIDrawCmd cmd;
-	cmd.type = UIDrawCmd::Type::SetScissor;
-	cmd.sc.enable = true;
-	cmd.sc.rect = rect;
+	UIDrawCmdUnion cmd;
+	cmd.type = UiDrawCmdType::SetScissor;
+	cmd.scissorCmd.x = rect.x;
+	cmd.scissorCmd.y = rect.y;
+	cmd.scissorCmd.w = rect.w;
+	cmd.scissorCmd.h = rect.h;
 	drawCmds.push_back(cmd);
 }
 
 void RenderWindow::remove_scissor()
 {
-	UIDrawCmd cmd;
-	cmd.type = UIDrawCmd::Type::SetScissor;
-	cmd.sc.enable = false;
+	UIDrawCmdUnion cmd;
+	cmd.type = UiDrawCmdType::ClearScissor;
 	drawCmds.push_back(cmd);
 }
 
@@ -34,24 +35,34 @@ void RenderWindow::add_draw_call(const MaterialInstance* mat, int start, const T
 {
 	const int count = meshbuilder.get_i().size() - start;
 
-	UIDrawCall* lastDC = nullptr;
-	if (!drawCmds.empty() && drawCmds.back().type == UIDrawCmd::Type::DrawCall) {
-		lastDC = &drawCmds.back().dc;
+	UIDrawCmdUnion* lastDC = nullptr;
+	if (!drawCmds.empty() && drawCmds.back().type == UiDrawCmdType::DrawCall) {
+		lastDC = &drawCmds.back();
 	}
+	if (!lastDC || cur_material != mat || cur_tex_0 != tex_override) {
+		if (cur_material != mat) {
+			cur_material = (MaterialInstance*)mat;
+			UIDrawCmdUnion cmd = {};
+			cmd.type = UiDrawCmdType::SetPipeline;
+			cmd.pipelineCmd.mat = cur_material;
+			drawCmds.push_back(cmd);
+		}
+		cur_tex_0 = (Texture*)tex_override;
+		UIDrawCmdUnion cmd = {};
+		cmd.type = UiDrawCmdType::SetTexture;
+		cmd.textureCmd.binding = 0;
+		cmd.textureCmd.tex = cur_tex_0;
+		drawCmds.push_back(cmd);
 
-	if (!lastDC || lastDC->mat != mat || lastDC->texOverride != tex_override) {
-		UIDrawCall dc;
-		dc.index_count = count;
-		dc.index_start = start;
-		dc.mat = const_cast<MaterialInstance*>(mat);// fix
-		dc.texOverride = tex_override;
-		UIDrawCmd cmd;
-		cmd.type = UIDrawCmd::Type::DrawCall;
-		cmd.dc = dc;
+		cmd = {};
+		cmd.type = UiDrawCmdType::DrawCall;
+		cmd.drawCmd.index_count = count;
+		cmd.drawCmd.index_start = start;
+		cmd.drawCmd.base_vertex = 0;
 		drawCmds.push_back(cmd);
 	}
 	else {
-		lastDC->index_count += count;
+		lastDC->drawCmd.index_count += count;
 	}
 }
 

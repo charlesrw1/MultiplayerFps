@@ -238,6 +238,13 @@ struct GraphicsBlitInfo {
 	GraphicsBlitTarget src;
 	GraphicsBlitTarget dest;
 	GraphicsFilterType filter = GraphicsFilterType::Nearest;
+
+	void set_width_both(int w) {
+		src.w = dest.w = w;
+	}
+	void set_height_both(int h) {
+		src.h = dest.h = h;
+	}
 };
 class ThingerBobber {
 public:

@@ -97,7 +97,7 @@ class RenderWindowBackendLocal : public RenderWindowBackend
 public:
 	int id_counter = 1;
 
-	std::vector<UIDrawCmd> drawCmds;
+	std::vector<UIDrawCmdUnion> drawCmds;
 
 	handle<RenderWindow> register_window() {
 		return { 1 };
@@ -118,48 +118,54 @@ public:
 		glBindBufferBase(GL_UNIFORM_BUFFER, 0, draw.ubo.current_frame);
 		auto& device = draw.get_device();
 		for (int i = 0; i < drawCmds.size(); i++) {
-			const auto& dcmd = drawCmds.at(i);
-			if (dcmd.type == UIDrawCmd::Type::SetScissor) {
-				if (dcmd.sc.enable) {
-					glEnable(GL_SCISSOR_TEST);
-					auto& r = dcmd.sc.rect;
-					glScissor(r.x, r.y, r.w, r.h);
-				}
-				else {
-					glDisable(GL_SCISSOR_TEST);
-				}
-				continue;
-			}
-			const UIDrawCall& dc = dcmd.dc;
-
-			if (!dc.mat)
-				continue;
-
-			assert(dc.mat->get_master_material()->usage == MaterialUsage::UI);
-
 			const GLenum mode = GL_TRIANGLES;
 
-			RenderPipelineState pipe;
-			pipe.backface_culling = true;
-			pipe.blend = dc.mat->get_master_material()->blend;
-			pipe.cull_front_face = false;
-			pipe.depth_testing = false;
-			pipe.depth_writes = false;
-			pipe.program = matman.get_mat_shader(nullptr,dc.mat,0);
-			pipe.vao = mb_draw_data.VAO;
-			
-			device.set_pipeline(pipe);
+			UIDrawCmdUnion& cmd = drawCmds[i];
+			switch (cmd.type)
+			{
+			case UiDrawCmdType::DrawCall: {
+				UiDrawCallCmd& drawCmd = cmd.drawCmd;
+				glDrawElementsBaseVertex(mode, drawCmd.index_count, GL_UNSIGNED_INT, (void*)(drawCmd.index_start * sizeof(int)), drawCmd.base_vertex);
+				draw.stats.total_draw_calls++;
+			}break;
+			case UiDrawCmdType::SetScissor: {
+				UiSetScissorCmd& r = cmd.scissorCmd;
+				glEnable(GL_SCISSOR_TEST);
+				glScissor(r.x, r.y, r.w, r.h);
+			}break;
+			case UiDrawCmdType::ClearScissor:
+				glDisable(GL_SCISSOR_TEST);
+				break;
+			case UiDrawCmdType::SetPipeline: {
+				MaterialInstance* mat = cmd.pipelineCmd.mat;
 
-			draw.shader().set_mat4("UIViewProj",view_proj);
+				assert(mat->get_master_material()->usage == MaterialUsage::UI);
+				RenderPipelineState pipe;
+				pipe.backface_culling = true;
+				pipe.blend = mat->get_master_material()->blend;
+				pipe.cull_front_face = false;
+				pipe.depth_testing = false;
+				pipe.depth_writes = false;
+				pipe.program = matman.get_mat_shader(nullptr, mat, 0);
+				pipe.vao = mb_draw_data.VAO;
+				device.set_pipeline(pipe);
 
-			auto& texs = dc.mat->impl->get_textures();
-			for (int i = 0; i < texs.size(); i++)
-				device.bind_texture_ptr(i, texs[i]->gpu_ptr);
-			if (dc.texOverride != nullptr)
-				device.bind_texture_ptr(0, dc.texOverride->gpu_ptr);
+				draw.shader().set_mat4("UIViewProj", view_proj);
 
-			glDrawElementsBaseVertex(mode, dc.index_count, GL_UNSIGNED_INT, (void*)(dc.index_start * sizeof(int)), 0);
-			
+				auto& texs = mat->impl->get_textures();
+				for (int i = 0; i < texs.size(); i++)
+					device.bind_texture_ptr(i, texs[i]->gpu_ptr);
+			}break;
+			case UiDrawCmdType::SetTexture:
+				if(cmd.textureCmd.tex)
+					device.bind_texture_ptr(cmd.textureCmd.binding, cmd.textureCmd.tex->gpu_ptr);
+				break;
+			case UiDrawCmdType::SetModelMatrix:
+				break;
+
+			default:
+				break;
+			}
 			draw.stats.total_draw_calls++;
 		}
 
@@ -1242,9 +1248,9 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 
 	// write to scene gbuffer0 for taa resolve
-	create_and_delete_fb(fbo.taa_resolve);
-	glNamedFramebufferTexture(fbo.taa_resolve, GL_COLOR_ATTACHMENT0, tex.scene_gbuffer0->get_internal_handle(), 0);
-	create_and_delete_fb(fbo.taa_blit);
+	//create_and_delete_fb(fbo.taa_resolve);
+	//glNamedFramebufferTexture(fbo.taa_resolve, GL_COLOR_ATTACHMENT0, tex.scene_gbuffer0->get_internal_handle(), 0);
+	//create_and_delete_fb(fbo.taa_blit);
 
 	cur_w = s_w;
 	cur_h = s_h;
@@ -1268,11 +1274,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 void Renderer::init_bloom_buffers()
 {
-	glDeleteFramebuffers(1, &fbo.bloom);
-	//if(tex.number_bloom_mips>0)
-	//	glDeleteTextures(tex.number_bloom_mips, tex.bloom_chain);
-	glCreateFramebuffers(1, &fbo.bloom);
-	
+
 	int x = cur_w / 2;
 	int y = cur_h / 2;
 	tex.number_bloom_mips = glm::min((int)MAX_BLOOM_MIPS, Texture::get_mip_map_count(x, y));
@@ -1319,8 +1321,8 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 
 	device.reset_states();
 
-	RenderPassSetup setup("bloompass", fbo.bloom, false, false, 0, 0, cur_w, cur_h);
-	auto scope = device.start_render_pass(setup);
+//	RenderPassSetup setup("bloompass", fbo.bloom, false, false, 0, 0, cur_w, cur_h);
+//	auto scope = device.start_render_pass(setup);
 
 	///IGraphicsDevice* device = IGraphicsDevice::inst;
 
@@ -1342,7 +1344,18 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 		{
 			auto& bc = tex.bloom_chain[i];
 
-			glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0,bc.texture->get_internal_handle(), 0);
+			//glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0,bc.texture->get_internal_handle(), 0);
+
+			auto setup_pass = [&]() {
+				auto color_infos = {
+					ColorTargetInfo(bc.texture)
+				};
+				RenderPassState pass;
+				pass.color_infos = color_infos;
+				IGraphicsDevice::inst->set_render_pass(pass);
+			};
+			setup_pass();
+
 
 			shader().set_vec2("srcResolution", vec2(src_x, src_y));
 			shader().set_int("mipLevel", i);
@@ -1371,7 +1384,17 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 		{
 			auto& bc = tex.bloom_chain[i-1];
 
-			glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0, bc.texture->get_internal_handle(), 0);
+			//glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0, bc.texture->get_internal_handle(), 0);
+			auto setup_pass = [&]() {
+				auto color_infos = {
+					ColorTargetInfo(bc.texture)
+				};
+				RenderPassState pass;
+				pass.color_infos = color_infos;
+				IGraphicsDevice::inst->set_render_pass(pass);
+			};
+			setup_pass();
+
 
 			vec2 destsize =  bc.fsize;
 			device.set_viewport(0, 0, destsize.x, destsize.y);
@@ -3668,8 +3691,17 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
 
 		// write to tex.scene_gbuffer0
-		RenderPassSetup setup("taa_resolve", fbo.taa_resolve, false, false, 0, 0, cur_w, cur_h);
-		auto scope = device.start_render_pass(setup);
+		//RenderPassSetup setup("taa_resolve", fbo.taa_resolve, false, false, 0, 0, cur_w, cur_h);
+		//auto scope = device.start_render_pass(setup);
+
+		auto color_infos = {
+			ColorTargetInfo(tex.scene_gbuffer0)
+		};
+		RenderPassState pass;
+		pass.color_infos = color_infos;
+		IGraphicsDevice::inst->set_render_pass(pass);
+
+
 		RenderPipelineState state;
 		state.program = prog.taa_resolve;
 		state.vao = get_empty_vao();
@@ -3691,10 +3723,20 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		bind_texture_ptr(4, tex.last_scene_motion);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
-		glNamedFramebufferTexture(fbo.taa_blit, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
-		glBlitNamedFramebuffer(fbo.taa_resolve, fbo.taa_blit, 0, 0, cur_w, cur_h,
-			0, 0, cur_w, cur_h, GL_COLOR_BUFFER_BIT,
-			GL_NEAREST);
+		// blit from gbuffer0 to scene color
+		//??
+		GraphicsBlitInfo blitinfo;
+		blitinfo.set_width_both(cur_w);
+		blitinfo.set_height_both(cur_h);
+		blitinfo.src.texture = tex.scene_gbuffer0;
+		blitinfo.dest.texture = tex.scene_color;
+		IGraphicsDevice::inst->blit_textures(blitinfo);
+
+
+		//glNamedFramebufferTexture(fbo.taa_blit, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
+		//glBlitNamedFramebuffer(fbo.taa_resolve, fbo.taa_blit, 0, 0, cur_w, cur_h,
+		//	0, 0, cur_w, cur_h, GL_COLOR_BUFFER_BIT,
+		//	GL_NEAREST);
 
 		return tex.scene_color->get_internal_handle();
 	};

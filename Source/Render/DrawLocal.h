@@ -480,10 +480,10 @@ public:
 
 	struct framebuffers {
 		//fbohandle reflected_scene{};
-		fbohandle taa_resolve{};
-		fbohandle taa_blit{};
+		//fbohandle taa_resolve{};
+		//fbohandle taa_blit{};
 
-		fbohandle bloom{};
+		//fbohandle bloom{};
 
 
 	}fbo;

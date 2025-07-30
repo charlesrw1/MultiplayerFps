@@ -21,14 +21,49 @@ struct UISetScissor {
 	bool enable;
 	Rect2d rect;
 };
-struct UIDrawCmd {
-	enum class Type {
-		DrawCall,
-		SetScissor,
-	}type;
-	// whatev, no union
-	UIDrawCall dc;
-	UISetScissor sc;
+enum class UiDrawCmdType {
+	DrawCall,
+	SetScissor,
+	ClearScissor,
+	SetSceneViewProj,
+	SetViewProj,
+	SetModelMatrix,
+	
+	SetPipeline,
+	SetTexture,
+
+};
+struct UiSetScissorCmd {
+	int x;
+	int y;
+	int w;
+	int h;
+};
+struct UiDrawCallCmd {
+	int index_start;
+	int index_count;
+	int base_vertex;
+};
+struct UiMatrixCmd {
+	glm::mat4 matrix;
+};
+struct UiPipelineCmd {
+	MaterialInstance* mat;
+};
+struct UiTextureCmd {
+	Texture* tex;
+	int binding;
+};
+
+struct UIDrawCmdUnion {
+	UiDrawCmdType type{};
+	union {
+		UiSetScissorCmd scissorCmd;
+		UiDrawCallCmd drawCmd;
+		UiMatrixCmd matrixCmd;
+		UiPipelineCmd pipelineCmd;
+		UiTextureCmd textureCmd;
+	};
 };
 
 // a window for drawing 2d things. sprites, UI, etc.
@@ -66,7 +101,7 @@ public:
 	void add_draw_call(const MaterialInstance* mat, int index_start, const Texture* tex_override = nullptr);
 	void draw(RectangleShape rect_shape);
 	void draw(TextShape text_shape);
-	const std::vector<UIDrawCmd>& get_draw_cmds() const { return drawCmds; }
+	const std::vector<UIDrawCmdUnion>& get_draw_cmds() const { return drawCmds; }
 
 	glm::mat4 view_mat = glm::mat4();
 	Color32 clear_color = {};
@@ -77,9 +112,14 @@ public:
 	void reset_verticies() {
 		meshbuilder.Begin();
 		drawCmds.clear();
+		cur_material = nullptr;
+		cur_tex_0 = nullptr;
 	}
 private:
-	std::vector<UIDrawCmd> drawCmds;
+	MaterialInstance* cur_material = nullptr;
+	Texture* cur_tex_0 = nullptr;
+
+	std::vector<UIDrawCmdUnion> drawCmds;
 };
 
 
