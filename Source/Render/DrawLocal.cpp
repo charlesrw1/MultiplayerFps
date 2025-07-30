@@ -969,6 +969,8 @@ void Renderer::create_default_textures()
 	tex.editorSel_vts_handle = Texture::install_system("_editorSelDepth");
 	tex.postProcessInput_vts_handle = Texture::install_system("_PostProcessInput");
 	tex.scene_motion_vts_handle = Texture::install_system("_scene_motion");
+
+	tex.read_scene_color_for_transparents_handle = Texture::install_system("_read_scene_color");
 }
 
 class FuckerBobberThing : public ThingerBobber {
@@ -1113,11 +1115,6 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-	auto create_and_delete_fb = [](uint32_t & framebuffer) {
-		glDeleteFramebuffers(1, &framebuffer);
-		glCreateFramebuffers(1, &framebuffer);
-	};
-
 	auto delete_and_create_texture = [&](IGraphicsTexture*& ptr, GraphicsTextureFormat format) {
 		safe_release(ptr);
 
@@ -1133,129 +1130,28 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	using gtf = GraphicsTextureFormat;
 	delete_and_create_texture(tex.scene_color, gtf::rgb16f);
 
-	// Main accumulation buffer, 16 bit color
-	//create_and_delete_texture(tex.scene_color);
-	//glTextureStorage2D(tex.scene_color, 1, GL_RGB16F, s_w, s_h);
-	//set_default_parameters(tex.scene_color);
-
 	// last frame, for TAA
 	delete_and_create_texture(tex.last_scene_color, gtf::rgb16f);
-	//create_and_delete_texture(tex.last_scene_color);
-	//glTextureStorage2D(tex.last_scene_color, 1, GL_RGB16F, s_w, s_h);
-	//set_default_parameters(tex.last_scene_color);
 
 	// Main scene depth
 	delete_and_create_texture(tex.scene_depth, gtf::depth32f);
-	//create_and_delete_texture(tex.scene_depth);
-	//glTextureStorage2D(tex.scene_depth, 1, GL_DEPTH_COMPONENT32F, s_w, s_h);
-	//set_default_parameters(tex.scene_depth);
-
 	// for mouse picking
 	delete_and_create_texture(tex.editor_id_buffer, gtf::rgba8);
 
-	//create_and_delete_texture(tex.editor_id_buffer);
-	//glTextureStorage2D(tex.editor_id_buffer, 1, GL_RGBA8, s_w, s_h);
-	//set_default_parameters(tex.editor_id_buffer);
-
-	// Create forward render framebuffer
-	// Transparents and other immediate stuff get rendered to this
-	//create_and_delete_fb(fbo.forward_render);
-	//glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
-	//glNamedFramebufferTexture(fbo.forward_render, GL_DEPTH_ATTACHMENT, tex.scene_depth->get_internal_handle(), 0);
-	//glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer, 0);
-
-	//unsigned int attachments[5] = { GL_COLOR_ATTACHMENT0,0,0,0, 0 };
-	//glNamedFramebufferDrawBuffers(fbo.forward_render, 5, attachments);
-
-	// Editor selection
 	delete_and_create_texture(tex.editor_selection_depth_buffer, gtf::depth32f);
-	//create_and_delete_texture(tex.editor_selection_depth_buffer);
-	//glTextureStorage2D(tex.editor_selection_depth_buffer, 1, GL_DEPTH_COMPONENT32F, s_w, s_h);
-	//set_default_parameters(tex.editor_selection_depth_buffer);
-
-	//create_and_delete_fb(fbo.editorSelectionDepth);
-	//glNamedFramebufferTexture(fbo.editorSelectionDepth, GL_DEPTH_ATTACHMENT, tex.editor_selection_depth_buffer->get_internal_handle(), 0);
-
 	
-	// Gbuffer textures
-	// See the comment above these var's decleration in DrawLocal.h for details
 	delete_and_create_texture(tex.scene_gbuffer0, gtf::rgb16f);
-	//create_and_delete_texture(tex.scene_gbuffer0);
-	//glTextureStorage2D(tex.scene_gbuffer0, 1, GL_RGB16F, s_w, s_h);
-	//set_default_parameters(tex.scene_gbuffer0);
-
-	
 	delete_and_create_texture(tex.scene_gbuffer1, gtf::rgba8);
-
-	//create_and_delete_texture(tex.scene_gbuffer1);
-//	glTextureStorage2D(tex.scene_gbuffer1, 1, GL_RGBA8, s_w, s_h);
-	//set_default_parameters(tex.scene_gbuffer1);
-
 	delete_and_create_texture(tex.scene_gbuffer2, gtf::rgba8);
 
-//	create_and_delete_texture(tex.scene_gbuffer2);
-//	glTextureStorage2D(tex.scene_gbuffer2, 1, GL_RGBA8, s_w, s_h);
-	//set_default_parameters(tex.scene_gbuffer2);
-
-
-	//const GLenum scene_motion_format = (r_taa_32f.get_bool()) ? GL_RG32F : GL_RG16F;
 	const gtf scene_motion_format = (r_taa_32f.get_bool()) ? gtf::rg32f : gtf::rg16f;
 
-
 	delete_and_create_texture(tex.scene_motion, scene_motion_format);
-	//create_and_delete_texture(tex.scene_motion);
-	//glTextureStorage2D(tex.scene_motion, 1, scene_motion_format, s_w, s_h);
-	//set_default_parameters(tex.scene_motion);
 
 	delete_and_create_texture(tex.last_scene_motion, scene_motion_format);
-	//create_and_delete_texture(tex.last_scene_motion);
-	//glTextureStorage2D(tex.last_scene_motion, 1, scene_motion_format, s_w, s_h);
-	//set_default_parameters(tex.last_scene_motion);
-
-
-	// Create Gbuffer
-	// outputs to 4 render targets: gbuffer 0,1,2 and scene_color for emissives
-	//create_and_delete_fb(fbo.gbuffer);
-	//glNamedFramebufferTexture(fbo.gbuffer, GL_DEPTH_ATTACHMENT, tex.scene_depth->get_internal_handle(), 0);
-	//glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT0, tex.scene_gbuffer0->get_internal_handle(), 0);
-	//glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT1, tex.scene_gbuffer1->get_internal_handle(), 0);
-	//glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT2, tex.scene_gbuffer2->get_internal_handle(), 0);
-	//glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color->get_internal_handle(), 0);
-	//glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT4, tex.editor_id_buffer->get_internal_handle(), 0);
-	//glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion->get_internal_handle(), 0);
-	//
-	//
-	//
-	//const uint32_t gbuffer_attach_count = 6;
-	//unsigned int gbuffer_attachments[gbuffer_attach_count] = { 
-	//	GL_COLOR_ATTACHMENT0,
-	//	GL_COLOR_ATTACHMENT1,
-	//	GL_COLOR_ATTACHMENT2,
-	//	GL_COLOR_ATTACHMENT3,
-	//	GL_COLOR_ATTACHMENT4,
-	//	GL_COLOR_ATTACHMENT5,
-	//};
-	//glNamedFramebufferDrawBuffers(fbo.gbuffer, gbuffer_attach_count, gbuffer_attachments);
-
-	// Composite textures
-	//create_and_delete_fb(fbo.composite);
+	
 	delete_and_create_texture(tex.output_composite, gtf::rgb8);
 	delete_and_create_texture(tex.output_composite_2, gtf::rgb8);
-
-
-	//create_and_delete_texture(tex.output_composite);
-	//create_and_delete_texture(tex.output_composite_2);
-	//glTextureStorage2D(tex.output_composite, 1, GL_RGB8, s_w, s_h);
-	//glTextureStorage2D(tex.output_composite_2, 1, GL_RGB8, s_w, s_h);
-	//set_default_parameters(tex.output_composite);
-	//set_default_parameters(tex.output_composite_2);
-	//glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite->get_internal_handle(), 0);
-
-
-	// write to scene gbuffer0 for taa resolve
-	//create_and_delete_fb(fbo.taa_resolve);
-	//glNamedFramebufferTexture(fbo.taa_resolve, GL_COLOR_ATTACHMENT0, tex.scene_gbuffer0->get_internal_handle(), 0);
-	//create_and_delete_fb(fbo.taa_blit);
 
 	cur_w = s_w;
 	cur_h = s_h;
@@ -1269,6 +1165,8 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	tex.editorid_vts_handle->update_specs_ptr(tex.editor_id_buffer);
 	tex.editorSel_vts_handle->update_specs_ptr(tex.editor_selection_depth_buffer);
 	tex.scene_motion_vts_handle->update_specs_ptr(tex.scene_motion);
+
+	tex.read_scene_color_for_transparents_handle->update_specs_ptr(tex.scene_gbuffer0);
 
 	// Also update bloom buffers (this can be elsewhere)
 	init_bloom_buffers();
@@ -1575,22 +1473,6 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, what_ubo);
 	
-
-	//*glBindFramebuffer(GL_FRAMEBUFFER, params.output_framebuffer);
-	//*glViewport(0, 0, vs.width, vs.height);
-	//*if (params.clear_framebuffer) {
-	//*	glClearColor(0.f, 0.0f, 0.f, 1.f);
-	//*
-	//*	if (params.pass != Render_Level_Params::SHADOWMAP) {
-	//*		// set clear depth to 0 
-	//*		// reversed Z has 1.0 being closest to camera and 0 being furthest
-	//*		glClearDepth(0.0);
-	//*	}
-	//*
-	//*	glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
-	//*
-	//*}
-
 	if (params.pass == Render_Level_Params::SHADOWMAP ) {
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		glPolygonOffset(params.offset_poly_units, 4/* this does nothing?*/);
@@ -3012,48 +2894,25 @@ ThumbnailRenderer::ThumbnailRenderer(int size) : pass(pass_type::TRANSPARENT) {
 	draw.scene.update_obj(object, o);
 
 
-	auto set_default_parameters = [](uint32_t handle) {
-		glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTextureParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTextureParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTextureParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	};
-
-	auto create_and_delete_texture = [](uint32_t& texture) {
-		glCreateTextures(GL_TEXTURE_2D, 1, &texture);
-	};
-
-	auto create_and_delete_fb = [](uint32_t& framebuffer) {
-		glDeleteFramebuffers(1, &framebuffer);
-		glCreateFramebuffers(1, &framebuffer);
-	};
 	const int w = size;
 	const int h = size;
-	fbohandle fbo_handle = 0;
-	texhandle color_tex = 0;
-	texhandle depth_tex = 0;
-	{
-		glCreateFramebuffers(1, &fbo_handle);
-		glCreateTextures(GL_TEXTURE_2D, 1, &color_tex);
-		set_default_parameters(color_tex);
-		glTextureStorage2D(color_tex, 1, GL_RGBA8, w, h);
 
-		glCreateTextures(GL_TEXTURE_2D, 1, &depth_tex);
-		set_default_parameters(depth_tex);
-		glTextureStorage2D(depth_tex, 1, GL_DEPTH_COMPONENT32F, w, h);
+	CreateTextureArgs colorArgs;
+	colorArgs.width = w;
+	colorArgs.height = h;
+	colorArgs.format = GraphicsTextureFormat::rgba8;
+	colorArgs.sampler_type = GraphicsSamplerType::NearestClamped;
+	this->color = IGraphicsDevice::inst->create_texture(colorArgs);
+	CreateTextureArgs depthArgs;
+	depthArgs.width = w;
+	depthArgs.height = h;
+	depthArgs.format = GraphicsTextureFormat::depth32f;
+	depthArgs.sampler_type = GraphicsSamplerType::NearestClamped;
+	this->depth = IGraphicsDevice::inst->create_texture(depthArgs);
 
-		glNamedFramebufferTexture(fbo_handle, GL_COLOR_ATTACHMENT0, color_tex, 0);
-		glNamedFramebufferTexture(fbo_handle, GL_DEPTH_ATTACHMENT, depth_tex, 0);
-		unsigned int attachments[5] = { GL_COLOR_ATTACHMENT0,0,0,0, 0 };
-		glNamedFramebufferDrawBuffers(fbo_handle, 5, attachments);
-	}
-
-	this->fbo = fbo_handle;
-	this->color = color_tex;
-	this->depth = depth_tex;
 
 	vts_handle = Texture::install_system("_test_thumbnail");
-	//vts_handle->update_specs(color_tex, w, h, 4, {});
+	vts_handle->update_specs_ptr(this->color);
 	vts_handle->type = Texture_Type::TEXTYPE_2D;
 }
 
@@ -3079,17 +2938,27 @@ void ThumbnailRenderer::render(Model* model) {
 		pass.add_object(proxy.proxy, object, mat, 0, j, 0, 0, false);
 	}
 	pass.make_batches(scene);
-	build_standard_cpu(
-		list,
-		pass,
-		scene.proxy_list
-	);
+	build_standard_cpu(list,pass,scene.proxy_list);
 
 	const int w = size;
 	const int h = size;
-	RenderPassSetup setup("thumbnail", this->fbo, true, true, 0, 0, w, h);
-	auto scope = draw.get_device().start_render_pass(setup);
-	auto sphere = model->get_bounding_sphere();
+	//RenderPassSetup setup("thumbnail", this->fbo, true, true, 0, 0, w, h);
+	//auto scope = draw.get_device().start_render_pass(setup);
+	auto set_pass = [&]() {
+		RenderPassState passState;
+		auto color_infos = {
+			ColorTargetInfo(color)
+		};
+		passState.color_infos = color_infos;
+		passState.depth_info = depth;
+		passState.set_clear_both(true);
+		IGraphicsDevice::inst->set_render_pass(passState);
+	};
+	set_pass();
+
+
+
+	glm::vec4 sphere = model->get_bounding_sphere();
 	const float fov_rad = glm::radians(thumbnail_fov.get_float());
 	glm::vec3 center = glm::vec3(sphere);
 	const float c_mult = 2.0 / fov_rad;
@@ -3555,7 +3424,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		if (params.output_to_screen) {
 			GPUSCOPESTART(Blit_composite_to_backbuffer);
 
-
 			GraphicsBlitInfo blitInfo;
 			blitInfo.dest.w = blitInfo.src.w = cur_w;
 			blitInfo.dest.h = blitInfo.src.h = cur_h;
@@ -3563,15 +3431,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 			blitInfo.src.texture = tex.output_composite;
 			blitInfo.filter = GraphicsFilterType::Nearest;
 			IGraphicsDevice::inst->blit_textures(blitInfo);
-
-			//glBlitNamedFramebuffer(
-			//	fbo.composite,
-			//	0,	/* blit to backbuffer */
-			//	0, 0, cur_w, cur_h,
-			//	0, 0, cur_w, cur_h,
-			//	GL_COLOR_BUFFER_BIT,
-			//	GL_NEAREST
-			//);
 		}
 		return;
 	}
@@ -3611,7 +3470,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		setup2.set_clear_both(clear_framebuffer);
 		IGraphicsDevice::inst->set_render_pass(setup2);
 
-		GPUSCOPESTART(GbufferPass);
+		GPUSCOPESTART(gbuffer_pass_scope);
 
 		Render_Level_Params cmdparams(
 			view_to_use,
@@ -3655,8 +3514,19 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 	//draw_height_fog();
 
+	auto copy_forward_to_temporary = [&]() {
+		GPUSCOPESTART(copy_forward_to_temporary_scope);
+		GraphicsBlitInfo blitInfo;
+		blitInfo.set_width_both(cur_w);
+		blitInfo.set_height_both(cur_h);
+		blitInfo.src.texture = tex.scene_color;
+		blitInfo.dest.texture = tex.scene_gbuffer0;
+		IGraphicsDevice::inst->blit_textures(blitInfo);
+	};
+	copy_forward_to_temporary();
+
 	auto draw_forward_pass = [&]() {
-		GPUSCOPESTART(ForwardPass);
+		GPUSCOPESTART(draw_forward_pass_scope);
 
 		const auto& view_to_use = current_frame_view;
 		//RenderPassSetup setup("transparents", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
@@ -3696,7 +3566,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 	if(params.is_editor)
 	{
-		GPUSCOPESTART(EDITORSELECT_PASS);
+		GPUSCOPESTART(editor_select_pass_scope);
 
 		auto create_editor_pass = [&]() {
 			RenderPassState state;
@@ -3735,6 +3605,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 			};
 			RenderPassState rp;
 			rp.color_infos = targets;
+			rp.depth_info = tex.scene_depth;
+
 			IGraphicsDevice::inst->set_render_pass(rp);
 		};
 		start_render_pass();

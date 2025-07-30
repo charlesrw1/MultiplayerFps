@@ -364,9 +364,11 @@ public:
 	void render(Model* m);
 	void output_to_path(std::string path);
 private:
-	fbohandle fbo = 0;
-	texhandle color = 0;
-	texhandle depth = 0;
+
+	IGraphicsTexture* color{};
+	IGraphicsTexture* depth{};
+
+
 	Texture* vts_handle = nullptr;
 	handle<Render_Object> object;
 	Render_Pass pass;
@@ -484,7 +486,7 @@ public:
 		IGraphicsTexture* last_scene_color{};
 		IGraphicsTexture* scene_depth{};
 
-		IGraphicsTexture* scene_gbuffer0{};	// also used to resolve TAA into since its rgbf16
+		IGraphicsTexture* scene_gbuffer0{};	// also used to resolve TAA into since its rgbf16 (and also used as a texture to read from for transparent fx)
 		IGraphicsTexture* scene_gbuffer1{};
 		IGraphicsTexture* scene_gbuffer2{};
 
@@ -535,6 +537,8 @@ public:
 		Texture* editorSel_vts_handle = nullptr;
 		Texture* postProcessInput_vts_handle = nullptr;
 		Texture* scene_motion_vts_handle = nullptr;
+
+		Texture* read_scene_color_for_transparents_handle = nullptr;
 	}tex;
 
 	struct uniform_buffers {
