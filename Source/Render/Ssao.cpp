@@ -95,8 +95,11 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 		glDeleteTextures(1, &texture.viewnormal);
 		glDeleteFramebuffers(1, &fbo.viewnormal);
 
-		glDeleteTextures(1, &texture.result);
-		glDeleteTextures(1, &texture.blur);
+		//glDeleteTextures(1, &texture.result);
+		//glDeleteTextures(1, &texture.blur);
+		safe_release(texture.blurred);
+		safe_release(texture.result);
+
 
 		glDeleteFramebuffers(1, &fbo.finalresolve);
 
@@ -131,19 +134,27 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	glCreateFramebuffers(1, &fbo.viewnormal);
 	glNamedFramebufferTexture(fbo.viewnormal, GL_COLOR_ATTACHMENT0, texture.viewnormal, 0);
 
-	glCreateTextures(GL_TEXTURE_2D, 1, &texture.result);
-	glTextureStorage2D(texture.result, 1, GL_RG16F, width, height);
-	glTextureParameteri(texture.result, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.result, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	//glCreateTextures(GL_TEXTURE_2D, 1, &texture.result);
+	//glTextureStorage2D(texture.result, 1, GL_RG16F, width, height);
+	//glTextureParameteri(texture.result, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	//glTextureParameteri(texture.result, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-	glCreateTextures(GL_TEXTURE_2D, 1, &texture.blur);
-	glTextureStorage2D(texture.blur, 1, GL_RG16F, width, height);
-	glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	CreateTextureArgs resultArgs;
+	resultArgs.width = width;
+	resultArgs.height = height;
+	resultArgs.sampler_type = GraphicsSamplerType::LinearClamped;
+	resultArgs.format = GraphicsTextureFormat::rg16f;
+	texture.result = IGraphicsDevice::inst->create_texture(resultArgs);
+	texture.blurred = IGraphicsDevice::inst->create_texture(resultArgs);
+
+//	glCreateTextures(GL_TEXTURE_2D, 1, &texture.blur);
+	//glTextureStorage2D(texture.blur, 1, GL_RG16F, width, height);
+	//glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	//glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	glCreateFramebuffers(1, &fbo.finalresolve);
-	glNamedFramebufferTexture(fbo.finalresolve, GL_COLOR_ATTACHMENT0, texture.result, 0);
-	glNamedFramebufferTexture(fbo.finalresolve, GL_COLOR_ATTACHMENT1, texture.blur, 0);
+	glNamedFramebufferTexture(fbo.finalresolve, GL_COLOR_ATTACHMENT0, texture.result->get_internal_handle(), 0);
+	glNamedFramebufferTexture(fbo.finalresolve, GL_COLOR_ATTACHMENT1, texture.blurred->get_internal_handle(), 0);
 
 	GLenum drawbuffers[NUM_MRT];
 	for (int layer = 0; layer < NUM_MRT; layer++)
@@ -183,9 +194,9 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	this->width = width;
 	this->height = height;
 
+	texture.blur_vts_handle->update_specs_ptr(texture.result);
+	texture.result_vts_handle->update_specs_ptr(texture.blurred);
 	// FIXME
-	//texture.blur_vts_handle->update_specs(texture.result, width, height, 2, {});
-	//texture.result_vts_handle->update_specs(texture.blur, width, height, 2, {});
 	//texture.view_normal_vts_handle->update_specs(texture.viewnormal, width, height, 4, {});
 	//texture.linear_depth_vts_handle->update_specs(texture.depthlinear, width, height, 4, {});
 }
@@ -436,7 +447,7 @@ void SSAO_System::render()
 			// framebuffer = fbo.finalresolve
 			glNamedFramebufferDrawBuffer(fbo.finalresolve, GL_COLOR_ATTACHMENT1);
 			//*glDrawBuffer(GL_COLOR_ATTACHMENT1);
-			glBindTextureUnit(0, texture.result);
+			glBindTextureUnit(0, texture.result->get_internal_handle());
 			shader.set_float("g_Sharpness",
 				tweak.blur_sharpness);
 			shader.set_vec2("g_InvResolutionDirection", glm::vec2(
@@ -447,7 +458,7 @@ void SSAO_System::render()
 
 			glNamedFramebufferDrawBuffer(fbo.finalresolve, GL_COLOR_ATTACHMENT0);
 			//*glDrawBuffer(GL_COLOR_ATTACHMENT0);
-			glBindTextureUnit(0, texture.blur);
+			glBindTextureUnit(0, texture.blurred->get_internal_handle());
 			shader.set_vec2("g_InvResolutionDirection", glm::vec2(
 				0,
 				1.0f / float(height)

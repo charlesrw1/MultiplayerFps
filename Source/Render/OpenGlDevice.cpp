@@ -14,12 +14,78 @@ template<typename T>
 using opt = std::optional<T>;
 using std::string;
 
+int total_gfx_mem_usage = 0;
 
 IGraphicsDevice* IGraphicsDevice::inst = nullptr;
 extern ConfigVar log_shader_compiles;
 
 class OpenGLTextureImpl : public IGraphicsTexture {
 public:
+	static double get_bytes_per_pixel(GraphicsTextureFormat fmt) {
+		switch (fmt)
+		{
+		case GraphicsTextureFormat::r8: return 1;
+			break;
+		case GraphicsTextureFormat::rg8: return 2;
+			break;
+		case GraphicsTextureFormat::rgb8:return 4;
+			break;
+		case GraphicsTextureFormat::rgba8:return 4;
+			break;
+		case GraphicsTextureFormat::r16f: return 2;
+			break;
+		case GraphicsTextureFormat::rg16f: return 4;
+			break;
+		case GraphicsTextureFormat::rgb16f: return 8;
+			break;
+		case GraphicsTextureFormat::rgba16f: return 8;
+			break;
+		case GraphicsTextureFormat::r32f: return 4;
+			break;
+		case GraphicsTextureFormat::rg32f: return 8;
+			break;
+		case GraphicsTextureFormat::bc1: return 0.5;
+			break;
+		case GraphicsTextureFormat::bc3: return 1;
+			break;
+		case GraphicsTextureFormat::bc4: return 1;
+			break;
+		case GraphicsTextureFormat::bc5: return 1;
+			break;
+		case GraphicsTextureFormat::bc6: return 1;//fixme
+			break;
+		case GraphicsTextureFormat::depth24f: return 4;
+			break;
+		case GraphicsTextureFormat::depth32f: return 4;
+			break;
+		case GraphicsTextureFormat::depth24stencil8: return 4;
+			break;
+		case GraphicsTextureFormat::r11f_g11f_b10f: return 4;
+			break;
+		case GraphicsTextureFormat::rgba16_snorm: return 8;
+			break;
+		default:
+			break;
+		}
+		return 0;
+	}
+
+	static int estimate_memory_usage(const CreateTextureArgs& args) {
+		double bytes_per_pixel = get_bytes_per_pixel(args.format);
+		int total = 0;
+		int x = args.width;
+		int y = args.height;
+		for (int i = 0; i < args.num_mip_maps; i++) {
+			total += x * y * bytes_per_pixel;
+			x >>= 2;
+			y >>= 2;
+		}
+		if (args.type == GraphicsTextureType::t2DArray)
+			total = total * args.depth_3d;
+		
+		return total;
+	}
+
 	static GLenum to_type(GraphicsTextureType type) {
 		switch (type)
 		{
@@ -149,8 +215,11 @@ public:
 		ASSERT(0 && "wrap_to_gl not defined");
 		return 0;
 	}
+	int mem_usage = 0;
 	OpenGLTextureImpl() = default;
 	OpenGLTextureImpl(const CreateTextureArgs& args) {
+		mem_usage = estimate_memory_usage(args);
+		total_gfx_mem_usage += mem_usage;
 		auto type = to_type(args.type);
 		glCreateTextures(type, 1, &id);
 		const int x = args.width;
@@ -224,6 +293,7 @@ public:
 	}
 	~OpenGLTextureImpl() override {
 		glDeleteTextures(1, &id);
+		total_gfx_mem_usage -= mem_usage;
 	}
 
 	texhandle id = 0;

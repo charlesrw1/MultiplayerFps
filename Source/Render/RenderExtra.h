@@ -136,6 +136,8 @@ public:
 	bool targets_dirty = false;
 };
 
+// uses old fbohandle and texhandle instead of being wrapped in IGraphicsTexture 
+// Nvidia wrote the hbao code and im afraid to break it so just leaving it for now
 class SSAO_System
 {
 public:
@@ -166,9 +168,10 @@ public:
 	}prog;
 
 	struct textures {
+		IGraphicsTexture* result = nullptr;
+		IGraphicsTexture* blurred = nullptr;
+
 		texhandle random = 0;
-		texhandle result = 0;
-		texhandle blur = 0;
 		texhandle viewnormal = 0;
 		texhandle depthlinear = 0;
 		texhandle deptharray = 0;

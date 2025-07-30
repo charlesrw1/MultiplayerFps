@@ -478,17 +478,7 @@ public:
 		program_handle height_fog{};
 	}prog;
 
-	struct framebuffers {
-		//fbohandle reflected_scene{};
-		//fbohandle taa_resolve{};
-		//fbohandle taa_blit{};
-
-		//fbohandle bloom{};
-
-
-	}fbo;
-
-
+	
 	struct textures {
 		IGraphicsTexture* scene_color{};
 		IGraphicsTexture* last_scene_color{};

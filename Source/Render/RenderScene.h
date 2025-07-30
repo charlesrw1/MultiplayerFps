@@ -178,8 +178,8 @@ struct Render_Lists
 	// for now its just set to batches[i].count in the Render_Pass
 	// when calling glMDEI, the offset into commands is the summation of previous command counts essentially
 	// it works like an indirection into commands
-	std::vector<uint32_t> command_count;
-	bufferhandle gpu_command_count = 0;
+	std::vector<int> command_count;
+	//bufferhandle gpu_command_count = 0;
 
 	// maps the gl_DrawID to submesh material (dynamically uniform for bindless)
 	bufferhandle gldrawid_to_submesh_material;

@@ -975,6 +975,7 @@ public:
 		draw.get_device().set_depth_write_enabled(b);
 	}
 };
+extern int total_gfx_mem_usage;
 
 void Renderer::init()
 {
@@ -1029,8 +1030,10 @@ void Renderer::init()
 	//brdf_lut->height = EnviornmentMapHelper::BRDF_PREINTEGRATE_LUT_SIZE;
 	//brdf_lut->type = Texture_Type::TEXTYPE_2D;
 	//FIXME
-
 	consoleCommands = ConsoleCmdGroup::create("");
+	consoleCommands->add("print_gfx_mem", [](const Cmd_Args&) {
+		sys_print(Info, "%d\n", total_gfx_mem_usage);
+		});
 	consoleCommands->add("cot", [this](const Cmd_Args& args) { debug_tex_out.output_tex = nullptr; });
 	consoleCommands->add("ot", [this](const Cmd_Args& args) { 
 		static const char* usage_str = "Usage: ot <scale:float> <alpha:float> <mip/slice:float> <texture_name>\n";
@@ -1409,7 +1412,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 	device.reset_states();
 }
 
-inline void setup_batch(Render_Lists& list,
+void setup_batch(Render_Lists& list,
 	Render_Pass& pass,
 	bool depth_test_enabled,
 	bool force_show_backfaces,
@@ -1452,7 +1455,8 @@ inline void setup_batch(Render_Lists& list,
 		draw.bind_texture(i, id);
 	}
 }
-inline void setup_execute_render_lists(Render_Lists& list,Render_Pass& pass) {
+ConfigVar use_client_buffer_mdi("use_client_buffer_mdi", "0", CVAR_BOOL, "");
+void setup_execute_render_lists(Render_Lists& list,Render_Pass& pass) {
 	auto& scene = draw.scene;
 	
 	IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
@@ -1462,8 +1466,10 @@ inline void setup_execute_render_lists(Render_Lists& list,Render_Pass& pass) {
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, material_buffer->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, list.glinstance_to_instance);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-
+	if (use_client_buffer_mdi.get_bool())
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+	else
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, list.gpu_command_list);
 
 	if (scene.has_lightmap && scene.lightmapObj.lightmap_texture) {
 		auto texture = scene.lightmapObj.lightmap_texture;
@@ -1484,16 +1490,23 @@ void Renderer::execute_render_lists(
 {
 	setup_execute_render_lists(list, pass);
 	int offset = 0;
+	const int DEIcmdSz = sizeof(gpu::DrawElementsIndirectCommand);
 	for (int i = 0; i < pass.batches.size(); i++) {
 		setup_batch(list, pass, depth_test_enabled, force_show_backfaces, depth_less_than_op, i, offset);
 		const int count = list.command_count[i];
 
 		const GLenum index_type = MODEL_INDEX_TYPE_GL;
 
+		void* indirect_ptr = nullptr;
+		if (use_client_buffer_mdi.get_bool())
+			indirect_ptr = (void*)(list.commands.data() + offset);
+		else
+			indirect_ptr = (void*)(int64_t(offset * DEIcmdSz));
+
 		glMultiDrawElementsIndirect(
 			GL_TRIANGLES,
 			index_type,
-			(void*)(list.commands.data() + offset),
+			indirect_ptr,
 			count,
 			sizeof(gpu::DrawElementsIndirectCommand)
 		);
@@ -1502,6 +1515,7 @@ void Renderer::execute_render_lists(
 
 		stats.total_draw_calls++;
 	}
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 }
 
 void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass,
@@ -1518,17 +1532,15 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass,
 		const auto& batch = pass.batches[i];
 		const GLenum index_type = MODEL_INDEX_TYPE_GL;
 		for (int dc = 0; dc < batch.count; dc++) {
-			auto& cmd = list.commands[offset + dc];
+			auto& cmd = list.commands.at(offset + dc);
 
-			#pragma warning(disable : 4312)	// (void*) casting
 			glDrawElementsInstancedBaseVertexBaseInstance(GL_TRIANGLES,
 				cmd.count,
 				index_type,
-				(void*)(cmd.firstIndex * MODEL_BUFFER_INDEX_TYPE_SIZE),
+				(void*)(int64_t(cmd.firstIndex * MODEL_BUFFER_INDEX_TYPE_SIZE)),
 				cmd.primCount,
 				cmd.baseVertex,
 				cmd.baseInstance);
-			#pragma warning(default : 4312)
 
 			stats.total_draw_calls++;
 		}
@@ -1924,6 +1936,8 @@ void Render_Lists::init(uint32_t drawbufsz, uint32_t instbufsz)
 {
 	glCreateBuffers(1, &gldrawid_to_submesh_material);
 	glCreateBuffers(1, &glinstance_to_instance);
+	glCreateBuffers(1, &gpu_command_list);
+
 }
 
 
@@ -1953,7 +1967,11 @@ static void build_standard_cpu(
 	}
 
 	glNamedBufferData(list.glinstance_to_instance, sizeof(uint32_t) * objCount, glinstance_to_instance, GL_DYNAMIC_DRAW);
+
+	const int command_list_size_bytes = sizeof(gpu::DrawElementsIndirectCommand) * list.commands.size();
+	glNamedBufferData(list.gpu_command_list, command_list_size_bytes, list.commands.data(), GL_DYNAMIC_DRAW);
 }
+
 
 static void build_cascade_cpu(
 	Render_Lists& shadowlist,
@@ -1988,6 +2006,10 @@ static void build_cascade_cpu(
 
 	glNamedBufferData(shadowlist.glinstance_to_instance, sizeof(uint32_t) * objCount, nullptr, GL_DYNAMIC_DRAW);
 	glNamedBufferSubData(shadowlist.glinstance_to_instance, 0, sizeof(uint32_t) * objCount, glinstance_to_instance);
+
+	auto& list = shadowlist;
+	const int command_list_size_bytes = sizeof(gpu::DrawElementsIndirectCommand) * list.commands.size();
+	glNamedBufferData(list.gpu_command_list, command_list_size_bytes, list.commands.data(), GL_DYNAMIC_DRAW);
 }
 
 void Render_Pass::merge_static_to_dynamic(bool* vis_array, int8_t* lod_array, Free_List<ROP_Internal>& objs)
@@ -2021,16 +2043,16 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 	int base_instance = 0;
 	int new_verts_drawn = 0;
 	for (int i = 0; i < src.batches.size(); i++) {
-		Multidraw_Batch& mdb = src.batches[i];
+		const Multidraw_Batch& mdb = src.batches[i];
 
 
 		for (int j = 0; j < mdb.count; j++) {
-			Mesh_Batch& meshb = src.mesh_batches[mdb.first + j];
-			auto& obj = src.objects[meshb.first];
-			Render_Object& proxy = proxy_list.get(obj.render_obj.id).proxy;
+			const Mesh_Batch& meshb = src.mesh_batches[mdb.first + j];
+			const Pass_Object& obj = src.objects[meshb.first];
+			const Render_Object& proxy = proxy_list.get(obj.render_obj.id).proxy;
 		
 
-			auto& part = proxy.model->get_part(obj.submesh_index);// mesh.parts[obj.submesh_index];
+			const Submesh& part = proxy.model->get_part(obj.submesh_index);// mesh.parts[obj.submesh_index];
 			gpu::DrawElementsIndirectCommand cmd;
 
 			cmd.baseVertex = part.base_vertex + proxy.model->get_merged_vertex_ofs();
@@ -2046,7 +2068,7 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 
 			base_instance += meshb.count;
 
-			auto batch_material = meshb.material;
+			const MaterialInstance* const batch_material = meshb.material;
 
 			assert(draw_to_material_index < src.mesh_batches.size());
 			draw_to_material[draw_to_material_index++] = batch_material->impl->gpu_buffer_offset;
@@ -2056,7 +2078,6 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 
 		command_count.push_back(mdb.count);
 	}
-
 
 	glNamedBufferData(gldrawid_to_submesh_material, sizeof(uint32_t) * draw_to_material_index, draw_to_material, GL_DYNAMIC_DRAW);
 
@@ -2769,8 +2790,9 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 
 	//auto scope = device.start_render_pass(setup);
 	const bool wants_ssao = !is_cubemap_view && enable_ssao.get_bool();
-	const texhandle ssao_tex = (wants_ssao) ? ssao.texture.result : white_texture->get_internal_handle();	// skip ssao in cubemap view
+	IGraphicsTexture* const ssao_tex = (wants_ssao) ? ssao.texture.result : white_texture;	// skip ssao in cubemap view
 	glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 
 	device.reset_states();
 	if(!r_no_indirect.get_bool())
@@ -2787,7 +2809,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		bind_texture_ptr(1, tex.scene_gbuffer1);
 		bind_texture_ptr(2, tex.scene_gbuffer2);
 		bind_texture_ptr(3, tex.scene_depth);
-		bind_texture(4, ssao_tex);
+		bind_texture_ptr(4, ssao_tex);
 
 		for (int i = 0; i < 6; i++)
 			shader().set_vec3(string_format("AmbientCube[%d]", i), glm::vec3(0.f));
@@ -2926,7 +2948,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		state.depth_testing = false;
 		state.depth_writes = false;
 		device.set_pipeline(state);
-		bind_texture(4, ssao_tex);
+		bind_texture_ptr(4, ssao_tex);
 		bind_texture_ptr(5, reflectionProbeTex->gpu_ptr);
 		bind_texture(6, EnviornmentMapHelper::get().integrator.get_texture());
 		shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
@@ -3123,6 +3145,7 @@ void Renderer::deferred_decal_pass()
 	setup2.color_infos = color_targets;
 	IGraphicsDevice::inst->set_render_pass(setup2);
 
+	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 
 	static Model* cube = find_global_asset_s<Model>("eng/cube.cmdl");	// cube model
 	assert(cube->is_this_globally_referenced());
