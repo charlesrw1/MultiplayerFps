@@ -59,7 +59,6 @@ public:
 	bool has_mips = false;
 	bool is_float = false;
 
-	IGraphicsTexture* gpu_ptr = nullptr;
 
 #ifdef EDITOR_BUILD
 	bool hasSimplifiedColor = false;
@@ -73,6 +72,7 @@ public:
 	static int get_mip_map_count(int width, int height){
 		return glm::floor(glm::log2((double)glm::max(width, height))) + 1;
 	}
+	IGraphicsTexture* gpu_ptr = nullptr;
 private:
 	struct LoadData {
 		std::vector<uint8_t> filedata;

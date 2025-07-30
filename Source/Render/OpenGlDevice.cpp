@@ -14,99 +14,10 @@ template<typename T>
 using opt = std::optional<T>;
 using std::string;
 
+
 IGraphicsDevice* IGraphicsDevice::inst = nullptr;
 extern ConfigVar log_shader_compiles;
-class OpenGLProgramImpl : public IGraphicsProgram {
-public:
-	static string compute_hash_for_program_def(const CreateProgramArgs& args)
-	{
-		string inp = std::string(args.file_name) + std::string(args.defines);// def.vert + def.frag + def.geo + def.defines;
-		return StringUtils::alphanumeric_hash(inp);
-	}
-	void recompile(const CreateProgramArgs& args) {
-		string file_name = std::string(args.file_name);
-		string hashed_path = compute_hash_for_program_def(args)+".bin";
-		//Shader::compile_vert_frag_single_file(&id, std::string(args.file_name), std::string(args.defines));
-		compile_failed = false;
-		auto binFile = FileSys::open_read(hashed_path.c_str(), FileSys::SHADER_CACHE);
-		auto shaderFile = FileSys::open_read_engine(file_name.c_str());
-		if (shaderFile && binFile) {
-			if (shaderFile->get_timestamp() <= binFile->get_timestamp()) {
-				if (log_shader_compiles.get_bool())
-					sys_print(Debug, "Program_Manager::recompile: loading cached binary: %s\n", hashed_path.data());
 
-				// load cached binary
-				BinaryReader reader(binFile.get());
-				auto sourceType = reader.read_int32();
-				auto len = reader.read_int32();
-				vector<uint8_t> bytes(len, 0);
-				reader.read_bytes_ptr(bytes.data(), bytes.size());
-
-				if (shader_obj.ID != 0) {
-					glDeleteProgram(shader_obj.ID);
-				}
-				shader_obj.ID = glCreateProgram();
-				glProgramBinary(shader_obj.ID, sourceType, bytes.data(), bytes.size());
-				glValidateProgram(shader_obj.ID);
-
-				GLint success = 0;
-				glGetProgramiv(shader_obj.ID, GL_LINK_STATUS, &success);
-				if (success == GL_FALSE) {
-					GLint logLength = 0;
-					glGetProgramiv(shader_obj.ID, GL_INFO_LOG_LENGTH, &logLength);
-					std::vector<GLchar> log(logLength);
-					glGetProgramInfoLog(shader_obj.ID, logLength, nullptr, log.data());
-					sys_print(Error, "Program_Manager::recompile: loading binary failed: %s\n", log.data());
-				}
-				else {
-					return;	// done
-				}
-			}
-		}
-		binFile.reset();
-
-		// fail path
-		compile_failed = Shader::compile_vert_frag_single_file(&shader_obj, file_name, std::string(args.defines)) != ShaderResult::SHADER_SUCCESS;
-
-		if (!compile_failed) {
-			const auto program = shader_obj.ID;
-			GLint length = 0;
-			glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
-			if (log_shader_compiles.get_bool())
-				sys_print(Debug, "Program_Manager::recompile: saving cached binary: %s\n", hashed_path.data());
-			vector<uint8_t> bytes(length, 0);
-			GLenum outType = 0;
-			glGetProgramBinary(shader_obj.ID, bytes.size(), nullptr, &outType, bytes.data());
-			FileWriter writer(bytes.size() + 8);
-			writer.write_int32(outType);
-			writer.write_int32(bytes.size());
-			writer.write_bytes_ptr(bytes.data(), bytes.size());
-			auto outFile = FileSys::open_write(hashed_path.c_str(), FileSys::SHADER_CACHE);
-			if (outFile) {
-				outFile->write(writer.get_buffer(), writer.get_size());
-			}
-			else {
-				sys_print(Error, "Program_Manager::recompile: couldnt open file to write program binary: %s\n", hashed_path.data());
-			}
-		}
-
-	}
-
-	OpenGLProgramImpl(const CreateProgramArgs& args) {
-		recompile(args);
-	}
-
-	bool compile_failed = true;
-	Shader shader_obj;
-
-	uint32_t get_internal_handle() override {
-		return shader_obj.ID;
-	}
-
-	void release() override {
-
-	}
-};
 class OpenGLTextureImpl : public IGraphicsTexture {
 public:
 	static GLenum to_type(GraphicsTextureType type) {
@@ -515,7 +426,7 @@ public:
 
 	OpenGLTextureImpl swapchain_fake_img;
 
-	OpenGLDeviceImpl() {
+	OpenGLDeviceImpl(ThingerBobber* f) : thinger_bobber(f) {
 		glGenFramebuffers(1, &shared_framebuffer);
 		glGenFramebuffers(1, &shared_framebuffer_2);
 	}
@@ -527,9 +438,7 @@ public:
 	{
 		return GraphicsDeviceType::OpenGl;
 	}
-	void set_pipeline(const GraphicsPipelineState& state) override
-	{
-	}
+
 	void set_framebuffer_with_info(const RenderPassState& state, fbohandle framebuffer_to_use, int& min_width, int& min_height) {
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_to_use);
 		for (int i = 0; i < state.color_infos.size(); i++) {
@@ -590,8 +499,8 @@ public:
 			if (state.wants_color_clear)
 				mask |= GL_COLOR_BUFFER_BIT;
 
-			//set_depth_write_enabled(true);	// ugh: glDepthMask applies to glClear also
-			glDepthMask(GL_TRUE);
+
+			thinger_bobber->set_depth_write_enabled(true);
 			glClear(mask);
 			//activeStats.framebuffer_clears++;
 		}
@@ -637,44 +546,6 @@ public:
 		return &swapchain_fake_img;
 	}
 
-	void set_viewport(int x, int y, int w, int h) override
-	{
-	}
-	void set_scissor(int x, int y, int w, int h) override
-	{
-	}
-	void clear_scissor() override
-	{
-	}
-	void draw_arrays(int ofs, int count) override
-	{
-		
-	}
-	void draw_elements(int ofs, int count) override
-	{
-	}
-	void multi_draw_elements_indirect(IGraphicsBuffer* buffer, int ofs, int count) override
-	{
-		
-	}
-	void bind_storage_buffers(int start, std::span<IGraphicsBuffer* const> buffers) override
-	{
-		int index = start;
-		for (IGraphicsBuffer* bufferOpaque : buffers) {
-			OpenGLBufferImpl* buffer = (OpenGLBufferImpl*)bufferOpaque;
-			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, index, buffer->id);
-			index += 1;
-		}
-	}
-	void bind_textures(int start, std::span<IGraphicsTexture* const> textures) override
-	{
-		
-	}
-	IGraphicsProgram* create_program(const CreateProgramArgs& args) override
-	{
-		OpenGLProgramImpl* program = new OpenGLProgramImpl(args);
-		return program;
-	}
 	IGraphicsTexture* create_texture(const CreateTextureArgs& args) override {
 		return new OpenGLTextureImpl(args);
 	}
@@ -688,9 +559,10 @@ public:
 	}
 
 private:
+	ThingerBobber* thinger_bobber = nullptr;
 	opt<RenderPassState> cur_pass;
 };
-IGraphicsDevice* IGraphicsDevice::create_opengl_device() {
-	return new OpenGLDeviceImpl();
+IGraphicsDevice* IGraphicsDevice::create_opengl_device(ThingerBobber* f) {
+	return new OpenGLDeviceImpl(f);
 }
 #endif

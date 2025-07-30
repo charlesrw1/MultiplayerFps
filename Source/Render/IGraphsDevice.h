@@ -4,6 +4,9 @@
 #include <span>
 #include <string_view>
 #include <optional>
+
+// A FAILED HALF IMPLMENTED GARBAGE F*KING REFACTOR
+
 enum BindingBits {
 	BINDING_FRAGMENT=1,
 	BINDING_VERTEX=2,
@@ -30,10 +33,6 @@ enum class GraphicsVertexAttribType {
 enum class GraphicsDeviceType {
 	Unknown,
 	OpenGl,
-	Vulkan,
-	Directx11,
-	Directx12,
-	Metal,
 };
 
 enum GraphicsBufferUseFlags {
@@ -119,12 +118,7 @@ public:
 	virtual uint32_t get_internal_handle() = 0;
 };
 
-class IGraphicsProgram {
-public:
-	virtual ~IGraphicsProgram() {}
-	virtual void release() = 0;
-	virtual uint32_t get_internal_handle() = 0;
-};
+
 
 // like a VAO in opengl.
 // enacapsulates vertex buffer, index buffer, vertex attribute state, index type
@@ -162,20 +156,6 @@ struct RenderPassState {
 	bool wants_color_clear = false;
 	bool wants_depth_clear = false;
 	float clear_depth_val = 0.0;
-};
-
-
-
-struct GraphicsPipelineState {
-	bool backface_culling = true;
-	bool cull_front_face = false;
-	bool depth_testing = true;
-	bool depth_less_than = false;
-	bool depth_writes = true;
-	//blend_state blend = blend_state::OPAQUE;
-	GraphicsPrimitiveType primitive = GraphicsPrimitiveType::Triangles;
-	IGraphicsProgram* program = nullptr;
-	IGraphicsVertexInput* vertex_input = nullptr;
 };
 
 
@@ -259,38 +239,24 @@ struct GraphicsBlitInfo {
 	GraphicsBlitTarget dest;
 	GraphicsFilterType filter = GraphicsFilterType::Nearest;
 };
-
+class ThingerBobber {
+public:
+	virtual void set_depth_write_enabled(bool b) = 0;
+};
 class IGraphicsDevice {
 public:
 	static IGraphicsDevice* inst;
-	static IGraphicsDevice* create_opengl_device();
+	static IGraphicsDevice* create_opengl_device(ThingerBobber* FUUUUUUUCK);
 
 	virtual ~IGraphicsDevice() {}
 
 	virtual GraphicsDeviceType get_device_type() = 0;
 	virtual IGraphicsTexture* get_swapchain_texture() = 0;
 
-	// pipelines bundle all the state you need for a draw call
-	virtual void set_pipeline(const GraphicsPipelineState& state) = 0;
-
 	// render passes describe what you are rendering to
 	virtual void set_render_pass(const RenderPassState& state) = 0;
 	virtual void blit_textures(const GraphicsBlitInfo& info) = 0;
 
-	// when starting a renderpass, viewport is automatically set. can also manually set it here
-	// same for scissor. starting renderpass clears scissor, can set and clear it manually also
-	virtual void set_viewport(int x, int y, int w, int h) = 0;
-	virtual void set_scissor(int x, int y, int w, int h) = 0;
-	virtual void clear_scissor() = 0;
-
-	virtual void draw_arrays(int offset, int count) = 0;
-	virtual void draw_elements(int offset, int count) = 0;
-	virtual void multi_draw_elements_indirect(IGraphicsBuffer* buffer, int offset, int count) = 0;
-
-	virtual void bind_storage_buffers(int start, std::span<IGraphicsBuffer* const> buffers) = 0;
-	virtual void bind_textures(int start, std::span<IGraphicsTexture* const> textures) = 0;
-
-	virtual IGraphicsProgram* create_program(const CreateProgramArgs& args) = 0;
 	virtual IGraphicsTexture* create_texture(const CreateTextureArgs& args) = 0;
 	virtual IGraphicsBuffer* create_buffer(const CreateBufferArgs& args) = 0;
 	virtual IGraphicsVertexInput* create_vertex_input(const CreateVertexInputArgs& args) = 0;

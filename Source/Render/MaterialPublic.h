@@ -11,6 +11,7 @@
 #include "DynamicMaterialPtr.h"
 #include "Framework/ConsoleCmdGroup.h"
 #include "Framework/MulticastDelegate.h"
+#include "Framework/SharedPtr.h"
 
 class MasterMaterialImpl;
 class Texture;
@@ -65,15 +66,6 @@ protected:
 };
 
 
-class IBakedLightingValuesFactory : public ClassBase {
-public:
-	CLASS_BODY(IBakedLightingValuesFactory);
-	virtual bool get_baked_values(const MaterialInstance* instance, Color32& out_albedo, Color32& out_emissive) = 0;
-};
-#include <memory>
-template<typename T>
-using sptr = std::shared_ptr<T>;
-
 class MaterialManagerPublic 
 {
 public:
@@ -88,7 +80,6 @@ public:
 	sptr<MaterialInstance> get_fallback_sptr() { return fallback; }
 	sptr<MaterialInstance> get_default_billboard_sptr() { return defaultBillboard; }
 protected:
-	uptr<IBakedLightingValuesFactory> bakedFactory;
 	sptr<MaterialInstance> defaultBillboard = nullptr;
 	sptr<MaterialInstance> fallback = nullptr;
 };

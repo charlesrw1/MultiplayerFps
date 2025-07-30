@@ -963,11 +963,18 @@ void Renderer::create_default_textures()
 	tex.scene_motion_vts_handle = Texture::install_system("_scene_motion");
 }
 
+class FuckerBobberThing : public ThingerBobber {
+public:
+	void set_depth_write_enabled(bool b) final {
+		draw.get_device().set_depth_write_enabled(b);
+	}
+};
+
 void Renderer::init()
 {
 	sys_print(Info, "--------- Initializing Renderer ---------\n");
 
-	IGraphicsDevice::inst = IGraphicsDevice::create_opengl_device();
+	IGraphicsDevice::inst = IGraphicsDevice::create_opengl_device(new FuckerBobberThing());
 
 
 	// Check hardware settings like extension availibility
@@ -1220,7 +1227,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	//glNamedFramebufferDrawBuffers(fbo.gbuffer, gbuffer_attach_count, gbuffer_attachments);
 
 	// Composite textures
-	create_and_delete_fb(fbo.composite);
+	//create_and_delete_fb(fbo.composite);
 	delete_and_create_texture(tex.output_composite, gtf::rgb8);
 	delete_and_create_texture(tex.output_composite_2, gtf::rgb8);
 
@@ -1231,7 +1238,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	//glTextureStorage2D(tex.output_composite_2, 1, GL_RGB8, s_w, s_h);
 	//set_default_parameters(tex.output_composite);
 	//set_default_parameters(tex.output_composite_2);
-	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite->get_internal_handle(), 0);
+	//glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite->get_internal_handle(), 0);
 
 
 	// write to scene gbuffer0 for taa resolve
@@ -1806,7 +1813,8 @@ void Render_Pass::make_batches(Render_Scene& scene)
 			const Render_Object* this_proxy = &scene.get(this_obj->render_obj);
 			const bool sort_key_equal = this_obj->sort_key.as_uint64() == batch_obj->sort_key.as_uint64();
 			const bool same_submesh = this_obj->submesh_index == batch_obj->submesh_index;
-			const bool can_be_merged = !no_batching_dbg&&sort_key_equal && same_submesh && type != pass_type::TRANSPARENT;	// dont merge transparent meshes into instances
+			const bool same_material = this_obj->material == batch_obj->material;
+			const bool can_be_merged = !no_batching_dbg&&same_material&&sort_key_equal && same_submesh && type != pass_type::TRANSPARENT;	// dont merge transparent meshes into instances
 			if (can_be_merged)
 				batch.count++;
 			else {
@@ -1921,8 +1929,7 @@ static void build_standard_cpu(
 		glinstance_to_instance[ofs + precount] = proxy_list.handle_to_obj[obj.render_obj.id];
 	}
 
-	glNamedBufferData(list.glinstance_to_instance, sizeof(uint32_t) * objCount, nullptr, GL_DYNAMIC_DRAW);
-	glNamedBufferSubData(list.glinstance_to_instance, 0, sizeof(uint32_t) * objCount, glinstance_to_instance);
+	glNamedBufferData(list.glinstance_to_instance, sizeof(uint32_t) * objCount, glinstance_to_instance, GL_DYNAMIC_DRAW);
 }
 
 static void build_cascade_cpu(
@@ -3441,8 +3448,16 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 		const auto& view_to_use = current_frame_view;
 		assert(cur_w == view_to_use.width && cur_h == view_to_use.height);
-		RenderPassSetup setup("composite", fbo.composite, true, true, 0, 0, view_to_use.width, view_to_use.height);
-		auto scope = device.start_render_pass(setup);
+		//RenderPassSetup setup("composite", fbo.composite, true, true, 0, 0, view_to_use.width, view_to_use.height);
+		//auto scope = device.start_render_pass(setup);
+
+		RenderPassState pass_state;
+		auto color_infos = {
+			ColorTargetInfo(tex.output_composite)
+		};
+		pass_state.color_infos = color_infos;
+		pass_state.wants_color_clear = true;
+		IGraphicsDevice::inst->set_render_pass(pass_state);
 
 		//draw_ui_local.render();
 
@@ -3451,14 +3466,23 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		if (params.output_to_screen) {
 			GPUSCOPESTART(Blit_composite_to_backbuffer);
 
-			glBlitNamedFramebuffer(
-				fbo.composite,
-				0,	/* blit to backbuffer */
-				0, 0, cur_w, cur_h,
-				0, 0, cur_w, cur_h,
-				GL_COLOR_BUFFER_BIT,
-				GL_NEAREST
-			);
+
+			GraphicsBlitInfo blitInfo;
+			blitInfo.dest.w = blitInfo.src.w = cur_w;
+			blitInfo.dest.h = blitInfo.src.h = cur_h;
+			blitInfo.dest.texture = IGraphicsDevice::inst->get_swapchain_texture();
+			blitInfo.src.texture = tex.output_composite;
+			blitInfo.filter = GraphicsFilterType::Nearest;
+			IGraphicsDevice::inst->blit_textures(blitInfo);
+
+			//glBlitNamedFramebuffer(
+			//	fbo.composite,
+			//	0,	/* blit to backbuffer */
+			//	0, 0, cur_w, cur_h,
+			//	0, 0, cur_w, cur_h,
+			//	GL_COLOR_BUFFER_BIT,
+			//	GL_NEAREST
+			//);
 		}
 		return;
 	}
@@ -3476,7 +3500,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	auto gbuffer_pass = [&](bool is_wireframe = false, bool wireframe_secondpass = false) {
 		if (r_skip_gbuffer.get_bool())
 			return;
-
 
 		const auto& view_to_use = current_frame_view;
 
@@ -3499,25 +3522,22 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		setup2.set_clear_both(clear_framebuffer);
 		IGraphicsDevice::inst->set_render_pass(setup2);
 
-		{
-			GPUSCOPESTART(GbufferPass);
+		GPUSCOPESTART(GbufferPass);
 
-			Render_Level_Params cmdparams(
-				view_to_use,
-				&scene.gbuffer_rlist,
-				&scene.gbuffer_pass,
-				Render_Level_Params::OPAQUE
-			);
+		Render_Level_Params cmdparams(
+			view_to_use,
+			&scene.gbuffer_rlist,
+			&scene.gbuffer_pass,
+			Render_Level_Params::OPAQUE
+		);
 
-			cmdparams.upload_constants = true;
-			cmdparams.provied_constant_buffer = ubo.current_frame;
-			cmdparams.draw_viewmodel = true;
-			cmdparams.wireframe_secondpass = wireframe_secondpass;
-			cmdparams.is_wireframe_pass = is_wireframe;
+		cmdparams.upload_constants = true;
+		cmdparams.provied_constant_buffer = ubo.current_frame;
+		cmdparams.draw_viewmodel = true;
+		cmdparams.wireframe_secondpass = wireframe_secondpass;
+		cmdparams.is_wireframe_pass = is_wireframe;
 
-			render_level_to_target(cmdparams);
-		}
-	
+		render_level_to_target(cmdparams);
 	};
 
 	if (is_wireframe_mode) {
@@ -3546,7 +3566,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 	//draw_height_fog();
 
-	{
+	auto draw_forward_pass = [&]() {
 		GPUSCOPESTART(ForwardPass);
 
 		const auto& view_to_use = current_frame_view;
@@ -3558,6 +3578,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 			ColorTargetInfo(tex.scene_color)
 		};
 		state.depth_info = tex.scene_depth;
+		state.color_infos = color_info;
 		IGraphicsDevice::inst->set_render_pass(state);
 
 
@@ -3567,7 +3588,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 			&scene.transparent_pass,
 			Render_Level_Params::FORWARD_PASS
 		);
-		
+
 		params.upload_constants = true;
 		params.provied_constant_buffer = ubo.current_frame;
 		params.draw_viewmodel = true;
@@ -3575,7 +3596,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		render_level_to_target(params);
 
 		render_particles();
-	}
+	};
+	draw_forward_pass();
 
 
 	// cubemap views end here
@@ -3613,11 +3635,11 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	device.reset_states();
 	
 	// mesh builder stuff
-	{
+	auto draw_mesh_builders = [&]() {
 		const auto& view_to_use = current_frame_view;
 		//RenderPassSetup setup("meshbuilders", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
 		//auto scope = device.start_render_pass(setup);
-		
+
 		auto start_render_pass = [&]() {
 			auto targets = {
 				ColorTargetInfo(tex.scene_color)
@@ -3629,7 +3651,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		start_render_pass();
 
 		draw_meshbuilders();
-	}
+	};
+	draw_mesh_builders();
 
 	auto taa_resolve_pass = [&]() -> texhandle {
 		GPUSCOPESTART(TaaResolve);
@@ -3687,76 +3710,95 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	// Bloom update
 	render_bloom_chain(scene_color_handle);
 
-	{
-		const auto& view_to_use = current_frame_view;
-		assert(cur_w == view_to_use.width && cur_h == view_to_use.height);
-		RenderPassSetup setup("composite", fbo.composite, true, false, 0, 0, view_to_use.width, view_to_use.height);
-		auto scope = device.start_render_pass(setup);
+	IGraphicsTexture* read_from_texture = tex.output_composite;
+	const auto& view_to_use = current_frame_view;
+	assert(cur_w == view_to_use.width && cur_h == view_to_use.height);
+	//RenderPassSetup setup("composite", fbo.composite, true, false, 0, 0, view_to_use.width, view_to_use.height);
+	//auto scope = device.start_render_pass(setup);
 
+	auto set_composite_pass = [&]() {
+		RenderPassState pass_state;
+		pass_state.wants_color_clear = true;
+		auto color_infos = {
+			ColorTargetInfo(read_from_texture)
+		};
+		pass_state.color_infos = color_infos;
+		IGraphicsDevice::inst->set_render_pass(pass_state);
+	};
+	set_composite_pass();
 
-		{
-			RenderPipelineState state;
-			state.program = prog.combine;
-			state.vao = get_empty_vao();
-			device.set_pipeline(state);
+	auto do_composite_pass = [&]() {
+		RenderPipelineState state;
+		state.program = prog.combine;
+		state.vao = get_empty_vao();
+		device.set_pipeline(state);
 
-			IGraphicsTexture* bloom_tex = tex.bloom_chain[0].texture;
-			if (!enable_bloom.get_bool())
-				bloom_tex = black_texture;
-			bind_texture(0, scene_color_handle);
-			bind_texture_ptr(1, bloom_tex);
-			bind_texture_ptr(2, lens_dirt->gpu_ptr);
+		IGraphicsTexture* bloom_tex = tex.bloom_chain[0].texture;
+		if (!enable_bloom.get_bool())
+			bloom_tex = black_texture;
+		bind_texture(0, scene_color_handle);
+		bind_texture_ptr(1, bloom_tex);
+		bind_texture_ptr(2, lens_dirt->gpu_ptr);
 
-			shader().set_int("tonemap_type", pp_tonemap_type);
-			shader().set_float("contrast_tweak", pp_contrast);
-			shader().set_float("saturation_tweak", pp_saturation);
-			shader().set_float("bloom_lerp", pp_bloom_add);
-			shader().set_float("exposure", pp_exposure);
+		shader().set_int("tonemap_type", pp_tonemap_type);
+		shader().set_float("contrast_tweak", pp_contrast);
+		shader().set_float("saturation_tweak", pp_saturation);
+		shader().set_float("bloom_lerp", pp_bloom_add);
+		shader().set_float("exposure", pp_exposure);
 
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+	};
+	do_composite_pass();
 
-
-
-
-			glDrawArrays(GL_TRIANGLES, 0, 3);
+	auto post_process_stack = [&](){
+		std::vector<MaterialInstance*> postProcesses;
+		if (r_debug_mode.get_integer() == DEBUG_OUTLINED) {
+			auto mat = g_assets.find_global_sync<MaterialInstance>("eng/editorEdgeDetect.mm");
+			if (mat.get() && mat->impl->gpu_buffer_offset != mat->impl->INVALID_MAPPING)
+				postProcesses.push_back(mat.get());
 		}
-		{
-			std::vector<MaterialInstance*> postProcesses;
-			if (r_debug_mode.get_integer() == DEBUG_OUTLINED) {
-				auto mat = g_assets.find_global_sync<MaterialInstance>("eng/editorEdgeDetect.mm");
-				if (mat.get() && mat->impl->gpu_buffer_offset != mat->impl->INVALID_MAPPING)
-					postProcesses.push_back(mat.get());
-			}
-			if (params.is_editor) {
-				postProcesses.push_back(matman.get_default_editor_sel_PP());
-			}
-			if (!r_no_postprocess.get_bool())
-				do_post_process_stack(postProcesses);
+		if (params.is_editor) {
+			postProcesses.push_back(matman.get_default_editor_sel_PP());
+		}
+		if (!r_no_postprocess.get_bool())
+			read_from_texture = do_post_process_stack(postProcesses);
+	};
+	post_process_stack();
+
+	auto do_ui_draw = [&]() {
+		// UI
+		if (params.draw_ui && !r_force_hide_ui.get_bool()) {
+			windowDrawer->render();
 		}
 
-		{
-			// UI
-			if (params.draw_ui && !r_force_hide_ui.get_bool()) {
-				windowDrawer->render();
-			}
+	};
+	do_ui_draw();
 
-		}
-		
-		debug_tex_out.draw_out();
-	}
+	debug_tex_out.draw_out();
+
+
+	tex.actual_output_composite = read_from_texture;
 	if (params.output_to_screen) {
 		GPUSCOPESTART(Blit_composite_to_backbuffer);
 
-		glBlitNamedFramebuffer(
-			fbo.composite,
-			0,	/* blit to backbuffer */
-			0, 0, cur_w, cur_h,
-			0, 0, cur_w, cur_h,
-			GL_COLOR_BUFFER_BIT,
-			GL_NEAREST
-		);
-	}
+		//glBlitNamedFramebuffer(
+		//	fbo.composite,
+		//	0,	/* blit to backbuffer */
+		//	0, 0, cur_w, cur_h,
+		//	0, 0, cur_w, cur_h,
+		//	GL_COLOR_BUFFER_BIT,
+		//	GL_NEAREST
+		//);
 
-	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, tex.output_composite->get_internal_handle(), 0);
+		GraphicsBlitInfo blitInfo;
+		blitInfo.dest.w = blitInfo.src.w = cur_w;
+		blitInfo.dest.h = blitInfo.src.h = cur_h;
+		blitInfo.dest.texture = IGraphicsDevice::inst->get_swapchain_texture();
+		blitInfo.src.texture = read_from_texture;
+		blitInfo.filter = GraphicsFilterType::Nearest;
+		IGraphicsDevice::inst->blit_textures(blitInfo);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 
@@ -3767,10 +3809,9 @@ Shader Renderer::shader()
 }
 
 
-void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postProcessMats)
+IGraphicsTexture* Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postProcessMats)
 {
 	ZoneScoped;
-
 
 	auto renderToTexture = tex.output_composite_2;
 	auto renderFromTexture = tex.output_composite;
@@ -3778,7 +3819,15 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 	for (int i = 0; i < postProcessMats.size(); i++) {
 		if (!postProcessMats[i])
 			continue;
-		glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderToTexture->get_internal_handle(), 0);
+
+		RenderPassState pass_setup;
+		auto color_infos = {
+			ColorTargetInfo(renderToTexture)
+		};
+		pass_setup.color_infos = color_infos;
+		IGraphicsDevice::inst->set_render_pass(pass_setup);
+
+//		glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderToTexture->get_internal_handle(), 0);
 		tex.postProcessInput_vts_handle->update_specs_ptr(renderFromTexture);
 
 		auto mat = postProcessMats[i];
@@ -3797,18 +3846,15 @@ void Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postP
 			bind_texture_ptr(i, texs[i]->gpu_ptr);
 		}
 
-
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
-
 		tex.actual_output_composite = renderToTexture;
-
-		auto temp = renderFromTexture;
-		renderFromTexture = renderToTexture;
-		renderToTexture = temp;
+		std::swap(renderFromTexture, renderToTexture);
 	}
 
-	glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderFromTexture->get_internal_handle(), 0);
+	return renderFromTexture;
+
+	//glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderFromTexture->get_internal_handle(), 0);
 }
 
 

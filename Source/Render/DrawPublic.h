@@ -3,6 +3,9 @@
 #include <glm/glm.hpp>
 #include <vector>
 #include <string>
+#include <span>
+#include "Framework/SharedPtr.h"
+
 
 struct View_Setup
 {
@@ -49,11 +52,10 @@ struct Lightmap_Object;
 class MeshBuilder;
 class IEditorTool;
 class UIControl;
-
+class GraphicsCommandList;
 class RenderScenePublic
 {
 public:
-	// Mesh API
 
 	virtual handle<Render_Object> register_obj() = 0;
 	virtual void update_obj(handle<Render_Object> handle, const Render_Object& proxy) = 0;
@@ -62,12 +64,9 @@ public:
 	// DONT cache this! just use for quick reads of an existing object
 	virtual const Render_Object* get_read_only_object(handle<Render_Object> handle) = 0;
 
-	// Decal API
 	virtual handle<Render_Decal> register_decal() = 0;
 	virtual void update_decal(handle<Render_Decal> handle, const Render_Decal& d) = 0;
 	virtual void remove_decal(handle<Render_Decal>& handle) = 0;
-
-	// Light API
 
 	virtual handle<Render_Light> register_light() = 0;
 	virtual void update_light(handle<Render_Light> handle, const Render_Light& l) = 0;
@@ -89,7 +88,6 @@ public:
 	virtual void update_fog(handle<RenderFog> handle, const RenderFog& fog) = 0;
 	virtual void remove_fog(handle<RenderFog>& handle) = 0;
 
-
 	// Debug line renderer handles
 	virtual handle<MeshBuilder_Object> register_meshbuilder() = 0;
 	virtual void update_meshbuilder(handle<MeshBuilder_Object> handle, const MeshBuilder_Object& mbobj) = 0;
@@ -103,6 +101,101 @@ public:
 	virtual void update_lightmap(handle<Lightmap_Object> handle, Lightmap_Object& lm) = 0;
 	virtual void remove_lightmap(handle<Lightmap_Object> obj) = 0;
 };
+
+class IGraphicsVertexInput;
+class IGraphicsBuffer;
+class IGraphicsTexture;
+class MaterialInstance;
+enum class RGraphicsCommandType : int8_t {
+	Draw,
+	SetScissor,
+	ClearScissor,
+	SetMaterial,
+	BindTexture,
+	SetColorTarget,
+	SetInstanceIndex,
+};
+struct RGraphicsDrawCmd {
+	int count;
+	int offset;
+};
+struct RGraphicsScissorCmd {
+	int x;
+	int y;
+	int w;
+	int h;
+};
+struct RGraphicsTextureCmd {
+	IGraphicsTexture* texture;
+	int binding = 0;
+};
+struct RGraphicsPipelineCmd {
+	MaterialInstance* mat;
+	IGraphicsVertexInput* vertex_input;
+	int primitive_type = 0;
+};
+
+struct RGraphicsSetInstanceIndex {
+	int index_to_set;
+};
+
+struct RGraphicsCmdUnion {
+	RGraphicsCommandType type{};
+	union {
+		RGraphicsDrawCmd drawCmd;		// draw
+		RGraphicsScissorCmd scissorCmd;	// set scissor
+		RGraphicsTextureCmd textureCmd;	// color target and bind texture
+		RGraphicsPipelineCmd pipelineCmd; // set material
+		RGraphicsSetInstanceIndex setIndexCmd;
+	};
+
+	static RGraphicsCmdUnion make_draw(RGraphicsDrawCmd cmd);
+	static RGraphicsCmdUnion make_set_scissor(RGraphicsScissorCmd cmd);
+	static RGraphicsCmdUnion make_clear_scissor();
+	static RGraphicsCmdUnion make_set_pipeline(RGraphicsPipelineCmd cmd);
+	static RGraphicsCmdUnion make_set_texture(IGraphicsTexture* texture);
+	static RGraphicsCmdUnion make_set_target(IGraphicsTexture* texture);
+private:
+	RGraphicsCmdUnion() {}
+};
+
+// particles:
+// one shared buffer. 
+// get write ptr, write to buffer
+// add draw commands (materi 
+
+// meshbuilders and particles share same path. just a meshbuilder object with draw commands
+
+// unifying it all:
+// VertexInput* with an RCommandList
+// handles: particles, debug shapes, ui
+
+// custom mesh shapes: (Model*)
+// create a VertexInput*. create submeshes. 
+
+class GraphicsCommandList {
+public:
+	GraphicsCommandList();
+	~GraphicsCommandList();
+
+	std::span<glm::mat4> get_instance_data_write_ptr(int count);
+	std::span<RGraphicsCmdUnion> get_write_ptr(int count);
+private:
+	IGraphicsBuffer* instance_data_buffer = nullptr;
+	std::vector<RGraphicsCmdUnion> command_buffer;
+};
+class MeshbuilderVertexData {
+public:
+	void upload_vertex_data(std::span<std::byte> data);
+	void upload_index_data(std::span<std::byte> data);
+	void release();
+private:
+	IGraphicsVertexInput* vinput = nullptr;
+	IGraphicsBuffer* vbuffer = nullptr;
+	IGraphicsBuffer* ibuffer = nullptr;
+};
+
+
 class Model;
 class GuiSystemPublic;
 class RendererPublic
@@ -118,7 +211,7 @@ public:
 	virtual void on_level_end() = 0;
 	virtual void bake_cubemaps() = 0;
 	virtual void reload_shaders() = 0;
-	// only used by animation editor to draw to an imgui window
+
 	virtual uint32_t get_composite_output_texture_handle() = 0;
 #ifdef EDITOR_BUILD
 	// tests the output buffer from last frame and returns whatever object was drawn

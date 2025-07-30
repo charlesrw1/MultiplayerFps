@@ -357,8 +357,8 @@ static GraphicsTextureFormat load_format_to_graphics_format(Texture_Format fmt) 
 	return GraphicsTextureFormat::rgba8;
 }
 
-static void make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat);
-static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
+static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat);
+static bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* buffer, int len)
 {
 	if (len < 4 + sizeof(ddsFileHeader_t)) return false;
 	if (buffer[0] != 'D' || buffer[1] != 'D' || buffer[2] != 'S' || buffer[3] != ' ') return false;
@@ -427,7 +427,7 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 		args.sampler_type = GraphicsSamplerType::AnisotropyDefault;
 		return IGraphicsDevice::inst->create_texture(args);
 	};
-	output->gpu_ptr = create_gpu_texture();
+	out_ptr = create_gpu_texture();
 
 	//glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
 	//glTextureStorage2D(output->gl_id, numMipmaps, internal_format, input_width, input_height);
@@ -452,7 +452,7 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 		//else
 		//	glTextureSubImage2D(output->gl_id, i, 0, 0, ux, uy, format, type, data_ptr);
 
-		output->gpu_ptr->sub_image_upload(i, 0, 0, ux, uy, size, data_ptr);
+		out_ptr->sub_image_upload(i, 0, 0, ux, uy, size, data_ptr);
 
 		data_ptr += size;
 		ux /= 2;
@@ -471,7 +471,7 @@ static bool load_dds_file(Texture* output, uint8_t* buffer, int len)
 	//return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
 }
 
-static void make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat, bool nearest_filtered = false)
+static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat, bool nearest_filtered = false)
 {
 	//glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
 
@@ -491,7 +491,7 @@ static void make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 			args.sampler_type = GraphicsSamplerType::AnisotropyDefault;
 		return IGraphicsDevice::inst->create_texture(args);
 	};
-	output->gpu_ptr = create_gpu_texture();
+	IGraphicsTexture* ptr = create_gpu_texture();
 
 	GLenum type{};
 	GLenum internal_format{};
@@ -512,10 +512,10 @@ static void make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 	//else
 	//	glTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, format, type, data);
 
-	output->gpu_ptr->sub_image_upload(0, 0, 0, x, y, size, data);
+	ptr->sub_image_upload(0, 0, 0, x, y, size, data);
 	if (!nearest_filtered) {
 		// fixme
-		glGenerateTextureMipmap(output->gpu_ptr->get_internal_handle());
+		glGenerateTextureMipmap(ptr->get_internal_handle());
 	}
 	//if (!nearest_filtered) {
 	//
@@ -534,6 +534,8 @@ static void make_from_data(Texture* output, int x, int y, void* data, Texture_Fo
 	//output->width = x;
 	//output->height = y;
 	output->format = informat;
+
+	return ptr;
 }
 
 using std::string;
@@ -565,6 +567,7 @@ void Texture::move_construct(IAsset* _src)
 	assert(!eng->get_is_in_overlapped_period());
 	Texture* src = (Texture*)_src;
 	uninstall();
+	assert(!gpu_ptr);
 	gpu_ptr = src->gpu_ptr;
 	type = src->type;
 	format = src->format;
@@ -624,9 +627,9 @@ void Texture::post_load() {
 	auto& filedata = user->filedata;
 
 	if (user->isDDSFile)
-		load_dds_file(this, filedata.data(), filedata.size());
+		load_dds_file(this,gpu_ptr, filedata.data(), filedata.size());
 	else
-		make_from_data(this, x, y, data, to_format(user->channels, user->is_float), user->wantsNearestFiltering);
+		gpu_ptr=make_from_data(this, x, y, data, to_format(user->channels, user->is_float), user->wantsNearestFiltering);
 
 	if (data)
 		stbi_image_free(data);

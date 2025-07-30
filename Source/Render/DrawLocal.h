@@ -283,11 +283,11 @@ public:
 			bind_texture(bind, ptr->get_internal_handle());
 	}
 	void set_shader(program_handle handle);
+	void set_depth_write_enabled(bool enabled);
 private:
 	void set_vao(vertexarrayhandle vao);
 	void set_blend_state(blend_state blend);
 	void set_show_backfaces(bool show_backfaces);
-	void set_depth_write_enabled(bool enabled);
 	void set_depth_test_enabled(bool enabled);
 	void set_cull_front_face(bool enabled);
 	void set_depth_less_than(bool enable_less_than);
@@ -375,6 +375,7 @@ private:
 };
 #endif
 
+
 class Renderer : public RendererPublic
 {
 public:
@@ -429,7 +430,7 @@ public:
 	);
 
 	void scene_draw_internal(SceneDrawParamsEx params, View_Setup view);
-	void do_post_process_stack(const std::vector<MaterialInstance*>& stack);
+	IGraphicsTexture* do_post_process_stack(const std::vector<MaterialInstance*>& stack);
 	void check_cubemaps_dirty();	// render any cubemaps
 	void update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Texture* cubemap, glm::vec3 position, bool skybox_only);
 
@@ -483,7 +484,7 @@ public:
 		fbohandle taa_blit{};
 
 		fbohandle bloom{};
-		fbohandle composite{};
+
 
 	}fbo;
 

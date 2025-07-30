@@ -183,6 +183,7 @@
     <ClInclude Include="Source\Framework\ConsoleCmdGroup.h" />
     <ClInclude Include="Source\Framework\FnFactory.h" />
     <ClInclude Include="Source\Framework\GlBufferLock.h" />
+    <ClInclude Include="Source\Framework\GlBuffers.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
     <ClInclude Include="Source\Framework\Log.h" />
     <ClInclude Include="Source\Framework\LuaColor.h" />
@@ -199,6 +200,7 @@
     <ClInclude Include="Source\Framework\SerializerBinary.h" />
     <ClInclude Include="Source\Framework\SerializerJson.h" />
     <ClInclude Include="Source\Framework\SerializerOldDict.h" />
+    <ClInclude Include="Source\Framework\SharedPtr.h" />
     <ClInclude Include="Source\Framework\StringUtils.h" />
     <ClInclude Include="Source\Framework\StructReflection.h" />
     <ClInclude Include="Source\Framework\SysPrint.h" />
@@ -226,6 +228,7 @@
     <ClInclude Include="Source\LevelSerialization\SerializeNewMakers.h" />
     <ClInclude Include="Source\MEGA.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
+    <ClInclude Include="Source\Render\GlDevice.h" />
     <ClInclude Include="Source\Render\IGraphsDevice.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Render\RenderWindow.h" />
