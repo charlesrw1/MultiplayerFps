@@ -5,6 +5,7 @@
 #include <cassert>
 #include <memory>
 #include "Framework/Util.h"
+#include <span>
 
 template<typename T, uint32_t INLINE_COUNT>
 class InlineVec
@@ -12,44 +13,18 @@ class InlineVec
 public:
     using fixed_count_value = std::integral_constant<uint32_t, INLINE_COUNT>;
 
-    using SIZE_TYPE = size_t;
+    using SIZE_TYPE = int;
 
-    InlineVec() {
-    }
-    ~InlineVec() {
-        destroy_(data(), data() + size());
-    }
+    InlineVec();
+    ~InlineVec();
 
     // fixme
-    InlineVec& operator=(const InlineVec& other) {
-        destroy_(data(), data() + size());
-        reserve(other.size());
-        const T* ptr = other.data();
-        const T* end = other.data() + other.size();
-        T* my_start = data();
-        for (; ptr != end; ptr++, my_start++)
-            new(my_start)T(*ptr);
-        set_size_(other.size());
-        return *this;
-    }
-    InlineVec(const InlineVec& other) {
-        destroy_(data(), data() + size());
-        reserve(other.size());
-        const T* ptr = other.data();
-        const T* end = other.data() + other.size();
-        T* my_start = data();
-        for (; ptr != end; ptr++, my_start++)
-            new(my_start)T(*ptr);
-        set_size_(other.size());
-    }
+    InlineVec& operator=(const InlineVec& other);
+    InlineVec(const InlineVec& other);
     InlineVec& operator=(InlineVec&& other) = delete;
     InlineVec(InlineVec&& other) = delete;
 
-    void reserve(SIZE_TYPE reserve_size) {
-        if (capacity_() < reserve_size) {
-            expand_capacity_(reserve_size);
-        }
-    }
+    void reserve(SIZE_TYPE reserve_size);
 
     const T& operator[](SIZE_TYPE index) const {
         ASSERT(index < size());
@@ -66,96 +41,35 @@ public:
     const T* data() const {
         return is_allocated_() ? heap.ptr : fixed.inline_;
     }
+    std::span<T> get_span() {
+        return std::span<T>(data(), size());
+    }
+    std::span<const T> get_span() const {
+        return std::span<const T>(data(), size());
+    }
+
+
     SIZE_TYPE size() const { return count_ >> 1; }
 
     SIZE_TYPE fixed_count() { return (SIZE_TYPE)INLINE_COUNT; }
-    void push_back(T&& val) {
-        SIZE_TYPE cap = capacity_();
-        SIZE_TYPE curcount = size();
-        if (curcount + 1 > cap)
-            expand_capacity_((curcount + 1 > cap * 2) ? curcount + 1 : cap * 2);
-        new(data() + curcount)T(std::move(val));
+    void push_back(T&& val);
 
-        set_size_(curcount + 1);
-    }
-
-    void push_back(const T& val) {
-        SIZE_TYPE cap = capacity_();
-        SIZE_TYPE curcount = size();
-        if (curcount + 1 > cap)
-            expand_capacity_((curcount + 1 > cap * 2) ? curcount + 1 : cap * 2);
-        new(data() + curcount)T(val);
-
-        set_size_(curcount + 1);
-    }
+    void push_back(const T& val);
 
     void resize(SIZE_TYPE newcount) {
         resize(newcount, {});
     }
-    void resize(SIZE_TYPE newcount, const T& value) {
-        if (newcount == size()) return;
-
-        SIZE_TYPE cap = capacity_();
-        SIZE_TYPE curcount = size();
-        if (newcount > cap)
-            expand_capacity_((newcount > cap * 2) ? newcount : cap * 2);
-
-
-        if (newcount > size()) {
-            T* start = data() + curcount;
-            T* end = data() + newcount;
-
-            for (; start != end; start++)
-                new(start)T(value);
-        }
-        else {
-            SIZE_TYPE newend = newcount;
-            T* end = data() + curcount;
-            T* start = data() + newcount;
-            destroy_(start, end);
-        }
-
-        set_size_(newcount);
+    void resize(SIZE_TYPE newcount, const T& value);
+    void clear() {
+        resize(0);
     }
 private:
     void set_size_(SIZE_TYPE s) {
         count_ = (s << 1) | (count_ & 1);
     }
-    void expand_capacity_(SIZE_TYPE capacity) {
-        T* new_p = (T*)std::malloc(capacity * sizeof(T));
-        T* cur_p = data();
-        T* end_cur_p = cur_p + size();
+    void expand_capacity_(SIZE_TYPE capacity);
 
-        if (std::is_trivially_copy_constructible<T>()) {
-            std::copy(cur_p, end_cur_p, new_p); // undefined behavior maybe??
-        }
-        else {
-            T* ptr = cur_p;
-            T* new_ptr = new_p;
-            T* end_new_p = new_p + capacity;
-            for (; ptr != end_cur_p && new_ptr != end_new_p; ptr++, new_ptr++) {
-                new(new_ptr)T(std::move(*ptr));
-            }
-        }
-
-        destroy_(cur_p, end_cur_p);
-
-        heap.ptr = new_p;
-        heap.allocated = capacity;
-
-        if (is_allocated_())
-            std::free(cur_p);
-
-        count_ |= 1;
-    }
-
-    void destroy_(T* start, T* end) {
-        if constexpr (!std::is_trivially_destructible<T>()) {
-            for (; start != end; start++) {
-                start->~T();
-            }
-        }
-    }
+    void destroy_(T* start, int count);
     SIZE_TYPE capacity_() const { return is_allocated_() ? heap.allocated : INLINE_COUNT; }
     bool is_allocated_() const { return count_ & 1; }
 
@@ -172,3 +86,156 @@ private:
     };
     SIZE_TYPE count_ = 0;
 };
+
+template<typename T, uint32_t INLINE_COUNT>
+inline InlineVec<T, INLINE_COUNT>::InlineVec(const InlineVec& other) {
+    reserve(other.size());
+    const T* other_start = other.data();
+    const int other_size = other.size();
+    T* my_start = data();
+
+    for (int i = 0; i < other_size; i++) {
+        T* my_ptr = &my_start[i];
+        const T* other_ptr = &other_start[i];
+        new(my_ptr)T(*other_ptr);
+    }
+    set_size_(other.size());
+}
+
+template<typename T, uint32_t INLINE_COUNT>
+inline void InlineVec<T, INLINE_COUNT>::reserve(SIZE_TYPE reserve_size) {
+    if (capacity_() < reserve_size) {
+        expand_capacity_(reserve_size);
+    }
+}
+
+template<typename T, uint32_t INLINE_COUNT>
+inline void InlineVec<T, INLINE_COUNT>::push_back(T&& val) {
+    SIZE_TYPE cap = capacity_();
+    SIZE_TYPE curcount = size();
+    if (curcount + 1 > cap) {
+        // need to increase capacity
+        int new_capacity = cap * 2;
+        if (curcount + 1 > new_capacity)
+            new_capacity = curcount + 1;
+        expand_capacity_(new_capacity);
+        assert(is_allocated_());
+    }
+    assert(curcount < capacity_());
+    T* my_ptr = &(data()[curcount]);
+    new(my_ptr)T(std::move(val));
+    set_size_(curcount + 1);
+}
+
+template<typename T, uint32_t INLINE_COUNT>
+inline void InlineVec<T, INLINE_COUNT>::push_back(const T& val) {
+    SIZE_TYPE cap = capacity_();
+    SIZE_TYPE curcount = size();
+    if (curcount + 1 > cap) {
+        // need to increase capacity
+        int new_capacity = cap * 2;
+        if (curcount + 1 > new_capacity)
+            new_capacity = curcount + 1;
+        expand_capacity_(new_capacity);
+        assert(is_allocated_());
+    }
+    assert(curcount < capacity_());
+    T* my_ptr = &(data()[curcount]);
+    new(my_ptr)T(val);
+    set_size_(curcount + 1);
+}
+
+template<typename T, uint32_t INLINE_COUNT>
+inline void InlineVec<T, INLINE_COUNT>::resize(SIZE_TYPE newcount, const T& value) {
+    if (newcount == size())
+        return;
+
+    SIZE_TYPE cap = capacity_();
+    SIZE_TYPE curcount = size();
+    if (curcount + 1 > cap) {
+        // need to increase capacity
+        int new_capacity = cap * 2;
+        if (curcount + 1 > new_capacity)
+            new_capacity = curcount + 1;
+        expand_capacity_(new_capacity);
+        assert(is_allocated_());
+    }
+
+
+    if (newcount > size()) {
+        T* start_ptr = data();
+        for (int i = curcount; i < newcount; i++) {
+            T* my_ptr = &start_ptr[i];
+            new(my_ptr)T(value);
+        }
+    }
+    else {
+        SIZE_TYPE newend = newcount;
+        T* start = data() + newend;
+        const int count = size() - newend;
+        assert(count >= 0);
+        destroy_(start, count);
+    }
+
+    set_size_(newcount);
+}
+
+template<typename T, uint32_t INLINE_COUNT>
+inline void InlineVec<T, INLINE_COUNT>::expand_capacity_(SIZE_TYPE capacity) {
+
+    T* const new_ptr = (T*)std::malloc(capacity * sizeof(T));
+    T* const cur_start_ptr = data();
+    const int cur_data_count = size();
+    assert(capacity >= cur_data_count);
+
+    if constexpr (std::is_trivially_copyable<T>::value) {
+        std::memcpy(new_ptr, cur_start_ptr, cur_data_count * sizeof(T));
+    }
+    else {
+        for (int i = 0; i < cur_data_count; i++) {
+            T* my_ptr = &cur_start_ptr[i];
+            T* other_ptr = &new_ptr[i];
+            new(other_ptr)T(std::move(*my_ptr));
+        }
+    }
+
+    destroy_(cur_start_ptr, cur_data_count);
+
+    heap.ptr = new_ptr;
+    heap.allocated = capacity;
+
+    if (is_allocated_())
+        std::free(cur_start_ptr);   // dont call destructor, we just did
+
+    count_ |= 1;    // sets allocated bit
+    assert(is_allocated_());
+}
+
+template<typename T, uint32_t INLINE_COUNT>
+inline void InlineVec<T, INLINE_COUNT>::destroy_(T* start, int count) {
+    if constexpr (!std::is_trivially_destructible<T>()) {
+        std::destroy(start, start + count);
+    }
+}
+template<typename T, uint32_t INLINE_COUNT>
+inline InlineVec<T, INLINE_COUNT>::InlineVec() {
+}
+template<typename T, uint32_t INLINE_COUNT>
+inline InlineVec<T, INLINE_COUNT>::~InlineVec() {
+    destroy_(data(), size());
+}
+template<typename T, uint32_t INLINE_COUNT>
+inline InlineVec<T, INLINE_COUNT>& InlineVec<T,INLINE_COUNT>::operator=(const InlineVec<T, INLINE_COUNT>& other) {
+    destroy_(data(), size());
+    const T* const other_ptr_start = other.data();
+    const int other_size = other.size();
+    reserve(other_size);
+    T* const my_start = data();
+    for (int i = 0; i < other_size; i++) {
+        T* my_ptr = &my_start[i];
+        const T* other_ptr = &other_ptr_start[i];
+        new(my_ptr)T(*other_ptr);
+    }
+    set_size_(other_size);
+    return *this;
+}

@@ -121,7 +121,7 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 		uint64_t tisFileTimeStamp = tisfile->get_timestamp();
 		tisfile->close();
 
-		if (to_str.find("!json\n") == 0) {
+		if (to_str.find("!json") == 0) {
 			to_str = to_str.substr(6);
 			MakeObjectFromPathGeneric objmaker;
 			ReadSerializerBackendJson reader("compile_texture_asset", to_str, objmaker, *loading);

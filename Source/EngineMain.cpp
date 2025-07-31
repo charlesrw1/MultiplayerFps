@@ -1520,16 +1520,32 @@ void GameEngineLocal::set_tester(IntegrationTester* tester, bool headless_mode) 
 #endif
 }
 
+int global_cnt = 0;
+class ClassThing {
+public:
+	ClassThing() {
+		global_cnt++;
+	}
+	~ClassThing() {
+		global_cnt--;
+	}
+	ClassThing(ClassThing&& other) {
+		global_cnt++;
+	}
+	ClassThing(const ClassThing& other) {
+		global_cnt++;
+	}
+};
 
 int game_engine_main(int argc, char** argv)
 {
 	material_print_debug.set_bool(true);
-	developer_mode.set_bool(true);
+	developer_mode.set_bool(false);
 	log_shader_compiles.set_bool(false);
 	log_all_asset_loads.set_bool(true);
 	loglevel.set_integer(4);
 	eng_local.init(argc,argv);
-	developer_mode.set_bool(true);
+	//developer_mode.set_bool(true);
 	//log_all_asset_loads.set_bool(false);
 	log_destroy_game_objects.set_bool(false);
 	//loglevel.set_integer(1);
@@ -2012,21 +2028,19 @@ void GameEngineLocal::init(int argc, char** argv)
 	SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
 
 
-	// not in editor and no queued map, load the entry point
-	
 	auto start_game = [&]() {
 		sys_print(Info, "starting game...\n");
 		Application* a = ClassBase::create_class<Application>(g_application_class.get_string());
 		if (!a) {
-			Fatalf("Engine::init: application class not found %s\n", g_application_class.get_string());
+			Fatalf("Engine::init: application class not found %s. set it in vars.txt\n", g_application_class.get_string());
 		}
 		app.reset(a);
 		Input::on_con_status.add(a, [this](int i, bool b) {
 			app->on_controller_status(i, b);
 			});
-		//Model::on_model_loaded.add(this, [this](Model* m) {
-		//	app->on_post_model_load(m);
-		//	});
+		Model::on_model_loaded.add(this, [this](Model* m) {
+			app->on_post_model_load(m);
+			});
 		MaterialInstance::on_material_loaded.add(this, [this](MaterialInstance* m) {
 			try {
 				app->on_post_material_load(m);

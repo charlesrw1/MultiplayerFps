@@ -87,7 +87,6 @@ loglevel 4
 
 #r.debug_specular 1
 
-developer_mode 1
 file_print_all_openfile_fails 0
 
 #loglevel 4
@@ -100,6 +99,6 @@ g_draw_grid 1
 bind 7 "start_ed AnimGraph beu_character.ag"
 
 loglevel 6
-developer_mode 1
+
 
 start_ed Map "bike_empty.tmap"

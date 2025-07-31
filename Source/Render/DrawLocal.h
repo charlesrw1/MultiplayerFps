@@ -94,18 +94,6 @@ struct Render_Level_Params {
 	bool wants_non_reverse_z = false;
 };
 
-
-// Render lists: represents opengl commands that have been uploaded (or kept CPU side)
-//				 these are fed into glMultiDrawElementsIndirect()
-//				 these are built around Render_Pass which contains the objects that will be renderered
-
-// Gpu occlusion culling:	
-
-// Reprsents a structure for storing DrawElementsIndirectCommands
-// These can be cpu or gpu stored, when using gpu culling, the gpu buffer is culled and used
-// This gets fed into "execute_render_lists"
-
-
 struct RenderPipelineState
 {
 	RenderPipelineState() = default;

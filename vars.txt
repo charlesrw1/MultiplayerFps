@@ -27,6 +27,8 @@ g_project_base "Data"
 
 g_application_class "MyApp"
 
+
+
 is_editor_app 1
 
 g_draw_grid 0
@@ -40,4 +42,6 @@ g_prefab_factory ThePrefabFactory
 disable_texture_loads 0
 g_debug_skeletons 0
 force_animation_to_bind_pose 1
+
+developer_mode 1
 

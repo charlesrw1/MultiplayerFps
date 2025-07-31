@@ -44,7 +44,6 @@ layout (location = 5) in vec4 VS_IN_BoneWeights;
 
 flat out uint FS_IN_Objid;
 flat out uint FS_IN_Matid;
-flat out uint FS_IN_DrawId;
 out vec3 FS_IN_FragPos;
 out vec3 FS_IN_Normal;
 out vec2 FS_IN_Texcoord;
@@ -94,7 +93,6 @@ vec3 calc_local_animated_pos_last_frame(uint obj_index)
 
 void main()
 {
-	FS_IN_DrawId = uint(gl_DrawID);
 	FS_IN_Matid = indirect_materials[indirect_material_offset + gl_DrawID];
 	uint obj_index = indirect_instance[gl_BaseInstance + gl_InstanceID]; 
 	FS_IN_Objid = obj_index;
@@ -234,6 +232,9 @@ in vec4 FS_IN_VertexColor;
 
 
 in mat3 FS_IN_TBN;
+
+
+uniform int indirect_material_offset = 0;
 
 vec3 randColor(uint number){
     return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
@@ -431,7 +432,7 @@ void main()
 			#endif	
 		}
 		else if(g.debug_options == DEBUG_DRAWID) {
-			GBUFFER_OUT_Emissive.rgb = randColor(FS_IN_DrawId+279343)*normal_mult_debug;
+			GBUFFER_OUT_Emissive.rgb = randColor(indirect_material_offset+279343)*normal_mult_debug;
 		}
 		
 	#endif	// FORWARD_SHADER
