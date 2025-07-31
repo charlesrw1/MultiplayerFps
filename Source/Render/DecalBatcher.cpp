@@ -34,6 +34,7 @@ void DecalBatcher::build_batches() {
 		program_handle the_shader = matman.get_mat_shader(the_model, mat, 0);
 		decal_objs[actual_count].program = the_shader;
 		decal_objs[actual_count].texture_set = mat->impl->texture_id_hash;
+		decal_objs[actual_count].sort_order = (int)decal_obj.ordering;
 		actual_count += 1;
 	}
 	decal_objs = std::span<DecalObj>(decal_objs.data(), actual_count);
@@ -41,6 +42,8 @@ void DecalBatcher::build_batches() {
 		return;
 
 	std::sort(decal_objs.begin(), decal_objs.end(), [](const DecalObj& a, const DecalObj& b) {
+		if (a.sort_order != b.sort_order)
+			return a.sort_order < b.sort_order;
 		if (a.program != b.program)
 			return a.program < b.program;
 		return a.texture_set < b.texture_set;

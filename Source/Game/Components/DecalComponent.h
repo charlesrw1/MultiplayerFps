@@ -30,5 +30,7 @@ public:
 private:
 	REFLECT();
 	AssetPtr<MaterialInstance> material;
+	REF int sort_order = 0;
+
 	handle<Render_Decal> handle;
 };

@@ -44,6 +44,7 @@ void DecalComponent::on_sync_render_data()
 #endif //  EDITOR_BUILD
 
 	rd.material = material.get();
+	rd.ordering = sort_order;
 	idraw->get_scene()->update_decal(handle, rd);
 }
 void DecalComponent::stop() {

@@ -22,6 +22,7 @@ struct Render_Object {
 		opposite_dither = false;
 		is_skybox = false;
 		lightmapped = false;
+		sort_first = false;
 	}
 
 	Model* model = nullptr;
@@ -37,7 +38,7 @@ struct Render_Object {
 	bool is_skybox : 1;	// if true, then this is included in the global skylight reflection probe
 	bool lightmapped : 1;
 	bool static_probe_lit : 1;	// if static probe lit, lightmap_coord.x gives the index
-
+	bool sort_first : 1;
 	// for debugging only (also editor uses this for picking)
 	const Component* owner = nullptr;
 	glm::mat4 transform = glm::mat4(1.f);

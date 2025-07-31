@@ -1642,9 +1642,11 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 	key.mesh = proxy.model->get_uid();
 	
 	if (proxy.is_skybox)
-		key.layer = 1; // make skybox last, saves frame time
-	else
+		key.layer = 2; // make skybox last, saves frame time
+	else if (proxy.sort_first)
 		key.layer = 0;
+	else
+		key.layer = 1;
 
 	key.distance = camera_dist;
 
@@ -2242,16 +2244,22 @@ void cull_spot_shadow_objects_job(handle<Render_Light> lightId, bool* visArray, 
 
 
 
-void calc_lod_job(uintptr_t user)
+void calc_lod_job(int8_t* lodarray, int16_t* camera_dist)
 {
 	ZoneScopedN("LodToRenderCalc");
 
-	int8_t* lodarray = (int8_t*)user;
+	//int8_t* lodarray = (int8_t*)user;
 
 	const float inv_two_times_tanfov = 1.0 / (tan(draw.get_current_frame_vs().fov * 0.5));
 	const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
 	auto& vs = draw.current_frame_view;
 	auto& proxy_list = draw.scene.proxy_list;
+
+	// adjust these, maybe exponential depth?
+	const float max_cam_dist = 100.0;
+	const float inv_max_dist_mult_2 = 1.0 / (max_cam_dist* max_cam_dist);
+	const float max_output = float(1 << 12);
+
 	for (int i = 0; i < proxy_list.objects.size(); i++) {
 		auto& obj = proxy_list.objects[i];
 		auto& proxy = obj.type_.proxy;
@@ -2264,6 +2272,11 @@ void calc_lod_job(uintptr_t user)
 		else {
 			lodarray[i] = (int8_t)get_lod_to_render(proxy.model, percentage_2);
 		}
+
+		float out_dist_cam = dist_to_camera_2* inv_max_dist_mult_2;
+		out_dist_cam = std::clamp(out_dist_cam, 0.f, 1.f);
+		int16_t as_int16 = max_output * out_dist_cam;
+		camera_dist[i] = as_int16;
 	}
 }
 
@@ -2422,6 +2435,7 @@ void Render_Scene::refresh_static_mesh_data(bool build_for_editor)
 }
 ConfigVar r_debug_transparents("r.debug_transparents", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_force_all_materials_to_fallback("r.force_all_materials_to_fallback", "0", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar r_dont_use_camera_depth_build_scene("r.dont_use_camera_depth_build_scene", "0", CVAR_BOOL | CVAR_DEV, "");
 
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 {
@@ -2449,6 +2463,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	
 	bool* visible_array = memArena.alloc_bottom_type<bool>(visible_count);
 	int8_t* lod_to_render_array = memArena.alloc_bottom_type<int8_t>(visible_count);
+	int16_t* camera_depth_array = memArena.alloc_bottom_type<int16_t>(visible_count);
 
 	{
 		//CPUSCOPESTART(cpu_object_cull);
@@ -2473,8 +2488,10 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		}
 
 		JobSystem::inst->add_jobs(decls, NUM_FRUSTUM_JOBS, cullAndLodCounter);
-		JobSystem::inst->add_job(calc_lod_job,uintptr_t(lod_to_render_array), cullAndLodCounter);
+		//JobSystem::inst->add_job(calc_lod_job,uintptr_t(lod_to_render_array), cullAndLodCounter);
 		
+		calc_lod_job(lod_to_render_array, camera_depth_array);
+
 		// while waiting, can refresh static mesh data if needed
 		if (statics_meshes_are_dirty) {
 			//printf("reset static mesh (editor: %d)\n", (int)build_for_editor);
@@ -2500,6 +2517,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		MaterialInstance* debug_transparent_mat = MaterialInstance::load("transparent_debug.mm");
 		const bool wants_transparent_debug = debug_transparent_mat&&r_debug_transparents.get_bool();
 		const bool wants_set_to_fallback = r_force_all_materials_to_fallback.get_bool();
+		const bool dont_use_cam_depth = r_dont_use_camera_depth_build_scene.get_bool();
 		for (int i = 0; i < proxy_list.objects.size(); i++) {
 			auto& obj = proxy_list.objects[i];
 			handle<Render_Object> objhandle{ obj.handle };
@@ -2541,22 +2559,26 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 
 				const MasterMaterialImpl* mm = mat->get_master_material();
 
+				int16_t cam_depth = 0;
+				if (!dont_use_cam_depth)
+					cam_depth = camera_depth_array[i];
+
 				if (mm->render_in_forward_pass()) {
 					if (is_visible)
-						transparent_pass.add_object(proxy, objhandle, mat, 0/* fixme sorting distance */, j, LOD_index, 0, build_for_editor);
+						transparent_pass.add_object(proxy, objhandle, mat, cam_depth, j, LOD_index, 0, build_for_editor);
 					if (!mm->is_translucent() && casts_shadow)
-						shadow_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
+						shadow_pass.add_object(proxy, objhandle, mat, cam_depth, j, LOD_index, 0, build_for_editor);
 				}
 				else {
 					if (casts_shadow)
-						shadow_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
+						shadow_pass.add_object(proxy, objhandle, mat, cam_depth, j, LOD_index, 0, build_for_editor);
 					if (is_visible)
-						gbuffer_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
+						gbuffer_pass.add_object(proxy, objhandle, mat, cam_depth, j, LOD_index, 0, build_for_editor);
 				}
 
 #ifdef EDITOR_BUILD
 				if (obj.type_.proxy.outline && is_visible) {
-					editor_sel_pass.add_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
+					editor_sel_pass.add_object(proxy, objhandle, mat, cam_depth, j, LOD_index, 0, build_for_editor);
 				}
 #endif
 			}

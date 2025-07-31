@@ -150,7 +150,7 @@ void MeshComponent::on_sync_render_data()
 		obj.static_probe_lit = true;
 		obj.lightmap_coord = lmCoords.to_vec4();
 	}
-
+	obj.sort_first = sort_first;
 	idraw->get_scene()->update_obj(draw_handle, obj);
 }
 

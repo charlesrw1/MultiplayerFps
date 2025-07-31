@@ -377,6 +377,7 @@ private:
 		int orig_index = 0;
 		int program = 0;
 		int texture_set = 0;
+		int sort_order = 0;
 
 		MaterialInstance* the_material = nullptr;
 	};

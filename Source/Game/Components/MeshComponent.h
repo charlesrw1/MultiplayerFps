@@ -96,6 +96,8 @@ private:
 	REFLECT(hide);
 	bool static_probe_lit = false;
 
+	REF bool sort_first = false;
+
 	REF std::vector<AssetPtr<MaterialInstance>> eMaterialOverride;
 	std::unique_ptr<AnimatorObject> animator;
 	handle<Render_Object> draw_handle;
