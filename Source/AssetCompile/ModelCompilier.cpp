@@ -880,9 +880,11 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		mdd.isLightmapped = true;
 
 	mdd.model_source = is->srcGlbFile;
+	LODDef lodd;
+	mdd.loddefs.push_back(lodd);
 	for (int i = 0; i < is->lodScreenSpaceSizes.size(); i++) {
 		LODDef lodd;
-		lodd.lod_num = i;
+		lodd.lod_num = i+1 ;
 		lodd.distance = is->lodScreenSpaceSizes[i];
 		mdd.loddefs.push_back(lodd);
 	}
@@ -975,7 +977,7 @@ ModelDefData new_import_settings_to_modeldef_data(const string& mis_path, IFile*
 
 	std::string to_str(file->size(),' ');
 	file->read(to_str.data(), file->size());
-	if (to_str.find("!json\n") == 0) {
+	if (to_str.find("!json") == 0) {
 		to_str = to_str.substr(6);
 		MakeObjectFromPathGeneric objmaker;
 		ReadSerializerBackendJson reader("read_modeldef", to_str, objmaker, *loading);
@@ -2687,11 +2689,11 @@ FinalModelData create_final_model_data(
 		MeshLod out_lod;
 
 		if (i != 0) {
-			if (lods_to_def[i] == -1) {
+			if (lods_to_def.at(i) == -1) {
 				sys_print(Error, "create_final_model_data: mesh has LOD_%d parts, but distance wasn't definied in .def, skipping...\n", i);
 				continue;
 			}
-			out_lod.end_percentage = def.loddefs[lods_to_def[i]].distance;
+			out_lod.end_percentage = def.loddefs.at(lods_to_def.at(i)).distance;
 		}
 		else
 			out_lod.end_percentage = 1.0;

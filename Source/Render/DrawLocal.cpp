@@ -1030,6 +1030,12 @@ void Renderer::init()
 		buf.lighting_uniforms = IGraphicsDevice::inst->create_buffer(args);
 	};
 	create_lighting_uniforms();
+	auto create_decal_uniforms = [&]() {
+		CreateBufferArgs args;
+		args.flags = BUFFER_USE_DYNAMIC;
+		buf.decal_uniforms = IGraphicsDevice::inst->create_buffer(args);
+	};
+	create_decal_uniforms();
 
 
 	on_level_start();
@@ -1106,6 +1112,7 @@ void Renderer::init()
 		});
 
 	spotShadows = std::make_unique<ShadowMapManager>();
+	decalBatcher = std::make_unique<DecalBatcher>();
 
 #ifdef EDITOR_BUILD
 	thumbnailRenderer = std::make_unique<ThumbnailRenderer>(64);
@@ -1591,6 +1598,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 
 #ifdef _DEBUG
 	const bool is_depth = !r_ignore_depth_shader.get_bool() && (type == pass_type::DEPTH);
+	assert(proxy.model);
 #else
 	const bool is_depth = type == pass_type::DEPTH;
 #endif
@@ -1632,7 +1640,12 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 
 	key.vao = (int)theVaoType;
 	key.mesh = proxy.model->get_uid();
-	key.layer = layer;
+	
+	if (proxy.is_skybox)
+		key.layer = 1; // make skybox last, saves frame time
+	else
+		key.layer = 0;
+
 	key.distance = camera_dist;
 
 	return key;
@@ -1694,6 +1707,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 			return  a.submesh_index < b.submesh_index;
 		else return false;
 	};
+
 
 	// objects were added correctly in back to front order, just sort by layer
 	const auto& sort_functor_transparent = [](const Pass_Object& a, const Pass_Object& b)
@@ -2349,6 +2363,7 @@ void merge_shadow_list_job(uintptr_t p)
 }
 
 #include "Framework/Jobs.h"
+
 void Render_Scene::refresh_static_mesh_data(bool build_for_editor)
 {
 	// update static cache this frame
@@ -2406,6 +2421,7 @@ void Render_Scene::refresh_static_mesh_data(bool build_for_editor)
 	}
 }
 ConfigVar r_debug_transparents("r.debug_transparents", "0", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar r_force_all_materials_to_fallback("r.force_all_materials_to_fallback", "0", CVAR_BOOL | CVAR_DEV, "");
 
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 {
@@ -2483,7 +2499,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		
 		MaterialInstance* debug_transparent_mat = MaterialInstance::load("transparent_debug.mm");
 		const bool wants_transparent_debug = debug_transparent_mat&&r_debug_transparents.get_bool();
-
+		const bool wants_set_to_fallback = r_force_all_materials_to_fallback.get_bool();
 		for (int i = 0; i < proxy_list.objects.size(); i++) {
 			auto& obj = proxy_list.objects[i];
 			handle<Render_Object> objhandle{ obj.handle };
@@ -2517,7 +2533,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 				const MaterialInstance* mat = proxy.model->get_material(part.material_idx);
 				if (obj.type_.proxy.mat_override)
 					mat = (MaterialInstance*)obj.type_.proxy.mat_override;
-				if (!mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
+				if (wants_set_to_fallback || !mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
 					mat = matman.get_fallback();
 				if (wants_transparent_debug && mat->get_master_material()->render_in_forward_pass())
 					mat = debug_transparent_mat;
@@ -2562,10 +2578,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	auto make_batches_for_passes = [&]() {
 		ZoneScopedN("MakeBatchesAndUploadGpuData");
 
-		// start gbuffer pass, but do the rest on this thread
-		//JobCounter* c{};
-		//JobSystem::inst->add_job(make_batches_job,uintptr_t(&gbuffer_pass), c);
-		//JobSystem::inst->add_job(make_batches_job, uintptr_t(&shadow_pass), c);
 		gbuffer_pass.make_batches(*this);
 		shadow_pass.make_batches(*this);
 		transparent_pass.make_batches(*this);
@@ -2842,12 +2854,12 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 					device.bind_texture_ptr(5, light.projected_texture->gpu_ptr);
 			}
 
-			glMultiDrawElementsIndirect(
+			glDrawElementsBaseVertex(
 				GL_TRIANGLES,
+				cmd.count,
 				index_type,
-				(void*)&cmd,
-				1,
-				sizeof(gpu::DrawElementsIndirectCommand)
+				(void*)int64_t(cmd.firstIndex* MODEL_BUFFER_INDEX_TYPE_SIZE), // in bytes!
+				cmd.baseVertex
 			);
 
 			light_index += 1;
@@ -3058,84 +3070,7 @@ void Renderer::draw_height_fog()
 
 void Renderer::deferred_decal_pass()
 {
-	GPUFUNCTIONSTART;
-
-	if (!r_drawdecals.get_bool())
-		return;
-	const auto& view_to_use = current_frame_view;
-	//RenderPassSetup setup("decalgbuffer",fbo.gbuffer,false,false,0,0, view_to_use.width, view_to_use.height);
-	//auto scope = device.start_render_pass(setup);
-
-	RenderPassState setup2;
-	auto color_targets = {
-		ColorTargetInfo(tex.scene_gbuffer0),
-		ColorTargetInfo(tex.scene_gbuffer1),
-		ColorTargetInfo(tex.scene_gbuffer2),
-		ColorTargetInfo(tex.scene_color),
-		ColorTargetInfo(tex.editor_id_buffer),
-		ColorTargetInfo(tex.scene_motion),
-	};
-	setup2.color_infos = color_targets;
-	IGraphicsDevice::inst->set_render_pass(setup2);
-
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-
-	static Model* cube = find_global_asset_s<Model>("eng/cube.cmdl");	// cube model
-	assert(cube->is_this_globally_referenced());
-	// Copied code from execute_render_lists
-	auto& part = cube->get_part(0);
-	const GLenum index_type = MODEL_INDEX_TYPE_GL;
-	gpu::DrawElementsIndirectCommand cmd;
-	cmd.baseVertex = part.base_vertex + cube->get_merged_vertex_ofs();
-	cmd.count = part.element_count;
-	cmd.firstIndex = part.element_offset + cube->get_merged_index_ptr();
-	cmd.firstIndex /= MODEL_BUFFER_INDEX_TYPE_SIZE;
-	cmd.primCount = 1;
-	cmd.baseInstance = 0;
-
-	bind_texture_ptr(20/* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/, tex.scene_depth);
-
-	vertexarrayhandle vao = g_modelMgr.get_vao_ptr(VaoType::Animated)->get_internal_handle();
-
-	for (int i = 0; i < scene.decal_list.objects.size(); i++) {
-		auto& obj = scene.decal_list.objects[i].type_.decal;
-		if (!obj.material)
-			continue;
-		MaterialInstance* l = (MaterialInstance*)obj.material;
-		if (l->get_master_material()->usage != MaterialUsage::Decal)
-			continue;
-
-		program_handle program = matman.get_mat_shader(nullptr, l, 0);
-
-		RenderPipelineState state;
-		state.depth_testing = false;
-		state.depth_writes = false;
-		state.program = program;
-		state.vao = vao;
-		state.blend = l->get_master_material()->blend;
-		device.set_pipeline(state);
-
-		glm::mat4 ModelTransform = obj.transform;
-		auto invTransform = glm::inverse(ModelTransform);
-
-		shader().set_vec2("DecalTCScale", obj.uv_scale);
-		shader().set_mat4("Model", ModelTransform);
-		shader().set_mat4("DecalViewProj", invTransform);
-		shader().set_mat4("InverseModel", invTransform);
-		shader().set_uint("FS_IN_Matid", l->impl->gpu_buffer_offset);
-
-		auto& texs = l->impl->get_textures();
-		for (int j = 0; j < texs.size(); j++)
-			bind_texture_ptr(j, texs[j]->gpu_ptr);
-
-		glMultiDrawElementsIndirect(
-			GL_TRIANGLES,
-			index_type,
-			(void*)&cmd,
-			1,
-			sizeof(gpu::DrawElementsIndirectCommand)
-		);
-	}
+	decalBatcher->draw_decals();
 }
 void Renderer::sync_update()
 {
@@ -3400,6 +3335,75 @@ void post_process_menu()
 ADD_TO_DEBUG_MENU(post_process_menu);
 
 
+void Renderer::upload_light_and_decal_buffers()
+{
+	auto upload_light_data = [&]() {
+		using glu = gpu::LightingObjectUniforms;
+		ArenaScope memScope(get_arena());
+		const int num_lights = scene.light_list.objects.size();
+		glu* lights_buffer = get_arena().alloc_bottom_type<glu>(num_lights);
+
+		int index = 0;
+		for (auto& light_pair : scene.light_list.objects) {
+			auto& light = light_pair.type_.light;
+
+			glm::mat4 ModelTransform = glm::translate(glm::mat4(1.f), light.position);
+			const float scale = light.radius;
+			ModelTransform = glm::scale(ModelTransform, glm::vec3(scale));
+
+			glu& light_uniforms = lights_buffer[index];
+			light_uniforms.transform = ModelTransform;
+			light_uniforms.position_radius = vec4(light.position, light.radius);
+			light_uniforms.flags = light.is_spotlight;
+			light_uniforms.spot_inner = cos(glm::radians(light.conemin));
+			light_uniforms.spot_angle = cos(glm::radians(light.conemax));
+			light_uniforms.spot_normal = vec4(light.normal, 0);
+			light_uniforms.epsilon = shadowmap.tweak.epsilon * 0.01f;
+			light_uniforms.light_color = vec4(light.color, 0);
+			if (light.casts_shadow_mode != 0) {
+				light_uniforms.lighting_view_proj = light_pair.type_.lightViewProj;
+				Rect2d rect = spotShadows->get_atlas().get_atlas_rect(light_pair.type_.shadow_array_handle);
+				glm::ivec2 atlas_size = spotShadows->get_atlas().get_size();
+				//xy is scale, zw is offset
+				glm::vec4 as_vec4 = glm::vec4(float(rect.w) / atlas_size.x, float(rect.h) / atlas_size.y,
+					float(rect.x) / atlas_size.x, float(rect.y) / atlas_size.y);
+				light_uniforms.atlas_offset = as_vec4;
+			}
+			index += 1;
+		}
+		buf.lighting_uniforms->upload(lights_buffer, num_lights * sizeof(glu));
+	};
+	upload_light_data();
+
+	auto upload_decal_data = [&]() {
+		using gdu = gpu::DecalObjectUniforms;
+		ArenaScope memScope(get_arena());
+		const int num_decals = scene.decal_list.objects.size();
+		gdu* decal_buffer = get_arena().alloc_bottom_type<gdu>(num_decals);
+
+		for (int i = 0; i < scene.decal_list.objects.size(); i++) {
+			auto& obj = scene.decal_list.objects[i].type_.decal;
+			if (!obj.material)
+				continue;
+			MaterialInstance* l = (MaterialInstance*)obj.material;
+			if (l->get_master_material()->usage != MaterialUsage::Decal)
+				continue;
+			glm::mat4 ModelTransform = obj.transform;
+			auto invTransform = glm::inverse(ModelTransform);
+			gdu& decal_obj = decal_buffer[i];
+			decal_obj.uv_scale_x = obj.uv_scale.x;
+			decal_obj.uv_scale_y = obj.uv_scale.y;
+			decal_obj.fs_mat_id = l->impl->gpu_buffer_offset;
+			decal_obj.transform = ModelTransform;
+			decal_obj.inv_transform = invTransform;
+		}
+		buf.decal_uniforms->upload(decal_buffer, num_decals * sizeof(gdu));
+	};
+	upload_decal_data();
+
+	decalBatcher->build_batches();
+}
+
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 {
 	TracyGpuZone("scene_draw_internal");
@@ -3457,46 +3461,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	}
 	upload_ubo_view_constants(current_frame_view, ubo.current_frame);
 	scene.build_scene_data(params.skybox_only, params.is_editor);
-
-	auto upload_light_data = [&]() {
-		using glu = gpu::LightingObjectUniforms;
-		ArenaScope memScope(get_arena());
-		const int num_lights = scene.light_list.objects.size();
-		glu* lights_buffer = get_arena().alloc_bottom_type<glu>(num_lights);
-
-		int index = 0;
-		for (auto& light_pair : scene.light_list.objects) {
-			auto& light = light_pair.type_.light;
-
-			glm::mat4 ModelTransform = glm::translate(glm::mat4(1.f), light.position);
-			const float scale = light.radius;
-			ModelTransform = glm::scale(ModelTransform, glm::vec3(scale));
-
-			glu& light_uniforms = lights_buffer[index];
-			light_uniforms.transform = ModelTransform;
-			light_uniforms.position_radius = vec4(light.position, light.radius);
-			light_uniforms.flags = light.is_spotlight;
-			light_uniforms.spot_inner = cos(glm::radians(light.conemin));
-			light_uniforms.spot_angle = cos(glm::radians(light.conemax));
-			light_uniforms.spot_normal = vec4(light.normal, 0);
-			light_uniforms.epsilon = shadowmap.tweak.epsilon * 0.01f;
-			light_uniforms.light_color = vec4(light.color, 0);
-			if (light.casts_shadow_mode != 0) {
-				light_uniforms.lighting_view_proj = light_pair.type_.lightViewProj;
-				Rect2d rect = spotShadows->get_atlas().get_atlas_rect(light_pair.type_.shadow_array_handle);
-				glm::ivec2 atlas_size = spotShadows->get_atlas().get_size();
-				//xy is scale, zw is offset
-				glm::vec4 as_vec4 = glm::vec4(float(rect.w) / atlas_size.x, float(rect.h) / atlas_size.y,
-					float(rect.x) / atlas_size.x, float(rect.y) / atlas_size.y);
-				light_uniforms.atlas_offset = as_vec4;
-			}
-			index += 1;
-			buf.lighting_uniforms->upload(lights_buffer, num_lights * sizeof(glu));
-		}
-	};
-	upload_light_data();
-
-
+	upload_light_and_decal_buffers();
 
 
 	shadowmap.update();

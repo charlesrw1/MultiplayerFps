@@ -49,6 +49,7 @@ struct Texture3d
 };
 Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int frequency, float persistence, float lacunarity);
 
+
 struct Render_Lists;
 class Render_Pass;
 struct Render_Level_Params {
@@ -377,6 +378,31 @@ private:
 };
 #endif
 
+class DecalBatcher
+{
+public:
+	DecalBatcher();
+	void build_batches();
+	void draw_decals();
+private:
+	struct DecalObj {
+		int orig_index = 0;
+		int program = 0;
+		int texture_set = 0;
+
+		MaterialInstance* the_material = nullptr;
+	};
+	struct DecalDraw {
+		int count = 0;
+		MaterialInstance* shared_pipeline_material = nullptr;
+		program_handle the_program_to_use = 0;
+	};
+
+	std::vector<DecalDraw> draws;
+	IGraphicsBuffer* multidraw_commands = nullptr;
+	IGraphicsBuffer* indirection_buffer = nullptr;
+};
+
 
 class Renderer : public RendererPublic
 {
@@ -550,6 +576,8 @@ public:
 		bufferhandle default_vb{};
 
 		IGraphicsBuffer* lighting_uniforms{};
+		IGraphicsBuffer* decal_uniforms{};
+
 	}buf;
 
 	struct vertex_array_objects {
@@ -586,6 +614,7 @@ public:
 	CascadeShadowMapSystem shadowmap;
 	Volumetric_Fog_System volfog;
 	std::unique_ptr<ShadowMapManager> spotShadows;
+	std::unique_ptr<DecalBatcher> decalBatcher;
 
 	DebuggingTextureOutput debug_tex_out;
 
@@ -607,6 +636,8 @@ private:
 #endif
 
 	void upload_ubo_view_constants(const View_Setup& view, bufferhandle ubo, bool wireframe_secondpass = false);
+
+	void upload_light_and_decal_buffers();
 
 	void init_bloom_buffers();
 	void render_bloom_chain(texhandle scene_color_handle);

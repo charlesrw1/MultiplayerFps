@@ -640,6 +640,7 @@
     <ClCompile Include="Source\Game\Components\RagdollComponent.cpp" />
     <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
     <ClCompile Include="Source\Framework\GlBufferLock.cpp" />
+    <ClCompile Include="Source\Render\DecalBatcher.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

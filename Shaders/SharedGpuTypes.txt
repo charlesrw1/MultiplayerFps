@@ -117,6 +117,15 @@ struct LightingObjectUniforms {
 	float epsilon;
 	uint flags;
 };
+struct DecalObjectUniforms {
+	mat4 transform;
+	mat4 inv_transform;
+	float uv_scale_x;
+	float uv_scale_y;
+	float padding;
+	uint fs_mat_id;
+};
+
 
 struct Chunk 
 {
