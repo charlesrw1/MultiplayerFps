@@ -395,11 +395,11 @@ public:
 			for (int i = 0; i < count; i++) {
 				if (type == cgltf_component_type_r_8u) {
 					int normalized = CAST_TO_AND_INDEX(i, uint8_t, input_buf);
-					out_vec[i] = normalized * 255.f;
+					out_vec[i] = normalized / 255.0;
 				}
 				else if (type == cgltf_component_type_r_16u) {
 					int normalized = CAST_TO_AND_INDEX(i, uint16_t, input_buf);
-					out_vec[i] = normalized * (float)UINT16_MAX;
+					out_vec[i] = normalized / (double)UINT16_MAX;
 				}
 				else
 					assert(0);
@@ -578,6 +578,10 @@ void append_a_found_mesh_node(
 					}, vert_start, mcd.verticies, &accessor);
 				location = CMA_TANGENT;
 			}
+			else if (strcmp(attribute.name, "COLOR_1") == 0) {
+				sys_print(Warning, "mesh has COLOR_1 attribute, ignoring it\n");
+			}
+
 			if (location == -1) continue;
 
 			attrib_mask |= (1 << location);
@@ -2363,9 +2367,8 @@ struct FinalModelData
 	int lightmapY = 0;
 };
 
-ModelVertex fatvert_to_mv_skinned(const FATVertex& v, const glm::mat4& transform, const glm::mat3& normal_tr)
+void add_data_to_vertex_shared(const FATVertex& v, const glm::mat4& transform, const glm::mat3& normal_tr, ModelVertex& mv)
 {
-	ModelVertex mv;
 	mv.pos = v.position;
 	mv.pos = transform * glm::vec4(v.position, 1.0);
 	mv.uv = v.uv;
@@ -2381,6 +2384,12 @@ ModelVertex fatvert_to_mv_skinned(const FATVertex& v, const glm::mat4& transform
 	for (int i = 0; i < 3; i++) {
 		mv.tangent[i] = tangent[i] * INT16_MAX;
 	}
+}
+
+ModelVertex fatvert_to_mv_skinned(const FATVertex& v, const glm::mat4& transform, const glm::mat3& normal_tr)
+{
+	ModelVertex mv;
+	add_data_to_vertex_shared(v, transform, normal_tr,mv);
 
 	for (int i = 0; i < 4; i++) {
 		mv.color[i] = v.bone_index[i];
@@ -2395,24 +2404,27 @@ ModelVertex fatvert_to_mv_skinned(const FATVertex& v, const glm::mat4& transform
 
 	return mv;
 }
+ModelVertex fatvert_to_mv_non_skinned(const FATVertex& v, const glm::mat4& transform, const glm::mat3& normal_tr)
+{
+	ModelVertex mv;
+	add_data_to_vertex_shared(v, transform, normal_tr, mv);
+
+	for (int i = 0; i < 4; i++) {
+		int qu = v.color[i] * 255.0;
+		if (qu > 255)qu = 255;
+		if (qu < 0)qu = 0;
+		mv.color2[i] = qu;
+	}
+
+	return mv;
+}
+
+
 ModelVertex fatvert_to_mv_lightmapped(const FATVertex& v, const glm::mat4& transform, const glm::mat3& normal_tr)
 {
 	ModelVertex mv;
-	mv.pos = v.position;
-	mv.pos = transform * glm::vec4(v.position, 1.0);
-	mv.uv = v.uv;
+	add_data_to_vertex_shared(v, transform, normal_tr, mv);
 
-	// quantize
-	glm::vec3 normal = normal_tr * v.normal;
-	normal = glm::normalize(normal);
-	for (int i = 0; i < 3; i++) {
-		mv.normal[i] = normal[i] * INT16_MAX;
-	}
-	glm::vec3 tangent = normal_tr * v.tangent;
-	tangent = glm::normalize(tangent);
-	for (int i = 0; i < 3; i++) {
-		mv.tangent[i] = tangent[i] * INT16_MAX;
-	}
 	int as_uintX = v.uv2.x * UINT16_MAX;
 	int as_uintY = v.uv2.y * UINT16_MAX;
 	as_uintX = glm::clamp(as_uintX,0, (int)UINT16_MAX);
@@ -2569,7 +2581,9 @@ FinalPhysicsData create_final_physics_data(
 }
 
 
+
 Submesh make_final_submesh_from_existing(
+	const bool has_skeleton,
 	const Submesh& in,
 	FinalModelData& finalmod, 
 	const ModelCompileData& compile, 
@@ -2597,9 +2611,14 @@ Submesh make_final_submesh_from_existing(
 			finalmod.verticies.push_back(fatvert_to_mv_lightmapped(compile.verticies[vertex_start + i], transform, normal_tr));
 		}
 	}
-	else {
+	else if(has_skeleton){
 		for (int i = 0; i < in.vertex_count; i++) {
 			finalmod.verticies.push_back(fatvert_to_mv_skinned(compile.verticies[vertex_start + i], transform, normal_tr));
+		}
+	}
+	else {
+		for (int i = 0; i < in.vertex_count; i++) {
+			finalmod.verticies.push_back(fatvert_to_mv_non_skinned(compile.verticies[vertex_start + i], transform, normal_tr));
 		}
 	}
 
@@ -2702,6 +2721,7 @@ FinalModelData create_final_model_data(
 
 			final_mod.submeshes.push_back(
 				make_final_submesh_from_existing(
+					skel!=nullptr,
 					lm.submesh,
 					final_mod,
 					compile,

@@ -9,10 +9,16 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
 
-uniform mat4 Model;
+layout (binding = 1, std430) readonly buffer LightingObjectUniforms_Buffer {
+	LightingObjectUniforms light_objects[];
+};
+
+uniform uint light_index = 0;
 
 void main()
 {
+	mat4 Model = light_objects[light_index].transform;
+
 	FS_IN_FragPos = vec3(Model * vec4(VS_IN_Postion,1.0));
     FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);
 	gl_Position = FS_IN_NDC;

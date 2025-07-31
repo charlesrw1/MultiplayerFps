@@ -494,6 +494,7 @@ public:
 		IGraphicsTexture* last_scene_motion{};
 
 
+
 		// ----------------------------------------------------------------------------------
 		// | gbuffer		|		X		|		Y		|		Z		|		A		|
 		// ----------------------------------------------------------------------------------
@@ -547,6 +548,8 @@ public:
 
 	struct buffers {
 		bufferhandle default_vb{};
+
+		IGraphicsBuffer* lighting_uniforms{};
 	}buf;
 
 	struct vertex_array_objects {

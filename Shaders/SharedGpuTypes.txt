@@ -105,6 +105,19 @@ struct DrawElementsIndirectCommand
 	uint baseInstance;
 };
 
+struct LightingObjectUniforms {
+	mat4 transform;
+	mat4 lighting_view_proj;
+	vec4 position_radius;
+	vec4 light_color;
+	vec4 spot_normal;
+	vec4 atlas_offset;
+	float spot_angle;
+	float spot_inner;
+	float epsilon;
+	uint flags;
+};
+
 struct Chunk 
 {
     vec4 cone_apex;

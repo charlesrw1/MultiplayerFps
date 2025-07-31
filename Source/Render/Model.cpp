@@ -776,7 +776,7 @@ void ModelMan::init()
 			VertexLayout(NORMAL_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, normal[0])),
 			VertexLayout(TANGENT_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, tangent[0])),
 			VertexLayout(JOINT_LOC,4,gvat::u8,stride,offsetof(ModelVertex, color[0])),
-			VertexLayout(WEIGHT_LOC,4,gvat::u8_normalized,stride,offsetof(ModelVertex, color2[0])),
+			VertexLayout(WEIGHT_OR_COLOR_LOC,4,gvat::u8_normalized,stride,offsetof(ModelVertex, color2[0])),
 		};
 		args.layout = animated_layout;
 		animated_vertex_input = IGraphicsDevice::inst->create_vertex_input(args);
@@ -795,6 +795,7 @@ void ModelMan::init()
 			VertexLayout(NORMAL_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, normal[0])),
 			VertexLayout(TANGENT_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, tangent[0])),
 			VertexLayout(LIGHTMAPCOORD_LOC,2,gvat::u16_normalized,stride,offsetof(ModelVertex, color[0])),
+			VertexLayout(WEIGHT_OR_COLOR_LOC,4,gvat::u8_normalized,stride,offsetof(ModelVertex, color2[0])),
 		};
 		args.layout = lightmapped_layout;
 		lightmapped_vertex_input = IGraphicsDevice::inst->create_vertex_input(args);

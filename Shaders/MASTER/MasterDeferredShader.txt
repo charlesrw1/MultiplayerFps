@@ -35,6 +35,7 @@ layout (location = 3) in vec3 VS_IN_Tangent;
 
 #ifdef LIGHTMAPPED
 layout (location = 4) in vec2 VS_IN_LightmapCoord;
+layout (location = 5) in vec4 VS_IN_VertexColor;
 #else
 layout (location = 4) in ivec4 VS_IN_BoneIndicies;
 layout (location = 5) in vec4 VS_IN_BoneWeights;
@@ -55,6 +56,9 @@ out vec4 FS_IN_PrevNDC;// for motion vectors
 out mat3 FS_IN_TBN;
 #ifdef LIGHTMAPPED
 out vec2 FS_IN_LightmapCoord;
+#endif
+#ifndef ANIMATED
+out vec4 FS_IN_VertexColor;
 #endif
 
 vec3 randColor(int number){
@@ -179,7 +183,14 @@ void main()
 	FS_IN_Texcoord = VS_IN_TexCoord;
 #ifdef LIGHTMAPPED
 	FS_IN_LightmapCoord = VS_IN_LightmapCoord;
+	FS_IN_VertexColor = VS_IN_VertexColor;
+#else	// else not lightmapped
+#ifndef ANIMATED
+	FS_IN_VertexColor = VS_IN_BoneWeights;
+#endif // not Animated
 #endif	// !LIGHTMAPPED
+
+
 }
 
 #endif // _VERTEX_SHADER
@@ -216,6 +227,9 @@ in vec4 FS_IN_NDC;
 in vec4 FS_IN_PrevNDC;
 #endif
 in vec2 FS_IN_LightmapCoord;
+#ifndef ANIMATED
+in vec4 FS_IN_VertexColor;
+#endif
 
 
 in mat3 FS_IN_TBN;

@@ -24,8 +24,9 @@ const int UV_LOC		= 1;
 const int NORMAL_LOC    = 2;
 const int TANGENT_LOC   = 3;
 const int JOINT_LOC		= 4;
-const int WEIGHT_LOC	= 5;
+const int WEIGHT_OR_COLOR_LOC	= 5;
 const int LIGHTMAPCOORD_LOC = 4;
+
 
 //const int COLOR_LOC = 5;
 //const int UV2_LOC = 6;

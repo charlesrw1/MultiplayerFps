@@ -1024,6 +1024,12 @@ void Renderer::init()
 	glBindBuffer(GL_ARRAY_BUFFER, buf.default_vb);
 	glBindVertexArray(0);
 
+	auto create_lighting_uniforms = [&]() {
+		CreateBufferArgs args;
+		args.flags = BUFFER_USE_DYNAMIC;
+		buf.lighting_uniforms = IGraphicsDevice::inst->create_buffer(args);
+	};
+	create_lighting_uniforms();
 
 
 	on_level_start();
@@ -2399,6 +2405,7 @@ void Render_Scene::refresh_static_mesh_data(bool build_for_editor)
 		}
 	}
 }
+ConfigVar r_debug_transparents("r.debug_transparents", "0", CVAR_BOOL | CVAR_DEV, "");
 
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 {
@@ -2473,6 +2480,10 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	auto add_objects_to_passes = [&]() {
 		ZoneScopedN("Traversal");
 		//ZoneScopedN("LoopObjects");
+		
+		MaterialInstance* debug_transparent_mat = MaterialInstance::load("transparent_debug.mm");
+		const bool wants_transparent_debug = debug_transparent_mat&&r_debug_transparents.get_bool();
+
 		for (int i = 0; i < proxy_list.objects.size(); i++) {
 			auto& obj = proxy_list.objects[i];
 			handle<Render_Object> objhandle{ obj.handle };
@@ -2508,6 +2519,10 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 					mat = (MaterialInstance*)obj.type_.proxy.mat_override;
 				if (!mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
 					mat = matman.get_fallback();
+				if (wants_transparent_debug && mat->get_master_material()->render_in_forward_pass())
+					mat = debug_transparent_mat;
+
+
 				const MasterMaterialImpl* mm = mat->get_master_material();
 
 				if (mm->render_in_forward_pass()) {
@@ -2770,9 +2785,12 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		// spot shadow atlas
 		bind_texture_ptr(4, spotShadows->get_atlas().get_atlas_texture());
 
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, buf.lighting_uniforms->get_internal_handle());
 
+		int light_index = 0;
 		for (auto& light_pair : scene.light_list.objects) {
 			auto& light = light_pair.type_.light;
+
 
 			glm::mat4 ModelTransform = glm::translate(glm::mat4(1.f), light.position);
 			const float scale = light.radius;
@@ -2800,24 +2818,25 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 			}
 			device.set_pipeline(state);
 
+			shader().set_uint("light_index", light_index);
 
-			shader().set_mat4("Model", ModelTransform);
-			shader().set_vec3("position", light.position);
-			shader().set_float("radius", light.radius);
-			shader().set_bool("is_spot_light", light.is_spotlight);
-			shader().set_float("spot_inner", cos(glm::radians(light.conemin)));
-			shader().set_float("spot_angle", cos(glm::radians(light.conemax)));
-			shader().set_vec3("spot_normal",light.normal);
-			shader().set_vec3("color", light.color);
-			shader().set_float("uEpsilon", shadowmap.tweak.epsilon * 0.01f);
+			//shader().set_mat4("Model", ModelTransform);
+			//shader().set_vec3("position", light.position);
+			//shader().set_float("radius", light.radius);
+			//shader().set_bool("is_spot_light", light.is_spotlight);
+			//shader().set_float("spot_inner", cos(glm::radians(light.conemin)));
+			//shader().set_float("spot_angle", cos(glm::radians(light.conemax)));
+			//shader().set_vec3("spot_normal",light.normal);
+			//shader().set_vec3("color", light.color);
+			//shader().set_float("uEpsilon", shadowmap.tweak.epsilon * 0.01f);
 			if (light.casts_shadow_mode != 0) {
-				shader().set_mat4("shadow_view_proj", light_pair.type_.lightViewProj);
+			//	shader().set_mat4("shadow_view_proj", light_pair.type_.lightViewProj);
 				Rect2d rect = spotShadows->get_atlas().get_atlas_rect(light_pair.type_.shadow_array_handle);
 				glm::ivec2 atlas_size = spotShadows->get_atlas().get_size();
 				//xy is scale, zw is offset
 				glm::vec4 as_vec4 = glm::vec4(float(rect.w) / atlas_size.x, float(rect.h) / atlas_size.y,
 					float(rect.x) / atlas_size.x, float(rect.y) / atlas_size.y);
-				shader().set_vec4("shadow_atlas_offset", as_vec4);
+			//	shader().set_vec4("shadow_atlas_offset", as_vec4);
 
 				if (light.projected_texture)
 					device.bind_texture_ptr(5, light.projected_texture->gpu_ptr);
@@ -2830,6 +2849,8 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 				1,
 				sizeof(gpu::DrawElementsIndirectCommand)
 			);
+
+			light_index += 1;
 		}
 	}
 
@@ -3436,6 +3457,47 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	}
 	upload_ubo_view_constants(current_frame_view, ubo.current_frame);
 	scene.build_scene_data(params.skybox_only, params.is_editor);
+
+	auto upload_light_data = [&]() {
+		using glu = gpu::LightingObjectUniforms;
+		ArenaScope memScope(get_arena());
+		const int num_lights = scene.light_list.objects.size();
+		glu* lights_buffer = get_arena().alloc_bottom_type<glu>(num_lights);
+
+		int index = 0;
+		for (auto& light_pair : scene.light_list.objects) {
+			auto& light = light_pair.type_.light;
+
+			glm::mat4 ModelTransform = glm::translate(glm::mat4(1.f), light.position);
+			const float scale = light.radius;
+			ModelTransform = glm::scale(ModelTransform, glm::vec3(scale));
+
+			glu& light_uniforms = lights_buffer[index];
+			light_uniforms.transform = ModelTransform;
+			light_uniforms.position_radius = vec4(light.position, light.radius);
+			light_uniforms.flags = light.is_spotlight;
+			light_uniforms.spot_inner = cos(glm::radians(light.conemin));
+			light_uniforms.spot_angle = cos(glm::radians(light.conemax));
+			light_uniforms.spot_normal = vec4(light.normal, 0);
+			light_uniforms.epsilon = shadowmap.tweak.epsilon * 0.01f;
+			light_uniforms.light_color = vec4(light.color, 0);
+			if (light.casts_shadow_mode != 0) {
+				light_uniforms.lighting_view_proj = light_pair.type_.lightViewProj;
+				Rect2d rect = spotShadows->get_atlas().get_atlas_rect(light_pair.type_.shadow_array_handle);
+				glm::ivec2 atlas_size = spotShadows->get_atlas().get_size();
+				//xy is scale, zw is offset
+				glm::vec4 as_vec4 = glm::vec4(float(rect.w) / atlas_size.x, float(rect.h) / atlas_size.y,
+					float(rect.x) / atlas_size.x, float(rect.y) / atlas_size.y);
+				light_uniforms.atlas_offset = as_vec4;
+			}
+			index += 1;
+			buf.lighting_uniforms->upload(lights_buffer, num_lights * sizeof(glu));
+		}
+	};
+	upload_light_data();
+
+
+
 
 	shadowmap.update();
 
