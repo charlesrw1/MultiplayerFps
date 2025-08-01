@@ -642,6 +642,9 @@ public:
 	Render_Pass transparent_pass;
 	Render_Pass editor_sel_pass;
 	Render_Pass shadow_pass;	// all shadow casting objects
+	Render_Pass depth_prepass;
+	Render_Lists depth_prepass_rlist;
+
 	Render_Lists gbuffer_rlist;
 	Render_Lists transparent_rlist;
 	std::vector<Render_Lists> cascades_rlists;	// lists specific to each cascade, culled

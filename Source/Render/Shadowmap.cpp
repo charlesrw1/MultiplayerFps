@@ -140,7 +140,7 @@ void CascadeShadowMapSystem::update()
 	// now setup scene for rendering
 	//glBindFramebuffer(GL_FRAMEBUFFER, fbo.shadow);
 	{
-		GPUSCOPESTART(RENDER_CSM_LAYERS);
+		GPUSCOPESTART(render_csm_scope);
 
 		auto& device = draw.get_device();
 		//RenderPassSetup setup("shadowmap", fbo.shadow, false, false /* clear it below */, 0, 0, csm_resolution, csm_resolution);

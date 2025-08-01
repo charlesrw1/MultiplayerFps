@@ -2316,7 +2316,8 @@ void GameEngineLocal::loop()
 	// I could double buffer draw data so ImGui can update on game thread and render simultaneously
 	auto imgui_render = [&](const bool skip_rendering)
 	{
-		ZoneScopedN("ImguiDraw");
+		//ZoneScopedN("ImguiDraw");
+		GPUSCOPESTART(imgui_update_scope);
 
 		ImGui::Render();
 		if (!skip_rendering) {
@@ -2327,6 +2328,7 @@ void GameEngineLocal::loop()
 	auto imgui_update = [&]()
 	{
 		ZoneScopedN("ImGuiUpdate");
+
 		gui_log.draw(UiSystem::inst->window);
 		EditorState* s = nullptr;
 #ifdef EDITOR_BUILD
@@ -2352,8 +2354,8 @@ void GameEngineLocal::loop()
 	};
 	auto wait_for_swap = [&](const bool skip_rendering)
 	{
-		ZoneScopedN("SwapWindow");
-		CPUSCOPESTART(SwapWindow);
+		//ZoneScopedN("SwapWindow");
+		GPUSCOPESTART(gl_swap_window_scope);
 		if(!skip_rendering)
 			SDL_GL_SwapWindow(window);
 	};

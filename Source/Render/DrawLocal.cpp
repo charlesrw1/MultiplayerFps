@@ -1643,8 +1643,8 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 	
 	if (proxy.is_skybox)
 		key.layer = 2; // make skybox last, saves frame time
-	else if (proxy.sort_first)
-		key.layer = 0;
+	//else if (proxy.sort_first)
+	//	key.layer = 0;
 	else
 		key.layer = 1;
 
@@ -1837,7 +1837,8 @@ Render_Scene::Render_Scene()
 	transparent_pass(pass_type::TRANSPARENT),
 	//shadow_pass(pass_type::DEPTH),
 	editor_sel_pass(pass_type::DEPTH),
-	shadow_pass(pass_type::DEPTH)
+	shadow_pass(pass_type::DEPTH),
+	depth_prepass(pass_type::DEPTH)
 {
 
 }
@@ -2041,6 +2042,7 @@ void Render_Scene::init()
 		c.init(0, 0);
 	spotLightShadowList.init(0, 0);
 
+	depth_prepass_rlist.init(0, 0);
 
 	glCreateBuffers(1, &gpu_render_instance_buffer);
 	glCreateBuffers(1, &gpu_skinned_mats_buffer);
@@ -2436,10 +2438,14 @@ void Render_Scene::refresh_static_mesh_data(bool build_for_editor)
 ConfigVar r_debug_transparents("r.debug_transparents", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_force_all_materials_to_fallback("r.force_all_materials_to_fallback", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_dont_use_camera_depth_build_scene("r.dont_use_camera_depth_build_scene", "0", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar r_skip_depth_prepass("r.skip_depth_prepass", "0", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar r_depth_prepass_all_objects("r.depth_prepass_all_objects", "0", CVAR_BOOL | CVAR_DEV, "");
 
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 {
-	ZoneScoped;
+	GPUSCOPESTART(build_scene_data_scope);
+
+	//ZoneScoped;
 	if (r_debug_skip_build_scene_data.get_bool())
 		return;
 	if (static_cache_built_for_editor != build_for_editor)
@@ -2447,14 +2453,20 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	if(static_cache_built_for_debug!=(r_debug_mode.get_integer() != 0))
 		statics_meshes_are_dirty = true;
 
+	const bool skip_prepass_objs = r_skip_depth_prepass.get_bool();
+
 	auto& memArena = draw.get_arena();
 	ArenaScope scope(memArena);
 
 	// clear objects
-	gbuffer_pass.clear();
-	transparent_pass.clear();
-	shadow_pass.clear();
-	editor_sel_pass.clear();
+	auto reset_passes = [&]() {
+		gbuffer_pass.clear();
+		transparent_pass.clear();
+		shadow_pass.clear();
+		editor_sel_pass.clear();
+		depth_prepass.clear();
+	};
+	reset_passes();
 
 	const int visible_count = proxy_list.objects.size();
 	bool* cascade_vis[4] = { nullptr,nullptr,nullptr,nullptr };
@@ -2518,6 +2530,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		const bool wants_transparent_debug = debug_transparent_mat&&r_debug_transparents.get_bool();
 		const bool wants_set_to_fallback = r_force_all_materials_to_fallback.get_bool();
 		const bool dont_use_cam_depth = r_dont_use_camera_depth_build_scene.get_bool();
+		const bool all_object_depth_prepass = r_depth_prepass_all_objects.get_bool();
 		for (int i = 0; i < proxy_list.objects.size(); i++) {
 			auto& obj = proxy_list.objects[i];
 			handle<Render_Object> objhandle{ obj.handle };
@@ -2539,6 +2552,10 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 
 			const int LOD_index = lod_to_render_array[i];
 
+			int16_t cam_depth = 0;
+			if (!dont_use_cam_depth)
+				cam_depth = camera_depth_array[i];
+
 			auto model = proxy.model;
 			const auto& lod = model->get_lod(LOD_index);
 
@@ -2559,26 +2576,29 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 
 				const MasterMaterialImpl* mm = mat->get_master_material();
 
-				int16_t cam_depth = 0;
-				if (!dont_use_cam_depth)
-					cam_depth = camera_depth_array[i];
+				auto add_to_pass = [&](Render_Pass& pass) {
+					pass.add_object(proxy, objhandle, mat, cam_depth, j, LOD_index, 0, build_for_editor);
+				};
 
 				if (mm->render_in_forward_pass()) {
 					if (is_visible)
-						transparent_pass.add_object(proxy, objhandle, mat, cam_depth, j, LOD_index, 0, build_for_editor);
+						add_to_pass(transparent_pass);
 					if (!mm->is_translucent() && casts_shadow)
-						shadow_pass.add_object(proxy, objhandle, mat, cam_depth, j, LOD_index, 0, build_for_editor);
+						add_to_pass(shadow_pass);
 				}
 				else {
 					if (casts_shadow)
-						shadow_pass.add_object(proxy, objhandle, mat, cam_depth, j, LOD_index, 0, build_for_editor);
-					if (is_visible)
-						gbuffer_pass.add_object(proxy, objhandle, mat, cam_depth, j, LOD_index, 0, build_for_editor);
+						add_to_pass(shadow_pass);
+					if (is_visible) {
+						add_to_pass(gbuffer_pass);
+						if ((all_object_depth_prepass||proxy.sort_first)&&!skip_prepass_objs)
+							add_to_pass(depth_prepass);
+					}
 				}
 
 #ifdef EDITOR_BUILD
 				if (obj.type_.proxy.outline && is_visible) {
-					editor_sel_pass.add_object(proxy, objhandle, mat, cam_depth, j, LOD_index, 0, build_for_editor);
+					add_to_pass(editor_sel_pass);
 				}
 #endif
 			}
@@ -2604,6 +2624,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		shadow_pass.make_batches(*this);
 		transparent_pass.make_batches(*this);
 		editor_sel_pass.make_batches(*this);
+		if(!skip_prepass_objs)
+			depth_prepass.make_batches(*this);
 
 		JobSystem::inst->wait_and_free_counter(gpu_obj_set_cntr);
 		{
@@ -2657,6 +2679,9 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		build_standard_cpu(gbuffer_rlist, gbuffer_pass, proxy_list);
 		build_standard_cpu(transparent_rlist, transparent_pass, proxy_list);
 		build_standard_cpu(editor_sel_rlist, editor_sel_pass, proxy_list);
+
+		if(!skip_prepass_objs)
+			build_standard_cpu(depth_prepass_rlist, depth_prepass, proxy_list);
 
 	};
 	make_render_lists();
@@ -3140,12 +3165,12 @@ void Renderer::sync_update()
 
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 {
-	GPUFUNCTIONSTART;
-	ZoneNamed(RendererSceneDraw,true);
-	TracyGpuZone("scene_draw");
+	GPUSCOPESTART(scene_draw_scope);
+	//ZoneNamed(RendererSceneDraw,true);
+	//TracyGpuZone("scene_draw");
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	r_taa_manager.start_frame();
 	if (r_taa_32f.was_changed()) {
@@ -3359,6 +3384,8 @@ ADD_TO_DEBUG_MENU(post_process_menu);
 
 void Renderer::upload_light_and_decal_buffers()
 {
+	GPUSCOPESTART(upload_light_and_decal_buffers_scope);
+
 	auto upload_light_data = [&]() {
 		using glu = gpu::LightingObjectUniforms;
 		ArenaScope memScope(get_arena());
@@ -3426,10 +3453,13 @@ void Renderer::upload_light_and_decal_buffers()
 	decalBatcher->build_batches();
 }
 
+
+
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 {
-	TracyGpuZone("scene_draw_internal");
-	ZoneScoped;
+	//TracyGpuZone("scene_draw_internal");
+	//ZoneScoped;
+	GPUSCOPESTART(scene_draw_internal_scope);
 
 	current_time = GetTime();
 
@@ -3493,14 +3523,50 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 	// main level render
 
+	auto depth_prepass = [&]() {
+		GPUSCOPESTART(depth_prepass_scope);
+
+
+		const auto& view_to_use = current_frame_view;
+
+		//RenderPassSetup setup("gbuffer", fbo.gbuffer, clear_framebuffer,clear_framebuffer, 0, 0, view_to_use.width, view_to_use.height);
+		//auto scope = device.start_render_pass(setup);
+
+		RenderPassState setup2;
+		setup2.depth_info = tex.scene_depth;
+		setup2.set_clear_both(true);
+		IGraphicsDevice::inst->set_render_pass(setup2);
+
+		if (r_skip_depth_prepass.get_bool())
+			return;	// do it here so framebuffer depth/color is cleared even if no prepass
+
+
+		Render_Level_Params cmdparams(
+			view_to_use,
+			&scene.depth_prepass_rlist,
+			&scene.depth_prepass,
+			Render_Level_Params::OPAQUE
+		);
+
+		cmdparams.upload_constants = true;
+		cmdparams.provied_constant_buffer = ubo.current_frame;
+		cmdparams.draw_viewmodel = true;
+
+		render_level_to_target(cmdparams);
+	};
+	depth_prepass();
+
 
 	auto gbuffer_pass = [&](bool is_wireframe = false, bool wireframe_secondpass = false) {
 		if (r_skip_gbuffer.get_bool())
 			return;
 
+
+		GPUSCOPESTART(gbuffer_pass_scope);
+
 		const auto& view_to_use = current_frame_view;
 
-		const bool clear_framebuffer = (!is_wireframe || !wireframe_secondpass);
+		const bool clear_framebuffer = false;// (!is_wireframe || !wireframe_secondpass);
 
 		//RenderPassSetup setup("gbuffer", fbo.gbuffer, clear_framebuffer,clear_framebuffer, 0, 0, view_to_use.width, view_to_use.height);
 		//auto scope = device.start_render_pass(setup);
@@ -3516,10 +3582,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		};
 		setup2.color_infos = color_targets;
 		setup2.depth_info = tex.scene_depth;
-		setup2.set_clear_both(clear_framebuffer);
+		setup2.wants_color_clear = (clear_framebuffer);	// depth clear done in prepass above
 		IGraphicsDevice::inst->set_render_pass(setup2);
-
-		GPUSCOPESTART(gbuffer_pass_scope);
 
 		Render_Level_Params cmdparams(
 			view_to_use,
@@ -3745,18 +3809,20 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	//RenderPassSetup setup("composite", fbo.composite, true, false, 0, 0, view_to_use.width, view_to_use.height);
 	//auto scope = device.start_render_pass(setup);
 
-	auto set_composite_pass = [&]() {
-		RenderPassState pass_state;
-		pass_state.wants_color_clear = true;
-		auto color_infos = {
-			ColorTargetInfo(read_from_texture)
-		};
-		pass_state.color_infos = color_infos;
-		IGraphicsDevice::inst->set_render_pass(pass_state);
-	};
-	set_composite_pass();
 
 	auto do_composite_pass = [&]() {
+		GPUSCOPESTART(composite_pass_scope);
+		auto set_composite_pass = [&]() {
+			RenderPassState pass_state;
+			pass_state.wants_color_clear = true;
+			auto color_infos = {
+				ColorTargetInfo(read_from_texture)
+			};
+			pass_state.color_infos = color_infos;
+			IGraphicsDevice::inst->set_render_pass(pass_state);
+		};
+		set_composite_pass();
+
 		RenderPipelineState state;
 		state.program = prog.combine;
 		state.vao = get_empty_vao();
@@ -3780,6 +3846,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	do_composite_pass();
 
 	auto post_process_stack = [&](){
+		GPUSCOPESTART(post_process_stack_scope);
+
 		std::vector<MaterialInstance*> postProcesses;
 		if (r_debug_mode.get_integer() == DEBUG_OUTLINED) {
 			auto mat = g_assets.find_global_sync<MaterialInstance>("eng/editorEdgeDetect.mm");
