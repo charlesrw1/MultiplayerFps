@@ -330,9 +330,6 @@
     <ClInclude Include="Source\Sound\SoundPublic.h">
       <Filter>Source\Sound</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\RenderFog.h">
-      <Filter>Source\Render\Public</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Render\EnvProbe.h">
       <Filter>Source\Render</Filter>
     </ClInclude>

@@ -32,4 +32,8 @@ struct Render_Skylight
 	float height_fog_exp = 1.0;
 	float height_fog_start = 0.0;
 	float height_fog_density = 1.0;
+
+	float fog_cubemap_min_dist = 0.0;
+	float fog_cubemap_max_dist = 100.0;
+	float fog_cubemap_max_mip = 0.7;
 };

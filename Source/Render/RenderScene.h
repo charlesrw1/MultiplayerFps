@@ -9,7 +9,6 @@
 #include "Render/Render_Volumes.h"
 #include "Render/DrawTypedefs.h"
 #include "Render/MaterialLocal.h"
-#include "Render/RenderFog.h"
 
 #include "Framework/FreeList.h"
 

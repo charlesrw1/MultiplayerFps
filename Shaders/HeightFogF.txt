@@ -79,7 +79,14 @@ void main()
 	vec3 fog_color = fog.color.rgb;
 	if(use_cubemap_color) {
 		vec3 dir = (worldspace-camera_pos)/to_world_pos_dist;
-		fog_color = textureLod(SkyCubemap,dir,6.0).rgb;
+		float fog_dist_min = fog.min_mip_dist;
+		float fog_dist_max = fog.max_mip_dist;
+		float fog_max_mip = fog.max_mip;
+		const float MAX_CUBEMAP_LOD = 7.0;
+		float p = smoothstep(fog_dist_min,fog_dist_max,to_world_pos_dist);
+		float lod_to_sample = (1-p*fog_max_mip) * MAX_CUBEMAP_LOD;
+		
+		fog_color = textureLod(SkyCubemap,dir,lod_to_sample).rgb;
 	}
 	
 	FS_OUT_Color = vec4(fog_color,factor);

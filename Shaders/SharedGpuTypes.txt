@@ -127,6 +127,12 @@ struct DecalObjectUniforms {
 };
 struct FogUniforms {
 	vec4 color;
+	
+	float min_mip_dist;
+	float max_mip_dist;
+	float max_mip;
+	float padding;
+	
 	float height;
 	float density;
 	float exp_falloff;

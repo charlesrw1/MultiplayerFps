@@ -199,6 +199,10 @@ void SkylightComponent::on_sync_render_data()
 	sl.height_fog_start = fog_height_start;
 	sl.fog_color = fog_color;
 	sl.fog_use_skylight_cubemap = use_sky_cubemap_for_fog;
+	sl.fog_cubemap_min_dist = fog_cubemap_min_dist;
+	sl.fog_cubemap_max_dist = fog_cubemap_max_dist;
+	sl.fog_cubemap_max_mip = fog_cubemap_max_mip;
+
 
 	idraw->get_scene()->update_skylight(handle, sl);
 }

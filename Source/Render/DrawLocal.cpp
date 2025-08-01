@@ -3086,6 +3086,11 @@ void Renderer::draw_height_fog()
 	uniformsToUpload.exp_falloff = skylight.height_fog_exp;
 	uniformsToUpload.height = skylight.height_fog_start;
 	uniformsToUpload.flags = skylight.fog_use_skylight_cubemap;
+
+	uniformsToUpload.max_mip = skylight.fog_cubemap_max_mip;
+	uniformsToUpload.min_mip_dist = skylight.fog_cubemap_min_dist;
+	uniformsToUpload.max_mip_dist = skylight.fog_cubemap_max_dist;
+
 	buf.fog_uniforms->upload(&uniformsToUpload, sizeof(uniformsToUpload));
 
 

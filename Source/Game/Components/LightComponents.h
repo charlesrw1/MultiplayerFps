@@ -178,17 +178,28 @@ public:
 	REFLECT(transient)
 	BoolButton recapture_skylight;
 
-	REF bool enable_fog = false;
+	REF bool enable_fog = false;	// fog on/off
+	// if true, then uses the skylight cubemap to source the color of the fog. else, uses constant fog_color.
 	REF bool use_sky_cubemap_for_fog = false;
 	REF Color32 fog_color = Color32();
-	REF float fog_height_start = 0.0;
-	REF float fog_height_falloff = 0.0;
-	REF float fog_density = 1.0;
+	REF float fog_height_start = 0.0;	// height offset from 0 to start the fog
+	REF float fog_height_falloff = 0.0;	// how the fog falls off over height
+	REF float fog_density = 1.0; // overall density of fog
+
+	// these are settings for when use_sky_cubemap_for_fog is true.
+	// if using the fog cubemap, then the color is altered by direction of the camera and by distance.
+	// basically:
+	// mip_to_sample = MAX_MIPS_IN_CUBEMAP * (1.0 - smoothstep(min_dist,max_dist,fog_sample_point_dist)*max_mip)
+	// color = texture(Cubemap, camera_dir, mip_to_sample)
+
+	REF float fog_cubemap_max_mip = 0.7;	// lower values means more diffuse
+	REF float fog_cubemap_min_dist = 0.0;	// values below this use the highest mip (more diffuse)
+	REF float fog_cubemap_max_dist = 50.0; // values above this use the lowest mip (less diffuse)
 	
 	Texture* mytexture = nullptr;
 	
 	REFLECT();
-	bool enableBakedAmbient = false;
+	bool enableBakedAmbient = false;	// todo: does nothing
 	glm::vec3 skyTop = glm::vec3(0.f);
 	glm::vec3 skyBottom = glm::vec3(0.f);
 
