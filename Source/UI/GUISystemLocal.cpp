@@ -211,7 +211,9 @@ void UiSystem::set_focus_to_viewport()
 
 bool UiSystem::blocking_keyboard_inputs() const
 {
-	return ImGui::GetIO().WantCaptureKeyboard;
+	// keep it for text input, not keyboard input. imgui *always* seems to want keyboard capture (for navigation or whatever) which is annoying
+	// but i really do want it blocking for text input
+	return ImGui::GetIO().WantTextInput;
 }
 
 bool UiSystem::blocking_mouse_inputs() const

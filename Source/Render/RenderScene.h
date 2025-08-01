@@ -442,30 +442,14 @@ public:
 		handle = { -1 };
 	}
 	handle<RenderFog> register_fog() final {
-		ASSERT(!eng->get_is_in_overlapped_period());
-		if (has_fog) {
-			sys_print(Warning, "only one fog allowed in a scene\n");
-			return { -1 };
-		}
-		has_fog = true;
-		//this->fog = fog;
+	
 		return { 0 };
 	}
 	void update_fog(handle<RenderFog> handle, const RenderFog& fog) final {
-		ASSERT(!eng->get_is_in_overlapped_period());
-		if (handle.is_valid()) {
-			assert(has_fog);
-			this->fog = fog;
-		}
+		
 	}
 	void remove_fog(handle<RenderFog>& handle) final {
-		if (eng->get_is_in_overlapped_period()) {
-			add_to_queued_deletes(handle.id, RenderObjectTypes::Fog);
-		}
-		else if (handle.is_valid()) {
-			has_fog = false;
-		}
-		handle = { -1 };
+
 	}
 
 	virtual const Render_Object* get_read_only_object(handle<Render_Object> handle) override {
@@ -702,8 +686,6 @@ public:
 	// objects can be deleted mid frame, so queue them
 	std::vector<QueuedRenderObjectDelete> queued_deletes;
 
-	bool has_fog = false;
-	RenderFog fog;
 	
 	// use for stuff that isnt getting alloced much multiple times like suns,skylights
 	int unique_id_counter = 0;

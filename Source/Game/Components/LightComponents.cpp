@@ -185,11 +185,21 @@ void SkylightComponent::stop() {
 }
 void SkylightComponent::on_sync_render_data()
 {
+	bool wants_recapture = !handle.is_valid();
+	wants_recapture |= recapture_skylight.check_and_swap();
+
 	if (!handle.is_valid())
 		handle = idraw->get_scene()->register_skylight();
 	Render_Skylight sl;
 	sl.generated_cube = mytexture;
-	sl.wants_update = true;
+	sl.wants_update = wants_recapture;
+	sl.fog_enabled = enable_fog;
+	sl.height_fog_density = fog_density;
+	sl.height_fog_exp = fog_height_falloff;
+	sl.height_fog_start = fog_height_start;
+	sl.fog_color = fog_color;
+	sl.fog_use_skylight_cubemap = use_sky_cubemap_for_fog;
+
 	idraw->get_scene()->update_skylight(handle, sl);
 }
 
@@ -335,10 +345,7 @@ void LightmapComponent::editor_on_change_property()
 	}
 }
 void SkylightComponent::editor_on_change_property() {
-	if (recapture_skylight.check_and_swap()) {
-		sys_print(Debug, "recapturing skylight");
-		sync_render_data();
-	}
+	sync_render_data();
 }
 
 

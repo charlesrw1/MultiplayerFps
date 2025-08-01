@@ -1,22 +1,17 @@
 
 layout(location = 0) out vec4 FS_OUT_Color;
 
-layout(binding = 3) uniform sampler2D DEPTH;// depth texture (writes disabled)
+layout(binding = 0) uniform sampler2D DEPTH;// depth texture (writes disabled)
+layout(binding = 1) uniform samplerCube SkyCubemap;
 
 #include "SharedGpuTypes.txt"
 
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
-
-uniform vec3 inscatteringColor;
-uniform vec3 sunDirection;
-uniform bool has_sun = false;
-uniform vec3 sunColor;
-uniform float directionalExp;
-uniform float height_falloff;
-uniform float height_start;
-uniform float density;
+layout (binding = 1, std430) readonly buffer FogUniform_Buffer {
+	FogUniforms fog;
+}; 
 
 vec3 WorldPosFromDepth(vec2 TexCoord, float depth) {
 
@@ -31,13 +26,35 @@ vec3 WorldPosFromDepth(vec2 TexCoord, float depth) {
 
     return viewSpacePosition.xyz;
 }
-float calc_density(float heightfalloff, float ray_dir_y, float ray_org)
-{
-	float Falloff = max(-127.0f, heightfalloff * ray_dir_y);    // if it's lower than -127.0, then exp2() goes crazy in OpenGL's GLSL.
-	float LineIntegral = (1.0 - exp2(-Falloff)) / Falloff;
-	float LineIntegralTaylor = log(2.0) - (0.5 * log(2.0)*log(2.0)) * Falloff;		// Taylor expansion around 0
 
-	return ray_org * (abs(Falloff) > 0.00001 ? LineIntegral : LineIntegralTaylor);
+float compute_exponential_height_fog(
+    vec3 worldPos,
+    vec3 cameraPos,
+    float rayLength,
+    float fogDensity,
+    float fogHeight,
+    float heightFalloff)
+{
+    float startHeight = cameraPos.y - fogHeight;
+    float endHeight = worldPos.y - fogHeight;
+
+    float H = heightFalloff;
+
+    float startExp = exp(-H * startHeight);
+    float endExp   = exp(-H * endHeight);
+
+    float deltaHeight = endHeight - startHeight;
+
+    float fogAmount;
+    if (abs(deltaHeight) > 1e-5) {
+        fogAmount = (startExp - endExp) / (H * deltaHeight);
+    } else {
+        fogAmount = startExp / H;
+    }
+
+    fogAmount *= fogDensity * rayLength;
+
+    return clamp(fogAmount, 0.0, 1.0);
 }
 
 void main()
@@ -45,22 +62,25 @@ void main()
 	vec2 uv = vec2(gl_FragCoord.xy) / vec2(g.viewport_size.xy);
 	float depth_value = texture(DEPTH,uv).r;
 	
-	float linear_depth = g.near/depth_value;
-	
 	vec3 worldspace = WorldPosFromDepth(uv, depth_value);
-
-	float t = length(worldspace-g.viewpos_time.xyz);
-	vec3 ro = g.viewpos_time.xyz;
-	vec3 rd = normalize(worldspace-g.viewpos_time.xyz);
-	float a = density;
-	float b = height_falloff;
-
-	float fac = ro.y*b;
-	fac = max(fac,0);
-	fac = min(fac,20);
-
-	float fogAmount = (a/b) * exp(-fac) * (1.0-exp(-t*rd.y*b))/rd.y;
+	vec3 camera_pos = g.viewpos_time.xyz;
 	
+	float to_world_pos_dist = length(worldspace-camera_pos);
 
-	FS_OUT_Color = vec4(inscatteringColor,fogAmount);
+	float factor = compute_exponential_height_fog(
+		worldspace,
+		camera_pos,
+		to_world_pos_dist,
+		fog.density,
+		fog.height,
+		fog.exp_falloff);
+	
+	bool use_cubemap_color = bool(fog.flags&1);
+	vec3 fog_color = fog.color.rgb;
+	if(use_cubemap_color) {
+		vec3 dir = (worldspace-camera_pos)/to_world_pos_dist;
+		fog_color = textureLod(SkyCubemap,dir,6.0).rgb;
+	}
+	
+	FS_OUT_Color = vec4(fog_color,factor);
 }

@@ -159,7 +159,7 @@ public:
 	uint64_t editor_arrow = 0;
 };
 
-
+// also used for fog settings
 struct Render_Skylight;
 class SkylightComponent : public Component
 {
@@ -174,8 +174,16 @@ public:
 #ifdef EDITOR_BUILD
 	void editor_on_change_property() final;
 #endif
+	// Recapture
 	REFLECT(transient)
-	BoolButton recapture_skylight;	// Recapture
+	BoolButton recapture_skylight;
+
+	REF bool enable_fog = false;
+	REF bool use_sky_cubemap_for_fog = false;
+	REF Color32 fog_color = Color32();
+	REF float fog_height_start = 0.0;
+	REF float fog_height_falloff = 0.0;
+	REF float fog_density = 1.0;
 	
 	Texture* mytexture = nullptr;
 	

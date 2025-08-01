@@ -125,7 +125,13 @@ struct DecalObjectUniforms {
 	float padding;
 	uint fs_mat_id;
 };
-
+struct FogUniforms {
+	vec4 color;
+	float height;
+	float density;
+	float exp_falloff;
+	uint flags;
+};
 
 struct Chunk 
 {

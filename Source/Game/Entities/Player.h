@@ -194,6 +194,9 @@ public:
 	REF static void set_capture_mouse(bool b) {
 		UiSystem::inst->set_game_capture_mouse(b);
 	}
+	REF static bool is_imgui_blocking_inputs() {
+		return UiSystem::inst->blocking_keyboard_inputs() || UiSystem::inst->blocking_mouse_inputs();
+	}
 };
 
 

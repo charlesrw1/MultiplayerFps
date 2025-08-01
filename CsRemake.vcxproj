@@ -406,7 +406,6 @@
     <ClCompile Include="Source\External\imnodes.cpp" />
     <ClCompile Include="Source\External\ImSequencer.cpp" />
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
-    <ClCompile Include="Source\Game\Components\FogComponent.cpp" />
     <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp" />
     <ClCompile Include="Source\IEditorTool.cpp" />

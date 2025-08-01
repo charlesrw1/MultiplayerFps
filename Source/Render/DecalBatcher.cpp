@@ -125,8 +125,6 @@ void DecalBatcher::draw_decals() {
 	setup2.depth_info = draw.tex.scene_depth;
 	IGraphicsDevice::inst->set_render_pass(setup2);
 
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-
 
 	draw.bind_texture_ptr(20/* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/, draw.tex.scene_depth);
 

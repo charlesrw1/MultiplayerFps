@@ -566,7 +566,7 @@ public:
 
 		IGraphicsBuffer* lighting_uniforms{};
 		IGraphicsBuffer* decal_uniforms{};
-
+		IGraphicsBuffer* fog_uniforms{};
 	}buf;
 
 	struct vertex_array_objects {

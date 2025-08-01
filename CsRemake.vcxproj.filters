@@ -531,9 +531,6 @@
     <ClCompile Include="Source\Game\SerializePtrHelpers.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Game\Components\FogComponent.cpp">
-      <Filter>Source\Game\Components</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Render\Meshlet.cpp" />
     <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />

@@ -380,7 +380,8 @@ EditorDoc::~EditorDoc() {
 
 void ManipulateTransformTool::check_input()
 {
-	if (UiSystem::inst->is_game_capturing_mouse() || !ed_doc.selection_state->has_any_selected())
+	const bool is_keyboard_blocked = UiSystem::inst->blocking_keyboard_inputs();
+	if (is_keyboard_blocked || UiSystem::inst->is_game_capturing_mouse() || !ed_doc.selection_state->has_any_selected())
 		return;
 	if (!UiSystem::inst->is_vp_hovered())
 		return;
@@ -513,6 +514,9 @@ void EditorDoc::on_mouse_drag(int x, int y)
 
 void EditorDoc::check_inputs()
 {
+	const bool is_keyboard_blocked = UiSystem::inst->blocking_keyboard_inputs();
+	if (is_keyboard_blocked)
+		return;
 	if (UiSystem::inst->is_game_capturing_mouse())
 		return;
 	if (!UiSystem::inst->is_vp_hovered())

@@ -1024,18 +1024,17 @@ void Renderer::init()
 	glBindBuffer(GL_ARRAY_BUFFER, buf.default_vb);
 	glBindVertexArray(0);
 
-	auto create_lighting_uniforms = [&]() {
+
+	auto create_uniform_buffer = [&](IGraphicsBuffer*& ptr) {
 		CreateBufferArgs args;
 		args.flags = BUFFER_USE_DYNAMIC;
-		buf.lighting_uniforms = IGraphicsDevice::inst->create_buffer(args);
+		ptr = IGraphicsDevice::inst->create_buffer(args);
 	};
-	create_lighting_uniforms();
-	auto create_decal_uniforms = [&]() {
-		CreateBufferArgs args;
-		args.flags = BUFFER_USE_DYNAMIC;
-		buf.decal_uniforms = IGraphicsDevice::inst->create_buffer(args);
-	};
-	create_decal_uniforms();
+	create_uniform_buffer(buf.lighting_uniforms);
+	create_uniform_buffer(buf.decal_uniforms);
+	create_uniform_buffer(buf.fog_uniforms);
+
+
 
 
 	on_level_start();
@@ -3069,50 +3068,49 @@ void ThumbnailRenderer::output_to_path(std::string path) {
 
 void Renderer::draw_height_fog()
 {
-	return;
-	assert(0);
-	if (!scene.has_fog)
-		return;
+	GPUSCOPESTART(draw_height_fog_scope);
+
 	if (!r_drawfog.get_bool())
 		return;
+	if (scene.skylights.empty())
+		return;
 
-	//glBindFramebuffer(GL_FRAMEBUFFER, fbo.forward_render);
+	RSkylight_Internal& skylight_int = scene.skylights.at(0);
+	Render_Skylight& skylight = skylight_int.skylight;
+	if (!skylight.fog_enabled)
+		return;
 
-	set_shader(prog.height_fog);
+	gpu::FogUniforms uniformsToUpload{};
+	uniformsToUpload.color = color32_to_vec4(skylight.fog_color);
+	uniformsToUpload.density = skylight.height_fog_density;
+	uniformsToUpload.exp_falloff = skylight.height_fog_exp;
+	uniformsToUpload.height = skylight.height_fog_start;
+	uniformsToUpload.flags = skylight.fog_use_skylight_cubemap;
+	buf.fog_uniforms->upload(&uniformsToUpload, sizeof(uniformsToUpload));
 
-	shader().set_float("directionalExp", scene.fog.directional_exponent);
-	shader().set_float("height_falloff", scene.fog.fog_height_falloff);
-	shader().set_float("height_start", scene.fog.height);
-	shader().set_float("density", scene.fog.fog_density);
-	glm::vec3 color = glm::vec3(scene.fog.inscattering_color.r, scene.fog.inscattering_color.g, scene.fog.inscattering_color.b);
-	color *= 1.0f / 255.f;
-	shader().set_vec3("inscatteringColor", color);
 
-	glDepthMask(GL_FALSE);
-	glDisable(GL_DEPTH_TEST);
+	RenderPassState state;
+	auto color_info = {
+		ColorTargetInfo(tex.scene_color)
+	};
+	state.color_infos = color_info;
+	IGraphicsDevice::inst->set_render_pass(state);
 
-	// enable blending
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	RenderPipelineState setup;
+	setup.blend = blend_state::BLEND;
+	setup.depth_testing = false;
+	setup.depth_writes = false;
+	setup.program = prog.height_fog;
+	setup.vao = get_empty_vao();
+	get_device().set_pipeline(setup);
 
-	bind_texture_ptr(3, tex.scene_depth);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, buf.fog_uniforms->get_internal_handle());
+	const Texture* reflectionProbeTex = skylight.generated_cube;
 
-	// fullscreen shader, no vao used
-	glBindVertexArray(vao.default_);
-	// to prevent crashes??
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-	glBindVertexBuffer(0, buf.default_vb, 0, 0);
-	glBindVertexBuffer(1, buf.default_vb, 0, 0);
-	glBindVertexBuffer(2, buf.default_vb, 0, 0);
+	bind_texture_ptr(0, tex.scene_depth);
+	bind_texture_ptr(1, reflectionProbeTex->gpu_ptr);
+
 	glDrawArrays(GL_TRIANGLES, 0, 3);
-
-	glDepthMask(GL_TRUE);
-	glDisable(GL_STENCIL_TEST);
-	glEnable(GL_CULL_FACE);
-	glEnable(GL_DEPTH_TEST);
-	glCullFace(GL_BACK);
-	glDisable(GL_BLEND);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 void Renderer::deferred_decal_pass()
@@ -3566,7 +3564,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 		const auto& view_to_use = current_frame_view;
 
-		const bool clear_framebuffer = false;// (!is_wireframe || !wireframe_secondpass);
+		const bool clear_framebuffer = (!is_wireframe || !wireframe_secondpass);
 
 		//RenderPassSetup setup("gbuffer", fbo.gbuffer, clear_framebuffer,clear_framebuffer, 0, 0, view_to_use.width, view_to_use.height);
 		//auto scope = device.start_render_pass(setup);
@@ -3625,8 +3623,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		accumulate_gbuffer_lighting(params.is_cubemap_view);
 
 
-	//draw_height_fog();
-
 	auto copy_forward_to_temporary = [&]() {
 		GPUSCOPESTART(copy_forward_to_temporary_scope);
 		GraphicsBlitInfo blitInfo;
@@ -3670,6 +3666,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		render_particles();
 	};
 	draw_forward_pass();
+
+	draw_height_fog();
 
 
 	// cubemap views end here
