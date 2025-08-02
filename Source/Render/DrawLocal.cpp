@@ -712,6 +712,9 @@ void Renderer::create_shaders()
 	prog.light_accumulation = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt");
 	prog.light_accumulation_shadowed = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt","SHADOWED");
 	prog.light_accumulation_shadow_cookie = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt", "SHADOWED,COOKIE");
+	prog.light_accumulation_fullscreen = prog_man.create_raster("fullscreenquad.txt", "LightAccumulationFullScreen.txt","SHADOWED");
+	prog.light_accumulation_fullscreen_tiled = prog_man.create_raster("fullscreenquad.txt", "LightAccumulationFullScreen.txt", "SHADOWED,TILED 1");
+	prog.light_accumulation_fullscreen_tiled2 = prog_man.create_raster("fullscreenquad.txt", "LightAccumulationFullScreen.txt", "SHADOWED,TILED 2");
 
 	prog.sunlight_accumulation = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt");
 	prog.sunlight_accumulation_debug = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt","DEBUG");
@@ -1112,7 +1115,7 @@ void Renderer::init()
 
 	spotShadows = std::make_unique<ShadowMapManager>();
 	decalBatcher = std::make_unique<DecalBatcher>();
-
+	lightListCuller = std::make_unique<LightListCuller>();
 #ifdef EDITOR_BUILD
 	thumbnailRenderer = std::make_unique<ThumbnailRenderer>(64);
 #endif
@@ -2772,6 +2775,226 @@ void update_debug_grid()
 	idraw->get_scene()->update_meshbuilder(debug_grid_handle, mbo);
 }
 
+const static int light_frustum_size_x = 8;
+const static int light_frustum_size_y = 6;
+
+struct FrustumPlane {
+	glm::vec3 normal;
+	float distance;
+};
+
+std::array<FrustumPlane, 4> get_tile_frustum_planes(
+	const glm::vec3& camPos,
+	const glm::vec3& forward,
+	const glm::vec3& right,
+	const glm::vec3& up,
+	float fovY,
+	float aspect,
+	float screenWidth,
+	float screenHeight,
+	int tileX,
+	int tileY,
+	float tileWidth,
+	float tileHeight
+) {
+	using namespace glm;
+
+//	vec3 forward = normalize(camDir);
+	//vec3 right = normalize(cross(forward, camUp));
+	//vec3 up = normalize(cross(right, forward)); // ensure orthogonal
+
+	float tanHalfFovY = tan(fovY * 0.5f);
+	float tanHalfFovX = tanHalfFovY * aspect;
+
+	float ndcMinX = ((float)(tileX * tileWidth) / (float)screenWidth) * 2.0f - 1.0f;
+	float ndcMaxX = ((float)((tileX + 1) * tileWidth) / (float)screenWidth) * 2.0f - 1.0f;
+	float ndcMinY = 1.0f - ((float)((tileY + 1) * tileHeight) / (float)screenHeight) * 2.0f;
+	float ndcMaxY = 1.0f - ((float)(tileY * tileHeight) / (float)screenHeight) * 2.0f;
+
+	vec3 centerDir = forward;
+	vec3 cornerDirs[4];
+	cornerDirs[0] = normalize(forward + right * ndcMinX * tanHalfFovX + up * ndcMinY * tanHalfFovY); // left-bottom
+	cornerDirs[1] = normalize(forward + right * ndcMaxX * tanHalfFovX + up * ndcMinY * tanHalfFovY); // right-bottom
+	cornerDirs[2] = normalize(forward + right * ndcMaxX * tanHalfFovX + up * ndcMaxY * tanHalfFovY); // right-top
+	cornerDirs[3] = normalize(forward + right * ndcMinX * tanHalfFovX + up * ndcMaxY * tanHalfFovY); // left-top
+
+	std::array<FrustumPlane, 4> planes;
+	vec3 leftNormal = normalize(cross(cornerDirs[0], cornerDirs[3]));
+	planes[0] = { leftNormal, -dot(leftNormal, camPos) };
+	vec3 rightNormal = normalize(cross(cornerDirs[2], cornerDirs[1]));
+	planes[1] = { rightNormal, -dot(rightNormal, camPos) };
+	vec3 topNormal = normalize(cross(cornerDirs[3], cornerDirs[2]));
+	planes[2] = { topNormal, -dot(topNormal, camPos) };
+	vec3 bottomNormal = normalize(cross(cornerDirs[1], cornerDirs[0]));
+	planes[3] = { bottomNormal, -dot(bottomNormal, camPos) };
+
+	return planes;
+}
+
+inline bool cull_sphere_by_frustum(const std::array<FrustumPlane, 4>& planes, glm::vec4 sphere)
+{
+	bool res = true;
+	res &= dot(planes[0].normal, glm::vec3(sphere)) + planes[0].distance >= -sphere.w;
+	res &= dot(planes[1].normal, glm::vec3(sphere)) + planes[1].distance >= -sphere.w;
+	res &= dot(planes[2].normal, glm::vec3(sphere)) + planes[2].distance >= -sphere.w;
+	res &= dot(planes[3].normal, glm::vec3(sphere)) + planes[3].distance >= -sphere.w;
+	return res;
+}
+#include "Framework/Range.h"
+
+LightListCuller::LightListCuller() {
+	auto create_buffer = [&]() {
+		CreateBufferArgs args;
+		args.flags = BUFFER_USE_DYNAMIC;
+		return IGraphicsDevice::inst->create_buffer(args);
+	};
+	light_indirection = create_buffer();
+	light_count_buffer = create_buffer();
+	tiled_uniforms = create_buffer();
+}
+ConfigVar r_light_use_tiled("r.light_use_tiled", "2", CVAR_INTEGER, "",0,2);
+
+void LightListCuller::draw_lights()
+{
+	GPUFUNCTIONSTART;
+
+	RenderPipelineState state;
+	state.vao = draw.get_empty_vao();
+	if (r_light_use_tiled.get_integer()==1)
+		state.program = draw.prog.light_accumulation_fullscreen_tiled;
+	else if (r_light_use_tiled.get_integer() == 2)
+		state.program = draw.prog.light_accumulation_fullscreen_tiled2;
+	else
+		state.program = draw.prog.light_accumulation_fullscreen;
+	state.blend = blend_state::ADD;
+	state.depth_testing = false;
+	state.depth_writes = false;
+	draw.get_device().set_pipeline(state);
+	auto& tex = draw.tex;
+	draw.bind_texture_ptr(0, tex.scene_gbuffer0);
+	draw.bind_texture_ptr(1, tex.scene_gbuffer1);
+	draw.bind_texture_ptr(2, tex.scene_gbuffer2);
+	draw.bind_texture_ptr(3, tex.scene_depth);
+	draw.bind_texture_ptr(4, draw.spotShadows->get_atlas().get_atlas_texture());
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, draw.buf.lighting_uniforms->get_internal_handle());
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, tiled_uniforms->get_internal_handle());
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, light_count_buffer->get_internal_handle());
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, light_indirection->get_internal_handle());
+
+	if(r_light_use_tiled.get_integer()!=1)
+		draw.shader().set_int("num_lights", draw.scene.light_list.objects.size());
+
+	if (r_light_use_tiled.get_integer() == 2) { // MAIN PATH
+		// its sometimes 2x faster than normal tiled to do this "dumb" way. okay i guess.
+		// normal tiled is sometimes worse than the bruteforce naive way, this way is always at least better than brute force.
+		// seems to be usually ~40% faster than normal tiled
+		// i guess the indirection of looking up "num_lights" hurts compared to a constant uniform?
+
+		// could just my AMD card (rx 480) thats being weird, curious to test on something else
+
+		const int w = draw.get_current_frame_vs().width;
+		const int h = draw.get_current_frame_vs().height;
+		auto& device = draw.get_device();
+		glm::ivec2 tile_count = glm::ivec2(light_frustum_size_x, light_frustum_size_y);
+		glm::vec2 tile_size = glm::ceil(glm::vec2(w,h) / glm::vec2(tile_count));
+		for (int y = 0; y < tile_count.y; y++) {
+			for (int x = 0; x < tile_count.x; x++) {
+				const int index = y * tile_count.x + x;
+				const int count = counts.at(index);
+				draw.shader().set_int("num_lights", count);
+				const int light_offset = index * gpu::MAX_TILE_LIGHTS;
+				draw.shader().set_int("light_indirect_offset", light_offset);
+
+
+				const int y_to_use = tile_count.y - y - 1;
+				glm::vec2 ofs = glm::floor(glm::vec2(x * tile_size.x, y_to_use * tile_size.y));
+				device.set_viewport(ofs.x, ofs.y, tile_size.x, tile_size.y);
+				glDrawArrays(GL_TRIANGLES, 0, 3);
+			}
+		}
+		device.set_viewport(0, 0, w, h);
+	}
+	else { // UNUSED/OPTIONAL
+
+		// fullscreen shader, no vao used
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+	}
+}
+void LightListCuller::cull(const View_Setup& setup)
+{
+	CPUFUNCTIONSTART;
+
+	using namespace glm;
+	const vec3 forward = normalize(setup.front);
+	const vec3 right = normalize(cross(forward, glm::vec3(0,1,0)));	// fixme
+	const vec3 up = normalize(cross(right, forward));
+	const float tile_size_x = setup.width / float(light_frustum_size_x);
+	const float tile_size_y = setup.height / float(light_frustum_size_y);
+	const float aspect = float(setup.width) / setup.height;
+
+	std::vector<int16_t> lights;
+
+	const int total_tiles = light_frustum_size_x * light_frustum_size_y;
+	const int max_lights_in_tile = gpu::MAX_TILE_LIGHTS;
+	counts.resize(total_tiles);
+
+	auto& memArena = draw.get_arena();
+	ArenaScope memScope(memArena);
+
+	int* light_index_buffer = memArena.alloc_bottom_type<int>(total_tiles*max_lights_in_tile);
+	int* tile_light_count = memArena.alloc_bottom_type<int>(total_tiles);
+
+
+	auto cull_volume = [&](int index_x, int index_y) {
+		const int my_tile_index = index_y * light_frustum_size_x + index_x;
+		const int my_light_index_index = my_tile_index * max_lights_in_tile;
+		int lights_in_tile = 0;
+
+
+		auto furstum_planes = get_tile_frustum_planes(setup.origin, forward, right, up, setup.fov, 
+			aspect, setup.width, setup.height, index_x, index_y, tile_size_x, tile_size_y);
+
+		auto& scene_lights = draw.scene.light_list.objects;
+		int light_index = -1;
+		for (auto& light_type : scene_lights) {
+			light_index += 1;
+			RL_Internal& light = light_type.type_;
+			glm::vec4 sphere(light.light.position, light.light.radius);
+			const bool in_frustum = cull_sphere_by_frustum(furstum_planes, sphere);
+			if (in_frustum) {
+				light_index_buffer[my_light_index_index+lights_in_tile] = light_index;
+				lights_in_tile += 1;
+				if (lights_in_tile >= max_lights_in_tile)
+					break;
+			}
+		}
+
+		tile_light_count[my_tile_index] = lights_in_tile;
+		counts[my_tile_index] = lights_in_tile;
+	};
+
+	for (int y = 0; y < light_frustum_size_y; y++) {
+		for (int x = 0; x < light_frustum_size_x; x++) {
+			cull_volume(x, y);
+		}
+	}
+
+	light_indirection->upload(light_index_buffer, total_tiles * max_lights_in_tile * sizeof(int));
+	light_count_buffer->upload(tile_light_count, total_tiles * sizeof(int));
+
+
+	gpu::TiledLightUniforms uniforms{};
+	uniforms.tile_count_x = light_frustum_size_x;
+	uniforms.tile_count_y = light_frustum_size_y;
+
+	uniforms.inv_tile_size_x = 1.0 / tile_size_x;
+	uniforms.inv_tile_size_y = 1.0 / tile_size_y;
+
+
+	tiled_uniforms->upload(&uniforms, sizeof(gpu::TiledLightUniforms));
+}
+
 void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 {
 	ZoneScoped;
@@ -2822,101 +3045,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 	device.reset_states();
 
 
-
-	Model* LIGHT_CONE = g_modelMgr.get_light_cone();
-	Model* LIGHT_SPHERE = g_modelMgr.get_light_sphere();
-	Model* LIGHT_DOME = g_modelMgr.get_light_dome();
-	vertexarrayhandle vao = g_modelMgr.get_vao_ptr(VaoType::Animated)->get_internal_handle();
-	{
-
-		RenderPipelineState state;
-		state.vao = vao;
-		state.depth_writes = false;
-		state.depth_testing = false;
-		state.program = prog.light_accumulation;
-		state.backface_culling = true;
-		state.cull_front_face = true;
-		state.blend = blend_state::ADD;
-		device.set_pipeline(state);
-
-
-		bind_texture_ptr(0, tex.scene_gbuffer0);
-		bind_texture_ptr(1, tex.scene_gbuffer1);
-		bind_texture_ptr(2, tex.scene_gbuffer2);
-		bind_texture_ptr(3, tex.scene_depth);
-
-		// spot shadow atlas
-		bind_texture_ptr(4, spotShadows->get_atlas().get_atlas_texture());
-
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, buf.lighting_uniforms->get_internal_handle());
-
-		int light_index = 0;
-		for (auto& light_pair : scene.light_list.objects) {
-			auto& light = light_pair.type_.light;
-
-
-			glm::mat4 ModelTransform = glm::translate(glm::mat4(1.f), light.position);
-			const float scale = light.radius;
-			ModelTransform = glm::scale(ModelTransform, glm::vec3(scale));
-
-			// Copied code from execute_render_lists
-			auto& part = LIGHT_SPHERE->get_part(0);
-			const GLenum index_type = MODEL_INDEX_TYPE_GL;
-			gpu::DrawElementsIndirectCommand cmd;
-			cmd.baseVertex = part.base_vertex + LIGHT_SPHERE->get_merged_vertex_ofs();
-			cmd.count = part.element_count;
-			cmd.firstIndex = part.element_offset + LIGHT_SPHERE->get_merged_index_ptr();
-			cmd.firstIndex /= MODEL_BUFFER_INDEX_TYPE_SIZE;
-			cmd.primCount = 1;
-			cmd.baseInstance = 0;
-
-			if (light.casts_shadow_mode != 0) {
-				if(light.projected_texture)
-					state.program = prog.light_accumulation_shadow_cookie;
-				else
-					state.program = prog.light_accumulation_shadowed;
-			}
-			else {
-				state.program = prog.light_accumulation;
-			}
-			device.set_pipeline(state);
-
-			shader().set_uint("light_index", light_index);
-
-			//shader().set_mat4("Model", ModelTransform);
-			//shader().set_vec3("position", light.position);
-			//shader().set_float("radius", light.radius);
-			//shader().set_bool("is_spot_light", light.is_spotlight);
-			//shader().set_float("spot_inner", cos(glm::radians(light.conemin)));
-			//shader().set_float("spot_angle", cos(glm::radians(light.conemax)));
-			//shader().set_vec3("spot_normal",light.normal);
-			//shader().set_vec3("color", light.color);
-			//shader().set_float("uEpsilon", shadowmap.tweak.epsilon * 0.01f);
-			if (light.casts_shadow_mode != 0) {
-			//	shader().set_mat4("shadow_view_proj", light_pair.type_.lightViewProj);
-				Rect2d rect = spotShadows->get_atlas().get_atlas_rect(light_pair.type_.shadow_array_handle);
-				glm::ivec2 atlas_size = spotShadows->get_atlas().get_size();
-				//xy is scale, zw is offset
-				glm::vec4 as_vec4 = glm::vec4(float(rect.w) / atlas_size.x, float(rect.h) / atlas_size.y,
-					float(rect.x) / atlas_size.x, float(rect.y) / atlas_size.y);
-			//	shader().set_vec4("shadow_atlas_offset", as_vec4);
-
-				if (light.projected_texture)
-					device.bind_texture_ptr(5, light.projected_texture->gpu_ptr);
-			}
-
-			glDrawElementsBaseVertex(
-				GL_TRIANGLES,
-				cmd.count,
-				index_type,
-				(void*)int64_t(cmd.firstIndex* MODEL_BUFFER_INDEX_TYPE_SIZE), // in bytes!
-				cmd.baseVertex
-			);
-
-			light_index += 1;
-		}
-	}
-
+	lightListCuller->draw_lights();
 
 	// fullscreen pass for directional light(s)
 	RSunInternal* sun_internal = scene.get_main_directional_light();
@@ -3169,7 +3298,7 @@ void Renderer::sync_update()
 		mgr->get_bonemat_ptr(0)
 	);
 }
-
+ConfigVar r_print_light_tiles("r.print_light_tiles", "0", CVAR_BOOL | CVAR_DEV, "");
 
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 {
@@ -3189,6 +3318,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 	spotShadows->update();
 	check_cubemaps_dirty();
 
+	
 	const bool temp_disable_taa = view.is_ortho;	// ortho view doesnt work with TAA
 
 	if (temp_disable_taa) {
@@ -3216,6 +3346,28 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 	//	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
 	//	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color->get_internal_handle(), 0);
 	//	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion->get_internal_handle(), 0);
+	}
+
+	// fixme:
+	if (r_print_light_tiles.get_bool()) {
+		const float height = Canvas::calc_text_size("0").h;
+		for (int y = 0; y < light_frustum_size_y; y++) {
+			for (int x = 0; x < light_frustum_size_x; x++) {
+				auto& counts = lightListCuller->get_counts();
+				int count = counts.at(y * light_frustum_size_x + x);
+				float ypos = y * (cur_h / float(light_frustum_size_y));
+				float xpos = x * (cur_w / float(light_frustum_size_x));
+				auto str = std::to_string(count);
+				TextShape text;
+				text.with_drop_shadow = true;
+				text.color = COLOR_WHITE;
+				text.rect.x = xpos;
+				text.rect.y = ypos + height;
+				text.text = str;
+				text.drop_shadow_ofs = 1;
+				UiSystem::inst->window.draw(text);
+			}
+		}
 	}
 }
 
@@ -3459,6 +3611,8 @@ void Renderer::upload_light_and_decal_buffers()
 	upload_decal_data();
 
 	decalBatcher->build_batches();
+
+	lightListCuller->cull(current_frame_view);
 }
 
 
@@ -3636,8 +3790,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	auto copy_forward_to_temporary = [&]() {
 		GPUSCOPESTART(copy_forward_to_temporary_scope);
 		GraphicsBlitInfo blitInfo;
-		blitInfo.set_width_both(cur_w);
-		blitInfo.set_height_both(cur_h);
+		blitInfo.set_width_height_both(cur_w,cur_h);
 		blitInfo.src.texture = tex.scene_color;
 		blitInfo.dest.texture = tex.scene_gbuffer0;
 		IGraphicsDevice::inst->blit_textures(blitInfo);
@@ -3786,8 +3939,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		// blit from gbuffer0 to scene color
 		//??
 		GraphicsBlitInfo blitinfo;
-		blitinfo.set_width_both(cur_w);
-		blitinfo.set_height_both(cur_h);
+		blitinfo.set_width_height_both(cur_w,cur_h);
 		blitinfo.src.texture = tex.scene_gbuffer0;
 		blitinfo.dest.texture = tex.scene_color;
 		IGraphicsDevice::inst->blit_textures(blitinfo);

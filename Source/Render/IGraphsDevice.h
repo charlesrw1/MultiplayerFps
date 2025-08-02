@@ -183,20 +183,6 @@ struct CreateVertexInputArgs {
 	VertexInputIndexType index_type = VertexInputIndexType::uint16;
 };
 
-// opengl:
-// compiles the fragment and vertex source code. dumps a binary obj to disk
-// sdl3:
-//	have spriv/dxil/metal ...
-//  for dynamic compilation:
-//		takes file name. loads the file. runs the platforms compilier. dumps bin to disk.
-//		load the binary. done.
-//	for ahead of time compilied:
-//		just load binary if it exists. otherwise, error.
-
-struct CreateProgramArgs {
-	std::string_view file_name;	// a glsl file with vertex and fragment #ifdef'd
-	std::string_view defines;	// comma seperated list
-};
 
 enum class GraphicsSamplerType {
 	AnisotropyDefault,
@@ -239,10 +225,8 @@ struct GraphicsBlitInfo {
 	GraphicsBlitTarget dest;
 	GraphicsFilterType filter = GraphicsFilterType::Nearest;
 
-	void set_width_both(int w) {
+	void set_width_height_both(int w, int h) {
 		src.w = dest.w = w;
-	}
-	void set_height_both(int h) {
 		src.h = dest.h = h;
 	}
 };

@@ -138,6 +138,14 @@ struct FogUniforms {
 	float exp_falloff;
 	uint flags;
 };
+struct TiledLightUniforms{
+	int tile_count_x;
+	int tile_count_y;
+	float inv_tile_size_x;
+	float inv_tile_size_y;
+};
+const int MAX_TILE_LIGHTS = 100;
+
 
 struct Chunk 
 {

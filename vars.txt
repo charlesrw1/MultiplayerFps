@@ -29,7 +29,7 @@ g_application_class "MyApp"
 
 
 
-is_editor_app 1
+is_editor_app 0
 
 g_draw_grid 0
 
@@ -44,4 +44,6 @@ g_debug_skeletons 0
 force_animation_to_bind_pose 1
 
 developer_mode 1
-loglevel 0
+loglevel 5
+
+r.print_light_tiles 1

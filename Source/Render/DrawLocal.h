@@ -391,6 +391,21 @@ private:
 	IGraphicsBuffer* multidraw_commands = nullptr;
 	IGraphicsBuffer* indirection_buffer = nullptr;
 };
+class LightListCuller
+{
+public:
+	LightListCuller();
+	void cull(const View_Setup& setup);
+	void draw_lights();
+	const std::vector<int>& get_counts() {
+		return counts;
+	}
+private:
+	std::vector<int> counts;
+	IGraphicsBuffer* tiled_uniforms = nullptr;
+	IGraphicsBuffer* light_count_buffer = nullptr;
+	IGraphicsBuffer* light_indirection = nullptr;
+};
 
 
 class Renderer : public RendererPublic
@@ -491,6 +506,11 @@ public:
 		program_handle sunlight_accumulation_debug{};
 		program_handle ambient_accumulation{};
 		program_handle reflection_accumulation{};
+		program_handle light_accumulation_fullscreen{};
+		program_handle light_accumulation_fullscreen_tiled{};
+		program_handle light_accumulation_fullscreen_tiled2{};
+
+
 
 		program_handle height_fog{};
 	}prog;
@@ -604,6 +624,7 @@ public:
 	Volumetric_Fog_System volfog;
 	std::unique_ptr<ShadowMapManager> spotShadows;
 	std::unique_ptr<DecalBatcher> decalBatcher;
+	std::unique_ptr<LightListCuller> lightListCuller;
 
 	DebuggingTextureOutput debug_tex_out;
 
