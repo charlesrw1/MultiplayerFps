@@ -43,6 +43,7 @@ struct Render_Object {
 	const Component* owner = nullptr;
 	glm::mat4 transform = glm::mat4(1.f);
 	glm::vec4 lightmap_coord = glm::vec4(0.f);
+	float dist_cull_2 = 0.0;
 };
 
 class MeshBuilder;

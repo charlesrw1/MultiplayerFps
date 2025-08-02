@@ -88,7 +88,7 @@ layout (location = 1) out vec4 GBUFFER_OUT_Albedo_AO;
 layout (location = 3) out vec4 GBUFFER_OUT_Emissive;
 #endif
 #ifdef DECAL_NORMAL_WRITE
-layout (location = 0) out vec3 GBUFFER_OUT_Normal;
+layout (location = 0) out vec4 GBUFFER_OUT_Normal;
 #endif
 #ifdef DECAL_ROUGHMETAL_WRITE
 layout (location = 2) out vec4 GBUFFER_OUT_M_R_Custom_Matid;
@@ -185,7 +185,7 @@ void main()
 	// World space normal
 	vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
 	Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
-	GBUFFER_OUT_Normal = Final_Normal;
+	GBUFFER_OUT_Normal = vec4(Final_Normal,OPACITY);
 	#endif
 	
 	#ifdef DECAL_ROUGHMETAL_WRITE

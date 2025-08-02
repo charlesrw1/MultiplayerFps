@@ -1536,14 +1536,13 @@ public:
 		global_cnt++;
 	}
 };
-
+extern void texture_loading_benchmark();
 int game_engine_main(int argc, char** argv)
 {
 	material_print_debug.set_bool(true);
 	developer_mode.set_bool(false);
 	log_shader_compiles.set_bool(false);
 	log_all_asset_loads.set_bool(true);
-	loglevel.set_integer(4);
 	eng_local.init(argc,argv);
 	//developer_mode.set_bool(true);
 	//log_all_asset_loads.set_bool(false);
@@ -1572,6 +1571,8 @@ int game_engine_main(int argc, char** argv)
 	//int val = c->get_value("hello");
 	//assert(val == 1);
 	//assert(c->myStr == "hello");
+
+	texture_loading_benchmark();
 
 	eng_local.loop();
 	eng_local.cleanup();

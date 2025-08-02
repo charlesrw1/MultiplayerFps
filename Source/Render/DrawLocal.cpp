@@ -2270,6 +2270,9 @@ void calc_lod_job(int8_t* lodarray, int16_t* camera_dist)
 		const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
 		if (!proxy.model)
 			lodarray[i] = 0;
+		else if (percentage_2<proxy.dist_cull_2) {
+			lodarray[i] = -1;
+		}
 		else {
 			lodarray[i] = (int8_t)get_lod_to_render(proxy.model, percentage_2);
 		}
@@ -2549,7 +2552,9 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 			if (!is_visible && !casts_shadow)
 				continue;
 
-			const int LOD_index = lod_to_render_array[i];
+			const int LOD_index = (int)lod_to_render_array[i];
+			if (LOD_index < 0)
+				continue;	// not visible
 
 			int16_t cam_depth = 0;
 			if (!dont_use_cam_depth)
@@ -3672,7 +3677,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	};
 	draw_forward_pass();
 
-	draw_height_fog();
+	if(!params.skybox_only)
+		draw_height_fog();
 
 
 	// cubemap views end here

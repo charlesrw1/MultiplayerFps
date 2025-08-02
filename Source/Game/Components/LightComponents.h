@@ -182,9 +182,9 @@ public:
 	// if true, then uses the skylight cubemap to source the color of the fog. else, uses constant fog_color.
 	REF bool use_sky_cubemap_for_fog = false;
 	REF Color32 fog_color = Color32();
-	REF float fog_height_start = 0.0;	// height offset from 0 to start the fog
-	REF float fog_height_falloff = 0.0;	// how the fog falls off over height
-	REF float fog_density = 1.0; // overall density of fog
+	REF float fog_height_start = -4.0;	// height offset from 0 to start the fog
+	REF float fog_height_falloff = 0.2;	// how the fog falls off over height
+	REF float fog_density = 0.1; // overall density of fog
 
 	// these are settings for when use_sky_cubemap_for_fog is true.
 	// if using the fog cubemap, then the color is altered by direction of the camera and by distance.
@@ -193,8 +193,8 @@ public:
 	// color = texture(Cubemap, camera_dir, mip_to_sample)
 
 	REF float fog_cubemap_max_mip = 0.7;	// lower values means more diffuse
-	REF float fog_cubemap_min_dist = 0.0;	// values below this use the highest mip (more diffuse)
-	REF float fog_cubemap_max_dist = 50.0; // values above this use the lowest mip (less diffuse)
+	REF float fog_cubemap_min_dist = 0.0;	// points before this use the highest mip (more diffuse)
+	REF float fog_cubemap_max_dist = 50.0; // points beyond this use the lowest mip (less diffuse)
 	
 	Texture* mytexture = nullptr;
 	
@@ -230,8 +230,9 @@ public:
 
 	void on_sync_render_data() final;
 
+	// Recapture
 	REFLECT(transient)
-	BoolButton recapture;	// Recapture
+	BoolButton recapture;
 	REF CubemapAnchor anchor;
 
 	void set_baked_probe_ofs(int ofs) {

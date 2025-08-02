@@ -44,10 +44,4 @@ g_debug_skeletons 0
 force_animation_to_bind_pose 1
 
 developer_mode 1
-
-keyboard input is faster than mouse input
-autocomplete/intellisense makes code almost as discoverable as GUIs, imo.
-i dont think theres that many advantages to the node based approach.
-
-
-
+loglevel 0

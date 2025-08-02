@@ -737,7 +737,179 @@ Texture* Texture::load(const std::string& path)
 {
 	return g_assets.find_sync<Texture>(path).get();
 }
+#include <array>
+static bool load_dds_file_file(Texture* output, IGraphicsTexture*& out_ptr, IFile* file_ptr, const int max_mips)
+{
+	const int size = file_ptr->size();
+	const int header_buffer_size = sizeof(ddsFileHeader_t) + 4;
+	if (size < header_buffer_size)
+		return false;
 
+	std::array<std::byte, header_buffer_size> headerBuffer;
+	file_ptr->read(headerBuffer.data(), header_buffer_size);
+
+	if (char(headerBuffer[0]) != 'D' || char(headerBuffer[1]) != 'D' || char(headerBuffer[2]) != 'S' || char(headerBuffer[3]) != ' ') 
+		return false;
+
+	ddsFileHeader_t* header = (ddsFileHeader_t*)(headerBuffer.data() + 4);
+
+	uint32_t dxt1_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('1' << 24);	// aka bc1
+	uint32_t dxt5_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('5' << 24);	// aka bc3
+	uint32_t bc4u_fourcc = 'B' | ('C' << 8) | ('4' << 16) | ('U' << 24);
+	uint32_t bc5u_fourcc = 'B' | ('C' << 8) | ('5' << 16) | ('U' << 24);
+
+	Texture_Format input_format = TEXFMT_RGB8;
+	int input_width = header->Width;
+	int input_height = header->Height;
+
+	if (header->ddspf.Flags & DDSF_FOURCC) {
+		if (header->ddspf.FourCC == dxt1_fourcc) {
+			if (header->ddspf.Flags & DDSF_ALPHAPIXELS)
+				input_format = TEXFMT_RGBA8_DXT1;
+			else
+				input_format = TEXFMT_RGB8_DXT1;
+		}
+		else if (header->ddspf.FourCC == dxt5_fourcc) {
+			input_format = TEXFMT_RGBA8_DXT5;
+		}
+		else if (header->ddspf.FourCC == bc4u_fourcc) {
+			input_format = TEXFMT_BC4;
+		}
+		else if (header->ddspf.FourCC == bc5u_fourcc) {
+			input_format = TEXFMT_BC5;
+		}
+		else
+			ASSERT(0 && "bad fourcc");
+	}
+	else {
+		if (header->ddspf.RGBBitCount == 24)
+			input_format = TEXFMT_RGB8;
+		else if (header->ddspf.RGBBitCount == 32)
+			input_format = TEXFMT_RGBA8;
+		else if (header->ddspf.RGBBitCount == 16)
+			input_format = TEXFMT_RG8;
+		else if (header->ddspf.RGBBitCount == 8)
+			input_format = TEXFMT_R8;
+		else
+			ASSERT(0 && "bad bit count in dds");
+	}
+
+	int numMipmaps = 1;
+	if (header->Flags & DDSF_MIPMAPCOUNT) {
+		numMipmaps = header->MipMapCount;
+	}
+
+
+	GLenum type;
+	GLenum internal_format;
+	GLenum format;
+	bool compressed;
+	texture_format_to_gl(input_format, &format, &internal_format, &type, &compressed);
+	
+	struct MipInfo {
+		int x = 0;
+		int y = 0;
+		int data_offset = 0;
+		int size = 0;
+	};
+	std::vector<MipInfo> mip_infos;
+	auto create_mip_infos = [&]() {
+		int ux = input_width;
+		int uy = input_height;
+		const int compressed_stride = (input_format == TEXFMT_RGBA8_DXT1 || input_format == TEXFMT_RGB8_DXT1) ? 8 : 16;
+		int data_offset = header_buffer_size;
+		for (int mip_index = 0; mip_index < numMipmaps; mip_index++) {
+			int size = 0;
+			if (compressed) {
+				size = ((ux + 3) / 4) * ((uy + 3) / 4) *
+					compressed_stride;
+			}
+			else {
+				size = ux * uy * int(header->ddspf.RGBBitCount / 8);
+			}
+
+			MipInfo this_mip;
+			this_mip.x = ux;
+			this_mip.y = uy;
+			this_mip.size = size;
+			this_mip.data_offset = data_offset;
+			mip_infos.push_back(this_mip);
+
+			data_offset += size;
+			ux /= 2;
+			uy /= 2;
+			if (ux < 1)ux = 1;
+			if (uy < 1)uy = 1;
+		}
+	};
+	create_mip_infos();
+
+	auto create_gpu_texture = [](int input_width, int input_height, int num_mips, Texture_Format input_format) {
+		CreateTextureArgs args;
+		args.width = input_width;
+		args.height = input_height;
+		args.num_mip_maps = num_mips;
+		args.format = load_format_to_graphics_format(input_format);
+		args.sampler_type = GraphicsSamplerType::AnisotropyDefault;
+		return IGraphicsDevice::inst->create_texture(args);
+	};
+
+	const int mips_to_read = glm::min(max_mips, numMipmaps);
+	const int start_mip = numMipmaps - mips_to_read;
+	MipInfo& start_mip_info = mip_infos[start_mip];
+
+	out_ptr = create_gpu_texture(start_mip_info.x, start_mip_info.y, mips_to_read, input_format);
+
+	std::vector<std::byte> dataBuffer;
+	for (int load_mip_i = start_mip; load_mip_i < numMipmaps; load_mip_i++) {
+		const int final_mip_index = load_mip_i - start_mip;
+		MipInfo& this_mip_info = mip_infos[load_mip_i];
+		const int mip_size = this_mip_info.size;
+		const int mip_offset = this_mip_info.data_offset;
+		dataBuffer.resize(mip_size);
+		file_ptr->seek(mip_offset);
+		file_ptr->read(dataBuffer.data(), mip_size);
+		out_ptr->sub_image_upload(final_mip_index, 0, 0, this_mip_info.x, this_mip_info.y, mip_size, dataBuffer.data());
+	}
+
+
+	output->format = input_format;
+
+	return true;
+	//return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
+}
+
+
+
+void texture_loading_benchmark()
+{
+	std::vector<std::byte> filedata;
+	filedata.reserve(10'000'000);
+	double start = GetTime();
+	auto print_time = [&](const char* msg) {
+		double now = GetTime();
+		printf("%s: %f\n", msg, float(now - start));
+		start = now;
+	};
+
+	const char* ssd_path = "work_prop/WorkLight02_Base_Color.dds";
+	const char* hdd_path = "E:/Users/charl/Downloads/WorkLight02_Base_Color.dds";
+	auto run_benchmark = [&](int max_mips) {
+		printf("mips: %d\n", max_mips);
+		IFilePtr ptr = FileSys::open_read(hdd_path,FileSys::FULL_SYSTEM);
+		print_time("	open file");
+
+		//ptr->read(filedata.data(), filedata.size());
+		print_time("	read file");
+		Texture dummy;
+		load_dds_file_file(&dummy, dummy.gpu_ptr, ptr.get(), max_mips);
+		print_time("	load to opengl");
+	};
+
+	for (int i = 12; i >= 1; i-=1) {
+		run_benchmark(i);
+	}
+}
 
 void benchmark_run()
 {

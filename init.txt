@@ -83,7 +83,6 @@ dbg.fly 1
 #r.debug_csm 1
 #sys.print_deps mats/wht_tile.mi
 #FONT_TEST
-loglevel 4
 
 #r.debug_specular 1
 
@@ -97,8 +96,6 @@ file_print_all_openfile_fails 0
 g_draw_grid 1
 
 bind 7 "start_ed AnimGraph beu_character.ag"
-
-loglevel 6
 
 
 start_ed Map "bike_empty.tmap"
