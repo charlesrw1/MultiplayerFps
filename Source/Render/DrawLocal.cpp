@@ -22,7 +22,7 @@
 #include "tracy/public/tracy/TracyOpenGL.hpp"
 #include "Framework/ArenaAllocator.h"
 #include "IGraphsDevice.h"
-
+#include "StreamingTextureMgr.h"
 const GLenum MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT;
 
 //#pragma optimize("", off)
@@ -463,29 +463,13 @@ void Program_Manager::recompile_do(program_def& def)
 	}
 }
 
-Material_Shader_Table::Material_Shader_Table() 
-{
-
-}
-
-program_handle Material_Shader_Table::lookup(shader_key key)
-{
-	uint32_t key32 = key.as_uint32();
-	auto find = shader_key_to_program_handle.find(key32);
-	return find == shader_key_to_program_handle.end() ? -1 : find->second;
-}
-void Material_Shader_Table::insert(shader_key key, program_handle handle)
-{
-	shader_key_to_program_handle.insert({ key.as_uint32(), handle });
-}
-
 
 void Renderer::bind_vao(uint32_t vao)
 {
 	device.set_vao(vao);
 }
 
-void Renderer::set_blend_state(blend_state blend)
+void Renderer::set_blend_state(BlendState blend)
 {
 	device.set_blend_state(blend);
 }
@@ -523,34 +507,34 @@ void OpenglRenderDevice::set_vao(vertexarrayhandle vao)
 	}
 }
 
-void OpenglRenderDevice::set_blend_state(blend_state blend)
+void OpenglRenderDevice::set_blend_state(BlendState blend)
 {
 	bool invalid = is_bit_invalid(BLENDING_BIT);
 	if (invalid || blend != blending) {
-		if (blend == blend_state::OPAQUE)
+		if (blend == BlendState::OPAQUE)
 			glDisable(GL_BLEND);
-		else if (blend == blend_state::ADD) {
-			if (invalid || blending == blend_state::OPAQUE)
+		else if (blend == BlendState::ADD) {
+			if (invalid || blending == BlendState::OPAQUE)
 				glEnable(GL_BLEND);
 			glBlendFunc(GL_ONE, GL_ONE);
 		}
-		else if (blend == blend_state::BLEND) {
-			if (invalid || blending == blend_state::OPAQUE)
+		else if (blend == BlendState::BLEND) {
+			if (invalid || blending == BlendState::OPAQUE)
 				glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		}
-		else if (blend == blend_state::MULT) {
-			if (invalid || blending == blend_state::OPAQUE)
+		else if (blend == BlendState::MULT) {
+			if (invalid || blending == BlendState::OPAQUE)
 				glEnable(GL_BLEND);
 			glBlendFunc(GL_DST_COLOR, GL_ZERO);
 		}
-		else if (blend == blend_state::SCREEN) {
-			if (invalid || blending == blend_state::OPAQUE)
+		else if (blend == BlendState::SCREEN) {
+			if (invalid || blending == BlendState::OPAQUE)
 				glEnable(GL_BLEND);
 			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
 		}
-		else if (blend == blend_state::PREMULT_BLEND) {
-			if (invalid || blending == blend_state::OPAQUE)
+		else if (blend == BlendState::PREMULT_BLEND) {
+			if (invalid || blending == BlendState::OPAQUE)
 				glEnable(GL_BLEND);
 			glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 		}
@@ -709,9 +693,6 @@ void Renderer::create_shaders()
 
 	prog.mdi_testing = prog_man.create_raster("SimpleMeshV.txt", "UnlitF.txt", "MDI");
 
-	prog.light_accumulation = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt");
-	prog.light_accumulation_shadowed = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt","SHADOWED");
-	prog.light_accumulation_shadow_cookie = prog_man.create_raster("LightAccumulationV.txt", "LightAccumulationF.txt", "SHADOWED,COOKIE");
 	prog.light_accumulation_fullscreen = prog_man.create_raster("fullscreenquad.txt", "LightAccumulationFullScreen.txt","SHADOWED");
 	prog.light_accumulation_fullscreen_tiled = prog_man.create_raster("fullscreenquad.txt", "LightAccumulationFullScreen.txt", "SHADOWED,TILED 1");
 	prog.light_accumulation_fullscreen_tiled2 = prog_man.create_raster("fullscreenquad.txt", "LightAccumulationFullScreen.txt", "SHADOWED,TILED 2");
@@ -1005,6 +986,7 @@ void Renderer::init()
 	InitGlState();
 	windowDrawer = new RenderWindowBackendLocal();
 	RenderWindowBackend::inst = windowDrawer;
+	StreamingTextureMgr::inst = new StreamingTextureMgr;
 
 	mem_arena.init("RenderTemp", renderer_memory_arena_size.get_integer());
 	// Init scene draw buffers
@@ -1237,7 +1219,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 	if (!enable_bloom.get_bool())
 		return;
 
-	device.reset_states();
+	//device.reset_states();
 
 //	RenderPassSetup setup("bloompass", fbo.bloom, false, false, 0, 0, cur_w, cur_h);
 //	auto scope = device.start_render_pass(setup);
@@ -1255,8 +1237,8 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 		float src_x = cur_w;
 		float src_y = cur_h;
 
-
-		glBindTextureUnit(0, scene_color_handle);
+		device.bind_texture(0, scene_color_handle);
+		//glBindTextureUnit(0, scene_color_handle);
 		glClearColor(0, 0, 0, 1);
 		for (int i = 0; i < tex.number_bloom_mips; i++)
 		{
@@ -1286,7 +1268,8 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 
-			glBindTextureUnit(0, bc.texture->get_internal_handle());
+			//glBindTextureUnit(0, bc.texture->get_internal_handle());
+			device.bind_texture_ptr(0, bc.texture);
 		}
 	}
 
@@ -1294,7 +1277,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
 		state.program = prog.bloom_upsample;
-		state.blend = blend_state::ADD;
+		state.blend = BlendState::ADD;
 		device.set_pipeline(state);
 
 
@@ -1317,14 +1300,15 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle)
 			vec2 destsize =  bc.fsize;
 			device.set_viewport(0, 0, destsize.x, destsize.y);
 
-			glBindTextureUnit(0, bc.texture->get_internal_handle());
+			//glBindTextureUnit(0, bc.texture->get_internal_handle());
+			device.bind_texture_ptr(0,bc.texture);
 			shader().set_float("filterRadius", 0.0001f);
 
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 		}
 	}
 
-	device.reset_states();
+	//device.reset_states();
 }
 
 void setup_batch(Render_Lists& list,
@@ -1339,7 +1323,7 @@ void setup_batch(Render_Lists& list,
 	const MaterialInstance* mat = (MaterialInstance*)mesh_batch.material;
 	const draw_call_key batch_key = pass.objects[mesh_batch.first].sort_key;
 	const program_handle program = (program_handle)batch_key.shader;
-	const blend_state blend = (blend_state)batch_key.blending;
+	const BlendState blend = (BlendState)batch_key.blending;
 	const bool show_backface = batch_key.backface;
 	const uint32_t layer = batch_key.layer;
 	const VaoType vaoType = (VaoType)batch_key.vao;
@@ -1559,7 +1543,7 @@ void Renderer::render_particles()
 		state.backface_culling = mat->get_master_material()->backface;
 		state.blend = mat->get_master_material()->blend;
 		state.depth_testing = true;
-		state.depth_writes = state.blend == blend_state::OPAQUE;
+		state.depth_writes = state.blend == BlendState::OPAQUE;
 		state.depth_less_than = false;
 		device.set_pipeline(state);
 
@@ -2445,7 +2429,7 @@ ConfigVar r_force_all_materials_to_fallback("r.force_all_materials_to_fallback",
 ConfigVar r_dont_use_camera_depth_build_scene("r.dont_use_camera_depth_build_scene", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_skip_depth_prepass("r.skip_depth_prepass", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_depth_prepass_all_objects("r.depth_prepass_all_objects", "0", CVAR_BOOL | CVAR_DEV, "");
-
+ConfigVar r_skip_add_to_passes("r.skip_add_to_passes", "0", CVAR_BOOL | CVAR_DEV, "");
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 {
 	GPUSCOPESTART(build_scene_data_scope);
@@ -2459,6 +2443,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		statics_meshes_are_dirty = true;
 
 	const bool skip_prepass_objs = r_skip_depth_prepass.get_bool();
+	const bool add_to_passes = !r_skip_add_to_passes.get_bool();
 
 	auto& memArena = draw.get_arena();
 	ArenaScope scope(memArena);
@@ -2471,7 +2456,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		editor_sel_pass.clear();
 		depth_prepass.clear();
 	};
-	reset_passes();
+	if(add_to_passes)
+		reset_passes();
 
 	const int visible_count = proxy_list.objects.size();
 	bool* cascade_vis[4] = { nullptr,nullptr,nullptr,nullptr };
@@ -2525,7 +2511,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	gpu::Object_Instance* gpu_objects = memArena.alloc_bottom_type<gpu::Object_Instance>(num_ren_objs);
 	ASSERT(gpu_objects);
 	JobCounter* gpu_obj_set_cntr{};
-	JobSystem::inst->add_job(set_gpu_objects_data_job, uintptr_t(gpu_objects), gpu_obj_set_cntr);
+	if(add_to_passes)
+		JobSystem::inst->add_job(set_gpu_objects_data_job, uintptr_t(gpu_objects), gpu_obj_set_cntr);
 
 	auto add_objects_to_passes = [&]() {
 		ZoneScopedN("Traversal");
@@ -2568,7 +2555,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 
 			const int pstart = lod.part_ofs;
 			const int pend = pstart + lod.part_count;
-
+			//
 			for (int j = pstart; j < pend; j++) {
 				auto& part = proxy.model->get_part(j);
 
@@ -2611,7 +2598,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 			}
 		}
 	};
-	add_objects_to_passes();
+	if(add_to_passes)
+		add_objects_to_passes();
 		
 	auto merge_static_and_dynamic = [&]() {
 		ZoneScopedN("MergeStaticWithDynamic");
@@ -2634,10 +2622,12 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		if(!skip_prepass_objs)
 			depth_prepass.make_batches(*this);
 
-		JobSystem::inst->wait_and_free_counter(gpu_obj_set_cntr);
-		{
-			ZoneScopedN("UploadGpuData");
-			glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs, gpu_objects, GL_DYNAMIC_DRAW);
+		if (add_to_passes) {
+			JobSystem::inst->wait_and_free_counter(gpu_obj_set_cntr);
+			{
+				ZoneScopedN("UploadGpuData");
+				glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs, gpu_objects, GL_DYNAMIC_DRAW);
+			}
 		}
 	};
 	make_batches_for_passes();
@@ -2697,6 +2687,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 	memArena.free_bottom();
 
 }
+
 
 void Renderer::draw_meshbuilders()
 {
@@ -2799,10 +2790,6 @@ std::array<FrustumPlane, 4> get_tile_frustum_planes(
 ) {
 	using namespace glm;
 
-//	vec3 forward = normalize(camDir);
-	//vec3 right = normalize(cross(forward, camUp));
-	//vec3 up = normalize(cross(right, forward)); // ensure orthogonal
-
 	float tanHalfFovY = tan(fovY * 0.5f);
 	float tanHalfFovX = tanHalfFovY * aspect;
 
@@ -2866,7 +2853,7 @@ void LightListCuller::draw_lights()
 		state.program = draw.prog.light_accumulation_fullscreen_tiled2;
 	else
 		state.program = draw.prog.light_accumulation_fullscreen;
-	state.blend = blend_state::ADD;
+	state.blend = BlendState::ADD;
 	state.depth_testing = false;
 	state.depth_writes = false;
 	draw.get_device().set_pipeline(state);
@@ -3026,7 +3013,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
 		state.program = prog.ambient_accumulation;
-		state.blend = blend_state::MULT;
+		state.blend = BlendState::MULT;	// does a mult of (albedo+ao) with the indirect lighting already in tex.scene_color
 		state.depth_testing = false;
 		state.depth_writes = false;
 		device.set_pipeline(state);
@@ -3037,8 +3024,6 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		bind_texture_ptr(3, tex.scene_depth);
 		bind_texture_ptr(4, ssao_tex);
 
-		for (int i = 0; i < 6; i++)
-			shader().set_vec3(string_format("AmbientCube[%d]", i), glm::vec3(0.f));
 		// fullscreen shader, no vao used
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
@@ -3054,7 +3039,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
 		state.program = prog.sunlight_accumulation;
-		state.blend = blend_state::ADD;
+		state.blend = BlendState::ADD;
 		state.depth_testing = false;
 		state.depth_writes = false;
 		device.set_pipeline(state);
@@ -3082,7 +3067,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
 		state.program = prog.reflection_accumulation;
-		state.blend = blend_state::ADD;
+		state.blend = BlendState::ADD;
 		state.depth_testing = false;
 		state.depth_writes = false;
 		device.set_pipeline(state);
@@ -3236,7 +3221,7 @@ void Renderer::draw_height_fog()
 	IGraphicsDevice::inst->set_render_pass(state);
 
 	RenderPipelineState setup;
-	setup.blend = blend_state::BLEND;
+	setup.blend = BlendState::BLEND;
 	setup.depth_testing = false;
 	setup.depth_writes = false;
 	setup.program = prog.height_fog;
@@ -3350,22 +3335,24 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 
 	// fixme:
 	if (r_print_light_tiles.get_bool()) {
-		const float height = Canvas::calc_text_size("0").h;
-		for (int y = 0; y < light_frustum_size_y; y++) {
-			for (int x = 0; x < light_frustum_size_x; x++) {
-				auto& counts = lightListCuller->get_counts();
-				int count = counts.at(y * light_frustum_size_x + x);
-				float ypos = y * (cur_h / float(light_frustum_size_y));
-				float xpos = x * (cur_w / float(light_frustum_size_x));
-				auto str = std::to_string(count);
-				TextShape text;
-				text.with_drop_shadow = true;
-				text.color = COLOR_WHITE;
-				text.rect.x = xpos;
-				text.rect.y = ypos + height;
-				text.text = str;
-				text.drop_shadow_ofs = 1;
-				UiSystem::inst->window.draw(text);
+		auto& counts = lightListCuller->get_counts();
+		if (!counts.empty()) {
+			const float height = Canvas::calc_text_size("0").h;
+			for (int y = 0; y < light_frustum_size_y; y++) {
+				for (int x = 0; x < light_frustum_size_x; x++) {
+					int count = counts.at(y * light_frustum_size_x + x);
+					float ypos = y * (cur_h / float(light_frustum_size_y));
+					float xpos = x * (cur_w / float(light_frustum_size_x));
+					auto str = std::to_string(count);
+					TextShape text;
+					text.with_drop_shadow = true;
+					text.color = COLOR_WHITE;
+					text.rect.x = xpos;
+					text.rect.y = ypos + height;
+					text.text = str;
+					text.drop_shadow_ofs = 1;
+					UiSystem::inst->window.draw(text);
+				}
 			}
 		}
 	}
@@ -4246,7 +4233,7 @@ void DebuggingTextureOutput::draw_out()
 
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
-	state.blend = blend_state::BLEND;
+	state.blend = BlendState::BLEND;
 
 	if (output_tex->type == Texture_Type::TEXTYPE_2D)
 		state.program = (draw.prog.tex_debug_2d);

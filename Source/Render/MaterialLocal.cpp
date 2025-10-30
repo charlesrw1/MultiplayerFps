@@ -12,7 +12,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <fstream>
-
+#include <array>
 #include "glad/glad.h"
 
 #include "IGraphsDevice.h"
@@ -79,7 +79,7 @@ public:
 };
 
 
-void Material_Shader_Table::recompile_for_material(MasterMaterialImpl* mat)
+void MaterialShaderTable::recompile_for_material(MasterMaterialImpl* mat)
 {
 	if (material_print_debug.get_bool())
 		sys_print(Debug, "recompiling material %s\n", mat->self->get_name().c_str());
@@ -97,6 +97,24 @@ void Material_Shader_Table::recompile_for_material(MasterMaterialImpl* mat)
 	if (!mat->is_compilied_shader_valid)
 		sys_print(Error, "recompile_for_material: material is invalid %s\n", mat->self->get_name().c_str());
 }
+
+MaterialShaderTable::MaterialShaderTable()
+{
+
+}
+
+program_handle MaterialShaderTable::lookup(shader_key key)
+{
+	uint32_t key32 = key.as_uint32();
+	auto find = shader_key_to_program_handle.find(key32);
+	return find == shader_key_to_program_handle.end() ? -1 : find->second;
+}
+void MaterialShaderTable::insert(shader_key key, program_handle handle)
+{
+	shader_key_to_program_handle.insert({ key.as_uint32(), handle });
+}
+
+
 
 program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* mat, shader_key key)
 {
@@ -124,7 +142,7 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 	program_handle handle = draw.get_prog_man().create_single_file(name, is_tesselation, params);
 	ASSERT(handle != -1);
 
-	mat_table.insert(key, handle);
+	mat_shader_table.insert(key, handle);
 	return handle;
 }
 
@@ -141,10 +159,34 @@ program_handle MaterialManagerLocal::get_mat_shader(
 	key.material_id = mm->material_id;
 	key.msf_flags = flags;
 
-	program_handle handle = mat_table.lookup(key);
+	program_handle handle = mat_shader_table.lookup(key);
 	if (handle != -1) 
 		return handle;
 	return compile_mat_shader(mm->self, key);	// dynamic compilation ...
+}
+
+void MaterialManagerLocal::add_to_dirty_list(MaterialInstance* mat) {
+	if (mat->impl->dirty_buffer_index == -1) {
+		dirty_list.push_back(mat);
+		mat->impl->dirty_buffer_index = dirty_list.size() - 1;
+	}
+}
+
+void MaterialManagerLocal::remove_from_dirty_list_if_it_is(MaterialInstance* mat) {
+	if (mat->impl->dirty_buffer_index != -1) {
+		ASSERT(mat->impl->dirty_buffer_index >= 0 && mat->impl->dirty_buffer_index < dirty_list.size());
+		dirty_list[mat->impl->dirty_buffer_index] = nullptr;
+	}
+}
+
+void MaterialManagerLocal::free_material_instance(MaterialInstance* m) {
+	if (!m->impl)
+		return;
+	remove_from_dirty_list_if_it_is(m);
+	if (m->impl->gpu_buffer_offset != MaterialImpl::INVALID_MAPPING) {
+		mat_offset_table->unregister_material(m);
+	}
+
 }
 
 #include "Assets/AssetDatabase.h"
@@ -256,6 +298,13 @@ MaterialInstance* MaterialManagerLocal::create_dynmaic_material_unsafier(const M
 	dynamicMat->set_loaded_manually_unsafe("%_DM_%");
 	outstanding_dynamic_mats += 1;
 	return dynamicMat;
+}
+
+void MaterialManagerLocal::free_dynamic_material(MaterialInstance* mat) {
+	if (!mat)
+		return;
+	queued_dynamic_mats_to_delete.push_back(mat);
+	outstanding_dynamic_mats -= 1;
 }
 
 
@@ -554,7 +603,7 @@ void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 					alpha_tested = parse_options({ "false","true" });
 				}
 				else if (tok.cmp("BlendMode")) {
-					blend = (blend_state)parse_options({ "Opaque","Blend","Add","Mult","Screen","PreMult"});
+					blend = (BlendState)parse_options({ "Opaque","Blend","Add","Mult","Screen","PreMult"});
 				}
 				else if (tok.cmp("LightingMode")) {
 					light_mode = (LightingMode)parse_options({ "Lit","Unlit" });
@@ -805,7 +854,7 @@ std::string MasterMaterialImpl::create_glsl_shader(
 	if (is_alphatested()) {
 		masterShader += "#define ALPHATEST\n";
 	}
-	if (blend != blend_state::OPAQUE) {
+	if (blend != BlendState::OPAQUE) {
 		masterShader+= "#define FORWARD_SHADER\n";
 		if (light_mode == LightingMode::Lit) {
 			masterShader += "#define FORWARD_LIT\n";
@@ -945,7 +994,8 @@ void MaterialManagerLocal::init() {
 	gpuMatBufferPtr = create_buffer();
 
 	materialBufferSize = MATERIAL_SIZE * MAX_MATERIALS;
-	materialBitmapAllocator.resize(MAX_MATERIALS/64	/* 64 bit bitmask */, 0);
+	mat_offset_table = std::make_unique<AllMaterialTable>(MAX_MATERIALS);
+	//materialBitmapAllocator.resize(MAX_MATERIALS/64	/* 64 bit bitmask */, 0);
 
 	fallback = g_assets.find_sync_sptr<MaterialInstance>("eng/fallback.mm",true);
 	if (!fallback)
@@ -955,11 +1005,11 @@ void MaterialManagerLocal::init() {
 	if (!defaultBillboard)
 		Fatalf("couldnt load the default billboard material\n");
 
-	PPeditorSelectMat = g_assets.find_sync_sptr<MaterialInstance>("eng/defaultEditorSelect.mm",true);
-	if (!PPeditorSelectMat)
+	pp_editor_select_mat = g_assets.find_sync_sptr<MaterialInstance>("eng/defaultEditorSelect.mm",true);
+	if (!pp_editor_select_mat)
 		Fatalf("couldnt load the default editor select material\n");
 }
-#include <array>
+
 void MaterialManagerLocal::pre_render_update()
 {
 	if (queued_dynamic_mats_to_delete.size() > 0 && material_print_debug.get_bool()) {
@@ -979,14 +1029,16 @@ void MaterialManagerLocal::pre_render_update()
 		mat->impl->dirty_buffer_index = -1;
 
 		if (mat->impl->masterImpl.get())
-			mat_table.recompile_for_material(mat->impl->masterImpl.get());
+			mat_shader_table.recompile_for_material(mat->impl->masterImpl.get());
 
-		auto& gpu_buffer_offset = mat->impl->gpu_buffer_offset;
-		// allocate it if it doesnt exist
-		if (gpu_buffer_offset == MaterialImpl::INVALID_MAPPING) {
-			gpu_buffer_offset = allocate_material_instance() * MATERIAL_SIZE/4;
-			ASSERT(gpu_buffer_offset >= 0 && gpu_buffer_offset < materialBufferSize/4);
-		}
+		auto check_buffer_offset = [&]() {
+			const int gpu_buffer_offset = mat->impl->gpu_buffer_offset;
+			// allocate it if it doesnt exist
+			if (gpu_buffer_offset == MaterialImpl::INVALID_MAPPING) {
+				mat_offset_table->register_material(mat);
+			}
+		};
+		check_buffer_offset();
 
 		std::array<std::byte, MATERIAL_SIZE> data_to_upload = {};
 
@@ -1072,4 +1124,120 @@ void DynamicMaterialDeleter::operator()(MaterialInstance* mat) const
 {
 	ASSERT(mat->impl->is_dynamic_material);
 	matman.free_dynamic_material(mat);
+}
+
+AllMaterialTable::AllMaterialTable(int max_materials) : allocator(max_materials) {
+	all_mats.resize(max_materials, nullptr);
+}
+
+void AllMaterialTable::register_material(MaterialInstance* mat) {
+	assert(mat);
+	assert(mat->impl->gpu_buffer_offset == MaterialImpl::INVALID_MAPPING);
+	const int index = allocator.allocate();
+	assert(!all_mats.at(index));
+	all_mats.at(index) = mat;
+	const int ofs = index * MATERIAL_SIZE / 4;
+	mat->impl->gpu_buffer_offset = ofs;
+
+	//assert(ofs >= 0 && ofs < materialBufferSize / 4);
+
+}
+
+void AllMaterialTable::unregister_material(MaterialInstance* mat) {
+	const int gpu_buf_ofs = mat->impl->gpu_buffer_offset;
+	assert(gpu_buf_ofs != MaterialImpl::INVALID_MAPPING);
+	const int byteIndex = mat->impl->get_material_index_from_buffer_ofs();
+	allocator.free(byteIndex);
+	assert(all_mats.at(byteIndex) == mat);
+	all_mats.at(byteIndex) = nullptr;
+	mat->impl->gpu_buffer_offset = MaterialImpl::INVALID_MAPPING;
+}
+
+const std::vector<MaterialInstance*>& AllMaterialTable::get_all_mat_array() const {
+	return all_mats;
+}
+
+BitmapAllocator::BitmapAllocator(int size) {
+	int bitmap_sz = size / 64;
+	if (size % 64 != 0)
+		bitmap_sz += 1;
+	materialBitmapAllocator.resize(bitmap_sz);
+	this->max_ids = size;
+}
+
+int BitmapAllocator::allocate() {
+	// returns INDEX, not POINTER
+	for (int i = 0; i < materialBitmapAllocator.size(); i++) {
+		if (materialBitmapAllocator[i] == UINT64_MAX)
+			continue;
+		// find bit
+		for (int bit = 0; bit < 64; bit++) {
+			if ((materialBitmapAllocator[i] & (1ull << bit)) == 0) {
+				materialBitmapAllocator[i] |= (1ull << bit);
+				return i * 64 + bit;
+			}
+		}
+		ASSERT(0);	// should have found a bit
+	}
+	Fatalf("allocate_material_instance: out of memory\n");
+
+	return  0;
+}
+
+void BitmapAllocator::free(int id) {
+	assert(id >= 0 && id < max_ids);
+
+	//int byteIndex = (m->impl->gpu_buffer_offset * 4) / MATERIAL_SIZE;
+	int bitmapIndex = id / 64;
+	int bitIndex = id % 64;
+	materialBitmapAllocator.at(bitmapIndex) &= ~(1ull << bitIndex);
+}
+
+int TextureBindingHasher::get_texture_hash_id_for_material(MaterialImpl* mat) {
+	if (mat->texture_bindings.empty())
+		return NO_TEXTURE_ID;
+	opt<int> existing = find_existing(mat->texture_bindings);
+	if (existing.has_value())
+		return *existing;
+	return insert_new(mat->texture_bindings);
+}
+
+bool TextureBindingHasher::are_arrays_equal(const InlineVec<Texture*, 6>& v1, const std::vector<Texture*>& v2) {
+	if (v1.size() != v2.size())
+		return false;
+	for (int i = 0; i < v1.size(); i++) {
+		if (v1[i] != v2[i])
+			return false;
+	}
+	return true;
+}
+
+int TextureBindingHasher::insert_new(const std::vector<Texture*> bindings) {
+	assert(!bindings.empty());
+	Texture* first = bindings.at(0);
+	assert(first);
+	const int this_id = current_texture_hash_id++;
+	HashItem item;
+	item.id = this_id;
+	for (auto t : bindings)
+		item.textures.push_back(t);
+	table[first].push_back(item);	// inserts into table if doesnt exist, then push_back()
+	return this_id;
+}
+
+opt<int> TextureBindingHasher::find_existing(const std::vector<Texture*> bindings) {
+	if (bindings.empty())
+		return NO_TEXTURE_ID;
+	Texture* first = bindings.at(0);
+	assert(first);
+	const HashItemVec* items = MapUtil::get_opt(table, first);
+	if (items) {
+		for (int i = 0; i < items->size(); i++) {
+			const HashItem* item = &(*items)[i];
+			const bool are_equal = are_arrays_equal(item->textures, bindings);
+			if (are_equal)
+				return item->id;
+		}
+	}
+	return std::nullopt;
 }

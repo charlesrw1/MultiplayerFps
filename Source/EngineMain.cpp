@@ -1539,6 +1539,7 @@ public:
 extern void texture_loading_benchmark();
 int game_engine_main(int argc, char** argv)
 {
+
 	material_print_debug.set_bool(true);
 	developer_mode.set_bool(false);
 	log_shader_compiles.set_bool(false);
@@ -1572,7 +1573,7 @@ int game_engine_main(int argc, char** argv)
 	//assert(val == 1);
 	//assert(c->myStr == "hello");
 
-	texture_loading_benchmark();
+	//texture_loading_benchmark();
 
 	eng_local.loop();
 	eng_local.cleanup();
@@ -2469,13 +2470,19 @@ void Debug_Console::draw()
 	if (lines.size() > 1000)
 		lines.clear();
 
+
+
 	ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
 	if (!ImGui::Begin("Console")) {
 		ImGui::End();
+
 		return;
 	}
+	
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, uint32_t(ImColor(5, 5, 5)));
+
 	const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
-	if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false, ImGuiWindowFlags_HorizontalScrollbar))
+	if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false))
 	{
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
 		for (int i = 0; i < lines.size(); i++)
@@ -2502,6 +2509,9 @@ void Debug_Console::draw()
 		ImGui::PopStyleVar();
 	}
 	ImGui::EndChild();
+
+	ImGui::PopStyleColor();
+
 	ImGui::Separator();
 
 	// Command-line

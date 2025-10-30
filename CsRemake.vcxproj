@@ -220,6 +220,7 @@
     <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\IntegrationTest.h" />
+    <ClInclude Include="Source\LevelEditor\Editor3.h" />
     <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h" />
     <ClInclude Include="Source\LevelEditor\EditorStatic.h" />
     <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h" />
@@ -232,6 +233,7 @@
     <ClInclude Include="Source\Render\IGraphsDevice.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Render\RenderWindow.h" />
+    <ClInclude Include="Source\Render\StreamingTextureMgr.h" />
     <ClInclude Include="Source\Render\UniformBuffer.h" />
     <ClInclude Include="Source\Scripting\FunctionReflection.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />

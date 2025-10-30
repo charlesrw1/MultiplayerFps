@@ -103,7 +103,7 @@ struct RenderPipelineState
 		bool depth_testing,
 		bool depth_less_than,
 		bool depth_writes,
-		blend_state blend_state,
+		BlendState blend_state,
 		program_handle shader,
 		vertexarrayhandle vao,
 		fbohandle framebuffer);
@@ -113,7 +113,7 @@ struct RenderPipelineState
 	bool depth_testing = true;
 	bool depth_less_than = false;
 	bool depth_writes = true;
-	blend_state blend = blend_state::OPAQUE;
+	BlendState blend = BlendState::OPAQUE;
 	program_handle program = 0;
 	vertexarrayhandle vao = 0;
 };
@@ -275,7 +275,7 @@ public:
 	void set_depth_write_enabled(bool enabled);
 private:
 	void set_vao(vertexarrayhandle vao);
-	void set_blend_state(blend_state blend);
+	void set_blend_state(BlendState blend);
 	void set_show_backfaces(bool show_backfaces);
 	void set_depth_test_enabled(bool enabled);
 	void set_cull_front_face(bool enabled);
@@ -289,7 +289,7 @@ private:
 	static const int MAX_SAMPLER_BINDINGS = 32;
 	program_handle active_program = -1;
 	texhandle textures_bound[MAX_SAMPLER_BINDINGS];
-	blend_state blending = blend_state::OPAQUE;
+	BlendState blending = BlendState::OPAQUE;
 	bool show_backface = false;
 	bool depth_test_enabled = true;
 	bool depth_write_enabled = true;
@@ -499,9 +499,7 @@ public:
 		program_handle tex_debug_2d_array{};
 		program_handle tex_debug_cubemap{};
 
-		program_handle light_accumulation_shadow_cookie{};
-		program_handle light_accumulation_shadowed{};
-		program_handle light_accumulation{};
+
 		program_handle sunlight_accumulation{};
 		program_handle sunlight_accumulation_debug{};
 		program_handle ambient_accumulation{};
@@ -611,7 +609,7 @@ public:
 	}
 
 	void set_shader(program_handle handle);
-	void set_blend_state(blend_state blend);
+	void set_blend_state(BlendState blend);
 	void set_show_backfaces(bool show_backfaces);
 	Shader shader();
 

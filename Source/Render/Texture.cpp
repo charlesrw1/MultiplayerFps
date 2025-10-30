@@ -24,6 +24,8 @@
 
 #include "IGraphsDevice.h"
 
+#include "StreamingTextureMgr.h"
+
 // TextureEditor.cpp
 extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*,Color32& outColor);
 #ifdef EDITOR_BUILD
@@ -637,6 +639,8 @@ void Texture::post_load() {
 	type = Texture_Type::TEXTYPE_2D;
 
 	loaddata.reset();
+
+	StreamingTextureMgr::inst->register_streaming_texture(this);
 }
 
 extern ConfigVar developer_mode;
@@ -718,6 +722,7 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 void Texture::uninstall()
 {
 	safe_release(gpu_ptr);
+	StreamingTextureMgr::inst->unregister_streaming_texture(this);
 }
 void Texture::update_specs_ptr(IGraphicsTexture* ptr) {
 	this->gpu_ptr = ptr;
@@ -886,9 +891,11 @@ void texture_loading_benchmark()
 	std::vector<std::byte> filedata;
 	filedata.reserve(10'000'000);
 	double start = GetTime();
+	double last = 0.0;
 	auto print_time = [&](const char* msg) {
 		double now = GetTime();
-		printf("%s: %f\n", msg, float(now - start));
+		last = now - start;
+		//printf("%s: %f\n", msg, float(now - start));
 		start = now;
 	};
 
@@ -904,11 +911,95 @@ void texture_loading_benchmark()
 		Texture dummy;
 		load_dds_file_file(&dummy, dummy.gpu_ptr, ptr.get(), max_mips);
 		print_time("	load to opengl");
+		return dummy.gpu_ptr;
 	};
 
 	for (int i = 12; i >= 1; i-=1) {
 		run_benchmark(i);
 	}
+
+	auto try_copy = [&]() {
+		IGraphicsTexture* src = run_benchmark(5);
+		const glm::ivec2 size = src->get_size();
+		const int mips = src->get_num_mips();
+		texhandle new_t{};
+		print_time("copying_texture...");
+		glCreateTextures(GL_TEXTURE_2D, 1, &new_t);
+		glTextureStorage2D(new_t, mips, GL_COMPRESSED_RGB_S3TC_DXT1_EXT, size.x, size.y);
+		print_time("	glTextureStorage2D...");
+
+		for (int mip = 0; mip < mips; ++mip) {
+			int mipWidth = std::max(1, size.x >> mip);
+			int mipHeight = std::max(1, size.y >> mip);
+
+			glCopyImageSubData(
+				src->get_internal_handle(), GL_TEXTURE_2D, mip, 0, 0, 0,
+				new_t, GL_TEXTURE_2D, mip, 0, 0, 0,
+				mipWidth, mipHeight, 1
+			);
+		}
+		print_time("	copying done.");
+	};
+	try_copy();
+	printf("%f\n", float(last));
+	__debugbreak();
+}
+#include "MaterialLocal.h"
+
+struct StreamTextureData {
+	ddsFileHeader_t cached_header{};
+	int num_mips_allocated = 0;
+	int num_mips_loaded = 0;
+	float mip_lod_factor = 0.0;
+	
+	int wanted_mip_level = -1;
+};
+
+StreamingTextureMgr::StreamingTextureMgr() {
+
+}
+StreamingTextureMgr::~StreamingTextureMgr() {
+
+}
+StreamingTextureMgr* StreamingTextureMgr::inst = nullptr;
+
+void StreamingTextureMgr::tick()
+{
+	
+
+}
+#include "Framework/Range.h"
+void StreamingTextureMgr::set_material_screen_size(std::span<float> sizes)
+{
+	for (auto& [texture, stream] : streaming_textures)
+		stream.wanted_mip_level = -1;
+
+	const std::vector<MaterialInstance*>& all_mats = matman.get_material_table()->get_all_mat_array();
+	assert(all_mats.size() == sizes.size());
+	for (int index = 0; index < all_mats.size();index++) {
+		MaterialInstance* material = all_mats.at(index);
+		float screen_size = sizes[index];
+		if (screen_size < 0)
+			continue;
+		for (Texture* texture : material->impl->texture_bindings) {
+			StreamTextureData* data = MapUtil::get_opt(streaming_textures, texture);
+			if (data)
+				data->wanted_mip_level = 0;
+		}
+	}
+
+
+}
+#include "Framework/MapUtil.h"
+void StreamingTextureMgr::register_streaming_texture(Texture* tex)
+{
+	MapUtil::insert_test_exists(streaming_textures, tex, StreamTextureData());
+}
+
+void StreamingTextureMgr::unregister_streaming_texture(Texture* tex)
+{
+	//assert(MapUtil::contains(streaming_textures,tex));
+	streaming_textures.erase(tex);
 }
 
 void benchmark_run()

@@ -102,6 +102,7 @@ public:
 	virtual void release() = 0;
 	virtual uint32_t get_internal_handle() = 0;
 
+	virtual int get_num_mips() const = 0;
 	virtual glm::ivec2 get_size() const = 0;
 	virtual GraphicsTextureFormat get_texture_format() const = 0;
 	virtual GraphicsTextureType get_texture_type() const = 0;

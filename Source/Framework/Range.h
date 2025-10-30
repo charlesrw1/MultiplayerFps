@@ -27,6 +27,7 @@ public:
 private:
 	int endIdx = 0;
 };
+
 template<typename T>
 class IPairs {
 public:

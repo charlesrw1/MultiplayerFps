@@ -14,6 +14,8 @@ public:
 	template<typename T, typename K>
 	static const T* get_opt(const std::unordered_map<K, T>&, const K& key);
 	template<typename T, typename K>
+	static T* get_opt(std::unordered_map<K, T>&, const K& key);
+	template<typename T, typename K>
 	static void insert_test_exists(std::unordered_map<K, T>&, const K& key, T value);
 };
 class SetUtil
@@ -44,6 +46,12 @@ inline T MapUtil::get_or_null(const std::unordered_map<K, T>& map, const K& key)
 }
 template<typename T, typename K>
 inline const T* MapUtil::get_opt(const std::unordered_map<K, T>& map, const K& key)
+{
+	auto find = map.find(key);
+	return find == map.end() ? nullptr : &find->second;
+}
+template<typename T, typename K>
+inline T* MapUtil::get_opt(std::unordered_map<K, T>& map, const K& key)
 {
 	auto find = map.find(key);
 	return find == map.end() ? nullptr : &find->second;

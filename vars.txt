@@ -29,7 +29,7 @@ g_application_class "MyApp"
 
 
 
-is_editor_app 0
+is_editor_app 1
 
 g_draw_grid 0
 

@@ -226,6 +226,7 @@ public:
 		const int y = args.height;
 		this->width = args.width;
 		this->height = args.height;
+		this->mips = args.num_mip_maps;
 		my_fmt = args.format;
 		internal_format_gl = to_format(args.format);
 		if (args.type == GraphicsTextureType::t2DArray) {
@@ -349,11 +350,16 @@ public:
 	GraphicsTextureType get_texture_type() const override {
 		return my_type;
 	}
+	int get_num_mips() const override {
+		return mips;
+	}
+
 	GraphicsTextureType my_type{};
 	GraphicsTextureFormat my_fmt{};
 	GLenum internal_format_gl{};
 	int width = 0;
 	int height = 0;
+	int mips = 0;
 };
 class OpenGLBufferImpl : public IGraphicsBuffer {
 public:

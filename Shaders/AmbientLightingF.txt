@@ -24,22 +24,8 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
 
-uniform vec3 AmbientCube[6];
 
-vec3 EvaluateAmbientCube(vec3 worldNormal)
-{
-	vec3 nSquared = worldNormal * worldNormal;
-	vec3 linearColor = nSquared.x * AmbientCube[int( worldNormal.x < 0.0 )] +
-	nSquared.y * AmbientCube[int( worldNormal.y < 0.0 )+2] +
-	nSquared.z * AmbientCube[int( worldNormal.z < 0.0 )+4];
-	return linearColor;
-}
 
-float linearize_depth(float d,float zNear,float zFar)
-{
-    float z_n = 2.0 * d - 1.0;
-    return 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
-}
 
 vec3 WorldPosFromDepth(vec2 TexCoord, float depth) {
 
