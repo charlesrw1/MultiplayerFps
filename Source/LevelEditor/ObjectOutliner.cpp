@@ -6,7 +6,8 @@
 #include "Framework/Files.h"
 #include "Framework/MyImguiLib.h"
 #include "ObjectOutlineFilter.h"
-#include "EditorFolderComponent.h"
+
+#if 0
 ObjectOutliner::~ObjectOutliner() {
 
 }
@@ -18,12 +19,6 @@ void ObjectOutliner::rebuild_tree() {
 
 	rootnode = std::make_unique<Node>();
 
-	auto folder = (EditorMapDataComponent*)eng->get_level()->find_first_component(&EditorMapDataComponent::StaticType);
-	if (!folder) {
-		auto newEnt = ed_doc.spawn_entity();
-		folder = (EditorMapDataComponent*)ed_doc.attach_component(&EditorMapDataComponent::StaticType, newEnt);
-	}
-	assert(folder);
 	cachedContainer = folder;
 
 	std::unordered_map<int, Node*> folderNodes;
@@ -665,6 +660,7 @@ void ObjectOutliner::draw()
 	}
 }
 
+#endif
 
 static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e)
 {

@@ -5,7 +5,6 @@
 #include "Framework/Hashset.h"
 #include "Framework/ScopedBoolean.h"
 #include "Framework/InlineVec.h"
-#include "DeferredSpawnScope.h"
 #include "Framework/ConsoleCmdGroup.h"
 #include "Game/EntityPtr.h"
 class SceneAsset;
@@ -39,12 +38,6 @@ public:
 	void destroy_component(Component* e);
 	Entity* spawn_prefab(const PrefabAsset* asset);
 	Entity* spawn_entity();
-	template<typename T>
-	DeferredSpawnScope spawn_entity_class_deferred(T*& ptrOut) {
-		auto ptr = spawn_entity_class_deferred_internal(T::StaticType);
-		ptrOut = (T*)ptr;
-		return DeferredSpawnScope(ptr);
-	}
 	void add_and_init_created_runtime_component(Component* c);
 	BaseUpdater* get_entity(uint64_t handle) {
 		return all_world_ents.find(handle);

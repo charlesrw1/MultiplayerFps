@@ -422,7 +422,6 @@ void PropertyFactoryUtil::register_editor(EditorDoc& doc, FnFactory<IPropertyEdi
 	factory.add("JointAnchor", [&doc]() {return new AnchorJointEditor(doc); });
 	factory.add("CubemapAnchor", [&doc]() {return new CubemapAnchorEditor(doc); });
 
-	factory.add("EntityTagString", []() {return new EntityTagEditor; });
 	factory.add("EntityBoneParentString", []() {return new EntityBoneParentStringEditor; });
 }
 void PropertyFactoryUtil::register_anim_editor(AnimationGraphEditor& doc, FnFactory<IPropertyEditor>& factory)
@@ -445,57 +444,8 @@ void PropertyFactoryUtil::register_anim_editor2(AnimationGraphEditorNew& ed, FnF
 // Inherited via IPropertyEditor
 
 
-#include "LevelEditor/TagManager.h"
+
 #include "Framework/StringUtils.h"
-
-EntityTagEditor::~EntityTagEditor() {
-	StringName* myName = (StringName*)prop->get_ptr(instance);
-	*myName = StringName(str.c_str());
-}
-
-// Inherited via IPropertyEditor
-
-bool EntityTagEditor::internal_update()
-{
-	Entity* self = (Entity*)instance;
-	if (!has_init) {
-
-		auto& all_tags = GameTagManager::get().registered_tags;
-		for (auto& t : all_tags)
-			options.push_back(t);
-
-		has_init = true;
-		StringName* myName = (StringName*)prop->get_ptr(instance);
-		if (!myName->is_null())
-			str = myName->get_c_str();
-	}
-
-	if (options.empty()) {
-		ImGui::Text("No options, add tag in init.txt with REG_GAME_TAG <tag>");
-		return false;
-	}
-
-	bool has_update = false;
-
-
-	const char* preview = (!str.empty()) ? str.c_str() : "<untagged>";
-	if (ImGui::BeginCombo("##combocalsstype", preview)) {
-		for (auto& option : options) {
-
-			if (ImGui::Selectable(option.c_str(),
-				str == option
-			)) {
-				self->set_tag(StringName(option.c_str()));
-				str = option;
-				has_update = true;
-			}
-
-		}
-		ImGui::EndCombo();
-	}
-
-	return has_update;
-}
 
 // Inherited via IPropertyEditor
 

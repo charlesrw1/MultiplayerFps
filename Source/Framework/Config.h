@@ -92,28 +92,43 @@ public:
 	virtual void set_var_float(const char* name, float fVal) = 0;
 };
 
+class BackgroundCommand {
+public:
+	virtual ~BackgroundCommand() {}
+	// return true, to exit
+	virtual bool on_input(const std::string& input) = 0;
+};
+
+#include <vector>
 class Cmd_Manager_Impl;
 class Cmd_Args
 {
 public:
 	int size() const {
-		return argc;
+		return args.size();
 	}
 	const char* at(int index) const;
 
 	void add_arg(const char* v, int len);
 	void clear() {
-		argc = 0;
-		buffer_index = 0;
+		args.clear();
+	}
+	// hack garbage
+	void sys_print(LogType type, const char* fmt, ...) const;
+
+	void spawn_background_command(std::unique_ptr<BackgroundCommand> ptr);
+
+	bool get_did_err() const { return did_err; }
+	void set_output_pipe(std::string* ptr) {
+		pipe_output_to_this = ptr;
 	}
 private:
 	static const int MAX_ARGS = 8;
 	static const int BUFFER_SIZE = 150;
-	int argc = 0;
-	int arg_to_index[MAX_ARGS];
-	int buffer_index = 0;
-	char buffer[BUFFER_SIZE];
+	std::vector<std::string> args;
 
+	mutable bool did_err = false;
+	std::string* pipe_output_to_this = nullptr;
 };
 
 typedef void(*Engine_Cmd_Function)(const Cmd_Args& args);

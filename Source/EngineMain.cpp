@@ -57,7 +57,7 @@
 #include "Assets/AssetBundle.h"
 #include "Framework/StringUtils.h"
 #include "Scripting/ScriptManager.h"
-#include "LevelEditor/TagManager.h"
+
 #include "EditorPopupTemplate.h"
 #include "Animation/SkeletonData.h"
 #include <mutex>
@@ -199,7 +199,7 @@ void Quit()
 	eng_local.cleanup();
 	exit(0);
 }
-inline Color32 get_color_of_print(LogType type) {
+Color32 get_color_of_print(LogType type) {
 
 	const Color32 err = { 255, 105, 105 };
 	const Color32 warn = { 252, 224, 121 };
@@ -447,78 +447,6 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 }
 
 
-#ifdef EDITOR_BUILD
-//TOGGLE_PLAY_EDIT_MAP
-#if 0
-void toggle_play_edit_map(const Cmd_Args& args)
-{
-	if (!eng->is_editor_level()) {
-		auto level = eng->get_level();
-		if(level)
-			Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, string_format("start_ed Map %s", level->get_source_asset()->get_name().c_str()));
-	}
-	else {
-		auto tool = eng->get_current_tool();
-		auto level = eng->get_level();
-		if (!level)
-			return;
-		if (!tool->get_asset_type_info().is_a(SceneAsset::StaticType)) {
-			PopupTemplate::create_basic_okay(
-				EditorPopupManager::inst,
-				"Error",
-				"Can only play Scene levels."
-			);
-
-			sys_print(Error, "can only play Scene levels\n");
-			return;
-		}
-
-		auto source = level->get_source_asset();
-		if (source) {
-			Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, string_format("map %s", source->get_name().c_str()));
-		}
-		else 
-			sys_print(Error, "no valid map");
-	}
-}
-#endif
-
-#if 0
-DECLARE_ENGINE_CMD(EDITOR_BACK_ONE_PAGE)
-{
-	if (eng_local.engine_map_state_history.size() <= 1) {
-		sys_print(Warning, "history empty\n");
-		return;
-	}
-	eng_local.engine_map_state_future.push_back(eng_local.engine_map_state_history.back());
-	eng_local.engine_map_state_history.pop_back();
-	Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, eng_local.engine_map_state_history.back().c_str());
-	eng_local.engine_map_state_history.pop_back();	// will get appended again
-}
-DECLARE_ENGINE_CMD(EDITOR_FORWARD_ONE_PAGE)
-{
-	if (eng_local.engine_map_state_future.empty()) {
-		sys_print(Warning, "future empty\n");
-		return;
-	}
-	eng_local.engine_map_state_history.push_back(eng_local.engine_map_state_future.back());
-	eng_local.engine_map_state_future.pop_back();
-	Cmd_Manager::get()->execute(Cmd_Execute_Mode::APPEND, eng_local.engine_map_state_history.back().c_str());
-	eng_local.engine_map_state_history.pop_back();	// will get appended again
-}
-#endif
-#if 0
-
-void close_editor(const Cmd_Args& args)
-{
-	{
-		eng_local.engine_map_state_history.push_back(
-			"close_ed"
-		);
-	}
-	eng_local.change_editor_state(nullptr,"");
-}
-#endif
 
 void OpenEditorToolCommand::execute()
 {
@@ -580,86 +508,7 @@ void start_editor(const Cmd_Args& args)
 		}
 	}
 
-	return;
-#if 0
-	if (metadata && metadata->tool_to_edit_me()) {
-
-		const char* file_to_open = "";	// make a new map
-		if (args.size() == 3)
-			file_to_open = args.at(2);
-		
-		{
-			std::string cmd = args.at(0);
-			cmd += " ";
-			cmd += args.at(1);
-			if (args.size() == 3) {
-				cmd += " ";
-				cmd += args.at(2);
-			}
-			eng_local.engine_map_state_history.push_back(
-				cmd
-			);
-		}
-
-		if (eng_local.get_current_tool()) {
-			std::string file_to_open_s = file_to_open;
-			eng_local.get_current_tool()->try_close(
-				[metadata, file_to_open_s]() {
-					eng_local.change_editor_state(metadata->tool_to_edit_me(), metadata->get_arg_for_editortool(), file_to_open_s.c_str());
-				}
-			);
-		}
-		else {
-			eng_local.change_editor_state(metadata->tool_to_edit_me(), metadata->get_arg_for_editortool(), file_to_open);
-		}
-	}
-	else {
-		sys_print(Error, "unknown editor\n");
-		sys_print(Info, usage_str);
-	}
-#endif
 }
-
-#endif
-
-
-
-#ifdef EDITOR_BUILD
-#if 0
-void GameEngineLocal::change_editor_state(IEditorTool* next_tool,const char* arg, const char* file)
-{
-	const char* str = string_format("%s:%s -> %s:%s",
-		(active_tool) ? active_tool->get_asset_type_info().classname : "<none>",
-		(active_tool) ? active_tool->get_doc_name().c_str() : "",
-		(next_tool) ? next_tool->get_asset_type_info().classname : "<none>",
-		(next_tool) ? file : ""
-		);
-	sys_print(Info, "--------- Change Editor State (%s) ---------\n",str);
-	if (active_tool != next_tool && active_tool != nullptr) {
-		// this should call close internally
-		get_current_tool()->close();
-		on_leave_editor.invoke();
-	}
-	active_tool = next_tool;
-	if (active_tool != nullptr) {
-		leave_level();
-		enable_imgui_docking();
-		bool could_open = get_current_tool()->open(file, arg);
-
-		if (!could_open) {
-			active_tool = nullptr;
-		}
-		else
-			on_enter_editor.invoke(get_current_tool());
-	}
-
-	if (!active_tool)
-		disable_imgui_docking();
-}
-#endif
-#endif
-
-
 
 
 vector<string>* GameEngineLocal::find_keybinds(SDL_Scancode code, uint16_t keymod) {
@@ -696,9 +545,7 @@ void GameEngineLocal::set_keybind(SDL_Scancode code, uint16_t keymod, std::strin
 	};
 	uint32_t both = uint32_t(code) | ((uint32_t)mod_to_integer(keymod) << 16);
 	keybinds[both].push_back(bind);
-	//keybinds.insert({ both,bind });
 }
-
 
 void bind_key(const Cmd_Args& args)
 {
@@ -730,7 +577,6 @@ void bind_key(const Cmd_Args& args)
 		eng_local.set_keybind(scancode, modifiers, args.at(args.size() - 1));
 	}
 }
-
 
 
 extern void init_log_gui();
@@ -949,15 +795,29 @@ void GameEngineLocal::add_commands()
 		});
 	commands->add("quit", [](const Cmd_Args& args) { Quit(); });
 
-	commands->add("bind", bind_key);
-	commands->add("REG_GAME_TAG", [](const Cmd_Args& args) {
-		if (args.size() != 2) {
-			sys_print(Error, "REG_GAME_TAG <tag>");
-			return;
-		}
-		GameTagManager::get().add_tag(args.at(1));
+	commands->add("echo", [](const Cmd_Args& args) {
+		args.sys_print(Info, args.at(1));
 		});
 
+	commands->add("grep", [](const Cmd_Args& args) {
+		std::string match = args.at(1);
+		std::string search = args.at(2);
+		auto lines = StringUtils::to_lines(search);
+		for (auto& l : lines) {
+			if (l.find(match) != std::string::npos) {
+				args.sys_print(Info, "%s\n", l.c_str());
+			}
+		}
+		});
+	commands->add("ls", [](const Cmd_Args& args) {
+		auto tree = FileSys::find_game_files();
+		for (auto& file : tree) {
+			args.sys_print(Info, "%s\n", file.c_str());
+		}
+		});
+
+	commands->add("bind", bind_key);
+	
 	commands->add("dump_bundle", [](const Cmd_Args& args) {
 		if (args.size() != 2) {
 			sys_print(Error, "usage: bundle name\n");
@@ -976,541 +836,7 @@ void GameEngineLocal::add_commands()
 void test_integration_1(IntegrationTester& tester)
 {
 }
-#if 0
-#include <variant>
-using std::variant;
-template<typename T>
-class FutureExpc
-{
-public:
-	FutureExpc(T data) : value(data) {}
-	FutureExpc(std::exception_ptr except) : value(except) {}
-	T get() {
-		return std::visit(ValueOrThrow{}, value);
-	}
-private:
-	struct ValueOrThrow {
-		T operator()(const T& val) const { return val; }
-		T operator()(const std::exception_ptr& ex) const { std::rethrow_exception(ex); }
-	};
-	variant<std::exception_ptr, T> value;
-};
 
-
-class AssetLoadError : public std::runtime_error {
-public:
-	AssetLoadError() : std::runtime_error("Asset load error.") {}
-};
-using AsyncAssetLoadResult = FutureExpc<IAsset*>;
-
-void load_asset_new(AsyncAssetLoadResult result) {
-	try {
-		IAsset* asset = result.get();
-	}
-	catch (AssetLoadError er) {
-		printf("%s", er.what());
-	}
-}
-
-
-class ChangeMapCommand {
-public:
-	ChangeMapCommand(const string& map, bool force_change, function<void(FutureExpc<Level*>)> callback);
-};
-class StartPlayMapCommand {
-public:
-	StartPlayMapCommand(const string& map, bool force_change, function<void(FutureExpc<Level*>)> callback);
-};
-// start_ed Tool Asset
-
-// for level editor to be valid:
-// must have the level loaded
-// 
-// loading a prefab, load the level and the prefab in the callback
-// then inserts them into the level
-
-// change level command while editor is open
-// issues a close editor command
-
-class StartEditorCommand {
-public:
-	StartEditorCommand(const string& map, bool force_change, function<void(FutureExpc<IEditorTool*>)> callback);
-};
-class OpenEmptyMapCommand {
-public:
-};
-
-
-// EditorTools have a method to create a CreateEditorCommand to put them back in the right state
-// CreateCommands can have multiple constructors
-// For example, one to create with a new map, one for existing map, one for putting back into old state
-// These commands set up required state like loading maps etc. for the editors
-class CreateEditorCommand {
-public:
-	virtual ~CreateEditorCommand() {}
-	using Callback = function<void(FutureExpc<uptr<IEditorTool>>)>;
-	virtual void execute(Callback callback) = 0;
-};
-class CreateLevelEditorCommand : public CreateEditorCommand {
-public:
-	CreateLevelEditorCommand();	// create empty map
-	CreateLevelEditorCommand(const string& mapname);	// create from map
-	CreateLevelEditorCommand(IEditorTool& existing);	// creates from existing state	
-	void execute(Callback callback) {
-		// step 1, load the map
-		auto cmd = new ChangeMapCommand(mapname, true, [callback](FutureExpc<Level*> res) {
-			uptr<IEditorTool> tool;
-			try {
-				Level* l = res.get();
-				assert(l);
-				// create editor tool
-			}
-			catch (...) {
-
-			}
-			// execute callback, could be a null tool
-			callback(FutureExpc(std::move(tool)));
-		});
-		// add cmd to system
-	}
-	string mapname;
-};
-#endif
-
-// multiple map workflow:
-//		root_map,level0,(map0|map1|map2)
-
-// map "map" -> PlayMap()
-//		starts an async load,
-//		then issues callback, then closes level
-//		
-//	 closes down cur level and editor state
-//		
-// 
-// open_map "map" -> OpenMap()
-//		all it does is open a map, unloads existing
-// 
-// open_empty_map -> OpenMap()
-//		opens empty map
-//
-// close_map -> CloseMap()
-//		all it does is close the map
-//
-// start_ed -> StartEditorCommand()
-//		opens an editor in the editor state
-//
-// close_ed_tab -> CloseEditorTab()
-//		closes the current editor tab
-//
-// save_ed -> SaveEditorTab()
-// close_all_ed_tabs -> Close
-#if 0
-#include "LevelEditor/EditorDocLocal.h"
-#include "LevelEditor/Commands.h"
-MulticastDelegate<> tempMD;
-
-
-class EditorIntTesterUtil {
-public:
-	static void open_map_state(IntegrationTester& tester, opt<string> mapname) {
-		double start = GetTime();
-		auto cmd = make_unique<OpenMapCommand>(mapname, true);
-		bool finished = false;
-		cmd->callback = [start,&finished](OpenMapReturnCode code) {
-			double now = GetTime();
-			finished = true;
-			printf("---TIME %f\n", float(now - start));
-			tempMD.invoke();
-		};
-		Cmd_Manager::inst->append_cmd(std::move(cmd));
-		tempMD.remove(&tester);
-		if (!finished) {
-			tester.wait_delegate(tempMD);
-			tester.wait_ticks(1);
-		}
-	}
-	static void open_editor_state(IntegrationTester& tester, const ClassTypeInfo& type, opt<string> map) {
-		open_editor_state_shared(tester, type, map, true);
-	}
-	static void open_editor_state_dont_wait(IntegrationTester& tester, const ClassTypeInfo& type, opt<string> map) {
-		open_editor_state_shared(tester, type, map, false);
-	}
-	static void open_editor_state_shared(IntegrationTester& tester, const ClassTypeInfo& type, opt<string> map, bool wait) {
-		bool should_fail = false;
-		double start = GetTime();
-		auto edCmd = make_unique<OpenEditorToolCommand>(type, map, true);
-		bool finished = false;
-		edCmd->callback = [start, &tester, &finished,should_fail](bool b) {
-			double now = GetTime();
-			sys_print(Debug, "open_editor_state_shared: wait delegate calling\n");
-
-			tester.checkTrue(!should_fail == b, "expected ed test wrong");
-			finished = true;
-			tempMD.invoke();
-		};
-		Cmd_Manager::inst->append_cmd(std::move(edCmd));
-		tempMD.remove(&tester);
-		sys_print(Debug, "adding wait delegate\n");
-		if (!finished && wait) {
-			tester.wait_delegate(tempMD);
-			tester.wait_ticks(1);
-		}
-	}
-	static EditorDoc& open_map_editor(IntegrationTester& tester, const ClassTypeInfo& type, opt<string> map) {
-		EditorDoc* document = nullptr;
-		EditorDoc::on_creation.add(&tester, [&](EditorDoc* ptr) {
-			document = ptr;
-			EditorDoc::on_creation.remove(&tester);
-			});
-		open_editor_state(tester, type, map);
-		tester.checkTrue(document, "");
-		tester.wait_ticks(1);
-		return *document;
-	}
-	static void run_command(IntegrationTester& tester, EditorDoc& doc,Command* ptr, bool want_success = true) {
-		opt<bool> res;
-		doc.command_mgr->add_command_with_execute_callback(ptr, [&res](bool b) {
-			res = b;
-			});
-		tester.wait_ticks(1);
-		tester.checkTrue(res.has_value(), "command wasnt executed?");
-		tester.checkTrue(res.value() == want_success, "mismatch command expected sucess");
-	}
-	static void remove_file(string path);
-	static void undo_cmd(EditorDoc& doc) {
-		doc.command_mgr->undo();
-	}
-	static Entity* find_with_name(string s) {
-		auto l = eng->get_level();
-		if (!l) return nullptr;
-		for (auto e : l->get_all_objects()) {
-			if (auto as_ent = e->cast_to<Entity>()) {
-				if (as_ent->get_editor_name() == s)
-					return as_ent;
-			}
-		}
-		return nullptr;
-	}
-};
-
-#include "Game/Components/PhysicsComponents.h"
-
-void test_opening_prefab_as_map(IntegrationTester& tester)
-{
-	const string prefabPath = "EditorTestValidPfb.pfb";
-	EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, prefabPath);
-}
-
-void test_remove_and_undo_pfb(IntegrationTester& tester)
-{
-	const string prefabPath = "EditorTestValidPfb.pfb";
-	EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, std::nullopt);
-	auto spawnPfb = new CreatePrefabCommand(doc, prefabPath, {});
-	EditorIntTesterUtil::run_command(tester, doc, spawnPfb);
-	auto preHandle = spawnPfb->handle;
-	tester.checkTrue(preHandle.get(), "");
-	auto removeCmd = new RemoveEntitiesCommand(doc, { preHandle });
-	EditorIntTesterUtil::run_command(tester, doc, removeCmd);
-	tester.checkTrue(!preHandle.get(), "");
-	EditorIntTesterUtil::undo_cmd(doc);
-	tester.checkTrue(preHandle.get(), "");
-	//auto instPfb = new InstantiatePrefabCommand(doc, preHandle.get());
-	//EditorIntTesterUtil::run_command(tester, doc, instPfb);
-	tester.checkTrue(preHandle.get() && preHandle->get_object_prefab_spawn_type() == EntityPrefabSpawnType::None, "");
-	EditorIntTesterUtil::undo_cmd(doc);
-	tester.checkTrue(preHandle.get() && preHandle->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab, "");
-
-	auto dupPfb = new DuplicateEntitiesCommand(doc, {preHandle});
-	EditorIntTesterUtil::run_command(tester, doc, dupPfb);
-	tester.checkTrue(dupPfb->handles.size() == 1, "");
-	EntityPtr dupEntHandle = dupPfb->handles.at(0);
-	tester.checkTrue(dupEntHandle && dupEntHandle->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab, "");
-
-	auto parentCmd = new ParentToCommand(doc, { dupEntHandle.get() }, preHandle.get(), false, false);
-	EditorIntTesterUtil::run_command(tester, doc, parentCmd);
-	auto delCmd2 = new RemoveEntitiesCommand(doc, { preHandle });
-	EditorIntTesterUtil::run_command(tester, doc, delCmd2);
-	tester.checkTrue(!dupEntHandle.get(), "");
-	EditorIntTesterUtil::undo_cmd(doc);
-	tester.checkTrue(dupEntHandle.get(), "");
-	tester.checkTrue(dupEntHandle && dupEntHandle->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab, "");
-	auto delCmd3 = new RemoveEntitiesCommand(doc, { dupEntHandle });
-	EditorIntTesterUtil::run_command(tester, doc, delCmd3);
-	EditorIntTesterUtil::undo_cmd(doc);
-	tester.checkTrue(dupEntHandle.get(), "");
-	tester.checkTrue(dupEntHandle->get_parent() == preHandle.get(), "");
-}
-
-void test_editor_entity_ptr(IntegrationTester& tester)
-{
-	EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, std::nullopt);
-	auto createJoint1 = new CreateCppClassCommand(doc, AdvancedJointComponent::StaticType.classname, {}, {},true);
-	EditorIntTesterUtil::run_command(tester, doc, createJoint1);
-	auto createObj = new CreateCppClassCommand(doc, "Entity", {}, {}, false);
-	EditorIntTesterUtil::run_command(tester, doc, createObj);
-
-	tester.checkTrue(createJoint1->handle, "");
-	tester.checkTrue(createObj->handle, "");
-	auto joint1 = createJoint1->handle->get_component<AdvancedJointComponent>();
-	tester.checkTrue(joint1, "");
-	joint1->set_target(createObj->handle.get());
-	EntityPtr j1Owner = joint1->get_owner()->get_self_ptr();
-
-	auto dup = new DuplicateEntitiesCommand(doc, { j1Owner,createObj->handle });
-	EditorIntTesterUtil::run_command(tester, doc, dup);
-	tester.checkTrue(dup->handles.size() == 2, "");
-	auto j = dup->handles.at(0)->get_component<AdvancedJointComponent>();
-	tester.checkTrue(j, "");
-	tester.checkTrue(j->get_target() && j->get_target() == dup->handles.at(1).get(), "");
-}
-
-void test_loading_prefab_without_component(IntegrationTester& tester)
-{
-	const string prefabPath = "EditorTestInvalidPfbComponent.pfb";
-	EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, PrefabAsset::StaticType, prefabPath);
-	//Entity* root = doc.get_prefab_root_entity();
-	//tester.checkTrue(root, "");
-}
-
-void test_state(IntegrationTester& tester)
-{
-	const string prefabPath = "EditorTestInvalidPfbComponent.pfb";
-	EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, PrefabAsset::StaticType, std::nullopt);
-	//Entity* root = doc.get_prefab_root_entity();
-	//tester.checkTrue(root, "");
-	EditorIntTesterUtil::run_command(tester, doc, new CreateStaticMeshCommand(doc, "SWAT_model.cmdl", {}));
-
-	EditorIntTesterUtil::open_map_state(tester, "top_down/map0.tmap");
-
-	tester.wait_time(200.0);
-}
-
-// What this does: creates a prefab object. creates a map with the prefab. deletes prefab from disk. tries loading the map again.
-// checks that map load fails gracefully.
-// put prefab back to disk. 
-// load map again.
-// check validity.
-void test_loading_invalid_prefab(IntegrationTester& tester)
-{
-	const string prefabPath = "EditorTestInvalidPfb.pfb";
-	const string mapPath = "EditorTestInvalidPfb.tmap";
-
-	auto create_pfb_cmds = [&]() {
-		EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, PrefabAsset::StaticType, std::nullopt);
-		//Entity* root = doc.get_prefab_root_entity();
-		//tester.checkTrue(root, "");
-		auto cmd = new CreateStaticMeshCommand(doc, "eng/cube.cmdl", {});
-		EditorIntTesterUtil::run_command(tester, doc, cmd);
-		//tester.checkTrue(root->get_children().size() == 1, "");
-		//.checkTrue(cmd->handle.get() && cmd->handle.get()->get_parent() == root, "");
-		//doc.set_document_path(prefabPath);
-		//tester.checkTrue(doc.save(), "");
-		//PrefabAsset* pfb = g_assets.find_sync<PrefabAsset>(prefabPath).get();
-		//tester.checkTrue(pfb && pfb->sceneFile->all_obj_vec.size() == 3, "");
-	};
-
-	// create prefab
-	create_pfb_cmds();
-	// create map
-	{
-		EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, std::nullopt);
-		auto cmd = new CreatePrefabCommand(doc, prefabPath, {});
-		EditorIntTesterUtil::run_command(tester, doc, cmd);
-		tester.checkTrue(cmd->handle.get() && cmd->handle->get_object_prefab().get_name() == prefabPath, "");
-		cmd->handle->set_editor_name("OBJECT");
-		doc.set_document_path(mapPath);
-		tester.checkTrue(doc.save(), "");
-
-		// test duplicating and instantiating
-		auto dupCmd = new DuplicateEntitiesCommand(doc, { cmd->handle });
-		EditorIntTesterUtil::run_command(tester, doc, dupCmd);
-		//auto isntCmd = new InstantiatePrefabCommand(doc, dupCmd->handles.at(0).get());
-		//EditorIntTesterUtil::run_command(tester, doc, isntCmd);
-		tester.checkTrue(doc.save(), "");	// try saving it, tests instantiating prefab works
-		EditorIntTesterUtil::undo_cmd(doc);
-		tester.checkTrue(doc.save(), "");
-		EditorIntTesterUtil::undo_cmd(doc);
-		tester.checkTrue(doc.save(), "");
-	}
-	{
-		// close editor
-		EditorIntTesterUtil::open_map_state(tester, std::nullopt);
-		tester.checkTrue(eng->get_level(), "");
-		tester.checkTrue(!eng_local.editorState->get_tool(), "");
-
-	}
-	{
-		// remove from disk
-		tester.checkTrue(FileSys::delete_game_file(prefabPath), "failed to delete");
-		tester.wait_ticks(2);
-		tester.checkTrue(!g_assets.is_asset_loaded(prefabPath),"failed to unload pfb");
-	}
-	{
-		// load the map again
-		EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, mapPath);
-		Entity* obj = EditorIntTesterUtil::find_with_name("OBJECT");
-		tester.checkTrue(obj, "");
-		tester.checkTrue(obj->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab, "");
-		tester.checkTrue(obj->get_object_prefab().get_name()==prefabPath, "");
-		tester.checkTrue(obj->get_children().size() == 0, "");
-		// try some operations
-
-		auto dupCmd = new DuplicateEntitiesCommand(doc, { EntityPtr(obj->get_instance_id()) });
-		EditorIntTesterUtil::run_command(tester, doc, dupCmd);
-		tester.checkTrue(dupCmd->handles.size()==1&&dupCmd->handles.at(0).get(), "");
-		auto dupObj = dupCmd->handles.at(0).get();
-		tester.checkTrue(dupObj->get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab, "");
-		tester.checkTrue(dupObj->get_object_prefab().get_name()==prefabPath, "");
-	//	auto instCmd = new InstantiatePrefabCommand(doc, dupObj);
-	//	EditorIntTesterUtil::run_command(tester, doc, instCmd, false);	// want failure
-
-
-		doc.save();
-	}
-	{
-		// load the map again 2, after saving it
-		EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, mapPath);
-		Entity* obj = EditorIntTesterUtil::find_with_name("OBJECT");
-		tester.checkTrue(obj, "");
-	}
-	// create the pfb again...
-	create_pfb_cmds();
-	// load the map x3
-	{
-		PrefabAsset* pfb = g_assets.find_sync<PrefabAsset>(prefabPath).get();
-		tester.checkTrue(pfb,"");
-
-		EditorDoc& doc = EditorIntTesterUtil::open_map_editor(tester, SceneAsset::StaticType, mapPath);
-		Entity* obj = EditorIntTesterUtil::find_with_name("OBJECT");
-		tester.checkTrue(obj, "");
-		tester.checkTrue(obj->get_children().size() == 1, "");
-	}
-}
-
-void test_integration_2(IntegrationTester& tester)
-{
-	
-	sys_print(Info, "HELLO WORLD\n");
-	auto open_map_state = [&](string name) {
-		double start = GetTime();
-
-		auto cmd = make_unique<OpenMapCommand>(name, true);
-		cmd->callback = [start](OpenMapReturnCode code) {
-			double now = GetTime();
-			printf("---TIME %f\n", float(now - start));
-			tempMD.invoke();
-		};
-		Cmd_Manager::inst->append_cmd(std::move(cmd));
-		tester.wait_delegate(tempMD);
-	};
-
-	auto get_rand_ticks = [&]() -> int {
-		float f = tester.get_rand().RandF(0, 1);
-		if (f < 0.2) return 0;
-		if (f < 0.5) return 1;
-		return tester.get_rand().RandI(2, 50);
-	};
-
-	//open_map_state("top_down/map0.tmap");
-	//tester.checkTrue(eng->get_level(),"");
-	//tester.wait_time(2.0);
-	//
-	auto open_editor_state = [&](const ClassTypeInfo& type, opt<string> map, bool wait = true, bool should_fail=false) {
-		double start = GetTime();
-		auto edCmd = make_unique<OpenEditorToolCommand>(type, map, true);
-		edCmd->callback = [start,&tester,should_fail](bool b) {
-			double now = GetTime();
-			printf("---TIME %f\n", float(now - start));
-			tester.checkTrue(!should_fail == b,"expected ed test wrong");
-			tempMD.invoke();
-		};
-		Cmd_Manager::inst->append_cmd(std::move(edCmd));
-		if(wait)
-			tester.wait_delegate(tempMD);
-	};
-	EditorDoc* document = nullptr;
-	EditorDoc::on_creation.add(&tester, [&](EditorDoc* ptr) {
-		document = ptr;
-		EditorDoc::on_creation.remove(&tester);
-		});
-	open_editor_state(SceneAsset::StaticType, "top_down/map0.tmap",true,false);
-	tester.checkTrue(document,"");
-	tester.wait_ticks(1);
-
-	auto run_command_and_get_good = [&](Command* ptr) -> bool {
-		opt<bool> res;
-		document->command_mgr->add_command_with_execute_callback(ptr, [&res](bool b) {
-				res = b;
-			});
-		tester.wait_ticks(1);
-		tester.checkTrue(res.has_value(), "command wasnt executed?");
-		return res.value();
-	};
-
-
-	CreatePrefabCommand* cmd = new CreatePrefabCommand(*document, "top_down/player.pfb", glm::mat4(1.f));
-	tester.checkTrue(run_command_and_get_good(cmd),"");
-	DuplicateEntitiesCommand* dup = new DuplicateEntitiesCommand(*document, { cmd->handle });
-	tester.checkTrue(run_command_and_get_good(dup), "");
-	RemoveEntitiesCommand* rem = new RemoveEntitiesCommand(*document, dup->handles);
-	tester.checkTrue(rem->handles.size() == 1, "has 1 handle");
-	EntityPtr handle = rem->handles.at(0);
-	tester.checkTrue(run_command_and_get_good(rem), "");
-	tester.checkTrue(!handle.get(),"removed correctly");
-	document->command_mgr->undo();
-	tester.checkTrue(handle.get(), "undo removed correctly");
-
-
-
-	tester.wait_time(200.0);
-
-	//tester.checkTrue(eng_local.editorState->has_tool(),"");
-	//tester.wait_ticks(get_rand_ticks());
-	//tester.wait_time(0.2);
-	open_editor_state(PrefabAsset::StaticType, std::nullopt,false,true);
-	tester.wait_time(2.0);
-	//tester.checkTrue(eng_local.editorState->has_tool(), "");
-	tester.wait_ticks(get_rand_ticks());
-	open_map_state("top_down/map0.tmap");
-	tester.wait_ticks(get_rand_ticks());
-	open_map_state("car/testmap.tmap");
-	tester.wait_ticks(get_rand_ticks());
-	open_editor_state(SceneAsset::StaticType, std::nullopt,false);
-	//tester.checkTrue(eng_local.editorState->has_tool(), "");
-	//tester.wait_ticks(get_rand_ticks());
-
-	tester.wait_time(2.0);
-	return;
-
-//	Cmd_Manager::inst->append_cmd(EngineCommandBuilder::create_change_map("top_down/map0.tmap", true));// Cmd_Execute_Mode::APPEND, "map top_down/map0.tmap");
-	//bool changeSuccesful = tester.wait_delegate(eng_local.on_map_load_return);
-	//tester.checkTrue(changeSuccesful, "map change worked");
-
-	g_assets.find_sync<PrefabAsset>("myprefabblah.pfb");// [](GenericAssetPtr) {
-		//tempMD.invoke();
-		//});
-	//tester.wait_delegate(tempMD);
-	tester.wait_ticks(1);
-	tester.checkTrue(!EditorPopupManager::inst->has_popup_open(), "no popup after changing map");
-	tester.checkTrue(!eng->is_editor_level(), "not editor level");
-	//tester.checkTrue(!eng_local.is_in_an_editor_state(), "not editor state");
-	tester.wait_time(0.1);
-//	eng_local.leave_level();
-	tester.wait_ticks(1);
-	tester.checkTrue(!eng->get_level(), "");
-	tester.wait_time(0.1);
-	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "start_ed Map top_down/map0.tmap");
-//	bool res = tester.wait_delegate(eng_local.on_map_load_return);
-//	tester.checkTrue(res, "Must have opened editor");
-	Level* l = eng->get_level();
-	const bool conditions = l && l->is_editor_level() && l->get_source_asset_name() == "top_down/map0.tmap";
-	tester.checkTrue(conditions, "level opened properly");
-//	tester.checkTrue(eng_local.get_current_tool(), "editor opened properly");
-	tester.wait_time(0.1);
-
-	//load_asset_new(std::make_exception_ptr(AssetLoadError()));
-}
-#endif
 #include "Testheader.h"
 
 void GameEngineLocal::set_tester(IntegrationTester* tester, bool headless_mode) {
@@ -1520,26 +846,231 @@ void GameEngineLocal::set_tester(IntegrationTester* tester, bool headless_mode) 
 #endif
 }
 
-int global_cnt = 0;
-class ClassThing {
-public:
-	ClassThing() {
-		global_cnt++;
+
+#include "Render/Frustum.h"
+static void cullobjstest(Frustum& frustum, bool* visible_array, int visible_array_size,glm::vec4* bounding_spheres)
+{
+	for (int i = 0; i < visible_array_size; i++)
+	{
+		glm::vec4& sph = bounding_spheres[i];
+		const glm::vec3& center = glm::vec3(sph);
+		const float& radius = sph.w;
+
+		int res = 0;
+		res += (glm::dot(glm::vec3(frustum.top_plane), center) + frustum.top_plane.w >= -radius) ? 1 : 0;
+		res += (glm::dot(glm::vec3(frustum.bot_plane), center) + frustum.bot_plane.w >= -radius) ? 1 : 0;
+		res += (glm::dot(glm::vec3(frustum.left_plane), center) + frustum.left_plane.w >= -radius) ? 1 : 0;
+		res += (glm::dot(glm::vec3(frustum.right_plane), center) + frustum.right_plane.w >= -radius) ? 1 : 0;
+
+		visible_array[i] = res == 4;
 	}
-	~ClassThing() {
-		global_cnt--;
-	}
-	ClassThing(ClassThing&& other) {
-		global_cnt++;
-	}
-	ClassThing(const ClassThing& other) {
-		global_cnt++;
-	}
-};
+}
+extern void build_a_frustum_for_perspective(Frustum& f, const View_Setup& view, glm::vec3* arrow_origin);
+#include "Framework/FreeList.h"
 extern void texture_loading_benchmark();
+
+
+// tests: iterate in a hot loop
+// remove/add objects randomly
+// access via ids
+
+struct FattyRo : public Render_Object {
+	glm::vec4 v{};
+	glm::mat4 matrix{};
+	glm::mat4 bruh{};
+};
+struct SmallRo {
+	glm::mat4 transform{};
+	int index = 0;
+};
+
+template<typename T>
+class FreeList2 {
+public:
+	void insert(T* ptr) {
+		int index = ptrs.size() - 1;
+		ptr->index = index;
+		ptrs.push_back(ptr);
+	}
+	void remove(T* ptr) {
+		int index = ptr->index;
+		ptrs.back()->index = index;
+		ptrs.at(index) = ptrs.back();
+		ptrs.pop_back();
+	}
+	std::vector<T*> ptrs;
+};
+
+int benchmark_free_list() {
+	using Type = SmallRo;
+	Random random(42341);
+	const int NUM_OBJECTS = 10'000;
+	const int NUM_REMOVE = 1000;
+	double totalt = 0;
+	double start = 0;
+	double timestamps[3];
+	auto add_time = [&](int idx) {
+		double now = GetTime();
+		timestamps[idx] = now - start;
+		start = now;
+	};
+	auto print_times = [&](const char* str) {
+		printf("times %s\n", str);
+		printf("	* %f\n", float(timestamps[0] * 1000));
+		printf("	* %f\n", float(timestamps[1] * 1000));
+		printf("	* %f\n", float(timestamps[2] * 1000));
+	};
+	{
+
+		// normal free list
+		Free_List<Type> render_objects;
+		for (int i = 0; i < NUM_OBJECTS; i++) {
+			int id = render_objects.make_new();
+			render_objects.get(id).transform[3] = glm::vec4(0, random.RandF(-1, 1), 0, 0);
+		}
+
+		start = GetTime();
+		// remove/add randomly
+		for (int i = 0; i < NUM_REMOVE; i++) {
+			render_objects.free(100 + i);
+		}
+		add_time(0);
+
+		// access via ids
+		for (int i = 100 + NUM_REMOVE; i < NUM_OBJECTS; i += 3) {
+			render_objects.get(i).transform[3].y += 0.1;
+		}
+		add_time(1);
+
+		// iterate hot loop
+		volatile float x = 0;
+		for (int i = 0; i < render_objects.objects.size(); i++) {
+			x += render_objects.objects[i].type_.transform[3].y;
+		}
+		add_time(2);
+		print_times("struct");
+		totalt += x;
+	}
+
+	{
+		std::vector<Type*> ptrs;
+		// normal free list
+		FreeList2<Type> render_objects;
+		for (int i = 0; i < NUM_OBJECTS; i++) {
+			Type* o = new Type;
+			o->transform[3] = glm::vec4(0, random.RandF(), 0, 0);
+			render_objects.insert(o);
+			ptrs.push_back(o);
+		}
+
+		start = GetTime();
+		// remove/add randomly
+		for (int i = 0; i < NUM_REMOVE; i++) {
+			render_objects.remove(ptrs.at(100 + i));
+		}
+		add_time(0);
+
+		// access via ids
+		for (int i = 100 + NUM_REMOVE; i < NUM_OBJECTS; i += 3) {
+			ptrs[i]->transform[3].y += 0.1;
+		}
+		add_time(1);
+
+		// iterate hot loop
+		volatile float x = 0;
+		for (int i = 0; i < render_objects.ptrs.size(); i++) {
+			x += render_objects.ptrs[i]->transform[3].y;
+		}
+		add_time(2);
+		print_times("struct2");
+		totalt += x;
+	}
+
+	{
+		// pointer free list
+		Free_List<Type*> render_objects;
+		for (int i = 0; i < NUM_OBJECTS; i++) {
+			Type* o = new Type;
+			int id = render_objects.make_new();
+			o->transform[3] = glm::vec4(0, random.RandF(), 0, 0);
+			render_objects.get(id) = o;
+		}
+		start = GetTime();
+		// remove/add randomly
+		for (int i = 0; i < NUM_REMOVE; i++) {
+			render_objects.free(100 + i);
+		}
+		add_time(0);
+		// access via ids
+		for (int i = 100 + NUM_REMOVE; i < NUM_OBJECTS; i += 3) {
+			render_objects.get(i)->transform[3].y += 0.1;
+		}
+		add_time(1);
+		// iterate hot loop
+		volatile float x = 0;
+		for (int i = 0; i < render_objects.objects.size(); i++) {
+			x += render_objects.objects[i].type_->transform[3].y;
+		}
+		add_time(2);
+		print_times("ptr");
+		totalt += x;
+	}
+
+	{
+		// pointer free list
+		hash_map<Type*> render_objects;
+		int64_t handle = 1;
+		for (int i = 0; i < NUM_OBJECTS; i++) {
+			Type* o = new Type;
+			render_objects.insert(handle++, o);
+			o->transform[3] = glm::vec4(0, random.RandF(), 0, 0);
+		}
+		start = GetTime();
+		// remove/add randomly
+		for (int i = 0; i < NUM_REMOVE; i++) {
+			render_objects.remove(1 + i);
+		}
+		add_time(0);
+
+		add_time(1);
+		// iterate hot loop
+		volatile float x = 0;
+		for (auto o : render_objects) {
+			x += o->transform[3].y;
+
+		}
+		add_time(2);
+		print_times("hashmap");
+		totalt += x;
+	}
+
+	printf("totalx %f", float(totalt));
+	return 0;
+
+
+
+	Frustum f;
+	build_a_frustum_for_perspective(f, View_Setup(glm::vec3(0), glm::vec3(1, 0, 0), glm::radians(60.f), 0.1, 100, 100, 100));
+	bool* visarray = new bool[NUM_OBJECTS];
+	glm::vec4* bounding_spheres = new glm::vec4[NUM_OBJECTS];
+	for (int i = 0; i < NUM_OBJECTS; i++) {
+		glm::vec4 v;
+		v.w = 1.0;
+		v.x = random.RandF(-100, 100);
+		v.y = random.RandF(-100, 100);
+		v.z = random.RandF(-100, 100);
+		bounding_spheres[i] = v;
+	}
+	start = GetTime();
+	cullobjstest(f, visarray, NUM_OBJECTS, bounding_spheres);
+	double end = GetTime();
+	printf("diff=%f\n", float(end - start) * 1000.f);
+	return 0;
+
+}
+
 int game_engine_main(int argc, char** argv)
 {
-
 	material_print_debug.set_bool(true);
 	developer_mode.set_bool(false);
 	log_shader_compiles.set_bool(false);
@@ -1582,11 +1113,9 @@ int game_engine_main(int argc, char** argv)
 }
 ClassWithDelegate StaticClass::myClass;
 
-
-
-
-
-
+// console vs text-gui mode
+// text-gui mode: swap to using normal 2d renderer? maybe.
+// multiple text-gui windows? inspector
 
 void GameEngineLocal::set_tick_rate(float tick_rate)
 {
@@ -1912,7 +1441,7 @@ void GameEngineLocal::init(int argc, char** argv)
 	auto print_time = [&](const char* msg) {
 		double now = GetTime();
 		//printf("-----TIME %s %f\n", msg, float(now - start));
-		sys_print(Debug, "init %s in %fs\n", msg, float(now-start));
+		printf("init % s in % fs\n", msg, float(now-start));
 		start = now;
 	};
 
@@ -2076,7 +1605,7 @@ void GameEngineLocal::init(int argc, char** argv)
 	Cmd_Manager::inst->set_set_unknown_variables(false);
 
 	// doesnt matter if it fails, just precache loading stuff
-	g_assets.find_sync<AssetBundle>("eng/default_bundle.bundle", true);
+	//g_assets.find_sync<AssetBundle>("eng/default_bundle.bundle", true);
 	print_time("load default bundle");
 
 	sys_print(Info, "execute startup in %f\n", (float)TimeSinceStart());
@@ -2151,43 +1680,49 @@ void GameEngineLocal::stop_game()
 
 bool GameEngineLocal::game_thread_update()
 {
-	try {
-		if (level)
-			game_update_tick();
-#ifdef EDITOR_BUILD
-		if (editorState)
-			editorState->tick(frame_time);
-#endif
-	}
-	catch (LuaRuntimeError luaErr) {
-		sys_print(Error, "game_thread_update: caught LuaRuntimeError: %s\n", luaErr.what());
-		string msg = string_format("LuaRuntimeError %s\n", luaErr.what());
-		eng->log_to_fullscreen_gui(Error, msg.c_str());
-	}
-	
-	isound->tick(frame_time);
 
 	return true;
 }
+
+
+enum class RpcId {
+	ChangeMap,
+};
+
+class Networking {
+public:
+	// unreliable
+	// netid 10bits, typeid 8bits, data, netid, typeid, data,...
+
+	// rpcs (reliable+unreiable):
+	// id,args,id,args
+
+	const int net_id_bits = 10;
+	const int max_net_ids = 1 << net_id_bits;
+	const int net_type_id_bits = 7;
+	const int max_net_types = 1 << net_type_id_bits;
+
+
+	void tick();
+	void get_state();
+
+	// who connected to. peers? for server
+
+	// snapshot management
+	// id management
+
+	// callbacks
+	virtual void process_rpcs() {}
+	virtual void process_snapshot() {}
+};
+
 
 struct GameUpdateOuput {
 	bool drawOut = false;
 	SceneDrawParamsEx paramsOut = SceneDrawParamsEx(0, 0);
 	View_Setup vsOut;
 };
-void game_update_job(uintptr_t user)
-{
-	ZoneScopedN("GameThreadUpdate");
-	CPUFUNCTIONSTART;
 
-	//printf("abc\n");
-	auto out = (GameUpdateOuput*)user;
-	out->drawOut = eng_local.game_thread_update();
-	eng_local.get_draw_params(out->paramsOut, out->vsOut);
-	//return;
-	// update particles, doesnt draw, only builds meshes FIXME
-	ParticleMgr::inst->draw(out->vsOut);
-}
 
 struct NetObj {
 	int net_id = 0;
@@ -2230,8 +1765,27 @@ public:
 // Game net manager also manages recieving net messages and determines if it has permissions.
 
 
+// shell process: can be spawned by a command, the process will exist in the background until finished (returning false in on_stdin or on_tick)
+class ccShellProcess {
+public:
+	virtual bool is_ticking() { return false; }
+	virtual bool tick() {}
+	virtual bool on_stdin(const string& line) {}
 
+	// Config: get_terminal_canvas()
+	// start_process(ccShellProcess*)
+	// is_terminal_focused()
+};
 
+// TUI programs:
+// object selector
+// layer selector
+// stats table
+// open recent
+// preview animations?
+// lod previewer
+// reference graph? (use rg.exe for finding references)
+// version history? go thru backup of map
 
 
 void GameEngineLocal::loop()
@@ -2300,7 +1854,38 @@ void GameEngineLocal::loop()
 		// 
 		//JobCounter* gameupdatecounter{};
 		//JobSystem::inst->add_job(game_update_job,uintptr_t(&out), gameupdatecounter);
-		game_update_job(uintptr_t(&out));
+		//game_update_job(uintptr_t(&out));
+
+
+		{
+			ZoneScopedN("GameThreadUpdate");
+			CPUFUNCTIONSTART;
+
+			//printf("abc\n");
+			out.drawOut = true;
+			try {
+				if (level)
+					game_update_tick();
+#ifdef EDITOR_BUILD
+				if (editorState)
+					editorState->tick(frame_time);
+#endif
+			}
+			catch (LuaRuntimeError luaErr) {
+				sys_print(Error, "game_thread_update: caught LuaRuntimeError: %s\n", luaErr.what());
+				string msg = string_format("LuaRuntimeError %s\n", luaErr.what());
+				eng->log_to_fullscreen_gui(Error, msg.c_str());
+			}
+
+			isound->tick(frame_time);
+
+
+			eng_local.get_draw_params(out.paramsOut, out.vsOut);
+			//return;
+			// update particles, doesnt draw, only builds meshes FIXME
+			ParticleMgr::inst->draw(out.vsOut);
+		}
+
 		if (!skip_rendering) {
 			if (!shouldDrawNext) {
 				drawparamsNext.draw_world = drawparamsNext.draw_ui = false;
@@ -2321,14 +1906,6 @@ void GameEngineLocal::loop()
 		//ZoneScopedN("ImguiDraw");
 		GPUSCOPESTART(imgui_update_scope);
 
-		ImGui::Render();
-		if (!skip_rendering) {
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-		}
-	};
-	auto imgui_update = [&]()
-	{
 		ZoneScopedN("ImGuiUpdate");
 
 		gui_log.draw(UiSystem::inst->window);
@@ -2337,8 +1914,13 @@ void GameEngineLocal::loop()
 		s = editorState.get();
 #endif
 		UiSystem::inst->draw_imgui_interfaces(s);
-	};
 
+		ImGui::Render();
+		if (!skip_rendering) {
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		}
+	};
 	auto do_sync_update = [&]()
 	{
 		ZoneScopedN("SyncUpdate");
@@ -2362,9 +1944,6 @@ void GameEngineLocal::loop()
 			SDL_GL_SwapWindow(window);
 	};
 
-	auto pre_update = [&]() {
-		
-	};
 
 	double last = GetTime() - 0.1;
 	// these are from the last game frame
@@ -2396,14 +1975,10 @@ void GameEngineLocal::loop()
 
 			// update input, console cmd buffer, could change maps etc.
 			frame_start();
-
-			pre_update();
-
 			// overlapped update (game+render)
 			do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering);
 
 			// sync period
-			imgui_update();	// fixme
 			imgui_render(skip_rendering);
 			do_sync_update();
 			wait_for_swap(skip_rendering);	// wait for swap last

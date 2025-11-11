@@ -99,3 +99,9 @@ bind 7 "start_ed AnimGraph beu_character.ag"
 
 
 #start_ed Map "bike_empty.tmap"
+
+loglevel 0
+developer_mode 0
+	
+	
+

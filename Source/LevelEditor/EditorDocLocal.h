@@ -37,7 +37,7 @@
 #include <variant>
 #include "LevelSerialization/SerializationAPI.h"
 #include "UI/GUISystemPublic.h"
-#include "EditorFolderComponent.h"
+
 extern ConfigVar g_mousesens;
 
 enum TransformType
@@ -60,7 +60,7 @@ class EditorDoc;
 template<typename T>
 using uptr = std::unique_ptr<T>;
 
-
+#if 0
 class Texture;
 class OONameFilter;
 class ObjectOutliner
@@ -163,6 +163,7 @@ private:
 
 	variant<EntityPtr, FolderId, std::monostate> contextMenuHandle;
 };
+#endif
 
 class EdPropertyGrid
 {
@@ -547,6 +548,8 @@ private:
 	obj<Entity> obj_ptr;
 };
 
+#include "Editor3.h"
+
 template<class... Ts>
 struct overloads : Ts... { using Ts::operator()...; };
 class LEPlugin;
@@ -651,13 +654,14 @@ public:
 	void instantiate_into_scene(BaseUpdater* u);
 	Entity* spawn_prefab(PrefabAsset* prefab);
 
+	std::unordered_map<uint64_t,std::shared_ptr<EditorObject>> editor_objects;
 
 	//std::unique_ptr<LEPlugin> active_plugin;
 	std::unique_ptr<UndoRedoSystem> command_mgr;
 	std::unique_ptr<SelectionState> selection_state;
 	std::unique_ptr<EdPropertyGrid> prop_editor;
 	std::unique_ptr<ManipulateTransformTool> manipulate;
-	std::unique_ptr<ObjectOutliner> outliner;
+//	std::unique_ptr<ObjectOutliner> outliner;
 	std::unique_ptr<DragDropPreview> drag_drop_preview;
 
 	EditorUILayout gui;

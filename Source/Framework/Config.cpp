@@ -244,32 +244,36 @@ VarManImpl::VarManImpl()
 }
 
 
-void tokenize_string(std::string& input, Cmd_Args& output)
+std::vector<std::string> tokenize_string(const std::string& input)
 {
+	std::vector<std::string> output;
 	std::string token;
 	bool in_quotes = false;
+	char last_c = 0;
 	for (char c : input) {
 		if ((c == ' ' || c == '\t' || c=='\r') && !in_quotes) {
 			if (!token.empty()) {
-				output.add_arg(token.c_str(), token.size());
+				output.push_back(token);
 				token.clear();
 			}
 		}
-		else if (c == '"') {
+		else if (c == '"' && last_c != '\\') {
 			in_quotes = !in_quotes;
 			if (!token.empty()) {
-				output.add_arg(token.c_str(),token.size());
+				output.push_back(token);
 				token.clear();
 			}
 		}
 		else {
 			token += c;
 		}
+		last_c = c;
 	}
 	if (!token.empty()) {
-		output.add_arg(token.c_str(), token.size());
+		output.push_back(token);
 		token.clear();
 	}
+	return output;
 }
 
 // shitty classification
@@ -292,9 +296,28 @@ static int classify_string(const char* s)
 	return (floating_point) ? 2 : 1;
 }
 
-
+#include "DebugConsole.h"
+extern Color32 get_color_of_print(LogType type);
 #include <algorithm>
+void Cmd_Args::sys_print(LogType type, const char* fmt, ...) const
+{
+	if (type == Error)
+		did_err |= true;
+	va_list args;
+	va_start(args, fmt);
+	if (pipe_output_to_this) {
+		char buf[1024];
+		vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
+		buf[IM_ARRAYSIZE(buf) - 1] = 0;
+		*pipe_output_to_this += buf;
+	}
+	else {
+		if (Debug_Console::inst)
+			Debug_Console::inst->print_args(get_color_of_print(type), fmt, args);
+	}
 
+	va_end(args);
+}
 
 static StringView strip_string_view(StringView sv)
 {
@@ -306,7 +329,7 @@ static StringView strip_string_view(StringView sv)
 	}
 	return StringView(sv.str_start + i, sv.str_len - i);
 }
-
+#include "Framework/StringUtils.h"
 class Cmd_Manager_Impl : public Cmd_Manager
 {
 public:
@@ -350,14 +373,12 @@ public:
 		}
 		all_cmds.insert({ std::string(name),cmd });
 	}
-	void execute_string(const char* command_string) {
 
-		sys_print(LtConsoleCommand, "> %s\n", command_string);
+	void actually_execute(Cmd_Args& args)
+	{
+		if (args.size() == 0)
+			return;
 
-		Cmd_Args args;
-		std::string command = command_string;
-		tokenize_string(command, args);
-		if (args.size() == 0) return;
 		Engine_Cmd_Function ec = find_cmd(args.at(0));
 		if (ec) {
 			ec(args);
@@ -370,17 +391,57 @@ public:
 			else {
 				ConfigVar* var = VarMan::get()->find(args.at(0));
 				if (var && args.size() == 1) {
-					sys_print(Info, "%s %s\n", var->get_name(), var->get_string());
-				}
+					args.sys_print(Info, "%s", var->get_string());
 
+					//sys_print(Info, "%s %s\n", var->get_name(), var->get_string());
+				}
 				else if (!var && set_unknown_variables && args.size() == 2)
 					VarMan::get()->set_var_string(args.at(0), args.at(1));
 				else if (var && args.size() == 2)
 					var->set_string(args.at(1));
 				else
-					sys_print(Error, "unknown command: %s\n", args.at(0));
+					args.sys_print(Error, "unknown command: %s\n", args.at(0));
 			}
 		}
+	}
+
+	void execute_string(const char* command_string) {
+
+		sys_print(LtConsoleCommand, "$ %s\n", command_string);
+
+		std::string command = command_string;
+		std::vector<string> toks = tokenize_string(command);
+		if (toks.size() == 0)
+			return;
+
+		std::string output_from_last;
+		auto execute_tokens = [&](int start, int end, bool pipe_output)
+		{
+			Cmd_Args args;
+			if (pipe_output)
+				args.set_output_pipe(&output_from_last);
+			const int count = end - start;
+			for (int i = 0; i < count; i++) {
+				const int idx = start + i;
+				args.add_arg(toks.at(idx).c_str(), toks.at(idx).size());
+			}
+			std::string last_copy = output_from_last;
+			output_from_last.clear();
+			if (!last_copy.empty()) {
+				args.add_arg(last_copy.c_str(), last_copy.size());
+			}
+			
+			actually_execute(args);
+		};
+
+		int start_index = 0;
+		for (int i = 0; i < toks.size(); i++) {
+			if (toks.at(i) == "|") {	
+				execute_tokens(start_index,i,true);
+				start_index = i + 1;
+			}
+		}
+		execute_tokens(start_index, toks.size(), false);
 	}
 
 	void execute(Cmd_Execute_Mode mode, const char* command_string) {
@@ -504,17 +565,11 @@ public:
 };
 
 const char* Cmd_Args::at(int index) const {
-	ASSERT(index >= 0 && index < argc&& index < MAX_ARGS);
-	return &buffer[arg_to_index[index]];
+	return args.at(index).c_str();
 }
 
 void Cmd_Args::add_arg(const char* v, int len) {
-	if (len + 1 + buffer_index >= BUFFER_SIZE || argc >= MAX_ARGS) return;
-	memcpy(buffer + buffer_index, v, len);
-	buffer[buffer_index + len] = 0;
-	arg_to_index[argc] = buffer_index;
-	buffer_index += len + 1;
-	argc++;
+	args.push_back(std::string(v, len));
 }
 
 uptr<ConsoleCmdGroup> ConsoleCmdGroup::create(std::string name)

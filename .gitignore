@@ -31,4 +31,6 @@ todo.txt
 
 *.diagsession
 
+*.zip
+
 __pycache__/

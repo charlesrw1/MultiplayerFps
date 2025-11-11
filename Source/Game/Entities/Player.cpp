@@ -701,12 +701,12 @@ void Player::on_foot_update()
 
 	 score_update_delegate.invoke(10);
 
-	 {
-		 auto scope = eng->get_level()->spawn_entity_class_deferred<BikeEntity>(bike);
-		 bike->get_owner()->set_ws_position(get_ws_position());
-	 }
-	 get_owner()->set_ws_position(glm::vec3(0, 0, 0.5));
-	 get_owner()->parent_to(bike->get_owner());
+	 //{
+	//	 auto scope = eng->get_level()->spawn_entity<BikeEntity>(bike);
+	//	 bike->get_owner()->set_ws_position(get_ws_position());
+	 //}
+	 //get_owner()->set_ws_position(glm::vec3(0, 0, 0.5));
+	 //get_owner()->parent_to(bike->get_owner());
 }
  void Player::stop() {
  }

@@ -212,6 +212,7 @@ public:
 			sys_print(Warning, "Program_Manager::recompile: handle out of range\n");
 	}
 private:
+	void recompile_normal(program_def& def);
 	void recompile_shared(program_def& def);
 	void recompile(program_def& def);
 	void recompile_do(program_def& def);

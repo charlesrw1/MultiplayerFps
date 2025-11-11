@@ -362,6 +362,7 @@ void Program_Manager::recompile(program_def& def) {
 	if(log_shader_compiles.get_bool())
 		sys_print(Debug, "Program_Manager::recompile: compiled/loaded %s in %f\n", def.vert.c_str(), time);
 }
+
 void Program_Manager::recompile_shared(program_def& def)
 {
 	string hashed_path = compute_hash_for_program_def(def) + ".bin";
@@ -428,6 +429,76 @@ void Program_Manager::recompile_shared(program_def& def)
 	}
 }
 
+
+void Program_Manager::recompile_normal(program_def& def)
+{
+	string hashed_path = compute_hash_for_program_def(def) + ".bin";
+	auto binFile = FileSys::open_read(hashed_path.c_str(), FileSys::SHADER_CACHE);
+	auto shaderFile = FileSys::open_read_engine(("Shaders\\"+def.vert).c_str());
+	if (shaderFile && binFile) {
+		if (shaderFile->get_timestamp() <= binFile->get_timestamp()) {
+			if (log_shader_compiles.get_bool())
+				sys_print(Debug, "Program_Manager::recompile: loading cached binary: %s\n", hashed_path.data());
+
+			// load cached binary
+			BinaryReader reader(binFile.get());
+			auto sourceType = reader.read_int32();
+			auto len = reader.read_int32();
+			vector<uint8_t> bytes(len, 0);
+			reader.read_bytes_ptr(bytes.data(), bytes.size());
+
+			if (def.shader_obj.ID != 0) {
+				glDeleteProgram(def.shader_obj.ID);
+			}
+			def.shader_obj.ID = glCreateProgram();
+			glProgramBinary(def.shader_obj.ID, sourceType, bytes.data(), bytes.size());
+			glValidateProgram(def.shader_obj.ID);
+
+			GLint success = 0;
+			glGetProgramiv(def.shader_obj.ID, GL_LINK_STATUS, &success);
+			if (success == GL_FALSE) {
+				GLint logLength = 0;
+				glGetProgramiv(def.shader_obj.ID, GL_INFO_LOG_LENGTH, &logLength);
+				std::vector<GLchar> log(logLength);
+				glGetProgramInfoLog(def.shader_obj.ID, logLength, nullptr, log.data());
+				sys_print(Error, "Program_Manager::recompile: loading binary failed: %s\n", log.data());
+			}
+			else {
+				return;	// done
+			}
+		}
+	}
+	binFile.reset();
+
+	// fail path
+	if (!def.geo.empty())
+		def.compile_failed = !Shader::compile(def.shader_obj, def.vert, def.frag, def.geo, def.defines);
+	else
+		def.compile_failed = Shader::compile(&def.shader_obj, def.vert, def.frag, def.defines) != ShaderResult::SHADER_SUCCESS;
+
+	if (!def.compile_failed) {
+		const auto program = def.shader_obj.ID;
+		GLint length = 0;
+		glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
+		if (log_shader_compiles.get_bool())
+			sys_print(Debug, "Program_Manager::recompile: saving cached binary: %s\n", hashed_path.data());
+		vector<uint8_t> bytes(length, 0);
+		GLenum outType = 0;
+		glGetProgramBinary(def.shader_obj.ID, bytes.size(), nullptr, &outType, bytes.data());
+		FileWriter writer(bytes.size() + 8);
+		writer.write_int32(outType);
+		writer.write_int32(bytes.size());
+		writer.write_bytes_ptr(bytes.data(), bytes.size());
+		auto outFile = FileSys::open_write(hashed_path.c_str(), FileSys::SHADER_CACHE);
+		if (outFile) {
+			outFile->write(writer.get_buffer(), writer.get_size());
+		}
+		else {
+			sys_print(Error, "Program_Manager::recompile: couldnt open file to write program binary: %s\n", hashed_path.data());
+		}
+	}
+}
+
 void Program_Manager::recompile_do(program_def& def)
 {
 	// look in shader cache, only for "shared shaders" now, these are the main materials so whatev
@@ -456,10 +527,12 @@ void Program_Manager::recompile_do(program_def& def)
 		def.compile_failed = Shader::compile_vert_frag_tess_single_file(&def.shader_obj, def.vert, def.defines) != ShaderResult::SHADER_SUCCESS;
 	}
 	else {
-		if (!def.geo.empty())
-			def.compile_failed = !Shader::compile(def.shader_obj, def.vert, def.frag, def.geo, def.defines);
-		else
-			def.compile_failed = Shader::compile(&def.shader_obj, def.vert, def.frag, def.defines) != ShaderResult::SHADER_SUCCESS;
+		recompile_normal(def);
+
+		//if (!def.geo.empty())
+		//	def.compile_failed = !Shader::compile(def.shader_obj, def.vert, def.frag, def.geo, def.defines);
+		//else
+		//	def.compile_failed = Shader::compile(&def.shader_obj, def.vert, def.frag, def.defines) != ShaderResult::SHADER_SUCCESS;
 	}
 }
 
@@ -827,7 +900,7 @@ void debug_message_callback(GLenum source, GLenum type, GLuint id,
 		return "";
 	}();
 
-	sys_print(Error, "%s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
+//	sys_print(Error, "%s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
 }
 
 void imgui_stat_hook()
@@ -969,8 +1042,17 @@ void Renderer::init()
 {
 	sys_print(Info, "--------- Initializing Renderer ---------\n");
 
+	double start = GetTime();
+	auto print_time = [&](const char* msg) {
+		double now = GetTime();
+		//printf("-----TIME %s %f\n", msg, float(now - start));
+		printf("init % s in % fs\n", msg, float(now - start));
+		start = now;
+	};
+
 	IGraphicsDevice::inst = IGraphicsDevice::create_opengl_device(new FuckerBobberThing());
 
+	print_time("draw:device");
 
 	// Check hardware settings like extension availibility
 	check_hardware_options();
@@ -984,6 +1066,10 @@ void Renderer::init()
 	}
 
 	InitGlState();
+
+	print_time("draw:init_state");
+
+
 	windowDrawer = new RenderWindowBackendLocal();
 	RenderWindowBackend::inst = windowDrawer;
 	StreamingTextureMgr::inst = new StreamingTextureMgr;
@@ -991,15 +1077,27 @@ void Renderer::init()
 	mem_arena.init("RenderTemp", renderer_memory_arena_size.get_integer());
 	// Init scene draw buffers
 	scene.init();
+	print_time("draw:arena");
+
 	create_shaders();
+	print_time("draw:create_shaders");
+
 	create_default_textures();
 	glCreateBuffers(1, &ubo.current_frame);
 	InitFramebuffers(true, g_window_w.get_integer(), g_window_h.get_integer());
+	print_time("draw:buffers");
+
+
 	EnviornmentMapHelper::get().init();
+	print_time("draw:env_map");
+
 	volfog.init();
 	shadowmap.init();
 	ssao.init();
-	lens_dirt = g_assets.find_global_sync<Texture>("eng/lens_dirt_fine.png").get();
+	print_time("draw:miscinit");
+	//lens_dirt = &whg_assets.find_global_sync<Texture>("eng/lens_dirt_fine.png").get();
+	lens_dirt = Texture::load("_white");
+	print_time("draw:lensdirt");
 
 
 	glGenVertexArrays(1, &vao.default_);
@@ -1101,6 +1199,8 @@ void Renderer::init()
 #ifdef EDITOR_BUILD
 	thumbnailRenderer = std::make_unique<ThumbnailRenderer>(64);
 #endif
+	print_time("draw:objects");
+
 }
 
 

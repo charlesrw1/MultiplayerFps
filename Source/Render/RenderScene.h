@@ -153,6 +153,7 @@ struct ROP_Internal
 	bool is_static = true;
 	bool has_init = false;
 };
+
 // RenderLight internal data
 struct RL_Internal{
 	Render_Light light;

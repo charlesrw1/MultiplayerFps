@@ -172,32 +172,15 @@ void EditorDoc::init_new()
 	selection_state = std::make_unique<SelectionState>(*this);
 	prop_editor = std::make_unique<EdPropertyGrid>(*this, grid_factory);
 	manipulate = std::make_unique<ManipulateTransformTool>(*this);
-	outliner = std::make_unique<ObjectOutliner>(*this);
 	drag_drop_preview = std::make_unique<DragDropPreview>();
 
 	PropertyFactoryUtil::register_basic(grid_factory);
 	PropertyFactoryUtil::register_editor(*this, grid_factory);
 
 
-	//global_asset_browser.init();
-	outliner->init();
 
 	cmds = ConsoleCmdGroup::create("");
-	cmds->add("create_folder", [this](const Cmd_Args& args) {
-		if (args.size() != 2)
-			return;
-		auto level = eng->get_level();
-		assert(level);
-		auto find = (EditorMapDataComponent*)level->find_first_component(&EditorMapDataComponent::StaticType);
-		if (find) {
-			auto newF = find->add_folder();
-			if (newF) {
-				newF->folderName = args.at(1);
-			}
-			post_node_changes.invoke();	// refresh stuff
-		}
-
-		});
+	
 
 	cmds->add("SET_ORBIT_TARGET", [this](const Cmd_Args&) {
 		set_camera_target_to_sel();
@@ -1034,9 +1017,6 @@ void EditorDoc::imgui_draw()
 	if (manipulate->get_is_using_for_custom()) {
 		draw_text("Manipulate Stolen");
 	}
-
-
-	outliner->draw();
 
 	prop_editor->draw();
 

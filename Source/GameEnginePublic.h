@@ -3,7 +3,6 @@
 #include <string>
 #include "Framework/Config.h"
 #include "glm/glm.hpp"
-#include "DeferredSpawnScope.h"
 #include "Framework/ScopedBoolean.h"
 #include "Framework/ClassBase.h"
 extern ConfigVar g_thirdperson;

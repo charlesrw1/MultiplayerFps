@@ -129,19 +129,7 @@ public:
 	bool set_keyboard_focus = true;
 	std::string node_menu_filter_buf;
 };
-class EntityTagEditor : public IPropertyEditor
-{
-public:
-	EntityTagEditor() {}
-	// Inherited via IPropertyEditor
-	~EntityTagEditor() override;
 
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-	std::string str;
-	bool has_init = false;
-	std::vector<std::string> options;
-};
 
 class ClassTypePtrPropertyEditor : public IPropertyEditor
 {
