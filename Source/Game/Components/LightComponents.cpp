@@ -383,7 +383,7 @@ void LightmapComponent::do_export()
 			glm::vec3 pos = owner->get_ws_transform()* glm::vec4(modelCenter, 1.0);
 
 			outfile << "probe " << pos.x << " " << pos.y << " " << pos.z << '\n';
-			lmProbeToObj.insert({ probe_index,as_mesh->unique_file_id });
+			lmProbeToObj.insert({ probe_index,(int)as_mesh->get_instance_id() });
 			probe_index += 1;
 		}
 		else if (auto as_cube = o->cast_to<CubemapComponent>()) {
@@ -393,7 +393,7 @@ void LightmapComponent::do_export()
 				continue;
 			auto pos = as_cube->get_probe_pos();
 			outfile << "probe " << pos.x << " " << pos.y << " " << pos.z << '\n';
-			lmProbeToObj.insert({ probe_index,as_cube->unique_file_id });
+			lmProbeToObj.insert({ probe_index,as_cube->get_instance_id() });
 			probe_index += 1;
 		}
 	}
@@ -457,13 +457,13 @@ void LightmapComponent::do_import()
 	for (auto o : all_objs) {
 		if (auto as_mesh = o->cast_to<MeshComponent>()) {
 			as_mesh->set_not_lightmapped();
-			if (as_mesh->unique_file_id != 0)
-				MapUtil::insert_test_exists(found, as_mesh->unique_file_id, (Component*)as_mesh);
+			if (as_mesh->get_instance_id() != 0)
+				MapUtil::insert_test_exists(found, (int)as_mesh->get_instance_id(), (Component*)as_mesh);
 		}
 		else if (auto as_box = o->cast_to<CubemapComponent>()) {
 			as_box->set_baked_probe_ofs(-1);
-			if (as_box->unique_file_id != 0)
-				MapUtil::insert_test_exists(found, as_box->unique_file_id, (Component*)as_box);
+			if (as_box->get_instance_id() != 0)
+				MapUtil::insert_test_exists(found, (int)as_box->get_instance_id(), (Component*)as_box);
 		}
 	}
 	bakedProbes.clear();

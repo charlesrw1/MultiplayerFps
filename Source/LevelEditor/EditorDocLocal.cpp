@@ -120,16 +120,6 @@ void EditorDoc::validate_fileids_before_serialize()
 	auto level = eng->get_level();
 	auto& objs = level->get_all_objects();
 	
-
-	// first find max
-	for (auto o : objs)
-		if (is_this_object_not_inherited(o) && !o->dont_serialize_or_edit) {
-			file_id_start = std::max(file_id_start, o->unique_file_id);
-		}
-	for (auto o : objs) {
-		if (is_this_object_not_inherited(o) && o->unique_file_id == 0 && !o->dont_serialize_or_edit)
-			o->unique_file_id = get_next_file_id();
-	}
 }
 
 void EditorDoc::init_new()
@@ -1239,37 +1229,7 @@ void EdPropertyGrid::draw_components(Entity* entity)
 			on_select_component(ec);
 		}
 
-		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[1]) {
-			ImGui::OpenPopup("outliner_ctx_menu");
-			on_select_component(ec);
-			component_context_menu = ec->get_instance_id();
-		}
-		if (ImGui::BeginPopup("outliner_ctx_menu")) {
-
-			if (eng->get_object(component_context_menu) == nullptr) {
-				component_context_menu = 0;
-				ImGui::CloseCurrentPopup();
-			}
-			else {
-				ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4({ 255,50,50,255 }));
-				if (ImGui::MenuItem("Remove (warning: no undo)")) {
-
-					auto ec_ = eng->get_object(component_context_menu)->cast_to<Component>();
-					if (ed_doc.is_this_object_not_inherited(ec_)) {
-						ed_doc.command_mgr->add_command(new RemoveComponentCommand(ed_doc, ec_->get_owner(), ec_));
-					}
-					else
-						eng->log_to_fullscreen_gui(Error, "Cant remove inherited components");
-
-					component_context_menu = 0;
-					ImGui::CloseCurrentPopup();
-				}
-				ImGui::PopStyleColor(1);
-			}
-
-			ImGui::EndPopup();
-		}
-
+		
 
 		ImGui::SameLine();
 		ImGui::Dummy(ImVec2(5.f, 1.0));
@@ -1359,10 +1319,9 @@ void EdPropertyGrid::draw()
 			Entity* ent = ss->get_only_one_selected().get();
 			ASSERT(ent);
 
-			if (ImGui::Button("Add Component")) {
-				ImGui::OpenPopup("addcomponentpopup");
-			}
-			ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(300, 500));
+			
+			//ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), ImVec2(300, 500));
+#if 0
 			if (ImGui::BeginPopup("addcomponentpopup")) {
 				if (component_set_keyboard_focus) {
 					ImGui::SetKeyboardFocusHere();
@@ -1406,6 +1365,7 @@ void EdPropertyGrid::draw()
 				component_set_keyboard_focus = true;
 				component_filter.clear();
 			}
+#endif
 
 
 			auto& comps = ent->get_components();
@@ -1909,7 +1869,7 @@ void EditorDoc::insert_unserialized_into_scene(UnserializedSceneFile& file)
 
 void EditorDoc::instantiate_into_scene(BaseUpdater* u)
 {
-	u->unique_file_id = get_next_file_id();
+	
 }
 
 Entity* EditorDoc::spawn_prefab(PrefabAsset* prefab)
@@ -1919,8 +1879,6 @@ Entity* EditorDoc::spawn_prefab(PrefabAsset* prefab)
 	Entity* e = eng->get_level()->spawn_prefab(prefab);
 	if (!e)
 		return nullptr;
-	e->unique_file_id = get_next_file_id();
-	//assert(e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
 	return e;
 }
 

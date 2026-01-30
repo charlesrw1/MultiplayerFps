@@ -8,7 +8,7 @@
 #include "Framework/Reflection2.h"
 
 
-// lots of junk, clean up after rewrite
+// lots of junk, clean up after rewrite 1/30
 
 class BaseUpdater;
 class PrefabAsset;

@@ -40,12 +40,10 @@ static void add_to_remove_list_R(vector<SavedCreateObj>& objs, Entity* e, std::u
 
 		SavedCreateObj created;
 		created.eng_handle = c->get_instance_id();
-		created.unique_file_id = c->unique_file_id;
 		objs.push_back(created);
 	}
 	SavedCreateObj created;
 	created.eng_handle = e->get_instance_id();
-	created.unique_file_id = e->unique_file_id;
 	//created.spawn_type = e->get_object_prefab_spawn_type();
 
 	objs.push_back(created);

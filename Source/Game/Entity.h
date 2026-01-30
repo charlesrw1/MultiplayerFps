@@ -139,8 +139,9 @@ private:
 	std::vector<Component*> all_components;
 	Entity* parent = nullptr;
 	std::vector<Entity*> children;
-	REF EntityTagString tag;
-	REF EntityBoneParentString parent_bone;
+	EntityTagString tag;
+	REFLECT(transient)
+	EntityBoneParentString parent_bone;
 	REF glm::vec3 position = glm::vec3(0.f);
 	REF glm::quat rotation = glm::quat(1,0,0,0);
 	REF glm::vec3 scale = glm::vec3(1.f);

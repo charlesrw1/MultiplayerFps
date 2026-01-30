@@ -103,5 +103,5 @@ bind 7 "start_ed AnimGraph beu_character.ag"
 loglevel 0
 developer_mode 0
 	
-	
+r.drawdecals 0
 

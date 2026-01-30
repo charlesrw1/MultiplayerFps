@@ -26,7 +26,7 @@ public:
 	bool dont_serialize_or_edit_this() const { return dont_serialize_or_edit; }
 	//Entity* creator_source = nullptr;		// my creator
 	//PrefabAsset* what_prefab = nullptr;	// (optional) what prefab created this (might be differnt than owner's prefab)
-	int unique_file_id = INVALID_FILEID;			// unique id in source owner (either native c++, prefab, map)
+	//int unique_file_id = INVALID_FILEID;			// unique id in source owner (either native c++, prefab, map)
 	//bool is_root_of_prefab = false;
 	// <<<<<<<<<<<<<<<<
 

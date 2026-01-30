@@ -698,13 +698,9 @@ private:
 	void init_for_prefab(PrefabAsset* prefab);
 	void init_for_scene(opt<string> scenePath);
 
-	int get_next_file_id() {
-		return ++file_id_start;
-	}
 	void on_mouse_drag(int x, int y);
 
 
-	int file_id_start = 0;
 
 	bool eye_dropper_active = false;
 	void* active_eyedropper_user_id = nullptr;	// for id purposes only

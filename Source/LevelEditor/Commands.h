@@ -17,8 +17,6 @@ public:
 
 struct SavedCreateObj {
 	uint64_t eng_handle = 0;
-	int unique_file_id = 0;
-	const PrefabAsset* what_prefab = nullptr;
 };
 class RemoveEntitiesCommand : public Command
 {

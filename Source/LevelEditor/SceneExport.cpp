@@ -91,7 +91,7 @@ void export_godot_scene(const std::string& base_export_path) {
                 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 0)
                 */
                 std::string model_inst_id = StringUtils::alphanumeric_hash(model->get_name());
-                out_scene_file += "[node name = \"mesh_" + std::to_string(mesh->unique_file_id) + "\" parent=\".\" instance=ExtResource(\"" + model_inst_id + "\")]\n";
+                out_scene_file += "[node name = \"mesh_" + std::to_string(mesh->get_instance_id()) + "\" parent=\".\" instance=ExtResource(\"" + model_inst_id + "\")]\n";
                 out_scene_file += "transform = " + write_transform3d(transform) + "\n";
             }
         }
@@ -108,7 +108,7 @@ void export_godot_scene(const std::string& base_export_path) {
             };
 
             if (auto point = as_ent->get_component<PointLightComponent>()) {
-                out_scene_file += "[node name=\"light" + std::to_string(point->unique_file_id);
+                out_scene_file += "[node name=\"light" + std::to_string(point->get_instance_id());
                 out_scene_file +=  "\" type=\"OmniLight3D\" parent=\".\"]\n";
                 out_scene_file += "transform = " + write_transform3d(transform) + "\n";
                 out_scene_file += "light_energy = " + std::to_string(point->intensity) + "\n";
@@ -117,7 +117,7 @@ void export_godot_scene(const std::string& base_export_path) {
                 out_scene_file += "shadow_enabled = true\n";
             }
             else if (auto spot = as_ent->get_component<SpotLightComponent>()) {
-                out_scene_file += "[node name=\"light" + std::to_string(spot->unique_file_id);
+                out_scene_file += "[node name=\"light" + std::to_string(spot->get_instance_id());
                 out_scene_file += "\" type=\"SpotLight3D\" parent=\".\"]\n";
                 out_scene_file += "transform = " + write_transform3d(transform) + "\n";
                 out_scene_file += "light_energy = " + std::to_string(spot->intensity) + "\n";
@@ -128,7 +128,7 @@ void export_godot_scene(const std::string& base_export_path) {
 
             }
             else if (auto sun = as_ent->get_component<SunLightComponent>()) {
-                out_scene_file += "[node name=\"light" + std::to_string(sun->unique_file_id);
+                out_scene_file += "[node name=\"light" + std::to_string(sun->get_instance_id());
                 out_scene_file += "\" type=\"DirectionalLight3D\" parent=\".\"]\n";
                 out_scene_file += "transform = " + write_transform3d(transform) + "\n";
                 out_scene_file += "light_energy = " + std::to_string(sun->intensity) + "\n";
