@@ -80,6 +80,7 @@
       <BasicRuntimeChecks Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Default</BasicRuntimeChecks>
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MaxSpeed</Optimization>
     </ClCompile>
+    <ClCompile Include="Source\Framework\SerializerJson2.cpp" />
     <ClCompile Include="Source\Framework\StringName.cpp" />
     <ClCompile Include="Source\Framework\StringUtils.cpp" />
     <ClCompile Include="Source\Framework\Util.cpp" />
@@ -201,6 +202,7 @@
     <ClInclude Include="Source\Framework\Serializer.h" />
     <ClInclude Include="Source\Framework\SerializerBinary.h" />
     <ClInclude Include="Source\Framework\SerializerJson.h" />
+    <ClInclude Include="Source\Framework\SerializerJson2.h" />
     <ClInclude Include="Source\Framework\SerializerOldDict.h" />
     <ClInclude Include="Source\Framework\SharedPtr.h" />
     <ClInclude Include="Source\Framework\StringUtils.h" />
@@ -221,7 +223,6 @@
     <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\IntegrationTest.h" />
-    <ClInclude Include="Source\LevelEditor\Editor3.h" />
     <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h" />
     <ClInclude Include="Source\LevelEditor\EditorStatic.h" />
     <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h" />

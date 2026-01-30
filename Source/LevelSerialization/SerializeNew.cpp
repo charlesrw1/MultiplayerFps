@@ -354,11 +354,36 @@ static void add_paths_from_container(const std::vector<Entity*>& input_objs, Mak
 static void validate_container(SerializeEntitiesContainer& con, SerializedSceneFile& out) {
 
 }
+#include <json.hpp>
+#include "Framework/SerializerJson2.h"
 
 #include "Framework/SerializerBinary.h"
 SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs)
 {
 	double now = GetTime();
+
+	{
+		nlohmann::json obj;
+		obj["objs"] = nlohmann::json::array();
+		for (auto ent : input_objs) {
+			if (ent->get_components().size() == 0) 
+				continue;
+			nlohmann::json out;
+			{
+				WriteSerializerBackendJson2 writer("", *ent);
+				out.update(writer.get_output());
+			}
+			auto c = ent->get_components().at(0);
+			{
+				WriteSerializerBackendJson2 writer("", *c);
+				out.update(writer.get_output());
+			}
+			out["__typename"] = c->get_type().classname;
+			out["__retid"] = ent->get_instance_id();
+			obj["objs"].push_back(out);
+			printf("%s\n", obj.dump(1).c_str());
+		}
+	}
 
 	SerializedSceneFile out;
 	SerializeEntitiesContainer container;
@@ -379,4 +404,21 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 	sys_print(Debug, "NewSerialization: bin size: %d\n", int(binWrite.writer.get_size()));
 
 	return out;
+}
+SerializedSceneFile NewNewSerialization::serialize_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs)
+{
+
+	string out_text;
+	WriteSerializerBackendJson2 backend2("", *input_objs.at(0));
+
+
+
+	return SerializedSceneFile();
+}
+
+UnserializedSceneFile NewNewSerialization::unserialize_from_json(const char* debug_tag, SerializedForDiffing& json, IAssetLoadingInterface& load)
+{
+	ClassBase c;
+	ReadSerializerBackendJson2 da(debug_tag, json.jsonObj, load, c);
+	return UnserializedSceneFile();
 }

@@ -474,8 +474,8 @@
     <ClInclude Include="Source\Framework\GlBuffers.h" />
     <ClInclude Include="Source\Framework\SharedPtr.h" />
     <ClInclude Include="Source\Render\StreamingTextureMgr.h" />
-    <ClInclude Include="Source\LevelEditor\Editor3.h" />
     <ClInclude Include="Source\MEGA.h" />
+    <ClInclude Include="Source\Framework\SerializerJson2.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -636,6 +636,7 @@
     <ClCompile Include="Source\Framework\GlBufferLock.cpp" />
     <ClCompile Include="Source\Render\DecalBatcher.cpp" />
     <ClCompile Include="Source\Debug_Console.cpp" />
+    <ClCompile Include="Source\Framework\SerializerJson2.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

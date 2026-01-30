@@ -548,7 +548,7 @@ private:
 	obj<Entity> obj_ptr;
 };
 
-#include "Editor3.h"
+
 
 template<class... Ts>
 struct overloads : Ts... { using Ts::operator()...; };
@@ -654,7 +654,7 @@ public:
 	void instantiate_into_scene(BaseUpdater* u);
 	Entity* spawn_prefab(PrefabAsset* prefab);
 
-	std::unordered_map<uint64_t,std::shared_ptr<EditorObject>> editor_objects;
+	//std::unordered_map<uint64_t,std::shared_ptr<EditorObject>> editor_objects;
 
 	//std::unique_ptr<LEPlugin> active_plugin;
 	std::unique_ptr<UndoRedoSystem> command_mgr;
