@@ -164,7 +164,7 @@ void Level::start(SceneAsset* source)
 		sourceAssetName = "<unnamed level>";
 	double start = GetTime();
 	if (source && source->sceneFile) {
-		insert_unserialized_entities_into_level_internal(*source->sceneFile,nullptr,true);
+		insert_unserialized_entities_into_level_internal(*source->sceneFile,true);
 		source->sceneFile.reset();
 	}
 	double end = GetTime();
@@ -252,86 +252,48 @@ void Level::close_level()
 }
 #include "Framework/Log.h"
 #include "Framework/MapUtil.h"
-void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids) {
-	insert_unserialized_entities_into_level_internal(scene, reassign_ids, false);
+void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene) {
+	insert_unserialized_entities_into_level_internal(scene, false);
 }
-void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids, bool addSpawnNames) // was bool assign_new_ids=false
+void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene, bool addSpawnNames) // was bool assign_new_ids=false
 {
 #ifndef EDITOR_BUILD
 	assert(!reassign_ids);
 #endif // !EDITOR_BUILD
 
 
-	const char* reassign_id_str = print_get_bool_string(reassign_ids != nullptr);
-	sys_print(Debug, "Level::insert_unserialized_entities_into_level: (level=%s) (reassign_ids=%s) (objs=%d)\n", sourceAssetName.c_str(), reassign_id_str,(int)scene.all_obj_vec.size());
+
+	sys_print(Debug, "Level::insert_unserialized_entities_into_level: (level=%s) (objs=%d)\n", sourceAssetName.c_str(), (int)scene.all_obj_vec.size());
 
 	auto& objs = scene.all_obj_vec;
 
 	std::unordered_set<BaseUpdater*> ObjsTest;
 #ifdef EDITOR_BUILD
-	std::unordered_set<int> fileIds;
+
 	for (auto o : objs) {
 		SetUtil::insert_test_exists(ObjsTest,o);
-		if (o->unique_file_id != 0)
-			SetUtil::insert_test_exists(fileIds, o->unique_file_id);
-	}
-
-	if(reassign_ids) {
-		std::unordered_set<uint64_t> found;
-		for (auto[fileid,eng_handle] : reassign_ids->path_to_instance_handle) {
-			SetUtil::insert_test_exists(found, eng_handle);
-		}
-		for (auto& o : objs) {
-			ASSERT(o);
-			assert(o->get_instance_id() == 0);
-			int pathFileId = o->unique_file_id;
-			uint64_t id_to_use = 0;
-			if (pathFileId != 0) {
-				auto idfind = reassign_ids->path_to_instance_handle.find(pathFileId);
-				if (idfind != reassign_ids->path_to_instance_handle.end()) {
-					id_to_use = idfind->second;
-
-					if (id_to_use == 0) {
-						sys_print(Warning, "Level::insert_unserialized_entities_into_level: reassign_ids->path_to_instance_handle returned 0 for fileid=(%lld)\n", pathFileId);
-					}
-				}
-			}
-			if(id_to_use==0) {
-				//sys_print(Warning, "Level::insert_unserialized_entities_into_level: couldnt find id in reassign_ids (%lld)\n", id_to_use);
-				id_to_use = get_next_id_and_increment();
-			}
-			ASSERT(id_to_use != 0);
-			auto ent = all_world_ents.find(id_to_use);
-			ASSERT(all_world_ents.find(id_to_use) == nullptr);
-
-			o->post_unserialization(id_to_use);
-			assert(o->get_instance_id() == id_to_use);
-			all_world_ents.insert(o->get_instance_id(), o);
+		if (o->is_a<Entity>()) {
+			ASSERT(((Entity*)o)->get_parent() == nullptr);
 		}
 	}
-	else
+
 #endif
 	{
 		for (auto& o : objs) {
 			ASSERT(o);
-			assert(o->get_instance_id() == 0);
-
-			o->post_unserialization(get_next_id_and_increment());
+			if (o->get_instance_id() != 0) {
+				ASSERT(all_world_ents.find(o->get_instance_id()) == nullptr);
+			}
+			else {
+				o->post_unserialization(get_next_id_and_increment());
+			}
 			ASSERT(all_world_ents.find(o->get_instance_id()) == nullptr);
 			assert(o->get_instance_id() != 0);
 			all_world_ents.insert(o->get_instance_id(), o);
 		}
 	}
 	validate();
-	scene.unserialize_post_assign_ids();
-	if (addSpawnNames) {
-		for (auto& e : objs) {
-			if (auto as_ent = e->cast_to<Entity>()) {
-				if (!as_ent->editor_name.empty())
-					spawnNameToEntity.insert({ as_ent->editor_name,as_ent->get_self_ptr() });
-			}
-		}
-	}
+
 	for (int i = 0; i < objs.size();i++) {
 		BaseUpdater* o = objs[i];
 		assert(o->get_instance_id() != 0);

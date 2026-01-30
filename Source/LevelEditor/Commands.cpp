@@ -77,7 +77,7 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<Enti
 
 	scene = CommandSerializeUtil::serialize_entities_text(ed_doc, handles);
 	assert(seen.size() == removed_objs.size());
-	assert(removed_objs.size() == scene->path_to_instance_handle.size());
+	//assert(removed_objs.size() == scene->path_to_instance_handle.size());
 
 	this->handles = handles;
 }
@@ -86,11 +86,11 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<Enti
 void RemoveEntitiesCommand::undo() {
 	ASSERT(is_valid());
 
-	auto restored = unserialize_entities_from_text("remove_entities_undo",scene->text, AssetDatabase::loader);
-	auto& extern_parents = scene->extern_parents;
+	auto restored = unserialize_entities_from_text("remove_entities_undo",scene->text, AssetDatabase::loader, true /* restore id*/);
+	//auto& extern_parents = scene->extern_parents;
 	
 
-	ed_doc.insert_unserialized_into_scene(restored, scene.get());
+	ed_doc.insert_unserialized_into_scene(restored);
 	//eng->get_level()->insert_unserialized_entities_into_level(restored, scene.get());	// pass in scene so handles get set to what they were
 
 	for (SavedCreateObj c : removed_objs) {
@@ -275,9 +275,9 @@ DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vecto
 }
 
 void DuplicateEntitiesCommand::execute() {
-	UnserializedSceneFile duplicated = unserialize_entities_from_text("duplicate_entities",scene->text, AssetDatabase::loader);
+	UnserializedSceneFile duplicated = unserialize_entities_from_text("duplicate_entities",scene->text, AssetDatabase::loader, false/* dont keep id*/);
 
-	auto& extern_parents = scene->extern_parents;
+	//auto& extern_parents = scene->extern_parents;
 	
 
 	// zero out file ids so new ones are set
@@ -285,7 +285,7 @@ void DuplicateEntitiesCommand::execute() {
 	//	if (o.second->creator_source == nullptr) // ==nullptr meaning that its created by level
 	//		o.second->unique_file_id = 0;
 
-	ed_doc.insert_unserialized_into_scene(duplicated, nullptr);
+	ed_doc.insert_unserialized_into_scene(duplicated);
 
 	//eng->get_level()->insert_unserialized_entities_into_level(duplicated);	// since duplicating, DONT pass in scene
 
@@ -324,7 +324,7 @@ MovePositionInHierarchy::MovePositionInHierarchy(EditorDoc& ed_doc, Entity* e, C
 
 	entPtr = e->get_self_ptr();
 }
-
+#include "LevelSerialization/SerializeNew.h"
 std::unique_ptr<SerializedSceneFile> CommandSerializeUtil::serialize_entities_text(EditorDoc& ed_doc, std::vector<EntityPtr> handles) {
 	std::vector<Entity*> ents;
 	for (auto h : handles) {
@@ -333,7 +333,7 @@ std::unique_ptr<SerializedSceneFile> CommandSerializeUtil::serialize_entities_te
 	ed_doc.validate_fileids_before_serialize();
 
 
-	return std::make_unique<SerializedSceneFile>(serialize_entities_to_text("Command::serialize_entities_text", ents));
+	return std::make_unique<SerializedSceneFile>(NewSerialization::serialize_to_text("Command::serialize_entities_text", ents,true));
 }
 
 void RemoveComponentCommand::execute() {

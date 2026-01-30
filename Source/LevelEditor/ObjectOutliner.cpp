@@ -669,7 +669,7 @@ static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e)
 		std::vector<Entity*> ents;
 		ents.push_back(e);
 		ed_doc.validate_fileids_before_serialize();
-		return std::make_unique<SerializedSceneFile>(serialize_entities_to_text("save_branch",ents));
+		return nullptr;// std::make_unique<SerializedSceneFile>(serialize_entities_to_text("save_branch", ents));
 	};
 
 	// vars
@@ -701,10 +701,10 @@ static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e)
 					return false;	// try again later
 				}
 
-				auto serialized = serialize_branch(e);
-
-				auto outfile = FileSys::open_write_game(finalpath);
-				outfile->write(serialized->text.c_str(), serialized->text.size());
+				//auto serialized = serialize_branch(e);
+				//
+				//auto outfile = FileSys::open_write_game(finalpath);
+				//outfile->write(serialized->text.c_str(), serialized->text.size());
 				const char* str = string_format("saved prefab as: %s\n", finalpath.c_str());
 				eng->log_to_fullscreen_gui(Info, str);
 				sys_print(Info, str);

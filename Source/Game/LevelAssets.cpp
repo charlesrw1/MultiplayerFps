@@ -7,7 +7,6 @@
 #include "Framework/ReflectionProp.h"
 #include "EngineSystemCommands.h"
 #include "LevelEditor/EditorDocLocal.h"
-#include "LevelSerialization/SerializeNewMakers.h"
 #include "Framework/MapUtil.h"
 #include "LevelSerialization/SerializeNew.h"
 #include "Framework/StringUtils.h"
@@ -174,7 +173,7 @@ void SceneAsset::post_load()
 	double start = GetTime();
 	
 
-	sceneFile = std::make_unique<UnserializedSceneFile>(NewSerialization::unserialize_from_json(get_name().c_str(), *halfUnserialized, *g_assets.loader));
+	sceneFile = std::make_unique<UnserializedSceneFile>(NewSerialization::unserialize_from_json(get_name().c_str(), *halfUnserialized, *g_assets.loader, false));
 
 	double now = GetTime();
 	sys_print(Debug, "SceneAsset::post_load: took %f\n", float(now - start));

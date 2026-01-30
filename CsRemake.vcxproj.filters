@@ -437,7 +437,6 @@
     <ClInclude Include="Source\Framework\SerializerOldDict.h" />
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Source\Framework\MapUtil.h" />
-    <ClInclude Include="Source\LevelSerialization\SerializeNewMakers.h" />
     <ClInclude Include="Source\Framework\ArenaAllocator.h" />
     <ClInclude Include="Source\Framework\ArenaStd.h" />
     <ClInclude Include="Source\Framework\Log.h" />
@@ -572,7 +571,6 @@
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
     <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp" />
     <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
-    <ClCompile Include="Source\LevelSerialization\SerializationAPI.cpp" />
     <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
     <ClCompile Include="Source\LevelSerialization\Unserialize.cpp" />

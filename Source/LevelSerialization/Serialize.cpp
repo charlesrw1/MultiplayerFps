@@ -38,51 +38,5 @@ bool this_is_a_serializeable_object(const BaseUpdater* b)
 	return true;
 }
 
-void add_to_write_set_R(Entity* o, std::unordered_set<Entity*>& to_write)
-{
-	auto dont_serialize_or_edit_me = [](auto&& self, Entity* e) -> bool {
-		if (e->dont_serialize_or_edit)
-			return true;
-		if (e->get_parent())
-			return self(self, e->get_parent());
-		return false;
-	};
-
-	if (dont_serialize_or_edit_me(dont_serialize_or_edit_me,o))
-		return;
-	to_write.insert(o);
-	for (auto c : o->get_children())
-		add_to_write_set_R(c, to_write);
-
-}
-std::vector<Entity*> root_objects_to_write(const std::vector<Entity*>& input_objs)
-{
-	std::unordered_set<Entity*> to_write;
-	for (auto o : input_objs) {
-		add_to_write_set_R(o,to_write);
-	}
-
-	std::vector<Entity*> roots;
-	for (auto o : to_write) {
-		if (!o->get_parent() || to_write.find(o->get_parent()) == to_write.end())
-			roots.push_back(o);
-	}
-
-	return roots;
-}
-
-void add_to_extern_parents(const BaseUpdater* obj, const BaseUpdater* parent, const PrefabAsset* for_prefab, SerializedSceneFile& output)
-{
-	SerializedSceneFile::external_parent ext;
-	assert(obj->unique_file_id != 0);
-	ext.child_id = obj->unique_file_id;
-	//ext.child_path = std::to_string(obj->unique_file_id);
-	ext.external_parent_handle = parent->get_instance_id();
-	output.extern_parents.push_back(ext);
-}
 #include "LevelSerialization/SerializeNew.h"
 
-SerializedSceneFile serialize_entities_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs)
-{
-	return NewSerialization::serialize_to_text(debug_tag, input_objs);
-}

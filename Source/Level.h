@@ -24,7 +24,7 @@ public:
 	Level(bool is_editor);
 	void start(SceneAsset* source);	// called right after ctor
 	~Level();
-	void insert_unserialized_entities_into_level(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids = nullptr); // was bool assign_new_ids=false
+	void insert_unserialized_entities_into_level(UnserializedSceneFile& scene); // was bool assign_new_ids=false
 	// ends the level
 	void close_level();
 	void update_level();
@@ -61,7 +61,7 @@ public:
 	Entity* find_initial_entity_by_name(const string& name) const;
 	Component* find_first_component(const ClassTypeInfo* type) const;
 private:
-	void insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene, const SerializedSceneFile* reassign_ids, bool addSpawnNames);
+	void insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene,bool addSpawnNames);
 	static void set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file);
 	Entity* spawn_prefab_shared(const PrefabAsset* asset, bool set_vars);
 	string sourceAssetName;

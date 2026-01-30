@@ -261,7 +261,7 @@ bool EditorDoc::save_document_internal()
 		if (auto e = o->cast_to<Entity>())
 			all_ents.push_back(e);
 	string debug_tag = "saving:" + assetName.value_or("<new>");
-	auto serialized = serialize_entities_to_text(debug_tag.c_str(),all_ents);
+	auto serialized = NewSerialization::serialize_to_text(debug_tag.c_str(), all_ents, false);
 	//NewSerialization::serialize_to_text(all_ents, pa);
 	assert(assetName.has_value());
 	const string path = assetName.value();
@@ -1901,12 +1901,10 @@ void EditorDoc::remove_scene_object(BaseUpdater* u)
 	u->destroy_deferred();
 }
 
-void EditorDoc::insert_unserialized_into_scene(UnserializedSceneFile& file, SerializedSceneFile* scene)
+void EditorDoc::insert_unserialized_into_scene(UnserializedSceneFile& file)
 {
-	if (!scene) {	// means assign new ids
-		
-	}
-	eng->get_level()->insert_unserialized_entities_into_level(file, scene);
+
+	eng->get_level()->insert_unserialized_entities_into_level(file);
 }
 
 void EditorDoc::instantiate_into_scene(BaseUpdater* u)

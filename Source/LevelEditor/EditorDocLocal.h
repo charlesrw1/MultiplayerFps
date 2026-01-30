@@ -650,7 +650,7 @@ public:
 	Entity* spawn_entity();
 	Component* attach_component(const ClassTypeInfo* ti, Entity* e);
 	void remove_scene_object(BaseUpdater* u);
-	void insert_unserialized_into_scene(UnserializedSceneFile& file, SerializedSceneFile* scene);
+	void insert_unserialized_into_scene(UnserializedSceneFile& file);
 	void instantiate_into_scene(BaseUpdater* u);
 	Entity* spawn_prefab(PrefabAsset* prefab);
 
