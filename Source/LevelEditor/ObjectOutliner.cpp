@@ -808,8 +808,7 @@ bool OONameFilter::does_entity_pass_one_filter(const string& filter, Entity* e)
 		if (is_in_string(filter, c->get_type().classname))	// names of components
 			return true;
 	}
-	if (e->get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab && is_in_string(filter, e->get_object_prefab().get_name()))	// prefab name
-		return true;
+
 	if (is_in_string(filter, std::to_string(e->get_instance_id())))	// instance id
 		return true;
 	

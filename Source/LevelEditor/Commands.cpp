@@ -46,7 +46,7 @@ static void add_to_remove_list_R(vector<SavedCreateObj>& objs, Entity* e, std::u
 	SavedCreateObj created;
 	created.eng_handle = e->get_instance_id();
 	created.unique_file_id = e->unique_file_id;
-	created.spawn_type = e->get_object_prefab_spawn_type();
+	//created.spawn_type = e->get_object_prefab_spawn_type();
 
 	objs.push_back(created);
 	for (auto c : e->get_children()) {
@@ -88,25 +88,10 @@ void RemoveEntitiesCommand::undo() {
 
 	auto restored = unserialize_entities_from_text("remove_entities_undo",scene->text, AssetDatabase::loader);
 	auto& extern_parents = scene->extern_parents;
-	for (auto& ep : extern_parents) {
-		auto e = restored.file_id_to_obj.find(ep.child_id);
-		ASSERT(e->second->is_a<Entity>());
-		if (e != restored.file_id_to_obj.end()) {
-			EntityPtr parent(ep.external_parent_handle);
-			if (parent.get()) {
-				auto ent = (Entity*)e->second;
-				ent->parent_to(parent.get());
-			}
-			else
-				sys_print(Warning, "RemoveEntitiesCommand::undo: restored parent doesnt exist\n");
-		}
-		else
-			sys_print(Warning, "RemoveEntitiesCommand::undo: restored obj doesnt exist\n");
-	}
+	
 
 	ed_doc.insert_unserialized_into_scene(restored, scene.get());
 	//eng->get_level()->insert_unserialized_entities_into_level(restored, scene.get());	// pass in scene so handles get set to what they were
-	auto& objs = restored.file_id_to_obj;
 
 	for (SavedCreateObj c : removed_objs) {
 		BaseUpdater* obj = eng->get_level()->get_entity(c.eng_handle);
@@ -114,184 +99,16 @@ void RemoveEntitiesCommand::undo() {
 			sys_print(Warning, "RemoveEntitiesCommand::undo: object cant be found to put back %lld\n", c.eng_handle);
 			continue;
 		}
-		if (auto as_ent = obj->cast_to<Entity>()) {
-			assert(as_ent->get_object_prefab_spawn_type() == c.spawn_type);
-		}
-		obj->unique_file_id = c.unique_file_id;
+
 		assert(obj->get_instance_id() == c.eng_handle);
 	}
 
 	// refresh handles i guess ? fixme
 	handles.clear();
-	for (auto& o : objs) {
-		if (o.second->is_a<Entity>()) {
-			auto ent = (Entity*)o.second;
-			handles.push_back(ent->get_self_ptr());
-		}
-	}
-
-	for (auto& o : objs) {
-		if (auto e = o.second->cast_to<Entity>())
-			ed_doc.on_entity_created.invoke(e->get_self_ptr());
-	}
+	
 	ed_doc.post_node_changes.invoke();
 }
 
-ParentToCommand::ParentToCommand(EditorDoc& ed_doc, std::vector<Entity*> ents, Entity* parent_to, bool create_new_parent, bool delete_parent) 
-	: ed_doc(ed_doc)
-{
-
-	if (delete_parent && ents.size() != 1) {
-		is_valid_flag = false;
-		return;
-	}
-	else if (delete_parent) {
-		auto p = ents[0];
-		if (p) {
-			ents.clear();
-			for (auto e : p->get_children())
-				ents.push_back(e);
-
-			parent_to = p->get_parent();
-		}
-		else
-			is_valid_flag = false;
-	}
-
-
-	auto validate = [&]() -> bool {
-		if (ents.empty())
-			return false;
-		for (auto e : ents) {
-			if (!e) return false;
-			if (!ed_doc.is_this_object_not_inherited(e)) return false;
-			if (e == parent_to) return false;
-		}
-		return true;
-	};
-
-	is_valid_flag = validate();
-	if (!is_valid_flag)
-		return;
-
-	for (auto e : ents)
-		this->entities.push_back(e->get_self_ptr());
-	for (auto e : ents)
-		this->prev_parents.push_back(EntityPtr(e->get_parent()));
-	this->parent_to = EntityPtr(parent_to);
-	parent_to_prev_parent = (parent_to) ? EntityPtr(parent_to->get_parent()) : EntityPtr();
-
-	ASSERT(!create_new_parent || !parent_to);	// if create_new_parent, parent_to is false
-	this->create_new_parent = create_new_parent;
-
-	auto all_parents_equal = [&]() -> bool {
-		auto p = this->prev_parents[0];
-		for (int i = 1; i < this->prev_parents.size(); i++) {
-			if (this->prev_parents[i] != p) return false;
-		}
-		return true;
-	};
-
-	if (!delete_parent || (all_parents_equal()))	// if delete_parent, all_parents_equal==true
-		this->delete_the_parent = delete_parent;
-	else
-		is_valid_flag = false;
-}
-
-void ParentToCommand::execute() {
-
-	if (create_new_parent) {
-		ASSERT(!parent_to);
-		Entity* newparent = ed_doc.spawn_entity();
-		glm::vec3 pos(0.f);
-		int count = 0;
-		for (auto e : entities) {
-			auto ent = e.get();
-			if (ent) {
-				pos += ent->get_ws_position();
-				count++;
-			}
-		}
-		pos /= (float)count;
-		newparent->set_ws_position(pos);
-		parent_to = newparent->get_self_ptr();
-
-		ed_doc.selection_state->set_select_only_this(newparent);
-	}
-
-	auto parent_to_ent = parent_to.get();
-	for (auto ent : entities) {
-		Entity* e = ent.get();
-		if (!e) {
-			sys_print(Warning, "Couldnt find entity for parent to command\n");
-			return;
-		}
-		auto ws_transform = e->get_ws_transform();
-		e->parent_to(parent_to_ent);
-		e->set_ws_transform(ws_transform);
-	}
-
-
-	if (delete_the_parent) {
-		ASSERT(this->prev_parents[0].get());
-		if (!remove_the_parent_cmd)	// do this here because we want to serialize the parent when the child entities are removed
-			remove_the_parent_cmd = std::make_unique<RemoveEntitiesCommand>(ed_doc, std::vector<EntityPtr>{ this->prev_parents[0]->get_self_ptr() });
-		//ASSERT(remove_the_parent_cmd->handles.size() == 1);
-		if (!remove_the_parent_cmd->is_valid())
-			throw std::runtime_error("RemoveEntitiesCommand not valid in ParentToCommand");
-		remove_the_parent_cmd->execute();
-		ASSERT(remove_the_parent_cmd->handles.size() == 1);
-	}
-
-	ed_doc.post_node_changes.invoke();
-}
-
-void ParentToCommand::undo() {
-	if (delete_the_parent) {
-		ASSERT(remove_the_parent_cmd->handles.size() == 1);
-		remove_the_parent_cmd->undo();
-		ASSERT(remove_the_parent_cmd->handles.size() == 1);
-		ASSERT(remove_the_parent_cmd->handles[0].get());
-		// set prev parent...
-		for (int i = 0; i < prev_parents.size(); i++) {
-			prev_parents[i] = remove_the_parent_cmd->handles[0]->get_self_ptr();
-		}
-	}
-
-	ed_doc.selection_state->clear_all_selected();
-
-	for (int i = 0; i < entities.size(); i++) {
-		Entity* e = entities[i].get();
-		Entity* prev = prev_parents[i].get();
-		if (!e) {
-			sys_print(Warning, "Couldnt find entity for parent to command\n");
-			return;
-		}
-		auto ws_transform = e->get_ws_transform();
-		e->parent_to(prev);
-		e->set_ws_transform(ws_transform);
-
-		ed_doc.selection_state->add_to_entity_selection(e);
-	}
-
-	if (parent_to_prev_parent) {
-		if (parent_to) {
-			parent_to->parent_to(parent_to_prev_parent.get());
-		}
-	}
-
-	if (create_new_parent) {
-		auto p = parent_to.get();
-		if (!p) {
-			sys_print(Warning, "create_new_parent ptr was null??\n");
-		}
-		ed_doc.remove_scene_object(p);
-		//eng->get_level()->destroy_entity(p);
-		parent_to = EntityPtr();
-	}
-
-	ed_doc.post_node_changes.invoke();
-}
 
 CreatePrefabCommand::CreatePrefabCommand(EditorDoc& ed_doc, const std::string& prefab_name, const glm::mat4& transform, EntityPtr parent)
 	: ed_doc(ed_doc)
@@ -461,21 +278,7 @@ void DuplicateEntitiesCommand::execute() {
 	UnserializedSceneFile duplicated = unserialize_entities_from_text("duplicate_entities",scene->text, AssetDatabase::loader);
 
 	auto& extern_parents = scene->extern_parents;
-	for (auto ep : extern_parents) {
-		auto e = duplicated.file_id_to_obj.find(ep.child_id);
-		if (e != duplicated.file_id_to_obj.end()) {
-			ASSERT(e->second->is_a<Entity>());
-			EntityPtr parent(ep.external_parent_handle);
-			if (parent.get()) {
-				auto ent = (Entity*)e->second;
-				ent->parent_to(parent.get());
-			}
-			else
-				sys_print(Warning, "duplicated parent doesnt exist\n");
-		}
-		else
-			sys_print(Warning, "duplicated obj doesnt exist\n");
-	}
+	
 
 	// zero out file ids so new ones are set
 	//for (auto o : duplicated.get_objects())
@@ -488,18 +291,6 @@ void DuplicateEntitiesCommand::execute() {
 
 
 	handles.clear();
-	auto& objs = duplicated.file_id_to_obj;
-	for (auto& o : objs) {
-		if (auto e = o.second->cast_to<Entity>())
-		{
-			ed_doc.on_entity_created.invoke(e->get_self_ptr());
-			handles.push_back(e->get_self_ptr());
-		}
-	}
-	ed_doc.selection_state->clear_all_selected();
-	for (auto e : handles) {
-		ed_doc.selection_state->add_to_entity_selection(e);
-	}
 
 	ed_doc.post_node_changes.invoke();
 }

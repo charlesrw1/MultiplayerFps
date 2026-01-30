@@ -121,13 +121,11 @@ void ReadSerializerBackendJson2::load_shared()
 
 bool ReadSerializerBackendJson2::serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr)
 {
-	ASSERT(0);
 	return false;
 }
 
 bool ReadSerializerBackendJson2::serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr)
 {
-	ASSERT(0);
 	return false;
 }
 
@@ -138,12 +136,12 @@ bool ReadSerializerBackendJson2::serialize_enum(const char* tag, const EnumTypeI
 
 void ReadSerializerBackendJson2::serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr)
 {
-	ASSERT(0);
+	return;
 }
 
 void ReadSerializerBackendJson2::serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr)
 {
-	ASSERT(0);
+	return;
 }
 
 void ReadSerializerBackendJson2::serialize_enum_ar(const EnumTypeInfo* info, int& i)

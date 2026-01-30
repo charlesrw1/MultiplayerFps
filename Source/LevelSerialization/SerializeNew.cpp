@@ -54,13 +54,6 @@ string MakePathForObjectNew::make_type_name(ClassBase* obj)
 	const BaseUpdater* bu = obj->cast_to<BaseUpdater>();
 	if (!bu)
 		return obj->get_type().classname;
-	if (const Entity* as_ent = bu->cast_to<Entity>()) {
-		if (as_ent->get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab) {
-			const PrefabAsset& pfb = as_ent->get_object_prefab();
-			return pfb.get_name();
-		}
-		
-	}
 
 	return bu->get_type().classname;
 #endif
@@ -86,39 +79,8 @@ ClassBase* MakeObjectForPathNew::create_from_name(ReadSerializerBackendJson& s, 
 
 	//assert(0);
 	auto ext = StringUtils::get_extension(str);
-	if (ext == ".pfb") {
-		PrefabAsset* pfb = cast_to<PrefabAsset>(load.load_asset(&PrefabAsset::StaticType, str));
-		
-		// this shouldnt happen ever but...
-		if (!pfb) {
-			sys_print(Error, "MakeObjectForPathNew::create_from_name: %s didnt even return ptr?\n", str.c_str());
-			return nullptr;
-		}
-
-		auto set_pfb_root_vars = [&](Entity& root) {
-			root.set_root_object_prefab(*pfb);
-			//root.unique_file_id = parse_fileid(parent_path);
-		};
-
-		auto make_fake_pfb_root = [&]() -> Entity* {
-			sys_print(Debug, "make_fake_pfb_root\n");
-			Entity* root = new Entity();
-			set_pfb_root_vars(*root);
-			assert(root->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
-			return root;
-
-		};
-		if (pfb && !pfb->did_load_fail()) {
-			sys_print(Debug, "MakeObjectForPathNew::create_from_name(%s): instancing prefab\n",s.get_debug_tag());
-			return make_fake_pfb_root();
-		}
-		else {
-			sys_print(Error, "MakeObjectForPathNew::create_from_name(%s): prefab load failed (%s)\n",s.get_debug_tag(), str.c_str());
-			
-			return make_fake_pfb_root();
-		}
-	}
-	else {
+	
+	{
 		return ClassBase::create_class<ClassBase>(str.c_str());
 	}
 
@@ -189,7 +151,7 @@ void NewSerialization::unserialize_shared(const char* debug_tag, UnserializedSce
 		//assert(this_is_a_serializeable_object(obj));
 		//if (this_is_a_serializeable_object(obj))
 			obj->unique_file_id = parse_fileid(*path);
-			MapUtil::insert_test_exists(outfile.file_id_to_obj,obj->unique_file_id, obj);
+			//MapUtil::insert_test_exists(outfile.file_id_to_obj,obj->unique_file_id, obj);
 			outfile.all_obj_vec.push_back(obj);
 		//else
 		//	obj->unique_file_id = 0;
@@ -232,24 +194,44 @@ void NewSerialization::unserialize_shared(const char* debug_tag, UnserializedSce
 	}
 #endif
 
-	outfile.num_roots = (int)roots.size();
-
-	if (!roots.empty()) {
-		outfile.set_root_entity(roots[0]);
-	}
-	else {
-		sys_print(Warning, "unserialize_from_text(%s): found no roots\n", debug_tag);
-	}
 
 	delete rootobj;
 }
+#include <json.hpp>
+#include "Framework/SerializerJson2.h"
+
+#include "Framework/SerializerBinary.h"
 UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_tag, SerializedForDiffing& json, IAssetLoadingInterface& load)
 {
+
 	UnserializedSceneFile outfile;
+	auto& obj = json.jsonObj;
+	if(obj["objs"].is_array())
+	{
+		auto& objarr = obj["objs"];
+		for (auto& ent : objarr) {
+			string type = ent["__typename"];
+			Entity* e = new Entity;
+			Component* c = ClassBase::create_class<Component>(type.c_str());
+			ASSERT(c);
+			e->add_component_from_unserialization(c);
+			{
+				ReadSerializerBackendJson2 reader("", ent, load, *e);
+			}
+			{
+				ReadSerializerBackendJson2 reader("", ent, load, *c);
+			}
+
+			outfile.all_obj_vec.push_back(e);
+			outfile.all_obj_vec.push_back(c);
+		}
+		return outfile;
+	}
+
 	MakeObjectForPathNew objmaker(load, outfile);
 	ReadSerializerBackendJson reader(debug_tag, json.jsonObj, objmaker, load);
 	unserialize_shared(debug_tag, outfile, reader);
-	return std::move(outfile);
+	return outfile;
 }
 using std::vector;
 UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_tag, const std::string& text, IAssetLoadingInterface& load)
@@ -259,7 +241,7 @@ UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_
 	MakeObjectForPathNew objmaker(load,outfile);
 	ReadSerializerBackendJson reader(debug_tag, text, objmaker,load);
 	unserialize_shared(debug_tag, outfile, reader);
-	return std::move(outfile);
+	return outfile;
 }
 
 void NewSerialization::add_objects_to_write(const char* debug_tag, SerializeEntitiesContainer& con, Entity& e)
@@ -354,10 +336,7 @@ static void add_paths_from_container(const std::vector<Entity*>& input_objs, Mak
 static void validate_container(SerializeEntitiesContainer& con, SerializedSceneFile& out) {
 
 }
-#include <json.hpp>
-#include "Framework/SerializerJson2.h"
 
-#include "Framework/SerializerBinary.h"
 SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs)
 {
 	double now = GetTime();
@@ -371,18 +350,23 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 			nlohmann::json out;
 			{
 				WriteSerializerBackendJson2 writer("", *ent);
-				out.update(writer.get_output());
+				if (writer.get_output().is_object())
+					out.update(writer.get_output());
 			}
 			auto c = ent->get_components().at(0);
 			{
 				WriteSerializerBackendJson2 writer("", *c);
-				out.update(writer.get_output());
+				if(writer.get_output().is_object())
+					out.update(writer.get_output());
 			}
 			out["__typename"] = c->get_type().classname;
 			out["__retid"] = ent->get_instance_id();
 			obj["objs"].push_back(out);
-			printf("%s\n", obj.dump(1).c_str());
+			//printf("%s\n", obj.dump(1).c_str());
 		}
+		auto file = FileSys::open_write("dumped_new_map.map", FileSys::ENGINE_DIR);
+		string dump = obj.dump(1);
+		file->write(dump.c_str(), dump.size());
 	}
 
 	SerializedSceneFile out;

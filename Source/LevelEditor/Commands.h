@@ -19,7 +19,6 @@ struct SavedCreateObj {
 	uint64_t eng_handle = 0;
 	int unique_file_id = 0;
 	const PrefabAsset* what_prefab = nullptr;
-	EntityPrefabSpawnType spawn_type = EntityPrefabSpawnType::None;
 };
 class RemoveEntitiesCommand : public Command
 {
@@ -47,34 +46,6 @@ public:
 
 	std::unique_ptr<SerializedSceneFile> scene;
 	std::vector<EntityPtr> handles;
-};
-
-class ParentToCommand : public Command
-{
-public:
-	EditorDoc& ed_doc;
-	ParentToCommand(EditorDoc& ed_doc, std::vector<Entity*> ents, Entity* parent_to, bool create_new_parent, bool delete_parent);
-	bool is_valid_flag = true;
-	bool is_valid() final {
-		return is_valid_flag;
-	}
-
-
-	void execute() final;
-	void undo() final;
-	std::string to_string() override {
-		return "Parent To";
-	}
-
-	std::vector<EntityPtr> prev_parents;
-	std::vector<EntityPtr> entities;
-	EntityPtr parent_to;
-	EntityPtr parent_to_prev_parent;
-	bool create_new_parent = false;
-	bool delete_the_parent = false;
-
-	// anti pattern?
-	std::unique_ptr<RemoveEntitiesCommand> remove_the_parent_cmd;
 };
 
 class CreatePrefabCommand : public Command

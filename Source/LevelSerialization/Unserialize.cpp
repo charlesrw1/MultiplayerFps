@@ -22,12 +22,6 @@ void UnserializedSceneFile::delete_objs()
 	all_obj_vec.clear();
 }
 
-BaseUpdater* UnserializedSceneFile::find(int fileId)
-{
-	auto find = file_id_to_obj.find(fileId);
-	return find == file_id_to_obj.end() ? nullptr : find->second;
-}
-
 
 
 uint32_t parse_fileid(const std::string& path)

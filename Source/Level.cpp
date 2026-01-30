@@ -424,15 +424,7 @@ Component* Level::find_first_component(const ClassTypeInfo* type) const
 void Level::set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file)
 {
 #ifdef EDITOR_BUILD
-	for (auto& o : file.all_obj_vec) {
-		if (o != &root) {
-			assert(o);
-			if (auto as_ent = o->cast_to<Entity>()) {
-				as_ent->set_spawned_by_prefab();
-			}
-		}
-	}
-	root.set_root_object_prefab(asset);
+
 #endif
 }
 
@@ -445,11 +437,11 @@ Entity* Level::spawn_prefab_shared(const PrefabAsset* asset, bool set_vars)
 	Entity* root = new Entity;
 	if (set_vars) {
 #ifdef EDITOR_BUILD
-		root->set_root_object_prefab(*asset);
+		
 #endif
 	}
 	else {
-		assert(root->get_object_prefab_spawn_type() == EntityPrefabSpawnType::None);
+		
 	}
 	insert_new_native_entity_into_hashmap_R(root);
 	initialize_new_entity_safe(root);

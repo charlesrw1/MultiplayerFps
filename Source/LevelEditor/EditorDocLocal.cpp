@@ -1655,10 +1655,11 @@ bool EditorUILayout::draw() {
 	const Entity* clicked = nullptr;
 	for (auto o : objs) {
 		const char* name = (o.e->get_editor_name().c_str());
-		const bool is_prefab_root = o.e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
+		const bool is_prefab_root = false;// o.e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
 		if (!*name) {
-			if (is_prefab_root)
-				name = o.e->get_object_prefab().get_name().c_str();
+			if (is_prefab_root) {
+				//name = o.e->get_object_prefab().get_name().c_str();
+			}
 			else {
 				if (auto m = o.e->get_component<MeshComponent>()) {
 					if (m->get_model())
@@ -1791,10 +1792,11 @@ void EditorUILayout::do_box_select(MouseSelectionAction action)
 
 	for (auto o : objs) {
 		const char* name = (o.e->get_editor_name().c_str());
-		const bool is_prefab_root = o.e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
+		const bool is_prefab_root = false;// o.e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
 		if (!*name) {
-			if (is_prefab_root)
-				name = o.e->get_object_prefab().get_name().c_str();
+			if (is_prefab_root) {
+				//name = o.e->get_object_prefab().get_name().c_str();
+			}
 			else {
 				if (auto m = o.e->get_component<MeshComponent>()) {
 					if (m->get_model())
@@ -1902,14 +1904,7 @@ void EditorDoc::remove_scene_object(BaseUpdater* u)
 void EditorDoc::insert_unserialized_into_scene(UnserializedSceneFile& file, SerializedSceneFile* scene)
 {
 	if (!scene) {	// means assign new ids
-		for (auto& [path, e] : file.file_id_to_obj) {
-			if(!is_this_object_inherited(e))
-				e->unique_file_id = get_next_file_id();
-			else {
-				auto as_ent = e->cast_to<Entity>();
-				assert(!as_ent || as_ent->get_object_prefab_spawn_type() != EntityPrefabSpawnType::RootOfPrefab);
-			}
-		}
+		
 	}
 	eng->get_level()->insert_unserialized_entities_into_level(file, scene);
 }
@@ -1927,7 +1922,7 @@ Entity* EditorDoc::spawn_prefab(PrefabAsset* prefab)
 	if (!e)
 		return nullptr;
 	e->unique_file_id = get_next_file_id();
-	assert(e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
+	//assert(e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
 	return e;
 }
 

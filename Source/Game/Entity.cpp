@@ -68,19 +68,8 @@ REGISTER_ASSETMETADATA_MACRO(EntityTypeMetadata);
 Entity::Entity()
 {
 }
-void Entity::set_root_object_prefab(const PrefabAsset& asset) {
-	if (what_prefab) {
-		sys_print(Warning, "Entity::set_root_object_prefab: already had prefab assigned?\n");
-	}
-	what_prefab = &asset;
-}
-EntityPrefabSpawnType Entity::get_object_prefab_spawn_type() const {
-	if (what_prefab) {
-		return EntityPrefabSpawnType::RootOfPrefab;
-	}
-	else
-		return EntityPrefabSpawnType::None;
-}
+
+
 #ifdef EDITOR_BUILD
 void Entity::set_hidden_in_editor(bool b)
 {
@@ -90,22 +79,6 @@ void Entity::set_hidden_in_editor(bool b)
 	}
 	for (int i = 0; i < all_components.size(); i++)
 		all_components[i]->sync_render_data();
-}
-const PrefabAsset& Entity::get_object_prefab() const {
-	assert(this->what_prefab && get_object_prefab_spawn_type()==EntityPrefabSpawnType::RootOfPrefab);
-	return *this->what_prefab;
-}
-void Entity::set_spawned_by_prefab() {
-	if (what_prefab)
-		what_prefab = nullptr;
-	set_editor_transient(true);	// make it not editable
-}
-
-void Entity::set_prefab_no_owner_after_being_root()
-{
-	assert(get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
-	what_prefab = nullptr;
-	assert(get_object_prefab_spawn_type() == EntityPrefabSpawnType::None);
 }
 
 
@@ -174,11 +147,6 @@ void Entity::initialize_internal()
 	init_state = initialization_state::CALLED_START;
 	check_for_transform_nans();
 
-
-	if (what_prefab) {
-		assert(get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab);
-		what_prefab->finish_prefab_setup(this);
-	}
 }
 
 

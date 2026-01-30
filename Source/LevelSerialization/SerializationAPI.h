@@ -18,10 +18,6 @@ public:
 	~UnserializedSceneFile() = default;
 	UnserializedSceneFile(UnserializedSceneFile&& other) {
 		all_obj_vec = std::move(other.all_obj_vec);
-		file_id_to_obj = std::move(other.file_id_to_obj);
-
-		root_entity = other.root_entity;
-		num_roots = other.num_roots;
 	}
 	UnserializedSceneFile& operator=(const UnserializedSceneFile&) = delete;
 	UnserializedSceneFile(const UnserializedSceneFile&) = delete;
@@ -29,20 +25,10 @@ public:
 	BaseUpdater* find(int fileId);
 	void delete_objs();
 
-	Entity* get_root_entity() const {
-		return root_entity;
-	}
-	void set_root_entity(Entity* root) {
-		root_entity = root;
-	}
 
 	void unserialize_post_assign_ids();
 
 	std::vector<BaseUpdater*> all_obj_vec;
-	std::unordered_map<int, BaseUpdater*> file_id_to_obj;
-
-	Entity* root_entity = nullptr;
-	int num_roots = 0;
 private:
 	void add_components_and_children_from_entity_R(const std::string& path, Entity* e, Entity* source);
 	friend class Level;
@@ -104,16 +90,3 @@ using std::string;
 class IAsset;
 
 // Passed down to serializers
-
-class LevelSerializationContext : public ClassBase {
-public:
-	CLASS_BODY(LevelSerializationContext);
-
-	SerializedSceneFile* out = nullptr;
-	UnserializedSceneFile* in = nullptr;
-	BaseUpdater* cur_obj = nullptr;
-	std::string* in_root = nullptr;
-	PrefabAsset* for_prefab = nullptr;
-	PrefabAsset* diffprefab = nullptr;
-	BaseUpdater* get_object(uint64_t handle);
-};
