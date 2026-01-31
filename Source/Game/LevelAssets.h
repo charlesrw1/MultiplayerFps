@@ -39,6 +39,16 @@ public:
 	}
 	std::unordered_set<std::string> defined_prefabs;
 };
+#include <json.hpp>
+class SchemaManager {
+public:
+	static SchemaManager& get() {
+		static SchemaManager inst;
+		return inst;
+	}
+	void init();
+	nlohmann::json schema_file;
+};
 
 struct SceneSerialized;
 class PrefabAsset : public IAsset {

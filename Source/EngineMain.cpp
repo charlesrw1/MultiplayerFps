@@ -477,38 +477,6 @@ void OpenEditorToolCommand::execute()
 
 }
 
-void start_editor(const Cmd_Args& args)
-{
-	if (!eng_local.editorState) {
-		sys_print(Error, "start_ed: didnt launch in editor mode, use 'is_editor_app 1' in cfg or command line\n");
-		return;
-	}
-
-	static const char* usage_str = "Usage: starteditor [Map,AnimGraph,Model,<asset metadata typename>] <file>\n";
-	if (args.size() != 2 && args.size()!=3) {
-		sys_print(Info, usage_str);
-		return;
-	}
-
-	//if (eng_local.is_wa) {
-	//	sys_print(Error, "start_ed but waiting on an async map load call (%s), skipping.\n",eng_local.queued_mapname.c_str());
-	//	return;
-	//}
-
-	std::string edit_type = args.at(1);
-	const AssetMetadata* metadata = AssetRegistrySystem::get().find_type(edit_type.c_str());
-	if (metadata) {
-		opt<string> asset;
-		if (args.size() >= 3)
-			asset = args.at(2);
-
-		auto creationTool = metadata->create_create_tool_to_edit(asset);
-		if (creationTool) {
-			eng_local.editorState->open_tool(std::move(creationTool), true, [](bool b) {});
-		}
-	}
-
-}
 
 
 vector<string>* GameEngineLocal::find_keybinds(SDL_Scancode code, uint16_t keymod) {
@@ -729,17 +697,7 @@ void GameEngineLocal::add_commands()
 	commands->add("IMPORT_TEX_FOLDER", IMPORT_TEX_FOLDER);
 	commands->add("IMPORT_TEX", IMPORT_TEX);
 	commands->add("COMPILE_TEX", COMPILE_TEX);
-	commands->add("TOGGLE_PLAY_EDIT_MAP", [this](const Cmd_Args&) {
-		if (!get_level()) 
-			return;
-		if (get_level()->is_editor_level()) {
-			Cmd_Manager::inst->append_cmd(std::make_unique<OpenMapCommand>(get_level()->get_source_asset_name(), true));
-		}
-		else {
-			Cmd_Manager::inst->append_cmd(std::make_unique<OpenEditorToolCommand>(SceneAsset::StaticType,get_level()->get_source_asset_name(), true));
-		}
-		});
-	commands->add("start_ed", start_editor);
+	
 #endif
 
 	//commands->add("close_ed", close_editor);
@@ -815,6 +773,17 @@ void GameEngineLocal::add_commands()
 			args.sys_print(Info, "%s\n", file.c_str());
 		}
 		});
+	commands->add("create-map", [](const Cmd_Args& args) {
+		auto existing = FileSys::open_read_game(args.at(1));
+		if (!existing) {
+			auto file = FileSys::open_write_game(args.at(1));
+			file->write("!json\n{objs[]}", 14);
+		}
+		else {
+			sys_print(Error, "cant make new map, already exists\n");
+		}
+		});
+
 
 	commands->add("bind", bind_key);
 	
@@ -1072,7 +1041,7 @@ int benchmark_free_list() {
 int game_engine_main(int argc, char** argv)
 {
 	material_print_debug.set_bool(true);
-	developer_mode.set_bool(false);
+	//developer_mode.set_bool(false);
 	log_shader_compiles.set_bool(false);
 	log_all_asset_loads.set_bool(true);
 	eng_local.init(argc,argv);
@@ -1486,7 +1455,7 @@ void GameEngineLocal::init(int argc, char** argv)
 	idraw->init();
 	print_time("draw init");
 
-
+	SchemaManager::get().init();
 	Input::inst = new Input();
 	UiSystem::inst = new UiSystem();
 	EditorPopupManager::inst = new EditorPopupManager();
@@ -1765,28 +1734,6 @@ public:
 // Game net manager also manages recieving net messages and determines if it has permissions.
 
 
-// shell process: can be spawned by a command, the process will exist in the background until finished (returning false in on_stdin or on_tick)
-class ccShellProcess {
-public:
-	virtual bool is_ticking() { return false; }
-	virtual bool tick() {}
-	virtual bool on_stdin(const string& line) {}
-
-	// Config: get_terminal_canvas()
-	// start_process(ccShellProcess*)
-	// is_terminal_focused()
-};
-
-// TUI programs:
-// object selector
-// layer selector
-// stats table
-// open recent
-// preview animations?
-// lod previewer
-// reference graph? (use rg.exe for finding references)
-// version history? go thru backup of map
-
 
 void GameEngineLocal::loop()
 {
@@ -2023,11 +1970,11 @@ int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 		}
 	}
 	else if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
-		const char* match = Cmd_Manager::get()->print_matches(console->input_buffer);
+		string match = Cmd_Manager::get()->print_matches(console->input_buffer);
 		console->scroll_to_bottom = true;
-		if (match) {
+		if (!match.empty()) {
 			data->DeleteChars(0, data->BufTextLen);
-			data->InsertChars(0, match);
+			data->InsertChars(0, match.c_str());
 		}
 	}
 

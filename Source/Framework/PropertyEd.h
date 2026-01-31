@@ -129,6 +129,8 @@ public:
 		uint32_t property_flag_mask = UINT32_MAX /* specifiy a mask that gets ANDd with each properties flags, will skip if its 0 */
 	);
 
+	void add_iproped_manual(IPropertyEditor* editor);
+
 	void add_class_to_grid(
 		ClassBase* classinst
 	);

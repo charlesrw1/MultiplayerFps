@@ -100,8 +100,10 @@ bind 7 "start_ed AnimGraph beu_character.ag"
 
 #start_ed Map "bike_empty.tmap"
 
-loglevel 0
-developer_mode 0
+loglevel 5
+developer_mode 1
+
+start_ed dumped_new_map.tmap
 	
 r.drawdecals 0
 

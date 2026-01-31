@@ -357,3 +357,24 @@ void RemoveComponentCommand::undo() {
 	comp_handle = ec->get_instance_id();
 }
 #endif
+
+CreateSpawnerCommand::CreateSpawnerCommand(EditorDoc& ed_doc, const std::string& cppclassname, const glm::mat4& transform) : ed_doc(ed_doc)
+{
+	this->transform = transform;
+	this->cppclassname = cppclassname;
+}
+#include "Game/Components/SpawnerComponenth.h"
+void CreateSpawnerCommand::execute()
+{
+	Entity* e = ed_doc.spawn_entity();
+	e->set_ws_transform(transform);
+	auto s = e->create_component<SpawnerComponent>();
+	s->set(cppclassname);
+	handle = e;
+}
+
+void CreateSpawnerCommand::undo()
+{
+	if (handle.get())
+		handle->destroy();
+}

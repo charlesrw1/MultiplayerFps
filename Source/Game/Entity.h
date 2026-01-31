@@ -171,7 +171,6 @@ private:
 	friend class UnserializedSceneFile;
 	friend class SelectionState;
 	friend class Level;
-	friend class Schema;
 	friend class LevelSerialization;
 	friend class DeferredSpawnScope;
 	friend class EdPropertyGrid;

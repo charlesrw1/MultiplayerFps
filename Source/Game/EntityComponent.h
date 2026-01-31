@@ -72,7 +72,6 @@ private:
 	bool call_init_in_editor = false;
 	bool tick_enabled = false;
 
-	friend class Schema;
 	friend class Entity;
 	friend class EdPropertyGrid;
 	friend class LevelSerialization;

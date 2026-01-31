@@ -22,18 +22,28 @@ public:
 
 	virtual std::string get_type_name() const  override
 	{
-		return "Component";
+		return "Component-Entity";
 	}
 
 	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override {
-		auto subclasses = ClassBase::get_subclasses<Component>();
-		for (; !subclasses.is_end(); subclasses.next()) {
-			if (subclasses.get_type()->has_allocate_func()) {
-				std::string path = subclasses.get_type()->classname;
 
-				filepaths.push_back(path);
-			}
-		}
+		// all editor spawnable components here fixme
+		filepaths.push_back("DecalComponent");
+
+		filepaths.push_back("SpotLightComponent");
+		filepaths.push_back("PointLightComponent");
+		filepaths.push_back("SunLightComponent");
+		filepaths.push_back("SkylightComponent");
+		filepaths.push_back("CubemapComponent");
+		filepaths.push_back("LightmapComponent");
+
+		filepaths.push_back("MeshComponent");
+
+		filepaths.push_back("ParticleComponent");
+		filepaths.push_back("TrailComponent");
+		filepaths.push_back("BeamComponent");
+
+		filepaths.push_back("SoundComponent");
 	}
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Component::StaticType; }
 

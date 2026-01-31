@@ -3,7 +3,6 @@
 #include "Framework/MapUtil.h"
 #include "Log.h"
 #include "SerializedForDiffing.h"
-const char* const CLASSNAME = "classname";
 
 //extern string serialize_build_relative_path(const char* from, const char* to);
 //extern string unserialize_relative_to_absolute(const char* relative, const char* root);

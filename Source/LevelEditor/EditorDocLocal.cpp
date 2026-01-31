@@ -114,6 +114,16 @@ Color32 to_color32(glm::vec4 v) {
 	return c;
 }
 
+bool check_if_string_is_number(const char* str) {
+	try {
+		std::stod(str);
+		return true;
+	}
+	catch (...) {
+		return false;
+	}
+}
+
 
 void EditorDoc::validate_fileids_before_serialize()
 {
@@ -121,7 +131,8 @@ void EditorDoc::validate_fileids_before_serialize()
 	auto& objs = level->get_all_objects();
 	
 }
-
+#include "Framework/SerializerJson2.h"
+#include "ObjectOutlineFilter.h"
 void EditorDoc::init_new()
 {
 	clear_editor_changes();
@@ -170,7 +181,122 @@ void EditorDoc::init_new()
 
 
 	cmds = ConsoleCmdGroup::create("");
-	
+	cmds->add("all", [this](const Cmd_Args& args) {
+		auto& objs = eng->get_level()->get_all_objects();
+		for (auto s : objs)
+			args.sys_print(Info, "%lld\n", int64_t(s->get_instance_id()));
+		});
+	cmds->add("sel", [this](const Cmd_Args& args) {
+		auto selected = selection_state->get_selection_as_vector();
+		for (auto s : selected)
+			args.sys_print(Info, "%lld\n", int64_t(s.handle));
+		});
+	cmds->add("pp", [this](const Cmd_Args& args) {
+		const string ents = args.at(1);
+		auto lines = StringUtils::to_lines(ents);
+
+		for (auto& e : lines) {
+			int64_t id = std::stoll(e);
+			Entity* ent = EntityPtr(id).get();
+			if (!ent) continue;
+			const char* comp_name = "<no component>";
+			const char* ent_name = "";
+			if (ent->get_editor_name().size() > 0)
+				ent_name = ent->get_editor_name().c_str();
+			if (ent->get_components().size() > 0) {
+				auto c = ent->get_components().at(0);
+				comp_name = c->get_type().classname;
+				if (c->is_a<MeshComponent>()) {
+					auto mc = (MeshComponent*)c;
+					if (mc->get_model())
+						comp_name = mc->get_model()->get_name().c_str();
+				}
+			}
+
+			args.sys_print(Info, "%-5lld %-20s %s\n", int64_t(id), comp_name, ent_name);
+
+		}
+	});
+
+	cmds->add("fil", [this](const Cmd_Args& args) {
+		const string ents = args.at(2);
+		const string filter = args.at(1);
+
+		auto lines = StringUtils::to_lines(ents);
+		for (auto& e : lines) {
+			int64_t id = std::stoll(e);
+			Entity* ent = EntityPtr(id).get();
+			if (!ent) continue;
+			if (OONameFilter::does_entity_pass_one_filter(filter, ent))
+				args.sys_print(Info, "%lld\n", int64_t(id));
+		}
+		});
+	cmds->add("so", [this](const Cmd_Args& args) {
+		const string ents = args.at(1);
+		auto lines = StringUtils::to_lines(ents);
+		selection_state->clear_all_selected();
+		for (auto& e : lines) {
+			int64_t id = std::stoll(e);
+			selection_state->add_to_entity_selection(EntityPtr(id));
+		}
+		});
+	cmds->add("sfso", [this](const Cmd_Args& args) {
+		auto str = string_format("sel | fil %s | so\n", args.at(1));
+		Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, str);
+		});
+	cmds->add("afso", [this](const Cmd_Args& args) {
+		auto str = string_format("all | fil %s | so\n", args.at(1));
+		Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, str);
+		});
+
+	cmds->add("as", [this](const Cmd_Args& args) {
+		const string ents = args.at(1);
+		auto lines = StringUtils::to_lines(ents);
+		for (auto& e : lines) {
+			int64_t id = std::stoll(e);
+			selection_state->add_to_entity_selection(EntityPtr(id));
+		}
+		});
+	cmds->add("us", [this](const Cmd_Args& args) {
+		const string ents = args.at(1);
+		auto lines = StringUtils::to_lines(ents);
+		for (auto& e : lines) {
+			int64_t id = std::stoll(e);
+			selection_state->remove_from_selection(EntityPtr(id));
+		}
+		});
+	cmds->add("set-field", [this](const Cmd_Args& args) {
+		const string ents = args.at(3);
+		nlohmann::json jsonObj;
+		if (check_if_string_is_number(args.at(2)))
+			jsonObj[args.at(1)] = std::stod(args.at(2));
+		else if (strcmp(args.at(2), "true") == 0)
+			jsonObj[args.at(1)] = true;
+		else if (strcmp(args.at(2), "false") == 0)
+			jsonObj[args.at(1)] = false;
+		else
+			jsonObj[args.at(1)] = args.at(2);
+
+		const string filter = args.at(1);
+
+		auto lines = StringUtils::to_lines(ents);
+		for (auto& e : lines) {
+			int64_t id = std::stoll(e);
+			Entity* ent = EntityPtr(id).get();
+			if (!ent) 
+				continue;
+			{
+				ReadSerializerBackendJson2 reader("", jsonObj, *AssetDatabase::loader, *ent);
+			}
+			if (ent->get_components().size() > 0) {
+				ReadSerializerBackendJson2 reader("", jsonObj, *AssetDatabase::loader, *ent->get_components().at(0));
+			}
+			ent->invalidate_transform(nullptr);
+		}
+		});
+
+
+
 
 	cmds->add("SET_ORBIT_TARGET", [this](const Cmd_Args&) {
 		set_camera_target_to_sel();
@@ -643,6 +769,8 @@ Bounds transform_bounds(glm::mat4 transform, Bounds b)
 	return out;
 }
 
+ConfigVar draw_coords_under_mouse("draw_coords_under_mouse", "0", CVAR_BOOL,"");
+
 void EditorDoc::tick(float dt)
 {
 
@@ -664,6 +792,7 @@ void EditorDoc::tick(float dt)
 		}
 
 	}
+
 
 	if (!using_ortho)
 		vs_setup = View_Setup(camera.position, camera.front, fov, 0.01, 100.0, window_sz.x, window_sz.y);
@@ -1017,6 +1146,36 @@ void EditorDoc::imgui_draw()
 	command_mgr->execute_queued_commands();
 
 	drag_drop_preview->tick();
+
+
+	if (draw_coords_under_mouse.get_bool() && UiSystem::inst->is_vp_hovered()) {
+		int x, y;
+		SDL_GetMouseState(&x, &y);
+
+		auto size = UiSystem::inst->get_vp_rect().get_pos();
+
+		const float scene_depth = idraw->get_scene_depth_for_editor(x - size.x, y - size.y);
+		if (abs(scene_depth) <= 300) {
+			glm::vec3 dir = unproject_mouse_to_ray(x, y);
+			glm::vec3 pos = vs_setup.origin + dir * scene_depth;
+
+			auto& win = UiSystem::inst->window;
+			const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+
+			TextShape text;
+			text.font = font;
+			text.with_drop_shadow = true;
+			text.color = COLOR_WHITE;
+
+			std::string str = string_format("%.1f %.1f %.1f",pos.x,pos.y,pos.z);
+			text.text = str.c_str();
+			text.rect.x = x - size.x;
+			text.rect.y = y - size.y;
+
+			win.draw(text);
+		}
+
+	}
 }
 void EditorDoc::hook_pre_scene_viewport_draw()
 {
@@ -1161,7 +1320,13 @@ void EditorDoc::hook_scene_viewport_draw()
 
 			if (const ImGuiPayload* dummy = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")) {
 
-				if (resource->type->get_asset_class_type()->is_a(Entity::StaticType)) {
+				if (resource->type->get_type_name() == "Spawner-Entity") {
+					command_mgr->add_command(new CreateSpawnerCommand(*this,
+						resource->filename,
+						drop_transform)
+					);
+				}
+				else if (resource->type->get_asset_class_type()->is_a(Entity::StaticType)) {
 					command_mgr->add_command(new CreateCppClassCommand(*this,
 						resource->filename,
 						drop_transform, EntityPtr(), false)
@@ -1456,6 +1621,36 @@ EdPropertyGrid::EdPropertyGrid(EditorDoc& ed_doc, const FnFactory<IPropertyEdito
 	ed_doc.on_component_deleted.add(this, &EdPropertyGrid::on_ec_deleted);
 	ed_doc.on_component_created.add(this, &EdPropertyGrid::on_select_component);
 }
+#include "Game/Components/SpawnerComponenth.h"
+
+class SpawnerIProped : public IPropertyEditor {
+public:
+	SpawnerIProped(SpawnerComponent* sc, string key) : sc(sc),key2(key) {
+		prop = &hacked_bullshit;
+		hacked_bullshit.name = key2.c_str();
+		value = sc->obj[key];
+		instance = this;//bs
+	}
+	~SpawnerIProped() {
+		sc->obj[key2] = value;
+	}
+	bool internal_update() {
+		ImguiInputTextCallbackUserStruct user;
+		user.string = &value;
+		if (ImGui::InputText("##input_text", (char*)value.c_str(), value.size() + 1/* null terminator byte */,
+			ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user)) {
+			value.resize(strlen(value.c_str()));	// imgui messes with buffer size
+			sc->obj[key2] = value;
+			return true;
+		}
+		return false;
+	}
+	PropertyInfo hacked_bullshit;
+	string key2;
+	string value;
+	obj<SpawnerComponent> sc;
+};
+
 
 void EdPropertyGrid::refresh_grid()
 {
@@ -1501,6 +1696,15 @@ void EdPropertyGrid::refresh_grid()
 				if (ti->props)
 					grid.add_property_list_to_grid(ti->props, c);
 				ti = ti->super_typeinfo;
+			}
+
+			if (c->is_a<SpawnerComponent>()) {
+				auto sc = (SpawnerComponent*)c;
+				for (auto& [name, prop] : sc->obj.items()) {
+					if (name[0] == '_')
+						continue;
+					grid.add_iproped_manual(new SpawnerIProped(sc, name));
+				}		
 			}
 		}
 	}

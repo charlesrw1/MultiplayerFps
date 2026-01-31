@@ -111,6 +111,21 @@ public:
 	EntityPtr parent_to;
 	bool is_component_type = false;
 };
+class CreateSpawnerCommand : public Command
+{
+public:
+	EditorDoc& ed_doc;
+	CreateSpawnerCommand(EditorDoc& ed_doc, const std::string& cppclassname, const glm::mat4& transform);
+
+	void execute() final;
+	void undo() final;
+	std::string to_string() final {
+		return "Create Spawner";
+	}
+	std::string cppclassname;
+	glm::mat4 transform;
+	EntityPtr handle;
+};
 
 
 class TransformCommand : public Command

@@ -319,6 +319,7 @@ void Cmd_Args::sys_print(LogType type, const char* fmt, ...) const
 	va_end(args);
 }
 
+
 static StringView strip_string_view(StringView sv)
 {
 	int i = 0;
@@ -333,9 +334,9 @@ static StringView strip_string_view(StringView sv)
 class Cmd_Manager_Impl : public Cmd_Manager
 {
 public:
-	const char* print_matches(const char* match) {
+	std::string print_matches(const char* match) {
 		struct Match {
-			const char* name = "";
+			string name = "";
 			const char* desc = "";
 		};
 		std::vector<Match> matches;
@@ -349,21 +350,39 @@ public:
 			if (c.first.find(match) != std::string::npos)
 				matches.push_back({ c.first.c_str(),nullptr });
 		}
+		if (matches.empty())
+			return "";
 		if (matches.size() == 1)
 			return matches[0].name;
 
 		std::sort(matches.begin(), matches.end(), [](Match a, Match b)
 			{
-				return strcmp(a.name, b.name) < 0;
+				return a.name < b.name;
 			});
-		sys_print(Info, ">");
+
+
+
+		//sys_print(Info, ">");
 		for (auto m : matches) {
 			if(m.desc)
-				sys_print(Info, ". %-24s: %s\n", m.name,m.desc);
+				sys_print(Info, ". %-24s: %s\n", m.name.c_str(),m.desc);
 			else
-				sys_print(Info, ". %s\n", m.name);
+				sys_print(Info, ". %s\n", m.name.c_str());
 		}
-		return nullptr;
+
+		string prefix = matches.at(0).name;
+
+		for (int i = 1; i < matches.size(); i++) {
+			int j = 0;
+			while (j < prefix.size() && j < matches[i].name.size()
+				&& prefix[j] == matches[i].name[j]) {
+				j++;
+			}
+			prefix = prefix.substr(0, j);
+			if (prefix.empty()) break;
+		}
+
+		return prefix;
 	}
 	void add_command(const char* name, Engine_Cmd_Function cmd) {
 

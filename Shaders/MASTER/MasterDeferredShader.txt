@@ -321,6 +321,22 @@ vec4 pbr_calculate_transparent(vec3 worldspace, vec3 Albedo, float Transmission,
 }
 #endif
 
+float grid3D_AA(vec3 p, float lineWidth)
+{
+    vec3 cell = fract(p);
+
+    // Distance to nearest grid plane
+    vec3 dist = min(cell, 1.0 - cell);
+
+    // Screen-space derivative for AA
+    vec3 fw = fwidth(p);
+
+    // Smooth grid lines
+    vec3 line = smoothstep(fw * lineWidth, vec3(0.0), dist);
+
+    return max(max(line.x, line.y), line.z);
+}
+
 void main()
 {
 #ifdef DEPTH_ONLY
@@ -413,8 +429,14 @@ void main()
 			GBUFFER_OUT_Emissive.rgb = randColor(FS_IN_Matid+279343)*normal_mult_debug;
 		else if(g.debug_options == DEBUG_NORMAL)
 			GBUFFER_OUT_Emissive.rgb = (GBUFFER_OUT_Normal.rgb*0.5+vec3(0.5));
-		else if(g.debug_options == DEBUG_ALBEDO)
-			GBUFFER_OUT_Emissive.rgb = BASE_COLOR*normal_mult_debug;
+		else if(g.debug_options == DEBUG_ALBEDO) {
+			float major = grid3D_AA(FS_IN_FragPos*vec3(0.5),0.9);
+			float minor = grid3D_AA(FS_IN_FragPos*vec3(1),0.6);
+			float is_grid = max(minor,major);
+			vec3 grid_color = mix(vec3(0.5),vec3(0.9),major);
+			
+			GBUFFER_OUT_Emissive.rgb = mix(BASE_COLOR,grid_color, is_grid)*normal_mult_debug;
+		}
 		else if(g.debug_options == DEBUG_WIREFRAME) {
 			if((g.flags & 1)!=0)	// second pass
 				GBUFFER_OUT_Emissive = vec4(0.0,0.5,0.5,1.0);

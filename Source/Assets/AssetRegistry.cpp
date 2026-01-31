@@ -14,6 +14,8 @@
 #include "HackedReloader.h"
 #include "Framework/Config.h"
 #include "Assets/AssetDatabase.h"
+
+
 void TOUCH_ASSET(const Cmd_Args& args)
 {
 	if (args.size() != 2) {

@@ -29,7 +29,6 @@ class Client;
 class Server;
 struct SDL_Window;
 class IEditorTool;
-class Schema;
 class Level;
 class OsInput;
 struct ImGuiContext;

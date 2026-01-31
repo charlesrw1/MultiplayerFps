@@ -26,40 +26,7 @@
 // create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
 #ifdef EDITOR_BUILD
 extern IEditorTool* g_editor_doc;	// EditorDocPublic.h
-class EntityTypeMetadata : public AssetMetadata
-{
-public:
-	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() const  override
-	{
-		return { 117, 75, 242 };
-	}
 
-	virtual std::string get_type_name() const  override
-	{
-		return "EntityClass";
-	}
-
-	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override {
-		auto subclasses = ClassBase::get_subclasses<Entity>();
-		for (; !subclasses.is_end(); subclasses.next()) {
-			if (subclasses.get_type()->has_allocate_func()) {
-				std::string path = subclasses.get_type()->classname;
-				//auto parent = subclasses.get_type();
-				//while (parent && parent != &Entity::StaticType) {
-				//	path.insert(0, std::string(parent->super_typeinfo->classname) + "/");
-				//	parent = parent->super_typeinfo;
-				//}
-				
-				filepaths.push_back(path);
-			}
-		}
-	}
-
-	virtual const ClassTypeInfo* get_asset_class_type() const { return &Entity::StaticType; }
-
-};
-REGISTER_ASSETMETADATA_MACRO(EntityTypeMetadata);
 #endif
 
 

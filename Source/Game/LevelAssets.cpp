@@ -123,6 +123,50 @@ public:
 	}
 };
 static AutoRegisterAsset<PrefabAssetMetadata> prefab_register_0987;
+
+void SchemaManager::init() {
+	auto ents = FileSys::open_read_game("ent_schema.json");
+	if (ents) {
+		string textForm = std::string(ents->size(), ' ');
+		ents->read((void*)textForm.data(), textForm.size());
+		schema_file = nlohmann::json::parse(textForm);
+	}
+	else {
+		sys_print(Warning, "no entity schema (ent_schema.json)\n");
+	}
+}
+
+
+class SpawnerAssetMeta : public AssetMetadata
+{
+public:
+	SpawnerAssetMeta() {
+	}
+
+	// Inherited via AssetMetadata
+	virtual Color32 get_browser_color()  const override
+	{
+		return { 255, 117, 133 };
+	}
+
+	virtual std::string get_type_name() const  override
+	{
+		return "Spawner-Entity";
+	}
+
+	//IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
+
+	virtual const ClassTypeInfo* get_asset_class_type() const { return nullptr; }
+	void fill_extra_assets(std::vector<std::string>& out) const final {
+		auto& json = SchemaManager::get().schema_file;
+		for (auto&[name,dict] : json.items()) {
+			out.push_back(name);
+		}
+	}
+};
+static AutoRegisterAsset<SpawnerAssetMeta> schefab_register_0987;
+
+
 #endif
 
 //YOU ARE GARBAGE

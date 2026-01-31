@@ -116,8 +116,6 @@ public:
 	// hack garbage
 	void sys_print(LogType type, const char* fmt, ...) const;
 
-	void spawn_background_command(std::unique_ptr<BackgroundCommand> ptr);
-
 	bool get_did_err() const { return did_err; }
 	void set_output_pipe(std::string* ptr) {
 		pipe_output_to_this = ptr;
@@ -164,7 +162,7 @@ public:
 	virtual void execute_buffer() = 0;
 	virtual void set_set_unknown_variables(bool b) = 0;
 	// returns string of match if one match exists, otherwise null
-	virtual const char* print_matches(const char* match) = 0;
+	virtual std::string print_matches(const char* match) = 0;
 };
 
 class Auto_Engine_Cmd

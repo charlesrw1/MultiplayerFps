@@ -520,6 +520,22 @@ const MaterialParameterDefinition* MasterMaterialImpl::find_definition(const std
 	return nullptr;
 }
 
+static const char* get_master_shader_path(MaterialUsage usage)
+{
+	const char* master_shader_path = "MASTER/MasterDeferredShader.txt";
+	if (usage == MaterialUsage::Terrain)
+		master_shader_path = "MASTER/MasterTerrainShader.txt";
+	else if (usage == MaterialUsage::Decal)
+		master_shader_path = "MASTER/MasterDecalShader.txt";
+	else if (usage == MaterialUsage::UI)
+		master_shader_path = "MASTER/MasterUIShader.txt";
+	else if (usage == MaterialUsage::Postprocess)
+		master_shader_path = "MASTER/MasterPostProcessShader.txt";
+	else if (usage == MaterialUsage::Particle)
+		master_shader_path = "MASTER/MasterParticleShader.txt";
+	return master_shader_path;
+}
+
 void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file, IAssetLoadingInterface* loading)
 {
 
@@ -723,10 +739,15 @@ void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 	// so it has to be done there.
 	// also this only looks at the timestamp of the .mm file, not the master file or includes
 	// so have to clean out .glsl files if you change includes/master
-	if (developer_mode.get_bool()) {
+	//if (developer_mode.get_bool()) 
+	{
 		auto out_glsl_path = strip_extension(fullpath) + "_shader.glsl";
 		auto outGlslFile = FileSys::open_read_game(out_glsl_path);
-		if (!outGlslFile || outGlslFile->get_timestamp() < file->get_timestamp()) {
+		auto masterFile = FileSys::open_read_engine(("Shaders\\" + std::string(get_master_shader_path(usage))).c_str());
+		ASSERT(masterFile);
+
+		if (!outGlslFile || outGlslFile->get_timestamp() < file->get_timestamp() || outGlslFile->get_timestamp() < masterFile->get_timestamp()) {
+			masterFile.reset(); // close master
 			sys_print(Debug, "MasterMaterialImpl::load_from_file: updating .glsl because its out of date (%s)\n", out_glsl_path.c_str());
 			string outStr = create_glsl_shader(vs_code, fs_code, inst_dats);
 			outGlslFile.reset(); // close it
@@ -820,6 +841,8 @@ static void replace_variable(std::string& str, const std::string& from, const st
 	}
 }
 
+
+
 std::string MasterMaterialImpl::create_glsl_shader(
 	std::string& vs_code,
 	std::string& fs_code,
@@ -828,17 +851,7 @@ std::string MasterMaterialImpl::create_glsl_shader(
 {
 	std::string masterShader;
 
-	const char* master_shader_path = "MASTER/MasterDeferredShader.txt";
-	if (usage == MaterialUsage::Terrain)
-		master_shader_path = "MASTER/MasterTerrainShader.txt";
-	else if (usage == MaterialUsage::Decal)
-		master_shader_path = "MASTER/MasterDecalShader.txt";
-	else if (usage == MaterialUsage::UI)
-		master_shader_path = "MASTER/MasterUIShader.txt";
-	else if (usage == MaterialUsage::Postprocess)
-		master_shader_path = "MASTER/MasterPostProcessShader.txt";
-	else if (usage == MaterialUsage::Particle)
-		master_shader_path = "MASTER/MasterParticleShader.txt";
+	const char* master_shader_path = get_master_shader_path(usage);
 
 	// handle defines here?
 	if (usage == MaterialUsage::Decal) {

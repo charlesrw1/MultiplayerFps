@@ -178,6 +178,12 @@ void PropertyGrid::add_property_list_to_grid(const PropertyInfoList* list, void*
 
 }
 
+void PropertyGrid::add_iproped_manual(IPropertyEditor* editor)
+{
+	PropertyRow* prop_ = new PropertyRow(editor,nullptr,editor,editor->prop/* hack job*/, -1);
+	rows.push_back(std::unique_ptr<IGridRow>(prop_));
+}
+
 void PropertyGrid::add_class_to_grid(ClassBase* classinst)
 {
 	auto ti = &classinst->get_type();
