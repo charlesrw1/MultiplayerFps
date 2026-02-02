@@ -7,7 +7,7 @@
 #include "Framework/Hashset.h"
 #include "Framework/ReflectionMacros.h"
 #include "Game/SerializePtrHelpers.h"
-
+#include "Framework/LuaColor.h"
 // fixme: these arent optimized really
 
 struct ParticleDef
@@ -22,6 +22,90 @@ struct ParticleDef
 	Color32 colorA{};
 	uint8_t lightIndex{};
 };
+#include "Assets/AssetDatabase.h"
+class ParticleDefinition : public IAsset {
+public:
+	CLASS_BODY(ParticleDefinition);
+
+	bool load_asset(IAssetLoadingInterface* loading) final { return true; }
+	void post_load() final {}
+	void uninstall() final {}
+	void move_construct(IAsset* other) final {}
+
+
+	REF static ParticleDefinition* create(std::string name) {
+		auto particle = g_assets.find_sync<ParticleDefinition>(name).get();
+		*particle = ParticleDefinition();
+		particle->editor_set_newly_made_path(name);
+		return particle;
+	}
+
+	REF void print(std::string s) {
+		sys_print(Warning, "%s\n", s.c_str());
+	}
+
+	REF void set_rate(float f) { 
+		continious_rate = f; }
+	REF void set_burst(float time, float min, float max) { 
+		burst_time = time; burst_min = min; burst_max = max; }
+
+	REF void set_gravity_drag(float g, float d) { 
+		gravity = g; drag = d; }
+	REF void set_size(float min, float max, float decay) { 
+		size_min = min; size_max = max; size_decay = decay; }
+	REF void set_color(lColor start, lColor end) {
+		start_color = start.to_color32(); end_color = end.to_color32();
+	}
+
+
+
+	float continious_rate = 0.f;	// particles/s
+	float burst_time = 0.f;
+	short burst_min = 0;
+	short burst_max = 0;
+	float gravity = 0.f;
+	float drag = 0.f;
+	float life_time_min = .5f;
+	float life_time_max = 1.f;
+	float size_min = 1.f;
+	float size_max = 1.f;
+	float size_decay = 0.f;
+	Color32 start_color = COLOR_WHITE;
+	Color32 end_color = COLOR_WHITE;
+	float alpha_start = 1.0;
+	float alpha_end = 1.0;
+	float intensity = 1.0;
+	float intensity_decay = 0.;
+	float rotation_min = 0.f;
+	float rotation_max = 0.f;
+	float rot_vel_min = 0.f;
+	float rot_vel_max = 0.f;
+	float spawn_sphere_min = 0.f;
+	float spawn_sphere_max = 0.5f;
+	glm::vec3 bias = glm::vec3(1, 1, 1);
+	bool init_particle_vel_sphere = true;
+	float speed_min = 0.f;
+	float speed_max = 1.f;
+	float speed_exp = 1.f;
+	glm::vec3 radial_vel = glm::vec3(0, 0, 0);
+	float orbital_strength = 0.0;
+	bool inherit_transform = true;
+	bool inherit_velocity = false;
+	MaterialInstance* material = nullptr;
+};
+
+class ParticleInstComponent : public Component {
+public:
+	CLASS_BODY(ParticleInstComponent);
+	REF ParticleDefinition* def = nullptr;
+
+#ifdef EDITOR_BUILD
+	const char* get_editor_outliner_icon() const final {
+		return "eng/editor/particle.png";
+	}
+#endif
+};
+
 
 class ParticleComponent : public Component {
 public:

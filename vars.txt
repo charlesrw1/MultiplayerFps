@@ -43,7 +43,3 @@ disable_texture_loads 0
 g_debug_skeletons 0
 force_animation_to_bind_pose 1
 
-developer_mode 0
-loglevel 0
-
-r.print_light_tiles 1

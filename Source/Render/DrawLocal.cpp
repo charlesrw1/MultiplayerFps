@@ -435,8 +435,10 @@ void Program_Manager::recompile_normal(program_def& def)
 	string hashed_path = compute_hash_for_program_def(def) + ".bin";
 	auto binFile = FileSys::open_read(hashed_path.c_str(), FileSys::SHADER_CACHE);
 	auto shaderFile = FileSys::open_read_engine(("Shaders\\"+def.vert).c_str());
+	auto shaderFileF = FileSys::open_read_engine(("Shaders\\" + def.frag).c_str());
+
 	if (shaderFile && binFile) {
-		if (shaderFile->get_timestamp() <= binFile->get_timestamp()) {
+		if (shaderFile->get_timestamp() <= binFile->get_timestamp() && shaderFileF->get_timestamp() <= binFile->get_timestamp()) {
 			if (log_shader_compiles.get_bool())
 				sys_print(Debug, "Program_Manager::recompile: loading cached binary: %s\n", hashed_path.data());
 
@@ -1800,11 +1802,13 @@ void Render_Pass::make_batches(Render_Scene& scene)
 	// objects were added correctly in back to front order, just sort by layer
 	const auto& sort_functor_transparent = [](const Pass_Object& a, const Pass_Object& b)
 	{
-		if (a.sort_key.blending < b.sort_key.blending) return true;
-		if (a.sort_key.distance > b.sort_key.distance) return true;
-		else if (a.sort_key.as_uint64() == b.sort_key.as_uint64())
-			return a.submesh_index < b.submesh_index;
-		else return false;
+		if (a.sort_key.blending != b.sort_key.blending) 
+			return a.sort_key.blending < b.sort_key.blending;
+		if (a.sort_key.distance != b.sort_key.distance)
+			return a.sort_key.distance > b.sort_key.distance;
+		else if (a.sort_key.as_uint64() != b.sort_key.as_uint64())
+			return a.sort_key.as_uint64() < b.sort_key.as_uint64();
+		return a.submesh_index < b.submesh_index;
 	};
 
 	if (type == pass_type::TRANSPARENT)
@@ -3829,6 +3833,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 			ColorTargetInfo(tex.editor_id_buffer),
 			ColorTargetInfo(tex.scene_motion),
 		};
+
+		setup2.use_gray_clear = true;
 		setup2.color_infos = color_targets;
 		setup2.depth_info = tex.scene_depth;
 		setup2.wants_color_clear = (clear_framebuffer);	// depth clear done in prepass above
@@ -3915,11 +3921,11 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 		render_particles();
 	};
-	draw_forward_pass();
 
 	if(!params.skybox_only)
 		draw_height_fog();
 
+	draw_forward_pass();
 
 	// cubemap views end here
 	// dont need to draw post processing or UI stuff

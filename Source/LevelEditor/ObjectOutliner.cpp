@@ -797,7 +797,7 @@ static bool check_props_for_assetptr_or_entityptr(const string& filter, void* in
 	}
 	return false;
 }
-
+#include "Game/Components/SpawnerComponenth.h"
 bool OONameFilter::does_entity_pass_one_filter(const string& filter, Entity* e)
 {
 	// check: name of object, component names, id of object
@@ -814,6 +814,11 @@ bool OONameFilter::does_entity_pass_one_filter(const string& filter, Entity* e)
 	
 	// now check properties
 	for (auto& c : e->get_components()) {
+		if (auto sc = c->cast_to<SpawnerComponent>()) {
+			if (is_in_string(filter, sc->get_spawner_type()))
+				return true;
+		}
+
 		auto type = &c->get_type();
 		while (type) {
 			const PropertyInfoList* p = type->props;

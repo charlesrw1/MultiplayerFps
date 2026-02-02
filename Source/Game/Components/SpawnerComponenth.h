@@ -17,5 +17,8 @@ public:
 	void set(string schema_name);
 	nlohmann::json obj;
 	void set_model();
+	string get_spawner_type() {
+		return obj["_type"];
+	}
 private:
 };

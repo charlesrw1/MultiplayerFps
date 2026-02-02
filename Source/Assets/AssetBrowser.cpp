@@ -38,7 +38,9 @@ AssetBrowser::AssetBrowser()
 }
 AssetBrowser* AssetBrowser::inst = nullptr;
 #include "EngineSystemCommands.h"
-static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesystemNode* node)
+ConfigVar ignore_folders("ignore_folders", "0", CVAR_BOOL, "");
+
+static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesystemNode* node, string parent_path)
 {
 	const float folder_indent = 20.0;
 	const int name_filter_len = strlen(b->asset_name_filter);
@@ -99,42 +101,56 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 			ImGui::SameLine();
 			ImGui::Dummy(ImVec2(indents * folder_indent, 0.1));
 			ImGui::SameLine();
-			ImGui::Text(node->name.c_str());
+			if (ignore_folders.get_bool()) {
+				string name = parent_path + "/" + node->name;
+				ImGui::Text(name.c_str());
+
+			}
+			else {
+				ImGui::Text(node->name.c_str());
+			}
+
 			ImGui::TableNextColumn();
 			ImGui::TextColored(color32_to_imvec4(asset.type->get_browser_color()), "%s", asset.type->get_type_name().c_str());
 
 			ImGui::PopID();
 		}
 		else {
-			ImGui::PushID(node);
+			if (!ignore_folders.get_bool()) {
 
-			ImGui::TableNextRow();
-			ImGui::TableNextColumn();
-			// folder node
-			ImGui::Dummy(ImVec2(indents * folder_indent, 0.1));
-			ImGui::SameLine();
-			//int flags = ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_SpanAvailWidth;
-			//if (node->folder_is_open)
-			//	flags |= ImGuiTreeNodeFlags_DefaultOpen;
-			//node->folder_is_open = ImGui::TreeNodeEx("##folder", flags);
-			bool booldummy = false;
-			int flagssel = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
-			if (ImGui::Selectable("##folder", &booldummy, flagssel))
-				node->folder_is_open = !node->folder_is_open;
-			//if(node->folder_is_open)
-			//	ImGui::TreePop();
-			ImGui::SameLine();
-			auto t = node->folder_is_open ? b->folder_open : b->folder_closed;
-			my_imgui_image(t, -1);
-			ImGui::SameLine();
-			ImGui::Text(node->name.c_str());
+				ImGui::PushID(node);
 
-			ImGui::TableNextColumn();
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				// folder node
+				ImGui::Dummy(ImVec2(indents * folder_indent, 0.1));
+				ImGui::SameLine();
+				//int flags = ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_SpanAvailWidth;
+				//if (node->folder_is_open)
+				//	flags |= ImGuiTreeNodeFlags_DefaultOpen;
+				//node->folder_is_open = ImGui::TreeNodeEx("##folder", flags);
+				bool booldummy = false;
+				int flagssel = ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+				if (ImGui::Selectable("##folder", &booldummy, flagssel))
+					node->folder_is_open = !node->folder_is_open;
+				//if(node->folder_is_open)
+				//	ImGui::TreePop();
+				ImGui::SameLine();
+				auto t = node->folder_is_open ? b->folder_open : b->folder_closed;
+				my_imgui_image(t, -1);
+				ImGui::SameLine();
+				ImGui::Text(node->name.c_str());
 
-			ImGui::PopID();
+				ImGui::TableNextColumn();
 
-			if(node->folder_is_open)
-				draw_browser_tree_view_R(b, indents + 1, node);
+				ImGui::PopID();
+			}
+			int add_indent = 1;
+			if (ignore_folders.get_bool()) 
+				add_indent = 0;
+
+			if(node->folder_is_open||ignore_folders.get_bool())
+				draw_browser_tree_view_R(b, indents + add_indent, node, parent_path + "/" + node->name);
 		}
 
 	}
@@ -154,7 +170,7 @@ static void draw_browser_tree_view(AssetBrowser* b)
 		
 		auto root = AssetRegistrySystem::get().get_root_files();
 		if(root)
-			draw_browser_tree_view_R(b, 0, root);
+			draw_browser_tree_view_R(b, 0, root, "");
 
 		ImGui::EndTable();
 	}

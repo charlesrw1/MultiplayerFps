@@ -157,6 +157,8 @@ struct RenderPassState {
 	bool wants_color_clear = false;
 	bool wants_depth_clear = false;
 	float clear_depth_val = 0.0;
+
+	bool use_gray_clear = false;
 };
 
 

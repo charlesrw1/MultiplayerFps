@@ -737,8 +737,6 @@ void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 	// i have another layer beneath this  (in Prog_Man) that compiles the glsl to a platform binary (which is cached), but that 
 	// layer depends on dynamic usage state like if its an animator object, editor mode, etc.
 	// so it has to be done there.
-	// also this only looks at the timestamp of the .mm file, not the master file or includes
-	// so have to clean out .glsl files if you change includes/master
 	//if (developer_mode.get_bool()) 
 	{
 		auto out_glsl_path = strip_extension(fullpath) + "_shader.glsl";

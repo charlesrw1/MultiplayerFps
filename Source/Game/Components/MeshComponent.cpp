@@ -60,7 +60,7 @@ MeshComponent::MeshComponent() {
 }
 glm::mat4 MeshComponent::get_ls_transform_of_bone(StringName bonename) const
 {
-	auto mod = model.get();
+	auto mod = model;
 	if (!mod || !mod->get_skel())
 		return glm::mat4(1);
 	auto& allbones = mod->get_skel()->get_all_bones();
@@ -181,12 +181,7 @@ void MeshComponent::pre_start()
 	sync_render_data();
 	set_ticking(false);
 
-	if (!eng->is_editor_level() && add_collision_if_available && model && model->get_physics_body()) {
-		MeshColliderComponent* existing = get_owner()->get_component<MeshColliderComponent>();
-		if (!existing) {
-			get_owner()->create_component<MeshColliderComponent>();
-		}
-	}
+	update_physics_mesh();
 }
 
 void MeshComponent::start()
@@ -327,8 +322,21 @@ void AnimPreviewComponent::stop()
 void AnimPreviewComponent::editor_on_change_property()
 {
 }
+void MeshComponent::update_physics_mesh()
+{
+	MeshColliderComponent* existing = get_owner()->get_component<MeshColliderComponent>();
+	if (existing) {
+		existing->destroy();
+		existing = nullptr;
+	}
+
+	if (add_collision_if_available && model && model->get_physics_body()) {
+		get_owner()->create_component<MeshColliderComponent>();
+	}
+}
 void MeshComponent::editor_on_change_property()
 {
 	sync_render_data();
+	update_physics_mesh();
 }
 #endif

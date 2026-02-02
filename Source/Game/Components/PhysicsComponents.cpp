@@ -144,8 +144,8 @@ void PhysicsBody::on_shape_changes()
 }
 void PhysicsBody::on_actor_type_change()
 {
-	if (eng->is_editor_level())
-		return;
+	//if (eng->is_editor_level())
+	//	return;
 
 
 	if (physxActor) {
@@ -188,8 +188,8 @@ void PhysicsBody::on_actor_type_change()
 }
 void PhysicsBody::pre_start()
 {
-	if (eng->is_editor_level()) 
-		return;
+	//if (eng->is_editor_level()) 
+	//	return;
 
 	ASSERT(editor_shape_id==0);
 	ASSERT(!has_initialized());
@@ -554,6 +554,23 @@ void PhysicsBody::force_set_transform(const glm::mat4& m)
 	}
 }
 
+static void remove_scale_mat4(glm::mat4 &m)
+{
+	vec3 right = vec3(m[0][0], m[1][0], m[2][0]);
+	vec3 up = vec3(m[0][1], m[1][1], m[2][1]);
+	vec3 fwd = vec3(m[0][2], m[1][2], m[2][2]);
+
+	// Remove scale
+	right = normalize(right);
+	up = normalize(up);
+	fwd = normalize(fwd);
+
+
+	// Write back
+	m[0][0] = right.x; m[1][0] = right.y; m[2][0] = right.z;
+	m[0][1] = up.x;    m[1][1] = up.y;    m[2][1] = up.z;
+	m[0][2] = fwd.x;   m[1][2] = fwd.y;   m[2][2] = fwd.z;
+}
 void PhysicsBody::set_transform(const glm::mat4& transform, bool teleport)
 {
 	if (has_initialized()) {
@@ -561,7 +578,9 @@ void PhysicsBody::set_transform(const glm::mat4& transform, bool teleport)
 			// empty
 		}
 		else if (get_is_actor_static()) {
-			auto t = glm_to_physx(transform);
+			glm::mat4 temp = transform;
+			remove_scale_mat4(temp);
+			auto t = glm_to_physx(temp);
 			t.q.normalize();
 			physxActor->setGlobalPose(t);
 			if (simulate_physics)

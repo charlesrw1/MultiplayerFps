@@ -2,10 +2,36 @@
 #include "Render/RenderObj.h"
 #include "GameEnginePublic.h"
 #include "ParticleMgr.h"
+#include "BillboardComponent.h"
 
 // comment 6
-
+#include "Assets/AssetRegistry.h"
 ParticleMgr* ParticleMgr::inst = nullptr;
+
+class ParticleTypeMetadata : public AssetMetadata
+{
+public:
+	// Inherited via AssetMetadata
+	virtual Color32 get_browser_color() const  override
+	{
+		return { 154, 191, 19 };
+	}
+
+	virtual std::string get_type_name() const  override
+	{
+		return "Particle-Def";
+	}
+
+	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override {
+		std::vector<IAsset*> out;
+		g_assets.get_assets_of_type(out, &ParticleDefinition::StaticType);
+		for (auto i : out)
+			filepaths.push_back(i->get_name());
+	}
+	virtual const ClassTypeInfo* get_asset_class_type() const { return &ParticleDefinition::StaticType; }
+
+};
+REGISTER_ASSETMETADATA_MACRO(ParticleTypeMetadata);
 
 void ParticleComponent::on_sync_render_data()
 {
@@ -20,7 +46,14 @@ void ParticleComponent::on_sync_render_data()
 }
 void ParticleComponent::start()
 {
-	
+	if (eng->is_editor_level())
+	{
+		auto billboard = get_owner()->create_component<BillboardComponent>();
+		billboard->set_texture(Texture::load("eng/icon/_nearest/particle.png"));
+		billboard->dont_serialize_or_edit = true;	// editor only item, dont serialize
+	}
+
+
 	r.state = wang_hash((uint32_t)get_instance_id());
 	ParticleMgr::inst->register_this(this);
 

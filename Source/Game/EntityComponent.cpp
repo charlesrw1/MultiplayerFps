@@ -44,6 +44,9 @@ public:
 		filepaths.push_back("BeamComponent");
 
 		filepaths.push_back("SoundComponent");
+
+		filepaths.push_back("ParticleInstComponent");
+
 	}
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Component::StaticType; }
 

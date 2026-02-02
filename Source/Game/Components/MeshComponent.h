@@ -82,6 +82,8 @@ public:
 #endif
 
 private:
+	void update_physics_mesh();
+
 	REF AssetPtr<Model> model;
 	REF bool is_visible = true;
 	REF bool cast_shadows = true;

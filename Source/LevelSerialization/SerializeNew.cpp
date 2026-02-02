@@ -93,6 +93,11 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 		for (auto ent : input_objs) {
 			if (ent->get_components().size() == 0) 
 				continue;
+			if (ent->dont_serialize_or_edit)
+				continue;
+			if (ent->get_parent())
+				continue;
+
 			nlohmann::json out;
 			{
 				WriteSerializerBackendJson2 writer("", *ent);

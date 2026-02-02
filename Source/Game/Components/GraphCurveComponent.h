@@ -27,3 +27,5 @@ public:
 	CLASS_BODY(GraphCurveComponent);
 	REF GraphCurve curve;
 };
+
+

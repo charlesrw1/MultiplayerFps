@@ -287,8 +287,17 @@ void DuplicateEntitiesCommand::execute() {
 
 	//eng->get_level()->insert_unserialized_entities_into_level(duplicated);	// since duplicating, DONT pass in scene
 
+	ed_doc.selection_state->clear_all_selected();
+	
+	for (auto e : duplicated.all_obj_vec)
+		if (auto ent = e->cast_to<Entity>()) {
+			ed_doc.selection_state->add_to_entity_selection(ent);
+			handles.push_back(ent);
+		}
 
-	handles.clear();
+	ed_doc.manipulate->set_force_op(ImGuizmo::TRANSLATE);
+	ed_doc.manipulate->set_force_gizmo_on(true);
+
 
 	ed_doc.post_node_changes.invoke();
 }

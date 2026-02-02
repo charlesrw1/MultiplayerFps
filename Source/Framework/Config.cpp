@@ -405,7 +405,12 @@ public:
 		else {
 			auto group_cmd = find_cmd_in_groups(args.at(0));
 			if (group_cmd) {
-				(*group_cmd)(args);
+				try {
+					(*group_cmd)(args);
+				}
+				catch (...) {
+					sys_print(Error, "command threw exception.\n");
+				}
 			}
 			else {
 				ConfigVar* var = VarMan::get()->find(args.at(0));

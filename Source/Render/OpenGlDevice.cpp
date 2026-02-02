@@ -568,7 +568,10 @@ public:
 		glViewport(0, 0, min_width, min_height);
 		if (state.wants_color_clear || state.wants_depth_clear) {
 			glClearDepth(state.clear_depth_val);
-			glClearColor(0, 0.5, 0, 1);
+			if (state.use_gray_clear)
+				glClearColor(0.1, 0.1, 0.1, 1);
+			else
+				glClearColor(0, 0.5, 0, 1);
 			GLbitfield mask{};
 			if (state.wants_depth_clear)
 				mask |= GL_DEPTH_BUFFER_BIT;

@@ -58,6 +58,10 @@ ConfigVar ed_force_guizmo("ed.force_guizmo", "0", CVAR_BOOL, "");
 ConfigVar test1("test1", "200", CVAR_INTEGER, "", 0, 256);
 ConfigVar test2("test2", "200", CVAR_INTEGER, "", 0, 256);
 
+
+ConfigVar foliage_active("ed_foliage_active", "0", CVAR_BOOL, "");
+
+
 extern bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAsset* for_prefab);
 extern void export_godot_scene(const std::string& base_export_path);
 extern void export_level_scene();
@@ -68,7 +72,7 @@ static std::string to_string(StringView view) {
 	return std::string(view.str_start, view.str_len);
 }
 // Unproject mouse coords into a vector
-glm::vec3 EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
+Ray EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
 {
 	Ray r;
 	// get ui size
@@ -102,7 +106,7 @@ glm::vec3 EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
 
 		r.dir = dir;
 	}
-	return r.dir;
+	return r;
 }
 
 Color32 to_color32(glm::vec4 v) {
@@ -124,6 +128,28 @@ bool check_if_string_is_number(const char* str) {
 	}
 }
 
+string get_name_display_entity(const Entity* e) {
+	string name = (e->get_editor_name().c_str());
+	const bool is_prefab_root = false;// o.e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
+	if (name.empty()) {
+		if (is_prefab_root) {
+			//name = o.e->get_object_prefab().get_name().c_str();
+		}
+		else {
+			if (auto m = e->get_component<MeshComponent>()) {
+				if (m->get_model())
+					name = m->get_model()->get_name();
+			}
+			if (auto m = e->get_component<SpawnerComponent>()) {
+				name = m->get_spawner_type();
+			}
+		}
+	}
+	if (name.empty()) {
+		name = e->get_type().classname;
+	}
+	return name;
+}
 
 void EditorDoc::validate_fileids_before_serialize()
 {
@@ -133,6 +159,9 @@ void EditorDoc::validate_fileids_before_serialize()
 }
 #include "Framework/SerializerJson2.h"
 #include "ObjectOutlineFilter.h"
+#include "Animation/SkeletonData.h"
+#include "Game/Components/BillboardComponent.h"
+Bounds transform_bounds(glm::mat4 transform, Bounds b);
 void EditorDoc::init_new()
 {
 	clear_editor_changes();
@@ -142,8 +171,6 @@ void EditorDoc::init_new()
 	command_mgr = std::make_unique<UndoRedoSystem>();
 
 	dragger.on_drag_end.add(this,[this](Rect2d rect) {
-		auto newRect = gui.convert_rect(rect);
-		auto selection = idraw->mouse_box_select_for_editor(newRect.x, newRect.y, newRect.w, newRect.h);
 		auto type = MouseSelectionAction::ADD_SELECT;
 		if (Input::is_shift_down())
 			type = MouseSelectionAction::ADD_SELECT;
@@ -152,17 +179,66 @@ void EditorDoc::init_new()
 		else {
 			selection_state->clear_all_selected();
 		}
-		for (auto handle : selection) {
-			if (handle.is_valid()) {
-				auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
-				if (component_ptr) {
-					auto owner = component_ptr->get_owner();
-					ASSERT(owner);
 
-					do_mouse_selection(type, owner, true);
+		auto newRect = gui.convert_rect(rect);
+
+		if (using_ortho) {
+			Bounds aabb;
+			auto to_worldspace = [&](int x, int y) {
+				auto rect = UiSystem::inst->get_vp_rect();
+				glm::vec2 normalized(x / float(rect.w), y / float(rect.h));
+				normalized = normalized * 2.0f - glm::vec2(1.0);
+				float w = ortho_camera.width;
+				float aratio = float(rect.h) / rect.w;
+				glm::vec3 worldspace = ortho_camera.position - ortho_camera.side * normalized.x * w - ortho_camera.up * normalized.y * w * aratio;
+				return worldspace;
+			};
+			glm::vec3 point1 = to_worldspace(newRect.x, newRect.y) - ortho_camera.front * 1000.0f;
+			glm::vec3 point2 = to_worldspace(newRect.x+newRect.w, newRect.y+newRect.h) + ortho_camera.front * 1000.0f;
+			Bounds camb(point1);
+			camb = bounds_union(camb, point2);
+
+			auto& allobjs = eng->get_level()->get_all_objects();
+			for (auto obj : allobjs) {
+
+
+				if (auto m = obj->cast_to<MeshComponent>()) {
+					if (m->get_model() && m->get_is_visible() &&!m->get_owner()->get_hidden_in_editor() && !m->get_is_skybox()/*skipskybox*/) {
+						auto thisbounds = m->get_model()->get_bounds();
+						thisbounds = transform_bounds(m->get_owner()->get_ws_transform(), thisbounds);
+						if (thisbounds.intersect(camb))
+							do_mouse_selection(type, m->get_owner(), true);
+					}
+
+				}
+				else if (auto b = obj->cast_to<BillboardComponent>()) {
+					if (!b->get_owner()->get_hidden_in_editor()) {
+						auto thisbounds = Bounds(b->get_ws_position() - glm::vec3(0.5), b->get_ws_position() + glm::vec3(0.5));
+						if (thisbounds.intersect(camb))
+							do_mouse_selection(type, b->get_owner(), true);
+					}
+				}
+			}
+
+			// rect.x to world space:
+
+		}
+		else {
+			auto selection = idraw->mouse_box_select_for_editor(newRect.x, newRect.y, newRect.w, newRect.h);
+			for (auto handle : selection) {
+				if (handle.is_valid()) {
+					auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
+					if (component_ptr) {
+						auto owner = component_ptr->get_owner();
+						ASSERT(owner);
+
+						do_mouse_selection(type, owner, true);
+					}
 				}
 			}
 		}
+
+
 		gui.do_box_select(type);
 		});
 
@@ -174,6 +250,7 @@ void EditorDoc::init_new()
 	prop_editor = std::make_unique<EdPropertyGrid>(*this, grid_factory);
 	manipulate = std::make_unique<ManipulateTransformTool>(*this);
 	drag_drop_preview = std::make_unique<DragDropPreview>();
+	foliage_tool = std::make_unique<FoliagePaintTool>(*this);
 
 	PropertyFactoryUtil::register_basic(grid_factory);
 	PropertyFactoryUtil::register_editor(*this, grid_factory);
@@ -200,20 +277,9 @@ void EditorDoc::init_new()
 			Entity* ent = EntityPtr(id).get();
 			if (!ent) continue;
 			const char* comp_name = "<no component>";
-			const char* ent_name = "";
-			if (ent->get_editor_name().size() > 0)
-				ent_name = ent->get_editor_name().c_str();
-			if (ent->get_components().size() > 0) {
-				auto c = ent->get_components().at(0);
-				comp_name = c->get_type().classname;
-				if (c->is_a<MeshComponent>()) {
-					auto mc = (MeshComponent*)c;
-					if (mc->get_model())
-						comp_name = mc->get_model()->get_name().c_str();
-				}
-			}
+			string ent_name = get_name_display_entity(ent);
 
-			args.sys_print(Info, "%-5lld %-20s %s\n", int64_t(id), comp_name, ent_name);
+			args.sys_print(Info, "%-5lld %-20s %s\n", int64_t(id), comp_name, ent_name.c_str());
 
 		}
 	});
@@ -295,6 +361,74 @@ void EditorDoc::init_new()
 		}
 		});
 
+	cmds->add("set-box", [this](const Cmd_Args& args) {
+		glm::vec3 min{};
+		glm::vec3 max{};
+		for (int i = 0; i < 3; i++)
+			min[i] = std::atof(args.at(i + 1));
+		for (int i = 0; i < 3; i++)
+			max[i] = std::atof(args.at(i + 4));
+
+		for (int i = 0; i < 3; i++) {
+			if (min[i] > max[i]) std::swap(min[i], max[i]);
+		}
+		if (!selection_state->has_only_one_selected())
+			return;
+		Entity* e = selection_state->get_only_one_selected().get();
+		if (!e)
+			return;
+		MeshComponent* mc = e->get_component<MeshComponent>();
+		if (!mc||!mc->get_model())
+			return;
+		auto bounds = mc->get_model()->get_bounds();
+
+		glm::vec3 set_size = (max - min);
+		vec3 bounds_size = bounds.bmax - bounds.bmin;
+
+		glm::vec3 scale = set_size / bounds_size;
+		glm::vec3 bounds_c = bounds.get_center();
+
+		glm::vec3 frac = glm::abs(bounds.bmin / bounds_size);
+
+		glm::vec3 set_center = frac * set_size + min;
+		e->set_ws_transform(set_center, glm::quat(), scale);
+		});
+	cmds->add("bone-list", [this](const Cmd_Args& args) {
+		if (!selection_state->has_only_one_selected())
+			return;
+		Entity* e = selection_state->get_only_one_selected().get();
+		if (!e)
+			return;
+		MeshComponent* mc = e->get_component<MeshComponent>();
+		if (!mc || !mc->get_model())
+			return;
+		MSkeleton* skel = mc->get_model()->get_skel();
+		if (!skel)
+			return;
+		auto& bones = skel->get_all_bones();
+		int count = bones.size();
+		sys_print(Info, "%s: num bones: %d\n", mc->get_model()->get_name().c_str(), count);
+		for (int i = 0; i < count; i++) {
+			sys_print(Info, "\t%s\n", bones[i].strname.c_str());
+		}
+		});
+	cmds->add("parent-to", [this](const Cmd_Args& args) {
+		if (!selection_state->has_only_one_selected())
+			return;
+		Entity* e = selection_state->get_only_one_selected().get();
+		if (!e)
+			return;
+		int64_t id = std::stoll(args.at(1));
+		string bonename = args.at(2);
+		EntityPtr parent_to(id);
+		Entity* parent_to_e = parent_to.get();
+		if (!parent_to_e)
+			return;
+		e->parent_to(parent_to_e);
+		e->set_ls_position(glm::vec3(0.f));
+		e->set_parent_bone(bonename.c_str());
+
+		});
 
 
 
@@ -325,7 +459,7 @@ void EditorDoc::init_new()
 		}
 		});
 
-	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  leveldock.ini");
+	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  editor.ini");
 
 	assert(eng->get_level());
 	gui.doc = this;
@@ -785,7 +919,7 @@ void EditorDoc::tick(float dt)
 		camera.orbit_mode = (Input::is_mouse_down(1)&&UiSystem::inst->is_vp_focused()) || Input::last_recieved_input_from_con();// && !UiSystem::inst->is_game_capturing_mouse();
 
 		{
-			if (using_ortho && ortho_camera.can_take_input())
+			if (using_ortho)
 				ortho_camera.update_from_input(aratio);
 			if (!using_ortho && camera.can_take_input())
 				camera.update_from_input(window_sz.x, window_sz.y, aratio, fov);
@@ -1108,6 +1242,8 @@ void ManipulateTransformTool::update()
 
 void EditorDoc::imgui_draw()
 {
+	const bool in_foliage_tool = foliage_active.get_bool();
+
 	bool clicked = gui.draw();
 	if(!clicked)
 		check_inputs();
@@ -1141,11 +1277,15 @@ void EditorDoc::imgui_draw()
 
 	IEditorTool::imgui_draw();
 
-	dragger.tick(!manipulate->is_hovered()&&!manipulate->is_using());
+	dragger.tick(!manipulate->is_hovered()&&!manipulate->is_using()&&!in_foliage_tool);
 
 	command_mgr->execute_queued_commands();
 
 	drag_drop_preview->tick();
+
+
+	if (in_foliage_tool)
+		foliage_tool->tick();
 
 
 	if (draw_coords_under_mouse.get_bool() && UiSystem::inst->is_vp_hovered()) {
@@ -1155,9 +1295,11 @@ void EditorDoc::imgui_draw()
 		auto size = UiSystem::inst->get_vp_rect().get_pos();
 
 		const float scene_depth = idraw->get_scene_depth_for_editor(x - size.x, y - size.y);
-		if (abs(scene_depth) <= 300) {
-			glm::vec3 dir = unproject_mouse_to_ray(x, y);
-			glm::vec3 pos = vs_setup.origin + dir * scene_depth;
+		if (abs(scene_depth) <= 300 || using_ortho) {
+			Ray dir = unproject_mouse_to_ray(x, y);
+			glm::vec3 pos = vs_setup.origin + dir.dir * scene_depth;
+			if (using_ortho)
+				pos = dir.pos;
 
 			auto& win = UiSystem::inst->window;
 			const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
@@ -1294,7 +1436,7 @@ void EditorDoc::hook_scene_viewport_draw()
 			auto size = UiSystem::inst->get_vp_rect().get_pos();
 			const float scene_depth = idraw->get_scene_depth_for_editor(x - size.x, y - size.y);
 
-			glm::vec3 dir = unproject_mouse_to_ray(x, y);
+			glm::vec3 dir = unproject_mouse_to_ray(x, y).dir;
 			glm::vec3 worldpos = (abs(scene_depth) > 50.0) ? vs_setup.origin - dir * 25.0f : vs_setup.origin + dir * scene_depth;
 			drop_transform[3] = glm::vec4(worldpos, 1.0);
 
@@ -1445,6 +1587,12 @@ void EdPropertyGrid::draw()
 
 	if (ImGui::Begin("Properties")) {
 		if (ss->has_only_one_selected()) {
+
+			auto selected = get_selected_component();
+			if (selected&&selected->is_a<SpawnerComponent>()) {
+				auto sc=(SpawnerComponent*) selected;
+				ImGui::Text("typename: %s\n", sc->get_spawner_type().c_str());
+			}
 
 			grid.update();
 
@@ -1651,6 +1799,61 @@ public:
 	obj<SpawnerComponent> sc;
 };
 
+class SpawnerModelProp : public IPropertyEditor {
+public:
+	SpawnerModelProp(SpawnerComponent* sc) : sc(sc) {
+		prop = &hacked_bullshit;
+		hacked_bullshit.name = "model";
+
+		instance = this;//bs
+
+		assetprop.instance = this;
+		assetprop.prop = &hacked_bullshit2;
+		hacked_bullshit2.type = core_type_id::AssetPtr;
+		hacked_bullshit2.class_type = &Model::StaticType;
+		hacked_bullshit2.offset = offsetof(SpawnerModelProp, model);
+
+		auto str = sc->obj["model"];
+		if(!str.empty())
+			model = Model::load(str);
+	}
+	~SpawnerModelProp() {
+		
+	}
+	bool internal_update() {
+		bool res =  assetprop.internal_update();
+		if (res) {
+			set_mod();
+		}
+		return res;
+	}
+	bool can_reset() final {
+		return assetprop.can_reset();
+	}
+	void reset_value() final {
+		assetprop.reset_value();
+		set_mod();
+	}
+	void set_mod() {
+		if (model)
+			sc->obj["model"] = model->get_name();
+		else
+			sc->obj["model"] = "";
+
+		sc->set_model();
+	}
+
+
+	AssetPropertyEditor assetprop;
+	Model* model = nullptr;
+
+	PropertyInfo hacked_bullshit;
+	PropertyInfo hacked_bullshit2;
+
+	obj<SpawnerComponent> sc;
+};
+
+
 
 void EdPropertyGrid::refresh_grid()
 {
@@ -1703,7 +1906,10 @@ void EdPropertyGrid::refresh_grid()
 				for (auto& [name, prop] : sc->obj.items()) {
 					if (name[0] == '_')
 						continue;
-					grid.add_iproped_manual(new SpawnerIProped(sc, name));
+					if (name == "model")
+						grid.add_iproped_manual(new SpawnerModelProp(sc));
+					else
+						grid.add_iproped_manual(new SpawnerIProped(sc, name));
 				}		
 			}
 		}
@@ -1775,7 +1981,6 @@ EditorUILayout::EditorUILayout() {
 
 }
 
-
 bool EditorUILayout::draw() {
 	RenderWindow& window = UiSystem::inst->window;
 	cube.rotation_matrix = (glm::mat3)doc->vs_setup.view;
@@ -1818,31 +2023,12 @@ bool EditorUILayout::draw() {
 		});
 	const Entity* clicked = nullptr;
 	for (auto o : objs) {
-		const char* name = (o.e->get_editor_name().c_str());
-		const bool is_prefab_root = false;// o.e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
-		if (!*name) {
-			if (is_prefab_root) {
-				//name = o.e->get_object_prefab().get_name().c_str();
-			}
-			else {
-				if (auto m = o.e->get_component<MeshComponent>()) {
-					if (m->get_model())
-						name = m->get_model()->get_name().c_str();
-				}
-			}
-		}
-		if (!*name) {
-			name = o.e->get_type().classname;
-		}
+		string name = get_name_display_entity(o.e);
 
 		const int icon_size = 16;
 		InlineVec<Texture*, 6> icons;
 		auto e = o.e;
-		if (is_prefab_root) {
-			const char* s = "eng/editor/prefab_p.png";
-			auto tex = g_assets.find_global_sync<Texture>(s);
-			icons.push_back(tex.get());
-		}
+		
 		bool found_script = false;
 		for (auto c : o.e->get_components()) {
 			if (c->dont_serialize_or_edit_this()) 
@@ -2235,4 +2421,183 @@ void DragDropPreview::delete_obj() {
 		e->destroy_deferred();
 	}
 	obj_ptr = nullptr;
+}
+
+int SamplePoisson(float lambda, Random& r)
+{
+	float L = exp(-lambda);
+	int k = 0;
+	float p = 1.0f;
+
+	do {
+		k++;
+		p *= r.RandF(0, 1);
+	} while (p > L);
+
+	return k - 1;
+}
+ConfigVar foliage_density("foliage_density", "3", CVAR_FLOAT | CVAR_UNBOUNDED, "");
+ConfigVar foliage_brush("foliage_brush", "1", CVAR_FLOAT | CVAR_UNBOUNDED, "");
+
+ConfigVar foliage_exdensity("foliage_exdensity", "0.7", CVAR_FLOAT | CVAR_UNBOUNDED, "");
+
+
+void FoliagePaintTool::tick()
+{
+	if (ImGui::Begin("Foliage")) {
+
+		static char buffer[1000];
+		ImGui::InputTextMultiline("#box", buffer, 1000, ImVec2(0, 0));
+	}
+	ImGui::End();
+
+
+	Entity* e = orb_cursor.get();
+	if (!e) {
+		e = doc.spawn_entity();
+		e->dont_serialize_or_edit = true;
+		auto mesh = e->create_component<MeshComponent>();
+		mesh->set_model_str("sphere.cmdl");
+		mesh->set_material_override(MaterialInstance::load("orb_cursor.mm"));
+		orb_cursor = e;
+	}
+	e->set_hidden_in_editor(true);
+
+	const float dt = 1.0/60.0;
+	const float density = foliage_density.get_float();
+	float R = foliage_brush.get_float();
+	const float area = PI * (R*R);
+	const float exclusive_radius = foliage_exdensity.get_float();
+	const bool is_hovered = UiSystem::inst->is_vp_hovered();
+
+	if (!is_hovered) 
+		return;
+
+	const auto mouse = Input::get_mouse_pos();
+	glm::vec3 dir = doc.unproject_mouse_to_ray(mouse.x, mouse.y).dir;
+	glm::vec3 pos = doc.get_vs()->origin;
+	world_query_result res;
+	const bool had_hit  = g_physics.trace_ray(res, pos, pos - dir * 100.f, nullptr, UINT32_MAX);
+
+	if (!had_hit) {
+		return;
+	}
+
+	e->set_hidden_in_editor(false);
+	e->set_ws_position(res.hit_pos);
+	e->set_ls_scale(glm::vec3(R));
+
+	const bool wants_delete = Input::is_key_down(SDL_SCANCODE_LCTRL);
+
+	if (Input::is_mouse_down(0)) {
+		float rate = density * area;
+		float lambda = rate * dt;
+		int toPlace = SamplePoisson(lambda,ran);
+
+		if (wants_delete) {
+			bool wants_continue = true;
+			std::vector<int> indicies;
+			for (int j = 0; j < foliage.size(); j++) {
+				glm::vec3 dist = res.hit_pos - foliage[j].pos;
+				float dist2 = dot(dist, dist);
+				if (dist2 <= R * R) {
+					indicies.push_back(j);
+				}
+			}
+
+			if (indicies.empty())
+				return;
+
+			int count = std::min(toPlace, (int)indicies.size());
+
+			// Partial Fisher–Yates shuffle
+			for (int i = 0; i < count; i++) {
+				int r = ran.RandI(i, (int)indicies.size() - 1);
+				std::swap(indicies[i], indicies[r]);
+			}
+
+			// First `count` are unique, random
+			std::vector<int> remove_these;
+			remove_these.reserve(count);
+
+			for (int i = 0; i < count; i++) {
+				remove_these.push_back(indicies[i]);
+			}
+
+			std::sort(remove_these.rbegin(), remove_these.rend());
+
+			for (int i = 0; i < remove_these.size(); i++) {
+				auto b = foliage[remove_these[i]];
+				idraw->get_scene()->remove_obj(b.object);
+
+
+				foliage.erase(foliage.begin() + remove_these[i]);
+			}
+
+		}
+		else {
+			for (int i = 0; i < toPlace; i++) {
+				// place instance
+				float theta = ran.RandF(0, 2 * PI);
+				float r = R * sqrt(ran.RandF(0, 1));
+				float x = cos(theta) * r;
+				float y = sin(theta) * r;
+
+				// get placement
+
+				glm::vec3 place_pos = res.hit_pos + glm::vec3(x, 0, y);
+				glm::mat4 rotation_matrix = glm::mat4(1);
+				// get the y component from raycast
+
+				{
+					bool hit_surface = g_physics.trace_ray(res, place_pos + glm::vec3(0, 1, 0), place_pos - glm::vec3(0, 1, 0), nullptr, UINT32_MAX);
+					if (!hit_surface) {
+						continue;
+					}
+					place_pos = res.hit_pos;
+					glm::vec3 N = res.hit_normal;
+
+					glm::vec3 refUp =
+						(fabs(N.z) < 0.999f) ? glm::vec3(0, 0, 1) : glm::vec3(0, 1, 0);
+
+					glm::vec3 T = glm::normalize(glm::cross(refUp, N)); // tangent
+					glm::vec3 B = glm::cross(N, T);                      // bitangent
+					auto T2 = T * cos(theta) + B * sin(theta);
+					auto B2 = -T * sin(theta) + B * cos(theta);
+					rotation_matrix[0] = glm::vec4(B2, 0);
+					rotation_matrix[1] = glm::vec4(N, 0);
+					rotation_matrix[2] = glm::vec4(T2, 0);
+				}
+
+				bool wants_continue = true;
+				for (int j = 0; j < foliage.size(); j++) {
+					glm::vec3 dist = place_pos - foliage[j].pos;
+					float dist2 = dot(dist, dist);
+					if (dist2 <= exclusive_radius * exclusive_radius) {
+						wants_continue = false;
+						break;
+					}
+
+				}
+				if (wants_continue) {
+
+					Render_Object ro;
+					ro.model = Model::load("grass_low.cmdl");
+					ro.transform = glm::translate(glm::mat4(1), place_pos);
+					ro.transform = glm::scale(ro.transform * rotation_matrix, glm::vec3(1));
+					auto handle = idraw->get_scene()->register_obj();
+
+					idraw->get_scene()->update_obj(handle, ro);
+
+					foliage.push_back({ handle,place_pos });
+				}
+			}
+		}
+	}
+}
+ConfigVar ortho_cam_scroll_amt("ortho_cam_scroll_amt", "0.25", CVAR_FLOAT | CVAR_UNBOUNDED, "");
+void OrthoCamera::scroll_callback(int amt) {
+	width -= (width * ortho_cam_scroll_amt.get_float()) * amt;
+	if (abs(width) < 0.000001)
+		width = 0.0001;
 }

@@ -110,6 +110,7 @@ public:
 	REF void set_parent_bone(StringName name) { 
 		parent_bone.name = name; 
 		world_transform_is_dirty = true; 
+		post_change_transform_R();
 	}
 	REF bool has_parent_bone() const;
 	REF StringName get_parent_bone() const { return parent_bone.name; }

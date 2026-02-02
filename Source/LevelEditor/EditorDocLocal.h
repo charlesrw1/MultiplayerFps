@@ -212,11 +212,11 @@ class OrthoCamera
 {
 public:
 	bool can_take_input() const {
-		return UiSystem::inst->is_game_capturing_mouse();
+		return Input::is_mouse_down(1) && UiSystem::inst->is_vp_focused() && Input::is_shift_down();
 	}
 
 	glm::vec3 position = glm::vec3(0.0);
-	float width = 10.0;
+	float width = 25.0;
 	glm::vec3 front = glm::vec3(1, 0, 0);
 	glm::vec3 up = glm::vec3(0, 1, 0);
 	glm::vec3 side = glm::vec3(0, 0, 1);
@@ -233,17 +233,21 @@ public:
 		side = cross(up, front);
 	}
 
-	void scroll_callback(int amt) {
-		width += (width * 0.5) * amt;
-		if (abs(width) < 0.000001)
-			width = 0.0001;
-	}
+	void scroll_callback(int amt);
 	void update_from_input(float aspectratio) {
-		auto mouseDelta = Input::get_mouse_delta();
+		if (can_take_input()) {
+			auto mouseDelta = Input::get_mouse_delta();
+			auto rect = UiSystem::inst->get_vp_rect();
+			float world_delta_x = (mouseDelta.x / float(rect.w)) * width * 2;
+			float world_delta_y = (mouseDelta.y / float(rect.h)) * width * aspectratio * 2;
 
 
-		position += side * (g_mousesens.get_float() * mouseDelta.x) * width;
-		position += up * (g_mousesens.get_float() * mouseDelta.y) * width * aspectratio;
+			position += side * world_delta_x;
+			position += up * world_delta_y;
+		}
+		if (UiSystem::inst->is_vp_hovered()) {
+			scroll_callback(Input::get_mouse_scroll());
+		}
 	}
 	glm::mat4 get_view_matrix() const {
 		return glm::lookAt(position, position+front, up);
@@ -456,6 +460,9 @@ public:
 		force_gizmo_on = b;
 		axis_mask = 0xff;
 	}
+	void set_force_op(ImGuizmo::OPERATION op) {
+		force_operation = op;
+	}
 	bool get_force_gizmo_on() const {
 		return force_gizmo_on;
 	}
@@ -548,6 +555,22 @@ private:
 	obj<Entity> obj_ptr;
 };
 
+#include "Render/DrawPublic.h"
+class FoliagePaintTool {
+public:
+	FoliagePaintTool(EditorDoc& doc) : doc(doc), ran(17) {}
+	void tick();
+private:
+	struct FoliageItem {
+		handle<Render_Object> object;
+		glm::vec3 pos;
+	};
+	std::vector<FoliageItem> foliage;
+	EditorDoc& doc;
+	Random ran;
+
+	EntityPtr orb_cursor;
+};
 
 
 template<class... Ts>
@@ -593,16 +616,10 @@ public:
 	void do_mouse_selection(MouseSelectionAction action, const Entity* e, bool select_root_most_entity);
 
 
-	void on_mouse_wheel(const SDL_MouseWheelEvent& wheel) {
-		if (using_ortho && ortho_camera.can_take_input())
-			ortho_camera.scroll_callback(wheel.y);
-		if(!using_ortho && camera.can_take_input())
-			camera.scroll_callback(wheel.y);
-	}
 	void on_mouse_pick();
 
 	void duplicate_selected_and_select_them();
-	glm::vec3 unproject_mouse_to_ray(int mx, int my);
+	Ray unproject_mouse_to_ray(int mx, int my);
 
 	const char* get_save_file_extension() const {
 		return "tmap";
@@ -663,6 +680,8 @@ public:
 	std::unique_ptr<ManipulateTransformTool> manipulate;
 //	std::unique_ptr<ObjectOutliner> outliner;
 	std::unique_ptr<DragDropPreview> drag_drop_preview;
+
+	std::unique_ptr<FoliagePaintTool> foliage_tool;
 
 	EditorUILayout gui;
 

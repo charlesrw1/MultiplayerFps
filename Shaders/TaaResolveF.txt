@@ -156,7 +156,7 @@ void main()
 		vec3 prev_clamped = AdjustHDRColor(clamp(last,minColor,maxColor)).rgb;
 		vec4 currentAdjust = AdjustHDRColor(current);
 		vec3 outputColor = (prev_clamped.rgb*amt + currentAdjust.rgb*(1-amt));
-		outputColor /= (prevAdjust.a*amt+currentAdjust.a*(1-amt));
+		outputColor /= max((prevAdjust.a*amt+currentAdjust.a*(1-amt)),0.000001);
 		FS_OUT_Color = outputColor;// current * (1-amt) + prev_clamped * amt;
 	}
 	else {

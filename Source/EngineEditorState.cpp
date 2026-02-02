@@ -91,39 +91,6 @@ void EditorState::imgui_draw()
 
 void EditorState::draw_tab_window()
 {
-	if (ImGui::Begin("EditorTabs")) {
-
-		uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
-			ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
-		if (ImGui::BeginTable("Browser", 2, ent_list_flags))
-		{
-			ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
-			ImGui::TableSetupColumn("X", ImGuiTableColumnFlags_WidthFixed, 15.f, 0);
-
-			for (int i = 0; i < tabs.size(); i++) {
-				auto& t = tabs[i];
-				ImGui::TableNextRow();
-				ImGui::TableNextColumn();
-				if (ImGui::Selectable("##selectednode", t.is_active,0, ImVec2(0, 0))) {
-					
-				}
-				ImGui::SameLine();
-				ImGui::SameLine();
-				ImGui::Text(t.assetName.c_str());
-				ImGui::TableNextColumn();
-				if (redCrossIcon) {
-					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5, 0.5, 0.5, 1));
-					if(my_imgui_image_button(redCrossIcon,-1)){//if(ImGui::ImageButton(ImTextureID(uintptr_t(redCrossIcon->get_internal_render_handle())), ImVec2(sz, sz))) {
-
-					}
-					ImGui::PopStyleColor();
-				}
-
-			}
-
-			ImGui::EndTable();
-		}
-	}
-	ImGui::End();
+	
 }
 #endif
