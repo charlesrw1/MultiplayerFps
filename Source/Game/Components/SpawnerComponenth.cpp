@@ -81,3 +81,44 @@ void SpawnerComponent::set_model()
 	}
 
 }
+
+void FoliageContainerComponent::serialize(Serializer& s)
+{
+#if 0
+	if (s.is_loading()) {
+		std::string outData;
+		if (s.serialize(baked_tag, outData)) {
+			auto data = StringUtils::base64_decode(outData);
+			if ((data.size() % sizeof(glm::vec3)) != 0) {
+				sys_print(Error, "LightmapComponent::serialize: unserialized bin data bad size?\n");
+			}
+			else {
+				const int vec3Count = data.size() / sizeof(glm::vec3);
+				bakedProbes.clear();
+				bakedProbes.resize(vec3Count);
+				for (int i = 0; i < vec3Count; i++) {
+					bakedProbes.at(i) = *(glm::vec3*)(&data.at(i * sizeof(glm::vec3)));
+				}
+			}
+		}
+	}
+	else {
+		std::vector<uint8_t> outData;
+		outData.resize(bakedProbes.size() * sizeof(glm::vec3));
+		for (int i = 0; i < bakedProbes.size(); i++) {
+			glm::vec3* outPtr = (glm::vec3*)&outData.at(i * sizeof(glm::vec3));
+			*outPtr = bakedProbes.at(i);
+		}
+		std::string encoded = StringUtils::base64_encode(outData);
+		s.serialize(baked_tag, encoded);
+	}
+#endif
+}
+
+void FoliageContainerComponent::start()
+{
+}
+
+void FoliageContainerComponent::stop()
+{
+}

@@ -275,6 +275,31 @@ public:
 	Model* s = nullptr;
 };
 
+class CreateEntityCommand : public Command
+{
+public:
+	CreateEntityCommand(EditorDoc& ed_doc, std::function<void(Entity*)> post_create) : doc(doc),post_create(post_create) {
+	}
+	std::string to_string() override {
+		return "CreateEntityCommand";
+	}
+	void undo() final {
+		auto obj = eng->get_object(ptr);
+		if (obj)ptr->destroy();
+		obj = EntityPtr();
+	}
+	void execute() final {
+		Entity* e = doc.spawn_entity();
+		ptr = e;
+		post_create(e);
+	}
+
+	std::function<void(Entity*)> post_create;
+	EditorDoc& doc;
+	EntityPtr ptr;
+};
+
+
 class RemoveComponentCommand  : public Command
 {
 public:

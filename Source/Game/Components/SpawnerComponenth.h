@@ -22,3 +22,18 @@ public:
 	}
 private:
 };
+
+class FoliageContainerComponent : public Component {
+public:
+	void serialize(Serializer&) final;
+	void start() final;
+	void stop() final;
+	
+	struct FoliageItem {
+		glm::mat4x3 transform{};
+		int model_index = 0;
+	};
+	std::vector<Model*> foliage_models;
+	std::vector<FoliageItem> transforms;
+	std::vector<handle<Render_Object>> objects;
+};

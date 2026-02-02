@@ -37,7 +37,7 @@ void DecalComponent::on_sync_render_data()
 		handle = idraw->get_scene()->register_decal();
 	}
 	Render_Decal rd;
-	rd.transform = get_ws_transform();
+	rd.transform = get_ws_transform() * glm::translate(glm::mat4(1),glm::vec3(-0.5,-0.5,0.5));
 	rd.visible = true;
 #ifdef  EDITOR_BUILD
 	rd.visible &= !get_owner()->get_hidden_in_editor();

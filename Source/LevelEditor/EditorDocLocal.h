@@ -559,6 +559,10 @@ private:
 class FoliagePaintTool {
 public:
 	FoliagePaintTool(EditorDoc& doc) : doc(doc), ran(17) {}
+	~FoliagePaintTool() {
+		for (auto item : foliage)
+			idraw->get_scene()->remove_obj(item.object);
+	}
 	void tick();
 private:
 	struct FoliageItem {
@@ -572,6 +576,20 @@ private:
 	EntityPtr orb_cursor;
 };
 
+class DecalStampTool {
+public:
+	DecalStampTool(EditorDoc& doc) : doc(doc) {}
+	~DecalStampTool() {
+		if (preview.get()) preview->destroy();
+	}
+	void tick();
+private:
+	float rotation = 0.0;
+	float scale = 1.0;
+	float depth = 1.0;
+	EntityPtr preview;
+	EditorDoc& doc;
+};
 
 template<class... Ts>
 struct overloads : Ts... { using Ts::operator()...; };
@@ -682,6 +700,7 @@ public:
 	std::unique_ptr<DragDropPreview> drag_drop_preview;
 
 	std::unique_ptr<FoliagePaintTool> foliage_tool;
+	std::unique_ptr<DecalStampTool> stamp_tool;
 
 	EditorUILayout gui;
 
