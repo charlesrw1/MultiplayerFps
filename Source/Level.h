@@ -38,14 +38,11 @@ public:
 	Entity* spawn_entity();
 	void add_and_init_created_runtime_component(Component* c);
 	const ScopedBooleanValue& get_is_in_update() const { return b_is_in_update_tick; }
-	BaseUpdater* get_entity(uint64_t handle) {
+	BaseUpdater* get_entity(int64_t handle) {
 		return all_world_ents.find(handle);
 	}
 	string get_source_asset_name() const {
 		return sourceAssetName;
-	}
-	bool is_editor_level() const {
-		return b_is_editor_level;
 	}
 	const hash_map<BaseUpdater*>& get_all_objects() const {
 		return all_world_ents;
@@ -65,19 +62,18 @@ private:
 	hash_map<BaseUpdater*> all_world_ents;
 	hash_set<Component> tick_list;
 	// last instance id, incremented to add objs
-	uint64_t last_id = 0;
-	ScopedBooleanValue b_is_in_update_tick;
-	ScopedBooleanValue b_is_in_level_startup;
+	int64_t last_id = 0;
 	std::vector<Component*> wantsToAddToUpdate;
 	hash_set<Component> wants_sync_update;
-	std::unordered_set<uint64_t> deferred_delete_list;
-	// is this an editor level
-	bool b_is_editor_level =false;
+	std::unordered_set<int64_t> deferred_delete_list;
+
+	ScopedBooleanValue b_is_in_update_tick;
+	ScopedBooleanValue b_is_in_level_startup;
 
 	void insert_new_native_entity_into_hashmap_R(Entity* e);
 	void initialize_new_entity_safe(Entity* e);
 	Entity* spawn_entity_class_deferred_internal(const ClassTypeInfo& ti);
-	uint64_t get_next_id_and_increment() {
+	int64_t get_next_id_and_increment() {
 		return ++last_id;	// prefix
 	}
 

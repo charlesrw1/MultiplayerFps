@@ -19,7 +19,7 @@ guiEditorCube::guiEditorCube()
 		textures.at(i) = g_assets.find_global_sync<Texture>(path).get();
 	}
 }
-void guiEditorCube::draw(RenderWindow& builder)
+void guiEditorCube::draw(RenderWindow& builder, float dt)
 {
 	auto& mb = builder.meshbuilder;
 	auto transform_to_screen = [&](glm::vec3 in_clip) {
@@ -66,6 +66,9 @@ void guiEditorCube::draw(RenderWindow& builder)
 		glm::vec2(1.0f, 0.0f), glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, 0.0f),
 	};
 	glm::mat4 proj = glm::perspective(glm::radians(90.f), 1.f, 0.001f, 100.f);
+
+	glm::mat3 rotation_matrix = rotation.get_matrix(dt);
+
 	for (int i = 0; i < 36; i++) {
 		corners[i].z *= -1;
 		corners[i] =  (rotation_matrix) * (corners[i]);

@@ -50,7 +50,6 @@ public:
 	PhysicsBody();
 	~PhysicsBody();
 
-	void pre_start() override;
 	void start() override;
 	void stop() override;
 	void update() override;

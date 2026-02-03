@@ -31,7 +31,7 @@ public:
 	CLASS_BODY(CarGameMode);
 
 	static CarGameMode* instance;
-	void pre_start() {
+	void start() {
 		ASSERT(!instance);
 		instance = this;
 	}

@@ -179,7 +179,7 @@ void EditorDoc::init_new()
 			selection_state->clear_all_selected();
 		}
 
-		auto newRect = gui.convert_rect(rect);
+		auto newRect = gui->convert_rect(rect);
 
 		if (using_ortho) {
 			Bounds aabb;
@@ -238,13 +238,13 @@ void EditorDoc::init_new()
 		}
 
 
-		gui.do_box_select(type);
+		gui->do_box_select(type);
 		});
 
 	command_mgr->on_command_execute_or_undo.add(this, [&]() {
 		set_has_editor_changes();
 		});
-
+	gui = std::make_unique<EditorUILayout>(*this);
 	selection_state = std::make_unique<SelectionState>(*this);
 	prop_editor = std::make_unique<EdPropertyGrid>(*this, grid_factory);
 	manipulate = std::make_unique<ManipulateTransformTool>(*this);
@@ -260,11 +260,13 @@ void EditorDoc::init_new()
 
 	cmds = ConsoleCmdGroup::create("");
 	cmds->add("all", [this](const Cmd_Args& args) {
+
 		auto& objs = eng->get_level()->get_all_objects();
 		for (auto s : objs)
 			args.sys_print(Info, "%lld\n", int64_t(s->get_instance_id()));
 		});
 	cmds->add("sel", [this](const Cmd_Args& args) {
+
 		auto selected = selection_state->get_selection_as_vector();
 		for (auto s : selected)
 			args.sys_print(Info, "%lld\n", int64_t(s.handle));
@@ -299,6 +301,10 @@ void EditorDoc::init_new()
 		}
 		});
 	cmds->add("so", [this](const Cmd_Args& args) {
+		if (args.size() == 1) {
+			selection_state->clear_all_selected();
+			return;
+		}
 		const string ents = args.at(1);
 		auto lines = StringUtils::to_lines(ents);
 		selection_state->clear_all_selected();
@@ -463,7 +469,7 @@ void EditorDoc::init_new()
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  editor.ini");
 
 	assert(eng->get_level());
-	gui.doc = this;
+
 	//gui = eng->get_level()->spawn_entity()->create_component<EditorUILayout>();
 	//gui->doc = this;
 	//gui->set_owner_dont_serialize_or_edit(true);
@@ -819,6 +825,7 @@ void EditorDoc::check_inputs()
 	}
 	else if (Input::was_key_pressed(SDL_SCANCODE_KP_5)) {
 		using_ortho = false;
+		ortho_camera.on_ortho_set.invoke();
 	}
 	else if (Input::was_key_pressed(SDL_SCANCODE_KP_7) && has_ctrl) {
 		set_camera_target_to_sel();
@@ -1249,7 +1256,7 @@ void EditorDoc::imgui_draw()
 {
 	const bool in_foliage_tool = foliage_active.get_bool();
 
-	bool clicked = gui.draw();
+	bool clicked = gui->draw();
 	if(!clicked)
 		check_inputs();
 	manipulate->check_input();
@@ -1779,7 +1786,8 @@ public:
 		instance = this;//bs
 	}
 	~SpawnerIProped() {
-		sc->obj[key2] = value;
+		if(sc.get())
+			sc->obj[key2] = value;
 	}
 	bool internal_update() {
 		ImguiInputTextCallbackUserStruct user;
@@ -1812,7 +1820,7 @@ public:
 		hacked_bullshit2.class_type = &Model::StaticType;
 		hacked_bullshit2.offset = offsetof(SpawnerModelProp, model);
 
-		auto str = sc->obj["model"];
+		string str = sc->obj["model"];
 		if(!str.empty())
 			model = Model::load(str);
 	}
@@ -1998,14 +2006,21 @@ void EditorDoc::hook_menu_bar()
 	}
 }
 
-EditorUILayout::EditorUILayout() {
+
+EditorUILayout::EditorUILayout(EditorDoc& doc) : doc(&doc) {
+
+	doc.ortho_camera.on_ortho_set.add(this, [&]() {
+		cube.rotation.begin_interpolate();
+		});
 
 }
 
 bool EditorUILayout::draw() {
+	const float dt = eng->get_dt();
+
 	RenderWindow& window = UiSystem::inst->window;
-	cube.rotation_matrix = (glm::mat3)doc->vs_setup.view;
-	cube.draw(window);
+	cube.rotation.set_current((glm::mat3)doc->vs_setup.view);
+	cube.draw(window,dt);
 	// paint
 	if (doc->dragger.get_is_dragging()) {
 		auto rect = doc->dragger.get_drag_rect();

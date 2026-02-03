@@ -78,7 +78,7 @@ public:
 	bool is_editor_level() const  final {
 		/* this passes when you are in the loading phase or past the loading phase */
 		/* added is_loading... to work with constructors before level gets set */
-		return is_loading_editor_level || (get_level() && get_level()->is_editor_level());
+		return editorState != nullptr;
 	}
 	bool is_editor_state() const { return editorState != nullptr; }
 	bool is_host() const final { return true; }

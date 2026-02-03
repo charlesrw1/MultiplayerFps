@@ -80,7 +80,7 @@ void Component::init_updater()
 {
 	auto level = eng->get_level();
 	ASSERT(level);
-	ASSERT(init_state == initialization_state::CALLED_PRE_START);
+	ASSERT(init_state == initialization_state::HAS_ID);
 	if (level && tick_enabled)
 		level->add_to_update_list(this);
 }
@@ -91,19 +91,10 @@ void Component::shutdown_updater()
 	if (level && tick_enabled)
 		level->remove_from_update_list(this);
 }
-void Component::activate_internal_step1()
-{
-	ASSERT(init_state == initialization_state::HAS_ID);
 
-	// set it up here first
-	init_state = initialization_state::CALLED_PRE_START;
-	if (!eng->is_editor_level() || get_call_init_in_editor()) {
-		pre_start();
-	}
-}
 void Component::activate_internal_step2()
 {
-	ASSERT(init_state == initialization_state::CALLED_PRE_START);
+	ASSERT(init_state == initialization_state::HAS_ID);
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
 		start();
 		init_updater();
@@ -114,7 +105,7 @@ void Component::activate_internal_step2()
 void Component::deactivate_internal()
 {
 	// can call stop after a pre_start()
-	ASSERT(init_state == initialization_state::CALLED_START||init_state==initialization_state::CALLED_PRE_START);
+	ASSERT(init_state == initialization_state::CALLED_START);
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
 		stop();
 	}
@@ -130,22 +121,14 @@ void Component::destroy()
 void Component::sync_render_data()
 {
 	// changed to start or pre_start
-	if(init_state == initialization_state::CALLED_START || init_state == initialization_state::CALLED_PRE_START)
+	//if(init_state == initialization_state::CALLED_START)
 		eng->get_level()->add_to_sync_render_data_list(this);
 }
 
-void Component::initialize_internal_step1()
-{
-	activate_internal_step1();
-}
-void Component::initialize_internal_step2()
-{
-	activate_internal_step2();
-}
 
 void Component::destroy_internal()
 {
-	if(init_state==initialization_state::CALLED_START||init_state==initialization_state::CALLED_PRE_START)
+	if(init_state==initialization_state::CALLED_START)
 		deactivate_internal();
 	ASSERT(entity_owner);
 	entity_owner->remove_this_component_internal(this);
@@ -153,7 +136,7 @@ void Component::destroy_internal()
 }
 
 Component::~Component() {
-	ASSERT(init_state != initialization_state::CALLED_PRE_START && init_state!=initialization_state::CALLED_START);
+	ASSERT(init_state!=initialization_state::CALLED_START);
 }
 
 const glm::mat4& Component::get_ws_transform() {

@@ -37,7 +37,6 @@ public:
 
 	MeshComponent();
 	~MeshComponent() override;
-	void pre_start() final;
 	void start() final;
 	void update() final;
 	void stop() final;
@@ -118,7 +117,6 @@ class AnimationSeqAsset;
 class AnimPreviewComponent : public Component {
 public:
 	CLASS_BODY(AnimPreviewComponent);
-	void pre_start() final;
 	void start() final;
 	void update() final;
 	void stop() final;

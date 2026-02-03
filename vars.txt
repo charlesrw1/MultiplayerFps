@@ -45,3 +45,6 @@ force_animation_to_bind_pose 1
 
 ed_decal_active 1
 r.drawdecals 1
+
+ignore_folders 1
+

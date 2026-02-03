@@ -164,7 +164,6 @@ private:
 	void destroy_internal();
 	// called by child entity to remove it from children list
 	void remove_this(Entity* child_entity);
-	static void set_active_R(Entity* e, bool b, bool step1);
 	bool has_transform_parent() const { return !get_is_top_level() && get_parent() != nullptr; }
 	void post_change_transform_R(bool ws_is_dirty = true, Component* skipthis = nullptr);
 

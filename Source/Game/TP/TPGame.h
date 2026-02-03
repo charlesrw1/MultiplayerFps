@@ -19,9 +19,7 @@ public:
 		return *instance;
 	}
 
-	void pre_start() override {
-		
-	}
+
 	void start() override {
 		//player = class_cast<TPPlayer>(eng->get_level()->spawn_prefab(playerPrefab));
 		ASSERT(player);

@@ -112,7 +112,7 @@ void Level::destroy_entity(Entity* e)
 {
 	if (!e) 
 		return;
-	uint64_t id = e->get_instance_id();
+	int64_t id = e->get_instance_id();
 	assert(id != 0);
 	if(log_destroy_game_objects.get_bool())
 		sys_print(Debug, "removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
@@ -134,7 +134,7 @@ void Level::destroy_component(Component* ec)
 		return;
 	wants_sync_update.remove(ec);
 
-	uint64_t id = ec->get_instance_id();
+	int64_t id = ec->get_instance_id();
 	//int uid = ec->unique_file_id;
 	assert(id != 0);
 	if (log_destroy_game_objects.get_bool())
@@ -154,7 +154,7 @@ void Level::destroy_component(Component* ec)
 Level::Level(bool is_editor) 
 	: all_world_ents(4/*2^4*/), tick_list(4), wants_sync_update(4)
 {
-	b_is_editor_level = is_editor;
+	
 }
 void Level::start(SceneAsset* source)
 {
@@ -207,12 +207,7 @@ void Level::initialize_new_entity_safe(Entity* e)
 	for (int i = 0; i < init_components.size();i++) {
 		auto ec = init_components[i];
 		ASSERT(ec->init_state == BaseUpdater::initialization_state::HAS_ID);
-		ec->initialize_internal_step1();
-	}
-	for (int i = 0; i < init_components.size();i++) {
-		auto ec = init_components[i];
-		ASSERT(ec->init_state == BaseUpdater::initialization_state::CALLED_PRE_START);
-		ec->initialize_internal_step2();
+		ec->activate_internal_step2();
 	}
 }
 
@@ -242,7 +237,6 @@ void Level::insert_new_native_entity_into_hashmap_R(Entity* e) {
 
 void Level::close_level()
 {
-	const bool is_this_editor_level = is_editor_level();	
 	for (auto ent : all_world_ents) {
 		if (Entity* e = ent->cast_to<Entity>())
 			e->destroy();
@@ -310,20 +304,11 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 				objs[i] = nullptr;
 			}
 			else {
-				ec->initialize_internal_step1();
+				ec->activate_internal_step2();
 			}
 		}
 		else
 			ASSERT(!"Non Eentity/Component?");
-	}
-
-	for (auto& o : objs) {
-		if (o) {
-			assert(o->get_instance_id() != 0);
-			auto ent = o;
-			if (Component* ec = ent->cast_to<Component>())
-				ec->initialize_internal_step2();
-		}
 	}
 }
 
@@ -334,9 +319,7 @@ void Level::add_and_init_created_runtime_component(Component* c)
 	c->post_unserialization(get_next_id_and_increment());
 	ASSERT(all_world_ents.find(c->get_instance_id()) == nullptr);
 	all_world_ents.insert(c->get_instance_id(), c);
-
-	c->initialize_internal_step1();
-	c->initialize_internal_step2();
+	c->activate_internal_step2();
 }
 
 

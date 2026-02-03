@@ -85,27 +85,6 @@ void Entity::validate_check()
 
 }
 
-
-void Entity::set_active_R(Entity* e, bool b, bool step1)
-{
-	if (e->is_activated() != b)
-	{
-		for (auto c : e->get_components()) {
-			if (b) {
-				if (step1)
-					c->activate_internal_step1();
-				else
-					c->activate_internal_step2();
-			}
-			else {
-				c->deactivate_internal();
-			}
-		}
-	}
-	for (auto c : e->get_children())
-		set_active_R(c, b, step1);
-}
-
 #include "LevelAssets.h"
 
 void Entity::initialize_internal()
@@ -159,7 +138,6 @@ void Entity::serialize(Serializer& s)
 
 void Entity::destroy_internal()
 {
-	ASSERT(init_state != initialization_state::CALLED_PRE_START);	// invalid state
 	if (init_state == initialization_state::CALLED_START) {
 		init_state = initialization_state::HAS_ID;
 	}
@@ -319,7 +297,7 @@ int Entity::get_child_entity_index(Entity* who) const
 
 Entity::~Entity()
 {
-	ASSERT(init_state != initialization_state::CALLED_START&&init_state!=initialization_state::CALLED_PRE_START);
+	ASSERT(init_state != initialization_state::CALLED_START);
 	//ASSERT(all_components.empty());
 }
 

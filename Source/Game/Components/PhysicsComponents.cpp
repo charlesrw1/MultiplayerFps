@@ -186,30 +186,7 @@ void PhysicsBody::on_actor_type_change()
 
 	on_shape_changes();
 }
-void PhysicsBody::pre_start()
-{
-	//if (eng->is_editor_level()) 
-	//	return;
 
-	ASSERT(editor_shape_id==0);
-	ASSERT(!has_initialized());
-	on_actor_type_change();
-	ASSERT(has_initialized());
-
-
-	set_ticking(false);
-	// latch physics interpolation
-	next_position = get_owner()->get_ls_position();
-	next_rot = get_owner()->get_ls_rotation();
-
-
-	if (get_is_simulating()) {
-		auto& ws = get_ws_transform();
-		get_owner()->set_is_top_level(true);
-		get_owner()->set_ws_transform(ws);
-	}
-
-}
 
 void PhysicsBody::update_bone_parent_animator()
 {
@@ -218,6 +195,31 @@ void PhysicsBody::update_bone_parent_animator()
 
 void PhysicsBody::start()
 {
+	// was in pre_start
+	{
+		//if (eng->is_editor_level()) 
+		//	return;
+
+		ASSERT(editor_shape_id == 0);
+		ASSERT(!has_initialized());
+		on_actor_type_change();
+		ASSERT(has_initialized());
+
+
+		set_ticking(false);
+		// latch physics interpolation
+		next_position = get_owner()->get_ls_position();
+		next_rot = get_owner()->get_ls_rotation();
+
+
+		if (get_is_simulating()) {
+			auto& ws = get_ws_transform();
+			get_owner()->set_is_top_level(true);
+			get_owner()->set_ws_transform(ws);
+		}
+	}
+
+
 	if (eng->is_editor_level()) {
 		auto shape = get_owner()->create_component<MeshBuilderComponent>();
 		shape->dont_serialize_or_edit = true;

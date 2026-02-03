@@ -22,7 +22,6 @@ public:
 	virtual ~Component() override;
 	// ClassBase override
 	void serialize(Serializer& s) override;
-	REF virtual void pre_start() {}
 	REF virtual void start() {}
 	REF virtual void update() {}
 	REF virtual void stop() {}
@@ -61,11 +60,9 @@ private:
 		entity_owner = e;
 	}
 
-	void activate_internal_step1();
 	void activate_internal_step2();
 	void deactivate_internal();
-	void initialize_internal_step1();
-	void initialize_internal_step2();
+
 	void destroy_internal();
 
 	Entity* entity_owner = nullptr;

@@ -27,14 +27,28 @@ void SpawnerComponent::serialize(Serializer& s)
 {
 	if (s.is_saving()) {
 		if (obj["_type"].is_string()) {
-			string str = obj["_type"];
-			s.serialize("_type", str);
+			for (auto& [key, value] : obj.items()) {
+				ASSERT(value.is_string());
+				string str = value;
+				s.serialize(key.c_str(), str);
+			}
 		}
 	}
 	else {
 		string str;
 		s.serialize("_type",str);
 		obj["_type"] = str;
+
+		auto& schemaItem = SchemaManager::get().schema_file[str];
+		for (auto& [key, value] : schemaItem.items()) {
+			if (key.at(0) != '_') {
+				string out;
+				if (s.serialize(key.c_str(), out))
+					obj[key] = out;
+				else
+					obj[key] = value;
+			}
+		}
 	}
 	// finish fixme
 }
@@ -42,8 +56,14 @@ void SpawnerComponent::serialize(Serializer& s)
 void SpawnerComponent::set(string schema_name)
 {
 	obj = nlohmann::json();
-	obj = SchemaManager::get().schema_file[schema_name];
+	auto& schemaItem = SchemaManager::get().schema_file[schema_name];
 	obj["_type"] = schema_name;
+	for (auto& [key, value] : schemaItem.items()) {
+		if (key.at(0) != '_') {
+			obj[key] = value;
+		}
+	}
+
 	set_model();
 }
 #include "BillboardComponent.h"

@@ -174,7 +174,7 @@ void MeshComponent::update_animator_instance()
 	}
 }
 
-void MeshComponent::pre_start()
+void MeshComponent::start()
 {
 	get_owner()->set_cached_mesh_component(this);
 	update_animator_instance();
@@ -182,10 +182,6 @@ void MeshComponent::pre_start()
 	set_ticking(false);
 
 	update_physics_mesh();
-}
-
-void MeshComponent::start()
-{
 }
 
 void MeshComponent::on_changed_transform()
@@ -303,9 +299,6 @@ void GameAnimationMgr::update_animating()
 	}
 }
 
-void AnimPreviewComponent::pre_start()
-{
-}
 
 void AnimPreviewComponent::start()
 {

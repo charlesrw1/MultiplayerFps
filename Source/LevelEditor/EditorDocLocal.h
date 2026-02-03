@@ -221,6 +221,8 @@ public:
 	glm::vec3 up = glm::vec3(0, 1, 0);
 	glm::vec3 side = glm::vec3(0, 0, 1);
 
+	MulticastDelegate<> on_ortho_set;
+
 	float far = 200.0;
 	void set_position_and_front(glm::vec3 position, glm::vec3 front) {
 		this->position = position;
@@ -231,6 +233,8 @@ public:
 		else
 			up = glm::vec3(0, 1, 0);
 		side = cross(up, front);
+
+		on_ortho_set.invoke();
 	}
 
 	void scroll_callback(int amt);
@@ -267,7 +271,7 @@ class guiEditorCube;
 class guiText;
 class EditorUILayout  {
 public:
-	EditorUILayout();
+	EditorUILayout(EditorDoc& doc);
 
 	bool draw();
 	void do_box_select(MouseSelectionAction action);
@@ -697,8 +701,7 @@ public:
 
 	std::unique_ptr<FoliagePaintTool> foliage_tool;
 	std::unique_ptr<DecalStampTool> stamp_tool;
-
-	EditorUILayout gui;
+	std::unique_ptr<EditorUILayout> gui;
 
 	View_Setup vs_setup;
 	bool using_ortho = false;
