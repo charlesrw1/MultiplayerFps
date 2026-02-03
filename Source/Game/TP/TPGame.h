@@ -23,7 +23,7 @@ public:
 		
 	}
 	void start() override {
-		player = class_cast<TPPlayer>(eng->get_level()->spawn_prefab(playerPrefab));
+		//player = class_cast<TPPlayer>(eng->get_level()->spawn_prefab(playerPrefab));
 		ASSERT(player);
 
 		{
@@ -33,7 +33,7 @@ public:
 		}
 	}
 
-	REF AssetPtr<PrefabAsset> playerPrefab;
+	//REF AssetPtr<PrefabAsset> playerPrefab;
 	REF TPPlayer* get_player() {
 		return player;
 	}
@@ -61,8 +61,8 @@ public:
 	REF AssetPtr<AnimationSeqAsset> jump_seq;
 	REF AssetPtr<AnimationSeqAsset> idle_to_run_seq;
 	REF AssetPtr<AnimationSeqAsset> run_to_idle_seq;
-	REF AssetPtr<PrefabAsset> projectile;
-	REF AssetPtr<PrefabAsset> shotgunSound;
+	//REF AssetPtr<PrefabAsset> projectile;
+	//REF AssetPtr<PrefabAsset> shotgunSound;
 
 
 	CharacterController cc;

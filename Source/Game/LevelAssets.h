@@ -49,26 +49,3 @@ public:
 	void init();
 	nlohmann::json schema_file;
 };
-
-struct SceneSerialized;
-class PrefabAsset : public IAsset {
-public:
-	CLASS_BODY(PrefabAsset);
-	PrefabAsset();
-	~PrefabAsset();
-
-	REF static PrefabAsset* load(string name);
-	// fixme refactoring
-
-	void finish_prefab_setup(Entity* me) const;
-
-	static void init_prefab_factory();
-	static IPrefabFactory* factory;
-private:
-	// IAsset overrides
-	bool load_asset(IAssetLoadingInterface* load) override;
-	void post_load() override;
-	void uninstall() override;
-	void move_construct(IAsset*) override;
-
-};

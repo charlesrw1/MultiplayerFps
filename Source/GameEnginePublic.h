@@ -71,7 +71,7 @@ public:
 	virtual ImGuiContext* get_imgui_context() const = 0;
 	virtual bool is_host() const = 0;
 	virtual bool is_editor_level() const = 0;
-
+	virtual bool load_level(string mapname) = 0;
 	virtual void log_to_fullscreen_gui(LogType type, const char* msg) = 0;
 
 	double get_game_time() const {

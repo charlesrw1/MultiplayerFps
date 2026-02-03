@@ -77,8 +77,8 @@ void TopDownPlayer::start() {
 		ASSERT(CameraComponent::get_scene_camera() == the_camera);
 	}
 
-	if (shotgunSoundAsset && !shotgunSoundAsset->did_load_fail())
-		cachedShotgunSound = eng->get_level()->spawn_prefab(shotgunSoundAsset)->get_component<SoundComponent>();
+	//if (shotgunSoundAsset && !shotgunSoundAsset->did_load_fail())
+	//	cachedShotgunSound = eng->get_level()->spawn_prefab(shotgunSoundAsset)->get_component<SoundComponent>();
 
 
 	ccontroller = std::make_unique<CharacterController>(capsule);

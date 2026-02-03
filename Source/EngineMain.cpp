@@ -448,34 +448,7 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 
 
 
-void OpenEditorToolCommand::execute()
-{
-	sys_print(Debug, "OpenEditorToolCommand::execute\n");
 
-	if (!eng_local.editorState) {
-		sys_print(Error, "OpenEditorToolCommand: didnt launch in editor mode, use 'is_editor_app 1' in cfg or command line\n");
-		return;
-	}
-
-
-	const AssetMetadata* metadata = AssetRegistrySystem::get().find_for_classtype(&assetType);
-	if (metadata) {
-		auto creationTool = metadata->create_create_tool_to_edit(assetName);
-		if (creationTool) {
-			eng_local.editorState->open_tool(std::move(creationTool), true, callback);
-			return;
-		}
-		else {
-			sys_print(Warning, "OpenEditorToolCommand::execute: no creation tool\n");
-		}
-	}
-	else {
-		sys_print(Warning, "OpenEditorToolCommand::execute: couldnt find asset metadata\n");
-	}
-	if(callback)
-		callback(false);
-
-}
 
 
 
@@ -549,90 +522,74 @@ void bind_key(const Cmd_Args& args)
 
 extern void init_log_gui();
 using std::make_unique;
-void GameEngineLocal::insert_this_map_as_level(SceneAsset*& loadedLevel, bool is_for_playing) {
-	assert(is_waiting_on_map_load);
-	is_waiting_on_map_load = false;
 
-	string mapname = loadedLevel ? loadedLevel->get_name() : "<new level>";
-	sys_print(Info, "Changing map: %s (for_playing=%s)\n", mapname.c_str(), print_get_bool_string(is_for_playing));
+bool GameEngineLocal::load_level(string mapname)
+{
+	if (level && level->get_is_in_update()) {
+		sys_print(Warning, "GameEngineLocal::load_level: level is in update period, can't change level here.\n");
+		return false;
+	}
+	const bool wants_empty = mapname == "<empty>";
+
+	double start_time = GetTime();
+	uptr<SceneAsset> scene = std::make_unique<SceneAsset>();
+	scene->editor_set_newly_made_path(mapname);
+	bool success = !wants_empty && scene->load_asset(g_assets.loader);
+	if (success) {
+		try {
+			scene->post_load();
+		}
+		catch (...) {
+			success = false;
+		}
+	}
+
+	auto insert_this_map_as_level = [&](SceneAsset*& loadedLevel, bool is_for_playing) {
+		string mapname = loadedLevel ? loadedLevel->get_name() : "<new level>";
+		sys_print(Info, "Changing map: %s (for_playing=%s)\n", mapname.c_str(), print_get_bool_string(is_for_playing));
 
 #ifdef EDITOR_BUILD
-	if (editorState && editorState->has_tool()) {
-		editorState->hide();
-		assert(!editorState->get_tool());
-	}
+		if (editorState && editorState->has_tool()) {
+			editorState->hide();
+			assert(!editorState->get_tool());
+		}
 #endif
-	if (level) {
-		stop_game();
-		assert(!level);
-	}
-	uptr<SceneAsset> unique_scene(loadedLevel);	// now its a unique ptr
-	loadedLevel = nullptr;	// set caller to null since this deletes the sceneasset :)
-
-	g_modelMgr.compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
-	time = 0.0;
-	set_tick_rate(60.f);
-	level = make_unique<Level>(!is_for_playing);
-	level->start(unique_scene.get());	// scene will then get destroyed
-	idraw->on_level_start();
-
-	if (app) {
-		app->on_map_changed();
-	}
-	sys_print(Info, "changed state to Engine_State::Game\n");
-}
-void OpenMapCommand::execute()
-{
-	sys_print(Debug, "OpenMapCommand::execute\n");
-	if (eng_local.is_waiting_on_map_load) {
-		sys_print(Warning,"OpenMapCommand::execute(%s): already waiting on another OpenMapCommand\n", map_name.value_or("<empty>").c_str());
-		if(callback)
-			callback(OpenMapReturnCode::AlreadyLoadingMap);
-	}
-	else if (map_name.has_value()) {
-		function<void(OpenMapReturnCode)> callback = this->callback;
-		bool is_for_playing = this->is_for_playing;
-		string mapname = map_name.value_or("<unnamed>");
-		eng_local.is_waiting_on_map_load = true;
-		double start_time = GetTime();
-
-		uptr<SceneAsset> scene = std::make_unique<SceneAsset>();
-		scene->editor_set_newly_made_path(mapname);
-		bool success = scene->load_asset(g_assets.loader);
-		if (success) {
-			try {
-				scene->post_load();
-			}
-			catch (...) {
-				success = false;
-			}
+		if (level) {
+			stop_game();
+			assert(!level);
 		}
+		uptr<SceneAsset> unique_scene(loadedLevel);	// now its a unique ptr
+		loadedLevel = nullptr;	// set caller to null since this deletes the sceneasset :)
 
-		if (success) {
-			auto scenePtr = scene.release();
-			eng_local.insert_this_map_as_level(scenePtr, is_for_playing);
-		}
-		else {
-			assert(eng_local.is_waiting_on_map_load);
-			sys_print(Warning, "OpenMapCommand::execute(%s): failed to load\n", mapname.c_str());
-			eng_local.is_waiting_on_map_load = false;
-		}
-		assert(!eng_local.is_waiting_on_map_load);
-		auto code = success ? OpenMapReturnCode::Success : OpenMapReturnCode::FailedToLoad;
-		double now = GetTime();
-		sys_print(Debug, "OpenMapCommand::execute: took %f\n", float(now - start_time));
+		g_modelMgr.compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
+		time = 0.0;
+		set_tick_rate(60.f);
+		level = make_unique<Level>(!is_for_playing);
+		level->start(unique_scene.get());	// scene will then get destroyed
+		idraw->on_level_start();
 
-		if (callback)
-			callback(code);
+		if (app) {
+			app->on_map_changed();
+		}
+		sys_print(Info, "changed state to Engine_State::Game\n");
+	};
+
+	if (success || wants_empty) {
+		auto scenePtr = scene.release();
+		insert_this_map_as_level(scenePtr, !is_editor_state());
 	}
 	else {
-		eng_local.is_waiting_on_map_load = true;
-		SceneAsset* asset = nullptr;	
-		eng_local.insert_this_map_as_level(asset, this->is_for_playing);
-		assert(!eng_local.is_waiting_on_map_load);
-		callback(OpenMapReturnCode::Success);
+		sys_print(Warning, "OpenMapCommand::execute(%s): failed to load\n", mapname.c_str());
+		return false;
 	}
+	
+	double now = GetTime();
+	sys_print(Debug, "OpenMapCommand::execute: took %f\n", float(now - start_time));
+
+	return true;
 }
+
+
 
 
 static void inc_or_dec_int_var(ConfigVar* var, bool decrement)
@@ -783,7 +740,20 @@ void GameEngineLocal::add_commands()
 			sys_print(Error, "cant make new map, already exists\n");
 		}
 		});
+	commands->add("open-editor", [&](const Cmd_Args& args) {
+		sys_print(Debug, "OpenEditorToolCommand::execute\n");
 
+		if (!eng_local.editorState) {
+			sys_print(Error, "OpenEditorToolCommand: didnt launch in editor mode, use 'is_editor_app 1' in cfg or command line\n");
+			return;
+		}
+		string mapname = "<empty>";
+		if (args.size() == 2)
+			mapname = args.at(1);
+
+		editorState->open_tool(mapname);
+
+		});
 
 	commands->add("bind", bind_key);
 	
@@ -1265,12 +1235,12 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 		auto vs = editorState->get_vs();
 
 		// fixme
-		isound->set_listener_position(vs->origin, glm::normalize(glm::cross(vs->front, glm::vec3(0, 1, 0))));
 
 		if (!vs) {
 			params.draw_world = false;
 			vs = &vs_for_gui;
 		}
+		isound->set_listener_position(vs->origin, glm::normalize(glm::cross(vs->front, glm::vec3(0, 1, 0))));
 		setup = *vs;
 		//idraw->scene_draw(params, *vs, get_gui());
 	}

@@ -73,7 +73,7 @@ public:
 	REF int pellets = 0;	// for shotgun
 	REF float accuracy = 1.f;
 	REF float bullet_speed = 20.f;
-	REF PrefabAsset* special_projectile = nullptr;	// what projectile to spawn
+//	REF PrefabAsset* special_projectile = nullptr;	// what projectile to spawn
 	REF std::vector<float> values;
 };
 
@@ -101,8 +101,8 @@ public:
 	REF AnimationSeqAsset* runToStar = nullptr;
 	REF AnimationSeqAsset* idleToRun = nullptr;
 	SoundComponent* cachedShotgunSound = nullptr;
-	REF PrefabAsset* particlePrefab = nullptr;
-	REF PrefabAsset* shotgunSoundAsset = nullptr;
+	//REF PrefabAsset* particlePrefab = nullptr;
+	//REF PrefabAsset* shotgunSoundAsset = nullptr;
 	REF AnimationSeqAsset* jumpAnim = nullptr;
 
 
@@ -130,23 +130,23 @@ public:
 
 			int count = 5;
 			for (int i = 0; i < count; i++) {
-				auto prefab = PrefabAsset::load("top_down/projectile.pfb");
-				auto projectile = eng->get_level()->spawn_prefab(prefab);
-				auto pc = projectile->get_component<ProjectileComponent>();
-				pc->ignore = capsule;
-				const float spread = 0.15;
-				pc->direction = lookdir + glm::vec3(r.RandF(-spread, spread), 0, r.RandF(-spread, spread));
-				if(using_third_person_movement)
-					pc->direction = get_front_dir();
-				else
-					glm::normalize(pc->direction);
-				pc->speed += r.RandF(-2, 2);
-
-				glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0, 1, 0), pc->direction));
-				glm::vec3 up = glm::cross(pc->direction, right);
-				glm::mat3 rotationMatrix(-pc->direction, up, right);
-
-				pc->get_owner()->set_ws_transform(get_ws_position() + glm::vec3(0, 0.5, 0), glm::quat_cast(rotationMatrix), pc->get_owner()->get_ls_scale());
+				//auto prefab = PrefabAsset::load("top_down/projectile.pfb");
+				//auto projectile = eng->get_level()->spawn_prefab(prefab);
+				//auto pc = projectile->get_component<ProjectileComponent>();
+				//pc->ignore = capsule;
+				//const float spread = 0.15;
+				//pc->direction = lookdir + glm::vec3(r.RandF(-spread, spread), 0, r.RandF(-spread, spread));
+				//if(using_third_person_movement)
+				//	pc->direction = get_front_dir();
+				//else
+				//	glm::normalize(pc->direction);
+				//pc->speed += r.RandF(-2, 2);
+				//
+				//glm::vec3 right = glm::normalize(glm::cross(glm::vec3(0, 1, 0), pc->direction));
+				//glm::vec3 up = glm::cross(pc->direction, right);
+				//glm::mat3 rotationMatrix(-pc->direction, up, right);
+				//
+				//pc->get_owner()->set_ws_transform(get_ws_position() + glm::vec3(0, 0.5, 0), glm::quat_cast(rotationMatrix), pc->get_owner()->get_ls_scale());
 			}
 
 			shake.start_shake(0.08,0.25);

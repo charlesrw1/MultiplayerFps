@@ -62,7 +62,6 @@ ConfigVar test2("test2", "200", CVAR_INTEGER, "", 0, 256);
 ConfigVar foliage_active("ed_foliage_active", "0", CVAR_BOOL, "");
 ConfigVar decal_active("ed_decal_active", "0", CVAR_BOOL, "");
 
-extern bool this_is_a_serializeable_object(const BaseUpdater* b, const PrefabAsset* for_prefab);
 extern void export_godot_scene(const std::string& base_export_path);
 extern void export_level_scene();
 extern void start_play_process();
@@ -1460,10 +1459,7 @@ void EditorDoc::hook_scene_viewport_draw()
 					Model* mod = Model::load(resource->filename);
 					drag_drop_preview->set_preview_model(mod, drop_transform);
 				}
-				else if (asset_class_type->is_a(PrefabAsset::StaticType)) {
-					PrefabAsset* mod = PrefabAsset::load(resource->filename);
-					drag_drop_preview->set_preview_prefab(mod, drop_transform);
-				}
+				
 			}
 
 
@@ -1500,12 +1496,7 @@ void EditorDoc::hook_scene_viewport_draw()
 						parent_to, true)
 					);
 				}
-				else if (resource->type->get_asset_class_type()->is_a(PrefabAsset::StaticType)) {
-					command_mgr->add_command(new CreatePrefabCommand(*this,
-						resource->filename,
-						drop_transform
-					));
-				}
+			
 			}
 
 		}
@@ -2292,15 +2283,6 @@ void EditorDoc::instantiate_into_scene(BaseUpdater* u)
 	
 }
 
-Entity* EditorDoc::spawn_prefab(PrefabAsset* prefab)
-{
-	if (!prefab)
-		return nullptr;
-	Entity* e = eng->get_level()->spawn_prefab(prefab);
-	if (!e)
-		return nullptr;
-	return e;
-}
 
 void DragDetector::tick(bool can_start_drag)
 {
@@ -2386,25 +2368,6 @@ void DragDropPreview::set_preview_component(const ClassTypeInfo* t, const glm::m
 		obj_ptr = e;
 		fixup_entity();
 
-	}
-	if (obj_ptr) {
-		obj_ptr->set_ws_transform(where);
-	}
-}
-
-void DragDropPreview::set_preview_prefab(PrefabAsset* pfb, const glm::mat4& where) {
-	if (!pfb) {
-		return;
-	}
-	had_state_set = true;
-	if (!(state == State::PreviewPrefab && preview_pfb == pfb)) {
-		state = State::PreviewPrefab;
-		preview_pfb = pfb;
-		delete_obj();
-		Entity* e = eng->get_level()->spawn_prefab(pfb);
-		e->dont_serialize_or_edit = true;
-		obj_ptr = e;
-		fixup_entity();
 	}
 	if (obj_ptr) {
 		obj_ptr->set_ws_transform(where);

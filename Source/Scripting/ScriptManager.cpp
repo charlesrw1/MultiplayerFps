@@ -257,7 +257,7 @@ void ScriptManager::check_for_reload() {
 		ClassBase::post_changes_class_init();
 		had_changes = false;
 
-		PrefabAsset::init_prefab_factory();
+		//PrefabAsset::init_prefab_factory();
 	}
 }
 void ScriptManager::reload_one_file(const std::string& strFilePath)

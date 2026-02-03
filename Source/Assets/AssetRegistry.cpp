@@ -298,12 +298,7 @@ bool update_on_changed_paths(ChangedPaths changes) {
 				g_assets.reload_sync<Texture>(asset);
 			}
 		}
-		else if (ext == "pfb") {
-			if (g_assets.is_asset_loaded(gamepath)) {
-				auto asset = g_assets.find_sync<PrefabAsset>(gamepath);
-				g_assets.reload_sync<PrefabAsset>(asset);
-			}
-		}
+		
 		else if (ext == "wav") {
 			if (g_assets.is_asset_loaded(gamepath)) {
 				auto asset = g_assets.find_sync<SoundFile>(gamepath);

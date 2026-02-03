@@ -6,7 +6,6 @@
 // Inherited by Entity and Component
 
 class Entity;
-class PrefabAsset;
 class Level;
 
 class BaseUpdater : public ClassBase

@@ -46,28 +46,6 @@ public:
 	std::vector<EntityPtr> handles;
 };
 
-class CreatePrefabCommand : public Command
-{
-public:
-	EditorDoc& ed_doc;
-	CreatePrefabCommand(EditorDoc& ed_doc, const std::string& prefab_name, const glm::mat4& transform, EntityPtr parent = EntityPtr());
-	~CreatePrefabCommand() override {
-	}
-
-	void execute();
-	void undo() {
-		handle->destroy();
-		ed_doc.post_node_changes.invoke();
-		handle = {};
-	}
-	std::string to_string() override {
-		return "Create Prefab";
-	}
-	EntityPtr parent_to;
-	EntityPtr handle;
-	std::string prefab_name;
-	glm::mat4 transform;
-};
 
 class CreateStaticMeshCommand : public Command
 {

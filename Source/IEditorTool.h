@@ -16,8 +16,6 @@ public:
 
 	void try_close(std::function<void()> callback);	// will try closing document, if success, does callback.
 	void try_save(std::function<void()> callback);
-	
-	virtual uptr<CreateEditorAsync> create_command_to_load_back() = 0;
 
 	// if save is called when !current_document_has_path(), then it will open a popup to pick a save directory
 	bool save();

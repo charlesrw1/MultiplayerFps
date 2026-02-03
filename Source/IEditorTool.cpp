@@ -257,12 +257,12 @@ void IEditorTool::draw_menu_bar()
 			if (ImGui::MenuItem("Save", "Ctrl+S")) {
 				save();
 			}
-			if (ImGui::MenuItem("New map")) {
-				Cmd_Manager::inst->append_cmd(std::make_unique<OpenEditorToolCommand>(SceneAsset::StaticType, std::nullopt, true));
-			}
-			if (ImGui::MenuItem("New prefab")) {
-				Cmd_Manager::inst->append_cmd(std::make_unique<OpenEditorToolCommand>(PrefabAsset::StaticType, std::nullopt, true));
-			}
+			//if (ImGui::MenuItem("New map")) {
+			//	Cmd_Manager::inst->append_cmd(std::make_unique<OpenEditorToolCommand>(SceneAsset::StaticType, std::nullopt, true));
+			//}
+			//if (ImGui::MenuItem("New prefab")) {
+			//	Cmd_Manager::inst->append_cmd(std::make_unique<OpenEditorToolCommand>(PrefabAsset::StaticType, std::nullopt, true));
+			//}
 
 			hook_menu_bar_file_menu();
 

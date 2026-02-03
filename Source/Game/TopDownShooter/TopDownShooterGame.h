@@ -37,7 +37,7 @@ public:
 		instance = this;
 	}
 	void start() override {
-		the_player = eng->get_level()->spawn_prefab(player_prefab.get());
+		//the_player = eng->get_level()->spawn_prefab(player_prefab.get());
 	}
 	void update() {}
 	void stop() {
@@ -48,7 +48,7 @@ public:
 	Entity* the_player = nullptr;
 	CameraComponent* static_level_cam = nullptr;
 	
-	REF AssetPtr<PrefabAsset> player_prefab;
+	//REF AssetPtr<PrefabAsset> player_prefab;
 	REF obj<Component> what_component;
 	REF obj<Component> my2nd;
 	REF obj<Component> my3rd;
@@ -341,7 +341,7 @@ public:
 		
 	}
 
-	REF AssetPtr<PrefabAsset> prefab;
+	//REF AssetPtr<PrefabAsset> prefab;
 	REF int count = 1;
 	bool wait_to_spawn = false;
 	bool start_disabled = false;
@@ -359,7 +359,7 @@ public:
 	float last_spawn = 0.0;
 
 
-	REF AssetPtr<PrefabAsset> prefab;
+	//REF AssetPtr<PrefabAsset> prefab;
 	REF float spawn_interval = 1.0;	// every x seconds
 	REF int max_count = 2000;
 };

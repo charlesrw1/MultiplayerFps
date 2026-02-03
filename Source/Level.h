@@ -8,7 +8,6 @@
 #include "Framework/ConsoleCmdGroup.h"
 #include "Game/EntityPtr.h"
 class SceneAsset;
-class PrefabAsset;
 class Entity;
 class GameMode;
 class UnserializedSceneFile;
@@ -36,9 +35,9 @@ public:
 	// destroy an entity, calls desroy_internal(), deletes, removes from list
 	void destroy_entity(Entity* e);
 	void destroy_component(Component* e);
-	Entity* spawn_prefab(const PrefabAsset* asset);
 	Entity* spawn_entity();
 	void add_and_init_created_runtime_component(Component* c);
+	const ScopedBooleanValue& get_is_in_update() const { return b_is_in_update_tick; }
 	BaseUpdater* get_entity(uint64_t handle) {
 		return all_world_ents.find(handle);
 	}
@@ -54,16 +53,12 @@ public:
 	// appends object to list that will be destroyed at end of frame, instead of instantly
 	void queue_deferred_delete(BaseUpdater* e);
 
-#ifdef EDITOR_BUILD
-	Entity* editor_spawn_prefab_but_dont_set_spawned_by(const PrefabAsset* asset);
-#endif
+
 	void validate();
 	Entity* find_initial_entity_by_name(const string& name) const;
 	Component* find_first_component(const ClassTypeInfo* type) const;
 private:
 	void insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene,bool addSpawnNames);
-	static void set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file);
-	Entity* spawn_prefab_shared(const PrefabAsset* asset, bool set_vars);
 	string sourceAssetName;
 	std::unordered_map<string, obj<Entity>> spawnNameToEntity;
 	// all entities/components in the map

@@ -73,14 +73,14 @@ public:
 
 	void log_to_fullscreen_gui(LogType type, const char* msg) final;
 
-
+	bool load_level(string mapname) final;
 
 	bool is_editor_level() const  final {
 		/* this passes when you are in the loading phase or past the loading phase */
 		/* added is_loading... to work with constructors before level gets set */
 		return is_loading_editor_level || (get_level() && get_level()->is_editor_level());
 	}
-
+	bool is_editor_state() const { return editorState != nullptr; }
 	bool is_host() const final { return true; }
 
 // local functions
@@ -120,7 +120,6 @@ public:
 	bool map_spawned() { return level != nullptr; }
 
 	OnScreenLog gui_log;
-	string queued_mapname;
 	bool is_loading_editor_level = false;
 	std::unique_ptr<Level> level= nullptr;
 	std::unique_ptr<Application> app;
@@ -147,8 +146,6 @@ public:
 
 	void set_tester(IntegrationTester* tester, bool headless_mode);
 
-	void insert_this_map_as_level(SceneAsset*& asset, bool is_for_playing);
-	bool is_waiting_on_map_load = false;
 private:
 
 	bool is_hosting_game = false;

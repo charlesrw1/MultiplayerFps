@@ -59,7 +59,6 @@ class GameplayStatic : public ClassBase {
 public:
 	CLASS_BODY(GameplayStatic);
 
-	REF static Entity* spawn_prefab(PrefabAsset* prefab);
 	REF static Entity* spawn_entity();
 	
 	// spatialize=R/L ear panning
@@ -92,8 +91,8 @@ public:
 		return eng->get_game_time();
 	}
 
-	REF static void change_level(string mapname) {
-		Cmd_Manager::inst->append_cmd(uptr<SystemCommand>(new OpenMapCommand(mapname, true)));
+	REF static bool change_level(string mapname) {
+		return eng->load_level(mapname);
 	}
 
 	REF static string get_current_level_name() {

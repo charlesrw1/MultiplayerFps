@@ -39,7 +39,7 @@ AssetBrowser::AssetBrowser()
 AssetBrowser* AssetBrowser::inst = nullptr;
 #include "EngineSystemCommands.h"
 ConfigVar ignore_folders("ignore_folders", "0", CVAR_BOOL, "");
-
+#include "GameEnginePublic.h"
 static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesystemNode* node, string parent_path)
 {
 	const float folder_indent = 20.0;
@@ -73,10 +73,9 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 				b->selected_resource = asset;
 				auto type = asset.type;
 				if (ImGui::GetIO().MouseClickedCount[0] == 2) {
-					auto assetType = type->get_asset_class_type();
-					if (assetType) {
-						auto cmd = std::make_unique<OpenEditorToolCommand>(*assetType, asset.filename, true);
-						Cmd_Manager::inst->append_cmd(std::move(cmd));
+					//auto assetType = type->get_asset_class_type();
+					if (type->get_type_name()=="Map") {
+						Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, ("open-editor " + asset.filename).c_str());
 					}
 					else {
 						sys_print(Warning, "AssetBrowser: Asset is not a standard IAsset, can't edit.\n");

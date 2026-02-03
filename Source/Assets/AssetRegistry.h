@@ -22,7 +22,6 @@ public:
 	// return <AssetName>::StaticType
 	virtual const ClassTypeInfo* get_asset_class_type() const { return nullptr; }
 
-	virtual uptr<CreateEditorAsync> create_create_tool_to_edit(opt<string> assetPath) const { return nullptr; }
 
 	virtual void draw_browser_menu(const string& assetPath) const {
 

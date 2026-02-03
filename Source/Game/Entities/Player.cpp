@@ -785,10 +785,7 @@ static int GameplayStatic_debug_text_start = 10;
 	 Debug::add_line(p, p + n * len, color.to_color32(), life);
  }
 
- Entity* GameplayStatic::spawn_prefab(PrefabAsset* prefab)
- {
-	 return eng->get_level()->spawn_prefab(prefab);
- }
+
  int GameplayStatic::get_collision_mask_for_physics_layer(PL physics_layer) {
 	 return (int)::get_collision_mask_for_physics_layer(physics_layer);
  }

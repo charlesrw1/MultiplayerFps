@@ -15,14 +15,7 @@ using std::vector;
 using std::string;
 using std::function;
 class IEditorTool;
-class CreateEditorAsync {
-public:
-	using Callback = function<void(uptr<IEditorTool>)>;
-	virtual ~CreateEditorAsync() {}
-	virtual void execute(Callback callback) = 0;
-	virtual string get_tab_name() = 0;
-	virtual opt<string> get_asset_name() = 0;
-};
+
 class ClassTypeInfo;
 class Texture;
 struct View_Setup;
@@ -40,7 +33,7 @@ public:
 	void hook_pre_viewport();
 	void hook_viewport();
 
-	void open_tool(uptr<CreateEditorAsync> creation/* non null*/, bool set_active, function<void(bool)> callback);
+	void open_tool(string mapname);
 
 	const View_Setup* get_vs();
 
@@ -48,47 +41,7 @@ public:
 	void imgui_hook_new_frame();
 	void imgui_draw();
 	void draw_tab_window();
-	
-	void select_tab(int index);
-
-	MulticastDelegate<> on_change_tool;
-	MulticastDelegate<> on_hide;
-	MulticastDelegate<> on_unhide;
 private:
 	uptr<IEditorTool> curTool;
-	void set_tab_open(string name) {
-		bool found = false;
-		for (auto& t : tabs) {
-			if (t.assetName == name) {
-				found = true;
-				t.is_active = true;
-			}
-			else {
-				t.is_active = false;
-			}
-		}
-		if (!found) {
-			tabs.push_back({});
-			tabs.back().assetName = name;
-			tabs.back().is_active = true;
-		}
-	}
-	opt<int> get_active_index() {
-		for (auto [i, tab] : IPairs(tabs)) {
-			if (tab->is_active)
-				return i;
-		}
-		return std::nullopt;
-	}
-
-	struct TabItem {
-		string itemName;
-		const ClassTypeInfo* assetType = nullptr;
-		string assetName;
-		bool is_active = false;
-		uptr<CreateEditorAsync> factoryTool;
-	};
-	vector<TabItem> tabs;
-	const Texture* redCrossIcon = nullptr;
 };
 #endif

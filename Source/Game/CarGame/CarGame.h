@@ -110,8 +110,8 @@ public:
 
 	CarSoundMaker() : r(4052347) {}
 
-	REF AssetPtr<PrefabAsset> engineSoundAsset;
-	REF AssetPtr<PrefabAsset> tireSoundAsset;
+	//REF AssetPtr<PrefabAsset> engineSoundAsset;
+	//REF AssetPtr<PrefabAsset> tireSoundAsset;
 
 	SoundComponent* engineSound{};
 	SoundComponent* tireSound{};
@@ -134,10 +134,10 @@ public:
 			// 
 			// get_owner()->parent_to(get_owner())
 
-			engineSound = eng->get_level()->spawn_prefab(engineSoundAsset.get())->get_component<SoundComponent>();
-			tireSound = eng->get_level()->spawn_prefab(tireSoundAsset.get())->get_component<SoundComponent>();
-			engineSound->get_owner()->parent_to(get_owner());
-			tireSound->get_owner()->parent_to(get_owner());
+			//engineSound = eng->get_level()->spawn_prefab(engineSoundAsset.get())->get_component<SoundComponent>();
+			//tireSound = eng->get_level()->spawn_prefab(tireSoundAsset.get())->get_component<SoundComponent>();
+			//engineSound->get_owner()->parent_to(get_owner());
+			//tireSound->get_owner()->parent_to(get_owner());
 
 		}
 		engineSound->set_play(true);

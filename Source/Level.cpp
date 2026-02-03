@@ -340,10 +340,6 @@ void Level::add_and_init_created_runtime_component(Component* c)
 }
 
 
-Entity* Level::spawn_prefab(const PrefabAsset* asset)
-{
-	return spawn_prefab_shared(asset, true);
-}
 
 void Level::queue_deferred_delete(BaseUpdater* e)
 {
@@ -354,12 +350,7 @@ void Level::queue_deferred_delete(BaseUpdater* e)
 	}
 	deferred_delete_list.insert(e->get_instance_id());
 }
-#ifdef EDITOR_BUILD
-Entity* Level::editor_spawn_prefab_but_dont_set_spawned_by(const PrefabAsset* asset)
-{
-	return spawn_prefab_shared(asset, false);
-}
-#endif
+
 
 void Level::validate()
 {
@@ -383,30 +374,3 @@ Component* Level::find_first_component(const ClassTypeInfo* type) const
 	return nullptr;
 }
 
-void Level::set_prefab_spawned(Entity& root, const PrefabAsset& asset, UnserializedSceneFile& file)
-{
-#ifdef EDITOR_BUILD
-
-#endif
-}
-
-Entity* Level::spawn_prefab_shared(const PrefabAsset* asset, bool set_vars)
-{
-	if (!asset || asset->did_load_fail()) {
-		sys_print(Warning, "Level::spawn_prefab: null asset\n");
-		return nullptr;
-	}
-	Entity* root = new Entity;
-	if (set_vars) {
-#ifdef EDITOR_BUILD
-		
-#endif
-	}
-	else {
-		
-	}
-	insert_new_native_entity_into_hashmap_R(root);
-	initialize_new_entity_safe(root);
-
-	return root;
-}

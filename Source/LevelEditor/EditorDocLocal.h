@@ -537,7 +537,6 @@ class DragDropPreview {
 public:
 	void set_preview_model(Model* m, const glm::mat4& where);
 	void set_preview_component(const ClassTypeInfo* t, const glm::mat4& where);
-	void set_preview_prefab(PrefabAsset* pfb, const glm::mat4& where);
 	void tick();
 private:
 	void fixup_entity();
@@ -551,7 +550,6 @@ private:
 	}state=State::None;
 	Model* preview_model = nullptr;
 	const ClassTypeInfo* preview_comp = nullptr;
-	PrefabAsset* preview_pfb = nullptr;
 	obj<Entity> obj_ptr;
 };
 
@@ -610,7 +608,6 @@ public:
 
 	void init_new();
 	void set_document_path(string newAssetName);
-	uptr<CreateEditorAsync> create_command_to_load_back() { return nullptr; }
 	void check_inputs();
 	bool save_document_internal() final;
 	void hook_menu_bar() final;
@@ -621,7 +618,7 @@ public:
 	void hook_pre_scene_viewport_draw() final;
 	bool wants_scene_viewport_menu_bar() const { return true; }
 	const ClassTypeInfo& get_asset_type_info() const final {
-		return is_editing_scene() ? SceneAsset::StaticType : PrefabAsset::StaticType;
+		return  SceneAsset::StaticType;
 	}
 	void tick(float dt) final;
 	void imgui_draw() final;
@@ -687,7 +684,6 @@ public:
 	void remove_scene_object(BaseUpdater* u);
 	void insert_unserialized_into_scene(UnserializedSceneFile& file);
 	void instantiate_into_scene(BaseUpdater* u);
-	Entity* spawn_prefab(PrefabAsset* prefab);
 
 	//std::unordered_map<uint64_t,std::shared_ptr<EditorObject>> editor_objects;
 
@@ -733,7 +729,6 @@ public:
 	}
 private:
 	EditorDoc();
-	void init_for_prefab(PrefabAsset* prefab);
 	void init_for_scene(opt<string> scenePath);
 
 	void on_mouse_drag(int x, int y);

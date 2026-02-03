@@ -10,7 +10,6 @@
 #include "Game/LevelAssets.h"
 #include "Framework/MyImguiLib.h"
 EditorState::EditorState(){
-	this->redCrossIcon = g_assets.find_sync<Texture>("eng/editor/red_cross.png", true).get();// [&](GenericAssetPtr ptr) {
 }
 
 EditorState::~EditorState()
@@ -42,23 +41,26 @@ void EditorState::hook_viewport()
 	if (curTool)
 		curTool->hook_scene_viewport_draw();
 }
+#include "GameEnginePublic.h"
+#include "LevelEditor/EditorDocLocal.h"
 
-void EditorState::open_tool(uptr<CreateEditorAsync> creation, bool set_active, function<void(bool)> callback)
+void EditorState::open_tool(string mapname)
 {
-	assert(creation);
-	sys_print(Debug, "EditorState::open_tool: calling creator\n");
-	creation->execute([this, callback](uptr<IEditorTool> arg) {
-		if (!arg)
-			sys_print(Warning, "EditorState::open_tool: creation returned null\n");
-		if (curTool&&arg)
-			sys_print(Debug, "EditorState::open_tool: replacing current tool\n");
-		if(arg)
-			set_tab_open(arg->get_doc_name());
 
-		this->curTool = std::move(arg);
-		if(callback)
-			callback(this->curTool != nullptr);
-		});
+
+	const bool good = eng->load_level(mapname);
+	if (good) {
+		uptr<EditorDoc> editorDoc(EditorDoc::create_scene(mapname));
+		if (curTool)
+			sys_print(Debug, "EditorState::open_tool: replacing current tool\n");
+		this->curTool = std::move(editorDoc);
+	}
+	else {
+		//sys_print(Warning, "CreateLevelEditorAync::execute: failed to load map (%s)\n", assetPath.value_or("<unnamed>").c_str());
+		sys_print(Warning, "EditorState::open_tool: creation returned null\n");
+		this->curTool = nullptr;
+	}
+
 }
 
 const View_Setup* EditorState::get_vs()
@@ -73,7 +75,7 @@ void EditorState::tick(float dt)
 	if (curTool)
 		curTool->tick(dt);
 	else {
-		Cmd_Manager::inst->append_cmd(uptr<SystemCommand>(new OpenEditorToolCommand(SceneAsset::StaticType, std::nullopt, true)));
+		Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "open-editor");
 	}
 }
 

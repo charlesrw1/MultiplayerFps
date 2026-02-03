@@ -108,31 +108,6 @@ void RemoveEntitiesCommand::undo() {
 }
 
 
-CreatePrefabCommand::CreatePrefabCommand(EditorDoc& ed_doc, const std::string& prefab_name, const glm::mat4& transform, EntityPtr parent)
-	: ed_doc(ed_doc)
-{
-	this->prefab_name = prefab_name;
-	this->transform = transform;
-	this->parent_to = parent;
-
-}
-
-void CreatePrefabCommand::execute() {
-	auto p = g_assets.find_sync<PrefabAsset>(prefab_name);
-	if (p) {
-		Entity* ent = ed_doc.spawn_prefab(p.get());
-		if (ent) {
-			handle = ent->get_self_ptr();
-			if (parent_to.get())
-				ent->parent_to(parent_to.get());
-			else
-				ent->set_ws_transform(transform);
-			ed_doc.selection_state->set_select_only_this(ent->get_self_ptr());
-			ed_doc.on_entity_created.invoke(handle);
-			ed_doc.post_node_changes.invoke();
-		}
-	}
-}
 
 CreateStaticMeshCommand::CreateStaticMeshCommand(EditorDoc& ed_doc, const std::string& modelname, const glm::mat4& transform, EntityPtr parent) 
 	: ed_doc(ed_doc)
