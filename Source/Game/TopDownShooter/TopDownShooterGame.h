@@ -18,7 +18,6 @@
 #include "Animation/Runtime/Animation.h"
 #include "Animation/AnimationSeqAsset.h"
 
-#include "Scripting/FunctionReflection.h"
 #include "Framework/Reflection2.h"
 #include "Physics/Physics2.h"
 

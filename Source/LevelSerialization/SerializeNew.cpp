@@ -1,16 +1,28 @@
 #include "SerializeNew.h"
-#include "Framework/SerializerJson.h"
-#include "Framework/StringUtils.h"
-#include "Game/BaseUpdater.h"
+#include "AssetCompile/Someutils.h"
+#include <stdexcept>
+#include "Assets/AssetDatabase.h"
+#include <unordered_map>
+#include <unordered_set>
+#include <stdexcept>
+#include "Level.h"
 #include "Game/Entity.h"
 #include "Game/EntityComponent.h"
 #include "Game/LevelAssets.h"
-#include "Assets/AssetDatabase.h"
-#include "Framework/MapUtil.h"
-
-
+#include "GameEnginePublic.h"
+#include "Framework/StringUtils.h"
 #include "Framework/Log.h"
-#include "SerializationAPI.h"
+#include "Framework/ReflectionProp.h"
+#include "Framework/DictParser.h"
+#include "Framework/ClassBase.h"
+#include "Framework/Util.h"
+#include "Framework/DictWriter.h"
+#include "Framework/ReflectionProp.h"
+#include "Framework/SerializedForDiffing.h"
+#include "Framework/SerializerJson2.h"
+#include "Framework/SerializerBinary.h"
+
+#include <json.hpp>
 
 
 
@@ -18,8 +30,6 @@
 
 using std::to_string;
 
-
-#include "Framework/SerializedForDiffing.h"
 
 template<typename T>
 T* cast_to(ClassBase* ptr) {
@@ -29,13 +39,6 @@ T* cast_to(ClassBase* ptr) {
 // factory method for components
 // factory method for prefabs
 // both defined in lua
-
-#include "Framework/MapUtil.h"
-
-#include <json.hpp>
-#include "Framework/SerializerJson2.h"
-
-#include "Framework/SerializerBinary.h"
 UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_tag, SerializedForDiffing& json, IAssetLoadingInterface& load, bool keepid)
 {
 	UnserializedSceneFile outfile;
@@ -126,4 +129,61 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 
 
 	return outfile;
+}
+
+
+class UnserializationWrapper;
+Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text, const std::string& rootpath,
+	PrefabAsset* prefab, Entity* starting_root, IAssetLoadingInterface* load);
+
+
+void UnserializedSceneFile::delete_objs()
+{
+	for (auto& o : all_obj_vec)
+		delete o;
+	all_obj_vec.clear();
+}
+
+
+
+UnserializedSceneFile unserialize_entities_from_text(const char* debug_tag, const std::string& text, IAssetLoadingInterface* load, bool keepid)
+{
+	if (!load)
+		load = AssetDatabase::loader;
+	if (StringUtils::starts_with(text, "!json\n")) {
+		auto fixedtext = text.substr(5);
+		return NewSerialization::unserialize_from_text(debug_tag, fixedtext, *load, keepid);
+	}
+	else {
+		sys_print(Error, "unserialize_entities_from_text: old format not supported\n");
+		return UnserializedSceneFile();
+	}
+}
+
+
+// TODO prefabs
+// rules:
+// * path based on source
+
+
+
+bool serialize_this_objects_children(const Entity* b)
+{
+	if (b->dont_serialize_or_edit)
+		return false;
+	return true;
+}
+
+bool this_is_a_serializeable_object(const BaseUpdater* b)
+{
+	assert(b);
+	if (b->dont_serialize_or_edit)
+		return false;
+
+	if (auto as_comp = b->cast_to<Component>()) {
+		assert(as_comp->get_owner());
+		if (!serialize_this_objects_children(as_comp->get_owner()))
+			return false;
+	}
+	return true;
 }

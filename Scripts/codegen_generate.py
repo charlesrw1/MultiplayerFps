@@ -13,7 +13,6 @@ def write_headers(path:str, additional_includes:list[str]):
     out += f"#include \"{path}\"\n"
     out += "#include \"Framework/ReflectionProp.h\"\n"
     out += "#include \"Framework/ReflectionMacros.h\"\n"
-    out += "#include \"Scripting/FunctionReflection.h\"\n"
     out += "#include \"Framework/VectorReflect2.h\"\n"
     out += "#include \"Framework/EnumDefReflection.h\"\n"
     out += "#include \"Scripting/ScriptFunctionCodegen.h\"\n"

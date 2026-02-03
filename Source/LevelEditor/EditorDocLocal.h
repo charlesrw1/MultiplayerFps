@@ -26,7 +26,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "Game/LevelAssets.h"
-#include "LevelSerialization/SerializationAPI.h"
 #include "Render/DrawPublic.h"
 #include "Game/EntityComponent.h"
 #include "Game/SerializePtrHelpers.h"
@@ -35,9 +34,8 @@
 #include "UI/Widgets/Layouts.h"
 #include "Input/InputSystem.h"
 #include <variant>
-#include "LevelSerialization/SerializationAPI.h"
 #include "UI/GUISystemPublic.h"
-
+#include "LevelSerialization/SerializeNew.h"
 extern ConfigVar g_mousesens;
 
 enum TransformType

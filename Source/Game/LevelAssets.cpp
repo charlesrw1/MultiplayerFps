@@ -3,7 +3,6 @@
 #include "Assets/AssetRegistry.h"
 #include "Framework/Files.h"
 #include "Game/BaseUpdater.h"
-#include "LevelSerialization/SerializationAPI.h"
 #include "Framework/ReflectionProp.h"
 #include "EngineSystemCommands.h"
 #include "LevelEditor/EditorDocLocal.h"

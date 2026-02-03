@@ -22,7 +22,6 @@ void validate_remove_entities(EditorDoc& ed_doc, std::vector<EntityPtr>& input)
 		eng->log_to_fullscreen_gui(Error, "Cant remove inherited entities");
 	had_errors = false;
 }
-#include "LevelSerialization/SerializationAPI.h"
 static void add_to_remove_list_R(vector<SavedCreateObj>& objs, Entity* e, std::unordered_set<BaseUpdater*>& seen)
 {
 	if (!this_is_a_serializeable_object(e))

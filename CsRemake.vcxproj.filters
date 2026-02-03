@@ -387,7 +387,6 @@
     <ClInclude Include="Source\Render\Frustum.h" />
     <ClInclude Include="Source\Game\Entities\BikeEntity.h" />
     <ClInclude Include="Source\Game\Entities\BikeSystem.h" />
-    <ClInclude Include="Source\LevelSerialization\SerializationAPI.h" />
     <ClInclude Include="Source\LevelEditor\CommandMgr.h" />
     <ClInclude Include="Source\UI\OnScreenLogGui.h" />
     <ClInclude Include="Source\Game\LevelAssets.h" />
@@ -398,7 +397,6 @@
     <ClInclude Include="Source\Game\Components\ParticleComponent.h" />
     <ClInclude Include="Source\Framework\Hashset.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
-    <ClInclude Include="Source\Scripting\FunctionReflection.h" />
     <ClInclude Include="Source\Game\EntityPtr.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
     <ClInclude Include="Source\Sound\SoundComponent.h" />
@@ -572,9 +570,7 @@
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
     <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp" />
     <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
-    <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
-    <ClCompile Include="Source\LevelSerialization\Unserialize.cpp" />
     <ClCompile Include="Source\Render\DrawLocal.cpp" />
     <ClCompile Include="Source\Render\EnvProbe.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />

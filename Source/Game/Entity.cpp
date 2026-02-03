@@ -11,7 +11,6 @@
 #include "Level.h"
 #include "GameEnginePublic.h"
 
-#include "Scripting/FunctionReflection.h"
 
 #include "Game/EntityPtr.h"
 #include "Game/Components/MeshComponent.h"
@@ -23,11 +22,6 @@
 
 #include "Framework/Serializer.h"
 
-// create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
-#ifdef EDITOR_BUILD
-extern IEditorTool* g_editor_doc;	// EditorDocPublic.h
-
-#endif
 
 
 

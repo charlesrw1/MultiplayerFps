@@ -1,7 +1,55 @@
 #pragma once
-#include "SerializationAPI.h"
+
 #include <unordered_set>
 #include <stdexcept>
+
+#include <string>
+#include <vector>
+#include <memory>
+#include <unordered_map>
+#include <unordered_set>
+#include "Framework/ClassBase.h"
+#include "Framework/Reflection2.h"
+#include "Framework/SerializedForDiffing.h"
+
+// lots of junk, clean up after rewrite 1/30
+
+class BaseUpdater;
+class PrefabAsset;
+class Entity;
+class EntityComponent;
+class Level;
+class UnserializedSceneFile
+{
+public:
+	UnserializedSceneFile() = default;
+	~UnserializedSceneFile() = default;
+	UnserializedSceneFile(UnserializedSceneFile&& other) {
+		all_obj_vec = std::move(other.all_obj_vec);
+	}
+	UnserializedSceneFile& operator=(const UnserializedSceneFile&) = delete;
+	UnserializedSceneFile(const UnserializedSceneFile&) = delete;
+
+
+	void delete_objs();
+
+	std::vector<BaseUpdater*> all_obj_vec;
+private:
+	friend class Level;
+};
+
+class IAssetLoadingInterface;
+UnserializedSceneFile unserialize_entities_from_text(const char* debug_tag, const std::string& text, IAssetLoadingInterface* load, bool keepid);
+
+class SerializedSceneFile
+{
+public:
+	std::string text;
+};
+
+bool this_is_a_serializeable_object(const BaseUpdater* b);
+bool serialize_this_objects_children(const Entity* b);
+
 
 class SerializeInputError : public std::runtime_error {
 public:

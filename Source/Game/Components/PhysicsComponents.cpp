@@ -13,7 +13,6 @@
 #include "Level.h"
 #include "MeshComponent.h"
 #include "Animation/Runtime/Animation.h"
-#include "Scripting/FunctionReflection.h"
 
 #include <physx/foundation/PxTransform.h>
 

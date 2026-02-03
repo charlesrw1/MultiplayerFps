@@ -121,9 +121,7 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MaxSpeed</Optimization>
       <BasicRuntimeChecks Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Default</BasicRuntimeChecks>
     </ClCompile>
-    <ClCompile Include="Source\LevelSerialization\Serialize.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
-    <ClCompile Include="Source\LevelSerialization\Unserialize.cpp" />
     <ClCompile Include="Source\Render\DecalBatcher.cpp" />
     <ClCompile Include="Source\Render\DrawLocal.cpp" />
     <ClCompile Include="Source\Render\EnvProbe.cpp" />
@@ -237,7 +235,6 @@
     <ClInclude Include="Source\Render\RenderWindow.h" />
     <ClInclude Include="Source\Render\StreamingTextureMgr.h" />
     <ClInclude Include="Source\Render\UniformBuffer.h" />
-    <ClInclude Include="Source\Scripting\FunctionReflection.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
     <ClInclude Include="Source\Framework\Hashset.h" />
     <ClInclude Include="Source\Game\Components\CameraComponent.h" />
@@ -324,7 +321,6 @@
     <ClInclude Include="Source\IEditorTool.h" />
     <ClInclude Include="Source\Input\InputSystem.h" />
     <ClInclude Include="Source\Level.h" />
-    <ClInclude Include="Source\LevelSerialization\SerializationAPI.h" />
     <ClInclude Include="Source\Physics\Physics2Local.h" />
     <ClInclude Include="Source\Scripting\ScriptFunctionCodegen.h" />
     <ClInclude Include="Source\Scripting\ScriptManager.h" />

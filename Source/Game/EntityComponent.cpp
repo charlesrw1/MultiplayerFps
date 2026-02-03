@@ -4,7 +4,6 @@
 #include "Level.h"
 #include "Assets/AssetRegistry.h"
 #include "GameEnginePublic.h"
-#include "Scripting/FunctionReflection.h"
 #include "Framework/ReflectionMacros.h"
 #include "Framework/Serializer.h"
 #include <stdexcept>
