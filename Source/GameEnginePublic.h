@@ -43,11 +43,13 @@ public:
 	CLASS_BODY(Application, scriptable);
 
 	REF virtual void start() {}
+	REF virtual void pre_update() {}
 	REF virtual void update() {}
 	REF virtual void stop() {}
 	REF virtual void on_map_changed() {}
 	// misc callbacks
 	REF virtual void on_controller_status(int index, bool connected) {}
+
 	// can do asset (post?) processing here after it loads
 	// also called on asset reloads. doesnt call for textures
 	// idk i want to use these to set physics materials and setup animation events

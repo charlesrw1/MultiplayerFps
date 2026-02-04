@@ -650,9 +650,9 @@ void GameEngineLocal::add_commands()
 	commands = ConsoleCmdGroup::create("");
 	commands->add("print_assets", [](const Cmd_Args&) { g_assets.print_usage(); });
 #ifdef EDITOR_BUILD
-	commands->add("IMPORT_TEX_FOLDER", IMPORT_TEX_FOLDER);
-	commands->add("IMPORT_TEX", IMPORT_TEX);
-	commands->add("COMPILE_TEX", COMPILE_TEX);
+	commands->add("import-tex-folder", IMPORT_TEX_FOLDER);
+	commands->add("import-tex", IMPORT_TEX);
+	commands->add("compile-tex", COMPILE_TEX);
 	
 #endif
 
@@ -709,31 +709,12 @@ void GameEngineLocal::add_commands()
 		});
 	commands->add("quit", [](const Cmd_Args& args) { Quit(); });
 
-	commands->add("echo", [](const Cmd_Args& args) {
-		args.sys_print(Info, args.at(1));
-		});
-
-	commands->add("grep", [](const Cmd_Args& args) {
-		std::string match = args.at(1);
-		std::string search = args.at(2);
-		auto lines = StringUtils::to_lines(search);
-		for (auto& l : lines) {
-			if (l.find(match) != std::string::npos) {
-				args.sys_print(Info, "%s\n", l.c_str());
-			}
-		}
-		});
-	commands->add("ls", [](const Cmd_Args& args) {
-		auto tree = FileSys::find_game_files();
-		for (auto& file : tree) {
-			args.sys_print(Info, "%s\n", file.c_str());
-		}
-		});
 	commands->add("create-map", [](const Cmd_Args& args) {
 		auto existing = FileSys::open_read_game(args.at(1));
 		if (!existing) {
 			auto file = FileSys::open_write_game(args.at(1));
-			file->write("!json\n{objs[]}", 14);
+			string s = "!json\n{\"objs\":[]}";
+			file->write(s.c_str(),s.size());
 		}
 		else {
 			sys_print(Error, "cant make new map, already exists\n");
@@ -1562,7 +1543,8 @@ void GameEngineLocal::game_update_tick()
 	auto update = [&](double dt) {
 		ZoneScopedN("update");
 		CPUSCOPESTART(game_update_tick_update);
-		level->update_level();
+		if(level)
+			level->update_level();
 		if (app)
 			app->update();
 		GameAnimationMgr::inst->update_animating();
@@ -1581,6 +1563,9 @@ void GameEngineLocal::game_update_tick()
 	tick_interval *= g_slomo.get_float();
 
 	// physics update
+
+	if (app)
+		app->pre_update();
 
 	for (int i = 0; i < 1; i++) {
 		fixed_update(tick_interval);
@@ -1757,6 +1742,9 @@ void GameEngineLocal::loop()
 		UiSystem::inst->update();
 		// Update the messsage queue! does level changing etc.
 		Cmd_Manager::inst->execute_buffer();
+
+		if (g_window_fullscreen.was_changed())
+			Canvas::set_window_fullscreen(g_window_fullscreen.get_bool());
 	};
 
 	auto do_overlapped_update = [&](bool& shouldDrawNext, SceneDrawParamsEx& drawparamsNext, View_Setup& setupNext, const bool skip_rendering)
@@ -1780,8 +1768,7 @@ void GameEngineLocal::loop()
 			//printf("abc\n");
 			out.drawOut = true;
 			try {
-				if (level)
-					game_update_tick();
+				game_update_tick();
 #ifdef EDITOR_BUILD
 				if (editorState)
 					editorState->tick(frame_time);

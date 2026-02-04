@@ -4142,6 +4142,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		//);
 
 		GraphicsBlitInfo blitInfo;
+		blitInfo.dest.y = 0;
 		blitInfo.dest.w = blitInfo.src.w = cur_w;
 		blitInfo.dest.h = blitInfo.src.h = cur_h;
 		blitInfo.dest.texture = IGraphicsDevice::inst->get_swapchain_texture();

@@ -189,7 +189,7 @@ void PhysicsBody::on_actor_type_change()
 
 void PhysicsBody::update_bone_parent_animator()
 {
-	ASSERT(init_state != initialization_state::HAS_ID);
+	//ASSERT(init_state != initialization_state::HAS_ID);
 }
 
 void PhysicsBody::start()

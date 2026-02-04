@@ -32,6 +32,7 @@ public:
 	static TopDownGameManager* instance;
 
 	void start() override {
+		ASSERT(0);
 		//ASSERT(instance == nullptr);
 		//instance = this;
 		//the_player = eng->get_level()->spawn_prefab(player_prefab.get());
