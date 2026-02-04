@@ -155,17 +155,12 @@ Level::Level(bool is_editor)
 {
 	
 }
-void Level::start(SceneAsset* source)
+void Level::start(string source_name, UnserializedSceneFile* source)
 {
-	if (source)
-		sourceAssetName = source->get_name();
-	else
-		sourceAssetName = "<unnamed level>";
+	this->source_name = source_name;
+	ASSERT(source);
 	double start = GetTime();
-	if (source && source->sceneFile) {
-		insert_unserialized_entities_into_level_internal(*source->sceneFile,true);
-		source->sceneFile.reset();
-	}
+	insert_unserialized_entities_into_level_internal(*source,true);
 	double end = GetTime();
 	sys_print(Debug, "Level::start: took %f\n", float(end - start));
 }
@@ -245,6 +240,7 @@ void Level::close_level()
 }
 #include "Framework/Log.h"
 #include "Framework/MapUtil.h"
+#include "LevelSerialization/SerializeNew.h"
 void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene) {
 	insert_unserialized_entities_into_level_internal(scene, false);
 }
@@ -256,7 +252,7 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 
 
 
-	sys_print(Debug, "Level::insert_unserialized_entities_into_level: (level=%s) (objs=%d)\n", sourceAssetName.c_str(), (int)scene.all_obj_vec.size());
+	//sys_print(Debug, "Level::insert_unserialized_entities_into_level: (level=%s) (objs=%d)\n", sourceAssetName.c_str(), (int)scene.all_obj_vec.size());
 
 	auto& objs = scene.all_obj_vec;
 

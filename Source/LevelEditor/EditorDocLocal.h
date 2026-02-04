@@ -619,9 +619,7 @@ public:
 	void hook_scene_viewport_draw() final;
 	void hook_pre_scene_viewport_draw() final;
 	bool wants_scene_viewport_menu_bar() const { return true; }
-	const ClassTypeInfo& get_asset_type_info() const final {
-		return  SceneAsset::StaticType;
-	}
+
 	void tick(float dt) final;
 	void imgui_draw() final;
 	const View_Setup* get_vs() final { return &vs_setup; }

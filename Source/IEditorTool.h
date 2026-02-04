@@ -39,7 +39,6 @@ public:
 	// the name of the document
 // the full path of the document is ($ENGINE_ROOT)+"get_save_root_dir() + name"
 	virtual std::string get_doc_name() const { return ""; }
-	virtual const ClassTypeInfo& get_asset_type_info() const = 0;
 	
 
 	bool get_has_editor_changes() const {

@@ -22,9 +22,7 @@ void IEditorTool::set_has_editor_changes()
 }
 void IEditorTool::set_window_title()
 {
-	auto metadata = AssetRegistrySystem::get().find_for_classtype(&get_asset_type_info());
-	assert(metadata);
-	const char* name = string_format("%s Editor: %s%s\n", metadata->get_type_name().c_str(), get_doc_name().c_str(), has_editor_changes?"*":"");
+	const char* name = string_format("LevelEditor: %s%s\n", get_doc_name().c_str(), has_editor_changes?"*":"");
 	SDL_SetWindowTitle(eng->get_os_window(), name);
 }
 #if 0

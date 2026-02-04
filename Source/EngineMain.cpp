@@ -521,7 +521,7 @@ void bind_key(const Cmd_Args& args)
 
 extern void init_log_gui();
 using std::make_unique;
-
+#include "LevelSerialization/SerializeNew.h"
 bool GameEngineLocal::load_level(string mapname)
 {
 	if (level && level->get_is_in_update()) {
@@ -531,20 +531,22 @@ bool GameEngineLocal::load_level(string mapname)
 	const bool wants_empty = mapname == "<empty>";
 
 	double start_time = GetTime();
-	uptr<SceneAsset> scene = std::make_unique<SceneAsset>();
-	scene->editor_set_newly_made_path(mapname);
-	bool success = !wants_empty && scene->load_asset(g_assets.loader);
-	if (success) {
-		try {
-			scene->post_load();
-		}
-		catch (...) {
+
+	bool success = true;
+	uptr<UnserializedSceneFile> file;
+	if (!wants_empty) {
+		auto val = load_level_asset(mapname);
+		if (val)
+			file = std::move(val);
+		else
 			success = false;
-		}
+	}
+	else {
+		file = std::make_unique<UnserializedSceneFile>();
 	}
 
-	auto insert_this_map_as_level = [&](SceneAsset*& loadedLevel, bool is_for_playing) {
-		string mapname = loadedLevel ? loadedLevel->get_name() : "<new level>";
+
+	auto insert_this_map_as_level = [&](UnserializedSceneFile* loadedLevel, bool is_for_playing) {
 		sys_print(Info, "Changing map: %s (for_playing=%s)\n", mapname.c_str(), print_get_bool_string(is_for_playing));
 
 #ifdef EDITOR_BUILD
@@ -557,14 +559,13 @@ bool GameEngineLocal::load_level(string mapname)
 			stop_game();
 			assert(!level);
 		}
-		uptr<SceneAsset> unique_scene(loadedLevel);	// now its a unique ptr
-		loadedLevel = nullptr;	// set caller to null since this deletes the sceneasset :)
+	
 
 		g_modelMgr.compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
 		time = 0.0;
 		set_tick_rate(60.f);
 		level = make_unique<Level>(!is_for_playing);
-		level->start(unique_scene.get());	// scene will then get destroyed
+		level->start(mapname,loadedLevel);	// scene will then get destroyed
 		idraw->on_level_start();
 
 		if (app) {
@@ -574,8 +575,7 @@ bool GameEngineLocal::load_level(string mapname)
 	};
 
 	if (success || wants_empty) {
-		auto scenePtr = scene.release();
-		insert_this_map_as_level(scenePtr, !is_editor_state());
+		insert_this_map_as_level(file.get(), !is_editor_state());
 	}
 	else {
 		sys_print(Warning, "OpenMapCommand::execute(%s): failed to load\n", mapname.c_str());

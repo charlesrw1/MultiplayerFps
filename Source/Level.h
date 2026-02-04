@@ -21,7 +21,7 @@ class Level
 public:
 	// constructed in GameEngineLocal::on_map_change_callback
 	Level(bool is_editor);
-	void start(SceneAsset* source);	// called right after ctor
+	void start(string source_name, UnserializedSceneFile* source);	// called right after ctor
 	~Level();
 	void insert_unserialized_entities_into_level(UnserializedSceneFile& scene); // was bool assign_new_ids=false
 	// ends the level
@@ -42,7 +42,7 @@ public:
 		return all_world_ents.find(handle);
 	}
 	string get_source_asset_name() const {
-		return sourceAssetName;
+		return source_name;;
 	}
 	const hash_map<BaseUpdater*>& get_all_objects() const {
 		return all_world_ents;
@@ -56,7 +56,6 @@ public:
 	Component* find_first_component(const ClassTypeInfo* type) const;
 private:
 	void insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene,bool addSpawnNames);
-	string sourceAssetName;
 	std::unordered_map<string, obj<Entity>> spawnNameToEntity;
 	// all entities/components in the map
 	hash_map<BaseUpdater*> all_world_ents;
@@ -66,9 +65,9 @@ private:
 	std::vector<Component*> wantsToAddToUpdate;
 	hash_set<Component> wants_sync_update;
 	std::unordered_set<int64_t> deferred_delete_list;
-
 	ScopedBooleanValue b_is_in_update_tick;
 	ScopedBooleanValue b_is_in_level_startup;
+	string source_name = "";
 
 	void insert_new_native_entity_into_hashmap_R(Entity* e);
 	void initialize_new_entity_safe(Entity* e);

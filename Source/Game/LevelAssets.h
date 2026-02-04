@@ -12,22 +12,8 @@
 class BaseUpdater;
 class UnserializedSceneFile;
 class Entity;
-class SceneAsset : public IAsset {
-public:
-	CLASS_BODY(SceneAsset);
-	SceneAsset();
-	~SceneAsset();
-	// IAsset overrides
-	bool load_asset(IAssetLoadingInterface* load) override;
-	void post_load() override;
-	void uninstall() override;
-	void move_construct(IAsset*) override;
 
-	UnserializedSceneFile unserializeStep2();
-
-	uptr<SerializedForDiffing> halfUnserialized;
-	std::unique_ptr<UnserializedSceneFile> sceneFile;
-};
+uptr<UnserializedSceneFile> load_level_asset(string path);
 
 class IPrefabFactory : public ClassBase{
 public:

@@ -43,7 +43,7 @@ public:
 
 	//IEditorTool* tool_to_edit_me() const override { return g_editor_doc; }
 
-	virtual const ClassTypeInfo* get_asset_class_type() const { return &SceneAsset::StaticType; }
+	virtual const ClassTypeInfo* get_asset_class_type() const { return nullptr; }
 
 
 
@@ -103,68 +103,37 @@ static AutoRegisterAsset<SpawnerAssetMeta> schefab_register_0987;
 ConfigVar g_prefab_factory("g_prefab_factory", "", CVAR_DEV, "");
 
 
-SceneAsset::~SceneAsset() {
-	sys_print(Debug, "~SceneAsset: %s\n", get_name().c_str());
-}
-SceneAsset::SceneAsset(){
 
-}
-
-
-void SceneAsset::uninstall() {
-
-	if (sceneFile.get()) {
-		sys_print(Warning, "scene asset with non-null scenefile\n");
-		for (auto& o : sceneFile->all_obj_vec)
-			delete o;
-		sceneFile.reset(nullptr);
-	}
-}
-void SceneAsset::move_construct(IAsset*) {
-	sys_print(Warning, "scene asset move construct, shouldnt have happened\n");
-}
-
-
-
-void SceneAsset::post_load()
+string get_string_from_file(IFile* fileptr)
 {
-	// hmm move this to post_load on main thread because lua isnt thread safe
-	// use asset bundles to do the models,textures, etc. on an async thread
-	// this also throws on error, catch it in assets
-	double start = GetTime();
-	
-
-	sceneFile = std::make_unique<UnserializedSceneFile>(NewSerialization::unserialize_from_json(get_name().c_str(), *halfUnserialized, *g_assets.loader, false));
-
-	double now = GetTime();
-	sys_print(Debug, "SceneAsset::post_load: took %f\n", float(now - start));
-}
-bool SceneAsset::load_asset(IAssetLoadingInterface* load)
-{
-	auto& path = get_name();
-
-	auto fileptr = FileSys::open_read_game(path.c_str());
-	if (!fileptr) {
-		sys_print(Error, "SceneAsset::load_asset: couldn't open scene %s\n", path.c_str());
-		return false;
-	}
-	double start = GetTime();
-
 	string textForm = std::string(fileptr->size(), ' ');
 	fileptr->read((void*)textForm.data(), textForm.size());
 	if (StringUtils::starts_with(textForm, "!json\n")) {
 		textForm = textForm.substr(5);
 	}
+	return textForm;
+}
+
+uptr<UnserializedSceneFile> load_level_asset(string path)
+{
+	auto fileptr = FileSys::open_read_game(path.c_str());
+	if (!fileptr) {
+		sys_print(Error, "SceneAsset::load_asset: couldn't open scene %s\n", path.c_str());
+		return nullptr;
+	}
+	string textForm = get_string_from_file(fileptr.get());
+	SerializedForDiffing blah;
 	try {
-		halfUnserialized = make_unique<SerializedForDiffing>();
-		halfUnserialized->jsonObj = nlohmann::json::parse(textForm);
+		blah.jsonObj = nlohmann::json::parse(textForm);
 	}
 	catch (...) {
-		sys_print(Error, "SceneAsset::load_asset: json unserialize error %s\n", path.c_str());
-		return false;
+		sys_print(Error, "error parsing json %s\n", path.c_str());
+		return nullptr;
 	}
+	UnserializedSceneFile* out = new UnserializedSceneFile(
+		NewSerialization::unserialize_from_json(path.c_str()/*debug tag*/, blah, *g_assets.loader, false)
+	);
 
-	double now = GetTime();
-	sys_print(Debug, "SceneAsset::load_asset: took %f\n", float(now - start));
-	return true;
+	return uptr<UnserializedSceneFile>(out);
 }
+
