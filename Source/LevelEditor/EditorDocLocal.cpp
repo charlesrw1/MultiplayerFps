@@ -73,39 +73,7 @@ static std::string to_string(StringView view) {
 // Unproject mouse coords into a vector
 Ray EditorDoc::unproject_mouse_to_ray(const int mx, const int my)
 {
-	Ray r;
-	// get ui size
-
-	const auto viewport_size = UiSystem::inst->get_vp_rect().get_size();
-	const auto viewport_pos = UiSystem::inst->get_vp_rect().get_pos();
-
-	const auto size = viewport_pos;
-	const int wx = viewport_size.x;
-	const int wy = viewport_size.y;
-	const float aratio = float(wy) / wx;
-	glm::vec3 ndc = glm::vec3(float(mx - size.x) / wx, float(my - size.y) / wy, 0);
-	ndc = ndc * 2.f - 1.f;
-	ndc.y *= -1;
-
-	if (using_ortho) {
-		glm::vec3 pos = ortho_camera.position - ortho_camera.side * ndc.x * ortho_camera.width + ortho_camera.up * ndc.y * ortho_camera.width * aratio;
-		glm::vec3 front = ortho_camera.front;
-		r.pos = pos;
-		r.dir = front;
-	}
-	else {
-		r.pos = vs_setup.origin;
-
-
-		glm::mat4 invviewproj = glm::inverse(vs_setup.viewproj);
-		glm::vec4 point = invviewproj * glm::vec4(ndc, 1.0);
-		point /= point.w;
-
-		glm::vec3 dir = glm::normalize(glm::vec3(point) - r.pos);
-
-		r.dir = dir;
-	}
-	return r;
+	return ed_cam.unproject_mouse(mx, my);
 }
 
 Color32 to_color32(glm::vec4 v) {
@@ -181,21 +149,9 @@ void EditorDoc::init_new()
 
 		auto newRect = gui->convert_rect(rect);
 
-		if (using_ortho) {
-			Bounds aabb;
-			auto to_worldspace = [&](int x, int y) {
-				auto rect = UiSystem::inst->get_vp_rect();
-				glm::vec2 normalized(x / float(rect.w), y / float(rect.h));
-				normalized = normalized * 2.0f - glm::vec2(1.0);
-				float w = ortho_camera.width;
-				float aratio = float(rect.h) / rect.w;
-				glm::vec3 worldspace = ortho_camera.position - ortho_camera.side * normalized.x * w - ortho_camera.up * normalized.y * w * aratio;
-				return worldspace;
-			};
-			glm::vec3 point1 = to_worldspace(newRect.x, newRect.y) - ortho_camera.front * 1000.0f;
-			glm::vec3 point2 = to_worldspace(newRect.x+newRect.w, newRect.y+newRect.h) + ortho_camera.front * 1000.0f;
-			Bounds camb(point1);
-			camb = bounds_union(camb, point2);
+		if (ed_cam.get_is_using_ortho()) {
+
+			const Bounds camb = ed_cam.get_ortho_selection_bounds(newRect);
 
 			auto& allobjs = eng->get_level()->get_all_objects();
 			for (auto obj : allobjs) {
@@ -796,7 +752,7 @@ void EditorDoc::check_inputs()
 	const bool has_shift = Input::is_shift_down();
 	const bool has_ctrl = Input::is_ctrl_down();
 
-	const float ORTHO_DIST = 20.0;
+
 	if (Input::was_key_pressed(SDL_SCANCODE_DELETE)) {
 		if (selection_state->has_any_selected()) {
 			auto selected_handles = selection_state->get_selection_as_vector();
@@ -823,40 +779,7 @@ void EditorDoc::check_inputs()
 		if (is_in_eyedropper_mode())
 			exit_eyedropper_mode();
 	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_KP_5)) {
-		using_ortho = false;
-		ortho_camera.on_ortho_set.invoke();
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_KP_7) && has_ctrl) {
-		set_camera_target_to_sel();
-		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, ORTHO_DIST + 50.0, 0), glm::vec3(0, -1, 0));
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_KP_7)) {
-		set_camera_target_to_sel();
-		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, -(ORTHO_DIST + 50.0), 0), glm::vec3(0, 1, 0));
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_KP_3) && has_ctrl) {
-		set_camera_target_to_sel();
-		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(ORTHO_DIST, 0, 0), glm::vec3(-1, 0, 0));
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_KP_3)) {
-		set_camera_target_to_sel();
-		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(-ORTHO_DIST, 0, 0), glm::vec3(1, 0, 0));
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_KP_1) && has_ctrl) {
-		set_camera_target_to_sel();
-		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, 0, ORTHO_DIST), glm::vec3(0, 0, -1));
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_KP_1)) {
-		set_camera_target_to_sel();
-		using_ortho = true;
-		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, 0, -ORTHO_DIST), glm::vec3(0, 0, 1));
-	}
+	else if (ed_cam.handle_events()) {}
 	else if (Input::was_key_pressed(SDL_SCANCODE_A)) {
 		// select all objects
 		auto& objs = eng->get_level()->get_all_objects();
@@ -919,44 +842,8 @@ ConfigVar draw_coords_under_mouse("draw_coords_under_mouse", "0", CVAR_BOOL,"");
 
 void EditorDoc::tick(float dt)
 {
-
-	auto window_sz = UiSystem::inst->get_vp_rect().get_size();
-	float aratio = (float)window_sz.y / window_sz.x;
-	float fov = glm::radians(g_fov.get_float());
-
-
-
-
-	{
-		camera.orbit_mode = (Input::is_mouse_down(1)&&UiSystem::inst->is_vp_focused()) || Input::last_recieved_input_from_con();// && !UiSystem::inst->is_game_capturing_mouse();
-
-		{
-			if (using_ortho)
-				ortho_camera.update_from_input(aratio);
-			if (!using_ortho && camera.can_take_input())
-				camera.update_from_input(window_sz.x, window_sz.y, aratio, fov);
-		}
-
-	}
-
-
-	if (!using_ortho)
-		vs_setup = View_Setup(camera.position, camera.front, fov, 0.01, 100.0, window_sz.x, window_sz.y);
-	else {
-		View_Setup vs;
-		vs.far = 100.0;
-		vs.front = ortho_camera.front;
-		vs.origin = ortho_camera.position;
-		vs.height = window_sz.y;
-		vs.width = window_sz.x;
-		vs.proj = ortho_camera.get_proj_matrix(aratio);
-		vs.view = ortho_camera.get_view_matrix();
-		vs.viewproj = vs.proj * vs.view;
-		vs.near = 0.001;
-		vs.fov = fov;
-		vs.is_ortho = true;
-		vs_setup = vs;
-	}
+	ed_cam.tick(dt);
+	vs_setup = ed_cam.make_view();
 }
 
 bool line_plane_intersect(Ray r, glm::vec3 plane, float planed, glm::vec3& intersect)
@@ -1176,10 +1063,10 @@ void ManipulateTransformTool::update()
 	ImGuizmo::SetDrawlist();
 	const auto s_pos = UiSystem::inst->get_vp_rect().get_pos();
 	const auto s_sz = UiSystem::inst->get_vp_rect().get_size();
-
+	const bool using_ortho = ed_doc.ed_cam.get_is_using_ortho();
 	ImGuizmo::SetRect(s_pos.x, s_pos.y, s_sz.x, s_sz.y);
 	ImGuizmo::Enable(true);
-	ImGuizmo::SetOrthographic(ed_doc.using_ortho);
+	ImGuizmo::SetOrthographic(using_ortho);
 	//ImGuizmo::GetStyle().TranslationLineArrowSize = 20.0;
 	ImGuizmo::GetStyle().TranslationLineThickness = 6.0;
 	ImGuizmo::GetStyle().RotationLineThickness = 6.0;
@@ -1221,10 +1108,10 @@ void ManipulateTransformTool::update()
 	const auto window_sz = UiSystem::inst->get_vp_rect().get_size();
 	const float aratio = (float)window_sz.y / window_sz.x;
 	const float* const view = glm::value_ptr(ed_doc.vs_setup.view);
-	const glm::mat4 friendly_proj_matrix = (ed_doc.using_ortho) ? ed_doc.ortho_camera.get_friendly_proj_matrix(aratio) : ed_doc.vs_setup.make_opengl_perspective_with_near_far();
+	const glm::mat4 friendly_proj_matrix =  ed_doc.ed_cam.make_friendly_imguizmo_matrix();
 	const float* const proj = glm::value_ptr(friendly_proj_matrix);
 	float* model = glm::value_ptr(current_transform_of_group);
-	ImGuizmo::SetOrthographic(ed_doc.using_ortho);
+	ImGuizmo::SetOrthographic(using_ortho);
 	bool good = ImGuizmo::Manipulate(get_force_gizmo_on(), view, proj, get_real_op_mask(mask_to_use, axis_mask), mode, model, nullptr, (snap.x > 0) ? &snap.x : nullptr);
 
 	has_any_changed |= good;
@@ -1309,10 +1196,10 @@ void EditorDoc::imgui_draw()
 		auto size = UiSystem::inst->get_vp_rect().get_pos();
 
 		const float scene_depth = idraw->get_scene_depth_for_editor(x - size.x, y - size.y);
-		if (abs(scene_depth) <= 300 || using_ortho) {
+		if (abs(scene_depth) <= 300 || ed_cam.get_is_using_ortho()) {
 			Ray dir = unproject_mouse_to_ray(x, y);
 			glm::vec3 pos = vs_setup.origin + dir.dir * scene_depth;
-			if (using_ortho)
+			if (ed_cam.get_is_using_ortho())
 				pos = dir.pos;
 
 			auto& win = UiSystem::inst->window;
@@ -1939,11 +1826,15 @@ void EditorDoc::set_camera_target_to_sel()
 		if (ptr) {
 			float radius = 1.f;
 			auto mesh = ptr->get_component<MeshComponent>();
+			auto pos = ptr->get_ws_position();
 			if (mesh && mesh->get_model()) {
 				radius = glm::max(mesh->get_model()->get_bounding_sphere().w, 0.5f);
+				auto sphere = glm::vec3(mesh->get_model()->get_bounding_sphere());
+				pos = glm::vec3(ptr->get_ws_transform() * glm::vec4(sphere,1.0));
 			}
-			auto pos = ptr->get_ws_position();
-			camera.set_orbit_target(pos, radius);
+
+			ed_cam.set_orbit_target(pos, radius);
+			//camera.set_orbit_target(pos, radius);
 		}
 	}
 }
@@ -2009,7 +1900,7 @@ void EditorDoc::hook_menu_bar()
 
 EditorUILayout::EditorUILayout(EditorDoc& doc) : doc(&doc) {
 
-	doc.ortho_camera.on_ortho_set.add(this, [&]() {
+	doc.ed_cam.on_ortho_state_change.add(this, [&]() {
 		cube.rotation.begin_interpolate();
 		});
 
@@ -2701,4 +2592,230 @@ void DecalStampTool::tick()
 
 	}
 
+}
+
+inline Ray EditorCamera::unproject_mouse(int mx, int my) const {
+	Ray r;
+	// get ui size
+
+	const auto viewport_size = UiSystem::inst->get_vp_rect().get_size();
+	const auto viewport_pos = UiSystem::inst->get_vp_rect().get_pos();
+
+	const auto size = viewport_pos;
+	const int wx = viewport_size.x;
+	const int wy = viewport_size.y;
+	const float aratio = float(wy) / wx;
+	glm::vec3 ndc = glm::vec3(float(mx - size.x) / wx, float(my - size.y) / wy, 0);
+	ndc = ndc * 2.f - 1.f;
+	ndc.y *= -1;
+
+	if (get_is_using_ortho()) {
+		glm::vec3 pos = ortho_camera.position - ortho_camera.side * ndc.x * ortho_camera.width + ortho_camera.up * ndc.y * ortho_camera.width * aratio;
+		glm::vec3 front = ortho_camera.front;
+		r.pos = pos;
+		r.dir = front;
+	}
+	else {
+		r.pos = vs_setup.origin;
+
+
+		glm::mat4 invviewproj = glm::inverse(vs_setup.viewproj);
+		glm::vec4 point = invviewproj * glm::vec4(ndc, 1.0);
+		point /= point.w;
+
+		glm::vec3 dir = glm::normalize(glm::vec3(point) - r.pos);
+
+		r.dir = dir;
+	}
+	return r;
+}
+
+// test: 
+// ortho selection box
+// test mouse picking
+// test keypad ortho
+
+
+bool EditorCamera::handle_events() {
+
+	const bool has_shift = Input::is_shift_down();
+	const bool has_ctrl = Input::is_ctrl_down();
+	const float ORTHO_DIST = 20.0;
+	auto start_interp = [&]() {
+		interp.start_interp(vs_setup);
+	};
+	if (Input::was_key_pressed(SDL_SCANCODE_KP_5)) {
+		go_to_cam_mode();
+		ortho_camera.on_ortho_set.invoke();
+	}
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_7) && has_ctrl) {
+		mode = OrthoMode;
+		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, -(ORTHO_DIST + 50.0), 0), glm::vec3(0, 1, 0));
+		start_interp();
+	}
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_7)) {
+		mode = OrthoMode;
+		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, (ORTHO_DIST + 50.0), 0), glm::vec3(0, -1, 0));
+		start_interp();
+	}
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_3) && has_ctrl) {
+		mode = OrthoMode;
+		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(-ORTHO_DIST, 0, 0), glm::vec3(1, 0, 0));
+		start_interp();
+	}
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_3)) {
+		mode = OrthoMode;
+		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(ORTHO_DIST, 0, 0), glm::vec3(-1, 0, 0));
+		start_interp();
+	}
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_1) && has_ctrl) {
+		mode = OrthoMode;
+		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, 0, -ORTHO_DIST), glm::vec3(0, 0, 1));
+		start_interp();
+	}
+	else if (Input::was_key_pressed(SDL_SCANCODE_KP_1)) {
+		mode = OrthoMode;
+		ortho_camera.set_position_and_front(camera.orbit_target + glm::vec3(0, 0, ORTHO_DIST), glm::vec3(0, 0, -1));
+		start_interp();
+	}
+	else
+		return false;
+	return true;
+}
+View_Setup EditorCamera::make_view() const
+{
+	return vs_setup;
+}
+glm::mat4 EditorCamera::make_friendly_imguizmo_matrix() {
+	auto window_sz = UiSystem::inst->get_vp_rect().get_size();
+	const float aratio = (float)window_sz.y / window_sz.x;
+	return (get_is_using_ortho()) ? ortho_camera.get_friendly_proj_matrix(aratio) : vs_setup.make_opengl_perspective_with_near_far();
+}
+EditorCamera* EditorCamera::inst = nullptr;
+void ed_cam_debug() {
+	if (EditorCamera::inst)
+		EditorCamera::inst->imgui();
+}
+ADD_TO_DEBUG_MENU(ed_cam_debug);
+
+void EditorCamera::imgui() {
+	ImGui::Text("is_orbit: %d",(int)get_is_using_ortho());
+	auto t = camera.orbit_target;
+	ImGui::Text("orbit_target: %f %f %f", t.x,t.y,t.z);
+	float cam_dist = camera.distance;
+	ImGui::Text("cam_dist: %f", cam_dist);
+	t = camera.position;
+	ImGui::Text("cam_pos: %f %f %f", t.x, t.y, t.z);
+	t = ortho_camera.position;
+	ImGui::Text("ortho_pos: %f %f %f", t.x, t.y, t.z);
+}
+
+void EditorCamera::tick(float dt)
+{
+
+	auto window_sz = UiSystem::inst->get_vp_rect().get_size();
+	float aratio = (float)window_sz.y / window_sz.x;
+	float fov = glm::radians(g_fov.get_float());
+
+
+	{
+		camera.orbit_mode = (Input::is_mouse_down(1) && UiSystem::inst->is_vp_focused()) || Input::last_recieved_input_from_con();// && !UiSystem::inst->is_game_capturing_mouse();
+
+		{
+			if (get_is_using_ortho()) {
+				ortho_camera.update_from_input(aratio);
+				// get orbit target
+
+				const glm::vec3 diff = -camera.orbit_target + ortho_camera.position;
+				glm::vec3 side = ortho_camera.side;
+				glm::vec3 up = ortho_camera.up;
+				camera.orbit_target += glm::dot(side, diff) * side + glm::dot(up, diff) * up;
+			}
+			if (!get_is_using_ortho() && camera.can_take_input() && camera.orbit_mode)
+				camera.update_from_input(window_sz.x, window_sz.y, aratio, fov);
+		}
+
+	}
+	if (!get_is_using_ortho())
+		vs_setup = View_Setup(camera.position, camera.front, fov, 0.01, 100.0, window_sz.x, window_sz.y);
+	else {
+		View_Setup vs;
+		vs.far = 100.0;
+		vs.front = ortho_camera.front;
+		vs.origin = ortho_camera.position;
+		vs.height = window_sz.y;
+		vs.width = window_sz.x;
+		vs.proj = ortho_camera.get_proj_matrix(aratio);
+		vs.view = ortho_camera.get_view_matrix();
+		vs.viewproj = vs.proj * vs.view;
+		vs.near = 0.001;
+		vs.fov = fov;
+		vs.is_ortho = true;
+		vs_setup = vs;
+	}
+
+	if (interp.is_interping()) {
+		vs_setup = interp.get_interp(vs_setup,camera.orbit_target);
+	}
+}
+#include "Game/Entities/Player.h"
+View_Setup EditorCamera::InterpolateManager::get_interp(View_Setup current, glm::vec3 orbit)
+{
+	GameplayStatic::reset_debug_text_height();
+	int adfasdf;
+	const float dt = eng->get_dt();
+	if (from.is_ortho && current.is_ortho) {
+		alpha += dt * 3.0;
+
+		View_Setup out = current;
+		const float dist = glm::length(orbit - from.origin);
+
+		glm::quat from_quat = glm::conjugate(glm::quat_cast(from.view));
+		glm::quat dest_quat = glm::conjugate(glm::quat_cast(current.view));
+
+		glm::quat slerped = glm::slerp(from_quat, dest_quat, evaluate_easing(Easing::CubicEaseInOut,alpha));
+		glm::mat3 rot = glm::mat3_cast(slerped);
+
+		glm::vec3 forward = -rot[2];
+
+		glm::vec3 want_pos = orbit - forward * dist;
+
+		GameplayStatic::debug_text(string_format("%f %f %f", forward.x, forward.y, forward.z));
+		GameplayStatic::debug_text(string_format("%f %f %f", want_pos.x, want_pos.y, want_pos.z));
+
+		glm::mat3 R = glm::transpose(rot);
+		glm::mat4 view(1.0f);
+		view[0] = glm::vec4(R[0], 0.0f);
+		view[1] = glm::vec4(R[1], 0.0f);
+		view[2] = glm::vec4(R[2], 0.0f);
+		view[3] = glm::vec4(-R * want_pos, 1.0f);
+
+
+		out.front = forward;
+		out.view = view;
+		out.viewproj = out.proj * out.view;
+		out.origin = want_pos;
+
+
+		if (alpha >= 1.0)
+			alpha = -1;
+		return out;
+	}
+	else if (!from.is_ortho && !current.is_ortho) {
+		View_Setup out = current;
+		alpha += dt * 4.0;
+
+		glm::vec3 want_pos = glm::mix(from.origin, current.origin, evaluate_easing(Easing::CubicEaseInOut, alpha));
+		out.origin = want_pos;
+		out.view[3] = glm::vec4(-glm::mat3(out.view) * want_pos, 1.0);
+		out.viewproj = out.proj * out.view;
+
+		if (alpha >= 1.0)
+			alpha = -1;
+		return out;
+	}
+	else {
+		alpha = -1;
+		return current;
+	}
 }

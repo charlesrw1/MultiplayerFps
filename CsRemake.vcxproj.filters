@@ -471,7 +471,6 @@
     <ClInclude Include="Source\Framework\GlBuffers.h" />
     <ClInclude Include="Source\Framework\SharedPtr.h" />
     <ClInclude Include="Source\Render\StreamingTextureMgr.h" />
-    <ClInclude Include="Source\MEGA.h" />
     <ClInclude Include="Source\Framework\SerializerJson2.h" />
     <ClInclude Include="Source\Game\Components\SpawnerComponenth.h" />
   </ItemGroup>

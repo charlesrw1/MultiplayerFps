@@ -381,15 +381,15 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 		front = AnglesToVector(pitch, yaw);
 		glm::vec3 right = normalize(cross(up, front));
 		glm::vec3 real_up = glm::cross(right, front);
-		float dist = glm::length(orbit_target - position);
+		distance = glm::length(orbit_target - position);
 
 		// panning
-		float x_orb = -deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX))*dist*0.2;
-		float y_orb = -deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY)) *dist*0.2;
+		float x_orb = -deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX))* distance *0.2;
+		float y_orb = -deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY)) * distance *0.2;
 
 		if (pan_in_orbit_model&&!Input::last_recieved_input_from_con()) {	
 			// scale by dist, not accurate, fixme	
-			float x_s = tan(fov / 2) * dist * 0.5;
+			float x_s = tan(fov / 2) * distance * 0.5;
 			float y_s = x_s * aratio;
 			x_orb += x_s * x_off;
 			y_orb += y_s * y_off;
@@ -398,7 +398,7 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 
 
 
-		position = orbit_target - front * dist;
+		position = orbit_target - front * distance;
 	}
 	else
 	{

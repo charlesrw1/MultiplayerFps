@@ -13,6 +13,7 @@ public:
 	float yaw = 0, pitch = 0;
 
 	glm::vec3 orbit_target = glm::vec3(0.f);
+	float distance = 0.0;
 	bool orbit_mode = false;
 
 	void set_orbit_target(glm::vec3 target, float object_size);

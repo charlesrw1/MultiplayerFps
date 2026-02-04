@@ -40,7 +40,7 @@ public:
 	void update() {}
 	void stop() {
 		ASSERT(instance == this);
-		instance = nullptr;
+		//instance = nullptr;
 	}
 
 	Entity* the_player = nullptr;

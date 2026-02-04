@@ -301,6 +301,8 @@ void GameAnimationMgr::update_animating()
 
 void AnimPreviewComponent::start()
 {
+	
+
 }
 
 void AnimPreviewComponent::update()
@@ -310,6 +312,7 @@ void AnimPreviewComponent::update()
 void AnimPreviewComponent::stop()
 {
 }
+
 #ifdef EDITOR_BUILD
 void AnimPreviewComponent::editor_on_change_property()
 {

@@ -10,7 +10,7 @@ def write_headers(path:str, additional_includes:list[str]):
     timestamp_str = now.strftime("%Y-%m-%d %H:%M:%S")
 
     out = f"// **** GENERATED SOURCE FILE version:{VERSION} {timestamp_str} ****\n"
-    out += f"#include \"{path}\"\n"
+    #out += f"#include \"{path}\"\n"
     out += "#include \"Framework/ReflectionProp.h\"\n"
     out += "#include \"Framework/ReflectionMacros.h\"\n"
     out += "#include \"Framework/VectorReflect2.h\"\n"

@@ -46,6 +46,9 @@ public:
 
 		filepaths.push_back("ParticleInstComponent");
 
+		filepaths.push_back("AnimPreviewComponent");
+
+
 	}
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Component::StaticType; }
 
@@ -97,8 +100,8 @@ void Component::activate_internal_step2()
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
 		start();
 		init_updater();
+		init_state = initialization_state::CALLED_START;
 	}
-	init_state = initialization_state::CALLED_START;
 }
 
 void Component::deactivate_internal()

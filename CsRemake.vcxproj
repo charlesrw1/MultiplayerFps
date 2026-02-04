@@ -228,7 +228,6 @@
     <ClInclude Include="Source\LevelEditor\PropertyEditors.h" />
     <ClInclude Include="Source\LevelEditor\TagManager.h" />
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
-    <ClInclude Include="Source\MEGA.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\IGraphsDevice.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
