@@ -6,7 +6,6 @@
 #include "Game/SerializePtrHelpers.h"
 #include "Game/Components/MeshComponent.h"
 #include "Animation/AnimationSeqAsset.h"
-#include "Game/SoftAssetPtr.h"
 class TDChest : public Component
 {
 public:
@@ -14,7 +13,7 @@ public:
 	
 	REF AssetPtr<SoundFile> soundfx;
 	REF AssetPtr<AnimationSeqAsset> openanim;
-	REF SoftAssetPtr<AnimationSeqAsset> delayedLoadAnim;
+	//REF SoftAssetPtr<AnimationSeqAsset> delayedLoadAnim;
 
 	MeshComponent* m = nullptr;
 	void start() {

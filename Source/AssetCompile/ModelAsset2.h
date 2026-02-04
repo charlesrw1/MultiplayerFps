@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Game/SoftAssetPtr.h"
 #include "Render/MaterialPublic.h"
 
 #include "SkeletonAsset.h"
@@ -16,7 +15,6 @@
 
 #include "Framework/Reflection2.h"
 
-#include "Game/SoftAssetPtr.h"
 
 
 struct BoneRenameContainer {

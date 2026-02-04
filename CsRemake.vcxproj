@@ -316,7 +316,6 @@
     <ClInclude Include="Source\Game\Entities\PlayerAnimDriver.h" />
     <ClInclude Include="Source\Game\SerializePtrHelpers.h" />
     <ClInclude Include="Source\GameEngineLocal.h" />
-    <ClInclude Include="Source\Game\SoftAssetPtr.h" />
     <ClInclude Include="Source\IEditorTool.h" />
     <ClInclude Include="Source\Input\InputSystem.h" />
     <ClInclude Include="Source\Level.h" />

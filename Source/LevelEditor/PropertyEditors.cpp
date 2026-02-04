@@ -5,7 +5,6 @@
 #include "Assets/AssetRegistry.h"
 #include "Framework/Config.h"
 #include "Assets/AssetBrowser.h"
-#include "Game/SoftAssetPtr.h"
 #include "LevelEditor/EditorDocLocal.h"
 #include "Assets/AssetDatabase.h"
 #include "Framework/MyImguiLib.h"
@@ -111,16 +110,6 @@ bool SharedAssetPropertyEditor::internal_update() {
 
 	return ret;
 
-}
-
-std::string SoftAssetPropertyEditor::get_str() {
-	auto ptr = (SoftAssetPtr<IAsset>*)prop->get_ptr(instance);
-	return ptr->path;
-}
-
-void SoftAssetPropertyEditor::set_asset(const std::string& str) {
-	auto ptr = (SoftAssetPtr<IAsset>*)prop->get_ptr(instance);
-	ptr->path = str;
 }
 
 std::string AssetPropertyEditor::get_str() {
@@ -408,7 +397,6 @@ void PropertyFactoryUtil::register_basic(FnFactory<IPropertyEditor>& factory)
 	factory.add("BoolButton", []() {return new ButtonPropertyEditor; });
 	factory.add("ColorUint", []() {return new ColorEditor; });
 	factory.add("AssetPtr", []() {return new AssetPropertyEditor; });
-	factory.add("SoftAssetPtr", []() {return new SoftAssetPropertyEditor; });
 	factory.add("ClassTypePtr", []() {return new ClassTypePtrPropertyEditor; });
 	factory.add("GraphCurve", []() {return new GraphCurveEditor; });
 

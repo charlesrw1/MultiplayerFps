@@ -42,16 +42,7 @@ private:
 	std::string asset_str;
 	const AssetMetadata* metadata = nullptr;
 };
-class SoftAssetPropertyEditor : public SharedAssetPropertyEditor
-{
-public:
-	SoftAssetPropertyEditor() {}
-	std::string get_str() override;
-	void set_asset(const std::string& str) override;
-	bool is_soft_editor() const override {
-		return true;
-	}
-};
+
 class AssetPropertyEditor : public SharedAssetPropertyEditor
 {
 public:

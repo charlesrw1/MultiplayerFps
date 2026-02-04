@@ -47,7 +47,7 @@ public:
 		return handle != other.handle;
 	}
 
-	uint64_t handle = 0;
+	int64_t handle = 0;
 };
 
 using EntityPtr = obj<Entity>;

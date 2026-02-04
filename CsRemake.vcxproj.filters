@@ -370,7 +370,6 @@
       <Filter>Source\Sound</Filter>
     </ClInclude>
     <ClInclude Include="Source\Physics\ChannelsAndPresets.h" />
-    <ClInclude Include="Source\Game\SoftAssetPtr.h" />
     <ClInclude Include="Source\AssetCompile\SkeletonAsset.h" />
     <ClInclude Include="Source\AssetCompile\ModelAsset2.h" />
     <ClInclude Include="Source\Animation\AnimationSeqAsset.h" />
