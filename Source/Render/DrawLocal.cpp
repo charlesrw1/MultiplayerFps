@@ -91,6 +91,8 @@ ConfigVar r_debug_mode("r.debug_mode", "0", CVAR_INTEGER | CVAR_DEV, "render deb
 
 ConfigVar r_drawfog("r.drawfog", "1", CVAR_BOOL | CVAR_DEV, "enable/disable drawing of fog");
 
+ConfigVar ddgi_test("ddgi_test", "0", CVAR_BOOL | CVAR_DEV, "");
+
 RenderWindowBackend* RenderWindowBackend::inst = nullptr;
 class RenderWindowBackendLocal : public RenderWindowBackend
 {
@@ -1198,10 +1200,15 @@ void Renderer::init()
 	spotShadows = std::make_unique<ShadowMapManager>();
 	decalBatcher = std::make_unique<DecalBatcher>();
 	lightListCuller = std::make_unique<LightListCuller>();
+	ddgi = std::make_unique<DdgiTesting>();
 #ifdef EDITOR_BUILD
 	thumbnailRenderer = std::make_unique<ThumbnailRenderer>(64);
 #endif
 	print_time("draw:objects");
+
+	consoleCommands->add("build-ddgi", [this](const Cmd_Args& args) {
+		ddgi->build_world();
+		});
 
 }
 
@@ -4098,6 +4105,10 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	};
 	do_composite_pass();
+
+	if (ddgi_test.get_bool())
+		ddgi->render();
+
 
 	auto post_process_stack = [&](){
 		GPUSCOPESTART(post_process_stack_scope);

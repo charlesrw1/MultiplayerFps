@@ -22,6 +22,8 @@
 #include "Render/RenderExtra.h"
 #include "Render/MaterialLocal.h"
 #include "Render/RenderScene.h"
+#include "RT/RaytraceTest.h"
+
 #include "Framework/ConsoleCmdGroup.h"
 #include <array>
 #include "IGraphsDevice.h"
@@ -624,6 +626,7 @@ public:
 	std::unique_ptr<ShadowMapManager> spotShadows;
 	std::unique_ptr<DecalBatcher> decalBatcher;
 	std::unique_ptr<LightListCuller> lightListCuller;
+	std::unique_ptr<DdgiTesting> ddgi;
 
 	DebuggingTextureOutput debug_tex_out;
 

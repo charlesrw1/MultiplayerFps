@@ -130,6 +130,7 @@
     <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
     <ClCompile Include="Source\Render\RenderExtra.cpp" />
     <ClCompile Include="Source\Render\RenderWindow.cpp" />
+    <ClCompile Include="Source\Render\RT\RaytraceTest.cpp" />
     <ClCompile Include="Source\Render\Shader.cpp" />
     <ClCompile Include="Source\Render\Shadowmap.cpp" />
     <ClCompile Include="Source\Render\Ssao.cpp" />
@@ -232,6 +233,7 @@
     <ClInclude Include="Source\Render\IGraphsDevice.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Render\RenderWindow.h" />
+    <ClInclude Include="Source\Render\RT\RaytraceTest.h" />
     <ClInclude Include="Source\Render\StreamingTextureMgr.h" />
     <ClInclude Include="Source\Render\UniformBuffer.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />

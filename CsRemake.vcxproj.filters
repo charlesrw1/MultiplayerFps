@@ -472,6 +472,7 @@
     <ClInclude Include="Source\Render\StreamingTextureMgr.h" />
     <ClInclude Include="Source\Framework\SerializerJson2.h" />
     <ClInclude Include="Source\Game\Components\SpawnerComponenth.h" />
+    <ClInclude Include="Source\Render\RT\RaytraceTest.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -631,6 +632,7 @@
     <ClCompile Include="Source\Debug_Console.cpp" />
     <ClCompile Include="Source\Framework\SerializerJson2.cpp" />
     <ClCompile Include="Source\Game\Components\SpawnerComponenth.cpp" />
+    <ClCompile Include="Source\Render\RT\RaytraceTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
