@@ -61,6 +61,8 @@ public:
 	void set_vec3(const char* name, glm::vec3 value);
 	void set_vec2(const char* name, glm::vec2 value);
 	void set_ivec2(const char* name, glm::ivec2 value);
+	void set_ivec3(const char* name, glm::ivec3 value);
+
 
 	void set_block_binding(const char* name, int binding);
 };

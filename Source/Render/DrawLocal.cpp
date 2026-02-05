@@ -1207,7 +1207,7 @@ void Renderer::init()
 	print_time("draw:objects");
 
 	consoleCommands->add("build-ddgi", [this](const Cmd_Args& args) {
-		ddgi->build_world();
+		ddgi->execute();
 		});
 
 }

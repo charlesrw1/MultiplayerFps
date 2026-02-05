@@ -21,7 +21,10 @@ struct GPUTriangle
 };
 
 
-
+struct RayBufferStruct {
+	glm::vec4 dir_dist;
+	glm::vec4 shading;
+};
 class DdgiTesting
 {
 public:
@@ -38,9 +41,13 @@ public:
 	IGraphicsBuffer* materials = nullptr;
 
 
-
+	IGraphicsBuffer* ray_buffer = nullptr;
 
 	IGraphicsTexture* probe_irradiance = nullptr;
 	IGraphicsTexture* probe_depth = nullptr;
+
 	program_handle raytrace_test{};
+
+	program_handle trace_shader{};
+	program_handle gather_shader{};
 };

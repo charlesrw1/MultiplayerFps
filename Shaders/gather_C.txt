@@ -1,0 +1,126 @@
+layout(local_size_x = 64, local_size_y =1, local_size_z = 1) in;
+
+struct Ubo_View_Constants_Struct
+{
+	mat4 view;
+	mat4 viewproj;
+	mat4 invview;
+	mat4 invproj;
+	mat4 inv_viewproj;
+	vec4 viewpos_time;
+	vec4 viewfront;
+	vec4 viewport_size;
+	mat4 prev_viewproj;
+
+	float near;
+	float far;
+	float shadowmap_epsilon;
+	float inv_scale_by_proj_distance;
+	
+	vec4 fogcolor;
+	vec4 fogparams;
+	
+	float numcubemaps;
+	float numlights;
+	float forcecubemap;
+	uint debug_options;
+	
+	// bit 0: wireframe first pass or second pass
+	uint flags;	
+	uint padding1;
+	uint padding2;
+	uint padding3;
+	
+	vec4 current_and_prev_jitter;
+};
+layout(r11f_g11f_b10f, binding = 0) uniform image2D probe_irradiance;
+
+struct RayHitOutput {
+	vec4 dir_dist;
+	vec4 light;
+};
+layout (binding = 1, std140) readonly buffer RayHitBuffer {
+	RayHitOutput hitbuffer[];
+};
+
+
+// Octahederal encoding functions
+vec2 OctahedralEncode(vec3 normal)
+{
+	normal = normalize(normal);
+	float l1norm = abs(normal.x) + abs(normal.y) + abs(normal.z);
+	vec2 result = normal.xy * (1.0 / l1norm);
+	
+	if (normal.z < 0.0) {
+		vec2 oldResult = result;
+		result.x = (1.0 - abs(oldResult.y)) * (oldResult.x >= 0.0 ? 1.0 : -1.0);
+		result.y = (1.0 - abs(oldResult.x)) * (oldResult.y >= 0.0 ? 1.0 : -1.0);
+	}
+	
+	return result * 0.5 + 0.5; // Map to [0,1]
+}
+
+vec3 OctahedralDecode(vec2 encoded)
+{
+	vec2 f = encoded * 2.0 - 1.0; // Map from [0,1] to [-1,1]
+	
+	vec3 normal = vec3(f.x, f.y, 1.0 - (abs(f.x) + abs(f.y)));
+	
+	if (normal.z < 0.0) {
+		vec2 oldNormal = normal.xy;
+		normal.x = (1.0 - abs(oldNormal.y)) * (oldNormal.x >= 0.0 ? 1.0 : -1.0);
+		normal.y = (1.0 - abs(oldNormal.x)) * (oldNormal.y >= 0.0 ? 1.0 : -1.0);
+	}
+	
+	return normalize(normal);
+}
+const int NUM_RAYS = 64;
+uniform ivec3 vol_grid;
+
+void main()
+{
+	int probe_number = int(gl_GlobalInvocationID.x);
+	
+	if(probe_number > vol_grid.x*vol_grid.y*vol_grid.z)
+		return;
+		
+		// Get probe position in grid
+	int probe_x = probe_number % int(vol_grid.x);
+	int probe_y = (probe_number / int(vol_grid.x)) % int(vol_grid.y);
+	int probe_z = probe_number / (int(vol_grid.x) * int(vol_grid.y));
+	
+	//vec3 probe_pos = volume_origin.xyz + vec3(probe_x, probe_y, probe_z) * vec3(volume_spacing);
+	
+	const int TILE_SIZE = 8;
+	const int IN_SIZE = TILE_SIZE - 2;
+	for(int y = 0; y < IN_SIZE; y++) {
+		for(int x = 0; x < IN_SIZE; x++) {
+			ivec2 coords;
+			coords.x = probe_x*TILE_SIZE + (vol_grid.x*probe_y*TILE_SIZE);
+			coords.y = probe_z*TILE_SIZE;
+			
+			vec2 uv = vec2(x+1,y+1)/vec2(IN_SIZE+1);
+			vec3 oct_normal = OctahedralDecode(uv);
+			
+			vec3 accum = vec3(0.0);
+			float weight_accum = 0.0;
+			
+			for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
+				int buffer_idx = probe_number * NUM_RAYS + ray_idx;
+				RayHitOutput data = hitbuffer[buffer_idx];
+				vec3 dir = data.dir_dist.xyz;
+				
+				float w = max(dot(dir,oct_normal),0.0);
+				accum+=data.light.xyz*w;
+				weight_accum+=w;
+			}
+			accum /= weight_accum;
+			
+			ivec2 coord_store = coords + ivec2(1)+ivec2(x,y);
+			
+			// Store in probe irradiance texture
+			imageStore(probe_irradiance, coord_store, vec4(accum, 1.0));
+		}
+	
+	}
+}

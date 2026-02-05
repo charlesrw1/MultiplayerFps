@@ -447,6 +447,11 @@ void Shader::set_ivec2(const char* name, glm::ivec2 value)
 {
 	glUniform2i(glGetUniformLocation(ID, name), value.x, value.y);
 }
+void Shader::set_ivec3(const char* name, glm::ivec3 value)
+{
+	glUniform3i(glGetUniformLocation(ID, name), value.x, value.y,value.z);
+}
+
 
 void Shader::set_block_binding(const char* name, int block_binding)
 {
