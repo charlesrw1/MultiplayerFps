@@ -7,10 +7,12 @@
 ConfigVar ddgi_size("ddgi_size", "10", CVAR_FLOAT | CVAR_UNBOUNDED, "");
 ConfigVar ddgi_density("ddgi_density", "2", CVAR_FLOAT | CVAR_UNBOUNDED, "probes/meter");
 
-const int MAX_RAYS = 64;
+const int MAX_RAYS = 256;
 
-const glm::ivec3 ddgiGRID{ 5,2,5 };
-const glm::vec3 ddgiVolumeOrigin = glm::vec3(-2.5, 0, -2.5);
+const glm::ivec3 ddgiGRID{20,4,20 };
+const glm::vec3 ddgiVolumeOrigin = glm::vec3(-11, -0.5, -11);
+
+const glm::vec3 ddgiDensity = vec3(3,3,3);
 
 const int ddgiIRRADTILE = 8;
 const int ddgiDEPTHTILE = 16;
@@ -21,7 +23,13 @@ DdgiTesting::DdgiTesting()
 	raytrace_test = draw.get_prog_man().create_raster("fullscreenquad.txt", "rtF.txt");
 
 	gather_shader = draw.get_prog_man().create_compute("gather_C.txt");
+		shade_fs = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeF.txt");
+		shade_debug_fs = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeDebugF.txt");
+
+
 	trace_shader = draw.get_prog_man().create_compute("trace_C.txt");
+	debug_probes = draw.get_prog_man().create_raster("MeshSimpleV.txt", "MeshDebugProbeF.txt");
+
 
 }
 
@@ -36,6 +44,7 @@ inline Bounds get_tri_bounds(vec3 v1, vec3 v2, vec3 v3)
 	b = bounds_union(b, v3);
 	return b;
 }
+ConfigVar vert_limit("vert_limit", "5000", CVAR_INTEGER | CVAR_UNBOUNDED, "");
 Color32 get_color_of_material_for_export(const MaterialInstance* m);
 #include "Assets/AssetDatabase.h"
 void DdgiTesting::build_world()
@@ -53,15 +62,18 @@ void DdgiTesting::build_world()
 		auto& o = _o.type_.proxy;
 		if (!o.model)
 			continue;
-		if (o.model->get_num_lods() == 0 || !o.model->has_lightmap_coords())
+		if (o.model->get_num_lods() == 0)
 			continue;
 		counter += 1;
+
+		auto matoverride = o.mat_override;
+
 		// upload transformed verts, indicies, add bounds
 
 		const glm::mat4 transform = o.transform;
 		auto rmd = o.model->get_raw_mesh_data();
 
-		if (rmd->get_num_verticies(0) > 2000)
+		if (rmd->get_num_verticies(0) > vert_limit.get_integer())
 			continue;
 
 		// lowest lod
@@ -74,9 +86,13 @@ void DdgiTesting::build_world()
 
 			const auto& part = o.model->get_part(parti);
 			auto material_inst = o.model->get_material(part.material_idx);
+			if (matoverride)
+				material_inst = matoverride;
 
 			if (!material_inst) continue;
 			auto material = material_inst->impl.get();
+			if (material->get_master_impl()->light_mode == LightingMode::Unlit)
+				continue;
 			
 
 			const int material_offset = material->gpu_buffer_offset == -1 ? 0 : material->get_material_index_from_buffer_ofs();
@@ -173,6 +189,7 @@ void DdgiTesting::build_world()
 	targs.format = GraphicsTextureFormat::r11f_g11f_b10f;
 	targs.sampler_type = GraphicsSamplerType::LinearDefault;
 	probe_irradiance = IGraphicsDevice::inst->create_texture(targs);
+	probe_irradiance->sub_image_upload(0, 0, 0, targs.width, targs.height, 0, nullptr);
 
 	auto handle = Texture::install_system("_ddgi");
 	handle->update_specs_ptr(this->probe_irradiance);
@@ -182,7 +199,23 @@ void DdgiTesting::build_world()
 	targs.height = tiles_height * ddgiDEPTHTILE;
 	targs.format = GraphicsTextureFormat::rg16f;
 	probe_depth = IGraphicsDevice::inst->create_texture(targs);
+	probe_depth->sub_image_upload(0, 0, 0, targs.width, targs.height, 0, nullptr);
+
+
+	handle = Texture::install_system("_ddgi_d");
+	handle->update_specs_ptr(this->probe_depth);
+	handle->type = Texture_Type::TEXTYPE_2D;
 }
+#include "imgui.h"
+static float irrad_mult = 1.0;
+void ddgi_debugmenu() {
+	auto self = draw.ddgi.get();
+	ImGui::InputInt3("select", &self->selected_probe.x);
+	self->selected_probe = glm::clamp(self->selected_probe, glm::ivec3(0), ddgiGRID - glm::ivec3(1));
+
+	ImGui::DragFloat("irradmul", &irrad_mult, 0.01);
+}
+ADD_TO_DEBUG_MENU(ddgi_debugmenu);
 
 void DdgiTesting::execute()
 {
@@ -197,33 +230,158 @@ void DdgiTesting::execute()
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, materials->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ray_buffer->get_internal_handle());
 	auto& device = draw.get_device();
-	device.bind_texture(5,draw.scene.skylights.at(0).skylight.generated_cube->get_internal_render_handle());
-	device.set_shader(trace_shader);
-	device.shader().set_vec3("volume_origin", ddgiVolumeOrigin);
-	device.shader().set_vec3("volume_spacing", vec3(2,2,2));
-	device.shader().set_ivec3("vol_grid", ddgiGRID);
 
-	const int total_probes = ddgiGRID.x * ddgiGRID.y * ddgiGRID.z;
-	const int groups = glm::ceil(total_probes / 64.f);
+	bool do_irrad_calcs = false;
+	for (int i = 0; i < 4; i++) {
+		device.bind_texture(5, draw.scene.skylights.at(0).skylight.generated_cube->get_internal_render_handle());
 
-	glDispatchCompute(groups, 1, 1);
-
-	// then run gather
-	device.set_shader(gather_shader);
-	device.shader().set_ivec3("vol_grid", ddgiGRID);
+		device.bind_texture(2, probe_irradiance->get_internal_handle());
+		device.bind_texture(3, probe_depth->get_internal_handle());
 
 
-	glBindImageTexture(0, probe_irradiance->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
-	glCheckError();
-	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-	glDispatchCompute(groups, 1, 1);
-	glCheckError();
 
-	float time = GetTime() - start;
-	sys_print(Debug, "time: %f\n",  time);
+		device.set_shader(trace_shader);
+		device.shader().set_bool("do_irrad_calcs", do_irrad_calcs);
+		device.shader().set_vec3("volume_origin", ddgiVolumeOrigin);
+		device.shader().set_vec3("volume_spacing", ddgiDensity);
+		device.shader().set_ivec3("vol_grid", ddgiGRID);
+
+		const int total_probes = ddgiGRID.x * ddgiGRID.y * ddgiGRID.z;
+		const int groups = glm::ceil(total_probes / 64.f);
+
+		glDispatchCompute(groups, 1, 1);
+
+		// then run gather
+		device.set_shader(gather_shader);
+		device.shader().set_ivec3("vol_grid", ddgiGRID);
+		device.shader().set_vec3("volume_spacing", ddgiDensity);
+
+
+		glBindImageTexture(0, probe_irradiance->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
+
+		glBindImageTexture(1, probe_depth->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16F);
+
+		glCheckError();
+		//glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+		//glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+		glDispatchCompute(groups, 1, 1);
+		glCheckError();
+
+		float time = GetTime() - start;
+		sys_print(Debug, "time: %f\n", time);
+		do_irrad_calcs = true;
+	}
 }
+void draw_model_simple_no_material(Model* model);
+#include "Render/ModelManager.h"
+void DdgiTesting::render_probes()
+{
+	if (!verts) {
+		execute();
+		ASSERT(verts);
+	}
+	auto& device = draw.get_device();
 
-void DdgiTesting::render()
+	auto set_composite_pass = [&]() {
+		RenderPassState pass_state;
+		pass_state.wants_color_clear = false;
+		auto color_infos = {
+			ColorTargetInfo(draw.tex.output_composite)
+		};
+		pass_state.color_infos = color_infos;
+		pass_state.depth_info = draw.tex.scene_depth;
+		IGraphicsDevice::inst->set_render_pass(pass_state);
+	};
+	set_composite_pass();
+
+	RenderPipelineState state = RenderPipelineState();
+	state.program = debug_probes;
+	state.vao = g_modelMgr.get_vao_ptr(VaoType::Animated)->get_internal_handle();
+	device.set_pipeline(state);
+
+	Model* m = Model::load("sphere.cmdl");
+	device.bind_texture_ptr(0, probe_irradiance);
+	device.shader().set_ivec3("vol_grid", ddgiGRID);
+	for (int x = 0; x < ddgiGRID.x; x++) {
+		for (int y = 0; y < ddgiGRID.y; y++) {
+			for (int z = 0; z < ddgiGRID.z; z++) {
+				glm::mat4 tr = glm::translate(glm::mat4(1), glm::vec3(x, y, z) * ddgiDensity + ddgiVolumeOrigin);
+				device.shader().set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
+				device.shader().set_ivec3("probe_coord", { x,y,z });
+
+				draw_model_simple_no_material(m);
+			}
+		}
+	}
+
+}
+void DdgiTesting::draw_lighting(IGraphicsTexture* ssao)
+{
+	if (!verts) {
+		execute();
+		ASSERT(verts);
+	}
+
+	//render_rt();
+	//return;
+
+	auto& device = draw.get_device();
+
+	
+	GPUFUNCTIONSTART;
+
+
+	// pass already set by caller
+	
+	// auto set_composite_pass2 = [&]() {
+	//	RenderPassState pass_state;
+	//	pass_state.wants_color_clear = false;
+	//	auto color_infos = {
+	//		ColorTargetInfo(draw.tex.output_composite)
+	//	};
+	//	pass_state.color_infos = color_infos;
+	//	IGraphicsDevice::inst->set_render_pass(pass_state);
+	//};
+	//set_composite_pass2();
+
+
+	RenderPipelineState state;
+	state.vao = draw.get_empty_vao();
+	state.program = shade_fs;
+	state.blend = BlendState::OPAQUE;
+	state.depth_testing = false;
+	state.depth_writes = false;
+	device.set_pipeline(state);
+
+	draw.bind_texture_ptr(0, draw.tex.scene_gbuffer0);
+	draw.bind_texture_ptr(1, draw.tex.scene_gbuffer1);
+	draw.bind_texture_ptr(2, draw.tex.scene_gbuffer2);
+	draw.bind_texture_ptr(3, draw.tex.scene_depth);
+
+	
+	draw.bind_texture_ptr(4, probe_irradiance);
+	draw.bind_texture_ptr(5, probe_depth);
+	draw.bind_texture_ptr(6, ssao);
+
+	draw.bind_texture(7, Texture::load("topdown_gi.png")->get_internal_render_handle());
+	draw.bind_texture(8, Texture::load("bottom_gi.png")->get_internal_render_handle());
+
+
+
+
+
+	device.shader().set_vec3("volume_origin", ddgiVolumeOrigin);
+	device.shader().set_vec3("volume_spacing", ddgiDensity);
+	device.shader().set_ivec3("vol_grid", ddgiGRID);
+	device.shader().set_ivec3("selected_probe_pos", selected_probe);
+	device.shader().set_float("irrad_mult", irrad_mult);
+
+	// fullscreen shader, no vao used
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+
+}
+void DdgiTesting::render_rt()
 {
 	GPUFUNCTIONSTART;
 

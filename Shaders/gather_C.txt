@@ -34,6 +34,8 @@ struct Ubo_View_Constants_Struct
 	vec4 current_and_prev_jitter;
 };
 layout(r11f_g11f_b10f, binding = 0) uniform image2D probe_irradiance;
+layout(rg16f, binding = 1) uniform image2D probe_depths;
+
 
 struct RayHitOutput {
 	vec4 dir_dist;
@@ -45,8 +47,10 @@ layout (binding = 1, std140) readonly buffer RayHitBuffer {
 
 
 // Octahederal encoding functions
-vec2 OctahedralEncode(vec3 normal)
+vec2 OctahedralEncode(vec3 normal_in)
 {
+	vec3 normal = normal_in.xzy;
+
 	normal = normalize(normal);
 	float l1norm = abs(normal.x) + abs(normal.y) + abs(normal.z);
 	vec2 result = normal.xy * (1.0 / l1norm);
@@ -72,10 +76,12 @@ vec3 OctahedralDecode(vec2 encoded)
 		normal.y = (1.0 - abs(oldNormal.x)) * (oldNormal.y >= 0.0 ? 1.0 : -1.0);
 	}
 	
-	return normalize(normal);
+	return normalize(normal.xzy);
 }
-const int NUM_RAYS = 64;
+const int NUM_RAYS = 256;
 uniform ivec3 vol_grid;
+uniform vec3 volume_spacing;
+
 
 void main()
 {
@@ -91,6 +97,21 @@ void main()
 	
 	//vec3 probe_pos = volume_origin.xyz + vec3(probe_x, probe_y, probe_z) * vec3(volume_spacing);
 	
+	int backface_hits = 0;
+	for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
+		int buffer_idx = probe_number * NUM_RAYS + ray_idx;
+		RayHitOutput data = hitbuffer[buffer_idx];
+		vec3 dir = data.dir_dist.xyz;
+		float dist = data.dir_dist.w;
+		
+		if(dist < 0 && abs(dist)<1000)
+			backface_hits += 1;
+	}
+	float global_dist_mult = 1.0;
+	if((backface_hits)/float(NUM_RAYS)>0.3) {
+		global_dist_mult = 0.0;	// disable it all
+	}
+	
 	const int TILE_SIZE = 8;
 	const int IN_SIZE = TILE_SIZE - 2;
 	for(int y = 0; y < IN_SIZE; y++) {
@@ -99,7 +120,7 @@ void main()
 			coords.x = probe_x*TILE_SIZE + (vol_grid.x*probe_y*TILE_SIZE);
 			coords.y = probe_z*TILE_SIZE;
 			
-			vec2 uv = vec2(x+1,y+1)/vec2(IN_SIZE+1);
+			vec2 uv = vec2(x+0.5,y+0.5)/vec2(IN_SIZE);
 			vec3 oct_normal = OctahedralDecode(uv);
 			
 			vec3 accum = vec3(0.0);
@@ -118,9 +139,123 @@ void main()
 			
 			ivec2 coord_store = coords + ivec2(1)+ivec2(x,y);
 			
+			accum.r *= global_dist_mult;
+			
 			// Store in probe irradiance texture
 			imageStore(probe_irradiance, coord_store, vec4(accum, 1.0));
 		}
 	
+	}
+	
+		
+	const int DTILE_SIZE = 16;
+	const int DIN_SIZE = DTILE_SIZE - 2;
+	for(int y = 0; y < DIN_SIZE; y++) {
+		for(int x = 0; x < DIN_SIZE; x++) {
+			ivec2 coords;
+			coords.x = probe_x*DTILE_SIZE + (vol_grid.x*probe_y*DTILE_SIZE);
+			coords.y = probe_z*DTILE_SIZE;
+			
+			vec2 uv = vec2(x+0.5,y+0.5)/vec2(DIN_SIZE);
+			vec3 oct_normal = OctahedralDecode(uv);
+			
+			vec2 accum = vec2(0.0);
+			float weight_accum = 0.0;
+			
+			for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
+				int buffer_idx = probe_number * NUM_RAYS + ray_idx;
+				RayHitOutput data = hitbuffer[buffer_idx];
+				vec3 dir = data.dir_dist.xyz;
+				float dist = abs(data.dir_dist.w);
+				
+				float w = max(dot(dir,oct_normal),0.0);
+				
+				float probeMaxRayDistance = length(volume_spacing)*1.3;
+
+				// Increase or decrease the filtered distance value's "sharpness"
+				w = pow(w, 40.0);
+				dist = min(dist,probeMaxRayDistance);
+				
+				accum+=vec2(dist*w*global_dist_mult, dist*dist*w*global_dist_mult);
+				weight_accum+=w;
+			}
+			accum /= weight_accum;
+			
+			ivec2 coord_store = coords + ivec2(1)+ivec2(x,y);
+			
+			// Store in probe irradiance texture
+			imageStore(probe_depths, coord_store, vec4(accum*0.5,0.0, 1.0));
+		}
+	
+	}
+	
+	// Border dilation for irradiance tile
+	{
+		//const int TILE_SIZE = 8;
+		//const int IN_SIZE = TILE_SIZE - 2;
+		ivec2 tile_base = ivec2(probe_x*TILE_SIZE + (vol_grid.x*probe_y*TILE_SIZE), probe_z*TILE_SIZE);
+		
+		for(int y = 0; y < TILE_SIZE; y++) {
+			for(int x = 0; x < TILE_SIZE; x++) {
+				bool isCornerTexel = (x == 0 || x == (TILE_SIZE - 1)) && (y == 0 || y == (TILE_SIZE - 1));
+				bool isRowTexel = (x > 0 && x < (TILE_SIZE - 1));
+				
+				ivec2 copyCoordinates = tile_base;
+				
+				if(isCornerTexel) {
+					copyCoordinates.x += x > 0 ? 1 : IN_SIZE;
+					copyCoordinates.y += y > 0 ? 1 : IN_SIZE;
+				}
+				else if(isRowTexel) {
+					copyCoordinates.x += (TILE_SIZE - 1) - x;
+					copyCoordinates.y += y + ((y > 0) ? -1 : 1);
+				}
+				else { // Column Texel
+					copyCoordinates.x += x + ((x > 0) ? -1 : 1);
+					copyCoordinates.y += (TILE_SIZE - 1) - y;
+				}
+				
+				bool isBorderTexel = (x == 0 || x == (TILE_SIZE - 1)) || (y == 0 || y == (TILE_SIZE - 1));
+				if(isBorderTexel) {
+					vec4 value = imageLoad(probe_irradiance, copyCoordinates);
+					imageStore(probe_irradiance, tile_base + ivec2(x, y), value);
+				}
+			}
+		}
+	}
+	
+	// Border dilation for depth tile
+	{
+		//const int DTILE_SIZE = 16;
+		//const int DIN_SIZE = DTILE_SIZE - 2;
+		ivec2 tile_base = ivec2(probe_x*DTILE_SIZE + (vol_grid.x*probe_y*DTILE_SIZE), probe_z*DTILE_SIZE);
+		
+		for(int y = 0; y < DTILE_SIZE; y++) {
+			for(int x = 0; x < DTILE_SIZE; x++) {
+				bool isCornerTexel = (x == 0 || x == (DTILE_SIZE - 1)) && (y == 0 || y == (DTILE_SIZE - 1));
+				bool isRowTexel = (x > 0 && x < (DTILE_SIZE - 1));
+				
+				ivec2 copyCoordinates = tile_base;
+				
+				if(isCornerTexel) {
+					copyCoordinates.x += x > 0 ? 1 : DIN_SIZE;
+					copyCoordinates.y += y > 0 ? 1 : DIN_SIZE;
+				}
+				else if(isRowTexel) {
+					copyCoordinates.x += (DTILE_SIZE - 1) - x;
+					copyCoordinates.y += y + ((y > 0) ? -1 : 1);
+				}
+				else { // Column Texel
+					copyCoordinates.x += x + ((x > 0) ? -1 : 1);
+					copyCoordinates.y += (DTILE_SIZE - 1) - y;
+				}
+				
+				bool isBorderTexel = (x == 0 || x == (DTILE_SIZE - 1)) || (y == 0 || y == (DTILE_SIZE - 1));
+				if(isBorderTexel) {
+					vec4 value = imageLoad(probe_depths, copyCoordinates);
+					imageStore(probe_depths, tile_base + ivec2(x, y), value);
+				}
+			}
+		}
 	}
 }

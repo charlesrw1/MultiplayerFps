@@ -1,0 +1,42 @@
+layout(location = 0) out vec4 FS_OUT_Color;
+
+
+layout(binding = 0) uniform sampler2D probe_texture;
+in vec3 FS_IN_Normal;
+in vec3 FS_IN_Fragpos;
+uniform ivec3 probe_coord;
+uniform ivec3 vol_grid;
+// Octahederal encoding functions
+vec2 OctahedralEncode(vec3 normal_in)
+{
+	vec3 normal = normal_in.xzy;
+
+	normal = normalize(normal);
+	float l1norm = abs(normal.x) + abs(normal.y) + abs(normal.z);
+	vec2 result = normal.xy * (1.0 / l1norm);
+	
+	if (normal.z < 0.0) {
+		vec2 oldResult = result;
+		result.x = (1.0 - abs(oldResult.y)) * (oldResult.x >= 0.0 ? 1.0 : -1.0);
+		result.y = (1.0 - abs(oldResult.x)) * (oldResult.y >= 0.0 ? 1.0 : -1.0);
+	}
+	
+	return result * 0.5 + 0.5; // Map to [0,1]
+}
+const int TILE_SIZE = 8;
+void main()
+{
+
+	vec2 uv = OctahedralEncode(normalize(FS_IN_Normal));
+	
+	vec2 coords;
+	coords.x = probe_coord.x*TILE_SIZE + (vol_grid.x*probe_coord.y*TILE_SIZE);
+	coords.y = probe_coord.z*TILE_SIZE;
+	
+	coords += vec2(uv*vec2(6))+vec2(1);
+	vec2 final_uv = vec2(coords)/vec2(vol_grid.x*vol_grid.y*TILE_SIZE,vol_grid.z*TILE_SIZE);
+	
+	vec3 outc = texture(probe_texture,final_uv).rgb;
+
+	FS_OUT_Color = vec4(pow(outc,vec3(1/2.2)),1.0);
+}

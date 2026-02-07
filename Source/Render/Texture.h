@@ -62,7 +62,7 @@ public:
 
 #ifdef EDITOR_BUILD
 	bool hasSimplifiedColor = false;
-	Color32 simplifiedColor = COLOR_WHITE;
+	Color32 simplifiedColor = { 50,50,50 };
 #endif
 
 	// used for system textures

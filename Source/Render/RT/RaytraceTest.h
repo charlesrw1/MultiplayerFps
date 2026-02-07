@@ -32,7 +32,10 @@ public:
 	~DdgiTesting();
 	void build_world();
 	void execute();
-	void render();
+	void render_rt();
+	void render_probes();
+	void draw_lighting(IGraphicsTexture* ssao);
+	glm::ivec3 selected_probe{};
 
 	IGraphicsBuffer* verts = nullptr;
 	IGraphicsBuffer* indicies = nullptr;
@@ -47,7 +50,10 @@ public:
 	IGraphicsTexture* probe_depth = nullptr;
 
 	program_handle raytrace_test{};
-
+	program_handle debug_probes{};
 	program_handle trace_shader{};
 	program_handle gather_shader{};
+
+	program_handle shade_fs{};
+	program_handle shade_debug_fs{};
 };

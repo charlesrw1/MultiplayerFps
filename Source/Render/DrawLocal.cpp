@@ -91,7 +91,9 @@ ConfigVar r_debug_mode("r.debug_mode", "0", CVAR_INTEGER | CVAR_DEV, "render deb
 
 ConfigVar r_drawfog("r.drawfog", "1", CVAR_BOOL | CVAR_DEV, "enable/disable drawing of fog");
 
-ConfigVar ddgi_test("ddgi_test", "0", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar ddgi_test("dt", "0", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar ddgi_rt("ddrt", "0", CVAR_BOOL | CVAR_DEV, "");
+
 
 RenderWindowBackend* RenderWindowBackend::inst = nullptr;
 class RenderWindowBackendLocal : public RenderWindowBackend
@@ -1463,6 +1465,23 @@ void setup_batch(Render_Lists& list,
 		draw.bind_texture(i, id);
 	}
 }
+
+void draw_model_simple_no_material(Model* model) {
+	if (model->get_num_lods() == 0)
+		return;
+	auto& lod = model->get_lod(0);
+	for (int p = 0; p < lod.part_count; p++) {
+		auto& part = model->get_part(p);
+		glDrawElementsBaseVertex(GL_TRIANGLES, 
+			part.element_count, 
+			MODEL_INDEX_TYPE_GL, 
+			(void*)int64_t(part.element_offset + model->get_merged_index_ptr()), 
+			part.base_vertex+model->get_merged_vertex_ofs()
+		);
+	}
+}
+
+
 ConfigVar use_client_buffer_mdi("use_client_buffer_mdi", "0", CVAR_BOOL, "");
 void setup_execute_render_lists(Render_Lists& list,Render_Pass& pass) {
 	auto& scene = draw.scene;
@@ -3119,7 +3138,10 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 
 	device.reset_states();
-	if(!r_no_indirect.get_bool())
+	if (ddgi_test.get_bool()) {
+		ddgi->draw_lighting(ssao_tex);
+	}
+	else if(!r_no_indirect.get_bool())
 	{
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
@@ -3886,7 +3908,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	if(r_debug_mode.get_integer() == 0 && !params.skybox_only)
 		accumulate_gbuffer_lighting(params.is_cubemap_view);
 
-
+	// STAMPS ON NORMALS IN GBUFFER0!
 	auto copy_forward_to_temporary = [&]() {
 		GPUSCOPESTART(copy_forward_to_temporary_scope);
 		GraphicsBlitInfo blitInfo;
@@ -4107,7 +4129,9 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	do_composite_pass();
 
 	if (ddgi_test.get_bool())
-		ddgi->render();
+		ddgi->render_probes();
+	else if (ddgi_rt.get_bool())
+		ddgi->render_rt();
 
 
 	auto post_process_stack = [&](){

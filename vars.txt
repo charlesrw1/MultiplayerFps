@@ -43,7 +43,7 @@ disable_texture_loads 0
 g_debug_skeletons 0
 force_animation_to_bind_pose 1
 
-ed_decal_active 1
+ed_decal_active 0
 r.drawdecals 1
 
 ignore_folders 1

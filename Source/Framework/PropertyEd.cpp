@@ -430,7 +430,7 @@ public:
 			euler = glm::eulerAngles(*v);
 			euler *= 180.f / PI;
 			lastQuat = *v;
-			printf("changed by someone\n");
+			//printf("changed by someone\n");
 		}
 
 		if (ImGui::DragFloat3("##eul", &euler.x, 1.0)) {

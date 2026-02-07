@@ -202,26 +202,39 @@ inline Color32 srgb_to_linear_color32(Color32 c) {
 #include "Render/MaterialLocal.h"
 #include "Render/Texture.h"
 Color32 get_color_of_material_for_export(const MaterialInstance* m) {
-    if (!m) return COLOR_PINK;
+    Color32 defaultc = { 10,10,50 };
+    if (!m) return defaultc;
     auto master = m->get_master_material();
     auto impl = m->impl.get();
-    if (!master) return COLOR_PINK;
-    if (!master->self) return COLOR_PINK;
+    if (!master) return defaultc;
+    if (!master->self) return defaultc;
     if (master->self->get_name() == "eng/fallback.mm") {
         auto p = impl->find_parameter(StringName("BaseColor"));
-        if (!p||!p->tex) return COLOR_PINK;
+        if (!p||!p->tex) return defaultc;
         return p->tex->simplifiedColor;
     }
     if (master->self->get_name() == "defaultPBR.mm") {
         auto p = impl->find_parameter(StringName("Albedo"));
-        if (!p || !p->tex) return COLOR_PINK;
+        if (!p || !p->tex) return defaultc;
         auto texColor = color32_to_vec4(p->tex->simplifiedColor);
         auto c = impl->find_parameter(StringName("colorMult"));
-        if (!c || c->type != MatParamType::Vector) return COLOR_PINK;
+        if (!c || c->type != MatParamType::Vector) return defaultc;
         auto multColor = color32_to_vec4(c->color32);
         return vec_to_color32(texColor * multColor);
     }
-    return COLOR_PINK;
+    else {
+        auto albedo = impl->find_parameter(StringName("Albedo"));
+        if (!albedo)
+            albedo = impl->find_parameter(StringName("Basecolor"));
+        if (!albedo)
+            albedo = impl->find_parameter(StringName("BaseColor"));
+
+        if (albedo && albedo->type == MatParamType::Texture2D) {
+            return (albedo->tex->simplifiedColor);
+        }
+    }
+
+    return defaultc;
 }
 
 void export_one_model(const Model& model, const char* export_path) {

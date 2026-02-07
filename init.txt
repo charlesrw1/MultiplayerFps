@@ -92,4 +92,4 @@ bind 7 "start_ed AnimGraph beu_character.ag"
 loglevel 5
 developer_mode 1
 
-open-editor dumped_new_map.tmap
+open-editor my_map.tmap

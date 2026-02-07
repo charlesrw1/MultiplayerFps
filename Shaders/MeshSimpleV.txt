@@ -1,0 +1,31 @@
+
+
+layout (location = 0) in vec3 VS_IN_Postion;
+layout (location = 1) in vec2 VS_IN_TexCoord;
+layout (location = 2) in vec3 VS_IN_Normal;
+layout (location = 3) in vec3 VS_IN_Tangent;
+
+out vec3 FS_IN_Normal;
+out vec3 FS_IN_Fragpos;
+
+uniform mat4 Model = mat4(1);
+#include "SharedGpuTypes.txt"
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+
+void main()
+{
+	FS_IN_Normal = VS_IN_Normal;
+	FS_IN_Fragpos = VS_IN_Postion;
+	vec4 pos =  g.viewproj *  Model * vec4(VS_IN_Postion, 1.0);
+	
+	#ifdef SKYBOX
+	gl_Position = pos.xyww;	// so z will always = 1
+	#else
+	gl_Position = pos;
+	#endif
+}
+
+

@@ -117,7 +117,7 @@ float RayTriIntersect2(vec3 ro, vec3 rd, vec3 v0, vec3 v1, vec3 v2, out vec3 bar
 }
 
 
-vec4 trace_ray(vec3 ro, vec3 rd)
+vec3 trace_ray(vec3 ro, vec3 rd)
 {
 	Ray out_ray;
 	out_ray.pos = ro;
@@ -137,6 +137,7 @@ vec4 trace_ray(vec3 ro, vec3 rd)
 	int triangles_intersected=0;
 	int tris_hit = 0;
 	int mat_hit = 0;
+	vec3 closest_normal = vec3(0.0);
 	while (stack_count > 0)
 	{
 		node=stack[--stack_count];
@@ -157,6 +158,10 @@ vec4 trace_ray(vec3 ro, vec3 rd)
 				uint i0 = Indicies.data[mesh_element_index];
 				uint i1 = Indicies.data[mesh_element_index+1];
 				uint i2 = Indicies.data[mesh_element_index+2];
+				
+				vec3 v0 = Verticies.data[i0].xyz;
+				vec3 v1 = Verticies.data[i1].xyz;
+				vec3 v2 = Verticies.data[i2].xyz;
 				vec3 bary;
 				float t_hit = RayTriIntersect2(
 					ro,rd,
@@ -172,6 +177,7 @@ vec4 trace_ray(vec3 ro, vec3 rd)
 					idx = mesh_element_index;
 					bary_near=bary;
 					mat_hit = int(Verticies.data[i0].w);
+					closest_normal = normalize(cross(v1-v0,v2-v0));
 				}
 			}
 			continue;
@@ -213,7 +219,7 @@ vec4 trace_ray(vec3 ro, vec3 rd)
 	//}
 	//color = vec4(randColor(mat_hit),1.0);
 	color = Albedos.data[mat_hit];
-	return color;//vec4(bary,1.0);
+	return color.rgb;randColor(idx);//color.rgb;//mix(vec3(1,0,0),vec3(0,0,1), sign(dot(closest_normal,rd))*0.5+0.5);//vec4(bary,1.0);
 	//return vec4(vec3(triangles_intersected/100.0),1.0);
 }
 
