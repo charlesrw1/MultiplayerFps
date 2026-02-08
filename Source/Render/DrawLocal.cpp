@@ -763,6 +763,9 @@ void Renderer::create_shaders()
 	prog.tex_debug_2d = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_2D_VERSION");
 	prog.tex_debug_2d_array = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_2D_ARRAY_VERSION");
 	prog.tex_debug_cubemap = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_CUBEMAP_VERSION");
+	prog.tex_debug_cubemap_array = prog_man.create_raster("MbTexturedV.txt", "MbTexturedF.txt", "TEXTURE_CUBEMAP_ARRAY_VERSION");
+
+
 	// Bloom shaders
 	prog.bloom_downsample = prog_man.create_raster("fullscreenquad.txt", "BloomDownsampleF.txt");
 	prog.bloom_upsample = prog_man.create_raster("fullscreenquad.txt", "BloomUpsampleF.txt");
@@ -906,7 +909,7 @@ void debug_message_callback(GLenum source, GLenum type, GLuint id,
 		return "";
 	}();
 
-//	sys_print(Error, "%s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
+	sys_print(Error, "%s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
 }
 
 void imgui_stat_hook()
@@ -2166,6 +2169,20 @@ void Render_Scene::init()
 	gpu_skinned_mats_buffer_size = r_skinned_mats_bone_buffer_size.get_integer();
 	glNamedBufferData(gpu_skinned_mats_buffer, gpu_skinned_mats_buffer_size * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
 
+
+	CreateTextureArgs args;
+	args.width = CUBEMAP_WIDTH;
+	args.height = CUBEMAP_WIDTH;
+	args.type = GraphicsTextureType::tCubemapArray;
+	args.format = GraphicsTextureFormat::rgb16f;
+	args.num_mip_maps = Texture::get_mip_map_count(CUBEMAP_WIDTH, CUBEMAP_WIDTH);
+	args.sampler_type = GraphicsSamplerType::CubemapDefault;
+	args.depth_3d = MAX_CUBEMAPS*6;
+	cubemap_array = IGraphicsDevice::inst->create_texture(args);
+
+	auto cm = Texture::install_system("_cubemaps");
+	cm->update_specs_ptr(cubemap_array);
+	cm->type = TEXTYPE_CUBEMAP_ARRAY;
 }
 
 glm::vec4 to_vec4(Color32 color) {
@@ -3608,6 +3625,37 @@ void Renderer::check_cubemaps_dirty()
 			sys_print(Debug, "check_cubemaps_dirty:rendering reflection vol cubemap\n");
 			glm::vec3 dummy[6];
 			update_cubemap_specular_irradiance(dummy, vol.generated_cube, vol.probe_position, false);
+
+			// copy from texture to cubemap array
+			const int volhandle = vols[i].handle;
+			const int mips = Texture::get_mip_map_count(CUBEMAP_WIDTH, CUBEMAP_WIDTH);
+			for (int face = 0; face < 6; face++) {
+				int width = CUBEMAP_WIDTH;
+				for (int mip = 0; mip < mips; mip++) {
+
+					//GraphicsBlitInfo blit;
+					//blit.src.texture = vol.generated_cube->gpu_ptr;
+					//blit.dest.texture = scene.cubemap_array;
+					//blit.dest.mip = mip;
+					//blit.dest.layer = 6*volhandle + face;	// face index
+					//blit.src.mip = mip;
+					//blit.src.layer = face;
+					//blit.src.x = blit.src.y = blit.dest.x = blit.dest.y = 0;
+					//blit.src.w = blit.src.h = blit.dest.w = blit.dest.h = CUBEMAP_WIDTH;
+					//IGraphicsDevice::inst->blit_textures(blit);
+					//glCheckError();
+
+
+					glCopyImageSubData(
+						vol.generated_cube->gpu_ptr->get_internal_handle(), GL_TEXTURE_CUBE_MAP, mip, 0, 0, face,
+						scene.cubemap_array->get_internal_handle(), GL_TEXTURE_CUBE_MAP_ARRAY, mip, 0, 0, 6 * volhandle + face,
+						width, width, 1
+					);
+					width /= 2;
+				}
+			}
+
+
 			vol.wants_update = false;
 			had_changes = true;
 		}
@@ -4360,7 +4408,7 @@ void Render_Scene::remove_light(handle<Render_Light>& handle) {
 }
 
 
-
+ConfigVar debug_out_layer("debug_out_layer", "0", CVAR_INTEGER | CVAR_UNBOUNDED, "");
 void DebuggingTextureOutput::draw_out()
 {
 	if (!output_tex)
@@ -4383,6 +4431,8 @@ void DebuggingTextureOutput::draw_out()
 		state.program = (draw.prog.tex_debug_2d_array);
 	else if (output_tex->type == Texture_Type::TEXTYPE_CUBEMAP)
 		state.program = (draw.prog.tex_debug_cubemap);
+	else if (output_tex->type == Texture_Type::TEXTYPE_CUBEMAP_ARRAY)
+		state.program = (draw.prog.tex_debug_cubemap_array);
 	else {
 		sys_print(Error, "can only debug 2d and 2d array textures\n");
 		output_tex = nullptr;
@@ -4406,7 +4456,7 @@ void DebuggingTextureOutput::draw_out()
 	draw.shader().set_float("mip_slice", output_tex->type == Texture_Type::TEXTYPE_2D ?
 		-1.f
 		: mip);
-
+	
 	draw.bind_texture_ptr(0,  output_tex->gpu_ptr);
 
 	glm::vec2 upper_left = glm::vec2(0, 1);

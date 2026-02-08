@@ -682,6 +682,7 @@ public:
 	std::vector<RSunInternal> suns;
 	std::vector<RSkylight_Internal> skylights;	// again should just be 1
 	Free_List<Render_Reflection_Volume> reflection_volumes;
+	IGraphicsTexture* cubemap_array = nullptr;
 
 	// objects can be deleted mid frame, so queue them
 	std::vector<QueuedRenderObjectDelete> queued_deletes;

@@ -43,6 +43,7 @@ public:
 	IGraphicsBuffer* references = nullptr;
 	IGraphicsBuffer* materials = nullptr;
 
+	IGraphicsBuffer* probe_to_best_cubemap = nullptr;
 
 	IGraphicsBuffer* ray_buffer = nullptr;
 
@@ -53,6 +54,9 @@ public:
 	program_handle debug_probes{};
 	program_handle trace_shader{};
 	program_handle gather_shader{};
+
+	program_handle get_best_cubemap_shader{};
+
 
 	program_handle shade_fs{};
 	program_handle shade_debug_fs{};

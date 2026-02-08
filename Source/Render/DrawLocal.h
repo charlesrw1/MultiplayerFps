@@ -51,6 +51,8 @@ struct Texture3d
 };
 Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int frequency, float persistence, float lacunarity);
 
+const int MAX_CUBEMAPS = 32;
+const int CUBEMAP_WIDTH = 128;
 
 struct Render_Lists;
 class Render_Pass;
@@ -501,6 +503,8 @@ public:
 		program_handle tex_debug_2d{};
 		program_handle tex_debug_2d_array{};
 		program_handle tex_debug_cubemap{};
+		program_handle tex_debug_cubemap_array{};
+
 
 
 		program_handle sunlight_accumulation{};

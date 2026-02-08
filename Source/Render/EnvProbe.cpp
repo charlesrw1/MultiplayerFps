@@ -181,6 +181,7 @@ void EnviornmentMapHelper::compute_specular_new(
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glBindVertexArray(0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
    //*glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 

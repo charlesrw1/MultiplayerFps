@@ -52,6 +52,7 @@ enum class GraphicsTextureType : int8_t {
 	t2DArray,
 	t3D,
 	tCubemap,
+	tCubemapArray
 };
 enum class GraphicsTextureFormat : int8_t {
 	r8,

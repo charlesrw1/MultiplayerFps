@@ -68,6 +68,7 @@ void BillboardComponent::on_sync_render_data()
 	obj.transform = glm::translate(glm::mat4(1), get_ws_position());
 	obj.shadow_caster = false;
 	obj.owner = this;
+	obj.ignore_in_baking = true;
 
 	idraw->get_scene()->update_obj(handle, obj);
 }

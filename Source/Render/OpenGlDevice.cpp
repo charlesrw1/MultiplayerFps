@@ -97,6 +97,8 @@ public:
 			break;
 		case GraphicsTextureType::tCubemap: return GL_TEXTURE_CUBE_MAP;
 			break;
+		case GraphicsTextureType::tCubemapArray: return GL_TEXTURE_CUBE_MAP_ARRAY;
+			break;
 		default:
 			break;
 		}
@@ -227,9 +229,10 @@ public:
 		this->width = args.width;
 		this->height = args.height;
 		this->mips = args.num_mip_maps;
+		my_type = args.type;
 		my_fmt = args.format;
 		internal_format_gl = to_format(args.format);
-		if (args.type == GraphicsTextureType::t2DArray) {
+		if (args.type == GraphicsTextureType::t2DArray || args.type == GraphicsTextureType::tCubemapArray) {
 			glTextureStorage3D(id, args.num_mip_maps, internal_format_gl, x, y,args.depth_3d);
 		}
 		else {
@@ -515,7 +518,10 @@ public:
 		return GraphicsDeviceType::OpenGl;
 	}
 
+
+
 	void set_framebuffer_with_info(const RenderPassState& state, fbohandle framebuffer_to_use, int& min_width, int& min_height) {
+
 		glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_to_use);
 		for (int i = 0; i < state.color_infos.size(); i++) {
 			const ColorTargetInfo& info = state.color_infos[i];

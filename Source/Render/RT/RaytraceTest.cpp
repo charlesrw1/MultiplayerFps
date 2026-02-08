@@ -9,8 +9,8 @@ ConfigVar ddgi_density("ddgi_density", "2", CVAR_FLOAT | CVAR_UNBOUNDED, "probes
 
 const int MAX_RAYS = 256;
 
-const glm::ivec3 ddgiGRID{20,4,20 };
-const glm::vec3 ddgiVolumeOrigin = glm::vec3(-11, -0.5, -11);
+const glm::ivec3 ddgiGRID{10,3,10 };
+const glm::vec3 ddgiVolumeOrigin = glm::vec3(-11, 2.5, -11);
 
 const glm::vec3 ddgiDensity = vec3(3,3,3);
 
@@ -29,6 +29,8 @@ DdgiTesting::DdgiTesting()
 
 	trace_shader = draw.get_prog_man().create_compute("trace_C.txt");
 	debug_probes = draw.get_prog_man().create_raster("MeshSimpleV.txt", "MeshDebugProbeF.txt");
+
+	get_best_cubemap_shader = draw.get_prog_man().create_compute("get_best_cubemap_C.txt");
 
 
 }
@@ -61,6 +63,10 @@ void DdgiTesting::build_world()
 	for (auto& _o : objs.objects) {
 		auto& o = _o.type_.proxy;
 		if (!o.model)
+			continue;
+		if (o.is_skybox)
+			continue;
+		if (o.ignore_in_baking)
 			continue;
 		if (o.model->get_num_lods() == 0)
 			continue;
@@ -205,6 +211,10 @@ void DdgiTesting::build_world()
 	handle = Texture::install_system("_ddgi_d");
 	handle->update_specs_ptr(this->probe_depth);
 	handle->type = Texture_Type::TEXTYPE_2D;
+
+	args.size = ddgiGRID.x*ddgiGRID.y*ddgiGRID.z*4;
+	this->probe_to_best_cubemap = IGraphicsDevice::inst->create_buffer(args);
+	this->probe_to_best_cubemap->upload(nullptr, args.size);
 }
 #include "imgui.h"
 static float irrad_mult = 1.0;
@@ -272,6 +282,44 @@ void DdgiTesting::execute()
 		sys_print(Debug, "time: %f\n", time);
 		do_irrad_calcs = true;
 	}
+
+	{
+		CreateBufferArgs args;
+		args.flags = GraphicsBufferUseFlags::BUFFER_USE_AS_STORAGE_READ;
+		struct ProbeInfo {
+			glm::vec4 pos_size;
+		};
+		args.size = 256 * sizeof(ProbeInfo);
+		auto& objs = draw.scene.reflection_volumes.objects;
+		std::vector<ProbeInfo> infos;
+		for (int i = 0; i < objs.size(); i++) {
+			glm::vec4 v = glm::vec4(objs[i].type_.probe_position, 10.0);	// fixme
+			infos.push_back({ v });
+		}
+		IGraphicsBuffer* buf = IGraphicsDevice::inst->create_buffer(args);
+		buf->upload(infos.data(), infos.size() * sizeof(ProbeInfo));
+
+
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 8, buf->get_internal_handle());
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, probe_to_best_cubemap->get_internal_handle());
+
+
+		// find best cubemaps
+		device.set_shader(get_best_cubemap_shader);
+		device.shader().set_vec3("volume_origin", ddgiVolumeOrigin);
+		device.shader().set_vec3("volume_spacing", ddgiDensity);
+		device.shader().set_ivec3("vol_grid", ddgiGRID);
+		device.shader().set_int("num_cubemap_volumes", infos.size());
+		const int total_probes = ddgiGRID.x * ddgiGRID.y * ddgiGRID.z;
+		const int groups = glm::ceil(total_probes / 64.f);
+		glDispatchCompute(groups, 1, 1);
+
+
+
+		buf->release();
+	}
+
+
 }
 void draw_model_simple_no_material(Model* model);
 #include "Render/ModelManager.h"
@@ -354,6 +402,8 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao)
 	state.depth_writes = false;
 	device.set_pipeline(state);
 
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, probe_to_best_cubemap->get_internal_handle());
+
 	draw.bind_texture_ptr(0, draw.tex.scene_gbuffer0);
 	draw.bind_texture_ptr(1, draw.tex.scene_gbuffer1);
 	draw.bind_texture_ptr(2, draw.tex.scene_gbuffer2);
@@ -368,8 +418,8 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao)
 	draw.bind_texture(8, Texture::load("bottom_gi.png")->get_internal_render_handle());
 
 
-
-
+	// boxes (with pos and size)
+	// trace against them, find best 1 box
 
 	device.shader().set_vec3("volume_origin", ddgiVolumeOrigin);
 	device.shader().set_vec3("volume_spacing", ddgiDensity);

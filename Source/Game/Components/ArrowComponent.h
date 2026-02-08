@@ -38,6 +38,7 @@ public:
 		obj.outline = get_owner()->get_is_any_selected_in_editor();
 #endif //  EDITOR_BUILD
 		obj.owner = this;
+		obj.ignore_in_baking = true;
 		idraw->get_scene()->update_obj(handle, obj);
 	}
 	bool visible = true;

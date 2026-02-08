@@ -240,6 +240,7 @@ void CubemapComponent::start() {
 		mesh->set_material_override(MaterialInstance::load("top_down/gray_metal.mi"));
 		meshEntity->dont_serialize_or_edit = true;
 		this->editor_mesh = meshEntity;
+		mesh->set_ignore_baking(true);
 
 		update_editormeshbuilder();
 	}

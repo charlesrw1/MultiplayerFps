@@ -79,7 +79,9 @@ public:
 	void set_not_lightmapped();
 	void set_static_probe_lit(int index);
 #endif
-
+	void set_ignore_baking(bool ignore) {
+		this->ignore_in_baking = ignore;
+	}
 private:
 	void update_physics_mesh();
 
@@ -91,6 +93,7 @@ private:
 	// If true, then it will check the model for collision. If the model has collision and there isnt a meshcomponent already, then it all create one.
 	// This only works on level load
 	REF bool add_collision_if_available = true;
+	bool ignore_in_baking = false;
 	REFLECT(hide);
 	bool lightmapped = false;
 	REFLECT(hide);

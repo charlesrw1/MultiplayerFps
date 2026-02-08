@@ -133,6 +133,18 @@ layout(binding = 4) uniform sampler2D probe_irradiance;
 layout(binding = 5) uniform sampler2D probe_depth;
 
 layout(binding = 1) uniform sampler2D GBUFFER1;		// ws normal (xyz)
+
+vec3 randColor(int number){
+    return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
+}
+
+
+
+layout(std430, binding =9) readonly buffer BestCubemapForProbe
+{
+	int data[];
+} BestCubemap;
+
 const uint MATERIAL_TYPE_UNLIT = 1;
 uniform float irrad_mult = 1.0;
 vec3 calculate_irradiance(vec3 direction, vec3 worldspace)
@@ -157,6 +169,8 @@ vec3 calculate_irradiance(vec3 direction, vec3 worldspace)
 	float accum_weight = 0.0;
 	float cheb_weight_total = 0.0;
 	
+	int best_probe = 0;
+	float best_weight = 0.0;
 
 	for(int probeIndex = 0;probeIndex < 8; probeIndex++) {
 		ivec3 adjacent_probe_ofs = ivec3(probeIndex, probeIndex>>1, probeIndex>>2)&ivec3(1);
@@ -219,11 +233,16 @@ vec3 calculate_irradiance(vec3 direction, vec3 worldspace)
 		accum_weight += weight;
 		// holy crap so much code!
 		
+		if(weight>best_weight) {
+			best_probe = adjacent_probe_coords.x + adjacent_probe_coords.y*vol_grid.x + adjacent_probe_coords.z*vol_grid.x*vol_grid.y;
+			best_weight = weight;
+			}
+		
 		//cheb_weight_total+= chebyshev_weight;
 	}
 	
 	irradiance *= (1.0/accum_weight);
-	
+	//randColor(BestCubemap.data[best_probe]+1);
 	return irradiance*irrad_mult;
 }
 
@@ -270,8 +289,7 @@ vec3 get_albedo_mult(vec3 worldspace, vec3 Albedo, float Metalness, float Roughn
 }
 layout(binding = 6) uniform sampler2D SSAOBlurred;
 
-layout(binding = 7) uniform sampler2D top_image;
-layout(binding = 8) uniform sampler2D bottom_image;
+layout(binding = 8) uniform samplerCubeArray bottom_image;
 
 
 uniform ivec3 selected_probe_pos;
