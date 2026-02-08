@@ -293,7 +293,11 @@ void DdgiTesting::execute()
 		auto& objs = draw.scene.reflection_volumes.objects;
 		std::vector<ProbeInfo> infos;
 		for (int i = 0; i < objs.size(); i++) {
-			glm::vec4 v = glm::vec4(objs[i].type_.probe_position, 10.0);	// fixme
+			auto& o = objs[i].type_;
+			auto size = (o.boxmax - o.boxmin);
+			float max_side = max(max(size.x, size.y), size.z);
+
+			glm::vec4 v = glm::vec4(objs[i].type_.probe_position, max_side*0.5);	// fixme
 			infos.push_back({ v });
 		}
 		buf = IGraphicsDevice::inst->create_buffer(args);
@@ -316,7 +320,7 @@ void DdgiTesting::execute()
 
 
 
-		buf->release();
+	//	buf->release();
 	}
 
 
@@ -402,7 +406,7 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 	state.depth_writes = false;
 	device.set_pipeline(state);
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, probe_to_best_cubemap->get_internal_handle());
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, buf->get_internal_handle());
 
 	draw.bind_texture_ptr(0, draw.tex.scene_gbuffer0);
 	draw.bind_texture_ptr(1, draw.tex.scene_gbuffer1);
@@ -433,6 +437,8 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 	device.shader().set_ivec3("vol_grid", ddgiGRID);
 	device.shader().set_ivec3("selected_probe_pos", selected_probe);
 	device.shader().set_float("irrad_mult", irrad_mult);
+	device.shader().set_int("num_cubemaps", draw.scene.reflection_volumes.objects.size());
+
 
 	// fullscreen shader, no vao used
 	glDrawArrays(GL_TRIANGLES, 0, 3);
