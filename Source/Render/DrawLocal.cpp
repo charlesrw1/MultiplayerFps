@@ -3156,7 +3156,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 
 	device.reset_states();
 	if (ddgi_test.get_bool()) {
-		ddgi->draw_lighting(ssao_tex);
+		ddgi->draw_lighting(ssao_tex, is_cubemap_view);
 	}
 	else if(!r_no_indirect.get_bool())
 	{
@@ -3211,23 +3211,23 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 	}
 
 
-	const Texture* reflectionProbeTex = scene.get_reflection_probe_for_render(view_to_use.origin);
-
-	if (reflectionProbeTex&& !is_cubemap_view) {
-		RenderPipelineState state;
-		state.vao = get_empty_vao();
-		state.program = prog.reflection_accumulation;
-		state.blend = BlendState::ADD;
-		state.depth_testing = false;
-		state.depth_writes = false;
-		device.set_pipeline(state);
-		bind_texture_ptr(4, ssao_tex);
-		bind_texture_ptr(5, reflectionProbeTex->gpu_ptr);
-		bind_texture(6, EnviornmentMapHelper::get().integrator.get_texture());
-		shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
-
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-	}
+	//const Texture* reflectionProbeTex = scene.get_reflection_probe_for_render(view_to_use.origin);
+	//
+	//if (reflectionProbeTex&& !is_cubemap_view) {
+	//	RenderPipelineState state;
+	//	state.vao = get_empty_vao();
+	//	state.program = prog.reflection_accumulation;
+	//	state.blend = BlendState::ADD;
+	//	state.depth_testing = false;
+	//	state.depth_writes = false;
+	//	device.set_pipeline(state);
+	//	bind_texture_ptr(4, ssao_tex);
+	//	bind_texture_ptr(5, reflectionProbeTex->gpu_ptr);
+	//	bind_texture(6, EnviornmentMapHelper::get().integrator.get_texture());
+	//	shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
+	//
+	//	glDrawArrays(GL_TRIANGLES, 0, 3);
+	//}
 }
 #ifdef EDITOR_BUILD
 int write_png_wrapper(const char* filename, int w, int h, int comp, const void* data, int stride_in_bytes);

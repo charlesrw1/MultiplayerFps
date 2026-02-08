@@ -296,7 +296,7 @@ void DdgiTesting::execute()
 			glm::vec4 v = glm::vec4(objs[i].type_.probe_position, 10.0);	// fixme
 			infos.push_back({ v });
 		}
-		IGraphicsBuffer* buf = IGraphicsDevice::inst->create_buffer(args);
+		buf = IGraphicsDevice::inst->create_buffer(args);
 		buf->upload(infos.data(), infos.size() * sizeof(ProbeInfo));
 
 
@@ -364,7 +364,7 @@ void DdgiTesting::render_probes()
 	}
 
 }
-void DdgiTesting::draw_lighting(IGraphicsTexture* ssao)
+void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 {
 	if (!verts) {
 		execute();
@@ -414,12 +414,19 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao)
 	draw.bind_texture_ptr(5, probe_depth);
 	draw.bind_texture_ptr(6, ssao);
 
-	draw.bind_texture(7, Texture::load("topdown_gi.png")->get_internal_render_handle());
-	draw.bind_texture(8, Texture::load("bottom_gi.png")->get_internal_render_handle());
+	//draw.bind_texture(7, Texture::load("topdown_gi.png")->get_internal_render_handle());
+	//draw.bind_texture(8, Texture::load("bottom_gi.png")->get_internal_render_handle());
 
 
 	// boxes (with pos and size)
 	// trace against them, find best 1 box
+	extern ConfigVar r_specular_ao_intensity;
+	device.shader().set_bool("include_cubemaps", !for_cubemap_view);
+
+	draw.bind_texture(7, EnviornmentMapHelper::get().integrator.get_texture());
+	draw.bind_texture(8, draw.scene.cubemap_array->get_internal_handle());
+
+	draw.shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
 
 	device.shader().set_vec3("volume_origin", ddgiVolumeOrigin);
 	device.shader().set_vec3("volume_spacing", ddgiDensity);

@@ -34,7 +34,7 @@ public:
 	void execute();
 	void render_rt();
 	void render_probes();
-	void draw_lighting(IGraphicsTexture* ssao);
+	void draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view);
 	glm::ivec3 selected_probe{};
 
 	IGraphicsBuffer* verts = nullptr;
@@ -49,7 +49,7 @@ public:
 
 	IGraphicsTexture* probe_irradiance = nullptr;
 	IGraphicsTexture* probe_depth = nullptr;
-
+	IGraphicsBuffer* buf = nullptr;
 	program_handle raytrace_test{};
 	program_handle debug_probes{};
 	program_handle trace_shader{};

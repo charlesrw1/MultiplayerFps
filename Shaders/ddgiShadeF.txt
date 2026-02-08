@@ -147,7 +147,12 @@ layout(std430, binding =9) readonly buffer BestCubemapForProbe
 
 const uint MATERIAL_TYPE_UNLIT = 1;
 uniform float irrad_mult = 1.0;
-vec3 calculate_irradiance(vec3 direction, vec3 worldspace)
+
+struct OutIrrad {
+	vec3 irrad;
+	int closest_probe;
+};
+OutIrrad calculate_irradiance(vec3 direction, vec3 worldspace)
 {
 	
 		
@@ -242,8 +247,13 @@ vec3 calculate_irradiance(vec3 direction, vec3 worldspace)
 	}
 	
 	irradiance *= (1.0/accum_weight);
+	
+	OutIrrad outd;
+	outd.irrad = irradiance;
+	outd.closest_probe = BestCubemap.data[best_probe];
+	
 	//randColor(BestCubemap.data[best_probe]+1);
-	return irradiance*irrad_mult;
+	return outd;
 }
 
 vec3 debug_one_probe(vec3 dir, ivec3 probeCoord)
@@ -289,8 +299,50 @@ vec3 get_albedo_mult(vec3 worldspace, vec3 Albedo, float Metalness, float Roughn
 }
 layout(binding = 6) uniform sampler2D SSAOBlurred;
 
-layout(binding = 8) uniform samplerCubeArray bottom_image;
 
+layout(binding = 7) uniform sampler2D PBR_brdflut;
+layout(binding = 8) uniform samplerCubeArray probes;
+uniform float specular_ao_intensity = 3.0;
+
+
+float compute_specular_occlusion(float ao, float NdotV, float roughness)
+{
+    float out_val = (pow(NdotV + ao, exp2(-16.0 * roughness - 1.0)) - 1.0 + ao);
+	return clamp(out_val,0,1);
+}
+
+
+vec3 pbr_calculate_reflection(vec3 worldspace, vec3 Albedo, float Roughness, float Metalness, vec3 Normal, float ambient_occlusion, int probe_num)
+{
+	vec3 view_pos = g.viewpos_time.xyz;
+	vec3 view_front = g.viewfront.xyz;
+
+	vec3 V = normalize(view_pos-worldspace);
+	vec3 R = reflect(-V,Normal);
+	
+	vec3 F0 = vec3(0.04);
+	F0 = mix(F0,Albedo,Metalness);
+	
+	const float MAX_REFLECTION_LOD = 7.0;
+	//vec3 prefiltered_color = textureLod(Skylight,vec3(R), Roughness*MAX_REFLECTION_LOD).rgb;
+
+	vec3 prefiltered_color = textureLod(probes,vec4(R,float(probe_num)),Roughness*MAX_REFLECTION_LOD).rgb;
+
+	float NdotV = max(dot(Normal,V),0.0);
+	vec3 F = FresnelSchlickRougness(NdotV,F0,Roughness);
+	//float F90 = clamp(50*dot(F0,vec3(0.33)),0,1);
+	//vec3 F = modified_f_schlick(F0,F90,NdotV);
+	
+	vec2 env_brdf = texture(PBR_brdflut,vec2(max(dot(Normal,V),0.0),Roughness)).rg;
+	
+	vec3 specular = prefiltered_color*(F*env_brdf.x+env_brdf.y);
+	float spec_occlusion =compute_specular_occlusion(ambient_occlusion,NdotV,Roughness);
+	
+
+	return specular*spec_occlusion;
+}
+
+uniform bool include_cubemaps = false;
 
 uniform ivec3 selected_probe_pos;
 void main()
@@ -320,10 +372,19 @@ void main()
 	
 	//float alpha = direction.y*0.5 + 0.5;
 	//vec3 weird_gi = mix(weird_gi_top,weird_gi_bot,1-alpha);
+	// intensifying the ao here. i guess this isnt "right". but otherwise specular occlusion is too weak in my opinion
+	OutIrrad outirrad = calculate_irradiance(direction, worldspace);
+	vec3 albedo_mult =  get_albedo_mult(worldspace, albedo.rgb, metal_rough.x, metal_rough.y, direction);
+	outirrad.irrad *= albedo_mult;
+	int probe_to_use = max(outirrad.closest_probe,0);
 	
+	vec3 spec_color = vec3(0);
+	if(include_cubemaps) {
+	// intensifying ao for indirect diffuse gets ugly halo stuff, but just for specular i think looks alright
+		spec_color = pbr_calculate_reflection(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz,pow(ssao_value,specular_ao_intensity),probe_to_use);
 	
-	vec3 irrad = calculate_irradiance(direction, worldspace)* get_albedo_mult(worldspace, albedo.rgb, metal_rough.x, metal_rough.y, direction);
+	}
 	//vec3 alb2 = get_albedo_mult(worldspace, albedo.rgb, metal_rough.x, metal_rough.y, direction);
-	FS_OUT_Color = vec4(irrad*ssao_value,1);
+	FS_OUT_Color = vec4(outirrad.irrad*ssao_value+spec_color,1);
 	
 }
