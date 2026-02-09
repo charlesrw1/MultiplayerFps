@@ -438,7 +438,7 @@ int MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const
 }
 
 
-static glm::vec4 bounds_to_sphere(Bounds b)
+glm::vec4 bounds_to_sphere(Bounds b)
 {
 	glm::vec3 center = b.get_center();
 	glm::vec3 mindiff = center - b.bmin;

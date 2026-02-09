@@ -9,10 +9,10 @@ ConfigVar ddgi_density("ddgi_density", "2", CVAR_FLOAT | CVAR_UNBOUNDED, "probes
 
 const int MAX_RAYS = 256;
 
-const glm::ivec3 ddgiGRID{10,3,10 };
+const glm::ivec3 ddgiGRID{20,3,20 };
 const glm::vec3 ddgiVolumeOrigin = glm::vec3(-11, 2.5, -11);
 
-const glm::vec3 ddgiDensity = vec3(3,3,3);
+const glm::vec3 ddgiDensity = vec3(2);
 
 const int ddgiIRRADTILE = 8;
 const int ddgiDEPTHTILE = 16;
@@ -429,6 +429,8 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 
 	draw.bind_texture(7, EnviornmentMapHelper::get().integrator.get_texture());
 	draw.bind_texture(8, draw.scene.cubemap_array->get_internal_handle());
+	draw.bind_texture(9, draw.scene.skylights.at(0).skylight.generated_cube->get_internal_render_handle());
+
 
 	draw.shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
 

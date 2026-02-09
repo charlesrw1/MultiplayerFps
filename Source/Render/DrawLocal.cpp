@@ -3055,6 +3055,81 @@ void LightListCuller::draw_lights()
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
 }
+void ReflectionProbeCuller::cull(const View_Setup& setup)
+{
+	CPUFUNCTIONSTART;
+
+	const vec3 forward = normalize(setup.front);
+	const vec3 right = normalize(cross(forward, glm::vec3(0, 1, 0)));	// fixme
+	const vec3 up = normalize(cross(right, forward));
+	const float tile_size_x = setup.width / float(light_frustum_size_x);
+	const float tile_size_y = setup.height / float(light_frustum_size_y);
+	const float aspect = float(setup.width) / setup.height;
+
+	std::vector<int16_t> lights;
+
+	const int total_tiles = light_frustum_size_x * light_frustum_size_y;
+	const int max_lights_in_tile = gpu::MAX_TILE_LIGHTS;
+	counts.resize(total_tiles);
+
+	auto& memArena = draw.get_arena();
+	ArenaScope memScope(memArena);
+
+	int* light_index_buffer = memArena.alloc_bottom_type<int>(total_tiles * max_lights_in_tile);
+	int* tile_light_count = memArena.alloc_bottom_type<int>(total_tiles);
+
+
+	auto cull_volume = [&](int index_x, int index_y) {
+		const int my_tile_index = index_y * light_frustum_size_x + index_x;
+		const int my_light_index_index = my_tile_index * max_lights_in_tile;
+		int lights_in_tile = 0;
+
+
+		auto furstum_planes = get_tile_frustum_planes(setup.origin, forward, right, up, setup.fov,
+			aspect, setup.width, setup.height, index_x, index_y, tile_size_x, tile_size_y);
+
+		auto& scene_volumes = draw.scene.reflection_volumes.objects;
+		int light_index = -1;
+		for (auto& volume : scene_volumes) {
+			light_index += 1;
+			Render_Reflection_Volume& light = volume.type_;
+			glm::vec4 sphere = bounds_to_sphere(Bounds(light.boxmin, light.boxmax));
+			//glm::vec4 sphere(light.light.position, light.light.radius);
+			const bool in_frustum = cull_sphere_by_frustum(furstum_planes, sphere);
+			if (in_frustum) {
+				light_index_buffer[my_light_index_index + lights_in_tile] = light_index;
+				lights_in_tile += 1;
+				if (lights_in_tile >= max_lights_in_tile)
+					break;
+			}
+		}
+
+		tile_light_count[my_tile_index] = lights_in_tile;
+		counts[my_tile_index] = lights_in_tile;
+	};
+
+	for (int y = 0; y < light_frustum_size_y; y++) {
+		for (int x = 0; x < light_frustum_size_x; x++) {
+			cull_volume(x, y);
+		}
+	}
+
+	light_indirection->upload(light_index_buffer, total_tiles * max_lights_in_tile * sizeof(int));
+	light_count_buffer->upload(tile_light_count, total_tiles * sizeof(int));
+
+
+	gpu::TiledLightUniforms uniforms{};
+	uniforms.tile_count_x = light_frustum_size_x;
+	uniforms.tile_count_y = light_frustum_size_y;
+
+	uniforms.inv_tile_size_x = 1.0 / tile_size_x;
+	uniforms.inv_tile_size_y = 1.0 / tile_size_y;
+
+
+	tiled_uniforms->upload(&uniforms, sizeof(gpu::TiledLightUniforms));
+
+}
+
 void LightListCuller::cull(const View_Setup& setup)
 {
 	CPUFUNCTIONSTART;
@@ -4585,3 +4660,4 @@ bool CheckGlErrorInternal_(const char* file, int line)
 	}
 	return has_error;
 }
+

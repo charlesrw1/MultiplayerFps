@@ -101,6 +101,7 @@ struct MeshLod
 	int part_ofs = 0;
 	int part_count = 0;
 };
+extern glm::vec4 bounds_to_sphere(Bounds b);
 
 class PhysicsMaterialWrapper;
 class MSkeleton;

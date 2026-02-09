@@ -396,6 +396,19 @@ private:
 	IGraphicsBuffer* multidraw_commands = nullptr;
 	IGraphicsBuffer* indirection_buffer = nullptr;
 };
+class ReflectionProbeCuller {
+public:
+	ReflectionProbeCuller();
+	void cull(const View_Setup& setup);
+	void setup_volume_buffer();
+	void draw_volumes();
+
+	IGraphicsBuffer* volume_info = nullptr;
+	std::vector<int> counts;
+	IGraphicsBuffer* tiled_uniforms = nullptr;
+	IGraphicsBuffer* light_count_buffer = nullptr;
+	IGraphicsBuffer* light_indirection = nullptr;
+};
 class LightListCuller
 {
 public:
