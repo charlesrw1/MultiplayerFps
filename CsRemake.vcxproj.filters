@@ -633,6 +633,7 @@
     <ClCompile Include="Source\Framework\SerializerJson2.cpp" />
     <ClCompile Include="Source\Game\Components\SpawnerComponenth.cpp" />
     <ClCompile Include="Source\Render\RT\RaytraceTest.cpp" />
+    <ClCompile Include="Source\Render\RT\Octtree.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

@@ -3,19 +3,90 @@
 #include "Render/Model.h"
 #include "Render/MaterialLocal.h"
 
+#include "Framework/MathLib.h"
 
 ConfigVar ddgi_size("ddgi_size", "10", CVAR_FLOAT | CVAR_UNBOUNDED, "");
 ConfigVar ddgi_density("ddgi_density", "2", CVAR_FLOAT | CVAR_UNBOUNDED, "probes/meter");
 
 const int MAX_RAYS = 256;
 
-const glm::ivec3 ddgiGRID{20,3,20 };
-const glm::vec3 ddgiVolumeOrigin = glm::vec3(-11, 2.5, -11);
+const glm::ivec3 ddgiGRID{60,5,40 };
+const glm::vec3 ddgiVolumeOrigin = glm::vec3(-30, 0, -11);
 
 const glm::vec3 ddgiDensity = vec3(2);
 
 const int ddgiIRRADTILE = 8;
 const int ddgiDEPTHTILE = 16;
+using std::vector;
+
+class OctTree
+{
+public:
+	struct Node {
+		std::vector<std::unique_ptr<Node>> subnodes;
+		bool tri_intersects = false;
+		Bounds bounds;
+		bool get_has_subdivied() const {
+			return !subnodes.empty();
+		}
+		void subdivide() {
+			ASSERT(!get_has_subdivied());
+			for (int i = 0; i < 8; i++) {
+				subnodes.push_back(uptr<Node>(new Node));
+			}
+		}
+	};
+	vec3 origin = vec3(0.0);
+	float size = 64.0;
+	uptr<Node> root_node;
+	int max_depth =6;
+	float min_leaf_size = 1.0f;// 2.0f;
+	
+	void insert_triangles(const vector<Bounds>& tri_bounds) {
+		root_node = uptr<Node>(new Node);
+		root_node->bounds = Bounds(origin-vec3(size), origin + vec3(size));
+		
+		for (int i = 0; i < tri_bounds.size(); i++) {
+			insert_triangle(root_node.get(), tri_bounds[i], 0);
+		}
+	}
+	
+private:
+	void insert_triangle(Node* node, const Bounds& tri_bounds, int depth) {
+		float node_size = size / (1 << depth);
+		if (node_size <= min_leaf_size || depth >= max_depth) {
+			return;
+		}
+		
+		if (!node->get_has_subdivied()) {
+			node->subdivide();
+			for (int i = 0; i < 8; i++) {
+				node->subnodes[i]->bounds = get_child_bounds(node->bounds, i);
+			}
+		}
+		for (int i = 0; i < 8; i++) {
+			auto& sn = node->subnodes[i];
+			sn->tri_intersects |= sn->bounds.intersect(tri_bounds);
+		}
+
+		
+		for (int i = 0; i < 8; i++) {
+			if (node->subnodes[i]->bounds.intersect(tri_bounds)) {
+				insert_triangle(node->subnodes[i].get(), tri_bounds, depth + 1);
+			}
+		}
+	}
+	
+	Bounds get_child_bounds(const Bounds& parent, int child_idx) {
+		vec3 half = (parent.bmax - parent.bmin) * 0.5f;
+		vec3 offset = vec3(
+			(child_idx & 1) ? half.x : 0,
+			(child_idx & 2) ? half.y : 0,
+			(child_idx & 4) ? half.z : 0
+		);
+		return Bounds(parent.bmin + offset, parent.bmin + offset + half);
+	}
+};
 
 
 DdgiTesting::DdgiTesting()
@@ -49,6 +120,7 @@ inline Bounds get_tri_bounds(vec3 v1, vec3 v2, vec3 v3)
 ConfigVar vert_limit("vert_limit", "5000", CVAR_INTEGER | CVAR_UNBOUNDED, "");
 Color32 get_color_of_material_for_export(const MaterialInstance* m);
 #include "Assets/AssetDatabase.h"
+static std::unordered_map<uint64_t, glm::vec3> hash_to_pos;
 void DdgiTesting::build_world()
 {
 	auto& objs = draw.scene.proxy_list;
@@ -57,6 +129,7 @@ void DdgiTesting::build_world()
 	std::vector<int> all_indicies;
 	std::vector<glm::vec4> all_verticies;
 
+	
 
 
 	int counter = 0;
@@ -215,6 +288,79 @@ void DdgiTesting::build_world()
 	args.size = ddgiGRID.x*ddgiGRID.y*ddgiGRID.z*4;
 	this->probe_to_best_cubemap = IGraphicsDevice::inst->create_buffer(args);
 	this->probe_to_best_cubemap->upload(nullptr, args.size);
+
+
+
+	{
+		OctTree tree;
+		tree.insert_triangles(bounds);
+
+		auto make_hash = [](glm::vec3 c) -> uint64_t {
+			std::size_t hx = std::hash<int>()(int(c.x) * 73856093);
+			std::size_t hy = std::hash<int>()(int(c.y) * 19349663);
+			std::size_t hz = std::hash<int>()(int(c.z) * 83492791);
+			return hx ^ hy ^ hz;
+		};
+		auto add_pos_to_hash = [&](glm::vec3 v) {
+			hash_to_pos[make_hash(v)] = v;
+		};
+
+		static MeshBuilder mb;
+		mb.Begin();
+	
+		auto recurse = [&](auto&& func, OctTree::Node* n, int depth) -> void {
+			if (!n->get_has_subdivied()) {
+				if (depth == 6) {
+					auto center = n->bounds.get_center();
+					auto size = n->bounds.bmax - n->bounds.bmin;
+					auto newmin = center - size * 0.25f;
+					auto newmax = center + size * 0.25f;
+					mb.PushLineBox(newmin, newmax, COLOR_RED);
+				}
+			}
+			else {
+				for (int i = 0; i < 8; i++)
+					func(func, n->subnodes.at(i).get(),depth+1);
+			}
+
+		};
+		recurse(recurse, tree.root_node.get(),0);
+
+		auto recurse2 = [&](auto&& func, OctTree::Node* n, int depth) -> void {
+				if (n->tri_intersects) {
+					auto center = n->bounds.get_center();
+					auto size = n->bounds.bmax - n->bounds.bmin;
+					auto newmin = center - size * 0.5f;
+					auto newmax = center + size * 0.5f;
+					// add 8 corners
+					for (int i = 0; i < 8; i++) {
+						glm::vec3 corner = glm::vec3(
+							(i & 1) ? newmax.x : newmin.x,
+							(i & 2) ? newmax.y : newmin.y,
+							(i & 4) ? newmax.z : newmin.z
+						);
+						add_pos_to_hash(corner);
+					}
+				}
+			if (!n->get_has_subdivied()) {
+			}
+			else {
+				for (int i = 0; i < 8; i++)
+					func(func, n->subnodes.at(i).get(), depth + 1);
+			}
+		};
+		recurse2(recurse2, tree.root_node.get(), 0);
+		printf("$$$$$$$ probes: %d\n", int(hash_to_pos.size()));
+		mb.End();
+
+		//auto handle = idraw->get_scene()->register_meshbuilder();
+		MeshBuilder_Object obj;
+		obj.meshbuilder = &mb;
+		obj.visible = true;
+		obj.use_background_color = true;
+		
+		//idraw->get_scene()->update_meshbuilder(handle, obj);
+	}
 }
 #include "imgui.h"
 static float irrad_mult = 1.0;
@@ -355,13 +501,22 @@ void DdgiTesting::render_probes()
 	Model* m = Model::load("sphere.cmdl");
 	device.bind_texture_ptr(0, probe_irradiance);
 	device.shader().set_ivec3("vol_grid", ddgiGRID);
+
+	//for (auto& [_, p] : hash_to_pos) {
+	//	glm::mat4 tr = glm::translate(glm::mat4(1), p);
+	//	device.shader().set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
+	//	device.shader().set_ivec3("probe_coord", { 0,0,0 });
+	//
+	//	draw_model_simple_no_material(m);
+	//}
+
 	for (int x = 0; x < ddgiGRID.x; x++) {
 		for (int y = 0; y < ddgiGRID.y; y++) {
 			for (int z = 0; z < ddgiGRID.z; z++) {
 				glm::mat4 tr = glm::translate(glm::mat4(1), glm::vec3(x, y, z) * ddgiDensity + ddgiVolumeOrigin);
 				device.shader().set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
 				device.shader().set_ivec3("probe_coord", { x,y,z });
-
+	
 				draw_model_simple_no_material(m);
 			}
 		}

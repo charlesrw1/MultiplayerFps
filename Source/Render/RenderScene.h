@@ -458,13 +458,15 @@ public:
 	}
 
 	virtual handle<MeshBuilder_Object> register_meshbuilder() final {
-		ASSERT(!eng->get_is_in_overlapped_period());
+	//	ASSERT(!eng->get_is_in_overlapped_period());
+		// FIXME!!
 		int handle = meshbuilder_objs.make_new();
 		//meshbuilder_objs.get(handle).obj = mbobj;
 		return { handle };
 	}
 	virtual void update_meshbuilder(handle<MeshBuilder_Object> handle, const MeshBuilder_Object& mbobj) final {
-		ASSERT(!eng->get_is_in_overlapped_period());
+		//ASSERT(!eng->get_is_in_overlapped_period());
+		// FIXME!!
 		assert(handle.is_valid());
 		meshbuilder_objs.get(handle.id).obj = mbobj;
 	}

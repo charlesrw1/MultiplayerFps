@@ -79,8 +79,8 @@ Model::Model() {}
 
 static const int MODEL_FORMAT_VERSION = 14;
 
-static const int STATIC_VERTEX_SIZE = 1'000'000;
-static const int STATIC_INDEX_SIZE = 3'000'000;
+static const int STATIC_VERTEX_SIZE = 4'000'000;
+static const int STATIC_INDEX_SIZE = 6'000'000;
 #include "IGraphsDevice.h"
 void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 {
