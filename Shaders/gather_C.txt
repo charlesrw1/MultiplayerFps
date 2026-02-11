@@ -78,10 +78,17 @@ vec3 OctahedralDecode(vec2 encoded)
 	
 	return normalize(normal.xzy);
 }
-const int NUM_RAYS = 256;
+const int NUM_RAYS = 128;
 uniform ivec3 vol_grid;
 uniform vec3 volume_spacing;
 
+layout(std430, binding =10) writeonly buffer InvalidCounterBuffer
+{
+	int data;
+} InvalidCounter;
+
+
+uniform int num_runs_so_far = 0;
 
 void main()
 {
@@ -110,15 +117,21 @@ void main()
 	float global_dist_mult = 1.0;
 	if((backface_hits)/float(NUM_RAYS)>0.3) {
 		global_dist_mult = 0.0;	// disable it all
+		
+		atomicAdd(InvalidCounter.data, 1);
 	}
 	
 	const int TILE_SIZE = 8;
 	const int IN_SIZE = TILE_SIZE - 2;
 	for(int y = 0; y < IN_SIZE; y++) {
 		for(int x = 0; x < IN_SIZE; x++) {
+		
+		
 			ivec2 coords;
 			coords.x = probe_x*TILE_SIZE + (vol_grid.x*probe_y*TILE_SIZE);
 			coords.y = probe_z*TILE_SIZE;
+			ivec2 coord_store = coords + ivec2(1)+ivec2(x,y);
+			vec3 cur_value = imageLoad(probe_irradiance, coord_store).rgb;
 			
 			vec2 uv = vec2(x+0.5,y+0.5)/vec2(IN_SIZE);
 			vec3 oct_normal = OctahedralDecode(uv);
@@ -135,11 +148,19 @@ void main()
 				accum+=data.light.xyz*w;
 				weight_accum+=w;
 			}
-			accum /= weight_accum;
 			
-			ivec2 coord_store = coords + ivec2(1)+ivec2(x,y);
+			float epsilon = NUM_RAYS *  1e-9;
+			accum /= (2.0*max(epsilon,weight_accum));
+			
+
+
+			
+			
+			accum = pow(accum,vec3(1.0/2.2));
 			
 			accum.r *= global_dist_mult;
+			
+			accum = (cur_value*float(num_runs_so_far)+accum)/(num_runs_so_far+1.0);	// running average
 			
 			// Store in probe irradiance texture
 			imageStore(probe_irradiance, coord_store, vec4(accum, 1.0));
@@ -155,6 +176,8 @@ void main()
 			ivec2 coords;
 			coords.x = probe_x*DTILE_SIZE + (vol_grid.x*probe_y*DTILE_SIZE);
 			coords.y = probe_z*DTILE_SIZE;
+			ivec2 coord_store = coords + ivec2(1)+ivec2(x,y);
+			vec2 cur_value = imageLoad(probe_depths, coord_store).rg;
 			
 			vec2 uv = vec2(x+0.5,y+0.5)/vec2(DIN_SIZE);
 			vec3 oct_normal = OctahedralDecode(uv);
@@ -173,18 +196,19 @@ void main()
 				float probeMaxRayDistance = length(volume_spacing)*1.3;
 
 				// Increase or decrease the filtered distance value's "sharpness"
-				w = pow(w, 40.0);
+				w = pow(w, 50.0);
 				dist = min(dist,probeMaxRayDistance);
 				
 				accum+=vec2(dist*w*global_dist_mult, dist*dist*w*global_dist_mult);
 				weight_accum+=w;
 			}
-			accum /= weight_accum;
+			float epsilon = NUM_RAYS *  1e-9;
+			accum /= (2.0*max(epsilon,weight_accum));
 			
-			ivec2 coord_store = coords + ivec2(1)+ivec2(x,y);
+			accum = (cur_value*float(num_runs_so_far)+accum)/(num_runs_so_far+1.0);
 			
 			// Store in probe irradiance texture
-			imageStore(probe_depths, coord_store, vec4(accum*0.5,0.0, 1.0));
+			imageStore(probe_depths, coord_store, vec4(accum,0.0, 1.0));
 		}
 	
 	}

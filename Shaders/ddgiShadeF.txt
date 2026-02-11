@@ -144,6 +144,8 @@ layout(std430, binding =9) readonly buffer BestCubemapForProbe
 {
 	vec4 data[];
 } Cubemaps;
+
+
 uniform int num_cubemaps = 0;
 
 const uint MATERIAL_TYPE_UNLIT = 1;
@@ -162,6 +164,9 @@ OutIrrad calculate_irradiance(vec3 direction, vec3 worldspace, vec3 reflection_d
 	base_probe_coords = clamp(base_probe_coords,ivec3(0), 
 	ivec3(vol_grid)-ivec3(1)
 	);
+	
+	
+	
 	vec3 base_probe_pos = get_probe_world_from_coords(base_probe_coords);
 	
 	vec3 alpha = clamp(
@@ -177,6 +182,7 @@ OutIrrad calculate_irradiance(vec3 direction, vec3 worldspace, vec3 reflection_d
 
 	for(int probeIndex = 0;probeIndex < 8; probeIndex++) {
 		ivec3 adjacent_probe_ofs = ivec3(probeIndex, probeIndex>>1, probeIndex>>2)&ivec3(1);
+		
 		ivec3 adjacent_probe_coords = clamp(
 			base_probe_coords+adjacent_probe_ofs,
 			ivec3(0),
@@ -192,7 +198,7 @@ OutIrrad calculate_irradiance(vec3 direction, vec3 worldspace, vec3 reflection_d
 		float trilinear_weight = trilinear.x*trilinear.y*trilinear.z;
 		float weight = 1.0;
 		float warp_shading = dot(biased_pos_to_adj_probe,direction)*0.5 + 0.5;
-		weight *= (warp_shading*warp_shading)+0.2;
+		weight *= (warp_shading*warp_shading)+0.1;
 		
 		vec2 octant_coords = OctahedralEncode(-biased_pos_to_adj_probe);
 		
@@ -202,7 +208,7 @@ OutIrrad calculate_irradiance(vec3 direction, vec3 worldspace, vec3 reflection_d
 		
 		vec2 filtered_distance = vec2(2.0)*texture(probe_depth, probe_texture_uv).rg;
 		
-		if(filtered_distance.x<0.000001)
+		if(filtered_distance.x<0.0000001)
 			continue;
 		
 		float variance = abs(
@@ -233,18 +239,22 @@ OutIrrad calculate_irradiance(vec3 direction, vec3 worldspace, vec3 reflection_d
 		//probe_irrad = pow(probe_irrad, vec3(2.5));
 		
 		// approximate specular?
-		octant_coords = OctahedralEncode(reflection_dir);
-		probe_texture_uv = get_irrad_probe_uv(octant_coords,adjacent_probe_coords);
-		vec3 reflect_irrad = texture(probe_irradiance,probe_texture_uv).rgb;
+		//octant_coords = OctahedralEncode(reflection_dir);
+		//probe_texture_uv = get_irrad_probe_uv(octant_coords,adjacent_probe_coords);
+		//vec3 reflect_irrad = texture(probe_irradiance,probe_texture_uv).rgb;
+		float exponent = 2.2*0.5;
+		probe_irrad = pow(probe_irrad,vec3(exponent));	// half way back to linear from srgb
 		
-		
-		reflect_irrad_accum+=reflect_irrad*weight;
+		//reflect_irrad_accum+=reflect_irrad*weight;
 		irradiance += (weight*probe_irrad);
 		accum_weight += weight;
 		// holy crap so much code!
 	}
 	
 	irradiance *= (1.0/accum_weight);
+	irradiance*=irradiance;	// go back to linear
+	irradiance*= 2.0 * 3.1415;
+	
 	reflect_irrad_accum *= (1.0/accum_weight);
 	
 	OutIrrad outd;
@@ -294,7 +304,7 @@ vec3 get_albedo_mult(vec3 worldspace, vec3 Albedo, float Metalness, float Roughn
 	vec3 kS = F;
 	vec3 kD = (1.0-kS)*(1.0-Metalness);
 	
-	return (kD*Albedo);
+	return (kD*Albedo/3.14159);
 }
 layout(binding = 6) uniform sampler2D SSAOBlurred;
 
@@ -415,4 +425,5 @@ void main()
 	FS_OUT_Color = vec4(rad,1);
 	
 	//FS_OUT_Color = vec4(get_prefiltered_color(worldspace,vec3(1),1.0),1.0);
+
 }

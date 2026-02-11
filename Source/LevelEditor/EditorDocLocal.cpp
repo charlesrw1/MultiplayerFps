@@ -2717,6 +2717,10 @@ void EditorCamera::tick(float dt)
 	float aratio = (float)window_sz.y / window_sz.x;
 	float fov = glm::radians(g_fov.get_float());
 
+	if (UiSystem::inst->is_vp_hovered() && Input::is_mouse_down(2))
+		UiSystem::inst->set_game_capture_mouse(true);
+	else
+		UiSystem::inst->set_game_capture_mouse(false);
 
 	{
 		camera.orbit_mode = (Input::is_mouse_down(1) && UiSystem::inst->is_vp_focused()) || Input::last_recieved_input_from_con();// && !UiSystem::inst->is_game_capturing_mouse();
@@ -2731,7 +2735,7 @@ void EditorCamera::tick(float dt)
 				glm::vec3 up = ortho_camera.up;
 				camera.orbit_target += glm::dot(side, diff) * side + glm::dot(up, diff) * up;
 			}
-			if (!get_is_using_ortho() && camera.can_take_input() && camera.orbit_mode)
+			if (!get_is_using_ortho() && camera.can_take_input())
 				camera.update_from_input(window_sz.x, window_sz.y, aratio, fov);
 		}
 

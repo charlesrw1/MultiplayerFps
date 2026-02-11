@@ -10,7 +10,7 @@ ConfigVar ddgi_density("ddgi_density", "2", CVAR_FLOAT | CVAR_UNBOUNDED, "probes
 
 const int MAX_RAYS = 256;
 
-const glm::ivec3 ddgiGRID{60,5,40 };
+const glm::ivec3 ddgiGRID{50,8,50 };
 const glm::vec3 ddgiVolumeOrigin = glm::vec3(-30, 0, -11);
 
 const glm::vec3 ddgiDensity = vec3(2);
@@ -26,6 +26,7 @@ public:
 		std::vector<std::unique_ptr<Node>> subnodes;
 		bool tri_intersects = false;
 		Bounds bounds;
+		bool forced_subdivide = false;
 		bool get_has_subdivied() const {
 			return !subnodes.empty();
 		}
@@ -39,7 +40,7 @@ public:
 	vec3 origin = vec3(0.0);
 	float size = 64.0;
 	uptr<Node> root_node;
-	int max_depth =6;
+	int max_depth = 6;
 	float min_leaf_size = 1.0f;// 2.0f;
 	
 	void insert_triangles(const vector<Bounds>& tri_bounds) {
@@ -49,6 +50,7 @@ public:
 		for (int i = 0; i < tri_bounds.size(); i++) {
 			insert_triangle(root_node.get(), tri_bounds[i], 0);
 		}
+
 	}
 	
 private:
@@ -77,6 +79,7 @@ private:
 		}
 	}
 	
+ 	
 	Bounds get_child_bounds(const Bounds& parent, int child_idx) {
 		vec3 half = (parent.bmax - parent.bmin) * 0.5f;
 		vec3 offset = vec3(
@@ -97,13 +100,12 @@ DdgiTesting::DdgiTesting()
 		shade_fs = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeF.txt");
 		shade_debug_fs = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeDebugF.txt");
 
-
-	trace_shader = draw.get_prog_man().create_compute("trace_C.txt");
+	//	while (1) {
+			trace_shader = draw.get_prog_man().create_compute("trace_C.txt");
+	//	};
 	debug_probes = draw.get_prog_man().create_raster("MeshSimpleV.txt", "MeshDebugProbeF.txt");
 
 	get_best_cubemap_shader = draw.get_prog_man().create_compute("get_best_cubemap_C.txt");
-
-
 }
 
 DdgiTesting::~DdgiTesting()
@@ -117,10 +119,14 @@ inline Bounds get_tri_bounds(vec3 v1, vec3 v2, vec3 v3)
 	b = bounds_union(b, v3);
 	return b;
 }
-ConfigVar vert_limit("vert_limit", "5000", CVAR_INTEGER | CVAR_UNBOUNDED, "");
+ConfigVar vert_limit("vert_limit", "9999999", CVAR_INTEGER | CVAR_UNBOUNDED, "");
 Color32 get_color_of_material_for_export(const MaterialInstance* m);
 #include "Assets/AssetDatabase.h"
-static std::unordered_map<uint64_t, glm::vec3> hash_to_pos;
+struct PosAndValue {
+	glm::vec3 v{};
+	bool needs_depth = false;
+};
+static std::unordered_map<uint64_t, PosAndValue> hash_to_pos;
 void DdgiTesting::build_world()
 {
 	auto& objs = draw.scene.proxy_list;
@@ -225,7 +231,9 @@ void DdgiTesting::build_world()
 			continue;
 		const int INDEX = m->get_material_index_from_buffer_ofs();
 
-		materialsdata.at(INDEX)=color32_to_vec4(get_color_of_material_for_export(allmats.at(i)));
+		auto vec = color32_to_vec4(get_color_of_material_for_export(allmats.at(i)));
+		auto linear = glm::pow(vec, glm::vec4(2.2));
+		materialsdata.at(INDEX) = linear;
 	}
 
 
@@ -289,7 +297,17 @@ void DdgiTesting::build_world()
 	this->probe_to_best_cubemap = IGraphicsDevice::inst->create_buffer(args);
 	this->probe_to_best_cubemap->upload(nullptr, args.size);
 
+	{
+		indirection = IGraphicsDevice::inst->create_buffer(args);
+		std::vector<int> indicies;
+		const int count = ddgiGRID.x * ddgiGRID.y;
+		Random r(13);
+		for (int i = 0; i < count; i++) {
+			indicies.push_back(r.RandI(0, count - 1));
+		}
+		indirection->upload(indicies.data(), indicies.size() * sizeof(int));
 
+	};
 
 	{
 		OctTree tree;
@@ -301,8 +319,10 @@ void DdgiTesting::build_world()
 			std::size_t hz = std::hash<int>()(int(c.z) * 83492791);
 			return hx ^ hy ^ hz;
 		};
-		auto add_pos_to_hash = [&](glm::vec3 v) {
-			hash_to_pos[make_hash(v)] = v;
+		auto add_pos_to_hash = [&](glm::vec3 v, bool needs_depth) {
+			auto& val = hash_to_pos[make_hash(v)];
+			val.needs_depth |= needs_depth;
+			val.v = v;
 		};
 
 		static MeshBuilder mb;
@@ -327,7 +347,8 @@ void DdgiTesting::build_world()
 		recurse(recurse, tree.root_node.get(),0);
 
 		auto recurse2 = [&](auto&& func, OctTree::Node* n, int depth) -> void {
-				if (n->tri_intersects) {
+				if (1) {
+					const bool needs_depth = n->tri_intersects&&depth == 6;	// lowest level
 					auto center = n->bounds.get_center();
 					auto size = n->bounds.bmax - n->bounds.bmin;
 					auto newmin = center - size * 0.5f;
@@ -339,7 +360,7 @@ void DdgiTesting::build_world()
 							(i & 2) ? newmax.y : newmin.y,
 							(i & 4) ? newmax.z : newmin.z
 						);
-						add_pos_to_hash(corner);
+						add_pos_to_hash(corner, needs_depth);
 					}
 				}
 			if (!n->get_has_subdivied()) {
@@ -351,6 +372,11 @@ void DdgiTesting::build_world()
 		};
 		recurse2(recurse2, tree.root_node.get(), 0);
 		printf("$$$$$$$ probes: %d\n", int(hash_to_pos.size()));
+		int probes_that_need_depth = 0;
+		for (auto& [key, val] : hash_to_pos)
+			probes_that_need_depth += val.needs_depth;
+		printf("$$$$$ needs depth: %d\n", probes_that_need_depth);
+
 		mb.End();
 
 		//auto handle = idraw->get_scene()->register_meshbuilder();
@@ -385,10 +411,25 @@ void DdgiTesting::execute()
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, references->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, materials->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ray_buffer->get_internal_handle());
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, draw.buf.lighting_uniforms->get_internal_handle());
+
+
+	//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, indirection->get_internal_handle());
+
 	auto& device = draw.get_device();
 
+
+
+	IGraphicsBuffer* invalid_count_buf{};
+	invalid_count_buf = IGraphicsDevice::inst->create_buffer({});
+	int counter_num = 0;
+	invalid_count_buf->upload(&counter_num, sizeof(int));
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, invalid_count_buf->get_internal_handle());
+
+	Random r(13);
 	bool do_irrad_calcs = false;
-	for (int i = 0; i < 4; i++) {
+	for (int i = 0; i < 8; i++) {
 		device.bind_texture(5, draw.scene.skylights.at(0).skylight.generated_cube->get_internal_render_handle());
 
 		device.bind_texture(2, probe_irradiance->get_internal_handle());
@@ -401,16 +442,21 @@ void DdgiTesting::execute()
 		device.shader().set_vec3("volume_origin", ddgiVolumeOrigin);
 		device.shader().set_vec3("volume_spacing", ddgiDensity);
 		device.shader().set_ivec3("vol_grid", ddgiGRID);
+		device.shader().set_float("ray_sample_randomness", r.RandF(0,TWOPI));
+		device.shader().set_int("num_lights", draw.scene.light_list.objects.size());
 
 		const int total_probes = ddgiGRID.x * ddgiGRID.y * ddgiGRID.z;
 		const int groups = glm::ceil(total_probes / 64.f);
 
+		printf("trace %d\n", i);
 		glDispatchCompute(groups, 1, 1);
 
 		// then run gather
 		device.set_shader(gather_shader);
 		device.shader().set_ivec3("vol_grid", ddgiGRID);
 		device.shader().set_vec3("volume_spacing", ddgiDensity);
+		device.shader().set_int("num_runs_so_far", i);
+
 
 
 		glBindImageTexture(0, probe_irradiance->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
@@ -420,15 +466,24 @@ void DdgiTesting::execute()
 		glCheckError();
 		//glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 		//glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
+		printf("gather %d\n", i);
 		glDispatchCompute(groups, 1, 1);
 		glCheckError();
+
+		if (i == 0) {
+			glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, invalid_count_buf->get_internal_handle());
+			int* ptr = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+			int result = *ptr;
+			glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+			printf("invalid probes: %d\n", result);
+		}
+
 
 		float time = GetTime() - start;
 		sys_print(Debug, "time: %f\n", time);
 		do_irrad_calcs = true;
 	}
-
 	{
 		CreateBufferArgs args;
 		args.flags = GraphicsBufferUseFlags::BUFFER_USE_AS_STORAGE_READ;
@@ -462,6 +517,8 @@ void DdgiTesting::execute()
 		device.shader().set_int("num_cubemap_volumes", infos.size());
 		const int total_probes = ddgiGRID.x * ddgiGRID.y * ddgiGRID.z;
 		const int groups = glm::ceil(total_probes / 64.f);
+
+
 		glDispatchCompute(groups, 1, 1);
 
 
@@ -473,6 +530,7 @@ void DdgiTesting::execute()
 }
 void draw_model_simple_no_material(Model* model);
 #include "Render/ModelManager.h"
+ConfigVar draw_real_grid("draw_real_grid", "2", CVAR_INTEGER|CVAR_UNBOUNDED, "");
 void DdgiTesting::render_probes()
 {
 	if (!verts) {
@@ -502,22 +560,25 @@ void DdgiTesting::render_probes()
 	device.bind_texture_ptr(0, probe_irradiance);
 	device.shader().set_ivec3("vol_grid", ddgiGRID);
 
-	//for (auto& [_, p] : hash_to_pos) {
-	//	glm::mat4 tr = glm::translate(glm::mat4(1), p);
-	//	device.shader().set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
-	//	device.shader().set_ivec3("probe_coord", { 0,0,0 });
-	//
-	//	draw_model_simple_no_material(m);
-	//}
+	if (draw_real_grid.get_integer()==1) {
+		for (auto& [_, p] : hash_to_pos) {
+			glm::mat4 tr = glm::translate(glm::mat4(1), p.v);
+			device.shader().set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
+			device.shader().set_ivec3("probe_coord", { 0,0,0 });
 
-	for (int x = 0; x < ddgiGRID.x; x++) {
-		for (int y = 0; y < ddgiGRID.y; y++) {
-			for (int z = 0; z < ddgiGRID.z; z++) {
-				glm::mat4 tr = glm::translate(glm::mat4(1), glm::vec3(x, y, z) * ddgiDensity + ddgiVolumeOrigin);
-				device.shader().set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
-				device.shader().set_ivec3("probe_coord", { x,y,z });
-	
-				draw_model_simple_no_material(m);
+			draw_model_simple_no_material(m);
+		}
+	}
+	else if(draw_real_grid.get_integer()==2){
+		for (int x = 0; x < ddgiGRID.x; x++) {
+			for (int y = 0; y < ddgiGRID.y; y++) {
+				for (int z = 0; z < ddgiGRID.z; z++) {
+					glm::mat4 tr = glm::translate(glm::mat4(1), glm::vec3(x, y, z) * ddgiDensity + ddgiVolumeOrigin);
+					device.shader().set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
+					device.shader().set_ivec3("probe_coord", { x,y,z });
+
+					draw_model_simple_no_material(m);
+				}
 			}
 		}
 	}

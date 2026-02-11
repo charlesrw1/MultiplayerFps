@@ -253,7 +253,7 @@ TraceOut trace_ray(vec3 ro, vec3 rd)
 // for sampling the sky
 layout(binding = 5) uniform samplerCube Skylight;
 
-const int NUM_RAYS = 256;
+const int NUM_RAYS = 128;
 
 uniform vec3  volume_origin;
 uniform vec3 volume_spacing;
@@ -271,6 +271,8 @@ uniform ivec3 vol_grid;
 
 // volume. (box, transform, probe dim)
 
+uniform float ray_sample_randomness = 0.0;
+
 
 vec3 RTXGISphericalFibonacci(float sampleIndex, float numSamples)
 {
@@ -278,6 +280,9 @@ vec3 RTXGISphericalFibonacci(float sampleIndex, float numSamples)
     float phi = 3.14159*2.0 * fract(sampleIndex * b);
     float cosTheta = 1.0 - (2.0 * sampleIndex + 1.0) * (1.0 / numSamples);
     float sinTheta = sqrt(clamp(1.f - (cosTheta * cosTheta),0.0,1.0));
+
+
+	phi += ray_sample_randomness;
 
     return vec3((cos(phi) * sinTheta), (sin(phi) * sinTheta), cosTheta);
 }
@@ -410,7 +415,8 @@ vec3 calculate_irradiance(vec3 direction, vec3 worldspace)
 		probe_texture_uv = get_irrad_probe_uv(octant_coords,adjacent_probe_coords);
 		
 		vec3 probe_irrad = texture(probe_irradiance, probe_texture_uv).rgb;
-		//probe_irrad = pow(probe_irrad, vec3(2.5));
+		float exponent = 2.2*0.5;
+		probe_irrad = pow(probe_irrad,vec3(exponent));	// half way back to linear from srgb
 		
 		irradiance += (weight*probe_irrad);
 		accum_weight += weight;
@@ -420,24 +426,173 @@ vec3 calculate_irradiance(vec3 direction, vec3 worldspace)
 	}
 	
 	irradiance *= (1.0/accum_weight);
+	irradiance*=irradiance;	// go back to linear
+	irradiance*= 2.0 * 3.1415;
 	
 	return irradiance;
 
 }
 uniform bool do_irrad_calcs = true;
+uniform int num_lights = 0;
+// FIXME SHAREDGPUTYPES
+struct LightingObjectUniforms {
+	mat4 transform;
+	mat4 lighting_view_proj;
+	vec4 position_radius;
+	vec4 light_color;
+	vec4 spot_normal;
+	vec4 atlas_offset;
+	float spot_angle;
+	float spot_inner;
+	float epsilon;
+	uint flags;
+};
+layout (binding = 11, std430) readonly buffer LightingObjectUniforms_Buffer {
+	LightingObjectUniforms light_objects[];
+};
+
+#define PI 3.1415927
+// ----------------------------------------------------------------------------
+float DistributionGGX(vec3 N, vec3 H, float roughness)
+{
+    float a = roughness*roughness;
+    float a2 = a*a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH*NdotH;
+
+    float nom   = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return nom / max(denom,0.0000001);
+}
+// ----------------------------------------------------------------------------
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+
+    float nom   = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return nom / denom;
+}
+// ----------------------------------------------------------------------------
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+// ----------------------------------------------------------------------------
+vec3 fresnelSchlick(float cosTheta, vec3 F0)
+{
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+vec3 FresnelSchlickRougness(float cosTheta, vec3 F0, float roughness)
+{
+	 return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+vec3 pbr_calculate(vec3 LightColor, vec3 LighDir, vec3 worldspace, vec3 Albedo, float Roughness, float Metalness, vec3 Normal)
+{
+	vec3 view_pos = g.viewpos_time.xyz;
+	vec3 view_front = g.viewfront.xyz;
+
+	vec3 V = normalize(view_pos-worldspace);
+	
+	vec3 R = reflect(-V,Normal);
+	vec3 F0 = vec3(0.04);
+	F0 = mix(F0,Albedo,Metalness);
+
+	vec3 Lo = vec3(0.0);
+    vec3 H = normalize(V + LighDir);
+    vec3 radiance = LightColor;
+
+        // Cook-Torrance BRDF
+        float NDF = DistributionGGX(Normal, H, Roughness);   
+        float G   = GeometrySmith(Normal, V, LighDir, Roughness);    
+        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);        
+        
+        vec3 numerator    = NDF * G * F;
+        float denominator = 4.0 * max(dot(Normal, V), 0.0) * max(dot(Normal, LighDir), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
+        vec3 specular = numerator / 1.0;
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - Metalness;	                
+          
+		float NdotL = max(dot(Normal, LighDir), 0.0);        
+
+		// add to outgoing radiance Lo
+		Lo += (kD * Albedo / PI + specular) * radiance * NdotL;
+	
+	return Lo;
+}
+
+
+
+
+vec3 evaluate_punctual_lights(vec3 worldspace, vec3 albedo, vec3 normal_t) {
+vec3 output_light_accum = vec3(0.0);
+	for(int light_index=0;light_index<num_lights;light_index++) {
+
+	
+		vec4 _position_radius = light_objects[light_index].position_radius;
+		vec3 position = _position_radius.xyz;
+		float radius = _position_radius.w;
+		vec3 color = light_objects[light_index].light_color.xyz;
+		bool is_spot_light = bool(light_objects[light_index].flags);
+		vec3 spot_normal =  light_objects[light_index].spot_normal.xyz;
+		float spot_angle = light_objects[light_index].spot_angle;
+		float spot_inner = light_objects[light_index].spot_inner;
+
+
+		
+		float distance_to_light = length(position-worldspace);
+		if(distance_to_light>radius)
+			continue;
+		
+		vec3 L = (position - worldspace)/distance_to_light;
+		
+		float distance_to_light_2 = distance_to_light*distance_to_light;
+		float radius_2 = radius*radius;
+		float attenuation = 1.0/distance_to_light_2 * clamp(1-distance_to_light_2/radius_2,0.0,1.0);
+		
+		vec3 out_color = pbr_calculate(color, L, worldspace, albedo.xyz, 1, 0, normal_t.xyz);
+		
+		if(is_spot_light) {
+			float angle = dot(-L, spot_normal);
+		#ifndef COOKIE
+			attenuation *= clamp((-spot_angle+angle) / (spot_inner-spot_angle), 0.0, 1.0);    
+		#endif
+			
+		}
+		
+		output_light_accum += out_color * attenuation;
+	}
+	return output_light_accum;
+	}
+
 
 vec3 evaluate_lighting(vec3 pos, vec3 normal, vec3 albedo)
 {
 	vec3 irrad = vec3(0.0);
 	if(do_irrad_calcs) {
-		irrad =  calculate_irradiance(normal,pos)*albedo;
+		irrad =  calculate_irradiance(normal,pos);
 		
 	}
-	//vec3 sun_dir = normalize(vec3(1,-1,1));
-	//TraceOut outsun = trace_ray(pos+normal*0.01, -sun_dir);
-	//if(outsun.t > 1000) {
-	//	irrad += albedo*1.0;
-	//}
+	vec3 sun_dir = normalize(vec3(1,-1,1));
+	TraceOut outsun = trace_ray(pos, -sun_dir);
+	if(outsun.t < 0) {
+		irrad += max(dot(-sun_dir,normal),0.0)*0.0;
+	}
+	
+	irrad = irrad * albedo / 3.14159;
+	irrad += evaluate_punctual_lights(pos,albedo,normal);
+	
 	return irrad;
 }
 
@@ -478,12 +633,10 @@ void main()
 			incoming_radiance = textureLod(Skylight,ray_dir, 2.0).rgb;
 		}
 		else {
+			vec3 pos_hit = probe_pos+ray_dir*hit_result.t;
+			vec3 pos_to_eval_from = pos_hit - ray_dir*0.03 + hit_result.hit_normal * 0.03;
 			out_distance = hit_result.t;
-			incoming_radiance = evaluate_lighting(
-			probe_pos+ray_dir*hit_result.t,
-			hit_result.hit_normal, 
-			Albedos.data[hit_result.mat_hit].xyz
-			);
+			incoming_radiance = evaluate_lighting(pos_to_eval_from,hit_result.hit_normal, Albedos.data[hit_result.mat_hit].xyz);
 		}
 		
 		// have lighting, have depth

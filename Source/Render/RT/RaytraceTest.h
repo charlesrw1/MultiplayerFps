@@ -55,6 +55,9 @@ public:
 	program_handle trace_shader{};
 	program_handle gather_shader{};
 
+	IGraphicsBuffer* indirection{};
+
+
 	program_handle get_best_cubemap_shader{};
 
 
