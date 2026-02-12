@@ -125,6 +125,7 @@ Color32 get_color_of_material_for_export(const MaterialInstance* m);
 struct PosAndValue {
 	glm::vec3 v{};
 	bool needs_depth = false;
+	glm::ivec2 atlas_index;
 };
 static std::unordered_map<uint64_t, PosAndValue> hash_to_pos;
 void DdgiTesting::build_world()
@@ -300,12 +301,14 @@ void DdgiTesting::build_world()
 	{
 		indirection = IGraphicsDevice::inst->create_buffer(args);
 		std::vector<int> indicies;
-		const int count = ddgiGRID.x * ddgiGRID.y;
+		const int count = ddgiGRID.x * ddgiGRID.y * ddgiGRID.z;
 		Random r(13);
 		for (int i = 0; i < count; i++) {
-			indicies.push_back(r.RandI(0, count - 1));
+			indicies.push_back(i);
 		}
 		indirection->upload(indicies.data(), indicies.size() * sizeof(int));
+
+		
 
 	};
 
@@ -415,7 +418,6 @@ void DdgiTesting::execute()
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, draw.buf.lighting_uniforms->get_internal_handle());
 
 
-	//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, indirection->get_internal_handle());
 
 	auto& device = draw.get_device();
 
@@ -429,7 +431,7 @@ void DdgiTesting::execute()
 
 	Random r(13);
 	bool do_irrad_calcs = false;
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < 3; i++) {
 		device.bind_texture(5, draw.scene.skylights.at(0).skylight.generated_cube->get_internal_render_handle());
 
 		device.bind_texture(2, probe_irradiance->get_internal_handle());
@@ -624,6 +626,8 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, buf->get_internal_handle());
 
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, indirection->get_internal_handle());
+
 	draw.bind_texture_ptr(0, draw.tex.scene_gbuffer0);
 	draw.bind_texture_ptr(1, draw.tex.scene_gbuffer1);
 	draw.bind_texture_ptr(2, draw.tex.scene_gbuffer2);
@@ -646,6 +650,8 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 	draw.bind_texture(7, EnviornmentMapHelper::get().integrator.get_texture());
 	draw.bind_texture(8, draw.scene.cubemap_array->get_internal_handle());
 	draw.bind_texture(9, draw.scene.skylights.at(0).skylight.generated_cube->get_internal_render_handle());
+
+
 
 
 	draw.shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());

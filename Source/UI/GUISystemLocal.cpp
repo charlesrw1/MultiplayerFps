@@ -101,9 +101,11 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 		if (editorState->has_tool() && editorState->wants_scene_viewport_menu_bar())
 			flags |= ImGuiWindowFlags_MenuBar;
 
+
+
 		if (ImGui::Begin("Scene viewport", nullptr, flags)) {
 
-			if (set_focus_to_viewport_next_tick) {
+			if (set_focus_to_viewport_next_tick || UiSystem::inst->is_game_capturing_mouse()) {
 				ImGui::SetWindowFocus();
 				set_focus_to_viewport_next_tick = false;
 			}
