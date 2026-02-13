@@ -36,6 +36,7 @@
 #include <variant>
 #include "UI/GUISystemPublic.h"
 #include "LevelSerialization/SerializeNew.h"
+#include "DraggableHandles.h"
 extern ConfigVar g_mousesens;
 
 enum TransformType
@@ -163,6 +164,67 @@ private:
 };
 #endif
 
+class IInputReciever
+{
+public:
+	virtual void on_focused_tick() {}
+};
+
+#include "Framework/MapUtil.h"
+enum class VHResult {
+	Unchanged,
+	Changing,
+	Finished
+};
+class EditorDoc;
+class EViewportHandles : public IInputReciever
+{
+public:
+	EViewportHandles(EditorDoc& doc) : doc(doc) {}
+	VHResult point_handle(int64_t id, glm::vec3& inout_position) {
+		auto& item = items[id];
+		item.pos = inout_position;
+		if (item.mytype == ActiveItem::NEWLY_MADE) {
+		}
+		item.was_wanted_this_frame = true;
+		return {};
+	}
+	VHResult box_handles(int64_t id, const glm::mat4& box_center, glm::vec3& boxmin, glm::vec3& boxmax);
+	void tick();
+private:
+	EditorDoc& doc;
+	struct ActiveItem {
+		enum type {
+			NEWLY_MADE,
+			POINT,
+			BOX
+		}mytype;
+		// random data
+		glm::vec3 pos{};
+		glm::mat4 transform{};
+		glm::vec3 boxmin{};
+		glm::vec3 boxmax{};
+
+		bool was_wanted_this_frame = false;
+	};
+
+	std::unordered_map<int64_t, ActiveItem> items;
+
+	struct Dragging {
+		int64_t item = -1;
+		int index = 0;	// for boxes
+		bool set_next_frame = false;
+	};
+	bool has_item_being_dragged() const {
+		return dragging_state.item != -1;
+	}
+
+
+	Dragging dragging_state;
+	EntityPtr hacked_entity_MFER;	// forgive me lord for i have sinned
+	std::vector<EntityPtr> cached_selection_to_return;
+};
+
 class EdPropertyGrid
 {
 public:
@@ -274,18 +336,19 @@ public:
 		return glm::ortho(-width, width, -width * aspect_ratio, width * aspect_ratio,0.001f, 1000.f);
 	}
 }; 
-
-class EditorCamera
+class EditorInputs;
+class EditorCamera : public IInputReciever
 {
 public:
 	static EditorCamera* inst;
-	EditorCamera() {
+	EditorCamera(EditorInputs& inputs) : inputs(inputs) {
 		inst = this;
 	}
+	EditorInputs& inputs;
 	~EditorCamera() {
 		inst = nullptr;
 	}
-
+	void on_focused_tick() final;
 	bool get_is_using_ortho() const {
 		return mode == OrthoMode;
 	}
@@ -325,6 +388,8 @@ public:
 
 	MulticastDelegate<> on_ortho_state_change;
 private:
+	bool do_update_flag = false;
+
 	glm::vec3 get_orbit_target() const {
 		return camera.orbit_target;
 	}
@@ -519,7 +584,7 @@ private:
 	std::unordered_set<uint64_t> selected_entity_handles;
 };
 
-class ManipulateTransformTool
+class ManipulateTransformTool : public IInputReciever
 {
 public:
 	ManipulateTransformTool(EditorDoc& ed_doc);
@@ -527,6 +592,7 @@ public:
 	bool is_hovered();
 	bool is_using();
 	void check_input();
+	void on_focused_tick() final;
 
 	void stop_using_custom() {
 		if (is_using_for_custom) {
@@ -555,7 +621,10 @@ public:
 	bool get_is_using_for_custom() const {
 		return is_using_for_custom;
 	}
-
+	void set_force_axis_mask(int i) {
+		reset_group_to_pre_transform();
+		axis_mask = i;
+	}
 
 	void set_force_gizmo_on(bool b) {
 		force_gizmo_on = b;
@@ -622,13 +691,18 @@ private:
 	EditorDoc& ed_doc;
 };
 
-struct DragDetector
+struct DragDetector : public IInputReciever
 {
+	DragDetector(EditorDoc& doc) :doc(doc) {}
+
 	MulticastDelegate<Rect2d> on_drag_end;
+	void on_focused_tick() final;
 	void tick(bool can_start_drag);
 	bool get_is_dragging() const;
 	Rect2d get_drag_rect() const;
 private:
+	void end_drag_func();
+	EditorDoc& doc;
 	bool is_dragging = false;
 	int mouseClickX = 0;
 	int mouseClickY = 0;
@@ -655,7 +729,13 @@ private:
 };
 
 #include "Render/DrawPublic.h"
-class FoliagePaintTool {
+
+class IEditorMode {
+public:
+	virtual void tick() = 0;
+};
+
+class FoliagePaintTool : public IInputReciever , public IEditorMode  {
 public:
 	FoliagePaintTool(EditorDoc& doc) : doc(doc), ran(17) {}
 	~FoliagePaintTool() {
@@ -675,7 +755,7 @@ private:
 	EntityPtr orb_cursor;
 };
 
-class DecalStampTool {
+class DecalStampTool : public IInputReciever , public IEditorMode {
 public:
 	DecalStampTool(EditorDoc& doc) : doc(doc) {}
 	~DecalStampTool() {
@@ -688,6 +768,45 @@ private:
 	float depth = 1.0;
 	EntityPtr preview;
 	EditorDoc& doc;
+};
+// the default tool
+class SelectionMode : public IEditorMode {
+public:
+	SelectionMode(EditorDoc& doc) :doc(doc) {}
+	void tick();
+	EditorDoc& doc;
+};
+
+class EditorInputs {
+public:
+	bool can_use_mouse_click() {
+		return mouse_click && !focused_item;
+	}
+	void eat_mouse_click() {
+	//	ASSERT(mouse_click);
+		mouse_click = false;
+	}
+	bool can_use_keyboard() {
+		return keyboard&&!focused_item&&!UiSystem::inst->blocking_keyboard_inputs();
+	}
+	void eat_keyboard() {
+		ASSERT(keyboard);
+		keyboard = false;
+	}
+	void reset() {
+		keyboard = mouse_click = true;
+	}
+	void set_focus(IInputReciever* recieve) {
+		focused_item = recieve;
+	}
+	IInputReciever* get_focused() {
+		return focused_item;
+	}
+private:
+	IInputReciever* focused_item = nullptr;
+	bool keyboard = true;
+	bool mouse_click = true;
+
 };
 
 template<class... Ts>
@@ -774,9 +893,6 @@ public:
 	int axis_bit_mask = 0;
 	glm::vec3 transform_tool_origin;
 	void transform_tool_update();
-	void enter_transform_tool(TransformType type);
-	void leave_transform_tool(bool apply_delta);
-	void set_plugin(const ClassTypeInfo* plugin_type) {}
 
 	Entity* spawn_entity();
 	Component* attach_component(const ClassTypeInfo* ti, Entity* e);
@@ -793,12 +909,17 @@ public:
 	std::unique_ptr<ManipulateTransformTool> manipulate;
 //	std::unique_ptr<ObjectOutliner> outliner;
 	std::unique_ptr<DragDropPreview> drag_drop_preview;
-
 	std::unique_ptr<FoliagePaintTool> foliage_tool;
 	std::unique_ptr<DecalStampTool> stamp_tool;
 	std::unique_ptr<EditorUILayout> gui;
+	std::unique_ptr<EViewportHandles> handle_dragger;
+	std::unique_ptr< SelectionMode> selection_mode;
+	IEditorMode* active_mode = nullptr;
 
 	View_Setup vs_setup;
+
+	EditorInputs inputs;
+
 
 	EditorCamera ed_cam;
 	bool get_using_ortho() const {

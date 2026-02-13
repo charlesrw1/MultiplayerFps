@@ -473,6 +473,7 @@
     <ClInclude Include="Source\Framework\SerializerJson2.h" />
     <ClInclude Include="Source\Game\Components\SpawnerComponenth.h" />
     <ClInclude Include="Source\Render\RT\RaytraceTest.h" />
+    <ClInclude Include="Source\LevelEditor\DraggableHandles.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

@@ -59,8 +59,7 @@ ConfigVar test1("test1", "200", CVAR_INTEGER, "", 0, 256);
 ConfigVar test2("test2", "200", CVAR_INTEGER, "", 0, 256);
 
 
-ConfigVar foliage_active("ed_foliage_active", "0", CVAR_BOOL, "");
-ConfigVar decal_active("ed_decal_active", "0", CVAR_BOOL, "");
+
 
 extern void export_godot_scene(const std::string& base_export_path);
 extern void export_level_scene();
@@ -207,7 +206,8 @@ void EditorDoc::init_new()
 	drag_drop_preview = std::make_unique<DragDropPreview>();
 	foliage_tool = std::make_unique<FoliagePaintTool>(*this);
 	stamp_tool = std::make_unique<DecalStampTool>(*this);
-
+	handle_dragger = std::make_unique<EViewportHandles>(*this);
+	selection_mode = std::make_unique<SelectionMode>(*this);
 
 	PropertyFactoryUtil::register_basic(grid_factory);
 	PropertyFactoryUtil::register_editor(*this, grid_factory);
@@ -558,7 +558,7 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 
 }
 
-EditorDoc::EditorDoc() {
+EditorDoc::EditorDoc() : ed_cam(inputs) , dragger(*this) {
 	assert(eng->get_level());
 }
 
@@ -585,6 +585,12 @@ void ManipulateTransformTool::check_input()
 		return;
 	//if (UiSystem::inst->blocking_keyboard_inputs())
 	//	return;
+
+	if (ed_doc.inputs.get_focused()&&ed_doc.inputs.get_focused() != this)
+		return;
+
+	if (ed_doc.inputs.can_use_mouse_click() && is_hovered())
+		ed_doc.inputs.eat_mouse_click();
 
 
 	const bool has_shift = Input::is_shift_down();
@@ -633,6 +639,25 @@ void ManipulateTransformTool::check_input()
 	}
 }
 
+void ManipulateTransformTool::on_focused_tick() {
+
+	if (Input::was_mouse_pressed(2)) {
+		if (get_force_gizmo_on()) {
+			reset_group_to_pre_transform();
+			set_force_gizmo_on(false);
+		}
+	}
+	else if (Input::was_mouse_pressed(0)) {
+		if (get_force_gizmo_on())
+			set_force_gizmo_on(false);
+	}
+
+	if (!is_using() && Input::was_mouse_released(0)) {	// some mf bs right here
+		ed_doc.inputs.set_focus(nullptr);
+		ed_doc.inputs.eat_mouse_click();
+	}
+}
+
 const Entity* select_outermost_entity(const Entity* in) {
 	const Entity* sel = in;
 	while (sel) {
@@ -673,7 +698,7 @@ void EditorDoc::do_mouse_selection(MouseSelectionAction action, const Entity* e,
 
 void EditorDoc::on_mouse_pick()
 {
-	if (selection_state->has_any_selected() && (manipulate->is_hovered() || manipulate->is_using()))
+	if (!inputs.can_use_mouse_click())
 		return;
 
 	auto pos = Input::get_mouse_pos();
@@ -701,6 +726,8 @@ void EditorDoc::on_mouse_pick()
 		else {
 			exit_eyedropper_mode();	// ?
 		}
+
+		inputs.eat_mouse_click();
 	}
 }
 
@@ -708,78 +735,46 @@ void EditorDoc::on_mouse_drag(int x, int y)
 {
 	
 }
-
-
-void EditorDoc::check_inputs()
+void SelectionMode::tick()
 {
-	const bool is_keyboard_blocked = UiSystem::inst->blocking_keyboard_inputs();
-	if (is_keyboard_blocked)
-		return;
-	if (UiSystem::inst->is_game_capturing_mouse())
-		return;
-	if (!UiSystem::inst->is_vp_hovered())
-		return;
+	doc.dragger.tick(true);
 
-	const bool tool_blocking = foliage_active.get_bool() || decal_active.get_bool();
-
-	if (Input::was_mouse_released(0) && !dragger.get_is_dragging() && !tool_blocking) {
-
-		if (UiSystem::inst->blocking_mouse_inputs()) {
-			if (UiSystem::inst->is_vp_hovered()) {
-				if (manipulate->get_force_gizmo_on()) {
-					manipulate->set_force_gizmo_on(false);
-				}
-				else {
-					on_mouse_pick();
-				}
-			}
-			else
-				sys_print(Warning, "vp not focused\n");
-		}
-		else
-			sys_print(Warning, "blocked input\n");
-	}
-	if (Input::was_mouse_pressed(2)) {
-		if (manipulate->get_force_gizmo_on()) {
-			manipulate->reset_group_to_pre_transform();
-			manipulate->set_force_gizmo_on(false);
-		}
+	if (!doc.inputs.can_use_mouse_click()) {
+		//printf("cant use mouse click\n");
+		return;
 	}
 
-	//if (UiSystem::inst->blocking_keyboard_inputs())
-	//	return;
-
+	const bool mouse1rel = Input::was_mouse_released(0);
 	const bool has_shift = Input::is_shift_down();
 	const bool has_ctrl = Input::is_ctrl_down();
 
-
+	auto selection_state = doc.selection_state.get();
+	auto command_mgr = doc.command_mgr.get();
+	if (mouse1rel && UiSystem::inst->is_vp_hovered()) {
+		doc.on_mouse_pick();
+	//	ASSERT(!doc.inputs.can_use_mouse_click());
+		//return;
+	}
+	
+	if (!UiSystem::inst->is_vp_focused()) {
+		return;
+	}
 	if (Input::was_key_pressed(SDL_SCANCODE_DELETE)) {
-		if (selection_state->has_any_selected()) {
-			auto selected_handles = selection_state->get_selection_as_vector();
+		if (doc.selection_state->has_any_selected()) {
+			auto selected_handles = doc.selection_state->get_selection_as_vector();
 			if (!selected_handles.empty()) {
-				RemoveEntitiesCommand* cmd = new RemoveEntitiesCommand(*this, selected_handles);
-				command_mgr->add_command(cmd);
+				RemoveEntitiesCommand* cmd = new RemoveEntitiesCommand(doc, selected_handles);
+				doc.command_mgr->add_command(cmd);
 			}
 		}
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_Z) && has_ctrl) {
-		command_mgr->undo();
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_S) && has_ctrl) {
-		save();
 	}
 	else if (Input::was_key_pressed(SDL_SCANCODE_D) && has_shift) {
 		if (selection_state->has_any_selected()) {
 			auto selected_handles = selection_state->get_selection_as_vector();;
-			DuplicateEntitiesCommand* cmd = new DuplicateEntitiesCommand(*this, selected_handles);
+			DuplicateEntitiesCommand* cmd = new DuplicateEntitiesCommand(doc, selected_handles);
 			command_mgr->add_command(cmd);
 		}
 	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_ESCAPE)) {
-		if (is_in_eyedropper_mode())
-			exit_eyedropper_mode();
-	}
-	else if (ed_cam.handle_events()) {}
 	else if (Input::was_key_pressed(SDL_SCANCODE_A)) {
 		// select all objects
 		auto& objs = eng->get_level()->get_all_objects();
@@ -809,6 +804,26 @@ void EditorDoc::check_inputs()
 		selection_state->clear_all_selected();
 		selection_state->add_entities_to_selection(selectThese);
 	}
+}
+
+
+void EditorDoc::check_inputs()
+{
+	const bool is_keyboard_blocked = UiSystem::inst->blocking_keyboard_inputs();
+	if (is_keyboard_blocked)
+		return;
+
+	const bool has_shift = Input::is_shift_down();
+	const bool has_ctrl = Input::is_ctrl_down();
+
+
+	if (Input::was_key_pressed(SDL_SCANCODE_Z) && has_ctrl) {
+		command_mgr->undo();
+	}
+	else if (Input::was_key_pressed(SDL_SCANCODE_S) && has_ctrl) {
+		save();
+	}
+	else if (ed_cam.handle_events()) {}
 }
 
 
@@ -842,7 +857,7 @@ ConfigVar draw_coords_under_mouse("draw_coords_under_mouse", "0", CVAR_BOOL,"");
 
 void EditorDoc::tick(float dt)
 {
-	ed_cam.tick(dt);
+	//ed_cam.tick(dt);
 	vs_setup = ed_cam.make_view();
 }
 
@@ -1137,16 +1152,47 @@ void ManipulateTransformTool::update()
 			}
 		}
 	}
+
+	if (is_using())
+		ed_doc.inputs.set_focus(this);
 }
 
 void EditorDoc::imgui_draw()
 {
-	const bool in_foliage_tool = foliage_active.get_bool();
+	{
+		for (int i = 0; i < 10; i++) {
+			glm::vec3 v{};
+			v.y = i;
+			handle_dragger->point_handle(i, v);
+		}
+	}
 
-	bool clicked = gui->draw();
-	if(!clicked)
-		check_inputs();
+
+	inputs.reset();
+
+	if (inputs.get_focused()) {
+		inputs.get_focused()->on_focused_tick();
+		// camera, dragger, manip, etc.
+	}
+	if (!active_mode)
+		active_mode = selection_mode.get();
+
+	ed_cam.tick(eng->get_dt());
 	manipulate->check_input();
+	handle_dragger->tick();
+	gui->draw();
+	active_mode->tick();	// foliage, decal
+	check_inputs();
+
+
+	//const bool in_foliage_tool = foliage_active.get_bool();
+
+	//handle_dragger->tick();
+
+	//manipulate->check_input();
+	//bool clicked = gui->draw();
+	//check_inputs();
+
 
 	int text_ofs = 0;
 	auto draw_text = [&](const char* str)  {
@@ -1176,17 +1222,11 @@ void EditorDoc::imgui_draw()
 
 	IEditorTool::imgui_draw();
 
-	dragger.tick(!manipulate->is_hovered()&&!manipulate->is_using()&&!in_foliage_tool);
 
 	command_mgr->execute_queued_commands();
 
 	drag_drop_preview->tick();
-	const bool in_decal = decal_active.get_bool();
-	if (in_decal)
-		stamp_tool->tick();
-
-	if (in_foliage_tool)
-		foliage_tool->tick();
+	
 
 
 	if (draw_coords_under_mouse.get_bool() && UiSystem::inst->is_vp_hovered()) {
@@ -1874,24 +1914,15 @@ void EditorDoc::hook_menu_bar()
 		ImGui::EndMenu();
 	}
 	if (ImGui::BeginMenu("Mode")) {
-		int cur_mode = 0;
-		if (foliage_active.get_bool()) cur_mode = 1;
-		if (decal_active.get_bool()) {
-			if (cur_mode == 0) cur_mode = 2;
-			else decal_active.set_bool(false);
-		}
-		if (ImGui::MenuItem("Default", nullptr, cur_mode == 0)) {
-			foliage_active.set_bool(false);
-			decal_active.set_bool(false);
 
+		if (ImGui::MenuItem("Default", nullptr, active_mode==selection_mode.get())) {
+			active_mode = selection_mode.get();
 		}
-		if (ImGui::MenuItem("Foliage Paint", nullptr, cur_mode == 1)) {
-			foliage_active.set_bool(true);
-			decal_active.set_bool(false);
+		if (ImGui::MenuItem("Foliage Paint", nullptr, active_mode==foliage_tool.get())) {
+			active_mode = foliage_tool.get();
 		}
-		if (ImGui::MenuItem("Decal Stamp", nullptr, cur_mode == 2)) {
-			foliage_active.set_bool(false);
-			decal_active.set_bool(true);
+		if (ImGui::MenuItem("Decal Stamp", nullptr, active_mode==stamp_tool.get())) {
+			active_mode = stamp_tool.get();
 		}
 		ImGui::EndMenu();
 	}
@@ -1904,6 +1935,22 @@ EditorUILayout::EditorUILayout(EditorDoc& doc) : doc(&doc) {
 		cube.rotation.begin_interpolate();
 		});
 
+}
+
+glm::ivec2 ndc_to_screen_coord(glm::vec3 ndc)
+{
+	ndc.y *= -1;
+	auto coordx = ndc.x * 0.5 + 0.5;
+	auto coordy = ndc.y * 0.5 + 0.5;
+
+	const auto vp_size = UiSystem::inst->get_vp_rect().get_size();
+	const auto vp_pos = UiSystem::inst->get_vp_rect().get_pos();
+
+
+	coordx *= vp_size.x;
+	coordy *= vp_size.y;
+
+	return { coordx,coordy };
 }
 
 bool EditorUILayout::draw() {
@@ -1933,8 +1980,7 @@ bool EditorUILayout::draw() {
 	int x = Input::get_mouse_pos().x;
 	int y = Input::get_mouse_pos().y;
 
-
-	if (doc->selection_state->has_any_selected() && (doc->manipulate->is_hovered() || doc->manipulate->is_using()))
+	if (!doc->inputs.can_use_mouse_click())
 		do_mouse_click = false;
 
 	if (!eng->get_level())
@@ -1949,7 +1995,7 @@ bool EditorUILayout::draw() {
 			return a.pos.z < b.pos.z;
 		});
 	const Entity* clicked = nullptr;
-	for (auto o : objs) {
+	for (const auto o : objs) {
 		string name = get_name_display_entity(o.e);
 
 		const int icon_size = 16;
@@ -1978,21 +2024,12 @@ bool EditorUILayout::draw() {
 		const int text_offset = (icon_size + 1) * icons.size();
 		size.w += text_offset;
 
+		const auto coord = ndc_to_screen_coord(o.pos);
+		const auto coordx = coord.x - size.w / 2;
+		const auto coordy = coord.y - size.h/2;
 
-		o.pos.y *= -1;
-		auto coordx = o.pos.x * 0.5 + 0.5;
-		auto coordy = o.pos.y * 0.5 + 0.5;
-
-		const auto vp_size = UiSystem::inst->get_vp_rect().get_size();
 		const auto vp_pos = UiSystem::inst->get_vp_rect().get_pos();
 
-
-		coordx *= vp_size.x;
-		coordy *= vp_size.y;
-		//coordx += vp_pos.x;
-		//coordy += vp_pos.y;
-		coordx -= size.w / 2;
-		coordy -= size.h / 2;
 
 		Color32 color = { 50,50,50,(uint8_t)editor_draw_name_text_alpha.get_integer() };
 		if (o.e->get_selected_in_editor())
@@ -2034,6 +2071,7 @@ bool EditorUILayout::draw() {
 
 	}
 	if (clicked) {
+		doc->inputs.eat_mouse_click();
 		if (Input::is_shift_down()) {
 			doc->do_mouse_selection(MouseSelectionAction::ADD_SELECT, clicked, true);
 		}
@@ -2188,23 +2226,42 @@ void EditorDoc::instantiate_into_scene(BaseUpdater* u)
 {
 	
 }
-
-
-void DragDetector::tick(bool can_start_drag)
+void DragDetector::end_drag_func()
 {
-	if (Input::was_mouse_pressed(0)) {
-		if (can_start_drag&&!is_dragging && UiSystem::inst->is_vp_hovered()) {
-			mouseClickX = Input::get_mouse_pos().x;
-			mouseClickY = Input::get_mouse_pos().y;
-			is_dragging = true;
-		}
-	}
 	if (!Input::is_mouse_down(0) && is_dragging) {
-		if(get_is_dragging())
+		if (get_is_dragging()) {
+			printf("end drag\n");
+			doc.inputs.set_focus(nullptr);
 			on_drag_end.invoke(get_drag_rect());
+		}
 		is_dragging = false;
 		mouseClickX = 0;
 		mouseClickY = 0;
+	}
+}
+
+void DragDetector::on_focused_tick()
+{
+	end_drag_func();
+}
+
+void DragDetector::tick(bool can_start_drag)
+{
+	const bool can_start = doc.inputs.can_use_mouse_click();
+
+	if (Input::was_mouse_pressed(0)) {
+		if (can_start &&!is_dragging && UiSystem::inst->is_vp_hovered()) {
+			mouseClickX = Input::get_mouse_pos().x;
+			mouseClickY = Input::get_mouse_pos().y;
+			is_dragging = true;
+			printf("start dragging\n");
+		}
+	}
+	end_drag_func();
+	if (get_is_dragging()) {
+		printf("start actual dragging\n");
+		doc.inputs.set_focus(this);
+		doc.inputs.eat_mouse_click();
 	}
 }
 
@@ -2369,7 +2426,7 @@ void FoliagePaintTool::tick()
 	const float exclusive_radius = foliage_exdensity.get_float();
 	const bool is_hovered = UiSystem::inst->is_vp_hovered();
 
-	if (!is_hovered) 
+	if (!is_hovered || !doc.inputs.can_use_mouse_click()) 
 		return;
 
 	const auto mouse = Input::get_mouse_pos();
@@ -2547,7 +2604,7 @@ void DecalStampTool::tick()
 
 	const bool is_hovered = UiSystem::inst->is_vp_hovered();
 
-	if (!is_hovered)
+	if (!is_hovered || !doc.inputs.can_use_mouse_click())
 		return;
 
 	const auto mouse = Input::get_mouse_pos();
@@ -2709,7 +2766,10 @@ void EditorCamera::imgui() {
 	t = ortho_camera.position;
 	ImGui::Text("ortho_pos: %f %f %f", t.x, t.y, t.z);
 }
-
+void EditorCamera::on_focused_tick()
+{
+	do_update_flag = true;
+}
 void EditorCamera::tick(float dt)
 {
 
@@ -2717,29 +2777,53 @@ void EditorCamera::tick(float dt)
 	float aratio = (float)window_sz.y / window_sz.x;
 	float fov = glm::radians(g_fov.get_float());
 
-	if (UiSystem::inst->is_vp_hovered() && Input::is_mouse_down(2))
-		UiSystem::inst->set_game_capture_mouse(true);
-	else
-		UiSystem::inst->set_game_capture_mouse(false);
 
-	{
-		camera.orbit_mode = (Input::is_mouse_down(1) && UiSystem::inst->is_vp_focused()) || Input::last_recieved_input_from_con();// && !UiSystem::inst->is_game_capturing_mouse();
-
-		{
-			if (get_is_using_ortho()) {
-				ortho_camera.update_from_input(aratio);
-				// get orbit target
-
-				const glm::vec3 diff = -camera.orbit_target + ortho_camera.position;
-				glm::vec3 side = ortho_camera.side;
-				glm::vec3 up = ortho_camera.up;
-				camera.orbit_target += glm::dot(side, diff) * side + glm::dot(up, diff) * up;
-			}
-			if (!get_is_using_ortho() && camera.can_take_input())
-				camera.update_from_input(window_sz.x, window_sz.y, aratio, fov);
+	if (inputs.can_use_mouse_click() && UiSystem::inst->is_vp_hovered()) {
+		if (get_is_using_ortho() && ortho_camera.can_take_input()) {
+			inputs.set_focus(this);
 		}
-
+		else if (Input::is_mouse_down(2)) {
+			UiSystem::inst->set_game_capture_mouse(true);
+			inputs.set_focus(this);
+		}
+		else if (Input::is_mouse_down(1)) {
+			inputs.set_focus(this);
+		}
 	}
+
+	if (do_update_flag) {
+
+
+		auto window_sz = UiSystem::inst->get_vp_rect().get_size();
+		float aratio = (float)window_sz.y / window_sz.x;
+		float fov = glm::radians(g_fov.get_float());
+
+		if (get_is_using_ortho()) {
+			ortho_camera.update_from_input(aratio);
+			// get orbit target
+
+			const glm::vec3 diff = -camera.orbit_target + ortho_camera.position;
+			glm::vec3 side = ortho_camera.side;
+			glm::vec3 up = ortho_camera.up;
+			camera.orbit_target += glm::dot(side, diff) * side + glm::dot(up, diff) * up;
+
+			if (!ortho_camera.can_take_input())
+				inputs.set_focus(nullptr);	// release focus
+		}
+		else {
+			camera.orbit_mode = (Input::is_mouse_down(1) && UiSystem::inst->is_vp_focused()) || Input::last_recieved_input_from_con();// && !UiSystem::inst->is_game_capturing_mouse();
+
+			camera.update_from_input(window_sz.x, window_sz.y, aratio, fov);
+
+			if (!Input::is_mouse_down(1) && !Input::is_mouse_down(2)) {
+				inputs.set_focus(nullptr);	// relase focus
+				UiSystem::inst->set_game_capture_mouse(false);
+			}
+
+		}
+		do_update_flag = false;
+	}
+
 	if (!get_is_using_ortho())
 		vs_setup = View_Setup(camera.position, camera.front, fov, 0.01, 100.0, window_sz.x, window_sz.y);
 	else {
@@ -2823,3 +2907,115 @@ View_Setup EditorCamera::InterpolateManager::get_interp(View_Setup current, glm:
 		return current;
 	}
 }
+#include "DraggableHandles.h"
+void EViewportHandles::tick()
+{
+	// delete items not updated
+	// state = not_dragging, dragging (1 item selected), just stopped dragging (update transform, return selection)
+	// for all handles, draw
+	// do mouse selection if not_dragging and mouse input not stolen
+
+	bool is_dragging_item = has_item_being_dragged();
+
+	// if dragging:
+	//		if mouse released: stop dragging
+	//		else: update dragging object from manip
+
+
+	const bool mouse_clicked = Input::was_mouse_pressed(0) && doc.inputs.can_use_mouse_click();
+
+	if (dragging_state.set_next_frame) {
+		dragging_state.set_next_frame = false;
+
+		doc.selection_state->clear_all_selected();
+		doc.selection_state->add_entities_to_selection(cached_selection_to_return);
+		doc.manipulate->reset_group_to_pre_transform();
+		cached_selection_to_return.clear();
+	}
+
+	if (is_dragging_item) {
+		Entity* hacked = hacked_entity_MFER.get();
+		if (!hacked) {
+			sys_print(Warning, "no hacked entity viewport handles");
+			hacked_entity_MFER = eng->get_level()->spawn_entity();
+			hacked_entity_MFER->dont_serialize_or_edit = true;
+		}
+		else {
+			items[dragging_state.item].pos = hacked->get_ws_position();
+		}
+		if (!Input::is_mouse_down(0)) {
+			// stop dragging
+			doc.manipulate->set_force_gizmo_on(false);
+			is_dragging_item = false;
+			dragging_state = Dragging();
+			doc.manipulate->reset_group_to_pre_transform();
+
+		
+			dragging_state.set_next_frame = true;
+
+			// hacky ...
+			doc.inputs.set_focus(nullptr);
+		}
+		doc.inputs.eat_mouse_click();
+	}
+
+	auto delete_usued = [&]() {
+		std::vector<int64_t> unused;
+		for (auto& [key, value] : items) {
+			if (!value.was_wanted_this_frame) {
+				unused.push_back(key);
+			}
+			else
+				value.was_wanted_this_frame = false;
+		}
+		for (auto key : unused)
+			items.erase(key);
+	};
+	delete_usued();
+
+	int64_t want_item_select = -1;
+	Texture* texture = Texture::load("circle.png");
+	for (auto& [key, value] : items) {
+		glm::vec4 transformed_pos = doc.vs_setup.viewproj * glm::vec4(value.pos, 1.0);
+		transformed_pos = transformed_pos / transformed_pos.w;
+		if (transformed_pos.z < 0)
+			continue;
+		const glm::ivec2 sc = ndc_to_screen_coord(transformed_pos);
+
+		RectangleShape rect;
+		const int size = 14;
+		rect.rect = Rect2d(sc.x - size/2, sc.y - size/2,size,size);
+		rect.color = COLOR_WHITE;
+		rect.texture = texture;
+		
+		UiSystem::inst->window.draw(rect);
+		auto mouse_pos = Input::get_mouse_pos() - UiSystem::inst->get_vp_rect().get_pos();
+		if (mouse_clicked && rect.rect.is_point_inside(mouse_pos)) {
+			want_item_select = key;
+		}
+	}
+
+	if (!is_dragging_item&&want_item_select != -1) {
+		dragging_state.item = want_item_select;
+		cached_selection_to_return = doc.selection_state->get_selection_as_vector();
+
+		if (!hacked_entity_MFER) {
+			hacked_entity_MFER = eng->get_level()->spawn_entity();
+			hacked_entity_MFER->dont_serialize_or_edit = true;
+		}
+		hacked_entity_MFER->set_ws_position(items[want_item_select].pos);
+
+		doc.selection_state->set_select_only_this(hacked_entity_MFER.get());
+		doc.manipulate->reset_group_to_pre_transform();
+		doc.manipulate->set_force_gizmo_on(true);
+		doc.manipulate->set_force_op(ImGuizmo::OPERATION::TRANSLATE);
+		doc.manipulate->set_force_axis_mask(4);
+		doc.manipulate->reset_group_to_pre_transform();
+
+
+
+
+		doc.inputs.eat_mouse_click();
+	}
+}
+
