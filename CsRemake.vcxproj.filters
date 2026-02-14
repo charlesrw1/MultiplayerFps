@@ -386,7 +386,6 @@
     <ClInclude Include="Source\Render\Frustum.h" />
     <ClInclude Include="Source\Game\Entities\BikeEntity.h" />
     <ClInclude Include="Source\Game\Entities\BikeSystem.h" />
-    <ClInclude Include="Source\LevelEditor\CommandMgr.h" />
     <ClInclude Include="Source\UI\OnScreenLogGui.h" />
     <ClInclude Include="Source\Game\LevelAssets.h" />
     <ClInclude Include="Source\LevelEditor\Commands.h" />
@@ -464,7 +463,6 @@
     <ClInclude Include="Source\Framework\Range.h" />
     <ClInclude Include="Source\Framework\LuaColor.h" />
     <ClInclude Include="Source\Game\Components\RagdollComponent.h" />
-    <ClInclude Include="Source\LevelEditor\EditorStatic.h" />
     <ClInclude Include="Source\Render\IGraphsDevice.h" />
     <ClInclude Include="Source\Framework\GlBufferLock.h" />
     <ClInclude Include="Source\Framework\GlBuffers.h" />
@@ -473,7 +471,6 @@
     <ClInclude Include="Source\Framework\SerializerJson2.h" />
     <ClInclude Include="Source\Game\Components\SpawnerComponenth.h" />
     <ClInclude Include="Source\Render\RT\RaytraceTest.h" />
-    <ClInclude Include="Source\LevelEditor\DraggableHandles.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -564,7 +561,6 @@
     <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
     <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
     <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
-    <ClCompile Include="Source\LevelEditor\CommandMgr.cpp" />
     <ClCompile Include="Source\LevelEditor\Commands.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
@@ -634,7 +630,6 @@
     <ClCompile Include="Source\Framework\SerializerJson2.cpp" />
     <ClCompile Include="Source\Game\Components\SpawnerComponenth.cpp" />
     <ClCompile Include="Source\Render\RT\RaytraceTest.cpp" />
-    <ClCompile Include="Source\Render\RT\Octtree.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

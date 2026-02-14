@@ -1,11 +1,69 @@
 #pragma once
 #ifdef EDITOR_BUILD
-#include "EditorDocLocal.h"
 #include "Assets/AssetDatabase.h"
 #include "Game/Components/MeshComponent.h"
 #include <memory>
 #include "Game/BaseUpdater.h"
 #include "Game/EntityPtr.h"
+#include "Game/Entity.h"
+#include <string>
+#include <vector>
+#include "Framework/Util.h"
+#include "GameEnginePublic.h"
+#include <stdexcept>
+#include "Framework/MulticastDelegate.h"
+#include <functional>
+#include "LevelSerialization/SerializeNew.h"
+#include <unordered_map>
+class Command
+{
+public:
+	virtual ~Command() { sys_print(Debug, "~Command\n"); }
+	virtual void execute() = 0;
+	virtual void undo() = 0;
+	virtual std::string to_string() = 0;
+	virtual bool is_valid() { return true; }
+};
+
+struct SDL_KeyboardEvent;
+class UndoRedoSystem
+{
+public:
+	UndoRedoSystem();
+	~UndoRedoSystem() {
+		clear_all();
+		for (auto& c : queued_commands)
+			delete c.c;
+		queued_commands.clear();
+	}
+
+	void on_key_event(const SDL_KeyboardEvent& k);
+
+	void clear_all();
+	// returns number of errord commands
+	int execute_queued_commands();
+
+	void add_command(Command* c) {
+		queued_commands.push_back({ c });
+	}
+	void add_command_with_execute_callback(Command* c, std::function<void(bool)> callback) {
+		queued_commands.push_back({ c, callback });
+	}
+
+	void undo();
+
+
+	MulticastDelegate<> on_command_execute_or_undo;
+	struct Queued {
+		Command* c = nullptr;
+		std::function<void(bool)> func;
+	};
+	std::vector<Queued> queued_commands;
+
+	const int HIST_SIZE = 128;
+	int index = 0;
+	std::vector<Command*> hist;
+};
 
 class CommandSerializeUtil
 {
@@ -13,7 +71,7 @@ public:
 	static std::unique_ptr<SerializedSceneFile> serialize_entities_text(EditorDoc& ed_doc, std::vector<EntityPtr> handles);
 };
 
-
+class EditorDoc;
 struct SavedCreateObj {
 	uint64_t eng_handle = 0;
 };
@@ -29,13 +87,7 @@ public:
 		return is_valid_flag;
 	}
 
-	void execute() final {
-		ASSERT(is_valid());
-		for (auto h : handles) {
-			h->destroy();
-		}
-		ed_doc.post_node_changes.invoke();
-	}
+	void execute() final;
 	void undo() final;
 	std::string to_string() final {
 		return "Remove Entity";
@@ -57,11 +109,7 @@ public:
 	bool is_valid() final { return true; }
 
 	void execute() final;
-	void undo() final {
-		handle->destroy();
-		ed_doc.post_node_changes.invoke();
-		handle = {};
-	}
+	void undo() final;
 	std::string to_string() final {
 		return "Create StaticMesh";
 	}
@@ -111,14 +159,7 @@ public:
 	EditorDoc& ed_doc;
 	TransformCommand(EditorDoc& ed_doc, const std::unordered_set<uint64_t>& selection, const std::unordered_map<uint64_t, glm::mat4>& pre_transforms);
 	void execute() final;
-	void undo() final {
-		for (auto& t : transforms) {
-			if (t.ptr.get()) {
-				t.ptr->set_ws_transform(t.pre_transform);
-			}
-		}
-		ed_doc.selection_state->on_selection_changed.invoke();	// hack
-	}
+	void undo() final;
 	std::string to_string() final {
 		return "Transform Entities";
 	}
@@ -143,13 +184,7 @@ public:
 	}
 
 	void execute() final;
-	void undo() final {
-		for (auto h : handles) {
-			h->destroy();
-		}
-
-		ed_doc.post_node_changes.invoke();
-	}
+	void undo() final;
 	std::string to_string() final {
 		return "Duplicate Entity";
 	}
@@ -172,20 +207,8 @@ public:
 	bool is_valid() final {
 		return entPtr;
 	}
-	void execute() final {
-		auto e = entPtr.get();
-		if (!e || !e->get_parent()) return;
-		e->get_parent()->move_child_entity_index(e, to_position);
-
-		ed_doc.post_node_changes.invoke();
-	}
-	void undo() final {
-		auto e = entPtr.get();
-		if (!e || !e->get_parent()) return;
-		e->get_parent()->move_child_entity_index(e, from_position);
-
-		ed_doc.post_node_changes.invoke();
-	}
+	void execute() final;
+	void undo() final;
 	std::string to_string() final {
 		return "MovePositionInHeirarchy";
 	}
@@ -203,31 +226,9 @@ public:
 		ASSERT(component_type->is_a(Component::StaticType));
 		info = component_type;
 	}
-	void execute() final {
-		ASSERT(comp_handle == 0);
-		auto e = ent.get();
-		if (!e) {
-			sys_print(Warning, "no entity in createcomponentcommand\n");
-			return;
-		}
-		auto ec = ed_doc.attach_component(info, e);
-		comp_handle = ec->get_instance_id();
-		post_create(ec);
-
-		ed_doc.on_component_created.invoke(ec);
-	}
-	virtual void post_create(Component* ec) {
-	}
-	void undo() final {
-		ASSERT(comp_handle != 0);
-		auto obj = eng->get_object(comp_handle);
-		ASSERT(obj->is_a<Component>());
-		auto ec = (Component*)obj;
-		auto id = ec->get_instance_id();
-		ec->destroy();
-		ed_doc.on_component_deleted.invoke(id);
-		comp_handle = 0;
-	}
+	void execute() final;
+	virtual void post_create(Component* ec);
+	void undo() final;
 	std::string to_string() override {
 		return "Create Component";
 	}
@@ -265,11 +266,7 @@ public:
 		if (obj)ptr->destroy();
 		obj = EntityPtr();
 	}
-	void execute() final {
-		Entity* e = doc.spawn_entity();
-		ptr = e;
-		post_create(e);
-	}
+	void execute() final;
 
 	std::function<void(Entity*)> post_create;
 	EditorDoc& doc;

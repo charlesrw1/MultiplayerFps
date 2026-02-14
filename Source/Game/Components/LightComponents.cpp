@@ -232,7 +232,7 @@ void CubemapComponent::start() {
 		editor_meshbuilder = get_owner()->create_component<MeshBuilderComponent>();
 		editor_meshbuilder->dont_serialize_or_edit = true;
 		editor_meshbuilder->use_background_color = true;
-		editor_meshbuilder->use_transform = false;
+		editor_meshbuilder->use_transform = true;
 
 		auto meshEntity = eng->get_level()->spawn_entity();
 		auto mesh = meshEntity->create_component<MeshComponent>();
@@ -269,8 +269,8 @@ void CubemapComponent::update_editormeshbuilder()
 	if (!editor_meshbuilder)
 		return;
 	glm::vec3 scale = get_owner()->get_ls_scale();
-	auto boxmin = get_ws_position() - scale * 0.5f;
-	auto boxmax = get_ws_position() + scale * 0.5f;
+	auto boxmin = vec3(-0.5f);
+	auto boxmax = vec3(0.5f);
 	editor_meshbuilder->mb.Begin();
 	editor_meshbuilder->mb.PushLineBox(boxmin, boxmax, COLOR_GREEN);
 	editor_meshbuilder->mb.End();

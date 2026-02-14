@@ -1,6 +1,5 @@
 #ifdef EDITOR_BUILD
 #include "EditorDocLocal.h"
-#include "EditorDocLocal.h"
 #include "imgui.h"
 #include "glad/glad.h"
 #include "glm/gtx/euler_angles.hpp"
@@ -57,7 +56,7 @@ ConfigVar ed_scale_snap_exp("ed_scale_snap_exp", "3", CVAR_FLOAT, "editor scale 
 ConfigVar ed_force_guizmo("ed.force_guizmo", "0", CVAR_BOOL, "");
 ConfigVar test1("test1", "200", CVAR_INTEGER, "", 0, 256);
 ConfigVar test2("test2", "200", CVAR_INTEGER, "", 0, 256);
-
+ConfigVar ed_show_box_handles("ed.show_box_handles", "0", CVAR_BOOL, "");
 
 
 
@@ -208,7 +207,7 @@ void EditorDoc::init_new()
 	stamp_tool = std::make_unique<DecalStampTool>(*this);
 	handle_dragger = std::make_unique<EViewportHandles>(*this);
 	selection_mode = std::make_unique<SelectionMode>(*this);
-
+	draw_handles = std::make_unique<DrawHandlesObject>(*this);
 	PropertyFactoryUtil::register_basic(grid_factory);
 	PropertyFactoryUtil::register_editor(*this, grid_factory);
 
@@ -541,7 +540,6 @@ EditorDoc* EditorDoc::create_scene(opt<string> scene)
 }
 
 void EditorDoc::init_for_scene(opt<string> scene) {
-	edit_category = EditCategory::EDIT_SCENE;
 	init_new();
 	validate_fileids_before_serialize();
 
@@ -645,14 +643,17 @@ void ManipulateTransformTool::on_focused_tick() {
 		if (get_force_gizmo_on()) {
 			reset_group_to_pre_transform();
 			set_force_gizmo_on(false);
+			ed_doc.inputs.set_focus(nullptr);
+			ed_doc.inputs.eat_mouse_click();
 		}
 	}
-	else if (Input::was_mouse_pressed(0)) {
-		if (get_force_gizmo_on())
+	if (Input::was_mouse_pressed(0)) {
+		if (get_force_gizmo_on()) {
 			set_force_gizmo_on(false);
+		}
 	}
 
-	if (!is_using() && Input::was_mouse_released(0)) {	// some mf bs right here
+	if (!is_using() && !Input::is_mouse_down(0)) {	// some mf bs right here
 		ed_doc.inputs.set_focus(nullptr);
 		ed_doc.inputs.eat_mouse_click();
 	}
@@ -739,18 +740,18 @@ void SelectionMode::tick()
 {
 	doc.dragger.tick(true);
 
-	if (!doc.inputs.can_use_mouse_click()) {
-		//printf("cant use mouse click\n");
-		return;
-	}
 
 	const bool mouse1rel = Input::was_mouse_released(0);
 	const bool has_shift = Input::is_shift_down();
 	const bool has_ctrl = Input::is_ctrl_down();
 
+
+	if (doc.inputs.get_focused())
+		return;
+
 	auto selection_state = doc.selection_state.get();
 	auto command_mgr = doc.command_mgr.get();
-	if (mouse1rel && UiSystem::inst->is_vp_hovered()) {
+	if (mouse1rel && UiSystem::inst->is_vp_hovered() && doc.inputs.can_use_mouse_click()) {
 		doc.on_mouse_pick();
 	//	ASSERT(!doc.inputs.can_use_mouse_click());
 		//return;
@@ -759,6 +760,8 @@ void SelectionMode::tick()
 	if (!UiSystem::inst->is_vp_focused()) {
 		return;
 	}
+
+
 	if (Input::was_key_pressed(SDL_SCANCODE_DELETE)) {
 		if (doc.selection_state->has_any_selected()) {
 			auto selected_handles = doc.selection_state->get_selection_as_vector();
@@ -881,28 +884,6 @@ glm::vec3 project_onto_line(glm::vec3 a, glm::vec3 b, glm::vec3 p)
 	return a + dot(ap, ab) / dot(ab, ab) * ab;
 }
 
-void EditorDoc::transform_tool_update()
-{
-	glm::vec3 planes[3];
-	float planed[3];
-
-	planes[0] = glm::vec3(1, 0, 0);
-	planes[1] = glm::vec3(0, 1, 0);
-	planes[2] = glm::vec3(0, 0, 1);
-	for (int i = 0; i < 3; i++) {
-		planed[i] = -glm::dot(planes[i], transform_tool_origin);
-	}
-
-	// now find the intersection point
-	bool xaxis = axis_bit_mask & 1;
-	bool yaxis = axis_bit_mask & (1 << 1);
-	bool zaxis = axis_bit_mask & (1 << 2);
-	bool xandy = xaxis && yaxis;
-	bool yandz = yaxis && zaxis;
-	bool zandx = zaxis && xaxis;
-
-
-}
 
 
 uint32_t color_to_uint(Color32 c) {
@@ -1159,15 +1140,6 @@ void ManipulateTransformTool::update()
 
 void EditorDoc::imgui_draw()
 {
-	{
-		for (int i = 0; i < 10; i++) {
-			glm::vec3 v{};
-			v.y = i;
-			handle_dragger->point_handle(i, v);
-		}
-	}
-
-
 	inputs.reset();
 
 	if (inputs.get_focused()) {
@@ -1183,7 +1155,7 @@ void EditorDoc::imgui_draw()
 	gui->draw();
 	active_mode->tick();	// foliage, decal
 	check_inputs();
-
+	draw_handles->tick();
 
 	//const bool in_foliage_tool = foliage_active.get_bool();
 
@@ -1336,7 +1308,13 @@ void EditorDoc::hook_pre_scene_viewport_draw()
 			}
 		}
 
-		ImGui::ImageButton(boundingbox, size);
+		{
+			ImVec4 tintColor(0.6,0.6,0.6,1.0);
+			if (ed_show_box_handles.get_bool()) tintColor = ImVec4(1.1, 1.1, 1.1, 1);
+			if (ImGui::ImageButton(boundingbox, size, ImVec2(), ImVec2(1, 1),-1, ImVec4(), tintColor)){
+				ed_show_box_handles.set_bool(!ed_show_box_handles.get_bool());
+				}
+		}
 
 		auto& drawtext = editor_draw_name_text;
 		push_active_style(drawtext.get_bool());
@@ -2466,7 +2444,7 @@ void FoliagePaintTool::tick()
 
 			int count = std::min(toPlace, (int)indicies.size());
 
-			// Partial Fisher–Yates shuffle
+			// Partial Fisherï¿½Yates shuffle
 			for (int i = 0; i < count; i++) {
 				int r = ran.RandI(i, (int)indicies.size() - 1);
 				std::swap(indicies[i], indicies[r]);
@@ -2791,6 +2769,9 @@ void EditorCamera::tick(float dt)
 		}
 	}
 
+	if (get_is_using_ortho() && inputs.get_focused() == nullptr && Input::get_mouse_scroll() != 0)
+		do_update_flag = true;	// hack
+
 	if (do_update_flag) {
 
 
@@ -2811,7 +2792,7 @@ void EditorCamera::tick(float dt)
 				inputs.set_focus(nullptr);	// release focus
 		}
 		else {
-			camera.orbit_mode = (Input::is_mouse_down(1) && UiSystem::inst->is_vp_focused()) || Input::last_recieved_input_from_con();// && !UiSystem::inst->is_game_capturing_mouse();
+			camera.orbit_mode = (Input::is_mouse_down(1) && UiSystem::inst->is_vp_hovered()) || Input::last_recieved_input_from_con();// && !UiSystem::inst->is_game_capturing_mouse();
 
 			camera.update_from_input(window_sz.x, window_sz.y, aratio, fov);
 
@@ -2823,7 +2804,10 @@ void EditorCamera::tick(float dt)
 		}
 		do_update_flag = false;
 	}
-
+	else {
+		static int c = 0;
+		//printf("no update %d\n", c++);
+	}
 	if (!get_is_using_ortho())
 		vs_setup = View_Setup(camera.position, camera.front, fov, 0.01, 100.0, window_sz.x, window_sz.y);
 	else {
@@ -2907,9 +2891,55 @@ View_Setup EditorCamera::InterpolateManager::get_interp(View_Setup current, glm:
 		return current;
 	}
 }
-#include "DraggableHandles.h"
+VHResult EViewportHandles::box_handles(int64_t id, glm::mat4& box_center, glm::vec3& boxextents)
+{
+	auto& item = items[id];
+	if (dragging_state.item != id) {
+		item.transform = box_center;
+		item.boxextents = boxextents;
+	}
+	if (item.mytype == ActiveItem::NEWLY_MADE) {
+	}
+	item.was_wanted_this_frame = true;
+	if (dragging_state.item == id) {
+		box_center = item.newtransform;
+		return VHResult::Changing;
+	}
+
+	return VHResult::Unchanged;
+}
+
+void extract_columns(glm::mat4 m, glm::vec3& right, glm::vec3& up, glm::vec3& forward)
+{
+	right = glm::normalize(glm::vec3(m[0][0], m[1][0], m[2][0]));
+	up = glm::normalize(glm::vec3(m[0][1], m[1][1], m[2][1]));
+	forward = glm::normalize(glm::vec3(m[0][2], m[1][2], m[2][2]));
+}
+
+void draw_matrix(glm::mat4 m)
+{
+	glm::vec3 o = m[3];
+
+	Debug::add_line(o, o + vec3(m[0]), COLOR_RED, 0);
+	Debug::add_line(o, o + vec3(m[1]), COLOR_GREEN, 0);
+	Debug::add_line(o, o + vec3(m[2]), COLOR_BLUE, 0);
+	GameplayStatic::debug_text(string_format("%f %f %f\n", o.x, o.y, o.z));
+}
+
+float a = 0.0;
+float b = -1;
+
+void masdfasdf() {
+	ImGui::InputFloat("a", &a);
+	ImGui::InputFloat("b", &b);
+
+}
+ADD_TO_DEBUG_MENU(masdfasdf);
 void EViewportHandles::tick()
 {
+	GameplayStatic::reset_debug_text_height();
+
+
 	// delete items not updated
 	// state = not_dragging, dragging (1 item selected), just stopped dragging (update transform, return selection)
 	// for all handles, draw
@@ -2924,6 +2954,7 @@ void EViewportHandles::tick()
 
 	const bool mouse_clicked = Input::was_mouse_pressed(0) && doc.inputs.can_use_mouse_click();
 
+	// I do this weird thing because Imguizmo acts weird, this is litteraly a hack built on a hacked in feature so yeah....
 	if (dragging_state.set_next_frame) {
 		dragging_state.set_next_frame = false;
 
@@ -2939,9 +2970,47 @@ void EViewportHandles::tick()
 			sys_print(Warning, "no hacked entity viewport handles");
 			hacked_entity_MFER = eng->get_level()->spawn_entity();
 			hacked_entity_MFER->dont_serialize_or_edit = true;
+			hacked_entity_MFER->set_editor_name("___handle_marker");
 		}
 		else {
-			items[dragging_state.item].pos = hacked->get_ws_position();
+
+			auto pos = hacked->get_ws_position();
+			int index = dragging_state.index;
+			auto transform = items[dragging_state.item].transform;
+
+			const bool modify_origin = index & 1;
+			const auto extents = items[dragging_state.item].boxextents;
+			const glm::vec3 localspace = glm::inverse(transform) * glm::vec4(pos, 1.0);
+			const auto dir = transform[index / 2];
+
+			glm::vec3 position = glm::vec3(transform[3]);
+
+			glm::vec3 scale;
+			scale.x = glm::length(glm::vec3(transform[0]));
+			scale.y = glm::length(glm::vec3(transform[1]));
+			scale.z = glm::length(glm::vec3(transform[2]));
+
+			glm::mat3 rotation;
+			rotation[0] = glm::vec3(transform[0]) / scale.x;
+			rotation[1] = glm::vec3(transform[1]) / scale.y;
+			rotation[2] = glm::vec3(transform[2]) / scale.z;
+
+
+			if (modify_origin) {
+				position += (localspace[index / 2] * glm::vec3(dir));
+				scale[index / 2] -= scale[index / 2] * localspace[index / 2]/ extents[index/2];
+			}
+			else {
+				scale[index / 2] += scale[index / 2] * (localspace[index / 2]-extents[index/2]) / extents[index/2];
+			}
+			glm::mat4 newTransform(1.0f);
+			newTransform = glm::translate(newTransform, position);
+			newTransform *= glm::mat4(rotation);
+			newTransform = glm::scale(newTransform, scale);
+
+			items[dragging_state.item].newtransform = newTransform;
+			draw_matrix(transform);
+
 		}
 		if (!Input::is_mouse_down(0)) {
 			// stop dragging
@@ -2968,48 +3037,78 @@ void EViewportHandles::tick()
 			else
 				value.was_wanted_this_frame = false;
 		}
-		for (auto key : unused)
+		for (auto key : unused) {
+			printf("deleting\n");
 			items.erase(key);
+		}
 	};
 	delete_usued();
 
 	int64_t want_item_select = -1;
+	int want_select_sub = -1;
 	Texture* texture = Texture::load("circle.png");
 	for (auto& [key, value] : items) {
-		glm::vec4 transformed_pos = doc.vs_setup.viewproj * glm::vec4(value.pos, 1.0);
-		transformed_pos = transformed_pos / transformed_pos.w;
-		if (transformed_pos.z < 0)
-			continue;
-		const glm::ivec2 sc = ndc_to_screen_coord(transformed_pos);
-
-		RectangleShape rect;
-		const int size = 14;
-		rect.rect = Rect2d(sc.x - size/2, sc.y - size/2,size,size);
-		rect.color = COLOR_WHITE;
-		rect.texture = texture;
 		
-		UiSystem::inst->window.draw(rect);
-		auto mouse_pos = Input::get_mouse_pos() - UiSystem::inst->get_vp_rect().get_pos();
-		if (mouse_clicked && rect.rect.is_point_inside(mouse_pos)) {
-			want_item_select = key;
+		for (int i = 0; i < 6; i++) {
+			glm::vec3 pos = value.get_position_for_handle(i,key==dragging_state.item);
+			auto normal = value.get_normal_for_handle(i);
+
+			if (!doc.ed_cam.get_is_using_ortho() && glm::dot(doc.vs_setup.front, normal) >= 0.0)
+				continue;
+
+			glm::vec4 transformed_pos = doc.vs_setup.viewproj * glm::vec4(pos, 1.0);
+			transformed_pos = transformed_pos / transformed_pos.w;
+			if (transformed_pos.z < 0)
+				continue;
+			const glm::ivec2 sc = ndc_to_screen_coord(transformed_pos);
+
+			RectangleShape rect;
+			const int size = 14;
+			rect.rect = Rect2d(sc.x - size / 2, sc.y - size / 2, size, size);
+			rect.color = COLOR_WHITE;
+			rect.texture = texture;
+
+			UiSystem::inst->window.draw(rect);
+			auto mouse_pos = Input::get_mouse_pos() - UiSystem::inst->get_vp_rect().get_pos();
+			Rect2d clickrect = Rect2d(sc.x - size*2, sc.y - size*2, size*4, size*4);
+			if (mouse_clicked && clickrect.is_point_inside(mouse_pos)) {
+				want_item_select = key;
+				want_select_sub = i;
+			}
 		}
 	}
 
 	if (!is_dragging_item&&want_item_select != -1) {
 		dragging_state.item = want_item_select;
+		dragging_state.index = want_select_sub;
 		cached_selection_to_return = doc.selection_state->get_selection_as_vector();
 
 		if (!hacked_entity_MFER) {
 			hacked_entity_MFER = eng->get_level()->spawn_entity();
 			hacked_entity_MFER->dont_serialize_or_edit = true;
+			hacked_entity_MFER->set_editor_name("___handle_marker");
+
 		}
-		hacked_entity_MFER->set_ws_position(items[want_item_select].pos);
+		hacked_entity_MFER->set_ws_position(items[want_item_select].get_position_for_handle(want_select_sub,false));
+		glm::vec3 p, s;
+		glm::quat q;
+		decompose_transform(items[want_item_select].transform, p, q, s);
+		q = glm::normalize(q);
+		hacked_entity_MFER->set_ws_rotation(q);
 
 		doc.selection_state->set_select_only_this(hacked_entity_MFER.get());
 		doc.manipulate->reset_group_to_pre_transform();
 		doc.manipulate->set_force_gizmo_on(true);
 		doc.manipulate->set_force_op(ImGuizmo::OPERATION::TRANSLATE);
-		doc.manipulate->set_force_axis_mask(4);
+
+		int mask = 0;
+		if (want_select_sub / 2 == 0)mask = 1;
+		if (want_select_sub / 2 ==1)mask = 2;
+		if (want_select_sub / 2 == 2)mask = 4;
+
+
+
+		doc.manipulate->set_force_axis_mask(mask);
 		doc.manipulate->reset_group_to_pre_transform();
 
 
@@ -3019,3 +3118,70 @@ void EViewportHandles::tick()
 	}
 }
 
+void DrawHandlesObject::tick()
+{
+	if (!ed_show_box_handles.get_bool())
+		return;
+
+
+	if (doc.selection_state->has_only_one_selected()) {
+		auto selected = doc.selection_state->get_only_one_selected();
+		if (selected->get_editor_name() == "___handle_marker") {
+
+		}
+		else {
+			last_selected = selected;
+		}
+	}
+	else {
+		last_selected = EntityPtr();
+	}
+	if (last_selected.get()) {
+
+		bool good_to_use = false;
+		Bounds bounds_to_use;
+
+		auto mesh = last_selected->get_component<MeshComponent>();
+		if (mesh&&mesh->get_model()) {
+			bounds_to_use = mesh->get_model()->get_bounds();
+			good_to_use = true;
+		}
+		else if (auto cubemap = last_selected->get_component<CubemapComponent>()) {
+			bounds_to_use = Bounds(-vec3(0.5), vec3(0.5));
+			good_to_use = true;
+		}
+		else if (auto decal = last_selected->get_component<DecalComponent>()) {
+			bounds_to_use = Bounds(-vec3(0.5), vec3(0.5));
+			good_to_use = true;
+		}
+
+		if (good_to_use) {
+			auto transform = last_selected->get_ws_transform();
+			glm::mat4 m = transform * glm::translate(glm::mat4(1), bounds_to_use.bmin);
+			auto extents = bounds_to_use.bmax - bounds_to_use.bmin;
+			auto result = doc.handle_dragger->box_handles(1, m, extents);
+
+			if (result == VHResult::Changing) {
+
+				// now do the inverse... (m was set)
+
+
+				mat4 want = m * glm::inverse(glm::translate(glm::mat4(1), bounds_to_use.bmin));
+				glm::vec3 p, s;
+				glm::quat q;
+				decompose_transform(want, p, q, s);
+				q = glm::normalize(q);
+				want=compose_transform(p, q, s);
+
+
+				last_selected->set_ws_transform(want);
+			}
+
+			Debug::add_transformed_box(m, extents, { 255,165,0 }, 0, false);
+		}
+	}
+	else {
+		last_selected = EntityPtr();
+	}
+
+}

@@ -132,10 +132,12 @@ struct Debug_Shape
 	enum type {
 		sphere,
 		line,
-		box
+		box,
+		transformed_box
 	}type;
 	glm::vec3 pos;
 	glm::vec3 size;
+	glm::mat4 transform;
 	Color32 color;
 	float lifetime = 0.0;
 };
@@ -2072,6 +2074,16 @@ void Debug::add_box(glm::vec3 c, glm::vec3 size, Color32 color, float duration, 
 	shape.lifetime = duration;
 	DebugShapeCtx::get().add(shape, fixedupdate);
 }
+void Debug::add_transformed_box(glm::mat4 c, glm::vec3 size, Color32 color, float duration, bool fixedupdate)
+{
+	Debug_Shape shape;
+	shape.type = Debug_Shape::transformed_box;
+	shape.transform = c;
+	shape.size = size;
+	shape.color = color;
+	shape.lifetime = duration;
+	DebugShapeCtx::get().add(shape, fixedupdate);
+}
 void Debug::add_sphere(glm::vec3 c, float radius, Color32 color, float duration, bool fixedupdate)
 {
 	Debug_Shape shape;
@@ -2103,6 +2115,9 @@ void DebugShapeCtx::update(float dt)
 				break;
 			case Debug_Shape::sphere:
 				builder.AddSphere(shapes[j].pos, shapes[j].size.x, 8, 6, shapes[j].color);
+				break;
+			case Debug_Shape::transformed_box:
+				builder.PushOrientedLineBox(glm::vec3(0.f), shapes[j].size, shapes[j].transform, shapes[j].color);
 				break;
 			}
 		}

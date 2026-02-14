@@ -1,7 +1,7 @@
 #pragma once
 #ifdef EDITOR_BUILD
 #include "IEditorTool.h"
-#include "CommandMgr.h"
+#include "Commands.h"
 #include "glm/glm.hpp"
 #include "Render/Model.h"
 #include "Types.h"
@@ -36,7 +36,6 @@
 #include <variant>
 #include "UI/GUISystemPublic.h"
 #include "LevelSerialization/SerializeNew.h"
-#include "DraggableHandles.h"
 extern ConfigVar g_mousesens;
 
 enum TransformType
@@ -168,6 +167,7 @@ class IInputReciever
 {
 public:
 	virtual void on_focused_tick() {}
+	virtual string get_name() { return ""; }
 };
 
 #include "Framework/MapUtil.h"
@@ -176,6 +176,11 @@ enum class VHResult {
 	Changing,
 	Finished
 };
+using glm::vec3;
+using glm::normalize;
+using glm::mat4;
+using glm::mat3;
+using glm::quat;
 class EditorDoc;
 class EViewportHandles : public IInputReciever
 {
@@ -189,8 +194,9 @@ public:
 		item.was_wanted_this_frame = true;
 		return {};
 	}
-	VHResult box_handles(int64_t id, const glm::mat4& box_center, glm::vec3& boxmin, glm::vec3& boxmax);
+	VHResult box_handles(int64_t id, glm::mat4& box_corner/* no scale*/, glm::vec3& box_extents);
 	void tick();
+	string get_name() final { return "viewport handles"; }
 private:
 	EditorDoc& doc;
 	struct ActiveItem {
@@ -202,8 +208,27 @@ private:
 		// random data
 		glm::vec3 pos{};
 		glm::mat4 transform{};
-		glm::vec3 boxmin{};
-		glm::vec3 boxmax{};
+		glm::vec3 boxextents{};
+
+		glm::mat4 newtransform{};
+
+		glm::vec3 get_position_for_handle(int idx, bool use_new) {
+			glm::vec3 local(0.5);
+			int i = idx / 2;
+			local[i] = (idx & 1) ? 0.0 : 1.0;
+
+			auto transform_to_use = (use_new) ? newtransform : transform;
+
+			glm::vec3 transformed = transform * glm::vec4(local * boxextents, 1);
+			return transformed;
+		}
+		glm::vec3 get_normal_for_handle(int idx) {
+			glm::vec3 local(0);
+			int i = idx / 2;
+			local[i] = (idx & 1) ? -1 : 1.0;
+			glm::vec3 transformed = glm::transpose(glm::inverse(glm::mat3(transform))) * glm::vec4(local, 1);
+			return transformed;
+		}
 
 		bool was_wanted_this_frame = false;
 	};
@@ -348,6 +373,8 @@ public:
 	~EditorCamera() {
 		inst = nullptr;
 	}
+	string get_name() final { return "editor camera"; }
+
 	void on_focused_tick() final;
 	bool get_is_using_ortho() const {
 		return mode == OrthoMode;
@@ -593,6 +620,7 @@ public:
 	bool is_using();
 	void check_input();
 	void on_focused_tick() final;
+	string get_name() final { return "manipulate tool"; }
 
 	void stop_using_custom() {
 		if (is_using_for_custom) {
@@ -694,7 +722,7 @@ private:
 struct DragDetector : public IInputReciever
 {
 	DragDetector(EditorDoc& doc) :doc(doc) {}
-
+	string get_name() final { return "drag detector"; }
 	MulticastDelegate<Rect2d> on_drag_end;
 	void on_focused_tick() final;
 	void tick(bool can_start_drag);
@@ -797,6 +825,10 @@ public:
 		keyboard = mouse_click = true;
 	}
 	void set_focus(IInputReciever* recieve) {
+		if (focused_item != recieve) {
+			printf("set focus: %s\n",(recieve) ? recieve->get_name().c_str() : "<null>");
+		}
+
 		focused_item = recieve;
 	}
 	IInputReciever* get_focused() {
@@ -808,7 +840,15 @@ private:
 	bool mouse_click = true;
 
 };
-
+class DrawHandlesObject
+{
+public:
+	DrawHandlesObject(EditorDoc& doc) : doc(doc) {}
+	EditorDoc& doc;
+	void tick();
+private:
+	EntityPtr last_selected;
+};
 template<class... Ts>
 struct overloads : Ts... { using Ts::operator()...; };
 class LEPlugin;
@@ -847,20 +887,13 @@ public:
 	}
 
 	void do_mouse_selection(MouseSelectionAction action, const Entity* e, bool select_root_most_entity);
-
-
 	void on_mouse_pick();
-
 	void duplicate_selected_and_select_them();
 	Ray unproject_mouse_to_ray(int mx, int my);
 
 	const char* get_save_file_extension() const {
 		return "tmap";
 	}
-
-	enum EditCategory {
-		EDIT_SCENE,
-	};
 
 	bool is_this_object_not_inherited(const BaseUpdater* b) const {
 		return this_is_a_serializeable_object(b);	// not inherted meaning i can edit it
@@ -888,83 +921,58 @@ public:
 
 	string get_name();
 
-	bool local_transform = false;
-	TransformType transform_tool_type;
-	int axis_bit_mask = 0;
-	glm::vec3 transform_tool_origin;
-	void transform_tool_update();
-
 	Entity* spawn_entity();
 	Component* attach_component(const ClassTypeInfo* ti, Entity* e);
 	void remove_scene_object(BaseUpdater* u);
 	void insert_unserialized_into_scene(UnserializedSceneFile& file);
 	void instantiate_into_scene(BaseUpdater* u);
+	bool get_using_ortho() const {
+		return ed_cam.get_is_using_ortho();
+	}
+	void validate_fileids_before_serialize();
+	void set_camera_target_to_sel();
+	string get_doc_name()const  final {
+		return assetName.value_or("<unnamed>");
+	}
 
-	//std::unordered_map<uint64_t,std::shared_ptr<EditorObject>> editor_objects;
-
-	//std::unique_ptr<LEPlugin> active_plugin;
 	std::unique_ptr<UndoRedoSystem> command_mgr;
 	std::unique_ptr<SelectionState> selection_state;
 	std::unique_ptr<EdPropertyGrid> prop_editor;
 	std::unique_ptr<ManipulateTransformTool> manipulate;
-//	std::unique_ptr<ObjectOutliner> outliner;
 	std::unique_ptr<DragDropPreview> drag_drop_preview;
 	std::unique_ptr<FoliagePaintTool> foliage_tool;
 	std::unique_ptr<DecalStampTool> stamp_tool;
 	std::unique_ptr<EditorUILayout> gui;
 	std::unique_ptr<EViewportHandles> handle_dragger;
 	std::unique_ptr< SelectionMode> selection_mode;
+	std::unique_ptr< DrawHandlesObject> draw_handles;
+	View_Setup vs_setup;
+	EditorInputs inputs;
+	EditorCamera ed_cam;
+	DragDetector dragger;
 	IEditorMode* active_mode = nullptr;
 
-	View_Setup vs_setup;
 
-	EditorInputs inputs;
-
-
-	EditorCamera ed_cam;
-	bool get_using_ortho() const {
-		return ed_cam.get_is_using_ortho();
-	}
-
-
-	//MulticastDelegate<LEPlugin*> on_start_plugin;
-	//MulticastDelegate<LEPlugin*> on_end_plugin;
 
 	MulticastDelegate<uint64_t> on_component_deleted;
 	MulticastDelegate<Component*> on_component_created;
 	MulticastDelegate<EntityPtr> on_entity_created;	// after creation
 	MulticastDelegate<> post_node_changes;	// called after any nodes are deleted/created
-
 	MulticastDelegate<const Entity*> on_eyedropper_callback;
-
 	MulticastDelegate<> on_start;
 	MulticastDelegate<> on_close;
 	MulticastDelegate<uint64_t> on_change_name;
-	DragDetector dragger;
 
-	void validate_fileids_before_serialize();
-
-	void set_camera_target_to_sel();
-
-	string get_doc_name()const  final {
-		return assetName.value_or("<unnamed>");
-	}
 private:
 	EditorDoc();
 	void init_for_scene(opt<string> scenePath);
-
 	void on_mouse_drag(int x, int y);
-
 
 
 	bool eye_dropper_active = false;
 	void* active_eyedropper_user_id = nullptr;	// for id purposes only
-
-	EditCategory edit_category = EditCategory::EDIT_SCENE;
-
 	FnFactory<IPropertyEditor> grid_factory;
 	uptr<ConsoleCmdGroup> cmds;
-
 	opt<string> assetName;
 };
 

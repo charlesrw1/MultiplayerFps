@@ -273,7 +273,7 @@ inline void decompose_transform(const glm::mat4& transform, glm::vec3& p, glm::q
 		transform[1] / s.y,
 		transform[2] / s.z
 	));
-	q = glm::normalize(q);
+	//q = glm::normalize(q);
 }
 inline glm::mat4 compose_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& s)
 {
