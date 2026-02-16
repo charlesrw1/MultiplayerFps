@@ -25,90 +25,8 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 };
 
 
-
-
-vec3 WorldPosFromDepth(vec2 TexCoord, float depth) {
-
-	// 7/30: reverse-Z change
-    float z = depth;// * 2.0 - 1.0;
-
-    vec4 clipSpacePosition = vec4(TexCoord * 2.0 - 1.0, z, 1.0);
-    vec4 viewSpacePosition = g.inv_viewproj * clipSpacePosition;
-
-    // Perspective division
-    viewSpacePosition /= viewSpacePosition.w;
-
-    return viewSpacePosition.xyz;
-}
-
-#define PI 3.1415927
-// ----------------------------------------------------------------------------
-float DistributionGGX(vec3 N, vec3 H, float roughness)
-{
-    float a = roughness*roughness;
-    float a2 = a*a;
-    float NdotH = max(dot(N, H), 0.0);
-    float NdotH2 = NdotH*NdotH;
-
-    float nom   = a2;
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = PI * denom * denom;
-
-    return nom / max(denom,0.0000001);
-}
-// ----------------------------------------------------------------------------
-float GeometrySchlickGGX(float NdotV, float roughness)
-{
-    float r = (roughness + 1.0);
-    float k = (r*r) / 8.0;
-
-    float nom   = NdotV;
-    float denom = NdotV * (1.0 - k) + k;
-
-    return nom / denom;
-}
-// ----------------------------------------------------------------------------
-float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
-{
-    float NdotV = max(dot(N, V), 0.0);
-    float NdotL = max(dot(N, L), 0.0);
-    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
-    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
-
-    return ggx1 * ggx2;
-}
-// ----------------------------------------------------------------------------
-vec3 fresnelSchlick(float cosTheta, vec3 F0)
-{
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-}
-vec3 FresnelSchlickRougness(float cosTheta, vec3 F0, float roughness)
-{
-	 return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-}
-
-vec3 pbr_calculate(vec3 worldspace, vec3 Albedo, float Roughness, float Metalness, vec3 Normal)
-{
-	vec3 view_pos = g.viewpos_time.xyz;
-	vec3 view_front = g.viewfront.xyz;
-
-	vec3 V = normalize(view_pos-worldspace);
-	
-	vec3 F0 = vec3(0.04);
-	F0 = mix(F0,Albedo,Metalness);
-	
-	vec3 F = FresnelSchlickRougness(max(dot(Normal,V),0.0),F0,Roughness);
-	
-	vec3 kS = F;
-	vec3 kD = (1.0-kS)*(1.0-Metalness);
-	
-	vec3 ambient =(kD*Albedo);
-	return ambient;
-}
-
-
-
-
+#include "commonUtil.txt"
+#include "pbrShared.txt"
 
 void main()
 {
@@ -129,7 +47,7 @@ void main()
 	
 	float depth_value = depth_tex.r;
 	vec3 worldspace = WorldPosFromDepth(uv, depth_value);
-	vec3 out_color = pbr_calculate(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz) * ssao_value;
+	vec3 out_color = pbr_get_albedo_mult(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz) * ssao_value * PI;
 	
 	FS_OUT_Color = vec4(out_color,1.0);
 }

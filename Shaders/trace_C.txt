@@ -3,40 +3,10 @@ layout(local_size_x = 64, local_size_y=1,local_size_z=1) in;
 
 layout(binding =2) uniform sampler2D  probe_irradiance;
 layout(binding =3) uniform sampler2D  probe_depth;
+layout(binding = 5) uniform samplerCube Skylight;
 
-struct Ubo_View_Constants_Struct
-{
-	mat4 view;
-	mat4 viewproj;
-	mat4 invview;
-	mat4 invproj;
-	mat4 inv_viewproj;
-	vec4 viewpos_time;
-	vec4 viewfront;
-	vec4 viewport_size;
-	mat4 prev_viewproj;
+#include "SharedGpuTypes.txt"
 
-	float near;
-	float far;
-	float shadowmap_epsilon;
-	float inv_scale_by_proj_distance;
-	
-	vec4 fogcolor;
-	vec4 fogparams;
-	
-	float numcubemaps;
-	float numlights;
-	float forcecubemap;
-	uint debug_options;
-	
-	// bit 0: wireframe first pass or second pass
-	uint flags;	
-	uint padding1;
-	uint padding2;
-	uint padding3;
-	
-	vec4 current_and_prev_jitter;
-};
 struct RayHitOutput {
 	vec4 dir_dist;
 	vec4 light;
@@ -51,51 +21,7 @@ layout (binding = 1, std140) writeonly buffer RayHitBuffer {
 };
 
 
-
-struct BVHNode
-{
-	vec4 bmin;
-	vec4 bmax;
-	int left_node;
-	int count;
-	int padding1;
-	int padding2;
-};
-
-layout(std430, binding = 3) readonly buffer VertexBuffer
-{
-	vec4 data[];
-}Verticies;
-layout(std430, binding = 4) readonly buffer IndexBuffer
-{
-	uint data[];
-}Indicies;
-
-layout(std430, binding =5) readonly buffer BottomLevelNodes
-{
-	BVHNode data[];
-} Nodes;
-
-layout(std430, binding =6) readonly buffer BottomLevelReferences
-{
-	int data[];
-} References;
-layout(std430, binding =7) readonly buffer MaterialAlbedosBuffer
-{
-	vec4 data[];
-} Albedos;
-
-
-
-#define INF 1000000.0
-#define BVH_BRANCH -1
-
-struct Ray
-{
-	vec3 pos;
-	vec3 dir;
-	vec3 inv_dir;
-};
+#include "rtShared.txt"
 
 
 vec3 randColor(int number){
@@ -103,161 +29,19 @@ vec3 randColor(int number){
 }
 
 
-
-float AABBIntersect(vec3 bmin,vec3 bmax, Ray r)
-{
-	vec3 tmin =(bmin-r.pos)*r.inv_dir;
-	vec3 tmax =(bmax-r.pos)*r.inv_dir;
-	vec3 t1 =min(tmin,tmax);
-	vec3 t2 = max(tmin,tmax);
-	float tnear = max(max(t1.x,t1.y),t1.z);
-	float tfar = min(min(t2.x,t2.y),t2.z);
-	
-	return (tnear>tfar||tfar<0) ? -INF : tnear;
-}
-
-float RayTriIntersect2(vec3 ro, vec3 rd, vec3 v0, vec3 v1, vec3 v2, out vec3 bary)
-{
-	vec4 uvt;
-	const vec3 edge1 = v1 - v0;
-	const vec3 edge2 = v2 - v0;
-	const vec3 h = cross(rd, edge2);
-	const float a = dot(edge1, h);
-//	if (a > -0.0000001 && a < 0.0000001) return -1; 
-	const float f = 1 / a;
-	const vec3 s = ro - v0;
-	uvt.x = f * dot(s, h);
-	//if (u < 0 || u > 1) return -1;
-	const vec3 q = cross(s, edge1);
-	uvt.y = f * dot(rd, q);
-	//if (v < 0 || u + v > 1) return -1;
-	uvt.z = f * dot(edge2, q);
-	uvt.w = 1-uvt.x-uvt.y;
-	if(all(greaterThanEqual(uvt,vec4(0.0))))
-	{
-		bary = uvt.xyw;
-		return uvt.z;
-	}
-	return -1;
-}
-
-struct TraceOut
-{
-	float t;
-	vec3 hit_normal;
-	int mat_hit;
-};
-
-TraceOut trace_ray(vec3 ro, vec3 rd)
-{
-	Ray out_ray;
-	out_ray.pos = ro;
-	out_ray.dir = rd;
-	out_ray.inv_dir = 1.f/(rd);
-	
-	uint stack[64];
-	stack[0]=0;
-	
-	
-	uint node;
-	int stack_count = 1;
-
-	float t = INF;
-	//vec3 bary_near;
-	int idx=-1;
-	//int tris_hit = 0;
-	int mat_hit = 0;
-	vec3 closest_normal;
-	while (stack_count > 0)
-	{
-		node=stack[--stack_count];
-		
-		
-		// Fetch data
-		int node_leftnode = Nodes.data[node].left_node;
-		int node_count = Nodes.data[node].count;
-
-		if (node_count != -1)
-		{
-			int index_count = node_count;
-			int index_start = node_leftnode;
-			for (int i = 0; i < index_count; i++) {
-				
-				int mesh_element_index = References.data[index_start+i]*3;
-				uint i0 = Indicies.data[mesh_element_index];
-				uint i1 = Indicies.data[mesh_element_index+1];
-				uint i2 = Indicies.data[mesh_element_index+2];
-				vec3 bary;
-				vec3 v0 = Verticies.data[i0].xyz;
-				vec3 v1 = Verticies.data[i1].xyz;
-				vec3 v2 = Verticies.data[i2].xyz;
-				
-				
-				float t_hit = RayTriIntersect2(
-					ro,rd,
-					v0,v1,v2,
-					bary);		
-				if(t_hit>0.00001 && t_hit < t) {
-					t = t_hit;
-					idx = mesh_element_index;
-					//bary_near=bary;
-					mat_hit = int(Verticies.data[i0].w);
-					closest_normal = normalize(cross(v1-v0,v2-v0));
-				}
-			}
-			continue;
-		}
-
-		float left_dist, right_dist;
-		left_dist = AABBIntersect(Nodes.data[node_leftnode].bmin.xyz,Nodes.data[node_leftnode].bmax.xyz,out_ray);
-		right_dist = AABBIntersect(Nodes.data[node_leftnode+1].bmin.xyz,Nodes.data[node_leftnode+1].bmax.xyz,out_ray);
-		
-		bool left_bool = left_dist>-INF&&left_dist<t;
-		bool right_bool = right_dist>-INF&&right_dist<t;
-
-		if (left_bool && right_bool) {
-			bool push_right_first = left_dist<right_dist;
-			stack[stack_count++]=node_leftnode+int(push_right_first);
-			stack[stack_count++]=node_leftnode+int(!push_right_first);
-		
-		
-			//if (left_dist < right_dist) {
-			//	stack[stack_count++]=node_leftnode+1;
-			//	stack[stack_count++]=node_leftnode;
-			//}
-			//else {
-			//
-			//	stack[stack_count++]=node_leftnode;
-			//	stack[stack_count++]=node_leftnode+1;
-			//}
-		}
-		else if (left_bool) {
-			stack[stack_count++]=node_leftnode;
-		}
-		else if (right_bool) {
-			stack[stack_count++]=node_leftnode+1;
-		}
-	}
-	
-	if(idx==-1) {
-		t=-1;
-	}
-
-	TraceOut outhit;
-	outhit.t = t;
-	outhit.hit_normal = closest_normal;
-	outhit.mat_hit = mat_hit;
-	return outhit;
-}
-
 // for sampling the sky
-layout(binding = 5) uniform samplerCube Skylight;
 
-const int NUM_RAYS = 128;
 
 uniform vec3  volume_origin;
 uniform vec3 volume_spacing;
 uniform ivec3 vol_grid;
+uniform float ray_sample_randomness = 0.0;
+uniform bool do_irrad_calcs = true;
+uniform int num_lights = 0;
+
+layout (binding = 11, std430) readonly buffer LightingObjectUniforms_Buffer {
+	LightingObjectUniforms light_objects[];
+};
 
 
 // each thread = 1 probe (ie global id)
@@ -271,7 +55,6 @@ uniform ivec3 vol_grid;
 
 // volume. (box, transform, probe dim)
 
-uniform float ray_sample_randomness = 0.0;
 
 
 vec3 RTXGISphericalFibonacci(float sampleIndex, float numSamples)
@@ -288,251 +71,12 @@ vec3 RTXGISphericalFibonacci(float sampleIndex, float numSamples)
 }
 
 
-vec3 get_probe_world_from_coords(ivec3 coords)
-{
-return  volume_origin+vec3(coords)*volume_spacing;
-}
-
-vec2 OctahedralEncode(vec3 normal_in)
-{
-	vec3 normal = normal_in.xzy;
-
-	normal = normalize(normal);
-	float l1norm = abs(normal.x) + abs(normal.y) + abs(normal.z);
-	vec2 result = normal.xy * (1.0 / l1norm);
-	
-	if (normal.z < 0.0) {
-		vec2 oldResult = result;
-		result.x = (1.0 - abs(oldResult.y)) * (oldResult.x >= 0.0 ? 1.0 : -1.0);
-		result.y = (1.0 - abs(oldResult.x)) * (oldResult.y >= 0.0 ? 1.0 : -1.0);
-	}
-	
-	return result * 0.5 + 0.5; // Map to [0,1]
-}
-
-vec2 get_depth_probe_uv(vec2 octant_uv, ivec3 probe_coord) {
-	const int DEPTH_IN_SIZE = 14;
-	const int DEPTH_TILE_SIZE = 16;
-	
-	vec2 coords;
-	coords.x = probe_coord.x*DEPTH_TILE_SIZE + (vol_grid.x*probe_coord.y*DEPTH_TILE_SIZE);
-	coords.y = probe_coord.z*DEPTH_TILE_SIZE;
-	
-	coords += vec2(octant_uv*vec2(DEPTH_IN_SIZE))+vec2(1);
-	vec2 final_uv = vec2(coords)/vec2(vol_grid.x*vol_grid.y*DEPTH_TILE_SIZE,vol_grid.z*DEPTH_TILE_SIZE);
-
-	return final_uv;
-}
-
-vec2 get_irrad_probe_uv(vec2 octant_uv, ivec3 probe_coord) {
-	const int DEPTH_IN_SIZE = 6;
-	const int DEPTH_TILE_SIZE = 8;
-	
-	vec2 coords;
-	coords.x = probe_coord.x*DEPTH_TILE_SIZE + (vol_grid.x*probe_coord.y*DEPTH_TILE_SIZE);
-	coords.y = probe_coord.z*DEPTH_TILE_SIZE;
-	
-	coords += vec2(octant_uv*vec2(DEPTH_IN_SIZE))+vec2(1);
-	vec2 final_uv = vec2(coords)/vec2(vol_grid.x*vol_grid.y*DEPTH_TILE_SIZE,vol_grid.z*DEPTH_TILE_SIZE);
-
-	return final_uv;
-}
+#define DDGILIGHTING
+#include "ddgiShared.txt"
 
 
-vec3 calculate_irradiance(vec3 direction, vec3 worldspace)
-{
-	
-		
-	vec3 biased_world_position = worldspace+direction*0.1;
-	
-	
-	
-	ivec3 base_probe_coords = ivec3((biased_world_position-volume_origin)/volume_spacing);
-	base_probe_coords = clamp(base_probe_coords,ivec3(0), 
-	ivec3(vol_grid)-ivec3(1)
-	);
-	vec3 base_probe_pos = get_probe_world_from_coords(base_probe_coords);
-	
-	vec3 alpha = clamp(
-		(biased_world_position-base_probe_pos)/volume_spacing,
-		vec3(0),
-		vec3(1));
-	
 
-	vec3 irradiance=vec3(0.0);
-	float accum_weight = 0.0;
-	float cheb_weight_total = 0.0;
-	
-	for(int probeIndex = 0;probeIndex < 8; probeIndex++) {
-		ivec3 adjacent_probe_ofs = ivec3(probeIndex, probeIndex>>1, probeIndex>>2)&ivec3(1);
-		ivec3 adjacent_probe_coords = clamp(
-			base_probe_coords+adjacent_probe_ofs,
-			ivec3(0),
-			ivec3(vol_grid)-ivec3(1));
-		vec3 adj_probe_worldpos = get_probe_world_from_coords(adjacent_probe_coords);
-		
-
-		vec3 biased_pos_to_adj_probe = normalize(adj_probe_worldpos-biased_world_position);
-		float biased_pos_to_adj_probe_len = length(adj_probe_worldpos-biased_world_position);
-		
-		vec3 trilinear = max(vec3(0.001), 
-			mix(vec3(1.0-alpha),vec3(alpha),vec3(adjacent_probe_ofs)));
-		float trilinear_weight = trilinear.x*trilinear.y*trilinear.z;
-		float weight = 1.0;
-		float warp_shading = dot(biased_pos_to_adj_probe,direction)*0.5 + 0.5;
-		weight *= (warp_shading*warp_shading)+0.2;
-		
-		vec2 octant_coords = OctahedralEncode(-biased_pos_to_adj_probe);
-		
-		vec2 probe_texture_uv = get_depth_probe_uv(
-		octant_coords,
-		adjacent_probe_coords);
-		
-		vec2 filtered_distance = vec2(2.0)*texture(probe_depth, probe_texture_uv).rg;
-		
-		float variance = abs(
-		(filtered_distance.x*filtered_distance.x) - filtered_distance.y);
-		
-		float chebyshev_weight = 1.0;
-		if(biased_pos_to_adj_probe_len > filtered_distance.x) {
-			float v = biased_pos_to_adj_probe_len - filtered_distance.x;
-			chebyshev_weight = variance/(variance+(v*v));
-			chebyshev_weight = max(
-			chebyshev_weight*chebyshev_weight*chebyshev_weight,
-			0.0
-			);
-		}
-		
-		weight *= max(0.05, chebyshev_weight);
-		weight = max(0.000001, weight);
-		const float crush_thresh = 0.2;
-		if(weight<crush_thresh) {
-			weight *= (weight*weight)*(1.0/(crush_thresh*crush_thresh));
-		}
-		weight *= trilinear_weight;
-		
-		octant_coords = OctahedralEncode(direction);
-		probe_texture_uv = get_irrad_probe_uv(octant_coords,adjacent_probe_coords);
-		
-		vec3 probe_irrad = texture(probe_irradiance, probe_texture_uv).rgb;
-		float exponent = 2.2*0.5;
-		probe_irrad = pow(probe_irrad,vec3(exponent));	// half way back to linear from srgb
-		
-		irradiance += (weight*probe_irrad);
-		accum_weight += weight;
-		// holy crap so much code!
-		
-		//cheb_weight_total+= chebyshev_weight;
-	}
-	
-	irradiance *= (1.0/accum_weight);
-	irradiance*=irradiance;	// go back to linear
-	irradiance*= 2.0 * 3.1415;
-	
-	return irradiance;
-
-}
-uniform bool do_irrad_calcs = true;
-uniform int num_lights = 0;
-// FIXME SHAREDGPUTYPES
-struct LightingObjectUniforms {
-	mat4 transform;
-	mat4 lighting_view_proj;
-	vec4 position_radius;
-	vec4 light_color;
-	vec4 spot_normal;
-	vec4 atlas_offset;
-	float spot_angle;
-	float spot_inner;
-	float epsilon;
-	uint flags;
-};
-layout (binding = 11, std430) readonly buffer LightingObjectUniforms_Buffer {
-	LightingObjectUniforms light_objects[];
-};
-
-#define PI 3.1415927
-// ----------------------------------------------------------------------------
-float DistributionGGX(vec3 N, vec3 H, float roughness)
-{
-    float a = roughness*roughness;
-    float a2 = a*a;
-    float NdotH = max(dot(N, H), 0.0);
-    float NdotH2 = NdotH*NdotH;
-
-    float nom   = a2;
-    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
-    denom = PI * denom * denom;
-
-    return nom / max(denom,0.0000001);
-}
-// ----------------------------------------------------------------------------
-float GeometrySchlickGGX(float NdotV, float roughness)
-{
-    float r = (roughness + 1.0);
-    float k = (r*r) / 8.0;
-
-    float nom   = NdotV;
-    float denom = NdotV * (1.0 - k) + k;
-
-    return nom / denom;
-}
-// ----------------------------------------------------------------------------
-float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
-{
-    float NdotV = max(dot(N, V), 0.0);
-    float NdotL = max(dot(N, L), 0.0);
-    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
-    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
-
-    return ggx1 * ggx2;
-}
-// ----------------------------------------------------------------------------
-vec3 fresnelSchlick(float cosTheta, vec3 F0)
-{
-    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-}
-vec3 FresnelSchlickRougness(float cosTheta, vec3 F0, float roughness)
-{
-	 return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
-}
-
-vec3 pbr_calculate(vec3 LightColor, vec3 LighDir, vec3 worldspace, vec3 Albedo, float Roughness, float Metalness, vec3 Normal)
-{
-	vec3 view_pos = g.viewpos_time.xyz;
-	vec3 view_front = g.viewfront.xyz;
-
-	vec3 V = normalize(view_pos-worldspace);
-	
-	vec3 R = reflect(-V,Normal);
-	vec3 F0 = vec3(0.04);
-	F0 = mix(F0,Albedo,Metalness);
-
-	vec3 Lo = vec3(0.0);
-    vec3 H = normalize(V + LighDir);
-    vec3 radiance = LightColor;
-
-        // Cook-Torrance BRDF
-        float NDF = DistributionGGX(Normal, H, Roughness);   
-        float G   = GeometrySmith(Normal, V, LighDir, Roughness);    
-        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);        
-        
-        vec3 numerator    = NDF * G * F;
-        float denominator = 4.0 * max(dot(Normal, V), 0.0) * max(dot(Normal, LighDir), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
-        vec3 specular = numerator / 1.0;
-        vec3 kS = F;
-        vec3 kD = vec3(1.0) - kS;
-        kD *= 1.0 - Metalness;	                
-          
-		float NdotL = max(dot(Normal, LighDir), 0.0);        
-
-		// add to outgoing radiance Lo
-		Lo += (kD * Albedo / PI + specular) * radiance * NdotL;
-	
-	return Lo;
-}
-
-
+#include "pbrShared.txt"
 
 
 vec3 evaluate_punctual_lights(vec3 worldspace, vec3 albedo, vec3 normal_t) {
@@ -561,7 +105,7 @@ vec3 output_light_accum = vec3(0.0);
 		float radius_2 = radius*radius;
 		float attenuation = 1.0/distance_to_light_2 * clamp(1-distance_to_light_2/radius_2,0.0,1.0);
 		
-		vec3 out_color = pbr_calculate(color, L, worldspace, albedo.xyz, 1, 0, normal_t.xyz);
+		vec3 out_color = pbr_calculate_punctual(color, L, worldspace, albedo.xyz, 1, 0, normal_t.xyz);
 		
 		if(is_spot_light) {
 			float angle = dot(-L, spot_normal);
@@ -581,7 +125,9 @@ vec3 evaluate_lighting(vec3 pos, vec3 normal, vec3 albedo)
 {
 	vec3 irrad = vec3(0.0);
 	if(do_irrad_calcs) {
-		irrad =  calculate_irradiance(normal,pos);
+		vec3 biased_world_position = pos+normal*0.1;
+	
+		irrad =  calculate_irradiance(normal,pos,biased_world_position);
 		
 	}
 	vec3 sun_dir = normalize(vec3(1,-1,1));

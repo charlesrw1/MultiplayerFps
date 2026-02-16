@@ -1,0 +1,18 @@
+vec3 WorldPosFromDepth(vec2 TexCoord, float depth) {
+
+	// 7/30: reverse Z change
+    float z = depth;// * 2.0 - 1.0;
+
+    vec4 clipSpacePosition = vec4(TexCoord * 2.0 - 1.0, z, 1.0);
+    vec4 viewSpacePosition = g.inv_viewproj * clipSpacePosition;
+
+    // Perspective division
+    viewSpacePosition /= viewSpacePosition.w;
+
+    return viewSpacePosition.xyz;
+}
+
+
+vec3 randColor(int number){
+    return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
+}

@@ -1,0 +1,105 @@
+// ----------------------------------------------------------------------------
+
+#ifndef PI
+#define PI 3.1415927
+#endif
+
+float DistributionGGX(vec3 N, vec3 H, float roughness)
+{
+    float a = roughness*roughness;
+    float a2 = a*a;
+    float NdotH = max(dot(N, H), 0.0);
+    float NdotH2 = NdotH*NdotH;
+
+    float nom   = a2;
+    float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+    denom = PI * denom * denom;
+
+    return nom / max(denom,0.0000001);
+}
+// ----------------------------------------------------------------------------
+float GeometrySchlickGGX(float NdotV, float roughness)
+{
+    float r = (roughness + 1.0);
+    float k = (r*r) / 8.0;
+
+    float nom   = NdotV;
+    float denom = NdotV * (1.0 - k) + k;
+
+    return nom / denom;
+}
+// ----------------------------------------------------------------------------
+float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
+{
+    float NdotV = max(dot(N, V), 0.0);
+    float NdotL = max(dot(N, L), 0.0);
+    float ggx2 = GeometrySchlickGGX(NdotV, roughness);
+    float ggx1 = GeometrySchlickGGX(NdotL, roughness);
+
+    return ggx1 * ggx2;
+}
+// ----------------------------------------------------------------------------
+vec3 fresnelSchlick(float cosTheta, vec3 F0)
+{
+    return F0 + (1.0 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+vec3 FresnelSchlickRougness(float cosTheta, vec3 F0, float roughness)
+{
+	 return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
+}
+
+// punctual light
+vec3 pbr_calculate_punctual(vec3 LightColor, vec3 LighDir, vec3 worldspace, vec3 Albedo, float Roughness, float Metalness, vec3 Normal)
+{
+	vec3 view_pos = g.viewpos_time.xyz;
+	vec3 view_front = g.viewfront.xyz;
+
+	vec3 V = normalize(view_pos-worldspace);
+	
+	vec3 R = reflect(-V,Normal);
+	vec3 F0 = vec3(0.04);
+	F0 = mix(F0,Albedo,Metalness);
+
+	vec3 Lo = vec3(0.0);
+    vec3 H = normalize(V + LighDir);
+    vec3 radiance = LightColor;
+
+        // Cook-Torrance BRDF
+        float NDF = DistributionGGX(Normal, H, Roughness);   
+        float G   = GeometrySmith(Normal, V, LighDir, Roughness);    
+        vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);        
+        
+        vec3 numerator    = NDF * G * F;
+        float denominator = 4.0 * max(dot(Normal, V), 0.0) * max(dot(Normal, LighDir), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
+        vec3 specular = numerator / 1.0;
+        vec3 kS = F;
+        vec3 kD = vec3(1.0) - kS;
+        kD *= 1.0 - Metalness;	                
+          
+		float NdotL = max(dot(Normal, LighDir), 0.0);        
+
+		// add to outgoing radiance Lo
+		Lo += (kD * Albedo / PI + specular) * radiance * NdotL;
+	
+	return Lo;
+}
+
+vec3 pbr_get_albedo_mult(vec3 worldspace, vec3 Albedo, float Roughness, float Metalness, vec3 Normal)
+{
+	vec3 view_pos = g.viewpos_time.xyz;
+	vec3 view_front = g.viewfront.xyz;
+
+	vec3 V = normalize(view_pos-worldspace);
+	
+	vec3 F0 = vec3(0.04);
+	F0 = mix(F0,Albedo,Metalness);
+	
+	vec3 F = FresnelSchlickRougness(max(dot(Normal,V),0.0),F0,Roughness);
+	
+	vec3 kS = F;
+	vec3 kD = (1.0-kS)*(1.0-Metalness);
+	
+	vec3 ambient =(kD*Albedo/PI);
+	return ambient;
+}
+

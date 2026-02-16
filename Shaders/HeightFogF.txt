@@ -13,19 +13,7 @@ layout (binding = 1, std430) readonly buffer FogUniform_Buffer {
 	FogUniforms fog;
 }; 
 
-vec3 WorldPosFromDepth(vec2 TexCoord, float depth) {
-
-	// 7/30: reverse-Z change
-    float z = depth;// * 2.0 - 1.0;
-
-    vec4 clipSpacePosition = vec4(TexCoord * 2.0 - 1.0, z, 1.0);
-    vec4 viewSpacePosition = g.inv_viewproj * clipSpacePosition;
-
-    // Perspective division
-    viewSpacePosition /= viewSpacePosition.w;
-
-    return viewSpacePosition.xyz;
-}
+#include "commonUtil.txt"
 
 float compute_exponential_height_fog(
     vec3 worldPos,

@@ -1,38 +1,6 @@
 layout(local_size_x = 64, local_size_y =1, local_size_z = 1) in;
 
-struct Ubo_View_Constants_Struct
-{
-	mat4 view;
-	mat4 viewproj;
-	mat4 invview;
-	mat4 invproj;
-	mat4 inv_viewproj;
-	vec4 viewpos_time;
-	vec4 viewfront;
-	vec4 viewport_size;
-	mat4 prev_viewproj;
 
-	float near;
-	float far;
-	float shadowmap_epsilon;
-	float inv_scale_by_proj_distance;
-	
-	vec4 fogcolor;
-	vec4 fogparams;
-	
-	float numcubemaps;
-	float numlights;
-	float forcecubemap;
-	uint debug_options;
-	
-	// bit 0: wireframe first pass or second pass
-	uint flags;	
-	uint padding1;
-	uint padding2;
-	uint padding3;
-	
-	vec4 current_and_prev_jitter;
-};
 layout(r11f_g11f_b10f, binding = 0) uniform image2D probe_irradiance;
 layout(rg16f, binding = 1) uniform image2D probe_depths;
 
@@ -47,38 +15,9 @@ layout (binding = 1, std140) readonly buffer RayHitBuffer {
 
 
 // Octahederal encoding functions
-vec2 OctahedralEncode(vec3 normal_in)
-{
-	vec3 normal = normal_in.xzy;
 
-	normal = normalize(normal);
-	float l1norm = abs(normal.x) + abs(normal.y) + abs(normal.z);
-	vec2 result = normal.xy * (1.0 / l1norm);
-	
-	if (normal.z < 0.0) {
-		vec2 oldResult = result;
-		result.x = (1.0 - abs(oldResult.y)) * (oldResult.x >= 0.0 ? 1.0 : -1.0);
-		result.y = (1.0 - abs(oldResult.x)) * (oldResult.y >= 0.0 ? 1.0 : -1.0);
-	}
-	
-	return result * 0.5 + 0.5; // Map to [0,1]
-}
+#include "ddgiShared.txt"
 
-vec3 OctahedralDecode(vec2 encoded)
-{
-	vec2 f = encoded * 2.0 - 1.0; // Map from [0,1] to [-1,1]
-	
-	vec3 normal = vec3(f.x, f.y, 1.0 - (abs(f.x) + abs(f.y)));
-	
-	if (normal.z < 0.0) {
-		vec2 oldNormal = normal.xy;
-		normal.x = (1.0 - abs(oldNormal.y)) * (oldNormal.x >= 0.0 ? 1.0 : -1.0);
-		normal.y = (1.0 - abs(oldNormal.x)) * (oldNormal.y >= 0.0 ? 1.0 : -1.0);
-	}
-	
-	return normalize(normal.xzy);
-}
-const int NUM_RAYS = 128;
 uniform ivec3 vol_grid;
 uniform vec3 volume_spacing;
 
