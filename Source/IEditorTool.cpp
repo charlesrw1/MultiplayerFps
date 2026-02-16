@@ -244,7 +244,6 @@ void IEditorTool::draw_imgui_public()
 {
 	imgui_draw();
 }
-#include "EngineSystemCommands.h"
 #include "Game/LevelAssets.h"
 void IEditorTool::draw_menu_bar()
 {

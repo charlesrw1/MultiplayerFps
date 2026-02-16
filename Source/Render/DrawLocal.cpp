@@ -3807,6 +3807,7 @@ void Renderer::upload_light_and_decal_buffers()
 			light_uniforms.transform = ModelTransform;
 			light_uniforms.position_radius = vec4(light.position, light.radius);
 			light_uniforms.flags = light.is_spotlight;
+			light_uniforms.flags |= int(light.casts_shadow_mode != 0) << 1;
 			light_uniforms.spot_inner = cos(glm::radians(light.conemin));
 			light_uniforms.spot_angle = cos(glm::radians(light.conemax));
 			light_uniforms.spot_normal = vec4(light.normal, 0);

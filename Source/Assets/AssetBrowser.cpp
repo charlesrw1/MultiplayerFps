@@ -37,7 +37,6 @@ AssetBrowser::AssetBrowser()
 
 }
 AssetBrowser* AssetBrowser::inst = nullptr;
-#include "EngineSystemCommands.h"
 ConfigVar ignore_folders("ignore_folders", "0", CVAR_BOOL, "");
 #include "GameEnginePublic.h"
 static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesystemNode* node, string parent_path)

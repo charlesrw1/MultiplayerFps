@@ -443,7 +443,6 @@
     <ClInclude Include="Source\LevelEditor\TagManager.h" />
     <ClInclude Include="Source\IntegrationTest.h" />
     <ClInclude Include="Source\EngineEditorState.h" />
-    <ClInclude Include="Source\EngineSystemCommands.h" />
     <ClInclude Include="Source\Framework\SerializedForDiffing.h" />
     <ClInclude Include="Source\Framework\NodeMenuItem.h" />
     <ClInclude Include="Source\DebugConsole.h" />

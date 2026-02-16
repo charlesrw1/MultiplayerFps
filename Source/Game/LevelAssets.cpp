@@ -4,7 +4,6 @@
 #include "Framework/Files.h"
 #include "Game/BaseUpdater.h"
 #include "Framework/ReflectionProp.h"
-#include "EngineSystemCommands.h"
 #include "LevelEditor/EditorDocLocal.h"
 #include "Framework/MapUtil.h"
 #include "LevelSerialization/SerializeNew.h"

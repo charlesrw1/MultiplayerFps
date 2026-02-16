@@ -69,9 +69,10 @@ vec3 pbr_calculate_punctual(vec3 LightColor, vec3 LighDir, vec3 worldspace, vec3
         float G   = GeometrySmith(Normal, V, LighDir, Roughness);    
         vec3 F    = fresnelSchlick(max(dot(H, V), 0.0), F0);        
         
+	
         vec3 numerator    = NDF * G * F;
         float denominator = 4.0 * max(dot(Normal, V), 0.0) * max(dot(Normal, LighDir), 0.0) + 0.0001; // + 0.0001 to prevent divide by zero
-        vec3 specular = numerator / 1.0;
+        vec3 specular = numerator / denominator;
         vec3 kS = F;
         vec3 kD = vec3(1.0) - kS;
         kD *= 1.0 - Metalness;	                

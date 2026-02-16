@@ -49,7 +49,6 @@
 #include "EditorPopups.h"
 #include "IntegrationTest.h"
 #include "EngineEditorState.h"
-#include "EngineSystemCommands.h"
 #include "DebugConsole.h"
 #include "Scripting/ScriptManager.h"
 #include "Scripting/ScriptFunctionCodegen.h"

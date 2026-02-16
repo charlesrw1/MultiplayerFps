@@ -41,7 +41,6 @@ void post_load_map_callback_generic(bool make_plane)
 	auto skylight = eng->get_level()->spawn_entity()->create_component<SkylightComponent>();
 
 }
-#include "EngineSystemCommands.h"
 
 Pool_Allocator<Pose> g_pose_pool = Pool_Allocator<Pose>(100, "g_pose_pool");
 Pool_Allocator<MatrixPose> g_matrix_pool = Pool_Allocator<MatrixPose>(10,"g_matrix_pool");

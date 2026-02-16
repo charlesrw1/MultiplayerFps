@@ -34,8 +34,8 @@ ShadowMapAtlas::ShadowMapAtlas() {
 	vtsHandle->update_specs_ptr(atlas);
 
 	// add the rects
-	const int subCount = 4;
-	const int subSize = size / 4;	// 256 or 512
+	const int subCount = 8;
+	const int subSize = size / subCount;	// 256 or 512
 	for (int x = 0; x < subCount; x++) {
 		for (int y = 0; y < subCount; y++) {
 			Rect2d rect;

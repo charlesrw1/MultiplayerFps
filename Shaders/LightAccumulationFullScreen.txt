@@ -146,7 +146,8 @@ void main()
 		vec3 position = _position_radius.xyz;
 		float radius = _position_radius.w;
 		vec3 color = light_objects[light_index].light_color.xyz;
-		bool is_spot_light = bool(light_objects[light_index].flags);
+		bool is_spot_light = bool(light_objects[light_index].flags & 1);
+		bool casts_shadow = bool(light_objects[light_index].flags & 2);
 		vec3 spot_normal =  light_objects[light_index].spot_normal.xyz;
 		float spot_angle = light_objects[light_index].spot_angle;
 		float spot_inner = light_objects[light_index].spot_inner;
@@ -171,7 +172,9 @@ void main()
 			attenuation *= clamp((-spot_angle+angle) / (spot_inner-spot_angle), 0.0, 1.0);    
 		#endif
 		#ifdef SHADOWED
-			attenuation *= sample_shadow(worldspace, light_index);
+			if(casts_shadow) {
+				attenuation *= sample_shadow(worldspace, light_index);
+			}
 		#endif
 			
 		}

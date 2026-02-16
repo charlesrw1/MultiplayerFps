@@ -138,7 +138,11 @@ vec3 pbr_calculate_reflection(vec3 worldspace, vec3 Albedo, float Roughness, flo
 	//prefiltered_color *= ref_irrad;
 
 	float NdotV = max(dot(Normal,V),0.0);
+	
+	
 	vec3 F = FresnelSchlickRougness(NdotV,F0,Roughness);
+	
+	
 	//float F90 = clamp(50*dot(F0,vec3(0.33)),0,1);
 	//vec3 F = modified_f_schlick(F0,F90,NdotV);
 	

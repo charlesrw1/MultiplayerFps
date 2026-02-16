@@ -52,7 +52,6 @@ struct HitResult {
 };
 
 
-#include "EngineSystemCommands.h"
 #include "../Level.h"
 #include "Sound/SoundPublic.h"
 class GameplayStatic : public ClassBase {
