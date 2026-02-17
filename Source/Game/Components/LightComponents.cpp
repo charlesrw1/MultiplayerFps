@@ -233,7 +233,13 @@ void CubemapComponent::start() {
 		editor_meshbuilder->dont_serialize_or_edit = true;
 		editor_meshbuilder->use_background_color = true;
 		editor_meshbuilder->use_transform = true;
-
+		{
+			auto mesh = get_owner()->create_component<MeshComponent>();
+			mesh->dont_serialize_or_edit = true;
+			mesh->set_model(Model::load("cube1m.cmdl"));
+			mesh->set_material_override(MaterialInstance::load("cubemap_zone.mi"));
+			mesh->set_ignore_baking(true);
+		}
 		auto meshEntity = eng->get_level()->spawn_entity();
 		auto mesh = meshEntity->create_component<MeshComponent>();
 		mesh->set_model(Model::load("eng/LIGHT_SPHERE.cmdl"));

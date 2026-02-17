@@ -1,0 +1,37 @@
+
+layout(location = 0) out vec4 FS_OUT_Color;
+
+layout(binding = 0) uniform sampler2D DEPTH;// depth texture (writes disabled)
+layout(binding = 1) uniform sampler3D frustum_fog;
+
+#include "SharedGpuTypes.txt"
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+struct Vfog_Params
+{
+	ivec4 volumesize;
+	vec4 spread_frustumend;
+	vec4 reprojection;
+	mat4 last_viewproj;
+	vec4 density_ani;
+};
+
+layout (binding = 4, std140) uniform Vfog_Param_Buffer {
+	Vfog_Params fogparam;
+};
+
+#include "VfogShared.txt"
+
+void main()
+{
+	vec2 uv = vec2(gl_FragCoord.xy) / vec2(g.viewport_size.xy);
+	float depth_value = texture(DEPTH,uv).r;
+	
+	vec3 ndc = vec3(uv*2.0-vec2(1.0), depth_value);
+	vec4 scattering_density = sample_volfog_volume(ndc, frustum_fog);
+	
+	FS_OUT_Color = vec4(scattering_density.rgb,1.0-scattering_density.a);
+}

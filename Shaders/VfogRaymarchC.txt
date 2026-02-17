@@ -8,6 +8,7 @@ struct Vfog_Params
 	vec4 spread_frustumend;
 	vec4 reprojection;
 	mat4 last_view;
+	vec4 den_ani;
 };
 layout (binding = 4, std140) uniform Vfog_Param_Buffer {
 	Vfog_Params fogparam;
@@ -28,19 +29,18 @@ void WriteOutput(ivec3 pos, vec4 colordensity)
 	imageStore(VolumeTexture,pos,finalval);
 }
 
-uniform float znear;
-uniform float zfar;
+#include "SharedGpuTypes.txt"
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
 
-float GetPlaneDist(uint z)
+
+float get_plane_dist_new2(uint z)
 {
-	return znear*pow(zfar/znear,float(z)/128.0);
+	float normalized = float(z)/fogparam.volumesize.z;
+	return pow(normalized,fogparam.spread_frustumend.x)*fogparam.spread_frustumend.y + g.near;
 }
-float GetPlaneDist_New(uint z, float cell_depth)
-{
-	float d = float(z)*cell_depth + cell_depth*0.5;	// d: [0,1]
-	d = pow(d, fogparam.spread_frustumend.x);
-	return d*fogparam.spread_frustumend.y;
-}
+
 #define NEWWAY
 void main()
 {
@@ -55,11 +55,9 @@ void main()
 	for(uint z=0;z<128;z++)
 	{
 	
-	#ifdef NEWWAY
-		deltaz =  GetPlaneDist_New(z+1, fog_cell_size.z)-GetPlaneDist_New(z, fog_cell_size.z);
-	#else
-		deltaz = GetPlaneDist(z+1)-GetPlaneDist(z);
-	#endif
+
+		float deltaz =  get_plane_dist_new2(z+1)-get_plane_dist_new2(z);
+
 	
 		const vec4 currentslice = imageLoad(VolumeTexture,ivec3(OutputCoords.xy,z));
 		const float transmittance = exp(-currentslice.a*deltaz*0.1);

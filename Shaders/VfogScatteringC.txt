@@ -2,10 +2,13 @@ layout(local_size_x = 8, local_size_y=8,local_size_z=1) in;
 layout(rgba16f,binding =2) uniform image3D  VolumeTexture;
 
 uniform sampler3D previous_volume;
-uniform sampler3D perlin_noise;
-uniform vec3 perlin_offset;
+
+//uniform sampler3D perlin_noise;
+//uniform vec3 perlin_offset;
 
 #define PI 3.14159
+
+#include "SharedGpuTypes.txt"
 
 float ComputeScattering(float lightDotView)
 {
@@ -28,68 +31,27 @@ struct Vfog_Params
 	vec4 spread_frustumend;
 	vec4 reprojection;
 	mat4 last_viewproj;
+	vec4 density_ani;
 };
 
 layout (binding = 4, std140) uniform Vfog_Param_Buffer {
 	Vfog_Params fogparam;
 };
 
-struct Ubo_View_Constants_Struct
-{
-	mat4 view;
-	mat4 viewproj;
-	mat4 invview;
-	mat4 invproj;
-	vec4 viewpos_time;
-	vec4 viewfront;
-	vec4 viewport_size;
-
-	float near;
-	float far;
-	float shadowmap_epsilon;
-	float padding1;
-	
-	vec4 fogcolor;
-	vec4 fogparams;
-	vec4 directional_light_dir_and_used;
-	vec4 directional_light_color;
-	
-	float numcubemaps;
-	float numlights;
-	float forcecubemap;
-	float padding2;
-};
-
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
+layout(binding = 1, std430) buffer LightingBuffer {
+	LightingObjectUniforms data[];
+}Lights;
+uniform int num_light=0;
 
-uniform float density;
-uniform float anisotropy;
 
-vec4 ScreenToView(vec4 screenspace)
-{
-	vec4 clipspace = vec4(vec2(screenspace.xy)*2.0-vec2(1.0),screenspace.z,screenspace.w);
-	
-	vec4 viewspace = g.invproj*clipspace;
-	viewspace = viewspace / viewspace.w;
-	return viewspace;
-}
-vec3 ViewToWorld(vec4 viewspace)
-{
-	vec4 world = g.invview*viewspace;
-	world = world/world.w;
-	return world.xyz;
-}
 
 vec3 randColor(int number){
     return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
 }
 
-uniform vec3 spotlightpos;
-uniform vec3 spotlightnormal;
-uniform float spotlightangle;
-uniform vec3 spotlightcolor;
 
 #define TEMPORAL_FRAMES 16
 const vec3 halton_map[TEMPORAL_FRAMES] = vec3[](
@@ -112,86 +74,73 @@ const vec3 halton_map[TEMPORAL_FRAMES] = vec3[](
 
 
 
-ivec3 fragcoords;
-vec3 invpixelsize;
-float znear;
-float zfar;
 
-vec3 get_worldpos_new(vec3 poffset)
+#include "VfogShared.txt"
+
+vec3 get_worldpos_new(ivec3 fragcoords,vec3 invpixelsize, vec3 poffset)
 {
-	vec3 screencoord = vec3(fragcoords)*invpixelsize + poffset*invpixelsize;
-	vec4 point_ss = vec4(vec2(screencoord.x,screencoord.y),-1.0,1.0);
-	vec4 point_vs = ScreenToView(point_ss);
-	screencoord.z = pow(screencoord.z, fogparam.spread_frustumend.x);
-	float tilez = screencoord.z*fogparam.spread_frustumend.y+znear;
-	vec3 viewspace_point = point_vs.xyz*tilez/(-point_vs.z);
-	return ViewToWorld(vec4(viewspace_point,1.0));
+	vec3 screencoord = vec3(fragcoords)*invpixelsize + poffset*invpixelsize;	// [0,1]
+	
+	float tilez = get_world_depth_from_volume_normalized(screencoord.z,fogparam.spread_frustumend.x,fogparam.spread_frustumend.y);
+	float clipspace_depth = unlinearize_depth(tilez);	// projection space
+	vec3 ndc = vec3(screencoord.x*2.0 - 1.0, screencoord.y*2.0 - 1.0, clipspace_depth);
+	
+	vec4 world = g.inv_viewproj * vec4(ndc,1.0);
+	world/=world.w;
+
+	return world.xyz;
 }
 
-float linearize_depth(float d,float zNear,float zFar)
-{
-    float z_n = 2.0 * d - 1.0;
-    return 2.0 * zNear * zFar / (zFar + zNear - z_n * (zFar - zNear));
-}
 
-vec4 get_previous_tex(vec3 NDC)
+vec3 get_inscattering(vec3 worldpos)
 {
-	float lineardepth = linearize_depth(NDC.z*0.5+0.5,znear,zfar);
-	vec3 texturecoord = vec3((NDC.xy+vec2(1.0))*0.5,0.0);
-	texturecoord.z = pow((lineardepth-znear) / fogparam.spread_frustumend.y,1.0/fogparam.spread_frustumend.x);
-	return texture(previous_volume,texturecoord);
+	vec3 raydir = normalize(worldpos-g.viewpos_time.xyz);
+
+	//vec3 spotdir = worldpos-(spot_pos+vec3(2,0,0));
+	//float spotlen = length(spotdir);
+	//spotdir = spotdir/spotlen;
+	vec3 spotadd = vec3(0.51);
+	//if(dot(spotdir,spotlightnormal)>0.5) {
+		//spotadd = phase_function(raydir,spotdir,anisotropy)/(spotlen*spotlen);
+	//	spotadd = min(spotadd, 100.0);
+	//}
+	return spotadd;
 }
 
 void main()
 {
-	fragcoords = ivec3(gl_GlobalInvocationID.xyz);
-	invpixelsize = 1/vec3(fogparam.volumesize);
-	znear = g.near;
-	zfar = g.far;
-	
-	vec3 spot_pos = spotlightpos;
+	ivec3 fragcoords = ivec3(gl_GlobalInvocationID.xyz);
+	vec3 invpixelsize = 1/vec3(fogparam.volumesize);
 
-
-	vec3 worldpos = get_worldpos_new(vec3(0.5));
+	vec3 worldpos = get_worldpos_new(fragcoords, invpixelsize, vec3(0.5));
 
 	// calc reprojection
 	vec4 reprojected_ndc = fogparam.last_viewproj*vec4(worldpos,1.0);
 	vec4 reprojected_value = vec4(0.0);
 	float reprojected_mix = 0.0;
 	
-#if 1
+#if 0
 	reprojected_ndc/=reprojected_ndc.w;
  	if (all(greaterThanEqual(reprojected_ndc.xyz, vec3(-1.0))) && all(lessThanEqual(reprojected_ndc.xyz, vec3(1.0)))) {
 		// good reprojection
-		reprojected_value = get_previous_tex(reprojected_ndc.xyz);
-		worldpos = get_worldpos_new(halton_map[int(fogparam.reprojection.x)]);
+		reprojected_value = sample_volfog_volume(reprojected_ndc.xyz, previous_volume);
+		worldpos = get_worldpos_new(fragcoords, invpixelsize, halton_map[int(fogparam.reprojection.x)]);
 		reprojected_mix = 0.95;
 	}
 #endif
 	
 	
+	vec3 inscattering = get_inscattering(worldpos);
 	
-	vec3 raydir = normalize(worldpos-g.viewpos_time.xyz);
-	vec3 inscattering = vec3(0.0);
-	
-	vec3 spotdir = worldpos-(spot_pos+vec3(2,0,0));
-	float spotlen = length(spotdir);
-	spotdir = spotdir/spotlen;
-	vec3 spotadd = vec3(0.51);
-	//if(dot(spotdir,spotlightnormal)>0.5) {
-		spotadd = phase_function(raydir,spotdir,anisotropy)*vec3(5,4,3)*10.0/(spotlen*spotlen);
-		spotadd = min(spotadd, 100.0);
-	//}
-	inscattering += spotadd;
-	
-	float real_density = (texture(perlin_noise, worldpos*0.2+perlin_offset*0.1).r - 1.0)*5.0+density;// + texture(perlin_noise, worldpos*0.8+perlin_offset*0.2).r;
-	real_density  = real_density;
+	//float real_density = (texture(perlin_noise, worldpos*0.2+perlin_offset*0.1).r - 1.0)*5.0+density;// + texture(perlin_noise, worldpos*0.8+perlin_offset*0.2).r;
+	float real_density  = fogparam.density_ani.x;
 	float edensity = max(exp(-real_density),0.000001)* exp(-max(worldpos.y*2.0,0.0));
-	vec4 coloranddensity = vec4(inscattering*edensity,edensity);
+	vec4 coloranddensity = vec4(inscattering*real_density,real_density);
 	//ComputeScattering(dot(raydir,-sun_dir));
 	
 	
 	coloranddensity = mix(coloranddensity, reprojected_value, reprojected_mix);
-	
+	coloranddensity.rgb = randColor(int(gl_GlobalInvocationID.z));
+	//coloranddensity.a = 0.5;
 	imageStore(VolumeTexture,ivec3(fragcoords),coloranddensity);//vec4(inscattering,density));
 }

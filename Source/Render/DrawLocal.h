@@ -531,6 +531,7 @@ public:
 
 
 		program_handle height_fog{};
+		program_handle volfog_apply{};
 	}prog;
 
 	

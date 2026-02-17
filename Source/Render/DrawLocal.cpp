@@ -785,11 +785,13 @@ void Renderer::create_shaders()
 	prog.reflection_accumulation = prog_man.create_raster("fullscreenquad.txt", "SampleCubemapsF.txt");
 
 	prog.height_fog = prog_man.create_raster("fullscreenquad.txt", "HeightFogF.txt");
+	prog.volfog_apply = prog_man.create_raster("fullscreenquad.txt", "VolfogApplyF.txt");
+
 	//prog_man.create_single_file()
 	// volumetric fog shaders
 	Shader::compute_compile(&volfog.prog.lightcalc, "VfogScatteringC.txt");
 	Shader::compute_compile(&volfog.prog.raymarch, "VfogRaymarchC.txt");
-	Shader::compute_compile(&volfog.prog.reproject, "VfogScatteringC.txt", "REPROJECTION");
+//	Shader::compute_compile(&volfog.prog.reproject, "VfogScatteringC.txt", "REPROJECTION");
 	volfog.prog.lightcalc.use();
 	volfog.prog.lightcalc.set_int("previous_volume", 0);
 	volfog.prog.lightcalc.set_int("perlin_noise", 1);
@@ -3421,6 +3423,31 @@ void Renderer::draw_height_fog()
 	if (scene.skylights.empty())
 		return;
 
+	if (enable_volumetric_fog.get_bool()) {
+
+		RenderPassState state;
+		auto color_info = {
+			ColorTargetInfo(tex.scene_color)
+		};
+		state.color_infos = color_info;
+		IGraphicsDevice::inst->set_render_pass(state);
+
+		RenderPipelineState setup;
+		setup.blend = BlendState::BLEND;
+		setup.depth_testing = false;
+		setup.depth_writes = false;
+		setup.program = prog.volfog_apply;
+		setup.vao = get_empty_vao();
+		get_device().set_pipeline(setup);
+
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, volfog.buffer.param);
+
+		bind_texture_ptr(0, tex.scene_depth);
+		bind_texture(1, volfog.texture.volume);
+
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+	}
+
 	RSkylight_Internal& skylight_int = scene.skylights.at(0);
 	Render_Skylight& skylight = skylight_int.skylight;
 	if (!skylight.fog_enabled)
@@ -3926,7 +3953,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 	shadowmap.update();
 
-	//volfog.compute();
+	volfog.compute();
 	const bool is_wireframe_mode = r_debug_mode.get_integer() == gpu::DEBUG_WIREFRAME;
 
 	// main level render

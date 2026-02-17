@@ -22,7 +22,6 @@ public:
 	int temporal_sequence = 0;
 
 	struct buffers {
-		bufferhandle light;
 		bufferhandle param;
 	}buffer;
 
