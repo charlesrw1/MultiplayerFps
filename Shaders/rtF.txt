@@ -246,6 +246,6 @@ void main()
 	// 2 bounce reflections
 	vec3 color = trace_ray(ro,rd).xyz;
 	
-	FS_OUT_FragColor = vec4(color,1);//vec4(rd,1.0);//color;//(idx==-1)?vec4(0):vec4(1,0,0,1);
+	FS_OUT_FragColor = vec4(pow(color,vec3(1/2.2)),1);//vec4(rd,1.0);//color;//(idx==-1)?vec4(0):vec4(1,0,0,1);
 }
 	

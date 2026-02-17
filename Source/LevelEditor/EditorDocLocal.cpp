@@ -2211,6 +2211,7 @@ void DragDetector::end_drag_func()
 			printf("end drag\n");
 			doc.inputs.set_focus(nullptr);
 			on_drag_end.invoke(get_drag_rect());
+			doc.inputs.eat_mouse_click();
 		}
 		is_dragging = false;
 		mouseClickX = 0;

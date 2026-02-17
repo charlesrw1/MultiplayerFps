@@ -29,6 +29,7 @@ void SoundComponent::update_player()
 	player->spatial_pos = get_ws_position();
 	player->looping = looping;
 }
+#include "Game/Components/BillboardComponent.h"
 void SoundComponent::start()
 {
 #ifdef EDITOR_BUILD
@@ -38,6 +39,10 @@ void SoundComponent::start()
 		editor_mesh->use_transform = true;
 		update_ed_mesh();
 		editor_mesh->on_changed_transform();
+
+		auto billboard = get_owner()->create_component<BillboardComponent>();
+		billboard->set_texture(Texture::load("eng/editor/sound.png"));
+		billboard->dont_serialize_or_edit = true;
 	}
 #endif
 	player = isound->register_sound_player();

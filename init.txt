@@ -94,4 +94,4 @@ r.taa 0
 loglevel 5
 developer_mode 1
 
-open-editor my_map.tmap
+open-editor demo_level_0.tmap
