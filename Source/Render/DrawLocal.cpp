@@ -22,7 +22,6 @@
 #include "tracy/public/tracy/TracyOpenGL.hpp"
 #include "Framework/ArenaAllocator.h"
 #include "IGraphsDevice.h"
-#include "StreamingTextureMgr.h"
 const GLenum MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT;
 
 //#pragma optimize("", off)
@@ -1081,7 +1080,6 @@ void Renderer::init()
 
 	windowDrawer = new RenderWindowBackendLocal();
 	RenderWindowBackend::inst = windowDrawer;
-	StreamingTextureMgr::inst = new StreamingTextureMgr;
 
 	mem_arena.init("RenderTemp", renderer_memory_arena_size.get_integer());
 	// Init scene draw buffers
@@ -2670,6 +2668,9 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 		const bool wants_set_to_fallback = r_force_all_materials_to_fallback.get_bool();
 		const bool dont_use_cam_depth = r_dont_use_camera_depth_build_scene.get_bool();
 		const bool all_object_depth_prepass = r_depth_prepass_all_objects.get_bool();
+
+		const bool set_transparents_to_default = r_debug_mode.get_integer() != 0 && r_debug_mode.get_integer() != gpu::DEBUG_ALBEDO;
+
 		for (int i = 0; i < proxy_list.objects.size(); i++) {
 			auto& obj = proxy_list.objects[i];
 			handle<Render_Object> objhandle{ obj.handle };
@@ -2711,8 +2712,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 					mat = (MaterialInstance*)obj.type_.proxy.mat_override;
 				if (wants_set_to_fallback || !mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
 					mat = matman.get_fallback();
-				if (wants_transparent_debug && mat->get_master_material()->render_in_forward_pass())
-					mat = debug_transparent_mat;
+				if (set_transparents_to_default && mat->get_master_material()->render_in_forward_pass())
+					mat = matman.get_fallback();
 
 
 				const MasterMaterialImpl* mm = mat->get_master_material();
@@ -2851,6 +2852,7 @@ void Renderer::draw_meshbuilders()
 		auto& dd = mbPair.type_.dd;
 		if (dd.num_indicies == 0)	// this check ...
 			continue;
+
 		if (mb.use_background_color) {
 			RenderPipelineState state;
 			state.program = prog.simple_solid_color;

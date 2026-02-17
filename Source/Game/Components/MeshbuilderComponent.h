@@ -35,3 +35,23 @@ public:
 	handle<MeshBuilder_Object> editor_mb_handle;
 	MeshBuilder mb;
 };
+class GuiFont;
+using std::string;
+struct Particle_Object;
+#include "Render/DynamicMaterialPtr.h"
+class WorldTextComponent : public Component {
+public:
+	CLASS_BODY(WorldTextComponent);
+	WorldTextComponent();
+	~WorldTextComponent();
+	void start() final;
+	void stop() final;
+	void on_changed_transform() final;
+	void on_sync_render_data() final;
+
+	DynamicMatUniquePtr font_mat;
+	handle<Particle_Object> editor_mb_handle;
+	MeshBuilder mb;
+	REF GuiFont* font = nullptr;
+	REF string text;
+};

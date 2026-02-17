@@ -24,7 +24,6 @@
 
 #include "IGraphsDevice.h"
 
-#include "StreamingTextureMgr.h"
 
 // TextureEditor.cpp
 extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*,Color32& outColor);
@@ -639,8 +638,6 @@ void Texture::post_load() {
 	type = Texture_Type::TEXTYPE_2D;
 
 	loaddata.reset();
-
-	StreamingTextureMgr::inst->register_streaming_texture(this);
 }
 
 extern ConfigVar developer_mode;
@@ -722,7 +719,6 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 void Texture::uninstall()
 {
 	safe_release(gpu_ptr);
-	StreamingTextureMgr::inst->unregister_streaming_texture(this);
 }
 void Texture::update_specs_ptr(IGraphicsTexture* ptr) {
 	this->gpu_ptr = ptr;
@@ -954,53 +950,6 @@ struct StreamTextureData {
 	
 	int wanted_mip_level = -1;
 };
-
-StreamingTextureMgr::StreamingTextureMgr() {
-
-}
-StreamingTextureMgr::~StreamingTextureMgr() {
-
-}
-StreamingTextureMgr* StreamingTextureMgr::inst = nullptr;
-
-void StreamingTextureMgr::tick()
-{
-	
-
-}
-#include "Framework/Range.h"
-void StreamingTextureMgr::set_material_screen_size(std::span<float> sizes)
-{
-	for (auto& [texture, stream] : streaming_textures)
-		stream.wanted_mip_level = -1;
-
-	const std::vector<MaterialInstance*>& all_mats = matman.get_material_table()->get_all_mat_array();
-	assert(all_mats.size() == sizes.size());
-	for (int index = 0; index < all_mats.size();index++) {
-		MaterialInstance* material = all_mats.at(index);
-		float screen_size = sizes[index];
-		if (screen_size < 0)
-			continue;
-		for (Texture* texture : material->impl->texture_bindings) {
-			StreamTextureData* data = MapUtil::get_opt(streaming_textures, texture);
-			if (data)
-				data->wanted_mip_level = 0;
-		}
-	}
-
-
-}
-#include "Framework/MapUtil.h"
-void StreamingTextureMgr::register_streaming_texture(Texture* tex)
-{
-	MapUtil::insert_test_exists(streaming_textures, tex, StreamTextureData());
-}
-
-void StreamingTextureMgr::unregister_streaming_texture(Texture* tex)
-{
-	//assert(MapUtil::contains(streaming_textures,tex));
-	streaming_textures.erase(tex);
-}
 
 void benchmark_run()
 {

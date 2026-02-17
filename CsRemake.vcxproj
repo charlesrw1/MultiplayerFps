@@ -231,7 +231,6 @@
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Render\RenderWindow.h" />
     <ClInclude Include="Source\Render\RT\RaytraceTest.h" />
-    <ClInclude Include="Source\Render\StreamingTextureMgr.h" />
     <ClInclude Include="Source\Render\UniformBuffer.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
     <ClInclude Include="Source\Framework\Hashset.h" />

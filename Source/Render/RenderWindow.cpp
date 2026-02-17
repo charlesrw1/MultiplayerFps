@@ -90,12 +90,9 @@ static void get_uvs(glm::vec2& top_left, glm::vec2& sz, int x, int y, int w, int
 	sz = { wf,hf };
 
 }
-void RenderWindow::draw(TextShape text_shape)
-{
-	if (!text_shape.font)
-		text_shape.font = UiSystem::inst->defaultFont;
-	const int start = meshbuilder.get_i().size();
 
+void TextShape::draw_text_to_meshbuilder(const TextShape& text_shape, MeshBuilder& meshbuilder)
+{
 	int x = text_shape.rect.x;
 	int y = text_shape.rect.y - text_shape.font->base;
 	auto text = text_shape.text;
@@ -124,7 +121,15 @@ void RenderWindow::draw(TextShape text_shape)
 			x += find->second.advance;
 		}
 	}
+}
 
+void RenderWindow::draw(TextShape text_shape)
+{
+	if (!text_shape.font)
+		text_shape.font = UiSystem::inst->defaultFont;
+
+	const int start = meshbuilder.get_i().size();
+	TextShape::draw_text_to_meshbuilder(text_shape, meshbuilder);
 	auto mat = (MaterialInstance*)UiSystem::inst->fontDefaultMat;
-	add_draw_call(mat, start, font->font_texture.get());
+	add_draw_call(mat, start, text_shape.font->font_texture.get());
 }

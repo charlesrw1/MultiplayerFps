@@ -85,6 +85,9 @@ struct TextShape {
 	bool with_drop_shadow = false;
 	Color32 drop_shadow_color = COLOR_BLACK;
 	int drop_shadow_ofs = 2;
+
+
+	static void draw_text_to_meshbuilder(const TextShape& shape, MeshBuilder& mb);
 };
 
 class RenderWindow {
