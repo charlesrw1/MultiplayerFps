@@ -793,8 +793,8 @@ void Renderer::create_shaders()
 	Shader::compute_compile(&volfog.prog.raymarch, "VfogRaymarchC.txt");
 //	Shader::compute_compile(&volfog.prog.reproject, "VfogScatteringC.txt", "REPROJECTION");
 	volfog.prog.lightcalc.use();
-	volfog.prog.lightcalc.set_int("previous_volume", 0);
-	volfog.prog.lightcalc.set_int("perlin_noise", 1);
+	//volfog.prog.lightcalc.set_int("previous_volume", 0);
+	//volfog.prog.lightcalc.set_int("perlin_noise", 1);
 
 	glUseProgram(0);
 }

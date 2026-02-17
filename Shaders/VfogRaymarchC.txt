@@ -55,12 +55,11 @@ void main()
 	for(uint z=0;z<128;z++)
 	{
 	
-
 		float deltaz =  get_plane_dist_new2(z+1)-get_plane_dist_new2(z);
 
-	
+
 		const vec4 currentslice = imageLoad(VolumeTexture,ivec3(OutputCoords.xy,z));
-		const float transmittance = exp(-currentslice.a*deltaz*0.1);
+		const float transmittance = exp(-currentslice.a*deltaz);
 		vec3 slice_scattering_integral = currentslice.rgb*(1.0-transmittance)/max(currentslice.a,0.00001);
 		
 		accumulatedscattrans.rgb += slice_scattering_integral*accumulatedscattrans.a;

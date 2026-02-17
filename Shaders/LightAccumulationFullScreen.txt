@@ -43,55 +43,9 @@ layout (binding = 4, std430) readonly buffer LightTiledIndicies_Buffer {
 
 #include "commonUtil.txt"
 #include "pbrShared.txt"
+#include "pointLightShared.txt"
 
-float sample_shadow(vec3 WorldSpace, int light_index)
-{
-	mat4 shadow_view_proj = light_objects[light_index].lighting_view_proj;
-	vec4 shadow_atlas_offset = light_objects[light_index].atlas_offset;
-	float bias = light_objects[light_index].epsilon;
 
-	vec4 frag_pos_light_space = shadow_view_proj*vec4(WorldSpace,1.0);
-	vec3 proj_coords=frag_pos_light_space.xyz/frag_pos_light_space.w;
-	proj_coords.xy=proj_coords.xy*0.5+0.5;
-	float depth_light_space=proj_coords.z;
-	if(depth_light_space<0.0)
-		return 0.0;
-	
-	// adjust to atlas pos
-	// proj_coords is [0,1]
-	vec2 coords_no_atlas = proj_coords.xy;
-	proj_coords.xy = proj_coords.xy*shadow_atlas_offset.xy + shadow_atlas_offset.zw;
-
-	float shadow = 0.0;
-	vec2 texelSize = 1.0 / vec2(textureSize(shadow_map_atlas, 0));
-	for(int x = -1; x <= 1; ++x)
-	{
-		for(int y = -1; y <=1; ++y)
-		{
-			#ifdef CHEAP_PCF
-		
-				float pcf_depth = texture(
-							cascade_shadow_map,
-							vec3(proj_coords.xy + vec2(x, y) * texelSize,
-							layer)
-							).r; 
-				shadow += (depth_light_space - bias) > pcf_depth ? 1.0 : 0.0;
-			#else	// Bilinear filtered, looks nice
-					shadow += texture(shadow_map_atlas,vec3(proj_coords.xy + vec2(x, y) * texelSize, (depth_light_space+bias)));
-			#endif
-		}    
-	}
-	shadow /= 9.0;
-#ifdef COOKIE
-	if(coords_no_atlas.x<0||coords_no_atlas.x>=1||coords_no_atlas.y<0||coords_no_atlas.y>=1)
-		return 0.0;
-
-	float cookie_val = texture(light_cookie,coords_no_atlas).r;
-	return (1.0-shadow)*cookie_val;
-#else
-	return 1.0-shadow;
-#endif
-}
 #ifndef TILED
 #define TILED 0
 #endif
@@ -162,14 +116,14 @@ void main()
 		
 		float distance_to_light_2 = distance_to_light*distance_to_light;
 		float radius_2 = radius*radius;
-		float attenuation = 1.0/distance_to_light_2 * clamp(1-distance_to_light_2/radius_2,0.0,1.0);
+		float attenuation =punctual_attenuation(distance_to_light_2,radius_2);
 		
 		vec3 out_color = pbr_calculate_punctual(color, L, worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz);
 		
 		if(is_spot_light) {
 			float angle = dot(-L, spot_normal);
 		#ifndef COOKIE
-			attenuation *= clamp((-spot_angle+angle) / (spot_inner-spot_angle), 0.0, 1.0);    
+			attenuation *= spotlight_angle_atten(spot_angle,angle,spot_inner);//clamp((-spot_angle+angle) / (spot_inner-spot_angle), 0.0, 1.0);    
 		#endif
 		#ifdef SHADOWED
 			if(casts_shadow) {

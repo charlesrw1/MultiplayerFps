@@ -1,7 +1,9 @@
 layout(local_size_x = 8, local_size_y=8,local_size_z=1) in;
 layout(rgba16f,binding =2) uniform image3D  VolumeTexture;
 
-uniform sampler3D previous_volume;
+layout(binding = 0) uniform sampler3D previous_volume;
+layout(binding = 1) uniform sampler2DShadow shadow_map_atlas;
+
 
 //uniform sampler3D perlin_noise;
 //uniform vec3 perlin_offset;
@@ -41,10 +43,11 @@ layout (binding = 4, std140) uniform Vfog_Param_Buffer {
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
-layout(binding = 1, std430) buffer LightingBuffer {
-	LightingObjectUniforms data[];
-}Lights;
-uniform int num_light=0;
+layout (binding = 1, std430) readonly buffer LightingObjectUniforms_Buffer {
+	LightingObjectUniforms light_objects[];
+};
+
+uniform int num_lights=0;
 
 
 
@@ -79,7 +82,7 @@ const vec3 halton_map[TEMPORAL_FRAMES] = vec3[](
 
 vec3 get_worldpos_new(ivec3 fragcoords,vec3 invpixelsize, vec3 poffset)
 {
-	vec3 screencoord = vec3(fragcoords)*invpixelsize + poffset*invpixelsize;	// [0,1]
+	vec3 screencoord = (vec3(fragcoords)+poffset)*invpixelsize;	// [0,1]
 	
 	float tilez = get_world_depth_from_volume_normalized(screencoord.z,fogparam.spread_frustumend.x,fogparam.spread_frustumend.y);
 	float clipspace_depth = unlinearize_depth(tilez);	// projection space
@@ -91,20 +94,66 @@ vec3 get_worldpos_new(ivec3 fragcoords,vec3 invpixelsize, vec3 poffset)
 	return world.xyz;
 }
 
-
-vec3 get_inscattering(vec3 worldpos)
+#include "pointLightShared.txt"
+	float sigmaS = 0.5; // scattering coefficient
+	float sigmaA = 0.2; // absorption coefficient
+	float sigmaT = sigmaS + sigmaA; // total extinction
+vec3 get_inscattering(vec3 worldspace)
 {
-	vec3 raydir = normalize(worldpos-g.viewpos_time.xyz);
+	vec3 raydir = normalize(worldspace-g.viewpos_time.xyz);
+
+
+	vec3 accum = vec3(0.0);
+	for(int light_index = 0;light_index<num_lights;light_index++) {
+	
+		vec4 _position_radius = light_objects[light_index].position_radius;
+		vec3 position = _position_radius.xyz;
+		float radius = _position_radius.w;
+		vec3 color = light_objects[light_index].light_color.xyz;
+		bool is_spot_light = bool(light_objects[light_index].flags & 1);
+		bool casts_shadow = bool(light_objects[light_index].flags & 2);
+		vec3 spot_normal =  light_objects[light_index].spot_normal.xyz;
+		float spot_angle = light_objects[light_index].spot_angle;
+		float spot_inner = light_objects[light_index].spot_inner;
+		
+		float distance_to_light = length(position-worldspace);
+		if(distance_to_light>radius)
+			continue;
+		
+		vec3 L = (position - worldspace)/distance_to_light;
+		
+		distance_to_light = max(distance_to_light,0.1);
+		
+		float distance_to_light_2 = distance_to_light*distance_to_light;
+		float radius_2 = radius*radius;
+		float attenuation =punctual_attenuation(distance_to_light_2,radius_2);
+				
+		if(is_spot_light) {
+			float angle = dot(-L, spot_normal);
+		#ifndef COOKIE
+			attenuation *= spotlight_angle_atten(spot_angle,angle,spot_inner);//clamp((-spot_angle+angle) / (spot_inner-spot_angle), 0.0, 1.0);    
+		#endif
+	
+			if(casts_shadow) {
+				attenuation *= sample_shadow(worldspace, light_index);
+			}
+			
+		}
+		attenuation *= exp(-sigmaT * distance_to_light);
+		
+		accum += attenuation * color * phase_function(raydir, -L,fogparam.density_ani.y);
+	
+	}
 
 	//vec3 spotdir = worldpos-(spot_pos+vec3(2,0,0));
 	//float spotlen = length(spotdir);
 	//spotdir = spotdir/spotlen;
-	vec3 spotadd = vec3(0.51);
+	accum += vec3(0.1);
 	//if(dot(spotdir,spotlightnormal)>0.5) {
 		//spotadd = phase_function(raydir,spotdir,anisotropy)/(spotlen*spotlen);
 	//	spotadd = min(spotadd, 100.0);
 	//}
-	return spotadd;
+	return accum;
 }
 
 void main()
@@ -119,28 +168,30 @@ void main()
 	vec4 reprojected_value = vec4(0.0);
 	float reprojected_mix = 0.0;
 	
-#if 0
-	reprojected_ndc/=reprojected_ndc.w;
- 	if (all(greaterThanEqual(reprojected_ndc.xyz, vec3(-1.0))) && all(lessThanEqual(reprojected_ndc.xyz, vec3(1.0)))) {
-		// good reprojection
-		reprojected_value = sample_volfog_volume(reprojected_ndc.xyz, previous_volume);
-		worldpos = get_worldpos_new(fragcoords, invpixelsize, halton_map[int(fogparam.reprojection.x)]);
-		reprojected_mix = 0.95;
+#if 1
+	if(reprojected_ndc.w>0) {
+		reprojected_ndc/=reprojected_ndc.w;
+		if (all(greaterThanEqual(reprojected_ndc.xyz, vec3(-1.0))) && all(lessThanEqual(reprojected_ndc.xyz, vec3(1.0)))  && reprojected_ndc.z >= 0.0) {
+			// good reprojection
+			reprojected_value = sample_volfog_volume(reprojected_ndc.xyz, previous_volume);
+			worldpos = get_worldpos_new(fragcoords, invpixelsize, halton_map[int(fogparam.reprojection.x)]);
+			reprojected_mix = 0.98;
+		}
 	}
 #endif
 	
 	
-	vec3 inscattering = get_inscattering(worldpos);
 	
 	//float real_density = (texture(perlin_noise, worldpos*0.2+perlin_offset*0.1).r - 1.0)*5.0+density;// + texture(perlin_noise, worldpos*0.8+perlin_offset*0.2).r;
 	float real_density  = fogparam.density_ani.x;
-	float edensity = max(exp(-real_density),0.000001)* exp(-max(worldpos.y*2.0,0.0));
-	vec4 coloranddensity = vec4(inscattering*real_density,real_density);
+	 float scattering = sigmaS * real_density;
+	vec3 inscattering = get_inscattering(worldpos) * scattering;
+	vec4 coloranddensity = vec4(inscattering*real_density*sigmaT,real_density*sigmaT);
 	//ComputeScattering(dot(raydir,-sun_dir));
 	
 	
 	coloranddensity = mix(coloranddensity, reprojected_value, reprojected_mix);
-	coloranddensity.rgb = randColor(int(gl_GlobalInvocationID.z));
+	//coloranddensity.rgb = randColor(int(gl_GlobalInvocationID.z));
 	//coloranddensity.a = 0.5;
 	imageStore(VolumeTexture,ivec3(fragcoords),coloranddensity);//vec4(inscattering,density));
 }
