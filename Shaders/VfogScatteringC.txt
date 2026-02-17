@@ -95,9 +95,7 @@ vec3 get_worldpos_new(ivec3 fragcoords,vec3 invpixelsize, vec3 poffset)
 }
 
 #include "pointLightShared.txt"
-	float sigmaS = 0.5; // scattering coefficient
-	float sigmaA = 0.2; // absorption coefficient
-	float sigmaT = sigmaS + sigmaA; // total extinction
+
 vec3 get_inscattering(vec3 worldspace)
 {
 	vec3 raydir = normalize(worldspace-g.viewpos_time.xyz);
@@ -122,7 +120,7 @@ vec3 get_inscattering(vec3 worldspace)
 		
 		vec3 L = (position - worldspace)/distance_to_light;
 		
-		distance_to_light = max(distance_to_light,0.1);
+		distance_to_light = max(distance_to_light,0.2);
 		
 		float distance_to_light_2 = distance_to_light*distance_to_light;
 		float radius_2 = radius*radius;
@@ -139,8 +137,7 @@ vec3 get_inscattering(vec3 worldspace)
 			}
 			
 		}
-		attenuation *= exp(-sigmaT * distance_to_light);
-		
+
 		accum += attenuation * color * phase_function(raydir, -L,fogparam.density_ani.y);
 	
 	}
@@ -148,7 +145,7 @@ vec3 get_inscattering(vec3 worldspace)
 	//vec3 spotdir = worldpos-(spot_pos+vec3(2,0,0));
 	//float spotlen = length(spotdir);
 	//spotdir = spotdir/spotlen;
-	accum += vec3(0.1);
+	accum += vec3(0.05);
 	//if(dot(spotdir,spotlightnormal)>0.5) {
 		//spotadd = phase_function(raydir,spotdir,anisotropy)/(spotlen*spotlen);
 	//	spotadd = min(spotadd, 100.0);
@@ -180,13 +177,13 @@ void main()
 	}
 #endif
 	
+	float real_density  = fogparam.density_ani.x*min(exp(-worldpos.y*0.5),1.0);
 	
 	
-	//float real_density = (texture(perlin_noise, worldpos*0.2+perlin_offset*0.1).r - 1.0)*5.0+density;// + texture(perlin_noise, worldpos*0.8+perlin_offset*0.2).r;
-	float real_density  = fogparam.density_ani.x;
-	 float scattering = sigmaS * real_density;
-	vec3 inscattering = get_inscattering(worldpos) * scattering;
-	vec4 coloranddensity = vec4(inscattering*real_density*sigmaT,real_density*sigmaT);
+	vec3 scattering_ = vec3(1.0)*real_density;
+	
+	vec3 inscattering = get_inscattering(worldpos);
+	vec4 coloranddensity = vec4(inscattering*scattering_,real_density);
 	//ComputeScattering(dot(raydir,-sun_dir));
 	
 	
