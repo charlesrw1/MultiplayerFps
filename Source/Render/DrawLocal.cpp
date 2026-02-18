@@ -789,12 +789,9 @@ void Renderer::create_shaders()
 
 	//prog_man.create_single_file()
 	// volumetric fog shaders
-	Shader::compute_compile(&volfog.prog.lightcalc, "VfogScatteringC.txt");
-	Shader::compute_compile(&volfog.prog.raymarch, "VfogRaymarchC.txt");
-//	Shader::compute_compile(&volfog.prog.reproject, "VfogScatteringC.txt", "REPROJECTION");
-	volfog.prog.lightcalc.use();
-	//volfog.prog.lightcalc.set_int("previous_volume", 0);
-	//volfog.prog.lightcalc.set_int("perlin_noise", 1);
+	volfog.prog.lightcalc = prog_man.create_compute("VfogScatteringC.txt");
+	volfog.prog.raymarch = prog_man.create_compute("VfogRaymarchC.txt");
+
 
 	glUseProgram(0);
 }

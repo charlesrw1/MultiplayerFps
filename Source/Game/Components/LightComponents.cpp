@@ -602,3 +602,18 @@ void LightmapComponent::serialize(Serializer& s)
 		s.serialize(baked_tag, encoded);
 	}
 }
+
+void GiVolumeComponent::start()
+{
+	if (eng->is_editor_level()) {
+		auto mesh = get_owner()->create_component<MeshComponent>();
+		mesh->set_model(Model::load("cube1m.cmdl"));
+		mesh->set_material_override(MaterialInstance::load("giprobe_zone.mi"));
+		mesh->dont_serialize_or_edit = true;
+		mesh->set_ignore_baking(true);
+	}
+}
+
+void GiVolumeComponent::stop()
+{
+}

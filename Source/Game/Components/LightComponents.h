@@ -252,6 +252,22 @@ private:
 	MeshBuilderComponent* editor_meshbuilder = nullptr;
 	obj<Entity> editor_mesh;
 };
+
+
+class GiVolumeComponent : public Component
+{
+public:
+	CLASS_BODY(GiVolumeComponent);
+	GiVolumeComponent() {
+		set_call_init_in_editor(true);
+	}
+	void start() final;
+	void stop() final;
+private:
+	REF float xz_density = 2.0;
+	REF float y_density = 2.0;
+};
+
 struct Lightmap_Object;
 class LightmapComponent : public Component {
 public:

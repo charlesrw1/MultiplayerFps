@@ -47,8 +47,9 @@ public:
 		filepaths.push_back("ParticleInstComponent");
 
 		filepaths.push_back("AnimPreviewComponent");
-		filepaths.push_back("wo");
+	
 		filepaths.push_back("WorldTextComponent");
+		filepaths.push_back("GiVolumeComponent");
 
 		filepaths.push_back("daf");
 

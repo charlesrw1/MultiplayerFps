@@ -26,9 +26,9 @@ public:
 	}buffer;
 
 	struct programs {
-		Shader reproject;
-		Shader lightcalc;
-		Shader raymarch;
+		program_handle reproject;
+		program_handle lightcalc;
+		program_handle raymarch;
 	}prog;
 
 	struct textures {

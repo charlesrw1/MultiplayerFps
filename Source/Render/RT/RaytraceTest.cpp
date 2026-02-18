@@ -19,78 +19,24 @@ const int ddgiIRRADTILE = 8;
 const int ddgiDEPTHTILE = 16;
 using std::vector;
 
-class OctTree
-{
-public:
-	struct Node {
-		std::vector<std::unique_ptr<Node>> subnodes;
-		bool tri_intersects = false;
-		Bounds bounds;
-		bool forced_subdivide = false;
-		bool get_has_subdivied() const {
-			return !subnodes.empty();
-		}
-		void subdivide() {
-			ASSERT(!get_has_subdivied());
-			for (int i = 0; i < 8; i++) {
-				subnodes.push_back(uptr<Node>(new Node));
-			}
-		}
-	};
-	vec3 origin = vec3(0.0);
-	float size = 64.0;
-	uptr<Node> root_node;
-	int max_depth = 6;
-	float min_leaf_size = 1.0f;// 2.0f;
-	
-	void insert_triangles(const vector<Bounds>& tri_bounds) {
-		root_node = uptr<Node>(new Node);
-		root_node->bounds = Bounds(origin-vec3(size), origin + vec3(size));
-		
-		for (int i = 0; i < tri_bounds.size(); i++) {
-			insert_triangle(root_node.get(), tri_bounds[i], 0);
-		}
 
-	}
-	
-private:
-	void insert_triangle(Node* node, const Bounds& tri_bounds, int depth) {
-		float node_size = size / (1 << depth);
-		if (node_size <= min_leaf_size || depth >= max_depth) {
-			return;
-		}
-		
-		if (!node->get_has_subdivied()) {
-			node->subdivide();
-			for (int i = 0; i < 8; i++) {
-				node->subnodes[i]->bounds = get_child_bounds(node->bounds, i);
-			}
-		}
-		for (int i = 0; i < 8; i++) {
-			auto& sn = node->subnodes[i];
-			sn->tri_intersects |= sn->bounds.intersect(tri_bounds);
-		}
-
-		
-		for (int i = 0; i < 8; i++) {
-			if (node->subnodes[i]->bounds.intersect(tri_bounds)) {
-				insert_triangle(node->subnodes[i].get(), tri_bounds, depth + 1);
-			}
-		}
-	}
-	
- 	
-	Bounds get_child_bounds(const Bounds& parent, int child_idx) {
-		vec3 half = (parent.bmax - parent.bmin) * 0.5f;
-		vec3 offset = vec3(
-			(child_idx & 1) ? half.x : 0,
-			(child_idx & 2) ? half.y : 0,
-			(child_idx & 4) ? half.z : 0
-		);
-		return Bounds(parent.bmin + offset, parent.bmin + offset + half);
-	}
+struct DdgiVolumeGpu {
+	glm::vec3 origin;
+	glm::vec3 density;
+	glm::ivec3 size;
+	int atlas_offset;
 };
-
+struct DdgiGlobals {
+	glm::ivec2 atlas_size;	// in probe units
+	float normal_bias;
+	float view_bias;
+};
+// per probe data:
+struct DdgiPerProbe {
+	int8_t offsets[3];	//[-1,1] on each axis to offset by quarter density value
+	int8_t padding;	// valid or not bit?
+};
+// using atlas offset, 
 
 DdgiTesting::DdgiTesting()
 {
@@ -122,12 +68,7 @@ inline Bounds get_tri_bounds(vec3 v1, vec3 v2, vec3 v3)
 ConfigVar vert_limit("vert_limit", "9999999", CVAR_INTEGER | CVAR_UNBOUNDED, "");
 Color32 get_color_of_material_for_export(const MaterialInstance* m);
 #include "Assets/AssetDatabase.h"
-struct PosAndValue {
-	glm::vec3 v{};
-	bool needs_depth = false;
-	glm::ivec2 atlas_index;
-};
-static std::unordered_map<uint64_t, PosAndValue> hash_to_pos;
+
 void DdgiTesting::build_world()
 {
 	auto& objs = draw.scene.proxy_list;
@@ -312,84 +253,7 @@ void DdgiTesting::build_world()
 
 	};
 
-	{
-		OctTree tree;
-		tree.insert_triangles(bounds);
-
-		auto make_hash = [](glm::vec3 c) -> uint64_t {
-			std::size_t hx = std::hash<int>()(int(c.x) * 73856093);
-			std::size_t hy = std::hash<int>()(int(c.y) * 19349663);
-			std::size_t hz = std::hash<int>()(int(c.z) * 83492791);
-			return hx ^ hy ^ hz;
-		};
-		auto add_pos_to_hash = [&](glm::vec3 v, bool needs_depth) {
-			auto& val = hash_to_pos[make_hash(v)];
-			val.needs_depth |= needs_depth;
-			val.v = v;
-		};
-
-		static MeshBuilder mb;
-		mb.Begin();
 	
-		auto recurse = [&](auto&& func, OctTree::Node* n, int depth) -> void {
-			if (!n->get_has_subdivied()) {
-				if (depth == 6) {
-					auto center = n->bounds.get_center();
-					auto size = n->bounds.bmax - n->bounds.bmin;
-					auto newmin = center - size * 0.25f;
-					auto newmax = center + size * 0.25f;
-					mb.PushLineBox(newmin, newmax, COLOR_RED);
-				}
-			}
-			else {
-				for (int i = 0; i < 8; i++)
-					func(func, n->subnodes.at(i).get(),depth+1);
-			}
-
-		};
-		recurse(recurse, tree.root_node.get(),0);
-
-		auto recurse2 = [&](auto&& func, OctTree::Node* n, int depth) -> void {
-				if (1) {
-					const bool needs_depth = n->tri_intersects&&depth == 6;	// lowest level
-					auto center = n->bounds.get_center();
-					auto size = n->bounds.bmax - n->bounds.bmin;
-					auto newmin = center - size * 0.5f;
-					auto newmax = center + size * 0.5f;
-					// add 8 corners
-					for (int i = 0; i < 8; i++) {
-						glm::vec3 corner = glm::vec3(
-							(i & 1) ? newmax.x : newmin.x,
-							(i & 2) ? newmax.y : newmin.y,
-							(i & 4) ? newmax.z : newmin.z
-						);
-						add_pos_to_hash(corner, needs_depth);
-					}
-				}
-			if (!n->get_has_subdivied()) {
-			}
-			else {
-				for (int i = 0; i < 8; i++)
-					func(func, n->subnodes.at(i).get(), depth + 1);
-			}
-		};
-		recurse2(recurse2, tree.root_node.get(), 0);
-		printf("$$$$$$$ probes: %d\n", int(hash_to_pos.size()));
-		int probes_that_need_depth = 0;
-		for (auto& [key, val] : hash_to_pos)
-			probes_that_need_depth += val.needs_depth;
-		printf("$$$$$ needs depth: %d\n", probes_that_need_depth);
-
-		mb.End();
-
-		//auto handle = idraw->get_scene()->register_meshbuilder();
-		MeshBuilder_Object obj;
-		obj.meshbuilder = &mb;
-		obj.visible = true;
-		obj.use_background_color = true;
-		
-		//idraw->get_scene()->update_meshbuilder(handle, obj);
-	}
 }
 #include "imgui.h"
 static float irrad_mult = 1.0;
@@ -401,7 +265,11 @@ void ddgi_debugmenu() {
 	ImGui::DragFloat("irradmul", &irrad_mult, 0.01);
 }
 ADD_TO_DEBUG_MENU(ddgi_debugmenu);
-
+void set_shit_fuck() {
+	draw.get_device().shader().set_vec3("volume_origin", ddgiVolumeOrigin);
+	draw.get_device().shader().set_vec3("volume_spacing", ddgiDensity);
+	draw.get_device().shader().set_ivec3("vol_grid", ddgiGRID);
+}
 void DdgiTesting::execute()
 {
 	build_world();
@@ -425,8 +293,9 @@ void DdgiTesting::execute()
 
 	IGraphicsBuffer* invalid_count_buf{};
 	invalid_count_buf = IGraphicsDevice::inst->create_buffer({});
-	int counter_num = 0;
-	invalid_count_buf->upload(&counter_num, sizeof(int));
+	glm::ivec4 counter_num = {};
+
+	invalid_count_buf->upload(&counter_num, sizeof(glm::ivec4));
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, invalid_count_buf->get_internal_handle());
 
 	Random r(13);
@@ -441,9 +310,7 @@ void DdgiTesting::execute()
 
 		device.set_shader(trace_shader);
 		device.shader().set_bool("do_irrad_calcs", do_irrad_calcs);
-		device.shader().set_vec3("volume_origin", ddgiVolumeOrigin);
-		device.shader().set_vec3("volume_spacing", ddgiDensity);
-		device.shader().set_ivec3("vol_grid", ddgiGRID);
+		set_shit_fuck();
 		device.shader().set_float("ray_sample_randomness", r.RandF(0,TWOPI));
 		device.shader().set_int("num_lights", draw.scene.light_list.objects.size());
 
@@ -455,8 +322,7 @@ void DdgiTesting::execute()
 
 		// then run gather
 		device.set_shader(gather_shader);
-		device.shader().set_ivec3("vol_grid", ddgiGRID);
-		device.shader().set_vec3("volume_spacing", ddgiDensity);
+		set_shit_fuck();
 		device.shader().set_int("num_runs_so_far", i);
 
 
@@ -475,10 +341,14 @@ void DdgiTesting::execute()
 		if (i == 0) {
 			glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 			glBindBuffer(GL_SHADER_STORAGE_BUFFER, invalid_count_buf->get_internal_handle());
-			int* ptr = (int*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-			int result = *ptr;
+			glm::ivec4* ptr = (glm::ivec4*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+			glm::ivec4 result = *ptr;
 			glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-			printf("invalid probes: %d\n", result);
+			const int total_probes = ddgiGRID.x * ddgiGRID.y * ddgiGRID.z;
+			printf("total_probes %d\n", total_probes);
+			printf("invalid probes: %d\n", result.y);
+			printf("no_depth_needed probes: %d\n", result.x);
+
 		}
 
 
@@ -562,16 +432,7 @@ void DdgiTesting::render_probes()
 	device.bind_texture_ptr(0, probe_irradiance);
 	device.shader().set_ivec3("vol_grid", ddgiGRID);
 
-	if (draw_real_grid.get_integer()==1) {
-		for (auto& [_, p] : hash_to_pos) {
-			glm::mat4 tr = glm::translate(glm::mat4(1), p.v);
-			device.shader().set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
-			device.shader().set_ivec3("probe_coord", { 0,0,0 });
-
-			draw_model_simple_no_material(m);
-		}
-	}
-	else if(draw_real_grid.get_integer()==2){
+	if(draw_real_grid.get_integer()==2){
 		for (int x = 0; x < ddgiGRID.x; x++) {
 			for (int y = 0; y < ddgiGRID.y; y++) {
 				for (int z = 0; z < ddgiGRID.z; z++) {
@@ -656,9 +517,8 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 
 	draw.shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
 
-	device.shader().set_vec3("volume_origin", ddgiVolumeOrigin);
-	device.shader().set_vec3("volume_spacing", ddgiDensity);
-	device.shader().set_ivec3("vol_grid", ddgiGRID);
+	set_shit_fuck();
+
 	device.shader().set_ivec3("selected_probe_pos", selected_probe);
 	device.shader().set_float("irrad_mult", irrad_mult);
 	device.shader().set_int("num_cubemaps", draw.scene.reflection_volumes.objects.size());

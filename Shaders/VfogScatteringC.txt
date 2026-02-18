@@ -77,7 +77,11 @@ const vec3 halton_map[TEMPORAL_FRAMES] = vec3[](
 
 
 
-
+layout(binding = 4) uniform sampler2D probe_irradiance;
+layout(binding = 5) uniform sampler2D probe_depth;
+uniform vec3 volume_spacing;
+uniform vec3 volume_origin;
+uniform ivec3 vol_grid;
 #include "VfogShared.txt"
 
 vec3 get_worldpos_new(ivec3 fragcoords,vec3 invpixelsize, vec3 poffset)
@@ -95,6 +99,8 @@ vec3 get_worldpos_new(ivec3 fragcoords,vec3 invpixelsize, vec3 poffset)
 }
 
 #include "pointLightShared.txt"
+#define DDGILIGHTING
+#include "ddgiShared.txt"
 
 vec3 get_inscattering(vec3 worldspace)
 {

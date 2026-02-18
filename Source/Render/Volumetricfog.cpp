@@ -104,7 +104,8 @@ void Volumetric_Fog_System::compute()
 	glCheckError();
 	ivec3 groups = ceil(vec3(voltexturesize) / vec3(8, 8, 1));
 	{
-		prog.lightcalc.use();
+		draw.get_device().set_shader(prog.lightcalc);
+		//prog.lightcalc.use();
 
 		//prog.lightcalc.set_mat4("InvViewProj", glm::inverse(draw.vs.viewproj));
 		//prog.lightcalc.set_vec3("ViewPos", draw.vs.origin);
@@ -131,11 +132,16 @@ void Volumetric_Fog_System::compute()
 		//prog.lightcalc.set_vec3("perlin_offset", glm::vec3(eng->get_game_time() * 0.2, 0, eng->get_game_time()));
 
 
-		prog.lightcalc.set_int("num_lights", draw.scene.light_list.objects.size());
+		draw.shader().set_int("num_lights", draw.scene.light_list.objects.size());
 		glCheckError();
 
 		glBindImageTexture(2, texture.volume, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 		draw.bind_texture_ptr(1, draw.spotShadows->get_atlas().get_atlas_texture());
+		extern void set_shit_fuck();
+		set_shit_fuck();
+		draw.bind_texture_ptr(4, draw.ddgi->probe_irradiance);
+		draw.bind_texture_ptr(5, draw.ddgi->probe_depth);
+
 
 		glDispatchCompute(groups.x, groups.y, groups.z);
 
@@ -145,7 +151,8 @@ void Volumetric_Fog_System::compute()
 	}
 	//static Config_Var* fog_raymarch = cfg.get_var("dbg/raymarch", "1");
 	if (1) {
-		prog.raymarch.use();
+		draw.set_shader(prog.raymarch);
+		//prog.raymarch.use();
 		//prog.raymarch.set_float("znear", draw.vs.near);
 		//prog.raymarch.set_float("zfar", draw.vs.far);
 	//	glUniform3i(glGetUniformLocation(prog.raymarch.ID, "TextureSize"), voltexturesize.x, voltexturesize.y, voltexturesize.z);
