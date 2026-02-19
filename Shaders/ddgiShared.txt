@@ -1,6 +1,31 @@
 
 const int NUM_RAYS = 128;
 
+struct DdgiVolumeGpu {
+	vec4 origin_pri;
+	vec4 density;
+	ivec4 size_offset;
+};
+struct DdgiGlobals {
+	int atlas_x;
+	int atlas_y;
+	float normal_bias;
+	float view_bias;
+	
+	int num_volumes;
+	int padding0;
+	int padding1;
+	int padding2;
+};
+
+layout (binding = 8, std140) uniform DdgiGlobalsBuffer {
+	DdgiGlobals ddgi_global;
+};
+layout(binding = 9,std430) readonly buffer DdgiVolumeBuffer {
+	DdgiVolumeGpu volumes[];
+};
+
+
 vec2 OctahedralEncode(vec3 normal_in)
 {
 	vec3 normal = normal_in.xzy;
@@ -34,41 +59,57 @@ vec3 OctahedralDecode(vec2 encoded)
 	return normalize(normal.xzy);
 }
 
+
+int get_volume_index_for_global_index(int i)
+{
+	const int num_volumes = ddgi_global.num_volumes;
+	for(int v = 1;v<num_volumes;v++) {
+		if(volumes[v].size_offset.w>i) {
+			return v-1;
+		}
+	}
+	return num_volumes-1;
+}
+
+
+vec2 get_probe_uv_shared(vec2 octant_uv, ivec3 probe_coord, ivec3 vol_grid, int vol_offset, int DEPTH_IN_SIZE,
+	int DEPTH_TILE_SIZE)
+{
+	const int probe_index = probe_coord.x + probe_coord.y*vol_grid.x + probe_coord.z*vol_grid.x*vol_grid.y + vol_offset;
+	ivec2 tile_coords = ivec2(
+		probe_index%ddgi_global.atlas_x,
+		probe_index/ddgi_global.atlas_x
+	);
+	vec2 coords;
+	coords.x = tile_coords.x*DEPTH_TILE_SIZE;
+	coords.y = tile_coords.y*DEPTH_TILE_SIZE;
+	
+	
+	coords += vec2(octant_uv*vec2(DEPTH_IN_SIZE))+vec2(1);
+	vec2 final_uv = vec2(coords)/vec2(ddgi_global.atlas_x*DEPTH_TILE_SIZE,ddgi_global.atlas_y*DEPTH_TILE_SIZE);
+
+	return final_uv;
+}
+
+vec2 get_depth_probe_uv(vec2 octant_uv, ivec3 probe_coord, ivec3 vol_grid, int vol_offset) {
+	const int DEPTH_IN_SIZE = 14;
+	const int DEPTH_TILE_SIZE = 16;
+	return get_probe_uv_shared(octant_uv,probe_coord,vol_grid,vol_offset,DEPTH_IN_SIZE,DEPTH_TILE_SIZE);
+}
+
+vec2 get_irrad_probe_uv(vec2 octant_uv, ivec3 probe_coord, ivec3 vol_grid, int vol_offset) {
+	const int DEPTH_IN_SIZE = 6;
+	const int DEPTH_TILE_SIZE = 8;
+	return get_probe_uv_shared(octant_uv,probe_coord,vol_grid,vol_offset,DEPTH_IN_SIZE,DEPTH_TILE_SIZE);
+}
 #ifdef DDGILIGHTING
-vec3 get_probe_world_from_coords(ivec3 coords)
+vec3 get_probe_world_from_coords(ivec3 coords, vec3 volume_origin, vec3 volume_spacing)
 {
 return  volume_origin+vec3(coords)*volume_spacing;
 }
 
 
 
-vec2 get_depth_probe_uv(vec2 octant_uv, ivec3 probe_coord) {
-	const int DEPTH_IN_SIZE = 14;
-	const int DEPTH_TILE_SIZE = 16;
-	
-	vec2 coords;
-	coords.x = probe_coord.x*DEPTH_TILE_SIZE + (vol_grid.x*probe_coord.y*DEPTH_TILE_SIZE);
-	coords.y = probe_coord.z*DEPTH_TILE_SIZE;
-	
-	coords += vec2(octant_uv*vec2(DEPTH_IN_SIZE))+vec2(1);
-	vec2 final_uv = vec2(coords)/vec2(vol_grid.x*vol_grid.y*DEPTH_TILE_SIZE,vol_grid.z*DEPTH_TILE_SIZE);
-
-	return final_uv;
-}
-
-vec2 get_irrad_probe_uv(vec2 octant_uv, ivec3 probe_coord) {
-	const int DEPTH_IN_SIZE = 6;
-	const int DEPTH_TILE_SIZE = 8;
-	
-	vec2 coords;
-	coords.x = probe_coord.x*DEPTH_TILE_SIZE + (vol_grid.x*probe_coord.y*DEPTH_TILE_SIZE);
-	coords.y = probe_coord.z*DEPTH_TILE_SIZE;
-	
-	coords += vec2(octant_uv*vec2(DEPTH_IN_SIZE))+vec2(1);
-	vec2 final_uv = vec2(coords)/vec2(vol_grid.x*vol_grid.y*DEPTH_TILE_SIZE,vol_grid.z*DEPTH_TILE_SIZE);
-
-	return final_uv;
-}
 
 #ifdef BLAHBLAH
 struct OutIrrad {
@@ -187,14 +228,43 @@ vec3 calculate_irradiance(vec3 direction, vec3 worldspace, vec3 biased_world_pos
 }
 #endif
 
+bool is_point_in_aabb(vec3 pos, vec3 bmin, vec3 bmax)
+{
+    return all(greaterThanEqual(pos, bmin)) &&
+           all(lessThanEqual(pos, bmax));
+}
+
+// find volume (with priority etc)
+int find_best_ddgi_volume(vec3 worldpos)
+{
+	const int num_volumes = ddgi_global.num_volumes;
+	for(int v = 0;v<num_volumes;v++) {
+		vec3 volume_origin = volumes[v].origin_pri.xyz;
+		vec3 density = volumes[v].density.xyz;
+		ivec3 size = volumes[v].size_offset.xyz;
+		
+		if(is_point_in_aabb(worldpos,volume_origin,volume_origin+(size-ivec3(1))*density)) {
+			return v;
+		}
+	}
+	return num_volumes-1;
+
+}
 
 vec3 calculate_irradiance(vec3 direction, vec3 worldspace, vec3 biased_world_position)
 {
+	const int volume_index = find_best_ddgi_volume(worldspace);
+	const vec3 volume_origin = volumes[volume_index].origin_pri.xyz;
+	const vec3 volume_spacing = volumes[volume_index].density.xyz;
+	const ivec3 vol_grid = volumes[volume_index].size_offset.xyz;
+	const int vol_offset = volumes[volume_index].size_offset.w;
+	
+
 	ivec3 base_probe_coords = ivec3((biased_world_position-volume_origin)/volume_spacing);
 	base_probe_coords = clamp(base_probe_coords,ivec3(0), 
 	ivec3(vol_grid)-ivec3(1)
 	);
-	vec3 base_probe_pos = get_probe_world_from_coords(base_probe_coords);
+	vec3 base_probe_pos = get_probe_world_from_coords(base_probe_coords, volume_origin,volume_spacing);
 	
 	vec3 alpha = clamp(
 		(biased_world_position-base_probe_pos)/volume_spacing,
@@ -212,7 +282,7 @@ vec3 calculate_irradiance(vec3 direction, vec3 worldspace, vec3 biased_world_pos
 			base_probe_coords+adjacent_probe_ofs,
 			ivec3(0),
 			ivec3(vol_grid)-ivec3(1));
-		vec3 adj_probe_worldpos = get_probe_world_from_coords(adjacent_probe_coords);
+		vec3 adj_probe_worldpos = get_probe_world_from_coords(adjacent_probe_coords, volume_origin,volume_spacing);
 		
 
 		vec3 biased_pos_to_adj_probe = normalize(adj_probe_worldpos-biased_world_position);
@@ -229,7 +299,7 @@ vec3 calculate_irradiance(vec3 direction, vec3 worldspace, vec3 biased_world_pos
 		
 		vec2 probe_texture_uv = get_depth_probe_uv(
 		octant_coords,
-		adjacent_probe_coords);
+		adjacent_probe_coords, vol_grid, vol_offset);
 		
 		vec2 filtered_distance = vec2(2.0)*texture(probe_depth, probe_texture_uv).rg;
 		
@@ -255,7 +325,7 @@ vec3 calculate_irradiance(vec3 direction, vec3 worldspace, vec3 biased_world_pos
 		weight *= trilinear_weight;
 		
 		octant_coords = OctahedralEncode(direction);
-		probe_texture_uv = get_irrad_probe_uv(octant_coords,adjacent_probe_coords);
+		probe_texture_uv = get_irrad_probe_uv(octant_coords,adjacent_probe_coords,  vol_grid, vol_offset);
 		
 		vec3 probe_irrad = texture(probe_irradiance, probe_texture_uv).rgb;
 		float exponent = 2.2*0.5;

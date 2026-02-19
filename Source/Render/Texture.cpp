@@ -732,6 +732,7 @@ Texture* Texture::install_system(const std::string& path)
 Texture::Texture() {}
 Texture::~Texture() {
 	//assert(is_this_globally_referenced()||gl_id == 0);
+
 }
 #include "Assets/AssetDatabase.h"
 Texture* Texture::load(const std::string& path)

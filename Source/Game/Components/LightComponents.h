@@ -263,7 +263,7 @@ public:
 	}
 	void start() final;
 	void stop() final;
-private:
+	REF int priority = 0;
 	REF float xz_density = 2.0;
 	REF float y_density = 2.0;
 };

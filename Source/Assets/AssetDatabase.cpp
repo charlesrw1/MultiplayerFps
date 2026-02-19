@@ -44,6 +44,7 @@ public:
 		asset->is_loaded = true;
 		asset->is_from_disk = false;
 		std::shared_ptr<IAsset> sptr(asset);
+		ASSERT(!MapUtil::contains(allAssets, name));
 		allAssets.insert({ name, std::move(sptr) });
 	}
 

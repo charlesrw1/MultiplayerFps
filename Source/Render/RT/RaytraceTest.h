@@ -25,6 +25,24 @@ struct RayBufferStruct {
 	glm::vec4 dir_dist;
 	glm::vec4 shading;
 };
+
+struct DdgiVolumeGpu {
+	glm::vec4 origin_priority;
+	glm::vec4 density;
+	glm::ivec4 size_offset;
+	int get_num_probes_total() const {
+		return size_offset.x * size_offset.y * size_offset.z;
+	}
+};
+struct DdgiGlobals {
+	int atlas_x;
+	int atlas_y;
+	float normal_bias;
+	float view_bias;
+
+	int num_volumes;
+	int padding[3];
+};
 class DdgiTesting
 {
 public:
@@ -36,26 +54,28 @@ public:
 	void render_probes();
 	void draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view);
 	glm::ivec3 selected_probe{};
-
+	void create_textures_raybuffer(int w, int h);
 	IGraphicsBuffer* verts = nullptr;
 	IGraphicsBuffer* indicies = nullptr;
 	IGraphicsBuffer* nodes = nullptr;
 	IGraphicsBuffer* references = nullptr;
 	IGraphicsBuffer* materials = nullptr;
 
-	IGraphicsBuffer* probe_to_best_cubemap = nullptr;
+	std::vector<DdgiVolumeGpu> myvolumes;
+	DdgiGlobals theglobals;
 
-	IGraphicsBuffer* ray_buffer = nullptr;
+	IGraphicsBuffer* ddgi_globals = nullptr;
+	IGraphicsBuffer* ddgi_volumes = nullptr;
+	IGraphicsBuffer* ddgi_probe_relocation_offsets = nullptr;
 
 	IGraphicsTexture* probe_irradiance = nullptr;
 	IGraphicsTexture* probe_depth = nullptr;
 	IGraphicsBuffer* buf = nullptr;
+
 	program_handle raytrace_test{};
 	program_handle debug_probes{};
 	program_handle trace_shader{};
 	program_handle gather_shader{};
-
-	IGraphicsBuffer* indirection{};
 
 
 	program_handle get_best_cubemap_shader{};

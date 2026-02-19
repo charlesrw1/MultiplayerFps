@@ -12,14 +12,10 @@ struct RayHitOutput {
 layout (binding = 1, std140) readonly buffer RayHitBuffer {
 	RayHitOutput hitbuffer[];
 };
-
-
-// Octahederal encoding functions
-
 #include "ddgiShared.txt"
 
-uniform ivec3 vol_grid;
-uniform vec3 volume_spacing;
+
+
 
 layout(std430, binding =10) writeonly buffer InvalidCounterBuffer
 {
@@ -33,13 +29,33 @@ layout(std430, binding =10) writeonly buffer InvalidCounterBuffer
 
 uniform int num_runs_so_far = 0;
 
+ivec2 get_probe_texel_base(ivec3 probe_coord, ivec3 vol_grid, int vol_offset, int tile_size)
+{
+	const int probe_index = probe_coord.x + probe_coord.y*vol_grid.x + probe_coord.z*vol_grid.x*vol_grid.y + vol_offset;
+	ivec2 tile_coords = ivec2(
+		probe_index%ddgi_global.atlas_x,
+		probe_index/ddgi_global.atlas_x
+	);
+	vec2 coords;
+	coords.x = tile_coords.x*tile_size;
+	coords.y = tile_coords.y*tile_size;
+	return ivec2(coords);
+}
+
 void main()
 {
-	int probe_number = int(gl_GlobalInvocationID.x);
+	const int global_index = int(gl_GlobalInvocationID.x);
+	const int volume_index = get_volume_index_for_global_index(global_index);
+	const int volume_offset = volumes[volume_index].size_offset.w;
+	const int probe_number = global_index-volume_offset;
+	const ivec3 vol_grid = volumes[volume_index].size_offset.xyz;
+	const vec3 volume_spacing = volumes[volume_index].density.xyz;
+	const vec3 volume_origin = volumes[volume_index].origin_pri.xyz;
+	
 	
 	if(probe_number > vol_grid.x*vol_grid.y*vol_grid.z)
 		return;
-		
+	
 		// Get probe position in grid
 	int probe_x = probe_number % int(vol_grid.x);
 	int probe_y = (probe_number / int(vol_grid.x)) % int(vol_grid.y);
@@ -50,7 +66,7 @@ void main()
 	int backface_hits = 0;
 	float closest_dist = 1000.0;
 	for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
-		int buffer_idx = probe_number * NUM_RAYS + ray_idx;
+		int buffer_idx = global_index * NUM_RAYS + ray_idx;
 		RayHitOutput data = hitbuffer[buffer_idx];
 		vec3 dir = data.dir_dist.xyz;
 		float dist = data.dir_dist.w;
@@ -83,10 +99,13 @@ void main()
 		for(int x = 0; x < IN_SIZE; x++) {
 		
 		
-			ivec2 coords;
-			coords.x = probe_x*TILE_SIZE + (vol_grid.x*probe_y*TILE_SIZE);
-			coords.y = probe_z*TILE_SIZE;
+			ivec2 coords = get_probe_texel_base(ivec3(probe_x,probe_y,probe_z),vol_grid,volume_offset,TILE_SIZE);
+			//coords.x = probe_x*TILE_SIZE + (vol_grid.x*probe_y*TILE_SIZE);
+			//coords.y = probe_z*TILE_SIZE;
 			ivec2 coord_store = coords + ivec2(1)+ivec2(x,y);
+			
+			
+			
 			vec3 cur_value = imageLoad(probe_irradiance, coord_store).rgb;
 			
 			vec2 uv = vec2(x+0.5,y+0.5)/vec2(IN_SIZE);
@@ -96,7 +115,7 @@ void main()
 			float weight_accum = 0.0;
 			
 			for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
-				int buffer_idx = probe_number * NUM_RAYS + ray_idx;
+				int buffer_idx = global_index * NUM_RAYS + ray_idx;
 				RayHitOutput data = hitbuffer[buffer_idx];
 				vec3 dir = data.dir_dist.xyz;
 				
@@ -116,8 +135,11 @@ void main()
 			
 			accum.r *= global_dist_mult;
 			
-			accum = (cur_value*float(num_runs_so_far)+accum)/(num_runs_so_far+1.0);	// running average
+			if(num_runs_so_far!=0)
+				accum = (cur_value*float(num_runs_so_far)+accum)/(num_runs_so_far+1.0);	// running average
 			
+			
+			//accum = vec3(1,0,1);
 			// Store in probe irradiance texture
 			imageStore(probe_irradiance, coord_store, vec4(accum, 1.0));
 		}
@@ -129,9 +151,7 @@ void main()
 	const int DIN_SIZE = DTILE_SIZE - 2;
 	for(int y = 0; y < DIN_SIZE; y++) {
 		for(int x = 0; x < DIN_SIZE; x++) {
-			ivec2 coords;
-			coords.x = probe_x*DTILE_SIZE + (vol_grid.x*probe_y*DTILE_SIZE);
-			coords.y = probe_z*DTILE_SIZE;
+			ivec2 coords=get_probe_texel_base(ivec3(probe_x,probe_y,probe_z),vol_grid,volume_offset,DTILE_SIZE);
 			ivec2 coord_store = coords + ivec2(1)+ivec2(x,y);
 			vec2 cur_value = imageLoad(probe_depths, coord_store).rg;
 			
@@ -142,7 +162,7 @@ void main()
 			float weight_accum = 0.0;
 			
 			for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
-				int buffer_idx = probe_number * NUM_RAYS + ray_idx;
+				int buffer_idx = global_index * NUM_RAYS + ray_idx;
 				RayHitOutput data = hitbuffer[buffer_idx];
 				vec3 dir = data.dir_dist.xyz;
 				float dist = abs(data.dir_dist.w);
@@ -161,7 +181,8 @@ void main()
 			float epsilon = NUM_RAYS *  1e-9;
 			accum /= (2.0*max(epsilon,weight_accum));
 			
-			accum = (cur_value*float(num_runs_so_far)+accum)/(num_runs_so_far+1.0);
+			if(num_runs_so_far!=0)
+				accum = (cur_value*float(num_runs_so_far)+accum)/(num_runs_so_far+1.0);
 			
 			// Store in probe irradiance texture
 			imageStore(probe_depths, coord_store, vec4(accum,0.0, 1.0));
@@ -173,7 +194,8 @@ void main()
 	{
 		//const int TILE_SIZE = 8;
 		//const int IN_SIZE = TILE_SIZE - 2;
-		ivec2 tile_base = ivec2(probe_x*TILE_SIZE + (vol_grid.x*probe_y*TILE_SIZE), probe_z*TILE_SIZE);
+		//ivec2 tile_base = ivec2(probe_x*TILE_SIZE + (vol_grid.x*probe_y*TILE_SIZE), probe_z*TILE_SIZE);
+		ivec2 tile_base = get_probe_texel_base(ivec3(probe_x,probe_y,probe_z),vol_grid,volume_offset,TILE_SIZE);
 		
 		for(int y = 0; y < TILE_SIZE; y++) {
 			for(int x = 0; x < TILE_SIZE; x++) {
@@ -208,7 +230,7 @@ void main()
 	{
 		//const int DTILE_SIZE = 16;
 		//const int DIN_SIZE = DTILE_SIZE - 2;
-		ivec2 tile_base = ivec2(probe_x*DTILE_SIZE + (vol_grid.x*probe_y*DTILE_SIZE), probe_z*DTILE_SIZE);
+		ivec2 tile_base = get_probe_texel_base(ivec3(probe_x,probe_y,probe_z),vol_grid,volume_offset,DTILE_SIZE);
 		
 		for(int y = 0; y < DTILE_SIZE; y++) {
 			for(int x = 0; x < DTILE_SIZE; x++) {

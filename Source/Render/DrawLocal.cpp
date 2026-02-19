@@ -4142,6 +4142,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	
 	// mesh builder stuff
 	auto draw_mesh_builders = [&]() {
+		GPUSCOPESTART(draw_mesh_builders);
 		const auto& view_to_use = current_frame_view;
 		//RenderPassSetup setup("meshbuilders", fbo.forward_render, false, false, 0, 0, view_to_use.width, view_to_use.height);
 		//auto scope = device.start_render_pass(setup);

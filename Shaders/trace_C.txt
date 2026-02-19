@@ -32,9 +32,6 @@ vec3 randColor(int number){
 // for sampling the sky
 
 
-uniform vec3  volume_origin;
-uniform vec3 volume_spacing;
-uniform ivec3 vol_grid;
 uniform float ray_sample_randomness = 0.0;
 uniform bool do_irrad_calcs = true;
 uniform int num_lights = 0;
@@ -73,7 +70,6 @@ vec3 RTXGISphericalFibonacci(float sampleIndex, float numSamples)
 
 #define DDGILIGHTING
 #include "ddgiShared.txt"
-
 
 
 #include "pbrShared.txt"
@@ -145,10 +141,13 @@ vec3 evaluate_lighting(vec3 pos, vec3 normal, vec3 albedo)
 
 void main()
 {
-	//uvec3 global_id = gl_GlobalInvocationID.z;
+	const int global_index = int(gl_GlobalInvocationID.x);
+	const int volume_index = get_volume_index_for_global_index(global_index);
+	const int probe_number = global_index-volumes[volume_index].size_offset.w;
+	const ivec3 vol_grid = volumes[volume_index].size_offset.xyz;
+	const vec3 volume_spacing = volumes[volume_index].density.xyz;
+	const vec3 volume_origin = volumes[volume_index].origin_pri.xyz;
 	
-	// Determine probe and ray index
-	int probe_number = int(gl_GlobalInvocationID.x);
 	
 	if(probe_number > vol_grid.x*vol_grid.y*vol_grid.z)
 		return;
@@ -159,7 +158,8 @@ void main()
 	int probe_z = probe_number / (int(vol_grid.x) * int(vol_grid.y));
 	
 	
-	vec3 probe_pos = volume_origin.xyz + vec3(probe_x, probe_y, probe_z) * vec3(volume_spacing);
+	vec3 probe_pos = get_probe_world_from_coords(ivec3(probe_x,probe_y,probe_z), volume_origin,volume_spacing);
+//	volume_origin.xyz + vec3(probe_x, probe_y, probe_z) * vec3(volume_spacing);
 	
 	for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
 		// Generate ray direction from ray index (spherical distribution)
@@ -188,7 +188,7 @@ void main()
 		// have lighting, have depth
 	
 		// Write to hit buffer
-		int buffer_idx = probe_number * NUM_RAYS + ray_idx;
+		int buffer_idx = global_index * NUM_RAYS + ray_idx;
 		hitbuffer[buffer_idx].dir_dist = vec4(ray_dir,out_distance*sign(-dot(ray_dir,hit_result.hit_normal)));
 		hitbuffer[buffer_idx].light = vec4(incoming_radiance, 1.0);
 	}
