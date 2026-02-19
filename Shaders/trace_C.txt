@@ -19,7 +19,11 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 layout (binding = 1, std140) writeonly buffer RayHitBuffer {
 	RayHitOutput hitbuffer[];
 };
-
+#ifdef RELOCATE
+layout(binding = 13,std430) writeonly buffer DdgiProbeRelocateBufferWrite {
+	vec4 ddgi_probe_relocations_write[];
+};
+#endif
 
 #include "rtShared.txt"
 
@@ -139,6 +143,7 @@ vec3 evaluate_lighting(vec3 pos, vec3 normal, vec3 albedo)
 }
 
 
+
 void main()
 {
 	const int global_index = int(gl_GlobalInvocationID.x);
@@ -147,6 +152,7 @@ void main()
 	const ivec3 vol_grid = volumes[volume_index].size_offset.xyz;
 	const vec3 volume_spacing = volumes[volume_index].density.xyz;
 	const vec3 volume_origin = volumes[volume_index].origin_pri.xyz;
+	const int vol_offset = volumes[volume_index].size_offset.w;
 	
 	
 	if(probe_number > vol_grid.x*vol_grid.y*vol_grid.z)
@@ -158,8 +164,17 @@ void main()
 	int probe_z = probe_number / (int(vol_grid.x) * int(vol_grid.y));
 	
 	
-	vec3 probe_pos = get_probe_world_from_coords(ivec3(probe_x,probe_y,probe_z), volume_origin,volume_spacing);
 //	volume_origin.xyz + vec3(probe_x, probe_y, probe_z) * vec3(volume_spacing);
+	
+	#ifdef RELOCATE
+	
+	vec3 probe_pos = get_probe_world_from_coords_original(ivec3(probe_x,probe_y,probe_z), volume_origin,volume_spacing);
+		vec3 best_relocate_pos = vec3(0.0);
+		float best_dist = 1000.0;
+	#else
+	vec3 probe_pos = get_probe_world_from_coords(ivec3(probe_x,probe_y,probe_z), volume_origin,volume_spacing, vol_grid,vol_offset);
+	
+	#endif
 	
 	for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
 		// Generate ray direction from ray index (spherical distribution)
@@ -170,7 +185,17 @@ void main()
 		// Trace ray from probe
 		TraceOut hit_result = trace_ray(probe_pos, ray_dir);
 		//vec3 hit_albedo = hit_color.xyz;
-		
+
+#ifdef RELOCATE
+	const bool is_backface = dot(ray_dir,hit_result.hit_normal) > 0;
+	if(hit_result.t>=0&&is_backface) {
+		if(hit_result.t < best_dist) {
+			vec3 pos_hit = probe_pos+ray_dir*hit_result.t;
+			best_dist = hit_result.t;
+			best_relocate_pos = pos_hit+hit_result.hit_normal*ddgi_global.relocate_normal_dist;
+		}
+	}
+#else		
 		vec3 incoming_radiance = vec3(0.0);
 		float out_distance = 1000.0;
 		if(hit_result.t < 0 || hit_result.t > 1000) {
@@ -191,7 +216,15 @@ void main()
 		int buffer_idx = global_index * NUM_RAYS + ray_idx;
 		hitbuffer[buffer_idx].dir_dist = vec4(ray_dir,out_distance*sign(-dot(ray_dir,hit_result.hit_normal)));
 		hitbuffer[buffer_idx].light = vec4(incoming_radiance, 1.0);
+#endif
 	}
+	
+	#ifdef RELOCATE
+		if(best_dist >= 1.0)	{ // fixme
+			best_relocate_pos = probe_pos;
+		}
+		ddgi_probe_relocations_write[global_index] = vec4(best_relocate_pos-probe_pos,0.0);
+	#endif
 }
 
 	

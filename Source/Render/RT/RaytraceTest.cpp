@@ -42,6 +42,7 @@ DdgiTesting::DdgiTesting()
 
 	get_best_cubemap_shader = draw.get_prog_man().create_compute("get_best_cubemap_C.txt");
 
+	relocate_shader = draw.get_prog_man().create_compute("trace_C.txt", "RELOCATE");
 
 	ddgi_probe_relocation_offsets = IGraphicsDevice::inst->create_buffer({});
 	ddgi_globals = IGraphicsDevice::inst->create_buffer({});
@@ -108,6 +109,7 @@ void raytrace_the_world() {
 	globals.atlas_x = width_probe_space;
 	globals.atlas_y = height_probe_space;
 	globals.num_volumes = volumes.size();
+	//globals.relocate_normal_dist = relocate_normal_dist;
 
 	// rt algorithm:
 	/*
@@ -350,6 +352,7 @@ static float normal_bias = 0.1;
 static float view_bias = 0.1;
 static int bounces = 4;
 static bool include_cubemaps = true;
+static float relocate_normal_dist = 0.2;
 void ddgi_debugmenu() {
 	auto self = draw.ddgi.get();
 	ImGui::InputInt3("select", &self->selected_probe.x);
@@ -363,6 +366,7 @@ void ddgi_debugmenu() {
 	ImGui::InputFloat("view bias", &view_bias);
 	ImGui::InputInt("bounces", &bounces);
 	ImGui::Checkbox("reflections", &include_cubemaps);
+	ImGui::InputFloat("relocate_normal_dist", &relocate_normal_dist);
 
 }
 ADD_TO_DEBUG_MENU(ddgi_debugmenu);
@@ -375,8 +379,10 @@ void set_shit_fuck() {
 
 	glBindBufferBase(GL_UNIFORM_BUFFER, 8, self->ddgi_globals->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, self->ddgi_volumes->get_internal_handle());
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, self->ddgi_probe_relocation_offsets->get_internal_handle());
 
 }
+vector<glm::vec4> temp_probe_relocate_thing;
 void DdgiTesting::execute()
 {
 	build_world();
@@ -403,9 +409,13 @@ void DdgiTesting::execute()
 	globals.atlas_x = width_probe_space;
 	globals.atlas_y = height_probe_space;
 	globals.num_volumes = volumes.size();
+	globals.relocate_normal_dist = relocate_normal_dist;
 	ddgi_globals->upload(&globals, sizeof(globals));
 	ddgi_volumes->upload(volumes.data(), volumes.size() * sizeof(DdgiVolumeGpu));
 	theglobals = globals;
+
+	ddgi_probe_relocation_offsets->upload(nullptr, sizeof(glm::vec4) * total_num_probes);
+
 
 	CreateBufferArgs args{};
 	args.size = total_num_probes * MAX_RAYS * sizeof(RayBufferStruct);
@@ -428,7 +438,30 @@ void DdgiTesting::execute()
 	invalid_count_buf->upload(&counter_num, sizeof(glm::ivec4));
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, invalid_count_buf->get_internal_handle());
 
+
+	// relocation
 	Random r(13);
+	{
+		device.set_shader(relocate_shader);
+		set_shit_fuck();
+		device.shader().set_float("ray_sample_randomness", r.RandF(0, TWOPI));
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, ddgi_probe_relocation_offsets->get_internal_handle());
+		const int total_probes = total_num_probes;
+		const int groups = glm::ceil(total_probes / 64.f);
+		glDispatchCompute(groups, 1, 1);
+
+		{
+			temp_probe_relocate_thing.resize(total_num_probes);
+			glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+			glBindBuffer(GL_SHADER_STORAGE_BUFFER, ddgi_probe_relocation_offsets->get_internal_handle());
+			glm::vec4* ptr = (glm::vec4*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+			for (int i = 0; i < total_num_probes; i++)
+				temp_probe_relocate_thing.at(i) = ptr[i];
+			glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+		}
+	}
+	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
 	for (int i = 0; i < bounces; i++) {
 		device.bind_texture(5, draw.scene.skylights.at(0).skylight.generated_cube->get_internal_render_handle());
 
@@ -554,7 +587,11 @@ void DdgiTesting::render_probes()
 		for (int x = 0; x < ddgiGRID.x; x++) {
 			for (int y = 0; y < ddgiGRID.y; y++) {
 				for (int z = 0; z < ddgiGRID.z; z++) {
-					glm::mat4 tr = glm::translate(glm::mat4(1), glm::vec3(x, y, z) * glm::vec3(vol.density) + glm::vec3(vol.origin_priority));
+
+					const int global_index = x + y * ddgiGRID.x + z * ddgiGRID.x * ddgiGRID.y + ddgiGRID.w;
+					glm::vec3 ofs = glm::vec3(temp_probe_relocate_thing.at(global_index));
+
+					glm::mat4 tr = glm::translate(glm::mat4(1), glm::vec3(x, y, z) * glm::vec3(vol.density) + glm::vec3(vol.origin_priority) + ofs);
 					device.shader().set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
 					device.shader().set_ivec3("probe_coord", { x,y,z });
 

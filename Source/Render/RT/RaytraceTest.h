@@ -41,7 +41,8 @@ struct DdgiGlobals {
 	float view_bias;
 
 	int num_volumes;
-	int padding[3];
+	float relocate_normal_dist;
+	int padding[2];
 };
 class DdgiTesting
 {
@@ -76,6 +77,8 @@ public:
 	program_handle debug_probes{};
 	program_handle trace_shader{};
 	program_handle gather_shader{};
+	program_handle relocate_shader{};
+
 
 
 	program_handle get_best_cubemap_shader{};
