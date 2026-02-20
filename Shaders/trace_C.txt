@@ -79,8 +79,21 @@ vec3 RTXGISphericalFibonacci(float sampleIndex, float numSamples)
 #include "pbrShared.txt"
 
 
+uniform vec4 light_sun_dir;
+uniform vec4 light_sun_color;
+
 vec3 evaluate_punctual_lights(vec3 worldspace, vec3 albedo, vec3 normal_t) {
 vec3 output_light_accum = vec3(0.0);
+
+	if(light_sun_dir.w>0) {
+		vec3 sun_dir = light_sun_dir.xyz;
+		TraceOut outsun = trace_ray(worldspace, -sun_dir);
+		if(outsun.t < 0) {
+			output_light_accum += pbr_calculate_punctual(light_sun_color.rgb, -sun_dir, worldspace, albedo.xyz, 1, 0, normal_t.xyz);
+		}
+	}
+	
+
 	for(int light_index=0;light_index<num_lights;light_index++) {
 
 	
@@ -129,11 +142,6 @@ vec3 evaluate_lighting(vec3 pos, vec3 normal, vec3 albedo)
 	
 		irrad =  calculate_irradiance(normal,pos,biased_world_position);
 		
-	}
-	vec3 sun_dir = normalize(vec3(1,-1,1));
-	TraceOut outsun = trace_ray(pos, -sun_dir);
-	if(outsun.t < 0) {
-		irrad += max(dot(-sun_dir,normal),0.0)*0.0;
 	}
 	
 	irrad = irrad * albedo / 3.14159;

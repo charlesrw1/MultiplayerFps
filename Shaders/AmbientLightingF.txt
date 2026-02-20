@@ -47,7 +47,7 @@ void main()
 	
 	float depth_value = depth_tex.r;
 	vec3 worldspace = WorldPosFromDepth(uv, depth_value);
-	vec3 out_color = pbr_get_albedo_mult(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz) * ssao_value * PI;
+	vec3 out_color = vec3(0.1)*pbr_get_albedo_mult(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz) * ssao_value * PI;
 	
 	FS_OUT_Color = vec4(out_color,1.0);
 }

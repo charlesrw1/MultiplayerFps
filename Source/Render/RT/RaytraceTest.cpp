@@ -475,6 +475,16 @@ void DdgiTesting::execute()
 		device.shader().set_float("ray_sample_randomness", r.RandF(0,TWOPI));
 		device.shader().set_int("num_lights", draw.scene.light_list.objects.size());
 
+
+		if (draw.scene.suns.size() > 0) {
+			auto& sun = draw.scene.suns.at(0).sun;
+			device.shader().set_vec4("light_sun_dir", vec4(sun.direction, 1));
+			device.shader().set_vec4("light_sun_color", vec4(sun.color, 0));
+		}
+		else {
+			device.shader().set_vec4("light_sun_dir", vec4(0,0,0, -1));
+		}
+
 		const int total_probes = total_num_probes;
 		const int groups = glm::ceil(total_probes / 64.f);
 

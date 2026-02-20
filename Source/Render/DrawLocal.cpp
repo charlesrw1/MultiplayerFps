@@ -2436,42 +2436,6 @@ void set_gpu_objects_data_job(uintptr_t p)
 			gpu_objects[i].prev_anim_mat_offset = prev_bone_buffer_offset + obj.type_.prev_bone_ofs;
 		gpu_objects[i].colorval = proxy.lightmap_coord;
 		gpu_objects[i].flags = 0;
-
-		bool needs_flat = !proxy.static_probe_lit&&!proxy.lightmapped;
-		if (proxy.static_probe_lit) {
-			int index = int(proxy.lightmap_coord.x)*6;
-			if (index >= 0 && index < draw.scene.lightmapObj.staticAmbientCubeProbes.size()) {
-				auto& probes = draw.scene.lightmapObj.staticAmbientCubeProbes;
-				glm::vec3 a0 = probes.at(index);
-				glm::vec3 a1 = probes.at(index+1);
-				glm::vec3 a2 = probes.at(index+2);
-				glm::vec3 a3 = probes.at(index+3);
-				glm::vec3 a4 = probes.at(index+4);
-				glm::vec3 a5 = probes.at(index+5);
-				gpu_objects[i].ambientCube0 = glm::vec4(a0,0.0);
-				gpu_objects[i].ambientCube1 = glm::vec4(a1, 0.0);
-				gpu_objects[i].ambientCube2 = glm::vec4(a2, 0.0);
-				gpu_objects[i].ambientCube3 = glm::vec4(a3, 0.0);
-				gpu_objects[i].ambientCube4 = glm::vec4(a4, 0.0);
-				gpu_objects[i].ambientCube5 = glm::vec4(a5, 0.0);
-			}
-			else
-				needs_flat = true;
-		}
-		if (needs_flat) {
-			glm::vec3 ambientCube[6];
-			glm::vec3 pos = proxy.transform[3];
-			if(proxy.model)
-				pos = proxy.transform * glm::vec4( proxy.model->get_bounds().get_center(),1.0);
-			draw.scene.evaluate_lighting_at_position(pos, ambientCube);
-
-			gpu_objects[i].ambientCube0 = glm::vec4(ambientCube[1],0.f);
-			gpu_objects[i].ambientCube1 = glm::vec4(ambientCube[0],0.f);
-			gpu_objects[i].ambientCube2 = glm::vec4(ambientCube[3],0.f);
-			gpu_objects[i].ambientCube3 = glm::vec4(ambientCube[2],0.f);
-			gpu_objects[i].ambientCube4 = glm::vec4(ambientCube[5],0.f);
-			gpu_objects[i].ambientCube5 = glm::vec4(ambientCube[4],0.f);
-		}
 	}
 }
 
@@ -3239,7 +3203,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
 		state.program = prog.ambient_accumulation;
-		state.blend = BlendState::MULT;	// does a mult of (albedo+ao) with the indirect lighting already in tex.scene_color
+		state.blend = BlendState::ADD;	// does a mult of (albedo+ao) with the indirect lighting already in tex.scene_color
 		state.depth_testing = false;
 		state.depth_writes = false;
 		device.set_pipeline(state);
