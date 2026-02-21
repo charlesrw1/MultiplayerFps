@@ -37,6 +37,7 @@ public:
 
 	// ONLY valid for dynamic materials! (is_this_a_dynamic_material())
 	REF void set_float_parameter(StringName name, float f);
+	void set_floatvec_parameter(StringName name, glm::vec4 f);
 	REF void set_tex_parameter(StringName name, const Texture* t);
 
 	REF bool is_this_a_dynamic_material() const;

@@ -617,3 +617,22 @@ void GiVolumeComponent::start()
 void GiVolumeComponent::stop()
 {
 }
+
+void AreaishLightComponent::start()
+{
+	mat = imaterials->create_dynmaic_material(MaterialInstance::load("emissive_basic.mm"));
+	auto mesh = get_owner()->create_component<MeshComponent>();
+	mesh->set_model(Model::load("eng/plane.cmdl"));
+	mesh->set_material_override(mat.get());
+	mat->set_floatvec_parameter("EmissiveColor", color32_to_vec4(color) * intensity);
+}
+
+void AreaishLightComponent::stop()
+{
+}
+
+void AreaishLightComponent::editor_on_change_property()
+{
+	glm::vec4 linear = colorvec_srgb_to_linear(color32_to_vec4(color));
+	mat->set_floatvec_parameter("EmissiveColor", linear * intensity);
+}

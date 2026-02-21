@@ -215,7 +215,12 @@ void main()
 			vec3 pos_hit = probe_pos+ray_dir*hit_result.t;
 			vec3 pos_to_eval_from = pos_hit - ray_dir*0.03 + hit_result.hit_normal * 0.03;
 			out_distance = hit_result.t;
-			incoming_radiance = evaluate_lighting(pos_to_eval_from,hit_result.hit_normal, Albedos.data[hit_result.mat_hit].xyz);
+			
+			vec4 albedo_or_emissive = Albedos.data[hit_result.mat_hit];
+			if(albedo_or_emissive.w>0.5)	
+				incoming_radiance = evaluate_lighting(pos_to_eval_from,hit_result.hit_normal, albedo_or_emissive.rgb);
+			else
+				incoming_radiance = albedo_or_emissive.rgb;
 		}
 		
 		// have lighting, have depth

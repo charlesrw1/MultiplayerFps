@@ -201,6 +201,7 @@ inline Color32 srgb_to_linear_color32(Color32 c) {
 #include "Render/MaterialPublic.h"
 #include "Render/MaterialLocal.h"
 #include "Render/Texture.h"
+
 Color32 get_color_of_material_for_export(const MaterialInstance* m) {
     Color32 defaultc = { 10,10,50 };
     if (!m) return defaultc;
@@ -236,6 +237,22 @@ Color32 get_color_of_material_for_export(const MaterialInstance* m) {
 
     return defaultc;
 }
+glm::vec3 get_emissive_of_mat_for_export(const MaterialInstance* m) {
+    glm::vec3 default_em(0.f);
+    if (!m) return default_em;
+    auto master = m->get_master_material();
+    auto impl = m->impl.get();
+    if (!master) return default_em;
+    if (!master->self) return default_em;
+   {
+        auto albedo = impl->find_parameter(StringName("EmissiveColor"));
+        if (albedo && albedo->type == MatParamType::FloatVec)
+            return albedo->vector;
+    }
+
+    return default_em;
+}
+
 
 void export_one_model(const Model& model, const char* export_path) {
     std::vector<ExportVertex> verticies;

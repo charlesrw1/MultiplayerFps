@@ -267,6 +267,20 @@ public:
 	REF float xz_density = 2.0;
 	REF float y_density = 2.0;
 };
+#include "Render/DynamicMaterialPtr.h"
+class AreaishLightComponent : public Component {
+public:
+	CLASS_BODY(AreaishLightComponent);
+	AreaishLightComponent() {
+		set_call_init_in_editor(true);
+	}
+	void start() final;
+	void stop() final;
+	void editor_on_change_property() final;
+	REF Color32 color = COLOR_WHITE;
+	REF float intensity = 1.0;
+	DynamicMatUniquePtr mat;
+};
 
 struct Lightmap_Object;
 class LightmapComponent : public Component {

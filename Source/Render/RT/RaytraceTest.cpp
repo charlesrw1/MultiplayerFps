@@ -202,6 +202,7 @@ void DdgiTesting::create_textures_raybuffer(int probe_width, int probe_height) {
 }
 
 
+extern glm::vec3 get_emissive_of_mat_for_export(const MaterialInstance* m);
 
 void DdgiTesting::build_world()
 {
@@ -307,6 +308,13 @@ void DdgiTesting::build_world()
 
 		auto vec = color32_to_vec4(get_color_of_material_for_export(allmats.at(i)));
 		auto linear = glm::pow(vec, glm::vec4(2.2));
+		linear.w = 1;
+
+		auto emissive = get_emissive_of_mat_for_export(allmats.at(i));
+		if (glm::dot(emissive, glm::vec3(1)) > 0.1) {
+			linear = glm::vec4(emissive, 0);
+		}
+
 		materialsdata.at(INDEX) = linear;
 	}
 
@@ -650,7 +658,7 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
 	state.program = shade_fs;
-	state.blend = BlendState::OPAQUE;
+	state.blend = BlendState::ADD;
 	state.depth_testing = false;
 	state.depth_writes = false;
 	device.set_pipeline(state);

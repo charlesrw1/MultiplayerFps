@@ -1110,6 +1110,22 @@ void MaterialInstance::set_float_parameter(StringName name, float f)
 	}
 	sys_print(Error, "couldnt find parameter for set_tex_parameter\n");
 }
+void MaterialInstance::set_floatvec_parameter(StringName name, glm::vec4 f)
+{
+	auto master = get_master_material();
+	auto& params = impl->params;
+	const int count = master->param_defs.size();
+	for (int i = 0; i < count; i++) {
+		if (master->param_defs[i].default_value.type == MatParamType::FloatVec &&
+			master->param_defs[i].hashed_name == name) {
+			params[i].vector = f;
+			matman.add_to_dirty_list(this);
+			return;
+		}
+	}
+	sys_print(Error, "couldnt find parameter for set_tex_parameter\n");
+}
+
 
 void MaterialInstance::set_tex_parameter(StringName name, const Texture* t)
 {
