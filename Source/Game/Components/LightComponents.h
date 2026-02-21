@@ -242,17 +242,14 @@ public:
 	glm::vec3 get_probe_pos()  {
 		return get_ws_transform() * glm::vec4(anchor.p, 1.0);
 	}
-private:
-	REFLECT(hide);
 	int probe_ofs = -1;
+private:
+
 
 	void update_editormeshbuilder();
-	handle<Render_Reflection_Volume> handle;
-	Texture* mytexture = nullptr;
 	MeshBuilderComponent* editor_meshbuilder = nullptr;
 	obj<Entity> editor_mesh;
 };
-
 
 class GiVolumeComponent : public Component
 {
@@ -267,6 +264,21 @@ public:
 	REF float xz_density = 2.0;
 	REF float y_density = 2.0;
 };
+
+class GameSceneGiUtil {
+public:
+	static void on_scene_load_gi(const string& mapname);
+	static void on_scene_exit();
+	static void bake_all_cubemaps();	// bake all
+	static void bake_one_cubemap(CubemapComponent* volume);	// force bake 1
+	static void on_cubemap_changes();	// removal/add/moving volume
+	static void bake_ddgi();
+	// global flag
+	static void check_changes();
+private:
+	static bool had_changes;
+};
+
 #include "Render/DynamicMaterialPtr.h"
 class AreaishLightComponent : public Component {
 public:

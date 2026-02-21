@@ -9,6 +9,7 @@
 #include "Framework/Config.h"
 #include "GameEnginePublic.h"
 #include "tracy/public/tracy/Tracy.hpp"
+#include "Game/Components/LightComponents.h"
 
 Level::~Level()
 {
@@ -44,6 +45,9 @@ void Level::update_level()
 		}
 	}
 	deferred_delete_list.clear();
+
+
+	GameSceneGiUtil::check_changes();
 }
 void Level::sync_level_render_data()
 {
@@ -155,6 +159,7 @@ Level::Level(bool is_editor)
 {
 	
 }
+
 void Level::start(string source_name, UnserializedSceneFile* source)
 {
 	this->source_name = source_name;
@@ -163,6 +168,8 @@ void Level::start(string source_name, UnserializedSceneFile* source)
 	insert_unserialized_entities_into_level_internal(*source,true);
 	double end = GetTime();
 	sys_print(Debug, "Level::start: took %f\n", float(end - start));
+
+	GameSceneGiUtil::on_scene_load_gi(source_name);
 }
 
 void Level::remove_from_update_list(Component* ec) {
@@ -231,12 +238,15 @@ void Level::insert_new_native_entity_into_hashmap_R(Entity* e) {
 
 void Level::close_level()
 {
+	GameSceneGiUtil::on_scene_exit();
+
 	for (auto ent : all_world_ents) {
 		if (Entity* e = ent->cast_to<Entity>())
 			e->destroy();
 	}
 	ASSERT(all_world_ents.num_used == 0);
 	all_world_ents.clear_all();
+
 }
 #include "Framework/Log.h"
 #include "Framework/MapUtil.h"

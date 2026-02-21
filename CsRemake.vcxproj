@@ -128,6 +128,7 @@
     <ClCompile Include="Source\Render\Model.cpp" />
     <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
     <ClCompile Include="Source\Render\RenderExtra.cpp" />
+    <ClCompile Include="Source\Render\RenderGiManager.cpp" />
     <ClCompile Include="Source\Render\RenderWindow.cpp" />
     <ClCompile Include="Source\Render\RT\RaytraceTest.cpp" />
     <ClCompile Include="Source\Render\Shader.cpp" />
@@ -229,6 +230,7 @@
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\IGraphsDevice.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
+    <ClInclude Include="Source\Render\RenderGiManager.h" />
     <ClInclude Include="Source\Render\RenderWindow.h" />
     <ClInclude Include="Source\Render\RT\RaytraceTest.h" />
     <ClInclude Include="Source\Render\UniformBuffer.h" />

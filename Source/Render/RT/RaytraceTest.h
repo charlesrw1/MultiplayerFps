@@ -56,6 +56,9 @@ public:
 	void draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view);
 	glm::ivec3 selected_probe{};
 	void create_textures_raybuffer(int w, int h);
+
+	void calculate_lum_for_spec();
+
 	IGraphicsBuffer* verts = nullptr;
 	IGraphicsBuffer* indicies = nullptr;
 	IGraphicsBuffer* nodes = nullptr;
@@ -71,13 +74,16 @@ public:
 
 	IGraphicsTexture* probe_irradiance = nullptr;
 	IGraphicsTexture* probe_depth = nullptr;
-	IGraphicsBuffer* buf = nullptr;
+	//IGraphicsBuffer* buf = nullptr;
 
 	program_handle raytrace_test{};
 	program_handle debug_probes{};
 	program_handle trace_shader{};
 	program_handle gather_shader{};
 	program_handle relocate_shader{};
+
+	program_handle lum_calc{};
+
 
 
 

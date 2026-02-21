@@ -226,7 +226,6 @@ SunLightComponent::SunLightComponent() {
 #include "MeshComponent.h"
 #include "Level.h"
 void CubemapComponent::start() {
-	mytexture = new Texture;
 
 	if (eng->is_editor_level()) {
 		editor_meshbuilder = get_owner()->create_component<MeshBuilderComponent>();
@@ -256,18 +255,7 @@ void CubemapComponent::start() {
 }
 void CubemapComponent::on_sync_render_data()
 {
-	if (!handle.is_valid())
-		handle = idraw->get_scene()->register_reflection_volume();
-	Render_Reflection_Volume h;
-	h.wants_update = true;
-	h.generated_cube = mytexture;
-	h.probe_position = get_probe_pos();
-	glm::vec3 scale = get_owner()->get_ls_scale();
-	h.boxmin = get_ws_position() - scale * 0.5f;
-	h.boxmax = get_ws_position() + scale * 0.5f;
-	h.probe_ofs = probe_ofs;
 
-	idraw->get_scene()->update_reflection_volume(handle, h);
 }
 
 void CubemapComponent::update_editormeshbuilder()
@@ -282,9 +270,8 @@ void CubemapComponent::update_editormeshbuilder()
 	editor_meshbuilder->mb.End();
 }
 void CubemapComponent::stop() {
-	idraw->get_scene()->remove_reflection_volume(handle);
+	
 	//delete mytexture;
-	mytexture = nullptr;
 	if (editor_meshbuilder) {
 		editor_meshbuilder->destroy();
 		editor_meshbuilder = nullptr;
@@ -635,4 +622,81 @@ void AreaishLightComponent::editor_on_change_property()
 {
 	glm::vec4 linear = colorvec_srgb_to_linear(color32_to_vec4(color));
 	mat->set_floatvec_parameter("EmissiveColor", linear * intensity);
+}
+
+
+#include "Render/RenderGiManager.h"
+
+void GameSceneGiUtil::on_scene_load_gi(const string& mapname)
+{
+	on_cubemap_changes();
+	bake_all_cubemaps();
+}
+
+void GameSceneGiUtil::on_scene_exit()
+{
+	RenderGiManager::inst->update_cubemap_volumes({});	// clear all
+}
+
+void GameSceneGiUtil::bake_all_cubemaps()
+{
+	std::vector<R_CubemapVolume> volumes;
+
+	std::vector<CubemapComponent*> components;
+	auto& objs = eng->get_level()->get_all_objects();
+	for (auto o : objs) {
+		if (auto cc = o->cast_to<CubemapComponent>()) {
+			components.push_back(cc);
+		}
+	}
+	for (int i = 0; i < components.size(); i++) {
+		components[i]->probe_ofs = i;
+
+		glm::quat rot = components[i]->get_owner()->get_ws_rotation();
+		glm::vec3 pos = components[i]->get_owner()->get_ws_position();
+
+		glm::mat4 transform = glm::translate(glm::mat4(1), pos) * glm::mat4_cast(rot);
+		glm::vec3 size = components[i]->get_owner()->get_ls_scale();
+		R_CubemapVolume vol{};
+		vol.extents = glm::vec4(size,0);
+		vol.transform = transform;
+
+		const auto& full_transform = components[i]->get_ws_transform();
+		glm::vec3 min1 = full_transform * glm::vec4(-0.5, -0.5, -0.5, 1);
+		glm::vec3 max1 = full_transform * glm::vec4(0.5, 0.5, 0.5, 1);
+		glm::vec3 min = glm::min(min1, max1);
+		glm::vec3 max = glm::max(min1, max1);
+		min -= vec3(1);
+		max += vec3(1);
+		vol.bounds_min = glm::vec4(min, 0);
+		vol.bounds_max = glm::vec4(max, 0);
+
+		volumes.push_back(vol);
+	}
+	RenderGiManager::inst->update_cubemap_volumes(volumes);
+	RenderGiManager::inst->bake_all_cubemaps();
+}
+
+void GameSceneGiUtil::bake_one_cubemap(CubemapComponent* volume)
+{
+	if (volume->probe_ofs != -1)
+		RenderGiManager::inst->bake_one_cubemap(volume->probe_ofs);
+
+}
+
+bool GameSceneGiUtil::had_changes = false;
+void GameSceneGiUtil::on_cubemap_changes()
+{
+	had_changes = true;
+}
+void GameSceneGiUtil::check_changes()
+{
+	if (!had_changes)
+		return;
+	had_changes = false;
+}
+
+
+void GameSceneGiUtil::bake_ddgi()
+{
 }

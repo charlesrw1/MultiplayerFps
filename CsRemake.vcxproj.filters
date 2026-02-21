@@ -469,6 +469,7 @@
     <ClInclude Include="Source\Framework\SerializerJson2.h" />
     <ClInclude Include="Source\Game\Components\SpawnerComponenth.h" />
     <ClInclude Include="Source\Render\RT\RaytraceTest.h" />
+    <ClInclude Include="Source\Render\RenderGiManager.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -628,6 +629,7 @@
     <ClCompile Include="Source\Framework\SerializerJson2.cpp" />
     <ClCompile Include="Source\Game\Components\SpawnerComponenth.cpp" />
     <ClCompile Include="Source\Render\RT\RaytraceTest.cpp" />
+    <ClCompile Include="Source\Render\RenderGiManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

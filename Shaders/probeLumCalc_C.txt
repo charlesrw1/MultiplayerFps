@@ -1,0 +1,93 @@
+
+layout(local_size_x = 64, local_size_y=1,local_size_z=1) in;
+
+layout(binding =2) uniform sampler2D  probe_irradiance;
+layout(binding =3) uniform sampler2D  probe_depth;
+
+#include "SharedGpuTypes.txt"
+
+uniform int num_cubemaps = 0;
+struct R_ReflectionVolume {
+	mat4 transform;
+	vec4 size;
+	vec4 bounds_min;
+	vec4 bounds_max;
+};
+
+layout(std430, binding =11) buffer BestCubemapForProbe
+{
+	R_ReflectionVolume data[];
+} Cubemaps;
+
+
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+
+
+#include "rtShared.txt"
+
+
+vec3 randColor(int number){
+    return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
+}
+
+
+// for sampling the sky
+
+
+
+// each thread = 1 probe (ie global id)
+// each thread computes 64 samples, computes lighting. then saves to work buffer
+
+// then run again to save into atlas
+
+// repeat.
+
+// need: radiance, depth, hitbuffer, lighting (lights, sun, spot, skybox), material/raytrace stuff
+
+// volume. (box, transform, probe dim)
+
+
+
+#define DDGILIGHTING
+#include "ddgiShared.txt"
+
+
+#include "pbrShared.txt"
+
+float luminance(vec3 v)
+{
+    return dot(v, vec3(0.2126, 0.7152, 0.0722));
+}
+
+void main()
+{
+	const int global_index = int(gl_GlobalInvocationID.x);
+	if(global_index>=num_cubemaps)
+		return;
+	
+	vec3 boxmin = Cubemaps.data[global_index].bounds_min.rgb;
+	vec3 boxmax = Cubemaps.data[global_index].bounds_max.rgb;
+	vec3 middle = (boxmax+boxmin)*0.5;
+	
+	vec3 sum = vec3(0.0);
+	
+	sum += calculate_irradiance(vec3(1,0,0),middle,middle);
+	sum += calculate_irradiance(vec3(-1,0,0),middle,middle);
+	sum += calculate_irradiance(vec3(0,1,0),middle,middle);
+	sum += calculate_irradiance(vec3(0,-1,0),middle,middle);
+	sum += calculate_irradiance(vec3(0,0,1),middle,middle);
+	sum += calculate_irradiance(vec3(0,0,-1),middle,middle);
+	
+	sum /= 6.0;
+	
+	float lum = luminance(sum);
+	
+	
+	Cubemaps.data[global_index].bounds_min = vec4(boxmin,lum);
+}
+
+	

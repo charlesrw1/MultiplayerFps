@@ -43,8 +43,6 @@ struct MeshBuilder_Object;
 struct Render_Decal;
 struct Render_Light;
 struct Render_Sun;
-struct Render_Irradiance_Volume;
-struct Render_Reflection_Volume;
 struct Render_Skylight;
 class TerrainInterfacePublic;
 struct RenderFog;
@@ -76,9 +74,6 @@ public:
 	virtual void update_sun(handle<Render_Sun> handle, const Render_Sun& s) = 0;
 	virtual void remove_sun(handle<Render_Sun>& handle) = 0;
 
-	virtual handle<Render_Reflection_Volume> register_reflection_volume() = 0;
-	virtual void update_reflection_volume(handle<Render_Reflection_Volume> handle, const Render_Reflection_Volume& v) = 0;
-	virtual void remove_reflection_volume(handle<Render_Reflection_Volume>& handle) = 0;
 	virtual handle<Render_Skylight> register_skylight() = 0;
 	virtual void update_skylight(handle<Render_Skylight> handle, const Render_Skylight& v) = 0;
 	virtual void remove_skylight(handle<Render_Skylight>& handle) = 0;

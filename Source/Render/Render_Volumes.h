@@ -6,18 +6,6 @@
 
 class Texture;
 
-struct Render_Reflection_Volume
-{
-	glm::vec3 probe_position = glm::vec3(0.f);
-	glm::vec3 boxmin = glm::vec3(0.f);
-	glm::vec3 boxmax = glm::vec3(0.f);
-	bool wants_update = false;
-	Texture* generated_cube = nullptr;
-	// manually set by baker, for reasons...
-	//glm::vec3 ambientCube[6];
-	int probe_ofs = -1;
-
-};
 
 // sky reflection and ambient
 // and stuffing the fog settings here too

@@ -656,7 +656,7 @@ void GameEngineLocal::add_commands()
 	commands->add("compile-tex", COMPILE_TEX);
 	
 #endif
-
+	commands->add("bake_probes", [](const Cmd_Args&) {GameSceneGiUtil::bake_all_cubemaps(); });
 	//commands->add("close_ed", close_editor);
 	commands->add("load_imgui_ini", load_imgui_ini);
 	commands->add("dump_imgui_ini", dump_imgui_ini);

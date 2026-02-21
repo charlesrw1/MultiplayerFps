@@ -22,6 +22,8 @@
 #include "tracy/public/tracy/TracyOpenGL.hpp"
 #include "Framework/ArenaAllocator.h"
 #include "IGraphsDevice.h"
+#include "RenderGiManager.h"
+
 const GLenum MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT;
 
 //#pragma optimize("", off)
@@ -1093,6 +1095,8 @@ void Renderer::init()
 	InitFramebuffers(true, g_window_w.get_integer(), g_window_h.get_integer());
 	print_time("draw:buffers");
 
+	ASSERT(!RenderGiManager::inst);
+	RenderGiManager::inst = new RenderGiManager;
 
 	EnviornmentMapHelper::get().init();
 	print_time("draw:env_map");
@@ -2167,19 +2171,6 @@ void Render_Scene::init()
 	glNamedBufferData(gpu_skinned_mats_buffer, gpu_skinned_mats_buffer_size * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
 
 
-	CreateTextureArgs args;
-	args.width = CUBEMAP_WIDTH;
-	args.height = CUBEMAP_WIDTH;
-	args.type = GraphicsTextureType::tCubemapArray;
-	args.format = GraphicsTextureFormat::rgb16f;
-	args.num_mip_maps = Texture::get_mip_map_count(CUBEMAP_WIDTH, CUBEMAP_WIDTH);
-	args.sampler_type = GraphicsSamplerType::CubemapDefault;
-	args.depth_3d = MAX_CUBEMAPS*6;
-	cubemap_array = IGraphicsDevice::inst->create_texture(args);
-
-	auto cm = Texture::install_system("_cubemaps");
-	cm->update_specs_ptr(cubemap_array);
-	cm->type = TEXTYPE_CUBEMAP_ARRAY;
 }
 
 glm::vec4 to_vec4(Color32 color) {
@@ -3020,80 +3011,7 @@ void LightListCuller::draw_lights()
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
 }
-void ReflectionProbeCuller::cull(const View_Setup& setup)
-{
-	CPUFUNCTIONSTART;
 
-	const vec3 forward = normalize(setup.front);
-	const vec3 right = normalize(cross(forward, glm::vec3(0, 1, 0)));	// fixme
-	const vec3 up = normalize(cross(right, forward));
-	const float tile_size_x = setup.width / float(light_frustum_size_x);
-	const float tile_size_y = setup.height / float(light_frustum_size_y);
-	const float aspect = float(setup.width) / setup.height;
-
-	std::vector<int16_t> lights;
-
-	const int total_tiles = light_frustum_size_x * light_frustum_size_y;
-	const int max_lights_in_tile = gpu::MAX_TILE_LIGHTS;
-	counts.resize(total_tiles);
-
-	auto& memArena = draw.get_arena();
-	ArenaScope memScope(memArena);
-
-	int* light_index_buffer = memArena.alloc_bottom_type<int>(total_tiles * max_lights_in_tile);
-	int* tile_light_count = memArena.alloc_bottom_type<int>(total_tiles);
-
-
-	auto cull_volume = [&](int index_x, int index_y) {
-		const int my_tile_index = index_y * light_frustum_size_x + index_x;
-		const int my_light_index_index = my_tile_index * max_lights_in_tile;
-		int lights_in_tile = 0;
-
-
-		auto furstum_planes = get_tile_frustum_planes(setup.origin, forward, right, up, setup.fov,
-			aspect, setup.width, setup.height, index_x, index_y, tile_size_x, tile_size_y);
-
-		auto& scene_volumes = draw.scene.reflection_volumes.objects;
-		int light_index = -1;
-		for (auto& volume : scene_volumes) {
-			light_index += 1;
-			Render_Reflection_Volume& light = volume.type_;
-			glm::vec4 sphere = bounds_to_sphere(Bounds(light.boxmin, light.boxmax));
-			//glm::vec4 sphere(light.light.position, light.light.radius);
-			const bool in_frustum = cull_sphere_by_frustum(furstum_planes, sphere);
-			if (in_frustum) {
-				light_index_buffer[my_light_index_index + lights_in_tile] = light_index;
-				lights_in_tile += 1;
-				if (lights_in_tile >= max_lights_in_tile)
-					break;
-			}
-		}
-
-		tile_light_count[my_tile_index] = lights_in_tile;
-		counts[my_tile_index] = lights_in_tile;
-	};
-
-	for (int y = 0; y < light_frustum_size_y; y++) {
-		for (int x = 0; x < light_frustum_size_x; x++) {
-			cull_volume(x, y);
-		}
-	}
-
-	light_indirection->upload(light_index_buffer, total_tiles * max_lights_in_tile * sizeof(int));
-	light_count_buffer->upload(tile_light_count, total_tiles * sizeof(int));
-
-
-	gpu::TiledLightUniforms uniforms{};
-	uniforms.tile_count_x = light_frustum_size_x;
-	uniforms.tile_count_y = light_frustum_size_y;
-
-	uniforms.inv_tile_size_x = 1.0 / tile_size_x;
-	uniforms.inv_tile_size_y = 1.0 / tile_size_y;
-
-
-	tiled_uniforms->upload(&uniforms, sizeof(gpu::TiledLightUniforms));
-
-}
 
 void LightListCuller::cull(const View_Setup& setup)
 {
@@ -3683,48 +3601,7 @@ void Renderer::check_cubemaps_dirty()
 		sys_print(Info, "skylight cubemap up/down irrad: (%f %f %f) (%f %f %f)\n", up.x, up.y, up.z, down.x, down.y, down.z);
 		had_changes = true;
 	}
-	auto& vols = scene.reflection_volumes.objects;
-	for (int i = 0; i < vols.size(); i++) {
-		auto& vol = vols[i].type_;
-		if (vol.wants_update||force_render_cubemaps.get_bool()) {
-			sys_print(Debug, "check_cubemaps_dirty:rendering reflection vol cubemap\n");
-			glm::vec3 dummy[6];
-			update_cubemap_specular_irradiance(dummy, vol.generated_cube, vol.probe_position, false);
-
-			// copy from texture to cubemap array
-			const int volhandle = vols[i].handle;
-			const int mips = Texture::get_mip_map_count(CUBEMAP_WIDTH, CUBEMAP_WIDTH);
-			for (int face = 0; face < 6; face++) {
-				int width = CUBEMAP_WIDTH;
-				for (int mip = 0; mip < mips; mip++) {
-
-					//GraphicsBlitInfo blit;
-					//blit.src.texture = vol.generated_cube->gpu_ptr;
-					//blit.dest.texture = scene.cubemap_array;
-					//blit.dest.mip = mip;
-					//blit.dest.layer = 6*volhandle + face;	// face index
-					//blit.src.mip = mip;
-					//blit.src.layer = face;
-					//blit.src.x = blit.src.y = blit.dest.x = blit.dest.y = 0;
-					//blit.src.w = blit.src.h = blit.dest.w = blit.dest.h = CUBEMAP_WIDTH;
-					//IGraphicsDevice::inst->blit_textures(blit);
-					//glCheckError();
-
-
-					glCopyImageSubData(
-						vol.generated_cube->gpu_ptr->get_internal_handle(), GL_TEXTURE_CUBE_MAP, mip, 0, 0, face,
-						scene.cubemap_array->get_internal_handle(), GL_TEXTURE_CUBE_MAP_ARRAY, mip, 0, 0, 6 * volhandle + face,
-						width, width, 1
-					);
-					width /= 2;
-				}
-			}
-
-
-			vol.wants_update = false;
-			had_changes = true;
-		}
-	}
+	RenderGiManager::inst->render_frame_tick();
 	force_render_cubemaps.set_bool(false);
 
 	if (had_changes) {

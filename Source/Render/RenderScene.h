@@ -237,7 +237,6 @@ enum class RenderObjectTypes
 	Particle,
 	Decal,
 	Skylight,
-	Reflection,
 	Meshbuilder,
 	Fog,
 	Lightmap,
@@ -373,32 +372,7 @@ public:
 		suns.erase(suns.begin() + i);
 		handle = { -1 };
 	}
-	handle<Render_Reflection_Volume> register_reflection_volume() override {
-		return { reflection_volumes.make_new() };
-	}
-	void update_reflection_volume(handle<Render_Reflection_Volume> handle, const Render_Reflection_Volume& sun) override {
-		ASSERT(!eng->get_is_in_overlapped_period());
-		if (!handle.is_valid())
-			return;
-		reflection_volumes.get(handle.id) = sun;
-		reflection_volumes.get(handle.id).wants_update = true;
-	}
-	void remove_reflection_volume(handle<Render_Reflection_Volume>& handle)override {
-		if (eng->get_is_in_overlapped_period()) {
-			add_to_queued_deletes(handle.id, RenderObjectTypes::Skylight);
-			handle = { -1 };
-			return;
-		}
-		if (!handle.is_valid())
-			return;
-		auto vol = reflection_volumes.get(handle.id).generated_cube;
-		if (vol) {
-			vol->uninstall();
-			delete vol;
-		}
-		reflection_volumes.free(handle.id);
-		handle = { -1 };
-	}
+
 	handle<Render_Skylight> register_skylight() override {
 		ASSERT(!eng->get_is_in_overlapped_period());
 		handle<Render_Skylight> id = { int(unique_id_counter++) };
@@ -570,10 +544,7 @@ public:
 				handle<Render_Sun> h{ qd.handle };
 				remove_sun(h);
 			}break;
-			case RenderObjectTypes::Reflection: {
-				handle<Render_Reflection_Volume> h{ qd.handle };
-				remove_reflection_volume(h);
-			}break;
+		
 			case RenderObjectTypes::Fog: {
 				handle<RenderFog> h{ qd.handle };
 				remove_fog(h);
@@ -590,19 +561,10 @@ public:
 	}
 
 	void evaluate_lighting_at_position(const glm::vec3& pos, glm::vec3* ambientCubeOut /* expects size 6 vector*/) const {
-		auto& vols = reflection_volumes.objects;
+		
 		auto& probes = lightmapObj.staticAmbientCubeProbes;
 		if (has_lightmap) {
-			for (auto& [_, vol] : vols) {
-				if (vol.wants_update || vol.probe_ofs == -1 || (vol.probe_ofs*6+5) >= (int)probes.size())
-					continue;
-				Bounds b(vol.boxmin, vol.boxmax);
-				if (b.inside(pos, 0)) {
-					for (int i = 0; i < 6; i++)
-						ambientCubeOut[i] = probes.at(vol.probe_ofs * 6 + i);
-					return;	// early out
-				}
-			}
+			
 		}
 		// hasnt found yet
 		if (!skylights.empty()&&!skylights.at(0).skylight.wants_update) {
@@ -645,15 +607,7 @@ public:
 			auto& skylight = skylights.front();
 			reflectionProbeTex = skylight.skylight.generated_cube;
 		}
-		auto& vols = reflection_volumes.objects;
-		for (int i = 0; i < vols.size(); i++) {
-			auto& vol = vols[i].type_;
-			if (vol.wants_update || !vol.generated_cube)
-				continue;
-			Bounds b(vol.boxmin, vol.boxmax);
-			if (b.inside(vieworigin, 0.0))
-				reflectionProbeTex = vol.generated_cube;
-		}
+		
 		return reflectionProbeTex;
 	}
 
@@ -683,8 +637,6 @@ public:
 	// should just be one, but I let multiple ones exist too
 	std::vector<RSunInternal> suns;
 	std::vector<RSkylight_Internal> skylights;	// again should just be 1
-	Free_List<Render_Reflection_Volume> reflection_volumes;
-	IGraphicsTexture* cubemap_array = nullptr;
 
 	// objects can be deleted mid frame, so queue them
 	std::vector<QueuedRenderObjectDelete> queued_deletes;

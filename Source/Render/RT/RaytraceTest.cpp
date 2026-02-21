@@ -44,6 +44,9 @@ DdgiTesting::DdgiTesting()
 
 	relocate_shader = draw.get_prog_man().create_compute("trace_C.txt", "RELOCATE");
 
+	lum_calc = draw.get_prog_man().create_compute("probeLumCalc_C.txt");
+
+
 	ddgi_probe_relocation_offsets = IGraphicsDevice::inst->create_buffer({});
 	ddgi_globals = IGraphicsDevice::inst->create_buffer({});
 	ddgi_volumes = IGraphicsDevice::inst->create_buffer({});
@@ -361,6 +364,7 @@ static float view_bias = 0.1;
 static int bounces = 4;
 static bool include_cubemaps = true;
 static float relocate_normal_dist = 0.2;
+static int lum_adjust_mode = 3;
 void ddgi_debugmenu() {
 	auto self = draw.ddgi.get();
 	ImGui::InputInt3("select", &self->selected_probe.x);
@@ -375,6 +379,7 @@ void ddgi_debugmenu() {
 	ImGui::InputInt("bounces", &bounces);
 	ImGui::Checkbox("reflections", &include_cubemaps);
 	ImGui::InputFloat("relocate_normal_dist", &relocate_normal_dist);
+	ImGui::SliderInt("lum_adjust", &lum_adjust_mode, 0, 7);
 
 }
 ADD_TO_DEBUG_MENU(ddgi_debugmenu);
@@ -538,27 +543,27 @@ void DdgiTesting::execute()
 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-	{
-	
-		CreateBufferArgs args;
-		args.flags = GraphicsBufferUseFlags::BUFFER_USE_AS_STORAGE_READ;
-		struct ProbeInfo {
-			glm::vec4 pos_size;
-		};
-		args.size = 256 * sizeof(ProbeInfo);
-		auto& objs = draw.scene.reflection_volumes.objects;
-		std::vector<ProbeInfo> infos;
-		for (int i = 0; i < objs.size(); i++) {
-			auto& o = objs[i].type_;
-			auto size = (o.boxmax - o.boxmin);
-			float max_side = max(max(size.x, size.y), size.z);
-
-			glm::vec4 v = glm::vec4(objs[i].type_.probe_position, max_side * 0.5);	// fixme
-			infos.push_back({ v });
-		}
-		buf = IGraphicsDevice::inst->create_buffer(args);
-		buf->upload(infos.data(), infos.size() * sizeof(ProbeInfo));
-	}
+	//{
+	//
+	//	CreateBufferArgs args;
+	//	args.flags = GraphicsBufferUseFlags::BUFFER_USE_AS_STORAGE_READ;
+	//	struct ProbeInfo {
+	//		glm::vec4 pos_size;
+	//	};
+	//	args.size = 256 * sizeof(ProbeInfo);
+	//	auto& objs = draw.scene.reflection_volumes.objects;
+	//	std::vector<ProbeInfo> infos;
+	//	for (int i = 0; i < objs.size(); i++) {
+	//		auto& o = objs[i].type_;
+	//		auto size = (o.boxmax - o.boxmin);
+	//		float max_side = max(max(size.x, size.y), size.z);
+	//
+	//		glm::vec4 v = glm::vec4(objs[i].type_.probe_position, max_side * 0.5);	// fixme
+	//		infos.push_back({ v });
+	//	}
+	//	buf = IGraphicsDevice::inst->create_buffer(args);
+	//	buf->upload(infos.data(), infos.size() * sizeof(ProbeInfo));
+	//}
 
 
 	ray_buffer->release();
@@ -621,6 +626,33 @@ void DdgiTesting::render_probes()
 	}
 
 }
+
+#include "Render/RenderGiManager.h"
+void DdgiTesting::calculate_lum_for_spec()
+{
+	const int num = RenderGiManager::inst->get_num_cubemaps();
+	if (num == 0) return;
+	if (!probe_depth || !probe_irradiance) return;
+	auto& device = draw.get_device();
+	device.bind_texture(2, probe_irradiance->get_internal_handle());
+	device.bind_texture(3, probe_depth->get_internal_handle());
+
+	device.set_shader(lum_calc);
+	set_shit_fuck();
+	const int num_cubemaps = RenderGiManager::inst->get_num_cubemaps();
+	device.shader().set_int("num_cubemaps", num_cubemaps);
+
+
+	const int groups = glm::ceil(num / 64.f);
+	printf("$$$$$$$$$$$$$$$$$$calculate_lum_for_spec %d\n",groups);
+
+	IGraphicsBuffer* const cubemap_volume_buffer = RenderGiManager::inst->get_cubemap_volume_buffer();
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, cubemap_volume_buffer->get_internal_handle());
+	glDispatchCompute(groups, 1, 1);
+
+	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+}
 void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 {
 	if (!verts) {
@@ -663,7 +695,7 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 	state.depth_writes = false;
 	device.set_pipeline(state);
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, buf->get_internal_handle());
+	//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, buf->get_internal_handle());
 
 	//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, indirection->get_internal_handle());
 
@@ -686,11 +718,21 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 	extern ConfigVar r_specular_ao_intensity;
 	device.shader().set_bool("include_cubemaps", !for_cubemap_view && include_cubemaps);
 
+	{
+		IGraphicsTexture* const cubemap_array = RenderGiManager::inst->get_cubemap_array_texture();
+		const int num_cubemaps = RenderGiManager::inst->get_num_cubemaps();
+		IGraphicsBuffer* const cubemap_volume_buffer = RenderGiManager::inst->get_cubemap_volume_buffer();
+
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, cubemap_volume_buffer->get_internal_handle());
+		draw.bind_texture_ptr(8, cubemap_array);
+		device.shader().set_int("num_cubemaps", num_cubemaps);
+	}
+
 	draw.bind_texture(7, EnviornmentMapHelper::get().integrator.get_texture());
-	draw.bind_texture(8, draw.scene.cubemap_array->get_internal_handle());
 	draw.bind_texture(9, draw.scene.skylights.at(0).skylight.generated_cube->get_internal_render_handle());
 
 
+	device.shader().set_int("lum_adjust_mode", lum_adjust_mode);
 
 
 	draw.shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
@@ -699,7 +741,6 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 
 	device.shader().set_ivec3("selected_probe_pos", selected_probe);
 	device.shader().set_float("irrad_mult", irrad_mult);
-	device.shader().set_int("num_cubemaps", draw.scene.reflection_volumes.objects.size());
 
 
 	// fullscreen shader, no vao used
