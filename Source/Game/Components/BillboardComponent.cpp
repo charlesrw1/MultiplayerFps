@@ -69,6 +69,6 @@ void BillboardComponent::on_sync_render_data()
 	obj.shadow_caster = false;
 	obj.owner = this;
 	obj.ignore_in_baking = true;
-
+	obj.ignore_in_cubemap = true;
 	idraw->get_scene()->update_obj(handle, obj);
 }

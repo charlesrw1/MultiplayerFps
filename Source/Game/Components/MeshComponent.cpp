@@ -138,6 +138,7 @@ void MeshComponent::on_sync_render_data()
 	obj.is_skybox = is_skybox;
 	obj.shadow_caster = cast_shadows;
 	obj.ignore_in_baking = ignore_in_baking;
+	obj.ignore_in_cubemap = ignore_in_cubemap;
 	if (animator)
 		obj.animator_bone_ofs = animator->get_matrix_palette_offset();
 	if (!eMaterialOverride.empty())

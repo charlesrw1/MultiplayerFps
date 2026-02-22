@@ -577,7 +577,7 @@ public:
 			ambientCubeOut[i] = glm::vec3(0.1);
 	}
 
-	void build_scene_data(bool skybox_only, bool is_for_editor);
+	void build_scene_data(bool skybox_only, bool is_for_editor, bool cubemap_view);
 	void refresh_static_mesh_data(bool is_for_editor);
 	RSunInternal* get_main_directional_light();
 

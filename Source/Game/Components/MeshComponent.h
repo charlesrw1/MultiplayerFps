@@ -82,6 +82,9 @@ public:
 	void set_ignore_baking(bool ignore) {
 		this->ignore_in_baking = ignore;
 	}
+	void set_ignore_cubemap_view(bool ignore) {
+		this->ignore_in_cubemap = ignore;
+	}
 private:
 	void update_physics_mesh();
 
@@ -94,6 +97,7 @@ private:
 	// This only works on level load
 	REF bool add_collision_if_available = true;
 	REF bool ignore_in_baking = false;
+	REF bool ignore_in_cubemap = false;
 	REFLECT(hide);
 	bool lightmapped = false;
 	REFLECT(hide);

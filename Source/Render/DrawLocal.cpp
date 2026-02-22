@@ -2535,7 +2535,7 @@ ConfigVar r_dont_use_camera_depth_build_scene("r.dont_use_camera_depth_build_sce
 ConfigVar r_skip_depth_prepass("r.skip_depth_prepass", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_depth_prepass_all_objects("r.depth_prepass_all_objects", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_skip_add_to_passes("r.skip_add_to_passes", "0", CVAR_BOOL | CVAR_DEV, "");
-void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
+void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, bool cubemap_view)
 {
 	GPUSCOPESTART(build_scene_data_scope);
 
@@ -2641,6 +2641,9 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor)
 
 			if (!proxy.is_skybox && skybox_only)
 				continue;
+			if (cubemap_view && proxy.ignore_in_cubemap)
+				continue;
+
 			if (obj.type_.is_static)	// only dynamic objects passthrough
 				continue;
 
@@ -3799,7 +3802,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		return;
 	}
 	upload_ubo_view_constants(current_frame_view, ubo.current_frame);
-	scene.build_scene_data(params.skybox_only, params.is_editor);
+	scene.build_scene_data(params.skybox_only, params.is_editor, params.is_cubemap_view);
 	upload_light_and_decal_buffers();
 
 
