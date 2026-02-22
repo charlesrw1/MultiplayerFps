@@ -13,8 +13,6 @@ struct BakedDdgiInputData {
 	IGraphicsTexture* irrad{};
 	IGraphicsTexture* depths{};
 	std::vector<DdgiVolumeGpu> volumes;
-	int atlas_x = 0;
-	int atlas_y = 0;
 };
 
 
@@ -31,6 +29,7 @@ public:
 	void set_loaded_ddgi_data(BakedDdgiInputData&& input);
 	void bake_ddgi();
 
+	const std::vector<R_CubemapVolume>& get_cubemap_volumes_vector() { return cm_volumes; }
 	void update_cubemap_volumes(const std::vector<R_CubemapVolume>& volumes);
 	void bake_all_cubemaps() {
 		wants_bake_all_cubemaps = true;
@@ -38,12 +37,19 @@ public:
 	void bake_one_cubemap(int index) {
 		bake_these_cubemaps.insert(index);
 	}
-	void set_cubemaps_texture(const Texture* cubemaps);
+	void set_cubemaps_from_loading(std::vector<R_CubemapVolume>&& volumes, IGraphicsTexture* cubemaps);
 
 
-	IGraphicsTexture* get_cubemap_array_texture() { return editable_cubemap_array; }
+	IGraphicsTexture* get_cubemap_array_texture() { 
+		if (runtime_loaded_cubemaps) 
+			return runtime_loaded_cubemaps;
+		return editable_cubemap_array; 
+	}
 	IGraphicsBuffer* get_cubemap_volume_buffer() { return cubemap_volume_buffer; }
 	int get_num_cubemaps() { return cm_volumes.size(); }
+
+
+
 private:
 
 	// ############
@@ -52,7 +58,7 @@ private:
 	std::vector<R_CubemapVolume> cm_volumes;
 	IGraphicsBuffer* cubemap_volume_buffer = nullptr;
 	// pre made loaded cubemaps
-	const Texture* runtime_loaded_cubemaps = nullptr;
+	IGraphicsTexture* runtime_loaded_cubemaps = nullptr;
 	// non compressed form that editor can render into
 	IGraphicsTexture* editable_cubemap_array=nullptr;
 

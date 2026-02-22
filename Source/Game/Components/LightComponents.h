@@ -275,6 +275,8 @@ public:
 	static void bake_ddgi();
 	// global flag
 	static void check_changes();
+
+	static void save_to_disk();
 private:
 	static bool had_changes;
 };

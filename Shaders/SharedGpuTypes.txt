@@ -68,8 +68,8 @@ struct Ubo_View_Constants_Struct
 	vec4 fogcolor;
 	vec4 fogparams;
 	
-	float numcubemaps;
-	float numlights;
+	int numcubemaps;
+	int numlights;
 	float forcecubemap;
 	uint debug_options;
 	

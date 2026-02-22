@@ -34,6 +34,12 @@ int write_png_wrapper(const char* filename, int w, int h, int comp, const void* 
 {
 	return stbi_write_png(filename, w, h, comp, data, stride_in_bytes);
 }
+int write_hdr_wrapper(const char* filename, int w, int h, int comp, const float* data)
+{
+	return stbi_write_hdr(filename, w, h, comp, data);
+}
+
+
 //extern IEditorTool* g_texture_editor_tool;
 class TextureAssetMetadata : public AssetMetadata
 {
@@ -133,9 +139,12 @@ void texture_format_to_gl(Texture_Format infmt, GLenum* format, GLenum* internal
 	default:
 		ASSERT(0);
 	};
-
-
 }
+
+
+
+
+
 
 // surface description flags
 const unsigned long DDSF_CAPS = 0x00000001l;
@@ -315,6 +324,7 @@ enum DXGI_FORMAT {
 	DXGI_FORMAT_SAMPLER_FEEDBACK_MIP_REGION_USED_OPAQUE,
 	DXGI_FORMAT_FORCE_UINT = 0xffffffff
 };
+#define DDS_RESOURCE_MISC_TEXTURECUBE 0x4
 struct DDS_HEADER_DXT10
 {
 	DXGI_FORMAT     dxgiFormat;
@@ -471,6 +481,137 @@ static bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* 
 	return true;
 	//return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
 }
+bool dxgi_texture_format_to_gl(DXGI_FORMAT infmt, GraphicsTextureFormat* outfmt)
+{
+	switch (infmt)
+	{
+	case DXGI_FORMAT_BC6H_UF16:
+		*outfmt = GraphicsTextureFormat::bc6;
+		break;
+
+	case DXGI_FORMAT_R11G11B10_FLOAT:
+		*outfmt = GraphicsTextureFormat::r11f_g11f_b10f;
+		break;
+
+	case DXGI_FORMAT_R16G16_FLOAT:
+		*outfmt = GraphicsTextureFormat::rg16f;
+		break;
+
+	default:
+		return false;
+	}
+	return true;
+}
+bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffer, int len)
+{
+	if (len < 4 + sizeof(ddsFileHeader_t)) return false;
+	if (buffer[0] != 'D' || buffer[1] != 'D' || buffer[2] != 'S' || buffer[3] != ' ') return false;
+	// BIG ENDIAN ISSUE:
+	ddsFileHeader_t* header = (ddsFileHeader_t*)(buffer + 4);
+
+
+	GraphicsTextureFormat input_format = GraphicsTextureFormat::rg16f;
+	int input_width = header->Width;
+	int input_height = header->Height;
+
+	int cubemap_array_size = 0;
+	uint32_t dx10FourCC = 'D' | ('X' << 8) | ('1' << 16) | ('0' << 24);
+	DDS_HEADER_DXT10 dx10 = {};
+	if ((header->ddspf.Flags & DDSF_FOURCC) &&
+		header->ddspf.FourCC == dx10FourCC)
+	{
+		dx10 = *(DDS_HEADER_DXT10*)(buffer + 4 + sizeof(ddsFileHeader_t));
+	}
+	else {
+		return false;
+	}
+
+	if (dx10.miscFlag & DDS_RESOURCE_MISC_TEXTURECUBE) {
+		cubemap_array_size = dx10.arraySize;
+	}
+
+	int numMipmaps = 1;
+	if (header->Flags & DDSF_MIPMAPCOUNT) {
+		numMipmaps = header->MipMapCount;
+	}
+
+
+	GraphicsTextureFormat type{};
+	
+	const bool res = dxgi_texture_format_to_gl(dx10.dxgiFormat, &type);
+	if (!res)
+		return false;
+
+	auto create_gpu_texture = [&]() {
+		CreateTextureArgs args;
+		args.width = input_width;
+		args.height = input_height;
+		args.num_mip_maps = numMipmaps;
+		args.format = type;
+		args.float_input_is_16f = true;
+		if (cubemap_array_size > 0) {
+			args.type = GraphicsTextureType::tCubemapArray;
+			args.depth_3d = cubemap_array_size*6;
+			args.sampler_type = GraphicsSamplerType::CubemapDefault;
+		}
+		else {
+			args.sampler_type = GraphicsSamplerType::LinearDefault;
+		}
+		return IGraphicsDevice::inst->create_texture(args);
+	};
+	out_ptr = create_gpu_texture();
+
+	//glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
+	//glTextureStorage2D(output->gl_id, numMipmaps, internal_format, input_width, input_height);
+
+	uint8_t* data_ptr = (buffer + 4 + sizeof(ddsFileHeader_t) + sizeof(DDS_HEADER_DXT10));
+
+	const bool compressed = out_ptr->is_compressed();
+
+	const int compressed_stride = 16;//for bc6 fixme
+	const int bytes_per_pixel = 4;	// fixme, hardcoded for rg16f and r11g11b10
+	int num_layers = 1;
+	if (cubemap_array_size > 0)
+		num_layers = cubemap_array_size * 6;
+	for (int layer = 0; layer < num_layers; layer++) {
+		int ux = input_width;
+		int uy = input_height;
+		for (int i = 0; i < numMipmaps; i++) {
+			int size = 0;
+			if (compressed) {
+				size = ((ux + 3) / 4) * ((uy + 3) / 4) *
+					compressed_stride;
+			}
+			else {
+				size = ux * uy * bytes_per_pixel;
+			}
+
+			//if (compressed)
+			//	glCompressedTextureSubImage2D(output->gl_id,i, 0, 0, ux, uy, internal_format, size, data_ptr);
+			//else
+			//	glTextureSubImage2D(output->gl_id, i, 0, 0, ux, uy, format, type, data_ptr);
+
+			if (num_layers == 1)
+				out_ptr->sub_image_upload(i, 0, 0, ux, uy, size, data_ptr);
+			else
+				out_ptr->sub_image_upload_3d(layer, i, 0, 0, ux, uy, size, data_ptr);
+
+			data_ptr += size;
+			ux /= 2;
+			uy /= 2;
+			if (ux < 1)ux = 1;
+			if (uy < 1)uy = 1;
+		}
+	}
+
+	//glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	//glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	//glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
+
+	return true;
+	//return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
+}
+
 
 static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat, bool nearest_filtered = false)
 {

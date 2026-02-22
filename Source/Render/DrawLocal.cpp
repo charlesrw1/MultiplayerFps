@@ -92,7 +92,7 @@ ConfigVar r_debug_mode("r.debug_mode", "0", CVAR_INTEGER | CVAR_DEV, "render deb
 
 ConfigVar r_drawfog("r.drawfog", "1", CVAR_BOOL | CVAR_DEV, "enable/disable drawing of fog");
 
-ConfigVar ddgi_test("dt", "0", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar ddgi_test("dt", "1", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar ddgi_rt("ddrt", "0", CVAR_BOOL | CVAR_DEV, "");
 
 
@@ -830,7 +830,9 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, bufferha
 	constants.fogcolor = vec4(vec3(0.7), 1);
 	constants.fogparams = vec4(10, 30, 0, 0);
 
-	constants.numcubemaps = 0;
+	const int num_lights = scene.light_list.objects.size();
+	constants.numlights = num_lights;
+	constants.numcubemaps = RenderGiManager::inst->get_num_cubemaps();
 
 	constants.forcecubemap = -1.0;
 
@@ -1222,6 +1224,10 @@ void Renderer::init()
 
 void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 {
+	s_w = std::min(s_w, 4000);
+	s_h = std::min(s_h, 4000);
+
+
 	refresh_render_targets_next_frame = false;
 	disable_taa_this_frame = true;
 
@@ -3421,6 +3427,14 @@ ConfigVar r_print_light_tiles("r.print_light_tiles", "0", CVAR_BOOL | CVAR_DEV, 
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 {
 	GPUSCOPESTART(scene_draw_scope);
+
+	if (view.width > 5000 || view.height > 5000) {
+		// something went wrong
+		view.width = 100;
+		view.height = 100;
+	}
+
+
 	//ZoneNamed(RendererSceneDraw,true);
 	//TracyGpuZone("scene_draw");
 

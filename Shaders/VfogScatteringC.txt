@@ -151,7 +151,17 @@ vec3 get_inscattering(vec3 worldspace)
 	//vec3 spotdir = worldpos-(spot_pos+vec3(2,0,0));
 	//float spotlen = length(spotdir);
 	//spotdir = spotdir/spotlen;
-	accum += vec3(0.05);
+	
+
+	vec3 sum = vec3(0.0);
+	sum += calculate_irradiance(raydir,worldspace,worldspace);
+	sum += calculate_irradiance(vec3(-1,0,0),worldspace,worldspace);
+	sum += calculate_irradiance(vec3(0,1,0),worldspace,worldspace);
+	sum += calculate_irradiance(vec3(0,-1,0),worldspace,worldspace);
+	sum += calculate_irradiance(vec3(0,0,1),worldspace,worldspace);
+	sum += calculate_irradiance(vec3(0,0,-1),worldspace,worldspace);	
+	sum /= 6.0;
+	accum += sum;
 	//if(dot(spotdir,spotlightnormal)>0.5) {
 		//spotadd = phase_function(raydir,spotdir,anisotropy)/(spotlen*spotlen);
 	//	spotadd = min(spotadd, 100.0);

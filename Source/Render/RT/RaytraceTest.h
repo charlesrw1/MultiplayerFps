@@ -40,7 +40,7 @@ struct DdgiGlobals {
 	float normal_bias;
 	float view_bias;
 
-	int num_volumes;
+	int num_volumes=0;
 	float relocate_normal_dist;
 	int padding[2];
 };
@@ -49,23 +49,30 @@ class DdgiTesting
 public:
 	DdgiTesting();
 	~DdgiTesting();
+	
+	// editor side
 	void build_world();
 	void execute();
-	void render_rt();
-	void render_probes();
-	void draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view);
-	glm::ivec3 selected_probe{};
-	void create_textures_raybuffer(int w, int h);
-
 	void calculate_lum_for_spec();
 
-	IGraphicsBuffer* verts = nullptr;
-	IGraphicsBuffer* indicies = nullptr;
-	IGraphicsBuffer* nodes = nullptr;
-	IGraphicsBuffer* references = nullptr;
-	IGraphicsBuffer* materials = nullptr;
+	// scene load
+	void load_the_gi(
+		IGraphicsTexture* irrad,
+		IGraphicsTexture* depth,
+		std::vector<glm::vec4>& relocate,
+		std::vector<DdgiVolumeGpu>& vols
+	);
+
+	// main func
+	void draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view);
+	// debug funcs
+	void render_rt();
+	void render_probes();
+
+	glm::ivec3 selected_probe{};
 
 	std::vector<DdgiVolumeGpu> myvolumes;
+	std::vector<glm::vec4> temp_probe_relocate_thing;
 	DdgiGlobals theglobals;
 
 	IGraphicsBuffer* ddgi_globals = nullptr;
@@ -74,22 +81,24 @@ public:
 
 	IGraphicsTexture* probe_irradiance = nullptr;
 	IGraphicsTexture* probe_depth = nullptr;
-	//IGraphicsBuffer* buf = nullptr;
+
+private:
+	// for editor builds
+	IGraphicsBuffer* verts = nullptr;
+	IGraphicsBuffer* indicies = nullptr;
+	IGraphicsBuffer* nodes = nullptr;
+	IGraphicsBuffer* references = nullptr;
+	IGraphicsBuffer* materials = nullptr;
+
+	void create_textures_raybuffer(int w, int h);
 
 	program_handle raytrace_test{};
 	program_handle debug_probes{};
 	program_handle trace_shader{};
 	program_handle gather_shader{};
 	program_handle relocate_shader{};
-
 	program_handle lum_calc{};
-
-
-
-
 	program_handle get_best_cubemap_shader{};
-
-
 	program_handle shade_fs{};
 	program_handle shade_debug_fs{};
 };

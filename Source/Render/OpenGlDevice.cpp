@@ -176,6 +176,8 @@ public:
 			break;
 		case GraphicsTextureFormat::bc5: return GL_COMPRESSED_RG_RGTC2;
 			break; 
+		case GraphicsTextureFormat::bc6: return GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT;
+			break;
 		case GraphicsTextureFormat::depth24f: return GL_DEPTH_COMPONENT24;
 			break;
 		case GraphicsTextureFormat::depth32f: return GL_DEPTH_COMPONENT32F;
@@ -229,11 +231,13 @@ public:
 		this->width = args.width;
 		this->height = args.height;
 		this->mips = args.num_mip_maps;
+		this->float_input_is_16f = args.float_input_is_16f;
 		my_type = args.type;
 		my_fmt = args.format;
 		internal_format_gl = to_format(args.format);
 		if (args.type == GraphicsTextureType::t2DArray || args.type == GraphicsTextureType::tCubemapArray) {
 			glTextureStorage3D(id, args.num_mip_maps, internal_format_gl, x, y,args.depth_3d);
+
 		}
 		else {
 			glTextureStorage2D(id, args.num_mip_maps, internal_format_gl, x, y);
@@ -311,9 +315,20 @@ public:
 		if(is_compressed())
 			glCompressedTextureSubImage2D(id, level, x, y, w, h, internal_format_gl, size, data);
 		else {
-			const GLenum type = is_float_type() ? GL_FLOAT : GL_UNSIGNED_BYTE;
+			const GLenum type = get_input_type();
 			const GLenum input_fmt = get_input_format(my_fmt);
 			glTextureSubImage2D(id, level, x, y, w, h, input_fmt, type, data);
+		}
+	}
+	void sub_image_upload_3d(int z, int level, int x, int y, int w, int h, int size, const void* data) final {
+		if (is_compressed())
+			glCompressedTextureSubImage3D(id, level, x, y, z, w, h,1, internal_format_gl, size, data);
+		else {
+			const GLenum type = get_input_type();
+			const GLenum input_fmt = get_input_format(my_fmt);
+			//glTextureSubImage2D(id, level, x, y, w, h, input_fmt, type, data);
+
+			glTextureSubImage3D(id, level, x, y, z, w, h, 1, input_fmt, type, data);
 		}
 	}
 	void release() override {
@@ -325,6 +340,21 @@ public:
 		int fmt_i = (int)my_fmt;
 		return fmt_i >= first && fmt_i <= last;
 	}
+	GLenum get_input_type() const {
+		if (my_fmt == GraphicsTextureFormat::r11f_g11f_b10f)
+			return GL_UNSIGNED_INT_10F_11F_11F_REV;
+		using gtf = GraphicsTextureFormat;
+		if (my_fmt == gtf::rg16f || my_fmt == gtf::r16f || my_fmt == gtf::rgb16f) {
+			if (float_input_is_16f)
+				return GL_HALF_FLOAT;
+			else
+				return GL_FLOAT;
+		}
+		if (is_float_type())
+			return GL_FLOAT;
+		return GL_UNSIGNED_BYTE;
+	}
+
 	bool is_float_type() const {
 		using gtf = GraphicsTextureFormat;
 		auto types = {
@@ -363,6 +393,7 @@ public:
 	int width = 0;
 	int height = 0;
 	int mips = 0;
+	bool float_input_is_16f = false;
 };
 class OpenGLBufferImpl : public IGraphicsBuffer {
 public:

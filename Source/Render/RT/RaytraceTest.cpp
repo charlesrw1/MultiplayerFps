@@ -205,6 +205,7 @@ void DdgiTesting::create_textures_raybuffer(int probe_width, int probe_height) {
 }
 
 
+
 extern glm::vec3 get_emissive_of_mat_for_export(const MaterialInstance* m);
 
 void DdgiTesting::build_world()
@@ -395,7 +396,9 @@ void set_shit_fuck() {
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, self->ddgi_probe_relocation_offsets->get_internal_handle());
 
 }
-vector<glm::vec4> temp_probe_relocate_thing;
+
+
+
 void DdgiTesting::execute()
 {
 	build_world();
@@ -483,6 +486,8 @@ void DdgiTesting::execute()
 
 
 		device.set_shader(trace_shader);
+		// dont know if this makes sense. want to start averaging for run i=1,2,3.
+		// at i=0, there will be no indirect so i dont think accumulating there will be totally right
 		device.shader().set_bool("do_irrad_calcs", i!=0);
 		set_shit_fuck();
 		device.shader().set_float("ray_sample_randomness", r.RandF(0,TWOPI));
@@ -575,10 +580,13 @@ void draw_model_simple_no_material(Model* model);
 ConfigVar draw_real_grid("draw_real_grid", "2", CVAR_INTEGER|CVAR_UNBOUNDED, "");
 void DdgiTesting::render_probes()
 {
-	if (!verts) {
-		execute();
-		ASSERT(verts);
-	}
+	if (myvolumes.size() == 0)
+		return;
+
+	//if (!verts) {
+	//	execute();
+	//	ASSERT(verts);
+	//}
 	auto& device = draw.get_device();
 
 	auto set_composite_pass = [&]() {
@@ -652,13 +660,44 @@ void DdgiTesting::calculate_lum_for_spec()
 	glDispatchCompute(groups, 1, 1);
 
 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+
+}
+void DdgiTesting::load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, std::vector<glm::vec4>& relocate, std::vector<DdgiVolumeGpu>& vols)
+{
+	const int width_probe_space = irrad->get_size().x / ddgiIRRADTILE;
+	const int height_probe_space = irrad->get_size().y / ddgiIRRADTILE;
+	ASSERT(width_probe_space == depth->get_size().x / ddgiDEPTHTILE);
+	ASSERT(height_probe_space == depth->get_size().y / ddgiDEPTHTILE);
+
+	this->myvolumes = std::move(vols);
+
+	DdgiGlobals globals{};
+	globals.atlas_x = width_probe_space;
+	globals.atlas_y = height_probe_space;
+	globals.num_volumes = myvolumes.size();
+	globals.relocate_normal_dist = relocate_normal_dist;
+	ddgi_globals->upload(&globals, sizeof(globals));
+	ddgi_volumes->upload(myvolumes.data(), myvolumes.size() * sizeof(DdgiVolumeGpu));
+	theglobals = globals;
+
+	temp_probe_relocate_thing = std::move(relocate);
+	ddgi_probe_relocation_offsets->upload(temp_probe_relocate_thing.data(), sizeof(glm::vec4) * temp_probe_relocate_thing.size());
+
+	if (this->probe_irradiance) {
+		this->probe_irradiance->release();
+	}
+	probe_irradiance = irrad;
+	if (this->probe_depth) {
+		this->probe_depth->release();
+	}
+	probe_depth = depth;
 }
 void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 {
-	if (!verts) {
-		execute();
-		ASSERT(verts);
-	}
+	//if (!verts) {
+	//	execute();
+	//	ASSERT(verts);
+	//}
 
 	//render_rt();
 	//return;

@@ -24,6 +24,9 @@ enum Texture_Format
 	TEXFMT_BC4,	// grey scale encoding
 	TEXFMT_BC5,	// normal map encoding
 	TEXFMT_BC6,	// float rgb data
+
+	TEXFMT_RG16F,
+	TEXFMT_R11G11B10F,
 };
 
 enum Texture_Type

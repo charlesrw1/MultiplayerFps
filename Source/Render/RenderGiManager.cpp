@@ -90,10 +90,12 @@ void RenderGiManager::update_ddgi_volumes(const DdgiVolumeGpu& volumes)
 const std::vector<DdgiVolumeGpu>& RenderGiManager::get_baked_ddgi_volumes() const
 {
 	// TODO: insert return statement here
+	return draw.ddgi->myvolumes;
 }
 
 void RenderGiManager::set_loaded_ddgi_data(BakedDdgiInputData&& input)
 {
+	draw.ddgi->load_the_gi(input.irrad, input.depths, input.offsets, input.volumes);
 }
 
 void RenderGiManager::bake_ddgi()
@@ -102,11 +104,36 @@ void RenderGiManager::bake_ddgi()
 
 void RenderGiManager::update_cubemap_volumes(const std::vector<R_CubemapVolume>& volumes)
 {
+	if (runtime_loaded_cubemaps) {
+		runtime_loaded_cubemaps->release();
+		runtime_loaded_cubemaps = nullptr;
+	}
+
+
 	this->cm_volumes = volumes;
 	cubemap_volume_buffer->upload(cm_volumes.data(), cm_volumes.size() * sizeof(R_CubemapVolume));
 	draw.ddgi->calculate_lum_for_spec();
+
+	// god dogshit awful
+	// gets the calc'd lum value back to cpu side so i can save it to disk
+	{
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER,
+			cubemap_volume_buffer->get_internal_handle()
+		);
+		R_CubemapVolume* ptr = (R_CubemapVolume*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+		const int num = get_num_cubemaps();
+		for (int i = 0; i < num; i++)
+			cm_volumes[i] = ptr[i];
+		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+	}
 }
 
-void RenderGiManager::set_cubemaps_texture(const Texture* cubemaps)
+void RenderGiManager::set_cubemaps_from_loading(std::vector<R_CubemapVolume>&& volumes, IGraphicsTexture* cubemaps)
 {
+	this->cm_volumes = std::move(volumes);
+	cubemap_volume_buffer->upload(cm_volumes.data(), cm_volumes.size() * sizeof(R_CubemapVolume));
+	if (runtime_loaded_cubemaps) {
+		runtime_loaded_cubemaps->release();
+	}
+	runtime_loaded_cubemaps = cubemaps;
 }

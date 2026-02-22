@@ -100,9 +100,12 @@ class IGraphicsTexture {
 public:
 	virtual ~IGraphicsTexture() {}
 	virtual void sub_image_upload(int layer, int x, int y, int w, int h, int size, const void* data) = 0;
+	virtual void sub_image_upload_3d(int z, int layer, int x, int y, int w, int h, int size, const void* data) = 0;
+
 	virtual void release() = 0;
 	virtual uint32_t get_internal_handle() = 0;
 
+	virtual bool is_compressed() const = 0;
 	virtual int get_num_mips() const = 0;
 	virtual glm::ivec2 get_size() const = 0;
 	virtual GraphicsTextureFormat get_texture_format() const = 0;
@@ -208,6 +211,8 @@ struct CreateTextureArgs {
 	int num_mip_maps = 1;
 	int depth_3d = 0;
 	GraphicsSamplerType sampler_type=GraphicsSamplerType::AnisotropyDefault;
+
+	bool float_input_is_16f = false;
 };
 
 struct CreateBufferArgs {

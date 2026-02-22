@@ -656,6 +656,9 @@ void GameEngineLocal::add_commands()
 	commands->add("compile-tex", COMPILE_TEX);
 	
 #endif
+	commands->add("save_baked_gi", [](const Cmd_Args&) {
+		GameSceneGiUtil::save_to_disk();
+		});
 	commands->add("bake_probes", [](const Cmd_Args&) {GameSceneGiUtil::bake_all_cubemaps(); });
 	//commands->add("close_ed", close_editor);
 	commands->add("load_imgui_ini", load_imgui_ini);

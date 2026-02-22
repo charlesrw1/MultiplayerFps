@@ -630,6 +630,7 @@
     <ClCompile Include="Source\Game\Components\SpawnerComponenth.cpp" />
     <ClCompile Include="Source\Render\RT\RaytraceTest.cpp" />
     <ClCompile Include="Source\Render\RenderGiManager.cpp" />
+    <ClCompile Include="Source\Render\DdsExport.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
