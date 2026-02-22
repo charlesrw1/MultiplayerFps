@@ -178,5 +178,35 @@ bool save_float_texture_as_dds(GLuint texture,
 		DDS_FLAGS_FORCE_DX10_EXT,
 		wfilename.c_str());
 
+
+
+	std::string parentDir = filename;
+	auto findSlash = parentDir.rfind('/');
+	if (findSlash != std::string::npos)
+		parentDir = parentDir.substr(0, findSlash + 1);
+
+	const std::string pathToNvidiaTextureConvertTool = "./x64/Debug/texconv.exe";
+
+	const std::string format = "BC6H_UF16";
+	std::string commandLine = pathToNvidiaTextureConvertTool + " -f ";
+	commandLine += format;
+	commandLine += " -y -dx10 -o ";
+	commandLine += StringUtils::get_directory(filename);
+	commandLine += " " + std::string(filename);
+
+	STARTUPINFOA startup = {};
+	PROCESS_INFORMATION out = {};
+
+
+	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup, &out)) {
+		sys_print(Error, "couldn't create process\n");
+		return false;
+	}
+	WaitForSingleObject(out.hProcess, INFINITE);
+	CloseHandle(out.hProcess);
+	CloseHandle(out.hThread);
+
+	return SUCCEEDED(hr);
+
 	return SUCCEEDED(hr);
 }
