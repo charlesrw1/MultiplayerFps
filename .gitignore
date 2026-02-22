@@ -12,7 +12,7 @@ Source/.generated/
 *.png
 *.tga
 *.jpg
-
+*.hdr
 *.dll
 *.bin
 

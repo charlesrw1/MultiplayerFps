@@ -16,6 +16,11 @@ public:
 
 	glm::ivec3 voltexturesize;
 	float density = 10.0;
+
+	float falloff = 0.5;
+	float offset = 0.0;
+
+
 	float anisotropy = 0.7;
 	float spread = 1.0;
 	float frustum_end = 50.f;

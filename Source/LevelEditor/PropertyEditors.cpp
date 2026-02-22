@@ -136,52 +136,6 @@ bool AssetPropertyEditor::get_failed_load() const {
 	return false;
 }
 
-EntityPtrAssetEditor::EntityPtrAssetEditor(EditorDoc& editor) :editor(editor) {
-	editor.on_eyedropper_callback.add(this, [&](const Entity* e)
-		{
-			if (editor.get_active_eyedropper_user_id() == this) {
-				sys_print(Debug, "entityptr on eye dropper callback\n");
-				EntityPtr* ptr_to_asset = (EntityPtr*)prop->get_ptr(instance);
-				*ptr_to_asset = e->get_self_ptr();
-			}
-		});
-}
-
-EntityPtrAssetEditor::~EntityPtrAssetEditor() {
-	editor.on_eyedropper_callback.remove(this);
-}
-
-bool EntityPtrAssetEditor::internal_update() {
-
-	EntityPtr* ptr_to_asset = (EntityPtr*)prop->get_ptr(instance);
-
-	ImGui::PushStyleColor(ImGuiCol_Button, color32_to_imvec4({ 51, 10, 74,200 }));
-	auto eyedropper = g_assets.find_global_sync<Texture>("eng/icon/eyedrop.png");
-	if(my_imgui_image_button(eyedropper,16)){
-		editor.enable_entity_eyedropper_mode(this);
-	}
-	ImGui::PopStyleColor();
-	ImGui::SameLine();
-	if (editor.is_in_eyedropper_mode() && editor.get_active_eyedropper_user_id() == this) {
-		ImGui::TextColored(color32_to_imvec4({ 255, 74, 249 }), "{ eyedropper  active }");
-	}
-	else if (ptr_to_asset->get()) {
-		const char* str = ptr_to_asset->get()->get_editor_name().c_str();
-		if (!*str)
-			str = ptr_to_asset->get()->get_type().classname;
-
-		std::string what = str;
-		what += "  id:(" + std::to_string(ptr_to_asset->get()->get_instance_id()) + ")";
-
-		ImGui::Text("%s", what.c_str());
-	}
-	else {
-		ImGui::TextColored(color32_to_imvec4({ 128,128,128 }), "<nullptr>");
-
-	}
-
-	return false;
-}
 
 bool ColorEditor::internal_update() {
 	assert(prop->type == core_type_id::Int32);
@@ -225,106 +179,6 @@ bool ButtonPropertyEditor::internal_update() {
 bool ButtonPropertyEditor::can_reset() {
 	return false;
 }
-
-AnchorJointEditor::~AnchorJointEditor() {
-	if (editor.manipulate->is_using_key_for_custom(this))
-		editor.manipulate->stop_using_custom();
-}
-
-// Inherited via IPropertyEditor
-
-bool AnchorJointEditor::internal_update()
-{
-	JointAnchor* j = (JointAnchor*)prop->get_ptr(instance);
-
-	Entity* me = editor.selection_state->get_only_one_selected().get();
-	if (!me) {
-		ImGui::Text("no Entity* found\n");
-		return false;
-	}
-
-	if (editor.manipulate->is_using_key_for_custom(this)) {
-		auto last_matrix = editor.manipulate->get_custom_transform();
-		auto local = glm::inverse(me->get_ws_transform()) * last_matrix;
-		j->q = (glm::quat_cast(local));
-		j->p = local[3];
-
-	};
-
-	bool ret = false;
-	if (ImGui::DragFloat3("##vec", (float*)&j->p, 0.05))
-		ret = true;
-	glm::vec3 eul = glm::eulerAngles(j->q);
-	eul *= 180.f / PI;
-	if (ImGui::DragFloat3("##eul", &eul.x, 1.0)) {
-		eul *= PI / 180.f;
-		j->q = glm::normalize(glm::quat(eul));
-
-		ret = true;
-	}
-
-	glm::mat4 matrix = glm::translate(glm::mat4(1.f), j->p) * glm::mat4_cast(j->q);
-	editor.manipulate->set_start_using_custom(this, me->get_ws_transform() * matrix);
-
-	return true;
-}
-
-CubemapAnchorEditor::~CubemapAnchorEditor() {
-	if (editor.manipulate->is_using_key_for_custom(this))
-		editor.manipulate->stop_using_custom();
-}
-
-// Inherited via IPropertyEditor
-
-bool CubemapAnchorEditor::internal_update()
-{
-	CubemapAnchor* j = (CubemapAnchor*)prop->get_ptr(instance);
-	Entity* me = editor.selection_state->get_only_one_selected().get();
-	if (!me) {
-		ImGui::Text("no Entity* found\n");
-		return false;
-	}
-
-	ImGui::Checkbox("edit_anchor", &using_this);
-
-	if (!using_this) {
-		editor.manipulate->stop_using_custom();
-	}
-
-	if (using_this) {
-		if (editor.manipulate->is_using_key_for_custom(this)) {
-			auto last_matrix = editor.manipulate->get_custom_transform();
-			auto local = glm::inverse(me->get_ws_transform()) * last_matrix;
-			j->p = local[3];
-		};
-	}
-
-	bool ret = false;
-	if (ImGui::DragFloat3("##vec", (float*)&j->p, 0.05))
-		ret = true;
-
-	if (using_this) {
-		glm::mat4 matrix = glm::translate(glm::mat4(1.f), j->p);
-		editor.manipulate->set_start_using_custom(this, me->get_ws_transform() * matrix);
-
-		return true;
-	}
-
-	return ret;
-
-}
-/*
-
-
-		pfac.registerClass<FindAnimationClipPropertyEditor>("AG_CLIP_TYPE");
-		pfac.registerClass<FindAnimGraphVariableProp>("FindAnimGraphVariableProp");
-		pfac.registerClass<AgBoneFinder>("AgBoneFinder");
-
-		pfac.registerClass<BlendspaceGridEd>("BlendspaceGridEd");
-
-		pfac.registerClass<AgEnumFinder>("AG_ENUM_TYPE_FINDER");
-
-*/
 
 
 template<typename FUNCTOR>
@@ -370,12 +224,7 @@ static bool drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&
 }
 
 int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
-bool CodeBlockPropEditor::internal_update()
-{
-	auto& str = *(std::string*)prop->get_ptr(instance);
-	ImGui::InputTextMultiline("##input", str.data(), str.size() + 1, ImVec2(0, 0), ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize,&str);
-	return false;
-}
+
 
 #include "Framework/CurveEditorImgui.h"
 class GraphCurveEditor : public IPropertyEditor {
@@ -401,15 +250,10 @@ void PropertyFactoryUtil::register_basic(FnFactory<IPropertyEditor>& factory)
 	factory.add("GraphCurve", []() {return new GraphCurveEditor; });
 
 
-	factory.add("code_block", []() {return new CodeBlockPropEditor; });
 
 }
 void PropertyFactoryUtil::register_editor(EditorDoc& doc, FnFactory<IPropertyEditor>& factory)
 {
-	factory.add("ObjPtr", [&doc]() {return new EntityPtrAssetEditor(doc); });
-	factory.add("JointAnchor", [&doc]() {return new AnchorJointEditor(doc); });
-	factory.add("CubemapAnchor", [&doc]() {return new CubemapAnchorEditor(doc); });
-
 	factory.add("EntityBoneParentString", []() {return new EntityBoneParentStringEditor; });
 }
 void PropertyFactoryUtil::register_anim_editor(AnimationGraphEditor& doc, FnFactory<IPropertyEditor>& factory)

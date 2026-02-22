@@ -46,6 +46,10 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 layout (binding = 1, std430) readonly buffer LightingObjectUniforms_Buffer {
 	LightingObjectUniforms light_objects[];
 };
+layout (binding = 15, std430) readonly buffer DDgiProbeAvgBuf {
+	float ddgi_probe_avg_value[];
+};
+
 
 uniform int num_lights=0;
 
@@ -102,6 +106,105 @@ vec3 get_worldpos_new(ivec3 fragcoords,vec3 invpixelsize, vec3 poffset)
 #define DDGILIGHTING
 #include "ddgiShared.txt"
 
+vec3 calculate_irradiance2(vec3 direction, vec3 worldspace, vec3 biased_world_position)
+{
+	const int volume_index = find_best_ddgi_volume(worldspace);
+	const vec3 volume_origin = volumes[volume_index].origin_pri.xyz;
+	const vec3 volume_spacing = volumes[volume_index].density.xyz;
+	const ivec3 vol_grid = volumes[volume_index].size_offset.xyz;
+	const int vol_offset = volumes[volume_index].size_offset.w;
+	
+
+	ivec3 base_probe_coords = ivec3((biased_world_position-volume_origin)/volume_spacing);
+	base_probe_coords = clamp(base_probe_coords,ivec3(0), 
+	ivec3(vol_grid)-ivec3(1)
+	);
+	vec3 base_probe_pos = get_probe_world_from_coords(base_probe_coords, volume_origin,volume_spacing, vol_grid, vol_offset);
+	
+	vec3 alpha = clamp(
+		(biased_world_position-base_probe_pos)/volume_spacing,
+		vec3(0),
+		vec3(1));
+	
+
+	vec3 irradiance=vec3(0.0);
+	float accum_weight = 0.0;
+	float cheb_weight_total = 0.0;
+	
+	for(int probeIndex = 0;probeIndex < 8; probeIndex++) {
+		ivec3 adjacent_probe_ofs = ivec3(probeIndex, probeIndex>>1, probeIndex>>2)&ivec3(1);
+		ivec3 adjacent_probe_coords = clamp(
+			base_probe_coords+adjacent_probe_ofs,
+			ivec3(0),
+			ivec3(vol_grid)-ivec3(1));
+		vec3 adj_probe_worldpos = get_probe_world_from_coords(adjacent_probe_coords, volume_origin,volume_spacing, vol_grid, vol_offset);
+		
+
+		vec3 biased_pos_to_adj_probe = normalize(adj_probe_worldpos-biased_world_position);
+		float biased_pos_to_adj_probe_len = length(adj_probe_worldpos-biased_world_position);
+		
+		vec3 trilinear = max(vec3(0.001), 
+			mix(vec3(1.0-alpha),vec3(alpha),vec3(adjacent_probe_ofs)));
+		float trilinear_weight = trilinear.x*trilinear.y*trilinear.z;
+		float weight = 1.0;
+		float warp_shading = dot(biased_pos_to_adj_probe,direction)*0.5 + 0.5;
+		weight *= (warp_shading*warp_shading)+0.2;
+		
+		vec2 octant_coords = OctahedralEncode(-biased_pos_to_adj_probe);
+		
+		vec2 probe_texture_uv = get_depth_probe_uv(
+		octant_coords,
+		adjacent_probe_coords, vol_grid, vol_offset);
+		
+		//vec2 filtered_distance = vec2(2.0)*texture(probe_depth, probe_texture_uv).rg;
+		//
+		//float variance = abs(
+		//(filtered_distance.x*filtered_distance.x) - filtered_distance.y);
+		//
+		//float chebyshev_weight = 1.0;
+		//if(biased_pos_to_adj_probe_len > filtered_distance.x) {
+		//	float v = biased_pos_to_adj_probe_len - filtered_distance.x;
+		//	chebyshev_weight = variance/(variance+(v*v));
+		//	chebyshev_weight = max(
+		//	chebyshev_weight*chebyshev_weight*chebyshev_weight,
+		//	0.0
+		//	);
+		//}
+		
+		//weight *= max(0.05, chebyshev_weight);
+		
+
+		weight = max(0.000001, weight);
+		const float crush_thresh = 0.2;
+		if(weight<crush_thresh) {
+			weight *= (weight*weight)*(1.0/(crush_thresh*crush_thresh));
+		}
+		weight *= trilinear_weight;
+		
+	
+		const int probe_index = adjacent_probe_coords.x + adjacent_probe_coords.y*vol_grid.x + adjacent_probe_coords.z*vol_grid.x*vol_grid.y + vol_offset;
+		
+		vec3 probe_irrad=vec3(0.0);
+		probe_irrad.r = ddgi_probe_avg_value[probe_index*3];
+		probe_irrad.g = ddgi_probe_avg_value[probe_index*3+1];
+		probe_irrad.b = ddgi_probe_avg_value[probe_index*3+2];
+		
+		
+	
+	
+		
+		irradiance += (weight*probe_irrad);
+		accum_weight += weight;
+		// holy crap so much code!
+		
+		//cheb_weight_total+= chebyshev_weight;
+	}
+	
+	irradiance *= (1.0/accum_weight);
+	
+	return irradiance;
+
+}
 vec3 get_inscattering(vec3 worldspace)
 {
 	vec3 raydir = normalize(worldspace-g.viewpos_time.xyz);
@@ -154,13 +257,14 @@ vec3 get_inscattering(vec3 worldspace)
 	
 
 	vec3 sum = vec3(0.0);
-	sum += calculate_irradiance(raydir,worldspace,worldspace);
-	sum += calculate_irradiance(vec3(-1,0,0),worldspace,worldspace);
-	sum += calculate_irradiance(vec3(0,1,0),worldspace,worldspace);
-	sum += calculate_irradiance(vec3(0,-1,0),worldspace,worldspace);
-	sum += calculate_irradiance(vec3(0,0,1),worldspace,worldspace);
-	sum += calculate_irradiance(vec3(0,0,-1),worldspace,worldspace);	
-	sum /= 6.0;
+	vec3 biased_towards_cam = worldspace-raydir*0.4;
+	sum += calculate_irradiance2(-raydir,biased_towards_cam,biased_towards_cam);
+	//sum += calculate_irradiance(vec3(-1,0,0),worldspace,worldspace);
+	//sum += calculate_irradiance(vec3(0,1,0),worldspace,worldspace);
+	//sum += calculate_irradiance(vec3(0,-1,0),worldspace,worldspace);
+	//sum += calculate_irradiance(vec3(0,0,1),worldspace,worldspace);
+	//sum += calculate_irradiance(vec3(0,0,-1),worldspace,worldspace);	
+	//sum /= 6.0;
 	accum += sum;
 	//if(dot(spotdir,spotlightnormal)>0.5) {
 		//spotadd = phase_function(raydir,spotdir,anisotropy)/(spotlen*spotlen);
@@ -193,7 +297,9 @@ void main()
 	}
 #endif
 	
-	float real_density  = fogparam.density_ani.x*min(exp(-worldpos.y*0.5),1.0);
+	float falloff = fogparam.density_ani.z;
+	float offset_ = fogparam.density_ani.w;
+	float real_density  = fogparam.density_ani.x*min(exp(-(worldpos.y-offset_)*falloff),1.0);
 	
 	
 	vec3 scattering_ = vec3(1.0)*real_density;

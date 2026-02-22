@@ -53,20 +53,6 @@ public:
 };
 
 
-class EntityPtrAssetEditor : public IPropertyEditor
-{
-public:
-	EntityPtrAssetEditor(EditorDoc& editor);
-	~EntityPtrAssetEditor() override;
-	bool internal_update() final;
-	virtual int extra_row_count() { return 0; }
-	virtual bool can_reset() { return false; }
-	virtual void reset_value() {
-	}
-
-	EditorDoc& editor;
-};
-
 class ColorEditor : public IPropertyEditor
 {
 public:
@@ -82,30 +68,6 @@ class ButtonPropertyEditor : public IPropertyEditor
 	bool internal_update();
 	bool can_reset();
 };
-
-class AnchorJointEditor : public IPropertyEditor
-{
-public:
-	AnchorJointEditor(EditorDoc& doc) : editor(doc) {}
-	~AnchorJointEditor();
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-
-	EditorDoc& editor;
-};
-
-class CubemapAnchorEditor : public IPropertyEditor
-{
-public:
-	CubemapAnchorEditor(EditorDoc& doc) : editor(doc) {}
-	~CubemapAnchorEditor();
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-	bool using_this = false;
-	EditorDoc& editor;
-};
-
-
 
 
 class EntityBoneParentStringEditor : public IPropertyEditor
@@ -132,11 +94,4 @@ public:
 	const ClassTypeInfo* type_of_base = nullptr;
 };
 
-class CodeBlockPropEditor : public IPropertyEditor
-{
-public:
-	// Inherited via IPropertyEditor
-	virtual bool internal_update() override;
-	bool has_init = false;
-};
 #endif

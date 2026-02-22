@@ -1,0 +1,106 @@
+
+layout(local_size_x = 64, local_size_y=1,local_size_z=1) in;
+
+layout(binding =2) uniform sampler2D  probe_irradiance;
+layout(binding =3) uniform sampler2D  probe_depth;
+
+#include "SharedGpuTypes.txt"
+
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+layout (binding = 15, std430) writeonly buffer ProbeAvgValueBuf {
+	float ddgi_probe_avg_val[];
+};
+
+
+
+#include "rtShared.txt"
+
+
+vec3 randColor(int number){
+    return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
+}
+
+
+// for sampling the sky
+
+
+
+// each thread = 1 probe (ie global id)
+// each thread computes 64 samples, computes lighting. then saves to work buffer
+
+// then run again to save into atlas
+
+// repeat.
+
+// need: radiance, depth, hitbuffer, lighting (lights, sun, spot, skybox), material/raytrace stuff
+
+// volume. (box, transform, probe dim)
+
+
+
+#define DDGILIGHTING
+#include "ddgiShared.txt"
+
+
+#include "pbrShared.txt"
+
+float luminance(vec3 v)
+{
+    return dot(v, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec3 sample_irrad_dir(vec3 direction,ivec3 probe_coords, ivec3 vol_grid, int vol_offset)
+{
+		vec2 octant_coords = OctahedralEncode(direction);
+		vec2 probe_texture_uv = get_irrad_probe_uv(octant_coords,probe_coords,  vol_grid, vol_offset);
+
+	vec3 probe_irrad = texture(probe_irradiance, probe_texture_uv).rgb;
+		float exponent = 2.2*0.5;
+		probe_irrad = pow(probe_irrad,vec3(exponent));	// half way back to linear from srgb
+	
+	probe_irrad*=probe_irrad;	// go back to linear
+	probe_irrad*= 2.0 * 3.1415;
+	
+	return probe_irrad;
+}
+
+void main()
+{
+	const int global_index = int(gl_GlobalInvocationID.x);
+	const int volume_index = get_volume_index_for_global_index(global_index);
+	const int volume_offset = volumes[volume_index].size_offset.w;
+	const int probe_number = global_index-volume_offset;
+	const ivec3 vol_grid = volumes[volume_index].size_offset.xyz;
+	const vec3 volume_spacing = volumes[volume_index].density.xyz;
+	const vec3 volume_origin = volumes[volume_index].origin_pri.xyz;
+	
+	if(probe_number > vol_grid.x*vol_grid.y*vol_grid.z)
+		return;
+	
+		// Get probe position in grid
+	int probe_x = probe_number % int(vol_grid.x);
+	int probe_y = (probe_number / int(vol_grid.x)) % int(vol_grid.y);
+	int probe_z = probe_number / (int(vol_grid.x) * int(vol_grid.y));
+	
+	ivec3 c = ivec3(probe_x,probe_y,probe_z);
+	vec3 sum = vec3(0.0);
+	sum += sample_irrad_dir(vec3(1,0,0),c,vol_grid,volume_offset);
+	sum += sample_irrad_dir(vec3(-1,0,0),c,vol_grid,volume_offset);
+	sum += sample_irrad_dir(vec3(0,1,0),c,vol_grid,volume_offset);
+	sum += sample_irrad_dir(vec3(0,-1,0),c,vol_grid,volume_offset);
+	sum += sample_irrad_dir(vec3(0,0,1),c,vol_grid,volume_offset);
+	sum += sample_irrad_dir(vec3(0,0,-1),c,vol_grid,volume_offset);
+	sum /= 6.0;
+	
+	ddgi_probe_avg_val[global_index*3]=sum.r;
+	ddgi_probe_avg_val[global_index*3+1]=sum.g;
+	ddgi_probe_avg_val[global_index*3+2]=sum.b;
+	
+	
+}
+
+	

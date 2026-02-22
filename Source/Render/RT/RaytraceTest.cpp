@@ -46,10 +46,16 @@ DdgiTesting::DdgiTesting()
 
 	lum_calc = draw.get_prog_man().create_compute("probeLumCalc_C.txt");
 
+	avg_probe_calc = draw.get_prog_man().create_compute("avgProbeCalc_C.txt");
+
+
 
 	ddgi_probe_relocation_offsets = IGraphicsDevice::inst->create_buffer({});
 	ddgi_globals = IGraphicsDevice::inst->create_buffer({});
 	ddgi_volumes = IGraphicsDevice::inst->create_buffer({});
+
+	ddgi_probe_avg_value = IGraphicsDevice::inst->create_buffer({});
+
 
 	Texture::install_system("_ddgi");
 	Texture::install_system("_ddgi_d");
@@ -166,6 +172,29 @@ inline Bounds get_tri_bounds(vec3 v1, vec3 v2, vec3 v3)
 ConfigVar vert_limit("vert_limit", "9999999", CVAR_INTEGER | CVAR_UNBOUNDED, "");
 Color32 get_color_of_material_for_export(const MaterialInstance* m);
 #include "Assets/AssetDatabase.h"
+void set_shit_fuck();
+void DdgiTesting::compute_avg_probe_value()
+{
+	const int num_probes = temp_probe_relocate_thing.size();
+	ddgi_probe_avg_value->upload(nullptr, num_probes * sizeof(float) * 3);
+
+	if (!probe_depth || !probe_irradiance) return;
+	auto& device = draw.get_device();
+	device.bind_texture(2, probe_irradiance->get_internal_handle());
+	device.bind_texture(3, probe_depth->get_internal_handle());
+
+	device.set_shader(avg_probe_calc);
+	set_shit_fuck();
+
+	const int groups = glm::ceil(num_probes / 64.f);
+	printf("compute_avg_probe_value %d\n", groups);
+
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 15, ddgi_probe_avg_value->get_internal_handle());
+	glDispatchCompute(groups, 1, 1);
+
+	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+}
 void DdgiTesting::create_textures_raybuffer(int probe_width, int probe_height) {
 
 	
@@ -570,6 +599,7 @@ void DdgiTesting::execute()
 	//	buf->upload(infos.data(), infos.size() * sizeof(ProbeInfo));
 	//}
 
+	compute_avg_probe_value();
 
 	ray_buffer->release();
 	invalid_count_buf->release();
@@ -662,6 +692,10 @@ void DdgiTesting::calculate_lum_for_spec()
 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
 }
+
+
+
+
 void DdgiTesting::load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, std::vector<glm::vec4>& relocate, std::vector<DdgiVolumeGpu>& vols)
 {
 	const int width_probe_space = irrad->get_size().x / ddgiIRRADTILE;
@@ -691,6 +725,9 @@ void DdgiTesting::load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, 
 		this->probe_depth->release();
 	}
 	probe_depth = depth;
+
+
+	compute_avg_probe_value();
 }
 void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 {

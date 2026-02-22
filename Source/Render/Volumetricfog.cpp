@@ -56,6 +56,11 @@ void Volumetric_Fog_System::init()
 void vfogmenu()
 {
 	ImGui::InputFloat("den", &draw.volfog.density);
+	ImGui::InputFloat("falloff", &draw.volfog.falloff);
+	ImGui::InputFloat("ofs", &draw.volfog.offset);
+
+
+
 	ImGui::InputFloat("ani", &draw.volfog.anisotropy);
 	ImGui::InputFloat("spread", &draw.volfog.spread);
 
@@ -90,7 +95,7 @@ void Volumetric_Fog_System::compute()
 	params.last_frame_viewproj = last_vs.viewproj;
 	params.reprojection = vec4(temporal_sequence, 0.1, 0, 0);
 
-	params.density_ani = glm::vec4(draw.volfog.density, draw.volfog.anisotropy, 0, 0);
+	params.density_ani = glm::vec4(draw.volfog.density, draw.volfog.anisotropy, falloff,offset);
 
 	glBindBuffer(GL_UNIFORM_BUFFER, buffer.param);
 	glBufferData(GL_UNIFORM_BUFFER, sizeof(Vfog_Params), &params, GL_DYNAMIC_DRAW);
@@ -141,7 +146,7 @@ void Volumetric_Fog_System::compute()
 		set_shit_fuck();
 		draw.bind_texture_ptr(4, draw.ddgi->probe_irradiance);
 		draw.bind_texture_ptr(5, draw.ddgi->probe_depth);
-
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 15, draw.ddgi->ddgi_probe_avg_value->get_internal_handle());
 
 		glDispatchCompute(groups.x, groups.y, groups.z);
 

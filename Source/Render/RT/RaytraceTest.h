@@ -78,11 +78,14 @@ public:
 	IGraphicsBuffer* ddgi_globals = nullptr;
 	IGraphicsBuffer* ddgi_volumes = nullptr;
 	IGraphicsBuffer* ddgi_probe_relocation_offsets = nullptr;
+	IGraphicsBuffer* ddgi_probe_avg_value = nullptr;
 
 	IGraphicsTexture* probe_irradiance = nullptr;
 	IGraphicsTexture* probe_depth = nullptr;
 
 private:
+	void compute_avg_probe_value();
+
 	// for editor builds
 	IGraphicsBuffer* verts = nullptr;
 	IGraphicsBuffer* indicies = nullptr;
@@ -101,4 +104,7 @@ private:
 	program_handle get_best_cubemap_shader{};
 	program_handle shade_fs{};
 	program_handle shade_debug_fs{};
+
+	program_handle avg_probe_calc{};
+
 };
