@@ -656,6 +656,7 @@ void GameEngineLocal::add_commands()
 	commands->add("compile-tex", COMPILE_TEX);
 	
 #endif
+	
 	commands->add("stress-test", [](const Cmd_Args&) {
 		int size = 20;
 		for (int x = 0; x < size; x++) {

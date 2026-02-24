@@ -148,12 +148,17 @@ void main()
 			break;
 		}
 	}
-	int part_index = int(model_info[model_ofs+1+lod_wanted*3]);
-	int command_index = int(model_info[model_ofs+1+num_lods*3+part_index]);
+	int part_ofs = int(model_info[model_ofs+1+(lod_wanted*3)]);
+	int part_count = int(model_info[model_ofs+1+(lod_wanted*3)+1]);
 	
+	for(int i=0;i<part_count;i++) {
+		int command_index = int(model_info[model_ofs+1+num_lods*3 + part_ofs + i]);
+		//int command_index = int(model_info[model_ofs+1+num_lods*3+part_index]);
+		
 	
-
-	uint count_index = atomicAdd(draw_cmd_out[command_index].primCount,1);
-	uint instanceIndex = draw_cmd_out[command_index].baseInstance + count_index;
-	object_inst_indirect[instanceIndex] = CullObjects.data[gID].misc.y;
+		uint count_index = atomicAdd(draw_cmd_out[command_index].primCount,1);
+		uint instanceIndex = draw_cmd_out[command_index].baseInstance + count_index;
+		object_inst_indirect[instanceIndex] = CullObjects.data[gID].misc.y;
+	
+	}
 }
