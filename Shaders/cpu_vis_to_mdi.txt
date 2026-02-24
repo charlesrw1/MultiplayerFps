@@ -1,0 +1,65 @@
+
+layout (local_size_x = 256) in;
+
+#include "SharedGpuTypes.txt"
+
+// draw calls
+layout(binding = 2, std430) buffer DrawElementsIndirectCommand_Buffer {
+	DrawElementsIndirectCommand draw_cmd_out[];
+};
+// gl_instance_id to render object id
+layout(binding = 3, std430) writeonly buffer ObjectInstIndirect_Buffer {
+	uint object_inst_indirect[];
+};
+layout(binding =7, std430) readonly buffer VisBuffer {
+	uint visbits[];
+};
+layout(binding = 8, std430) readonly buffer PackedObjectIndex_Buffer {
+	uint packed_objects[];
+};
+
+struct CullData {
+	vec4 frustum_up;
+	vec4 frustum_down;
+	vec4 frustum_l;
+	vec4 frustum_r;
+	
+	int num_objects;
+	float inv_two_times_tanfov_2;
+	float p00;
+	float p11;
+	
+	vec4 camera_origin;
+	
+	float near;
+	int pyramid_width;
+	int pyramid_height;
+	int cpu_offset;
+	
+	mat4 view;
+};	
+layout(binding = 5) uniform CullDataBuffer {
+	CullData cull;
+};
+
+uniform int num_objects = 0;
+void main()
+{
+	uint gID = gl_GlobalInvocationID.x;
+	// cull object id
+	if(gID>=num_objects)
+		return;
+	uint packed_data = packed_objects[gID];
+	uint obj_id = packed_data & 0xffff;
+	uint mdi_index = (packed_data>>16)&0xffff;
+	
+	uint obj_id_in_vis = obj_id + uint(cull.cpu_offset);
+	uint dword_i =obj_id_in_vis/32;
+	uint bit_i = obj_id_in_vis%32;
+	uint vis_word = visbits[dword_i];
+	if(bool(vis_word&(1<<bit_i))) {
+		uint count_index = atomicAdd(draw_cmd_out[mdi_index].primCount,1);
+		uint instanceIndex = draw_cmd_out[mdi_index].baseInstance + count_index;
+		object_inst_indirect[instanceIndex] = obj_id;
+	}
+}

@@ -20,12 +20,20 @@ format:
 	parts[]
 		int mat, int mdi_offset, int flags
 
-STEPS:
-1. make the object buffer and model data buffer on cpu
-2. make fully expanded MDI commands on cpu (sorted)
-3. execute culling for main view, shadows, etc
-4. now multidraw_buffer can be bound and called
-	
+#########
+# STEPS #
+#########
+
+1. pass 1 
+	frustum+occlusion cull objects with LAST frame HI-Z
+	ouput MDI commands
+	output a bitarray per object if it was drawn
+2. draw this MDI buffer
+3. build Hi-Z for this frame
+4. pass 2
+	occlusion cull objects that werent drawn (from bitarray)
+	output MDI 
+4. draw 2nd MDI buffer
 
 
 
@@ -49,7 +57,7 @@ struct CullData {
 	float near;
 	int pyramid_width;
 	int pyramid_height;
-	int padding2;
+	int cpu_obj_offset;
 
 	mat4 view;
 };
@@ -59,6 +67,14 @@ public:
 
 	GpuCullingTest();
 	~GpuCullingTest();
+
+	void build_data_1();
+	void gbuffer_pass_1();
+	void build_hi_z();
+	void build_data_2();
+	void gbuffer_pass_2();
+
+	void copy_cpu(Render_Lists_Gpu_Culled& list);
 
 	void build_data();
 
@@ -77,7 +93,11 @@ public:
 	IGraphicsBuffer* objindirect = nullptr;
 	IGraphicsBuffer* matindirect = nullptr;
 
+	// used for both cpu and gpu objs. big buffers
+	IGraphicsBuffer* vis_bitarray = nullptr;
 	IGraphicsBuffer* cull_data = nullptr;
+
+
 	CullData cull{};
 	std::vector<const MaterialInstance*> cmd_mats;
 
@@ -90,5 +110,8 @@ public:
 	uint32 hiZSampler{};
 
 	glm::mat4 prev_view = glm::mat4(1.0);
+
+
+	program_handle cpu_vis_array_to_mdi{};
 
 };

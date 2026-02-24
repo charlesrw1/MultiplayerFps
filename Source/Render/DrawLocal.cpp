@@ -1986,6 +1986,10 @@ static void build_standard_cpu(
 		glinstance_to_instance[ofs + precount] = proxy_list.handle_to_obj[obj.render_obj.id];
 	}
 
+	// cull objects (just cull every obj, f it)
+	// then dispatch a compute that looks in glinstance_to_instance, finds instance vis status
+	// then increments 
+
 
 	glNamedBufferData(list.gldrawid_to_submesh_material, sizeof(uint32_t) * draw_to_material.size(), draw_to_material.data(), GL_DYNAMIC_DRAW);
 
@@ -1995,6 +1999,65 @@ static void build_standard_cpu(
 	const int command_list_size_bytes = sizeof(gpu::DrawElementsIndirectCommand) * list.commands.size();
 	glNamedBufferData(list.gpu_command_list, command_list_size_bytes, list.commands.data(), GL_DYNAMIC_DRAW);
 }
+void Render_Lists_Gpu_Culled::init(uint32_t drawidsz, uint32_t instbufsz)
+{
+	Render_Lists::init(drawidsz, instbufsz);
+	inst_to_obj = IGraphicsDevice::inst->create_buffer({});
+}
+static void build_standard_cpu_culling(
+	Render_Lists_Gpu_Culled& list,
+	Render_Pass& src,
+	Free_List<ROP_Internal>& proxy_list
+)
+{
+	auto& memArena = draw.get_arena();
+	ArenaScope memScope(memArena);
+	std::span<uint32_t> draw_to_material = memArena.alloc_bottom_span<uint32_t>(src.mesh_batches.size());
+
+	// first build the lists
+	list.build_from(src, proxy_list, draw_to_material);
+
+
+	const int objCount = src.objects.size();
+	uint32_t* inst_to_object = memArena.alloc_bottom_type<uint32_t>(objCount);
+
+
+	for (int objIndex = 0; objIndex < objCount; objIndex++) {
+		auto& obj = src.objects[objIndex];
+
+		int precount = list.commands[obj.batch_idx].primCount++;	// increment count
+		int ofs = list.commands[obj.batch_idx].baseInstance;
+
+		// set the pointer to the Render_Object strucutre that will be found on the gpu
+
+		uint32_t packed = 0;
+		const int id = proxy_list.handle_to_obj[obj.render_obj.id];
+		packed |= id & 0xffff;
+		const int batch_id = obj.batch_idx;
+		packed |= (batch_id & 0xffff) << 16;
+
+		inst_to_object[ofs + precount] = packed;	// both instance id and batch id
+	}
+	for (int i = 0; i < list.commands.size(); i++)
+		list.commands[i].primCount = 0;	// set back to 0, compute cull will increment per visible
+
+
+	glNamedBufferData(list.gldrawid_to_submesh_material, sizeof(uint32_t) * draw_to_material.size(), draw_to_material.data(), GL_DYNAMIC_DRAW);
+
+
+	glNamedBufferData(list.glinstance_to_instance, sizeof(uint32_t) * objCount, nullptr, GL_DYNAMIC_DRAW);
+	list.inst_to_obj->upload(inst_to_object, sizeof(uint32_t) * objCount);
+	// then, inst_to_obj used in compute shader to increment DEIcmds based on object visibility
+	// access batch_id and obj_id
+	list.obj_count = objCount;
+
+	const int command_list_size_bytes = sizeof(gpu::DrawElementsIndirectCommand) * list.commands.size();
+	glNamedBufferData(list.gpu_command_list, command_list_size_bytes, list.commands.data(), GL_DYNAMIC_DRAW);
+
+
+	GpuCullingTest::inst->copy_cpu(list);
+}
+
 
 ConfigVar collapse_draw_calls("collapse_draw_calls", "1", CVAR_BOOL | CVAR_DEV, "");
 static void build_cascade_cpu(
@@ -2679,7 +2742,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		update_spotlight_shadows();
 
 
-		build_standard_cpu(gbuffer_rlist, gbuffer_pass, proxy_list);
+		build_standard_cpu_culling(gbuffer_rlist, gbuffer_pass, proxy_list);
+
 		build_standard_cpu(transparent_rlist, transparent_pass, proxy_list);
 		build_standard_cpu(editor_sel_rlist, editor_sel_pass, proxy_list);
 

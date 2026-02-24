@@ -75,7 +75,7 @@ struct Pass_Object
 	short submesh_index = 0;		// what submesh am i
 	short lod_index = 0;
 	int hl_obj_index{};
-	int batch_idx = 0;
+	int batch_idx = 0;	// mesh_batches[]
 };
 
 // in the end: want a flat list of batches that are merged with neighbors
@@ -147,6 +147,7 @@ struct RDecal_Internal{
 };
 struct Render_Lists
 {
+public:
 	void init(uint32_t drawidsz, uint32_t instbufsz);
 
 	void build_from(Render_Pass& src,
@@ -172,6 +173,15 @@ struct Render_Lists
 
 	// where are we getting our objects from
 	const Render_Pass* parent_pass = nullptr;
+};
+class IGraphicsBuffer;
+// w/ gpu occlusion culling
+struct Render_Lists_Gpu_Culled : public Render_Lists
+{
+	void init(uint32_t drawidsz, uint32_t instbufsz);
+	IGraphicsBuffer* inst_to_obj = nullptr;
+	int obj_count = 0;
+
 };
 
 // In theory render passes can be made once and cached if the object is static and do culling on the gpu
@@ -566,7 +576,7 @@ public:
 	Render_Pass depth_prepass;
 	Render_Lists depth_prepass_rlist;
 
-	Render_Lists gbuffer_rlist;
+	Render_Lists_Gpu_Culled gbuffer_rlist;
 	Render_Lists transparent_rlist;
 	std::vector<Render_Lists> cascades_rlists;	// lists specific to each cascade, culled
 	Render_Lists editor_sel_rlist;

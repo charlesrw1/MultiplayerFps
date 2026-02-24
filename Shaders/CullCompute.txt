@@ -24,6 +24,9 @@ layout(binding = 6, std430) readonly buffer ModelInfoBuffer {
 layout(binding = 4, std430) readonly buffer CullObjectsBuffer {
 	CullObject data[];
 }CullObjects;
+layout(binding =7, std430)  buffer VisBuffer {
+	uint visbits[];
+};
 
 struct CullData {
 	vec4 frustum_up;
@@ -87,12 +90,9 @@ void main()
 	// cull object id
 	if(gID>=cull.num_objects)
 		return;
-	
-	int model_ofs = CullObjects.data[gID].misc.x;
-	int num_lods = int(model_info[model_ofs]);
 
 	vec4 bounding_sphere = CullObjects.data[gID].bounds_sphere;
-	
+
 	// frustum cull
 	vec3 center = bounding_sphere.xyz;
 	float radius = bounding_sphere.w;
@@ -102,9 +102,9 @@ void main()
 	res += int(dot(cull.frustum_l.xyz,center)+cull.frustum_l.w >= -radius);
 	res += int(dot(cull.frustum_r.xyz,center)+cull.frustum_r.w >= -radius);
 	
+	
 	if(res!=4)
 		return;
-	
 	
 	// occlusion cull, from vkguide
 	if(occlusion_cull) {
@@ -112,29 +112,41 @@ void main()
 		vs_center.y *= -1;
 		vs_center.z *= -1;	// [0,+inf]
 		vec4 aabb;
-		radius *= radius_bias;
+		//radius *= radius_bias;
 		if(projectSphere(vs_center, radius, cull.near, cull.p00, cull.p11, aabb)) {
 			float width = (aabb.z - aabb.x) * cull.pyramid_width;
 			float height = (aabb.w - aabb.y) * cull.pyramid_height;
 
 			//find the mipmap level that will match the screen size of the sphere
-			float level = floor(log2(max(width, height)))+float(lod_bias);
+			float level = floor(log2(max(width, height) * 2.0));
 
 			//sample the depth pyramid at that specific level
 			float depth = textureLod(depth_pyramid, (aabb.xy + aabb.zw) * 0.5, level).x;
 
-			float depthSphere = cull.near /  max((vs_center.z - radius),cull.near);
+			float depthSphere = cull.near /  max((vs_center.z - radius-0.1),cull.near);
 
-			if(depth>depthSphere)
+			if(depth>depthSphere+1e-4)
 				return;	// occluded
 		}
 		else {
 			//return;
 		}
 	}
+		
+	// save to visarray
+	uint dword_index = gID/32;	// 2bits per entry
+	uint visword_shift = (gID % 32);
+	atomicOr(visbits[dword_index],1<<visword_shift); 
 	
 	
+	int model_ofs = CullObjects.data[gID].misc.x;
+	if(model_ofs<0) {
+		return;
+	}
 	
+	
+	int num_lods = int(model_info[model_ofs]);
+
 	// get lod to render
 	vec3 to_camera = bounding_sphere.xyz - cull.camera_origin.xyz;
 	const float dist_to_camera_2 = dot(to_camera, to_camera);
