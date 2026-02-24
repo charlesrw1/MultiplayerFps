@@ -23,8 +23,8 @@
 #include "Framework/ArenaAllocator.h"
 #include "IGraphsDevice.h"
 #include "RenderGiManager.h"
-
 const GLenum MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT;
+
 
 //#pragma optimize("", off)
 
@@ -1048,7 +1048,7 @@ public:
 	}
 };
 extern int total_gfx_mem_usage;
-
+#include "GpuCullingTest.h"
 void Renderer::init()
 {
 	sys_print(Info, "--------- Initializing Renderer ---------\n");
@@ -1099,6 +1099,8 @@ void Renderer::init()
 
 	ASSERT(!RenderGiManager::inst);
 	RenderGiManager::inst = new RenderGiManager;
+	GpuCullingTest::inst = new GpuCullingTest;
+
 
 	EnviornmentMapHelper::get().init();
 	print_time("draw:env_map");
@@ -1801,27 +1803,6 @@ void Render_Pass::add_object(
 		objects.push_back(obj);
 }
 
-void Render_Pass::add_static_object(
-	const Render_Object& proxy,
-	handle<Render_Object> handle,
-	const MaterialInstance* material,
-	uint32_t camera_dist,
-	int submesh,
-	int lod,
-	int layer, bool is_editor_mode)
-{
-	ASSERT(handle.is_valid() && "null handle");
-	ASSERT(material && "null material");
-	Pass_Object obj;
-	obj.sort_key = create_sort_key_from_obj(proxy, material, camera_dist, submesh, layer, is_editor_mode);
-	obj.render_obj = handle;
-	obj.submesh_index = submesh;
-	obj.material = material;
-	obj.lod_index = lod;
-	if (material->impl->gpu_buffer_offset != MaterialImpl::INVALID_MAPPING)
-		cached_static_objects.push_back(obj);
-}
-
 
 #include <iterator>
 void Render_Pass::make_batches(Render_Scene& scene)
@@ -2089,16 +2070,6 @@ static void build_cascade_cpu(
 	glNamedBufferData(list.gpu_command_list, command_list_size_bytes, list.commands.data(), GL_DYNAMIC_DRAW);
 }
 
-void Render_Pass::merge_static_to_dynamic(bool* vis_array, int8_t* lod_array, Free_List<ROP_Internal>& objs)
-{
-	for (int i = 0; i < cached_static_objects.size(); i++) {
-		auto& o = cached_static_objects[i];
-		int idx = objs.handle_to_obj.at(o.render_obj.id);
-		if (vis_array&&!vis_array[idx]) continue;
-		if (lod_array[idx] != o.lod_index) continue;
-		objects.push_back(o);
-	}
-}
 
 
 void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_list, std::span<uint32_t> draw_to_material)
@@ -2464,71 +2435,14 @@ void make_shadow_render_list_job(uintptr_t p)
 	);
 }
 
-void merge_shadow_list_job(uintptr_t p)
-{
-	ZoneScopedN("merge_shadow_list_job");
-	int8_t* lodarray = (int8_t*)p;
-	draw.scene.shadow_pass.merge_static_to_dynamic(nullptr, lodarray, draw.scene.proxy_list);
-}
 
 #include "Framework/Jobs.h"
 
 void Render_Scene::refresh_static_mesh_data(bool build_for_editor)
 {
-	// update static cache this frame
-	gbuffer_pass.clear_static();
-	transparent_pass.clear_static();
-	editor_sel_pass.clear_static();
-	shadow_pass.clear_static();
-
-	for (int i = 0; i < proxy_list.objects.size(); i++) {
-		auto& obj = proxy_list.objects[i];
-		auto& proxy = obj.type_.proxy;
-		obj.type_.is_static = false;	// FIXME
-		if (!obj.type_.is_static || proxy.is_skybox)
-			continue;
-		handle<Render_Object> objhandle{ obj.handle };
-		if (!proxy.visible || !proxy.model || !proxy.model->get_is_loaded())
-			continue;
-		const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
-		auto model = proxy.model;
-		for (int LOD_index = 0; LOD_index < model->get_num_lods(); LOD_index++) {
-			const auto& lod = model->get_lod(LOD_index);
-
-			const int pstart = lod.part_ofs;
-			const int pend = pstart + lod.part_count;
-
-			for (int j = pstart; j < pend; j++) {
-				auto& part = proxy.model->get_part(j);
-
-				const MaterialInstance* mat = (MaterialInstance*)proxy.model->get_material(part.material_idx);
-				
-				if (obj.type_.proxy.mat_override)
-					mat = (MaterialInstance*)obj.type_.proxy.mat_override;
-				if (!mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
-					mat = matman.get_fallback();
-				const MasterMaterialImpl* mm = mat->get_master_material();
-
-				if (mm->render_in_forward_pass()) {
-					transparent_pass.add_static_object(proxy, objhandle, mat, 0/* fixme sorting distance */, j, LOD_index, 0, build_for_editor);
-					if (!mm->is_translucent() && casts_shadow)
-						shadow_pass.add_static_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
-				}
-				else {
-					if (casts_shadow)
-						shadow_pass.add_static_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
-					gbuffer_pass.add_static_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
-				}
-
-#ifdef EDITOR_BUILD
-				if (proxy.outline) {
-					editor_sel_pass.add_static_object(proxy, objhandle, mat, 0, j, LOD_index, 0, build_for_editor);
-				}
-#endif
-			}
-		}
-	}
+	
 }
+ConfigVar test_ignore_bake("test_ignore_bake", "1", CVAR_BOOL, "");
 ConfigVar r_debug_transparents("r.debug_transparents", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_force_all_materials_to_fallback("r.force_all_materials_to_fallback", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_dont_use_camera_depth_build_scene("r.dont_use_camera_depth_build_scene", "0", CVAR_BOOL | CVAR_DEV, "");
@@ -2539,13 +2453,12 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 {
 	GPUSCOPESTART(build_scene_data_scope);
 
+	GpuCullingTest::inst->build_data();
+
 	//ZoneScoped;
 	if (r_debug_skip_build_scene_data.get_bool())
 		return;
-	if (static_cache_built_for_editor != build_for_editor)
-		statics_meshes_are_dirty = true;
-	if(static_cache_built_for_debug!=(r_debug_mode.get_integer() != 0))
-		statics_meshes_are_dirty = true;
+	
 
 	const bool skip_prepass_objs = r_skip_depth_prepass.get_bool();
 	const bool add_to_passes = !r_skip_add_to_passes.get_bool();
@@ -2600,16 +2513,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		
 		calc_lod_job(lod_to_render_array, camera_depth_array);
 
-		// while waiting, can refresh static mesh data if needed
-		if (statics_meshes_are_dirty) {
-			//printf("reset static mesh (editor: %d)\n", (int)build_for_editor);
-			refresh_static_mesh_data(build_for_editor);
-			statics_meshes_are_dirty = false;
-			static_cache_built_for_debug = r_debug_mode.get_integer() != 0;
-			static_cache_built_for_editor = build_for_editor;
-
-		}
-
 		JobSystem::inst->wait_and_free_counter(cullAndLodCounter);
 	}
 	const size_t num_ren_objs = proxy_list.objects.size();
@@ -2639,13 +2542,15 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			if (!proxy.visible || !proxy.model || !proxy.model->get_is_loaded() || (proxy.model->get_num_lods() == 0))
 				continue;
 
+			if (proxy.ignore_in_baking&& test_ignore_bake.get_bool())
+				continue;	// FIXME TESTING
+			
+			
 			if (!proxy.is_skybox && skybox_only)
 				continue;
 			if (cubemap_view && proxy.ignore_in_cubemap)
 				continue;
 
-			if (obj.type_.is_static)	// only dynamic objects passthrough
-				continue;
 
 			const bool is_visible = visible_array[i];
 			const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
@@ -2712,16 +2617,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 	if(add_to_passes)
 		add_objects_to_passes();
 		
-	auto merge_static_and_dynamic = [&]() {
-		ZoneScopedN("MergeStaticWithDynamic");
-		if (!skybox_only) {
-			draw.scene.shadow_pass.merge_static_to_dynamic(nullptr, lod_to_render_array, draw.scene.proxy_list);
-			editor_sel_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
-			gbuffer_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
-			transparent_pass.merge_static_to_dynamic(visible_array, lod_to_render_array, proxy_list);
-		}
-	};
-	merge_static_and_dynamic();
 
 	auto make_batches_for_passes = [&]() {
 		ZoneScopedN("MakeBatchesAndUploadGpuData");
@@ -3891,6 +3786,10 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		cmdparams.is_wireframe_pass = is_wireframe;
 
 		render_level_to_target(cmdparams);
+
+
+		GpuCullingTest::inst->dodraw();
+
 	};
 
 	if (is_wireframe_mode) {
@@ -4305,12 +4204,8 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 {
 	ASSERT(!eng->get_is_in_overlapped_period());
 	ROP_Internal& in = proxy_list.get(handle.id);
-	if (proxy.is_skybox)
-		in.is_static = false;
 
-	// mark dirty if model or material changed
-	if(in.is_static && (proxy.model!=in.proxy.model||proxy.mat_override!=in.proxy.mat_override))
-		statics_meshes_are_dirty = true;
+
 
 	in.prev_transform = in.proxy.transform;
 	in.prev_bone_ofs = in.proxy.animator_bone_ofs;

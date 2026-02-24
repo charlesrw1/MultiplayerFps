@@ -129,6 +129,7 @@
     <ClCompile Include="Source\Render\DecalBatcher.cpp" />
     <ClCompile Include="Source\Render\DrawLocal.cpp" />
     <ClCompile Include="Source\Render\EnvProbe.cpp" />
+    <ClCompile Include="Source\Render\GpuCullingTest.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />
     <ClCompile Include="Source\Render\Model.cpp" />
     <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
@@ -233,6 +234,7 @@
     <ClInclude Include="Source\LevelEditor\TagManager.h" />
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
+    <ClInclude Include="Source\Render\GpuCullingTest.h" />
     <ClInclude Include="Source\Render\IGraphsDevice.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Render\RenderGiManager.h" />

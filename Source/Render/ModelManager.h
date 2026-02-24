@@ -62,6 +62,10 @@ public:
 	Model* get_light_cone() const { return LIGHT_CONE; }
 	void add_model_to_list(Model* m);
 	void remove_model_from_list(Model* m);
+
+	const hash_set<Model>& get_all_models() const {
+		return all_models;
+	}
 private:
 	hash_set<Model> all_models;
 

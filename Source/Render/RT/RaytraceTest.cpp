@@ -394,7 +394,7 @@ static float view_bias = 0.1;
 static int bounces = 4;
 static bool include_cubemaps = true;
 static float relocate_normal_dist = 0.2;
-static int lum_adjust_mode = 3;
+static int lum_adjust_mode = 4;
 void ddgi_debugmenu() {
 	auto self = draw.ddgi.get();
 	ImGui::InputInt3("select", &self->selected_probe.x);

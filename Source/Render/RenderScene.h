@@ -20,15 +20,6 @@
 #include "Framework/MeshBuilderImpl.h"
 
 class MaterialInstance;
-struct Render_Box_Cubemap
-{
-	vec3 boxmin;
-	vec3 boxmax;
-	vec3 probe_pos = vec3(0.f);
-	int priority = 0;
-	bool found_probe_flag = false;
-	int id = -1;
-};
 
 
 // represents a singular call to glDrawElements() with same mesh and material instance. these can be hardware instanced
@@ -106,7 +97,6 @@ class Render_Pass
 public:
 	Render_Pass(pass_type type);
 	void make_batches(Render_Scene& scene);
-	void merge_static_to_dynamic(bool* vis_array, int8_t* lod_array, Free_List<ROP_Internal>& proxy_list);
 	void add_object(
 		const Render_Object& proxy,
 		handle<Render_Object> handle,
@@ -115,14 +105,7 @@ public:
 		int submesh,
 		int lod,
 		int layer, bool is_editor_mode);
-	void add_static_object(
-		const Render_Object& proxy,
-		handle<Render_Object> handle,
-		const MaterialInstance* material,
-		uint32_t camera_dist,
-		int submesh,
-		int lod,
-		int layer, bool is_editor_mode);
+
 
 	draw_call_key create_sort_key_from_obj(
 		const Render_Object& proxy,
@@ -132,14 +115,12 @@ public:
 		int layer, bool is_editor_mode);
 
 	void clear() { objects.clear();}
-	void clear_static() { cached_static_objects.clear(); }
 	const pass_type type{};					// modifies batching+sorting logic
 
 	bool forced_forward = false;
 
 
 	std::vector<Pass_Object> objects;		// geometry + material id + object id
-	std::vector<Pass_Object> cached_static_objects;	// copied into objects
 	std::vector<Mesh_Batch> mesh_batches;	// glDrawElementsIndirect()
 	std::vector<Multidraw_Batch> batches;	// glMultiDrawElementsIndirect()
 };
@@ -150,7 +131,6 @@ struct ROP_Internal
 	glm::mat4 prev_transform{};
 	int prev_bone_ofs = 0;
 	glm::vec4 bounding_sphere_and_radius;
-	bool is_static = true;
 	bool has_init = false;
 };
 
@@ -272,7 +252,6 @@ public:
 	// UGGGGGGGGH
 	handle<Render_Object> register_obj() override {
 		ASSERT(!eng->get_is_in_overlapped_period());
-		statics_meshes_are_dirty = true;
 		handle<Render_Object> handle = { proxy_list.make_new() };
 		return handle;
 	}
@@ -283,11 +262,8 @@ public:
 			handle = { -1 };
 			return;
 		}
-		statics_meshes_are_dirty = true;
 		if (handle.is_valid()) {
-			const bool was_static = proxy_list.get(handle.id).is_static;
 			proxy_list.free(handle.id);
-			statics_meshes_are_dirty |= was_static;
 		}
 		handle = { -1 };
 	}
@@ -582,9 +558,6 @@ public:
 	RSunInternal* get_main_directional_light();
 
 
-	bool statics_meshes_are_dirty = false;
-	bool static_cache_built_for_editor = false;
-	bool static_cache_built_for_debug = false;
 
 	Render_Pass gbuffer_pass;
 	Render_Pass transparent_pass;

@@ -1,0 +1,97 @@
+
+layout (local_size_x = 256) in;
+
+#include "SharedGpuTypes.txt"
+
+// draw calls
+layout(binding = 2, std430) buffer DrawElementsIndirectCommand_Buffer {
+	DrawElementsIndirectCommand draw_cmd_out[];
+};
+// gl_instance_id to render object id
+layout(binding = 3, std430) writeonly buffer ObjectInstIndirect_Buffer {
+	uint object_inst_indirect[];
+};
+
+struct CullObject {
+	vec4 bounds_sphere;
+	ivec4 misc;
+};	
+
+layout(binding = 6, std430) readonly buffer ModelInfoBuffer {
+	uint model_info[];
+};
+
+layout(binding = 4, std430) readonly buffer CullObjectsBuffer {
+	CullObject data[];
+}CullObjects;
+
+struct CullData {
+	vec4 frustum_up;
+	vec4 frustum_down;
+	vec4 frustum_l;
+	vec4 frustum_r;
+	int num_objects;
+	float inv_two_times_tanfov_2;
+	int padding2;
+	int padding1;
+	vec4 camera_origin;
+};	
+layout(binding = 5) uniform CullDataBuffer {
+	CullData cull;
+};
+
+
+float get_screen_percentage_2(vec4 bounding_sphere, float inv_two_times_tanfov_2, float camera_dist_2)
+{
+	return (bounding_sphere.w * bounding_sphere.w) * inv_two_times_tanfov_2 / camera_dist_2;
+}
+
+
+void main()
+{
+	uint gID = gl_GlobalInvocationID.x;
+	// cull object id
+	if(gID>=cull.num_objects)
+		return;
+	
+	int model_ofs = CullObjects.data[gID].misc.x;
+	int num_lods = int(model_info[model_ofs]);
+
+	vec4 bounding_sphere = CullObjects.data[gID].bounds_sphere;
+	
+	// frustum cull
+	vec3 center = bounding_sphere.xyz;
+	float radius = bounding_sphere.w;
+	int res = 0;
+	res += int(dot(cull.frustum_up.xyz,center)+cull.frustum_up.w >= -radius);
+	res += int(dot(cull.frustum_down.xyz,center)+cull.frustum_down.w >= -radius);
+	res += int(dot(cull.frustum_l.xyz,center)+cull.frustum_l.w >= -radius);
+	res += int(dot(cull.frustum_r.xyz,center)+cull.frustum_r.w >= -radius);
+	
+	if(res!=4)
+		return;
+	
+	
+	
+	// get lod to render
+	vec3 to_camera = bounding_sphere.xyz - cull.camera_origin.xyz;
+	const float dist_to_camera_2 = dot(to_camera, to_camera);
+	const float percentage_2 = get_screen_percentage_2(bounding_sphere, cull.inv_two_times_tanfov_2, dist_to_camera_2);
+	
+	int lod_wanted = 0;
+	for(int i=num_lods-1;i>0;i--) {
+		float end = uintBitsToFloat(model_info[model_ofs+1+(i*3)+2]);
+		if(percentage_2<=end) {
+			lod_wanted = i;
+			break;
+		}
+	}
+	int part_index = int(model_info[model_ofs+1+lod_wanted*3]);
+	int command_index = int(model_info[model_ofs+1+num_lods*3+part_index]);
+	
+	
+
+	uint count_index = atomicAdd(draw_cmd_out[command_index].primCount,1);
+	uint instanceIndex = draw_cmd_out[command_index].baseInstance + count_index;
+	object_inst_indirect[instanceIndex] = CullObjects.data[gID].misc.y;
+}

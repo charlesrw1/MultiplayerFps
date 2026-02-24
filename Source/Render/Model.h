@@ -131,6 +131,8 @@ public:
 	}
 	MSkeleton* get_skel() const { return skel.get(); }
 	const Submesh& get_part(int index) const { return parts[index]; }
+	int get_num_parts() const { return parts.size(); }
+
 	int get_num_lods() const { return lods.size(); }
 	const MeshLod& get_lod(int index) const { return lods[index]; }
 	const MaterialInstance* get_material(int index) const { return materials[index].get(); }

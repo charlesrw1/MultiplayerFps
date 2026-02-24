@@ -470,6 +470,7 @@
     <ClInclude Include="Source\Game\Components\SpawnerComponenth.h" />
     <ClInclude Include="Source\Render\RT\RaytraceTest.h" />
     <ClInclude Include="Source\Render\RenderGiManager.h" />
+    <ClInclude Include="Source\Render\GpuCullingTest.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -631,6 +632,7 @@
     <ClCompile Include="Source\Render\RT\RaytraceTest.cpp" />
     <ClCompile Include="Source\Render\RenderGiManager.cpp" />
     <ClCompile Include="Source\Render\DdsExport.cpp" />
+    <ClCompile Include="Source\Render\GpuCullingTest.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
