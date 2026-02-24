@@ -13,19 +13,19 @@ void main()
 	if(pos.x>=width||pos.y>=height)
 		return;
 
-	ivec2 base = ivec2(pos)*2;
+	//ivec2 base = ivec2(pos)*2;
    //
-	float d0 = texelFetch(in_img, base,level).r;
-	float d1 = texelFetch(in_img, base + ivec2(1,0), level).r;
-	float d2 = texelFetch(in_img, base + ivec2(0,1), level).r;
-	float d3 = texelFetch(in_img, base + ivec2(1,1), level).r;
+	//float d0 = texelFetch(in_img, base,level).r;
+	//float d1 = texelFetch(in_img, base + ivec2(1,0), level).r;
+	//float d2 = texelFetch(in_img, base + ivec2(0,1), level).r;
+	//float d3 = texelFetch(in_img, base + ivec2(1,1), level).r;
   
-   float minDepth = min(min(d0, d1), min(d2, d3));
+  // float minDepth = min(min(d0, d1), min(d2, d3));
 
 
-	//vec2 uv = (vec2(pos)+vec2(0.5))/vec2(width,height);
+	vec2 uv = (vec2(pos)+vec2(0.5))/vec2(width,height);
 
-	//float value = textureLod(in_img,uv,level).r;
+	float value = textureLod(in_img,uv,level).r;
 
-	imageStore(out_img, ivec2(pos), vec4(minDepth));
+	imageStore(out_img, ivec2(pos), vec4(value));
 }

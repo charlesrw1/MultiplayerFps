@@ -118,7 +118,7 @@ void main()
 			float height = (aabb.w - aabb.y) * cull.pyramid_height;
 
 			//find the mipmap level that will match the screen size of the sphere
-			float level = floor(log2(max(width, height) * 2.0));
+			float level = floor(log2(max(width, height)));
 
 			//sample the depth pyramid at that specific level
 			float depth = textureLod(depth_pyramid, (aabb.xy + aabb.zw) * 0.5, level).x;

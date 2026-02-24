@@ -343,8 +343,8 @@ void GpuCullingTest::build_data()
 		cull.frustum_r = frustum.right_plane;
 
 		cull.near = vs.near;
-		cull.pyramid_width = depth_size.x;
-		cull.pyramid_height = depth_size.y;
+		cull.pyramid_width = actual_depth_size.x;
+		cull.pyramid_height = actual_depth_size.y;
 		
 		const float aratio = vs.width / (float)vs.height;
 		const float halfVSide =  tanf(vs.fov * .5f);
@@ -561,12 +561,18 @@ void GpuCullingTest::init_depth_pyramid(int w, int h)
 	depth_size = { w,h };
 	if (depth_pyramid)
 		depth_pyramid->release();
+
+	auto actual_width = previousPow2(w);
+	auto actual_height = previousPow2(h);
+	actual_depth_size = { actual_width,actual_height };
+
+
 	CreateTextureArgs args;
-	args.num_mip_maps = Texture::get_mip_map_count(w, h);
-	args.width = w;
-	args.height = h;
+	args.num_mip_maps = Texture::get_mip_map_count(actual_width,actual_height);
+	args.width = actual_width;
+	args.height = actual_height;
 	//previousPow2(w*2)
-	//args.num_mip_maps = getImageMipLevels()
+	//args.num_mip_maps = getImageMipLevels(actual_width, actual_height);
 	args.type = GraphicsTextureType::t2D;
 	args.sampler_type = GraphicsSamplerType::DepthPyramid;
 	args.format = GraphicsTextureFormat::r32f;
@@ -604,10 +610,10 @@ void GpuCullingTest::downsample_depth()
 	GPUSCOPESTART(downsample);
 
 	draw.get_device().set_shader(build_pyramid);
-	const int levels = Texture::get_mip_map_count(depth_size.x, depth_size.y);
-	int width = depth_size.x;
-	int height = depth_size.y;
-			//glBindSampler(0, hiZSampler);
+	const int levels = Texture::get_mip_map_count(actual_depth_size.x, actual_depth_size.y);
+	int width = actual_depth_size.x;
+	int height = actual_depth_size.y;
+			glBindSampler(0, hiZSampler);
 	for (int level = 0; level < levels; level++) {
 		//glBindImageTexture()
 		glBindImageTexture(1, depth_pyramid->get_internal_handle(), level, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);

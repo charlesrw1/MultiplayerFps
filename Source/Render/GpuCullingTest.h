@@ -106,6 +106,8 @@ public:
 	program_handle build_pyramid{};
 	IGraphicsTexture* depth_pyramid = nullptr;
 	glm::ivec2 depth_size = {};
+	glm::ivec2 actual_depth_size = {};
+
 
 	uint32 hiZSampler{};
 
