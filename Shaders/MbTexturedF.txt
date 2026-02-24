@@ -48,7 +48,7 @@ void main()
 			tex_color = texelFetch(the_texture, coords, int(mip_slice));
 		}
 		else {
-			tex_color = textureLod(the_texture, FS_IN_TexCoord, mip_slice);
+			tex_color = vec4(textureLod(the_texture, FS_IN_TexCoord, mip_slice).r);
 		}
 	}
 #endif

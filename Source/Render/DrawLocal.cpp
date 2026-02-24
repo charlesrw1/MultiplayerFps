@@ -4041,6 +4041,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	else if (ddgi_rt.get_bool())
 		ddgi->render_rt();
 
+	GpuCullingTest::inst->debug_overlay();
 
 	auto post_process_stack = [&](){
 		GPUSCOPESTART(post_process_stack_scope);
@@ -4309,11 +4310,11 @@ void DebuggingTextureOutput::draw_out()
 	draw.shader().set_mat4("ViewProj", proj);
 
 	draw.shader().set_float("alpha", alpha);
-	draw.shader().set_float("mip_slice", output_tex->type == Texture_Type::TEXTYPE_2D ?
-		-1.f
-		: mip);
+	draw.shader().set_float("mip_slice", mip);
 	
 	draw.bind_texture_ptr(0,  output_tex->gpu_ptr);
+
+	
 
 	glm::vec2 upper_left = glm::vec2(0, 1);
 	glm::vec2 size = glm::vec2(1, -1);
@@ -4327,6 +4328,8 @@ void DebuggingTextureOutput::draw_out()
 
 	dd.draw(MeshBuilderDD::TRIANGLES);
 	dd.free();
+
+
 
 }
 #ifdef EDITOR_BUILD

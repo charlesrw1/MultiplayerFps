@@ -41,9 +41,17 @@ struct CullData {
 	vec4 frustum_r;
 	int num_objects;
 	float inv_two_times_tanfov_2;
-	int padding2;
-	int padding1;
+	float p00;
+	float p11;
+
 	vec4 camera_origin;
+
+	float near;
+	int pyramid_width;
+	int pyramid_height;
+	int padding2;
+
+	mat4 view;
 };
 class GpuCullingTest {
 public:
@@ -55,10 +63,13 @@ public:
 	void build_data();
 
 	void dodraw();
+	void debug_overlay();
+	void init_depth_pyramid(int w, int h);
+	void downsample_depth();
 
 	program_handle cull_compute{};
 	program_handle compaction{};
-
+	program_handle debug_overlays{};
 	IGraphicsBuffer* object_buffer = nullptr;
 	IGraphicsBuffer* model_data_buffer = nullptr;
 	IGraphicsBuffer* multidraw_buffer = nullptr;
@@ -71,5 +82,13 @@ public:
 	std::vector<const MaterialInstance*> cmd_mats;
 
 	std::vector<Multidraw_Batch> batches;
+
+	program_handle build_pyramid{};
+	IGraphicsTexture* depth_pyramid = nullptr;
+	glm::ivec2 depth_size = {};
+
+	uint32 hiZSampler{};
+
+	glm::mat4 prev_view = glm::mat4(1.0);
 
 };

@@ -30,11 +30,20 @@ struct CullData {
 	vec4 frustum_down;
 	vec4 frustum_l;
 	vec4 frustum_r;
+	
 	int num_objects;
 	float inv_two_times_tanfov_2;
-	int padding2;
-	int padding1;
+	float p00;
+	float p11;
+	
 	vec4 camera_origin;
+	
+	float near;
+	int pyramid_width;
+	int pyramid_height;
+	int padding2;
+	
+	mat4 view;
 };	
 layout(binding = 5) uniform CullDataBuffer {
 	CullData cull;
@@ -46,7 +55,32 @@ float get_screen_percentage_2(vec4 bounding_sphere, float inv_two_times_tanfov_2
 	return (bounding_sphere.w * bounding_sphere.w) * inv_two_times_tanfov_2 / camera_dist_2;
 }
 
+// 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere. Michael Mara, Morgan McGuire. 2013
+bool projectSphere(vec3 C, float r, float znear, float P00, float P11, out vec4 aabb)
+{
+	if (C.z+r <  znear)
+		return false;
 
+	vec2 cx = -C.xz;
+	vec2 vx = vec2(sqrt(dot(cx, cx) - r * r), r);
+	vec2 minx = mat2(vx.x, vx.y, -vx.y, vx.x) * cx;
+	vec2 maxx = mat2(vx.x, -vx.y, vx.y, vx.x) * cx;
+
+	vec2 cy = -C.yz;
+	vec2 vy = vec2(sqrt(dot(cy, cy) - r * r), r);
+	vec2 miny = mat2(vy.x, vy.y, -vy.y, vy.x) * cy;
+	vec2 maxy = mat2(vy.x, -vy.y, vy.y, vy.x) * cy;
+
+	aabb = vec4(minx.x / minx.y * P00, miny.x / miny.y * P11, maxx.x / maxx.y * P00, maxy.x / maxy.y * P11);
+	aabb = aabb.xwzy * vec4(0.5f, -0.5f, 0.5f, -0.5f) + vec4(0.5f); // clip space -> uv space
+
+	return true;
+}
+uniform int lod_bias = 1;
+uniform float radius_bias = 1;
+
+uniform bool occlusion_cull = false;
+layout(binding = 0) uniform sampler2D depth_pyramid;
 void main()
 {
 	uint gID = gl_GlobalInvocationID.x;
@@ -70,6 +104,34 @@ void main()
 	
 	if(res!=4)
 		return;
+	
+	
+	// occlusion cull, from vkguide
+	if(occlusion_cull) {
+		vec3 vs_center = (cull.view * vec4(center,1.0)).xyz;
+		vs_center.y *= -1;
+		vs_center.z *= -1;	// [0,+inf]
+		vec4 aabb;
+		radius *= radius_bias;
+		if(projectSphere(vs_center, radius, cull.near, cull.p00, cull.p11, aabb)) {
+			float width = (aabb.z - aabb.x) * cull.pyramid_width;
+			float height = (aabb.w - aabb.y) * cull.pyramid_height;
+
+			//find the mipmap level that will match the screen size of the sphere
+			float level = floor(log2(max(width, height)))+float(lod_bias);
+
+			//sample the depth pyramid at that specific level
+			float depth = textureLod(depth_pyramid, (aabb.xy + aabb.zw) * 0.5, level).x;
+
+			float depthSphere = cull.near /  max((vs_center.z - radius),cull.near);
+
+			if(depth>depthSphere)
+				return;	// occluded
+		}
+		else {
+			//return;
+		}
+	}
 	
 	
 	
