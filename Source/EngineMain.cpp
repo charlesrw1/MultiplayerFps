@@ -656,11 +656,11 @@ void GameEngineLocal::add_commands()
 	commands->add("compile-tex", COMPILE_TEX);
 	
 #endif
-	
+	static int blah = 0;
 	commands->add("stress-test", [](const Cmd_Args&) {
 		int size = 20;
 		for (int x = 0; x < size; x++) {
-			for (int y = 0; y < size; y++) {
+			for (int y = 0; y < 1; y++) {
 				for (int z = 0; z < size; z++) {
 					Entity* e = eng->get_level()->spawn_entity();
 					auto m = e->create_component<MeshComponent>();
@@ -668,10 +668,11 @@ void GameEngineLocal::add_commands()
 					m->dont_serialize_or_edit = true;
 					m->set_ignore_baking(true);
 					m->set_model(Model::load("sphere_lods.cmdl"));
-					e->set_ws_position(glm::vec3(x, y, z)*3.f);
+					e->set_ws_position(glm::vec3(x+blah*size, y, z)*3.f);
 				}
 			}
 		}
+		blah += 1;
 
 		});
 	commands->add("save_baked_gi", [](const Cmd_Args&) {

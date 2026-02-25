@@ -2605,8 +2605,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			if (!proxy.visible || !proxy.model || !proxy.model->get_is_loaded() || (proxy.model->get_num_lods() == 0))
 				continue;
 
-			if (proxy.ignore_in_baking&& test_ignore_bake.get_bool())
-				continue;	// FIXME TESTING
+			//if (proxy.ignore_in_baking&& test_ignore_bake.get_bool())
+			//	continue;	// FIXME TESTING
 			
 			
 			if (!proxy.is_skybox && skybox_only)

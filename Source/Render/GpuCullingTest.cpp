@@ -70,6 +70,8 @@ void occ_cul_menu()
 	}
 
 }
+// asdfa
+static int blah = 0;
 ADD_TO_DEBUG_MENU(occ_cul_menu);
 void GpuCullingTest::debug_overlay()
 {
@@ -112,8 +114,9 @@ void GpuCullingTest::copy_cpu(Render_Lists_Gpu_Culled& list)
 	auto& device = draw.get_device();
 
 	device.set_shader(cpu_vis_array_to_mdi);
-	const int co_size = cull.num_objects;
-	const int groups = glm::ceil(int(co_size) / 256.f);
+	const int co_size = cull.num_objects-cull.cpu_obj_offset;
+//	ASSERT(co_size == list.obj_count);
+	const int groups = glm::ceil(int(list.obj_count) / 256.f);
 
 	device.shader().set_int("num_objects", list.obj_count);
 
@@ -126,7 +129,7 @@ void GpuCullingTest::copy_cpu(Render_Lists_Gpu_Culled& list)
 
 	glDispatchCompute(groups, 1, 1);
 
-	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
 }
 void GpuCullingTest::build_data()
 {
@@ -198,6 +201,8 @@ void GpuCullingTest::build_data()
 			for (int i = 0; i < num_parts; i++) {
 				const int mat = m->get_part(i).material_idx;
 				const MaterialInstance* matp = m->get_material(mat);
+				if (!matp || !matp->impl)
+					matp = matman.get_fallback();
 
 				auto& part = m->get_part(i);
 				gpu::DrawElementsIndirectCommand cmd{};
@@ -276,6 +281,7 @@ void GpuCullingTest::build_data()
 		std::vector<CullObject> cos;
 		int index = 0;
 		for (auto& [h, o] : all_objs) {
+			// fill objects here
 			if (o.proxy.ignore_in_baking) {
 				CullObject co{};
 				co.bounds_sphere = o.bounding_sphere_and_radius;
@@ -285,6 +291,8 @@ void GpuCullingTest::build_data()
 				models_used[o.proxy.model] += 1;
 			}
 			index += 1;
+			if (cos.size() == 1)
+				break;
 		}
 
 		// cpu side objects
@@ -302,8 +310,9 @@ void GpuCullingTest::build_data()
 		object_buffer->upload(cos.data(), cos.size() * sizeof(CullObject));
 		cull.num_objects = cos.size();
 
-		const int bytes_needed = glm::round(cull.num_objects / 8.f);
-		vis_bitarray->upload(nullptr, bytes_needed);
+
+		const int words_needed = glm::ceil(cull.num_objects / 32.f);
+		vis_bitarray->upload(nullptr, words_needed*4);
 		uint32 value = 0;
 		glClearNamedBufferData(vis_bitarray->get_internal_handle(),
 			GL_R32UI,
@@ -384,7 +393,7 @@ void GpuCullingTest::build_data()
 
 		glDispatchCompute(groups, 1, 1);
 
-		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
 
 		glBindSampler(0,0);
 
