@@ -882,6 +882,10 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 	if (mdd.worldLmMerge)
 		mdd.isLightmapped = true;
 	mdd.generate_auto_lods = is->generate_auto_lods;
+	if (mdd.generate_auto_lods && is->lodScreenSpaceSizes.empty()) {
+		// set default screenspace sizes
+		is->lodScreenSpaceSizes = { 0.1,0.01,0.005 };	// idk random
+	}
 
 	mdd.model_source = is->srcGlbFile;
 	LODDef lodd;
@@ -1334,15 +1338,23 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 				 for (int i = 0; i < lod_gen; i++)
 					 err_allowed *= 0.6f;
 
-				 int result_count = (int)meshopt_simplify(indicies.data(),
-					 (uint32_t*)&mcd.indicies.at(orig_indicies_index),
-					 num_i,
-					 (float*)&mcd.verticies.at(vertex_i),
-					 part_obj.submesh.vertex_count,
-					 sizeof(FATVertex),
-					 target_i,
-					 err_allowed,
-					 0,
+				 const auto attribute_weights = { 1.f,1.f,1.f };
+				 int result_count = (int)meshopt_simplifyWithAttributes(
+					 indicies.data(),									// out indicies
+					 (uint32_t*)&mcd.indicies.at(orig_indicies_index),	// in indicies
+					 num_i,												// in indicies count
+					 (float*)&mcd.verticies.at(vertex_i).position.x,	// position
+					 part_obj.submesh.vertex_count,						// vertex count
+					 sizeof(FATVertex),									// vertex stride
+					 (float*)&mcd.verticies.at(vertex_i).normal.x,		// attributes
+					 sizeof(FATVertex),									// attribute stride
+					 attribute_weights.begin(),							// attribute weights (normalx, normaly, normalz)
+					 attribute_weights.size(),							// num attribute weights (3)
+					 nullptr,											// vertex lock, disabled
+
+					 target_i,				// target indicies
+					 err_allowed,			// err allowed
+					 meshopt_SimplifyPrune,	// options
 					 &out_er);
 	
 
@@ -2418,7 +2430,7 @@ struct ProcessNodesAndMeshOutput
 	ModelCompileData mcd;
 	ProcessMeshOutput meshout;
 };
-
+ConfigVar mod_meshopt_run("mod.meshopt", "1", CVAR_BOOL, "");
 ProcessNodesAndMeshOutput process_nodes_and_mesh(cgltf_data* data, const SkeletonCompileData* scd, const cgltf_skin* using_skin, const ModelDefData& def)
 {
 	ModelCompileData mcd;
@@ -2428,6 +2440,42 @@ ProcessNodesAndMeshOutput process_nodes_and_mesh(cgltf_data* data, const Skeleto
 		cgltf_node* node = scene->nodes[i];
 		traverse_model_nodes(def, mcd, using_skin, node, glm::mat4(1.f));
 	}
+
+	// run optimizer on mesh
+	if(mod_meshopt_run.get_bool())
+	{
+		for (int i = 0; i < mcd.lod_where.size(); i++) {
+			auto& lod = mcd.lod_where.at(i);
+			auto& parts = lod.mesh_nodes;
+			for (auto& part : parts) {
+				auto& mesh = part.submesh;
+				std::vector<unsigned> dest(mesh.element_count);
+				uint32_t* source = &mcd.indicies.at(mesh.element_offset / sizeof(uint32_t));
+				// DAMN WOWWZERS 25% reduction in drawing time...
+				meshopt_optimizeVertexCacheFifo(dest.data(),
+					source,
+					mesh.element_count,
+					mesh.vertex_count,
+					16
+				);
+				for (int j = 0; j < dest.size(); j++) {
+					source[j] = dest.at(j);
+				}
+				if (!lod.share_verticies_with_lod0) {
+					std::vector<FATVertex> dest(mesh.vertex_count);
+					FATVertex* source_v = &mcd.verticies.at(mesh.base_vertex);
+					const size_t out_v_count = meshopt_optimizeVertexFetch(dest.data(), source, mesh.element_count, source_v, mesh.vertex_count, sizeof(FATVertex));
+					for (int i = 0; i < out_v_count; i++) {
+						source_v[i] = dest.at(i);
+					}
+					mesh.vertex_count = out_v_count;	// modify vertex count
+
+				}
+			}
+
+		}
+	}
+
 
 	ProcessMeshOutput post_mesh_process = ModelCompileHelper::process_mesh(mcd, scd, def);
 

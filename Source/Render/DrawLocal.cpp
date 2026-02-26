@@ -2406,12 +2406,15 @@ void cull_spot_shadow_objects_job(handle<Render_Light> lightId, bool* visArray, 
 }
 
 
-
+ConfigVar r_force_lod("r.force_lod", "-1", CVAR_INTEGER | CVAR_UNBOUNDED, "");
 void calc_lod_job(int8_t* lodarray, int16_t* camera_dist)
 {
 	ZoneScopedN("LodToRenderCalc");
 
 	//int8_t* lodarray = (int8_t*)user;
+
+	const int force_lod = r_force_lod.get_integer();
+	
 
 	const float inv_two_times_tanfov = 1.0 / (tan(draw.get_current_frame_vs().fov * 0.5));
 	const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
@@ -2432,6 +2435,10 @@ void calc_lod_job(int8_t* lodarray, int16_t* camera_dist)
 		const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
 		if (!proxy.model)
 			lodarray[i] = 0;
+		else if (force_lod != -1) {
+			int lod_to_pick = glm::clamp(force_lod, 0, proxy.model->get_num_lods() - 1);
+			lodarray[i] = lod_to_pick;
+		}
 		else if (percentage_2<proxy.dist_cull_2) {
 			lodarray[i] = -1;
 		}
