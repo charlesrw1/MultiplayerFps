@@ -3867,6 +3867,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	else
 		gbuffer_pass();
 
+
+	GpuCullingTest::inst->build_data_2();
 	//device.reset_states();
 	
 

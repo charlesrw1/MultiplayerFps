@@ -102,6 +102,7 @@ public:
 	// LODS
 	std::vector<LODDef> loddefs;
 	const int num_lods() const { return loddefs.size(); }
+	bool generate_auto_lods = false;
 
 	// SKELETON
 	bool merge_meshes_into_skeleton = false;

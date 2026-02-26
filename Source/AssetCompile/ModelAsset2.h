@@ -72,6 +72,8 @@ public:
 	REF bool meshAsConvex = false;
 	REF bool meshAsCollision = false;
 
+	REF bool generate_auto_lods = false;
+
 	// type=BoneRenameContainer
 	// this renames bones in this asset using this dataclass
 	// each entry in the array is "my_current_bone renamed_bone", with a space in between

@@ -13,7 +13,7 @@ GpuCullingTest::GpuCullingTest()
 	cpu_vis_array_to_mdi = draw.get_prog_man().create_compute("cpu_vis_to_mdi.txt");
 	debug_overlays  = draw.get_prog_man().create_raster("fullscreenquad.txt", "debugCull.txt");
 	vis_bitarray = IGraphicsDevice::inst->create_buffer({});
-
+	zero_instances_mdi = draw.get_prog_man().create_compute("zero_instances_mdi.txt");
 	Texture::install_system("_depth_pyramid");
 
 	glGenSamplers(1, &hiZSampler);
@@ -131,6 +131,73 @@ void GpuCullingTest::copy_cpu(Render_Lists_Gpu_Culled& list)
 
 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
 }
+void GpuCullingTest::do_cull(Phase pass)
+{
+	if (pass == Phase::Pass2)
+		return;
+
+	if (update_depth_pyramid)
+	{
+		const float inv_two_times_tanfov = 1.0 / (tan(draw.get_current_frame_vs().fov * 0.5));
+		const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
+		cull.inv_two_times_tanfov_2 = inv_two_times_tanfov_2;
+		auto& vs = draw.current_frame_view;
+		cull.camera_origin = glm::vec4(vs.origin, 1);
+
+		Frustum frustum;
+		build_a_frustum_for_perspective(frustum, draw.current_frame_view);
+		cull.frustum_up = frustum.top_plane;
+		cull.frustum_down = frustum.bot_plane;
+		cull.frustum_l = frustum.left_plane;
+		cull.frustum_r = frustum.right_plane;
+
+		cull.near = vs.near;
+		cull.pyramid_width = actual_depth_size.x;
+		cull.pyramid_height = actual_depth_size.y;
+
+		const float aratio = vs.width / (float)vs.height;
+		const float halfVSide = tanf(vs.fov * .5f);
+		const float halfHSide = halfVSide * aratio;
+		cull.p00 = 1 / halfHSide;
+		cull.p11 = 1 / halfVSide;
+
+		cull.view = prev_view;
+		prev_view = vs.view;
+		cull_data->upload(&cull, sizeof(CullData));
+	}
+
+
+
+	auto& device = draw.get_device();
+
+	device.set_shader(cull_compute);
+	const int co_size = cull.num_objects;
+	const int groups = glm::ceil(int(co_size) / 256.f);
+
+	device.shader().set_bool("occlusion_cull", do_occlusion_culling);
+
+	device.bind_texture_ptr(0, depth_pyramid);
+	glBindSampler(0, hiZSampler);
+	device.shader().set_int("lod_bias", lod_bias);
+	device.shader().set_float("radius_bias", radius_bias);
+
+
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, multidraw_buffer->get_internal_handle());
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, objindirect->get_internal_handle());
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, model_data_buffer->get_internal_handle());
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, object_buffer->get_internal_handle());
+	glBindBufferBase(GL_UNIFORM_BUFFER, 5, cull_data->get_internal_handle());
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, vis_bitarray->get_internal_handle());
+
+
+	glDispatchCompute(groups, 1, 1);
+
+	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
+
+	glBindSampler(0, 0);
+
+
+}
 void GpuCullingTest::build_data()
 {
 	// fill model data buffer
@@ -138,20 +205,6 @@ void GpuCullingTest::build_data()
 	
 	GPUSCOPESTART(gpu_cull);
 
-
-	if(update_depth_pyramid)
-	{
-
-
-		const auto& viewsetup = draw.current_frame_view;
-		int v_w = viewsetup.width/2;
-		int v_h = viewsetup.height/2;
-		if (depth_size.x != v_w || depth_size.y != v_h)
-			init_depth_pyramid(v_w, v_h);
-		downsample_depth();
-	}
-
-	
 	std::vector<gpu::DrawElementsIndirectCommand> commands;
 	std::vector<int> material_indirection;
 	std::vector<const Model*> cmd_to_model;
@@ -336,69 +389,6 @@ void GpuCullingTest::build_data()
 	multidraw_buffer->upload(commands.data(), commands.size() * sizeof(gpu::DrawElementsIndirectCommand));
 
 
-	if(update_depth_pyramid)
-	{
-		const float inv_two_times_tanfov = 1.0 / (tan(draw.get_current_frame_vs().fov * 0.5));
-		const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
-		cull.inv_two_times_tanfov_2 = inv_two_times_tanfov_2;
-		auto& vs = draw.current_frame_view;
-		cull.camera_origin =glm::vec4( vs.origin,1);
-
-		Frustum frustum;
-		build_a_frustum_for_perspective(frustum, draw.current_frame_view);
-		cull.frustum_up = frustum.top_plane;
-		cull.frustum_down = frustum.bot_plane;
-		cull.frustum_l = frustum.left_plane;
-		cull.frustum_r = frustum.right_plane;
-
-		cull.near = vs.near;
-		cull.pyramid_width = actual_depth_size.x;
-		cull.pyramid_height = actual_depth_size.y;
-		
-		const float aratio = vs.width / (float)vs.height;
-		const float halfVSide =  tanf(vs.fov * .5f);
-		const float halfHSide = halfVSide * aratio;
-		cull.p00 = 1 / halfHSide;
-		cull.p11 = 1 / halfVSide;
-
-		cull.view = prev_view;
-		prev_view = vs.view;
-		cull_data->upload(&cull, sizeof(CullData));
-	}
-
-	{
-		GPUSCOPESTART(cull_step);
-
-		auto& device = draw.get_device();
-
-		device.set_shader(cull_compute);
-		const int co_size = cull.num_objects;
-		const int groups = glm::ceil(int(co_size) / 256.f);
-
-		device.shader().set_bool("occlusion_cull", do_occlusion_culling);
-
-		device.bind_texture_ptr(0, depth_pyramid);
-		glBindSampler(0,hiZSampler);
-		device.shader().set_int("lod_bias", lod_bias);
-		device.shader().set_float("radius_bias", radius_bias);
-
-
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, multidraw_buffer->get_internal_handle());
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, objindirect->get_internal_handle());
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, model_data_buffer->get_internal_handle());
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, object_buffer->get_internal_handle());
-		glBindBufferBase(GL_UNIFORM_BUFFER, 5, cull_data->get_internal_handle());
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, vis_bitarray->get_internal_handle());
-
-
-		glDispatchCompute(groups, 1, 1);
-
-		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
-
-		glBindSampler(0,0);
-
-	}
-
 	// set up mesh batches (groups of drawelements commands, 1 multidraw command)
 	{
 		batches.clear();
@@ -455,6 +445,27 @@ void GpuCullingTest::build_data()
 
 		batches.push_back(batch);
 	}
+
+
+	do_cull(Phase::Pass1);
+}
+void GpuCullingTest::build_data_2()
+{
+
+
+	// depth pyramid update
+	if (update_depth_pyramid)
+	{
+		const auto& viewsetup = draw.current_frame_view;
+		int v_w = viewsetup.width / 2;
+		int v_h = viewsetup.height / 2;
+		if (depth_size.x != v_w || depth_size.y != v_h)
+			init_depth_pyramid(v_w, v_h);
+		downsample_depth();
+	}
+
+	do_cull(Phase::Pass2);
+
 }
 
 void setup_batch2(const MaterialInstance* mat, const int offset)
@@ -679,5 +690,14 @@ void GpuCullingTest::downsample_depth()
 
 		}
 	}
+}
+
+void GpuCullingTest::zero_instances_in_this(bufferhandle mdi_buf, int count)
+{
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, mdi_buf);
+	draw.set_shader(zero_instances_mdi);
+	int groups_x = glm::ceil(count / 256.f);
+	draw.shader().set_int("draw_count", count);
+	glDispatchCompute(groups_x, 1, 1);
 }
 

@@ -68,17 +68,22 @@ public:
 	GpuCullingTest();
 	~GpuCullingTest();
 
-	void build_data_1();
-	void gbuffer_pass_1();
-	void build_hi_z();
-	void build_data_2();
-	void gbuffer_pass_2();
 
-	void copy_cpu(Render_Lists_Gpu_Culled& list);
-
+	// builds mod info etc
+	// culls against prev frustum
 	void build_data();
+	// copies culled data to render lists
+	void copy_cpu(Render_Lists_Gpu_Culled& list);
+	
+	// build hi-z and do 2nd cull pass
+	void build_data_2();
 
+	// # copy_cpu() again for cpu objects
+
+	// call this twice
 	void dodraw();
+
+
 	void debug_overlay();
 	void init_depth_pyramid(int w, int h);
 	void downsample_depth();
@@ -113,7 +118,15 @@ public:
 
 	glm::mat4 prev_view = glm::mat4(1.0);
 
-
+	program_handle zero_instances_mdi{};
 	program_handle cpu_vis_array_to_mdi{};
 
+	void zero_instances_in_this(bufferhandle mdi_buf, int count);
+
+private:
+	enum class Phase {
+		Pass1,
+		Pass2
+	};
+	void do_cull(Phase pass);
 };

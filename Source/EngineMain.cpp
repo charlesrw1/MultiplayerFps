@@ -660,15 +660,15 @@ void GameEngineLocal::add_commands()
 	commands->add("stress-test", [](const Cmd_Args&) {
 		int size = 20;
 		for (int x = 0; x < size; x++) {
-			for (int y = 0; y < 1; y++) {
+			for (int y = 0; y < 10; y++) {
 				for (int z = 0; z < size; z++) {
 					Entity* e = eng->get_level()->spawn_entity();
 					auto m = e->create_component<MeshComponent>();
 					e->dont_serialize_or_edit = true;
 					m->dont_serialize_or_edit = true;
 					m->set_ignore_baking(true);
-					m->set_model(Model::load("sphere_lods.cmdl"));
-					e->set_ws_position(glm::vec3(x+blah*size, y, z)*3.f);
+					m->set_model(Model::load("work_prop/gas_cylinder.cmdl"));
+					e->set_ws_position(glm::vec3(x, y+blah*10, z)*4.0f);
 				}
 			}
 		}

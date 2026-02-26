@@ -28,6 +28,8 @@
 
 #include <fstream>
 
+#include <meshoptimizer.h>
+
 // MODEL FORMAT:
 // HEADER
 // int magic 'C' 'M' 'D' 'L'
@@ -217,6 +219,7 @@ struct LODMesh
 struct CompileModLOD
 {
 	std::vector<LODMesh> mesh_nodes;
+	bool share_verticies_with_lod0 = false;
 };
 
 
@@ -878,6 +881,7 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 	mdd.worldLmMerge = is->worldLmMerge;
 	if (mdd.worldLmMerge)
 		mdd.isLightmapped = true;
+	mdd.generate_auto_lods = is->generate_auto_lods;
 
 	mdd.model_source = is->srcGlbFile;
 	LODDef lodd;
@@ -1189,6 +1193,8 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 		}
 	}
 
+
+
 	 for (int i = 0; i < mcd.lod_where.size(); i++) {
 		 auto& lod = mcd.lod_where[i];
 
@@ -1300,6 +1306,90 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 		 }
 	 }
 
+	 // testing: lods via meshopt
+	 if (def.generate_auto_lods)
+	 {
+		 const int NUM_LODS_TO_GEN = 4;	// generate 4 lods
+		 for (int lod_gen = 0; lod_gen < NUM_LODS_TO_GEN; lod_gen++) {
+			CompileModLOD newLod;
+			newLod.share_verticies_with_lod0 = true;
+			// use last lod (including just added ones)
+				const CompileModLOD lod0 = mcd.lod_where.at(mcd.lod_where.size()-1);
+
+
+			int wants_stop_count = 0;
+			 for (int part = 0; part < lod0.mesh_nodes.size(); part++) {
+				 const auto& part_obj = lod0.mesh_nodes.at(part);
+				 if (part_obj.mark_for_delete)
+					 continue;
+				 const int target_i = part_obj.submesh.element_count >> 1;	// divide each lod by 2
+				 const int orig_indicies_index = part_obj.submesh.element_offset/sizeof(uint32_t);
+				 const int vertex_i = part_obj.submesh.base_vertex;
+				 const int num_i = part_obj.submesh.element_count;
+				 std::vector<uint32_t> indicies(num_i);
+
+				 float out_er = 0.0;
+
+				 float err_allowed = 0.1;
+				 for (int i = 0; i < lod_gen; i++)
+					 err_allowed *= 0.6f;
+
+				 int result_count = (int)meshopt_simplify(indicies.data(),
+					 (uint32_t*)&mcd.indicies.at(orig_indicies_index),
+					 num_i,
+					 (float*)&mcd.verticies.at(vertex_i),
+					 part_obj.submesh.vertex_count,
+					 sizeof(FATVertex),
+					 target_i,
+					 err_allowed,
+					 0,
+					 &out_er);
+	
+
+				 bool append_original = false;
+				 if ((float(result_count) / num_i) > 0.8) {
+
+					 // try a sloppy simplify
+					 result_count = (int)meshopt_simplifySloppy(indicies.data(),
+						 (uint32_t*)&mcd.indicies.at(orig_indicies_index),
+						 num_i,
+						 (float*)&mcd.verticies.at(vertex_i),
+						 part_obj.submesh.vertex_count,
+						 sizeof(FATVertex),
+						 target_i,
+						 err_allowed,
+						 &out_er);
+
+					 if ((float(result_count) / num_i) > 0.8) {
+					//	 wants_stop = true;
+						 wants_stop_count += 1;
+						 append_original = true;
+						// break;	// okay actually stop now
+					 }
+						// stop gening lods when you arent getting better than 80%
+				 }
+
+
+				 LODMesh new_part = part_obj;
+				 if (!append_original) {
+					 new_part.submesh.element_count = result_count;
+					 new_part.submesh.element_offset = mcd.indicies.size() * sizeof(uint32_t);
+					 for (int i = 0; i < result_count; i++) {
+						 mcd.indicies.push_back(indicies.at(i));
+					 }
+				 }
+				 newLod.mesh_nodes.push_back(new_part);
+			 }
+
+			 if (wants_stop_count==lod0.mesh_nodes.size())
+				 break;
+
+			 mcd.lod_where.push_back(newLod);
+		 }
+
+	 }
+
+
 	 // mark used bone parents
 
 	 int FINAL_bone_count = 0;
@@ -1330,6 +1420,9 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 		 sys_print(Info,"final bone count %d\n", FINAL_bone_count);
 
 		 for (int i = 0; i < mcd.lod_where.size(); i++) {
+			 if (mcd.lod_where[i].share_verticies_with_lod0)
+				 continue;
+
 			 for (int j = 0; j < mcd.lod_where[i].mesh_nodes.size(); j++) {
 				 auto& mesh = mcd.lod_where[i].mesh_nodes[j];
 				 if (mesh.mark_for_delete)
@@ -2590,7 +2683,8 @@ Submesh make_final_submesh_from_existing(
 	FinalModelData& finalmod, 
 	const ModelCompileData& compile, 
 	const std::vector<int>& indirect_mats_out,
-	glm::mat4 transform)
+	glm::mat4 transform,
+	const bool dont_append_verticies)
 {
 	Submesh out;
 	out.material_idx = (in.material_idx == -1) ? indirect_mats_out[indirect_mats_out.size() - 1] : indirect_mats_out[in.material_idx];
@@ -2608,23 +2702,25 @@ Submesh make_final_submesh_from_existing(
 	const int vertex_start = in.base_vertex;
 	const int new_vertex_start = finalmod.verticies.size();
 
-	if (finalmod.get_is_lightmapped_bool()) {
-		for (int i = 0; i < in.vertex_count; i++) {
-			finalmod.verticies.push_back(fatvert_to_mv_lightmapped(compile.verticies[vertex_start + i], transform, normal_tr));
+	if (!dont_append_verticies) {
+		if (finalmod.get_is_lightmapped_bool()) {
+			for (int i = 0; i < in.vertex_count; i++) {
+				finalmod.verticies.push_back(fatvert_to_mv_lightmapped(compile.verticies[vertex_start + i], transform, normal_tr));
+			}
 		}
-	}
-	else if(has_skeleton){
-		for (int i = 0; i < in.vertex_count; i++) {
-			finalmod.verticies.push_back(fatvert_to_mv_skinned(compile.verticies[vertex_start + i], transform, normal_tr));
+		else if (has_skeleton) {
+			for (int i = 0; i < in.vertex_count; i++) {
+				finalmod.verticies.push_back(fatvert_to_mv_skinned(compile.verticies[vertex_start + i], transform, normal_tr));
+			}
 		}
-	}
-	else {
-		for (int i = 0; i < in.vertex_count; i++) {
-			finalmod.verticies.push_back(fatvert_to_mv_non_skinned(compile.verticies[vertex_start + i], transform, normal_tr));
+		else {
+			for (int i = 0; i < in.vertex_count; i++) {
+				finalmod.verticies.push_back(fatvert_to_mv_non_skinned(compile.verticies[vertex_start + i], transform, normal_tr));
+			}
 		}
+		out.base_vertex = new_vertex_start;
 	}
 
-	out.base_vertex = new_vertex_start;
 	out.element_offset = new_index_start * sizeof(uint16_t);
 
 	return out;
@@ -2728,9 +2824,18 @@ FinalModelData create_final_model_data(
 					final_mod,
 					compile,
 					indirect_mats_out,
-					transform
+					transform,
+					lod.share_verticies_with_lod0
 				)
 			);
+			if (lod.share_verticies_with_lod0) {
+				auto& lod0 = final_mod.lods.at(0);
+				ASSERT(lod0.part_count == lod.mesh_nodes.size());
+				auto& submesh = final_mod.submeshes.at(lod0.part_ofs + j);
+				auto& my_submesh = final_mod.submeshes.back();
+				my_submesh.base_vertex = submesh.base_vertex;
+			}
+
 		}
 		out_lod.part_count = final_mod.submeshes.size()- out_lod.part_ofs;
 
