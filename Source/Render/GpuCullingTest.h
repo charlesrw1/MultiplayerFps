@@ -89,6 +89,16 @@ public:
 	void init_depth_pyramid(int w, int h);
 	void downsample_depth();
 
+
+	void compact_draws(
+		int num_batches,
+		int num_commands,
+		bufferhandle mdi_buf,
+		bufferhandle mat_buf,
+		IGraphicsBuffer* count_buf,
+		IGraphicsBuffer* batches_buf
+	);
+
 	program_handle cull_compute{};
 	program_handle compaction{};
 	program_handle debug_overlays{};

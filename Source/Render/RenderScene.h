@@ -173,6 +173,9 @@ public:
 
 	// where are we getting our objects from
 	const Render_Pass* parent_pass = nullptr;
+
+	// fixme bs crap
+	virtual IGraphicsBuffer* get_count_buf() { return nullptr; }
 };
 class IGraphicsBuffer;
 // w/ gpu occlusion culling
@@ -180,6 +183,12 @@ struct Render_Lists_Gpu_Culled : public Render_Lists
 {
 	void init(uint32_t drawidsz, uint32_t instbufsz);
 	IGraphicsBuffer* inst_to_obj = nullptr;
+
+	IGraphicsBuffer* batches_buf = nullptr;
+	IGraphicsBuffer* count_buffer = nullptr;
+
+	IGraphicsBuffer* get_count_buf() final { return count_buffer; }
+
 	int obj_count = 0;
 
 };

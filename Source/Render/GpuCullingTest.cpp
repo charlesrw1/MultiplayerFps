@@ -14,6 +14,7 @@ GpuCullingTest::GpuCullingTest()
 	debug_overlays  = draw.get_prog_man().create_raster("fullscreenquad.txt", "debugCull.txt");
 	vis_bitarray = IGraphicsDevice::inst->create_buffer({});
 	zero_instances_mdi = draw.get_prog_man().create_compute("zero_instances_mdi.txt");
+	compaction = draw.get_prog_man().create_compute("compact_mdi.txt");
 	Texture::install_system("_depth_pyramid");
 
 	glGenSamplers(1, &hiZSampler);
@@ -181,7 +182,8 @@ void GpuCullingTest::do_cull(Phase pass)
 	const int co_size = cull.num_objects;
 	const int groups = glm::ceil(int(co_size) / 256.f);
 
-	device.shader().set_bool("occlusion_cull", do_occlusion_culling);
+	const bool is_ortho = draw.get_current_frame_vs().is_ortho;	// this check should go elsewhere? or not, ortho is pretty special case
+	device.shader().set_bool("occlusion_cull", do_occlusion_culling&&!is_ortho);
 	device.shader().set_bool("second_pass", pass==Phase::Pass2);
 
 	device.bind_texture_ptr(0, depth_pyramid);
@@ -700,6 +702,28 @@ void GpuCullingTest::downsample_depth()
 
 		}
 	}
+}
+
+void GpuCullingTest::compact_draws(int num_batches, int num_commands, bufferhandle mdi_buf, bufferhandle mat_buf, IGraphicsBuffer* count_buf, IGraphicsBuffer* batches_buf)
+{
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, mdi_buf);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, batches_buf->get_internal_handle());
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, mat_buf);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, count_buf->get_internal_handle());
+
+	// stored in mdi buf after first 2 sections
+	glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 6, mdi_buf, num_commands*sizeof(gpu::DrawElementsIndirectCommand)*2,
+		num_commands*sizeof(int));
+
+
+	draw.set_shader(compaction);
+	int groups_x = glm::ceil(num_commands / 32.f);
+	draw.shader().set_int("num_draws", num_batches);
+	draw.shader().set_int("command_count", num_commands);
+
+	glDispatchCompute(groups_x, 1, 1);
+
+	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
 }
 
 void GpuCullingTest::zero_instances_in_this(bufferhandle mdi_buf, int count)

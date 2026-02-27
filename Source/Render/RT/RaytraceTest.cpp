@@ -270,6 +270,8 @@ void DdgiTesting::build_world()
 
 			if (!material_inst) continue;
 			auto material = material_inst->impl.get();
+			if (!material||!material->get_master_impl())
+				continue;
 			if (material->get_master_impl()->light_mode == LightingMode::Unlit)
 				continue;
 			

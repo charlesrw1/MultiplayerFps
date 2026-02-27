@@ -1,0 +1,74 @@
+
+layout (local_size_x = 32) in;
+
+#include "SharedGpuTypes.txt"
+
+// draw calls
+layout(binding = 2, std430) buffer DrawElementsIndirectCommand_Buffer {
+	DrawElementsIndirectCommand draw_cmd_out[];
+};
+
+layout(binding = 3, std430) readonly buffer multidraw_batches_buffer {
+	uint multidraw_batches[];
+};
+
+layout(binding = 4, std430) buffer material_indirect_buffer {
+	uint material_indirect[];
+};
+
+layout(binding = 5, std430)  buffer counts_buffer {
+	uint counts[];
+};
+layout(binding = 6, std430) readonly buffer draw_to_batch_buffer {
+	int draw_to_batch[];
+};
+
+
+uniform int num_draws = 0;
+uniform int command_count = 0;
+void main()
+{
+	uint gID = gl_GlobalInvocationID.x;
+	// cull object id
+	if(gID>=num_draws)
+		return;
+		
+	uint draw_offset = multidraw_batches[gID*2];
+	uint draw_count = multidraw_batches[gID*2+1];
+	
+	int total_count = 0;
+	for(int i=0;i<draw_count;i++) {
+		if(draw_cmd_out[draw_offset+i].primCount > 0) {
+			draw_cmd_out[command_count+draw_offset+total_count] = draw_cmd_out[draw_offset+i];
+			// also adjust material indirect
+			material_indirect[command_count+draw_offset+total_count] = material_indirect[draw_offset+i];
+			
+			total_count += 1;
+		}
+	}
+	counts[gID] = total_count;
+}
+
+//void main()
+//{
+//    uint cmdIndex = gl_GlobalInvocationID.x;
+//    if (cmdIndex >= command_count)
+//        return;
+//
+//    DrawElementsIndirectCommand cmd = draw_cmd_out[cmdIndex];
+//
+//    if (cmd.primCount == 0)
+//        return;
+//
+//    int batch = draw_to_batch[cmdIndex];
+//
+//    // atomic counter per batch
+//    uint localIndex = atomicAdd(counts[batch], 1);
+//
+//    uint writeIndex = command_count +
+//                      multidraw_batches[batch * 2] +
+//                      localIndex;
+//
+//    draw_cmd_out[writeIndex] = cmd;
+//    material_indirect[writeIndex] =  material_indirect[cmdIndex];
+//}

@@ -1499,7 +1499,7 @@ void draw_model_simple_no_material(Model* model) {
 
 
 ConfigVar use_client_buffer_mdi("use_client_buffer_mdi", "0", CVAR_BOOL, "");
-void setup_execute_render_lists(Render_Lists& list,Render_Pass& pass) {
+int setup_execute_render_lists(Render_Lists& list,Render_Pass& pass) {
 	auto& scene = draw.scene;
 	
 	IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
@@ -1508,11 +1508,30 @@ void setup_execute_render_lists(Render_Lists& list,Render_Pass& pass) {
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, material_buffer->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, list.glinstance_to_instance);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
-	if (use_client_buffer_mdi.get_bool())
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-	else
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, list.gpu_command_list);
+	int offset_command_bytes = 0;
+	if (pass.type == pass_type::OPAQUE) {
+		const int size = pass.mesh_batches.size()*sizeof(int);
+		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material, size,size);
+		const int command_size = list.commands.size()*sizeof(gpu::DrawElementsIndirectCommand);
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER,list.gpu_command_list);
+		offset_command_bytes = command_size;
+		//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
+		//if (use_client_buffer_mdi.get_bool())
+		//	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+		//else
+		//	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, list.gpu_command_list);
+
+		auto buf = list.get_count_buf();
+		ASSERT(buf);
+		glBindBuffer(GL_PARAMETER_BUFFER, buf->get_internal_handle());
+	}
+	else {
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
+		if (use_client_buffer_mdi.get_bool())
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+		else
+			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, list.gpu_command_list);
+	}
 
 	if (scene.has_lightmap && scene.lightmapObj.lightmap_texture) {
 		auto texture = scene.lightmapObj.lightmap_texture;
@@ -1521,6 +1540,8 @@ void setup_execute_render_lists(Render_Lists& list,Render_Pass& pass) {
 	else {
 		draw.bind_texture_ptr(20/* FIXME, defined to be bound at spot 20,*/, draw.black_texture);
 	}
+
+	return offset_command_bytes;
 
 }
 
@@ -1531,7 +1552,7 @@ void Renderer::execute_render_lists(
 	bool force_show_backfaces,
 	bool depth_less_than_op)
 {
-	setup_execute_render_lists(list, pass);
+	const int offset_buffer_start = setup_execute_render_lists(list, pass);
 	int offset = 0;
 	const int DEIcmdSz = sizeof(gpu::DrawElementsIndirectCommand);
 	for (int i = 0; i < pass.batches.size(); i++) {
@@ -1547,15 +1568,27 @@ void Renderer::execute_render_lists(
 			if (use_client_buffer_mdi.get_bool())
 				indirect_ptr = (void*)(list.commands.data() + offset);
 			else
-				indirect_ptr = (void*)(int64_t(offset * DEIcmdSz));
+				indirect_ptr = (void*)(int64_t(offset_buffer_start+offset * DEIcmdSz));
 
-			glMultiDrawElementsIndirect(
-				GL_TRIANGLES,
-				index_type,
-				indirect_ptr,
-				count,
-				sizeof(gpu::DrawElementsIndirectCommand)
-			);
+			if (pass.type == pass_type::OPAQUE) {
+				glMultiDrawElementsIndirectCount(
+					GL_TRIANGLES,
+					index_type,
+					indirect_ptr,
+					i*sizeof(uint32),
+					count,
+					sizeof(gpu::DrawElementsIndirectCommand)
+				);
+			}
+			else {
+				glMultiDrawElementsIndirect(
+					GL_TRIANGLES,
+					index_type,
+					indirect_ptr,
+					count,
+					sizeof(gpu::DrawElementsIndirectCommand)
+				);
+			}
 		}
 		offset += incr;
 
@@ -2009,6 +2042,9 @@ void Render_Lists_Gpu_Culled::init(uint32_t drawidsz, uint32_t instbufsz)
 {
 	Render_Lists::init(drawidsz, instbufsz);
 	inst_to_obj = IGraphicsDevice::inst->create_buffer({});
+	count_buffer = IGraphicsDevice::inst->create_buffer({});
+	batches_buf = IGraphicsDevice::inst->create_buffer({});
+
 }
 static void build_standard_cpu_culling(
 	Render_Lists_Gpu_Culled& list,
@@ -2016,6 +2052,8 @@ static void build_standard_cpu_culling(
 	Free_List<ROP_Internal>& proxy_list
 )
 {
+	GPUSCOPESTART(build_standard_cpu_culling);
+
 	auto& memArena = draw.get_arena();
 	ArenaScope memScope(memArena);
 	std::span<uint32_t> draw_to_material = memArena.alloc_bottom_span<uint32_t>(src.mesh_batches.size());
@@ -2048,7 +2086,8 @@ static void build_standard_cpu_culling(
 		list.commands[i].primCount = 0;	// set back to 0, compute cull will increment per visible
 
 
-	glNamedBufferData(list.gldrawid_to_submesh_material, sizeof(uint32_t) * draw_to_material.size(), draw_to_material.data(), GL_DYNAMIC_DRAW);
+	glNamedBufferData(list.gldrawid_to_submesh_material, sizeof(uint32_t) * draw_to_material.size() * 2 /* expects it to be double the size*/,nullptr, GL_DYNAMIC_DRAW);
+	glNamedBufferSubData(list.gldrawid_to_submesh_material, 0,sizeof(uint32_t) * draw_to_material.size(), draw_to_material.data());
 
 
 	glNamedBufferData(list.glinstance_to_instance, sizeof(uint32_t) * objCount, nullptr, GL_DYNAMIC_DRAW);
@@ -2057,11 +2096,48 @@ static void build_standard_cpu_culling(
 	// access batch_id and obj_id
 	list.obj_count = objCount;
 
-	const int command_list_size_bytes = sizeof(gpu::DrawElementsIndirectCommand) * list.commands.size();
-	glNamedBufferData(list.gpu_command_list, command_list_size_bytes, list.commands.data(), GL_DYNAMIC_DRAW);
+	const int command_list_size_bytes = sizeof(gpu::DrawElementsIndirectCommand) * list.commands.size(); 
+	glNamedBufferData(list.gpu_command_list, command_list_size_bytes*2 + list.commands.size()*sizeof(int), nullptr, GL_DYNAMIC_DRAW);	// also double the buffer size
+	glNamedBufferSubData(list.gpu_command_list, 0, command_list_size_bytes, list.commands.data());
 
+	{
+		std::span<int> draw_to_batch = memArena.alloc_bottom_span<int>(list.commands.size());
+		for (int i = 0; i < src.mesh_batches.size(); i++) {
+			auto& b = src.mesh_batches.at(i);
+			for (int c = 0; c < b.count; c++) {
+				draw_to_batch[b.first + c] = i;
+			}
+			glNamedBufferSubData(list.gpu_command_list, command_list_size_bytes * 2, list.commands.size()*sizeof(int), draw_to_batch.data());
+		}
+	}
 
-	GpuCullingTest::inst->copy_cpu(list);
+	static_assert(sizeof(Multidraw_Batch) == 8, "multidraw batch used on gpu");
+	list.batches_buf->upload(src.batches.data(), src.batches.size() * sizeof(Multidraw_Batch));
+	list.count_buffer->upload(nullptr, sizeof(int) * src.batches.size());
+	GLuint zero = 0;
+	glClearNamedBufferData(
+		list.count_buffer->get_internal_handle(),
+		GL_R32UI,
+		GL_RED_INTEGER,
+		GL_UNSIGNED_INT,
+		&zero
+	);
+	{
+		GPUSCOPESTART(copycpu);
+		GpuCullingTest::inst->copy_cpu(list);
+	}
+	{
+		GPUSCOPESTART(compactdraws);
+
+		GpuCullingTest::inst->compact_draws(
+			src.batches.size(),
+			list.commands.size(),
+			list.gpu_command_list,
+			list.gldrawid_to_submesh_material,
+			list.count_buffer,
+			list.batches_buf
+		);
+	}
 }
 
 
@@ -3868,7 +3944,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		render_level_to_target(cmdparams);
 
 
-		GpuCullingTest::inst->dodraw();
+		//GpuCullingTest::inst->dodraw();
 
 	};
 
@@ -3888,6 +3964,17 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		GpuCullingTest::inst->build_data_2();
 		GpuCullingTest::inst->zero_instances_in_this(scene.gbuffer_rlist.gpu_command_list, scene.gbuffer_rlist.commands.size());
 		GpuCullingTest::inst->copy_cpu(scene.gbuffer_rlist);
+
+		auto& list = scene.gbuffer_rlist;
+		GpuCullingTest::inst->compact_draws(
+			scene.gbuffer_pass.batches.size(),
+			list.commands.size(),
+			list.gpu_command_list,
+			list.gldrawid_to_submesh_material,
+			list.count_buffer,
+			list.batches_buf
+		);
+
 		{
 			GPUSCOPESTART(gbuffer_pass_scope2);
 			gbuffer_pass(false, false, true);	// second gbuffer pass
