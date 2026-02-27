@@ -105,6 +105,9 @@ public:
 	IGraphicsBuffer* object_buffer = nullptr;
 	IGraphicsBuffer* model_data_buffer = nullptr;
 	IGraphicsBuffer* multidraw_buffer = nullptr;
+	IGraphicsBuffer* batches_buf = nullptr;
+	IGraphicsBuffer* count_buffer = nullptr;
+
 
 	IGraphicsBuffer* objindirect = nullptr;
 	IGraphicsBuffer* matindirect = nullptr;

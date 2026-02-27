@@ -15,6 +15,9 @@ GpuCullingTest::GpuCullingTest()
 	vis_bitarray = IGraphicsDevice::inst->create_buffer({});
 	zero_instances_mdi = draw.get_prog_man().create_compute("zero_instances_mdi.txt");
 	compaction = draw.get_prog_man().create_compute("compact_mdi.txt");
+	count_buffer = IGraphicsDevice::inst->create_buffer({});
+	batches_buf = IGraphicsDevice::inst->create_buffer({});
+
 	Texture::install_system("_depth_pyramid");
 
 	glGenSamplers(1, &hiZSampler);
@@ -204,8 +207,17 @@ void GpuCullingTest::do_cull(Phase pass)
 
 	glBindSampler(0, 0);
 
+	
+	compact_draws(gbuffer_batches.size(),
+		cmd_mats.size(),
+		multidraw_buffer->get_internal_handle(),
+		matindirect->get_internal_handle(),
+		count_buffer,
+		batches_buf
+	);
 
 }
+#include "Framework/ArenaAllocator.h"
 void GpuCullingTest::build_data()
 {
 	// fill model data buffer
@@ -390,12 +402,13 @@ void GpuCullingTest::build_data()
 		commands[i].baseInstance = base_inst_sum;
 		base_inst_sum += models_used[model] + 100;
 	}
-	matindirect->upload(material_indirection.data(), material_indirection.size() * sizeof(int));
 	if (!skip_obj_upload.get_bool()) {
 		objindirect->upload(nullptr, sizeof(int) * base_inst_sum);
 	}
-	multidraw_buffer->upload(commands.data(), commands.size() * sizeof(gpu::DrawElementsIndirectCommand));
 
+	const int material_bytes_size = material_indirection.size() * sizeof(int);
+	matindirect->upload(nullptr, material_bytes_size*2);
+	matindirect->sub_upload(material_indirection.data(),material_bytes_size,material_bytes_size);
 
 	// set up mesh batches (groups of drawelements commands, 1 multidraw command)
 	
@@ -457,6 +470,31 @@ void GpuCullingTest::build_data()
 	};
 	make_batches(gbuffer_batches, false);
 	//make_batches(depth_batches, true);
+
+
+	static_assert(sizeof(Multidraw_Batch) == 8, "multidraw batch used on gpu");
+	batches_buf->upload(gbuffer_batches.data(), gbuffer_batches.size() * sizeof(Multidraw_Batch));
+	count_buffer->upload(nullptr, sizeof(int)* gbuffer_batches.size());
+
+	const int command_bytes_size = commands.size() * sizeof(gpu::DrawElementsIndirectCommand);
+	multidraw_buffer->upload(nullptr, command_bytes_size * 2 + cmd_mats.size()*sizeof(int));
+	multidraw_buffer->sub_upload(commands.data(), command_bytes_size, command_bytes_size);
+	{
+		auto& memArena = draw.mem_arena;
+		ArenaScope scope(memArena);
+		std::span<int> draw_to_batch = memArena.alloc_bottom_span<int>(cmd_mats.size());
+		for (int i = 0; i < gbuffer_batches.size(); i++) {
+			auto& b = gbuffer_batches.at(i);
+			for (int c = 0; c < b.count; c++) {
+				ASSERT(b.first + c < draw_to_batch.size());
+				draw_to_batch[b.first + c] = i;
+			}
+			multidraw_buffer->sub_upload(draw_to_batch.data(),
+				draw_to_batch.size_bytes(), command_bytes_size * 2);
+		}
+	}
+
+
 
 	do_cull(Phase::Pass1);
 }
@@ -528,10 +566,14 @@ void GpuCullingTest::dodraw()
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, material_buffer->get_internal_handle());
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, objindirect->get_internal_handle());
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, matindirect->get_internal_handle());
-
+		
+		const int size = cmd_mats.size() * sizeof(int);
+		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 6, matindirect->get_internal_handle(), size, size);
+		const int command_size = cmd_mats.size() * sizeof(gpu::DrawElementsIndirectCommand);
+		glBindBuffer(GL_PARAMETER_BUFFER, count_buffer->get_internal_handle());
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, multidraw_buffer->get_internal_handle());
 
+		const int offset_buffer_start = command_size;
 		int offset = 0;
 		const int DEIcmdSz = sizeof(gpu::DrawElementsIndirectCommand);
 		for (int i = 0; i < batches.size(); i++) {
@@ -547,12 +589,13 @@ void GpuCullingTest::dodraw()
 
 				void* indirect_ptr = nullptr;
 		
-				indirect_ptr = (void*)(int64_t(offset * DEIcmdSz));
+				indirect_ptr = (void*)(int64_t(offset_buffer_start+offset * DEIcmdSz));
 
-				glMultiDrawElementsIndirect(
+				glMultiDrawElementsIndirectCount(
 					GL_TRIANGLES,
 					index_type,
 					indirect_ptr,
+					i * sizeof(uint32),
 					count,
 					sizeof(gpu::DrawElementsIndirectCommand)
 				);
