@@ -81,8 +81,8 @@ public:
 
 void MaterialShaderTable::recompile_for_material(MasterMaterialImpl* mat)
 {
-	if (material_print_debug.get_bool())
-		sys_print(Debug, "recompiling material %s\n", mat->self->get_name().c_str());
+	//if (material_print_debug.get_bool())
+	//	sys_print(Debug, "recompiling material %s\n", mat->self->get_name().c_str());
 
 	uint32_t id = mat->material_id;
 	for (auto& pair : shader_key_to_program_handle) {
@@ -136,7 +136,7 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 	if (!params.empty())params.pop_back();
 
 	if(material_print_debug.get_bool())
-		sys_print(Debug,"compiling shader: %s\n", mat->get_name().c_str(), params.c_str());
+		sys_print(Debug,"compiling shader: %s %s\n", mat->get_name().c_str(), params.c_str());
 
 	const bool is_tesselation = mat->get_master_material()->usage == MaterialUsage::Terrain;
 	program_handle handle = draw.get_prog_man().create_single_file(name, is_tesselation, params);

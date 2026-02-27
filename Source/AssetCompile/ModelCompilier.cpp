@@ -323,7 +323,7 @@ public:
 	static ModelDefData parse_definition_file(const std::string& deffile, IAssetLoadingInterface* loading);
 	static std::string model_def_to_string(const ModelDefData& def);
 
-	static bool compile_model(const std::string& defname, const ModelDefData& data);
+	static ModelCompilier::Ret compile_model(const std::string& defname, const ModelDefData& data);
 
 	static void load_gltf_skeleton(cgltf_data* data, glm::mat4& armature_root,std::vector<BoneData>& bones, cgltf_skin* skin);
 
@@ -1313,6 +1313,8 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 	 // testing: lods via meshopt
 	 if (def.generate_auto_lods)
 	 {
+		 sys_print(Info, "generating automatic lods\n");
+
 		 const int NUM_LODS_TO_GEN = 4;	// generate 4 lods
 		 for (int lod_gen = 0; lod_gen < NUM_LODS_TO_GEN; lod_gen++) {
 			CompileModLOD newLod;
@@ -2431,6 +2433,8 @@ struct ProcessNodesAndMeshOutput
 	ProcessMeshOutput meshout;
 };
 ConfigVar mod_meshopt_run("mod.meshopt", "1", CVAR_BOOL, "");
+ConfigVar mod_meshopt_run2("mod.meshopt2nd", "1", CVAR_BOOL, "");
+
 ProcessNodesAndMeshOutput process_nodes_and_mesh(cgltf_data* data, const SkeletonCompileData* scd, const cgltf_skin* using_skin, const ModelDefData& def)
 {
 	ModelCompileData mcd;
@@ -2441,43 +2445,65 @@ ProcessNodesAndMeshOutput process_nodes_and_mesh(cgltf_data* data, const Skeleto
 		traverse_model_nodes(def, mcd, using_skin, node, glm::mat4(1.f));
 	}
 
-	// run optimizer on mesh
-	if(mod_meshopt_run.get_bool())
-	{
+	auto run_meshopt = [&](bool for_autogen) {
 		for (int i = 0; i < mcd.lod_where.size(); i++) {
 			auto& lod = mcd.lod_where.at(i);
+			if (lod.share_verticies_with_lod0 != for_autogen)
+				continue;
 			auto& parts = lod.mesh_nodes;
+			int part_index = -1;
 			for (auto& part : parts) {
+				part_index += 1;
 				auto& mesh = part.submesh;
-				std::vector<unsigned> dest(mesh.element_count);
-				uint32_t* source = &mcd.indicies.at(mesh.element_offset / sizeof(uint32_t));
-				// DAMN WOWWZERS 25% reduction in drawing time...
-				meshopt_optimizeVertexCacheFifo(dest.data(),
-					source,
-					mesh.element_count,
-					mesh.vertex_count,
-					16
-				);
-				for (int j = 0; j < dest.size(); j++) {
-					source[j] = dest.at(j);
-				}
-				if (!lod.share_verticies_with_lod0) {
-					std::vector<FATVertex> dest(mesh.vertex_count);
-					FATVertex* source_v = &mcd.verticies.at(mesh.base_vertex);
-					const size_t out_v_count = meshopt_optimizeVertexFetch(dest.data(), source, mesh.element_count, source_v, mesh.vertex_count, sizeof(FATVertex));
-					for (int i = 0; i < out_v_count; i++) {
-						source_v[i] = dest.at(i);
-					}
-					mesh.vertex_count = out_v_count;	// modify vertex count
 
+				// optimize vertex cache first
+				// each lod will optimize this since its not dependent on vertex buffer
+				uint32_t* source_indicies = &mcd.indicies.at(mesh.element_offset / sizeof(uint32_t));
+				{
+					std::vector<unsigned> dest(mesh.element_count);
+					// DAMN WOWWZERS 40% reduction in drawing time...!!!!!!!!!!! WTFTFTFTF
+					meshopt_optimizeVertexCacheFifo(dest.data(),
+						source_indicies,
+						mesh.element_count,
+						mesh.vertex_count,
+						16
+					);
+					for (int j = 0; j < dest.size(); j++) {
+						source_indicies[j] = dest.at(j);
+					}
+				}
+
+				if (mod_meshopt_run2.get_bool()) {
+					// now optimize vertex fetch (only for non-auto generated LODs)
+					if (!lod.share_verticies_with_lod0) {
+						std::vector<FATVertex> outFatVert(mesh.vertex_count);
+						FATVertex* source_v = &mcd.verticies.at(mesh.base_vertex);
+						const size_t out_v_count = meshopt_optimizeVertexFetch(outFatVert.data(), source_indicies, mesh.element_count, source_v, mesh.vertex_count, sizeof(FATVertex));
+						for (int i = 0; i < out_v_count; i++) {
+							source_v[i] = outFatVert.at(i);
+						}
+						mesh.vertex_count = out_v_count;	// modify vertex count
+					}
 				}
 			}
-
 		}
+	};
+
+	// Okay im pretty stupid, theres some indexing bug when i do optimizeVertexFetch with auto gened lods and I dont want to fix it,
+	// just do the stupid thing and do the optmize part for the imported meshes first, then the auto-gen after. (auto-gen'ing happens in process_mesh())
+	// so autogen mesh will simply used the remapped buffer to start with, EZ!
+
+	// also optimizeVertexFetch barely does anything, its the vertex cache that is the heavy lifter
+	if (mod_meshopt_run.get_bool()) {
+		run_meshopt(false);
 	}
-
-
+	else {
+		sys_print(Warning, "meshoptimizer disabled, skipping...\n");
+	}
 	ProcessMeshOutput post_mesh_process = ModelCompileHelper::process_mesh(mcd, scd, def);
+	if (mod_meshopt_run.get_bool()) {
+		run_meshopt(true);
+	}
 
 	ProcessNodesAndMeshOutput output;
 	output.mcd = std::move(mcd);
@@ -3101,12 +3127,16 @@ void add_bone_def_data_to_skeleton(const ModelDefData& def, SkeletonCompileData*
 	}
 }
 
-bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDefData& def)
+ModelCompilier::Ret ModelCompileHelper::compile_model(const std::string& defname, const ModelDefData& def)
 {
+	sys_print(Info, "#### Compiling Model %s ####\n", defname.c_str());
+
+
+
 	cgltf_and_binary out = load_cgltf_data(def.model_source);
 	if (!out.data) {
 		sys_print(Error, "load_cgltf_data failed\n");
-		return false;
+		return ModelCompilier::CompileErr;
 	}
 
 	std::string finalpath = strip_extension(defname);
@@ -3149,7 +3179,7 @@ bool ModelCompileHelper::compile_model(const std::string& defname, const ModelDe
 
 	bool res =  write_out_compilied_model(finalpath, &final_model, final_skeleton.get());
 	out.free();
-	return res;
+	return res ? ModelCompilier::CompileGood : ModelCompilier::CompileErr;
 }
 
 static bool compile_everything = false;
@@ -3249,25 +3279,23 @@ bool ModelCompilier::does_model_need_compile(const char* game_path, ModelDefData
 	return needs_compile;
 }
 
-bool ModelCompilier::compile_from_settings(const std::string& output, ModelImportSettings* settings)
+ModelCompilier::Ret ModelCompilier::compile_from_settings(const std::string& output, ModelImportSettings* settings)
 {
-	sys_print(Info, "----- Compiling Model from settings -----\n");
 	ModelDefData def_data = new_import_settings_to_modeldef_data(settings);
 	return ModelCompileHelper::compile_model(output, def_data);
 }
-bool ModelCompilier::compile(const char* game_path, IAssetLoadingInterface* loading)
+ModelCompilier::Ret ModelCompilier::compile(const char* game_path, IAssetLoadingInterface* loading)
 {
-	sys_print(Info, "----- Compiling Model %s -----\n", game_path);
 
 	ModelDefData def;
 	try {
 		bool needs_compile = does_model_need_compile(game_path, def, true, loading);
 		if (!needs_compile)
-			return true;
+			return Ret::Skipped;
 	}
 	catch (std::runtime_error er) {
 		sys_print(Error, "ModelCompilier::compile: when model compiling %s: %s\n", game_path, er.what());
-		return true;	// skip compile
+		return Ret::Skipped;	// skip compile
 	}
 
 	return ModelCompileHelper::compile_model(game_path, def);

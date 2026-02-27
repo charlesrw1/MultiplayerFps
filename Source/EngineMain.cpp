@@ -667,7 +667,7 @@ void GameEngineLocal::add_commands()
 					e->dont_serialize_or_edit = true;
 					m->dont_serialize_or_edit = true;
 					m->set_ignore_baking(true);
-					m->set_model(Model::load("SWAT_Model.cmdl"));
+					m->set_model(Model::load("work_prop/gas_cylinder.cmdl"));
 					e->set_ws_position(glm::vec3(x, y+blah*10, z)*4.0f);
 				}
 			}

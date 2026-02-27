@@ -248,8 +248,8 @@ void IGridRow::update(PropertyGrid* parentGrid,float header_ofs)
 	{
 		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
 		if(num_cols == 3)
-			ImGui::TableSetupColumn("##Controls", ImGuiTableColumnFlags_WidthFixed, 100.0);
-		ImGui::TableSetupColumn("##Reset", ImGuiTableColumnFlags_WidthFixed, 50.0);
+			ImGui::TableSetupColumn("##Controls", ImGuiTableColumnFlags_WidthFixed, 60.0);
+		ImGui::TableSetupColumn("##Reset", ImGuiTableColumnFlags_WidthFixed, 30.0);
 
 
 		ImGui::TableNextRow();

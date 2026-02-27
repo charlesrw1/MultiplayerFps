@@ -102,18 +102,17 @@ void COMPILE_TEX(const Cmd_Args& args)
 	Color32 dummy;
 	compile_texture_asset(args.at(1), AssetDatabase::loader,dummy);
 }
-
+#include "Framework/StringUtils.h"
 #define WITH_TEXTURE_COMPILE
 bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* loading, Color32& outColor)
 {
 #ifdef WITH_TEXTURE_COMPILE
-	sys_print(Info,"Compiling texture asset %s\n", gamepath.c_str());
 	TextureImportSettings* tis = nullptr;
 	{
 		auto texfile = FileSys::open_read_game(gamepath);
 		auto tisfile = FileSys::open_read_game(strip_extension(gamepath) + ".tis");
 		if (!tisfile) {
-			sys_print(Warning, "couldn't find texture import settings file\n");
+			sys_print(Warning, "couldn't find texture import settings file %s\n",gamepath.c_str());
 			return false;
 		}
 		std::string to_str(tisfile->size(), ' ');
@@ -134,7 +133,7 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 		}
 
 		if (!tis) {
-			sys_print(Error, "couldnt parse texture import settings\n");
+			sys_print(Error, "couldnt parse texture import settings %s\n",gamepath.c_str());
 			return false;
 		}
 
@@ -145,13 +144,15 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 			needsCompile = texfile->get_timestamp() < tisFileTimeStamp;
 		}
 		if (!needsCompile) {
-			sys_print(Info,"skipping compile\n");
 			return true;
 		}
 	}
-
 	{
-		auto imageFile = FileSys::open_read_game(tis->src_file);
+		auto dir = StringUtils::get_directory(gamepath);
+		if (!dir.empty()) dir += "/";
+		dir += tis->src_file;
+
+		auto imageFile = FileSys::open_read_game(dir);
 		if (imageFile) {
 			std::vector<char> data;
 			data.resize(imageFile->size());
@@ -174,7 +175,6 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 				int pixelCount = outX * outY;
 				for (int i = 0; i < 4; i++) 
 					sum[i] /= double(pixelCount);
-				sys_print(Debug, "compile_texture_asset: average: %f %f %f\n", float(sum[0]), float(sum[1]), float(sum[2]));
 				
 				tis->simplifiedColor.r = sum[0] * 255.0;
 				tis->simplifiedColor.g = sum[1] * 255.0;

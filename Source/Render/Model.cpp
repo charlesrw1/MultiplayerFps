@@ -685,9 +685,12 @@ bool Model::load_asset(IAssetLoadingInterface* loading) {
 		std::string model_def = strip_extension(path.c_str());
 		model_def += ".mis";
 
-		bool good = ModelCompilier::compile(model_def.c_str(),loading);
-		if (!good) {
+		ModelCompilier::Ret ret = ModelCompilier::compile(model_def.c_str(),loading);
+		if (ret == ModelCompilier::CompileErr) {
 			sys_print(Error, "compilier failed on model %s\n", model_def.c_str());
+		}
+		else if (ret == ModelCompilier::CompileGood) {
+			Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, string_format("model_info %s", path.c_str()));
 		}
 	}
 #endif

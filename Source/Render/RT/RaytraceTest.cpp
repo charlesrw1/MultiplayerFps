@@ -269,8 +269,9 @@ void DdgiTesting::build_world()
 		if (rmd->get_num_verticies(0) > vert_limit.get_integer())
 			continue;
 
-		// lowest lod
-		auto& lod = o.model->get_lod(o.model->get_num_lods() - 1);
+		// use lod1? idk want less verts but not shitty verts
+		const int lod_to_use = glm::min(1, (int)o.model->get_num_lods() - 1);
+		auto& lod = o.model->get_lod(lod_to_use);
 
 		// for all parts
 		for (int parti = lod.part_ofs; parti < lod.part_ofs+lod.part_count; parti++) {

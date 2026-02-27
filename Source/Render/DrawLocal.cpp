@@ -963,7 +963,9 @@ void Renderer::check_hardware_options()
 
 	}
 
-	sys_print(Debug,"==== Extension support ====\n");
+	sys_print(Debug,"###########################\n");
+	sys_print(Debug,"#### Extension support ####\n");
+	sys_print(Debug,"###########################\n");
 	sys_print(Debug,"-GL_ARB_bindless_texture: %s\n", (supports_bindless) ? "yes" : "no");
 	sys_print(Debug,"-GL_ARB_sparse_texture: %s\n", (supports_sprase_tex) ? "yes" : "no");
 	sys_print(Debug,"-GL_ARB_texture_filter_minmax: %s\n", (supports_filter_minmax) ? "yes" : "no");
@@ -981,7 +983,9 @@ void Renderer::check_hardware_options()
 		Fatalf("Opengl driver must support program binary. (GL_NUM_PROGRAM_BINARY_FORMATS>0)\n");
 	}
 
-	sys_print(Debug,"==== GL Hardware Values ====\n");
+	sys_print(Debug,"############################\n");
+	sys_print(Debug,"#### GL Hardware Values ####\n");
+	sys_print(Debug,"############################\n");
 	int max_buffer_bindings = 0;
 	glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &max_buffer_bindings);
 	sys_print(Debug,"-GL_MAX_UNIFORM_BUFFER_BINDINGS: %d\n", max_buffer_bindings);
@@ -3581,7 +3585,7 @@ void Renderer::check_cubemaps_dirty()
 		auto up = colorvec_linear_to_srgb(glm::vec4(skylight.ambientCube[2],0.0));
 		auto down = colorvec_linear_to_srgb(glm::vec4(skylight.ambientCube[3], 0.0));
 
-		sys_print(Info, "skylight cubemap up/down irrad: (%f %f %f) (%f %f %f)\n", up.x, up.y, up.z, down.x, down.y, down.z);
+		//sys_print(Debug, "skylight cubemap up/down irrad: (%f %f %f) (%f %f %f)\n", up.x, up.y, up.z, down.x, down.y, down.z);
 		had_changes = true;
 	}
 	RenderGiManager::inst->render_frame_tick();
