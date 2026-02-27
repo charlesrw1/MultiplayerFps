@@ -2102,9 +2102,10 @@ static void build_standard_cpu_culling(
 
 	{
 		std::span<int> draw_to_batch = memArena.alloc_bottom_span<int>(list.commands.size());
-		for (int i = 0; i < src.mesh_batches.size(); i++) {
-			auto& b = src.mesh_batches.at(i);
+		for (int i = 0; i < src.batches.size(); i++) {
+			auto& b = src.batches.at(i);
 			for (int c = 0; c < b.count; c++) {
+				ASSERT(b.first + c < draw_to_batch.size());
 				draw_to_batch[b.first + c] = i;
 			}
 			glNamedBufferSubData(list.gpu_command_list, command_list_size_bytes * 2, list.commands.size()*sizeof(int), draw_to_batch.data());
