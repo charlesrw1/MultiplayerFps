@@ -260,6 +260,32 @@ void ScriptManager::check_for_reload() {
 		//PrefabAsset::init_prefab_factory();
 	}
 }
+#include <iostream>
+void printStackTrace(lua_State* L)
+{
+	const char* traceback = lua_tostring(L, -1);
+	if (traceback)
+		std::cout << traceback << std::endl;
+	lua_pop(L, 1); // remove traceback string
+}
+static int traceback(lua_State* L)
+{
+	const char* msg = lua_tostring(L, 1);
+	if (!msg) msg = "(no error message)";
+
+	// Generate a full traceback using luaL_traceback
+	luaL_traceback(L, L, msg, 1); // 1 = skip this function
+	return 1; // leave traceback string on top of stack
+}
+int safe_pcall(lua_State* L, int nargs, int nresults)
+{
+	int base = lua_gettop(L) - nargs;
+	lua_pushcfunction(L, traceback);
+	lua_insert(L, base);
+	int status = lua_pcall(L, nargs, nresults, base);
+	lua_remove(L, base);
+	return status;
+}
 void ScriptManager::reload_one_file(const std::string& strFilePath)
 {
 	auto file = FileSys::open_read_game(strFilePath);
@@ -279,7 +305,7 @@ void ScriptManager::reload_one_file(const std::string& strFilePath)
 		}
 		had_changes = true;
 
-		if (luaL_loadstring(lua, out.c_str()) != LUA_OK) {
+		if (luaL_loadbuffer(lua, out.c_str(),out.size(),strFilePath.c_str()) != LUA_OK) {
 			sys_print(Error, "ScriptManager: error loading script %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
 			lua_pop(lua, 1);
 			lua_settop(lua, 0);
@@ -288,8 +314,9 @@ void ScriptManager::reload_one_file(const std::string& strFilePath)
 		}
 
 		// Execute the loaded chunk
-		if (lua_pcall(lua, 0, LUA_MULTRET, 0) != LUA_OK) {
-			fprintf(stderr, "Error executing chunk for %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
+		if (safe_pcall(lua, 0, LUA_MULTRET) != LUA_OK) {
+			//fprintf(stderr, "Error executing chunk for %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
+			printStackTrace(lua);
 			return;
 		}
 	}
@@ -304,6 +331,7 @@ void ScriptManager::reload_one_file(const std::string& strFilePath)
 		}
 	}
 }
+
 void ScriptManager::reload_all_scripts()
 {
 	sys_print(Info, "ScriptManager::reload_all_scripts\n");

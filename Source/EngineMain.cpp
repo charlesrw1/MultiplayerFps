@@ -1670,46 +1670,49 @@ struct GameUpdateOuput {
 };
 
 
-struct NetObj {
-	int net_id = 0;
-	int net_type = 0;
-};
-class NetBuffer {
-public:
-};
+static void lua_error_loop(string msg, auto&& frame_start, auto&& wait_for_swap, SceneDrawParamsEx drawparamsNext, View_Setup setupNext)
+{
+	// bsod is funny lol
+	sys_print(Error, "loop: caught LuaRuntimeError: %s\n", msg.c_str());
+	auto lines = StringUtils::to_lines(msg);
+	//	drawparamsNext.draw_world = false;
+	drawparamsNext.draw_ui = true;
 
-class LLNetworkSystemCallbacks {
-public:
-	virtual void on_new_object(handle<NetObj> no) = 0;
-	virtual void on_net_message(NetBuffer& buffer) = 0;
-	virtual void on_conn_change() = 0;
-};
+	while (1) {
+		SDL_Delay(10);
 
-class LlNetworkSystem {
-public:
-	handle<NetObj> register_net_obj();
-	// connect to server
-	//		with callback set
-	// spawn server
-	//		on client connect callback
-	//			approve/deny
-	//			send map info
-	//				
-	//			
+		frame_start();
 
-};
+		if (Input::was_key_pressed(SDL_SCANCODE_RETURN))
+			break;
 
-// [Game]
-// Game code
-// Game net manager
-// [Engine]
-// LlNetworkSystem
+		RectangleShape shape;
+		shape.color = { 50,50,255,180 };
+		shape.rect.w = setupNext.width;
+		shape.rect.h = setupNext.height;
+		UiSystem::inst->window.draw(shape);
+		TextShape text;
+		text.font = GuiFont::load("eng/fonts/monospace12.fnt");
+		text.color = COLOR_WHITE;
+		text.rect.x = 5;
+		text.rect.y = 5;
+		for (auto& l : lines) {
+			text.text = l;
+			text.rect.y += text.font->lineHeight;
+			UiSystem::inst->window.draw(text);
+		}
+		text.rect.y += text.font->lineHeight * 5;
+		text.text = "[PRESS ENTER TO CONTINUE]";
+		UiSystem::inst->window.draw(text);
 
-// LlNetworkSystem not aware of Entities/Components. Just does replication, message sending, client/server connections.
-// Game net manager is user provided (can provide a base implmentation).
-// It maps the LlNetworkSystem to the gameplay. For example, "net_id" will likely map to a Component. "net_type" maps to a prefab type, for example.
-// Game net manager also manages recieving net messages and determines if it has permissions.
+		UiSystem::inst->sync_to_renderer();
+		idraw->sync_update();
+		idraw->scene_draw(drawparamsNext, setupNext);
+		wait_for_swap(false);
+	}
+	ScriptManager::inst->check_for_reload();
 
+}
 
 
 void GameEngineLocal::loop()
@@ -1790,18 +1793,11 @@ void GameEngineLocal::loop()
 
 			//printf("abc\n");
 			out.drawOut = true;
-			try {
-				game_update_tick();
+			game_update_tick();
 #ifdef EDITOR_BUILD
-				if (editorState)
-					editorState->tick(frame_time);
+			if (editorState)
+				editorState->tick(frame_time);
 #endif
-			}
-			catch (LuaRuntimeError luaErr) {
-				sys_print(Error, "game_thread_update: caught LuaRuntimeError: %s\n", luaErr.what());
-				string msg = string_format("LuaRuntimeError %s\n", luaErr.what());
-				eng->log_to_fullscreen_gui(Error, msg.c_str());
-			}
 
 			isound->tick(frame_time);
 
@@ -1913,9 +1909,7 @@ void GameEngineLocal::loop()
 			Profiler::end_frame_tick(frame_time);	// my crappy profilier
 		}
 		catch (LuaRuntimeError luaErr) {
-			sys_print(Error, "loop: caught LuaRuntimeError: %s\n", luaErr.what());
-			string msg = string_format("LuaRuntimeError %s\n", luaErr.what());
-			eng->log_to_fullscreen_gui(Error, msg.c_str());
+			lua_error_loop(luaErr.what(),frame_start,wait_for_swap,drawparamsNext,setupNext);
 		}
 	}
 }

@@ -427,9 +427,8 @@ def write_scriptable_class(newclass : ClassDef) -> str:
             
             error_str = f"\"During call {newclass.classname}::{f.name}\" + std::string(\"(luatype=\")+type->classname+\"):\""
             output+= f"""
-            if (lua_pcall(L, {arg_count}, {return_num}, 0) != LUA_OK) {{
+            if (safe_pcall(L, {arg_count}, {return_num}) != LUA_OK) {{
                 const char* error = lua_tostring(L, -1);
-                printf("Lua error: %s\\n", error);
                 lua_pop(L, 1);  // pop error
 
                 throw LuaRuntimeError({error_str} + error);

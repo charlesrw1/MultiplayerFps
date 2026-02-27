@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include "Render/DynamicMaterialPtr.h"
 #include "Framework/Reflection2.h"
+#include "Assets/AssetDatabase.h"
 class GuiFont;
 class Texture;
 class MaterialInstance;
@@ -42,5 +43,9 @@ public:
 	void move_construct(IAsset* _other) {
 		GuiFont* other = (GuiFont*)_other;
 		*this = std::move(*other);
+	}
+
+	REF static GuiFont* load(const std::string& name) {
+		return g_assets.find_sync<GuiFont>(name).get();
 	}
 };

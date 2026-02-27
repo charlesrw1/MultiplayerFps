@@ -191,6 +191,9 @@ public:
 
 };
 
+// sets error handler
+int safe_pcall(lua_State* L, int nargs, int nresults);
+
 class ClassBase;
 void push_bool_to_lua(lua_State* L, bool b);
 void push_float_to_lua(lua_State* L, float f);
