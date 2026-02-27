@@ -1556,7 +1556,6 @@ void Renderer::execute_render_lists(
 				count,
 				sizeof(gpu::DrawElementsIndirectCommand)
 			);
-
 		}
 		offset += incr;
 
@@ -1867,10 +1866,13 @@ void Render_Pass::make_batches(Render_Scene& scene)
 		for (int i = 1; i < objects.size(); i++) {
 			Pass_Object* this_obj = &objects[i];
 			const Render_Object* this_proxy = &scene.get(this_obj->render_obj);
-			const bool sort_key_equal = this_obj->sort_key.as_uint64() == batch_obj->sort_key.as_uint64();
+			const bool same_mesh = this_obj->sort_key.mesh == batch_obj->sort_key.mesh;
+			const bool same_shader = this_obj->sort_key.shader == batch_obj->sort_key.shader;
+
+
 			const bool same_submesh = this_obj->submesh_index == batch_obj->submesh_index;
 			const bool same_material = this_obj->material == batch_obj->material;
-			const bool can_be_merged = !no_batching_dbg&&same_material&&sort_key_equal && same_submesh && type != pass_type::TRANSPARENT;	// dont merge transparent meshes into instances
+			const bool can_be_merged = !no_batching_dbg&&same_material&& same_mesh&&same_shader && same_submesh && type != pass_type::TRANSPARENT;	// dont merge transparent meshes into instances
 			if (can_be_merged)
 				batch.count++;
 			else {
@@ -2567,8 +2569,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		//CPUSCOPESTART(cpu_object_cull);
 		ZoneScopedN("SetupThreaded");
 
-		JobCounter* cullAndLodCounter{};
-
 		const int NUM_FRUSTUM_JOBS = 5;
 		JobDecl decls[NUM_FRUSTUM_JOBS];
 		CullObjectsUser mainview;
@@ -2585,25 +2585,22 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			decls[i + 1].funcarg = uintptr_t(&cascades[i]);
 		}
 
-		JobSystem::inst->add_jobs(decls, NUM_FRUSTUM_JOBS, cullAndLodCounter);
-		//JobSystem::inst->add_job(calc_lod_job,uintptr_t(lod_to_render_array), cullAndLodCounter);
-		
-		calc_lod_job(lod_to_render_array, camera_depth_array);
+		for (int i = 0; i < NUM_FRUSTUM_JOBS; i++)
+			decls[i].func(decls[i].funcarg);
 
-		JobSystem::inst->wait_and_free_counter(cullAndLodCounter);
+		calc_lod_job(lod_to_render_array, camera_depth_array);
 	}
 	const size_t num_ren_objs = proxy_list.objects.size();
 	uint8* gpu_objects = memArena.alloc_bottom_type<uint8>(num_ren_objs*64);
 	ASSERT(gpu_objects);
-	JobCounter* gpu_obj_set_cntr{};
 	if(add_to_passes)
-		JobSystem::inst->add_job(set_gpu_objects_data_job, uintptr_t(gpu_objects), gpu_obj_set_cntr);
+		set_gpu_objects_data_job(uintptr_t(gpu_objects));
 
 	auto add_objects_to_passes = [&]() {
 		ZoneScopedN("Traversal");
 		//ZoneScopedN("LoopObjects");
 		
-		MaterialInstance* debug_transparent_mat = MaterialInstance::load("transparent_debug.mm");
+		MaterialInstance* const debug_transparent_mat = MaterialInstance::load("transparent_debug.mm");
 		const bool wants_transparent_debug = debug_transparent_mat&&r_debug_transparents.get_bool();
 		const bool wants_set_to_fallback = r_force_all_materials_to_fallback.get_bool();
 		const bool dont_use_cam_depth = r_dont_use_camera_depth_build_scene.get_bool();
@@ -2706,7 +2703,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			depth_prepass.make_batches(*this);
 
 		if (add_to_passes) {
-			JobSystem::inst->wait_and_free_counter(gpu_obj_set_cntr);
 			{
 				ZoneScopedN("UploadGpuData");
 				//glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs, gpu_objects, GL_DYNAMIC_DRAW);
@@ -2717,8 +2713,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 					gpu_objects,
 					GL_DYNAMIC_DRAW
 				);
-
-			
+	
 			}
 		}
 	};
@@ -3829,16 +3824,14 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	depth_prepass();
 
 
-	auto gbuffer_pass = [&](bool is_wireframe = false, bool wireframe_secondpass = false) {
+	auto gbuffer_pass = [&](bool is_wireframe = false, bool wireframe_secondpass = false, bool gbuffer_2nd = false) {
 		if (r_skip_gbuffer.get_bool())
 			return;
 
 
-		GPUSCOPESTART(gbuffer_pass_scope);
-
 		const auto& view_to_use = current_frame_view;
 
-		const bool clear_framebuffer = (!is_wireframe || !wireframe_secondpass);
+		const bool clear_framebuffer = (!is_wireframe || !wireframe_secondpass)&&!gbuffer_2nd;
 
 		//RenderPassSetup setup("gbuffer", fbo.gbuffer, clear_framebuffer,clear_framebuffer, 0, 0, view_to_use.width, view_to_use.height);
 		//auto scope = device.start_render_pass(setup);
@@ -3887,11 +3880,20 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		gbuffer_pass(true,true);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
-	else
-		gbuffer_pass();
+	else {
+		{
+			GPUSCOPESTART(gbuffer_pass_scope1);
+			gbuffer_pass(false, false, false);
+		}
+		GpuCullingTest::inst->build_data_2();
+		GpuCullingTest::inst->zero_instances_in_this(scene.gbuffer_rlist.gpu_command_list, scene.gbuffer_rlist.commands.size());
+		GpuCullingTest::inst->copy_cpu(scene.gbuffer_rlist);
+		{
+			GPUSCOPESTART(gbuffer_pass_scope2);
+			gbuffer_pass(false, false, true);	// second gbuffer pass
+		}
+	}
 
-
-	GpuCullingTest::inst->build_data_2();
 	//device.reset_states();
 	
 

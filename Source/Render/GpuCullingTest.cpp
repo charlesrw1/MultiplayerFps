@@ -133,8 +133,8 @@ void GpuCullingTest::copy_cpu(Render_Lists_Gpu_Culled& list)
 }
 void GpuCullingTest::do_cull(Phase pass)
 {
-	if (pass == Phase::Pass2)
-		return;
+	// pass1: testing against last frame
+	// pass2: testing against cur frame
 
 	if (update_depth_pyramid)
 	{
@@ -161,10 +161,17 @@ void GpuCullingTest::do_cull(Phase pass)
 		cull.p00 = 1 / halfHSide;
 		cull.p11 = 1 / halfVSide;
 
-		cull.view = prev_view;
-		prev_view = vs.view;
+		if (pass == Phase::Pass1) {
+			cull.view = prev_view;
+			prev_view = vs.view;	// pass 1, use last view
+		}
+		else {
+			cull.view = vs.view;	// in pass 2, use current view
+		}
 		cull_data->upload(&cull, sizeof(CullData));
 	}
+
+	zero_instances_in_this(multidraw_buffer->get_internal_handle(), cmd_mats.size());	// clear instances to 0, so they can be incremented
 
 
 
@@ -175,12 +182,12 @@ void GpuCullingTest::do_cull(Phase pass)
 	const int groups = glm::ceil(int(co_size) / 256.f);
 
 	device.shader().set_bool("occlusion_cull", do_occlusion_culling);
+	device.shader().set_bool("second_pass", pass==Phase::Pass2);
 
 	device.bind_texture_ptr(0, depth_pyramid);
 	glBindSampler(0, hiZSampler);
 	device.shader().set_int("lod_bias", lod_bias);
 	device.shader().set_float("radius_bias", radius_bias);
-
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, multidraw_buffer->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, objindirect->get_internal_handle());
@@ -188,7 +195,6 @@ void GpuCullingTest::do_cull(Phase pass)
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, object_buffer->get_internal_handle());
 	glBindBufferBase(GL_UNIFORM_BUFFER, 5, cull_data->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, vis_bitarray->get_internal_handle());
-
 
 	glDispatchCompute(groups, 1, 1);
 
@@ -390,6 +396,8 @@ void GpuCullingTest::build_data()
 
 
 	// set up mesh batches (groups of drawelements commands, 1 multidraw command)
+	
+	auto make_batches = [&](std::vector<Multidraw_Batch>& batches, const bool is_depth_pass)
 	{
 		batches.clear();
 
@@ -402,7 +410,7 @@ void GpuCullingTest::build_data()
 
 		for (int i = 1; i < commands.size(); i++)
 		{
-			
+
 			const Model* this_model = cmd_to_model.at(i);
 			auto this_sort_key = make_key(i);
 
@@ -415,7 +423,7 @@ void GpuCullingTest::build_data()
 			bool same_other_state = batch_sort_key.blending == this_sort_key.blending
 				&& batch_sort_key.backface == this_sort_key.blending;
 
-			if (true) {
+			if (!is_depth_pass) {
 				if (same_vao && same_material && same_other_state && same_shader && same_layer)
 					batch_this = true;	// can batch with different meshes
 				else
@@ -444,15 +452,14 @@ void GpuCullingTest::build_data()
 		}
 
 		batches.push_back(batch);
-	}
-
+	};
+	make_batches(gbuffer_batches, false);
+	//make_batches(depth_batches, true);
 
 	do_cull(Phase::Pass1);
 }
 void GpuCullingTest::build_data_2()
 {
-
-
 	// depth pyramid update
 	if (update_depth_pyramid)
 	{
@@ -468,12 +475,12 @@ void GpuCullingTest::build_data_2()
 
 }
 
-void setup_batch2(const MaterialInstance* mat, const int offset)
+void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth)
 {
-
+	auto flags = (is_depth) ? MSF_DEPTH_ONLY : 0;
 	const program_handle program = matman.get_mat_shader(
 		nullptr, mat,
-		0
+		flags
 	);
 	const BlendState blend = mat->get_master_material()->blend;
 	const bool show_backface = false;
@@ -512,46 +519,49 @@ void GpuCullingTest::dodraw()
 	if (!test_ignore_bake.get_bool())
 		return;
 	
+	auto do_draw_internal = [&](std::vector<Multidraw_Batch>& batches, const bool is_depth) {
+		IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
+		auto& scene = draw.scene;
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_instance_buffer->get_internal_handle());
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, material_buffer->get_internal_handle());
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, objindirect->get_internal_handle());
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, matindirect->get_internal_handle());
 
-	IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
-	auto& scene = draw.scene;
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_instance_buffer->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, material_buffer->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, objindirect->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, matindirect->get_internal_handle());
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, multidraw_buffer->get_internal_handle());
 
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, multidraw_buffer->get_internal_handle());
+		int offset = 0;
+		const int DEIcmdSz = sizeof(gpu::DrawElementsIndirectCommand);
+		for (int i = 0; i < batches.size(); i++) {
+			const int count = batches.at(i).count;
+			const int mat_ofs = batches.at(i).first;
+			//const int count = 1;// list.command_count[i];
+			const int incr = count;// pass.batches[i].count;
+			if (count != 0) {
 
-	int offset = 0;
-	const int DEIcmdSz = sizeof(gpu::DrawElementsIndirectCommand);
-	for (int i = 0; i < batches.size(); i++) {
-		const int count = batches.at(i).count;
-		const int mat_ofs = batches.at(i).first;
-		//const int count = 1;// list.command_count[i];
-		const int incr = count;// pass.batches[i].count;
-		if (count != 0) {
+				setup_batch2(cmd_mats[mat_ofs], offset, is_depth);
 
-			setup_batch2(cmd_mats[mat_ofs], offset);
+				const GLenum index_type = MODEL_INDEX_TYPE_GL;
 
-			const GLenum index_type = MODEL_INDEX_TYPE_GL;
-
-			void* indirect_ptr = nullptr;
+				void* indirect_ptr = nullptr;
 		
-			indirect_ptr = (void*)(int64_t(offset * DEIcmdSz));
+				indirect_ptr = (void*)(int64_t(offset * DEIcmdSz));
 
-			glMultiDrawElementsIndirect(
-				GL_TRIANGLES,
-				index_type,
-				indirect_ptr,
-				count,
-				sizeof(gpu::DrawElementsIndirectCommand)
-			);
+				glMultiDrawElementsIndirect(
+					GL_TRIANGLES,
+					index_type,
+					indirect_ptr,
+					count,
+					sizeof(gpu::DrawElementsIndirectCommand)
+				);
 
+			}
+			offset += incr;
 		}
-		offset += incr;
-	}
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+	};
+
+	do_draw_internal(gbuffer_batches, false);
 }
 // vkguide
 uint32_t previousPow2(uint32_t v)
@@ -699,5 +709,8 @@ void GpuCullingTest::zero_instances_in_this(bufferhandle mdi_buf, int count)
 	int groups_x = glm::ceil(count / 256.f);
 	draw.shader().set_int("draw_count", count);
 	glDispatchCompute(groups_x, 1, 1);
+
+	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
+
 }
 

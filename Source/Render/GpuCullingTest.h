@@ -72,6 +72,7 @@ public:
 	// builds mod info etc
 	// culls against prev frustum
 	void build_data();
+
 	// copies culled data to render lists
 	void copy_cpu(Render_Lists_Gpu_Culled& list);
 	
@@ -106,7 +107,9 @@ public:
 	CullData cull{};
 	std::vector<const MaterialInstance*> cmd_mats;
 
-	std::vector<Multidraw_Batch> batches;
+	std::vector<Multidraw_Batch> gbuffer_batches;
+	std::vector<Multidraw_Batch> depth_batches;
+
 
 	program_handle build_pyramid{};
 	IGraphicsTexture* depth_pyramid = nullptr;

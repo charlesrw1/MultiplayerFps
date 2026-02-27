@@ -83,6 +83,7 @@ uniform int lod_bias = 1;
 uniform float radius_bias = 1;
 
 uniform bool occlusion_cull = false;
+uniform bool second_pass = false;
 layout(binding = 0) uniform sampler2D depth_pyramid;
 void main()
 {
@@ -90,10 +91,21 @@ void main()
 	// cull object id
 	if(gID>=cull.num_objects)
 		return;
+		
+		// save to visarray
+	uint dword_index = gID/32;	// 2bits per entry
+	uint visword_shift = (gID % 32);
+	if(second_pass) {
+		uint and_word = ~(1<<visword_shift);
+		uint word = atomicAnd(visbits[dword_index],and_word);
+		if(bool(word&(1<<visword_shift))) {
+			return;	// already drawn
+		}
+	}
 
 	vec4 bounding_sphere = CullObjects.data[gID].bounds_sphere;
 
-	// frustum cull
+	// frustum cull (just do again on 2nd pass)
 	vec3 center = bounding_sphere.xyz;
 	float radius = bounding_sphere.w;
 	int res = 0;
@@ -132,18 +144,14 @@ void main()
 			//return;
 		}
 	}
-		
-	// save to visarray
-	uint dword_index = gID/32;	// 2bits per entry
-	uint visword_shift = (gID % 32);
-	atomicOr(visbits[dword_index],1<<visword_shift); 
 	
+	// set vis bit
+	atomicOr(visbits[dword_index],1<<visword_shift); 	
 	
 	int model_ofs = CullObjects.data[gID].misc.x;
 	if(model_ofs<0) {
-		return;
+		return;	// this is a cpu object, draws will be added in another shader
 	}
-	
 	
 	int num_lods = int(model_info[model_ofs]);
 
