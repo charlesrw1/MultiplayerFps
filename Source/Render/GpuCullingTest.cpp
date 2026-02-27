@@ -515,7 +515,7 @@ void GpuCullingTest::dodraw()
 
 	IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
 	auto& scene = draw.scene;
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_render_instance_buffer);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_instance_buffer->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, material_buffer->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, objindirect->get_internal_handle());

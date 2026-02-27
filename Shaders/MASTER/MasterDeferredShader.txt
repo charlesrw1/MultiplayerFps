@@ -8,9 +8,49 @@
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
-layout (binding = 2, std140) readonly buffer Object_Data_Buffer {
-	Object_Instance g_objects[];
+
+layout (binding = 2, std430) readonly buffer Object_Data_Buffer {
+	uint gobject_buffer[];
 };
+
+// some functions
+mat4 load_object_transform(uint obj_offset_) {
+	const uint obj_offset = obj_offset_*16;
+
+	vec4 v1 = uintBitsToFloat(uvec4(
+		gobject_buffer[obj_offset],
+		gobject_buffer[obj_offset+1],
+		gobject_buffer[obj_offset+2],
+		gobject_buffer[obj_offset+3]));
+	vec4 v2 = uintBitsToFloat(uvec4(
+		gobject_buffer[obj_offset+4],
+		gobject_buffer[obj_offset+5],
+		gobject_buffer[obj_offset+6],
+		gobject_buffer[obj_offset+7]));
+	vec4 v3 = uintBitsToFloat(uvec4(
+		gobject_buffer[obj_offset+8],
+		gobject_buffer[obj_offset+9],
+		gobject_buffer[obj_offset+10],
+		gobject_buffer[obj_offset+11]));
+	return mat4(
+		vec4(v1.x,v2.x,v3.x,0),
+		vec4(v1.y,v2.y,v3.y,0),
+		vec4(v1.z,v2.z,v3.z,0),
+		vec4(v1.w,v2.w,v3.w,1)
+	);
+}
+uvec4 load_object_flags_and_anim(uint obj_offset_)
+{
+	const uint obj_offset = obj_offset_*16;
+	
+	return uvec4(
+		gobject_buffer[obj_offset+12],
+		gobject_buffer[obj_offset+13],
+		gobject_buffer[obj_offset+14],
+		gobject_buffer[obj_offset+15]);
+}
+
+
 layout (binding = 3, std140) readonly buffer Object_Skin_Matricies {
 	mat4 g_skin_matricies[];
 };
@@ -79,7 +119,7 @@ ___USER_VS_CODE___
 vec3 calc_local_animated_pos_last_frame(uint obj_index)
 {
 	vec3 local_pos = vec3(0.0);
-	uint obj_skin_offset = g_objects[obj_index].prev_anim_mat_offset;
+	uint obj_skin_offset = 0;	//FIXME g_objects[obj_index].prev_anim_mat_offset;
 	for(int i=0;i<4;i++) {
 		if(VS_IN_BoneIndicies[i]==-1)
 			continue;
@@ -97,14 +137,16 @@ void main()
 	uint obj_index = indirect_instance[gl_BaseInstance + gl_InstanceID]; 
 	FS_IN_Objid = obj_index;
 
-	ObjModelMatrix = g_objects[obj_index].model;
+	ObjModelMatrix = load_object_transform(obj_index);
 	
 	vec3 local_pos = vec3(0.0);
 	vec3 local_normal = vec3(0.0);
 	vec3 local_tangent = vec3(0.0);
+	
+	uvec4 object_flags_anim = load_object_flags_and_anim(obj_index);
 #ifdef ANIMATED
 
-	uint obj_skin_offset = g_objects[obj_index].anim_mat_offset;
+	uint obj_skin_offset = object_flags_anim.y;
 
 	for(int i=0;i<4;i++) {
 		if(VS_IN_BoneIndicies[i]==-1)
@@ -143,7 +185,7 @@ void main()
 	FS_IN_FragPos = FS_IN_FragPos + WORLD_POSITION_OFFSET;
 	#ifndef DEPTH_ONLY
 		mat3 normal_matrix;
-		if(bool(g_objects[obj_index].flags & INSTANCE_NON_UNIFORM_SCALE)) {
+		if(bool(object_flags_anim.x & INSTANCE_NON_UNIFORM_SCALE)) {
 			normal_matrix = transpose(inverse(mat3(ObjModelMatrix)));
 		}
 		else {
@@ -172,7 +214,10 @@ void main()
 			vec3 prev_local_pos = local_pos;
 		#endif
 		
-		vec4 lastfrag_pos = g_objects[obj_index].prev_model*vec4(prev_local_pos,1.0) + vec4(WORLD_POSITION_OFFSET,0.0);	// hack for WPO,not right
+		// fixme
+		vec4 lastfrag_pos = ObjModelMatrix*vec4(prev_local_pos,1.0) + vec4(WORLD_POSITION_OFFSET,0.0);	
+		
+		//vec4 lastfrag_pos = g_objects[obj_index].prev_model*vec4(prev_local_pos,1.0) + vec4(WORLD_POSITION_OFFSET,0.0);	// hack for WPO,not right
 		FS_IN_PrevNDC = g.prev_viewproj * vec4(lastfrag_pos.xyz,1.0);
 	}
 	#endif
@@ -372,7 +417,7 @@ void main()
 		GBUFFER_OUT_M_R_Custom_Matid = vec4(METALLIC,ROUGHNESS,0,float(_MATERIAL_TYPE)/255.0);
 		
 	#ifdef LIGHTMAPPED
-		vec4 uvoffsets = g_objects[FS_IN_Objid].colorval;
+		vec4 uvoffsets = vec4(0);//g_objects[FS_IN_Objid].colorval;
 		vec2 lightmap_offset = uvoffsets.xy;
 		vec2 lightmap_scale = uvoffsets.zw;
 		vec2 lm_coord = FS_IN_LightmapCoord * lightmap_scale + lightmap_offset;

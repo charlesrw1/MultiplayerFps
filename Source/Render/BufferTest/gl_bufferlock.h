@@ -1,16 +1,13 @@
 #pragma once
-
 #include "glad/glad.h"
 #include <vector>
-
-// From azdo presentation
-//https://github.dev/nvMcJohn/apitest/tree/master/src/solutions
-
+// --------------------------------------------------------------------------------------------------------------------
+// --------------------------------------------------------------------------------------------------------------------
 // --------------------------------------------------------------------------------------------------------------------
 struct BufferRange
 {
-    size_t mStartOffset=0;
-    size_t mLength=0;
+    size_t mStartOffset;
+    size_t mLength;
 
     bool Overlaps(const BufferRange& _rhs) const {
         return mStartOffset < (_rhs.mStartOffset + _rhs.mLength)
@@ -22,8 +19,7 @@ struct BufferRange
 struct BufferLock
 {
     BufferRange mRange;
-    GLsync mSyncObj=nullptr;
-
+    GLsync mSyncObj;
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -43,5 +39,5 @@ private:
     std::vector<BufferLock> mBufferLocks;
 
     // Whether it's the CPU (true) that updates, or the GPU (false)
-    bool mCPUUpdates=false;
+    bool mCPUUpdates;
 };

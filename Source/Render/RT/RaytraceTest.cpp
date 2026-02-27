@@ -5,27 +5,12 @@
 
 #include "Framework/MathLib.h"
 
-ConfigVar ddgi_size("ddgi_size", "10", CVAR_FLOAT | CVAR_UNBOUNDED, "");
-ConfigVar ddgi_density("ddgi_density", "2", CVAR_FLOAT | CVAR_UNBOUNDED, "probes/meter");
-
 const int MAX_RAYS = 256;
-
-const glm::ivec3 ddgiGRID{50,8,50 };
-const glm::vec3 ddgiVolumeOrigin = glm::vec3(-30, 0, -11);
-
-const glm::vec3 ddgiDensity = vec3(2);
-
 const int ddgiIRRADTILE = 8;
 const int ddgiDEPTHTILE = 16;
+
 using std::vector;
 
-
-// per probe data:
-struct DdgiPerProbe {
-	int8_t offsets[3];	//[-1,1] on each axis to offset by quarter density value
-	int8_t padding;	// valid or not bit?
-};
-// using atlas offset, 
 
 DdgiTesting::DdgiTesting()
 {
@@ -399,8 +384,7 @@ static int lum_adjust_mode = 4;
 void ddgi_debugmenu() {
 	auto self = draw.ddgi.get();
 	ImGui::InputInt3("select", &self->selected_probe.x);
-	self->selected_probe = glm::clamp(self->selected_probe, glm::ivec3(0), ddgiGRID - glm::ivec3(1));
-
+	
 	ImGui::DragFloat("irradmul", &irrad_mult, 0.01);
 
 	if (ImGui::Button("refresh"))
@@ -415,10 +399,7 @@ void ddgi_debugmenu() {
 }
 ADD_TO_DEBUG_MENU(ddgi_debugmenu);
 void set_shit_fuck() {
-	draw.get_device().shader().set_vec3("volume_origin", ddgiVolumeOrigin);
-	draw.get_device().shader().set_vec3("volume_spacing", ddgiDensity);
-	draw.get_device().shader().set_ivec3("vol_grid", ddgiGRID);
-
+	
 	auto self = draw.ddgi.get();
 
 	glBindBufferBase(GL_UNIFORM_BUFFER, 8, self->ddgi_globals->get_internal_handle());

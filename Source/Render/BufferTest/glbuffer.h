@@ -1,9 +1,8 @@
 #pragma once
-#pragma once
+#include "glad/glad.h"
+#include "gl_bufferlock.h"
 
-#include "GlBufferLock.h"
-// From azdo presentation
-//https://github.dev/nvMcJohn/apitest/tree/master/src/solutions
+//https://github.com/nvMcJohn/apitest/blob/master/src/framework/bufferlock.cpp
 
 // --------------------------------------------------------------------------------------------------------------------
 enum class BufferStorage
@@ -14,10 +13,10 @@ enum class BufferStorage
 
 // --------------------------------------------------------------------------------------------------------------------
 template <typename Atom>
-class Buffer
+class BufferGl
 {
 public:
-    Buffer(bool _cpuUpdates)
+    BufferGl(bool _cpuUpdates)
         : mLockManager(_cpuUpdates)
         , mBufferContents()
         , mName()
@@ -25,7 +24,7 @@ public:
         , mBufferStorage(BufferStorage::SystemMemory)
     { }
 
-    ~Buffer()
+    ~BufferGl()
     {
         Destroy();
     }
@@ -57,14 +56,14 @@ public:
             glBufferStorage(mTarget, sizeof(Atom) * _atomCount, nullptr, _createFlags);
             mBufferContents = reinterpret_cast<Atom*>(glMapBufferRange(mTarget, 0, sizeof(Atom) * _atomCount, _mapFlags));
             if (!mBufferContents) {
-                console::warn("glMapBufferRange failed, probable bug.");
+                printf("glMapBufferRange failed, probable bug.");
                 return false;
             }
             break;
         }
 
         default: {
-            console::error("Error, need to update Buffer::Create with logic for mBufferStorage = %d", mBufferStorage);
+            printf("Error, need to update Buffer::Create with logic for mBufferStorage = %d", mBufferStorage);
             break;
         }
         };
@@ -77,7 +76,7 @@ public:
     {
         switch (mBufferStorage) {
         case BufferStorage::SystemMemory: {
-            SafeDeleteArray(mBufferContents);
+            //SafeDeleteArray(mBufferContents);
             break;
         }
 
@@ -92,7 +91,7 @@ public:
         }
 
         default: {
-            console::error("Error, need to update Buffer::Create with logic for mBufferStorage = %d", mBufferStorage);
+            printf("Error, need to update Buffer::Create with logic for mBufferStorage = %d", mBufferStorage);
             break;
         }
         };
@@ -106,6 +105,7 @@ public:
     void BindBufferBase(GLuint _index) { glBindBufferBase(mTarget, _index, mName); }
     void BindBufferRange(GLuint _index, GLsizeiptr _head, GLsizeiptr _atomCount) { glBindBufferRange(mTarget, _index, mName, _head * sizeof(Atom), _atomCount * sizeof(Atom)); }
 
+    int get_id() { return mName; }
 private:
     BufferLockManager mLockManager;
     Atom* mBufferContents;
@@ -143,7 +143,7 @@ public:
     Atom* Reserve(GLsizeiptr _atomCount)
     {
         if (_atomCount > mSizeAtoms) {
-            console::error("Requested an update of size %d for a buffer of size %d atoms.", _atomCount, mSizeAtoms);
+            printf("Requested an update of size %d for a buffer of size %d atoms.", (int)_atomCount, (int)mSizeAtoms);
         }
 
         GLsizeiptr lockStart = mHead;
@@ -153,13 +153,13 @@ public:
             lockStart = 0;
         }
 
-        mBuffer.WaitForLockedRange(lockStart, _atomCount);
+        mBuffer.WaitForLockedRange(lockStart*sizeof(Atom), _atomCount*sizeof(Atom));
         return &mBuffer.GetContents()[lockStart];
     }
 
     void OnUsageComplete(GLsizeiptr _atomCount)
     {
-        mBuffer.LockRange(mHead, _atomCount);
+        mBuffer.LockRange(mHead*sizeof(Atom), _atomCount*sizeof(Atom));
         mHead = (mHead + _atomCount) % mSizeAtoms;
     }
 
@@ -170,9 +170,10 @@ public:
     GLsizeiptr GetHead() const { return mHead; }
     void* GetHeadOffset() const { return (void*)(mHead * sizeof(Atom)); }
     GLsizeiptr GetSize() const { return mSizeAtoms; }
+    int get_id() { return mBuffer.get_id(); }
 
 private:
-    Buffer<Atom> mBuffer;
+    BufferGl<Atom> mBuffer;
 
     GLsizeiptr mHead;
     // TODO: Maybe this should be in the Buffer class?

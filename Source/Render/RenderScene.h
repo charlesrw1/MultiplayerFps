@@ -607,7 +607,8 @@ public:
 	int gpu_skinned_mats_buffer_size = 0;	// in matricies (64 bytes)
 	bool gpu_skinned_mats_using_front_buffer = true;
 	bufferhandle gpu_skinned_mats_buffer = 0;
-	bufferhandle gpu_render_instance_buffer = 0;
+
+	IGraphicsBuffer* gpu_instance_buffer = nullptr;
 
 	bool has_lightmap = false;
 	Lightmap_Object lightmapObj;

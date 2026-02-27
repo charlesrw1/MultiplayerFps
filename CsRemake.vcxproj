@@ -65,7 +65,6 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="Source\Framework\GlBufferLock.cpp" />
     <ClCompile Include="Source\Framework\Jobs.cpp" />
     <ClCompile Include="Source\Framework\MeshBuilder.cpp" />
     <ClCompile Include="Source\Framework\MyImguiLib.cpp" />
@@ -121,6 +120,7 @@
       <BasicRuntimeChecks Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Default</BasicRuntimeChecks>
     </ClCompile>
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
+    <ClCompile Include="Source\Render\BufferTest\glbuffer.cpp" />
     <ClCompile Include="Source\Render\DdsExport.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
@@ -189,8 +189,6 @@
     <ClInclude Include="Source\Framework\ClassTypeInfo.h" />
     <ClInclude Include="Source\Framework\ConsoleCmdGroup.h" />
     <ClInclude Include="Source\Framework\FnFactory.h" />
-    <ClInclude Include="Source\Framework\GlBufferLock.h" />
-    <ClInclude Include="Source\Framework\GlBuffers.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
     <ClInclude Include="Source\Framework\Log.h" />
     <ClInclude Include="Source\Framework\LuaColor.h" />
@@ -233,6 +231,8 @@
     <ClInclude Include="Source\LevelEditor\PropertyEditors.h" />
     <ClInclude Include="Source\LevelEditor\TagManager.h" />
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
+    <ClInclude Include="Source\Render\BufferTest\glbuffer.h" />
+    <ClInclude Include="Source\Render\BufferTest\gl_bufferlock.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\GpuCullingTest.h" />
     <ClInclude Include="Source\Render\IGraphsDevice.h" />
@@ -240,7 +240,6 @@
     <ClInclude Include="Source\Render\RenderGiManager.h" />
     <ClInclude Include="Source\Render\RenderWindow.h" />
     <ClInclude Include="Source\Render\RT\RaytraceTest.h" />
-    <ClInclude Include="Source\Render\UniformBuffer.h" />
     <ClInclude Include="Source\Framework\Hashmap.h" />
     <ClInclude Include="Source\Framework\Hashset.h" />
     <ClInclude Include="Source\Game\Components\CameraComponent.h" />

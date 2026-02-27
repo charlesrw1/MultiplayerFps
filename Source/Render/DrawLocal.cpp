@@ -1504,7 +1504,7 @@ void setup_execute_render_lists(Render_Lists& list,Render_Pass& pass) {
 	
 	IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_render_instance_buffer);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_instance_buffer->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, material_buffer->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, list.glinstance_to_instance);
@@ -2208,7 +2208,9 @@ void Render_Scene::init()
 
 	depth_prepass_rlist.init(0, 0);
 
-	glCreateBuffers(1, &gpu_render_instance_buffer);
+	gpu_instance_buffer = IGraphicsDevice::inst->create_buffer({});
+
+	//glCreateBuffers(1, &gpu_render_instance_buffer);
 	glCreateBuffers(1, &gpu_skinned_mats_buffer);
 
 	gpu_skinned_mats_buffer_size = r_skinned_mats_bone_buffer_size.get_integer();
@@ -2463,21 +2465,22 @@ void set_gpu_objects_data_job(uintptr_t p)
 	const int current_bone_buffer_offset = draw.scene.get_front_bone_buffer_offset();
 	const int prev_bone_buffer_offset = draw.scene.get_back_bone_buffer_offset();
 
-	auto gpu_objects = (gpu::Object_Instance*)p;
+	auto gpu_objects = (uint8*)p;
 	auto& proxy_list = draw.scene.proxy_list;
 	ZoneScopedN("SetGpuObjectData");
 	for (int i = 0; i < proxy_list.objects.size(); i++) {
 		auto& obj = proxy_list.objects[i];
 		auto& proxy = obj.type_.proxy;
-		gpu_objects[i].anim_mat_offset = current_bone_buffer_offset + obj.type_.proxy.animator_bone_ofs;
-		gpu_objects[i].model = proxy.transform;
-		gpu_objects[i].prev_model = obj.type_.prev_transform;
-		if (obj.type_.prev_bone_ofs == -1)
-			gpu_objects[i].prev_anim_mat_offset = gpu_objects[i].anim_mat_offset;
-		else
-			gpu_objects[i].prev_anim_mat_offset = prev_bone_buffer_offset + obj.type_.prev_bone_ofs;
-		gpu_objects[i].colorval = proxy.lightmap_coord;
-		gpu_objects[i].flags = 0;
+
+		const int offset = i * 64;
+		glm::vec4* v1 = (glm::vec4*)(gpu_objects + offset);
+		*v1 = glm::vec4(proxy.transform[0][0], proxy.transform[1][0], proxy.transform[2][0], proxy.transform[3][0]);
+		v1 = (glm::vec4*)(gpu_objects + offset + 16);
+		*v1 = glm::vec4(proxy.transform[0][1], proxy.transform[1][1], proxy.transform[2][1], proxy.transform[3][1]);
+		v1 = (glm::vec4*)(gpu_objects + offset + 32);
+		*v1 = glm::vec4(proxy.transform[0][2], proxy.transform[1][2], proxy.transform[2][2], proxy.transform[3][2]);
+		glm::ivec4* flags = (glm::ivec4*)(gpu_objects + offset + 48);
+		*flags = glm::ivec4(0, proxy.animator_bone_ofs, obj.type_.prev_bone_ofs, 0);
 	}
 }
 
@@ -2590,7 +2593,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		JobSystem::inst->wait_and_free_counter(cullAndLodCounter);
 	}
 	const size_t num_ren_objs = proxy_list.objects.size();
-	gpu::Object_Instance* gpu_objects = memArena.alloc_bottom_type<gpu::Object_Instance>(num_ren_objs);
+	uint8* gpu_objects = memArena.alloc_bottom_type<uint8>(num_ren_objs*64);
 	ASSERT(gpu_objects);
 	JobCounter* gpu_obj_set_cntr{};
 	if(add_to_passes)
@@ -2706,7 +2709,16 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			JobSystem::inst->wait_and_free_counter(gpu_obj_set_cntr);
 			{
 				ZoneScopedN("UploadGpuData");
-				glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs, gpu_objects, GL_DYNAMIC_DRAW);
+				//glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs, gpu_objects, GL_DYNAMIC_DRAW);
+			
+				glNamedBufferData(
+					gpu_instance_buffer->get_internal_handle(),
+					num_ren_objs * 64,
+					gpu_objects,
+					GL_DYNAMIC_DRAW
+				);
+
+			
 			}
 		}
 	};

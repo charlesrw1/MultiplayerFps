@@ -411,7 +411,6 @@
     <ClInclude Include="Source\Game\Components\GameAnimationMgr.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Framework\MeshBuilderImpl.h" />
-    <ClInclude Include="Source\Render\UniformBuffer.h" />
     <ClInclude Include="Source\Assets\AssetRegistryLocal.h" />
     <ClInclude Include="Source\Framework\InterfaceBase.h" />
     <ClInclude Include="Source\Game\CarGame\CarGui.h" />
@@ -463,14 +462,14 @@
     <ClInclude Include="Source\Framework\LuaColor.h" />
     <ClInclude Include="Source\Game\Components\RagdollComponent.h" />
     <ClInclude Include="Source\Render\IGraphsDevice.h" />
-    <ClInclude Include="Source\Framework\GlBufferLock.h" />
-    <ClInclude Include="Source\Framework\GlBuffers.h" />
     <ClInclude Include="Source\Framework\SharedPtr.h" />
     <ClInclude Include="Source\Framework\SerializerJson2.h" />
     <ClInclude Include="Source\Game\Components\SpawnerComponenth.h" />
     <ClInclude Include="Source\Render\RT\RaytraceTest.h" />
     <ClInclude Include="Source\Render\RenderGiManager.h" />
     <ClInclude Include="Source\Render\GpuCullingTest.h" />
+    <ClInclude Include="Source\Render\BufferTest\gl_bufferlock.h" />
+    <ClInclude Include="Source\Render\BufferTest\glbuffer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -624,7 +623,6 @@
     <ClCompile Include="Source\UI\GUISystemPublic.cpp" />
     <ClCompile Include="Source\Game\Components\RagdollComponent.cpp" />
     <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
-    <ClCompile Include="Source\Framework\GlBufferLock.cpp" />
     <ClCompile Include="Source\Render\DecalBatcher.cpp" />
     <ClCompile Include="Source\Debug_Console.cpp" />
     <ClCompile Include="Source\Framework\SerializerJson2.cpp" />
@@ -633,6 +631,7 @@
     <ClCompile Include="Source\Render\RenderGiManager.cpp" />
     <ClCompile Include="Source\Render\DdsExport.cpp" />
     <ClCompile Include="Source\Render\GpuCullingTest.cpp" />
+    <ClCompile Include="Source\Render\BufferTest\glbuffer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
