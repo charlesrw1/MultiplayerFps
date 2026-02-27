@@ -706,6 +706,16 @@ void GpuCullingTest::downsample_depth()
 
 void GpuCullingTest::compact_draws(int num_batches, int num_commands, bufferhandle mdi_buf, bufferhandle mat_buf, IGraphicsBuffer* count_buf, IGraphicsBuffer* batches_buf)
 {
+	GLuint zero = 0;
+	glClearNamedBufferData(
+		count_buf->get_internal_handle(),
+		GL_R32UI,
+		GL_RED_INTEGER,
+		GL_UNSIGNED_INT,
+		&zero
+	);
+
+
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, mdi_buf);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, batches_buf->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, mat_buf);

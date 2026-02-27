@@ -1756,7 +1756,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 	bool is_editor_mode
 )
 {
-	draw_call_key key;
+	draw_call_key key{};
 
 #ifdef _DEBUG
 	const bool is_depth = !r_ignore_depth_shader.get_bool() && (type == pass_type::DEPTH);
@@ -1810,7 +1810,8 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 	else
 		key.layer = 1;
 
-	key.distance = camera_dist;
+	if(mm->blend!=BlendState::OPAQUE)
+		key.distance = camera_dist;
 
 	return key;
 }
@@ -2115,14 +2116,7 @@ static void build_standard_cpu_culling(
 	static_assert(sizeof(Multidraw_Batch) == 8, "multidraw batch used on gpu");
 	list.batches_buf->upload(src.batches.data(), src.batches.size() * sizeof(Multidraw_Batch));
 	list.count_buffer->upload(nullptr, sizeof(int) * src.batches.size());
-	GLuint zero = 0;
-	glClearNamedBufferData(
-		list.count_buffer->get_internal_handle(),
-		GL_R32UI,
-		GL_RED_INTEGER,
-		GL_UNSIGNED_INT,
-		&zero
-	);
+	
 	{
 		GPUSCOPESTART(copycpu);
 		GpuCullingTest::inst->copy_cpu(list);
