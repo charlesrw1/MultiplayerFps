@@ -6,6 +6,7 @@ IntegrationTester::IntegrationTester(bool exit_on_finish, vector<IntTestCase>& t
 	testcases = std::move(test_cases);
 	thread = std::thread(&IntegrationTester::tester_thread, this);
 	total_tests = testcases.size();
+	thread.detach();
 }
 
 // called in main thread

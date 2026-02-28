@@ -470,6 +470,7 @@
     <ClInclude Include="Source\Render\GpuCullingTest.h" />
     <ClInclude Include="Source\Render\BufferTest\gl_bufferlock.h" />
     <ClInclude Include="Source\Render\BufferTest\glbuffer.h" />
+    <ClInclude Include="Source\UnitTests\EngineTesterApplication.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -632,6 +633,7 @@
     <ClCompile Include="Source\Render\DdsExport.cpp" />
     <ClCompile Include="Source\Render\GpuCullingTest.cpp" />
     <ClCompile Include="Source\Render\BufferTest\glbuffer.cpp" />
+    <ClCompile Include="Source\UnitTests\EngineTesterApplication.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

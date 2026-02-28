@@ -79,7 +79,57 @@ static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp)
 	return planedistances;
 }
 #include "Render/Render_Sun.h"
-void CascadeShadowMapSystem::update()
+void CascadeShadowMapSystem::render_cascades()
+{
+	// now setup scene for rendering
+//glBindFramebuffer(GL_FRAMEBUFFER, fbo.shadow);
+	{
+		GPUSCOPESTART(render_csm_scope);
+
+		auto& device = draw.get_device();
+		//RenderPassSetup setup("shadowmap", fbo.shadow, false, false /* clear it below */, 0, 0, csm_resolution, csm_resolution);
+		//auto scope = device.start_render_pass(setup);
+
+		for (int i = 0; i < 4; i++) {
+
+			RenderPassState state;
+			state.depth_info = texture.shadow_array;
+			state.depth_layer = i;
+			state.clear_depth_val = 1.f;
+			state.wants_depth_clear = true;
+			IGraphicsDevice::inst->set_render_pass(state);
+
+			//glNamedFramebufferTextureLayer(fbo.shadow, GL_DEPTH_ATTACHMENT, texture.shadow_array->get_internal_handle(), 0, i);
+
+			device.set_viewport(0, 0, csm_resolution, csm_resolution);
+			device.clear_framebuffer(true, true, 1.f/* depth value of 1.f to clear*/);
+
+
+			View_Setup setup;
+			setup.width = csm_resolution;
+			setup.height = csm_resolution;
+			setup.near = nearplanes[i];
+			setup.far = farplanes[i];
+			setup.viewproj = matricies[i];
+			setup.view = setup.proj = mat4(1);	// unused
+
+			Render_Level_Params params(
+				setup,
+				&draw.scene.cascades_rlists.at(i),
+				&draw.scene.shadow_pass,
+				Render_Level_Params::SHADOWMAP
+			);
+
+			params.provied_constant_buffer = ubo.frame_view[i];
+			params.upload_constants = true;
+			params.wants_non_reverse_z = true;
+			params.offset_poly_units = 1;
+			draw.render_level_to_target(params);
+		}
+	}
+}
+
+void CascadeShadowMapSystem::update_matricies()
 {
 	//int setting = draw.shadow_quality_setting.integer();
 	//if (setting < 0) setting = 0;
@@ -136,52 +186,6 @@ void CascadeShadowMapSystem::update()
 		}
 
 		glNamedBufferData(ubo.info, sizeof(Shadowmap_Csm_Ubo_Struct), &upload_data, GL_DYNAMIC_DRAW);
-	}
-	// now setup scene for rendering
-	//glBindFramebuffer(GL_FRAMEBUFFER, fbo.shadow);
-	{
-		GPUSCOPESTART(render_csm_scope);
-
-		auto& device = draw.get_device();
-		//RenderPassSetup setup("shadowmap", fbo.shadow, false, false /* clear it below */, 0, 0, csm_resolution, csm_resolution);
-		//auto scope = device.start_render_pass(setup);
-
-		for (int i = 0; i < 4; i++) {
-
-			RenderPassState state;
-			state.depth_info = texture.shadow_array;
-			state.depth_layer = i;
-			state.clear_depth_val = 1.f;
-			state.wants_depth_clear = true;
-			IGraphicsDevice::inst->set_render_pass(state);
-
-			//glNamedFramebufferTextureLayer(fbo.shadow, GL_DEPTH_ATTACHMENT, texture.shadow_array->get_internal_handle(), 0, i);
-
-			device.set_viewport(0, 0, csm_resolution, csm_resolution);
-			device.clear_framebuffer(true, true, 1.f/* depth value of 1.f to clear*/);
-
-
-			View_Setup setup;
-			setup.width = csm_resolution;
-			setup.height = csm_resolution;
-			setup.near = nearplanes[i];
-			setup.far = farplanes[i];
-			setup.viewproj = matricies[i];
-			setup.view = setup.proj = mat4(1);	// unused
-
-			Render_Level_Params params(
-				setup,
-				&draw.scene.cascades_rlists.at(i),
-				&draw.scene.shadow_pass,
-				Render_Level_Params::SHADOWMAP
-			);
-
-			params.provied_constant_buffer = ubo.frame_view[i];
-			params.upload_constants = true;
-			params.wants_non_reverse_z = true;
-			params.offset_poly_units = 1;
-			draw.render_level_to_target(params);
-		}
 	}
 }
 

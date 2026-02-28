@@ -99,7 +99,9 @@ class CascadeShadowMapSystem
 {
 public:
 	void init();
-	void update();
+	void update_matricies();
+	void render_cascades();
+
 	void make_csm_rendertargets();
 	void update_cascade(int idx, const View_Setup& vs, glm::vec3 directional_dir);
 

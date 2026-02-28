@@ -287,7 +287,10 @@ void GameAnimationMgr::update_animating()
 			if (matricies_used + ai->num_bones() > matricies_allocated)
 				Fatalf("animator out of memory\n");
 			ai->set_matrix_palette_offset(matricies_used);
-			ai->update(eng->get_dt());
+
+			float dt = eng->get_dt();
+
+			ai->update(dt);
 			matricies_used += ai->num_bones();
 
 			if (ai->get_owner())

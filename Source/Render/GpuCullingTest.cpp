@@ -40,7 +40,7 @@ GpuCullingTest* GpuCullingTest::inst = nullptr;
 #include <algorithm>
 ConfigVar skip_obj_upload("skip_obj_upload", "0", CVAR_BOOL, "");
 #include "imgui.h"
-static bool do_occlusion_culling = true;
+bool do_occlusion_culling = true;
 static bool update_depth_pyramid = true;
 static bool draw_debug_overlay = false;
 static int lod_bias = 0;

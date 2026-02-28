@@ -293,6 +293,20 @@ void EditorDoc::init_new()
 			selection_state->remove_from_selection(EntityPtr(id));
 		}
 		});
+	cmds->add("set-to-camera", [this](const Cmd_Args& args) {
+		if (ed_cam.get_is_using_ortho()) {
+			return;
+		}
+		if (!selection_state->has_only_one_selected())
+			return;
+		auto ent = selection_state->get_only_one_selected();
+		if (ent.get()) {
+			glm::mat4 cam_transform = glm::inverse(vs_setup.view);
+			ent->set_ws_transform(cam_transform);
+			manipulate->update_pivot_and_cached();
+		}
+
+		});
 	cmds->add("set-field", [this](const Cmd_Args& args) {
 		const string ents = args.at(3);
 		nlohmann::json jsonObj;

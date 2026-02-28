@@ -24,6 +24,7 @@ class IntegrationTester
 {
 public:
 	IntegrationTester(bool exit_on_finish, vector<IntTestCase>& test_cases, unsigned int rand_seed = 7);
+
 	// called in main thread
 	bool tick(float dt);
 	// called by test functions

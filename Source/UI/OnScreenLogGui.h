@@ -8,10 +8,14 @@
 #include "UILoader.h"
 #include "Assets/AssetDatabase.h"
 #include "UI/UIBuilder.h"
+extern ConfigVar ui_disable_screen_log;
 class OnScreenLog
 {
 public:
 	void draw(RenderWindow& b) {
+		if (ui_disable_screen_log.get_bool())
+			return;
+
 		auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
 
 		float time_now = GetTime();

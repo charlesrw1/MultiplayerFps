@@ -99,7 +99,7 @@ ConfigVar g_host_port("net.hostport", "47000", CVAR_INTEGER | CVAR_READONLY, "",
 ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL, "enables dev mode features like compiling assets when loading");
 ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop", 0.0001, 5.0);
-
+ConfigVar ui_disable_screen_log("ui.disable_screen_log","0",CVAR_BOOL,"");
 
 double GetTime()
 {
@@ -1488,11 +1488,13 @@ void GameEngineLocal::init(int argc, char** argv)
 
 		else if (argv[i][0] == '-') {
 			string cmd;
+			const int start_i = i;
 			cmd += &argv[i++][1];
 			while (i < argc && argv[i][0] != '-') {
 				cmd += ' ';
 				cmd += argv[i++];
 			}
+			i = glm::max(start_i, i - 1);
 
 			Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, cmd.c_str());
 		}
@@ -1586,6 +1588,7 @@ void GameEngineLocal::game_update_tick()
 	tick_interval *= g_slomo.get_float();
 
 	// physics update
+
 
 	if (app)
 		app->pre_update();
@@ -1814,11 +1817,11 @@ void GameEngineLocal::loop()
 			}
 			idraw->scene_draw(drawparamsNext, setupNext);
 		}
-		//JobSystem::inst->wait_and_free_counter(gameupdatecounter);// wait for game update to finish while render is on this thread
 
 		shouldDrawNext = out.drawOut;
 		drawparamsNext = out.paramsOut;
 		setupNext = out.vsOut;
+		//JobSystem::inst->wait_and_free_counter(gameupdatecounter);// wait for game update to finish while render is on this thread
 	};
 
 	// This happens on main thread

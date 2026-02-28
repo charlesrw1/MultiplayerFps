@@ -2553,7 +2553,7 @@ void set_gpu_objects_data_job(uintptr_t p)
 		v1 = (glm::vec4*)(gpu_objects + offset + 32);
 		*v1 = glm::vec4(proxy.transform[0][2], proxy.transform[1][2], proxy.transform[2][2], proxy.transform[3][2]);
 		glm::ivec4* flags = (glm::ivec4*)(gpu_objects + offset + 48);
-		*flags = glm::ivec4(0, proxy.animator_bone_ofs, obj.type_.prev_bone_ofs, 0);
+		*flags = glm::ivec4(0, current_bone_buffer_offset+proxy.animator_bone_ofs, obj.type_.prev_bone_ofs, 0);
 	}
 }
 
@@ -3850,11 +3850,11 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		return;
 	}
 	upload_ubo_view_constants(current_frame_view, ubo.current_frame);
+	shadowmap.update_matricies();
 	scene.build_scene_data(params.skybox_only, params.is_editor, params.is_cubemap_view);
 	upload_light_and_decal_buffers();
 
-
-	shadowmap.update();
+	shadowmap.render_cascades();
 
 	volfog.compute();
 	const bool is_wireframe_mode = r_debug_mode.get_integer() == gpu::DEBUG_WIREFRAME;

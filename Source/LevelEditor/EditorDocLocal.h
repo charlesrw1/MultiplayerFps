@@ -678,6 +678,7 @@ public:
 	ImGuizmo::MODE get_mode() const {
 		return mode;
 	}
+	void update_pivot_and_cached();
 private:
 	bool force_gizmo_on = false;
 
@@ -691,7 +692,6 @@ private:
 
 	void on_selected_tarnsform_change(uint64_t);
 
-	void update_pivot_and_cached();
 
 	void begin_drag();
 	void end_drag();

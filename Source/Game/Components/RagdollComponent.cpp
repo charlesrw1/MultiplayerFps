@@ -52,7 +52,11 @@ void RagdollComponent::enable()
 	animator->set_ragdoll(this);
 }
 void RagdollComponent::stop() {
-
+	for (auto& b : bodies) {
+		if (b.ptr.get()) {
+			b.ptr->destroy();	// remove physics bodies
+		}
+	}
 }
 
 void RagdollComponent::disable()
