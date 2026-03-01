@@ -22,13 +22,21 @@ void SpawnerComponent::start()
 void SpawnerComponent::stop()
 {
 }
+string SpawnerComponent::get_spawner_type() {
+	if (obj.is_null()) return "__none";
+	auto& t = obj["_type"];
+	return t.is_string() ? t : "__none";
+}
 
 void SpawnerComponent::serialize(Serializer& s)
 {
 	if (s.is_saving()) {
 		if (obj["_type"].is_string()) {
 			for (auto& [key, value] : obj.items()) {
-				ASSERT(value.is_string());
+				if (!value.is_string()) {
+					continue;
+				}
+	
 				string str = value;
 				s.serialize(key.c_str(), str);
 			}
@@ -66,20 +74,27 @@ void SpawnerComponent::set(string schema_name)
 
 	set_model();
 }
+#include "Render/MaterialPublic.h"
 #include "BillboardComponent.h"
 void SpawnerComponent::set_model()
 {
+	if(!obj.is_object())
+		return;
 	string model_str = "";
+	MaterialInstance* mat_override{};
 	if (obj["_type"].is_string()) {
 		string  s = obj["_type"];
 		auto& schema = SchemaManager::get().schema_file[s];
 		if (schema.is_object() && schema["_model"].is_string()) {
 			model_str = schema["_model"];
 		}
+		if (schema.is_object() && schema["_material"].is_string())
+			mat_override = MaterialInstance::load(schema["_material"]);
 		auto& ms = obj["model"];
 		if (ms.is_string() && !std::string(ms).empty()) {
 			model_str = ms;
 		}
+
 	}
 	
 
@@ -98,6 +113,11 @@ void SpawnerComponent::set_model()
 		mesh = get_owner()->create_component<MeshComponent>();
 		mesh->set_model_str(model_str.c_str());
 		mesh->set_editor_transient(true);
+		// dont want these rendering in cubemaps or baking
+		mesh->set_ignore_baking(true);
+		mesh->set_ignore_cubemap_view(true);	
+		if(mat_override)
+			mesh->set_material_override(mat_override);
 	}
 
 }

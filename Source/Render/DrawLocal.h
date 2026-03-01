@@ -355,7 +355,7 @@ const uint32_t MAX_BLOOM_MIPS = 6;
 class ThumbnailRenderer {
 public:
 	ThumbnailRenderer(int size);
-	void render(Model* m);
+	void render(Model* m, MaterialInstance* override_mat);
 	void output_to_path(std::string path);
 private:
 
@@ -442,9 +442,9 @@ public:
 	handle<Render_Object> mouse_pick_scene_for_editor(int x, int y) final;
 	std::vector<handle<Render_Object>> mouse_box_select_for_editor(int x, int y, int w, int h) final;
 	float get_scene_depth_for_editor(int x, int y) final;
-	void editor_render_thumbnail_for(Model* model, int w, int h, std::string path) final {
+	void editor_render_thumbnail_for(Model* model, MaterialInstance* override_mat, int w, int h, std::string path) final {
 		matman.pre_render_update();	// hack fixme
-		thumbnailRenderer->render(model);
+		thumbnailRenderer->render(model, override_mat);
 		thumbnailRenderer->output_to_path(path);
 	}
 #endif

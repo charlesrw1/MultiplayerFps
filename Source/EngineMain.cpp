@@ -1743,10 +1743,17 @@ void GameEngineLocal::loop()
 					SDL_GetWindowSize(window, &x, &y);
 					if (x % 2 == 1) x -= 1;
 					if (y % 2 == 1) y -= 1;
-					if (x != g_window_w.get_integer())
+					bool changed = false;
+					if (x != g_window_w.get_integer()) {
+						changed = true;
 						g_window_w.set_integer(x);
-					if (y != g_window_h.get_integer())
+					}
+					if (y != g_window_h.get_integer()) {
+						changed = true;
 						g_window_h.set_integer(y);
+					}
+					if (changed)
+						SDL_SetWindowSize(window, x, y);
 				}
 				break;
 			case SDL_KEYUP:

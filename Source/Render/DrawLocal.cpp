@@ -1216,7 +1216,7 @@ void Renderer::init()
 	lightListCuller = std::make_unique<LightListCuller>();
 	ddgi = std::make_unique<DdgiTesting>();
 #ifdef EDITOR_BUILD
-	thumbnailRenderer = std::make_unique<ThumbnailRenderer>(64);
+	thumbnailRenderer = std::make_unique<ThumbnailRenderer>(128);
 #endif
 	print_time("draw:objects");
 
@@ -3288,7 +3288,7 @@ ThumbnailRenderer::ThumbnailRenderer(int size) : pass(pass_type::TRANSPARENT) {
 }
 
 
-void ThumbnailRenderer::render(Model* model) {
+void ThumbnailRenderer::render(Model* model, MaterialInstance* override_mat) {
 	ASSERT(!eng->get_is_in_overlapped_period());
 	if (!model || model->get_num_lods() == 0)
 		return;
@@ -3303,6 +3303,9 @@ void ThumbnailRenderer::render(Model* model) {
 		auto& part = model->get_part(j);
 
 		const MaterialInstance* mat = model->get_material(part.material_idx);
+		if (override_mat)
+			mat = override_mat;
+
 		if (!mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
 			mat = matman.get_fallback();
 
@@ -3328,12 +3331,14 @@ void ThumbnailRenderer::render(Model* model) {
 	set_pass();
 
 
-
+	float mult_z = 1.0;
+	if (override_mat)
+		mult_z = 0.6;
 	glm::vec4 sphere = model->get_bounding_sphere();
 	const float fov_rad = glm::radians(thumbnail_fov.get_float());
 	glm::vec3 center = glm::vec3(sphere);
 	const float c_mult = 2.0 / fov_rad;
-	glm::vec3 cam_pos = center + glm::normalize(glm::vec3(1, 1, 1)) * sphere.w * c_mult;
+	glm::vec3 cam_pos = center + glm::normalize(glm::vec3(1, 1, 1)) * sphere.w * c_mult * mult_z;
 	View_Setup viewSetup = View_Setup(glm::lookAt(cam_pos, center, glm::vec3(0, 1, 0)), fov_rad, 0.01, 100.0, w, h);
 
 	Render_Level_Params cmdparams(

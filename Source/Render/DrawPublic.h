@@ -100,6 +100,8 @@ public:
 
 
 class Model;
+class MaterialInstance;
+
 class GuiSystemPublic;
 class RendererPublic
 {
@@ -125,7 +127,7 @@ public:
 	// test the depth buffer, returns LINEAR depth, ONLY for editor!
 	virtual float get_scene_depth_for_editor(int x, int y) = 0;
 	// hm.
-	virtual void editor_render_thumbnail_for(Model* model, int w, int h, std::string disk_path) = 0;
+	virtual void editor_render_thumbnail_for(Model* model,MaterialInstance* override_mat, int w, int h, std::string disk_path) = 0;
 #endif
 };
 

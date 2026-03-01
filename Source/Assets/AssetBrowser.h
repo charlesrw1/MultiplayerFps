@@ -46,6 +46,8 @@ public:
 		Grid,
 	};
 
+	bool big_thumbnail = false;
+
 	bool force_focus = false;
 	bool show_filter_type_options = true;
 	Mode mode = Mode::Grid;

@@ -369,6 +369,10 @@ float grid3D_AA(vec3 p, float lineWidth)
     return max(max(line.x, line.y), line.z);
 }
 
+#ifdef THUMBNAIL_FORWARD
+#include "pbrShared.txt"
+#endif
+
 void main()
 {
 #ifdef DEPTH_ONLY
@@ -392,8 +396,20 @@ void main()
 		// World space normal
 		vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
 		Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
-		float d = max(dot(Final_Normal,normalize(g.viewpos_time.xyz-FS_IN_FragPos)),0.0);	
-		SCENE_OUT_Color = vec4(pow((BASE_COLOR+EMISSIVE)*d,vec3(1.0/2.2)),OPACITY);	
+		
+		// cursed bullshit
+		#ifdef FORWARD_SHADER
+			// blending types
+			float d = max(dot(Final_Normal,normalize(g.viewpos_time.xyz-FS_IN_FragPos)),0.0);	
+			SCENE_OUT_Color = vec4(pow((BASE_COLOR+EMISSIVE)*d,vec3(1.0/2.2)),OPACITY);	
+		#else
+			// normal materials
+			vec3 final_color = pbr_calculate_punctual(vec3(2.0),normalize(vec3(0.4,1,0)),FS_IN_FragPos, BASE_COLOR,ROUGHNESS,METALLIC,Final_Normal);
+			// not correct, just add in an ambient term
+			final_color += BASE_COLOR*vec3(0.1) + EMISSIVE;
+			SCENE_OUT_Color = vec4(pow(final_color,vec3(1.0/2.2)),1.0);
+		#endif
+		
 	#else 
 	#ifdef FORWARD_SHADER
 	

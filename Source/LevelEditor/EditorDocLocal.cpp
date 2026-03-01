@@ -570,7 +570,7 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 
 }
 
-EditorDoc::EditorDoc() : ed_cam(inputs) , dragger(*this) {
+EditorDoc::EditorDoc() : ed_cam(inputs) , dragger(*this), vis_filter(*this) {
 	assert(eng->get_level());
 }
 
@@ -1170,7 +1170,7 @@ void EditorDoc::imgui_draw()
 	active_mode->tick();	// foliage, decal
 	check_inputs();
 	draw_handles->tick();
-
+	vis_filter.tick();
 	//const bool in_foliage_tool = foliage_active.get_bool();
 
 	//handle_dragger->tick();
@@ -1739,9 +1739,11 @@ public:
 		hacked_bullshit2.class_type = &Model::StaticType;
 		hacked_bullshit2.offset = offsetof(SpawnerModelProp, model);
 
-		string str = sc->obj["model"];
-		if(!str.empty())
-			model = Model::load(str);
+		if (sc->obj["model"].is_string()) {
+			string str = sc->obj["model"];
+			if (!str.empty())
+				model = Model::load(str);
+		}
 	}
 	~SpawnerModelProp() {
 		
@@ -1830,6 +1832,8 @@ void EdPropertyGrid::refresh_grid()
 			if (c->is_a<SpawnerComponent>()) {
 				auto sc = (SpawnerComponent*)c;
 				for (auto& [name, prop] : sc->obj.items()) {
+					if (!prop.is_string())
+						continue;
 					if (name[0] == '_')
 						continue;
 					if (name == "model")
@@ -3198,5 +3202,78 @@ void DrawHandlesObject::tick()
 	else {
 		last_selected = EntityPtr();
 	}
+
+}
+
+void EntityVisiblityFilter::tick()
+{
+	if (!ImGui::Begin("OutlineFilter")) {
+		ImGui::End();
+		return;
+	}
+
+	// not a pretty way
+	auto draw_item = [&](const string& s) -> int {
+		if (!MapUtil::contains(status, s))
+			status[s] = true;
+		bool b = status[s];
+		if (ImGui::Selectable(s.c_str(), false, 0,ImVec2(200,0)))
+			return 1;
+		ImGui::SameLine();
+		ImGui::PushID(s.c_str());
+		if (ImGui::Checkbox("##empty",&b)) {
+			status[s] = b;
+			ImGui::PopID();
+			return b ? 2 : 3;
+		}
+		ImGui::PopID();
+		return 0;
+	};
+	auto add_component_type_to_selection = [&](const ClassTypeInfo& t) {
+		auto& objs = eng->get_level()->get_all_objects();
+		const bool select_only = !Input::is_shift_down();
+		if (select_only) 
+			doc.selection_state->clear_all_selected();
+		for (auto o : objs) {
+			if (o->get_type().is_a(t)) {
+				auto owner = o->cast_to<Component>()->get_owner();
+				doc.selection_state->add_to_entity_selection(owner);
+			}
+		}
+	};
+	auto set_component_visibility = [&](const ClassTypeInfo& t, bool b) {
+		auto& objs = eng->get_level()->get_all_objects();
+		for (auto o : objs) {
+			if (o->get_type().is_a(t)) {
+				auto owner = o->cast_to<Component>()->get_owner();
+				owner->set_hidden_in_editor(!b);
+			}
+		}
+	};
+	auto do_stuff = [&](const ClassTypeInfo& t, int res) {
+		if (res == 1)
+			add_component_type_to_selection(t);
+		else if (res == 2)
+			set_component_visibility(t, true);
+		else if (res == 3)
+			set_component_visibility(t, false);
+	};
+
+	int res = draw_item("Lights");
+	do_stuff(PointLightComponent::StaticType,res);
+	do_stuff(SpotLightComponent::StaticType,res);
+	res = draw_item("GiVols");
+	do_stuff(GiVolumeComponent::StaticType, res);
+	res = draw_item("CubemapVols");
+	do_stuff(CubemapComponent::StaticType, res);
+	res = draw_item("Decals");
+	do_stuff(DecalComponent::StaticType, res);
+	res = draw_item("Sun");
+	do_stuff(SunLightComponent::StaticType, res);
+	res = draw_item("Env");
+	do_stuff(SkylightComponent::StaticType, res);
+	res = draw_item("Spawners");
+	do_stuff(SpawnerComponent::StaticType, res);
+	ImGui::End();
 
 }

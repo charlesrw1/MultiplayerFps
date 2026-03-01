@@ -849,6 +849,16 @@ public:
 private:
 	EntityPtr last_selected;
 };
+
+class EntityVisiblityFilter {
+public:
+	EntityVisiblityFilter(EditorDoc& doc) : doc(doc) {}
+	void tick();
+private:
+	EditorDoc& doc;
+	std::unordered_map<std::string, bool> status;
+};
+
 template<class... Ts>
 struct overloads : Ts... { using Ts::operator()...; };
 class LEPlugin;
@@ -951,7 +961,7 @@ public:
 	EditorCamera ed_cam;
 	DragDetector dragger;
 	IEditorMode* active_mode = nullptr;
-
+	EntityVisiblityFilter vis_filter;
 
 
 	MulticastDelegate<uint64_t> on_component_deleted;

@@ -411,7 +411,7 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file, IAssetLoad
 		std::string parent_mat = to_std_string_sv(tok);
 		auto parent = g_assets.find_sync_sptr<MaterialInstance>(parent_mat);// loading->load_asset(&MaterialInstance::StaticType, parent_mat);
 	//	AssetPtr<MaterialInstance> parent = mat->cast_to<MaterialInstance>();
-		if (!parent)
+		if (!parent||!parent->impl)
 			throw MasterMaterialExcept("Couldnt find parent material" + fullpath);
 
 		init_from(parent);

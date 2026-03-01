@@ -293,7 +293,11 @@ public:
 	void editor_on_change_property() final;
 	REF Color32 color = COLOR_WHITE;
 	REF float intensity = 1.0;
+	REF Model* override_model = nullptr;
+
 	DynamicMatUniquePtr mat;
+private:
+	Model* get_model_to_use();
 };
 
 struct Lightmap_Object;

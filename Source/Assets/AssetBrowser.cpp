@@ -231,7 +231,9 @@ bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* la
 }
 
 void AssetBrowser::draw_browser_grid() {
-	const int SIZE_PER = 80;
+
+
+	const int SIZE_PER = (big_thumbnail)?144:80;
 	auto win_size = ImGui::GetWindowSize();
 	int boxes = win_size.x / SIZE_PER;
 	boxes = std::max(boxes, 1);
@@ -281,7 +283,10 @@ void AssetBrowser::draw_browser_grid() {
 		//	ImGui::ImageButton(ImTextureID(uint64_t(t->get_internal_render_handle())), ImVec2(64, 64),ImVec2(0, 1), ImVec2(1, 0));
 			string only_filename = c->asset.filename;
 			StringUtils::get_filename(only_filename);
-			ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())), ImVec2(64, 64), only_filename.c_str());
+
+			const int THUMB_SIZE = (big_thumbnail) ? 128 : 64;
+
+			ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())), ImVec2(THUMB_SIZE, THUMB_SIZE), only_filename.c_str());
 			ImGui::PopStyleColor();
 			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
 			{
@@ -407,6 +412,8 @@ void AssetBrowser::imgui_draw()
 			all_lower_cast_filter_name[i] = tolower(all_lower_cast_filter_name[i]);
 	}
 	if (using_grid) {
+		ImGui::SameLine();
+		ImGui::Checkbox("Big", &big_thumbnail);
 		draw_browser_grid();
 	}
 	else {
@@ -418,9 +425,12 @@ void AssetBrowser::imgui_draw()
 #include "Render/DrawPublic.h"
 
 #include "Framework/MapUtil.h"
+#include "Render/MaterialPublic.h"
+#include "Render/MaterialLocal.h"
 Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset)
 {
-	if (asset.type->get_asset_class_type() != &Model::StaticType)
+	auto asset_class = asset.type->get_asset_class_type();
+	if (asset_class != &Model::StaticType && asset_class != &MaterialInstance::StaticType)
 		return nullptr;
 
 	if (MapUtil::contains(cache, asset.filename)) {
@@ -439,11 +449,25 @@ Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset)
 	if (!thumbnail_file || model_file->get_timestamp() > thumbnail_file->get_timestamp()) {
 		thumbnail_file.reset();
 		model_file.reset();
-
-		Model* the_model = Model::load(asset.filename);
+		Model* the_model{};
+		MaterialInstance* override_mat{};
+		if (asset_class == &Model::StaticType) {
+			the_model = Model::load(asset.filename);
+		}
+		else {
+			auto mat = MaterialInstance::load(asset.filename);
+			if (mat && mat->impl && mat->impl->get_master_impl() && mat->impl->get_master_impl()->usage == MaterialUsage::Default)
+			{
+				override_mat = mat;
+				the_model = Model::load("sphere.cmdl");
+			}
+			else {
+				return nullptr;
+			}
+		}
 		if (the_model) {
 			// hmm..
-			idraw->editor_render_thumbnail_for(the_model, 64, 64, FileSys::get_full_path_from_game_path(thumnail_path));
+			idraw->editor_render_thumbnail_for(the_model, override_mat, 128,128, FileSys::get_full_path_from_game_path(thumnail_path));
 		}
 		out_t = Texture::load(thumnail_path);
 		//out_t = Texture::load("eng/icon/_nearest/skylight.png");
