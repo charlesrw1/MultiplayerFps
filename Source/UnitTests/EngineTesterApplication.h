@@ -52,7 +52,7 @@ public:
 		ui_disable_screen_log.set_bool(true);
 		SDL_SetWindowSize(eng->get_os_window(), TEST_WINDOW_SIZE.x, TEST_WINDOW_SIZE.y);
 		
-		eng->load_level("demo_level_1.tmap");
+		eng->load_level("cs_map.tmap");
 		Level* l = eng->get_level();
 		auto ent = l->spawn_entity();
 		auto cam = ent->create_component<CameraComponent>();

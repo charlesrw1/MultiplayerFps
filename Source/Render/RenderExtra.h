@@ -106,6 +106,7 @@ public:
 	void update_cascade(int idx, const View_Setup& vs, glm::vec3 directional_dir);
 
 	const static int MAXCASCADES = 4;
+	const static int CASCADES_USED = 3;	// also change this in SunLightAccumulation.txt
 
 	struct uniform_buffers {
 		bufferhandle frame_view[4];

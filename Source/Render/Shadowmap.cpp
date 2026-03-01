@@ -3,7 +3,7 @@
 #include "glad/glad.h"
 #include <glm/gtc/matrix_transform.hpp>
 
-const static int csm_resolutions[] = { 0, 256, 512, 1024 };
+const static int csm_resolutions[] = { 0, 512, 1024,2048 };
 
 void shadow_map_tweaks()
 {
@@ -46,7 +46,7 @@ void CascadeShadowMapSystem::make_csm_rendertargets()
 	args.type = GraphicsTextureType::t2DArray;
 	args.width = csm_resolution;
 	args.height = csm_resolution;
-	args.depth_3d = 4;
+	args.depth_3d = CASCADES_USED;
 	args.num_mip_maps = 1;
 	args.sampler_type = GraphicsSamplerType::CsmShadowmap;
 	safe_release(texture.shadow_array);
@@ -66,11 +66,11 @@ static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp)
 	float zrange = far - near;
 
 	const float bias = 0.0001f;
-
+	const int CASCADES_USED = CascadeShadowMapSystem::CASCADES_USED;
 	glm::vec4 planedistances;
-	for (int i = 0; i < 4; i++)
+	for (int i = 0; i < CASCADES_USED; i++)
 	{
-		float x = (i + 1) / 4.f;
+		float x = (i + 1) / float(CASCADES_USED);
 		float log = near * pow(zratio, x);
 		float linear = near + zrange * x;
 		planedistances[i] = log_lin_lerp * (log - linear) + linear + bias;
@@ -89,8 +89,10 @@ void CascadeShadowMapSystem::render_cascades()
 		auto& device = draw.get_device();
 		//RenderPassSetup setup("shadowmap", fbo.shadow, false, false /* clear it below */, 0, 0, csm_resolution, csm_resolution);
 		//auto scope = device.start_render_pass(setup);
+		const int CASCADES_USED = CascadeShadowMapSystem::CASCADES_USED;
 
-		for (int i = 0; i < 4; i++) {
+
+		for (int i = 0; i < CASCADES_USED; i++) {
 
 			RenderPassState state;
 			state.depth_info = texture.shadow_array;
@@ -169,7 +171,7 @@ void CascadeShadowMapSystem::update_matricies()
 		float far = tweak.max_shadow_dist;
 
 		split_distances = CalcPlaneSplits(near, far, tweak.log_lin_lerp_factor);
-		for (int i = 0; i < MAXCASCADES; i++)
+		for (int i = 0; i < CASCADES_USED; i++)
 			update_cascade(i, view, directional_dir);
 
 		struct Shadowmap_Csm_Ubo_Struct
@@ -179,7 +181,7 @@ void CascadeShadowMapSystem::update_matricies()
 			vec4 far_planes;
 		}upload_data;
 
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < CASCADES_USED; i++) {
 			upload_data.data[i] = matricies[i];
 			upload_data.near_planes[i] = nearplanes[i];
 			upload_data.far_planes[i] = farplanes[i];

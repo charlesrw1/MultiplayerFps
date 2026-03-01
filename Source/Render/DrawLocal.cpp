@@ -3201,10 +3201,18 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view)
 	RSunInternal* sun_internal = scene.get_main_directional_light();
 	if(sun_internal)
 	{
+
+
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
-		state.program = prog.sunlight_accumulation;
-		state.blend = BlendState::ADD;
+		if (debug_sun_shadow.get_bool()) {
+			state.program = prog.sunlight_accumulation_debug;
+			state.blend = BlendState::OPAQUE;
+		}
+		else {
+			state.program = prog.sunlight_accumulation;
+			state.blend = BlendState::ADD;
+		}
 		state.depth_testing = false;
 		state.depth_writes = false;
 		device.set_pipeline(state);
