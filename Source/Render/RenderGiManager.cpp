@@ -16,7 +16,6 @@ RenderGiManager::RenderGiManager()
 
 		auto cm = Texture::install_system("_cubemaps");
 		cm->update_specs_ptr(editable_cubemap_array);
-		cm->type = TEXTYPE_CUBEMAP_ARRAY;
 	}
 
 	cubemap_volume_buffer = IGraphicsDevice::inst->create_buffer({});

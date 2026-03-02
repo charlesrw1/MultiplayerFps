@@ -9,7 +9,6 @@ ShadowMapAtlas::ShadowMapAtlas() {
 		size = 2048;
 	atlas_size = { size,size };
 	vtsHandle = Texture::install_system("_spto_shadow");
-	vtsHandle->type = Texture_Type::TEXTYPE_2D;
 
 	CreateTextureArgs args;
 	args.width = size;

@@ -656,7 +656,6 @@ void GpuCullingTest::init_depth_pyramid(int w, int h)
 
 	auto t = Texture::load("_depth_pyramid");
 	t->update_specs_ptr(depth_pyramid);
-	t->type = Texture_Type::TEXTYPE_2D;
 }
 // 2D Polyhedral Bounds of a Clipped, Perspective-Projected 3D Sphere. Michael Mara, Morgan McGuire. 2013
 static bool projectSphere(vec3 C, float r, float znear, float P00, float P11,  vec4& aabb)

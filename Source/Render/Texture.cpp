@@ -76,73 +76,6 @@ public:
 REGISTER_ASSETMETADATA_MACRO(TextureAssetMetadata);
 #endif
 
-void texture_format_to_gl(Texture_Format infmt, GLenum* format, GLenum* internal_format, GLenum* type, bool* compressed)
-{
-	if (infmt == TEXFMT_RGBA16F || infmt == TEXFMT_RGB16F || infmt == TEXFMT_BC6)
-		*type = GL_FLOAT;
-	else
-		*type = GL_UNSIGNED_BYTE;
-
-	*compressed = false;
-
-	switch (infmt)
-	{
-	case TEXFMT_RGBA8:
-		*format = GL_RGBA;
-		*internal_format = GL_RGBA8;
-		break;
-	case TEXFMT_RGBA8_DXT1:
-		*format = GL_RGBA;
-		*internal_format = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
-		*compressed = true;
-		break;
-	case TEXFMT_RGBA8_DXT5:
-		*format = GL_RGBA;
-		*internal_format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
-		*compressed = true;
-		break;
-	case TEXFMT_RGBA16F:
-		*format = GL_RGBA;
-		*internal_format = GL_RGBA16F;
-		break;
-	case TEXFMT_RGB8:
-		*format = GL_RGB;
-		*internal_format = GL_RGB8;
-		break;
-	case TEXFMT_RGB8_DXT1:
-		*format = GL_RGB;
-		*internal_format = GL_COMPRESSED_RGB_S3TC_DXT1_EXT;
-		*compressed = true;
-		break;
-	case TEXFMT_RGB16F:
-		*format = GL_RGB;
-		*internal_format = GL_RGB16F;
-		break;
-	case TEXFMT_RG8:
-		*format = GL_RG;
-		*internal_format = GL_RG8;
-		break;
-	case TEXFMT_R8:
-		*format = GL_RED;
-		*internal_format = GL_R8;
-		break;
-	case TEXFMT_BC4:
-		*format = GL_RED;
-		*internal_format = GL_COMPRESSED_RED_RGTC1;
-		*compressed = true;
-		break;
-	case TEXFMT_BC5:
-		*format = GL_RG;
-		*internal_format = GL_COMPRESSED_RG_RGTC2;
-		*compressed = true;
-		break;
-	default:
-		ASSERT(0);
-	};
-}
-
-
-
 
 
 
@@ -162,9 +95,6 @@ const unsigned long DDSF_FOURCC = 0x00000004l;
 const unsigned long DDSF_RGB = 0x00000040l;
 const unsigned long DDSF_RGBA = 0x00000041l;
 
-// our extended flags
-const unsigned long DDSF_ID_INDEXCOLOR = 0x10000000l;
-const unsigned long DDSF_ID_MONOCHROME = 0x20000000l;
 
 // dwCaps1 flags
 const unsigned long DDSF_COMPLEX = 0x00000008l;
@@ -334,41 +264,8 @@ struct DDS_HEADER_DXT10
 	uint32_t        miscFlags2; // see DDS_MISC_FLAGS2
 };
 
-static GraphicsTextureFormat load_format_to_graphics_format(Texture_Format fmt) {
-	switch (fmt)
-	{
-	case TEXFMT_RGBA8: return GraphicsTextureFormat::rgba8;
-		break;
-	case TEXFMT_RGB8:  return GraphicsTextureFormat::rgb8;
-		break;
-	case TEXFMT_RG8:  return GraphicsTextureFormat::rg8;
-		break;
-	case TEXFMT_R8:  return GraphicsTextureFormat::r8;
-		break;
-	case TEXFMT_RGBA16F:  return GraphicsTextureFormat::rgba16f;
-		break;
-	case TEXFMT_RGB16F:  return GraphicsTextureFormat::rgb16f;
-		break;
-	case TEXFMT_RGBA8_DXT5:  return GraphicsTextureFormat::bc3;
-		break;
-	case TEXFMT_RGB8_DXT1:  return GraphicsTextureFormat::bc1;
-		break;
-	case TEXFMT_RGBA8_DXT1:  return GraphicsTextureFormat::bc1;
-		break;
-	case TEXFMT_BC4:  return GraphicsTextureFormat::bc4;
-		break;
-	case TEXFMT_BC5:  return GraphicsTextureFormat::bc5;
-		break;
-	case TEXFMT_BC6:  return GraphicsTextureFormat::bc6;
-		break;
-	default:
-		break;
-	}
-	assert(0 && "load_format_to_graphics_format: not defined");
-	return GraphicsTextureFormat::rgba8;
-}
 
-static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat);
+static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, GraphicsTextureFormat informat);
 static bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* buffer, int len)
 {
 	if (len < 4 + sizeof(ddsFileHeader_t)) return false;
@@ -518,6 +415,8 @@ bool dxgi_texture_format_to_gl(DXGI_FORMAT infmt, GraphicsTextureFormat* outfmt)
 	}
 	return true;
 }
+
+// use for bc6 cubemap array, bc6 irrad/depth textures
 bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffer, int len)
 {
 	if (len < 4 + sizeof(ddsFileHeader_t)) return false;
@@ -629,7 +528,7 @@ bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffe
 }
 
 
-static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, Texture_Format informat, bool nearest_filtered = false)
+static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, GraphicsTextureFormat informat, bool nearest_filtered = false)
 {
 	//glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
 
@@ -641,7 +540,7 @@ static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* dat
 		args.width = x;
 		args.height = y;
 		args.num_mip_maps = num_mip_maps;
-		args.format = load_format_to_graphics_format(informat);
+		args.format = informat;
 		args.type = GraphicsTextureType::t2D;
 		if (nearest_filtered)
 			args.sampler_type = GraphicsSamplerType::NearestDefault;
@@ -650,18 +549,10 @@ static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* dat
 		return IGraphicsDevice::inst->create_texture(args);
 	};
 	IGraphicsTexture* ptr = create_gpu_texture();
+	ASSERT(!ptr->is_compressed());	// compressed takes dds path
 
-	GLenum type{};
-	GLenum internal_format{};
-	GLenum format{};
-	bool compressed{};
-	texture_format_to_gl(informat, &format, &internal_format, &type, &compressed);
-
-	int size = 0;
-	if (compressed) {
-		size = ((x + 3) / 4) * ((y + 3) / 4) *
-			(informat == TEXFMT_RGBA8_DXT5 ? 16 : 8);
-	}
+	const int size = 0;
+	
 
 	//glTextureStorage2D(output->gl_id, num_mip_maps, internal_format, x, y);
 	assert(x == x_real && y == y_real);
@@ -707,16 +598,21 @@ enum class TextureMipLevel
 	Low,
 };
 
-Texture_Format to_format(int n, bool isfloat)
+GraphicsTextureFormat to_format(int n, bool isfloat)
 {
+	using gtf = GraphicsTextureFormat;
 	if (isfloat) {
-		if (n == 4) return TEXFMT_RGBA16F;
-		else if (n == 3) return TEXFMT_RGB16F;
+		if (n == 4) return gtf::rgba16f;
+		else if (n == 3) return gtf::rgb16f;
 	}
 	else {
-		if (n >= 1 && n <= 4) return Texture_Format(TEXFMT_R8 - (n - 1));
+		if (n == 1) return gtf::r8;
+		if (n == 2) return gtf::rg8;
+		if (n == 3)return gtf::rgb8;
+		if (n == 4)return gtf::rgba8;
 	}
-	return TEXFMT_RGB8;
+	ASSERT(0 && "unknown to format");
+	return gtf::rgb8;
 }
 
 #include "GameEnginePublic.h"
@@ -727,7 +623,6 @@ void Texture::move_construct(IAsset* _src)
 	uninstall();
 	assert(!gpu_ptr);
 	gpu_ptr = src->gpu_ptr;
-	type = src->type;
 	//format = src->format;
 	loaddata = std::move(src->loaddata);
 	src->gpu_ptr = nullptr;	// dont uninstall it since were just stealing it
@@ -771,7 +666,6 @@ void Texture::post_load() {
 		};
 		create_defeault(gpu_ptr, missing_tex);
 
-		type = Texture_Type::TEXTYPE_2D;
 	//	format = Texture_Format::TEXFMT_RGBA8;
 
 		return;
@@ -792,7 +686,6 @@ void Texture::post_load() {
 	if (data)
 		stbi_image_free(data);
 
-	type = Texture_Type::TEXTYPE_2D;
 
 	loaddata.reset();
 }
@@ -897,151 +790,12 @@ Texture* Texture::load(const std::string& path)
 	return g_assets.find_sync<Texture>(path).get();
 }
 #include <array>
-static bool load_dds_file_file(Texture* output, IGraphicsTexture*& out_ptr, IFile* file_ptr, const int max_mips)
-{
-	const int size = file_ptr->size();
-	const int header_buffer_size = sizeof(ddsFileHeader_t) + 4;
-	if (size < header_buffer_size)
-		return false;
-
-	std::array<std::byte, header_buffer_size> headerBuffer;
-	file_ptr->read(headerBuffer.data(), header_buffer_size);
-
-	if (char(headerBuffer[0]) != 'D' || char(headerBuffer[1]) != 'D' || char(headerBuffer[2]) != 'S' || char(headerBuffer[3]) != ' ') 
-		return false;
-
-	ddsFileHeader_t* header = (ddsFileHeader_t*)(headerBuffer.data() + 4);
-
-	uint32_t dxt1_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('1' << 24);	// aka bc1
-	uint32_t dxt5_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('5' << 24);	// aka bc3
-	uint32_t bc4u_fourcc = 'B' | ('C' << 8) | ('4' << 16) | ('U' << 24);
-	uint32_t bc5u_fourcc = 'B' | ('C' << 8) | ('5' << 16) | ('U' << 24);
-
-	Texture_Format input_format = TEXFMT_RGB8;
-	int input_width = header->Width;
-	int input_height = header->Height;
-
-	if (header->ddspf.Flags & DDSF_FOURCC) {
-		if (header->ddspf.FourCC == dxt1_fourcc) {
-			if (header->ddspf.Flags & DDSF_ALPHAPIXELS)
-				input_format = TEXFMT_RGBA8_DXT1;
-			else
-				input_format = TEXFMT_RGB8_DXT1;
-		}
-		else if (header->ddspf.FourCC == dxt5_fourcc) {
-			input_format = TEXFMT_RGBA8_DXT5;
-		}
-		else if (header->ddspf.FourCC == bc4u_fourcc) {
-			input_format = TEXFMT_BC4;
-		}
-		else if (header->ddspf.FourCC == bc5u_fourcc) {
-			input_format = TEXFMT_BC5;
-		}
-		else
-			ASSERT(0 && "bad fourcc");
-	}
-	else {
-		if (header->ddspf.RGBBitCount == 24)
-			input_format = TEXFMT_RGB8;
-		else if (header->ddspf.RGBBitCount == 32)
-			input_format = TEXFMT_RGBA8;
-		else if (header->ddspf.RGBBitCount == 16)
-			input_format = TEXFMT_RG8;
-		else if (header->ddspf.RGBBitCount == 8)
-			input_format = TEXFMT_R8;
-		else
-			ASSERT(0 && "bad bit count in dds");
-	}
-
-	int numMipmaps = 1;
-	if (header->Flags & DDSF_MIPMAPCOUNT) {
-		numMipmaps = header->MipMapCount;
-	}
-
-
-	GLenum type;
-	GLenum internal_format;
-	GLenum format;
-	bool compressed;
-	texture_format_to_gl(input_format, &format, &internal_format, &type, &compressed);
-	
-	struct MipInfo {
-		int x = 0;
-		int y = 0;
-		int data_offset = 0;
-		int size = 0;
-	};
-	std::vector<MipInfo> mip_infos;
-	auto create_mip_infos = [&]() {
-		int ux = input_width;
-		int uy = input_height;
-		const int compressed_stride = (input_format == TEXFMT_RGBA8_DXT1 || input_format == TEXFMT_RGB8_DXT1) ? 8 : 16;
-		int data_offset = header_buffer_size;
-		for (int mip_index = 0; mip_index < numMipmaps; mip_index++) {
-			int size = 0;
-			if (compressed) {
-				size = ((ux + 3) / 4) * ((uy + 3) / 4) *
-					compressed_stride;
-			}
-			else {
-				size = ux * uy * int(header->ddspf.RGBBitCount / 8);
-			}
-
-			MipInfo this_mip;
-			this_mip.x = ux;
-			this_mip.y = uy;
-			this_mip.size = size;
-			this_mip.data_offset = data_offset;
-			mip_infos.push_back(this_mip);
-
-			data_offset += size;
-			ux /= 2;
-			uy /= 2;
-			if (ux < 1)ux = 1;
-			if (uy < 1)uy = 1;
-		}
-	};
-	create_mip_infos();
-
-	auto create_gpu_texture = [](int input_width, int input_height, int num_mips, Texture_Format input_format) {
-		CreateTextureArgs args;
-		args.width = input_width;
-		args.height = input_height;
-		args.num_mip_maps = num_mips;
-		args.format = load_format_to_graphics_format(input_format);
-		args.sampler_type = GraphicsSamplerType::AnisotropyDefault;
-		return IGraphicsDevice::inst->create_texture(args);
-	};
-
-	const int mips_to_read = glm::min(max_mips, numMipmaps);
-	const int start_mip = numMipmaps - mips_to_read;
-	MipInfo& start_mip_info = mip_infos[start_mip];
-
-	out_ptr = create_gpu_texture(start_mip_info.x, start_mip_info.y, mips_to_read, input_format);
-
-	std::vector<std::byte> dataBuffer;
-	for (int load_mip_i = start_mip; load_mip_i < numMipmaps; load_mip_i++) {
-		const int final_mip_index = load_mip_i - start_mip;
-		MipInfo& this_mip_info = mip_infos[load_mip_i];
-		const int mip_size = this_mip_info.size;
-		const int mip_offset = this_mip_info.data_offset;
-		dataBuffer.resize(mip_size);
-		file_ptr->seek(mip_offset);
-		file_ptr->read(dataBuffer.data(), mip_size);
-		out_ptr->sub_image_upload(final_mip_index, 0, 0, this_mip_info.x, this_mip_info.y, mip_size, dataBuffer.data());
-	}
-
-
-//	output->format = input_format;
-
-	return true;
-	//return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
-}
 
 
 
 void texture_loading_benchmark()
 {
+	ASSERT(0);
 	std::vector<std::byte> filedata;
 	filedata.reserve(10'000'000);
 	double start = GetTime();
@@ -1063,7 +817,7 @@ void texture_loading_benchmark()
 		//ptr->read(filedata.data(), filedata.size());
 		print_time("	read file");
 		Texture dummy;
-		load_dds_file_file(&dummy, dummy.gpu_ptr, ptr.get(), max_mips);
+	//	load_dds_file_file(&dummy, dummy.gpu_ptr, ptr.get(), max_mips);
 		print_time("	load to opengl");
 		return dummy.gpu_ptr;
 	};

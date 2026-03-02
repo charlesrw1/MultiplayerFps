@@ -3284,7 +3284,6 @@ ThumbnailRenderer::ThumbnailRenderer(int size) : pass(pass_type::TRANSPARENT) {
 
 	vts_handle = Texture::install_system("_test_thumbnail");
 	vts_handle->update_specs_ptr(this->color);
-	vts_handle->type = Texture_Type::TEXTYPE_2D;
 }
 
 
@@ -3593,7 +3592,6 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 		//glTextureParameteri(cubemap->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 		//glTextureParameteri(cubemap->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-		cubemap->type = Texture_Type::TEXTYPE_CUBEMAP;
 	//	cubemap->width = cubemap->height = specular_cubemap_size;
 
 		auto set_default_parameters = [](uint32_t handle) {
@@ -4472,13 +4470,16 @@ void DebuggingTextureOutput::draw_out()
 	state.vao = draw.get_empty_vao();
 	state.blend = BlendState::BLEND;
 
-	if (output_tex->type == Texture_Type::TEXTYPE_2D)
+	using gtt = GraphicsTextureType;
+	auto type = output_tex->gpu_ptr->get_texture_type();
+
+	if (type == gtt::t2D)
 		state.program = (draw.prog.tex_debug_2d);
-	else if (output_tex->type == Texture_Type::TEXTYPE_2D_ARRAY)
+	else if (type == gtt::t2DArray)
 		state.program = (draw.prog.tex_debug_2d_array);
-	else if (output_tex->type == Texture_Type::TEXTYPE_CUBEMAP)
+	else if (type == gtt::tCubemap)
 		state.program = (draw.prog.tex_debug_cubemap);
-	else if (output_tex->type == Texture_Type::TEXTYPE_CUBEMAP_ARRAY)
+	else if (type == gtt::tCubemapArray)
 		state.program = (draw.prog.tex_debug_cubemap_array);
 	else {
 		sys_print(Error, "can only debug 2d and 2d array textures\n");

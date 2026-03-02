@@ -204,7 +204,6 @@ void DdgiTesting::create_textures_raybuffer(int probe_width, int probe_height) {
 
 	auto handle = Texture::load("_ddgi");
 	handle->update_specs_ptr(this->probe_irradiance);
-	handle->type = Texture_Type::TEXTYPE_2D;
 
 	targs.width = tiles_wide * ddgiDEPTHTILE;
 	targs.height = tiles_height * ddgiDEPTHTILE;
@@ -215,7 +214,6 @@ void DdgiTesting::create_textures_raybuffer(int probe_width, int probe_height) {
 
 	handle = Texture::load("_ddgi_d");
 	handle->update_specs_ptr(this->probe_depth);
-	handle->type = Texture_Type::TEXTYPE_2D;
 }
 
 

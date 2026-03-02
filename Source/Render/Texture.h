@@ -9,35 +9,6 @@
 #include <memory>
 #include <vector>
 
-enum Texture_Format
-{
-	TEXFMT_RGBA8,
-	TEXFMT_RGB8,
-	TEXFMT_RG8,
-	TEXFMT_R8,
-	TEXFMT_RGBA16F,
-	TEXFMT_RGB16F,
-	TEXFMT_RGBA8_DXT5,
-	TEXFMT_RGB8_DXT1,	
-	TEXFMT_RGBA8_DXT1,
-
-	TEXFMT_BC4,	// grey scale encoding
-	TEXFMT_BC5,	// normal map encoding
-	TEXFMT_BC6,	// float rgb data
-
-	TEXFMT_RG16F,
-	TEXFMT_R11G11B10F,
-};
-
-enum Texture_Type
-{
-	TEXTYPE_2D,
-	TEXTYPE_2D_ARRAY,
-	TEXTYPE_3D,
-	TEXTYPE_CUBEMAP,
-	TEXTYPE_CUBEMAP_ARRAY
-};
-
 
 class IGraphicsTexture;
 class Texture : public IAsset {
@@ -55,9 +26,6 @@ public:
 
 	glm::ivec2 get_size() const;
 	texhandle get_internal_render_handle() const;
-
-
-	Texture_Type type = Texture_Type::TEXTYPE_2D;
 
 	bool no_filtering = false;
 	bool has_mips = false;

@@ -26,7 +26,6 @@ const static int spotlight_shadow_res[] = { 128,256,512 };
 void CascadeShadowMapSystem::init()
 {
 	texture.shadow_vts_handle = Texture::install_system("_csm_shadow");
-	texture.shadow_vts_handle->type = Texture_Type::TEXTYPE_2D_ARRAY;
 
 	Debug_Interface::get()->add_hook("shadow map", shadow_map_tweaks);
 
