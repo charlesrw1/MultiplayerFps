@@ -438,15 +438,15 @@ Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset)
 	}
 	// load it
 	auto model_file = FileSys::open_read_game(asset.filename);
-	if (!model_file)
-		return nullptr;
+	//if (!model_file)
+	//	return nullptr;
 
 	string hashed = StringUtils::alphanumeric_hash(asset.filename);
 	string thumnail_path = ".thumbnails/" + hashed + ".png";
 	auto thumbnail_file = FileSys::open_read_game(thumnail_path);
 
 	Texture* out_t = nullptr;
-	if (!thumbnail_file || model_file->get_timestamp() > thumbnail_file->get_timestamp()) {
+	if (!thumbnail_file ||!model_file|| model_file->get_timestamp() > thumbnail_file->get_timestamp()) {
 		thumbnail_file.reset();
 		model_file.reset();
 		Model* the_model{};

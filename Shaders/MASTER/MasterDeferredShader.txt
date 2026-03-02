@@ -71,7 +71,7 @@ layout (binding = 4, std430) readonly buffer GlobalMaterialBuffer {
 layout (location = 0) in vec3 VS_IN_Postion;
 layout (location = 1) in vec2 VS_IN_TexCoord;
 layout (location = 2) in vec3 VS_IN_Normal;
-layout (location = 3) in vec3 VS_IN_Tangent;
+layout (location = 3) in uvec3 VS_IN_Tangent;
 
 #ifdef LIGHTMAPPED
 layout (location = 4) in vec2 VS_IN_LightmapCoord;
@@ -130,6 +130,18 @@ vec3 calc_local_animated_pos_last_frame(uint obj_index)
 }
 #endif // !ANIMATED
 
+#define INT16_MAX  32767
+vec4 get_tangent_handedness()
+{
+	uint z_val = VS_IN_Tangent.z;
+	float Tz = float(z_val & 0x7FFF) / 0x7FFF * 2.0 - 1.0;   // magnitude
+	float handedness = (z_val & 0x8000) != 0 ? -1.0 : 1.0;    // sign bit
+	return vec4(
+		vec3(
+		(vec2(VS_IN_Tangent.xy) / 0x7FFF)*2.0-vec2(1.0), 
+		Tz),
+		handedness);
+}
 
 void main()
 {
@@ -144,6 +156,15 @@ void main()
 	vec3 local_tangent = vec3(0.0);
 	
 	uvec4 object_flags_anim = load_object_flags_and_anim(obj_index);
+	
+	
+	// decode tangent
+	
+	
+	const vec4 _tangent_to_use = get_tangent_handedness();
+	const vec3 VS_Tangent_Adjusted = _tangent_to_use.xyz;
+	const float VS_Tangent_Handedness = _tangent_to_use.w;
+	
 #ifdef ANIMATED
 
 	uint obj_skin_offset = object_flags_anim.y;
@@ -157,7 +178,7 @@ void main()
 		vec3 normaladded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_IN_Normal;
 		local_normal += normaladded * VS_IN_BoneWeights[i];
 		
-		vec3 tangentadded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_IN_Tangent;
+		vec3 tangentadded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_Tangent_Adjusted;
 		local_tangent += tangentadded;
 	}
 	local_normal = normalize(local_normal);
@@ -165,7 +186,7 @@ void main()
 #else	// (NOT ANIMATED)
 	local_pos = VS_IN_Postion;
 	local_normal = VS_IN_Normal;
-	local_tangent = VS_IN_Tangent;
+	local_tangent = VS_Tangent_Adjusted;
 
 #endif // ANIMATED
 
@@ -192,14 +213,18 @@ void main()
 			normal_matrix = mat3(ObjModelMatrix);
 		}
 		
-		FS_IN_Normal = normal_matrix*(local_normal);
+		FS_IN_Normal = normalize(normal_matrix*(local_normal));
 		vec3 world_tangent = normal_matrix*(local_tangent);
 
-		vec3 world_bitangent = cross(FS_IN_Normal, world_tangent);
+		//vec3 world_bitangent = cross(FS_IN_Normal, world_tangent) * VS_Tangent_Handedness;
+		
+		vec3 T = normalize(world_tangent - FS_IN_Normal * dot(FS_IN_Normal, world_tangent));
+		vec3 B = normalize(cross(FS_IN_Normal, T) * VS_Tangent_Handedness);
+		
 		FS_IN_TBN = mat3(
-		normalize(local_tangent  ), 
-		normalize(world_bitangent), 
-		normalize(FS_IN_Normal   ));
+		T, 
+		B, 
+		FS_IN_Normal);
 	#endif // DEPTH_ONLY
     
     FS_IN_NDC = g.viewproj * vec4(FS_IN_FragPos, 1.0);

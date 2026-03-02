@@ -394,6 +394,7 @@ const ClassTypeInfo* AssetRegistrySystem::find_asset_type_for_ext(const std::str
 void HackedAsyncAssetRegReindex::post_load()  {
 	AssetRegistrySystem::get().root = std::move(root);
 }
+#include <unordered_set>
 #include "Framework/MapUtil.h"
 bool HackedAsyncAssetRegReindex::load_asset(IAssetLoadingInterface*, AssetFilesystemNode& rootToClone)  {
 	std::vector<AssetOnDisk> diskAssets;
@@ -405,6 +406,7 @@ bool HackedAsyncAssetRegReindex::load_asset(IAssetLoadingInterface*, AssetFilesy
 	AssetMetadata* soundMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("SoundFile"));
 	AssetMetadata* fontMeta = (AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("GuiFont"));
 
+	std::unordered_set<string> models;
 	for (const auto& file : FileSys::find_game_files()) {
 		auto ext = get_extension_no_dot(file);
 		auto gamepath = FileSys::get_game_path_from_full_path(file);
@@ -423,8 +425,13 @@ bool HackedAsyncAssetRegReindex::load_asset(IAssetLoadingInterface*, AssetFilesy
 			diskAssets.push_back(aod);
 		}
 		else if (ext == "cmdl") {
-			aod.type = modelMeta;
-			diskAssets.push_back(aod);
+			models.insert(aod.filename);
+		}
+		else if (ext == "mis") {
+			auto& file = aod.filename;
+			StringUtils::remove_extension(file);
+			file += ".cmdl";
+			models.insert(file);
 		}
 		else if (ext == "wav") {
 			aod.type = soundMeta;
@@ -434,6 +441,12 @@ bool HackedAsyncAssetRegReindex::load_asset(IAssetLoadingInterface*, AssetFilesy
 			aod.type = fontMeta;
 			diskAssets.push_back(aod);
 		}
+	}
+	for (auto& m : models) {
+		AssetOnDisk aod;
+		aod.filename = std::move(m);
+		aod.type = modelMeta;
+		diskAssets.push_back(aod);
 	}
 
 	for (int i = 0; i < all_assettypes.size(); i++){

@@ -33,7 +33,7 @@
 // MODEL FORMAT:
 // HEADER
 // int magic 'C' 'M' 'D' 'L'
-static const int MODEL_VERSION = 14;
+static const int MODEL_VERSION = 18;
 // int version XXX
 // 
 // mat4 root_transform
@@ -178,7 +178,8 @@ struct FATVertex
 {
 	glm::vec3 position;
 	glm::vec3 normal;
-	glm::vec3 tangent;
+	glm::vec4 tangent;	//xyz=tangent, w = handedness
+
 	glm::vec4 bone_weight;
 	glm::ivec4 bone_index;
 
@@ -580,7 +581,7 @@ void append_a_found_mesh_node(
 						v.tangent = FormatConverter::convert_to_floatvec(ptr, ct, type, normalized);
 					}, vert_start, mcd.verticies, &accessor);
 				location = CMA_TANGENT;
-			}
+			}	
 			else if (strcmp(attribute.name, "COLOR_1") == 0) {
 				sys_print(Warning, "mesh has COLOR_1 attribute, ignoring it\n");
 			}
@@ -611,6 +612,7 @@ void append_a_found_mesh_node(
 				
 				// compute something thats orthogonal just so the mesh has something
 				glm::vec3 output_tangent = glm::vec3(0.f);
+				float output_handedness = 1.0;
 				if (glm::abs(glm::dot(v0.normal, glm::vec3(0, 1, 0))) < 0.9999) {
 					output_tangent = glm::normalize(glm::cross(v0.normal, glm::vec3(0, 1, 0)));
 				}
@@ -621,11 +623,16 @@ void append_a_found_mesh_node(
 				if (glm::abs(denom) > 0.0000001f) {
 					float f = 1.0f / denom;
 					glm::vec3 tangent = f * (deltauv_2.y * edge_1 - deltauv_1.y * edge_2);
+
+					glm::vec3 bitangent = f * (-deltauv_2.x * edge_1 + deltauv_1.x * edge_2);
+					bitangent = glm::normalize(bitangent);
 					float len = glm::length(tangent);
 					if (len > 0.000001f)
 						output_tangent = tangent / len;
+
+					output_handedness = (glm::dot(glm::cross(v0.normal, tangent), bitangent) < 0.0f) ? -1.0f : 1.0f;
 				}
-				v0.tangent = v1.tangent = v2.tangent = output_tangent;
+				v0.tangent = v1.tangent = v2.tangent = glm::vec4(output_tangent, output_handedness);
 			}
 
 		}
@@ -1334,6 +1341,7 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 				 const int num_i = part_obj.submesh.element_count;
 				 std::vector<uint32_t> indicies(num_i);
 
+
 				 float out_er = 0.0;
 
 				 float err_allowed = 0.1;
@@ -1381,6 +1389,11 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 						// break;	// okay actually stop now
 					 }
 						// stop gening lods when you arent getting better than 80%
+				 }
+
+				 if (result_count == 0) {
+					 wants_stop_count += 1;
+					 break;
 				 }
 
 
@@ -2417,6 +2430,11 @@ std::vector<std::string> ModelCompileHelper::create_final_material_names(
 
 		if (index_accum < def.directMaterialSet.size())
 			mat_name = def.directMaterialSet[index_accum];
+		if (!mat_name.ends_with(".mi") && !mat_name.ends_with(".mm")) {
+			sys_print(Warning, "Exported material %s doesnt end with '.mi' or '.mm', adding it\n", mat_name.c_str());
+			mat_name += ".mi";
+		}
+
 		final_mats[i] = mat_name;
 		index_accum++;
 	}
@@ -2548,11 +2566,34 @@ void add_data_to_vertex_shared(const FATVertex& v, const glm::mat4& transform, c
 	for (int i = 0; i < 3; i++) {
 		mv.normal[i] = normal[i] * INT16_MAX;
 	}
-	glm::vec3 tangent = normal_tr * v.tangent;
+
+	// FIX, encoding bitangent in tangent, not sure why i didnt do this before
+
+	glm::vec3 tangent = normal_tr * glm::vec3(v.tangent);
 	tangent = glm::normalize(tangent);
-	for (int i = 0; i < 3; i++) {
-		mv.tangent[i] = tangent[i] * INT16_MAX;
+
+	for (int i = 0; i < 2; i++) {
+		uint16_t z_magnitude = uint16_t(glm::clamp(tangent[i] * 0.5 + 0.5, 0.0, 1.0) * 0x7FFF);
+		mv.tangent[i] = *reinterpret_cast<int16_t*>(&z_magnitude);
+
 	}
+
+	// OMG I HATE FIXING NORMALMAP BUGS REEEEEEEEEEEEEE
+
+	// use 1 of the bits to encode hanedness
+	const float handedness = v.tangent.w;
+	//const float tz = glm::clamp(tangent[2] * 0.5 + 0.5,0.0,1.0);	// positive [0,1]
+	//mv.tangent[2] = int16_t((tz * INT16_MAX));
+	//if (handedness < 0)
+	//	mv.tangent[2] *= -1;
+	
+	uint16_t sign_bit = (handedness < 0) ? 0x8000 : 0x0000; // top bit
+	uint16_t z_magnitude = int16_t(glm::clamp(tangent.z * 0.5 + 0.5, 0.0, 1.0) * 0x7FFF);
+	uint16_t packed = z_magnitude | sign_bit;
+	mv.tangent[2] = *reinterpret_cast<int16_t*>(&packed);
+
+	// in shader:
+	// if tangent.z < 0, then flip bitangent. tangent.z = (tangent.z*2.0-1.0)
 }
 
 ModelVertex fatvert_to_mv_skinned(const FATVertex& v, const glm::mat4& transform, const glm::mat3& normal_tr)

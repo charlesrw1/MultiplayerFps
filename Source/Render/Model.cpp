@@ -77,7 +77,7 @@ Model* Model::load(std::string path)
 }
 Model::Model() {}
 
-static const int MODEL_FORMAT_VERSION = 14;
+static const int MODEL_FORMAT_VERSION = 18;
 
 static const int STATIC_VERTEX_SIZE = 4'000'000;
 static const int STATIC_INDEX_SIZE = 6'000'000;
@@ -777,7 +777,7 @@ void ModelMan::init()
 			VertexLayout(POSITION_LOC,3,gvat::float32,stride,offsetof(ModelVertex, pos)),
 			VertexLayout(UV_LOC,2,gvat::float32,stride,offsetof(ModelVertex, uv)),
 			VertexLayout(NORMAL_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, normal[0])),
-			VertexLayout(TANGENT_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, tangent[0])),
+			VertexLayout(TANGENT_LOC,3,gvat::u16,stride,offsetof(ModelVertex, tangent[0])),
 			VertexLayout(JOINT_LOC,4,gvat::u8,stride,offsetof(ModelVertex, color[0])),
 			VertexLayout(WEIGHT_OR_COLOR_LOC,4,gvat::u8_normalized,stride,offsetof(ModelVertex, color2[0])),
 		};

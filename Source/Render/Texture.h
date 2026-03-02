@@ -58,7 +58,7 @@ public:
 
 
 	Texture_Type type = Texture_Type::TEXTYPE_2D;
-	Texture_Format format{};
+
 	bool no_filtering = false;
 	bool has_mips = false;
 	bool is_float = false;

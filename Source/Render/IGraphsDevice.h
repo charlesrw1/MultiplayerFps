@@ -66,6 +66,7 @@ enum class GraphicsTextureFormat : int8_t {
 	r32f,
 	rg32f,
 	bc1,
+	bc1_srgb,
 	bc3,
 	bc4,
 	bc5,
@@ -110,6 +111,7 @@ public:
 	virtual glm::ivec2 get_size() const = 0;
 	virtual GraphicsTextureFormat get_texture_format() const = 0;
 	virtual GraphicsTextureType get_texture_type() const = 0;
+	virtual int get_compressed_stride() const = 0;
 };
 
 // used for vertex,index,uniform, and shader storage buffers

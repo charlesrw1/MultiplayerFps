@@ -4009,8 +4009,11 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		blitInfo.src.texture = tex.scene_color;
 		blitInfo.dest.texture = tex.scene_gbuffer0;
 		IGraphicsDevice::inst->blit_textures(blitInfo);
+
 	};
-	copy_forward_to_temporary();
+
+	if (r_taa_enabled.get_bool())
+		copy_forward_to_temporary();
 
 	auto draw_forward_pass = [&]() {
 		GPUSCOPESTART(draw_forward_pass_scope);
@@ -4046,6 +4049,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 	if(!params.skybox_only)
 		draw_height_fog();
+
 
 	draw_forward_pass();
 

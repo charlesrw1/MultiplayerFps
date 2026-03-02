@@ -170,6 +170,8 @@ public:
 			break;
 		case GraphicsTextureFormat::bc1: return GL_COMPRESSED_RGB_S3TC_DXT1_EXT;
 			break;
+		case GraphicsTextureFormat::bc1_srgb: return GL_COMPRESSED_SRGB_S3TC_DXT1_EXT;
+			break;
 		case GraphicsTextureFormat::bc3: return GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
 			break;
 		case GraphicsTextureFormat::bc4: return GL_COMPRESSED_RED_RGTC1;
@@ -348,6 +350,13 @@ public:
 		int fmt_i = (int)my_fmt;
 		return fmt_i >= first && fmt_i <= last;
 	}
+	int get_compressed_stride() const final {
+		ASSERT(is_compressed());
+		if (my_fmt == GraphicsTextureFormat::bc1 || my_fmt == GraphicsTextureFormat::bc1_srgb || my_fmt == GraphicsTextureFormat::bc4)
+			return 8;
+		return 16;
+	}
+
 	GLenum get_input_type() const {
 		if (my_fmt == GraphicsTextureFormat::r11f_g11f_b10f)
 			return GL_UNSIGNED_INT_10F_11F_11F_REV;

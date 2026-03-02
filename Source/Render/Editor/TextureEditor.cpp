@@ -200,9 +200,17 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 
 	const std::string pathToNvidiaTextureConvertTool = "./x64/Debug/texconv.exe";
 
-	const std::string format = (tis->is_normalmap) ? "BC5_UNORM" : "BC1_UNORM";
+	string format = "BC1_UNORM";
+	if (tis->is_normalmap)
+		format = "BC5_UNORM";
+	else if (tis->is_srgb)
+		format = "BC1_UNORM_SRGB";
+
 	std::string commandLine = pathToNvidiaTextureConvertTool + " -f ";
 	commandLine += format;
+
+	if (tis->is_srgb)
+		commandLine += " -srgb ";
 
 	if (tis->resize_width != 0) {
 		commandLine += " -w " + std::to_string(tis->resize_width);
