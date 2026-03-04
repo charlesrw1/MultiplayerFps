@@ -699,7 +699,7 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 		return true;
 
 #ifdef EDITOR_BUILD
-	if (developer_mode.get_bool()) {
+	if (developer_mode.get_bool()&&!force_nearest) {
 		// this will check if a compile is needed
 		bool good = compile_texture_asset(path,loading,this->simplifiedColor);
 		if (good)
@@ -724,7 +724,7 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 
 	if (path.find("/_nearest")!=std::string::npos)
 		user->wantsNearestFiltering = true;	// hack moment
-
+	user->wantsNearestFiltering |= force_nearest;
 
 	user->filedata.resize(file->size());
 	file->read(user->filedata.data(), user->filedata.size());
@@ -777,6 +777,17 @@ Texture* Texture::install_system(const std::string& path)
 {
 	Texture* t = new Texture;
 	g_assets.install_system_asset(t, path);
+	return t;
+}
+Texture* Texture::force_load_for_ui(const string& name)
+{
+	Texture* t = Texture::install_system(name);
+	t->set_loaded_manually_unsafe(name);
+	t->force_nearest = true;	// hack
+	const bool good = t->load_asset(nullptr/*hope nobody uses this*/);
+	if(good)
+		t->post_load();
+
 	return t;
 }
 Texture::Texture() {}

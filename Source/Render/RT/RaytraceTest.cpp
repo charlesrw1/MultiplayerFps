@@ -396,6 +396,10 @@ void ddgi_debugmenu() {
 	ImGui::InputFloat("relocate_normal_dist", &relocate_normal_dist);
 	ImGui::SliderInt("lum_adjust", &lum_adjust_mode, 0, 7);
 
+	ImGui::InputFloat("max_relocate_dist", &self->max_relocate_dist);
+	ImGui::InputFloat("indirect_boost", &self->indirect_boost);
+
+
 }
 ADD_TO_DEBUG_MENU(ddgi_debugmenu);
 void set_shit_fuck() {
@@ -436,6 +440,8 @@ void DdgiTesting::execute()
 	globals.atlas_x = width_probe_space;
 	globals.atlas_y = height_probe_space;
 	globals.num_volumes = volumes.size();
+	globals.max_relocate_dist = max_relocate_dist;
+	globals.indirect_boost = indirect_boost;
 	globals.relocate_normal_dist = relocate_normal_dist;
 	ddgi_globals->upload(&globals, sizeof(globals));
 	ddgi_volumes->upload(volumes.data(), volumes.size() * sizeof(DdgiVolumeGpu));

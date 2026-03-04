@@ -14,8 +14,8 @@ struct DdgiGlobals {
 	
 	int num_volumes;
 	float relocate_normal_dist;
-	int padding1;
-	int padding2;
+	float max_relocate_dist;
+	float indirect_boost;
 };
 
 layout (binding = 8, std140) uniform DdgiGlobalsBuffer {

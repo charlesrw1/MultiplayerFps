@@ -124,6 +124,7 @@ void BVHBuilder::build_R(int start, int end, int node_number)
 		for (int i = start; i < end; i++) {
 			glm::vec3 centroid = centroids[indicies[i]];
 			int bin_idx = glm::min(NUM_BINS - 1, (int)((centroid[a] - bounds_min) * scale));
+			bin_idx = glm::max(bin_idx, 0);
 			bins[bin_idx].tri_count++;
 			bins[bin_idx].aabb = bounds_union(bins[bin_idx].aabb, bounds[indicies[i]]);
 		}

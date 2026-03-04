@@ -140,7 +140,7 @@ vec3 evaluate_lighting(vec3 pos, vec3 normal, vec3 albedo)
 	if(do_irrad_calcs) {
 		vec3 biased_world_position = pos+normal*0.1;
 	
-		irrad =  calculate_irradiance(normal,pos,biased_world_position);
+		irrad =  calculate_irradiance(normal,pos,biased_world_position) * ddgi_global.indirect_boost;
 		
 	}
 	
@@ -233,7 +233,7 @@ void main()
 	}
 	
 	#ifdef RELOCATE
-		if(best_dist >= 1.0)	{ // fixme
+		if(best_dist >= ddgi_global.max_relocate_dist)	{ // fixme
 			best_relocate_pos = probe_pos;
 		}
 		ddgi_probe_relocations_write[global_index] = vec4(best_relocate_pos-probe_pos,0.0);

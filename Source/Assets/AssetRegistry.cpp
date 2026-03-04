@@ -393,6 +393,14 @@ const ClassTypeInfo* AssetRegistrySystem::find_asset_type_for_ext(const std::str
 
 void HackedAsyncAssetRegReindex::post_load()  {
 	AssetRegistrySystem::get().root = std::move(root);
+	AssetRegistrySystem::get().linear_list = {};
+	auto recurse = [](auto&& self, vector<AssetFilesystemNode*>& outlist, AssetFilesystemNode* node) -> void {
+		if (node->children.empty())
+			outlist.push_back(node);
+		for (auto a : node->sorted_list)
+			self(self, outlist, a);
+	};
+	recurse(recurse, AssetRegistrySystem::get().linear_list, AssetRegistrySystem::get().root.get());
 }
 #include <unordered_set>
 #include "Framework/MapUtil.h"

@@ -71,6 +71,10 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 			if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
 				b->selected_resource = asset;
 				auto type = asset.type;
+
+				if (ImGui::GetIO().MouseClicked[2]) {
+					ImGui::OpenPopup("asset-click-menu");
+				}
 				if (ImGui::GetIO().MouseClickedCount[0] == 2) {
 					//auto assetType = type->get_asset_class_type();
 					if (type->get_type_name()=="Map") {
@@ -153,9 +157,126 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 
 	}
 }
+extern void OpenInNotepad(const string& name);
+extern void SetClipboardText(const string& name);
+
+static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesystemNode* node, string parent_path)
+{
+	const float folder_indent = 20.0;
+	const int name_filter_len = strlen(b->asset_name_filter);
+
+		// leaf node
+		if (node->children.empty()) {
+			auto& asset = node->asset;
+			
+
+			ImGui::PushID(node);
+
+			ImGuiSelectableFlags selectable_flags = ImGuiSelectableFlags_AllowDoubleClick | ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+			bool item_is_selected = b->selected_resource.filename == asset.filename;
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			if (ImGui::Selectable("##selectednode", item_is_selected, selectable_flags, ImVec2(0, 0))) {
+				b->selected_resource = asset;
+				auto type = asset.type;
+				if (ImGui::GetIO().MouseClickedCount[0] == 2) {
+					//auto assetType = type->get_asset_class_type();
+					if (type->get_type_name() == "Map") {
+						Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, ("open-editor " + asset.filename).c_str());
+					}
+					else {
+						sys_print(Warning, "AssetBrowser: Asset is not a standard IAsset, can't edit.\n");
+					}
+				}
+			}
+			if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
+				b->selected_resource = asset;
+				ImGui::OpenPopup("asset-click-menu");
+			}
+
+			if (ImGui::BeginPopup("asset-click-menu")) {
+				ImGui::Text("%s",b->selected_resource.filename.c_str());
+				ImGui::Separator();
+				if (ImGui::MenuItem("Copy to clipboard")) {
+					SetClipboardText(b->selected_resource.filename);
+					ImGui::CloseCurrentPopup();
+				}
+				if (ImGui::MenuItem("Open in notepad")) {
+					OpenInNotepad(b->selected_resource.filename);
+					ImGui::CloseCurrentPopup();
+				}
+				ImGui::EndPopup();
+			}
+
+
+			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+			{
+				b->drag_drop = asset;
+				auto ptr = &b->drag_drop;
+
+
+				ImGui::SetDragDropPayload("AssetBrowserDragDrop", &ptr, sizeof(AssetOnDisk*));
+
+				ImGui::TextColored(color32_to_imvec4(asset.type->get_browser_color()), "%s", asset.type->get_type_name().c_str());
+				ImGui::Text("Asset: %s", asset.filename.c_str());
+
+				ImGui::EndDragDropSource();
+			}
+
+			ImGui::SameLine();
+			ImGui::Dummy(ImVec2(indents * folder_indent, 0.1));
+			ImGui::SameLine();
+			if (ignore_folders.get_bool()) {
+				string name = parent_path + "/" + node->name;
+				ImGui::Text(name.c_str());
+
+			}
+			else {
+				ImGui::Text(node->name.c_str());
+			}
+
+			ImGui::TableNextColumn();
+			ImGui::TextColored(color32_to_imvec4(asset.type->get_browser_color()), "%s", asset.type->get_type_name().c_str());
+
+			ImGui::PopID();
+		}
+	
+}
 
 static void draw_browser_tree_view(AssetBrowser* b)
 {
+	auto& linear = AssetRegistrySystem::get().get_linear_list();
+	const int name_filter_len = strlen(b->asset_name_filter);
+	vector<AssetFilesystemNode*> linear2;
+	for (auto node : linear) {
+		auto& asset = node->asset;
+		if (!b->should_type_show(1 << asset.type->self_index)) {
+			continue;
+		}
+		if (!b->filter_match_case && name_filter_len > 0) {
+			std::string path = asset.filename;
+			for (int i = 0; i < path.size(); i++) path[i] = tolower(path[i]);
+			if (path.find(b->all_lower_cast_filter_name, 0) == std::string::npos)
+				continue;
+		}
+		else if (name_filter_len > 0) {
+			if (asset.filename.find(b->asset_name_filter) == std::string::npos)
+				continue;
+		}
+		linear2.push_back(node);
+	}
+
+	ImGuiListClipper clipper;
+	clipper.Begin(linear2.size());
+	//IteratorDraw iter(this, rootnode.get());
+	//int cur_n = 0;
+	//ImGuiTableFlags const flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_ScrollY;
+	//if (ImGui::Begin("PropEdit")) {
+
+
+
+
+
 	uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
 		ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
 	if (ImGui::BeginTable("Browser", 2, ent_list_flags))
@@ -165,31 +286,29 @@ static void draw_browser_tree_view(AssetBrowser* b)
 
 		ImGui::TableHeadersRow();
 
+
+		while (clipper.Step()) {
+	
+			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
+				draw_browser_tree_view_R2(b, 0, linear2.at(i), "");
+			}
+		}
+
 		
-		auto root = AssetRegistrySystem::get().get_root_files();
-		if(root)
-			draw_browser_tree_view_R(b, 0, root, "");
+		//auto root = AssetRegistrySystem::get().get_root_files();
+		//if(root)
+		//	draw_browser_tree_view_R(b, 0, root, "");
 
 		ImGui::EndTable();
 	}
+
+	clipper.End();
+
 }
 
 // too much of a brainlet do the dumb thing
 void fill_big_vector(std::vector<AssetFilesystemNode*>& nodes, AssetFilesystemNode* root) {
-	if (!root)
-		return;
-	auto recurse = [](auto&& self, AssetFilesystemNode* n, std::vector<AssetFilesystemNode*>& nodes) -> void {
-		if (!n->is_folder()) {
-			assert(n->children.empty());
-			nodes.push_back(n);
-		}
-		else {
-			for (auto c : n->sorted_list) {
-				self(self, c, nodes);
-			}
-		}
-	};
-	recurse(recurse, root, nodes);
+	nodes = AssetRegistrySystem::get().get_linear_list();
 }
 #include "Render/Model.h"
 #include "Framework/StringUtils.h"
@@ -242,23 +361,13 @@ void AssetBrowser::draw_browser_grid() {
 		ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY ;
 
 
-	std::vector<AssetFilesystemNode*> items;
-	fill_big_vector(items, AssetRegistrySystem::get().get_root_files());
-
-	const int name_filter_len = strlen(asset_name_filter);
-	if (ImGui::BeginTable("Browser", boxes, ent_list_flags))
+	std::vector<AssetFilesystemNode*> items2;
 	{
-		for (int i = 0; i < boxes; i++) {
-			ImGui::TableSetupColumn("##blah", ImGuiTableColumnFlags_WidthStretch);
-		}
+		std::vector<AssetFilesystemNode*> items;
+		fill_big_vector(items, AssetRegistrySystem::get().get_root_files());
 
-		int cur_row = 0;
-		int cur_col = 0;
-
-		for (auto c : items) {
-			Texture* t = thumbnails.get_thumbnail(c->asset);
-			if (!t) 
-				continue;
+		const int name_filter_len = strlen(asset_name_filter);
+		for (auto& c : items) {
 			{
 				auto& asset = c->asset;
 				if (!filter_match_case && name_filter_len > 0) {
@@ -272,46 +381,71 @@ void AssetBrowser::draw_browser_grid() {
 						continue;
 				}
 			}
-		
-			ImGui::PushID(c);
-			if (cur_col == 0) {
-				ImGui::TableNextRow();
-			}
-			ImGui::TableNextColumn();
+			Texture* t = thumbnails.get_thumbnail(c->asset);
+			if (!t)
+				continue;
+			items2.push_back(c);
+		}
+	}
+	ImGuiListClipper clipper;
+	clipper.Begin(glm::ceil(items2.size()/float(boxes)));
 
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+
+	auto draw_item = [&](const int item_idx) {
+		auto& c = items2.at(item_idx);
+		Texture* t = thumbnails.get_thumbnail(c->asset);
+		ASSERT(t);
+		ImGui::TableNextColumn();
+		ImGui::PushID(c);
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 		//	ImGui::ImageButton(ImTextureID(uint64_t(t->get_internal_render_handle())), ImVec2(64, 64),ImVec2(0, 1), ImVec2(1, 0));
-			string only_filename = c->asset.filename;
-			StringUtils::get_filename(only_filename);
+		string only_filename = c->asset.filename;
+		StringUtils::get_filename(only_filename);
 
-			const int THUMB_SIZE = (big_thumbnail) ? 128 : 64;
+		const int THUMB_SIZE = (big_thumbnail) ? 128 : 64;
 
-			ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())), ImVec2(THUMB_SIZE, THUMB_SIZE), only_filename.c_str());
-			ImGui::PopStyleColor();
-			if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
-			{
-				drag_drop = c->asset;
-				auto ptr = &drag_drop;
-				ImGui::SetDragDropPayload("AssetBrowserDragDrop", &ptr, sizeof(AssetOnDisk*));
+		ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())), ImVec2(THUMB_SIZE, THUMB_SIZE), only_filename.c_str());
+		ImGui::PopStyleColor();
+		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None))
+		{
+			drag_drop = c->asset;
+			auto ptr = &drag_drop;
+			ImGui::SetDragDropPayload("AssetBrowserDragDrop", &ptr, sizeof(AssetOnDisk*));
 
-				ImGui::TextColored(color32_to_imvec4(c->asset.type->get_browser_color()), "%s", c->asset.type->get_type_name().c_str());
-				ImGui::Text("Asset: %s", c->asset.filename.c_str());
+			ImGui::TextColored(color32_to_imvec4(c->asset.type->get_browser_color()), "%s", c->asset.type->get_type_name().c_str());
+			ImGui::Text("Asset: %s", c->asset.filename.c_str());
 
-				ImGui::EndDragDropSource();
-			}
+			ImGui::EndDragDropSource();
+		}
+		ImGui::PopID();
+	};
 
-			cur_col += 1;
-			if (cur_col >= boxes) {
-				cur_col = 0;
-				cur_row += 1;
-			}
-			ImGui::PopID();
+	auto draw_in_row = [&](const int row) {
+		ImGui::TableNextRow();
+		const int start = row * boxes;
+		for (int i = 0; i < boxes; i++) {
+			const int index = start + i;
+			if (index >= items2.size())
+				break;
+			draw_item(index);
+		}
+	};
+
+	if (ImGui::BeginTable("Browser", boxes, ent_list_flags))
+	{
+		for (int i = 0; i < boxes; i++) {
+			ImGui::TableSetupColumn("##blah", ImGuiTableColumnFlags_WidthStretch);
 		}
 
+		while (clipper.Step()) {
 
+			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
+				draw_in_row(i);
+			}
+		}
 		ImGui::EndTable();
 	}
-
+	clipper.End();
 }
 
 
@@ -362,6 +496,7 @@ void AssetBrowser::imgui_draw()
 		ImGui::End();
 		return;
 	}
+
 
 	uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
 		ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable | ImGuiTableFlags_Sortable;
@@ -469,13 +604,13 @@ Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset)
 			// hmm..
 			idraw->editor_render_thumbnail_for(the_model, override_mat, 128,128, FileSys::get_full_path_from_game_path(thumnail_path));
 		}
-		out_t = Texture::load(thumnail_path);
+		out_t = Texture::force_load_for_ui(thumnail_path);
 		//out_t = Texture::load("eng/icon/_nearest/skylight.png");
 	}
 	else {
 		thumbnail_file.reset();
 		model_file.reset();
-		out_t = Texture::load(thumnail_path);
+		out_t = Texture::force_load_for_ui(thumnail_path);
 	}
 	cache[asset.filename] = out_t;
 	return out_t;

@@ -30,6 +30,69 @@ void write_texture_import_settings(TextureImportSettings* tis, const std::string
 		sys_print(Error, "write_texture_import_settings Couldnt open file to write out new version of mis %s\n", path.c_str());
 	}
 }
+void SetClipboardText(const std::string& text)
+{
+	if (!OpenClipboard(nullptr))
+		return;
+
+	EmptyClipboard();
+
+
+	HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, text.size() + 1);
+	if (!hMem)
+	{
+		CloseClipboard();
+		return;
+	}
+	memcpy(GlobalLock(hMem), text.c_str(), text.size() + 1);
+	GlobalUnlock(hMem);
+
+
+	SetClipboardData(CF_TEXT, hMem);
+
+	CloseClipboard();
+
+	// Do NOT free hMem after SetClipboardData — clipboard owns it now
+}
+#include "Framework/StringUtils.h"
+void OpenInNotepad(const string& name)
+{
+	string path = name;
+	string stripped= StringUtils::strip_extension(name);
+	auto ext = StringUtils::get_extension(name);
+	if (ext == ".mi" || ext == ".mm") {
+
+	}
+	else if (ext == ".cmdl") {
+		path=stripped+ ".mis";
+	}
+	else if (ext == ".dds") {
+		path = stripped + ".tis";
+	}
+	else if (ext == ".tmap") {
+
+	}
+	else {
+		sys_print(Warning, "cant open that\n");
+		return;
+	}
+
+	string fullpath = FileSys::get_full_path_from_game_path(path);
+
+	std::string commandLine = "powershell.exe -Command \"n++ '" + fullpath+"'\"";
+	
+	STARTUPINFOA startup = {};
+	PROCESS_INFORMATION out = {};
+
+	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup, &out)) {
+		sys_print(Error, "couldn't create process\n");
+		return;
+	}
+	WaitForSingleObject(out.hProcess, INFINITE);
+	CloseHandle(out.hProcess);
+	CloseHandle(out.hThread);
+	return;
+}
 
 
 void IMPORT_TEX(const Cmd_Args& args)
@@ -209,6 +272,7 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 	std::string commandLine = pathToNvidiaTextureConvertTool + " -f ";
 	commandLine += format;
 
+	// otherwise texconv picks up on input .png srgb randomly incorrectly
 	if (tis->is_srgb)
 		commandLine += " -srgb ";
 

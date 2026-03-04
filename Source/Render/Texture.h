@@ -45,7 +45,11 @@ public:
 		return glm::floor(glm::log2((double)glm::max(width, height))) + 1;
 	}
 	IGraphicsTexture* gpu_ptr = nullptr;
+
+
+	static Texture* force_load_for_ui(const std::string& name);
 private:
+	bool force_nearest = false;
 	struct LoadData {
 		std::vector<uint8_t> filedata;
 		bool isDDSFile = false;
