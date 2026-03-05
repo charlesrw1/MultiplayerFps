@@ -60,7 +60,7 @@ public:
 	Model* get_light_dome() const { return LIGHT_DOME; }
 	Model* get_light_sphere() const { return LIGHT_SPHERE; }
 	Model* get_light_cone() const { return LIGHT_CONE; }
-	void add_model_to_list(Model* m);
+
 	void remove_model_from_list(Model* m);
 
 	const hash_set<Model>& get_all_models() const {

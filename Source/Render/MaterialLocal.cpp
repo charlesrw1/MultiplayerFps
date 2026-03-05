@@ -1079,33 +1079,36 @@ void MaterialManagerLocal::pre_render_update()
 
 void MaterialInstance::set_float_parameter(StringName name, float f)
 {
-	auto master = get_master_material();
-	auto& params = impl->params;
-	const int count = master->param_defs.size();
-	for (int i = 0; i < count; i++) {
-		if (master->param_defs[i].default_value.type == MatParamType::Float &&
-			master->param_defs[i].hashed_name == name) {
-			params[i].scalar = f;
-			matman.add_to_dirty_list(this);
-			return;
-		}
+	if (auto p = impl->find_param_type(name, MatParamType::Float)) {
+		p->scalar = f;
+		matman.add_to_dirty_list(this);
 	}
-	sys_print(Error, "couldnt find parameter for set_tex_parameter\n");
+	else {
+		sys_print(Error, "couldnt find parameter for set_float_parameter\n");
+
+	}
 }
 void MaterialInstance::set_floatvec_parameter(StringName name, glm::vec4 f)
 {
-	auto master = get_master_material();
-	auto& params = impl->params;
-	const int count = master->param_defs.size();
-	for (int i = 0; i < count; i++) {
-		if (master->param_defs[i].default_value.type == MatParamType::FloatVec &&
-			master->param_defs[i].hashed_name == name) {
-			params[i].vector = f;
-			matman.add_to_dirty_list(this);
-			return;
-		}
+	if (auto p = impl->find_param_type(name, MatParamType::FloatVec)) {
+		p->vector = f;
+		matman.add_to_dirty_list(this);
 	}
-	sys_print(Error, "couldnt find parameter for set_tex_parameter\n");
+	else {
+		sys_print(Error, "couldnt find parameter for set_floatvec_parameter\n");
+
+	}
+}
+
+void MaterialInstance::set_u8vec_parameter(StringName name, Color32 f)
+{
+	if (auto p = impl->find_param_type(name, MatParamType::Vector)) {
+		p->color32 = f.to_uint();
+		matman.add_to_dirty_list(this);
+	}
+	else {
+		sys_print(Error, "couldnt find parameter for set_u8vec_parameter\n");
+	}
 }
 
 
@@ -1113,20 +1116,15 @@ void MaterialInstance::set_tex_parameter(StringName name, const Texture* t)
 {
 	if (!t) 
 		return;
-	auto master = get_master_material();
-	auto& params = impl->params;
-	const int count = master->param_defs.size();
-	for (int i = 0; i < count; i++) {
-		if (master->param_defs[i].default_value.type == MatParamType::Texture2D &&
-			master->param_defs[i].hashed_name == name) {
-			// fixme
-			params[i].tex = g_assets.find_sync_sptr<Texture>(t->get_name());
 
-			matman.add_to_dirty_list(this);
-			return;
-		}
+	if (auto p = impl->find_param_type(name, MatParamType::Texture2D)) {
+		p->tex = g_assets.find_sync_sptr<Texture>(t->get_name());
+		matman.add_to_dirty_list(this);
 	}
-	sys_print(Error, "couldnt find parameter for set_tex_parameter\n");
+	else {
+		sys_print(Error, "couldnt find parameter for set_tex_parameter\n");
+
+	}
 }
 
 void DynamicMaterialDeleter::operator()(MaterialInstance* mat) const

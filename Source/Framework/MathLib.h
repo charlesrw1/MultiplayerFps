@@ -31,6 +31,15 @@ inline float linearize_depth(float d, float zNear, float zFar)
 inline glm::vec4 color32_to_vec4(Color32 c) {
 	return glm::vec4(c.r / 255.0, c.g / 255.0, c.b / 255.0, c.a / 255.0);
 }
+inline Color32 vec4_to_color32(glm::vec4 v) {
+	Color32 out;
+	out.r = (uint8_t)glm::clamp(v.x * 255.f, 0.f, 255.f);
+	out.g = (uint8_t)glm::clamp(v.y * 255.f, 0.f, 255.f);
+	out.b = (uint8_t)glm::clamp(v.z * 255.f, 0.f, 255.f);
+	out.a = (uint8_t)glm::clamp(v.w * 255.f, 0.f, 255.f);
+	return out;
+}
+
 inline glm::vec4 colorvec_srgb_to_linear(const glm::vec4& color) {
 	auto to_linear = [](float x) {
 		return glm::pow(x, 2.2f);

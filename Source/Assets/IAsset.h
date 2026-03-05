@@ -46,6 +46,9 @@ public:
 	bool is_this_globally_referenced() const {
 		return persistent_flag;
 	}
+	void set_globally_referenced()  {
+		persistent_flag = true;
+	}
 
 	int get_reference_count() const {
 		return internal_reference_count;
@@ -64,6 +67,10 @@ public:
 		internal_reference_count -= 1;
 	}
 	
+protected:
+	void set_is_loaded(bool b) {
+		is_loaded = b;
+	}
 private:
 	// you can allocate a UserStruct in load_asset and have access to it in post_load. It will get deleted for you if non nullptr
 	virtual bool load_asset(IAssetLoadingInterface* loading) = 0; // called on loader thread

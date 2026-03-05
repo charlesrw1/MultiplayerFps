@@ -117,6 +117,7 @@ public:
 			//	asset2->post_load();
 				asset->move_construct(asset2);
 				asset->post_load();
+				ASSERT(asset->get_is_loaded());
 			}
 			catch (...) {
 				sys_print(Error, "post load reload failed\n");

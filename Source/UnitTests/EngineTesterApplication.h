@@ -11,7 +11,8 @@
 #include "Game/Components/SpawnerComponenth.h"
 #include "Animation/Runtime/RuntimeNodesNew2.h"
 #include "Game/Components/RagdollComponent.h"
-
+#include "Render/DynamicMaterialPtr.h"
+#include "Render/MaterialPublic.h"
 class LuaMiscFuncs : public ClassBase {
 public:
 	CLASS_BODY(LuaMiscFuncs, scriptable);
@@ -45,7 +46,10 @@ public:
 		}
 		return test_ents;
 	}
-
+	const std::array<Color32,2> colors = {
+		COLOR_RED,
+		COLOR_BLUE
+	};
 	void start() {
 		extern ConfigVar ui_disable_screen_log;
 		extern ConfigVar g_drawconsole;
@@ -78,15 +82,22 @@ public:
 				index = (index + 1) % (int)anims.size();
 			}
 		}
+		
 		// ragdolls
 		{
 			Random rnd(113);
 			auto rds = find_all_in_class("ragdoll_test");
+
+	
+			int i = 0;
 			for (auto& rd : rds) {
+				i++;
 				Ragdoll r;
+				r.dynamic_mat = imaterials->create_dynmaic_material(MaterialInstance::load("defaultPBR.mm"));
+				r.dynamic_mat->set_u8vec_parameter("colorMult",colors.at(i % 2));
 				r.transform = rd->get_ws_transform();
 				r.lifespan_left = rnd.RandF(0,1);
-				ragdolls.push_back(r);
+				ragdolls.push_back(std::move(r));
 			}
 		}
 
@@ -113,7 +124,9 @@ public:
 	void update() {
 		tester->tick(eng->get_dt());
 
+			int i = 0;
 		for (auto& r : ragdolls) {
+			i++;
 			r.lifespan_left -= eng->get_dt();
 			if (r.lifespan_left < 0) {
 				if(r.ptr.get())
@@ -123,13 +136,22 @@ public:
 				auto rc = r.ptr->get_component<RagdollComponent>();
 				rc->enable();
 				r.lifespan_left = 3.7;
+
+				auto mesh = r.ptr->get_component<MeshComponent>();
+				mesh->set_material_override(r.dynamic_mat.get());
 			}
+			float alpha = r.lifespan_left / 3.7;
+			glm::vec4 v = color32_to_vec4(colors.at(i % 2));
+			v *= alpha;
+			r.dynamic_mat->set_u8vec_parameter("colorMult", vec4_to_color32(v));
+
 		}
 
 	}
 
 	struct Ragdoll {
 		EntityPtr ptr;
+		DynamicMatUniquePtr dynamic_mat;
 		glm::mat4 transform;
 		float lifespan_left = 1.0;
 	};

@@ -18,6 +18,7 @@ void DecalBatcher::build_batches() {
 	draws.clear();
 
 	Model* the_model = Model::load("eng/cube.cmdl");
+	the_model->set_globally_referenced();
 
 	Memory_Arena& arena = draw.get_arena();
 	ArenaScope memScope(arena);

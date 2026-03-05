@@ -19,7 +19,7 @@
 #include "Render/ModelManager.h"
 #include "Render/RenderWindow.h"
 #include "tracy/public/tracy/Tracy.hpp"
-#include "tracy/public/tracy/TracyOpenGL.hpp"
+#include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
 #include "IGraphsDevice.h"
 #include "RenderGiManager.h"
@@ -941,6 +941,36 @@ void imgui_stat_hook()
 
 }
 
+void Renderer::unload_unused_models_test()
+{
+	ArenaScope scope(mem_arena);
+
+	// unload unused models
+	std::unordered_set<Model*> used;
+	for (auto&[handle,obj] : scene.proxy_list.objects) {
+		used.insert(obj.proxy.model);
+	}
+	// cross reference
+	auto& all_models = g_modelMgr.get_all_models();
+	std::span<Model*> remove = mem_arena.alloc_bottom_span<Model*>(all_models.num_used);
+	int removed_count = 0;
+	for (const auto& mod : all_models) {
+		Model* non_const = (Model*)mod;	//fixme
+		if (!non_const->get_is_loaded()) continue;
+		if (non_const->is_this_globally_referenced()) continue;
+		if (SetUtil::contains(used, non_const))
+			continue;
+		// want unload
+		remove[removed_count++] = non_const;
+	}
+	for (int i = 0; i < removed_count; i++) {
+		auto non_const = remove[i];
+		sys_print(Debug, "unloading model %s...\n", non_const->get_name().c_str());
+		non_const->uninstall();
+	}
+
+}
+
 void Renderer::check_hardware_options()
 {
 	bool supports_compression = false;
@@ -1155,6 +1185,9 @@ void Renderer::init()
 	//brdf_lut->type = Texture_Type::TEXTYPE_2D;
 	//FIXME
 	consoleCommands = ConsoleCmdGroup::create("");
+	consoleCommands->add("unload-unused-models", [this](const Cmd_Args& args) {
+		unload_unused_models_test();
+		});
 	consoleCommands->add("print_gfx_mem", [](const Cmd_Args&) {
 		sys_print(Info, "%d\n", total_gfx_mem_usage);
 		});
@@ -1639,6 +1672,7 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass,
 void Renderer::render_level_to_target(const Render_Level_Params& params)
 {
 	ZoneScoped;
+	TracyGpuZone("render_to_target");
 
 
 	device.reset_states();
@@ -2610,13 +2644,13 @@ ConfigVar r_skip_add_to_passes("r.skip_add_to_passes", "0", CVAR_BOOL | CVAR_DEV
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, bool cubemap_view)
 {
 	GPUSCOPESTART(build_scene_data_scope);
+	TracyGpuZone("build_scene_data");
 
 	GpuCullingTest::inst->build_data();
 
 	//ZoneScoped;
 	if (r_debug_skip_build_scene_data.get_bool())
 		return;
-	
 
 	const bool skip_prepass_objs = r_skip_depth_prepass.get_bool();
 	const bool add_to_passes = !r_skip_add_to_passes.get_bool();
@@ -2692,8 +2726,26 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			handle<Render_Object> objhandle{ obj.handle };
 			auto& proxy = obj.type_.proxy;
 
-			if (!proxy.visible || !proxy.model || !proxy.model->get_is_loaded() || (proxy.model->get_num_lods() == 0))
+			if (!proxy.visible || !proxy.model)
 				continue;
+
+
+			// #####################
+			// # UNLOADING TESTING #
+			// #####################
+			// possible for model to not be loaded here. ie user caches a model ptr, not in render system.
+			// model is unloaded because its not "used", then user tries using the ptr without going through asset system
+			if (!proxy.model->get_is_loaded()) {
+				sys_print(Debug, "emergency model reload %s\n", proxy.model->get_name().c_str());
+				g_assets.reload_sync<Model>(proxy.model);
+			}
+
+
+
+
+			if (!proxy.model->get_is_loaded() || (proxy.model->get_num_lods() == 0))
+				continue;
+
 
 			//if (proxy.ignore_in_baking&& test_ignore_bake.get_bool())
 			//	continue;	// FIXME TESTING
@@ -2714,6 +2766,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			const int LOD_index = (int)lod_to_render_array[i];
 			if (LOD_index < 0)
 				continue;	// not visible
+
+
 
 			int16_t cam_depth = 0;
 			if (!dont_use_cam_depth)
@@ -3507,7 +3561,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 
 
 	//ZoneNamed(RendererSceneDraw,true);
-	//TracyGpuZone("scene_draw");
+	TracyGpuZone("scene_draw");
 
 	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -3814,7 +3868,7 @@ void Renderer::upload_light_and_decal_buffers()
 
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 {
-	//TracyGpuZone("scene_draw_internal");
+	TracyGpuZone("scene_draw_internal");
 	//ZoneScoped;
 	GPUSCOPESTART(scene_draw_internal_scope);
 

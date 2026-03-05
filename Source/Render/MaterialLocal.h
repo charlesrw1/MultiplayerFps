@@ -167,6 +167,12 @@ public:
 	bool is_valid() const {
 		return bool(masterImpl) != bool(masterMaterial);
 	}
+	MaterialParameterValue* find_param_type(StringName name, MatParamType type) {
+		auto param = find_parameter(name);
+		if (!param || param->type != type)
+			return nullptr;
+		return param;
+	}
 	bool is_this_currently_uploaded() const { return gpu_buffer_offset != INVALID_MAPPING; }
 	const std::vector<Texture*>& get_textures() const { return texture_bindings; }
 	void init_from(const std::shared_ptr<MaterialInstance>& ptr);

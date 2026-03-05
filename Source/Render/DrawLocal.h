@@ -424,7 +424,9 @@ public:
 	MulticastDelegate<> on_reload_shaders;	// called before shaders are reloaded
 
 
-	// public interface
+	// ####################
+	// # public interface #
+	// ####################
 	void init() final;
 	void scene_draw(SceneDrawParamsEx params, View_Setup view) final;
 	void sync_update() final;
@@ -448,6 +450,12 @@ public:
 		thumbnailRenderer->output_to_path(path);
 	}
 #endif
+
+	// ###################
+	// # local interface #
+	// ###################
+
+	void unload_unused_models_test();
 
 	void check_hardware_options();
 	void create_default_textures();

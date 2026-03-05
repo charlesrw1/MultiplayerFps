@@ -14,7 +14,26 @@ void gpuSpanAllocator::init_clear(int bytes)
     this->initialized_size = bytes;
 }
 
-gpuAllocSpan gpuSpanAllocator::allocate(int bytes) {
+static inline size_t round_up(size_t size, size_t align)
+{
+    return (size + align - 1) & ~(align - 1);
+}
+
+static inline size_t normalize_alloc_size(size_t size)
+{
+    const size_t PAGE = 2048;
+
+    if (size <= PAGE)
+        return round_up(size, 256);
+
+    return round_up(size, PAGE);
+}
+
+gpuAllocSpan gpuSpanAllocator::allocate(int bytes, int align_to_size) {
+    bytes += align_to_size; // slightly wasteful
+    // normalize to big stuff
+    bytes = (int)normalize_alloc_size(bytes);
+
     for (auto it = freeSpans.begin(); it != freeSpans.end(); ++it) {
         if (it->s.size >= bytes) {
             gpuAllocSpan result = { it->s.start, bytes };
@@ -26,6 +45,11 @@ gpuAllocSpan gpuSpanAllocator::allocate(int bytes) {
             else {
                 freeSpans.erase(it);
             }
+            result.aligned_start = result.start;
+            const int modulo = result.start % align_to_size;
+            if (modulo != 0)
+                result.aligned_start += align_to_size - modulo;
+
 
             return result;
         }

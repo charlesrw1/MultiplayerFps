@@ -116,16 +116,6 @@ bool Model::has_bones() const
 	return skel!=nullptr;
 }
 
-bool Model::has_colors() const
-{
-	return false;
-}
-
-bool Model::has_tangents() const
-{
-	return true;
-}
-
 
 
 int Model::bone_for_name(StringName name) const
@@ -411,11 +401,17 @@ gpuAllocSpan MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t si
 		std::abort();
 	};
 
-	const gpuAllocSpan my_ptr = buf.alloc.allocate(size);
+	// fixme
+	// also for different vertex layouts etc
+	int align_size = MODEL_BUFFER_INDEX_TYPE_SIZE;
+	if (target == GL_ARRAY_BUFFER)
+		align_size = sizeof(ModelVertex);
+
+	const gpuAllocSpan my_ptr = buf.alloc.allocate(size, align_size);
 	if (my_ptr.size == 0)// fixme
 		out_of_memory();
 
-	buf.ptr->sub_upload(data, size, my_ptr.start);
+	buf.ptr->sub_upload(data, size, my_ptr.aligned_start);
 
 	return my_ptr;
 }
@@ -449,17 +445,22 @@ void Model::uninstall()
 	//	mat->dec_ref_count_and_uninstall_if_zero();
 	//}
 	materials.clear();
-	uid = 0;	// reset the UID
+	
+	// DONT reset the UID
+	// dont do this 'uid = 0'
 
 	g_modelMgr.remove_model_from_list(this);
+
+	set_is_loaded(false);
 }
 
 
 void Model::post_load() {
+	ASSERT(get_is_loaded());
 	if (did_load_fail()) {
 		return;
 	}
-	ASSERT(uid == 0);
+//	ASSERT(uid == 0);
 	g_modelMgr.upload_model(this);
 	Model::on_model_loaded.invoke(this);
 }
@@ -688,9 +689,13 @@ void Model::move_construct(IAsset* _src)
 {
 	const bool had_skel = skel != nullptr;
 	uninstall();
+
+	assert(!get_is_loaded());
+	
+
 	assert(had_skel == (skel != nullptr));
 	Model* src = (Model*)_src;
-	ASSERT(this->uid == 0);
+	//ASSERT(this->uid == 0);
 	assert(src);
 
 	for (int i = 0; i < src->lods.size(); i++)
@@ -721,6 +726,8 @@ void Model::move_construct(IAsset* _src)
 	lightmapX = src->lightmapX;
 	lightmapY = src->lightmapY;
 	src->uninstall();
+
+	set_is_loaded(true);
 }
 
 
@@ -859,6 +866,7 @@ void ModelMan::create_default_models()
 		lod.part_count = 1;
 		lod.part_ofs = 0;
 
+		_sprite->set_globally_referenced();
 		_sprite->parts.push_back(sm);
 		_sprite->lods.push_back(lod);
 		upload_model(_sprite);
@@ -875,8 +883,9 @@ bool ModelMan::upload_model(Model* mesh)
 	ASSERT(all_models.find(mesh) == nullptr);
 	all_models.insert(mesh);
 
+	if(mesh->uid==0)
+		mesh->uid = cur_mesh_id++;
 
-	mesh->uid = cur_mesh_id++;
 	//sys_print(Debug, "uploading mode: %s\n", mesh->get_name().c_str());
 
 	if (mesh->parts.size() == 0) {
@@ -909,12 +918,7 @@ void ModelMan::remove_model_from_list(Model* m)
 	all_models.remove(m);
 	ASSERT(!all_models.find(m));
 }
-void ModelMan::add_model_to_list(Model* m)
-{
-	ASSERT(m->uid != 0);
-	ASSERT(all_models.find(m) == nullptr);
-	all_models.insert(m);
-}
+
 ModelMan::ModelMan() : all_models(6)
 {
 

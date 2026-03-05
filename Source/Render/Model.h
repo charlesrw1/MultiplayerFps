@@ -141,16 +141,14 @@ public:
 	glm::ivec2 get_lightmap_size() const { return glm::ivec2(lightmapX,lightmapY); }
 
 	bool has_lightmap_coords() const;
-	bool has_colors() const;
 	bool has_bones() const;
-	bool has_tangents() const;
 
 
 	int get_merged_vertex_ofs() const {
-		return vertex_alloc_ptr.start / sizeof(ModelVertex);
+		return vertex_alloc_ptr.aligned_start / sizeof(ModelVertex);
 	}
 	int get_merged_index_ptr() const {
-		return index_alloc_ptr.start;
+		return index_alloc_ptr.aligned_start;
 	}
 
 

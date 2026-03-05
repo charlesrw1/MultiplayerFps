@@ -9,12 +9,13 @@
 struct gpuAllocSpan {
     int start = 0;
     int size = 0;
+    int aligned_start = 0;
 };
 
 class gpuSpanAllocator {
 public:
     void init_clear(int bytes);
-    gpuAllocSpan allocate(int bytes);
+    gpuAllocSpan allocate(int bytes, int align_to_size);
     void free(gpuAllocSpan span);
     int get_init_sized() const { return initialized_size; }
 private:

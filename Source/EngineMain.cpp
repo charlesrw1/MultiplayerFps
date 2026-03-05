@@ -1324,7 +1324,7 @@ GameEngineLocal::GameEngineLocal()
 
 }
 
-
+#include <tracy/public/tracy/TracyOpenGL.hpp>
 void GameEngineLocal::init_sdl_window()
 {
 	ASSERT(!window);
@@ -1358,9 +1358,13 @@ void GameEngineLocal::init_sdl_window()
 	sys_print(Debug, "Renderer: %s\n", glGetString(GL_RENDERER));
 	sys_print(Debug, "Version: %s\n\n", glGetString(GL_VERSION));
 
+	
 	// init tracy profiling for opengl
 	TracyGpuContext;
-	TracyGpuContextName("a", 1);	//??
+	TracyGpuZone("Test");
+	glClear(GL_COLOR_BUFFER_BIT);
+	TracyGpuCollect;
+
 
 	SDL_GL_SetSwapInterval(0);
 }
@@ -1913,10 +1917,14 @@ void GameEngineLocal::loop()
 			// sync period
 			imgui_render(skip_rendering);
 			do_sync_update();
+			TracyGpuCollect;
 			wait_for_swap(skip_rendering);	// wait for swap last
+
 
 			FrameMark;	// tracy profiling
 			Profiler::end_frame_tick(frame_time);	// my crappy profilier
+			
+			
 		}
 		catch (LuaRuntimeError luaErr) {
 			lua_error_loop(luaErr.what(),frame_start,wait_for_swap,drawparamsNext,setupNext);
