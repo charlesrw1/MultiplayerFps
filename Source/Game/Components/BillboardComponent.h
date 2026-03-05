@@ -4,9 +4,23 @@
 #include <memory>
 #include "Render/DynamicMaterialPtr.h"
 #include "Render/Texture.h"
+#include <unordered_map>
 class Texture;
 class MaterialInstance;
 struct Render_Object;
+
+// simple dynamic material billboard cache for texture overrides
+class BillboardMaterialCache {
+public:
+	static BillboardMaterialCache& get() {
+		static BillboardMaterialCache cache;
+		return cache;
+	}
+	MaterialInstance* find(Texture* t);
+private:
+	std::unordered_map<Texture*, MaterialInstance*> texture_to_mat;
+};
+
 class BillboardComponent : public Component
 {
 public:
@@ -34,7 +48,7 @@ public:
 	}
 private:
 	REF bool visible = true;
-	DynamicMatUniquePtr dynamicMaterial = nullptr;
+	MaterialInstance* dynamic_mat = nullptr;
 	REF AssetPtr<Texture> texture;
 	handle<Render_Object> handle;
 };

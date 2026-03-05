@@ -11,6 +11,7 @@
 #include "Game/Components/SpawnerComponenth.h"
 #include "Animation/Runtime/RuntimeNodesNew2.h"
 #include "Game/Components/RagdollComponent.h"
+
 class LuaMiscFuncs : public ClassBase {
 public:
 	CLASS_BODY(LuaMiscFuncs, scriptable);

@@ -166,17 +166,11 @@ program_handle MaterialManagerLocal::get_mat_shader(
 }
 
 void MaterialManagerLocal::add_to_dirty_list(MaterialInstance* mat) {
-	if (mat->impl->dirty_buffer_index == -1) {
-		dirty_list.push_back(mat);
-		mat->impl->dirty_buffer_index = dirty_list.size() - 1;
-	}
+	dirty_list.insert(mat);
 }
 
 void MaterialManagerLocal::remove_from_dirty_list_if_it_is(MaterialInstance* mat) {
-	if (mat->impl->dirty_buffer_index != -1) {
-		ASSERT(mat->impl->dirty_buffer_index >= 0 && mat->impl->dirty_buffer_index < dirty_list.size());
-		dirty_list[mat->impl->dirty_buffer_index] = nullptr;
-	}
+	dirty_list.remove(mat);
 }
 
 void MaterialManagerLocal::free_material_instance(MaterialInstance* m) {
@@ -257,7 +251,6 @@ void MaterialInstance::move_construct(IAsset* _other)
 	std::shared_ptr<MaterialInstance> myParentMat = impl->masterMaterial;
 	*this = std::move(*other);
 	impl->self = this;
-	impl->dirty_buffer_index = -1;
 	if (impl->masterImpl) {
 		impl->masterImpl->self = this;
 	}
@@ -284,27 +277,27 @@ void MaterialInstance::move_construct(IAsset* _other)
 
 }
 
-MaterialInstance* MaterialManagerLocal::create_dynmaic_material_unsafier(const MaterialInstance* material) {
-	assert(material);
+MaterialInstance* MaterialManagerLocal::create_dynmaic_material_unsafier(const MaterialInstance* parent) {
+	assert(parent);
 	// more bs crap
-	std::shared_ptr<MaterialInstance> as_sptr = g_assets.find_sync_sptr<MaterialInstance>(material->get_name());
+	std::shared_ptr<MaterialInstance> as_sptr = g_assets.find_sync_sptr<MaterialInstance>(parent->get_name());
 
-	MaterialInstance* dynamicMat = new MaterialInstance();
-	dynamicMat->impl = std::make_unique<MaterialImpl>();
-	dynamicMat->impl->self = dynamicMat;
-	dynamicMat->impl->init_from(as_sptr);
-	dynamicMat->impl->is_dynamic_material = true;
-	dynamicMat->impl->post_load(dynamicMat);	// add to dirty list, set material id
-	dynamicMat->set_loaded_manually_unsafe("%_DM_%");
-	outstanding_dynamic_mats += 1;
-	return dynamicMat;
+	MaterialInstance* dynamic_mat = dynamic_mat_allocator.allocate_dynamic();
+	ASSERT(dynamic_mat);
+
+	dynamic_mat->impl = std::make_unique<MaterialImpl>();
+	dynamic_mat->impl->self = dynamic_mat;
+	dynamic_mat->impl->init_from(as_sptr);
+	dynamic_mat->impl->is_dynamic_material = true;
+	dynamic_mat->impl->post_load(dynamic_mat);	// add to dirty list, set material id
+
+	return dynamic_mat;
 }
 
 void MaterialManagerLocal::free_dynamic_material(MaterialInstance* mat) {
 	if (!mat)
 		return;
-	queued_dynamic_mats_to_delete.push_back(mat);
-	outstanding_dynamic_mats -= 1;
+	dynamic_mat_allocator.free_dynamic(mat);
 }
 
 
@@ -1023,21 +1016,10 @@ void MaterialManagerLocal::init() {
 
 void MaterialManagerLocal::pre_render_update()
 {
-	if (queued_dynamic_mats_to_delete.size() > 0 && material_print_debug.get_bool()) {
-		sys_print(Debug, "deleting %d dynamic materials\n", (int)queued_dynamic_mats_to_delete.size());
-	}
-	//for (auto mat : queued_dynamic_mats_to_delete) {
-	//	ASSERT(mat->impl->is_dynamic_material);
-	//	free_material_instance(mat);
-	//	delete mat;
-	//}
-	queued_dynamic_mats_to_delete.clear();
-
 	for (auto mat : dirty_list) {
 		// dynamic or static material got removed after it got added to the dirty list, skip
 		if (!mat)
 			continue;
-		mat->impl->dirty_buffer_index = -1;
 
 		if (mat->impl->masterImpl.get())
 			mat_shader_table.recompile_for_material(mat->impl->masterImpl.get());
@@ -1092,7 +1074,7 @@ void MaterialManagerLocal::pre_render_update()
 
 	}
 
-	dirty_list.clear();
+	dirty_list.clear_all();
 }
 
 void MaterialInstance::set_float_parameter(StringName name, float f)
@@ -1267,4 +1249,36 @@ opt<int> TextureBindingHasher::find_existing(const std::vector<Texture*> binding
 		}
 	}
 	return std::nullopt;
+}
+
+MaterialInstance* DynamicMaterialAllocator::allocate_dynamic()
+{
+	auto it = free_dynamic_ptrs.begin();
+	MaterialInstance* first = nullptr;
+	if (it != free_dynamic_ptrs.end()) {
+		first = *it;
+		free_dynamic_ptrs.remove(first);
+	}
+	else {
+		first = new MaterialInstance;
+	}
+
+	outstanding_dynamic_mats += 1;
+
+
+	ASSERT(first);
+	first->set_loaded_manually_unsafe("*dm");
+	assert(first->get_is_loaded());
+	return first;
+}
+
+void DynamicMaterialAllocator::free_dynamic(MaterialInstance* mat)
+{
+	ASSERT(mat && mat->is_this_a_dynamic_material());
+	ASSERT(free_dynamic_ptrs.find(mat) == nullptr);
+
+	outstanding_dynamic_mats -= 1;
+	ASSERT(outstanding_dynamic_mats >= 0);
+	mat->uninstall();
+	free_dynamic_ptrs.insert(mat);
 }

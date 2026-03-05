@@ -23,6 +23,7 @@ class MaterialInstance;
 
 
 // represents a singular call to glDrawElements() with same mesh and material instance. these can be hardware instanced
+// basically mesh_batch maps to 1 mesh primitive to be drawn
 struct Mesh_Batch
 {
 	int first = 0;	// indexes into pass.sorted_list

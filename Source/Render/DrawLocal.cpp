@@ -1813,8 +1813,8 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 	
 	if (proxy.is_skybox)
 		key.layer = 2; // make skybox last, saves frame time
-	//else if (proxy.sort_first)
-	//	key.layer = 0;
+	else if (proxy.sort_first)
+		key.layer = 0;
 	else
 		key.layer = 1;
 

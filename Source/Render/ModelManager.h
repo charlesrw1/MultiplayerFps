@@ -1,6 +1,7 @@
 #pragma once
 #include "Render/Model.h"
 #include "Framework/Hashset.h"
+#include "GpuAllocator.h"
 
 // use 16 bit indicies
 const int MODEL_BUFFER_INDEX_TYPE_SIZE = sizeof(uint16_t);
@@ -12,25 +13,24 @@ public:
 	void init(uint32_t num_indicies, uint32_t num_verts);
 	void print_usage() const;
 
-	int append_to_v_buffer(const uint8_t* data, size_t size);
-	int append_to_i_buffer(const uint8_t* data, size_t size);
+	gpuAllocSpan append_to_v_buffer(const uint8_t* data, size_t size);
+	gpuAllocSpan append_to_i_buffer(const uint8_t* data, size_t size);
 
 
 	struct buffer {
 		IGraphicsBuffer* ptr = nullptr;
-		int allocated = 0;
+		gpuSpanAllocator alloc;
 
-		int used_total = 0;
-	
-		int tail = 0;	// min element
-		int head = 0;	// max element
+		int get_allocated() const {
+			return alloc.get_init_sized();
+		}
 	};
 
 	buffer vbuffer;
 	buffer ibuffer;
 
 private:
-	int append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target);
+	gpuAllocSpan append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target);
 };
 #include "Framework/ConsoleCmdGroup.h"
 enum class VaoType {

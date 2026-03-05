@@ -9,11 +9,10 @@ struct hash_set_iterator
 {
     using ActualType = typename std::remove_cv<T>::type;
 
-    hash_set_iterator(const hash_set<ActualType>* p, uint64_t i);
-    hash_set_iterator(uint64_t i) : index(i) {}
+    hash_set_iterator(const hash_set<ActualType>* p, int i);
 
     bool operator!=(const hash_set_iterator& other) {
-        return index < other.index;
+        return index != other.index;
     }
     T* operator*();
     hash_set_iterator<T>& operator++() {
@@ -24,7 +23,7 @@ struct hash_set_iterator
 
     void advance();
 
-    uint64_t index = 0;
+    int index = 0;
     const hash_set<ActualType>* parent = nullptr;
 };
 
@@ -39,13 +38,13 @@ public:
         return hash_set_iterator<T>(this, 0);
     }
     hash_set_iterator<T> end() {
-        return  hash_set_iterator<T>(items.size());
+        return  hash_set_iterator<T>(this,items.size());
     }
     hash_set_iterator<const T> begin() const {
         return hash_set_iterator<const T>(this, 0);
     }
     hash_set_iterator<const T> end() const {
-        return  hash_set_iterator<const T>(items.size());
+        return  hash_set_iterator<const T>(this,items.size());
     }
    
 
@@ -176,12 +175,12 @@ public:
 
 template<typename T>
 inline T* hash_set_iterator<T>::operator*() {
-    return parent->items[index].ptr;
+    return parent->items.at(index).ptr;
 }
 
 
 template<typename T>
-inline hash_set_iterator<T>::hash_set_iterator(const hash_set<ActualType>* parent, uint64_t i) {
+inline hash_set_iterator<T>::hash_set_iterator(const hash_set<ActualType>* parent, int i) {
     this->parent = parent;
     index = i;
     advance();
@@ -189,7 +188,7 @@ inline hash_set_iterator<T>::hash_set_iterator(const hash_set<ActualType>* paren
 
 template<typename T>
 inline void hash_set_iterator<T>::advance() {
-    for (; index < parent->items.size(); index++) {
+    for (; index < (int)parent->items.size(); index++) {
         if (parent->items[index].ptr != nullptr && parent->items[index].ptr != (T*)HASHSET_TOMBSTONE)
             break;
     }

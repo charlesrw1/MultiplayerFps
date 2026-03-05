@@ -203,7 +203,6 @@ public:
 	std::vector<Texture*> texture_bindings;
 	std::vector<MaterialParameterValue> params;
 	int gpu_buffer_offset = INVALID_MAPPING;	// offset in buffer if uploaded (the buffer is uint's so byte = buffer_offset*4)
-	int dirty_buffer_index = -1;	// if not -1, then its sitting in a queue already
 	bool has_called_post_load_already = false;
 
 	friend class MaterialManagerLocal;
@@ -297,7 +296,16 @@ private:
 	std::vector<MaterialInstance*> all_mats;
 	BitmapAllocator allocator;
 };
+#include "Framework/Hashset.h"
 
+class DynamicMaterialAllocator {
+public:
+	MaterialInstance* allocate_dynamic();
+	void free_dynamic(MaterialInstance* mat);
+private:
+	int outstanding_dynamic_mats = 0;	// to check for leaks
+	hash_set<MaterialInstance> free_dynamic_ptrs;
+};
 
 class IGraphicsBuffer;
 class Model;
@@ -324,21 +332,21 @@ private:
 	void on_reload_shader_invoke();
 	program_handle compile_mat_shader(const MaterialInstance* mat, shader_key key);
 
-	int outstanding_dynamic_mats = 0;	// to check for mem leaks
 	std::shared_ptr<MaterialInstance> pp_editor_select_mat = nullptr;
 	MaterialInstance* fallback_master = nullptr;
 	MaterialInstance* shared_depth_master = nullptr;
 
 	int materialBufferSize = 0;
 	IGraphicsBuffer* gpuMatBufferPtr = nullptr;
-	std::vector<MaterialInstance*> queued_dynamic_mats_to_delete;
+
 	// materials to allocate or update
-	std::vector<MaterialInstance*> dirty_list;
+	hash_set<MaterialInstance> dirty_list;
 	int current_master_id = 0;
 
 	MaterialShaderTable mat_shader_table;
 	std::unique_ptr<AllMaterialTable> mat_offset_table;
 	TextureBindingHasher binding_hasher;
+	DynamicMaterialAllocator dynamic_mat_allocator;
 };
 
 extern MaterialManagerLocal matman;

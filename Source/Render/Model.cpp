@@ -85,11 +85,7 @@ static const int STATIC_INDEX_SIZE = 6'000'000;
 void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 {
 	
-
-	vbuffer.allocated = sizeof(ModelVertex) * STATIC_VERTEX_SIZE;
-	vbuffer.used_total = 0;
-	vbuffer.tail = 0;
-	vbuffer.head = 0;
+	vbuffer.alloc.init_clear(sizeof(ModelVertex) * STATIC_VERTEX_SIZE);
 
 	CreateBufferArgs args;
 	args.flags = BUFFER_USE_AS_VB;
@@ -99,10 +95,8 @@ void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 	
 
 	const int index_size = MODEL_BUFFER_INDEX_TYPE_SIZE;
-	ibuffer.allocated = index_size * STATIC_INDEX_SIZE;
-	ibuffer.used_total = 0;
-	ibuffer.tail = 0;
-	ibuffer.head = 0;
+	ibuffer.alloc.init_clear(index_size * STATIC_INDEX_SIZE);
+
 
 	args.flags = BUFFER_USE_AS_IB;
 	args.size = index_size * STATIC_INDEX_SIZE;
@@ -141,9 +135,10 @@ int Model::bone_for_name(StringName name) const
 	return get_skel()->get_bone_index(name);
 }
 
-
+// FIXME broke
 void ModelMan::compact_memory()
 {
+#if 0
 	sys_print(Debug, "ModelMan::compact_memory\n");
 	std::vector<Model*> models;
 	models.reserve(all_models.num_used);
@@ -197,6 +192,7 @@ void ModelMan::compact_memory()
 		models[i]->merged_vert_offset = allocator.append_to_v_buffer(v_bufferdata, vertbufsize);
 		models[i]->merged_vert_offset /= sizeof(ModelVertex);
 	}
+#endif
 }
 
 #ifdef EDITOR_BUILD
@@ -378,14 +374,14 @@ void ModelMan::add_commands(ConsoleCmdGroup& group)
 void MainVbIbAllocator::print_usage() const
 {
 	auto print_facts = [](const char* name, const buffer& b, int element_size) {
-		float used_percentage = 1.0;
-		if (b.allocated > 0)
-			used_percentage = (double)b.used_total / (double)b.allocated;
-		used_percentage *= 100.0;
-
-		int used_elements = b.used_total / element_size;
-		int allocated_elements = b.allocated / element_size;
-		sys_print(Info, "	%s: %d/%d (%.1f%%) (bytes:%d) (%d:%d)\n", name, used_elements, allocated_elements, used_percentage, b.used_total, b.tail, b.head);
+		//float used_percentage = 1.0;
+		//if (b.allocated > 0)
+		//	used_percentage = (double)b.used_total / (double)b.allocated;
+		//used_percentage *= 100.0;
+		//
+		//int used_elements = b.used_total / element_size;
+		//int allocated_elements = b.allocated / element_size;
+		//sys_print(Info, "	%s: %d/%d (%.1f%%) (bytes:%d) (%d:%d)\n", name, used_elements, allocated_elements, used_percentage, b.used_total, b.tail, b.head);
 
 	};
 	sys_print(Info, "MainVbIbAllocator::print_usage\n");
@@ -399,42 +395,29 @@ void ModelMan::print_usage() const
 }
 
 
-int MainVbIbAllocator::append_to_v_buffer(const uint8_t* data, size_t size) {
+gpuAllocSpan MainVbIbAllocator::append_to_v_buffer(const uint8_t* data, size_t size) {
 	return append_buf_shared(data, size, "Vertex", vbuffer, GL_ARRAY_BUFFER);
 }
-int MainVbIbAllocator::append_to_i_buffer(const uint8_t* data, size_t size) {
+gpuAllocSpan MainVbIbAllocator::append_to_i_buffer(const uint8_t* data, size_t size) {
 	return append_buf_shared(data, size, "Index", ibuffer, GL_ELEMENT_ARRAY_BUFFER);
 }
 
 
-int MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target)
+gpuAllocSpan MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target)
 {
 	auto out_of_memory = [&]() {
-		sys_print(Error, "%s buffer overflow %d/%d !!!\n", name, int(size + buf.used_total), int(buf.allocated));
+		//sys_print(Error, "%s buffer overflow %d/%d !!!\n", name, int(size + buf.used_total), int(buf.allocated));
 		std::fflush(stdout);
 		std::abort();
 	};
 
-	int where_to_append = buf.head;
-	if (buf.head >= buf.tail) {
-		if (buf.head + size > buf.allocated) {
-			if (size > buf.tail) {
-				out_of_memory();
-			}
-			where_to_append = 0;
-		}
-	}
-	else {
-		if (buf.head + size > buf.tail) {
-			out_of_memory();
-		}
-	}
+	const gpuAllocSpan my_ptr = buf.alloc.allocate(size);
+	if (my_ptr.size == 0)// fixme
+		out_of_memory();
 
-	buf.ptr->sub_upload(data, size, where_to_append);
+	buf.ptr->sub_upload(data, size, my_ptr.start);
 
-	buf.used_total += size;
-	buf.head = where_to_append + size;
-	return where_to_append;
+	return my_ptr;
 }
 
 
@@ -454,7 +437,7 @@ void Model::uninstall()
 {
 	lods.resize(0);
 	parts.clear();
-	merged_index_pointer = merged_vert_offset = 0;
+
 	data = RawMeshData();	// so destructor gets called and memory is freed
 	//skel.reset(nullptr);	// dont uninstall because of pointers...
 	if (skel) {
@@ -713,8 +696,8 @@ void Model::move_construct(IAsset* _src)
 	for (int i = 0; i < src->lods.size(); i++)
 		this->lods.push_back(src->lods[i]);
 	parts = std::move(src->parts);
-	merged_index_pointer = src->merged_index_pointer;
-	merged_vert_offset = src->merged_vert_offset;
+	index_alloc_ptr = src->index_alloc_ptr;
+	vertex_alloc_ptr = src->vertex_alloc_ptr;
 	aabb = src->aabb;
 	bounding_sphere = src->bounding_sphere;
 	data = std::move(src->data);
@@ -796,7 +779,7 @@ void ModelMan::init()
 			VertexLayout(POSITION_LOC,3,gvat::float32,stride,offsetof(ModelVertex, pos)),
 			VertexLayout(UV_LOC,2,gvat::float32,stride,offsetof(ModelVertex, uv)),
 			VertexLayout(NORMAL_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, normal[0])),
-			VertexLayout(TANGENT_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, tangent[0])),
+			VertexLayout(TANGENT_LOC,3,gvat::u16,stride,offsetof(ModelVertex, tangent[0])),
 			VertexLayout(LIGHTMAPCOORD_LOC,2,gvat::u16_normalized,stride,offsetof(ModelVertex, color[0])),
 			VertexLayout(WEIGHT_OR_COLOR_LOC,4,gvat::u8_normalized,stride,offsetof(ModelVertex, color2[0])),
 		};
@@ -901,15 +884,14 @@ bool ModelMan::upload_model(Model* mesh)
 		return false;
 	}
 
-
 	size_t indiciesbufsize{};
 	const uint8_t* const ibufferdata = mesh->data.get_index_data(&indiciesbufsize);
-	mesh->merged_index_pointer = allocator.append_to_i_buffer(ibufferdata, indiciesbufsize);	// dont divide by sizeof(uint16_2), this is an pointer
+	mesh->index_alloc_ptr = allocator.append_to_i_buffer(ibufferdata, indiciesbufsize);	// dont divide by sizeof(uint16_2), this is an pointer
 
 	size_t vertbufsize{};
 	const uint8_t* const v_bufferdata = mesh->data.get_vertex_data(&vertbufsize);
-	mesh->merged_vert_offset = allocator.append_to_v_buffer(v_bufferdata, vertbufsize);
-	mesh->merged_vert_offset /= sizeof(ModelVertex);
+	mesh->vertex_alloc_ptr = allocator.append_to_v_buffer(v_bufferdata, vertbufsize);
+	//mesh->merged_vert_offset /= sizeof(ModelVertex);
 
 	return true;
 }
@@ -918,6 +900,12 @@ bool ModelMan::upload_model(Model* mesh)
 void ModelMan::remove_model_from_list(Model* m)
 {
 	ASSERT(m);
+
+	allocator.ibuffer.alloc.free(m->index_alloc_ptr);
+	allocator.vbuffer.alloc.free(m->vertex_alloc_ptr);
+	m->index_alloc_ptr = {};
+	m->vertex_alloc_ptr = {};
+
 	all_models.remove(m);
 	ASSERT(!all_models.find(m));
 }

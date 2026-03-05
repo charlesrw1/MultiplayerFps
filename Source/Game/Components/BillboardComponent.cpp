@@ -22,8 +22,11 @@ BillboardComponent::~BillboardComponent() {
 }
 
 void BillboardComponent::start() {
-	dynamicMaterial = imaterials->create_dynmaic_material(imaterials->get_default_billboard());
-	dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
+
+	dynamic_mat = BillboardMaterialCache::get().find(texture.get());
+
+	//dynamicMaterial = imaterials->create_dynmaic_material(imaterials->get_default_billboard());
+	//dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
 
 	sync_render_data();
 }
@@ -36,7 +39,8 @@ void BillboardComponent::on_changed_transform() {
 #ifdef EDITOR_BUILD
 void BillboardComponent::editor_on_change_property() {
 
-	dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
+	//dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
+	dynamic_mat = BillboardMaterialCache::get().find(texture.get());
 	sync_render_data();
 }
 #endif
@@ -46,7 +50,8 @@ void BillboardComponent::set_texture(const Texture* tex) {
 	texture.ptr = (Texture*)tex; // FIXME
 	if (!handle.is_valid())	// could be initialization setting
 		return;
-	dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
+	dynamic_mat = BillboardMaterialCache::get().find(texture.get());
+
 	sync_render_data();
 }
 
@@ -63,12 +68,25 @@ void BillboardComponent::on_sync_render_data()
 #endif //  EDITOR_BUILD
 
 	obj.model = g_modelMgr.get_default_plane_model();
-	ASSERT(dynamicMaterial.get());
-	obj.mat_override = dynamicMaterial.get();
+	obj.mat_override = dynamic_mat;
 	obj.transform = glm::translate(glm::mat4(1), get_ws_position());
 	obj.shadow_caster = false;
 	obj.owner = this;
 	obj.ignore_in_baking = true;
 	obj.ignore_in_cubemap = true;
 	idraw->get_scene()->update_obj(handle, obj);
+}
+#include "Framework/MapUtil.h"
+MaterialInstance* BillboardMaterialCache::find(Texture* t)
+{
+	if (!t)
+		return nullptr;
+	if (MapUtil::contains(texture_to_mat, t))
+		return texture_to_mat[t];
+
+	auto dynamicMaterial = imaterials->create_dynmaic_material(imaterials->get_default_billboard());
+	dynamicMaterial->set_tex_parameter(NAME("Sprite"),t);
+	auto released_ptr = dynamicMaterial.release(); // hack fixme
+	texture_to_mat[t] = released_ptr;
+	return released_ptr;
 }

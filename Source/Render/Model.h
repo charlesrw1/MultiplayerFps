@@ -14,6 +14,7 @@
 #include "Framework/MathLib.h"
 #include "Framework/MulticastDelegate.h"
 #include "Framework/Reflection2.h"
+#include "GpuAllocator.h"
 class MaterialInstance;
 using std::string;
 using std::vector;
@@ -143,8 +144,16 @@ public:
 	bool has_colors() const;
 	bool has_bones() const;
 	bool has_tangents() const;
-	uint32_t get_merged_index_ptr() const { return merged_index_pointer; }
-	uint32_t get_merged_vertex_ofs() const { return merged_vert_offset; }
+
+
+	int get_merged_vertex_ofs() const {
+		return vertex_alloc_ptr.start / sizeof(ModelVertex);
+	}
+	int get_merged_index_ptr() const {
+		return index_alloc_ptr.start;
+	}
+
+
 	const glm::mat4& get_root_transform() const { return skeleton_root_transform; }
 	const Bounds& get_bounds() const { return aabb; }
 	const PhysicsBodyDefinition* get_physics_body() const { return collision.get(); }
@@ -175,8 +184,10 @@ private:
 	vector<Submesh> parts;
 	Bounds aabb;
 	glm::vec4 bounding_sphere=glm::vec4(0.f);
-	uint32_t merged_index_pointer = 0;	// in bytes
-	uint32_t merged_vert_offset = 0;
+
+	gpuAllocSpan index_alloc_ptr;
+	gpuAllocSpan vertex_alloc_ptr;
+
 	RawMeshData data;
 	// skeleton + animation data
 	unique_ptr<MSkeleton> skel;
