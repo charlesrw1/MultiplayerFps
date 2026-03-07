@@ -132,7 +132,9 @@ struct ROP_Internal
 	glm::mat4 prev_transform{};
 	int prev_bone_ofs = 0;
 	glm::vec4 bounding_sphere_and_radius;
+	int16_t fastcpu_index = -1;
 	bool has_init = false;
+	bool has_transparents = false;
 };
 
 // RenderLight internal data

@@ -1360,10 +1360,10 @@ void GameEngineLocal::init_sdl_window()
 
 	
 	// init tracy profiling for opengl
-	TracyGpuContext;
-	TracyGpuZone("Test");
-	glClear(GL_COLOR_BUFFER_BIT);
-	TracyGpuCollect;
+	//TracyGpuContext;
+	//TracyGpuZone("Test");
+	//glClear(GL_COLOR_BUFFER_BIT);
+	//TracyGpuCollect;
 
 
 	SDL_GL_SetSwapInterval(0);
@@ -1917,11 +1917,11 @@ void GameEngineLocal::loop()
 			// sync period
 			imgui_render(skip_rendering);
 			do_sync_update();
-			TracyGpuCollect;
+			//TracyGpuCollect;
 			wait_for_swap(skip_rendering);	// wait for swap last
 
 
-			FrameMark;	// tracy profiling
+			//FrameMark;	// tracy profiling
 			Profiler::end_frame_tick(frame_time);	// my crappy profilier
 			
 			

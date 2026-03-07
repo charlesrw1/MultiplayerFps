@@ -145,12 +145,13 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 	mat_shader_table.insert(key, handle);
 	return handle;
 }
-
+#include "tracy/public/tracy/Tracy.hpp"
 program_handle MaterialManagerLocal::get_mat_shader(
 	const Model* mod, 
 	const MaterialInstance* mat,
 	int flags)
 {
+	//ZoneScopedN("get_mat_shader");
 	const MasterMaterialImpl* mm = mat->get_master_material();
 
 	//bool is_animated = mod && mod->has_bones() && has_animated_matricies;

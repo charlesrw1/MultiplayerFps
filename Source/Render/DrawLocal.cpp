@@ -249,6 +249,490 @@ private:
 };
 static TaaManager r_taa_manager;
 
+inline size_t hash_combine(size_t a, size_t b)
+{
+	return a ^ (b + 0x9e3779b9 + (a << 6) + (a >> 2));
+}
+struct ModelAndMatTextureSet {
+	Model* m{};
+	// for mat overrides...
+	MasterMaterialImpl* parent{};
+	MaterialInstance* has_textures{};
+	uint32_t texture_hash{};
+
+	bool operator==(const ModelAndMatTextureSet& other) const {
+		return m == other.m && parent == other.parent && texture_hash == other.texture_hash;
+	}
+};
+struct ModelAndMatTextureSetHasher {
+	size_t operator()(const ModelAndMatTextureSet& k) const noexcept {
+		size_t h1 = std::hash<Model*>{}(k.m);
+		size_t h2 = std::hash<MasterMaterialImpl*>{}(k.parent);
+		size_t h3 = k.texture_hash;
+		return hash_combine(hash_combine(h2, h3), h1);
+	}
+};
+
+struct ModelAndMatTData {
+	Model* m{};
+	std::vector<int> part_to_draw_cmd;	// total num_parts (inc lods etc)
+	int instance_count = 0;
+	int instance_alloced = 0;
+	int16_t ptr_ofs = 0;
+};
+
+struct MaterialAndShader_CpuFast {
+	MaterialInstance* mat = nullptr;
+	draw_call_key key{};
+};
+struct Render_Pass_CpuFast {
+public:
+	std::vector<Multidraw_Batch> batches;
+};
+struct Render_List_CpuFast {
+	std::vector<int> glinstances;
+	std::vector<gpu::DrawElementsIndirectCommand> out_cmds;
+	std::vector<MaterialAndShader_CpuFast> batch_to_material;
+};
+
+class BuildSceneData_CpuFast {
+public:
+	static BuildSceneData_CpuFast* inst;
+
+	// now
+	void build_scene_data(bool* vis_list, int8_t* lod_list);
+
+	int16_t get_index(Model* m, MaterialInstance* mat) {
+		if (!m)
+			return -1;
+		ModelAndMatTextureSet search;
+		search.m = m;
+		if (mat && mat->impl) {
+			search.parent = mat->impl->get_master_impl();
+			search.texture_hash = mat->impl->texture_id_hash;
+			search.has_textures = mat;
+		}
+		auto find = mod_data.find(search);
+		if (find != mod_data.end()) {
+			return find->second.ptr_ofs;
+		}
+		ModelAndMatTData data;
+		data.ptr_ofs = (int)mod_data_ptrs.size();
+		data.m = m;
+
+		mod_data[search] = data;
+		mod_data_ptrs.push_back(&mod_data[search]);
+
+		return data.ptr_ofs;
+	}
+
+	inline bool is_modptr_index_in_fast_path(int16_t fast_index) const {
+		if (fast_index < 0) return false;
+		return mod_data_ptrs[fast_index]->instance_alloced > 0;
+	}
+
+private:
+	void rebuild_mod_data();
+	void rebuild_batches();
+
+	// sorted specially for shadows
+	Render_Pass_CpuFast shadow_pass;
+	// sorted for opaques
+	Render_Pass_CpuFast gbuffer_pass;
+
+	Render_List_CpuFast gbuffer_list;
+	// then have a list per cascades and spotlight and such
+	Render_List_CpuFast shared_shadow_list;
+
+	// mod data, updated when needed. must then update out_cmds
+	std::unordered_map<ModelAndMatTextureSet, ModelAndMatTData, ModelAndMatTextureSetHasher> mod_data;
+	std::vector<ModelAndMatTData*> mod_data_ptrs;
+
+	// sorted draw cmds, indexed into by M&MTS
+	std::vector<gpu::DrawElementsIndirectCommand> out_cmds;
+	std::vector<int16_t> cmd_to_mod_data_ptr;
+	struct CmdExtraData {
+		Model* model{};
+		MaterialInstance* material{};
+		int submesh{};
+		draw_call_key key{};
+	};
+	std::vector<CmdExtraData> cmd_to_extra;
+
+	std::vector<MaterialAndShader_CpuFast> batch_to_material;
+
+	// instance, int16|int16. object and model index
+	// updated per frame
+	std::vector<int> mmts_instances;
+};
+BuildSceneData_CpuFast* BuildSceneData_CpuFast::inst = nullptr;
+inline int next_pow2(uint32_t x) {
+	return std::bit_ceil(x);
+}
+#include "Framework/ArenaStd.h"
+void BuildSceneData_CpuFast::rebuild_batches()
+{
+	auto make_batches = [&](std::vector<Multidraw_Batch>& batches, const bool is_depth_pass)
+	{
+		batches.clear();
+
+		if (out_cmds.empty())
+			return;
+
+		Multidraw_Batch batch;
+		batch.first = 0;
+		batch.count = 1;
+
+		const Model* batch_model = cmd_to_extra.at(0).model;
+		auto batch_sort_key = cmd_to_extra.at(0).key;
+
+		for (int i = 1; i < out_cmds.size(); i++)
+		{
+
+			const Model* this_model = cmd_to_extra.at(i).model;
+			auto this_sort_key = cmd_to_extra.at(i).key;
+
+			bool batch_this = false;
+
+			bool same_layer = batch_sort_key.layer == this_sort_key.layer;
+			bool same_vao = batch_sort_key.vao == this_sort_key.vao;
+			bool same_material = batch_sort_key.texture == this_sort_key.texture;
+			bool same_shader = batch_sort_key.shader == this_sort_key.shader;
+			bool same_other_state = batch_sort_key.blending == this_sort_key.blending
+				&& batch_sort_key.backface == this_sort_key.blending;
+
+			if (!is_depth_pass) {
+				if (same_vao && same_material && same_other_state && same_shader && same_layer)
+					batch_this = true;	// can batch with different meshes
+				else
+					batch_this = false;
+
+			}
+			else {// pass==DEPTH
+				// can batch across texture changes as long as its not alpha tested
+				if (same_shader && same_vao && same_other_state)
+					batch_this = true;
+				else
+					batch_this = false;
+			}
+
+			if (batch_this) {
+				batch.count += 1;
+			}
+			else {
+				batches.push_back(batch);
+				batch.count = 1;
+				batch.first = i;
+
+				batch_model = this_model;
+				batch_sort_key = this_sort_key;
+			}
+		}
+
+		batches.push_back(batch);
+	};
+
+	make_batches(gbuffer_pass.batches, false);
+	make_batches(shadow_pass.batches, true);
+
+}
+void BuildSceneData_CpuFast::rebuild_mod_data()
+{
+	ZoneScopedN("BuildSceneData_CpuFast::rebuild_mod_data");
+
+	ArenaScope scope(draw.mem_arena);
+
+	out_cmds.clear();
+	cmd_to_mod_data_ptr.clear();
+	cmd_to_extra.clear();
+
+	batch_to_material.clear();
+	gbuffer_pass.batches.clear();
+	shadow_pass.batches.clear();
+
+
+	auto make_key = [&](MaterialInstance* this_mat, Model* this_model) -> draw_call_key {
+		draw_call_key k{};
+		if (!this_mat)
+			return k;
+		auto parent = this_mat->impl->get_master_impl();
+		if (!parent)
+			return k;
+
+		k.backface = parent->backface;
+		k.blending = (uint64_t)parent->blend;
+		k.mesh = this_model->get_uid();
+		k.texture = this_mat->impl->texture_id_hash;
+		k.shader = matman.get_mat_shader(
+			nullptr, this_mat,
+			0
+		);
+		return k;
+	};
+
+	for (auto& [key, md] : mod_data) {
+		auto m = key.m;
+		const int num_parts = key.m->get_num_parts();
+		md.part_to_draw_cmd.clear();
+		for (int parti = 0; parti < num_parts; parti++) {
+			auto& part = key.m->get_part(parti);
+			MaterialInstance* mati = (MaterialInstance*)key.m->get_material_for_part(part);
+			if (key.has_textures)
+				mati = key.has_textures;
+			if (!mati || !mati->impl)
+				mati = matman.get_fallback();
+
+
+			gpu::DrawElementsIndirectCommand cmd{};
+			cmd.baseVertex = part.base_vertex + m->get_merged_vertex_ofs();
+			cmd.count = part.element_count;
+			cmd.firstIndex = part.element_offset + m->get_merged_index_ptr();
+			cmd.firstIndex /= MODEL_BUFFER_INDEX_TYPE_SIZE;
+
+			// Important! Set primCount to 0 because visible instances will increment this
+			cmd.primCount = 0;// meshb.count;
+			cmd.baseInstance = 0;
+			out_cmds.push_back(cmd);
+			cmd_to_mod_data_ptr.push_back(md.ptr_ofs);
+			cmd_to_extra.push_back({ m,mati,parti,make_key(mati,m) });
+
+			const int cmd_index = (int)out_cmds.size() - 1;
+			const int data = (mati->impl->gpu_buffer_offset);
+
+			md.part_to_draw_cmd.push_back(cmd_index);
+			md.part_to_draw_cmd.push_back(data);
+		}
+	}
+	// sort the commands around
+
+	struct IntAndKey {
+
+		int i = 0;
+		draw_call_key key{};
+		int submesh_idx = 0;
+	};
+
+	std::vector<IntAndKey> sorted;
+
+	for (int i = 0; i < out_cmds.size(); i++) {
+		sorted.push_back({ i,cmd_to_extra[i].key, cmd_to_extra[i].submesh });
+	}
+	const auto& merge_functor = [](const IntAndKey& a, const IntAndKey& b)
+	{
+		if (a.key.as_uint64() < b.key.as_uint64()) return true;
+		else if (a.key.as_uint64() == b.key.as_uint64())
+			return  a.submesh_idx < b.submesh_idx;
+		else return false;
+	};
+
+	std::sort(sorted.begin(), sorted.end(), merge_functor);
+		
+
+	const arena_vec<gpu::DrawElementsIndirectCommand> copied_cmds(out_cmds.begin(),out_cmds.end(),scope);
+	for (int i = 0; i < sorted.size(); i++)
+		out_cmds[i] = copied_cmds[sorted[i].i];
+	const arena_vec<CmdExtraData> copied_extra(cmd_to_extra.begin(), cmd_to_extra.end(), scope);
+	for (int i = 0; i < sorted.size(); i++)
+		cmd_to_extra[i] = copied_extra[sorted[i].i];
+	const arena_vec<int16_t> copied_ptr_i(cmd_to_mod_data_ptr.begin(), cmd_to_mod_data_ptr.end(), scope);
+	for (int i = 0; i < sorted.size(); i++)
+		cmd_to_mod_data_ptr[i] = copied_ptr_i[sorted[i].i];
+
+	arena_vec<int> inv_sorted(sorted.size(),scope);
+	for (int i = 0; i < sorted.size(); i++) {
+		inv_sorted[sorted[i].i] = i;
+	}
+
+	// must adjust model index
+	for (auto& [key, md] : mod_data) {
+		const int num_parts = md.part_to_draw_cmd.size() / 2;
+		for (int parti = 0; parti < num_parts; parti++) {
+			const int index = parti * 2;
+			const int cmd_ofs_prev = md.part_to_draw_cmd.at(index);
+			const int remapped = inv_sorted.at(cmd_ofs_prev);
+			md.part_to_draw_cmd.at(index) = remapped;
+		}
+	}
+
+	rebuild_batches();
+}
+
+// wrinkles
+// 1. objects with sort layers? do slow path
+// 2. scene wide material overrides? 
+// 3. models with some transparent parts? -> store this on the model. if has transparents, must iterate them. (this set is very small)
+// 4. integrate occlusion culling.
+// 5. unloading
+
+void BuildSceneData_CpuFast::build_scene_data(bool* vis_list, int8_t* lod_list)
+{
+	ZoneScopedN("BuildSceneData_CpuFast");
+
+	// step1:
+	// must check if theres new [model,mat_override] in the renderable set
+	// must count up [model,mat_override] pairs, only new model if count > thresh
+	// if new model?
+	//		-> rebuild
+	// else if count > alloc'd?
+	//		-> just rebuild the count
+	// then for instances
+	//		add to mmts_instances if in fast path (hasnt updated etc)
+
+
+	auto& arena = draw.get_arena();
+	auto& proxies = draw.scene.proxy_list.objects;
+
+
+
+	ArenaScope scope(arena);
+		
+
+	// step 1.1
+
+	auto mmt_counts = arena.alloc_bottom_span<uint16>(mod_data_ptrs.size());
+	std::fill(mmt_counts.begin(), mmt_counts.end(), 0);
+	for (auto& [_, obj] : proxies) {
+		if (obj.fastcpu_index >= 0)
+			mmt_counts[obj.fastcpu_index] += 1;
+	}
+
+	// step 1.2
+	const int thresh = 5;	// if more than 5
+	bool wants_rebuild_counts = false;
+	bool needs_new_model = false;
+	for (int c = 0; c < mmt_counts.size(); c++) {
+		const int count = mmt_counts[c];
+		auto ptr = mod_data_ptrs.at(c);
+		if (count >= thresh) {
+			ptr->instance_count = count;
+			if (count > ptr->instance_alloced) {
+				// set how many to alloc
+
+				if (ptr->instance_alloced == 0) {
+					needs_new_model = true;
+				}
+				else
+					wants_rebuild_counts = true;
+
+				ptr->instance_alloced = next_pow2(count);
+			}
+
+			// #####################
+			// # UNLOADING TESTING #
+			// #####################
+			// possible for model to not be loaded here. ie user caches a model ptr, not in render system.
+			// model is unloaded because its not "used", then user tries using the ptr without going through asset system
+			if (count > 0 && !ptr->m->get_is_loaded()) {
+				sys_print(Debug, "emergency model reload %s\n", ptr->m->get_name().c_str());
+				g_assets.reload_sync<Model>(ptr->m);
+			}
+		}
+	}
+
+	needs_new_model = true;
+
+	// step 1.3
+	if (needs_new_model) {
+		ZoneScopedN("rebuild_model");
+
+
+		// the expensive step.
+		//sys_print(Debug, "rebuilding fast path model data\n");
+		rebuild_mod_data();
+	}
+		
+	if (needs_new_model||wants_rebuild_counts) {
+		ZoneScopedN("rebuild_counts");
+
+		//sys_print(Debug, "rebuilding fast path inst counts\n");
+
+		int count_sum = 0;
+		for (int cmdi = 0; cmdi < out_cmds.size(); cmdi++) {
+			auto ptr = mod_data_ptrs.at(cmd_to_mod_data_ptr.at(cmdi));
+			auto& cmd = out_cmds[cmdi];
+			cmd.baseInstance = count_sum;
+			count_sum += ptr->instance_alloced;
+		}
+
+		gbuffer_list.glinstances.resize(count_sum);
+	}
+
+
+	// step2: 
+	// for render lists:
+	//		for objects:
+	//			inc render list cmds
+	//		compact render list commands
+	//		upload cmds, instances
+	//		draw the commands (noice)
+
+	{
+		ZoneScopedN("bsd_fast_step2");
+
+		for (int i = 0; i < out_cmds.size(); i++)
+			out_cmds[i].primCount = 0;
+
+		const bool is_cubemap_view = false;
+		const bool is_skybox_view = false;
+
+		if (is_skybox_view)
+			return;	// none pass
+
+		// step 2.1
+		int index = -1;
+		for (auto& [_, obj] : proxies) {
+			index += 1;
+
+			const int fast_idx = obj.fastcpu_index;
+			const bool wants_skip = (fast_idx < 0)||(!obj.proxy.visible) || (obj.proxy.is_skybox) || (is_cubemap_view && obj.proxy.ignore_in_cubemap);
+
+			if (wants_skip)
+				continue;
+
+			ModelAndMatTData* ptr = mod_data_ptrs.at(fast_idx);
+			if (ptr->instance_alloced > 0) {
+				if (vis_list[index] && lod_list[index] > 0) {
+					const int8_t want_lod = lod_list[index];
+					auto& lod = obj.proxy.model->get_lod(want_lod);
+					for (int part = 0; part < lod.part_count; part++) {
+						const int part_i = lod.part_ofs + part;
+						const int drawcmd_i = ptr->part_to_draw_cmd.at(part_i * 2);
+						const int prim = out_cmds.at(drawcmd_i).primCount;
+						const int base = out_cmds.at(drawcmd_i).baseInstance;
+						out_cmds.at(drawcmd_i).primCount += 1;
+						gbuffer_list.glinstances.at(base + prim) = index;
+					}
+				}
+
+			}
+		}
+
+		// step 2.2
+		gbuffer_list.out_cmds.resize(out_cmds.size());
+		for (auto& md : gbuffer_pass.batches) {
+			int start = 0;
+			const int count = md.count;
+			for (int i = 0; i < count; i++) {
+				auto& cmd = out_cmds.at(md.first + i);
+				if (cmd.primCount > 0) {
+					gbuffer_list.out_cmds.at(md.first + start) = cmd;
+					start += 1;
+				}
+			}
+		}
+
+	}
+
+	// fully gpu?
+	//  cmds and batches always uploaded
+	//	mod data always uploaded
+	//  only upload instances
+	// 
+	//	upload mmts_instances (very small if you only upload changed portion)
+	//	cull + lod on gpu. you are already uploading to gpu anyways for occlusion culling. so look into this!
+	// would also have to upload remapping table from objid -> inst buffer... unless you change allocation strategy
+}
+
 
 
 /*
@@ -971,6 +1455,7 @@ void Renderer::unload_unused_models_test()
 
 }
 
+
 void Renderer::check_hardware_options()
 {
 	bool supports_compression = false;
@@ -1123,6 +1608,7 @@ void Renderer::init()
 	print_time("draw:init_state");
 
 
+	BuildSceneData_CpuFast::inst = new BuildSceneData_CpuFast;
 	windowDrawer = new RenderWindowBackendLocal();
 	RenderWindowBackend::inst = windowDrawer;
 
@@ -1672,7 +2158,7 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass,
 void Renderer::render_level_to_target(const Render_Level_Params& params)
 {
 	ZoneScoped;
-	TracyGpuZone("render_to_target");
+	//TracyGpuZone("render_to_target");
 
 
 	device.reset_states();
@@ -1870,6 +2356,7 @@ void Render_Pass::add_object(
 	bool is_editor_mode) {
 	ASSERT(handle.is_valid() && "null handle");
 	ASSERT(material && "null material");
+	ZoneScopedN("add_object");
 	Pass_Object obj;
 	obj.sort_key = create_sort_key_from_obj(proxy, material,camera_dist, submesh, layer, is_editor_mode);
 	obj.render_obj = handle;
@@ -2047,6 +2534,8 @@ static void build_standard_cpu(
 	Free_List<ROP_Internal>& proxy_list
 )
 {
+	ZoneScopedN("build_standard_cpu");
+
 	auto& memArena = draw.get_arena();
 	ArenaScope memScope(memArena);
 	std::span<uint32_t> draw_to_material = memArena.alloc_bottom_span<uint32_t>(src.mesh_batches.size());
@@ -2095,6 +2584,7 @@ static void build_standard_cpu_culling(
 	Free_List<ROP_Internal>& proxy_list
 )
 {
+	ZoneScopedN("build_standard_cpu_culling");
 	GPUSCOPESTART(build_standard_cpu_culling);
 
 	auto& memArena = draw.get_arena();
@@ -2550,7 +3040,8 @@ void calc_lod_job(int8_t* lodarray, int16_t* camera_dist)
 	for (int i = 0; i < proxy_list.objects.size(); i++) {
 		auto& obj = proxy_list.objects[i];
 		auto& proxy = obj.type_.proxy;
-		const glm::vec3 to_camera = glm::vec3(obj.type_.bounding_sphere_and_radius) - vs.origin;
+		glm::vec3 to_camera = glm::vec3(obj.type_.bounding_sphere_and_radius) - vs.origin;
+
 		const float dist_to_camera_2 = glm::dot(to_camera, to_camera);
 		const float percentage_2 = get_screen_percentage_2(obj.type_.bounding_sphere_and_radius, inv_two_times_tanfov_2, dist_to_camera_2);
 		const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
@@ -2641,10 +3132,12 @@ ConfigVar r_dont_use_camera_depth_build_scene("r.dont_use_camera_depth_build_sce
 ConfigVar r_skip_depth_prepass("r.skip_depth_prepass", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_depth_prepass_all_objects("r.depth_prepass_all_objects", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_skip_add_to_passes("r.skip_add_to_passes", "0", CVAR_BOOL | CVAR_DEV, "");
+
+
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, bool cubemap_view)
 {
 	GPUSCOPESTART(build_scene_data_scope);
-	TracyGpuZone("build_scene_data");
+	ZoneScopedN("build_scene_data");
 
 	GpuCullingTest::inst->build_data();
 
@@ -2680,7 +3173,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 
 	{
 		//CPUSCOPESTART(cpu_object_cull);
-		ZoneScopedN("SetupThreaded");
+		ZoneScopedN("lod_calcs");
 
 		const int NUM_FRUSTUM_JOBS = 5;
 		JobDecl decls[NUM_FRUSTUM_JOBS];
@@ -2709,8 +3202,10 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 	if(add_to_passes)
 		set_gpu_objects_data_job(uintptr_t(gpu_objects));
 
+	BuildSceneData_CpuFast::inst->build_scene_data(visible_array, lod_to_render_array);
+
 	auto add_objects_to_passes = [&]() {
-		ZoneScopedN("Traversal");
+		ZoneScopedN("add_objects_to_passes");
 		//ZoneScopedN("LoopObjects");
 		
 		MaterialInstance* const debug_transparent_mat = MaterialInstance::load("transparent_debug.mm");
@@ -2726,8 +3221,18 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			handle<Render_Object> objhandle{ obj.handle };
 			auto& proxy = obj.type_.proxy;
 
+			// go down this path if:
+			//		have transparents, not being rendered in fast path
+			//		is_skybox (render these last)
+
 			if (!proxy.visible || !proxy.model)
 				continue;
+			const bool is_in_fastpath = BuildSceneData_CpuFast::inst->is_modptr_index_in_fast_path(obj.type_.fastcpu_index);
+			const bool has_transparent = obj.type_.has_transparents;
+			const bool ed_selected = proxy.outline;
+			if (is_in_fastpath && !has_transparent && !ed_selected)
+				continue;
+
 
 
 			// #####################
@@ -2739,17 +3244,9 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 				sys_print(Debug, "emergency model reload %s\n", proxy.model->get_name().c_str());
 				g_assets.reload_sync<Model>(proxy.model);
 			}
-
-
-
-
-			if (!proxy.model->get_is_loaded() || (proxy.model->get_num_lods() == 0))
+			if (proxy.model->get_num_lods() == 0)
 				continue;
 
-
-			//if (proxy.ignore_in_baking&& test_ignore_bake.get_bool())
-			//	continue;	// FIXME TESTING
-			
 			
 			if (!proxy.is_skybox && skybox_only)
 				continue;
@@ -2767,8 +3264,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			if (LOD_index < 0)
 				continue;	// not visible
 
-
-
 			int16_t cam_depth = 0;
 			if (!dont_use_cam_depth)
 				cam_depth = camera_depth_array[i];
@@ -2781,8 +3276,10 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			//
 			for (int j = pstart; j < pend; j++) {
 				auto& part = proxy.model->get_part(j);
+				if (is_in_fastpath && !part.is_material_transparent() && !ed_selected)
+					continue;
 
-				const MaterialInstance* mat = proxy.model->get_material(part.material_idx);
+				const MaterialInstance* mat = proxy.model->get_material_for_part(part);
 				if (obj.type_.proxy.mat_override)
 					mat = (MaterialInstance*)obj.type_.proxy.mat_override;
 				if (wants_set_to_fallback || !mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
@@ -2803,18 +3300,16 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 					if (!mm->is_translucent() && casts_shadow)
 						add_to_pass(shadow_pass);
 				}
-				else {
+				else if(!is_in_fastpath) {
 					if (casts_shadow)
 						add_to_pass(shadow_pass);
 					if (is_visible) {
 						add_to_pass(gbuffer_pass);
-						if ((all_object_depth_prepass||proxy.sort_first)&&!skip_prepass_objs)
-							add_to_pass(depth_prepass);
 					}
 				}
 
 #ifdef EDITOR_BUILD
-				if (obj.type_.proxy.outline && is_visible) {
+				if (ed_selected && is_visible) {
 					add_to_pass(editor_sel_pass);
 				}
 #endif
@@ -2826,14 +3321,12 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		
 
 	auto make_batches_for_passes = [&]() {
-		ZoneScopedN("MakeBatchesAndUploadGpuData");
+		ZoneScopedN("make_batches_for_passes");
 
 		gbuffer_pass.make_batches(*this);
 		shadow_pass.make_batches(*this);
 		transparent_pass.make_batches(*this);
 		editor_sel_pass.make_batches(*this);
-		if(!skip_prepass_objs)
-			depth_prepass.make_batches(*this);
 
 		if (add_to_passes) {
 			{
@@ -2854,7 +3347,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 
 
 	auto make_render_lists = [&]() {
-		ZoneScopedN("MakeRenderLists");
+		ZoneScopedN("make_render_lists");
 
 		auto make_shadow_render_lists = [&]() {
 			JobDecl shadowlistdecl[4];
@@ -2892,14 +3385,11 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		};
 		update_spotlight_shadows();
 
-
 		build_standard_cpu_culling(gbuffer_rlist, gbuffer_pass, proxy_list);
 
 		build_standard_cpu(transparent_rlist, transparent_pass, proxy_list);
 		build_standard_cpu(editor_sel_rlist, editor_sel_pass, proxy_list);
 
-		if(!skip_prepass_objs)
-			build_standard_cpu(depth_prepass_rlist, depth_prepass, proxy_list);
 
 	};
 	make_render_lists();
@@ -3363,7 +3853,7 @@ void ThumbnailRenderer::render(Model* model, MaterialInstance* override_mat) {
 	for (int j = pstart; j < pend; j++) {
 		auto& part = model->get_part(j);
 
-		const MaterialInstance* mat = model->get_material(part.material_idx);
+		const MaterialInstance* mat = model->get_material_for_part(part);
 		if (override_mat)
 			mat = override_mat;
 
@@ -3561,7 +4051,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 
 
 	//ZoneNamed(RendererSceneDraw,true);
-	TracyGpuZone("scene_draw");
+	//TracyGpuZone("scene_draw");
 
 	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -3868,7 +4358,7 @@ void Renderer::upload_light_and_decal_buffers()
 
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 {
-	TracyGpuZone("scene_draw_internal");
+	//TracyGpuZone("scene_draw_internal");
 	//ZoneScoped;
 	GPUSCOPESTART(scene_draw_internal_scope);
 
@@ -4456,7 +4946,17 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 	ASSERT(!eng->get_is_in_overlapped_period());
 	ROP_Internal& in = proxy_list.get(handle.id);
 
-
+	if (!(in.proxy.model == proxy.model && in.proxy.mat_override == proxy.mat_override)) {
+		if (proxy.model)
+			in.has_transparents = proxy.model->get_has_any_transparent_materials();
+		if (proxy.mat_override && proxy.mat_override->impl && proxy.mat_override->impl->is_transparent_material()) {
+			in.fastcpu_index = -1;	// skip, material is transparent
+			in.has_transparents = true;
+		}
+		else {
+			in.fastcpu_index = BuildSceneData_CpuFast::inst->get_index(proxy.model, proxy.mat_override);
+		}
+	}
 
 	in.prev_transform = in.proxy.transform;
 	in.prev_bone_ofs = in.proxy.animator_bone_ofs;

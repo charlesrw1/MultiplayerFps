@@ -289,7 +289,7 @@ void export_one_model(const Model& model, const char* export_path) {
         p.index_ofs = new_index_start;
         p.vert_count = verticies.size() - new_offset;
         p.vert_ofs = new_offset;
-        p.materialAlbedo = srgb_to_linear_color32(get_color_of_material_for_export(model.get_material(part.material_idx)));
+        p.materialAlbedo = srgb_to_linear_color32(get_color_of_material_for_export(model.get_material_for_part(part)));
         parts.push_back(p);
     }
 

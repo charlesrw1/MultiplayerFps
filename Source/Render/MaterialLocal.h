@@ -201,6 +201,10 @@ public:
 		return (gpu_buffer_offset * 4) / MATERIAL_SIZE;
 	}
 
+	bool is_transparent_material() const {
+		return get_master_impl()->is_translucent();
+	}
+
 	MaterialInstance* self = nullptr;
 	bool is_dynamic_material = false;
 	int texture_id_hash = 0;

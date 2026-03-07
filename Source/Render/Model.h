@@ -88,6 +88,17 @@ public:
 	int element_count = 0;	// in element size
 	int material_idx = 0;
 	int vertex_count = 0;	// in element size
+
+	bool is_material_transparent() const {
+		return material_idx & (1 << 30);
+	}
+	int get_material_idx_to_use() const {
+		return material_idx & ~(1 << 30);
+	}
+	void set_material_transparent() {
+		material_idx |= (1 << 30);
+	}
+
 };
 
 struct ModelTag {
@@ -137,6 +148,10 @@ public:
 	int get_num_lods() const { return lods.size(); }
 	const MeshLod& get_lod(int index) const { return lods[index]; }
 	const MaterialInstance* get_material(int index) const { return materials[index].get(); }
+	const MaterialInstance* get_material_for_part(const Submesh& mesh) const {
+		return get_material(mesh.get_material_idx_to_use());
+	}
+
 	int get_num_materials() const { return materials.size(); }
 	glm::ivec2 get_lightmap_size() const { return glm::ivec2(lightmapX,lightmapY); }
 
@@ -163,6 +178,9 @@ public:
 		WorldMerged=2	// all WorldMerged get turned into one lightmap. prevents seams on floors/walls stuff
 	};
 	LightmapType get_lightmap_type() const { return isLightmapped; }
+	bool get_has_any_transparent_materials() const {
+		return has_any_transparent_materials;
+	}
 
 	REF void set_physics_material(PhysicsMaterialWrapper* mat) {
 		this->physics_material = mat;
@@ -197,6 +215,8 @@ private:
 	LightmapType isLightmapped = LightmapType::None;
 	int16_t lightmapX = 0;
 	int16_t lightmapY = 0;
+	bool has_any_transparent_materials = false;
+
 	PhysicsMaterialWrapper* physics_material = nullptr;
 
 	friend class ModelMan;

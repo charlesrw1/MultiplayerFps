@@ -874,6 +874,7 @@ void ModelMan::create_default_models()
 		g_assets.install_system_asset(_sprite, "_SPRITE");
 	}
 }
+#include "Render/MaterialLocal.h"
 
 // Uploads the models vertex and index data to the gpu
 // and sets the models ptrs/offsets into the global vertex buffer
@@ -901,6 +902,17 @@ bool ModelMan::upload_model(Model* mesh)
 	const uint8_t* const v_bufferdata = mesh->data.get_vertex_data(&vertbufsize);
 	mesh->vertex_alloc_ptr = allocator.append_to_v_buffer(v_bufferdata, vertbufsize);
 	//mesh->merged_vert_offset /= sizeof(ModelVertex);
+
+	bool has_transparent = false;
+	for (int i = 0; i < mesh->parts.size(); i++) {
+		auto& part = mesh->parts.at(i);
+		auto mat = mesh->materials.at(part.get_material_idx_to_use()).get();
+		if (mat && mat->impl && mat->impl->get_master_impl() && mat->impl->get_master_impl()->is_translucent()) {
+			has_transparent = true;
+			part.set_material_transparent();
+		}
+	}
+	mesh->has_any_transparent_materials = has_transparent;
 
 	return true;
 }

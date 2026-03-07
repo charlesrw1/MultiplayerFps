@@ -272,8 +272,8 @@ void GpuCullingTest::build_data()
 			}
 			const int num_parts = m->get_num_parts();
 			for (int i = 0; i < num_parts; i++) {
-				const int mat = m->get_part(i).material_idx;
-				const MaterialInstance* matp = m->get_material(mat);
+		
+				const MaterialInstance* matp = m->get_material_for_part(m->get_part(i));
 				if (!matp || !matp->impl)
 					matp = matman.get_fallback();
 
@@ -347,6 +347,8 @@ void GpuCullingTest::build_data()
 
 	}
 	if (!skip_obj_upload.get_bool()) {
+		CPUSCOPESTART(obj_upload);
+
 		models_used.clear();
 		auto& all_objs = draw.scene.proxy_list.objects;
 		// first fill object buffer

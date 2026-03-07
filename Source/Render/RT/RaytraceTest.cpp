@@ -262,7 +262,7 @@ void DdgiTesting::build_world()
 			const int vertex_start = all_verticies.size();
 
 			const auto& part = o.model->get_part(parti);
-			auto material_inst = o.model->get_material(part.material_idx);
+			auto material_inst = o.model->get_material_for_part(part);
 			if (matoverride)
 				material_inst = matoverride;
 
