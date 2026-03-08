@@ -28,6 +28,8 @@
 #include <array>
 #include "IGraphsDevice.h"
 
+#include <span>
+
 class MeshPart;
 class Model;
 class Animator;
@@ -53,6 +55,14 @@ Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int fr
 
 const int MAX_CUBEMAPS = 32;
 const int CUBEMAP_WIDTH = 128;
+
+
+struct Render_lists_cpufast
+{
+	IGraphicsBuffer* glinst_to_inst{};	// object indirection
+	IGraphicsBuffer* cmdbuf{};			// cmd buffer
+	std::span<int> md_counts;			// size = batches.size()
+};
 
 struct Render_Lists;
 class Render_Pass;
@@ -82,6 +92,8 @@ struct Render_Level_Params {
 
 	Render_Lists* rl = nullptr;
 	Render_Pass* rp = nullptr;
+
+	Render_lists_cpufast* rl_cpufast = nullptr;
 
 	Pass_Type pass = OPAQUE;
 	bool draw_viewmodel = false;

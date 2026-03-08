@@ -576,6 +576,8 @@ public:
 	}
 
 	void build_scene_data(bool skybox_only, bool is_for_editor, bool cubemap_view);
+	void update_spotlight_data();
+
 	void refresh_static_mesh_data(bool is_for_editor);
 	RSunInternal* get_main_directional_light();
 

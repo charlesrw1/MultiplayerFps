@@ -97,6 +97,7 @@ ConfigVar r_drawfog("r.drawfog", "1", CVAR_BOOL | CVAR_DEV, "enable/disable draw
 ConfigVar ddgi_test("dt", "1", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar ddgi_rt("ddrt", "0", CVAR_BOOL | CVAR_DEV, "");
 
+extern void build_frustum_for_cascade(Frustum& f, int index);
 
 RenderWindowBackend* RenderWindowBackend::inst = nullptr;
 class RenderWindowBackendLocal : public RenderWindowBackend
@@ -317,7 +318,26 @@ public:
 	}
 
 	// now
-	void build_scene_data(uint8_t* lod_list);
+	void build_scene_data(bool cubemap_view, bool skybox_only);
+
+	// e2e func, fixme
+	void cull_and_draw_shadow_cascade(int idx);
+	void cull_and_draw_shadow_spot(
+		Frustum f,
+		glm::vec4 backplane,
+		float fov,
+		glm::vec3 origin,
+		float poly_factor
+	);
+
+
+	void make_shadow_object_data_threadsafe(
+		std::span<uint8_t> vis,
+		std::span<int> glinst,
+		std::span<gpu::DrawElementsIndirectCommand> outcmds,
+		std::span<int> mdcounts
+	) const;
+
 
 	int16_t get_index(Model* m, MaterialInstance* mat) {
 		if (!m)
@@ -363,9 +383,31 @@ public:
 		input.num_objs = gpu.num_cullobjs;
 		return input;
 	}
-	void do_gbuffer_draw();
+	GpuCullInput get_cull_input_shadow() const {
 
+		GpuCullInput input = get_cull_input();
+		input.batches_buf = gpu.shadow_batches;
+		input.draw_to_batch = gpu.shadow_draw_to_batch;
+		input.num_batches = shadow_pass.batches.size();
+
+		return input;
+	}
+
+	void do_gbuffer_draw();
+	void do_shadow_draw(float polyfac, bool lessthan);
+
+
+	int get_num_commands() const {
+		return out_cmds.size();
+	}
+	int get_num_instances() const {
+		return gbuffer_list.glinstances.size();
+	}
+	int get_num_shadow_batches() const {
+		return shadow_pass.batches.size();
+	}
 private:
+	void do_draw_shared(bool shadow, float polyfac, bool lessthan);
 	void rebuild_mod_data();
 	void rebuild_batches();
 	void upload_gpu_cmds(int sum_count);
@@ -490,7 +532,7 @@ void BuildSceneData_CpuFast::upload_gpu_cmds(int sum_count)
 
 	gpu.glinst_to_inst->upload(nullptr, sum_count * sizeof(int) * 2);	// *2 because materials stored with instances
 }
-void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth)
+void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, bool depth_less_than_op, bool force_backface)
 {
 	auto flags = (is_depth) ? MSF_DEPTH_ONLY : 0;
 	flags |= MSF_MATERIAL_IN_INSTANCE;
@@ -503,20 +545,21 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth)
 		nullptr, mat,
 		flags
 	);
-	const BlendState blend = mat->get_master_material()->blend;
-	const bool show_backface = false;
+	auto master = mat->get_master_material();
+	const BlendState blend = master->blend;
+	const bool show_backface = master->backface;
 
 	IGraphicsVertexInput* vao_ptr = g_modelMgr.get_vao_ptr(VaoType::Lightmapped);
 
 	RenderPipelineState state;
 	state.program = program;
 	state.vao = vao_ptr->get_internal_handle();
-	state.backface_culling = !show_backface;
+	state.backface_culling = !show_backface && !force_backface;
 	state.blend = blend;
 	state.depth_testing = true;
 	//state.depth_writes = depth_write_enabled;
-	state.depth_writes = !mat->get_master_material()->is_translucent();
-	//state.depth_less_than = depth_less_than_op;
+	state.depth_writes = !master->is_translucent();
+	state.depth_less_than = depth_less_than_op;
 	draw.get_device().set_pipeline(state);
 
 
@@ -531,14 +574,26 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth)
 		draw.bind_texture(i, id);
 	}
 }
-
-void BuildSceneData_CpuFast::do_gbuffer_draw()
+void BuildSceneData_CpuFast::do_draw_shared(bool depth, float poly_factor, bool less_than)
 {
-
 	if (gpu.num_cullobjs <= 0)
 		return;
 
+	if (depth) {
+		glEnable(GL_POLYGON_OFFSET_FILL);
+		glPolygonOffset(poly_factor, 4/* this does nothing?*/);
+	}
+
 	auto do_draw_internal = [&](std::vector<Multidraw_Batch>& batches, const bool is_depth) {
+
+		bool force_backface = false;
+		bool want_less_than = false;
+
+		if (is_depth) {
+			force_backface = true;
+			want_less_than = less_than;
+		}
+
 		IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
 		auto& scene = draw.scene;
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_instance_buffer->get_internal_handle());
@@ -548,7 +603,7 @@ void BuildSceneData_CpuFast::do_gbuffer_draw()
 
 		const int size = out_cmds.size() * sizeof(int);
 		//glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 6, matindirect->get_internal_handle(), size, size);
-		
+
 		const int command_size = out_cmds.size() * sizeof(gpu::DrawElementsIndirectCommand);
 		glBindBuffer(GL_PARAMETER_BUFFER, gpu.gbuffer_count->get_internal_handle());
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, gpu.cmd_list->get_internal_handle());
@@ -563,7 +618,7 @@ void BuildSceneData_CpuFast::do_gbuffer_draw()
 			const int incr = count;// pass.batches[i].count;
 			if (count != 0) {
 
-				setup_batch2(cmd_to_extra.at(mat_ofs).material, offset, is_depth);
+				setup_batch2(cmd_to_extra.at(mat_ofs).material, offset, is_depth, want_less_than, force_backface);
 
 				const GLenum index_type = MODEL_INDEX_TYPE_GL;
 
@@ -586,7 +641,22 @@ void BuildSceneData_CpuFast::do_gbuffer_draw()
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 	};
 
-	do_draw_internal(gbuffer_pass.batches, false);
+	if (depth)
+		do_draw_internal(shadow_pass.batches, true);
+	else
+		do_draw_internal(gbuffer_pass.batches, false);
+
+	glDisable(GL_POLYGON_OFFSET_FILL);
+
+}
+void BuildSceneData_CpuFast::do_shadow_draw(float factor, bool less_than)
+{
+	do_draw_shared(true,factor,less_than);
+}
+void BuildSceneData_CpuFast::do_gbuffer_draw()
+{
+	do_draw_shared(false,0,false);
+
 }
 void BuildSceneData_CpuFast::rebuild_mod_data()
 {
@@ -788,7 +858,7 @@ inline void pack_input_lod_arr(uint8_t& out, bool is_vis, int8_t lod)
 }
 
 
-void BuildSceneData_CpuFast::build_scene_data(uint8_t* lod_list)
+void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_only)
 {
 	ZoneScopedN("BuildSceneData_CpuFast");
 	CPUFUNCTIONSTART;
@@ -822,7 +892,7 @@ void BuildSceneData_CpuFast::build_scene_data(uint8_t* lod_list)
 	}
 
 	// step 1.2
-	const int thresh = 2;	// if more than 2
+	const int thresh = 1;	// if more than 2
 	bool wants_rebuild_counts = false;
 	bool needs_new_model = false;
 	for (int c = 0; c < mmt_counts.size(); c++) {
@@ -899,10 +969,8 @@ void BuildSceneData_CpuFast::build_scene_data(uint8_t* lod_list)
 		for (int i = 0; i < out_cmds.size(); i++)
 			out_cmds[i].primCount = 0;
 
-		const bool is_cubemap_view = false;
-		const bool is_skybox_view = false;
 
-		if (is_skybox_view)
+		if (skybox_only)
 			return;	// none pass
 
 
@@ -915,7 +983,7 @@ void BuildSceneData_CpuFast::build_scene_data(uint8_t* lod_list)
 			index += 1;
 
 			const int fast_idx = obj.fastcpu_index;
-			const bool wants_skip = (fast_idx < 0)||(!obj.proxy.visible) || (obj.proxy.is_skybox) || (is_cubemap_view && obj.proxy.ignore_in_cubemap);
+			const bool wants_skip = (fast_idx < 0)||(!obj.proxy.visible) || (obj.proxy.is_skybox) || (cubemap_view && obj.proxy.ignore_in_cubemap);
 
 			if (wants_skip)
 				continue;
@@ -975,6 +1043,96 @@ void BuildSceneData_CpuFast::build_scene_data(uint8_t* lod_list)
 	//	upload mmts_instances (very small if you only upload changed portion)
 	//	cull + lod on gpu. you are already uploading to gpu anyways for occlusion culling. so look into this!
 	// would also have to upload remapping table from objid -> inst buffer... unless you change allocation strategy
+}
+void cull_and_draw_cascade_fucker(int idx)
+{
+	BuildSceneData_CpuFast::inst->cull_and_draw_shadow_cascade(idx);
+}
+void cull_and_draw_spot(Frustum f, glm::vec4 back, float fov, glm::vec3 origin, float poly)
+{
+	BuildSceneData_CpuFast::inst->cull_and_draw_shadow_spot(f,back,fov,origin,poly);
+
+}
+
+
+void BuildSceneData_CpuFast::cull_and_draw_shadow_cascade(int idx)
+{
+	Frustum f;
+	build_frustum_for_cascade(f, idx);
+	GpuCullingTest::inst->do_shadow_cull(get_cull_input_shadow(), f);
+	do_shadow_draw(1.0,true);
+
+}
+
+void BuildSceneData_CpuFast::cull_and_draw_shadow_spot(Frustum f,
+	glm::vec4 backplane,
+	float fov,
+	glm::vec3 origin,
+	float poly_factor)
+{
+	GpuCullingTest::inst->do_shadow_cull(get_cull_input_shadow(), f);
+	do_shadow_draw(-3, false);
+}
+
+void BuildSceneData_CpuFast::make_shadow_object_data_threadsafe(std::span<uint8_t> vis, std::span<int> glinst, std::span<gpu::DrawElementsIndirectCommand> outcmds, std::span<int> mdcounts) const
+{
+
+	ASSERT(glinst.size() == gbuffer_list.glinstances.size());
+	ASSERT(outcmds.size() == out_cmds.size());
+	ASSERT(mdcounts.size() == shadow_pass.batches.size());
+
+	for (int i = 0; i < outcmds.size(); i++) {
+		outcmds[i] = out_cmds[i];
+		outcmds[i].primCount = 0;
+	}
+
+	const auto& arena = draw.get_arena();
+	const auto& proxies = draw.scene.proxy_list.objects;
+	int index = -1;
+	for (auto& [_, obj] : proxies) {
+		index += 1;
+
+		const int fast_idx = obj.fastcpu_index;
+		const bool wants_skip = (fast_idx < 0) || (!obj.proxy.visible) || (!obj.proxy.shadow_caster);
+
+		if (wants_skip)
+			continue;
+		ModelAndMatTData* ptr = mod_data_ptrs.at(fast_idx);
+		if (ptr->instance_alloced > 0) {
+
+			bool visible{};
+			int8_t wantlod{};
+			split_input_lod_arr(vis[index], visible, wantlod);
+			if (visible) {
+				auto& lod = obj.proxy.model->get_lod(wantlod);
+				for (int part = 0; part < lod.part_count; part++) {
+					const int part_i = lod.part_ofs + part;
+					const int drawcmd_i = ptr->part_to_draw_cmd.at(part_i * 2);
+					const int prim = out_cmds.at(drawcmd_i).primCount;
+					const int base = out_cmds.at(drawcmd_i).baseInstance;
+					outcmds[drawcmd_i].primCount += 1;
+					glinst[base + prim] = index;
+				}
+			}
+		}
+	}
+	
+	index = -1;
+	for (auto& md : shadow_pass.batches) {
+		index += 1;
+		int start = 0;
+		const int count = md.count;
+		int actual_count = 0;
+		for (int i = 0; i < count; i++) {
+			auto& cmd = outcmds[md.first + i];
+			if (cmd.primCount > 0) {
+				outcmds[md.first + start] = cmd;
+				start += 1;
+				actual_count += 1;
+			}
+		}
+		mdcounts[index] = actual_count;
+	}
 }
 
 
@@ -2920,7 +3078,7 @@ static void build_cascade_cpu(
 	Render_Lists& shadowlist,
 	Render_Pass& shadowpass,
 	Free_List<ROP_Internal>& proxy_list,
-	bool* visiblity
+	uint8_t* visiblity
 )
 {
 	Memory_Arena& memArena = draw.get_arena();
@@ -2939,7 +3097,11 @@ static void build_cascade_cpu(
 		auto& obj = shadowpass.objects[objIndex];
 		int id = proxy_list.handle_to_obj[obj.render_obj.id];
 		//ASSERT(visiblity[id]);
-		if (!visiblity[id])
+
+		bool visible = true;
+		int8_t wantlod = 0;
+		//split_input_lod_arr(visiblity[id], visible, wantlod);
+		if (!visible)
 			continue;
 
 
@@ -3053,7 +3215,7 @@ void Render_Scene::init()
 	transparent_rlist.init(0,0);
 	//csm_shadow_rlist.init(0,0);
 	editor_sel_rlist.init(0, 0);
-	cascades_rlists.resize(4);
+	cascades_rlists.resize(CascadeShadowMapSystem::CASCADES_USED);
 	for (auto& c : cascades_rlists)
 		c.init(0, 0);
 	spotLightShadowList.init(0, 0);
@@ -3078,6 +3240,14 @@ glm::vec4 to_vec4(Color32 color) {
 inline float get_screen_percentage_2(const glm::vec4& bounding_sphere, float inv_two_times_tanfov_2, float camera_dist_2)
 {
 	return (bounding_sphere.w * bounding_sphere.w) * inv_two_times_tanfov_2 / camera_dist_2;
+}
+inline float get_shadow_cascade_percentage_2(const glm::vec4& bounding_sphere, float cascade_extent)
+{
+	float texels_per_unit = 1.0 / (cascade_extent);
+
+	float r = bounding_sphere.w * texels_per_unit;
+
+	return r * r;
 }
 
 inline const int get_lod_to_render(const Model* model, const float percentage)
@@ -3120,6 +3290,7 @@ Frustum build_frustom_for_ortho(const glm::mat4& ortho_viewproj)
 void build_frustum_for_cascade(Frustum& f, int index)
 {
 	f = build_frustom_for_ortho(draw.shadowmap.matricies[index]);
+	f.ortho_max_extent = draw.shadowmap.max_extents[index];
 }
 
 
@@ -3171,7 +3342,7 @@ void build_a_frustum_for_perspective(Frustum& f, const View_Setup& view, glm::ve
 }
 ConfigVar r_force_lod("r.force_lod", "-1", CVAR_INTEGER | CVAR_UNBOUNDED, "");
 
-template<bool with_lod>
+template<bool is_main_view>
 static void cull_objects(Frustum& frustum, int visible_array_size,uint8_t* out_array, int16_t* camera_dist, const Free_List<ROP_Internal>& objs_free_list)
 {
 	assert(visible_array_size == objs_free_list.objects.size());
@@ -3205,8 +3376,8 @@ static void cull_objects(Frustum& frustum, int visible_array_size,uint8_t* out_a
 		const bool is_visible = res == 4;
 
 		int8_t want_lod = 0;
-		if (with_lod) {
-			glm::vec3 to_camera = center - vs.origin;
+		if (is_main_view) {
+			const glm::vec3 to_camera = center - vs.origin;
 			const float dist_to_camera_2 = glm::dot(to_camera, to_camera);
 			const float percentage_2 = get_screen_percentage_2(obj.bounding_sphere_and_radius, inv_two_times_tanfov_2, dist_to_camera_2);
 			if (!obj.proxy.model)
@@ -3226,7 +3397,17 @@ static void cull_objects(Frustum& frustum, int visible_array_size,uint8_t* out_a
 
 		}
 		else {
-
+			const glm::vec3 to_camera = center - vs.origin;
+			const float percentage_2 = get_shadow_cascade_percentage_2(obj.bounding_sphere_and_radius, frustum.ortho_max_extent);
+			if (!obj.proxy.model)
+				want_lod = 0;
+			else if (force_lod != -1) {
+				int lod_to_pick = glm::clamp(force_lod, 0, obj.proxy.model->get_num_lods() - 1);
+				want_lod = lod_to_pick;
+			}
+			else {
+				want_lod = (int8_t)get_lod_to_render(obj.proxy.model, percentage_2);
+			}
 		}
 		pack_input_lod_arr(out_array[i], is_visible, want_lod);
 	}
@@ -3259,7 +3440,8 @@ void cull_shadow_objects_job(uintptr_t user)
 	cull_objects<false>(f, d->count, d->lodarr, nullptr, objs);
 }
 
-void cull_spot_shadow_objects_job(handle<Render_Light> lightId, bool* visArray, int visArraySize, bool& any_dynamic_found)
+
+void cull_spot_shadow_objects_job(handle<Render_Light> lightId, uint8_t* visArray, int visArraySize)
 {
 	ZoneScopedN("cull_spot_shadow_objects_job");
 	auto& light = draw.scene.light_list.get(lightId.id);
@@ -3279,9 +3461,10 @@ void cull_spot_shadow_objects_job(handle<Render_Light> lightId, bool* visArray, 
 
 	glm::vec4 backplane = glm::vec4(-n, 0.0);
 	backplane.w = glm::dot(n, p + n * light.light.radius);
-
+	const int force_lod = r_force_lod.get_integer();
 	auto& objs = draw.scene.proxy_list.objects;
-
+	const float inv_two_times_tanfov = 1.0 / (tan(setup.fov * 0.5));
+	const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
 	assert(visArraySize == objs.size());
 	int count = 0;
 	for (int i = 0; i < objs.size(); i++) {
@@ -3296,15 +3479,45 @@ void cull_spot_shadow_objects_job(handle<Render_Light> lightId, bool* visArray, 
 		res += (glm::dot(glm::vec3(frustum.right_plane), center) + frustum.right_plane.w >= -radius) ? 1 : 0;
 		res += (glm::dot(glm::vec3(backplane), center) + backplane.w >= -radius) ? 1 : 0;
 
-		visArray[i] = res == 5;
+		const bool visible = res == 5;
+
+		int8_t want_lod = 0;
+		if (visible) {
+			const glm::vec3 to_camera = center - setup.origin;
+			const float dist_to_camera_2 = glm::dot(to_camera, to_camera);
+			const float percentage_2 = get_screen_percentage_2(obj.bounding_sphere_and_radius, inv_two_times_tanfov_2, dist_to_camera_2);
+			if (!obj.proxy.model)
+				want_lod = 0;
+			else if (force_lod != -1) {
+				int lod_to_pick = glm::clamp(force_lod, 0, obj.proxy.model->get_num_lods() - 1);
+				want_lod = lod_to_pick;
+			}
+			else {
+				want_lod = (int8_t)get_lod_to_render(obj.proxy.model, percentage_2);
+			}
+		}
+		pack_input_lod_arr(visArray[i], visible, want_lod);
+
 		count += visArray[i];
 
 		//visArray[i] = true;
 	}
 	draw.stats.shadow_objs += count;
-
-	// fixme
-	any_dynamic_found = true;
+}
+struct CullSpotData {
+	handle<Render_Light> light;
+	int face_idx = 0;	// todo
+	std::span<uint8_t> vis_array;
+	std::span<gpu::DrawElementsIndirectCommand> commands;
+	std::span<int> instances;
+	std::span<int> md_counts;
+};
+void cull_spot_shadow_and_build_and_compact(uintptr_t user)
+{
+	CullSpotData* data = (CullSpotData*)user;
+	cull_spot_shadow_objects_job(data->light, data->vis_array.data(), data->vis_array.size());	// now have objects culled
+	BuildSceneData_CpuFast::inst->make_shadow_object_data_threadsafe(data->vis_array, data->instances,
+		data->commands, data->md_counts);
 }
 
 
@@ -3390,7 +3603,7 @@ void make_batches_job(uintptr_t p)
 
 struct MakeShadowRenderListParam
 {
-	bool* visarray = nullptr;
+	uint8_t* visarray = nullptr;
 	int index = 0;
 };
 
@@ -3423,6 +3636,33 @@ ConfigVar r_skip_depth_prepass("r.skip_depth_prepass", "0", CVAR_BOOL | CVAR_DEV
 ConfigVar r_depth_prepass_all_objects("r.depth_prepass_all_objects", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_skip_add_to_passes("r.skip_add_to_passes", "0", CVAR_BOOL | CVAR_DEV, "");
 
+void Render_Scene::update_spotlight_data()
+{
+	ZoneScopedN("update_spotlight_data");
+	GPUSCOPESTART(update_spotlight_shadows_scope);
+
+	std::vector<handle<Render_Light>> lightsToCalcShadow;
+	draw.spotShadows->get_lights_to_render(lightsToCalcShadow);
+	draw.stats.shadow_lights += lightsToCalcShadow.size();
+	// tbh just do it here whatev
+
+	const int visible_count = draw.scene.proxy_list.objects.size();
+	auto& memArena = draw.get_arena();
+	if (!lightsToCalcShadow.empty()) {
+		// parallelize this
+
+
+
+		for (int i = 0; i < lightsToCalcShadow.size(); i++) {
+			bool any_dynamic_found = false;
+			build_cascade_cpu(spotLightShadowList, draw.scene.shadow_pass,
+				draw.scene.proxy_list,
+				nullptr);
+			draw.spotShadows->do_render(spotLightShadowList, lightsToCalcShadow[i], any_dynamic_found);
+		}
+	}
+
+}
 
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, bool cubemap_view)
 {
@@ -3434,7 +3674,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 	if (r_debug_skip_build_scene_data.get_bool())
 		return;
 
-	const bool skip_prepass_objs = r_skip_depth_prepass.get_bool();
 	const bool add_to_passes = !r_skip_add_to_passes.get_bool();
 
 	auto& memArena = draw.get_arena();
@@ -3453,9 +3692,9 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 
 	const int visible_count = proxy_list.objects.size();
 
-	uint8_t* cascade_vis[4] = { nullptr,nullptr,nullptr,nullptr };
-	for(int i=0;i<4;i++)
-		cascade_vis[i] = memArena.alloc_bottom_type<uint8_t>(visible_count);
+	//uint8_t* cascade_vis[4] = { nullptr,nullptr,nullptr,nullptr };
+	//for(int i=0;i<4;i++)
+	//	cascade_vis[i] = memArena.alloc_bottom_type<uint8_t>(visible_count);
 	
 	uint8_t* lod_to_render_array = memArena.alloc_bottom_type<uint8_t>(visible_count);
 	int16_t* camera_depth_array = memArena.alloc_bottom_type<int16_t>(visible_count);
@@ -3467,31 +3706,31 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		JobCounter* counter{};
 
 
-		const int NUM_FRUSTUM_JOBS = 5;
+		const int NUM_FRUSTUM_JOBS = CascadeShadowMapSystem::CASCADES_USED + 1;
 		JobDecl decls[NUM_FRUSTUM_JOBS];
 		CullObjectsUser mainview;
-		CullObjectsUser cascades[4];
+		CullObjectsUser cascades[CascadeShadowMapSystem::CASCADES_USED];
 		mainview.count = visible_count;
 		mainview.lodarr = lod_to_render_array;
 		mainview.camdistarr = camera_depth_array;
 		decls[0].func = cull_objects_job;
 		decls[0].funcarg = uintptr_t(&mainview);
-		for (int i = 0; i < 4; i++) {
-			cascades[i].index = i;
-			cascades[i].count = visible_count;
-			cascades[i].lodarr = cascade_vis[i];
-			decls[i + 1].func = cull_shadow_objects_job;
-			decls[i + 1].funcarg = uintptr_t(&cascades[i]);
-		}
+		//for (int i = 0; i < CascadeShadowMapSystem::CASCADES_USED; i++) {
+		//	cascades[i].index = i;
+		//	cascades[i].count = visible_count;
+		//	cascades[i].lodarr = cascade_vis[i];
+		//	decls[i + 1].func = cull_shadow_objects_job;
+		//	decls[i + 1].funcarg = uintptr_t(&cascades[i]);
+		//}
 
 		//for (int i = 0; i < NUM_FRUSTUM_JOBS; i++)
 		//	decls[i].func(decls[i].funcarg);
 
-		JobSystem::inst->add_jobs(decls, NUM_FRUSTUM_JOBS, counter);
+		//JobSystem::inst->add_jobs(decls, 1, counter);
 
 		//calc_lod_job(lod_to_render_array, camera_depth_array);
 
-		JobSystem::inst->wait_and_free_counter(counter);
+		//JobSystem::inst->wait_and_free_counter(counter);
 	}
 	const size_t num_ren_objs = proxy_list.objects.size();
 	uint8* gpu_objects = memArena.alloc_bottom_type<uint8>(num_ren_objs*64);
@@ -3499,7 +3738,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 	if(add_to_passes)
 		set_gpu_objects_data_job(uintptr_t(gpu_objects));
 
-	BuildSceneData_CpuFast::inst->build_scene_data(lod_to_render_array);
+	BuildSceneData_CpuFast::inst->build_scene_data(cubemap_view,skybox_only);
 
 	auto add_objects_to_passes = [&]() {
 		CPUSCOPESTART(add_objects_to_passes);
@@ -3525,10 +3764,10 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 
 			if (!proxy.visible || !proxy.model)
 				continue;
-			const bool is_in_fastpath = BuildSceneData_CpuFast::inst->is_modptr_index_in_fast_path(obj.type_.fastcpu_index);
+			const bool is_in_fastpath = BuildSceneData_CpuFast::inst->is_modptr_index_in_fast_path(obj.type_.fastcpu_index) && !proxy.is_skybox;
 			const bool has_transparent = obj.type_.has_transparents;
 			const bool ed_selected = proxy.outline;
-			if (is_in_fastpath && !has_transparent && !ed_selected)
+			if (is_in_fastpath && !has_transparent && !ed_selected && !proxy.is_skybox)
 				continue;
 
 
@@ -3552,9 +3791,9 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 				continue;
 
 
-			bool is_visible = false;
+			bool is_visible = true;
 			int8_t LOD_index = 0;
-			split_input_lod_arr(lod_to_render_array[i], is_visible, LOD_index);
+		//	split_input_lod_arr(lod_to_render_array[i], is_visible, LOD_index);
 
 		//	const bool is_visible = visible_array[i];
 			const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
@@ -3599,8 +3838,8 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 				if (mm->render_in_forward_pass()) {
 					if (is_visible)
 						add_to_pass(transparent_pass);
-					if (!mm->is_translucent() && casts_shadow)
-						add_to_pass(shadow_pass);
+					//if (!mm->is_translucent() && casts_shadow)
+					//	add_to_pass(shadow_pass);
 				}
 				else if(!is_in_fastpath) {
 					if (casts_shadow)
@@ -3652,40 +3891,21 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		ZoneScopedN("make_render_lists");
 
 		auto make_shadow_render_lists = [&]() {
-			JobDecl shadowlistdecl[4];
-			MakeShadowRenderListParam params[4];
-			for (int i = 0; i < 4; i++) {
-				params[i].visarray = (bool*)cascade_vis[i];
+			JobDecl shadowlistdecl[CascadeShadowMapSystem::CASCADES_USED];
+			MakeShadowRenderListParam params[CascadeShadowMapSystem::CASCADES_USED];
+			for (int i = 0; i < CascadeShadowMapSystem::CASCADES_USED; i++) {
+				params[i].visarray = nullptr;
 				params[i].index = i;
 				shadowlistdecl[i].func = make_shadow_render_list_job;
 				shadowlistdecl[i].funcarg = uintptr_t(&params[i]);
 			}
-			for (int i = 0; i < 4; i++) {
+			for (int i = 0; i < CascadeShadowMapSystem::CASCADES_USED; i++) {
 				shadowlistdecl[i].func(shadowlistdecl[i].funcarg);
 			}
 		};
 		make_shadow_render_lists();
 
-		auto update_spotlight_shadows = [&]() {
-			GPUSCOPESTART(update_spotlight_shadows_scope);
-
-			std::vector<handle<Render_Light>> lightsToCalcShadow;
-			draw.spotShadows->get_lights_to_render(lightsToCalcShadow);
-			draw.stats.shadow_lights += lightsToCalcShadow.size();
-			// tbh just do it here whatev
-			if (!lightsToCalcShadow.empty()) {
-				bool* spot_visible_array = memArena.alloc_bottom_type<bool>(visible_count);
-				for (int i = 0; i < lightsToCalcShadow.size(); i++) {
-					bool any_dynamic_found = false;
-					cull_spot_shadow_objects_job(lightsToCalcShadow[i], spot_visible_array, visible_count, any_dynamic_found);
-					build_cascade_cpu(spotLightShadowList, draw.scene.shadow_pass,
-						draw.scene.proxy_list,
-						spot_visible_array);
-					draw.spotShadows->do_render(spotLightShadowList, lightsToCalcShadow[i], any_dynamic_found);
-				}
-			}
-		};
-		update_spotlight_shadows();
+		//this->update_spotlight_data();
 
 		build_standard_cpu(gbuffer_rlist, gbuffer_pass, proxy_list);
 
@@ -4719,8 +4939,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	scene.build_scene_data(params.skybox_only, params.is_editor, params.is_cubemap_view);
 	upload_light_and_decal_buffers();
 
-	shadowmap.render_cascades();
-
 	volfog.compute();
 	const bool is_wireframe_mode = r_debug_mode.get_integer() == gpu::DEBUG_WIREFRAME;
 
@@ -4807,7 +5025,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	
 		render_level_to_target(cmdparams);
 
-		BuildSceneData_CpuFast::inst->do_gbuffer_draw();
+		if(!params.skybox_only)
+			BuildSceneData_CpuFast::inst->do_gbuffer_draw();
 		//GpuCullingTest::inst->dodraw();
 
 	};
@@ -4825,13 +5044,18 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 			GPUSCOPESTART(gbuffer_pass_scope1);
 			gbuffer_pass(false, false, false);
 		}
-		GpuCullingTest::inst->build_data_2(BuildSceneData_CpuFast::inst->get_cull_input());
-	
+		
 		{
-			GPUSCOPESTART(gbuffer_pass_scope2);
-			gbuffer_pass(false, false, true);	// second gbuffer pass
+			if(!params.skybox_only)
+				GpuCullingTest::inst->build_data_2(BuildSceneData_CpuFast::inst->get_cull_input());
+			{
+				GPUSCOPESTART(gbuffer_pass_scope2);
+				gbuffer_pass(false, false, true);	// second gbuffer pass
+			}
 		}
 	}
+	if(!params.skybox_only)
+		shadowmap.render_cascades();
 
 	//device.reset_states();
 	
@@ -4891,7 +5115,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		render_particles();
 	};
 
-	if(!params.skybox_only)
+	// no fog in cubemaps?
+	if(!params.is_cubemap_view)
 		draw_height_fog();
 
 
@@ -5241,11 +5466,18 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 	ROP_Internal& in = proxy_list.get(handle.id);
 
 	if (!(in.proxy.model == proxy.model && in.proxy.mat_override == proxy.mat_override)) {
-		if (proxy.model)
+		int parts = 0;
+		if (proxy.model) {
+			parts = proxy.model->get_num_parts();
 			in.has_transparents = proxy.model->get_has_any_transparent_materials();
+		}
 		if (proxy.mat_override && proxy.mat_override->impl && proxy.mat_override->impl->is_transparent_material()) {
 			in.fastcpu_index = -1;	// skip, material is transparent
 			in.has_transparents = true;
+		}
+		// prevent bad case... if too many parts dont take fast path
+		else if (parts > 200) {
+			in.fastcpu_index = -1;
 		}
 		else {
 			in.fastcpu_index = BuildSceneData_CpuFast::inst->get_index(proxy.model, proxy.mat_override);

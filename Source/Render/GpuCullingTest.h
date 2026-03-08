@@ -1,6 +1,6 @@
 #pragma once
 #include "DrawLocal.h"
-
+#include "Render/Frustum.h"
 /*
 ###########
 # OUTLINE #
@@ -64,6 +64,9 @@ struct CullData {
 	int cpu_obj_offset;
 
 	mat4 view;
+
+	float cascade_extent;
+	int padding[3];
 };
 
 struct GpuCullInput {
@@ -79,7 +82,16 @@ struct GpuCullInput {
 	int num_cmds = 0;
 	int num_objs = 0;
 };
-
+struct ShadowCullInput {
+	ShadowCullInput() = default;
+	ShadowCullInput(Frustum f, bool cascade, float fov, glm::vec4 backplane, glm::vec3 origin)
+		: f(f), cascade(cascade), fov(fov), backplane(backplane), origin(origin) {}
+	Frustum f;
+	bool cascade = true;
+	float fov;
+	glm::vec4 backplane;
+	glm::vec3 origin;
+};
 class GpuCullingTest {
 public:
 	static GpuCullingTest* inst;
@@ -114,6 +126,8 @@ public:
 	);
 
 	program_handle cull_compute{};
+	program_handle cull_compute_cascade{};
+
 	program_handle compaction{};
 	program_handle debug_overlays{};
 
@@ -145,10 +159,12 @@ public:
 
 	void zero_instances_in_this(bufferhandle mdi_buf, int count);
 
+	void do_shadow_cull(const GpuCullInput& input, Frustum f);
 private:
 	enum class Phase {
 		Pass1,
 		Pass2
 	};
-	void do_cull(const GpuCullInput& input, Phase pass);
+	void do_cull_for_scene(const GpuCullInput& input, Phase pass);
+	void do_cull(const GpuCullInput& input, Phase pass, bool is_for_shadow, Frustum in_frustum);
 };

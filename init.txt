@@ -67,8 +67,6 @@ bind "Keypad 0" Ctrl "CLEAR_AB_FILTER"
 
 dbg.fly 1
 
-#output_texture 0.5 1.0 0.0 _csm_shadow
-
 #r.debug_csm 1
 #sys.print_deps mats/wht_tile.mi
 #FONT_TEST
@@ -88,6 +86,8 @@ r.taa 0
 loglevel 5
 developer_mode 1
 
-open-editor testmap1.tmap
+open-editor demo_level_1.tmap
+
+otex 0.25 1 0 _csm_shadow
 
 g_application_class EngineTesterApp

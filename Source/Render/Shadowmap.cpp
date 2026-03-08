@@ -78,6 +78,7 @@ static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp)
 	return planedistances;
 }
 #include "Render/Render_Sun.h"
+extern void cull_and_draw_cascade_fucker(int idx);
 void CascadeShadowMapSystem::render_cascades()
 {
 	// now setup scene for rendering
@@ -116,16 +117,19 @@ void CascadeShadowMapSystem::render_cascades()
 
 			Render_Level_Params params(
 				setup,
-				&draw.scene.cascades_rlists.at(i),
-				&draw.scene.shadow_pass,
+				nullptr,
+				nullptr,
 				Render_Level_Params::SHADOWMAP
 			);
+			//params.rl_cpufast = 
 
 			params.provied_constant_buffer = ubo.frame_view[i];
 			params.upload_constants = true;
 			params.wants_non_reverse_z = true;
 			params.offset_poly_units = 1;
 			draw.render_level_to_target(params);
+
+			cull_and_draw_cascade_fucker(i);
 		}
 	}
 }
@@ -301,4 +305,6 @@ void CascadeShadowMapSystem::update_cascade(int cascade_idx, const View_Setup& v
 	matricies[cascade_idx] = shadow_matrix;// light_cascade_proj* light_cascade_view;
 	nearplanes[cascade_idx] = viewspace_min.z;
 	farplanes[cascade_idx] = viewspace_max.z;
+
+	max_extents[cascade_idx] = glm::max(cascade_extent.x, cascade_extent.y);
 }

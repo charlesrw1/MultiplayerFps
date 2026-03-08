@@ -47,11 +47,24 @@ struct CullData {
 	int padding2;
 	
 	mat4 view;
+	
+	float cascade_extent;
+	int padding1;
+	int padding3;
+	int padding4;
 };	
 layout(binding = 5) uniform CullDataBuffer {
 	CullData cull;
 };
 
+float get_shadow_cascade_percentage_2(vec4 bounding_sphere, float cascade_extent)
+{
+	float texels_per_unit = 1.0 / (cascade_extent);
+
+	float r = bounding_sphere.w * texels_per_unit;
+
+	return r * r;
+}
 
 float get_screen_percentage_2(vec4 bounding_sphere, float inv_two_times_tanfov_2, float camera_dist_2)
 {
@@ -84,6 +97,7 @@ uniform float radius_bias = 1;
 
 uniform bool occlusion_cull = false;
 uniform bool second_pass = false;
+uniform int force_lod = -1;
 layout(binding = 0) uniform sampler2D depth_pyramid;
 void main()
 {
@@ -91,6 +105,14 @@ void main()
 	// cull object id
 	if(gID>=cull.num_objects)
 		return;
+		
+	const int obj_flags = CullObjects.data[gID].misc.w;
+	
+	#ifdef SHADOW_CASCADE
+	if(!bool(obj_flags&1)) {
+		return;	// not shadow caster
+	}
+	#endif
 		
 		// save to visarray
 	uint dword_index = gID/32;	// 2bits per entry
@@ -118,6 +140,7 @@ void main()
 	if(res!=4)
 		return;
 	
+#ifndef SHADOW_CASCADE
 	// occlusion cull, from vkguide
 	if(occlusion_cull) {
 		vec3 vs_center = (cull.view * vec4(center,1.0)).xyz;
@@ -147,16 +170,20 @@ void main()
 
 	// set vis bit
 	atomicOr(visbits[dword_index],1<<visword_shift); 	
+#endif
 	
 	int model_ofs = CullObjects.data[gID].misc.x;
 
 	int num_lods = int(model_info[model_ofs]);
 
 	// get lod to render
+#ifdef SHADOW_CASCADE
+	const float percentage_2 = get_shadow_cascade_percentage_2(bounding_sphere, cull.cascade_extent);
+#else
 	vec3 to_camera = bounding_sphere.xyz - cull.camera_origin.xyz;
 	const float dist_to_camera_2 = dot(to_camera, to_camera);
 	const float percentage_2 = get_screen_percentage_2(bounding_sphere, cull.inv_two_times_tanfov_2, dist_to_camera_2);
-	
+#endif
 	int lod_wanted = 0;
 	for(int i=num_lods-1;i>0;i--) {
 		float end = uintBitsToFloat(model_info[model_ofs+1+(i*3)+2]);
@@ -165,6 +192,9 @@ void main()
 			break;
 		}
 	}
+	lod_wanted = (force_lod>=0)?min(force_lod,num_lods-1) : lod_wanted;
+	//lod_wanted = 0;
+	
 	int part_ofs = int(model_info[model_ofs+1+(lod_wanted*3)]);
 	int part_count = int(model_info[model_ofs+1+(lod_wanted*3)+1]);
 	

@@ -6,6 +6,8 @@ GpuCullingTest::GpuCullingTest()
 	matindirect = IGraphicsDevice::inst->create_buffer({});
 	cull_data = IGraphicsDevice::inst->create_buffer({});
 	cull_compute = draw.get_prog_man().create_compute("CullCompute.txt");
+	cull_compute_cascade = draw.get_prog_man().create_compute("CullCompute.txt","SHADOW_CASCADE");
+
 	build_pyramid = draw.get_prog_man().create_compute("DepthPyramidC.txt");
 	cpu_vis_array_to_mdi = draw.get_prog_man().create_compute("cpu_vis_to_mdi.txt");
 	debug_overlays  = draw.get_prog_man().create_raster("fullscreenquad.txt", "debugCull.txt");
@@ -111,7 +113,19 @@ void GpuCullingTest::copy_cpu(Render_Lists_Gpu_Culled& list)
 {
 	
 }
-void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass)
+void GpuCullingTest::do_cull_for_scene(const GpuCullInput& input, Phase pass)
+{
+	Frustum frustum;
+	build_a_frustum_for_perspective(frustum, draw.current_frame_view);
+	cull.frustum_up = frustum.top_plane;
+	cull.frustum_down = frustum.bot_plane;
+	cull.frustum_l = frustum.left_plane;
+	cull.frustum_r = frustum.right_plane;
+	do_cull(input, pass, false, frustum);
+
+}
+extern ConfigVar r_force_lod;
+void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_shadow, Frustum frustum)
 {
 	if (cull.num_objects <= 0)
 		return;
@@ -127,8 +141,7 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass)
 		auto& vs = draw.current_frame_view;
 		cull.camera_origin = glm::vec4(vs.origin, 1);
 
-		Frustum frustum;
-		build_a_frustum_for_perspective(frustum, draw.current_frame_view);
+	
 		cull.frustum_up = frustum.top_plane;
 		cull.frustum_down = frustum.bot_plane;
 		cull.frustum_l = frustum.left_plane;
@@ -144,13 +157,16 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass)
 		cull.p00 = 1 / halfHSide;
 		cull.p11 = 1 / halfVSide;
 
-		if (pass == Phase::Pass1) {
-			cull.view = prev_view;
-			prev_view = vs.view;	// pass 1, use last view
+		if (!is_for_shadow) {
+			if (pass == Phase::Pass1) {
+				cull.view = prev_view;
+				prev_view = vs.view;	// pass 1, use last view
+			}
+			else {
+				cull.view = vs.view;	// in pass 2, use current view
+			}
 		}
-		else {
-			cull.view = vs.view;	// in pass 2, use current view
-		}
+		cull.cascade_extent = frustum.ortho_max_extent * 2.0;
 		cull_data->upload(&cull, sizeof(CullData));
 	}
 
@@ -161,18 +177,22 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass)
 
 
 	auto& device = draw.get_device();
-
-	device.set_shader(cull_compute);
+	if (is_for_shadow)
+		device.set_shader(cull_compute_cascade);
+	else
+		device.set_shader(cull_compute);
 	const int co_size = cull.num_objects;
 	const int groups = glm::ceil(int(co_size) / 256.f);
 
 	const bool is_ortho = draw.get_current_frame_vs().is_ortho;	// this check should go elsewhere? or not, ortho is pretty special case
-	device.shader().set_bool("occlusion_cull", do_occlusion_culling&&!is_ortho);
+	device.shader().set_bool("occlusion_cull", do_occlusion_culling&&!is_ortho&& !is_for_shadow);
 	device.shader().set_bool("second_pass", pass==Phase::Pass2);
 
 	device.bind_texture_ptr(0, depth_pyramid);
 	glBindSampler(0, hiZSampler);
 	device.shader().set_int("lod_bias", lod_bias);
+	device.shader().set_int("force_lod", r_force_lod.get_integer());
+
 	device.shader().set_float("radius_bias", radius_bias);
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, input.cmd_buf->get_internal_handle());
@@ -210,7 +230,7 @@ void GpuCullingTest::build_data(const GpuCullInput& input)
 			GL_UNSIGNED_INT,
 			&value);
 	
-	do_cull(input, Phase::Pass1);
+	do_cull_for_scene(input, Phase::Pass1);
 }
 void GpuCullingTest::build_data_2(const GpuCullInput& input)
 {
@@ -225,7 +245,7 @@ void GpuCullingTest::build_data_2(const GpuCullInput& input)
 		downsample_depth();
 	}
 
-	do_cull(input, Phase::Pass2);
+	do_cull_for_scene(input, Phase::Pass2);
 
 }
 
@@ -415,5 +435,10 @@ void GpuCullingTest::zero_instances_in_this(bufferhandle mdi_buf, int count)
 
 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
 
+}
+
+void GpuCullingTest::do_shadow_cull(const GpuCullInput& input, Frustum f)
+{
+	do_cull(input, {},true, f);
 }
 

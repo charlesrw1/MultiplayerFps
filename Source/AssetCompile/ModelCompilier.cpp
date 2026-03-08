@@ -1209,6 +1209,7 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 	 for (int i = 0; i < mcd.lod_where.size(); i++) {
 		 auto& lod = mcd.lod_where[i];
 
+		 vector<LODMesh> copied_output = lod.mesh_nodes;
 		 const int NUM_NODES_PRE_ADD = lod.mesh_nodes.size();
 		 for (int MESH_NODE_IDX = 0; MESH_NODE_IDX < NUM_NODES_PRE_ADD;MESH_NODE_IDX++) {
 			 auto& mesh = lod.mesh_nodes[MESH_NODE_IDX];
@@ -1231,7 +1232,7 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 			 else
 				 material_is_used.at(material_is_used.size() - 1) = true;	// null material needed
 
-			 const uint32_t MAX_VERTICIES_PER_SUBMESH = UINT16_MAX - 9; /*just give me some buffer room just in case...*/
+			 const uint32_t MAX_VERTICIES_PER_SUBMESH = UINT16_MAX - 1000; /*just give me some buffer room just in case...*/
 			 if (mesh.submesh.vertex_count >= MAX_VERTICIES_PER_SUBMESH) {
 
 				 // need to split up the mesh so stuff doesnt get cut off
@@ -1271,7 +1272,10 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 						 
 						 LODMesh copiedLodMesh = mesh;
 						 copiedLodMesh.submesh = NEW_SUBMESH;
-						 lod.mesh_nodes.push_back(copiedLodMesh);	// fixme BREAKS UB!! for each
+						 copiedLodMesh.mark_for_delete = false;
+						 copied_output.push_back(copiedLodMesh);	// fixme BREAKS UB!! for each
+						
+
 
 						 NEW_SUBMESH.base_vertex = mcd.verticies.size();
 						 NEW_SUBMESH.element_count = 0;
@@ -1279,7 +1283,7 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 						 NEW_SUBMESH.element_offset = mcd.indicies.size() * sizeof(uint32_t);
 						 added_verticies = 0;
 						 added_indicies = 0;
-						 new_vertex_to_old_vertex = {};	// clear the hash map
+						 new_vertex_to_old_vertex = {};	// clear the hash map	
 					 }
 
 				 }
@@ -1288,8 +1292,9 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 					 NEW_SUBMESH.vertex_count = added_verticies;
 
 					 LODMesh copiedLodMesh = mesh;
+					 copiedLodMesh.mark_for_delete = false;
 					 copiedLodMesh.submesh = NEW_SUBMESH;
-					 lod.mesh_nodes.push_back(copiedLodMesh);	// fixme BREAKS UB!! for each
+					 copied_output.push_back(copiedLodMesh);	// fixme BREAKS UB!! for each
 				 }
 
 				 mesh.mark_for_delete = true;	// delete this since we are using newly created submeshes
@@ -1315,6 +1320,10 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 				 }
 			 }
 		 }
+
+		 for (int i = 0; i < lod.mesh_nodes.size(); i++)
+			 copied_output[i] = lod.mesh_nodes[i];
+		 lod.mesh_nodes = copied_output;
 	 }
 
 	 // testing: lods via meshopt

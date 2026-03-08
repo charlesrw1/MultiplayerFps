@@ -137,6 +137,10 @@ public:
 	glm::mat4x4 matricies[MAXCASCADES];
 	float nearplanes[MAXCASCADES];
 	float farplanes[MAXCASCADES];
+
+	// max of x/y
+	float max_extents[MAXCASCADES];
+
 	int csm_resolution = 0;
 	bool enabled = false;
 
