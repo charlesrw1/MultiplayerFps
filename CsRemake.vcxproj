@@ -129,6 +129,7 @@
     <ClCompile Include="Source\Render\DecalBatcher.cpp" />
     <ClCompile Include="Source\Render\DrawLocal.cpp" />
     <ClCompile Include="Source\Render\EnvProbe.cpp" />
+    <ClCompile Include="Source\Render\Frustum.cpp" />
     <ClCompile Include="Source\Render\GpuAllocator.cpp" />
     <ClCompile Include="Source\Render\GpuCullingTest.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />
@@ -136,6 +137,7 @@
     <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
     <ClCompile Include="Source\Render\RenderExtra.cpp" />
     <ClCompile Include="Source\Render\RenderGiManager.cpp" />
+    <ClCompile Include="Source\Render\RenderScene.cpp" />
     <ClCompile Include="Source\Render\RenderWindow.cpp" />
     <ClCompile Include="Source\Render\RT\RaytraceTest.cpp" />
     <ClCompile Include="Source\Render\Shader.cpp" />
@@ -235,7 +237,6 @@
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Source\Render\BufferTest\glbuffer.h" />
     <ClInclude Include="Source\Render\BufferTest\gl_bufferlock.h" />
-    <ClInclude Include="Source\Render\BuildSceneData_CF.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\GpuAllocator.h" />
     <ClInclude Include="Source\Render\GpuCullingTest.h" />

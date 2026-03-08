@@ -52,6 +52,8 @@ struct CullData {
 	int padding1;
 	int padding3;
 	int padding4;
+	
+	vec4 backplane;
 };	
 layout(binding = 5) uniform CullDataBuffer {
 	CullData cull;
@@ -108,12 +110,13 @@ void main()
 		
 	const int obj_flags = CullObjects.data[gID].misc.w;
 	
-	#ifdef SHADOW_CASCADE
+	#ifndef MAINVIEW
 	if(!bool(obj_flags&1)) {
 		return;	// not shadow caster
 	}
 	#endif
 		
+	#ifdef MAINVIEW
 		// save to visarray
 	uint dword_index = gID/32;	// 2bits per entry
 	uint visword_shift = (gID % 32);
@@ -124,6 +127,7 @@ void main()
 			return;	// already drawn
 		}
 	}
+	#endif
 
 	vec4 bounding_sphere = CullObjects.data[gID].bounds_sphere;
 
@@ -136,11 +140,17 @@ void main()
 	res += int(dot(cull.frustum_l.xyz,center)+cull.frustum_l.w >= -radius);
 	res += int(dot(cull.frustum_r.xyz,center)+cull.frustum_r.w >= -radius);
 	
-	
+	#ifdef SHADOW_SPOT
+	res += int(dot(cull.backplane.xyz,center)+cull.backplane.w >= -radius);
+	if(res!=5)
+		return;
+	#else
 	if(res!=4)
 		return;
+	#endif
 	
-#ifndef SHADOW_CASCADE
+	
+#ifdef MAINVIEW
 	// occlusion cull, from vkguide
 	if(occlusion_cull) {
 		vec3 vs_center = (cull.view * vec4(center,1.0)).xyz;

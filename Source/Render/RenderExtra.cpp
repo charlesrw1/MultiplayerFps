@@ -110,14 +110,15 @@ void ShadowMapManager::get_lights_to_render(std::vector<handle<Render_Light>>& v
 
 		const bool was_updated = l.updated_this_frame;
 		if (casts_shadow) {
-			if((l.light.casts_shadow_mode==2&&was_updated) || l.light.casts_shadow_mode==1)
+			if ((l.light.casts_shadow_mode == 2 && was_updated) || l.light.casts_shadow_mode == 1)
 				vec.push_back({ handle });
 		}
 		l.updated_this_frame = false;
 	}
-
-
 }
+
+#include "Frustum.h"
+void cull_and_draw_spot(Frustum f);
 extern ConfigVar r_spot_near;
 void ShadowMapManager::do_render(Render_Lists& list, handle<Render_Light> handle, bool any_dynamic_in_frustum)
 {
@@ -168,7 +169,7 @@ void ShadowMapManager::do_render(Render_Lists& list, handle<Render_Light> handle
 		params.offset_poly_units = -3;
 		draw.render_level_to_target(params);
 
-		
+		cull_and_draw_spot(build_frustum_for_light(light));
 	}
 }
 

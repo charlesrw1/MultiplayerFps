@@ -472,7 +472,6 @@
     <ClInclude Include="Source\Render\BufferTest\glbuffer.h" />
     <ClInclude Include="Source\UnitTests\EngineTesterApplication.h" />
     <ClInclude Include="Source\Render\GpuAllocator.h" />
-    <ClInclude Include="Source\Render\BuildSceneData_CF.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -637,6 +636,8 @@
     <ClCompile Include="Source\Render\BufferTest\glbuffer.cpp" />
     <ClCompile Include="Source\UnitTests\EngineTesterApplication.cpp" />
     <ClCompile Include="Source\Render\GpuAllocator.cpp" />
+    <ClCompile Include="Source\Render\Frustum.cpp" />
+    <ClCompile Include="Source\Render\RenderScene.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

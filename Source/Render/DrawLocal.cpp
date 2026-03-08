@@ -252,207 +252,7 @@ private:
 };
 static TaaManager r_taa_manager;
 
-inline size_t hash_combine(size_t a, size_t b)
-{
-	return a ^ (b + 0x9e3779b9 + (a << 6) + (a >> 2));
-}
-struct ModelAndMatTextureSet {
-	Model* m{};
-	// for mat overrides...
-	MasterMaterialImpl* parent{};
-	MaterialInstance* has_textures{};
-	uint32_t texture_hash{};
 
-	bool operator==(const ModelAndMatTextureSet& other) const {
-		return m == other.m && parent == other.parent && texture_hash == other.texture_hash;
-	}
-};
-struct ModelAndMatTextureSetHasher {
-	size_t operator()(const ModelAndMatTextureSet& k) const noexcept {
-		size_t h1 = std::hash<Model*>{}(k.m);
-		size_t h2 = std::hash<MasterMaterialImpl*>{}(k.parent);
-		size_t h3 = k.texture_hash;
-		return hash_combine(hash_combine(h2, h3), h1);
-	}
-};
-
-struct ModelAndMatTData {
-	Model* m{};
-	std::vector<int> part_to_draw_cmd;	// total num_parts (inc lods etc)
-	int instance_count = 0;
-	int instance_alloced = 0;
-	int16_t ptr_ofs = 0;
-	int gpu_buf_ofs = 0;
-};
-
-struct MaterialAndShader_CpuFast {
-	MaterialInstance* mat = nullptr;
-	draw_call_key key{};
-};
-struct Render_Pass_CpuFast {
-public:
-	std::vector<Multidraw_Batch> batches;
-};
-struct Render_List_CpuFast {
-	std::vector<int> glinstances;
-	std::vector<gpu::DrawElementsIndirectCommand> out_cmds;
-	std::vector<MaterialAndShader_CpuFast> batch_to_material;
-};
-
-class BuildSceneData_CpuFast {
-public:
-	static BuildSceneData_CpuFast* inst;
-
-	BuildSceneData_CpuFast() {
-		gpu.cmd_list = IGraphicsDevice::inst->create_buffer({});
-		gpu.cullobj_buf = IGraphicsDevice::inst->create_buffer({});
-		gpu.gbuffer_batches = IGraphicsDevice::inst->create_buffer({});
-		gpu.gbuffer_count = IGraphicsDevice::inst->create_buffer({});
-		gpu.gbuffer_draw_to_batch = IGraphicsDevice::inst->create_buffer({});
-		gpu.glinst_to_inst = IGraphicsDevice::inst->create_buffer({});
-		gpu.mod_data_gpu = IGraphicsDevice::inst->create_buffer({});
-		gpu.shadows_count = IGraphicsDevice::inst->create_buffer({});
-		gpu.shadow_batches = IGraphicsDevice::inst->create_buffer({});
-		gpu.shadow_draw_to_batch = IGraphicsDevice::inst->create_buffer({});
-
-	}
-
-	// now
-	void build_scene_data(bool cubemap_view, bool skybox_only);
-
-	// e2e func, fixme
-	void cull_and_draw_shadow_cascade(int idx);
-	void cull_and_draw_shadow_spot(
-		Frustum f,
-		glm::vec4 backplane,
-		float fov,
-		glm::vec3 origin,
-		float poly_factor
-	);
-
-
-	void make_shadow_object_data_threadsafe(
-		std::span<uint8_t> vis,
-		std::span<int> glinst,
-		std::span<gpu::DrawElementsIndirectCommand> outcmds,
-		std::span<int> mdcounts
-	) const;
-
-
-	int16_t get_index(Model* m, MaterialInstance* mat) {
-		if (!m)
-			return -1;
-		ModelAndMatTextureSet search;
-		search.m = m;
-		if (mat && mat->impl) {
-			search.parent = mat->impl->get_master_impl();
-			search.texture_hash = mat->impl->get_texture_id_hash();
-			search.has_textures = mat;
-		}
-		auto find = mod_data.find(search);
-		if (find != mod_data.end()) {
-			return find->second.ptr_ofs;
-		}
-		ModelAndMatTData data;
-		data.ptr_ofs = (int)mod_data_ptrs.size();
-		data.m = m;
-
-		mod_data[search] = data;
-		mod_data_ptrs.push_back(&mod_data[search]);
-
-		return data.ptr_ofs;
-	}
-
-	inline bool is_modptr_index_in_fast_path(int16_t fast_index) const {
-		if (fast_index < 0) return false;
-		return mod_data_ptrs[fast_index]->instance_alloced > 0;
-	}
-
-	GpuCullInput get_cull_input() const {
-
-		GpuCullInput input;
-		input.batches_buf = gpu.gbuffer_batches;
-		input.cmd_buf = gpu.cmd_list;
-		input.count_buf = gpu.gbuffer_count;
-		input.draw_to_batch = gpu.gbuffer_draw_to_batch;
-		input.glinst_to_inst = gpu.glinst_to_inst;
-		input.mod_data = gpu.mod_data_gpu;
-		input.num_batches = gbuffer_pass.batches.size();
-		input.num_cmds = out_cmds.size();
-		input.obj_data_buf = gpu.cullobj_buf;
-		input.num_objs = gpu.num_cullobjs;
-		return input;
-	}
-	GpuCullInput get_cull_input_shadow() const {
-
-		GpuCullInput input = get_cull_input();
-		input.batches_buf = gpu.shadow_batches;
-		input.draw_to_batch = gpu.shadow_draw_to_batch;
-		input.num_batches = shadow_pass.batches.size();
-
-		return input;
-	}
-
-	void do_gbuffer_draw();
-	void do_shadow_draw(float polyfac, bool lessthan);
-
-
-	int get_num_commands() const {
-		return out_cmds.size();
-	}
-	int get_num_instances() const {
-		return gbuffer_list.glinstances.size();
-	}
-	int get_num_shadow_batches() const {
-		return shadow_pass.batches.size();
-	}
-private:
-	void do_draw_shared(bool shadow, float polyfac, bool lessthan);
-	void rebuild_mod_data();
-	void rebuild_batches();
-	void upload_gpu_cmds(int sum_count);
-
-	// sorted specially for shadows
-	Render_Pass_CpuFast shadow_pass;
-	// sorted for opaques
-	Render_Pass_CpuFast gbuffer_pass;
-
-	Render_List_CpuFast gbuffer_list;
-	// then have a list per cascades and spotlight and such
-	Render_List_CpuFast shared_shadow_list;
-
-	// mod data, updated when needed. must then update out_cmds
-	std::unordered_map<ModelAndMatTextureSet, ModelAndMatTData, ModelAndMatTextureSetHasher> mod_data;
-	std::vector<ModelAndMatTData*> mod_data_ptrs;
-
-	struct {
-		IGraphicsBuffer* mod_data_gpu = nullptr;
-		IGraphicsBuffer* shadow_batches = nullptr;
-		IGraphicsBuffer* gbuffer_batches = nullptr;
-		IGraphicsBuffer* gbuffer_count = nullptr;
-		IGraphicsBuffer* shadows_count = nullptr;
-		IGraphicsBuffer* gbuffer_draw_to_batch = nullptr;
-		IGraphicsBuffer* shadow_draw_to_batch = nullptr;
-		IGraphicsBuffer* glinst_to_inst = nullptr;
-		IGraphicsBuffer* cmd_list = nullptr;
-
-		IGraphicsBuffer* cullobj_buf = nullptr;
-		int num_cullobjs = 0;
-	}gpu;
-
-	// sorted draw cmds, indexed into by M&MTS
-	std::vector<gpu::DrawElementsIndirectCommand> out_cmds;
-	std::vector<int16_t> cmd_to_mod_data_ptr;
-	struct CmdExtraData {
-		Model* model{};
-		MaterialInstance* material{};
-		int submesh{};
-		draw_call_key key{};
-	};
-	std::vector<CmdExtraData> cmd_to_extra;
-
-
-};
 BuildSceneData_CpuFast* BuildSceneData_CpuFast::inst = nullptr;
 inline int next_pow2(uint32_t x) {
 	return std::bit_ceil(x);
@@ -652,6 +452,30 @@ void BuildSceneData_CpuFast::do_draw_shared(bool depth, float poly_factor, bool 
 void BuildSceneData_CpuFast::do_shadow_draw(float factor, bool less_than)
 {
 	do_draw_shared(true,factor,less_than);
+}
+GpuCullInput BuildSceneData_CpuFast::get_cull_input() const {
+
+	GpuCullInput input;
+	input.batches_buf = gpu.gbuffer_batches;
+	input.cmd_buf = gpu.cmd_list;
+	input.count_buf = gpu.gbuffer_count;
+	input.draw_to_batch = gpu.gbuffer_draw_to_batch;
+	input.glinst_to_inst = gpu.glinst_to_inst;
+	input.mod_data = gpu.mod_data_gpu;
+	input.num_batches = gbuffer_pass.batches.size();
+	input.num_cmds = out_cmds.size();
+	input.obj_data_buf = gpu.cullobj_buf;
+	input.num_objs = gpu.num_cullobjs;
+	return input;
+}
+GpuCullInput BuildSceneData_CpuFast::get_cull_input_shadow() const {
+
+	GpuCullInput input = get_cull_input();
+	input.batches_buf = gpu.shadow_batches;
+	input.draw_to_batch = gpu.shadow_draw_to_batch;
+	input.num_batches = shadow_pass.batches.size();
+
+	return input;
 }
 void BuildSceneData_CpuFast::do_gbuffer_draw()
 {
@@ -858,6 +682,20 @@ inline void pack_input_lod_arr(uint8_t& out, bool is_vis, int8_t lod)
 }
 
 
+BuildSceneData_CpuFast::BuildSceneData_CpuFast() {
+	gpu.cmd_list = IGraphicsDevice::inst->create_buffer({});
+	gpu.cullobj_buf = IGraphicsDevice::inst->create_buffer({});
+	gpu.gbuffer_batches = IGraphicsDevice::inst->create_buffer({});
+	gpu.gbuffer_count = IGraphicsDevice::inst->create_buffer({});
+	gpu.gbuffer_draw_to_batch = IGraphicsDevice::inst->create_buffer({});
+	gpu.glinst_to_inst = IGraphicsDevice::inst->create_buffer({});
+	gpu.mod_data_gpu = IGraphicsDevice::inst->create_buffer({});
+	gpu.shadows_count = IGraphicsDevice::inst->create_buffer({});
+	gpu.shadow_batches = IGraphicsDevice::inst->create_buffer({});
+	gpu.shadow_draw_to_batch = IGraphicsDevice::inst->create_buffer({});
+
+}
+
 void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_only)
 {
 	ZoneScopedN("BuildSceneData_CpuFast");
@@ -1048,9 +886,9 @@ void cull_and_draw_cascade_fucker(int idx)
 {
 	BuildSceneData_CpuFast::inst->cull_and_draw_shadow_cascade(idx);
 }
-void cull_and_draw_spot(Frustum f, glm::vec4 back, float fov, glm::vec3 origin, float poly)
+void cull_and_draw_spot(Frustum f)
 {
-	BuildSceneData_CpuFast::inst->cull_and_draw_shadow_spot(f,back,fov,origin,poly);
+	BuildSceneData_CpuFast::inst->cull_and_draw_shadow_spot(f);
 
 }
 
@@ -1059,16 +897,13 @@ void BuildSceneData_CpuFast::cull_and_draw_shadow_cascade(int idx)
 {
 	Frustum f;
 	build_frustum_for_cascade(f, idx);
+	ASSERT(f.is_ortho);
 	GpuCullingTest::inst->do_shadow_cull(get_cull_input_shadow(), f);
 	do_shadow_draw(1.0,true);
 
 }
 
-void BuildSceneData_CpuFast::cull_and_draw_shadow_spot(Frustum f,
-	glm::vec4 backplane,
-	float fov,
-	glm::vec3 origin,
-	float poly_factor)
+void BuildSceneData_CpuFast::cull_and_draw_shadow_spot(const Frustum& f)
 {
 	GpuCullingTest::inst->do_shadow_cull(get_cull_input_shadow(), f);
 	do_shadow_draw(-3, false);
@@ -2676,261 +2511,6 @@ void Renderer::render_particles()
 
 
 
-Render_Pass::Render_Pass(pass_type type) : type(type) {}
-
-draw_call_key Render_Pass::create_sort_key_from_obj(
-	const Render_Object& proxy, 
-	const MaterialInstance* material,
-	uint32_t camera_dist, 
-	int submesh, 
-	int layer,
-	bool is_editor_mode
-)
-{
-	draw_call_key key{};
-
-#ifdef _DEBUG
-	const bool is_depth = !r_ignore_depth_shader.get_bool() && (type == pass_type::DEPTH);
-	assert(proxy.model);
-#else
-	const bool is_depth = type == pass_type::DEPTH;
-#endif
-	
-	int flags = 0;
-	// do some if/else here to cut back on permutation insanity. depth only doesnt care about lightmap,taa,editor_id, or debug
-	if (proxy.animator_bone_ofs != -1 && proxy.model && proxy.model->has_bones())
-		flags |= MSF_ANIMATED;
-	if (is_depth) {
-		flags |= MSF_DEPTH_ONLY;
-	}
-	else if (forced_forward) {
-		flags |= MSF_IS_FORCED_FORWARD;
-	}
-	else {
-		if (proxy.lightmapped)
-			flags |= MSF_LIGHTMAPPED;
-		if (is_editor_mode)
-			flags |= MSF_EDITOR_ID;
-		if (!r_taa_enabled.get_bool())
-			flags |= MSF_NO_TAA;
-		if (r_debug_mode.get_integer() != 0)
-			flags |= MSF_DEBUG;
-	}
-
-	key.shader = matman.get_mat_shader(
-		proxy.model, material, 
-		flags
-	);
-	const MasterMaterialImpl* mm = material->get_master_material();
-
-	key.blending = (uint64_t)mm->blend;
-	key.backface = mm->backface;
-	key.texture = material->impl->get_texture_id_hash();
-
-	VaoType theVaoType = VaoType::Animated;
-	if (proxy.lightmapped)
-		theVaoType = VaoType::Lightmapped;
-
-	key.vao = (int)theVaoType;
-	key.mesh = proxy.model->get_uid();
-	
-	if (proxy.is_skybox)
-		key.layer = 2; // make skybox last, saves frame time
-	else if (proxy.sort_first)
-		key.layer = 0;
-	else
-		key.layer = 1;
-
-	if(mm->blend!=BlendState::OPAQUE)
-		key.distance = camera_dist;
-
-	return key;
-}
-
-
-void Render_Pass::add_object(
-	const Render_Object& proxy, 
-	handle<Render_Object> handle,
-	const MaterialInstance* material,
-	uint32_t camera_dist,
-	int submesh,
-	int lod,
-	int layer,
-	bool is_editor_mode) {
-	ASSERT(handle.is_valid() && "null handle");
-	ASSERT(material && "null material");
-	ZoneScopedN("add_object");
-	Pass_Object obj;
-	obj.sort_key = create_sort_key_from_obj(proxy, material,camera_dist, submesh, layer, is_editor_mode);
-	obj.render_obj = handle;
-	obj.submesh_index = submesh;
-	obj.material = material;
-	obj.lod_index = lod;
-	
-	// ensure this material maps to a gpu material
-	if(material->impl->gpu_buffer_offset != MaterialImpl::INVALID_MAPPING)
-		objects.push_back(obj);
-}
-
-
-#include <iterator>
-void Render_Pass::make_batches(Render_Scene& scene)
-{
-	const auto& merge_functor = [](const Pass_Object& a, const Pass_Object& b)
-	{
-		if (a.sort_key.as_uint64() < b.sort_key.as_uint64()) return true;
-		else if (a.sort_key.as_uint64() == b.sort_key.as_uint64()) 
-			return  a.submesh_index < b.submesh_index;
-		else return false;
-	};
-
-
-	// objects were added correctly in back to front order, just sort by layer
-	const auto& sort_functor_transparent = [](const Pass_Object& a, const Pass_Object& b)
-	{
-		if (a.sort_key.blending != b.sort_key.blending) 
-			return a.sort_key.blending < b.sort_key.blending;
-		if (a.sort_key.distance != b.sort_key.distance)
-			return a.sort_key.distance > b.sort_key.distance;
-		else if (a.sort_key.as_uint64() != b.sort_key.as_uint64())
-			return a.sort_key.as_uint64() < b.sort_key.as_uint64();
-		return a.submesh_index < b.submesh_index;
-	};
-
-	if (type == pass_type::TRANSPARENT)
-		std::sort(objects.begin(), objects.end(), sort_functor_transparent);
-	else
-		std::sort(objects.begin(), objects.end(), merge_functor);
-
-	batches.clear();
-	mesh_batches.clear();
-
-	if (objects.empty()) 
-		return;
-
-	{
-		auto functor = [](int first, Pass_Object* po, const Render_Object* rop) -> Mesh_Batch
-		{
-			Mesh_Batch batch;
-			batch.first = first;
-			batch.count = 1;
-			//auto& mats = rop->mats;
-			int index = rop->model->get_part(po->submesh_index).material_idx;// rop->mesh->parts.at(po->submesh_index).material_idx;
-			batch.material = po->material;
-			//batch.shader_index = po->sort_key.shader;
-			return batch;
-		};
-
-		const bool no_batching_dbg = r_no_batching.get_bool();
-
-		// build mesh batches first
-		Pass_Object* batch_obj = &objects.at(0);
-		const Render_Object* batch_proxy = &scene.get(batch_obj->render_obj);
-		Mesh_Batch batch = functor(0, batch_obj, batch_proxy);
-		batch_obj->batch_idx = 0;
-
-		for (int i = 1; i < objects.size(); i++) {
-			Pass_Object* this_obj = &objects[i];
-			const Render_Object* this_proxy = &scene.get(this_obj->render_obj);
-			const bool same_mesh = this_obj->sort_key.mesh == batch_obj->sort_key.mesh;
-			const bool same_shader = this_obj->sort_key.shader == batch_obj->sort_key.shader;
-
-
-			const bool same_submesh = this_obj->submesh_index == batch_obj->submesh_index;
-			const bool same_material = this_obj->material == batch_obj->material;
-			const bool can_be_merged = !no_batching_dbg&&same_material&& same_mesh&&same_shader && same_submesh && type != pass_type::TRANSPARENT;	// dont merge transparent meshes into instances
-			if (can_be_merged)
-				batch.count++;
-			else {
-				mesh_batches.push_back(batch);
-				batch = functor(i, this_obj, this_proxy);
-				batch_obj = this_obj;
-				batch_proxy = this_proxy;
-			}
-			this_obj->batch_idx = mesh_batches.size();
-		}
-		mesh_batches.push_back(batch);
-	}
-
-	Multidraw_Batch batch;
-	batch.first = 0;
-	batch.count = 1;
-	
-	Mesh_Batch* mesh_batch = &mesh_batches[0];
-	Pass_Object* batch_obj = &objects[mesh_batch->first];
-	const Render_Object* batch_proxy = &scene.get(batch_obj->render_obj);
-
-	const bool use_better_depth_batching = r_better_depth_batching.get_bool();
-
-	for (int i = 1; i < mesh_batches.size(); i++)
-	{
-		Mesh_Batch* this_batch = &mesh_batches[i];
-		Pass_Object* this_obj = &objects[this_batch->first];
-		const Render_Object* this_proxy = &scene.get(this_obj->render_obj);
-
-		bool batch_this = false;
-
-		bool same_layer = batch_obj->sort_key.layer == this_obj->sort_key.layer;
-		bool same_vao = batch_obj->sort_key.vao == this_obj->sort_key.vao;
-		bool same_material = batch_obj->sort_key.texture == this_obj->sort_key.texture;
-		bool same_shader = batch_obj->sort_key.shader == this_obj->sort_key.shader;
-		bool same_other_state = batch_obj->sort_key.blending == this_obj->sort_key.blending 
-			&& batch_obj->sort_key.backface == this_obj->sort_key.blending;
-
-		if (type == pass_type::OPAQUE || type == pass_type::TRANSPARENT || !use_better_depth_batching) {
-			if (same_vao && same_material && same_other_state && same_shader && same_layer)
-				batch_this = true;	// can batch with different meshes
-			else
-				batch_this = false;
-
-		}
-		else {// pass==DEPTH
-			// can batch across texture changes as long as its not alpha tested
-			if (same_shader && same_vao && same_other_state && !this_batch->material->impl->get_master_impl()->is_alphatested())
-				batch_this = true;
-			else
-				batch_this = false;
-		}
-
-		if (batch_this) {
-			batch.count += 1;
-		}
-		else {
-			batches.push_back(batch);
-			batch.count = 1;
-			batch.first = i;
-
-			mesh_batch = this_batch;
-			batch_obj = this_obj;
-			batch_proxy = this_proxy;
-		}
-	}
-
-	batches.push_back(batch);
-}
-
-
-
-Render_Scene::Render_Scene() 
-	: gbuffer_pass(pass_type::OPAQUE),
-	transparent_pass(pass_type::TRANSPARENT),
-	//shadow_pass(pass_type::DEPTH),
-	editor_sel_pass(pass_type::DEPTH),
-	shadow_pass(pass_type::DEPTH),
-	depth_prepass(pass_type::DEPTH)
-{
-
-}
-
-void Render_Lists::init(uint32_t drawbufsz, uint32_t instbufsz)
-{
-	glCreateBuffers(1, &gldrawid_to_submesh_material);
-	glCreateBuffers(1, &glinstance_to_instance);
-	glCreateBuffers(1, &gpu_command_list);
-
-}
-
-
 static void build_standard_cpu(
 	Render_Lists& list,
 	Render_Pass& src,
@@ -2980,96 +2560,6 @@ void Render_Lists_Gpu_Culled::init(uint32_t drawidsz, uint32_t instbufsz)
 	count_buffer = IGraphicsDevice::inst->create_buffer({});
 	batches_buf = IGraphicsDevice::inst->create_buffer({});
 
-}
-static void build_standard_cpu_culling(
-	Render_Lists_Gpu_Culled& list,
-	Render_Pass& src,
-	Free_List<ROP_Internal>& proxy_list
-)
-{
-#if 0
-	ZoneScopedN("build_standard_cpu_culling");
-	GPUSCOPESTART(build_standard_cpu_culling);
-
-	auto& memArena = draw.get_arena();
-	ArenaScope memScope(memArena);
-	std::span<uint32_t> draw_to_material = memArena.alloc_bottom_span<uint32_t>(src.mesh_batches.size());
-
-	// first build the lists
-	list.build_from(src, proxy_list, draw_to_material);
-
-
-	const int objCount = src.objects.size();
-	uint32_t* inst_to_object = memArena.alloc_bottom_type<uint32_t>(objCount);
-
-
-	for (int objIndex = 0; objIndex < objCount; objIndex++) {
-		auto& obj = src.objects[objIndex];
-
-		int precount = list.commands[obj.batch_idx].primCount++;	// increment count
-		int ofs = list.commands[obj.batch_idx].baseInstance;
-
-		// set the pointer to the Render_Object strucutre that will be found on the gpu
-
-		uint32_t packed = 0;
-		const int id = proxy_list.handle_to_obj[obj.render_obj.id];
-		packed |= id & 0xffff;
-		const int batch_id = obj.batch_idx;
-		packed |= (batch_id & 0xffff) << 16;
-
-		inst_to_object[ofs + precount] = packed;	// both instance id and batch id
-	}
-	for (int i = 0; i < list.commands.size(); i++)
-		list.commands[i].primCount = 0;	// set back to 0, compute cull will increment per visible
-
-
-	glNamedBufferData(list.gldrawid_to_submesh_material, sizeof(uint32_t) * draw_to_material.size() * 2 /* expects it to be double the size*/,nullptr, GL_DYNAMIC_DRAW);
-	glNamedBufferSubData(list.gldrawid_to_submesh_material, 0,sizeof(uint32_t) * draw_to_material.size(), draw_to_material.data());
-
-
-	glNamedBufferData(list.glinstance_to_instance, sizeof(uint32_t) * objCount, nullptr, GL_DYNAMIC_DRAW);
-	list.inst_to_obj->upload(inst_to_object, sizeof(uint32_t) * objCount);
-	// then, inst_to_obj used in compute shader to increment DEIcmds based on object visibility
-	// access batch_id and obj_id
-	list.obj_count = objCount;
-
-	const int command_list_size_bytes = sizeof(gpu::DrawElementsIndirectCommand) * list.commands.size(); 
-	glNamedBufferData(list.gpu_command_list, command_list_size_bytes*2 + list.commands.size()*sizeof(int), nullptr, GL_DYNAMIC_DRAW);	// also double the buffer size
-	glNamedBufferSubData(list.gpu_command_list, 0, command_list_size_bytes, list.commands.data());
-
-	{
-		std::span<int> draw_to_batch = memArena.alloc_bottom_span<int>(list.commands.size());
-		for (int i = 0; i < src.batches.size(); i++) {
-			auto& b = src.batches.at(i);
-			for (int c = 0; c < b.count; c++) {
-				ASSERT(b.first + c < draw_to_batch.size());
-				draw_to_batch[b.first + c] = i;
-			}
-			glNamedBufferSubData(list.gpu_command_list, command_list_size_bytes * 2, list.commands.size()*sizeof(int), draw_to_batch.data());
-		}
-	}
-
-	static_assert(sizeof(Multidraw_Batch) == 8, "multidraw batch used on gpu");
-	list.batches_buf->upload(src.batches.data(), src.batches.size() * sizeof(Multidraw_Batch));
-	list.count_buffer->upload(nullptr, sizeof(int) * src.batches.size());
-	
-	{
-		GPUSCOPESTART(copycpu);
-		GpuCullingTest::inst->copy_cpu(list);
-	}
-	{
-		GPUSCOPESTART(compactdraws);
-
-		GpuCullingTest::inst->compact_draws(
-			src.batches.size(),
-			list.commands.size(),
-			list.gpu_command_list,
-			list.gldrawid_to_submesh_material,
-			list.count_buffer,
-			list.batches_buf
-		);
-	}
-#endif
 }
 
 
@@ -3152,87 +2642,6 @@ static void build_cascade_cpu(
 }
 
 
-
-void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_list, std::span<uint32_t> draw_to_material)
-{
-	// This function essentially just loops over all batches and creates gpu commands for them
-	// its O(n) to the number of batches, not n^2 which it kind of looks like it is
-
-	commands.clear();
-	command_count.clear();
-
-	const int max_draw_to_materials = 20000;
-
-	int draw_to_material_index = 0;
-
-	int base_instance = 0;
-	int new_verts_drawn = 0;
-	for (int i = 0; i < src.batches.size(); i++) {
-		const Multidraw_Batch& mdb = src.batches[i];
-
-
-		for (int j = 0; j < mdb.count; j++) {
-			const Mesh_Batch& meshb = src.mesh_batches[mdb.first + j];
-			const Pass_Object& obj = src.objects[meshb.first];
-			const Render_Object& proxy = proxy_list.get(obj.render_obj.id).proxy;
-		
-
-			const Submesh& part = proxy.model->get_part(obj.submesh_index);// mesh.parts[obj.submesh_index];
-			gpu::DrawElementsIndirectCommand cmd;
-
-			cmd.baseVertex = part.base_vertex + proxy.model->get_merged_vertex_ofs();
-			cmd.count = part.element_count;
-			cmd.firstIndex = part.element_offset + proxy.model->get_merged_index_ptr();
-			cmd.firstIndex /= MODEL_BUFFER_INDEX_TYPE_SIZE;
-
-			// Important! Set primCount to 0 because visible instances will increment this
-			cmd.primCount = 0;// meshb.count;
-			cmd.baseInstance = base_instance;
-
-			commands.push_back(cmd);
-
-			base_instance += meshb.count;
-
-			const MaterialInstance* const batch_material = meshb.material;
-
-			assert(draw_to_material_index < src.mesh_batches.size());
-			draw_to_material[draw_to_material_index++] = batch_material->impl->gpu_buffer_offset;
-
-			new_verts_drawn += meshb.count * cmd.count;
-		}
-
-		command_count.push_back(mdb.count);
-	}
-
-	draw.stats.tris_drawn += new_verts_drawn / 3;
-
-}
-
-
-void Render_Scene::init()
-{
-	gbuffer_rlist.init(0,0);
-	transparent_rlist.init(0,0);
-	//csm_shadow_rlist.init(0,0);
-	editor_sel_rlist.init(0, 0);
-	cascades_rlists.resize(CascadeShadowMapSystem::CASCADES_USED);
-	for (auto& c : cascades_rlists)
-		c.init(0, 0);
-	spotLightShadowList.init(0, 0);
-
-	depth_prepass_rlist.init(0, 0);
-
-	gpu_instance_buffer = IGraphicsDevice::inst->create_buffer({});
-
-	//glCreateBuffers(1, &gpu_render_instance_buffer);
-	glCreateBuffers(1, &gpu_skinned_mats_buffer);
-
-	gpu_skinned_mats_buffer_size = r_skinned_mats_bone_buffer_size.get_integer();
-	glNamedBufferData(gpu_skinned_mats_buffer, gpu_skinned_mats_buffer_size * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
-
-
-}
-
 glm::vec4 to_vec4(Color32 color) {
 	return glm::vec4(color.r, color.g, color.b, color.a) / 255.f;
 }
@@ -3261,85 +2670,6 @@ inline const int get_lod_to_render(const Model* model, const float percentage)
 
 #include "Frustum.h"
 
-Frustum build_frustom_for_ortho(const glm::mat4& ortho_viewproj)
-{
-	Frustum f;
-	auto inv = glm::inverse(ortho_viewproj);
-	const glm::vec3 front = -inv[2];
-	const glm::vec3 side = inv[0];
-	const glm::vec3 up = inv[1];
-	glm::vec3 corners[8];
-	for (int i = 0; i < 8; i++) {
-		glm::vec3 v = glm::vec3(1, 1, 1);
-		if (i % 2 == 1)v.x = -1;
-		if (i % 4 >= 2) v.y = -1;
-		if (i / 4 == 1) v.z = 0;
-		corners[i] = inv * glm::vec4(v, 1.f);
-	}
-	glm::vec3 n = glm::normalize(corners[2] - corners[0]);
-	f.top_plane = glm::vec4(n, -glm::dot(n, corners[0]));
-
-	f.bot_plane = glm::vec4(-n, glm::dot(n, corners[2]));
-	n = glm::normalize(corners[1] - corners[0]);
-	f.right_plane = glm::vec4(n, -glm::dot(n, corners[0]));
-	f.left_plane = glm::vec4(-n, glm::dot(n, corners[1]));
-	return f;
-}
-
-
-void build_frustum_for_cascade(Frustum& f, int index)
-{
-	f = build_frustom_for_ortho(draw.shadowmap.matricies[index]);
-	f.ortho_max_extent = draw.shadowmap.max_extents[index];
-}
-
-
-void build_a_frustum_for_perspective(Frustum& f, const View_Setup& view, glm::vec3* arrow_origin)
-{
-	if (view.is_ortho) {
-		f = build_frustom_for_ortho(view.viewproj);
-		return;
-	}
-
-	const float fakeFar = 5.0;
-	const float fakeNear = 0.0;
-	const float aratio = view.width / (float)view.height;
-
-	auto inv = glm::inverse(view.view);
-
-	const glm::vec3 front = -inv[2];
-	const glm::vec3 side = inv[0];
-	const glm::vec3 up = inv[1];
-
-	const float halfVSide = fakeFar * tanf(view.fov * .5f);
-	const float halfHSide = halfVSide * aratio;
-
-	glm::vec3 corners[4];
-	corners[0] = front * fakeFar + halfHSide * side + halfVSide * up;
-	corners[1] = front * fakeFar + halfHSide * side - halfVSide * up;
-	corners[2] = front * fakeFar - halfHSide * side - halfVSide * up;
-	corners[3] = front * fakeFar - halfHSide * side + halfVSide * up;
-
-	if (arrow_origin) {
-		arrow_origin[3] = front * fakeFar + halfVSide * up; // bottom
-		arrow_origin[1] = front * fakeFar - halfVSide * up; // up
-		arrow_origin[0] = front * fakeFar + halfHSide * side;	// right
-		arrow_origin[2] = front * fakeFar - halfHSide * side;	// left
-		for (int i = 0; i < 4; i++)
-			arrow_origin[i] = arrow_origin[i] * 0.5f + view.origin;
-	}
-
-	glm::vec3 normals[4];
-	normals[0] = -glm::normalize(glm::cross(corners[0], up));	//right
-	normals[1] = -glm::normalize(glm::cross(corners[1], side));	// up
-	normals[2] = glm::normalize(glm::cross(corners[2], up));	// left
-	normals[3] = glm::normalize(glm::cross(corners[3], side)); // bottom
-
-	f.top_plane = glm::vec4(normals[1], -glm::dot(normals[1], view.origin));
-	f.bot_plane = glm::vec4(normals[3], -glm::dot(normals[3], view.origin));
-	f.right_plane = glm::vec4(normals[0], -glm::dot(normals[0], view.origin));
-	f.left_plane = glm::vec4(normals[2], -glm::dot(normals[2], view.origin));
-}
 ConfigVar r_force_lod("r.force_lod", "-1", CVAR_INTEGER | CVAR_UNBOUNDED, "");
 
 template<bool is_main_view>
@@ -3410,161 +2740,6 @@ static void cull_objects(Frustum& frustum, int visible_array_size,uint8_t* out_a
 			}
 		}
 		pack_input_lod_arr(out_array[i], is_visible, want_lod);
-	}
-}
-struct CullObjectsUser
-{
-	int count = 0;
-	int index = 0;	// for shadows
-
-	uint8_t* lodarr = nullptr;	// lod and vis array
-	int16_t* camdistarr = nullptr;
-};
-
-void cull_objects_job(uintptr_t user)
-{
-	ZoneScopedN("ObjectCull");
-	auto d = (CullObjectsUser*)user;
-	Frustum frustum;
-	build_a_frustum_for_perspective(frustum, draw.current_frame_view);
-	auto& objs = draw.scene.proxy_list;
-	cull_objects<true>(frustum,  d->count, d->lodarr, d->camdistarr,  objs);
-}
-void cull_shadow_objects_job(uintptr_t user)
-{
-	ZoneScopedN("ShadowObjectCull");
-	auto d = (CullObjectsUser*)user;
-	Frustum f;
-	build_frustum_for_cascade(f, d->index);
-	auto& objs = draw.scene.proxy_list;
-	cull_objects<false>(f, d->count, d->lodarr, nullptr, objs);
-}
-
-
-void cull_spot_shadow_objects_job(handle<Render_Light> lightId, uint8_t* visArray, int visArraySize)
-{
-	ZoneScopedN("cull_spot_shadow_objects_job");
-	auto& light = draw.scene.light_list.get(lightId.id);
-	auto& p = light.light.position;
-	auto& n = light.light.normal;
-
-	Frustum frustum;
-	View_Setup setup;
-	glm::vec3 up = glm::vec3(0, 1, 0);
-	if (glm::abs(glm::dot(up, n)) > 0.999) 
-		up = glm::vec3(1, 0, 0);
-	setup.view = glm::lookAt(p, p+n,up);
-	setup.origin = p;
-	setup.width = setup.height = 1;	//aratio=1
-	setup.fov = glm::radians(light.light.conemax) * 2.0;
-	build_a_frustum_for_perspective(frustum,setup,nullptr);
-
-	glm::vec4 backplane = glm::vec4(-n, 0.0);
-	backplane.w = glm::dot(n, p + n * light.light.radius);
-	const int force_lod = r_force_lod.get_integer();
-	auto& objs = draw.scene.proxy_list.objects;
-	const float inv_two_times_tanfov = 1.0 / (tan(setup.fov * 0.5));
-	const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
-	assert(visArraySize == objs.size());
-	int count = 0;
-	for (int i = 0; i < objs.size(); i++) {
-		const auto& obj = objs[i].type_;
-		const glm::vec3& center = glm::vec3(obj.bounding_sphere_and_radius);
-		const float& radius = obj.bounding_sphere_and_radius.w;
-
-		int res = 0;
-		res += (glm::dot(glm::vec3(frustum.top_plane), center) + frustum.top_plane.w >= -radius) ? 1 : 0;
-		res += (glm::dot(glm::vec3(frustum.bot_plane), center) + frustum.bot_plane.w >= -radius) ? 1 : 0;
-		res += (glm::dot(glm::vec3(frustum.left_plane), center) + frustum.left_plane.w >= -radius) ? 1 : 0;
-		res += (glm::dot(glm::vec3(frustum.right_plane), center) + frustum.right_plane.w >= -radius) ? 1 : 0;
-		res += (glm::dot(glm::vec3(backplane), center) + backplane.w >= -radius) ? 1 : 0;
-
-		const bool visible = res == 5;
-
-		int8_t want_lod = 0;
-		if (visible) {
-			const glm::vec3 to_camera = center - setup.origin;
-			const float dist_to_camera_2 = glm::dot(to_camera, to_camera);
-			const float percentage_2 = get_screen_percentage_2(obj.bounding_sphere_and_radius, inv_two_times_tanfov_2, dist_to_camera_2);
-			if (!obj.proxy.model)
-				want_lod = 0;
-			else if (force_lod != -1) {
-				int lod_to_pick = glm::clamp(force_lod, 0, obj.proxy.model->get_num_lods() - 1);
-				want_lod = lod_to_pick;
-			}
-			else {
-				want_lod = (int8_t)get_lod_to_render(obj.proxy.model, percentage_2);
-			}
-		}
-		pack_input_lod_arr(visArray[i], visible, want_lod);
-
-		count += visArray[i];
-
-		//visArray[i] = true;
-	}
-	draw.stats.shadow_objs += count;
-}
-struct CullSpotData {
-	handle<Render_Light> light;
-	int face_idx = 0;	// todo
-	std::span<uint8_t> vis_array;
-	std::span<gpu::DrawElementsIndirectCommand> commands;
-	std::span<int> instances;
-	std::span<int> md_counts;
-};
-void cull_spot_shadow_and_build_and_compact(uintptr_t user)
-{
-	CullSpotData* data = (CullSpotData*)user;
-	cull_spot_shadow_objects_job(data->light, data->vis_array.data(), data->vis_array.size());	// now have objects culled
-	BuildSceneData_CpuFast::inst->make_shadow_object_data_threadsafe(data->vis_array, data->instances,
-		data->commands, data->md_counts);
-}
-
-
-void calc_lod_job(int8_t* lodarray, int16_t* camera_dist)
-{
-	ZoneScopedN("LodToRenderCalc");
-
-	//int8_t* lodarray = (int8_t*)user;
-
-	const int force_lod = r_force_lod.get_integer();
-	
-
-	const float inv_two_times_tanfov = 1.0 / (tan(draw.get_current_frame_vs().fov * 0.5));
-	const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
-	auto& vs = draw.current_frame_view;
-	auto& proxy_list = draw.scene.proxy_list;
-
-	// adjust these, maybe exponential depth?
-	const float max_cam_dist = 100.0;
-	const float inv_max_dist_mult_2 = 1.0 / (max_cam_dist* max_cam_dist);
-	const float max_output = float(1 << 12);
-
-	for (int i = 0; i < proxy_list.objects.size(); i++) {
-		auto& obj = proxy_list.objects[i];
-		auto& proxy = obj.type_.proxy;
-		glm::vec3 to_camera = glm::vec3(obj.type_.bounding_sphere_and_radius) - vs.origin;
-
-		const float dist_to_camera_2 = glm::dot(to_camera, to_camera);
-		const float percentage_2 = get_screen_percentage_2(obj.type_.bounding_sphere_and_radius, inv_two_times_tanfov_2, dist_to_camera_2);
-		const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
-		if (!proxy.model)
-			lodarray[i] = 0;
-		else if (force_lod != -1) {
-			int lod_to_pick = glm::clamp(force_lod, 0, proxy.model->get_num_lods() - 1);
-			lodarray[i] = lod_to_pick;
-		}
-		else if (percentage_2<proxy.dist_cull_2) {
-			lodarray[i] = -1;
-		}
-		else {
-			lodarray[i] = (int8_t)get_lod_to_render(proxy.model, percentage_2);
-		}
-
-		float out_dist_cam = dist_to_camera_2* inv_max_dist_mult_2;
-		out_dist_cam = std::clamp(out_dist_cam, 0.f, 1.f);
-		int16_t as_int16 = max_output * out_dist_cam;
-		camera_dist[i] = as_int16;
 	}
 }
 
@@ -3651,8 +2826,6 @@ void Render_Scene::update_spotlight_data()
 	if (!lightsToCalcShadow.empty()) {
 		// parallelize this
 
-
-
 		for (int i = 0; i < lightsToCalcShadow.size(); i++) {
 			bool any_dynamic_found = false;
 			build_cascade_cpu(spotLightShadowList, draw.scene.shadow_pass,
@@ -3703,18 +2876,18 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		CPUSCOPESTART(cpu_object_cull);
 		ZoneScopedN("lod_calcs");
 
-		JobCounter* counter{};
-
-
-		const int NUM_FRUSTUM_JOBS = CascadeShadowMapSystem::CASCADES_USED + 1;
-		JobDecl decls[NUM_FRUSTUM_JOBS];
-		CullObjectsUser mainview;
-		CullObjectsUser cascades[CascadeShadowMapSystem::CASCADES_USED];
-		mainview.count = visible_count;
-		mainview.lodarr = lod_to_render_array;
-		mainview.camdistarr = camera_depth_array;
-		decls[0].func = cull_objects_job;
-		decls[0].funcarg = uintptr_t(&mainview);
+		//JobCounter* counter{};
+		//
+		//
+		//const int NUM_FRUSTUM_JOBS = CascadeShadowMapSystem::CASCADES_USED + 1;
+		//JobDecl decls[NUM_FRUSTUM_JOBS];
+		//CullObjectsUser mainview;
+		//CullObjectsUser cascades[CascadeShadowMapSystem::CASCADES_USED];
+		//mainview.count = visible_count;
+		//mainview.lodarr = lod_to_render_array;
+		//mainview.camdistarr = camera_depth_array;
+		//decls[0].func = cull_objects_job;
+		//decls[0].funcarg = uintptr_t(&mainview);
 		//for (int i = 0; i < CascadeShadowMapSystem::CASCADES_USED; i++) {
 		//	cascades[i].index = i;
 		//	cascades[i].count = visible_count;
@@ -3904,8 +3077,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			}
 		};
 		make_shadow_render_lists();
-
-		//this->update_spotlight_data();
 
 		build_standard_cpu(gbuffer_rlist, gbuffer_pass, proxy_list);
 
@@ -4149,9 +3320,11 @@ void LightListCuller::cull(const View_Setup& setup)
 	CPUFUNCTIONSTART;
 
 	using namespace glm;
-	const vec3 forward = normalize(setup.front);
-	const vec3 right = normalize(cross(forward, glm::vec3(0,1,0)));	// fixme
-	const vec3 up = normalize(cross(right, forward));
+	auto& view = setup.view;
+	vec3 right = vec3(view[0][0], view[1][0], view[2][0]);
+	vec3 up = vec3(view[0][1], view[1][1], view[2][1]);
+	vec3 forward = -vec3(view[0][2], view[1][2], view[2][2]);
+
 	const float tile_size_x = setup.width / float(light_frustum_size_x);
 	const float tile_size_y = setup.height / float(light_frustum_size_y);
 	const float aspect = float(setup.width) / setup.height;
@@ -5054,9 +4227,11 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 			}
 		}
 	}
-	if(!params.skybox_only)
+	if (!params.skybox_only) {
 		shadowmap.render_cascades();
 
+		scene.update_spotlight_data();
+	}
 	//device.reset_states();
 	
 
@@ -5459,86 +4634,6 @@ void Renderer::on_level_start()
 }
 
 ConfigVar r_disable_animated_velocity_vector("r.disable_animated_velocity_vector", "0", CVAR_BOOL|CVAR_DEV, "");
-
-void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object& proxy)
-{
-	ASSERT(!eng->get_is_in_overlapped_period());
-	ROP_Internal& in = proxy_list.get(handle.id);
-
-	if (!(in.proxy.model == proxy.model && in.proxy.mat_override == proxy.mat_override)) {
-		int parts = 0;
-		if (proxy.model) {
-			parts = proxy.model->get_num_parts();
-			in.has_transparents = proxy.model->get_has_any_transparent_materials();
-		}
-		if (proxy.mat_override && proxy.mat_override->impl && proxy.mat_override->impl->is_transparent_material()) {
-			in.fastcpu_index = -1;	// skip, material is transparent
-			in.has_transparents = true;
-		}
-		// prevent bad case... if too many parts dont take fast path
-		else if (parts > 200) {
-			in.fastcpu_index = -1;
-		}
-		else {
-			in.fastcpu_index = BuildSceneData_CpuFast::inst->get_index(proxy.model, proxy.mat_override);
-		}
-	}
-
-	in.prev_transform = in.proxy.transform;
-	in.prev_bone_ofs = in.proxy.animator_bone_ofs;
-	in.proxy = proxy;
-	if (!in.has_init) {
-		in.has_init = true;
-		in.prev_transform = in.proxy.transform;
-		in.prev_bone_ofs = -1;
-	}
-	//if (r_disable_animated_velocity_vector.get_bool())
-	//	in.prev_bone_ofs = -1;
-
-	if (proxy.model) {
-		auto& sphere = proxy.model->get_bounding_sphere();
-		auto center = proxy.transform * glm::vec4(glm::vec3(sphere),1.f);
-		float max_scale = glm::max(glm::length(proxy.transform[0]), glm::max(glm::length(proxy.transform[1]), glm::length(proxy.transform[2])));
-		float radius = sphere.w* max_scale;
-		in.bounding_sphere_and_radius = glm::vec4(glm::vec3(center), radius);
-	}
-}
-ConfigVar r_spot_near("r_spot_near", "0.1", CVAR_FLOAT, "", 0, 2);
-void Render_Scene::update_light(handle<Render_Light> handle, const Render_Light& proxy) {
-	ASSERT(!eng->get_is_in_overlapped_period());
-	auto& l = light_list.get(handle.id);
-	l.light = proxy;
-	l.updated_this_frame = true;
-
-	if (l.light.casts_shadow_mode != 0 && l.light.is_spotlight) {
-		auto& p = l.light.position;
-		auto& n = l.light.normal;
-		glm::vec3 up = glm::vec3(0, 1, 0);
-		if (glm::abs(glm::dot(up, n)) > 0.999)
-			up = glm::vec3(1, 0, 0);
-		auto viewMat = glm::lookAt(p, p + n, up);
-		float fov = glm::radians(l.light.conemax) * 2.0;
-		auto proj = glm::perspectiveRH_ZO(fov, 1.0f, l.light.radius, r_spot_near.get_float());
-		//proj[2][2] *= -1.0f;	// reverse z // [1,0]
-		//proj[3][2] *= -1.0f;
-
-		l.lightViewProj = proj * viewMat;
-	}
-
-}
-
-void Render_Scene::remove_light(handle<Render_Light>& handle) {
-	if (eng->get_is_in_overlapped_period()) {
-		add_to_queued_deletes(handle.id, RenderObjectTypes::Light);
-		handle = { -1 };
-		return;
-	}
-	if (!handle.is_valid())
-		return;
-	draw.spotShadows->on_remove_light(handle);
-	light_list.free(handle.id);
-	handle = { -1 };
-}
 
 
 ConfigVar debug_out_layer("debug_out_layer", "0", CVAR_INTEGER | CVAR_UNBOUNDED, "");

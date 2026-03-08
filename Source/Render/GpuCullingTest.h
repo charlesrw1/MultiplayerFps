@@ -67,31 +67,12 @@ struct CullData {
 
 	float cascade_extent;
 	int padding[3];
+
+	vec4 backplane;
 };
 
-struct GpuCullInput {
-	IGraphicsBuffer* mod_data{};	// model data buffer. contains lods, parts, cmd indidices, material offsets
-	IGraphicsBuffer* obj_data_buf{};	// CullObject[]
-	IGraphicsBuffer* count_buf{};		// count buffer to use with drawelementsindirectcount
-	IGraphicsBuffer* batches_buf{};	// array of multidraw_batches
-	IGraphicsBuffer* glinst_to_inst{};	// int[], used for indirecting to object transform etc data
-	IGraphicsBuffer* cmd_buf{};			// drawelementsindirectcommands[] 
-	IGraphicsBuffer* draw_to_batch{};	// int[] mapping from cmd_buf to batches_buf
 
-	int num_batches = 0;
-	int num_cmds = 0;
-	int num_objs = 0;
-};
-struct ShadowCullInput {
-	ShadowCullInput() = default;
-	ShadowCullInput(Frustum f, bool cascade, float fov, glm::vec4 backplane, glm::vec3 origin)
-		: f(f), cascade(cascade), fov(fov), backplane(backplane), origin(origin) {}
-	Frustum f;
-	bool cascade = true;
-	float fov;
-	glm::vec4 backplane;
-	glm::vec3 origin;
-};
+
 class GpuCullingTest {
 public:
 	static GpuCullingTest* inst;
@@ -127,6 +108,8 @@ public:
 
 	program_handle cull_compute{};
 	program_handle cull_compute_cascade{};
+	program_handle cull_compute_spot{};
+
 
 	program_handle compaction{};
 	program_handle debug_overlays{};

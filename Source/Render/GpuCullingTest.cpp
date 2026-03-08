@@ -5,8 +5,10 @@ GpuCullingTest::GpuCullingTest()
 
 	matindirect = IGraphicsDevice::inst->create_buffer({});
 	cull_data = IGraphicsDevice::inst->create_buffer({});
-	cull_compute = draw.get_prog_man().create_compute("CullCompute.txt");
+	cull_compute = draw.get_prog_man().create_compute("CullCompute.txt","MAINVIEW");
 	cull_compute_cascade = draw.get_prog_man().create_compute("CullCompute.txt","SHADOW_CASCADE");
+	cull_compute_spot = draw.get_prog_man().create_compute("CullCompute.txt", "SHADOW_SPOT");
+
 
 	build_pyramid = draw.get_prog_man().create_compute("DepthPyramidC.txt");
 	cpu_vis_array_to_mdi = draw.get_prog_man().create_compute("cpu_vis_to_mdi.txt");
@@ -135,22 +137,33 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 
 	if (update_depth_pyramid)
 	{
-		const float inv_two_times_tanfov = 1.0 / (tan(draw.get_current_frame_vs().fov * 0.5));
+		glm::vec3  origin{};
+		float fov{};
+		if (is_for_shadow) {
+			origin = frustum.origin;
+			fov = frustum.fov;
+		}
+		else {
+			origin = draw.current_frame_view.origin;
+			fov = draw.get_current_frame_vs().fov;
+		}
+		const float inv_two_times_tanfov = 1.0 / (tan(fov*0.5));
 		const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
 		cull.inv_two_times_tanfov_2 = inv_two_times_tanfov_2;
 		auto& vs = draw.current_frame_view;
-		cull.camera_origin = glm::vec4(vs.origin, 1);
+		cull.camera_origin = glm::vec4(origin, 1);
 
 	
 		cull.frustum_up = frustum.top_plane;
 		cull.frustum_down = frustum.bot_plane;
 		cull.frustum_l = frustum.left_plane;
 		cull.frustum_r = frustum.right_plane;
+		cull.backplane = frustum.back_plane;
 
+		// unused for shadow
 		cull.near = vs.near;
 		cull.pyramid_width = actual_depth_size.x;
 		cull.pyramid_height = actual_depth_size.y;
-
 		const float aratio = vs.width / (float)vs.height;
 		const float halfVSide = tanf(vs.fov * .5f);
 		const float halfHSide = halfVSide * aratio;
@@ -177,8 +190,14 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 
 
 	auto& device = draw.get_device();
-	if (is_for_shadow)
-		device.set_shader(cull_compute_cascade);
+	if (is_for_shadow) {
+		if (frustum.is_ortho) {
+			device.set_shader(cull_compute_cascade);
+		}
+		else {
+			device.set_shader(cull_compute_spot);
+		}
+	}
 	else
 		device.set_shader(cull_compute);
 	const int co_size = cull.num_objects;
