@@ -472,6 +472,7 @@
     <ClInclude Include="Source\Render\BufferTest\glbuffer.h" />
     <ClInclude Include="Source\UnitTests\EngineTesterApplication.h" />
     <ClInclude Include="Source\Render\GpuAllocator.h" />
+    <ClInclude Include="Source\Render\BuildSceneData_CF.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">

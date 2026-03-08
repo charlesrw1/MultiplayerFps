@@ -286,11 +286,13 @@ void DuplicateEntitiesCommand::execute() {
 
 	ed_doc.selection_state->clear_all_selected();
 	
+	vector<EntityPtr> ents;
 	for (auto e : duplicated.all_obj_vec)
 		if (auto ent = e->cast_to<Entity>()) {
-			ed_doc.selection_state->add_to_entity_selection(ent);
+			ents.push_back(ent);
 			handles.push_back(ent);
 		}
+			ed_doc.selection_state->add_entities_to_selection(ents);
 
 	ed_doc.manipulate->set_force_op(ImGuizmo::TRANSLATE);
 	ed_doc.manipulate->set_force_gizmo_on(true);

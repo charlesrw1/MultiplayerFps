@@ -58,10 +58,10 @@ void Level::sync_level_render_data()
 }
 void Level::add_to_sync_render_data_list(Component* ec)
 {
-	if (eng->get_is_in_overlapped_period())
+	//if (eng->get_is_in_overlapped_period())
 		wants_sync_update.insert(ec);
-	else
-		ec->on_sync_render_data();
+	//else
+	//	ec->on_sync_render_data();
 }
 
 void Level::add_to_update_list(Component* ec) {

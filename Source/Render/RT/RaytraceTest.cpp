@@ -721,6 +721,8 @@ void DdgiTesting::load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, 
 }
 void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 {
+	if (draw.scene.skylights.empty())
+		return;//fixme
 	//if (!verts) {
 	//	execute();
 	//	ASSERT(verts);

@@ -540,7 +540,18 @@ public:
 	void add_to_entity_selection(const Entity* e) {
 		return add_to_entity_selection(e->get_self_ptr());
 	}
+	void remove_from_selection(std::vector<EntityPtr> ptrs) {
 
+		for (auto ptr : ptrs) {
+			auto e = ptr.get();
+			if (e) {	// can be null
+				e->selected_in_editor = false;
+				e->set_ws_transform(e->get_ws_transform());
+			}
+			selected_entity_handles.erase(ptr.handle);
+		}
+		on_selection_changed.invoke();
+	}
 	void remove_from_selection(EntityPtr ptr) {
 
 		auto e = ptr.get();
@@ -897,6 +908,9 @@ public:
 	}
 
 	void do_mouse_selection(MouseSelectionAction action, const Entity* e, bool select_root_most_entity);
+	void do_mouse_selection(MouseSelectionAction action, vector<EntityPtr> ents, bool select_root_most_entity);
+
+
 	void on_mouse_pick();
 	void duplicate_selected_and_select_them();
 	Ray unproject_mouse_to_ray(int mx, int my);

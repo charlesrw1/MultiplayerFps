@@ -112,6 +112,8 @@ public:
 	virtual RenderScenePublic* get_scene() = 0;
 	virtual void scene_draw(SceneDrawParamsEx params, View_Setup view	/* camera */) = 0;
 	virtual void sync_update() = 0;
+	virtual void pre_sync_update() = 0;
+
 	virtual void on_level_start() = 0;
 	virtual void on_level_end() = 0;
 	virtual void bake_cubemaps() = 0;

@@ -88,6 +88,6 @@ r.taa 0
 loglevel 5
 developer_mode 1
 
-open-editor demo_level_1.tmap
+open-editor testmap1.tmap
 
 g_application_class EngineTesterApp

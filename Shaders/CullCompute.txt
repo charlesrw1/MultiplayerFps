@@ -144,15 +144,12 @@ void main()
 			//return;
 		}
 	}
-	
+
 	// set vis bit
 	atomicOr(visbits[dword_index],1<<visword_shift); 	
 	
 	int model_ofs = CullObjects.data[gID].misc.x;
-	if(model_ofs<0) {
-		return;	// this is a cpu object, draws will be added in another shader
-	}
-	
+
 	int num_lods = int(model_info[model_ofs]);
 
 	// get lod to render
@@ -171,14 +168,22 @@ void main()
 	int part_ofs = int(model_info[model_ofs+1+(lod_wanted*3)]);
 	int part_count = int(model_info[model_ofs+1+(lod_wanted*3)+1]);
 	
+	int mat_override = CullObjects.data[gID].misc.z;
 	for(int i=0;i<part_count;i++) {
-		int command_index = int(model_info[model_ofs+1+num_lods*3 + part_ofs + i]);
+		int command_index = int(model_info[model_ofs+1+num_lods*3 + (part_ofs + i)*2]);
+		int mat_offset = int(model_info[model_ofs+1+num_lods*3 + (part_ofs + i)*2 + 1]);
+		
 		//int command_index = int(model_info[model_ofs+1+num_lods*3+part_index]);
 		
 	
 		uint count_index = atomicAdd(draw_cmd_out[command_index].primCount,1);
 		uint instanceIndex = draw_cmd_out[command_index].baseInstance + count_index;
-		object_inst_indirect[instanceIndex] = CullObjects.data[gID].misc.y;
+		object_inst_indirect[instanceIndex*2] = CullObjects.data[gID].misc.y;	// the index of object
+		
+		mat_offset = (mat_override>0)?mat_override:mat_offset;
+		
+		object_inst_indirect[instanceIndex*2 + 1] = mat_offset;
+		
 	
 	}
 }

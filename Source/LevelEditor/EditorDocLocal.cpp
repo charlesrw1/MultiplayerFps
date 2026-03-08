@@ -146,12 +146,13 @@ void EditorDoc::init_new()
 		}
 
 		auto newRect = gui->convert_rect(rect);
-
+		vector<EntityPtr> ents;
 		if (ed_cam.get_is_using_ortho()) {
 
 			const Bounds camb = ed_cam.get_ortho_selection_bounds(newRect);
 
 			auto& allobjs = eng->get_level()->get_all_objects();
+
 			for (auto obj : allobjs) {
 
 
@@ -160,7 +161,7 @@ void EditorDoc::init_new()
 						auto thisbounds = m->get_model()->get_bounds();
 						thisbounds = transform_bounds(m->get_owner()->get_ws_transform(), thisbounds);
 						if (thisbounds.intersect(camb))
-							do_mouse_selection(type, m->get_owner(), true);
+							ents.push_back(m->get_owner());
 					}
 
 				}
@@ -168,11 +169,10 @@ void EditorDoc::init_new()
 					if (!b->get_owner()->get_hidden_in_editor()) {
 						auto thisbounds = Bounds(b->get_ws_position() - glm::vec3(0.5), b->get_ws_position() + glm::vec3(0.5));
 						if (thisbounds.intersect(camb))
-							do_mouse_selection(type, b->get_owner(), true);
+							ents.push_back(b->get_owner());
 					}
 				}
 			}
-
 			// rect.x to world space:
 
 		}
@@ -184,13 +184,12 @@ void EditorDoc::init_new()
 					if (component_ptr) {
 						auto owner = component_ptr->get_owner();
 						ASSERT(owner);
-
-						do_mouse_selection(type, owner, true);
+						ents.push_back(owner);
 					}
 				}
 			}
 		}
-
+		do_mouse_selection(type, ents, true);
 
 		gui->do_box_select(type);
 		});
@@ -708,6 +707,21 @@ void EditorDoc::do_mouse_selection(MouseSelectionAction action, const Entity* e,
 		selection_state->add_to_entity_selection(actual_entity_to_select);
 	else if (action == MouseSelectionAction::UNSELECT)
 		selection_state->remove_from_selection(actual_entity_to_select);
+}
+
+void EditorDoc::do_mouse_selection(MouseSelectionAction action, vector<EntityPtr> ents, bool select_root_most_entity)
+{
+	if (action == MouseSelectionAction::SELECT_ONLY) {
+		selection_state->clear_all_selected();
+		selection_state->add_entities_to_selection(ents);
+	}
+	else if (action == MouseSelectionAction::ADD_SELECT) {
+		selection_state->add_entities_to_selection(ents);
+
+	}
+	else if (action == MouseSelectionAction::UNSELECT) {
+		selection_state->remove_from_selection(ents);
+	}
 }
 
 

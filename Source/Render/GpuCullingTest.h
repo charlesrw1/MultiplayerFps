@@ -41,6 +41,10 @@ format:
 struct CullObject {
 	glm::vec4 bounds_sphere;
 	glm::ivec4 model_ofs;
+	// x component is model
+	// y component is object index
+	// z component is material ofs
+	// w component is flags
 };
 struct CullData {
 	vec4 frustum_up;
@@ -61,6 +65,21 @@ struct CullData {
 
 	mat4 view;
 };
+
+struct GpuCullInput {
+	IGraphicsBuffer* mod_data{};	// model data buffer. contains lods, parts, cmd indidices, material offsets
+	IGraphicsBuffer* obj_data_buf{};	// CullObject[]
+	IGraphicsBuffer* count_buf{};		// count buffer to use with drawelementsindirectcount
+	IGraphicsBuffer* batches_buf{};	// array of multidraw_batches
+	IGraphicsBuffer* glinst_to_inst{};	// int[], used for indirecting to object transform etc data
+	IGraphicsBuffer* cmd_buf{};			// drawelementsindirectcommands[] 
+	IGraphicsBuffer* draw_to_batch{};	// int[] mapping from cmd_buf to batches_buf
+
+	int num_batches = 0;
+	int num_cmds = 0;
+	int num_objs = 0;
+};
+
 class GpuCullingTest {
 public:
 	static GpuCullingTest* inst;
@@ -71,13 +90,13 @@ public:
 
 	// builds mod info etc
 	// culls against prev frustum
-	void build_data();
+	void build_data(const GpuCullInput& input);
 
 	// copies culled data to render lists
 	void copy_cpu(Render_Lists_Gpu_Culled& list);
 	
 	// build hi-z and do 2nd cull pass
-	void build_data_2();
+	void build_data_2(const GpuCullInput& input);
 
 	// # copy_cpu() again for cpu objects
 
@@ -91,25 +110,14 @@ public:
 
 
 	void compact_draws(
-		int num_batches,
-		int num_commands,
-		bufferhandle mdi_buf,
-		bufferhandle mat_buf,
-		IGraphicsBuffer* count_buf,
-		IGraphicsBuffer* batches_buf
+		const GpuCullInput& input
 	);
 
 	program_handle cull_compute{};
 	program_handle compaction{};
 	program_handle debug_overlays{};
-	IGraphicsBuffer* object_buffer = nullptr;
-	IGraphicsBuffer* model_data_buffer = nullptr;
-	IGraphicsBuffer* multidraw_buffer = nullptr;
-	IGraphicsBuffer* batches_buf = nullptr;
-	IGraphicsBuffer* count_buffer = nullptr;
 
 
-	IGraphicsBuffer* objindirect = nullptr;
 	IGraphicsBuffer* matindirect = nullptr;
 
 	// used for both cpu and gpu objs. big buffers
@@ -118,10 +126,8 @@ public:
 
 
 	CullData cull{};
-	std::vector<const MaterialInstance*> cmd_mats;
+	//std::vector<const MaterialInstance*> cmd_mats;
 
-	std::vector<Multidraw_Batch> gbuffer_batches;
-	std::vector<Multidraw_Batch> depth_batches;
 
 
 	program_handle build_pyramid{};
@@ -144,5 +150,5 @@ private:
 		Pass1,
 		Pass2
 	};
-	void do_cull(Phase pass);
+	void do_cull(const GpuCullInput& input, Phase pass);
 };

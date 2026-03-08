@@ -48,8 +48,7 @@ void BillboardComponent::set_texture(const Texture* tex) {
 	if (tex == texture.get())
 		return;
 	texture.ptr = (Texture*)tex; // FIXME
-	if (!handle.is_valid())	// could be initialization setting
-		return;
+
 	dynamic_mat = BillboardMaterialCache::get().find(texture.get());
 
 	sync_render_data();

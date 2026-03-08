@@ -34,7 +34,7 @@ void DecalBatcher::build_batches() {
 		decal_objs[actual_count].the_material = mat;
 		program_handle the_shader = matman.get_mat_shader(the_model, mat, 0);
 		decal_objs[actual_count].program = the_shader;
-		decal_objs[actual_count].texture_set = mat->impl->texture_id_hash;
+		decal_objs[actual_count].texture_set = mat->impl->get_texture_id_hash();
 		decal_objs[actual_count].sort_order = (int)decal_obj.ordering;
 		actual_count += 1;
 	}

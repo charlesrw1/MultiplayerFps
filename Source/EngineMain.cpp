@@ -1865,7 +1865,7 @@ void GameEngineLocal::loop()
 		AssetRegistrySystem::get().update(); 		// update hot reloading
 #endif
 		ScriptManager::inst->update();
-
+		idraw->pre_sync_update();
 		if (get_level())
 			get_level()->sync_level_render_data();
 		UiSystem::inst->sync_to_renderer();
@@ -1921,7 +1921,7 @@ void GameEngineLocal::loop()
 			wait_for_swap(skip_rendering);	// wait for swap last
 
 
-			//FrameMark;	// tracy profiling
+			FrameMark;	// tracy profiling
 			Profiler::end_frame_tick(frame_time);	// my crappy profilier
 			
 			

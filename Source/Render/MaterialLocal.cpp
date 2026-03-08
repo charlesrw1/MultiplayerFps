@@ -133,6 +133,7 @@ program_handle MaterialManagerLocal::compile_mat_shader(const MaterialInstance* 
 	if (key.has_flag(MSF_LIGHTMAPPED)) params += "LIGHTMAPPED,";
 	if (key.has_flag(MSF_IS_FORCED_FORWARD))params += "THUMBNAIL_FORWARD,";
 	if (key.has_flag(MSF_NO_TAA))params += "NO_TAA,";
+	if (key.has_flag(MSF_MATERIAL_IN_INSTANCE))params += "MAT_WITH_INST,";
 	if (!params.empty())params.pop_back();
 
 	if(material_print_debug.get_bool())
@@ -167,6 +168,8 @@ program_handle MaterialManagerLocal::get_mat_shader(
 }
 
 void MaterialManagerLocal::add_to_dirty_list(MaterialInstance* mat) {
+	if (mat->impl)
+		mat->impl->texture_id_hash = std::nullopt;
 	dirty_list.insert(mat);
 }
 
@@ -1013,6 +1016,13 @@ void MaterialManagerLocal::init() {
 	pp_editor_select_mat = g_assets.find_sync_sptr<MaterialInstance>("eng/defaultEditorSelect.mm",true);
 	if (!pp_editor_select_mat)
 		Fatalf("couldnt load the default editor select material\n");
+}
+int MaterialImpl::get_texture_id_hash()
+{
+	if (texture_id_hash.has_value())
+		return texture_id_hash.value();
+	texture_id_hash = matman.compute_tex_hash_for(this);
+	return texture_id_hash.value();
 }
 
 void MaterialManagerLocal::pre_render_update()

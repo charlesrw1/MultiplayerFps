@@ -450,6 +450,9 @@ public:
 		thumbnailRenderer->output_to_path(path);
 	}
 #endif
+	void pre_sync_update() final {
+		matman.pre_render_update();
+	}
 
 	// ###################
 	// # local interface #

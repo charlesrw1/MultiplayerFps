@@ -23,6 +23,8 @@
 #include "Framework/ArenaAllocator.h"
 #include "IGraphsDevice.h"
 #include "RenderGiManager.h"
+#include "GpuCullingTest.h"
+
 const GLenum MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT;
 
 
@@ -279,6 +281,7 @@ struct ModelAndMatTData {
 	int instance_count = 0;
 	int instance_alloced = 0;
 	int16_t ptr_ofs = 0;
+	int gpu_buf_ofs = 0;
 };
 
 struct MaterialAndShader_CpuFast {
@@ -299,8 +302,22 @@ class BuildSceneData_CpuFast {
 public:
 	static BuildSceneData_CpuFast* inst;
 
+	BuildSceneData_CpuFast() {
+		gpu.cmd_list = IGraphicsDevice::inst->create_buffer({});
+		gpu.cullobj_buf = IGraphicsDevice::inst->create_buffer({});
+		gpu.gbuffer_batches = IGraphicsDevice::inst->create_buffer({});
+		gpu.gbuffer_count = IGraphicsDevice::inst->create_buffer({});
+		gpu.gbuffer_draw_to_batch = IGraphicsDevice::inst->create_buffer({});
+		gpu.glinst_to_inst = IGraphicsDevice::inst->create_buffer({});
+		gpu.mod_data_gpu = IGraphicsDevice::inst->create_buffer({});
+		gpu.shadows_count = IGraphicsDevice::inst->create_buffer({});
+		gpu.shadow_batches = IGraphicsDevice::inst->create_buffer({});
+		gpu.shadow_draw_to_batch = IGraphicsDevice::inst->create_buffer({});
+
+	}
+
 	// now
-	void build_scene_data(bool* vis_list, int8_t* lod_list);
+	void build_scene_data(uint8_t* lod_list);
 
 	int16_t get_index(Model* m, MaterialInstance* mat) {
 		if (!m)
@@ -309,7 +326,7 @@ public:
 		search.m = m;
 		if (mat && mat->impl) {
 			search.parent = mat->impl->get_master_impl();
-			search.texture_hash = mat->impl->texture_id_hash;
+			search.texture_hash = mat->impl->get_texture_id_hash();
 			search.has_textures = mat;
 		}
 		auto find = mod_data.find(search);
@@ -331,9 +348,27 @@ public:
 		return mod_data_ptrs[fast_index]->instance_alloced > 0;
 	}
 
+	GpuCullInput get_cull_input() const {
+
+		GpuCullInput input;
+		input.batches_buf = gpu.gbuffer_batches;
+		input.cmd_buf = gpu.cmd_list;
+		input.count_buf = gpu.gbuffer_count;
+		input.draw_to_batch = gpu.gbuffer_draw_to_batch;
+		input.glinst_to_inst = gpu.glinst_to_inst;
+		input.mod_data = gpu.mod_data_gpu;
+		input.num_batches = gbuffer_pass.batches.size();
+		input.num_cmds = out_cmds.size();
+		input.obj_data_buf = gpu.cullobj_buf;
+		input.num_objs = gpu.num_cullobjs;
+		return input;
+	}
+	void do_gbuffer_draw();
+
 private:
 	void rebuild_mod_data();
 	void rebuild_batches();
+	void upload_gpu_cmds(int sum_count);
 
 	// sorted specially for shadows
 	Render_Pass_CpuFast shadow_pass;
@@ -348,6 +383,21 @@ private:
 	std::unordered_map<ModelAndMatTextureSet, ModelAndMatTData, ModelAndMatTextureSetHasher> mod_data;
 	std::vector<ModelAndMatTData*> mod_data_ptrs;
 
+	struct {
+		IGraphicsBuffer* mod_data_gpu = nullptr;
+		IGraphicsBuffer* shadow_batches = nullptr;
+		IGraphicsBuffer* gbuffer_batches = nullptr;
+		IGraphicsBuffer* gbuffer_count = nullptr;
+		IGraphicsBuffer* shadows_count = nullptr;
+		IGraphicsBuffer* gbuffer_draw_to_batch = nullptr;
+		IGraphicsBuffer* shadow_draw_to_batch = nullptr;
+		IGraphicsBuffer* glinst_to_inst = nullptr;
+		IGraphicsBuffer* cmd_list = nullptr;
+
+		IGraphicsBuffer* cullobj_buf = nullptr;
+		int num_cullobjs = 0;
+	}gpu;
+
 	// sorted draw cmds, indexed into by M&MTS
 	std::vector<gpu::DrawElementsIndirectCommand> out_cmds;
 	std::vector<int16_t> cmd_to_mod_data_ptr;
@@ -359,11 +409,7 @@ private:
 	};
 	std::vector<CmdExtraData> cmd_to_extra;
 
-	std::vector<MaterialAndShader_CpuFast> batch_to_material;
 
-	// instance, int16|int16. object and model index
-	// updated per frame
-	std::vector<int> mmts_instances;
 };
 BuildSceneData_CpuFast* BuildSceneData_CpuFast::inst = nullptr;
 inline int next_pow2(uint32_t x) {
@@ -436,6 +482,112 @@ void BuildSceneData_CpuFast::rebuild_batches()
 	make_batches(shadow_pass.batches, true);
 
 }
+void BuildSceneData_CpuFast::upload_gpu_cmds(int sum_count)
+{
+	const int command_bytes_size = out_cmds.size() * sizeof(gpu::DrawElementsIndirectCommand);
+	gpu.cmd_list->upload(nullptr, command_bytes_size * 2);
+	gpu.cmd_list->sub_upload(out_cmds.data(), command_bytes_size, 0);
+
+	gpu.glinst_to_inst->upload(nullptr, sum_count * sizeof(int) * 2);	// *2 because materials stored with instances
+}
+void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth)
+{
+	auto flags = (is_depth) ? MSF_DEPTH_ONLY : 0;
+	flags |= MSF_MATERIAL_IN_INSTANCE;
+
+	if (r_debug_mode.get_integer() != 0)
+		flags |= MSF_DEBUG;
+	flags |= MSF_EDITOR_ID;
+
+	const program_handle program = matman.get_mat_shader(
+		nullptr, mat,
+		flags
+	);
+	const BlendState blend = mat->get_master_material()->blend;
+	const bool show_backface = false;
+
+	IGraphicsVertexInput* vao_ptr = g_modelMgr.get_vao_ptr(VaoType::Lightmapped);
+
+	RenderPipelineState state;
+	state.program = program;
+	state.vao = vao_ptr->get_internal_handle();
+	state.backface_culling = !show_backface;
+	state.blend = blend;
+	state.depth_testing = true;
+	//state.depth_writes = depth_write_enabled;
+	state.depth_writes = !mat->get_master_material()->is_translucent();
+	//state.depth_less_than = depth_less_than_op;
+	draw.get_device().set_pipeline(state);
+
+
+	auto& textures = mat->impl->get_textures();
+
+	for (int i = 0; i < textures.size(); i++) {
+		Texture* t = textures[i];
+		uint32_t id = 0;// t->gl_id;
+		if (t->gpu_ptr) {
+			id = t->gpu_ptr->get_internal_handle();
+		}
+		draw.bind_texture(i, id);
+	}
+}
+
+void BuildSceneData_CpuFast::do_gbuffer_draw()
+{
+
+	if (gpu.num_cullobjs <= 0)
+		return;
+
+	auto do_draw_internal = [&](std::vector<Multidraw_Batch>& batches, const bool is_depth) {
+		IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
+		auto& scene = draw.scene;
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_instance_buffer->get_internal_handle());
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, material_buffer->get_internal_handle());
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, gpu.glinst_to_inst->get_internal_handle());
+
+		const int size = out_cmds.size() * sizeof(int);
+		//glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 6, matindirect->get_internal_handle(), size, size);
+		
+		const int command_size = out_cmds.size() * sizeof(gpu::DrawElementsIndirectCommand);
+		glBindBuffer(GL_PARAMETER_BUFFER, gpu.gbuffer_count->get_internal_handle());
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, gpu.cmd_list->get_internal_handle());
+
+		const int offset_buffer_start = command_size;
+		int offset = 0;
+		const int DEIcmdSz = sizeof(gpu::DrawElementsIndirectCommand);
+		for (int i = 0; i < batches.size(); i++) {
+			const int count = batches.at(i).count;
+			const int mat_ofs = batches.at(i).first;
+			//const int count = 1;// list.command_count[i];
+			const int incr = count;// pass.batches[i].count;
+			if (count != 0) {
+
+				setup_batch2(cmd_to_extra.at(mat_ofs).material, offset, is_depth);
+
+				const GLenum index_type = MODEL_INDEX_TYPE_GL;
+
+				void* indirect_ptr = nullptr;
+
+				indirect_ptr = (void*)(int64_t(offset_buffer_start + offset * DEIcmdSz));
+
+				glMultiDrawElementsIndirectCount(
+					GL_TRIANGLES,
+					index_type,
+					indirect_ptr,
+					i * sizeof(uint32),
+					count,
+					sizeof(gpu::DrawElementsIndirectCommand)
+				);
+
+			}
+			offset += incr;
+		}
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+	};
+
+	do_draw_internal(gbuffer_pass.batches, false);
+}
 void BuildSceneData_CpuFast::rebuild_mod_data()
 {
 	ZoneScopedN("BuildSceneData_CpuFast::rebuild_mod_data");
@@ -446,7 +598,6 @@ void BuildSceneData_CpuFast::rebuild_mod_data()
 	cmd_to_mod_data_ptr.clear();
 	cmd_to_extra.clear();
 
-	batch_to_material.clear();
 	gbuffer_pass.batches.clear();
 	shadow_pass.batches.clear();
 
@@ -462,7 +613,7 @@ void BuildSceneData_CpuFast::rebuild_mod_data()
 		k.backface = parent->backface;
 		k.blending = (uint64_t)parent->blend;
 		k.mesh = this_model->get_uid();
-		k.texture = this_mat->impl->texture_id_hash;
+		k.texture = this_mat->impl->get_texture_id_hash();
 		k.shader = matman.get_mat_shader(
 			nullptr, this_mat,
 			0
@@ -470,8 +621,25 @@ void BuildSceneData_CpuFast::rebuild_mod_data()
 		return k;
 	};
 
+	arena_vec<int> mod_data_gpu_buf(scope);
+	mod_data_gpu_buf.reserve(10'000);
+
 	for (auto& [key, md] : mod_data) {
 		auto m = key.m;
+
+		const int bufstart = mod_data_gpu_buf.size();
+		md.gpu_buf_ofs = bufstart;
+
+		mod_data_gpu_buf.push_back(m->get_num_lods());
+		for (int lodi = 0; lodi < m->get_num_lods(); lodi++) {
+			auto& lod = m->get_lod(lodi);
+			mod_data_gpu_buf.push_back(lod.part_ofs);
+			mod_data_gpu_buf.push_back(lod.part_count);
+			const float f = lod.end_percentage;
+			mod_data_gpu_buf.push_back(*((int*)&f));
+		}
+
+
 		const int num_parts = key.m->get_num_parts();
 		md.part_to_draw_cmd.clear();
 		for (int parti = 0; parti < num_parts; parti++) {
@@ -501,6 +669,11 @@ void BuildSceneData_CpuFast::rebuild_mod_data()
 
 			md.part_to_draw_cmd.push_back(cmd_index);
 			md.part_to_draw_cmd.push_back(data);
+
+			mod_data_gpu_buf.push_back(cmd_index);
+			mod_data_gpu_buf.push_back(data);
+
+
 		}
 	}
 	// sort the commands around
@@ -547,14 +720,53 @@ void BuildSceneData_CpuFast::rebuild_mod_data()
 	for (auto& [key, md] : mod_data) {
 		const int num_parts = md.part_to_draw_cmd.size() / 2;
 		for (int parti = 0; parti < num_parts; parti++) {
-			const int index = parti * 2;
-			const int cmd_ofs_prev = md.part_to_draw_cmd.at(index);
-			const int remapped = inv_sorted.at(cmd_ofs_prev);
-			md.part_to_draw_cmd.at(index) = remapped;
+			
+			{
+				const int index = parti * 2;
+				const int cmd_ofs_prev = md.part_to_draw_cmd.at(index);
+				const int remapped = inv_sorted.at(cmd_ofs_prev);
+				md.part_to_draw_cmd.at(index) = remapped;
+			}
+			{
+				const int index = md.gpu_buf_ofs + 1 + 3 * md.m->get_num_lods() + parti*2;
+				const int cmd_ofs_prev = mod_data_gpu_buf.at(index);
+				const int remapped = inv_sorted.at(cmd_ofs_prev);
+				mod_data_gpu_buf.at(index) = remapped;
+			}
+
 		}
 	}
 
 	rebuild_batches();
+
+	// ##############
+	// # GPU UPLOAD #
+	// ##############
+	gpu.mod_data_gpu->upload(mod_data_gpu_buf.data(), mod_data_gpu_buf.size() * sizeof(int));
+	gpu.gbuffer_batches->upload(gbuffer_pass.batches.data(), gbuffer_pass.batches.size() * sizeof(Multidraw_Batch));
+	gpu.shadow_batches->upload(shadow_pass.batches.data(), shadow_pass.batches.size() * sizeof(Multidraw_Batch));
+	gpu.gbuffer_count->upload(nullptr, sizeof(int)* gbuffer_pass.batches.size());
+	gpu.shadows_count->upload(nullptr, sizeof(int)* shadow_pass.batches.size());
+
+	// cmd upload is done with instances
+
+	auto& gb = gbuffer_pass.batches;
+	auto& sb = shadow_pass.batches;
+	std::span<int> draw_to_batch = draw.mem_arena.alloc_bottom_span<int>(out_cmds.size());
+	auto set_and_upload = [&](IGraphicsBuffer* buf, const vector<Multidraw_Batch>& mbv) {
+		for (int i = 0; i < mbv.size(); i++) {
+			auto& b = mbv.at(i);
+			for (int c = 0; c < b.count; c++) {
+				ASSERT(b.first + c < draw_to_batch.size());
+				draw_to_batch[b.first + c] = i;
+			}
+		}
+		buf->upload(draw_to_batch.data(),
+			draw_to_batch.size_bytes());
+	};
+	set_and_upload(gpu.gbuffer_draw_to_batch, gb);
+	set_and_upload(gpu.shadow_draw_to_batch, sb);
+
 }
 
 // wrinkles
@@ -564,9 +776,22 @@ void BuildSceneData_CpuFast::rebuild_mod_data()
 // 4. integrate occlusion culling.
 // 5. unloading
 
-void BuildSceneData_CpuFast::build_scene_data(bool* vis_list, int8_t* lod_list)
+
+inline void split_input_lod_arr(uint8_t in, bool& is_vis, int8_t& lod)
+{
+	is_vis = bool(in & 1);
+	lod = int8_t(in >> 1);
+}
+inline void pack_input_lod_arr(uint8_t& out, bool is_vis, int8_t lod)
+{
+	out = uint8_t(is_vis) | uint8_t(lod << 1);
+}
+
+
+void BuildSceneData_CpuFast::build_scene_data(uint8_t* lod_list)
 {
 	ZoneScopedN("BuildSceneData_CpuFast");
+	CPUFUNCTIONSTART;
 
 	// step1:
 	// must check if theres new [model,mat_override] in the renderable set
@@ -597,7 +822,7 @@ void BuildSceneData_CpuFast::build_scene_data(bool* vis_list, int8_t* lod_list)
 	}
 
 	// step 1.2
-	const int thresh = 5;	// if more than 5
+	const int thresh = 2;	// if more than 2
 	bool wants_rebuild_counts = false;
 	bool needs_new_model = false;
 	for (int c = 0; c < mmt_counts.size(); c++) {
@@ -629,7 +854,7 @@ void BuildSceneData_CpuFast::build_scene_data(bool* vis_list, int8_t* lod_list)
 		}
 	}
 
-	needs_new_model = true;
+	//needs_new_model = true;
 
 	// step 1.3
 	if (needs_new_model) {
@@ -655,6 +880,8 @@ void BuildSceneData_CpuFast::build_scene_data(bool* vis_list, int8_t* lod_list)
 		}
 
 		gbuffer_list.glinstances.resize(count_sum);
+
+		upload_gpu_cmds(count_sum);
 	}
 
 
@@ -678,6 +905,10 @@ void BuildSceneData_CpuFast::build_scene_data(bool* vis_list, int8_t* lod_list)
 		if (is_skybox_view)
 			return;	// none pass
 
+
+		arena_vec<CullObject> cull_obj_gpu_buf(scope);
+		cull_obj_gpu_buf.reserve(proxies.size());
+
 		// step 2.1
 		int index = -1;
 		for (auto& [_, obj] : proxies) {
@@ -688,40 +919,53 @@ void BuildSceneData_CpuFast::build_scene_data(bool* vis_list, int8_t* lod_list)
 
 			if (wants_skip)
 				continue;
-
 			ModelAndMatTData* ptr = mod_data_ptrs.at(fast_idx);
 			if (ptr->instance_alloced > 0) {
-				if (vis_list[index] && lod_list[index] > 0) {
-					const int8_t want_lod = lod_list[index];
-					auto& lod = obj.proxy.model->get_lod(want_lod);
-					for (int part = 0; part < lod.part_count; part++) {
-						const int part_i = lod.part_ofs + part;
-						const int drawcmd_i = ptr->part_to_draw_cmd.at(part_i * 2);
-						const int prim = out_cmds.at(drawcmd_i).primCount;
-						const int base = out_cmds.at(drawcmd_i).baseInstance;
-						out_cmds.at(drawcmd_i).primCount += 1;
-						gbuffer_list.glinstances.at(base + prim) = index;
-					}
-				}
+				CullObject co;
+				co.bounds_sphere = obj.bounding_sphere_and_radius;
+				const int mat_ofs = (obj.proxy.mat_override && obj.proxy.mat_override->impl) ? (obj.proxy.mat_override->impl->gpu_buffer_offset) : -1;
+				co.model_ofs = glm::ivec4(ptr->gpu_buf_ofs, index, mat_ofs, 0);
+				if (obj.proxy.shadow_caster)
+					co.model_ofs.w |= 1;
+
+				cull_obj_gpu_buf.push_back(co);
+
+
+				//if (vis_list[index] && lod_list[index] > 0) {
+				//	const int8_t want_lod = lod_list[index];
+				//	auto& lod = obj.proxy.model->get_lod(want_lod);
+				//	for (int part = 0; part < lod.part_count; part++) {
+				//		const int part_i = lod.part_ofs + part;
+				//		const int drawcmd_i = ptr->part_to_draw_cmd.at(part_i * 2);
+				//		const int prim = out_cmds.at(drawcmd_i).primCount;
+				//		const int base = out_cmds.at(drawcmd_i).baseInstance;
+				//		out_cmds.at(drawcmd_i).primCount += 1;
+				//		gbuffer_list.glinstances.at(base + prim) = index;
+				//	}
+				//}
 
 			}
 		}
+		gpu.cullobj_buf->upload(cull_obj_gpu_buf.data(), cull_obj_gpu_buf.size() * sizeof(CullObject));
+		gpu.num_cullobjs = cull_obj_gpu_buf.size();
 
 		// step 2.2
-		gbuffer_list.out_cmds.resize(out_cmds.size());
-		for (auto& md : gbuffer_pass.batches) {
-			int start = 0;
-			const int count = md.count;
-			for (int i = 0; i < count; i++) {
-				auto& cmd = out_cmds.at(md.first + i);
-				if (cmd.primCount > 0) {
-					gbuffer_list.out_cmds.at(md.first + start) = cmd;
-					start += 1;
-				}
-			}
-		}
+		//gbuffer_list.out_cmds.resize(out_cmds.size());
+		//for (auto& md : gbuffer_pass.batches) {
+		//	int start = 0;
+		//	const int count = md.count;
+		//	for (int i = 0; i < count; i++) {
+		//		auto& cmd = out_cmds.at(md.first + i);
+		//		if (cmd.primCount > 0) {
+		//			gbuffer_list.out_cmds.at(md.first + start) = cmd;
+		//			start += 1;
+		//		}
+		//	}
+		//}
 
 	}
+
+	GpuCullingTest::inst->build_data(get_cull_input());
 
 	// fully gpu?
 	//  cmds and batches always uploaded
@@ -1803,6 +2047,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	
 	delete_and_create_texture(tex.output_composite, gtf::rgb8);
 	delete_and_create_texture(tex.output_composite_2, gtf::rgb8);
+	tex.actual_output_composite = tex.output_composite;
 
 	cur_w = s_w;
 	cur_h = s_h;
@@ -2036,7 +2281,7 @@ int setup_execute_render_lists(Render_Lists& list,Render_Pass& pass) {
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, material_buffer->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, list.glinstance_to_instance);
 	int offset_command_bytes = 0;
-	if (pass.type == pass_type::OPAQUE) {
+	if (0) {
 		const int size = pass.mesh_batches.size()*sizeof(int);
 		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material, size,size);
 		const int command_size = list.commands.size()*sizeof(gpu::DrawElementsIndirectCommand);
@@ -2097,7 +2342,7 @@ void Renderer::execute_render_lists(
 			else
 				indirect_ptr = (void*)(int64_t(offset_buffer_start+offset * DEIcmdSz));
 
-			if (pass.type == pass_type::OPAQUE) {
+			if (0) {
 				glMultiDrawElementsIndirectCount(
 					GL_TRIANGLES,
 					index_type,
@@ -2195,7 +2440,7 @@ void Renderer::render_level_to_target(const Render_Level_Params& params)
 		bind_texture(18, EnviornmentMapHelper::get().integrator.get_texture());
 	}
 
-
+	if(params.rl&&params.rp)
 	{
 		// shadows map dont have reversed Z, just standard 0,1 depth
 		//*if (params.pass != Render_Level_Params::SHADOWMAP)
@@ -2322,7 +2567,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 
 	key.blending = (uint64_t)mm->blend;
 	key.backface = mm->backface;
-	key.texture = material->impl->texture_id_hash;
+	key.texture = material->impl->get_texture_id_hash();
 
 	VaoType theVaoType = VaoType::Animated;
 	if (proxy.lightmapped)
@@ -2584,6 +2829,7 @@ static void build_standard_cpu_culling(
 	Free_List<ROP_Internal>& proxy_list
 )
 {
+#if 0
 	ZoneScopedN("build_standard_cpu_culling");
 	GPUSCOPESTART(build_standard_cpu_culling);
 
@@ -2665,6 +2911,7 @@ static void build_standard_cpu_culling(
 			list.batches_buf
 		);
 	}
+#endif
 }
 
 
@@ -2922,11 +3169,27 @@ void build_a_frustum_for_perspective(Frustum& f, const View_Setup& view, glm::ve
 	f.right_plane = glm::vec4(normals[0], -glm::dot(normals[0], view.origin));
 	f.left_plane = glm::vec4(normals[2], -glm::dot(normals[2], view.origin));
 }
+ConfigVar r_force_lod("r.force_lod", "-1", CVAR_INTEGER | CVAR_UNBOUNDED, "");
 
-static void cull_objects(Frustum& frustum, bool* visible_array, int visible_array_size,const Free_List<ROP_Internal>& objs_free_list)
+template<bool with_lod>
+static void cull_objects(Frustum& frustum, int visible_array_size,uint8_t* out_array, int16_t* camera_dist, const Free_List<ROP_Internal>& objs_free_list)
 {
 	assert(visible_array_size == objs_free_list.objects.size());
 	auto& objs = objs_free_list.objects;
+
+
+	const int force_lod = r_force_lod.get_integer();
+
+	const float inv_two_times_tanfov = 1.0 / (tan(draw.get_current_frame_vs().fov * 0.5));
+	const float inv_two_times_tanfov_2 = inv_two_times_tanfov * inv_two_times_tanfov;
+	auto& vs = draw.current_frame_view;
+	auto& proxy_list = draw.scene.proxy_list;
+
+	// adjust these, maybe exponential depth?
+	const float max_cam_dist = 100.0;
+	const float inv_max_dist_mult_2 = 1.0 / (max_cam_dist * max_cam_dist);
+	const float max_output = float(1 << 12);
+
 	for (int i = 0; i < objs.size(); i++)
 	{
 		const auto& obj = objs[i].type_;
@@ -2939,14 +3202,42 @@ static void cull_objects(Frustum& frustum, bool* visible_array, int visible_arra
 		res += (glm::dot(glm::vec3(frustum.left_plane), center) + frustum.left_plane.w >= -radius) ? 1 : 0;
 		res += (glm::dot(glm::vec3(frustum.right_plane), center) + frustum.right_plane.w >= -radius) ? 1 : 0;
 
-		visible_array[i] = res == 4;
+		const bool is_visible = res == 4;
+
+		int8_t want_lod = 0;
+		if (with_lod) {
+			glm::vec3 to_camera = center - vs.origin;
+			const float dist_to_camera_2 = glm::dot(to_camera, to_camera);
+			const float percentage_2 = get_screen_percentage_2(obj.bounding_sphere_and_radius, inv_two_times_tanfov_2, dist_to_camera_2);
+			if (!obj.proxy.model)
+				want_lod = 0;
+			else if (force_lod != -1) {
+				int lod_to_pick = glm::clamp(force_lod, 0, obj.proxy.model->get_num_lods() - 1);
+				want_lod = lod_to_pick;
+			}
+			else {
+				want_lod = (int8_t)get_lod_to_render(obj.proxy.model, percentage_2);
+			}
+
+			float out_dist_cam = dist_to_camera_2 * inv_max_dist_mult_2;
+			out_dist_cam = std::clamp(out_dist_cam, 0.f, 1.f);
+			int16_t as_int16 = max_output * out_dist_cam;
+			camera_dist[i] = as_int16;
+
+		}
+		else {
+
+		}
+		pack_input_lod_arr(out_array[i], is_visible, want_lod);
 	}
 }
 struct CullObjectsUser
 {
-	bool* visarray = nullptr;
 	int count = 0;
 	int index = 0;	// for shadows
+
+	uint8_t* lodarr = nullptr;	// lod and vis array
+	int16_t* camdistarr = nullptr;
 };
 
 void cull_objects_job(uintptr_t user)
@@ -2956,7 +3247,7 @@ void cull_objects_job(uintptr_t user)
 	Frustum frustum;
 	build_a_frustum_for_perspective(frustum, draw.current_frame_view);
 	auto& objs = draw.scene.proxy_list;
-	cull_objects(frustum, d->visarray, d->count, objs);
+	cull_objects<true>(frustum,  d->count, d->lodarr, d->camdistarr,  objs);
 }
 void cull_shadow_objects_job(uintptr_t user)
 {
@@ -2965,7 +3256,7 @@ void cull_shadow_objects_job(uintptr_t user)
 	Frustum f;
 	build_frustum_for_cascade(f, d->index);
 	auto& objs = draw.scene.proxy_list;
-	cull_objects(f, d->visarray, d->count, objs);
+	cull_objects<false>(f, d->count, d->lodarr, nullptr, objs);
 }
 
 void cull_spot_shadow_objects_job(handle<Render_Light> lightId, bool* visArray, int visArraySize, bool& any_dynamic_found)
@@ -3017,7 +3308,6 @@ void cull_spot_shadow_objects_job(handle<Render_Light> lightId, bool* visArray, 
 }
 
 
-ConfigVar r_force_lod("r.force_lod", "-1", CVAR_INTEGER | CVAR_UNBOUNDED, "");
 void calc_lod_job(int8_t* lodarray, int16_t* camera_dist)
 {
 	ZoneScopedN("LodToRenderCalc");
@@ -3139,7 +3429,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 	GPUSCOPESTART(build_scene_data_scope);
 	ZoneScopedN("build_scene_data");
 
-	GpuCullingTest::inst->build_data();
 
 	//ZoneScoped;
 	if (r_debug_skip_build_scene_data.get_bool())
@@ -3163,38 +3452,46 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		reset_passes();
 
 	const int visible_count = proxy_list.objects.size();
-	bool* cascade_vis[4] = { nullptr,nullptr,nullptr,nullptr };
+
+	uint8_t* cascade_vis[4] = { nullptr,nullptr,nullptr,nullptr };
 	for(int i=0;i<4;i++)
-		cascade_vis[i] = memArena.alloc_bottom_type<bool>(visible_count);
+		cascade_vis[i] = memArena.alloc_bottom_type<uint8_t>(visible_count);
 	
-	bool* visible_array = memArena.alloc_bottom_type<bool>(visible_count);
-	int8_t* lod_to_render_array = memArena.alloc_bottom_type<int8_t>(visible_count);
+	uint8_t* lod_to_render_array = memArena.alloc_bottom_type<uint8_t>(visible_count);
 	int16_t* camera_depth_array = memArena.alloc_bottom_type<int16_t>(visible_count);
 
 	{
-		//CPUSCOPESTART(cpu_object_cull);
+		CPUSCOPESTART(cpu_object_cull);
 		ZoneScopedN("lod_calcs");
+
+		JobCounter* counter{};
+
 
 		const int NUM_FRUSTUM_JOBS = 5;
 		JobDecl decls[NUM_FRUSTUM_JOBS];
 		CullObjectsUser mainview;
 		CullObjectsUser cascades[4];
 		mainview.count = visible_count;
-		mainview.visarray = visible_array;
+		mainview.lodarr = lod_to_render_array;
+		mainview.camdistarr = camera_depth_array;
 		decls[0].func = cull_objects_job;
 		decls[0].funcarg = uintptr_t(&mainview);
 		for (int i = 0; i < 4; i++) {
 			cascades[i].index = i;
 			cascades[i].count = visible_count;
-			cascades[i].visarray = cascade_vis[i];
+			cascades[i].lodarr = cascade_vis[i];
 			decls[i + 1].func = cull_shadow_objects_job;
 			decls[i + 1].funcarg = uintptr_t(&cascades[i]);
 		}
 
-		for (int i = 0; i < NUM_FRUSTUM_JOBS; i++)
-			decls[i].func(decls[i].funcarg);
+		//for (int i = 0; i < NUM_FRUSTUM_JOBS; i++)
+		//	decls[i].func(decls[i].funcarg);
 
-		calc_lod_job(lod_to_render_array, camera_depth_array);
+		JobSystem::inst->add_jobs(decls, NUM_FRUSTUM_JOBS, counter);
+
+		//calc_lod_job(lod_to_render_array, camera_depth_array);
+
+		JobSystem::inst->wait_and_free_counter(counter);
 	}
 	const size_t num_ren_objs = proxy_list.objects.size();
 	uint8* gpu_objects = memArena.alloc_bottom_type<uint8>(num_ren_objs*64);
@@ -3202,9 +3499,10 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 	if(add_to_passes)
 		set_gpu_objects_data_job(uintptr_t(gpu_objects));
 
-	BuildSceneData_CpuFast::inst->build_scene_data(visible_array, lod_to_render_array);
+	BuildSceneData_CpuFast::inst->build_scene_data(lod_to_render_array);
 
 	auto add_objects_to_passes = [&]() {
+		CPUSCOPESTART(add_objects_to_passes);
 		ZoneScopedN("add_objects_to_passes");
 		//ZoneScopedN("LoopObjects");
 		
@@ -3254,13 +3552,17 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 				continue;
 
 
-			const bool is_visible = visible_array[i];
+			bool is_visible = false;
+			int8_t LOD_index = 0;
+			split_input_lod_arr(lod_to_render_array[i], is_visible, LOD_index);
+
+		//	const bool is_visible = visible_array[i];
 			const bool casts_shadow = proxy.shadow_caster;//&& percentage_2 >= 0.001;
 
 			if (!is_visible && !casts_shadow)
 				continue;
 
-			const int LOD_index = (int)lod_to_render_array[i];
+			//const int LOD_index = (int)lod_to_render_array[i];
 			if (LOD_index < 0)
 				continue;	// not visible
 
@@ -3353,7 +3655,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			JobDecl shadowlistdecl[4];
 			MakeShadowRenderListParam params[4];
 			for (int i = 0; i < 4; i++) {
-				params[i].visarray = cascade_vis[i];
+				params[i].visarray = (bool*)cascade_vis[i];
 				params[i].index = i;
 				shadowlistdecl[i].func = make_shadow_render_list_job;
 				shadowlistdecl[i].funcarg = uintptr_t(&params[i]);
@@ -3385,7 +3687,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		};
 		update_spotlight_shadows();
 
-		build_standard_cpu_culling(gbuffer_rlist, gbuffer_pass, proxy_list);
+		build_standard_cpu(gbuffer_rlist, gbuffer_pass, proxy_list);
 
 		build_standard_cpu(transparent_rlist, transparent_pass, proxy_list);
 		build_standard_cpu(editor_sel_rlist, editor_sel_pass, proxy_list);
@@ -4061,7 +4363,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 		refresh_render_targets_next_frame = true;
 	}
 
-	matman.pre_render_update();
+	//matman.pre_render_update();
 	spotShadows->update();
 	check_cubemaps_dirty();
 
@@ -4489,9 +4791,12 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		Render_Level_Params cmdparams(
 			view_to_use,
 			&scene.gbuffer_rlist,
-			&scene.gbuffer_pass,
+		&scene.gbuffer_pass,
 			Render_Level_Params::OPAQUE
 		);
+		if (!gbuffer_2nd) {
+			cmdparams.rl = nullptr;
+		}
 
 		cmdparams.upload_constants = true;
 		cmdparams.provied_constant_buffer = ubo.current_frame;
@@ -4499,9 +4804,10 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		cmdparams.wireframe_secondpass = wireframe_secondpass;
 		cmdparams.is_wireframe_pass = is_wireframe;
 
+	
 		render_level_to_target(cmdparams);
 
-
+		BuildSceneData_CpuFast::inst->do_gbuffer_draw();
 		//GpuCullingTest::inst->dodraw();
 
 	};
@@ -4519,20 +4825,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 			GPUSCOPESTART(gbuffer_pass_scope1);
 			gbuffer_pass(false, false, false);
 		}
-		GpuCullingTest::inst->build_data_2();
-		GpuCullingTest::inst->zero_instances_in_this(scene.gbuffer_rlist.gpu_command_list, scene.gbuffer_rlist.commands.size());
-		GpuCullingTest::inst->copy_cpu(scene.gbuffer_rlist);
-
-		auto& list = scene.gbuffer_rlist;
-		GpuCullingTest::inst->compact_draws(
-			scene.gbuffer_pass.batches.size(),
-			list.commands.size(),
-			list.gpu_command_list,
-			list.gldrawid_to_submesh_material,
-			list.count_buffer,
-			list.batches_buf
-		);
-
+		GpuCullingTest::inst->build_data_2(BuildSceneData_CpuFast::inst->get_cull_input());
+	
 		{
 			GPUSCOPESTART(gbuffer_pass_scope2);
 			gbuffer_pass(false, false, true);	// second gbuffer pass

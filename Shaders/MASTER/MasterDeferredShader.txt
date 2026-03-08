@@ -58,6 +58,7 @@ layout (binding = 3, std140) readonly buffer Object_Skin_Matricies {
 layout (binding = 5, std430) readonly buffer Indirect_Instance_Buf {
 	uint indirect_instance[];
 };
+
 layout(binding = 6, std430) readonly buffer Indirect_Mat_Buf {
 	uint indirect_materials[];
 };
@@ -145,9 +146,15 @@ vec4 get_tangent_handedness()
 
 void main()
 {
+#ifdef MAT_WITH_INST
+	uint obj_index = indirect_instance[(gl_BaseInstance + gl_InstanceID)*2]; 
+	FS_IN_Objid = obj_index;
+	FS_IN_Matid = indirect_instance[(gl_BaseInstance + gl_InstanceID)*2+1];
+#else
 	FS_IN_Matid = indirect_materials[indirect_material_offset + gl_DrawID];
 	uint obj_index = indirect_instance[gl_BaseInstance + gl_InstanceID]; 
 	FS_IN_Objid = obj_index;
+#endif
 
 	ObjModelMatrix = load_object_transform(obj_index);
 	

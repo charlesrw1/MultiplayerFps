@@ -105,7 +105,7 @@ struct InstanceData
 	bool is_vector_type = false;	/* true = is scalar */
 	int index = 0;
 };
-
+#include "Animation/Editor/Optional.h"
 // compilied material, material instances can be based off it to allow for variation but minimize draw call changes
 class MasterMaterialImpl
 {
@@ -207,7 +207,10 @@ public:
 
 	MaterialInstance* self = nullptr;
 	bool is_dynamic_material = false;
-	int texture_id_hash = 0;
+
+	int get_texture_id_hash();
+
+	opt<int> texture_id_hash;
 	std::shared_ptr<MaterialInstance> masterMaterial;
 	std::unique_ptr<MasterMaterialImpl> masterImpl;	// if this material instance is a default instance of a master material, this is filled
 	std::vector<Texture*> texture_bindings;
@@ -234,7 +237,8 @@ enum master_shader_flags {
 	MSF_DEBUG = 16,
 	MSF_LIGHTMAPPED = 32,
 	MSF_IS_FORCED_FORWARD = 64,
-	MSF_NO_TAA = 128
+	MSF_NO_TAA = 128,
+	MSF_MATERIAL_IN_INSTANCE = 256,
 };
 
 struct shader_key
@@ -247,8 +251,8 @@ struct shader_key
 		return (int(msf_flags) & f);
 	}
 
-	uint32_t material_id : 24;
-	uint32_t msf_flags : 8;
+	uint32_t material_id : 23;
+	uint32_t msf_flags : 9;
 
 	uint32_t as_uint32() const {
 		return *((uint32_t*)this);
@@ -338,6 +342,9 @@ public:
 	int get_next_master_id() {return ++current_master_id;}
 	MaterialInstance* get_default_editor_sel_PP() {return pp_editor_select_mat.get();}
 	AllMaterialTable* get_material_table() { return mat_offset_table.get(); }
+	int compute_tex_hash_for(MaterialImpl* m) {
+		return binding_hasher.get_texture_hash_id_for_material(m);
+	}
 private:
 	void on_reload_shader_invoke();
 	program_handle compile_mat_shader(const MaterialInstance* mat, shader_key key);
