@@ -14,7 +14,6 @@ layout (binding = 1, std430) readonly buffer FogUniform_Buffer {
 }; 
 
 #include "commonUtil.txt"
-
 float compute_exponential_height_fog(
     vec3 worldPos,
     vec3 cameraPos,
@@ -23,28 +22,35 @@ float compute_exponential_height_fog(
     float fogHeight,
     float heightFalloff)
 {
-    float startHeight = cameraPos.y - fogHeight;
-    float endHeight = worldPos.y - fogHeight;
+    float H = max(heightFalloff, 1e-5);
 
-    float H = heightFalloff;
+    vec3 ray = worldPos - cameraPos;
+    vec3 rayDir = ray / rayLength;
+
+    float startHeight = cameraPos.y - fogHeight;
 
     float startExp = exp(-H * startHeight);
-    float endExp   = exp(-H * endHeight);
-
-    float deltaHeight = endHeight - startHeight;
 
     float fogAmount;
-    if (abs(deltaHeight) > 1e-5) {
-        fogAmount = (startExp - endExp) / (H * deltaHeight);
-    } else {
-        fogAmount = startExp / H;
+
+    // Handle shallow rays
+    if (abs(rayDir.y) > 1e-4)
+    {
+        float endHeight = startHeight + rayDir.y * rayLength;
+        float endExp = exp(-H * endHeight);
+
+        fogAmount = (startExp - endExp) / (H * rayDir.y);
+    }
+    else
+    {
+        // Horizontal-ray limit
+        fogAmount = startExp * rayLength;
     }
 
-    fogAmount *= fogDensity * rayLength;
+    fogAmount *= fogDensity;
 
     return clamp(fogAmount, 0.0, 1.0);
 }
-
 void main()
 {
 	vec2 uv = vec2(gl_FragCoord.xy) / vec2(g.viewport_size.xy);

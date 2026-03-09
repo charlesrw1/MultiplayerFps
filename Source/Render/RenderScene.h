@@ -144,6 +144,7 @@ struct RL_Internal{
 	int shadow_array_handle = -1;
 	bool updated_this_frame = false;
 	glm::mat4 lightViewProj = glm::mat4(1.f);
+	glm::vec4 cookie_atlas{};
 };
 struct RDecal_Internal{
 	Render_Decal decal;

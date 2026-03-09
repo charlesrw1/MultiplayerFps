@@ -87,6 +87,7 @@ void PointLightComponent::on_sync_render_data()
 	Render_Light light;
 	light.color = get_color_light_value(color, intensity);// glm::vec3(color.r, color.g, color.b)* (intensity / 255.f)* PI;
 	light.radius = radius;
+	light.projected_texture = (Texture*)cookie_asset;
 	light.is_spotlight = false;
 	auto& transform = get_owner()->get_ws_transform();
 	light.position = transform[3];

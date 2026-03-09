@@ -217,6 +217,7 @@ public:
 	std::vector<MaterialParameterValue> params;
 	int gpu_buffer_offset = INVALID_MAPPING;	// offset in buffer if uploaded (the buffer is uint's so byte = buffer_offset*4)
 	bool has_called_post_load_already = false;
+	bool used_in_fastpath_cache = false;
 
 	friend class MaterialManagerLocal;
 	friend class MaterialLodJob;

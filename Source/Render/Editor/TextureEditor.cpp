@@ -112,6 +112,7 @@ void IMPORT_TEX(const Cmd_Args& args)
 	write_texture_import_settings(&tis, path);
 
 	Color32 dummy;
+	path = strip_extension(gamepath) + ".dds";
 	compile_texture_asset(path, AssetDatabase::loader,dummy);
 }
 #include "AssetCompile/Someutils.h"
@@ -268,6 +269,8 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 		format = "BC5_UNORM";
 	else if (tis->is_srgb)
 		format = "BC1_UNORM_SRGB";
+	if (tis->make_uncompressed)
+		format = "R8_UNORM";
 
 	std::string commandLine = pathToNvidiaTextureConvertTool + " -f ";
 	commandLine += format;

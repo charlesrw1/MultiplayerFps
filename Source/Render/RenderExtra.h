@@ -6,7 +6,7 @@
 #include "Shader.h"
 #include "../Shaders/SharedGpuTypes.txt"
 #include "DrawTypedefs.h"
-
+#include <unordered_map>
 
 
 class Volumetric_Fog_System
@@ -66,6 +66,16 @@ public:
 	glm::ivec2 get_size() {
 		return atlas_size;
 	}
+	bool has_any_free() const {
+		for (auto& r : rects) {
+			if (!r.used) return true;
+		}
+		return false;
+	}
+	int total_rects() {
+		return rects.size();
+	}
+
 private:
 	struct Available {
 		Rect2d rect;
@@ -93,6 +103,23 @@ public:
 private:
 	ShadowMapAtlas atlas;
 	bufferhandle frame_view = 0;
+};
+
+// rect packed atlas for light cookies+ies
+class LightCookieAtlas {
+public:
+	static const int ATLAS_WIDTH = 1024;
+	static LightCookieAtlas* inst;
+	LightCookieAtlas();
+
+	void update();
+	// normalized coords
+	glm::vec4 get_rect_for_cookie(Texture* t);
+	IGraphicsTexture* get_atlas() const { return atlas; }
+private:
+	std::unordered_map<Texture*, Rect2d> rects;
+	IGraphicsTexture* atlas = nullptr;
+	int atlasheight = 0;
 };
 
 class CascadeShadowMapSystem

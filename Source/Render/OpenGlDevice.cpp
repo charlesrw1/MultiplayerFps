@@ -135,6 +135,7 @@ public:
 		case GraphicsTextureFormat::bc4:
 		case GraphicsTextureFormat::bc5:
 		case GraphicsTextureFormat::bc6:
+		case GraphicsTextureFormat::depth16f:
 		case GraphicsTextureFormat::depth24f:
 		case GraphicsTextureFormat::depth32f:
 		case GraphicsTextureFormat::depth24stencil8:
@@ -179,6 +180,8 @@ public:
 		case GraphicsTextureFormat::bc5: return GL_COMPRESSED_RG_RGTC2;
 			break; 
 		case GraphicsTextureFormat::bc6: return GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT;
+			break;
+		case GraphicsTextureFormat::depth16f: return GL_DEPTH_COMPONENT16;
 			break;
 		case GraphicsTextureFormat::depth24f: return GL_DEPTH_COMPONENT24;
 			break;
@@ -381,6 +384,7 @@ public:
 			gtf::rgba16f,
 			gtf::r32f,
 			gtf::rg32f,
+			gtf::depth16f,
 			gtf::depth24f,
 			gtf::depth32f,
 			gtf::r11f_g11f_b10f,

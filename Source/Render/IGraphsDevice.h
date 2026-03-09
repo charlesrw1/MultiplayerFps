@@ -71,6 +71,7 @@ enum class GraphicsTextureFormat : int8_t {
 	bc4,
 	bc5,
 	bc6,
+	depth16f,
 	depth24f,
 	depth32f,
 	depth24stencil8,

@@ -332,7 +332,7 @@ void BuildSceneData_CpuFast::upload_gpu_cmds(int sum_count)
 
 	gpu.glinst_to_inst->upload(nullptr, sum_count * sizeof(int) * 2);	// *2 because materials stored with instances
 }
-void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, bool depth_less_than_op, bool force_backface)
+void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, bool depth_less_than_op, bool force_backface, Model* m)
 {
 	auto flags = (is_depth) ? MSF_DEPTH_ONLY : 0;
 	flags |= MSF_MATERIAL_IN_INSTANCE;
@@ -340,6 +340,8 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 	if (r_debug_mode.get_integer() != 0)
 		flags |= MSF_DEBUG;
 	flags |= MSF_EDITOR_ID;
+	if (m->has_bones())
+		flags |= MSF_ANIMATED;
 
 	const program_handle program = matman.get_mat_shader(
 		nullptr, mat,
@@ -349,7 +351,10 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 	const BlendState blend = master->blend;
 	const bool show_backface = master->backface;
 
-	IGraphicsVertexInput* vao_ptr = g_modelMgr.get_vao_ptr(VaoType::Lightmapped);
+	VaoType type = VaoType::Lightmapped;
+	if (m->has_bones())
+		type = VaoType::Animated;
+	IGraphicsVertexInput* vao_ptr = g_modelMgr.get_vao_ptr(type);
 
 	RenderPipelineState state;
 	state.program = program;
@@ -360,6 +365,7 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 	//state.depth_writes = depth_write_enabled;
 	state.depth_writes = !master->is_translucent();
 	state.depth_less_than = depth_less_than_op;
+
 	draw.get_device().set_pipeline(state);
 
 
@@ -418,7 +424,7 @@ void BuildSceneData_CpuFast::do_draw_shared(bool depth, float poly_factor, bool 
 			const int incr = count;// pass.batches[i].count;
 			if (count != 0) {
 
-				setup_batch2(cmd_to_extra.at(mat_ofs).material, offset, is_depth, want_less_than, force_backface);
+				setup_batch2(cmd_to_extra.at(mat_ofs).material, offset, is_depth, want_less_than, force_backface, cmd_to_extra.at(mat_ofs).model);
 
 				const GLenum index_type = MODEL_INDEX_TYPE_GL;
 
@@ -508,9 +514,12 @@ void BuildSceneData_CpuFast::rebuild_mod_data()
 		k.blending = (uint64_t)parent->blend;
 		k.mesh = this_model->get_uid();
 		k.texture = this_mat->impl->get_texture_id_hash();
+		int flags = 0;
+		if (this_model->has_bones())
+			flags |= MSF_ANIMATED;
 		k.shader = matman.get_mat_shader(
 			nullptr, this_mat,
-			0
+			flags
 		);
 		return k;
 	};
@@ -967,6 +976,37 @@ void BuildSceneData_CpuFast::make_shadow_object_data_threadsafe(std::span<uint8_
 			}
 		}
 		mdcounts[index] = actual_count;
+	}
+}
+
+void BuildSceneData_CpuFast::on_fastpath_material_removed(MaterialInstance* mat) {
+	assert(mat->impl->used_in_fastpath_cache);
+	sys_print(Warning, "on_fastpath_material_removed\n");
+
+	auto invalidate_these = [&](int fast_index) {
+		for (auto& [_, obj] : draw.scene.proxy_list.objects) {
+			if (obj.fastcpu_index == fast_index) {
+				obj.fastcpu_index = get_index(obj.proxy.model, obj.proxy.mat_override);
+			}
+		}
+	};
+
+	opt<ModelAndMatTextureSet> found_key;
+	int fast_index = -1;
+	for (auto& [key, data] : mod_data) {
+		if (key.has_textures == mat) {
+			found_key = key;
+			fast_index = data.ptr_ofs;
+			break;
+		}
+	}
+	if (found_key.has_value()) {
+		mod_data_ptrs.at(fast_index) = nullptr;
+		mod_data.erase(found_key.value());
+		invalidate_these(fast_index);
+	}
+	else {
+		sys_print(Warning, "on_fastpath_material_removed: couldn't find material???\n");
 	}
 }
 
@@ -1497,6 +1537,8 @@ void Renderer::create_shaders()
 
 	prog.mdi_testing = prog_man.create_raster("SimpleMeshV.txt", "UnlitF.txt", "MDI");
 
+	prog.fullscreen_draw_texture = prog_man.create_raster("fullscreenquad.txt", "fullscreen_quad_textureF.txt");
+
 	prog.light_accumulation_fullscreen = prog_man.create_raster("fullscreenquad.txt", "LightAccumulationFullScreen.txt","SHADOWED");
 	prog.light_accumulation_fullscreen_tiled = prog_man.create_raster("fullscreenquad.txt", "LightAccumulationFullScreen.txt", "SHADOWED,TILED 1");
 	prog.light_accumulation_fullscreen_tiled2 = prog_man.create_raster("fullscreenquad.txt", "LightAccumulationFullScreen.txt", "SHADOWED,TILED 2");
@@ -1865,7 +1907,7 @@ void Renderer::init()
 	ASSERT(!RenderGiManager::inst);
 	RenderGiManager::inst = new RenderGiManager;
 	GpuCullingTest::inst = new GpuCullingTest;
-
+	LightCookieAtlas::inst = new LightCookieAtlas;
 
 	EnviornmentMapHelper::get().init();
 	print_time("draw:env_map");
@@ -2764,7 +2806,10 @@ void set_gpu_objects_data_job(uintptr_t p)
 		v1 = (glm::vec4*)(gpu_objects + offset + 32);
 		*v1 = glm::vec4(proxy.transform[0][2], proxy.transform[1][2], proxy.transform[2][2], proxy.transform[3][2]);
 		glm::ivec4* flags = (glm::ivec4*)(gpu_objects + offset + 48);
-		*flags = glm::ivec4(0, current_bone_buffer_offset+proxy.animator_bone_ofs, obj.type_.prev_bone_ofs, 0);
+		int bone_ofs = proxy.animator_bone_ofs;
+		if (bone_ofs >= 0)
+			bone_ofs = current_bone_buffer_offset + bone_ofs;
+		*flags = glm::ivec4(0, bone_ofs, bone_ofs, 0);
 	}
 }
 
@@ -3268,6 +3313,11 @@ void LightListCuller::draw_lights()
 	draw.bind_texture_ptr(2, tex.scene_gbuffer2);
 	draw.bind_texture_ptr(3, tex.scene_depth);
 	draw.bind_texture_ptr(4, draw.spotShadows->get_atlas().get_atlas_texture());
+	auto cookieAtlas = LightCookieAtlas::inst->get_atlas();
+	if (!cookieAtlas)
+		cookieAtlas = draw.white_texture;
+	draw.bind_texture_ptr(5, cookieAtlas);
+
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, draw.buf.lighting_uniforms->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, tiled_uniforms->get_internal_handle());
@@ -3688,6 +3738,7 @@ void Renderer::draw_height_fog()
 
 void Renderer::deferred_decal_pass()
 {
+	glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
 	decalBatcher->draw_decals();
 }
 void Renderer::sync_update()
@@ -3756,6 +3807,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view)
 		refresh_render_targets_next_frame = true;
 	}
 
+	LightCookieAtlas::inst->update();
 	//matman.pre_render_update();
 	spotShadows->update();
 	check_cubemaps_dirty();
@@ -3997,13 +4049,18 @@ void Renderer::upload_light_and_decal_buffers()
 			light_uniforms.transform = ModelTransform;
 			light_uniforms.position_radius = vec4(light.position, light.radius);
 			light_uniforms.flags = light.is_spotlight;
-			light_uniforms.flags |= int(light.casts_shadow_mode != 0) << 1;
+
+			const bool casts_shadow = light.casts_shadow_mode != 0 && light_pair.type_.shadow_array_handle != -1;
+			const bool has_cookie = light.projected_texture != nullptr;
+			light_uniforms.flags |= int(casts_shadow) << 1;
+			light_uniforms.flags |= int(has_cookie) << 2;
 			light_uniforms.spot_inner = cos(glm::radians(light.conemin));
 			light_uniforms.spot_angle = cos(glm::radians(light.conemax));
 			light_uniforms.spot_normal = vec4(light.normal, 0);
-			light_uniforms.epsilon = shadowmap.tweak.epsilon * 0.01f;
+			light_uniforms.epsilon = shadowmap.tweak.epsilon * 0.03f;
 			light_uniforms.light_color = vec4(light.color, 0);
-			if (light.casts_shadow_mode != 0) {
+			light_uniforms.cookieAtlas = light_pair.type_.cookie_atlas;
+			if (casts_shadow) {
 				light_uniforms.lighting_view_proj = light_pair.type_.lightViewProj;
 				Rect2d rect = spotShadows->get_atlas().get_atlas_rect(light_pair.type_.shadow_array_handle);
 				glm::ivec2 atlas_size = spotShadows->get_atlas().get_size();

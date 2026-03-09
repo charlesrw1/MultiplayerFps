@@ -14,7 +14,7 @@ ShadowMapAtlas::ShadowMapAtlas() {
 	args.width = size;
 	args.height = size;
 	args.num_mip_maps = 1;
-	args.format = GraphicsTextureFormat::depth32f;
+	args.format = GraphicsTextureFormat::depth16f;
 	args.type = GraphicsTextureType::t2D;
 	args.sampler_type = GraphicsSamplerType::AtlasShadowmap;
 	safe_release(atlas);
@@ -33,7 +33,7 @@ ShadowMapAtlas::ShadowMapAtlas() {
 	vtsHandle->update_specs_ptr(atlas);
 
 	// add the rects
-	const int subCount = 8;
+	const int subCount = 4;
 	const int subSize = size / subCount;	// 256 or 512
 	for (int x = 0; x < subCount; x++) {
 		for (int y = 0; y < subCount; y++) {
@@ -82,17 +82,72 @@ ShadowMapManager::ShadowMapManager()
 	glCreateBuffers(1, &frame_view);
 }
 
+
+// some stuff to do:
+//	lights given priority based on dist to camera and size
+//  if atlas is full start evicting and pick highest priority
+//  static updated only once
+//  only update if in frustum obv
+
+
+#include "Framework/ArenaAllocator.h"
+#include "Framework/ArenaStd.h"
+struct LightSortObj {
+	RL_Internal* light{};
+	float score = 0.0;
+};
+#include <algorithm>
 void ShadowMapManager::update()
 {
+	auto& memarena = draw.get_arena();
 	auto& lights = draw.scene.light_list.objects;
+	ArenaScope scope(memarena);
+	arena_vec<LightSortObj> shadowlights(scope);
+	shadowlights.reserve(lights.size());
+
+	auto& vs = draw.get_current_frame_vs();
+
 	for (auto&[_,l] : lights) {
 		const bool casts_shadow = l.light.casts_shadow_mode != 0;
-		if (casts_shadow && l.shadow_array_handle == -1) {
-			l.shadow_array_handle = atlas.allocate(0);
+		if (casts_shadow) {
+			LightSortObj o;
+			o.light = &l;
+			auto origin = o.light->light.position;
+			float radius = o.light->light.radius;
+			if (l.light.is_spotlight) {
+				origin += l.light.normal * l.light.radius * 0.5f;
+				radius = l.light.radius * 0.5f;
+			}
+
+			auto to = origin - vs.origin;
+			float dist = glm::dot(to, to);
+			o.score = radius / dist;
+			shadowlights.push_back(o);
 		}
-		else if (!casts_shadow && l.shadow_array_handle != -1) {
-			atlas.free(l.shadow_array_handle);
-			l.shadow_array_handle = -1;
+		else {
+			if (l.shadow_array_handle != -1) {
+				atlas.free(l.shadow_array_handle);
+				l.shadow_array_handle = -1;
+			}
+		}
+	}
+	std::sort(shadowlights.begin(), shadowlights.end(), [](LightSortObj& a, LightSortObj& b) {
+		return a.score > b.score;
+		});
+
+	// keep highest
+	const int totalrects = atlas.total_rects();
+	for (int i = totalrects; i < shadowlights.size(); i++) {
+		if (shadowlights[i].light->shadow_array_handle != -1) {
+			atlas.free(shadowlights[i].light->shadow_array_handle);
+			shadowlights[i].light->shadow_array_handle = -1;
+		}
+	}
+	for (int i = 0; i < totalrects && i < shadowlights.size(); i++) {
+		if (shadowlights[i].light->shadow_array_handle == -1) {
+			shadowlights[i].light->shadow_array_handle=atlas.allocate(0);
+			if (shadowlights[i].light->light.casts_shadow_mode == 2)
+				shadowlights[i].light->updated_this_frame = true;
 		}
 	}
 }
@@ -102,16 +157,38 @@ void ShadowMapManager::get_lights_to_render(std::vector<handle<Render_Light>>& v
 	// if light is static and was updated, render
 	// if light is dynamic and was updated or had dynamic in frustum last update, render
 	// else skip
+	Frustum frustum;
+	build_a_frustum_for_perspective(frustum, draw.get_current_frame_vs(), {});
+
+	auto is_in_frustum = [&](RL_Internal& l)  -> bool {
+		glm::vec3 center = glm::vec3(l.light.position+l.light.normal*l.light.radius*0.5f);
+		const float radius = l.light.radius * 0.5f;
+
+		int res = 0;
+		res += (glm::dot(glm::vec3(frustum.top_plane), center) + frustum.top_plane.w >= -radius) ? 1 : 0;
+		res += (glm::dot(glm::vec3(frustum.bot_plane), center) + frustum.bot_plane.w >= -radius) ? 1 : 0;
+		res += (glm::dot(glm::vec3(frustum.left_plane), center) + frustum.left_plane.w >= -radius) ? 1 : 0;
+		res += (glm::dot(glm::vec3(frustum.right_plane), center) + frustum.right_plane.w >= -radius) ? 1 : 0;
+
+		const bool is_visible = res == 4;
+
+		return is_visible;
+	};
 
 	auto& lights = draw.scene.light_list.objects;
 	for (auto& [handle, l] : lights) {
 		const bool casts_shadow = l.light.casts_shadow_mode != 0;
-		assert(casts_shadow == (l.shadow_array_handle != -1));
-
+		const bool is_alloced = l.shadow_array_handle != -1;
 		const bool was_updated = l.updated_this_frame;
-		if (casts_shadow) {
-			if ((l.light.casts_shadow_mode == 2 && was_updated) || l.light.casts_shadow_mode == 1)
+		if (is_alloced&&casts_shadow ) {
+			// always update static
+			if ((l.light.casts_shadow_mode == 2 && was_updated))
 				vec.push_back({ handle });
+			else if (l.light.casts_shadow_mode == 1) {
+				if (is_in_frustum(l)) {
+					vec.push_back({ handle });
+				}
+			}
 		}
 		l.updated_this_frame = false;
 	}
@@ -180,4 +257,124 @@ void ShadowMapManager::on_remove_light(handle<Render_Light> h)
 		atlas.free(light.shadow_array_handle);
 		light.shadow_array_handle = -1;
 	}
+}
+#include "RectPackerUtil.h"
+LightCookieAtlas* LightCookieAtlas::inst = nullptr;
+LightCookieAtlas::LightCookieAtlas()
+{
+	Texture::install_system("_cookieatlas");
+}
+
+void blit_texture_into_thing_because_reasons(
+	IGraphicsTexture* srct, 
+	IGraphicsTexture* destt,
+	Rect2d dest
+)
+{
+	auto& device = draw.get_device();
+
+
+	//RenderPassState setup;
+	//setup.set_clear_both(false);
+	//auto colorinfos = { ColorTargetInfo(destt) };
+	//setup.color_infos = colorinfos;
+	//IGraphicsDevice::inst->set_render_pass(setup);
+	device.set_viewport(dest.x, dest.y, dest.w, dest.h);
+
+	RenderPipelineState state;
+	state.blend = BlendState::OPAQUE;
+	state.depth_testing = false;
+	state.depth_writes = false;
+	state.vao = draw.get_empty_vao();
+	state.program = draw.prog.fullscreen_draw_texture;
+	device.set_pipeline(state);
+	device.shader().set_ivec2("viewport_size", glm::ivec2(dest.w, dest.h));
+
+	device.bind_texture_ptr(0, srct);
+
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+
+void LightCookieAtlas::update()
+{
+	auto& lights = draw.scene.light_list.objects;
+	bool has_new = false;
+	for (auto& [_,l] : lights) {
+		if (!l.light.projected_texture||!l.light.projected_texture->gpu_ptr)
+			continue;
+		if (!MapUtil::contains(rects, l.light.projected_texture)) {
+			has_new = true;
+			rects.insert({ l.light.projected_texture,{} });
+		}
+	}
+	if (has_new) {
+		sys_print(Warning, "updating lightcookieatlas...\n");
+
+		std::vector<Texture*> where;
+		std::vector<Rect2d> outrects;
+		std::vector<Texture*> ies_textures;
+		// save room for ies's
+		int num_ies = 0;
+		for (auto& [t, r] : rects) {
+			auto size = t->gpu_ptr->get_size();
+			size = glm::min(size, glm::ivec2(ATLAS_WIDTH));
+			if (size.y > 1) {	// non ies
+				where.push_back(t);
+				outrects.push_back(Rect2d(0, 0, size.x, size.y));
+			}
+			else {
+				num_ies += 1;
+				ies_textures.push_back(t);
+			}
+		}
+		const int ies_width = 512;
+		outrects.push_back(Rect2d(0, 0, ies_width, num_ies*3));
+		const auto[pos,height]=RectPackerUtil::shelf_pack(outrects,ATLAS_WIDTH);
+		for (int i = 0; i < where.size(); i++) {
+			auto size = where[i]->gpu_ptr->get_size();
+			size = glm::min(size, glm::ivec2(ATLAS_WIDTH));
+			rects[where[i]] = Rect2d(pos[i].x, pos[i].y, size.x, size.y);
+		}
+		for (int i = 0; i < ies_textures.size(); i++) {
+			rects[ies_textures[i]] = Rect2d(pos.back().x, pos.back().y + i*3, ies_width, 3);
+		}
+
+		if(atlas)
+			atlas->release();
+		CreateTextureArgs args;
+		args.format = GraphicsTextureFormat::r8;
+		args.num_mip_maps = 1;
+		args.sampler_type = GraphicsSamplerType::LinearClamped;
+		args.type = GraphicsTextureType::t2D;
+		args.width = ATLAS_WIDTH;
+		args.height = height;
+		atlas = IGraphicsDevice::inst->create_texture(args);
+		atlasheight = height;
+
+		Texture::load("_cookieatlas")->update_specs_ptr(atlas);
+
+		RenderPassState setup;
+		setup.set_clear_both(true);
+		auto colorinfos = { ColorTargetInfo(atlas) };
+		setup.color_infos = colorinfos;
+		IGraphicsDevice::inst->set_render_pass(setup);
+		int index = -1;
+
+		for (auto& [t, r] : rects) {
+			blit_texture_into_thing_because_reasons(t->gpu_ptr, atlas,
+				r);
+		}
+
+	}
+	for (auto& [_, l] : lights) {
+		if (!l.light.projected_texture || !l.light.projected_texture->gpu_ptr)
+			continue;
+		l.cookie_atlas = get_rect_for_cookie(l.light.projected_texture);
+	}
+}
+
+glm::vec4 LightCookieAtlas::get_rect_for_cookie(Texture* t)
+{
+	Rect2d r = rects[t];
+	return glm::vec4((r.x+0.5001) / float(ATLAS_WIDTH), (r.y+0.5) / float(atlasheight), (r.w-1) / float(ATLAS_WIDTH), (r.h-1.001) / float(atlasheight));
 }

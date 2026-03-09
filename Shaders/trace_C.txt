@@ -150,8 +150,6 @@ vec3 evaluate_lighting(vec3 pos, vec3 normal, vec3 albedo)
 	return irrad;
 }
 
-
-
 void main()
 {
 	const int global_index = int(gl_GlobalInvocationID.x);

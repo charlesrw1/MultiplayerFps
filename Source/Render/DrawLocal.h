@@ -428,6 +428,7 @@ public:
 		std::span<int> mdcounts
 	) const;
 
+	void on_fastpath_material_removed(MaterialInstance* mat);
 
 	int16_t get_index(Model* m, MaterialInstance* mat) {
 		if (!m)
@@ -436,8 +437,17 @@ public:
 		search.m = m;
 		if (mat && mat->impl) {
 			search.parent = mat->impl->get_master_impl();
-			search.texture_hash = mat->impl->get_texture_id_hash();
-			search.has_textures = mat;
+			auto parent_texhash = search.parent->self->impl->get_texture_id_hash();
+			auto myhash = mat->impl->get_texture_id_hash();
+			if (parent_texhash == myhash) {
+				search.texture_hash = parent_texhash;
+				search.has_textures = search.parent->self;
+			}
+			else {
+				search.texture_hash = myhash;
+				search.has_textures = mat;
+			}
+			search.has_textures->impl->used_in_fastpath_cache = true;
 		}
 		auto find = mod_data.find(search);
 		if (find != mod_data.end()) {
@@ -713,7 +723,7 @@ public:
 		program_handle light_accumulation_fullscreen_tiled{};
 		program_handle light_accumulation_fullscreen_tiled2{};
 
-
+		program_handle fullscreen_draw_texture{};
 
 		program_handle height_fog{};
 		program_handle volfog_apply{};

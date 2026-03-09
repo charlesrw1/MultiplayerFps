@@ -88,6 +88,6 @@ developer_mode 1
 
 open-editor demo_level_1.tmap
 
-otex 0.25 1 0 _csm_shadow
+otex 1 1 0 _cookieatlas
 
 g_application_class EngineTesterApp

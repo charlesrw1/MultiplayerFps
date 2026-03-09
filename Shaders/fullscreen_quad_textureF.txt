@@ -1,0 +1,11 @@
+
+layout(location = 0) out vec4 FS_OUT_Color;
+
+layout(binding = 0) uniform sampler2D texture_to_sample;
+uniform ivec2 viewport_size;
+void main()
+{
+	vec2 uv = vec2(gl_FragCoord.xy) / vec2(viewport_size);
+	vec4 texture_color = texture(texture_to_sample,uv);
+	FS_OUT_Color = vec4(texture_color);//vec4(linearize_depth(depth_value,0.01,100.0)*0.02);
+}

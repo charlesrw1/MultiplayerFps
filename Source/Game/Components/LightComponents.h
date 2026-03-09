@@ -115,6 +115,7 @@ public:
 		this->visible = b;
 	}
 
+	REF const Texture* cookie_asset = nullptr;
 
 	REF Color32 color = COLOR_WHITE;
 	REF float intensity = 1.f;

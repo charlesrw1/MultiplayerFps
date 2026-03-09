@@ -176,20 +176,27 @@ void main()
 
 	uint obj_skin_offset = object_flags_anim.y;
 
-	for(int i=0;i<4;i++) {
-		if(VS_IN_BoneIndicies[i]==-1)
-			continue;
-		vec3 posadded = vec3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]]*vec4(VS_IN_Postion,1.0));
-		local_pos += posadded * VS_IN_BoneWeights[i];
-		
-		vec3 normaladded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_IN_Normal;
-		local_normal += normaladded * VS_IN_BoneWeights[i];
-		
-		vec3 tangentadded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_Tangent_Adjusted;
-		local_tangent += tangentadded;
+	if(obj_skin_offset<2000000000) {
+		for(int i=0;i<4;i++) {
+			if(VS_IN_BoneIndicies[i]==-1)
+				continue;
+			vec3 posadded = vec3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]]*vec4(VS_IN_Postion,1.0));
+			local_pos += posadded * VS_IN_BoneWeights[i];
+			
+			vec3 normaladded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_IN_Normal;
+			local_normal += normaladded * VS_IN_BoneWeights[i];
+			
+			vec3 tangentadded = mat3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]])*VS_Tangent_Adjusted;
+			local_tangent += tangentadded;
+		}
+		local_normal = normalize(local_normal);
+		local_tangent = normalize(local_tangent);
 	}
-	local_normal = normalize(local_normal);
-	local_tangent = normalize(local_tangent);
+	else {
+		local_pos = VS_IN_Postion;
+		local_normal = VS_IN_Normal;
+		local_tangent = VS_Tangent_Adjusted;
+	}
 #else	// (NOT ANIMATED)
 	local_pos = VS_IN_Postion;
 	local_normal = VS_IN_Normal;
@@ -240,11 +247,12 @@ void main()
 	#ifndef NO_TAA
 	{
 		// calc last position for motion vectors
-		#ifdef ANIMATED
-			vec3 prev_local_pos = calc_local_animated_pos_last_frame(obj_index);
-		#else
+		//#ifdef ANIMATED
+		//	vec3 prev_local_pos = calc_local_animated_pos_last_frame(obj_index);
+		//#else
+		// FIXME!
 			vec3 prev_local_pos = local_pos;
-		#endif
+		//#endif
 		
 		// fixme
 		vec4 lastfrag_pos = ObjModelMatrix*vec4(prev_local_pos,1.0) + vec4(WORLD_POSITION_OFFSET,0.0);	

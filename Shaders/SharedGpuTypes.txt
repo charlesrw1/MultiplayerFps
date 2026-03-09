@@ -109,6 +109,7 @@ struct LightingObjectUniforms {
 	float spot_inner;
 	float epsilon;
 	uint flags;
+	vec4 cookieAtlas;
 };
 struct DecalObjectUniforms {
 	mat4 transform;
