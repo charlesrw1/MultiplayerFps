@@ -317,6 +317,10 @@ class DynamicMaterialAllocator {
 public:
 	MaterialInstance* allocate_dynamic();
 	void free_dynamic(MaterialInstance* mat);
+
+	int get_num_dynamic_mats() const {
+		return outstanding_dynamic_mats;
+	}
 private:
 	int outstanding_dynamic_mats = 0;	// to check for leaks
 	hash_set<MaterialInstance> free_dynamic_ptrs;

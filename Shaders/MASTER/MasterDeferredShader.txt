@@ -513,8 +513,9 @@ void main()
 			normal_mult_debug = max(dot(Final_Normal,normalize(g.viewpos_time.xyz-FS_IN_FragPos)),0.08);
 		if(g.debug_options == DEBUG_OBJID)
 			GBUFFER_OUT_Emissive.rgb = randColor(FS_IN_Objid)*normal_mult_debug;
-		else if(g.debug_options == DEBUG_MATID)
+		else if(g.debug_options == DEBUG_MATID) {
 			GBUFFER_OUT_Emissive.rgb = randColor(FS_IN_Matid+279343)*normal_mult_debug;
+		}
 		else if(g.debug_options == DEBUG_NORMAL)
 			GBUFFER_OUT_Emissive.rgb = (GBUFFER_OUT_Normal.rgb*0.5+vec3(0.5));
 		else if(g.debug_options == DEBUG_ALBEDO) {
@@ -548,6 +549,9 @@ void main()
 		}
 		else if(g.debug_options == DEBUG_DRAWID) {
 			GBUFFER_OUT_Emissive.rgb = randColor(indirect_material_offset+279343)*normal_mult_debug;
+		}
+		else if(g.debug_options == DEBUG_OVERDRAW) {
+			GBUFFER_OUT_Emissive.rgba = vec4(0.08);
 		}
 		
 	#endif	// FORWARD_SHADER

@@ -100,6 +100,7 @@ void MeshComponent::set_model_str(const char* model_path)
 	if (modelnext != model.get()) {
 		model = modelnext;
 		sync_render_data();
+		update_physics_mesh();
 	}
 }
 void MeshComponent::set_model(Model* modelnext)
@@ -107,6 +108,7 @@ void MeshComponent::set_model(Model* modelnext)
 	if (modelnext != model.get()) {
 		model = modelnext;
 		sync_render_data();
+		update_physics_mesh();
 	}
 }
 

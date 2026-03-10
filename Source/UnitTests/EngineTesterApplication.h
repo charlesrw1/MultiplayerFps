@@ -22,6 +22,44 @@ public:
 	}
 };
 
+class CameraPathFollower {
+public:
+	CameraPathFollower(std::vector<SpawnerComponent*> components) {
+		for (auto c : components) {
+			points.push_back({ c->get_ws_position(),c->get_owner()->get_ws_rotation() });
+		}
+		time_start = GetTime();
+	}
+	static glm::vec3 catmull_rom(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t) {
+		return 0.5f * ((2.f * p1) +
+			(-p0 + p2) * t +
+			(2.f * p0 - 5.f * p1 + 4.f * p2 - p3) * t * t +
+			(-p0 + 3.f * p1 - 3.f * p2 + p3) * t * t * t);
+	}
+	void update() {
+		double time = GetTime() - time_start;
+		int index = time / time_per_point;
+		index = (index) % points.size();
+		int next = (index + 1) % points.size();
+		int next2 = (index + 2) % points.size();
+		int next3 = (index + 3) % points.size();
+
+		float frac = fmod(time, time_per_point)/time_per_point;
+		glm::quat rot = glm::slerp(points.at(index).q, points.at(next).q, frac);
+		glm::vec3 pos = glm::mix(points.at(index).p, points.at(next).p, frac);
+			
+
+		CameraComponent::get_scene_camera()->get_owner()->set_ws_transform(pos, rot, glm::vec3(1));
+	}
+
+	struct Point {
+		glm::vec3 p;
+		glm::quat q;
+	};
+	std::vector< Point> points;
+	double time_per_point = 6.0;
+	double time_start = 0.0;
+};
 
 class EngineTesterApp : public Application {
 public:
@@ -35,8 +73,21 @@ public:
 			ASSERT(LuaMiscFuncs::inst);
 		}
 	}
+	
+	static std::vector<SpawnerComponent*> find_all_with_name_ordered(string name, string class_) {
+		auto all = find_all_in_class(class_);
+		std::vector<SpawnerComponent*> matches;
+		for (auto s : all) {
+			if (s->get_owner()->get_editor_name().find(name) != std::string::npos)
+				matches.push_back(s);
+		}
+		std::sort(matches.begin(), matches.end(), [](SpawnerComponent* a, SpawnerComponent* b) {
+			return a->get_owner()->get_editor_name() < b->get_owner()->get_editor_name();
+			});
+		return matches;
+	}
 
-	std::vector<SpawnerComponent*> find_all_in_class(string name) {
+	static std::vector<SpawnerComponent*> find_all_in_class(string name) {
 		std::vector<SpawnerComponent*> test_ents;
 		for (auto e : eng->get_level()->get_all_objects()) {
 			if (auto s = e->cast_to<SpawnerComponent>()) {
@@ -82,6 +133,23 @@ public:
 				index = (index + 1) % (int)anims.size();
 			}
 		}
+		{
+			auto physics = find_all_in_class("prop_physics");
+			for (auto p : physics) {
+				auto obj = l->spawn_entity();
+				obj->set_ws_transform(p->get_ws_transform());
+				auto model = Model::load(p->obj["model"]);
+				auto mc = obj->create_component<MeshComponent>();
+				mc->set_model(model);
+				auto mcc = obj->create_component<MeshColliderComponent>();
+				ASSERT(mcc);
+				mcc->set_is_enable(false);
+				mcc->set_is_enable(true);
+				mcc->set_is_simulating(true);
+				mcc->set_is_static(false);
+
+			}
+		}
 		
 		// ragdolls
 		{
@@ -104,15 +172,22 @@ public:
 		auto func = [&](IntegrationTester& tester) {
 			std::vector<SpawnerComponent*> test_ents = find_all_in_class("engine_test_case");
 
+			auto ents = find_all_with_name_ordered("path", "engine_test_case");
+			CameraPathFollower path(ents);
+
 			int index = 0;
 			for (;;) {
-				auto s = test_ents.at(index);
+				//auto s = test_ents.at(index);
 				auto scene_cam = CameraComponent::get_scene_camera();
-				scene_cam->get_owner()->set_ws_transform(s->get_ws_transform());
+				scene_cam->set_fov(80);
+				//scene_cam->get_owner()->set_ws_transform(s->get_ws_transform());
 
-				tester.wait_time(2.f);
+				//tester.wait_time(2.f);
 
-				index = (index + 1) % (int)test_ents.size();
+				//index = (index + 1) % (int)test_ents.size();
+
+				path.update();
+				tester.wait_ticks(1);
 			}
 
 		};

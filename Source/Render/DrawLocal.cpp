@@ -287,7 +287,7 @@ void BuildSceneData_CpuFast::rebuild_batches()
 			bool same_material = batch_sort_key.texture == this_sort_key.texture;
 			bool same_shader = batch_sort_key.shader == this_sort_key.shader;
 			bool same_other_state = batch_sort_key.blending == this_sort_key.blending
-				&& batch_sort_key.backface == this_sort_key.blending;
+				&& batch_sort_key.backface == this_sort_key.backface;
 
 			if (!is_depth_pass) {
 				if (same_vao && same_material && same_other_state && same_shader && same_layer)
@@ -332,7 +332,7 @@ void BuildSceneData_CpuFast::upload_gpu_cmds(int sum_count)
 
 	gpu.glinst_to_inst->upload(nullptr, sum_count * sizeof(int) * 2);	// *2 because materials stored with instances
 }
-void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, bool depth_less_than_op, bool force_backface, Model* m)
+void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, bool depth_less_than_op, bool force_backface, Model* m, bool overdraw_vis)
 {
 	auto flags = (is_depth) ? MSF_DEPTH_ONLY : 0;
 	flags |= MSF_MATERIAL_IN_INSTANCE;
@@ -348,7 +348,7 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 		flags
 	);
 	auto master = mat->get_master_material();
-	const BlendState blend = master->blend;
+	BlendState blend = master->blend;
 	const bool show_backface = master->backface;
 
 	VaoType type = VaoType::Lightmapped;
@@ -356,12 +356,21 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 		type = VaoType::Animated;
 	IGraphicsVertexInput* vao_ptr = g_modelMgr.get_vao_ptr(type);
 
+	bool depth_tests = true;
+	const int debug_mode = r_debug_mode.get_integer();
+	//if (debug_mode == gpu::DEBUG_MATID) 
+	if(overdraw_vis)
+	{
+		blend = BlendState::ADD;
+		depth_tests = false;
+	}
+
 	RenderPipelineState state;
 	state.program = program;
 	state.vao = vao_ptr->get_internal_handle();
 	state.backface_culling = !show_backface && !force_backface;
 	state.blend = blend;
-	state.depth_testing = true;
+	state.depth_testing = depth_tests;
 	//state.depth_writes = depth_write_enabled;
 	state.depth_writes = !master->is_translucent();
 	state.depth_less_than = depth_less_than_op;
@@ -380,12 +389,12 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 		draw.bind_texture(i, id);
 	}
 }
-void BuildSceneData_CpuFast::do_draw_shared(bool depth, float poly_factor, bool less_than)
+void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor)
 {
 	if (gpu.num_cullobjs <= 0)
 		return;
 
-	if (depth) {
+	if (flags & IS_SHADOW) {
 		glEnable(GL_POLYGON_OFFSET_FILL);
 		glPolygonOffset(poly_factor, 4/* this does nothing?*/);
 	}
@@ -397,7 +406,7 @@ void BuildSceneData_CpuFast::do_draw_shared(bool depth, float poly_factor, bool 
 
 		if (is_depth) {
 			force_backface = true;
-			want_less_than = less_than;
+			want_less_than = bool(flags & DEPTH_LESSTHAN);
 		}
 
 		IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
@@ -424,7 +433,7 @@ void BuildSceneData_CpuFast::do_draw_shared(bool depth, float poly_factor, bool 
 			const int incr = count;// pass.batches[i].count;
 			if (count != 0) {
 
-				setup_batch2(cmd_to_extra.at(mat_ofs).material, offset, is_depth, want_less_than, force_backface, cmd_to_extra.at(mat_ofs).model);
+				setup_batch2(cmd_to_extra.at(mat_ofs).material, offset, is_depth, want_less_than, force_backface, cmd_to_extra.at(mat_ofs).model, flags & OVERDRAWVIS);
 
 				const GLenum index_type = MODEL_INDEX_TYPE_GL;
 
@@ -441,13 +450,14 @@ void BuildSceneData_CpuFast::do_draw_shared(bool depth, float poly_factor, bool 
 					sizeof(gpu::DrawElementsIndirectCommand)
 				);
 
+				draw.stats.total_draw_calls += 1;
 			}
 			offset += incr;
 		}
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 	};
 
-	if (depth)
+	if (flags & IS_SHADOW)
 		do_draw_internal(shadow_pass.batches, true);
 	else
 		do_draw_internal(gbuffer_pass.batches, false);
@@ -457,7 +467,10 @@ void BuildSceneData_CpuFast::do_draw_shared(bool depth, float poly_factor, bool 
 }
 void BuildSceneData_CpuFast::do_shadow_draw(float factor, bool less_than)
 {
-	do_draw_shared(true,factor,less_than);
+	int flags = IS_SHADOW;
+	if (less_than)
+		flags |= DEPTH_LESSTHAN;
+	do_draw_shared(flags,factor);
 }
 GpuCullInput BuildSceneData_CpuFast::get_cull_input() const {
 
@@ -483,9 +496,12 @@ GpuCullInput BuildSceneData_CpuFast::get_cull_input_shadow() const {
 
 	return input;
 }
-void BuildSceneData_CpuFast::do_gbuffer_draw()
+void BuildSceneData_CpuFast::do_gbuffer_draw(bool overdraw_visualization_2nd_pass)
 {
-	do_draw_shared(false,0,false);
+	int flags = 0;
+	if (overdraw_visualization_2nd_pass)
+		flags |= OVERDRAWVIS;
+	do_draw_shared(flags,0);
 
 }
 void BuildSceneData_CpuFast::rebuild_mod_data()
@@ -1691,16 +1707,20 @@ void imgui_stat_hook()
 	ImGui::Text("shadow lights: %d", stats.shadow_lights);
 	ImGui::Separator();
 	auto& scene = draw.scene;
-	ImGui::Text("depth batches: %d", (int)scene.shadow_pass.batches.size());
-	ImGui::Text("depth mesh batches: %d", (int)scene.shadow_pass.mesh_batches.size());
+	auto cf = BuildSceneData_CpuFast::inst;
+	ImGui::Text("depth batches: %d", (int)cf->get_num_depth_batches());
+	ImGui::Text("opaque batches: %d", (int)cf->get_num_opaque_batches());
+	ImGui::Text("cached model cmds: %d", (int)cf->get_num_cached_cmds());
+	ImGui::Text("cached model/mats: %d", (int)cf->get_num_cached_mod_mats());
 	ImGui::Text("transparent batches: %d", (int)scene.transparent_pass.batches.size());
-	ImGui::Text("opaque batches: %d", (int)scene.gbuffer_pass.batches.size());
-	ImGui::Text("opaque mesh batches: %d", (int)scene.gbuffer_pass.mesh_batches.size());
+
 	ImGui::Separator();
 	ImGui::Text("total objects: %d", (int)scene.proxy_list.objects.size());
 	ImGui::Text("total lights: %d", (int)scene.light_list.objects.size());
 	ImGui::Text("total decals: %d", (int)scene.decal_list.objects.size());
 	ImGui::Text("total meshbuilders: %d", (int)scene.meshbuilder_objs.objects.size());
+	ImGui::Separator();
+
 
 }
 
@@ -1794,8 +1814,12 @@ void Renderer::check_hardware_options()
 	sys_print(Debug, "-GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS: %d\n", max_ssbos);
 	glGetIntegerv(GL_MAX_FRAGMENT_SHADER_STORAGE_BLOCKS, &max_ssbos);
 	sys_print(Debug, "-GL_MAX_FRAGMENT_SHADER_STORAGE_BLOCKS: %d\n", max_ssbos);
+	glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &max_ssbos);
+	sys_print(Debug, "-GL_MAX_ARRAY_TEXTURE_LAYERS: %d\n", max_ssbos);
+	glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_ssbos);
+	sys_print(Debug, "-GL_MAX_COLOR_ATTACHMENTS: %d\n", max_ssbos);
 
-
+	
 	sys_print(Debug,"\n");
 }
 
@@ -2396,10 +2420,10 @@ void Renderer::execute_render_lists(
 					sizeof(gpu::DrawElementsIndirectCommand)
 				);
 			}
+			stats.total_draw_calls++;
 		}
 		offset += incr;
 
-		stats.total_draw_calls++;
 	}
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 }
@@ -4107,7 +4131,7 @@ void Renderer::upload_light_and_decal_buffers()
 }
 
 
-
+ConfigVar dont_attach_velocity("r.dont_attach_velocity", "1", CVAR_BOOL, "");
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 {
 	//TracyGpuZone("scene_draw_internal");
@@ -4174,6 +4198,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 	// main level render
 
+#if 0
 	auto depth_prepass = [&]() {
 		GPUSCOPESTART(depth_prepass_scope);
 
@@ -4206,16 +4231,25 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		render_level_to_target(cmdparams);
 	};
 	depth_prepass();
+#endif
 
+	enum GbufferPassRenderType {
+		GPRF_WIREFRAME_1,
+		GPRF_WIREFRAME_2,
+		GPRF_GBUFFER_1,
+		GPRF_GBUFFER_2,
+		GPRF_OVERDRAWVIS
+	};
 
-	auto gbuffer_pass = [&](bool is_wireframe = false, bool wireframe_secondpass = false, bool gbuffer_2nd = false) {
+	auto gbuffer_pass = [&](GbufferPassRenderType type) {
 		if (r_skip_gbuffer.get_bool())
 			return;
 
 
 		const auto& view_to_use = current_frame_view;
 
-		const bool clear_framebuffer = (!is_wireframe || !wireframe_secondpass)&&!gbuffer_2nd;
+		const bool clear_color = (type == GPRF_WIREFRAME_1 || type==GPRF_GBUFFER_1 || type == GPRF_OVERDRAWVIS);// (!is_wireframe || !wireframe_secondpass) && !gbuffer_2nd;
+		const bool clear_depth = (clear_color) && (type != GPRF_OVERDRAWVIS);
 
 		//RenderPassSetup setup("gbuffer", fbo.gbuffer, clear_framebuffer,clear_framebuffer, 0, 0, view_to_use.width, view_to_use.height);
 		//auto scope = device.start_render_pass(setup);
@@ -4229,11 +4263,16 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 			ColorTargetInfo(tex.editor_id_buffer),
 			ColorTargetInfo(tex.scene_motion),
 		};
+		std::span ct_span = color_targets;
+
+		if (dont_attach_velocity.get_bool())
+			ct_span = std::span<const ColorTargetInfo>(ct_span.data(), ct_span.size() - 1);
 
 		setup2.use_gray_clear = true;
-		setup2.color_infos = color_targets;
+		setup2.color_infos = ct_span;
 		setup2.depth_info = tex.scene_depth;
-		setup2.wants_color_clear = (clear_framebuffer);	// depth clear done in prepass above
+		setup2.wants_color_clear = (clear_color);	// depth clear done in prepass above
+		setup2.wants_depth_clear = (clear_depth);
 		IGraphicsDevice::inst->set_render_pass(setup2);
 
 		Render_Level_Params cmdparams(
@@ -4242,21 +4281,21 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		&scene.gbuffer_pass,
 			Render_Level_Params::OPAQUE
 		);
-		if (!gbuffer_2nd) {
+		if (type ==GPRF_GBUFFER_2 || type == GPRF_OVERDRAWVIS) {
 			cmdparams.rl = nullptr;
 		}
 
 		cmdparams.upload_constants = true;
 		cmdparams.provied_constant_buffer = ubo.current_frame;
 		cmdparams.draw_viewmodel = true;
-		cmdparams.wireframe_secondpass = wireframe_secondpass;
-		cmdparams.is_wireframe_pass = is_wireframe;
+		cmdparams.wireframe_secondpass = (type==GPRF_WIREFRAME_2);
+		cmdparams.is_wireframe_pass = (type==GPRF_WIREFRAME_1||type==GPRF_WIREFRAME_2);
 
 	
 		render_level_to_target(cmdparams);
 
 		if(!params.skybox_only)
-			BuildSceneData_CpuFast::inst->do_gbuffer_draw();
+			BuildSceneData_CpuFast::inst->do_gbuffer_draw(type==GPRF_OVERDRAWVIS);
 		//GpuCullingTest::inst->dodraw();
 
 	};
@@ -4264,24 +4303,25 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	if (is_wireframe_mode) {
 		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 		glLineWidth(3);
-		gbuffer_pass(true,false);
+		gbuffer_pass(GPRF_WIREFRAME_1);
 		glLineWidth(1);
-		gbuffer_pass(true,true);
+		gbuffer_pass(GPRF_WIREFRAME_2);
 		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 	}
 	else {
 		{
 			GPUSCOPESTART(gbuffer_pass_scope1);
-			gbuffer_pass(false, false, false);
+			gbuffer_pass(GPRF_GBUFFER_1);
 		}
-		
+		if (r_debug_mode.get_integer() == gpu::DEBUG_OVERDRAW) {
+			gbuffer_pass(GPRF_OVERDRAWVIS);
+		}
+		if(!params.skybox_only)
+			GpuCullingTest::inst->build_data_2(BuildSceneData_CpuFast::inst->get_cull_input());
+		if (r_debug_mode.get_integer() != gpu::DEBUG_OVERDRAW)
 		{
-			if(!params.skybox_only)
-				GpuCullingTest::inst->build_data_2(BuildSceneData_CpuFast::inst->get_cull_input());
-			{
-				GPUSCOPESTART(gbuffer_pass_scope2);
-				gbuffer_pass(false, false, true);	// second gbuffer pass
-			}
+			GPUSCOPESTART(gbuffer_pass_scope2);
+			gbuffer_pass(GPRF_GBUFFER_2);	// second gbuffer pass
 		}
 	}
 	if (!params.skybox_only) {
@@ -4295,7 +4335,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	deferred_decal_pass();
 		//device.reset_states();
 
-	if (enable_ssao.get_bool()&&!params.is_cubemap_view)
+	if (r_debug_mode.get_integer() == 0 && enable_ssao.get_bool()&&!params.is_cubemap_view)
 		ssao.render();
 
 	if(r_debug_mode.get_integer() == 0 && !params.skybox_only)
@@ -4538,6 +4578,12 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		GPUSCOPESTART(post_process_stack_scope);
 
 		std::vector<MaterialInstance*> postProcesses;
+		if (r_debug_mode.get_integer() == gpu::DEBUG_OVERDRAW) {
+			auto mat = MaterialInstance::load("eng/overdraw_pp.mm");
+			if (mat&&mat->impl&&mat->impl->gpu_buffer_offset!=-1)
+				postProcesses.push_back(mat);
+		}
+
 		if (r_debug_mode.get_integer() == DEBUG_OUTLINED) {
 			auto mat = g_assets.find_global_sync<MaterialInstance>("eng/editorEdgeDetect.mm");
 			if (mat.get() && mat->impl->gpu_buffer_offset != mat->impl->INVALID_MAPPING)
@@ -4546,6 +4592,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		if (params.is_editor) {
 			postProcesses.push_back(matman.get_default_editor_sel_PP());
 		}
+
 		if (!r_no_postprocess.get_bool())
 			read_from_texture = do_post_process_stack(postProcesses);
 	};

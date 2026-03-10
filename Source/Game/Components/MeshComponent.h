@@ -85,6 +85,9 @@ public:
 	void set_ignore_cubemap_view(bool ignore) {
 		this->ignore_in_cubemap = ignore;
 	}
+	void set_add_collision(bool add_col) {
+		this->add_collision_if_available = true;
+	}
 private:
 	void update_physics_mesh();
 

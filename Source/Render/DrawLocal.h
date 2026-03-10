@@ -471,7 +471,7 @@ public:
 	GpuCullInput get_cull_input() const;
 	GpuCullInput get_cull_input_shadow() const;
 
-	void do_gbuffer_draw();
+	void do_gbuffer_draw(bool overdraw_visualization_2nd_pass);
 	void do_shadow_draw(float polyfac, bool lessthan);
 
 
@@ -484,8 +484,26 @@ public:
 	int get_num_shadow_batches() const {
 		return shadow_pass.batches.size();
 	}
+	int get_num_depth_batches() {
+		return shadow_pass.batches.size();
+	}
+	int get_num_opaque_batches() {
+		return gbuffer_pass.batches.size();
+	}
+	int get_num_cached_cmds() {
+		return out_cmds.size();
+	}
+	int get_num_cached_mod_mats() {
+		return mod_data_ptrs.size();
+	}
 private:
-	void do_draw_shared(bool shadow, float polyfac, bool lessthan);
+	enum DoDrawFlags {
+		IS_SHADOW=1,
+		DEPTH_LESSTHAN=2,
+		OVERDRAWVIS=4,
+	};
+
+	void do_draw_shared(int flags, float polyfac);
 	void rebuild_mod_data();
 	void rebuild_batches();
 	void upload_gpu_cmds(int sum_count);

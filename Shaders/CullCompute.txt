@@ -170,7 +170,7 @@ void main()
 
 			float depthSphere = cull.near /  max((vs_center.z - radius-0.1),cull.near);
 
-			if(depth>depthSphere+1e-4)
+			if(depth>depthSphere+1e-5)	// 1e-4 -> 1e-5 epsilon
 				return;	// occluded
 		}
 		else {
