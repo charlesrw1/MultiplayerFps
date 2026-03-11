@@ -673,7 +673,7 @@ public:
 	// ###################
 
 	void unload_unused_models_test();
-
+	glm::vec2 get_taa_jitter() const;
 	void check_hardware_options();
 	void create_default_textures();
 
@@ -760,6 +760,7 @@ public:
 		IGraphicsTexture* scene_motion{};
 		IGraphicsTexture* last_scene_motion{};
 
+		IGraphicsTexture* halfres_scene_color{};
 
 
 		// ----------------------------------------------------------------------------------

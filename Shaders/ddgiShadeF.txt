@@ -251,10 +251,16 @@ vec3 pbr_calculate_reflection(vec3 worldspace, vec3 Albedo, float Roughness, flo
 
 	return specular*spec_occlusion;
 }
-
+uniform bool wants_half_res = false;
 void main()
 {
-	vec2 uv = vec2(gl_FragCoord.xy) / vec2(g.viewport_size.xy);
+	ivec2 half_res = ivec2(g.viewport_size.xy)/2;
+	vec2 uv = (vec2(gl_FragCoord.xy)) / vec2(half_res);
+	if(!wants_half_res) {
+		uv = (vec2(gl_FragCoord.xy)) / vec2(g.viewport_size.xy);
+	}
+	
+	
 	vec4 depth_tex = texture(DEPTH,uv);
 	vec4 normal_t = texture(GBUFFER0,uv);
 	vec4 metal_rough = texture(GBUFFER2,uv);
@@ -291,7 +297,11 @@ void main()
 	vec3 outirrad = calculate_irradiance(direction, worldspace, biased_world_position);
 	//outirrad.irrad = vec3(0.0);
 	vec3 albedo_mult =  pbr_get_albedo_mult(worldspace, albedo.rgb, metal_rough.y, metal_rough.x, direction);
-	vec3 rad = outirrad*albedo_mult * ssao_value;
+	vec3 rad = outirrad;//*albedo_mult * ssao_value;
+
+	if(!wants_half_res) {
+		rad = outirrad * albedo_mult * ssao_value;
+	}
 
 	//int probe_to_use = max(outirrad.closest_probe,0);
 	

@@ -357,8 +357,6 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 	IGraphicsVertexInput* vao_ptr = g_modelMgr.get_vao_ptr(type);
 
 	bool depth_tests = true;
-	const int debug_mode = r_debug_mode.get_integer();
-	//if (debug_mode == gpu::DEBUG_MATID) 
 	if(overdraw_vis)
 	{
 		blend = BlendState::ADD;
@@ -1754,6 +1752,11 @@ void Renderer::unload_unused_models_test()
 
 }
 
+glm::vec2 Renderer::get_taa_jitter() const
+{
+	return r_taa_manager.calc_frame_jitter(current_frame_view.width, current_frame_view.height);
+}
+
 
 void Renderer::check_hardware_options()
 {
@@ -1867,7 +1870,7 @@ void Renderer::create_default_textures()
 	tex.editorSel_vts_handle = Texture::install_system("_editorSelDepth");
 	tex.postProcessInput_vts_handle = Texture::install_system("_PostProcessInput");
 	tex.scene_motion_vts_handle = Texture::install_system("_scene_motion");
-
+	Texture::install_system("_halfres_scene_color");
 	tex.read_scene_color_for_transparents_handle = Texture::install_system("_read_scene_color");
 }
 
@@ -2080,9 +2083,23 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 		args.sampler_type = GraphicsSamplerType::NearestClamped;
 		ptr = IGraphicsDevice::inst->create_texture(args);
 	};
+	auto delete_and_create_texture_half_res = [&](IGraphicsTexture*& ptr, GraphicsTextureFormat format) {
+		safe_release(ptr);
+
+		CreateTextureArgs args;
+		args.format = format;
+		args.num_mip_maps = 1;
+		args.width = s_w/2;
+		args.height = s_h/2;
+		args.sampler_type = GraphicsSamplerType::NearestClamped;
+		ptr = IGraphicsDevice::inst->create_texture(args);
+	};
 
 	using gtf = GraphicsTextureFormat;
 	delete_and_create_texture(tex.scene_color, gtf::rgb16f);
+
+	delete_and_create_texture_half_res(tex.halfres_scene_color, gtf::rgb16f);
+	Texture::load("_halfres_scene_color")->update_specs_ptr(tex.halfres_scene_color);
 
 	// last frame, for TAA
 	delete_and_create_texture(tex.last_scene_color, gtf::rgb16f);

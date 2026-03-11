@@ -1,0 +1,115 @@
+
+
+// scene depth, normal
+// write to blah
+
+// constants
+// probe_depth and probe_irradiance
+// volume location, size, grid
+
+
+layout(location = 0) out vec4 FS_OUT_Color;
+
+#include "SharedGpuTypes.txt"
+
+layout(binding = 0) uniform sampler2D GBUFFER0;		// ws normal (xyz)
+layout(binding = 3) uniform sampler2D GBUFFER1;		// ws normal (xyz)
+
+layout(binding = 1) uniform sampler2D DEPTH;		// depth texture (writes disabled)
+layout(binding = 2) uniform sampler2D half_res_color;
+layout(binding = 4) uniform sampler2D ssao_tex;
+
+
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+
+uniform float depth_sigma = 1.0;
+uniform float normal_sigma = 1.0;
+
+float DepthWeight(float d0, float d1)
+{
+    float diff = abs(g.near/d0 - g.near/d1);
+    return exp(-diff *diff* depth_sigma);
+}
+float NormalWeight(vec3 n0, vec3 n1)
+{
+    float d = max(dot(n0, n1), 0.0);
+    return pow(d, normal_sigma);
+}
+uniform vec2 jitter;
+
+
+vec3 BilateralUpscale(vec2 uv)
+{
+    float centerDepth = texture(DEPTH, uv).r;
+    vec3 centerNormal = texture(GBUFFER0, uv).xyz * 2.0 - 1.0;
+
+	ivec2 half_res = ivec2(g.viewport_size.xy/2);
+	vec2 uInvHalfRes = 1.0/vec2(half_res);
+	vec2 inv_full_res = 1.0/g.viewport_size.xy;
+
+    // Convert full-res UV to half-res
+    vec2 halfUV = uv;// * 0.5;
+
+    vec2 base = uv;//floor(halfUV / uInvHalfRes) * uInvHalfRes;
+
+
+	vec2 offsets[5] = vec2[](
+        vec2(0.0, 0.0),
+		
+
+        vec2(uInvHalfRes.x, 0.0),
+
+        vec2(0.0, uInvHalfRes.y),
+       // vec2(uInvHalfRes.x, uInvHalfRes.y),
+		
+		vec2(-uInvHalfRes.x, 0.0),
+        vec2(0.0, -uInvHalfRes.y)
+        //vec2(-uInvHalfRes.x, -uInvHalfRes.y),
+		
+		//vec2(uInvHalfRes.x, -uInvHalfRes.y),
+       // vec2(-uInvHalfRes.x, uInvHalfRes.y)
+				
+    );
+
+    vec3 accum = vec3(0.0);
+    float weightSum = 0.0;
+
+    for(int i = 0; i < 5; i++)
+    {
+        vec2 sampleUV = base + offsets[i];
+        vec2 sampleUVFull = base + offsets[i];
+		
+
+        vec3 lighting = texture(half_res_color, sampleUVFull).rgb;
+        float sampleDepth = texture(DEPTH, sampleUVFull).r;
+
+        // Optional: reconstruct normal from gbuffer if stored half-res
+        vec3 sampleNormal = texture(GBUFFER0,sampleUVFull).rgb*2.0-1.0;
+
+        float wDepth  = DepthWeight(centerDepth, sampleDepth);
+        float wNormal = NormalWeight(centerNormal, sampleNormal);
+		wDepth = wDepth < 0.9?0:wDepth;
+		//wNormal = wNormal < 0.5 ? 0 : 1;
+
+        float weight = wDepth*wNormal;
+
+        accum += vec3(lighting) * weight;
+        weightSum += weight;
+    }
+
+    return accum / max(weightSum, 0.0001);
+}
+#if 1
+void main()
+{
+	vec2 uv = (vec2(gl_FragCoord.xy)) / vec2(g.viewport_size.xy);
+	float ssao_val = texture(ssao_tex,uv).r;
+	FS_OUT_Color = vec4(
+		BilateralUpscale(uv)*texture(GBUFFER1,uv).rgb/3.1415*ssao_val,
+		1.0);
+}
+#endif
