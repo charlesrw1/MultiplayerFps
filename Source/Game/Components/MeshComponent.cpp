@@ -308,7 +308,7 @@ void GameAnimationMgr::update_animating()
 
 void AnimPreviewComponent::start()
 {
-	
+
 
 }
 

@@ -127,13 +127,16 @@ class AnimationSeqAsset;
 class AnimPreviewComponent : public Component {
 public:
 	CLASS_BODY(AnimPreviewComponent);
+	AnimPreviewComponent() {
+		set_call_init_in_editor(true);
+	}
 	void start() final;
 	void update() final;
 	void stop() final;
 #ifdef EDITOR_BUILD
 	void editor_on_change_property() final;
 #endif
-private:
 	REF const AnimationSeqAsset* asset = nullptr;
+private:
 	REF AnimPreviewInfoUi info;
 };

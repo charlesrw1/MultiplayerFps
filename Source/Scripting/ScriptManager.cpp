@@ -39,6 +39,17 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text)
 		if (tokens.empty())
 			continue;
 
+		auto append_class = [&]() {
+
+			if (!currentClass.name.empty()) {
+				out.push_back({ currentClass.name, currentClass.inherited, currentClass.properties });
+				currentClass = PendingClass();
+			}
+			inClass = false;
+			//printf("inclass=false %d\n", i + 1);
+			pendingType.clear();
+		};
+
 		// Parse class definition
 		if (tokens.at(0) == "---" && tokens.size() > 2 && tokens.at(1) == "@class") {
 
@@ -71,12 +82,16 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text)
 
 			//printf("start class: %d\n",i+1);
 
-
 			if (!currentClass.name.empty()) {
 				inClass = true;
 				//printf("inclass=true %d\n", i + 1);
 
 			}
+			if (tokens.at(tokens.size() - 1) == "}") {
+				printf("oneline class\n");
+				append_class();
+			}
+
 		}
 		// Parse property type annotation
 		else if (tokens.size() >= 3 && tokens.at(0) == "---" && tokens.at(1) == "@type") {
@@ -103,14 +118,7 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text)
 
 			//printf("end class %d\n", i + 1);
 
-
-			if (!currentClass.name.empty()) {
-				out.push_back({currentClass.name, currentClass.inherited, currentClass.properties});
-				currentClass = PendingClass();
-			}
-			inClass = false;
-			//printf("inclass=false %d\n", i + 1);
-			pendingType.clear();
+			append_class();
 		}
 	}
 	// Handle last class if file doesn't end with }

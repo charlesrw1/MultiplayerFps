@@ -236,6 +236,8 @@ public:
 	BoolButton recapture;
 	REF CubemapAnchor anchor;
 
+	REF int priority = 0;
+
 	void set_baked_probe_ofs(int ofs) {
 		this->probe_ofs = ofs;
 		sync_render_data();
@@ -264,6 +266,10 @@ public:
 	REF int priority = 0;
 	REF float xz_density = 2.0;
 	REF float y_density = 2.0;
+
+	REF bool override_relocate_dist = false;
+	REF float relocate_max_dist = 0.2;
+	REF float relocate_normal_push = 0.2;
 };
 
 class GameSceneGiUtil {

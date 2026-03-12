@@ -87,7 +87,3 @@ loglevel 5
 developer_mode 1
 
 open-editor demo_level_1.tmap
-
-otex 1 1 0 _halfres_scene_color
-
-g_application_class EngineTesterApp

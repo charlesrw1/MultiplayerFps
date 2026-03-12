@@ -6,24 +6,26 @@ cl.interp 0.07
 cl.fake_lag 50
 cl.fake_loss 0
 
-#render vars
+# render vars
 gpu.draw_collision_tris 0
 gpu.draw_sv_colliders 0
 gpu.draw_viewmodel 1
 view.tp 0
 dbg.fly 0
 
-#game vars
+# game vars
 view.sens 0.005
 
-#the main entry point into the game
+# the main entry point into the game
 g_entry_level "mainMenuMap.tmap"
 ed_default_sky_material "indoorHdriSky"
 g_project_name DevEngine
 
-#project vars
+# project vars
 godot_lightmap_engine_path "C:/Users/charl/Documents/lightmapexporter/"
-g_project_base "Data"
+# g_project_base "Data"
+g_project_base "D:/Data"
+
 
 g_application_class "EngineTesterApp"
 is_editor_app 1

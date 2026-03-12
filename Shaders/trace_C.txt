@@ -23,6 +23,9 @@ layout (binding = 1, std140) writeonly buffer RayHitBuffer {
 layout(binding = 13,std430) writeonly buffer DdgiProbeRelocateBufferWrite {
 	vec4 ddgi_probe_relocations_write[];
 };
+layout(binding = 14, std430) readonly buffer DdgiProbeRelocateVol_Param {
+	vec4 ddgi_relocate_volume_params[];
+};
 #endif
 
 #include "rtShared.txt"
@@ -177,6 +180,11 @@ void main()
 	vec3 probe_pos = get_probe_world_from_coords_original(ivec3(probe_x,probe_y,probe_z), volume_origin,volume_spacing);
 		vec3 best_relocate_pos = vec3(0.0);
 		float best_dist = 1000.0;
+		
+	const float max_relocate_dist = ddgi_relocate_volume_params[volume_index].x;
+	const float relocate_normal_dist = ddgi_relocate_volume_params[volume_index].y;
+	
+		
 	#else
 	vec3 probe_pos = get_probe_world_from_coords(ivec3(probe_x,probe_y,probe_z), volume_origin,volume_spacing, vol_grid,vol_offset);
 	
@@ -198,7 +206,7 @@ void main()
 		if(hit_result.t < best_dist) {
 			vec3 pos_hit = probe_pos+ray_dir*hit_result.t;
 			best_dist = hit_result.t;
-			best_relocate_pos = pos_hit+hit_result.hit_normal*ddgi_global.relocate_normal_dist;
+			best_relocate_pos = pos_hit+hit_result.hit_normal*relocate_normal_dist;
 		}
 	}
 #else		
@@ -231,7 +239,7 @@ void main()
 	}
 	
 	#ifdef RELOCATE
-		if(best_dist >= ddgi_global.max_relocate_dist)	{ // fixme
+		if(best_dist >= max_relocate_dist)	{ // fixme
 			best_relocate_pos = probe_pos;
 		}
 		ddgi_probe_relocations_write[global_index] = vec4(best_relocate_pos-probe_pos,0.0);

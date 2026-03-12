@@ -53,7 +53,10 @@ DdgiTesting::DdgiTesting()
 struct VolumesAndNumProbes {
 	vector<DdgiVolumeGpu> volumes;
 	int num_probes;
+
+	vector<glm::vec4> relocate_data;
 };
+extern float relocate_normal_dist;
 #include <algorithm>
 VolumesAndNumProbes find_volumes() {
 	auto level = eng->get_level();
@@ -69,6 +72,7 @@ VolumesAndNumProbes find_volumes() {
 	std::sort(comps.begin(), comps.end(), [](GiVolumeComponent* a, GiVolumeComponent* b) {
 		return a->priority > b->priority;
 		});
+	vector<vec4> relocate_volume_params;
 	for (auto givol : comps) {
 		glm::mat4 transform = givol->get_ws_transform();
 		glm::vec3 min1 = transform * glm::vec4(-0.5, -0.5, -0.5, 1);
@@ -85,16 +89,23 @@ VolumesAndNumProbes find_volumes() {
 		volume.size_offset = glm::ivec4(probe_size, probes_summation);
 		probes_summation += volume.get_num_probes_total();
 		volumes.push_back(volume);
+		if (givol->override_relocate_dist) {
+			relocate_volume_params.push_back(vec4(givol->relocate_max_dist, givol->relocate_normal_push, 0, 0));
+		}
+		else {
+			relocate_volume_params.push_back(vec4(draw.ddgi->max_relocate_dist, relocate_normal_dist, 0, 0));
+		}
 	}
-	return { volumes,probes_summation };
+	return { volumes,probes_summation,relocate_volume_params };
 }
 
 void raytrace_the_world() {
-	auto [volumes, num_probes] = find_volumes();
+	auto [volumes, num_probes, relocate_params] = find_volumes();
 	// allocate probe irradiance and depth
 	auto self = draw.ddgi.get();
 	self->probe_irradiance->release();
 	self->probe_depth->release();
+	ASSERT(relocate_params.size() == volumes.size());
 
 	const int height_probe_space = 128;
 	const int width_probe_space = (int)glm::ceil(num_probes / float(height_probe_space));
@@ -435,8 +446,9 @@ void DdgiTesting::execute()
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, materials->get_internal_handle());
 	
 	
-	auto [volumes, total_num_probes] = find_volumes();
+	auto [volumes, total_num_probes, relocate_params] = find_volumes();
 	if (volumes.size() == 0) throw 1;
+	ASSERT(relocate_params.size() == volumes.size());
 	
 	this->myvolumes = volumes;
 	// allocate probe irradiance and depth
@@ -484,6 +496,12 @@ void DdgiTesting::execute()
 	Random r(13);
 	{
 		device.set_shader(relocate_shader);
+
+		// bruh moment
+		IGraphicsBuffer* relocate_param_buf = IGraphicsDevice::inst->create_buffer({});
+		relocate_param_buf->upload(relocate_params.data(), relocate_params.size() * sizeof(vec4));
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 14, relocate_param_buf->get_internal_handle());
+
 		set_shit_fuck();
 		device.shader().set_float("ray_sample_randomness", r.RandF(0, TWOPI));
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, ddgi_probe_relocation_offsets->get_internal_handle());
@@ -500,6 +518,8 @@ void DdgiTesting::execute()
 				temp_probe_relocate_thing.at(i) = ptr[i];
 			glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
 		}
+
+		relocate_param_buf->release();
 	}
 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 
@@ -774,7 +794,9 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
 	state.program = shade_fs;
-	state.blend = BlendState::OPAQUE;
+	state.blend = BlendState::ADD;
+	if (wants_half_res)
+		state.blend = BlendState::OPAQUE;
 	state.depth_testing = false;
 	state.depth_writes = false;
 	device.set_pipeline(state);

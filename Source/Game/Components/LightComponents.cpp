@@ -744,7 +744,7 @@ void GameSceneGiUtil::bake_all_cubemaps()
 		glm::mat4 transform = glm::translate(glm::mat4(1), pos) * glm::mat4_cast(rot);
 		glm::vec3 size = components[i]->get_owner()->get_ls_scale();
 		R_CubemapVolume vol{};
-		vol.extents = glm::vec4(size,0);
+		vol.extents = glm::vec4(size,components[i]->priority);
 		vol.transform = transform;
 
 		const auto& full_transform = components[i]->get_ws_transform();
@@ -759,6 +759,10 @@ void GameSceneGiUtil::bake_all_cubemaps()
 
 		volumes.push_back(vol);
 	}
+	std::sort(volumes.begin(), volumes.end(), [](const R_CubemapVolume& a, const R_CubemapVolume& b) {
+		return a.extents.w > b.extents.w;
+		});
+
 	RenderGiManager::inst->update_cubemap_volumes(volumes);
 	RenderGiManager::inst->bake_all_cubemaps();
 }
