@@ -91,7 +91,7 @@ private:
 	void draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap_view);
 	void draw_lighting_halfres(IGraphicsTexture* ssao);
 	void draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap);
-
+	void set_reflection_uniforms();
 	
 
 	void compute_avg_probe_value();
@@ -112,7 +112,9 @@ private:
 	program_handle relocate_shader{};
 	program_handle lum_calc{};
 	program_handle get_best_cubemap_shader{};
+	program_handle shade_fs_halfres{};
 	program_handle shade_fs{};
+
 	program_handle shade_debug_fs{};
 
 	program_handle avg_probe_calc{};

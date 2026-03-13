@@ -18,6 +18,8 @@ DdgiTesting::DdgiTesting()
 
 	gather_shader = draw.get_prog_man().create_compute("gather_C.txt");
 		shade_fs = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeF.txt");
+		shade_fs_halfres = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeF.txt","HALFRES_DDGI");
+
 		shade_debug_fs = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeDebugF.txt");
 
 	//	while (1) {
@@ -785,7 +787,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao)
 
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
-	state.program = shade_fs;
+	state.program = shade_fs_halfres;
 	state.blend = BlendState::OPAQUE;
 	state.depth_testing = false;
 	state.depth_writes = false;
@@ -852,12 +854,21 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao)
 	rp.color_infos = targets3;
 	IGraphicsDevice::inst->set_render_pass(rp);
 	state.program = apply_halfres_accum_to_scene;
-	state.blend = BlendState::OPAQUE;
+	state.blend = BlendState::ADD;
 	device.set_pipeline(state);
-	draw.bind_texture_ptr(0, draw.tex.ddgi_accum);
+	draw.bind_texture_ptr(0, draw.tex.scene_gbuffer0);
 	draw.bind_texture_ptr(1, draw.tex.scene_gbuffer1);
-	draw.bind_texture_ptr(2, ssao);
+	draw.bind_texture_ptr(2, draw.tex.scene_gbuffer2);
+	draw.bind_texture_ptr(3, draw.tex.scene_depth);
+	draw.bind_texture_ptr(4, ssao);
+	draw.bind_texture_ptr(5, draw.tex.ddgi_accum);
+
+
+	set_reflection_uniforms();
+
 	glDrawArrays(GL_TRIANGLES, 0, 3);
+
+
 
 	// now swap
 	std::swap(draw.tex.ddgi_accum, draw.tex.last_ddgi_accum);
@@ -888,6 +899,23 @@ void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_
 	extern ConfigVar r_specular_ao_intensity;
 	device.shader().set_bool("include_cubemaps", !for_cubemap_view && include_cubemaps);
 
+
+	set_shit_fuck();
+
+	device.shader().set_ivec3("selected_probe_pos", selected_probe);
+	device.shader().set_float("irrad_mult", irrad_mult);
+	device.shader().set_bool("wants_half_res", false);
+	set_reflection_uniforms();
+}
+
+void DdgiTesting::set_reflection_uniforms()
+{
+	auto& device = draw.get_device();
+
+	extern ConfigVar r_specular_ao_intensity;
+	device.shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
+	device.shader().set_int("lum_adjust_mode", lum_adjust_mode);
+
 	{
 		IGraphicsTexture* const cubemap_array = RenderGiManager::inst->get_cubemap_array_texture();
 		const int num_cubemaps = RenderGiManager::inst->get_num_cubemaps();
@@ -900,18 +928,6 @@ void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_
 
 	draw.bind_texture(7, EnviornmentMapHelper::get().integrator.get_texture());
 	draw.bind_texture(9, draw.scene.skylights.at(0).skylight.generated_cube->get_internal_render_handle());
-
-
-	device.shader().set_int("lum_adjust_mode", lum_adjust_mode);
-
-
-	draw.shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
-
-	set_shit_fuck();
-
-	device.shader().set_ivec3("selected_probe_pos", selected_probe);
-	device.shader().set_float("irrad_mult", irrad_mult);
-	device.shader().set_bool("wants_half_res", false);
 
 }
 

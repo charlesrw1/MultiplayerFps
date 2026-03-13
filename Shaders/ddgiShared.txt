@@ -105,6 +105,12 @@ vec2 get_irrad_probe_uv(vec2 octant_uv, ivec3 probe_coord, ivec3 vol_grid, int v
 	const int DEPTH_TILE_SIZE = 8;
 	return get_probe_uv_shared(octant_uv,probe_coord,vol_grid,vol_offset,DEPTH_IN_SIZE,DEPTH_TILE_SIZE);
 }
+bool is_point_in_aabb(vec3 pos, vec3 bmin, vec3 bmax)
+{
+    return all(greaterThanEqual(pos, bmin)) &&
+           all(lessThanEqual(pos, bmax));
+}
+
 #ifdef DDGILIGHTING
 vec3 get_probe_world_from_coords(ivec3 coords, vec3 volume_origin, vec3 volume_spacing, ivec3 vol_grid, int vol_offset)
 {
@@ -123,12 +129,6 @@ vec3 get_probe_world_from_coords_original(ivec3 coords, vec3 volume_origin, vec3
 }
 
 
-
-bool is_point_in_aabb(vec3 pos, vec3 bmin, vec3 bmax)
-{
-    return all(greaterThanEqual(pos, bmin)) &&
-           all(lessThanEqual(pos, bmax));
-}
 
 // find volume (with priority etc)
 int find_best_ddgi_volume(vec3 worldpos)

@@ -103,8 +103,8 @@ vec3 temporal_upscale()
 	//color clamping (for ddgi: clamp to halfres? idk)
 	vec3 minColor=vec3(9999);
 	vec3 maxColor = vec3(-9999);
-	for(int x = 0;x<=0;x++) {
-		for(int y=0;y<=0;y++) {
+	for(int x = -1;x<=1;x++) {
+		for(int y=-1;y<=1;y++) {
 			vec3 color = texture(halfResColor,input_uv+vec2(x,y)*invsize).rgb;
 			minColor = min(minColor,color);
 			maxColor = max(maxColor,color);

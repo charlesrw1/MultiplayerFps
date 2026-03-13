@@ -1,34 +1,55 @@
 
 
-// scene depth, normal
-// write to blah
-
-// constants
-// probe_depth and probe_irradiance
-// volume location, size, grid
-
-
 layout(location = 0) out vec4 FS_OUT_Color;
 
 #include "SharedGpuTypes.txt"
 
-layout(binding = 0) uniform sampler2D ddgi_accum;		// ws normal (xyz)
+layout(binding = 0) uniform sampler2D GBUFFER0;		// ws normal (xyz)
 layout(binding = 1) uniform sampler2D GBUFFER1;		// albedo
-layout(binding = 2) uniform sampler2D ssao_tex;
+layout(binding = 2) uniform sampler2D GBUFFER2;		// metallic,roughness, custom, matid, custom, matid
+layout(binding = 3) uniform sampler2D DEPTH;		// depth texture (writes disabled)
+
+layout(binding = 4) uniform sampler2D SSAOBlurred;
+layout(binding = 5) uniform sampler2D ddgi_accum;
 
 
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
 
+#include "commonUtil.txt"
+#include "LightingShared.txt"
+#include "pbrShared.txt"
+#include "ddgiShared.txt"
+#include "reflectionShared.txt"
+
+uniform float specular_ao_intensity = 3.0;
 
 #if 1
 void main()
 {
 	vec2 uv = (vec2(gl_FragCoord.xy)) / vec2(g.viewport_size.xy);
-	float ssao_val = texture(ssao_tex,uv).r;
-	FS_OUT_Color = vec4(
-		texture(ddgi_accum,uv).rgb*texture(GBUFFER1,uv).rgb/3.1415*ssao_val,
-		1.0);
+	
+	ivec2 texel_to_fetch = ivec2(gl_FragCoord.xy);
+
+	vec4 depth_tex = texelFetch(DEPTH,texel_to_fetch,0);
+	vec4 normal_t = texelFetch(GBUFFER0,texel_to_fetch,0);
+	vec4 metal_rough = texelFetch(GBUFFER2,texel_to_fetch,0);
+	vec4 albedo = texelFetch(GBUFFER1,texel_to_fetch,0);
+	
+	uint type = get_gbuffer_material_type(metal_rough);
+	if(type==MATERIAL_TYPE_UNLIT)
+		discard;
+		
+	const vec3 direction = normal_t.xyz;
+	const vec3 worldspace = WorldPosFromDepth(uv, depth_tex.r);
+	const float ssao_value = texture(SSAOBlurred, uv).r;
+
+	const vec3 outirrad = texture(ddgi_accum,uv).rgb;
+	vec3 rad = vec3(0.0);
+	rad = outirrad * pbr_get_albedo_mult(worldspace, albedo.rgb, metal_rough.y, metal_rough.x, direction) * ssao_value;
+	vec3 spec_color = vec3(0);
+	spec_color = pbr_calculate_reflection(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz,pow(ssao_value,specular_ao_intensity),outirrad);
+	FS_OUT_Color = vec4(rad+spec_color,1);
 }
 #endif

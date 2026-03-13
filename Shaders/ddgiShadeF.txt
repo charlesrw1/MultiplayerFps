@@ -19,9 +19,6 @@ layout(binding = 3) uniform sampler2D DEPTH;		// depth texture (writes disabled)
 layout(binding = 4) uniform sampler2D probe_irradiance;
 layout(binding = 5) uniform sampler2D probe_depth;
 layout(binding = 6) uniform sampler2D SSAOBlurred;
-layout(binding = 7) uniform sampler2D PBR_brdflut;
-layout(binding = 8) uniform samplerCubeArray probes;
-layout(binding = 9) uniform samplerCube skyprobe;
 
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
@@ -33,18 +30,6 @@ uniform float specular_ao_intensity = 3.0;
 uniform bool include_cubemaps = false;
 uniform ivec3 selected_probe_pos;
 
-uniform int num_cubemaps = 0;
-struct R_ReflectionVolume {
-	mat4 transform;
-	vec4 size;
-	vec4 bounds_min;
-	vec4 bounds_max;
-};
-
-layout(std430, binding =11) readonly buffer BestCubemapForProbe
-{
-	R_ReflectionVolume data[];
-} Cubemaps;
 
 #include "commonUtil.txt"
 #include "LightingShared.txt"
@@ -54,7 +39,7 @@ layout(std430, binding =11) readonly buffer BestCubemapForProbe
 
 #include "pbrShared.txt"
 
-
+#include "reflectionShared.txt"
 
 
 //ivec3 get_actual_probe_coord(ivec3 input_)
@@ -94,206 +79,25 @@ layout(std430, binding =11) readonly buffer BestCubemapForProbe
 //bool is_point_in_aabb(vec3 pos, vec3 bmin, vec3 bmax)
 
 
-// forget where this is from, frostbite paper i think
-float compute_specular_occlusion(float ao, float NdotV, float roughness)
-{
-    float out_val = (pow(NdotV + ao, exp2(-16.0 * roughness - 1.0)) - 1.0 + ao);
-	return clamp(out_val,0,1);
-}
-
-// p = test_pos - box_pos, b = box_size
-float sdBox( vec3 p, vec3 b )
-{
-	  vec3 q = abs(p) - b;
-	  return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
-}
-
-float luminance(vec3 v)
-{
-    return dot(v, vec3(0.2126, 0.7152, 0.0722));
-}
-
-
-
-vec3 get_cubemap_volume_index_debug(vec3 worldpos, vec3 outirrad)
-{
-
-	float in_lum = luminance(outirrad);
-
-	float weight_sum = 0.0;
-	vec3 sum = vec3(0.0);
-			const float MAX_REFLECTION_LOD = 7.0;
-	float max_priority = -1000;
-	vec3 fade_out_color = vec3(1,0,1);
-	for(int i=0;i<num_cubemaps;i++) {
-		mat4 transform = Cubemaps.data[i].transform;
-		vec4 size = Cubemaps.data[i].size;
-		vec4 bmin = Cubemaps.data[i].bounds_min;
-		vec4 bmax = Cubemaps.data[i].bounds_max;
-		float priority = size.w;
-		if(is_point_in_aabb(worldpos,bmin.xyz,bmax.xyz)) {
-			vec3 middle = (bmax.xyz+bmin.xyz)*0.5;
-			vec3 size = (bmax.xyz-bmin.xyz);
-			
-		
-			float dist = sdBox(worldpos-middle, size*0.5);
-			float alpha = 1.0-smoothstep(1.0,0.0,abs(dist));
-			
-			max_priority = max(max_priority,priority);
-			
-			
-			//vec3 pf = vec3(min(1,in_lum/bmin.w));// randColor(i);
-			vec3 pf = randColor(i);
-			if(priority<max_priority) {
-				fade_out_color = pf;
-				break;
-			}
-			
-			sum +=pf*alpha;
-			weight_sum += alpha;	
-		}
-	}
-	if(weight_sum <= 1.0) {
-		sum += fade_out_color*(1.0-weight_sum);
-		weight_sum = 1.0;
-	}
-	return sum / weight_sum;
-}
-
-uniform int lum_adjust_mode = 4;	// 4 looks the best
-
-vec3 get_prefiltered_color(vec3 worldpos, vec3 R, float Roughness,float nDotV, vec3 outirrad)
-{
-	float weight_sum = 0.0;
-	vec3 sum = vec3(0.0);
-			const float MAX_REFLECTION_LOD = 7.0;
-
-	float in_lum = luminance(outirrad);
-
-	float max_priority = -1000.0;
-	vec3 fade_out_color = vec3(-1);
-	for(int i=0;i<num_cubemaps;i++) {
-		mat4 transform = Cubemaps.data[i].transform;
-		vec4 size = Cubemaps.data[i].size;
-		vec4 bmin = Cubemaps.data[i].bounds_min;
-		vec4 bmax = Cubemaps.data[i].bounds_max;
-		float priority = size.w;
-
-		
-		if(is_point_in_aabb(worldpos,bmin.xyz,bmax.xyz)) {
-		
-			vec3 middle = (bmax.xyz+bmin.xyz)*0.5;
-			vec3 size = (bmax.xyz-bmin.xyz);
-			
-		
-			float dist = sdBox(worldpos-middle, size*0.5);
-			float alpha = 1.0-smoothstep(1.0,0.0,abs(dist));
-			
-		
-			// if blending out the seams, then you can pick a lower priroty box. ie a blend out from a higher to a lower priority
-			// note, volumes already sorted from highest to lowest priority.
-			max_priority = max(max_priority,priority);
-
-	
-			vec3 pf = textureLod(probes,vec4(R,float(i)),Roughness*MAX_REFLECTION_LOD).rgb;
-			// scale the brightness down. bmin.w is precomputed luminance at the position of the specular probe see probeLumCalc_C.txt
-			float brightness_adjust = min(1,in_lum/bmin.w);
-			if(lum_adjust_mode==0)
-				brightness_adjust=1.0;
-			else if(lum_adjust_mode==2) {
-				brightness_adjust = mix(1,brightness_adjust,Roughness);
-			}
-			else if(lum_adjust_mode==3) {
-				brightness_adjust = mix(1,brightness_adjust,pow(Roughness,0.5));
-			}	
-			else if(lum_adjust_mode==4) {
-				// from treyarch presentation
-				// wtf magic numbers
-				float mip = Roughness*MAX_REFLECTION_LOD;
-				float max_spec = max(
-					1.26816,
-					max(
-						9.13681*exp2(6.85741-2*mip)*nDotV,
-						9.70809*exp2(7.085-mip-0.403181*mip*mip)*nDotV
-					));
-				float adjust_max = max_spec*in_lum;
-				brightness_adjust = adjust_max/(adjust_max+bmin.w);
-			
-			}
-			
-			pf *= brightness_adjust;
-			
-			if(priority<max_priority) {
-				fade_out_color = pf;
-				break;
-			}
-	
-			sum +=pf*alpha;
-			weight_sum += alpha;
-		}
-	}
-	
-	if(weight_sum < 1.0) {
-		if(fade_out_color.x<0)
-			fade_out_color = textureLod(skyprobe,vec3(R),Roughness*MAX_REFLECTION_LOD).rgb;
-		sum += fade_out_color*(1.0-weight_sum);
-		weight_sum = 1.0;
-	}
-	return sum / weight_sum;
-}
-
-vec3 pbr_calculate_reflection(vec3 worldspace, vec3 Albedo, float Roughness, float Metalness, vec3 Normal, float ambient_occlusion, vec3 ref_irrad)
-{
-	vec3 view_pos = g.viewpos_time.xyz;
-	vec3 view_front = g.viewfront.xyz;
-
-	vec3 V = normalize(view_pos-worldspace);
-	vec3 R = reflect(-V,Normal);
-	
-	vec3 F0 = vec3(0.04);
-	F0 = mix(F0,Albedo,Metalness);
-	
-	const float MAX_REFLECTION_LOD = 7.0;
-	//vec3 prefiltered_color = textureLod(skyprobe,vec3(R), Roughness*MAX_REFLECTION_LOD).rgb;
-	//vec3 prefiltered_color = pow(ref_irrad,vec3(1.5));
-	float NdotV = max(dot(Normal,V),0.0);
-	
-	vec3 prefiltered_color = get_prefiltered_color(worldspace+Normal*0.3,R,Roughness, NdotV,ref_irrad);///get_prefiltered_color(worldspace,R,1.0);// textureLod(probes,vec4(R,float(probe_num)),Roughness*MAX_REFLECTION_LOD).rgb;
-	//prefiltered_color *= ref_irrad;
-
-	
-	
-	vec3 F = FresnelSchlickRougness(NdotV,F0,Roughness);
-	
-	
-	//float F90 = clamp(50*dot(F0,vec3(0.33)),0,1);
-	//vec3 F = modified_f_schlick(F0,F90,NdotV);
-	
-	vec2 env_brdf = texture(PBR_brdflut,vec2(max(dot(Normal,V),0.0),Roughness)).rg;
-	
-	
-	vec3 specular = prefiltered_color*(F*env_brdf.x+env_brdf.y);
-	float spec_occlusion =compute_specular_occlusion(ambient_occlusion,NdotV,Roughness);
-	
-
-	return specular*spec_occlusion;
-}
-uniform bool wants_half_res = false;
 uniform ivec2 halfres_texel_offset = ivec2(0,0);
+
 
 void main()
 {
 	ivec2 texel_to_fetch = ivec2(gl_FragCoord.xy);
-	if(wants_half_res) {
+	
+#ifdef HALFRES_DDGI
+	{
 		texel_to_fetch *= 2;	// 2x2
 		texel_to_fetch += halfres_texel_offset;	// for temporal accum
-	}	
+	}
+#endif
 	vec2 uv = vec2(vec2(texel_to_fetch)+vec2(0.5)) / vec2(g.viewport_size.xy);
 	
 	vec4 depth_tex = texelFetch(DEPTH,texel_to_fetch,0);
 	vec4 normal_t = texelFetch(GBUFFER0,texel_to_fetch,0);
 	vec4 metal_rough = texelFetch(GBUFFER2,texel_to_fetch,0);
-	vec4 albedo = texelFetch(GBUFFER1,texel_to_fetch,0);
+	
 	
 	uint type = get_gbuffer_material_type(metal_rough);
 	if(type==MATERIAL_TYPE_UNLIT)
@@ -304,11 +108,8 @@ void main()
 	float depth_value = depth_tex.r;
 	vec3 worldspace = WorldPosFromDepth(uv, depth_value);
 	
-	float ssao_value = texture(SSAOBlurred, uv).r;
 
 
-	vec3 R = reflect(-normalize(g.viewpos_time.xyz-worldspace),direction);
-	
 	
 	//vec2 uv_gi = (worldspace.xz+vec2(10.0))/vec2(20.0);
 //	uv_gi = clamp(uv_gi,vec2(0),vec2(1));
@@ -322,33 +123,24 @@ void main()
 	
 
 	vec3 biased_world_position = worldspace+direction*ddgi_global.normal_bias-normalize(worldspace-g.viewpos_time.xyz)*ddgi_global.view_bias;
-
 	vec3 outirrad = calculate_irradiance(direction, worldspace, biased_world_position);
 	//outirrad.irrad = vec3(0.0);
+	
+#ifdef HALFRES_DDGI
+	FS_OUT_Color = vec4(outirrad,1);
+#else
+	vec4 albedo = texelFetch(GBUFFER1,texel_to_fetch,0);
+	float ssao_value = texture(SSAOBlurred, uv).r;
 	vec3 albedo_mult =  pbr_get_albedo_mult(worldspace, albedo.rgb, metal_rough.y, metal_rough.x, direction);
-	vec3 rad = outirrad;//*albedo_mult * ssao_value;
-
-	if(!wants_half_res) {
-		rad = outirrad * albedo_mult * ssao_value;
-	}
-
-	//int probe_to_use = max(outirrad.closest_probe,0);
-	
-	vec3 spec_color = vec3(0);
+	vec3 rad = vec3(0.0);//*albedo_mult * ssao_value;
+	rad = outirrad * albedo_mult * ssao_value;
 	if(include_cubemaps) {
-	//// intensifying ao for indirect diffuse gets ugly halo stuff, but just for specular i think looks alright
-		spec_color = pbr_calculate_reflection(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz,pow(ssao_value,specular_ao_intensity),outirrad);
-	//vec3 alb2 = get_albedo_mult(worldspace, albedo.rgb, metal_rough.x, metal_rough.y, direction);
-	FS_OUT_Color = vec4(rad+spec_color,1);
-	
+		vec3 spec_color = pbr_calculate_reflection(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz,pow(ssao_value,specular_ao_intensity),outirrad);
+		FS_OUT_Color = vec4(rad+spec_color,1);	
 	}
 	else {
-	//	FS_OUT_Color = vec4(get_cubemap_volume_index_debug(worldspace, outirrad),1);
 		FS_OUT_Color = vec4(rad,1);
-	
 	}
-	
-	
-	//FS_OUT_Color = vec4(get_prefiltered_color(worldspace,vec3(1),1.0),1.0);
+#endif
 
 }
