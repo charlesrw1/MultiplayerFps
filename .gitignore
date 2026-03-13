@@ -21,7 +21,7 @@ Source/.generated/
 *.lib
 *.tlog
 *.exe
-
+*.csv
 *.dat
 *.ini
 

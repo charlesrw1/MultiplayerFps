@@ -34,6 +34,8 @@ DdgiTesting::DdgiTesting()
 	avg_probe_calc = draw.get_prog_man().create_compute("avgProbeCalc_C.txt");
 
 	bilateral_upsample = draw.get_prog_man().create_raster("fullscreenquad.txt", "bilateral_upsample_ddgi.txt");
+	temporal_upsample = draw.get_prog_man().create_raster("fullscreenquad.txt", "temporal_upsample_ddgi.txt");
+	apply_halfres_accum_to_scene = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgi_apply_upsampled.txt");
 
 	ddgi_probe_relocation_offsets = IGraphicsDevice::inst->create_buffer({});
 	ddgi_globals = IGraphicsDevice::inst->create_buffer({});
@@ -169,6 +171,8 @@ ConfigVar vert_limit("vert_limit", "9999999", CVAR_INTEGER | CVAR_UNBOUNDED, "")
 Color32 get_color_of_material_for_export(const MaterialInstance* m);
 #include "Assets/AssetDatabase.h"
 void set_shit_fuck();
+
+
 void DdgiTesting::compute_avg_probe_value()
 {
 	const int num_probes = temp_probe_relocate_thing.size();
@@ -747,61 +751,127 @@ void DdgiTesting::load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, 
 
 	compute_avg_probe_value();
 }
-void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
+void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap_view)
 {
-	if (draw.scene.skylights.empty())
-		return;//fixme
-	//if (!verts) {
-	//	execute();
-	//	ASSERT(verts);
-	//}
-
-	//render_rt();
-	//return;
-
 	auto& device = draw.get_device();
 
-	
-	GPUFUNCTIONSTART;
-
-	if (wants_half_res) {
-		auto targets = {
-			ColorTargetInfo(draw.tex.halfres_scene_color)
-		};
-		RenderPassState rp;
-		rp.color_infos = targets;
-		IGraphicsDevice::inst->set_render_pass(rp);
-
-	}
 	// pass already set by caller
-	
-	// auto set_composite_pass2 = [&]() {
-	//	RenderPassState pass_state;
-	//	pass_state.wants_color_clear = false;
-	//	auto color_infos = {
-	//		ColorTargetInfo(draw.tex.output_composite)
-	//	};
-	//	pass_state.color_infos = color_infos;
-	//	IGraphicsDevice::inst->set_render_pass(pass_state);
-	//};
-	//set_composite_pass2();
-
-	theglobals.view_bias = view_bias;
-	theglobals.normal_bias = normal_bias;
-	ddgi_globals->upload(&theglobals, sizeof(theglobals));
-
 
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
 	state.program = shade_fs;
 	state.blend = BlendState::ADD;
-	if (wants_half_res)
-		state.blend = BlendState::OPAQUE;
 	state.depth_testing = false;
 	state.depth_writes = false;
 	device.set_pipeline(state);
 
-	//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, buf->get_internal_handle());
+	draw_lighting_shared(ssao,for_cubemap_view);
+
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+ConfigVar r_ddgi_halfres_blend("r.ddgi_halfres_blend", "0.1", CVAR_FLOAT, "[0,1] blend input into ddgi temporal accumulation");
+void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao)
+{
+	auto& device = draw.get_device();
+
+	const glm::ivec2 texel_offset = get_half_res_offset();
+
+	auto targets = {
+			ColorTargetInfo(draw.tex.halfres_scene_color)
+	};
+	RenderPassState rp;
+	rp.color_infos = targets;
+	IGraphicsDevice::inst->set_render_pass(rp);
+
+	RenderPipelineState state;
+	state.vao = draw.get_empty_vao();
+	state.program = shade_fs;
+	state.blend = BlendState::OPAQUE;
+	state.depth_testing = false;
+	state.depth_writes = false;
+	device.set_pipeline(state);
+
+	draw_lighting_shared(ssao,false);
+	device.shader().set_ivec2("halfres_texel_offset", texel_offset);
+	device.shader().set_bool("wants_half_res", true);
+
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+
+	{
+		GPUSCOPESTART(temporal_upsample_ddgi);
+
+		// now do temporal upsample
+		auto targets2 = {
+			ColorTargetInfo(draw.tex.ddgi_accum)
+		};
+		rp.color_infos = targets2;
+		IGraphicsDevice::inst->set_render_pass(rp);
+
+		state.blend = BlendState::OPAQUE;
+		state.program = temporal_upsample;
+		device.set_pipeline(state);
+
+		draw.bind_texture_ptr(0, draw.tex.halfres_scene_color);
+		draw.bind_texture_ptr(1, draw.tex.last_ddgi_accum);
+		draw.bind_texture_ptr(2, draw.tex.scene_depth);
+		draw.bind_texture_ptr(3, draw.tex.scene_motion);
+		draw.bind_texture_ptr(4, draw.tex.last_scene_motion);
+
+		// FIXME
+		extern ConfigVar r_taa_blend;
+		extern ConfigVar r_taa_flicker_remove;
+		extern ConfigVar r_taa_reproject;
+		extern ConfigVar r_taa_dilate_velocity;
+		extern float taa_doc_mult;
+		extern float taa_doc_vel_bias;
+		extern float taa_doc_bias;
+		extern float taa_doc_pow;
+
+		auto the_shader = device.shader();
+		the_shader.set_float("amt", r_ddgi_halfres_blend.get_float());
+		the_shader.set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
+		the_shader.set_mat4("lastViewProj", draw.last_frame_main_view.viewproj);
+		the_shader.set_bool("use_reproject", r_taa_reproject.get_bool());
+		the_shader.set_float("doc_mult", taa_doc_mult);
+		the_shader.set_float("doc_vel_bias", taa_doc_vel_bias);
+		the_shader.set_float("doc_bias", taa_doc_bias);
+		the_shader.set_float("doc_pow", taa_doc_pow);
+		the_shader.set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
+		the_shader.set_ivec2("halfres_texel_offset", texel_offset);
+
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+	}
+
+	GPUSCOPESTART(ddgihalfres_apply);
+
+
+	// now apply to scene
+	auto targets3 = {
+		ColorTargetInfo(draw.tex.scene_color)
+	};
+	rp.color_infos = targets3;
+	IGraphicsDevice::inst->set_render_pass(rp);
+	state.program = apply_halfres_accum_to_scene;
+	state.blend = BlendState::OPAQUE;
+	device.set_pipeline(state);
+	draw.bind_texture_ptr(0, draw.tex.ddgi_accum);
+	draw.bind_texture_ptr(1, draw.tex.scene_gbuffer1);
+	draw.bind_texture_ptr(2, ssao);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+
+	// now swap
+	std::swap(draw.tex.ddgi_accum, draw.tex.last_ddgi_accum);
+	increment_half_res_offset_index();
+}
+
+void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_view)
+{
+	auto& device = draw.get_device();
+
+
+	theglobals.view_bias = view_bias;
+	theglobals.normal_bias = normal_bias;
+	ddgi_globals->upload(&theglobals, sizeof(theglobals));
 
 	//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, indirection->get_internal_handle());
 
@@ -810,17 +880,11 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 	draw.bind_texture_ptr(2, draw.tex.scene_gbuffer2);
 	draw.bind_texture_ptr(3, draw.tex.scene_depth);
 
-	
+
 	draw.bind_texture_ptr(4, probe_irradiance);
 	draw.bind_texture_ptr(5, probe_depth);
 	draw.bind_texture_ptr(6, ssao);
 
-	//draw.bind_texture(7, Texture::load("topdown_gi.png")->get_internal_render_handle());
-	//draw.bind_texture(8, Texture::load("bottom_gi.png")->get_internal_render_handle());
-
-
-	// boxes (with pos and size)
-	// trace against them, find best 1 box
 	extern ConfigVar r_specular_ao_intensity;
 	device.shader().set_bool("include_cubemaps", !for_cubemap_view && include_cubemaps);
 
@@ -847,42 +911,31 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 
 	device.shader().set_ivec3("selected_probe_pos", selected_probe);
 	device.shader().set_float("irrad_mult", irrad_mult);
-	device.shader().set_vec2("jitter", draw.get_taa_jitter());
-	device.shader().set_bool("wants_half_res", wants_half_res);
+	device.shader().set_bool("wants_half_res", false);
 
-	// fullscreen shader, no vao used
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+}
+
+void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
+{
+	if (draw.scene.skylights.empty())
+		return;//fixme
+	//if (!verts) {
+	//	execute();
+	//	ASSERT(verts);
+	//}
+
+	//render_rt();
+	//return;
+
+	auto& device = draw.get_device();
+
 	
-	if (!wants_half_res)
-		return;
+	GPUFUNCTIONSTART;
 
-
-	auto targets2 = {
-		ColorTargetInfo(draw.tex.scene_color)
-	};
-	RenderPassState rp;
-	rp.color_infos = targets2;
-	IGraphicsDevice::inst->set_render_pass(rp);
-
-	state.blend = BlendState::OPAQUE;
-	state.program = bilateral_upsample;
-	device.set_pipeline(state);
-
-	draw.bind_texture_ptr(0, draw.tex.scene_gbuffer0);
-	draw.bind_texture_ptr(1, draw.tex.scene_depth);
-	draw.bind_texture_ptr(2, draw.tex.halfres_scene_color);
-	draw.bind_texture_ptr(3, draw.tex.scene_gbuffer1);
-	draw.bind_texture_ptr(4, ssao);
-
-	device.shader().set_float("normal_sigma", normal_sigma);
-	device.shader().set_bool("y_blur", false);
-	device.shader().set_float("depth_sigma", depth_sigma);
-	device.shader().set_vec2("jitter", draw.get_taa_jitter());
-	glDrawArrays(GL_TRIANGLES, 0, 3);
-	//device.shader().set_bool("y_blur", true);
-	//glDrawArrays(GL_TRIANGLES, 0, 3);
-
-
+	if (wants_half_res && !for_cubemap_view)
+		draw_lighting_halfres(ssao);
+	else
+		draw_lighting_fullres(ssao, for_cubemap_view);
 }
 void DdgiTesting::render_rt()
 {

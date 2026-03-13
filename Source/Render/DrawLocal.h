@@ -760,7 +760,11 @@ public:
 		IGraphicsTexture* scene_motion{};
 		IGraphicsTexture* last_scene_motion{};
 
+		// textures for ddgi rendering at half res
+		// full res just writes to scene_color
 		IGraphicsTexture* halfres_scene_color{};
+		IGraphicsTexture* last_ddgi_accum{};
+		IGraphicsTexture* ddgi_accum{};
 
 
 		// ----------------------------------------------------------------------------------

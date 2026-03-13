@@ -1871,6 +1871,10 @@ void Renderer::create_default_textures()
 	tex.postProcessInput_vts_handle = Texture::install_system("_PostProcessInput");
 	tex.scene_motion_vts_handle = Texture::install_system("_scene_motion");
 	Texture::install_system("_halfres_scene_color");
+	Texture::install_system("_ddgi_accum");
+	Texture::install_system("_ddgi_accum_prev");
+
+
 	tex.read_scene_color_for_transparents_handle = Texture::install_system("_read_scene_color");
 }
 
@@ -2100,6 +2104,11 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	delete_and_create_texture_half_res(tex.halfres_scene_color, gtf::rgb16f);
 	Texture::load("_halfres_scene_color")->update_specs_ptr(tex.halfres_scene_color);
+	delete_and_create_texture(tex.ddgi_accum, gtf::r11f_g11f_b10f);
+	delete_and_create_texture(tex.last_ddgi_accum, gtf::r11f_g11f_b10f);
+	Texture::load("_ddgi_accum")->update_specs_ptr(tex.ddgi_accum);
+	Texture::load("_ddgi_accum_prev")->update_specs_ptr(tex.last_ddgi_accum);
+
 
 	// last frame, for TAA
 	delete_and_create_texture(tex.last_scene_color, gtf::rgb16f);
@@ -4031,10 +4040,10 @@ ConfigVar r_taa_blend("r.taa_blend", "0.75", CVAR_FLOAT, "", 0, 1.0);
 ConfigVar r_taa_flicker_remove("r.taa_flicker_remove", "1", CVAR_BOOL, "");
 ConfigVar r_taa_reproject("r.taa_reproject", "0", CVAR_BOOL, "");
 ConfigVar r_taa_dilate_velocity("r.taa_dilate_velocity", "1", CVAR_BOOL, "");
-static float taa_doc_mult = 80.0;
-static float taa_doc_vel_bias = 0.001;
-static float taa_doc_bias = 0.2;
-static float taa_doc_pow = 0.15;
+float taa_doc_mult = 80.0;
+float taa_doc_vel_bias = 0.001;
+float taa_doc_bias = 0.2;
+float taa_doc_pow = 0.15;
 
 void taa_menu()
 {
@@ -4148,7 +4157,7 @@ void Renderer::upload_light_and_decal_buffers()
 }
 
 
-ConfigVar dont_attach_velocity("r.dont_attach_velocity", "1", CVAR_BOOL, "");
+ConfigVar dont_attach_velocity("r.dont_attach_velocity", "0", CVAR_BOOL, "");
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 {
 	//TracyGpuZone("scene_draw_internal");

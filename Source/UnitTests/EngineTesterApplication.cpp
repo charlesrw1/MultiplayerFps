@@ -91,9 +91,6 @@ public:
 	bool update(bool f) {
 
 	}
-
-
-
 };
 // anim into ragdoll
 class ET_Ragdoll : public EngineTestcase {
@@ -160,8 +157,12 @@ public:
 };
 
 // physics layer tests. on overlap, raycast, on hit, materials. joints. 
+// ragdolls. features physics gun.
 class ET_PhysicsTest : public EngineTestcase {
 public:
+	ET_PhysicsTest() {
+		eng->load_level("physics_test_world.tmap");
+	}
 };
 class ET_ShadowmapAtlas : public EngineTestcase {
 public:

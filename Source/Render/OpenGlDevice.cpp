@@ -19,6 +19,50 @@ int total_gfx_mem_usage = 0;
 IGraphicsDevice* IGraphicsDevice::inst = nullptr;
 extern ConfigVar log_shader_compiles;
 
+static const char* graphics_texture_format_to_str(GraphicsTextureFormat fmt)
+{
+	static const array enum_strs = {
+		"r8",
+		"rg8",
+		"rgb8",
+		"rgba8",
+		"r16f",
+		"rg16f",
+		"rgb16f",
+		"rgba16f",
+		"r32f",
+		"rg32f",
+		"bc1",
+		"bc1_srgb",
+		"bc3",
+		"bc4",
+		"bc5",
+		"bc6",
+		"depth16f",
+		"depth24f",
+		"depth32f",
+		"depth24stencil8",
+		"r11f_g11f_b10f",
+		"rgba16_snorm"
+	};
+	return enum_strs[(int)fmt];
+}
+
+class OpenGLTextureImpl;
+class OpenGLBufferImpl;
+class OpenglDataStatic {
+public:
+	hash_set<OpenGLTextureImpl> all_textures;
+	hash_set<OpenGLBufferImpl> all_buffers;
+
+	void dump_to_disk(std::string str);
+};
+static OpenglDataStatic opengl_stats;
+void dump_render_memory_usage()
+{
+	opengl_stats.dump_to_disk("r_mem_usage.csv");
+}
+
 class OpenGLTextureImpl : public IGraphicsTexture {
 public:
 	static double get_bytes_per_pixel(GraphicsTextureFormat fmt) {
@@ -227,6 +271,8 @@ public:
 	int mem_usage = 0;
 	OpenGLTextureImpl() = default;
 	OpenGLTextureImpl(const CreateTextureArgs& args) {
+		opengl_stats.all_textures.insert(this);
+
 		mem_usage = estimate_memory_usage(args);
 		total_gfx_mem_usage += mem_usage;
 		auto type = to_type(args.type);
@@ -315,6 +361,8 @@ public:
 	~OpenGLTextureImpl() override {
 		glDeleteTextures(1, &id);
 		total_gfx_mem_usage -= mem_usage;
+
+		opengl_stats.all_textures.remove(this);
 	}
 
 	texhandle id = 0;
@@ -423,14 +471,20 @@ public:
 		glCreateBuffers(1, &id);
 		usage_type = (args.flags & BUFFER_USE_DYNAMIC) ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW;
 		glNamedBufferData(id, args.size, nullptr, usage_type);
+		this->buffer_size = args.size;
+
+		opengl_stats.all_buffers.insert(this);
 	}
 	~OpenGLBufferImpl() override {
 		glDeleteBuffers(1, &id);
+
+		opengl_stats.all_buffers.remove(this);
 	}
 	void release() override {
 		delete this;
 	}
 	void upload(const void* data, int size) override {
+		this->buffer_size = size;
 		glNamedBufferData(id, size, data, usage_type);
 	}
 	void sub_upload(const void* data, int size, int ofs) override {
@@ -440,7 +494,7 @@ public:
 		return id;
 	}
 
-
+	int buffer_size = 0;
 	GLenum usage_type{};
 };
 class OpenGLVertexInputImpl : public IGraphicsVertexInput {
@@ -703,3 +757,17 @@ IGraphicsDevice* IGraphicsDevice::create_opengl_device(ThingerBobber* f) {
 	return new OpenGLDeviceImpl(f);
 }
 #endif
+
+void OpenglDataStatic::dump_to_disk(std::string str) {
+	std::string output;
+	for (auto t : all_textures) {
+		output += string_format("texture,%s,%d\n", graphics_texture_format_to_str(t->get_texture_format()),
+			t->mem_usage);
+	}
+	for (auto t : all_buffers) {
+		output += string_format("buffer,,%d\n",
+			t->buffer_size);
+	}
+	auto fileptr = FileSys::open_write(str.c_str(), FileSys::ENGINE_DIR);
+	fileptr->write(output.data(), output.size());
+}

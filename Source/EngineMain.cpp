@@ -645,7 +645,7 @@ void load_imgui_ini(const Cmd_Args& args)
 extern void IMPORT_TEX_FOLDER(const Cmd_Args& args);
 extern void IMPORT_TEX(const Cmd_Args& args);
 extern void COMPILE_TEX(const Cmd_Args& args);
-
+extern void dump_render_memory_usage();
 void GameEngineLocal::add_commands()
 {
 	commands = ConsoleCmdGroup::create("");
@@ -656,6 +656,9 @@ void GameEngineLocal::add_commands()
 	commands->add("compile-tex", COMPILE_TEX);
 	
 #endif
+	commands->add("dump_render_memory_usage", [](const Cmd_Args&) {
+		dump_render_memory_usage();
+		});
 	static int blah = 0;
 	commands->add("stress-test", [](const Cmd_Args&) {
 		int size = 20;
