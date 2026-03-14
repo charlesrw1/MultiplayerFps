@@ -1,5 +1,7 @@
 
-layout(local_size_x = 64, local_size_y=1,local_size_z=1) in;
+#define NUM_RAYS_PER_PROBE 128
+
+layout(local_size_x = NUM_RAYS_PER_PROBE, local_size_y=1,local_size_z=1) in;
 
 layout(binding =2) uniform sampler2D  probe_irradiance;
 layout(binding =3) uniform sampler2D  probe_depth;
@@ -155,7 +157,12 @@ vec3 evaluate_lighting(vec3 pos, vec3 normal, vec3 albedo)
 
 void main()
 {
+#ifndef RELOCATE
+	const int global_index = int(gl_WorkGroupID.x);	
+	const int local_index = int(gl_LocalInvocationID.x);
+#else
 	const int global_index = int(gl_GlobalInvocationID.x);
+#endif
 	const int volume_index = get_volume_index_for_global_index(global_index);
 	const int probe_number = global_index-volumes[volume_index].size_offset.w;
 	const ivec3 vol_grid = volumes[volume_index].size_offset.xyz;
@@ -171,6 +178,8 @@ void main()
 	int probe_x = probe_number % int(vol_grid.x);
 	int probe_y = (probe_number / int(vol_grid.x)) % int(vol_grid.y);
 	int probe_z = probe_number / (int(vol_grid.x) * int(vol_grid.y));
+	
+	
 	
 	
 //	volume_origin.xyz + vec3(probe_x, probe_y, probe_z) * vec3(volume_spacing);
@@ -190,7 +199,13 @@ void main()
 	
 	#endif
 	
-	for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
+	#ifdef RELOCATE
+	int backface_hits = 0;
+	for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) 
+	#else
+	const int ray_idx = local_index;
+	#endif
+	{
 		// Generate ray direction from ray index (spherical distribution)
 
 		vec3 ray_dir = RTXGISphericalFibonacci(ray_idx,NUM_RAYS);
@@ -208,6 +223,7 @@ void main()
 			best_dist = hit_result.t;
 			best_relocate_pos = pos_hit+hit_result.hit_normal*relocate_normal_dist;
 		}
+		backface_hits += 1;
 	}
 #else		
 		vec3 incoming_radiance = vec3(0.0);
@@ -239,6 +255,7 @@ void main()
 	}
 	
 	#ifdef RELOCATE
+
 		if(best_dist >= max_relocate_dist)	{ // fixme
 			best_relocate_pos = probe_pos;
 		}

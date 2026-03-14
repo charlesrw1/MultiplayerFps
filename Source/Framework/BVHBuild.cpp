@@ -192,7 +192,7 @@ void BVHBuilder::build_R(int start, int end, int node_number)
 BVH BVH::build(const std::vector<Bounds>& bounds, int max_per_node, PartitionStrategy strat)
 {
 	BVHBuilder builder(bounds, max_per_node);
-
+	
 	int start_node = builder.add_new_node();	// =0
 	builder.build_R(0, bounds.size(), start_node);
 

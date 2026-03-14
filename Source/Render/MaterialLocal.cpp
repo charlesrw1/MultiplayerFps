@@ -277,6 +277,7 @@ void MaterialInstance::move_construct(IAsset* _other)
 		}
 	}
 
+	matman.on_reloaded_material(this);
 //	other->uninstall();
 
 }
@@ -980,6 +981,12 @@ std::string MasterMaterialImpl::create_glsl_shader(
 	return masterShader;
 }
 #endif
+
+void MaterialManagerLocal::on_reloaded_material(MaterialInstance* mat)
+{
+	sys_print(Debug, "material reloaded from disk %s\n", mat->get_name().c_str());
+	BuildSceneData_CpuFast::inst->rebuild_models();
+}
 
 void MaterialManagerLocal::on_reload_shader_invoke()
 {

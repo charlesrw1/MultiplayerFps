@@ -68,7 +68,7 @@ void main()
 	const int global_index = int(gl_GlobalInvocationID.x);
 	if(global_index>=num_cubemaps)
 		return;
-	
+		
 	vec3 boxmin = Cubemaps.data[global_index].bounds_min.rgb;
 	vec3 boxmax = Cubemaps.data[global_index].bounds_max.rgb;
 	vec3 middle = (boxmax+boxmin)*0.5;

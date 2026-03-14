@@ -1,4 +1,9 @@
-layout(local_size_x = 64, local_size_y =1, local_size_z = 1) in;
+
+// (16-2)^2 + (8-2)^2
+#define NUM_LOCAL_INNVOC 232
+
+
+layout(local_size_x = NUM_LOCAL_INNVOC, local_size_y =1, local_size_z = 1) in;
 
 
 layout(r11f_g11f_b10f, binding = 0) uniform image2D probe_irradiance;
@@ -14,6 +19,13 @@ layout (binding = 1, std140) readonly buffer RayHitBuffer {
 };
 #include "ddgiShared.txt"
 
+
+// w component is used for if probe is active (if backface hits are high, disable the probe)
+layout(binding = 14,std430)  buffer DdgiProbeRelocateBufferWrite {
+	vec4 ddgi_probe_relocations_write[];
+};
+
+// partial refit? idea: static and dynamic bvh. also for dynamics, have 1 bvh for dynamics that havnet moved in a while. 
 
 
 
@@ -42,20 +54,41 @@ ivec2 get_probe_texel_base(ivec3 probe_coord, ivec3 vol_grid, int vol_offset, in
 	return ivec2(coords);
 }
 
+
+// each workgroup maps to 1 probe
+// load rays into shared memory
+// local innovaction maps to 1 texel
+//		-> either depth or irradiance
+
+shared RayHitOutput local_rays[NUM_RAYS];
+shared int volume_index;
 void main()
 {
-	const int global_index = int(gl_GlobalInvocationID.x);
-	const int volume_index = get_volume_index_for_global_index(global_index);
+	const int global_index = int(gl_WorkGroupID.x);
+	
+	const int local_index = int(gl_LocalInvocationID.x);
+	
+	// load rays into shared memory
+	if(local_index < NUM_RAYS) {
+		local_rays[local_index] = hitbuffer[global_index * NUM_RAYS + local_index];
+	}
+	barrier();
+	
+	if(local_index==0)
+		volume_index = get_volume_index_for_global_index(global_index);
+	barrier();
+		
 	const int volume_offset = volumes[volume_index].size_offset.w;
 	const int probe_number = global_index-volume_offset;
 	const ivec3 vol_grid = volumes[volume_index].size_offset.xyz;
 	const vec3 volume_spacing = volumes[volume_index].density.xyz;
 	const vec3 volume_origin = volumes[volume_index].origin_pri.xyz;
 	
-	
 	if(probe_number > vol_grid.x*vol_grid.y*vol_grid.z)
 		return;
 	
+	const vec4 probe_origin_and_valid = ddgi_probe_relocations_write[global_index];
+
 		// Get probe position in grid
 	int probe_x = probe_number % int(vol_grid.x);
 	int probe_y = (probe_number / int(vol_grid.x)) % int(vol_grid.y);
@@ -65,131 +98,123 @@ void main()
 	
 	int backface_hits = 0;
 	float closest_dist = 1000.0;
-	for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
-		int buffer_idx = global_index * NUM_RAYS + ray_idx;
-		RayHitOutput data = hitbuffer[buffer_idx];
-		vec3 dir = data.dir_dist.xyz;
-		float dist = data.dir_dist.w;
-		
-		if(dist < 0 && abs(dist)<1000) {
-			backface_hits += 1;
-		}
-		if(dist>=0.001)
-			closest_dist = min(dist,closest_dist);
-		
-	}
+	//for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
+	//	int buffer_idx = global_index * NUM_RAYS + ray_idx;
+	//	RayHitOutput data = hitbuffer[buffer_idx];
+	//	vec3 dir = data.dir_dist.xyz;
+	//	float dist = data.dir_dist.w;
+	//	
+	//	if(dist < 0 && abs(dist)<1000) {
+	//		backface_hits += 1;
+	//	}
+	//	if(dist>=0.001)
+	//		closest_dist = min(dist,closest_dist);
+	//	
+	//}
 
 	
-	float global_dist_mult = 1.0;
-	if((backface_hits)/float(NUM_RAYS)>0.3) {
-		global_dist_mult = 0.0;	// disable it all
-		
-		atomicAdd(InvalidCounter.data, 1);
-	}
-	else {
-		if(closest_dist >= length(volume_spacing)) {
-			atomicAdd(InvalidCounter.no_depth_needed,1);
-		}
-	
-	}
-	
+	const float global_dist_mult = probe_origin_and_valid.w>0.5?0:1;
+	//if((backface_hits)/float(NUM_RAYS)>0.3) {
+	//	global_dist_mult = 0.0;	// disable it all
+	//	
+	//	atomicAdd(InvalidCounter.data, 1);
+	//}
+	//else {
+	//	if(closest_dist >= length(volume_spacing)) {
+	//		atomicAdd(InvalidCounter.no_depth_needed,1);
+	//	}
+	//
+	//}
+	const int DTILE_SIZE = 16;
+	const int DIN_SIZE = DTILE_SIZE - 2;
 	const int TILE_SIZE = 8;
 	const int IN_SIZE = TILE_SIZE - 2;
-	for(int y = 0; y < IN_SIZE; y++) {
-		for(int x = 0; x < IN_SIZE; x++) {
+	const bool is_depth_local_innvoc = local_index>=IN_SIZE*IN_SIZE;
+	{
+	//for(int y = 0; y < IN_SIZE; y++) {
+	//	for(int x = 0; x < IN_SIZE; x++) {
+			int shared_tile_size = 0;
+			int x = 0;
+			int y = 0;
+			if(is_depth_local_innvoc) {
+				shared_tile_size = DTILE_SIZE;
+				x = (local_index-IN_SIZE*IN_SIZE) % DIN_SIZE;
+				y = (local_index-IN_SIZE*IN_SIZE) / DIN_SIZE;
+			}
+			else {
+				shared_tile_size = TILE_SIZE;
+				x = local_index % IN_SIZE;
+				y = local_index / IN_SIZE;
+			}
+			const int shared_tile_size_inner = shared_tile_size-2;
 		
-		
-			ivec2 coords = get_probe_texel_base(ivec3(probe_x,probe_y,probe_z),vol_grid,volume_offset,TILE_SIZE);
+			const ivec2 coords = get_probe_texel_base(ivec3(probe_x,probe_y,probe_z),vol_grid,volume_offset,shared_tile_size);
 			//coords.x = probe_x*TILE_SIZE + (vol_grid.x*probe_y*TILE_SIZE);
 			//coords.y = probe_z*TILE_SIZE;
-			ivec2 coord_store = coords + ivec2(1)+ivec2(x,y);
-			
-			
-			
-			vec3 cur_value = imageLoad(probe_irradiance, coord_store).rgb;
-			
-			vec2 uv = vec2(x+0.5,y+0.5)/vec2(IN_SIZE);
-			vec3 oct_normal = OctahedralDecode(uv);
+			const ivec2 coord_store = coords + ivec2(1)+ivec2(x,y);
+			const vec2 uv = vec2(x+0.5,y+0.5)/vec2(shared_tile_size_inner);
+			const vec3 oct_normal = OctahedralDecode(uv);
 			
 			vec3 accum = vec3(0.0);
 			float weight_accum = 0.0;
 			
 			for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
-				int buffer_idx = global_index * NUM_RAYS + ray_idx;
-				RayHitOutput data = hitbuffer[buffer_idx];
-				vec3 dir = data.dir_dist.xyz;
+				//int buffer_idx = global_index * NUM_RAYS + ray_idx;
+				RayHitOutput data = local_rays[ray_idx];
+				const vec3 dir = data.dir_dist.xyz;	
+				backface_hits += int(data.dir_dist.w < 0 && abs(data.dir_dist.w)<1000);
 				
-				float w = max(dot(dir,oct_normal),0.0);
-				accum+=data.light.xyz*w;
-				weight_accum+=w;
+				if(is_depth_local_innvoc) {
+					float dist = abs(data.dir_dist.w);			
+					float w = max(dot(dir,oct_normal),0.0);				
+					float probeMaxRayDistance = length(volume_spacing)*1.3;
+					// Increase or decrease the filtered distance value's "sharpness"
+					w = pow(w, 50.0);
+					dist = min(dist,probeMaxRayDistance);
+					accum+=vec3(dist*w*global_dist_mult, dist*dist*w*global_dist_mult,0);
+					weight_accum+=w;
+				}
+				else {
+					float w = max(dot(dir,oct_normal),0.0);
+					accum+=data.light.xyz*w;
+					weight_accum+=w;		
+				}
 			}
-			
-			float epsilon = NUM_RAYS *  1e-9;
+			const float epsilon = NUM_RAYS *  1e-9;
 			accum /= (2.0*max(epsilon,weight_accum));
 			
-
-
-			
-			
-			accum = pow(accum,vec3(1.0/2.2));
-			
-			accum.r *= global_dist_mult;
-			
-			if(num_runs_so_far!=0)
-				accum = (cur_value*float(num_runs_so_far)+accum)/(num_runs_so_far+1.0);	// running average
-			
-			
-			//accum = vec3(1,0,1);
-			// Store in probe irradiance texture
-			imageStore(probe_irradiance, coord_store, vec4(accum, 1.0));
-		}
+			if(is_depth_local_innvoc) {
+				vec2 cur_value = imageLoad(probe_depths, coord_store).rg;
+				if(num_runs_so_far!=0)
+					accum.rg = (cur_value*float(num_runs_so_far)+accum.rg)/(num_runs_so_far+1.0);			
+				// Store in probe irradiance texture
+				imageStore(probe_depths, coord_store, vec4(accum.rg,0.0, 1.0));		
+			}
+			else {
+				accum = pow(accum,vec3(1.0/2.2));			
+				accum.r *= global_dist_mult;		
+				vec3 cur_value = imageLoad(probe_irradiance, coord_store).rgb;
+				if(num_runs_so_far!=0)
+					accum = (cur_value*float(num_runs_so_far)+accum)/(num_runs_so_far+1.0);	// running average
+				
+				//accum = vec3(1,0,1);
+				// Store in probe irradiance texture
+				imageStore(probe_irradiance, coord_store, vec4(accum, 1.0));
+			}
+	//	}
 	
+//	}
 	}
 	
+	barrier();
+	
+	if(local_index!=0)
+		return;
+	
+	const float backface_pct = (backface_hits)/float(NUM_RAYS);
+	float invalid_float = (backface_pct>0.3) ? 1.0 : 0.0;
+	ddgi_probe_relocations_write[global_index] = vec4(probe_origin_and_valid.xyz,invalid_float);
 		
-	const int DTILE_SIZE = 16;
-	const int DIN_SIZE = DTILE_SIZE - 2;
-	for(int y = 0; y < DIN_SIZE; y++) {
-		for(int x = 0; x < DIN_SIZE; x++) {
-			ivec2 coords=get_probe_texel_base(ivec3(probe_x,probe_y,probe_z),vol_grid,volume_offset,DTILE_SIZE);
-			ivec2 coord_store = coords + ivec2(1)+ivec2(x,y);
-			vec2 cur_value = imageLoad(probe_depths, coord_store).rg;
-			
-			vec2 uv = vec2(x+0.5,y+0.5)/vec2(DIN_SIZE);
-			vec3 oct_normal = OctahedralDecode(uv);
-			
-			vec2 accum = vec2(0.0);
-			float weight_accum = 0.0;
-			
-			for(int ray_idx = 0; ray_idx < NUM_RAYS; ray_idx += 1) {
-				int buffer_idx = global_index * NUM_RAYS + ray_idx;
-				RayHitOutput data = hitbuffer[buffer_idx];
-				vec3 dir = data.dir_dist.xyz;
-				float dist = abs(data.dir_dist.w);
-				
-				float w = max(dot(dir,oct_normal),0.0);
-				
-				float probeMaxRayDistance = length(volume_spacing)*1.3;
-
-				// Increase or decrease the filtered distance value's "sharpness"
-				w = pow(w, 50.0);
-				dist = min(dist,probeMaxRayDistance);
-				
-				accum+=vec2(dist*w*global_dist_mult, dist*dist*w*global_dist_mult);
-				weight_accum+=w;
-			}
-			float epsilon = NUM_RAYS *  1e-9;
-			accum /= (2.0*max(epsilon,weight_accum));
-			
-			if(num_runs_so_far!=0)
-				accum = (cur_value*float(num_runs_so_far)+accum)/(num_runs_so_far+1.0);
-			
-			// Store in probe irradiance texture
-			imageStore(probe_depths, coord_store, vec4(accum,0.0, 1.0));
-		}
-	
-	}
-	
 	// Border dilation for irradiance tile
 	{
 		//const int TILE_SIZE = 8;

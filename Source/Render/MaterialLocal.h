@@ -350,6 +350,7 @@ public:
 	int compute_tex_hash_for(MaterialImpl* m) {
 		return binding_hasher.get_texture_hash_id_for_material(m);
 	}
+	void on_reloaded_material(MaterialInstance* mat);
 private:
 	void on_reload_shader_invoke();
 	program_handle compile_mat_shader(const MaterialInstance* mat, shader_key key);

@@ -755,7 +755,7 @@ void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_onl
 	// step 1.2
 	const int thresh = 1;	// if more than 2
 	bool wants_rebuild_counts = false;
-	bool needs_new_model = false;
+	bool needs_new_model = force_rebuild;
 	for (int c = 0; c < mmt_counts.size(); c++) {
 		const int count = mmt_counts[c];
 		auto ptr = mod_data_ptrs.at(c);
@@ -784,6 +784,7 @@ void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_onl
 			}
 		}
 	}
+	force_rebuild = false;
 
 	//needs_new_model = true;
 
@@ -793,7 +794,7 @@ void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_onl
 
 
 		// the expensive step.
-		//sys_print(Debug, "rebuilding fast path model data\n");
+		sys_print(Debug, "rebuilding fast path model data\n");
 		rebuild_mod_data();
 	}
 		

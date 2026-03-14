@@ -875,7 +875,7 @@ void ModelMan::create_default_models()
 	}
 }
 #include "Render/MaterialLocal.h"
-
+#include "DrawLocal.h"
 // Uploads the models vertex and index data to the gpu
 // and sets the models ptrs/offsets into the global vertex buffer
 bool ModelMan::upload_model(Model* mesh)
@@ -886,6 +886,10 @@ bool ModelMan::upload_model(Model* mesh)
 
 	if(mesh->uid==0)
 		mesh->uid = cur_mesh_id++;
+	else {
+		sys_print(Debug, "model reloaded: %s\n", mesh->get_name().c_str());
+		BuildSceneData_CpuFast::inst->rebuild_models();	// force rebuild models...
+	}
 
 	//sys_print(Debug, "uploading mode: %s\n", mesh->get_name().c_str());
 

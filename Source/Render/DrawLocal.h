@@ -429,6 +429,10 @@ public:
 	) const;
 
 	void on_fastpath_material_removed(MaterialInstance* mat);
+	void rebuild_models() {
+		sys_print(Warning, "force rebuild models flag set\n");
+		force_rebuild = true;
+	}
 
 	int16_t get_index(Model* m, MaterialInstance* mat) {
 		if (!m)
@@ -497,6 +501,7 @@ public:
 		return mod_data_ptrs.size();
 	}
 private:
+	bool force_rebuild = false;
 	enum DoDrawFlags {
 		IS_SHADOW=1,
 		DEPTH_LESSTHAN=2,
@@ -625,6 +630,51 @@ private:
 	IGraphicsBuffer* tiled_uniforms = nullptr;
 	IGraphicsBuffer* light_count_buffer = nullptr;
 	IGraphicsBuffer* light_indirection = nullptr;
+};
+
+// sanity checking, for sharing a render target multiple times across a frame
+
+class SharedRenderTargetTexture;
+class SharedRenderTargetOwner {
+public:
+	IGraphicsTexture*& get_ptr_ref_for_setting() {
+		ASSERT(!is_locked);
+		return ptr;
+	}
+	IGraphicsTexture* get_for_reading(SharedRenderTargetTexture* t) {
+		ASSERT(t==is_locked);
+		return ptr;
+	}
+	IGraphicsTexture* aquire_lock_to_write(SharedRenderTargetTexture* t) {
+		ASSERT(!is_locked);
+		is_locked = t;
+		return ptr;
+	}
+	void release_lock(SharedRenderTargetTexture* t) {
+		ASSERT(is_locked==t);
+		is_locked = nullptr;
+	}
+private:
+	IGraphicsTexture* ptr = nullptr;
+	SharedRenderTargetTexture* is_locked = nullptr;
+};
+class SharedRenderTargetTexture {
+public:
+	void init(SharedRenderTargetOwner* p) {
+		ASSERT(!parent);
+		this->parent = p;
+	}
+	IGraphicsTexture* get_for_reading() {
+		return parent->get_for_reading(this);
+	}
+	IGraphicsTexture* aquire_lock_to_write() {
+		return parent->aquire_lock_to_write(this);
+	}
+	void release_lock() {
+		parent->release_lock(this);
+	}
+private:
+	SharedRenderTargetOwner* parent = nullptr;
 };
 
 

@@ -242,7 +242,7 @@ void DdgiTesting::build_world()
 	auto& objs = draw.scene.proxy_list;
 
 	std::vector<Bounds> bounds;
-	std::vector<int> all_indicies;
+	//std::vector<int> all_indicies;
 	std::vector<glm::vec4> all_verticies;
 
 	
@@ -275,7 +275,7 @@ void DdgiTesting::build_world()
 
 		// for all parts
 		for (int parti = lod.part_ofs; parti < lod.part_ofs+lod.part_count; parti++) {
-			const int index_start = all_indicies.size();
+			//const int index_start = all_indicies.size();
 			const int vertex_start = all_verticies.size();
 
 			const auto& part = o.model->get_part(parti);
@@ -302,23 +302,29 @@ void DdgiTesting::build_world()
 				return transform * glm::vec4(rmd->get_vertex_at_index(base_vertex+index).pos, 1.0);
 			};
 
-			for (int i = 0; i < num_verts; i++) {
-				all_verticies.push_back(glm::vec4(get_vertex(i), material_offset));
-			}
+			//for (int i = 0; i < num_verts; i++) {
+			//	all_verticies.push_back(glm::vec4(get_vertex(i), material_offset));
+			//}
 			for (int i = 0; i < part_index_count; i+=3) {
 				const int i0 = rmd->get_index_at_index(part_index_start+i);
 				const int i1 = rmd->get_index_at_index(part_index_start+i+1);
 				const int i2 = rmd->get_index_at_index(part_index_start+i+2);
 
-				all_indicies.push_back(i0+vertex_start);
-				all_indicies.push_back(i1+vertex_start);
-				all_indicies.push_back(i2+vertex_start);
+				//all_indicies.push_back(i0+vertex_start);
+				//all_indicies.push_back(i1+vertex_start);
+				//all_indicies.push_back(i2+vertex_start);
+				all_verticies.push_back(glm::vec4(get_vertex(i0),material_offset));
+				all_verticies.push_back(glm::vec4(get_vertex(i1), material_offset));
+				all_verticies.push_back(glm::vec4(get_vertex(i2), material_offset));
+
 				const Bounds tri_bounds = get_tri_bounds(get_vertex(i0), get_vertex(i1), get_vertex(i2));
 				bounds.push_back(tri_bounds);
 			}
 		}
 	}
+	const double start = GetTime();
 	BVH as = BVH::build(bounds, 4, PartitionStrategy::BVH_SAH);
+	printf("rt build bvh time: %f\n", float(GetTime() - start));
 
 	// Build for GPU
 	std::vector<GPUBVHNode> nodes;
@@ -372,9 +378,9 @@ void DdgiTesting::build_world()
 	verts = IGraphicsDevice::inst->create_buffer(args);
 	verts->upload(all_verticies.data(), args.size);
 
-	args.size = sizeof(int) * all_indicies.size();
-	indicies = IGraphicsDevice::inst->create_buffer(args);
-	indicies->upload(all_indicies.data(), args.size);
+	//args.size = sizeof(int) * all_indicies.size();
+	//indicies = IGraphicsDevice::inst->create_buffer(args);
+	//indicies->upload(all_indicies.data(), args.size);
 
 
 	args.size = sizeof(int) * as.indicies.size();
@@ -401,6 +407,8 @@ static int lum_adjust_mode = 4;
 static float depth_sigma = 50.0;
 static float normal_sigma = 1.0;
 static bool wants_half_res = false;
+static bool do_flush_after = true;
+static bool skip_gather = false;
 void ddgi_debugmenu() {
 	auto self = draw.ddgi.get();
 	ImGui::InputInt3("select", &self->selected_probe.x);
@@ -423,6 +431,8 @@ void ddgi_debugmenu() {
 	ImGui::InputFloat("normal_sigma", &normal_sigma);
 
 	ImGui::Checkbox("wants_half_res", &wants_half_res);
+	ImGui::Checkbox("do_flush", &do_flush_after);
+	ImGui::Checkbox("skip_gather", &skip_gather);
 
 
 }
@@ -438,15 +448,16 @@ void set_shit_fuck() {
 }
 
 
-
+ConfigVar r_rt_skiprebuild("r.rt_skiprebuild", "0", CVAR_BOOL, "");
 void DdgiTesting::execute()
 {
-	build_world();
+	if(!verts||!r_rt_skiprebuild.get_bool())
+		build_world();
 	double start = GetTime();
 
 	// run trace
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, verts->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, indicies->get_internal_handle());
+	//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, indicies->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, nodes->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, references->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, materials->get_internal_handle());
@@ -555,28 +566,35 @@ void DdgiTesting::execute()
 		}
 
 		const int total_probes = total_num_probes;
-		const int groups = glm::ceil(total_probes / 64.f);
+		const int groups = total_probes;// glm::ceil(total_probes / 64.f);
 
 		printf("trace %d\n", i);
 		glDispatchCompute(groups, 1, 1);
 
-		// then run gather
-		device.set_shader(gather_shader);
-		set_shit_fuck();
-		device.shader().set_int("num_runs_so_far", glm::max(0,i-1));
+		if (!skip_gather) {
+			// then run gather
+			device.set_shader(gather_shader);
+			set_shit_fuck();
+			device.shader().set_int("num_runs_so_far", glm::max(0, i - 1));
 
 
 
-		glBindImageTexture(0, probe_irradiance->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
+			glBindImageTexture(0, probe_irradiance->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
 
-		glBindImageTexture(1, probe_depth->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16F);
+			glBindImageTexture(1, probe_depth->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16F);
 
-		glCheckError();
+			glCheckError();
 		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
 		printf("gather %d\n", i);
-		glDispatchCompute(groups, 1, 1);
+		const int NUM_LOCAL_INNVOC = 232;
+
+		const int gather_groups = total_probes;	// one global innvoc per probe
+		const int gather_groups_prev = glm::ceil(total_probes / 64.f);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 14, ddgi_probe_relocation_offsets->get_internal_handle());	// bind for writing...
+
+		glDispatchCompute(gather_groups, 1, 1);
 		glCheckError();
 
 		if (i == 0) {
@@ -591,14 +609,18 @@ void DdgiTesting::execute()
 			printf("no_depth_needed probes: %d\n", result.x);
 
 		}
+		}
 
+		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-		float time = GetTime() - start;
-		sys_print(Debug, "time: %f\n", time);
 	}
-	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-	glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
+
+	if(do_flush_after)
+		glFinish();	// finish here to get accurate time..
+	float time = GetTime() - start;
+	sys_print(Debug, "sfasdf asdf sadftime: %f\n", time);
 	//{
 	//
 	//	CreateBufferArgs args;
@@ -979,7 +1001,7 @@ void DdgiTesting::render_rt()
 	device.set_pipeline(state);
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, verts->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, indicies->get_internal_handle());
+	//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, indicies->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, nodes->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, references->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, materials->get_internal_handle());

@@ -236,3 +236,10 @@ public:
 	glm::vec4 random_elements[RANDOM_ELEMENTS];
 };
 
+class SSRSystem {
+public:
+	void execute_compute();
+
+	program_handle hiz_downsample{};
+	program_handle ssr_compute{};
+};
