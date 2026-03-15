@@ -378,3 +378,156 @@ glm::vec4 LightCookieAtlas::get_rect_for_cookie(Texture* t)
 	Rect2d r = rects[t];
 	return glm::vec4((r.x+0.5001) / float(ATLAS_WIDTH), (r.y+0.5) / float(atlasheight), (r.w-1) / float(ATLAS_WIDTH), (r.h-1.001) / float(atlasheight));
 }
+SSRSystem* SSRSystem::inst = nullptr;
+SSRSystem::SSRSystem()
+{
+	ssr_compute = draw.get_prog_man().create_raster("fullscreenquad.txt","ssr_f.txt");
+	hiz_downsample = draw.get_prog_man().create_compute("DepthPyramidC.txt");
+	Texture::install_system("_depth_pyramid2");
+	glGenSamplers(1, &hiz_max_sampler);
+	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
+	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_REDUCTION_MODE_ARB, GL_MAX);	// max, takes the closest value to the camera. depth buffer stored in reverse-Z [1,0]
+}
+void SSRSystem::compute_depth()
+{
+	GPUSCOPESTART(ssr_compute_depth_pyramid);
+
+	draw.get_device().set_shader(hiz_downsample);
+	const int levels = Texture::get_mip_map_count(actual_depth_size.x, actual_depth_size.y);
+	int width = actual_depth_size.x;
+	int height = actual_depth_size.y;
+	glBindSampler(0, hiz_max_sampler);
+	for (int level = 0; level < levels; level++) {
+		//glBindImageTexture()
+		glBindImageTexture(1, depth_pyramid->get_internal_handle(), level, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+		if (level == 0)
+			draw.get_device().bind_texture_ptr(0, draw.tex.scene_depth);
+		else {
+			draw.get_device().bind_texture_ptr(0, depth_pyramid);
+		}
+
+
+		int groups_x = glm::ceil(width / 32.f);
+		int groups_y = glm::ceil(height / 32.f);
+		draw.shader().set_float("width", width);
+		draw.shader().set_float("height", height);
+		const int level_to_sample = level == 0 ? 0 : level - 1;
+		draw.shader().set_int("level", level_to_sample);
+
+
+		glDispatchCompute(groups_x, groups_y, 1);
+
+
+		width /= 2.0;
+		height /= 2.0;
+		width = glm::max(width, 1);
+		height = glm::max(height, 1);
+
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT |
+			GL_TEXTURE_FETCH_BARRIER_BIT);
+	}
+
+	glBindSampler(0, 0);
+}
+#include "imgui.h"
+static int max_steps = 30;
+static float bias = 0.7;
+static float step_size = 0.3;
+static float max_dist = 100.0;
+static float max_thick = 0.3;
+
+void imgui_menu_ssr() {
+	ImGui::InputFloat("bias", &bias);
+	ImGui::InputFloat("step_size", &step_size);
+	ImGui::InputFloat("max_dist", &max_dist);
+	ImGui::InputFloat("max_thick", &max_thick);
+
+	ImGui::InputInt("max_steps", &max_steps);
+}
+ADD_TO_DEBUG_MENU(imgui_menu_ssr);
+void SSRSystem::execute_compute()
+{
+	GPUSCOPESTART(ssr_system_execute);
+
+	// compute depthp
+	const auto& viewsetup = draw.current_frame_view;
+	int v_w = viewsetup.width / 2;
+	int v_h = viewsetup.height / 2;
+	if (depth_size.x != v_w || depth_size.y != v_h)
+		init_depth_pyramid(v_w, v_h);
+	//compute_depth();
+
+	// compute ssr
+	auto& device = draw.get_device();
+	auto targets = {
+		ColorTargetInfo(draw.tex.ddgi_accum)
+	};
+	RenderPassState rp;
+	rp.color_infos = targets;
+	IGraphicsDevice::inst->set_render_pass(rp);
+
+	RenderPipelineState state;
+	state.vao = draw.get_empty_vao();
+	state.program = ssr_compute;
+	state.blend = BlendState::OPAQUE;
+	state.depth_testing = false;
+	state.depth_writes = false;
+	device.set_pipeline(state);
+	device.shader().set_int("MAX_STEPS", max_steps);
+	device.shader().set_float("max_distance", max_dist);
+	device.shader().set_float("bias", bias);
+	device.shader().set_float("step_size", step_size);
+	device.shader().set_float("max_thickness", max_thick);
+	auto time = GetTime();
+	device.shader().set_float("temporalTime", time-std::round(time/10.0)*10.0);
+
+
+	device.shader().set_mat4("g_proj", viewsetup.proj);
+	device.bind_texture_ptr(0, draw.tex.scene_gbuffer0);
+	device.bind_texture_ptr(1, draw.tex.scene_gbuffer1);
+	device.bind_texture_ptr(2, draw.tex.scene_gbuffer2);
+	glBindSampler(3, hiz_max_sampler);
+	device.bind_texture_ptr(3, depth_pyramid);
+	device.bind_texture_ptr(4, draw.tex.scene_depth);
+	device.bind_texture_ptr(5, draw.tex.scene_color);
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+	glBindSampler(3, 0);
+
+
+	GraphicsBlitInfo b;
+	b.dest.texture = draw.tex.scene_color;
+	b.src.texture = draw.tex.ddgi_accum;
+	b.set_width_height_both(viewsetup.width, viewsetup.height);
+	IGraphicsDevice::inst->blit_textures(b);
+}
+extern uint32_t previousPow2(uint32_t v);
+void SSRSystem::init_depth_pyramid(int w, int h)
+{
+	depth_size = { w,h };
+	if (depth_pyramid)
+		depth_pyramid->release();
+
+	auto actual_width = previousPow2(w)*2;
+	auto actual_height = previousPow2(h)*2;
+	actual_depth_size = { actual_width,actual_height };
+
+
+	CreateTextureArgs args;
+	args.num_mip_maps = Texture::get_mip_map_count(actual_width, actual_height);
+	args.width = actual_width;
+	args.height = actual_height;
+	//previousPow2(w*2)
+	//args.num_mip_maps = getImageMipLevels(actual_width, actual_height);
+	args.type = GraphicsTextureType::t2D;
+	args.sampler_type = GraphicsSamplerType::NearestClamped;
+	args.format = GraphicsTextureFormat::r32f;
+
+	depth_pyramid = IGraphicsDevice::inst->create_texture(args);
+
+	auto t = Texture::load("_depth_pyramid2");
+	t->update_specs_ptr(depth_pyramid);
+}

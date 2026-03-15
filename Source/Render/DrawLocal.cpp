@@ -1940,6 +1940,7 @@ void Renderer::init()
 	RenderGiManager::inst = new RenderGiManager;
 	GpuCullingTest::inst = new GpuCullingTest;
 	LightCookieAtlas::inst = new LightCookieAtlas;
+	SSRSystem::inst = new SSRSystem;
 
 	EnviornmentMapHelper::get().init();
 	print_time("draw:env_map");
@@ -4367,6 +4368,10 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 	if(r_debug_mode.get_integer() == 0 && !params.skybox_only)
 		accumulate_gbuffer_lighting(params.is_cubemap_view);
+
+	if (r_debug_mode.get_integer() == 0 && !params.skybox_only) {
+		SSRSystem::inst->execute_compute();
+	}
 
 	// STAMPS ON NORMALS IN GBUFFER0!
 	auto copy_forward_to_temporary = [&]() {

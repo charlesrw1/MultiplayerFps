@@ -206,9 +206,20 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 		bool needsCompile = texfile == nullptr;
 		if (!needsCompile) {
 			needsCompile = texfile->get_timestamp() < tisFileTimeStamp;
+			if(needsCompile)
+				sys_print(Debug, "%s needs compile because texFile is newer tha tisFile\n", gamepath.c_str());
 		}
+		else {
+			sys_print(Debug, "%s needs compile because texFile==null\n", gamepath.c_str());
+		}
+
 		if (!needsCompile) {
 			return true;
+		}
+		auto src_file = FileSys::open_read(tis->src_file.c_str(), FileSys::GAME_DIR);
+		if (!src_file) {
+			sys_print(Debug, "%s skipping compile because src_file==null\n", gamepath.c_str());
+			return false;
 		}
 	}
 	{

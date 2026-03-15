@@ -163,6 +163,12 @@ public:
 	virtual void set_set_unknown_variables(bool b) = 0;
 	// returns string of match if one match exists, otherwise null
 	virtual std::string print_matches(const char* match) = 0;
+	struct MatchType {
+		std::string name;
+		bool is_cmd = false;
+		std::string desc;
+	};
+	virtual std::vector<MatchType> get_matches(const char* match) = 0;
 };
 
 class Auto_Engine_Cmd

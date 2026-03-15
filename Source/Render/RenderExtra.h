@@ -238,8 +238,15 @@ public:
 
 class SSRSystem {
 public:
+	static SSRSystem* inst;
+	SSRSystem();
 	void execute_compute();
-
+	uint32 hiz_max_sampler{};
 	program_handle hiz_downsample{};
 	program_handle ssr_compute{};
+	IGraphicsTexture* depth_pyramid = nullptr;
+	void compute_depth();
+	glm::ivec2 depth_size{};
+	glm::ivec2 actual_depth_size{};
+	void init_depth_pyramid(int w, int h);
 };

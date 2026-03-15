@@ -2058,6 +2058,29 @@ void Debug_Console::draw()
 		ImGui::SetKeyboardFocusHere(-1);
 		wants_toggle_set_focus = false;
 	}
+
+	if (ImGui::IsItemFocused() && input_buffer[0]!=0) {
+		auto matches = Cmd_Manager::inst->get_matches(input_buffer);
+		if (!matches.empty()) {
+			ImVec2 pos = ImGui::GetItemRectMin();
+			ImDrawList* draw_list = ImGui::GetForegroundDrawList();
+			const int height = std::min((int)matches.size(), 12);
+			ImVec2 font_pos = pos + ImVec2(5, -5 - 12);
+			const float frame_padding = 8;
+			auto min = ImVec2(pos) - ImVec2(-5 + frame_padding, height * 12 + frame_padding);
+			auto max = ImVec2(pos) + ImVec2(500, -3);
+			draw_list->AddRectFilled(min - ImVec2(2, 2), max + ImVec2(2, 2), Color32(200, 200, 200, 80).to_uint(), 0.f);
+			draw_list->AddRectFilled(min, max, Color32(0, 0, 0, 200).to_uint(), 0.f);
+			for (int i = 0; i < height; i++) {
+				auto color = COLOR_WHITE.to_uint();
+				if (matches[i].is_cmd)
+					color = Color32(255, 255, 200).to_uint();
+
+				draw_list->AddText(font_pos, color, matches.at(i).name.c_str());
+				font_pos = font_pos - ImVec2(0, 12);
+			}
+		}
+	}
 	ImGui::End();
 }
 void Debug_Console::print_args(Color32 color, const char* fmt, va_list args)

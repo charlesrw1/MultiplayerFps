@@ -334,6 +334,27 @@ static StringView strip_string_view(StringView sv)
 class Cmd_Manager_Impl : public Cmd_Manager
 {
 public:
+	std::vector<MatchType> get_matches(const char* match) final {
+		std::vector<MatchType> out;
+		VarManImpl* v = (VarManImpl*)VarMan::get();
+		for (auto& var : v->vars) {
+			if (var.first.find(match) != std::string::npos) {
+				out.push_back({ var.first.c_str(),false });
+			}
+		}
+		for (auto& c : all_cmds) {
+			if (c.first.find(match) != std::string::npos)
+				out.push_back({ c.first,true });
+		}
+		for (auto& cg : cmd_groups) {
+			for (auto& c : cg->cmds) {
+				if (c.first.find(match) != std::string::npos)
+					out.push_back({ c.first,true });
+			}
+		}
+		return out;
+	}
+
 	std::string print_matches(const char* match) {
 		struct Match {
 			string name = "";
@@ -350,6 +371,13 @@ public:
 			if (c.first.find(match) != std::string::npos)
 				matches.push_back({ c.first.c_str(),nullptr });
 		}
+		for (auto& cg : cmd_groups) {
+			for (auto& c : cg->cmds) {
+				if (c.first.find(match) != std::string::npos)
+					matches.push_back({ c.first.c_str(),nullptr });
+			}
+		}
+
 		if (matches.empty())
 			return "";
 		if (matches.size() == 1)

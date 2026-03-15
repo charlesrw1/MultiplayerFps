@@ -203,7 +203,7 @@ enum class GraphicsSamplerType {
 	CsmShadowmap,
 	AtlasShadowmap,
 	CubemapDefault,
-	DepthPyramid
+	DepthPyramid,
 };
 
 
