@@ -1,0 +1,46 @@
+
+layout(location = 0) out vec4 FS_OUT_Color;
+layout(binding=0) uniform sampler2D prev_mip;
+uniform int mip_level;
+uniform vec2 myimg_size;
+uniform vec2 inv_prev_size;
+float get_weight(vec4 c) {
+	return (c.r+c.g+c.b)>1e-4 ? 1.0 : 0.0;
+}
+void main()
+{
+	//vec2 uv = (vec2(gl_FragCoord.xy))/myimg_size;
+	
+	ivec2 texel = ivec2(gl_FragCoord.xy) * 2;
+	
+	vec4 c0 = texelFetch(prev_mip,texel,mip_level);
+	vec4 c1 = texelFetch(prev_mip,texel+ivec2(1,0),mip_level);
+	vec4 c2 = texelFetch(prev_mip,texel+ivec2(1,1),mip_level);
+	vec4 c3 = texelFetch(prev_mip,texel+ivec2(0,1),mip_level);
+	
+	vec3 sum=vec3(0.0);
+	float sumweight = 0.0;
+	sum += c0.rgb*get_weight(c0);
+	sumweight += get_weight(c0);
+	sum += c1.rgb*get_weight(c1);
+	sumweight += get_weight(c1);
+	sum += c2.rgb*get_weight(c2);
+	sumweight += get_weight(c2);
+	sum += c3.rgb*get_weight(c3);
+	sumweight += get_weight(c3);
+	
+	if(sumweight>1e-4)
+		sum /= sumweight;
+	//if(mip_level==0)
+	//	sum = vec3(1,0.1,0.1);
+	//else if(mip_level==1)
+	//	sum = vec3(0.1,1.0,0.1);
+	//else if(mip_level==2)
+	//	sum = vec3(0.1,0.1,1.0);
+	//else if(mip_level==3)
+	//	sum = vec3(0.1,1.0,1.0);
+		
+		
+	FS_OUT_Color = vec4(sum,1.0);
+}
+

@@ -88,4 +88,4 @@ developer_mode 1
 
 open-editor demo_level_1.tmap
 
-ot _ddgi_accum
+#ot _ddgi_accum

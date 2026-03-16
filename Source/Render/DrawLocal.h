@@ -815,6 +815,8 @@ public:
 		IGraphicsTexture* halfres_scene_color{};
 		IGraphicsTexture* last_ddgi_accum{};
 		IGraphicsTexture* ddgi_accum{};
+		IGraphicsTexture* halfres_ssr{};
+		IGraphicsTexture* last_reflection_accum{};
 
 
 		// ----------------------------------------------------------------------------------

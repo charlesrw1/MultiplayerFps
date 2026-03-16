@@ -1874,6 +1874,7 @@ void Renderer::create_default_textures()
 	Texture::install_system("_halfres_scene_color");
 	Texture::install_system("_ddgi_accum");
 	Texture::install_system("_ddgi_accum_prev");
+	Texture::install_system("_ssr");
 
 
 	tex.read_scene_color_for_transparents_handle = Texture::install_system("_read_scene_color");
@@ -2089,6 +2090,17 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 		args.sampler_type = GraphicsSamplerType::NearestClamped;
 		ptr = IGraphicsDevice::inst->create_texture(args);
 	};
+	auto delete_and_create_texture_halfresmips = [&](IGraphicsTexture*& ptr, GraphicsTextureFormat format,int num_mips) {
+		safe_release(ptr);
+
+		CreateTextureArgs args;
+		args.format = format;
+		args.num_mip_maps = num_mips;
+		args.width = s_w;
+		args.height = s_h;
+		args.sampler_type = GraphicsSamplerType::AnisotropyDefault;
+		ptr = IGraphicsDevice::inst->create_texture(args);
+	};
 	auto delete_and_create_texture_half_res = [&](IGraphicsTexture*& ptr, GraphicsTextureFormat format) {
 		safe_release(ptr);
 
@@ -2110,7 +2122,9 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	delete_and_create_texture(tex.last_ddgi_accum, gtf::r11f_g11f_b10f);
 	Texture::load("_ddgi_accum")->update_specs_ptr(tex.ddgi_accum);
 	Texture::load("_ddgi_accum_prev")->update_specs_ptr(tex.last_ddgi_accum);
-
+	delete_and_create_texture(tex.last_reflection_accum, gtf::r11f_g11f_b10f);
+	delete_and_create_texture_halfresmips(tex.halfres_ssr, gtf::r11f_g11f_b10f,3);
+	Texture::load("_ssr")->update_specs_ptr(tex.halfres_ssr);
 
 	// last frame, for TAA
 	delete_and_create_texture(tex.last_scene_color, gtf::rgb16f);

@@ -383,6 +383,9 @@ SSRSystem::SSRSystem()
 {
 	ssr_compute = draw.get_prog_man().create_raster("fullscreenquad.txt","ssr_f.txt");
 	hiz_downsample = draw.get_prog_man().create_compute("DepthPyramidC.txt");
+	ssr_downsample =draw.get_prog_man().create_raster("fullscreenquad.txt", "ssr_downsample.txt");
+	ssr_upsample = draw.get_prog_man().create_raster("fullscreenquad.txt", "ssr_upsample.txt");
+
 	Texture::install_system("_depth_pyramid2");
 	glGenSamplers(1, &hiz_max_sampler);
 	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
@@ -433,18 +436,82 @@ void SSRSystem::compute_depth()
 
 	glBindSampler(0, 0);
 }
+void SSRSystem::do_downsample()
+{
+	const auto& viewsetup = draw.current_frame_view;
+
+	auto& device = draw.get_device();
+	RenderPipelineState state;
+	state.vao = draw.get_empty_vao();
+	state.program = ssr_downsample;
+	state.blend = BlendState::OPAQUE;
+	state.depth_testing = false;
+	state.depth_writes = false;
+	device.set_pipeline(state);
+	const int num_mips = 3;
+	glm::ivec2 size(viewsetup.width, viewsetup.height);
+	glm::vec2 inv_presize = 1.f / glm::vec2(size);
+	for (int i =1; i < num_mips; i++) {
+		size /= 2.f;
+		auto targets = {
+		ColorTargetInfo(draw.tex.halfres_ssr,-1,i)
+		};
+		RenderPassState rp;
+		rp.color_infos = targets;
+		IGraphicsDevice::inst->set_render_pass(rp);
+		device.shader().set_int("mip_level", i - 1);
+		device.shader().set_vec2("myimg_size",size);
+		device.shader().set_vec2("inv_prev_size", inv_presize);
+		device.bind_texture_ptr(0, draw.tex.halfres_ssr);
+		device.set_viewport(0,0,size.x, size.y);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+
+		inv_presize = 1.f / glm::vec2(size);
+	}
+}static float lod_force = 1.0;
+void SSRSystem::do_upsample()
+{
+	const auto& viewsetup = draw.current_frame_view;
+
+	auto& device = draw.get_device();
+	RenderPipelineState state;
+	state.vao = draw.get_empty_vao();
+	state.program = ssr_upsample;
+	state.blend = BlendState::OPAQUE;
+	state.depth_testing = false;
+	state.depth_writes = false;
+	device.set_pipeline(state);
+	glm::ivec2 size(viewsetup.width, viewsetup.height);
+	glm::vec2 inv_presize = 1.f / glm::vec2(size);
+
+	device.bind_texture_ptr(0, draw.tex.halfres_ssr);
+	device.bind_texture_ptr(1, draw.tex.scene_gbuffer2);
+	device.shader().set_vec2("myimg_size", size);
+	device.shader().set_float("lod_force", lod_force);
+
+	auto targets = {
+		ColorTargetInfo(draw.tex.scene_color)
+	};
+	RenderPassState rp;
+	rp.color_infos = targets;
+	IGraphicsDevice::inst->set_render_pass(rp);
+
+	glDrawArrays(GL_TRIANGLES, 0, 3);
+}
 #include "imgui.h"
-static int max_steps = 30;
-static float bias = 0.7;
-static float step_size = 0.3;
+static int max_steps = 40;
+static float bias = 0.05;
+static float step_size = 0.2;
 static float max_dist = 100.0;
-static float max_thick = 0.3;
+static float max_thick = 0.07;
 
 void imgui_menu_ssr() {
 	ImGui::InputFloat("bias", &bias);
 	ImGui::InputFloat("step_size", &step_size);
 	ImGui::InputFloat("max_dist", &max_dist);
 	ImGui::InputFloat("max_thick", &max_thick);
+	ImGui::InputFloat("lod_force", &lod_force);
 
 	ImGui::InputInt("max_steps", &max_steps);
 }
@@ -464,7 +531,7 @@ void SSRSystem::execute_compute()
 	// compute ssr
 	auto& device = draw.get_device();
 	auto targets = {
-		ColorTargetInfo(draw.tex.ddgi_accum)
+		ColorTargetInfo(draw.tex.halfres_ssr,-1,0)
 	};
 	RenderPassState rp;
 	rp.color_infos = targets;
@@ -497,12 +564,17 @@ void SSRSystem::execute_compute()
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	glBindSampler(3, 0);
 
+	do_downsample();
 
-	GraphicsBlitInfo b;
-	b.dest.texture = draw.tex.scene_color;
-	b.src.texture = draw.tex.ddgi_accum;
-	b.set_width_height_both(viewsetup.width, viewsetup.height);
-	IGraphicsDevice::inst->blit_textures(b);
+	do_upsample();
+
+	//GraphicsBlitInfo b;
+	//b.dest.texture = draw.tex.scene_color;
+	//b.src.texture = draw.tex.halfres_ssr;
+	//b.src.mip = 2;
+	//b.filter = GraphicsFilterType::Linear;
+	//b.set_width_height_both(viewsetup.width, viewsetup.height);
+	//IGraphicsDevice::inst->blit_textures(b);
 }
 extern uint32_t previousPow2(uint32_t v);
 void SSRSystem::init_depth_pyramid(int w, int h)

@@ -361,6 +361,11 @@ void ssr_2()
         FS_OUT_Color = vec4(col, 1.0);
         return;
     }
+	float roughness = texelFetch(GBUFFER2,texelCoord,0).g;
+	if(roughness>0.5) {
+		FS_OUT_Color = vec4(col,1.0);
+		return;
+	}
 
     // Reconstruct view-space position
     vec4 clipPos = vec4(uv * 2.0 - 1.0, depth, 1.0);
@@ -369,9 +374,10 @@ void ssr_2()
 
     // View-space normal
     vec3 worldNormal = texelFetch(GBUFFER0, texelCoord, 0).rgb;
-	worldNormal = ScreenSpaceReflectionDirection(uv,worldNormal,0.3,0.8);
+	//worldNormal = ScreenSpaceReflectionDirection(uv,worldNormal,0.3,0.8);
     vec3 normalVS = normalize((g.view * vec4(worldNormal, 0.0)).xyz);
 
+	
     // View direction (camera at origin)
     vec3 viewDir = normalize(viewPos);
 
@@ -448,10 +454,10 @@ void ssr_2()
         prevPos = rayPosVS;
     }
 
-    vec3 albedo = texelFetch(SceneColor, texelCoord, 0).rgb;
-    col = mix(albedo, col, 0.5);//pow(mix(albedo, col, 0.5), vec3(1.0/2.2));
+   // vec3 albedo = texelFetch(SceneColor, texelCoord, 0).rgb;
+   // col = mix(albedo, col, 0.5);//pow(mix(albedo, col, 0.5), vec3(1.0/2.2));
 
-    FS_OUT_Color = vec4(col, 0.5);
+    FS_OUT_Color = vec4(col, 1.0);
 }
 void main()
 {

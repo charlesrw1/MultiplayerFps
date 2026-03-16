@@ -244,9 +244,15 @@ public:
 	uint32 hiz_max_sampler{};
 	program_handle hiz_downsample{};
 	program_handle ssr_compute{};
+	program_handle ssr_downsample{};
+	program_handle ssr_upsample{};
+
+
 	IGraphicsTexture* depth_pyramid = nullptr;
-	void compute_depth();
 	glm::ivec2 depth_size{};
 	glm::ivec2 actual_depth_size{};
 	void init_depth_pyramid(int w, int h);
+	void compute_depth();
+	void do_downsample();
+	void do_upsample();
 };

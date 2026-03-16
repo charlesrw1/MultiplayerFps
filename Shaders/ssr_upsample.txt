@@ -1,0 +1,22 @@
+
+layout(location = 0) out vec4 FS_OUT_Color;
+layout(binding=0) uniform sampler2D mip_chain;
+layout(binding=1) uniform sampler2D GBUFFER2;
+
+
+uniform vec2 myimg_size;
+uniform float lod_force;
+
+void main()
+{
+	vec2 uv = (vec2(gl_FragCoord.xy)+vec2(0.5))/myimg_size;
+	vec4 metal_rough = textureLod(GBUFFER2,uv,0);
+	const float roughness = metal_rough.g;
+	const float mip_to_sample = mix(0,2,pow(roughness-0.5,1.0));
+	vec4 high = texelFetch(mip_chain,ivec2(gl_FragCoord.xy),0);
+	float mult = (high.r+high.g+high.b)>1e-3 ? 1.0 : 0.0;
+	mult = (roughness<0.5)?mult:0.0;
+	vec3 mip_color = textureLod(mip_chain,uv,lod_force).rgb;
+	FS_OUT_Color = vec4(mip_color*mult,1.0);
+}
+
