@@ -356,6 +356,7 @@ vec4 ImportanceSampleGGX(vec2 e, float roughness)
     float pdf = d * cosTheta;
     return vec4(h, pdf);
 }
+
 vec2 HaltonJittered(vec2 uv, int frame)
 {
     vec2 h = Halton2D(frame);
@@ -363,18 +364,95 @@ vec2 HaltonJittered(vec2 uv, int frame)
 
     return fract(h + jitter);
 }
-vec3 ScreenSpaceReflectionDirection(vec2 uv, vec3 world_normal, float roughness, float brdfBias)
+vec4 ScreenSpaceReflectionDirection(vec2 uv, vec3 world_normal, float roughness, float brdfBias, int temp_add)
 {
     // Randomize it a little
     //vec2 jitter = RandN2(uv + vec2(temporalTime));
 	
-	int sampleIndex = int(temporalTime)%1024;
+	int sampleIndex = int(temporalTime + temp_add)%1024;
 	vec2 jitter = HaltonJittered(uv,sampleIndex);
 	
     vec2 Xi = jitter;
     Xi.y = mix(Xi.y, 0.0, brdfBias);
-    vec3 H =TangentToWorld(ImportanceSampleGGX(Xi, roughness).xyz,world_normal);
-	return H;
+	vec4 t = ImportanceSampleGGX(Xi, roughness);
+    vec3 H =TangentToWorld(t.xyz,world_normal);
+	return vec4(H,t.w);
+}
+// 1.7ms
+vec3 do_raymarch(vec2 uv, vec3 reflDir_1_VS, float roughness, vec3 viewPos, vec3 normalVS, int rayIndex)
+{
+	
+	vec4 refl_and_pdf = ScreenSpaceReflectionDirection(uv,reflDir_1_VS,roughness,0.9,rayIndex);
+	vec3 reflDirVS = refl_and_pdf.xyz;
+	//vec3 normalVSRough = (g.view * vec4(worldH, 0.0)).xyz;
+	
+	//vec3 reflDirVS = (g.view * vec4(worldReflect, 0.0)).xyz;
+
+	
+    // View direction (camera at origin)
+	//vec3 reflDirVS = reflect(-viewDir, viewH);
+
+    // Reflection direction in view space
+
+    // Initialize ray in view space
+	//float step_sz_to_use = step_size * (max(dot(normalVS, reflDirVS), 0.2)*2.0);
+    vec3 rayPosVS = viewPos + normalVS * step_size * bias;
+	float step_sz_to_use = step_size;// * length(rayPosVS - viewPos) / max(dot(normalVS, reflDirVS), 0.1);
+vec3 col = vec3(0.0);
+    //vec3 prevPos = rayPosVS;
+
+    for (int i = 0; i < MAX_STEPS; i++)
+    {
+        rayPosVS += reflDirVS * step_sz_to_use;
+
+        if (length(rayPosVS) > max_distance)
+            break;
+
+        // Project ray to screen
+        vec4 rayClip = g_proj * vec4(rayPosVS, 1.0);
+        vec2 rayUV = rayClip.xy / rayClip.w * 0.5 + 0.5;
+
+        // Edge fading
+        float edgeFade = smoothstep(0.0, 0.05, min(rayUV.x, rayUV.y)) *
+                         smoothstep(1.0, 0.95, max(rayUV.x, rayUV.y));
+
+        if (rayUV.x < 0.0 || rayUV.x > 1.0 || rayUV.y < 0.0 || rayUV.y > 1.0)
+            break;
+
+        float depthSample = textureLod(DEPTH, rayUV, 0.0).r;
+        if (depthSample <= 0.0)
+            continue;
+
+        // Linearize depth
+        float linearSceneZ = -g.near / depthSample; // Replace with proper linearization if needed
+
+        // Adaptive thickness
+        float thickness = max_thickness ;/// max(dot(normalVS, reflDirVS), 0.4);
+
+        // Check hit
+		float depth_diff = (rayPosVS.z - linearSceneZ);
+		
+        if (depth_diff<0)	// my pos is behind geometry
+        {
+			rayPosVS -= reflDirVS * step_sz_to_use;	// set to previous pos
+			step_sz_to_use *= 0.5;	// half step size on next loop
+		
+			if(abs(depth_diff)<=thickness) {
+				vec2 sample_pos = (rayUV*vec2(g.viewport_size.xy)+vec2(0.5))/g.viewport_size.xy;
+				col=vec3(sample_pos, refl_and_pdf.w);//
+           // col =textureLod(SceneColor, midUV, 0.0).rgb * edgeFade;
+				break;
+            }
+        }
+
+        //prevPos = rayPosVS;
+    }
+
+   // vec3 albedo = texelFetch(SceneColor, texelCoord, 0).rgb;
+   // col = mix(albedo, col, 0.5);//pow(mix(albedo, col, 0.5), vec3(1.0/2.2));
+	//col = min(col, vec3(1.2));	// clamp brightness..
+
+    return col;
 }
 
 void ssr_2()
@@ -411,11 +489,20 @@ void ssr_2()
 	
     vec3 reflDir_1_VS = reflect(viewDir, normalVS);	// reflection in viewspace from input normal
 	
-	vec3 reflDirVS = ScreenSpaceReflectionDirection(uv,reflDir_1_VS,roughness,0.7);
+	//vec3 reflDirVS = ScreenSpaceReflectionDirection(uv,reflDir_1_VS,roughness,0.7);
 	//vec3 normalVSRough = (g.view * vec4(worldH, 0.0)).xyz;
 	
 	//vec3 reflDirVS = (g.view * vec4(worldReflect, 0.0)).xyz;
 
+	vec3 sum = vec3(0.0);
+	for(int r=0;r<1;r++) {
+		sum += do_raymarch(uv, reflDir_1_VS,roughness, viewPos, normalVS,r);
+	}
+	sum /= 1.0;
+	FS_OUT_Color = vec4(
+		sum,
+		1.0);
+	
 	
     // View direction (camera at origin)
 	//vec3 reflDirVS = reflect(-viewDir, viewH);
@@ -424,79 +511,7 @@ void ssr_2()
 
     // Initialize ray in view space
 	//float step_sz_to_use = step_size * (max(dot(normalVS, reflDirVS), 0.2)*2.0);
-    vec3 rayPosVS = viewPos + normalVS * step_size * bias;
-	float step_sz_to_use = step_size;// * length(rayPosVS - viewPos) / max(dot(normalVS, reflDirVS), 0.1);
 
-    vec3 prevPos = rayPosVS;
-
-    for (int i = 0; i < MAX_STEPS; i++)
-    {
-        rayPosVS += reflDirVS * step_sz_to_use;
-
-        if (length(rayPosVS) > max_distance)
-            break;
-
-        // Project ray to screen
-        vec4 rayClip = g_proj * vec4(rayPosVS, 1.0);
-        vec2 rayUV = rayClip.xy / rayClip.w * 0.5 + 0.5;
-
-        // Edge fading
-        float edgeFade = smoothstep(0.0, 0.05, min(rayUV.x, rayUV.y)) *
-                         smoothstep(1.0, 0.95, max(rayUV.x, rayUV.y));
-
-        if (rayUV.x < 0.0 || rayUV.x > 1.0 || rayUV.y < 0.0 || rayUV.y > 1.0)
-            break;
-
-        float depthSample = textureLod(DEPTH, rayUV, 0.0).r;
-        if (depthSample <= 0.0)
-            continue;
-
-        // Linearize depth
-        float linearSceneZ = -g.near / depthSample; // Replace with proper linearization if needed
-
-        // Adaptive thickness
-        float thickness = max_thickness / max(dot(normalVS, reflDirVS), 0.4);
-
-        // Check hit
-		float depth_diff = (rayPosVS.z - linearSceneZ);
-		
-        if (depth_diff<0)	// my pos is behind geometry
-        {
-            // Binary search to refine intersection
-            vec3 start = prevPos;
-            vec3 end = rayPosVS;
-			vec2 midUV = rayUV;
-            for (int j = 0; j < 8; j++)
-            {
-                vec3 mid = (start + end) * 0.5;
-                vec4 midClip = g_proj * vec4(mid, 1.0);
-                midUV = midClip.xy / midClip.w * 0.5 + 0.5;
-                midUV = clamp(midUV, 0.0, 1.0);
-
-                float midDepth = textureLod(DEPTH, midUV, 0.0).r;
-                float linearMidZ = -g.near / midDepth;
-
-				depth_diff = (mid.z - linearMidZ);
-                if ((mid.z - linearMidZ) < 0)	// mid is behind geometry
-                    end = mid;
-                else	// mid in front of geometry
-                    start = mid;
-            }
-			if(abs(depth_diff)>=thickness)
-				break;
-			
-            col = textureLod(SceneColor, midUV, 0.0).rgb * edgeFade;
-            break;
-        }
-
-        prevPos = rayPosVS;
-    }
-
-   // vec3 albedo = texelFetch(SceneColor, texelCoord, 0).rgb;
-   // col = mix(albedo, col, 0.5);//pow(mix(albedo, col, 0.5), vec3(1.0/2.2));
-	col = min(col, vec3(1.2));	// clamp brightness..
-
-    FS_OUT_Color = vec4(col.xyz, 1.0);
 }
 void main()
 {

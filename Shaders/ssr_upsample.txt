@@ -1,22 +1,117 @@
 
 layout(location = 0) out vec4 FS_OUT_Color;
-layout(binding=0) uniform sampler2D mip_chain;
-layout(binding=1) uniform sampler2D GBUFFER2;
+layout(binding=0) uniform sampler2D hitbuffer;	// stores uv of hit + pdf
+layout(binding=1) uniform sampler2D GBUFFER0;	// ws normal
+layout(binding=2) uniform sampler2D SceneColor;
+layout(binding=3) uniform sampler2D GBUFFER2;	// rough/metal
+layout(binding=4) uniform sampler2D DEPTH;	
+layout(binding=5) uniform sampler2D pbrLUT;	
 
 
-uniform vec2 myimg_size;
-uniform float lod_force;
+#include "SharedGpuTypes.txt"
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+#include "commonUtil.txt"
+
+float GGX_D(float NoH, float alpha)
+{
+    float alpha2 = alpha * alpha;
+    float denom = NoH*NoH*(alpha2 - 1.0) + 1.0;
+    return alpha2 / (3.14159265 * denom * denom);
+}
+
+// PDF of GGX half-vector H
+float GGX_PDF(vec3 H, vec3 N, vec3 V, float roughness)
+{
+    float alpha = roughness * roughness;
+    float NoH = max(dot(N, H), 0.0);
+    float VoH = max(dot(V, H), 0.0);
+    
+    float D = GGX_D(NoH, alpha);
+    
+    // convert half-vector PDF -> reflection vector PDF
+    return D * NoH / (4.0 * VoH + 1e-5);
+}
+
+vec3 get_position_from_depth(ivec2 sample_texel, float depth)
+{
+	const vec2 uv = (vec2(sample_texel))/vec2(g.viewport_size.xy);
+	const vec4 clippos = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    const vec4 viewPos4 = g.invproj * clippos;
+    const vec3 viewPos = viewPos4.xyz / viewPos4.w;
+	return viewPos.xyz;
+}
+uniform int temporal_frame = 0;
 
 void main()
 {
-	vec2 uv = (vec2(gl_FragCoord.xy)+vec2(0.5))/myimg_size;
-	vec4 metal_rough = textureLod(GBUFFER2,uv,0);
-	const float roughness = metal_rough.g;
-	const float mip_to_sample = mix(0,2,pow(roughness-0.5,1.0));
-	vec4 high = texelFetch(mip_chain,ivec2(gl_FragCoord.xy),0);
-	float mult = (high.r+high.g+high.b)>1e-3 ? 1.0 : 0.0;
-	//mult = (roughness<0.5)?mult:0.0;
-	vec3 mip_color = textureLod(mip_chain,uv,0).rgb;
-	FS_OUT_Color = vec4(mip_color*mult,1.0);
+	const ivec2 texel = ivec2(gl_FragCoord.xy);
+	const vec3 MY_normal = texelFetch(GBUFFER0,texel,0).rgb;
+	const float MY_roughness = texelFetch(GBUFFER2,texel,0).g;
+	const float depth = texelFetch(DEPTH,texel,0).r;
+	const vec2 uv = (vec2(texel)+vec2(0.5))/vec2(g.viewport_size.xy);
+	const vec4 clipPos = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    const vec4 viewPos4 = g.invproj * clipPos;
+    const vec3 MY_viewPos = viewPos4.xyz / viewPos4.w;
+    const vec3 MY_viewDir = -normalize(MY_viewPos);
+
+    // View-space normal
+    const vec3 MYnormalVS = normalize((g.view * vec4(MY_normal, 0.0)).xyz);
+	
+	// gather 4 nearby samples
+	const ivec2 sample_texel_base = (texel/ivec2(2))*2 + ivec2(temporal_frame&1,temporal_frame&2);
+	vec3 sum = vec3(0.0);
+	float sum_weight = 0.0;
+	int count = 0;
+	for(int i=0;i<4;i++) {
+		const ivec2 sample_texel = texel + ivec2(i&2,i&1)*2;
+		const vec3 uv_and_pdf = texelFetch(hitbuffer,sample_texel, 0).rgb;
+		if(uv_and_pdf.z<=1e-6)
+			continue;
+		count += 1;
+			
+		//const float sample_rough = texelFetch(GBUFFER2,sample_texel,0).g;
+		//const vec3 sample_world_normal = texelFetch(GBUFFER0,sample_texel,0).rgb;
+
+		const vec3 sample_vs = get_position_from_depth(sample_texel,texelFetch(DEPTH,sample_texel,0).r);
+		
+		const ivec2 sample_hit_texel = ivec2(uv_and_pdf.xy * g.viewport_size.xy);
+		const vec3 sample_hit_vs = get_position_from_depth(sample_hit_texel,
+			texelFetch(DEPTH,sample_hit_texel,0).r);
+			
+		
+		const vec3 sample_r_vec_vs = normalize(sample_hit_vs-MY_viewPos);
+		const vec3 samplehit_H = normalize(sample_r_vec_vs + MY_viewDir);
+		//vec3 N_vs = normalize((g.view * vec4(sample_world_normal, 0.0)).xyz);
+		//vec3 viewDir = normalize(sample_vs);
+		// get GGX PDF for MY output sample
+		const float MY_pdf = GGX_PDF(samplehit_H, MYnormalVS, MY_viewDir, MY_roughness);
+		
+		const vec3 scene_color = textureLod(SceneColor,uv_and_pdf.xy,0).rgb;
+		float weight = MY_pdf/uv_and_pdf.z;
+		if(isnan(weight) || isinf(weight))
+			weight = 1.0;
+
+		sum += scene_color * weight;
+		sum_weight += weight;
+	}
+	
+	float preFactor = texture(pbrLUT,vec2(max(dot(MYnormalVS,-MY_viewDir),0.0),MY_roughness)).r;
+	float normalizedWeight = min(sum_weight * preFactor, 1.0);
+	if(sum_weight>=1e-5) {
+		sum /= sum_weight;
+		sum *= sum_weight * preFactor;
+	}
+		
+		
+
+	
+	vec3 blah= texelFetch(hitbuffer,texel,0).rgb;
+	sum = 	 textureLod(SceneColor,blah.xy,0).rgb;
+	if(blah.x<=1e-3)
+		sum = vec3(0.0);
+	//sum = blah;
+	FS_OUT_Color = vec4(sum,1.0);
 }
 

@@ -472,6 +472,8 @@ void SSRSystem::do_downsample()
 }static float lod_force = 1.0;
 void SSRSystem::do_upsample()
 {
+	GPUFUNCTIONSTART;
+
 	const auto& viewsetup = draw.current_frame_view;
 
 	auto& device = draw.get_device();
@@ -486,9 +488,16 @@ void SSRSystem::do_upsample()
 	glm::vec2 inv_presize = 1.f / glm::vec2(size);
 
 	device.bind_texture_ptr(0, draw.tex.halfres_ssr);
-	device.bind_texture_ptr(1, draw.tex.scene_gbuffer2);
-	device.shader().set_vec2("myimg_size", size);
-	device.shader().set_float("lod_force", lod_force);
+	device.bind_texture_ptr(1, draw.tex.scene_gbuffer0);
+	device.bind_texture_ptr(2, draw.tex.scene_color);
+	device.bind_texture_ptr(3, draw.tex.scene_gbuffer2);
+	device.bind_texture_ptr(4, draw.tex.scene_depth);
+	device.bind_texture(5, EnviornmentMapHelper::get().integrator.get_texture());
+	static int frame = 0;
+	device.shader().set_int("temporal_frame", (frame++) % 4);
+
+//	device.shader().set_vec2("myimg_size", size);
+	//device.shader().set_float("lod_force", lod_force);
 
 	auto targets = {
 		ColorTargetInfo(draw.tex.scene_color)
@@ -565,7 +574,7 @@ void SSRSystem::execute_compute()
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	glBindSampler(3, 0);
 
-	do_downsample();
+	//do_downsample();
 
 	do_upsample();
 

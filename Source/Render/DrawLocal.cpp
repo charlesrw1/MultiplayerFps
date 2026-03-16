@@ -2123,7 +2123,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	Texture::load("_ddgi_accum")->update_specs_ptr(tex.ddgi_accum);
 	Texture::load("_ddgi_accum_prev")->update_specs_ptr(tex.last_ddgi_accum);
 	delete_and_create_texture(tex.last_reflection_accum, gtf::r11f_g11f_b10f);
-	delete_and_create_texture_halfresmips(tex.halfres_ssr, gtf::r11f_g11f_b10f,3);
+	delete_and_create_texture_halfresmips(tex.halfres_ssr, gtf::rgb16f,1);
 	Texture::load("_ssr")->update_specs_ptr(tex.halfres_ssr);
 
 	// last frame, for TAA
