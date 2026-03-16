@@ -303,7 +303,28 @@ uniform float max_distance = 100.0;
 uniform float bias = 3.0;
 uniform float max_thickness = 0.5;
 uniform float temporalTime=0;
+float Halton(int index_, int base)
+{
+    float f = 1.0;
+    float r = 0.0;
 
+    int i = index_;
+    while(i > 0)
+    {
+        f = f / float(base);
+        r = r + f * float(i % base);
+        i = i / base;
+    }
+
+    return r;
+}
+vec2 Halton2D(int index_)
+{
+    return vec2(
+        Halton(index_, 2),
+        Halton(index_, 3)
+    );
+}
 // from flax
 vec2 RandN2(vec2 n)
 {
@@ -335,13 +356,24 @@ vec4 ImportanceSampleGGX(vec2 e, float roughness)
     float pdf = d * cosTheta;
     return vec4(h, pdf);
 }
+vec2 HaltonJittered(vec2 uv, int frame)
+{
+    vec2 h = Halton2D(frame);
+    vec2 jitter = RandN2(uv);
+
+    return fract(h + jitter);
+}
 vec3 ScreenSpaceReflectionDirection(vec2 uv, vec3 world_normal, float roughness, float brdfBias)
 {
     // Randomize it a little
-    vec2 jitter = RandN2(uv + vec2(temporalTime));
+    //vec2 jitter = RandN2(uv + vec2(temporalTime));
+	
+	int sampleIndex = int(temporalTime)%1024;
+	vec2 jitter = HaltonJittered(uv,sampleIndex);
+	
     vec2 Xi = jitter;
     Xi.y = mix(Xi.y, 0.0, brdfBias);
-    vec3 H =TangentToWorld(world_normal, ImportanceSampleGGX(Xi, roughness).xyz);
+    vec3 H =TangentToWorld(ImportanceSampleGGX(Xi, roughness).xyz,world_normal);
 	return H;
 }
 
@@ -362,27 +394,31 @@ void ssr_2()
         return;
     }
 	float roughness = texelFetch(GBUFFER2,texelCoord,0).g;
-	if(roughness>0.5) {
-		FS_OUT_Color = vec4(col,1.0);
-		return;
-	}
+//	if(roughness>0.5) {
+//		FS_OUT_Color = vec4(col,1.0);
+//		return;
+//	}
 
     // Reconstruct view-space position
     vec4 clipPos = vec4(uv * 2.0 - 1.0, depth, 1.0);
     vec4 viewPos4 = g.invproj * clipPos;
     vec3 viewPos = viewPos4.xyz / viewPos4.w;
+    vec3 viewDir = normalize(viewPos);
 
     // View-space normal
     vec3 worldNormal = texelFetch(GBUFFER0, texelCoord, 0).rgb;
-	//worldNormal = ScreenSpaceReflectionDirection(uv,worldNormal,0.3,0.8);
     vec3 normalVS = normalize((g.view * vec4(worldNormal, 0.0)).xyz);
+	vec3 worldH = ScreenSpaceReflectionDirection(uv,worldNormal,roughness,0.8);
+	vec3 normalVSRough = (g.view * vec4(worldH, 0.0)).xyz;
+	
+	//vec3 reflDirVS = (g.view * vec4(worldReflect, 0.0)).xyz;
 
 	
     // View direction (camera at origin)
-    vec3 viewDir = normalize(viewPos);
+	//vec3 reflDirVS = reflect(-viewDir, viewH);
 
     // Reflection direction in view space
-    vec3 reflDirVS = reflect(viewDir, normalVS);
+    vec3 reflDirVS = reflect(viewDir, normalVSRough);
 
     // Initialize ray in view space
 	//float step_sz_to_use = step_size * (max(dot(normalVS, reflDirVS), 0.2)*2.0);
@@ -457,7 +493,7 @@ void ssr_2()
    // vec3 albedo = texelFetch(SceneColor, texelCoord, 0).rgb;
    // col = mix(albedo, col, 0.5);//pow(mix(albedo, col, 0.5), vec3(1.0/2.2));
 
-    FS_OUT_Color = vec4(col, 1.0);
+    FS_OUT_Color = vec4(col.xyz, 1.0);
 }
 void main()
 {

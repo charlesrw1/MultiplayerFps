@@ -550,7 +550,8 @@ void SSRSystem::execute_compute()
 	device.shader().set_float("step_size", step_size);
 	device.shader().set_float("max_thickness", max_thick);
 	auto time = GetTime();
-	device.shader().set_float("temporalTime", time-std::round(time/10.0)*10.0);
+	static int index = 0;
+	device.shader().set_float("temporalTime", float(index++));// time - std::round(time / 10.0) * 10.0);
 
 
 	device.shader().set_mat4("g_proj", viewsetup.proj);
