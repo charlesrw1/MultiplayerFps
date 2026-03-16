@@ -394,10 +394,10 @@ void ssr_2()
         return;
     }
 	float roughness = texelFetch(GBUFFER2,texelCoord,0).g;
-//	if(roughness>0.5) {
-//		FS_OUT_Color = vec4(col,1.0);
-//		return;
-//	}
+	if(roughness>0.7) {
+		FS_OUT_Color = vec4(col,1.0);
+		return;
+	}
 
     // Reconstruct view-space position
     vec4 clipPos = vec4(uv * 2.0 - 1.0, depth, 1.0);
@@ -408,8 +408,11 @@ void ssr_2()
     // View-space normal
     vec3 worldNormal = texelFetch(GBUFFER0, texelCoord, 0).rgb;
     vec3 normalVS = normalize((g.view * vec4(worldNormal, 0.0)).xyz);
-	vec3 worldH = ScreenSpaceReflectionDirection(uv,worldNormal,roughness,0.8);
-	vec3 normalVSRough = (g.view * vec4(worldH, 0.0)).xyz;
+	
+    vec3 reflDir_1_VS = reflect(viewDir, normalVS);	// reflection in viewspace from input normal
+	
+	vec3 reflDirVS = ScreenSpaceReflectionDirection(uv,reflDir_1_VS,roughness,0.7);
+	//vec3 normalVSRough = (g.view * vec4(worldH, 0.0)).xyz;
 	
 	//vec3 reflDirVS = (g.view * vec4(worldReflect, 0.0)).xyz;
 
@@ -418,7 +421,6 @@ void ssr_2()
 	//vec3 reflDirVS = reflect(-viewDir, viewH);
 
     // Reflection direction in view space
-    vec3 reflDirVS = reflect(viewDir, normalVSRough);
 
     // Initialize ray in view space
 	//float step_sz_to_use = step_size * (max(dot(normalVS, reflDirVS), 0.2)*2.0);
@@ -492,6 +494,7 @@ void ssr_2()
 
    // vec3 albedo = texelFetch(SceneColor, texelCoord, 0).rgb;
    // col = mix(albedo, col, 0.5);//pow(mix(albedo, col, 0.5), vec3(1.0/2.2));
+	col = min(col, vec3(1.2));	// clamp brightness..
 
     FS_OUT_Color = vec4(col.xyz, 1.0);
 }
