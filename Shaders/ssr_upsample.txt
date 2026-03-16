@@ -88,6 +88,7 @@ vec3 SoftClamp(vec3 color, float threshold)
     vec3 compressed = threshold + over / (1.0 + over); // compress high values
     return min(color, compressed); 
 }
+uniform bool debug_toggle = false;
 void main()
 {
 	const ivec2 texel = ivec2(gl_FragCoord.xy);
@@ -111,17 +112,17 @@ void main()
     ivec2(1,1)
 	};
 	
-	const ivec2 sample_texel_base = texel + offsets[temporal_frame%2];
+	const ivec2 sample_texel_base = (texel/ivec2(2))*2 + offsets[temporal_frame%4];
 	vec3 sum = vec3(0.0);
 	float sum_weight = 0.0;
 	int count = 0;
 	
 
-	
-	for(int i=0;i<2;i++) {
+	for(int i=0;i<4;i++) {
 		ivec2 sample_ofs = ivec2(i%2,i/2);
 		//sample_ofs.y *= 2;
-		const ivec2 sample_texel = texel + sample_ofs;
+		
+		const ivec2 sample_texel = sample_texel_base + sample_ofs;
 		const vec3 uv_and_pdf = texelFetch(hitbuffer,sample_texel, 0).rgb;
 		if(uv_and_pdf.z<=1e-6)
 			continue;
@@ -150,7 +151,7 @@ void main()
 		const float mip = log2(footprint*3.0);
 		
 		vec3 scene_color = (mip>1)?textureLod(SceneColorMipChain,uv_and_pdf.xy,mip).rgb : textureLod(SceneColor,uv_and_pdf.xy,0.0).rgb;
-		//scene_color = SoftClamp(scene_color,1.5);	// remove bright stuff...
+		//scene_color = vec3(mod(uv_and_pdf.xy,vec2(0.1))*10.0,1.0);
 		
 		float weight = MY_pdf/uv_and_pdf.z;
 		if(isnan(weight) || isinf(weight))
@@ -167,19 +168,11 @@ void main()
 		sum *= sum_weight * preFactor;
 	}
 		
-		
-
-	
-	vec3 blah = texelFetch(hitbuffer,texel,0).rgb;
-	sum = textureLod(SceneColor,blah.xy,0).rgb;
-	if(blah.x<=1e-3)
-		sum = vec3(0.0);
-	//sum = blah;
 	
 	const vec3 scene_color = texelFetch(SceneColor,texel,0).rgb;
 	const vec3 spec_add = pbr_calculate_reflection2(vec3(0.8),MY_roughness,0.0,MYnormalVS,-MY_viewDir,sum);
 	
 	//vec3 blah= texelFetch(hitbuffer,texel,0).rgb;
-	FS_OUT_Color = vec4(sum,1.0);
+	FS_OUT_Color = vec4(spec_add,1.0);
 }
 

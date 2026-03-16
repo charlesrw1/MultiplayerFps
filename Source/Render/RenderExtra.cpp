@@ -474,6 +474,7 @@ void SSRSystem::do_downsample()
 		inv_presize = 1.f / glm::vec2(size);
 	}
 }static float lod_force = 1.0;
+static bool debug_toggle = false;
 void SSRSystem::do_upsample()
 {
 	GPUFUNCTIONSTART;
@@ -484,7 +485,7 @@ void SSRSystem::do_upsample()
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
 	state.program = ssr_upsample;
-	state.blend = BlendState::OPAQUE;
+	state.blend = BlendState::ADD;
 	state.depth_testing = false;
 	state.depth_writes = false;
 	device.set_pipeline(state);
@@ -493,7 +494,7 @@ void SSRSystem::do_upsample()
 
 	device.bind_texture_ptr(0, draw.tex.halfres_ssr);
 	device.bind_texture_ptr(1, draw.tex.scene_gbuffer0);
-	device.bind_texture_ptr(2, draw.tex.scene_color);
+	device.bind_texture_ptr(2, draw.tex.last_scene_color);
 	device.bind_texture_ptr(3, draw.tex.scene_gbuffer2);
 	device.bind_texture_ptr(4, draw.tex.scene_depth);
 	device.bind_texture(5, EnviornmentMapHelper::get().integrator.get_texture());
@@ -501,7 +502,7 @@ void SSRSystem::do_upsample()
 
 	static int frame = 0;
 	device.shader().set_int("temporal_frame", (frame++) % 4);
-
+	device.shader().set_bool("debug_toggle", debug_toggle);
 //	device.shader().set_vec2("myimg_size", size);
 	//device.shader().set_float("lod_force", lod_force);
 
@@ -527,7 +528,7 @@ void imgui_menu_ssr() {
 	ImGui::InputFloat("max_dist", &max_dist);
 	ImGui::InputFloat("max_thick", &max_thick);
 	ImGui::InputFloat("lod_force", &lod_force);
-
+	ImGui::Checkbox("debug_toggle", &debug_toggle);
 	ImGui::InputInt("max_steps", &max_steps);
 }
 ADD_TO_DEBUG_MENU(imgui_menu_ssr);
@@ -564,6 +565,7 @@ void SSRSystem::execute_compute()
 	device.shader().set_float("bias", bias);
 	device.shader().set_float("step_size", step_size);
 	device.shader().set_float("max_thickness", max_thick);
+	device.shader().set_bool("debug_toggle", debug_toggle);
 	auto time = GetTime();
 	static int index = 0;
 	device.shader().set_float("temporalTime", float(index++));// time - std::round(time / 10.0) * 10.0);

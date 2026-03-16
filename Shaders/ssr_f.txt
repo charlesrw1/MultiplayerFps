@@ -379,6 +379,7 @@ vec4 ScreenSpaceReflectionDirection(vec2 uv, vec3 world_normal, float roughness,
 	return vec4(H,t.w);
 }
 // 1.7ms
+uniform bool debug_toggle = false;
 vec3 do_raymarch(vec2 uv, vec3 reflDir_1_VS, float roughness, vec3 viewPos, vec3 normalVS, int rayIndex)
 {
 	
@@ -440,7 +441,8 @@ vec3 col = vec3(0.0);
 			if(abs(depth_diff)<=thickness) {
 				//vec2 sample_pos = (rayUV*vec2(g.viewport_size.xy)+vec2(0.5))/g.viewport_size.xy;
 				col=vec3(rayUV, refl_and_pdf.w);//
-           // col =textureLod(SceneColor, midUV, 0.0).rgb * edgeFade;
+				//if(debug_toggle)
+				//	col =texelFetch(SceneColor, ivec2(rayUV*g.viewport_size.xy), 0).rgb;// * edgeFade;
 				break;
             }
         }
@@ -501,7 +503,7 @@ void ssr_2()
 	for(int r=0;r<1;r++) {
 		sum += do_raymarch(uv, reflDir_1_VS,roughness, viewPos, normalVS,r);
 	}
-	sum /= 1.0;
+	//sum /= 1.0;
 	FS_OUT_Color = vec4(
 		sum,
 		1.0);
