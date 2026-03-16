@@ -448,21 +448,25 @@ void SSRSystem::do_downsample()
 	state.depth_testing = false;
 	state.depth_writes = false;
 	device.set_pipeline(state);
-	const int num_mips = 3;
+	const int num_mips = 5;
 	glm::ivec2 size(viewsetup.width, viewsetup.height);
 	glm::vec2 inv_presize = 1.f / glm::vec2(size);
-	for (int i =1; i < num_mips; i++) {
+	for (int i =0; i < num_mips; i++) {
 		size /= 2.f;
 		auto targets = {
-		ColorTargetInfo(draw.tex.halfres_ssr,-1,i)
+		ColorTargetInfo(draw.tex.last_reflection_accum,-1,i)
 		};
 		RenderPassState rp;
 		rp.color_infos = targets;
 		IGraphicsDevice::inst->set_render_pass(rp);
-		device.shader().set_int("mip_level", i - 1);
+		int mip_to_fetch = (i == 0) ? 0 : i - 1;
+		device.shader().set_int("mip_level", mip_to_fetch);
 		device.shader().set_vec2("myimg_size",size);
 		device.shader().set_vec2("inv_prev_size", inv_presize);
-		device.bind_texture_ptr(0, draw.tex.halfres_ssr);
+		if(i==0)
+			device.bind_texture_ptr(0, draw.tex.scene_color);
+		else
+			device.bind_texture_ptr(0, draw.tex.last_reflection_accum);
 		device.set_viewport(0,0,size.x, size.y);
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 
@@ -493,6 +497,8 @@ void SSRSystem::do_upsample()
 	device.bind_texture_ptr(3, draw.tex.scene_gbuffer2);
 	device.bind_texture_ptr(4, draw.tex.scene_depth);
 	device.bind_texture(5, EnviornmentMapHelper::get().integrator.get_texture());
+	device.bind_texture_ptr(6,draw.tex.last_reflection_accum);
+
 	static int frame = 0;
 	device.shader().set_int("temporal_frame", (frame++) % 4);
 
@@ -571,10 +577,11 @@ void SSRSystem::execute_compute()
 	device.bind_texture_ptr(3, depth_pyramid);
 	device.bind_texture_ptr(4, draw.tex.scene_depth);
 	device.bind_texture_ptr(5, draw.tex.scene_color);
+
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 	glBindSampler(3, 0);
 
-	//do_downsample();
+	do_downsample();
 
 	do_upsample();
 

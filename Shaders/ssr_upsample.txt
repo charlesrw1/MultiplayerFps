@@ -6,6 +6,7 @@ layout(binding=2) uniform sampler2D SceneColor;
 layout(binding=3) uniform sampler2D GBUFFER2;	// rough/metal
 layout(binding=4) uniform sampler2D DEPTH;	
 layout(binding=5) uniform sampler2D pbrLUT;	
+layout(binding=6) uniform sampler2D SceneColorMipChain;
 
 
 #include "SharedGpuTypes.txt"
@@ -42,8 +43,51 @@ vec3 get_position_from_depth(ivec2 sample_texel, float depth)
     const vec3 viewPos = viewPos4.xyz / viewPos4.w;
 	return viewPos.xyz;
 }
+vec3 get_position_from_depth_uv(vec2 sample_uv, float depth)
+{
+	const vec2 uv = sample_uv;
+	const vec4 clippos = vec4(uv * 2.0 - 1.0, depth, 1.0);
+    const vec4 viewPos4 = g.invproj * clippos;
+    const vec3 viewPos = viewPos4.xyz / viewPos4.w;
+	return viewPos.xyz;
+}
+#include "pbrShared.txt"
+vec3 pbr_calculate_reflection2(vec3 Albedo, float Roughness, float Metalness, vec3 Normal, vec3 V, vec3 prefiltered)
+{
+        vec3 R = reflect(-V,Normal);
+vec3 F0 = vec3(0.04);
+        F0 = mix(F0,Albedo,Metalness);
+
+        //vec3 prefiltered_color = textureLod(skyprobe,vec3(R), Roughness*MAX_REFLECTION_LOD).rgb;
+        //vec3 prefiltered_color = pow(ref_irrad,vec3(1.5));
+        float NdotV = max(dot(Normal,V),0.0);
+
+        vec3 prefiltered_color = prefiltered;// textureLod(probes,vec4(R,float(probe_num)),Roughness*MAX_REFLECTION_LOD).rgb;
+        //prefiltered_color *= ref_irrad;
+
+
+
+        vec3 F = FresnelSchlickRougness(NdotV,F0,Roughness);
+
+
+        //float F90 = clamp(50*dot(F0,vec3(0.33)),0,1);
+        //vec3 F = modified_f_schlick(F0,F90,NdotV);
+
+        vec2 env_brdf = texture(pbrLUT,vec2(max(dot(Normal,V),0.0),Roughness)).rg;
+
+
+        vec3 specular = prefiltered_color*(F*env_brdf.x+env_brdf.y);
+     
+        return specular;
+}
 uniform int temporal_frame = 0;
 
+vec3 SoftClamp(vec3 color, float threshold)
+{
+    vec3 over = max(color - threshold, vec3(0.0));
+    vec3 compressed = threshold + over / (1.0 + over); // compress high values
+    return min(color, compressed); 
+}
 void main()
 {
 	const ivec2 texel = ivec2(gl_FragCoord.xy);
@@ -60,12 +104,24 @@ void main()
     const vec3 MYnormalVS = normalize((g.view * vec4(MY_normal, 0.0)).xyz);
 	
 	// gather 4 nearby samples
-	const ivec2 sample_texel_base = (texel/ivec2(2))*2 + ivec2(temporal_frame&1,temporal_frame&2);
+	const ivec2 offsets[4] = {
+    ivec2(0,0),
+    ivec2(0,1),
+    ivec2(1,0),
+    ivec2(1,1)
+	};
+	
+	const ivec2 sample_texel_base = texel + offsets[temporal_frame%2];
 	vec3 sum = vec3(0.0);
 	float sum_weight = 0.0;
 	int count = 0;
-	for(int i=0;i<4;i++) {
-		const ivec2 sample_texel = texel + ivec2(i&2,i&1)*2;
+	
+
+	
+	for(int i=0;i<2;i++) {
+		ivec2 sample_ofs = ivec2(i%2,i/2);
+		//sample_ofs.y *= 2;
+		const ivec2 sample_texel = texel + sample_ofs;
 		const vec3 uv_and_pdf = texelFetch(hitbuffer,sample_texel, 0).rgb;
 		if(uv_and_pdf.z<=1e-6)
 			continue;
@@ -74,11 +130,11 @@ void main()
 		//const float sample_rough = texelFetch(GBUFFER2,sample_texel,0).g;
 		//const vec3 sample_world_normal = texelFetch(GBUFFER0,sample_texel,0).rgb;
 
-		const vec3 sample_vs = get_position_from_depth(sample_texel,texelFetch(DEPTH,sample_texel,0).r);
+		//const vec3 sample_vs = get_position_from_depth(sample_texel,texelFetch(DEPTH,sample_texel,0).r);
 		
-		const ivec2 sample_hit_texel = ivec2(uv_and_pdf.xy * g.viewport_size.xy);
-		const vec3 sample_hit_vs = get_position_from_depth(sample_hit_texel,
-			texelFetch(DEPTH,sample_hit_texel,0).r);
+		//const ivec2 sample_hit_texel = ivec2(uv_and_pdf.xy * g.viewport_size.xy);
+		const vec3 sample_hit_vs = get_position_from_depth_uv(uv_and_pdf.xy,
+			textureLod(DEPTH,uv_and_pdf.xy,0).r);
 			
 		
 		const vec3 sample_r_vec_vs = normalize(sample_hit_vs-MY_viewPos);
@@ -86,9 +142,16 @@ void main()
 		//vec3 N_vs = normalize((g.view * vec4(sample_world_normal, 0.0)).xyz);
 		//vec3 viewDir = normalize(sample_vs);
 		// get GGX PDF for MY output sample
-		const float MY_pdf = GGX_PDF(samplehit_H, MYnormalVS, MY_viewDir, MY_roughness);
+		const float MY_pdf = GGX_PDF(samplehit_H, MYnormalVS, MY_viewDir, MY_roughness)* max(dot(sample_r_vec_vs, MYnormalVS), 0.0);
 		
-		const vec3 scene_color = textureLod(SceneColor,uv_and_pdf.xy,0).rgb;
+		
+		const float dist = length(sample_hit_vs - MY_viewPos);
+		const float footprint = dist * MY_roughness;
+		const float mip = log2(footprint*3.0);
+		
+		vec3 scene_color = (mip>1)?textureLod(SceneColorMipChain,uv_and_pdf.xy,mip).rgb : textureLod(SceneColor,uv_and_pdf.xy,0.0).rgb;
+		//scene_color = SoftClamp(scene_color,1.5);	// remove bright stuff...
+		
 		float weight = MY_pdf/uv_and_pdf.z;
 		if(isnan(weight) || isinf(weight))
 			weight = 1.0;
@@ -107,11 +170,16 @@ void main()
 		
 
 	
-	vec3 blah= texelFetch(hitbuffer,texel,0).rgb;
-	sum = 	 textureLod(SceneColor,blah.xy,0).rgb;
+	vec3 blah = texelFetch(hitbuffer,texel,0).rgb;
+	sum = textureLod(SceneColor,blah.xy,0).rgb;
 	if(blah.x<=1e-3)
 		sum = vec3(0.0);
 	//sum = blah;
+	
+	const vec3 scene_color = texelFetch(SceneColor,texel,0).rgb;
+	const vec3 spec_add = pbr_calculate_reflection2(vec3(0.8),MY_roughness,0.0,MYnormalVS,-MY_viewDir,sum);
+	
+	//vec3 blah= texelFetch(hitbuffer,texel,0).rgb;
 	FS_OUT_Color = vec4(sum,1.0);
 }
 

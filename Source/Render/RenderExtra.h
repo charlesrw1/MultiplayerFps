@@ -210,7 +210,8 @@ public:
 		IGraphicsTexture* blurred = nullptr;
 
 		texhandle random = 0;
-		texhandle viewnormal = 0;
+		IGraphicsTexture* viewnormal = nullptr;
+		//texhandle viewnormal = 0;
 		texhandle depthlinear = 0;
 		texhandle deptharray = 0;
 		texhandle resultarray = 0;

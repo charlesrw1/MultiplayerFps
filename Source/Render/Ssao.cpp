@@ -92,14 +92,14 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	if (!initial) {
 		glDeleteTextures(1, &texture.depthlinear);
 		glDeleteFramebuffers(1, &fbo.depthlinear);
-		glDeleteTextures(1, &texture.viewnormal);
+		//glDeleteTextures(1, &texture.viewnormal);
 		glDeleteFramebuffers(1, &fbo.viewnormal);
 
 		//glDeleteTextures(1, &texture.result);
 		//glDeleteTextures(1, &texture.blur);
 		safe_release(texture.blurred);
 		safe_release(texture.result);
-
+		safe_release(texture.viewnormal);
 
 		glDeleteFramebuffers(1, &fbo.finalresolve);
 
@@ -124,15 +124,23 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	glCreateFramebuffers(1, &fbo.depthlinear);
 	glNamedFramebufferTexture(fbo.depthlinear, GL_COLOR_ATTACHMENT0, texture.depthlinear, 0);
 
-	glCreateTextures(GL_TEXTURE_2D, 1, &texture.viewnormal);
-	glTextureStorage2D(texture.viewnormal, 1, GL_RGBA8, width, height);
-	glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.viewnormal, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(texture.viewnormal, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	{
+		CreateTextureArgs args;
+		args.width = width;
+		args.height = height;
+		args.format = GraphicsTextureFormat::rgba8;
+		args.sampler_type = GraphicsSamplerType::NearestClamped;
+		texture.viewnormal = IGraphicsDevice::inst->create_texture(args);
+	}
+	//glCreateTextures(GL_TEXTURE_2D, 1, &texture.viewnormal);
+	//glTextureStorage2D(texture.viewnormal, 1, GL_RGBA8, width, height);
+	//glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	//glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	//glTextureParameteri(texture.viewnormal, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	//glTextureParameteri(texture.viewnormal, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	glCreateFramebuffers(1, &fbo.viewnormal);
-	glNamedFramebufferTexture(fbo.viewnormal, GL_COLOR_ATTACHMENT0, texture.viewnormal, 0);
+	glNamedFramebufferTexture(fbo.viewnormal, GL_COLOR_ATTACHMENT0, texture.viewnormal->get_internal_handle(), 0);
 
 	//glCreateTextures(GL_TEXTURE_2D, 1, &texture.result);
 	//glTextureStorage2D(texture.result, 1, GL_RG16F, width, height);
@@ -197,6 +205,7 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	texture.blur_vts_handle->update_specs_ptr(texture.result);
 	texture.result_vts_handle->update_specs_ptr(texture.blurred);
 	// FIXME
+	texture.view_normal_vts_handle->update_specs_ptr(texture.viewnormal);
 	//texture.view_normal_vts_handle->update_specs(texture.viewnormal, width, height, 4, {});
 	//texture.linear_depth_vts_handle->update_specs(texture.depthlinear, width, height, 4, {});
 }
@@ -399,7 +408,7 @@ void SSAO_System::render()
 			//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_calc);
 			//*glViewport(0, 0, quarterWidth, quarterHeight);
 			glBindTextureUnit(0, texture.deptharray);
-			glBindTextureUnit(1, texture.viewnormal);
+			glBindTextureUnit(1, texture.viewnormal->get_internal_handle());
 
 			glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.data);
 

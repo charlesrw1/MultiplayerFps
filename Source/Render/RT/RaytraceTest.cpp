@@ -215,7 +215,7 @@ void DdgiTesting::create_textures_raybuffer(int probe_width, int probe_height) {
 	targs.type = GraphicsTextureType::t2D;
 	targs.num_mip_maps = 1;
 	targs.format = GraphicsTextureFormat::r11f_g11f_b10f;
-	targs.sampler_type = GraphicsSamplerType::LinearDefault;
+	targs.sampler_type = GraphicsSamplerType::LinearNoMipmaps;
 	probe_irradiance = IGraphicsDevice::inst->create_texture(targs);
 	probe_irradiance->sub_image_upload(0, 0, 0, targs.width, targs.height, 0, nullptr);
 

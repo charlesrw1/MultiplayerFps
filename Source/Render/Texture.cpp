@@ -470,7 +470,9 @@ bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffe
 			args.sampler_type = GraphicsSamplerType::CubemapDefault;
 		}
 		else {
-			args.sampler_type = GraphicsSamplerType::LinearDefault;
+			args.sampler_type = GraphicsSamplerType::LinearNoMipmaps;
+			if(numMipmaps>1)
+				sys_print(Warning, "specilized format has more than 1 mipmap\n");
 		}
 		return IGraphicsDevice::inst->create_texture(args);
 	};

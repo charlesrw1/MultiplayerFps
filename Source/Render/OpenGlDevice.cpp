@@ -301,8 +301,12 @@ public:
 			glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			glTextureParameteri(id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
 			break;
-		case GraphicsSamplerType::LinearDefault:
+		case GraphicsSamplerType::LinearNoMipmaps:
 			glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			break;
+		case GraphicsSamplerType::LinearDefault:
+			glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 			glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			break;
 		case GraphicsSamplerType::NearestDefault:

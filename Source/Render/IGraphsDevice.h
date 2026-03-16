@@ -204,6 +204,7 @@ enum class GraphicsSamplerType {
 	AtlasShadowmap,
 	CubemapDefault,
 	DepthPyramid,
+	LinearNoMipmaps,
 };
 
 

@@ -2096,11 +2096,12 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 		CreateTextureArgs args;
 		args.format = format;
 		args.num_mip_maps = num_mips;
-		args.width = s_w;
-		args.height = s_h;
-		args.sampler_type = GraphicsSamplerType::AnisotropyDefault;
+		args.width = s_w/2;
+		args.height = s_h/2;
+		args.sampler_type = GraphicsSamplerType::LinearDefault;
 		ptr = IGraphicsDevice::inst->create_texture(args);
 	};
+
 	auto delete_and_create_texture_half_res = [&](IGraphicsTexture*& ptr, GraphicsTextureFormat format) {
 		safe_release(ptr);
 
@@ -2122,8 +2123,8 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	delete_and_create_texture(tex.last_ddgi_accum, gtf::r11f_g11f_b10f);
 	Texture::load("_ddgi_accum")->update_specs_ptr(tex.ddgi_accum);
 	Texture::load("_ddgi_accum_prev")->update_specs_ptr(tex.last_ddgi_accum);
-	delete_and_create_texture(tex.last_reflection_accum, gtf::r11f_g11f_b10f);
-	delete_and_create_texture_halfresmips(tex.halfres_ssr, gtf::rgb16f,1);
+	delete_and_create_texture_halfresmips(tex.last_reflection_accum, gtf::r11f_g11f_b10f,5);
+	delete_and_create_texture(tex.halfres_ssr, gtf::rgb16f);
 	Texture::load("_ssr")->update_specs_ptr(tex.halfres_ssr);
 
 	// last frame, for TAA
@@ -4172,7 +4173,7 @@ void Renderer::upload_light_and_decal_buffers()
 	lightListCuller->cull(current_frame_view);
 }
 
-
+ConfigVar enable_ssr("r.ssr", "1", CVAR_BOOL, "");
 ConfigVar dont_attach_velocity("r.dont_attach_velocity", "0", CVAR_BOOL, "");
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 {
@@ -4383,7 +4384,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	if(r_debug_mode.get_integer() == 0 && !params.skybox_only)
 		accumulate_gbuffer_lighting(params.is_cubemap_view);
 
-	if (r_debug_mode.get_integer() == 0 && !params.skybox_only) {
+	if (enable_ssr.get_bool()&&r_debug_mode.get_integer() == 0 && !params.skybox_only) {
 		SSRSystem::inst->execute_compute();
 	}
 

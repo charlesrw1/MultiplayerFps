@@ -438,8 +438,8 @@ vec3 col = vec3(0.0);
 			step_sz_to_use *= 0.5;	// half step size on next loop
 		
 			if(abs(depth_diff)<=thickness) {
-				vec2 sample_pos = (rayUV*vec2(g.viewport_size.xy)+vec2(0.5))/g.viewport_size.xy;
-				col=vec3(sample_pos, refl_and_pdf.w);//
+				//vec2 sample_pos = (rayUV*vec2(g.viewport_size.xy)+vec2(0.5))/g.viewport_size.xy;
+				col=vec3(rayUV, refl_and_pdf.w);//
            // col =textureLod(SceneColor, midUV, 0.0).rgb * edgeFade;
 				break;
             }
@@ -469,12 +469,12 @@ void ssr_2()
     if (depth <= 0.0)
     {
         FS_OUT_Color = vec4(col, 1.0);
-        return;
+       // return;
     }
 	float roughness = texelFetch(GBUFFER2,texelCoord,0).g;
 	if(roughness>0.7) {
 		FS_OUT_Color = vec4(col,1.0);
-		return;
+		//return;
 	}
 
     // Reconstruct view-space position
@@ -486,6 +486,9 @@ void ssr_2()
     // View-space normal
     vec3 worldNormal = texelFetch(GBUFFER0, texelCoord, 0).rgb;
     vec3 normalVS = normalize((g.view * vec4(worldNormal, 0.0)).xyz);
+	//normalVS.y *= -1;
+	//normalVS.x*= -1;
+	
 	
     vec3 reflDir_1_VS = reflect(viewDir, normalVS);	// reflection in viewspace from input normal
 	

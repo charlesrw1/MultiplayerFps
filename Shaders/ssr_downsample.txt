@@ -5,7 +5,7 @@ uniform int mip_level;
 uniform vec2 myimg_size;
 uniform vec2 inv_prev_size;
 float get_weight(vec4 c) {
-	return (c.r+c.g+c.b)>1e-4 ? 1.0 : 0.0;
+	return 1.0;// (c.r+c.g+c.b)>1e-4 ? 1.0 : 0.0;
 }
 void main()
 {
