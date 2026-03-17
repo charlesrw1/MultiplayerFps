@@ -2123,9 +2123,11 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	delete_and_create_texture(tex.last_ddgi_accum, gtf::r11f_g11f_b10f);
 	Texture::load("_ddgi_accum")->update_specs_ptr(tex.ddgi_accum);
 	Texture::load("_ddgi_accum_prev")->update_specs_ptr(tex.last_ddgi_accum);
-	delete_and_create_texture_halfresmips(tex.last_reflection_accum, gtf::r11f_g11f_b10f,5);
-	delete_and_create_texture(tex.halfres_ssr, gtf::rgb16f);
-	Texture::load("_ssr")->update_specs_ptr(tex.halfres_ssr);
+
+	delete_and_create_texture_halfresmips(tex.scene_color_mipchain, gtf::r11f_g11f_b10f,5);
+	delete_and_create_texture(tex.reflection_accum, gtf::r11f_g11f_b10f);
+	delete_and_create_texture(tex.last_reflection_accum, gtf::r11f_g11f_b10f);
+	Texture::load("_ssr")->update_specs_ptr(tex.reflection_accum);
 
 	// last frame, for TAA
 	delete_and_create_texture(tex.last_scene_color, gtf::rgb16f);

@@ -16,6 +16,8 @@ layout(binding=2) uniform sampler2D GBUFFER2;    // metal/rough
 layout(binding=3) uniform sampler2D sceneHiZ;
 layout(binding=4) uniform sampler2D DEPTH;
 layout(binding=5) uniform sampler2D SceneColor; // used to sample reflected color
+layout(binding=6) uniform sampler2D SceneColorMipChain; // used to sample reflected color
+
 
 uniform int max_ssr_iters = 100;
 const float MAX_THICKNESS = 0.05;
@@ -369,7 +371,7 @@ vec4 ScreenSpaceReflectionDirection(vec2 uv, vec3 world_normal, float roughness,
     // Randomize it a little
     //vec2 jitter = RandN2(uv + vec2(temporalTime));
 	
-	int sampleIndex = int(temporalTime + temp_add)%1024;
+	int sampleIndex = int(temporalTime + temp_add)%256;
 	vec2 jitter = HaltonJittered(uv,sampleIndex);
 	
     vec2 Xi = jitter;
@@ -380,10 +382,12 @@ vec4 ScreenSpaceReflectionDirection(vec2 uv, vec3 world_normal, float roughness,
 }
 // 1.7ms
 uniform bool debug_toggle = false;
+
 vec3 do_raymarch(vec2 uv, vec3 reflDir_1_VS, float roughness, vec3 viewPos, vec3 normalVS, int rayIndex)
 {
 	
-	vec4 refl_and_pdf = ScreenSpaceReflectionDirection(uv,reflDir_1_VS,roughness,0.9,rayIndex);
+	vec4 refl_and_pdf = ScreenSpaceReflectionDirection(uv,reflDir_1_VS,roughness,0.92,rayIndex);
+	//refl_and_pdf.w *= max(dot(normalVS, refl_and_pdf.xyz),0.0);
 	vec3 reflDirVS = refl_and_pdf.xyz;
 	//vec3 normalVSRough = (g.view * vec4(worldH, 0.0)).xyz;
 	
@@ -442,7 +446,15 @@ vec3 col = vec3(0.0);
 				//vec2 sample_pos = (rayUV*vec2(g.viewport_size.xy)+vec2(0.5))/g.viewport_size.xy;
 				col=vec3(rayUV, refl_and_pdf.w);//
 				//if(debug_toggle)
-				//	col =texelFetch(SceneColor, ivec2(rayUV*g.viewport_size.xy), 0).rgb;// * edgeFade;
+				
+				
+				const float dist = length(rayPosVS - viewPos);
+				const float footprint = dist * roughness;
+				const float mip = log2(footprint*5.0);
+				
+				col = (mip>1)?textureLod(SceneColorMipChain,rayUV.xy,mip).rgb : textureLod(SceneColor,rayUV.xy,0.0).rgb;
+				
+				//col =textureLod(SceneColor,rayUV, 0).rgb;// * edgeFade;
 				break;
             }
         }
@@ -456,13 +468,28 @@ vec3 col = vec3(0.0);
 
     return col;
 }
+uniform int res_mode = 0;
+uniform ivec2 texel_offset = ivec2(0,0);
 
 void ssr_2()
 {
     vec3 col = vec3(0.0,0.0,0.0);
 
     // Pixel coordinates
-    const ivec2 texelCoord = ivec2(gl_FragCoord.xy);
+    ivec2 texelCoord = ivec2(gl_FragCoord.xy);
+	
+	//if(res_mode==1) {
+	//	// half res, vertically
+	//	texelCoord.y *= 2;
+	//	texelCoord += texel_offset;
+	//}
+	//else if(res_mode==2) {
+	//	// quarter res
+	//	texelCoord *= 2;
+	//}
+	texelCoord *= 2;
+		texelCoord += texel_offset;
+	
     const vec2 invSize = 1.0 / g.viewport_size.xy;
     const vec2 uv = (vec2(texelCoord) + 0.5) * invSize;
 
@@ -471,12 +498,12 @@ void ssr_2()
     if (depth <= 0.0)
     {
         FS_OUT_Color = vec4(col, 1.0);
-       // return;
+        return;
     }
 	float roughness = texelFetch(GBUFFER2,texelCoord,0).g;
 	if(roughness>0.7) {
 		FS_OUT_Color = vec4(col,1.0);
-		//return;
+		return;
 	}
 
     // Reconstruct view-space position

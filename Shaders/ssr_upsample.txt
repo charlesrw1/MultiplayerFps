@@ -89,6 +89,8 @@ vec3 SoftClamp(vec3 color, float threshold)
     return min(color, compressed); 
 }
 uniform bool debug_toggle = false;
+uniform int res_mode = 0;
+uniform int num_samples_to_get = 4;
 void main()
 {
 	const ivec2 texel = ivec2(gl_FragCoord.xy);
@@ -112,14 +114,35 @@ void main()
     ivec2(1,1)
 	};
 	
-	const ivec2 sample_texel_base = (texel/ivec2(2))*2 + offsets[temporal_frame%4];
+	// case1: full res
+	// case2: half res
+	// case3: quarter res
+	
+	ivec2 sample_texel_base = ivec2(0,0);//(texel/ivec2(2))*2 + offsets[temporal_frame%4];
+	float weight_mult = 1;
+	if(res_mode==0) {
+		// full 
+		sample_texel_base=texel;
+	}
+	else if(res_mode ==1) {
+		// half res. vertically
+		sample_texel_base = texel;
+		sample_texel_base.y -= temporal_frame % 2;
+		sample_texel_base.y /= 2;
+	}
+	else {
+		// quarter
+		sample_texel_base = (texel-offsets[temporal_frame%4])/ivec2(2);
+	}
+	
+	
 	vec3 sum = vec3(0.0);
 	float sum_weight = 0.0;
 	int count = 0;
 	
 
-	for(int i=0;i<4;i++) {
-		ivec2 sample_ofs = ivec2(i%2,i/2);
+	for(int i=0;i<num_samples_to_get;i++) {
+		ivec2 sample_ofs = offsets[i];
 		//sample_ofs.y *= 2;
 		
 		const ivec2 sample_texel = sample_texel_base + sample_ofs;
@@ -143,7 +166,7 @@ void main()
 		//vec3 N_vs = normalize((g.view * vec4(sample_world_normal, 0.0)).xyz);
 		//vec3 viewDir = normalize(sample_vs);
 		// get GGX PDF for MY output sample
-		const float MY_pdf = GGX_PDF(samplehit_H, MYnormalVS, MY_viewDir, MY_roughness)* max(dot(sample_r_vec_vs, MYnormalVS), 0.0);
+		const float MY_pdf = GGX_PDF(samplehit_H, MYnormalVS, MY_viewDir, MY_roughness);
 		
 		
 		const float dist = length(sample_hit_vs - MY_viewPos);
@@ -153,19 +176,27 @@ void main()
 		vec3 scene_color = (mip>1)?textureLod(SceneColorMipChain,uv_and_pdf.xy,mip).rgb : textureLod(SceneColor,uv_and_pdf.xy,0.0).rgb;
 		//scene_color = vec3(mod(uv_and_pdf.xy,vec2(0.1))*10.0,1.0);
 		
-		float weight = MY_pdf/uv_and_pdf.z;
+		float weight =MY_pdf;///uv_and_pdf.z;
 		if(isnan(weight) || isinf(weight))
-			weight = 1.0;
+			weight = 0.01;
+			
+		//weight *= (i==0) ? 1.0 : 0.5;
 
 		sum += scene_color * weight;
 		sum_weight += weight;
 	}
 	
 	float preFactor = texture(pbrLUT,vec2(max(dot(MYnormalVS,-MY_viewDir),0.0),MY_roughness)).r;
-	float normalizedWeight = min(sum_weight * preFactor, 1.0);
 	if(sum_weight>=1e-5) {
-		sum /= sum_weight;
-		sum *= sum_weight * preFactor;
+		//float visibility = min(preFactor*sum_weight / float(count), 1.0);
+		float avg_sum = sum_weight/float(count);	// should be ~1
+		sum = sum / float(count);
+		sum /= avg_sum;
+		
+		//sum *= visibility * 3.0;
+	}
+	else {
+		sum = vec3(0,0,1);
 	}
 		
 	

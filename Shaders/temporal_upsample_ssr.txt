@@ -1,0 +1,131 @@
+
+
+
+layout(location = 0) out vec4 FS_OUT_Color;
+
+#include "SharedGpuTypes.txt"
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+layout(binding=0) uniform sampler2D halfResColor;
+layout(binding=1) uniform sampler2D lastFullColor;
+layout(binding=2) uniform sampler2D sceneDepth;
+layout(binding=3) uniform sampler2D sceneMotion;
+layout(binding=4) uniform sampler2D lastSceneMotion;
+
+
+uniform mat4 lastViewProj;
+vec2 reproject_to_last(vec2 uv)
+{
+	float depth = textureLod(sceneDepth,uv,0.0).r;
+	uv = uv*2.0 - vec2(1.0);
+	vec4 worldspace = g.inv_viewproj * vec4(uv.x,uv.y,depth,1.0);
+	worldspace /= worldspace.w;
+	vec4 lastClipspace = lastViewProj * vec4(worldspace.xyz,1.0);
+	lastClipspace /= lastClipspace.w;
+	
+	vec2 reproject_uv = lastClipspace.xy*0.5 + vec2(0.5);
+	return reproject_uv;
+}
+// to save my fucking eyeballs
+float sanitize_float(float v)
+{
+    if (isnan(v) || isinf(v))
+        return 0.0;
+    return v;
+}
+vec3 sanitize(vec3 v)
+{
+    return vec3(
+        sanitize_float(v.x),
+        sanitize_float(v.y),
+		sanitize_float(v.z)
+    );
+}
+
+uniform bool remove_flicker=true;
+uniform bool use_reproject = false;
+uniform float doc_mult =  10.0;
+uniform float doc_vel_bias = 0.001;
+uniform float doc_bias = 0.01;
+uniform float doc_pow = 0.4;
+uniform bool dilate_velocity = false;
+uniform float amt = 0.0;
+uniform ivec2 halfres_texel_offset = ivec2(-1,-1);
+
+vec3 temporal_upscale()
+{
+	const ivec2 input_texel = ivec2(gl_FragCoord.xy);
+	const vec2 invsize = 1.0 / g.viewport_size.xy;
+	const vec2 input_uv = vec2(vec2(input_texel)+vec2(0.5)) * invsize;
+	
+	const ivec2 my_texel_offset = ivec2(uvec2(input_texel)%uvec2(2,2));
+	const float weight = (my_texel_offset == halfres_texel_offset)? 1.0 : 0.1;
+	
+	const ivec2 halfres_texel_coord_i_map_to = (input_texel/ivec2(2));
+	//const ivec2 fullres_texel_sampled_this_frame = halfres_texel_coord_i_map_to*ivec2(2) + halfres_texel_offset;
+	
+	
+	const vec3 current = texelFetch(halfResColor,halfres_texel_coord_i_map_to,0).rgb;
+	
+	
+	vec2 velocity_uv = texelFetch(sceneMotion,input_texel,0).rg;
+	//if(dilate_velocity)
+	//	velocity_uv = GetVelocity(input_uv);
+	
+	if(length(velocity_uv)<0.00001)
+		velocity_uv=vec2(0.5);
+	
+	//velocity_uv = vec2(0.5);
+	vec2 ndc_input = input_uv*2.0-vec2(1.0);
+	vec2 velocity_uv_ndc = velocity_uv*2.0-vec2(1.0);
+	ndc_input += velocity_uv_ndc;
+	vec2 uv_to_use = ndc_input * 0.5 + 0.5;
+	//uv_to_use = reproject_to_last(input_uv);
+	uv_to_use = clamp(uv_to_use,vec2(0.0),vec2(1.0));
+	
+	vec2 actual_uv = reproject_to_last(input_uv);
+	//uv_to_use = actual_uv;
+	if(use_reproject)
+		uv_to_use = actual_uv;
+	
+	//vec3 last = SampleTextureCatmullRom5(lastColor,uv_to_use).rgb;
+	vec3 last = textureLod(lastFullColor,uv_to_use,0).rgb;// looks better than the cubic filter...
+	vec2 lastVelocityUv = textureLod(lastSceneMotion,uv_to_use,0).rg;
+	float vel_len = length(lastVelocityUv-velocity_uv);
+	float velocityDisocclusion = clamp(pow((vel_len-doc_vel_bias)*doc_mult-doc_bias,doc_pow),0.0,1.0);
+	
+	// when dioccluded, lerp to 1.0
+	// else, lerp to weight. weight is 0 if this texel wasnt fetched this frame, else 1. so ddgi is basically updating at 15hz (assuming 60hz rendering)
+	const float weight_with_dissocclusion = mix(weight*0.2,1.0,velocityDisocclusion);
+
+	//color clamping (for ddgi: clamp to halfres? idk)
+	vec3 minColor=vec3(9999);
+	vec3 maxColor = vec3(-9999);
+	for(int x = -1;x<=1;x++) {
+		for(int y=-1;y<=1;y++) {
+			vec3 color = texture(lastFullColor,input_uv+vec2(x,y)*invsize).rgb;
+			minColor = min(minColor,color);
+			maxColor = max(maxColor,color);
+		}
+	}
+	
+	vec3 out_return = vec3(0.0);
+	{
+		vec3 clamped = clamp(last,minColor,maxColor);
+		out_return = current * (1-amt) + clamped*amt;
+		
+		//out_return = last;
+	}
+	out_return = mix(out_return,current,weight_with_dissocclusion);
+	
+	return sanitize(out_return);
+}
+
+void main()
+{
+	FS_OUT_Color = vec4(
+		temporal_upscale(),
+		1.0);
+}

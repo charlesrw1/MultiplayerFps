@@ -236,7 +236,7 @@ public:
 	gpu::HBAOData data = {};
 	glm::vec4 random_elements[RANDOM_ELEMENTS];
 };
-
+#include <array>
 class SSRSystem {
 public:
 	static SSRSystem* inst;
@@ -247,7 +247,9 @@ public:
 	program_handle ssr_compute{};
 	program_handle ssr_downsample{};
 	program_handle ssr_upsample{};
-
+	program_handle ssr_blur{};
+	program_handle temporal_upsample{};
+	program_handle apply_temporal{};
 
 	IGraphicsTexture* depth_pyramid = nullptr;
 	glm::ivec2 depth_size{};
@@ -256,4 +258,21 @@ public:
 	void compute_depth();
 	void do_downsample();
 	void do_upsample();
+	void do_temporal();
+
+
+	glm::ivec2 get_frame_offset() const {
+		const std::array offs = {
+			glm::ivec2(0,0),
+			glm::ivec2(1,0),
+			glm::ivec2(0,1),
+			glm::ivec2(1,1),
+		};
+		return offs.at(temporalframe%4);
+	}
+	void increment_temporal_frame() {
+		temporalframe = (temporalframe + 1)%2048;
+	}
+
+	int temporalframe = 0;
 };

@@ -89,4 +89,4 @@ developer_mode 1
 open-editor demo_level_1.tmap
 
 #ot _ddgi_accum
-#otex 0.5 1 0 _ssao_view_normal
+#otex 1 1 0 _ssr
