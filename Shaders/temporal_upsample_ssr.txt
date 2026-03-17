@@ -54,6 +54,8 @@ uniform bool dilate_velocity = false;
 uniform float amt = 0.0;
 uniform ivec2 halfres_texel_offset = ivec2(-1,-1);
 
+uniform float ssr_nonoccluded_weight_mult = 0.2;
+
 vec3 temporal_upscale()
 {
 	const ivec2 input_texel = ivec2(gl_FragCoord.xy);
@@ -98,7 +100,7 @@ vec3 temporal_upscale()
 	
 	// when dioccluded, lerp to 1.0
 	// else, lerp to weight. weight is 0 if this texel wasnt fetched this frame, else 1. so ddgi is basically updating at 15hz (assuming 60hz rendering)
-	const float weight_with_dissocclusion = mix(weight*0.2,1.0,velocityDisocclusion);
+	const float weight_with_dissocclusion = mix(weight*ssr_nonoccluded_weight_mult,1.0,velocityDisocclusion);
 
 	//color clamping (for ddgi: clamp to halfres? idk)
 	vec3 minColor=vec3(9999);

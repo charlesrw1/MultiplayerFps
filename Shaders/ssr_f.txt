@@ -371,7 +371,7 @@ vec4 ScreenSpaceReflectionDirection(vec2 uv, vec3 world_normal, float roughness,
     // Randomize it a little
     //vec2 jitter = RandN2(uv + vec2(temporalTime));
 	
-	int sampleIndex = int(temporalTime + temp_add)%256;
+	int sampleIndex = int(temporalTime + temp_add)%32;	// low repeat count!
 	vec2 jitter = HaltonJittered(uv,sampleIndex);
 	
     vec2 Xi = jitter;
@@ -382,11 +382,14 @@ vec4 ScreenSpaceReflectionDirection(vec2 uv, vec3 world_normal, float roughness,
 }
 // 1.7ms
 uniform bool debug_toggle = false;
+uniform float ssr_brdf_bias = 0.92;
+uniform float ssr_mip_bias = 5.0;
+uniform float ssr_max_roughness = 0.7;
 
 vec3 do_raymarch(vec2 uv, vec3 reflDir_1_VS, float roughness, vec3 viewPos, vec3 normalVS, int rayIndex)
 {
 	
-	vec4 refl_and_pdf = ScreenSpaceReflectionDirection(uv,reflDir_1_VS,roughness,0.92,rayIndex);
+	vec4 refl_and_pdf = ScreenSpaceReflectionDirection(uv,reflDir_1_VS,roughness,ssr_brdf_bias,rayIndex);
 	//refl_and_pdf.w *= max(dot(normalVS, refl_and_pdf.xyz),0.0);
 	vec3 reflDirVS = refl_and_pdf.xyz;
 	//vec3 normalVSRough = (g.view * vec4(worldH, 0.0)).xyz;
@@ -432,7 +435,7 @@ vec3 col = vec3(0.0);
         float linearSceneZ = -g.near / depthSample; // Replace with proper linearization if needed
 
         // Adaptive thickness
-        float thickness = max_thickness ;/// max(dot(normalVS, reflDirVS), 0.4);
+        float thickness = max_thickness/ max(dot(normalVS, reflDirVS), 0.4);
 
         // Check hit
 		float depth_diff = (rayPosVS.z - linearSceneZ);
@@ -440,6 +443,7 @@ vec3 col = vec3(0.0);
         if (depth_diff<0)	// my pos is behind geometry
         {
 			rayPosVS -= reflDirVS * step_sz_to_use;	// set to previous pos
+
 			step_sz_to_use *= 0.5;	// half step size on next loop
 		
 			if(abs(depth_diff)<=thickness) {
@@ -450,10 +454,9 @@ vec3 col = vec3(0.0);
 				
 				const float dist = length(rayPosVS - viewPos);
 				const float footprint = dist * roughness;
-				const float mip = log2(footprint*5.0);
+				const float mip = log2(footprint*ssr_mip_bias);
 				
 				col = (mip>1)?textureLod(SceneColorMipChain,rayUV.xy,mip).rgb : textureLod(SceneColor,rayUV.xy,0.0).rgb;
-				
 				//col =textureLod(SceneColor,rayUV, 0).rgb;// * edgeFade;
 				break;
             }
@@ -501,7 +504,7 @@ void ssr_2()
         return;
     }
 	float roughness = texelFetch(GBUFFER2,texelCoord,0).g;
-	if(roughness>0.7) {
+	if(roughness>ssr_max_roughness) {
 		FS_OUT_Color = vec4(col,1.0);
 		return;
 	}
@@ -530,7 +533,7 @@ void ssr_2()
 	for(int r=0;r<1;r++) {
 		sum += do_raymarch(uv, reflDir_1_VS,roughness, viewPos, normalVS,r);
 	}
-	//sum /= 1.0;
+	sum /= 1.0;
 	FS_OUT_Color = vec4(
 		sum,
 		1.0);

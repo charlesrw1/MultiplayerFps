@@ -550,6 +550,7 @@ void SSRSystem::do_upsample()
 
 }
 ConfigVar ssr_temporal_blend("r.ssr_temporal_blend", "0.9", CVAR_FLOAT, "", 0, 1);
+static float ssr_nonoccluded_weight_mult = 0.2;
 void SSRSystem::do_temporal()
 {
 	auto& device = draw.get_device();
@@ -596,7 +597,7 @@ void SSRSystem::do_temporal()
 	the_shader.set_float("doc_pow", taa_doc_pow);
 	the_shader.set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
 	the_shader.set_ivec2("halfres_texel_offset", get_frame_offset());
-
+	the_shader.set_float("ssr_nonoccluded_weight_mult", ssr_nonoccluded_weight_mult);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
 	glm::ivec2 size(vs.width, vs.height);
@@ -659,6 +660,10 @@ void draw_imgui_for_cvar(ConfigVar& var)
 		}
 	}
 }
+static float ssr_brdf_bias = 0.92;
+static float ssr_mip_bias = 5;
+static float ssr_max_roughness = 0.7;
+
 
 void imgui_menu_ssr() {
 	ImGui::InputFloat("bias", &bias);
@@ -668,6 +673,12 @@ void imgui_menu_ssr() {
 	ImGui::InputFloat("lod_force", &lod_force);
 	ImGui::Checkbox("debug_toggle", &debug_toggle);
 	ImGui::InputInt("max_steps", &max_steps);
+	ImGui::DragFloat("ssr_nonoccluded_weight_mult", &ssr_nonoccluded_weight_mult, 0.01, 0, 1);
+	ImGui::DragFloat("ssr_brdf_bias", &ssr_brdf_bias, 0.01, 0.5, 1);
+	ImGui::DragFloat("ssr_mip_bias", &ssr_mip_bias, 0.1, 1.0, 9);
+	ImGui::DragFloat("ssr_max_roughness", &ssr_max_roughness, 0.05, 0.0, 1.0);
+
+
 
 	draw_imgui_for_cvar(r_ssr_res);
 	draw_imgui_for_cvar(r_ssr_num_samples);
@@ -716,6 +727,11 @@ void SSRSystem::execute_compute()
 	device.shader().set_float("temporalTime", float(index++));// time - std::round(time / 10.0) * 10.0);
 	r_ssr_res.set_integer(2);
 	device.shader().set_int("res_mode", r_ssr_res.get_integer());
+	device.shader().set_float("ssr_max_roughness", ssr_max_roughness);
+	device.shader().set_float("ssr_brdf_bias", ssr_brdf_bias);
+	device.shader().set_float("ssr_mip_bias", ssr_mip_bias);
+
+
 	glm::ivec2 texel_offset{};
 	if (r_ssr_res.get_integer() == 1) {
 
