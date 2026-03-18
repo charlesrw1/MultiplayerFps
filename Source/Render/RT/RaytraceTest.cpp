@@ -409,6 +409,7 @@ static float normal_sigma = 1.0;
 static bool wants_half_res = false;
 static bool do_flush_after = true;
 static bool skip_gather = false;
+static vec2 ssr_lum_range = vec2(0, 0.1);
 void ddgi_debugmenu() {
 	auto self = draw.ddgi.get();
 	ImGui::InputInt3("select", &self->selected_probe.x);
@@ -433,7 +434,8 @@ void ddgi_debugmenu() {
 	ImGui::Checkbox("wants_half_res", &wants_half_res);
 	ImGui::Checkbox("do_flush", &do_flush_after);
 	ImGui::Checkbox("skip_gather", &skip_gather);
-
+	ImGui::InputFloat("ssr_lum_min", &ssr_lum_range.x);
+	ImGui::InputFloat("ssr_lum_max", &ssr_lum_range.y);
 
 }
 ADD_TO_DEBUG_MENU(ddgi_debugmenu);
@@ -863,6 +865,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao)
 		the_shader.set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
 		the_shader.set_ivec2("halfres_texel_offset", texel_offset);
 
+
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
 
@@ -884,7 +887,12 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao)
 	draw.bind_texture_ptr(3, draw.tex.scene_depth);
 	draw.bind_texture_ptr(4, ssao);
 	draw.bind_texture_ptr(5, draw.tex.ddgi_accum);
-
+	device.shader().set_vec2("ssr_lum_range", ssr_lum_range);
+	extern ConfigVar enable_ssr;
+	if (enable_ssr.get_bool())
+		draw.bind_texture_ptr(6, draw.tex.reflection_accum);
+	else
+		draw.bind_texture_ptr(6, draw.black_texture);
 
 	set_reflection_uniforms();
 

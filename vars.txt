@@ -27,8 +27,8 @@ godot_lightmap_engine_path "C:/Users/charl/Documents/lightmapexporter/"
 g_project_base "D:/Data"
 
 
-g_application_class "EngineTesterApp"
-is_editor_app 1
+g_application_class "EngineTesterAppImpl"
+is_editor_app 0
 
 g_draw_grid 0
 

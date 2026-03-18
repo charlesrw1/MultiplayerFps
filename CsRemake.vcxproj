@@ -148,6 +148,7 @@
     </ClCompile>
     <ClCompile Include="Source\Render\Volumetricfog.cpp" />
     <ClCompile Include="Source\Scripting\ScriptFunctionCodegen.cpp" />
+    <ClCompile Include="Source\Scripting\ScriptingStdLib.cpp" />
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
     <ClCompile Include="Source\UI\BaseGUI.cpp" />
     <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
@@ -332,6 +333,7 @@
     <ClInclude Include="Source\Level.h" />
     <ClInclude Include="Source\Physics\Physics2Local.h" />
     <ClInclude Include="Source\Scripting\ScriptFunctionCodegen.h" />
+    <ClInclude Include="Source\Scripting\ScriptingStdLib.h" />
     <ClInclude Include="Source\Scripting\ScriptManager.h" />
     <ClInclude Include="Source\Sound\SoundComponent.h" />
     <ClInclude Include="Source\Testheader.h" />

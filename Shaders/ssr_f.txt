@@ -366,12 +366,13 @@ vec2 HaltonJittered(vec2 uv, int frame)
 
     return fract(h + jitter);
 }
+uniform int random_repeat =32;
 vec4 ScreenSpaceReflectionDirection(vec2 uv, vec3 world_normal, float roughness, float brdfBias, int temp_add)
 {
     // Randomize it a little
     //vec2 jitter = RandN2(uv + vec2(temporalTime));
 	
-	int sampleIndex = int(temporalTime + temp_add)%32;	// low repeat count!
+	int sampleIndex = int(temporalTime + temp_add)%random_repeat;	// low repeat count!
 	vec2 jitter = HaltonJittered(uv,sampleIndex);
 	
     vec2 Xi = jitter;
@@ -385,6 +386,29 @@ uniform bool debug_toggle = false;
 uniform float ssr_brdf_bias = 0.92;
 uniform float ssr_mip_bias = 5.0;
 uniform float ssr_max_roughness = 0.7;
+
+uniform mat4 lastViewProj;
+vec2 reproject_to_last(vec2 uv, float depth)
+{
+	uv = uv*2.0 - vec2(1.0);
+	vec4 worldspace = g.inv_viewproj * vec4(uv.x,uv.y,depth,1.0);
+	worldspace /= worldspace.w;
+	vec4 lastClipspace = lastViewProj * vec4(worldspace.xyz,1.0);
+	lastClipspace /= lastClipspace.w;
+	
+	vec2 reproject_uv = lastClipspace.xy*0.5 + vec2(0.5);
+	return reproject_uv;
+}
+vec3 sample_last_frame_scene_color(vec2 uv, float depth, float mip)
+{
+	vec2 prev_uv = reproject_to_last(uv,depth);
+	prev_uv = clamp(prev_uv,vec2(0),vec2(1));
+
+	vec3 col = (mip>1)?textureLod(SceneColorMipChain,prev_uv.xy,mip).rgb : textureLod(SceneColor,prev_uv.xy,0.0).rgb;
+	
+	return col;
+}
+
 
 vec3 do_raymarch(vec2 uv, vec3 reflDir_1_VS, float roughness, vec3 viewPos, vec3 normalVS, int rayIndex)
 {
@@ -404,7 +428,9 @@ vec3 do_raymarch(vec2 uv, vec3 reflDir_1_VS, float roughness, vec3 viewPos, vec3
 
     // Initialize ray in view space
 	//float step_sz_to_use = step_size * (max(dot(normalVS, reflDirVS), 0.2)*2.0);
-    vec3 rayPosVS = viewPos + normalVS * step_size * bias;
+	const float jitter_start_amt = mix(0.0,0.3,HaltonJittered(uv,7).y);
+	
+    vec3 rayPosVS = viewPos + normalVS * step_size * (bias) + reflDirVS * jitter_start_amt;
 	float step_sz_to_use = step_size;// * length(rayPosVS - viewPos) / max(dot(normalVS, reflDirVS), 0.1);
 vec3 col = vec3(0.0);
     //vec3 prevPos = rayPosVS;
@@ -456,7 +482,7 @@ vec3 col = vec3(0.0);
 				const float footprint = dist * roughness;
 				const float mip = log2(footprint*ssr_mip_bias);
 				
-				col = (mip>1)?textureLod(SceneColorMipChain,rayUV.xy,mip).rgb : textureLod(SceneColor,rayUV.xy,0.0).rgb;
+				col = sample_last_frame_scene_color(rayUV.xy, depthSample,mip);
 				//col =textureLod(SceneColor,rayUV, 0).rgb;// * edgeFade;
 				break;
             }
@@ -473,7 +499,7 @@ vec3 col = vec3(0.0);
 }
 uniform int res_mode = 0;
 uniform ivec2 texel_offset = ivec2(0,0);
-
+uniform int num_traces_per_pixel = 1;
 void ssr_2()
 {
     vec3 col = vec3(0.0,0.0,0.0);
@@ -530,10 +556,10 @@ void ssr_2()
 	//vec3 reflDirVS = (g.view * vec4(worldReflect, 0.0)).xyz;
 
 	vec3 sum = vec3(0.0);
-	for(int r=0;r<1;r++) {
+	for(int r=0;r<num_traces_per_pixel;r++) {
 		sum += do_raymarch(uv, reflDir_1_VS,roughness, viewPos, normalVS,r);
 	}
-	sum /= 1.0;
+	sum /= float(num_traces_per_pixel);
 	FS_OUT_Color = vec4(
 		sum,
 		1.0);

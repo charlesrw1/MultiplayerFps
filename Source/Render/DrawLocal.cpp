@@ -4380,16 +4380,16 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	deferred_decal_pass();
 		//device.reset_states();
 
-	if (r_debug_mode.get_integer() == 0 && enable_ssao.get_bool()&&!params.is_cubemap_view)
-		ssao.render();
-
-	if(r_debug_mode.get_integer() == 0 && !params.skybox_only)
-		accumulate_gbuffer_lighting(params.is_cubemap_view);
 
 	if (enable_ssr.get_bool()&&r_debug_mode.get_integer() == 0 && !params.skybox_only) {
 		SSRSystem::inst->execute_compute();
 	}
 
+	if (r_debug_mode.get_integer() == 0 && enable_ssao.get_bool()&&!params.is_cubemap_view)
+		ssao.render();
+
+	if(r_debug_mode.get_integer() == 0 && !params.skybox_only)
+		accumulate_gbuffer_lighting(params.is_cubemap_view);
 	// STAMPS ON NORMALS IN GBUFFER0!
 	auto copy_forward_to_temporary = [&]() {
 		GPUSCOPESTART(copy_forward_to_temporary_scope);

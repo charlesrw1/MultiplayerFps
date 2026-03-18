@@ -385,6 +385,12 @@ def class_has_actual_properties(newclass : ClassDef) -> bool:
             return True
     return False
 
+def append_to_array_R(arr:list[Property],classdef:ClassDef):
+    for f in classdef.properties:
+        if f.new_type.type==FUNCTION_TYPE and f.is_virtual:
+            arr.append(f)
+    if classdef.super_type_def is not None:
+        append_to_array_R(arr,classdef.super_type_def)
 
 def write_scriptable_class(newclass : ClassDef) -> str:
     assert(newclass.scriptable)
@@ -395,7 +401,12 @@ def write_scriptable_class(newclass : ClassDef) -> str:
     const ClassTypeInfo* type = nullptr;
     const ClassTypeInfo& get_type() const final {{ return *type; }}
     """
-    for f in newclass.properties:
+
+    virtual_function_types : list[Property] = []
+    append_to_array_R(virtual_function_types, newclass)
+
+
+    for f in virtual_function_types:
         if f.new_type.type==FUNCTION_TYPE and f.is_virtual:
             output += "\t" + f.return_type.get_raw_type_string() + f" {f.name}("
             for argType,argName in f.func_args:

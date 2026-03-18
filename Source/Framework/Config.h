@@ -185,6 +185,8 @@ public:
 	static Debug_Interface* get();
 
 	virtual void add_hook(const char* menu_name, void(*drawfunc)()) = 0;
+	virtual void add_hook_w_name(const char* menu_name, void(*drawfunc)(const char*)) = 0;
+
 	virtual void draw() = 0;
 };
 

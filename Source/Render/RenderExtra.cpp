@@ -469,7 +469,7 @@ void SSRSystem::do_downsample()
 		device.shader().set_vec2("myimg_size",size);
 		device.shader().set_vec2("inv_prev_size", inv_presize);
 		if(i==0)
-			device.bind_texture_ptr(0, draw.tex.scene_color);
+			device.bind_texture_ptr(0, draw.tex.last_scene_color);
 		else
 			device.bind_texture_ptr(0, draw.tex.scene_color_mipchain);
 		device.set_viewport(0,0,size.x, size.y);
@@ -517,7 +517,7 @@ void SSRSystem::do_upsample()
 	//device.shader().set_float("lod_force", lod_force);
 
 	auto targets = {
-		ColorTargetInfo(draw.tex.scene_color)
+		ColorTargetInfo(draw.tex.last_reflection_accum)
 	};
 	RenderPassState rp;
 	rp.color_infos = targets;
@@ -600,6 +600,8 @@ void SSRSystem::do_temporal()
 	the_shader.set_float("ssr_nonoccluded_weight_mult", ssr_nonoccluded_weight_mult);
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
+	return;
+
 	glm::ivec2 size(vs.width, vs.height);
 	glm::vec2 inv_presize = 1.f / glm::vec2(size);
 
@@ -663,8 +665,8 @@ void draw_imgui_for_cvar(ConfigVar& var)
 static float ssr_brdf_bias = 0.92;
 static float ssr_mip_bias = 5;
 static float ssr_max_roughness = 0.7;
-
-
+static int random_repeat = 32;
+static int traces_per_pixel = 1;
 void imgui_menu_ssr() {
 	ImGui::InputFloat("bias", &bias);
 	ImGui::InputFloat("step_size", &step_size);
@@ -677,6 +679,8 @@ void imgui_menu_ssr() {
 	ImGui::DragFloat("ssr_brdf_bias", &ssr_brdf_bias, 0.01, 0.5, 1);
 	ImGui::DragFloat("ssr_mip_bias", &ssr_mip_bias, 0.1, 1.0, 9);
 	ImGui::DragFloat("ssr_max_roughness", &ssr_max_roughness, 0.05, 0.0, 1.0);
+	ImGui::SliderInt("traces_per_pixel", &traces_per_pixel, 1, 4);
+	ImGui::InputInt("random_repeat", &random_repeat);
 
 
 
@@ -730,6 +734,9 @@ void SSRSystem::execute_compute()
 	device.shader().set_float("ssr_max_roughness", ssr_max_roughness);
 	device.shader().set_float("ssr_brdf_bias", ssr_brdf_bias);
 	device.shader().set_float("ssr_mip_bias", ssr_mip_bias);
+	device.shader().set_int("random_repeat", random_repeat);
+	device.shader().set_int("traces_per_pixel", traces_per_pixel);
+	device.shader().set_mat4("lastViewProj", draw.last_frame_main_view.viewproj);
 
 
 	glm::ivec2 texel_offset{};
@@ -757,7 +764,7 @@ void SSRSystem::execute_compute()
 	glBindSampler(3, hiz_max_sampler);
 	device.bind_texture_ptr(3, depth_pyramid);
 	device.bind_texture_ptr(4, draw.tex.scene_depth);
-	device.bind_texture_ptr(5, draw.tex.scene_color);
+	device.bind_texture_ptr(5, draw.tex.last_scene_color);
 	device.bind_texture_ptr(6, draw.tex.scene_color_mipchain);
 
 

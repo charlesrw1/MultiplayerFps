@@ -216,7 +216,10 @@ std::vector<SpawnerComponent*> EngineTesterApp::find_all_in_class(string name) {
 	return test_ents;
 }
 
-void EngineTesterApp::start() {
+void EngineTesterApp::start2() {
+
+	sys_print(Info, "EngineTesterApp:start");
+
 	extern ConfigVar ui_disable_screen_log;
 	extern ConfigVar g_drawconsole;
 	g_drawconsole.set_bool(false);

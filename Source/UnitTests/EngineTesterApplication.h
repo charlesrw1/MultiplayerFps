@@ -48,6 +48,8 @@ public:
 	string name{};
 };
 
+
+
 class EngineTesterApp : public Application {
 public:
 	CLASS_BODY(EngineTesterApp, scriptable);
@@ -70,7 +72,7 @@ public:
 	static std::vector<SpawnerComponent*> find_all_with_name_ordered(string name, string class_);
 
 	static std::vector<SpawnerComponent*> find_all_in_class(string name);
-	void start();
+	REF void start2();
 	void update();
 
 

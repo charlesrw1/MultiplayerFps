@@ -1136,12 +1136,15 @@ void GameEngineLocal::cleanup()
 class Debug_Interface_Impl : public Debug_Interface
 {
 public:
-	void add_hook(const char* menu_name, void(*drawfunc)()) {
+
+	template<typename FUNC>
+	void add_hook_shared(const char* menu_name, FUNC&& f) {
 		int i = 0;
 		for (; i < hooks.size(); i++) {
 			if (strcmp(menu_name, hooks[i].menu_name) == 0) {
 				Hook_Node* node = new Hook_Node;
-				node->drawfunc = drawfunc;
+				//node->drawfunc = drawfunc;
+				f(node);
 				node->next = nullptr;
 				hooks[i].tail->next = node;
 				hooks[i].tail = node;
@@ -1153,11 +1156,24 @@ public:
 			auto& hook = hooks.back();
 			hook.menu_name = menu_name;
 			Hook_Node* node = new Hook_Node;
-			node->drawfunc = drawfunc;
+		//	node->drawfunc = drawfunc;
+			f(node);
 			node->next = nullptr;
 			hook.tail = hook.head = node;
 		}
 	}
+
+	void add_hook(const char* menu_name, void(*drawfunc)()) final {
+		add_hook_shared(menu_name, [&](Hook_Node* node) {
+			node->drawfunc = drawfunc;
+			});
+	}
+	void add_hook_w_name(const char* menu_name, void(*drawfunc)(const char*)) final {
+		add_hook_shared(menu_name, [&](Hook_Node* node) {
+			node->drawfunc2 = drawfunc;
+			});
+	}
+
 
 	void draw() {
 		ImVec2 winsize = ImGui::GetMainViewport()->Size;
@@ -1173,7 +1189,7 @@ public:
 				if (ImGui::CollapsingHeader(hooks[i].menu_name)) {
 					Hook_Node* p = hooks[i].head;
 					while (p) {
-						p->drawfunc();
+						p->do_call(hooks[i].menu_name);
 						p = p->next;
 					}
 				}
@@ -1187,7 +1203,15 @@ public:
 
 	struct Hook_Node {
 		Hook_Node* next = nullptr;
-		void(*drawfunc)();
+
+		void do_call(const char* menu_name) {
+			if (drawfunc)
+				drawfunc();
+			else if (drawfunc2)
+				drawfunc2(menu_name);
+		}
+		void(*drawfunc2)(const char*)=nullptr;
+		void(*drawfunc)()=nullptr;
 	};
 
 	struct Menu_Hook {

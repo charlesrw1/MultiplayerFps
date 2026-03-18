@@ -473,6 +473,7 @@
     <ClInclude Include="Source\UnitTests\EngineTesterApplication.h" />
     <ClInclude Include="Source\Render\GpuAllocator.h" />
     <ClInclude Include="Source\Render\RectPackerUtil.h" />
+    <ClInclude Include="Source\Scripting\ScriptingStdLib.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Level.cpp">
@@ -639,6 +640,7 @@
     <ClCompile Include="Source\Render\GpuAllocator.cpp" />
     <ClCompile Include="Source\Render\Frustum.cpp" />
     <ClCompile Include="Source\Render\RenderScene.cpp" />
+    <ClCompile Include="Source\Scripting\ScriptingStdLib.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
