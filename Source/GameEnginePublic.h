@@ -42,6 +42,8 @@ class Application : public ClassBase {
 public:
 	CLASS_BODY(Application, scriptable);
 
+	REF static Application* get_app();
+
 	REF virtual void start() {}
 	REF virtual void pre_update() {}
 	REF virtual void update() {}

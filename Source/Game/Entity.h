@@ -136,6 +136,10 @@ public:
 #endif
 	void check_for_transform_nans();
 	void validate_check();
+
+	REF std::string get_editor_name_lua() const {
+		return editor_name;
+	}
 private:
 	std::vector<Component*> all_components;
 	Entity* parent = nullptr;

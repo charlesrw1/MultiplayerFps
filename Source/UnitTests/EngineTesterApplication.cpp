@@ -216,8 +216,8 @@ std::vector<SpawnerComponent*> EngineTesterApp::find_all_in_class(string name) {
 	return test_ents;
 }
 
-void EngineTesterApp::start2() {
-
+void EngineTesterApp::start() {
+	lua_start();
 	sys_print(Info, "EngineTesterApp:start");
 
 	extern ConfigVar ui_disable_screen_log;
@@ -298,7 +298,8 @@ void EngineTesterApp::start2() {
 }
 
 void EngineTesterApp::update() {
-	tester->tick(eng->get_dt());
+	if(tester)
+		tester->tick(eng->get_dt());
 
 	
 }

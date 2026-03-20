@@ -406,7 +406,7 @@ def write_scriptable_class(newclass : ClassDef) -> str:
     append_to_array_R(virtual_function_types, newclass)
 
 
-    for f in virtual_function_types:
+    for f in newclass.properties:
         if f.new_type.type==FUNCTION_TYPE and f.is_virtual:
             output += "\t" + f.return_type.get_raw_type_string() + f" {f.name}("
             for argType,argName in f.func_args:
@@ -422,6 +422,7 @@ def write_scriptable_class(newclass : ClassDef) -> str:
             output+= f"""
         lua_State* L = ScriptManager::inst->get_lua_state();
         int myTable = get_table_registry_id();
+        int top = lua_gettop(L);  // save stack
         lua_rawgeti(L, LUA_REGISTRYINDEX, myTable);
         lua_pushstring(L, \"{f.name}\");
         lua_rawget(L, -2); // use raw get to not look in __index
@@ -441,17 +442,23 @@ def write_scriptable_class(newclass : ClassDef) -> str:
             if (safe_pcall(L, {arg_count}, {return_num}) != LUA_OK) {{
                 const char* error = lua_tostring(L, -1);
                 lua_pop(L, 1);  // pop error
-
+                lua_settop(L, top); // restore stack!
                 throw LuaRuntimeError({error_str} + error);
             }}
             else {{\n"""
             if return_num == 1:
-                output += f"\t\t\treturn {write_get_type_from_lua_func(f.return_type,-1)};\n"
+                
+                output += f"\t\t\tauto value =  {write_get_type_from_lua_func(f.return_type,-1)};\n"
+                output += f"\t\t\tlua_settop(L,top); // stack restore\n"
+                output += f"\t\t\treturn value;\n"
+
             else:
-                pass
+                output += f"\t\t\tlua_settop(L,top); // stack restore\n"
+
             output += "\t\t\t}\n"
             output += "\t\t}\n\t\telse{\n"
             output += "\t\t\tlua_pop(L,1);\n"
+            output += "\t\t\tlua_settop(L,top); // stack restore\n"
             output += f"\t\t\treturn {newclass.classname}::{f.name}("
             for argType,argName in f.func_args:
                 output += argName

@@ -54,6 +54,7 @@ struct HitResult {
 
 #include "../Level.h"
 #include "Sound/SoundPublic.h"
+class SpawnerComponent;
 class GameplayStatic : public ClassBase {
 public:
 	CLASS_BODY(GameplayStatic);
@@ -72,6 +73,7 @@ public:
 		isound->play_sound(sound, 1, 1, 0, 0, {}, false, false, {});
 	}
 
+	REF static std::vector<SpawnerComponent*> find_spawners_in_class(std::string name);
 
 	REF static HitResult cast_ray(glm::vec3 start, glm::vec3 end, int channel_mask, PhysicsBody* ignore_this);
 

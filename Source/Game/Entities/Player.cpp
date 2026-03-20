@@ -793,6 +793,18 @@ static int GameplayStatic_debug_text_start = 10;
  {
 	 return eng->get_level()->spawn_entity();
  }
+#include "Game/Components/SpawnerComponenth.h"
+ std::vector<SpawnerComponent*> GameplayStatic::find_spawners_in_class(std::string name)
+ {
+	 std::vector<SpawnerComponent*> test_ents;
+	 for (auto e : eng->get_level()->get_all_objects()) {
+		 if (auto s = e->cast_to<SpawnerComponent>()) {
+			 if (s->get_spawner_type() == name)
+				 test_ents.push_back(s);
+		 }
+	 }
+	 return test_ents;
+ }
  HitResult GameplayStatic::cast_ray(glm::vec3 start, glm::vec3 end, int channel_mask, PhysicsBody* ignore_this) {
 	 HitResult out;
 	 world_query_result res;

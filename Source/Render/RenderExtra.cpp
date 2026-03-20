@@ -692,6 +692,10 @@ void SSRSystem::execute_compute()
 {
 	GPUSCOPESTART(ssr_system_execute);
 
+	// swap here
+	std::swap(draw.tex.reflection_accum, draw.tex.last_reflection_accum);
+
+
 	increment_temporal_frame();
 
 	// compute depthp
@@ -776,7 +780,6 @@ void SSRSystem::execute_compute()
 
 	do_temporal();
 
-	std::swap(draw.tex.reflection_accum, draw.tex.last_reflection_accum);
 
 	//GraphicsBlitInfo b;
 	//b.dest.texture = draw.tex.scene_color;

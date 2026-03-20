@@ -287,11 +287,28 @@ static int traceback(lua_State* L)
 }
 int safe_pcall(lua_State* L, int nargs, int nresults)
 {
-	int base = lua_gettop(L) - nargs;
+	int top = lua_gettop(L);
+
+	// Validate stack layout
+	if (top < nargs + 1) {
+		// not enough elements: function + args
+		return LUA_ERRRUN;
+	}
+
+	int base = top - nargs;
+
+	luaL_checkstack(L, 1, "not enough stack space");
+
 	lua_pushcfunction(L, traceback);
 	lua_insert(L, base);
+
 	int status = lua_pcall(L, nargs, nresults, base);
-	lua_remove(L, base);
+
+	// Ensure base is still valid before removing
+	if (lua_gettop(L) >= base) {
+		lua_remove(L, base);
+	}
+
 	return status;
 }
 void ScriptManager::reload_one_file(const std::string& strFilePath)

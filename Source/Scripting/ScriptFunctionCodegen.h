@@ -119,6 +119,10 @@ public:
 	REF static lVec3 vec_max(const lVec3& v1, const lVec3& max) {
 		return glm::max(glm::vec3(v1), glm::vec3(max));
 	}
+	REF static lVec3 vec_mix(const lVec3& v1, const lVec3& v2, float f) {
+		return glm::mix(glm::vec3(v1), glm::vec3(v2), f);
+	}
+
 	REF static lQuat from_euler(const lVec3& v) {
 		return glm::quat(v);
 	}

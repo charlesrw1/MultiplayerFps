@@ -1558,6 +1558,7 @@ void GameEngineLocal::init(int argc, char** argv)
 
 
 		app->start();
+
 	};
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
@@ -2228,4 +2229,8 @@ void DebugShapeCtx::update(float dt)
 void DebugShapeCtx::fixed_update_start()
 {
 	one_frame_fixedupdate.clear();
+}
+Application* Application::get_app()
+{
+	return eng->get_app();
 }
