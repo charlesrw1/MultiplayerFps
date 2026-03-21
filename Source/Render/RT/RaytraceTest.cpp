@@ -398,8 +398,8 @@ void DdgiTesting::build_world()
 }
 #include "imgui.h"
 static float irrad_mult = 1.0;
-static float normal_bias = 0.1;
-static float view_bias = 0.1;
+static float normal_bias = 0.2;
+static float view_bias = 0.3;
 static int bounces = 4;
 static bool include_cubemaps = true;
 static float relocate_normal_dist = 0.2;
@@ -436,7 +436,6 @@ void ddgi_debugmenu() {
 	ImGui::Checkbox("skip_gather", &skip_gather);
 	ImGui::InputFloat("ssr_lum_min", &ssr_lum_range.x);
 	ImGui::InputFloat("ssr_lum_max", &ssr_lum_range.y);
-
 }
 ADD_TO_DEBUG_MENU(ddgi_debugmenu);
 void set_shit_fuck() {
@@ -795,7 +794,7 @@ void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap
 
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 }
-ConfigVar r_ddgi_halfres_blend("r.ddgi_halfres_blend", "0.1", CVAR_FLOAT, "[0,1] blend input into ddgi temporal accumulation");
+ConfigVar r_ddgi_halfres_blend("r.ddgi_halfres_blend", "0.8", CVAR_FLOAT, "[0,1] blend input into ddgi temporal accumulation");
 void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao)
 {
 	auto& device = draw.get_device();
@@ -894,6 +893,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao)
 	else
 		draw.bind_texture_ptr(6, draw.black_texture);
 
+	
 	set_reflection_uniforms();
 
 	glDrawArrays(GL_TRIANGLES, 0, 3);

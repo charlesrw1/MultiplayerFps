@@ -549,8 +549,8 @@ void SSRSystem::do_upsample()
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 
 }
-ConfigVar ssr_temporal_blend("r.ssr_temporal_blend", "0.9", CVAR_FLOAT, "", 0, 1);
-static float ssr_nonoccluded_weight_mult = 0.2;
+ConfigVar ssr_temporal_blend("r.ssr_temporal_blend", "0.75", CVAR_FLOAT, "", 0, 1);
+static float ssr_nonoccluded_weight_mult = 0.6;
 void SSRSystem::do_temporal()
 {
 	auto& device = draw.get_device();
@@ -662,8 +662,8 @@ void draw_imgui_for_cvar(ConfigVar& var)
 		}
 	}
 }
-static float ssr_brdf_bias = 0.92;
-static float ssr_mip_bias = 5;
+static float ssr_brdf_bias = 0.95;
+static float ssr_mip_bias =2;
 static float ssr_max_roughness = 0.7;
 static int random_repeat = 32;
 static int traces_per_pixel = 1;

@@ -4805,7 +4805,9 @@ void DebuggingTextureOutput::draw_out()
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
 	state.blend = BlendState::BLEND;
-
+	state.depth_testing = false;
+	state.depth_writes = false;
+	state.backface_culling = false;
 	using gtt = GraphicsTextureType;
 	auto type = output_tex->gpu_ptr->get_texture_type();
 
