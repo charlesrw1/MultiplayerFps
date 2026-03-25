@@ -2,7 +2,7 @@ BasedOnStyle: Microsoft
 ColumnLimit: 120
 IndentWidth: 4
 TabWidth: 4
-UseTab: Never
+UseTab: Always
 PointerAlignment: Right
 AccessModifierOffset: -4
 AlignAfterOpenBracket: Align
