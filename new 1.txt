@@ -1,9 +1,0 @@
-I like 
-class MyManager {
-	static MyManager* inst;
-}
-MyManager::inst->do_stuff();
-
-its nice because initialization is controlled. you can inject mocks/null objects into the pointer. the singleton is namespaced and easy to type.
-
-ssr_compute_depth_pyramid
