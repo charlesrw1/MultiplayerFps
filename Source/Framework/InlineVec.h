@@ -152,11 +152,11 @@ inline void InlineVec<T, INLINE_COUNT>::resize(SIZE_TYPE newcount, const T& valu
 
     SIZE_TYPE cap = capacity_();
     SIZE_TYPE curcount = size();
-    if (curcount + 1 > cap) {
+    if (newcount > cap) {
         // need to increase capacity
         int new_capacity = cap * 2;
-        if (curcount + 1 > new_capacity)
-            new_capacity = curcount + 1;
+        if (newcount > new_capacity)
+            new_capacity = newcount;
         expand_capacity_(new_capacity);
         assert(is_allocated_());
     }

@@ -10,7 +10,7 @@ public:
 	void invoke(Args... args);
 	template<typename T>
 	void add(T* instance, void (T::* memberFunction)(Args...));
-	bool has_any_listeners() const { return !head; }
+	bool has_any_listeners() const { return head != nullptr; }
 private:
 	struct Item {
 		void* key = nullptr;

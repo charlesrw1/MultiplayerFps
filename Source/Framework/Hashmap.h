@@ -107,11 +107,14 @@ public:
         uint64_t count = items.size();
         for (uint64_t i = 0; i < count; i++) {
             uint64_t actual_index = (index + i) & mask;
-            if (items[actual_index].handle == handle || items[actual_index].handle == 0 || items[actual_index].handle == TOMBSTONE) {
-
+            if (items[actual_index].handle == handle) {
+                // Update existing entry — do not bump num_used
+                items[actual_index].data = dataToAdd;
+                return;
+            }
+            if (items[actual_index].handle == 0 || items[actual_index].handle == TOMBSTONE) {
                 num_tombstones -= items[actual_index].handle == TOMBSTONE;
                 num_used++;
-
                 items[actual_index].data = dataToAdd;
                 items[actual_index].handle = handle;
                 return;

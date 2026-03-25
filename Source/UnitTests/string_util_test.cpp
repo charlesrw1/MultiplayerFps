@@ -1,17 +1,35 @@
-#include "Unittest.h"
+#include <gtest/gtest.h>
 #include "Framework/StringUtils.h"
 
-ADD_TEST(string_utils)
+TEST(StringUtilsTest, GetExtension)
 {
-	checkTrue(StringUtils::get_extension("myfile/something.xyz ") == ".xyz");
-	checkTrue(StringUtils::get_extension(" myfile\\something.xyz ") == ".xyz");
-	checkTrue(StringUtils::strip("\r  \tsome string\t   \r") == "some string");
-	std::string str = "thing;with;things";
-	StringUtils::replace(str, ";", " ; ");
-	checkTrue(str == "thing ; with ; things");
-	checkTrue(StringUtils::starts_with("abc", "ab"));
+    EXPECT_EQ(StringUtils::get_extension("myfile/something.xyz "), ".xyz");
+    EXPECT_EQ(StringUtils::get_extension(" myfile\\something.xyz "), ".xyz");
+}
 
-	auto tokens = StringUtils::split(" \tthis is\ta token ");
-	checkTrue(tokens.size() == 4 && tokens[0] == "this" && tokens[1] == "is" && tokens[2] == "a" && tokens[3] == "token");
+TEST(StringUtilsTest, Strip)
+{
+    EXPECT_EQ(StringUtils::strip("\r  \tsome string\t   \r"), "some string");
+}
 
+TEST(StringUtilsTest, Replace)
+{
+    std::string str = "thing;with;things";
+    StringUtils::replace(str, ";", " ; ");
+    EXPECT_EQ(str, "thing ; with ; things");
+}
+
+TEST(StringUtilsTest, StartsWith)
+{
+    EXPECT_TRUE(StringUtils::starts_with("abc", "ab"));
+}
+
+TEST(StringUtilsTest, Split)
+{
+    auto tokens = StringUtils::split(" \tthis is\ta token ");
+    ASSERT_EQ(tokens.size(), 4u);
+    EXPECT_EQ(tokens[0], "this");
+    EXPECT_EQ(tokens[1], "is");
+    EXPECT_EQ(tokens[2], "a");
+    EXPECT_EQ(tokens[3], "token");
 }
