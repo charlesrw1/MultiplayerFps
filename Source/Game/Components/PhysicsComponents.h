@@ -97,6 +97,8 @@ public:
 	//REF void set_objects_density(float density);
 	void set_transform(const glm::mat4& transform, bool teleport = false);
 
+
+
 	void enable_with_initial_transforms(const glm::mat4& t0, const glm::mat4& t1, float dt);
 
 	physx::PxRigidActor* get_physx_actor() const {
@@ -171,7 +173,7 @@ private:
 	glm::quat last_rot = glm::quat();
 	glm::vec3 next_position = glm::vec3(0.f);
 	glm::quat next_rot = glm::quat();
-
+	bool in_transform_fetch = false;
 	friend class PhysicsJointComponent;
 };
 

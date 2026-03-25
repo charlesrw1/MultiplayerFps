@@ -304,12 +304,75 @@ void GameAnimationMgr::update_animating()
 		}
 	}
 }
+#include "LevelEditor/EditorDocLocal.h"
+#include "GameEngineLocal.h"
 
+#include "Animation/Runtime/Animation.h"
+#include "Animation/Runtime/RuntimeNodesNew2.h"
+void anim_preview_debug_menu()
+{
+	auto tool = (EditorDoc*)eng_local.editorState->get_tool();
+	if (!tool)
+		return;
 
+	auto sel = tool->selection_state->has_only_one_selected() ? tool->selection_state->get_only_one_selected() : nullptr;
+	if (!sel.get())
+		return;
+	auto anim = sel->get_component<AnimPreviewComponent>();
+	if (!anim) {
+		ImGui::Text("select entity with animpreview");
+		return;
+	}
+	if (anim->asset) {
+		auto seq = anim->asset->seq;
+		ASSERT(seq);
+		ImGui::Text("time: %.2f frames: %d", seq->duration, seq->num_frames);
+		const int frames = seq->num_frames;
+		ImGui::Checkbox("wants_force_frame", &anim->wants_force_frame);
+		ImGui::DragInt("force_frame",&anim->force_frame, 0, frames);
+
+		if (anim->wants_force_frame != bool(anim->eval)) {
+			anim->update_mesh_component();
+		}
+		if (anim->eval)
+			anim->eval->frame = anim->force_frame;
+		static bool move = false;
+		(ImGui::Checkbox("move", &move));
+		if(move)
+			anim->get_owner()->set_ws_position(glm::vec3(0, 2, fmod(GetTime(), 5.0) * 3.7));
+	}
+
+}
+ADD_TO_DEBUG_MENU(anim_preview_debug_menu);
+
+void AnimPreviewComponent::update_mesh_component()
+{
+	eval = nullptr;
+	auto mesh = get_owner()->get_component<MeshComponent>();
+	if (!mesh) {
+		mesh = get_owner()->create_component<MeshComponent>();
+	}
+	mesh->set_model((Model*)model);
+	if (asset && model) {
+		agBuilder builder;
+		if (wants_force_frame) {
+			auto clip = builder.alloc<agEvaluateClip>();
+			clip->set_clip(asset);
+			builder.set_root(clip);
+			this->eval = clip;
+		}
+		else {
+			auto clip = builder.alloc<agClipNode>();
+			clip->set_clip(asset);
+			clip->set_looping(true);
+			builder.set_root(clip);
+		}
+		mesh->create_animator(&builder);
+	}
+}
 void AnimPreviewComponent::start()
 {
-
-
+	update_mesh_component();
 }
 
 void AnimPreviewComponent::update()
@@ -323,6 +386,7 @@ void AnimPreviewComponent::stop()
 #ifdef EDITOR_BUILD
 void AnimPreviewComponent::editor_on_change_property()
 {
+	update_mesh_component();
 }
 void MeshComponent::update_physics_mesh()
 {

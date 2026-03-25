@@ -337,6 +337,8 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 	auto flags = (is_depth) ? MSF_DEPTH_ONLY : 0;
 	flags |= MSF_MATERIAL_IN_INSTANCE;
 
+	if (is_depth)
+		flags |= MSF_NO_TAA;
 	if (r_debug_mode.get_integer() != 0)
 		flags |= MSF_DEBUG;
 	flags |= MSF_EDITOR_ID;
@@ -3728,7 +3730,7 @@ void ThumbnailRenderer::output_to_path(std::string path) {
 }
 #endif
 
-void Renderer::draw_height_fog()
+void Renderer::draw_height_fog(IGraphicsTexture* target)
 {
 	GPUSCOPESTART(draw_height_fog_scope);
 
@@ -3741,7 +3743,7 @@ void Renderer::draw_height_fog()
 
 		RenderPassState state;
 		auto color_info = {
-			ColorTargetInfo(tex.scene_color)
+			ColorTargetInfo(target)
 		};
 		state.color_infos = color_info;
 		IGraphicsDevice::inst->set_render_pass(state);
@@ -3783,7 +3785,7 @@ void Renderer::draw_height_fog()
 
 	RenderPassState state;
 	auto color_info = {
-		ColorTargetInfo(tex.scene_color)
+		ColorTargetInfo(target)
 	};
 	state.color_infos = color_info;
 	IGraphicsDevice::inst->set_render_pass(state);
@@ -4404,6 +4406,71 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	if (r_taa_enabled.get_bool())
 		copy_forward_to_temporary();
 
+
+	auto taa_resolve_pass = [&]() -> IGraphicsTexture* {
+		GPUSCOPESTART(TaaResolve);
+		ZoneScopedN("TaaResolve");
+		bool wants_disable = disable_taa_this_frame || params.is_cubemap_view;
+		disable_taa_this_frame = false;
+		//if (wants_disable)
+		//	sys_print(Debug, "disabled taa this frame\n");
+		if (!r_taa_enabled.get_bool() || wants_disable) {
+			return tex.scene_color;
+		}
+
+		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
+
+		// write to tex.scene_gbuffer0
+		//RenderPassSetup setup("taa_resolve", fbo.taa_resolve, false, false, 0, 0, cur_w, cur_h);
+		//auto scope = device.start_render_pass(setup);
+
+		auto color_infos = {
+			ColorTargetInfo(tex.scene_gbuffer0)
+		};
+		RenderPassState pass;
+		pass.color_infos = color_infos;
+		IGraphicsDevice::inst->set_render_pass(pass);
+
+
+		RenderPipelineState state;
+		state.program = prog.taa_resolve;
+		state.vao = get_empty_vao();
+		device.set_pipeline(state);
+		shader().set_float("amt", r_taa_blend.get_float());
+		shader().set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
+		shader().set_mat4("lastViewProj", last_frame_main_view.viewproj);
+		shader().set_bool("use_reproject", r_taa_reproject.get_bool());
+		shader().set_float("doc_mult", taa_doc_mult);
+		shader().set_float("doc_vel_bias", taa_doc_vel_bias);
+		shader().set_float("doc_bias", taa_doc_bias);
+		shader().set_float("doc_pow", taa_doc_pow);
+		shader().set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
+
+		bind_texture_ptr(0, tex.scene_color);
+		bind_texture_ptr(1, tex.last_scene_color);
+		bind_texture_ptr(2, tex.scene_depth);
+		bind_texture_ptr(3, tex.scene_motion);
+		bind_texture_ptr(4, tex.last_scene_motion);
+		glDrawArrays(GL_TRIANGLES, 0, 3);
+
+		// blit from gbuffer0 to scene color
+		//??
+		GraphicsBlitInfo blitinfo;
+		blitinfo.set_width_height_both(cur_w, cur_h);
+		blitinfo.src.texture = tex.scene_gbuffer0;
+		blitinfo.dest.texture = tex.scene_color;
+		IGraphicsDevice::inst->blit_textures(blitinfo);
+
+
+		//glNamedFramebufferTexture(fbo.taa_blit, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
+		//glBlitNamedFramebuffer(fbo.taa_resolve, fbo.taa_blit, 0, 0, cur_w, cur_h,
+		//	0, 0, cur_w, cur_h, GL_COLOR_BUFFER_BIT,
+		//	GL_NEAREST);
+
+		return tex.scene_gbuffer0;
+	};
+	IGraphicsTexture* const scene_color_handle = taa_resolve_pass();
+
 	auto draw_forward_pass = [&]() {
 		GPUSCOPESTART(draw_forward_pass_scope);
 
@@ -4413,7 +4480,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 		RenderPassState state;
 		auto color_info = {
-			ColorTargetInfo(tex.scene_color)
+			ColorTargetInfo(scene_color_handle)
 		};
 		state.depth_info = tex.scene_depth;
 		state.color_infos = color_info;
@@ -4438,7 +4505,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 	// no fog in cubemaps?
 	if(!params.is_cubemap_view)
-		draw_height_fog();
+		draw_height_fog(scene_color_handle);
 
 
 	draw_forward_pass();
@@ -4486,7 +4553,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 
 		auto start_render_pass = [&]() {
 			auto targets = {
-				ColorTargetInfo(tex.scene_color)
+				ColorTargetInfo(scene_color_handle)
 			};
 			RenderPassState rp;
 			rp.color_infos = targets;
@@ -4500,69 +4567,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	};
 	draw_mesh_builders();
 
-	auto taa_resolve_pass = [&]() -> texhandle {
-		GPUSCOPESTART(TaaResolve);
-		ZoneScopedN("TaaResolve");
-		bool wants_disable = disable_taa_this_frame;
-		disable_taa_this_frame = false;
-		//if (wants_disable)
-		//	sys_print(Debug, "disabled taa this frame\n");
-		if (!r_taa_enabled.get_bool()||wants_disable) {
-			return tex.scene_color->get_internal_handle();
-		}
-
-		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
-
-		// write to tex.scene_gbuffer0
-		//RenderPassSetup setup("taa_resolve", fbo.taa_resolve, false, false, 0, 0, cur_w, cur_h);
-		//auto scope = device.start_render_pass(setup);
-
-		auto color_infos = {
-			ColorTargetInfo(tex.scene_gbuffer0)
-		};
-		RenderPassState pass;
-		pass.color_infos = color_infos;
-		IGraphicsDevice::inst->set_render_pass(pass);
-
-
-		RenderPipelineState state;
-		state.program = prog.taa_resolve;
-		state.vao = get_empty_vao();
-		device.set_pipeline(state);
-		shader().set_float("amt", r_taa_blend.get_float());
-		shader().set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
-		shader().set_mat4("lastViewProj", last_frame_main_view.viewproj);
-		shader().set_bool("use_reproject", r_taa_reproject.get_bool());
-		shader().set_float("doc_mult", taa_doc_mult);
-		shader().set_float("doc_vel_bias", taa_doc_vel_bias);
-		shader().set_float("doc_bias", taa_doc_bias);
-		shader().set_float("doc_pow", taa_doc_pow);
-		shader().set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
-
-		bind_texture_ptr(0, tex.scene_color);
-		bind_texture_ptr(1, tex.last_scene_color);
-		bind_texture_ptr(2, tex.scene_depth);
-		bind_texture_ptr(3, tex.scene_motion);
-		bind_texture_ptr(4, tex.last_scene_motion);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
-
-		// blit from gbuffer0 to scene color
-		//??
-		GraphicsBlitInfo blitinfo;
-		blitinfo.set_width_height_both(cur_w,cur_h);
-		blitinfo.src.texture = tex.scene_gbuffer0;
-		blitinfo.dest.texture = tex.scene_color;
-		IGraphicsDevice::inst->blit_textures(blitinfo);
-
-
-		//glNamedFramebufferTexture(fbo.taa_blit, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
-		//glBlitNamedFramebuffer(fbo.taa_resolve, fbo.taa_blit, 0, 0, cur_w, cur_h,
-		//	0, 0, cur_w, cur_h, GL_COLOR_BUFFER_BIT,
-		//	GL_NEAREST);
-
-		return tex.scene_color->get_internal_handle();
-	};
-	const texhandle scene_color_handle = taa_resolve_pass();
 
 	// last_scene
 	// scene
@@ -4572,7 +4576,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 	// render_transparents(scene_color_handle)
 
 	// Bloom update
-	render_bloom_chain(scene_color_handle);
+	render_bloom_chain(scene_color_handle->get_internal_handle());
 
 	IGraphicsTexture* read_from_texture = tex.output_composite;
 	const auto& view_to_use = current_frame_view;
@@ -4602,7 +4606,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view)
 		IGraphicsTexture* bloom_tex = tex.bloom_chain[0].texture;
 		if (!enable_bloom.get_bool())
 			bloom_tex = black_texture;
-		bind_texture(0, scene_color_handle);
+		bind_texture(0, scene_color_handle->get_internal_handle());
 		bind_texture_ptr(1, bloom_tex);
 		bind_texture_ptr(2, lens_dirt->gpu_ptr);
 

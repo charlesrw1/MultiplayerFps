@@ -1492,6 +1492,11 @@ void GameEngineLocal::init(int argc, char** argv)
 	auto path = FileSys::get_full_path_from_game_path("eng/inconsolata_bold.ttf");
 	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
 	global_big_imgui_font = ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 24.0);
+	path = FileSys::get_full_path_from_game_path("inter_regular.ttf");
+	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
+	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 18.0);
+
+
 	ImGui::GetIO().Fonts->Build();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	print_time("imgui font");

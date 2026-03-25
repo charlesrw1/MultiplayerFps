@@ -12,6 +12,7 @@ static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip,
 	bool has_sync_group, StringName syncgroupname, sync_opt SyncOption, bool loop, const BoneIndexRetargetMap* remap,
 	float speed, float& anim_time, bool& stopped_flag, const Node_CFG* owner)
 {
+	const float speed_modify = 1.0f;
 	// synced update
 	if (has_sync_group) {
 		SyncGroupData& sync = ctx.find_sync_group(syncgroupname);
@@ -23,7 +24,7 @@ static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip,
 		}
 		const float time_to_evaluate_sequence = anim_time;
 		if (sync.should_write_new_update_weight(SyncOption, 0.5/*TODO*/)) {
-			anim_time += ctx.dt * speed * 0.8f;	// fixme
+			anim_time += ctx.dt * speed * speed_modify;	// fixme
 			if (anim_time > clip->duration || anim_time < 0.f) {
 				if (loop)
 					anim_time = fmod(fmod(anim_time, clip->duration) + clip->duration, clip->duration);
@@ -39,7 +40,7 @@ static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip,
 	// unsynced update
 	else {
 		const float time_to_evaluate_sequence = anim_time;
-		anim_time += ctx.dt * speed * 0.8f;	// see above
+		anim_time += ctx.dt * speed * speed_modify;	// see above
 		if (anim_time > clip->duration || anim_time < 0.f) {
 			if (loop)
 				anim_time = fmod(fmod(anim_time, clip->duration) + clip->duration, clip->duration);
@@ -54,7 +55,7 @@ static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip,
 
 void agClipNode::get_pose(agGetPoseCtx& ctx)
 {
-	if (has_init) {
+	if (!has_init) {
 		if (!seq||!clipFrom)
 			throw std::runtime_error("agClipNode: no sequence");
 
@@ -76,12 +77,37 @@ void agClipNode::get_pose(agGetPoseCtx& ctx)
 	ctx.debug_exit();
 }
 
+void agEvaluateClip::get_pose(agGetPoseCtx& ctx)
+{
+	if (!has_init) {
+		if (!seq || !clipFrom)
+			throw std::runtime_error("agClipNode: no sequence");
+
+		if (!clipFrom->get_skel())
+			throw std::runtime_error("agClipNode: sequence without skel");
+		remap = ctx.get_skeleton().get_remap(clipFrom->get_skel());
+		has_init = true;
+	}
+
+	bool stopped_flag = false;
+	float time_to_play = seq->get_time_of_keyframe(frame);
+	time_to_play = glm::clamp(time_to_play, 0.f, seq->duration);
+	get_clip_pose_shared(
+		ctx, seq, false, "", {}, false, remap, 1.0, time_to_play, stopped_flag, nullptr);
+}
+void agEvaluateClip::set_clip(const AnimationSeqAsset* asset)
+{
+	seq = asset->seq;
+	clipFrom = asset->srcModel.get();
+}
+
 void agClipNode::set_clip(const Model* m, string clipName)
 {
 	assert(m->get_skel());
 	seq = m->get_skel()->find_clip(clipName);
 	clipFrom = m;
 }
+
 
 void agClipNode::set_clip(const AnimationSeqAsset* asset)
 {

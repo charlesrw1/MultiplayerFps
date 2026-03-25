@@ -117,13 +117,9 @@ private:
 	void update_animator_instance();
 };
 
-// hack for property grid ui
-struct AnimPreviewInfoUi {
-	STRUCT_BODY();
-};
-
 // this is just for previewing in the editor, use AnimatorObject on the MeshComponent for actual animation
 class AnimationSeqAsset;
+class agEvaluateClip;
 class AnimPreviewComponent : public Component {
 public:
 	CLASS_BODY(AnimPreviewComponent);
@@ -136,7 +132,11 @@ public:
 #ifdef EDITOR_BUILD
 	void editor_on_change_property() final;
 #endif
+
+	agEvaluateClip* eval = nullptr;
+	void update_mesh_component();
+	int force_frame = -1;
+	bool wants_force_frame = false;
+	REF const Model* model = nullptr;
 	REF const AnimationSeqAsset* asset = nullptr;
-private:
-	REF AnimPreviewInfoUi info;
 };

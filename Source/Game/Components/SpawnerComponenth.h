@@ -17,8 +17,20 @@ public:
 	void set(string schema_name);
 	nlohmann::json obj;
 	void set_model();
-	string get_spawner_type();
-private:
+
+	REF string get_spawner_type();
+	REF bool has_key(string name) {
+		return !obj[name].is_null();
+	}
+	REF float get_float(string name) {
+		return float(std::atof(string(obj[name]).c_str()));
+	}
+	REF int get_int(string name) {
+		return int(std::atoi(string(obj[name]).c_str()));
+	}
+	REF string get_string(string name) {
+		return string(obj[name]);
+	}
 };
 
 class FoliageContainerComponent : public Component {

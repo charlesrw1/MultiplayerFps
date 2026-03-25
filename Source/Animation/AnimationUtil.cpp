@@ -379,6 +379,23 @@ const AnimationEvent* AnimationSeq::get_events_for_keyframe(int keyframe, int* c
 }
 
 #include "Animation/SkeletonData.h"
+ConfigVar skeleton_calc_rotations_force_from_anim("skeleton_calc_rotations_force_from_anim", "0", CVAR_BOOL, "");
+
+
+static std::unordered_map<std::string, int> bone_to_bool;
+void bone_menu()
+{
+	Model* m = Model::load("indiana.cmdl");
+	for (auto& b : m->get_skel()->get_all_bones()) {
+		if (bone_to_bool.find(b.strname) == bone_to_bool.end())
+			bone_to_bool[b.strname] = (int)b.retarget_type;
+		int bb = bone_to_bool[b.strname];
+		ImGui::SliderInt(b.strname.c_str(), &bb,0,2);
+		bone_to_bool[b.strname] = bb;
+	}
+}
+ADD_TO_DEBUG_MENU(bone_menu);
+
 void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, float time, const BoneIndexRetargetMap* remap_indicies, Pose& outpose)
 {
 	const int count = skeleton->get_num_bones();
@@ -403,26 +420,48 @@ void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, fl
 
 	}
 	if (remap_indicies) {
+#if 1
+		const bool force_to_from_anim = skeleton_calc_rotations_force_from_anim.get_bool();
 		for (int dest_idx = 0; dest_idx < count; dest_idx++) {
 			int src_idx = (remap_indicies) ? (remap_indicies->my_skeleton_to_who)[dest_idx] : dest_idx;
 			if (src_idx == -1)
 				continue;
 
 			auto& bone = skeleton->get_all_bones()[dest_idx];
-			if (bone.retarget_type == RetargetBoneType::FromAnimation) {
+			auto get_op = [&]() {
+				if (bone_to_bool.find(bone.strname) == bone_to_bool.end())
+					bone_to_bool[bone.strname] = (int)bone.retarget_type;
+			};
+			get_op();
+			const int opposite_day = bone_to_bool[bone.strname];
+
+			auto type = bone.retarget_type;
+		
+			//if (type!=RetargetBoneType::FromTargetBindPose) {
+				type = RetargetBoneType(opposite_day);
+			//}
+
+			if (type==RetargetBoneType::FromAnimation || force_to_from_anim) {
 				// do nothing
+				outpose.q[dest_idx] = remap_indicies->my_skelton_to_who_quat_delta.at(dest_idx) * outpose.q[dest_idx];
+
 			}
-			else if (bone.retarget_type == RetargetBoneType::FromAnimationScaled) {
+			else if (type==RetargetBoneType::FromAnimationScaled) {
 				float scale = glm::length(skeleton->get_bone_local_transform(dest_idx)[3]);
-				scale /= glm::length(remap_indicies->who->get_bone_local_transform(src_idx)[3]);
-				outpose.pos[dest_idx] *= scale;
+				scale /= glm::max(glm::length(remap_indicies->who->get_bone_local_transform(src_idx)[3]),0.00001f);
+				if (glm::abs(scale) < 0.00001)
+					scale = 1.0;
+				outpose.pos[dest_idx].y += (1 - scale);
+
+				outpose.q[dest_idx] = remap_indicies->my_skelton_to_who_quat_delta.at(dest_idx) * outpose.q[dest_idx];
+
 			}
-			else if (bone.retarget_type == RetargetBoneType::FromTargetBindPose) {
+			else if (type==RetargetBoneType::FromTargetBindPose) {
 				outpose.pos[dest_idx] = skeleton->get_bone_local_transform(dest_idx)[3];
 
-				//outpose.q[dest_idx] = remap_indicies->my_skelton_to_who_quat_delta.at(dest_idx) * outpose.q[dest_idx];
 			}
 		}
+#endif
 	}
 }
 
@@ -438,14 +477,16 @@ void util_set_to_bind_pose(Pose& pose, const MSkeleton* skel)
 }
 
 static const int ROOT_BONE = -1;
-
+//ConfigVar skip_scale_in_animation("skip_scale_in_animation", "0", CVAR_BOOL, "");
 void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& out_bone_matricies, const MSkeleton* model)
 {
+	//const bool skip_scale = skip_scale_in_animation.get_bool();
 	for (int i = 0; i < model->get_num_bones(); i++)
 	{
 		glm::mat4x4 matrix = glm::mat4_cast(local.q[i]);
 		matrix[3] = glm::vec4(local.pos[i], 1.0);
-		matrix = glm::scale(matrix, glm::vec3(local.scale[i]));
+		//if(!skip_scale)
+			matrix = glm::scale(matrix, glm::vec3(local.scale[i]));
 
 		if (model->get_bone_parent(i) == ROOT_BONE) {
 			out_bone_matricies[i] = matrix;

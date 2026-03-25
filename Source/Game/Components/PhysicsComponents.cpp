@@ -29,7 +29,7 @@ void PhysicsBody::fetch_new_transform()
 	ASSERT(get_is_simulating());
 	ASSERT(has_initialized());
 	auto pose = physxActor->getGlobalPose();
-
+	in_transform_fetch = true;
 	if (0&&interpolate_visuals) {
 		last_position = next_position;
 		last_rot = next_rot;
@@ -49,6 +49,7 @@ void PhysicsBody::fetch_new_transform()
 	else {
 		get_owner()->set_ws_transform(physx_to_glm(pose.p), physx_to_glm(pose.q), get_owner()->get_ls_scale());
 	}
+	in_transform_fetch = false;
 }
 
 glm::vec3 calc_angular_vel(const glm::quat& q1, const glm::quat& q2, float dt) {
@@ -329,7 +330,7 @@ void PhysicsBody::on_changed_transform() {
 		return;
 	if (!enabled)	// not enabled, skip
 		return;	
-	if (simulate_physics)
+	if (simulate_physics && in_transform_fetch)	// skip if in transform fetching
 		return;
 	set_transform(get_ws_transform());
 }
@@ -575,17 +576,16 @@ static void remove_scale_mat4(glm::mat4 &m)
 void PhysicsBody::set_transform(const glm::mat4& transform, bool teleport)
 {
 	if (has_initialized()) {
-		if (simulate_physics) {
-			// empty
-		}
-		else if (get_is_actor_static()) {
+		if (simulate_physics|| get_is_actor_static()) {
 			glm::mat4 temp = transform;
 			remove_scale_mat4(temp);
 			auto t = glm_to_physx(temp);
 			t.q.normalize();
 			physxActor->setGlobalPose(t);
-			if (simulate_physics)
+			if (simulate_physics) {
+				set_angular_velocity({});
 				set_linear_velocity({});
+			}
 		}
 		else {
 			auto dyn = get_dynamic_actor();

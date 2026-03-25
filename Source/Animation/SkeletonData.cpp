@@ -28,7 +28,8 @@ void MSkeleton::move_construct(MSkeleton& other)
 void MSkeleton::uninstall()
 {
 	for (auto& [c, clip] : clips) {
-		*clip.ptr = AnimationSeq();
+		if(clip.ptr)
+			*clip.ptr = AnimationSeq();
 	}
 
 }
@@ -93,7 +94,7 @@ const BoneIndexRetargetMap* MSkeleton::get_remap(const MSkeleton* other)
 		if (j != bone_dat.size()) {
 			remap->my_skeleton_to_who.at(j) = i;
 
-			//remap->my_skelton_to_who_quat_delta.at(j) = quat_delta(bone_dat.at(j).rot, other->bone_dat.at(i).rot);
+			remap->my_skelton_to_who_quat_delta.at(j) = quat_delta(bone_dat.at(j).rot, other->bone_dat.at(i).rot);
 
 		}
 	}

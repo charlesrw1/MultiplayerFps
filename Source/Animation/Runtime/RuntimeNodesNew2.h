@@ -124,6 +124,24 @@ private:
 	float anim_time = 0.f;
 	bool has_init = false;
 };
+class agEvaluateClip : public agBaseNode {
+public:
+	CLASS_BODY(agEvaluateClip);
+
+	void reset() final {
+
+	}
+	void get_pose(agGetPoseCtx& ctx) final;
+	void set_clip(const AnimationSeqAsset* asset);
+
+	int frame = 0;
+
+	const Model* clipFrom = nullptr;
+	const AnimationSeq* seq = nullptr;
+	const BoneIndexRetargetMap* remap = nullptr;
+	bool has_init = false;
+};
+
 
 class agBlendNode : public agBaseNode {
 public:

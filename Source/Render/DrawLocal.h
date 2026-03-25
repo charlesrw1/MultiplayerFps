@@ -949,7 +949,7 @@ private:
 	void InitGlState();
 	void InitFramebuffers(bool create_composite_texture, int s_w, int s_h);
 
-	void draw_height_fog();
+	void draw_height_fog(IGraphicsTexture* target);
 
 
 	int cur_w = 0;

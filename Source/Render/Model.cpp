@@ -289,7 +289,7 @@ void ModelMan::add_commands(ConsoleCmdGroup& group)
 		auto& bones = skel->get_all_bones();
 		sys_print(Info, "numBones=%d\n", int(bones.size()));
 		for (int i = 0; i < bones.size(); i++) {
-			sys_print(Info, "%s = %d (parent=%d)\n", bones[i].strname.c_str(), i, int(bones[i].parent));
+			sys_print(Info, "%s = %d (parent=%d)(rt=%d)\n", bones[i].strname.c_str(), i, int(bones[i].parent),int(bones[i].retarget_type));
 		}
 
 		});

@@ -941,6 +941,9 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is)
 		const auto& str2 = reparent.remap.at(size_t(i + 1));
 		mdd.bone_reparent.insert({ str1,str2 });
 	}
+	for (auto& [name, type] : is->bone_retargets) {
+		mdd.bone_retarget_type[name] = (RetargetBoneType)glm::clamp(type, 0, 2);
+	}
 
 
 	for (int i = 0; i < is->animations.size(); i++) {

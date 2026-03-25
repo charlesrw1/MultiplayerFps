@@ -27,6 +27,13 @@ struct BoneReparentContainer  {
 	REF std::vector<std::string> remap;
 };
 
+
+struct BoneRetargetName {
+	STRUCT_BODY();
+	REF std::string bone_name;
+	REF int type = 0;
+};
+
 struct AnimImportSettings {
 	STRUCT_BODY();
 
@@ -64,6 +71,7 @@ public:
 	REF std::vector<std::string> curveNames;					// array of strings that can be used to name custom curves for animations
 	REF std::vector<std::string> additionalAnimationGlbFiles;	// additional glb files to source animations from (will retarget)
 	REF std::vector<AnimImportSettings> animations;				// all animations indexed by string with import settings
+	REF std::vector<BoneRetargetName> bone_retargets;
 
 	REF int lightmapSizeX = 0;
 	REF int lightmapSizeY = 0;
