@@ -555,7 +555,7 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c) {
 		// stack_dump(L);
 		lua_settable(L, -5); // dst[key] = value
 							 // stack_dump(L);
-		// leaves key for next lua_next
+							 // leaves key for next lua_next
 	}
 	check_top(2);
 	// stack_dump(L);

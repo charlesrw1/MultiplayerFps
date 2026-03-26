@@ -1674,7 +1674,7 @@ void GameEngineLocal::loop() {
 			//	if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) && ImGui::GetIO().WantCaptureKeyboard)
 			//		continue;
 			//	if (!scene_hovered && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) &&
-			//ImGui::GetIO().WantCaptureMouse) 		continue;
+			// ImGui::GetIO().WantCaptureMouse) 		continue;
 			//}
 			// g_guiSystem->handle_event(event);
 		}

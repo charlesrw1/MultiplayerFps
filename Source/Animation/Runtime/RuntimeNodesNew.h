@@ -125,4 +125,10 @@ struct atClipNodeStruct
 	REF int start_frame = 0;
 };
 
-NEWENUM(ModifyBoneType, int){None, Meshspace, MeshspaceAdd, Localspace, LocalspaceAdd};
+NEWENUM(ModifyBoneType, int){
+	None, 
+	Meshspace, 
+	MeshspaceAdd, 
+	Localspace, 
+	LocalspaceAdd
+};

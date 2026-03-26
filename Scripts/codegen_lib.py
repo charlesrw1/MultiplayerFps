@@ -426,7 +426,8 @@ def parse_struct_decl(line : str) -> str:
 def parse_struct_from_start(line:str, file_iter:enumerate[str]) -> ClassDef|None:
     if remove_comment_from_end(line).strip().endswith(";"):  # to skip forward declares, hacky
         return None
-    
+    if len(line.split())<=1:
+        return None
     name_and_bases = parse_struct_decl(line)
     c = ClassDef([name_and_bases],ClassDef.TYPE_STRUCT, False)
 
@@ -527,7 +528,7 @@ def parse_type(string: str, typenames: dict[str, ClassDef]) -> CppType:
 def parse_function(cur_line: str, typenames: dict[str, ClassDef]) -> tuple[str, list[tuple[CppType, str]]]:
     # Example: "void MyFunc(int a, float b)"
     l_paren = cur_line.find("(")
-    r_paren = cur_line.rfind(")")
+    r_paren = cur_line.find(")",l_paren)
     if l_paren == -1 or r_paren == -1:
         raise Exception("Malformed function declaration")
     before_paren = cur_line[:l_paren].strip()
@@ -579,6 +580,12 @@ def parse_property(cur_line: str, file: enumerate[str], typenames: dict[str, Cla
     if is_virtual:
         cur_line = " ".join(tokens[1:])
     
+
+    # BS hack:
+    if cur_line.endswith(","):
+        _, next_line = next(file)
+        cur_line += remove_comment_from_end(next_line.strip())
+                        
     # Determine if function or variable
     assignment_sign = cur_line.find("=")
     l_paren = cur_line.find("(")
@@ -595,6 +602,7 @@ def parse_property(cur_line: str, file: enumerate[str], typenames: dict[str, Cla
         return_type_str = " ".join(tokens[:-1])
         prop.return_type = parse_type(return_type_str, typenames)
     else:
+        assert(not cur_line.endswith(","))
         # Variable
         # Remove trailing ';' or '=' and value
         if "=" in cur_line:
@@ -651,6 +659,9 @@ def parse_file(file_path:str, typenames:dict[str,ClassDef]):
                         classes.append(current_class)
                         current_class = None
                     current_class = find_class_in_typenames(line,file_iter,typenames)  # valid if current class is none
+                    
+                    if current_class != None and current_class.classname=="BeamComponent":
+                        pass
                     if current_class != None:
                         current_class.tooltip = combine_comments(current_comments)
                         current_comments.clear()
@@ -680,6 +691,7 @@ def parse_file(file_path:str, typenames:dict[str,ClassDef]):
                 elif line.startswith("REFLECT") or line.startswith("REF"):
                     if current_class == None:
                         raise Exception("REFLECT seen before NEWCLASS")
+                    
                     current_prop = parse_property(line, file_iter, typenames)
                     current_class.properties.append(current_prop)
 

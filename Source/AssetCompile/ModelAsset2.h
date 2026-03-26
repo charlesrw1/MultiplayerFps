@@ -68,12 +68,13 @@ public:
 	// Skeleton data
 	REF bool useSharedSkeleton = false;		   // use another skeleton defined in shareSkeletonWithThis
 	REF AssetPtr<Model> shareSkeletonWithThis; // an optional ModelAsset to share skeletons with
-	// REF AssetPtr<DataClass> mirrorTableAsset;			// this is a SkeletonMirror object ptr, fixme needs better type
-	// hints
+	// REF AssetPtr<DataClass> mirrorTableAsset;			// this is a SkeletonMirror object ptr, fixme needs better
+	// type hints
 	REF std::vector<std::string> keepBones;	 // array of bones to keep (compilier automatically prunes out unused bones)
 	REF std::vector<std::string> curveNames; // array of strings that can be used to name custom curves for animations
-	REF std::vector<std::string>
-		additionalAnimationGlbFiles;				// additional glb files to source animations from (will retarget)
+
+	// additional glb files to source animations from (will retarget)
+	REF std::vector<std::string> additionalAnimationGlbFiles;
 	REF std::vector<AnimImportSettings> animations; // all animations indexed by string with import settings
 	REF std::vector<BoneRetargetName> bone_retargets;
 

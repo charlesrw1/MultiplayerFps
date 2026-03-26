@@ -94,8 +94,8 @@ void RemoveEntitiesCommand::undo() {
 	// auto& extern_parents = scene->extern_parents;
 
 	ed_doc.insert_unserialized_into_scene(restored);
-	// eng->get_level()->insert_unserialized_entities_into_level(restored, scene.get());	// pass in scene so handles get
-	// set to what they were
+	// eng->get_level()->insert_unserialized_entities_into_level(restored, scene.get());	// pass in scene so handles
+	// get set to what they were
 
 	for (SavedCreateObj c : removed_objs) {
 		BaseUpdater* obj = eng->get_level()->get_entity(c.eng_handle);

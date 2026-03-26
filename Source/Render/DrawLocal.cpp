@@ -1235,7 +1235,7 @@ void Program_Manager::recompile_do(program_def& def) {
 		//	def.compile_failed = !Shader::compile(def.shader_obj, def.vert, def.frag, def.geo, def.defines);
 		// else
 		//	def.compile_failed = Shader::compile(&def.shader_obj, def.vert, def.frag, def.defines) !=
-		//ShaderResult::SHADER_SUCCESS;
+		// ShaderResult::SHADER_SUCCESS;
 	}
 }
 
@@ -3605,7 +3605,7 @@ void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view) {
 		tex.scene_motion_vts_handle->update_specs_ptr(tex.scene_motion);
 
 		//	glNamedFramebufferTexture(fbo.forward_render, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(),
-		//0); 	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color->get_internal_handle(), 0);
+		// 0); 	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT3, tex.scene_color->get_internal_handle(), 0);
 		//	glNamedFramebufferTexture(fbo.gbuffer, GL_COLOR_ATTACHMENT5, tex.scene_motion->get_internal_handle(), 0);
 	}
 
@@ -4355,7 +4355,7 @@ IGraphicsTexture* Renderer::do_post_process_stack(const std::vector<MaterialInst
 		IGraphicsDevice::inst->set_render_pass(pass_setup);
 
 		//		glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderToTexture->get_internal_handle(),
-		//0);
+		// 0);
 		tex.postProcessInput_vts_handle->update_specs_ptr(renderFromTexture);
 
 		auto mat = postProcessMats[i];

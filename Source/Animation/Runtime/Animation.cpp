@@ -265,7 +265,7 @@ void AnimatorObject::update_physics_bones(const Pose& inpose, RagdollComponent* 
 		cached_bonemats[bone_index] = transform;
 
 		//	std::string str = std::string(e->get_parent_bone().get_c_str()) + "= " +
-		//print_vector(cached_bonemats[parent][3]); 	GameplayStatic::debug_text(str);
+		// print_vector(cached_bonemats[parent][3]); 	GameplayStatic::debug_text(str);
 	}
 	// if (update_owner_position_to_root) {
 	//	glm::mat4 root = cached_bonemats[0];

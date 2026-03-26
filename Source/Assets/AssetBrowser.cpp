@@ -376,7 +376,7 @@ void AssetBrowser::draw_browser_grid() {
 		ImGui::PushID(c);
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 		//	ImGui::ImageButton(ImTextureID(uint64_t(t->get_internal_render_handle())), ImVec2(64, 64),ImVec2(0, 1),
-		//ImVec2(1, 0));
+		// ImVec2(1, 0));
 		string only_filename = c->asset.filename;
 		StringUtils::get_filename(only_filename);
 

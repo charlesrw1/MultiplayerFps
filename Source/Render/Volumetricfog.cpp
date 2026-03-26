@@ -151,7 +151,7 @@ void Volumetric_Fog_System::compute() {
 		// prog.raymarch.set_float("znear", draw.vs.near);
 		// prog.raymarch.set_float("zfar", draw.vs.far);
 		//	glUniform3i(glGetUniformLocation(prog.raymarch.ID, "TextureSize"), voltexturesize.x, voltexturesize.y,
-		//voltexturesize.z);
+		// voltexturesize.z);
 
 		glBindImageTexture(5, texture.last_volume, 0, GL_TRUE, 0, GL_WRITE_ONLY, GL_RGBA16F);
 		glBindImageTexture(2, texture.volume, 0, GL_TRUE, 0, GL_READ_ONLY, GL_RGBA16F);

@@ -39,8 +39,8 @@ void PhysicsBody::fetch_new_transform() {
 		// else {
 		//	auto parent_t = get_owner()->get_parent()->get_ws_transform();
 		//	glm::mat4 myworld = glm::translate(glm::mat4(1.f), physx_to_glm(pose.p)) *
-		//glm::mat4_cast(physx_to_glm(pose.q)); 	auto mylocal = glm::inverse(parent_t) * myworld; 	next_rot =
-		//glm::normalize(glm::quat_cast(mylocal)); 	next_position = mylocal[3];
+		// glm::mat4_cast(physx_to_glm(pose.q)); 	auto mylocal = glm::inverse(parent_t) * myworld; 	next_rot =
+		// glm::normalize(glm::quat_cast(mylocal)); 	next_position = mylocal[3];
 		//}
 		set_ticking(true);
 	} else {

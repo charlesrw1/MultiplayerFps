@@ -6,6 +6,7 @@ UseTab: Always
 PointerAlignment: Left
 AccessModifierOffset: -4
 AlignAfterOpenBracket: Align
+AllowShortEnumsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Inline
 AllowShortIfStatementsOnASingleLine: Never
 BreakBeforeBraces: Custom
