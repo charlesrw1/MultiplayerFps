@@ -210,6 +210,7 @@ class ScriptManagerTest : public ::testing::Test {
 protected:
     void SetUp() override {
         sm = new ScriptManager();
+		ASSERT(!ScriptManager::inst);
         ScriptManager::inst = sm;
     }
     void TearDown() override {
@@ -434,6 +435,7 @@ protected:
 
     void SetUp() override {
         sm = new ScriptManager();
+		ASSERT(!ScriptManager::inst);
         ScriptManager::inst = sm;
         // init_class_info_for_script() calls init_this_class_type() for
         // every registered C++ class (sets lua_prototype_index_table) and

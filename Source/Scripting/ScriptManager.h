@@ -10,17 +10,6 @@ using std::vector;
 #include "Framework/ConsoleCmdGroup.h"
 #include <stdexcept>
 
-enum class ScriptType
-{
-	Nil,
-	Number,
-	Bool,
-	Vec3,
-	Quat,
-	Transform,
-	Color,
-	Ptr,
-};
 struct ParseProperty
 {
 	string name;
