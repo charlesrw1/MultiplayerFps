@@ -6,6 +6,8 @@ USE git to save your progress. Write summaries in the message of all commits.
 
 DO NOT use rm. Use my powershell's profile "trash" alias.
 
+USE AgentDocs/ for documenation made by previous agents.
+
 ### Project information
 
 Built on windows. Visual studio 2019. No CMAKE. 
