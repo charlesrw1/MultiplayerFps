@@ -11,51 +11,59 @@
 class MaterialInstance;
 class Texture;
 
-struct UIDrawCall {
+struct UIDrawCall
+{
 	int index_start = 0;
 	int index_count = 0;
 	MaterialInstance* mat = nullptr;
 	const Texture* texOverride = nullptr;
 };
-struct UISetScissor {
+struct UISetScissor
+{
 	bool enable;
 	Rect2d rect;
 };
-enum class UiDrawCmdType {
+enum class UiDrawCmdType
+{
 	DrawCall,
 	SetScissor,
 	ClearScissor,
 	SetSceneViewProj,
 	SetViewProj,
 	SetModelMatrix,
-	
+
 	SetPipeline,
 	SetTexture,
-
 };
-struct UiSetScissorCmd {
+struct UiSetScissorCmd
+{
 	int x;
 	int y;
 	int w;
 	int h;
 };
-struct UiDrawCallCmd {
+struct UiDrawCallCmd
+{
 	int index_start;
 	int index_count;
 	int base_vertex;
 };
-struct UiMatrixCmd {
+struct UiMatrixCmd
+{
 	glm::mat4 matrix;
 };
-struct UiPipelineCmd {
+struct UiPipelineCmd
+{
 	MaterialInstance* mat;
 };
-struct UiTextureCmd {
+struct UiTextureCmd
+{
 	Texture* tex;
 	int binding;
 };
 
-struct UIDrawCmdUnion {
+struct UIDrawCmdUnion
+{
 	UiDrawCmdType type{};
 	union {
 		UiSetScissorCmd scissorCmd;
@@ -68,16 +76,18 @@ struct UIDrawCmdUnion {
 
 // a window for drawing 2d things. sprites, UI, etc.
 class GuiFont;
-struct RectangleShape {
+struct RectangleShape
+{
 	Rect2d rect;
-	Color32 color=COLOR_WHITE;
+	Color32 color = COLOR_WHITE;
 	const MaterialInstance* material = nullptr;
 	const Texture* texture = nullptr;
 	bool with_outline = false;
 	Color32 outline_color;
 	int outline_width = 0;
 };
-struct TextShape {
+struct TextShape
+{
 	Rect2d rect;
 	Color32 color;
 	const GuiFont* font = nullptr;
@@ -86,11 +96,11 @@ struct TextShape {
 	Color32 drop_shadow_color = COLOR_BLACK;
 	int drop_shadow_ofs = 2;
 
-
 	static void draw_text_to_meshbuilder(const TextShape& shape, MeshBuilder& mb);
 };
 
-class RenderWindow {
+class RenderWindow
+{
 public:
 	RenderWindow();
 	~RenderWindow();
@@ -118,6 +128,7 @@ public:
 		cur_material = nullptr;
 		cur_tex_0 = nullptr;
 	}
+
 private:
 	MaterialInstance* cur_material = nullptr;
 	Texture* cur_tex_0 = nullptr;
@@ -125,9 +136,9 @@ private:
 	std::vector<UIDrawCmdUnion> drawCmds;
 };
 
-
 class MeshBuilder;
-class RenderWindowBackend {
+class RenderWindowBackend
+{
 public:
 	static RenderWindowBackend* inst;
 	virtual handle<RenderWindow> register_window() = 0;

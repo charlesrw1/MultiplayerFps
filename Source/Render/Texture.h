@@ -9,9 +9,9 @@
 #include <memory>
 #include <vector>
 
-
 class IGraphicsTexture;
-class Texture : public IAsset {
+class Texture : public IAsset
+{
 public:
 	CLASS_BODY(Texture);
 	Texture();
@@ -31,26 +31,26 @@ public:
 	bool has_mips = false;
 	bool is_float = false;
 
-
 #ifdef EDITOR_BUILD
 	bool hasSimplifiedColor = false;
-	Color32 simplifiedColor = { 50,50,50 };
+	Color32 simplifiedColor = {50, 50, 50};
 #endif
 
 	// used for system textures
 	void update_specs_ptr(IGraphicsTexture* ptr);
 
 	static Texture* install_system(const std::string& path);
-	static int get_mip_map_count(int width, int height){
+	static int get_mip_map_count(int width, int height) {
 		return glm::floor(glm::log2((double)glm::max(width, height))) + 1;
 	}
 	IGraphicsTexture* gpu_ptr = nullptr;
 
-
 	static Texture* force_load_for_ui(const std::string& name);
+
 private:
 	bool force_nearest = false;
-	struct LoadData {
+	struct LoadData
+	{
 		std::vector<uint8_t> filedata;
 		bool isDDSFile = false;
 		int x{}, y{}, channels{};
@@ -60,7 +60,5 @@ private:
 	};
 	std::unique_ptr<LoadData> loaddata;
 };
-
-
 
 #endif // !TEXTURE_H

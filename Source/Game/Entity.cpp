@@ -11,7 +11,6 @@
 #include "Level.h"
 #include "GameEnginePublic.h"
 
-
 #include "Game/EntityPtr.h"
 #include "Game/Components/MeshComponent.h"
 
@@ -19,21 +18,12 @@
 #include "Framework/ReflectionMacros.h"
 #include "Framework/AddClassToFactory.h"
 
-
 #include "Framework/Serializer.h"
 
-
-
-
-
-Entity::Entity()
-{
-}
-
+Entity::Entity() {}
 
 #ifdef EDITOR_BUILD
-void Entity::set_hidden_in_editor(bool b)
-{
+void Entity::set_hidden_in_editor(bool b) {
 	hidden_in_editor = b;
 	for (int i = 0; i < children.size(); i++) {
 		children[i]->set_hidden_in_editor(b);
@@ -41,7 +31,6 @@ void Entity::set_hidden_in_editor(bool b)
 	for (int i = 0; i < all_components.size(); i++)
 		all_components[i]->sync_render_data();
 }
-
 
 bool Entity::get_is_any_selected_in_editor() const {
 	if (get_selected_in_editor())
@@ -51,8 +40,7 @@ bool Entity::get_is_any_selected_in_editor() const {
 	return get_parent()->get_is_any_selected_in_editor();
 }
 #endif
-void Entity::check_for_transform_nans()
-{
+void Entity::check_for_transform_nans() {
 	if (position.x != position.x || position.y != position.y || position.z != position.z) {
 		sys_print(Warning, "detected NaN in entity position\n");
 		position = glm::vec3(0.f);
@@ -66,8 +54,7 @@ void Entity::check_for_transform_nans()
 		scale = glm::vec3(1.f);
 	}
 }
-void Entity::validate_check()
-{
+void Entity::validate_check() {
 	assert(get_instance_id() != 0);
 	assert(eng->get_object(get_instance_id()) == this);
 	for (auto c : children)
@@ -76,22 +63,17 @@ void Entity::validate_check()
 		assert(comp->get_instance_id() != 0);
 		assert(eng->get_object(comp->get_instance_id()) == comp);
 	}
-
 }
 
 #include "LevelAssets.h"
 
-void Entity::initialize_internal()
-{
+void Entity::initialize_internal() {
 	ASSERT(init_state == initialization_state::HAS_ID);
 	init_state = initialization_state::CALLED_START;
 	check_for_transform_nans();
-
 }
 
-
-void Entity::remove_this(Entity* child)
-{
+void Entity::remove_this(Entity* child) {
 	ASSERT(child);
 	ASSERT(child->parent == this);
 	child->parent = nullptr;
@@ -115,27 +97,22 @@ void Entity::remove_this(Entity* child)
 	ASSERT(!"unreachable");
 }
 
-
-void Entity::destroy()
-{
+void Entity::destroy() {
 	eng->get_level()->destroy_entity(this);
 }
 
-void Entity::serialize(Serializer& s)
-{
-	//Entity* myparent = get_parent();
-	//bool hasparent = s.serialize_class_reference("parent", myparent);
-	//if (s.is_loading() && hasparent && myparent) {
+void Entity::serialize(Serializer& s) {
+	// Entity* myparent = get_parent();
+	// bool hasparent = s.serialize_class_reference("parent", myparent);
+	// if (s.is_loading() && hasparent && myparent) {
 	//	parent_to(myparent);
 	//}
 }
 
-void Entity::destroy_internal()
-{
+void Entity::destroy_internal() {
 	if (init_state == initialization_state::CALLED_START) {
 		init_state = initialization_state::HAS_ID;
 	}
-
 
 	if (get_parent())
 		get_parent()->remove_this(this);
@@ -145,7 +122,7 @@ void Entity::destroy_internal()
 	while (!children.empty()) {
 		ASSERT(loop_count < 100);
 		int pre_count = children.size();
-		children.front()->destroy();	// destroy() unparents entity, which shrinks this vec, assert this
+		children.front()->destroy(); // destroy() unparents entity, which shrinks this vec, assert this
 		ASSERT(children.size() <= pre_count - 1);
 		loop_count++;
 	}
@@ -156,14 +133,13 @@ void Entity::destroy_internal()
 		ASSERT(loop_count < 100);
 		int presize = all_components.size();
 		all_components.front()->destroy();
-		ASSERT(all_components.size() <= presize - 1);	// can be less than if components desroy other components
+		ASSERT(all_components.size() <= presize - 1); // can be less than if components desroy other components
 		loop_count++;
 	}
 	ASSERT(all_components.empty());
 }
 
-void Entity::parent_to(Entity* other)
-{
+void Entity::parent_to(Entity* other) {
 	if (other == this) {
 		sys_print(Warning, "cant parent entity to self\n");
 	}
@@ -179,7 +155,7 @@ void Entity::parent_to(Entity* other)
 
 			if (cur_node->get_parent() == this) {
 				remove_this(cur_node);
-				cur_node->parent_to(parent);	// parent circular child entity to my parent
+				cur_node->parent_to(parent); // parent circular child entity to my parent
 				break;
 			}
 			cur_node = cur_node->get_parent();
@@ -190,10 +166,9 @@ void Entity::parent_to(Entity* other)
 	if (get_parent())
 		get_parent()->remove_this(this);
 	ASSERT(parent == nullptr);
-	
-	
+
 	if (other) {
-		// check if 'other' has 'this' as a parent (circular) 
+		// check if 'other' has 'this' as a parent (circular)
 		auto check_circular = [&]() -> bool {
 			Entity* check = other;
 			int loop_count = 0;
@@ -215,16 +190,14 @@ void Entity::parent_to(Entity* other)
 	invalidate_transform(nullptr);
 }
 
-void Entity::transform_look_at(glm::vec3 pos, glm::vec3 look_pos)
-{
+void Entity::transform_look_at(glm::vec3 pos, glm::vec3 look_pos) {
 	set_ws_transform(glm::inverse(glm::lookAt(pos, look_pos, glm::vec3(0, 1, 0))));
 }
 void Entity::set_ls_rotation(glm::quat q) {
 	set_ls_transform(get_ls_position(), q, get_ls_scale());
 }
 
-void Entity::remove_this_component_internal(Component* component_to_remove)
-{
+void Entity::remove_this_component_internal(Component* component_to_remove) {
 	ASSERT(component_to_remove);
 	ASSERT(component_to_remove->entity_owner == this);
 	component_to_remove->entity_owner = nullptr;
@@ -247,8 +220,7 @@ void Entity::remove_this_component_internal(Component* component_to_remove)
 	ASSERT(!"unreachable");
 }
 
-void Entity::move_child_entity_index(Entity* who, int move_to)
-{
+void Entity::move_child_entity_index(Entity* who, int move_to) {
 	if (move_to < 0 || move_to >= children.size()) {
 		sys_print(Warning, "move_child_entity_index out of range\n");
 		return;
@@ -270,9 +242,8 @@ void Entity::move_child_entity_index(Entity* who, int move_to)
 
 	assert(get_child_entity_index(who) == move_to);
 }
-int Entity::get_child_entity_index(Entity* who) const
-{
-	auto only_once_in_children = [&]()->bool {
+int Entity::get_child_entity_index(Entity* who) const {
+	auto only_once_in_children = [&]() -> bool {
 		int c = 0;
 		for (int i = 0; i < children.size(); i++) {
 			if (children[i] == who)
@@ -289,26 +260,24 @@ int Entity::get_child_entity_index(Entity* who) const
 	return -1;
 }
 
-Entity::~Entity()
-{
+Entity::~Entity() {
 	ASSERT(init_state != initialization_state::CALLED_START);
-	//ASSERT(all_components.empty());
+	// ASSERT(all_components.empty());
 }
 
-Component* Entity::create_component(const ClassTypeInfo* info)
-{
+Component* Entity::create_component(const ClassTypeInfo* info) {
 	ASSERT(init_state != initialization_state::CONSTRUCTOR);
 	if (!info) {
 		sys_print(Error, "Entity::create_component: null type info\n");
 		return nullptr;
 	}
 	if (!info->is_a(Component::StaticType)) {
-		sys_print(Error, "Entity::create_component: not subtype of Component %s\n",info->classname);
+		sys_print(Error, "Entity::create_component: not subtype of Component %s\n", info->classname);
 		return nullptr;
 	}
 	Component* ec = (Component*)info->allocate_this_type();
 	if (!ec) {
-		sys_print(Error, "Entity::create_component: allocate returned null %s\n",info->classname);
+		sys_print(Error, "Entity::create_component: allocate returned null %s\n", info->classname);
 		return nullptr;
 	}
 
@@ -321,8 +290,7 @@ Component* Entity::create_component(const ClassTypeInfo* info)
 	return ec;
 }
 
-Entity* Entity::create_child_entity()
-{
+Entity* Entity::create_child_entity() {
 	ASSERT(init_state != initialization_state::CONSTRUCTOR);
 
 	Entity* e = eng->get_level()->spawn_entity();
@@ -332,14 +300,12 @@ Entity* Entity::create_child_entity()
 	return e;
 }
 
-
-void Entity::add_component_from_unserialization(Component* component)
-{
+void Entity::add_component_from_unserialization(Component* component) {
 	ASSERT(component);
 	ASSERT(init_state == initialization_state::CONSTRUCTOR);
 	ASSERT(component->init_state == initialization_state::CONSTRUCTOR);
 	component->entity_owner = this;
-	
+
 	auto try_find = [&]() -> bool {
 		for (auto& c : all_components)
 			if (c == component)
@@ -351,15 +317,10 @@ void Entity::add_component_from_unserialization(Component* component)
 	all_components.push_back(component);
 }
 
-
-
-
-
 #include "tracy/public/tracy/Tracy.hpp"
 
-glm::mat4 Entity::get_ls_transform() const
-{
-	return compose_transform(position,rotation,scale);
+glm::mat4 Entity::get_ls_transform() const {
+	return compose_transform(position, rotation, scale);
 }
 void Entity::set_ls_transform(const glm::mat4& transform) {
 	decompose_transform(transform, position, rotation, scale);
@@ -378,8 +339,7 @@ void Entity::set_ls_euler_rotation(glm::vec3 euler) {
 	post_change_transform_R();
 }
 
-void Entity::post_change_transform_R(bool ws_is_dirty, Component* skipthis)
-{
+void Entity::post_change_transform_R(bool ws_is_dirty, Component* skipthis) {
 	world_transform_is_dirty = ws_is_dirty;
 
 	if (init_state != initialization_state::CALLED_START)
@@ -393,31 +353,24 @@ void Entity::post_change_transform_R(bool ws_is_dirty, Component* skipthis)
 		children[i]->post_change_transform_R();
 }
 
-void Entity::set_ws_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale)
-{
+void Entity::set_ws_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale) {
 	if (!has_transform_parent()) {
 		set_ls_transform(v, q, scale);
-	}
-	else {
+	} else {
 		auto matrix = compose_transform(v, q, scale);
 		set_ws_transform(matrix);
 	}
 }
-void Entity::set_ls_position(glm::vec3 v)
-{
+void Entity::set_ls_position(glm::vec3 v) {
 	position = v;
 	post_change_transform_R();
 }
-void Entity::set_ls_scale(glm::vec3 v)
-{
+void Entity::set_ls_scale(glm::vec3 v) {
 	scale = v;
 	post_change_transform_R();
 }
 
-
-
-void Entity::set_ws_transform(const glm::mat4& transform)
-{
+void Entity::set_ws_transform(const glm::mat4& transform) {
 	// want local space
 	if (has_transform_parent()) {
 		const glm::mat4& parent_t = get_parent_transform();
@@ -426,41 +379,39 @@ void Entity::set_ws_transform(const glm::mat4& transform)
 		glm::vec3 newp;
 		decompose_transform(local, newp, rotation, scale);
 		if (newp.x != newp.x) {
-			sys_print(Error,"ERROR");
+			sys_print(Error, "ERROR");
 		}
 		position = newp;
 
 		cached_world_transform = transform;
-	}
-	else {
+	} else {
 		cached_world_transform = transform;
 		decompose_transform(transform, position, rotation, scale);
 	}
 	check_for_transform_nans();
-	post_change_transform_R( false /* cached_world_transform doesnt need updating, we already have it*/);
+	post_change_transform_R(false /* cached_world_transform doesnt need updating, we already have it*/);
 }
 
-glm::mat4 Entity::get_parent_transform() const
-{
+glm::mat4 Entity::get_parent_transform() const {
 	Entity* parent = get_parent();
 	ASSERT(parent);
 
 	if (!has_parent_bone() || !parent->get_cached_mesh_component()) {
 		return parent->get_ws_transform();
-	}
-	else {
+	} else {
 		MeshComponent* cached_mesh = parent->get_cached_mesh_component();
 		return parent->get_ws_transform() * cached_mesh->get_ls_transform_of_bone(parent_bone.name);
 	}
 }
-bool Entity::has_parent_bone() const { return !parent_bone.name.is_null(); }
+bool Entity::has_parent_bone() const {
+	return !parent_bone.name.is_null();
+}
 // lazily evalutated
 const glm::mat4& Entity::get_ws_transform() {
 	if (world_transform_is_dirty) {
 		if (has_transform_parent()) {
 			cached_world_transform = get_parent_transform() * get_ls_transform();
-		}
-		else
+		} else
 			cached_world_transform = get_ls_transform();
 		world_transform_is_dirty = false;
 	}
@@ -487,33 +438,28 @@ glm::vec3 Entity::get_ws_scale() {
 	return glm::vec3(1.f);
 }
 
-void Entity::set_ws_position(glm::vec3 v) { set_ws_transform(v, get_ws_rotation(), get_ws_scale()); }
-
-void Entity::set_ws_position_rotation(glm::vec3 pos, glm::quat rot)
-{
-	set_ws_transform(pos, rot, get_ws_scale());	//fixme
+void Entity::set_ws_position(glm::vec3 v) {
+	set_ws_transform(v, get_ws_rotation(), get_ws_scale());
 }
 
-void Entity::set_ls_position_rotation(glm::vec3 pos, glm::quat rot)
-{
+void Entity::set_ws_position_rotation(glm::vec3 pos, glm::quat rot) {
+	set_ws_transform(pos, rot, get_ws_scale()); // fixme
+}
+
+void Entity::set_ls_position_rotation(glm::vec3 pos, glm::quat rot) {
 	set_ls_transform(pos, rot, get_ls_scale());
 }
 
-void Entity::set_is_top_level(bool b)
-{
+void Entity::set_is_top_level(bool b) {
 	is_top_level = b;
 	world_transform_is_dirty = true;
 }
 
-void Entity::invalidate_transform(Component* skipthis)
-{
-	post_change_transform_R(true,skipthis);
+void Entity::invalidate_transform(Component* skipthis) {
+	post_change_transform_R(true, skipthis);
 }
 
-
-
 #ifdef EDITOR_BUILD
-
 
 #endif
 

@@ -3,14 +3,13 @@
 #include <unordered_set>
 #include "Framework/MapUtil.h"
 #include "EditorDocLocal.h"
-void validate_remove_entities(EditorDoc& ed_doc, std::vector<EntityPtr>& input)
-{
+void validate_remove_entities(EditorDoc& ed_doc, std::vector<EntityPtr>& input) {
 	bool had_errors = false;
-	for (int i = 0; i < input.size(); i++)
-	{
+	for (int i = 0; i < input.size(); i++) {
 		auto e = input[i];
 		Entity* ent = e.get();
-		if (!ent) continue;	// whatever, doesnt matter
+		if (!ent)
+			continue; // whatever, doesnt matter
 
 		if (!ed_doc.can_delete_this_object(ent)) {
 			had_errors = true;
@@ -22,8 +21,7 @@ void validate_remove_entities(EditorDoc& ed_doc, std::vector<EntityPtr>& input)
 		eng->log_to_fullscreen_gui(Error, "Cant remove inherited entities");
 	had_errors = false;
 }
-static void add_to_remove_list_R(vector<SavedCreateObj>& objs, Entity* e, std::unordered_set<BaseUpdater*>& seen)
-{
+static void add_to_remove_list_R(vector<SavedCreateObj>& objs, Entity* e, std::unordered_set<BaseUpdater*>& seen) {
 	if (!this_is_a_serializeable_object(e))
 		return;
 	if (SetUtil::contains(seen, (BaseUpdater*)e))
@@ -43,15 +41,15 @@ static void add_to_remove_list_R(vector<SavedCreateObj>& objs, Entity* e, std::u
 	}
 	SavedCreateObj created;
 	created.eng_handle = e->get_instance_id();
-	//created.spawn_type = e->get_object_prefab_spawn_type();
+	// created.spawn_type = e->get_object_prefab_spawn_type();
 
 	objs.push_back(created);
 	for (auto c : e->get_children()) {
-		add_to_remove_list_R(objs,c,seen);
+		add_to_remove_list_R(objs, c, seen);
 	}
 }
 
-RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles):ed_doc(ed_doc) {
+RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles) : ed_doc(ed_doc) {
 	validate_remove_entities(ed_doc, handles);
 	for (EntityPtr e : handles) {
 		is_valid_flag &= ed_doc.can_delete_this_object(e.get());
@@ -66,7 +64,7 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<Enti
 	for (EntityPtr e : handles) {
 		Entity* ent = e.get();
 		if (ent)
-			add_to_remove_list_R(removed_objs, ent,seen);
+			add_to_remove_list_R(removed_objs, ent, seen);
 		else {
 			sys_print(Warning, "RemoveEntitiesCommand(): handle invalid: %lld\n", e.handle);
 		}
@@ -74,7 +72,7 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<Enti
 
 	scene = CommandSerializeUtil::serialize_entities_text(ed_doc, handles);
 	assert(seen.size() == removed_objs.size());
-	//assert(removed_objs.size() == scene->path_to_instance_handle.size());
+	// assert(removed_objs.size() == scene->path_to_instance_handle.size());
 
 	this->handles = handles;
 }
@@ -91,12 +89,13 @@ void RemoveEntitiesCommand::execute() {
 void RemoveEntitiesCommand::undo() {
 	ASSERT(is_valid());
 
-	auto restored = unserialize_entities_from_text("remove_entities_undo",scene->text, AssetDatabase::loader, true /* restore id*/);
-	//auto& extern_parents = scene->extern_parents;
-	
+	auto restored = unserialize_entities_from_text("remove_entities_undo", scene->text, AssetDatabase::loader,
+												   true /* restore id*/);
+	// auto& extern_parents = scene->extern_parents;
 
 	ed_doc.insert_unserialized_into_scene(restored);
-	//eng->get_level()->insert_unserialized_entities_into_level(restored, scene.get());	// pass in scene so handles get set to what they were
+	// eng->get_level()->insert_unserialized_entities_into_level(restored, scene.get());	// pass in scene so handles get
+	// set to what they were
 
 	for (SavedCreateObj c : removed_objs) {
 		BaseUpdater* obj = eng->get_level()->get_entity(c.eng_handle);
@@ -110,20 +109,17 @@ void RemoveEntitiesCommand::undo() {
 
 	// refresh handles i guess ? fixme
 	handles.clear();
-	
+
 	ed_doc.post_node_changes.invoke();
 }
 
-
-
-CreateStaticMeshCommand::CreateStaticMeshCommand(EditorDoc& ed_doc, const std::string& modelname, const glm::mat4& transform, EntityPtr parent) 
-	: ed_doc(ed_doc)
-{
+CreateStaticMeshCommand::CreateStaticMeshCommand(EditorDoc& ed_doc, const std::string& modelname,
+												 const glm::mat4& transform, EntityPtr parent)
+	: ed_doc(ed_doc) {
 
 	this->transform = transform;
 	this->modelname = modelname;
 	this->parent_to = parent;
-
 }
 
 void CreateStaticMeshCommand::execute() {
@@ -141,7 +137,6 @@ void CreateStaticMeshCommand::execute() {
 	ed_doc.on_entity_created.invoke(handle);
 	ed_doc.post_node_changes.invoke();
 
-
 	Model* modelP = g_assets.find_sync<Model>(modelname).get();
 	if (modelP) {
 		if (ent) {
@@ -152,8 +147,7 @@ void CreateStaticMeshCommand::execute() {
 				firstmesh->set_model(modelP);
 			else
 				sys_print(Warning, "CreateStaticMeshCommand couldnt find mesh component\n");
-		}
-		else
+		} else
 			sys_print(Warning, "CreateStaticMeshCommand: ent handle invalid in async callback\n");
 	}
 }
@@ -164,9 +158,9 @@ void CreateStaticMeshCommand::undo() {
 	handle = {};
 }
 
-CreateCppClassCommand::CreateCppClassCommand(EditorDoc& ed_doc, const std::string& cppclassname, const glm::mat4& transform, EntityPtr parent, bool is_component) 
-	: ed_doc(ed_doc)
-{
+CreateCppClassCommand::CreateCppClassCommand(EditorDoc& ed_doc, const std::string& cppclassname,
+											 const glm::mat4& transform, EntityPtr parent, bool is_component)
+	: ed_doc(ed_doc) {
 	auto find = cppclassname.rfind('/');
 	auto types = cppclassname.substr(find == std::string::npos ? 0 : find + 1);
 	ti = ClassBase::find_class(types.c_str());
@@ -179,10 +173,9 @@ void CreateCppClassCommand::execute() {
 	assert(ti);
 	Entity* ent{};
 	if (is_component_type) {
-		ent = ed_doc.spawn_entity();// eng->get_level()->spawn_entity();
-		ed_doc.attach_component(ti, ent);// ent->create_component_type(ti);
-	}
-	else
+		ent = ed_doc.spawn_entity();	  // eng->get_level()->spawn_entity();
+		ed_doc.attach_component(ti, ent); // ent->create_component_type(ti);
+	} else
 		ent = ed_doc.spawn_entity();
 
 	if (parent_to.get())
@@ -205,15 +198,15 @@ void CreateCppClassCommand::undo() {
 	if (ed_doc.selection_state->is_entity_selected(ent)) {
 		ed_doc.selection_state->clear_all_selected();
 	}
-	//auto level = eng->get_level();
-	//level->destroy_entity(ent);
+	// auto level = eng->get_level();
+	// level->destroy_entity(ent);
 	ed_doc.post_node_changes.invoke();
 	handle = {};
 }
 
-TransformCommand::TransformCommand(EditorDoc& ed_doc, const std::unordered_set<uint64_t>& selection, const std::unordered_map<uint64_t, glm::mat4>& pre_transforms) 
-	:ed_doc(ed_doc)
-{
+TransformCommand::TransformCommand(EditorDoc& ed_doc, const std::unordered_set<uint64_t>& selection,
+								   const std::unordered_map<uint64_t, glm::mat4>& pre_transforms)
+	: ed_doc(ed_doc) {
 	for (auto& pair : selection) {
 		auto find = pre_transforms.find(pair);
 		if (find != pre_transforms.end()) {
@@ -242,7 +235,7 @@ void TransformCommand::execute() {
 			t.ptr->set_ws_transform(t.post_transform);
 		}
 	}
-	ed_doc.selection_state->on_selection_changed.invoke();//hack
+	ed_doc.selection_state->on_selection_changed.invoke(); // hack
 }
 
 void TransformCommand::undo() {
@@ -251,16 +244,14 @@ void TransformCommand::undo() {
 			t.ptr->set_ws_transform(t.pre_transform);
 		}
 	}
-	ed_doc.selection_state->on_selection_changed.invoke();	// hack
+	ed_doc.selection_state->on_selection_changed.invoke(); // hack
 }
 
-DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles) 
-	:ed_doc(ed_doc)
-{
+DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles) : ed_doc(ed_doc) {
 
 	if (handles.empty())
 		is_valid_flag = false;
-	
+
 	if (!is_valid_flag)
 		return;
 
@@ -270,33 +261,32 @@ DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vecto
 }
 
 void DuplicateEntitiesCommand::execute() {
-	UnserializedSceneFile duplicated = unserialize_entities_from_text("duplicate_entities",scene->text, AssetDatabase::loader, false/* dont keep id*/);
+	UnserializedSceneFile duplicated = unserialize_entities_from_text("duplicate_entities", scene->text,
+																	  AssetDatabase::loader, false /* dont keep id*/);
 
-	//auto& extern_parents = scene->extern_parents;
-	
+	// auto& extern_parents = scene->extern_parents;
 
 	// zero out file ids so new ones are set
-	//for (auto o : duplicated.get_objects())
+	// for (auto o : duplicated.get_objects())
 	//	if (o.second->creator_source == nullptr) // ==nullptr meaning that its created by level
 	//		o.second->unique_file_id = 0;
 
 	ed_doc.insert_unserialized_into_scene(duplicated);
 
-	//eng->get_level()->insert_unserialized_entities_into_level(duplicated);	// since duplicating, DONT pass in scene
+	// eng->get_level()->insert_unserialized_entities_into_level(duplicated);	// since duplicating, DONT pass in scene
 
 	ed_doc.selection_state->clear_all_selected();
-	
+
 	vector<EntityPtr> ents;
 	for (auto e : duplicated.all_obj_vec)
 		if (auto ent = e->cast_to<Entity>()) {
 			ents.push_back(ent);
 			handles.push_back(ent);
 		}
-			ed_doc.selection_state->add_entities_to_selection(ents);
+	ed_doc.selection_state->add_entities_to_selection(ents);
 
 	ed_doc.manipulate->set_force_op(ImGuizmo::TRANSLATE);
 	ed_doc.manipulate->set_force_gizmo_on(true);
-
 
 	ed_doc.post_node_changes.invoke();
 }
@@ -309,12 +299,12 @@ void DuplicateEntitiesCommand::undo() {
 	ed_doc.post_node_changes.invoke();
 }
 
-MovePositionInHierarchy::MovePositionInHierarchy(EditorDoc& ed_doc, Entity* e, Cmd cmd) 
-	:ed_doc(ed_doc)
-{
-	if (!e) return;
+MovePositionInHierarchy::MovePositionInHierarchy(EditorDoc& ed_doc, Entity* e, Cmd cmd) : ed_doc(ed_doc) {
+	if (!e)
+		return;
 	const auto parent = e->get_parent();
-	if (!parent) return;
+	if (!parent)
+		return;
 	from_position = parent->get_child_entity_index(e);
 	if (from_position == -1)
 		return;
@@ -335,33 +325,35 @@ MovePositionInHierarchy::MovePositionInHierarchy(EditorDoc& ed_doc, Entity* e, C
 		break;
 	}
 
-
 	entPtr = e->get_self_ptr();
 }
 void MovePositionInHierarchy::execute() {
 	auto e = entPtr.get();
-	if (!e || !e->get_parent()) return;
+	if (!e || !e->get_parent())
+		return;
 	e->get_parent()->move_child_entity_index(e, to_position);
 
 	ed_doc.post_node_changes.invoke();
 }
 void MovePositionInHierarchy::undo() {
 	auto e = entPtr.get();
-	if (!e || !e->get_parent()) return;
+	if (!e || !e->get_parent())
+		return;
 	e->get_parent()->move_child_entity_index(e, from_position);
 
 	ed_doc.post_node_changes.invoke();
 }
 #include "LevelSerialization/SerializeNew.h"
-std::unique_ptr<SerializedSceneFile> CommandSerializeUtil::serialize_entities_text(EditorDoc& ed_doc, std::vector<EntityPtr> handles) {
+std::unique_ptr<SerializedSceneFile> CommandSerializeUtil::serialize_entities_text(EditorDoc& ed_doc,
+																				   std::vector<EntityPtr> handles) {
 	std::vector<Entity*> ents;
 	for (auto h : handles) {
 		ents.push_back(h.get());
 	}
 	ed_doc.validate_fileids_before_serialize();
 
-
-	return std::make_unique<SerializedSceneFile>(NewSerialization::serialize_to_text("Command::serialize_entities_text", ents,true));
+	return std::make_unique<SerializedSceneFile>(
+		NewSerialization::serialize_to_text("Command::serialize_entities_text", ents, true));
 }
 
 void RemoveComponentCommand::execute() {
@@ -388,14 +380,14 @@ void RemoveComponentCommand::undo() {
 }
 #endif
 
-CreateSpawnerCommand::CreateSpawnerCommand(EditorDoc& ed_doc, const std::string& cppclassname, const glm::mat4& transform) : ed_doc(ed_doc)
-{
+CreateSpawnerCommand::CreateSpawnerCommand(EditorDoc& ed_doc, const std::string& cppclassname,
+										   const glm::mat4& transform)
+	: ed_doc(ed_doc) {
 	this->transform = transform;
 	this->cppclassname = cppclassname;
 }
 #include "Game/Components/SpawnerComponenth.h"
-void CreateSpawnerCommand::execute()
-{
+void CreateSpawnerCommand::execute() {
 	Entity* e = ed_doc.spawn_entity();
 	e->set_ws_transform(transform);
 	auto s = e->create_component<SpawnerComponent>();
@@ -403,8 +395,7 @@ void CreateSpawnerCommand::execute()
 	handle = e;
 }
 
-void CreateSpawnerCommand::undo()
-{
+void CreateSpawnerCommand::undo() {
 	if (handle.get())
 		handle->destroy();
 }
@@ -414,8 +405,7 @@ void CreateSpawnerCommand::undo()
 UndoRedoSystem::UndoRedoSystem() {
 	hist.resize(HIST_SIZE, nullptr);
 }
-void UndoRedoSystem::on_key_event(const SDL_KeyboardEvent& key)
-{
+void UndoRedoSystem::on_key_event(const SDL_KeyboardEvent& key) {
 	if (key.keysym.scancode == SDL_SCANCODE_Z && key.keysym.mod & KMOD_CTRL)
 		undo();
 }
@@ -427,7 +417,7 @@ void UndoRedoSystem::clear_all() {
 	}
 }
 
-// returns number of errord commands 
+// returns number of errord commands
 //
 
 int UndoRedoSystem::execute_queued_commands() {
@@ -475,7 +465,8 @@ int UndoRedoSystem::execute_queued_commands() {
 }
 void UndoRedoSystem::undo() {
 	index -= 1;
-	if (index < 0) index = HIST_SIZE - 1;
+	if (index < 0)
+		index = HIST_SIZE - 1;
 	if (hist[index]) {
 
 		sys_print(Debug, "Undoing: %s\n", hist[index]->to_string().c_str());
@@ -487,8 +478,7 @@ void UndoRedoSystem::undo() {
 		hist[index] = nullptr;
 
 		on_command_execute_or_undo.invoke();
-	}
-	else {
+	} else {
 		eng->log_to_fullscreen_gui(Warning, "Nothing to undo");
 
 		sys_print(Debug, "nothing to undo\n");
@@ -510,8 +500,7 @@ void CreateComponentCommand::execute() {
 	ed_doc.on_component_created.invoke(ec);
 }
 
-void CreateComponentCommand::post_create(Component* ec) {
-}
+void CreateComponentCommand::post_create(Component* ec) {}
 
 void CreateComponentCommand::undo() {
 	ASSERT(comp_handle != 0);

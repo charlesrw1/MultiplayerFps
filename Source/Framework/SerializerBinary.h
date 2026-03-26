@@ -1,7 +1,8 @@
 #pragma once
 #include "Serializer.h"
 #include "BinaryReadWrite.h"
-class BinaryWriterBackend : public Serializer {
+class BinaryWriterBackend : public Serializer
+{
 public:
 	BinaryWriterBackend(ClassBase& rootObj);
 

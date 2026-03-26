@@ -1,8 +1,7 @@
 #include "IntegrationTest.h"
 
 IntegrationTester::IntegrationTester(bool exit_on_finish, vector<IntTestCase>& test_cases, unsigned int rand_seed)
-	: is_done(false), can_do_work(false), rand(rand_seed)
-{
+	: is_done(false), can_do_work(false), rand(rand_seed) {
 	testcases = std::move(test_cases);
 	thread = std::thread(&IntegrationTester::tester_thread, this);
 	total_tests = testcases.size();
@@ -26,12 +25,10 @@ bool IntegrationTester::tick(float dt) {
 			waiting_on_delegate = false;
 			abort_because_waited_too_long = true;
 			time_waiting_on_delegate = 0.0;
-		}
-		else {
+		} else {
 			return false;
 		}
-	}
-	else {
+	} else {
 		time_waiting_on_delegate = 0.0;
 	}
 
@@ -41,7 +38,7 @@ bool IntegrationTester::tick(float dt) {
 	cv.wait(l, [&]() { return is_done || !can_do_work; });
 
 	if (is_done) {
-		sys_print(Info, "Integration tests finished. (%d/%d passed)\n", total_tests-failed_tests,total_tests);
+		sys_print(Info, "Integration tests finished. (%d/%d passed)\n", total_tests - failed_tests, total_tests);
 	}
 
 	return is_done;
@@ -91,7 +88,7 @@ void IntegrationTester::wait_delegate(MulticastDelegate<>& delegate) {
 
 void IntegrationTester::checkTrue(bool b, const char* msg) {
 	if (!b)
-		throw std::runtime_error(msg);	// caught by tester_thread
+		throw std::runtime_error(msg); // caught by tester_thread
 }
 
 IntegrationTester::~IntegrationTester() {

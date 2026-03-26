@@ -11,13 +11,11 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include "Game/Components/LightComponents.h"
 
-Level::~Level()
-{
+Level::~Level() {
 	assert(all_world_ents.num_used == 0);
 }
 
-void Level::update_level()
-{
+void Level::update_level() {
 	{
 		BooleanScope scope(b_is_in_update_tick);
 
@@ -33,34 +31,30 @@ void Level::update_level()
 
 	for (auto h : deferred_delete_list) {
 		auto e = get_entity(h);
-		if (!e) 
+		if (!e)
 			continue;
 		if (e->is_a<Entity>()) {
 			auto ent = (Entity*)e;
 			ent->destroy();
-		}
-		else if (e->is_a<Component>()) {
+		} else if (e->is_a<Component>()) {
 			auto ent = (Component*)e;
 			ent->destroy();
 		}
 	}
 	deferred_delete_list.clear();
 
-
 	GameSceneGiUtil::check_changes();
 }
-void Level::sync_level_render_data()
-{
+void Level::sync_level_render_data() {
 	ZoneScoped;
 	for (auto ec : wants_sync_update)
 		ec->on_sync_render_data();
 	wants_sync_update.clear_all();
 }
-void Level::add_to_sync_render_data_list(Component* ec)
-{
-	//if (eng->get_is_in_overlapped_period())
-		wants_sync_update.insert(ec);
-	//else
+void Level::add_to_sync_render_data_list(Component* ec) {
+	// if (eng->get_is_in_overlapped_period())
+	wants_sync_update.insert(ec);
+	// else
 	//	ec->on_sync_render_data();
 }
 
@@ -71,10 +65,9 @@ void Level::add_to_update_list(Component* ec) {
 		tick_list.insert(ec);
 }
 
-Entity* Level::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti)
-{
+Entity* Level::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti) {
 	ASSERT(ti.has_allocate_func());
-	ClassBase* e = ti.allocate_this_type();	// allocate + call constructor
+	ClassBase* e = ti.allocate_this_type(); // allocate + call constructor
 	ASSERT(e);
 
 	Entity* ec = nullptr;
@@ -86,23 +79,22 @@ Entity* Level::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti)
 		return nullptr;
 	}
 
-	insert_new_native_entity_into_hashmap_R(ec);	// insert into hashmap but DONT call initialize, that is done by the RAII DeferredSpawnScope
+	insert_new_native_entity_into_hashmap_R(
+		ec); // insert into hashmap but DONT call initialize, that is done by the RAII DeferredSpawnScope
 
 	return ec;
 }
 
 ConfigVar log_destroy_game_objects("log_destroy_game_objects", "1", CVAR_BOOL, "");
 
-Entity* Level::spawn_entity()
-{
+Entity* Level::spawn_entity() {
 	auto& ti = Entity::StaticType;
 	ASSERT(ti.has_allocate_func());
 
-	ClassBase* e = ti.allocate_this_type();	// allocate + call constructor
+	ClassBase* e = ti.allocate_this_type(); // allocate + call constructor
 	ASSERT(e);
 
 	auto ent = (Entity*)e;
-
 
 	// call_startup_functions_for_new_entity
 	insert_new_native_entity_into_hashmap_R(ent);
@@ -111,61 +103,54 @@ Entity* Level::spawn_entity()
 	return ent;
 }
 
-void Level::destroy_entity(Entity* e)
-{
-	if (!e) 
+void Level::destroy_entity(Entity* e) {
+	if (!e)
 		return;
 	int64_t id = e->get_instance_id();
 	assert(id != 0);
-	if(log_destroy_game_objects.get_bool())
+	if (log_destroy_game_objects.get_bool())
 		sys_print(Debug, "removing entity (handle:%llu,class:%s)\n", id, e->get_type().classname);
 
 	e->destroy_internal();
 	delete e;
-	// remove from hashmap
-	#ifdef _DEBUG
-		auto ent = all_world_ents.find(id);
-		if (!ent) {
-			sys_print(Warning,"destroy_entity: entity does not exist in hashmap, double delete?\n");
-		}
-	#endif // _DEBUG
+// remove from hashmap
+#ifdef _DEBUG
+	auto ent = all_world_ents.find(id);
+	if (!ent) {
+		sys_print(Warning, "destroy_entity: entity does not exist in hashmap, double delete?\n");
+	}
+#endif // _DEBUG
 	all_world_ents.remove(id);
 }
-void Level::destroy_component(Component* ec)
-{
-	if (!ec) 
+void Level::destroy_component(Component* ec) {
+	if (!ec)
 		return;
 	wants_sync_update.remove(ec);
 
 	int64_t id = ec->get_instance_id();
-	//int uid = ec->unique_file_id;
+	// int uid = ec->unique_file_id;
 	assert(id != 0);
 	if (log_destroy_game_objects.get_bool())
-		sys_print(Debug,"removing eComponent (handle:%llu,class:%s)\n", id, ec->get_type().classname);
+		sys_print(Debug, "removing eComponent (handle:%llu,class:%s)\n", id, ec->get_type().classname);
 	ec->destroy_internal();
 	delete ec;
-	// remove from hashmap
-	#ifdef _DEBUG
-		auto ent = all_world_ents.find(id);
-		if (!ent) {
-			sys_print(Warning,"destroy_component: entity does not exist in hashmap, double delete?\n");
-		}
-	#endif // _DEBUG
+// remove from hashmap
+#ifdef _DEBUG
+	auto ent = all_world_ents.find(id);
+	if (!ent) {
+		sys_print(Warning, "destroy_component: entity does not exist in hashmap, double delete?\n");
+	}
+#endif // _DEBUG
 	all_world_ents.remove(id);
 }
 
-Level::Level(bool is_editor) 
-	: all_world_ents(4/*2^4*/), tick_list(4), wants_sync_update(4)
-{
-	
-}
+Level::Level(bool is_editor) : all_world_ents(4 /*2^4*/), tick_list(4), wants_sync_update(4) {}
 
-void Level::start(string source_name, UnserializedSceneFile* source)
-{
+void Level::start(string source_name, UnserializedSceneFile* source) {
 	this->source_name = source_name;
 	ASSERT(source);
 	double start = GetTime();
-	insert_unserialized_entities_into_level_internal(*source,true);
+	insert_unserialized_entities_into_level_internal(*source, true);
 	double end = GetTime();
 	sys_print(Debug, "Level::start: took %f\n", float(end - start));
 
@@ -180,8 +165,7 @@ void Level::remove_from_update_list(Component* ec) {
 		}
 }
 
-void add_entities_and_components_to_init_R(Entity* e, InlineVec<Entity*, 4>& es, InlineVec<Component*, 16>& cs)
-{
+void add_entities_and_components_to_init_R(Entity* e, InlineVec<Entity*, 4>& es, InlineVec<Component*, 16>& cs) {
 	es.push_back(e);
 	for (auto c : e->get_components())
 		cs.push_back(c);
@@ -189,8 +173,7 @@ void add_entities_and_components_to_init_R(Entity* e, InlineVec<Entity*, 4>& es,
 		add_entities_and_components_to_init_R(child, es, cs);
 }
 
-void Level::initialize_new_entity_safe(Entity* e)
-{
+void Level::initialize_new_entity_safe(Entity* e) {
 	ASSERT(e);
 	ASSERT(e->init_state == BaseUpdater::initialization_state::HAS_ID);
 
@@ -199,13 +182,13 @@ void Level::initialize_new_entity_safe(Entity* e)
 	InlineVec<Entity*, 4> init_entities;
 	InlineVec<Component*, 16> init_components;
 	add_entities_and_components_to_init_R(e, init_entities, init_components);
-	
-	for (int i = 0; i < init_entities.size();i++) {
+
+	for (int i = 0; i < init_entities.size(); i++) {
 		auto e = init_entities[i];
 		ASSERT(e->init_state == BaseUpdater::initialization_state::HAS_ID);
-		e->initialize_internal();	// just sets init_state => CALLED_START
+		e->initialize_internal(); // just sets init_state => CALLED_START
 	}
-	for (int i = 0; i < init_components.size();i++) {
+	for (int i = 0; i < init_components.size(); i++) {
 		auto ec = init_components[i];
 		ASSERT(ec->init_state == BaseUpdater::initialization_state::HAS_ID);
 		ec->activate_internal_step2();
@@ -215,12 +198,12 @@ void Level::initialize_new_entity_safe(Entity* e)
 void Level::insert_new_native_entity_into_hashmap_R(Entity* e) {
 	ASSERT(e);
 	ASSERT(e->init_state == BaseUpdater::initialization_state::CONSTRUCTOR);
-	ASSERT(e->get_instance_id()==0);
+	ASSERT(e->get_instance_id() == 0);
 
 	e->post_unserialization(get_next_id_and_increment());
 
 	ASSERT(all_world_ents.find(e->get_instance_id()) == nullptr);
-	ASSERT(e->get_instance_id()!=0);
+	ASSERT(e->get_instance_id() != 0);
 
 	all_world_ents.insert(e->get_instance_id(), e);
 
@@ -236,8 +219,7 @@ void Level::insert_new_native_entity_into_hashmap_R(Entity* e) {
 		insert_new_native_entity_into_hashmap_R(child);
 }
 
-void Level::close_level()
-{
+void Level::close_level() {
 	GameSceneGiUtil::on_scene_exit();
 
 	for (auto ent : all_world_ents) {
@@ -246,7 +228,6 @@ void Level::close_level()
 	}
 	ASSERT(all_world_ents.num_used == 0);
 	all_world_ents.clear_all();
-
 }
 #include "Framework/Log.h"
 #include "Framework/MapUtil.h"
@@ -254,15 +235,15 @@ void Level::close_level()
 void Level::insert_unserialized_entities_into_level(UnserializedSceneFile& scene) {
 	insert_unserialized_entities_into_level_internal(scene, false);
 }
-void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene, bool addSpawnNames) // was bool assign_new_ids=false
+void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene,
+															 bool addSpawnNames) // was bool assign_new_ids=false
 {
 #ifndef EDITOR_BUILD
 	assert(!reassign_ids);
 #endif // !EDITOR_BUILD
 
-
-
-	//sys_print(Debug, "Level::insert_unserialized_entities_into_level: (level=%s) (objs=%d)\n", sourceAssetName.c_str(), (int)scene.all_obj_vec.size());
+	// sys_print(Debug, "Level::insert_unserialized_entities_into_level: (level=%s) (objs=%d)\n",
+	// sourceAssetName.c_str(), (int)scene.all_obj_vec.size());
 
 	auto& objs = scene.all_obj_vec;
 
@@ -270,7 +251,7 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 #ifdef EDITOR_BUILD
 
 	for (auto o : objs) {
-		SetUtil::insert_test_exists(ObjsTest,o);
+		SetUtil::insert_test_exists(ObjsTest, o);
 		if (o->is_a<Entity>()) {
 			ASSERT(((Entity*)o)->get_parent() == nullptr);
 		}
@@ -282,8 +263,7 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 			ASSERT(o);
 			if (o->get_instance_id() != 0) {
 				ASSERT(all_world_ents.find(o->get_instance_id()) == nullptr);
-			}
-			else {
+			} else {
 				o->post_unserialization(get_next_id_and_increment());
 			}
 			ASSERT(all_world_ents.find(o->get_instance_id()) == nullptr);
@@ -293,7 +273,7 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 	}
 	validate();
 
-	for (int i = 0; i < objs.size();i++) {
+	for (int i = 0; i < objs.size(); i++) {
 		BaseUpdater* o = objs[i];
 		assert(o->get_instance_id() != 0);
 		auto ent = o;
@@ -302,24 +282,22 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 		else if (Component* ec = ent->cast_to<Component>()) {
 			if (!ec->get_owner()) {
 				const char* type = ec->get_type().classname;
-				sys_print(Error, "Level::insert_unserialized_entities_into_level: component witout owner (type=%s,id=%lld)\n",type,ec->get_instance_id());
+				sys_print(Error,
+						  "Level::insert_unserialized_entities_into_level: component witout owner (type=%s,id=%lld)\n",
+						  type, ec->get_instance_id());
 				ASSERT(ec->get_instance_id() != 0);
 				all_world_ents.remove(ec->get_instance_id());
 				delete ec;
 				objs[i] = nullptr;
-			}
-			else {
+			} else {
 				ec->activate_internal_step2();
 			}
-		}
-		else
+		} else
 			ASSERT(!"Non Eentity/Component?");
 	}
 }
 
-
-void Level::add_and_init_created_runtime_component(Component* c)
-{
+void Level::add_and_init_created_runtime_component(Component* c) {
 	ASSERT(c->init_state == BaseUpdater::initialization_state::CONSTRUCTOR);
 	c->post_unserialization(get_next_id_and_increment());
 	ASSERT(all_world_ents.find(c->get_instance_id()) == nullptr);
@@ -327,11 +305,8 @@ void Level::add_and_init_created_runtime_component(Component* c)
 	c->activate_internal_step2();
 }
 
-
-
-void Level::queue_deferred_delete(BaseUpdater* e)
-{
-	if (!e) 
+void Level::queue_deferred_delete(BaseUpdater* e) {
+	if (!e)
 		return;
 	if (log_destroy_game_objects.get_bool()) {
 		sys_print(Debug, "Level::queue_deferred_delete: (%lld)", e->get_instance_id());
@@ -339,26 +314,21 @@ void Level::queue_deferred_delete(BaseUpdater* e)
 	deferred_delete_list.insert(e->get_instance_id());
 }
 
-
-void Level::validate()
-{
+void Level::validate() {
 	for (auto o : all_world_ents) {
 		if (auto e = o->cast_to<Entity>())
 			e->validate_check();
 	}
 }
 
-Entity* Level::find_initial_entity_by_name(const string& name) const
-{
-	return MapUtil::get_or(spawnNameToEntity,name,EntityPtr()).get();
+Entity* Level::find_initial_entity_by_name(const string& name) const {
+	return MapUtil::get_or(spawnNameToEntity, name, EntityPtr()).get();
 }
 
-Component* Level::find_first_component(const ClassTypeInfo* type) const
-{
+Component* Level::find_first_component(const ClassTypeInfo* type) const {
 	for (auto o : all_world_ents) {
 		if (o->is_a<Component>() && o->get_type().is_a(*type))
 			return (Component*)o;
 	}
 	return nullptr;
 }
-

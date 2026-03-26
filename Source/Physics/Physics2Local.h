@@ -30,9 +30,9 @@
 
 struct CollisionResponse
 {
-	uint32_t blockMask = 0;	// mask of objects to block
-	uint32_t overlapMask = 0; // mask of objects to overlap with 
-	uint8_t type = 0;	// 0-32 value to set what "type" the object is
+	uint32_t blockMask = 0;	  // mask of objects to block
+	uint32_t overlapMask = 0; // mask of objects to overlap with
+	uint8_t type = 0;		  // 0-32 value to set what "type" the object is
 	uint8_t preset = 0;
 	bool generateHitEvent : 1;
 	bool generateOverlapEvent : 1;
@@ -49,21 +49,13 @@ inline physx::PxVec3 glm_to_physx(const glm::vec3& v) {
 	return physx::PxVec3(v.x, v.y, v.z);
 }
 inline physx::PxQuat glm_to_physx(const glm::quat& v) {
-	return physx::PxQuat(v.x, v.y, v.z,v.w);
+	return physx::PxQuat(v.x, v.y, v.z, v.w);
 }
-
 
 #include <glm/gtc/type_ptr.hpp>
-inline PxTransform glm_to_physx(const glm::mat4& mI)
-{
-	return PxTransform(PxMat44(
-		glm_to_physx(mI[0]),
-		glm_to_physx(mI[1]),
-		glm_to_physx(mI[2]),
-		glm_to_physx(mI[3])
-	));
+inline PxTransform glm_to_physx(const glm::mat4& mI) {
+	return PxTransform(PxMat44(glm_to_physx(mI[0]), glm_to_physx(mI[1]), glm_to_physx(mI[2]), glm_to_physx(mI[3])));
 }
-
 
 class MyPhysicsCallback;
 class PhysicsManImpl
@@ -72,24 +64,11 @@ public:
 	PhysicsManImpl();
 	~PhysicsManImpl();
 
+	bool sweep_shared(world_query_result& out, physx::PxGeometry& geom, const glm::vec3& start, const glm::vec3& dir,
+					  float length, const TraceIgnoreVec* ignored_components = nullptr,
+					  uint32_t collision_channel_mask = UINT32_MAX);
 
-	bool sweep_shared(world_query_result& out,
-		physx::PxGeometry& geom,
-		const glm::vec3& start,
-		const glm::vec3& dir,
-		float length,
-		const TraceIgnoreVec* ignored_components = nullptr,
-		uint32_t collision_channel_mask = UINT32_MAX);
-
-	bool overlap_shared(
-		overlap_query_result& out,
-		physx::PxGeometry& geom,
-		const glm::vec3& start,
-		uint32_t mask);
-
-
-
-
+	bool overlap_shared(overlap_query_result& out, physx::PxGeometry& geom, const glm::vec3& start, uint32_t mask);
 
 	physx::PxScene* get_physx_scene() { return scene; }
 
@@ -98,7 +77,6 @@ public:
 
 	// used only by model loader
 	bool load_physics_into_shape(BinaryReader& reader, physics_shape_def& def);
-
 
 	physx::PxMaterial* default_material = nullptr;
 	physx::PxCpuDispatcher* dispatcher = nullptr;

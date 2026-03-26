@@ -3,8 +3,7 @@
 #include "GameEnginePublic.h"
 class IAsset;
 
-void Serializer::serialize_property_ar(PropertyPtr ptr)
-{
+void Serializer::serialize_property_ar(PropertyPtr ptr) {
 	assert(ptr.is_an_array_property());
 	if (ptr.is_array()) {
 		auto arrayprp = ptr.as_array();
@@ -18,8 +17,7 @@ void Serializer::serialize_property_ar(PropertyPtr ptr)
 			}
 			end_obj();
 		}
-	}
-	else if (ptr.is_struct()) {
+	} else if (ptr.is_struct()) {
 		const bool hasstruct = serialize_dict_ar();
 		if (hasstruct) {
 			auto asstruct = ptr.as_struct();
@@ -29,17 +27,15 @@ void Serializer::serialize_property_ar(PropertyPtr ptr)
 			}
 			end_obj();
 		}
-	}
-	else if (ptr.is_string()) {
+	} else if (ptr.is_string()) {
 		auto& ref = ptr.as_string();
 		serialize_ar(ref);
-	}
-	else {
+	} else {
 		switch (ptr.get_type()) {
 		case core_type_id::Bool: {
 			bool& b = ptr.as_boolean();
 			serialize_ar(b);
-		}break;
+		} break;
 		case core_type_id::Enum8:
 		case core_type_id::Enum16:
 		case core_type_id::Enum32:
@@ -51,36 +47,35 @@ void Serializer::serialize_property_ar(PropertyPtr ptr)
 			serialize_ar(i);
 			if (is_loading())
 				ptr.set_integer_casted(i);
-		}break;
+		} break;
 		case core_type_id::Float: {
 			float& f = ptr.as_float();
 			serialize_ar(f);
-		}break;
+		} break;
 		case core_type_id::Quat: {
 			serialize_ar(ptr.as_quat());
-		}break;
+		} break;
 		case core_type_id::Vec2: {
 			serialize_ar(ptr.as_vec2());
-		}break;
+		} break;
 		case core_type_id::Vec3: {
 			serialize_ar(ptr.as_vec3());
-		}break;
+		} break;
 		case core_type_id::StringName: {
 			if (is_loading()) {
 				string s;
 				serialize_ar(s);
 				ptr.as_string_name() = StringName(s.c_str());
-			}
-			else {
+			} else {
 				string s = ptr.as_string_name().get_c_str();
 				serialize_ar(s);
 			}
-		}break;
+		} break;
 		case core_type_id::AssetPtr: {
 			auto pi = ptr.get_property_info();
 			IAsset** assetptr = (IAsset**)pi->get_ptr(ptr.get_instance_ptr_unsafe());
 			serialize_asset_ar(*pi->class_type, *assetptr);
-		}break;
+		} break;
 		case core_type_id::ObjHandlePtr: {
 			auto pi = ptr.get_property_info();
 			int64_t* handle = (int64_t*)pi->get_ptr(ptr.get_instance_ptr_unsafe());
@@ -88,23 +83,19 @@ void Serializer::serialize_property_ar(PropertyPtr ptr)
 				BaseUpdater* b = nullptr;
 				serialize_class_reference_ar(b);
 				if (b) {
-					*((BaseUpdater**)handle) = b;	// gets fixed up later
+					*((BaseUpdater**)handle) = b; // gets fixed up later
 				}
-			}
-			else {
+			} else {
 				BaseUpdater* b = nullptr;
 				if (*handle != 0)
 					b = eng->get_object(*handle);
 				serialize_class_reference_ar(b);
 			}
-		}break;
-
-
+		} break;
 		}
 	}
 }
-void Serializer::serialize_property(PropertyPtr ptr)
-{
+void Serializer::serialize_property(PropertyPtr ptr) {
 	assert(!ptr.is_an_array_property());
 	if (ptr.is_array()) {
 		auto arrayprp = ptr.as_array();
@@ -118,8 +109,7 @@ void Serializer::serialize_property(PropertyPtr ptr)
 			}
 			end_obj();
 		}
-	}
-	else if (ptr.is_struct()) {
+	} else if (ptr.is_struct()) {
 		const bool hasstruct = serialize_dict(ptr.get_name());
 		if (hasstruct) {
 			auto asstruct = ptr.as_struct();
@@ -129,17 +119,15 @@ void Serializer::serialize_property(PropertyPtr ptr)
 			}
 			end_obj();
 		}
-	}
-	else if (ptr.is_string()) {
+	} else if (ptr.is_string()) {
 		auto& ref = ptr.as_string();
 		serialize(ptr.get_name(), ref);
-	}
-	else {
+	} else {
 		switch (ptr.get_type()) {
 		case core_type_id::Bool: {
 			bool& b = ptr.as_boolean();
-			serialize(ptr.get_name(),b);
-		}break;
+			serialize(ptr.get_name(), b);
+		} break;
 		case core_type_id::Enum8:
 		case core_type_id::Enum16:
 		case core_type_id::Enum32:
@@ -148,39 +136,38 @@ void Serializer::serialize_property(PropertyPtr ptr)
 		case core_type_id::Int32:
 		case core_type_id::Int64: {
 			int64_t i = ptr.get_integer_casted();
-			bool found = serialize(ptr.get_name(),i);
+			bool found = serialize(ptr.get_name(), i);
 			if (found && is_loading())
 				ptr.set_integer_casted(i);
-		}break;
+		} break;
 		case core_type_id::Float: {
 			float& f = ptr.as_float();
 			serialize(ptr.get_name(), f);
-		}break;
+		} break;
 		case core_type_id::Quat: {
-			serialize(ptr.get_name(),ptr.as_quat());
-		}break;
+			serialize(ptr.get_name(), ptr.as_quat());
+		} break;
 		case core_type_id::Vec2: {
-			serialize(ptr.get_name(),ptr.as_vec2());
-		}break;
+			serialize(ptr.get_name(), ptr.as_vec2());
+		} break;
 		case core_type_id::Vec3: {
-			serialize(ptr.get_name(),ptr.as_vec3());
-		}break;
+			serialize(ptr.get_name(), ptr.as_vec3());
+		} break;
 		case core_type_id::StringName: {
 			if (is_loading()) {
 				string s;
 				serialize(ptr.get_name(), s);
 				ptr.as_string_name() = StringName(s.c_str());
-			}
-			else {
+			} else {
 				string s = ptr.as_string_name().get_c_str();
 				serialize(ptr.get_name(), s);
 			}
-		}break;
+		} break;
 		case core_type_id::AssetPtr: {
 			auto pi = ptr.get_property_info();
 			IAsset** assetptr = (IAsset**)pi->get_ptr(ptr.get_instance_ptr_unsafe());
 			serialize_asset(ptr.get_name(), *pi->class_type, *assetptr);
-		}break;
+		} break;
 		case core_type_id::ObjHandlePtr: {
 			auto pi = ptr.get_property_info();
 			int64_t* handle = (int64_t*)pi->get_ptr(ptr.get_instance_ptr_unsafe());
@@ -188,16 +175,15 @@ void Serializer::serialize_property(PropertyPtr ptr)
 				BaseUpdater* b = nullptr;
 				serialize_class_reference(ptr.get_name(), b);
 				if (b) {
-					*((BaseUpdater**)handle) = b;	// gets fixed up later
+					*((BaseUpdater**)handle) = b; // gets fixed up later
 				}
-			}
-			else {
+			} else {
 				BaseUpdater* b = nullptr;
-				if(*handle!=0)
+				if (*handle != 0)
 					b = eng->get_object(*handle);
 				serialize_class_reference(ptr.get_name(), b);
 			}
-		}break;
+		} break;
 		}
 	}
 }

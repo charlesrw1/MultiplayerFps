@@ -16,26 +16,25 @@
 
 #include <cstdint>
 
-#include "GameEnginePublic.h"	// just for b_is_in_overlapped
+#include "GameEnginePublic.h" // just for b_is_in_overlapped
 #include "Framework/MeshBuilderImpl.h"
 
 class MaterialInstance;
-
 
 // represents a singular call to glDrawElements() with same mesh and material instance. these can be hardware instanced
 // basically mesh_batch maps to 1 mesh primitive to be drawn
 struct Mesh_Batch
 {
-	int first = 0;	// indexes into pass.sorted_list
+	int first = 0; // indexes into pass.sorted_list
 	int count = 0;
 
 	const MaterialInstance* material = nullptr;
 };
 
-// represents multiple Mesh_Batch calls packaged into one glMultidrawElementsIndirect(). 
-// these are batched as long as pipeline state is the same like same texture bindings, 
-// same shader program. note that this can batch across material instances as long as they have the same textures since non-texture materials
-// parameters are all stored in a shared buffer.
+// represents multiple Mesh_Batch calls packaged into one glMultidrawElementsIndirect().
+// these are batched as long as pipeline state is the same like same texture bindings,
+// same shader program. note that this can batch across material instances as long as they have the same textures since
+// non-texture materials parameters are all stored in a shared buffer.
 struct Multidraw_Batch
 {
 	int first = 0;
@@ -43,7 +42,8 @@ struct Multidraw_Batch
 };
 
 // represents one draw call of a mesh with a material and various state, sorted and put into Mesh_Batch's
-struct draw_call_key {
+struct draw_call_key
+{
 	draw_call_key() {
 		shader = blending = backface = texture = vao = mesh = 0;
 		distance = 0;
@@ -62,9 +62,7 @@ struct draw_call_key {
 	// highest
 
 	// :)
-	uint64_t as_uint64() const {
-		return *(reinterpret_cast<const uint64_t*>(this));
-	}
+	uint64_t as_uint64() const { return *(reinterpret_cast<const uint64_t*>(this)); }
 };
 static_assert(sizeof(draw_call_key) == 8, "key needs 8 bytes");
 
@@ -72,25 +70,26 @@ struct Pass_Object
 {
 	draw_call_key sort_key;
 	const MaterialInstance* material = nullptr;
-	handle<Render_Object> render_obj{};	// entity instance
-	short submesh_index = 0;		// what submesh am i
+	handle<Render_Object> render_obj{}; // entity instance
+	short submesh_index = 0;			// what submesh am i
 	short lod_index = 0;
 	int hl_obj_index{};
-	int batch_idx = 0;	// mesh_batches[]
+	int batch_idx = 0; // mesh_batches[]
 };
 
 // in the end: want a flat list of batches that are merged with neighbors
 enum class pass_type
 {
-	OPAQUE,			// front to back sorting
-	TRANSPARENT,	// back to front sorting
-	DEPTH			// front to back sorting, ignores material textures unless alpha tested
+	OPAQUE,		 // front to back sorting
+	TRANSPARENT, // back to front sorting
+	DEPTH		 // front to back sorting, ignores material textures unless alpha tested
 };
 
 typedef int passobj_handle;
 
 // A render_pass is one collection of POSSIBLE draw calls
-// A render_list is created from a pass which is the actual draw calls to submit along with extra buffers to facilitate it
+// A render_list is created from a pass which is the actual draw calls to submit along with extra buffers to facilitate
+// it
 class Render_Scene;
 struct ROP_Internal;
 class Render_Pass
@@ -98,32 +97,20 @@ class Render_Pass
 public:
 	Render_Pass(pass_type type);
 	void make_batches(Render_Scene& scene);
-	void add_object(
-		const Render_Object& proxy,
-		handle<Render_Object> handle,
-		const MaterialInstance* material,
-		uint32_t camera_dist,
-		int submesh,
-		int lod,
-		int layer, bool is_editor_mode);
+	void add_object(const Render_Object& proxy, handle<Render_Object> handle, const MaterialInstance* material,
+					uint32_t camera_dist, int submesh, int lod, int layer, bool is_editor_mode);
 
+	draw_call_key create_sort_key_from_obj(const Render_Object& proxy, const MaterialInstance* material,
+										   uint32_t camera_dist, int submesh, int layer, bool is_editor_mode);
 
-	draw_call_key create_sort_key_from_obj(
-		const Render_Object& proxy,
-		const MaterialInstance* material,
-		uint32_t camera_dist,
-		int submesh,
-		int layer, bool is_editor_mode);
-
-	void clear() { objects.clear();}
-	const pass_type type{};					// modifies batching+sorting logic
+	void clear() { objects.clear(); }
+	const pass_type type{}; // modifies batching+sorting logic
 
 	bool forced_forward = false;
 
-
-	std::vector<Pass_Object> objects;		// geometry + material id + object id
-	std::vector<Mesh_Batch> mesh_batches;	// glDrawElementsIndirect()
-	std::vector<Multidraw_Batch> batches;	// glMultiDrawElementsIndirect()
+	std::vector<Pass_Object> objects;	  // geometry + material id + object id
+	std::vector<Mesh_Batch> mesh_batches; // glDrawElementsIndirect()
+	std::vector<Multidraw_Batch> batches; // glMultiDrawElementsIndirect()
 };
 // RenderObject internal data
 struct ROP_Internal
@@ -138,7 +125,8 @@ struct ROP_Internal
 };
 
 // RenderLight internal data
-struct RL_Internal{
+struct RL_Internal
+{
 	Render_Light light;
 	// stuff like shadowmap indicies etc.
 	int shadow_array_handle = -1;
@@ -146,7 +134,8 @@ struct RL_Internal{
 	glm::mat4 lightViewProj = glm::mat4(1.f);
 	glm::vec4 cookie_atlas{};
 };
-struct RDecal_Internal{
+struct RDecal_Internal
+{
 	Render_Decal decal;
 };
 struct Render_Lists
@@ -154,11 +143,7 @@ struct Render_Lists
 public:
 	void init(uint32_t drawidsz, uint32_t instbufsz);
 
-	void build_from(Render_Pass& src,
-		Free_List<ROP_Internal>& proxy_list,
-		std::span<uint32_t> draw_to_material
-		);
-
+	void build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_list, std::span<uint32_t> draw_to_material);
 
 	// commands to input to glMultiDrawElementsIndirect
 	std::vector<gpu::DrawElementsIndirectCommand> commands;
@@ -168,7 +153,7 @@ public:
 	// when calling glMDEI, the offset into commands is the summation of previous command counts essentially
 	// it works like an indirection into commands
 	std::vector<int> command_count;
-	//bufferhandle gpu_command_count = 0;
+	// bufferhandle gpu_command_count = 0;
 
 	// maps the gl_DrawID to submesh material (dynamically uniform for bindless)
 	bufferhandle gldrawid_to_submesh_material;
@@ -194,7 +179,6 @@ struct Render_Lists_Gpu_Culled : public Render_Lists
 	IGraphicsBuffer* get_count_buf() final { return count_buffer; }
 
 	int obj_count = 0;
-
 };
 
 // In theory render passes can be made once and cached if the object is static and do culling on the gpu
@@ -223,7 +207,6 @@ struct RSunInternal
 	Render_Sun sun;
 	int unique_id = 0;
 };
-
 
 struct RSkylight_Internal
 {
@@ -262,7 +245,6 @@ struct ParticleObj_Internal
 	MeshBuilderDD dd;
 };
 
-
 class TerrainInterfaceLocal;
 class Render_Scene : public RenderScenePublic
 {
@@ -275,29 +257,27 @@ public:
 	// UGGGGGGGGH
 	handle<Render_Object> register_obj() override {
 		ASSERT(!eng->get_is_in_overlapped_period());
-		handle<Render_Object> handle = { proxy_list.make_new() };
+		handle<Render_Object> handle = {proxy_list.make_new()};
 		return handle;
 	}
 	void update_obj(handle<Render_Object> handle, const Render_Object& proxy) override;
 	void remove_obj(handle<Render_Object>& handle) override {
 		if (eng->get_is_in_overlapped_period()) {
 			add_to_queued_deletes(handle.id, RenderObjectTypes::Object);
-			handle = { -1 };
+			handle = {-1};
 			return;
 		}
 		if (handle.is_valid()) {
 			proxy_list.free(handle.id);
 		}
-		handle = { -1 };
+		handle = {-1};
 	}
-	const Render_Object& get(handle<Render_Object> handle) {
-		return proxy_list.get(handle.id).proxy;
-	}
+	const Render_Object& get(handle<Render_Object> handle) { return proxy_list.get(handle.id).proxy; }
 
-	handle<Render_Light> register_light() override { 
+	handle<Render_Light> register_light() override {
 		ASSERT(!eng->get_is_in_overlapped_period());
-		handle<Render_Light> handle = { light_list.make_new() };
-		//update_light(handle, proxy);
+		handle<Render_Light> handle = {light_list.make_new()};
+		// update_light(handle, proxy);
 		return handle;
 	}
 	void update_light(handle<Render_Light> handle, const Render_Light& proxy) override;
@@ -306,14 +286,13 @@ public:
 	handle<Render_Decal> register_decal() override {
 		ASSERT(!eng->get_is_in_overlapped_period());
 		auto handle = decal_list.make_new();
-		//auto& internal = decal_list.get(handle);
-		//internal.decal = decal;
-		return { handle };
-
+		// auto& internal = decal_list.get(handle);
+		// internal.decal = decal;
+		return {handle};
 	}
 	void update_decal(handle<Render_Decal> handle, const Render_Decal& decal) override {
 		ASSERT(!eng->get_is_in_overlapped_period());
-		if (!handle.is_valid()) 
+		if (!handle.is_valid())
 			return;
 		auto& i = decal_list.get(handle.id);
 		i.decal = decal;
@@ -321,19 +300,19 @@ public:
 	void remove_decal(handle<Render_Decal>& handle) override {
 		if (eng->get_is_in_overlapped_period()) {
 			add_to_queued_deletes(handle.id, RenderObjectTypes::Decal);
-			handle = { -1 };
+			handle = {-1};
 			return;
 		}
 		if (!handle.is_valid())
 			return;
 		decal_list.free(handle.id);
-		handle = { -1 };
+		handle = {-1};
 	}
 	handle<Render_Sun> register_sun() override {
 		ASSERT(!eng->get_is_in_overlapped_period());
-		handle<Render_Sun> id = { int(unique_id_counter++) };
+		handle<Render_Sun> id = {int(unique_id_counter++)};
 		RSunInternal internal_sun;
-		//internal_sun.sun = sun;
+		// internal_sun.sun = sun;
 		internal_sun.unique_id = id.id;
 		suns.push_back(internal_sun);
 		return id;
@@ -354,7 +333,7 @@ public:
 	void remove_sun(handle<Render_Sun>& handle) override {
 		if (eng->get_is_in_overlapped_period()) {
 			add_to_queued_deletes(handle.id, RenderObjectTypes::Sun);
-			handle = { -1 };
+			handle = {-1};
 			return;
 		}
 		if (!handle.is_valid())
@@ -369,19 +348,19 @@ public:
 			return;
 		}
 		suns.erase(suns.begin() + i);
-		handle = { -1 };
+		handle = {-1};
 	}
 
 	handle<Render_Skylight> register_skylight() override {
 		ASSERT(!eng->get_is_in_overlapped_period());
-		handle<Render_Skylight> id = { int(unique_id_counter++) };
+		handle<Render_Skylight> id = {int(unique_id_counter++)};
 		RSkylight_Internal internal_skylight;
-		//internal_skylight.skylight = skylight;
+		// internal_skylight.skylight = skylight;
 		internal_skylight.unique_id = id.id;
 		skylights.push_back(internal_skylight);
 		return id;
 	}
-	void update_skylight(handle<Render_Skylight> handle, const Render_Skylight& sky)override {
+	void update_skylight(handle<Render_Skylight> handle, const Render_Skylight& sky) override {
 		ASSERT(!eng->get_is_in_overlapped_period());
 		int i = 0;
 		for (; i < skylights.size(); i++) {
@@ -397,7 +376,7 @@ public:
 	void remove_skylight(handle<Render_Skylight>& handle) override {
 		if (eng->get_is_in_overlapped_period()) {
 			add_to_queued_deletes(handle.id, RenderObjectTypes::Skylight);
-			handle = { -1 };
+			handle = {-1};
 			return;
 		}
 		if (!handle.is_valid())
@@ -412,33 +391,27 @@ public:
 			return;
 		}
 		skylights.erase(skylights.begin() + i);
-		handle = { -1 };
+		handle = {-1};
 	}
-	handle<RenderFog> register_fog() final {
-	
-		return { 0 };
-	}
-	void update_fog(handle<RenderFog> handle, const RenderFog& fog) final {
-		
-	}
-	void remove_fog(handle<RenderFog>& handle) final {
-
-	}
+	handle<RenderFog> register_fog() final { return {0}; }
+	void update_fog(handle<RenderFog> handle, const RenderFog& fog) final {}
+	void remove_fog(handle<RenderFog>& handle) final {}
 
 	virtual const Render_Object* get_read_only_object(handle<Render_Object> handle) override {
-		if (!handle.is_valid()) return nullptr;
+		if (!handle.is_valid())
+			return nullptr;
 		return &proxy_list.get(handle.id).proxy;
 	}
 
 	virtual handle<MeshBuilder_Object> register_meshbuilder() final {
-	//	ASSERT(!eng->get_is_in_overlapped_period());
+		//	ASSERT(!eng->get_is_in_overlapped_period());
 		// FIXME!!
 		int handle = meshbuilder_objs.make_new();
-		//meshbuilder_objs.get(handle).obj = mbobj;
-		return { handle };
+		// meshbuilder_objs.get(handle).obj = mbobj;
+		return {handle};
 	}
 	virtual void update_meshbuilder(handle<MeshBuilder_Object> handle, const MeshBuilder_Object& mbobj) final {
-		//ASSERT(!eng->get_is_in_overlapped_period());
+		// ASSERT(!eng->get_is_in_overlapped_period());
 		// FIXME!!
 		assert(handle.is_valid());
 		meshbuilder_objs.get(handle.id).obj = mbobj;
@@ -446,19 +419,18 @@ public:
 	virtual void remove_meshbuilder(handle<MeshBuilder_Object>& handle) final {
 		if (eng->get_is_in_overlapped_period()) {
 			add_to_queued_deletes(handle.id, RenderObjectTypes::Meshbuilder);
-		}
-		else if (handle.is_valid()) {
+		} else if (handle.is_valid()) {
 			meshbuilder_objs.free(handle.id);
 		}
-		handle = { -1 };
+		handle = {-1};
 	}
 
 	Free_List<ParticleObj_Internal> particle_objs;
 	virtual handle<Particle_Object> register_particle_obj() final {
 		ASSERT(!eng->get_is_in_overlapped_period());
 		int handle = particle_objs.make_new();
-		//particle_objs.get(handle).obj = mbobj;
-		return { handle };
+		// particle_objs.get(handle).obj = mbobj;
+		return {handle};
 	}
 	virtual void update_particle_obj(handle<Particle_Object> handle, const Particle_Object& mbobj) final {
 		ASSERT(!eng->get_is_in_overlapped_period());
@@ -466,21 +438,20 @@ public:
 		particle_objs.get(handle.id).obj = mbobj;
 	}
 	virtual void remove_particle_obj(handle<Particle_Object>& handle) final {
-		if (eng->get_is_in_overlapped_period()){
+		if (eng->get_is_in_overlapped_period()) {
 			add_to_queued_deletes(handle.id, RenderObjectTypes::Particle);
-		}
-		else if (handle.is_valid()) {
+		} else if (handle.is_valid()) {
 			particle_objs.free(handle.id);
 		}
-		handle = { -1 };
+		handle = {-1};
 	}
 	handle<Lightmap_Object> register_lightmap() final {
 		if (has_lightmap) {
 			sys_print(Warning, "RenderScene::register_lightmap: already has lightmap, this handle is now empty\n");
-			return { -1 };
+			return {-1};
 		}
 		has_lightmap = true;
-		return { 0 };
+		return {0};
 	}
 	void update_lightmap(handle<Lightmap_Object> lightmap, Lightmap_Object& obj) final {
 		assert(!eng->get_is_in_overlapped_period());
@@ -498,60 +469,55 @@ public:
 		}
 		if (eng->get_is_in_overlapped_period()) {
 			add_to_queued_deletes(handle.id, RenderObjectTypes::Lightmap);
-		}
-		else if (handle.is_valid()) {
+		} else if (handle.is_valid()) {
 			has_lightmap = false;
 			lightmapObj = Lightmap_Object();
 		}
-		handle = { -1 };
+		handle = {-1};
 	}
 
-	void add_to_queued_deletes(int id, RenderObjectTypes type)
-	{
-		queued_deletes.push_back({ id,type });
-	}
+	void add_to_queued_deletes(int id, RenderObjectTypes type) { queued_deletes.push_back({id, type}); }
 	void execute_deferred_deletes() {
 		ASSERT(!eng->get_is_in_overlapped_period());
 		for (auto& qd : queued_deletes) {
-			switch (qd.type)
-			{
+			switch (qd.type) {
 			case RenderObjectTypes::Decal: {
-				handle<Render_Decal> h{ qd.handle };
+				handle<Render_Decal> h{qd.handle};
 				remove_decal(h);
-			}break;
+			} break;
 			case RenderObjectTypes::Object: {
-				handle<Render_Object> h{ qd.handle };
+				handle<Render_Object> h{qd.handle};
 				remove_obj(h);
-			}break;
+			} break;
 			case RenderObjectTypes::Light: {
-				handle<Render_Light> h{ qd.handle };
+				handle<Render_Light> h{qd.handle};
 				remove_light(h);
-			}break;
+			} break;
 			case RenderObjectTypes::Skylight: {
-				handle<Render_Skylight> h{ qd.handle };
+				handle<Render_Skylight> h{qd.handle};
 				remove_skylight(h);
-			}break;
+			} break;
 			case RenderObjectTypes::Meshbuilder: {
-				handle<MeshBuilder_Object> h{ qd.handle };
+				handle<MeshBuilder_Object> h{qd.handle};
 				remove_meshbuilder(h);
-			}break;
+			} break;
 			case RenderObjectTypes::Particle: {
-				handle<Particle_Object> h{ qd.handle };
+				handle<Particle_Object> h{qd.handle};
 				remove_particle_obj(h);
-			}break;
+			} break;
 			case RenderObjectTypes::Sun: {
-				handle<Render_Sun> h{ qd.handle };
+				handle<Render_Sun> h{qd.handle};
 				remove_sun(h);
-			}break;
-		
+			} break;
+
 			case RenderObjectTypes::Fog: {
-				handle<RenderFog> h{ qd.handle };
+				handle<RenderFog> h{qd.handle};
 				remove_fog(h);
-			}break;
+			} break;
 			case RenderObjectTypes::Lightmap: {
-				handle<Lightmap_Object> h{ qd.handle };
+				handle<Lightmap_Object> h{qd.handle};
 				remove_lightmap(h);
-			}break;
+			} break;
 			default:
 				ASSERT(!"no type defined for queued delete render");
 			}
@@ -559,14 +525,14 @@ public:
 		queued_deletes.clear();
 	}
 
-	void evaluate_lighting_at_position(const glm::vec3& pos, glm::vec3* ambientCubeOut /* expects size 6 vector*/) const {
-		
+	void evaluate_lighting_at_position(const glm::vec3& pos,
+									   glm::vec3* ambientCubeOut /* expects size 6 vector*/) const {
+
 		auto& probes = lightmapObj.staticAmbientCubeProbes;
 		if (has_lightmap) {
-			
 		}
 		// hasnt found yet
-		if (!skylights.empty()&&!skylights.at(0).skylight.wants_update) {
+		if (!skylights.empty() && !skylights.at(0).skylight.wants_update) {
 			for (int i = 0; i < 6; i++)
 				ambientCubeOut[i] = skylights.at(0).ambientCube[i];
 			return;
@@ -582,22 +548,18 @@ public:
 	void refresh_static_mesh_data(bool is_for_editor);
 	RSunInternal* get_main_directional_light();
 
-
-
 	Render_Pass gbuffer_pass;
 	Render_Pass transparent_pass;
 	Render_Pass editor_sel_pass;
-	Render_Pass shadow_pass;	// all shadow casting objects
+	Render_Pass shadow_pass; // all shadow casting objects
 	Render_Pass depth_prepass;
 	Render_Lists depth_prepass_rlist;
 
 	Render_Lists_Gpu_Culled gbuffer_rlist;
 	Render_Lists transparent_rlist;
-	std::vector<Render_Lists> cascades_rlists;	// lists specific to each cascade, culled
+	std::vector<Render_Lists> cascades_rlists; // lists specific to each cascade, culled
 	Render_Lists editor_sel_rlist;
 	Render_Lists spotLightShadowList;
-
-
 
 	const Texture* get_reflection_probe_for_render(const glm::vec3& vieworigin) {
 		const Texture* reflectionProbeTex = nullptr;
@@ -605,7 +567,7 @@ public:
 			auto& skylight = skylights.front();
 			reflectionProbeTex = skylight.skylight.generated_cube;
 		}
-		
+
 		return reflectionProbeTex;
 	}
 
@@ -615,11 +577,9 @@ public:
 	int get_back_bone_buffer_offset() const {
 		return gpu_skinned_mats_using_front_buffer ? gpu_skinned_mats_buffer_size / 2 : 0;
 	}
-	void flip_bone_buffers() {
-		gpu_skinned_mats_using_front_buffer = !gpu_skinned_mats_using_front_buffer;
-	}
+	void flip_bone_buffers() { gpu_skinned_mats_using_front_buffer = !gpu_skinned_mats_using_front_buffer; }
 
-	int gpu_skinned_mats_buffer_size = 0;	// in matricies (64 bytes)
+	int gpu_skinned_mats_buffer_size = 0; // in matricies (64 bytes)
 	bool gpu_skinned_mats_using_front_buffer = true;
 	bufferhandle gpu_skinned_mats_buffer = 0;
 
@@ -628,19 +588,17 @@ public:
 	bool has_lightmap = false;
 	Lightmap_Object lightmapObj;
 
-
 	Free_List<ROP_Internal> proxy_list;
 	Free_List<MeshbuilderObj_Internal> meshbuilder_objs;
 	Free_List<RL_Internal> light_list;
 	Free_List<RDecal_Internal> decal_list;
 	// should just be one, but I let multiple ones exist too
 	std::vector<RSunInternal> suns;
-	std::vector<RSkylight_Internal> skylights;	// again should just be 1
+	std::vector<RSkylight_Internal> skylights; // again should just be 1
 
 	// objects can be deleted mid frame, so queue them
 	std::vector<QueuedRenderObjectDelete> queued_deletes;
 
-	
 	// use for stuff that isnt getting alloced much multiple times like suns,skylights
 	int unique_id_counter = 0;
 };

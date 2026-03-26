@@ -25,30 +25,28 @@ glm::vec4 get_color_light_value(Color32 c, float intensity) {
 	return linear * PI * intensity;
 }
 
-void SpotLightComponent::start()
-{
-	if (eng->is_editor_level())
-	{
+void SpotLightComponent::start() {
+	if (eng->is_editor_level()) {
 		auto billboard = get_owner()->create_component<BillboardComponent>();
 		billboard->set_texture(default_asset_load<Texture>("eng/icon/_nearest/flashlight.png"));
-		billboard->dont_serialize_or_edit = true;	// editor only item, dont serialize
+		billboard->dont_serialize_or_edit = true; // editor only item, dont serialize
 		auto arrow_obj = get_owner()->create_child_entity();
 		arrow_obj->dont_serialize_or_edit = true;
 		auto arrow_comp = arrow_obj->create_component<ArrowComponent>();
-		arrow_obj->set_ls_transform(glm::vec3(0,0,0.4), {}, glm::vec3(0.25f));
+		arrow_obj->set_ls_transform(glm::vec3(0, 0, 0.4), {}, glm::vec3(0.25f));
 		editor_arrow = arrow_comp;
 		editor_billboard = billboard;
 	}
 
 	sync_render_data();
 }
-void SpotLightComponent::on_sync_render_data()
-{
+void SpotLightComponent::on_sync_render_data() {
 	if (!light_handle.is_valid())
 		light_handle = idraw->get_scene()->register_light();
 
 	Render_Light light;
-	light.color = get_color_light_value(color, intensity);// glm::vec3(color.r, color.g, color.b)* (intensity / 255.f)* PI;
+	light.color =
+		get_color_light_value(color, intensity); // glm::vec3(color.r, color.g, color.b)* (intensity / 255.f)* PI;
 	light.projected_texture = const_cast<Texture*>(cookie_asset);
 	light.conemax = cone_angle;
 	light.conemin = inner_cone;
@@ -65,10 +63,7 @@ void SpotLightComponent::on_sync_render_data()
 	idraw->get_scene()->update_light(light_handle, light);
 }
 
-
-
-void SpotLightComponent::stop()
-{
+void SpotLightComponent::stop() {
 	idraw->get_scene()->remove_light(light_handle);
 	if (auto b = editor_billboard.get()) {
 		b->destroy();
@@ -78,14 +73,12 @@ void SpotLightComponent::stop()
 	}
 }
 
-
-
-void PointLightComponent::on_sync_render_data()
-{
+void PointLightComponent::on_sync_render_data() {
 	if (!light_handle.is_valid())
 		light_handle = idraw->get_scene()->register_light();
 	Render_Light light;
-	light.color = get_color_light_value(color, intensity);// glm::vec3(color.r, color.g, color.b)* (intensity / 255.f)* PI;
+	light.color =
+		get_color_light_value(color, intensity); // glm::vec3(color.r, color.g, color.b)* (intensity / 255.f)* PI;
 	light.radius = radius;
 	light.projected_texture = (Texture*)cookie_asset;
 	light.is_spotlight = false;
@@ -94,32 +87,29 @@ void PointLightComponent::on_sync_render_data()
 	idraw->get_scene()->update_light(light_handle, light);
 };
 
-void PointLightComponent::start()
-{
-	if (eng->is_editor_level())
-	{
+void PointLightComponent::start() {
+	if (eng->is_editor_level()) {
 		auto b = get_owner()->create_component<BillboardComponent>();
 		b->set_texture(default_asset_load<Texture>("eng/icon/pointBig.png"));
-		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+		b->dont_serialize_or_edit = true; // editor only item, dont serialize
 		editor_billboard = b->get_instance_id();
 	}
 	sync_render_data();
 }
 
-void PointLightComponent::stop()
-{
+void PointLightComponent::stop() {
 	idraw->get_scene()->remove_light(light_handle);
 	auto e = eng->get_object(editor_billboard);
 	if (e)
 		((Component*)e)->destroy();
 }
 
-void SunLightComponent::on_sync_render_data()
-{
+void SunLightComponent::on_sync_render_data() {
 	if (!light_handle.is_valid())
 		light_handle = idraw->get_scene()->register_sun();
 	Render_Sun light;
-	light.color = get_color_light_value(color, intensity);// glm::vec3(color.r, color.g, color.b)* (intensity / 255.f)* PI;
+	light.color =
+		get_color_light_value(color, intensity); // glm::vec3(color.r, color.g, color.b)* (intensity / 255.f)* PI;
 	light.fit_to_scene = fit_to_scene;
 	light.log_lin_lerp_factor = log_lin_lerp_factor;
 	light.z_dist_scaling = z_dist_scaling;
@@ -131,15 +121,11 @@ void SunLightComponent::on_sync_render_data()
 	idraw->get_scene()->update_sun(light_handle, light);
 }
 
-
-
-void SunLightComponent::start()
-{
-	if (eng->is_editor_level())
-	{
+void SunLightComponent::start() {
+	if (eng->is_editor_level()) {
 		auto b = get_owner()->create_component<BillboardComponent>();
 		b->set_texture(default_asset_load<Texture>("eng/icon/_nearest/sun.png"));
-		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+		b->dont_serialize_or_edit = true; // editor only item, dont serialize
 
 		auto s = get_owner()->create_component<ArrowComponent>();
 		s->dont_serialize_or_edit = true;
@@ -150,8 +136,7 @@ void SunLightComponent::start()
 	sync_render_data();
 }
 
-void SunLightComponent::stop()
-{
+void SunLightComponent::stop() {
 	idraw->get_scene()->remove_sun(light_handle);
 
 	auto e = eng->get_object(editor_billboard);
@@ -161,7 +146,6 @@ void SunLightComponent::stop()
 	if (e)
 		((Component*)e)->destroy();
 }
-
 
 SunLightComponent::~SunLightComponent() {}
 PointLightComponent::~PointLightComponent() {}
@@ -176,16 +160,15 @@ void SkylightComponent::start() {
 	if (eng->is_editor_level()) {
 		auto b = get_owner()->create_component<BillboardComponent>();
 		b->set_texture(default_asset_load<Texture>("eng/icon/_nearest/skylight.png"));
-		b->dont_serialize_or_edit = true;	// editor only item, dont serialize
+		b->dont_serialize_or_edit = true; // editor only item, dont serialize
 	}
 }
 void SkylightComponent::stop() {
 	idraw->get_scene()->remove_skylight(handle);
-	//delete mytexture;
+	// delete mytexture;
 	mytexture = nullptr;
 }
-void SkylightComponent::on_sync_render_data()
-{
+void SkylightComponent::on_sync_render_data() {
 	bool wants_recapture = !handle.is_valid();
 	wants_recapture |= recapture_skylight.check_and_swap();
 
@@ -204,13 +187,10 @@ void SkylightComponent::on_sync_render_data()
 	sl.fog_cubemap_max_dist = fog_cubemap_max_dist;
 	sl.fog_cubemap_max_mip = fog_cubemap_max_mip;
 
-
 	idraw->get_scene()->update_skylight(handle, sl);
 }
 
-
 #include "Game/Entity.h"
-
 
 SpotLightComponent::SpotLightComponent() {
 	set_call_init_in_editor(true);
@@ -256,13 +236,9 @@ void CubemapComponent::start() {
 
 	sync_render_data();
 }
-void CubemapComponent::on_sync_render_data()
-{
+void CubemapComponent::on_sync_render_data() {}
 
-}
-
-void CubemapComponent::update_editormeshbuilder()
-{
+void CubemapComponent::update_editormeshbuilder() {
 	if (!editor_meshbuilder)
 		return;
 	glm::vec3 scale = get_owner()->get_ls_scale();
@@ -273,8 +249,8 @@ void CubemapComponent::update_editormeshbuilder()
 	editor_meshbuilder->mb.End();
 }
 void CubemapComponent::stop() {
-	
-	//delete mytexture;
+
+	// delete mytexture;
 	if (editor_meshbuilder) {
 		editor_meshbuilder->destroy();
 		editor_meshbuilder = nullptr;
@@ -291,18 +267,12 @@ void CubemapComponent::on_changed_transform() {
 	}
 }
 
-
-
-
-
 #include "Framework/Files.h"
-void LightmapComponent::start()
-{
+void LightmapComponent::start() {
 	sync_render_data();
 }
 
-void LightmapComponent::stop()
-{
+void LightmapComponent::stop() {
 	if (handle.is_valid())
 		idraw->get_scene()->remove_lightmap(handle);
 }
@@ -314,13 +284,12 @@ extern void export_godot_scene(const std::string& base_export_path);
 #include "Framework/MapUtil.h"
 // hack fixme stuff etc
 
-void LightmapComponent::on_sync_render_data()
-{
+void LightmapComponent::on_sync_render_data() {
 	if (!handle.is_valid())
 		handle = idraw->get_scene()->register_lightmap();
 	Lightmap_Object obj;
 	obj.lightmap_texture = lightmapTexture;
-	obj.staticAmbientCubeProbes = bakedProbes;	//fixme copy
+	obj.staticAmbientCubeProbes = bakedProbes; // fixme copy
 	idraw->get_scene()->update_lightmap(handle, obj);
 }
 
@@ -336,8 +305,7 @@ void CubemapComponent::editor_on_change_property() {
 	}
 	update_editormeshbuilder();
 }
-void LightmapComponent::editor_on_change_property()
-{
+void LightmapComponent::editor_on_change_property() {
 	if (bakeLightmaps.check_and_swap()) {
 		do_export();
 	}
@@ -349,10 +317,8 @@ void SkylightComponent::editor_on_change_property() {
 	sync_render_data();
 }
 
-
-void LightmapComponent::do_export()
-{
-	string expPath = godot_lightmap_engine_path.get_string();// "C:/Users/charl/Documents/lightmapexporter/";
+void LightmapComponent::do_export() {
+	string expPath = godot_lightmap_engine_path.get_string(); // "C:/Users/charl/Documents/lightmapexporter/";
 	export_godot_scene(expPath);
 
 	string probeInputPath = expPath + "LM_PROBE_POSITIONS_INPUT.txt";
@@ -377,20 +343,19 @@ void LightmapComponent::do_export()
 			auto owner = as_mesh->get_owner();
 
 			glm::vec3 modelCenter = as_mesh->get_model()->get_bounds().get_center();
-			glm::vec3 pos = owner->get_ws_transform()* glm::vec4(modelCenter, 1.0);
+			glm::vec3 pos = owner->get_ws_transform() * glm::vec4(modelCenter, 1.0);
 
 			outfile << "probe " << pos.x << " " << pos.y << " " << pos.z << '\n';
-			lmProbeToObj.insert({ probe_index,(int)as_mesh->get_instance_id() });
+			lmProbeToObj.insert({probe_index, (int)as_mesh->get_instance_id()});
 			probe_index += 1;
-		}
-		else if (auto as_cube = o->cast_to<CubemapComponent>()) {
+		} else if (auto as_cube = o->cast_to<CubemapComponent>()) {
 			if (as_cube->dont_serialize_or_edit)
 				continue;
 			if (as_cube->get_owner()->dont_serialize_or_edit)
 				continue;
 			auto pos = as_cube->get_probe_pos();
 			outfile << "probe " << pos.x << " " << pos.y << " " << pos.z << '\n';
-			lmProbeToObj.insert({ probe_index,as_cube->get_instance_id() });
+			lmProbeToObj.insert({probe_index, as_cube->get_instance_id()});
 			probe_index += 1;
 		}
 	}
@@ -400,26 +365,25 @@ glm::vec3 evaluate_sh9(const glm::vec3 dir, const glm::vec3 sh[9]) {
 	float x = dir.x, y = dir.y, z = dir.z;
 
 	float sh_basis[9];
-	sh_basis[0] = 0.282095f;                       // L00
-	sh_basis[1] = 0.488603f * y;                   // L1-1
-	sh_basis[2] = 0.488603f * z;                   // L10
-	sh_basis[3] = 0.488603f * x;                   // L11
-	sh_basis[4] = 1.092548f * x * y;               // L2-2
-	sh_basis[5] = 1.092548f * y * z;               // L2-1
+	sh_basis[0] = 0.282095f;						 // L00
+	sh_basis[1] = 0.488603f * y;					 // L1-1
+	sh_basis[2] = 0.488603f * z;					 // L10
+	sh_basis[3] = 0.488603f * x;					 // L11
+	sh_basis[4] = 1.092548f * x * y;				 // L2-2
+	sh_basis[5] = 1.092548f * y * z;				 // L2-1
 	sh_basis[6] = 0.315392f * (3.0f * z * z - 1.0f); // L20
-	sh_basis[7] = 1.092548f * x * z;               // L21
-	sh_basis[8] = 0.546274f * (x * x - y * y);     // L22
+	sh_basis[7] = 1.092548f * x * z;				 // L21
+	sh_basis[8] = 0.546274f * (x * x - y * y);		 // L22
 
 	glm::vec3 result(0.0f);
 	for (int i = 0; i < 9; ++i)
 		result += sh[i] * sh_basis[i];
 
-	return result;  // RGB value in that direction
+	return result; // RGB value in that direction
 }
 ConfigVar lightmapShDebug("lightmapShDebug", "0", CVAR_BOOL, "");
 ConfigVar lightmapShTweakSh("lightmapShTweakSh", "0.5", CVAR_FLOAT, "");
-void LightmapComponent::do_import()
-{
+void LightmapComponent::do_import() {
 	namespace fs = std::filesystem;
 	string sourcePath = string(godot_lightmap_engine_path.get_string()) + "lightmap_root_scene.exr";
 	string gamePath = FileSys::get_game_path();
@@ -430,24 +394,22 @@ void LightmapComponent::do_import()
 	string filename = eng->get_level()->get_source_asset_name();
 	StringUtils::remove_extension(filename);
 	filename += "_lightmap_baked.exr";
-	fs::path target = gamePath+"/"+filename;
+	fs::path target = gamePath + "/" + filename;
 
-	//fs::create_directories(target_dir);
-	//fs::path target = target_dir / source.filename();
+	// fs::create_directories(target_dir);
+	// fs::path target = target_dir / source.filename();
 
 	fs::copy_file(source, target, fs::copy_options::overwrite_existing);
 
 	lightmapTexture = Texture::load(filename);
 	if (lightmapTexture) {
 		g_assets.reload_sync<Texture>(lightmapTexture);
-	}
-	else {
+	} else {
 		sys_print(Warning, "LightmapComponent::do_import: failed to texture load?\n");
 	}
 
-	//OUT_LIGHTMAP_BAKED.txt
-	string bakedPath = string(godot_lightmap_engine_path.get_string()) +  "OUT_LIGHTMAP_BAKED.txt";
-
+	// OUT_LIGHTMAP_BAKED.txt
+	string bakedPath = string(godot_lightmap_engine_path.get_string()) + "OUT_LIGHTMAP_BAKED.txt";
 
 	std::unordered_map<int, Component*> found;
 	auto& all_objs = eng->get_level()->get_all_objects();
@@ -456,8 +418,7 @@ void LightmapComponent::do_import()
 			as_mesh->set_not_lightmapped();
 			if (as_mesh->get_instance_id() != 0)
 				MapUtil::insert_test_exists(found, (int)as_mesh->get_instance_id(), (Component*)as_mesh);
-		}
-		else if (auto as_box = o->cast_to<CubemapComponent>()) {
+		} else if (auto as_box = o->cast_to<CubemapComponent>()) {
 			as_box->set_baked_probe_ofs(-1);
 			if (as_box->get_instance_id() != 0)
 				MapUtil::insert_test_exists(found, (int)as_box->get_instance_id(), (Component*)as_box);
@@ -468,7 +429,8 @@ void LightmapComponent::do_import()
 	std::string str;
 	int cur_probe_index = 0;
 	while (std::getline(infile, str)) {
-		if (str.empty()) continue;
+		if (str.empty())
+			continue;
 		auto split = StringUtils::split(str);
 		if (split.empty()) {
 			sys_print(Warning, "LightmapComponent: didnt get 5 args in line\n");
@@ -487,11 +449,10 @@ void LightmapComponent::do_import()
 				continue;
 			}
 			if (auto as_mesh = find->cast_to<MeshComponent>()) {
-				LightmapCoords coords{ x,y,xofs,yofs };
+				LightmapCoords coords{x, y, xofs, yofs};
 				as_mesh->set_lightmapped(coords);
 			}
-		}
-		else if (split.at(0) == "probe") {
+		} else if (split.at(0) == "probe") {
 			glm::vec3 colors[9];
 			for (int i = 0; i < 9; i++) {
 				for (int j = 0; j < 3; j++) {
@@ -506,22 +467,21 @@ void LightmapComponent::do_import()
 			float b = colors[0].b;
 			sys_print(Debug, "LightmapComponent: probe %f %f %f\n", r, g, b);
 
-
 			const glm::vec3 face_dirs[6] = {
-				{ -1,  0,  0},  // +X
-				{1,  0,  0},  // -X
-				{ 0,  -1,  0},  // +Y
-				{ 0, +1,  0},  // -Y
-				{ 0,  0,  -1},  // +Z
-				{ 0,  0, +1},  // -Z
+				{-1, 0, 0}, // +X
+				{1, 0, 0},	// -X
+				{0, -1, 0}, // +Y
+				{0, +1, 0}, // -Y
+				{0, 0, -1}, // +Z
+				{0, 0, +1}, // -Z
 			};
 			glm::vec3 ambient_cube[6];
 			for (int i = 0; i < 6; ++i) {
 				if (!lightmapShDebug.get_bool()) {
 					// looks too dark whatev
-					ambient_cube[i] = evaluate_sh9(face_dirs[i], colors) + colors[0] * lightmapShTweakSh.get_float(); // bruh
-				}
-				else {
+					ambient_cube[i] =
+						evaluate_sh9(face_dirs[i], colors) + colors[0] * lightmapShTweakSh.get_float(); // bruh
+				} else {
 					ambient_cube[i] = colors[0];
 				}
 			}
@@ -531,15 +491,12 @@ void LightmapComponent::do_import()
 				auto find = MapUtil::get_or(found, uid, (Component*)nullptr);
 				if (!find) {
 					sys_print(Warning, "LightmapComponent: couldnt find probe lit obj with id %d\n", uid);
-				}
-				else {
+				} else {
 					if (auto as_mesh = find->cast_to<MeshComponent>()) {
 						as_mesh->set_static_probe_lit(cur_probe_index);
-					}
-					else if(auto as_cube = find->cast_to<CubemapComponent>()) {
+					} else if (auto as_cube = find->cast_to<CubemapComponent>()) {
 						as_cube->set_baked_probe_ofs(cur_probe_index);
 					}
-
 				}
 			}
 			for (int i = 0; i < 6; i++) {
@@ -553,13 +510,9 @@ void LightmapComponent::do_import()
 #endif
 #include "Framework/Serializer.h"
 
+LightmapComponent::~LightmapComponent() {}
 
-LightmapComponent::~LightmapComponent() {
-
-}
-
-void LightmapComponent::serialize(Serializer& s)
-{
+void LightmapComponent::serialize(Serializer& s) {
 	Component::serialize(s);
 
 	const char* const baked_tag = "lmProbeBin";
@@ -570,8 +523,7 @@ void LightmapComponent::serialize(Serializer& s)
 			auto data = StringUtils::base64_decode(outData);
 			if ((data.size() % sizeof(glm::vec3)) != 0) {
 				sys_print(Error, "LightmapComponent::serialize: unserialized bin data bad size?\n");
-			}
-			else {
+			} else {
 				const int vec3Count = data.size() / sizeof(glm::vec3);
 				bakedProbes.clear();
 				bakedProbes.resize(vec3Count);
@@ -580,8 +532,7 @@ void LightmapComponent::serialize(Serializer& s)
 				}
 			}
 		}
-	}
-	else {
+	} else {
 		std::vector<uint8_t> outData;
 		outData.resize(bakedProbes.size() * sizeof(glm::vec3));
 		for (int i = 0; i < bakedProbes.size(); i++) {
@@ -593,8 +544,7 @@ void LightmapComponent::serialize(Serializer& s)
 	}
 }
 
-void GiVolumeComponent::start()
-{
+void GiVolumeComponent::start() {
 	if (eng->is_editor_level()) {
 		auto mesh = get_owner()->create_component<MeshComponent>();
 		mesh->set_ignore_baking(true);
@@ -605,16 +555,13 @@ void GiVolumeComponent::start()
 	}
 }
 
-void GiVolumeComponent::stop()
-{
-}
-Model* AreaishLightComponent::get_model_to_use()
-{
-	if (override_model) return override_model;
+void GiVolumeComponent::stop() {}
+Model* AreaishLightComponent::get_model_to_use() {
+	if (override_model)
+		return override_model;
 	return Model::load("eng/plane.cmdl");
 }
-void AreaishLightComponent::start()
-{
+void AreaishLightComponent::start() {
 	mat = imaterials->create_dynmaic_material(MaterialInstance::load("emissive_basic.mm"));
 	auto mesh = get_owner()->create_component<MeshComponent>();
 	mesh->set_model(get_model_to_use());
@@ -622,18 +569,14 @@ void AreaishLightComponent::start()
 	mat->set_floatvec_parameter("EmissiveColor", color32_to_vec4(color) * intensity);
 }
 
-void AreaishLightComponent::stop()
-{
-}
+void AreaishLightComponent::stop() {}
 
-void AreaishLightComponent::editor_on_change_property()
-{
+void AreaishLightComponent::editor_on_change_property() {
 	glm::vec4 linear = colorvec_srgb_to_linear(color32_to_vec4(color));
 	mat->set_floatvec_parameter("EmissiveColor", linear * intensity);
 	get_owner()->get_component<MeshComponent>()->set_model(get_model_to_use());
 }
 bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffer, int len);
-
 
 #include "Render/RenderGiManager.h"
 
@@ -651,8 +594,7 @@ static const int gi_saved_version = 1;
 // num probes/relocate
 // relocate[]
 #include "Framework/BinaryReadWrite.h"
-void GameSceneGiUtil::on_scene_load_gi(const string& mapname)
-{
+void GameSceneGiUtil::on_scene_load_gi(const string& mapname) {
 	string name = mapname;
 	StringUtils::remove_extension(name);
 	auto baked_file = FileSys::open_read_game((name + baked_gi_suffix).c_str());
@@ -686,8 +628,9 @@ void GameSceneGiUtil::on_scene_load_gi(const string& mapname)
 	reader.read_bytes_ptr(relocate.data(), probe_count * sizeof(glm::vec4));
 
 	auto read_tex = [&](string suffix) -> IGraphicsTexture* {
-		auto file = FileSys::open_read_game((name+suffix).c_str());
-		if (!file) return nullptr;
+		auto file = FileSys::open_read_game((name + suffix).c_str());
+		if (!file)
+			return nullptr;
 		std::vector<std::byte> buf;
 		buf.resize(file->size());
 		file->read(buf.data(), buf.size());
@@ -700,7 +643,8 @@ void GameSceneGiUtil::on_scene_load_gi(const string& mapname)
 	IGraphicsTexture* cubemaps = read_tex(cubemap_suffix);
 
 	auto release = [](IGraphicsTexture* t) {
-		if (t) t->release();
+		if (t)
+			t->release();
 	};
 	if (!irrad || !depth || !cubemaps) {
 		sys_print(Warning, "couldnt load baked texture(s)\n");
@@ -719,13 +663,11 @@ void GameSceneGiUtil::on_scene_load_gi(const string& mapname)
 	RenderGiManager::inst->set_cubemaps_from_loading(std::move(cm_vols), cubemaps);
 }
 
-void GameSceneGiUtil::on_scene_exit()
-{
-	RenderGiManager::inst->update_cubemap_volumes({});	// clear all
+void GameSceneGiUtil::on_scene_exit() {
+	RenderGiManager::inst->update_cubemap_volumes({}); // clear all
 }
 
-void GameSceneGiUtil::bake_all_cubemaps()
-{
+void GameSceneGiUtil::bake_all_cubemaps() {
 	std::vector<R_CubemapVolume> volumes;
 
 	std::vector<CubemapComponent*> components;
@@ -744,7 +686,7 @@ void GameSceneGiUtil::bake_all_cubemaps()
 		glm::mat4 transform = glm::translate(glm::mat4(1), pos) * glm::mat4_cast(rot);
 		glm::vec3 size = components[i]->get_owner()->get_ls_scale();
 		R_CubemapVolume vol{};
-		vol.extents = glm::vec4(size,components[i]->priority);
+		vol.extents = glm::vec4(size, components[i]->priority);
 		vol.transform = transform;
 
 		const auto& full_transform = components[i]->get_ws_transform();
@@ -759,28 +701,23 @@ void GameSceneGiUtil::bake_all_cubemaps()
 
 		volumes.push_back(vol);
 	}
-	std::sort(volumes.begin(), volumes.end(), [](const R_CubemapVolume& a, const R_CubemapVolume& b) {
-		return a.extents.w > b.extents.w;
-		});
+	std::sort(volumes.begin(), volumes.end(),
+			  [](const R_CubemapVolume& a, const R_CubemapVolume& b) { return a.extents.w > b.extents.w; });
 
 	RenderGiManager::inst->update_cubemap_volumes(volumes);
 	RenderGiManager::inst->bake_all_cubemaps();
 }
 
-void GameSceneGiUtil::bake_one_cubemap(CubemapComponent* volume)
-{
+void GameSceneGiUtil::bake_one_cubemap(CubemapComponent* volume) {
 	if (volume->probe_ofs != -1)
 		RenderGiManager::inst->bake_one_cubemap(volume->probe_ofs);
-
 }
 
 bool GameSceneGiUtil::had_changes = false;
-void GameSceneGiUtil::on_cubemap_changes()
-{
+void GameSceneGiUtil::on_cubemap_changes() {
 	had_changes = true;
 }
-void GameSceneGiUtil::check_changes()
-{
+void GameSceneGiUtil::check_changes() {
 	if (!had_changes)
 		return;
 	had_changes = false;
@@ -788,22 +725,12 @@ void GameSceneGiUtil::check_changes()
 #include "Framework/BinaryReadWrite.h"
 void ExportCubemapArrayHDR(GLuint texture, int faceSize, int cubemapCount);
 void export_float_texture(GLuint texture, int width, int height, string name);
-bool SaveCubeArrayToDDS(GLuint texture,
-	uint32_t width,
-	uint32_t height,
-	uint32_t mipLevels,
-	uint32_t cubeCount,
-	const char* filename);
+bool SaveCubeArrayToDDS(GLuint texture, uint32_t width, uint32_t height, uint32_t mipLevels, uint32_t cubeCount,
+						const char* filename);
 
-bool save_float_texture_as_dds(GLuint texture,
-	uint32_t width,
-	uint32_t height,
-	int mode,
-	const char* filename);
+bool save_float_texture_as_dds(GLuint texture, uint32_t width, uint32_t height, int mode, const char* filename);
 
-
-void GameSceneGiUtil::save_to_disk()
-{
+void GameSceneGiUtil::save_to_disk() {
 	// save specular cubemaps
 	// save spec volume info
 	// save diffuse volumes
@@ -820,59 +747,48 @@ void GameSceneGiUtil::save_to_disk()
 	writer.write_bytes_ptr((uint8_t*)volumes.data(), volumes.size() * sizeof(R_CubemapVolume));
 	const auto& ddgivols = draw.ddgi->myvolumes;
 	writer.write_int32(ddgivols.size());
-	writer.write_bytes_ptr((uint8_t*)ddgivols.data(), ddgivols.size()*sizeof(DdgiVolumeGpu));
+	writer.write_bytes_ptr((uint8_t*)ddgivols.data(), ddgivols.size() * sizeof(DdgiVolumeGpu));
 	auto& relocate = draw.ddgi->temp_probe_relocate_thing;
 	writer.write_int32(relocate.size());
-	writer.write_bytes_ptr((uint8_t*)relocate.data(), relocate.size()*sizeof(glm::vec4));
+	writer.write_bytes_ptr((uint8_t*)relocate.data(), relocate.size() * sizeof(glm::vec4));
 	IFilePtr out = FileSys::open_write_game(name + baked_gi_suffix);
 	out->write(writer.get_buffer(), writer.get_size());
 
 	auto cubemap_tex = RenderGiManager::inst->get_cubemap_array_texture();
-		const string dir = FileSys::get_game_path()+string("/")+name;
+	const string dir = FileSys::get_game_path() + string("/") + name;
 	SaveCubeArrayToDDS(cubemap_tex->get_internal_handle(), CUBEMAP_WIDTH, CUBEMAP_WIDTH,
-		Texture::get_mip_map_count(CUBEMAP_WIDTH, CUBEMAP_WIDTH), volumes.size(), 
-		(dir+ cubemap_suffix).c_str()
-	
+					   Texture::get_mip_map_count(CUBEMAP_WIDTH, CUBEMAP_WIDTH), volumes.size(),
+					   (dir + cubemap_suffix).c_str()
+
 	);
-	
+
 	if (draw.ddgi->probe_irradiance) {
 		auto t = draw.ddgi->probe_irradiance;
-		save_float_texture_as_dds(t->get_internal_handle(),
-			t->get_size().x,
-			t->get_size().y,
-			1,
-			(dir + irrad_suffix).c_str()
-		);
+		save_float_texture_as_dds(t->get_internal_handle(), t->get_size().x, t->get_size().y, 1,
+								  (dir + irrad_suffix).c_str());
 		t = draw.ddgi->probe_depth;
-		save_float_texture_as_dds(t->get_internal_handle(),
-			t->get_size().x,
-			t->get_size().y,
-			0,
-			(dir + depth_suffix).c_str()
-		);
-	}
-	else {
+		save_float_texture_as_dds(t->get_internal_handle(), t->get_size().x, t->get_size().y, 0,
+								  (dir + depth_suffix).c_str());
+	} else {
 		sys_print(Warning, "no probe irrad/depth to save\n");
 	}
 
-	//auto file = FileSys::open_read_engine("cubemaparray.dds");
-	//std::vector<std::byte> buf;
-	//buf.resize(file->size());
-	//file->read(buf.data(), buf.size());
-	//IGraphicsTexture* tex{};
-	//load_dds_file_specialized_format(tex, (uint8_t*)buf.data(), buf.size());
+	// auto file = FileSys::open_read_engine("cubemaparray.dds");
+	// std::vector<std::byte> buf;
+	// buf.resize(file->size());
+	// file->read(buf.data(), buf.size());
+	// IGraphicsTexture* tex{};
+	// load_dds_file_specialized_format(tex, (uint8_t*)buf.data(), buf.size());
 	//
 	//
-	//file = FileSys::open_read_engine("probe_depth.dds");
-	//buf.resize(file->size());
-	//file->read(buf.data(), buf.size());
-	//tex = {};
-	//load_dds_file_specialized_format(tex, (uint8_t*)buf.data(), buf.size());
-
+	// file = FileSys::open_read_engine("probe_depth.dds");
+	// buf.resize(file->size());
+	// file->read(buf.data(), buf.size());
+	// tex = {};
+	// load_dds_file_specialized_format(tex, (uint8_t*)buf.data(), buf.size());
 }
 int write_hdr_wrapper(const char* filename, int w, int h, int comp, const float* data);
-void export_float_texture(GLuint texture,int width, int height, string name)
-{
+void export_float_texture(GLuint texture, int width, int height, string name) {
 	glBindTexture(GL_TEXTURE_2D, texture);
 
 	const int channels = 3; // assuming RGB
@@ -880,38 +796,20 @@ void export_float_texture(GLuint texture,int width, int height, string name)
 
 	std::vector<float> faceBuffer(facePixelCount);
 
+	int outputWidth = width;
+	int outputHeight = height;
 
-		int outputWidth = width;
-		int outputHeight = height;
+	// Read one face layer
+	glGetTextureImage(texture, 0, GL_RGB, GL_FLOAT, faceBuffer.size() * sizeof(float), faceBuffer.data());
 
+	// Save HDR
+	std::string filename = name + ".hdr";
 
-
-			// Read one face layer
-			glGetTextureImage(
-				texture, 0,
-				GL_RGB,
-				GL_FLOAT,
-				faceBuffer.size() * sizeof(float),
-				faceBuffer.data()
-			);
-
-
-		// Save HDR
-		std::string filename = name + ".hdr";
-
-		write_hdr_wrapper(
-			filename.c_str(),
-			outputWidth,
-			outputHeight,
-			channels,
-			faceBuffer.data()
-		);
-
+	write_hdr_wrapper(filename.c_str(), outputWidth, outputHeight, channels, faceBuffer.data());
 
 	glBindTexture(GL_TEXTURE_2D, 0);
 }
-void ExportCubemapArrayHDR(GLuint texture, int faceSize, int cubemapCount)
-{
+void ExportCubemapArrayHDR(GLuint texture, int faceSize, int cubemapCount) {
 	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, texture);
 
 	const int channels = 3; // assuming RGBA
@@ -919,41 +817,28 @@ void ExportCubemapArrayHDR(GLuint texture, int faceSize, int cubemapCount)
 
 	std::vector<float> faceBuffer(facePixelCount);
 
-	for (int cube = 0; cube < cubemapCount; cube++)
-	{
+	for (int cube = 0; cube < cubemapCount; cube++) {
 		int outputWidth = faceSize * 6;
 		int outputHeight = faceSize;
 
 		std::vector<float> outputImage(outputWidth * outputHeight * channels);
 
-		for (int face = 0; face < 6; face++)
-		{
+		for (int face = 0; face < 6; face++) {
 			int layer = cube * 6 + face;
 
 			// Read one face layer
-			glGetTextureSubImage(
-				texture,
-				0,                  // mip level
-				0, 0, layer,        // x,y,z offset
-				faceSize,
-				faceSize,
-				1,                  // depth = 1 layer
-				GL_RGB,
-				GL_FLOAT,
-				facePixelCount * sizeof(float),
-				faceBuffer.data()
-			);
+			glGetTextureSubImage(texture,
+								 0,			  // mip level
+								 0, 0, layer, // x,y,z offset
+								 faceSize, faceSize,
+								 1, // depth = 1 layer
+								 GL_RGB, GL_FLOAT, facePixelCount * sizeof(float), faceBuffer.data());
 
 			// Copy into horizontal strip
-			for (int y = 0; y < faceSize; y++)
-			{
-				float* dst = &outputImage[
-					(y * outputWidth + face * faceSize) * channels
-				];
+			for (int y = 0; y < faceSize; y++) {
+				float* dst = &outputImage[(y * outputWidth + face * faceSize) * channels];
 
-				float* src = &faceBuffer[
-					(y * faceSize) * channels
-				];
+				float* src = &faceBuffer[(y * faceSize) * channels];
 
 				memcpy(dst, src, faceSize * channels * sizeof(float));
 			}
@@ -962,18 +847,10 @@ void ExportCubemapArrayHDR(GLuint texture, int faceSize, int cubemapCount)
 		// Save HDR
 		std::string filename = "cubemap_" + std::to_string(cube) + ".hdr";
 
-		write_hdr_wrapper(
-			filename.c_str(),
-			outputWidth,
-			outputHeight,
-			channels,
-			outputImage.data()
-		);
+		write_hdr_wrapper(filename.c_str(), outputWidth, outputHeight, channels, outputImage.data());
 	}
 
 	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, 0);
 }
 
-void GameSceneGiUtil::bake_ddgi()
-{
-}
+void GameSceneGiUtil::bake_ddgi() {}

@@ -13,7 +13,7 @@ struct CullObject
 CullObject object_buffer[]
 
 int8 model_data_buffer[]
-format:	
+format:
 	int num_lods
 	lods[]
 		int part_ofs, int part_count, float screen_size
@@ -24,7 +24,7 @@ format:
 # STEPS #
 #########
 
-1. pass 1 
+1. pass 1
 	frustum+occlusion cull objects with LAST frame HI-Z
 	ouput MDI commands
 	output a bitarray per object if it was drawn
@@ -32,13 +32,14 @@ format:
 3. build Hi-Z for this frame
 4. pass 2
 	occlusion cull objects that werent drawn (from bitarray)
-	output MDI 
+	output MDI
 4. draw 2nd MDI buffer
 
 
 
 */
-struct CullObject {
+struct CullObject
+{
 	glm::vec4 bounds_sphere;
 	glm::ivec4 model_ofs;
 	// x component is model
@@ -46,7 +47,8 @@ struct CullObject {
 	// z component is material ofs
 	// w component is flags
 };
-struct CullData {
+struct CullData
+{
 	vec4 frustum_up;
 	vec4 frustum_down;
 	vec4 frustum_l;
@@ -71,15 +73,13 @@ struct CullData {
 	vec4 backplane;
 };
 
-
-
-class GpuCullingTest {
+class GpuCullingTest
+{
 public:
 	static GpuCullingTest* inst;
 
 	GpuCullingTest();
 	~GpuCullingTest();
-
 
 	// builds mod info etc
 	// culls against prev frustum
@@ -87,7 +87,7 @@ public:
 
 	// copies culled data to render lists
 	void copy_cpu(Render_Lists_Gpu_Culled& list);
-	
+
 	// build hi-z and do 2nd cull pass
 	void build_data_2(const GpuCullInput& input);
 
@@ -96,24 +96,18 @@ public:
 	// call this twice
 	void dodraw();
 
-
 	void debug_overlay();
 	void init_depth_pyramid(int w, int h);
 	void downsample_depth();
 
-
-	void compact_draws(
-		const GpuCullInput& input
-	);
+	void compact_draws(const GpuCullInput& input);
 
 	program_handle cull_compute{};
 	program_handle cull_compute_cascade{};
 	program_handle cull_compute_spot{};
 
-
 	program_handle compaction{};
 	program_handle debug_overlays{};
-
 
 	IGraphicsBuffer* matindirect = nullptr;
 
@@ -121,17 +115,13 @@ public:
 	IGraphicsBuffer* vis_bitarray = nullptr;
 	IGraphicsBuffer* cull_data = nullptr;
 
-
 	CullData cull{};
-	//std::vector<const MaterialInstance*> cmd_mats;
-
-
+	// std::vector<const MaterialInstance*> cmd_mats;
 
 	program_handle build_pyramid{};
 	IGraphicsTexture* depth_pyramid = nullptr;
 	glm::ivec2 depth_size = {};
 	glm::ivec2 actual_depth_size = {};
-
 
 	uint32 hiZSampler{};
 
@@ -143,8 +133,10 @@ public:
 	void zero_instances_in_this(bufferhandle mdi_buf, int count);
 
 	void do_shadow_cull(const GpuCullInput& input, Frustum f);
+
 private:
-	enum class Phase {
+	enum class Phase
+	{
 		Pass1,
 		Pass2
 	};

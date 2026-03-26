@@ -7,9 +7,8 @@
 #include "Config.h"
 #include <unordered_map>
 
-using std::chrono::steady_clock;
 using std::chrono::microseconds;
-
+using std::chrono::steady_clock;
 
 struct Profile_Event
 {
@@ -17,17 +16,16 @@ struct Profile_Event
 	bool enabled = false;
 	uint64_t last_interval_time_cpu = 0;
 	uint64_t cpustart = 0;
-	uint64_t cputime = 0;	// microseconds
+	uint64_t cputime = 0; // microseconds
 	uint32_t accumulated_cpu = 0;
 
 	uint64_t last_period_high = 0;
 	uint64_t period_high = 0;
 
-
 	bool started = false;
 
 	uint64_t last_interval_time_gpu = 0;
-	uint64_t gputime = 0;	// nanoseconds
+	uint64_t gputime = 0; // nanoseconds
 	uint32_t glquery[2];
 	uint32_t accumulated_gpu = 0;
 	bool waiting = false;
@@ -52,7 +50,6 @@ struct FrameHighStruct
 
 	int ticks_above_average_epsilon = 0;
 
-
 	void update(float dt, float interval) {
 		accumulator += dt;
 		tick_count++;
@@ -76,11 +73,8 @@ struct FrameHighStruct
 static FrameHighStruct one_second;
 static FrameHighStruct ten_second;
 
-
-
 // super not optimized lol
-static void draw_node_children(Profile_Event* ep)
-{
+static void draw_node_children(Profile_Event* ep) {
 	Profile_Event& e = *ep;
 	if (ImGui::TreeNodeEx(e.name, ImGuiTreeNodeFlags_DefaultOpen)) {
 		ImGui::Text("CPU avg: %3.5f\n", e.last_interval_time_cpu / 1000.0);
@@ -88,58 +82,48 @@ static void draw_node_children(Profile_Event* ep)
 		if (e.is_gpu_event) {
 			ImGui::Text("GPU: %3.5f\n", e.last_interval_time_gpu / 1000000.0);
 		}
-		for (auto& ec : events)
-		{
+		for (auto& ec : events) {
 			if (ec.second.parent == ep)
 				draw_node_children(&ec.second);
 		}
-		
 
 		ImGui::TreePop();
 	}
 }
 
-static void draw_imgui_profile_window()
-{
+static void draw_imgui_profile_window() {
 
 	{
 		ImGui::Text("1s high: %f", one_second.high_last_period);
-		ImGui::Text("1s avg: %f", 1.0/one_second.tick_count_last_period);
-		ImGui::Text("1s percent above middle: %f", one_second.ticks_above_average_epsilon_last / (float)one_second.tick_count_last_period);
+		ImGui::Text("1s avg: %f", 1.0 / one_second.tick_count_last_period);
+		ImGui::Text("1s percent above middle: %f",
+					one_second.ticks_above_average_epsilon_last / (float)one_second.tick_count_last_period);
 		ImGui::Text("10s high: %f", ten_second.high_last_period);
-		ImGui::Text("10s avg: %f", 10.0/ten_second.tick_count_last_period);
+		ImGui::Text("10s avg: %f", 10.0 / ten_second.tick_count_last_period);
 
-		for (auto& ec : events)
-		{
+		for (auto& ec : events) {
 			if (ec.second.parent == nullptr)
 				draw_node_children(&ec.second);
 		}
 	}
 }
 
-
-
-void Profiler::init()
-{
+void Profiler::init() {
 	intervalstart = SDL_GetPerformanceCounter();
 
 	Debug_Interface::get()->add_hook("Profiling", draw_imgui_profile_window);
-
 }
 
-void Profiler::end_frame_tick(float dt)
-{
+void Profiler::end_frame_tick(float dt) {
 	uint64_t timenow = SDL_GetPerformanceCounter();
 
 	one_second.update(dt, 1.0);
 	ten_second.update(dt, 10.0);
 
-
 	if ((timenow - intervalstart) / (double)SDL_GetPerformanceFrequency() > 1.0) {
-		
+
 		accumulated = 0;
-		for (auto& ep : events)
-		{
+		for (auto& ep : events) {
 			auto& e = ep.second;
 
 			e.last_interval_time_cpu = (e.accumulated_cpu > 0) ? e.cputime / e.accumulated_cpu : 0;
@@ -160,8 +144,7 @@ void Profiler::end_frame_tick(float dt)
 	}
 }
 
-void Profiler::start_scope(const char* name, bool gpu)
-{
+void Profiler::start_scope(const char* name, bool gpu) {
 
 	Profile_Event* pe = nullptr;
 	auto find = events.find(name);
@@ -172,8 +155,7 @@ void Profiler::start_scope(const char* name, bool gpu)
 			pe->is_gpu_event = true;
 			glGenQueries(2, pe->glquery);
 		}
-	}
-	else {
+	} else {
 		pe = &find->second;
 	}
 	if (stack.size() > 0)
@@ -191,7 +173,7 @@ void Profiler::start_scope(const char* name, bool gpu)
 		glQueryCounter(e.glquery[0], GL_TIMESTAMP);
 	}
 
-	if(e.is_gpu_event)
+	if (e.is_gpu_event)
 		glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, name);
 
 	stack.push_back(pe);
@@ -199,8 +181,7 @@ void Profiler::start_scope(const char* name, bool gpu)
 	glCheckError();
 }
 
-void Profiler::end_scope(const char* name)
-{
+void Profiler::end_scope(const char* name) {
 	Profile_Event* pe = nullptr;
 	auto find = events.find(name);
 	assert(find != events.end());
@@ -235,7 +216,7 @@ void Profiler::end_scope(const char* name)
 
 			e.gputime += stoptime - starttime;
 			e.accumulated_gpu++;
-			//e.queryback = !e.queryback;
+			// e.queryback = !e.queryback;
 			e.waiting = false;
 		}
 	}

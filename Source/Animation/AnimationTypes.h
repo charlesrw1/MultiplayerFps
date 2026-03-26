@@ -6,11 +6,11 @@
 #include <memory>
 
 class Model;
-using std::vector;
 using std::unique_ptr;
+using std::vector;
 
-
-// AnimChannel,KeyframeBase and Animation are OLD formats. However, I use them in the Model compilier so they are still kept around
+// AnimChannel,KeyframeBase and Animation are OLD formats. However, I use them in the Model compilier so they are still
+// kept around
 
 struct AnimChannel
 {
@@ -24,8 +24,7 @@ struct AnimChannel
 	int scale_start = 0;
 };
 
-template<typename T>
-struct KeyframeBase
+template <typename T> struct KeyframeBase
 {
 	T val;
 	float time;
@@ -71,6 +70,7 @@ public:
 	const RotKeyframe& GetRot(int channel, int index, int clip) const;
 	const ScaleKeyframe& GetScale(int channel, int index, int clip) const;
 	const AnimChannel& GetChannel(int clip, int channel) const;
+
 public:
 	int num_channels = 0;
 	std::vector<AnimChannel> channels;
@@ -86,7 +86,6 @@ struct Animation_Index
 	int16_t clip = -1;
 	int16_t skel = -1;
 };
-
 
 class Pose
 {

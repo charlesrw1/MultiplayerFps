@@ -26,20 +26,17 @@ const char* MeshComponent::get_editor_outliner_icon() const {
 		return "eng/editor/anim_icon.png";
 	return "eng/editor/mesh_icon.png";
 }
-void MeshComponent::set_lightmapped(LightmapCoords coords)
-{
+void MeshComponent::set_lightmapped(LightmapCoords coords) {
 	lightmapped = true;
 	this->lmCoords = coords;
 	sync_render_data();
 }
-void MeshComponent::set_not_lightmapped()
-{
+void MeshComponent::set_not_lightmapped() {
 	lightmapped = false;
 	static_probe_lit = false;
 	sync_render_data();
 }
-void MeshComponent::set_static_probe_lit(int index)
-{
+void MeshComponent::set_static_probe_lit(int index) {
 	if (lightmapped) {
 		sys_print(Warning, "MeshComponent::set_static_probe_lit: already ligtmapped?\n");
 		lightmapped = false;
@@ -50,15 +47,13 @@ void MeshComponent::set_static_probe_lit(int index)
 }
 #endif
 
-MeshComponent::~MeshComponent()
-{
+MeshComponent::~MeshComponent() {
 	assert(!animator && !draw_handle.is_valid());
 }
 MeshComponent::MeshComponent() {
 	set_call_init_in_editor(true);
 }
-glm::mat4 MeshComponent::get_ls_transform_of_bone(StringName bonename) const
-{
+glm::mat4 MeshComponent::get_ls_transform_of_bone(StringName bonename) const {
 	auto mod = model;
 	if (!mod || !mod->get_skel())
 		return glm::mat4(1);
@@ -78,8 +73,7 @@ glm::mat4 MeshComponent::get_ls_transform_of_bone(StringName bonename) const
 		return allbones.at(index).posematrix;
 }
 
-int MeshComponent::get_index_of_bone(StringName bonename) const
-{
+int MeshComponent::get_index_of_bone(StringName bonename) const {
 	auto mod = model.get();
 	if (!mod || !mod->get_skel())
 		return -1;
@@ -94,8 +88,7 @@ int MeshComponent::get_index_of_bone(StringName bonename) const
 	return -1;
 }
 
-void MeshComponent::set_model_str(const char* model_path)
-{
+void MeshComponent::set_model_str(const char* model_path) {
 	Model* modelnext = g_assets.find_sync<Model>(model_path).get();
 	if (modelnext != model.get()) {
 		model = modelnext;
@@ -103,8 +96,7 @@ void MeshComponent::set_model_str(const char* model_path)
 		update_physics_mesh();
 	}
 }
-void MeshComponent::set_model(Model* modelnext)
-{
+void MeshComponent::set_model(Model* modelnext) {
 	if (modelnext != model.get()) {
 		model = modelnext;
 		sync_render_data();
@@ -112,25 +104,21 @@ void MeshComponent::set_model(Model* modelnext)
 	}
 }
 
-void MeshComponent::set_material_override(const MaterialInstance* mi)
-{
+void MeshComponent::set_material_override(const MaterialInstance* mi) {
 	if (eMaterialOverride.empty())
-		eMaterialOverride.push_back({ (MaterialInstance*)mi });
+		eMaterialOverride.push_back({(MaterialInstance*)mi});
 	else
-		eMaterialOverride[0] = { (MaterialInstance*)mi };
+		eMaterialOverride[0] = {(MaterialInstance*)mi};
 	sync_render_data();
 }
 
-
-
-void MeshComponent::on_sync_render_data()
-{
-	if(!draw_handle.is_valid())
+void MeshComponent::on_sync_render_data() {
+	if (!draw_handle.is_valid())
 		draw_handle = idraw->get_scene()->register_obj();
 	Render_Object obj;
 	obj.model = model.get();
 	obj.visible = is_visible;
-#ifdef  EDITOR_BUILD
+#ifdef EDITOR_BUILD
 	obj.visible &= !get_owner()->get_hidden_in_editor();
 	obj.outline = get_owner()->get_is_any_selected_in_editor();
 #endif //  EDITOR_BUILD
@@ -148,8 +136,7 @@ void MeshComponent::on_sync_render_data()
 	if (lightmapped) {
 		obj.lightmapped = true;
 		obj.lightmap_coord = lmCoords.to_vec4();
-	}
-	else if (static_probe_lit) {
+	} else if (static_probe_lit) {
 		obj.static_probe_lit = true;
 		obj.lightmap_coord = lmCoords.to_vec4();
 	}
@@ -159,26 +146,22 @@ void MeshComponent::on_sync_render_data()
 	idraw->get_scene()->update_obj(draw_handle, obj);
 }
 
-
-
-void MeshComponent::update_animator_instance()
-{
+void MeshComponent::update_animator_instance() {
 	animator.reset();
 	auto modToUse = (model.did_fail()) ? g_modelMgr.get_error_model() : model.get();
-	if (modToUse&&modToUse->get_skel()) {
+	if (modToUse && modToUse->get_skel()) {
 		try {
-			//AnimatorObject* c = new AnimatorObject(*modToUse, *animator_tree, get_owner());
-			//animator.reset(c);
+			// AnimatorObject* c = new AnimatorObject(*modToUse, *animator_tree, get_owner());
+			// animator.reset(c);
 		}
 		catch (...) {
 			sys_print(Error, "couldnt initialize animator\n");
-			//animator_tree = nullptr;
+			// animator_tree = nullptr;
 		}
 	}
 }
 
-void MeshComponent::start()
-{
+void MeshComponent::start() {
 	get_owner()->set_cached_mesh_component(this);
 	update_animator_instance();
 	sync_render_data();
@@ -187,27 +170,23 @@ void MeshComponent::start()
 	update_physics_mesh();
 }
 
-void MeshComponent::on_changed_transform()
-{
+void MeshComponent::on_changed_transform() {
 	sync_render_data();
 }
 
-void MeshComponent::update()
-{
+void MeshComponent::update() {}
 
-}
-
-void MeshComponent::stop()
-{
+void MeshComponent::stop() {
 	get_owner()->set_cached_mesh_component(nullptr);
 	idraw->get_scene()->remove_obj(draw_handle);
 	animator.reset();
 }
 
-const Model* MeshComponent::get_model() const { return model.get(); }
+const Model* MeshComponent::get_model() const {
+	return model.get();
+}
 
-AnimatorObject* MeshComponent::create_animator(agBuilder* data)
-{
+AnimatorObject* MeshComponent::create_animator(agBuilder* data) {
 	assert(data);
 	auto modToUse = (model.did_fail()) ? g_modelMgr.get_error_model() : model.get();
 	if (modToUse && modToUse->get_skel()) {
@@ -222,39 +201,34 @@ AnimatorObject* MeshComponent::create_animator(agBuilder* data)
 	return animator.get();
 }
 
-
 const MaterialInstance* MeshComponent::get_material_override() const {
 	return eMaterialOverride.empty() ? nullptr : eMaterialOverride[0].get();
 }
 
-static ConfigVar animation_bonemat_arena_size("animation_bonemat_arena_size", "15000", CVAR_DEV | CVAR_INTEGER | CVAR_READONLY, "arena size of animation bone matricies in matrix size (64)", 0, FLT_MAX);
+static ConfigVar animation_bonemat_arena_size("animation_bonemat_arena_size", "15000",
+											  CVAR_DEV | CVAR_INTEGER | CVAR_READONLY,
+											  "arena size of animation bone matricies in matrix size (64)", 0, FLT_MAX);
 
-
-GameAnimationMgr::~GameAnimationMgr()
-{
-	delete[]matricies;
+GameAnimationMgr::~GameAnimationMgr() {
+	delete[] matricies;
 }
-GameAnimationMgr::GameAnimationMgr() : animating_meshcomponents(4)
-{
+GameAnimationMgr::GameAnimationMgr() : animating_meshcomponents(4) {
 	matricies_allocated = animation_bonemat_arena_size.get_integer();
 	matricies = new glm::mat4[matricies_allocated];
 }
 
-void GameAnimationMgr::remove_from_animating_set(AnimatorObject& mc)
-{
-	//ASSERT(animating_meshcomponents.find(mc));
+void GameAnimationMgr::remove_from_animating_set(AnimatorObject& mc) {
+	// ASSERT(animating_meshcomponents.find(mc));
 	animating_meshcomponents.remove(&mc);
 }
-void GameAnimationMgr::add_to_animating_set(AnimatorObject& mc)
-{
-	//ASSERT(!animating_meshcomponents.find(mc));
+void GameAnimationMgr::add_to_animating_set(AnimatorObject& mc) {
+	// ASSERT(!animating_meshcomponents.find(mc));
 	animating_meshcomponents.insert(&mc);
 }
 
 extern ConfigVar g_debug_skeletons;
 
-static void draw_skeleton(const AnimatorObject* a, float line_len, const glm::mat4& transform)
-{
+static void draw_skeleton(const AnimatorObject* a, float line_len, const glm::mat4& transform) {
 	auto& bones = a->get_global_bonemats();
 	auto model = &a->get_model();
 	if (!model || !model->get_skel())
@@ -263,7 +237,7 @@ static void draw_skeleton(const AnimatorObject* a, float line_len, const glm::ma
 	auto skel = model->get_skel();
 	for (int index = 0; index < skel->get_num_bones(); index++) {
 		vec3 org = transform * bones[index][3];
-		Color32 colors[] = { COLOR_RED,COLOR_GREEN,COLOR_BLUE };
+		Color32 colors[] = {COLOR_RED, COLOR_GREEN, COLOR_BLUE};
 		for (int i = 0; i < 3; i++) {
 			vec3 dir = glm::mat3(transform) * bones[index][i];
 			dir = normalize(dir);
@@ -277,9 +251,7 @@ static void draw_skeleton(const AnimatorObject* a, float line_len, const glm::ma
 	}
 }
 
-
-void GameAnimationMgr::update_animating()
-{
+void GameAnimationMgr::update_animating() {
 	ZoneScoped;
 
 	matricies_used = 0;
@@ -309,13 +281,13 @@ void GameAnimationMgr::update_animating()
 
 #include "Animation/Runtime/Animation.h"
 #include "Animation/Runtime/RuntimeNodesNew2.h"
-void anim_preview_debug_menu()
-{
+void anim_preview_debug_menu() {
 	auto tool = (EditorDoc*)eng_local.editorState->get_tool();
 	if (!tool)
 		return;
 
-	auto sel = tool->selection_state->has_only_one_selected() ? tool->selection_state->get_only_one_selected() : nullptr;
+	auto sel =
+		tool->selection_state->has_only_one_selected() ? tool->selection_state->get_only_one_selected() : nullptr;
 	if (!sel.get())
 		return;
 	auto anim = sel->get_component<AnimPreviewComponent>();
@@ -329,7 +301,7 @@ void anim_preview_debug_menu()
 		ImGui::Text("time: %.2f frames: %d", seq->duration, seq->num_frames);
 		const int frames = seq->num_frames;
 		ImGui::Checkbox("wants_force_frame", &anim->wants_force_frame);
-		ImGui::DragInt("force_frame",&anim->force_frame, 0, frames);
+		ImGui::DragInt("force_frame", &anim->force_frame, 0, frames);
 
 		if (anim->wants_force_frame != bool(anim->eval)) {
 			anim->update_mesh_component();
@@ -338,15 +310,13 @@ void anim_preview_debug_menu()
 			anim->eval->frame = anim->force_frame;
 		static bool move = false;
 		(ImGui::Checkbox("move", &move));
-		if(move)
+		if (move)
 			anim->get_owner()->set_ws_position(glm::vec3(0, 2, fmod(GetTime(), 5.0) * 3.7));
 	}
-
 }
 ADD_TO_DEBUG_MENU(anim_preview_debug_menu);
 
-void AnimPreviewComponent::update_mesh_component()
-{
+void AnimPreviewComponent::update_mesh_component() {
 	eval = nullptr;
 	auto mesh = get_owner()->get_component<MeshComponent>();
 	if (!mesh) {
@@ -360,8 +330,7 @@ void AnimPreviewComponent::update_mesh_component()
 			clip->set_clip(asset);
 			builder.set_root(clip);
 			this->eval = clip;
-		}
-		else {
+		} else {
 			auto clip = builder.alloc<agClipNode>();
 			clip->set_clip(asset);
 			clip->set_looping(true);
@@ -370,26 +339,19 @@ void AnimPreviewComponent::update_mesh_component()
 		mesh->create_animator(&builder);
 	}
 }
-void AnimPreviewComponent::start()
-{
+void AnimPreviewComponent::start() {
 	update_mesh_component();
 }
 
-void AnimPreviewComponent::update()
-{
-}
+void AnimPreviewComponent::update() {}
 
-void AnimPreviewComponent::stop()
-{
-}
+void AnimPreviewComponent::stop() {}
 
 #ifdef EDITOR_BUILD
-void AnimPreviewComponent::editor_on_change_property()
-{
+void AnimPreviewComponent::editor_on_change_property() {
 	update_mesh_component();
 }
-void MeshComponent::update_physics_mesh()
-{
+void MeshComponent::update_physics_mesh() {
 	MeshColliderComponent* existing = get_owner()->get_component<MeshColliderComponent>();
 	if (existing) {
 		existing->destroy();
@@ -400,8 +362,7 @@ void MeshComponent::update_physics_mesh()
 		get_owner()->create_component<MeshColliderComponent>();
 	}
 }
-void MeshComponent::editor_on_change_property()
-{
+void MeshComponent::editor_on_change_property() {
 	sync_render_data();
 	update_physics_mesh();
 }

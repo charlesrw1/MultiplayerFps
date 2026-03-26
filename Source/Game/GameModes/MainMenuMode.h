@@ -1,6 +1,5 @@
 #pragma once
 
-
 #if 0
 class GameTransitionUI
 {
@@ -118,7 +117,5 @@ public:
 	}
 
 };
-
-
 
 #endif

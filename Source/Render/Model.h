@@ -17,20 +17,19 @@
 #include "GpuAllocator.h"
 class MaterialInstance;
 using std::string;
-using std::vector;
 using std::unique_ptr;
+using std::vector;
 // Hardcoded attribute locations for shaders
-const int POSITION_LOC  = 0;
-const int UV_LOC		= 1;
-const int NORMAL_LOC    = 2;
-const int TANGENT_LOC   = 3;
-const int JOINT_LOC		= 4;
-const int WEIGHT_OR_COLOR_LOC	= 5;
+const int POSITION_LOC = 0;
+const int UV_LOC = 1;
+const int NORMAL_LOC = 2;
+const int TANGENT_LOC = 3;
+const int JOINT_LOC = 4;
+const int WEIGHT_OR_COLOR_LOC = 5;
 const int LIGHTMAPCOORD_LOC = 4;
 
-
-//const int COLOR_LOC = 5;
-//const int UV2_LOC = 6;
+// const int COLOR_LOC = 5;
+// const int UV2_LOC = 6;
 
 struct ModelVertex
 {
@@ -38,26 +37,18 @@ struct ModelVertex
 	glm::vec2 uv;
 	int16_t normal[3];
 	int16_t tangent[3];
-	uint8_t color[4];	// or bone index (or lightmap coord, normalized uint16[2])
-	uint8_t color2[4];	// or bone weight
+	uint8_t color[4];  // or bone index (or lightmap coord, normalized uint16[2])
+	uint8_t color2[4]; // or bone weight
 };
 static_assert(sizeof(ModelVertex) == 40, "vertex size wrong");
 
 class RawMeshData
 {
 public:
-	int get_num_indicies(int index_size) const {
-		return (int)indicies.size();
-	}
-	int get_num_verticies(int vertex_size) const {
-		return (int)verts.size();
-	}
-	int get_num_vertex_bytes() const {
-		return (int)verts.size()*sizeof(ModelVertex);
-	}
-	int get_num_index_bytes() const {
-		return (int)indicies.size()*sizeof(uint16_t);
-	}
+	int get_num_indicies(int index_size) const { return (int)indicies.size(); }
+	int get_num_verticies(int vertex_size) const { return (int)verts.size(); }
+	int get_num_vertex_bytes() const { return (int)verts.size() * sizeof(ModelVertex); }
+	int get_num_index_bytes() const { return (int)indicies.size() * sizeof(uint16_t); }
 	const uint8_t* get_index_data(size_t* size) const {
 		*size = indicies.size() * sizeof(uint16_t);
 		return (uint8_t*)indicies.data();
@@ -66,12 +57,8 @@ public:
 		*size = verts.size() * sizeof(ModelVertex);
 		return (uint8_t*)verts.data();
 	}
-	const ModelVertex& get_vertex_at_index(int index) const {
-		return verts[index];
-	}
-	uint16_t get_index_at_index(int index) const {
-		return indicies[index];
-	}
+	const ModelVertex& get_vertex_at_index(int index) const { return verts[index]; }
+	uint16_t get_index_at_index(int index) const { return indicies[index]; }
 
 private:
 	// index offset always = 0
@@ -81,27 +68,22 @@ private:
 	friend class ModelMan;
 };
 
-class Submesh {
+class Submesh
+{
 public:
 	int base_vertex = 0;	// index
-	int element_offset = 0;	// in bytes
+	int element_offset = 0; // in bytes
 	int element_count = 0;	// in element size
 	int material_idx = 0;
-	int vertex_count = 0;	// in element size
+	int vertex_count = 0; // in element size
 
-	bool is_material_transparent() const {
-		return material_idx & (1 << 30);
-	}
-	int get_material_idx_to_use() const {
-		return material_idx & ~(1 << 30);
-	}
-	void set_material_transparent() {
-		material_idx |= (1 << 30);
-	}
-
+	bool is_material_transparent() const { return material_idx & (1 << 30); }
+	int get_material_idx_to_use() const { return material_idx & ~(1 << 30); }
+	void set_material_transparent() { material_idx |= (1 << 30); }
 };
 
-struct ModelTag {
+struct ModelTag
+{
 	string name;
 	int bone_index = -1;
 	glm::mat4 transform;
@@ -119,15 +101,15 @@ class PhysicsMaterialWrapper;
 class MSkeleton;
 class PhysicsBodyDefinition;
 class IAssetLoadingInterface;
-class Model : public IAsset {
+class Model : public IAsset
+{
 public:
 	CLASS_BODY(Model);
 	Model();
 	~Model() override;
 
 	REF static Model* load(std::string path);
-	//static Model* load(const std::string& path);
-
+	// static Model* load(const std::string& path);
 
 	void uninstall() override;
 	void post_load() override;
@@ -137,9 +119,9 @@ public:
 	int get_uid() const { return uid; }
 	int bone_for_name(StringName name) const;
 	const glm::vec4& get_bounding_sphere() const { return bounding_sphere; }
-	Bounds get_aabb_from_sphere() const { 
+	Bounds get_aabb_from_sphere() const {
 		return Bounds(glm::vec3(bounding_sphere) - glm::vec3(bounding_sphere.w),
-			glm::vec3(bounding_sphere) + glm::vec3(bounding_sphere.w));
+					  glm::vec3(bounding_sphere) + glm::vec3(bounding_sphere.w));
 	}
 	MSkeleton* get_skel() const { return skel.get(); }
 	const Submesh& get_part(int index) const { return parts[index]; }
@@ -153,45 +135,35 @@ public:
 	}
 
 	int get_num_materials() const { return materials.size(); }
-	glm::ivec2 get_lightmap_size() const { return glm::ivec2(lightmapX,lightmapY); }
+	glm::ivec2 get_lightmap_size() const { return glm::ivec2(lightmapX, lightmapY); }
 
 	bool has_lightmap_coords() const;
 	bool has_bones() const;
 
-
-	int get_merged_vertex_ofs() const {
-		return vertex_alloc_ptr.aligned_start / sizeof(ModelVertex);
-	}
-	int get_merged_index_ptr() const {
-		return index_alloc_ptr.aligned_start;
-	}
-
+	int get_merged_vertex_ofs() const { return vertex_alloc_ptr.aligned_start / sizeof(ModelVertex); }
+	int get_merged_index_ptr() const { return index_alloc_ptr.aligned_start; }
 
 	const glm::mat4& get_root_transform() const { return skeleton_root_transform; }
 	const Bounds& get_bounds() const { return aabb; }
 	const PhysicsBodyDefinition* get_physics_body() const { return collision.get(); }
 	const RawMeshData* get_raw_mesh_data() const { return &data; }
 	static MulticastDelegate<Model*> on_model_loaded;
-	enum class LightmapType {
-		None=0,	// no lightmaps
-		Lightmapped=1,	// individual lightmaps
-		WorldMerged=2	// all WorldMerged get turned into one lightmap. prevents seams on floors/walls stuff
+	enum class LightmapType
+	{
+		None = 0,		 // no lightmaps
+		Lightmapped = 1, // individual lightmaps
+		WorldMerged = 2	 // all WorldMerged get turned into one lightmap. prevents seams on floors/walls stuff
 	};
 	LightmapType get_lightmap_type() const { return isLightmapped; }
-	bool get_has_any_transparent_materials() const {
-		return has_any_transparent_materials;
-	}
+	bool get_has_any_transparent_materials() const { return has_any_transparent_materials; }
 
-	REF void set_physics_material(PhysicsMaterialWrapper* mat) {
-		this->physics_material = mat;
-	}
-	REF PhysicsMaterialWrapper* get_physics_material() const {
-		return this->physics_material;
-	}
+	REF void set_physics_material(PhysicsMaterialWrapper* mat) { this->physics_material = mat; }
+	REF PhysicsMaterialWrapper* get_physics_material() const { return this->physics_material; }
 	// can return null
 	// if the model has a physics material, returns that
 	// otherwise checks the 1st render material for a physics material
 	REF PhysicsMaterialWrapper* get_physics_material_to_use() const;
+
 private:
 	bool load_internal(IAssetLoadingInterface* loading);
 
@@ -199,7 +171,7 @@ private:
 	InlineVec<MeshLod, 2> lods;
 	vector<Submesh> parts;
 	Bounds aabb;
-	glm::vec4 bounding_sphere=glm::vec4(0.f);
+	glm::vec4 bounding_sphere = glm::vec4(0.f);
 
 	gpuAllocSpan index_alloc_ptr;
 	gpuAllocSpan vertex_alloc_ptr;

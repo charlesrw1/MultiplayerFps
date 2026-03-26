@@ -4,20 +4,18 @@
 #include "Framework/InlineVec.h"
 #include "Framework/EnumDefReflection.h"
 
-NEWENUM(sync_opt , uint8_t)
-{
+NEWENUM(sync_opt, uint8_t){
 	Default,		// clip can by the leader if it has the highest weight
 	AlwaysLeader,	// clip is always the leader
-	AlwaysFollower,	// clip is always the follower
+	AlwaysFollower, // clip is always the follower
 };
-
 
 class Node_CFG;
 struct SyncGroupData
 {
-	StringName name;	// hashed string name of group
+	StringName name; // hashed string name of group
 
-	Percentage time;	// normalized time, either of full clip length or the percentage through sync marker
+	Percentage time; // normalized time, either of full clip length or the percentage through sync marker
 	StringName sync_marker_name;
 	bool has_sync_marker = false;
 
@@ -39,12 +37,17 @@ struct SyncGroupData
 	// if true, then compute the nodes next time by incrementing time += dt*speed, whatever else
 	// set this syncgroups time with that, also account for sync markers
 	bool should_write_new_update_weight(sync_opt option, float new_update_weight) {
-		if (update_owner == nullptr) return true;
-		if (option == sync_opt::AlwaysLeader) return true;	// leaders always update
-		if (option == sync_opt::AlwaysFollower) return false; // followers never update (except when update_owner==nullptr; ie first update)
+		if (update_owner == nullptr)
+			return true;
+		if (option == sync_opt::AlwaysLeader)
+			return true; // leaders always update
+		if (option == sync_opt::AlwaysFollower)
+			return false; // followers never update (except when update_owner==nullptr; ie first update)
 		// else: option == sync_opt::Default; syncs when has highest blend weight
-		if (update_owner_synctype == sync_opt::AlwaysFollower) return true;	// update leader is always follower, update
-		if (update_owner_synctype == sync_opt::AlwaysLeader) return false;	// update leader is always leader, dont update
+		if (update_owner_synctype == sync_opt::AlwaysFollower)
+			return true; // update leader is always follower, update
+		if (update_owner_synctype == sync_opt::AlwaysLeader)
+			return false; // update leader is always leader, dont update
 		// update_owner must be another sync_opt::Default, update if update_weight is higher than active
 		if (new_update_weight > update_weight)
 			return true;
@@ -56,6 +59,6 @@ struct SyncGroupData
 		this->update_weight = new_update_weight;
 		this->update_owner_synctype = option;
 		this->update_time = newtime;
-		this->update_has_sync_marker = false;	// TODO
+		this->update_has_sync_marker = false; // TODO
 	}
 };

@@ -5,8 +5,8 @@
 #include "glm/glm.hpp"
 #include "glm/gtx/quaternion.hpp"
 
-
-class IComponentEditorUi {
+class IComponentEditorUi
+{
 public:
 	virtual ~IComponentEditorUi() {}
 	// return true if mouse is grabbed
@@ -51,7 +51,7 @@ protected:
 	virtual bool editor_compile() { return true; }
 	virtual void editor_on_change_property() {}
 	bool editor_is_selected = false;
-	bool editor_is_editor_only = false;	// set in CTOR
+	bool editor_is_editor_only = false; // set in CTOR
 #endif
 
 private:

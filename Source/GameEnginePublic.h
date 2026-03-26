@@ -18,9 +18,7 @@ extern ConfigVar g_window_h;
 extern ConfigVar g_window_fullscreen;
 extern ConfigVar g_host_port;
 
-
-template<typename... Args>
-class MulticastDelegate;
+template <typename... Args> class MulticastDelegate;
 
 class Level;
 class Entity;
@@ -38,7 +36,8 @@ class GameMode;
 class BaseUpdater;
 class Model;
 class MaterialInstance;
-class Application : public ClassBase {
+class Application : public ClassBase
+{
 public:
 	CLASS_BODY(Application, scriptable);
 
@@ -57,7 +56,6 @@ public:
 	// idk i want to use these to set physics materials and setup animation events
 	REF virtual void on_post_model_load(Model* asset) {}
 	REF virtual void on_post_material_load(MaterialInstance* asset) {}
-
 };
 
 class GameEnginePublic
@@ -78,40 +76,28 @@ public:
 	virtual bool load_level(string mapname) = 0;
 	virtual void log_to_fullscreen_gui(LogType type, const char* msg) = 0;
 
-	double get_game_time() const {
-		return time;
-	}
+	double get_game_time() const { return time; }
 	// update() interval
-	double get_dt() const {
-		return frame_time;
-	}
+	double get_dt() const { return frame_time; }
 	// physics update() interval
-	double get_fixed_tick_interval() const {
-		return tick_interval;
-	}
-	double get_frame_remainder() const {
-		return frame_remainder;
-	}
+	double get_fixed_tick_interval() const { return tick_interval; }
+	double get_frame_remainder() const { return frame_remainder; }
 
 	// used by client/server for syncing
 	void set_tick_interval(double next_interval) {
-		//assert(get_state() != Engine_State::Game);
+		// assert(get_state() != Engine_State::Game);
 		tick_interval = next_interval;
 	}
-	void set_game_time(double newtime) {
-		time = newtime;
-	}
-	double time = 0.0;			// this is essentially tick*tick_interval +- smoothing on client
-	double frame_time = 0.0;	// total frame time of program
-	double frame_remainder = 0.0;	// frame time accumulator
-	double tick_interval = 1.0/60.0;	// 1/tick_rate
+	void set_game_time(double newtime) { time = newtime; }
+	double time = 0.0;				   // this is essentially tick*tick_interval +- smoothing on client
+	double frame_time = 0.0;		   // total frame time of program
+	double frame_remainder = 0.0;	   // frame time accumulator
+	double tick_interval = 1.0 / 60.0; // 1/tick_rate
 
-	bool get_is_in_overlapped_period() const {
-		return b_is_in_overlapped_period.get_value();
-	}
+	bool get_is_in_overlapped_period() const { return b_is_in_overlapped_period.get_value(); }
+
 protected:
 	ScopedBooleanValue b_is_in_overlapped_period;
 };
-
 
 extern GameEnginePublic* eng;

@@ -3,10 +3,9 @@
 #include "glad/glad.h"
 #include <glm/gtc/matrix_transform.hpp>
 
-const static int csm_resolutions[] = { 0, 512, 1024,2048 };
+const static int csm_resolutions[] = {0, 512, 1024, 2048};
 
-void shadow_map_tweaks()
-{
+void shadow_map_tweaks() {
 	auto& tweak = draw.shadowmap.tweak;
 	ImGui::DragFloat("log lin", &tweak.log_lin_lerp_factor, 0.02);
 	if (ImGui::SliderInt("quality", &tweak.quality, 0, 4))
@@ -15,16 +14,14 @@ void shadow_map_tweaks()
 	ImGui::DragFloat("pfac", &tweak.poly_factor, 0.01);
 	ImGui::DragFloat("punit", &tweak.poly_units, 0.01);
 	ImGui::DragFloat("zscale", &tweak.z_dist_scaling, 0.01);
-
-
-
 }
-ConfigVar r_spotlight_shadow_fade_radius("r.spotlight_shadow_fade_radius", "5.0", CVAR_FLOAT, "dist to fade out spot light shadows", 0, 100);
-ConfigVar r_spotlight_shadow_quality("r.spotlight_shadow_quality", "1", CVAR_INTEGER, "quality of spotlight shadow 0,1,2", 0, 2);
-const static int spotlight_shadow_res[] = { 128,256,512 };
+ConfigVar r_spotlight_shadow_fade_radius("r.spotlight_shadow_fade_radius", "5.0", CVAR_FLOAT,
+										 "dist to fade out spot light shadows", 0, 100);
+ConfigVar r_spotlight_shadow_quality("r.spotlight_shadow_quality", "1", CVAR_INTEGER,
+									 "quality of spotlight shadow 0,1,2", 0, 2);
+const static int spotlight_shadow_res[] = {128, 256, 512};
 
-void CascadeShadowMapSystem::init()
-{
+void CascadeShadowMapSystem::init() {
 	texture.shadow_vts_handle = Texture::install_system("_csm_shadow");
 
 	Debug_Interface::get()->add_hook("shadow map", shadow_map_tweaks);
@@ -33,8 +30,7 @@ void CascadeShadowMapSystem::init()
 	glCreateBuffers(1, &ubo.info);
 	glCreateBuffers(4, ubo.frame_view);
 }
-void CascadeShadowMapSystem::make_csm_rendertargets()
-{
+void CascadeShadowMapSystem::make_csm_rendertargets() {
 	if (tweak.quality == 0)
 		return;
 	tweak.quality = 3;
@@ -51,24 +47,20 @@ void CascadeShadowMapSystem::make_csm_rendertargets()
 	safe_release(texture.shadow_array);
 	texture.shadow_array = IGraphicsDevice::inst->create_texture(args);
 
-	//glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.shadow_array);
-	//glTextureStorage3D(texture.shadow_array, 1, GL_DEPTH_COMPONENT32F, csm_resolution, csm_resolution, 4);
-
+	// glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.shadow_array);
+	// glTextureStorage3D(texture.shadow_array, 1, GL_DEPTH_COMPONENT32F, csm_resolution, csm_resolution, 4);
 
 	texture.shadow_vts_handle->update_specs_ptr(texture.shadow_array);
 }
 
-
-static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp)
-{
+static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp) {
 	float zratio = far / near;
 	float zrange = far - near;
 
 	const float bias = 0.0001f;
 	const int CASCADES_USED = CascadeShadowMapSystem::CASCADES_USED;
 	glm::vec4 planedistances;
-	for (int i = 0; i < CASCADES_USED; i++)
-	{
+	for (int i = 0; i < CASCADES_USED; i++) {
 		float x = (i + 1) / float(CASCADES_USED);
 		float log = near * pow(zratio, x);
 		float linear = near + zrange * x;
@@ -79,18 +71,16 @@ static glm::vec4 CalcPlaneSplits(float near, float far, float log_lin_lerp)
 }
 #include "Render/Render_Sun.h"
 extern void cull_and_draw_cascade_fucker(int idx);
-void CascadeShadowMapSystem::render_cascades()
-{
+void CascadeShadowMapSystem::render_cascades() {
 	// now setup scene for rendering
-//glBindFramebuffer(GL_FRAMEBUFFER, fbo.shadow);
+	// glBindFramebuffer(GL_FRAMEBUFFER, fbo.shadow);
 	{
 		GPUSCOPESTART(render_csm_scope);
 
 		auto& device = draw.get_device();
-		//RenderPassSetup setup("shadowmap", fbo.shadow, false, false /* clear it below */, 0, 0, csm_resolution, csm_resolution);
-		//auto scope = device.start_render_pass(setup);
+		// RenderPassSetup setup("shadowmap", fbo.shadow, false, false /* clear it below */, 0, 0, csm_resolution,
+		// csm_resolution); auto scope = device.start_render_pass(setup);
 		const int CASCADES_USED = CascadeShadowMapSystem::CASCADES_USED;
-
 
 		for (int i = 0; i < CASCADES_USED; i++) {
 
@@ -101,11 +91,11 @@ void CascadeShadowMapSystem::render_cascades()
 			state.wants_depth_clear = true;
 			IGraphicsDevice::inst->set_render_pass(state);
 
-			//glNamedFramebufferTextureLayer(fbo.shadow, GL_DEPTH_ATTACHMENT, texture.shadow_array->get_internal_handle(), 0, i);
+			// glNamedFramebufferTextureLayer(fbo.shadow, GL_DEPTH_ATTACHMENT,
+			// texture.shadow_array->get_internal_handle(), 0, i);
 
 			device.set_viewport(0, 0, csm_resolution, csm_resolution);
-			device.clear_framebuffer(true, true, 1.f/* depth value of 1.f to clear*/);
-
+			device.clear_framebuffer(true, true, 1.f /* depth value of 1.f to clear*/);
 
 			View_Setup setup;
 			setup.width = csm_resolution;
@@ -113,15 +103,10 @@ void CascadeShadowMapSystem::render_cascades()
 			setup.near = nearplanes[i];
 			setup.far = farplanes[i];
 			setup.viewproj = matricies[i];
-			setup.view = setup.proj = mat4(1);	// unused
+			setup.view = setup.proj = mat4(1); // unused
 
-			Render_Level_Params params(
-				setup,
-				nullptr,
-				nullptr,
-				Render_Level_Params::SHADOWMAP
-			);
-			//params.rl_cpufast = 
+			Render_Level_Params params(setup, nullptr, nullptr, Render_Level_Params::SHADOWMAP);
+			// params.rl_cpufast =
 
 			params.provied_constant_buffer = ubo.frame_view[i];
 			params.upload_constants = true;
@@ -134,14 +119,13 @@ void CascadeShadowMapSystem::render_cascades()
 	}
 }
 
-void CascadeShadowMapSystem::update_matricies()
-{
-	//int setting = draw.shadow_quality_setting.integer();
-	//if (setting < 0) setting = 0;
-	//else if (setting > 3) setting = 3;
-	//draw.shadow_quality_setting.integer() = setting;
+void CascadeShadowMapSystem::update_matricies() {
+	// int setting = draw.shadow_quality_setting.integer();
+	// if (setting < 0) setting = 0;
+	// else if (setting > 3) setting = 3;
+	// draw.shadow_quality_setting.integer() = setting;
 
-	//if (tweak.quality != setting) {
+	// if (tweak.quality != setting) {
 	//	tweak.quality = setting;
 	//	targets_dirty = true;
 	//}
@@ -182,7 +166,7 @@ void CascadeShadowMapSystem::update_matricies()
 			mat4 data[4];
 			vec4 near_planes;
 			vec4 far_planes;
-		}upload_data;
+		} upload_data;
 
 		for (int i = 0; i < CASCADES_USED; i++) {
 			upload_data.data[i] = matricies[i];
@@ -194,10 +178,7 @@ void CascadeShadowMapSystem::update_matricies()
 	}
 }
 
-
-
-static glm::vec3* GetFrustumCorners(const mat4& view, const mat4& projection)
-{
+static glm::vec3* GetFrustumCorners(const mat4& view, const mat4& projection) {
 	mat4 inv_viewproj = glm::inverse(projection * view);
 	static glm::vec3 corners[8];
 	int i = 0;
@@ -215,19 +196,14 @@ static glm::vec3* GetFrustumCorners(const mat4& view, const mat4& projection)
 	return corners;
 }
 
-
-void CascadeShadowMapSystem::update_cascade(int cascade_idx, const View_Setup& view, vec3 directionalDir)
-{
+void CascadeShadowMapSystem::update_cascade(int cascade_idx, const View_Setup& view, vec3 directionalDir) {
 	float far = split_distances[cascade_idx];
 	float near = (cascade_idx == 0) ? view.near : split_distances[cascade_idx - 1];
 	if (tweak.fit_to_scene)
 		near = view.near;
 
 	// 7/30: this doesnt need to be zero to one, not used to rendering, just in GetFrustumnCorners
-	mat4 camera_cascaded_proj = glm::perspective(
-		view.fov,
-		(float)view.width / view.height,
-		near, far);
+	mat4 camera_cascaded_proj = glm::perspective(view.fov, (float)view.width / view.height, near, far);
 
 	// World space corners
 	glm::vec3* corners = GetFrustumCorners(view.view, camera_cascaded_proj);
@@ -239,8 +215,7 @@ void CascadeShadowMapSystem::update_cascade(int cascade_idx, const View_Setup& v
 	mat4 light_cascade_view = glm::lookAt(frustum_center - directionalDir, frustum_center, vec3(0, 1, 0));
 	vec3 viewspace_min = vec3(INFINITY);
 	vec3 viewspace_max = vec3(-INFINITY);
-	if (tweak.reduce_shimmering)
-	{
+	if (tweak.reduce_shimmering) {
 		float sphere_radius = 0.f;
 		for (int i = 0; i < 8; i++) {
 			float dist = glm::length(corners[i] - frustum_center);
@@ -256,8 +231,7 @@ void CascadeShadowMapSystem::update_cascade(int cascade_idx, const View_Setup& v
 		viewspace_min = glm::min(v_max, v_min);
 		viewspace_max = vec3(sphere_radius);
 		viewspace_min = -viewspace_max;
-	}
-	else {
+	} else {
 		for (int i = 0; i < 8; i++) {
 			vec3 viewspace_corner = light_cascade_view * vec4(corners[i], 1.0);
 			viewspace_min = glm::min(viewspace_min, viewspace_corner);
@@ -265,7 +239,6 @@ void CascadeShadowMapSystem::update_cascade(int cascade_idx, const View_Setup& v
 		}
 
 		// insert scaling for pcf filtering here
-
 	}
 	if (viewspace_min.z < 0)
 		viewspace_min.z *= tweak.z_dist_scaling;
@@ -280,10 +253,10 @@ void CascadeShadowMapSystem::update_cascade(int cascade_idx, const View_Setup& v
 	vec3 cascade_extent = viewspace_max - viewspace_min;
 
 	// 7/30: reverse z update: make ortho matrix from zero to one
-	mat4 light_cascade_proj = glm::orthoRH_ZO(viewspace_min.x, viewspace_max.x, viewspace_min.y, viewspace_max.y, viewspace_min.z, viewspace_max.z);
+	mat4 light_cascade_proj = glm::orthoRH_ZO(viewspace_min.x, viewspace_max.x, viewspace_min.y, viewspace_max.y,
+											  viewspace_min.z, viewspace_max.z);
 	mat4 shadow_matrix = light_cascade_proj * light_cascade_view;
-	if (tweak.reduce_shimmering)
-	{
+	if (tweak.reduce_shimmering) {
 		vec4 shadow_origin = vec4(0, 0, 0, 1);
 		shadow_origin = shadow_matrix * shadow_origin;
 		float w = shadow_origin.w;
@@ -301,8 +274,7 @@ void CascadeShadowMapSystem::update_cascade(int cascade_idx, const View_Setup& v
 		shadow_matrix = shadow_cascade_proj * light_cascade_view;
 	}
 
-
-	matricies[cascade_idx] = shadow_matrix;// light_cascade_proj* light_cascade_view;
+	matricies[cascade_idx] = shadow_matrix; // light_cascade_proj* light_cascade_view;
 	nearplanes[cascade_idx] = viewspace_min.z;
 	farplanes[cascade_idx] = viewspace_max.z;
 

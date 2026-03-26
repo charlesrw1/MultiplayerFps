@@ -6,13 +6,16 @@ struct PropertyInfoList;
 class ClassBase;
 class ClassTypeInfo;
 
-
 struct ClassTypeIterator
 {
 	ClassTypeIterator(ClassTypeInfo* ti);
-	ClassTypeIterator& next() { index++; return *this; }
+	ClassTypeIterator& next() {
+		index++;
+		return *this;
+	}
 	bool is_end() const { return index >= end; }
 	const ClassTypeInfo* get_type() const;
+
 private:
 	int32_t index = 0;
 	int32_t end = 0;
@@ -26,8 +29,9 @@ private:
 //		- 'script_write' : script_can only write
 //		- 'edit_hide'	: dont show in editor inspector
 //		- 'hide' : (edit_hide AND script_hide)
-// 
-//		- 'lua_generic' : will treat arg as a generic parameter and return that when making the lua stub file (doesnt affect runtime)
+//
+//		- 'lua_generic' : will treat arg as a generic parameter and return that when making the lua stub file (doesnt
+//affect runtime)
 //		- 'transient' : dont serialize this property
 //		- 'type="my_custom_type"' : tags this for use with custom serializer/editor
 //		- 'name="some name"' : provides a name override
@@ -55,10 +59,10 @@ private:
 // like reflect, this also supports arguments (in ...)
 // options:
 //		- 'scriptable' : lets this class be implemented in lua
-#define CLASS_BODY(classname, ...) \
-	using MyClassType = classname; \
-	static ClassTypeInfo StaticType; \
-	virtual const ClassTypeInfo& get_type() const { return classname::StaticType; } \
+#define CLASS_BODY(classname, ...)                                                                                     \
+	using MyClassType = classname;                                                                                     \
+	static ClassTypeInfo StaticType;                                                                                   \
+	virtual const ClassTypeInfo& get_type() const { return classname::StaticType; }                                    \
 	static const PropertyInfoList* get_props();
 
 struct Serializer;
@@ -68,28 +72,19 @@ class ClassBase
 public:
 	CLASS_BODY(ClassBase);
 
-	const static bool CreateDefaultObject;	/* = false, default setting */
+	const static bool CreateDefaultObject; /* = false, default setting */
 	ClassBase() = default;
 	virtual ~ClassBase();
 	ClassBase& operator=(const ClassBase& other);
 	ClassBase(const ClassBase& other);
 	ClassBase(ClassBase&& other);
 
-
-
-	virtual void serialize(Serializer& s) {}	// override to add custom serialization functionality
+	virtual void serialize(Serializer& s) {} // override to add custom serialization functionality
 	// cast this class to type T, returns nullptr if failed
-	template<typename T>
-	const T* cast_to() const {
-		return (is_a<T>() ? static_cast<const T*>(this) : nullptr);
-	}
-	template<typename T>
-	T* cast_to() {
-		return (is_a<T>() ? static_cast<T*>(this) : nullptr );
-	}
+	template <typename T> const T* cast_to() const { return (is_a<T>() ? static_cast<const T*>(this) : nullptr); }
+	template <typename T> T* cast_to() { return (is_a<T>() ? static_cast<T*>(this) : nullptr); }
 	// is this class a subclass or an instance of type T
-	template<typename T>
-	bool is_a() const;
+	template <typename T> bool is_a() const;
 
 	REFLECT();
 	const ClassTypeInfo* my_type() const;
@@ -101,6 +96,7 @@ public:
 	static ClassBase* alloc(const ClassTypeInfo* type);
 	REFLECT();
 	static void free(ClassBase* ptr);
+
 public:
 	static void unregister_class(ClassTypeInfo* type);
 	// called by ClassTypeInfo only during static init
@@ -110,27 +106,19 @@ public:
 	// called in main() after all classes have been reg'd
 	static void init_classes_startup();
 
-
 	static const ClassTypeInfo* find_class(const char* classname);
 	static const ClassTypeInfo* find_class(int32_t id);
 
-	static bool does_class_exist(const char* classname) {
-		return find_class(classname) != nullptr;
-	}
+	static bool does_class_exist(const char* classname) { return find_class(classname) != nullptr; }
 
 	// allocate a class by string
-	template<typename T>
-	static T* create_class(const char* classname);
+	template <typename T> static T* create_class(const char* classname);
 	// allocate by id
-	template<typename T>
-	static T* create_class(int16_t id);
+	template <typename T> static T* create_class(int16_t id);
 	// get all subclasses to a class excluding abstract ones
-	template<typename T>
-	static ClassTypeIterator get_subclasses() {
-		return ClassTypeIterator(&T::StaticType);
-	}
+	template <typename T> static ClassTypeIterator get_subclasses() { return ClassTypeIterator(&T::StaticType); }
 	static ClassTypeIterator get_subclasses(const ClassTypeInfo* typeinfo) {
-		return ClassTypeIterator((ClassTypeInfo*)typeinfo/* remove const here, doesnt matter tho*/);
+		return ClassTypeIterator((ClassTypeInfo*)typeinfo /* remove const here, doesnt matter tho*/);
 	}
 	static void init_class_info_for_script();
 
@@ -138,8 +126,8 @@ public:
 	int get_table_registry_id();
 	bool is_class_referenced_from_lua() const;
 	void free_table_registry_id();
-private:
 
+private:
 	// this is used for interop with lua
 	// this is the table id returned by luaL_ref in the registry
 	// the lua table stores a ptr to this object. when the object is deleted in c++, the table's ptr is nulled
@@ -149,14 +137,12 @@ private:
 	int lua_table_id = 0;
 };
 
-template<typename T>
-struct is_abstract {
+template <typename T> struct is_abstract
+{
 private:
-	template<typename U>
-	static constexpr auto test(U*) -> decltype(U(), std::false_type());
+	template <typename U> static constexpr auto test(U*) -> decltype(U(), std::false_type());
 
-	template<typename>
-	static constexpr std::true_type test(...);
+	template <typename> static constexpr std::true_type test(...);
 
 public:
 	static constexpr bool value = decltype(test<T>(nullptr))::value;
@@ -168,8 +154,7 @@ public:
 // DONT make get_props() or CLASS_IMPL(x), the tool does that for you
 // use REFLECT() macros instead
 
-
-// sometimes you want forward declared class types in the header, but they need to be definied when registering 
+// sometimes you want forward declared class types in the header, but they need to be definied when registering
 // them in the generated file like AssetPtr<>'s
 // use GENERATED_CLASS_INCLUDE(file) to include a file in the generated source, but not in the header
 #define GENERATED_CLASS_INCLUDE(x)
@@ -178,15 +163,13 @@ public:
 
 // is this class a subclass or an instance of type T
 
-template<typename T>
-inline bool ClassBase::is_a() const {
+template <typename T> inline bool ClassBase::is_a() const {
 	return get_type().is_a(T::StaticType);
 }
 
 // allocate a class by string
 
-template<typename T>
-inline T* ClassBase::create_class(const char* classname) {
+template <typename T> inline T* ClassBase::create_class(const char* classname) {
 	auto classinfo = find_class(classname);
 	if (!classinfo || !classinfo->is_a(T::StaticType))
 		return nullptr;
@@ -196,10 +179,9 @@ inline T* ClassBase::create_class(const char* classname) {
 
 // allocate by id
 
-template<typename T>
-inline T* ClassBase::create_class(int16_t id) {
+template <typename T> inline T* ClassBase::create_class(int16_t id) {
 	auto classinfo = find_class(id);
-	if (!classinfo  || !classinfo->is_a(T::StaticType))
+	if (!classinfo || !classinfo->is_a(T::StaticType))
 		return nullptr;
 	ClassBase* base = classinfo->allocate_this_type();
 	return static_cast<T*>(base);

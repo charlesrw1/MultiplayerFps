@@ -7,9 +7,9 @@ using namespace glm;
 
 struct Chunk
 {
-    vec4 bounding_sphere;
+	vec4 bounding_sphere;
 	uint32_t cone;
-	uint32_t count; // number of indicies in this chunk, max = 64*3
+	uint32_t count;	 // number of indicies in this chunk, max = 64*3
 	uint32_t offset; // offset into model's index buffer
 	uint32_t padding;
 };
@@ -21,10 +21,10 @@ struct Chunk
 // meshlet_count = 0;
 // ..
 // };
-// 
+//
 // uint global_index_buffer[]
 // Vertex global_vertex_buffer[]
-// 
+//
 
 struct Subpart_ext
 {
@@ -39,8 +39,8 @@ struct Chunked_Model
 	vector<uint32_t> indicies;
 	vector<Chunk> chunks;
 	vector<Subpart_ext> parts_ext;
-	
+
 	Model* model;
 };
 
-//Chunked_Model* get_chunked_mod(const char* filename);
+// Chunked_Model* get_chunked_mod(const char* filename);

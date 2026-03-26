@@ -10,19 +10,22 @@
 #include "Framework/Reflection2.h"
 class Animator;
 class AnimatorObject;
-class AnimationEvent : public ClassBase {
+class AnimationEvent : public ClassBase
+{
 public:
 	CLASS_BODY(AnimationEvent);
 	~AnimationEvent() {}
 	virtual void on_event(AnimatorObject* animator) {}
 	int get_frame() const { return frame; }
+
 private:
 	friend class AnimationEventGetter;
 	friend class EditModelAnimations;
 	int frame = 0;
 };
 
-class AnimDurationEvent : public ClassBase {
+class AnimDurationEvent : public ClassBase
+{
 public:
 	CLASS_BODY(AnimDurationEvent);
 

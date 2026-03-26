@@ -2,7 +2,8 @@
 #include "Framework/StructReflection.h"
 #include "Framework/Util.h"
 
-struct lColor {
+struct lColor
+{
 	STRUCT_BODY();
 	REF int r = 255;
 	REF int g = 255;

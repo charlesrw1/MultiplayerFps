@@ -20,27 +20,26 @@
 // MASK BIN FORMAT
 // empty
 
-
 // if high bit set, then channel has only one frame
 // CHANNEL_OFS
 // int pos_ofs
 // int rot_ofs
 // int scale_ofs
 
-// float* packed_data[ pos_ofs + 3*keyframe ] 
+// float* packed_data[ pos_ofs + 3*keyframe ]
 
-// ANIMATION 
+// ANIMATION
 // string name
 // float duration
 // float linear_velocity
 // int num_keyframes
 // bool is_delta
-// 
+//
 // CHANNEL_OFS channels[num_bones]
-// 
+//
 // int packed_size
 // float packed_data[packed_size]
-// 
+//
 // int num_events
 // EVENT events[num_events]
 //		"{ type <event_type> <fields> }"
@@ -48,5 +47,5 @@
 
 // BAKEDCURVE
 // int curve_data_count
-// 
+//
 // float[curve_data_count]

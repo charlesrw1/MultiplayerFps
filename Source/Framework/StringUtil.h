@@ -9,56 +9,50 @@
 // from vkguide
 namespace StringUtils_Hash {
 
-	// FNV-1a 32bit hashing algorithm.
-	constexpr uint32_t fnv1a_32(char const* s, std::size_t count)
-	{
-		return ((count ? fnv1a_32(s, count - 1) : 2166136261u) ^ s[count]) * 16777619u;
-	}
-	constexpr uint64_t fnv1a_64(const char* s, std::size_t count)
-	{
-		return ((count ? fnv1a_64(s, count - 1) : 14695981039346656037ull /* offset */) ^ s[count]) * 1099511628211ull /* prime */;
-	}
-	constexpr size_t const_strlen(const char* s)
-	{
-		size_t size = 0;
-		while (s[size]) { size++; };
-		return size;
-	}
-
-	struct StringHash
-	{
-		uint32_t computedHash;
-
-		constexpr StringHash(uint32_t hash) noexcept : computedHash(hash) {}
-
-		constexpr StringHash(const char* s) noexcept : computedHash(0)
-		{
-			computedHash = fnv1a_32(s, const_strlen(s));
-		}
-		constexpr StringHash(const char* s, std::size_t count)noexcept : computedHash(0)
-		{
-			computedHash = fnv1a_32(s, count);
-		}
-		StringHash(const StringHash& other) = default;
+// FNV-1a 32bit hashing algorithm.
+constexpr uint32_t fnv1a_32(char const* s, std::size_t count) {
+	return ((count ? fnv1a_32(s, count - 1) : 2166136261u) ^ s[count]) * 16777619u;
+}
+constexpr uint64_t fnv1a_64(const char* s, std::size_t count) {
+	return ((count ? fnv1a_64(s, count - 1) : 14695981039346656037ull /* offset */) ^ s[count]) *
+		   1099511628211ull /* prime */;
+}
+constexpr size_t const_strlen(const char* s) {
+	size_t size = 0;
+	while (s[size]) {
+		size++;
 	};
-
-	struct StringHash2
-	{
-		uint32_t computedHash=0;
-		const char* str = "";
-		constexpr StringHash2(const char* s) noexcept : computedHash(0)
-		{
-			computedHash = fnv1a_32(s, const_strlen(s));
-			str = s;
-		}
-	
-		StringHash2(const StringHash2& other) = default;
-	};
-
+	return size;
 }
 
-template<int BUFSIZE>
-class Stack_String
+struct StringHash
+{
+	uint32_t computedHash;
+
+	constexpr StringHash(uint32_t hash) noexcept : computedHash(hash) {}
+
+	constexpr StringHash(const char* s) noexcept : computedHash(0) { computedHash = fnv1a_32(s, const_strlen(s)); }
+	constexpr StringHash(const char* s, std::size_t count) noexcept : computedHash(0) {
+		computedHash = fnv1a_32(s, count);
+	}
+	StringHash(const StringHash& other) = default;
+};
+
+struct StringHash2
+{
+	uint32_t computedHash = 0;
+	const char* str = "";
+	constexpr StringHash2(const char* s) noexcept : computedHash(0) {
+		computedHash = fnv1a_32(s, const_strlen(s));
+		str = s;
+	}
+
+	StringHash2(const StringHash2& other) = default;
+};
+
+} // namespace StringUtils_Hash
+
+template <int BUFSIZE> class Stack_String
 {
 public:
 	Stack_String() {
@@ -78,7 +72,8 @@ public:
 		data_len = 0;
 
 		int s = strlen(str);
-		if (len < s) s = len;
+		if (len < s)
+			s = len;
 		if (s + 1 < BUFSIZE) {
 			memcpy(data, str, s);
 			data[s] = 0;
@@ -89,6 +84,7 @@ public:
 	const char* c_str() const { return data; }
 
 	char* get_data() { return data; }
+
 private:
 	int data_len = 0;
 	char data[BUFSIZE];
@@ -111,17 +107,19 @@ public:
 			assert(str_start[i] != '\0');
 		}
 #endif // _DEBUG
-
 	}
 
 	bool cmp(const char* other) const {
-		if (!str_start) return false;
+		if (!str_start)
+			return false;
 
 		const char* p1 = str_start;
 		int count = 0;
 		while (*other) {
-			if (count > str_len) return false;
-			if (*p1 != *other) return false;
+			if (count > str_len)
+				return false;
+			if (*p1 != *other)
+				return false;
 			p1++;
 			other++;
 			count++;
@@ -129,9 +127,7 @@ public:
 		return count == str_len;
 	}
 
-	Stack_String<256> to_stack_string() {
-		return Stack_String<256>(str_start, str_len);
-	}
+	Stack_String<256> to_stack_string() { return Stack_String<256>(str_start, str_len); }
 	bool is_empty() const { return str_len == 0; }
 
 	bool operator==(const StringView& other) const {

@@ -1,7 +1,5 @@
 #pragma once
 
-
-
 #include "Assets/IAsset.h"
 #include "DrawTypedefs.h"
 #include <memory>
@@ -19,8 +17,8 @@ class IAssetLoadingInterface;
 class MaterialImpl;
 class PhysicsMaterialWrapper;
 
-
-class MaterialInstance : public IAsset {
+class MaterialInstance : public IAsset
+{
 public:
 	CLASS_BODY(MaterialInstance);
 
@@ -41,8 +39,6 @@ public:
 	void set_u8vec_parameter(StringName name, Color32 f);
 	REF void set_tex_parameter(StringName name, const Texture* t);
 
-
-
 	REF bool is_this_a_dynamic_material() const;
 	const MasterMaterialImpl* get_master_material() const;
 	bool is_this_a_master_material() const;
@@ -54,24 +50,19 @@ public:
 	void sweep_references(IAssetLoadingInterface* loading) const;
 	void move_construct(IAsset* other);
 
-	REF void set_physics_material(PhysicsMaterialWrapper* material) {
-		this->physics_mat = material;
-	}
-	PhysicsMaterialWrapper* get_physics_material() const {
-		return physics_mat;
-	}
+	REF void set_physics_material(PhysicsMaterialWrapper* material) { this->physics_mat = material; }
+	PhysicsMaterialWrapper* get_physics_material() const { return physics_mat; }
 
 	std::unique_ptr<MaterialImpl> impl;
 	static MulticastDelegate<MaterialInstance*> on_material_loaded;
-protected:
 
+protected:
 	PhysicsMaterialWrapper* physics_mat = nullptr;
 
 	friend class MaterialManagerLocal;
 };
 
-
-class MaterialManagerPublic 
+class MaterialManagerPublic
 {
 public:
 	virtual void init() = 0;
@@ -84,6 +75,7 @@ public:
 	MaterialInstance* get_default_billboard() { return defaultBillboard.get(); }
 	sptr<MaterialInstance> get_fallback_sptr() { return fallback; }
 	sptr<MaterialInstance> get_default_billboard_sptr() { return defaultBillboard; }
+
 protected:
 	sptr<MaterialInstance> defaultBillboard = nullptr;
 	sptr<MaterialInstance> fallback = nullptr;

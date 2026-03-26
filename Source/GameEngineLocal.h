@@ -15,8 +15,8 @@
 
 class GUIFullscreen;
 class OnScreenLog;
-using std::unordered_set;
 using glm::vec3;
+using std::unordered_set;
 class IEditorTool;
 class Player;
 class Model;
@@ -34,20 +34,14 @@ struct View_Setup;
 class IntegrationTester;
 class EditorState;
 
-
-
 class GameEngineLocal : public GameEnginePublic
 {
 public:
 	GameEngineLocal();
 
 	// Public Interface
-	Application* get_app() const final {
-		return app.get();
-	}
-	Level* get_level() const final {
-		return level.get();
-	}
+	Application* get_app() const final { return app.get(); }
+	Level* get_level() const final { return level.get(); }
 	Entity* get_entity(uint64_t handle) final {
 		ASSERT(get_level());
 		auto o = level->get_entity(handle);
@@ -59,23 +53,19 @@ public:
 	}
 
 	Client* get_client() final {
-		return nullptr;// cl.get();
+		return nullptr; // cl.get();
 	}
 	Server* get_server() final {
-		return nullptr;// sv.get();
+		return nullptr; // sv.get();
 	}
-	SDL_Window* get_os_window() final {
-		return window;
-	}
-	ImGuiContext* get_imgui_context() const final {
-		return imgui_context;
-	}
+	SDL_Window* get_os_window() final { return window; }
+	ImGuiContext* get_imgui_context() const final { return imgui_context; }
 
 	void log_to_fullscreen_gui(LogType type, const char* msg) final;
 
 	bool load_level(string mapname) final;
 
-	bool is_editor_level() const  final {
+	bool is_editor_level() const final {
 		/* this passes when you are in the loading phase or past the loading phase */
 		/* added is_loading... to work with constructors before level gets set */
 		return editorState != nullptr;
@@ -83,7 +73,7 @@ public:
 	bool is_editor_state() const { return editorState != nullptr; }
 	bool is_host() const final { return true; }
 
-// local functions
+	// local functions
 public:
 	void init(int argc, char** argv);
 	void cleanup();
@@ -95,15 +85,12 @@ public:
 	// state relevant functions
 	void set_tick_rate(float tick_rate);
 
-	bool is_in_game() const {
-		return get_level() != nullptr;
-	}
+	bool is_in_game() const { return get_level() != nullptr; }
 
 #ifdef EDITOR_BUILD
 #else
 	bool is_in_an_editor_state() const { return false; }
 #endif
-
 
 	void stop_game();
 	void spawn_starting_players(bool initial);
@@ -114,6 +101,7 @@ public:
 	MulticastDelegate<> on_leave_level;
 	MulticastDelegate<> on_leave_editor;
 	MulticastDelegate<IEditorTool*> on_enter_editor;
+
 public:
 	void add_commands();
 	void set_keybind(SDL_Scancode code, uint16_t keymod, std::string bind);
@@ -121,7 +109,7 @@ public:
 
 	OnScreenLog gui_log;
 	bool is_loading_editor_level = false;
-	std::unique_ptr<Level> level= nullptr;
+	std::unique_ptr<Level> level = nullptr;
 	std::unique_ptr<Application> app;
 	ImGuiContext* imgui_context = nullptr;
 	SDL_Window* window = nullptr;
@@ -147,7 +135,6 @@ public:
 	void set_tester(IntegrationTester* tester, bool headless_mode);
 
 private:
-
 	bool is_hosting_game = false;
 	bool headless_mode = false;
 	void init_sdl_window();

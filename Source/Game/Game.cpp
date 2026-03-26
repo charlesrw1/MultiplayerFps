@@ -4,17 +4,12 @@
 #include "Render/DrawPublic.h"
 #include "Physics/Physics2.h"
 
-
-
-static float mid_lerp(float min, float max, float mid_val)
-{
+static float mid_lerp(float min, float max, float mid_val) {
 	return (mid_val - min) / (max - min);
 }
-float modulo_lerp(float start, float end, float mod, float alpha)
-{
+float modulo_lerp(float start, float end, float mod, float alpha) {
 	float d1 = glm::abs(end - start);
 	float d2 = mod - d1;
-
 
 	if (d1 <= d2)
 		return glm::mix(start, end, alpha);
@@ -120,9 +115,5 @@ void RenderInterpolationComponent::clear()
 
 #include <PxPhysics.h>
 
-
-
 #include "Framework/MeshBuilder.h"
 #include "Framework/Config.h"
-
-

@@ -14,17 +14,11 @@ class ComponentTypeMetadata : public AssetMetadata
 {
 public:
 	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() const  override
-	{
-		return { 181, 159, 245 };
-	}
+	virtual Color32 get_browser_color() const override { return {181, 159, 245}; }
 
-	virtual std::string get_type_name() const  override
-	{
-		return "Component-Entity";
-	}
+	virtual std::string get_type_name() const override { return "Component-Entity"; }
 
-	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override {
+	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const override {
 
 		// all editor spawnable components here fixme
 		filepaths.push_back("DecalComponent");
@@ -47,29 +41,24 @@ public:
 		filepaths.push_back("ParticleInstComponent");
 
 		filepaths.push_back("AnimPreviewComponent");
-	
+
 		filepaths.push_back("WorldTextComponent");
 		filepaths.push_back("GiVolumeComponent");
 
 		filepaths.push_back("AreaishLightComponent");
 
-
 		filepaths.push_back("daf");
-
 	}
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Component::StaticType; }
-
 };
 REGISTER_ASSETMETADATA_MACRO(ComponentTypeMetadata);
 #endif
 
-void Component::set_owner_dont_serialize_or_edit(bool b)
-{
+void Component::set_owner_dont_serialize_or_edit(bool b) {
 	if (get_owner())
 		get_owner()->dont_serialize_or_edit = b;
 }
-void Component::set_ticking(bool shouldTick)
-{
+void Component::set_ticking(bool shouldTick) {
 	auto level = eng->get_level();
 	if (level && tick_enabled != shouldTick && init_state == initialization_state::CALLED_START) {
 		if (shouldTick)
@@ -80,29 +69,22 @@ void Component::set_ticking(bool shouldTick)
 	tick_enabled = shouldTick;
 }
 #include "Framework/Log.h"
-void Component::serialize(Serializer& s)
-{
-	
-
-}
-void Component::init_updater()
-{
+void Component::serialize(Serializer& s) {}
+void Component::init_updater() {
 	auto level = eng->get_level();
 	ASSERT(level);
 	ASSERT(init_state == initialization_state::HAS_ID);
 	if (level && tick_enabled)
 		level->add_to_update_list(this);
 }
-void Component::shutdown_updater()
-{
+void Component::shutdown_updater() {
 	auto level = eng->get_level();
 	ASSERT(level);
 	if (level && tick_enabled)
 		level->remove_from_update_list(this);
 }
 
-void Component::activate_internal_step2()
-{
+void Component::activate_internal_step2() {
 	ASSERT(init_state == initialization_state::HAS_ID);
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
 		start();
@@ -111,8 +93,7 @@ void Component::activate_internal_step2()
 	}
 }
 
-void Component::deactivate_internal()
-{
+void Component::deactivate_internal() {
 	// can call stop after a pre_start()
 	ASSERT(init_state == initialization_state::CALLED_START);
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
@@ -122,22 +103,18 @@ void Component::deactivate_internal()
 	init_state = initialization_state::HAS_ID;
 }
 
-void Component::destroy()
-{
+void Component::destroy() {
 	ASSERT(eng->get_level());
 	eng->get_level()->destroy_component(this);
 }
-void Component::sync_render_data()
-{
+void Component::sync_render_data() {
 	// changed to start or pre_start
-	//if(init_state == initialization_state::CALLED_START)
-		eng->get_level()->add_to_sync_render_data_list(this);
+	// if(init_state == initialization_state::CALLED_START)
+	eng->get_level()->add_to_sync_render_data_list(this);
 }
 
-
-void Component::destroy_internal()
-{
-	if(init_state==initialization_state::CALLED_START)
+void Component::destroy_internal() {
+	if (init_state == initialization_state::CALLED_START)
 		deactivate_internal();
 	ASSERT(entity_owner);
 	entity_owner->remove_this_component_internal(this);
@@ -145,7 +122,7 @@ void Component::destroy_internal()
 }
 
 Component::~Component() {
-	ASSERT(init_state!=initialization_state::CALLED_START);
+	ASSERT(init_state != initialization_state::CALLED_START);
 }
 
 const glm::mat4& Component::get_ws_transform() {

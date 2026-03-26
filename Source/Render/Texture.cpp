@@ -3,8 +3,6 @@
 
 #include "glm/glm.hpp"
 
-
-
 #include "stb_image.h"
 
 #include "glad/glad.h"
@@ -18,65 +16,47 @@
 #include "Framework/Config.h"
 #undef APIENTRY
 
-
 #include "tinyexr.h"
 #undef APIENTRY
 
 #include "IGraphsDevice.h"
 
-
 // TextureEditor.cpp
-extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*,Color32& outColor);
+extern bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface*, Color32& outColor);
 #ifdef EDITOR_BUILD
-#include"stb_image_write.h"
-int write_png_wrapper(const char* filename, int w, int h, int comp, const void* data, int stride_in_bytes)
-{
+#include "stb_image_write.h"
+int write_png_wrapper(const char* filename, int w, int h, int comp, const void* data, int stride_in_bytes) {
 	return stbi_write_png(filename, w, h, comp, data, stride_in_bytes);
 }
-int write_hdr_wrapper(const char* filename, int w, int h, int comp, const float* data)
-{
+int write_hdr_wrapper(const char* filename, int w, int h, int comp, const float* data) {
 	return stbi_write_hdr(filename, w, h, comp, data);
 }
 
-
-//extern IEditorTool* g_texture_editor_tool;
+// extern IEditorTool* g_texture_editor_tool;
 class TextureAssetMetadata : public AssetMetadata
 {
 public:
 	TextureAssetMetadata() {
 		extensions.push_back("dds");
 		extensions.push_back("hdr");
-
 	}
-
 
 	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() const  override
-	{
-		return { 227, 39, 39 };
-	}
+	virtual Color32 get_browser_color() const override { return {227, 39, 39}; }
 
-	virtual std::string get_type_name() const  override
-	{
-		return "Texture";
-	}
+	virtual std::string get_type_name() const override { return "Texture"; }
 
-	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const override
-	{
+	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const override {
 		filepaths.push_back("_white");
 		filepaths.push_back("_black");
 		filepaths.push_back("_flat_normal");
 	}
-
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Texture::StaticType; }
 };
 
 REGISTER_ASSETMETADATA_MACRO(TextureAssetMetadata);
 #endif
-
-
-
 
 // surface description flags
 const unsigned long DDSF_CAPS = 0x00000001l;
@@ -94,14 +74,13 @@ const unsigned long DDSF_FOURCC = 0x00000004l;
 const unsigned long DDSF_RGB = 0x00000040l;
 const unsigned long DDSF_RGBA = 0x00000041l;
 
-
 // dwCaps1 flags
 const unsigned long DDSF_COMPLEX = 0x00000008l;
 const unsigned long DDSF_TEXTURE = 0x00001000l;
 const unsigned long DDSF_MIPMAP = 0x00400000l;
 
-
-typedef struct {
+typedef struct
+{
 	unsigned long Size;
 	unsigned long Flags;
 	unsigned long FourCC;
@@ -128,8 +107,8 @@ typedef struct
 	unsigned long Reserved2[3];
 } ddsFileHeader_t;
 
-
-enum DXGI_FORMAT {
+enum DXGI_FORMAT
+{
 	DXGI_FORMAT_UNKNOWN = 0,
 	DXGI_FORMAT_R32G32B32A32_TYPELESS = 1,
 	DXGI_FORMAT_R32G32B32A32_FLOAT = 2,
@@ -256,31 +235,30 @@ enum DXGI_FORMAT {
 #define DDS_RESOURCE_MISC_TEXTURECUBE 0x4
 struct DDS_HEADER_DXT10
 {
-	DXGI_FORMAT     dxgiFormat;
-	uint32_t        resourceDimension;
-	uint32_t        miscFlag; // see D3D11_RESOURCE_MISC_FLAG
-	uint32_t        arraySize;
-	uint32_t        miscFlags2; // see DDS_MISC_FLAGS2
+	DXGI_FORMAT dxgiFormat;
+	uint32_t resourceDimension;
+	uint32_t miscFlag; // see D3D11_RESOURCE_MISC_FLAG
+	uint32_t arraySize;
+	uint32_t miscFlags2; // see DDS_MISC_FLAGS2
 };
 
-
 static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, GraphicsTextureFormat informat);
-static bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* buffer, int len)
-{
-	if (len < 4 + sizeof(ddsFileHeader_t)) return false;
-	if (buffer[0] != 'D' || buffer[1] != 'D' || buffer[2] != 'S' || buffer[3] != ' ') return false;
+static bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* buffer, int len) {
+	if (len < 4 + sizeof(ddsFileHeader_t))
+		return false;
+	if (buffer[0] != 'D' || buffer[1] != 'D' || buffer[2] != 'S' || buffer[3] != ' ')
+		return false;
 	// BIG ENDIAN ISSUE:
 	ddsFileHeader_t* header = (ddsFileHeader_t*)(buffer + 4);
-	
-	const uint32_t dxt1_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('1' << 24);	// aka bc1
-	const uint32_t dxt5_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('5' << 24);	// aka bc3
+
+	const uint32_t dxt1_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('1' << 24); // aka bc1
+	const uint32_t dxt5_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('5' << 24); // aka bc3
 	const uint32_t bc4u_fourcc = 'B' | ('C' << 8) | ('4' << 16) | ('U' << 24);
 	const uint32_t bc5u_fourcc = 'B' | ('C' << 8) | ('5' << 16) | ('U' << 24);
 
 	GraphicsTextureFormat fmt{};
 	int input_width = header->Width;
 	int input_height = header->Height;
-
 
 	DDS_HEADER_DXT10* dx10 = nullptr;
 	const uint32_t dx10FourCC = 'D' | ('X' << 8) | ('1' << 16) | ('0' << 24);
@@ -292,18 +270,13 @@ static bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* 
 				fmt = gtf::bc1;
 			else
 				fmt = gtf::bc1;
-		}
-		else if (header->ddspf.FourCC == dxt5_fourcc) {
+		} else if (header->ddspf.FourCC == dxt5_fourcc) {
 			fmt = gtf::bc3;
-		}
-		else if (header->ddspf.FourCC == bc4u_fourcc) {
+		} else if (header->ddspf.FourCC == bc4u_fourcc) {
 			fmt = gtf::bc4;
-		}
-		else if (header->ddspf.FourCC == bc5u_fourcc) {
+		} else if (header->ddspf.FourCC == bc5u_fourcc) {
 			fmt = gtf::bc5;
-		}
-		else if((header->ddspf.Flags & DDSF_FOURCC) &&
-			header->ddspf.FourCC == dx10FourCC) {
+		} else if ((header->ddspf.Flags & DDSF_FOURCC) && header->ddspf.FourCC == dx10FourCC) {
 			dx10 = (DDS_HEADER_DXT10*)(buffer + 4 + sizeof(ddsFileHeader_t));
 
 			if (dx10->dxgiFormat == DXGI_FORMAT_BC1_UNORM_SRGB)
@@ -313,11 +286,9 @@ static bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* 
 			else
 				ASSERT(0 && "UNHANDLED DDS FORMAT");
 
-			}
-		else
+		} else
 			ASSERT(0 && "bad fourcc");
-	}
-	else {
+	} else {
 		if (header->ddspf.RGBBitCount == 24)
 			fmt = gtf::rgb8;
 		else if (header->ddspf.RGBBitCount == 32)
@@ -335,8 +306,6 @@ static bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* 
 		numMipmaps = header->MipMapCount;
 	}
 
-
-
 	auto create_gpu_texture = [&]() {
 		CreateTextureArgs args;
 		args.width = input_width;
@@ -349,32 +318,30 @@ static bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* 
 	out_ptr = create_gpu_texture();
 	const bool compressed = out_ptr->is_compressed();
 
-	//glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
-	//glTextureStorage2D(output->gl_id, numMipmaps, internal_format, input_width, input_height);
+	// glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
+	// glTextureStorage2D(output->gl_id, numMipmaps, internal_format, input_width, input_height);
 
 	int ux = input_width;
 	int uy = input_height;
-	uint8_t* data_ptr = (buffer+4+sizeof(ddsFileHeader_t));
+	uint8_t* data_ptr = (buffer + 4 + sizeof(ddsFileHeader_t));
 	if (dx10)
 		data_ptr += sizeof(DDS_HEADER_DXT10);
 
 	int compressed_stride = 0;
 	if (compressed)
 		compressed_stride = out_ptr->get_compressed_stride();
-	//const int compressed_stride = (input_format == TEXFMT_RGBA8_DXT1 || input_format == TEXFMT_RGB8_DXT1) ? 8 : 16;
+	// const int compressed_stride = (input_format == TEXFMT_RGBA8_DXT1 || input_format == TEXFMT_RGB8_DXT1) ? 8 : 16;
 	for (int i = 0; i < numMipmaps; i++) {
 		int size = 0;
 		if (compressed) {
-			size = ((ux + 3) / 4) * ((uy + 3) / 4) *
-				compressed_stride;
+			size = ((ux + 3) / 4) * ((uy + 3) / 4) * compressed_stride;
+		} else {
+			size = ux * uy * int(header->ddspf.RGBBitCount / 8);
 		}
-		else {
-			size = ux*uy* int(header->ddspf.RGBBitCount / 8);
-		}
-		
-		//if (compressed)
+
+		// if (compressed)
 		//	glCompressedTextureSubImage2D(output->gl_id,i, 0, 0, ux, uy, internal_format, size, data_ptr);
-		//else
+		// else
 		//	glTextureSubImage2D(output->gl_id, i, 0, 0, ux, uy, format, type, data_ptr);
 
 		out_ptr->sub_image_upload(i, 0, 0, ux, uy, size, data_ptr);
@@ -382,21 +349,21 @@ static bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* 
 		data_ptr += size;
 		ux /= 2;
 		uy /= 2;
-		if (ux < 1)ux = 1;
-		if (uy < 1)uy = 1;
+		if (ux < 1)
+			ux = 1;
+		if (uy < 1)
+			uy = 1;
 	}
 
-	//glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	//glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
+	// glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	// glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	// glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
 
 	return true;
-	//return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
+	// return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
 }
-bool dxgi_texture_format_to_gl(DXGI_FORMAT infmt, GraphicsTextureFormat* outfmt)
-{
-	switch (infmt)
-	{
+bool dxgi_texture_format_to_gl(DXGI_FORMAT infmt, GraphicsTextureFormat* outfmt) {
+	switch (infmt) {
 	case DXGI_FORMAT_BC6H_UF16:
 		*outfmt = GraphicsTextureFormat::bc6;
 		break;
@@ -416,13 +383,13 @@ bool dxgi_texture_format_to_gl(DXGI_FORMAT infmt, GraphicsTextureFormat* outfmt)
 }
 
 // use for bc6 cubemap array, bc6 irrad/depth textures
-bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffer, int len)
-{
-	if (len < 4 + sizeof(ddsFileHeader_t)) return false;
-	if (buffer[0] != 'D' || buffer[1] != 'D' || buffer[2] != 'S' || buffer[3] != ' ') return false;
+bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffer, int len) {
+	if (len < 4 + sizeof(ddsFileHeader_t))
+		return false;
+	if (buffer[0] != 'D' || buffer[1] != 'D' || buffer[2] != 'S' || buffer[3] != ' ')
+		return false;
 	// BIG ENDIAN ISSUE:
 	ddsFileHeader_t* header = (ddsFileHeader_t*)(buffer + 4);
-
 
 	GraphicsTextureFormat input_format = GraphicsTextureFormat::rg16f;
 	int input_width = header->Width;
@@ -431,12 +398,9 @@ bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffe
 	int cubemap_array_size = 0;
 	uint32_t dx10FourCC = 'D' | ('X' << 8) | ('1' << 16) | ('0' << 24);
 	DDS_HEADER_DXT10 dx10 = {};
-	if ((header->ddspf.Flags & DDSF_FOURCC) &&
-		header->ddspf.FourCC == dx10FourCC)
-	{
+	if ((header->ddspf.Flags & DDSF_FOURCC) && header->ddspf.FourCC == dx10FourCC) {
 		dx10 = *(DDS_HEADER_DXT10*)(buffer + 4 + sizeof(ddsFileHeader_t));
-	}
-	else {
+	} else {
 		return false;
 	}
 
@@ -449,9 +413,8 @@ bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffe
 		numMipmaps = header->MipMapCount;
 	}
 
-
 	GraphicsTextureFormat type{};
-	
+
 	const bool res = dxgi_texture_format_to_gl(dx10.dxgiFormat, &type);
 	if (!res)
 		return false;
@@ -465,27 +428,26 @@ bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffe
 		args.float_input_is_16f = true;
 		if (cubemap_array_size > 0) {
 			args.type = GraphicsTextureType::tCubemapArray;
-			args.depth_3d = cubemap_array_size*6;
+			args.depth_3d = cubemap_array_size * 6;
 			args.sampler_type = GraphicsSamplerType::CubemapDefault;
-		}
-		else {
+		} else {
 			args.sampler_type = GraphicsSamplerType::LinearNoMipmaps;
-			if(numMipmaps>1)
+			if (numMipmaps > 1)
 				sys_print(Warning, "specilized format has more than 1 mipmap\n");
 		}
 		return IGraphicsDevice::inst->create_texture(args);
 	};
 	out_ptr = create_gpu_texture();
 
-	//glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
-	//glTextureStorage2D(output->gl_id, numMipmaps, internal_format, input_width, input_height);
+	// glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
+	// glTextureStorage2D(output->gl_id, numMipmaps, internal_format, input_width, input_height);
 
 	uint8_t* data_ptr = (buffer + 4 + sizeof(ddsFileHeader_t) + sizeof(DDS_HEADER_DXT10));
 
 	const bool compressed = out_ptr->is_compressed();
 
-	const int compressed_stride = 16;//for bc6 fixme
-	const int bytes_per_pixel = 4;	// fixme, hardcoded for rg16f and r11g11b10
+	const int compressed_stride = 16; // for bc6 fixme
+	const int bytes_per_pixel = 4;	  // fixme, hardcoded for rg16f and r11g11b10
 	int num_layers = 1;
 	if (cubemap_array_size > 0)
 		num_layers = cubemap_array_size * 6;
@@ -495,16 +457,14 @@ bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffe
 		for (int i = 0; i < numMipmaps; i++) {
 			int size = 0;
 			if (compressed) {
-				size = ((ux + 3) / 4) * ((uy + 3) / 4) *
-					compressed_stride;
-			}
-			else {
+				size = ((ux + 3) / 4) * ((uy + 3) / 4) * compressed_stride;
+			} else {
 				size = ux * uy * bytes_per_pixel;
 			}
 
-			//if (compressed)
+			// if (compressed)
 			//	glCompressedTextureSubImage2D(output->gl_id,i, 0, 0, ux, uy, internal_format, size, data_ptr);
-			//else
+			// else
 			//	glTextureSubImage2D(output->gl_id, i, 0, 0, ux, uy, format, type, data_ptr);
 
 			if (num_layers == 1)
@@ -515,23 +475,24 @@ bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffe
 			data_ptr += size;
 			ux /= 2;
 			uy /= 2;
-			if (ux < 1)ux = 1;
-			if (uy < 1)uy = 1;
+			if (ux < 1)
+				ux = 1;
+			if (uy < 1)
+				uy = 1;
 		}
 	}
 
-	//glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-	//glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	//glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
+	// glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	// glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	// glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
 
 	return true;
-	//return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
+	// return make_from_data(output, input_width, input_height, (buffer + 4 + sizeof(ddsFileHeader_t)), input_format);
 }
 
-
-static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, GraphicsTextureFormat informat, bool nearest_filtered = false)
-{
-	//glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
+static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, GraphicsTextureFormat informat,
+										bool nearest_filtered = false) {
+	// glCreateTextures(GL_TEXTURE_2D, 1, &output->gl_id);
 
 	int x_real = x;
 	int y_real = y;
@@ -550,16 +511,15 @@ static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* dat
 		return IGraphicsDevice::inst->create_texture(args);
 	};
 	IGraphicsTexture* ptr = create_gpu_texture();
-	ASSERT(!ptr->is_compressed());	// compressed takes dds path
+	ASSERT(!ptr->is_compressed()); // compressed takes dds path
 
 	const int size = 0;
-	
 
-	//glTextureStorage2D(output->gl_id, num_mip_maps, internal_format, x, y);
+	// glTextureStorage2D(output->gl_id, num_mip_maps, internal_format, x, y);
 	assert(x == x_real && y == y_real);
-	//if (compressed)
+	// if (compressed)
 	//	glCompressedTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, internal_format, size, data);
-	//else
+	// else
 	//	glTextureSubImage2D(output->gl_id, 0, 0, 0, x, y, format, type, data);
 
 	ptr->sub_image_upload(0, 0, 0, x, y, size, data);
@@ -567,30 +527,29 @@ static IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* dat
 		// fixme
 		glGenerateTextureMipmap(ptr->get_internal_handle());
 	}
-	//if (!nearest_filtered) {
+	// if (!nearest_filtered) {
 	//
 	//	glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
 	//	glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	//	glTextureParameteri(output->gl_id, GL_TEXTURE_MAX_ANISOTROPY, 16.f);
 	//	glGenerateTextureMipmap(output->gl_id);
 	//}
-	//else {
+	// else {
 	//	glTextureParameteri(output->gl_id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	//	glTextureParameteri(output->gl_id, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	//}
 
 	glCheckError();
 
-	//output->width = x;
-	//output->height = y;
-	//output->format = informat;
+	// output->width = x;
+	// output->height = y;
+	// output->format = informat;
 
 	return ptr;
 }
 
 using std::string;
 using std::vector;
-
 
 enum class TextureMipLevel
 {
@@ -599,34 +558,37 @@ enum class TextureMipLevel
 	Low,
 };
 
-GraphicsTextureFormat to_format(int n, bool isfloat)
-{
+GraphicsTextureFormat to_format(int n, bool isfloat) {
 	using gtf = GraphicsTextureFormat;
 	if (isfloat) {
-		if (n == 4) return gtf::rgba16f;
-		else if (n == 3) return gtf::rgb16f;
-	}
-	else {
-		if (n == 1) return gtf::r8;
-		if (n == 2) return gtf::rg8;
-		if (n == 3)return gtf::rgb8;
-		if (n == 4)return gtf::rgba8;
+		if (n == 4)
+			return gtf::rgba16f;
+		else if (n == 3)
+			return gtf::rgb16f;
+	} else {
+		if (n == 1)
+			return gtf::r8;
+		if (n == 2)
+			return gtf::rg8;
+		if (n == 3)
+			return gtf::rgb8;
+		if (n == 4)
+			return gtf::rgba8;
 	}
 	ASSERT(0 && "unknown to format");
 	return gtf::rgb8;
 }
 
 #include "GameEnginePublic.h"
-void Texture::move_construct(IAsset* _src)
-{
+void Texture::move_construct(IAsset* _src) {
 	assert(!eng->get_is_in_overlapped_period());
 	Texture* src = (Texture*)_src;
 	uninstall();
 	assert(!gpu_ptr);
 	gpu_ptr = src->gpu_ptr;
-	//format = src->format;
+	// format = src->format;
 	loaddata = std::move(src->loaddata);
-	src->gpu_ptr = nullptr;	// dont uninstall it since were just stealing it
+	src->gpu_ptr = nullptr; // dont uninstall it since were just stealing it
 #ifdef EDITOR_BUILD
 	simplifiedColor = src->simplifiedColor;
 	hasSimplifiedColor = src->hasSimplifiedColor;
@@ -638,8 +600,7 @@ glm::ivec2 Texture::get_size() const {
 	}
 	return {};
 }
-texhandle Texture::get_internal_render_handle() const
-{
+texhandle Texture::get_internal_render_handle() const {
 	if (gpu_ptr)
 		return gpu_ptr->get_internal_handle();
 	return 0;
@@ -651,8 +612,7 @@ void Texture::post_load() {
 		return;
 
 	if (disable_texture_loads.get_bool()) {
-		const uint8_t missing_tex[] = { 230,0,255,255,  0,0,0,255,
-										0,0,0,255,	230,0,255,255 };
+		const uint8_t missing_tex[] = {230, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 230, 0, 255, 255};
 		auto create_defeault = [](IGraphicsTexture*& handle, const uint8_t* data) -> void {
 			CreateTextureArgs args;
 			args.num_mip_maps = 1;
@@ -661,13 +621,12 @@ void Texture::post_load() {
 			args.format = GraphicsTextureFormat::rgba8;
 			args.sampler_type = GraphicsSamplerType::LinearDefault;
 
-
 			handle = IGraphicsDevice::inst->create_texture(args);
 			handle->sub_image_upload(0, 0, 0, 2, 2, sizeof(uint8_t) * 4 * 4, data);
 		};
 		create_defeault(gpu_ptr, missing_tex);
 
-	//	format = Texture_Format::TEXFMT_RGBA8;
+		//	format = Texture_Format::TEXFMT_RGBA8;
 
 		return;
 	}
@@ -680,13 +639,13 @@ void Texture::post_load() {
 	auto& filedata = user->filedata;
 
 	if (user->isDDSFile)
-		load_dds_file(this,gpu_ptr, filedata.data(), filedata.size());
+		load_dds_file(this, gpu_ptr, filedata.data(), filedata.size());
 	else
-		gpu_ptr=make_from_data(this, x, y, data, to_format(user->channels, user->is_float), user->wantsNearestFiltering);
+		gpu_ptr =
+			make_from_data(this, x, y, data, to_format(user->channels, user->is_float), user->wantsNearestFiltering);
 
 	if (data)
 		stbi_image_free(data);
-
 
 	loaddata.reset();
 }
@@ -695,14 +654,15 @@ extern ConfigVar developer_mode;
 
 bool Texture::load_asset(IAssetLoadingInterface* loading) {
 	const auto& path = get_name();
-	assert(path != "_white" && path != "_black");	// quick assert here, default textures should be initialized before anything else
+	assert(path != "_white" &&
+		   path != "_black"); // quick assert here, default textures should be initialized before anything else
 	if (disable_texture_loads.get_bool())
 		return true;
 
 #ifdef EDITOR_BUILD
-	if (developer_mode.get_bool()&&!force_nearest) {
+	if (developer_mode.get_bool() && !force_nearest) {
 		// this will check if a compile is needed
-		bool good = compile_texture_asset(path,loading,this->simplifiedColor);
+		bool good = compile_texture_asset(path, loading, this->simplifiedColor);
 		if (good)
 			this->hasSimplifiedColor = true;
 	}
@@ -723,8 +683,8 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 	auto& is_float = user->is_float;
 	auto& channels = user->channels;
 
-	if (path.find("/_nearest")!=std::string::npos)
-		user->wantsNearestFiltering = true;	// hack moment
+	if (path.find("/_nearest") != std::string::npos)
+		user->wantsNearestFiltering = true; // hack moment
 	user->wantsNearestFiltering |= force_nearest;
 
 	user->filedata.resize(file->size());
@@ -733,13 +693,11 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 	if (path.find(".dds") != std::string::npos) {
 		user->isDDSFile = true;
 		return true;
-	}
-	else if (path.find(".hdr") != std::string::npos) {
+	} else if (path.find(".hdr") != std::string::npos) {
 		data = stbi_loadf_from_memory(filedata.data(), filedata.size(), &x, &y, &channels, 0);
 		filedata = {};
 		is_float = true;
-	}
-	else if (path.find(".exr") != std::string::npos) {
+	} else if (path.find(".exr") != std::string::npos) {
 		float* out_data = nullptr;
 		const char* err = nullptr;
 		int res = LoadEXRFromMemory(&out_data, &x, &y, filedata.data(), filedata.size(), &err);
@@ -751,8 +709,7 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 		channels = 4;
 		filedata = {};
 		data = out_data;
-	}
-	else {
+	} else {
 		data = stbi_load_from_memory(filedata.data(), filedata.size(), &x, &y, &channels, 0);
 		filedata = {};
 		is_float = false;
@@ -767,46 +724,38 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 	return true;
 }
 
-void Texture::uninstall()
-{
+void Texture::uninstall() {
 	safe_release(gpu_ptr);
 }
 void Texture::update_specs_ptr(IGraphicsTexture* ptr) {
 	this->gpu_ptr = ptr;
 }
-Texture* Texture::install_system(const std::string& path)
-{
+Texture* Texture::install_system(const std::string& path) {
 	Texture* t = new Texture;
 	g_assets.install_system_asset(t, path);
 	return t;
 }
-Texture* Texture::force_load_for_ui(const string& name)
-{
+Texture* Texture::force_load_for_ui(const string& name) {
 	Texture* t = Texture::install_system(name);
 	t->set_loaded_manually_unsafe(name);
-	t->force_nearest = true;	// hack
-	const bool good = t->load_asset(nullptr/*hope nobody uses this*/);
-	if(good)
+	t->force_nearest = true; // hack
+	const bool good = t->load_asset(nullptr /*hope nobody uses this*/);
+	if (good)
 		t->post_load();
 
 	return t;
 }
 Texture::Texture() {}
 Texture::~Texture() {
-	//assert(is_this_globally_referenced()||gl_id == 0);
-
+	// assert(is_this_globally_referenced()||gl_id == 0);
 }
 #include "Assets/AssetDatabase.h"
-Texture* Texture::load(const std::string& path)
-{
+Texture* Texture::load(const std::string& path) {
 	return g_assets.find_sync<Texture>(path).get();
 }
 #include <array>
 
-
-
-void texture_loading_benchmark()
-{
+void texture_loading_benchmark() {
 	ASSERT(0);
 	std::vector<std::byte> filedata;
 	filedata.reserve(10'000'000);
@@ -815,7 +764,7 @@ void texture_loading_benchmark()
 	auto print_time = [&](const char* msg) {
 		double now = GetTime();
 		last = now - start;
-		//printf("%s: %f\n", msg, float(now - start));
+		// printf("%s: %f\n", msg, float(now - start));
 		start = now;
 	};
 
@@ -823,18 +772,18 @@ void texture_loading_benchmark()
 	const char* hdd_path = "E:/Users/charl/Downloads/WorkLight02_Base_Color.dds";
 	auto run_benchmark = [&](int max_mips) {
 		printf("mips: %d\n", max_mips);
-		IFilePtr ptr = FileSys::open_read(hdd_path,FileSys::FULL_SYSTEM);
+		IFilePtr ptr = FileSys::open_read(hdd_path, FileSys::FULL_SYSTEM);
 		print_time("	open file");
 
-		//ptr->read(filedata.data(), filedata.size());
+		// ptr->read(filedata.data(), filedata.size());
 		print_time("	read file");
 		Texture dummy;
-	//	load_dds_file_file(&dummy, dummy.gpu_ptr, ptr.get(), max_mips);
+		//	load_dds_file_file(&dummy, dummy.gpu_ptr, ptr.get(), max_mips);
 		print_time("	load to opengl");
 		return dummy.gpu_ptr;
 	};
 
-	for (int i = 12; i >= 1; i-=1) {
+	for (int i = 12; i >= 1; i -= 1) {
 		run_benchmark(i);
 	}
 
@@ -852,11 +801,8 @@ void texture_loading_benchmark()
 			int mipWidth = std::max(1, size.x >> mip);
 			int mipHeight = std::max(1, size.y >> mip);
 
-			glCopyImageSubData(
-				src->get_internal_handle(), GL_TEXTURE_2D, mip, 0, 0, 0,
-				new_t, GL_TEXTURE_2D, mip, 0, 0, 0,
-				mipWidth, mipHeight, 1
-			);
+			glCopyImageSubData(src->get_internal_handle(), GL_TEXTURE_2D, mip, 0, 0, 0, new_t, GL_TEXTURE_2D, mip, 0, 0,
+							   0, mipWidth, mipHeight, 1);
 		}
 		print_time("	copying done.");
 	};
@@ -866,17 +812,17 @@ void texture_loading_benchmark()
 }
 #include "MaterialLocal.h"
 
-struct StreamTextureData {
+struct StreamTextureData
+{
 	ddsFileHeader_t cached_header{};
 	int num_mips_allocated = 0;
 	int num_mips_loaded = 0;
 	float mip_lod_factor = 0.0;
-	
+
 	int wanted_mip_level = -1;
 };
 
-void benchmark_run()
-{
+void benchmark_run() {
 #if 0
 	const char* dds_file = "Data\\Textures\\Cttexturenavy.dds";
 	const char* png_file = "Data\\Textures\\Cttexturenavy.png";
@@ -909,5 +855,4 @@ void benchmark_run()
 	end = GetTime();
 	printf("DDS: %f\n", float(end - start));
 #endif
-
 }

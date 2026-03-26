@@ -13,36 +13,40 @@
 class Node_CFG;
 class Pose;
 
-struct ChannelOffset {
+struct ChannelOffset
+{
 	uint32_t pos = 0;	// float[3]
 	uint32_t rot = 0;	// float[4]
-	uint32_t scale = 0;	// float[1]
+	uint32_t scale = 0; // float[1]
 };
 
-struct ScalePositionRot {
+struct ScalePositionRot
+{
 	float scale;
 	glm::vec3 pos;
 	glm::quat rot;
 };
 
-struct SeqDirectPlayOpt {
+struct SeqDirectPlayOpt
+{
 	float blend_time = 0.2;
 	StringName slotname;
-	Easing easing=Easing::Linear;
+	Easing easing = Easing::Linear;
 };
-struct SyncMarker {
+struct SyncMarker
+{
 	StringName name;
 	int time = 0;
 };
-struct AnimCurveData {
+struct AnimCurveData
+{
 	StringName name;
-	struct Point {
-		glm::vec2 val = glm::vec2(0.0,0.0);
-		Easing interp=Easing::Linear;
+	struct Point
+	{
+		glm::vec2 val = glm::vec2(0.0, 0.0);
+		Easing interp = Easing::Linear;
 	};
-	void add_point(float time, float value, Easing interp) {
-		points.push_back({ {time,value},interp });
-	}
+	void add_point(float time, float value, Easing interp) { points.push_back({{time, value}, interp}); }
 	std::vector<Point> points;
 };
 
@@ -73,17 +77,22 @@ public:
 	int get_num_keyframes_exclusive() const { return num_frames; }
 	bool is_pose_clip() const { return num_frames == 1; }
 	uint32_t get_num_channels() const { return channel_offsets.size(); }
-	double get_clip_play_speed_for_linear_velocity(float velocity) const { return (average_linear_velocity >= 0.000001) ? velocity / average_linear_velocity : 0.0; }
+	double get_clip_play_speed_for_linear_velocity(float velocity) const {
+		return (average_linear_velocity >= 0.000001) ? velocity / average_linear_velocity : 0.0;
+	}
 	float get_duration() const { return duration; }
-	int get_frame_for_time(float time) const { 
+	int get_frame_for_time(float time) const {
 		int frame = int(time * fps);
-		if (frame < 0)return 0;
-		if (frame >= num_frames)return num_frames - 1;
+		if (frame < 0)
+			return 0;
+		if (frame >= num_frames)
+			return num_frames - 1;
 		return frame;
 	}
 	float get_time_of_keyframe(int keyframe) const { return (float)keyframe / fps; }
 	ScalePositionRot get_keyframe(int bone, int keyframe, float lerp) const;
 	const AnimationEvent* get_events_for_keyframe(int keyframe, int* out_count) const;
+
 private:
 	glm::vec3* get_pos_write_ptr(int channel, int keyframe);
 	float* get_scale_write_ptr(int channel, int keyframe);
@@ -94,9 +103,10 @@ private:
 
 // simple index remapping of bones
 class MSkeleton;
-struct BoneIndexRetargetMap {
+struct BoneIndexRetargetMap
+{
 	const MSkeleton* who = nullptr;
-	// size = bones.size() 
+	// size = bones.size()
 	std::vector<int16_t> my_skeleton_to_who;
 	std::vector<glm::quat> my_skelton_to_who_quat_delta;
 };
@@ -114,7 +124,7 @@ struct BoneData
 	std::string strname;
 	int16_t parent;
 	RetargetBoneType retarget_type = RetargetBoneType::FromAnimation;
-	glm::mat4x3 posematrix;	// bone space -> mesh space
+	glm::mat4x3 posematrix;	   // bone space -> mesh space
 	glm::mat4x3 invposematrix; // mesh space -> bone space
 	glm::mat4x3 localtransform;
 	glm::quat rot;
@@ -152,14 +162,14 @@ public:
 	const AnimationSeq* find_clip(const std::string& name) const;
 	AnimationSeq* find_clip(const std::string& name);
 	const BoneIndexRetargetMap* get_remap(const MSkeleton* other);
-	const std::vector<BoneData>& get_all_bones() const {
-		return bone_dat;
-	}
+	const std::vector<BoneData>& get_all_bones() const { return bone_dat; }
 	int get_num_animations() const { return clips.size(); }
-	struct refed_clip {
+	struct refed_clip
+	{
 		AnimationSeq* ptr = nullptr;
 	};
 	const std::unordered_map<std::string, refed_clip>& get_all_clips() const { return clips; }
+
 private:
 	// if adding data, update move_construct
 	std::vector<std::unique_ptr<BoneIndexRetargetMap>> remaps;
@@ -171,7 +181,7 @@ private:
 	friend class ModelCompileHelper;
 	friend class ModelMan;
 	friend class Model;
-	friend class AgBoneFinder;	// for accessing bones
+	friend class AgBoneFinder; // for accessing bones
 public:
 	// For use with editor
 	const std::unordered_map<std::string, refed_clip>& get_clips_hashmap() const { return clips; }

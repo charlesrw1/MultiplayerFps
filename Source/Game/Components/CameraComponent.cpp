@@ -11,8 +11,7 @@
 
 CameraComponent* CameraComponent::scene_camera;
 
-void CameraComponent::start()
-{
+void CameraComponent::start() {
 	if (eng->is_editor_level()) {
 
 		editor_mesh = get_owner()->create_component<MeshComponent>();
@@ -27,8 +26,7 @@ void CameraComponent::start()
 		update_meshbuilder();
 	}
 }
-void CameraComponent::stop()
-{
+void CameraComponent::stop() {
 	if (editor_mbview)
 		editor_mbview->destroy();
 	if (editor_mesh)
@@ -54,7 +52,6 @@ void CameraComponent::update_meshbuilder() {
 	mb.PushLine(arrow_origin[2], arrow_origin[2] + glm::vec3(f.left_plane), COLOR_BLUE);
 	mb.PushLine(arrow_origin[3], arrow_origin[3] + glm::vec3(f.bot_plane), COLOR_PINK);
 
-
 	mb.PushLine(vs.origin, arrow_origin[0], COLOR_RED);
 	mb.PushLine(vs.origin, arrow_origin[1], COLOR_GREEN);
 	mb.PushLine(vs.origin, arrow_origin[2], COLOR_BLUE);
@@ -65,12 +62,12 @@ void CameraComponent::update_meshbuilder() {
 	editor_mbview->sync_render_data();
 }
 void CameraComponent::set_is_enabled(bool b) {
-	if (is_enabled == b) return;
+	if (is_enabled == b)
+		return;
 	if (is_enabled) {
 		ASSERT(scene_camera == this);
 		scene_camera = nullptr;
-	}
-	else {
+	} else {
 		if (scene_camera) {
 			ASSERT(scene_camera->is_enabled);
 			scene_camera->is_enabled = false;
@@ -79,8 +76,7 @@ void CameraComponent::set_is_enabled(bool b) {
 		is_enabled = true;
 	}
 }
-void CameraComponent::get_view(glm::mat4& viewMatrix, float& fov)
-{
+void CameraComponent::get_view(glm::mat4& viewMatrix, float& fov) {
 	fov = this->fov;
 	viewMatrix = glm::inverse(get_ws_transform());
 }

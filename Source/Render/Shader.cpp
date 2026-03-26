@@ -27,7 +27,6 @@ public:
 				print_error_for_line_num(line_num);
 			}
 			catch (...) {
-
 			}
 		}
 	}
@@ -53,7 +52,8 @@ public:
 
 	string source;
 	int line_count = 0;
-	struct FileAndRange {
+	struct FileAndRange
+	{
 		string filename;
 		int line_start = 0;
 		int line_count = 0;
@@ -63,9 +63,7 @@ public:
 	vector<FileAndRange> ranges;
 };
 
-
-static bool read_and_add_recursive(std::string filepath, SourceAndLinenums& text, bool path_is_relative)
-{
+static bool read_and_add_recursive(std::string filepath, SourceAndLinenums& text, bool path_is_relative) {
 	std::string path = path_is_relative ? SHADER_PATH : "";
 	path += filepath;
 	std::ifstream infile(path);
@@ -74,9 +72,9 @@ static bool read_and_add_recursive(std::string filepath, SourceAndLinenums& text
 		return false;
 	}
 
-	//text += "#line 0 \"";
-	//text += filepath;
-	//text += "\"\n";
+	// text += "#line 0 \"";
+	// text += filepath;
+	// text += "\"\n";
 
 	SourceAndLinenums::FileAndRange cur_range;
 	cur_range.filename = filepath;
@@ -89,8 +87,7 @@ static bool read_and_add_recursive(std::string filepath, SourceAndLinenums& text
 		size_t pos = line.find(INCLUDE_SPECIFIER);
 		if (pos == std::string::npos) {
 			text.source.append(line + '\n');
-		}
-		else if (pos == 0) {
+		} else if (pos == 0) {
 			size_t start_file = line.find('\"');
 			if (start_file == std::string::npos) {
 				sys_print(Error, "ERROR: include not followed with filepath\n");
@@ -105,19 +102,18 @@ static bool read_and_add_recursive(std::string filepath, SourceAndLinenums& text
 			cur_range.line_count = text.line_count - cur_range.line_start;
 			text.ranges.push_back(cur_range);
 			const int pre_start = cur_range.input_line_start + cur_range.line_count;
-			read_and_add_recursive(line.substr(start_file + 1, end_file - start_file - 1), text, true /* so includes inside _glsl files work*/);
+			read_and_add_recursive(line.substr(start_file + 1, end_file - start_file - 1), text,
+								   true /* so includes inside _glsl files work*/);
 
 			cur_range.input_line_start = pre_start + 1;
 			cur_range.line_start = text.line_count;
 
-
-			//text += "#line ";
-			//text += std::to_string(linenum);
-			//text += " \"";
-			//text += filepath;
-			//text += "\"\n";
+			// text += "#line ";
+			// text += std::to_string(linenum);
+			// text += " \"";
+			// text += filepath;
+			// text += "\"\n";
 		}
-
 
 		text.line_count++;
 	}
@@ -127,9 +123,7 @@ static bool read_and_add_recursive(std::string filepath, SourceAndLinenums& text
 	return true;
 }
 
-
-static std::string get_definess_with_directive(std::string& defines)
-{
+static std::string get_definess_with_directive(std::string& defines) {
 	std::stringstream ss(defines);
 	std::string temp_define;
 	std::string defines_with_directive;
@@ -139,19 +133,17 @@ static std::string get_definess_with_directive(std::string& defines)
 	return defines_with_directive;
 }
 
-
-int count_characters(const std::string& str, char ch)
-{
+int count_characters(const std::string& str, char ch) {
 	int s = 0;
 	for (auto c : str)
 		s += int(c == ch);
 	return s;
 }
 
-static SourceAndLinenums get_source(const std::string& path, const std::string& defines, bool paths_are_relative = true)
-{
-	//std::string source = "#version 460 core\n";
-	//source += defines;
+static SourceAndLinenums get_source(const std::string& path, const std::string& defines,
+									bool paths_are_relative = true) {
+	// std::string source = "#version 460 core\n";
+	// source += defines;
 
 	SourceAndLinenums source;
 	source.source = "#version 460 core\n";
@@ -164,8 +156,7 @@ static SourceAndLinenums get_source(const std::string& path, const std::string& 
 	}
 	return source;
 }
-static bool make_shader(const char* source, GLenum type, uint32_t* gl_shader, char* error_buf, int error_buf_size)
-{
+static bool make_shader(const char* source, GLenum type, uint32_t* gl_shader, char* error_buf, int error_buf_size) {
 	int success = 0;
 
 	*gl_shader = glCreateShader(type);
@@ -180,25 +171,21 @@ static bool make_shader(const char* source, GLenum type, uint32_t* gl_shader, ch
 	return true;
 }
 
-
-
-ShaderResult Shader::compile_vert_frag_tess_single_file(
-	Shader* shader,
-	const std::string& shared_path,
-	std::string shader_defines
-)
-{
+ShaderResult Shader::compile_vert_frag_tess_single_file(Shader* shader, const std::string& shared_path,
+														std::string shader_defines) {
 	if (shader->ID != 0)
 		glDeleteProgram(shader->ID);
 	shader->ID = 0;
 
-
 	std::string defines_with_directive = get_definess_with_directive(shader_defines);
-	SourceAndLinenums vertex_source = get_source(shared_path, defines_with_directive + "\n#define _VERTEX_SHADER\n#line 0\n", false);
-	SourceAndLinenums fragment_source = get_source(shared_path, defines_with_directive + "\n#define _FRAGMENT_SHADER\n#line 0\n", false);
-	SourceAndLinenums tess_eval_source = get_source(shared_path, defines_with_directive + "\n#define _TESS_EVAL_SHADER\n#line 0\n", false);
-	SourceAndLinenums tess_ctrl_source = get_source(shared_path, defines_with_directive + "\n#define _TESS_CTRL_SHADER\n#line 0\n", false);
-
+	SourceAndLinenums vertex_source =
+		get_source(shared_path, defines_with_directive + "\n#define _VERTEX_SHADER\n#line 0\n", false);
+	SourceAndLinenums fragment_source =
+		get_source(shared_path, defines_with_directive + "\n#define _FRAGMENT_SHADER\n#line 0\n", false);
+	SourceAndLinenums tess_eval_source =
+		get_source(shared_path, defines_with_directive + "\n#define _TESS_EVAL_SHADER\n#line 0\n", false);
+	SourceAndLinenums tess_ctrl_source =
+		get_source(shared_path, defines_with_directive + "\n#define _TESS_CTRL_SHADER\n#line 0\n", false);
 
 	if (vertex_source.empty() || fragment_source.empty() || tess_eval_source.empty() || tess_ctrl_source.empty()) {
 		sys_print(Error, "Parse fail  single file with tess %s\n", shared_path.c_str());
@@ -231,7 +218,8 @@ ShaderResult Shader::compile_vert_frag_tess_single_file(
 	}
 	good = make_shader(tess_ctrl_source.c_str(), GL_TESS_CONTROL_SHADER, &tess_control, infolog, 512);
 	if (!good) {
-		sys_print(Error, "Error: tesselation control shader (%s) compiliation failed: %s\n", shared_path.c_str(), infolog);
+		sys_print(Error, "Error: tesselation control shader (%s) compiliation failed: %s\n", shared_path.c_str(),
+				  infolog);
 		return ShaderResult::SHADER_COMPILE_FAIL;
 	}
 
@@ -258,22 +246,19 @@ ShaderResult Shader::compile_vert_frag_tess_single_file(
 	shader->ID = program;
 
 	return ShaderResult::SHADER_SUCCESS;
-
 }
 
-ShaderResult Shader::compile_vert_frag_single_file(
-	Shader* shader,
-	const std::string& shared_path,
-	std::string shader_defines
-)
-{
+ShaderResult Shader::compile_vert_frag_single_file(Shader* shader, const std::string& shared_path,
+												   std::string shader_defines) {
 	if (shader->ID != 0)
 		glDeleteProgram(shader->ID);
 	shader->ID = 0;
 
 	std::string defines_with_directive = get_definess_with_directive(shader_defines);
-	SourceAndLinenums vertex_source = get_source(shared_path, defines_with_directive + "\n#define _VERTEX_SHADER\n#line 0\n", false);
-	SourceAndLinenums fragment_source = get_source(shared_path, defines_with_directive + "\n#define _FRAGMENT_SHADER\n#line 0\n", false);
+	SourceAndLinenums vertex_source =
+		get_source(shared_path, defines_with_directive + "\n#define _VERTEX_SHADER\n#line 0\n", false);
+	SourceAndLinenums fragment_source =
+		get_source(shared_path, defines_with_directive + "\n#define _FRAGMENT_SHADER\n#line 0\n", false);
 
 	if (vertex_source.empty() || fragment_source.empty()) {
 		sys_print(Error, "Shader::compile_vert_frag_single_file: Parse fail single file %s\n", shared_path.c_str());
@@ -322,14 +307,8 @@ ShaderResult Shader::compile_vert_frag_single_file(
 	return ShaderResult::SHADER_SUCCESS;
 }
 
-bool Shader::compile(
-	Shader& shader,
-	const std::string& vertex_path,
-	const std::string& fragment_path,
-	const std::string& geometry_path,
-	std::string shader_defines
-)
-{
+bool Shader::compile(Shader& shader, const std::string& vertex_path, const std::string& fragment_path,
+					 const std::string& geometry_path, std::string shader_defines) {
 	if (shader.ID != 0)
 		glDeleteProgram(shader.ID);
 	shader.ID = 0;
@@ -339,9 +318,9 @@ bool Shader::compile(
 	SourceAndLinenums fragment_source = get_source(fragment_path, defines_with_directive);
 	SourceAndLinenums geometry_source = get_source(geometry_path, defines_with_directive);
 
-
 	if (vertex_source.empty() || fragment_source.empty() || geometry_source.empty()) {
-		sys_print(Error, "Parse fail normal w geo %s %s %s\n", vertex_path.c_str(), fragment_path.c_str(), geometry_path.c_str());
+		sys_print(Error, "Parse fail normal w geo %s %s %s\n", vertex_path.c_str(), fragment_path.c_str(),
+				  geometry_path.c_str());
 		return false;
 	}
 
@@ -394,13 +373,8 @@ bool Shader::compile(
 	return true;
 }
 
-ShaderResult Shader::compile(
-	Shader* shader,
-	const std::string& vertex_path,
-	const std::string& fragment_path,
-	std::string shader_defines
-)
-{
+ShaderResult Shader::compile(Shader* shader, const std::string& vertex_path, const std::string& fragment_path,
+							 std::string shader_defines) {
 	if (shader->ID != 0)
 		glDeleteProgram(shader->ID);
 	shader->ID = 0;
@@ -456,8 +430,7 @@ ShaderResult Shader::compile(
 	return ShaderResult::SHADER_SUCCESS;
 }
 
-ShaderResult Shader::compute_compile(Shader* shader, const std::string& compute_path, std::string shader_defines)
-{
+ShaderResult Shader::compute_compile(Shader* shader, const std::string& compute_path, std::string shader_defines) {
 	if (shader->ID != 0)
 		glDeleteProgram(shader->ID);
 	shader->ID = 0;
@@ -504,54 +477,41 @@ ShaderResult Shader::compute_compile(Shader* shader, const std::string& compute_
 	return ShaderResult::SHADER_SUCCESS;
 }
 
-void Shader::use()
-{
+void Shader::use() {
 	glUseProgram(ID);
 }
-void Shader::set_bool(const char* name, bool value)
-{
+void Shader::set_bool(const char* name, bool value) {
 	glUniform1i(glGetUniformLocation(ID, name), (int)value);
 }
-void Shader::set_int(const char* name, int value)
-{
+void Shader::set_int(const char* name, int value) {
 	glUniform1i(glGetUniformLocation(ID, name), value);
 }
-void Shader::set_uint(const char* name, unsigned int value)
-{
+void Shader::set_uint(const char* name, unsigned int value) {
 	glUniform1ui(glGetUniformLocation(ID, name), value);
 }
-void Shader::set_float(const char* name, float value)
-{
+void Shader::set_float(const char* name, float value) {
 	glUniform1f(glGetUniformLocation(ID, name), value);
 }
-void Shader::set_mat4(const char* name, glm::mat4 value)
-{
+void Shader::set_mat4(const char* name, glm::mat4 value) {
 	glUniformMatrix4fv(glGetUniformLocation(ID, name), 1, GL_FALSE, glm::value_ptr(value));
 }
-void Shader::set_vec3(const char* name, glm::vec3 value)
-{
+void Shader::set_vec3(const char* name, glm::vec3 value) {
 	glUniform3f(glGetUniformLocation(ID, name), value.r, value.g, value.b);
 }
-void Shader::set_vec2(const char* name, glm::vec2 value)
-{
+void Shader::set_vec2(const char* name, glm::vec2 value) {
 	glUniform2f(glGetUniformLocation(ID, name), value.x, value.y);
 }
 
-void Shader::set_vec4(const char* name, glm::vec4 value)
-{
+void Shader::set_vec4(const char* name, glm::vec4 value) {
 	glUniform4f(glGetUniformLocation(ID, name), value.x, value.y, value.z, value.w);
 }
-void Shader::set_ivec2(const char* name, glm::ivec2 value)
-{
+void Shader::set_ivec2(const char* name, glm::ivec2 value) {
 	glUniform2i(glGetUniformLocation(ID, name), value.x, value.y);
 }
-void Shader::set_ivec3(const char* name, glm::ivec3 value)
-{
+void Shader::set_ivec3(const char* name, glm::ivec3 value) {
 	glUniform3i(glGetUniformLocation(ID, name), value.x, value.y, value.z);
 }
 
-
-void Shader::set_block_binding(const char* name, int block_binding)
-{
+void Shader::set_block_binding(const char* name, int block_binding) {
 	glUniformBlockBinding(ID, glGetUniformBlockIndex(ID, name), block_binding);
 }

@@ -9,13 +9,8 @@
 #include "Framework/StringUtils.h"
 
 // Save OpenGL cubemap array to DDS (RGB32F, uncompressed)
-bool SaveCubeArrayToDDS(GLuint texture,
-	uint32_t width,
-	uint32_t height,
-	uint32_t mipLevels,
-	uint32_t cubeCount,
-	const char* filename)
-{
+bool SaveCubeArrayToDDS(GLuint texture, uint32_t width, uint32_t height, uint32_t mipLevels, uint32_t cubeCount,
+						const char* filename) {
 	const uint32_t facesPerCube = 6;
 	const uint32_t arraySize = cubeCount * facesPerCube;
 	using namespace DirectX;
@@ -37,8 +32,7 @@ bool SaveCubeArrayToDDS(GLuint texture,
 
 	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, texture);
 
-	for (uint32_t mip = 0; mip < mipLevels; ++mip)
-	{
+	for (uint32_t mip = 0; mip < mipLevels; ++mip) {
 		uint32_t mipWidth = std::max(1u, width >> mip);
 		uint32_t mipHeight = std::max(1u, height >> mip);
 
@@ -47,31 +41,17 @@ bool SaveCubeArrayToDDS(GLuint texture,
 
 		std::vector<float> buffer(pixelCount * 3);
 
-		for (uint32_t layer = 0; layer < arraySize; ++layer)
-		{
+		for (uint32_t layer = 0; layer < arraySize; ++layer) {
 			// Read mip/layer from OpenGL
-			glGetTextureSubImage(texture,
-				mip,
-				0, 0, layer,
-				mipWidth,
-				mipHeight,
-				1,
-				GL_RGB,
-				GL_FLOAT,
-				dataSize,
-				buffer.data());
+			glGetTextureSubImage(texture, mip, 0, 0, layer, mipWidth, mipHeight, 1, GL_RGB, GL_FLOAT, dataSize,
+								 buffer.data());
 
 			const Image* img = image.GetImage(mip, layer, 0);
 			memcpy(img->pixels, buffer.data(), dataSize);
 		}
 	}
 	std::wstring wfilename(filename, filename + strlen(filename));
-	hr = SaveToDDSFile(image.GetImages(),
-		image.GetImageCount(),
-		metadata,
-		DDS_FLAGS_FORCE_DX10_EXT,
-		wfilename.c_str());
-
+	hr = SaveToDDSFile(image.GetImages(), image.GetImageCount(), metadata, DDS_FLAGS_FORCE_DX10_EXT, wfilename.c_str());
 
 	std::string parentDir = filename;
 	auto findSlash = parentDir.rfind('/');
@@ -90,8 +70,8 @@ bool SaveCubeArrayToDDS(GLuint texture,
 	STARTUPINFOA startup = {};
 	PROCESS_INFORMATION out = {};
 
-
-	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup, &out)) {
+	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup,
+						&out)) {
 		sys_print(Error, "couldn't create process\n");
 		return false;
 	}
@@ -102,12 +82,7 @@ bool SaveCubeArrayToDDS(GLuint texture,
 	return SUCCEEDED(hr);
 }
 
-bool save_float_texture_as_dds(GLuint texture,
-	uint32_t width,
-	uint32_t height,
-	int mode,
-	const char* filename)
-{
+bool save_float_texture_as_dds(GLuint texture, uint32_t width, uint32_t height, int mode, const char* filename) {
 
 	using namespace DirectX;
 	// Setup DDS metadata
@@ -128,8 +103,7 @@ bool save_float_texture_as_dds(GLuint texture,
 
 	glBindTexture(GL_TEXTURE_2D, texture);
 
-	for (uint32_t mip = 0; mip < 1; ++mip)
-	{
+	for (uint32_t mip = 0; mip < 1; ++mip) {
 		uint32_t mipWidth = std::max(1u, width >> mip);
 		uint32_t mipHeight = std::max(1u, height >> mip);
 
@@ -138,15 +112,9 @@ bool save_float_texture_as_dds(GLuint texture,
 
 		std::vector<float> buffer(pixelCount * 3);
 
-		for (uint32_t layer = 0; layer < 1; ++layer)
-		{
+		for (uint32_t layer = 0; layer < 1; ++layer) {
 			// Read mip/layer from OpenGL
-			glGetTextureImage(texture,
-				mip,
-				GL_RGB,
-				GL_FLOAT,
-				dataSize,
-				buffer.data());
+			glGetTextureImage(texture, mip, GL_RGB, GL_FLOAT, dataSize, buffer.data());
 
 			const Image* img = image.GetImage(mip, layer, 0);
 			memcpy(img->pixels, buffer.data(), dataSize);
@@ -161,24 +129,17 @@ bool save_float_texture_as_dds(GLuint texture,
 	else if (mode == 1)
 		out_fmt = DXGI_FORMAT_R11G11B10_FLOAT;
 
-	hr = Convert(
-		*image.GetImage(0, 0, 0),     // source image
-		out_fmt,					// target format
-		TEX_FILTER_DEFAULT,            // optional filter
-		TEX_THRESHOLD_DEFAULT,         // optional threshold
-		dstImage                        // output
+	hr = Convert(*image.GetImage(0, 0, 0), // source image
+				 out_fmt,				   // target format
+				 TEX_FILTER_DEFAULT,	   // optional filter
+				 TEX_THRESHOLD_DEFAULT,	   // optional threshold
+				 dstImage				   // output
 	);
 
-
 	std::wstring wfilename(filename, filename + strlen(filename));
-	
-	hr = SaveToDDSFile(dstImage.GetImages(),
-		dstImage.GetImageCount(),
-		dstImage.GetMetadata(),
-		DDS_FLAGS_FORCE_DX10_EXT,
-		wfilename.c_str());
 
-
+	hr = SaveToDDSFile(dstImage.GetImages(), dstImage.GetImageCount(), dstImage.GetMetadata(), DDS_FLAGS_FORCE_DX10_EXT,
+					   wfilename.c_str());
 
 	std::string parentDir = filename;
 	auto findSlash = parentDir.rfind('/');
@@ -197,8 +158,8 @@ bool save_float_texture_as_dds(GLuint texture,
 	STARTUPINFOA startup = {};
 	PROCESS_INFORMATION out = {};
 
-
-	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup, &out)) {
+	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup,
+						&out)) {
 		sys_print(Error, "couldn't create process\n");
 		return false;
 	}

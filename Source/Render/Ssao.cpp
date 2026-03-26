@@ -8,19 +8,17 @@
 #include "Assets/AssetDatabase.h"
 #include "IGraphsDevice.h"
 
-void draw_hbao_menu()
-{
+void draw_hbao_menu() {
 	ImGui::DragFloat("radius", &draw.ssao.tweak.radius, 0.05, 0.f);
 	ImGui::DragFloat("sharpness", &draw.ssao.tweak.blur_sharpness, 0.05, 0);
-	ImGui::DragFloat("bias", &draw.ssao.tweak.bias, 0.001,0, 0.999);
+	ImGui::DragFloat("bias", &draw.ssao.tweak.bias, 0.001, 0, 0.999);
 	ImGui::DragFloat("intensity", &draw.ssao.tweak.intensity, 0.05, 0);
 }
 
 static const int NOISE_RES = 4;
 static const int NUM_MRT = 8;
 
-void SSAO_System::init()
-{
+void SSAO_System::init() {
 
 	texture.result_vts_handle = Texture::install_system("_ssao_result");
 	texture.blur_vts_handle = Texture::install_system("_ssao_blur");
@@ -37,12 +35,11 @@ void SSAO_System::init()
 
 	std::mt19937 rmt;
 
-	const float numDir = 8;  // keep in sync to glsl
+	const float numDir = 8; // keep in sync to glsl
 
 	signed short hbaoRandomShort[RANDOM_ELEMENTS * 4];
 
-	for (int i = 0; i < RANDOM_ELEMENTS; i++)
-	{
+	for (int i = 0; i < RANDOM_ELEMENTS; i++) {
 		float Rand1 = static_cast<float>(rmt()) / 4294967296.0f;
 		float Rand2 = static_cast<float>(rmt()) / 4294967296.0f;
 
@@ -67,18 +64,15 @@ void SSAO_System::init()
 	glTextureParameteri(texture.random, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 
-Shader make_program(const char* vert, const char* frag, const std::string& defines = "")
-{
+Shader make_program(const char* vert, const char* frag, const std::string& defines = "") {
 	Shader ret{};
 	Shader::compile(&ret, vert, frag, defines);
 	return ret;
 }
 
-
-void SSAO_System::reload_shaders()
-{
+void SSAO_System::reload_shaders() {
 	auto& prog_man = draw.get_prog_man();
-	prog.hbao_calc= prog_man.create_raster( "fullscreenquad.txt", "hbao/hbao.txt");
+	prog.hbao_calc = prog_man.create_raster("fullscreenquad.txt", "hbao/hbao.txt");
 	prog.hbao_blur = prog_man.create_raster("fullscreenquad.txt", "hbao/hbaoblur.txt");
 	prog.hbao_deinterleave = prog_man.create_raster("fullscreenquad.txt", "hbao/hbaodeinterleave.txt");
 	prog.hbao_reinterleave = prog_man.create_raster("fullscreenquad.txt", "hbao/hbaoreinterleave.txt");
@@ -86,17 +80,15 @@ void SSAO_System::reload_shaders()
 	prog.make_viewspace_normals = prog_man.create_raster("fullscreenquad.txt", "hbao/viewnormal.txt");
 }
 
-
-void SSAO_System::make_render_targets(bool initial, int width, int height)
-{
+void SSAO_System::make_render_targets(bool initial, int width, int height) {
 	if (!initial) {
 		glDeleteTextures(1, &texture.depthlinear);
 		glDeleteFramebuffers(1, &fbo.depthlinear);
-		//glDeleteTextures(1, &texture.viewnormal);
+		// glDeleteTextures(1, &texture.viewnormal);
 		glDeleteFramebuffers(1, &fbo.viewnormal);
 
-		//glDeleteTextures(1, &texture.result);
-		//glDeleteTextures(1, &texture.blur);
+		// glDeleteTextures(1, &texture.result);
+		// glDeleteTextures(1, &texture.blur);
 		safe_release(texture.blurred);
 		safe_release(texture.result);
 		safe_release(texture.viewnormal);
@@ -107,9 +99,7 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 
 		glDeleteTextures(1, &texture.deptharray);
 
-
 		glDeleteTextures(1, &texture.resultarray);
-
 
 		glDeleteFramebuffers(1, &fbo.hbao2_calc);
 	}
@@ -132,20 +122,20 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 		args.sampler_type = GraphicsSamplerType::NearestClamped;
 		texture.viewnormal = IGraphicsDevice::inst->create_texture(args);
 	}
-	//glCreateTextures(GL_TEXTURE_2D, 1, &texture.viewnormal);
-	//glTextureStorage2D(texture.viewnormal, 1, GL_RGBA8, width, height);
-	//glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	//glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	//glTextureParameteri(texture.viewnormal, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	//glTextureParameteri(texture.viewnormal, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	// glCreateTextures(GL_TEXTURE_2D, 1, &texture.viewnormal);
+	// glTextureStorage2D(texture.viewnormal, 1, GL_RGBA8, width, height);
+	// glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	// glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	// glTextureParameteri(texture.viewnormal, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	// glTextureParameteri(texture.viewnormal, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	glCreateFramebuffers(1, &fbo.viewnormal);
 	glNamedFramebufferTexture(fbo.viewnormal, GL_COLOR_ATTACHMENT0, texture.viewnormal->get_internal_handle(), 0);
 
-	//glCreateTextures(GL_TEXTURE_2D, 1, &texture.result);
-	//glTextureStorage2D(texture.result, 1, GL_RG16F, width, height);
-	//glTextureParameteri(texture.result, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	//glTextureParameteri(texture.result, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	// glCreateTextures(GL_TEXTURE_2D, 1, &texture.result);
+	// glTextureStorage2D(texture.result, 1, GL_RG16F, width, height);
+	// glTextureParameteri(texture.result, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	// glTextureParameteri(texture.result, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	CreateTextureArgs resultArgs;
 	resultArgs.width = width;
@@ -155,10 +145,10 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	texture.result = IGraphicsDevice::inst->create_texture(resultArgs);
 	texture.blurred = IGraphicsDevice::inst->create_texture(resultArgs);
 
-//	glCreateTextures(GL_TEXTURE_2D, 1, &texture.blur);
-	//glTextureStorage2D(texture.blur, 1, GL_RG16F, width, height);
-	//glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	//glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	//	glCreateTextures(GL_TEXTURE_2D, 1, &texture.blur);
+	// glTextureStorage2D(texture.blur, 1, GL_RG16F, width, height);
+	// glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	// glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
 	glCreateFramebuffers(1, &fbo.finalresolve);
 	glNamedFramebufferTexture(fbo.finalresolve, GL_COLOR_ATTACHMENT0, texture.result->get_internal_handle(), 0);
@@ -173,15 +163,12 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	int quarterWidth = ((width + 3) / 4);
 	int quarterHeight = ((height + 3) / 4);
 
-
 	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.deptharray);
 	glTextureStorage3D(texture.deptharray, 1, GL_R32F, quarterWidth, quarterHeight, RANDOM_ELEMENTS);
 	glTextureParameteri(texture.deptharray, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTextureParameteri(texture.deptharray, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTextureParameteri(texture.deptharray, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTextureParameteri(texture.deptharray, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	
 
 	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.resultarray);
 	glTextureStorage3D(texture.resultarray, 1, GL_RG16F, quarterWidth, quarterHeight, RANDOM_ELEMENTS);
@@ -191,7 +178,7 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	glTextureParameteri(texture.resultarray, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	glCreateFramebuffers(1, &fbo.hbao2_calc);
-	//glNamedFramebufferTexture(fbo.hbao2_calc, GL_COLOR_ATTACHMENT0, texture.resultarray, 0);
+	// glNamedFramebufferTexture(fbo.hbao2_calc, GL_COLOR_ATTACHMENT0, texture.resultarray, 0);
 
 	// render viewspace normals and linear depth
 	// deinterleave
@@ -206,15 +193,14 @@ void SSAO_System::make_render_targets(bool initial, int width, int height)
 	texture.result_vts_handle->update_specs_ptr(texture.blurred);
 	// FIXME
 	texture.view_normal_vts_handle->update_specs_ptr(texture.viewnormal);
-	//texture.view_normal_vts_handle->update_specs(texture.viewnormal, width, height, 4, {});
-	//texture.linear_depth_vts_handle->update_specs(texture.depthlinear, width, height, 4, {});
+	// texture.view_normal_vts_handle->update_specs(texture.viewnormal, width, height, 4, {});
+	// texture.linear_depth_vts_handle->update_specs(texture.depthlinear, width, height, 4, {});
 }
 
 #define USE_AO_LAYERED_SINGLEPASS 2
 const int HBAO_RANDOM_ELEMENTS = 4 * 4;
 
-void SSAO_System::update_ubo()
-{
+void SSAO_System::update_ubo() {
 	// projection
 
 	const auto& viewsetup = draw.current_frame_view;
@@ -225,17 +211,17 @@ void SSAO_System::update_ubo()
 	const float* P = glm::value_ptr(proj_matrix);
 
 	float projInfoPerspective[] = {
-		2.0f / (P[4 * 0 + 0]),                  // (x) * (R - L)/N
-		2.0f / (P[4 * 1 + 1]),                  // (y) * (T - B)/N
-		-(1.0f - P[4 * 2 + 0]) / P[4 * 0 + 0],  // L/N
-		-(1.0f + P[4 * 2 + 1]) / P[4 * 1 + 1],  // B/N
+		2.0f / (P[4 * 0 + 0]),				   // (x) * (R - L)/N
+		2.0f / (P[4 * 1 + 1]),				   // (y) * (T - B)/N
+		-(1.0f - P[4 * 2 + 0]) / P[4 * 0 + 0], // L/N
+		-(1.0f + P[4 * 2 + 1]) / P[4 * 1 + 1], // B/N
 	};
 
 	float projInfoOrtho[] = {
-		2.0f / (P[4 * 0 + 0]),                  // ((x) * R - L)
-		2.0f / (P[4 * 1 + 1]),                  // ((y) * T - B)
-		-(1.0f + P[4 * 3 + 0]) / P[4 * 0 + 0],  // L
-		-(1.0f - P[4 * 3 + 1]) / P[4 * 1 + 1],  // B
+		2.0f / (P[4 * 0 + 0]),				   // ((x) * R - L)
+		2.0f / (P[4 * 1 + 1]),				   // ((y) * T - B)
+		-(1.0f + P[4 * 3 + 0]) / P[4 * 0 + 0], // L
+		-(1.0f - P[4 * 3 + 1]) / P[4 * 1 + 1], // B
 	};
 
 	int useOrtho = false;
@@ -243,12 +229,9 @@ void SSAO_System::update_ubo()
 	data.projInfo = useOrtho ? glm::make_vec4(projInfoOrtho) : glm::make_vec4(projInfoPerspective);
 
 	float projScale;
-	if (useOrtho)
-	{
+	if (useOrtho) {
 		projScale = float(height) / (projInfoOrtho[1]);
-	}
-	else
-	{
+	} else {
 		projScale = float(height) / (tanf(proj_fov * 0.5f) * 2.0f);
 	}
 
@@ -272,8 +255,7 @@ void SSAO_System::update_ubo()
 	data.InvFullResolution = vec2(1.0f / float(width), 1.0f / float(height));
 
 #if USE_AO_LAYERED_SINGLEPASS
-	for (int i = 0; i < HBAO_RANDOM_ELEMENTS; i++)
-	{
+	for (int i = 0; i < HBAO_RANDOM_ELEMENTS; i++) {
 		data.float2Offsets[i] = vec4(float(i % 4) + 0.5f, float(i / 4) + 0.5f, 0.0f, 0.0f);
 		data.jitters[i] = random_elements[i];
 	}
@@ -281,18 +263,16 @@ void SSAO_System::update_ubo()
 
 	glNamedBufferSubData(ubo.data, 0, sizeof(gpu::HBAOData), &data);
 }
-ConfigVar r_ssao_blur("r.ssao_blur", "1", CVAR_BOOL | CVAR_DEV,"option to disable ssao blur for debug");
-void SSAO_System::render()
-{
+ConfigVar r_ssao_blur("r.ssao_blur", "1", CVAR_BOOL | CVAR_DEV, "option to disable ssao blur for debug");
+void SSAO_System::render() {
 
 	GPUFUNCTIONSTART;
 	const auto& viewsetup = draw.current_frame_view;
 	int v_w = viewsetup.width;
 	int v_h = viewsetup.height;
 
-
 	if (width != v_w || height != v_h)
-		make_render_targets(false, v_w,v_h);
+		make_render_targets(false, v_w, v_h);
 
 	update_ubo();
 
@@ -317,15 +297,9 @@ void SSAO_System::render()
 		float near = viewsetup.near;
 		float far = viewsetup.far;
 		//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.depthlinear);
-		//prog.linearize_depth.use();
-		shader.set_vec4("clipInfo", glm::vec4(
-			near * far,
-			near - far,
-			far,
-			1.0
-		));
+		// prog.linearize_depth.use();
+		shader.set_vec4("clipInfo", glm::vec4(near * far, near - far, far, 1.0));
 		shader.set_float("zNear", near);
-
 
 		glBindTextureUnit(0, draw.tex.scene_depth->get_internal_handle());
 		glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -346,7 +320,7 @@ void SSAO_System::render()
 		auto shader = device.shader();
 
 		//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.viewnormal);
-		//prog.make_viewspace_normals.use();
+		// prog.make_viewspace_normals.use();
 		shader.set_int("projOrtho", 0);
 		shader.set_vec4("projInfo", data.projInfo);
 		shader.set_vec2("InvFullResolution", data.InvFullResolution);
@@ -356,7 +330,8 @@ void SSAO_System::render()
 
 	// deinterleave, writes to texture.deptharray
 	{
-		RenderPassSetup setup("hbao2_deinterleave", fbo.hbao2_deinterleave, false, false, 0, 0, quarterWidth, quarterHeight);
+		RenderPassSetup setup("hbao2_deinterleave", fbo.hbao2_deinterleave, false, false, 0, 0, quarterWidth,
+							  quarterHeight);
 		auto scope = device.start_render_pass(setup);
 
 		RenderPipelineState state;
@@ -369,22 +344,18 @@ void SSAO_System::render()
 		//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_deinterleave);
 		//*glViewport(0, 0, quarterWidth, quarterHeight);
 		glBindTextureUnit(0, texture.depthlinear);
-		//prog.hbao_deinterleave.use();
+		// prog.hbao_deinterleave.use();
 		// two passes
 		for (int i = 0; i < RANDOM_ELEMENTS; i += NUM_MRT) {
-			shader.set_vec4("info", glm::vec4(
-				float(i % 4) + 0.5f,
-				float(i / 4) + 0.5f,
-				data.InvFullResolution.x,
-				data.InvFullResolution.y
-			));
+			shader.set_vec4("info", glm::vec4(float(i % 4) + 0.5f, float(i / 4) + 0.5f, data.InvFullResolution.x,
+											  data.InvFullResolution.y));
 
 			for (int layer = 0; layer < NUM_MRT; layer++) {
-				glNamedFramebufferTextureLayer(fbo.hbao2_deinterleave, GL_COLOR_ATTACHMENT0 + layer,
-					texture.deptharray, 0, i+layer);
+				glNamedFramebufferTextureLayer(fbo.hbao2_deinterleave, GL_COLOR_ATTACHMENT0 + layer, texture.deptharray,
+											   0, i + layer);
 			}
-				//glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, texture.depthview[i + layer], 0);
-			
+			// glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, texture.depthview[i + layer], 0);
+
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 		}
 	}
@@ -412,7 +383,7 @@ void SSAO_System::render()
 
 			glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.data);
 
-			//prog.hbao_calc.use();
+			// prog.hbao_calc.use();
 
 			glDrawArrays(GL_TRIANGLES, 0, 3);
 		}
@@ -435,7 +406,7 @@ void SSAO_System::render()
 			//*glViewport(0, 0, width, height);
 			glNamedFramebufferDrawBuffer(fbo.finalresolve, GL_COLOR_ATTACHMENT0);
 			//*glDrawBuffer(GL_COLOR_ATTACHMENT0);
-			//prog.hbao_reinterleave.use();
+			// prog.hbao_reinterleave.use();
 
 			glBindTextureUnit(0, texture.resultarray);
 
@@ -443,8 +414,7 @@ void SSAO_System::render()
 		}
 
 		// depth aware blur, writes to texture.result
-		if(r_ssao_blur.get_bool())
-		{
+		if (r_ssao_blur.get_bool()) {
 			RenderPipelineState state;
 			state.vao = draw.get_empty_vao();
 			state.depth_testing = state.depth_writes = false;
@@ -452,32 +422,25 @@ void SSAO_System::render()
 			device.set_pipeline(state);
 			auto shader = device.shader();
 
-			//prog.hbao_blur.use();
+			// prog.hbao_blur.use();
 			// framebuffer = fbo.finalresolve
 			glNamedFramebufferDrawBuffer(fbo.finalresolve, GL_COLOR_ATTACHMENT1);
 			//*glDrawBuffer(GL_COLOR_ATTACHMENT1);
 			glBindTextureUnit(0, texture.result->get_internal_handle());
-			shader.set_float("g_Sharpness",
-				tweak.blur_sharpness);
-			shader.set_vec2("g_InvResolutionDirection", glm::vec2(
-				1.0f / float(width),
-				0
-			));
-			glDrawArrays(GL_TRIANGLES, 0, 3);	// read from .result and write to .blur
+			shader.set_float("g_Sharpness", tweak.blur_sharpness);
+			shader.set_vec2("g_InvResolutionDirection", glm::vec2(1.0f / float(width), 0));
+			glDrawArrays(GL_TRIANGLES, 0, 3); // read from .result and write to .blur
 
 			glNamedFramebufferDrawBuffer(fbo.finalresolve, GL_COLOR_ATTACHMENT0);
 			//*glDrawBuffer(GL_COLOR_ATTACHMENT0);
 			glBindTextureUnit(0, texture.blurred->get_internal_handle());
-			shader.set_vec2("g_InvResolutionDirection", glm::vec2(
-				0,
-				1.0f / float(height)
-			));
-			glDrawArrays(GL_TRIANGLES, 0, 3);	// read from .blur and write to .result
+			shader.set_vec2("g_InvResolutionDirection", glm::vec2(0, 1.0f / float(height)));
+			glDrawArrays(GL_TRIANGLES, 0, 3); // read from .blur and write to .result
 		}
 	}
 
 	device.reset_states();
 	//*glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	//glEnable(GL_DEPTH_TEST);
-	//glUseProgram(0);
+	// glEnable(GL_DEPTH_TEST);
+	// glUseProgram(0);
 }

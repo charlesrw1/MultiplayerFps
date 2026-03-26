@@ -5,16 +5,16 @@
 
 const char* const CLASSNAME = "classname";
 
-//extern string serialize_build_relative_path(const char* from, const char* to);
-//extern string unserialize_relative_to_absolute(const char* relative, const char* root);
+// extern string serialize_build_relative_path(const char* from, const char* to);
+// extern string unserialize_relative_to_absolute(const char* relative, const char* root);
 
 using std::vector;
 
-vector<string> split_path(const string& path, char delimiter='/') {
+vector<string> split_path(const string& path, char delimiter = '/') {
 	vector<string> result;
 	size_t start = 0;
 	size_t end = 0;
-	while ((end = path.find(delimiter, start)) !=  string::npos) {
+	while ((end = path.find(delimiter, start)) != string::npos) {
 		if (end != start) // skip empty segments
 			result.emplace_back(path.substr(start, end - start));
 		start = end + 1;
@@ -26,8 +26,7 @@ vector<string> split_path(const string& path, char delimiter='/') {
 	return result;
 }
 
-vector<string> make_relative_path(const vector<string>& from, const vector<string>& to)
-{
+vector<string> make_relative_path(const vector<string>& from, const vector<string>& to) {
 	size_t common = 0;
 	while (common < from.size() && common < to.size() && from[common] == to[common]) {
 		++common;
@@ -45,16 +44,14 @@ vector<string> make_relative_path(const vector<string>& from, const vector<strin
 	return result;
 }
 
-
-vector<string> resolve_relative_path(const vector<string>& base, const vector<string>& relative)
-{
+vector<string> resolve_relative_path(const vector<string>& base, const vector<string>& relative) {
 	vector<string> result = base;
 
 	for (const auto& part : relative) {
 		if (part == "..") {
-			if (!result.empty()) result.pop_back(); // go up one level
-		}
-		else if (part != ".") {
+			if (!result.empty())
+				result.pop_back(); // go up one level
+		} else if (part != ".") {
 			result.push_back(part); // descend into directory or file
 		}
 	}
@@ -66,13 +63,13 @@ string combine_path(const vector<string>& paths) {
 	string out;
 	for (auto& p : paths)
 		out += p + "/";
-	if (!out.empty()) out.pop_back();
+	if (!out.empty())
+		out.pop_back();
 	return out;
 }
 
-
-void WriteSerializerBackendJson::serialize_class_shared(opt<const char*> tag, const ClassTypeInfo& info, ClassBase*& ptr, bool is_only_reference)
-{
+void WriteSerializerBackendJson::serialize_class_shared(opt<const char*> tag, const ClassTypeInfo& info,
+														ClassBase*& ptr, bool is_only_reference) {
 	const bool is_array = !tag.has_value();
 
 	if (!ptr) {
@@ -84,7 +81,7 @@ void WriteSerializerBackendJson::serialize_class_shared(opt<const char*> tag, co
 		return;
 	}
 
-	//string path = pathmaker.make_path(ptr);
+	// string path = pathmaker.make_path(ptr);
 	auto [path, is_subobject] = pathmaker.make_path(ptr);
 	vector<string> path_s = split_path(path);
 	assert(!path_s.empty());
@@ -101,13 +98,12 @@ void WriteSerializerBackendJson::serialize_class_shared(opt<const char*> tag, co
 	if (pathtowrite.empty())
 		pathtowrite = path;
 
-
 	if (is_array)
 		serialize_ar(pathtowrite);
 	else
 		serialize(tag.value(), pathtowrite);
 
-	if(!is_only_reference)
+	if (!is_only_reference)
 		write_queue.push_back(ptr);
 
 	if (!MapUtil::contains(paths_to_objects, path)) {
@@ -116,8 +112,7 @@ void WriteSerializerBackendJson::serialize_class_shared(opt<const char*> tag, co
 	}
 }
 
-void WriteSerializerBackendJson::write_actual_class(ClassBase* ptr, const string& path)
-{
+void WriteSerializerBackendJson::write_actual_class(ClassBase* ptr, const string& path) {
 	assert(ptr);
 	assert(!currently_writing_class);
 
@@ -137,9 +132,9 @@ void WriteSerializerBackendJson::write_actual_class(ClassBase* ptr, const string
 	}
 }
 
-WriteSerializerBackendJson::WriteSerializerBackendJson(const char* debug_tag, IMakePathForObject& pathmaker, ClassBase& obj_to_serialize, bool serialize_single_object) 
-	: pathmaker(pathmaker), debug_tag(debug_tag),serialize_single_object(serialize_single_object)
-{
+WriteSerializerBackendJson::WriteSerializerBackendJson(const char* debug_tag, IMakePathForObject& pathmaker,
+													   ClassBase& obj_to_serialize, bool serialize_single_object)
+	: pathmaker(pathmaker), debug_tag(debug_tag), serialize_single_object(serialize_single_object) {
 	if (!serialize_single_object) {
 		stack.push_back(&obj);
 		{
@@ -172,9 +167,8 @@ WriteSerializerBackendJson::WriteSerializerBackendJson(const char* debug_tag, IM
 			}
 		}
 		end_obj();
-	}
-	else {
-		stack.push_back({ &obj });
+	} else {
+		stack.push_back({&obj});
 		ClassBase* ptr = &obj_to_serialize;
 		assert(!currently_writing_class);
 		currently_writing_class = ptr;
@@ -194,64 +188,55 @@ WriteSerializerBackendJson::WriteSerializerBackendJson(const char* debug_tag, IM
 	}
 }
 
-bool WriteSerializerBackendJson::serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr)
-{
+bool WriteSerializerBackendJson::serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) {
 	serialize_class_shared(tag, info, ptr, false);
 	return true;
 }
 
-bool WriteSerializerBackendJson::serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr)
-{
+bool WriteSerializerBackendJson::serialize_class_reference(const char* tag, const ClassTypeInfo& info,
+														   ClassBase*& ptr) {
 	serialize_class_shared(tag, info, ptr, true);
 	return true;
 }
 
-bool WriteSerializerBackendJson::serialize_enum(const char* tag, const EnumTypeInfo* info, int& i)
-{
+bool WriteSerializerBackendJson::serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) {
 	return false;
 }
 
-void WriteSerializerBackendJson::serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr)
-{
+void WriteSerializerBackendJson::serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) {
 	serialize_class_shared(std::nullopt, info, ptr, false);
 }
 
-void WriteSerializerBackendJson::serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr)
-{
+void WriteSerializerBackendJson::serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr) {
 	serialize_class_shared(std::nullopt, info, ptr, true);
 }
 
-void WriteSerializerBackendJson::serialize_enum_ar(const EnumTypeInfo* info, int& i)
-{
-}
+void WriteSerializerBackendJson::serialize_enum_ar(const EnumTypeInfo* info, int& i) {}
 
-void WriteSerializerBackendJson::serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr)
-{
+void WriteSerializerBackendJson::serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr) {
 	string name = "";
 	if (ptr)
 		name = ptr->get_name();
 	serialize_ar(name);
 }
 
-bool WriteSerializerBackendJson::serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr)
-{
+bool WriteSerializerBackendJson::serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr) {
 	string name = "";
 	if (ptr)
 		name = ptr->get_name();
 	serialize(tag, name);
 	return true;
 }
-ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, nlohmann::json& json_obj, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
-	:objmaker(objmaker), loader(loader), debug_tag(debug_tag)
-{
+ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, nlohmann::json& json_obj,
+													 IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
+	: objmaker(objmaker), loader(loader), debug_tag(debug_tag) {
 	this->obj = &json_obj;
 	load_shared();
 	this->obj = nullptr;
 	stack.clear();
 }
 
-void ReadSerializerBackendJson::load_shared()
-{
+void ReadSerializerBackendJson::load_shared() {
 	if (obj->contains("__classname")) {
 		stack.push_back(obj);
 		// load single
@@ -271,14 +256,14 @@ void ReadSerializerBackendJson::load_shared()
 				serialize_property(property);
 			}
 			catch (...) {
-				sys_print(Error, "ReadSerializerBackendJson(%s): error serializing property %s for class %s\n", get_debug_tag(), property.get_name(),obj->get_type().classname);
+				sys_print(Error, "ReadSerializerBackendJson(%s): error serializing property %s for class %s\n",
+						  get_debug_tag(), property.get_name(), obj->get_type().classname);
 			}
 		}
 		current_root_path = nullptr;
 		stack.pop_back();
 		assert(stack.empty());
-	}
-	else {
+	} else {
 
 		stack.push_back(obj);
 		int sz = 0;
@@ -315,7 +300,8 @@ void ReadSerializerBackendJson::load_shared()
 		serialize_dict("objs");
 		for (auto& p : path_to_objs) {
 			if (!p.second) {
-				sys_print(Warning, "ReadSerializerBackendJson(%s): null object (path=%s)\n", get_debug_tag(), p.first.c_str());
+				sys_print(Warning, "ReadSerializerBackendJson(%s): null object (path=%s)\n", get_debug_tag(),
+						  p.first.c_str());
 				continue;
 			}
 
@@ -328,7 +314,8 @@ void ReadSerializerBackendJson::load_shared()
 						serialize_property(property);
 					}
 					catch (...) {
-						sys_print(Error, "ReadSerializerBackendJson(%s): error serializing property %s for class %s\n", get_debug_tag(), property.get_name(), p.second->get_type().classname);
+						sys_print(Error, "ReadSerializerBackendJson(%s): error serializing property %s for class %s\n",
+								  get_debug_tag(), property.get_name(), p.second->get_type().classname);
 					}
 				}
 				current_root_path = nullptr;
@@ -339,9 +326,9 @@ void ReadSerializerBackendJson::load_shared()
 	}
 }
 
-ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, const string& text, IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
-	:objmaker(objmaker), loader(loader), debug_tag(debug_tag)
-{
+ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, const string& text,
+													 IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
+	: objmaker(objmaker), loader(loader), debug_tag(debug_tag) {
 	auto objStack = nlohmann::json::parse(text);
 	this->obj = &objStack;
 	load_shared();
@@ -349,38 +336,30 @@ ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, cons
 	stack.clear();
 }
 
-bool ReadSerializerBackendJson::serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr)
-{
+bool ReadSerializerBackendJson::serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) {
 	return serialize_class_shared(tag, info, ptr, false);
 }
 
-bool ReadSerializerBackendJson::serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr)
-{
+bool ReadSerializerBackendJson::serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) {
 	return serialize_class_shared(tag, info, ptr, true);
 }
 
-bool ReadSerializerBackendJson::serialize_enum(const char* tag, const EnumTypeInfo* info, int& i)
-{
+bool ReadSerializerBackendJson::serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) {
 	return false;
 }
 
-void ReadSerializerBackendJson::serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr)
-{
+void ReadSerializerBackendJson::serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) {
 	serialize_class_shared(std::nullopt, info, ptr, false);
 }
 
-void ReadSerializerBackendJson::serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr)
-{
+void ReadSerializerBackendJson::serialize_class_reference_ar(const ClassTypeInfo& info, ClassBase*& ptr) {
 	serialize_class_shared(std::nullopt, info, ptr, true);
 }
 
-void ReadSerializerBackendJson::serialize_enum_ar(const EnumTypeInfo* info, int& i)
-{
-}
+void ReadSerializerBackendJson::serialize_enum_ar(const EnumTypeInfo* info, int& i) {}
 
 #include "Assets/AssetDatabase.h"
-void ReadSerializerBackendJson::serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr)
-{
+void ReadSerializerBackendJson::serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr) {
 	string path = "";
 	serialize_ar(path);
 	if (path.empty())
@@ -388,11 +367,10 @@ void ReadSerializerBackendJson::serialize_asset_ar(const ClassTypeInfo& info, IA
 	else
 		ptr = loader.load_asset(&info, path);
 }
-bool ReadSerializerBackendJson::serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr)
-{
+bool ReadSerializerBackendJson::serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr) {
 	string path = "";
 	bool found = serialize(tag, path);
-	if (!found) 
+	if (!found)
 		return false;
 	if (path.empty())
 		ptr = nullptr;
@@ -401,8 +379,8 @@ bool ReadSerializerBackendJson::serialize_asset(const char* tag, const ClassType
 	return true;
 }
 #include <variant>
-bool ReadSerializerBackendJson::serialize_class_shared(opt<const char*> tag, const ClassTypeInfo& info, ClassBase*& ptr, bool is_only_reference)
-{
+bool ReadSerializerBackendJson::serialize_class_shared(opt<const char*> tag, const ClassTypeInfo& info, ClassBase*& ptr,
+													   bool is_only_reference) {
 	const bool is_array = !tag.has_value();
 
 	ptr = nullptr;
@@ -414,9 +392,9 @@ bool ReadSerializerBackendJson::serialize_class_shared(opt<const char*> tag, con
 	else
 		found = serialize(tag.value(), relativepath);
 	if (!found)
-		return false;	// not found, false
+		return false; // not found, false
 	if (relativepath.empty())
-		return true;	// found so true, but a nullptr
+		return true; // found so true, but a nullptr
 
 	string path;
 	if (current_root_path) {
@@ -427,22 +405,21 @@ bool ReadSerializerBackendJson::serialize_class_shared(opt<const char*> tag, con
 			path = combine_path(resolve_relative_path(cur_s, rel_s));
 		}
 
-		//path = unserialize_relative_to_absolute(relativepath.c_str(), current_root_path->c_str());
+		// path = unserialize_relative_to_absolute(relativepath.c_str(), current_root_path->c_str());
 	}
 	if (path.empty()) {
 		path = relativepath;
 	}
-	//else
+	// else
 	//	path = relativepath;
 
-	//auto find = path_to_objs.find(path);
-	//if (find != path_to_objs.end())
+	// auto find = path_to_objs.find(path);
+	// if (find != path_to_objs.end())
 	//	ptr = find->second;
 
 	ptr = MapUtil::get_or_null(path_to_objs, path);
 
 	return true;
-
 }
 
 nlohmann::json JsonSerializerUtil::diff_json(const nlohmann::json& a, const nlohmann::json& b) {
@@ -459,17 +436,15 @@ nlohmann::json JsonSerializerUtil::diff_json(const nlohmann::json& a, const nloh
 		for (auto it = b.begin(); it != b.end(); ++it) {
 			const string& key = it.key();
 			if (!a.contains(key)) {
-				result[key] = it.value();  // new key
-			}
-			else {
+				result[key] = it.value(); // new key
+			} else {
 				json subdiff = diff_json(a.at(key), it.value());
 				if (!subdiff.is_null() && !(subdiff.is_object() && subdiff.empty())) {
 					result[key] = subdiff;
 				}
 			}
 		}
-	}
-	else if (a.is_array()) {
+	} else if (a.is_array()) {
 		// if arrays are different, return full array from b
 		if (a != b) {
 			result = b;
@@ -480,16 +455,15 @@ nlohmann::json JsonSerializerUtil::diff_json(const nlohmann::json& a, const nloh
 }
 #include "SerializedForDiffing.h"
 nlohmann::json* MakePathForGenericObj::find_diff_for_obj(ClassBase* obj) {
-	if (!diff_available) 
+	if (!diff_available)
 		return nullptr;
 	if (obj->get_type().diff_data)
 		return &obj->get_type().diff_data->jsonObj;
 	else
 		return nullptr;
 }
-void ReadSerializerBackendJson::insert_nested_object(string path, ClassBase* obj)
-{
-	//LOG_MSG("inserted nested obj");
+void ReadSerializerBackendJson::insert_nested_object(string path, ClassBase* obj) {
+	// LOG_MSG("inserted nested obj");
 	MapUtil::insert_test_exists(path_to_objs, path, obj);
 	MapUtil::insert_test_exists(obj_to_path, obj, path);
 }

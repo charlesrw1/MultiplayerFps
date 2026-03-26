@@ -2,16 +2,12 @@
 
 LuaMiscFuncs* LuaMiscFuncs::inst = nullptr;
 
-
 // test lua integration and general object stuff
-class ET_GenericTest : public EngineTestcase {
+class ET_GenericTest : public EngineTestcase
+{
 public:
-	ET_GenericTest() {
-		name = "generic_test";
-	}
-	bool update(bool focused) final {
-		return false;
-	}
+	ET_GenericTest() { name = "generic_test"; }
+	bool update(bool focused) final { return false; }
 	void integration_tick(IntegrationTester& t) final {
 		Level* l = eng->get_level();
 		auto app = eng->get_app()->cast_to<EngineTesterApp>();
@@ -33,13 +29,13 @@ public:
 		ASSERT(!e.get());
 		ASSERT(!app->make_object_test_return_exists());
 
-
 		ASSERT(app->count_in_vector({}) == 0);
-		ASSERT(app->count_in_vector({1,2,3}) == 3);
+		ASSERT(app->count_in_vector({1, 2, 3}) == 3);
 	}
 };
 // test anims, ragdolls, ik, parenting to bones,
-class ET_Anims : public EngineTestcase {
+class ET_Anims : public EngineTestcase
+{
 public:
 	const glm::vec3 all_anim_location = glm::vec3(0, 5, 0);
 	const int all_anim_width = 8;
@@ -50,10 +46,10 @@ public:
 		auto model = Model::load("SWAT_Model.cmdl");
 		auto& allClips = model->get_skel()->get_all_clips();
 		int index = -1;
-		for (auto&[name,clip] : allClips) {
+		for (auto& [name, clip] : allClips) {
 			index += 1;
-		
-			glm::vec3 position = all_anim_location + glm::vec3(index / all_anim_width, 0, index % all_anim_width)*3.f;
+
+			glm::vec3 position = all_anim_location + glm::vec3(index / all_anim_width, 0, index % all_anim_width) * 3.f;
 
 			auto mesh = l->spawn_entity()->create_component<MeshComponent>();
 			mesh->set_model(model);
@@ -71,7 +67,7 @@ public:
 
 		std::vector<SpawnerComponent*> players = EngineTesterApp::find_all_in_class("player_spawn");
 		index = 0;
-		std::array anims = { "stand_rifle_run_n","run_forward_unequip","falling" };
+		std::array anims = {"stand_rifle_run_n", "run_forward_unequip", "falling"};
 		for (auto player : players) {
 			auto mesh = player->get_owner()->create_component<MeshComponent>();
 			mesh->set_model(model);
@@ -87,23 +83,17 @@ public:
 		// additive test, ik, blend, slot, statemachine, masked, sync, retarget, modify
 	}
 
-
-	bool update(bool f) {
-
-	}
+	bool update(bool f) {}
 };
 // anim into ragdoll
-class ET_Ragdoll : public EngineTestcase {
+class ET_Ragdoll : public EngineTestcase
+{
 public:
-
-	const std::array<Color32, 2> colors = {
-		COLOR_RED,
-		COLOR_BLUE
-	};
+	const std::array<Color32, 2> colors = {COLOR_RED, COLOR_BLUE};
 
 	ET_Ragdoll() {
-		name="ragdoll";
-	
+		name = "ragdoll";
+
 		// ragdolls
 		Random rnd(113);
 		auto rds = EngineTesterApp::find_all_in_class("ragdoll_test");
@@ -140,14 +130,12 @@ public:
 			glm::vec4 v = color32_to_vec4(colors.at(i % 2));
 			v *= alpha;
 			r.dynamic_mat->set_u8vec_parameter("colorMult", vec4_to_color32(v));
-
 		}
 		return false;
 	}
-	void integration_tick(IntegrationTester& t) final {
-
-	}
-	struct Ragdoll {
+	void integration_tick(IntegrationTester& t) final {}
+	struct Ragdoll
+	{
 		EntityPtr ptr;
 		DynamicMatUniquePtr dynamic_mat;
 		glm::mat4 transform;
@@ -156,26 +144,23 @@ public:
 	std::vector<Ragdoll> ragdolls;
 };
 
-// physics layer tests. on overlap, raycast, on hit, materials. joints. 
+// physics layer tests. on overlap, raycast, on hit, materials. joints.
 // ragdolls. features physics gun.
-class ET_PhysicsTest : public EngineTestcase {
+class ET_PhysicsTest : public EngineTestcase
+{
 public:
-	ET_PhysicsTest() {
-		eng->load_level("physics_test_world.tmap");
-	}
+	ET_PhysicsTest() { eng->load_level("physics_test_world.tmap"); }
 };
-class ET_ShadowmapAtlas : public EngineTestcase {
+class ET_ShadowmapAtlas : public EngineTestcase
+{
 public:
 };
 
 using std::make_unique;
 
-static std::vector<uptr<EngineTestcase>> make_main_test()
-{
+static std::vector<uptr<EngineTestcase>> make_main_test() {
 	vector<uptr<EngineTestcase>> output;
-	auto add = [&](auto ptr) {
-		output.push_back(uptr<EngineTestcase>(ptr));
-	};
+	auto add = [&](auto ptr) { output.push_back(uptr<EngineTestcase>(ptr)); };
 	add(new ET_GenericTest);
 	add(new ET_Ragdoll);
 	add(new ET_Anims);
@@ -201,7 +186,7 @@ std::vector<SpawnerComponent*> EngineTesterApp::find_all_with_name_ordered(strin
 	}
 	std::sort(matches.begin(), matches.end(), [](SpawnerComponent* a, SpawnerComponent* b) {
 		return a->get_owner()->get_editor_name() < b->get_owner()->get_editor_name();
-		});
+	});
 	return matches;
 }
 
@@ -236,7 +221,7 @@ void EngineTesterApp::start() {
 		// spawn animated models for testing
 		std::vector<SpawnerComponent*> players = find_all_in_class("player_spawn");
 		int index = 0;
-		std::array anims = { "stand_rifle_run_n","run_forward_unequip","falling" };
+		std::array anims = {"stand_rifle_run_n", "run_forward_unequip", "falling"};
 		for (auto player : players) {
 			auto mesh = player->get_owner()->create_component<MeshComponent>();
 			auto model = Model::load("SWAT_Model.cmdl");
@@ -265,7 +250,6 @@ void EngineTesterApp::start() {
 			mcc->set_is_enable(true);
 			mcc->set_is_simulating(true);
 			mcc->set_is_static(false);
-
 		}
 	}
 
@@ -277,45 +261,40 @@ void EngineTesterApp::start() {
 
 		int index = 0;
 		for (;;) {
-			//auto s = test_ents.at(index);
+			// auto s = test_ents.at(index);
 			auto scene_cam = CameraComponent::get_scene_camera();
 			scene_cam->set_fov(80);
-			//scene_cam->get_owner()->set_ws_transform(s->get_ws_transform());
+			// scene_cam->get_owner()->set_ws_transform(s->get_ws_transform());
 
-			//tester.wait_time(2.f);
+			// tester.wait_time(2.f);
 
-			//index = (index + 1) % (int)test_ents.size();
+			// index = (index + 1) % (int)test_ents.size();
 
 			path.update();
 			tester.wait_ticks(1);
 		}
-
 	};
 
 	std::vector<IntTestCase> cases;
-	cases.push_back({ func,"main_test",60.f });
+	cases.push_back({func, "main_test", 60.f});
 	tester = std::make_unique<IntegrationTester>(false, cases);
 }
 
 void EngineTesterApp::update() {
-	if(tester)
+	if (tester)
 		tester->tick(eng->get_dt());
-
-	
 }
 
 CameraPathFollower::CameraPathFollower(std::vector<SpawnerComponent*> components) {
 	for (auto c : components) {
-		points.push_back({ c->get_ws_position(),c->get_owner()->get_ws_rotation() });
+		points.push_back({c->get_ws_position(), c->get_owner()->get_ws_rotation()});
 	}
 	time_start = GetTime();
 }
 
 glm::vec3 CameraPathFollower::catmull_rom(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t) {
-	return 0.5f * ((2.f * p1) +
-		(-p0 + p2) * t +
-		(2.f * p0 - 5.f * p1 + 4.f * p2 - p3) * t * t +
-		(-p0 + 3.f * p1 - 3.f * p2 + p3) * t * t * t);
+	return 0.5f * ((2.f * p1) + (-p0 + p2) * t + (2.f * p0 - 5.f * p1 + 4.f * p2 - p3) * t * t +
+				   (-p0 + 3.f * p1 - 3.f * p2 + p3) * t * t * t);
 }
 
 void CameraPathFollower::update() {
@@ -329,7 +308,6 @@ void CameraPathFollower::update() {
 	float frac = fmod(time, time_per_point) / time_per_point;
 	glm::quat rot = glm::slerp(points.at(index).q, points.at(next).q, frac);
 	glm::vec3 pos = glm::mix(points.at(index).p, points.at(next).p, frac);
-
 
 	CameraComponent::get_scene_camera()->get_owner()->set_ws_transform(pos, rot, glm::vec3(1));
 }

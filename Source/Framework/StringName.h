@@ -2,11 +2,11 @@
 #include <cstdint>
 #include "Framework/StringUtil.h"
 
-
 typedef uint64_t name_hash_t;
 
-
-#define NAME(x) StringName(x, std::integral_constant<name_hash_t,StringUtils_Hash::fnv1a_64(x, StringUtils_Hash::const_strlen(x))>())
+#define NAME(x)                                                                                                        \
+	StringName(                                                                                                        \
+		x, std::integral_constant<name_hash_t, StringUtils_Hash::fnv1a_64(x, StringUtils_Hash::const_strlen(x))>())
 
 class StringName
 {
@@ -20,8 +20,8 @@ public:
 	StringName(const char* name, name_hash_t hash);
 #endif
 	StringName(const StringName& other) { hash = other.hash; }
-	StringName& operator=(const StringName& other) { 
-		hash = other.hash; 
+	StringName& operator=(const StringName& other) {
+		hash = other.hash;
 		return *this;
 	}
 
@@ -31,9 +31,8 @@ public:
 #ifdef EDITOR_BUILD
 #endif
 	name_hash_t get_hash() const { return hash; }
-	bool is_null() const {
-		return hash == 0;
-	}
+	bool is_null() const { return hash == 0; }
+
 private:
 	name_hash_t hash = 0;
 };

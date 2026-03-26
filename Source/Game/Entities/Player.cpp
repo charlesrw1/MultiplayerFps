@@ -3,14 +3,12 @@
 #include "Framework/MeshBuilder.h"
 #include "Framework/Config.h"
 
-
 #include "GameEnginePublic.h"
 #include "imgui.h"
 
 #include "Render/DrawPublic.h"
 
 #include "Debug.h"
-
 
 #include "Assets/AssetDatabase.h"
 
@@ -19,17 +17,13 @@
 #include "Physics/Physics2.h"
 #include "Physics/ChannelsAndPresets.h"
 
-
-
 #include "Framework/ClassTypePtr.h"
 #include "Render/Texture.h"
 
 #include "Input/InputSystem.h"
 
-
 #include "UI/GUISystemPublic.h"
 #include "UI/Widgets/Layouts.h"
-
 
 #include <SDL2/SDL_events.h>
 
@@ -39,38 +33,28 @@
 
 #include "BikeEntity.h"
 
-
-
-
-
-
-
 #include "Game/Components/BillboardComponent.h"
 #include "Game/Components/ArrowComponent.h"
-
-
-
 
 //
 //	PLAYER MOVEMENT CODE
 //
 
-
-//static float fall_speed_threshold = -0.05f;
-//static float grnd_speed_threshold = 0.6f;
+// static float fall_speed_threshold = -0.05f;
+// static float grnd_speed_threshold = 0.6f;
 //
-//static float ground_friction = 8.2;
-//static float air_friction = 0.01;
-//static float ground_accel = 6;
-//static float ground_accel_crouch = 4;
-//static float air_accel = 3;
-//static float jumpimpulse = 5.f;
-//static float max_ground_speed = 5.7;
-//static float max_sprint_speed = 8.0;
-//static float sprint_accel = 8;
-//static float max_air_speed = 2;
+// static float ground_friction = 8.2;
+// static float air_friction = 0.01;
+// static float ground_accel = 6;
+// static float ground_accel_crouch = 4;
+// static float air_accel = 3;
+// static float jumpimpulse = 5.f;
+// static float max_ground_speed = 5.7;
+// static float max_sprint_speed = 8.0;
+// static float sprint_accel = 8;
+// static float max_air_speed = 2;
 
-//void move_variables_menu()
+// void move_variables_menu()
 //{
 //	ImGui::SliderFloat("ground_friction", &ground_friction, 0, 20);
 //	ImGui::SliderFloat("air_friction", &air_friction, 0, 10);
@@ -81,116 +65,92 @@
 //	ImGui::SliderFloat("jumpimpulse", &jumpimpulse, 0, 20);
 //}
 
-using glm::vec3;
-using glm::vec2;
-using glm::dot;
 using glm::cross;
+using glm::dot;
+using glm::vec2;
+using glm::vec3;
 
-
-
-
-float lensquared_noy(vec3 v)
-{
+float lensquared_noy(vec3 v) {
 	return v.x * v.x + v.z * v.z;
 }
 
-
-
-//static AddToDebugMenu addmovevars("move vars", move_variables_menu);
+// static AddToDebugMenu addmovevars("move vars", move_variables_menu);
 #include "Sound/SoundPublic.h"
 
-
-template<typename T>
-T neg_modulo(T x, T mod_)
-{
+template <typename T> T neg_modulo(T x, T mod_) {
 	return glm::mod(glm::mod(x, mod_) + mod_, mod_);
 }
-static float modulo_lerp_(float start, float end, float mod, float t)
-{
+static float modulo_lerp_(float start, float end, float mod, float t) {
 	return neg_modulo(t - start, mod) / neg_modulo(end - start, mod);
 }
 
-
-
-
-void Player::find_a_spawn_point()
-{
-	//InlineVec<PlayerSpawnPoint*, 16> points;
-	//if (!eng->get_level()->find_all_entities_of_class(points))
+void Player::find_a_spawn_point() {
+	// InlineVec<PlayerSpawnPoint*, 16> points;
+	// if (!eng->get_level()->find_all_entities_of_class(points))
 	//	sys_print(Error, "no spawn points");
-	//else {
+	// else {
 	//	auto pos = points[0]->get_ws_position();
 	//
 	//	set_ws_position(pos);
 	//}
 }
 
-glm::vec3 Player::calc_eye_position()
-{
-	float view_height = 0.0;// (is_crouching) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
+glm::vec3 Player::calc_eye_position() {
+	float view_height = 0.0; // (is_crouching) ? CROUCH_EYE_OFFSET : STANDING_EYE_OFFSET;
 	return get_ws_position() + vec3(0, view_height, 0);
 }
 
 float bike_view_damp = 0.01;
-void bike_view_menu()
-{
+void bike_view_menu() {
 	ImGui::InputFloat("bike_view_damp", &bike_view_damp);
 }
 ADD_TO_DEBUG_MENU(bike_view_menu);
 
-void Player::get_view(glm::mat4& viewMat, float& fov)
-{
+void Player::get_view(glm::mat4& viewMat, float& fov) {
 	if (g_thirdperson.get_bool()) {
 
 		auto dir = bike->bike_direction;
 		auto pos = get_ws_position();
 		auto camera_pos = glm::vec3(pos.x, 6.0, pos.z - 6);
-		auto dir_mat = glm::lookAt(glm::vec3(0), glm::vec3(dir.x,-0.1f,dir.z), glm::vec3(0, 1, 0));
+		auto dir_mat = glm::lookAt(glm::vec3(0), glm::vec3(dir.x, -0.1f, dir.z), glm::vec3(0, 1, 0));
 		auto dir_quat = glm::quat(dir_mat);
 		this->view_quat = damp_dt_independent(dir_quat, this->view_quat, bike_view_damp, eng->get_dt());
 		auto actual_dir = glm::inverse(this->view_quat) * glm::vec3(0, 0, 1);
 
-		vec3 front = dir;// AnglesToVector(view_angles.x, view_angles.y);
+		vec3 front = dir; // AnglesToVector(view_angles.x, view_angles.y);
 		vec3 side = normalize(cross(front, vec3(0, 1, 0)));
 		camera_pos = get_ws_position() + vec3(0, 3.0, 0) - front * 2.5f + side * 0.f;
 
 		this->view_pos = damp_dt_independent(camera_pos, this->view_pos, bike_view_damp, eng->get_dt());
 
-		//viewMat = glm::lookAt(camera_pos, vec3(pos.x,0,pos.z), glm::vec3(0, 1, 0));
+		// viewMat = glm::lookAt(camera_pos, vec3(pos.x,0,pos.z), glm::vec3(0, 1, 0));
 
 		viewMat = glm::lookAt(this->view_pos, this->view_pos - actual_dir, glm::vec3(0, 1, 0));
 
-		//org = camera_pos;
-		//ang = view_angles;
+		// org = camera_pos;
+		// ang = view_angles;
 		fov = g_fov.get_float();
-	}
-	else
-	{
+	} else {
 		vec3 cam_position = calc_eye_position();
 		vec3 front = AnglesToVector(view_angles.x, view_angles.y);
 
 		viewMat = glm::lookAt(cam_position, cam_position + front, glm::vec3(0, 1, 0));
-		//org = cam_position;
-		//ang = view_angles;
+		// org = cam_position;
+		// ang = view_angles;
 		fov = g_fov.get_float();
 	}
 }
 
-
-glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt)
-{
+glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt) {
 	float p = (1 / (peakt - 1));
 
 	if (t < peakt)
 		return maxrecoil * (1 / peakt) * t;
 	else
 		return maxrecoil * (p * t - p);
-
 }
 
-
-static void update_viewmodel(glm::vec3 view_angles, bool crouching, glm::vec3& viewmodel_offsets)
-{
+static void update_viewmodel(glm::vec3 view_angles, bool crouching, glm::vec3& viewmodel_offsets) {
 #if 0
 	Entity& e = *eng->get_local_player();
 	glm::vec3 velocity = e.get_velocity();
@@ -470,21 +430,18 @@ public:
 };
 #endif
 
-
-void Player::on_jump_callback()
-{
+void Player::on_jump_callback() {
 	static int i = 0;
-	if(is_on_ground())
+	if (is_on_ground())
 		velocity.y += 5.0;
-	else if(wall_jump_cooldown<=0.0){
-		glm::vec2 stick = {};// glm::vec2(cmd.forward_move, cmd.lateral_move);
+	else if (wall_jump_cooldown <= 0.0) {
+		glm::vec2 stick = {}; // glm::vec2(cmd.forward_move, cmd.lateral_move);
 		if (glm::length(stick) > 0.7) {
 
 			vec3 look_front = AnglesToVector(view_angles.x, view_angles.y);
 			look_front.y = 0;
 			look_front = normalize(look_front);
 			vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
-
 
 			vec3 wishdir = (look_front * stick.x + look_side * stick.y);
 			wishdir = vec3(wishdir.x, 0.f, wishdir.z);
@@ -494,7 +451,7 @@ void Player::on_jump_callback()
 
 			world_query_result wqr;
 			auto pos = get_ws_position() + glm::vec3(0, 0.7, 0);
-			const float test_len = ccontroller->capsule_radius+0.4;
+			const float test_len = ccontroller->capsule_radius + 0.4;
 			bool good = g_physics.trace_ray(wqr, pos, pos - wishdir * test_len, nullptr, UINT32_MAX);
 			if (good) {
 				velocity = wqr.hit_normal * 8.0f;
@@ -503,13 +460,11 @@ void Player::on_jump_callback()
 
 				wall_jump_cooldown = 0.2;
 			}
-
 		}
 	}
 }
 
-void Player::update()
-{
+void Player::update() {
 	vec2 moveAction = {};
 	moveAction.x = Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX);
 	moveAction.y = Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY);
@@ -522,19 +477,17 @@ void Player::update()
 	bike->turn_strength = moveAction.x;
 	{
 		auto off = lookAction;
-		view_angles.x -= off.y;	// pitch
-		view_angles.y += off.x;	// yaw
+		view_angles.x -= off.y; // pitch
+		view_angles.y += off.x; // yaw
 		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
 		view_angles.y = fmod(view_angles.y, TWOPI);
 	}
-	//set_ws_position(bike->get_ws_position());
+	// set_ws_position(bike->get_ws_position());
 }
 
-void Player::on_foot_update()
-{
+void Player::on_foot_update() {
 	if (wall_jump_cooldown > 0)
 		wall_jump_cooldown -= eng->get_dt();
-
 
 	vec2 moveAction = {};
 	moveAction.x = Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX);
@@ -544,13 +497,13 @@ void Player::on_foot_update()
 	lookAction.y = Input::get_con_axis(SDL_CONTROLLER_AXIS_RIGHTY);
 	float accelAction = Input::get_con_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
 
-	// 
+	//
 
 	is_crouching = Input::is_con_button_down(SDL_CONTROLLER_BUTTON_Y);
 	{
 		auto off = lookAction;
-		view_angles.x -= off.y;	// pitch
-		view_angles.y += off.x;	// yaw
+		view_angles.x -= off.y; // pitch
+		view_angles.y += off.x; // yaw
 		view_angles.x = glm::clamp(view_angles.x, -HALFPI + 0.01f, HALFPI - 0.01f);
 		view_angles.y = fmod(view_angles.y, TWOPI);
 	}
@@ -560,19 +513,17 @@ void Player::on_foot_update()
 		if (length > 1.0)
 			move /= length;
 
-		//cmd.forward_move = move.y;
-		//cmd.lateral_move = move.x;
-		//printf("%f %f %f\n", move.x, move.y,length);
-
+		// cmd.forward_move = move.y;
+		// cmd.lateral_move = move.x;
+		// printf("%f %f %f\n", move.x, move.y,length);
 	}
 
-	if(Input::was_con_button_pressed(SDL_CONTROLLER_BUTTON_A))
+	if (Input::was_con_button_pressed(SDL_CONTROLLER_BUTTON_A))
 		on_jump_callback();
-
 
 	const bool is_sprinting = Input::is_con_button_down(SDL_CONTROLLER_BUTTON_X);
 
-	float friction_value = 0.0;// (is_on_ground()) ? ground_friction : air_friction;
+	float friction_value = 0.0; // (is_on_ground()) ? ground_friction : air_friction;
 	float speed = glm::length(velocity);
 
 	if (speed >= 0.0001) {
@@ -585,11 +536,11 @@ void Player::on_foot_update()
 		velocity.z *= factor;
 	}
 
-	vec2 inputvec = {};// vec2(cmd.forward_move, cmd.lateral_move);
+	vec2 inputvec = {}; // vec2(cmd.forward_move, cmd.lateral_move);
 	float inputlen = length(inputvec);
-	//if (inputlen > 0.00001)
+	// if (inputlen > 0.00001)
 	//	inputvec = inputvec / inputlen;
-	//if (inputlen > 1)
+	// if (inputlen > 1)
 	//	inputlen = 1;
 
 	vec3 look_front = AnglesToVector(view_angles.x, view_angles.y);
@@ -597,14 +548,13 @@ void Player::on_foot_update()
 	look_front = normalize(look_front);
 	vec3 look_side = -normalize(cross(look_front, vec3(0, 1, 0)));
 
-	const bool player_on_ground =  is_on_ground();
-	float acceleation_val = 0.5;// (player_on_ground) ?
-		//((is_sprinting) ? sprint_accel : ground_accel) :
+	const bool player_on_ground = is_on_ground();
+	float acceleation_val = 0.5; // (player_on_ground) ?
+								 //((is_sprinting) ? sprint_accel : ground_accel) :
 	//	air_accel;
-	//acceleation_val = (is_crouching) ? ground_accel_crouch : acceleation_val;
+	// acceleation_val = (is_crouching) ? ground_accel_crouch : acceleation_val;
 
-
-	float maxspeed_val = 1.0;// (player_on_ground) ?
+	float maxspeed_val = 1.0; // (player_on_ground) ?
 	//	((is_sprinting) ? max_sprint_speed : max_ground_speed) :
 	//	max_air_speed;
 
@@ -620,19 +570,19 @@ void Player::on_foot_update()
 	xz_velocity += accelspeed * wishdir;
 
 	float len = length(xz_velocity);
-	//if (len > maxspeed)
+	// if (len > maxspeed)
 	//	xz_velocity = xz_velocity * (maxspeed / len);
 	if (len < 0.3 && accelspeed < 0.0001)
 		xz_velocity = vec3(0);
 	velocity = vec3(xz_velocity.x, velocity.y, xz_velocity.z);
-	
+
 	velocity.y -= 10.0 * eng->get_dt();
 
 	int flags = 0;
 
 	glm::vec3 out_vel;
-	ccontroller->move(velocity*(float)eng->get_dt(), eng->get_dt(), 0.001f, flags, out_vel);
-	
+	ccontroller->move(velocity * (float)eng->get_dt(), eng->get_dt(), 0.001f, flags, out_vel);
+
 	velocity = out_vel;
 	action = (flags & CCCF_BELOW) ? Action_State::Idle : Action_State::Falling;
 
@@ -641,88 +591,82 @@ void Player::on_foot_update()
 	if (flags & CCCF_BELOW)
 		Debug::add_box(ccontroller->get_character_pos(), glm::vec3(0.5), COLOR_RED, 0);
 	if (flags & CCCF_ABOVE)
-		Debug::add_box(ccontroller->get_character_pos() + glm::vec3(0, ccontroller->capsule_height, 0), glm::vec3(0.5), COLOR_GREEN, 0.5);
+		Debug::add_box(ccontroller->get_character_pos() + glm::vec3(0, ccontroller->capsule_height, 0), glm::vec3(0.5),
+					   COLOR_GREEN, 0.5);
 
 	auto line_start = ccontroller->get_character_pos() + glm::vec3(0, 0.5, 0);
-	Debug::add_line(line_start, line_start + velocity * 3.0f, COLOR_CYAN,0);
+	Debug::add_line(line_start, line_start + velocity * 3.0f, COLOR_CYAN, 0);
 
 	Debug::add_line(line_start, line_start + wishdir * 2.0f, COLOR_RED, 0);
 }
 
 #include "BikeEntity.h"
 
- void Player::start()  {
+void Player::start() {
 
-	 UiSystem::inst->set_game_capture_mouse(true);
+	UiSystem::inst->set_game_capture_mouse(true);
 
-//
-//	 {
-//		 std::vector<const InputDevice*> devices;
-//		 g_inputSys.get_connected_devices(devices);
-//		 int deviceIdx = 0;
-//		 for (; deviceIdx < devices.size(); deviceIdx++) {
-//			 if (devices[deviceIdx]->type == InputDeviceType::Controller) {
-//				 inputPtr->assign_device(devices[deviceIdx]->selfHandle);
-//				 break;
-//			 }
-//		 }
-//		 if (deviceIdx == devices.size())
-//			 inputPtr->assign_device(g_inputSys.get_keyboard_device_handle());
-//
-//		 g_inputSys.device_connected.add(this, [&](handle<InputDevice> handle)
-//			 {
-//
-//				 inputPtr->assign_device(handle);
-//			 });
-//
-//		 inputPtr->on_lost_device.add(this, [&]()
-//			 {
-//				inputPtr->assign_device(g_inputSys.get_keyboard_device_handle());
-//			 });
-//	 }
-//
-
+	//
+	//	 {
+	//		 std::vector<const InputDevice*> devices;
+	//		 g_inputSys.get_connected_devices(devices);
+	//		 int deviceIdx = 0;
+	//		 for (; deviceIdx < devices.size(); deviceIdx++) {
+	//			 if (devices[deviceIdx]->type == InputDeviceType::Controller) {
+	//				 inputPtr->assign_device(devices[deviceIdx]->selfHandle);
+	//				 break;
+	//			 }
+	//		 }
+	//		 if (deviceIdx == devices.size())
+	//			 inputPtr->assign_device(g_inputSys.get_keyboard_device_handle());
+	//
+	//		 g_inputSys.device_connected.add(this, [&](handle<InputDevice> handle)
+	//			 {
+	//
+	//				 inputPtr->assign_device(handle);
+	//			 });
+	//
+	//		 inputPtr->on_lost_device.add(this, [&]()
+	//			 {
+	//				inputPtr->assign_device(g_inputSys.get_keyboard_device_handle());
+	//			 });
+	//	 }
+	//
 
 	// inputPtr->get("ui/menu")->bind_start_function([this] {
 	//		 if(hud)
 	//			 hud->toggle_menu_mode();
 	//	 });
 
+	Player::find_a_spawn_point();
 
+	ccontroller = std::make_unique<CharacterController>(player_capsule);
+	ccontroller->set_position(get_ws_position());
+	ccontroller->capsule_height = player_capsule->height;
+	ccontroller->capsule_radius = player_capsule->radius;
 
+	score_update_delegate.invoke(10);
 
-	 Player::find_a_spawn_point();
-
-	 ccontroller = std::make_unique<CharacterController>(player_capsule);
-	 ccontroller->set_position(get_ws_position());
-	 ccontroller->capsule_height = player_capsule->height;
-	 ccontroller->capsule_radius = player_capsule->radius;
-
-
-	 score_update_delegate.invoke(10);
-
-	 //{
+	//{
 	//	 auto scope = eng->get_level()->spawn_entity<BikeEntity>(bike);
 	//	 bike->get_owner()->set_ws_position(get_ws_position());
-	 //}
-	 //get_owner()->set_ws_position(glm::vec3(0, 0, 0.5));
-	 //get_owner()->parent_to(bike->get_owner());
+	//}
+	// get_owner()->set_ws_position(glm::vec3(0, 0, 0.5));
+	// get_owner()->parent_to(bike->get_owner());
 }
- void Player::stop() {
- }
+void Player::stop() {}
 
- Player::~Player() {
- }
+Player::~Player() {}
 
- Player::Player() {
-	 return;
-	 //player_mesh = construct_sub_component<MeshComponent>("CharMesh");
-	 //player_capsule = construct_sub_component<CapsuleComponent>("CharCapsule");
-	 //spotlight = construct_sub_component<SpotLightComponent>("Flashlight");
-	 //health = construct_sub_component<HealthComponent>("PlayerHealth");
+Player::Player() {
+	return;
+	// player_mesh = construct_sub_component<MeshComponent>("CharMesh");
+	// player_capsule = construct_sub_component<CapsuleComponent>("CharCapsule");
+	// spotlight = construct_sub_component<SpotLightComponent>("Flashlight");
+	// health = construct_sub_component<HealthComponent>("PlayerHealth");
 
 	// auto playerMod = g_assets.find_assetptr_unsafe<Model>("SWAT_model.cmdl");
-	 //player_mesh->set_model(playerMod);
+	// player_mesh->set_model(playerMod);
 	// player_mesh->set_animation_graph("ik_test.ag");
 	// player_mesh->set_is_visible(false);
 	//
@@ -733,150 +677,138 @@ void Player::on_foot_update()
 	// player_capsule->height = 1.7;
 	// player_capsule->radius = 0.3;
 
-	 set_ticking(true);
- }
+	set_ticking(true);
+}
 
- vector<Component*> GameplayStatic::find_components(const ClassTypeInfo* info) {
-	 assert(info && info->is_a(Component::StaticType));
-	 double now = GetTime();
-	 auto& all = eng->get_level()->get_all_objects();
-	 vector<Component*> out;
-	 for (auto e : all)
-		 if (e->get_type().is_a(*info))
-			 out.push_back((Component*)e);
-	 double end = GetTime();
-	 printf("find_components_of_class: took %f\n", float(end - now));
-	 return out;
- }
- Entity* GameplayStatic::find_by_name(string name) {
-	 return eng->get_level()->find_initial_entity_by_name(name);
- }
+vector<Component*> GameplayStatic::find_components(const ClassTypeInfo* info) {
+	assert(info && info->is_a(Component::StaticType));
+	double now = GetTime();
+	auto& all = eng->get_level()->get_all_objects();
+	vector<Component*> out;
+	for (auto e : all)
+		if (e->get_type().is_a(*info))
+			out.push_back((Component*)e);
+	double end = GetTime();
+	printf("find_components_of_class: took %f\n", float(end - now));
+	return out;
+}
+Entity* GameplayStatic::find_by_name(string name) {
+	return eng->get_level()->find_initial_entity_by_name(name);
+}
 #include "UI/UILoader.h"
 static int GameplayStatic_debug_text_start = 10;
- void GameplayStatic::reset_debug_text_height()
- {
-	 GameplayStatic_debug_text_start = 10;
- }
+void GameplayStatic::reset_debug_text_height() {
+	GameplayStatic_debug_text_start = 10;
+}
 
- void GameplayStatic::debug_text(string text)
- {
-	 auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
-	 auto draw_text = [&](const char* s) {
-		 string str = s;
-		 TextShape shape;
-		 Rect2d size = GuiHelpers::calc_text_size(std::string_view(str), font);
-		 glm::ivec2 ofs = GuiHelpers::calc_layout({ -100,-10 }, guiAnchor::Center, UiSystem::inst->get_vp_rect());
+void GameplayStatic::debug_text(string text) {
+	auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+	auto draw_text = [&](const char* s) {
+		string str = s;
+		TextShape shape;
+		Rect2d size = GuiHelpers::calc_text_size(std::string_view(str), font);
+		glm::ivec2 ofs = GuiHelpers::calc_layout({-100, -10}, guiAnchor::Center, UiSystem::inst->get_vp_rect());
 
-		 shape.rect.x = ofs.x;
-		 shape.rect.y = ofs.y + size.h + GameplayStatic_debug_text_start;
-		 shape.font = font;
-		 shape.color = COLOR_WHITE;
-		 shape.with_drop_shadow = true;
-		 shape.drop_shadow_ofs = 1;
-		 shape.text = str;
-		 UiSystem::inst->window.draw(shape);
-		 GameplayStatic_debug_text_start += size.h;
-	 };
-	 draw_text(text.c_str());
- }
+		shape.rect.x = ofs.x;
+		shape.rect.y = ofs.y + size.h + GameplayStatic_debug_text_start;
+		shape.font = font;
+		shape.color = COLOR_WHITE;
+		shape.with_drop_shadow = true;
+		shape.drop_shadow_ofs = 1;
+		shape.text = str;
+		UiSystem::inst->window.draw(shape);
+		GameplayStatic_debug_text_start += size.h;
+	};
+	draw_text(text.c_str());
+}
 
- void GameplayStatic::debug_line_normal(glm::vec3 p, glm::vec3 n, float len, float life, const lColor& color)
- {
-	 Debug::add_line(p, p + n * len, color.to_color32(), life);
- }
+void GameplayStatic::debug_line_normal(glm::vec3 p, glm::vec3 n, float len, float life, const lColor& color) {
+	Debug::add_line(p, p + n * len, color.to_color32(), life);
+}
 
-
- int GameplayStatic::get_collision_mask_for_physics_layer(PL physics_layer) {
-	 return (int)::get_collision_mask_for_physics_layer(physics_layer);
- }
- Entity* GameplayStatic::spawn_entity()
- {
-	 return eng->get_level()->spawn_entity();
- }
+int GameplayStatic::get_collision_mask_for_physics_layer(PL physics_layer) {
+	return (int)::get_collision_mask_for_physics_layer(physics_layer);
+}
+Entity* GameplayStatic::spawn_entity() {
+	return eng->get_level()->spawn_entity();
+}
 #include "Game/Components/SpawnerComponenth.h"
- std::vector<SpawnerComponent*> GameplayStatic::find_spawners_in_class(std::string name)
- {
-	 std::vector<SpawnerComponent*> test_ents;
-	 for (auto e : eng->get_level()->get_all_objects()) {
-		 if (auto s = e->cast_to<SpawnerComponent>()) {
-			 if (s->get_spawner_type() == name)
-				 test_ents.push_back(s);
-		 }
-	 }
-	 return test_ents;
- }
- HitResult GameplayStatic::cast_ray(glm::vec3 start, glm::vec3 end, int channel_mask, PhysicsBody* ignore_this) {
-	 HitResult out;
-	 world_query_result res;
-	 TraceIgnoreVec ignore;
-	 if (ignore_this)
-		 ignore.push_back(ignore_this);
+std::vector<SpawnerComponent*> GameplayStatic::find_spawners_in_class(std::string name) {
+	std::vector<SpawnerComponent*> test_ents;
+	for (auto e : eng->get_level()->get_all_objects()) {
+		if (auto s = e->cast_to<SpawnerComponent>()) {
+			if (s->get_spawner_type() == name)
+				test_ents.push_back(s);
+		}
+	}
+	return test_ents;
+}
+HitResult GameplayStatic::cast_ray(glm::vec3 start, glm::vec3 end, int channel_mask, PhysicsBody* ignore_this) {
+	HitResult out;
+	world_query_result res;
+	TraceIgnoreVec ignore;
+	if (ignore_this)
+		ignore.push_back(ignore_this);
 
-	 g_physics.trace_ray(res, start, end, &ignore, channel_mask);
-	 out.hit = res.component != nullptr;
-	 if (res.component) {
-		 out.pos = res.hit_pos;
-		 out.what = res.component->get_owner();
-		 out.normal = res.hit_normal;
-	 }
-	 return out;
- }
- std::vector<obj<Entity>> GameplayStatic::sphere_overlap(glm::vec3 center, float radius, int channel_mask)
- {
-	 std::vector<obj<Entity>> outVec;
-	 overlap_query_result res;
-	 g_physics.sphere_is_overlapped(res, radius, center, channel_mask);
-	 for (int i = 0; i < res.overlaps.size(); i++) {
-		 outVec.push_back(res.overlaps[i]->get_owner());
-	 }
-	 return outVec;
- }
- void GameplayStatic::debug_sphere(glm::vec3 center, float r, float life, const lColor& color)
- {
-	 Debug::add_sphere(center, r, color.to_color32(), life);
- }
- extern string print_vector(glm::vec3 v);
+	g_physics.trace_ray(res, start, end, &ignore, channel_mask);
+	out.hit = res.component != nullptr;
+	if (res.component) {
+		out.pos = res.hit_pos;
+		out.what = res.component->get_owner();
+		out.normal = res.hit_normal;
+	}
+	return out;
+}
+std::vector<obj<Entity>> GameplayStatic::sphere_overlap(glm::vec3 center, float radius, int channel_mask) {
+	std::vector<obj<Entity>> outVec;
+	overlap_query_result res;
+	g_physics.sphere_is_overlapped(res, radius, center, channel_mask);
+	for (int i = 0; i < res.overlaps.size(); i++) {
+		outVec.push_back(res.overlaps[i]->get_owner());
+	}
+	return outVec;
+}
+void GameplayStatic::debug_sphere(glm::vec3 center, float r, float life, const lColor& color) {
+	Debug::add_sphere(center, r, color.to_color32(), life);
+}
+extern string print_vector(glm::vec3 v);
 
- void GameplayStatic::enable_ragdoll_shared(Entity* e, bool enable) {
-	 MeshComponent* mesh = e->get_cached_mesh_component();
-	 ASSERT(mesh);
-	 AnimatorObject* animator = mesh->get_animator();
-	 ASSERT(animator);
+void GameplayStatic::enable_ragdoll_shared(Entity* e, bool enable) {
+	MeshComponent* mesh = e->get_cached_mesh_component();
+	ASSERT(mesh);
+	AnimatorObject* animator = mesh->get_animator();
+	ASSERT(animator);
 	// animator->set_update_owner_position_to_root(true);
-	 auto& children = e->get_children();
-	 for (auto c : children) {
+	auto& children = e->get_children();
+	for (auto c : children) {
 
-		 auto phys = c->get_component<PhysicsBody>();
-		 if (!phys || phys->is_a<AdvancedJointComponent>())
-			 continue;
+		auto phys = c->get_component<PhysicsBody>();
+		if (!phys || phys->is_a<AdvancedJointComponent>())
+			continue;
 
-		 auto m = e->get_cached_mesh_component();
-		 if (!m || !m->get_animator())
-			 continue;
-		 int i = m->get_index_of_bone(c->get_parent_bone());
-		 if (i == -1)
-			 continue;
+		auto m = e->get_cached_mesh_component();
+		if (!m || !m->get_animator())
+			continue;
+		int i = m->get_index_of_bone(c->get_parent_bone());
+		if (i == -1)
+			continue;
 
-		 const glm::mat4& this_ws = e->get_ws_transform();
+		const glm::mat4& this_ws = e->get_ws_transform();
 
+		if (enable) {
+			auto cur = c->get_ls_transform();
+			auto theFinalMat = this_ws * m->get_animator()->get_global_bonemats().at(i);
+			string msg = std::string(c->get_parent_bone().get_c_str()) + ": " + print_vector(theFinalMat[1]);
+			msg += " --- " + print_vector(cur[3]);
 
+			eng->log_to_fullscreen_gui(Info, msg.c_str());
+			sys_print(Info, msg.c_str());
 
-		 if (enable) {
-			 auto cur = c->get_ls_transform();
-			 auto theFinalMat = this_ws * m->get_animator()->get_global_bonemats().at(i);
-			 string msg = std::string(c->get_parent_bone().get_c_str()) + ": " + print_vector(theFinalMat[1]);
-			 msg += " --- "+print_vector(cur[3]);
-			
-			 eng->log_to_fullscreen_gui(Info, msg.c_str());
-			 sys_print(Info, msg.c_str());
-
-			 phys->enable_with_initial_transforms(
-				 this_ws * m->get_animator()->get_last_global_bonemats().at(i) * cur,
-				 this_ws * m->get_animator()->get_global_bonemats().at(i) * cur,
-				 eng->get_dt());
-		 }
-		 else {
-			 phys->set_is_enable(false);
-		 }
-	 }
- }
+			phys->enable_with_initial_transforms(this_ws * m->get_animator()->get_last_global_bonemats().at(i) * cur,
+												 this_ws * m->get_animator()->get_global_bonemats().at(i) * cur,
+												 eng->get_dt());
+		} else {
+			phys->set_is_enable(false);
+		}
+	}
+}

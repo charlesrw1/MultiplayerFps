@@ -14,11 +14,12 @@ public:
 	void write_to(FileWriter& out);
 	void read_from(FileReader& in);
 
-	struct track {
+	struct track
+	{
 		StringName name;
 		int keyframe_start = 0;
 		// if keyframe_start < 0, then track only has 1 keyframe
-		float min_val=0.0;
+		float min_val = 0.0;
 	};
 	int total_keyframes = 0;
 	float total_length = 0.0;

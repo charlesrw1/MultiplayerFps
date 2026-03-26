@@ -8,20 +8,19 @@ class GameAnimationMgr
 {
 public:
 	static GameAnimationMgr* inst;
-	
+
 	GameAnimationMgr();
 	~GameAnimationMgr();
 
-	void update_animating();	// blocking
+	void update_animating(); // blocking
 	void add_to_animating_set(AnimatorObject& mc);
 	void remove_from_animating_set(AnimatorObject& mc);
 	glm::mat4* get_bonemat_ptr(int ofs) {
 		assert(ofs >= 0 && ofs < matricies_allocated);
 		return (matricies + ofs);
 	}
-	int get_num_matricies_used() const {
-		return matricies_used;
-	}
+	int get_num_matricies_used() const { return matricies_used; }
+
 private:
 	hash_set<AnimatorObject> animating_meshcomponents;
 	glm::mat4* matricies = nullptr;

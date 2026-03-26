@@ -11,7 +11,8 @@ class MaterialInstance;
 class Entity;
 class Model;
 class Component;
-struct Render_Object {
+struct Render_Object
+{
 	Render_Object() {
 		visible = true;
 		shadow_caster = true;
@@ -36,9 +37,9 @@ struct Render_Object {
 	bool color_overlay : 1;
 	bool dither : 1;
 	bool opposite_dither : 1;
-	bool is_skybox : 1;	// if true, then this is included in the global skylight reflection probe
+	bool is_skybox : 1; // if true, then this is included in the global skylight reflection probe
 	bool lightmapped : 1;
-	bool static_probe_lit : 1;	// if static probe lit, lightmap_coord.x gives the index
+	bool static_probe_lit : 1; // if static probe lit, lightmap_coord.x gives the index
 	bool sort_first : 1;
 	bool ignore_in_baking : 1;
 	bool ignore_in_cubemap : 1;
@@ -51,7 +52,8 @@ struct Render_Object {
 };
 
 class MeshBuilder;
-struct MeshBuilder_Object {
+struct MeshBuilder_Object
+{
 	MeshBuilder_Object() {
 		visible = false;
 		depth_tested = true;
@@ -67,10 +69,9 @@ struct MeshBuilder_Object {
 	glm::mat4 transform = glm::mat4(1.f);
 };
 
-struct Particle_Object {
-	Particle_Object() {
-
-	}
+struct Particle_Object
+{
+	Particle_Object() {}
 	const Component* owner = nullptr;
 	MeshBuilder* meshbuilder = nullptr;
 	MaterialInstance* material = nullptr;
@@ -78,17 +79,19 @@ struct Particle_Object {
 };
 class Texture;
 
-struct DynamicProbeGridObject {
+struct DynamicProbeGridObject
+{
 	Bounds boxBounds;	// bounds of grid
-	int probeStart = 0;	// index = probe*6 (ambient cube)
-	glm::ivec3 probeSize = { 0,0,0 };
+	int probeStart = 0; // index = probe*6 (ambient cube)
+	glm::ivec3 probeSize = {0, 0, 0};
 	// probeCount = x*y*z
 };
 
-struct Lightmap_Object {
+struct Lightmap_Object
+{
 	const Texture* lightmap_texture = nullptr;
 	// 6*num_probes. static
 	std::vector<glm::vec3> staticAmbientCubeProbes;
-	//std::vector<DynamicProbeGridObject> probeGrids;
-	//std::vector<glm::vec3> dynamicProbes;
+	// std::vector<DynamicProbeGridObject> probeGrids;
+	// std::vector<glm::vec3> dynamicProbes;
 };

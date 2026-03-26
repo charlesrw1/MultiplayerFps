@@ -4,239 +4,237 @@
 
 /*
 for struct in file ('{', '}')
-    for field in struct
-        (opt) for struct in list
-        (opt) for field in list
-        (opt) for struct in struct
-        field.skip()
-    struct.skip()
+	for field in struct
+		(opt) for struct in list
+		(opt) for field in list
+		(opt) for struct in struct
+		field.skip()
+	struct.skip()
 */
 
 void DictParser::load_from_memory(const char* ptr, int length, const char* name) {
-    
-    assert(!buffer);
 
+	assert(!buffer);
 
-    buffer = (char*)ptr;
-    buffer_size = length;
-    read_ptr = 0;
-    line = 1;
-    allocated = false;
+	buffer = (char*)ptr;
+	buffer_size = length;
+	read_ptr = 0;
+	line = 1;
+	allocated = false;
 
-    this->filename = name;
+	this->filename = name;
 
-    ASSERT(buffer[length] == 0);
+	ASSERT(buffer[length] == 0);
 }
 
-void DictParser::load_from_file(IFile* file)
-{
-    assert(!buffer);
+void DictParser::load_from_file(IFile* file) {
+	assert(!buffer);
 
-    const int file_size = file->size();
-    buffer = new char[file_size +1];
-    buffer_size = file_size;
-    allocated = true;
+	const int file_size = file->size();
+	buffer = new char[file_size + 1];
+	buffer_size = file_size;
+	allocated = true;
 
-    file->read((char*)buffer, file_size);
+	file->read((char*)buffer, file_size);
 
-    buffer[buffer_size] = 0;
-    ASSERT(buffer[buffer_size] == 0);
+	buffer[buffer_size] = 0;
+	ASSERT(buffer[buffer_size] == 0);
 
-    read_ptr = 0;
-    line = 1;
+	read_ptr = 0;
+	line = 1;
 
-    this->filename = filename;
+	this->filename = filename;
 }
 
 // convenience functions
 
- bool DictParser::read_int(int& i) {
-    StringView view;
-    bool ret = read_next_token(view);
-    if (!ret) return false;
-    auto cstr = view.to_stack_string();
-    i = atoi(cstr.c_str());
-    return true;
+bool DictParser::read_int(int& i) {
+	StringView view;
+	bool ret = read_next_token(view);
+	if (!ret)
+		return false;
+	auto cstr = view.to_stack_string();
+	i = atoi(cstr.c_str());
+	return true;
 }
 
- bool DictParser::read_float(float& f) {
-    StringView view;
-    bool ret = read_next_token(view);
-    if (!ret) return false;
-    auto cstr = view.to_stack_string();
-    f = atof(cstr.c_str());
-    return true;
+bool DictParser::read_float(float& f) {
+	StringView view;
+	bool ret = read_next_token(view);
+	if (!ret)
+		return false;
+	auto cstr = view.to_stack_string();
+	f = atof(cstr.c_str());
+	return true;
 }
 
- bool DictParser::read_float2(float& f1, float& f2) {
-    StringView view;
-    bool ret = read_next_token(view);
-    if (!ret) return false;
-    auto cstr = view.to_stack_string();
-    return sscanf_s(cstr.c_str(), "%f %f", &f1, &f2) == 2;
+bool DictParser::read_float2(float& f1, float& f2) {
+	StringView view;
+	bool ret = read_next_token(view);
+	if (!ret)
+		return false;
+	auto cstr = view.to_stack_string();
+	return sscanf_s(cstr.c_str(), "%f %f", &f1, &f2) == 2;
 }
 
- bool DictParser::read_float3(float& f1, float& f2, float& f3) {
-    StringView view;
-    bool ret = read_next_token(view);
-    if (!ret) return false;
-    auto cstr = view.to_stack_string();
-    return sscanf_s(cstr.c_str(), "%f %f %f", &f1, &f2, &f3) == 3;
+bool DictParser::read_float3(float& f1, float& f2, float& f3) {
+	StringView view;
+	bool ret = read_next_token(view);
+	if (!ret)
+		return false;
+	auto cstr = view.to_stack_string();
+	return sscanf_s(cstr.c_str(), "%f %f %f", &f1, &f2, &f3) == 3;
 }
 
 StringView DictParser::get_line_str(int line_to_get) {
-    int line_so_far = 1;
-    int i = 0;
-    while (i < buffer_size) {
-        if (get_character(i++) == '\n') line_so_far++;
-        if (line_so_far == line_to_get) {
-            break;
-        }
-    }
-    int count = 0;
-    int start = i;
-    while (i < buffer_size) {
-        if (get_character(i++) == '\n') {
-            break;
-        }
-    }
-    return StringView(get_c_str(start), count);
+	int line_so_far = 1;
+	int i = 0;
+	while (i < buffer_size) {
+		if (get_character(i++) == '\n')
+			line_so_far++;
+		if (line_so_far == line_to_get) {
+			break;
+		}
+	}
+	int count = 0;
+	int start = i;
+	while (i < buffer_size) {
+		if (get_character(i++) == '\n') {
+			break;
+		}
+	}
+	return StringView(get_c_str(start), count);
 }
 
 bool DictParser::expect_no_more_tokens() {
-    StringView tok;
-    bool ret = read_next_token(tok);
-    if (ret) {
-        raise_error("got tokens but expected eof");
-    }
-    else if (!ret) {
-        had_error = false;
-        error_msg = "";
-    }
-    return !ret;
+	StringView tok;
+	bool ret = read_next_token(tok);
+	if (ret) {
+		raise_error("got tokens but expected eof");
+	} else if (!ret) {
+		had_error = false;
+		error_msg = "";
+	}
+	return !ret;
 }
 
 // low level
 
 bool DictParser::read_next_token(StringView& token) {
-    bool is_quote = false;
+	bool is_quote = false;
 
-    skip_whitespace();
+	skip_whitespace();
 
-    if (is_eof()) {
-        raise_error("tried to read past end");
-        return false;
-    }
+	if (is_eof()) {
+		raise_error("tried to read past end");
+		return false;
+	}
 
-    char c = get_character(read_ptr++);
-    // skip commented lines
-    while (c == ';') {
-        skip_to_next_line();
-        skip_whitespace();
+	char c = get_character(read_ptr++);
+	// skip commented lines
+	while (c == ';') {
+		skip_to_next_line();
+		skip_whitespace();
 
-        if (is_eof()) {
-            raise_error("tried to read past end");
-            return false;
-        }
+		if (is_eof()) {
+			raise_error("tried to read past end");
+			return false;
+		}
 
-        c = get_character(read_ptr++);
-    }
-    if (double_slash_comments) {
-        while (read_ptr < buffer_size - 1 && c == '/' && get_character(read_ptr) == '/') {
-            skip_to_next_line();
-            skip_whitespace();
+		c = get_character(read_ptr++);
+	}
+	if (double_slash_comments) {
+		while (read_ptr < buffer_size - 1 && c == '/' && get_character(read_ptr) == '/') {
+			skip_to_next_line();
+			skip_whitespace();
 
-            if (is_eof()) {
-                raise_error("tried to read past end");
-                return false;
-            }
+			if (is_eof()) {
+				raise_error("tried to read past end");
+				return false;
+			}
 
-            c = get_character(read_ptr++);
-        }
-    }
+			c = get_character(read_ptr++);
+		}
+	}
 
-    if (c == '\"') {
-        is_quote = true;
-    }
-    else if (break_a_token(c)) {
-        token = StringView(get_c_str(read_ptr - 1), 1);
-        skip_whitespace();
-        return true;
-    }
+	if (c == '\"') {
+		is_quote = true;
+	} else if (break_a_token(c)) {
+		token = StringView(get_c_str(read_ptr - 1), 1);
+		skip_whitespace();
+		return true;
+	}
 
-    int start = read_ptr - 1;
-    int count = 1;
-    while (read_ptr < size()) {
+	int start = read_ptr - 1;
+	int count = 1;
+	while (read_ptr < size()) {
 
-        c = get_character(read_ptr++);
-        if (is_quote && c == '\"') {
-            assert(start + 1 < buffer_size);
-            start = start + 1;
-            count = count - 1;
-            break;
-        }
-        else if (!is_quote && break_a_token(c)) {
-            break;
-        }
-        count++;
-    }
-    token = StringView(get_c_str(start), count);
+		c = get_character(read_ptr++);
+		if (is_quote && c == '\"') {
+			assert(start + 1 < buffer_size);
+			start = start + 1;
+			count = count - 1;
+			break;
+		} else if (!is_quote && break_a_token(c)) {
+			break;
+		}
+		count++;
+	}
+	token = StringView(get_c_str(start), count);
 
-    skip_whitespace();
+	skip_whitespace();
 
-    return true;
+	return true;
 }
 
 char DictParser::get_next_character_but_dont_fail(char default_) {
-    if (read_ptr < buffer_size) {
-        return buffer[read_ptr];
-    }
-    else
-        return default_;
+	if (read_ptr < buffer_size) {
+		return buffer[read_ptr];
+	} else
+		return default_;
 }
 
-bool DictParser::read_line(StringView& line, char delimiter)
-{
-    if (is_eof()) {
-        return false;
-    }
-    int start = read_ptr;
-    while (read_ptr < size()) {
-        if (get_character(read_ptr) == delimiter) {
-            line.str_start = (char*)&buffer[start];
-            line.str_len = read_ptr - start;
-            read_ptr++;
-            return true;
-        }
-        read_ptr++;
-    }
+bool DictParser::read_line(StringView& line, char delimiter) {
+	if (is_eof()) {
+		return false;
+	}
+	int start = read_ptr;
+	while (read_ptr < size()) {
+		if (get_character(read_ptr) == delimiter) {
+			line.str_start = (char*)&buffer[start];
+			line.str_len = read_ptr - start;
+			read_ptr++;
+			return true;
+		}
+		read_ptr++;
+	}
 
-    line.str_start = (char*)&buffer[start];
-    line.str_len = read_ptr - start;
-    return true;
+	line.str_start = (char*)&buffer[start];
+	line.str_len = read_ptr - start;
+	return true;
 }
 
 void DictParser::skip_to_next_line() {
-    while (read_ptr < size()) {
-        char c = get_character(read_ptr++);
-        if (c == '\n') {
-            line++;
-            break;
-        }
-    }
+	while (read_ptr < size()) {
+		char c = get_character(read_ptr++);
+		if (c == '\n') {
+			line++;
+			break;
+		}
+	}
 }
 
 void DictParser::skip_whitespace() {
-    while (read_ptr < size()) {
-        char c = get_character(read_ptr++);
-        if (c == ' ' || c == '\t' || c== '\r') continue;
-        else if (c == '\n') {
-            line++;
-            continue;
-        }
-        else {
-            read_ptr--;
-            break;
-        }
-    }
+	while (read_ptr < size()) {
+		char c = get_character(read_ptr++);
+		if (c == ' ' || c == '\t' || c == '\r')
+			continue;
+		else if (c == '\n') {
+			line++;
+			continue;
+		} else {
+			read_ptr--;
+			break;
+		}
+	}
 }

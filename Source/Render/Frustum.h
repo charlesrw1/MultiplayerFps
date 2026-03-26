@@ -8,9 +8,9 @@ struct Frustum
 
 	glm::vec4 back_plane;
 	bool is_ortho = false;
-	float ortho_max_extent = 1.0;	// for cascades, fixme
+	float ortho_max_extent = 1.0; // for cascades, fixme
 	glm::vec3 origin{};
-	float fov=0.0;
+	float fov = 0.0;
 };
 
 #include "Render/RenderScene.h"

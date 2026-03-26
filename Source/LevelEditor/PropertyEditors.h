@@ -15,18 +15,14 @@ public:
 	static void register_mat_editor(MaterialEditorLocal& ed, FnFactory<IPropertyEditor>& factory);
 
 	static void register_anim_editor2(AnimationGraphEditorNew& ed, FnFactory<IPropertyEditor>& factory);
-
 };
 
 class SharedAssetPropertyEditor : public IPropertyEditor
 {
 public:
-
 	virtual std::string get_str() = 0;
 	virtual void set_asset(const std::string& str) = 0;
-	virtual bool is_soft_editor() const {
-		return false;
-	}
+	virtual bool is_soft_editor() const { return false; }
 	virtual bool get_failed_load() const { return false; }
 	virtual bool internal_update();
 	virtual int extra_row_count() { return 0; }
@@ -34,9 +30,10 @@ public:
 	virtual void reset_value() {
 		set_asset("");
 		asset_str = "";
-		//auto ptr = (IAsset**)prop->get_ptr(instance);
+		// auto ptr = (IAsset**)prop->get_ptr(instance);
 		//*ptr = nullptr;
 	}
+
 private:
 	bool has_init = false;
 	std::string asset_str;
@@ -52,7 +49,6 @@ public:
 	bool get_failed_load() const override;
 };
 
-
 class ColorEditor : public IPropertyEditor
 {
 public:
@@ -60,6 +56,7 @@ public:
 	virtual int extra_row_count();
 	virtual bool can_reset();
 	virtual void reset_value();
+
 private:
 };
 
@@ -68,7 +65,6 @@ class ButtonPropertyEditor : public IPropertyEditor
 	bool internal_update();
 	bool can_reset();
 };
-
 
 class EntityBoneParentStringEditor : public IPropertyEditor
 {
@@ -82,7 +78,6 @@ public:
 	bool set_keyboard_focus = true;
 	std::string node_menu_filter_buf;
 };
-
 
 class ClassTypePtrPropertyEditor : public IPropertyEditor
 {

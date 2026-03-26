@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "Framework/MulticastDelegate.h"
 #include <vector>
 #include <memory>
@@ -12,7 +11,8 @@ using glm::vec2;
 using std::vector;
 
 // input wrapper over sdl with controller support
-class Input {
+class Input
+{
 public:
 	Input();
 	~Input();
@@ -51,11 +51,12 @@ public:
 	static SDL_GameControllerType get_con_type();
 	static SDL_GameControllerType get_con_type_idx(int idx);
 	static bool last_recieved_input_from_con();
-	static MulticastDelegate<int /* index */, bool/* connected/disconnected */> on_con_status;
-	static MulticastDelegate<int /* controller index or -1 if keyboard */> on_any_input; // invoked on any input recieved from a device
+	static MulticastDelegate<int /* index */, bool /* connected/disconnected */> on_con_status;
+	static MulticastDelegate<int /* controller index or -1 if keyboard */>
+		on_any_input; // invoked on any input recieved from a device
 private:
-
-	struct PressReleaseState {
+	struct PressReleaseState
+	{
 		PressReleaseState() {
 			is_down = false;
 			is_pressed = false;
@@ -67,7 +68,8 @@ private:
 	};
 	static_assert(sizeof(PressReleaseState) == 1, "");
 
-	struct Device {
+	struct Device
+	{
 		Device(SDL_GameController* ptr, int index);
 		int index = -1;
 		SDL_GameController* ptr = nullptr;
@@ -84,7 +86,8 @@ private:
 	int mouseY = 0;
 
 	const Uint8* keyState = nullptr;
-	vector<PressReleaseState> keyPressedReleasedState;	// 0 = not down, 1 = down, 2 = not down and released, 3 = down and pressed,
+	vector<PressReleaseState>
+		keyPressedReleasedState; // 0 = not down, 1 = down, 2 = not down and released, 3 = down and pressed,
 	vector<PressReleaseState> mouseButtonsState;
 
 	opt<int> find_device_for_index(int idx) const;

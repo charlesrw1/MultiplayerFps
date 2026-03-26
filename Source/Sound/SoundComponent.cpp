@@ -6,19 +6,17 @@
 #include "Game/Entity.h"
 
 #ifdef EDITOR_BUILD
-void SoundComponent::update_ed_mesh()
-{
+void SoundComponent::update_ed_mesh() {
 	editor_mesh->mb.Begin();
 	if (attenuate) {
-		if(minRadius>0.0001)
-			editor_mesh->mb.AddLineSphere({}, minRadius, Color32( 100,100,255 ));
+		if (minRadius > 0.0001)
+			editor_mesh->mb.AddLineSphere({}, minRadius, Color32(100, 100, 255));
 		editor_mesh->mb.AddLineSphere({}, maxRadius, COLOR_WHITE);
 	}
 	editor_mesh->mb.End();
 }
 #endif
-void SoundComponent::update_player()
-{
+void SoundComponent::update_player() {
 	ASSERT(player);
 	player->asset = sound.get();
 	player->minRadius = minRadius;
@@ -30,8 +28,7 @@ void SoundComponent::update_player()
 	player->looping = looping;
 }
 #include "Game/Components/BillboardComponent.h"
-void SoundComponent::start()
-{
+void SoundComponent::start() {
 #ifdef EDITOR_BUILD
 	if (eng->is_editor_level()) {
 		editor_mesh = get_owner()->create_component<MeshBuilderComponent>();
@@ -52,37 +49,26 @@ void SoundComponent::start()
 	}
 	set_ticking(false);
 }
-void SoundComponent::stop()
-{
+void SoundComponent::stop() {
 	if (player) {
 		isound->remove_sound_player(player);
 	}
 }
-void SoundComponent::update()
-{
+void SoundComponent::update() {}
 
-}
-
-void SoundComponent::play_one_shot_at_pos(const glm::vec3& v) const
-{
-	isound->play_sound(
-		sound.get(),
-		1, 1, minRadius, maxRadius, (SndAtn)attenuation, attenuate, spatialize, v
-	);
+void SoundComponent::play_one_shot_at_pos(const glm::vec3& v) const {
+	isound->play_sound(sound.get(), 1, 1, minRadius, maxRadius, (SndAtn)attenuation, attenuate, spatialize, v);
 }
 
 #ifdef EDITOR_BUILD
-void SoundComponent::editor_on_change_property()
-{
+void SoundComponent::editor_on_change_property() {
 	update_ed_mesh();
 	if (editor_test_sound.check_and_swap()) {
 		play_one_shot();
 	}
-	
 }
 #endif
-void SoundComponent::on_changed_transform()
-{
+void SoundComponent::on_changed_transform() {
 	if (player) {
 		player->spatial_pos = get_ws_position();
 	}

@@ -9,14 +9,12 @@
 #include "Framework/EnumDefReflection.h"
 #include "Framework/LuaColor.h"
 
-
 glm::vec4 get_color_light_value(Color32 c, float intensity);
 
-NEWENUM(ShadowMode, int8_t)
-{
+NEWENUM(ShadowMode, int8_t){
 	Disabled,
-	Realtime,	// shadows update when nessecary
-	Static,	// shadows update only once
+	Realtime, // shadows update when nessecary
+	Static,	  // shadows update only once
 };
 
 class Texture;
@@ -32,52 +30,41 @@ public:
 	void start() final;
 	void stop() final;
 	void on_sync_render_data() final;
-	void on_changed_transform() final {
-		sync_render_data();
-	}
+	void on_changed_transform() final { sync_render_data(); }
 #ifdef EDITOR_BUILD
 	void editor_on_change_property() final {
 		sync_render_data();
-		if (shadow_size < 0)shadow_size = 0;
-		else if (shadow_size > 2)shadow_size = 2;
+		if (shadow_size < 0)
+			shadow_size = 0;
+		else if (shadow_size > 2)
+			shadow_size = 2;
 	}
-	const char* get_editor_outliner_icon() const final {
-		return "eng/editor/light.png";
-	}
+	const char* get_editor_outliner_icon() const final { return "eng/editor/light.png"; }
 #endif
 	REF void set_color(lColor color, float intensity) {
 		this->color = color.to_color32();
 		this->intensity = intensity;
 	}
-	REF void set_radius(float r) {
-		this->radius = r;
-	}
-	REF void set_visible(bool b) {
-		this->visible = b;
-	}
+	REF void set_radius(float r) { this->radius = r; }
+	REF void set_visible(bool b) { this->visible = b; }
 	REF void set_cone(float angle, float inner_angle) {
 		this->cone_angle = angle;
 		this->inner_cone = inner_angle;
 	}
-	REF void set_shadows(bool b) {
-		shadow = (b) ? ShadowMode::Realtime : ShadowMode::Disabled;
-	}
-	REF void set_cookie(const Texture* t) {
-		this->cookie_asset = t;
-	}
-
-
+	REF void set_shadows(bool b) { shadow = (b) ? ShadowMode::Realtime : ShadowMode::Disabled; }
+	REF void set_cookie(const Texture* t) { this->cookie_asset = t; }
 
 	REF Color32 color = COLOR_WHITE;
 	REF float intensity = 1.f;
 	REF float radius = 20.f;
 	REF float cone_angle = 45.0;
 	REF float inner_cone = 40.0;
-	// only works with shadows on. projects a square, mask texture to use to attenuate the light. this disables "inner_cone" attenuation
+	// only works with shadows on. projects a square, mask texture to use to attenuate the light. this disables
+	// "inner_cone" attenuation
 	REF const Texture* cookie_asset = nullptr;
 	REF bool visible = true;
 	REF ShadowMode shadow = ShadowMode::Disabled;
-	REF int8_t shadow_size = 0;	// 0=small,1=medium,2=big
+	REF int8_t shadow_size = 0; // 0=small,1=medium,2=big
 
 	handle<Render_Light> light_handle;
 	obj<BillboardComponent> editor_billboard;
@@ -92,28 +79,18 @@ public:
 	void start() final;
 	void stop() final;
 	void on_sync_render_data() final;
-	void on_changed_transform() final {
-		sync_render_data();
-	}
+	void on_changed_transform() final { sync_render_data(); }
 	~PointLightComponent() final;
 #ifdef EDITOR_BUILD
-	void editor_on_change_property() final {
-		sync_render_data();
-	}
-	const char* get_editor_outliner_icon() const final {
-		return "eng/editor/light.png";
-	}
+	void editor_on_change_property() final { sync_render_data(); }
+	const char* get_editor_outliner_icon() const final { return "eng/editor/light.png"; }
 #endif
 	REF void set_color(lColor color, float intensity) {
 		this->color = color.to_color32();
 		this->intensity = intensity;
 	}
-	REF void set_radius(float r) {
-		this->radius = r;
-	}
-	REF void set_visible(bool b) {
-		this->visible = b;
-	}
+	REF void set_radius(float r) { this->radius = r; }
+	REF void set_visible(bool b) { this->visible = b; }
 
 	REF const Texture* cookie_asset = nullptr;
 
@@ -135,17 +112,11 @@ public:
 	~SunLightComponent();
 	void start() final;
 	void stop() final;
-	void on_changed_transform() final {
-		sync_render_data();
-	}
+	void on_changed_transform() final { sync_render_data(); }
 	void on_sync_render_data() final;
 #ifdef EDITOR_BUILD
-	void editor_on_change_property() final {
-		sync_render_data();
-	}
-	const char* get_editor_outliner_icon() const final {
-		return "eng/editor/light.png";
-	}
+	void editor_on_change_property() final { sync_render_data(); }
+	const char* get_editor_outliner_icon() const final { return "eng/editor/light.png"; }
 #endif
 	REF Color32 color = COLOR_WHITE;
 	REF float intensity = 2.f;
@@ -166,9 +137,7 @@ class SkylightComponent : public Component
 {
 public:
 	CLASS_BODY(SkylightComponent);
-	SkylightComponent() {
-		set_call_init_in_editor(true);
-	}
+	SkylightComponent() { set_call_init_in_editor(true); }
 	void start() final;
 	void stop() final;
 	void on_sync_render_data() final;
@@ -179,13 +148,13 @@ public:
 	REFLECT(transient)
 	BoolButton recapture_skylight;
 
-	REF bool enable_fog = false;	// fog on/off
+	REF bool enable_fog = false; // fog on/off
 	// if true, then uses the skylight cubemap to source the color of the fog. else, uses constant fog_color.
 	REF bool use_sky_cubemap_for_fog = false;
 	REF Color32 fog_color = Color32();
 	REF float fog_height_start = -4.0;	// height offset from 0 to start the fog
-	REF float fog_height_falloff = 0.2;	// how the fog falls off over height
-	REF float fog_density = 0.1; // overall density of fog
+	REF float fog_height_falloff = 0.2; // how the fog falls off over height
+	REF float fog_density = 0.1;		// overall density of fog
 
 	// these are settings for when use_sky_cubemap_for_fog is true.
 	// if using the fog cubemap, then the color is altered by direction of the camera and by distance.
@@ -193,21 +162,22 @@ public:
 	// mip_to_sample = MAX_MIPS_IN_CUBEMAP * (1.0 - smoothstep(min_dist,max_dist,fog_sample_point_dist)*max_mip)
 	// color = texture(Cubemap, camera_dir, mip_to_sample)
 
-	REF float fog_cubemap_max_mip = 0.7;	// lower values means more diffuse
-	REF float fog_cubemap_min_dist = 0.0;	// points before this use the highest mip (more diffuse)
+	REF float fog_cubemap_max_mip = 0.7;   // lower values means more diffuse
+	REF float fog_cubemap_min_dist = 0.0;  // points before this use the highest mip (more diffuse)
 	REF float fog_cubemap_max_dist = 50.0; // points beyond this use the lowest mip (less diffuse)
-	
+
 	Texture* mytexture = nullptr;
-	
+
 	REFLECT();
-	bool enableBakedAmbient = false;	// todo: does nothing
+	bool enableBakedAmbient = false; // todo: does nothing
 	glm::vec3 skyTop = glm::vec3(0.f);
 	glm::vec3 skyBottom = glm::vec3(0.f);
 
 	handle<Render_Skylight> handle;
 };
 
-struct CubemapAnchor {
+struct CubemapAnchor
+{
 	STRUCT_BODY();
 	REF bool worldspace = false;
 	REF glm::vec3 p = glm::vec3(0.f);
@@ -219,13 +189,11 @@ class CubemapComponent : public Component
 {
 public:
 	CLASS_BODY(CubemapComponent);
-	CubemapComponent() {
-		set_call_init_in_editor(true);
-	}
+	CubemapComponent() { set_call_init_in_editor(true); }
 	void start() final;
 	void stop() final;
 	void on_changed_transform() final;
-#ifdef  EDITOR_BUILD
+#ifdef EDITOR_BUILD
 	void editor_on_change_property() final;
 #endif //  EDITOR_BUILD
 
@@ -242,13 +210,10 @@ public:
 		this->probe_ofs = ofs;
 		sync_render_data();
 	}
-	glm::vec3 get_probe_pos()  {
-		return get_ws_transform() * glm::vec4(anchor.p, 1.0);
-	}
+	glm::vec3 get_probe_pos() { return get_ws_transform() * glm::vec4(anchor.p, 1.0); }
 	int probe_ofs = -1;
+
 private:
-
-
 	void update_editormeshbuilder();
 	MeshBuilderComponent* editor_meshbuilder = nullptr;
 	obj<Entity> editor_mesh;
@@ -258,9 +223,7 @@ class GiVolumeComponent : public Component
 {
 public:
 	CLASS_BODY(GiVolumeComponent);
-	GiVolumeComponent() {
-		set_call_init_in_editor(true);
-	}
+	GiVolumeComponent() { set_call_init_in_editor(true); }
 	void start() final;
 	void stop() final;
 	REF int priority = 0;
@@ -272,29 +235,30 @@ public:
 	REF float relocate_normal_push = 0.2;
 };
 
-class GameSceneGiUtil {
+class GameSceneGiUtil
+{
 public:
 	static void on_scene_load_gi(const string& mapname);
 	static void on_scene_exit();
-	static void bake_all_cubemaps();	// bake all
-	static void bake_one_cubemap(CubemapComponent* volume);	// force bake 1
-	static void on_cubemap_changes();	// removal/add/moving volume
+	static void bake_all_cubemaps();						// bake all
+	static void bake_one_cubemap(CubemapComponent* volume); // force bake 1
+	static void on_cubemap_changes();						// removal/add/moving volume
 	static void bake_ddgi();
 	// global flag
 	static void check_changes();
 
 	static void save_to_disk();
+
 private:
 	static bool had_changes;
 };
 
 #include "Render/DynamicMaterialPtr.h"
-class AreaishLightComponent : public Component {
+class AreaishLightComponent : public Component
+{
 public:
 	CLASS_BODY(AreaishLightComponent);
-	AreaishLightComponent() {
-		set_call_init_in_editor(true);
-	}
+	AreaishLightComponent() { set_call_init_in_editor(true); }
 	void start() final;
 	void stop() final;
 	void editor_on_change_property() final;
@@ -303,17 +267,17 @@ public:
 	REF Model* override_model = nullptr;
 
 	DynamicMatUniquePtr mat;
+
 private:
 	Model* get_model_to_use();
 };
 
 struct Lightmap_Object;
-class LightmapComponent : public Component {
+class LightmapComponent : public Component
+{
 public:
 	CLASS_BODY(LightmapComponent);
-	LightmapComponent() {
-		set_call_init_in_editor(true);
-	}
+	LightmapComponent() { set_call_init_in_editor(true); }
 	~LightmapComponent();
 	void start() final;
 	void stop() final;
@@ -326,9 +290,10 @@ public:
 	void on_sync_render_data() final;
 
 	void serialize(Serializer& s) final;
+
 private:
 	REFLECT(hide);
-	Texture* lightmapTexture=nullptr;
+	Texture* lightmapTexture = nullptr;
 	// Export For Baking
 	REFLECT(transient)
 	BoolButton bakeLightmaps;

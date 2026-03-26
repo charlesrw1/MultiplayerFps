@@ -32,13 +32,15 @@ class AnimationSeq;
 class AnimTreePoseNode;
 struct Rt_Vars_Base;
 
-struct RootMotionTransform {
-	glm::vec3 position_displacement=glm::vec3(0.f);
-	glm::quat rotation_displacement=glm::quat();
+struct RootMotionTransform
+{
+	glm::vec3 position_displacement = glm::vec3(0.f);
+	glm::quat rotation_displacement = glm::quat();
 };
 
 // direct play slots for manual animation playback
-struct DirectAnimationSlot {
+struct DirectAnimationSlot
+{
 	StringName name;
 	const AnimationSeqAsset* active = nullptr;
 	float time = 0.0;
@@ -51,24 +53,23 @@ struct DirectAnimationSlot {
 
 // create this through code however you want
 class agBaseNode;
-class agBuilder : public ClassBase {
+class agBuilder : public ClassBase
+{
 public:
 	CLASS_BODY(agBuilder);
-	
+
 	REFLECT(lua_generic)
 	agBaseNode* alloc(const ClassTypeInfo* info);
 	REF void set_root(agBaseNode* node);
 
-	template<typename T>
-	T* alloc() {
-		return (T*)alloc(&T::StaticType);
-	}
+	template <typename T> T* alloc() { return (T*)alloc(&T::StaticType); }
 
 	void add_cached_pose_root(agBaseNode* node);
 	agBaseNode* get_root() const { return root; }
 	std::vector<agBaseNode*>& get_cache_nodes() { return cachePoseNodes; }
 	void add_slot_name(StringName name);
 	std::vector<StringName>& get_slots() { return slot_names; }
+
 private:
 	agBaseNode* root = nullptr;
 	std::vector<agBaseNode*> cachePoseNodes;
@@ -76,12 +77,14 @@ private:
 };
 class RagdollComponent;
 #include "Game/EntityPtr.h"
-class ConstructorError : public std::runtime_error {
+class ConstructorError : public std::runtime_error
+{
 public:
 	ConstructorError() : std::runtime_error("Constructor error.") {}
 };
 class agClipNode;
-class AnimatorObject : public ClassBase {
+class AnimatorObject : public ClassBase
+{
 public:
 	CLASS_BODY(AnimatorObject);
 
@@ -97,15 +100,14 @@ public:
 	const MSkeleton* get_skel() const { return model.get_skel(); }
 	int num_bones() const { return cached_bonemats.size(); }
 	Entity* get_owner() const { return owner; }
-	bool play_animation(const AnimationSeqAsset* seq, float play_speed=1.f, float start_pos=0.f);
-	// callback: returns true if interrupted, false if not. guaranteed to fire. 
+	bool play_animation(const AnimationSeqAsset* seq, float play_speed = 1.f, float start_pos = 0.f);
+	// callback: returns true if interrupted, false if not. guaranteed to fire.
 	void play_animation(const AnimationSeqAsset* seq, float play_speed, float start_pos, function<void(bool)> callback);
 	void stop_animation_in_slot(StringName slot);
-	//void add_simulating_physics_object(Entity* obj);
-	//void remove_simulating_physics_object(Entity* obj);
-	//REF void set_update_owner_position_to_root(bool b) { update_owner_position_to_root = b; }
+	// void add_simulating_physics_object(Entity* obj);
+	// void remove_simulating_physics_object(Entity* obj);
+	// REF void set_update_owner_position_to_root(bool b) { update_owner_position_to_root = b; }
 	void set_ragdoll(RagdollComponent* ragdoll);
-
 
 	RootMotionTransform get_last_root_motion() const { return root_motion; }
 	void set_matrix_palette_offset(int ofs) { matrix_palette_offset = ofs; }
@@ -126,16 +128,15 @@ public:
 	DirectAnimationSlot* find_slot_with_name(StringName name);
 	void add_playing_clip(agClipNode* clip) { playingClipsThisUpdate.push_back(clip); }
 	const std::vector<agClipNode*>& get_playing_clips() { return playingClipsThisUpdate; }
-	
+
 	// when debug printing enabled
 	void debug_print(int start_y);
 	void debug_enter_node(string msg) {
-		debug_output_messages.push_back(string(cur_depth,' ')+msg);
+		debug_output_messages.push_back(string(cur_depth, ' ') + msg);
 		cur_depth++;
 	}
-	void debug_exit_node() {
-		cur_depth--;
-	}
+	void debug_exit_node() { cur_depth--; }
+
 private:
 	int cur_depth = 0;
 	vector<string> debug_output_messages;
@@ -144,15 +145,15 @@ private:
 	std::unordered_map<uint64_t, float> curve_values;
 	std::unordered_map<uint64_t, std::variant<bool, float, int, glm::vec3>> blackboard;
 	bool using_global_bonemat_double_buffer = true;
-	vector<glm::mat4> cached_bonemats;	// global bonemats
+	vector<glm::mat4> cached_bonemats; // global bonemats
 	vector<glm::mat4> last_cached_bonemats;
-	int matrix_palette_offset = 0;	// mesh space -> bone space -> meshspace, what the renderer consumes
-	//bool update_owner_position_to_root = false;
+	int matrix_palette_offset = 0; // mesh space -> bone space -> meshspace, what the renderer consumes
+	// bool update_owner_position_to_root = false;
 	// owning entity, can be null for example in editor
 	Entity* owner = nullptr;
 	const Model& model;
 	RootMotionTransform root_motion;
-	//std::unordered_set<uint64_t> simulating_physics_objects;
+	// std::unordered_set<uint64_t> simulating_physics_objects;
 	obj<RagdollComponent> ragdoll;
 
 	// active sync groups for graph
@@ -162,15 +163,13 @@ private:
 
 	bool update_sync_group(int idx);
 	void update_slot(int idx, float dt);
-	void update_physics_bones(const Pose& inpose,RagdollComponent* rd);
+	void update_physics_bones(const Pose& inpose, RagdollComponent* rd);
 	void ConcatWithInvPose();
-
 
 	friend class NodeRt_Ctx;
 	friend class EditModelAnimations;
 	friend class AnimationEditorTool;
 	friend class atGraphContext;
 };
-
 
 #endif

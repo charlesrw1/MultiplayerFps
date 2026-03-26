@@ -12,16 +12,13 @@ bool ClassTypeInfo::is_subclass_of(const ClassTypeInfo* info) const {
 	return is_a(*info);
 }
 
-std::string ClassTypeInfo::get_classname() const
-{
+std::string ClassTypeInfo::get_classname() const {
 	return classname;
 }
 
-const ClassTypeInfo* ClassTypeInfo::get_super_type() const
-{
+const ClassTypeInfo* ClassTypeInfo::get_super_type() const {
 	return super_typeinfo;
 }
-
 
 int ClassTypeInfo::get_prototype_index_table() const {
 	assert(lua_prototype_index_table != 0);
@@ -37,7 +34,7 @@ struct TypeInfoWithExtra
 	bool has_initialized = false;
 	void set_parent(TypeInfoWithExtra* owner) {
 		ASSERT(owner);
-		
+
 		this->next = owner->child;
 		owner->child = this;
 	}
@@ -46,23 +43,19 @@ struct TypeInfoWithExtra
 
 struct ClassRegistryData
 {
-	std::unordered_map <std::string, TypeInfoWithExtra> string_to_typeinfo;
+	std::unordered_map<std::string, TypeInfoWithExtra> string_to_typeinfo;
 	std::vector<ClassTypeInfo*> id_to_typeinfo;
 	bool initialzed = false;
 };
 
-
-static ClassRegistryData& get_registry()
-{
+static ClassRegistryData& get_registry() {
 	static ClassRegistryData inst;
 	return inst;
 }
 
-
-ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_typeinfo, 
-	GetPropsFunc_t get_props_func, CreateObjectFunc alloc, bool create_default_obj,
-	const FunctionInfo* lua_funcs, int lua_func_count, CreateObjectFunc scriptAlloc, bool is_lua_obj)
-{
+ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_typeinfo, GetPropsFunc_t get_props_func,
+							 CreateObjectFunc alloc, bool create_default_obj, const FunctionInfo* lua_funcs,
+							 int lua_func_count, CreateObjectFunc scriptAlloc, bool is_lua_obj) {
 	this->classname = classname;
 	this->superclassname = "";
 	this->props = nullptr;
@@ -83,9 +76,7 @@ ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_t
 	}
 }
 
-ClassTypeInfo::~ClassTypeInfo()
-{
-}
+ClassTypeInfo::~ClassTypeInfo() {}
 
 ClassTypeIterator::ClassTypeIterator(ClassTypeInfo* ti) {
 	if (ti) {
@@ -94,48 +85,43 @@ ClassTypeIterator::ClassTypeIterator(ClassTypeInfo* ti) {
 	}
 }
 
-const ClassTypeInfo* ClassTypeIterator::get_type() const
-{
+const ClassTypeInfo* ClassTypeIterator::get_type() const {
 	return ClassBase::find_class(index);
 }
 
-const ClassTypeInfo* ClassBase::my_type() const { return &get_type(); }
+const ClassTypeInfo* ClassBase::my_type() const {
+	return &get_type();
+}
 
-bool ClassBase::is_subclass_of(const ClassTypeInfo* type) const
-{
+bool ClassBase::is_subclass_of(const ClassTypeInfo* type) const {
 	assert(type);
 	return get_type().is_a(*type);
 }
 
-ClassBase* ClassBase::alloc(const ClassTypeInfo* type)
-{
+ClassBase* ClassBase::alloc(const ClassTypeInfo* type) {
 	assert(type);
 	return type->alloc();
 }
 
-void ClassBase::free(ClassBase* ptr)
-{
+void ClassBase::free(ClassBase* ptr) {
 	if (!ptr)
 		return;
 	delete ptr;
 }
 
-void ClassBase::unregister_class(ClassTypeInfo* type)
-{
+void ClassBase::unregister_class(ClassTypeInfo* type) {
 	auto& string_to_typeinfo = get_registry().string_to_typeinfo;
 	std::string cn_str = type->classname;
 	auto find = string_to_typeinfo.find(cn_str);
 	if (find == string_to_typeinfo.end()) {
 		sys_print(Warning, "ClassBase::unregister_class: not registered: %s\n", type->classname);
-	}
-	else {
+	} else {
 		string_to_typeinfo.erase(cn_str);
 	}
 }
 
-void ClassBase::register_class(ClassTypeInfo* cti)
-{
-	//if (get_registry().initialzed)
+void ClassBase::register_class(ClassTypeInfo* cti) {
+	// if (get_registry().initialzed)
 	//	Fatalf("!!! RegisterClass called outside of static initialization\n");
 	if (!cti->super_typeinfo && cti != &ClassBase::StaticType)
 		Fatalf("!!! RegisterClass called without a super class, parent to ClassBase if its a root class");
@@ -145,11 +131,10 @@ void ClassBase::register_class(ClassTypeInfo* cti)
 	auto find = string_to_typeinfo.find(cn_str);
 	if (find != string_to_typeinfo.end())
 		Fatalf("!!! RegisterClass two classes defined for %s", cn_str.c_str());
-	string_to_typeinfo.insert({ cn_str,TypeInfoWithExtra(cti) });
+	string_to_typeinfo.insert({cn_str, TypeInfoWithExtra(cti)});
 }
 
-void ClassBase::post_changes_class_init()
-{
+void ClassBase::post_changes_class_init() {
 	get_registry().id_to_typeinfo.clear();
 	// create class tree graph
 	for (auto& class_ : get_registry().string_to_typeinfo) {
@@ -167,10 +152,7 @@ void ClassBase::post_changes_class_init()
 	ClassTypeInfo::set_typenum_R(&root_class->second);
 }
 
-
-
-void TypeInfoWithExtra::init()
-{
+void TypeInfoWithExtra::init() {
 	ASSERT(typeinfo);
 
 	if (has_initialized)
@@ -192,8 +174,7 @@ void TypeInfoWithExtra::init()
 	has_initialized = true;
 }
 
-void ClassTypeInfo::set_typenum_R(TypeInfoWithExtra* node)
-{
+void ClassTypeInfo::set_typenum_R(TypeInfoWithExtra* node) {
 	node->typeinfo->id = get_registry().id_to_typeinfo.size();
 	get_registry().id_to_typeinfo.push_back(node->typeinfo);
 
@@ -204,12 +185,10 @@ void ClassTypeInfo::set_typenum_R(TypeInfoWithExtra* node)
 	}
 
 	uint32_t end = get_registry().id_to_typeinfo.size();
-	node->typeinfo->last_child = end - 1;	// last child ID
+	node->typeinfo->last_child = end - 1; // last child ID
 }
 
-
-void ClassBase::init_classes_startup()
-{
+void ClassBase::init_classes_startup() {
 	post_changes_class_init();
 
 	// now call get props functions
@@ -233,8 +212,7 @@ void ClassBase::init_classes_startup()
 				auto rootOut = writer.get_root_object();
 				if (!rootOut) {
 					sys_print(Error, "ClassBase::init: couldn't create a diff for class: %s\n", classtype->classname);
-				}
-				else {
+				} else {
 					classtype->diff_data = std::make_unique<SerializedForDiffing>();
 					classtype->diff_data->jsonObj = std::move(*rootOut);
 				}
@@ -247,8 +225,7 @@ void ClassBase::init_classes_startup()
 	get_registry().initialzed = true;
 }
 
-const ClassTypeInfo* ClassBase::find_class(const char* classname)
-{
+const ClassTypeInfo* ClassBase::find_class(const char* classname) {
 	ASSERT(get_registry().initialzed);
 
 	auto& string_to_typeinfo = get_registry().string_to_typeinfo;
@@ -260,8 +237,7 @@ const ClassTypeInfo* ClassBase::find_class(const char* classname)
 	return nullptr;
 }
 // find a ClassTypeInfo by integer id
-const ClassTypeInfo* ClassBase::find_class(int32_t id)
-{
+const ClassTypeInfo* ClassBase::find_class(int32_t id) {
 	ASSERT(get_registry().initialzed);
 
 	auto& list = get_registry().id_to_typeinfo;
@@ -271,12 +247,11 @@ const ClassTypeInfo* ClassBase::find_class(int32_t id)
 	return nullptr;
 }
 #include "Framework/StringUtils.h"
-void ClassBase::init_class_info_for_script()
-{
+void ClassBase::init_class_info_for_script() {
 	auto& classes = get_registry().id_to_typeinfo;
 	for (auto c : classes) {
 		ScriptManager::inst->init_this_class_type(c);
-		assert(c->get_prototype_index_table()!=0);
+		assert(c->get_prototype_index_table() != 0);
 	}
 	for (auto c : classes) {
 		assert(c->get_prototype_index_table() != 0);
@@ -284,45 +259,38 @@ void ClassBase::init_class_info_for_script()
 	}
 	auto& all_enums = EnumRegistry::get_all_enums();
 	for (auto& [enumName, enumType] : all_enums) {
-		ScriptManager::inst->set_enum_global(enumName,enumType);
+		ScriptManager::inst->set_enum_global(enumName, enumType);
 	}
 }
-int ClassBase::get_table_registry_id()
-{
+int ClassBase::get_table_registry_id() {
 	if (lua_table_id == 0) {
-	//	sys_print(Debug, "ClassBase::get_table_registry_id\n");
+		//	sys_print(Debug, "ClassBase::get_table_registry_id\n");
 		lua_table_id = ScriptManager::inst->create_class_table_for(this);
 		assert(is_class_referenced_from_lua());
 	}
 	return lua_table_id;
 }
-bool ClassBase::is_class_referenced_from_lua() const
-{
-	return lua_table_id!=0;
+bool ClassBase::is_class_referenced_from_lua() const {
+	return lua_table_id != 0;
 }
-void ClassBase::free_table_registry_id()
-{
+void ClassBase::free_table_registry_id() {
 	if (lua_table_id != 0) {
 		ScriptManager::inst->free_class_table(lua_table_id);
 		lua_table_id = 0;
 	}
 }
 #include "Assets/AssetDatabase.h"
-ClassBase::~ClassBase()
-{
+ClassBase::~ClassBase() {
 	free_table_registry_id();
 }
 // dont move or set the lua_table_id. its lazily evaluated, so it will create itself when needed
-ClassBase& ClassBase::operator=(const ClassBase& other)
-{
+ClassBase& ClassBase::operator=(const ClassBase& other) {
 	// TODO: insert return statement here
 	return *this;
 }
-ClassBase::ClassBase(const ClassBase& other)
-{
+ClassBase::ClassBase(const ClassBase& other) {
 	return;
 }
-ClassBase::ClassBase(ClassBase&& other)
-{
+ClassBase::ClassBase(ClassBase&& other) {
 	return;
 }

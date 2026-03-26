@@ -9,7 +9,6 @@
 
 // All assets that you want showing in the asset browser should be registered here
 
-
 class IEditorTool;
 class AssetMetadata
 {
@@ -22,10 +21,7 @@ public:
 	// return <AssetName>::StaticType
 	virtual const ClassTypeInfo* get_asset_class_type() const { return nullptr; }
 
-
-	virtual void draw_browser_menu(const string& assetPath) const {
-
-	}
+	virtual void draw_browser_menu(const string& assetPath) const {}
 
 	// fills extra assets
 	virtual void fill_extra_assets(std::vector<std::string>& out) const {}
@@ -60,7 +56,8 @@ public:
 
 	const AssetMetadata* find_type(const char* type_name) const {
 		for (auto& a : all_assettypes) {
-			if (a->get_type_name() == type_name) return a.get();
+			if (a->get_type_name() == type_name)
+				return a.get();
 		}
 		return nullptr;
 	}
@@ -73,9 +70,10 @@ public:
 	}
 
 	AssetFilesystemNode* get_root_files() const { return root.get(); }
-	const std::vector<AssetFilesystemNode*>& get_linear_list() const { return  linear_list; }
+	const std::vector<AssetFilesystemNode*>& get_linear_list() const { return linear_list; }
 
 	const ClassTypeInfo* find_asset_type_for_ext(const std::string& ext);
+
 private:
 	uptr<ConsoleCmdGroup> consoleCommands;
 	void reindex_all_assets();
@@ -87,12 +85,9 @@ private:
 	friend class HackedAsyncAssetRegReindex;
 };
 
-template<typename T>
-struct AutoRegisterAsset
+template <typename T> struct AutoRegisterAsset
 {
-	AutoRegisterAsset() {
-		AssetRegistrySystem::get().register_asset_type(new T);
-	}
+	AutoRegisterAsset() { AssetRegistrySystem::get().register_asset_type(new T); }
 };
 #define REGISTER_ASSETMETADATA_MACRO(Type) static AutoRegisterAsset<Type> autoregtype##Type;
 

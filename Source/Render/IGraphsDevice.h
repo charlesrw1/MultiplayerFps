@@ -7,18 +7,21 @@
 
 // A FAILED HALF IMPLMENTED GARBAGE F*KING REFACTOR
 
-enum BindingBits {
-	BINDING_FRAGMENT=1,
-	BINDING_VERTEX=2,
+enum BindingBits
+{
+	BINDING_FRAGMENT = 1,
+	BINDING_VERTEX = 2,
 };
 
-enum class GraphicsPrimitiveType : int8_t {
+enum class GraphicsPrimitiveType : int8_t
+{
 	Triangles,
 	TriangleStrip,
 	Lines
 };
 
-enum class GraphicsVertexAttribType {
+enum class GraphicsVertexAttribType
+{
 	u8,
 	u16,
 	i8,
@@ -30,31 +33,36 @@ enum class GraphicsVertexAttribType {
 	float32,
 };
 
-enum class GraphicsDeviceType {
+enum class GraphicsDeviceType
+{
 	Unknown,
 	OpenGl,
 };
 
-enum GraphicsBufferUseFlags {
+enum GraphicsBufferUseFlags
+{
 	BUFFER_USE_AS_VB = 1,
 	BUFFER_USE_AS_IB = 2,
 	BUFFER_USE_AS_STORAGE_READ = 4,
 	BUFFER_USE_AS_INDIRECT = 8,
 	BUFFER_USE_DYNAMIC = 16,
 };
-enum class VertexInputIndexType : int8_t {
+enum class VertexInputIndexType : int8_t
+{
 	uint16,
 	uint32
 };
 
-enum class GraphicsTextureType : int8_t {
+enum class GraphicsTextureType : int8_t
+{
 	t2D,
 	t2DArray,
 	t3D,
 	tCubemap,
 	tCubemapArray
 };
-enum class GraphicsTextureFormat : int8_t {
+enum class GraphicsTextureFormat : int8_t
+{
 	r8,
 	rg8,
 	rgb8,
@@ -79,26 +87,27 @@ enum class GraphicsTextureFormat : int8_t {
 	rgba16_snorm,
 };
 
-enum class GraphicsFilterType : int8_t {
+enum class GraphicsFilterType : int8_t
+{
 	Linear,
 	Nearest,
 	MipmapLinear,
 };
-enum class GraphicsTextureEdge : int8_t {
+enum class GraphicsTextureEdge : int8_t
+{
 	Repeat,
 	Clamp
 };
 
-
-template<typename T>
-inline void safe_release(T*& ptr) {
+template <typename T> inline void safe_release(T*& ptr) {
 	if (ptr) {
 		ptr->release();
 		ptr = nullptr;
 	}
 }
 
-class IGraphicsTexture {
+class IGraphicsTexture
+{
 public:
 	virtual ~IGraphicsTexture() {}
 	virtual void sub_image_upload(int layer, int x, int y, int w, int h, int size, const void* data) = 0;
@@ -116,7 +125,8 @@ public:
 };
 
 // used for vertex,index,uniform, and shader storage buffers
-class IGraphicsBuffer {
+class IGraphicsBuffer
+{
 public:
 	virtual ~IGraphicsBuffer() {}
 	virtual void upload(const void* data, int size) = 0;
@@ -126,11 +136,10 @@ public:
 	virtual uint32_t get_internal_handle() = 0;
 };
 
-
-
 // like a VAO in opengl.
 // enacapsulates vertex buffer, index buffer, vertex attribute state, index type
-class IGraphicsVertexInput {
+class IGraphicsVertexInput
+{
 public:
 	virtual ~IGraphicsVertexInput() {}
 	virtual void release() = 0;
@@ -138,8 +147,8 @@ public:
 	virtual uint32_t get_internal_handle() = 0;
 };
 
-
-struct ColorTargetInfo {
+struct ColorTargetInfo
+{
 	ColorTargetInfo(IGraphicsTexture* texture, int layer = -1, int mip = 0) {
 		assert(texture);
 		this->texture = texture;
@@ -152,14 +161,13 @@ struct ColorTargetInfo {
 	int mip = 0;
 };
 
-struct RenderPassState {
+struct RenderPassState
+{
 	std::span<const ColorTargetInfo> color_infos;
 	IGraphicsTexture* depth_info = nullptr;
 	int depth_layer = -1;
 
-	void set_clear_both(bool b) {
-		wants_color_clear = wants_depth_clear = b;
-	}
+	void set_clear_both(bool b) { wants_color_clear = wants_depth_clear = b; }
 
 	bool wants_color_clear = false;
 	bool wants_depth_clear = false;
@@ -168,8 +176,8 @@ struct RenderPassState {
 	bool use_gray_clear = false;
 };
 
-
-struct VertexLayout {
+struct VertexLayout
+{
 	VertexLayout(int index, int count, GraphicsVertexAttribType type, int stride, int offset) {
 		this->index = index;
 		this->count = count;
@@ -178,23 +186,23 @@ struct VertexLayout {
 		this->offset = offset;
 	}
 
-	int index=0;
-	int count=0;
+	int index = 0;
+	int count = 0;
 	GraphicsVertexAttribType type{};
-	int stride=0;
-	int offset=0;
+	int stride = 0;
+	int offset = 0;
 };
 
-
-struct CreateVertexInputArgs {
+struct CreateVertexInputArgs
+{
 	IGraphicsBuffer* vertex = nullptr;
 	IGraphicsBuffer* index = nullptr;
 	std::span<const VertexLayout> layout;
 	VertexInputIndexType index_type = VertexInputIndexType::uint16;
 };
 
-
-enum class GraphicsSamplerType {
+enum class GraphicsSamplerType
+{
 	AnisotropyDefault,
 	LinearDefault,
 	NearestDefault,
@@ -207,25 +215,27 @@ enum class GraphicsSamplerType {
 	LinearNoMipmaps,
 };
 
-
-struct CreateTextureArgs {
+struct CreateTextureArgs
+{
 	GraphicsTextureType type = GraphicsTextureType::t2D;
 	GraphicsTextureFormat format = GraphicsTextureFormat::rgba8;
 	int width = 0;
 	int height = 0;
 	int num_mip_maps = 1;
 	int depth_3d = 0;
-	GraphicsSamplerType sampler_type=GraphicsSamplerType::AnisotropyDefault;
+	GraphicsSamplerType sampler_type = GraphicsSamplerType::AnisotropyDefault;
 
 	bool float_input_is_16f = false;
 };
 
-struct CreateBufferArgs {
+struct CreateBufferArgs
+{
 	int size = 0;
 	GraphicsBufferUseFlags flags = {};
 };
 
-struct GraphicsBlitTarget {
+struct GraphicsBlitTarget
+{
 	IGraphicsTexture* texture = nullptr;
 	int x = 0;
 	int y = 0;
@@ -234,7 +244,8 @@ struct GraphicsBlitTarget {
 	int mip = 0;
 	int layer = -1;
 };
-struct GraphicsBlitInfo {
+struct GraphicsBlitInfo
+{
 	GraphicsBlitTarget src;
 	GraphicsBlitTarget dest;
 	GraphicsFilterType filter = GraphicsFilterType::Nearest;
@@ -244,11 +255,13 @@ struct GraphicsBlitInfo {
 		src.h = dest.h = h;
 	}
 };
-class ThingerBobber {
+class ThingerBobber
+{
 public:
 	virtual void set_depth_write_enabled(bool b) = 0;
 };
-class IGraphicsDevice {
+class IGraphicsDevice
+{
 public:
 	static IGraphicsDevice* inst;
 	static IGraphicsDevice* create_opengl_device(ThingerBobber* FUUUUUUUCK);

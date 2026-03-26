@@ -2,18 +2,15 @@
 #pragma once
 #include "Serializer.h"
 #include <json.hpp>
-#include <optional>	// just to try it out :)
+#include <optional> // just to try it out :)
 #include "glm/gtc/quaternion.hpp"
 
 #include "SerializerJson.h"
 
 class ReadSerializerBackendJson;
-using std::unordered_map;
 using std::string;
-template<typename T>
-using opt = std::optional<T>;
-
-
+using std::unordered_map;
+template <typename T> using opt = std::optional<T>;
 
 class WriteSerializerBackendJson2 : public Serializer
 {
@@ -21,34 +18,16 @@ public:
 	WriteSerializerBackendJson2(const char* debug_tag, ClassBase& obj_to_serialize);
 
 	const char* debug_tag = "";
-	const char* get_debug_tag() final {
-		return debug_tag;
-	}
+	const char* get_debug_tag() final { return debug_tag; }
 
-	nlohmann::json* get_root_object() {
-		return &obj;
-	}
-	nlohmann::json& get_output() {
-		return obj;
-	}
-	void serialize_ar(bool& b) final {
-		write_to_array(b);
-	}
-	void serialize_ar(int8_t& i) final {
-		write_to_array(i);
-	}
-	void serialize_ar(int16_t& i) final {
-		write_to_array(i);
-	}
-	void serialize_ar(int32_t& i) final {
-		write_to_array(i);
-	}
-	void serialize_ar(int64_t& i) final {
-		write_to_array(i);
-	}
-	void serialize_ar(float& f) final {
-		write_to_array(f);
-	}
+	nlohmann::json* get_root_object() { return &obj; }
+	nlohmann::json& get_output() { return obj; }
+	void serialize_ar(bool& b) final { write_to_array(b); }
+	void serialize_ar(int8_t& i) final { write_to_array(i); }
+	void serialize_ar(int16_t& i) final { write_to_array(i); }
+	void serialize_ar(int32_t& i) final { write_to_array(i); }
+	void serialize_ar(int64_t& i) final { write_to_array(i); }
+	void serialize_ar(float& f) final { write_to_array(f); }
 	bool serialize(const char* tag, glm::vec3& v) final {
 		auto& vec = get_json(tag);
 		if (vec.is_array()) {
@@ -101,31 +80,15 @@ public:
 		}
 	}
 
-	void serialize_ar(std::string& s) final {
-		write_to_array(s);
-	}
-	bool serialize(const char* tag, bool& b) final {
-		return write_to_dict(tag, b);
-	}
-	bool serialize(const char* tag, float& f) final {
-		return write_to_dict(tag, f);
-	}
-	bool serialize(const char* tag, int& i) final {
-		return write_to_dict(tag, i);
-	}
-	bool serialize(const char* tag, int8_t& i) final {
-		return write_to_dict(tag, i);
-	}
-	bool serialize(const char* tag, int16_t& i) final {
-		return write_to_dict(tag, i);
-	}
-	bool serialize(const char* tag, int64_t& i) final {
-		return write_to_dict(tag, i);
-	}
+	void serialize_ar(std::string& s) final { write_to_array(s); }
+	bool serialize(const char* tag, bool& b) final { return write_to_dict(tag, b); }
+	bool serialize(const char* tag, float& f) final { return write_to_dict(tag, f); }
+	bool serialize(const char* tag, int& i) final { return write_to_dict(tag, i); }
+	bool serialize(const char* tag, int8_t& i) final { return write_to_dict(tag, i); }
+	bool serialize(const char* tag, int16_t& i) final { return write_to_dict(tag, i); }
+	bool serialize(const char* tag, int64_t& i) final { return write_to_dict(tag, i); }
 
-	bool serialize(const char* tag, std::string& str) final {
-		return write_to_dict(tag, str);
-	}
+	bool serialize(const char* tag, std::string& str) final { return write_to_dict(tag, str); }
 	bool serialize_dict(const char* tag) final {
 		(*get_back().ptr)[tag] = nlohmann::json::object();
 		auto newdict = &(*get_back().ptr)[tag];
@@ -151,13 +114,9 @@ public:
 		return true;
 	}
 
-	void end_obj() final {
-		stack.pop_back();
-	}
+	void end_obj() final { stack.pop_back(); }
 
-	bool is_loading() final {
-		return false;
-	}
+	bool is_loading() final { return false; }
 
 	bool serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
 	bool serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
@@ -169,13 +128,11 @@ public:
 	bool serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr) final;
 
 private:
-	template<typename T>
-	void write_to_array(T& t) {
+	template <typename T> void write_to_array(T& t) {
 		JsonStack& s = get_back();
 		(*s.ptr)[s.arr_idx++] = t;
 	}
-	template<typename T>
-	bool write_to_dict(const char* tag, T& t) {
+	template <typename T> bool write_to_dict(const char* tag, T& t) {
 		JsonStack& s = get_back();
 		(*s.ptr)[tag] = t;
 		return true;
@@ -197,7 +154,8 @@ private:
 		return backptr[back.arr_idx++];
 	}
 
-	void serialize_class_shared(opt<const char*> tag, const ClassTypeInfo& info, ClassBase*& ptr, bool is_only_reference);
+	void serialize_class_shared(opt<const char*> tag, const ClassTypeInfo& info, ClassBase*& ptr,
+								bool is_only_reference);
 	void write_actual_class(ClassBase* o, const std::string& path);
 
 	ClassBase* currently_writing_class = nullptr;
@@ -209,12 +167,11 @@ class IAssetLoadingInterface;
 class ReadSerializerBackendJson2 : public Serializer
 {
 public:
-	ReadSerializerBackendJson2(const char* debug_tag, nlohmann::json& json_obj, IAssetLoadingInterface& loader, ClassBase& obj);
+	ReadSerializerBackendJson2(const char* debug_tag, nlohmann::json& json_obj, IAssetLoadingInterface& loader,
+							   ClassBase& obj);
 
 	const char* debug_tag = "";
-	const char* get_debug_tag() final {
-		return debug_tag;
-	}
+	const char* get_debug_tag() final { return debug_tag; }
 
 	bool serialize_class(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
 	bool serialize_class_reference(const char* tag, const ClassTypeInfo& info, ClassBase*& ptr) final;
@@ -225,45 +182,19 @@ public:
 	void serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr) final;
 	bool serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr) final;
 
-	void serialize_ar(bool& b) final {
-		read_from_array(b);
-	}
-	void serialize_ar(int8_t& i) final {
-		read_from_array(i);
-	}
-	void serialize_ar(int16_t& i) final {
-		read_from_array(i);
-	}
-	void serialize_ar(int32_t& i) final {
-		read_from_array(i);
-	}
-	void serialize_ar(int64_t& i) final {
-		read_from_array(i);
-	}
-	void serialize_ar(float& f) final {
-		read_from_array(f);
-	}
-	void serialize_ar(std::string& s) final {
-		read_from_array(s);
-	}
-	bool serialize(const char* tag, bool& b) final {
-		return read_from_dict(tag, b);
-	}
-	bool serialize(const char* tag, float& f) final {
-		return read_from_dict(tag, f);
-	}
-	bool serialize(const char* tag, int& i) final {
-		return read_from_dict(tag, i);
-	}
-	bool serialize(const char* tag, int8_t& i) final {
-		return read_from_dict(tag, i);
-	}
-	bool serialize(const char* tag, int16_t& i) final {
-		return read_from_dict(tag, i);
-	}
-	bool serialize(const char* tag, int64_t& i) final {
-		return read_from_dict(tag, i);
-	}
+	void serialize_ar(bool& b) final { read_from_array(b); }
+	void serialize_ar(int8_t& i) final { read_from_array(i); }
+	void serialize_ar(int16_t& i) final { read_from_array(i); }
+	void serialize_ar(int32_t& i) final { read_from_array(i); }
+	void serialize_ar(int64_t& i) final { read_from_array(i); }
+	void serialize_ar(float& f) final { read_from_array(f); }
+	void serialize_ar(std::string& s) final { read_from_array(s); }
+	bool serialize(const char* tag, bool& b) final { return read_from_dict(tag, b); }
+	bool serialize(const char* tag, float& f) final { return read_from_dict(tag, f); }
+	bool serialize(const char* tag, int& i) final { return read_from_dict(tag, i); }
+	bool serialize(const char* tag, int8_t& i) final { return read_from_dict(tag, i); }
+	bool serialize(const char* tag, int16_t& i) final { return read_from_dict(tag, i); }
+	bool serialize(const char* tag, int64_t& i) final { return read_from_dict(tag, i); }
 
 	bool serialize(const char* tag, glm::vec3& v) final {
 		auto& vec = get_json(tag);
@@ -320,9 +251,7 @@ public:
 		}
 	}
 
-	bool serialize(const char* tag, std::string& str) final {
-		return read_from_dict(tag, str);
-	}
+	bool serialize(const char* tag, std::string& str) final { return read_from_dict(tag, str); }
 	bool serialize_dict(const char* tag) final {
 		auto& back = get_back();
 		auto& backptr = *back.ptr;
@@ -357,13 +286,10 @@ public:
 		stack.push_back(&backptr[back.arr_idx++]);
 		return true;
 	}
-	void end_obj() final {
-		stack.pop_back();
-	}
+	void end_obj() final { stack.pop_back(); }
 
-	bool is_loading() final {
-		return true;
-	}
+	bool is_loading() final { return true; }
+
 private:
 	void load_shared();
 
@@ -377,18 +303,14 @@ private:
 		auto& backptr = *back.ptr;
 		return backptr[back.arr_idx++];
 	}
-	JsonStack& get_back() {
-		return stack.back();
-	}
-	template<typename T>
-	void read_from_array(T& t) {
+	JsonStack& get_back() { return stack.back(); }
+	template <typename T> void read_from_array(T& t) {
 		auto& back = get_back();
 		auto& backptr = *back.ptr;
 
 		t = backptr[back.arr_idx++];
 	}
-	template<typename T>
-	bool read_from_dict(const char* tag, T& t) {
+	template <typename T> bool read_from_dict(const char* tag, T& t) {
 		auto& back = get_back();
 		auto& backptr = *back.ptr;
 		if (backptr.contains(tag)) {
@@ -397,7 +319,6 @@ private:
 		}
 		return false;
 	}
-
 
 	IAssetLoadingInterface& loader;
 	ClassBase& rootobj;

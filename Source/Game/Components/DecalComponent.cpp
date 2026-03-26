@@ -18,28 +18,25 @@ DecalComponent::DecalComponent() {
 	set_call_init_in_editor(true);
 }
 void DecalComponent::start() {
-	
-	if (eng->is_editor_level())
-	{
+
+	if (eng->is_editor_level()) {
 		auto b = get_owner()->create_component<BillboardComponent>();
 		b->set_texture(Texture::load("eng/icon/_nearest/decal.png"));
-		b->dont_serialize_or_edit=true;
+		b->dont_serialize_or_edit = true;
 		auto a = get_owner()->create_component<ArrowComponent>();
-		a->dont_serialize_or_edit=true;
-
+		a->dont_serialize_or_edit = true;
 	}
 
 	sync_render_data();
 }
-void DecalComponent::on_sync_render_data()
-{
+void DecalComponent::on_sync_render_data() {
 	if (!handle.is_valid()) {
 		handle = idraw->get_scene()->register_decal();
 	}
 	Render_Decal rd;
-	rd.transform = get_ws_transform() * glm::translate(glm::mat4(1),glm::vec3(-0.5,-0.5,0.5));
+	rd.transform = get_ws_transform() * glm::translate(glm::mat4(1), glm::vec3(-0.5, -0.5, 0.5));
 	rd.visible = true;
-#ifdef  EDITOR_BUILD
+#ifdef EDITOR_BUILD
 	rd.visible &= !get_owner()->get_hidden_in_editor();
 #endif //  EDITOR_BUILD
 
@@ -53,7 +50,7 @@ void DecalComponent::stop() {
 void DecalComponent::on_changed_transform() {
 	sync_render_data();
 }
-#ifdef  EDITOR_BUILD
+#ifdef EDITOR_BUILD
 void DecalComponent::editor_on_change_property() {
 	sync_render_data();
 }
@@ -61,21 +58,19 @@ void DecalComponent::editor_on_change_property() {
 
 DecalComponent::~DecalComponent() {}
 
-void DecalComponent::set_material(MaterialInstance* mat)
-{
+void DecalComponent::set_material(MaterialInstance* mat) {
 	material.ptr = mat;
 	sync_render_data();
 }
 #include "UI/GUISystemPublic.h"
-class DecalComponentEditorUi : public IComponentEditorUi {
+class DecalComponentEditorUi : public IComponentEditorUi
+{
 public:
-	DecalComponentEditorUi(DecalComponent* decal) : decal(decal) {
-
-	}
+	DecalComponentEditorUi(DecalComponent* decal) : decal(decal) {}
 	DecalComponent* decal = nullptr;
 	bool draw() final {
 		auto& window = UiSystem::inst->window;
-		//window.draw()
+		// window.draw()
 
 		return false;
 	}

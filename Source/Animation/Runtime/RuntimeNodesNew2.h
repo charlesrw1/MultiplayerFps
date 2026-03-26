@@ -4,7 +4,8 @@
 // inline constant values or StringName which sources a value from variables/curves
 
 class agGetPoseCtx;
-struct ValueType {
+struct ValueType
+{
 	ValueType(float f) : value(f) {}
 	ValueType(bool b) : value(b) {}
 	ValueType(int i) : value(i) {}
@@ -20,15 +21,19 @@ struct ValueType {
 	variant<bool, int, float, glm::vec3, StringName> value;
 };
 
-class agSampledAnimEvents {
+class agSampledAnimEvents
+{
 public:
-	struct Sampled {
-		enum DurationType {
+	struct Sampled
+	{
+		enum DurationType
+		{
 			Started,
 			Ended,
 			Active,
 		};
-		struct DurationEv {
+		struct DurationEv
+		{
 			const AnimDurationEvent* ptr = nullptr;
 			Percentage thru;
 			DurationType type{};
@@ -58,17 +63,15 @@ public:
 
 //
 class agClipNode;
-class agGetPoseCtx : public ClassBase {
+class agGetPoseCtx : public ClassBase
+{
 public:
 	CLASS_BODY(agGetPoseCtx);
 
 	agGetPoseCtx(AnimatorObject& obj, Pool_Allocator<Pose>& allocator, float dt)
-		: object(obj), pose(allocator.allocate_scoped()), dt(dt) {
-	}
+		: object(obj), pose(allocator.allocate_scoped()), dt(dt) {}
 	agGetPoseCtx(const agGetPoseCtx& other)
-	: object(other.object), pose(other.pose.get_parent().allocate_scoped()), dt(other.dt){
-
-	}
+		: object(other.object), pose(other.pose.get_parent().allocate_scoped()), dt(other.dt) {}
 
 	agGetPoseCtx& operator=(const agGetPoseCtx& other) = delete;
 
@@ -89,19 +92,21 @@ public:
 
 	ScopedPoolPtr<Pose> pose;
 	AnimatorObject& object;
-	//agSampledAnimEvents& events;
+	// agSampledAnimEvents& events;
 	float weight = 1.f;
 	float dt = 0.f;
 };
 
-class agBaseNode : public ClassBase {
+class agBaseNode : public ClassBase
+{
 public:
 	CLASS_BODY(agBaseNode);
-	virtual void reset()=0;
-	virtual void get_pose(agGetPoseCtx& ctx)=0;
+	virtual void reset() = 0;
+	virtual void get_pose(agGetPoseCtx& ctx) = 0;
 };
 struct BoneIndexRetargetMap;
-class agClipNode : public agBaseNode {
+class agClipNode : public agBaseNode
+{
 public:
 	CLASS_BODY(agClipNode);
 
@@ -109,14 +114,13 @@ public:
 	void get_pose(agGetPoseCtx& ctx) final;
 	REF void set_clip(const Model* m, string clipName);
 	void set_clip(const AnimationSeqAsset* asset);
-	REF void set_looping(bool b) {
-		looping = b;
-	}
+	REF void set_looping(bool b) { looping = b; }
 
 	StringName syncGroup;
 	sync_opt syncType = sync_opt::Default;
 	ValueType speed = 1.f;
 	bool looping = true;
+
 private:
 	const Model* clipFrom = nullptr;
 	const AnimationSeq* seq = nullptr;
@@ -124,13 +128,12 @@ private:
 	float anim_time = 0.f;
 	bool has_init = false;
 };
-class agEvaluateClip : public agBaseNode {
+class agEvaluateClip : public agBaseNode
+{
 public:
 	CLASS_BODY(agEvaluateClip);
 
-	void reset() final {
-
-	}
+	void reset() final {}
 	void get_pose(agGetPoseCtx& ctx) final;
 	void set_clip(const AnimationSeqAsset* asset);
 
@@ -142,8 +145,8 @@ public:
 	bool has_init = false;
 };
 
-
-class agBlendNode : public agBaseNode {
+class agBlendNode : public agBaseNode
+{
 public:
 	CLASS_BODY(agBlendNode);
 	void reset() final;
@@ -152,18 +155,15 @@ public:
 		this->input0 = inp0;
 		this->input1 = inp1;
 	}
-	REF void set_alpha_const(float f) {
-		alpha = f;
-	}
-	REF void set_alpha_var(string name) {
-		alpha = StringName(name.c_str());
-	}
+	REF void set_alpha_const(float f) { alpha = f; }
+	REF void set_alpha_var(string name) { alpha = StringName(name.c_str()); }
 
 	agBaseNode* input0 = nullptr;
 	agBaseNode* input1 = nullptr;
 	ValueType alpha = 0.f;
 };
-class agBlendMasked : public agBaseNode {
+class agBlendMasked : public agBaseNode
+{
 public:
 	CLASS_BODY(agBlendMasked);
 
@@ -174,15 +174,9 @@ public:
 		this->input0 = inp0;
 		this->input1 = inp1;
 	}
-	REF void set_alpha_const(float f) {
-		alpha = f;
-	}
-	REF void set_alpha_var(string name) {
-		alpha = StringName(name.c_str());
-	}
-	REF void set_meshspace_blend(bool b) {
-		this->meshspace_blend = b;
-	}
+	REF void set_alpha_const(float f) { alpha = f; }
+	REF void set_alpha_var(string name) { alpha = StringName(name.c_str()); }
+	REF void set_meshspace_blend(bool b) { this->meshspace_blend = b; }
 
 	agBaseNode* input0 = nullptr;
 	agBaseNode* input1 = nullptr;
@@ -192,10 +186,12 @@ public:
 	REF void init_mask_for_model(const Model* model, float default_weight);
 	REF void set_all_children_weights(const Model* model, string bone, float weight);
 	REF void set_one_bone_weight(const Model* model, string bone, float weight);
+
 private:
 	std::vector<float> maskWeights;
 };
-class agAddNode : public agBaseNode {
+class agAddNode : public agBaseNode
+{
 public:
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
@@ -203,7 +199,8 @@ public:
 	agBaseNode* input1 = nullptr;
 	ValueType alpha = 0.f;
 };
-class agIk2Bone : public agBaseNode {
+class agIk2Bone : public agBaseNode
+{
 public:
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
@@ -221,8 +218,9 @@ private:
 	bool has_init = false;
 	int bone_idx = -1;
 	int other_bone_idx = -1;
-};//
-class agModifyBone : public agBaseNode {
+}; //
+class agModifyBone : public agBaseNode
+{
 public:
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
@@ -234,11 +232,13 @@ public:
 	ModifyBoneType rotation = {};
 	ValueType alpha = 0.f;
 	StringName boneName;
+
 private:
 	bool has_init = false;
 	int bone_index = -1;
 };
-class agCopyBone : public agBaseNode {
+class agCopyBone : public agBaseNode
+{
 public:
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
@@ -248,14 +248,15 @@ public:
 	ValueType copyTranslation = false;
 	ValueType copyRotation = false;
 	bool copyBonespace = false;
+
 private:
 	bool has_init = false;
 	int source_bone_idx = -1;
 	int target_bone_idx = -1;
-
 };
 
-class agBlendspace : public agBlendNode {
+class agBlendspace : public agBlendNode
+{
 public:
 	ValueType vecInput = 0;
 };
@@ -268,12 +269,13 @@ public:
 //			update() -> sets new tree
 //			checks for transition starts
 
-class agStatemachineBase : public agBaseNode {
+class agStatemachineBase : public agBaseNode
+{
 public:
 	CLASS_BODY(agStatemachineBase);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
-	REF virtual void update(agGetPoseCtx* ctx, bool wantsReset) { } // ABSTRACT CLASS
+	REF virtual void update(agGetPoseCtx* ctx, bool wantsReset) {} // ABSTRACT CLASS
 	// each update, use set_pose to set what state is active
 	REF void set_pose(agBaseNode* pose);
 	// use set_transition before a pose change to set how it transitions
@@ -283,6 +285,7 @@ public:
 	REF float get_transition_time_left() const { return curTransitionDuration - curTransitionTime; }
 	REF float get_transition_percent() const { return curTransitionTime / curTransitionDuration; }
 	REF float get_state_duration() const { return curTime; }
+
 private:
 	float curTime = 0.0;
 	agBaseNode* currentTree = nullptr;
@@ -294,24 +297,28 @@ private:
 };
 
 struct DirectAnimationSlot;
-class agSlotClipInternal : public agBaseNode {
+class agSlotClipInternal : public agBaseNode
+{
 public:
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
 	DirectAnimationSlot* slot = nullptr;
 };
 // manual playback of animation in the graph
-class agSlotPlayer : public agStatemachineBase {
+class agSlotPlayer : public agStatemachineBase
+{
 public:
 	void update(agGetPoseCtx* ctx, bool wantsReset) final;
 	bool updateChildrenWhenPlaying = false;
 	StringName slotName;
 	agBaseNode* input = nullptr;
+
 private:
 	agSlotClipInternal clipPlayer;
 	Pose* fadingOutPose = nullptr;
 };
-class agBlendByInt : public agStatemachineBase {
+class agBlendByInt : public agStatemachineBase
+{
 public:
 	CLASS_BODY(agBlendByInt);
 	void update(agGetPoseCtx* ctx, bool wantsReset) final;
@@ -320,12 +327,8 @@ public:
 		this->easing = easing;
 		this->blending_duration = duration;
 	}
-	REF void append_input(agBaseNode* node) {
-		inputs.push_back(node);
-	}
-	REF void set_integer_var(string str) {
-		integer = StringName(str.c_str());
-	}
+	REF void append_input(agBaseNode* node) { inputs.push_back(node); }
+	REF void set_integer_var(string str) { integer = StringName(str.c_str()); }
 
 	Easing easing = Easing::CubicEaseIn;
 	float blending_duration = 0.5;

@@ -10,16 +10,17 @@
 #include "Framework/MulticastDelegate.h"
 #include "Framework/Range.h"
 
+using std::function;
+using std::string;
 using std::variant;
 using std::vector;
-using std::string;
-using std::function;
 class IEditorTool;
 
 class ClassTypeInfo;
 class Texture;
 struct View_Setup;
-class EditorState {
+class EditorState
+{
 public:
 	EditorState();
 	~EditorState();
@@ -41,6 +42,7 @@ public:
 	void imgui_hook_new_frame();
 	void imgui_draw();
 	void draw_tab_window();
+
 private:
 	uptr<IEditorTool> curTool;
 };

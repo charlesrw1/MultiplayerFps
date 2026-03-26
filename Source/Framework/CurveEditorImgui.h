@@ -11,14 +11,12 @@
 #include "ReflectionMacros.h"
 #include "ArrayReflection.h"
 
-NEWENUM(CurvePointType,uint8_t)
-{
-	Linear,	// linear interp
-	Constant,	// no interp
-	SplitTangents,	// 2 handle free tangents
-	Aligned,		// free tangents but they are kept aligned
+NEWENUM(CurvePointType, uint8_t){
+	Linear,		   // linear interp
+	Constant,	   // no interp
+	SplitTangents, // 2 handle free tangents
+	Aligned,	   // free tangents but they are kept aligned
 };
-
 
 class CurvePoint
 {
@@ -35,17 +33,14 @@ struct EditingCurve
 	static const PropertyInfoList* get_props() {
 		static StdVectorCallback<CurvePoint> vecdef_points(get_cruve_point_prop());
 		START_PROPS(EditingCurve)
-			REG_STDSTRING(name,PROP_SERIALIZE),
-			REG_INT(color,PROP_SERIALIZE,""),/* reg it as a uint*/
-			REG_STDVECTOR(points,PROP_SERIALIZE)
-		END_PROPS(EditingCurve)
+		REG_STDSTRING(name, PROP_SERIALIZE), REG_INT(color, PROP_SERIALIZE, ""), /* reg it as a uint*/
+			REG_STDVECTOR(points, PROP_SERIALIZE) END_PROPS(EditingCurve)
 	}
 
 	static const PropertyInfoList* get_cruve_point_prop() {
 		static PropertyInfo info[] = {
-			make_struct_property("_value",0/* 0 offset */,PROP_DEFAULT, "CurvePointSerialize")
-		};
-		static PropertyInfoList list = { info,1,"_CurvePoint" };
+			make_struct_property("_value", 0 /* 0 offset */, PROP_DEFAULT, "CurvePointSerialize")};
+		static PropertyInfoList list = {info, 1, "_CurvePoint"};
 		return &list;
 	}
 
@@ -63,10 +58,11 @@ class CurveEditorImgui;
 class SequencerEditorItem
 {
 public:
-	virtual ~SequencerEditorItem() {  }
+	virtual ~SequencerEditorItem() {}
 	virtual std::string get_name() { return "placeholder"; }
 
-	bool instant_item = false;	// if true, then event will have 2 handles, one for start and one for end, "duration events"
+	bool instant_item =
+		false; // if true, then event will have 2 handles, one for start and one for end, "duration events"
 	float time_start = 0;
 	float time_end = 0;
 	Color32 color = COLOR_CYAN;
@@ -75,7 +71,7 @@ public:
 	friend class CurveEditorImgui;
 };
 
-using CurveEditContextMenuCallback = void(*)(CurveEditorImgui*);
+using CurveEditContextMenuCallback = void (*)(CurveEditorImgui*);
 class CurveEditorImgui
 {
 public:
@@ -143,8 +139,7 @@ public:
 
 		if (moving_right_side) {
 			item->time_end = gridspace.x;
-		}
-		else {
+		} else {
 			item->time_start = gridspace.x;
 		}
 		if (!item->instant_item) {
@@ -158,21 +153,17 @@ public:
 	SequencerEditorItem* get_selected_event() const {
 		return is_selected_event_valid() ? events.at(selected_curve_or_event).get() : nullptr;
 	}
+
 private:
-	bool is_curve_selected(int index) const {
-		return !selecting_event && index == selected_curve_or_event;
-	}
-	bool is_event_selected(int index) const {
-		return selecting_event && index == selected_curve_or_event;
-	}
-	bool is_selecting_a_curve() const {
-		return !selecting_event && selected_curve_or_event != -1;
-	}
+	bool is_curve_selected(int index) const { return !selecting_event && index == selected_curve_or_event; }
+	bool is_event_selected(int index) const { return selecting_event && index == selected_curve_or_event; }
+	bool is_selecting_a_curve() const { return !selecting_event && selected_curve_or_event != -1; }
 	bool is_selected_curve_valid() const {
 		return !selecting_event && selected_curve_or_event >= 0 && selected_curve_or_event < curves.size();
 	}
 	bool is_selected_point_valid() const {
-		return is_selected_curve_valid() && dragged_point_index >= 0 && dragged_point_index < curves.at(selected_curve_or_event).points.size();
+		return is_selected_curve_valid() && dragged_point_index >= 0 &&
+			   dragged_point_index < curves.at(selected_curve_or_event).points.size();
 	}
 	bool is_selected_event_valid() const {
 		return selecting_event && selected_curve_or_event >= 0 && selected_curve_or_event < events.size();
@@ -186,13 +177,14 @@ private:
 	// Scale is what gets changed with zooming, modifies base_scale
 	ImVec2 scale = ImVec2(1, 15);
 	// Base scale is constant, defines a screenspace -> grid unit factor
-	const ImVec2 base_scale =ImVec2(1.0/32,-1.0/30);
+	const ImVec2 base_scale = ImVec2(1.0 / 32, -1.0 / 30);
 	// Offset, defined in grid space
-	ImVec2 grid_offset=ImVec2(0,1);
+	ImVec2 grid_offset = ImVec2(0, 1);
 
 	// used internally for convenience
-	ImVec2 BASE_SCREENPOS;	// base screenpos corner of graph content region
-	ImVec2 WINDOW_SIZE;	// not actually the window size :P, its the content region that the graph draws into in the imgui table
+	ImVec2 BASE_SCREENPOS; // base screenpos corner of graph content region
+	ImVec2 WINDOW_SIZE;	   // not actually the window size :P, its the content region that the graph draws into in the
+						   // imgui table
 
 	// state stuff
 	bool selecting_event = false;
@@ -205,7 +197,7 @@ private:
 
 	// these are all indexing into selected_curve
 	int dragged_point_index = -1;
-	int dragged_point_type = 0;   // 0 = point, 1=tangent0,2=tangent1
+	int dragged_point_type = 0; // 0 = point, 1=tangent0,2=tangent1
 
 	bool dragging_scrubber = false;
 
@@ -232,7 +224,7 @@ private:
 		}
 	}
 	void set_selected_event(int index, bool dragging_left) {
-		sys_print(Debug, "set selected event %d\n",index);
+		sys_print(Debug, "set selected event %d\n", index);
 		selecting_event = true;
 		is_dragging_selected = true;
 		moving_right_side = !dragging_left;
@@ -253,7 +245,9 @@ private:
 			gridspace.x = 0;
 		if (gridspace.x > max_x_value)
 			gridspace.x = max_x_value;
-		if (gridspace.y < min_y_value) gridspace.y = min_y_value;
-		if (gridspace.y > max_y_value) gridspace.y = max_y_value;
+		if (gridspace.y < min_y_value)
+			gridspace.y = min_y_value;
+		if (gridspace.y > max_y_value)
+			gridspace.y = max_y_value;
 	}
 };

@@ -12,7 +12,8 @@
 // has a lua impl, which sets inst
 #include "Framework/ConsoleCmdGroup.h"
 #include "Framework/Config.h"
-class LuaCallbackShim : public ClassBase {
+class LuaCallbackShim : public ClassBase
+{
 public:
 	CLASS_BODY(LuaCallbackShim, scriptable);
 
@@ -22,9 +23,7 @@ public:
 		ASSERT(!inst);
 		inst = i;
 	}
-	LuaCallbackShim() {
-		cmds_groups = ConsoleCmdGroup::create("");
-	}
+	LuaCallbackShim() { cmds_groups = ConsoleCmdGroup::create(""); }
 
 	// cursed
 	REF void _add_command_name(std::string command_name) {
@@ -34,8 +33,7 @@ public:
 				args2.push_back(args.at(i));
 			}
 			_call_command(args.at(0), args2);
-			}
-		);
+		});
 	}
 	REF void _add_imgui_menu_name(std::string imgui_menu) {
 		some_bs.push_back(std::make_unique<std::string>(imgui_menu));
@@ -43,13 +41,10 @@ public:
 	}
 
 	// overridden by lua
-	REF virtual void _call_command(std::string name, std::vector<std::string> args) {
-	}
-	REF virtual void _call_imgui_menu(std::string name) {
-	}
+	REF virtual void _call_command(std::string name, std::vector<std::string> args) {}
+	REF virtual void _call_imgui_menu(std::string name) {}
 
 private:
-
 	static void debug_interface_function(const char* name) {
 		auto self = LuaCallbackShim::inst;
 		ASSERT(self);
@@ -60,7 +55,8 @@ private:
 	uptr<ConsoleCmdGroup> cmds_groups;
 };
 
-class LuaSystem : public ClassBase {
+class LuaSystem : public ClassBase
+{
 public:
 	CLASS_BODY(LuaSystem);
 	REF static bool im_checkbox(std::string name, bool b);
@@ -76,15 +72,10 @@ public:
 
 	// 0=append,1=now
 	REF static void execute_command(int mode, std::string command);
-	//0=er,1=warn,2=info,3=debug
-	REF static void sys_print(int type, std::string str) {
-		::sys_print(LogType(type),"%s", str.c_str());
-	}
-	REF static float get_time_since_start() {
-		return ::TimeSinceStart();
-	}
+	// 0=er,1=warn,2=info,3=debug
+	REF static void sys_print(int type, std::string str) { ::sys_print(LogType(type), "%s", str.c_str()); }
+	REF static float get_time_since_start() { return ::TimeSinceStart(); }
 	REF static void log_fullscreen(int type, std::string str) {
 		eng->log_to_fullscreen_gui(LogType(type), str.c_str());
 	}
-
 };

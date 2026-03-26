@@ -11,19 +11,17 @@ const int ddgiDEPTHTILE = 16;
 
 using std::vector;
 
-
-DdgiTesting::DdgiTesting()
-{
+DdgiTesting::DdgiTesting() {
 	raytrace_test = draw.get_prog_man().create_raster("fullscreenquad.txt", "rtF.txt");
 
 	gather_shader = draw.get_prog_man().create_compute("gather_C.txt");
-		shade_fs = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeF.txt");
-		shade_fs_halfres = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeF.txt","HALFRES_DDGI");
+	shade_fs = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeF.txt");
+	shade_fs_halfres = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeF.txt", "HALFRES_DDGI");
 
-		shade_debug_fs = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeDebugF.txt");
+	shade_debug_fs = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeDebugF.txt");
 
 	//	while (1) {
-			trace_shader = draw.get_prog_man().create_compute("trace_C.txt");
+	trace_shader = draw.get_prog_man().create_compute("trace_C.txt");
 	//	};
 	debug_probes = draw.get_prog_man().create_raster("MeshSimpleV.txt", "MeshDebugProbeF.txt");
 
@@ -45,16 +43,15 @@ DdgiTesting::DdgiTesting()
 
 	ddgi_probe_avg_value = IGraphicsDevice::inst->create_buffer({});
 
-
 	Texture::install_system("_ddgi");
 	Texture::install_system("_ddgi_d");
-
 }
-//FIXME
+// FIXME
 #include "Game/Components/LightComponents.h"
 #include "Level.h"
 #include "Game/Entity.h"
-struct VolumesAndNumProbes {
+struct VolumesAndNumProbes
+{
 	vector<DdgiVolumeGpu> volumes;
 	int num_probes;
 
@@ -73,9 +70,8 @@ VolumesAndNumProbes find_volumes() {
 			comps.push_back(givol);
 		}
 	}
-	std::sort(comps.begin(), comps.end(), [](GiVolumeComponent* a, GiVolumeComponent* b) {
-		return a->priority > b->priority;
-		});
+	std::sort(comps.begin(), comps.end(),
+			  [](GiVolumeComponent* a, GiVolumeComponent* b) { return a->priority > b->priority; });
 	vector<vec4> relocate_volume_params;
 	for (auto givol : comps) {
 		glm::mat4 transform = givol->get_ws_transform();
@@ -83,7 +79,6 @@ VolumesAndNumProbes find_volumes() {
 		glm::vec3 max1 = transform * glm::vec4(0.5, 0.5, 0.5, 1);
 		glm::vec3 min = glm::min(min1, max1);
 		glm::vec3 max = glm::max(min1, max1);
-
 
 		DdgiVolumeGpu volume{};
 		volume.density = glm::vec4(givol->xz_density, givol->y_density, givol->xz_density, 0);
@@ -95,12 +90,11 @@ VolumesAndNumProbes find_volumes() {
 		volumes.push_back(volume);
 		if (givol->override_relocate_dist) {
 			relocate_volume_params.push_back(vec4(givol->relocate_max_dist, givol->relocate_normal_push, 0, 0));
-		}
-		else {
+		} else {
 			relocate_volume_params.push_back(vec4(draw.ddgi->max_relocate_dist, relocate_normal_dist, 0, 0));
 		}
 	}
-	return { volumes,probes_summation,relocate_volume_params };
+	return {volumes, probes_summation, relocate_volume_params};
 }
 
 void raytrace_the_world() {
@@ -118,13 +112,13 @@ void raytrace_the_world() {
 	globals.atlas_x = width_probe_space;
 	globals.atlas_y = height_probe_space;
 	globals.num_volumes = volumes.size();
-	//globals.relocate_normal_dist = relocate_normal_dist;
+	// globals.relocate_normal_dist = relocate_normal_dist;
 
 	// rt algorithm:
 	/*
-	
+
 	build the rt structure:
-		
+
 
 
 	for each volume:
@@ -153,17 +147,10 @@ void raytrace_the_world() {
 	}
 
 	*/
-
 }
 
-
-
-DdgiTesting::~DdgiTesting()
-{
-
-}
-inline Bounds get_tri_bounds(vec3 v1, vec3 v2, vec3 v3)
-{
+DdgiTesting::~DdgiTesting() {}
+inline Bounds get_tri_bounds(vec3 v1, vec3 v2, vec3 v3) {
 	Bounds b(v1);
 	b = bounds_union(b, v2);
 	b = bounds_union(b, v3);
@@ -174,13 +161,12 @@ Color32 get_color_of_material_for_export(const MaterialInstance* m);
 #include "Assets/AssetDatabase.h"
 void set_shit_fuck();
 
-
-void DdgiTesting::compute_avg_probe_value()
-{
+void DdgiTesting::compute_avg_probe_value() {
 	const int num_probes = temp_probe_relocate_thing.size();
 	ddgi_probe_avg_value->upload(nullptr, num_probes * sizeof(float) * 3);
 
-	if (!probe_depth || !probe_irradiance) return;
+	if (!probe_depth || !probe_irradiance)
+		return;
 	auto& device = draw.get_device();
 	device.bind_texture(2, probe_irradiance->get_internal_handle());
 	device.bind_texture(3, probe_depth->get_internal_handle());
@@ -191,7 +177,6 @@ void DdgiTesting::compute_avg_probe_value()
 	const int groups = glm::ceil(num_probes / 64.f);
 	printf("compute_avg_probe_value %d\n", groups);
 
-
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 15, ddgi_probe_avg_value->get_internal_handle());
 	glDispatchCompute(groups, 1, 1);
 
@@ -199,12 +184,10 @@ void DdgiTesting::compute_avg_probe_value()
 }
 void DdgiTesting::create_textures_raybuffer(int probe_width, int probe_height) {
 
-	
 	if (this->probe_depth)
 		this->probe_depth->release();
 	if (this->probe_irradiance)
 		this->probe_irradiance->release();
-
 
 	CreateTextureArgs targs;
 	const int tiles_wide = probe_width;
@@ -228,24 +211,19 @@ void DdgiTesting::create_textures_raybuffer(int probe_width, int probe_height) {
 	probe_depth = IGraphicsDevice::inst->create_texture(targs);
 	probe_depth->sub_image_upload(0, 0, 0, targs.width, targs.height, 0, nullptr);
 
-
 	handle = Texture::load("_ddgi_d");
 	handle->update_specs_ptr(this->probe_depth);
 }
 
-
-
 extern glm::vec3 get_emissive_of_mat_for_export(const MaterialInstance* m);
 
-void DdgiTesting::build_world()
-{
+void DdgiTesting::build_world() {
 	auto& objs = draw.scene.proxy_list;
 
 	std::vector<Bounds> bounds;
-	//std::vector<int> all_indicies;
+	// std::vector<int> all_indicies;
 	std::vector<glm::vec4> all_verticies;
 
-	
 	int counter = 0;
 	for (auto& _o : objs.objects) {
 		auto& o = _o.type_.proxy;
@@ -274,8 +252,8 @@ void DdgiTesting::build_world()
 		auto& lod = o.model->get_lod(lod_to_use);
 
 		// for all parts
-		for (int parti = lod.part_ofs; parti < lod.part_ofs+lod.part_count; parti++) {
-			//const int index_start = all_indicies.size();
+		for (int parti = lod.part_ofs; parti < lod.part_ofs + lod.part_count; parti++) {
+			// const int index_start = all_indicies.size();
 			const int vertex_start = all_verticies.size();
 
 			const auto& part = o.model->get_part(parti);
@@ -283,37 +261,38 @@ void DdgiTesting::build_world()
 			if (matoverride)
 				material_inst = matoverride;
 
-			if (!material_inst) continue;
+			if (!material_inst)
+				continue;
 			auto material = material_inst->impl.get();
-			if (!material||!material->get_master_impl())
+			if (!material || !material->get_master_impl())
 				continue;
 			if (material->get_master_impl()->light_mode == LightingMode::Unlit)
 				continue;
-			
 
-			const int material_offset = material->gpu_buffer_offset == -1 ? 0 : material->get_material_index_from_buffer_ofs();
+			const int material_offset =
+				material->gpu_buffer_offset == -1 ? 0 : material->get_material_index_from_buffer_ofs();
 
 			const int part_index_start = part.element_offset / 2;
 			const int part_index_count = part.element_count;
 			const int base_vertex = part.base_vertex;
 			const int num_verts = part.vertex_count;
 
-			auto get_vertex = [&](int index) ->glm::vec3 {
-				return transform * glm::vec4(rmd->get_vertex_at_index(base_vertex+index).pos, 1.0);
+			auto get_vertex = [&](int index) -> glm::vec3 {
+				return transform * glm::vec4(rmd->get_vertex_at_index(base_vertex + index).pos, 1.0);
 			};
 
-			//for (int i = 0; i < num_verts; i++) {
+			// for (int i = 0; i < num_verts; i++) {
 			//	all_verticies.push_back(glm::vec4(get_vertex(i), material_offset));
 			//}
-			for (int i = 0; i < part_index_count; i+=3) {
-				const int i0 = rmd->get_index_at_index(part_index_start+i);
-				const int i1 = rmd->get_index_at_index(part_index_start+i+1);
-				const int i2 = rmd->get_index_at_index(part_index_start+i+2);
+			for (int i = 0; i < part_index_count; i += 3) {
+				const int i0 = rmd->get_index_at_index(part_index_start + i);
+				const int i1 = rmd->get_index_at_index(part_index_start + i + 1);
+				const int i2 = rmd->get_index_at_index(part_index_start + i + 2);
 
-				//all_indicies.push_back(i0+vertex_start);
-				//all_indicies.push_back(i1+vertex_start);
-				//all_indicies.push_back(i2+vertex_start);
-				all_verticies.push_back(glm::vec4(get_vertex(i0),material_offset));
+				// all_indicies.push_back(i0+vertex_start);
+				// all_indicies.push_back(i1+vertex_start);
+				// all_indicies.push_back(i2+vertex_start);
+				all_verticies.push_back(glm::vec4(get_vertex(i0), material_offset));
 				all_verticies.push_back(glm::vec4(get_vertex(i1), material_offset));
 				all_verticies.push_back(glm::vec4(get_vertex(i2), material_offset));
 
@@ -341,7 +320,7 @@ void DdgiTesting::build_world()
 	auto& allmats = matman.get_material_table()->get_all_mat_array();
 	materialsdata.resize(MAX_MATERIALS);
 	for (int i = 0; i < allmats.size(); i++) {
-		if(!allmats.at(i))
+		if (!allmats.at(i))
 			continue;
 		auto m = (MaterialImpl*)allmats.at(i)->impl.get();
 		if (m->gpu_buffer_offset == MaterialImpl::INVALID_MAPPING)
@@ -371,17 +350,15 @@ void DdgiTesting::build_world()
 	if (this->materials)
 		this->materials->release();
 
-
 	CreateBufferArgs args;
 	args.flags = GraphicsBufferUseFlags::BUFFER_USE_AS_STORAGE_READ;
 	args.size = all_verticies.size() * sizeof(glm::vec4);
 	verts = IGraphicsDevice::inst->create_buffer(args);
 	verts->upload(all_verticies.data(), args.size);
 
-	//args.size = sizeof(int) * all_indicies.size();
-	//indicies = IGraphicsDevice::inst->create_buffer(args);
-	//indicies->upload(all_indicies.data(), args.size);
-
+	// args.size = sizeof(int) * all_indicies.size();
+	// indicies = IGraphicsDevice::inst->create_buffer(args);
+	// indicies->upload(all_indicies.data(), args.size);
 
 	args.size = sizeof(int) * as.indicies.size();
 	references = IGraphicsDevice::inst->create_buffer(args);
@@ -390,11 +367,10 @@ void DdgiTesting::build_world()
 	args.size = nodes.size() * sizeof(GPUBVHNode);
 	this->nodes = IGraphicsDevice::inst->create_buffer(args);
 	this->nodes->upload(nodes.data(), args.size);
-	
+
 	args.size = materialsdata.size() * sizeof(glm::vec4);
 	this->materials = IGraphicsDevice::inst->create_buffer(args);
 	this->materials->upload(materialsdata.data(), args.size);
-
 }
 #include "imgui.h"
 static float irrad_mult = 1.0;
@@ -413,7 +389,7 @@ static vec2 ssr_lum_range = vec2(0, 0.1);
 void ddgi_debugmenu() {
 	auto self = draw.ddgi.get();
 	ImGui::InputInt3("select", &self->selected_probe.x);
-	
+
 	ImGui::DragFloat("irradmul", &irrad_mult, 0.01);
 
 	if (ImGui::Button("refresh"))
@@ -439,35 +415,32 @@ void ddgi_debugmenu() {
 }
 ADD_TO_DEBUG_MENU(ddgi_debugmenu);
 void set_shit_fuck() {
-	
+
 	auto self = draw.ddgi.get();
 
 	glBindBufferBase(GL_UNIFORM_BUFFER, 8, self->ddgi_globals->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, self->ddgi_volumes->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, self->ddgi_probe_relocation_offsets->get_internal_handle());
-
 }
 
-
 ConfigVar r_rt_skiprebuild("r.rt_skiprebuild", "0", CVAR_BOOL, "");
-void DdgiTesting::execute()
-{
-	if(!verts||!r_rt_skiprebuild.get_bool())
+void DdgiTesting::execute() {
+	if (!verts || !r_rt_skiprebuild.get_bool())
 		build_world();
 	double start = GetTime();
 
 	// run trace
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, verts->get_internal_handle());
-	//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, indicies->get_internal_handle());
+	// glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, indicies->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, nodes->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, references->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, materials->get_internal_handle());
-	
-	
+
 	auto [volumes, total_num_probes, relocate_params] = find_volumes();
-	if (volumes.size() == 0) throw 1;
+	if (volumes.size() == 0)
+		throw 1;
 	ASSERT(relocate_params.size() == volumes.size());
-	
+
 	this->myvolumes = volumes;
 	// allocate probe irradiance and depth
 
@@ -487,28 +460,22 @@ void DdgiTesting::execute()
 
 	ddgi_probe_relocation_offsets->upload(nullptr, sizeof(glm::vec4) * total_num_probes);
 
-
 	CreateBufferArgs args{};
 	args.size = total_num_probes * MAX_RAYS * sizeof(RayBufferStruct);
 	IGraphicsBuffer* ray_buffer = IGraphicsDevice::inst->create_buffer(args);
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ray_buffer->get_internal_handle());
 
-
-
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, draw.buf.lighting_uniforms->get_internal_handle());
 
 	create_textures_raybuffer(width_probe_space, height_probe_space);
 
-
 	auto& device = draw.get_device();
-
 
 	IGraphicsBuffer* invalid_count_buf{};
 	invalid_count_buf = IGraphicsDevice::inst->create_buffer({});
 	glm::ivec4 counter_num = {};
 	invalid_count_buf->upload(&counter_num, sizeof(glm::ivec4));
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, invalid_count_buf->get_internal_handle());
-
 
 	// relocation
 	Random r(13);
@@ -547,27 +514,24 @@ void DdgiTesting::execute()
 		device.bind_texture(2, probe_irradiance->get_internal_handle());
 		device.bind_texture(3, probe_depth->get_internal_handle());
 
-
 		device.set_shader(trace_shader);
 		// dont know if this makes sense. want to start averaging for run i=1,2,3.
 		// at i=0, there will be no indirect so i dont think accumulating there will be totally right
-		device.shader().set_bool("do_irrad_calcs", i!=0);
+		device.shader().set_bool("do_irrad_calcs", i != 0);
 		set_shit_fuck();
-		device.shader().set_float("ray_sample_randomness", r.RandF(0,TWOPI));
+		device.shader().set_float("ray_sample_randomness", r.RandF(0, TWOPI));
 		device.shader().set_int("num_lights", draw.scene.light_list.objects.size());
-
 
 		if (draw.scene.suns.size() > 0) {
 			auto& sun = draw.scene.suns.at(0).sun;
 			device.shader().set_vec4("light_sun_dir", vec4(sun.direction, 1));
 			device.shader().set_vec4("light_sun_color", vec4(sun.color, 0));
-		}
-		else {
-			device.shader().set_vec4("light_sun_dir", vec4(0,0,0, -1));
+		} else {
+			device.shader().set_vec4("light_sun_dir", vec4(0, 0, 0, -1));
 		}
 
 		const int total_probes = total_num_probes;
-		const int groups = total_probes;// glm::ceil(total_probes / 64.f);
+		const int groups = total_probes; // glm::ceil(total_probes / 64.f);
 
 		printf("trace %d\n", i);
 		glDispatchCompute(groups, 1, 1);
@@ -578,48 +542,45 @@ void DdgiTesting::execute()
 			set_shit_fuck();
 			device.shader().set_int("num_runs_so_far", glm::max(0, i - 1));
 
-
-
-			glBindImageTexture(0, probe_irradiance->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R11F_G11F_B10F);
+			glBindImageTexture(0, probe_irradiance->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY,
+							   GL_R11F_G11F_B10F);
 
 			glBindImageTexture(1, probe_depth->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16F);
 
 			glCheckError();
-		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-		printf("gather %d\n", i);
-		const int NUM_LOCAL_INNVOC = 232;
-
-		const int gather_groups = total_probes;	// one global innvoc per probe
-		const int gather_groups_prev = glm::ceil(total_probes / 64.f);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 14, ddgi_probe_relocation_offsets->get_internal_handle());	// bind for writing...
-
-		glDispatchCompute(gather_groups, 1, 1);
-		glCheckError();
-
-		if (i == 0) {
 			glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-			glBindBuffer(GL_SHADER_STORAGE_BUFFER, invalid_count_buf->get_internal_handle());
-			glm::ivec4* ptr = (glm::ivec4*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-			glm::ivec4 result = *ptr;
-			glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
-		//	const int total_probes = ddgiGRID.x * ddgiGRID.y * ddgiGRID.z;
-			printf("total_probes %d\n", total_probes);
-			printf("invalid probes: %d\n", result.y);
-			printf("no_depth_needed probes: %d\n", result.x);
+			glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-		}
+			printf("gather %d\n", i);
+			const int NUM_LOCAL_INNVOC = 232;
+
+			const int gather_groups = total_probes; // one global innvoc per probe
+			const int gather_groups_prev = glm::ceil(total_probes / 64.f);
+			glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 14,
+							 ddgi_probe_relocation_offsets->get_internal_handle()); // bind for writing...
+
+			glDispatchCompute(gather_groups, 1, 1);
+			glCheckError();
+
+			if (i == 0) {
+				glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+				glBindBuffer(GL_SHADER_STORAGE_BUFFER, invalid_count_buf->get_internal_handle());
+				glm::ivec4* ptr = (glm::ivec4*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
+				glm::ivec4 result = *ptr;
+				glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+				//	const int total_probes = ddgiGRID.x * ddgiGRID.y * ddgiGRID.z;
+				printf("total_probes %d\n", total_probes);
+				printf("invalid probes: %d\n", result.y);
+				printf("no_depth_needed probes: %d\n", result.x);
+			}
 		}
 
 		glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
 	}
 
-
-	if(do_flush_after)
-		glFinish();	// finish here to get accurate time..
+	if (do_flush_after)
+		glFinish(); // finish here to get accurate time..
 	float time = GetTime() - start;
 	sys_print(Debug, "sfasdf asdf sadftime: %f\n", time);
 	//{
@@ -648,17 +609,15 @@ void DdgiTesting::execute()
 
 	ray_buffer->release();
 	invalid_count_buf->release();
-
 }
 void draw_model_simple_no_material(Model* model);
 #include "Render/ModelManager.h"
-ConfigVar draw_real_grid("draw_real_grid", "2", CVAR_INTEGER|CVAR_UNBOUNDED, "");
-void DdgiTesting::render_probes()
-{
+ConfigVar draw_real_grid("draw_real_grid", "2", CVAR_INTEGER | CVAR_UNBOUNDED, "");
+void DdgiTesting::render_probes() {
 	if (myvolumes.size() == 0)
 		return;
 
-	//if (!verts) {
+	// if (!verts) {
 	//	execute();
 	//	ASSERT(verts);
 	//}
@@ -667,9 +626,7 @@ void DdgiTesting::render_probes()
 	auto set_composite_pass = [&]() {
 		RenderPassState pass_state;
 		pass_state.wants_color_clear = false;
-		auto color_infos = {
-			ColorTargetInfo(draw.tex.output_composite)
-		};
+		auto color_infos = {ColorTargetInfo(draw.tex.output_composite)};
 		pass_state.color_infos = color_infos;
 		pass_state.depth_info = draw.tex.scene_depth;
 		IGraphicsDevice::inst->set_render_pass(pass_state);
@@ -686,38 +643,39 @@ void DdgiTesting::render_probes()
 
 	device.bind_texture_ptr(0, probe_irradiance);
 	set_shit_fuck();
-	if(draw_real_grid.get_integer()==2){
+	if (draw_real_grid.get_integer() == 2) {
 		for (auto& vol : myvolumes) {
 			auto ddgiGRID = vol.size_offset;
-	device.shader().set_ivec3("vol_grid", ddgiGRID);
-	device.shader().set_int("vol_offset", ddgiGRID.w);
+			device.shader().set_ivec3("vol_grid", ddgiGRID);
+			device.shader().set_int("vol_offset", ddgiGRID.w);
 
-		for (int x = 0; x < ddgiGRID.x; x++) {
-			for (int y = 0; y < ddgiGRID.y; y++) {
-				for (int z = 0; z < ddgiGRID.z; z++) {
+			for (int x = 0; x < ddgiGRID.x; x++) {
+				for (int y = 0; y < ddgiGRID.y; y++) {
+					for (int z = 0; z < ddgiGRID.z; z++) {
 
-					const int global_index = x + y * ddgiGRID.x + z * ddgiGRID.x * ddgiGRID.y + ddgiGRID.w;
-					glm::vec3 ofs = glm::vec3(temp_probe_relocate_thing.at(global_index));
+						const int global_index = x + y * ddgiGRID.x + z * ddgiGRID.x * ddgiGRID.y + ddgiGRID.w;
+						glm::vec3 ofs = glm::vec3(temp_probe_relocate_thing.at(global_index));
 
-					glm::mat4 tr = glm::translate(glm::mat4(1), glm::vec3(x, y, z) * glm::vec3(vol.density) + glm::vec3(vol.origin_priority) + ofs);
-					device.shader().set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
-					device.shader().set_ivec3("probe_coord", { x,y,z });
+						glm::mat4 tr = glm::translate(glm::mat4(1), glm::vec3(x, y, z) * glm::vec3(vol.density) +
+																		glm::vec3(vol.origin_priority) + ofs);
+						device.shader().set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
+						device.shader().set_ivec3("probe_coord", {x, y, z});
 
-					draw_model_simple_no_material(m);
+						draw_model_simple_no_material(m);
+					}
 				}
 			}
 		}
-		}
 	}
-
 }
 
 #include "Render/RenderGiManager.h"
-void DdgiTesting::calculate_lum_for_spec()
-{
+void DdgiTesting::calculate_lum_for_spec() {
 	const int num = RenderGiManager::inst->get_num_cubemaps();
-	if (num == 0) return;
-	if (!probe_depth || !probe_irradiance) return;
+	if (num == 0)
+		return;
+	if (!probe_depth || !probe_irradiance)
+		return;
 	auto& device = draw.get_device();
 	device.bind_texture(2, probe_irradiance->get_internal_handle());
 	device.bind_texture(3, probe_depth->get_internal_handle());
@@ -727,9 +685,8 @@ void DdgiTesting::calculate_lum_for_spec()
 	const int num_cubemaps = RenderGiManager::inst->get_num_cubemaps();
 	device.shader().set_int("num_cubemaps", num_cubemaps);
 
-
 	const int groups = glm::ceil(num / 64.f);
-	printf("$$$$$$$$$$$$$$$$$$calculate_lum_for_spec %d\n",groups);
+	printf("$$$$$$$$$$$$$$$$$$calculate_lum_for_spec %d\n", groups);
 
 	IGraphicsBuffer* const cubemap_volume_buffer = RenderGiManager::inst->get_cubemap_volume_buffer();
 
@@ -737,14 +694,10 @@ void DdgiTesting::calculate_lum_for_spec()
 	glDispatchCompute(groups, 1, 1);
 
 	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-
 }
 
-
-
-
-void DdgiTesting::load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, std::vector<glm::vec4>& relocate, std::vector<DdgiVolumeGpu>& vols)
-{
+void DdgiTesting::load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, std::vector<glm::vec4>& relocate,
+							  std::vector<DdgiVolumeGpu>& vols) {
 	const int width_probe_space = irrad->get_size().x / ddgiIRRADTILE;
 	const int height_probe_space = irrad->get_size().y / ddgiIRRADTILE;
 	ASSERT(width_probe_space == depth->get_size().x / ddgiDEPTHTILE);
@@ -762,7 +715,8 @@ void DdgiTesting::load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, 
 	theglobals = globals;
 
 	temp_probe_relocate_thing = std::move(relocate);
-	ddgi_probe_relocation_offsets->upload(temp_probe_relocate_thing.data(), sizeof(glm::vec4) * temp_probe_relocate_thing.size());
+	ddgi_probe_relocation_offsets->upload(temp_probe_relocate_thing.data(),
+										  sizeof(glm::vec4) * temp_probe_relocate_thing.size());
 
 	if (this->probe_irradiance) {
 		this->probe_irradiance->release();
@@ -773,11 +727,9 @@ void DdgiTesting::load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, 
 	}
 	probe_depth = depth;
 
-
 	compute_avg_probe_value();
 }
-void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap_view)
-{
+void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap_view) {
 	auto& device = draw.get_device();
 
 	// pass already set by caller
@@ -790,20 +742,18 @@ void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap
 	state.depth_writes = false;
 	device.set_pipeline(state);
 
-	draw_lighting_shared(ssao,for_cubemap_view);
+	draw_lighting_shared(ssao, for_cubemap_view);
 
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 }
-ConfigVar r_ddgi_halfres_blend("r.ddgi_halfres_blend", "0.8", CVAR_FLOAT, "[0,1] blend input into ddgi temporal accumulation");
-void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao)
-{
+ConfigVar r_ddgi_halfres_blend("r.ddgi_halfres_blend", "0.8", CVAR_FLOAT,
+							   "[0,1] blend input into ddgi temporal accumulation");
+void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
 	auto& device = draw.get_device();
 
 	const glm::ivec2 texel_offset = get_half_res_offset();
 
-	auto targets = {
-			ColorTargetInfo(draw.tex.halfres_scene_color)
-	};
+	auto targets = {ColorTargetInfo(draw.tex.halfres_scene_color)};
 	RenderPassState rp;
 	rp.color_infos = targets;
 	IGraphicsDevice::inst->set_render_pass(rp);
@@ -816,7 +766,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao)
 	state.depth_writes = false;
 	device.set_pipeline(state);
 
-	draw_lighting_shared(ssao,false);
+	draw_lighting_shared(ssao, false);
 	device.shader().set_ivec2("halfres_texel_offset", texel_offset);
 	device.shader().set_bool("wants_half_res", true);
 
@@ -826,9 +776,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao)
 		GPUSCOPESTART(temporal_upsample_ddgi);
 
 		// now do temporal upsample
-		auto targets2 = {
-			ColorTargetInfo(draw.tex.ddgi_accum)
-		};
+		auto targets2 = {ColorTargetInfo(draw.tex.ddgi_accum)};
 		rp.color_infos = targets2;
 		IGraphicsDevice::inst->set_render_pass(rp);
 
@@ -864,17 +812,13 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao)
 		the_shader.set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
 		the_shader.set_ivec2("halfres_texel_offset", texel_offset);
 
-
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
 
 	GPUSCOPESTART(ddgihalfres_apply);
 
-
 	// now apply to scene
-	auto targets3 = {
-		ColorTargetInfo(draw.tex.scene_color)
-	};
+	auto targets3 = {ColorTargetInfo(draw.tex.scene_color)};
 	rp.color_infos = targets3;
 	IGraphicsDevice::inst->set_render_pass(rp);
 	state.program = apply_halfres_accum_to_scene;
@@ -893,34 +837,28 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao)
 	else
 		draw.bind_texture_ptr(6, draw.black_texture);
 
-	
 	set_reflection_uniforms();
 
 	glDrawArrays(GL_TRIANGLES, 0, 3);
-
-
 
 	// now swap
 	std::swap(draw.tex.ddgi_accum, draw.tex.last_ddgi_accum);
 	increment_half_res_offset_index();
 }
 
-void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_view)
-{
+void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_view) {
 	auto& device = draw.get_device();
-
 
 	theglobals.view_bias = view_bias;
 	theglobals.normal_bias = normal_bias;
 	ddgi_globals->upload(&theglobals, sizeof(theglobals));
 
-	//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, indirection->get_internal_handle());
+	// glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, indirection->get_internal_handle());
 
 	draw.bind_texture_ptr(0, draw.tex.scene_gbuffer0);
 	draw.bind_texture_ptr(1, draw.tex.scene_gbuffer1);
 	draw.bind_texture_ptr(2, draw.tex.scene_gbuffer2);
 	draw.bind_texture_ptr(3, draw.tex.scene_depth);
-
 
 	draw.bind_texture_ptr(4, probe_irradiance);
 	draw.bind_texture_ptr(5, probe_depth);
@@ -928,7 +866,6 @@ void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_
 
 	extern ConfigVar r_specular_ao_intensity;
 	device.shader().set_bool("include_cubemaps", !for_cubemap_view && include_cubemaps);
-
 
 	set_shit_fuck();
 
@@ -938,8 +875,7 @@ void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_
 	set_reflection_uniforms();
 }
 
-void DdgiTesting::set_reflection_uniforms()
-{
+void DdgiTesting::set_reflection_uniforms() {
 	auto& device = draw.get_device();
 
 	extern ConfigVar r_specular_ao_intensity;
@@ -958,24 +894,21 @@ void DdgiTesting::set_reflection_uniforms()
 
 	draw.bind_texture(7, EnviornmentMapHelper::get().integrator.get_texture());
 	draw.bind_texture(9, draw.scene.skylights.at(0).skylight.generated_cube->get_internal_render_handle());
-
 }
 
-void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
-{
+void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view) {
 	if (draw.scene.skylights.empty())
-		return;//fixme
-	//if (!verts) {
+		return; // fixme
+	// if (!verts) {
 	//	execute();
 	//	ASSERT(verts);
 	//}
 
-	//render_rt();
-	//return;
+	// render_rt();
+	// return;
 
 	auto& device = draw.get_device();
 
-	
 	GPUFUNCTIONSTART;
 
 	if (wants_half_res && !for_cubemap_view)
@@ -983,8 +916,7 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view)
 	else
 		draw_lighting_fullres(ssao, for_cubemap_view);
 }
-void DdgiTesting::render_rt()
-{
+void DdgiTesting::render_rt() {
 	GPUFUNCTIONSTART;
 
 	if (!verts) {
@@ -995,9 +927,7 @@ void DdgiTesting::render_rt()
 	auto set_composite_pass = [&]() {
 		RenderPassState pass_state;
 		pass_state.wants_color_clear = true;
-		auto color_infos = {
-			ColorTargetInfo(draw.tex.output_composite)
-		};
+		auto color_infos = {ColorTargetInfo(draw.tex.output_composite)};
 		pass_state.color_infos = color_infos;
 		IGraphicsDevice::inst->set_render_pass(pass_state);
 	};
@@ -1009,12 +939,10 @@ void DdgiTesting::render_rt()
 	device.set_pipeline(state);
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, verts->get_internal_handle());
-	//glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, indicies->get_internal_handle());
+	// glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, indicies->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, nodes->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, references->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, materials->get_internal_handle());
 
-
 	glDrawArrays(GL_TRIANGLES, 0, 3);
-
 }

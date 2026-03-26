@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include "Game/SerializePtrHelpers.h"
 #include <glm/glm.hpp>
 #include <unordered_map>
@@ -21,7 +20,8 @@ struct GuiFontGlyph
 	int16_t advance{};
 };
 class IAssetLoadingInterface;
-class GuiFont : public IAsset {
+class GuiFont : public IAsset
+{
 public:
 	CLASS_BODY(GuiFont);
 
@@ -35,9 +35,7 @@ public:
 	friend class GuiFontLoader;
 	friend class GuiHelpers;
 
-	void uninstall() override {
-		character_to_glyph.clear();
-	}
+	void uninstall() override { character_to_glyph.clear(); }
 	bool load_asset(IAssetLoadingInterface*);
 	void post_load();
 	void move_construct(IAsset* _other) {
@@ -45,7 +43,5 @@ public:
 		*this = std::move(*other);
 	}
 
-	REF static GuiFont* load(const std::string& name) {
-		return g_assets.find_sync<GuiFont>(name).get();
-	}
+	REF static GuiFont* load(const std::string& name) { return g_assets.find_sync<GuiFont>(name).get(); }
 };

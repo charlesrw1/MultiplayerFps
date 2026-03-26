@@ -4,8 +4,7 @@
 #include "Framework/StringUtils.h"
 #include "Framework/DictParser.h"
 #include "IAsset.h"
-bool AssetBundle::load_asset(IAssetLoadingInterface* loading)
-{
+bool AssetBundle::load_asset(IAssetLoadingInterface* loading) {
 	auto file = FileSys::open_read_game(get_name());
 	if (!file) {
 		sys_print(Error, "AssetBundle::load_asset: no path %s\n", get_name().c_str());
@@ -18,15 +17,13 @@ bool AssetBundle::load_asset(IAssetLoadingInterface* loading)
 		auto toks = StringUtils::split(line);
 		if (toks.size() == 2) {
 			auto class_type = ClassBase::find_class(toks.at(0).c_str());
-			if (class_type&&class_type->is_a(IAsset::StaticType)) {
+			if (class_type && class_type->is_a(IAsset::StaticType)) {
 				auto asset = g_assets.find_sync_sptr(toks.at(1), class_type);
 				assets.push_back(asset);
-			}
-			else {
+			} else {
 				sys_print(Error, "AssetBundle::load_asset: no IAsset type %s\n", toks.at(0).c_str());
 			}
 		}
 	}
 	return true;
 }
-

@@ -13,30 +13,20 @@
 #include "Framework/Files.h"
 #include "Framework/MapUtil.h"
 
+using std::function;
 using std::string;
 using std::unordered_map;
 using std::vector;
-using std::function;
-template<typename T>
-using uptr = std::unique_ptr<T>;
-
+template <typename T> using uptr = std::unique_ptr<T>;
 
 ConfigVar log_all_asset_loads("log_all_asset_loads", "1", CVAR_BOOL, "");
 ConfigVar log_finish_job_func("log_finish_job_func", "0", CVAR_BOOL, "");
-void AssetDatabase::quit() {
-
-}
+void AssetDatabase::quit() {}
 class AssetDatabaseImpl
 {
 public:
-	
-	AssetDatabaseImpl() {
-	
-	}
-	~AssetDatabaseImpl() {
-
-	}
-
+	AssetDatabaseImpl() {}
+	~AssetDatabaseImpl() {}
 
 	void install_system_direct(IAsset* asset, const std::string& name) {
 		asset->path = name;
@@ -45,14 +35,12 @@ public:
 		asset->is_from_disk = false;
 		std::shared_ptr<IAsset> sptr(asset);
 		ASSERT(!MapUtil::contains(allAssets, name));
-		allAssets.insert({ name, std::move(sptr) });
+		allAssets.insert({name, std::move(sptr)});
 	}
 
-	void tick_asyncs_standard() {
-	}
+	void tick_asyncs_standard() {}
 
-	std::shared_ptr<IAsset> load_asset_sync_sptr(const std::string& str, const ClassTypeInfo* type, bool is_system)
-	{
+	std::shared_ptr<IAsset> load_asset_sync_sptr(const std::string& str, const ClassTypeInfo* type, bool is_system) {
 		if (str.empty())
 			return nullptr;
 		auto existing = find_in_all_assets_sptr(str);
@@ -63,8 +51,7 @@ public:
 		return find_in_all_assets_sptr(str);
 	}
 
-	IAsset* load_asset_sync(const std::string& str, const ClassTypeInfo* type, bool is_system)
-	{
+	IAsset* load_asset_sync(const std::string& str, const ClassTypeInfo* type, bool is_system) {
 		assert(type->is_a(IAsset::StaticType));
 		if (str.empty())
 			return nullptr;
@@ -77,14 +64,13 @@ public:
 			}
 			existing->persistent_flag |= is_system;
 			return existing;
-		}
-		else {
+		} else {
 			// asset doesnt exist
 			if (!existing) {
 				existing = (IAsset*)type->alloc();
 				existing->path = str;
 				std::shared_ptr<IAsset> sptr(existing);
-				allAssets.insert({ str,sptr });
+				allAssets.insert({str, sptr});
 			}
 			existing->persistent_flag |= is_system;
 			existing->is_loaded = true;
@@ -100,7 +86,7 @@ public:
 				}
 			}
 
-			assert(find_in_all_assets(str)==existing);
+			assert(find_in_all_assets(str) == existing);
 			return existing;
 		}
 	}
@@ -114,7 +100,7 @@ public:
 		asset2->load_failed = !success;
 		if (success) {
 			try {
-			//	asset2->post_load();
+				//	asset2->post_load();
 				asset->move_construct(asset2);
 				asset->post_load();
 				ASSERT(asset->get_is_loaded());
@@ -127,13 +113,11 @@ public:
 		asset2 = nullptr;
 	}
 
-
-
 	void print_assets() {
-		sys_print(Info, "%-32s|%-18s|%s|%s\n","NAME", "TYPE", "F", "MASK");
+		sys_print(Info, "%-32s|%-18s|%s|%s\n", "NAME", "TYPE", "F", "MASK");
 		std::string usename;
 		std::string usetype;
-		for (auto& [name,type] : allAssets) {	// structured bindings r cool
+		for (auto& [name, type] : allAssets) { // structured bindings r cool
 			if (!type->is_loaded)
 				continue;
 			usename = name;
@@ -145,7 +129,8 @@ public:
 				usetype = usetype.substr(0, 15) + "...";
 			}
 
-			sys_print(Info, "%-32s|%-18s|%s|%s\n", usename.c_str(), usetype.c_str(), (type->load_failed) ? "X" : " ", "");
+			sys_print(Info, "%-32s|%-18s|%s|%s\n", usename.c_str(), usetype.c_str(), (type->load_failed) ? "X" : " ",
+					  "");
 		}
 	}
 	void dump_to_file(IFile* file) {
@@ -157,17 +142,18 @@ public:
 			else if (strcmp(a->get_type().classname, "Model") == 0)
 				return 2;
 			return 3;
-		};		
-		std::vector<std::pair<IAsset*,int>> list;
-		for (auto& [name, type] : allAssets) {	// structured bindings r cool
+		};
+		std::vector<std::pair<IAsset*, int>> list;
+		for (auto& [name, type] : allAssets) { // structured bindings r cool
 			if (!type->is_loaded)
 				continue;
-			list.push_back({ type.get(),get_i(type.get()) });
+			list.push_back({type.get(), get_i(type.get())});
 		}
 		// order them slightly
-		std::sort(list.begin(), list.end(), [](const std::pair<IAsset*, int>& a, const std::pair<IAsset*, int>& b) -> bool {
-			return a.second < b.second;
-			});
+		std::sort(list.begin(), list.end(),
+				  [](const std::pair<IAsset*, int>& a, const std::pair<IAsset*, int>& b) -> bool {
+					  return a.second < b.second;
+				  });
 		for (auto& a : list) {
 			string line = a.first->get_type().classname + string(" ") + a.first->get_name() + "\n";
 			file->write(line.data(), line.size());
@@ -176,21 +162,19 @@ public:
 
 	void quit() {
 		sys_print(Info, "quitting asset loader\n");
-		//backend.signal_end_work();
+		// backend.signal_end_work();
 	}
-	bool is_asset_loaded(const string& path) {
-		return MapUtil::contains(allAssets, path);
-	}
+	bool is_asset_loaded(const string& path) { return MapUtil::contains(allAssets, path); }
 	void get_assets_of_type(std::vector<IAsset*>& out, const ClassTypeInfo* type) {
 		for (auto& [path, ptr] : allAssets) {
 			if (ptr->get_type().is_a(*type))
 				out.push_back(ptr.get());
 		}
 	}
-private:
 
+private:
 	IAsset* find_in_all_assets(const string& str) {
-		auto f= allAssets.find(str);
+		auto f = allAssets.find(str);
 		return f == allAssets.end() ? nullptr : f->second.get();
 	}
 	std::shared_ptr<IAsset> find_in_all_assets_sptr(const string& str) {
@@ -201,24 +185,14 @@ private:
 	// maps a path to a loaded asset
 	// this doesnt need a mutex to read
 	unordered_map<string, std::shared_ptr<IAsset>> allAssets;
-
 };
 
-// reloading: actually allow multiple in memory? then old copy gets GCed. 
+// reloading: actually allow multiple in memory? then old copy gets GCed.
 
-// when an object references a 
+// when an object references a
 
-
-
-
-AssetDatabase::AssetDatabase() {
-
-
-}
-AssetDatabase::~AssetDatabase() {
-	
-
-}
+AssetDatabase::AssetDatabase() {}
+AssetDatabase::~AssetDatabase() {}
 AssetDatabase g_assets;
 
 class PrimaryAssetLoadingInterface : public IAssetLoadingInterface
@@ -227,68 +201,53 @@ public:
 	PrimaryAssetLoadingInterface(AssetDatabaseImpl& frontend);
 	IAsset* load_asset(const ClassTypeInfo* type, string path) override;
 	void touch_asset(const IAsset* asset) override;
+
 private:
 	AssetDatabaseImpl& impl;
 };
 
-
-
 void AssetDatabase::init() {
 	// init the loader thread
-	impl = new AssetDatabaseImpl;// dont make it a uptr because blah blah
+	impl = new AssetDatabaseImpl; // dont make it a uptr because blah blah
 	AssetDatabase::loader = new PrimaryAssetLoadingInterface(*impl);
 }
-void AssetDatabase::reset_testing()
-{
-
-}
-void AssetDatabase::finish_all_jobs()
-{
-	//impl->finish_all_jobs();
+void AssetDatabase::reset_testing() {}
+void AssetDatabase::finish_all_jobs() {
+	// impl->finish_all_jobs();
 }
 
-void AssetDatabase::remove_system_reference(IAsset* asset)
-{
-	//asset->is_system = false;
-	//impl->remove_asset_direct(asset);
+void AssetDatabase::remove_system_reference(IAsset* asset) {
+	// asset->is_system = false;
+	// impl->remove_asset_direct(asset);
 }
-bool AssetDatabase::is_asset_loaded(const std::string& path)
-{
+bool AssetDatabase::is_asset_loaded(const std::string& path) {
 	return impl->is_asset_loaded(path);
 }
-void AssetDatabase::mark_unreferences()
-{
-	//impl->mark_assets_as_unreferenced();
+void AssetDatabase::mark_unreferences() {
+	// impl->mark_assets_as_unreferenced();
 }
-std::shared_ptr<IAsset> AssetDatabase::find_sync_sptr(const string& path, const ClassTypeInfo* classType, bool system_asset)
-{
+std::shared_ptr<IAsset> AssetDatabase::find_sync_sptr(const string& path, const ClassTypeInfo* classType,
+													  bool system_asset) {
 	return impl->load_asset_sync_sptr(path, classType, system_asset);
 }
-void AssetDatabase::reload_sync(IAsset* asset)
-{
+void AssetDatabase::reload_sync(IAsset* asset) {
 	impl->reload_asset_sync(asset);
 }
 
-void AssetDatabase::install_system_asset(IAsset* assetPtr, const std::string& name)
-{
+void AssetDatabase::install_system_asset(IAsset* assetPtr, const std::string& name) {
 	impl->install_system_direct(assetPtr, name);
 }
-GenericAssetPtr AssetDatabase::find_sync(const std::string& path, const ClassTypeInfo* classType, bool is_system)
-{
-	return impl->load_asset_sync(path,classType,is_system);
+GenericAssetPtr AssetDatabase::find_sync(const std::string& path, const ClassTypeInfo* classType, bool is_system) {
+	return impl->load_asset_sync(path, classType, is_system);
 }
 
-
-void AssetDatabase::remove_unreferences()
-{
-	//impl->uninstall_unreferenced_assets();
+void AssetDatabase::remove_unreferences() {
+	// impl->uninstall_unreferenced_assets();
 }
-void AssetDatabase::print_usage()
-{
+void AssetDatabase::print_usage() {
 	impl->print_assets();
 }
-void AssetDatabase::dump_loaded_assets_to_disk(const std::string& path)
-{
+void AssetDatabase::dump_loaded_assets_to_disk(const std::string& path) {
 	sys_print(Info, "AssetDatabase::dump_loaded_assets_to_disk: %s\n", path.c_str());
 	auto file = FileSys::open_write_game(path);
 	if (!file) {
@@ -297,22 +256,16 @@ void AssetDatabase::dump_loaded_assets_to_disk(const std::string& path)
 	impl->dump_to_file(file.get());
 }
 
-void AssetDatabase::get_assets_of_type(std::vector<IAsset*>& out, const ClassTypeInfo* type)
-{
+void AssetDatabase::get_assets_of_type(std::vector<IAsset*>& out, const ClassTypeInfo* type) {
 	impl->get_assets_of_type(out, type);
 }
-PrimaryAssetLoadingInterface::PrimaryAssetLoadingInterface(AssetDatabaseImpl& frontend) : impl(frontend) {
-}
-IAsset* PrimaryAssetLoadingInterface::load_asset(const ClassTypeInfo* type, string path)
-{
+PrimaryAssetLoadingInterface::PrimaryAssetLoadingInterface(AssetDatabaseImpl& frontend) : impl(frontend) {}
+IAsset* PrimaryAssetLoadingInterface::load_asset(const ClassTypeInfo* type, string path) {
 	return impl.load_asset_sync(path, type, false);
 }
 
-
-void PrimaryAssetLoadingInterface::touch_asset(const IAsset* asset)
-{
+void PrimaryAssetLoadingInterface::touch_asset(const IAsset* asset) {
 	assert(0);
-
 }
 
-IAssetLoadingInterface* AssetDatabase::loader=nullptr;
+IAssetLoadingInterface* AssetDatabase::loader = nullptr;

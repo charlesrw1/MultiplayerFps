@@ -13,16 +13,14 @@
 #include "Assets/AssetBrowser.h"
 #include "Assets/AssetRegistry.h"
 
-void IEditorTool::set_has_editor_changes()
-{
+void IEditorTool::set_has_editor_changes() {
 	if (!this->has_editor_changes) {
 		this->has_editor_changes = true;
 		set_window_title();
 	}
 }
-void IEditorTool::set_window_title()
-{
-	const char* name = string_format("LevelEditor: %s%s\n", get_doc_name().c_str(), has_editor_changes?"*":"");
+void IEditorTool::set_window_title() {
+	const char* name = string_format("LevelEditor: %s%s\n", get_doc_name().c_str(), has_editor_changes ? "*" : "");
 	SDL_SetWindowTitle(eng->get_os_window(), name);
 }
 #if 0
@@ -52,54 +50,44 @@ bool IEditorTool::open(const char* name, const char* arg) {
 extern ConfigVar g_project_name;
 
 #include "EditorPopups.h"
-void IEditorTool::try_save(std::function<void()> callback)
-{
-	EditorPopupManager::inst->add_popup(
-		"Save new document.",
-		[this,callback]()->bool {
-			if (ImGui::Button("Save?")) {
-				save();
-				callback();
-				return true;
-			}
-			if (ImGui::Button("Cancel.")) {
-				return true;
-			}
-			return false;
+void IEditorTool::try_save(std::function<void()> callback) {
+	EditorPopupManager::inst->add_popup("Save new document.", [this, callback]() -> bool {
+		if (ImGui::Button("Save?")) {
+			save();
+			callback();
+			return true;
 		}
-	);
+		if (ImGui::Button("Cancel.")) {
+			return true;
+		}
+		return false;
+	});
 }
 
-void IEditorTool::try_close(std::function<void()> callback)
-{
+void IEditorTool::try_close(std::function<void()> callback) {
 	bool is_done_with_save = false;
-	EditorPopupManager::inst->add_popup(
-		"Are you sure?",
-		[callback, is_done_with_save,this]()mutable->bool {
-			ImGui::Text("Editor is open, continue without saving?");
+	EditorPopupManager::inst->add_popup("Are you sure?", [callback, is_done_with_save, this]() mutable -> bool {
+		ImGui::Text("Editor is open, continue without saving?");
 
-			if (ImGui::Button("Continue")) {
-				callback();
-				return true;
-			}
-			if (ImGui::Button("Save and continue")) {
-				try_save([&is_done_with_save]()mutable {
-					is_done_with_save = true;
-					});
-				return false;
-			}
-			if (ImGui::Button("Cancel")) {
-
-				return true;
-			}
-			if (is_done_with_save) {
-				callback();
-				return true;
-			}
-
+		if (ImGui::Button("Continue")) {
+			callback();
+			return true;
+		}
+		if (ImGui::Button("Save and continue")) {
+			try_save([&is_done_with_save]() mutable { is_done_with_save = true; });
 			return false;
 		}
-	);
+		if (ImGui::Button("Cancel")) {
+
+			return true;
+		}
+		if (is_done_with_save) {
+			callback();
+			return true;
+		}
+
+		return false;
+	});
 }
 #if 0
 
@@ -119,15 +107,14 @@ void IEditorTool::close()
 }
 #endif
 
-bool IEditorTool::save()
-{
+bool IEditorTool::save() {
 
 	return save_document_internal();
 }
 
-template<typename FUNCTOR>
-static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path_prefix, const bool is_save_dialog, IEditorTool* tool)
-{
+template <typename FUNCTOR>
+static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path_prefix, const bool is_save_dialog,
+									 IEditorTool* tool) {
 	static bool alread_exists = false;
 	static bool cant_open_path = false;
 	static char buffer[256];
@@ -149,7 +136,7 @@ static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path
 
 	if (returned_true) {
 		const char* full_path = string_format("%s/%s.%s", path_prefix.c_str(), buffer, tool->get_save_file_extension());
-		bool file_already_exists = FileSys::does_file_exist(buffer,FileSys::GAME_DIR);
+		bool file_already_exists = FileSys::does_file_exist(buffer, FileSys::GAME_DIR);
 		cant_open_path = false;
 		alread_exists = false;
 
@@ -165,14 +152,12 @@ static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path
 			if (!alread_exists && !cant_open_path) {
 				write_out = true;
 			}
-		}
-		else {
+		} else {
 
 			if (file_already_exists)
 				write_out = true;
 			else
 				cant_open_path = true;
-
 		}
 	}
 	if (alread_exists) {
@@ -187,13 +172,11 @@ static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path
 			if (ImGui::Button("No")) {
 				alread_exists = false;
 			}
-		}
-		else {
+		} else {
 			// open file dialog
 			write_out = true;
 		}
-	}
-	else if (cant_open_path) {
+	} else if (cant_open_path) {
 		ImGui::Text("Cant open path\n");
 	}
 	ImGui::Separator();
@@ -203,16 +186,16 @@ static void open_or_save_file_dialog(FUNCTOR&& callback, const std::string& path
 	}
 
 	if (write_out) {
-init = true;
-ImGui::CloseCurrentPopup();
-callback(buffer);
+		init = true;
+		ImGui::CloseCurrentPopup();
+		callback(buffer);
 	}
 
 	ImGui::EndPopup();
 }
 
-static void draw_popups_for_editor(bool& open_open_popup, bool& open_save_popup, std::string& name, IEditorTool* tool, const std::string& prefix)
-{
+static void draw_popups_for_editor(bool& open_open_popup, bool& open_save_popup, std::string& name, IEditorTool* tool,
+								   const std::string& prefix) {
 	if (open_open_popup) {
 		ImGui::OpenPopup("Open file dialog");
 		open_open_popup = false;
@@ -224,41 +207,40 @@ static void draw_popups_for_editor(bool& open_open_popup, bool& open_save_popup,
 
 	if (ImGui::BeginPopupModal("Save file dialog")) {
 		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Will be saved under %s", prefix.c_str());
-		open_or_save_file_dialog([&](const char* buf) {
-			name = buf + std::string(".") + tool->get_save_file_extension();
-			tool->save();
-			}, prefix.c_str(), true, tool);
+		open_or_save_file_dialog(
+			[&](const char* buf) {
+				name = buf + std::string(".") + tool->get_save_file_extension();
+				tool->save();
+			},
+			prefix.c_str(), true, tool);
 	}
 
 	if (ImGui::BeginPopupModal("Open file dialog")) {
 		assert(0);
-		//ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Searched for in %s", prefix.c_str());
-		//open_or_save_file_dialog([&](const char* buf) {
+		// ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1), "Searched for in %s", prefix.c_str());
+		// open_or_save_file_dialog([&](const char* buf) {
 		//	tool->open( (buf +std::string( "." ) + tool->get_save_file_extension()).c_str() );
 		//	}, prefix.c_str(), false, tool);
 	}
 }
 
-
-void IEditorTool::draw_imgui_public()
-{
+void IEditorTool::draw_imgui_public() {
 	imgui_draw();
 }
 #include "Game/LevelAssets.h"
-void IEditorTool::draw_menu_bar()
-{
-	if (ImGui::BeginMenuBar())
-	{
-		if (ImGui::BeginMenu("File"))
-		{
+void IEditorTool::draw_menu_bar() {
+	if (ImGui::BeginMenuBar()) {
+		if (ImGui::BeginMenu("File")) {
 			if (ImGui::MenuItem("Save", "Ctrl+S")) {
 				save();
 			}
-			//if (ImGui::MenuItem("New map")) {
-			//	Cmd_Manager::inst->append_cmd(std::make_unique<OpenEditorToolCommand>(SceneAsset::StaticType, std::nullopt, true));
+			// if (ImGui::MenuItem("New map")) {
+			//	Cmd_Manager::inst->append_cmd(std::make_unique<OpenEditorToolCommand>(SceneAsset::StaticType,
+			//std::nullopt, true));
 			//}
-			//if (ImGui::MenuItem("New prefab")) {
-			//	Cmd_Manager::inst->append_cmd(std::make_unique<OpenEditorToolCommand>(PrefabAsset::StaticType, std::nullopt, true));
+			// if (ImGui::MenuItem("New prefab")) {
+			//	Cmd_Manager::inst->append_cmd(std::make_unique<OpenEditorToolCommand>(PrefabAsset::StaticType,
+			//std::nullopt, true));
 			//}
 
 			hook_menu_bar_file_menu();

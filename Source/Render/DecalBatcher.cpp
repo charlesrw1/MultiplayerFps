@@ -48,8 +48,7 @@ void DecalBatcher::build_batches() {
 		if (a.program != b.program)
 			return a.program < b.program;
 		return a.texture_set < b.texture_set;
-		});
-
+	});
 
 	auto make_indirection_data = [&]() {
 		std::span<int> indirection_data = arena.alloc_bottom_span<int>(actual_count);
@@ -59,7 +58,8 @@ void DecalBatcher::build_batches() {
 		for (int i = 0; i < decal_objs.size(); i++) {
 			DecalObj* self = &decal_objs[i];
 			indirection_data[i] = self->orig_index;
-			if (!current_batching || current_batching->program != self->program || current_batching->texture_set != self->texture_set) {
+			if (!current_batching || current_batching->program != self->program ||
+				current_batching->texture_set != self->texture_set) {
 				if (cur_draw.count != 0) {
 					draws.push_back(cur_draw);
 					cur_draw = DecalDraw();
@@ -68,8 +68,7 @@ void DecalBatcher::build_batches() {
 				cur_draw.the_program_to_use = self->program;
 				cur_draw.shared_pipeline_material = self->the_material;
 				current_batching = self;
-			}
-			else {
+			} else {
 				cur_draw.count += 1;
 			}
 		}
@@ -80,7 +79,6 @@ void DecalBatcher::build_batches() {
 		indirection_buffer->upload(indirection_data.data(), indirection_data.size_bytes());
 	};
 	make_indirection_data();
-
 
 	// multidraw buffer
 	auto make_multidraw_buffer = [&]() {
@@ -107,29 +105,26 @@ void DecalBatcher::build_batches() {
 void DecalBatcher::draw_decals() {
 	GPUFUNCTIONSTART;
 
-
 	if (!r_drawdecals.get_bool())
 		return;
-	//RenderPassSetup setup("decalgbuffer",fbo.gbuffer,false,false,0,0, view_to_use.width, view_to_use.height);
-	//auto scope = device.start_render_pass(setup);
+	// RenderPassSetup setup("decalgbuffer",fbo.gbuffer,false,false,0,0, view_to_use.width, view_to_use.height);
+	// auto scope = device.start_render_pass(setup);
 
 	RenderPassState setup2;
 	auto color_targets = {
-		ColorTargetInfo(draw.tex.scene_gbuffer0),
-		ColorTargetInfo(draw.tex.scene_gbuffer1),
-		ColorTargetInfo(draw.tex.scene_gbuffer2),
-		ColorTargetInfo(draw.tex.scene_color),
-		ColorTargetInfo(draw.tex.editor_id_buffer),
-		ColorTargetInfo(draw.tex.scene_motion),
+		ColorTargetInfo(draw.tex.scene_gbuffer0),	ColorTargetInfo(draw.tex.scene_gbuffer1),
+		ColorTargetInfo(draw.tex.scene_gbuffer2),	ColorTargetInfo(draw.tex.scene_color),
+		ColorTargetInfo(draw.tex.editor_id_buffer), ColorTargetInfo(draw.tex.scene_motion),
 	};
 	setup2.color_infos = color_targets;
 	setup2.depth_info = draw.tex.scene_depth;
 	IGraphicsDevice::inst->set_render_pass(setup2);
 
 	const int ROUGH_METAL_TEX_INDEX = 2;
-	glColorMaski(ROUGH_METAL_TEX_INDEX, GL_TRUE, GL_TRUE, GL_FALSE, GL_FALSE);	// disable writes to mat id
+	glColorMaski(ROUGH_METAL_TEX_INDEX, GL_TRUE, GL_TRUE, GL_FALSE, GL_FALSE); // disable writes to mat id
 
-	draw.bind_texture_ptr(20/* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/, draw.tex.scene_depth);
+	draw.bind_texture_ptr(20 /* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/,
+						  draw.tex.scene_depth);
 
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, draw.buf.decal_uniforms->get_internal_handle());
 	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, indirection_buffer->get_internal_handle());
@@ -157,18 +152,12 @@ void DecalBatcher::draw_decals() {
 		draw.shader().set_uint("decal_indirect_offset", cur_offset);
 
 		const int dei_size = sizeof(gpu::DrawElementsIndirectCommand);
-		glMultiDrawElementsIndirect(
-			GL_TRIANGLES,
-			index_type,
-			(void*)int64_t(cur_offset * dei_size),
-			ddraw.count,
-			dei_size
-		);
+		glMultiDrawElementsIndirect(GL_TRIANGLES, index_type, (void*)int64_t(cur_offset * dei_size), ddraw.count,
+									dei_size);
 
 		cur_offset += ddraw.count;
 	}
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
-
 
 	glColorMaski(ROUGH_METAL_TEX_INDEX, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 }

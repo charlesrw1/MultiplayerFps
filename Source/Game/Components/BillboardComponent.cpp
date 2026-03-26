@@ -16,8 +16,8 @@ BillboardComponent::BillboardComponent() {
 	set_call_init_in_editor(true);
 }
 BillboardComponent::~BillboardComponent() {
-	
-	//assert(dynamicMaterial == nullptr);
+
+	// assert(dynamicMaterial == nullptr);
 	assert(!handle.is_valid());
 }
 
@@ -25,8 +25,8 @@ void BillboardComponent::start() {
 
 	dynamic_mat = BillboardMaterialCache::get().find(texture.get());
 
-	//dynamicMaterial = imaterials->create_dynmaic_material(imaterials->get_default_billboard());
-	//dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
+	// dynamicMaterial = imaterials->create_dynmaic_material(imaterials->get_default_billboard());
+	// dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
 
 	sync_render_data();
 }
@@ -39,7 +39,7 @@ void BillboardComponent::on_changed_transform() {
 #ifdef EDITOR_BUILD
 void BillboardComponent::editor_on_change_property() {
 
-	//dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
+	// dynamicMaterial->set_tex_parameter(NAME("Sprite"), texture.get());
 	dynamic_mat = BillboardMaterialCache::get().find(texture.get());
 	sync_render_data();
 }
@@ -54,14 +54,13 @@ void BillboardComponent::set_texture(const Texture* tex) {
 	sync_render_data();
 }
 
-void BillboardComponent::on_sync_render_data()
-{
+void BillboardComponent::on_sync_render_data() {
 	if (!handle.is_valid())
 		handle = idraw->get_scene()->register_obj();
 
 	Render_Object obj;
 	obj.visible = visible;
-#ifdef  EDITOR_BUILD
+#ifdef EDITOR_BUILD
 	obj.visible &= !get_owner()->get_hidden_in_editor();
 	obj.outline = get_owner()->get_is_any_selected_in_editor();
 #endif //  EDITOR_BUILD
@@ -76,15 +75,14 @@ void BillboardComponent::on_sync_render_data()
 	idraw->get_scene()->update_obj(handle, obj);
 }
 #include "Framework/MapUtil.h"
-MaterialInstance* BillboardMaterialCache::find(Texture* t)
-{
+MaterialInstance* BillboardMaterialCache::find(Texture* t) {
 	if (!t)
 		return nullptr;
 	if (MapUtil::contains(texture_to_mat, t))
 		return texture_to_mat[t];
 
 	auto dynamicMaterial = imaterials->create_dynmaic_material(imaterials->get_default_billboard());
-	dynamicMaterial->set_tex_parameter(NAME("Sprite"),t);
+	dynamicMaterial->set_tex_parameter(NAME("Sprite"), t);
 	auto released_ptr = dynamicMaterial.release(); // hack fixme
 	texture_to_mat[t] = released_ptr;
 	return released_ptr;

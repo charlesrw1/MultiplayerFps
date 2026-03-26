@@ -16,14 +16,13 @@
 #include "Render/MaterialPublic.h"
 #include "AnimationTreeLocal.h"
 
-void post_load_map_callback_generic(bool make_plane)
-{
+void post_load_map_callback_generic(bool make_plane) {
 	auto dome = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
 	dome->set_model(g_assets.find_sync<Model>("eng/skydome.cmdl").get());
 	dome->get_owner()->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
-	dome->set_is_skybox(true);	// FIXME
+	dome->set_is_skybox(true); // FIXME
 	dome->set_casts_shadows(false);
-	//dome->Mesh->set_material_override(g_assets.find_sync<MaterialInstance>(ed_default_sky_material.get_string()).get());
+	// dome->Mesh->set_material_override(g_assets.find_sync<MaterialInstance>(ed_default_sky_material.get_string()).get());
 
 	if (make_plane) {
 		auto plane = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
@@ -39,8 +38,7 @@ void post_load_map_callback_generic(bool make_plane)
 	sun->max_shadow_dist = 40.0;
 	sun->get_owner()->set_ls_euler_rotation(glm::vec3(-glm::radians(45.f), glm::radians(15.f), 0.f));
 	auto skylight = eng->get_level()->spawn_entity()->create_component<SkylightComponent>();
-
 }
 
 Pool_Allocator<Pose> g_pose_pool = Pool_Allocator<Pose>(100, "g_pose_pool");
-Pool_Allocator<MatrixPose> g_matrix_pool = Pool_Allocator<MatrixPose>(10,"g_matrix_pool");
+Pool_Allocator<MatrixPose> g_matrix_pool = Pool_Allocator<MatrixPose>(10, "g_matrix_pool");

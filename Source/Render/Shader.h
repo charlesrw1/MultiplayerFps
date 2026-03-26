@@ -15,40 +15,21 @@ class Shader
 public:
 	unsigned int ID = 0;
 
-	static ShaderResult compile(
-		Shader* shader,
-		const std::string& vertpath,
-		const std::string& frag,
-		std::string shader_defines = {}
-	);
-	static ShaderResult compute_compile(
-		Shader* shader,
-		const std::string& path,
-		std::string shader_defines = {}
-	);
+	static ShaderResult compile(Shader* shader, const std::string& vertpath, const std::string& frag,
+								std::string shader_defines = {});
+	static ShaderResult compute_compile(Shader* shader, const std::string& path, std::string shader_defines = {});
 
-	static bool compile(
-		Shader& shader,
-		const std::string& vertpath,
-		const std::string& fragpath,
-		const std::string& geopath,
+	static bool compile(Shader& shader, const std::string& vertpath, const std::string& fragpath,
+						const std::string& geopath,
 
-		std::string shader_defines = {}
-	);
+						std::string shader_defines = {});
 
 	// use ifdefs for vertex/fragment
-	static ShaderResult compile_vert_frag_single_file(
-		Shader* shader,
-		const std::string& path,
-		std::string shader_defines = {}
-	);
+	static ShaderResult compile_vert_frag_single_file(Shader* shader, const std::string& path,
+													  std::string shader_defines = {});
 	// this is getting out of hand...
-	static ShaderResult compile_vert_frag_tess_single_file(
-		Shader* shader,
-		const std::string& path,
-		std::string shader_defines = {}
-	);
-
+	static ShaderResult compile_vert_frag_tess_single_file(Shader* shader, const std::string& path,
+														   std::string shader_defines = {});
 
 	void use();
 
@@ -62,7 +43,6 @@ public:
 	void set_vec2(const char* name, glm::vec2 value);
 	void set_ivec2(const char* name, glm::ivec2 value);
 	void set_ivec3(const char* name, glm::ivec3 value);
-
 
 	void set_block_binding(const char* name, int binding);
 };

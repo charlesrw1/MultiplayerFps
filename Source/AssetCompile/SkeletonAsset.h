@@ -8,23 +8,27 @@
 #include "Framework/StructReflection.h"
 
 using std::string;
-struct BoneMirror {
+struct BoneMirror
+{
 	STRUCT_BODY();
 	REF string boneA;
 	REF string boneB;
 };
 
-class SkeletonMirror : public ClassBase {
+class SkeletonMirror : public ClassBase
+{
 public:
 	CLASS_BODY(SkeletonMirror);
 	REF std::vector<BoneMirror> mirrors;
 };
-struct BoneMaskValue {
+struct BoneMaskValue
+{
 	STRUCT_BODY();
 	REF string bone;
 	REF float weight = 1.0;
 };
-class SkeletonMask : public ClassBase {
+class SkeletonMask : public ClassBase
+{
 public:
 	CLASS_BODY(SkeletonMask);
 	REF std::vector<BoneMaskValue> masks;

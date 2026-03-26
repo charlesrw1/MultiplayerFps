@@ -28,37 +28,26 @@
 
 #include "Render/MaterialPublic.h"
 
-
-
 #include <unordered_set>
-#include "AssetCompile/Someutils.h"// string stuff
+#include "AssetCompile/Someutils.h" // string stuff
 #include "Assets/AssetRegistry.h"
 
 #include "Assets/AssetDatabase.h"
 
 ModelMan g_modelMgr;
 
-
 #ifdef EDITOR_BUILD
-//extern IEditorTool* g_model_editor;	// defined in AssetCompile/ModelAssetEditorLocal.h
+// extern IEditorTool* g_model_editor;	// defined in AssetCompile/ModelAssetEditorLocal.h
 class ModelAssetMetadata : public AssetMetadata
 {
 public:
-	ModelAssetMetadata() {
-		extensions.push_back("cmdl");
-	}
+	ModelAssetMetadata() { extensions.push_back("cmdl"); }
 	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() const  override
-	{
-		return Color32(20, 125, 245);
-	}
+	virtual Color32 get_browser_color() const override { return Color32(20, 125, 245); }
 
-	virtual std::string get_type_name() const  override
-	{
-		return "Model";
-	}
+	virtual std::string get_type_name() const override { return "Model"; }
 
-	//virtual IEditorTool* tool_to_edit_me() const override { return g_model_editor; }
+	// virtual IEditorTool* tool_to_edit_me() const override { return g_model_editor; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Model::StaticType; }
 };
@@ -71,8 +60,7 @@ Model::~Model() {
 		printf("");
 	}
 }
-Model* Model::load(std::string path)
-{
+Model* Model::load(std::string path) {
 	return g_assets.find_sync<Model>(path).get();
 }
 Model::Model() {}
@@ -82,9 +70,8 @@ static const int MODEL_FORMAT_VERSION = 18;
 static const int STATIC_VERTEX_SIZE = 4'000'000;
 static const int STATIC_INDEX_SIZE = 6'000'000;
 #include "IGraphsDevice.h"
-void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
-{
-	
+void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts) {
+
 	vbuffer.alloc.init_clear(sizeof(ModelVertex) * STATIC_VERTEX_SIZE);
 
 	CreateBufferArgs args;
@@ -92,42 +79,30 @@ void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts)
 	args.size = sizeof(ModelVertex) * STATIC_VERTEX_SIZE;
 	vbuffer.ptr = IGraphicsDevice::inst->create_buffer(args);
 
-	
-
 	const int index_size = MODEL_BUFFER_INDEX_TYPE_SIZE;
 	ibuffer.alloc.init_clear(index_size * STATIC_INDEX_SIZE);
-
 
 	args.flags = BUFFER_USE_AS_IB;
 	args.size = index_size * STATIC_INDEX_SIZE;
 	ibuffer.ptr = IGraphicsDevice::inst->create_buffer(args);
-
-
-
 }
 
-bool Model::has_lightmap_coords() const
-{
+bool Model::has_lightmap_coords() const {
 	return isLightmapped != Model::LightmapType::None;
 }
 
-bool Model::has_bones() const
-{
-	return skel!=nullptr;
+bool Model::has_bones() const {
+	return skel != nullptr;
 }
 
-
-
-int Model::bone_for_name(StringName name) const
-{
+int Model::bone_for_name(StringName name) const {
 	if (!get_skel())
 		return -1;
 	return get_skel()->get_bone_index(name);
 }
 
 // FIXME broke
-void ModelMan::compact_memory()
-{
+void ModelMan::compact_memory() {
 #if 0
 	sys_print(Debug, "ModelMan::compact_memory\n");
 	std::vector<Model*> models;
@@ -203,13 +178,12 @@ void write_model_import_settings(ModelImportSettings* mis, const std::string& sa
 
 		string out = "!json\n" + writer.get_output().dump(1);
 		fileptr->write(out.data(), out.size());
-	}
-	else {
-		sys_print(Error, "new_import_settings_to_modeldef_dataL Couldnt open file to write out new version of mis %s\n", savepath.c_str());
+	} else {
+		sys_print(Error, "new_import_settings_to_modeldef_dataL Couldnt open file to write out new version of mis %s\n",
+				  savepath.c_str());
 	}
 }
-void IMPORT_MODEL_FUNC(const Cmd_Args& args)
-{
+void IMPORT_MODEL_FUNC(const Cmd_Args& args) {
 	if (args.size() != 2) {
 		sys_print(Error, "usage: IMPORT_MODEL <.glb path>");
 		return;
@@ -219,11 +193,10 @@ void IMPORT_MODEL_FUNC(const Cmd_Args& args)
 	ModelImportSettings mis;
 	mis.srcGlbFile = args.at(1);
 	write_model_import_settings(&mis, savepath);
-	
+
 	ModelCompilier::compile(savepath.c_str(), AssetDatabase::loader);
 }
-void import_model_lightmapped(const Cmd_Args& args)
-{
+void import_model_lightmapped(const Cmd_Args& args) {
 	if (args.size() != 4) {
 		sys_print(Error, "usage: import_model_lightmapped <.glb path> <lm x> <lm y>");
 		return;
@@ -243,13 +216,11 @@ void import_model_lightmapped(const Cmd_Args& args)
 	}
 }
 
-
 #endif
 #include "Framework/StringUtils.h"
 void export_one_model(const Model& model, const char* export_path);
 
-void ModelMan::add_commands(ConsoleCmdGroup& group)
-{
+void ModelMan::add_commands(ConsoleCmdGroup& group) {
 	group.add("compact_vertex_buffer", [this](const Cmd_Args&) { compact_memory(); });
 	group.add("print_vertex_usage", [this](const Cmd_Args&) { print_usage(); });
 
@@ -257,7 +228,7 @@ void ModelMan::add_commands(ConsoleCmdGroup& group)
 	group.add("IMPORT_MODEL", IMPORT_MODEL_FUNC);
 	group.add("import_model_lightmapped", import_model_lightmapped);
 
-	group.add("export_model", [](const Cmd_Args & args) {
+	group.add("export_model", [](const Cmd_Args& args) {
 		if (args.size() != 2) {
 			sys_print(Error, "usage: export_model <model>\n");
 			return;
@@ -267,7 +238,7 @@ void ModelMan::add_commands(ConsoleCmdGroup& group)
 			sys_print(Error, "model doesn't exist\n");
 			return;
 		}
-		auto outPath = StringUtils::alphanumeric_hash(args.at(1))+".glb";
+		auto outPath = StringUtils::alphanumeric_hash(args.at(1)) + ".glb";
 		sys_print(Info, "writing out to %s\n", outPath.c_str());
 		export_one_model(*mod, outPath.c_str());
 	});
@@ -289,10 +260,10 @@ void ModelMan::add_commands(ConsoleCmdGroup& group)
 		auto& bones = skel->get_all_bones();
 		sys_print(Info, "numBones=%d\n", int(bones.size()));
 		for (int i = 0; i < bones.size(); i++) {
-			sys_print(Info, "%s = %d (parent=%d)(rt=%d)\n", bones[i].strname.c_str(), i, int(bones[i].parent),int(bones[i].retarget_type));
+			sys_print(Info, "%s = %d (parent=%d)(rt=%d)\n", bones[i].strname.c_str(), i, int(bones[i].parent),
+					  int(bones[i].retarget_type));
 		}
-
-		});
+	});
 	group.add("print_anims", [](const Cmd_Args& args) {
 		if (args.size() != 2) {
 			sys_print(Error, "usage: print_bones <model>\n");
@@ -310,10 +281,11 @@ void ModelMan::add_commands(ConsoleCmdGroup& group)
 		auto skel = mod->get_skel();
 		auto& clips = skel->get_all_clips();
 		sys_print(Info, "numClips=%d\n", int(clips.size()));
-		for (auto&[name,seq] : clips) {
-			sys_print(Info, "%s (duration=%f) (additive=%d)\n", name.c_str(),seq.ptr->duration, int(seq.ptr->is_additive_clip));
+		for (auto& [name, seq] : clips) {
+			sys_print(Info, "%s (duration=%f) (additive=%d)\n", name.c_str(), seq.ptr->duration,
+					  int(seq.ptr->is_additive_clip));
 		}
-		});
+	});
 	group.add("model_info", [](const Cmd_Args& args) {
 		if (args.size() != 2) {
 			sys_print(Error, "usage: model_info <model>\n");
@@ -334,16 +306,15 @@ void ModelMan::add_commands(ConsoleCmdGroup& group)
 		for (int i = 0; i < mod->get_num_materials(); i++) {
 			auto mat = mod->get_material(i);
 			if (mat) {
-				sys_print(Info, "\t%s\n",mat->get_name().c_str());
-			}
-			else {
+				sys_print(Info, "\t%s\n", mat->get_name().c_str());
+			} else {
 				sys_print(Info, "\t<null>\n");
 			}
 		}
 		sys_print(Info, "]\n");
 		sys_print(Info, "isLightmapped = %d\n", int(mod->get_lightmap_type()));
 		sys_print(Info, "lightmapSize = %d %d\n", mod->get_lightmap_size().x, mod->get_lightmap_size().y);
-		sys_print(Info, "hasCollision = %d\n", int(mod->get_physics_body()!=nullptr));
+		sys_print(Info, "hasCollision = %d\n", int(mod->get_physics_body() != nullptr));
 		sys_print(Info, "numLods(%d) = [\n", mod->get_num_lods());
 		for (int i = 0; i < mod->get_num_lods(); i++) {
 			auto& lod = mod->get_lod(i);
@@ -353,37 +324,35 @@ void ModelMan::add_commands(ConsoleCmdGroup& group)
 				totalV += mod->get_part(p + lod.part_ofs).vertex_count;
 				totalI += mod->get_part(p + lod.part_ofs).element_count / MODEL_BUFFER_INDEX_TYPE_SIZE;
 			}
-			sys_print(Info, "\t[%d] verts=%d indicies=%d parts=%d fade=%f\n", i, totalV, totalI, lod.part_count, lod.end_percentage);
+			sys_print(Info, "\t[%d] verts=%d indicies=%d parts=%d fade=%f\n", i, totalV, totalI, lod.part_count,
+					  lod.end_percentage);
 		}
 		sys_print(Info, "]\n");
-		});
+	});
 
 #endif
 }
 
-void MainVbIbAllocator::print_usage() const
-{
+void MainVbIbAllocator::print_usage() const {
 	auto print_facts = [](const char* name, const buffer& b, int element_size) {
-		//float used_percentage = 1.0;
-		//if (b.allocated > 0)
+		// float used_percentage = 1.0;
+		// if (b.allocated > 0)
 		//	used_percentage = (double)b.used_total / (double)b.allocated;
-		//used_percentage *= 100.0;
+		// used_percentage *= 100.0;
 		//
-		//int used_elements = b.used_total / element_size;
-		//int allocated_elements = b.allocated / element_size;
-		//sys_print(Info, "	%s: %d/%d (%.1f%%) (bytes:%d) (%d:%d)\n", name, used_elements, allocated_elements, used_percentage, b.used_total, b.tail, b.head);
-
+		// int used_elements = b.used_total / element_size;
+		// int allocated_elements = b.allocated / element_size;
+		// sys_print(Info, "	%s: %d/%d (%.1f%%) (bytes:%d) (%d:%d)\n", name, used_elements, allocated_elements,
+		// used_percentage, b.used_total, b.tail, b.head);
 	};
 	sys_print(Info, "MainVbIbAllocator::print_usage\n");
 
 	print_facts("IndexBuffer", ibuffer, MODEL_BUFFER_INDEX_TYPE_SIZE);
 	print_facts("VertexBuffer", vbuffer, sizeof(ModelVertex));
 }
-void ModelMan::print_usage() const
-{
+void ModelMan::print_usage() const {
 	allocator.print_usage();
 }
-
 
 gpuAllocSpan MainVbIbAllocator::append_to_v_buffer(const uint8_t* data, size_t size) {
 	return append_buf_shared(data, size, "Vertex", vbuffer, GL_ARRAY_BUFFER);
@@ -392,11 +361,10 @@ gpuAllocSpan MainVbIbAllocator::append_to_i_buffer(const uint8_t* data, size_t s
 	return append_buf_shared(data, size, "Index", ibuffer, GL_ELEMENT_ARRAY_BUFFER);
 }
 
-
-gpuAllocSpan MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target)
-{
+gpuAllocSpan MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf,
+												  uint32_t target) {
 	auto out_of_memory = [&]() {
-		//sys_print(Error, "%s buffer overflow %d/%d !!!\n", name, int(size + buf.used_total), int(buf.allocated));
+		// sys_print(Error, "%s buffer overflow %d/%d !!!\n", name, int(size + buf.used_total), int(buf.allocated));
 		std::fflush(stdout);
 		std::abort();
 	};
@@ -408,7 +376,7 @@ gpuAllocSpan MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t si
 		align_size = sizeof(ModelVertex);
 
 	const gpuAllocSpan my_ptr = buf.alloc.allocate(size, align_size);
-	if (my_ptr.size == 0)// fixme
+	if (my_ptr.size == 0) // fixme
 		out_of_memory();
 
 	buf.ptr->sub_upload(data, size, my_ptr.aligned_start);
@@ -416,9 +384,7 @@ gpuAllocSpan MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t si
 	return my_ptr;
 }
 
-
-glm::vec4 bounds_to_sphere(Bounds b)
-{
+glm::vec4 bounds_to_sphere(Bounds b) {
 	glm::vec3 center = b.get_center();
 	glm::vec3 mindiff = center - b.bmin;
 	glm::vec3 maxdiff = b.bmax - center;
@@ -426,26 +392,24 @@ glm::vec4 bounds_to_sphere(Bounds b)
 	return glm::vec4(center, radius);
 }
 
-
 extern ConfigVar developer_mode;
 
-void Model::uninstall()
-{
+void Model::uninstall() {
 	lods.resize(0);
 	parts.clear();
 
-	data = RawMeshData();	// so destructor gets called and memory is freed
-	//skel.reset(nullptr);	// dont uninstall because of pointers...
+	data = RawMeshData(); // so destructor gets called and memory is freed
+	// skel.reset(nullptr);	// dont uninstall because of pointers...
 	if (skel) {
 		skel->uninstall();
 	}
 	collision.reset();
 	tags.clear();
-	//for (auto mat : materials) {
+	// for (auto mat : materials) {
 	//	mat->dec_ref_count_and_uninstall_if_zero();
 	//}
 	materials.clear();
-	
+
 	// DONT reset the UID
 	// dont do this 'uid = 0'
 
@@ -454,28 +418,22 @@ void Model::uninstall()
 	set_is_loaded(false);
 }
 
-
 void Model::post_load() {
 	ASSERT(get_is_loaded());
 	if (did_load_fail()) {
 		return;
 	}
-//	ASSERT(uid == 0);
+	//	ASSERT(uid == 0);
 	g_modelMgr.upload_model(this);
 	Model::on_model_loaded.invoke(this);
 }
 
 MulticastDelegate<Model*> Model::on_model_loaded;
 
-
 #include "AssetCompile/ModelCompilierLocal.h"
 
-
-
-
-PhysicsMaterialWrapper* Model::get_physics_material_to_use() const
-{
-	if (physics_material) 
+PhysicsMaterialWrapper* Model::get_physics_material_to_use() const {
+	if (physics_material)
 		return physics_material;
 	if (get_num_materials() > 0) {
 		// can return null here
@@ -485,8 +443,7 @@ PhysicsMaterialWrapper* Model::get_physics_material_to_use() const
 }
 
 // Format definied in ModelCompilier.cpp
-bool Model::load_internal(IAssetLoadingInterface* loading)
-{
+bool Model::load_internal(IAssetLoadingInterface* loading) {
 	auto file = FileSys::open_read_game(get_name().c_str());
 	if (!file) {
 		sys_print(Error, "model %s does not exist\n", get_name().c_str());
@@ -510,7 +467,6 @@ bool Model::load_internal(IAssetLoadingInterface* loading)
 	isLightmapped = (Model::LightmapType)isLightmappedByte;
 	lightmapX = (int16_t)read.read_int32();
 	lightmapY = (int16_t)read.read_int32();
-
 
 	read.read_struct(&skeleton_root_transform);
 
@@ -541,15 +497,15 @@ bool Model::load_internal(IAssetLoadingInterface* loading)
 	for (int i = 0; i < num_materials; i++) {
 		read.read_string(buffer);
 
-		//materials.push_back(imaterials->find_material_instance(buffer.c_str()));
-		materials[i] = g_assets.find_sync_sptr<MaterialInstance>(buffer);// loading->load_asset(&MaterialInstance::StaticType, buffer);
+		// materials.push_back(imaterials->find_material_instance(buffer.c_str()));
+		materials[i] = g_assets.find_sync_sptr<MaterialInstance>(
+			buffer); // loading->load_asset(&MaterialInstance::StaticType, buffer);
 
 		if (!materials[i]->is_valid_to_use()) {
 			sys_print(Error, "model doesn't have material %s\n", buffer.c_str());
 			materials.back() = imaterials->get_fallback_sptr();
 		}
 	}
-
 
 	int num_locators = read.read_int32();
 	tags.reserve(num_locators);
@@ -561,24 +517,16 @@ bool Model::load_internal(IAssetLoadingInterface* loading)
 		tags.push_back(tag);
 	}
 
-
 	int num_indicies = read.read_int32();
 	data.indicies.resize(num_indicies);
-	read.read_bytes_ptr(
-		data.indicies.data(),
-		num_indicies * MODEL_BUFFER_INDEX_TYPE_SIZE
-	);
+	read.read_bytes_ptr(data.indicies.data(), num_indicies * MODEL_BUFFER_INDEX_TYPE_SIZE);
 
 	int num_verticies = read.read_int32();
 	data.verts.resize(num_verticies);
-	read.read_bytes_ptr(
-		data.verts.data(),
-		num_verticies * sizeof(ModelVertex)
-	);
+	read.read_bytes_ptr(data.verts.data(), num_verticies * sizeof(ModelVertex));
 
 	DEBUG_MARKER = read.read_int32();
 	assert(DEBUG_MARKER == 'HELP');
-
 
 	bool has_physics = read.read_byte();
 	if (has_physics) {
@@ -592,7 +540,6 @@ bool Model::load_internal(IAssetLoadingInterface* loading)
 			assert(DEBUG_MARKER == 'HELP');
 		}
 	}
-
 
 	DEBUG_MARKER = read.read_int32();
 	assert(DEBUG_MARKER == 'HELP');
@@ -635,10 +582,10 @@ bool Model::load_internal(IAssetLoadingInterface* loading)
 			uint32_t packed_size = read.read_int32();
 			aseq->pose_data.resize(packed_size);
 			read.read_bytes_ptr(aseq->pose_data.data(), packed_size * sizeof(float));
-	
+
 			MSkeleton::refed_clip rc;
 			rc.ptr = aseq;
-			skel->clips.insert({ std::move(name),rc });
+			skel->clips.insert({std::move(name), rc});
 		}
 
 		int num_includes = read.read_int32();
@@ -669,11 +616,10 @@ bool Model::load_asset(IAssetLoadingInterface* loading) {
 		std::string model_def = strip_extension(path.c_str());
 		model_def += ".mis";
 
-		ModelCompilier::Ret ret = ModelCompilier::compile(model_def.c_str(),loading);
+		ModelCompilier::Ret ret = ModelCompilier::compile(model_def.c_str(), loading);
 		if (ret == ModelCompilier::CompileErr) {
 			sys_print(Error, "compilier failed on model %s\n", model_def.c_str());
-		}
-		else if (ret == ModelCompilier::CompileGood) {
+		} else if (ret == ModelCompilier::CompileGood) {
 			Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, string_format("model_info %s", path.c_str()));
 		}
 	}
@@ -685,17 +631,15 @@ bool Model::load_asset(IAssetLoadingInterface* loading) {
 	return false;
 }
 
-void Model::move_construct(IAsset* _src)
-{
+void Model::move_construct(IAsset* _src) {
 	const bool had_skel = skel != nullptr;
 	uninstall();
 
 	assert(!get_is_loaded());
-	
 
 	assert(had_skel == (skel != nullptr));
 	Model* src = (Model*)_src;
-	//ASSERT(this->uid == 0);
+	// ASSERT(this->uid == 0);
 	assert(src);
 
 	for (int i = 0; i < src->lods.size(); i++)
@@ -706,9 +650,10 @@ void Model::move_construct(IAsset* _src)
 	aabb = src->aabb;
 	bounding_sphere = src->bounding_sphere;
 	data = std::move(src->data);
-	
+
 	if (bool(skel) != bool(src->skel)) {
-		throw std::runtime_error("Model::move_construct: cant reaload a model to a skeletal model or vice versa. restart the game.\n");
+		throw std::runtime_error(
+			"Model::move_construct: cant reaload a model to a skeletal model or vice versa. restart the game.\n");
 	}
 	if (skel) {
 		assert(src->skel);
@@ -730,7 +675,6 @@ void Model::move_construct(IAsset* _src)
 	set_is_loaded(true);
 }
 
-
 #if 0
 bool ModelMan::append_to_buffer(Gpu_Buffer& buf,  char* input_data, uint32_t input_length)
 {
@@ -746,13 +690,9 @@ bool ModelMan::append_to_buffer(Gpu_Buffer& buf,  char* input_data, uint32_t inp
 }
 #endif
 
-void ModelMan::set_v_attributes()
-{
-	
-}
+void ModelMan::set_v_attributes() {}
 
-void ModelMan::init()
-{
+void ModelMan::init() {
 	allocator.init(STATIC_INDEX_SIZE, STATIC_VERTEX_SIZE);
 
 	{
@@ -764,12 +704,12 @@ void ModelMan::init()
 		args.vertex = allocator.vbuffer.ptr;
 		args.index_type = VertexInputIndexType::uint16;
 		auto animated_layout = {
-			VertexLayout(POSITION_LOC,3,gvat::float32,stride,offsetof(ModelVertex, pos)),
-			VertexLayout(UV_LOC,2,gvat::float32,stride,offsetof(ModelVertex, uv)),
-			VertexLayout(NORMAL_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, normal[0])),
-			VertexLayout(TANGENT_LOC,3,gvat::u16,stride,offsetof(ModelVertex, tangent[0])),
-			VertexLayout(JOINT_LOC,4,gvat::u8,stride,offsetof(ModelVertex, color[0])),
-			VertexLayout(WEIGHT_OR_COLOR_LOC,4,gvat::u8_normalized,stride,offsetof(ModelVertex, color2[0])),
+			VertexLayout(POSITION_LOC, 3, gvat::float32, stride, offsetof(ModelVertex, pos)),
+			VertexLayout(UV_LOC, 2, gvat::float32, stride, offsetof(ModelVertex, uv)),
+			VertexLayout(NORMAL_LOC, 3, gvat::i16_normalized, stride, offsetof(ModelVertex, normal[0])),
+			VertexLayout(TANGENT_LOC, 3, gvat::u16, stride, offsetof(ModelVertex, tangent[0])),
+			VertexLayout(JOINT_LOC, 4, gvat::u8, stride, offsetof(ModelVertex, color[0])),
+			VertexLayout(WEIGHT_OR_COLOR_LOC, 4, gvat::u8_normalized, stride, offsetof(ModelVertex, color2[0])),
 		};
 		args.layout = animated_layout;
 		animated_vertex_input = IGraphicsDevice::inst->create_vertex_input(args);
@@ -783,17 +723,16 @@ void ModelMan::init()
 		args.vertex = allocator.vbuffer.ptr;
 		args.index_type = VertexInputIndexType::uint16;
 		auto lightmapped_layout = {
-			VertexLayout(POSITION_LOC,3,gvat::float32,stride,offsetof(ModelVertex, pos)),
-			VertexLayout(UV_LOC,2,gvat::float32,stride,offsetof(ModelVertex, uv)),
-			VertexLayout(NORMAL_LOC,3,gvat::i16_normalized,stride,offsetof(ModelVertex, normal[0])),
-			VertexLayout(TANGENT_LOC,3,gvat::u16,stride,offsetof(ModelVertex, tangent[0])),
-			VertexLayout(LIGHTMAPCOORD_LOC,2,gvat::u16_normalized,stride,offsetof(ModelVertex, color[0])),
-			VertexLayout(WEIGHT_OR_COLOR_LOC,4,gvat::u8_normalized,stride,offsetof(ModelVertex, color2[0])),
+			VertexLayout(POSITION_LOC, 3, gvat::float32, stride, offsetof(ModelVertex, pos)),
+			VertexLayout(UV_LOC, 2, gvat::float32, stride, offsetof(ModelVertex, uv)),
+			VertexLayout(NORMAL_LOC, 3, gvat::i16_normalized, stride, offsetof(ModelVertex, normal[0])),
+			VertexLayout(TANGENT_LOC, 3, gvat::u16, stride, offsetof(ModelVertex, tangent[0])),
+			VertexLayout(LIGHTMAPCOORD_LOC, 2, gvat::u16_normalized, stride, offsetof(ModelVertex, color[0])),
+			VertexLayout(WEIGHT_OR_COLOR_LOC, 4, gvat::u8_normalized, stride, offsetof(ModelVertex, color2[0])),
 		};
 		args.layout = lightmapped_layout;
 		lightmapped_vertex_input = IGraphicsDevice::inst->create_vertex_input(args);
 	}
-
 
 	create_default_models();
 	auto& a = g_assets;
@@ -805,8 +744,7 @@ void ModelMan::init()
 		Fatalf("!!! ModelMan::init: couldn't load default LIGHT_x volumes (used for gbuffer lighting)\n");
 }
 
-void ModelMan::create_default_models()
-{
+void ModelMan::create_default_models() {
 	error_model = g_assets.find_global_sync<Model>("eng/question.cmdl").get();
 	if (!error_model)
 		Fatalf("couldnt load error model (question.cmdl)\n");
@@ -878,20 +816,19 @@ void ModelMan::create_default_models()
 #include "DrawLocal.h"
 // Uploads the models vertex and index data to the gpu
 // and sets the models ptrs/offsets into the global vertex buffer
-bool ModelMan::upload_model(Model* mesh)
-{
+bool ModelMan::upload_model(Model* mesh) {
 	ASSERT(mesh);
 	ASSERT(all_models.find(mesh) == nullptr);
 	all_models.insert(mesh);
 
-	if(mesh->uid==0)
+	if (mesh->uid == 0)
 		mesh->uid = cur_mesh_id++;
 	else {
 		sys_print(Debug, "model reloaded: %s\n", mesh->get_name().c_str());
-		BuildSceneData_CpuFast::inst->rebuild_models();	// force rebuild models...
+		BuildSceneData_CpuFast::inst->rebuild_models(); // force rebuild models...
 	}
 
-	//sys_print(Debug, "uploading mode: %s\n", mesh->get_name().c_str());
+	// sys_print(Debug, "uploading mode: %s\n", mesh->get_name().c_str());
 
 	if (mesh->parts.size() == 0) {
 		sys_print(Warning, "ModelMan::upload_model: model has not parts (%s)\n", mesh->get_name().c_str());
@@ -900,12 +837,13 @@ bool ModelMan::upload_model(Model* mesh)
 
 	size_t indiciesbufsize{};
 	const uint8_t* const ibufferdata = mesh->data.get_index_data(&indiciesbufsize);
-	mesh->index_alloc_ptr = allocator.append_to_i_buffer(ibufferdata, indiciesbufsize);	// dont divide by sizeof(uint16_2), this is an pointer
+	mesh->index_alloc_ptr = allocator.append_to_i_buffer(
+		ibufferdata, indiciesbufsize); // dont divide by sizeof(uint16_2), this is an pointer
 
 	size_t vertbufsize{};
 	const uint8_t* const v_bufferdata = mesh->data.get_vertex_data(&vertbufsize);
 	mesh->vertex_alloc_ptr = allocator.append_to_v_buffer(v_bufferdata, vertbufsize);
-	//mesh->merged_vert_offset /= sizeof(ModelVertex);
+	// mesh->merged_vert_offset /= sizeof(ModelVertex);
 
 	bool has_transparent = false;
 	for (int i = 0; i < mesh->parts.size(); i++) {
@@ -921,9 +859,7 @@ bool ModelMan::upload_model(Model* mesh)
 	return true;
 }
 
-
-void ModelMan::remove_model_from_list(Model* m)
-{
+void ModelMan::remove_model_from_list(Model* m) {
 	ASSERT(m);
 
 	allocator.ibuffer.alloc.free(m->index_alloc_ptr);
@@ -935,7 +871,4 @@ void ModelMan::remove_model_from_list(Model* m)
 	ASSERT(!all_models.find(m));
 }
 
-ModelMan::ModelMan() : all_models(6)
-{
-
-}
+ModelMan::ModelMan() : all_models(6) {}

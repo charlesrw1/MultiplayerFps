@@ -14,23 +14,21 @@
 ConfigVar g_project_base("g_project_base", "Data", CVAR_DEV, "what folder to search for assets in");
 static ConfigVar g_user_save_dir("g_user_save_dir", "User", CVAR_DEV, "what folder to save user config/settings to");
 
-static ConfigVar file_print_all_openfile_fails("file_print_all_openfile_fails", "0", CVAR_DEV | CVAR_BOOL, "prints an error log for all CreateFile errors");
+static ConfigVar file_print_all_openfile_fails("file_print_all_openfile_fails", "0", CVAR_DEV | CVAR_BOOL,
+											   "prints an error log for all CreateFile errors");
 
 class OSFile : public IFile
 {
 public:
-	virtual ~OSFile() {
-		OSFile::close();
-	}
+	virtual ~OSFile() { OSFile::close(); }
 
 	void init(const char* path) {
-		winhandle = CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+		winhandle =
+			CreateFileA(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 		if (winhandle != INVALID_HANDLE_VALUE) {
 			len = GetFileSize(winhandle, nullptr);
-		}
-		else if (file_print_all_openfile_fails.get_bool())
+		} else if (file_print_all_openfile_fails.get_bool())
 			sys_print(Error, "OSFile failed to open read: %s\n", path);
-
 	}
 	void init_write(const char* path) {
 		winhandle = CreateFileA(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -40,38 +38,25 @@ public:
 	}
 
 	// Inherited via IFile
-	virtual void close() final
-	{
+	virtual void close() final {
 		if (winhandle != INVALID_HANDLE_VALUE)
 			CloseHandle(winhandle);
 		winhandle = INVALID_HANDLE_VALUE;
 	}
-	virtual void read(void* dest, size_t count) override
-	{
+	virtual void read(void* dest, size_t count) override {
 		DWORD bytesread{};
 		bool good = ReadFile(winhandle, dest, count, &bytesread, nullptr);
 
 		if (bytesread == 0 && good)
 			eof_triggered = true;
-
 	}
-	virtual size_t size() const override
-	{
-		return len;
-	}
-	virtual bool is_eof() const override
-	{
-		return eof_triggered;
-	}
-	virtual size_t tell() const override
-	{
+	virtual size_t size() const override { return len; }
+	virtual bool is_eof() const override { return eof_triggered; }
+	virtual size_t tell() const override {
 		auto where_ = SetFilePointer(winhandle, 0, nullptr, FILE_CURRENT);
 		return where_;
 	}
-	virtual void seek(size_t ofs) override
-	{
-		SetFilePointer(winhandle, ofs, nullptr, FILE_BEGIN);
-	}
+	virtual void seek(size_t ofs) override { SetFilePointer(winhandle, ofs, nullptr, FILE_BEGIN); }
 	virtual uint64_t get_timestamp() const override {
 		FILETIME ft;
 		GetFileTime(winhandle, nullptr, nullptr, &ft);
@@ -88,7 +73,6 @@ public:
 	HANDLE winhandle = INVALID_HANDLE_VALUE;
 };
 
-
 // a basic archive file
 struct OneArchiveFile
 {
@@ -99,8 +83,7 @@ struct OneArchiveFile
 class ArchiveFile
 {
 public:
-	~ArchiveFile() {
-	}
+	~ArchiveFile() {}
 
 	bool open(const char* file);
 
@@ -112,17 +95,10 @@ class PackagedFile : public IFile
 {
 
 public:
-
 	bool handle_is_valid() const { return self; }
 
-	void seek(size_t ofs) override
-	{
-		parentFile->file->seek(self->data_offset + ofs);
-	}
-	size_t tell() const override
-	{
-		return parentFile->file->tell() - self->data_offset;
-	}
+	void seek(size_t ofs) override { parentFile->file->seek(self->data_offset + ofs); }
+	size_t tell() const override { return parentFile->file->tell() - self->data_offset; }
 
 	bool write(const void* data, size_t size) override {
 		assert(0);
@@ -130,22 +106,11 @@ public:
 		return false;
 	}
 
-	bool is_eof() const override
-	{
-		return eof_triggered;
-	}
+	bool is_eof() const override { return eof_triggered; }
 
-	size_t size() const override {
-		return self->data_len;
-	}
-	void close() override
-	{
-
-	}
-	void read(void* dest, size_t count) override
-	{
-		parentFile->file->read(dest, count);
-	}
+	size_t size() const override { return self->data_len; }
+	void close() override {}
+	void read(void* dest, size_t count) override { parentFile->file->read(dest, count); }
 
 	bool eof_triggered = false;
 	size_t ptr = 0;
@@ -153,9 +118,8 @@ public:
 	ArchiveFile* parentFile = nullptr;
 };
 
-bool ArchiveFile::open(const char* archive_path)
-{
-	///file = FileSys::open_read(archive_path);
+bool ArchiveFile::open(const char* archive_path) {
+	/// file = FileSys::open_read(archive_path);
 
 	if (!file) {
 		sys_print(Error, "couldn't open archive file %s\n", archive_path);
@@ -188,7 +152,6 @@ bool ArchiveFile::open(const char* archive_path)
 	uint32_t string_offset = 16 + num_entries * 20;
 	uint32_t string_table_len = data_offset - string_offset;
 
-
 	std::vector<char> string_table;
 	string_table.resize(string_table_len);
 
@@ -200,9 +163,8 @@ bool ArchiveFile::open(const char* archive_path)
 	return true;
 }
 
-IFilePtr open_read_dir(const std::string& root, const std::string& relative)
-{
-	auto fullpath = (root.empty())?relative:(root + "/" + relative);
+IFilePtr open_read_dir(const std::string& root, const std::string& relative) {
+	auto fullpath = (root.empty()) ? relative : (root + "/" + relative);
 	OSFile* file = new OSFile;
 	file->init(fullpath.c_str());
 	if (file->handle_is_valid())
@@ -210,8 +172,7 @@ IFilePtr open_read_dir(const std::string& root, const std::string& relative)
 	delete file;
 	return nullptr;
 }
-IFilePtr open_write_dir(const std::string& root, const std::string& relative)
-{
+IFilePtr open_write_dir(const std::string& root, const std::string& relative) {
 	auto fullpath = root + "/" + relative;
 	OSFile* file = new OSFile;
 	file->init_write(fullpath.c_str());
@@ -221,41 +182,32 @@ IFilePtr open_write_dir(const std::string& root, const std::string& relative)
 	return nullptr;
 }
 
-IFilePtr FileSys::open_read(const char* p, WhereEnum flags)
-{
+IFilePtr FileSys::open_read(const char* p, WhereEnum flags) {
 
 	if (flags == FileSys::USER_DIR) {
 		return open_read_dir(g_user_save_dir.get_string(), p);
-	}
-	else if (flags == FileSys::GAME_DIR) {
+	} else if (flags == FileSys::GAME_DIR) {
 		return open_read_dir(g_project_base.get_string(), p);
-	}
-	else if (flags == FileSys::ENGINE_DIR) {
+	} else if (flags == FileSys::ENGINE_DIR) {
 		return open_read_dir(".", p);
-	}
-	else if (flags == FileSys::SHADER_CACHE) {
+	} else if (flags == FileSys::SHADER_CACHE) {
 		return open_read_dir("ShaderCache", p);
-	}
-	else if (flags == FileSys::FULL_SYSTEM) {
-		return open_read_dir("",p);
+	} else if (flags == FileSys::FULL_SYSTEM) {
+		return open_read_dir("", p);
 	}
 
 	assert(0);
 
 	return nullptr;
 }
-IFilePtr FileSys::open_write(const char* relative_path, WhereEnum where)
-{
+IFilePtr FileSys::open_write(const char* relative_path, WhereEnum where) {
 	if (where == FileSys::USER_DIR) {
 		return open_write_dir(g_user_save_dir.get_string(), relative_path);
-	}
-	else if (where == FileSys::GAME_DIR) {
+	} else if (where == FileSys::GAME_DIR) {
 		return open_write_dir(g_project_base.get_string(), relative_path);
-	}
-	else if (where == FileSys::ENGINE_DIR) {
+	} else if (where == FileSys::ENGINE_DIR) {
 		return open_write_dir(".", relative_path);
-	}
-	else if (where == FileSys::SHADER_CACHE) {
+	} else if (where == FileSys::SHADER_CACHE) {
 		return open_write_dir("ShaderCache", relative_path);
 	}
 
@@ -263,8 +215,7 @@ IFilePtr FileSys::open_write(const char* relative_path, WhereEnum where)
 
 	return nullptr;
 }
-const char* FileSys::get_path(WhereEnum where)
-{
+const char* FileSys::get_path(WhereEnum where) {
 	if (where == USER_DIR)
 		return g_user_save_dir.get_string();
 	else if (where == GAME_DIR)
@@ -291,15 +242,13 @@ std::string FileSys::get_game_path_from_full_path(const std::string& fullpath) {
 	return fullpath.substr(gamedir.size());
 }
 
-bool FileSys::delete_game_file(std::string filepath)
-{
+bool FileSys::delete_game_file(std::string filepath) {
 	auto fullpath = get_full_path_from_game_path(filepath);
 	sys_print(Debug, "FileSys::delete_game_file: %s\n", fullpath.c_str());
 	if (DeleteFileA(fullpath.c_str())) {
 		sys_print(Info, "Deleted file %s\n", fullpath.c_str());
 		return true;
-	}
-	else {
+	} else {
 		sys_print(Error, "FileSys::delete_game_file: failed to delete %s\n", fullpath.c_str());
 		return false;
 	}
@@ -314,22 +263,20 @@ void start_play_process() {
 	STARTUPINFOA startup = {};
 	PROCESS_INFORMATION out = {};
 
-
-	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup, &out)) {
+	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &startup,
+						&out)) {
 		sys_print(Error, "start_play_process: couldn't create process\n");
 	}
 	CloseHandle(out.hProcess);
 	CloseHandle(out.hThread);
 }
-void FileSys::init()
-{
+void FileSys::init() {
 	sys_print(Info, "------ FileSys init ------\n");
 
 	// updates working directory to ./CsRemake/*
 	char own_path[256];
 	HMODULE hModule = GetModuleHandleA(NULL);
-	if (hModule != NULL)
-	{
+	if (hModule != NULL) {
 		GetModuleFileNameA(hModule, own_path, (sizeof(own_path)));
 		std::string path = own_path;
 		auto find = path.rfind('\\');
@@ -340,35 +287,30 @@ void FileSys::init()
 		int ret = _chdir(path.c_str());
 		if (ret != 0)
 			Fatalf("!!! failed to change working directory %d %s\n", ret, path.c_str());
-	}
-	else {
+	} else {
 		Fatalf("!!! GetModuleHandle returned null\n");
 	}
-
 }
 
-class FileTreeIterator {
+class FileTreeIterator
+{
 public:
-	struct FileEntry {
+	struct FileEntry
+	{
 		std::string path;
 		WIN32_FIND_DATAA findData;
 	};
 
 	FileTreeIterator(const std::string& root, bool dont_descend) : dont_descend(dont_descend) {
 		pushDirectory(root);
-		++(*this);  // Move to the first valid file
+		++(*this); // Move to the first valid file
 	}
 
-	FileTreeIterator() {
-	}
+	FileTreeIterator() {}
 
-	~FileTreeIterator() {
-		closeCurrentHandle();
-	}
+	~FileTreeIterator() { closeCurrentHandle(); }
 
-	const FileEntry& operator*() const {
-		return currentEntry;
-	}
+	const FileEntry& operator*() const { return currentEntry; }
 
 	FileTreeIterator& operator++() {
 		while (!directories.empty()) {
@@ -382,23 +324,21 @@ public:
 					}
 					return *this;
 				}
-			}
-			else {
+			} else {
 				closeCurrentHandle();
 				directories.pop_back();
 			}
 		}
 
-		currentEntry = FileEntry();  // Reset current entry to end state
+		currentEntry = FileEntry(); // Reset current entry to end state
 		return *this;
 	}
 
-	bool operator!=(const FileTreeIterator& other) const {
-		return !directories.empty() || !other.directories.empty();
-	}
+	bool operator!=(const FileTreeIterator& other) const { return !directories.empty() || !other.directories.empty(); }
 
 private:
-	struct DirectoryEntry {
+	struct DirectoryEntry
+	{
 		HANDLE handle;
 		std::string path;
 	};
@@ -412,7 +352,7 @@ private:
 		std::string searchPath = directory + "/*";
 		HANDLE handle = FindFirstFileA(searchPath.c_str(), &currentEntry.findData);
 		if (handle != INVALID_HANDLE_VALUE) {
-			directories.push_back({ handle, directory });
+			directories.push_back({handle, directory});
 		}
 	}
 
@@ -423,14 +363,9 @@ private:
 	}
 };
 
+FileTreeIter::~FileTreeIter() {}
 
-FileTreeIter::~FileTreeIter()
-{
-
-}
-
-FileTreeIter::FileTreeIter()
-{
+FileTreeIter::FileTreeIter() {
 	ptr = std::make_unique<FileTreeIterator>();
 }
 
@@ -441,7 +376,6 @@ FileTreeIter::FileTreeIter(FileTreeIter&& other) {
 FileTreeIter::FileTreeIter(const std::string& root, bool dont_descend) {
 	ptr = std::make_unique<FileTreeIterator>(root, dont_descend);
 }
-
 
 const std::string& FileTreeIter::operator*() const {
 	return ptr->operator*().path;
@@ -456,9 +390,7 @@ FileTreeIter& FileTreeIter::operator++() {
 	return *this;
 }
 
-
-bool FileWriter::write_out(const std::string& path)
-{
+bool FileWriter::write_out(const std::string& path) {
 	std::ofstream outfile(path);
 	if (!outfile)
 		return false;

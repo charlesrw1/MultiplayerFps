@@ -2,29 +2,26 @@
 #include "Animation/AnimationUtil.h"
 #include "AnimationTreeLocal.h"
 
-void agClipNode::reset()
-{
+void agClipNode::reset() {
 	anim_time = 0.0;
 }
 
-
-static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip,
-	bool has_sync_group, StringName syncgroupname, sync_opt SyncOption, bool loop, const BoneIndexRetargetMap* remap,
-	float speed, float& anim_time, bool& stopped_flag, const Node_CFG* owner)
-{
+static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip, bool has_sync_group,
+								 StringName syncgroupname, sync_opt SyncOption, bool loop,
+								 const BoneIndexRetargetMap* remap, float speed, float& anim_time, bool& stopped_flag,
+								 const Node_CFG* owner) {
 	const float speed_modify = 1.0f;
 	// synced update
 	if (has_sync_group) {
 		SyncGroupData& sync = ctx.find_sync_group(syncgroupname);
 		if (sync.is_this_first_update()) {
 			// do nothing
-		}
-		else {
-			anim_time = sync.time.get() * clip->duration;	// normalized time, TODO: sync markers
+		} else {
+			anim_time = sync.time.get() * clip->duration; // normalized time, TODO: sync markers
 		}
 		const float time_to_evaluate_sequence = anim_time;
-		if (sync.should_write_new_update_weight(SyncOption, 0.5/*TODO*/)) {
-			anim_time += ctx.dt * speed * speed_modify;	// fixme
+		if (sync.should_write_new_update_weight(SyncOption, 0.5 /*TODO*/)) {
+			anim_time += ctx.dt * speed * speed_modify; // fixme
 			if (anim_time > clip->duration || anim_time < 0.f) {
 				if (loop)
 					anim_time = fmod(fmod(anim_time, clip->duration) + clip->duration, clip->duration);
@@ -33,14 +30,14 @@ static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip,
 					stopped_flag = true;
 				}
 			}
-			sync.write_to_update_time(SyncOption, 0.5/*TODO*/, owner, Percentage(anim_time, clip->duration));
+			sync.write_to_update_time(SyncOption, 0.5 /*TODO*/, owner, Percentage(anim_time, clip->duration));
 			util_calc_rotations(&ctx.get_skeleton(), clip, time_to_evaluate_sequence, remap, *ctx.pose);
 		}
 	}
 	// unsynced update
 	else {
 		const float time_to_evaluate_sequence = anim_time;
-		anim_time += ctx.dt * speed * speed_modify;	// see above
+		anim_time += ctx.dt * speed * speed_modify; // see above
 		if (anim_time > clip->duration || anim_time < 0.f) {
 			if (loop)
 				anim_time = fmod(fmod(anim_time, clip->duration) + clip->duration, clip->duration);
@@ -53,13 +50,12 @@ static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip,
 	}
 }
 
-void agClipNode::get_pose(agGetPoseCtx& ctx)
-{
+void agClipNode::get_pose(agGetPoseCtx& ctx) {
 	if (!has_init) {
-		if (!seq||!clipFrom)
+		if (!seq || !clipFrom)
 			throw std::runtime_error("agClipNode: no sequence");
 
-		if(!clipFrom->get_skel())
+		if (!clipFrom->get_skel())
 			throw std::runtime_error("agClipNode: sequence without skel");
 		remap = ctx.get_skeleton().get_remap(clipFrom->get_skel());
 		has_init = true;
@@ -68,8 +64,8 @@ void agClipNode::get_pose(agGetPoseCtx& ctx)
 	const float playSpeed = speed.get_float(ctx);
 
 	bool stopped_flag = false;
-	get_clip_pose_shared(
-		ctx, seq, !syncGroup.is_null(),syncGroup, syncType, looping, remap, playSpeed, anim_time, stopped_flag, nullptr);
+	get_clip_pose_shared(ctx, seq, !syncGroup.is_null(), syncGroup, syncType, looping, remap, playSpeed, anim_time,
+						 stopped_flag, nullptr);
 
 	ctx.add_playing_clip(this);
 
@@ -77,8 +73,7 @@ void agClipNode::get_pose(agGetPoseCtx& ctx)
 	ctx.debug_exit();
 }
 
-void agEvaluateClip::get_pose(agGetPoseCtx& ctx)
-{
+void agEvaluateClip::get_pose(agGetPoseCtx& ctx) {
 	if (!has_init) {
 		if (!seq || !clipFrom)
 			throw std::runtime_error("agClipNode: no sequence");
@@ -92,47 +87,38 @@ void agEvaluateClip::get_pose(agGetPoseCtx& ctx)
 	bool stopped_flag = false;
 	float time_to_play = seq->get_time_of_keyframe(frame);
 	time_to_play = glm::clamp(time_to_play, 0.f, seq->duration);
-	get_clip_pose_shared(
-		ctx, seq, false, "", {}, false, remap, 1.0, time_to_play, stopped_flag, nullptr);
+	get_clip_pose_shared(ctx, seq, false, "", {}, false, remap, 1.0, time_to_play, stopped_flag, nullptr);
 }
-void agEvaluateClip::set_clip(const AnimationSeqAsset* asset)
-{
+void agEvaluateClip::set_clip(const AnimationSeqAsset* asset) {
 	seq = asset->seq;
 	clipFrom = asset->srcModel.get();
 }
 
-void agClipNode::set_clip(const Model* m, string clipName)
-{
+void agClipNode::set_clip(const Model* m, string clipName) {
 	assert(m->get_skel());
 	seq = m->get_skel()->find_clip(clipName);
 	clipFrom = m;
 }
 
-
-void agClipNode::set_clip(const AnimationSeqAsset* asset)
-{
+void agClipNode::set_clip(const AnimationSeqAsset* asset) {
 	seq = asset->seq;
 	clipFrom = asset->srcModel.get();
 }
 
-void agBlendNode::reset()
-{
+void agBlendNode::reset() {
 	input0->reset();
 	input1->reset();
 }
 
-void agBlendNode::get_pose(agGetPoseCtx& ctx)
-{
+void agBlendNode::get_pose(agGetPoseCtx& ctx) {
 	const float alphaVal = alpha.get_float(ctx);
 	ctx.debug_enter("agBlend: " + std::to_string(alphaVal));
 
 	if (alphaVal <= 0.00001) {
 		input0->get_pose(ctx);
-	}
-	else if (alphaVal >= 0.99999) {
+	} else if (alphaVal >= 0.99999) {
 		input1->get_pose(ctx);
-	}
-	else {
+	} else {
 		agGetPoseCtx other(ctx);
 		input0->get_pose(ctx);
 		input1->get_pose(other);
@@ -141,20 +127,17 @@ void agBlendNode::get_pose(agGetPoseCtx& ctx)
 	ctx.debug_exit();
 }
 
-void agAddNode::reset()
-{
+void agAddNode::reset() {
 	input0->reset();
 	input1->reset();
 }
 
-void agAddNode::get_pose(agGetPoseCtx& ctx)
-{
+void agAddNode::get_pose(agGetPoseCtx& ctx) {
 	const float alphaVal = alpha.get_float(ctx);
 	ctx.debug_enter("agAddNode: " + std::to_string(alphaVal));
 	if (alphaVal <= 0.00001) {
 		input0->get_pose(ctx);
-	}
-	else {
+	} else {
 		agGetPoseCtx other(ctx);
 		input0->get_pose(ctx);
 		input1->get_pose(other);
@@ -163,14 +146,12 @@ void agAddNode::get_pose(agGetPoseCtx& ctx)
 	ctx.debug_exit();
 }
 
-SyncGroupData& agGetPoseCtx::find_sync_group(StringName name) const
-{
+SyncGroupData& agGetPoseCtx::find_sync_group(StringName name) const {
 	// TODO: insert return statement here
 	return object.find_or_create_sync_group(name);
 }
 
-float ValueType::get_float(agGetPoseCtx& ctx)
-{
+float ValueType::get_float(agGetPoseCtx& ctx) {
 	if (std::holds_alternative<float>(value))
 		return std::get<float>(value);
 	else if (std::holds_alternative<StringName>(value))
@@ -178,8 +159,7 @@ float ValueType::get_float(agGetPoseCtx& ctx)
 	throw std::runtime_error("ValueType::get_float: doesn't hold float");
 }
 
-int ValueType::get_int(agGetPoseCtx& ctx)
-{
+int ValueType::get_int(agGetPoseCtx& ctx) {
 	if (std::holds_alternative<int>(value))
 		return std::get<int>(value);
 	else if (std::holds_alternative<StringName>(value))
@@ -187,8 +167,7 @@ int ValueType::get_int(agGetPoseCtx& ctx)
 	throw std::runtime_error("ValueType::get_int: doesn't hold int");
 }
 
-int ValueType::get_bool(agGetPoseCtx& ctx)
-{
+int ValueType::get_bool(agGetPoseCtx& ctx) {
 	if (std::holds_alternative<bool>(value))
 		return std::get<bool>(value);
 	else if (std::holds_alternative<StringName>(value))
@@ -196,8 +175,7 @@ int ValueType::get_bool(agGetPoseCtx& ctx)
 	throw std::runtime_error("ValueType::get_bool: doesn't hold bool");
 }
 
-glm::vec3 ValueType::get_vec3(agGetPoseCtx& ctx)
-{
+glm::vec3 ValueType::get_vec3(agGetPoseCtx& ctx) {
 	if (std::holds_alternative<glm::vec3>(value))
 		return std::get<glm::vec3>(value);
 	else if (std::holds_alternative<StringName>(value))
@@ -205,14 +183,11 @@ glm::vec3 ValueType::get_vec3(agGetPoseCtx& ctx)
 	throw std::runtime_error("ValueType::get_vec3: doesn't hold vec3");
 }
 
-void agIk2Bone::reset()
-{
+void agIk2Bone::reset() {
 	input->reset();
 }
 
-
-static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkeleton* skel, int index)
-{
+static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkeleton* skel, int index) {
 	const int ALLOCED_MATS = 36;
 	glm::mat4 mats[ALLOCED_MATS];
 
@@ -231,18 +206,16 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 	return final_;
 }
 
-
-void agIk2Bone::get_pose(agGetPoseCtx& ctx)
-{
+void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 	if (!has_init) {
 		bone_idx = ctx.get_skeleton().get_bone_index(bone_name);
-		if (bone_idx==-1) {
+		if (bone_idx == -1) {
 			sys_print(Error, " agIk2Bone::get_pose: model doesnt have bone %s\n", bone_name.get_c_str());
 			throw std::runtime_error("doesn't have bone");
 		}
 		if (ik_in_bone_space) {
 			other_bone_idx = ctx.get_skeleton().get_bone_index(other_bone);
-			if(other_bone_idx==-1) {
+			if (other_bone_idx == -1) {
 				sys_print(Error, " agIk2Bone::get_pose: other model doesnt have bone %s\n", bone_name.get_c_str());
 				throw std::runtime_error("doesn't have other bone");
 			}
@@ -255,7 +228,7 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx)
 	input->get_pose(ctx);
 	auto& pose = *ctx.pose;
 	// build up global matrix when needed instead of recreating it every step
-   // not sure if this is optimal, should profile different ways to pass around pose
+	// not sure if this is optimal, should profile different ways to pass around pose
 	const int ALLOCED_MATS = 36;
 	glm::mat4 mats[ALLOCED_MATS];
 	int indicies[36];
@@ -281,7 +254,6 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx)
 	}
 
 	auto ikfunctor = [&](glm::quat& outlocal1, glm::quat& outlocal2, vec3 target, bool print = false) {
-
 		const float dist_eps = 0.0001f;
 		// GLOBAL positions
 		vec3 a = mats[2] * glm::vec4(0.0, 0.0, 0.0, 1.0);
@@ -292,9 +264,9 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx)
 			return;
 		}
 
-		//Debug::add_sphere(ent_transform * vec4(a, 1.0), 0.01, COLOR_GREEN, 0.0, true);
-		//Debug::add_sphere(ent_transform * vec4(b, 1.0), 0.01, COLOR_BLUE, 0.0, true);
-		//Debug::add_sphere(ent_transform * vec4(c, 1.0), 0.01, COLOR_CYAN, 0.0, true);
+		// Debug::add_sphere(ent_transform * vec4(a, 1.0), 0.01, COLOR_GREEN, 0.0, true);
+		// Debug::add_sphere(ent_transform * vec4(b, 1.0), 0.01, COLOR_BLUE, 0.0, true);
+		// Debug::add_sphere(ent_transform * vec4(c, 1.0), 0.01, COLOR_CYAN, 0.0, true);
 
 		glm::quat a_global = glm::quat_cast(mats[2]);
 		glm::quat b_global = glm::quat_cast(mats[1]);
@@ -310,14 +282,12 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx)
 			target_rotation = glm::quat_cast(matrix);
 	}
 
-
 	int index1 = indicies[1];
 	int index2 = indicies[2];
 
 	ikfunctor(pose.q[index1], pose.q[index2], tagetVec, false);
 
-
-	if (ik_in_bone_space&&take_rotation_of_other) {
+	if (ik_in_bone_space && take_rotation_of_other) {
 		// compute the global rotation now
 		glm::quat q = {};
 		if (count >= 4)
@@ -329,13 +299,11 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx)
 	}
 }
 
-void agModifyBone::reset()
-{
+void agModifyBone::reset() {
 	input->reset();
 }
 
-void agModifyBone::get_pose(agGetPoseCtx& ctx)
-{
+void agModifyBone::get_pose(agGetPoseCtx& ctx) {
 	if (!has_init) {
 		this->bone_index = ctx.get_skeleton().get_bone_index(boneName);
 		if (bone_index == -1) {
@@ -371,20 +339,23 @@ void agModifyBone::get_pose(agGetPoseCtx& ctx)
 		more_than_one = count > 1;
 	}
 
-	const glm::vec3 set_pos = translationVal.get_vec3(ctx);// ->get_value<glm::vec3>(ctx);
-	const glm::quat set_rot = glm::quat(rotationVal.get_vec3(ctx));// rotation->get_value<glm::quat>(ctx);
+	const glm::vec3 set_pos = translationVal.get_vec3(ctx);			// ->get_value<glm::vec3>(ctx);
+	const glm::quat set_rot = glm::quat(rotationVal.get_vec3(ctx)); // rotation->get_value<glm::quat>(ctx);
 
 	const glm::vec3 global_pos = mats[0][3];
 	const glm::quat global_rot = glm::quat_cast(mats[0]);
 
 	const bool apply_position = translation != ModifyBoneType::None;
-	const bool apply_position_meshspace = translation == ModifyBoneType::Meshspace || translation == ModifyBoneType::MeshspaceAdd;
-	const bool apply_position_additive = translation == ModifyBoneType::LocalspaceAdd || translation == ModifyBoneType::MeshspaceAdd;
+	const bool apply_position_meshspace =
+		translation == ModifyBoneType::Meshspace || translation == ModifyBoneType::MeshspaceAdd;
+	const bool apply_position_additive =
+		translation == ModifyBoneType::LocalspaceAdd || translation == ModifyBoneType::MeshspaceAdd;
 
 	const bool apply_rotation = rotation != ModifyBoneType::None;
-	const bool apply_rotation_meshspace = rotation == ModifyBoneType::Meshspace || rotation == ModifyBoneType::MeshspaceAdd;
-	const bool apply_rotation_additive = rotation == ModifyBoneType::LocalspaceAdd || rotation == ModifyBoneType::MeshspaceAdd;
-
+	const bool apply_rotation_meshspace =
+		rotation == ModifyBoneType::Meshspace || rotation == ModifyBoneType::MeshspaceAdd;
+	const bool apply_rotation_additive =
+		rotation == ModifyBoneType::LocalspaceAdd || rotation == ModifyBoneType::MeshspaceAdd;
 
 	if (apply_position) {
 		if (apply_position_meshspace) {
@@ -392,8 +363,7 @@ void agModifyBone::get_pose(agGetPoseCtx& ctx)
 				mats[0][3] = glm::vec4(global_pos + set_pos, 1.0f);
 			else
 				mats[0][3] = glm::vec4(set_pos, 1.0f);
-		}
-		else {
+		} else {
 			if (apply_position_additive)
 				pose.pos[MYBONEINDEX] += set_pos;
 			else
@@ -407,15 +377,13 @@ void agModifyBone::get_pose(agGetPoseCtx& ctx)
 				glm::vec4 lastcol = mats[0][3];
 				mats[0] = glm::mat4_cast(q);
 				mats[0][3] = lastcol;
-			}
-			else {
+			} else {
 				glm::quat q = set_rot;
 				glm::vec4 lastcol = mats[0][3];
 				mats[0] = glm::mat4_cast(q);
 				mats[0][3] = lastcol;
 			}
-		}
-		else {
+		} else {
 			if (apply_rotation_additive)
 				pose.q[MYBONEINDEX] = set_rot * pose.q[MYBONEINDEX];
 			else
@@ -434,13 +402,11 @@ void agModifyBone::get_pose(agGetPoseCtx& ctx)
 	}
 }
 
-void agCopyBone::reset()
-{
+void agCopyBone::reset() {
 	input->reset();
 }
 
-void agCopyBone::get_pose(agGetPoseCtx& ctx)
-{
+void agCopyBone::get_pose(agGetPoseCtx& ctx) {
 	if (!has_init) {
 		source_bone_idx = ctx.get_skeleton().get_bone_index(sourceBone);
 		target_bone_idx = ctx.get_skeleton().get_bone_index(targetBone);
@@ -462,54 +428,47 @@ void agCopyBone::get_pose(agGetPoseCtx& ctx)
 		pose.q[target_bone_idx] = pose.q[source_bone_idx];
 		pose.pos[target_bone_idx] = pose.pos[source_bone_idx];
 		pose.scale[target_bone_idx] = pose.scale[source_bone_idx];
-	}
-	else {
+	} else {
 		glm::mat4 mat = build_global_transform_for_bone_index(&pose, &skel, source_bone_idx);
 		pose.q[target_bone_idx] = glm::quat_cast(mat);
 		pose.pos[target_bone_idx] = mat[3];
 		pose.scale[target_bone_idx] = glm::length(mat[0]);
-
 	}
 }
 
-float agGetPoseCtx::get_float_var(StringName name) const
-{
+float agGetPoseCtx::get_float_var(StringName name) const {
 	auto var = object.get_float_variable(name);
-	if (var.has_value()) 
+	if (var.has_value())
 		return var.value();
 	auto curve = object.get_curve_value(name);
 	return curve.value_or(0.f);
 }
 
-glm::vec3 agGetPoseCtx::get_vec3_var(StringName name) const
-{
+glm::vec3 agGetPoseCtx::get_vec3_var(StringName name) const {
 	auto var = object.get_vec3_variable(name);
-	if (var.has_value()) 
+	if (var.has_value())
 		return var.value();
 	sys_print(Error, "agGetPoseCtx::get_vec3_var: no variable exists: %s\n", name.get_c_str());
 	throw std::runtime_error("no variable exists");
 }
 
-bool agGetPoseCtx::get_bool_var(StringName name) const
-{
+bool agGetPoseCtx::get_bool_var(StringName name) const {
 	auto var = object.get_bool_variable(name);
-	if (var.has_value()) 
+	if (var.has_value())
 		return var.value();
 	sys_print(Error, "agGetPoseCtx::get_bool_var: no variable exists: %s\n", name.get_c_str());
 	throw std::runtime_error("no variable exists");
 }
 
-int agGetPoseCtx::get_int_var(StringName name) const
-{
+int agGetPoseCtx::get_int_var(StringName name) const {
 	auto var = object.get_int_variable(name);
-	if (var.has_value()) 
+	if (var.has_value())
 		return var.value();
 	sys_print(Error, "agGetPoseCtx::get_int_var: no variable exists: %s\n", name.get_c_str());
 	throw std::runtime_error("no variable exists");
 }
 
-void agBlendMasked::reset()
-{
+void agBlendMasked::reset() {
 	input0->reset();
 	input1->reset();
 }
@@ -520,45 +479,40 @@ void agBlendMasked::get_pose(agGetPoseCtx& ctx) {
 	ctx.debug_enter("agBlendMasked: " + std::to_string(alpha_val));
 	if (alpha_val <= 0.00001) {
 		input0->get_pose(ctx);
-	}
-	else {
+	} else {
 		agGetPoseCtx basePose(ctx);
 		input0->get_pose(basePose);
 		input1->get_pose(ctx);
-		if (meshspace_blend) {	
+		if (meshspace_blend) {
 			util_global_blend(&ctx.get_skeleton(), &(*basePose.pose), &(*ctx.pose), alpha_val, maskWeights);
-		}
-		else {
+		} else {
 			util_blend_with_mask(ctx.get_num_bones(), (*basePose.pose), (*ctx.pose), alpha_val, maskWeights);
 		}
 	}
 	ctx.debug_exit();
 }
 
-void agBlendMasked::init_mask_for_model(const Model* model, float default_weight)
-{
+void agBlendMasked::init_mask_for_model(const Model* model, float default_weight) {
 	assert(model);
 	maskWeights.resize(model->get_skel()->get_num_bones(), default_weight);
 }
 
-void agBlendMasked::set_all_children_weights(const Model* model, string bone, float weight)
-{
+void agBlendMasked::set_all_children_weights(const Model* model, string bone, float weight) {
 	assert(model);
 	const int myIndex = model->bone_for_name(StringName(bone.c_str()));
 	if (myIndex == -1)
 		throw std::runtime_error("set_all_children_weights: invalid bone");
 	int num_bones = model->get_skel()->get_num_bones();
 	maskWeights.at(myIndex) = weight;
-	for (int i = myIndex+1; i < num_bones; i++) {
-		const int parent= model->get_skel()->get_bone_parent(i);
+	for (int i = myIndex + 1; i < num_bones; i++) {
+		const int parent = model->get_skel()->get_bone_parent(i);
 		if (parent < myIndex)
 			break;
 		maskWeights.at(i) = weight;
 	}
 }
 
-void agBlendMasked::set_one_bone_weight(const Model* model, string bone, float weight)
-{
+void agBlendMasked::set_one_bone_weight(const Model* model, string bone, float weight) {
 	assert(model);
 	const int myIndex = model->bone_for_name(StringName(bone.c_str()));
 	if (myIndex == -1)
@@ -566,8 +520,7 @@ void agBlendMasked::set_one_bone_weight(const Model* model, string bone, float w
 	maskWeights.at(myIndex) = weight;
 }
 
-void agStatemachineBase::reset()
-{
+void agStatemachineBase::reset() {
 	currentTree = nullptr;
 	curTime = 0.0;
 	if (blendingOut) {
@@ -576,14 +529,12 @@ void agStatemachineBase::reset()
 	}
 }
 
-void agStatemachineBase::get_pose(agGetPoseCtx& ctx)
-{
+void agStatemachineBase::get_pose(agGetPoseCtx& ctx) {
 	if (!currentTree) {
-		update(&ctx,true);
+		update(&ctx, true);
 		if (currentTree) {
 			currentTree->reset();
-		}
-		else {
+		} else {
 			sys_print(Error, "agStatemachineBase::reset: no tree after update?\n");
 			return;
 		}
@@ -592,8 +543,7 @@ void agStatemachineBase::get_pose(agGetPoseCtx& ctx)
 	if (blendingOut) {
 		float time_left = get_transition_time_left();
 		ctx.debug_enter("agStatemachineBase: transitoning " + std::to_string(time_left));
-	}
-	else {
+	} else {
 		ctx.debug_enter("agStatemachineBase");
 	}
 	currentTree->get_pose(ctx);
@@ -605,14 +555,14 @@ void agStatemachineBase::get_pose(agGetPoseCtx& ctx)
 		glm::clamp(alpha, 0.f, 1.f);
 		alpha = evaluate_easing(curTransition, alpha);
 		agGetPoseCtx other(ctx);
-		util_blend(ctx.get_num_bones(), *blendingOut, *ctx.pose, 1.0-alpha);	// blend the last transition pose to the cur tree
-	
+		util_blend(ctx.get_num_bones(), *blendingOut, *ctx.pose,
+				   1.0 - alpha); // blend the last transition pose to the cur tree
+
 		if (curTransitionTime >= curTransitionDuration) {
 			g_pose_pool.free(blendingOut);
 			blendingOut = nullptr;
 			sys_print(Debug, "agStatemachineBase: transition end\n");
-		}
-		else {
+		} else {
 			curTransitionTime += ctx.dt;
 		}
 	}
@@ -626,8 +576,7 @@ void agStatemachineBase::get_pose(agGetPoseCtx& ctx)
 		sys_print(Debug, "agStatemachineBase: transition\n");
 		if (blendingOut) {
 			sys_print(Debug, "agStatemachineBase: transition interrupted\n");
-		}
-		else {
+		} else {
 			blendingOut = g_pose_pool.allocate();
 		}
 		auto& curPose = *ctx.pose;
@@ -637,10 +586,7 @@ void agStatemachineBase::get_pose(agGetPoseCtx& ctx)
 	}
 }
 
-
-
-void agStatemachineBase::set_pose(agBaseNode* pose)
-{
+void agStatemachineBase::set_pose(agBaseNode* pose) {
 	currentTree = pose;
 }
 
@@ -651,49 +597,42 @@ void agStatemachineBase::set_transition_parameters(Easing easing, float blend_ti
 	this->curTransitionDuration = blend_time;
 }
 
-void agSlotPlayer::update(agGetPoseCtx* ctx, bool wantsReset)
-{
+void agSlotPlayer::update(agGetPoseCtx* ctx, bool wantsReset) {
 	auto slotPlayer = ctx->object.find_slot_with_name(slotName);
 	if (slotPlayer) {
 		clipPlayer.slot = slotPlayer;
-	}
-	else {
+	} else {
 		sys_print(Warning, "agSlotPlayer::update: no slot %s\n", slotName.get_c_str());
 		return;
 	}
 	set_transition_parameters(Easing::Linear, 0.2);
-	if (slotPlayer->active&&slotPlayer->time_remaining() > 0.2 /* start fading out */) {
+	if (slotPlayer->active && slotPlayer->time_remaining() > 0.2 /* start fading out */) {
 		set_pose(&clipPlayer);
-	}
-	else {
+	} else {
 		set_pose(input);
 	}
 }
 
-void agBlendByInt::update(agGetPoseCtx* ctx, bool wantsReset)
-{
+void agBlendByInt::update(agGetPoseCtx* ctx, bool wantsReset) {
 	if (inputs.empty()) {
 		sys_print(Error, "agBlendByInt::update: no inuts?\n");
 		throw std::runtime_error("agBlendByInt::update");
 	}
 	int index = integer.get_int(*ctx);
 	if (index < 0 || index >= inputs.size()) {
-		sys_print(Warning, "agBlendByInt::update: index out of range (%d, size=%d)\n",index,(int)inputs.size());
+		sys_print(Warning, "agBlendByInt::update: index out of range (%d, size=%d)\n", index, (int)inputs.size());
 		index = 0;
 	}
 	set_transition_parameters(easing, blending_duration);
 	set_pose(inputs.at(index));
 }
 
-void agSlotClipInternal::reset()
-{
+void agSlotClipInternal::reset() {
 	// nothing
 }
 #include "Animation.h"
-void agSlotClipInternal::get_pose(agGetPoseCtx& ctx)
-{
+void agSlotClipInternal::get_pose(agGetPoseCtx& ctx) {
 	bool stopped_flag = false;
 	float time_in = slot->time;
-	get_clip_pose_shared(
-		ctx, slot->active->seq, false, {}, {}, false, nullptr, 0.0, time_in, stopped_flag, nullptr);
+	get_clip_pose_shared(ctx, slot->active->seq, false, {}, {}, false, nullptr, 0.0, time_in, stopped_flag, nullptr);
 }

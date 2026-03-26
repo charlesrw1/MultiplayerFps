@@ -7,12 +7,10 @@
 #include "Framework/Util.h"
 #include <mutex>
 
-template<typename T>
-class Pool_Allocator;
-template<typename T>
-struct ScopedPoolPtr
+template <typename T> class Pool_Allocator;
+template <typename T> struct ScopedPoolPtr
 {
-	ScopedPoolPtr(T* ptr, Pool_Allocator<T>* parent) : ptr(ptr),parent(parent) {}
+	ScopedPoolPtr(T* ptr, Pool_Allocator<T>* parent) : ptr(ptr), parent(parent) {}
 	~ScopedPoolPtr();
 	ScopedPoolPtr(const ScopedPoolPtr&) = delete;
 	ScopedPoolPtr& operator=(const ScopedPoolPtr&) = delete;
@@ -23,9 +21,7 @@ struct ScopedPoolPtr
 		other.parent = nullptr;
 	}
 
-	T* get() const {
-		return ptr;
-	}
+	T* get() const { return ptr; }
 	T& operator*() const {
 		assert(ptr);
 		return *ptr;
@@ -34,19 +30,19 @@ struct ScopedPoolPtr
 		assert(parent);
 		return *parent;
 	}
+
 private:
 	T* ptr = nullptr;
 	Pool_Allocator<T>* parent = nullptr;
 };
 
 // doesnt construct/destruct the object
-template<typename T>
-class Pool_Allocator
+template <typename T> class Pool_Allocator
 {
 public:
 	Pool_Allocator(int num_objs, const char* debug_name = "") : debug_name(debug_name) {
 		obj_size = sizeof(T);
-		
+
 		if (sizeof(T) % 8 != 0)
 			obj_size += 8 - (obj_size % 8);
 
@@ -62,15 +58,13 @@ public:
 		}
 		first_free = memory;
 	}
-	~Pool_Allocator() {
-		delete memory;
-	}
+	~Pool_Allocator() { delete memory; }
 
 	T* allocate() {
 		std::lock_guard<std::mutex> lock(mutex);
 
 		if (first_free == nullptr) {
-			Fatalf("memory pool (%s) full\n",debug_name);
+			Fatalf("memory pool (%s) full\n", debug_name);
 		}
 		uint8_t* next = *((uint8_t**)first_free);
 		uint8_t* ret = first_free;
@@ -78,11 +72,10 @@ public:
 		used_objects++;
 		return (T*)ret;
 	}
-	ScopedPoolPtr<T> allocate_scoped() {
-		return ScopedPoolPtr<T>(allocate(), this);
-	}
+	ScopedPoolPtr<T> allocate_scoped() { return ScopedPoolPtr<T>(allocate(), this); }
 	void free(T* ptr) {
-		if (ptr == nullptr) return;
+		if (ptr == nullptr)
+			return;
 
 		std::lock_guard<std::mutex> lock(mutex);
 
@@ -105,9 +98,7 @@ public:
 	std::mutex mutex;
 };
 
-template<typename T>
-inline ScopedPoolPtr<T>::~ScopedPoolPtr()
-{
+template <typename T> inline ScopedPoolPtr<T>::~ScopedPoolPtr() {
 	if (parent)
 		parent->free(ptr);
 }

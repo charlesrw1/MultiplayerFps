@@ -15,26 +15,27 @@
 
 #include "Framework/Reflection2.h"
 
-
-
-struct BoneRenameContainer {
+struct BoneRenameContainer
+{
 	STRUCT_BODY();
 	REF std::vector<std::string> remap;
 };
 
-struct BoneReparentContainer  {
+struct BoneReparentContainer
+{
 	STRUCT_BODY();
 	REF std::vector<std::string> remap;
 };
 
-
-struct BoneRetargetName {
+struct BoneRetargetName
+{
 	STRUCT_BODY();
 	REF std::string bone_name;
 	REF int type = 0;
 };
 
-struct AnimImportSettings {
+struct AnimImportSettings
+{
 	STRUCT_BODY();
 
 	REF std::string clipName;
@@ -44,33 +45,36 @@ struct AnimImportSettings {
 	REF bool hasEndCrop = false;
 	REF bool hasStartCrop = false;
 	REF int cropStart = 0;
-	REF int cropEnd =0;	// a big number
+	REF int cropEnd = 0; // a big number
 	REF bool fixLoop = false;
 	REF bool makeAdditive = false;
 	REF bool additiveFromSelf = false;
-	REF bool removeLinearVelocity = false;	// if true, then subtracts linear_velocity*t from each position
-	REF bool enableRootMotion = false;		// if true, then marks clip for root motion, note that you shouldnt use removeLinearVelocity or setRootToFirstPose
-	REF bool setRootToFirstPose = false;	// if true, then sets all root poses to first frame
+	REF bool removeLinearVelocity = false; // if true, then subtracts linear_velocity*t from each position
+	REF bool enableRootMotion = false;	   // if true, then marks clip for root motion, note that you shouldnt use
+										   // removeLinearVelocity or setRootToFirstPose
+	REF bool setRootToFirstPose = false;   // if true, then sets all root poses to first frame
 };
 
-
-class ModelImportSettings : public ClassBase {
+class ModelImportSettings : public ClassBase
+{
 public:
 	CLASS_BODY(ModelImportSettings);
 
-	REF std::string srcGlbFile;									// what .glb file did this come from
+	REF std::string srcGlbFile; // what .glb file did this come from
 	// Mesh data
-	REF std::vector<float> lodScreenSpaceSizes;					// array of lod sizes
+	REF std::vector<float> lodScreenSpaceSizes; // array of lod sizes
 	REF std::vector<AssetPtr<MaterialInstance>> myMaterials;
 
 	// Skeleton data
-	REF bool useSharedSkeleton = false;							// use another skeleton defined in shareSkeletonWithThis
-	REF AssetPtr<Model> shareSkeletonWithThis;		// an optional ModelAsset to share skeletons with
-	//REF AssetPtr<DataClass> mirrorTableAsset;			// this is a SkeletonMirror object ptr, fixme needs better type hints
-	REF std::vector<std::string> keepBones;						// array of bones to keep (compilier automatically prunes out unused bones)
-	REF std::vector<std::string> curveNames;					// array of strings that can be used to name custom curves for animations
-	REF std::vector<std::string> additionalAnimationGlbFiles;	// additional glb files to source animations from (will retarget)
-	REF std::vector<AnimImportSettings> animations;				// all animations indexed by string with import settings
+	REF bool useSharedSkeleton = false;		   // use another skeleton defined in shareSkeletonWithThis
+	REF AssetPtr<Model> shareSkeletonWithThis; // an optional ModelAsset to share skeletons with
+	// REF AssetPtr<DataClass> mirrorTableAsset;			// this is a SkeletonMirror object ptr, fixme needs better type
+	// hints
+	REF std::vector<std::string> keepBones;	 // array of bones to keep (compilier automatically prunes out unused bones)
+	REF std::vector<std::string> curveNames; // array of strings that can be used to name custom curves for animations
+	REF std::vector<std::string>
+		additionalAnimationGlbFiles;				// additional glb files to source animations from (will retarget)
+	REF std::vector<AnimImportSettings> animations; // all animations indexed by string with import settings
 	REF std::vector<BoneRetargetName> bone_retargets;
 
 	REF int lightmapSizeX = 0;
@@ -85,15 +89,14 @@ public:
 	// type=BoneRenameContainer
 	// this renames bones in this asset using this dataclass
 	// each entry in the array is "my_current_bone renamed_bone", with a space in between
-	//REF AssetPtr<DataClass> bone_rename_dataclass;
-	//REF AssetPtr<DataClass> bone_reparent;
+	// REF AssetPtr<DataClass> bone_rename_dataclass;
+	// REF AssetPtr<DataClass> bone_reparent;
 	REF float animations_set_fps = 30.0;
 
 	REF BoneRenameContainer bone_rename;
 	REF BoneReparentContainer bone_reparent;
 
-
-	//static const PropertyInfoList* get_props() {
+	// static const PropertyInfoList* get_props() {
 	//
 	//	MAKE_VECTORCALLBACK_ATOM(float, lodScreenSpaceSizes);
 	//	MAKE_VECTORCALLBACK_ATOM(std::string, additionalAnimationGlbFiles);

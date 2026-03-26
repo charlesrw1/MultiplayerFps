@@ -2,17 +2,8 @@
 #include "Framework/Util.h"
 #include "EnumDefReflection.h"
 
-NEWENUM(LogCategory, int)
-{
-	Core,
-	Game,
-	Render,
-	Anim,
-	Editor,
-	UI,
-	Script,
-	Physics,
-	Input,
+NEWENUM(LogCategory, int){
+	Core, Game, Render, Anim, Editor, UI, Script, Physics, Input,
 };
 using LC = LogCategory;
 

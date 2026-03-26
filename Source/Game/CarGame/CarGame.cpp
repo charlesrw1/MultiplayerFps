@@ -32,32 +32,30 @@ float epsilon_friction = 0.005;
 float max_spring = 0.8;
 float visual_wheel_interp = 0.0053;
 
-void car_debug_menu()
-{
+void car_debug_menu() {
 	// thi
-	// 
+	//
 
 	float v = 0.0;
-	ImGui::DragFloat("spring_damp", &spring_damp,0.1,200);
-	ImGui::DragFloat("spring_constant", &spring_constant,0.1,0,500);
+	ImGui::DragFloat("spring_damp", &spring_damp, 0.1, 200);
+	ImGui::DragFloat("spring_constant", &spring_constant, 0.1, 0, 500);
 
-	ImGui::DragFloat("forward_force_mult", &forward_force_mult,0.1,0,100);
-	ImGui::DragFloat("side_force_mult", &side_force_mult,0.1,0,100);
+	ImGui::DragFloat("forward_force_mult", &forward_force_mult, 0.1, 0, 100);
+	ImGui::DragFloat("side_force_mult", &side_force_mult, 0.1, 0, 100);
 
-	ImGui::DragFloat("friction_coeff", &friction_coeff,0.01,0,50);
+	ImGui::DragFloat("friction_coeff", &friction_coeff, 0.01, 0, 50);
 
-	ImGui::DragFloat("steer_mult", &steer_mult,0.005,0,2);
+	ImGui::DragFloat("steer_mult", &steer_mult, 0.005, 0, 2);
 
-	ImGui::DragFloat("visual_wheel_interp", &visual_wheel_interp,0.01,0,1);
+	ImGui::DragFloat("visual_wheel_interp", &visual_wheel_interp, 0.01, 0, 1);
 
+	ImGui::DragFloat("wind_resist", &wind_resist, 0.005, 0, 2);
 
-	ImGui::DragFloat("wind_resist", &wind_resist,0.005,0,2);
+	ImGui::DragFloat("epsilon_friction", &epsilon_friction, 0.005, 0, 0.2);
 
-	ImGui::DragFloat("epsilon_friction", &epsilon_friction,0.005,0,0.2);
-
-	ImGui::DragFloat("max_spring", &max_spring,0.05,0.1,1.5);
+	ImGui::DragFloat("max_spring", &max_spring, 0.05, 0.1, 1.5);
 }
-ADD_TO_DEBUG_MENU(car_debug_menu);//
+ADD_TO_DEBUG_MENU(car_debug_menu); //
 
 void CarComponent::update() {
 	auto body_t = body->get_ws_transform();
@@ -65,18 +63,17 @@ void CarComponent::update() {
 	glm::vec3 side_vec = glm::mat3(body_t) * glm::vec3(1, 0, 0);
 	glm::vec3 front_vec = glm::mat3(body_t) * glm::vec3(0, 0, 1);
 
-	//const float max_spring = 1.0;
+	// const float max_spring = 1.0;
 	const float wheel_radius = 0.43;
 
 	float current_speed = glm::length(body->get_linear_velocity());
 	const float delta_angle = (current_speed * eng->get_dt()) / wheel_radius;
 	tire_screech_amt = 0.0;
-	//Debug::add_line(body_t[3], glm::vec3(body_t[3]) + up_vec*2.f, COLOR_PINK, 0);
+	// Debug::add_line(body_t[3], glm::vec3(body_t[3]) + up_vec*2.f, COLOR_PINK, 0);
 	for (int i = 0; i < 4; i++) {
 		auto w = wheels[i];
 		auto o = w->get_owner();
 		auto ws_pos = glm::vec3(body_t * glm::vec4(localspace_wheel_pos[i], 1));
-
 
 		Ray r;
 		r.pos = ws_pos;
@@ -86,19 +83,18 @@ void CarComponent::update() {
 		world_query_result res;
 		TraceIgnoreVec vec;
 		vec.push_back(body);
-		//if (g_physics.trace_ray(res, r.pos, r.pos + r.dir * max_spring, &vec, UINT32_MAX))
+		// if (g_physics.trace_ray(res, r.pos, r.pos + r.dir * max_spring, &vec, UINT32_MAX))
 		//	dist = res.distance;
-		if (g_physics.sweep_sphere(res, wheel_radius, r.pos + up_vec * wheel_radius, -up_vec, max_spring + wheel_radius, UINT32_MAX, &vec))
+		if (g_physics.sweep_sphere(res, wheel_radius, r.pos + up_vec * wheel_radius, -up_vec, max_spring + wheel_radius,
+								   UINT32_MAX, &vec))
 			dist = res.distance;
-
 
 		float d = glm::max(0.f, max_spring - dist);
 		bool touching_ground = d > 0.f;
-		if (dist < -0.1)touching_ground = false;
+		if (dist < -0.1)
+			touching_ground = false;
 
 		float dxdt = (dist - last_dist[i]) / (float)eng->get_dt();
-
-
 
 		if (touching_ground) {
 			body->apply_force(ws_pos, up_vec * (d * spring_constant - dxdt * spring_damp));
@@ -106,7 +102,8 @@ void CarComponent::update() {
 			wheel_angles[i] += delta_angle * glm::sign(glm::dot(body->get_linear_velocity(), front_vec));
 
 			// apply braking force
-			body->apply_force(ws_pos, -glm::sign(glm::dot(body->get_linear_velocity(), front_vec)) * front_vec * brake_force * brake_force_mult);
+			body->apply_force(ws_pos, -glm::sign(glm::dot(body->get_linear_velocity(), front_vec)) * front_vec *
+										  brake_force * brake_force_mult);
 
 			if (i == 0 || i == 1) {
 
@@ -138,31 +135,25 @@ void CarComponent::update() {
 			if (touching_ground) {
 				body->apply_force(ws_pos, -side_ddt * normal_force * friction_coeff);
 			}
-
 		}
-		//Debug::add_line(ws_pos, ws_pos - side_ddt, COLOR_RED, 0);
-
-
+		// Debug::add_line(ws_pos, ws_pos - side_ddt, COLOR_RED, 0);
 
 		auto wheelpos = localspace_wheel_pos[i] - glm::vec3(0, glm::min(dist, max_spring) - wheel_radius, 0);
 		if (!touching_ground)
 			wheelpos = localspace_wheel_pos[i] - glm::vec3(0, max_spring - wheel_radius, 0);
 
-
 		float yang = (i == 0 || i == 1) ? steer_angle : 0.0;
-		if (i == 1 || i == 3) yang += PI;
+		if (i == 1 || i == 3)
+			yang += PI;
 
 		float xang = wheel_angles[i];
-		if (i == 1 || i == 3)xang *= -1;
-		wheels[i]->get_owner()->set_ls_transform(
-			wheelpos,
-			glm::quat(glm::vec3(xang, yang, 0)),
-			glm::vec3(1.f));
+		if (i == 1 || i == 3)
+			xang *= -1;
+		wheels[i]->get_owner()->set_ls_transform(wheelpos, glm::quat(glm::vec3(xang, yang, 0)), glm::vec3(1.f));
 
 		last_dist[i] = touching_ground ? dist : max_spring;
 		last_ws_pos[i] = ws_pos;
 	}
-
 
 	glm::vec3 velocity = body->get_linear_velocity();
 	float len = glm::length(velocity);
@@ -170,7 +161,7 @@ void CarComponent::update() {
 		velocity /= len;
 		body->apply_force(body->get_ws_position(), -velocity * len * len * wind_resist);
 	}
-	//body->apply_force(ws_pos, side_vec  *steer_force* side_force_mult);
+	// body->apply_force(ws_pos, side_vec  *steer_force* side_force_mult);
 }
 void CarDriver::update() {
 
@@ -187,7 +178,7 @@ void CarDriver::update() {
 	if (Input::was_con_button_pressed(SDL_CONTROLLER_BUTTON_A))
 		top_view = !top_view;
 
-	//printf("%f %f\n", move_vec.x, move_vec.y);
+	// printf("%f %f\n", move_vec.x, move_vec.y);
 
 	car->forward_force = accel_val;
 	car->brake_force = deccel_val;
@@ -199,7 +190,7 @@ void CarDriver::update() {
 	set_steer_angle = damp_dt_independent(what_val, set_steer_angle, 0.0001, eng->get_dt());
 
 	car->steer_angle = set_steer_angle;
-	//car->forward_force = move_vec.y;// move_vec.y;
+	// car->forward_force = move_vec.y;// move_vec.y;
 
 	glm::vec3 dir{};
 
@@ -209,10 +200,8 @@ void CarDriver::update() {
 		auto t = car->get_ws_transform();
 		auto front = -t[2];
 
-
 		dir = glm::vec3(front.x * 4.0, 1.5, front.z * 4.0) * 3.0f;
-	}
-	else
+	} else
 		dir = glm::vec3(0, 2.5, -5);
 	pos = pos + dir;
 
@@ -237,23 +226,17 @@ void CarDriver::update() {
 
 CarGameMode* CarGameMode::instance = nullptr;
 
-
-
 float car_pitch_min = 0.5;
 float car_pitch_max = 2.0;
 float pitchinterp = 0.1;
 float sqthresh = 2.0;
-void car_pitch_menu()
-{
+void car_pitch_menu() {
 	ImGui::DragFloat("car_pitch_min", &car_pitch_min, 0.01);
 	ImGui::DragFloat("car_pitch_max", &car_pitch_max, 0.01);
 	ImGui::DragFloat("pitchinterp", &pitchinterp, 0.01);
 	ImGui::DragFloat("sqthresh", &sqthresh, 0.01);
-
-
 }
 ADD_TO_DEBUG_MENU(car_pitch_menu);
-
 
 void CarSoundMaker::update() {
 	float target = glm::mix(car_pitch_min, car_pitch_max, car->forward_force);
@@ -267,10 +250,8 @@ void CarSoundMaker::update() {
 		}
 		squel_start = eng->get_game_time();
 		tireSound->set_play(true);
-	}
-	else if (squel_start + 0.4 < eng->get_game_time()) {
+	} else if (squel_start + 0.4 < eng->get_game_time()) {
 		is_squel = false;
 		tireSound->set_play(false);
 	}
 }
-

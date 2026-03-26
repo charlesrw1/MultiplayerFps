@@ -2,19 +2,18 @@
 #include <vector>
 #include <cassert>
 
-#ifdef _DEBUG 
+#ifdef _DEBUG
 #define FREELIST_CHECK
-#endif // _DEBUG 
+#endif // _DEBUG
 
-template<typename T>
-class Free_List
+template <typename T> class Free_List
 {
 public:
 	using handle_type = int;
 
 	bool check_handle(handle_type handle) {
 		return (handle >= 0 && handle < handle_to_obj.size()) &&
-			(handle_to_obj[handle] >= 0 && handle_to_obj[handle] < objects.size());
+			   (handle_to_obj[handle] >= 0 && handle_to_obj[handle] < objects.size());
 	}
 
 	T& get(handle_type handle) {
@@ -31,13 +30,12 @@ public:
 		if (free_handles.empty()) {
 			h = first_free++;
 			handle_to_obj.push_back(objects.size());
-		}
-		else {
+		} else {
 			h = free_handles.back();
 			free_handles.pop_back();
 			handle_to_obj[h] = objects.size();
 		}
-		objects.push_back({ h, T() });
+		objects.push_back({h, T()});
 
 		return h;
 	}
@@ -62,7 +60,8 @@ public:
 	std::vector<handle_type> free_handles;
 
 	std::vector<int> handle_to_obj;
-	struct pair {
+	struct pair
+	{
 		handle_type handle = -1;
 		T type_;
 	};

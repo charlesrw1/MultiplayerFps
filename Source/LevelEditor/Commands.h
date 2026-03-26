@@ -43,18 +43,16 @@ public:
 	// returns number of errord commands
 	int execute_queued_commands();
 
-	void add_command(Command* c) {
-		queued_commands.push_back({ c });
-	}
+	void add_command(Command* c) { queued_commands.push_back({c}); }
 	void add_command_with_execute_callback(Command* c, std::function<void(bool)> callback) {
-		queued_commands.push_back({ c, callback });
+		queued_commands.push_back({c, callback});
 	}
 
 	void undo();
 
-
 	MulticastDelegate<> on_command_execute_or_undo;
-	struct Queued {
+	struct Queued
+	{
 		Command* c = nullptr;
 		std::function<void(bool)> func;
 	};
@@ -68,11 +66,13 @@ public:
 class CommandSerializeUtil
 {
 public:
-	static std::unique_ptr<SerializedSceneFile> serialize_entities_text(EditorDoc& ed_doc, std::vector<EntityPtr> handles);
+	static std::unique_ptr<SerializedSceneFile> serialize_entities_text(EditorDoc& ed_doc,
+																		std::vector<EntityPtr> handles);
 };
 
 class EditorDoc;
-struct SavedCreateObj {
+struct SavedCreateObj
+{
 	uint64_t eng_handle = 0;
 };
 class RemoveEntitiesCommand : public Command
@@ -83,36 +83,29 @@ public:
 	EditorDoc& ed_doc;
 	RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles);
 	bool is_valid_flag = true;
-	bool is_valid() final {
-		return is_valid_flag;
-	}
+	bool is_valid() final { return is_valid_flag; }
 
 	void execute() final;
 	void undo() final;
-	std::string to_string() final {
-		return "Remove Entity";
-	}
+	std::string to_string() final { return "Remove Entity"; }
 
 	std::unique_ptr<SerializedSceneFile> scene;
 	std::vector<EntityPtr> handles;
 };
 
-
 class CreateStaticMeshCommand : public Command
 {
 public:
 	EditorDoc& ed_doc;
-	CreateStaticMeshCommand(EditorDoc& ed_doc, const std::string& modelname, const glm::mat4& transform, EntityPtr parent = EntityPtr());
-	~CreateStaticMeshCommand() override {
-	}
+	CreateStaticMeshCommand(EditorDoc& ed_doc, const std::string& modelname, const glm::mat4& transform,
+							EntityPtr parent = EntityPtr());
+	~CreateStaticMeshCommand() override {}
 
 	bool is_valid() final { return true; }
 
 	void execute() final;
 	void undo() final;
-	std::string to_string() final {
-		return "Create StaticMesh";
-	}
+	std::string to_string() final { return "Create StaticMesh"; }
 	EntityPtr parent_to;
 	EntityPtr handle;
 	glm::mat4 transform;
@@ -122,14 +115,13 @@ class CreateCppClassCommand : public Command
 {
 public:
 	EditorDoc& ed_doc;
-	CreateCppClassCommand(EditorDoc& ed_doc, const std::string& cppclassname, const glm::mat4& transform, EntityPtr parent, bool is_component);
+	CreateCppClassCommand(EditorDoc& ed_doc, const std::string& cppclassname, const glm::mat4& transform,
+						  EntityPtr parent, bool is_component);
 	bool is_valid() final { return ti != nullptr; }
 
 	void execute() final;
 	void undo() final;
-	std::string to_string() final {
-		return "Create Class";
-	}
+	std::string to_string() final { return "Create Class"; }
 	const ClassTypeInfo* ti = nullptr;
 	glm::mat4 transform;
 	EntityPtr handle;
@@ -144,27 +136,24 @@ public:
 
 	void execute() final;
 	void undo() final;
-	std::string to_string() final {
-		return "Create Spawner";
-	}
+	std::string to_string() final { return "Create Spawner"; }
 	std::string cppclassname;
 	glm::mat4 transform;
 	EntityPtr handle;
 };
 
-
 class TransformCommand : public Command
 {
 public:
 	EditorDoc& ed_doc;
-	TransformCommand(EditorDoc& ed_doc, const std::unordered_set<uint64_t>& selection, const std::unordered_map<uint64_t, glm::mat4>& pre_transforms);
+	TransformCommand(EditorDoc& ed_doc, const std::unordered_set<uint64_t>& selection,
+					 const std::unordered_map<uint64_t, glm::mat4>& pre_transforms);
 	void execute() final;
 	void undo() final;
-	std::string to_string() final {
-		return "Transform Entities";
-	}
+	std::string to_string() final { return "Transform Entities"; }
 	bool skip_this_time = false;
-	struct pre_and_post {
+	struct pre_and_post
+	{
 		EntityPtr ptr;
 		glm::mat4 pre_transform;
 		glm::mat4 post_transform;
@@ -172,22 +161,17 @@ public:
 	std::vector<pre_and_post> transforms;
 };
 
-
 class DuplicateEntitiesCommand : public Command
 {
 public:
 	EditorDoc& ed_doc;
 	DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vector<EntityPtr> handles);
 	bool is_valid_flag = true;
-	bool is_valid() final {
-		return is_valid_flag;
-	}
+	bool is_valid() final { return is_valid_flag; }
 
 	void execute() final;
 	void undo() final;
-	std::string to_string() final {
-		return "Duplicate Entity";
-	}
+	std::string to_string() final { return "Duplicate Entity"; }
 
 	std::unique_ptr<SerializedSceneFile> scene;
 	std::vector<EntityPtr> handles;
@@ -196,7 +180,8 @@ public:
 class MovePositionInHierarchy : public Command
 {
 public:
-	enum class Cmd {
+	enum class Cmd
+	{
 		Next,
 		Prev,
 		First,
@@ -204,14 +189,10 @@ public:
 	};
 	EditorDoc& ed_doc;
 	MovePositionInHierarchy(EditorDoc& ed_doc, Entity* e, Cmd cmd);
-	bool is_valid() final {
-		return entPtr;
-	}
+	bool is_valid() final { return entPtr; }
 	void execute() final;
 	void undo() final;
-	std::string to_string() final {
-		return "MovePositionInHeirarchy";
-	}
+	std::string to_string() final { return "MovePositionInHeirarchy"; }
 	int to_position = 0;
 	int from_position = 0;
 	EntityPtr entPtr{};
@@ -221,7 +202,7 @@ class CreateComponentCommand : public Command
 {
 public:
 	EditorDoc& ed_doc;
-	CreateComponentCommand(EditorDoc& ed_doc, Entity* e, const ClassTypeInfo* component_type) :ed_doc(ed_doc){
+	CreateComponentCommand(EditorDoc& ed_doc, Entity* e, const ClassTypeInfo* component_type) : ed_doc(ed_doc) {
 		ent = e->get_self_ptr();
 		ASSERT(component_type->is_a(Component::StaticType));
 		info = component_type;
@@ -229,9 +210,7 @@ public:
 	void execute() final;
 	virtual void post_create(Component* ec);
 	void undo() final;
-	std::string to_string() override {
-		return "Create Component";
-	}
+	std::string to_string() override { return "Create Component"; }
 	EntityPtr ent;
 	uint64_t comp_handle = 0;
 	const ClassTypeInfo* info = nullptr;
@@ -244,7 +223,7 @@ public:
 		: CreateComponentCommand(ed_doc, e, &MeshComponent::StaticType) {
 		this->s = s;
 	}
-	void post_create(Component* ec)override {
+	void post_create(Component* ec) override {
 		auto sc = ec->cast_to<MeshComponent>();
 		ASSERT(sc);
 		sc->set_model(s);
@@ -256,14 +235,13 @@ public:
 class CreateEntityCommand : public Command
 {
 public:
-	CreateEntityCommand(EditorDoc& ed_doc, std::function<void(Entity*)> post_create) : doc(doc),post_create(post_create) {
-	}
-	std::string to_string() override {
-		return "CreateEntityCommand";
-	}
+	CreateEntityCommand(EditorDoc& ed_doc, std::function<void(Entity*)> post_create)
+		: doc(doc), post_create(post_create) {}
+	std::string to_string() override { return "CreateEntityCommand"; }
 	void undo() final {
 		auto obj = eng->get_object(ptr);
-		if (obj)ptr->destroy();
+		if (obj)
+			ptr->destroy();
 		obj = EntityPtr();
 	}
 	void execute() final;
@@ -273,27 +251,25 @@ public:
 	EntityPtr ptr;
 };
 
-
-class RemoveComponentCommand  : public Command
+class RemoveComponentCommand : public Command
 {
 public:
 	EditorDoc& ed_doc;
-	RemoveComponentCommand(EditorDoc& ed_doc, Entity* e, Component* which) : ed_doc(ed_doc){
+	RemoveComponentCommand(EditorDoc& ed_doc, Entity* e, Component* which) : ed_doc(ed_doc) {
 		ent = e->get_self_ptr();
 		comp_handle = which->get_instance_id();
 		info = &which->get_type();
 	}
 	void execute() final;
 	void undo() final;
-	std::string to_string() final {
-		return "Remove Component";
-	}
+	std::string to_string() final { return "Remove Component"; }
 	EntityPtr ent;
 	uint64_t comp_handle = 0;
 	const ClassTypeInfo* info = nullptr;
 };
 
-class SetFolderCommand : public Command {
+class SetFolderCommand : public Command
+{
 public:
 	EditorDoc& ed_doc;
 	SetFolderCommand(EditorDoc& ed_doc, std::vector<EntityPtr> ptrs, int folderId) : ed_doc(ed_doc) {
@@ -303,7 +279,7 @@ public:
 	void execute() final {
 		prevIds.clear();
 		prevIds.resize(ptrs.size());
-		for (int i = 0; i < ptrs.size();i++) {
+		for (int i = 0; i < ptrs.size(); i++) {
 			auto ent = ptrs[i].get();
 			if (ent) {
 				prevIds.at(i) = ent->get_folder_id();
@@ -319,9 +295,7 @@ public:
 			}
 		}
 	}
-	std::string to_string() final {
-		return "SetFolderCommand";
-	}
+	std::string to_string() final { return "SetFolderCommand"; }
 	std::vector<EntityPtr> ptrs;
 	std::vector<int8_t> prevIds;
 	int setTo = 0;

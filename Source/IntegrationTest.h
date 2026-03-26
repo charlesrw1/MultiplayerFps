@@ -3,9 +3,9 @@
 #include <vector>
 #include <string>
 #include "Framework/MulticastDelegate.h"
-using std::vector;
-using std::string;
 using std::function;
+using std::string;
+using std::vector;
 #include <thread>
 #include <mutex>
 #include <condition_variable>
@@ -14,7 +14,8 @@ using std::function;
 #include "Framework/MathLib.h"
 
 class IntegrationTester;
-struct IntTestCase {
+struct IntTestCase
+{
 	function<void(IntegrationTester&)> func;
 	string test_name;
 	float time_limit = 1.0;
@@ -31,11 +32,11 @@ public:
 	void wait_time(float time);
 	void wait_ticks(int ticks);
 	void wait_delegate(MulticastDelegate<>& delegate);
-	template<typename T>
-	T wait_delegate(MulticastDelegate<T>& delegate);
-	void checkTrue(bool b, const char* msg="");
+	template <typename T> T wait_delegate(MulticastDelegate<T>& delegate);
+	void checkTrue(bool b, const char* msg = "");
 	~IntegrationTester();
 	Random& get_rand() { return rand; }
+
 private:
 	void wait_delegate_shared();
 	void tester_thread();
@@ -57,12 +58,11 @@ private:
 	std::thread thread;
 };
 
-template<typename T>
-inline T IntegrationTester::wait_delegate(MulticastDelegate<T>& delegate) {
+template <typename T> inline T IntegrationTester::wait_delegate(MulticastDelegate<T>& delegate) {
 	assert(!waiting_on_delegate);
 	waiting_on_delegate = true;
 	T outVal = T();
-	delegate.add(this, [this, &delegate,&outVal](T dummy) {
+	delegate.add(this, [this, &delegate, &outVal](T dummy) {
 		outVal = dummy;
 		waiting_on_delegate = false;
 		delegate.remove(this);

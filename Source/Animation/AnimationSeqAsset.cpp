@@ -8,24 +8,16 @@
 #include <fstream>
 
 #ifdef EDITOR_BUILD
-//extern IEditorTool* g_animseq_editor;
+// extern IEditorTool* g_animseq_editor;
 class AnimationSeqAssetMetadata : public AssetMetadata
 {
 public:
-
 	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() const  override
-	{
-		return { 40, 135, 205 };
-	}
+	virtual Color32 get_browser_color() const override { return {40, 135, 205}; }
 
-	virtual std::string get_type_name() const  override
-	{
-		return "AnimationSeq";
-	}
+	virtual std::string get_type_name() const override { return "AnimationSeq"; }
 
-	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const  override
-	{	
+	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const override {
 		for (auto& f : FileSys::find_game_files()) {
 			if (get_extension(f) == ".anims") {
 				std::ifstream infile(f);
@@ -37,18 +29,16 @@ public:
 			}
 		}
 	}
-	//virtual IEditorTool* tool_to_edit_me() const override {
-	//	return g_animseq_editor; 
+	// virtual IEditorTool* tool_to_edit_me() const override {
+	//	return g_animseq_editor;
 	//}
-
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &AnimationSeqAsset::StaticType; }
 };
 REGISTER_ASSETMETADATA_MACRO(AnimationSeqAssetMetadata);
 #endif
 
-bool AnimationSeqAsset::load_asset(IAssetLoadingInterface* load)
-{
+bool AnimationSeqAsset::load_asset(IAssetLoadingInterface* load) {
 	auto& path = get_name();
 	auto pos = path.rfind('/');
 	if (pos == std::string::npos) {
@@ -58,26 +48,19 @@ bool AnimationSeqAsset::load_asset(IAssetLoadingInterface* load)
 	std::string modName = path.substr(0, pos) + ".cmdl";
 	std::string animName = path.substr(pos + 1);
 
-	//auto m = load->load_asset(&Model::StaticType, modName);
-	srcModel = g_assets.find_sync_sptr<Model>(modName);// m->cast_to<Model>();
+	// auto m = load->load_asset(&Model::StaticType, modName);
+	srcModel = g_assets.find_sync_sptr<Model>(modName); // m->cast_to<Model>();
 	if (srcModel && srcModel->get_skel()) {
 		seq = srcModel->get_skel()->find_clip(animName);
 
-
-
 		return true;
-	}
-	else
+	} else
 		return false;
 }
-
 
 void AnimationSeqAsset::move_construct(IAsset* _other) {
 	auto other = (AnimationSeqAsset*)_other;
 
 	*this = std::move(*other);
 }
-void AnimationSeqAsset::uninstall()
-{
-
-}
+void AnimationSeqAsset::uninstall() {}

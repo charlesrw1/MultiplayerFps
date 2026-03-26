@@ -11,8 +11,8 @@
 #include "Framework/MapUtil.h"
 #include "Animation/Editor/Optional.h"
 
-const int MAX_INSTANCE_PARAMETERS = 8;	// 8 scalars/color32s
-const int MATERIAL_SIZE = 64;	// 64 bytes
+const int MAX_INSTANCE_PARAMETERS = 8; // 8 scalars/color32s
+const int MATERIAL_SIZE = 64;		   // 64 bytes
 const int MAX_MATERIALS = 1024;
 const int MAX_MAXTERIALS_BUFFER_SIZE = MATERIAL_SIZE * MAX_MATERIALS;
 
@@ -31,7 +31,7 @@ enum class MaterialUsage : int8_t
 	Particle,
 };
 
-#undef OPAQUE	// windows header leaking
+#undef OPAQUE // windows header leaking
 enum class BlendState : int8_t
 {
 	OPAQUE,
@@ -48,10 +48,10 @@ enum class BlendState : int8_t
 enum class MatParamType : int8_t
 {
 	Empty,
-	FloatVec,	// float[4]
-	Float,		// float
-	Vector,		// uint8[4]
-	Bool,		// uint8
+	FloatVec, // float[4]
+	Float,	  // float
+	Vector,	  // uint8[4]
+	Bool,	  // uint8
 	Texture2D,
 };
 
@@ -102,7 +102,7 @@ struct MaterialParameterDefinition
 struct InstanceData
 {
 	std::string name;
-	bool is_vector_type = false;	/* true = is scalar */
+	bool is_vector_type = false; /* true = is scalar */
 	int index = 0;
 };
 #include "Animation/Editor/Optional.h"
@@ -110,12 +110,8 @@ struct InstanceData
 class MasterMaterialImpl
 {
 public:
-	MasterMaterialImpl() {
-	
-	}
-	~MasterMaterialImpl() {
-		sys_print(Debug, "~MasterMaterialImpl: %s\n", self->get_name().c_str());
-	}
+	MasterMaterialImpl() {}
+	~MasterMaterialImpl() { sys_print(Debug, "~MasterMaterialImpl: %s\n", self->get_name().c_str()); }
 	const MaterialParameterDefinition* find_definition(const std::string& str, int& index) const;
 	bool is_translucent() const { return blend != BlendState::OPAQUE; }
 	bool render_in_forward_pass() const { return is_translucent(); }
@@ -123,15 +119,17 @@ public:
 	void load_from_file(const std::string& fullpath, IFile* file, IAssetLoadingInterface* loading);
 #ifdef EDITOR_BUILD
 	// generated glsl fragment and vertex shader
-	std::string create_glsl_shader(std::string& vs_code,std::string& fs_code,const std::vector<InstanceData>& instdat);
+	std::string create_glsl_shader(std::string& vs_code, std::string& fs_code,
+								   const std::vector<InstanceData>& instdat);
 #endif
 
 	MaterialInstance* self = nullptr;
 	// All parameters that can be set by instances
 	std::vector<MaterialParameterDefinition> param_defs;
 	int num_texture_bindings = 0;
-	struct UboBinding {
-		//MaterialParameterBuffer* buffer = nullptr;
+	struct UboBinding
+	{
+		// MaterialParameterBuffer* buffer = nullptr;
 		int binding_loc = 0;
 	};
 	std::vector<UboBinding> constant_buffers;
@@ -161,12 +159,9 @@ class MaterialImpl
 {
 public:
 	static const int INVALID_MAPPING = int(-1);
-	MaterialImpl(bool is_dynamic_mat=false)  {
-	}
+	MaterialImpl(bool is_dynamic_mat = false) {}
 
-	bool is_valid() const {
-		return bool(masterImpl) != bool(masterMaterial);
-	}
+	bool is_valid() const { return bool(masterImpl) != bool(masterMaterial); }
 	MaterialParameterValue* find_param_type(StringName name, MatParamType type) {
 		auto param = find_parameter(name);
 		if (!param || param->type != type)
@@ -195,15 +190,11 @@ public:
 		assert(masterMaterial || masterImpl);
 		return masterImpl ? masterImpl.get() : masterMaterial.get()->impl->masterImpl.get();
 
-		//return masterMaterial->impl ? masterMaterial->impl->masterImpl.get() : nullptr;
+		// return masterMaterial->impl ? masterMaterial->impl->masterImpl.get() : nullptr;
 	}
-	int get_material_index_from_buffer_ofs() const {
-		return (gpu_buffer_offset * 4) / MATERIAL_SIZE;
-	}
+	int get_material_index_from_buffer_ofs() const { return (gpu_buffer_offset * 4) / MATERIAL_SIZE; }
 
-	bool is_transparent_material() const {
-		return get_master_impl()->is_translucent();
-	}
+	bool is_transparent_material() const { return get_master_impl()->is_translucent(); }
 
 	MaterialInstance* self = nullptr;
 	bool is_dynamic_material = false;
@@ -212,10 +203,12 @@ public:
 
 	opt<int> texture_id_hash;
 	std::shared_ptr<MaterialInstance> masterMaterial;
-	std::unique_ptr<MasterMaterialImpl> masterImpl;	// if this material instance is a default instance of a master material, this is filled
+	std::unique_ptr<MasterMaterialImpl>
+		masterImpl; // if this material instance is a default instance of a master material, this is filled
 	std::vector<Texture*> texture_bindings;
 	std::vector<MaterialParameterValue> params;
-	int gpu_buffer_offset = INVALID_MAPPING;	// offset in buffer if uploaded (the buffer is uint's so byte = buffer_offset*4)
+	int gpu_buffer_offset =
+		INVALID_MAPPING; // offset in buffer if uploaded (the buffer is uint's so byte = buffer_offset*4)
 	bool has_called_post_load_already = false;
 	bool used_in_fastpath_cache = false;
 
@@ -223,14 +216,13 @@ public:
 	friend class MaterialLodJob;
 };
 
-
 namespace gpu {
-	struct Material_Data;
+struct Material_Data;
 }
 
-
 // master shader flags are #ifdef defines in the shader. compilied seperately
-enum master_shader_flags {
+enum master_shader_flags
+{
 	MSF_ANIMATED = 1,
 	MSF_EDITOR_ID = 2,
 	MSF_DEPTH_ONLY = 4,
@@ -248,20 +240,14 @@ struct shader_key
 		material_id = 0;
 		msf_flags = 0;
 	}
-	bool has_flag(master_shader_flags f) {
-		return (int(msf_flags) & f);
-	}
+	bool has_flag(master_shader_flags f) { return (int(msf_flags) & f); }
 
 	uint32_t material_id : 23;
 	uint32_t msf_flags : 9;
 
-	uint32_t as_uint32() const {
-		return *((uint32_t*)this);
-	}
+	uint32_t as_uint32() const { return *((uint32_t*)this); }
 };
 static_assert(sizeof(shader_key) == 4, "shader key needs 4 bytes");
-
-
 
 class MaterialShaderTable
 {
@@ -274,12 +260,15 @@ public:
 	std::unordered_map<uint32_t, program_handle> shader_key_to_program_handle;
 };
 
-class TextureBindingHasher {
+class TextureBindingHasher
+{
 public:
 	int get_texture_hash_id_for_material(MaterialImpl* mat);
+
 private:
 	static const int NO_TEXTURE_ID = 0;
-	struct HashItem {
+	struct HashItem
+	{
 		InlineVec<Texture*, 6> textures;
 		int id = 0;
 	};
@@ -289,40 +278,44 @@ private:
 	opt<int> find_existing(const std::vector<Texture*> bindings);
 
 	std::unordered_map<Texture*, HashItemVec> table;
-	int current_texture_hash_id = NO_TEXTURE_ID+1;
+	int current_texture_hash_id = NO_TEXTURE_ID + 1;
 };
 
-class BitmapAllocator {
+class BitmapAllocator
+{
 public:
 	BitmapAllocator(int size);
 	int allocate();
 	void free(int id);
+
 private:
 	int max_ids = 0;
 	std::vector<uint64_t> materialBitmapAllocator;
 };
-class AllMaterialTable {
+class AllMaterialTable
+{
 public:
 	AllMaterialTable(int max_materials);
 	void register_material(MaterialInstance* mat);
 	void unregister_material(MaterialInstance* mat);
 	const std::vector<MaterialInstance*>& get_all_mat_array() const;
+
 private:
 	std::vector<MaterialInstance*> all_mats;
 	BitmapAllocator allocator;
 };
 #include "Framework/Hashset.h"
 
-class DynamicMaterialAllocator {
+class DynamicMaterialAllocator
+{
 public:
 	MaterialInstance* allocate_dynamic();
 	void free_dynamic(MaterialInstance* mat);
 
-	int get_num_dynamic_mats() const {
-		return outstanding_dynamic_mats;
-	}
+	int get_num_dynamic_mats() const { return outstanding_dynamic_mats; }
+
 private:
-	int outstanding_dynamic_mats = 0;	// to check for leaks
+	int outstanding_dynamic_mats = 0; // to check for leaks
 	hash_set<MaterialInstance> free_dynamic_ptrs;
 };
 
@@ -333,7 +326,7 @@ class MaterialManagerLocal : public MaterialManagerPublic
 public:
 	void init() override;
 	// public interface
-	void pre_render_update() override;	// material buffer updates
+	void pre_render_update() override; // material buffer updates
 	DynamicMatUniquePtr create_dynmaic_material(const MaterialInstance* material) final {
 		return DynamicMatUniquePtr(create_dynmaic_material_unsafier(material));
 	}
@@ -344,13 +337,12 @@ public:
 	void add_to_dirty_list(MaterialInstance* mat);
 	void remove_from_dirty_list_if_it_is(MaterialInstance* mat);
 	void free_material_instance(MaterialInstance* m);
-	int get_next_master_id() {return ++current_master_id;}
-	MaterialInstance* get_default_editor_sel_PP() {return pp_editor_select_mat.get();}
+	int get_next_master_id() { return ++current_master_id; }
+	MaterialInstance* get_default_editor_sel_PP() { return pp_editor_select_mat.get(); }
 	AllMaterialTable* get_material_table() { return mat_offset_table.get(); }
-	int compute_tex_hash_for(MaterialImpl* m) {
-		return binding_hasher.get_texture_hash_id_for_material(m);
-	}
+	int compute_tex_hash_for(MaterialImpl* m) { return binding_hasher.get_texture_hash_id_for_material(m); }
 	void on_reloaded_material(MaterialInstance* mat);
+
 private:
 	void on_reload_shader_invoke();
 	program_handle compile_mat_shader(const MaterialInstance* mat, shader_key key);

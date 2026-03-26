@@ -6,7 +6,6 @@
 #include <span>
 #include "Framework/SharedPtr.h"
 
-
 struct View_Setup
 {
 	View_Setup() {}
@@ -24,11 +23,11 @@ struct View_Setup
 	int width, height;
 };
 
-struct SceneDrawParamsEx {
-	SceneDrawParamsEx(float time, float dt) 
-		: time(time), dt(dt) {}
+struct SceneDrawParamsEx
+{
+	SceneDrawParamsEx(float time, float dt) : time(time), dt(dt) {}
 	bool draw_ui = true;
-	bool output_to_screen = true;	// else output to a framebuffer texture, later sampled by ie ImGui ui
+	bool output_to_screen = true; // else output to a framebuffer texture, later sampled by ie ImGui ui
 	bool draw_world = true;
 	float time;
 	float dt;
@@ -54,7 +53,6 @@ class GraphicsCommandList;
 class RenderScenePublic
 {
 public:
-
 	virtual handle<Render_Object> register_obj() = 0;
 	virtual void update_obj(handle<Render_Object> handle, const Render_Object& proxy) = 0;
 	virtual void remove_obj(handle<Render_Object>& handle) = 0;
@@ -97,8 +95,6 @@ public:
 	virtual void remove_lightmap(handle<Lightmap_Object> obj) = 0;
 };
 
-
-
 class Model;
 class MaterialInstance;
 
@@ -110,7 +106,7 @@ public:
 
 	// Game call api
 	virtual RenderScenePublic* get_scene() = 0;
-	virtual void scene_draw(SceneDrawParamsEx params, View_Setup view	/* camera */) = 0;
+	virtual void scene_draw(SceneDrawParamsEx params, View_Setup view /* camera */) = 0;
 	virtual void sync_update() = 0;
 	virtual void pre_sync_update() = 0;
 
@@ -129,7 +125,8 @@ public:
 	// test the depth buffer, returns LINEAR depth, ONLY for editor!
 	virtual float get_scene_depth_for_editor(int x, int y) = 0;
 	// hm.
-	virtual void editor_render_thumbnail_for(Model* model,MaterialInstance* override_mat, int w, int h, std::string disk_path) = 0;
+	virtual void editor_render_thumbnail_for(Model* model, MaterialInstance* override_mat, int w, int h,
+											 std::string disk_path) = 0;
 #endif
 };
 

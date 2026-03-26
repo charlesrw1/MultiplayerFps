@@ -4,7 +4,6 @@
 #include "glm/glm.hpp"
 #include "Framework/Util.h"
 
-
 struct MbVertex
 {
 	MbVertex(glm::vec3 position, Color32 color) : position(position), color(color) {}
@@ -14,8 +13,8 @@ struct MbVertex
 	glm::vec2 uv = glm::vec2(0);
 };
 class MeshBuilderDD;
-using glm::vec3;
 using glm::vec2;
+using glm::vec3;
 class MeshBuilder
 {
 public:
@@ -23,9 +22,7 @@ public:
 	void End();
 
 	int GetBaseVertex() const { return verticies.size(); }
-	void AddVertex(MbVertex vertex) {
-		verticies.push_back(vertex);
-	}
+	void AddVertex(MbVertex vertex) { verticies.push_back(vertex); }
 	void AddTriangle(int v1, int v2, int v3) {
 		indicies.push_back(v1);
 		indicies.push_back(v2);
@@ -49,18 +46,16 @@ public:
 
 	void PushOrientedLineBox(vec3 box_min, vec3 box_max, glm::mat4 transform, Color32 color);
 	void AddSphere(vec3 origin, float radius, int xsegments, int ysegments, Color32 color);
-	void AddLineCapsule(vec3 origin, float radius, float half_height, Color32 color);	
-	void AddLineSphere(vec3 origin, float radius, Color32 color);	
-
+	void AddLineCapsule(vec3 origin, float radius, float half_height, Color32 color);
+	void AddLineSphere(vec3 origin, float radius, Color32 color);
 
 	const std::vector<MbVertex>& get_v() { return verticies; }
 	const std::vector<uint32_t>& get_i() { return indicies; }
 
-
 private:
 	friend class MeshBuilderDD;
 	bool wants_new_upload = false;
-	//uint32_t VBO = 0, VAO = 0, EBO = 0;
+	// uint32_t VBO = 0, VAO = 0, EBO = 0;
 	std::vector<MbVertex> verticies;
 	std::vector<uint32_t> indicies;
 

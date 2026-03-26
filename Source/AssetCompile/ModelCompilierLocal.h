@@ -8,7 +8,8 @@
 #include <vector>
 #include "Framework/CurveEditorImgui.h"
 
-enum class AnimImportType_Load {
+enum class AnimImportType_Load
+{
 	File,
 	Folder,
 	Model,
@@ -22,7 +23,8 @@ struct AnimImportedSet_Load
 	bool include_weightlist = true;
 	bool retarget = false;
 };
-enum class SubtractType_Load {
+enum class SubtractType_Load
+{
 	None,
 	FromThis,
 	FromAnother,
@@ -35,8 +37,6 @@ struct ClipCrop
 	bool has_crop = false;
 };
 
-
-
 struct AnimationClip_Load
 {
 	SubtractType_Load sub = SubtractType_Load::None;
@@ -48,7 +48,6 @@ struct AnimationClip_Load
 	bool fixloop = false;
 	bool enableRootMotion = false;
 	bool setRootToFirstFrame = false;
-
 
 	// if non empty, then set origin of clip to this
 	std::string make_relative_to_locator;
@@ -70,7 +69,7 @@ struct SkeletonLODDef
 struct PhysicsCollisionShapeDefLoad
 {
 	std::string node_name_target;
-	bool is_mesh = false;		// exports tri mesh
+	bool is_mesh = false; // exports tri mesh
 
 	std::string material_name;
 	physics_shape_def def;
@@ -97,7 +96,7 @@ public:
 	uint64_t timestamp_of_def = 0;
 
 	// MATERIALS
-	std::vector<std::string> directMaterialSet;	// use final index
+	std::vector<std::string> directMaterialSet; // use final index
 
 	// LODS
 	std::vector<LODDef> loddefs;
@@ -112,12 +111,13 @@ public:
 	std::unordered_map<std::string, std::string> bone_rename;
 	std::vector<std::string> keepbones;
 	std::unordered_map<std::string, RetargetBoneType> bone_retarget_type;
-	struct mirror {
+	struct mirror
+	{
 		std::string bone1;
 		std::string bone2;
 	};
 	std::vector<mirror> mirrored_bones;
-	std::vector< WeightlistDef> weightlists;
+	std::vector<WeightlistDef> weightlists;
 	float override_fps = 30.0;
 
 	// PHYSICS

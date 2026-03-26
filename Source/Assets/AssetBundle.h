@@ -3,7 +3,8 @@
 #include <memory>
 #include <vector>
 // A collection of assets that are loaded all at once
-class AssetBundle : public IAsset {
+class AssetBundle : public IAsset
+{
 public:
 	CLASS_BODY(AssetBundle);
 	bool load_asset(IAssetLoadingInterface* loading) final;
@@ -14,6 +15,7 @@ public:
 			assets = std::move(as_bundle->assets);
 		}
 	}
+
 private:
 	std::vector<std::shared_ptr<IAsset>> assets;
 };

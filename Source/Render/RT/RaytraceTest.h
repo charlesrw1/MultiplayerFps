@@ -20,27 +20,27 @@ struct GPUTriangle
 	glm::vec4 v2;
 };
 
-
-struct RayBufferStruct {
+struct RayBufferStruct
+{
 	glm::vec4 dir_dist;
 	glm::vec4 shading;
 };
 
-struct DdgiVolumeGpu {
+struct DdgiVolumeGpu
+{
 	glm::vec4 origin_priority;
 	glm::vec4 density;
 	glm::ivec4 size_offset;
-	int get_num_probes_total() const {
-		return size_offset.x * size_offset.y * size_offset.z;
-	}
+	int get_num_probes_total() const { return size_offset.x * size_offset.y * size_offset.z; }
 };
-struct DdgiGlobals {
+struct DdgiGlobals
+{
 	int atlas_x;
 	int atlas_y;
 	float normal_bias;
 	float view_bias;
 
-	int num_volumes=0;
+	int num_volumes = 0;
 	float relocate_normal_dist;
 	float max_relocate_dist;
 	float indirect_boost;
@@ -50,19 +50,15 @@ class DdgiTesting
 public:
 	DdgiTesting();
 	~DdgiTesting();
-	
+
 	// editor side
 	void build_world();
 	void execute();
 	void calculate_lum_for_spec();
 
 	// scene load
-	void load_the_gi(
-		IGraphicsTexture* irrad,
-		IGraphicsTexture* depth,
-		std::vector<glm::vec4>& relocate,
-		std::vector<DdgiVolumeGpu>& vols
-	);
+	void load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, std::vector<glm::vec4>& relocate,
+					 std::vector<DdgiVolumeGpu>& vols);
 
 	// main func
 	void draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view);
@@ -84,15 +80,13 @@ public:
 	IGraphicsTexture* probe_irradiance = nullptr;
 	IGraphicsTexture* probe_depth = nullptr;
 
-
-	float max_relocate_dist = 1.0;	// in meteres, how far can probe trace and relocate?
-	float indirect_boost = 1.0;		// probe_irrad += albedo * sample_irradiance() * indirect_boost
+	float max_relocate_dist = 1.0; // in meteres, how far can probe trace and relocate?
+	float indirect_boost = 1.0;	   // probe_irrad += albedo * sample_irradiance() * indirect_boost
 private:
 	void draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap_view);
 	void draw_lighting_halfres(IGraphicsTexture* ssao);
 	void draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap);
 	void set_reflection_uniforms();
-	
 
 	void compute_avg_probe_value();
 
@@ -127,7 +121,7 @@ private:
 	// for halfres:
 	//		render ddgi into halfres buffer
 	//		upsample to ddgi_accum, using last_ddgi_accum and motion vectors
-	//		apply to scene 
+	//		apply to scene
 	//		swap cur and last
 
 	int half_res_offset_index = 0;
@@ -136,9 +130,7 @@ private:
 		half_res_offset_index %= 4;
 	}
 	glm::ivec2 get_half_res_offset() const {
-		const std::array offsets = {
-			glm::ivec2(0,0),glm::ivec2(1,0),glm::ivec2(0,1),glm::ivec2(1,1)
-		};
+		const std::array offsets = {glm::ivec2(0, 0), glm::ivec2(1, 0), glm::ivec2(0, 1), glm::ivec2(1, 1)};
 		return offsets.at(half_res_offset_index);
 	}
 };

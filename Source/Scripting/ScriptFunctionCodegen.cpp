@@ -9,8 +9,7 @@ void push_float_to_lua(lua_State* L, float f) {
 	lua_pushnumber(L, f);
 }
 
-void push_int_to_lua(lua_State* L, int64_t i)
-{
+void push_int_to_lua(lua_State* L, int64_t i) {
 	lua_pushinteger(L, i);
 }
 
@@ -22,8 +21,7 @@ void push_object_to_lua(lua_State* L, const ClassBase* ptrConst) {
 	ClassBase* ptr = const_cast<ClassBase*>(ptrConst);
 	if (!ptr) {
 		lua_pushnil(L);
-	}
-	else {
+	} else {
 		// push
 		lua_rawgeti(L, LUA_REGISTRYINDEX, ptr->get_table_registry_id());
 	}
@@ -47,7 +45,7 @@ std::string get_std_string_from_lua(lua_State* L, int index) {
 }
 extern void stack_dump(lua_State* L);
 ClassBase* get_object_from_lua(lua_State* L, int index) {
-	//stack_dump(L);
+	// stack_dump(L);
 
 	if (lua_isnil(L, index))
 		return nullptr;
@@ -57,11 +55,10 @@ ClassBase* get_object_from_lua(lua_State* L, int index) {
 	lua_getfield(L, index, "__ptr");
 	if (lua_islightuserdata(L, -1)) {
 		void* ptr = lua_touserdata(L, -1);
-		lua_pop(L, 1);  // Clean up the stack
+		lua_pop(L, 1); // Clean up the stack
 		return (ClassBase*)ptr;
-	}
-	else {
-		lua_pop(L, 1);  // Clean up the stack
+	} else {
+		lua_pop(L, 1); // Clean up the stack
 		luaL_error(L, "expected __ptr user data in table");
 		return nullptr;
 	}

@@ -15,18 +15,18 @@ class Entity;
 
 uptr<UnserializedSceneFile> load_level_asset(string path);
 
-class IPrefabFactory : public ClassBase{
+class IPrefabFactory : public ClassBase
+{
 public:
 	CLASS_BODY(IPrefabFactory, scriptable);
 	REF virtual void start() {}
 	REF virtual bool create(Entity* e, string name) { return false; }
-	REF void define_prefab(string s) {
-		defined_prefabs.insert(s);
-	}
+	REF void define_prefab(string s) { defined_prefabs.insert(s); }
 	std::unordered_set<std::string> defined_prefabs;
 };
 #include <json.hpp>
-class SchemaManager {
+class SchemaManager
+{
 public:
 	static SchemaManager& get() {
 		static SchemaManager inst;

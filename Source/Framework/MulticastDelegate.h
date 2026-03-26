@@ -1,18 +1,18 @@
 #pragma once
 #include <functional>
-template<typename... Args>
-class MulticastDelegate
+template <typename... Args> class MulticastDelegate
 {
 public:
 	~MulticastDelegate();
 	void add(void* key, std::function<void(Args...)> func);
 	void remove(void* key);
 	void invoke(Args... args);
-	template<typename T>
-	void add(T* instance, void (T::* memberFunction)(Args...));
+	template <typename T> void add(T* instance, void (T::*memberFunction)(Args...));
 	bool has_any_listeners() const { return head != nullptr; }
+
 private:
-	struct Item {
+	struct Item
+	{
 		void* key = nullptr;
 		std::function<void(Args...)> func;
 		Item* next = nullptr;
@@ -24,8 +24,7 @@ private:
 	Item* head = nullptr;
 };
 
-template<typename ...Args>
-inline MulticastDelegate<Args...>::~MulticastDelegate() {
+template <typename... Args> inline MulticastDelegate<Args...>::~MulticastDelegate() {
 	Item* ptr = head;
 	while (ptr) {
 		Item* next = ptr->next;
@@ -34,9 +33,7 @@ inline MulticastDelegate<Args...>::~MulticastDelegate() {
 	}
 }
 
-template<typename ...Args>
-inline void MulticastDelegate<Args...>::add(void* key, std::function<void(Args...)> func)
-{
+template <typename... Args> inline void MulticastDelegate<Args...>::add(void* key, std::function<void(Args...)> func) {
 	Item* i = new Item;
 	i->key = key;
 	i->func = std::move(func);
@@ -44,17 +41,14 @@ inline void MulticastDelegate<Args...>::add(void* key, std::function<void(Args..
 	head = i;
 }
 
-template<typename ...Args>
-inline void MulticastDelegate<Args...>::remove(void* key)
-{
+template <typename... Args> inline void MulticastDelegate<Args...>::remove(void* key) {
 	Item* prev = nullptr;
 	Item* ptr = head;
 	while (ptr) {
 		if (key == ptr->key) {
 			if (ptr->in_func) {
 				ptr->wants_delete = true;
-			}
-			else {
+			} else {
 				if (prev)
 					prev->next = ptr->next;
 				else
@@ -67,15 +61,13 @@ inline void MulticastDelegate<Args...>::remove(void* key)
 		prev = ptr;
 		ptr = ptr->next;
 	}
-	//printf("no matching key\n");
+	// printf("no matching key\n");
 }
 
-template<typename ...Args>
-inline void MulticastDelegate<Args...>::invoke(Args ...args) {
+template <typename... Args> inline void MulticastDelegate<Args...>::invoke(Args... args) {
 	Item* prev = nullptr;
 	Item* ptr = head;
-	while (ptr)
-	{
+	while (ptr) {
 		ptr->in_func = true;
 		ptr->func(args...);
 		ptr->in_func = false;
@@ -86,8 +78,7 @@ inline void MulticastDelegate<Args...>::invoke(Args ...args) {
 			else
 				head = next;
 			delete ptr;
-		}
-		else {
+		} else {
 			ptr->in_func = false;
 			prev = ptr;
 		}
@@ -95,7 +86,7 @@ inline void MulticastDelegate<Args...>::invoke(Args ...args) {
 	}
 }
 
-template<typename ...Args>
+template <typename... Args>
 inline typename MulticastDelegate<Args...>::Item* MulticastDelegate<Args...>::find(Item* start, void* key) {
 	Item* i = start;
 	while (i) {
@@ -106,11 +97,8 @@ inline typename MulticastDelegate<Args...>::Item* MulticastDelegate<Args...>::fi
 	return nullptr;
 }
 
-template<typename ...Args>
-template<typename T>
-inline void MulticastDelegate<Args...>::add(T* instance, void(T::* memberFunction)(Args...))
-{
-	add(instance, [instance, memberFunction](Args... args) {
-		(instance->*memberFunction)(args...);
-		});
+template <typename... Args>
+template <typename T>
+inline void MulticastDelegate<Args...>::add(T* instance, void (T::*memberFunction)(Args...)) {
+	add(instance, [instance, memberFunction](Args... args) { (instance->*memberFunction)(args...); });
 }

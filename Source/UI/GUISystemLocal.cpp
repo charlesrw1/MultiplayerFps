@@ -15,7 +15,7 @@
 #include "Assets/AssetDatabase.h"
 #include "DebugConsole.h"
 #include <SDL2/SDL.h>
-UiSystem::UiSystem()  {
+UiSystem::UiSystem() {
 	ui_default = g_assets.find_global_sync<MaterialInstance>("eng/uiDefault.mm").get();
 	if (!ui_default)
 		Fatalf("Couldnt find default ui material");
@@ -28,23 +28,17 @@ UiSystem::UiSystem()  {
 }
 UiSystem* UiSystem::inst = nullptr;
 
-static void enable_imgui_docking()
-{
+static void enable_imgui_docking() {
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 }
-static void disable_imgui_docking()
-{
+static void disable_imgui_docking() {
 	ImGui::GetIO().ConfigFlags &= ~(ImGuiConfigFlags_DockingEnable);
 }
-
 
 extern ConfigVar g_drawdebugmenu;
 extern ConfigVar g_drawconsole;
 void UiSystem::pre_events() {}
-void UiSystem::handle_event(const SDL_Event& event)
-{
-
-}
+void UiSystem::handle_event(const SDL_Event& event) {}
 
 void UiSystem::draw_imgui_interfaces(EditorState* edState) {
 
@@ -66,8 +60,8 @@ void UiSystem::draw_imgui_interfaces(EditorState* edState) {
 }
 void UiSystem::draw_imgui_internal(EditorState* editorState) {
 	CPUSCOPESTART(imgui_draw);
-	ImGui::PushStyleColor(ImGuiCol_WindowBg, color32_to_imvec4({ 51, 51, 51 }));
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, color32_to_imvec4({ 35, 35, 35 }));
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, color32_to_imvec4({51, 51, 51}));
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, color32_to_imvec4({35, 35, 35}));
 
 	EditorPopupManager::inst->draw_popups();
 
@@ -76,7 +70,7 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 
 #ifdef EDITOR_BUILD
 	// draw tool interface if its active
-	if (editorState&&editorState->has_tool()) {
+	if (editorState && editorState->has_tool()) {
 		dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode, editorState->get_tool());
 		editorState->imgui_draw();
 		AssetBrowser::inst->imgui_draw();
@@ -87,9 +81,8 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 	// draw after to enable docking
 	if (g_drawconsole.get_bool())
 		Debug_Console::inst->draw();
-	
-#ifdef EDITOR_BUILD
 
+#ifdef EDITOR_BUILD
 
 	// will only be true if in a tool state
 	if (!is_drawing_to_screen() && eng->get_level()) {
@@ -101,8 +94,6 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 		if (editorState->has_tool() && editorState->wants_scene_viewport_menu_bar())
 			flags |= ImGuiWindowFlags_MenuBar;
 
-
-
 		if (ImGui::Begin("Scene viewport", nullptr, flags)) {
 
 			if (set_focus_to_viewport_next_tick || UiSystem::inst->is_game_capturing_mouse()) {
@@ -112,20 +103,22 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 
 			if (editorState->has_tool())
 				editorState->hook_pre_viewport();
-			//get_current_tool()->hook_pre_scene_viewport_draw();
+			// get_current_tool()->hook_pre_scene_viewport_draw();
 
 			// BRUH
 			auto size = ImGui::GetWindowSize();
 			size.y -= 50;
 			size.x -= 30;
-			if (size.y < 0) size.y = 0;
-			if (size.x < 0) size.x = 0;
+			if (size.y < 0)
+				size.y = 0;
+			if (size.x < 0)
+				size.x = 0;
 
 			auto pos = ImGui::GetCursorPos();
 			auto winpos = ImGui::GetWindowPos();
 			ImGui::Image((ImTextureID)uint64_t(idraw->get_composite_output_texture_handle()),
-				ImVec2(size.x, size.y), /* magic numbers ;) */
-				ImVec2(0, 1), ImVec2(1, 0));	// this is the scene draw texture
+						 ImVec2(size.x, size.y),	  /* magic numbers ;) */
+						 ImVec2(0, 1), ImVec2(1, 0)); // this is the scene draw texture
 			auto sz = ImGui::GetItemRectSize();
 			is_viewport_hovered = ImGui::IsItemHovered();
 			is_viewport_focused = ImGui::IsWindowFocused();
@@ -133,14 +126,13 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 			// save off where the viewport is the GUI for mouse events
 			viewportRect = Rect2d(pos.x + winpos.x, pos.y + winpos.y, size.x, size.y);
 			assert(!is_drawing_to_screen());
-	
+
 			// hook tool for drag and drop stuff
 			if (editorState->has_tool())
 				editorState->hook_viewport();
 		}
 		ImGui::End();
-	}
-	else
+	} else
 #endif
 	{
 		// normal game path, scene view was already drawn the the window framebuffer
@@ -151,7 +143,7 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 	if (g_drawimguidemo.get_bool())
 		ImGui::ShowDemoWindow();
 
-	ImGui::PopStyleColor(2);//framebg
+	ImGui::PopStyleColor(2); // framebg
 
 	set_focus_to_viewport_next_tick = false;
 }
@@ -161,41 +153,34 @@ void UiSystem::update() {
 	if (is_game_capturing_mouse()) {
 		SDL_WarpMouseInWindow(eng->get_os_window(), saved_mouse_x, saved_mouse_y);
 	}
-	window.clear();	// clear the window
+	window.clear(); // clear the window
 	auto rect = get_vp_rect();
 	auto mat = glm::orthoZO(0.f, (float)rect.get_size().x, (float)rect.get_size().y, 0.f, -1.f, 1.f);
 	window.view_mat = mat;
 	window.reset_verticies();
 }
 
-void ui_state_debug()
-{
+void ui_state_debug() {
 	ImGui::Text("is_vp_focused: %d\n", (int)UiSystem::inst->is_vp_focused());
 	ImGui::Text("is_vp_hovered: %d\n", (int)UiSystem::inst->is_vp_hovered());
 	ImGui::Text("is_game_capturing_mouse: %d\n", (int)UiSystem::inst->is_game_capturing_mouse());
-
-
 }
 
 ADD_TO_DEBUG_MENU(ui_state_debug);
 
 void UiSystem::sync_to_renderer() {
-	RenderWindowBackend::inst->update_window({ 1 }, window);
+	RenderWindowBackend::inst->update_window({1}, window);
 }
-bool UiSystem::is_drawing_to_screen() const
-{
+bool UiSystem::is_drawing_to_screen() const {
 	return drawing_to_screen;
 }
-bool UiSystem::is_vp_hovered() const
-{
+bool UiSystem::is_vp_hovered() const {
 	return is_viewport_hovered;
 }
-bool UiSystem::is_vp_focused() const
-{
+bool UiSystem::is_vp_focused() const {
 	return is_viewport_focused;
 }
-glm::ivec2 UiSystem::convert_screen_to_vp(glm::ivec2 screen) const
-{
+glm::ivec2 UiSystem::convert_screen_to_vp(glm::ivec2 screen) const {
 	return screen - get_vp_rect().get_pos();
 }
 void UiSystem::set_game_capture_mouse(bool b) {
@@ -207,8 +192,7 @@ void UiSystem::set_game_capture_mouse(bool b) {
 		SDL_GetRelativeMouseState(nullptr, nullptr);
 		SDL_GetMouseState(&saved_mouse_x, &saved_mouse_y);
 		SDL_SetRelativeMouseMode(SDL_TRUE);
-	}
-	else {
+	} else {
 		SDL_SetRelativeMouseMode(SDL_FALSE);
 	}
 }
@@ -216,22 +200,16 @@ bool UiSystem::is_game_capturing_mouse() const {
 	return game_focused;
 }
 
-void UiSystem::set_focus_to_viewport()
-{
+void UiSystem::set_focus_to_viewport() {
 	set_focus_to_viewport_next_tick = true;
 }
 
-
-bool UiSystem::blocking_keyboard_inputs() const
-{
-	// keep it for text input, not keyboard input. imgui *always* seems to want keyboard capture (for navigation or whatever) which is annoying
-	// but i really do want it blocking for text input
+bool UiSystem::blocking_keyboard_inputs() const {
+	// keep it for text input, not keyboard input. imgui *always* seems to want keyboard capture (for navigation or
+	// whatever) which is annoying but i really do want it blocking for text input
 	return ImGui::GetIO().WantTextInput;
 }
 
-bool UiSystem::blocking_mouse_inputs() const
-{
+bool UiSystem::blocking_mouse_inputs() const {
 	return ImGui::GetIO().WantCaptureMouse;
 }
-
-

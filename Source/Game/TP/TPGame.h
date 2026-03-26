@@ -19,28 +19,23 @@ public:
 		return *instance;
 	}
 
-
 	void start() override {
-		//player = class_cast<TPPlayer>(eng->get_level()->spawn_prefab(playerPrefab));
+		// player = class_cast<TPPlayer>(eng->get_level()->spawn_prefab(playerPrefab));
 		ASSERT(player);
 
 		{
 			auto ent = eng->get_level()->spawn_entity();
 			game_camera = ent->create_component<CameraComponent>();
-			game_camera->set_is_enabled(true);	// enable it
+			game_camera->set_is_enabled(true); // enable it
 		}
 	}
 
-	//REF AssetPtr<PrefabAsset> playerPrefab;
-	REF TPPlayer* get_player() {
-		return player;
-	}
+	// REF AssetPtr<PrefabAsset> playerPrefab;
+	REF TPPlayer* get_player() { return player; }
 
 	CameraComponent* game_camera = nullptr;
 	TPPlayer* player = nullptr;
 };
-
-
 
 class TPGun
 {
@@ -59,36 +54,27 @@ public:
 	REF AssetPtr<AnimationSeqAsset> jump_seq;
 	REF AssetPtr<AnimationSeqAsset> idle_to_run_seq;
 	REF AssetPtr<AnimationSeqAsset> run_to_idle_seq;
-	//REF AssetPtr<PrefabAsset> projectile;
-	//REF AssetPtr<PrefabAsset> shotgunSound;
-
+	// REF AssetPtr<PrefabAsset> projectile;
+	// REF AssetPtr<PrefabAsset> shotgunSound;
 
 	CharacterController cc;
 	glm::vec3 velocity = glm::vec3(0.f);
 
 	CapsuleComponent* capsule = nullptr;
 
-	void try_shoot_gun() {
-		
-	}
+	void try_shoot_gun() {}
 
 	void start() override {
 		cc.set_position(get_ws_position());
-	
 
 		capsule = get_owner()->get_component<CapsuleComponent>();
 		ASSERT(capsule);
 	}
 
-	void update() override {
+	void update() override {}
 
-	}
-
-	void stop() override {
-
-	}
+	void stop() override {}
 };
-
 
 class TPProjectile : public Component
 {
@@ -115,16 +101,16 @@ public:
 		g_physics.trace_ray(res, pos, newpos, &ig, (1 << (int)PL::Character));
 
 		if (res.component) {
-			//auto owner = res.component->get_owner()->get_component<TopDownHealthComponent>();
-			//if (owner) {
-				//DamageEvent dmg;
-				//dmg.amt = damage;
-				//dmg.position = pos;
-				//dmg.dir = direction;
-				//
-				//owner->deal_damage(dmg);
-				//
-				//get_owner()->destroy();
+			// auto owner = res.component->get_owner()->get_component<TopDownHealthComponent>();
+			// if (owner) {
+			// DamageEvent dmg;
+			// dmg.amt = damage;
+			// dmg.position = pos;
+			// dmg.dir = direction;
+			//
+			// owner->deal_damage(dmg);
+			//
+			// get_owner()->destroy();
 			//	return;
 			//}
 		}
@@ -147,8 +133,7 @@ public:
 	int damage = 10;
 };
 
-inline void TPGun::try_shoot_gun()
-{
+inline void TPGun::try_shoot_gun() {
 #if 0
 	if (shoot_cooldown <= 0.0)
 	{

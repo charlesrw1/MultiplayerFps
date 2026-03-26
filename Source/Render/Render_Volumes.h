@@ -6,7 +6,6 @@
 
 class Texture;
 
-
 // sky reflection and ambient
 // and stuffing the fog settings here too
 struct Render_Skylight

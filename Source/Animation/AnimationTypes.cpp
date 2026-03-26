@@ -1,15 +1,13 @@
 #include "AnimationTypes.h"
 #include "Framework/Util.h"
 
-int Animation_Set::FirstPositionKeyframe(float frame, int channel_num, int clip) const
-{
+int Animation_Set::FirstPositionKeyframe(float frame, int channel_num, int clip) const {
 	const Animation& an = clips[clip];
 
 	assert(channel_num < channels.size());
-	//AnimChannel* chan = channels + channel_num;
+	// AnimChannel* chan = channels + channel_num;
 	const AnimChannel& chan = channels[an.channel_offset + channel_num];
-	//const AnimChannel* chan = channels.data() + channel_num;
-
+	// const AnimChannel* chan = channels.data() + channel_num;
 
 	if (chan.num_positions == 0)
 		return -1;
@@ -21,8 +19,7 @@ int Animation_Set::FirstPositionKeyframe(float frame, int channel_num, int clip)
 
 	return chan.num_positions - 1;
 }
-int Animation_Set::FirstRotationKeyframe(float frame, int channel_num, int clip) const
-{
+int Animation_Set::FirstRotationKeyframe(float frame, int channel_num, int clip) const {
 	const Animation& an = clips[clip];
 	assert(channel_num < channels.size());
 	const AnimChannel& chan = channels[an.channel_offset + channel_num];
@@ -37,12 +34,10 @@ int Animation_Set::FirstRotationKeyframe(float frame, int channel_num, int clip)
 
 	return chan.num_rotations - 1;
 }
-int Animation_Set::FirstScaleKeyframe(float frame, int channel_num, int clip) const
-{
+int Animation_Set::FirstScaleKeyframe(float frame, int channel_num, int clip) const {
 	const Animation& an = clips[clip];
 	assert(channel_num < channels.size());
 	const AnimChannel& chan = channels[an.channel_offset + channel_num];
-
 
 	if (chan.num_scales == 0)
 		return -1;
@@ -78,8 +73,7 @@ const AnimChannel& Animation_Set::GetChannel(int clip, int channel) const {
 	return channels[clips[clip].channel_offset + channel];
 }
 
-int Animation_Set::find(const char* name) const
-{
+int Animation_Set::find(const char* name) const {
 	for (int i = 0; i < clips.size(); i++) {
 		if (clips[i].name == name)
 			return i;

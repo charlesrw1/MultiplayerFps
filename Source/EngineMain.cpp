@@ -73,14 +73,16 @@ extern ConfigVar developer_mode;
 extern ConfigVar log_shader_compiles;
 extern ConfigVar material_print_debug;
 extern ConfigVar g_project_name;
-ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "Cfg", CVAR_DEV, "what folder to save .ini and other editor cfg to");
+ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "Cfg", CVAR_DEV,
+							  "what folder to save .ini and other editor cfg to");
 ConfigVar loglevel("loglevel", "4", CVAR_INTEGER, "(0=disable,4=all)", 0, 4);
 ConfigVar colorLog("colorLog", "1", CVAR_BOOL, "");
 ConfigVar g_application_class("g_application_class", "Application", CVAR_DEV, "");
 ConfigVar with_threading("with_threading", "1", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar is_editor_app("is_editor_app", "0", CVAR_BOOL, "");
 ConfigVar g_drawconsole("drawconsole", "0", CVAR_BOOL, "draw the console");
-ConfigVar g_project_name("g_project_name", "CsRemakeEngine", CVAR_DEV, "the project name of the game, used for save file folders");
+ConfigVar g_project_name("g_project_name", "CsRemakeEngine", CVAR_DEV,
+						 "the project name of the game, used for save file folders");
 ConfigVar g_mousesens("g_mousesens", "0.005", CVAR_FLOAT, "", 0.0, 1.0);
 ConfigVar g_fov("fov", "70.0", CVAR_FLOAT, "", 10.0, 110.0);
 ConfigVar g_thirdperson("thirdperson", "70.0", CVAR_BOOL, "");
@@ -90,23 +92,23 @@ ConfigVar g_debug_skeletons("g_debug_skeletons", "0", CVAR_BOOL, "draw skeletons
 ConfigVar g_draw_grid("g_draw_grid", "0", CVAR_BOOL, "draw a debug grid around the origin");
 ConfigVar g_grid_size("g_grid_size", "1", CVAR_FLOAT, "size of g_draw_grid", 0.01, 10);
 // defualt sky material to use for editors like materials/models/etc.
-ConfigVar ed_default_sky_material("ed_default_sky_material", "eng/hdriSky.mm", CVAR_DEV, "default sky material used for editors");
+ConfigVar ed_default_sky_material("ed_default_sky_material", "eng/hdriSky.mm", CVAR_DEV,
+								  "default sky material used for editors");
 ConfigVar g_drawdebugmenu("g_drawdebugmenu", "0", CVAR_BOOL, "draw the debug menu");
 ConfigVar g_window_w("vid.width", "1200", CVAR_INTEGER, "", 1, 4000);
 ConfigVar g_window_h("vid.height", "800", CVAR_INTEGER, "", 1, 4000);
 ConfigVar g_window_fullscreen("vid.fullscreen", "0", CVAR_BOOL, "");
 ConfigVar g_host_port("net.hostport", "47000", CVAR_INTEGER | CVAR_READONLY, "", 0, UINT16_MAX);
 ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV, "");
-ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL, "enables dev mode features like compiling assets when loading");
+ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL,
+						 "enables dev mode features like compiling assets when loading");
 ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop", 0.0001, 5.0);
-ConfigVar ui_disable_screen_log("ui.disable_screen_log","0",CVAR_BOOL,"");
+ConfigVar ui_disable_screen_log("ui.disable_screen_log", "0", CVAR_BOOL, "");
 
-double GetTime()
-{
+double GetTime() {
 	return SDL_GetPerformanceCounter() / (double)SDL_GetPerformanceFrequency();
 }
-double TimeSinceStart()
-{
+double TimeSinceStart() {
 	return GetTime() - program_time_start;
 }
 
@@ -125,15 +127,15 @@ void add_events_test(Model* model) {
 	}
 }
 
-
 struct Debug_Shape
 {
-	enum type {
+	enum type
+	{
 		sphere,
 		line,
 		box,
 		transformed_box
-	}type;
+	} type;
 	glm::vec3 pos;
 	glm::vec3 size;
 	glm::mat4 transform;
@@ -164,6 +166,7 @@ public:
 			shapes.push_back(shape);
 	}
 	void fixed_update_start();
+
 private:
 	std::vector<Debug_Shape> shapes;
 	std::vector<Debug_Shape> one_frame_fixedupdate;
@@ -172,11 +175,10 @@ private:
 };
 //
 
-
-static std::mutex printMutex;	// fixme
+static std::mutex printMutex; // fixme
 
 char* string_format(const char* fmt, ...) {
-	std::lock_guard<std::mutex> printLock(printMutex);	// fixme
+	std::lock_guard<std::mutex> printLock(printMutex); // fixme
 
 	va_list argptr;
 	static int index = 0;
@@ -193,79 +195,73 @@ char* string_format(const char* fmt, ...) {
 	return buf;
 }
 
-void Quit()
-{
+void Quit() {
 	sys_print(Info, "Quiting... (runtime %f)\n", TimeSinceStart());
 	eng_local.cleanup();
 	exit(0);
 }
 Color32 get_color_of_print(LogType type) {
 
-	const Color32 err = { 255, 105, 105 };
-	const Color32 warn = { 252, 224, 121 };
+	const Color32 err = {255, 105, 105};
+	const Color32 warn = {252, 224, 121};
 	const Color32 info = COLOR_WHITE;
-	const Color32 debug = { 136, 161, 252 };
-	const Color32 consolePrint = { 136,23,152 };
+	const Color32 debug = {136, 161, 252};
+	const Color32 consolePrint = {136, 23, 152};
 	Color32 out = info;
-	if (type == LogType::Error) out = err;
-	else if (type == LogType::Warning)out = warn;
-	else if (type == LogType::Debug) out = debug;
-	else if (type == LogType::LtConsoleCommand) out = consolePrint;
+	if (type == LogType::Error)
+		out = err;
+	else if (type == LogType::Warning)
+		out = warn;
+	else if (type == LogType::Debug)
+		out = debug;
+	else if (type == LogType::LtConsoleCommand)
+		out = consolePrint;
 	return out;
 }
 
-void sys_print(LogType type, const char* fmt, ...)
-{
+void sys_print(LogType type, const char* fmt, ...) {
 	if ((int(type)) > loglevel.get_integer())
 		return;
 
 	va_list args;
 	va_start(args, fmt);
-	
+
 	bool print_end = false;
 	if (colorLog.get_bool()) {
 		print_end = true;
 		if (type == LogType::Error) {
 			printf("\033[91m");
-		}
-		else if (type == LogType::Warning) {
+		} else if (type == LogType::Warning) {
 			printf("\033[33m");
-		}
-		else if (type == LogType::Debug) {
+		} else if (type == LogType::Debug) {
 			printf("\033[32m");
-		}
-		else if (type == LogType::LtConsoleCommand) {
+		} else if (type == LogType::LtConsoleCommand) {
 			printf("\033[35m");
 			char buf[1024];
 			vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
 			buf[IM_ARRAYSIZE(buf) - 1] = 0;
 			eng->log_to_fullscreen_gui(LtConsoleCommand, buf);
-		}
-		else
+		} else
 			print_end = false;
 	}
 
-
 	vprintf(fmt, args);
-	if(Debug_Console::inst)
-		Debug_Console::inst->print_args(get_color_of_print(type),fmt, args);
+	if (Debug_Console::inst)
+		Debug_Console::inst->print_args(get_color_of_print(type), fmt, args);
 	va_end(args);
 
 	if (print_end)
 		printf("\033[0m");
 }
 
-
-void sys_vprint(const char* fmt, va_list args)
-{
+void sys_vprint(const char* fmt, va_list args) {
 	std::lock_guard<std::mutex> printLock(printMutex);
 
 	vprintf(fmt, args);
-	Debug_Console::inst->print_args(get_color_of_print(Info),fmt, args);
+	Debug_Console::inst->print_args(get_color_of_print(Info), fmt, args);
 }
 
-void Fatalf(const char* format, ...)
-{
+void Fatalf(const char* format, ...) {
 	va_list list;
 	va_start(list, format);
 	vprintf(format, list);
@@ -274,8 +270,7 @@ void Fatalf(const char* format, ...)
 	exit(-1);
 }
 
-int imgui_std_string_resize(ImGuiInputTextCallbackData* data)
-{
+int imgui_std_string_resize(ImGuiInputTextCallbackData* data) {
 	std::string* user = (std::string*)data->UserData;
 	assert(user);
 
@@ -286,27 +281,20 @@ int imgui_std_string_resize(ImGuiInputTextCallbackData* data)
 
 	return 0;
 }
-bool std_string_input_text(const char* label, std::string& str, int flags)
-{
-	return ImGui::InputText(label, (char*)str.c_str(), str.size() + 1, flags | ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &str);
+bool std_string_input_text(const char* label, std::string& str, int flags) {
+	return ImGui::InputText(label, (char*)str.c_str(), str.size() + 1, flags | ImGuiInputTextFlags_CallbackResize,
+							imgui_std_string_resize, &str);
 }
 
-
-
-void GameEngineLocal::log_to_fullscreen_gui(LogType type, const char* msg)
-{
+void GameEngineLocal::log_to_fullscreen_gui(LogType type, const char* msg) {
 	gui_log.add_text(get_color_of_print(type), msg);
 }
 
-static void SDLError(const char* msg)
-{
+static void SDLError(const char* msg) {
 	printf(" %s: %s\n", msg, SDL_GetError());
 	SDL_Quit();
 	exit(-1);
 }
-
-
-
 
 glm::mat4 User_Camera::get_view_matrix() const {
 	return glm::lookAt(position, position + front, up);
@@ -315,20 +303,15 @@ bool User_Camera::can_take_input() const {
 	return orbit_mode || UiSystem::inst->is_game_capturing_mouse() || Input::last_recieved_input_from_con();
 }
 
-
-void User_Camera::set_orbit_target(glm::vec3 target, float object_size)
-{
+void User_Camera::set_orbit_target(glm::vec3 target, float object_size) {
 	orbit_target = target;
 	position = orbit_target - front * object_size * 4.f;
 }
 
-
-
-void User_Camera::update_from_input(int width, int height, float aratio, float fov)
-{
-	//int xpos, ypos;
-	//xpos = mouse_dx;
-	//ypos = mouse_dy;
+void User_Camera::update_from_input(int width, int height, float aratio, float fov) {
+	// int xpos, ypos;
+	// xpos = mouse_dx;
+	// ypos = mouse_dy;
 
 	auto deadzone = [](float in) -> float {
 		const float dead_zone_val = 0.1;
@@ -341,7 +324,6 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 	mousedelta.x += deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_RIGHTX)) * controllerSens;
 	mousedelta.y += deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_RIGHTY)) * controllerSens;
 
-
 	int xpos = mousedelta.x;
 	int ypos = mousedelta.y;
 
@@ -351,7 +333,7 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 	float sensitivity = 0.01;
 	x_off *= sensitivity;
 	y_off *= sensitivity;
-	
+
 	auto update_pitch_yaw = [&]() {
 		yaw += x_off;
 		pitch -= y_off;
@@ -369,11 +351,10 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 		}
 	};
 
-	if (orbit_mode)
-	{
+	if (orbit_mode) {
 
-		//auto keystate = SDL_GetKeyboardState(nullptr);
-		bool pan_in_orbit_model = Input::is_shift_down();// keystate[SDL_SCANCODE_LSHIFT];
+		// auto keystate = SDL_GetKeyboardState(nullptr);
+		bool pan_in_orbit_model = Input::is_shift_down(); // keystate[SDL_SCANCODE_LSHIFT];
 
 		if (!pan_in_orbit_model) {
 			update_pitch_yaw();
@@ -385,24 +366,20 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 		distance = glm::length(orbit_target - position);
 
 		// panning
-		float x_orb = -deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX))* distance *0.2;
-		float y_orb = -deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY)) * distance *0.2;
+		float x_orb = -deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX)) * distance * 0.2;
+		float y_orb = -deadzone(Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY)) * distance * 0.2;
 
-		if (pan_in_orbit_model&&!Input::last_recieved_input_from_con()) {	
-			// scale by dist, not accurate, fixme	
+		if (pan_in_orbit_model && !Input::last_recieved_input_from_con()) {
+			// scale by dist, not accurate, fixme
 			float x_s = tan(fov / 2) * distance * 0.5;
 			float y_s = x_s * aratio;
 			x_orb += x_s * x_off;
 			y_orb += y_s * y_off;
 		}
-		orbit_target = orbit_target - real_up *  y_orb + right *  x_orb;
-
-
+		orbit_target = orbit_target - real_up * y_orb + right * x_orb;
 
 		position = orbit_target - front * distance;
-	}
-	else
-	{
+	} else {
 		update_pitch_yaw();
 
 		front = AnglesToVector(pitch, yaw);
@@ -437,20 +414,13 @@ void User_Camera::update_from_input(int width, int height, float aratio, float f
 			if (abs(lookatpointdist) < 0.01)
 				lookatpointdist = 0.01;
 			position = (lookatpoint - front * lookatpointdist);
-		}
-		else {
+		} else {
 			move_speed += (move_speed * 0.5) * scroll_amt;
 			if (abs(move_speed) < 0.000001)
 				move_speed = 0.0001;
 		}
 	}
 }
-
-
-
-
-
-
 
 vector<string>* GameEngineLocal::find_keybinds(SDL_Scancode code, uint16_t keymod) {
 
@@ -465,11 +435,11 @@ vector<string>* GameEngineLocal::find_keybinds(SDL_Scancode code, uint16_t keymo
 		return mod;
 	};
 
-
 	uint32_t both = uint32_t(code) | ((uint32_t)mod_to_integer(keymod) << 16);
 
 	auto find = keybinds.find(both);
-	if (find == keybinds.end()) return nullptr;
+	if (find == keybinds.end())
+		return nullptr;
 	return &find->second;
 }
 
@@ -488,43 +458,41 @@ void GameEngineLocal::set_keybind(SDL_Scancode code, uint16_t keymod, std::strin
 	keybinds[both].push_back(bind);
 }
 
-void bind_key(const Cmd_Args& args)
-{
-	if (args.size() < 2) return;
+void bind_key(const Cmd_Args& args) {
+	if (args.size() < 2)
+		return;
 	SDL_Scancode scancode = SDL_GetScancodeFromName(args.at(1));
-	if (scancode == SDL_SCANCODE_UNKNOWN) 
+	if (scancode == SDL_SCANCODE_UNKNOWN)
 		return;
 	if (args.size() <= 2)
-		eng_local.set_keybind(scancode,0, "");
+		eng_local.set_keybind(scancode, 0, "");
 	else if (args.size() <= 3)
-		eng_local.set_keybind(scancode,0, args.at(2));
+		eng_local.set_keybind(scancode, 0, args.at(2));
 	else {
-		
+
 		uint16_t modifiers = 0;
 		for (int i = 2; i < args.size() - 1; i++) {
 			const char* m = args.at(i);
-			if (strcmp(m, "Ctrl")==0)
+			if (strcmp(m, "Ctrl") == 0)
 				modifiers |= KMOD_CTRL;
-			else if (strcmp(m, "Alt")==0)
+			else if (strcmp(m, "Alt") == 0)
 				modifiers |= KMOD_ALT;
-			else if (strcmp(m, "Shift")==0)
+			else if (strcmp(m, "Shift") == 0)
 				modifiers |= KMOD_SHIFT;
 			else
 				sys_print(Warning, "unknown modifier for 'bind': %s\n", m);
 		}
 
 		// bind M Ctrl Alt "mycommand"
-		
+
 		eng_local.set_keybind(scancode, modifiers, args.at(args.size() - 1));
 	}
 }
 
-
 extern void init_log_gui();
 using std::make_unique;
 #include "LevelSerialization/SerializeNew.h"
-bool GameEngineLocal::load_level(string mapname)
-{
+bool GameEngineLocal::load_level(string mapname) {
 	if (level && level->get_is_in_update()) {
 		sys_print(Warning, "GameEngineLocal::load_level: level is in update period, can't change level here.\n");
 		return false;
@@ -541,11 +509,9 @@ bool GameEngineLocal::load_level(string mapname)
 			file = std::move(val);
 		else
 			success = false;
-	}
-	else {
+	} else {
 		file = std::make_unique<UnserializedSceneFile>();
 	}
-
 
 	auto insert_this_map_as_level = [&](UnserializedSceneFile* loadedLevel, bool is_for_playing) {
 		sys_print(Info, "Changing map: %s (for_playing=%s)\n", mapname.c_str(), print_get_bool_string(is_for_playing));
@@ -560,13 +526,13 @@ bool GameEngineLocal::load_level(string mapname)
 			stop_game();
 			assert(!level);
 		}
-	
 
-		g_modelMgr.compact_memory();	// fixme, compacting memory here means newly loaded objs get moved twice, should be queuing uploads
+		g_modelMgr.compact_memory(); // fixme, compacting memory here means newly loaded objs get moved twice, should be
+									 // queuing uploads
 		time = 0.0;
 		set_tick_rate(60.f);
 		level = make_unique<Level>(!is_for_playing);
-		level->start(mapname,loadedLevel);	// scene will then get destroyed
+		level->start(mapname, loadedLevel); // scene will then get destroyed
 		idraw->on_level_start();
 
 		if (app) {
@@ -577,23 +543,18 @@ bool GameEngineLocal::load_level(string mapname)
 
 	if (success || wants_empty) {
 		insert_this_map_as_level(file.get(), !is_editor_state());
-	}
-	else {
+	} else {
 		sys_print(Warning, "OpenMapCommand::execute(%s): failed to load\n", mapname.c_str());
 		return false;
 	}
-	
+
 	double now = GetTime();
 	sys_print(Debug, "OpenMapCommand::execute: took %f\n", float(now - start_time));
 
 	return true;
 }
 
-
-
-
-static void inc_or_dec_int_var(ConfigVar* var, bool decrement)
-{
+static void inc_or_dec_int_var(ConfigVar* var, bool decrement) {
 	int cur = var->get_integer();
 	int max = std::round(var->get_max_val());
 	int min = std::round(var->get_min_val());
@@ -610,8 +571,7 @@ static void inc_or_dec_int_var(ConfigVar* var, bool decrement)
 	sys_print(Info, "%s = %s\n", var->get_name(), var->get_string());
 }
 
-void dump_imgui_ini(const Cmd_Args& args)
-{
+void dump_imgui_ini(const Cmd_Args& args) {
 	if (args.size() != 2) {
 		sys_print(Info, "usage: dump_imgui_ini  ($g_editor_cfg_folder)/<file>");
 		return;
@@ -621,12 +581,11 @@ void dump_imgui_ini(const Cmd_Args& args)
 	relative += "/";
 	relative += args.at(1);
 
-	auto path = FileSys::get_full_path_from_relative(relative, FileSys::ENGINE_DIR);	// might change this to user dir
+	auto path = FileSys::get_full_path_from_relative(relative, FileSys::ENGINE_DIR); // might change this to user dir
 
 	ImGui::SaveIniSettingsToDisk(path.c_str());
 }
-void load_imgui_ini(const Cmd_Args& args)
-{
+void load_imgui_ini(const Cmd_Args& args) {
 	if (args.size() != 2) {
 		sys_print(Info, "usage: load_imgui_ini ($g_editor_cfg_folder)/<file>");
 		return;
@@ -646,19 +605,16 @@ extern void IMPORT_TEX_FOLDER(const Cmd_Args& args);
 extern void IMPORT_TEX(const Cmd_Args& args);
 extern void COMPILE_TEX(const Cmd_Args& args);
 extern void dump_render_memory_usage();
-void GameEngineLocal::add_commands()
-{
+void GameEngineLocal::add_commands() {
 	commands = ConsoleCmdGroup::create("");
 	commands->add("print_assets", [](const Cmd_Args&) { g_assets.print_usage(); });
 #ifdef EDITOR_BUILD
 	commands->add("import-tex-folder", IMPORT_TEX_FOLDER);
 	commands->add("import-tex", IMPORT_TEX);
 	commands->add("compile-tex", COMPILE_TEX);
-	
+
 #endif
-	commands->add("dump_render_memory_usage", [](const Cmd_Args&) {
-		dump_render_memory_usage();
-		});
+	commands->add("dump_render_memory_usage", [](const Cmd_Args&) { dump_render_memory_usage(); });
 	static int blah = 0;
 	commands->add("stress-test", [](const Cmd_Args&) {
 		int size = 20;
@@ -671,29 +627,25 @@ void GameEngineLocal::add_commands()
 					m->dont_serialize_or_edit = true;
 					m->set_ignore_baking(true);
 					m->set_model(Model::load("work_prop/gas_cylinder.cmdl"));
-					e->set_ws_position(glm::vec3(x, y+blah*10, z)*4.0f);
+					e->set_ws_position(glm::vec3(x, y + blah * 10, z) * 4.0f);
 				}
 			}
 		}
 		blah += 1;
-
-		});
-	commands->add("save_baked_gi", [](const Cmd_Args&) {
-		GameSceneGiUtil::save_to_disk();
-		});
-	commands->add("bake_probes", [](const Cmd_Args&) {GameSceneGiUtil::bake_all_cubemaps(); });
-	//commands->add("close_ed", close_editor);
+	});
+	commands->add("save_baked_gi", [](const Cmd_Args&) { GameSceneGiUtil::save_to_disk(); });
+	commands->add("bake_probes", [](const Cmd_Args&) { GameSceneGiUtil::bake_all_cubemaps(); });
+	// commands->add("close_ed", close_editor);
 	commands->add("load_imgui_ini", load_imgui_ini);
 	commands->add("dump_imgui_ini", dump_imgui_ini);
-	commands->add("reload_shaders", [](const Cmd_Args&) { idraw->reload_shaders(); } );
+	commands->add("reload_shaders", [](const Cmd_Args&) { idraw->reload_shaders(); });
 	commands->add("dec", [](const Cmd_Args& args) {
 		if (args.size() != 2) {
 			sys_print(Warning, "usage: dec <int cvar>");
 			return;
 		}
 		auto var = VarMan::get()->find(args.at(1));
-		if (!var || !(var->get_var_flags() & CVAR_INTEGER))
-		{
+		if (!var || !(var->get_var_flags() & CVAR_INTEGER)) {
 			sys_print(Warning, "usage: dec <int cvar>");
 			return;
 		}
@@ -705,34 +657,32 @@ void GameEngineLocal::add_commands()
 			return;
 		}
 		auto var = VarMan::get()->find(args.at(1));
-		if (!var || !(var->get_var_flags() & CVAR_INTEGER))
-		{
+		if (!var || !(var->get_var_flags() & CVAR_INTEGER)) {
 			sys_print(Warning, "usage: inc <int cvar>");
 			return;
 		}
 		inc_or_dec_int_var(var, false);
-		});
+	});
 	commands->add("toggle", [](const Cmd_Args& args) {
 		if (args.size() != 2) {
 			sys_print(Warning, "usage: toggle <boolean cvar>");
 			return;
 		}
 		auto var = VarMan::get()->find(args.at(1));
-		if (!var || !(var->get_var_flags() & CVAR_BOOL))
-		{
+		if (!var || !(var->get_var_flags() & CVAR_BOOL)) {
 			sys_print(Warning, "usage: toggle <boolean cvar>");
 			return;
 		}
 		var->set_bool(!var->get_bool());
 		sys_print(Info, "%s = %s\n", var->get_name(), var->get_string());
-		});
+	});
 	commands->add("exec", [](const Cmd_Args& args) {
 		if (args.size() < 2) {
 			sys_print(Info, "usage: exec <exec filename>");
 			return;
 		}
 		Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, args.at(1));
-		});
+	});
 	commands->add("quit", [](const Cmd_Args& args) { Quit(); });
 
 	commands->add("create-map", [](const Cmd_Args& args) {
@@ -740,17 +690,18 @@ void GameEngineLocal::add_commands()
 		if (!existing) {
 			auto file = FileSys::open_write_game(args.at(1));
 			string s = "!json\n{\"objs\":[]}";
-			file->write(s.c_str(),s.size());
-		}
-		else {
+			file->write(s.c_str(), s.size());
+		} else {
 			sys_print(Error, "cant make new map, already exists\n");
 		}
-		});
+	});
 	commands->add("open-editor", [&](const Cmd_Args& args) {
 		sys_print(Debug, "OpenEditorToolCommand::execute\n");
 
 		if (!eng_local.editorState) {
-			sys_print(Error, "OpenEditorToolCommand: didnt launch in editor mode, use 'is_editor_app 1' in cfg or command line\n");
+			sys_print(
+				Error,
+				"OpenEditorToolCommand: didnt launch in editor mode, use 'is_editor_app 1' in cfg or command line\n");
 			return;
 		}
 		string mapname = "<empty>";
@@ -758,29 +709,23 @@ void GameEngineLocal::add_commands()
 			mapname = args.at(1);
 
 		editorState->open_tool(mapname);
-
-		});
+	});
 
 	commands->add("bind", bind_key);
-	
+
 	commands->add("dump_bundle", [](const Cmd_Args& args) {
 		if (args.size() != 2) {
 			sys_print(Error, "usage: bundle name\n");
-		}
-		else {
+		} else {
 			g_assets.dump_loaded_assets_to_disk(args.at(1));
 		}
-		});
-	commands->add("reload_script",[](const Cmd_Args& args) {
-		ScriptManager::inst->reload_all_scripts();
-		});
+	});
+	commands->add("reload_script", [](const Cmd_Args& args) { ScriptManager::inst->reload_all_scripts(); });
 
 	g_modelMgr.add_commands(*commands);
 }
 
-void test_integration_1(IntegrationTester& tester)
-{
-}
+void test_integration_1(IntegrationTester& tester) {}
 
 #include "Testheader.h"
 
@@ -791,12 +736,9 @@ void GameEngineLocal::set_tester(IntegrationTester* tester, bool headless_mode) 
 #endif
 }
 
-
 #include "Render/Frustum.h"
-static void cullobjstest(Frustum& frustum, bool* visible_array, int visible_array_size,glm::vec4* bounding_spheres)
-{
-	for (int i = 0; i < visible_array_size; i++)
-	{
+static void cullobjstest(Frustum& frustum, bool* visible_array, int visible_array_size, glm::vec4* bounding_spheres) {
+	for (int i = 0; i < visible_array_size; i++) {
 		glm::vec4& sph = bounding_spheres[i];
 		const glm::vec3& center = glm::vec3(sph);
 		const float& radius = sph.w;
@@ -814,23 +756,24 @@ extern void build_a_frustum_for_perspective(Frustum& f, const View_Setup& view, 
 #include "Framework/FreeList.h"
 extern void texture_loading_benchmark();
 
-
 // tests: iterate in a hot loop
 // remove/add objects randomly
 // access via ids
 
-struct FattyRo : public Render_Object {
+struct FattyRo : public Render_Object
+{
 	glm::vec4 v{};
 	glm::mat4 matrix{};
 	glm::mat4 bruh{};
 };
-struct SmallRo {
+struct SmallRo
+{
 	glm::mat4 transform{};
 	int index = 0;
 };
 
-template<typename T>
-class FreeList2 {
+template <typename T> class FreeList2
+{
 public:
 	void insert(T* ptr) {
 		int index = ptrs.size() - 1;
@@ -982,7 +925,6 @@ int benchmark_free_list() {
 		volatile float x = 0;
 		for (auto o : render_objects) {
 			x += o->transform[3].y;
-
 		}
 		add_time(2);
 		print_times("hashmap");
@@ -992,10 +934,9 @@ int benchmark_free_list() {
 	printf("totalx %f", float(totalt));
 	return 0;
 
-
-
 	Frustum f;
-	build_a_frustum_for_perspective(f, View_Setup(glm::vec3(0), glm::vec3(1, 0, 0), glm::radians(60.f), 0.1, 100, 100, 100));
+	build_a_frustum_for_perspective(
+		f, View_Setup(glm::vec3(0), glm::vec3(1, 0, 0), glm::radians(60.f), 0.1, 100, 100, 100));
 	bool* visarray = new bool[NUM_OBJECTS];
 	glm::vec4* bounding_spheres = new glm::vec4[NUM_OBJECTS];
 	for (int i = 0; i < NUM_OBJECTS; i++) {
@@ -1011,20 +952,18 @@ int benchmark_free_list() {
 	double end = GetTime();
 	printf("diff=%f\n", float(end - start) * 1000.f);
 	return 0;
-
 }
 
-int game_engine_main(int argc, char** argv)
-{
+int game_engine_main(int argc, char** argv) {
 	material_print_debug.set_bool(true);
-	//developer_mode.set_bool(false);
+	// developer_mode.set_bool(false);
 	log_shader_compiles.set_bool(false);
 	log_all_asset_loads.set_bool(true);
-	eng_local.init(argc,argv);
-	//developer_mode.set_bool(true);
-	//log_all_asset_loads.set_bool(false);
+	eng_local.init(argc, argv);
+	// developer_mode.set_bool(true);
+	// log_all_asset_loads.set_bool(false);
 	log_destroy_game_objects.set_bool(false);
-	//loglevel.set_integer(1);
+	// loglevel.set_integer(1);
 #if 0
 	vector<IntTestCase> tests;
 	tests.push_back({ test_integration_1, "myTest" });
@@ -1043,17 +982,16 @@ int game_engine_main(int argc, char** argv)
 	//
 #endif
 
+	// c->buzzer();
+	// int val = c->get_value("hello");
+	// assert(val == 1);
+	// assert(c->myStr == "hello");
 
-	//c->buzzer();
-	//int val = c->get_value("hello");
-	//assert(val == 1);
-	//assert(c->myStr == "hello");
-
-	//texture_loading_benchmark();
+	// texture_loading_benchmark();
 
 	eng_local.loop();
 	eng_local.cleanup();
-	
+
 	return 0;
 }
 ClassWithDelegate StaticClass::myClass;
@@ -1062,25 +1000,21 @@ ClassWithDelegate StaticClass::myClass;
 // text-gui mode: swap to using normal 2d renderer? maybe.
 // multiple text-gui windows? inspector
 
-void GameEngineLocal::set_tick_rate(float tick_rate)
-{
-//	if (state == Engine_State::Game) {
+void GameEngineLocal::set_tick_rate(float tick_rate) {
+	//	if (state == Engine_State::Game) {
 	//	sys_print(Warning, "Can't change tick rate while running\n");
 	//	return;
-//	}
+	//	}
 	tick_interval = 1.0 / tick_rate;
 }
 
-
-void GameEngineLocal::key_event(SDL_Event event)
-{
+void GameEngineLocal::key_event(SDL_Event event) {
 	if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
 		show_console = !show_console;
 
-		if (!UiSystem::inst->is_vp_focused()&&Debug_Console::inst->get_is_console_focused()) {
+		if (!UiSystem::inst->is_vp_focused() && Debug_Console::inst->get_is_console_focused()) {
 			UiSystem::inst->set_focus_to_viewport();
-		}
-		else {
+		} else {
 			Debug_Console::inst->toggle_set_focus();
 		}
 	}
@@ -1096,17 +1030,16 @@ void GameEngineLocal::key_event(SDL_Event event)
 		SDL_Scancode scancode = event.key.keysym.scancode;
 		vector<string>* keybinds = find_keybinds(scancode, event.key.keysym.mod);
 		if (keybinds != nullptr) {
-			for(string& k : *keybinds)
+			for (string& k : *keybinds)
 				Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, k.c_str());
 		}
 	}
 }
 
-void GameEngineLocal::cleanup()
-{
+void GameEngineLocal::cleanup() {
 #ifdef EDITOR_BUILD
-	//assert(0);
-	//if (get_current_tool())
+	// assert(0);
+	// if (get_current_tool())
 	//	get_current_tool()->close();
 	if (editorState)
 		editorState.reset();
@@ -1114,7 +1047,7 @@ void GameEngineLocal::cleanup()
 	if (level) {
 		stop_game();
 	}
-	
+
 	if (app) {
 		app->stop();
 		app.reset();
@@ -1126,24 +1059,21 @@ void GameEngineLocal::cleanup()
 
 	// could get fatal error before initializing this stuff
 	if (gl_context && window) {
-		//NetworkQuit();
+		// NetworkQuit();
 		SDL_GL_DeleteContext(gl_context);
 		SDL_DestroyWindow(window);
 	}
 }
 
-
 class Debug_Interface_Impl : public Debug_Interface
 {
 public:
-
-	template<typename FUNC>
-	void add_hook_shared(const char* menu_name, FUNC&& f) {
+	template <typename FUNC> void add_hook_shared(const char* menu_name, FUNC&& f) {
 		int i = 0;
 		for (; i < hooks.size(); i++) {
 			if (strcmp(menu_name, hooks[i].menu_name) == 0) {
 				Hook_Node* node = new Hook_Node;
-				//node->drawfunc = drawfunc;
+				// node->drawfunc = drawfunc;
 				f(node);
 				node->next = nullptr;
 				hooks[i].tail->next = node;
@@ -1156,24 +1086,19 @@ public:
 			auto& hook = hooks.back();
 			hook.menu_name = menu_name;
 			Hook_Node* node = new Hook_Node;
-		//	node->drawfunc = drawfunc;
+			//	node->drawfunc = drawfunc;
 			f(node);
 			node->next = nullptr;
 			hook.tail = hook.head = node;
 		}
 	}
 
-	void add_hook(const char* menu_name, void(*drawfunc)()) final {
-		add_hook_shared(menu_name, [&](Hook_Node* node) {
-			node->drawfunc = drawfunc;
-			});
+	void add_hook(const char* menu_name, void (*drawfunc)()) final {
+		add_hook_shared(menu_name, [&](Hook_Node* node) { node->drawfunc = drawfunc; });
 	}
-	void add_hook_w_name(const char* menu_name, void(*drawfunc)(const char*)) final {
-		add_hook_shared(menu_name, [&](Hook_Node* node) {
-			node->drawfunc2 = drawfunc;
-			});
+	void add_hook_w_name(const char* menu_name, void (*drawfunc)(const char*)) final {
+		add_hook_shared(menu_name, [&](Hook_Node* node) { node->drawfunc2 = drawfunc; });
 	}
-
 
 	void draw() {
 		ImVec2 winsize = ImGui::GetMainViewport()->Size;
@@ -1181,9 +1106,9 @@ public:
 		ImGui::SetNextWindowPos(ImVec2(winsize.x - width - 10, 50));
 		ImGui::SetNextWindowSize(ImVec2(width, 700));
 		ImGui::SetNextWindowBgAlpha(0.3);
-		ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar
-			| ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
-		if (ImGui::Begin("Debug",nullptr, flags)) {
+		ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoScrollbar |
+								 ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize;
+		if (ImGui::Begin("Debug", nullptr, flags)) {
 			ImGui::PushItemWidth(140.f);
 			for (int i = 0; i < hooks.size(); i++) {
 				if (ImGui::CollapsingHeader(hooks[i].menu_name)) {
@@ -1194,14 +1119,12 @@ public:
 					}
 				}
 			}
-
-
 		}
 		ImGui::End();
 	}
 
-
-	struct Hook_Node {
+	struct Hook_Node
+	{
 		Hook_Node* next = nullptr;
 
 		void do_call(const char* menu_name) {
@@ -1210,11 +1133,12 @@ public:
 			else if (drawfunc2)
 				drawfunc2(menu_name);
 		}
-		void(*drawfunc2)(const char*)=nullptr;
-		void(*drawfunc)()=nullptr;
+		void (*drawfunc2)(const char*) = nullptr;
+		void (*drawfunc)() = nullptr;
 	};
 
-	struct Menu_Hook {
+	struct Menu_Hook
+	{
 		const char* menu_name = "";
 		Hook_Node* head = nullptr;
 		Hook_Node* tail = nullptr;
@@ -1222,46 +1146,33 @@ public:
 	std::vector<Menu_Hook> hooks;
 };
 
-
-
-
-
-Debug_Interface* Debug_Interface::get()
-{
+Debug_Interface* Debug_Interface::get() {
 	static Debug_Interface_Impl inst;
 	return &inst;
 }
 
-
-bool GameEngineLocal::is_drawing_to_window_viewport() const
-{
+bool GameEngineLocal::is_drawing_to_window_viewport() const {
 	return !UiSystem::inst->is_drawing_to_screen();
 }
-
 
 static bool scene_hovered = false;
 
 #include "Framework/MyImguiLib.h"
-void GameEngineLocal::draw_any_imgui_interfaces()
-{
-	
-}
+void GameEngineLocal::draw_any_imgui_interfaces() {}
 
-void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& setup)
-{
+void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& setup) {
 	params = SceneDrawParamsEx(time, frame_time);
 	params.output_to_screen = UiSystem::inst->is_drawing_to_screen();
 	// so the width/height parameters are valid
 	View_Setup vs_for_gui;
-	auto viewport = UiSystem::inst->get_vp_rect().get_size();// get_game_viewport_size();
+	auto viewport = UiSystem::inst->get_vp_rect().get_size(); // get_game_viewport_size();
 	vs_for_gui.width = viewport.x;
 	vs_for_gui.height = viewport.y;
 
-
 #ifdef EDITOR_BUILD
 	// draw general ui
-	if (editorState&&editorState->has_tool()) {
-		params.is_editor = true;	// draw to the id buffer for mouse picking
+	if (editorState && editorState->has_tool()) {
+		params.is_editor = true; // draw to the id buffer for mouse picking
 		auto vs = editorState->get_vs();
 
 		// fixme
@@ -1272,12 +1183,11 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 		}
 		isound->set_listener_position(vs->origin, glm::normalize(glm::cross(vs->front, glm::vec3(0, 1, 0))));
 		setup = *vs;
-		//idraw->scene_draw(params, *vs, get_gui());
-	}
-	else
+		// idraw->scene_draw(params, *vs, get_gui());
+	} else
 #endif
 	{
-		params=SceneDrawParamsEx(time, frame_time);
+		params = SceneDrawParamsEx(time, frame_time);
 		params.output_to_screen = UiSystem::inst->is_drawing_to_screen();
 		View_Setup vs_for_gui;
 		auto viewport = UiSystem::inst->get_vp_rect().get_size();
@@ -1291,9 +1201,7 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 			params.draw_world = false;
 			params.draw_ui = true;
 			setup = vs_for_gui;
-		}
-		else {
-
+		} else {
 
 			glm::mat4 view;
 			float fov = 60.f;
@@ -1309,21 +1217,17 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 			// fixme
 			isound->set_listener_position(vs.origin, glm::normalize(glm::cross(vs.front, glm::vec3(0, 1, 0))));
 		}
-		
 	}
-
 }
 
 // RH, reverse Z, infinite far plane perspective matrix
 
-glm::mat4 View_Setup::make_opengl_perspective_with_near_far() const
-{
+glm::mat4 View_Setup::make_opengl_perspective_with_near_far() const {
 	return glm::perspectiveRH_NO(fov, width / (float)height, near, far);
 }
 
 View_Setup::View_Setup(glm::mat4 viewMat, float fov, float near, float far, int width, int height)
-	: view(viewMat), fov(fov), near(near), far(far), width(width), height(height)
-{
+	: view(viewMat), fov(fov), near(near), far(far), width(width), height(height) {
 	auto inv = glm::inverse(viewMat);
 	this->origin = inv[3];
 	this->front = -inv[2];
@@ -1333,10 +1237,9 @@ View_Setup::View_Setup(glm::mat4 viewMat, float fov, float near, float far, int 
 }
 
 View_Setup::View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near, float far, int width, int height)
-	: origin(origin),front(front),fov(fov),near(near),far(far),width(width),height(height)
-{
+	: origin(origin), front(front), fov(fov), near(near), far(far), width(width), height(height) {
 	view = glm::lookAt(origin, origin + front, glm::vec3(0, 1.f, 0));
-	//proj = glm::perspective(fov, width / (float)height, near, far);
+	// proj = glm::perspective(fov, width / (float)height, near, far);
 
 	const float aspectRatio = width / (float)height;
 	proj = MakeInfReversedZProjRH(fov, aspectRatio, near);
@@ -1344,22 +1247,20 @@ View_Setup::View_Setup(glm::vec3 origin, glm::vec3 front, float fov, float near,
 	viewproj = proj * view;
 }
 
-#define TIMESTAMP(x) sys_print(Debug, "%s in %f\n",x,(float)GetTime()-start); start = GetTime();
+#define TIMESTAMP(x)                                                                                                   \
+	sys_print(Debug, "%s in %f\n", x, (float)GetTime() - start);                                                       \
+	start = GetTime();
 
-GameEngineLocal::GameEngineLocal()
-{
-
-}
+GameEngineLocal::GameEngineLocal() {}
 
 #include <tracy/public/tracy/TracyOpenGL.hpp>
-void GameEngineLocal::init_sdl_window()
-{
+void GameEngineLocal::init_sdl_window() {
 	ASSERT(!window);
 
 	sys_print(Info, "initializing window...\n");
 
 	if (SDL_Init(SDL_INIT_EVERYTHING)) {
-		sys_print(Error,"init sdl failed: %s\n", SDL_GetError());
+		sys_print(Error, "init sdl failed: %s\n", SDL_GetError());
 		exit(-1);
 	}
 
@@ -1370,8 +1271,8 @@ void GameEngineLocal::init_sdl_window()
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
 	const char* title = g_project_name.get_string();
-	window = SDL_CreateWindow(title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-		g_window_w.get_integer(), g_window_h.get_integer(), SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+	window = SDL_CreateWindow(title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, g_window_w.get_integer(),
+							  g_window_h.get_integer(), SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	if (!window) {
 		sys_print(Error, "create sdl window failed: %s\n", SDL_GetError());
 		exit(-1);
@@ -1385,25 +1286,20 @@ void GameEngineLocal::init_sdl_window()
 	sys_print(Debug, "Renderer: %s\n", glGetString(GL_RENDERER));
 	sys_print(Debug, "Version: %s\n\n", glGetString(GL_VERSION));
 
-	
 	// init tracy profiling for opengl
-	//TracyGpuContext;
-	//TracyGpuZone("Test");
-	//glClear(GL_COLOR_BUFFER_BIT);
-	//TracyGpuCollect;
-
+	// TracyGpuContext;
+	// TracyGpuZone("Test");
+	// glClear(GL_COLOR_BUFFER_BIT);
+	// TracyGpuCollect;
 
 	SDL_GL_SetSwapInterval(0);
 }
-
 
 using std::make_unique;
 
 ImFont* global_big_imgui_font = nullptr;
 
-
-void GameEngineLocal::init(int argc, char** argv)
-{
+void GameEngineLocal::init(int argc, char** argv) {
 	this->argc = argc;
 	this->argv = argv;
 
@@ -1413,8 +1309,8 @@ void GameEngineLocal::init(int argc, char** argv)
 	double start = GetTime();
 	auto print_time = [&](const char* msg) {
 		double now = GetTime();
-		//printf("-----TIME %s %f\n", msg, float(now - start));
-		printf("init % s in % fs\n", msg, float(now-start));
+		// printf("-----TIME %s %f\n", msg, float(now - start));
+		printf("init % s in % fs\n", msg, float(now - start));
 		start = now;
 	};
 
@@ -1427,11 +1323,9 @@ void GameEngineLocal::init(int argc, char** argv)
 	ClassBase::init_classes_startup();
 	print_time("init class system");
 
-
 	level = nullptr;
 	tick_interval = 1.0 / 60.0;
 	is_hosting_game = false;
-
 
 	init_sdl_window();
 	print_time("init sdl window");
@@ -1440,7 +1334,6 @@ void GameEngineLocal::init(int argc, char** argv)
 	FileSys::init();
 	print_time("file init");
 
-
 	Cmd_Manager::inst->set_set_unknown_variables(true);
 	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
 	print_time("execute vars file");
@@ -1448,7 +1341,7 @@ void GameEngineLocal::init(int argc, char** argv)
 	g_assets.init();
 	print_time("asset init");
 
-	JobSystem::inst = new JobSystem();// spawns worker threads
+	JobSystem::inst = new JobSystem(); // spawns worker threads
 	print_time("job sys init");
 
 	ScriptManager::inst = new ScriptManager();
@@ -1467,7 +1360,6 @@ void GameEngineLocal::init(int argc, char** argv)
 	g_physics.init();
 	print_time("physics init");
 
-
 	imaterials->init();
 	print_time("mat init");
 
@@ -1478,7 +1370,6 @@ void GameEngineLocal::init(int argc, char** argv)
 
 	Model::on_model_loaded.add(this, [](Model* mod) { add_events_test(mod); });
 	print_time("init mods,sounds");
-
 
 	imgui_context = ImGui::CreateContext();
 	DebugShapeCtx::get().init();
@@ -1496,28 +1387,22 @@ void GameEngineLocal::init(int argc, char** argv)
 	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
 	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 18.0);
 
-
 	ImGui::GetIO().Fonts->Build();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	print_time("imgui font");
 
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
-	for (int i = 1; i < argc; i++)
-	{
+	for (int i = 1; i < argc; i++) {
 		if (strcmp(argv[i], "-x") == 0) {
 			startx = atoi(argv[++i]);
-		}
-		else if (strcmp(argv[i], "-y") == 0) {
+		} else if (strcmp(argv[i], "-y") == 0) {
 			starty = atoi(argv[++i]);
-		}
-		else if (strcmp(argv[i], "-w") == 0) {
+		} else if (strcmp(argv[i], "-w") == 0) {
 			g_window_w.set_integer(atoi(argv[++i]));
-		}
-		else if (strcmp(argv[i], "-h") == 0) {
+		} else if (strcmp(argv[i], "-h") == 0) {
 			g_window_h.set_integer(atoi(argv[++i]));
-		}
-		else if (strcmp(argv[i], "-VISUALSTUDIO") == 0) {
+		} else if (strcmp(argv[i], "-VISUALSTUDIO") == 0) {
 			const char* projName = g_project_name.get_string();
 			SDL_SetWindowTitle(window, string_format("%s - VISUAL STUDIO\n", projName));
 		}
@@ -1538,43 +1423,36 @@ void GameEngineLocal::init(int argc, char** argv)
 	SDL_SetWindowPosition(window, startx, starty);
 	SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
 
-
 	auto start_game = [&]() {
 		sys_print(Info, "starting game...\n");
 		Application* a = ClassBase::create_class<Application>(g_application_class.get_string());
 		if (!a) {
-			Fatalf("Engine::init: application class not found %s. set it in vars.txt\n", g_application_class.get_string());
+			Fatalf("Engine::init: application class not found %s. set it in vars.txt\n",
+				   g_application_class.get_string());
 		}
 		app.reset(a);
-		Input::on_con_status.add(a, [this](int i, bool b) {
-			app->on_controller_status(i, b);
-			});
-		Model::on_model_loaded.add(this, [this](Model* m) {
-			app->on_post_model_load(m);
-			});
+		Input::on_con_status.add(a, [this](int i, bool b) { app->on_controller_status(i, b); });
+		Model::on_model_loaded.add(this, [this](Model* m) { app->on_post_model_load(m); });
 		MaterialInstance::on_material_loaded.add(this, [this](MaterialInstance* m) {
 			try {
 				app->on_post_material_load(m);
 			}
 			catch (LuaRuntimeError er) {
-				sys_print(Error, "on_post_material_load %s\n",er.what());
+				sys_print(Error, "on_post_material_load %s\n", er.what());
 			}
-			});
-
+		});
 
 		app->start();
-
 	};
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
-	
+
 	if (is_editor_app.get_bool()) {
 		AssetBrowser::inst = new AssetBrowser();
 		editorState = make_unique<EditorState>();
 		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		print_time("asset reg and browser init");
-	}
-	else {
+	} else {
 		start_game();
 	}
 #else
@@ -1586,14 +1464,13 @@ void GameEngineLocal::init(int argc, char** argv)
 	Cmd_Manager::inst->set_set_unknown_variables(false);
 
 	// doesnt matter if it fails, just precache loading stuff
-	//g_assets.find_sync<AssetBundle>("eng/default_bundle.bundle", true);
+	// g_assets.find_sync<AssetBundle>("eng/default_bundle.bundle", true);
 	print_time("load default bundle");
 
 	sys_print(Info, "execute startup in %f\n", (float)TimeSinceStart());
 }
 
-void GameEngineLocal::game_update_tick()
-{
+void GameEngineLocal::game_update_tick() {
 	ZoneScopedN("game_update_tick");
 
 	auto fixed_update = [&](double dt) {
@@ -1605,7 +1482,7 @@ void GameEngineLocal::game_update_tick()
 	auto update = [&](double dt) {
 		ZoneScopedN("update");
 		CPUSCOPESTART(game_update_tick_update);
-		if(level)
+		if (level)
 			level->update_level();
 		if (app)
 			app->update();
@@ -1620,12 +1497,11 @@ void GameEngineLocal::game_update_tick()
 
 	float orig_ft = frame_time;
 	float orig_ti = tick_interval;
-	
+
 	frame_time *= g_slomo.get_float();
 	tick_interval *= g_slomo.get_float();
 
 	// physics update
-
 
 	if (app)
 		app->pre_update();
@@ -1643,39 +1519,35 @@ void GameEngineLocal::game_update_tick()
 	tick_interval = orig_ti;
 }
 
-
 // unloads all game state
-void GameEngineLocal::stop_game()
-{
+void GameEngineLocal::stop_game() {
 	if (!map_spawned())
 		return;
 
 	assert(level);
 	string name = level->get_source_asset_name();
-	sys_print(Info,"Clearing Map (%s)\n", name.c_str());
+	sys_print(Info, "Clearing Map (%s)\n", name.c_str());
 	on_leave_level.invoke();
 	idraw->on_level_end();
 	level->close_level();
 	level.reset();
 
-
-
 	// clear any debug shapes
 	DebugShapeCtx::get().fixed_update_start();
 }
 
-bool GameEngineLocal::game_thread_update()
-{
+bool GameEngineLocal::game_thread_update() {
 
 	return true;
 }
 
-
-enum class RpcId {
+enum class RpcId
+{
 	ChangeMap,
 };
 
-class Networking {
+class Networking
+{
 public:
 	// unreliable
 	// netid 10bits, typeid 8bits, data, netid, typeid, data,...
@@ -1687,7 +1559,6 @@ public:
 	const int max_net_ids = 1 << net_id_bits;
 	const int net_type_id_bits = 7;
 	const int max_net_types = 1 << net_type_id_bits;
-
 
 	void tick();
 	void get_state();
@@ -1702,16 +1573,15 @@ public:
 	virtual void process_snapshot() {}
 };
 
-
-struct GameUpdateOuput {
+struct GameUpdateOuput
+{
 	bool drawOut = false;
 	SceneDrawParamsEx paramsOut = SceneDrawParamsEx(0, 0);
 	View_Setup vsOut;
 };
 
-
-static void lua_error_loop(string msg, auto&& frame_start, auto&& wait_for_swap, SceneDrawParamsEx drawparamsNext, View_Setup setupNext)
-{
+static void lua_error_loop(string msg, auto&& frame_start, auto&& wait_for_swap, SceneDrawParamsEx drawparamsNext,
+						   View_Setup setupNext) {
 	// bsod is funny lol
 	sys_print(Error, "loop: caught LuaRuntimeError: %s\n", msg.c_str());
 	auto lines = StringUtils::to_lines(msg);
@@ -1727,7 +1597,7 @@ static void lua_error_loop(string msg, auto&& frame_start, auto&& wait_for_swap,
 			break;
 
 		RectangleShape shape;
-		shape.color = { 50,50,255,180 };
+		shape.color = {50, 50, 255, 180};
 		shape.rect.w = setupNext.width;
 		shape.rect.h = setupNext.height;
 		UiSystem::inst->window.draw(shape);
@@ -1751,21 +1621,16 @@ static void lua_error_loop(string msg, auto&& frame_start, auto&& wait_for_swap,
 		wait_for_swap(false);
 	}
 	ScriptManager::inst->check_for_reload();
-
 }
 
-
-void GameEngineLocal::loop()
-{
-	auto frame_start = [&]()
-	{
+void GameEngineLocal::loop() {
+	auto frame_start = [&]() {
 		ZoneScopedN("frame_start");
 		// update input
 		Input::inst->pre_events();
 		UiSystem::inst->pre_events();
 		SDL_Event event;
-		while (SDL_PollEvent(&event))
-		{
+		while (SDL_PollEvent(&event)) {
 			ImGui_ImplSDL2_ProcessEvent(&event);
 			Input::inst->handle_event(event);
 			UiSystem::inst->handle_event(event);
@@ -1778,8 +1643,10 @@ void GameEngineLocal::loop()
 				if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
 					int x, y;
 					SDL_GetWindowSize(window, &x, &y);
-					if (x % 2 == 1) x -= 1;
-					if (y % 2 == 1) y -= 1;
+					if (x % 2 == 1)
+						x -= 1;
+					if (y % 2 == 1)
+						y -= 1;
 					bool changed = false;
 					if (x != g_window_w.get_integer()) {
 						changed = true;
@@ -1803,13 +1670,13 @@ void GameEngineLocal::loop()
 			default:
 				break;
 			}
-			//if (!is_game_focused()) {
+			// if (!is_game_focused()) {
 			//	if ((event.type == SDL_KEYUP || event.type == SDL_KEYDOWN) && ImGui::GetIO().WantCaptureKeyboard)
 			//		continue;
-			//	if (!scene_hovered && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) && ImGui::GetIO().WantCaptureMouse)
-			//		continue;
+			//	if (!scene_hovered && (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP) &&
+			//ImGui::GetIO().WantCaptureMouse) 		continue;
 			//}
-			//g_guiSystem->handle_event(event);
+			// g_guiSystem->handle_event(event);
 		}
 		Input::inst->tick();
 		UiSystem::inst->update();
@@ -1820,25 +1687,25 @@ void GameEngineLocal::loop()
 			Canvas::set_window_fullscreen(g_window_fullscreen.get_bool());
 	};
 
-	auto do_overlapped_update = [&](bool& shouldDrawNext, SceneDrawParamsEx& drawparamsNext, View_Setup& setupNext, const bool skip_rendering)
-	{
+	auto do_overlapped_update = [&](bool& shouldDrawNext, SceneDrawParamsEx& drawparamsNext, View_Setup& setupNext,
+									const bool skip_rendering) {
 		ZoneScopedN("OverlappedUpdate");
 		CPUSCOPESTART(OverlappedUpdate);
 		BooleanScope scope(b_is_in_overlapped_period);
 		GameUpdateOuput out;
 
-		// I reworked the asset system so have to disable this for now. issue is sync loading assets on game thread. otherwise everything else is threadsafe(tm).
-		// 
-		//JobCounter* gameupdatecounter{};
-		//JobSystem::inst->add_job(game_update_job,uintptr_t(&out), gameupdatecounter);
-		//game_update_job(uintptr_t(&out));
-
+		// I reworked the asset system so have to disable this for now. issue is sync loading assets on game thread.
+		// otherwise everything else is threadsafe(tm).
+		//
+		// JobCounter* gameupdatecounter{};
+		// JobSystem::inst->add_job(game_update_job,uintptr_t(&out), gameupdatecounter);
+		// game_update_job(uintptr_t(&out));
 
 		{
 			ZoneScopedN("GameThreadUpdate");
 			CPUFUNCTIONSTART;
 
-			//printf("abc\n");
+			// printf("abc\n");
 			out.drawOut = true;
 			game_update_tick();
 #ifdef EDITOR_BUILD
@@ -1848,9 +1715,8 @@ void GameEngineLocal::loop()
 
 			isound->tick(frame_time);
 
-
 			eng_local.get_draw_params(out.paramsOut, out.vsOut);
-			//return;
+			// return;
 			// update particles, doesnt draw, only builds meshes FIXME
 			ParticleMgr::inst->draw(out.vsOut);
 		}
@@ -1865,14 +1731,14 @@ void GameEngineLocal::loop()
 		shouldDrawNext = out.drawOut;
 		drawparamsNext = out.paramsOut;
 		setupNext = out.vsOut;
-		//JobSystem::inst->wait_and_free_counter(gameupdatecounter);// wait for game update to finish while render is on this thread
+		// JobSystem::inst->wait_and_free_counter(gameupdatecounter);// wait for game update to finish while render is
+		// on this thread
 	};
 
 	// This happens on main thread
 	// I could double buffer draw data so ImGui can update on game thread and render simultaneously
-	auto imgui_render = [&](const bool skip_rendering)
-	{
-		//ZoneScopedN("ImguiDraw");
+	auto imgui_render = [&](const bool skip_rendering) {
+		// ZoneScopedN("ImguiDraw");
 		GPUSCOPESTART(imgui_update_scope);
 
 		ZoneScopedN("ImGuiUpdate");
@@ -1890,29 +1756,26 @@ void GameEngineLocal::loop()
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		}
 	};
-	auto do_sync_update = [&]()
-	{
+	auto do_sync_update = [&]() {
 		ZoneScopedN("SyncUpdate");
 		DebugShapeCtx::get().update(frame_time);
 #ifdef EDITOR_BUILD
-		AssetRegistrySystem::get().update(); 		// update hot reloading
+		AssetRegistrySystem::get().update(); // update hot reloading
 #endif
 		ScriptManager::inst->update();
 		idraw->pre_sync_update();
 		if (get_level())
 			get_level()->sync_level_render_data();
 		UiSystem::inst->sync_to_renderer();
-		g_physics.sync_render_data();		
+		g_physics.sync_render_data();
 		idraw->sync_update();
 	};
-	auto wait_for_swap = [&](const bool skip_rendering)
-	{
-		//ZoneScopedN("SwapWindow");
+	auto wait_for_swap = [&](const bool skip_rendering) {
+		// ZoneScopedN("SwapWindow");
 		GPUSCOPESTART(gl_swap_window_scope);
-		if(!skip_rendering)
+		if (!skip_rendering)
 			SDL_GL_SwapWindow(window);
 	};
-
 
 	double last = GetTime() - 0.1;
 	// these are from the last game frame
@@ -1920,8 +1783,7 @@ void GameEngineLocal::loop()
 	View_Setup setupNext;
 	bool shouldDrawNext = true;
 
-	for (;;)
-	{
+	for (;;) {
 		try {
 			const bool skip_rendering = headless_mode;
 
@@ -1950,36 +1812,30 @@ void GameEngineLocal::loop()
 			// sync period
 			imgui_render(skip_rendering);
 			do_sync_update();
-			//TracyGpuCollect;
-			wait_for_swap(skip_rendering);	// wait for swap last
+			// TracyGpuCollect;
+			wait_for_swap(skip_rendering); // wait for swap last
 
-
-			FrameMark;	// tracy profiling
-			Profiler::end_frame_tick(frame_time);	// my crappy profilier
-			
-			
+			FrameMark;							  // tracy profiling
+			Profiler::end_frame_tick(frame_time); // my crappy profilier
 		}
 		catch (LuaRuntimeError luaErr) {
-			lua_error_loop(luaErr.what(),frame_start,wait_for_swap,drawparamsNext,setupNext);
+			lua_error_loop(luaErr.what(), frame_start, wait_for_swap, drawparamsNext, setupNext);
 		}
 	}
 }
 
-int debug_console_text_callback(ImGuiInputTextCallbackData* data)
-{
-	Debug_Console* console = (Debug_Console * )data->UserData;
+int debug_console_text_callback(ImGuiInputTextCallbackData* data) {
+	Debug_Console* console = (Debug_Console*)data->UserData;
 	if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory) {
 		if (data->EventKey == ImGuiKey_UpArrow) {
 			if (console->history_index == -1) {
-				console->history_index = console->history.size() -1 ;
-			}
-			else {
+				console->history_index = console->history.size() - 1;
+			} else {
 				console->history_index--;
 				if (console->history_index < 0)
 					console->history_index = 0;
 			}
-		}
-		else if (data->EventKey == ImGuiKey_DownArrow) {
+		} else if (data->EventKey == ImGuiKey_DownArrow) {
 			if (console->history_index != -1) {
 				console->history_index++;
 				if (console->history_index >= console->history.size())
@@ -1992,8 +1848,7 @@ int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 			data->DeleteChars(0, data->BufTextLen);
 			data->InsertChars(0, hist.c_str());
 		}
-	}
-	else if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
+	} else if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
 		string match = Cmd_Manager::get()->print_matches(console->input_buffer);
 		console->scroll_to_bottom = true;
 		if (!match.empty()) {
@@ -2005,8 +1860,7 @@ int debug_console_text_callback(ImGuiInputTextCallbackData* data)
 	return 0;
 }
 
-void Debug_Console::draw()
-{
+void Debug_Console::draw() {
 	{
 		std::lock_guard<std::mutex> printLock(printMutex);
 		for (auto& l : bufferedLines)
@@ -2016,32 +1870,28 @@ void Debug_Console::draw()
 	if (lines.size() > 1000)
 		lines.clear();
 
-
-
 	ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
 	if (!ImGui::Begin("Console")) {
 		ImGui::End();
 
 		return;
 	}
-	
+
 	ImGui::PushStyleColor(ImGuiCol_ChildBg, uint32_t(ImColor(5, 5, 5)));
 
 	const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
-	if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false))
-	{
+	if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false)) {
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
-		for (int i = 0; i < lines.size(); i++)
-		{
+		for (int i = 0; i < lines.size(); i++) {
 			Color32 color;
-	
+
 			auto& line = lines[i];
 			auto& lineStr = line.line;
 			auto lineColor = line.color;
 
-			//if (!lines[i].empty() && lines[i][0] == '>') { 
-			//	color = { 136,23,152 }; 
-			//	has_color = true; 
+			// if (!lines[i].empty() && lines[i][0] == '>') {
+			//	color = { 136,23,152 };
+			//	has_color = true;
 			//}
 
 			ImGui::PushStyleColor(ImGuiCol_Text, lineColor.to_uint());
@@ -2062,11 +1912,11 @@ void Debug_Console::draw()
 
 	// Command-line
 	bool reclaim_focus = false;
-	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | 
-		ImGuiInputTextFlags_EscapeClearsAll | ImGuiInputTextFlags_CallbackHistory | ImGuiInputTextFlags_CallbackCompletion;
+	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_EscapeClearsAll |
+										   ImGuiInputTextFlags_CallbackHistory | ImGuiInputTextFlags_CallbackCompletion;
 
-	if (ImGui::InputText("##Input", input_buffer, IM_ARRAYSIZE(input_buffer), input_text_flags, debug_console_text_callback, this))
-	{
+	if (ImGui::InputText("##Input", input_buffer, IM_ARRAYSIZE(input_buffer), input_text_flags,
+						 debug_console_text_callback, this)) {
 		char* s = input_buffer;
 		if (s[0]) {
 			// this will print it to the console
@@ -2084,12 +1934,12 @@ void Debug_Console::draw()
 
 	ImGui::SetItemDefaultFocus();
 
-	if (reclaim_focus||wants_toggle_set_focus) {
+	if (reclaim_focus || wants_toggle_set_focus) {
 		ImGui::SetKeyboardFocusHere(-1);
 		wants_toggle_set_focus = false;
 	}
 
-	if (ImGui::IsItemFocused() && input_buffer[0]!=0) {
+	if (ImGui::IsItemFocused() && input_buffer[0] != 0) {
 		auto matches = Cmd_Manager::inst->get_matches(input_buffer);
 		if (!matches.empty()) {
 			ImVec2 pos = ImGui::GetItemRectMin();
@@ -2113,8 +1963,7 @@ void Debug_Console::draw()
 	}
 	ImGui::End();
 }
-void Debug_Console::print_args(Color32 color, const char* fmt, va_list args)
-{
+void Debug_Console::print_args(Color32 color, const char* fmt, va_list args) {
 	std::lock_guard<std::mutex> printLock(printMutex);
 
 	char buf[1024];
@@ -2126,8 +1975,7 @@ void Debug_Console::print_args(Color32 color, const char* fmt, va_list args)
 	bufferedLines.push_back(lc);
 }
 
-void Debug_Console::print(Color32 color, const char* fmt, ...)
-{
+void Debug_Console::print(Color32 color, const char* fmt, ...) {
 	std::lock_guard<std::mutex> printLock(printMutex);
 
 	char buf[1024];
@@ -2142,9 +1990,7 @@ void Debug_Console::print(Color32 color, const char* fmt, ...)
 	bufferedLines.push_back(lc);
 }
 
-
-void Debug::add_line(glm::vec3 f, glm::vec3 to, Color32 color, float duration, bool fixedupdate)
-{
+void Debug::add_line(glm::vec3 f, glm::vec3 to, Color32 color, float duration, bool fixedupdate) {
 	Debug_Shape shape;
 	shape.type = Debug_Shape::line;
 	shape.pos = f;
@@ -2153,8 +1999,7 @@ void Debug::add_line(glm::vec3 f, glm::vec3 to, Color32 color, float duration, b
 	shape.lifetime = duration;
 	DebugShapeCtx::get().add(shape, fixedupdate);
 }
-void Debug::add_box(glm::vec3 c, glm::vec3 size, Color32 color, float duration, bool fixedupdate)
-{
+void Debug::add_box(glm::vec3 c, glm::vec3 size, Color32 color, float duration, bool fixedupdate) {
 	Debug_Shape shape;
 	shape.type = Debug_Shape::box;
 	shape.pos = c;
@@ -2163,8 +2008,7 @@ void Debug::add_box(glm::vec3 c, glm::vec3 size, Color32 color, float duration, 
 	shape.lifetime = duration;
 	DebugShapeCtx::get().add(shape, fixedupdate);
 }
-void Debug::add_transformed_box(glm::mat4 c, glm::vec3 size, Color32 color, float duration, bool fixedupdate)
-{
+void Debug::add_transformed_box(glm::mat4 c, glm::vec3 size, Color32 color, float duration, bool fixedupdate) {
 	Debug_Shape shape;
 	shape.type = Debug_Shape::transformed_box;
 	shape.transform = c;
@@ -2173,8 +2017,7 @@ void Debug::add_transformed_box(glm::mat4 c, glm::vec3 size, Color32 color, floa
 	shape.lifetime = duration;
 	DebugShapeCtx::get().add(shape, fixedupdate);
 }
-void Debug::add_sphere(glm::vec3 c, float radius, Color32 color, float duration, bool fixedupdate)
-{
+void Debug::add_sphere(glm::vec3 c, float radius, Color32 color, float duration, bool fixedupdate) {
 	Debug_Shape shape;
 	shape.type = Debug_Shape::sphere;
 	shape.pos = c;
@@ -2184,23 +2027,22 @@ void Debug::add_sphere(glm::vec3 c, float radius, Color32 color, float duration,
 	DebugShapeCtx::get().add(shape, fixedupdate);
 }
 
-void DebugShapeCtx::update(float dt)
-{
+void DebugShapeCtx::update(float dt) {
 
 	auto& builder = mb;
 	builder.Begin();
 
-	vector<Debug_Shape>* shapearrays[2] = { &one_frame_fixedupdate,&shapes };
+	vector<Debug_Shape>* shapearrays[2] = {&one_frame_fixedupdate, &shapes};
 	for (int i = 0; i < 2; i++) {
 		vector<Debug_Shape>& shapes = *shapearrays[i];
 		for (int j = 0; j < shapes.size(); j++) {
-			switch (shapes[j].type)
-			{
+			switch (shapes[j].type) {
 			case Debug_Shape::line:
 				builder.PushLine(shapes[j].pos, shapes[j].size, shapes[j].color);
 				break;
 			case Debug_Shape::box:
-				builder.PushLineBox(shapes[j].pos - shapes[j].size * 0.5f, shapes[j].pos + shapes[j].size * 0.5f, shapes[j].color);
+				builder.PushLineBox(shapes[j].pos - shapes[j].size * 0.5f, shapes[j].pos + shapes[j].size * 0.5f,
+									shapes[j].color);
 				break;
 			case Debug_Shape::sphere:
 				builder.AddSphere(shapes[j].pos, shapes[j].size.x, 8, 6, shapes[j].color);
@@ -2222,7 +2064,6 @@ void DebugShapeCtx::update(float dt)
 
 	idraw->get_scene()->update_meshbuilder(handle, mbo);
 
-
 	for (int i = 0; i < shapes.size(); i++) {
 		shapes[i].lifetime -= dt;
 		if (shapes[i].lifetime <= 0.f) {
@@ -2231,11 +2072,9 @@ void DebugShapeCtx::update(float dt)
 		}
 	}
 }
-void DebugShapeCtx::fixed_update_start()
-{
+void DebugShapeCtx::fixed_update_start() {
 	one_frame_fixedupdate.clear();
 }
-Application* Application::get_app()
-{
+Application* Application::get_app() {
 	return eng->get_app();
 }

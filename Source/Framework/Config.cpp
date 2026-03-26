@@ -38,7 +38,6 @@ public:
 		flags |= data.flags;
 		description = data.description;
 
-
 		update();
 	}
 
@@ -55,24 +54,26 @@ public:
 	void update() {
 		flags |= CVAR_CHANGED;
 		if (flags & CVAR_BOOL) {
-			integerVal = atoi(value)!=0;
+			integerVal = atoi(value) != 0;
 			valueStr = std::to_string(integerVal);
 			value = valueStr.c_str();
-		}
-		else if (flags & CVAR_INTEGER) {
+		} else if (flags & CVAR_INTEGER) {
 			integerVal = atoi(value);
 			if (!(flags & CVAR_UNBOUNDED)) {
-				if (integerVal < minVal)integerVal = minVal;
-				else if (integerVal > maxVal) integerVal = maxVal;
+				if (integerVal < minVal)
+					integerVal = minVal;
+				else if (integerVal > maxVal)
+					integerVal = maxVal;
 				valueStr = std::to_string(integerVal);
 				value = valueStr.c_str();
 			}
-		}
-		else if (flags & CVAR_FLOAT) {
+		} else if (flags & CVAR_FLOAT) {
 			floatVal = atof(value);
 			if (!(flags & CVAR_UNBOUNDED)) {
-				if (floatVal < minVal)floatVal = minVal;
-				else if (floatVal > maxVal) floatVal = maxVal;
+				if (floatVal < minVal)
+					floatVal = minVal;
+				else if (floatVal > maxVal)
+					floatVal = maxVal;
 				valueStr = std::to_string(floatVal);
 				value = valueStr.c_str();
 			}
@@ -83,17 +84,13 @@ public:
 	std::string valueStr;
 
 	ConfigVar selfptr;
-
 };
 
-
-ConfigVar::ConfigVar(ConfigVarDataInternal* ptr)
-{
+ConfigVar::ConfigVar(ConfigVarDataInternal* ptr) {
 	this->ptr = ptr;
 }
 
-ConfigVar::ConfigVar(const char* name, const char* value, int flags, const char* description, float min , float max )
-{
+ConfigVar::ConfigVar(const char* name, const char* value, int flags, const char* description, float min, float max) {
 	ConfigVarDataPublic init;
 	init.name = name;
 	init.value = value;
@@ -104,26 +101,19 @@ ConfigVar::ConfigVar(const char* name, const char* value, int flags, const char*
 	VarMan::get()->register_var(this, init);
 }
 
-void ConfigVar::set_string(const char* s)
-{
+void ConfigVar::set_string(const char* s) {
 	((ConfigVarDataInternal*)ptr)->set_string(s);
 }
-void ConfigVar::set_bool(bool b)
-{
+void ConfigVar::set_bool(bool b) {
 	set_string(std::to_string((int)b).c_str());
 }
 
-void ConfigVar::set_float(float f)
-{
+void ConfigVar::set_float(float f) {
 	set_string(std::to_string(f).c_str());
 }
-void ConfigVar::set_integer(int i)
-{
+void ConfigVar::set_integer(int i) {
 	set_string(std::to_string(i).c_str());
 }
-
-
-
 
 class VarManImpl : public VarMan
 {
@@ -132,7 +122,7 @@ public:
 
 	ConfigVar* find(const char* name) {
 		auto find = vars.find(name);
-		if (find != vars.end()) 
+		if (find != vars.end())
 			return &find->second->selfptr;
 		return nullptr;
 	}
@@ -145,9 +135,8 @@ public:
 			if (internal_->flags & CVAR_REGISTERED)
 				Fatalf("config var was allocated twice %s\n", internal_->name);
 			internal_->init_from_register(initializer);
-		}
-		else {
-			auto pair = vars.insert({ std::string(initializer.name),new ConfigVarDataInternal(initializer) });
+		} else {
+			auto pair = vars.insert({std::string(initializer.name), new ConfigVarDataInternal(initializer)});
 			internal_ = pair.first->second;
 		}
 		internal_->flags |= CVAR_REGISTERED;
@@ -158,34 +147,25 @@ public:
 		auto internal_ = find_internal_var(name);
 		if (internal_) {
 			internal_->set_string(value);
-		}
-		else {
+		} else {
 			ConfigVarDataPublic initializer;
 			initializer.name = name;
 			initializer.value = value;
-			vars.insert({ std::string(name), new ConfigVarDataInternal(initializer) });
+			vars.insert({std::string(name), new ConfigVarDataInternal(initializer)});
 		}
 	}
-	void set_var_int(const char* name,int iVal) {
-		set_var_string(name, std::to_string(iVal).c_str());
-	}
-	void set_var_bool(const char* name, bool bVal) {
-		set_var_string(name, std::to_string((int)bVal).c_str());
-	}
-	void set_var_float(const char* name, float fVal) {
-		set_var_string(name, std::to_string(fVal).c_str());
-	}
+	void set_var_int(const char* name, int iVal) { set_var_string(name, std::to_string(iVal).c_str()); }
+	void set_var_bool(const char* name, bool bVal) { set_var_string(name, std::to_string((int)bVal).c_str()); }
+	void set_var_float(const char* name, float fVal) { set_var_string(name, std::to_string(fVal).c_str()); }
 
-	
 	void print_vars(const char* match) {
 		sys_print(Info, "%--36s %s", "name", "value");
-		//for (int i = 0; i < num_vars; i++)
-			//if (!match || all_vars[i].name.find(match) != std::string::npos)
-				//sys_print("%--36s %s\n", all_vars[i].name.c_str(), all_vars[i].value.c_str());
+		// for (int i = 0; i < num_vars; i++)
+		// if (!match || all_vars[i].name.find(match) != std::string::npos)
+		// sys_print("%--36s %s\n", all_vars[i].name.c_str(), all_vars[i].value.c_str());
 	}
 
 	void imgui_draw() {
-	
 
 		for (auto var_pair : vars) {
 			auto var = var_pair.second;
@@ -194,30 +174,22 @@ public:
 
 			if (readonly) {
 				ImGui::Text(var->value);
-			}
-			else if (var->flags & CVAR_INTEGER) {
+			} else if (var->flags & CVAR_INTEGER) {
 
-			}
-			else if (var->flags & CVAR_FLOAT) {
+			} else if (var->flags & CVAR_FLOAT) {
 
-			}
-			else if (var->flags & CVAR_BOOL) {
+			} else if (var->flags & CVAR_BOOL) {
 
-			}
-			else {
-
+			} else {
 			}
 		}
 	}
 
-
-	void sort_vars() {
-	
-	}
+	void sort_vars() {}
 
 	ConfigVarDataInternal* find_internal_var(const std::string& name) {
 		auto find = vars.find(name);
-		if (find != vars.end()) 
+		if (find != vars.end())
 			return find->second;
 		return nullptr;
 	}
@@ -227,44 +199,37 @@ public:
 	std::unordered_map<std::string, ConfigVarDataInternal*> vars;
 };
 
-VarMan* VarMan::get()
-{
+VarMan* VarMan::get() {
 	static VarManImpl inst;
 	return &inst;
 }
 
-void imgui_vars_hook()
-{
+void imgui_vars_hook() {
 	((VarManImpl*)VarMan::get())->imgui_draw();
 }
 
-VarManImpl::VarManImpl()
-{
+VarManImpl::VarManImpl() {
 	Debug_Interface::get()->add_hook("Cvars", imgui_vars_hook);
 }
 
-
-std::vector<std::string> tokenize_string(const std::string& input)
-{
+std::vector<std::string> tokenize_string(const std::string& input) {
 	std::vector<std::string> output;
 	std::string token;
 	bool in_quotes = false;
 	char last_c = 0;
 	for (char c : input) {
-		if ((c == ' ' || c == '\t' || c=='\r') && !in_quotes) {
+		if ((c == ' ' || c == '\t' || c == '\r') && !in_quotes) {
 			if (!token.empty()) {
 				output.push_back(token);
 				token.clear();
 			}
-		}
-		else if (c == '"' && last_c != '\\') {
+		} else if (c == '"' && last_c != '\\') {
 			in_quotes = !in_quotes;
 			if (!token.empty()) {
 				output.push_back(token);
 				token.clear();
 			}
-		}
-		else {
+		} else {
 			token += c;
 		}
 		last_c = c;
@@ -277,8 +242,7 @@ std::vector<std::string> tokenize_string(const std::string& input)
 }
 
 // shitty classification
-static int classify_string(const char* s)
-{
+static int classify_string(const char* s) {
 	int l = strlen(s);
 	bool floating_point = false;
 	for (int i = 0; i < l; i++) {
@@ -289,7 +253,8 @@ static int classify_string(const char* s)
 		if (s[i] == 'f' && i == l - 1) {
 			floating_point = true;
 		}
-		if (s[i] >= '0' && s[i] <= '9') continue;
+		if (s[i] >= '0' && s[i] <= '9')
+			continue;
 
 		return 0;
 	}
@@ -299,8 +264,7 @@ static int classify_string(const char* s)
 #include "DebugConsole.h"
 extern Color32 get_color_of_print(LogType type);
 #include <algorithm>
-void Cmd_Args::sys_print(LogType type, const char* fmt, ...) const
-{
+void Cmd_Args::sys_print(LogType type, const char* fmt, ...) const {
 	if (type == Error)
 		did_err |= true;
 	va_list args;
@@ -310,8 +274,7 @@ void Cmd_Args::sys_print(LogType type, const char* fmt, ...) const
 		vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
 		buf[IM_ARRAYSIZE(buf) - 1] = 0;
 		*pipe_output_to_this += buf;
-	}
-	else {
+	} else {
 		if (Debug_Console::inst)
 			Debug_Console::inst->print_args(get_color_of_print(type), fmt, args);
 	}
@@ -319,13 +282,11 @@ void Cmd_Args::sys_print(LogType type, const char* fmt, ...) const
 	va_end(args);
 }
 
-
-static StringView strip_string_view(StringView sv)
-{
+static StringView strip_string_view(StringView sv) {
 	int i = 0;
 	for (; i < sv.str_len; i++) {
 		char c = sv.str_start[i];
-		if (!(c == ' ' || c == '\t' || c=='\r'))
+		if (!(c == ' ' || c == '\t' || c == '\r'))
 			break;
 	}
 	return StringView(sv.str_start + i, sv.str_len - i);
@@ -339,24 +300,25 @@ public:
 		VarManImpl* v = (VarManImpl*)VarMan::get();
 		for (auto& var : v->vars) {
 			if (var.first.find(match) != std::string::npos) {
-				out.push_back({ var.first.c_str(),false });
+				out.push_back({var.first.c_str(), false});
 			}
 		}
 		for (auto& c : all_cmds) {
 			if (c.first.find(match) != std::string::npos)
-				out.push_back({ c.first,true });
+				out.push_back({c.first, true});
 		}
 		for (auto& cg : cmd_groups) {
 			for (auto& c : cg->cmds) {
 				if (c.first.find(match) != std::string::npos)
-					out.push_back({ c.first,true });
+					out.push_back({c.first, true});
 			}
 		}
 		return out;
 	}
 
 	std::string print_matches(const char* match) {
-		struct Match {
+		struct Match
+		{
 			string name = "";
 			const char* desc = "";
 		};
@@ -364,17 +326,17 @@ public:
 		VarManImpl* v = (VarManImpl*)VarMan::get();
 		for (auto& var : v->vars) {
 			if (var.first.find(match) != std::string::npos) {
-				matches.push_back({ var.first.c_str(),var.second->description });
+				matches.push_back({var.first.c_str(), var.second->description});
 			}
 		}
 		for (auto& c : all_cmds) {
 			if (c.first.find(match) != std::string::npos)
-				matches.push_back({ c.first.c_str(),nullptr });
+				matches.push_back({c.first.c_str(), nullptr});
 		}
 		for (auto& cg : cmd_groups) {
 			for (auto& c : cg->cmds) {
 				if (c.first.find(match) != std::string::npos)
-					matches.push_back({ c.first.c_str(),nullptr });
+					matches.push_back({c.first.c_str(), nullptr});
 			}
 		}
 
@@ -383,17 +345,12 @@ public:
 		if (matches.size() == 1)
 			return matches[0].name;
 
-		std::sort(matches.begin(), matches.end(), [](Match a, Match b)
-			{
-				return a.name < b.name;
-			});
+		std::sort(matches.begin(), matches.end(), [](Match a, Match b) { return a.name < b.name; });
 
-
-
-		//sys_print(Info, ">");
+		// sys_print(Info, ">");
 		for (auto m : matches) {
-			if(m.desc)
-				sys_print(Info, ". %-24s: %s\n", m.name.c_str(),m.desc);
+			if (m.desc)
+				sys_print(Info, ". %-24s: %s\n", m.name.c_str(), m.desc);
 			else
 				sys_print(Info, ". %s\n", m.name.c_str());
 		}
@@ -402,12 +359,12 @@ public:
 
 		for (int i = 1; i < matches.size(); i++) {
 			int j = 0;
-			while (j < prefix.size() && j < matches[i].name.size()
-				&& prefix[j] == matches[i].name[j]) {
+			while (j < prefix.size() && j < matches[i].name.size() && prefix[j] == matches[i].name[j]) {
 				j++;
 			}
 			prefix = prefix.substr(0, j);
-			if (prefix.empty()) break;
+			if (prefix.empty())
+				break;
 		}
 
 		return prefix;
@@ -418,19 +375,17 @@ public:
 			sys_print(Warning, "Set duplicate command %s\n", name);
 			return;
 		}
-		all_cmds.insert({ std::string(name),cmd });
+		all_cmds.insert({std::string(name), cmd});
 	}
 
-	void actually_execute(Cmd_Args& args)
-	{
+	void actually_execute(Cmd_Args& args) {
 		if (args.size() == 0)
 			return;
 
 		Engine_Cmd_Function ec = find_cmd(args.at(0));
 		if (ec) {
 			ec(args);
-		}
-		else {
+		} else {
 			auto group_cmd = find_cmd_in_groups(args.at(0));
 			if (group_cmd) {
 				try {
@@ -439,15 +394,13 @@ public:
 				catch (...) {
 					sys_print(Error, "command threw exception.\n");
 				}
-			}
-			else {
+			} else {
 				ConfigVar* var = VarMan::get()->find(args.at(0));
 				if (var && args.size() == 1) {
 					args.sys_print(Info, "%s", var->get_string());
 
-					//sys_print(Info, "%s %s\n", var->get_name(), var->get_string());
-				}
-				else if (!var && set_unknown_variables && args.size() == 2)
+					// sys_print(Info, "%s %s\n", var->get_name(), var->get_string());
+				} else if (!var && set_unknown_variables && args.size() == 2)
 					VarMan::get()->set_var_string(args.at(0), args.at(1));
 				else if (var && args.size() == 2)
 					var->set_string(args.at(1));
@@ -467,8 +420,7 @@ public:
 			return;
 
 		std::string output_from_last;
-		auto execute_tokens = [&](int start, int end, bool pipe_output)
-		{
+		auto execute_tokens = [&](int start, int end, bool pipe_output) {
 			Cmd_Args args;
 			if (pipe_output)
 				args.set_output_pipe(&output_from_last);
@@ -482,14 +434,14 @@ public:
 			if (!last_copy.empty()) {
 				args.add_arg(last_copy.c_str(), last_copy.size());
 			}
-			
+
 			actually_execute(args);
 		};
 
 		int start_index = 0;
 		for (int i = 0; i < toks.size(); i++) {
-			if (toks.at(i) == "|") {	
-				execute_tokens(start_index,i,true);
+			if (toks.at(i) == "|") {
+				execute_tokens(start_index, i, true);
 				start_index = i + 1;
 			}
 		}
@@ -517,17 +469,15 @@ public:
 		systemCommands.push_back(std::move(cmd));
 	}
 
-	void execute_cmd(const std::string& msg) final {
-		execute_string(msg.c_str());
-	}
+	void execute_cmd(const std::string& msg) final { execute_string(msg.c_str()); }
 	void execute_file(Cmd_Execute_Mode mode, const char* path) {
 
 		auto file = FileSys::open_read_engine(path);
-		if(!file) {
+		if (!file) {
 			sys_print(Error, "couldn't open config file to execute: %s\n", path);
 			return;
 		}
-		
+
 		DictParser parser;
 		parser.load_from_file(file.get());
 
@@ -538,7 +488,7 @@ public:
 
 			view = strip_string_view(view);
 
-			if (view.str_start[0] == '#' || (view.str_len==1&&view.str_start[0]=='\r'))
+			if (view.str_start[0] == '#' || (view.str_len == 1 && view.str_start[0] == '\r'))
 				continue;
 			if (view.str_len >= 2 && view.str_start[0] == '/' && view.str_start[1] == '/')
 				continue;
@@ -557,8 +507,7 @@ public:
 					if (!line.empty())
 						execute_string(line.c_str());
 					line.clear();
-				}
-				else {
+				} else {
 					line += c;
 				}
 			}
@@ -574,17 +523,13 @@ public:
 				sys_print(Info, "executing: %s\n", cmd->to_string().c_str());
 				cmd->execute();
 			}
-			systemCommands.clear();	// calls destructors
+			systemCommands.clear(); // calls destructors
 		};
 		execute_string_buffer();
-		execute_object_commands();	// called after, string commands can add to object commands
+		execute_object_commands(); // called after, string commands can add to object commands
 	}
 
-	void set_set_unknown_variables(bool b) override {
-		set_unknown_variables = b;
-	}
-
-
+	void set_set_unknown_variables(bool b) override { set_unknown_variables = b; }
 
 	Engine_Cmd_Function find_cmd(const std::string& str) {
 		auto find = all_cmds.find(str);
@@ -600,19 +545,14 @@ public:
 		}
 		return nullptr;
 	}
-	
+
 	std::string command_buffer;
 	bool set_unknown_variables = false;
 	std::unordered_map<std::string, Engine_Cmd_Function> all_cmds;
 	std::vector<uptr<SystemCommand>> systemCommands;
 
-
-	void add_cmd_group(ConsoleCmdGroup* group) {
-		cmd_groups.insert(group);
-	}
-	void remove_cmd_group(ConsoleCmdGroup* group) {
-		cmd_groups.erase(group);
-	}
+	void add_cmd_group(ConsoleCmdGroup* group) { cmd_groups.insert(group); }
+	void remove_cmd_group(ConsoleCmdGroup* group) { cmd_groups.erase(group); }
 	std::unordered_set<ConsoleCmdGroup*> cmd_groups;
 };
 
@@ -624,27 +564,23 @@ void Cmd_Args::add_arg(const char* v, int len) {
 	args.push_back(std::string(v, len));
 }
 
-uptr<ConsoleCmdGroup> ConsoleCmdGroup::create(std::string name)
-{
-	auto p = uptr< ConsoleCmdGroup>(new ConsoleCmdGroup);
+uptr<ConsoleCmdGroup> ConsoleCmdGroup::create(std::string name) {
+	auto p = uptr<ConsoleCmdGroup>(new ConsoleCmdGroup);
 	p->groupname = name;
 	auto impl = (Cmd_Manager_Impl*)Cmd_Manager::get();
 	impl->add_cmd_group(p.get());
 	return std::move(p);
 }
-ConsoleCmdGroup::~ConsoleCmdGroup()
-{
+ConsoleCmdGroup::~ConsoleCmdGroup() {
 	auto impl = (Cmd_Manager_Impl*)Cmd_Manager::get();
 	impl->remove_cmd_group(this);
 }
-ConsoleCmdGroup& ConsoleCmdGroup::add(std::string name, const std::function<void(const Cmd_Args&)>& func)
-{
-	cmds.insert({ name,func });
+ConsoleCmdGroup& ConsoleCmdGroup::add(std::string name, const std::function<void(const Cmd_Args&)>& func) {
+	cmds.insert({name, func});
 	return *this;
 }
 Cmd_Manager* Cmd_Manager::inst = nullptr;
 
-Cmd_Manager* Cmd_Manager::create()
-{
+Cmd_Manager* Cmd_Manager::create() {
 	return new Cmd_Manager_Impl;
 }

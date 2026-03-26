@@ -10,13 +10,15 @@ class MaterialInstance;
 struct Render_Object;
 
 // simple dynamic material billboard cache for texture overrides
-class BillboardMaterialCache {
+class BillboardMaterialCache
+{
 public:
 	static BillboardMaterialCache& get() {
 		static BillboardMaterialCache cache;
 		return cache;
 	}
 	MaterialInstance* find(Texture* t);
+
 private:
 	std::unordered_map<Texture*, MaterialInstance*> texture_to_mat;
 };
@@ -43,9 +45,8 @@ public:
 			sync_render_data();
 		}
 	}
-	bool get_is_visible() const {
-		return visible;
-	}
+	bool get_is_visible() const { return visible; }
+
 private:
 	REF bool visible = true;
 	MaterialInstance* dynamic_mat = nullptr;

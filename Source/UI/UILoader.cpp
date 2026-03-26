@@ -10,25 +10,15 @@
 #include "GameEnginePublic.h"
 #include "GUISystemPublic.h"
 
-
 #ifdef EDITOR_BUILD
 class FontAssetMetadata : public AssetMetadata
 {
 public:
-	FontAssetMetadata() {
-		extensions.push_back("fnt");
-	}
+	FontAssetMetadata() { extensions.push_back("fnt"); }
 	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() const  override
-	{
-		return { 252, 245, 35 };
-	}
+	virtual Color32 get_browser_color() const override { return {252, 245, 35}; }
 
-	virtual std::string get_type_name() const  override
-	{
-		return "Font";
-	}
-
+	virtual std::string get_type_name() const override { return "Font"; }
 
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &GuiFont::StaticType; }
 };
@@ -36,22 +26,16 @@ REGISTER_ASSETMETADATA_MACRO(FontAssetMetadata);
 #endif
 
 #include "Render/Texture.h"
-#define MAKE_FOUR(a,b,c,d) ( (uint32_t)a | ((uint32_t)b<< 8) | ((uint32_t)c << 16) | ((uint32_t)d<<24) )
-
-
+#define MAKE_FOUR(a, b, c, d) ((uint32_t)a | ((uint32_t)b << 8) | ((uint32_t)c << 16) | ((uint32_t)d << 24))
 
 #include "Framework/StringUtils.h"
 
-void GuiFont::post_load()
-{
-}
-bool GuiFont::load_asset(IAssetLoadingInterface* load)
-{
+void GuiFont::post_load() {}
+bool GuiFont::load_asset(IAssetLoadingInterface* load) {
 
 	auto& path = get_name();
 	auto file = FileSys::open_read_game(path.c_str());
-	if (!file)
-	{
+	if (!file) {
 		sys_print(Error, "couldn't open font: %s\n", path.c_str());
 		return false;
 	}
@@ -110,13 +94,12 @@ bool GuiFont::load_asset(IAssetLoadingInterface* load)
 		auto page = in.read_byte();
 		auto chnl = in.read_byte();
 
-		character_to_glyph.insert({ id,glyph });
+		character_to_glyph.insert({id, glyph});
 	}
 	std::string texpath = StringUtils::get_directory(get_name()) + "/" + texname;
-	font_texture = g_assets.find_sync_sptr<Texture>(texpath);// load->load_asset(&Texture::StaticType, texpath);
+	font_texture = g_assets.find_sync_sptr<Texture>(texpath); // load->load_asset(&Texture::StaticType, texpath);
 	return true;
 }
-
 
 #include "GameEnginePublic.h"
 

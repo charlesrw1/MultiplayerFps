@@ -19,11 +19,10 @@ class MeshBuilderComponent;
 class AnimatorObject;
 class agBuilder;
 
-struct LightmapCoords {
+struct LightmapCoords
+{
 	STRUCT_BODY();
-	glm::vec4 to_vec4() const {
-		return glm::vec4(x, y, xofs, yofs);
-	}
+	glm::vec4 to_vec4() const { return glm::vec4(x, y, xofs, yofs); }
 	REF float x = 0;
 	REF float y = 0;
 	REF float xofs = 0;
@@ -49,9 +48,7 @@ public:
 	void set_model_str(const char* model_path);
 	REF void set_model(Model* model);
 	REF const Model* get_model() const;
-	REF AnimatorObject* get_animator() const { 
-		return animator.get(); 
-	}
+	REF AnimatorObject* get_animator() const { return animator.get(); }
 	REF AnimatorObject* create_animator(agBuilder* data);
 
 	bool get_is_visible() const { return is_visible; }
@@ -79,15 +76,10 @@ public:
 	void set_not_lightmapped();
 	void set_static_probe_lit(int index);
 #endif
-	void set_ignore_baking(bool ignore) {
-		this->ignore_in_baking = ignore;
-	}
-	void set_ignore_cubemap_view(bool ignore) {
-		this->ignore_in_cubemap = ignore;
-	}
-	void set_add_collision(bool add_col) {
-		this->add_collision_if_available = true;
-	}
+	void set_ignore_baking(bool ignore) { this->ignore_in_baking = ignore; }
+	void set_ignore_cubemap_view(bool ignore) { this->ignore_in_cubemap = ignore; }
+	void set_add_collision(bool add_col) { this->add_collision_if_available = true; }
+
 private:
 	void update_physics_mesh();
 
@@ -96,8 +88,8 @@ private:
 	REF bool cast_shadows = true;
 	REF bool is_skybox = false;
 	REF float dist_cull_percentage = 0.0;
-	// If true, then it will check the model for collision. If the model has collision and there isnt a meshcomponent already, then it all create one.
-	// This only works on level load
+	// If true, then it will check the model for collision. If the model has collision and there isnt a meshcomponent
+	// already, then it all create one. This only works on level load
 	REF bool add_collision_if_available = true;
 	REF bool ignore_in_baking = false;
 	REF bool ignore_in_cubemap = false;
@@ -120,12 +112,11 @@ private:
 // this is just for previewing in the editor, use AnimatorObject on the MeshComponent for actual animation
 class AnimationSeqAsset;
 class agEvaluateClip;
-class AnimPreviewComponent : public Component {
+class AnimPreviewComponent : public Component
+{
 public:
 	CLASS_BODY(AnimPreviewComponent);
-	AnimPreviewComponent() {
-		set_call_init_in_editor(true);
-	}
+	AnimPreviewComponent() { set_call_init_in_editor(true); }
 	void start() final;
 	void update() final;
 	void stop() final;

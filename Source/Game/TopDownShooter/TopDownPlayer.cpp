@@ -3,8 +3,7 @@
 #include "Animation/Runtime/RuntimeNodesNew2.h"
 #include "Animation/Runtime/Animation.h"
 
-static agBuilder make_player_tree(const Model* model)
-{
+static agBuilder make_player_tree(const Model* model) {
 	agBuilder out;
 	agClipNode* clip = out.alloc<agClipNode>();
 	clip->set_clip(model, "run_forward_unequip");
@@ -54,8 +53,8 @@ void TopDownPlayer::start() {
 
 	mesh = get_owner()->get_component<MeshComponent>();
 	assert(mesh);
-	assert(mesh->get_model()&&mesh->get_model()->get_skel());
-	//auto tree = make_player_tree(*mesh->get_model());
+	assert(mesh->get_model() && mesh->get_model()->get_skel());
+	// auto tree = make_player_tree(*mesh->get_model());
 	agBuilder tree;
 	auto factory = class_cast<PlayerAgFactory>(ScriptManager::inst->allocate_class("PlayerAgFactoryImpl"));
 	if (factory) {
@@ -64,9 +63,7 @@ void TopDownPlayer::start() {
 	auto animator = mesh->create_animator(&tree);
 
 	animator->set_float_variable("flLean", GetTime());
-	animator->set_int_variable("iState",0);
-
-
+	animator->set_int_variable("iState", 0);
 
 	capsule = get_owner()->get_component<CapsuleComponent>();
 	assert(mesh && capsule);
@@ -77,9 +74,8 @@ void TopDownPlayer::start() {
 		ASSERT(CameraComponent::get_scene_camera() == the_camera);
 	}
 
-	//if (shotgunSoundAsset && !shotgunSoundAsset->did_load_fail())
+	// if (shotgunSoundAsset && !shotgunSoundAsset->did_load_fail())
 	//	cachedShotgunSound = eng->get_level()->spawn_prefab(shotgunSoundAsset)->get_component<SoundComponent>();
-
 
 	ccontroller = std::make_unique<CharacterController>(capsule);
 	ccontroller->set_position(get_ws_position());
@@ -103,11 +99,11 @@ void TopDownPlayer::update() {
 	update_view_angles();
 
 	if (Input::was_key_pressed(SDL_SCANCODE_T)) {
-	//	return;
-		
+		//	return;
+
 		using_third_person_movement = !using_third_person_movement;
 
-		//mesh->get_animator()->play_animation(jumpSeq);
+		// mesh->get_animator()->play_animation(jumpSeq);
 	}
 	if (Input::was_key_pressed(SDL_SCANCODE_Z)) {
 		eng->log_to_fullscreen_gui(Info, "entering ragdoll");
@@ -120,16 +116,15 @@ void TopDownPlayer::update() {
 			AnimatorObject* animator = mesh->get_animator();
 			if (!ragdoll_enabled) {
 				int index = mesh->get_index_of_bone(StringName("mixamorig:Hips"));
-				glm::mat4 ws = get_ws_transform() * animator->get_global_bonemats().at(index);	//root
+				glm::mat4 ws = get_ws_transform() * animator->get_global_bonemats().at(index); // root
 				glm::vec3 pos = ws[3];
 				pos.y = 0;
 				get_owner()->set_ws_position(pos);
 				ccontroller->set_position(pos);
-				//animator->set_update_owner_position_to_root(false);
-			}
-			else {
-				//animator->set_update_owner_position_to_root(true);
-				//set_ws_transform(glm::mat4(1.f));
+				// animator->set_update_owner_position_to_root(false);
+			} else {
+				// animator->set_update_owner_position_to_root(true);
+				// set_ws_transform(glm::mat4(1.f));
 			}
 		}
 	}
@@ -140,37 +135,37 @@ void TopDownPlayer::update() {
 		return;
 	}
 
+	if (shoot_cooldown > 0.0)
+		shoot_cooldown -= eng->get_dt();
 
-
-	if (shoot_cooldown > 0.0)shoot_cooldown -= eng->get_dt();
-
-	if (Input::is_mouse_down(0) || Input::get_con_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT)>0.5)
+	if (Input::is_mouse_down(0) || Input::get_con_axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 0.5)
 		shoot_gun();
 
 	if (has_had_update) {
 
 		if (using_third_person_movement) {
 
-		}
-		else {
+		} else {
 			{
 				glm::ivec2 mouse;
 				SDL_GetMouseState(&mouse.x, &mouse.y);
 
 				Ray r;
-				r.dir = TopDownUtil::unproject_mouse_to_ray(CameraComponent::get_scene_camera()->last_vs, mouse.x, mouse.y);
+				r.dir =
+					TopDownUtil::unproject_mouse_to_ray(CameraComponent::get_scene_camera()->last_vs, mouse.x, mouse.y);
 				r.pos = view_pos;
 				glm::vec3 intersect(0.f);
 				ray_plane_intersect(r, glm::vec3(0, 1, 0), glm::vec3(0.8f), intersect);
 				auto mypos = get_ws_position();
 				lookdir = intersect - mypos;
 				lookdir.y = 0;
-				if (glm::length(lookdir) < 0.000001) lookdir = glm::vec3(1, 0, 0);
-				else lookdir = glm::normalize(lookdir);
+				if (glm::length(lookdir) < 0.000001)
+					lookdir = glm::vec3(1, 0, 0);
+				else
+					lookdir = glm::normalize(lookdir);
 				mouse_pos = intersect;
 			}
 		}
-
 	}
 
 	glm::vec2 move = {};
@@ -183,10 +178,8 @@ void TopDownPlayer::update() {
 	if (Input::is_key_down(SDL_SCANCODE_D))
 		move.x -= 1;
 
-
-										//	move.x += Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX);
-												//	move.y += Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY);
-
+	//	move.x += Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX);
+	//	move.y += Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY);
 
 	float len = glm::length(move);
 	if (len > 1.0)
@@ -220,7 +213,7 @@ void TopDownPlayer::update() {
 		string str = s;
 		TextShape shape;
 		Rect2d size = GuiHelpers::calc_text_size(std::string_view(str), font);
-		glm::ivec2 ofs = GuiHelpers::calc_layout({ -100,-10 }, guiAnchor::Center, UiSystem::inst->get_vp_rect());
+		glm::ivec2 ofs = GuiHelpers::calc_layout({-100, -10}, guiAnchor::Center, UiSystem::inst->get_vp_rect());
 
 		shape.rect.x = ofs.x;
 		shape.rect.y = ofs.y + size.h + start;
@@ -239,10 +232,8 @@ void TopDownPlayer::update() {
 
 	mesh->get_animator()->debug_print(start);
 
-
 	float angle = -atan2(-lookdir.x, lookdir.z);
 	auto q = glm::angleAxis(angle, glm::vec3(0, 1, 0));
-
 
 	last_ws = get_ws_transform();
 	get_owner()->set_ws_transform(ccontroller->get_character_pos(), q, get_owner()->get_ls_scale());
@@ -254,7 +245,7 @@ void TopDownPlayer::update() {
 
 void TopDownPlayer::update_view() {
 	auto pos = get_ws_position();
-	//pos = glm::mix(pos, mouse_pos, 0.15);
+	// pos = glm::mix(pos, mouse_pos, 0.15);
 	glm::vec3 camera_pos;
 	if (is_jumping)
 		camera_pos = glm::vec3(pos.x + 3.0, pos.y + 1.0, pos.z - 3.0);
@@ -283,8 +274,7 @@ void TopDownPlayer::update_view() {
 		float speed = glm::length(linvel);
 		float desire_fov = glm::mix(50.0, 60.0, glm::min(speed * 0.1, 1.0));
 		fov = damp_dt_independent(desire_fov, fov, 0.002f, (float)eng->get_dt());
-	}
-	else {
+	} else {
 		fov = damp_dt_independent(50.0f, fov, 0.002f, (float)eng->get_dt());
 	}
 	the_camera->fov = fov;

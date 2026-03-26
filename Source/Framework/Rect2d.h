@@ -16,24 +16,17 @@ struct Rect2d
 		y = pos.y;
 	}
 
-
 	int16_t x = 0;
 	int16_t y = 0;
 	int16_t w = 0;
 	int16_t h = 0;
 
-	bool is_point_inside(int16_t px, int16_t py) const {
-		return px >= x && px < x + w && py >= y && py < y + h;
-	}
-	bool is_point_inside(glm::ivec2 point) const {
-		return is_point_inside(point.x, point.y);
-	}
+	bool is_point_inside(int16_t px, int16_t py) const { return px >= x && px < x + w && py >= y && py < y + h; }
+	bool is_point_inside(glm::ivec2 point) const { return is_point_inside(point.x, point.y); }
 	bool overlaps(Rect2d other) const {
-		return !(x + w <= other.x || other.x + other.w <= x ||
-			y + h <= other.y || other.y + other.h <= y);
+		return !(x + w <= other.x || other.x + other.w <= x || y + h <= other.y || other.y + other.h <= y);
 	}
 
-
-	glm::ivec2 get_size() const { return { w,h }; }
-	glm::ivec2 get_pos() const { return { x,y }; }
+	glm::ivec2 get_size() const { return {w, h}; }
+	glm::ivec2 get_pos() const { return {x, y}; }
 };

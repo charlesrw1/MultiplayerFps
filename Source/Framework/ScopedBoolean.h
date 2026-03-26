@@ -2,12 +2,9 @@
 #include <cassert>
 struct ScopedBooleanValue
 {
-	bool get_value() const {
-		return value;
-	}
-	operator bool() const {
-		return value;
-	}
+	bool get_value() const { return value; }
+	operator bool() const { return value; }
+
 private:
 	friend class BooleanScope;
 	bool value = false;
@@ -24,6 +21,7 @@ public:
 		assert(ptr->value);
 		ptr->value = false;
 	}
+
 private:
 	ScopedBooleanValue* ptr = nullptr;
 };

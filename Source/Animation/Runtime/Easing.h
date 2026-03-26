@@ -1,20 +1,12 @@
 #pragma once
 #include "Framework/EnumDefReflection.h"
 
-
-NEWENUM(Easing, uint8_t)
-{
-	Linear,
-	CubicEaseIn,
-	CubicEaseOut,
-	CubicEaseInOut,
-	Constant,
+NEWENUM(Easing, uint8_t){
+	Linear, CubicEaseIn, CubicEaseOut, CubicEaseInOut, Constant,
 };
 
-inline float evaluate_easing(Easing type, float t)
-{
-	switch (type)
-	{
+inline float evaluate_easing(Easing type, float t) {
+	switch (type) {
 	case Easing::Linear:
 		return t;
 		break;
@@ -28,10 +20,10 @@ inline float evaluate_easing(Easing type, float t)
 	case Easing::CubicEaseInOut: {
 		float othert = -2 * t + 2;
 		return (t < 0.5) ? 4 * t * t * t : 1.0 - othert * othert * othert * 0.5;
-	}break;
+	} break;
 	case Easing::Constant: {
 		return 1.f;
-	}break;
+	} break;
 	default:
 		return t;
 		break;

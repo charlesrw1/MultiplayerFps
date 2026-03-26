@@ -3,8 +3,7 @@
 class BVHBuilder
 {
 public:
-	BVHBuilder(const std::vector<Bounds>& bounds, int max_per_leaf) : bounds(bounds), max_per_leaf(max_per_leaf)
-	{
+	BVHBuilder(const std::vector<Bounds>& bounds, int max_per_leaf) : bounds(bounds), max_per_leaf(max_per_leaf) {
 		indicies.resize(bounds.size());
 		centroids.resize(bounds.size());
 		for (int i = 0; i < bounds.size(); i++)
@@ -28,13 +27,11 @@ public:
 	float EvalSAH(int start, int end, int axis, float pos) const {
 		Bounds left, right;
 		int left_count = 0, right_count = 0;
-		for (int i = start; i < end; i++)
-		{
+		for (int i = start; i < end; i++) {
 			if (centroids[indicies[i]][axis] < pos) {
 				left_count++;
 				left = bounds_union(left, bounds[indicies[i]]);
-			}
-			else {
+			} else {
 				right_count++;
 				right = bounds_union(right, bounds[indicies[i]]);
 			}
@@ -59,11 +56,10 @@ struct Bin
 static const int NUM_BINS = 20;
 
 #define SAH
-#ifndef  _DEBUG 
-#endif // ! _DEBUG 
+#ifndef _DEBUG
+#endif // ! _DEBUG
 
-void BVHBuilder::build_R(int start, int end, int node_number)
-{
+void BVHBuilder::build_R(int start, int end, int node_number) {
 	assert(start >= 0 && end <= bounds.size());
 	int num_elements = end - start;
 	BVHNode* node = &nodes[node_number];
@@ -82,11 +78,9 @@ void BVHBuilder::build_R(int start, int end, int node_number)
 	int longest_axis = node->aabb.longest_axis();
 	float mid = bounds_center[longest_axis];
 
-	auto split_iter = std::partition(indicies.begin() + start, indicies.begin() + end,
-		[longest_axis, mid, this](int index) {
-			return this->centroids[index][longest_axis] < mid;
-		}
-	);
+	auto split_iter =
+		std::partition(indicies.begin() + start, indicies.begin() + end,
+					   [longest_axis, mid, this](int index) { return this->centroids[index][longest_axis] < mid; });
 	split = split_iter - indicies.begin();
 	if (split == start || split == end)
 		split = (start + end) / 2;
@@ -98,19 +92,19 @@ void BVHBuilder::build_R(int start, int end, int node_number)
 		centroid_bounds = bounds_union(centroid_bounds, centroids[indicies[i]]);
 	}
 
-
 	float mid;
 	int axis = -1;
 	float best_cost = 1e30f;
 	for (int a = 0; a < 3; a++) {
-		float bounds_min = centroid_bounds.bmin[a];// node->aabb.bmin[a];
-		float bounds_max = centroid_bounds.bmax[a];// node->aabb.bmax[a];
-		if (bounds_min == bounds_max)continue;
+		float bounds_min = centroid_bounds.bmin[a]; // node->aabb.bmin[a];
+		float bounds_max = centroid_bounds.bmax[a]; // node->aabb.bmax[a];
+		if (bounds_min == bounds_max)
+			continue;
 		Bin bins[NUM_BINS];
 #ifdef NO_BIN
 		float scale = (bounds_max - bounds_min) / 100.f;
 		for (int i = 0; i < 100; i++) {
-			//float centroid = centroids[indicies[start + i]][a];
+			// float centroid = centroids[indicies[start + i]][a];
 			float pos = bounds_min + i * scale;
 			float cost = EvalSAH(start, end, a, pos);
 			if (cost < best_cost) {
@@ -133,8 +127,7 @@ void BVHBuilder::build_R(int start, int end, int node_number)
 		int left_count[NUM_BINS - 1], right_count[NUM_BINS - 1];
 		Bounds left_aabb, right_aabb;
 		int left_sum = 0, right_sum = 0;
-		for (int i = 0; i < NUM_BINS - 1; i++)
-		{
+		for (int i = 0; i < NUM_BINS - 1; i++) {
 			left_sum += bins[i].tri_count;
 			left_count[i] = left_sum;
 			left_aabb = bounds_union(left_aabb, bins[i].aabb);
@@ -155,7 +148,6 @@ void BVHBuilder::build_R(int start, int end, int node_number)
 				best_cost = plane_cost;
 			}
 		}
-
 	}
 
 	if (axis == -1 || best_cost >= parent_cost) {
@@ -165,16 +157,11 @@ void BVHBuilder::build_R(int start, int end, int node_number)
 	}
 
 	auto split_iter = std::partition(indicies.begin() + start, indicies.begin() + end,
-		[axis, mid, this](int index) {
-			return this->centroids[index][axis] < mid;
-		}
-	);
+									 [axis, mid, this](int index) { return this->centroids[index][axis] < mid; });
 	split = split_iter - indicies.begin();
 
 	if (split == start || split == end)
 		split = (start + end) / 2;
-
-
 
 #endif // !SAH
 
@@ -189,11 +176,10 @@ void BVHBuilder::build_R(int start, int end, int node_number)
 }
 
 // Static builder function
-BVH BVH::build(const std::vector<Bounds>& bounds, int max_per_node, PartitionStrategy strat)
-{
+BVH BVH::build(const std::vector<Bounds>& bounds, int max_per_node, PartitionStrategy strat) {
 	BVHBuilder builder(bounds, max_per_node);
-	
-	int start_node = builder.add_new_node();	// =0
+
+	int start_node = builder.add_new_node(); // =0
 	builder.build_R(0, bounds.size(), start_node);
 
 	if (builder.nodes.size() == 0) {

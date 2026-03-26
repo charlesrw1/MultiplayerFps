@@ -11,9 +11,9 @@
 #include "Framework/MapUtil.h"
 #include "Framework/PoolAllocator.h"
 #include <variant>
-using std::variant;
-using glm::vec3;
 using glm::vec2;
+using glm::vec3;
+using std::variant;
 class atValueNode;
 class AnimatorInstance;
 class atClipNode;
@@ -22,7 +22,8 @@ class atInitContext;
 struct BoneIndexRetargetMap;
 using std::pair;
 class AnimatorObject;
-class SampledAnimCurveBuffer {
+class SampledAnimCurveBuffer
+{
 public:
 	void set_curve(StringName s, float f);
 	float get_curve(StringName s);
@@ -32,10 +33,12 @@ public:
 class atUpdateStack;
 class atInitContext;
 class atCreateInstContext;
-class AnimTreePoseNode : public ClassBase {
+class AnimTreePoseNode : public ClassBase
+{
 public:
 	CLASS_BODY(AnimTreePoseNode);
-	struct Inst {
+	struct Inst
+	{
 		virtual ~Inst() {}
 		virtual void get_pose(atUpdateStack& context) {}
 		virtual void reset() {}
@@ -44,15 +47,19 @@ public:
 };
 using PoseNodeInst = AnimTreePoseNode::Inst;
 
-class SampledAnimEventBuffer {
+class SampledAnimEventBuffer
+{
 public:
-	struct Sampled {
-		enum DurationType {
+	struct Sampled
+	{
+		enum DurationType
+		{
 			Started,
 			Ended,
 			Active,
 		};
-		struct DurationEv {
+		struct DurationEv
+		{
 			const AnimDurationEvent* ptr = nullptr;
 			Percentage thru;
 			DurationType type{};
@@ -83,13 +90,9 @@ public:
 class atGraphContext
 {
 public:
-	atGraphContext(AnimatorObject& obj, float dt) 
-		: dt(dt),obj(obj), skeleton(*obj.get_skel())
-	{
-
-	}
+	atGraphContext(AnimatorObject& obj, float dt) : dt(dt), obj(obj), skeleton(*obj.get_skel()) {}
 	SyncGroupData& find_sync_group(StringName name) const;
-//	void add_playing_clip(atClipNode::Inst* clip) { relevant_playing_clips.push_back(clip); }
+	//	void add_playing_clip(atClipNode::Inst* clip) { relevant_playing_clips.push_back(clip); }
 	int get_num_bones() const { return skeleton.get_num_bones(); }
 
 	float dt = 1.f;
@@ -97,40 +100,29 @@ public:
 	SampledAnimEventBuffer events;
 	SampledAnimCurveBuffer curves;
 	const MSkeleton& skeleton;
-	//vector<atClipNode::Inst*> relevant_playing_clips;
+	// vector<atClipNode::Inst*> relevant_playing_clips;
 };
 class atUpdateStack
 {
 public:
-	atUpdateStack(atGraphContext& graph, Pool_Allocator<Pose>& allocator) 
-		: graph(graph),pose(allocator.allocate_scoped()) {
-	}
+	atUpdateStack(atGraphContext& graph, Pool_Allocator<Pose>& allocator)
+		: graph(graph), pose(allocator.allocate_scoped()) {}
 	atGraphContext& graph;
 	ScopedPoolPtr<Pose> pose;
 	RootMotionTransform rootMotion;
 	float weight = 1.f;
-	atUpdateStack(const atUpdateStack& other) 
-		: graph(other.graph),pose(other.pose.get_parent().allocate_scoped()) {
-	}
+	atUpdateStack(const atUpdateStack& other) : graph(other.graph), pose(other.pose.get_parent().allocate_scoped()) {}
 };
 
-struct atClipNodeStruct {
+struct atClipNodeStruct
+{
 	STRUCT_BODY();
 	REF AssetPtr<AnimationSeqAsset> Clip;
 	REF bool loop = true;
 	REF StringName SyncGroup;
 	REF sync_opt SyncOption = sync_opt::Default;
-	bool has_sync_group() const {
-		return !SyncGroup.is_null();
-	}
+	bool has_sync_group() const { return !SyncGroup.is_null(); }
 	REF int start_frame = 0;
 };
 
-NEWENUM(ModifyBoneType, int)
-{
-	None,
-	Meshspace,
-	MeshspaceAdd,
-	Localspace,
-	LocalspaceAdd
-};
+NEWENUM(ModifyBoneType, int){None, Meshspace, MeshspaceAdd, Localspace, LocalspaceAdd};

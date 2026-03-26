@@ -1,22 +1,24 @@
 #pragma once
 #include "DrawLocal.h"
 
-struct R_CubemapVolume {
+struct R_CubemapVolume
+{
 	glm::mat4x4 transform;
 	glm::vec4 extents;
 	glm::vec4 bounds_min;
 	glm::vec4 bounds_max;
 };
 
-struct BakedDdgiInputData {
+struct BakedDdgiInputData
+{
 	std::vector<glm::vec4> offsets;
 	IGraphicsTexture* irrad{};
 	IGraphicsTexture* depths{};
 	std::vector<DdgiVolumeGpu> volumes;
 };
 
-
-class RenderGiManager {
+class RenderGiManager
+{
 public:
 	static RenderGiManager* inst;
 	RenderGiManager();
@@ -31,27 +33,19 @@ public:
 
 	const std::vector<R_CubemapVolume>& get_cubemap_volumes_vector() { return cm_volumes; }
 	void update_cubemap_volumes(const std::vector<R_CubemapVolume>& volumes);
-	void bake_all_cubemaps() {
-		wants_bake_all_cubemaps = true;
-	}
-	void bake_one_cubemap(int index) {
-		bake_these_cubemaps.insert(index);
-	}
+	void bake_all_cubemaps() { wants_bake_all_cubemaps = true; }
+	void bake_one_cubemap(int index) { bake_these_cubemaps.insert(index); }
 	void set_cubemaps_from_loading(std::vector<R_CubemapVolume>&& volumes, IGraphicsTexture* cubemaps);
 
-
-	IGraphicsTexture* get_cubemap_array_texture() { 
-		if (runtime_loaded_cubemaps) 
+	IGraphicsTexture* get_cubemap_array_texture() {
+		if (runtime_loaded_cubemaps)
 			return runtime_loaded_cubemaps;
-		return editable_cubemap_array; 
+		return editable_cubemap_array;
 	}
 	IGraphicsBuffer* get_cubemap_volume_buffer() { return cubemap_volume_buffer; }
 	int get_num_cubemaps() { return cm_volumes.size(); }
 
-
-
 private:
-
 	// ############
 	// # CUBEMAPS #
 	// ############
@@ -60,7 +54,7 @@ private:
 	// pre made loaded cubemaps
 	IGraphicsTexture* runtime_loaded_cubemaps = nullptr;
 	// non compressed form that editor can render into
-	IGraphicsTexture* editable_cubemap_array=nullptr;
+	IGraphicsTexture* editable_cubemap_array = nullptr;
 
 	bool wants_bake_all_cubemaps = false;
 	std::unordered_set<int> bake_these_cubemaps;
@@ -70,6 +64,4 @@ private:
 	// ########
 	// # DDGI #
 	// ########
-
-
 };

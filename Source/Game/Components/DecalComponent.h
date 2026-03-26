@@ -20,12 +20,9 @@ public:
 
 	REF void set_material(MaterialInstance* mat);
 
-
 #ifdef EDITOR_BUILD
 	void editor_on_change_property() final;
-	const char* get_editor_outliner_icon() const final {
-		return "eng/editor/decal.png";
-	}
+	const char* get_editor_outliner_icon() const final { return "eng/editor/decal.png"; }
 #endif
 private:
 	REFLECT();

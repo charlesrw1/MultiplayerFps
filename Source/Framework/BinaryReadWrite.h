@@ -22,7 +22,7 @@ public:
 		if (owns_ptr)
 			delete[] data;
 	}
-	BinaryReader(size_t size, uint8_t* data) : data(data),size(size),owns_ptr(false) {}
+	BinaryReader(size_t size, uint8_t* data) : data(data), size(size), owns_ptr(false) {}
 	BinaryReader(const BinaryReader& other) = delete;
 	BinaryReader(BinaryReader&& other) = delete;
 
@@ -36,7 +36,7 @@ public:
 	StringView read_string_view() {
 		uint16_t count = read_int16();
 		if (!can_read_these_bytes(count))
-			return{};// null
+			return {}; // null
 		StringView ret = StringView((const char*)&data[ptr], count);
 		ptr += count;
 		return ret;
@@ -51,27 +51,27 @@ public:
 		if (!can_read_these_bytes(2))
 			return 0;
 		uint16_t out = (uint16_t)data[ptr] | ((uint16_t)data[ptr + 1] << 8);
-		ptr+=2;
+		ptr += 2;
 		return out;
 	}
 	uint32_t read_int32() {
 		if (!can_read_these_bytes(4))
 			return 0;
-		uint32_t out = (uint32_t)data[ptr] | ((uint32_t)data[ptr + 1] << 8) 
-			| ((uint32_t)data[ptr+2] << 16) | ((uint32_t)data[ptr + 3] << 24);
+		uint32_t out = (uint32_t)data[ptr] | ((uint32_t)data[ptr + 1] << 8) | ((uint32_t)data[ptr + 2] << 16) |
+					   ((uint32_t)data[ptr + 3] << 24);
 		ptr += 4;
 		return out;
 	}
 	uint64_t read_int64() {
 		if (!can_read_these_bytes(8))
 			return 0;
-		uint32_t out = (uint32_t)data[ptr] | ((uint32_t)data[ptr + 1] << 8)
-			| ((uint32_t)data[ptr + 2] << 16) | ((uint32_t)data[ptr + 3] << 24);
+		uint32_t out = (uint32_t)data[ptr] | ((uint32_t)data[ptr + 1] << 8) | ((uint32_t)data[ptr + 2] << 16) |
+					   ((uint32_t)data[ptr + 3] << 24);
 		ptr += 4;
-		uint32_t outhigh = (uint32_t)data[ptr] | ((uint32_t)data[ptr + 1] << 8)
-			| ((uint32_t)data[ptr + 2] << 16) | ((uint32_t)data[ptr + 3] << 24);
+		uint32_t outhigh = (uint32_t)data[ptr] | ((uint32_t)data[ptr + 1] << 8) | ((uint32_t)data[ptr + 2] << 16) |
+						   ((uint32_t)data[ptr + 3] << 24);
 		ptr += 4;
-		return (uint64_t)out | ((uint64_t)outhigh << 32 );
+		return (uint64_t)out | ((uint64_t)outhigh << 32);
 	}
 	float read_float() {
 		union {
@@ -88,24 +88,19 @@ public:
 		ptr += write_size;
 		return true;
 	}
-	template<typename T>
-	bool read_struct(T* dest) {
-		return read_bytes_ptr(dest, sizeof(T));
-	}
+	template <typename T> bool read_struct(T* dest) { return read_bytes_ptr(dest, sizeof(T)); }
 	bool seek(size_t where_) {
 		if (where_ >= size)
 			return false;
 		ptr = where_;
 		return true;
 	}
-	size_t tell() {
-		return ptr;
-	}
+	size_t tell() { return ptr; }
 	bool has_failed() { return fail_flag; }
 	bool is_eof() { return !fail_flag && ptr == size; }
 
-
 	bool getline(StringView& tok, char delimiter = '\n');
+
 private:
 	bool can_read_these_bytes(int count) {
 		if (count + ptr > size)
@@ -123,9 +118,7 @@ private:
 class FileWriter
 {
 public:
-	FileWriter(size_t reserve = 0) {
-		buffer.reserve(reserve);
-	}
+	FileWriter(size_t reserve = 0) { buffer.reserve(reserve); }
 	FileWriter(const FileWriter& other) = delete;
 	FileWriter(FileWriter&& other) = delete;
 
@@ -174,22 +167,17 @@ public:
 		for (int i = 0; i < size; i++)
 			write_byte(data[i]);
 	}
-	template<typename T>
-	void write_struct(const T* t) {
-		write_bytes_ptr((uint8_t*)t, sizeof(T));
-	}
+	template <typename T> void write_struct(const T* t) { write_bytes_ptr((uint8_t*)t, sizeof(T)); }
 	void seek(size_t where_) {
 		ptr = where_;
 		if (ptr > buffer.size())
 			buffer.resize(ptr, 0);
 	}
-	size_t tell() {
-		return ptr;
-	}
-
+	size_t tell() { return ptr; }
 
 	size_t get_size() const { return buffer.size(); }
 	const char* get_buffer() const { return (char*)buffer.data(); }
+
 private:
 	size_t ptr = 0;
 	std::vector<uint8_t> buffer;

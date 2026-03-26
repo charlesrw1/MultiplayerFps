@@ -18,13 +18,13 @@ void EnumRegistry::register_enum(const EnumTypeInfo* eti) {
 	auto& name_to_idx = GlobalEnumDefMgr::get().name_to_idx;
 	auto& name_to_type = GlobalEnumDefMgr::get().name_to_type;
 
-	name_to_type.insert({ eti->name,eti });
+	name_to_type.insert({eti->name, eti});
 	for (int i = 0; i < eti->str_count; i++) {
 		EnumFindResult efr;
 		efr.enum_idx = i;
 		efr.value = eti->strs[i].value;
 		efr.typeinfo = eti;
-		name_to_idx[(std::string(eti->name)+"::")+eti->strs[i].name] = efr;
+		name_to_idx[(std::string(eti->name) + "::") + eti->strs[i].name] = efr;
 	}
 }
 const EnumTypeInfo* EnumRegistry::find_enum_type(const char* enum_type) {
@@ -48,18 +48,16 @@ EnumFindResult EnumRegistry::find_enum_by_name(const std::string& str) {
 	return find == name_to_idx.end() ? EnumFindResult() : find->second;
 }
 
-const std::unordered_map<std::string, const EnumTypeInfo*>& EnumRegistry::get_all_enums()
-{
+const std::unordered_map<std::string, const EnumTypeInfo*>& EnumRegistry::get_all_enums() {
 	return GlobalEnumDefMgr::get().name_to_type;
 }
 
-EnumTypeInfo::EnumTypeInfo(const char* name, const EnumIntPair* strs, size_t count) : name(name),strs(strs),str_count(count)
-{
+EnumTypeInfo::EnumTypeInfo(const char* name, const EnumIntPair* strs, size_t count)
+	: name(name), strs(strs), str_count(count) {
 	EnumRegistry::register_enum(this);
 }
 
-const EnumIntPair* EnumTypeInfo::find_for_value(int64_t value) const
-{
+const EnumIntPair* EnumTypeInfo::find_for_value(int64_t value) const {
 	for (int i = 0; i < str_count; i++)
 		if (strs[i].value == value)
 			return &strs[i];

@@ -12,8 +12,6 @@
 #include "Game/Components/PhysicsComponents.h"
 #include "Game/Components/LightComponents.h"
 
-
-
 #include "imgui_internal.h"
 bool SharedAssetPropertyEditor::internal_update() {
 	assert(prop->class_type && prop->type == core_type_id::AssetPtr || prop->type == core_type_id::SoftAssetPtr);
@@ -28,7 +26,6 @@ bool SharedAssetPropertyEditor::internal_update() {
 		return false;
 	}
 
-
 	auto drawlist = ImGui::GetWindowDrawList();
 	auto& style = ImGui::GetStyle();
 	auto min = ImGui::GetCursorScreenPos();
@@ -41,21 +38,20 @@ bool SharedAssetPropertyEditor::internal_update() {
 
 	if (is_soft_editor()) {
 		float border = 2.f;
-		drawlist->AddRectFilled(
-			ImVec2(min.x - style.FramePadding.x * 0.5f - border, min.y - border),
-			ImVec2(min.x + width + border, min.y + sz.y + style.FramePadding.y * 2.0 + border),
-			(Color32{ 255, 229, 99 }).to_uint());
+		drawlist->AddRectFilled(ImVec2(min.x - style.FramePadding.x * 0.5f - border, min.y - border),
+								ImVec2(min.x + width + border, min.y + sz.y + style.FramePadding.y * 2.0 + border),
+								(Color32{255, 229, 99}).to_uint());
 	}
 
-	drawlist->AddRectFilled(ImVec2(min.x - style.FramePadding.x * 0.5f, min.y), ImVec2(min.x + width, min.y + sz.y + style.FramePadding.y * 2.0),
-		color.to_uint());
+	drawlist->AddRectFilled(ImVec2(min.x - style.FramePadding.x * 0.5f, min.y),
+							ImVec2(min.x + width, min.y + sz.y + style.FramePadding.y * 2.0), color.to_uint());
 	auto cursor = ImGui::GetCursorPos();
 
 	if (is_soft_editor())
-		ImGui::TextColored(ImColor((Color32{ 255, 229, 99 }).to_uint()), asset_str.c_str());
+		ImGui::TextColored(ImColor((Color32{255, 229, 99}).to_uint()), asset_str.c_str());
 	else {
 		if (get_failed_load())
-			ImGui::TextColored(ImColor((Color32{ 255, 141, 133 }).to_uint()), asset_str.c_str());
+			ImGui::TextColored(ImColor((Color32{255, 141, 133}).to_uint()), asset_str.c_str());
 		else
 			ImGui::Text(asset_str.c_str());
 	}
@@ -70,20 +66,19 @@ bool SharedAssetPropertyEditor::internal_update() {
 		}
 		ImGui::EndTooltip();
 
-
 		if (ImGui::GetIO().MouseClicked[0]) {
 			AssetBrowser::inst->filter_all();
 			AssetBrowser::inst->unset_filter(1 << metadata->self_index);
 		}
 	}
 	bool ret = false;
-	if (ImGui::BeginDragDropTarget())
-	{
-		//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
-		//if (payload->IsDataType("AssetBrowserDragDrop"))
+	if (ImGui::BeginDragDropTarget()) {
+		// const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+		// if (payload->IsDataType("AssetBrowserDragDrop"))
 		//	sys_print("``` accepting\n");
 
-		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
+		const ImGuiPayload* payload =
+			ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
 		if (payload) {
 
 			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
@@ -93,13 +88,11 @@ bool SharedAssetPropertyEditor::internal_update() {
 			}
 
 			if (actually_accept) {
-				if (payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))
-				{
-					//IAsset** ptr_to_asset = (IAsset**)prop->get_ptr(instance);
+				if (payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")) {
+					// IAsset** ptr_to_asset = (IAsset**)prop->get_ptr(instance);
 
 					set_asset(resource->filename);
 					asset_str = get_str();
-
 
 					ret = true;
 				}
@@ -109,7 +102,6 @@ bool SharedAssetPropertyEditor::internal_update() {
 	}
 
 	return ret;
-
 }
 
 std::string AssetPropertyEditor::get_str() {
@@ -121,10 +113,9 @@ void AssetPropertyEditor::set_asset(const std::string& str) {
 	auto ptr = (IAsset**)prop->get_ptr(instance);
 	if (str.empty()) {
 		*ptr = nullptr;
-	}
-	else {
+	} else {
 		auto classtype = prop->class_type;
-		auto asset = g_assets.find_sync(str, classtype, 0).get();// loader->load_asset(resource->filename);
+		auto asset = g_assets.find_sync(str, classtype, 0).get(); // loader->load_asset(resource->filename);
 		*ptr = asset;
 	}
 }
@@ -135,7 +126,6 @@ bool AssetPropertyEditor::get_failed_load() const {
 		return true;
 	return false;
 }
-
 
 bool ColorEditor::internal_update() {
 	assert(prop->type == core_type_id::Int32);
@@ -150,12 +140,13 @@ bool ColorEditor::internal_update() {
 	return false;
 }
 
-int ColorEditor::extra_row_count() { return 0; }
+int ColorEditor::extra_row_count() {
+	return 0;
+}
 
 bool ColorEditor::can_reset() {
 	Color32* c = (Color32*)prop->get_ptr(instance);
 	return c->r != 255 || c->g != 255 || c->b != 255;
-
 }
 
 void ColorEditor::reset_value() {
@@ -180,22 +171,23 @@ bool ButtonPropertyEditor::can_reset() {
 	return false;
 }
 
+template <typename FUNCTOR>
+static bool drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&& callback, const char* targetname,
+									   const char* tooltip) {
 
-template<typename FUNCTOR>
-static bool drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&& callback, const char* targetname, const char* tooltip)
-{
+	// ImGui::PushStyleColor(Imguicolba)
 
-	//ImGui::PushStyleColor(Imguicolba)
+	//	ImGui::InputText("##inp", (char*)str->c_str(), str->size(), ImGuiInputTextFlags_ReadOnly);
 
-//	ImGui::InputText("##inp", (char*)str->c_str(), str->size(), ImGuiInputTextFlags_ReadOnly);
-
-	//ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0)); // Ensure no clip rect so mouse hover can reach FramePadding edges
+	// ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0)); // Ensure no clip rect so mouse hover can reach
+	// FramePadding edges
 	auto drawlist = ImGui::GetWindowDrawList();
 	auto& style = ImGui::GetStyle();
 	auto min = ImGui::GetCursorScreenPos();
 	auto sz = ImGui::CalcTextSize(str->c_str());
 	float width = ImGui::CalcItemWidth();
-	drawlist->AddRectFilled(ImVec2(min.x - style.FramePadding.x * 0.5f, min.y), ImVec2(min.x + width, min.y + sz.y + style.FramePadding.y * 2.0), color.to_uint());
+	drawlist->AddRectFilled(ImVec2(min.x - style.FramePadding.x * 0.5f, min.y),
+							ImVec2(min.x + width, min.y + sz.y + style.FramePadding.y * 2.0), color.to_uint());
 	auto cursor = ImGui::GetCursorPos();
 	ImGui::Text(str->c_str());
 	ImGui::SetCursorPos(cursor);
@@ -206,28 +198,24 @@ static bool drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&
 		ImGui::EndTooltip();
 	}
 	bool return_val = false;
-	if (ImGui::BeginDragDropTarget())
-	{
-		//const ImGuiPayload* payload = ImGui::GetDragDropPayload();
-		//if (payload->IsDataType("AssetBrowserDragDrop"))
+	if (ImGui::BeginDragDropTarget()) {
+		// const ImGuiPayload* payload = ImGui::GetDragDropPayload();
+		// if (payload->IsDataType("AssetBrowserDragDrop"))
 		//	sys_print("``` accepting\n");
 
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(targetname))
-		{
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(targetname)) {
 			return_val = callback(payload->Data);
-
 		}
 		ImGui::EndDragDropTarget();
 	}
 	return return_val;
-
 }
 
 int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 
-
 #include "Framework/CurveEditorImgui.h"
-class GraphCurveEditor : public IPropertyEditor {
+class GraphCurveEditor : public IPropertyEditor
+{
 public:
 	bool internal_update() final {
 		editor.draw();
@@ -235,47 +223,31 @@ public:
 	}
 	virtual int extra_row_count() { return 0; }
 	virtual bool can_reset() { return false; }
-	virtual void reset_value() {
-	}
+	virtual void reset_value() {}
 	CurveEditorImgui editor;
 };
 
-
-void PropertyFactoryUtil::register_basic(FnFactory<IPropertyEditor>& factory)
-{
-	factory.add("BoolButton", []() {return new ButtonPropertyEditor; });
-	factory.add("ColorUint", []() {return new ColorEditor; });
-	factory.add("AssetPtr", []() {return new AssetPropertyEditor; });
-	factory.add("ClassTypePtr", []() {return new ClassTypePtrPropertyEditor; });
-	factory.add("GraphCurve", []() {return new GraphCurveEditor; });
-
-
-
+void PropertyFactoryUtil::register_basic(FnFactory<IPropertyEditor>& factory) {
+	factory.add("BoolButton", []() { return new ButtonPropertyEditor; });
+	factory.add("ColorUint", []() { return new ColorEditor; });
+	factory.add("AssetPtr", []() { return new AssetPropertyEditor; });
+	factory.add("ClassTypePtr", []() { return new ClassTypePtrPropertyEditor; });
+	factory.add("GraphCurve", []() { return new GraphCurveEditor; });
 }
-void PropertyFactoryUtil::register_editor(EditorDoc& doc, FnFactory<IPropertyEditor>& factory)
-{
-	factory.add("EntityBoneParentString", []() {return new EntityBoneParentStringEditor; });
+void PropertyFactoryUtil::register_editor(EditorDoc& doc, FnFactory<IPropertyEditor>& factory) {
+	factory.add("EntityBoneParentString", []() { return new EntityBoneParentStringEditor; });
 }
-void PropertyFactoryUtil::register_anim_editor(AnimationGraphEditor& doc, FnFactory<IPropertyEditor>& factory)
-{
-	
-}
-void PropertyFactoryUtil::register_mat_editor(MaterialEditorLocal& doc, FnFactory<IPropertyEditor>& factory)
-{
-}
+void PropertyFactoryUtil::register_anim_editor(AnimationGraphEditor& doc, FnFactory<IPropertyEditor>& factory) {}
+void PropertyFactoryUtil::register_mat_editor(MaterialEditorLocal& doc, FnFactory<IPropertyEditor>& factory) {}
 #include "Framework/PropertyPtr.h"
 
-
-void PropertyFactoryUtil::register_anim_editor2(AnimationGraphEditorNew& ed, FnFactory<IPropertyEditor>& factory)
-{
-	//factory.add("StateAliasStruct", [&ed]() {return new StatemachineAliasEditor(ed); });
+void PropertyFactoryUtil::register_anim_editor2(AnimationGraphEditorNew& ed, FnFactory<IPropertyEditor>& factory) {
+	// factory.add("StateAliasStruct", [&ed]() {return new StatemachineAliasEditor(ed); });
 }
 
 // Inherited via IPropertyEditor
 
 // Inherited via IPropertyEditor
-
-
 
 #include "Framework/StringUtils.h"
 
@@ -287,11 +259,9 @@ EntityBoneParentStringEditor::~EntityBoneParentStringEditor() {
 }
 #include "Game/Components/MeshComponent.h"
 #include "Animation/SkeletonData.h"
-bool EntityBoneParentStringEditor::internal_update()
-{
+bool EntityBoneParentStringEditor::internal_update() {
 	// cursed!
 	Entity* self = (Entity*)instance;
-
 
 	if (!has_init) {
 		Entity* parent = self->get_parent();
@@ -328,7 +298,8 @@ bool EntityBoneParentStringEditor::internal_update()
 			ImGui::SetKeyboardFocusHere();
 			set_keyboard_focus = false;
 		}
-		if (ImGui::InputText("##text", (char*)node_menu_filter_buf.c_str(), node_menu_filter_buf.size() + 1, ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &node_menu_filter_buf)) {
+		if (ImGui::InputText("##text", (char*)node_menu_filter_buf.c_str(), node_menu_filter_buf.size() + 1,
+							 ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &node_menu_filter_buf)) {
 			node_menu_filter_buf = node_menu_filter_buf.c_str();
 		}
 
@@ -341,9 +312,7 @@ bool EntityBoneParentStringEditor::internal_update()
 		for (auto& option : options) {
 			string lower = StringUtils::to_lower(option);
 			if (filter_lower.empty() || lower.find(filter_lower) != string::npos) {
-				if (ImGui::Selectable(option.c_str(),
-					str == option
-				)) {
+				if (ImGui::Selectable(option.c_str(), str == option)) {
 					self->set_parent_bone(StringName(option.c_str()));
 					str = option;
 					has_update = true;
@@ -351,25 +320,22 @@ bool EntityBoneParentStringEditor::internal_update()
 			}
 		}
 		ImGui::EndCombo();
-	}
-	else {
+	} else {
 		set_keyboard_focus = true;
 	}
 
 	return has_update;
 }
 
-
 // Inherited via IPropertyEditor
 
-bool ClassTypePtrPropertyEditor::internal_update()
-{
+bool ClassTypePtrPropertyEditor::internal_update() {
 	if (!has_init) {
 		type_of_base = prop->class_type;
 		has_init = true;
 	}
 	assert(type_of_base);
-	
+
 	bool has_update = false;
 	const ClassTypeInfo** ptr_prop = (const ClassTypeInfo**)prop->get_ptr(instance);
 	const char* preview = (*ptr_prop) ? (*ptr_prop)->classname : "<empty>";
@@ -377,13 +343,10 @@ bool ClassTypePtrPropertyEditor::internal_update()
 		auto subclasses = ClassBase::get_subclasses(type_of_base);
 		for (; !subclasses.is_end(); subclasses.next()) {
 
-			if (ImGui::Selectable(subclasses.get_type()->classname,
-				subclasses.get_type() == *ptr_prop
-			)) {
+			if (ImGui::Selectable(subclasses.get_type()->classname, subclasses.get_type() == *ptr_prop)) {
 				*ptr_prop = subclasses.get_type();
 				has_update = true;
 			}
-
 		}
 		ImGui::EndCombo();
 	}

@@ -10,32 +10,26 @@ class TDChest : public Component
 {
 public:
 	CLASS_BODY(TDChest);
-	
+
 	REF AssetPtr<SoundFile> soundfx;
 	REF AssetPtr<AnimationSeqAsset> openanim;
-	//REF SoftAssetPtr<AnimationSeqAsset> delayedLoadAnim;
+	// REF SoftAssetPtr<AnimationSeqAsset> delayedLoadAnim;
 
 	MeshComponent* m = nullptr;
-	void start() {
-		m = get_owner()->get_component<MeshComponent>();
-	}
+	void start() { m = get_owner()->get_component<MeshComponent>(); }
 
 	REF void open_chest() {
 		if (!is_open) {
 
-			isound->play_sound(
-				soundfx, 1, 1, 1, 1, {}, false, false, {}
-			);
+			isound->play_sound(soundfx, 1, 1, 1, 1, {}, false, false, {});
 
 			m->get_animator()->play_animation(openanim);
 
 			is_open = true;
-		}
-		else {
+		} else {
 			is_open = false;
 		}
 	}
 
 	bool is_open = false;
 };
-

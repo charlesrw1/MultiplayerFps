@@ -10,37 +10,27 @@ class CameraComponent : public Component
 public:
 	CLASS_BODY(CameraComponent);
 
-	CameraComponent() {
-		set_call_init_in_editor(true);
-	}
-	REF static CameraComponent* get_scene_camera() {
-		return scene_camera;
-	}
-	REF bool get_is_enabled() const {return is_enabled;}
+	CameraComponent() { set_call_init_in_editor(true); }
+	REF static CameraComponent* get_scene_camera() { return scene_camera; }
+	REF bool get_is_enabled() const { return is_enabled; }
 	REF void set_is_enabled(bool b);
-	REF void set_fov(float f) {
-		fov = f;
-	}
-	REF float get_fov() {
-		return fov;
-	}
+	REF void set_fov(float f) { fov = f; }
+	REF float get_fov() { return fov; }
 
 	void start() override;
 	void stop() override;
 	void on_changed_transform() override {
-		if(eng->is_editor_level())
+		if (eng->is_editor_level())
 			update_meshbuilder();
 	}
 	void update_meshbuilder();
 
 	void get_view(glm::mat4& viewMatrix, float& fov);
 #ifdef EDITOR_BUILD
-	const char* get_editor_outliner_icon() const final {
-		return "eng/editor/camera_icon.png";
-	}
+	const char* get_editor_outliner_icon() const final { return "eng/editor/camera_icon.png"; }
 #endif
 	float fov = 70.f;
-	View_Setup last_vs;	// valid for enabled, fixme
+	View_Setup last_vs; // valid for enabled, fixme
 private:
 	bool is_enabled = false;
 	MeshBuilderComponent* editor_mbview = nullptr;

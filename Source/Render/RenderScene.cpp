@@ -11,15 +11,8 @@ extern ConfigVar r_skinned_mats_bone_buffer_size;
 
 Render_Pass::Render_Pass(pass_type type) : type(type) {}
 
-draw_call_key Render_Pass::create_sort_key_from_obj(
-	const Render_Object& proxy,
-	const MaterialInstance* material,
-	uint32_t camera_dist,
-	int submesh,
-	int layer,
-	bool is_editor_mode
-)
-{
+draw_call_key Render_Pass::create_sort_key_from_obj(const Render_Object& proxy, const MaterialInstance* material,
+													uint32_t camera_dist, int submesh, int layer, bool is_editor_mode) {
 	draw_call_key key{};
 
 #ifdef _DEBUG
@@ -30,16 +23,15 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 #endif
 
 	int flags = 0;
-	// do some if/else here to cut back on permutation insanity. depth only doesnt care about lightmap,taa,editor_id, or debug
+	// do some if/else here to cut back on permutation insanity. depth only doesnt care about lightmap,taa,editor_id, or
+	// debug
 	if (proxy.animator_bone_ofs != -1 && proxy.model && proxy.model->has_bones())
 		flags |= MSF_ANIMATED;
 	if (is_depth) {
 		flags |= MSF_DEPTH_ONLY;
-	}
-	else if (forced_forward) {
+	} else if (forced_forward) {
 		flags |= MSF_IS_FORCED_FORWARD;
-	}
-	else {
+	} else {
 		if (proxy.lightmapped)
 			flags |= MSF_LIGHTMAPPED;
 		if (is_editor_mode)
@@ -50,10 +42,7 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 			flags |= MSF_DEBUG;
 	}
 
-	key.shader = matman.get_mat_shader(
-		proxy.model, material,
-		flags
-	);
+	key.shader = matman.get_mat_shader(proxy.model, material, flags);
 	const MasterMaterialImpl* mm = material->get_master_material();
 
 	key.blending = (uint64_t)mm->blend;
@@ -80,16 +69,8 @@ draw_call_key Render_Pass::create_sort_key_from_obj(
 	return key;
 }
 
-
-void Render_Pass::add_object(
-	const Render_Object& proxy,
-	handle<Render_Object> handle,
-	const MaterialInstance* material,
-	uint32_t camera_dist,
-	int submesh,
-	int lod,
-	int layer,
-	bool is_editor_mode) {
+void Render_Pass::add_object(const Render_Object& proxy, handle<Render_Object> handle, const MaterialInstance* material,
+							 uint32_t camera_dist, int submesh, int lod, int layer, bool is_editor_mode) {
 	ASSERT(handle.is_valid() && "null handle");
 	ASSERT(material && "null material");
 	ZoneScopedN("add_object");
@@ -105,22 +86,19 @@ void Render_Pass::add_object(
 		objects.push_back(obj);
 }
 
-
 #include <iterator>
-void Render_Pass::make_batches(Render_Scene& scene)
-{
-	const auto& merge_functor = [](const Pass_Object& a, const Pass_Object& b)
-	{
-		if (a.sort_key.as_uint64() < b.sort_key.as_uint64()) return true;
+void Render_Pass::make_batches(Render_Scene& scene) {
+	const auto& merge_functor = [](const Pass_Object& a, const Pass_Object& b) {
+		if (a.sort_key.as_uint64() < b.sort_key.as_uint64())
+			return true;
 		else if (a.sort_key.as_uint64() == b.sort_key.as_uint64())
-			return  a.submesh_index < b.submesh_index;
-		else return false;
+			return a.submesh_index < b.submesh_index;
+		else
+			return false;
 	};
 
-
 	// objects were added correctly in back to front order, just sort by layer
-	const auto& sort_functor_transparent = [](const Pass_Object& a, const Pass_Object& b)
-	{
+	const auto& sort_functor_transparent = [](const Pass_Object& a, const Pass_Object& b) {
 		if (a.sort_key.blending != b.sort_key.blending)
 			return a.sort_key.blending < b.sort_key.blending;
 		if (a.sort_key.distance != b.sort_key.distance)
@@ -142,15 +120,15 @@ void Render_Pass::make_batches(Render_Scene& scene)
 		return;
 
 	{
-		auto functor = [](int first, Pass_Object* po, const Render_Object* rop) -> Mesh_Batch
-		{
+		auto functor = [](int first, Pass_Object* po, const Render_Object* rop) -> Mesh_Batch {
 			Mesh_Batch batch;
 			batch.first = first;
 			batch.count = 1;
-			//auto& mats = rop->mats;
-			int index = rop->model->get_part(po->submesh_index).material_idx;// rop->mesh->parts.at(po->submesh_index).material_idx;
+			// auto& mats = rop->mats;
+			int index = rop->model->get_part(po->submesh_index)
+							.material_idx; // rop->mesh->parts.at(po->submesh_index).material_idx;
 			batch.material = po->material;
-			//batch.shader_index = po->sort_key.shader;
+			// batch.shader_index = po->sort_key.shader;
 			return batch;
 		};
 
@@ -168,10 +146,10 @@ void Render_Pass::make_batches(Render_Scene& scene)
 			const bool same_mesh = this_obj->sort_key.mesh == batch_obj->sort_key.mesh;
 			const bool same_shader = this_obj->sort_key.shader == batch_obj->sort_key.shader;
 
-
 			const bool same_submesh = this_obj->submesh_index == batch_obj->submesh_index;
 			const bool same_material = this_obj->material == batch_obj->material;
-			const bool can_be_merged = !no_batching_dbg && same_material && same_mesh && same_shader && same_submesh && type != pass_type::TRANSPARENT;	// dont merge transparent meshes into instances
+			const bool can_be_merged = !no_batching_dbg && same_material && same_mesh && same_shader && same_submesh &&
+									   type != pass_type::TRANSPARENT; // dont merge transparent meshes into instances
 			if (can_be_merged)
 				batch.count++;
 			else {
@@ -195,8 +173,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 
 	const bool use_better_depth_batching = r_better_depth_batching.get_bool();
 
-	for (int i = 1; i < mesh_batches.size(); i++)
-	{
+	for (int i = 1; i < mesh_batches.size(); i++) {
 		Mesh_Batch* this_batch = &mesh_batches[i];
 		Pass_Object* this_obj = &objects[this_batch->first];
 		const Render_Object* this_proxy = &scene.get(this_obj->render_obj);
@@ -207,19 +184,19 @@ void Render_Pass::make_batches(Render_Scene& scene)
 		bool same_vao = batch_obj->sort_key.vao == this_obj->sort_key.vao;
 		bool same_material = batch_obj->sort_key.texture == this_obj->sort_key.texture;
 		bool same_shader = batch_obj->sort_key.shader == this_obj->sort_key.shader;
-		bool same_other_state = batch_obj->sort_key.blending == this_obj->sort_key.blending
-			&& batch_obj->sort_key.backface == this_obj->sort_key.blending;
+		bool same_other_state = batch_obj->sort_key.blending == this_obj->sort_key.blending &&
+								batch_obj->sort_key.backface == this_obj->sort_key.blending;
 
 		if (type == pass_type::OPAQUE || type == pass_type::TRANSPARENT || !use_better_depth_batching) {
 			if (same_vao && same_material && same_other_state && same_shader && same_layer)
-				batch_this = true;	// can batch with different meshes
+				batch_this = true; // can batch with different meshes
 			else
 				batch_this = false;
 
-		}
-		else {// pass==DEPTH
+		} else { // pass==DEPTH
 			// can batch across texture changes as long as its not alpha tested
-			if (same_shader && same_vao && same_other_state && !this_batch->material->impl->get_master_impl()->is_alphatested())
+			if (same_shader && same_vao && same_other_state &&
+				!this_batch->material->impl->get_master_impl()->is_alphatested())
 				batch_this = true;
 			else
 				batch_this = false;
@@ -227,8 +204,7 @@ void Render_Pass::make_batches(Render_Scene& scene)
 
 		if (batch_this) {
 			batch.count += 1;
-		}
-		else {
+		} else {
 			batches.push_back(batch);
 			batch.count = 1;
 			batch.first = i;
@@ -242,30 +218,19 @@ void Render_Pass::make_batches(Render_Scene& scene)
 	batches.push_back(batch);
 }
 
-
-
 Render_Scene::Render_Scene()
-	: gbuffer_pass(pass_type::OPAQUE),
-	transparent_pass(pass_type::TRANSPARENT),
-	//shadow_pass(pass_type::DEPTH),
-	editor_sel_pass(pass_type::DEPTH),
-	shadow_pass(pass_type::DEPTH),
-	depth_prepass(pass_type::DEPTH)
-{
+	: gbuffer_pass(pass_type::OPAQUE), transparent_pass(pass_type::TRANSPARENT),
+	  // shadow_pass(pass_type::DEPTH),
+	  editor_sel_pass(pass_type::DEPTH), shadow_pass(pass_type::DEPTH), depth_prepass(pass_type::DEPTH) {}
 
-}
-
-void Render_Lists::init(uint32_t drawbufsz, uint32_t instbufsz)
-{
+void Render_Lists::init(uint32_t drawbufsz, uint32_t instbufsz) {
 	glCreateBuffers(1, &gldrawid_to_submesh_material);
 	glCreateBuffers(1, &glinstance_to_instance);
 	glCreateBuffers(1, &gpu_command_list);
-
 }
 
-
-void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_list, std::span<uint32_t> draw_to_material)
-{
+void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_list,
+							  std::span<uint32_t> draw_to_material) {
 	// This function essentially just loops over all batches and creates gpu commands for them
 	// its O(n) to the number of batches, not n^2 which it kind of looks like it is
 
@@ -281,14 +246,12 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 	for (int i = 0; i < src.batches.size(); i++) {
 		const Multidraw_Batch& mdb = src.batches[i];
 
-
 		for (int j = 0; j < mdb.count; j++) {
 			const Mesh_Batch& meshb = src.mesh_batches[mdb.first + j];
 			const Pass_Object& obj = src.objects[meshb.first];
 			const Render_Object& proxy = proxy_list.get(obj.render_obj.id).proxy;
 
-
-			const Submesh& part = proxy.model->get_part(obj.submesh_index);// mesh.parts[obj.submesh_index];
+			const Submesh& part = proxy.model->get_part(obj.submesh_index); // mesh.parts[obj.submesh_index];
 			gpu::DrawElementsIndirectCommand cmd;
 
 			cmd.baseVertex = part.base_vertex + proxy.model->get_merged_vertex_ofs();
@@ -297,7 +260,7 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 			cmd.firstIndex /= MODEL_BUFFER_INDEX_TYPE_SIZE;
 
 			// Important! Set primCount to 0 because visible instances will increment this
-			cmd.primCount = 0;// meshb.count;
+			cmd.primCount = 0; // meshb.count;
 			cmd.baseInstance = base_instance;
 
 			commands.push_back(cmd);
@@ -316,15 +279,12 @@ void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_l
 	}
 
 	draw.stats.tris_drawn += new_verts_drawn / 3;
-
 }
 
-
-void Render_Scene::init()
-{
+void Render_Scene::init() {
 	gbuffer_rlist.init(0, 0);
 	transparent_rlist.init(0, 0);
-	//csm_shadow_rlist.init(0,0);
+	// csm_shadow_rlist.init(0,0);
 	editor_sel_rlist.init(0, 0);
 	cascades_rlists.resize(CascadeShadowMapSystem::CASCADES_USED);
 	for (auto& c : cascades_rlists)
@@ -335,17 +295,15 @@ void Render_Scene::init()
 
 	gpu_instance_buffer = IGraphicsDevice::inst->create_buffer({});
 
-	//glCreateBuffers(1, &gpu_render_instance_buffer);
+	// glCreateBuffers(1, &gpu_render_instance_buffer);
 	glCreateBuffers(1, &gpu_skinned_mats_buffer);
 
 	gpu_skinned_mats_buffer_size = r_skinned_mats_bone_buffer_size.get_integer();
-	glNamedBufferData(gpu_skinned_mats_buffer, gpu_skinned_mats_buffer_size * sizeof(glm::mat4), nullptr, GL_STATIC_DRAW);
-
-
+	glNamedBufferData(gpu_skinned_mats_buffer, gpu_skinned_mats_buffer_size * sizeof(glm::mat4), nullptr,
+					  GL_STATIC_DRAW);
 }
 
-void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object& proxy)
-{
+void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object& proxy) {
 	ASSERT(!eng->get_is_in_overlapped_period());
 	ROP_Internal& in = proxy_list.get(handle.id);
 
@@ -356,14 +314,13 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 			in.has_transparents = proxy.model->get_has_any_transparent_materials();
 		}
 		if (proxy.mat_override && proxy.mat_override->impl && proxy.mat_override->impl->is_transparent_material()) {
-			in.fastcpu_index = -1;	// skip, material is transparent
+			in.fastcpu_index = -1; // skip, material is transparent
 			in.has_transparents = true;
 		}
 		// prevent bad case... if too many parts dont take fast path
 		else if (parts > 200) {
 			in.fastcpu_index = -1;
-		}
-		else {
+		} else {
 			in.fastcpu_index = BuildSceneData_CpuFast::inst->get_index(proxy.model, proxy.mat_override);
 		}
 	}
@@ -376,13 +333,14 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 		in.prev_transform = in.proxy.transform;
 		in.prev_bone_ofs = -1;
 	}
-	//if (r_disable_animated_velocity_vector.get_bool())
+	// if (r_disable_animated_velocity_vector.get_bool())
 	//	in.prev_bone_ofs = -1;
 
 	if (proxy.model) {
 		auto& sphere = proxy.model->get_bounding_sphere();
 		auto center = proxy.transform * glm::vec4(glm::vec3(sphere), 1.f);
-		float max_scale = glm::max(glm::length(proxy.transform[0]), glm::max(glm::length(proxy.transform[1]), glm::length(proxy.transform[2])));
+		float max_scale = glm::max(glm::length(proxy.transform[0]),
+								   glm::max(glm::length(proxy.transform[1]), glm::length(proxy.transform[2])));
 		float radius = sphere.w * max_scale;
 		in.bounding_sphere_and_radius = glm::vec4(glm::vec3(center), radius);
 	}
@@ -403,23 +361,22 @@ void Render_Scene::update_light(handle<Render_Light> handle, const Render_Light&
 		auto viewMat = glm::lookAt(p, p + n, up);
 		float fov = glm::radians(l.light.conemax) * 2.0;
 		auto proj = glm::perspectiveRH_ZO(fov, 1.0f, l.light.radius, r_spot_near.get_float());
-		//proj[2][2] *= -1.0f;	// reverse z // [1,0]
-		//proj[3][2] *= -1.0f;
+		// proj[2][2] *= -1.0f;	// reverse z // [1,0]
+		// proj[3][2] *= -1.0f;
 
 		l.lightViewProj = proj * viewMat;
 	}
-
 }
 
 void Render_Scene::remove_light(handle<Render_Light>& handle) {
 	if (eng->get_is_in_overlapped_period()) {
 		add_to_queued_deletes(handle.id, RenderObjectTypes::Light);
-		handle = { -1 };
+		handle = {-1};
 		return;
 	}
 	if (!handle.is_valid())
 		return;
 	draw.spotShadows->on_remove_light(handle);
 	light_list.free(handle.id);
-	handle = { -1 };
+	handle = {-1};
 }

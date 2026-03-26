@@ -33,25 +33,24 @@ public:
 
 	void start() override {
 		ASSERT(0);
-		//ASSERT(instance == nullptr);
-		//instance = this;
-		//the_player = eng->get_level()->spawn_prefab(player_prefab.get());
+		// ASSERT(instance == nullptr);
+		// instance = this;
+		// the_player = eng->get_level()->spawn_prefab(player_prefab.get());
 	}
 	void update() {}
 	void stop() {
 		ASSERT(instance == this);
-		//instance = nullptr;
+		// instance = nullptr;
 	}
 
 	Entity* the_player = nullptr;
 	CameraComponent* static_level_cam = nullptr;
-	
-	//REF AssetPtr<PrefabAsset> player_prefab;
+
+	// REF AssetPtr<PrefabAsset> player_prefab;
 	REF obj<Component> what_component;
 	REF obj<Component> my2nd;
 	REF obj<Component> my3rd;
 };
-
 
 struct DamageEvent
 {
@@ -79,15 +78,10 @@ public:
 	REFLECT();
 	int max_health = 100;
 
-	void start() {
-		current_health = max_health;
-	}
+	void start() { current_health = max_health; }
 
 	int current_health = 0;
 };
-
-
-
 
 class ProjectileComponent : public Component
 {
@@ -153,62 +147,59 @@ public:
 		auto e = get_owner();
 		auto& children = e->get_children();
 		for (auto c : children) {
-			if (c->get_tag() != StringName("Ragdoll")) continue;
+			if (c->get_tag() != StringName("Ragdoll"))
+				continue;
 			auto phys = c->get_component<PhysicsBody>();
 			if (!phys)
 				continue;
 
 			auto m = e->get_cached_mesh_component();
-			if (!m || !m->get_animator()) 
+			if (!m || !m->get_animator())
 				continue;
 			int i = m->get_index_of_bone(c->get_parent_bone());
-			if (i == -1) continue;
+			if (i == -1)
+				continue;
 
 			const glm::mat4& this_ws = e->get_ws_transform();
 
 			phys->set_is_enable(true);
 		}
 
-
-		//e->get_cached_mesh_component()->get_animator()->set_update_owner_position_to_root(true);
+		// e->get_cached_mesh_component()->get_animator()->set_update_owner_position_to_root(true);
 	}
 };
 
 class TopDownUtil
 {
 public:
-	static void enable_ragdoll_shared(Entity* e, const glm::mat4& last_ws, bool enable)
-	{
+	static void enable_ragdoll_shared(Entity* e, const glm::mat4& last_ws, bool enable) {
 		auto& children = e->get_children();
 		for (auto c : children) {
-			if (c->get_tag() != StringName("Ragdoll")) 
+			if (c->get_tag() != StringName("Ragdoll"))
 				continue;
 			auto phys = c->get_component<PhysicsBody>();
-			if (!phys||phys->is_a<AdvancedJointComponent>())
+			if (!phys || phys->is_a<AdvancedJointComponent>())
 				continue;
 
 			auto m = e->get_cached_mesh_component();
-			if (!m || !m->get_animator()) 
+			if (!m || !m->get_animator())
 				continue;
 			int i = m->get_index_of_bone(c->get_parent_bone());
-			if (i == -1) 
+			if (i == -1)
 				continue;
 
 			const glm::mat4& this_ws = e->get_ws_transform();
 
 			if (enable) {
-				phys->enable_with_initial_transforms(
-					last_ws * m->get_animator()->get_last_global_bonemats().at(i),
-					this_ws * m->get_animator()->get_global_bonemats().at(i),
-					eng->get_dt());
-			}
-			else {
+				phys->enable_with_initial_transforms(last_ws * m->get_animator()->get_last_global_bonemats().at(i),
+													 this_ws * m->get_animator()->get_global_bonemats().at(i),
+													 eng->get_dt());
+			} else {
 				phys->set_is_enable(false);
 			}
 		}
 	}
-	static glm::vec3 unproject_mouse_to_ray(const View_Setup& vs, const int mx, const int my)
-	{
+	static glm::vec3 unproject_mouse_to_ray(const View_Setup& vs, const int mx, const int my) {
 		Ray r;
 
 		auto size = UiSystem::inst->get_vp_rect().get_size();
@@ -228,8 +219,6 @@ public:
 		}
 		return r.dir;
 	}
-
-
 };
 
 class TopDownEnemyComponent : public Component
@@ -240,37 +229,35 @@ public:
 	void start() override {
 		auto health = get_owner()->get_component<TopDownHealthComponent>();
 		ASSERT(health);
-		health->on_death.add(this, [&](DamageEvent dmg)
-			{
-				set_ticking(true);
-				is_dead = true;
-				death_time = eng->get_game_time();
+		health->on_death.add(this, [&](DamageEvent dmg) {
+			set_ticking(true);
+			is_dead = true;
+			death_time = eng->get_game_time();
 
-				auto cap = get_owner()->get_component<PhysicsBody>();
-				cap->set_is_enable(false);
-				cap->destroy_deferred();
+			auto cap = get_owner()->get_component<PhysicsBody>();
+			cap->set_is_enable(false);
+			cap->destroy_deferred();
 
-				TopDownUtil::enable_ragdoll_shared(get_owner(), last_ws, true);
+			TopDownUtil::enable_ragdoll_shared(get_owner(), last_ws, true);
 
-				Random r(get_instance_id());
-				const StringName names[] = { StringName("mixamorig:Hips"),StringName("mixamorig:Neck1"),StringName("mixamorig:RightLeg") };
-				int index = r.RandI(0, 2);
-				for (auto c : get_owner()->get_children()) {
-					if (c->get_parent_bone() == names[index]) {
-						auto p = c->get_component<PhysicsBody>();
-						p->apply_impulse(c->get_ws_position(), dmg.dir * 0.3f);
-						break;
-					}
+			Random r(get_instance_id());
+			const StringName names[] = {StringName("mixamorig:Hips"), StringName("mixamorig:Neck1"),
+										StringName("mixamorig:RightLeg")};
+			int index = r.RandI(0, 2);
+			for (auto c : get_owner()->get_children()) {
+				if (c->get_parent_bone() == names[index]) {
+					auto p = c->get_component<PhysicsBody>();
+					p->apply_impulse(c->get_ws_position(), dmg.dir * 0.3f);
+					break;
 				}
-
-			});
+			}
+		});
 
 		auto capsule = get_owner()->get_component<CapsuleComponent>();
 		ccontroller = std::make_unique<CharacterController>(capsule);
 		ccontroller->set_position(get_ws_position());
 		ccontroller->capsule_height = capsule->height;
 		ccontroller->capsule_radius = capsule->radius;
-
 
 		set_ticking(true);
 	}
@@ -285,8 +272,10 @@ public:
 		auto the_player = TopDownGameManager::instance->the_player;
 
 		auto to_dir = the_player->get_ws_position() - get_ws_position();
-		if (glm::length(to_dir) < 0.001) to_dir = glm::vec3(1, 0, 0);
-		else to_dir = glm::normalize(to_dir);
+		if (glm::length(to_dir) < 0.001)
+			to_dir = glm::vec3(1, 0, 0);
+		else
+			to_dir = glm::normalize(to_dir);
 		facing_dir = to_dir;
 
 		float dt = eng->get_dt();
@@ -295,17 +284,13 @@ public:
 		float move_speed = 3.0;
 		ccontroller->move(glm::vec3(to_dir.x, 0, to_dir.z) * move_speed * dt, dt, 0.005f, flags, outvel);
 
-
 		float angle = -atan2(-to_dir.x, to_dir.z);
 		auto q = glm::angleAxis(angle, glm::vec3(0, 1, 0));
 
 		last_ws = get_ws_transform();
 		get_owner()->set_ws_transform(ccontroller->get_character_pos(), q, get_owner()->get_ls_scale());
-
 	}
-	void stop() {
-
-	}
+	void stop() {}
 
 	glm::vec3 facing_dir = glm::vec3(1, 0, 0);
 	std::unique_ptr<CharacterController> ccontroller;
@@ -314,7 +299,8 @@ public:
 	float death_time = 0.0;
 };
 
-class TopDownCameraReg : public Component {
+class TopDownCameraReg : public Component
+{
 public:
 	CLASS_BODY(TopDownCameraReg);
 
@@ -326,43 +312,37 @@ public:
 	}
 };
 
-
-class TopDownSpawner : public Component {
+class TopDownSpawner : public Component
+{
 public:
 	CLASS_BODY(TopDownSpawner);
-	void start() {
-		
-	}
+	void start() {}
 
 	REFLECT();
-	void enable_object() {
-		
-	}
+	void enable_object() {}
 
-	//REF AssetPtr<PrefabAsset> prefab;
+	// REF AssetPtr<PrefabAsset> prefab;
 	REF int count = 1;
 	bool wait_to_spawn = false;
 	bool start_disabled = false;
 };
-class TDSpawnOverTime : public Component {
+class TDSpawnOverTime : public Component
+{
 public:
 	CLASS_BODY(TDSpawnOverTime);
-	void start() final {
-		set_ticking(true);
-	}
+	void start() final { set_ticking(true); }
 	void update() final {
-		//return;
-		
+		// return;
 	}
 	float last_spawn = 0.0;
 
-
-	//REF AssetPtr<PrefabAsset> prefab;
-	REF float spawn_interval = 1.0;	// every x seconds
+	// REF AssetPtr<PrefabAsset> prefab;
+	REF float spawn_interval = 1.0; // every x seconds
 	REF int max_count = 2000;
 };
 
-class TopDownSpawnPoint : public Component {
+class TopDownSpawnPoint : public Component
+{
 public:
 	CLASS_BODY(TopDownSpawnPoint);
 };

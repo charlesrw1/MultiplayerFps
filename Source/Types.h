@@ -23,5 +23,4 @@ public:
 	glm::mat4 get_view_matrix() const;
 };
 
-
 #endif // !GAMETYPE_H

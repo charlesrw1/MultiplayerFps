@@ -6,19 +6,11 @@
 class SoundAssetMetadata : public AssetMetadata
 {
 public:
-	SoundAssetMetadata() {
-		extensions.push_back("wav");
-	}
+	SoundAssetMetadata() { extensions.push_back("wav"); }
 	// Inherited via AssetMetadata
-	virtual Color32 get_browser_color() const  override
-	{
-		return Color32( 134, 217, 181 );
-	}
+	virtual Color32 get_browser_color() const override { return Color32(134, 217, 181); }
 
-	virtual std::string get_type_name() const  override
-	{
-		return "Sound";
-	}
+	virtual std::string get_type_name() const override { return "Sound"; }
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &SoundFile::StaticType; }
 };
 REGISTER_ASSETMETADATA_MACRO(SoundAssetMetadata);
@@ -32,8 +24,7 @@ ConfigVar snd_max_voices("snd.max_voices", "16", CVAR_INTEGER | CVAR_DEV, 0, 64)
 SoundFile* SoundFile::load(std::string s) {
 	return g_assets.find_sync<SoundFile>(s).get();
 }
-bool SoundFile::load_asset(IAssetLoadingInterface*)
-{
+bool SoundFile::load_asset(IAssetLoadingInterface*) {
 	std::string pathfull = FileSys::get_full_path_from_game_path(get_name());
 	Mix_Chunk* data = Mix_LoadWAV(pathfull.c_str());
 	if (!data) {
@@ -46,8 +37,7 @@ bool SoundFile::load_asset(IAssetLoadingInterface*)
 	return true;
 }
 
-void SoundFile::uninstall()
-{
+void SoundFile::uninstall() {
 	Mix_FreeChunk(internal_data);
 	internal_data = nullptr;
 }

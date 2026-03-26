@@ -20,8 +20,6 @@ public:
 
 using IFilePtr = std::unique_ptr<IFile>;
 
-
-
 class FileTreeIterator;
 struct FileTreeIter
 {
@@ -36,32 +34,28 @@ struct FileTreeIter
 	std::unique_ptr<FileTreeIterator> ptr;
 };
 
-class FileTree {
+class FileTree
+{
 public:
 	FileTree(const std::string& root) : rootPath(root) {}
 	FileTree(const std::string& root, bool dont_descend) : rootPath(root), dont_descend(dont_descend) {}
 
+	FileTreeIter begin() { return FileTreeIter(rootPath, dont_descend); }
 
-	FileTreeIter begin() {
-		return FileTreeIter(rootPath, dont_descend);
-	}
-
-	FileTreeIter end() {
-		return FileTreeIter();
-	}
+	FileTreeIter end() { return FileTreeIter(); }
 
 private:
 	bool dont_descend = false;
 	std::string rootPath;
 };
 
-
 class FileSys
 {
 public:
-	enum WhereEnum {
+	enum WhereEnum
+	{
 		GAME_DIR = 0,	// searches engine dir and game_dir
-		ENGINE_DIR = 1,	// root engine dir
+		ENGINE_DIR = 1, // root engine dir
 		USER_DIR = 2,	// the save folder location for users
 
 		SHADER_CACHE = 3,
@@ -72,27 +66,14 @@ public:
 
 	// open a file for reading, can look in archive or os paths
 	static IFilePtr open_read(const char* relative_path, WhereEnum where);
-	static IFilePtr open_read_engine(const char* rel) {
-		return open_read(rel, ENGINE_DIR);
-	}
-	static IFilePtr open_read_game(const char* rel) {
-		return open_read(rel, GAME_DIR);
-	}
-	static IFilePtr open_read_game(const std::string& str) {
-		return open_read(str.c_str(), GAME_DIR);
-	}
+	static IFilePtr open_read_engine(const char* rel) { return open_read(rel, ENGINE_DIR); }
+	static IFilePtr open_read_game(const char* rel) { return open_read(rel, GAME_DIR); }
+	static IFilePtr open_read_game(const std::string& str) { return open_read(str.c_str(), GAME_DIR); }
 
+	static bool does_file_exist(const char* path, WhereEnum where) { return open_read(path, where) != nullptr; }
 
-	static bool does_file_exist(const char* path, WhereEnum where) {
-		return open_read(path, where) != nullptr;
-	}
-
-	static FileTree find_files(const char* relative_path) {
-		return FileTree(relative_path);
-	}
-	static FileTree find_game_files() {
-		return FileTree(get_path(GAME_DIR));
-	}
+	static FileTree find_files(const char* relative_path) { return FileTree(relative_path); }
+	static FileTree find_game_files() { return FileTree(get_path(GAME_DIR)); }
 	static FileTree find_game_files_path(const std::string& path) {
 		return FileTree(get_path(GAME_DIR) + ("/" + path));
 	}
@@ -102,20 +83,12 @@ public:
 
 	// opens a file to write, DEFAULT writes to engine dir, GAME_DIR writes to the project dir, etc.
 	static IFilePtr open_write(const char* relative_path, WhereEnum where);
-	static IFilePtr open_write_game(const char* rel) {
-		return open_write(rel, GAME_DIR);
-	}
-	static IFilePtr open_write_game(const std::string& str) {
-		return open_write(str.c_str(), GAME_DIR);
-	}
+	static IFilePtr open_write_game(const char* rel) { return open_write(rel, GAME_DIR); }
+	static IFilePtr open_write_game(const std::string& str) { return open_write(str.c_str(), GAME_DIR); }
 
 	static const char* get_path(WhereEnum where);
-	static const char* get_game_path() {
-		return get_path(GAME_DIR);
-	}
-	static std::string get_full_path_from_game_path(const std::string& game) {
-		return get_game_path() + ("/" + game);
-	}
+	static const char* get_game_path() { return get_path(GAME_DIR); }
+	static std::string get_full_path_from_game_path(const std::string& game) { return get_game_path() + ("/" + game); }
 	static std::string get_full_path_from_relative(const std::string& relative, WhereEnum where) {
 		return get_path(where) + ("/" + relative);
 	}

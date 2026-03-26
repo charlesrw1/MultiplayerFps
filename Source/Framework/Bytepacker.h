@@ -11,18 +11,15 @@ using std::string;
 class ByteWriter
 {
 public:
-	ByteWriter(uint8_t* data, int data_len) 
-	{
-		ASSERT(data_len % 4 == 0 &&"Bitwriter buffer must be multiple of 4 bytes!\n");
+	ByteWriter(uint8_t* data, int data_len) {
+		ASSERT(data_len % 4 == 0 && "Bitwriter buffer must be multiple of 4 bytes!\n");
 		buffer_size = data_len / 4;
 		ASSERT(buffer_size > 0);
 		buffer = (uint32_t*)data;
 	}
-	~ByteWriter() {
-		EndWrite();
-	}
+	~ByteWriter() { EndWrite(); }
 
-	//int BytesWritten() const { return data_ptr; }
+	// int BytesWritten() const { return data_ptr; }
 	bool HasFailed() const { return failed; }
 
 	// returns how many bytes have been written, but not necessarily written out to final buffer
@@ -42,8 +39,8 @@ public:
 
 		scratch |= (uint64_t)val << scratch_bits;
 		scratch_bits += numbits;
-		
-		//bitswritten += numbits;
+
+		// bitswritten += numbits;
 
 		if (scratch_bits >= 32) {
 			FlushScratch();
@@ -52,23 +49,15 @@ public:
 		assert(scratch < ((1ull << scratch_bits)));
 		assert(scratch_bits == 0 && scratch == 0 || scratch_bits > 0);
 	}
-	void WriteBool(bool b) {
-		WriteBits(b, 1);
-	}
-	void WriteByte(uint8_t byte) {
-		WriteBits(byte, 8);
-	}
-	void WriteShort(uint16_t word) {
-		WriteBits(word, 16);
-	}
-	void WriteLong(uint32_t dword) {
-		WriteBits(dword, 32);
-	}
+	void WriteBool(bool b) { WriteBits(b, 1); }
+	void WriteByte(uint8_t byte) { WriteBits(byte, 8); }
+	void WriteShort(uint16_t word) { WriteBits(word, 16); }
+	void WriteLong(uint32_t dword) { WriteBits(dword, 32); }
 	void WriteFloat(float f) {
 		union {
 			uint32_t ival;
 			float fval;
-		}x;
+		} x;
 		x.fval = f;
 		WriteLong(x.ival);
 	}
@@ -88,7 +77,7 @@ public:
 	void EndWrite() {
 		int bits_to_align_to_word = (32 - (scratch_bits % 32)) % 32;
 
-		int extra_bytes_written = (32 - scratch_bits)/8;	// how many extra bytes are we adding unintentionally
+		int extra_bytes_written = (32 - scratch_bits) / 8; // how many extra bytes are we adding unintentionally
 
 		if (bits_to_align_to_word != 0) {
 			WriteBits(0, bits_to_align_to_word);
@@ -102,13 +91,12 @@ public:
 	// Aligns the next bits to be written to a byte boundary
 	void AlignToByteBoundary() {
 		int bits_to_align = (8 - (scratch_bits % 8)) % 8;
-		if(bits_to_align!=0)
+		if (bits_to_align != 0)
 			WriteBits(0, bits_to_align);
 		ASSERT(((8 - (scratch_bits % 8)) % 8) == 0);
 	}
 
-	void write_string(const string& str, int maxlen=512)
-	{
+	void write_string(const string& str, int maxlen = 512) {
 		int size_bits = ceil(log2(maxlen));
 		WriteBits(str.size(), size_bits);
 		WriteBytes((uint8_t*)&str[0], str.size());
@@ -144,11 +132,10 @@ private:
 	int scratch_bits = 0;
 	int word_index = 0;
 	uint32_t* buffer = nullptr;
-	int buffer_size = 0;	// in multiple of 4 bytes !!!
+	int buffer_size = 0; // in multiple of 4 bytes !!!
 
 	int actual_bytes_written = 0;
 };
-
 
 class ByteReader
 {
@@ -156,7 +143,7 @@ public:
 	ByteReader(const uint8_t* data, int data_len, int buffer_len_ = -1) {
 		if (buffer_len_ == -1)
 			buffer_len_ = data_len;
-		
+
 		if (buffer_len_ % 4 != 0) {
 			printf("bitreader buffer must be multiple of 4 bytes\n");
 			failed = true;
@@ -167,9 +154,7 @@ public:
 		buffer = (uint32_t*)data;
 	}
 	bool HasFailed() const { return failed; }
-	bool IsEof() const {
-		return !failed && num_bits_read == total_bits;
-	}
+	bool IsEof() const { return !failed && num_bits_read == total_bits; }
 
 	void AdvanceBytes(int bytes) {
 		if (bytes >= 4) {
@@ -178,11 +163,11 @@ public:
 				return;
 			word_index = word_index + full_words;
 			num_bits_read += full_words * 32;
-			ReadNextWord();	// fill scratch
+			ReadNextWord(); // fill scratch
 		}
 		int extra_bytes = bytes % 4;
-		if(extra_bytes!=0)
-			ReadBits(extra_bytes * 8);	// empty extra bytes
+		if (extra_bytes != 0)
+			ReadBits(extra_bytes * 8); // empty extra bytes
 	}
 
 	uint32_t ReadBits(int numbits) {
@@ -199,23 +184,15 @@ public:
 
 		return lowbits;
 	}
-	bool ReadBool() {
-		return ReadBits(1);
-	}
-	uint8_t ReadByte() {
-		return ReadBits(8);
-	}
-	uint16_t ReadShort() {
-		return ReadBits(16);
-	}
-	uint32_t ReadLong() {
-		return ReadBits(32);
-	}
+	bool ReadBool() { return ReadBits(1); }
+	uint8_t ReadByte() { return ReadBits(8); }
+	uint16_t ReadShort() { return ReadBits(16); }
+	uint32_t ReadLong() { return ReadBits(32); }
 	float ReadFloat() {
 		union {
 			uint32_t ival;
 			float fval;
-		}x;
+		} x;
 		x.ival = ReadBits(32);
 		return x.fval;
 	}
@@ -241,8 +218,7 @@ public:
 			}
 		}
 	}
-	void read_string(string& str, int maxlen = 512) 
-	{
+	void read_string(string& str, int maxlen = 512) {
 		int sizebits = ceil(log2(maxlen));
 		int length = ReadBits(sizebits);
 

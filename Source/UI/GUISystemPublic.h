@@ -8,7 +8,8 @@ union SDL_Event;
 
 #include "Framework/LuaColor.h"
 
-class Canvas : public ClassBase {
+class Canvas : public ClassBase
+{
 public:
 	CLASS_BODY(Canvas);
 	REF static void draw_text(std::string str, int x, int y);
@@ -20,7 +21,6 @@ public:
 	REF static void set_window_title(std::string name);
 	REF static void set_window_capture_mouse(bool capturing_mouse);
 };
-
 
 class EditorState;
 class MaterialInstance;
@@ -34,8 +34,8 @@ public:
 	~UiSystem();
 
 	// viewport actions
-	bool is_vp_hovered() const;	// is the scene viewport hovered?
-	bool is_vp_focused() const;	// is the scene viewport focused for inputs? (obstructed by imgui or gui widgets?)
+	bool is_vp_hovered() const; // is the scene viewport hovered?
+	bool is_vp_focused() const; // is the scene viewport focused for inputs? (obstructed by imgui or gui widgets?)
 	Rect2d get_vp_rect() const { return viewportRect; }
 	glm::ivec2 convert_screen_to_vp(glm::ivec2 screen) const;
 	bool is_drawing_to_screen() const;
@@ -56,6 +56,7 @@ public:
 	const MaterialInstance* ui_default = nullptr;
 	const MaterialInstance* fontDefaultMat = nullptr;
 	const GuiFont* defaultFont = nullptr;
+
 private:
 	void draw_imgui_internal(EditorState* edState);
 	bool is_viewport_focused = false;

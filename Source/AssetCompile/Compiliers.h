@@ -8,16 +8,18 @@ class ModelDefData;
 class ModelCompilier
 {
 public:
-	enum Ret {
+	enum Ret
+	{
 		Skipped,
 		CompileErr,
 		CompileGood,
 	};
 
-	static Ret compile(const char* name,IAssetLoadingInterface* loading);
+	static Ret compile(const char* name, IAssetLoadingInterface* loading);
 
 	static Ret compile_from_settings(const std::string& output, ModelImportSettings* settings);
-	static bool does_model_need_compile(const char* name, ModelDefData& def, bool needs_def, IAssetLoadingInterface* loading);
+	static bool does_model_need_compile(const char* name, ModelDefData& def, bool needs_def,
+										IAssetLoadingInterface* loading);
 };
 
 #endif

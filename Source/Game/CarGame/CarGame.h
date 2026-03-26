@@ -35,15 +35,12 @@ public:
 		ASSERT(!instance);
 		instance = this;
 	}
-	void stop() {
-		instance = nullptr;
-	}
+	void stop() { instance = nullptr; }
 	Entity* thecar = nullptr;
 
 	REFLECT();
 	MulticastDelegate<> on_player_damaged;
 };
-
 
 class WheelComponent : public Component
 {
@@ -57,9 +54,7 @@ class CarComponent : public Component
 public:
 	CLASS_BODY(CarComponent);
 
-	CarComponent() {
-		memset(wheels, 0, sizeof(wheels));
-	}
+	CarComponent() { memset(wheels, 0, sizeof(wheels)); }
 	void start() {
 		body = get_owner()->get_component<PhysicsBody>();
 		for (auto c : get_owner()->get_children()) {
@@ -80,8 +75,7 @@ public:
 			wheel_angles[i] = 0;
 		}
 	}
-	void stop() {
-	}
+	void stop() {}
 	void update() override;
 
 	float tire_screech_amt = 0.0;
@@ -110,13 +104,12 @@ public:
 
 	CarSoundMaker() : r(4052347) {}
 
-	//REF AssetPtr<PrefabAsset> engineSoundAsset;
-	//REF AssetPtr<PrefabAsset> tireSoundAsset;
+	// REF AssetPtr<PrefabAsset> engineSoundAsset;
+	// REF AssetPtr<PrefabAsset> tireSoundAsset;
 
 	SoundComponent* engineSound{};
 	SoundComponent* tireSound{};
 	CarComponent* car = nullptr;
-
 
 	void start() {
 		car = get_owner()->get_component<CarComponent>();
@@ -128,17 +121,16 @@ public:
 			// e->add_comp<>()
 			// e->parent_to()
 			// e->get_parent()
-			// 
+			//
 			// spawn_prefab_deferred()
-			// 
-			// 
+			//
+			//
 			// get_owner()->parent_to(get_owner())
 
-			//engineSound = eng->get_level()->spawn_prefab(engineSoundAsset.get())->get_component<SoundComponent>();
-			//tireSound = eng->get_level()->spawn_prefab(tireSoundAsset.get())->get_component<SoundComponent>();
-			//engineSound->get_owner()->parent_to(get_owner());
-			//tireSound->get_owner()->parent_to(get_owner());
-
+			// engineSound = eng->get_level()->spawn_prefab(engineSoundAsset.get())->get_component<SoundComponent>();
+			// tireSound = eng->get_level()->spawn_prefab(tireSoundAsset.get())->get_component<SoundComponent>();
+			// engineSound->get_owner()->parent_to(get_owner());
+			// tireSound->get_owner()->parent_to(get_owner());
 		}
 		engineSound->set_play(true);
 		set_ticking(true);
@@ -155,9 +147,8 @@ class CarDriver : public Component
 public:
 	CLASS_BODY(CarDriver);
 
-
 	void start() override {
-	
+
 		auto camobj = eng->get_level()->spawn_entity();
 		camera = camobj->create_component<CameraComponent>();
 		camera->set_is_enabled(true);
@@ -167,8 +158,7 @@ public:
 	}
 	//
 	void update();
-	void stop() {
-	}
+	void stop() {}
 
 	float set_steer_angle = 0.0;
 

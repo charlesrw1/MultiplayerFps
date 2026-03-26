@@ -662,14 +662,13 @@ void ObjectOutliner::draw()
 
 #endif
 
-static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e)
-{
-	auto serialize_branch = [&ed_doc](Entity* e) -> auto {
+static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e) {
+	auto serialize_branch = [&ed_doc](Entity * e) -> auto {
 		assert(!"not implmented");
 		std::vector<Entity*> ents;
 		ents.push_back(e);
 		ed_doc.validate_fileids_before_serialize();
-		return nullptr;// std::make_unique<SerializedSceneFile>(serialize_entities_to_text("save_branch", ents));
+		return nullptr; // std::make_unique<SerializedSceneFile>(serialize_entities_to_text("save_branch", ents));
 	};
 
 	// vars
@@ -677,12 +676,11 @@ static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e)
 	std::string selected_name;
 	EntityPtr ptr(e);
 	EditorPopupManager::inst->add_popup(
-		"Enter name for new prefab: ",
-		[ptr, serialize_branch, failed, selected_name]() mutable -> bool {
+		"Enter name for new prefab: ", [ptr, serialize_branch, failed, selected_name]() mutable -> bool {
 			Entity* e = ptr.get();
 			if (!e) {
 				sys_print(Error, "in prefab popup: entity was null\n");
-				return true;	// close popup
+				return true; // close popup
 			}
 
 			std_string_input_text("##input", selected_name, 0);
@@ -692,19 +690,19 @@ static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e)
 			}
 			if (ImGui::Button("Save")) {
 				// try file path
-				std::string finalpath = selected_name.c_str();	// because imgui messes withstuff
+				std::string finalpath = selected_name.c_str(); // because imgui messes withstuff
 				finalpath += ".pfb";
 
 				const bool check_file_exists = FileSys::does_file_exist(finalpath.c_str(), FileSys::GAME_DIR);
 				if (check_file_exists) {
 					failed = true;
-					return false;	// try again later
+					return false; // try again later
 				}
 
-				//auto serialized = serialize_branch(e);
+				// auto serialized = serialize_branch(e);
 				//
-				//auto outfile = FileSys::open_write_game(finalpath);
-				//outfile->write(serialized->text.c_str(), serialized->text.size());
+				// auto outfile = FileSys::open_write_game(finalpath);
+				// outfile->write(serialized->text.c_str(), serialized->text.size());
 				const char* str = string_format("saved prefab as: %s\n", finalpath.c_str());
 				eng->log_to_fullscreen_gui(Info, str);
 				sys_print(Info, str);
@@ -717,17 +715,12 @@ static void save_off_branch_as_scene(EditorDoc& ed_doc, Entity* e)
 			}
 
 			return false;
-		}
-	);
+		});
 }
 
-
-
-static void HelpMarker(const char* desc)
-{
+static void HelpMarker(const char* desc) {
 	ImGui::TextDisabled("(?)");
-	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) && ImGui::BeginTooltip())
-	{
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) && ImGui::BeginTooltip()) {
 		ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
 		ImGui::TextUnformatted(desc);
 		ImGui::PopTextWrapPos();
@@ -735,56 +728,49 @@ static void HelpMarker(const char* desc)
 	}
 }
 
-void OONameFilter::draw()
-{
+void OONameFilter::draw() {
 	if (std_string_input_text("##filter", filter_component, ImGuiInputTextFlags_EnterReturnsTrue)) {
 		filter_component = filter_component.c_str();
 		on_filter_enter.invoke(filter_component);
 	}
-	ImGui::SameLine(); 
-	HelpMarker(
-		"Filter scene.\n"
-		"Searches for:\n"
-			"\tentity name\n"
-			"\tentity id\n"
-			"\tcomponent name\n"
-			"\tasset name\n"
-			"\tprefab name\n"
-			"\tentity ptr is\n"
-		"Searches for all categories automatically.\n"
-		"Supprts AND and OR searches:\n"
-		"\t\"mymesh | physics somename\" searches for mymesh OR (physics AND somename)\n"
-		"Not case sensitive.\n"
-		"Return to confirm filter.\n"
-	);
+	ImGui::SameLine();
+	HelpMarker("Filter scene.\n"
+			   "Searches for:\n"
+			   "\tentity name\n"
+			   "\tentity id\n"
+			   "\tcomponent name\n"
+			   "\tasset name\n"
+			   "\tprefab name\n"
+			   "\tentity ptr is\n"
+			   "Searches for all categories automatically.\n"
+			   "Supprts AND and OR searches:\n"
+			   "\t\"mymesh | physics somename\" searches for mymesh OR (physics AND somename)\n"
+			   "Not case sensitive.\n"
+			   "Return to confirm filter.\n");
 }
 
 // dumb but want something that just works
-bool OONameFilter::is_in_string(const string& filter, const string& match)
-{
+bool OONameFilter::is_in_string(const string& filter, const string& match) {
 	auto lowercased = to_lower(match);
 	return lowercased.find(filter) != std::string::npos;
 }
 
-static bool check_props_for_assetptr_or_entityptr(const string& filter, void* inst, const PropertyInfoList* list)
-{
+static bool check_props_for_assetptr_or_entityptr(const string& filter, void* inst, const PropertyInfoList* list) {
 	for (int i = 0; i < list->count; i++) {
 		auto& prop = list->list[i];
-		if (prop.type==core_type_id::AssetPtr)
-		{
+		if (prop.type == core_type_id::AssetPtr) {
 			IAsset** asset = (IAsset**)prop.get_ptr(inst);
 			if (*asset) {
-				if (OONameFilter::is_in_string(filter, (*asset)->get_name()))	// asset name
+				if (OONameFilter::is_in_string(filter, (*asset)->get_name())) // asset name
 					return true;
 			}
-		}
-		else if (prop.type==core_type_id::ObjHandlePtr) {
+		} else if (prop.type == core_type_id::ObjHandlePtr) {
 			obj<BaseUpdater>* eptr = (obj<BaseUpdater>*)prop.get_ptr(inst);
 			BaseUpdater* what = eptr->get();
-			if (what && OONameFilter::is_in_string(filter, std::to_string(what->get_instance_id())))	// entity ptr instance id
+			if (what &&
+				OONameFilter::is_in_string(filter, std::to_string(what->get_instance_id()))) // entity ptr instance id
 				return true;
-		}
-		else if (prop.type == core_type_id::List) {
+		} else if (prop.type == core_type_id::List) {
 			auto listptr = prop.get_ptr(inst);
 			auto size = prop.list_ptr->get_size(listptr);
 			for (int j = 0; j < size; j++) {
@@ -798,20 +784,19 @@ static bool check_props_for_assetptr_or_entityptr(const string& filter, void* in
 	return false;
 }
 #include "Game/Components/SpawnerComponenth.h"
-bool OONameFilter::does_entity_pass_one_filter(const string& filter, Entity* e)
-{
+bool OONameFilter::does_entity_pass_one_filter(const string& filter, Entity* e) {
 	// check: name of object, component names, id of object
 	// props: asset names, ptr names/ids
-	if (is_in_string(filter, e->get_editor_name()))	// name of object
+	if (is_in_string(filter, e->get_editor_name())) // name of object
 		return true;
 	for (auto& c : e->get_components()) {
-		if (is_in_string(filter, c->get_type().classname))	// names of components
+		if (is_in_string(filter, c->get_type().classname)) // names of components
 			return true;
 	}
 
-	if (is_in_string(filter, std::to_string(e->get_instance_id())))	// instance id
+	if (is_in_string(filter, std::to_string(e->get_instance_id()))) // instance id
 		return true;
-	
+
 	// now check properties
 	for (auto& c : e->get_components()) {
 		if (auto sc = c->cast_to<SpawnerComponent>()) {
@@ -831,17 +816,16 @@ bool OONameFilter::does_entity_pass_one_filter(const string& filter, Entity* e)
 		}
 	}
 
-	return false;	// no matches
+	return false; // no matches
 }
 
-bool OONameFilter::does_entity_pass(const vector<vector<string>>& filter, Entity* e)
-{
+bool OONameFilter::does_entity_pass(const vector<vector<string>>& filter, Entity* e) {
 	if (filter.empty())
 		return true;
 	for (auto& ors : filter) {
 		bool res = true;
 		for (auto& ands : ors) {
-			if (!does_entity_pass_one_filter(ands,e)) {
+			if (!does_entity_pass_one_filter(ands, e)) {
 				res = false;
 				break;
 			}
@@ -853,18 +837,17 @@ bool OONameFilter::does_entity_pass(const vector<vector<string>>& filter, Entity
 }
 #include <sstream>
 
-vector<vector<string>> OONameFilter::parse_into_and_ors(const std::string& filter)
-{
+vector<vector<string>> OONameFilter::parse_into_and_ors(const std::string& filter) {
 	std::vector<std::vector<std::string>> result;
 	std::stringstream ss(filter);
 	std::string segment;
 
-	while (std::getline(ss, segment, '|')) {  // Split by '|'
+	while (std::getline(ss, segment, '|')) { // Split by '|'
 		std::vector<std::string> subVector;
 		std::stringstream subSS(segment);
 		std::string word;
 
-		while (subSS >> word) {  // Split by spaces within segments
+		while (subSS >> word) { // Split by spaces within segments
 			subVector.push_back(to_lower(word));
 		}
 
@@ -872,6 +855,5 @@ vector<vector<string>> OONameFilter::parse_into_and_ors(const std::string& filte
 	}
 
 	return result;
-
 }
 #endif

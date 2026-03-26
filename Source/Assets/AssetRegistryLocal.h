@@ -1,7 +1,8 @@
 #pragma once
 #include "AssetRegistry.h"
 
-struct AssetFilesystemNode {
+struct AssetFilesystemNode
+{
 	AssetFilesystemNode* parent = nullptr;
 	bool is_used = true;
 	bool folder_is_open = false;
@@ -17,9 +18,7 @@ struct AssetFilesystemNode {
 		children = other.children;
 		is_used = other.is_used;
 	}
-	bool is_folder() const {
-		return !children.empty();
-	}
+	bool is_folder() const { return !children.empty(); }
 	void set_is_used_to_false_R() {
 		is_used = false;
 		for (auto& c : children)

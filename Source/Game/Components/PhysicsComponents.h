@@ -12,14 +12,14 @@ class PhysicsActor;
 class MeshBuilder;
 
 /* blank */ namespace physx {
-	class PxRigidActor;
-	class PxShape;
-	class PxRigidDynamic;
-	class PxJoint;
-	class PxRevoluteJoint;
-	class PxSphericalJoint;
-	class PxD6Joint;
-}
+class PxRigidActor;
+class PxShape;
+class PxRigidDynamic;
+class PxJoint;
+class PxRevoluteJoint;
+class PxSphericalJoint;
+class PxD6Joint;
+} // namespace physx
 class PhysicsMaterialWrapper;
 
 // wrapper around physx actors
@@ -29,16 +29,17 @@ class BillboardComponent;
 class Model;
 
 // hack bs to work with script fixme
-struct PhysicsBodyEventArg {
+struct PhysicsBodyEventArg
+{
 	STRUCT_BODY();
 	REF obj<Entity> who;
-	REF bool entered_trigger = false;	// false = left
+	REF bool entered_trigger = false; // false = left
 };
 
-
-class IPhysicsEventCallback  : public ClassBase {
+class IPhysicsEventCallback : public ClassBase
+{
 public:
-	CLASS_BODY(IPhysicsEventCallback,scriptable);
+	CLASS_BODY(IPhysicsEventCallback, scriptable);
 	REF virtual void on_event(PhysicsBodyEventArg event) {}
 };
 
@@ -73,9 +74,7 @@ public:
 	REF void set_send_overlap(bool send_overlap);
 	REF void set_send_hit(bool send_hit);
 
-	REF PL get_physics_layer() const {
-		return physics_layer;
-	}
+	REF PL get_physics_layer() const { return physics_layer; }
 	REF void set_physics_layer(PL l);
 
 	glm::mat4 get_transform() const;
@@ -93,21 +92,17 @@ public:
 		on_shape_changes();
 	}
 
-	//REF void set_objects_mass(float mass);
-	//REF void set_objects_density(float density);
+	// REF void set_objects_mass(float mass);
+	// REF void set_objects_density(float density);
 	void set_transform(const glm::mat4& transform, bool teleport = false);
-
-
 
 	void enable_with_initial_transforms(const glm::mat4& t0, const glm::mat4& t1, float dt);
 
-	physx::PxRigidActor* get_physx_actor() const {
-		return physxActor;
-	}
-	
+	physx::PxRigidActor* get_physx_actor() const { return physxActor; }
+
 	// allocate but DO NOT FREE IPhysicsEventCallback. ownership is taken
 	// this is for lua code, c++ use on_trigger. bs fixme etc
-	// 
+	//
 	// see add_physics_callback and PhysicsEventCallbackImpl in lua for usage
 	REF void add_triggered_callback(IPhysicsEventCallback* callback);
 
@@ -118,6 +113,7 @@ public:
 	}
 
 	MulticastDelegate<PhysicsBodyEventArg> on_trigger;
+
 protected:
 	void add_model_shape_to_actor(const Model* m);
 	void add_sphere_shape_to_actor(const glm::vec3& pos, float radius);
@@ -128,6 +124,7 @@ protected:
 	void on_shape_changes();
 
 	MeshBuilderComponent* get_editor_meshbuilder() const;
+
 private:
 	void on_actor_type_change();
 
@@ -149,17 +146,19 @@ private:
 	physx::PxRigidDynamic* get_dynamic_actor() const;
 	void set_shape_flags(physx::PxShape* shape);
 
-
 	REF PL physics_layer = PL::Default;
 	REF bool enabled = true;
-	REF bool simulate_physics = false;		// if true, then object is a DYNAMIC object driven by the physics simulation
-	REF bool is_static = true;				// if true, then the object is a STATIC object driven that cant ever move
-		 									// if false, then this object is KINEMATIC if simulate_physics is false or DYNAMIC if its true
-	 										// isStatic and simulate_physics is illogical so it falls back to isStatic in that case
-	REF bool is_trigger = false;			// if true, then the objects shapes are treated like triggers and sends OVERLAP events
-										// for a generic static trigger box, use with is_static = true
-	REF bool send_overlap = false;			// if true on both objects, then a overlap event will be sent (one of the objects has to be a trigger object)
-	REF bool send_hit = false;				// if true on both objects, then a hit event will be sent when the 2 objects hit each other in the simulation
+	REF bool simulate_physics = false; // if true, then object is a DYNAMIC object driven by the physics simulation
+	REF bool is_static =
+		true; // if true, then the object is a STATIC object driven that cant ever move
+			  // if false, then this object is KINEMATIC if simulate_physics is false or DYNAMIC if its true
+			  // isStatic and simulate_physics is illogical so it falls back to isStatic in that case
+	REF bool is_trigger = false; // if true, then the objects shapes are treated like triggers and sends OVERLAP events
+								 // for a generic static trigger box, use with is_static = true
+	REF bool send_overlap = false; // if true on both objects, then a overlap event will be sent (one of the objects has
+								   // to be a trigger object)
+	REF bool send_hit = false;	   // if true on both objects, then a hit event will be sent when the 2 objects hit each
+								   // other in the simulation
 	REF bool interpolate_visuals = true;
 	REF float density = 2.0;
 
@@ -204,7 +203,6 @@ public:
 	REF float height_offset = 0.0;
 };
 
-
 class BoxComponent : public PhysicsBody
 {
 public:
@@ -213,13 +211,11 @@ public:
 	void add_actor_shapes() override;
 	void add_editor_shapes() override;
 
-
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
 		return get_is_simulating() ? "eng/editor/phys_box_simulate.png" : "eng/editor/phys_box.png";
 	}
 #endif
-
 };
 class SphereComponent : public PhysicsBody
 {
@@ -258,7 +254,6 @@ public:
 #endif
 };
 
-
 struct JointAnchor
 {
 	STRUCT_BODY();
@@ -280,32 +275,26 @@ public:
 #ifdef EDITOR_BUILD
 	void editor_on_change_property() override;
 #endif
-	void clear_joint() {
-		set_target(nullptr);
-	}
-	REF Entity* get_target() {
-		return target.get();
-	}
+	void clear_joint() { set_target(nullptr); }
+	REF Entity* get_target() { return target.get(); }
 	REF void set_target(Entity* e);
 
 #ifdef EDITOR_BUILD
-	const char* get_editor_outliner_icon() const final {
-		return "eng/editor/phys_joint.png";
-	}
+	const char* get_editor_outliner_icon() const final { return "eng/editor/phys_joint.png"; }
 #endif
 
 	REF void set_joint_anchor(glm::vec3 p, glm::quat q, int axis) {
 		anchor.p = p;
 		anchor.q = q;
-		if (axis < 0 || axis>2) 
+		if (axis < 0 || axis > 2)
 			axis = 0;
 		local_joint_axis = axis;
 	}
 
 	// call after changing stuff
 	REF void refresh_joint();
-protected:
 
+protected:
 	PhysicsBody* get_owner_physics();
 
 	virtual void init_joint(PhysicsBody* a, PhysicsBody* b) = 0;
@@ -315,17 +304,15 @@ protected:
 
 	float limit_spring = 0.f;
 	float limit_damping = 0.f;
-	
+
 	REF obj<Entity> target;
 	REF JointAnchor anchor;
-	REF int local_joint_axis = 0;	//0=x,1=y,2=z
+	REF int local_joint_axis = 0; // 0=x,1=y,2=z
 
 	MeshBuilderComponent* editor_meshbuilder = nullptr;
 
 private:
-
 };
-
 
 class HingeJointComponent : public PhysicsJointComponent
 {
@@ -336,8 +323,6 @@ private:
 	void init_joint(PhysicsBody* a, PhysicsBody* b) override;
 	physx::PxJoint* get_joint() const override;
 	void free_joint() override;
-
-
 
 	float limit_min = 0.f;
 	float limit_max = 0.f;
@@ -353,19 +338,15 @@ public:
 	physx::PxJoint* get_joint() const override;
 	void free_joint() override;
 
-
 	physx::PxSphericalJoint* joint = nullptr;
 };
 
-
-NEWENUM(JM,int8_t)
-{
+NEWENUM(JM, int8_t){
 	Locked,
 	Limited,
 	Free,
 };
 using JointMotion = JM;
-
 
 class AdvancedJointComponent : public PhysicsJointComponent
 {

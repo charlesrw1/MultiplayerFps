@@ -21,7 +21,7 @@ class Level
 public:
 	// constructed in GameEngineLocal::on_map_change_callback
 	Level(bool is_editor);
-	void start(string source_name, UnserializedSceneFile* source);	// called right after ctor
+	void start(string source_name, UnserializedSceneFile* source); // called right after ctor
 	~Level();
 	void insert_unserialized_entities_into_level(UnserializedSceneFile& scene); // was bool assign_new_ids=false
 	// ends the level
@@ -38,24 +38,21 @@ public:
 	Entity* spawn_entity();
 	void add_and_init_created_runtime_component(Component* c);
 	const ScopedBooleanValue& get_is_in_update() const { return b_is_in_update_tick; }
-	BaseUpdater* get_entity(int64_t handle) {
-		return all_world_ents.find(handle);
-	}
+	BaseUpdater* get_entity(int64_t handle) { return all_world_ents.find(handle); }
 	string get_source_asset_name() const {
-		return source_name;;
+		return source_name;
+		;
 	}
-	const hash_map<BaseUpdater*>& get_all_objects() const {
-		return all_world_ents;
-	}
+	const hash_map<BaseUpdater*>& get_all_objects() const { return all_world_ents; }
 	// appends object to list that will be destroyed at end of frame, instead of instantly
 	void queue_deferred_delete(BaseUpdater* e);
-
 
 	void validate();
 	Entity* find_initial_entity_by_name(const string& name) const;
 	Component* find_first_component(const ClassTypeInfo* type) const;
+
 private:
-	void insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene,bool addSpawnNames);
+	void insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene, bool addSpawnNames);
 	std::unordered_map<string, obj<Entity>> spawnNameToEntity;
 	// all entities/components in the map
 	hash_map<BaseUpdater*> all_world_ents;
@@ -73,8 +70,8 @@ private:
 	void initialize_new_entity_safe(Entity* e);
 	Entity* spawn_entity_class_deferred_internal(const ClassTypeInfo& ti);
 	int64_t get_next_id_and_increment() {
-		return ++last_id;	// prefix
+		return ++last_id; // prefix
 	}
 
-	friend class DeferredSpawnScope;	// for initialize_new_entity_safe
+	friend class DeferredSpawnScope; // for initialize_new_entity_safe
 };

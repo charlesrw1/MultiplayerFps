@@ -1,8 +1,7 @@
 #include "Render/RenderGiManager.h"
 extern ConfigVar is_editor_app;
 
-RenderGiManager::RenderGiManager()
-{
+RenderGiManager::RenderGiManager() {
 	if (is_editor_app.get_bool()) {
 		CreateTextureArgs args;
 		args.width = CUBEMAP_WIDTH;
@@ -21,17 +20,14 @@ RenderGiManager::RenderGiManager()
 	cubemap_volume_buffer = IGraphicsDevice::inst->create_buffer({});
 
 	dummy_temp_cubemap = new Texture;
-	
 }
 
-inline glm::vec3 get_probe_position_from_volume(const R_CubemapVolume& vol)
-{
+inline glm::vec3 get_probe_position_from_volume(const R_CubemapVolume& vol) {
 	return vol.transform[3];
 }
 extern ConfigVar force_render_cubemaps;
 RenderGiManager* RenderGiManager::inst = nullptr;
-void RenderGiManager::render_frame_tick()
-{
+void RenderGiManager::render_frame_tick() {
 	if (force_render_cubemaps.get_bool())
 		bake_all_cubemaps();
 
@@ -47,34 +43,30 @@ void RenderGiManager::render_frame_tick()
 				ASSERT(dummy_temp_cubemap && dummy_temp_cubemap->gpu_ptr);
 
 				// copy from texture to cubemap array
-				const int volhandle = i;	// the index
+				const int volhandle = i; // the index
 				const int mips = Texture::get_mip_map_count(CUBEMAP_WIDTH, CUBEMAP_WIDTH);
 				for (int face = 0; face < 6; face++) {
 					int width = CUBEMAP_WIDTH;
 					for (int mip = 0; mip < mips; mip++) {
 
-						//GraphicsBlitInfo blit;
-						//blit.src.texture = vol.generated_cube->gpu_ptr;
-						//blit.dest.texture = scene.cubemap_array;
-						//blit.dest.mip = mip;
-						//blit.dest.layer = 6*volhandle + face;	// face index
-						//blit.src.mip = mip;
-						//blit.src.layer = face;
-						//blit.src.x = blit.src.y = blit.dest.x = blit.dest.y = 0;
-						//blit.src.w = blit.src.h = blit.dest.w = blit.dest.h = CUBEMAP_WIDTH;
-						//IGraphicsDevice::inst->blit_textures(blit);
-						//glCheckError();
+						// GraphicsBlitInfo blit;
+						// blit.src.texture = vol.generated_cube->gpu_ptr;
+						// blit.dest.texture = scene.cubemap_array;
+						// blit.dest.mip = mip;
+						// blit.dest.layer = 6*volhandle + face;	// face index
+						// blit.src.mip = mip;
+						// blit.src.layer = face;
+						// blit.src.x = blit.src.y = blit.dest.x = blit.dest.y = 0;
+						// blit.src.w = blit.src.h = blit.dest.w = blit.dest.h = CUBEMAP_WIDTH;
+						// IGraphicsDevice::inst->blit_textures(blit);
+						// glCheckError();
 
-
-						glCopyImageSubData(
-							dummy_temp_cubemap->gpu_ptr->get_internal_handle(), GL_TEXTURE_CUBE_MAP, mip, 0, 0, face,
-							editable_cubemap_array->get_internal_handle(), GL_TEXTURE_CUBE_MAP_ARRAY, mip, 0, 0, 6 * volhandle + face,
-							width, width, 1
-						);
+						glCopyImageSubData(dummy_temp_cubemap->gpu_ptr->get_internal_handle(), GL_TEXTURE_CUBE_MAP, mip,
+										   0, 0, face, editable_cubemap_array->get_internal_handle(),
+										   GL_TEXTURE_CUBE_MAP_ARRAY, mip, 0, 0, 6 * volhandle + face, width, width, 1);
 						width /= 2;
 					}
 				}
-
 			}
 		}
 	}
@@ -82,32 +74,24 @@ void RenderGiManager::render_frame_tick()
 	wants_bake_all_cubemaps = false;
 }
 
-void RenderGiManager::update_ddgi_volumes(const DdgiVolumeGpu& volumes)
-{
-}
+void RenderGiManager::update_ddgi_volumes(const DdgiVolumeGpu& volumes) {}
 
-const std::vector<DdgiVolumeGpu>& RenderGiManager::get_baked_ddgi_volumes() const
-{
+const std::vector<DdgiVolumeGpu>& RenderGiManager::get_baked_ddgi_volumes() const {
 	// TODO: insert return statement here
 	return draw.ddgi->myvolumes;
 }
 
-void RenderGiManager::set_loaded_ddgi_data(BakedDdgiInputData&& input)
-{
+void RenderGiManager::set_loaded_ddgi_data(BakedDdgiInputData&& input) {
 	draw.ddgi->load_the_gi(input.irrad, input.depths, input.offsets, input.volumes);
 }
 
-void RenderGiManager::bake_ddgi()
-{
-}
+void RenderGiManager::bake_ddgi() {}
 
-void RenderGiManager::update_cubemap_volumes(const std::vector<R_CubemapVolume>& volumes)
-{
+void RenderGiManager::update_cubemap_volumes(const std::vector<R_CubemapVolume>& volumes) {
 	if (runtime_loaded_cubemaps) {
 		runtime_loaded_cubemaps->release();
 		runtime_loaded_cubemaps = nullptr;
 	}
-
 
 	this->cm_volumes = volumes;
 	cubemap_volume_buffer->upload(cm_volumes.data(), cm_volumes.size() * sizeof(R_CubemapVolume));
@@ -116,9 +100,7 @@ void RenderGiManager::update_cubemap_volumes(const std::vector<R_CubemapVolume>&
 	// god dogshit awful
 	// gets the calc'd lum value back to cpu side so i can save it to disk
 	{
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER,
-			cubemap_volume_buffer->get_internal_handle()
-		);
+		glBindBuffer(GL_SHADER_STORAGE_BUFFER, cubemap_volume_buffer->get_internal_handle());
 		R_CubemapVolume* ptr = (R_CubemapVolume*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
 		const int num = get_num_cubemaps();
 		for (int i = 0; i < num; i++)
@@ -127,8 +109,7 @@ void RenderGiManager::update_cubemap_volumes(const std::vector<R_CubemapVolume>&
 	}
 }
 
-void RenderGiManager::set_cubemaps_from_loading(std::vector<R_CubemapVolume>&& volumes, IGraphicsTexture* cubemaps)
-{
+void RenderGiManager::set_cubemaps_from_loading(std::vector<R_CubemapVolume>&& volumes, IGraphicsTexture* cubemaps) {
 	this->cm_volumes = std::move(volumes);
 	cubemap_volume_buffer->upload(cm_volumes.data(), cm_volumes.size() * sizeof(R_CubemapVolume));
 	if (runtime_loaded_cubemaps) {

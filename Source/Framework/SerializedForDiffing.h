@@ -1,5 +1,6 @@
 #pragma once
 #include "Framework/SerializerJson.h"
-struct SerializedForDiffing {
+struct SerializedForDiffing
+{
 	nlohmann::json jsonObj;
 };

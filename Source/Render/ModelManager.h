@@ -9,21 +9,18 @@ class IGraphicsBuffer;
 class MainVbIbAllocator
 {
 public:
-
 	void init(uint32_t num_indicies, uint32_t num_verts);
 	void print_usage() const;
 
 	gpuAllocSpan append_to_v_buffer(const uint8_t* data, size_t size);
 	gpuAllocSpan append_to_i_buffer(const uint8_t* data, size_t size);
 
-
-	struct buffer {
+	struct buffer
+	{
 		IGraphicsBuffer* ptr = nullptr;
 		gpuSpanAllocator alloc;
 
-		int get_allocated() const {
-			return alloc.get_init_sized();
-		}
+		int get_allocated() const { return alloc.get_init_sized(); }
 	};
 
 	buffer vbuffer;
@@ -33,7 +30,8 @@ private:
 	gpuAllocSpan append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf, uint32_t target);
 };
 #include "Framework/ConsoleCmdGroup.h"
-enum class VaoType {
+enum class VaoType
+{
 	Animated,
 	Lightmapped
 };
@@ -63,9 +61,8 @@ public:
 
 	void remove_model_from_list(Model* m);
 
-	const hash_set<Model>& get_all_models() const {
-		return all_models;
-	}
+	const hash_set<Model>& get_all_models() const { return all_models; }
+
 private:
 	hash_set<Model> all_models;
 
@@ -84,7 +81,6 @@ private:
 
 	IGraphicsVertexInput* animated_vertex_input = nullptr;
 	IGraphicsVertexInput* lightmapped_vertex_input = nullptr;
-
 
 	MainVbIbAllocator allocator;
 	int cur_mesh_id = 1;

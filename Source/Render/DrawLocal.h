@@ -14,7 +14,6 @@
 #include "glm/glm.hpp"
 #include "Types.h"
 
-
 #include "Render/Shader.h"
 #include "Render/EnvProbe.h"
 #include "Render/Texture.h"
@@ -51,40 +50,35 @@ struct Texture3d
 	glm::ivec3 size;
 	uint32_t id = 0;
 };
-Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int frequency, float persistence, float lacunarity);
+Texture3d generate_perlin_3d(glm::ivec3 size, uint32_t seed, int octaves, int frequency, float persistence,
+							 float lacunarity);
 
 const int MAX_CUBEMAPS = 32;
 const int CUBEMAP_WIDTH = 128;
 
-
 struct Render_lists_cpufast
 {
-	IGraphicsBuffer* glinst_to_inst{};	// object indirection
-	IGraphicsBuffer* cmdbuf{};			// cmd buffer
-	std::span<int> md_counts;			// size = batches.size()
+	IGraphicsBuffer* glinst_to_inst{}; // object indirection
+	IGraphicsBuffer* cmdbuf{};		   // cmd buffer
+	std::span<int> md_counts;		   // size = batches.size()
 };
 
 struct Render_Lists;
 class Render_Pass;
-struct Render_Level_Params {
+struct Render_Level_Params
+{
 
-	enum Pass_Type { 
-		OPAQUE, 
-		FORWARD_PASS, 
-		DEPTH, 
-		SHADOWMAP 
-	};
-	Render_Level_Params(
-		const View_Setup& view,
-		Render_Lists* render_list,
-		Render_Pass* render_pass,
-		Pass_Type type
-		) : view(view), rl(render_list), rp(render_pass), 
-
-		pass(type)
+	enum Pass_Type
 	{
+		OPAQUE,
+		FORWARD_PASS,
+		DEPTH,
+		SHADOWMAP
+	};
+	Render_Level_Params(const View_Setup& view, Render_Lists* render_list, Render_Pass* render_pass, Pass_Type type)
+		: view(view), rl(render_list), rp(render_pass),
 
-	}
+		  pass(type) {}
 
 	View_Setup view;
 
@@ -113,16 +107,9 @@ struct Render_Level_Params {
 struct RenderPipelineState
 {
 	RenderPipelineState() = default;
-	RenderPipelineState(
-		bool backface_culling,
-		bool cull_front_face,
-		bool depth_testing,
-		bool depth_less_than,
-		bool depth_writes,
-		BlendState blend_state,
-		program_handle shader,
-		vertexarrayhandle vao,
-		fbohandle framebuffer);
+	RenderPipelineState(bool backface_culling, bool cull_front_face, bool depth_testing, bool depth_less_than,
+						bool depth_writes, BlendState blend_state, program_handle shader, vertexarrayhandle vao,
+						fbohandle framebuffer);
 
 	bool backface_culling = true;
 	bool cull_front_face = false;
@@ -136,17 +123,10 @@ struct RenderPipelineState
 
 struct RenderPassSetup
 {
-	RenderPassSetup(
-		const char* debug_name,
-		fbohandle framebuffer,
-		bool clear_color,
-		bool clear_depth,
-		int x,
-		int y,
-		int w,
-		int h
-	) : debug_name(debug_name), framebuffer(framebuffer), clear_color(clear_color), clear_depth(clear_depth),
-		x(x), y(y), w(w), h(h) {}
+	RenderPassSetup(const char* debug_name, fbohandle framebuffer, bool clear_color, bool clear_depth, int x, int y,
+					int w, int h)
+		: debug_name(debug_name), framebuffer(framebuffer), clear_color(clear_color), clear_depth(clear_depth), x(x),
+		  y(y), w(w), h(h) {}
 
 	const char* debug_name = "";
 	fbohandle framebuffer = 0;
@@ -163,15 +143,17 @@ struct GpuRenderPassScope
 {
 	GpuRenderPassScope& operator=(const GpuRenderPassScope& other) = delete;
 	GpuRenderPassScope(const GpuRenderPassScope& other) = default;
+
 private:
-	GpuRenderPassScope(const RenderPassSetup& setup) : setup(setup) {};
+	GpuRenderPassScope(const RenderPassSetup& setup) : setup(setup){};
 
 	const RenderPassSetup setup;
 	friend class OpenglRenderDevice;
 };
 #include "glad/glad.h"
 
-struct Render_Stats {
+struct Render_Stats
+{
 	int tris_drawn = 0;
 	int total_draw_calls = 0;
 	int program_changes = 0;
@@ -190,10 +172,11 @@ class IGraphicsProgram;
 class Program_Manager
 {
 public:
-
-	program_handle create_single_file(const std::string& shared_file, bool is_tesselation = false, const std::string& defines = {});
+	program_handle create_single_file(const std::string& shared_file, bool is_tesselation = false,
+									  const std::string& defines = {});
 	program_handle create_raster(const std::string& frag, const std::string& vert, const std::string& defines = {});
-	program_handle create_raster_geo(const std::string& frag, const std::string& vert, const std::string& geo = nullptr, const std::string& defines = {});
+	program_handle create_raster_geo(const std::string& frag, const std::string& vert, const std::string& geo = nullptr,
+									 const std::string& defines = {});
 	program_handle create_compute(const std::string& compute, const std::string& defines = {});
 	Shader get_obj(program_handle handle) const {
 		assert(handle >= 0 && handle < programs.size());
@@ -204,10 +187,10 @@ public:
 		return programs.at(handle).compile_failed;
 	}
 
-
 	void recompile_all();
 
-	struct program_def {
+	struct program_def
+	{
 		std::string defines;
 		std::string frag;
 		std::string vert;
@@ -216,7 +199,7 @@ public:
 		bool compile_failed = false;
 		bool is_tesselation = false;
 
-		bool is_shared() const { return !vert.empty() && frag.empty()&& !is_compute; }
+		bool is_shared() const { return !vert.empty() && frag.empty() && !is_compute; }
 		Shader shader_obj;
 	};
 	std::vector<program_def> programs;
@@ -227,27 +210,24 @@ public:
 		else
 			sys_print(Warning, "Program_Manager::recompile: handle out of range\n");
 	}
+
 private:
 	void recompile_normal(program_def& def);
 	void recompile_shared(program_def& def);
 	void recompile(program_def& def);
 	void recompile_do(program_def& def);
-
 };
 
 class OpenglRenderDevice
 {
 public:
-	OpenglRenderDevice() {
-		memset(textures_bound, 0, sizeof(textures_bound));
-	}
+	OpenglRenderDevice() { memset(textures_bound, 0, sizeof(textures_bound)); }
 	Shader shader() const {
-		if (active_program == -1) return Shader();
+		if (active_program == -1)
+			return Shader();
 		return prog_man.get_obj(active_program);
 	}
-	Program_Manager& get_prog_man() {
-		return prog_man;
-	}
+	Program_Manager& get_prog_man() { return prog_man; }
 
 	void set_pipeline(const RenderPipelineState& pipeline);
 	GpuRenderPassScope start_render_pass(const RenderPassSetup& setup);
@@ -265,9 +245,7 @@ public:
 		glMultiDrawElementsIndirect(mode, type, indirect, drawcount, stride);
 	}
 
-	const Render_Stats& get_stats() {
-		return lastStats;
-	}
+	const Render_Stats& get_stats() { return lastStats; }
 
 	void reset_states() {
 		active_program = -1;
@@ -278,18 +256,17 @@ public:
 		activeStats = Render_Stats();
 	}
 
-	void set_viewport(int x, int y, int w, int h) {
-		glViewport(x, y, w, h);
-	}
+	void set_viewport(int x, int y, int w, int h) { glViewport(x, y, w, h); }
 	void clear_framebuffer(bool clear_depth, bool clear_color, float depth_value = 0.f);
 
 	void bind_texture(int bind, int id);
 	void bind_texture_ptr(int bind, IGraphicsTexture* ptr) {
-		if(ptr)
+		if (ptr)
 			bind_texture(bind, ptr->get_internal_handle());
 	}
 	void set_shader(program_handle handle);
 	void set_depth_write_enabled(bool enabled);
+
 private:
 	void set_vao(vertexarrayhandle vao);
 	void set_blend_state(BlendState blend);
@@ -321,7 +298,8 @@ private:
 	Render_Stats activeStats;
 	Render_Stats lastStats;
 
-	enum invalid_bits {
+	enum invalid_bits
+	{
 		PROGRAM_BIT,
 		BLENDING_BIT,
 		BACKFACE_BIT,
@@ -340,17 +318,17 @@ private:
 	void invalidate_all() { invalid_bits = UINT64_MAX; }
 
 	Program_Manager prog_man;
+
 private:
 	uint64_t invalid_bits = UINT32_MAX;
 	friend class Renderer;
 };
 
-
-inline size_t hash_combine(size_t a, size_t b)
-{
+inline size_t hash_combine(size_t a, size_t b) {
 	return a ^ (b + 0x9e3779b9 + (a << 6) + (a >> 2));
 }
-struct ModelAndMatTextureSet {
+struct ModelAndMatTextureSet
+{
 	Model* m{};
 	// for mat overrides...
 	MasterMaterialImpl* parent{};
@@ -361,7 +339,8 @@ struct ModelAndMatTextureSet {
 		return m == other.m && parent == other.parent && texture_hash == other.texture_hash;
 	}
 };
-struct ModelAndMatTextureSetHasher {
+struct ModelAndMatTextureSetHasher
+{
 	size_t operator()(const ModelAndMatTextureSet& k) const noexcept {
 		size_t h1 = std::hash<Model*>{}(k.m);
 		size_t h2 = std::hash<MasterMaterialImpl*>{}(k.parent);
@@ -370,43 +349,49 @@ struct ModelAndMatTextureSetHasher {
 	}
 };
 
-struct ModelAndMatTData {
+struct ModelAndMatTData
+{
 	Model* m{};
-	std::vector<int> part_to_draw_cmd;	// total num_parts (inc lods etc)
+	std::vector<int> part_to_draw_cmd; // total num_parts (inc lods etc)
 	int instance_count = 0;
 	int instance_alloced = 0;
 	int16_t ptr_ofs = 0;
 	int gpu_buf_ofs = 0;
 };
 
-struct MaterialAndShader_CpuFast {
+struct MaterialAndShader_CpuFast
+{
 	MaterialInstance* mat = nullptr;
 	draw_call_key key{};
 };
-struct Render_Pass_CpuFast {
+struct Render_Pass_CpuFast
+{
 public:
 	std::vector<Multidraw_Batch> batches;
 };
-struct Render_List_CpuFast {
+struct Render_List_CpuFast
+{
 	std::vector<int> glinstances;
 	std::vector<gpu::DrawElementsIndirectCommand> out_cmds;
 	std::vector<MaterialAndShader_CpuFast> batch_to_material;
 };
-struct GpuCullInput {
-	IGraphicsBuffer* mod_data{};	// model data buffer. contains lods, parts, cmd indidices, material offsets
-	IGraphicsBuffer* obj_data_buf{};	// CullObject[]
-	IGraphicsBuffer* count_buf{};		// count buffer to use with drawelementsindirectcount
-	IGraphicsBuffer* batches_buf{};	// array of multidraw_batches
-	IGraphicsBuffer* glinst_to_inst{};	// int[], used for indirecting to object transform etc data
-	IGraphicsBuffer* cmd_buf{};			// drawelementsindirectcommands[] 
-	IGraphicsBuffer* draw_to_batch{};	// int[] mapping from cmd_buf to batches_buf
+struct GpuCullInput
+{
+	IGraphicsBuffer* mod_data{};	   // model data buffer. contains lods, parts, cmd indidices, material offsets
+	IGraphicsBuffer* obj_data_buf{};   // CullObject[]
+	IGraphicsBuffer* count_buf{};	   // count buffer to use with drawelementsindirectcount
+	IGraphicsBuffer* batches_buf{};	   // array of multidraw_batches
+	IGraphicsBuffer* glinst_to_inst{}; // int[], used for indirecting to object transform etc data
+	IGraphicsBuffer* cmd_buf{};		   // drawelementsindirectcommands[]
+	IGraphicsBuffer* draw_to_batch{};  // int[] mapping from cmd_buf to batches_buf
 
 	int num_batches = 0;
 	int num_cmds = 0;
 	int num_objs = 0;
 };
 struct Frustum;
-class BuildSceneData_CpuFast {
+class BuildSceneData_CpuFast
+{
 public:
 	static BuildSceneData_CpuFast* inst;
 
@@ -417,16 +402,11 @@ public:
 
 	// e2e func, fixme
 	void cull_and_draw_shadow_cascade(int idx);
-	void cull_and_draw_shadow_spot(
-		const Frustum& f);
+	void cull_and_draw_shadow_spot(const Frustum& f);
 
-
-	void make_shadow_object_data_threadsafe(
-		std::span<uint8_t> vis,
-		std::span<int> glinst,
-		std::span<gpu::DrawElementsIndirectCommand> outcmds,
-		std::span<int> mdcounts
-	) const;
+	void make_shadow_object_data_threadsafe(std::span<uint8_t> vis, std::span<int> glinst,
+											std::span<gpu::DrawElementsIndirectCommand> outcmds,
+											std::span<int> mdcounts) const;
 
 	void on_fastpath_material_removed(MaterialInstance* mat);
 	void rebuild_models() {
@@ -446,8 +426,7 @@ public:
 			if (parent_texhash == myhash) {
 				search.texture_hash = parent_texhash;
 				search.has_textures = search.parent->self;
-			}
-			else {
+			} else {
 				search.texture_hash = myhash;
 				search.has_textures = mat;
 			}
@@ -468,7 +447,8 @@ public:
 	}
 
 	inline bool is_modptr_index_in_fast_path(int16_t fast_index) const {
-		if (fast_index < 0) return false;
+		if (fast_index < 0)
+			return false;
 		return mod_data_ptrs[fast_index]->instance_alloced > 0;
 	}
 
@@ -478,34 +458,21 @@ public:
 	void do_gbuffer_draw(bool overdraw_visualization_2nd_pass);
 	void do_shadow_draw(float polyfac, bool lessthan);
 
+	int get_num_commands() const { return out_cmds.size(); }
+	int get_num_instances() const { return gbuffer_list.glinstances.size(); }
+	int get_num_shadow_batches() const { return shadow_pass.batches.size(); }
+	int get_num_depth_batches() { return shadow_pass.batches.size(); }
+	int get_num_opaque_batches() { return gbuffer_pass.batches.size(); }
+	int get_num_cached_cmds() { return out_cmds.size(); }
+	int get_num_cached_mod_mats() { return mod_data_ptrs.size(); }
 
-	int get_num_commands() const {
-		return out_cmds.size();
-	}
-	int get_num_instances() const {
-		return gbuffer_list.glinstances.size();
-	}
-	int get_num_shadow_batches() const {
-		return shadow_pass.batches.size();
-	}
-	int get_num_depth_batches() {
-		return shadow_pass.batches.size();
-	}
-	int get_num_opaque_batches() {
-		return gbuffer_pass.batches.size();
-	}
-	int get_num_cached_cmds() {
-		return out_cmds.size();
-	}
-	int get_num_cached_mod_mats() {
-		return mod_data_ptrs.size();
-	}
 private:
 	bool force_rebuild = false;
-	enum DoDrawFlags {
-		IS_SHADOW=1,
-		DEPTH_LESSTHAN=2,
-		OVERDRAWVIS=4,
+	enum DoDrawFlags
+	{
+		IS_SHADOW = 1,
+		DEPTH_LESSTHAN = 2,
+		OVERDRAWVIS = 4,
 	};
 
 	void do_draw_shared(int flags, float polyfac);
@@ -526,7 +493,8 @@ private:
 	std::unordered_map<ModelAndMatTextureSet, ModelAndMatTData, ModelAndMatTextureSetHasher> mod_data;
 	std::vector<ModelAndMatTData*> mod_data_ptrs;
 
-	struct {
+	struct
+	{
 		IGraphicsBuffer* mod_data_gpu = nullptr;
 		IGraphicsBuffer* shadow_batches = nullptr;
 		IGraphicsBuffer* gbuffer_batches = nullptr;
@@ -539,22 +507,20 @@ private:
 
 		IGraphicsBuffer* cullobj_buf = nullptr;
 		int num_cullobjs = 0;
-	}gpu;
+	} gpu;
 
 	// sorted draw cmds, indexed into by M&MTS
 	std::vector<gpu::DrawElementsIndirectCommand> out_cmds;
 	std::vector<int16_t> cmd_to_mod_data_ptr;
-	struct CmdExtraData {
+	struct CmdExtraData
+	{
 		Model* model{};
 		MaterialInstance* material{};
 		int submesh{};
 		draw_call_key key{};
 	};
 	std::vector<CmdExtraData> cmd_to_extra;
-
-
 };
-
 
 class DebuggingTextureOutput
 {
@@ -568,19 +534,18 @@ public:
 	bool explicit_texel = false;
 };
 
-
 const uint32_t MAX_BLOOM_MIPS = 6;
 #ifdef EDITOR_BUILD
-class ThumbnailRenderer {
+class ThumbnailRenderer
+{
 public:
 	ThumbnailRenderer(int size);
 	void render(Model* m, MaterialInstance* override_mat);
 	void output_to_path(std::string path);
-private:
 
+private:
 	IGraphicsTexture* color{};
 	IGraphicsTexture* depth{};
-
 
 	Texture* vts_handle = nullptr;
 	handle<Render_Object> object;
@@ -596,8 +561,10 @@ public:
 	DecalBatcher();
 	void build_batches();
 	void draw_decals();
+
 private:
-	struct DecalObj {
+	struct DecalObj
+	{
 		int orig_index = 0;
 		int program = 0;
 		int texture_set = 0;
@@ -605,7 +572,8 @@ private:
 
 		MaterialInstance* the_material = nullptr;
 	};
-	struct DecalDraw {
+	struct DecalDraw
+	{
 		int count = 0;
 		MaterialInstance* shared_pipeline_material = nullptr;
 		program_handle the_program_to_use = 0;
@@ -622,9 +590,8 @@ public:
 	LightListCuller();
 	void cull(const View_Setup& setup);
 	void draw_lights();
-	const std::vector<int>& get_counts() {
-		return counts;
-	}
+	const std::vector<int>& get_counts() { return counts; }
+
 private:
 	std::vector<int> counts;
 	IGraphicsBuffer* tiled_uniforms = nullptr;
@@ -635,14 +602,15 @@ private:
 // sanity checking, for sharing a render target multiple times across a frame
 
 class SharedRenderTargetTexture;
-class SharedRenderTargetOwner {
+class SharedRenderTargetOwner
+{
 public:
 	IGraphicsTexture*& get_ptr_ref_for_setting() {
 		ASSERT(!is_locked);
 		return ptr;
 	}
 	IGraphicsTexture* get_for_reading(SharedRenderTargetTexture* t) {
-		ASSERT(t==is_locked);
+		ASSERT(t == is_locked);
 		return ptr;
 	}
 	IGraphicsTexture* aquire_lock_to_write(SharedRenderTargetTexture* t) {
@@ -651,32 +619,28 @@ public:
 		return ptr;
 	}
 	void release_lock(SharedRenderTargetTexture* t) {
-		ASSERT(is_locked==t);
+		ASSERT(is_locked == t);
 		is_locked = nullptr;
 	}
+
 private:
 	IGraphicsTexture* ptr = nullptr;
 	SharedRenderTargetTexture* is_locked = nullptr;
 };
-class SharedRenderTargetTexture {
+class SharedRenderTargetTexture
+{
 public:
 	void init(SharedRenderTargetOwner* p) {
 		ASSERT(!parent);
 		this->parent = p;
 	}
-	IGraphicsTexture* get_for_reading() {
-		return parent->get_for_reading(this);
-	}
-	IGraphicsTexture* aquire_lock_to_write() {
-		return parent->aquire_lock_to_write(this);
-	}
-	void release_lock() {
-		parent->release_lock(this);
-	}
+	IGraphicsTexture* get_for_reading() { return parent->get_for_reading(this); }
+	IGraphicsTexture* aquire_lock_to_write() { return parent->aquire_lock_to_write(this); }
+	void release_lock() { parent->release_lock(this); }
+
 private:
 	SharedRenderTargetOwner* parent = nullptr;
 };
-
 
 class Renderer : public RendererPublic
 {
@@ -684,9 +648,8 @@ public:
 	Renderer();
 
 	// local delegates
-	MulticastDelegate<int, int> on_viewport_size_changed;	// hook up to change buffers etc.
-	MulticastDelegate<> on_reload_shaders;	// called before shaders are reloaded
-
+	MulticastDelegate<int, int> on_viewport_size_changed; // hook up to change buffers etc.
+	MulticastDelegate<> on_reload_shaders;				  // called before shaders are reloaded
 
 	// ####################
 	// # public interface #
@@ -700,23 +663,23 @@ public:
 	RenderScenePublic* get_scene() override { return &scene; }
 	void bake_cubemaps() final {}
 	uint32_t get_composite_output_texture_handle() final {
-		if (!tex.actual_output_composite) return 0;
-		//assert(tex.actual_output_composite);
-		return tex.actual_output_composite->get_internal_handle(); 
+		if (!tex.actual_output_composite)
+			return 0;
+		// assert(tex.actual_output_composite);
+		return tex.actual_output_composite->get_internal_handle();
 	}
 #ifdef EDITOR_BUILD
 	handle<Render_Object> mouse_pick_scene_for_editor(int x, int y) final;
 	std::vector<handle<Render_Object>> mouse_box_select_for_editor(int x, int y, int w, int h) final;
 	float get_scene_depth_for_editor(int x, int y) final;
-	void editor_render_thumbnail_for(Model* model, MaterialInstance* override_mat, int w, int h, std::string path) final {
-		matman.pre_render_update();	// hack fixme
+	void editor_render_thumbnail_for(Model* model, MaterialInstance* override_mat, int w, int h,
+									 std::string path) final {
+		matman.pre_render_update(); // hack fixme
 		thumbnailRenderer->render(model, override_mat);
 		thumbnailRenderer->output_to_path(path);
 	}
 #endif
-	void pre_sync_update() final {
-		matman.pre_render_update();
-	}
+	void pre_sync_update() final { matman.pre_render_update(); }
 
 	// ###################
 	// # local interface #
@@ -735,23 +698,22 @@ public:
 
 	void create_shaders();
 
-	void render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled, bool force_show_backface, bool depth_less_than_op);
-	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, 
-		bool depth_test_enabled,
-		bool force_show_backfaces,
-		bool depth_less_than_op
-	);
+	void render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled, bool force_show_backface,
+							  bool depth_less_than_op);
+	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, bool depth_test_enabled,
+							  bool force_show_backfaces, bool depth_less_than_op);
 
 	void scene_draw_internal(SceneDrawParamsEx params, View_Setup view);
 	IGraphicsTexture* do_post_process_stack(const std::vector<MaterialInstance*>& stack);
-	void check_cubemaps_dirty();	// render any cubemaps
-	void update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Texture* cubemap, glm::vec3 position, bool skybox_only);
+	void check_cubemaps_dirty(); // render any cubemaps
+	void update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Texture* cubemap, glm::vec3 position,
+											bool skybox_only);
 
 	uptr<ConsoleCmdGroup> consoleCommands;
 	Memory_Arena mem_arena;
 
 	Memory_Arena& get_arena() { return mem_arena; }
-	
+
 	// default textuers
 	IGraphicsTexture* white_texture{};
 	IGraphicsTexture* black_texture{};
@@ -761,16 +723,16 @@ public:
 	{
 		program_handle simple{};
 		program_handle simple_solid_color{};
-		//program_handle textured;
-		//program_handle textured3d;
-		//program_handle texturedarray;
+		// program_handle textured;
+		// program_handle textured3d;
+		// program_handle texturedarray;
 
-		//program_handle particle_basic;
+		// program_handle particle_basic;
 		program_handle bloom_downsample{};
 		program_handle taa_resolve{};
 		program_handle bloom_upsample{};
 		program_handle combine{};
-		
+
 		program_handle mdi_testing{};
 
 		// depth pyramid compute shader
@@ -780,8 +742,6 @@ public:
 		program_handle tex_debug_2d_array{};
 		program_handle tex_debug_cubemap{};
 		program_handle tex_debug_cubemap_array{};
-
-
 
 		program_handle sunlight_accumulation{};
 		program_handle sunlight_accumulation_debug{};
@@ -795,15 +755,16 @@ public:
 
 		program_handle height_fog{};
 		program_handle volfog_apply{};
-	}prog;
+	} prog;
 
-	
-	struct textures {
+	struct textures
+	{
 		IGraphicsTexture* scene_color{};
 		IGraphicsTexture* last_scene_color{};
 		IGraphicsTexture* scene_depth{};
 
-		IGraphicsTexture* scene_gbuffer0{};	// also used to resolve TAA into since its rgbf16 (and also used as a texture to read from for transparent fx)
+		IGraphicsTexture* scene_gbuffer0{}; // also used to resolve TAA into since its rgbf16 (and also used as a
+											// texture to read from for transparent fx)
 		IGraphicsTexture* scene_gbuffer1{};
 		IGraphicsTexture* scene_gbuffer2{};
 
@@ -818,8 +779,6 @@ public:
 		IGraphicsTexture* reflection_accum{};
 		IGraphicsTexture* last_reflection_accum{};
 		IGraphicsTexture* scene_color_mipchain{};
-
-
 
 		// ----------------------------------------------------------------------------------
 		// | gbuffer		|		X		|		Y		|		Z		|		A		|
@@ -837,15 +796,15 @@ public:
 		IGraphicsTexture* editor_selection_depth_buffer{};
 		IGraphicsTexture* editor_id_buffer{};
 
+		// texhandle reflected_color{};
+		// texhandle reflected_depth{};
 
-		//texhandle reflected_color{};
-		//texhandle reflected_depth{};
-		
 		IGraphicsTexture* output_composite{};
 		IGraphicsTexture* output_composite_2{};
 		IGraphicsTexture* actual_output_composite{};
 
-		struct BloomChain {
+		struct BloomChain
+		{
 			IGraphicsTexture* texture = nullptr;
 			glm::ivec2 isize = {};
 			glm::vec2 fsize = glm::vec2(0.0);
@@ -866,28 +825,29 @@ public:
 		Texture* scene_motion_vts_handle = nullptr;
 
 		Texture* read_scene_color_for_transparents_handle = nullptr;
-	}tex;
+	} tex;
 
-	struct uniform_buffers {
+	struct uniform_buffers
+	{
 		bufferhandle current_frame{};
-	}ubo;
+	} ubo;
 
-	struct buffers {
+	struct buffers
+	{
 		bufferhandle default_vb{};
 
 		IGraphicsBuffer* lighting_uniforms{};
 		IGraphicsBuffer* decal_uniforms{};
 		IGraphicsBuffer* fog_uniforms{};
-	}buf;
+	} buf;
 
-	struct vertex_array_objects {
+	struct vertex_array_objects
+	{
 		vertexarrayhandle default_{};
-	}vao;
+	} vao;
 
-	vertexarrayhandle get_empty_vao() {
-		return vao.default_;
-	}
-	
+	vertexarrayhandle get_empty_vao() { return vao.default_; }
+
 	const View_Setup& get_current_frame_vs() const { return current_frame_view; }
 	View_Setup current_frame_view;
 	View_Setup last_frame_main_view;
@@ -897,7 +857,7 @@ public:
 	void bind_vao(uint32_t vao);
 	void bind_texture(int bind, int id);
 	void bind_texture_ptr(int bind, IGraphicsTexture* ptr) {
-		if(ptr)
+		if (ptr)
 			bind_texture(bind, ptr->get_internal_handle());
 	}
 
@@ -921,16 +881,12 @@ public:
 	DebuggingTextureOutput debug_tex_out;
 
 	Render_Scene scene;
-	
+
 	Render_Stats stats;
 
+	OpenglRenderDevice& get_device() { return device; }
+	Program_Manager& get_prog_man() { return device.get_prog_man(); }
 
-	OpenglRenderDevice& get_device() {
-		return device;
-	}
-	Program_Manager& get_prog_man() {
-		return device.get_prog_man();
-	}
 private:
 	RenderWindowBackendLocal* windowDrawer = nullptr;
 #ifdef EDITOR_BUILD
@@ -944,13 +900,10 @@ private:
 	void init_bloom_buffers();
 	void render_bloom_chain(texhandle scene_color_handle);
 
-
-
 	void InitGlState();
 	void InitFramebuffers(bool create_composite_texture, int s_w, int s_h);
 
 	void draw_height_fog(IGraphicsTexture* target);
-
 
 	int cur_w = 0;
 	int cur_h = 0;

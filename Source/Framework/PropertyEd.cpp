@@ -9,12 +9,15 @@ static uint32_t color32_to_uint(Color32 color) {
 	return *(uint32_t*)&color;
 }
 
-IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx, uint32_t property_flag_mask);
+IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst,
+					 int row_idx, uint32_t property_flag_mask);
 
 class UniquePtrRow : public IGridRow
 {
 public:
-	UniquePtrRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* info, int row_idx, uint32_t prop_flag_mask) : IGridRow(parent, row_idx), factory(factory) {
+	UniquePtrRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* info,
+				 int row_idx, uint32_t prop_flag_mask)
+		: IGridRow(parent, row_idx), factory(factory) {
 		assert(info->type == core_type_id::StdUniquePtr);
 		flagmask = prop_flag_mask;
 		ClassBase** uniquePtr = (ClassBase**)info->get_ptr(instance);
@@ -23,7 +26,6 @@ public:
 		type_of_base = info->class_type;
 		this->info = info;
 		this->inst = instance;
-
 	}
 	bool internal_update() override {
 		auto classroot = info->class_type;
@@ -46,36 +48,31 @@ public:
 			for (; !subclasses.is_end(); subclasses.next()) {
 
 				if (subclasses.get_type()->has_allocate_func()) {
-					if (ImGui::Selectable(subclasses.get_type()->classname,
-						subclasses.get_type() == thisType
-					)) {
+					if (ImGui::Selectable(subclasses.get_type()->classname, subclasses.get_type() == thisType)) {
 						thisType = subclasses.get_type();
 						has_update = true;
 					}
 				}
-
 			}
 			ImGui::EndCombo();
 		}
 
 		if (has_update) {
-			delete* uniquePtr;
+			delete *uniquePtr;
 			*uniquePtr = nullptr;
 			if (thisType) {
-				//assert(thisType->);
+				// assert(thisType->);
 				*uniquePtr = thisType->allocate_this_type();
 			}
-			
+
 			add_children(*uniquePtr);
 		}
 
 		return has_update;
-
 	}
 	void draw_header(float header_ofs) override {
 		ImGui::Dummy(ImVec2(header_ofs, 0));
 		ImGui::SameLine();
-
 
 		ImGui::PushStyleColor(ImGuiCol_Header, 0);
 		ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
@@ -109,7 +106,7 @@ public:
 			if (!passed_mask_check)
 				continue;
 
-			auto row = create_row(factory,this, &prop, b, -1, flagmask);
+			auto row = create_row(factory, this, &prop, b, -1, flagmask);
 			if (row)
 				child_rows.push_back(std::unique_ptr<IGridRow>(row));
 		}
@@ -122,29 +119,25 @@ public:
 	const ClassTypeInfo* type_of_base = nullptr;
 };
 
-
 #include "StructReflection.h"
-static IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst, int row_idx, uint32_t property_flag_mask)
-{
+static IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst,
+							int row_idx, uint32_t property_flag_mask) {
 	if (prop->type == core_type_id::List) {
 		ArrayRow* array_ = new ArrayRow(factory, nullptr, inst, prop, row_idx, property_flag_mask);
 		return array_;
-	}
-	else if (prop->type == core_type_id::StdUniquePtr) {
+	} else if (prop->type == core_type_id::StdUniquePtr) {
 		auto row = new UniquePtrRow(factory, nullptr, inst, prop, row_idx, property_flag_mask);
 		return row;
-	}
-	else if (prop->type == core_type_id::ActualStruct) {
+	} else if (prop->type == core_type_id::ActualStruct) {
 		// try finding a property editor first
 		auto create = factory.create(prop->struct_type->structname);
 		if (create) {
 			create->post_construct_for_custom_type(inst, prop, parent);
-			return new PropertyRow(create, parent, inst, prop, row_idx);	// create a property row
+			return new PropertyRow(create, parent, inst, prop, row_idx); // create a property row
 		}
 		auto row = new GroupRow(factory, parent, prop->get_ptr(inst), prop, row_idx, property_flag_mask);
 		return row;
-	}
-	else {
+	} else {
 		PropertyRow* prop_ = new PropertyRow(factory, nullptr, inst, prop, row_idx);
 
 		if (prop_->prop_editor)
@@ -154,38 +147,29 @@ static IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow*
 	}
 }
 
+PropertyGrid::PropertyGrid(const FnFactory<IPropertyEditor>& factory) : factory(factory) {}
 
-PropertyGrid::PropertyGrid(const FnFactory<IPropertyEditor>& factory)
-	: factory(factory)
-{
-
-}
-
-void PropertyGrid::add_property_list_to_grid(const PropertyInfoList* list, void* inst, uint32_t flags, uint32_t property_flag_mask)
-{
+void PropertyGrid::add_property_list_to_grid(const PropertyInfoList* list, void* inst, uint32_t flags,
+											 uint32_t property_flag_mask) {
 	IGridRow* row = nullptr;
 
 	if (flags & PG_LIST_PASSTHROUGH && list->count == 1 && list->list[0].type == core_type_id::List) {
 		row = create_row(factory, nullptr, list->list, inst, -1, property_flag_mask);
 		row->set_name_override(list->type_name);
 		ASSERT(row);
-	}
-	else {
+	} else {
 		row = new GroupRow(factory, nullptr, inst, list, -1, property_flag_mask);
 	}
 
 	rows.push_back(std::unique_ptr<IGridRow>(row));
-
 }
 
-void PropertyGrid::add_iproped_manual(IPropertyEditor* editor)
-{
-	PropertyRow* prop_ = new PropertyRow(editor,nullptr,editor,editor->prop/* hack job*/, -1);
+void PropertyGrid::add_iproped_manual(IPropertyEditor* editor) {
+	PropertyRow* prop_ = new PropertyRow(editor, nullptr, editor, editor->prop /* hack job*/, -1);
 	rows.push_back(std::unique_ptr<IGridRow>(prop_));
 }
 
-void PropertyGrid::add_class_to_grid(ClassBase* classinst)
-{
+void PropertyGrid::add_class_to_grid(ClassBase* classinst) {
 	auto ti = &classinst->get_type();
 	while (ti) {
 		if (ti->props)
@@ -194,9 +178,8 @@ void PropertyGrid::add_class_to_grid(ClassBase* classinst)
 	}
 }
 
-void PropertyGrid::update()
-{
-	//if (rows_had_changes)
+void PropertyGrid::update() {
+	// if (rows_had_changes)
 	//	sys_print(Debug, "cleared change flag\n");
 	rows_had_changes = false;
 
@@ -207,63 +190,57 @@ void PropertyGrid::update()
 
 	ImGui::BeginDisabled(read_only);
 
-	ImGuiTableFlags const flags =  ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit;
-	//if (ImGui::Begin("PropEdit")) {
-		if(ImGui::BeginTable("Table", 2, flags) ){
+	ImGuiTableFlags const flags =
+		ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit;
+	// if (ImGui::Begin("PropEdit")) {
+	if (ImGui::BeginTable("Table", 2, flags)) {
 
-			ImGui::TableSetupColumn("##Header", ImGuiTableColumnFlags_WidthFixed, 200);
-			ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
+		ImGui::TableSetupColumn("##Header", ImGuiTableColumnFlags_WidthFixed, 200);
+		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
 
-			for (int i = 0; i < rows.size(); i++) {
-				rows[i]->update(this, 0.0);
-			}
-
-			ImGui::EndTable();
+		for (int i = 0; i < rows.size(); i++) {
+			rows[i]->update(this, 0.0);
 		}
 
-		ImGui::EndDisabled();
-//	}
-	//ImGui::End();
+		ImGui::EndTable();
+	}
+
+	ImGui::EndDisabled();
+	//	}
+	// ImGui::End();
 }
 #include "Render/Texture.h"
-void IGridRow::clear_children()
-{
-	child_rows.clear();	// unique_ptr handles destruction
+void IGridRow::clear_children() {
+	child_rows.clear(); // unique_ptr handles destruction
 }
-void IGridRow::update(PropertyGrid* parentGrid,float header_ofs)
-{
+void IGridRow::update(PropertyGrid* parentGrid, float header_ofs) {
 	ImGui::PushID(this);
 
 	ImGui::TableNextRow();
 	ImGui::TableNextColumn();
 	ImGui::AlignTextToFramePadding();
 
-
 	draw_header(header_ofs);
 
 	ImGui::TableNextColumn();
 	ImGuiTableFlags const flags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingFixedFit;
 	int num_cols = (has_row_controls()) ? 3 : 2;
-	if (ImGui::BeginTable("GridTable", num_cols, flags))
-	{
+	if (ImGui::BeginTable("GridTable", num_cols, flags)) {
 		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
-		if(num_cols == 3)
+		if (num_cols == 3)
 			ImGui::TableSetupColumn("##Controls", ImGuiTableColumnFlags_WidthFixed, 60.0);
 		ImGui::TableSetupColumn("##Reset", ImGuiTableColumnFlags_WidthFixed, 30.0);
-
 
 		ImGui::TableNextRow();
 
 		ImGui::TableNextColumn();
 		ImGui::AlignTextToFramePadding();
-		
+
 		const bool had_changes = internal_update();
 		if (had_changes)
 			parentGrid->set_rows_had_changes();
 
-
-		if (has_row_controls())
-		{
+		if (has_row_controls()) {
 			ImGui::TableNextColumn();
 			const bool changes = draw_row_controls();
 			if (changes)
@@ -271,8 +248,7 @@ void IGridRow::update(PropertyGrid* parentGrid,float header_ofs)
 		}
 
 		ImGui::TableNextColumn();
-		if (has_reset_button())
-		{
+		if (has_reset_button()) {
 			auto reset_img = g_assets.find_global_sync<Texture>("eng/icon/undo.png");
 			if (my_imgui_image_button(reset_img, 14)) {
 				on_reset();
@@ -291,50 +267,44 @@ void IGridRow::update(PropertyGrid* parentGrid,float header_ofs)
 	}
 }
 
-bool IPropertyEditor::update()
-{
+bool IPropertyEditor::update() {
 	ASSERT(prop && instance);
 	ImGui::PushID(this);
-	bool ret= internal_update();
+	bool ret = internal_update();
 	ImGui::PopID();
 	return ret;
 }
 
-bool StringEditor::internal_update()
-{
+bool StringEditor::internal_update() {
 	ASSERT(prop->type == core_type_id::StdString);
 
 	auto str = (std::string*)((char*)instance + prop->offset);
 
 	ImguiInputTextCallbackUserStruct user;
 	user.string = str;
-	if (ImGui::InputText("##input_text", (char*)str->data(), str->size() + 1/* null terminator byte */, 
-		ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user)) {
-		str->resize(strlen(str->c_str()));	// imgui messes with buffer size
+	if (ImGui::InputText("##input_text", (char*)str->data(), str->size() + 1 /* null terminator byte */,
+						 ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user)) {
+		str->resize(strlen(str->c_str())); // imgui messes with buffer size
 		return true;
 	}
 	return false;
-
 }
 
-bool StringEditor::can_reset()
-{
+bool StringEditor::can_reset() {
 	ASSERT(prop->type == core_type_id::StdString);
 
 	auto str = (std::string*)((char*)instance + prop->offset);
 	return *str != prop->range_hint;
 }
 
-void StringEditor::reset_value()
-{
+void StringEditor::reset_value() {
 	ASSERT(prop->type == core_type_id::StdString);
 
 	auto str = (std::string*)((char*)instance + prop->offset);
 	*str = prop->range_hint;
 }
 
-bool FloatEditor::internal_update()
-{
+bool FloatEditor::internal_update() {
 	ASSERT(prop->type == core_type_id::Float);
 
 	float* ptr = (float*)((char*)instance + prop->offset);
@@ -344,16 +314,16 @@ bool FloatEditor::internal_update()
 	return false;
 }
 
-bool EnumEditor::internal_update()
-{
-	ASSERT(prop->type == core_type_id::Enum8 || prop->type == core_type_id::Enum16 || prop->type == core_type_id::Enum32);
+bool EnumEditor::internal_update() {
+	ASSERT(prop->type == core_type_id::Enum8 || prop->type == core_type_id::Enum16 ||
+		   prop->type == core_type_id::Enum32);
 	ASSERT(prop->enum_type && prop->enum_type->str_count > 0);
 	int64_t myval = prop->get_int(instance);
 
 	auto myenumint = prop->enum_type->find_for_value(myval);
 	if (!myenumint) {
 		myval = prop->enum_type->strs[0].value;
-		prop->set_int(instance,myval);
+		prop->set_int(instance, myval);
 		myenumint = &prop->enum_type->strs[0];
 	}
 
@@ -372,8 +342,7 @@ bool EnumEditor::internal_update()
 	return ret;
 }
 
-bool BooleanEditor::internal_update()
-{
+bool BooleanEditor::internal_update() {
 	ASSERT(prop->type == core_type_id::Bool);
 
 	bool b = prop->get_int(instance);
@@ -383,9 +352,9 @@ bool BooleanEditor::internal_update()
 	return ret;
 }
 
-bool IntegerEditor::internal_update()
-{
-	ASSERT(prop->type == core_type_id::Int8 || prop->type == core_type_id::Int16 || prop->type == core_type_id::Int32 || prop->type == core_type_id::Int64);
+bool IntegerEditor::internal_update() {
+	ASSERT(prop->type == core_type_id::Int8 || prop->type == core_type_id::Int16 || prop->type == core_type_id::Int32 ||
+		   prop->type == core_type_id::Int64);
 
 	int val = prop->get_int(instance);
 
@@ -399,7 +368,8 @@ class VectorEditor : public IPropertyEditor
 {
 public:
 	VectorEditor(void* ins, PropertyInfo* inf) {
-		prop = inf; instance = ins;
+		prop = inf;
+		instance = ins;
 	}
 	virtual bool internal_update() {
 		glm::vec3* v = (glm::vec3*)prop->get_ptr(instance);
@@ -413,8 +383,9 @@ public:
 class RotationEditor : public IPropertyEditor
 {
 public:
-	RotationEditor(void* ins, PropertyInfo* inf)  {
-		prop = inf; instance = ins;
+	RotationEditor(void* ins, PropertyInfo* inf) {
+		prop = inf;
+		instance = ins;
 		glm::quat* v = (glm::quat*)prop->get_ptr(instance);
 		euler = glm::eulerAngles(*v);
 		euler *= 180.f / PI;
@@ -430,7 +401,7 @@ public:
 			euler = glm::eulerAngles(*v);
 			euler *= 180.f / PI;
 			lastQuat = *v;
-			//printf("changed by someone\n");
+			// printf("changed by someone\n");
 		}
 
 		if (ImGui::DragFloat3("##eul", &euler.x, 1.0)) {
@@ -444,17 +415,17 @@ public:
 	glm::vec3 euler{};
 };
 
-static IPropertyEditor* create_ipropertyed(const FnFactory<IPropertyEditor>& factory,PropertyInfo* prop, void* instance, IGridRow* parent) {
+static IPropertyEditor* create_ipropertyed(const FnFactory<IPropertyEditor>& factory, PropertyInfo* prop,
+										   void* instance, IGridRow* parent) {
 
 	IPropertyEditor* out = nullptr;
-	out = factory.create(prop->custom_type_str);// IPropertyEditor::get_factory().createObject(prop->custom_type_str);
+	out = factory.create(prop->custom_type_str); // IPropertyEditor::get_factory().createObject(prop->custom_type_str);
 	if (out) {
-		out->post_construct_for_custom_type(instance, prop,parent);
+		out->post_construct_for_custom_type(instance, prop, parent);
 		return out;
 	}
 
-	switch (prop->type)
-	{
+	switch (prop->type) {
 	case core_type_id::Bool:
 		return new BooleanEditor(instance, prop);
 	case core_type_id::Enum8:
@@ -476,33 +447,30 @@ static IPropertyEditor* create_ipropertyed(const FnFactory<IPropertyEditor>& fac
 		return new RotationEditor(instance, prop);
 	case core_type_id::ObjHandlePtr: {
 		out = factory.create("ObjPtr");
-	}break;
+	} break;
 	case core_type_id::AssetPtr: {
 		out = factory.create("AssetPtr");
-	}break;
+	} break;
 	case core_type_id::SoftAssetPtr: {
 		out = factory.create("SoftAssetPtr");
-	}break;
+	} break;
 	case core_type_id::ClassTypeInfo: {
 		out = factory.create("ClassTypePtr");
-	}break;
+	} break;
 	}
 	if (out) {
 		out->post_construct_for_custom_type(instance, prop, parent);
-	}
-	else {
+	} else {
 		printf("!!!! NO TYPE DEFINED FOR IPropertyEditorFactory %s !!!\n", prop->name);
 		return nullptr;
 	}
 	return out;
 }
 
-int imgui_input_text_callback_completion(ImGuiInputTextCallbackData* data, ImguiInputTextCallbackUserStruct* user)
-{
+int imgui_input_text_callback_completion(ImGuiInputTextCallbackData* data, ImguiInputTextCallbackUserStruct* user) {
 	const char* word_end = data->Buf + data->CursorPos;
 	const char* word_start = word_end;
-	while (word_start > data->Buf)
-	{
+	while (word_start > data->Buf) {
 		const char c = word_start[-1];
 		if (c == ' ' || c == '\t' || c == ',' || c == ';')
 			break;
@@ -511,25 +479,19 @@ int imgui_input_text_callback_completion(ImGuiInputTextCallbackData* data, Imgui
 
 	auto candidates = *user->fcsc(user->fcsc_user_data, word_start, (int)(word_end - word_start));
 
-	if (candidates.empty())
-	{
+	if (candidates.empty()) {
 		// No match
 		sys_print(Info, "No match for \"%.*s\"!\n", (int)(word_end - word_start), word_start);
-	}
-	else if (candidates.size() == 1)
-	{
+	} else if (candidates.size() == 1) {
 		// Single match. Delete the beginning of the word and replace it entirely so we've got nice casing.
 		data->DeleteChars((int)(word_start - data->Buf), (int)(word_end - word_start));
 		data->InsertChars(data->CursorPos, candidates[0]);
 		data->InsertChars(data->CursorPos, " ");
-	}
-	else
-	{
+	} else {
 		// Multiple matches. Complete as much as we can..
 		// So inputing "C"+Tab will complete to "CL" then display "CLEAR" and "CLASSIFY" as matches.
 		int match_len = (int)(word_end - word_start);
-		for (;;)
-		{
+		for (;;) {
 			int c = 0;
 			bool all_candidates_matches = true;
 			for (int i = 0; i < candidates.size() && all_candidates_matches; i++)
@@ -542,8 +504,7 @@ int imgui_input_text_callback_completion(ImGuiInputTextCallbackData* data, Imgui
 			match_len++;
 		}
 
-		if (match_len > 0)
-		{
+		if (match_len > 0) {
 			data->DeleteChars((int)(word_start - data->Buf), (int)(word_end - word_start));
 			data->InsertChars(data->CursorPos, candidates[0], candidates[0] + match_len);
 		}
@@ -556,8 +517,7 @@ int imgui_input_text_callback_completion(ImGuiInputTextCallbackData* data, Imgui
 	return 0;
 }
 
-int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data)
-{
+int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data) {
 	ImguiInputTextCallbackUserStruct* user = (ImguiInputTextCallbackUserStruct*)data->UserData;
 	assert(user);
 
@@ -565,58 +525,51 @@ int imgui_input_text_callback_function(ImGuiInputTextCallbackData* data)
 		assert(user->string);
 		user->string->resize(data->BufSize);
 		data->Buf = (char*)user->string->data();
-	}
-	else if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
+	} else if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
 		imgui_input_text_callback_completion(data, user);
 	}
-
 
 	return 0;
 }
 
-
-Factory<std::string, IArrayHeader>& IArrayHeader::get_factory()
-{
+Factory<std::string, IArrayHeader>& IArrayHeader::get_factory() {
 	static Factory<std::string, IArrayHeader> inst;
 	return inst;
 }
 
-ArrayRow::ArrayRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx, uint32_t property_flag_mask)
-	: IGridRow(parent, row_idx), instance(instance), prop(prop), property_flag_mask(property_flag_mask),factory(factory)
-{
+ArrayRow::ArrayRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* prop,
+				   int row_idx, uint32_t property_flag_mask)
+	: IGridRow(parent, row_idx), instance(instance), prop(prop), property_flag_mask(property_flag_mask),
+	  factory(factory) {
 	header = std::unique_ptr<IArrayHeader>(IArrayHeader::get_factory().createObject(prop->custom_type_str));
-	if(header)
+	if (header)
 		header->post_construct(instance, prop);
 
 	rebuild_child_rows();
 }
 
-int ArrayRow::get_size()
-{
+int ArrayRow::get_size() {
 	return prop->list_ptr->get_size(prop->get_ptr(instance));
 }
 
-PropertyRow::PropertyRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) 
-	: IGridRow(parent, row_idx), instance(instance), prop(prop)
-{
-	prop_editor = std::unique_ptr<IPropertyEditor>(create_ipropertyed(factory, prop,instance, this));
+PropertyRow::PropertyRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance,
+						 PropertyInfo* prop, int row_idx)
+	: IGridRow(parent, row_idx), instance(instance), prop(prop) {
+	prop_editor = std::unique_ptr<IPropertyEditor>(create_ipropertyed(factory, prop, instance, this));
 }
-PropertyRow::PropertyRow(IPropertyEditor* editor, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx) 
-	: IGridRow(parent,row_idx),instance(instance),prop(prop) {
+PropertyRow::PropertyRow(IPropertyEditor* editor, IGridRow* parent, void* instance, PropertyInfo* prop, int row_idx)
+	: IGridRow(parent, row_idx), instance(instance), prop(prop) {
 	prop_editor.reset(editor);
 }
 
-
-void ArrayRow::hook_update_pre_tree_node()
-{
+void ArrayRow::hook_update_pre_tree_node() {
 	if (set_next_state == next_state::hidden)
 		ImGui::SetNextItemOpen(false);
 	else if (set_next_state == next_state::visible)
 		ImGui::SetNextItemOpen(true);
 }
 
-bool ArrayRow::are_any_nodes_open()
-{
+bool ArrayRow::are_any_nodes_open() {
 	for (int i = 0; i < child_rows.size(); i++) {
 		if (child_rows[i]->expanded)
 			return true;
@@ -624,8 +577,7 @@ bool ArrayRow::are_any_nodes_open()
 	return false;
 }
 
-bool ArrayRow::draw_row_controls()
-{
+bool ArrayRow::draw_row_controls() {
 	if (header && !header->can_edit_array())
 		return false;
 	bool ret = false;
@@ -640,14 +592,15 @@ bool ArrayRow::draw_row_controls()
 	uint8_t* list_instance_ptr = prop->get_ptr(instance);
 
 	ImGui::PushStyleColor(ImGuiCol_Button, 0);
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint({ 245, 242, 242, 55 }));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint({245, 242, 242, 55}));
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
 
 #pragma warning(disable : 4312)
 	if (my_imgui_image_button(addimg, 16)) {
 		ret = true;
 		clear_children();
-		prop->list_ptr->resize(list_instance_ptr, prop->list_ptr->get_size(list_instance_ptr) + 1);	// might invalidate childrens ptrs, so refresh
+		prop->list_ptr->resize(list_instance_ptr, prop->list_ptr->get_size(list_instance_ptr) +
+													  1); // might invalidate childrens ptrs, so refresh
 		rebuild_child_rows();
 	}
 
@@ -670,9 +623,8 @@ bool ArrayRow::draw_row_controls()
 		if (my_imgui_image_button(visible_icon, 16)) {
 			set_next_state = next_state::hidden;
 		}
-	}
-	else {
-		if(my_imgui_image_button(hidden_icon,16)) {
+	} else {
+		if (my_imgui_image_button(hidden_icon, 16)) {
 			set_next_state = next_state::visible;
 		}
 	}
@@ -683,334 +635,318 @@ bool ArrayRow::draw_row_controls()
 	return ret;
 }
 
- bool ArrayRow::internal_update() 
-{
-	 bool ret = false;
+bool ArrayRow::internal_update() {
+	bool ret = false;
 
+	uint8_t* list_instance_ptr = prop->get_ptr(instance);
+	{
+		int count = get_size();
 
-	 uint8_t* list_instance_ptr = prop->get_ptr(instance);
-	 {
-		 int count = get_size();
+		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1.0), "elements: %d", count);
+	}
 
-		 ImGui::TextColored(ImVec4(0.5,0.5,0.5,1.0),"elements: %d", count);
+	if (header && !header->can_edit_array())
+		commands.clear();
 
-	 }
+	for (int i = 0; i < commands.size(); i++) {
+		switch (commands[i].command) {
+		case Delete: {
 
-	 if (header && !header->can_edit_array())
-		 commands.clear();
+			// do this here so destructors dont access stale pointers
+			child_rows.erase(child_rows.begin() + i);
 
-	 for (int i = 0; i < commands.size(); i++) {
-		 switch (commands[i].command) {
-		 case Delete: {
+			int index_to_delete = commands[i].index;
+			int size = get_size();
+			for (int i = index_to_delete; i < size - 1; i++) {
 
-			 // do this here so destructors dont access stale pointers
-			 child_rows.erase(child_rows.begin() + i);
+				prop->list_ptr->swap_elements(list_instance_ptr, i, i + 1);
+			}
+			prop->list_ptr->resize(list_instance_ptr, size - 1);
 
-			 int index_to_delete = commands[i].index;
-			 int size = get_size();
-			 for (int i = index_to_delete; i < size - 1; i++) {
+		} break;
 
-				 prop->list_ptr->swap_elements(list_instance_ptr, i, i + 1);
+		case Movedown: {
+			int size = get_size();
 
-			 }
-			 prop->list_ptr->resize(list_instance_ptr, size - 1);
+			int index = commands[i].index;
+			if (index < size - 1) {
+				prop->list_ptr->swap_elements(list_instance_ptr, index, index + 1);
+			}
 
-		 }break;
+		} break;
 
-		 case Movedown: {
-			 int size = get_size();
+		case Moveup: {
+			int index = commands[i].index;
+			if (index > 0) {
+				prop->list_ptr->swap_elements(list_instance_ptr, index - 1, index);
+			}
 
-			 int index = commands[i].index;
-			 if (index < size - 1) {
-				 prop->list_ptr->swap_elements(list_instance_ptr, index, index + 1);
-			 }
+		} break;
+		}
+	}
 
-		 }break;
-
-		 case Moveup: {
-			 int index = commands[i].index;
-			 if (index > 0) {
-				 prop->list_ptr->swap_elements(list_instance_ptr, index - 1, index);
-			 }
-
-		 }break;
-
-		 }
-	 }
-
-	 if (!commands.empty()) {
-		 ret = true;
-		 clear_children();
-		 rebuild_child_rows();
-		 commands.clear();
-	 }
-	 return ret;
+	if (!commands.empty()) {
+		ret = true;
+		clear_children();
+		rebuild_child_rows();
+		commands.clear();
+	}
+	return ret;
 }
 
+static std::string type_to_string(const PropertyInfo* p) {
+	switch (p->type) {
+	case core_type_id::Bool:
+		return "Bool";
+	case core_type_id::Int8:
+		return "Int8";
+	case core_type_id::Int16:
+		return "Int16";
+	case core_type_id::Int32:
+		return "Int32";
+	case core_type_id::Int64:
+		return "Int64";
+	case core_type_id::Float:
+		return "Float";
+	case core_type_id::ActualStruct: {
+		return p->struct_type->structname;
+	} break;
+	case core_type_id::List: {
+		if (!p->list_ptr->get_is_new_list_type())
+			return "vector";
+		return "vector<" + type_to_string(p->list_ptr->get_property()) + ">";
+	} break;
+	case core_type_id::StdString:
+		return "String";
+	case core_type_id::Quat:
+		return "Quat";
+	case core_type_id::Vec3:
+		return "Vec3";
+	case core_type_id::Enum8:
+	case core_type_id::Enum16:
+	case core_type_id::Enum32:
+		return p->enum_type->name;
+	case core_type_id::Struct: {
+		return p->custom_type_str;
+	}
+	default:
+		break;
+	}
+	return "Unknown Type";
+}
 
- static std::string type_to_string(const PropertyInfo* p)
- {
-	 switch (p->type)
-	 {
-	 case core_type_id::Bool: return "Bool";
-	 case core_type_id::Int8: return "Int8";
-	 case core_type_id::Int16: return "Int16";
-	 case core_type_id::Int32: return "Int32";
-	 case core_type_id::Int64: return "Int64";
-	 case core_type_id::Float: return "Float";
-	 case core_type_id::ActualStruct: {
-		 return p->struct_type->structname;
-	 }break;
-	 case core_type_id::List: {
-		 if (!p->list_ptr->get_is_new_list_type())
-			 return "vector";
-		 return "vector<" + type_to_string(p->list_ptr->get_property()) + ">";
-	 }break;
-	 case core_type_id::StdString: return "String";
-	 case core_type_id::Quat: return "Quat";
-	 case core_type_id::Vec3: return "Vec3";
-	 case core_type_id::Enum8:
-	 case core_type_id::Enum16:
-	 case core_type_id::Enum32:
-		 return p->enum_type->name;
-	 case core_type_id::Struct: {
-		 return p->custom_type_str;
-	 }
-	 default:
-		 break;
-	 }
-	 return "Unknown Type";
- }
+static void draw_tooltip(const PropertyInfo* prop) {
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+		ImGui::BeginTooltip();
+		ImGui::Text("%s", type_to_string(prop).c_str());
+		if (*prop->tooltip) {
+			ImGui::TextColored(ImVec4(0.8, 0.8, 0.8, 1), "%s", prop->tooltip);
+		}
+		ImGui::EndTooltip();
+	}
+}
 
- static void draw_tooltip(const PropertyInfo* prop)
- {
-	 if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
-		 ImGui::BeginTooltip();
-		 ImGui::Text("%s", type_to_string(prop).c_str());
-		 if (*prop->tooltip) {
-			 ImGui::TextColored(ImVec4(0.8, 0.8, 0.8, 1), "%s", prop->tooltip);
-		 }
-		 ImGui::EndTooltip();
-	 }
- }
+void ArrayRow::draw_header(float header_ofs) {
+	ImGui::Dummy(ImVec2(header_ofs, 0));
+	ImGui::SameLine();
 
+	ImGui::PushStyleColor(ImGuiCol_Header, 0);
+	ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
+	ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
 
- void ArrayRow::draw_header(float header_ofs)
- {
-	 ImGui::Dummy(ImVec2(header_ofs, 0));
-	 ImGui::SameLine();
+	const char* name = prop->name;
+	if (!name_override.empty())
+		name = name_override.c_str();
 
-	 ImGui::PushStyleColor(ImGuiCol_Header, 0);
-	 ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
-	 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
+	expanded = ImGui::TreeNodeEx(name, ImGuiTreeNodeFlags_DefaultOpen);
+	draw_tooltip(prop);
+	if (expanded)
+		ImGui::TreePop();
+	ImGui::PopStyleColor(3);
+}
 
-	 const char* name = prop->name;
-	 if (!name_override.empty()) name = name_override.c_str();
+void ArrayRow::rebuild_child_rows() {
 
-	 expanded = ImGui::TreeNodeEx(name, ImGuiTreeNodeFlags_DefaultOpen);
-	 draw_tooltip(prop);
-	 if(expanded)
-		 ImGui::TreePop();
-	 ImGui::PopStyleColor(3);
- }
+	ASSERT(child_rows.size() == 0); // clearing done before
+	ASSERT(prop->type == core_type_id::List);
 
- void ArrayRow::rebuild_child_rows()
- {
-	
-	 ASSERT(child_rows.size() == 0);	// clearing done before
-	 ASSERT(prop->type == core_type_id::List);
+	IListCallback* list = prop->list_ptr;
+	int count = list->get_size(prop->get_ptr(instance));
 
-	 IListCallback* list = prop->list_ptr;
-	 int count = list->get_size(prop->get_ptr(instance));
+	for (int i = 0; i < count; i++) {
+		IGridRow* row = nullptr;
+		if (list->get_is_new_list_type()) { // new way
+			void* inst = list->get_index(prop->get_ptr(instance), i);
+			row = create_row(factory, this, (PropertyInfo*)list->get_property(), inst, i, property_flag_mask);
+		} else { // old way
+			const PropertyInfoList* struct_ = list->props_in_list;
+			row = new GroupRow(factory, this, list->get_index(prop->get_ptr(instance), i), struct_, i,
+							   property_flag_mask);
+		}
+		assert(row);
+		child_rows.push_back(std::unique_ptr<IGridRow>(row));
+	}
+}
 
-	 for (int i = 0; i < count; i++) {
-		 IGridRow* row = nullptr;
-		 if (list->get_is_new_list_type()) { // new way
-			 void* inst = list->get_index(prop->get_ptr(instance), i);
-			 row = create_row(factory, this, (PropertyInfo*)list->get_property(), inst, i, property_flag_mask);
-		 }
-		 else {	// old way
-			 const PropertyInfoList* struct_ = list->props_in_list;
-			 row = new GroupRow(factory, this, list->get_index(prop->get_ptr(instance), i), struct_, i, property_flag_mask);
-		 }
-		 assert(row);
-		 child_rows.push_back(std::unique_ptr<IGridRow>(row));
-	 }
- }
+void PropertyRow::draw_header(float ofs) {
+	ImGui::Dummy(ImVec2(ofs, 0));
+	ImGui::SameLine();
+	if (name_override.empty())
+		ImGui::Text("%s", prop->name);
+	else
+		ImGui::Text("%s", name_override.c_str());
+	draw_tooltip(prop);
+}
 
+bool PropertyRow::internal_update() {
+	return prop_editor->update();
+}
 
+GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance,
+				   const PropertyInfo* info, int row_idx, uint32_t property_flag_mask)
+	: IGridRow(parent, row_idx), property(info), inst(instance) {
+	assert(info->type == core_type_id::ActualStruct);
+	proplist = info->struct_type->properties;
+	auto list = proplist;
+	for (int i = 0; i < list->count; i++) {
+		auto& prop = list->list[i];
+		if (!prop.can_edit())
+			continue;
+		bool passed_mask_check = (prop.flags & property_flag_mask) != 0;
+		if (!passed_mask_check)
+			continue;
 
- void PropertyRow::draw_header(float ofs)
- {
-	 ImGui::Dummy(ImVec2(ofs, 0));
-	 ImGui::SameLine();
-	 if (name_override.empty())
-		 ImGui::Text("%s",prop->name);
-	 else
-		 ImGui::Text("%s",name_override.c_str());
-	 draw_tooltip(prop);
- }
+		auto row = create_row(factory, this, &prop, inst, -1, property_flag_mask);
+		if (row)
+			child_rows.push_back(std::unique_ptr<IGridRow>(row));
+	}
+	name = info->name; // the variable name
+	if (row_idx != -1) {
+		name = string_format("[ %d ]", row_idx);
+	}
+}
 
- bool PropertyRow::internal_update()
- {
-	 return prop_editor->update();
- }
+GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance,
+				   const PropertyInfoList* list, int row_idx, uint32_t property_flag_mask)
+	: IGridRow(parent, row_idx), proplist(list), inst(instance) {
 
- GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, const PropertyInfo* info, int row_idx, uint32_t property_flag_mask)
-	 : IGridRow(parent, row_idx), property(info), inst(instance)
- {
-	 assert(info->type == core_type_id::ActualStruct);
-	 proplist = info->struct_type->properties;
-	 auto list = proplist;
-	 for (int i = 0; i < list->count; i++) {
-		 auto& prop = list->list[i];
-		 if (!prop.can_edit())
-			 continue;
-		 bool passed_mask_check = (prop.flags & property_flag_mask) != 0;
-		 if (!passed_mask_check)
-			 continue;
+	for (int i = 0; i < list->count; i++) {
+		auto& prop = list->list[i];
+		if (!prop.can_edit())
+			continue;
+		bool passed_mask_check = (prop.flags & property_flag_mask) != 0;
+		if (!passed_mask_check)
+			continue;
 
-		 auto row = create_row(factory, this, &prop, inst, -1, property_flag_mask);
-		 if (row)
-			 child_rows.push_back(std::unique_ptr<IGridRow>(row));
-	 }
-	 name = info->name;	// the variable name
-	 if (row_idx != -1) {
-		 name = string_format("[ %d ]", row_idx);
-	 }
- }
+		auto row = create_row(factory, this, &prop, inst, -1, property_flag_mask);
+		if (row)
+			child_rows.push_back(std::unique_ptr<IGridRow>(row));
+	}
 
- GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, void* instance, const PropertyInfoList* list,
-	 int row_idx, uint32_t property_flag_mask) 
-	 : IGridRow(parent, row_idx), proplist(list), 
-	 inst(instance)
- {
-	
-	 for (int i = 0; i < list->count; i++) {
-		 auto& prop = list->list[i];
-		 if (!prop.can_edit())
-			 continue;
-		 bool passed_mask_check = (prop.flags & property_flag_mask)!= 0;
-		 if (!passed_mask_check)
-			 continue;
+	name = list->type_name;
 
-		 auto row = create_row(factory, this, &prop, inst, -1, property_flag_mask);
-		 if (row)
-			 child_rows.push_back(std::unique_ptr<IGridRow>(row));
-	 }
+	if (row_idx != -1) {
+		name = string_format("[ %d ]", row_idx);
+	}
+}
 
-	 name = list->type_name;
+bool GroupRow::draw_children() {
+	return !passthrough_to_child();
+}
 
-	 if (row_idx != -1) {
-		 name = string_format("[ %d ]", row_idx);
-	 }
- }
+bool GroupRow::draw_row_controls() {
+	ASSERT(parent);
+	ASSERT(row_index != -1);
 
- bool GroupRow::draw_children()
- {
-	 return !passthrough_to_child();
- }
+	ArrayRow* array_ = (ArrayRow*)parent;
+	if (!array_)
+		return false;
+	if (array_->header && !array_->header->can_edit_array())
+		return false;
 
- bool GroupRow::draw_row_controls()
- {
-	 ASSERT(parent);
-	 ASSERT(row_index != -1);
+	bool canmoveup = row_index > 0;
+	bool canmovedown = (row_index != array_->get_size() - 1);
 
-	 ArrayRow* array_ = (ArrayRow*)parent;
-	 if (!array_)
-		 return false;
-	 if (array_->header && !array_->header->can_edit_array())
-		 return false;
+	auto moveup = g_assets.find_global_sync<Texture>("eng/icon/moveup.png");
+	auto movedown = g_assets.find_global_sync<Texture>("eng/icon/movedown.png");
+	auto trash1 = g_assets.find_global_sync<Texture>("eng/icon/trash1.png");
 
-	 bool canmoveup = row_index > 0;
-	 bool canmovedown = (row_index != array_->get_size() - 1);
-
-	 auto moveup = g_assets.find_global_sync<Texture>("eng/icon/moveup.png");
-	 auto movedown = g_assets.find_global_sync<Texture>("eng/icon/movedown.png");
-	 auto trash1 = g_assets.find_global_sync<Texture>("eng/icon/trash1.png");
-
-
-	 ImGui::PushStyleColor(ImGuiCol_Button, 0);
-	 ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint({ 245, 242, 242, 55 }));
-	 ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+	ImGui::PushStyleColor(ImGuiCol_Button, 0);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint({245, 242, 242, 55}));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
 
 #pragma warning(disable : 4312)
-	 ImGui::BeginDisabled(!canmoveup);
-	 if(my_imgui_image_button(moveup,16)) {
-		 array_->moveup_index(row_index);
-	 }
-	 ImGui::EndDisabled();
-	 ImGui::SameLine();
-	 ImGui::BeginDisabled(!canmovedown);
-	 if (my_imgui_image_button(movedown, 16)) {
-		 array_->movedown_index(row_index);
-	 }
-	 ImGui::EndDisabled();
-	 ImGui::SameLine();
-	 if (my_imgui_image_button(trash1, 16)) {
-		 array_->delete_index(row_index);
-	 }
+	ImGui::BeginDisabled(!canmoveup);
+	if (my_imgui_image_button(moveup, 16)) {
+		array_->moveup_index(row_index);
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	ImGui::BeginDisabled(!canmovedown);
+	if (my_imgui_image_button(movedown, 16)) {
+		array_->movedown_index(row_index);
+	}
+	ImGui::EndDisabled();
+	ImGui::SameLine();
+	if (my_imgui_image_button(trash1, 16)) {
+		array_->delete_index(row_index);
+	}
 
-	 ImGui::PopStyleColor(3);
+	ImGui::PopStyleColor(3);
 #pragma warning(default : 4312)
 
-	 return false;	// array will update the flag itself
- }
+	return false; // array will update the flag itself
+}
 
+void GroupRow::draw_header(float ofs) {
+	ImGui::Dummy(ImVec2(ofs, 0));
+	ImGui::SameLine();
 
- void GroupRow::draw_header(float ofs)
- {
-	 ImGui::Dummy(ImVec2(ofs, 0));
-	 ImGui::SameLine();
+	ImGui::PushStyleColor(ImGuiCol_Header, 0);
+	ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
+	ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
 
-	 ImGui::PushStyleColor(ImGuiCol_Header, 0);
-	 ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
-	 ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
+	bool is_array = row_index != -1;
+	bool has_drawn = false;
+	if (is_array) {
+		ArrayRow* array_ = (ArrayRow*)parent;
 
-	 bool is_array = row_index != -1;
-	 bool has_drawn = false;
-	 if (is_array) {
-		 ArrayRow* array_ = (ArrayRow*)parent;
+		array_->hook_update_pre_tree_node();
 
-		 array_->hook_update_pre_tree_node();
-
-		 if (array_->header) {
-			 expanded = array_->header->imgui_draw_header(row_index);
-			 has_drawn = true;
-		 }
-	 }
-	 if(!has_drawn) {
+		if (array_->header) {
+			expanded = array_->header->imgui_draw_header(row_index);
+			has_drawn = true;
+		}
+	}
+	if (!has_drawn) {
 
 		uint32_t flags = (row_index == -1) ? ImGuiTreeNodeFlags_DefaultOpen : 0;
 		expanded = ImGui::TreeNodeEx(name.c_str(), flags);
 		if (property)
 			draw_tooltip(property);
 
-		if(expanded)
-			 ImGui::TreePop();
-
-	 }
+		if (expanded)
+			ImGui::TreePop();
+	}
 	ImGui::PopStyleColor(3);
- }
+}
 
- bool GroupRow::internal_update() {
+bool GroupRow::internal_update() {
 
-	 bool ret = false;
-	 if (passthrough_to_child())
-	 {
-		 auto row = (IGridRow*)child_rows[0].get();
+	bool ret = false;
+	if (passthrough_to_child()) {
+		auto row = (IGridRow*)child_rows[0].get();
 
-		ret =  row->internal_update();
+		ret = row->internal_update();
+	}
 
-	 }
-
-	 bool is_array = row_index != -1;
-	 if (!expanded && is_array) {
-		 ArrayRow* array_ = (ArrayRow*)parent;
-		 if (array_->header) {
-			 array_->header->imgui_draw_closed_body(row_index);
-		 }
-	 }
-	 return ret;
- }
+	bool is_array = row_index != -1;
+	if (!expanded && is_array) {
+		ArrayRow* array_ = (ArrayRow*)parent;
+		if (array_->header) {
+			array_->header->imgui_draw_closed_body(row_index);
+		}
+	}
+	return ret;
+}
 #endif

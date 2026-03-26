@@ -24,22 +24,21 @@ class UnserializedSceneFile
 public:
 	UnserializedSceneFile() = default;
 	~UnserializedSceneFile() = default;
-	UnserializedSceneFile(UnserializedSceneFile&& other) {
-		all_obj_vec = std::move(other.all_obj_vec);
-	}
+	UnserializedSceneFile(UnserializedSceneFile&& other) { all_obj_vec = std::move(other.all_obj_vec); }
 	UnserializedSceneFile& operator=(const UnserializedSceneFile&) = delete;
 	UnserializedSceneFile(const UnserializedSceneFile&) = delete;
-
 
 	void delete_objs();
 
 	std::vector<BaseUpdater*> all_obj_vec;
+
 private:
 	friend class Level;
 };
 
 class IAssetLoadingInterface;
-UnserializedSceneFile unserialize_entities_from_text(const char* debug_tag, const std::string& text, IAssetLoadingInterface* load, bool keepid);
+UnserializedSceneFile unserialize_entities_from_text(const char* debug_tag, const std::string& text,
+													 IAssetLoadingInterface* load, bool keepid);
 
 class SerializedSceneFile
 {
@@ -50,11 +49,10 @@ public:
 bool this_is_a_serializeable_object(const BaseUpdater* b);
 bool serialize_this_objects_children(const Entity* b);
 
-
-class SerializeInputError : public std::runtime_error {
+class SerializeInputError : public std::runtime_error
+{
 public:
-	SerializeInputError(string er_str) :std::runtime_error("SerializeInvalidInput: " + er_str) {
-	}
+	SerializeInputError(string er_str) : std::runtime_error("SerializeInvalidInput: " + er_str) {}
 };
 using std::string;
 using std::unordered_map;
@@ -64,8 +62,10 @@ class NewSerialization
 {
 public:
 	// throws SerializeInputError on bad input
-	static SerializedSceneFile serialize_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs, bool write_ids);
-	static UnserializedSceneFile unserialize_from_text(const char* debug_tag, const std::string& text, IAssetLoadingInterface& load, bool keepid);
-	static UnserializedSceneFile unserialize_from_json(const char* debug_tag, SerializedForDiffing& json, IAssetLoadingInterface& load, bool keepid);
-
+	static SerializedSceneFile serialize_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs,
+												 bool write_ids);
+	static UnserializedSceneFile unserialize_from_text(const char* debug_tag, const std::string& text,
+													   IAssetLoadingInterface& load, bool keepid);
+	static UnserializedSceneFile unserialize_from_json(const char* debug_tag, SerializedForDiffing& json,
+													   IAssetLoadingInterface& load, bool keepid);
 };
