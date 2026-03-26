@@ -4,7 +4,7 @@
 #include "glm/glm.hpp"
 
 
-#define STB_IMAGE_IMPLEMENTATION
+
 #include "stb_image.h"
 
 #include "glad/glad.h"
@@ -17,7 +17,7 @@
 #include "Assets/AssetDatabase.h"
 #include "Framework/Config.h"
 #undef APIENTRY
-#define TINYEXR_IMPLEMENTATION
+
 
 #include "tinyexr.h"
 #undef APIENTRY
@@ -28,7 +28,6 @@
 // TextureEditor.cpp
 extern bool compile_texture_asset(const std::string& gamepath,IAssetLoadingInterface*,Color32& outColor);
 #ifdef EDITOR_BUILD
-#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include"stb_image_write.h"
 int write_png_wrapper(const char* filename, int w, int h, int comp, const void* data, int stride_in_bytes)
 {

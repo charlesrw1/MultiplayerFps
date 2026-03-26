@@ -153,9 +153,6 @@
     <ClCompile Include="Source\EngineEditorState.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\External\miniz.c">
-      <Filter>Source\External</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Framework\BVHBuild.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
@@ -417,44 +414,8 @@
     <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp">
       <Filter>Source\AssetCompile</Filter>
     </ClCompile>
-    <ClCompile Include="Source\External\tracy\public\TracyClient.cpp">
-      <Filter>Source\External\tracy\public</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Framework\Hashset.cpp">
       <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\glad.c">
-      <Filter>Source\External</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui.cpp">
-      <Filter>Source\External</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\ImGuizmo.cpp">
-      <Filter>Source\External</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui_demo.cpp">
-      <Filter>Source\External</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui_draw.cpp">
-      <Filter>Source\External</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui_impl_opengl3.cpp">
-      <Filter>Source\External</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui_impl_sdl2.cpp">
-      <Filter>Source\External</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui_tables.cpp">
-      <Filter>Source\External</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imgui_widgets.cpp">
-      <Filter>Source\External</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\imnodes.cpp">
-      <Filter>Source\External</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\External\ImSequencer.cpp">
-      <Filter>Source\External</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\Tests\Containers.cpp">
       <Filter>Source\Framework\Tests</Filter>

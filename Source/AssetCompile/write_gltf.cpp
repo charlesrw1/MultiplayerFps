@@ -1,4 +1,4 @@
-#define CGLTF_WRITE_IMPLEMENTATION
+
 #include "cgltf_write.h"
 #include <vector>
 #include "glm/glm.hpp"

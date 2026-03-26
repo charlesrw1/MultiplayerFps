@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Visual Studio Test Explorer settings for Google Test.
+    To activate: Test > Configure Run Settings > Select Solution-Wide runsettings File
+    Or: set via Test Explorer toolbar dropdown.
+
+    The Google Test Adapter discovers and runs the compiled test binary.
+    Make sure to build UnitTests (Debug|x64) before running from Test Explorer.
+-->
+<RunSettings>
+  <GoogleTestAdapterSettings>
+    <TestDiscovery>
+      <AdditionalTestExecutionParam>--gtest_color=yes</AdditionalTestExecutionParam>
+    </TestDiscovery>
+    <TestExecution>
+      <AdditionalTestExecutionParam>--gtest_color=yes</AdditionalTestExecutionParam>
+    </TestExecution>
+  </GoogleTestAdapterSettings>
+  <RunConfiguration>
+    <!-- Increase timeout for slower tests -->
+    <TestSessionTimeout>120000</TestSessionTimeout>
+  </RunConfiguration>
+</RunSettings>

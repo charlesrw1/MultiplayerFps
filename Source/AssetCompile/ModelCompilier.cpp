@@ -5,7 +5,6 @@
 #include "Framework/DictParser.h"
 #include "Compiliers.h"
 #include "Render/Model.h"
-#define CGLTF_IMPLEMENTATION
 #include "cgltf.h"
 #define USE_CGLTF
 #include <unordered_set>
