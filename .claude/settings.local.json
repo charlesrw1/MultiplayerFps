@@ -57,7 +57,14 @@
       "Bash(cd:*)",
       "Bash(powershell.exe -File Scripts/build_and_test.ps1)",
       "Bash(powershell.exe -Command \"cd 'C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\Scripts'; py -m unittest codegen_tests.TestNewenum -v 2>&1\")",
-      "Bash(powershell.exe -Command \"cd 'C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake'; py Scripts/codegen.py 2>&1\")"
+      "Bash(powershell.exe -Command \"cd 'C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake'; py Scripts/codegen.py 2>&1\")",
+      "Bash(grep -E \"\\\\.\\(ps1|py|sh\\)$\")",
+      "Bash(grep -r \"^TEST\\(\" /c/Users/charl/source/repos/CsRemake/Source/UnitTests/*.cpp)",
+      "Bash(powershell.exe -NonInteractive -File Scripts/build_and_test.ps1)",
+      "Bash(powershell.exe -NonInteractive -Command \"& { . $PROFILE; clang-format-all.ps1 }\")",
+      "Bash(powershell.exe -Command \"py Scripts/check_deps.py\")",
+      "WebSearch",
+      "Bash(powershell.exe -Command \"\\(Get-Item ''x64/PhysX_64.dll''\\).VersionInfo | Select-Object FileVersion, ProductVersion, ProductName\")"
     ]
   }
 }

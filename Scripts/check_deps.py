@@ -110,24 +110,27 @@ def allowed_modules(module: str) -> set[str]:
 
 # ── Main logic ─────────────────────────────────────────────────────────────────
 
-def collect_headers() -> set[str]:
-    headers: set[str] = set()
+def collect_sources() -> set[str]:
+    """Collect all headers and .cpp files under Source/."""
+    sources: set[str] = set()
     for dirpath, _dirs, files in os.walk(SOURCE_ROOT):
         for f in files:
-            if f.endswith((".h", ".hpp")):
-                headers.add(os.path.normpath(os.path.join(dirpath, f)))
-    return headers
+            if f.endswith((".h", ".hpp", ".cpp")):
+                sources.add(os.path.normpath(os.path.join(dirpath, f)))
+    return sources
 
 
 def run() -> None:
-    all_headers = collect_headers()
+    all_sources = collect_sources()
+    # Include resolution only looks up headers (not .cpp), so build a header-only set
+    all_headers = {p for p in all_sources if not p.endswith(".cpp")}
 
-    # Group headers by module
+    # Group all source files (headers + .cpp) by module
     module_files: dict[str, list[str]] = defaultdict(list)
-    for h in sorted(all_headers):
-        m = module_of(h)
+    for src in sorted(all_sources):
+        m = module_of(src)
         if m and m in ALLOWED_DEPS:
-            module_files[m].append(h)
+            module_files[m].append(src)
 
     # For display: shorten an absolute path to be relative to SOURCE_ROOT
     def short(p: str) -> str:
@@ -146,7 +149,7 @@ def run() -> None:
         allowed = allowed_modules(module)
 
         for hdr in files:
-            all_deps = transitive_includes(hdr, all_headers)
+            all_deps = transitive_includes(hdr, all_headers)  # resolves via headers only
             for dep in all_deps:
                 dep_module = module_of(dep)
                 if dep_module and dep_module not in allowed:

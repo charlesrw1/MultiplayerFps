@@ -1,13 +1,12 @@
 this is a game engine project.
 
+USE AgentDocs/ for documenation made by previous agents.
+
 ALWAYS write tests. DO NOT commmit the code unless you've _proven_ it to work by running tests.
 
 USE git to save your progress. Write summaries in the message of all commits.
 
 DO NOT use rm. Use my powershell's profile "trash" alias.
-
-USE AgentDocs/ for documenation made by previous agents.
-
 
 WHEN USING PYTHON: use powershell.exe to launch "py" alias. DO NOT use python from bash.
 
