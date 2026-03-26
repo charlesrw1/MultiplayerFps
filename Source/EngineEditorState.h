@@ -3,7 +3,7 @@
 #include "Framework/ConsoleCmdGroup.h"
 #include <string>
 #include <variant>
-#include "Animation/Editor/Optional.h"
+#include "Framework/Optional.h"
 #include <vector>
 #include <cassert>
 #include <functional>

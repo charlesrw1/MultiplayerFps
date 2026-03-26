@@ -9,7 +9,7 @@
 
 #include "Framework/InlineVec.h"
 #include "Framework/MapUtil.h"
-#include "Animation/Editor/Optional.h"
+#include "Framework/Optional.h"
 
 const int MAX_INSTANCE_PARAMETERS = 8; // 8 scalars/color32s
 const int MATERIAL_SIZE = 64;		   // 64 bytes
@@ -105,7 +105,7 @@ struct InstanceData
 	bool is_vector_type = false; /* true = is scalar */
 	int index = 0;
 };
-#include "Animation/Editor/Optional.h"
+#include "Framework/Optional.h"
 // compilied material, material instances can be based off it to allow for variation but minimize draw call changes
 class MasterMaterialImpl
 {

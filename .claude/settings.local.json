@@ -53,7 +53,11 @@
       "Bash(powershell.exe -ExecutionPolicy Bypass -File \".\\\\Scripts\\\\build_and_test.ps1\")",
       "Bash(python Scripts/check_deps.py)",
       "Bash(python:*)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(cd:*)",
+      "Bash(powershell.exe -File Scripts/build_and_test.ps1)",
+      "Bash(powershell.exe -Command \"cd 'C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\Scripts'; py -m unittest codegen_tests.TestNewenum -v 2>&1\")",
+      "Bash(powershell.exe -Command \"cd 'C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake'; py Scripts/codegen.py 2>&1\")"
     ]
   }
 }

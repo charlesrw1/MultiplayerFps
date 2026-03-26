@@ -249,5 +249,57 @@ class MyTester(unittest.TestCase):
         self.assertTrue(c.object_type == cg.CLASS_OBJECT)
         """
 
+import io
+import tempfile
+import os
+
+def parse_newenum_text(text: str):
+    """Helper: run both codegen passes on a string, return parsed classes."""
+    typenames = cg.read_typenames_from_text(io.StringIO(text), "<test>")
+    cg.ClassDef.fixup_types(typenames)
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.h', delete=False) as f:
+        f.write(text)
+        tmp_path = f.name
+    try:
+        classes, _ = cg.parse_file(tmp_path, typenames)
+    finally:
+        os.unlink(tmp_path)
+    return classes
+
+class TestNewenum(unittest.TestCase):
+    def test_multiline_enum(self):
+        text = "NEWENUM(guiAlignment, uint8_t){\n\tLeft,\n\tCenter,\n\tRight,\n\tFill\n};\n"
+        classes = parse_newenum_text(text)
+        self.assertEqual(len(classes), 1)
+        c = classes[0]
+        self.assertEqual(c.object_type, cg.ClassDef.TYPE_ENUM)
+        names = [p.name for p in c.properties]
+        self.assertEqual(names, ["Left", "Center", "Right", "Fill"])
+
+    def test_singleline_enum(self):
+        text = "NEWENUM(rootmotion_setting, uint8_t){keep, remove, add_velocity};\n"
+        classes = parse_newenum_text(text)
+        self.assertEqual(len(classes), 1)
+        c = classes[0]
+        self.assertEqual(c.object_type, cg.ClassDef.TYPE_ENUM)
+        names = [p.name for p in c.properties]
+        self.assertEqual(names, ["keep", "remove", "add_velocity"])
+
+    def test_singleline_enum_with_values_after_clangformat(self):
+        # clang-format collapses: NEWENUM(Foo, int){A, B, C, D};
+        text = "NEWENUM(Foo, int){A, B, C, D};\n"
+        classes = parse_newenum_text(text)
+        self.assertEqual(len(classes), 1)
+        names = [p.name for p in classes[0].properties]
+        self.assertEqual(names, ["A", "B", "C", "D"])
+
+    def test_multivalue_per_line_enum(self):
+        # opening brace on NEWENUM line, values comma-separated on next line
+        text = "NEWENUM(Easing, uint8_t){\n\tLinear, CubicEaseIn, CubicEaseOut, CubicEaseInOut, Constant,\n};\n"
+        classes = parse_newenum_text(text)
+        self.assertEqual(len(classes), 1)
+        names = [p.name for p in classes[0].properties]
+        self.assertEqual(names, ["Linear", "CubicEaseIn", "CubicEaseOut", "CubicEaseInOut", "Constant"])
+
 if __name__ == "__main__":
     unittest.main()

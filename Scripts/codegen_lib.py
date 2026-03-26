@@ -252,15 +252,22 @@ def parse_enum(enumname : str, file_iter : enumerate[str], typenames:dict[str,Cl
         elif line.startswith("{"): 
             continue
         else:
-            line = line.replace("="," = ")
-            line = line.replace(","," , ")
-
-            value = line.split()[0]
-            if current_prop == None:
-                current_prop = Property()
-            current_prop.name = value
-            obj.properties.append(current_prop)
-            current_prop = None
+            comment_pos = line.find("//")
+            if comment_pos != -1:
+                line = line[:comment_pos]
+            for token in line.split(","):
+                token = token.strip().split()[0] if token.strip() else None
+                if not token:
+                    continue
+                # strip initializer (e.g. "A = 3" -> "A")
+                token = token.split("=")[0].strip()
+                if not token:
+                    continue
+                if current_prop is None:
+                    current_prop = Property()
+                current_prop.name = token
+                obj.properties.append(current_prop)
+                current_prop = None
     if current_prop != None:
         raise Exception(f"Parsing enum '{enumname}': REFLECT() should have preceded enum value") 
     return obj
@@ -687,7 +694,20 @@ def parse_file(file_path:str, typenames:dict[str,ClassDef]):
                     if current_class != None:
                         classes.append(current_class)
                         current_class = None
-                    outclass = parse_enum(enumname,file_iter,typenames)
+                    brace_pos = line.find("{")
+                    if brace_pos != -1 and "};" in line:
+                        # single-line enum: e.g. NEWENUM(Foo, int){A, B, C};
+                        obj = typenames[enumname]
+                        end_brace = line.find("};")
+                        for val in line[brace_pos+1:end_brace].split(","):
+                            val = val.strip().split()[0] if val.strip() else None
+                            if val:
+                                p = Property()
+                                p.name = val
+                                obj.properties.append(p)
+                        outclass = obj
+                    else:
+                        outclass = parse_enum(enumname,file_iter,typenames)
                     classes.append(outclass)
                     assert(current_class==None)
 

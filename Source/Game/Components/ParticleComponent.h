@@ -220,7 +220,7 @@ public:
 	std::vector<PosEntry> pos_history;
 };
 #include "Game/EntityPtr.h"
-#include "Animation/Editor/Optional.h"
+#include "Framework/Optional.h"
 #include "Game/Entity.h"
 // almost like a trail
 class BeamComponent : public Component

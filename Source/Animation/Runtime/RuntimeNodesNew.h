@@ -3,7 +3,7 @@
 #include "Framework/EnumDefReflection.h"
 #include "SyncTime.h"
 #include "Framework/StructReflection.h"
-#include "Animation/Editor/Optional.h"
+#include "Framework/Optional.h"
 #include "Framework/PropertyPtr.h"
 #include "Animation/SkeletonData.h"
 #include "Animation/Runtime/Animation.h"

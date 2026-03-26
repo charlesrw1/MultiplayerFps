@@ -20,7 +20,7 @@
 #include <unordered_set>
 #include <functional>
 #include <variant>
-#include "Animation/Editor/Optional.h"
+#include "Framework/Optional.h"
 #include <stdexcept>
 using std::function;
 class atGraphContext;

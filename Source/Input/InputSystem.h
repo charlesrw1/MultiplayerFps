@@ -3,7 +3,7 @@
 #include "Framework/MulticastDelegate.h"
 #include <vector>
 #include <memory>
-#include "Animation/Editor/Optional.h"
+#include "Framework/Optional.h"
 #include <SDL2/SDL_events.h>
 #include "glm/glm.hpp"
 using glm::ivec2;

@@ -461,9 +461,6 @@
     <ClInclude Include="Source\Animation\AnimationUtil.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Animation\Editor\Optional.h">
-      <Filter>Source\Animation\Editor</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Animation\Event.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>

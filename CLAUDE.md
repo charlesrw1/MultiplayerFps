@@ -23,6 +23,6 @@ uses vcpkg for packagement. vcpkg is located in ~\source\vcpkg\vcpkg.exe
 
 use Scripts/build_and_test.ps1 to run application unit tests. _prove_ that your code works before commiting it.
 
-run clang-format-all.ps1 before commits
+RUN clang-format-all.ps1 before commits
 
 write summaries for each commit message

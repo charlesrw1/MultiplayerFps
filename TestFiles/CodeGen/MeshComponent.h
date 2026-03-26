@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Game/EntityComponent.h"
-#include "Game/SerializePtrHelpers.h"
+
 #include "Framework/Reflection2.h"
 #include <vector>
 #include <memory>
@@ -20,13 +20,12 @@ class MaterialInstance;
 class RigidbodyComponent;
 class MeshBuilderComponent;
 
-
 struct SomeStruct
 {
 	STRUCT_BODY();
 	REF int x = 0;
 	REF int y = 0;
-	
+
 	REF void serialize(Serializer& s);
 };
 
@@ -52,26 +51,20 @@ public:
 	const Model* get_model() const;
 
 	void set_animator_class(const ClassTypeInfo* ti);
-	//REF void set_animation_graph(Animation_Tree_CFG* tree);
+	// REF void set_animation_graph(Animation_Tree_CFG* tree);
 
-	bool get_is_visible() const {
-		return is_visible;
-	}
+	bool get_is_visible() const { return is_visible; }
 
 	REF void set_is_visible(bool b) {
 		is_visible = b;
 		sync_render_data();
 	}
-	bool get_casts_shadows() const {
-		return cast_shadows;
-	}
+	bool get_casts_shadows() const { return cast_shadows; }
 	void set_casts_shadows(bool b) {
 		cast_shadows = b;
 		sync_render_data();
 	}
-	bool get_is_skybox() const {
-		return is_skybox;
-	}
+	bool get_is_skybox() const { return is_skybox; }
 	void set_is_skybox(bool b) {
 		is_skybox = b;
 		sync_render_data();
@@ -89,16 +82,16 @@ public:
 #endif
 
 private:
-	//REF Model* model = nullptr;
+	// REF Model* model = nullptr;
 
-	REF AssetPtr<Model> model;		// the model of this
-	
-	//REF AssetPtr<Animation_Tree_CFG> animator_tree;
-	
-	REF bool is_visible = true;		// disables drawing
-	REF bool cast_shadows = true;	// does model cast shadows
-	REF bool is_skybox = false;		// is this mesh a skybox? used for skylight emission
-	
+	REF AssetPtr<Model> model; // the model of this
+
+	// REF AssetPtr<Animation_Tree_CFG> animator_tree;
+
+	REF bool is_visible = true;	  // disables drawing
+	REF bool cast_shadows = true; // does model cast shadows
+	REF bool is_skybox = false;	  // is this mesh a skybox? used for skylight emission
+
 	// array of material overrides for the model
 	REF std::vector<AssetPtr<MaterialInstance>> eMaterialOverride;
 

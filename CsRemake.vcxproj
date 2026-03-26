@@ -159,7 +159,6 @@
     <ClCompile Include="Source\UnitTests\EngineTesterApplication.cpp" />
     <ClInclude Include="Source\Animation\AnimationTypes.h" />
     <ClInclude Include="Source\Animation\AnimationUtil.h" />
-    <ClInclude Include="Source\Animation\Editor\Optional.h" />
     <ClInclude Include="Source\Animation\Event.h" />
     <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew.h" />
     <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew2.h" />
