@@ -3,7 +3,7 @@ ColumnLimit: 120
 IndentWidth: 4
 TabWidth: 4
 UseTab: Always
-PointerAlignment: Right
+PointerAlignment: Left
 AccessModifierOffset: -4
 AlignAfterOpenBracket: Align
 AllowShortFunctionsOnASingleLine: Inline
