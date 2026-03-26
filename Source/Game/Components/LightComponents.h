@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Game/EntityComponent.h"
-#include "Game/SerializePtrHelpers.h"
+
 #include "Framework/Reflection2.h"
 #include "Framework/StructReflection.h"
 #include "Framework/BoolButton.h"

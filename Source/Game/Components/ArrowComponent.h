@@ -1,6 +1,6 @@
 #pragma once
 #include "Game/EntityComponent.h"
-#include "Game/SerializePtrHelpers.h"
+
 #include "Render/Model.h"
 #include "Render/DrawPublic.h"
 #include "Assets/AssetDatabase.h"

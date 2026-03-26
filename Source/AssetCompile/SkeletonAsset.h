@@ -1,6 +1,6 @@
 #pragma once
 #include "Assets/IAsset.h"
-#include "Game/SerializePtrHelpers.h"
+
 #include "Render/MaterialPublic.h"
 #include "Framework/ReflectionMacros.h"
 #include "Framework/ReflectionProp.h"

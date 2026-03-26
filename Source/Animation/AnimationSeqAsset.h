@@ -5,7 +5,7 @@
 #include "Framework/ReflectionMacros.h"
 #include "Framework/ArrayReflection.h"
 #include "Assets/IAsset.h"
-#include "Game/SerializePtrHelpers.h"
+
 #include "Render/Model.h"
 class Model;
 class AnimationSeq;

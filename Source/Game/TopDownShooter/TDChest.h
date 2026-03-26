@@ -3,7 +3,7 @@
 #include "Game/EntityComponent.h"
 #include "Game/Entity.h"
 #include "Sound/SoundPublic.h"
-#include "Game/SerializePtrHelpers.h"
+
 #include "Game/Components/MeshComponent.h"
 #include "Animation/AnimationSeqAsset.h"
 class TDChest : public Component

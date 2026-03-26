@@ -1,6 +1,6 @@
 #pragma once
 #include "Game/EntityComponent.h"
-#include "Game/SerializePtrHelpers.h"
+
 #include "MeshbuilderComponent.h"
 
 class MaterialInstance;

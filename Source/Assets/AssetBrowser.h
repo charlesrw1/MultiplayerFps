@@ -2,7 +2,7 @@
 #ifdef EDITOR_BUILD
 #include "Assets/AssetRegistry.h"
 #include "Render/Texture.h"
-#include "Game/SerializePtrHelpers.h"
+
 #include "Framework/ConsoleCmdGroup.h"
 
 class ThumbnailManager

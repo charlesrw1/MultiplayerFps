@@ -12,7 +12,7 @@
 #include "Framework/PoolAllocator.h"
 #include "Framework/ClassBase.h"
 #include "Animation/SkeletonData.h"
-#include "Game/SerializePtrHelpers.h" // for AssetPtr
+// for AssetPtr
 #include "Animation/AnimationSeqAsset.h"
 #include <type_traits>
 #include <cassert>
@@ -26,11 +26,7 @@ struct MatrixPose
 extern Pool_Allocator<Pose> g_pose_pool;
 extern Pool_Allocator<MatrixPose> g_matrix_pool;
 
-NEWENUM(rootmotion_setting, uint8_t){
-	keep,
-	remove,
-	add_velocity
-};
+NEWENUM(rootmotion_setting, uint8_t){keep, remove, add_velocity};
 
 class BaseAGNode;
 class Animation_Tree_CFG;

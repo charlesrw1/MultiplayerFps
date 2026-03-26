@@ -6,7 +6,7 @@
 #include "Framework/MathLib.h"
 #include "Framework/Hashset.h"
 #include "Framework/ReflectionMacros.h"
-#include "Game/SerializePtrHelpers.h"
+
 #include "Framework/LuaColor.h"
 // fixme: these arent optimized really
 

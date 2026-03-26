@@ -6,7 +6,7 @@
 #include "Shader.h"
 #include <unordered_map>
 #include "Framework/Files.h"
-#include "Game/SerializePtrHelpers.h"
+
 #include "Framework/InlineVec.h"
 #include "Framework/MapUtil.h"
 #include "Animation/Editor/Optional.h"

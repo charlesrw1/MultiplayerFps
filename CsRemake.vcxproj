@@ -325,7 +325,6 @@
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Game\Entities\Player.h" />
     <ClInclude Include="Source\Game\Entities\PlayerAnimDriver.h" />
-    <ClInclude Include="Source\Game\SerializePtrHelpers.h" />
     <ClInclude Include="Source\GameEngineLocal.h" />
     <ClInclude Include="Source\IEditorTool.h" />
     <ClInclude Include="Source\Input\InputSystem.h" />
@@ -379,7 +378,6 @@
     <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
     <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp" />
-    <ClCompile Include="Source\Game\SerializePtrHelpers.cpp" />
     <ClCompile Include="Source\IEditorTool.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level.cpp" />

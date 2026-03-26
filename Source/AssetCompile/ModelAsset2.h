@@ -11,7 +11,6 @@
 #include "Animation/AnimationSeqAsset.h"
 
 #include "Framework/ArrayReflection.h"
-#include "Game/SerializePtrHelpers.h"
 
 #include "Framework/Reflection2.h"
 

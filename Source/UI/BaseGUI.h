@@ -18,12 +18,7 @@ struct SDL_MouseWheelEvent;
 class GuiSystemLocal;
 class UIBuilder;
 
-NEWENUM(guiAlignment, uint8_t){
-	Left, 
-	Center, 
-	Right, 
-	Fill
-};
+NEWENUM(guiAlignment, uint8_t){Left, Center, Right, Fill};
 NEWENUM(guiAnchor, uint8_t){
 	TopLeft,  // (0,0)
 	TopRight, // (1,0)

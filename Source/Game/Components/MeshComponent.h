@@ -1,11 +1,12 @@
 #pragma once
 
 #include "Game/EntityComponent.h"
-#include "Game/SerializePtrHelpers.h"
+
 #include "Framework/Reflection2.h"
 #include <vector>
 #include <memory>
 #include "Framework/StructReflection.h"
+#include "Assets/IAsset.h"
 
 class PhysicsFilterPresetBase;
 class Model;

@@ -50,7 +50,10 @@
       "Bash(xargs wc:*)",
       "Bash(find /c/Users/charl/source/repos/CsRemake -type f \\\\\\(-name *Scripting* -o -name *ClassBase* \\\\\\))",
       "Bash(find /c/Users/charl/source/repos/CsRemake -path */Test* -type f \\\\\\(-name *Script* -o -name *ClassBase* \\\\\\))",
-      "Bash(powershell.exe -ExecutionPolicy Bypass -File \".\\\\Scripts\\\\build_and_test.ps1\")"
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \".\\\\Scripts\\\\build_and_test.ps1\")",
+      "Bash(python Scripts/check_deps.py)",
+      "Bash(python:*)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }

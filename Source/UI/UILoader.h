@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Game/SerializePtrHelpers.h"
 #include <glm/glm.hpp>
 #include <unordered_map>
 #include "Render/DynamicMaterialPtr.h"

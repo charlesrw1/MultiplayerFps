@@ -3,7 +3,6 @@
 
 #include <functional>
 #include <string>
-#include "Game/SerializePtrHelpers.h"
 
 struct PendingLoadJob;
 using std::string;

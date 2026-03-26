@@ -8,6 +8,9 @@ DO NOT use rm. Use my powershell's profile "trash" alias.
 
 USE AgentDocs/ for documenation made by previous agents.
 
+
+WHEN USING PYTHON: use powershell.exe to launch "py" alias. DO NOT use python from bash.
+
 ### Project information
 
 Built on windows. Visual studio 2019. No CMAKE. 

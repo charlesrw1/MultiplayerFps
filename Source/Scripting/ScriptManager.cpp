@@ -318,8 +318,7 @@ void ScriptManager::reload_from_content(const std::string& source, const std::st
 	had_changes = true;
 
 	if (luaL_loadbuffer(lua, source.c_str(), source.size(), chunkname.c_str()) != LUA_OK) {
-		sys_print(Error, "ScriptManager: error loading script %s: %s\n", chunkname.c_str(),
-				  lua_tostring(lua, -1));
+		sys_print(Error, "ScriptManager: error loading script %s: %s\n", chunkname.c_str(), lua_tostring(lua, -1));
 		lua_pop(lua, 1);
 		lua_settop(lua, 0);
 		return;

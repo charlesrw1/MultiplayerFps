@@ -1,7 +1,7 @@
 #pragma once
 #include "Game/EntityComponent.h"
 #include "Sound/SoundPublic.h"
-#include "Game/SerializePtrHelpers.h"
+
 #include "Framework/Reflection2.h"
 #include "Framework/BoolButton.h"
 class MeshBuilderComponent;
