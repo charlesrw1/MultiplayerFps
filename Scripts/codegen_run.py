@@ -1,7 +1,7 @@
 from codegen_lib import *
 import codegen_generate as generate
 import time
-
+PRINT_SOURCE_FILES = True
 def do_codegen(lua_output_path : str, path:str, skip_dirs:list[str], full_rebuild:bool):
 
     print(f"Starting codegen script... fullrebuild={full_rebuild}")
@@ -24,7 +24,8 @@ def do_codegen(lua_output_path : str, path:str, skip_dirs:list[str], full_rebuil
     print(f"mega file time {mega_file_time}")
 
     source_files_to_build : list[tuple[str,str]] = get_source_files_to_build(path, skip_dirs, full_rebuild,mega_file_time)
-    print(source_files_to_build)
+    if PRINT_SOURCE_FILES:
+        print(source_files_to_build)
     if len(source_files_to_build)==0:
         print("Skipping")
         return

@@ -380,7 +380,7 @@ def parse_class_body_macro(line : str, inDef : ClassDef):
     try:
         for t in token_iter:
             if t == "scriptable":
-                print(f"found scriptable tag for {inDef.classname}")
+                #print(f"found scriptable tag for {inDef.classname}")
                 inDef.scriptable = True
             else:
                 raise Exception(f"unexpected CLASS_BODY(...) arg \"{t}\"")
@@ -775,7 +775,7 @@ def get_source_files_to_build(path:str, skip_dirs:list[str], add_all_files:bool,
     for root, _, files in os.walk(path):
         if should_skip_this(root, skip_dirs):
             continue
-        print(root)
+        #print(root)
         for file_name in files:
             if os.path.splitext(file_name)[-1] != ".h":
                 continue
