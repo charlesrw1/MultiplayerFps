@@ -3,6 +3,7 @@ from codegen_lib import *
 
 from datetime import datetime
 
+EXTRA_DEBUG_PRINT = False
 
 def write_headers(path:str, additional_includes:list[str]):
 
@@ -102,7 +103,8 @@ def output_macro_for_prop(typenames : dict[str,ClassDef],cpptype:CppType,name:st
     elif type == OTHER_CLASS_TYPE:
         base_typename = cpptype.typename
         if cpptype.is_pointer and (not base_typename is None) and ClassDef.is_self_derived_from(base_typename,typenames["IAsset"]):
-            print(f"Found a raw IAsset derived pointer, reging prop as AssetPtr... ({base_typename.classname}, {name})")
+            if EXTRA_DEBUG_PRINT:
+                print(f"Found a raw IAsset derived pointer, reging prop as AssetPtr... ({base_typename.classname}, {name})")
             return f'make_assetptr_property_new({name_offset_flags},{tooltip},&{base_typename.classname}::StaticType)'
 
 

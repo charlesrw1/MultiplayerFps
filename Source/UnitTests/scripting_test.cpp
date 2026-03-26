@@ -382,6 +382,15 @@ TEST_F(ClassBaseRegistryTest, UnregisteredClassIsNoLongerFound) {
 
 TEST_F(ClassBaseRegistryTest, ExistingClassesUnaffectedByAddRemove) {
     // Registering and unregistering a temp class should leave ClassBase intact.
+
+    auto classIter = ClassBase::get_subclasses(&ClassBase::StaticType);
+	std::vector<std::string> all_classes;
+	while (classIter.is_end()) {
+		ASSERT(classIter.get_type());
+		all_classes.push_back(classIter.get_type()->classname);
+		classIter = classIter.next();
+    }
+
     testInfo = make_test_class();
     ClassBase::register_class(testInfo.get());
     ClassBase::post_changes_class_init();
@@ -389,6 +398,7 @@ TEST_F(ClassBaseRegistryTest, ExistingClassesUnaffectedByAddRemove) {
     ClassBase::post_changes_class_init();
     testInfo.reset();
 
-    EXPECT_NE(ClassBase::find_class("ClassBase"), nullptr);
+    for (auto& s : all_classes)
+        EXPECT_NE(ClassBase::find_class(s.c_str()), nullptr);
     EXPECT_TRUE(ClassBase::StaticType.is_a(ClassBase::StaticType));
 }

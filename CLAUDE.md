@@ -8,6 +8,8 @@ DO NOT use rm. Use my powershell's profile "trash" alias.
 
 ### Project information
 
+* Built on windows. Visual studio 2019. No CMAKE. 
+
 * Uses code generation for ClassBase system. The python codegen script is located under Scripts/. It generates MEGA.cpp in Source/
 
 * vars.txt and init.txt store configuration used at runtime

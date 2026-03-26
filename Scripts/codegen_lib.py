@@ -8,6 +8,8 @@ from textwrap import indent
 from typing import Any, List, Optional
 
 
+EXTRA_DEBUG_PRINT = False
+
 VERSION = 1
 
 # where are enums reeee
@@ -680,7 +682,8 @@ def parse_file(file_path:str, typenames:dict[str,ClassDef]):
                     if start_p==-1 or end_p==-1:
                         raise Exception("expected NEWENUM(<enumname>)")
                     enumname = line[start_p+1:comma].strip()
-                    print(f"FOUND ENUM: {enumname}")
+                    if EXTRA_DEBUG_PRINT:
+                        print(f"FOUND ENUM: {enumname}")
                     if current_class != None:
                         classes.append(current_class)
                         current_class = None

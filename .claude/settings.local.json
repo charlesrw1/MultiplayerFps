@@ -41,7 +41,16 @@
       "Bash(powershell -Command \"Get-ChildItem -Path 'C:\\\\' -Filter 'vcpkg' -Recurse -Depth 3 -Directory -ErrorAction SilentlyContinue | Select-Object FullName\")",
       "Bash(\"C:/Users/charl/source/vcpkg/vcpkg.exe\" install:*)",
       "Bash(\"/c/Program Files \\(x86\\)/Microsoft Visual Studio/2019/Community/MSBuild/Current/Bin/amd64/MSBuild.exe\" \"C:/Users/charl/source/repos/CsRemake/CsRemake.sln\" /t:CsRemake /p:Configuration=Debug /p:Platform=x64 /v:minimal /nologo)",
-      "Bash(\"/c/Program Files \\(x86\\)/Microsoft Visual Studio/2019/Community/MSBuild/Current/Bin/amd64/MSBuild.exe\" \"C:/Users/charl/source/repos/CsRemake/CsRemake.vcxproj\" /p:Configuration=Debug /p:Platform=x64 /v:minimal /nologo)"
+      "Bash(\"/c/Program Files \\(x86\\)/Microsoft Visual Studio/2019/Community/MSBuild/Current/Bin/amd64/MSBuild.exe\" \"C:/Users/charl/source/repos/CsRemake/CsRemake.vcxproj\" /p:Configuration=Debug /p:Platform=x64 /v:minimal /nologo)",
+      "Bash(/tmp/count_loc.sh:*)",
+      "Bash(chmod +x /tmp/count_loc.sh)",
+      "Read(//cygdrive/c/Users/charl/source/repos/**)",
+      "Bash(bash /tmp/count_loc.sh)",
+      "Bash(xargs echo:*)",
+      "Bash(xargs wc:*)",
+      "Bash(find /c/Users/charl/source/repos/CsRemake -type f \\\\\\(-name *Scripting* -o -name *ClassBase* \\\\\\))",
+      "Bash(find /c/Users/charl/source/repos/CsRemake -path */Test* -type f \\\\\\(-name *Script* -o -name *ClassBase* \\\\\\))",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File \".\\\\Scripts\\\\build_and_test.ps1\")"
     ]
   }
 }
