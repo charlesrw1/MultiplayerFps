@@ -85,6 +85,9 @@ public:
 	ClassBase* allocate_class(string name);
 	void reload_all_scripts();
 	void reload_one_file(const string& fileName);
+	// Load and execute Lua source text directly, without touching the filesystem.
+	// Used by reload_one_file and directly by tests.
+	void reload_from_content(const std::string& source, const std::string& chunkname);
 
 private:
 	bool had_changes = false;

@@ -296,37 +296,37 @@ int safe_pcall(lua_State* L, int nargs, int nresults) {
 }
 void ScriptManager::reload_one_file(const std::string& strFilePath) {
 	auto file = FileSys::open_read_game(strFilePath);
-	std::vector<uptr<LuaClassTypeInfo>> newClasses;
 	if (file) {
 		string out(file->size(), ' ');
 		file->read(out.data(), out.size());
-		auto outTypes = ScriptLoadingUtil::parse_text(out);
-		for (auto& t : outTypes) {
-			if (t.inherited.size() > 0) {
-				auto info = std::make_unique<LuaClassTypeInfo>();
-				info->set_classname(t.name);
-				bool b = info->set_superclass(t.inherited.at(0));
-				if (b)
-					newClasses.push_back(std::move(info));
-			}
-		}
-		had_changes = true;
+		reload_from_content(out, strFilePath);
+	}
+}
 
-		if (luaL_loadbuffer(lua, out.c_str(), out.size(), strFilePath.c_str()) != LUA_OK) {
-			sys_print(Error, "ScriptManager: error loading script %s: %s\n", strFilePath.c_str(),
-					  lua_tostring(lua, -1));
-			lua_pop(lua, 1);
-			lua_settop(lua, 0);
-			// ASSERT(lua_gettop(lua) == 0);
-			return;
+void ScriptManager::reload_from_content(const std::string& source, const std::string& chunkname) {
+	std::vector<uptr<LuaClassTypeInfo>> newClasses;
+	auto outTypes = ScriptLoadingUtil::parse_text(source);
+	for (auto& t : outTypes) {
+		if (t.inherited.size() > 0) {
+			auto info = std::make_unique<LuaClassTypeInfo>();
+			info->set_classname(t.name);
+			bool b = info->set_superclass(t.inherited.at(0));
+			if (b)
+				newClasses.push_back(std::move(info));
 		}
+	}
+	had_changes = true;
 
-		// Execute the loaded chunk
-		if (safe_pcall(lua, 0, LUA_MULTRET) != LUA_OK) {
-			// fprintf(stderr, "Error executing chunk for %s: %s\n", strFilePath.c_str(), lua_tostring(lua, -1));
-			printStackTrace(lua);
-			return;
-		}
+	if (luaL_loadbuffer(lua, source.c_str(), source.size(), chunkname.c_str()) != LUA_OK) {
+		sys_print(Error, "ScriptManager: error loading script %s: %s\n", chunkname.c_str(),
+				  lua_tostring(lua, -1));
+		lua_pop(lua, 1);
+		lua_settop(lua, 0);
+		return;
+	}
+	if (safe_pcall(lua, 0, LUA_MULTRET) != LUA_OK) {
+		printStackTrace(lua);
+		return;
 	}
 	for (auto& c : newClasses) {
 		if (!MapUtil::contains(lua_classes, c->get_name())) {

@@ -157,6 +157,7 @@
   <ItemGroup>
     <ClCompile Include="delegate_test.cpp" />
     <ClCompile Include="framwork_test.cpp" />
+    <ClCompile Include="scripting_test.cpp" />
     <ClCompile Include="hashmap_test.cpp" />
     <ClCompile Include="inlinevec_test.cpp" />
     <ClCompile Include="main.cpp" />
