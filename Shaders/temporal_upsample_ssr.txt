@@ -96,7 +96,7 @@ vec3 temporal_upscale()
 	vec3 last = textureLod(lastFullColor,uv_to_use,0).rgb;// looks better than the cubic filter...
 	vec2 lastVelocityUv = textureLod(lastSceneMotion,uv_to_use,0).rg;
 	float vel_len = length(lastVelocityUv-velocity_uv);
-	float velocityDisocclusion = clamp(pow((vel_len-doc_vel_bias)*doc_mult-doc_bias,doc_pow),0.0,1.0);
+	float velocityDisocclusion = clamp(pow(max((vel_len-doc_vel_bias)*doc_mult-doc_bias, 0.0),doc_pow),0.0,1.0);
 	
 	// when dioccluded, lerp to 1.0
 	// else, lerp to weight. weight is 0 if this texel wasnt fetched this frame, else 1. so ddgi is basically updating at 15hz (assuming 60hz rendering)
