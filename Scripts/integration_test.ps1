@@ -36,12 +36,12 @@ function Build-Args([string]$mode) {
 
 # ---- Game pass -------------------------------------------------------------
 Write-Host "`n=== Game pass ===" -ForegroundColor Cyan
-& $exe (Build-Args "game")
+& $exe (Build-Args "game") -exec "test_game_vars.txt"
 $gameExit = $LASTEXITCODE
 
 # ---- Editor pass -----------------------------------------------------------
 Write-Host "`n=== Editor pass ===" -ForegroundColor Cyan
-& $exe (Build-Args "editor")
+& $exe (Build-Args "editor") -exec "test_editor_vars.txt"
 $editorExit = $LASTEXITCODE
 
 # ---- Merge JUnit XML -------------------------------------------------------

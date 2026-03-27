@@ -15,6 +15,8 @@ extern ConfigVar g_slomo;
 
 extern ConfigVar g_window_w;
 extern ConfigVar g_window_h;
+extern glm::ivec2 get_app_window_size();
+
 extern ConfigVar g_window_fullscreen;
 extern ConfigVar g_host_port;
 

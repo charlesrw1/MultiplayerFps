@@ -1,7 +1,7 @@
 // Source/IntegrationTests/Screenshot.h
 #pragma once
 #include <string>
-
+#include "glm/glm.hpp"
 struct ScreenshotConfig
 {
 	bool promote = false;			  // write actual as golden instead of diffing
@@ -12,4 +12,4 @@ struct ScreenshotConfig
 
 // Called by GameTestRunner after a frame renders when screenshot_pending is set.
 // Returns true if test passes (or promote mode).
-bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cfg);
+bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cfg, glm::ivec2 screen_size);

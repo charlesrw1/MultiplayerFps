@@ -2,27 +2,7 @@
 #include <string>
 #include "Framework/ClassBase.h"
 #include "Framework/MulticastDelegate.h"
-class ClassWithDelegate : public ClassBase
-{
-public:
-	CLASS_BODY(ClassWithDelegate);
-	REF void func() { printf("abc\n"); }
-	REF MulticastDelegate<ClassBase*> on_creation;
-	REF MulticastDelegate<int> on_number;
-	REF MulticastDelegate<> on_startup;
-};
 
-class StaticClass : public ClassBase
-{
-public:
-	CLASS_BODY(StaticClass);
-	REF static void do_something() { printf("doing something\n"); }
-	REF static ClassWithDelegate* get_class() { return &myClass; }
-
-	REF static int get_int() { return 10; }
-	static ClassWithDelegate myClass;
-};
-//
 class InterfaceClass : public ClassBase
 {
 public:

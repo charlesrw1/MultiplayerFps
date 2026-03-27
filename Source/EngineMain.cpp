@@ -975,7 +975,6 @@ int game_engine_main(int argc, char** argv) {
 
 	return 0;
 }
-ClassWithDelegate StaticClass::myClass;
 
 // console vs text-gui mode
 // text-gui mode: swap to using normal 2d renderer? maybe.
@@ -1136,6 +1135,10 @@ bool GameEngineLocal::is_drawing_to_window_viewport() const {
 	return !UiSystem::inst->is_drawing_to_screen();
 }
 
+
+glm::ivec2 get_app_window_size() {
+	return {g_window_w.get_integer(), g_window_h.get_integer()};
+}
 static bool scene_hovered = false;
 
 #include "Framework/MyImguiLib.h"
@@ -1318,6 +1321,34 @@ void GameEngineLocal::init(int argc, char** argv) {
 	Cmd_Manager::inst->set_set_unknown_variables(true);
 	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
 	print_time("execute vars file");
+	int startx = SDL_WINDOWPOS_UNDEFINED;
+	int starty = SDL_WINDOWPOS_UNDEFINED;
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "-x") == 0) {
+			startx = atoi(argv[++i]);
+		} else if (strcmp(argv[i], "-y") == 0) {
+			starty = atoi(argv[++i]);
+		} else if (strcmp(argv[i], "-w") == 0) {
+			g_window_w.set_integer(atoi(argv[++i]));
+		} else if (strcmp(argv[i], "-h") == 0) {
+			g_window_h.set_integer(atoi(argv[++i]));
+		} else if (strcmp(argv[i], "-VISUALSTUDIO") == 0) {
+			const char* projName = g_project_name.get_string();
+			SDL_SetWindowTitle(window, string_format("%s - VISUAL STUDIO\n", projName));
+		}
+		else if (argv[i][0] == '-') {
+			string cmd;
+			const int start_i = i;
+			cmd += &argv[i++][1];
+			while (i < argc && argv[i][0] != '-') {
+				cmd += ' ';
+				cmd += argv[i++];
+			}
+			i = glm::max(start_i, i - 1);
+			Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, cmd.c_str());
+		}
+	}
+
 
 	g_assets.init();
 	print_time("asset init");
@@ -1372,35 +1403,7 @@ void GameEngineLocal::init(int argc, char** argv) {
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	print_time("imgui font");
 
-	int startx = SDL_WINDOWPOS_UNDEFINED;
-	int starty = SDL_WINDOWPOS_UNDEFINED;
-	for (int i = 1; i < argc; i++) {
-		if (strcmp(argv[i], "-x") == 0) {
-			startx = atoi(argv[++i]);
-		} else if (strcmp(argv[i], "-y") == 0) {
-			starty = atoi(argv[++i]);
-		} else if (strcmp(argv[i], "-w") == 0) {
-			g_window_w.set_integer(atoi(argv[++i]));
-		} else if (strcmp(argv[i], "-h") == 0) {
-			g_window_h.set_integer(atoi(argv[++i]));
-		} else if (strcmp(argv[i], "-VISUALSTUDIO") == 0) {
-			const char* projName = g_project_name.get_string();
-			SDL_SetWindowTitle(window, string_format("%s - VISUAL STUDIO\n", projName));
-		}
 
-		else if (argv[i][0] == '-') {
-			string cmd;
-			const int start_i = i;
-			cmd += &argv[i++][1];
-			while (i < argc && argv[i][0] != '-') {
-				cmd += ' ';
-				cmd += argv[i++];
-			}
-			i = glm::max(start_i, i - 1);
-
-			Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, cmd.c_str());
-		}
-	}
 	SDL_SetWindowPosition(window, startx, starty);
 	SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
 
@@ -1789,7 +1792,7 @@ void GameEngineLocal::loop() {
 #ifdef EDITOR_BUILD
 			if (test_runner) {
 				if (test_runner->tick(dt)) {
-					exit(test_runner->exit_code());
+					_exit(test_runner->exit_code());
 				}
 			}
 #endif

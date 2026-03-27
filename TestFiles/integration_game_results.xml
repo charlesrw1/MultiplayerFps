@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="IntegrationTests.Game" tests="3" failures="0">
+  <testcase name="game/boot">
+  </testcase>
+  <testcase name="game/level_load">
+  </testcase>
+  <testcase name="renderer/screenshot_smoke">
+  </testcase>
+</testsuite>

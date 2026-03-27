@@ -3,7 +3,7 @@ from codegen_lib import *
 
 from datetime import datetime
 
-EXTRA_DEBUG_PRINT = False
+
 
 def write_headers(path:str, additional_includes:list[str]):
 

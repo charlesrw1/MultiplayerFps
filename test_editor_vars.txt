@@ -1,0 +1,3 @@
+
+is_editor_app 1
+r.taa 0

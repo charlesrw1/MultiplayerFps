@@ -55,10 +55,10 @@ int main(int argc, char** argv) {
 	if (mode == "game") {
 		g_application_class.set_string("TestGameApp");
 		auto tests = TestRegistry::get_filtered(TestMode::Game, test_filter.c_str());
-		g_pending_test_runner = new GameTestRunner(tests, cfg);
+		g_pending_test_runner = new GameTestRunner("Game", tests, cfg);
 	} else if (mode == "editor") {
 		auto tests = TestRegistry::get_filtered(TestMode::Editor, test_filter.c_str());
-		g_pending_test_runner = new EditorTestRunner(tests, cfg);
+		g_pending_test_runner = new GameTestRunner("Editor", tests, cfg);
 	} else {
 		fprintf(stderr, "Unknown mode: %s\n", mode.c_str());
 		return 1;

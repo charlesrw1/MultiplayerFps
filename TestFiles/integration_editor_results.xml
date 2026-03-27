@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="IntegrationTests.Editor" tests="2" failures="0">
+  <testcase name="editor/serialize_round_trip">
+  </testcase>
+  <testcase name="editor/undo_noop">
+  </testcase>
+</testsuite>

@@ -13,6 +13,8 @@
 #include "External/stb_image.h"
 #include "External/stb_image_write.h"
 
+#include "glm/glm.hpp"
+
 static std::string actual_path(const char* name) {
 	return std::string("TestFiles/screenshots/") + name + "_actual.png";
 }
@@ -20,12 +22,14 @@ static std::string golden_path(const char* name) {
 	return std::string("TestFiles/goldens/") + name + ".png";
 }
 
-bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cfg) {
-	GLint vp[4];
-	glGetIntegerv(GL_VIEWPORT, vp);
-	int w = vp[2], h = vp[3];
+bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cfg, glm::ivec2 size) {
+
+	const int w = size.x;
+	const int h = size.y;
+
 
 	std::vector<unsigned char> pixels(w * h * 3);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
 
 	// GL gives bottom-left origin — flip rows for PNG top-left convention

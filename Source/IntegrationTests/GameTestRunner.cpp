@@ -5,20 +5,27 @@
 #include <cstdio>
 #include <ctime>
 #include <direct.h>
-
-GameTestRunner::GameTestRunner(std::vector<TestEntry> tests, const TestRunnerConfig& cfg)
-	: tests_(std::move(tests)), cfg_(cfg) {
+#include "GameEnginePublic.h"
+#include "Framework/StringUtils.h"
+GameTestRunner::GameTestRunner(std::string_view name, std::vector<TestEntry> tests, const TestRunnerConfig& cfg)
+	: tests_(std::move(tests)), cfg_(cfg) ,name(name){
 	screenshot_cfg_.promote = cfg.promote;
 	screenshot_cfg_.interactive = cfg.interactive;
-	ctx_.is_editor_mode = false;
+	is_this_editor_mode = name == "Editor";
+
+	ctx_.is_editor_mode = is_this_editor_mode;
 }
 
 bool GameTestRunner::tick(float dt) {
 	// First call: kick off the first test
+
+
+	const std::string xml_path = "TestFiles/integration_" + StringUtils::to_lower(name.data()) + "_results.xml";
+
 	if (current_idx_ < 0) {
 		start_next_test();
 		if (current_idx_ >= (int)tests_.size()) {
-			write_results_xml("TestFiles/integration_game_results.xml");
+			write_results_xml(xml_path.c_str());
 			return true;
 		}
 		return false;
@@ -36,7 +43,7 @@ bool GameTestRunner::tick(float dt) {
 		finish_current_test("TIMEOUT");
 		start_next_test();
 		if (current_idx_ >= (int)tests_.size()) {
-			write_results_xml("TestFiles/integration_game_results.xml");
+			write_results_xml(xml_path.c_str());
 			return true;
 		}
 		return false;
@@ -45,7 +52,8 @@ bool GameTestRunner::tick(float dt) {
 	// Screenshot: capture after the frame that rendered (wait_ticks reached 0)
 	if (ctx_.wait.screenshot_pending && ctx_.wait.wait_ticks == 0) {
 		ctx_.wait.screenshot_pending = false;
-		bool ok = screenshot_capture_and_compare(ctx_.wait.screenshot_name.c_str(), screenshot_cfg_);
+		bool ok = screenshot_capture_and_compare(ctx_.wait.screenshot_name.c_str(), screenshot_cfg_,
+												get_app_window_size());
 		if (!ok)
 			ctx_.check(false, ("screenshot failed: " + ctx_.wait.screenshot_name).c_str());
 	}
@@ -76,7 +84,7 @@ bool GameTestRunner::tick(float dt) {
 		finish_current_test(nullptr);
 		start_next_test();
 		if (current_idx_ >= (int)tests_.size()) {
-			write_results_xml("TestFiles/integration_game_results.xml");
+			write_results_xml(xml_path.c_str());
 			return true;
 		}
 	}
@@ -92,7 +100,7 @@ void GameTestRunner::start_next_test() {
 	printf("\n==> [%d/%d] %s\n", current_idx_ + 1, (int)tests_.size(), entry.name);
 	elapsed_ = 0.f;
 	ctx_ = TestContext{};
-	ctx_.is_editor_mode = false;
+	ctx_.is_editor_mode = is_this_editor_mode;
 	task_.emplace(entry.fn(ctx_));
 }
 
@@ -116,13 +124,13 @@ void GameTestRunner::finish_current_test(const char* reason) {
 }
 
 void GameTestRunner::write_results_xml(const char* path) {
-	printf("\n=== Game Tests: %d passed, %d failed ===\n", passed_count_, failed_count_);
+	printf("\n=== %s Tests: %d passed, %d failed ===\n", name.data(), passed_count_, failed_count_);
 	_mkdir("TestFiles");
 	FILE* f = fopen(path, "w");
 	if (!f)
 		return;
 	fprintf(f, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-	fprintf(f, "<testsuite name=\"IntegrationTests.Game\" tests=\"%d\" failures=\"%d\">\n", (int)results_.size(),
+	fprintf(f, "<testsuite name=\"IntegrationTests.%s\" tests=\"%d\" failures=\"%d\">\n",name.data(), (int)results_.size(),
 			failed_count_);
 	for (auto& r : results_) {
 		fprintf(f, "  <testcase name=\"%s\">\n", r.name.c_str());

@@ -14,7 +14,7 @@ static EditorDoc* get_doc() {
 }
 
 int EditorTestContext::entity_count() const {
-	return (int)eng->get_level()->get_all_objects().size();
+	return (int)eng->get_level()->get_all_objects().num_used;
 }
 
 void EditorTestContext::save_level(const char* path) {
