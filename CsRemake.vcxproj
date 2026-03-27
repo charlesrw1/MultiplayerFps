@@ -242,6 +242,7 @@
     <ClInclude Include="Source\Render\IGraphsDevice.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Render\RectPackerUtil.h" />
+    <ClInclude Include="Source\Render\RenderConfigVars.h" />
     <ClInclude Include="Source\Render\RenderGiManager.h" />
     <ClInclude Include="Source\Render\RenderWindow.h" />
     <ClInclude Include="Source\Render\RT\RaytraceTest.h" />

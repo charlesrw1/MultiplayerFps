@@ -1075,6 +1075,7 @@
     <ClInclude Include="Source\Scripting\LuaTestRunner.h" />
     <ClInclude Include="Source\UI\Gui.h" />
     <ClInclude Include="Source\EngineMain.h" />
+    <ClInclude Include="Source\Render\RenderConfigVars.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

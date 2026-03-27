@@ -122,6 +122,8 @@ public:
 	virtual GraphicsTextureFormat get_texture_format() const = 0;
 	virtual GraphicsTextureType get_texture_type() const = 0;
 	virtual int get_compressed_stride() const = 0;
+
+	virtual void clear_image() = 0;
 };
 
 // used for vertex,index,uniform, and shader storage buffers

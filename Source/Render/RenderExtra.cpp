@@ -513,6 +513,10 @@ static float ssr_nonoccluded_weight_mult = 0.6;
 void SSRSystem::do_temporal() {
 	auto& device = draw.get_device();
 
+	auto last_reflect = draw.tex.last_reflection_accum;
+	if (draw.wants_disable_temporal_effects_this_frame())
+		last_reflect = draw.black_texture;
+
 	RenderPassState rp;
 
 	// now do temporal upsample
@@ -527,7 +531,7 @@ void SSRSystem::do_temporal() {
 	auto& vs = draw.current_frame_view;
 	device.set_viewport(0, 0, vs.width, vs.height);
 	draw.bind_texture_ptr(0, draw.tex.halfres_scene_color);
-	draw.bind_texture_ptr(1, draw.tex.last_reflection_accum);
+	draw.bind_texture_ptr(1, last_reflect);
 	draw.bind_texture_ptr(2, draw.tex.scene_depth);
 	draw.bind_texture_ptr(3, draw.tex.scene_motion);
 	draw.bind_texture_ptr(4, draw.tex.last_scene_motion);
@@ -554,32 +558,6 @@ void SSRSystem::do_temporal() {
 	the_shader.set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
 	the_shader.set_ivec2("halfres_texel_offset", get_frame_offset());
 	the_shader.set_float("ssr_nonoccluded_weight_mult", ssr_nonoccluded_weight_mult);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
-
-	return;
-
-	glm::ivec2 size(vs.width, vs.height);
-	glm::vec2 inv_presize = 1.f / glm::vec2(size);
-
-	state.vao = draw.get_empty_vao();
-	state.program = ssr_blur;
-	state.blend = BlendState::ADD;
-	state.depth_testing = false;
-	state.depth_writes = false;
-	device.set_pipeline(state);
-	device.shader().set_vec2("texelSize", inv_presize);
-
-	auto targets3 = {ColorTargetInfo(draw.tex.scene_color)};
-	rp;
-	rp.color_infos = targets3;
-	IGraphicsDevice::inst->set_render_pass(rp);
-	device.set_viewport(0, 0, vs.width, vs.height);
-	device.bind_texture_ptr(0, draw.tex.reflection_accum);
-	device.bind_texture_ptr(1, draw.tex.scene_depth);
-	device.bind_texture(2, EnviornmentMapHelper::get().integrator.get_texture());
-	device.bind_texture_ptr(3, draw.tex.scene_gbuffer0);
-	device.bind_texture_ptr(4, draw.tex.scene_gbuffer2);
-
 	glDrawArrays(GL_TRIANGLES, 0, 3);
 }
 #include "imgui.h"

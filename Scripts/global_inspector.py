@@ -3,7 +3,16 @@
 global_inspector.py - C++ global variable access analyzer
 
 Usage:
-    python global_inspector.py <src_dir> [--output FILE] [--exclude DIR] [--no-pretty] [--include-headers]
+    python global_inspector.py <src_dir> [options]
+
+Options:
+    --output FILE         JSON output file (default: globals_report.json)
+    --graph FILE          Generate interactive HTML graph (e.g. graph.html)
+    --exclude DIR         Directory name to skip (repeatable, default: External)
+    --include-dir DIR     Add include path passed to libclang (repeatable)
+                          Defaults to src_dir itself so project headers resolve
+    --no-pretty           Skip console pretty-print
+    --include-headers     Also analyze .h/.hpp files for function bodies
 
 Requirements:
     pip install libclang
@@ -135,9 +144,10 @@ def find_source_files(
 # ---------------------------------------------------------------------------
 
 class Inspector:
-    def __init__(self, cl, exclude_dirs: List[str]):
+    def __init__(self, cl, exclude_dirs: List[str], include_dirs: List[str] = None):
         self.cl = cl
         self.exclude_dirs = [e.lower() for e in exclude_dirs]
+        self.include_dirs: List[str] = include_dirs or []
         self.index = cl.Index.create()
         # Keyed by clang USR string to deduplicate across TUs
         self.globals: Dict[str, GlobalVar] = {}
@@ -175,6 +185,8 @@ class Inspector:
         """Parse a file with libclang; return TU or None on hard failure."""
         cl = self.cl
         args = ["-x", "c++", "-std=c++17"]
+        for d in self.include_dirs:
+            args += ["-I", d]
         opts = (cl.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
                 if skip_bodies else 0)
         try:
@@ -402,6 +414,184 @@ def pretty_print(report: dict) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Graph visualization
+# ---------------------------------------------------------------------------
+
+def generate_graph_html(report: dict, output_path: str) -> None:
+    """Generate an interactive HTML/vis.js graph of file→global relationships."""
+    globals_meta = report["globals"]
+    files = report["files"]
+
+    nodes = []
+    edges = []
+    seen_globals: set = set()
+
+    for filepath, data in files.items():
+        ntrans = len(data["transitive_globals"])
+        if ntrans == 0:
+            continue
+        fname = os.path.basename(filepath)
+        file_id = f"f:{filepath}"
+        nodes.append({
+            "id": file_id,
+            "label": fname,
+            "title": f"{filepath}<br>direct: {len(data['direct_globals'])}, transitive: {ntrans}",
+            "group": "file",
+            "value": ntrans,
+        })
+        direct_set = set(data["direct_globals"])
+        for qname in data["direct_globals"]:
+            seen_globals.add(qname)
+            edges.append({
+                "from": file_id,
+                "to": f"g:{qname}",
+                "edgeType": "direct",
+            })
+        for qname in data["transitive_globals"]:
+            if qname not in direct_set:
+                seen_globals.add(qname)
+                edges.append({
+                    "from": file_id,
+                    "to": f"g:{qname}",
+                    "edgeType": "transitive",
+                })
+
+    for qname in seen_globals:
+        gmeta = globals_meta.get(qname, {})
+        is_static = gmeta.get("is_static", False)
+        nodes.append({
+            "id": f"g:{qname}",
+            "label": gmeta.get("name", qname),
+            "title": f"{qname}<br>{gmeta.get('type','?')}<br>{'static' if is_static else 'non-static'}<br>{gmeta.get('file','')}:{gmeta.get('line','')}",
+            "group": "static_global" if is_static else "global",
+            "value": 1,
+        })
+
+    graph_data = json.dumps({"nodes": nodes, "edges": edges})
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Global Variable Access Graph</title>
+<script src="https://unpkg.com/vis-network@9.1.9/dist/vis-network.min.js"></script>
+<link href="https://unpkg.com/vis-network@9.1.9/dist/dist/vis-network.min.css" rel="stylesheet"/>
+<style>
+  * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{ background: #0d1117; color: #c9d1d9; font-family: monospace; font-size: 13px; }}
+  #controls {{
+    padding: 8px 16px; background: #161b22; border-bottom: 1px solid #30363d;
+    display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
+  }}
+  #network {{ width: 100%; height: calc(100vh - 44px); }}
+  label {{ display: flex; align-items: center; gap: 6px; cursor: pointer; }}
+  input[type=range] {{ width: 120px; accent-color: #58a6ff; }}
+  #minVal {{ min-width: 20px; }}
+  .legend {{ display: flex; gap: 12px; align-items: center; margin-left: auto; }}
+  .dot {{ width: 10px; height: 10px; border-radius: 50%; display: inline-block; }}
+  .diamond {{ width: 10px; height: 10px; transform: rotate(45deg); display: inline-block; }}
+  #stats {{ color: #8b949e; font-size: 11px; }}
+</style>
+</head>
+<body>
+<div id="controls">
+  <strong>Global Access Graph</strong>
+  <label>Min transitive:
+    <input type="range" id="minGlobals" min="0" max="30" value="2">
+    <span id="minVal">2</span>
+  </label>
+  <label><input type="checkbox" id="showTransitive"> Show transitive edges</label>
+  <label><input type="checkbox" id="showGlobalNodes" checked> Show global nodes</label>
+  <span id="stats"></span>
+  <div class="legend">
+    <span><span class="dot" style="background:#58a6ff"></span> File</span>
+    <span><span class="diamond" style="background:#f0883e"></span>&nbsp;Non-static global</span>
+    <span><span class="diamond" style="background:#bc8cff"></span>&nbsp;Static global</span>
+  </div>
+</div>
+<div id="network"></div>
+<script>
+const RAW = {graph_data};
+
+const FILE_COLOR   = {{ border:'#58a6ff', background:'#1f3550', highlight:{{border:'#79c0ff',background:'#2d4a6e'}} }};
+const GLOB_COLOR   = {{ border:'#f0883e', background:'#3d2210', highlight:{{border:'#ffa657',background:'#5c3318'}} }};
+const STATIC_COLOR = {{ border:'#bc8cff', background:'#2b1a3d', highlight:{{border:'#d2a8ff',background:'#3d2858'}} }};
+
+function build(minT, showTrans, showGlobal) {{
+  const fileNodes = RAW.nodes.filter(n => n.group === 'file' && n.value >= minT);
+  const fileIds   = new Set(fileNodes.map(n => n.id));
+
+  let filteredEdges = RAW.edges.filter(e => fileIds.has(e.from));
+  if (!showTrans) filteredEdges = filteredEdges.filter(e => e.edgeType === 'direct');
+
+  const usedGlobalIds = new Set(filteredEdges.map(e => e.to));
+  const globalNodes = showGlobal
+    ? RAW.nodes.filter(n => n.group !== 'file' && usedGlobalIds.has(n.id))
+    : [];
+
+  const nodes = new vis.DataSet([
+    ...fileNodes.map(n => ({{
+      id: n.id, label: n.label, title: n.title,
+      color: FILE_COLOR, shape: 'dot',
+      size: Math.max(8, Math.min(30, n.value * 2)),
+      font: {{ color:'#c9d1d9', size:11 }},
+    }})),
+    ...globalNodes.map(n => ({{
+      id: n.id, label: n.label, title: n.title,
+      color: n.group === 'static_global' ? STATIC_COLOR : GLOB_COLOR,
+      shape: 'diamond', size: 8,
+      font: {{ color:'#8b949e', size:10 }},
+    }})),
+  ]);
+
+  const edges = showGlobal ? new vis.DataSet(filteredEdges.map(e => ({{
+    from: e.from, to: e.to,
+    dashes: e.edgeType === 'transitive',
+    color: {{ color: e.edgeType === 'direct' ? '#58a6ff' : '#30363d', opacity: 0.6 }},
+    width: e.edgeType === 'direct' ? 1.5 : 0.8,
+    arrows: {{ to: {{ enabled: true, scaleFactor: 0.4 }} }},
+  }}))) : new vis.DataSet([]);
+
+  document.getElementById('stats').textContent =
+    `${{nodes.length}} nodes · ${{edges.length}} edges`;
+  return {{ nodes, edges }};
+}}
+
+const container = document.getElementById('network');
+let network = null;
+
+function redraw() {{
+  const minT       = parseInt(document.getElementById('minGlobals').value);
+  const showTrans  = document.getElementById('showTransitive').checked;
+  const showGlobal = document.getElementById('showGlobalNodes').checked;
+  document.getElementById('minVal').textContent = minT;
+  const {{ nodes, edges }} = build(minT, showTrans, showGlobal);
+
+  if (!network) {{
+    network = new vis.Network(container, {{ nodes, edges }}, {{
+      physics: {{ solver:'forceAtlas2Based', stabilization:{{ iterations:120 }}, forceAtlas2Based:{{ gravitationalConstant:-60, springLength:120 }} }},
+      interaction: {{ hover:true, tooltipDelay:100 }},
+      edges: {{ smooth:{{ type:'continuous', roundness:0.2 }} }},
+    }});
+  }} else {{
+    network.setData({{ nodes, edges }});
+  }}
+}}
+
+document.getElementById('minGlobals').addEventListener('input', redraw);
+document.getElementById('showTransitive').addEventListener('change', redraw);
+document.getElementById('showGlobalNodes').addEventListener('change', redraw);
+redraw();
+</script>
+</body>
+</html>"""
+
+    with open(output_path, "w", encoding="utf-8") as fh:
+        fh.write(html)
+    print(f"Graph written to: {output_path}")
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -412,9 +602,14 @@ def main():
     parser.add_argument("src_dir", help="Root source directory to analyze")
     parser.add_argument("--output", default="globals_report.json",
                         help="JSON output file (default: globals_report.json)")
+    parser.add_argument("--graph", default=None, metavar="FILE",
+                        help="Generate interactive HTML graph (e.g. --graph graph.html)")
     parser.add_argument("--exclude", action="append", default=None,
                         metavar="DIR",
                         help="Directory name to exclude (repeatable, default: External)")
+    parser.add_argument("--include-dir", action="append", default=None,
+                        dest="include_dirs", metavar="DIR",
+                        help="Add include path for libclang (repeatable). Defaults to src_dir.")
     parser.add_argument("--no-pretty", action="store_true",
                         help="Skip console pretty-print, only write JSON")
     parser.add_argument("--include-headers", action="store_true",
@@ -428,14 +623,18 @@ def main():
         print(f"ERROR: src_dir not found: {args.src_dir}")
         sys.exit(1)
 
+    # Default include dir to src_dir so project headers resolve without extra flags
+    include_dirs = args.include_dirs if args.include_dirs else [args.src_dir]
+
     cl = load_libclang()
     print(f"Scanning: {args.src_dir}")
-    print(f"Excluding dirs containing: {args.exclude}")
+    print(f"Excluding dirs: {args.exclude}")
+    print(f"Include dirs:   {include_dirs}")
 
     files = find_source_files(args.src_dir, args.exclude, args.include_headers)
     print(f"Found {len(files)} source file(s)")
 
-    inspector = Inspector(cl, args.exclude)
+    inspector = Inspector(cl, args.exclude, include_dirs=include_dirs)
 
     # Pass 1: collect globals from all files
     print("Pass 1: collecting globals...")
@@ -461,6 +660,9 @@ def main():
     with open(args.output, "w", encoding="utf-8") as fh:
         json.dump(report, fh, indent=2)
     print(f"\nReport written to: {args.output}")
+
+    if args.graph:
+        generate_graph_html(report, args.graph)
 
     if not args.no_pretty:
         pretty_print(report)

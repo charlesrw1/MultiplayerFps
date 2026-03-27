@@ -14,7 +14,7 @@
 #include "External/stb_image_write.h"
 
 #include "glm/glm.hpp"
-
+#include "Render/DrawLocal.h"
 static std::string actual_path(const char* name) {
 	return std::string("TestFiles/screenshots/") + name + "_actual.png";
 }
@@ -22,33 +22,35 @@ static std::string golden_path(const char* name) {
 	return std::string("TestFiles/goldens/") + name + ".png";
 }
 
-bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cfg, glm::ivec2 size) {
+bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cfg, glm::ivec2 _unused_) {
+	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	
+	auto size_to_use = draw.tex.actual_output_composite->get_size();
+	const int w = size_to_use.x;
+	const int h = size_to_use.y;
+	std::vector<unsigned char> pixels(w * h * 4); // RGBA
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	//glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+	const int stride = w * 4;
 
-	const int w = size.x;
-	const int h = size.y;
 
-	std::vector<unsigned char> pixels(w * h * 3);
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+	glGetTextureImage(draw.tex.actual_output_composite->get_internal_handle(), 0, GL_RGBA, GL_UNSIGNED_BYTE, w*h*4,
+		pixels.data());
 
-	// GL gives bottom-left origin — flip rows for PNG top-left convention
-	std::vector<unsigned char> flipped(pixels.size());
-	int row_bytes = w * 3;
-	for (int y = 0; y < h; ++y)
-		memcpy(flipped.data() + y * row_bytes, pixels.data() + (h - 1 - y) * row_bytes, row_bytes);
 
 	_mkdir("TestFiles");
 	_mkdir("TestFiles/screenshots");
 
 	std::string ap = actual_path(name);
-	stbi_write_png(ap.c_str(), w, h, 3, flipped.data(), row_bytes);
+	stbi_flip_vertically_on_write(true);
+	stbi_write_png(ap.c_str(), w, h, 4, pixels.data(), stride);
 	printf("  Screenshot saved: %s\n", ap.c_str());
 
 	std::string gp = golden_path(name);
 
 	if (cfg.promote) {
 		_mkdir("TestFiles/goldens");
-		if (stbi_write_png(gp.c_str(), w, h, 3, flipped.data(), row_bytes))
+		if (stbi_write_png(gp.c_str(), w, h, 4, pixels.data(), stride))
 			printf("  [PROMOTE] Golden updated: %s\n", gp.c_str());
 		else
 			fprintf(stderr, "  [PROMOTE] Failed to write golden: %s\n", gp.c_str());
@@ -72,7 +74,7 @@ bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cf
 	int diff_pixels = 0;
 	int max_delta = 0;
 	for (int i = 0; i < total * 3; ++i) {
-		int d = abs((int)flipped[i] - (int)golden[i]);
+		int d = abs((int)pixels[i] - (int)golden[i]);
 		if (d > max_delta)
 			max_delta = d;
 		if (d > cfg.max_channel_delta)
@@ -88,5 +90,6 @@ bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cf
 				diff_pixels, diff_frac * 100.f, gp.c_str());
 	else
 		printf("  Screenshot OK: max_delta=%d diff_pixels=%d\n", max_delta, diff_pixels);
+
 	return pass;
 }

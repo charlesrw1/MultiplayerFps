@@ -1227,8 +1227,9 @@ glm::ivec2 get_app_window_size() {
 	return {g_window_w.get_integer(), g_window_h.get_integer()};
 }
 void set_app_window_size(glm::ivec2 i) {
+	sys_print(Debug, "set window size %d %d\n", i.x, i.y);
 	g_window_w.set_integer(i.x);
-	g_window_w.set_integer(i.y);
+	g_window_h.set_integer(i.y);
 }
 static bool scene_hovered = false;
 

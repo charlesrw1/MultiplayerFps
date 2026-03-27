@@ -382,10 +382,12 @@ static float relocate_normal_dist = 0.2;
 static int lum_adjust_mode = 4;
 static float depth_sigma = 50.0;
 static float normal_sigma = 1.0;
-static bool wants_half_res = false;
 static bool do_flush_after = true;
 static bool skip_gather = false;
 static vec2 ssr_lum_range = vec2(0, 0.1);
+
+extern void draw_imgui_for_cvar(ConfigVar& var);
+ConfigVar r_ddgi_halfres("r.ddgi_halfres", "1", CVAR_BOOL, "");
 void ddgi_debugmenu() {
 	auto self = draw.ddgi.get();
 	ImGui::InputInt3("select", &self->selected_probe.x);
@@ -407,11 +409,14 @@ void ddgi_debugmenu() {
 	ImGui::InputFloat("depth_sigma", &depth_sigma);
 	ImGui::InputFloat("normal_sigma", &normal_sigma);
 
-	ImGui::Checkbox("wants_half_res", &wants_half_res);
+
+	draw_imgui_for_cvar(r_ddgi_halfres);
 	ImGui::Checkbox("do_flush", &do_flush_after);
 	ImGui::Checkbox("skip_gather", &skip_gather);
 	ImGui::InputFloat("ssr_lum_min", &ssr_lum_range.x);
 	ImGui::InputFloat("ssr_lum_max", &ssr_lum_range.y);
+
+
 }
 ADD_TO_DEBUG_MENU(ddgi_debugmenu);
 void set_shit_fuck() {
@@ -911,7 +916,7 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view) {
 
 	GPUFUNCTIONSTART;
 
-	if (wants_half_res && !for_cubemap_view)
+	if (r_ddgi_halfres.get_bool() && !for_cubemap_view)
 		draw_lighting_halfres(ssao);
 	else
 		draw_lighting_fullres(ssao, for_cubemap_view);

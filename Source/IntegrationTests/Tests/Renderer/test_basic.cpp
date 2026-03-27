@@ -32,3 +32,30 @@ static TestTask test_screenshot_smoke(TestContext& t) {
 }
 GAME_TEST("renderer/screenshot_smoke", 15.f, test_screenshot_smoke);
 
+#include "Render/RenderConfigVars.h"
+
+#include "Game/Entity.h"
+#include "Game/Components/CameraComponent.h"
+static void change_map_and_make_camera(const std::string& path, glm::vec3 pos)
+{
+	eng->load_level(path);
+	auto cc = eng->get_level()->spawn_entity()->create_component<CameraComponent>();
+	cc->set_is_enabled(true);
+	cc->get_owner()->set_ws_position(pos);
+	ASSERT(CameraComponent::get_scene_camera() == cc);
+}
+
+// ssr/taa smoke test
+static TestTask test_ssr_motion_vec_smoke(TestContext& t) {
+	r_taa_enabled.set_bool(true);
+	auto pre_size = get_app_window_size();
+	change_map_and_make_camera("demo_level_1.tmap", {});
+
+	for (int i = 0; i < 50; i++) {
+		set_app_window_size({ pre_size.x + i * 5,pre_size.y });
+		co_await t.wait_ticks(1);
+	}
+	co_await t.capture_screenshot("ssr_smoke");
+
+}
+GAME_TEST("renderer/ssr_smoke", 15.f, test_ssr_motion_vec_smoke);

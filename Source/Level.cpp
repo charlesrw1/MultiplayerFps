@@ -85,7 +85,7 @@ Entity* Level::spawn_entity_class_deferred_internal(const ClassTypeInfo& ti) {
 	return ec;
 }
 
-ConfigVar log_destroy_game_objects("log_destroy_game_objects", "1", CVAR_BOOL, "");
+ConfigVar log_destroy_game_objects("log_destroy_game_objects", "0", CVAR_BOOL, "");
 
 Entity* Level::spawn_entity() {
 	auto& ti = Entity::StaticType;

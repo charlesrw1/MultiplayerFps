@@ -887,6 +887,9 @@ public:
 	OpenglRenderDevice& get_device() { return device; }
 	Program_Manager& get_prog_man() { return device.get_prog_man(); }
 
+	bool wants_disable_temporal_effects_this_frame() const {
+		return disable_taa_this_frame;
+	}
 private:
 	RenderWindowBackendLocal* windowDrawer = nullptr;
 #ifdef EDITOR_BUILD

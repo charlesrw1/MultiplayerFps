@@ -1994,6 +1994,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	using gtf = GraphicsTextureFormat;
 	delete_and_create_texture(tex.scene_color, gtf::rgb16f);
+	tex.scene_color->clear_image();
 
 	delete_and_create_texture_half_res(tex.halfres_scene_color, gtf::rgb16f);
 	Texture::load("_halfres_scene_color")->update_specs_ptr(tex.halfres_scene_color);
@@ -2001,14 +2002,19 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	delete_and_create_texture(tex.last_ddgi_accum, gtf::r11f_g11f_b10f);
 	Texture::load("_ddgi_accum")->update_specs_ptr(tex.ddgi_accum);
 	Texture::load("_ddgi_accum_prev")->update_specs_ptr(tex.last_ddgi_accum);
+	tex.ddgi_accum->clear_image();
+	tex.last_ddgi_accum->clear_image();
 
 	delete_and_create_texture_halfresmips(tex.scene_color_mipchain, gtf::r11f_g11f_b10f, 5);
 	delete_and_create_texture(tex.reflection_accum, gtf::r11f_g11f_b10f);
 	delete_and_create_texture(tex.last_reflection_accum, gtf::r11f_g11f_b10f);
 	Texture::load("_ssr")->update_specs_ptr(tex.reflection_accum);
+	tex.reflection_accum->clear_image();
+	tex.last_reflection_accum->clear_image();
 
 	// last frame, for TAA
 	delete_and_create_texture(tex.last_scene_color, gtf::rgb16f);
+	tex.last_scene_color->clear_image();
 
 	// Main scene depth
 	delete_and_create_texture(tex.scene_depth, gtf::depth32f);
@@ -2026,6 +2032,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	delete_and_create_texture(tex.scene_motion, scene_motion_format);
 
 	delete_and_create_texture(tex.last_scene_motion, scene_motion_format);
+	tex.last_scene_motion->clear_image();
 
 	delete_and_create_texture(tex.output_composite, gtf::rgb8);
 	delete_and_create_texture(tex.output_composite_2, gtf::rgb8);

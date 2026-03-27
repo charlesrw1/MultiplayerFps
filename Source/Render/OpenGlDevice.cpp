@@ -492,6 +492,22 @@ public:
 	GraphicsTextureType get_texture_type() const override { return my_type; }
 	int get_num_mips() const override { return mips; }
 
+	void clear_image() final {
+		ASSERT(!is_compressed());
+		ASSERT(my_fmt != GraphicsTextureFormat::depth32f);
+		ASSERT(my_fmt != GraphicsTextureFormat::depth24f);
+		ASSERT(my_fmt != GraphicsTextureFormat::depth16f);
+
+		if (is_float_type()) {
+			float clear_values[] = { 0.f,0.f,0.f,0.f };
+			glClearTexImage(id, 0, get_input_format(my_fmt), GL_FLOAT, clear_values);
+		}
+		else {
+			uint8_t clear_values[] = { 0,0,0,0 };
+			glClearTexImage(id, 0, get_input_format(my_fmt), GL_UNSIGNED_BYTE, clear_values);
+		}
+	}
+
 	GraphicsTextureType my_type{};
 	GraphicsTextureFormat my_fmt{};
 	GLenum internal_format_gl{};
