@@ -99,6 +99,7 @@ ConfigVar g_window_h("vid.height", "800", CVAR_INTEGER, "", 1, 4000);
 ConfigVar g_window_fullscreen("vid.fullscreen", "0", CVAR_BOOL, "");
 ConfigVar g_host_port("net.hostport", "47000", CVAR_INTEGER | CVAR_READONLY, "", 0, UINT16_MAX);
 ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar g_run_tests("g_run_tests", "0", CVAR_BOOL, "run lua integration tests on startup then quit");
 ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL,
 						 "enables dev mode features like compiling assets when loading");
 ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop", 0.0001, 5.0);
@@ -277,9 +278,7 @@ static std::string append_strings(int c, char** str) {
 class FileSink : public LogSink
 {
 public:
-	FileSink(const std::string& filename) : file(filename) {
-	
-	}
+	FileSink(const std::string& filename) : file(filename) {}
 	void log(LogType type, const std::string& message) override {
 		if (file.is_open()) {
 			if (type == LogType::Error) {
@@ -300,15 +299,15 @@ public:
 private:
 	std::ofstream file;
 };
-class GameConsoleSink : public LogSink {
+class GameConsoleSink : public LogSink
+{
 	void log(LogType type, const std::string& message) override {
 		if (Debug_Console::inst)
 			Debug_Console::inst->print(get_color_of_print(type), "%s", message.c_str());
-		if(type==LogType::LtConsoleCommand)
+		if (type == LogType::LtConsoleCommand)
 			eng->log_to_fullscreen_gui(LtConsoleCommand, message.c_str());
 	}
 };
-
 
 class Logger
 {
@@ -333,12 +332,10 @@ public:
 		}
 	}
 
-
 private:
 	std::vector<std::shared_ptr<LogSink>> sinks;
 };
 Logger* Logger::inst = nullptr;
-
 
 void sys_print(LogType type, const char* fmt, ...) {
 	va_list args;
@@ -1229,7 +1226,6 @@ bool GameEngineLocal::is_drawing_to_window_viewport() const {
 	return !UiSystem::inst->is_drawing_to_screen();
 }
 
-
 glm::ivec2 get_app_window_size() {
 	return {g_window_w.get_integer(), g_window_h.get_integer()};
 }
@@ -1237,9 +1233,12 @@ static bool scene_hovered = false;
 
 #include "Framework/MyImguiLib.h"
 void GameEngineLocal::draw_any_imgui_interfaces() {}
-
+ConfigVar disable_render_time_tick("disable_render_time_tick", "0", CVAR_BOOL, "");
 void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& setup) {
-	params = SceneDrawParamsEx(time, frame_time);
+
+	const float time_to_use = (disable_render_time_tick.get_bool()) ? 0 : time;
+
+	params = SceneDrawParamsEx(time_to_use, frame_time);
 	params.output_to_screen = UiSystem::inst->is_drawing_to_screen();
 	// so the width/height parameters are valid
 	View_Setup vs_for_gui;
@@ -1265,7 +1264,7 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 	} else
 #endif
 	{
-		params = SceneDrawParamsEx(time, frame_time);
+		params = SceneDrawParamsEx(time_to_use, frame_time);
 		params.output_to_screen = UiSystem::inst->is_drawing_to_screen();
 		View_Setup vs_for_gui;
 		auto viewport = UiSystem::inst->get_vp_rect().get_size();
@@ -1376,7 +1375,7 @@ void GameEngineLocal::init_sdl_window() {
 using std::make_unique;
 
 ImFont* global_big_imgui_font = nullptr;
-ConfigVar dont_print_log_to_console("dont_print_log_to_console", "0", CVAR_BOOL, ""); 
+ConfigVar dont_print_log_to_console("dont_print_log_to_console", "0", CVAR_BOOL, "");
 static bool has_arg(int argc, char** argv, const char* flag) {
 	for (int i = 1; i < argc; ++i)
 		if (std::string(argv[i]) == flag)
@@ -1391,15 +1390,13 @@ void GameEngineLocal::init(int argc, char** argv) {
 
 	Logger::inst = new Logger;
 	Logger::inst->add_sink(std::make_shared<FileSink>("output.log"));
-	if (!has_arg(argc,argv,"--no_console_print")) {
+	if (!has_arg(argc, argv, "--no_console_print")) {
 		Logger::inst->add_sink(std::make_shared<ConsoleSink>());
 		Logger::inst->add_sink(std::make_shared<GameConsoleSink>());
 	}
-	sys_print(Debug, "%s\n",append_strings(argc, argv).c_str());
+	sys_print(Debug, "%s\n", append_strings(argc, argv).c_str());
 	sys_print(Debug, "%s\n", current_timestamp().c_str());
 	sys_print(Debug, "---------------------------------\n");
-
-
 
 	sys_print(Info, "--------- Initializing Engine ---------\n");
 
@@ -1408,7 +1405,7 @@ void GameEngineLocal::init(int argc, char** argv) {
 	auto print_time = [&](const char* msg) {
 		double now = GetTime();
 		// printf("-----TIME %s %f\n", msg, float(now - start));
-		sys_print(Debug,"init % s in % fs\n", msg, float(now - start));
+		sys_print(Debug, "init % s in % fs\n", msg, float(now - start));
 		start = now;
 	};
 
@@ -1447,8 +1444,7 @@ void GameEngineLocal::init(int argc, char** argv) {
 		} else if (strcmp(argv[i], "-VISUALSTUDIO") == 0) {
 			const char* projName = g_project_name.get_string();
 			SDL_SetWindowTitle(window, string_format("%s - VISUAL STUDIO\n", projName));
-		}
-		else if (argv[i][0] == '-') {
+		} else if (argv[i][0] == '-') {
 			string cmd;
 			const int start_i = i;
 			cmd += &argv[i++][1];
@@ -1460,7 +1456,6 @@ void GameEngineLocal::init(int argc, char** argv) {
 			Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, cmd.c_str());
 		}
 	}
-
 
 	g_assets.init();
 	print_time("asset init");
@@ -1515,7 +1510,6 @@ void GameEngineLocal::init(int argc, char** argv) {
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	print_time("imgui font");
 
-
 	SDL_SetWindowPosition(window, startx, starty);
 	SDL_SetWindowSize(window, g_window_w.get_integer(), g_window_h.get_integer());
 
@@ -1539,6 +1533,9 @@ void GameEngineLocal::init(int argc, char** argv) {
 		});
 
 		app->start();
+		if (g_run_tests.get_bool()) {
+			app->run_integration_tests();
+		}
 		// inject pending test runner (game mode)
 		if (g_pending_test_runner && eng_local.app) {
 			eng_local.set_runner(g_pending_test_runner, g_pending_skip_swap);

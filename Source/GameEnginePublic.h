@@ -12,6 +12,7 @@ extern ConfigVar g_fakemovedebug;
 extern ConfigVar g_drawdebugmenu;
 extern ConfigVar g_drawimguidemo;
 extern ConfigVar g_slomo;
+extern ConfigVar g_run_tests;
 
 extern ConfigVar g_window_w;
 extern ConfigVar g_window_h;
@@ -50,6 +51,7 @@ public:
 	REF virtual void update() {}
 	REF virtual void stop() {}
 	REF virtual void on_map_changed() {}
+	REF virtual void run_integration_tests() {}
 	// misc callbacks
 	REF virtual void on_controller_status(int index, bool connected) {}
 
