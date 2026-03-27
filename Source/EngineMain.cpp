@@ -218,39 +218,133 @@ Color32 get_color_of_print(LogType type) {
 	return out;
 }
 
-void sys_print(LogType type, const char* fmt, ...) {
-	if ((int(type)) > loglevel.get_integer())
-		return;
+#include <iostream>
 
-	va_list args;
-	va_start(args, fmt);
+class LogSink
+{
+public:
+	virtual ~LogSink() = default;
+	virtual void log(LogType type, const std::string& message) = 0;
+};
 
-	bool print_end = false;
-	if (colorLog.get_bool()) {
-		print_end = true;
-		if (type == LogType::Error) {
-			printf("\033[91m");
-		} else if (type == LogType::Warning) {
-			printf("\033[33m");
-		} else if (type == LogType::Debug) {
-			printf("\033[32m");
-		} else if (type == LogType::LtConsoleCommand) {
-			printf("\033[35m");
-			char buf[1024];
-			vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
-			buf[IM_ARRAYSIZE(buf) - 1] = 0;
-			eng->log_to_fullscreen_gui(LtConsoleCommand, buf);
-		} else
-			print_end = false;
+class ConsoleSink : public LogSink
+{
+public:
+	void log(LogType type, const std::string& message) override {
+		bool print_end = false;
+		if (colorLog.get_bool()) {
+			print_end = true;
+			if (type == LogType::Error) {
+				printf("\033[91m");
+			} else if (type == LogType::Warning) {
+				printf("\033[33m");
+			} else if (type == LogType::Debug) {
+				printf("\033[32m");
+			} else if (type == LogType::LtConsoleCommand) {
+				printf("\033[35m");
+			} else
+				print_end = false;
+		}
+		printf("%s", message.c_str());
+		if (print_end)
+			printf("\033[0m");
+	}
+};
+
+static std::string current_timestamp() {
+	auto now = std::chrono::system_clock::now();
+	auto time_t_now = std::chrono::system_clock::to_time_t(now);
+
+	// For milliseconds
+	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+	std::ostringstream oss;
+	// Format: YYYY-MM-DD HH:MM:SS.mmm
+	oss << std::put_time(std::localtime(&time_t_now), "%Y-%m-%d %H:%M:%S") << '.' << std::setfill('0') << std::setw(3)
+		<< ms.count();
+
+	return oss.str();
+}
+static std::string append_strings(int c, char** str) {
+	std::string out;
+	for (int i = 0; i < c; i++) {
+		out += str[i];
+		out += " ";
+	}
+	return out;
+}
+
+class FileSink : public LogSink
+{
+public:
+	FileSink(const std::string& filename) : file(filename) {
+	
+	}
+	void log(LogType type, const std::string& message) override {
+		if (file.is_open()) {
+			if (type == LogType::Error) {
+				file << "[Error] ";
+			} else if (type == LogType::Warning) {
+				file << "[Warning] ";
+			} else if (type == LogType::Debug) {
+				file << "[Debug] ";
+			} else if (type == LogType::LtConsoleCommand) {
+
+			} else {
+				file << "[Info] ";
+			}
+			file << message << std::flush;
+		}
 	}
 
-	vprintf(fmt, args);
-	if (Debug_Console::inst)
-		Debug_Console::inst->print_args(get_color_of_print(type), fmt, args);
-	va_end(args);
+private:
+	std::ofstream file;
+};
+class GameConsoleSink : public LogSink {
+	void log(LogType type, const std::string& message) override {
+		if (Debug_Console::inst)
+			Debug_Console::inst->print(get_color_of_print(type), "%s", message.c_str());
+		if(type==LogType::LtConsoleCommand)
+			eng->log_to_fullscreen_gui(LtConsoleCommand, message.c_str());
+	}
+};
 
-	if (print_end)
-		printf("\033[0m");
+
+class Logger
+{
+public:
+	static Logger* inst;
+
+	void add_sink(std::shared_ptr<LogSink> sink) { sinks.push_back(sink); }
+
+	void log(LogType type, const char* fmt, va_list args) {
+		if (static_cast<int>(type) > loglevel.get_integer())
+			return;
+
+		char buf[1024];
+
+		vsnprintf(buf, sizeof(buf), fmt, args);
+		buf[sizeof(buf) - 1] = 0;
+
+		std::string message(buf);
+
+		for (auto& sink : sinks) {
+			sink->log(type, message);
+		}
+	}
+
+
+private:
+	std::vector<std::shared_ptr<LogSink>> sinks;
+};
+Logger* Logger::inst = nullptr;
+
+
+void sys_print(LogType type, const char* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	Logger::inst->log(type, fmt, args);
+	va_end(args);
 }
 
 void sys_vprint(const char* fmt, va_list args) {
@@ -1282,10 +1376,30 @@ void GameEngineLocal::init_sdl_window() {
 using std::make_unique;
 
 ImFont* global_big_imgui_font = nullptr;
-
+ConfigVar dont_print_log_to_console("dont_print_log_to_console", "0", CVAR_BOOL, ""); 
+static bool has_arg(int argc, char** argv, const char* flag) {
+	for (int i = 1; i < argc; ++i)
+		if (std::string(argv[i]) == flag)
+			return true;
+	return false;
+}
 void GameEngineLocal::init(int argc, char** argv) {
 	this->argc = argc;
 	this->argv = argv;
+
+	FileSys::init();
+
+	Logger::inst = new Logger;
+	Logger::inst->add_sink(std::make_shared<FileSink>("output.log"));
+	if (!has_arg(argc,argv,"--no_console_print")) {
+		Logger::inst->add_sink(std::make_shared<ConsoleSink>());
+		Logger::inst->add_sink(std::make_shared<GameConsoleSink>());
+	}
+	sys_print(Debug, "%s\n",append_strings(argc, argv).c_str());
+	sys_print(Debug, "%s\n", current_timestamp().c_str());
+	sys_print(Debug, "---------------------------------\n");
+
+
 
 	sys_print(Info, "--------- Initializing Engine ---------\n");
 
@@ -1294,7 +1408,7 @@ void GameEngineLocal::init(int argc, char** argv) {
 	auto print_time = [&](const char* msg) {
 		double now = GetTime();
 		// printf("-----TIME %s %f\n", msg, float(now - start));
-		printf("init % s in % fs\n", msg, float(now - start));
+		sys_print(Debug,"init % s in % fs\n", msg, float(now - start));
 		start = now;
 	};
 
@@ -1315,8 +1429,6 @@ void GameEngineLocal::init(int argc, char** argv) {
 	print_time("init sdl window");
 
 	Profiler::init();
-	FileSys::init();
-	print_time("file init");
 
 	Cmd_Manager::inst->set_set_unknown_variables(true);
 	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");

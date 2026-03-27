@@ -291,9 +291,6 @@
     <ClCompile Include="Source\Game\TP\TPGame.cpp">
       <Filter>Source\Game\TP</Filter>
     </ClCompile>
-    <ClCompile Include="Source\IntegrationTest.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="Source\LevelEditor\Commands.cpp">
       <Filter>Source\LevelEditor</Filter>
     </ClCompile>
@@ -404,9 +401,6 @@
     </ClCompile>
     <ClCompile Include="Source\UI\Widgets\SharedFuncs.cpp">
       <Filter>Source\UI\Widgets</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\UnitTests\EngineTesterApplication.cpp">
-      <Filter>Source\UnitTests</Filter>
     </ClCompile>
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp">
       <Filter>Source\AssetCompile</Filter>
@@ -667,9 +661,6 @@
     </ClInclude>
     <ClInclude Include="Source\Game\TP\TPGame.h">
       <Filter>Source\Game\TP</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\IntegrationTest.h">
-      <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h">
       <Filter>Source\LevelEditor</Filter>
@@ -1075,9 +1066,6 @@
     </ClInclude>
     <ClInclude Include="Source\UI\Widgets\Layouts.h">
       <Filter>Source\UI\Widgets</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\UnitTests\EngineTesterApplication.h">
-      <Filter>Source\UnitTests</Filter>
     </ClInclude>
     <ClInclude Include="Source\Sound\SoundLocal.h">
       <Filter>Source\Sound</Filter>

@@ -1791,7 +1791,7 @@ void Renderer::init() {
 	auto print_time = [&](const char* msg) {
 		double now = GetTime();
 		// printf("-----TIME %s %f\n", msg, float(now - start));
-		printf("init % s in % fs\n", msg, float(now - start));
+		sys_print(Debug,"init % s in % fs\n", msg, float(now - start));
 		start = now;
 	};
 

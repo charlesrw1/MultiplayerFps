@@ -27,7 +27,7 @@ if (-not (Test-Path $exe)) { Write-Error "Binary not found: $exe"; exit 1 }
 
 # ---- Helpers ---------------------------------------------------------------
 function Build-Args([string]$mode) {
-    $a = @("--mode=$mode")
+    $a = @("--mode=$mode") + "--no_console_print"
     if ($TestFilter)   { $a += "--test=$TestFilter" }
     if ($Promote)      { $a += "--promote" }
     if ($TimingAssert) { $a += "--timing-assert" }
