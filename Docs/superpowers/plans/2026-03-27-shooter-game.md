@@ -1121,10 +1121,13 @@ g_application_class "FpsGameApplication"
 is_editor_app 0
 g_run_tests 1
 g_entry_level "demo_level_0.tmap"
+g_project_base "Data"
 r.taa 0
 ui.disable_screen_log 1
 disable_render_time_tick 1
 ```
+
+Note: `g_project_base "Data"` uses the repo-local Data/ folder. The main vars.txt has `D:/Data` which is a machine-specific absolute path — never use that for tests or the shooter game.
 
 - [ ] **Step 2: Commit**
 

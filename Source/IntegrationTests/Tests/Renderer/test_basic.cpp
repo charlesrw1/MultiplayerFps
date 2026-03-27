@@ -31,3 +31,4 @@ static TestTask test_screenshot_smoke(TestContext& t) {
 	co_await t.capture_screenshot("smoke_demo_level_1");
 }
 GAME_TEST("renderer/screenshot_smoke", 15.f, test_screenshot_smoke);
+

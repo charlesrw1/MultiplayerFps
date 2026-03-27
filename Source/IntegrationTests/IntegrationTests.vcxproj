@@ -92,7 +92,6 @@
     <ClCompile Include="TestContext.cpp" />
     <ClCompile Include="TestRegistry.cpp" />
     <ClCompile Include="GameTestRunner.cpp" />
-    <ClCompile Include="EditorTestRunner.cpp" />
     <ClCompile Include="EditorTestContext.cpp" />
     <ClCompile Include="Screenshot.cpp" />
     <ClCompile Include="GpuTimer.cpp" />
@@ -107,7 +106,6 @@
     <ClInclude Include="TestContext.h" />
     <ClInclude Include="GameTestRunner.h" />
     <ClInclude Include="TestGameApp.h" />
-    <ClInclude Include="EditorTestRunner.h" />
     <ClInclude Include="EditorTestContext.h" />
     <ClInclude Include="Screenshot.h" />
     <ClInclude Include="GpuTimer.h" />

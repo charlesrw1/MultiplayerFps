@@ -271,7 +271,7 @@ void start_play_process() {
 	CloseHandle(out.hThread);
 }
 void FileSys::init() {
-	//sys_print(Info, "------ FileSys init ------\n");
+	// sys_print(Info, "------ FileSys init ------\n");
 
 	// updates working directory to ./CsRemake/*
 	char own_path[256];

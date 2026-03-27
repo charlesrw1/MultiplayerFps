@@ -5,7 +5,7 @@
 #include "TestRegistry.h"
 #include "GameTestRunner.h"
 #include "TestGameApp.h"
-#include "EditorTestRunner.h"
+#include "EngineMain.h"
 #include "Framework/Config.h"
 
 // Defined in EngineMain.cpp — set before calling game_engine_main
@@ -13,7 +13,6 @@ extern ITestRunner* g_pending_test_runner;
 extern bool g_pending_skip_swap;
 extern ConfigVar g_application_class;
 
-extern int game_engine_main(int argc, char** argv);
 
 static bool has_arg(int argc, char** argv, const char* flag) {
 	for (int i = 1; i < argc; ++i)
@@ -52,18 +51,27 @@ int main(int argc, char** argv) {
 	cfg.interactive = interactive;
 	cfg.timing_assert = timing_assert;
 
+
+	MainConfigurationOptions mainOptions;
+	mainOptions.skip_swap = skip_swap;
+	mainOptions.no_console_print = true;
+
 	if (mode == "game") {
-		g_application_class.set_string("TestGameApp");
+		//g_application_class.set_string("TestGameApp");
 		auto tests = TestRegistry::get_filtered(TestMode::Game, test_filter.c_str());
-		g_pending_test_runner = new GameTestRunner("Game", tests, cfg);
+		mainOptions.pending_test_runnner.reset(new GameTestRunner("Game", tests, cfg));
+		mainOptions.vars_file = "test_game_vars.txt";
+		mainOptions.log_file = "test_game_output.log";
 	} else if (mode == "editor") {
 		auto tests = TestRegistry::get_filtered(TestMode::Editor, test_filter.c_str());
-		g_pending_test_runner = new GameTestRunner("Editor", tests, cfg);
+		mainOptions.pending_test_runnner.reset(new GameTestRunner("Editor", tests, cfg));
+		mainOptions.vars_file = "test_editor_vars.txt";
+		mainOptions.log_file = "test_editor_output.log";
 	} else {
 		fprintf(stderr, "Unknown mode: %s\n", mode.c_str());
 		return 1;
 	}
 
-	g_pending_skip_swap = skip_swap;
-	return game_engine_main(argc, argv);
+	//g_pending_skip_swap = skip_swap;
+	return game_engine_main(mainOptions, argc, argv);
 }

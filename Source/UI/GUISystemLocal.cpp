@@ -47,6 +47,10 @@ void UiSystem::draw_imgui_interfaces(EditorState* edState) {
 	drawing_to_screen = !edState || !edState->get_tool();
 #endif
 
+	if (g_window_h.was_changed() || g_window_w.was_changed()) {
+		SDL_SetWindowSize(eng->get_os_window(), g_window_w.get_integer(), g_window_h.get_integer());
+	}
+
 	// draw imgui interfaces
 	// if a tool is active, game screen gets drawn to an imgui viewport
 	ImGui_ImplSDL2_NewFrame();

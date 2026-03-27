@@ -19,7 +19,7 @@ using std::unordered_map;
 using std::vector;
 template <typename T> using uptr = std::unique_ptr<T>;
 
-ConfigVar log_all_asset_loads("log_all_asset_loads", "1", CVAR_BOOL, "");
+ConfigVar log_all_asset_loads("log_all_asset_loads", "0", CVAR_BOOL, "");
 ConfigVar log_finish_job_func("log_finish_job_func", "0", CVAR_BOOL, "");
 void AssetDatabase::quit() {}
 class AssetDatabaseImpl

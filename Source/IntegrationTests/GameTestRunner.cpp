@@ -8,7 +8,7 @@
 #include "GameEnginePublic.h"
 #include "Framework/StringUtils.h"
 GameTestRunner::GameTestRunner(std::string_view name, std::vector<TestEntry> tests, const TestRunnerConfig& cfg)
-	: tests_(std::move(tests)), cfg_(cfg) ,name(name){
+	: tests_(std::move(tests)), cfg_(cfg), name(name) {
 	screenshot_cfg_.promote = cfg.promote;
 	screenshot_cfg_.interactive = cfg.interactive;
 	is_this_editor_mode = name == "Editor";
@@ -18,7 +18,6 @@ GameTestRunner::GameTestRunner(std::string_view name, std::vector<TestEntry> tes
 
 bool GameTestRunner::tick(float dt) {
 	// First call: kick off the first test
-
 
 	const std::string xml_path = "TestFiles/integration_" + StringUtils::to_lower(name.data()) + "_results.xml";
 
@@ -52,8 +51,8 @@ bool GameTestRunner::tick(float dt) {
 	// Screenshot: capture after the frame that rendered (wait_ticks reached 0)
 	if (ctx_.wait.screenshot_pending && ctx_.wait.wait_ticks == 0) {
 		ctx_.wait.screenshot_pending = false;
-		bool ok = screenshot_capture_and_compare(ctx_.wait.screenshot_name.c_str(), screenshot_cfg_,
-												get_app_window_size());
+		bool ok =
+			screenshot_capture_and_compare(ctx_.wait.screenshot_name.c_str(), screenshot_cfg_, get_app_window_size());
 		if (!ok)
 			ctx_.check(false, ("screenshot failed: " + ctx_.wait.screenshot_name).c_str());
 	}
@@ -130,8 +129,8 @@ void GameTestRunner::write_results_xml(const char* path) {
 	if (!f)
 		return;
 	fprintf(f, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-	fprintf(f, "<testsuite name=\"IntegrationTests.%s\" tests=\"%d\" failures=\"%d\">\n",name.data(), (int)results_.size(),
-			failed_count_);
+	fprintf(f, "<testsuite name=\"IntegrationTests.%s\" tests=\"%d\" failures=\"%d\">\n", name.data(),
+			(int)results_.size(), failed_count_);
 	for (auto& r : results_) {
 		fprintf(f, "  <testcase name=\"%s\">\n", r.name.c_str());
 		for (auto& fail : r.failures)

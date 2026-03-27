@@ -27,7 +27,6 @@ bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cf
 	const int w = size.x;
 	const int h = size.y;
 
-
 	std::vector<unsigned char> pixels(w * h * 3);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glReadPixels(0, 0, w, h, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());

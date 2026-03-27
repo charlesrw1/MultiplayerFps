@@ -17,6 +17,7 @@ extern ConfigVar g_run_tests;
 extern ConfigVar g_window_w;
 extern ConfigVar g_window_h;
 extern glm::ivec2 get_app_window_size();
+extern void set_app_window_size(glm::ivec2 new_size);
 
 extern ConfigVar g_window_fullscreen;
 extern ConfigVar g_host_port;

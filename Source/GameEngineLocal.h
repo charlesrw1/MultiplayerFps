@@ -33,7 +33,7 @@ class UIControl;
 struct SceneDrawParamsEx;
 struct View_Setup;
 class EditorState;
-
+struct MainConfigurationOptions;
 class GameEngineLocal : public GameEnginePublic
 {
 public:
@@ -75,7 +75,7 @@ public:
 
 	// local functions
 public:
-	void init(int argc, char** argv);
+	void init(MainConfigurationOptions& options, int argc, char** argv);
 	void cleanup();
 
 	void get_draw_params(SceneDrawParamsEx& param, View_Setup& setup);

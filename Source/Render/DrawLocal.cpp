@@ -90,7 +90,7 @@ ConfigVar r_ignore_depth_shader("r_ignore_depth_shader", "0", CVAR_BOOL | CVAR_D
 ConfigVar enable_gl_debug_output("enable_gl_debug_output", "1", CVAR_BOOL, "");
 ConfigVar r_taa_jitter_test("r.taa_jitter_test", "0", CVAR_INTEGER, "", 0, 4);
 ConfigVar r_normal_shaded_debug("r.normal_shaded_debug", "1", CVAR_BOOL, "");
-ConfigVar log_shader_compiles("log_shader_compiles", "1", CVAR_BOOL, "");
+ConfigVar log_shader_compiles("log_shader_compiles", "0", CVAR_BOOL, "");
 
 ConfigVar r_debug_mode("r.debug_mode", "0", CVAR_INTEGER | CVAR_DEV,
 					   "render debug mode, see Draw.cpp for DEBUG_x values, 0 to disable", 0, 200);
@@ -1489,7 +1489,7 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, bufferha
 	constants.invview = glm::inverse(vs.view);
 	constants.invproj = glm::inverse(vs.proj);
 	constants.inv_viewproj = glm::inverse(vs.viewproj);
-	constants.viewpos_time = glm::vec4(vs.origin, TimeSinceStart());
+	constants.viewpos_time = glm::vec4(vs.origin, current_time);
 	constants.viewfront = glm::vec4(vs.front, 0.0);
 	constants.viewport_size = glm::vec4(vs.width, vs.height, 0, 0);
 	constants.prev_viewproj = last_frame_main_view.viewproj;
@@ -1791,7 +1791,7 @@ void Renderer::init() {
 	auto print_time = [&](const char* msg) {
 		double now = GetTime();
 		// printf("-----TIME %s %f\n", msg, float(now - start));
-		sys_print(Debug,"init % s in % fs\n", msg, float(now - start));
+		sys_print(Debug, "init % s in % fs\n", msg, float(now - start));
 		start = now;
 	};
 
@@ -3873,7 +3873,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	// ZoneScoped;
 	GPUSCOPESTART(scene_draw_internal_scope);
 
-	current_time = GetTime();
+	current_time = params.time;
 
 	mem_arena.free_bottom();
 	stats = Render_Stats();

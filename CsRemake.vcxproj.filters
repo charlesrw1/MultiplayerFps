@@ -447,6 +447,8 @@
     <ClCompile Include="Source\Sound\SoundLocal.cpp">
       <Filter>Source\Sound</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Scripting\LuaTestRunner.cpp" />
+    <ClCompile Include="Source\UI\Gui.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation\AnimationTypes.h">
@@ -1070,6 +1072,9 @@
     <ClInclude Include="Source\Sound\SoundLocal.h">
       <Filter>Source\Sound</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Scripting\LuaTestRunner.h" />
+    <ClInclude Include="Source\UI\Gui.h" />
+    <ClInclude Include="Source\EngineMain.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

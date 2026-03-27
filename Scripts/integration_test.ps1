@@ -27,7 +27,7 @@ if (-not (Test-Path $exe)) { Write-Error "Binary not found: $exe"; exit 1 }
 
 # ---- Helpers ---------------------------------------------------------------
 function Build-Args([string]$mode) {
-    $a = @("--mode=$mode") + "--no_console_print"
+    $a = @("--mode=$mode")
     if ($TestFilter)   { $a += "--test=$TestFilter" }
     if ($Promote)      { $a += "--promote" }
     if ($TimingAssert) { $a += "--timing-assert" }
@@ -36,12 +36,12 @@ function Build-Args([string]$mode) {
 
 # ---- Game pass -------------------------------------------------------------
 Write-Host "`n=== Game pass ===" -ForegroundColor Cyan
-& $exe (Build-Args "game") -exec "test_game_vars.txt"
+& $exe (Build-Args "game")
 $gameExit = $LASTEXITCODE
 
 # ---- Editor pass -----------------------------------------------------------
 Write-Host "`n=== Editor pass ===" -ForegroundColor Cyan
-& $exe (Build-Args "editor") -exec "test_editor_vars.txt"
+& $exe (Build-Args "editor")
 $editorExit = $LASTEXITCODE
 
 # ---- Merge JUnit XML -------------------------------------------------------

@@ -186,6 +186,7 @@
     <ClInclude Include="Source\EditorPopups.h" />
     <ClInclude Include="Source\EditorPopupTemplate.h" />
     <ClInclude Include="Source\EngineEditorState.h" />
+    <ClInclude Include="Source\EngineMain.h" />
     <ClInclude Include="Source\Framework\ArenaAllocator.h" />
     <ClInclude Include="Source\Framework\ArenaStd.h" />
     <ClInclude Include="Source\Framework\BoolButton.h" />

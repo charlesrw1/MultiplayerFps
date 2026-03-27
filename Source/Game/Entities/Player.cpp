@@ -865,7 +865,7 @@ void CamPathFollowerLua::update() {
 		lTransform& p1 = path.points.at(first + 1);
 		scene_cam->get_owner()->set_ws_position_rotation(glm::mix(glm::vec3(p0.pos), glm::vec3(p1.pos), frac),
 														 glm::slerp(glm::quat(p0.rot), glm::quat(p1.rot), frac));
-		GameplayStatic::debug_text(string_format("%i %.3f", first, frac));
+		// GameplayStatic::debug_text(string_format("%i %.3f", first, frac));
 	}
 	float dt = GameplayStatic::get_dt();
 	cur_time += dt;

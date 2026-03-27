@@ -54,7 +54,7 @@
 #include "Assets/AssetBundle.h"
 #include "Framework/StringUtils.h"
 #include "Scripting/ScriptManager.h"
-
+#include "EngineMain.h"
 #include "EditorPopupTemplate.h"
 #include "Animation/SkeletonData.h"
 #include <mutex>
@@ -99,7 +99,6 @@ ConfigVar g_window_h("vid.height", "800", CVAR_INTEGER, "", 1, 4000);
 ConfigVar g_window_fullscreen("vid.fullscreen", "0", CVAR_BOOL, "");
 ConfigVar g_host_port("net.hostport", "47000", CVAR_INTEGER | CVAR_READONLY, "", 0, UINT16_MAX);
 ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV, "");
-ConfigVar g_run_tests("g_run_tests", "0", CVAR_BOOL, "run lua integration tests on startup then quit");
 ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL,
 						 "enables dev mode features like compiling assets when loading");
 ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop", 0.0001, 5.0);
@@ -340,7 +339,10 @@ Logger* Logger::inst = nullptr;
 void sys_print(LogType type, const char* fmt, ...) {
 	va_list args;
 	va_start(args, fmt);
-	Logger::inst->log(type, fmt, args);
+	if (Logger::inst)
+		Logger::inst->log(type, fmt, args);
+	else
+		vprintf(fmt, args);
 	va_end(args);
 }
 
@@ -815,14 +817,9 @@ void GameEngineLocal::add_commands() {
 	g_modelMgr.add_commands(*commands);
 }
 
-ITestRunner* g_pending_test_runner = nullptr;
-bool g_pending_skip_swap = false;
-
 void GameEngineLocal::set_runner(ITestRunner* runner, bool skip_swap_) {
-#ifdef EDITOR_BUILD
 	test_runner = runner;
 	skip_swap = skip_swap_;
-#endif
 }
 
 #include "Render/Frustum.h"
@@ -1043,15 +1040,15 @@ int benchmark_free_list() {
 	return 0;
 }
 
-int game_engine_main(int argc, char** argv) {
-	material_print_debug.set_bool(true);
+int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
+	//material_print_debug.set_bool(true);
 	// developer_mode.set_bool(false);
-	log_shader_compiles.set_bool(false);
-	log_all_asset_loads.set_bool(true);
-	eng_local.init(argc, argv);
+	//log_shader_compiles.set_bool(false);
+	//log_all_asset_loads.set_bool(true);
+	eng_local.init(options, argc, argv);
 	// developer_mode.set_bool(true);
 	// log_all_asset_loads.set_bool(false);
-	log_destroy_game_objects.set_bool(false);
+	//log_destroy_game_objects.set_bool(false);
 	// loglevel.set_integer(1);
 
 	// c->buzzer();
@@ -1229,6 +1226,10 @@ bool GameEngineLocal::is_drawing_to_window_viewport() const {
 glm::ivec2 get_app_window_size() {
 	return {g_window_w.get_integer(), g_window_h.get_integer()};
 }
+void set_app_window_size(glm::ivec2 i) {
+	g_window_w.set_integer(i.x);
+	g_window_w.set_integer(i.y);
+}
 static bool scene_hovered = false;
 
 #include "Framework/MyImguiLib.h"
@@ -1374,29 +1375,26 @@ void GameEngineLocal::init_sdl_window() {
 
 using std::make_unique;
 
-ImFont* global_big_imgui_font = nullptr;
-ConfigVar dont_print_log_to_console("dont_print_log_to_console", "0", CVAR_BOOL, "");
 static bool has_arg(int argc, char** argv, const char* flag) {
 	for (int i = 1; i < argc; ++i)
 		if (std::string(argv[i]) == flag)
 			return true;
 	return false;
 }
-void GameEngineLocal::init(int argc, char** argv) {
+void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** argv) {
 	this->argc = argc;
 	this->argv = argv;
 
 	FileSys::init();
 
 	Logger::inst = new Logger;
-	Logger::inst->add_sink(std::make_shared<FileSink>("output.log"));
-	if (!has_arg(argc, argv, "--no_console_print")) {
+	Logger::inst->add_sink(std::make_shared<FileSink>(options.log_file));
+	if (!options.no_console_print) {
 		Logger::inst->add_sink(std::make_shared<ConsoleSink>());
 		Logger::inst->add_sink(std::make_shared<GameConsoleSink>());
 	}
 	sys_print(Debug, "%s\n", append_strings(argc, argv).c_str());
 	sys_print(Debug, "%s\n", current_timestamp().c_str());
-	sys_print(Debug, "---------------------------------\n");
 
 	sys_print(Info, "--------- Initializing Engine ---------\n");
 
@@ -1428,7 +1426,7 @@ void GameEngineLocal::init(int argc, char** argv) {
 	Profiler::init();
 
 	Cmd_Manager::inst->set_set_unknown_variables(true);
-	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "vars.txt");
+	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, options.vars_file.c_str());
 	print_time("execute vars file");
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
@@ -1499,15 +1497,24 @@ void GameEngineLocal::init(int argc, char** argv) {
 	ImGui_ImplOpenGL3_Init();
 	print_time("imgui init");
 
-	auto path = FileSys::get_full_path_from_game_path("eng/inconsolata_bold.ttf");
-	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
-	global_big_imgui_font = ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 24.0);
-	path = FileSys::get_full_path_from_game_path("inter_regular.ttf");
-	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 14.0);
-	ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), 18.0);
-
-	ImGui::GetIO().Fonts->Build();
+	auto build_imgui_fonts = []() {
+		auto add_font_to_imgui = [&](std::string data_path, std::vector<float> sizes) -> void {
+			auto path = FileSys::get_full_path_from_game_path(data_path.c_str());
+			if (FileSys::does_file_exist(path.c_str(), FileSys::FULL_SYSTEM)) {
+				for (auto s : sizes)
+					ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), s);
+			}
+			else {
+				sys_print(Error, ".ttf for imgui not found: %s\n", path.c_str());
+			}
+		};
+		add_font_to_imgui("eng/inconsolata_bold.ttf", { 14.0,24.0 });
+		add_font_to_imgui("inter_regular.ttf", { 14.0,18.0 });
+		ImGui::GetIO().Fonts->Build();
+	};
+	build_imgui_fonts();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
 	print_time("imgui font");
 
 	SDL_SetWindowPosition(window, startx, starty);
@@ -1533,14 +1540,6 @@ void GameEngineLocal::init(int argc, char** argv) {
 		});
 
 		app->start();
-		if (g_run_tests.get_bool()) {
-			app->run_integration_tests();
-		}
-		// inject pending test runner (game mode)
-		if (g_pending_test_runner && eng_local.app) {
-			eng_local.set_runner(g_pending_test_runner, g_pending_skip_swap);
-			g_pending_test_runner = nullptr;
-		}
 	};
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
@@ -1550,11 +1549,6 @@ void GameEngineLocal::init(int argc, char** argv) {
 		editorState = make_unique<EditorState>();
 		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		print_time("asset reg and browser init");
-		// inject pending test runner (editor mode)
-		if (g_pending_test_runner && !eng_local.app) {
-			eng_local.set_runner(g_pending_test_runner, g_pending_skip_swap);
-			g_pending_test_runner = nullptr;
-		}
 	} else {
 		start_game();
 	}
@@ -1562,7 +1556,16 @@ void GameEngineLocal::init(int argc, char** argv) {
 	start_game();
 #endif
 
-	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, "init.txt");
+	// inject pending test runner
+	if (options.pending_test_runnner.get()) {
+		set_runner(options.pending_test_runnner.release(), options.skip_swap);
+		if (get_app()) {
+			ASSERT(!is_editor_app.get_bool());
+			app->run_integration_tests();
+		}
+	}
+
+	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, options.init_file.c_str());
 	print_time("execute init");
 	Cmd_Manager::inst->set_set_unknown_variables(false);
 
