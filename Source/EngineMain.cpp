@@ -47,7 +47,6 @@
 #include "tracy/public/tracy/TracyOpenGL.hpp"
 #include "Framework/Jobs.h"
 #include "EditorPopups.h"
-#include "IntegrationTest.h"
 #include "EngineEditorState.h"
 #include "DebugConsole.h"
 #include "Scripting/ScriptManager.h"
