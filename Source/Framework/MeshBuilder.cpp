@@ -1,6 +1,7 @@
 #include "Framework/MeshBuilder.h"
 #include "glad/glad.h"
 #include "MeshBuilderImpl.h"
+#include <glm/gtc/constants.hpp>
 
 static const int MIN_VERTEX_ARRAY_SIZE = 16;
 
@@ -239,6 +240,21 @@ void MeshBuilder::AddLineCapsule(vec3 origin, float radius, float realhalfheight
 		AddVertex(MbVertex(vec3(x, y, z) * radius + origin + glm::vec3(0, halfheight, 0), color));
 		AddVertex(MbVertex(vec3(x, y, z) * radius + origin - glm::vec3(0, halfheight, 0), color));
 		AddLine(verticies.size() - 2, verticies.size() - 1);
+	}
+}
+void MeshBuilder::Push2dCircle(glm::vec2 center, float radius, int segments, Color32 color) {
+	const float step = (2.0f * glm::pi<float>()) / segments;
+	const int base = GetBaseVertex();
+	// Center vertex
+	AddVertex(MbVertex(glm::vec3(center, 0), color));
+	for (int i = 0; i <= segments; i++) {
+		float angle = i * step;
+		glm::vec2 p = center + glm::vec2(cos(angle), sin(angle)) * radius;
+		AddVertex(MbVertex(glm::vec3(p, 0), color));
+	}
+	// Triangle fan: center + adjacent ring vertices
+	for (int i = 0; i < segments; i++) {
+		AddTriangle(base, base + 1 + i, base + 2 + i);
 	}
 }
 void MeshBuilder::AddSphere(vec3 origin, float radius, int xsegments, int ysegments, Color32 color) {

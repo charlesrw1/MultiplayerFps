@@ -48,6 +48,7 @@ public:
 	void AddSphere(vec3 origin, float radius, int xsegments, int ysegments, Color32 color);
 	void AddLineCapsule(vec3 origin, float radius, float half_height, Color32 color);
 	void AddLineSphere(vec3 origin, float radius, Color32 color);
+	void Push2dCircle(glm::vec2 center, float radius, int segments, Color32 color);
 
 	const std::vector<MbVertex>& get_v() { return verticies; }
 	const std::vector<uint32_t>& get_i() { return indicies; }
