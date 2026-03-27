@@ -341,7 +341,67 @@ class Inspector:
 
 
 # ---------------------------------------------------------------------------
-# Main entry point (filled in later tasks)
+# Output
+# ---------------------------------------------------------------------------
+
+def build_report(inspector: "Inspector", file_reports: Dict[str, dict]) -> dict:
+    """Assemble the full JSON report structure."""
+    globals_out = {}
+    for usr, g in inspector.globals.items():
+        globals_out[g.qualified_name] = {
+            "name": g.name,
+            "type": g.type_str,
+            "file": g.file,
+            "line": g.line,
+            "is_static": g.is_static,
+        }
+
+    return {
+        "globals": globals_out,
+        "files": file_reports,
+        "parse_errors": inspector.parse_errors,
+    }
+
+
+def pretty_print(report: dict) -> None:
+    """Print a ranked summary to stdout."""
+    globals_meta = report["globals"]
+
+    def _describe(qname: str) -> str:
+        g = globals_meta.get(qname)
+        if g is None:
+            return qname
+        tag = "static" if g["is_static"] else "non-static"
+        return f"({tag}) {qname} — {g['type']}"
+
+    files = report["files"]
+    ranked = sorted(files.items(), key=lambda kv: len(kv[1]["transitive_globals"]), reverse=True)
+
+    print("\n=== Global Variable Access Report ===\n")
+    for filepath, data in ranked:
+        ndirect = len(data["direct_globals"])
+        ntrans = len(data["transitive_globals"])
+        print(f"{filepath}  [direct: {ndirect}, transitive: {ntrans}]")
+
+        if data["direct_globals"]:
+            print("  Direct:")
+            for qname in data["direct_globals"]:
+                print(f"    {_describe(qname)}")
+
+        extra = [g for g in data["transitive_globals"] if g not in data["direct_globals"]]
+        if extra:
+            print("  Transitive (additional):")
+            for qname in extra:
+                print(f"    {_describe(qname)}")
+        print()
+
+    nerrors = len(report["parse_errors"])
+    if nerrors:
+        print(f"parse errors: {nerrors} file(s) — see output JSON for details\n")
+
+
+# ---------------------------------------------------------------------------
+# Main entry point
 # ---------------------------------------------------------------------------
 
 def main():
@@ -363,9 +423,46 @@ def main():
     if args.exclude is None:
         args.exclude = ["External"]
 
+    if not os.path.isdir(args.src_dir):
+        print(f"ERROR: src_dir not found: {args.src_dir}")
+        sys.exit(1)
+
     cl = load_libclang()
     print(f"Scanning: {args.src_dir}")
     print(f"Excluding dirs containing: {args.exclude}")
+
+    files = find_source_files(args.src_dir, args.exclude, args.include_headers)
+    print(f"Found {len(files)} source file(s)")
+
+    inspector = Inspector(cl, args.exclude)
+
+    # Pass 1: collect globals from all files
+    print("Pass 1: collecting globals...")
+    for f in files:
+        inspector.collect_file_globals(f)
+    print(f"  Found {len(inspector.globals)} global variable(s)")
+
+    # Pass 2: analyze function bodies in .cpp files only
+    cpp_files = [f for f in files if f.suffix.lower() in _CPP_EXTS]
+    if args.include_headers:
+        cpp_files = files
+    print(f"Pass 2: analyzing {len(cpp_files)} file(s) for function bodies...")
+    for f in cpp_files:
+        inspector.analyze_file_functions(f)
+    print(f"  Found {len(inspector.functions)} function definition(s)")
+
+    # Pass 3: transitive closure
+    print("Pass 3: computing transitive closure...")
+    file_reports = inspector.compute_file_reports()
+
+    # Output
+    report = build_report(inspector, file_reports)
+    with open(args.output, "w", encoding="utf-8") as fh:
+        json.dump(report, fh, indent=2)
+    print(f"\nReport written to: {args.output}")
+
+    if not args.no_pretty:
+        pretty_print(report)
 
 
 if __name__ == "__main__":
