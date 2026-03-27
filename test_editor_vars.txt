@@ -1,3 +1,4 @@
 
 is_editor_app 1
 r.taa 0
+ui.disable_screen_log 1

@@ -108,6 +108,66 @@ public:
 	REF static void debug_break() { __debugbreak(); }
 	REF static bool is_editor() { return eng->is_editor_level(); }
 };
+class LuaMiscFuncs : public ClassBase
+{
+public:
+	CLASS_BODY(LuaMiscFuncs, scriptable);
+	static LuaMiscFuncs* inst;
+	REF virtual Entity* create_ragdoll() { return nullptr; }
+};
+
+class CameraPathFollower
+{
+public:
+	CameraPathFollower(std::vector<SpawnerComponent*> components);
+	static glm::vec3 catmull_rom(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t);
+	void update();
+
+	struct Point
+	{
+		glm::vec3 p;
+		glm::quat q;
+	};
+	std::vector<Point> points;
+	double time_per_point = 6.0;
+	double time_start = 0.0;
+};
+template <typename T> inline T negative_modulo(T x, T mod_) {
+	return ((x % mod_) + mod_ % mod_);
+}
+#include "Scripting/ScriptFunctionCodegen.h"
+#include "Framework/MathLib.h"
+#include "Game/Entities/Player.h"
+struct CamPathPoints
+{
+	STRUCT_BODY();
+
+	REF float time = 1.0;
+	REF std::vector<lTransform> points;
+};
+class CamPathFollowerLua : public ClassBase
+{
+public:
+	CLASS_BODY(CamPathFollowerLua);
+
+	REF void clear_all() { paths.clear(); }
+	REF void add(CamPathPoints points) { paths.push_back(points); }
+	REF void goto_next() {
+		cur_time = 0.0;
+		cur_idx = (cur_idx + 1) % paths.size();
+	}
+	REF void goto_prev() {
+		cur_time = 0.0;
+		cur_idx -= 1;
+		if (cur_idx < 0)
+			cur_idx += paths.size();
+	}
+	REF void update();
+	float cur_time = 0.0;
+	int cur_idx = -1;
+	std::vector<CamPathPoints> paths;
+};
+
 #include "Input/InputSystem.h"
 //
 /// <summary>

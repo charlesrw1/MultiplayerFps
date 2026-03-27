@@ -2,3 +2,4 @@
 g_application_class "EngineTesterAppImpl"
 is_editor_app 0
 r.taa 0
+ui.disable_screen_log 1
