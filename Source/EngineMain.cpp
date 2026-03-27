@@ -725,14 +725,13 @@ void GameEngineLocal::add_commands() {
 	g_modelMgr.add_commands(*commands);
 }
 
-void test_integration_1(IntegrationTester& tester) {}
+ITestRunner* g_pending_test_runner = nullptr;
+bool g_pending_skip_swap = false;
 
-#include "Testheader.h"
-
-void GameEngineLocal::set_tester(IntegrationTester* tester, bool headless_mode) {
+void GameEngineLocal::set_runner(ITestRunner* runner, bool skip_swap_) {
 #ifdef EDITOR_BUILD
-	this->tester.reset(tester);
-	this->headless_mode = headless_mode;
+	test_runner = runner;
+	skip_swap = skip_swap_;
 #endif
 }
 
@@ -1443,6 +1442,11 @@ void GameEngineLocal::init(int argc, char** argv) {
 		});
 
 		app->start();
+		// inject pending test runner (game mode)
+		if (g_pending_test_runner && eng_local.app) {
+			eng_local.set_runner(g_pending_test_runner, g_pending_skip_swap);
+			g_pending_test_runner = nullptr;
+		}
 	};
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
@@ -1452,6 +1456,11 @@ void GameEngineLocal::init(int argc, char** argv) {
 		editorState = make_unique<EditorState>();
 		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		print_time("asset reg and browser init");
+		// inject pending test runner (editor mode)
+		if (g_pending_test_runner && !eng_local.app) {
+			eng_local.set_runner(g_pending_test_runner, g_pending_skip_swap);
+			g_pending_test_runner = nullptr;
+		}
 	} else {
 		start_game();
 	}
@@ -1770,10 +1779,10 @@ void GameEngineLocal::loop() {
 		g_physics.sync_render_data();
 		idraw->sync_update();
 	};
-	auto wait_for_swap = [&](const bool skip_rendering) {
+	auto wait_for_swap = [&](const bool /*unused*/) {
 		// ZoneScopedN("SwapWindow");
 		GPUSCOPESTART(gl_swap_window_scope);
-		if (!skip_rendering)
+		if (!skip_swap)
 			SDL_GL_SwapWindow(window);
 	};
 
@@ -1785,7 +1794,7 @@ void GameEngineLocal::loop() {
 
 	for (;;) {
 		try {
-			const bool skip_rendering = headless_mode;
+			const bool skip_rendering = false; // rendering always runs; only swap is skipped
 
 			// update time
 			const double now = GetTime();
@@ -1796,10 +1805,9 @@ void GameEngineLocal::loop() {
 			frame_time = dt;
 
 #ifdef EDITOR_BUILD
-			if (tester) {
-				bool res = tester->tick(dt);
-				if (res) {
-					Quit();
+			if (test_runner) {
+				if (test_runner->tick(dt)) {
+					exit(test_runner->exit_code());
 				}
 			}
 #endif

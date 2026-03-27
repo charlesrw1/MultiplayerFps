@@ -1,4 +1,5 @@
 #pragma once
+#include "ITestRunner.h"
 #include <SDL2/SDL.h>
 #include <string>
 #include "Types.h"
@@ -31,7 +32,6 @@ class GUI_RootControl;
 class UIControl;
 struct SceneDrawParamsEx;
 struct View_Setup;
-class IntegrationTester;
 class EditorState;
 
 class GameEngineLocal : public GameEnginePublic
@@ -128,15 +128,15 @@ public:
 	// like ["start_ed Map mymap", "map mymap"]
 	std::vector<std::string> engine_map_state_history;
 	std::vector<std::string> engine_map_state_future;
-	uptr<IntegrationTester> tester;
+	ITestRunner* test_runner = nullptr;
 	uptr<EditorState> editorState;
 #endif
 
-	void set_tester(IntegrationTester* tester, bool headless_mode);
+	void set_runner(ITestRunner* runner, bool skip_swap);
 
 private:
 	bool is_hosting_game = false;
-	bool headless_mode = false;
+	bool skip_swap = false;
 	void init_sdl_window();
 	void key_event(SDL_Event event);
 	void draw_any_imgui_interfaces();
