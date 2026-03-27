@@ -145,6 +145,7 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Source\Render\Volumetricfog.cpp" />
+    <ClCompile Include="Source\Scripting\LuaTestRunner.cpp" />
     <ClCompile Include="Source\Scripting\ScriptFunctionCodegen.cpp" />
     <ClCompile Include="Source\Scripting\ScriptingStdLib.cpp" />
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
@@ -327,6 +328,7 @@
     <ClInclude Include="Source\Input\InputSystem.h" />
     <ClInclude Include="Source\Level.h" />
     <ClInclude Include="Source\Physics\Physics2Local.h" />
+    <ClInclude Include="Source\Scripting\LuaTestRunner.h" />
     <ClInclude Include="Source\Scripting\ScriptFunctionCodegen.h" />
     <ClInclude Include="Source\Scripting\ScriptingStdLib.h" />
     <ClInclude Include="Source\Scripting\ScriptManager.h" />
