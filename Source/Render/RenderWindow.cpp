@@ -1,4 +1,5 @@
 #include "RenderWindow.h"
+#include <glm/gtc/constants.hpp>
 
 RenderWindow::RenderWindow() {}
 
@@ -116,4 +117,51 @@ void RenderWindow::draw(TextShape text_shape) {
 	TextShape::draw_text_to_meshbuilder(text_shape, meshbuilder);
 	auto mat = (MaterialInstance*)UiSystem::inst->fontDefaultMat;
 	add_draw_call(mat, start, text_shape.font->font_texture.get());
+}
+
+void RenderWindow::draw(LineShape line_shape) {
+	const int start = meshbuilder.get_i().size();
+	glm::vec2 a(line_shape.start);
+	glm::vec2 b(line_shape.end);
+	glm::vec2 dir = b - a;
+	float len = glm::length(dir);
+	if (len < 0.001f)
+		return;
+	dir /= len;
+	glm::vec2 perp(-dir.y, dir.x);
+	float half = line_shape.thickness * 0.5f;
+	glm::vec2 p0 = a + perp * half;
+	glm::vec2 p1 = a - perp * half;
+	glm::vec2 p2 = b - perp * half;
+	glm::vec2 p3 = b + perp * half;
+	int base = meshbuilder.GetBaseVertex();
+	meshbuilder.AddVertex(MbVertex(glm::vec3(p0, 0), line_shape.color));
+	meshbuilder.AddVertex(MbVertex(glm::vec3(p1, 0), line_shape.color));
+	meshbuilder.AddVertex(MbVertex(glm::vec3(p2, 0), line_shape.color));
+	meshbuilder.AddVertex(MbVertex(glm::vec3(p3, 0), line_shape.color));
+	meshbuilder.AddQuad(base, base + 1, base + 2, base + 3);
+	auto mat = (MaterialInstance*)UiSystem::inst->get_default_ui_mat();
+	add_draw_call(mat, start, nullptr);
+}
+
+void RenderWindow::draw(CircleShape circle_shape) {
+	const int start = meshbuilder.get_i().size();
+	if (circle_shape.filled) {
+		meshbuilder.Push2dCircle(glm::vec2(circle_shape.center), (float)circle_shape.radius, circle_shape.segments,
+								 circle_shape.color);
+	} else {
+		const float step = (2.0f * glm::pi<float>()) / circle_shape.segments;
+		for (int i = 0; i < circle_shape.segments; i++) {
+			float a0 = i * step;
+			float a1 = (i + 1) * step;
+			glm::vec2 pa = glm::vec2(circle_shape.center) + glm::vec2(cos(a0), sin(a0)) * (float)circle_shape.radius;
+			glm::vec2 pb = glm::vec2(circle_shape.center) + glm::vec2(cos(a1), sin(a1)) * (float)circle_shape.radius;
+			int base = meshbuilder.GetBaseVertex();
+			meshbuilder.AddVertex(MbVertex(glm::vec3(pa, 0), circle_shape.color));
+			meshbuilder.AddVertex(MbVertex(glm::vec3(pb, 0), circle_shape.color));
+			meshbuilder.AddLine(base, base + 1);
+		}
+	}
+	auto mat = (MaterialInstance*)UiSystem::inst->get_default_ui_mat();
+	add_draw_call(mat, start, nullptr);
 }

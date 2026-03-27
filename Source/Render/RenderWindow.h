@@ -98,6 +98,20 @@ struct TextShape
 
 	static void draw_text_to_meshbuilder(const TextShape& shape, MeshBuilder& mb);
 };
+struct LineShape
+{
+	glm::ivec2 start, end;
+	int thickness = 1;
+	Color32 color = COLOR_WHITE;
+};
+struct CircleShape
+{
+	glm::ivec2 center;
+	int radius = 8;
+	int segments = 12;
+	bool filled = true;
+	Color32 color = COLOR_WHITE;
+};
 
 class RenderWindow
 {
@@ -114,6 +128,8 @@ public:
 	void add_draw_call(const MaterialInstance* mat, int index_start, const Texture* tex_override = nullptr);
 	void draw(RectangleShape rect_shape);
 	void draw(TextShape text_shape);
+	void draw(LineShape line_shape);
+	void draw(CircleShape circle_shape);
 	const std::vector<UIDrawCmdUnion>& get_draw_cmds() const { return drawCmds; }
 
 	glm::mat4 view_mat = glm::mat4();
