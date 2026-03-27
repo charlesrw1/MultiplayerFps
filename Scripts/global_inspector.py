@@ -131,6 +131,103 @@ def find_source_files(
 
 
 # ---------------------------------------------------------------------------
+# Inspector
+# ---------------------------------------------------------------------------
+
+class Inspector:
+    def __init__(self, cl, exclude_dirs: List[str]):
+        self.cl = cl
+        self.exclude_dirs = [e.lower() for e in exclude_dirs]
+        self.index = cl.Index.create()
+        # Keyed by clang USR string to deduplicate across TUs
+        self.globals: Dict[str, GlobalVar] = {}
+        self.functions: Dict[str, FunctionInfo] = {}
+        self.parse_errors: List[str] = []
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _get_qualified_name(self, cursor) -> str:
+        cl = self.cl
+        parts = []
+        c = cursor
+        while c and c.kind != cl.CursorKind.TRANSLATION_UNIT:
+            if c.spelling:
+                parts.append(c.spelling)
+            c = c.semantic_parent
+        return "::".join(reversed(parts))
+
+    def _is_file_or_namespace_scope(self, cursor) -> bool:
+        cl = self.cl
+        parent = cursor.semantic_parent
+        while parent:
+            k = parent.kind
+            if k == cl.CursorKind.TRANSLATION_UNIT:
+                return True
+            if k == cl.CursorKind.NAMESPACE:
+                parent = parent.semantic_parent
+                continue
+            return False  # Inside a class, function, etc.
+        return False
+
+    def _parse(self, filepath: Path, skip_bodies: bool = False):
+        """Parse a file with libclang; return TU or None on hard failure."""
+        cl = self.cl
+        args = ["-x", "c++", "-std=c++17"]
+        opts = (cl.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES
+                if skip_bodies else 0)
+        try:
+            tu = self.index.parse(str(filepath), args=args, options=opts)
+            errors = [d for d in tu.diagnostics
+                      if d.severity >= cl.Diagnostic.Error]
+            if len(errors) > 10:
+                self.parse_errors.append(
+                    f"{filepath}: {len(errors)} parse errors — results may be incomplete"
+                )
+            return tu
+        except Exception as exc:
+            self.parse_errors.append(f"{filepath}: {exc}")
+            return None
+
+    # ------------------------------------------------------------------
+    # Pass 1: global collection
+    # ------------------------------------------------------------------
+
+    def collect_file_globals(self, filepath: Path):
+        """Parse filepath and register all file/namespace-scope VAR_DECLs."""
+        cl = self.cl
+        tu = self._parse(filepath, skip_bodies=True)
+        if tu is None:
+            return
+
+        fp_str = str(filepath)
+
+        def _walk(cursor):
+            if cursor.kind == cl.CursorKind.VAR_DECL:
+                loc = cursor.location
+                if loc.file and os.path.normpath(str(loc.file.name)) == os.path.normpath(fp_str):
+                    if self._is_file_or_namespace_scope(cursor):
+                        usr = cursor.get_usr()
+                        if usr and usr not in self.globals:
+                            is_static = (
+                                cursor.storage_class == cl.StorageClass.STATIC
+                            )
+                            self.globals[usr] = GlobalVar(
+                                name=cursor.spelling,
+                                qualified_name=self._get_qualified_name(cursor),
+                                type_str=cursor.type.spelling,
+                                file=fp_str,
+                                line=loc.line,
+                                is_static=is_static,
+                            )
+            for child in cursor.get_children():
+                _walk(child)
+
+        _walk(tu.cursor)
+
+
+# ---------------------------------------------------------------------------
 # Main entry point (filled in later tasks)
 # ---------------------------------------------------------------------------
 
