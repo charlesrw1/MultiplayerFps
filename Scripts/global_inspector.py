@@ -388,7 +388,8 @@ def pretty_print(report: dict) -> None:
             for qname in data["direct_globals"]:
                 print(f"    {_describe(qname)}")
 
-        extra = [g for g in data["transitive_globals"] if g not in data["direct_globals"]]
+        direct_set = set(data["direct_globals"])
+        extra = [g for g in data["transitive_globals"] if g not in direct_set]
         if extra:
             print("  Transitive (additional):")
             for qname in extra:
