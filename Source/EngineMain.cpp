@@ -963,23 +963,6 @@ int game_engine_main(int argc, char** argv) {
 	// log_all_asset_loads.set_bool(false);
 	log_destroy_game_objects.set_bool(false);
 	// loglevel.set_integer(1);
-#if 0
-	vector<IntTestCase> tests;
-	tests.push_back({ test_integration_1, "myTest" });
-	tests.push_back({ test_integration_2, "myTest2" });
-	tests.push_back({ test_state, "test_state" });
-	tests.push_back({ test_opening_prefab_as_map, "test_opening_prefab_as_map" });
-	tests.push_back({ test_loading_prefab_without_component, "test_loading_prefab_without_component" });
-	tests.push_back({ test_loading_invalid_prefab, "test_loading_invalid_prefab" });
-	tests.push_back({ test_remove_and_undo_pfb, "test_remove_and_undo_pfb" });
-	tests.push_back({ test_editor_entity_ptr, "test_editor_entity_ptr" });
-
-	//Cmd_Manager::inst->append_cmd(uptr<OpenMapCommand>(new OpenMapCommand("top_down/map0.tmap", true)));
-
-	//eng_local.set_tester(new IntegrationTester(true, tests), false);
-	auto c = ClassBase::create_class<InterfaceClass>("TestClassI");
-	//
-#endif
 
 	// c->buzzer();
 	// int val = c->get_value("hello");
