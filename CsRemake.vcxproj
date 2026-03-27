@@ -150,6 +150,7 @@
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
     <ClCompile Include="Source\UI\BaseGUI.cpp" />
     <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
+    <ClCompile Include="Source\UI\Gui.cpp" />
     <ClCompile Include="Source\UI\GUISystemPublic.cpp" />
     <ClCompile Include="Source\UI\UIBuilder.cpp" />
     <ClCompile Include="Source\UI\UILoader.cpp" />
@@ -356,6 +357,7 @@
     <ClInclude Include="Source\Sound\SoundPublic.h" />
     <ClInclude Include="Source\Types.h" />
     <ClInclude Include="Source\UI\BaseGUI.h" />
+    <ClInclude Include="Source\UI\Gui.h" />
     <ClInclude Include="Source\UI\GUISystemPublic.h" />
     <ClInclude Include="Source\UI\UIBuilder.h" />
     <ClInclude Include="Source\UI\UILoader.h" />
