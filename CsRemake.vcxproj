@@ -106,7 +106,6 @@
     <ClCompile Include="Source\Game\TopDownShooter\TopDownPlayer.cpp" />
     <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
     <ClCompile Include="Source\Game\TP\TPGame.cpp" />
-    <ClCompile Include="Source\IntegrationTest.cpp" />
     <ClCompile Include="Source\LevelEditor\Commands.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
@@ -228,7 +227,6 @@
     <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
     <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
-    <ClInclude Include="Source\IntegrationTest.h" />
     <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h" />
     <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h" />
     <ClInclude Include="Source\LevelEditor\PropertyEditors.h" />
