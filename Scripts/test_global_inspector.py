@@ -36,3 +36,18 @@ def test_find_source_files_include_headers(tmp_path):
     names = [Path(f).name for f in files]
     assert "foo.cpp" in names
     assert "bar.h" in names
+
+
+def test_find_source_files_nested_exclude(tmp_path):
+    from global_inspector import find_source_files
+    src = tmp_path / "Source"
+    src.mkdir()
+    (src / "engine.cpp").write_text("int x;")
+    ext = src / "External"
+    ext.mkdir()
+    (ext / "imgui.cpp").write_text("int y;")
+
+    files = find_source_files(str(tmp_path), exclude_dirs=["External"], include_headers=False)
+    names = [Path(f).name for f in files]
+    assert "engine.cpp" in names
+    assert "imgui.cpp" not in names   # nested External excluded
