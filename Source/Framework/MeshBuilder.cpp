@@ -243,18 +243,20 @@ void MeshBuilder::AddLineCapsule(vec3 origin, float radius, float realhalfheight
 	}
 }
 void MeshBuilder::Push2dCircle(glm::vec2 center, float radius, int segments, Color32 color) {
+	if (segments <= 0)
+		return;
 	const float step = (2.0f * glm::pi<float>()) / segments;
 	const int base = GetBaseVertex();
 	// Center vertex
 	AddVertex(MbVertex(glm::vec3(center, 0), color));
-	for (int i = 0; i <= segments; i++) {
+	for (int i = 0; i < segments; i++) {
 		float angle = i * step;
 		glm::vec2 p = center + glm::vec2(cos(angle), sin(angle)) * radius;
 		AddVertex(MbVertex(glm::vec3(p, 0), color));
 	}
-	// Triangle fan: center + adjacent ring vertices
+	// Triangle fan: close by wrapping last ring vertex back to first
 	for (int i = 0; i < segments; i++) {
-		AddTriangle(base, base + 1 + i, base + 2 + i);
+		AddTriangle(base, base + 1 + i, base + 1 + (i + 1) % segments);
 	}
 }
 void MeshBuilder::AddSphere(vec3 origin, float radius, int xsegments, int ysegments, Color32 color) {
