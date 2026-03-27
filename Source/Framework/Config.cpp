@@ -158,6 +158,11 @@ public:
 	void set_var_bool(const char* name, bool bVal) { set_var_string(name, std::to_string((int)bVal).c_str()); }
 	void set_var_float(const char* name, float fVal) { set_var_string(name, std::to_string(fVal).c_str()); }
 
+	void enumerate_vars(void (*callback)(const ConfigVarDataPublic&, void*), void* user) const override {
+		for (auto& pair : vars)
+			callback(*pair.second, user);
+	}
+
 	void print_vars(const char* match) {
 		sys_print(Info, "%--36s %s", "name", "value");
 		// for (int i = 0; i < num_vars; i++)

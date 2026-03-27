@@ -3,6 +3,7 @@
 #include "Framework/Files.h"
 #include "Framework/MapUtil.h"
 #include <cassert>
+#include "Framework/Config.h"
 
 extern "C"
 {
@@ -126,9 +127,26 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 	return out;
 }
 
+static ConfigVar g_lua_debug("g_lua_debug", "0", CVAR_BOOL, "Start MobDebug on script load (requires ZeroBrane/DAP server on port g_lua_debug_port)");
+static ConfigVar g_lua_debug_host("g_lua_debug_host", "localhost", 0, "MobDebug server host");
+static ConfigVar g_lua_debug_port("g_lua_debug_port", "8172", CVAR_INTEGER, "MobDebug server port");
+// Extra directory to add to Lua package.cpath for loading socket/core.dll and mime/core.dll.
+// Set to your vcpkg bin dir, e.g.: C:/Users/you/source/vcpkg/installed/x64-windows/bin
+static ConfigVar g_lua_cpath_extra("g_lua_cpath_extra", "", 0, "Extra dir appended to Lua package.cpath for C socket extensions");
+
 ScriptManager::ScriptManager() {
 	lua = luaL_newstate();
 	luaL_openlibs(lua);
+
+	// Add Data/scripts/lib/ to package.path so require("mobdebug"), require("socket"), etc. work.
+	// Files in lib/ are module-style (not auto-executed by reload_all_scripts).
+	lua_getglobal(lua, "package");
+	lua_getfield(lua, -1, "path");
+	std::string new_path = std::string(lua_tostring(lua, -1)) + ";Data/scripts/lib/?.lua";
+	lua_pop(lua, 1);
+	lua_pushstring(lua, new_path.c_str());
+	lua_setfield(lua, -2, "path");
+	lua_pop(lua, 1);
 }
 
 ScriptManager::~ScriptManager() {
@@ -343,6 +361,9 @@ void ScriptManager::reload_all_scripts() {
 	std::vector<string> files;
 	for (auto& file : FileSys::find_game_files_path("scripts")) {
 		if (file.find("lua_stubs.lua") != string::npos)
+			continue;
+		// lib/ holds require-style modules (mobdebug, socket, etc.) — not auto-executed
+		if (file.find("/lib/") != string::npos || file.find("\\lib\\") != string::npos)
 			continue;
 		if (StringUtils::get_extension_no_dot(file) == "lua") {
 			sys_print(Debug, "ScriptManager::load_script_files: found lua file %s\n", file.c_str());

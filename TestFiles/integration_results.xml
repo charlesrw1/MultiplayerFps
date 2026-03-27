@@ -1,13 +1,15 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-<testsuite name="IntegrationTests.Game" tests="11" failures="0">
+<testsuite name="IntegrationTests.Game" tests="11" failures="2">
   <testcase name="game/boot">
   </testcase>
   <testcase name="game/level_load">
   </testcase>
   <testcase name="renderer/screenshot_smoke">
+    <failure message="FAIL: screenshot failed: smoke_demo_level_1"/>
   </testcase>
   <testcase name="renderer/ssr_smoke">
+    <failure message="FAIL: screenshot failed: ssr_smoke"/>
   </testcase>
   <testcase name="filesys/write_read_roundtrip">
   </testcase>

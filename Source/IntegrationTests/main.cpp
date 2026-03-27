@@ -7,6 +7,8 @@
 #include "TestGameApp.h"
 #include "EngineMain.h"
 #include "Framework/Config.h"
+#include "Framework/Util.h"
+#include "StateDump.h"
 
 // Defined in EngineMain.cpp — set before calling game_engine_main
 extern ITestRunner* g_pending_test_runner;
@@ -44,6 +46,11 @@ int main(int argc, char** argv) {
 	bool interactive = has_arg(argc, argv, "--interactive");
 	bool timing_assert = has_arg(argc, argv, "--timing-assert");
 	bool skip_swap = !interactive;
+
+	set_assert_hook([](const char* cond) {
+		fprintf(stderr, "\n[ASSERT FAILED] %s\n", cond);
+		print_stack_trace();
+	});
 
 	TestRunnerConfig cfg;
 	cfg.test_filter = test_filter;

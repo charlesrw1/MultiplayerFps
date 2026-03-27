@@ -3,7 +3,12 @@
 #include <cstdlib>
 #include <stdexcept>
 
+static AssertHookFn s_assert_hook = nullptr;
+void set_assert_hook(AssertHookFn fn) { s_assert_hook = fn; }
+
 void handle_assert_internal(const char* cond) {
+	if (s_assert_hook)
+		s_assert_hook(cond);
 	printf("Assertion failed: %s", cond);
 #ifdef WITH_TEST_ASSERT
 	if (ProgramTester::get().get_is_in_test())

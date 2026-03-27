@@ -15,6 +15,7 @@
 
 #include "glm/glm.hpp"
 #include "Render/DrawLocal.h"
+#include "RenderDump.h"
 static std::string actual_path(const char* name) {
 	return std::string("TestFiles/screenshots/") + name + "_actual.png";
 }
@@ -61,12 +62,16 @@ bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cf
 	unsigned char* golden = stbi_load(gp.c_str(), &gw, &gh, &gc, 3);
 	if (!golden) {
 		fprintf(stderr, "  SCREENSHOT FAIL: no golden at %s — run with --promote\n", gp.c_str());
+		// SKIP THESE
+		//dump_render_targets(name);
 		return false;
 	}
 
 	if (gw != w || gh != h) {
 		fprintf(stderr, "  SCREENSHOT FAIL: size mismatch — golden %dx%d vs actual %dx%d\n", gw, gh, w, h);
 		stbi_image_free(golden);
+		// SKIP THESE
+		//dump_render_targets(name);
 		return false;
 	}
 
@@ -85,10 +90,12 @@ bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cf
 	float diff_frac = (float)diff_pixels / (float)(total * 3);
 	bool pass = (max_delta <= cfg.max_channel_delta) && (diff_frac <= cfg.max_diff_fraction);
 
-	if (!pass)
+	if (!pass) {
 		fprintf(stderr, "  SCREENSHOT FAIL: max_delta=%d diff_pixels=%d (%.4f%%) — golden: %s\n", max_delta,
 				diff_pixels, diff_frac * 100.f, gp.c_str());
-	else
+		// SKIP THESE
+		//dump_render_targets(name);
+	} else
 		printf("  Screenshot OK: max_delta=%d diff_pixels=%d\n", max_delta, diff_pixels);
 
 	return pass;

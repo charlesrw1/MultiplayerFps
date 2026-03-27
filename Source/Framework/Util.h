@@ -4,6 +4,8 @@
 #include "Framework/Handle.h"
 
 void handle_assert_internal(const char* msg);
+typedef void (*AssertHookFn)(const char* condition);
+void set_assert_hook(AssertHookFn fn);
 #ifdef WITH_ASSERT
 #define ASSERT(x)                                                                                                      \
 	do {                                                                                                               \

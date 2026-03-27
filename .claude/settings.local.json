@@ -116,7 +116,18 @@
       "Bash(powershell.exe -Command \"cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake; py Scripts/global_inspector.py Source/ --output globals_report.json\" 2>&1)",
       "Bash(powershell.exe -Command \"cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake; py Scripts/global_inspector.py Source/ --output globals_report.json 2>&1\")",
       "Bash(powershell.exe -Command \"cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake; git status 2>&1\")",
-      "Bash(powershell.exe -Command \"cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake; git diff Scripts/global_inspector.py 2>&1\")"
+      "Bash(powershell.exe -Command \"cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake; git diff Scripts/global_inspector.py 2>&1\")",
+      "Bash(powershell.exe -Command \"cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake; py Scripts/global_inspector.py Source/ --output globals_report.json --graph globals_graph.html 2>&1\")",
+      "Bash(powershell.exe -Command \"cd Scripts; py -m pytest test_global_inspector.py -v 2>&1\")",
+      "Bash(Get-Content \"C:\\\\Users\\\\charl\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-charl-source-repos-CsRemake\\\\801dccc4-a48b-4688-b8e5-b01eef260390\\\\tasks\\\\bwu8uzjul.output\")",
+      "Bash(powershell.exe -Command \"$input | Select-Object -Last 30\")",
+      "Bash(powershell.exe -Command \"Get-Content 'C:\\\\Users\\\\charl\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-charl-source-repos-CsRemake\\\\801dccc4-a48b-4688-b8e5-b01eef260390\\\\tasks\\\\bwu8uzjul.output' | Select-Object -Last 20\")",
+      "Bash(powershell.exe -Command \"Get-Content 'C:\\\\Users\\\\charl\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-charl-source-repos-CsRemake\\\\801dccc4-a48b-4688-b8e5-b01eef260390\\\\tasks\\\\bwu8uzjul.output' | Select-String -Pattern 'Entity' -Context 0,5\")",
+      "Bash(powershell.exe -Command \"\\(Get-Item 'C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\globals_graph.html'\\).Length / 1KB\")",
+      "Bash(powershell.exe -Command \"Get-Content 'C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\globals_report.json' | ConvertFrom-Json | Select-Object -ExpandProperty globals | Get-Member -MemberType NoteProperty | Where-Object { $_.Name -like '*idraw*' -or $_.Name -like '*draw*' }\")",
+      "Bash(powershell.exe -Command \"Select-String -Path 'C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\globals_report.json' -Pattern 'idraw' | Select-Object -First 10\")",
+      "Bash(powershell.exe -Command \"Select-String -Path 'C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\globals_report.json' -Pattern 'EditorDoc' | Select-Object -First 5\")",
+      "Bash(powershell.exe -Command \"Select-String -Path 'C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\globals_report.json' -Pattern 'EditorDocLocal.cpp' | Select-Object -First 3\")"
     ]
   },
   "enabledPlugins": {

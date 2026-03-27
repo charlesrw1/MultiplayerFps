@@ -55,11 +55,12 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;EDITOR_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;EDITOR_BUILD;WITH_ASSERT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Source\;$(SolutionDir)Source\External\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -73,11 +74,12 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;EDITOR_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;EDITOR_BUILD;WITH_ASSERT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)Source\;$(SolutionDir)Source\External\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -94,6 +96,8 @@
     <ClCompile Include="GameTestRunner.cpp" />
     <ClCompile Include="EditorTestContext.cpp" />
     <ClCompile Include="Screenshot.cpp" />
+    <ClCompile Include="RenderDump.cpp" />
+    <ClCompile Include="StateDump.cpp" />
     <ClCompile Include="GpuTimer.cpp" />
     <ClCompile Include="Tests\Renderer\test_basic.cpp" />
     <ClCompile Include="Tests\Editor\test_serialize.cpp" />
@@ -108,6 +112,8 @@
     <ClInclude Include="TestGameApp.h" />
     <ClInclude Include="EditorTestContext.h" />
     <ClInclude Include="Screenshot.h" />
+    <ClInclude Include="RenderDump.h" />
+    <ClInclude Include="StateDump.h" />
     <ClInclude Include="GpuTimer.h" />
   </ItemGroup>
   <ItemGroup>

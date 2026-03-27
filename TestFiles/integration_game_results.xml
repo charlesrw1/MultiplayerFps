@@ -9,8 +9,6 @@
   </testcase>
   <testcase name="renderer/ssr_smoke">
     <failure message="FAIL: screenshot failed: ssr_smoke"/>
-    <failure message="FAIL: screenshot failed: ssr_smoke_2"/>
-    <failure message="FAIL: screenshot failed: ssr_smoke_3"/>
   </testcase>
   <testcase name="filesys/write_read_roundtrip">
   </testcase>

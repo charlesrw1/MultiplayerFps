@@ -20,6 +20,8 @@ struct TestWaitState
 	bool screenshot_pending = false;
 	std::string screenshot_name;
 	std::string level_path;
+	bool dump_state_pending = false;
+	std::string dump_state_label;
 };
 
 struct TestContext
@@ -82,11 +84,25 @@ struct TestContext
 		void await_resume() noexcept {}
 	};
 
+	struct DumpStateAwaitable
+	{
+		TestWaitState& wait;
+		const char* label;
+		bool await_ready() const noexcept { return false; }
+		void await_suspend(std::coroutine_handle<>) noexcept {
+			wait.dump_state_pending = true;
+			wait.dump_state_label = label;
+			wait.wait_ticks = 0;
+		}
+		void await_resume() noexcept {}
+	};
+
 	TickAwaitable wait_ticks(int n) { return {wait, n}; }
 	SecondAwaitable wait_seconds(float t) { return {wait, t}; }
 	DelegateAwaitable wait_for(MulticastDelegate<>& d) { return {wait, d}; }
 	LevelAwaitable load_level(const char* path) { return {wait, path}; }
 	ScreenshotAwaitable capture_screenshot(const char* name) { return {wait, name}; }
+	DumpStateAwaitable dump_state(const char* label) { return {wait, label}; }
 
 	ScopedGpuTimer gpu_timer(const char* name);
 

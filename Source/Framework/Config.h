@@ -81,6 +81,7 @@ public:
 	virtual void set_var_int(const char* name, int iVAl) = 0;
 	virtual void set_var_bool(const char* name, bool bVal) = 0;
 	virtual void set_var_float(const char* name, float fVal) = 0;
+	virtual void enumerate_vars(void (*callback)(const ConfigVarDataPublic&, void*), void* user) const = 0;
 };
 
 class BackgroundCommand

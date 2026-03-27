@@ -7,6 +7,7 @@
 #include <direct.h>
 #include "GameEnginePublic.h"
 #include "Framework/StringUtils.h"
+#include "StateDump.h"
 GameTestRunner::GameTestRunner(std::string_view name, std::vector<TestEntry> tests, const TestRunnerConfig& cfg)
 	: tests_(std::move(tests)), cfg_(cfg), name(name) {
 	screenshot_cfg_.promote = cfg.promote;
@@ -46,6 +47,17 @@ bool GameTestRunner::tick(float dt) {
 			return true;
 		}
 		return false;
+	}
+
+	// State dump: requested via co_await t.dump_state("label")
+	if (ctx_.wait.dump_state_pending) {
+		ctx_.wait.dump_state_pending = false;
+		std::string full_label = std::string(tests_[current_idx_].name) + "_" + ctx_.wait.dump_state_label;
+		// sanitize label for use as filename
+		for (char& c : full_label)
+			if (c == '/' || c == '\\' || c == ':' || c == ' ')
+				c = '_';
+		print_engine_state(full_label.c_str());
 	}
 
 	// Screenshot: capture after the frame that rendered (wait_ticks reached 0)
