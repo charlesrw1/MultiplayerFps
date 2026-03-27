@@ -1,12 +1,26 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-<testsuite name="IntegrationTests.Game" tests="3" failures="1">
+<testsuite name="IntegrationTests.Game" tests="10" failures="1">
   <testcase name="game/boot">
   </testcase>
   <testcase name="game/level_load">
   </testcase>
   <testcase name="renderer/screenshot_smoke">
     <failure message="FAIL: screenshot failed: smoke_demo_level_1"/>
+  </testcase>
+  <testcase name="filesys/write_read_roundtrip">
+  </testcase>
+  <testcase name="filesys/exist_true">
+  </testcase>
+  <testcase name="filesys/exist_false">
+  </testcase>
+  <testcase name="filesys/delete_game_file">
+  </testcase>
+  <testcase name="game/time_advances">
+  </testcase>
+  <testcase name="game/dt_positive">
+  </testcase>
+  <testcase name="game/get_entity_invalid_handle">
   </testcase>
 </testsuite>
 <testsuite name="IntegrationTests.Editor" tests="2" failures="0">
