@@ -285,6 +285,60 @@ class Inspector:
 
         _walk(tu.cursor)
 
+    # ------------------------------------------------------------------
+    # Pass 3: transitive closure
+    # ------------------------------------------------------------------
+
+    def compute_file_reports(self) -> Dict[str, dict]:
+        """
+        For each file, compute direct + transitive global sets.
+        Returns a dict keyed by filepath.
+        """
+        # Group functions by the file they are defined in
+        file_to_funcs: Dict[str, Set[str]] = defaultdict(set)
+        for qname, finfo in self.functions.items():
+            file_to_funcs[finfo.file].add(qname)
+
+        results: Dict[str, dict] = {}
+
+        for filepath, func_qnames in file_to_funcs.items():
+            # Direct globals = union of all functions in this file
+            direct: Set[str] = set()
+            for qn in func_qnames:
+                direct |= self.functions[qn].direct_globals
+
+            # BFS over call graph for transitive globals
+            visited: Set[str] = set(func_qnames)
+            queue: deque = deque(func_qnames)
+            transitive: Set[str] = set(direct)
+
+            while queue:
+                qn = queue.popleft()
+                fn = self.functions.get(qn)
+                if fn is None:
+                    continue
+                for callee in fn.calls:
+                    if callee not in visited:
+                        visited.add(callee)
+                        queue.append(callee)
+                        callee_fn = self.functions.get(callee)
+                        if callee_fn:
+                            transitive |= callee_fn.direct_globals
+
+            results[filepath] = {
+                "direct_globals": sorted(direct),
+                "transitive_globals": sorted(transitive),
+                "functions": {
+                    qn: {
+                        "direct_globals": sorted(self.functions[qn].direct_globals),
+                        "calls": sorted(self.functions[qn].calls),
+                    }
+                    for qn in func_qnames
+                },
+            }
+
+        return results
+
 
 # ---------------------------------------------------------------------------
 # Main entry point (filled in later tasks)

@@ -129,3 +129,54 @@ def test_detects_call_edge(tmp_path):
     caller = insp.functions.get("caller")
     assert caller is not None
     assert "helper" in caller.calls
+
+
+def test_transitive_global_through_call(tmp_path):
+    insp = _make_inspector()
+    f = tmp_path / "foo.cpp"
+    f.write_text(
+        "int g_state = 0;\n"
+        "void helper() { g_state = 1; }\n"
+        "void top() { helper(); }\n"
+    )
+    insp.collect_file_globals(f)
+    insp.analyze_file_functions(f)
+    report = insp.compute_file_reports()
+    fp = str(f)
+    assert fp in report
+    # top() doesn't touch g_state directly but helper() does
+    assert "g_state" not in report[fp]["functions"]["top"]["direct_globals"]
+    assert "g_state" in report[fp]["transitive_globals"]
+
+
+def test_no_duplicate_in_transitive(tmp_path):
+    insp = _make_inspector()
+    f = tmp_path / "foo.cpp"
+    f.write_text(
+        "int g_x = 0;\n"
+        "void a() { g_x = 1; }\n"
+        "void b() { g_x = 2; }\n"
+        "void top() { a(); b(); }\n"
+    )
+    insp.collect_file_globals(f)
+    insp.analyze_file_functions(f)
+    report = insp.compute_file_reports()
+    fp = str(f)
+    assert report[fp]["transitive_globals"].count("g_x") == 1
+
+
+def test_cycle_in_call_graph(tmp_path):
+    insp = _make_inspector()
+    f = tmp_path / "foo.cpp"
+    f.write_text(
+        "int g_x = 0;\n"
+        "void a();\n"
+        "void b() { g_x = 1; a(); }\n"
+        "void a() { b(); }\n"
+    )
+    insp.collect_file_globals(f)
+    insp.analyze_file_functions(f)
+    # Should not hang or crash on cycle
+    report = insp.compute_file_reports()
+    fp = str(f)
+    assert "g_x" in report[fp]["transitive_globals"]
