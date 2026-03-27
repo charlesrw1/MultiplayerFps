@@ -9,9 +9,6 @@
 class EditorTestContext;
 class ScopedGpuTimer;
 
-// Thrown by require() to abort the current test without crashing
-struct TestAbortException {};
-
 // State the runner checks each tick to decide whether to resume the coroutine.
 // Awaitables write into this struct during await_suspend.
 struct TestWaitState {
@@ -21,6 +18,7 @@ struct TestWaitState {
     bool   delegate_fired    = false;
     bool   screenshot_pending = false;
     std::string screenshot_name;
+    std::string level_path;
 };
 
 struct TestContext {
@@ -59,7 +57,10 @@ struct TestContext {
         TestWaitState& wait;
         const char* path;
         bool await_ready() const noexcept { return false; }
-        void await_suspend(std::coroutine_handle<>) noexcept;
+        void await_suspend(std::coroutine_handle<>) noexcept {
+            wait.level_path = path;
+            wait.wait_ticks = 1; // runner will call load_level and then resume
+        }
         void await_resume() noexcept {}
     };
     struct ScreenshotAwaitable {

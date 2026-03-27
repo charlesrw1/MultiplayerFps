@@ -2,7 +2,6 @@
 #define _CRT_SECURE_NO_WARNINGS
 #include "GpuTimer.h"
 #include <cstdio>
-#include <ctime>
 
 GpuTimingLog& GpuTimingLog::get() {
     static GpuTimingLog s;
@@ -34,8 +33,12 @@ ScopedGpuTimer::ScopedGpuTimer(const char* name) : name_(name) {
 ScopedGpuTimer::~ScopedGpuTimer() {
     if (query_id_) {
         glEndQuery(GL_TIME_ELAPSED);
-        double result = ms();
-        GpuTimingLog::get().record(name_, result);
+        if (result_read_) {
+            // Caller already read the result via ms() — record it
+            GpuTimingLog::get().record(name_, cached_ms_);
+        }
+        // If not result_read_, caller forgot to read before destruction.
+        // Don't block on GL_QUERY_RESULT here — just clean up.
         glDeleteQueries(1, &query_id_);
     }
 }

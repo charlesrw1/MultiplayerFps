@@ -1,6 +1,11 @@
 // Source/IntegrationTests/TestTask.h
 #pragma once
 #include <coroutine>
+#include <exception>
+
+// Thrown by TestContext::require() to abort a test without crashing the process.
+// Caught by TestTask::promise_type::unhandled_exception — do not catch elsewhere.
+struct TestAbortException {};
 
 // The return type for all test coroutines.
 // Usage: TestTask my_test(TestContext& t) { co_await t.wait_ticks(1); }
@@ -14,7 +19,15 @@ struct TestTask {
         // Stay alive after completion so done() is readable
         std::suspend_always final_suspend() noexcept { return {}; }
         void return_void() noexcept {}
-        void unhandled_exception() noexcept { std::terminate(); }
+        void unhandled_exception() noexcept {
+            try {
+                std::rethrow_exception(std::current_exception());
+            } catch (const TestAbortException&) {
+                // Test aborted via require() — runner sees done()==true and records failure
+            } catch (...) {
+                std::terminate();
+            }
+        }
     };
 
     std::coroutine_handle<promise_type> handle;

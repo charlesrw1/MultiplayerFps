@@ -2,7 +2,6 @@
 #include "TestContext.h"
 #include "EditorTestContext.h"
 #include "GpuTimer.h"
-#include "GameEnginePublic.h"
 #include <cstdio>
 #include <cassert>
 
@@ -29,16 +28,12 @@ void TestContext::require(bool b, const char* msg) {
 void TestContext::DelegateAwaitable::await_suspend(std::coroutine_handle<>) noexcept {
     wait.waiting_delegate = true;
     wait.delegate_fired = false;
-    delegate.add(this, [this]() {
-        wait.delegate_fired = true;
-        delegate.remove(this);
+    TestWaitState* w = &wait;
+    MulticastDelegate<>* d = &delegate;
+    delegate.add(w, [w, d]() {
+        w->delegate_fired = true;
+        d->remove(w);
     });
-}
-
-void TestContext::LevelAwaitable::await_suspend(std::coroutine_handle<>) noexcept {
-    eng->load_level(path);
-    // level load is synchronous — one tick to settle
-    wait.wait_ticks = 1;
 }
 
 ScopedGpuTimer TestContext::gpu_timer(const char* name) {
