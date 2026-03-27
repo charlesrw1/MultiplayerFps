@@ -45,13 +45,20 @@ def load_libclang():
         r"C:\Program Files\LLVM\bin\libclang.dll",
         r"C:\Program Files (x86)\LLVM\bin\libclang.dll",
     ]
+
+    # Check LIBCLANG_PATH environment variable
+    env_path = os.environ.get("LIBCLANG_PATH")
+    if env_path:
+        candidate_paths = [env_path] + candidate_paths
+
     for path in candidate_paths:
         if os.path.exists(path):
             cl.Config.set_library_file(path)
             try:
                 cl.Index.create()
                 return cl
-            except Exception:
+            except Exception as exc:
+                print(f"  (tried {path}: {exc})")
                 continue
 
     print("ERROR: libclang.dll not found.")
@@ -93,7 +100,7 @@ def main():
     parser.add_argument("src_dir", help="Root source directory to analyze")
     parser.add_argument("--output", default="globals_report.json",
                         help="JSON output file (default: globals_report.json)")
-    parser.add_argument("--exclude", action="append", default=["External"],
+    parser.add_argument("--exclude", action="append", default=None,
                         metavar="DIR",
                         help="Directory name to exclude (repeatable, default: External)")
     parser.add_argument("--no-pretty", action="store_true",
@@ -101,6 +108,9 @@ def main():
     parser.add_argument("--include-headers", action="store_true",
                         help="Also analyze .h/.hpp files for function bodies")
     args = parser.parse_args()
+
+    if args.exclude is None:
+        args.exclude = ["External"]
 
     cl = load_libclang()
     print(f"Scanning: {args.src_dir}")
