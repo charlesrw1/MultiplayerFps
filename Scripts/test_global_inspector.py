@@ -1,6 +1,7 @@
 import pytest
 import sys
 import os
+from pathlib import Path
 sys.path.insert(0, os.path.dirname(__file__))
 
 def test_libclang_loads():
@@ -9,3 +10,29 @@ def test_libclang_loads():
     assert cl is not None
     idx = cl.Index.create()
     assert idx is not None
+
+
+def test_find_source_files_basic(tmp_path):
+    from global_inspector import find_source_files
+    (tmp_path / "foo.cpp").write_text("int x;")
+    (tmp_path / "bar.h").write_text("int y;")
+    sub = tmp_path / "External"
+    sub.mkdir()
+    (sub / "third.cpp").write_text("int z;")
+
+    files = find_source_files(str(tmp_path), exclude_dirs=["External"], include_headers=False)
+    names = [Path(f).name for f in files]
+    assert "foo.cpp" in names
+    assert "bar.h" not in names        # headers excluded by default
+    assert "third.cpp" not in names    # External excluded
+
+
+def test_find_source_files_include_headers(tmp_path):
+    from global_inspector import find_source_files
+    (tmp_path / "foo.cpp").write_text("int x;")
+    (tmp_path / "bar.h").write_text("int y;")
+
+    files = find_source_files(str(tmp_path), exclude_dirs=[], include_headers=True)
+    names = [Path(f).name for f in files]
+    assert "foo.cpp" in names
+    assert "bar.h" in names

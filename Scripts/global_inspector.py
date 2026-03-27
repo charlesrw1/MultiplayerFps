@@ -90,6 +90,47 @@ class FunctionInfo:
 
 
 # ---------------------------------------------------------------------------
+# File discovery
+# ---------------------------------------------------------------------------
+
+_CPP_EXTS = {".cpp", ".cxx", ".cc"}
+_HEADER_EXTS = {".h", ".hpp", ".hxx"}
+
+
+def find_source_files(
+    src_dir: str,
+    exclude_dirs: List[str],
+    include_headers: bool,
+) -> List[Path]:
+    """Walk src_dir and return all C++ source files, skipping excluded dirs."""
+    exts = set(_CPP_EXTS)
+    if include_headers:
+        exts |= _HEADER_EXTS
+
+    exclude_lower = [e.lower() for e in exclude_dirs]
+
+    def _is_excluded(path: str) -> bool:
+        normalized = path.replace("\\", "/").lower()
+        return any(f"/{e}/" in normalized or normalized.endswith(f"/{e}")
+                   for e in exclude_lower)
+
+    results: List[Path] = []
+    for root, dirs, files in os.walk(src_dir):
+        if _is_excluded(root):
+            dirs.clear()
+            continue
+        # Prune excluded subdirs in-place so os.walk doesn't descend
+        dirs[:] = [
+            d for d in dirs
+            if d.lower() not in exclude_lower
+        ]
+        for fname in files:
+            if Path(fname).suffix.lower() in exts:
+                results.append(Path(root) / fname)
+    return results
+
+
+# ---------------------------------------------------------------------------
 # Main entry point (filled in later tasks)
 # ---------------------------------------------------------------------------
 
