@@ -226,6 +226,65 @@ class Inspector:
 
         _walk(tu.cursor)
 
+    # ------------------------------------------------------------------
+    # Pass 2: function analysis
+    # ------------------------------------------------------------------
+
+    def analyze_file_functions(self, filepath: Path):
+        """Parse filepath with function bodies; record direct globals and calls."""
+        cl = self.cl
+        tu = self._parse(filepath, skip_bodies=False)
+        if tu is None:
+            return
+
+        fp_str = str(filepath)
+        # Build a fast lookup: USR -> qualified_name for known globals
+        usr_to_qname: Dict[str, str] = {
+            usr: g.qualified_name for usr, g in self.globals.items()
+        }
+
+        def _analyze_body(func_cursor, qname: str):
+            info = FunctionInfo(qualified_name=qname, file=fp_str)
+
+            def _walk_body(cursor):
+                if cursor.kind == cl.CursorKind.DECL_REF_EXPR:
+                    ref = cursor.referenced
+                    if ref:
+                        usr = ref.get_usr()
+                        if usr in usr_to_qname:
+                            info.direct_globals.add(usr_to_qname[usr])
+                elif cursor.kind == cl.CursorKind.CALL_EXPR:
+                    ref = cursor.referenced
+                    if ref and ref.spelling:
+                        callee_qname = self._get_qualified_name(ref)
+                        if callee_qname:
+                            info.calls.add(callee_qname)
+                for child in cursor.get_children():
+                    _walk_body(child)
+
+            _walk_body(func_cursor)
+            return info
+
+        _FUNC_KINDS = (
+            cl.CursorKind.FUNCTION_DECL,
+            cl.CursorKind.CXX_METHOD,
+            cl.CursorKind.CONSTRUCTOR,
+            cl.CursorKind.DESTRUCTOR,
+        )
+
+        def _walk(cursor):
+            if cursor.kind in _FUNC_KINDS:
+                loc = cursor.location
+                if (cursor.is_definition()
+                        and loc.file
+                        and os.path.normpath(str(loc.file.name)) == os.path.normpath(fp_str)):
+                    qname = self._get_qualified_name(cursor)
+                    self.functions[qname] = _analyze_body(cursor, qname)
+            for child in cursor.get_children():
+                _walk(child)
+
+        _walk(tu.cursor)
+
 
 # ---------------------------------------------------------------------------
 # Main entry point (filled in later tasks)

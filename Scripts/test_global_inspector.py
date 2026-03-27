@@ -88,3 +88,44 @@ def test_skips_local_variable(tmp_path):
     insp.collect_file_globals(f)
     by_name = {v.name: v for v in insp.globals.values()}
     assert "local" not in by_name
+
+
+def test_detects_direct_global_reference(tmp_path):
+    insp = _make_inspector()
+    f = tmp_path / "foo.cpp"
+    f.write_text(
+        "int g_value = 0;\n"
+        "void setter() { g_value = 5; }\n"
+    )
+    insp.collect_file_globals(f)
+    insp.analyze_file_functions(f)
+    assert "setter" in insp.functions
+    fn = insp.functions["setter"]
+    assert "g_value" in fn.direct_globals
+
+
+def test_no_false_positive_for_local(tmp_path):
+    insp = _make_inspector()
+    f = tmp_path / "foo.cpp"
+    f.write_text(
+        "void fn() { int local = 1; local = 2; }\n"
+    )
+    insp.collect_file_globals(f)
+    insp.analyze_file_functions(f)
+    fn = insp.functions.get("fn")
+    assert fn is not None
+    assert len(fn.direct_globals) == 0
+
+
+def test_detects_call_edge(tmp_path):
+    insp = _make_inspector()
+    f = tmp_path / "foo.cpp"
+    f.write_text(
+        "void helper() {}\n"
+        "void caller() { helper(); }\n"
+    )
+    insp.collect_file_globals(f)
+    insp.analyze_file_functions(f)
+    caller = insp.functions.get("caller")
+    assert caller is not None
+    assert "helper" in caller.calls
