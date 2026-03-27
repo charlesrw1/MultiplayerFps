@@ -34,3 +34,6 @@ todo.txt
 *.zip
 
 __pycache__/
+
+TestFiles/screenshots/
+TestFiles/timing_*.json

@@ -111,6 +111,9 @@
     <ClInclude Include="GpuTimer.h" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\CsRemake.vcxproj">
+      <Project>{359193A0-4260-402D-968F-060546D8C049}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\External\External.vcxproj">
       <Project>{8d0a22ce-2c78-4f41-9cdc-94d0abe8e634}</Project>
     </ProjectReference>
