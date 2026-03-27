@@ -180,3 +180,35 @@ def test_cycle_in_call_graph(tmp_path):
     report = insp.compute_file_reports()
     fp = str(f)
     assert "g_x" in report[fp]["transitive_globals"]
+
+
+def test_end_to_end_json_output(tmp_path):
+    """Full pipeline: two files, one calls the other, check JSON shape."""
+    from global_inspector import Inspector, find_source_files, build_report, load_libclang
+    cl = load_libclang()
+
+    (tmp_path / "utils.cpp").write_text(
+        "int g_count = 0;\n"
+        "void increment() { g_count++; }\n"
+    )
+    (tmp_path / "main.cpp").write_text(
+        "void increment();\n"
+        "void run() { increment(); }\n"
+    )
+
+    files = find_source_files(str(tmp_path), exclude_dirs=[], include_headers=False)
+    insp = Inspector(cl, exclude_dirs=[])
+    for f in files:
+        insp.collect_file_globals(f)
+    for f in files:
+        insp.analyze_file_functions(f)
+    file_reports = insp.compute_file_reports()
+    report = build_report(insp, file_reports)
+
+    assert "g_count" in report["globals"]
+    assert report["globals"]["g_count"]["is_static"] == False
+
+    # utils.cpp: increment() directly touches g_count
+    utils_key = next(k for k in report["files"] if "utils" in k)
+    assert "g_count" in report["files"][utils_key]["direct_globals"]
+    assert "g_count" in report["files"][utils_key]["transitive_globals"]
