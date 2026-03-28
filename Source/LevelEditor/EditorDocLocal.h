@@ -43,7 +43,20 @@
 #include <variant>
 #include "UI/GUISystemPublic.h"
 #include "LevelSerialization/SerializeNew.h"
+#include "DragDropPreview.h"
+#include "DragDetector.h"
+
 extern ConfigVar g_mousesens;
+
+extern ConfigVar ed_has_snap;
+extern ConfigVar ed_translation_snap;
+extern ConfigVar ed_translation_snap_exp;
+extern ConfigVar ed_rotation_snap;
+extern ConfigVar ed_rotation_snap_exp;
+extern ConfigVar ed_scale_snap_exp;
+extern ConfigVar ed_scale_snap;
+
+
 
 enum TransformType
 {
@@ -106,46 +119,9 @@ public:
 
 
 
-struct DragDetector : public IInputReciever
-{
-	DragDetector(EditorDoc& doc) : doc(doc) {}
-	string get_name() final { return "drag detector"; }
-	MulticastDelegate<Rect2d> on_drag_end;
-	void on_focused_tick() final;
-	void tick(bool can_start_drag);
-	bool get_is_dragging() const;
-	Rect2d get_drag_rect() const;
 
-private:
-	void end_drag_func();
-	EditorDoc& doc;
-	bool is_dragging = false;
-	int mouseClickX = 0;
-	int mouseClickY = 0;
-};
 
-class DragDropPreview
-{
-public:
-	void set_preview_model(Model* m, const glm::mat4& where);
-	void set_preview_component(const ClassTypeInfo* t, const glm::mat4& where);
-	void tick();
 
-private:
-	void fixup_entity();
-	void delete_obj();
-	bool had_state_set = false;
-	enum class State
-	{
-		None,
-		PreviewModel,
-		PreviewPrefab,
-		PreviewComponent
-	} state = State::None;
-	Model* preview_model = nullptr;
-	const ClassTypeInfo* preview_comp = nullptr;
-	obj<Entity> obj_ptr;
-};
 
 #include "Render/DrawPublic.h"
 
@@ -176,7 +152,7 @@ template <class... Ts> struct overloads : Ts...
 class LEPlugin;
 class EditorUILayout;
 class Model;
-class EditorDoc : public ILevelEditorInterface
+class EditorDoc : public IEditorTool
 {
 public:
 	static MulticastDelegate<EditorDoc*> on_creation;

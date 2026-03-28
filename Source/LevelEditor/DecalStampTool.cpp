@@ -1,6 +1,7 @@
 
 #include "Game/Components/DecalComponent.h"
 #include "EditorDocLocal.h"
+#include "Render/MaterialPublic.h"
 
 void DecalStampTool::tick() {
 	auto handle_scroll = [&]() {

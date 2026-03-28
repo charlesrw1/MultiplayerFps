@@ -12,7 +12,7 @@
 #include "../Shaders/SharedGpuTypes.txt"
 
 #include "glm/glm.hpp"
-#include "Types.h"
+#include "User_Camera.h"
 
 #include "Render/Shader.h"
 #include "Render/EnvProbe.h"

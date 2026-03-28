@@ -1,6 +1,7 @@
 #include "LevelEditorCamera.h"
 #include "imgui.h"
 #include "Framework/Config.h"
+#include "EditorInputs.h"
 
 inline Ray EditorCamera::unproject_mouse(int mx, int my) const {
 	Ray r;

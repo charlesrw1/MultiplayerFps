@@ -1,6 +1,6 @@
 #pragma once
-
-
+#include "AllHeader.h"
+#include "Framework/PropertyEd.h"
 class EdPropertyGrid
 {
 public:

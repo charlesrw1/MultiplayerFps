@@ -8,6 +8,7 @@
 #include "Assets/AssetRegistry.h"
 #include "EditorDocLocal.h"
 #include "Framework/MyImguiLib.h"
+#include "Game/Components/SpawnerComponenth.h"
 
 void EdPropertyGrid::draw_components(Entity* entity) {
 	ASSERT(selected_component != 0);

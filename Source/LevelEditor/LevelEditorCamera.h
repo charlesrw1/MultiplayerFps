@@ -7,7 +7,7 @@ class EditorInputs;
 #include "Render/ViewSetup.h"
 #include "OrthoCamera.h"
 #include "User_Camera.h"
-
+#include "AllHeader.h"
 using std::string;
 
 class EditorCamera : public IInputReciever

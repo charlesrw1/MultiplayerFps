@@ -78,12 +78,10 @@ public:
 	}
 };
 
-class ILevelEditorInterface
+class IEditorTool
 {
 public:
-	virtual ~ILevelEditorInterface() {}
-
-	virtual Entity* get_selected();
+	virtual ~IEditorTool() {}
 
 
 	// if save is called when !current_document_has_path(), then it will open a popup to pick a save directory

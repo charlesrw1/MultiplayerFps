@@ -2,7 +2,7 @@
 #include "ITestRunner.h"
 #include <SDL2/SDL.h>
 #include <string>
-#include "Types.h"
+#include "User_Camera.h"
 #include "Framework/Config.h"
 #include "Game/Entity.h"
 

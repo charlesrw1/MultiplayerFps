@@ -1,5 +1,7 @@
 #include "ManipulateTransformTool.h"
 #include "EditorDocLocal.h"
+#include "glm/gtc/type_ptr.hpp"
+#include "External/ImGuizmo.h"
 bool line_plane_intersect(Ray r, glm::vec3 plane, float planed, glm::vec3& intersect) {
 	float denom = dot(plane, r.dir);
 

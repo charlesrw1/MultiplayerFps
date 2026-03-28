@@ -1,5 +1,5 @@
+#include "DragDetector.h"
 #include "EditorDocLocal.h"
-
 void DragDetector::end_drag_func() {
 	if (!Input::is_mouse_down(0) && is_dragging) {
 		if (get_is_dragging()) {

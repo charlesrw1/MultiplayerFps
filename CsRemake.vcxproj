@@ -112,8 +112,16 @@
     <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
     <ClCompile Include="Source\Game\TP\TPGame.cpp" />
     <ClCompile Include="Source\LevelEditor\Commands.cpp" />
+    <ClCompile Include="Source\LevelEditor\DecalStampTool.cpp" />
+    <ClCompile Include="Source\LevelEditor\DragDetector.cpp" />
+    <ClCompile Include="Source\LevelEditor\DragDropPreview.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
+    <ClCompile Include="Source\LevelEditor\EdPropertyGrid.cpp" />
+    <ClCompile Include="Source\LevelEditor\FoliagePaintTool.cpp" />
+    <ClCompile Include="Source\LevelEditor\LevelEditorCamera.cpp" />
+    <ClCompile Include="Source\LevelEditor\ManipulateTransformTool.cpp" />
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
+    <ClCompile Include="Source\LevelEditor\OrthoCamera.cpp" />
     <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp" />
     <ClCompile Include="Source\LevelEditor\SceneExport.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
@@ -122,6 +130,9 @@
       <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MaxSpeed</Optimization>
       <BasicRuntimeChecks Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Default</BasicRuntimeChecks>
     </ClCompile>
+    <ClCompile Include="Source\LevelEditor\SelectionMode.cpp" />
+    <ClCompile Include="Source\LevelEditor\SelectionState.cpp" />
+    <ClCompile Include="Source\LevelEditor\ViewportHandles.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
     <ClCompile Include="Source\Render\BufferTest\glbuffer.cpp" />
     <ClCompile Include="Source\Render\DdsExport.cpp">
@@ -162,6 +173,7 @@
     <ClCompile Include="Source\UI\UILoader.cpp" />
     <ClCompile Include="Source\UI\Widgets\EditorCube.cpp" />
     <ClCompile Include="Source\UI\Widgets\SharedFuncs.cpp" />
+    <ClCompile Include="Source\User_Camera.cpp" />
     <ClInclude Include="Source\Animation\AnimationTypes.h" />
     <ClInclude Include="Source\Animation\AnimationUtil.h" />
     <ClInclude Include="Source\Animation\Event.h" />
@@ -236,6 +248,8 @@
     <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
     <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
+    <ClInclude Include="Source\LevelEditor\DragDetector.h" />
+    <ClInclude Include="Source\LevelEditor\DragDropPreview.h" />
     <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h" />
     <ClInclude Include="Source\LevelEditor\EditorInputs.h" />
     <ClInclude Include="Source\LevelEditor\EditorModes.h" />

@@ -449,6 +449,19 @@
     </ClCompile>
     <ClCompile Include="Source\Scripting\LuaTestRunner.cpp" />
     <ClCompile Include="Source\UI\Gui.cpp" />
+    <ClCompile Include="Source\Assets\FileWatcher.cpp" />
+    <ClCompile Include="Source\LevelEditor\DragDropPreview.cpp" />
+    <ClCompile Include="Source\LevelEditor\DragDetector.cpp" />
+    <ClCompile Include="Source\LevelEditor\DecalStampTool.cpp" />
+    <ClCompile Include="Source\LevelEditor\LevelEditorCamera.cpp" />
+    <ClCompile Include="Source\LevelEditor\ManipulateTransformTool.cpp" />
+    <ClCompile Include="Source\LevelEditor\OrthoCamera.cpp" />
+    <ClCompile Include="Source\LevelEditor\SelectionMode.cpp" />
+    <ClCompile Include="Source\LevelEditor\SelectionState.cpp" />
+    <ClCompile Include="Source\LevelEditor\ViewportHandles.cpp" />
+    <ClCompile Include="Source\LevelEditor\FoliagePaintTool.cpp" />
+    <ClCompile Include="Source\LevelEditor\EdPropertyGrid.cpp" />
+    <ClCompile Include="Source\User_Camera.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation\AnimationTypes.h">
@@ -1088,6 +1101,9 @@
     <ClInclude Include="Source\Game\GameplayStatic.h" />
     <ClInclude Include="Source\LevelEditor\EdPropertyGrid.h" />
     <ClInclude Include="Source\LevelEditor\EditorModes.h" />
+    <ClInclude Include="Source\Assets\FileWatcher.h" />
+    <ClInclude Include="Source\LevelEditor\DragDetector.h" />
+    <ClInclude Include="Source\LevelEditor\DragDropPreview.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

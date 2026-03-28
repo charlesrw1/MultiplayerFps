@@ -1,7 +1,5 @@
 #pragma once
-#include "IInputReciever.h"
-#include "ImGuizmo.h"
-#include <glm/glm.hpp>
+#include "AllHeader.h"
 class ManipulateTransformTool : public IInputReciever
 {
 public:

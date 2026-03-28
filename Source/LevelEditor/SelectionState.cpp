@@ -1,4 +1,5 @@
 #include "SelectionState.h"
+#include "EditorDocLocal.h"
 
 SelectionState::SelectionState(EditorDoc& ed_doc) {
 	ed_doc.post_node_changes.add(this, &SelectionState::on_node_deleted);
