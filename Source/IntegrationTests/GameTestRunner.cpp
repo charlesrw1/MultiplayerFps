@@ -62,13 +62,9 @@ bool GameTestRunner::tick(float dt) {
 			sys_print(Info, "[AgentREPL] debug_break in test '%s' — connect to 127.0.0.1:9999\n",
 					  tests_[current_idx_].name);
 		}
-		// poll() will block internally if the agent sends "block"
-		if (AgentREPL::inst) {
-			AgentREPL::inst->poll();
-			if (AgentREPL::inst->take_resume_requested()) {
-				ctx_.wait.debug_break_pending = false;
-				debug_break_entered_ = false;
-			}
+		if (AgentREPL::inst && AgentREPL::inst->take_resume_requested()) {
+			ctx_.wait.debug_break_pending = false;
+			debug_break_entered_ = false;
 		}
 		return false;
 	}

@@ -16,6 +16,7 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "Framework/MathLib.h"
 #include "Framework/Config.h"
+#include "Framework/AgentREPL.h"
 #include "Framework/ClassBase.h"
 #include "Framework/MeshBuilder.h"
 #include "Framework/Files.h"
@@ -176,14 +177,11 @@ private:
 };
 //
 
-
-
 void Quit() {
 	sys_print(Info, "Quiting... (runtime %f)\n", TimeSinceStart());
 	eng_local.cleanup();
 	exit(0);
 }
-
 
 int imgui_std_string_resize(ImGuiInputTextCallbackData* data) {
 	std::string* user = (std::string*)data->UserData;
@@ -210,7 +208,6 @@ static void SDLError(const char* msg) {
 	SDL_Quit();
 	exit(-1);
 }
-
 
 vector<string>* GameEngineLocal::find_keybinds(SDL_Scancode code, uint16_t keymod) {
 
@@ -1626,13 +1623,14 @@ void GameEngineLocal::loop() {
 					bool call_exit = true;
 					if (get_app()) {
 						const bool has_integration_tests = app->run_integration_tests();
-						if (has_integration_tests) 
+						if (has_integration_tests)
 							call_exit = false;
 						else {
-							sys_print(Info, "App doesnt have any lua integration tests, exiting. (run_integration_tests should return true if this is wrong)\n");
+							sys_print(Info, "App doesnt have any lua integration tests, exiting. "
+											"(run_integration_tests should return true if this is wrong)\n");
 						}
 					}
-					if(call_exit)
+					if (call_exit)
 						_exit(code);
 				}
 			}
@@ -1640,6 +1638,8 @@ void GameEngineLocal::loop() {
 
 			// update input, console cmd buffer, could change maps etc.
 			frame_start();
+			if (AgentREPL::inst && AgentREPL::inst->is_running())
+				AgentREPL::inst->poll();
 			// overlapped update (game+render)
 			do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering);
 
