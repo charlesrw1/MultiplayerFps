@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-<testsuite name="IntegrationTests.Game" tests="15" failures="1">
+<testsuite name="IntegrationTests.Game" tests="16" failures="0">
   <testcase name="renderer/ssr_smoke">
   </testcase>
   <testcase name="renderer/hotreload_material_instance">
@@ -8,7 +8,8 @@
   <testcase name="renderer/hotreload_master_material">
   </testcase>
   <testcase name="renderer/hotreload_os_filewatcher">
-    <failure message="TIMEOUT"/>
+  </testcase>
+  <testcase name="renderer/hotreload_rapid_save_dedup">
   </testcase>
   <testcase name="filesys/write_read_roundtrip">
   </testcase>
@@ -33,10 +34,12 @@
   <testcase name="game/get_entity_invalid_handle">
   </testcase>
 </testsuite>
-<testsuite name="IntegrationTests.Editor" tests="2" failures="0">
+<testsuite name="IntegrationTests.Editor" tests="3" failures="0">
   <testcase name="editor/serialize_round_trip">
   </testcase>
   <testcase name="editor/undo_noop">
+  </testcase>
+  <testcase name="editor/does_new_assets_appear">
   </testcase>
 </testsuite>
 </testsuites>

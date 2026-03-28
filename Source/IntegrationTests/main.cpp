@@ -72,6 +72,7 @@ int main(int argc, char** argv) {
 		mainOptions.pending_test_runnner.reset(new GameTestRunner("Editor", tests, cfg));
 		mainOptions.vars_file = "test_editor_vars.txt";
 		mainOptions.log_file = "test_editor_output.log";
+		mainOptions.init_file = "";
 	} else {
 		fprintf(stderr, "Unknown mode: %s\n", mode.c_str());
 		return 1;

@@ -328,11 +328,7 @@ void AssetRegistrySystem::update() {
 		if (exists) {
 			root->add_path(aod, split(aod.filename, '/'));
 			tree_dirty = true;
-		} else if (aod.type != modelMeta) {
-			// Safe to remove non-model assets immediately.
-			// Models are left in place: a deleted .cmdl is often about to be
-			// recompiled, and we'd rather tolerate a brief stale entry than
-			// flicker the asset browser.
+		} else {
 			remove_from_tree(*root, aod.filename);
 			tree_dirty = true;
 		}
