@@ -23,6 +23,21 @@ private:
 	Item* find(Item* start, void* key);
 	Item* head = nullptr;
 };
+template <typename... Args>
+class viewMulticastDelegate {
+public:
+	viewMulticastDelegate(MulticastDelegate<Args...>& self) : _delegate(self){}
+	void add(void* key, std::function<void(Args...)> func) {
+		_delegate.add(key,func);
+	}
+	void remove(void* key) {
+		_delegate.remove(key);
+	}
+	bool has_any_listeners() const { return _delegate.has_any_listeners(); }
+private:
+	MulticastDelegate<Args...>& _delegate;
+};
+
 
 template <typename... Args> inline MulticastDelegate<Args...>::~MulticastDelegate() {
 	Item* ptr = head;
