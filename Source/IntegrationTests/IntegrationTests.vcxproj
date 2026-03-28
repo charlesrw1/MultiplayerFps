@@ -101,6 +101,7 @@
     <ClCompile Include="LuaDebugServer.cpp" />
     <ClCompile Include="GpuTimer.cpp" />
     <ClCompile Include="Tests\Renderer\test_basic.cpp" />
+    <ClCompile Include="Tests\Renderer\test_material_hotreload.cpp" />
     <ClCompile Include="Tests\Editor\test_serialize.cpp" />
     <ClCompile Include="Tests\Framework\test_filesys.cpp" />
     <ClCompile Include="Tests\Framework\test_lua_debug_server.cpp" />
