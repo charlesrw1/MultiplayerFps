@@ -14,12 +14,10 @@ C++20 coroutine-based integration testing framework. Tests run inside the full g
 - `RenderDump.h/cpp` — Capture and compare render state
 - `StateDump.h/cpp` — Capture and compare game state
 - `Screenshot.h/cpp` — Screenshot capture and diff
-- `LuaDebugServer.h/cpp` — Lua debugging over network
 - `Tests/Game/test_engine.cpp` — Engine integration tests
 - `Tests/Renderer/test_basic.cpp` — Renderer tests
 - `Tests/Renderer/test_material_hotreload.cpp` — Material hot reload tests (instance reload, master shader reload, OS file-watcher reload)
 - `Tests/Framework/test_filesys.cpp` — File system tests
-- `Tests/Framework/test_lua_debug_server.cpp` — Lua debug server tests
 
 ## Key Classes
 
@@ -62,10 +60,6 @@ Drives test execution each game tick.
 ### `GpuTimer` (GpuTimer.h)
 Wraps OpenGL timer queries to measure GPU time for a code block.
 - Used in performance-sensitive renderer tests to assert frame time budgets
-
-### `LuaDebugServer` (LuaDebugServer.h)
-Runs a debug server that exposes Lua state over a network socket.
-- Used by `test_lua_debug_server.cpp` to verify the Lua debugging protocol
 
 ## Test Registration Macros
 

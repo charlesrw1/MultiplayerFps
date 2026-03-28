@@ -98,8 +98,9 @@ struct TestContext
 	DelegateAwaitable wait_for(MulticastDelegate<>& d) { return {wait, d}; }
 	ScreenshotAwaitable capture_screenshot(const char* name) { return {wait, name}; }
 	DumpStateAwaitable dump_state(const char* label) { return {wait, label}; }
-	// Pauses the test and opens a file-based Lua REPL for AI agent inspection.
-	// See LuaDebugServer.h for protocol details.
+	// Pauses the test and opens an AgentREPL socket for AI agent inspection.
+	// Connect to 127.0.0.1:9999. Send "resume" to let the test continue.
+	// See Framework/AgentREPL.h for the full protocol.
 	DebugBreakAwaitable debug_break() { return {wait}; }
 
 	ScopedGpuTimer gpu_timer(const char* name);

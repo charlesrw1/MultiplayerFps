@@ -8,8 +8,7 @@
 #include "GameEnginePublic.h"
 #include "Framework/StringUtils.h"
 #include "StateDump.h"
-#include "LuaDebugServer.h"
-#include "Scripting/ScriptManager.h"
+#include "Framework/AgentREPL.h"
 GameTestRunner::GameTestRunner(std::string_view name, std::vector<TestEntry> tests, const TestRunnerConfig& cfg)
 	: tests_(std::move(tests)), cfg_(cfg), name(name) {
 	screenshot_cfg_.promote = cfg.promote;
@@ -51,15 +50,25 @@ bool GameTestRunner::tick(float dt) {
 		return false;
 	}
 
-	// Debug break: AI file-based Lua REPL (co_await t.debug_break())
+	// Debug break: agent socket REPL (co_await t.debug_break())
 	if (ctx_.wait.debug_break_pending) {
 		if (!debug_break_entered_) {
 			debug_break_entered_ = true;
-			LuaDebugServer::on_enter(tests_[current_idx_].name);
+			if (!AgentREPL::inst || !AgentREPL::inst->is_running()) {
+				if (!AgentREPL::inst)
+					AgentREPL::inst = new AgentREPL();
+				AgentREPL::inst->start();
+			}
+			sys_print(Info, "[AgentREPL] debug_break in test '%s' — connect to 127.0.0.1:9999\n",
+					  tests_[current_idx_].name);
 		}
-		if (LuaDebugServer::poll(ScriptManager::inst->get_lua_state())) {
-			ctx_.wait.debug_break_pending = false;
-			debug_break_entered_ = false;
+		// poll() will block internally if the agent sends "block"
+		if (AgentREPL::inst) {
+			AgentREPL::inst->poll();
+			if (AgentREPL::inst->take_resume_requested()) {
+				ctx_.wait.debug_break_pending = false;
+				debug_break_entered_ = false;
+			}
 		}
 		return false;
 	}

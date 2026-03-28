@@ -63,6 +63,13 @@ Core engine infrastructure: reflection, serialization, memory, collections, math
 - `BoolButton.h` — Toggle button widget
 - `MulticastDelegate.h` — Multicast event/delegate system
 
+### Agent REPL
+- `AgentREPL.h/cpp` — TCP socket REPL for AI agents. Listens on `127.0.0.1:9999` (loopback only).
+  - `start(port)` / `stop()` / `poll()` — call `poll()` each game loop tick
+  - Commands: `cmd:<str>` (Cmd_Manager), `lua:<code>` (ScriptManager), `block`, `continue`, `wait_ticks:<n>`, `wait_time:<secs>`, `resume`
+  - Responses end with `>>OK`, `>>BLOCKED`, or `>>ERROR: <msg>`
+  - Subclasses `LogSink` to forward Error/Warning/Info/LtConsoleCommand output back to the client
+
 ### Utilities
 - `Files.h/cpp` — File I/O (read, write, exists, enumerate)
 - `Util.h/cpp` — General utilities
