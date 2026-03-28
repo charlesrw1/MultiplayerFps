@@ -379,30 +379,6 @@ void EditorDoc::check_inputs() {
 	}
 }
 
-Bounds transform_bounds(glm::mat4 transform, Bounds b) {
-	glm::vec3 corners[8];
-	corners[0] = glm::vec3(b.bmin);
-	corners[1] = glm::vec3(b.bmax.x, b.bmin.y, b.bmin.z);
-	corners[2] = glm::vec3(b.bmax.x, b.bmax.y, b.bmin.z);
-	corners[3] = glm::vec3(b.bmin.x, b.bmax.y, b.bmin.z);
-
-	corners[4] = glm::vec3(b.bmin.x, b.bmin.y, b.bmax.z);
-	corners[5] = glm::vec3(b.bmax.x, b.bmin.y, b.bmax.z);
-	corners[6] = glm::vec3(b.bmax.x, b.bmax.y, b.bmax.z);
-	corners[7] = glm::vec3(b.bmin.x, b.bmax.y, b.bmax.z);
-	for (int i = 0; i < 8; i++) {
-		corners[i] = transform * glm::vec4(corners[i], 1.0f);
-	}
-
-	Bounds out;
-	out.bmin = corners[0];
-	out.bmax = corners[0];
-	for (int i = 1; i < 8; i++) {
-		out.bmax = glm::max(out.bmax, corners[i]);
-		out.bmin = glm::min(out.bmin, corners[i]);
-	}
-	return out;
-}
 
 ConfigVar draw_coords_under_mouse("draw_coords_under_mouse", "0", CVAR_BOOL, "");
 

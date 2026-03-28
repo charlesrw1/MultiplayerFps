@@ -467,6 +467,8 @@
     <ClCompile Include="Source\User_Camera.cpp" />
     <ClCompile Include="Source\LevelEditor\AddEditorCommands.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorUILayout.cpp" />
+    <ClCompile Include="Source\Framework\MathLib.cpp" />
+    <ClCompile Include="Source\Logging.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation\AnimationTypes.h">
@@ -1110,6 +1112,7 @@
     <ClInclude Include="Source\LevelEditor\DragDetector.h" />
     <ClInclude Include="Source\LevelEditor\DragDropPreview.h" />
     <ClInclude Include="Source\LevelEditor\EditorUILayout.h" />
+    <ClInclude Include="Source\Logging.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

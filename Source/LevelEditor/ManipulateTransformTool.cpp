@@ -2,23 +2,7 @@
 #include "EditorDocLocal.h"
 #include "glm/gtc/type_ptr.hpp"
 #include "External/ImGuizmo.h"
-bool line_plane_intersect(Ray r, glm::vec3 plane, float planed, glm::vec3& intersect) {
-	float denom = dot(plane, r.dir);
 
-	if (abs(denom) > 0.00001) { // such a high epsilon to deal with weird issues
-		float planedist = dot(plane, r.pos) + planed;
-		float time = -planedist / denom;
-		intersect = r.pos + r.dir * time;
-		return true;
-	}
-	return false;
-}
-
-glm::vec3 project_onto_line(glm::vec3 a, glm::vec3 b, glm::vec3 p) {
-	glm::vec3 ap = p - a;
-	glm::vec3 ab = b - a;
-	return a + dot(ap, ab) / dot(ab, ab) * ab;
-}
 
 uint32_t color_to_uint(Color32 c) {
 	return c.r | c.g << 8 | c.b << 16 | c.a << 24;

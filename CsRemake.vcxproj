@@ -70,6 +70,7 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Source\Framework\Jobs.cpp" />
+    <ClCompile Include="Source\Framework\MathLib.cpp" />
     <ClCompile Include="Source\Framework\MeshBuilder.cpp" />
     <ClCompile Include="Source\Framework\MyImguiLib.cpp" />
     <ClCompile Include="Source\Framework\Profilier.cpp" />
@@ -136,6 +137,7 @@
     <ClCompile Include="Source\LevelEditor\SelectionState.cpp" />
     <ClCompile Include="Source\LevelEditor\ViewportHandles.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
+    <ClCompile Include="Source\Logging.cpp" />
     <ClCompile Include="Source\Render\BufferTest\glbuffer.cpp" />
     <ClCompile Include="Source\Render\DdsExport.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
@@ -268,6 +270,7 @@
     <ClInclude Include="Source\LevelEditor\TagManager.h" />
     <ClInclude Include="Source\LevelEditor\ViewportHandles.h" />
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
+    <ClInclude Include="Source\Logging.h" />
     <ClInclude Include="Source\Render\BufferTest\glbuffer.h" />
     <ClInclude Include="Source\Render\BufferTest\gl_bufferlock.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />

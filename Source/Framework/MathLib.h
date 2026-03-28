@@ -137,6 +137,7 @@ struct Bounds
 
 	glm::vec3 bmin, bmax;
 };
+
 inline Bounds bounds_union(const Bounds& b1, const Bounds& b2) {
 	Bounds b;
 	b.bmin = glm::min(b1.bmin, b2.bmin);
@@ -160,36 +161,10 @@ inline glm::vec3 closest_point_on_line(const glm::vec3& A, const glm::vec3& B, c
 	return A + glm::min(glm::max(t, 0.f), 1.f) * AB;
 }
 
-inline bool to_barycentric(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 point, float& u, float& v, float& w) {
-	glm::vec3 e1 = p2 - p1;
-	glm::vec3 e2 = p3 - p1;
-	glm::vec3 N = glm::cross(e1, e2);
-	float area = glm::length(N) / 2.f;
-
-	e1 = p2 - p1;
-	e2 = point - p1;
-	glm::vec3 c = glm::cross(e1, e2);
-	if (glm::dot(c, N) < -0.0001)
-		return false;
-
-	e1 = p3 - p2;
-	e2 = point - p2;
-	c = glm::cross(e1, e2);
-	if (glm::dot(c, N) < -0.0001)
-		return false;
-	u = (glm::length(c) / 2.f) / area;
-
-	e1 = p1 - p3;
-	e2 = point - p3;
-	c = glm::cross(e1, e2);
-	if (glm::dot(c, N) < -0.0001)
-		return false;
-	v = (glm::length(glm::cross(e1, e2)) / 2.f) / area;
-
-	w = 1 - u - v;
-
-	return true;
-}
+Bounds transform_bounds(glm::mat4 transform, Bounds b);
+bool to_barycentric(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 point, float& u, float& v, float& w);
+bool line_plane_intersect(Ray r, glm::vec3 plane, float planed, glm::vec3& intersect);
+glm::vec3 project_onto_line(glm::vec3 a, glm::vec3 b, glm::vec3 p);
 
 inline unsigned int wang_hash(unsigned int seed) {
 	seed = (seed ^ 61) ^ (seed >> 16);
