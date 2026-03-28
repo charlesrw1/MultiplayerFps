@@ -106,6 +106,8 @@ struct AgentREPL::Impl
 	bool reblock_pending = false;
 	// Set when agent sends "resume" at the top level (resumes debug_break coroutine)
 	bool resume_requested = false;
+	// cmd: uses APPEND mode so output arrives next tick — defer >>OK by one poll()
+	bool pending_cmd_ok = false;
 
 	bool wsa_initialized = false;
 
@@ -244,7 +246,7 @@ struct AgentREPL::Impl
 			std::string cmd = line.substr(4);
 			if (Cmd_Manager::inst)
 				Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, cmd.c_str());
-			send_str(">>OK\n");
+			pending_cmd_ok = true; // send >>OK next tick after APPEND has run
 		} else if (line.rfind("lua:", 0) == 0) {
 			std::string code = line.substr(4);
 			if (ScriptManager::inst) {
@@ -312,6 +314,11 @@ struct AgentREPL::Impl
 		try_accept();
 		if (!has_client())
 			return;
+
+		if (pending_cmd_ok) {
+			pending_cmd_ok = false;
+			send_str(">>OK\n");
+		}
 
 		// If a wait is in progress, check if it has expired
 		if (waiting_ticks) {
