@@ -207,75 +207,213 @@ void AssetRegistrySystem::init() {
 #include "Render/MaterialPublic.h"
 #include "Render/Model.h"
 #include "Scripting/ScriptManager.h"
-using ChangedPaths = std::vector<std::string>;
 
-bool update_on_changed_paths(ChangedPaths changes) {
+// Remove a leaf node from the tree by game path, pruning any now-empty parent directories.
+static void remove_from_tree(AssetFilesystemNode& root, const std::string& game_path) {
+	auto parts = split(game_path, '/');
+	if (parts.empty())
+		return;
 
-	bool wants_reindex = false;
-	// just do the stupid way
-	for (string& gamepath : changes) {
+	std::vector<AssetFilesystemNode*> stack;
+	stack.reserve(parts.size());
+	stack.push_back(&root);
 
-		// reload
-		sys_print(Info, "found new asset %s\n", gamepath.c_str());
-		auto ext = StringUtils::get_extension_no_dot(gamepath);
-		const bool prev = wants_reindex;
-		wants_reindex = true;
-		if (ext == "mm" || ext == "mi") {
-			if (g_assets.is_asset_loaded(gamepath)) {
-				auto asset = g_assets.find_sync<MaterialInstance>(gamepath);
-				g_assets.reload_sync<MaterialInstance>(asset);
-			}
-		} else if (ext == "mis" || ext == "glb") {
-			StringUtils::remove_extension(gamepath);
-			gamepath += ".cmdl";
-			if (g_assets.is_asset_loaded(gamepath)) {
-				auto asset = g_assets.find_sync<Model>(gamepath);
-				g_assets.reload_sync<Model>(asset);
-			}
-		} else if (ext == "png" || ext == "jpg" || ext == "tis") {
-			StringUtils::remove_extension(gamepath);
-			gamepath += ".dds";
-			if (g_assets.is_asset_loaded(gamepath)) {
-				auto asset = g_assets.find_sync<Texture>(gamepath);
-				g_assets.reload_sync<Texture>(asset);
-			}
-		}
-
-		else if (ext == "wav") {
-			if (g_assets.is_asset_loaded(gamepath)) {
-				auto asset = g_assets.find_sync<SoundFile>(gamepath);
-				g_assets.reload_sync<SoundFile>(asset);
-			}
-		} else if (ext == "lua") {
-			ScriptManager::inst->reload_one_file(gamepath);
-		} else if (ext == "tmap") {
-			//...
-		} else {
-			wants_reindex = prev;
-		}
+	for (size_t i = 0; i + 1 < parts.size(); ++i) {
+		auto it = stack.back()->children.find(parts[i]);
+		if (it == stack.back()->children.end())
+			return; // path not present in tree
+		stack.push_back(&it->second);
 	}
-	return wants_reindex;
+
+	stack.back()->children.erase(parts.back());
+
+	// Prune now-empty ancestor directories bottom-up
+	for (int i = static_cast<int>(stack.size()) - 1; i > 0; --i) {
+		if (!stack[i]->children.empty())
+			break;
+		stack[i - 1]->children.erase(parts[i - 1]);
+	}
+}
+
+void AssetRegistrySystem::rebuild_linear_list_() {
+	linear_list.clear();
+	auto recurse = [](auto&& self, std::vector<AssetFilesystemNode*>& out, AssetFilesystemNode* node) -> void {
+		if (node->children.empty())
+			out.push_back(node);
+		for (auto* child : node->sorted_list)
+			self(self, out, child);
+	};
+	recurse(recurse, linear_list, root.get());
 }
 
 void AssetRegistrySystem::update() {
-	auto changed = file_watcher_.poll(150);
+	// FileWatcher gives us exactly the paths that changed — no full scan needed.
+	auto changed = file_watcher_.poll(300 /*debounce ms*/);
 	if (changed.empty())
 		return;
-	sys_print(Debug, "AssetRegistrySystem: %zu file(s) changed\n", changed.size());
-	bool wants_reindex = update_on_changed_paths(changed);
-	if (wants_reindex)
-		reindex_all_assets();
+
+	auto* texMeta   = (AssetMetadata*)find_for_classtype(ClassBase::find_class("Texture"));
+	auto* modelMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("Model"));
+	auto* matMeta   = (AssetMetadata*)find_for_classtype(ClassBase::find_class("MaterialInstance"));
+	auto* soundMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SoundFile"));
+	auto* fontMeta  = (AssetMetadata*)find_for_classtype(ClassBase::find_class("GuiFont"));
+	auto* mapMeta   = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SceneAsset"));
+
+	bool tree_dirty = false;
+
+	for (auto rel_path : changed) {
+		sys_print(Info, "AssetRegistry: file changed: %s\n", rel_path.c_str());
+		auto ext = StringUtils::get_extension_no_dot(rel_path);
+
+		// Hot-reload in-memory assets
+		if (ext == "mm" || ext == "mi") {
+			if (g_assets.is_asset_loaded(rel_path)) {
+				auto asset = g_assets.find_sync<MaterialInstance>(rel_path);
+				g_assets.reload_sync<MaterialInstance>(asset);
+			}
+		} else if (ext == "mis" || ext == "glb") {
+			std::string cmdl = rel_path;
+			StringUtils::remove_extension(cmdl);
+			cmdl += ".cmdl";
+			if (g_assets.is_asset_loaded(cmdl)) {
+				auto asset = g_assets.find_sync<Model>(cmdl);
+				g_assets.reload_sync<Model>(asset);
+			}
+		} else if (ext == "png" || ext == "jpg" || ext == "tis") {
+			std::string dds = rel_path;
+			StringUtils::remove_extension(dds);
+			dds += ".dds";
+			if (g_assets.is_asset_loaded(dds)) {
+				auto asset = g_assets.find_sync<Texture>(dds);
+				g_assets.reload_sync<Texture>(asset);
+			}
+		} else if (ext == "wav") {
+			if (g_assets.is_asset_loaded(rel_path)) {
+				auto asset = g_assets.find_sync<SoundFile>(rel_path);
+				g_assets.reload_sync<SoundFile>(asset);
+			}
+		} else if (ext == "lua") {
+			ScriptManager::inst->reload_one_file(rel_path);
+		}
+
+		// Incremental tree update: resolve to the canonical asset entry
+		AssetOnDisk aod;
+		aod.filename = rel_path;
+		if (ext == "hdr" || ext == "dds")
+			aod.type = texMeta;
+		else if (ext == "tmap")
+			aod.type = mapMeta;
+		else if (ext == "mm" || ext == "mi")
+			aod.type = matMeta;
+		else if (ext == "wav")
+			aod.type = soundMeta;
+		else if (ext == "fnt")
+			aod.type = fontMeta;
+		else if (ext == "cmdl")
+			aod.type = modelMeta;
+		else if (ext == "mis") {
+			StringUtils::remove_extension(aod.filename);
+			aod.filename += ".cmdl";
+			aod.type = modelMeta;
+		} else {
+			continue; // not a tracked asset type; skip tree update
+		}
+
+		// Check whether the file actually exists now to distinguish add vs delete
+		auto f = FileSys::open_read_game(aod.filename);
+		const bool exists = (f != nullptr);
+		if (f)
+			f->close();
+
+		if (exists) {
+			root->add_path(aod, split(aod.filename, '/'));
+			tree_dirty = true;
+		} else if (aod.type != modelMeta) {
+			// Safe to remove non-model assets immediately.
+			// Models are left in place: a deleted .cmdl is often about to be
+			// recompiled, and we'd rather tolerate a brief stale entry than
+			// flicker the asset browser.
+			remove_from_tree(*root, aod.filename);
+			tree_dirty = true;
+		}
+	}
+
+	if (tree_dirty) {
+		root->sort_R();
+		root->set_parent_R();
+		rebuild_linear_list_();
+	}
 }
 
 void AssetRegistrySystem::reindex_all_assets() {
-	using HA = HackedAsyncAssetRegReindex;
-	if (!root.get())
-		root = std::make_unique<AssetFilesystemNode>();
-	HackedAsyncAssetRegReindex blahblah;
-	double now = GetTime();
-	blahblah.load_asset(nullptr, *root.get());
-	blahblah.post_load();
-	sys_print(Debug, "AssetRegistry: finished assset reindex in %f\n", float(GetTime() - now));
+	double t0 = GetTime();
+
+	root = std::make_unique<AssetFilesystemNode>();
+
+	auto* texMeta   = (AssetMetadata*)find_for_classtype(ClassBase::find_class("Texture"));
+	auto* modelMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("Model"));
+	auto* matMeta   = (AssetMetadata*)find_for_classtype(ClassBase::find_class("MaterialInstance"));
+	auto* mapMeta   = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SceneAsset"));
+	auto* soundMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SoundFile"));
+	auto* fontMeta  = (AssetMetadata*)find_for_classtype(ClassBase::find_class("GuiFont"));
+
+	// Use a set to deduplicate model entries: both .cmdl and .mis map to the same .cmdl asset.
+	std::unordered_set<std::string> model_paths;
+
+	auto add = [&](AssetOnDisk aod) { root->add_path(aod, split(aod.filename, '/')); };
+
+	for (const auto& full : FileSys::find_game_files()) {
+		auto gp  = FileSys::get_game_path_from_full_path(full);
+		auto ext = get_extension_no_dot(gp);
+
+		if (ext == "cmdl" || ext == "mis") {
+			// Both .cmdl and .mis (.mis is import settings that produce a .cmdl) resolve to the
+			// same tree entry.  Collect and deduplicate before adding.
+			if (ext == "mis") {
+				StringUtils::remove_extension(gp);
+				gp += ".cmdl";
+			}
+			model_paths.insert(std::move(gp));
+			continue;
+		}
+
+		AssetOnDisk aod;
+		aod.filename = std::move(gp);
+		if      (ext == "hdr" || ext == "dds") aod.type = texMeta;
+		else if (ext == "tmap")                aod.type = mapMeta;
+		else if (ext == "mm" || ext == "mi")   aod.type = matMeta;
+		else if (ext == "wav")                 aod.type = soundMeta;
+		else if (ext == "fnt")                 aod.type = fontMeta;
+		else continue;
+
+		add(std::move(aod));
+	}
+
+	for (auto& m : model_paths) {
+		AssetOnDisk aod;
+		aod.filename = m;
+		aod.type     = modelMeta;
+		add(std::move(aod));
+	}
+
+	// Let individual asset type handlers inject synthetic entries (e.g. procedural assets)
+	for (auto& type : all_assettypes) {
+		std::vector<std::string> extras;
+		type->fill_extra_assets(extras);
+		for (auto& e : extras) {
+			AssetOnDisk aod;
+			aod.filename = std::move(e);
+			aod.type     = type.get();
+			add(std::move(aod));
+		}
+	}
+
+	root->sort_R();
+	root->set_parent_R();
+	rebuild_linear_list_();
+
+	sys_print(Debug, "AssetRegistry: reindexed %zu assets in %.1f ms\n",
+	          linear_list.size(), (GetTime() - t0) * 1000.0);
 }
 
 const ClassTypeInfo* AssetRegistrySystem::find_asset_type_for_ext(const std::string& ext) {

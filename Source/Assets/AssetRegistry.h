@@ -78,11 +78,12 @@ public:
 private:
 	uptr<ConsoleCmdGroup> consoleCommands;
 	void reindex_all_assets();
+	void rebuild_linear_list_();
 	std::unique_ptr<AssetFilesystemNode> root;
 	std::vector<AssetFilesystemNode*> linear_list;
 	std::vector<std::unique_ptr<AssetMetadata>> all_assettypes;
-	double last_reindex_time = 0.0;
 	FileWatcher file_watcher_;
+	double last_reindex_time = 0.0;
 	friend class HackedAsyncAssetRegReindex;
 };
 

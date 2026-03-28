@@ -39,3 +39,5 @@ TestFiles/screenshots/
 TestFiles/timing_*.json
 
 *.log
+
+todo_local.md
