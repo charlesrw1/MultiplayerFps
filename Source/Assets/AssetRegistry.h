@@ -5,11 +5,10 @@
 #include <unordered_map>
 #include "Framework/ConsoleCmdGroup.h"
 #include "IAsset.h"
-#include "EngineEditorState.h"
 #include "Assets/FileWatcher.h"
 
 // All assets that you want showing in the asset browser should be registered here
-
+using std::string;
 class IEditorTool;
 class AssetMetadata
 {

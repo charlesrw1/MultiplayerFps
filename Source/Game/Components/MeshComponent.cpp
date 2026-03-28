@@ -282,7 +282,7 @@ void GameAnimationMgr::update_animating() {
 #include "Animation/Runtime/Animation.h"
 #include "Animation/Runtime/RuntimeNodesNew2.h"
 void anim_preview_debug_menu() {
-	auto tool = (EditorDoc*)eng_local.editorState->get_tool();
+	auto tool = (EditorDoc*)eng->get_tool();
 	if (!tool)
 		return;
 

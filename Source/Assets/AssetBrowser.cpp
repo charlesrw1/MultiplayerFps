@@ -235,7 +235,7 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 static void draw_browser_tree_view(AssetBrowser* b) {
 	auto& linear = AssetRegistrySystem::get().get_linear_list();
 	const int name_filter_len = strlen(b->asset_name_filter);
-	vector<AssetFilesystemNode*> linear2;
+	std::vector<AssetFilesystemNode*> linear2;
 	for (auto node : linear) {
 		auto& asset = node->asset;
 		if (!b->should_type_show(1 << asset.type->self_index)) {

@@ -153,9 +153,6 @@
     <ClCompile Include="Source\EditorPopupTemplate.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\EngineEditorState.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Framework\BVHBuild.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
@@ -469,6 +466,7 @@
     <ClCompile Include="Source\LevelEditor\EditorUILayout.cpp" />
     <ClCompile Include="Source\Framework\MathLib.cpp" />
     <ClCompile Include="Source\Logging.cpp" />
+    <ClCompile Include="Source\Framework\AgentREPL.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation\AnimationTypes.h">
@@ -553,9 +551,6 @@
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\EditorPopupTemplate.h">
-      <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\EngineEditorState.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\ArenaAllocator.h">

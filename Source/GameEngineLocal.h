@@ -60,7 +60,7 @@ public:
 	}
 	SDL_Window* get_os_window() final { return window; }
 	ImGuiContext* get_imgui_context() const final { return imgui_context; }
-
+	IEditorTool* get_tool() final { return editor_tool.get(); }
 	void log_to_fullscreen_gui(LogType type, const char* msg) final;
 
 	bool load_level(string mapname) final;
@@ -68,13 +68,14 @@ public:
 	bool is_editor_level() const final {
 		/* this passes when you are in the loading phase or past the loading phase */
 		/* added is_loading... to work with constructors before level gets set */
-		return editorState != nullptr;
+		return loaded_in_tool_mode;
 	}
-	bool is_editor_state() const { return editorState != nullptr; }
+	bool is_editor_state() const { return loaded_in_tool_mode; }
 	bool is_host() const final { return true; }
 
 	// local functions
 public:
+	void open_tool(string mapname);
 	void init(MainConfigurationOptions& options, int argc, char** argv);
 	void cleanup();
 
@@ -116,7 +117,7 @@ public:
 	SDL_GLContext gl_context = nullptr;
 	bool show_console = false;
 	bool dedicated_server = false;
-
+	bool loaded_in_tool_mode = false;
 	bool is_drawing_to_window_viewport() const;
 
 	int argc = 0;
@@ -129,7 +130,7 @@ public:
 	std::vector<std::string> engine_map_state_history;
 	std::vector<std::string> engine_map_state_future;
 	ITestRunner* test_runner = nullptr;
-	uptr<EditorState> editorState;
+	uptr<IEditorTool> editor_tool;
 #endif
 
 	void set_runner(ITestRunner* runner, bool skip_swap);

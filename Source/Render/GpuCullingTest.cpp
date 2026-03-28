@@ -51,7 +51,7 @@ void occ_cul_menu() {
 	ImGui::Checkbox("output_depth", &output_depth);
 	ImGui::InputFloat("radius_bias", &radius_bias);
 	if (ImGui::Button("to selected")) {
-		auto doc = (EditorDoc*)eng_local.editorState->get_tool();
+		auto doc = (EditorDoc*)eng->get_tool();
 		if (doc->selection_state->has_only_one_selected()) {
 			auto only = doc->selection_state->get_only_one_selected();
 			auto mesh = only->get_component<MeshComponent>();

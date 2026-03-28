@@ -6,7 +6,8 @@
 #include <functional>
 union SDL_Event;
 struct View_Setup;
-#include "EngineEditorState.h"
+
+#include "Framework/MulticastDelegate.h"
 
 // Base editor tool class
 #include "Game/EntityPtr.h"
@@ -83,6 +84,7 @@ class IEditorTool
 public:
 	virtual ~IEditorTool() {}
 
+	static IEditorTool* create(string mapname);
 
 	// if save is called when !current_document_has_path(), then it will open a popup to pick a save directory
 	bool save();

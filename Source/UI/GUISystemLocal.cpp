@@ -3,7 +3,6 @@
 #include "UIBuilder.h"
 #include <algorithm>
 #include "Render/MaterialPublic.h"
-#include "EngineEditorState.h"
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
@@ -40,11 +39,11 @@ extern ConfigVar g_drawconsole;
 void UiSystem::pre_events() {}
 void UiSystem::handle_event(const SDL_Event& event) {}
 
-void UiSystem::draw_imgui_interfaces(EditorState* edState) {
+void UiSystem::draw_imgui_interfaces(IEditorTool* edState) {
 
 	drawing_to_screen = true;
 #ifdef EDITOR_BUILD
-	drawing_to_screen = !edState || !edState->get_tool();
+	drawing_to_screen = !edState;
 #endif
 
 	if (g_window_h.was_changed() || g_window_w.was_changed()) {
@@ -58,11 +57,11 @@ void UiSystem::draw_imgui_interfaces(EditorState* edState) {
 	ImGui::NewFrame();
 #ifdef EDITOR_BUILD
 	if (edState)
-		edState->imgui_hook_new_frame();
+		edState->hook_imgui_newframe();
 #endif
 	draw_imgui_internal(edState);
 }
-void UiSystem::draw_imgui_internal(EditorState* editorState) {
+void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
 	CPUSCOPESTART(imgui_draw);
 	ImGui::PushStyleColor(ImGuiCol_WindowBg, color32_to_imvec4({51, 51, 51}));
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, color32_to_imvec4({35, 35, 35}));
@@ -74,11 +73,11 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 
 #ifdef EDITOR_BUILD
 	// draw tool interface if its active
-	if (editorState && editorState->has_tool()) {
-		dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode, editorState->get_tool());
-		editorState->imgui_draw();
+	if (editorState) {
+		dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode, editorState);
+		editorState->draw_imgui_public();
 		AssetBrowser::inst->imgui_draw();
-		editorState->draw_tab_window();
+		//editorState->drdrawaw_tab_window();
 	}
 #endif
 
@@ -95,7 +94,7 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 		if (is_viewport_hovered)
 			flags |= ImGuiWindowFlags_NoMove;
 
-		if (editorState->has_tool() && editorState->wants_scene_viewport_menu_bar())
+		if (editorState && editorState->wants_scene_viewport_menu_bar())
 			flags |= ImGuiWindowFlags_MenuBar;
 
 		if (ImGui::Begin("Scene viewport", nullptr, flags)) {
@@ -105,8 +104,8 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 				set_focus_to_viewport_next_tick = false;
 			}
 
-			if (editorState->has_tool())
-				editorState->hook_pre_viewport();
+			if (editorState)
+				editorState->hook_pre_scene_viewport_draw();
 			// get_current_tool()->hook_pre_scene_viewport_draw();
 
 			// BRUH
@@ -132,8 +131,8 @@ void UiSystem::draw_imgui_internal(EditorState* editorState) {
 			assert(!is_drawing_to_screen());
 
 			// hook tool for drag and drop stuff
-			if (editorState->has_tool())
-				editorState->hook_viewport();
+			if (editorState)
+				editorState->hook_scene_viewport_draw();
 		}
 		ImGui::End();
 	} else

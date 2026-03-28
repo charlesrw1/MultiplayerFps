@@ -7,7 +7,7 @@
 union SDL_Event;
 
 #include "Framework/LuaColor.h"
-
+#include "IEditorTool.h"
 class Canvas : public ClassBase
 {
 public:
@@ -50,7 +50,7 @@ public:
 	void handle_event(const SDL_Event& event);
 	void update();
 	void sync_to_renderer();
-	void draw_imgui_interfaces(EditorState* edState);
+	void draw_imgui_interfaces(IEditorTool* edState);
 	const MaterialInstance* get_default_ui_mat() const { return ui_default; }
 
 	const MaterialInstance* ui_default = nullptr;
@@ -58,7 +58,7 @@ public:
 	const GuiFont* defaultFont = nullptr;
 
 private:
-	void draw_imgui_internal(EditorState* edState);
+	void draw_imgui_internal(IEditorTool* edState);
 	bool is_viewport_focused = false;
 	bool is_viewport_hovered = false;
 	Rect2d viewportRect{};

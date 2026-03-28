@@ -56,7 +56,6 @@
     <ClCompile Include="Source\Debug_Console.cpp" />
     <ClCompile Include="Source\EditorPopups.cpp" />
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
-    <ClCompile Include="Source\EngineEditorState.cpp" />
     <ClCompile Include="Source\Framework\AgentREPL.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
@@ -212,7 +211,6 @@
     <ClInclude Include="Source\DebugConsole.h" />
     <ClInclude Include="Source\EditorPopups.h" />
     <ClInclude Include="Source\EditorPopupTemplate.h" />
-    <ClInclude Include="Source\EngineEditorState.h" />
     <ClInclude Include="Source\EngineMain.h" />
     <ClInclude Include="Source\Framework\ArenaAllocator.h" />
     <ClInclude Include="Source\Framework\ArenaStd.h" />

@@ -82,6 +82,7 @@ public:
 	virtual bool is_editor_level() const = 0;
 	virtual bool load_level(string mapname) = 0;
 	virtual void log_to_fullscreen_gui(LogType type, const char* msg) = 0;
+	virtual IEditorTool* get_tool() = 0;
 
 	double get_game_time() const { return time; }
 	// update() interval

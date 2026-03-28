@@ -866,3 +866,7 @@ void EntityVisiblityFilter::tick() {
 	do_stuff(SpawnerComponent::StaticType, res);
 	ImGui::End();
 }
+IEditorTool* IEditorTool::create(string mapname)
+{
+	return EditorDoc::create_scene(mapname);
+}

@@ -48,7 +48,6 @@
 #include "tracy/public/tracy/TracyOpenGL.hpp"
 #include "Framework/Jobs.h"
 #include "EditorPopups.h"
-#include "EngineEditorState.h"
 #include "DebugConsole.h"
 #include "Scripting/ScriptManager.h"
 #include "Scripting/ScriptFunctionCodegen.h"
@@ -305,9 +304,9 @@ bool GameEngineLocal::load_level(string mapname) {
 		sys_print(Info, "Changing map: %s (for_playing=%s)\n", mapname.c_str(), print_get_bool_string(is_for_playing));
 
 #ifdef EDITOR_BUILD
-		if (editorState && editorState->has_tool()) {
-			editorState->hide();
-			assert(!editorState->get_tool());
+		if (editor_tool) {
+			editor_tool.reset();
+			//assert(!editorState->get_tool());
 		}
 #endif
 		if (level) {
@@ -486,7 +485,7 @@ void GameEngineLocal::add_commands() {
 	commands->add("open-editor", [&](const Cmd_Args& args) {
 		sys_print(Debug, "OpenEditorToolCommand::execute\n");
 
-		if (!eng_local.editorState) {
+		if (!eng_local.is_editor_state()) {
 			sys_print(
 				Error,
 				"OpenEditorToolCommand: didnt launch in editor mode, use 'is_editor_app 1' in cfg or command line\n");
@@ -496,7 +495,7 @@ void GameEngineLocal::add_commands() {
 		if (args.size() == 2)
 			mapname = args.at(1);
 
-		editorState->open_tool(mapname);
+		open_tool(mapname);
 	});
 
 	commands->add("bind", bind_key);
@@ -810,8 +809,8 @@ void GameEngineLocal::cleanup() {
 	// assert(0);
 	// if (get_current_tool())
 	//	get_current_tool()->close();
-	if (editorState)
-		editorState.reset();
+	if (editor_tool)
+		editor_tool.reset();
 #endif
 	if (level) {
 		stop_game();
@@ -951,9 +950,9 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 
 #ifdef EDITOR_BUILD
 	// draw general ui
-	if (editorState && editorState->has_tool()) {
+	if (editor_tool) {
 		params.is_editor = true; // draw to the id buffer for mouse picking
-		auto vs = editorState->get_vs();
+		auto vs = editor_tool->get_vs();
 
 		// fixme
 
@@ -1104,6 +1103,21 @@ static std::string append_strings(int c, char** str) {
 		out += " ";
 	}
 	return out;
+}
+void GameEngineLocal::open_tool(string mapname) {
+
+	const bool good = load_level(mapname);
+	if (good) {
+		if (this->editor_tool)
+			sys_print(Debug, "EditorState::open_tool: replacing current tool\n");
+		this->editor_tool.reset(IEditorTool::create(mapname));
+	}
+	else {
+		// sys_print(Warning, "CreateLevelEditorAync::execute: failed to load map (%s)\n",
+		// assetPath.value_or("<unnamed>").c_str());
+		sys_print(Warning, "EditorState::open_tool: creation returned null\n");
+		this->editor_tool = nullptr;
+	}
 }
 void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** argv) {
 	this->argc = argc;
@@ -1265,7 +1279,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 
 	if (is_editor_app.get_bool()) {
 		AssetBrowser::inst = new AssetBrowser();
-		editorState = make_unique<EditorState>();
+		loaded_in_tool_mode = true;
 		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 		print_time("asset reg and browser init");
 	} else {
@@ -1533,8 +1547,8 @@ void GameEngineLocal::loop() {
 			out.drawOut = true;
 			game_update_tick();
 #ifdef EDITOR_BUILD
-			if (editorState)
-				editorState->tick(frame_time);
+			if (editor_tool)
+				editor_tool->tick(frame_time);
 #endif
 
 			isound->tick(frame_time);
@@ -1568,11 +1582,8 @@ void GameEngineLocal::loop() {
 		ZoneScopedN("ImGuiUpdate");
 
 		gui_log.draw(UiSystem::inst->window);
-		EditorState* s = nullptr;
-#ifdef EDITOR_BUILD
-		s = editorState.get();
-#endif
-		UiSystem::inst->draw_imgui_interfaces(s);
+
+		UiSystem::inst->draw_imgui_interfaces(editor_tool.get());
 
 		ImGui::Render();
 		if (!skip_rendering) {
