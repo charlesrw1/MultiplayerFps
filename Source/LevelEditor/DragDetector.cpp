@@ -1,12 +1,12 @@
 #include "DragDetector.h"
 #include "EditorDocLocal.h"
-void DragDetector::end_drag_func() {
+void DragDetector::end_drag_func(EditorInputs& inputs) {
 	if (!Input::is_mouse_down(0) && is_dragging) {
 		if (get_is_dragging()) {
 			printf("end drag\n");
-			doc.inputs.set_focus(nullptr);
+			inputs.set_focus(nullptr);
 			on_drag_end.invoke(get_drag_rect());
-			doc.inputs.eat_mouse_click();
+			inputs.eat_mouse_click();
 		}
 		is_dragging = false;
 		mouseClickX = 0;
@@ -14,12 +14,12 @@ void DragDetector::end_drag_func() {
 	}
 }
 
-void DragDetector::on_focused_tick() {
-	end_drag_func();
+void DragDetector::on_focused_tick(EditorInputs& inputs) {
+	end_drag_func(inputs);
 }
 
-void DragDetector::tick(bool can_start_drag) {
-	const bool can_start = doc.inputs.can_use_mouse_click();
+void DragDetector::tick(EditorInputs& inputs, bool can_start_drag) {
+	const bool can_start = inputs.can_use_mouse_click();
 
 	if (Input::was_mouse_pressed(0)) {
 		if (can_start && !is_dragging && UiSystem::inst->is_vp_hovered()) {
@@ -29,11 +29,11 @@ void DragDetector::tick(bool can_start_drag) {
 			printf("start dragging\n");
 		}
 	}
-	end_drag_func();
+	end_drag_func(inputs);
 	if (get_is_dragging()) {
 		printf("start actual dragging\n");
-		doc.inputs.set_focus(this);
-		doc.inputs.eat_mouse_click();
+		inputs.set_focus(this);
+		inputs.eat_mouse_click();
 	}
 }
 

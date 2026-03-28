@@ -3,7 +3,7 @@
 #include "EditorDocLocal.h"
 #include "Render/MaterialPublic.h"
 
-void DecalStampTool::tick() {
+void DecalStampTool::tick(EditorInputs& inputs) {
 	auto handle_scroll = [&]() {
 		const bool hovered = UiSystem::inst->is_vp_hovered();
 		const int amt = Input::get_mouse_scroll();
@@ -45,7 +45,7 @@ void DecalStampTool::tick() {
 
 	const bool is_hovered = UiSystem::inst->is_vp_hovered();
 
-	if (!is_hovered || !doc.inputs.can_use_mouse_click())
+	if (!is_hovered || !inputs.can_use_mouse_click())
 		return;
 
 	const auto mouse = Input::get_mouse_pos();

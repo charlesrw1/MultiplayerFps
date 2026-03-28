@@ -170,7 +170,7 @@ void ManipulateTransformTool::end_drag() {
 	update_pivot_and_cached();
 }
 
-void ManipulateTransformTool::update() {
+void ManipulateTransformTool::update(EditorInputs& inputs) {
 	if (state == IDLE)
 		return;
 
@@ -265,9 +265,9 @@ void ManipulateTransformTool::update() {
 	}
 
 	if (is_using())
-		ed_doc.inputs.set_focus(this);
+		inputs.set_focus(this);
 }
-void ManipulateTransformTool::check_input() {
+void ManipulateTransformTool::check_input(EditorInputs& inputs) {
 	const bool is_keyboard_blocked = UiSystem::inst->blocking_keyboard_inputs();
 	if (is_keyboard_blocked || UiSystem::inst->is_game_capturing_mouse() || !ed_doc.selection_state->has_any_selected())
 		return;
@@ -276,11 +276,11 @@ void ManipulateTransformTool::check_input() {
 	// if (UiSystem::inst->blocking_keyboard_inputs())
 	//	return;
 
-	if (ed_doc.inputs.get_focused() && ed_doc.inputs.get_focused() != this)
+	if (inputs.get_focused() && inputs.get_focused() != this)
 		return;
 
-	if (ed_doc.inputs.can_use_mouse_click() && is_hovered())
-		ed_doc.inputs.eat_mouse_click();
+	if (inputs.can_use_mouse_click() && is_hovered())
+		inputs.eat_mouse_click();
 
 	const bool has_shift = Input::is_shift_down();
 	if (Input::was_key_pressed(SDL_SCANCODE_R)) {
@@ -328,14 +328,14 @@ void ManipulateTransformTool::check_input() {
 	}
 }
 
-void ManipulateTransformTool::on_focused_tick() {
+void ManipulateTransformTool::on_focused_tick(EditorInputs& inputs) {
 
 	if (Input::was_mouse_pressed(2)) {
 		if (get_force_gizmo_on()) {
 			reset_group_to_pre_transform();
 			set_force_gizmo_on(false);
-			ed_doc.inputs.set_focus(nullptr);
-			ed_doc.inputs.eat_mouse_click();
+			inputs.set_focus(nullptr);
+			inputs.eat_mouse_click();
 		}
 	}
 	if (Input::was_mouse_pressed(0)) {
@@ -345,7 +345,7 @@ void ManipulateTransformTool::on_focused_tick() {
 	}
 
 	if (!is_using() && !Input::is_mouse_down(0)) { // some mf bs right here
-		ed_doc.inputs.set_focus(nullptr);
-		ed_doc.inputs.eat_mouse_click();
+		inputs.set_focus(nullptr);
+		inputs.eat_mouse_click();
 	}
 }

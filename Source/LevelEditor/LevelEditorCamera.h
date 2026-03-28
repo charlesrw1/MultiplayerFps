@@ -14,18 +14,17 @@ class EditorCamera : public IInputReciever
 {
 public:
 	static EditorCamera* inst;
-	EditorCamera(EditorInputs& inputs) : inputs(inputs) { inst = this; }
-	EditorInputs& inputs;
+	EditorCamera(EditorInputs& inputs) { inst = this; }
 	~EditorCamera() { inst = nullptr; }
 	string get_name() final { return "editor camera"; }
 
-	void on_focused_tick() final;
+	void on_focused_tick(EditorInputs& inputs) final;
 	bool get_is_using_ortho() const { return mode == OrthoMode; }
 
 	Ray unproject_mouse(int mx, int my) const;
 	bool handle_events();
 
-	void tick(float dt);
+	void tick(EditorInputs& inputs, float dt);
 	View_Setup make_view() const;
 	void set_orbit_target(glm::vec3 v, float r) {
 		if (mode == OrthoMode)

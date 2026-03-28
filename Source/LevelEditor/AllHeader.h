@@ -26,3 +26,4 @@ class IPropertyEditor;
 #include <string>
 using std::string;
 #include "Level.h"
+#include "EditorInputs.h"

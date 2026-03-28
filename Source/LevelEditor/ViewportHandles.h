@@ -22,7 +22,7 @@ public:
 	EViewportHandles(EditorDoc& doc) : doc(doc) {}
 	VHResult point_handle(int64_t id, glm::vec3& inout_position);
 	VHResult box_handles(int64_t id, glm::mat4& box_corner /* no scale*/, glm::vec3& box_extents);
-	void tick();
+	void tick(EditorInputs& inputs);
 	string get_name() final { return "viewport handles"; }
 
 private:

@@ -3,7 +3,7 @@
 #include "Framework/Config.h"
 #include "EditorInputs.h"
 
-inline Ray EditorCamera::unproject_mouse(int mx, int my) const {
+Ray EditorCamera::unproject_mouse(int mx, int my) const {
 	Ray r;
 	// get ui size
 
@@ -117,10 +117,10 @@ void EditorCamera::imgui() {
 	t = ortho_camera.position;
 	ImGui::Text("ortho_pos: %f %f %f", t.x, t.y, t.z);
 }
-void EditorCamera::on_focused_tick() {
+void EditorCamera::on_focused_tick(EditorInputs& inputs) {
 	do_update_flag = true;
 }
-void EditorCamera::tick(float dt) {
+void EditorCamera::tick(EditorInputs& inputs, float dt) {
 
 	auto window_sz = UiSystem::inst->get_vp_rect().get_size();
 	float aratio = (float)window_sz.y / window_sz.x;

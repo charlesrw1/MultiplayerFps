@@ -692,20 +692,20 @@ void EditorDoc::tick(float dt) {
 
 
 void EditorDoc::imgui_draw() {
-	inputs.reset();
+	inputs.reset_keyboard_and_mouse();
 
 	if (inputs.get_focused()) {
-		inputs.get_focused()->on_focused_tick();
+		inputs.get_focused()->on_focused_tick(inputs);
 		// camera, dragger, manip, etc.
 	}
 	if (!active_mode)
 		active_mode = selection_mode.get();
 
-	ed_cam.tick(eng->get_dt());
-	manipulate->check_input();
-	handle_dragger->tick();
-	gui->draw();
-	active_mode->tick(); // foliage, decal
+	ed_cam.tick(inputs,eng->get_dt());
+	manipulate->check_input(inputs);
+	handle_dragger->tick(inputs);
+	gui->draw(inputs);
+	active_mode->tick(inputs); // selection,foliage, or decal
 	check_inputs();
 	draw_handles->tick();
 	vis_filter.tick();
@@ -934,7 +934,7 @@ void EditorDoc::hook_scene_viewport_draw() {
 		ImGui::EndDragDropTarget();
 	}
 
-	manipulate->update();
+	manipulate->update(inputs);
 }
 
 #include "Game/Components/SpawnerComponenth.h"
@@ -1168,7 +1168,7 @@ glm::ivec2 ndc_to_screen_coord(glm::vec3 ndc) {
 	return {coordx, coordy};
 }
 
-bool EditorUILayout::draw() {
+bool EditorUILayout::draw(EditorInputs& inputs) {
 	const float dt = eng->get_dt();
 
 	RenderWindow& window = UiSystem::inst->window;
@@ -1194,7 +1194,7 @@ bool EditorUILayout::draw() {
 	int x = Input::get_mouse_pos().x;
 	int y = Input::get_mouse_pos().y;
 
-	if (!doc->inputs.can_use_mouse_click())
+	if (!inputs.can_use_mouse_click())
 		do_mouse_click = false;
 
 	if (!eng->get_level())
@@ -1280,7 +1280,7 @@ bool EditorUILayout::draw() {
 		window.draw(tshape);
 	}
 	if (clicked) {
-		doc->inputs.eat_mouse_click();
+		inputs.eat_mouse_click();
 		if (Input::is_shift_down()) {
 			doc->do_mouse_selection(MouseSelectionAction::ADD_SELECT, clicked, true);
 		} else if (Input::is_ctrl_down()) {

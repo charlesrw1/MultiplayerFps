@@ -1,19 +1,19 @@
 #include "EditorModes.h"
 #include "EditorDocLocal.h"
 
-void SelectionMode::tick() {
-	doc.dragger.tick(true);
+void SelectionMode::tick(EditorInputs& inputs) {
+	doc.dragger.tick(inputs,true);
 
 	const bool mouse1rel = Input::was_mouse_released(0);
 	const bool has_shift = Input::is_shift_down();
 	const bool has_ctrl = Input::is_ctrl_down();
 
-	if (doc.inputs.get_focused())
+	if (inputs.get_focused())
 		return;
 
 	auto selection_state = doc.selection_state.get();
 	auto command_mgr = doc.command_mgr.get();
-	if (mouse1rel && UiSystem::inst->is_vp_hovered() && doc.inputs.can_use_mouse_click()) {
+	if (mouse1rel && UiSystem::inst->is_vp_hovered() && inputs.can_use_mouse_click()) {
 		doc.on_mouse_pick();
 		//	ASSERT(!doc.inputs.can_use_mouse_click());
 		// return;

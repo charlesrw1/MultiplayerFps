@@ -97,7 +97,7 @@ class EditorUILayout
 public:
 	EditorUILayout(EditorDoc& doc);
 
-	bool draw();
+	bool draw(EditorInputs& inputs);
 	void do_box_select(MouseSelectionAction action);
 	Rect2d convert_rect(Rect2d screenSpaceRect) {
 		Rect2d out = screenSpaceRect;
@@ -152,6 +152,44 @@ template <class... Ts> struct overloads : Ts...
 class LEPlugin;
 class EditorUILayout;
 class Model;
+
+
+
+class IEditorCameraApi {
+public:
+	virtual void set_look_at(glm::vec3 pos, glm::vec3 look) = 0;
+	virtual glm::vec3 get_positon() = 0;
+	virtual Ray unproject_ray(int x, int y) = 0;
+	virtual bool is_ortho() = 0;
+};
+class ISelectionApi {
+public:
+	virtual std::vector<EntityPtr> get_selected() = 0;
+	virtual void clear_selected() = 0;
+	virtual viewMulticastDelegate<> on_selection_changed() = 0;
+};
+
+
+class IEditorApi2 {
+public:
+
+	virtual IEditorCameraApi* camera() = 0;
+	virtual ISelectionApi* selection() = 0;
+	virtual void save() = 0;
+	virtual void undo() = 0;
+	virtual void redo() = 0;
+	virtual std::string get_document_name() = 0;
+
+	// commands
+	// mouse pick, box pick
+
+	// save, undo, redo
+
+	// get document name
+
+	// camera interface
+};
+
 class EditorDoc : public IEditorTool
 {
 public:
@@ -235,7 +273,6 @@ public:
 	std::unique_ptr<SelectionMode> selection_mode;
 	std::unique_ptr<DrawHandlesObject> draw_handles;
 	View_Setup vs_setup;
-	EditorInputs inputs;
 	EditorCamera ed_cam;
 	DragDetector dragger;
 	IEditorMode* active_mode = nullptr;
@@ -260,6 +297,9 @@ private:
 	FnFactory<IPropertyEditor> grid_factory;
 	uptr<ConsoleCmdGroup> cmds;
 	opt<string> assetName;
+
+	EditorInputs inputs;
+
 };
 
 #endif

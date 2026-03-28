@@ -100,6 +100,9 @@
     <Filter Include="Source\Framework\Tests">
       <UniqueIdentifier>{f15efcb3-3c64-5379-967f-ace0f3c25466}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\LevelEditor\Tools">
+      <UniqueIdentifier>{e5c82610-1e77-4ae3-ada2-67c5fbba2b3f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Animation\AnimationSeqAsset.cpp">

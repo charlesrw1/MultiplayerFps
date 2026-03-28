@@ -17,7 +17,7 @@ ConfigVar foliage_brush("foliage_brush", "1", CVAR_FLOAT | CVAR_UNBOUNDED, "");
 
 ConfigVar foliage_exdensity("foliage_exdensity", "0.7", CVAR_FLOAT | CVAR_UNBOUNDED, "");
 
-void FoliagePaintTool::tick() {
+void FoliagePaintTool::tick(EditorInputs& inputs) {
 	if (ImGui::Begin("Foliage")) {
 
 		static char buffer[1000];
@@ -43,7 +43,7 @@ void FoliagePaintTool::tick() {
 	const float exclusive_radius = foliage_exdensity.get_float();
 	const bool is_hovered = UiSystem::inst->is_vp_hovered();
 
-	if (!is_hovered || !doc.inputs.can_use_mouse_click())
+	if (!is_hovered || !inputs.can_use_mouse_click())
 		return;
 
 	const auto mouse = Input::get_mouse_pos();

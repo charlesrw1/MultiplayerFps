@@ -1,10 +1,10 @@
 #pragma once
 #include "IInputReciever.h"
-
+#include "AllHeader.h"
 class IEditorMode
 {
 public:
-	virtual void tick() = 0;
+	virtual void tick(EditorInputs& inputs) = 0;
 };
 
 class FoliagePaintTool : public IInputReciever, public IEditorMode
@@ -15,7 +15,7 @@ public:
 		for (auto item : foliage)
 			idraw->get_scene()->remove_obj(item.object);
 	}
-	void tick();
+	void tick(EditorInputs& inputs);
 
 private:
 	struct FoliageItem
@@ -38,7 +38,7 @@ public:
 		if (preview.get())
 			preview->destroy();
 	}
-	void tick();
+	void tick(EditorInputs& inputs);
 
 private:
 	float rotation = 0.0;
@@ -52,7 +52,7 @@ class SelectionMode : public IEditorMode
 {
 public:
 	SelectionMode(EditorDoc& doc) : doc(doc) {}
-	void tick();
+	void tick(EditorInputs& inputs);
 	EditorDoc& doc;
 };
 

@@ -3,8 +3,9 @@
 #include "Game/GameplayStatic.h"
 #include "imgui.h"
 #include "Input/InputSystem.h"
-
-inline VHResult EViewportHandles::point_handle(int64_t id, glm::vec3& inout_position) {
+#include "EditorInputs.h"
+#include "EditorDocLocal.h"
+VHResult EViewportHandles::point_handle(int64_t id, glm::vec3& inout_position) {
 	auto& item = items[id];
 	item.pos = inout_position;
 	if (item.mytype == ActiveItem::NEWLY_MADE) {
@@ -53,7 +54,7 @@ void masdfasdf() {
 	ImGui::InputFloat("b", &b);
 }
 ADD_TO_DEBUG_MENU(masdfasdf);
-void EViewportHandles::tick() {
+void EViewportHandles::tick(EditorInputs& inputs) {
 	GameplayStatic::reset_debug_text_height();
 
 	// delete items not updated
@@ -67,7 +68,7 @@ void EViewportHandles::tick() {
 	//		if mouse released: stop dragging
 	//		else: update dragging object from manip
 
-	const bool mouse_clicked = Input::was_mouse_pressed(0) && doc.inputs.can_use_mouse_click();
+	const bool mouse_clicked = Input::was_mouse_pressed(0) && inputs.can_use_mouse_click();
 
 	// I do this weird thing because Imguizmo acts weird, this is litteraly a hack built on a hacked in feature so
 	// yeah....
@@ -137,9 +138,9 @@ void EViewportHandles::tick() {
 			dragging_state.set_next_frame = true;
 
 			// hacky ...
-			doc.inputs.set_focus(nullptr);
+			inputs.set_focus(nullptr);
 		}
-		doc.inputs.eat_mouse_click();
+		inputs.eat_mouse_click();
 	}
 
 	auto delete_usued = [&]() {
@@ -225,7 +226,7 @@ void EViewportHandles::tick() {
 		doc.manipulate->set_force_axis_mask(mask);
 		doc.manipulate->reset_group_to_pre_transform();
 
-		doc.inputs.eat_mouse_click();
+		inputs.eat_mouse_click();
 	}
 }
 

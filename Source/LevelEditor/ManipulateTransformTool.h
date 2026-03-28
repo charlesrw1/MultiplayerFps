@@ -4,11 +4,11 @@ class ManipulateTransformTool : public IInputReciever
 {
 public:
 	ManipulateTransformTool(EditorDoc& ed_doc);
-	void update();
+	void update(EditorInputs& inputs);
 	bool is_hovered();
 	bool is_using();
-	void check_input();
-	void on_focused_tick() final;
+	void check_input(EditorInputs& inputs);
+	void on_focused_tick(EditorInputs& inputs) final;
 	string get_name() final { return "manipulate tool"; }
 
 	void stop_using_custom() {
