@@ -114,9 +114,47 @@ Both tests use the standard `capture_screenshot` golden workflow:
 
 ---
 
+---
+
+## Test 3: `renderer/hotreload_os_filewatcher` (Editor-mode)
+
+**Timeout:** 45 seconds (OS watcher has up to 5-second throttle + async scan latency)
+
+**Mode:** `EDITOR_TEST` — the `AssetRegistrySystem` file watcher is `#ifdef EDITOR_BUILD` only.
+
+### How the OS watcher works
+
+`AssetRegistrySystem::update()` runs each editor tick. It uses Win32 `FindFirstChangeNotificationA` on the game data directory. When a filesystem change is detected:
+1. It launches an async future that scans all game files by timestamp.
+2. Files with a timestamp ≥ `last_time_check` are reloaded via `g_assets.reload_sync`.
+3. For `.mm`/`.mi` files this triggers the normal `post_load` → `on_material_loaded` path.
+
+There is a 5-second rate-limit between reindex cycles.
+
+### Steps
+
+1. `setup_test_scene({0, 1, -3})` (same helper as tests 1 & 2).
+2. Write `mats/test_hotreload_os.mi` with `colorMult 255 0 0 255` (red).
+3. `ScopedTempFile` guard on `mats/test_hotreload_os.mi`.
+4. Load and apply to cube: `g_assets.find_sync<MaterialInstance>("mats/test_hotreload_os.mi")`.
+5. `co_await ctx.wait_ticks(3)`.
+6. `co_await ctx.capture_screenshot("hotreload_os_before")` — golden: red cube.
+7. Overwrite file with `colorMult 0 255 0 255` (green).
+8. `co_await ctx.wait_for(MaterialInstance::on_material_loaded)` — suspends until the watcher fires the delegate for any material.
+9. `co_await ctx.wait_ticks(2)` — let the GPU catch up.
+10. `co_await ctx.capture_screenshot("hotreload_os_after")` — golden: green cube.
+
+### What This Proves
+
+The full OS-driven hot reload path — filesystem notification → async timestamp scan → `reload_sync` → GPU material buffer update → visible output change — works end-to-end without any manual `reload_sync` call in the test.
+
+---
+
 ## Constraints & Non-Goals
 
 - No file system watcher involvement — `reload_sync` is called explicitly.
 - No assertion on `is_compilied_shader_valid` — screenshot diff is the observable signal.
 - Dynamic material (`alloc_dynamic_mat`) path is not tested here — that is a different code path from hot reload.
 - No new `.tmap` files — level is built entirely in code.
+- Test 3 (`os_filewatcher`) only runs in editor builds; tests 1 & 2 run in game builds.
+- The 5-second OS watcher throttle is handled by the 45-second timeout, not by artificially sleeping.
