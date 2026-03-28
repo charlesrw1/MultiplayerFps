@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-<testsuite name="IntegrationTests.Game" tests="11" failures="2">
+<testsuite name="IntegrationTests.Game" tests="15" failures="2">
   <testcase name="game/boot">
   </testcase>
   <testcase name="game/level_load">
@@ -18,6 +18,14 @@
   <testcase name="filesys/exist_false">
   </testcase>
   <testcase name="filesys/delete_game_file">
+  </testcase>
+  <testcase name="framework/lua_repl_exec">
+  </testcase>
+  <testcase name="framework/lua_repl_continue">
+  </testcase>
+  <testcase name="framework/lua_repl_error_captured">
+  </testcase>
+  <testcase name="framework/lua_repl_no_cmd">
   </testcase>
   <testcase name="game/time_advances">
   </testcase>

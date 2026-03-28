@@ -15,7 +15,6 @@ extern ITestRunner* g_pending_test_runner;
 extern bool g_pending_skip_swap;
 extern ConfigVar g_application_class;
 
-
 static bool has_arg(int argc, char** argv, const char* flag) {
 	for (int i = 1; i < argc; ++i)
 		if (std::string(argv[i]) == flag)
@@ -58,13 +57,12 @@ int main(int argc, char** argv) {
 	cfg.interactive = interactive;
 	cfg.timing_assert = timing_assert;
 
-
 	MainConfigurationOptions mainOptions;
-	mainOptions.skip_swap = skip_swap;
+	mainOptions.skip_swap = false;
 	mainOptions.no_console_print = true;
 
 	if (mode == "game") {
-		//g_application_class.set_string("TestGameApp");
+		// g_application_class.set_string("TestGameApp");
 		auto tests = TestRegistry::get_filtered(TestMode::Game, test_filter.c_str());
 		mainOptions.pending_test_runnner.reset(new GameTestRunner("Game", tests, cfg));
 		mainOptions.vars_file = "test_game_vars.txt";
@@ -79,6 +77,6 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	//g_pending_skip_swap = skip_swap;
+	// g_pending_skip_swap = skip_swap;
 	return game_engine_main(mainOptions, argc, argv);
 }

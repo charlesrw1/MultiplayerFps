@@ -1048,7 +1048,7 @@
     <ClInclude Include="Source\Sound\SoundPublic.h">
       <Filter>Source\Sound</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Types.h">
+    <ClInclude Include="Source\User_Camera.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\UI\BaseGUI.h">
@@ -1076,6 +1076,18 @@
     <ClInclude Include="Source\UI\Gui.h" />
     <ClInclude Include="Source\EngineMain.h" />
     <ClInclude Include="Source\Render\RenderConfigVars.h" />
+    <ClInclude Include="Source\LevelEditor\IEditorApi.h" />
+    <ClInclude Include="Source\LevelEditor\OrthoCamera.h" />
+    <ClInclude Include="Source\LevelEditor\LevelEditorCamera.h" />
+    <ClInclude Include="Source\LevelEditor\IInputReciever.h" />
+    <ClInclude Include="Source\Render\ViewSetup.h" />
+    <ClInclude Include="Source\LevelEditor\EditorInputs.h" />
+    <ClInclude Include="Source\LevelEditor\SelectionState.h" />
+    <ClInclude Include="Source\LevelEditor\ManipulateTransformTool.h" />
+    <ClInclude Include="Source\LevelEditor\ViewportHandles.h" />
+    <ClInclude Include="Source\Game\GameplayStatic.h" />
+    <ClInclude Include="Source\LevelEditor\EdPropertyGrid.h" />
+    <ClInclude Include="Source\LevelEditor\EditorModes.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

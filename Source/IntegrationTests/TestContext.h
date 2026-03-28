@@ -22,6 +22,7 @@ struct TestWaitState
 	std::string level_path;
 	bool dump_state_pending = false;
 	std::string dump_state_label;
+	bool debug_break_pending = false;
 };
 
 struct TestContext
@@ -96,6 +97,13 @@ struct TestContext
 		}
 		void await_resume() noexcept {}
 	};
+	struct DebugBreakAwaitable
+	{
+		TestWaitState& wait;
+		bool await_ready() const noexcept { return false; }
+		void await_suspend(std::coroutine_handle<>) noexcept { wait.debug_break_pending = true; }
+		void await_resume() noexcept {}
+	};
 
 	TickAwaitable wait_ticks(int n) { return {wait, n}; }
 	SecondAwaitable wait_seconds(float t) { return {wait, t}; }
@@ -103,6 +111,9 @@ struct TestContext
 	LevelAwaitable load_level(const char* path) { return {wait, path}; }
 	ScreenshotAwaitable capture_screenshot(const char* name) { return {wait, name}; }
 	DumpStateAwaitable dump_state(const char* label) { return {wait, label}; }
+	// Pauses the test and opens a file-based Lua REPL for AI agent inspection.
+	// See LuaDebugServer.h for protocol details.
+	DebugBreakAwaitable debug_break() { return {wait}; }
 
 	ScopedGpuTimer gpu_timer(const char* name);
 

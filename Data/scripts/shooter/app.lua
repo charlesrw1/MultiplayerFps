@@ -86,34 +86,6 @@ function FpsGameApplication:advance_level(next_index)
     end
 end
 
--- ---- Lua integration test framework ----
-local _tests = {}
-local _runner = nil
-local _wait_remaining = 0.0
-
-function add_test(name, fn)
-    table.insert(_tests, {name=name, fn=fn})
-end
-
-local function run_all_tests()
-    local pass, fail, failures = 0, 0, {}
-    for _, t in ipairs(_tests) do
-        local co = coroutine.create(t.fn)
-        local ok, err = true, nil
-        while coroutine.status(co) ~= "dead" do
-            local success, val = coroutine.resume(co)
-            if not success then ok = false; err = val; break end
-            if val then coroutine.yield(val) end
-        end
-        if ok then
-            pass = pass + 1
-        else
-            fail = fail + 1
-            table.insert(failures, t.name .. ": " .. tostring(err))
-        end
-    end
-    LuaTestRunner.finish(pass, fail, table.concat(failures, "\n"))
-end
 
 function FpsGameApplication:run_integration_tests()
     add_test("shooter/player_spawns", function()
@@ -127,6 +99,31 @@ function FpsGameApplication:run_integration_tests()
         coroutine.yield(1.5)
         local app = Application.get_app()
         assert(app:get_enemies_alive() == 3, "demo_level_0 should spawn 3 enemies, got: " .. tostring(app:get_enemies_alive()))
+    end)
+
+    -- Verify the Lua file-based REPL: pre-write cmd.lua that prints a known
+    -- value and self-resumes via continue.txt, then check output.txt.
+    add_test("framework/lua_repl_break", function()
+        os.execute('mkdir "TestFiles\\debug" 2>nul')
+        os.remove("TestFiles/debug/output.txt")
+        os.remove("TestFiles/debug/continue.txt")
+
+        -- Pre-write command: print a sentinel and then create continue.txt
+        local cmd = io.open("TestFiles/debug/cmd.lua", "w")
+        assert(cmd ~= nil, "should be able to write TestFiles/debug/cmd.lua")
+        cmd:write("print('lua_repl_break_ok')\n")
+        cmd:write("local f = io.open('TestFiles/debug/continue.txt', 'w')\n")
+        cmd:write("f:close()\n")
+        cmd:close()
+
+        debug_break()
+
+        local out = io.open("TestFiles/debug/output.txt", "r")
+        assert(out ~= nil, "output.txt should exist after debug_break")
+        local content = out:read("*a")
+        out:close()
+        assert(content:find("lua_repl_break_ok") ~= nil,
+            "output.txt should contain expected print output, got: " .. tostring(content))
     end)
 
     _runner = coroutine.create(run_all_tests)

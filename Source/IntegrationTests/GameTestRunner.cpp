@@ -8,6 +8,8 @@
 #include "GameEnginePublic.h"
 #include "Framework/StringUtils.h"
 #include "StateDump.h"
+#include "LuaDebugServer.h"
+#include "Scripting/ScriptManager.h"
 GameTestRunner::GameTestRunner(std::string_view name, std::vector<TestEntry> tests, const TestRunnerConfig& cfg)
 	: tests_(std::move(tests)), cfg_(cfg), name(name) {
 	screenshot_cfg_.promote = cfg.promote;
@@ -45,6 +47,19 @@ bool GameTestRunner::tick(float dt) {
 		if (current_idx_ >= (int)tests_.size()) {
 			write_results_xml(xml_path.c_str());
 			return true;
+		}
+		return false;
+	}
+
+	// Debug break: AI file-based Lua REPL (co_await t.debug_break())
+	if (ctx_.wait.debug_break_pending) {
+		if (!debug_break_entered_) {
+			debug_break_entered_ = true;
+			LuaDebugServer::on_enter(tests_[current_idx_].name);
+		}
+		if (LuaDebugServer::poll(ScriptManager::inst->get_lua_state())) {
+			ctx_.wait.debug_break_pending = false;
+			debug_break_entered_ = false;
 		}
 		return false;
 	}
@@ -111,6 +126,7 @@ void GameTestRunner::start_next_test() {
 	printf("\n==> [%d/%d] %s\n", current_idx_ + 1, (int)tests_.size(), entry.name);
 	elapsed_ = 0.f;
 	ctx_ = TestContext{};
+	debug_break_entered_ = false;
 	ctx_.is_editor_mode = is_this_editor_mode;
 	task_.emplace(entry.fn(ctx_));
 }

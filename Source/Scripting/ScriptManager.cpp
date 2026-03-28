@@ -127,12 +127,14 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 	return out;
 }
 
-static ConfigVar g_lua_debug("g_lua_debug", "0", CVAR_BOOL, "Start MobDebug on script load (requires ZeroBrane/DAP server on port g_lua_debug_port)");
+static ConfigVar g_lua_debug("g_lua_debug", "0", CVAR_BOOL,
+							 "Start MobDebug on script load (requires ZeroBrane/DAP server on port g_lua_debug_port)");
 static ConfigVar g_lua_debug_host("g_lua_debug_host", "localhost", 0, "MobDebug server host");
-static ConfigVar g_lua_debug_port("g_lua_debug_port", "8172", CVAR_INTEGER, "MobDebug server port");
+static ConfigVar g_lua_debug_port("g_lua_debug_port", "8172", CVAR_INTEGER | CVAR_UNBOUNDED, "MobDebug server port");
 // Extra directory to add to Lua package.cpath for loading socket/core.dll and mime/core.dll.
 // Set to your vcpkg bin dir, e.g.: C:/Users/you/source/vcpkg/installed/x64-windows/bin
-static ConfigVar g_lua_cpath_extra("g_lua_cpath_extra", "", 0, "Extra dir appended to Lua package.cpath for C socket extensions");
+static ConfigVar g_lua_cpath_extra("g_lua_cpath_extra", "", 0,
+								   "Extra dir appended to Lua package.cpath for C socket extensions");
 
 ScriptManager::ScriptManager() {
 	lua = luaL_newstate();
@@ -425,7 +427,34 @@ static void print_table_keys(lua_State* L, int index) {
 void ScriptManager::load_script_files() {
 	ClassBase::init_class_info_for_script();
 	sys_print(Debug, "ScriptManager::load_script_files\n");
+
+	// Extend package.cpath so LuaSocket's C DLLs can be found.
+	// Set g_lua_cpath_extra to your vcpkg bin dir, e.g.:
+	//   C:/Users/you/source/vcpkg/installed/x64-windows/bin
+	const char* extra = g_lua_cpath_extra.get_string();
+	if (extra && extra[0]) {
+		lua_getglobal(lua, "package");
+		lua_getfield(lua, -1, "cpath");
+		std::string new_cpath = std::string(extra) + "/?.dll;" + lua_tostring(lua, -1);
+		lua_pop(lua, 1);
+		lua_pushstring(lua, new_cpath.c_str());
+		lua_setfield(lua, -2, "cpath");
+		lua_pop(lua, 1);
+	}
+
 	reload_all_scripts();
+
+	if (g_lua_debug.get_bool())
+		activate_debugger(g_lua_debug_host.get_string(), g_lua_debug_port.get_integer());
+}
+
+void ScriptManager::activate_debugger(const char* host, int port) {
+	sys_print(Info, "ScriptManager: starting MobDebug, connecting to %s:%d\n", host, port);
+	std::string code = std::string("require('mobdebug').start('") + host + "'," + std::to_string(port) + ")";
+	if (luaL_dostring(lua, code.c_str()) != LUA_OK) {
+		sys_print(Error, "ScriptManager: MobDebug start failed: %s\n", lua_tostring(lua, -1));
+		lua_pop(lua, 1);
+	}
 }
 
 LuaClassTypeInfo::LuaClassTypeInfo()
