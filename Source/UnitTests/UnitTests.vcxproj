@@ -161,6 +161,7 @@
     <ClCompile Include="framwork_test.cpp" />
     <ClCompile Include="freelist_test.cpp" />
     <ClCompile Include="handle_test.cpp" />
+    <ClCompile Include="asset_file_watcher_test.cpp" />
     <ClCompile Include="maputil_test.cpp" />
     <ClCompile Include="pool_allocator_test.cpp" />
     <ClCompile Include="scripting_test.cpp" />

@@ -1,13 +1,9 @@
 // Source/Assets/FileWatcher.h
 #pragma once
 #ifdef EDITOR_BUILD
+#include <memory>
 #include <string>
 #include <vector>
-#include <unordered_map>
-#include <mutex>
-#include <thread>
-#include <chrono>
-#include <windows.h>
 
 // Watches a directory tree for file changes using ReadDirectoryChangesW.
 // All events are deduplicated and debounced: a path is only returned from
@@ -16,9 +12,12 @@
 //
 // poll() is safe to call from the main thread concurrently with the
 // background watcher thread.
+//
+// Windows types are hidden in the Impl pimpl to avoid <windows.h> leaking
+// min/max macros into translation units that include this header.
 class FileWatcher {
 public:
-    FileWatcher() = default;
+    FileWatcher();
     ~FileWatcher();
 
     FileWatcher(const FileWatcher&) = delete;
@@ -34,14 +33,7 @@ public:
     std::vector<std::string> poll(int debounce_ms = 150);
 
 private:
-    void worker();
-
-    HANDLE dir_handle_  = INVALID_HANDLE_VALUE;
-    HANDLE stop_event_  = INVALID_HANDLE_VALUE;
-    std::thread worker_thread_;
-    std::mutex  mutex_;
-    // path -> time of most recent change notification
-    std::unordered_map<std::string,
-                       std::chrono::steady_clock::time_point> pending_;
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
 };
 #endif // EDITOR_BUILD
