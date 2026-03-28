@@ -18,7 +18,8 @@
 #include "Render/MaterialPublic.h"
 #include "Assets/AssetDatabase.h"
 #include "Framework/Files.h"
-
+#include "Render/Model.h"
+#include "Render/RenderConfigVars.h"
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
@@ -51,10 +52,19 @@ static MeshComponent* setup_test_scene() {
 	auto* mesh = cube_ent->create_component<MeshComponent>();
 	mesh->set_model_str("eng/cube.cmdl");
 
+	auto skybox = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
+	skybox->set_is_skybox(true);
+	skybox->get_owner()->set_ls_scale(glm::vec3(2000));
+	skybox->set_model(Model::load("eng/skydome.cmdl"));
+
+	extern ConfigVar r_debug_mode;
+	r_taa_enabled.set_bool(false);
+	r_debug_mode.set_integer(5 /* albedo */);
+
 	auto* cam_ent = eng->get_level()->spawn_entity();
 	auto* cam = cam_ent->create_component<CameraComponent>();
 	cam->set_is_enabled(true);
-	cam_ent->set_ws_position({0.f, 1.f, -4.f});
+	cam_ent->set_ws_position({0.f, 1.f, 4.f});
 
 	return mesh;
 }
@@ -66,7 +76,8 @@ static MeshComponent* setup_test_scene() {
 // screenshots again.  Baselines: red cube then blue cube.
 
 static TestTask test_hotreload_material_instance(TestContext& t) {
-	co_await t.load_level("Data/eng/template_map.tmap");
+	eng->load_level("");
+	ASSERT(eng->get_level()->get_source_asset_name() == "");
 	MeshComponent* mesh = setup_test_scene();
 
 	const std::string inst_path = "mats/test_hotreload_inst.mi";
@@ -82,7 +93,7 @@ static TestTask test_hotreload_material_instance(TestContext& t) {
 	t.require(mat != nullptr, ".mi asset loaded");
 	mesh->set_material_override(mat.get());
 
-	co_await t.wait_ticks(3);
+	co_await t.wait_ticks(1);
 	co_await t.capture_screenshot("hotreload_inst_before"); // golden: red cube
 
 	const std::string blue_mi =
@@ -93,7 +104,7 @@ static TestTask test_hotreload_material_instance(TestContext& t) {
 
 	g_assets.reload_sync(mat.get());
 
-	co_await t.wait_ticks(3);
+	co_await t.wait_ticks(1);
 	co_await t.capture_screenshot("hotreload_inst_after"); // golden: blue cube
 }
 GAME_TEST("renderer/hotreload_material_instance", 20.f, test_hotreload_material_instance);
@@ -106,7 +117,8 @@ GAME_TEST("renderer/hotreload_material_instance", 20.f, test_hotreload_material_
 // to all dependent instances), screenshots again.
 
 static TestTask test_hotreload_master_material(TestContext& t) {
-	co_await t.load_level("Data/eng/template_map.tmap");
+	eng->load_level("");
+
 	MeshComponent* mesh = setup_test_scene();
 
 	const std::string master_path = "test_hotreload_master.mm";
@@ -130,7 +142,7 @@ static TestTask test_hotreload_master_material(TestContext& t) {
 	t.require(mat != nullptr, ".mm asset loaded");
 	mesh->set_material_override(mat.get());
 
-	co_await t.wait_ticks(3);
+	co_await t.wait_ticks(1);
 	co_await t.capture_screenshot("hotreload_master_before"); // golden: solid red
 
 	const std::string green_mm =
@@ -151,7 +163,7 @@ static TestTask test_hotreload_master_material(TestContext& t) {
 	// all MaterialInstances that point to this master.
 	g_assets.reload_sync(mat.get());
 
-	co_await t.wait_ticks(5); // extra ticks for shader compile latency
+	co_await t.wait_ticks(1); // extra ticks for shader compile latency
 	co_await t.capture_screenshot("hotreload_master_after"); // golden: solid green
 }
 GAME_TEST("renderer/hotreload_master_material", 30.f, test_hotreload_master_material);
@@ -168,7 +180,8 @@ GAME_TEST("renderer/hotreload_master_material", 30.f, test_hotreload_master_mate
 
 #ifdef EDITOR_BUILD
 static TestTask test_hotreload_os_filewatcher(TestContext& t) {
-	co_await t.load_level("Data/eng/template_map.tmap");
+	eng->load_level("");
+
 	MeshComponent* mesh = setup_test_scene();
 
 	const std::string inst_path = "mats/test_hotreload_os.mi";
@@ -184,7 +197,7 @@ static TestTask test_hotreload_os_filewatcher(TestContext& t) {
 	t.require(mat != nullptr, "OS test .mi loaded");
 	mesh->set_material_override(mat.get());
 
-	co_await t.wait_ticks(3);
+	co_await t.wait_ticks(1);
 	co_await t.capture_screenshot("hotreload_os_before"); // golden: red cube
 
 	// Overwrite on disk — the OS watcher will pick this up automatically.
@@ -211,8 +224,8 @@ static TestTask test_hotreload_os_filewatcher(TestContext& t) {
 	// its own listener from reload_signal, but not from on_material_loaded).
 	MaterialInstance::on_material_loaded.remove(&reload_signal);
 
-	co_await t.wait_ticks(2); // let GPU material buffer catch up
+	co_await t.wait_ticks(1); // let GPU material buffer catch up
 	co_await t.capture_screenshot("hotreload_os_after"); // golden: green cube
 }
-EDITOR_TEST("renderer/hotreload_os_filewatcher", 45.f, test_hotreload_os_filewatcher);
+GAME_TEST("renderer/hotreload_os_filewatcher", 5.f, test_hotreload_os_filewatcher);
 #endif

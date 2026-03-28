@@ -1,14 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="IntegrationTests.Game" tests="15" failures="2">
-  <testcase name="game/boot">
-  </testcase>
-  <testcase name="game/level_load">
-  </testcase>
-  <testcase name="renderer/screenshot_smoke">
-    <failure message="FAIL: screenshot failed: smoke_demo_level_1"/>
-  </testcase>
+<testsuite name="IntegrationTests.Game" tests="15" failures="1">
   <testcase name="renderer/ssr_smoke">
-    <failure message="FAIL: screenshot failed: ssr_smoke"/>
+  </testcase>
+  <testcase name="renderer/hotreload_material_instance">
+  </testcase>
+  <testcase name="renderer/hotreload_master_material">
+  </testcase>
+  <testcase name="renderer/hotreload_os_filewatcher">
+    <failure message="TIMEOUT"/>
   </testcase>
   <testcase name="filesys/write_read_roundtrip">
   </testcase>

@@ -589,7 +589,7 @@ bool GameEngineLocal::load_level(string mapname) {
 		sys_print(Warning, "GameEngineLocal::load_level: level is in update period, can't change level here.\n");
 		return false;
 	}
-	const bool wants_empty = mapname == "<empty>";
+	const bool wants_empty = mapname == "<empty>" || mapname.empty();
 
 	double start_time = GetTime();
 
@@ -1906,9 +1906,17 @@ void GameEngineLocal::loop() {
 					int code = test_runner->exit_code();
 					test_runner = nullptr;
 					// C++ tests done — kick off Lua tests; they will call Quit() when finished
-					if (get_app())
-						app->run_integration_tests();
-					else
+
+					bool call_exit = true;
+					if (get_app()) {
+						const bool has_integration_tests = app->run_integration_tests();
+						if (has_integration_tests) 
+							call_exit = false;
+						else {
+							sys_print(Info, "App doesnt have any lua integration tests, exiting. (run_integration_tests should return true if this is wrong)\n");
+						}
+					}
+					if(call_exit)
 						_exit(code);
 				}
 			}

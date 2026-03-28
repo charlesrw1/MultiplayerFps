@@ -6,7 +6,7 @@
 
 // Serialize round-trip: load a level, save it, reload, check entity count matches
 static TestTask test_serialize_round_trip(TestContext& t) {
-	co_await t.load_level("Data/demo_level_1.tmap");
+	eng->load_level("Data/demo_level_1.tmap");
 	t.require(eng->get_level() != nullptr, "level loaded in editor mode");
 
 	int count_before = t.editor().entity_count();
@@ -15,7 +15,7 @@ static TestTask test_serialize_round_trip(TestContext& t) {
 	t.editor().save_level("TestFiles/temp_serialize_test.tmap");
 	co_await t.wait_ticks(1);
 
-	co_await t.load_level("TestFiles/temp_serialize_test.tmap");
+	eng->load_level("TestFiles/temp_serialize_test.tmap");
 	t.require(eng->get_level() != nullptr, "reloaded level is non-null");
 
 	int count_after = t.editor().entity_count();
@@ -27,7 +27,7 @@ EDITOR_TEST("editor/serialize_round_trip", 15.f, test_serialize_round_trip);
 
 // Undo with no commands queued should not crash or change entity count
 static TestTask test_undo_noop(TestContext& t) {
-	co_await t.load_level("Data/demo_level_1.tmap");
+	eng->load_level("Data/demo_level_1.tmap");
 	int count_before = t.editor().entity_count();
 
 	t.editor().undo();

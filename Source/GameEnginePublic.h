@@ -52,7 +52,9 @@ public:
 	REF virtual void update() {}
 	REF virtual void stop() {}
 	REF virtual void on_map_changed() {}
-	REF virtual void run_integration_tests() {}
+
+	// returns true if the class has integration tests to run. otherwise false, and integration test mode will exit.
+	REF virtual bool run_integration_tests() { return false; }
 	// misc callbacks
 	REF virtual void on_controller_status(int index, bool connected) {}
 

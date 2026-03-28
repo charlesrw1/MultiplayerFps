@@ -377,7 +377,8 @@ static float irrad_mult = 1.0;
 static float normal_bias = 0.2;
 static float view_bias = 0.3;
 static int bounces = 4;
-static bool include_cubemaps = true;
+ConfigVar include_cubemaps("r.include_cubemaps", "1", CVAR_BOOL, "");
+
 static float relocate_normal_dist = 0.2;
 static int lum_adjust_mode = 4;
 static float depth_sigma = 50.0;
@@ -399,7 +400,8 @@ void ddgi_debugmenu() {
 	ImGui::InputFloat("normal bias", &normal_bias);
 	ImGui::InputFloat("view bias", &view_bias);
 	ImGui::InputInt("bounces", &bounces);
-	ImGui::Checkbox("reflections", &include_cubemaps);
+	draw_imgui_for_cvar(include_cubemaps);
+
 	ImGui::InputFloat("relocate_normal_dist", &relocate_normal_dist);
 	ImGui::SliderInt("lum_adjust", &lum_adjust_mode, 0, 7);
 
@@ -870,7 +872,7 @@ void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_
 	draw.bind_texture_ptr(6, ssao);
 
 	extern ConfigVar r_specular_ao_intensity;
-	device.shader().set_bool("include_cubemaps", !for_cubemap_view && include_cubemaps);
+	device.shader().set_bool("include_cubemaps", !for_cubemap_view && include_cubemaps.get_bool());
 
 	set_shit_fuck();
 

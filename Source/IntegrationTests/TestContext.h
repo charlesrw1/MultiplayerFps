@@ -19,7 +19,6 @@ struct TestWaitState
 	bool delegate_fired = false;
 	bool screenshot_pending = false;
 	std::string screenshot_name;
-	std::string level_path;
 	bool dump_state_pending = false;
 	std::string dump_state_label;
 	bool debug_break_pending = false;
@@ -61,17 +60,6 @@ struct TestContext
 		void await_suspend(std::coroutine_handle<>) noexcept;
 		void await_resume() noexcept {}
 	};
-	struct LevelAwaitable
-	{
-		TestWaitState& wait;
-		const char* path;
-		bool await_ready() const noexcept { return false; }
-		void await_suspend(std::coroutine_handle<>) noexcept {
-			wait.level_path = path;
-			wait.wait_ticks = 1; // runner will call load_level and then resume
-		}
-		void await_resume() noexcept {}
-	};
 	struct ScreenshotAwaitable
 	{
 		TestWaitState& wait;
@@ -108,7 +96,6 @@ struct TestContext
 	TickAwaitable wait_ticks(int n) { return {wait, n}; }
 	SecondAwaitable wait_seconds(float t) { return {wait, t}; }
 	DelegateAwaitable wait_for(MulticastDelegate<>& d) { return {wait, d}; }
-	LevelAwaitable load_level(const char* path) { return {wait, path}; }
 	ScreenshotAwaitable capture_screenshot(const char* name) { return {wait, name}; }
 	DumpStateAwaitable dump_state(const char* label) { return {wait, label}; }
 	// Pauses the test and opens a file-based Lua REPL for AI agent inspection.

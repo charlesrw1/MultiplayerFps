@@ -3693,7 +3693,7 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 		get_view_mat(i, position, viewmat, viewfront);
 		View_Setup cubemap_view(viewmat, glm::radians(90.f), 0.01, 100.f, specular_cubemap_size, specular_cubemap_size);
 
-		SceneDrawParamsEx params(GetTime(), 0.016f);
+		SceneDrawParamsEx params(0.f, 0.016f);
 		params.draw_ui = false;
 		params.draw_world = true;
 		params.is_editor = false;

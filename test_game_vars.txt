@@ -1,6 +1,11 @@
 exec vars.txt
-g_application_class "EngineTesterAppImpl"
+g_application_class "Application"
 is_editor_app 0
 r.taa 0
 ui.disable_screen_log 1
 disable_render_time_tick 1
+r.ddgi_halfres 0
+r.ssr 0
+r.ssao 0
+dt 1
+r.include_cubemaps 1

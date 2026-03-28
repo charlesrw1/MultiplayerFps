@@ -59,7 +59,8 @@ bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cf
 	}
 
 	int gw, gh, gc;
-	unsigned char* golden = stbi_load(gp.c_str(), &gw, &gh, &gc, 3);
+	stbi_set_flip_vertically_on_load(true);
+	unsigned char* golden = stbi_load(gp.c_str(), &gw, &gh, &gc, 4);
 	if (!golden) {
 		fprintf(stderr, "  SCREENSHOT FAIL: no golden at %s — run with --promote\n", gp.c_str());
 		// SKIP THESE
@@ -78,7 +79,7 @@ bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cf
 	int total = w * h;
 	int diff_pixels = 0;
 	int max_delta = 0;
-	for (int i = 0; i < total * 3; ++i) {
+	for (int i = 0; i < total * 4; ++i) {
 		int d = abs((int)pixels[i] - (int)golden[i]);
 		if (d > max_delta)
 			max_delta = d;
