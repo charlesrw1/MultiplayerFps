@@ -40,14 +40,15 @@
 #include "Input/InputSystem.h"
 #include "Game/Components/DecalComponent.h"
 #include "Framework/PropertyEd.h"
+
+#include "Game/Components/SpawnerComponenth.h"
+
 MulticastDelegate<EditorDoc*> EditorDoc::on_creation;
 MulticastDelegate<EditorDoc*> EditorDoc::on_deletion;
 
 ConfigVar g_editor_newmap_template("g_editor_newmap_template", "eng/template_map.tmap", CVAR_DEV,
 								   "whenever a new map is created, it will use this map as a template");
-ConfigVar editor_draw_name_text("editor_draw_name_text", "0", CVAR_BOOL,
-								"draw text above every entities head in editor");
-ConfigVar editor_draw_name_text_alpha("editor_draw_name_text_alpha", "150", CVAR_INTEGER, "", 0, 255);
+
 ConfigVar ed_has_snap("ed_has_snap", "0", CVAR_BOOL, "");
 ConfigVar ed_translation_snap("ed_translation_snap", "0.2", CVAR_FLOAT, "what editor translation snap", 0.1, 128);
 ConfigVar ed_translation_snap_exp("ed_translation_snap_exp", "10", CVAR_FLOAT,
@@ -58,8 +59,7 @@ ConfigVar ed_rotation_snap_exp("ed_rotation_snap_exp", "3", CVAR_FLOAT, "editor 
 ConfigVar ed_scale_snap("ed_scale_snap", "1.0", CVAR_FLOAT, "what editor scale snap", 0.1, 360);
 ConfigVar ed_scale_snap_exp("ed_scale_snap_exp", "3", CVAR_FLOAT, "editor scale snap increment exponent", 1, 10);
 ConfigVar ed_force_guizmo("ed.force_guizmo", "0", CVAR_BOOL, "");
-ConfigVar test1("test1", "200", CVAR_INTEGER, "", 0, 256);
-ConfigVar test2("test2", "200", CVAR_INTEGER, "", 0, 256);
+
 ConfigVar ed_show_box_handles("ed.show_box_handles", "0", CVAR_BOOL, "");
 
 extern void export_godot_scene(const std::string& base_export_path);
@@ -82,16 +82,6 @@ Color32 to_color32(glm::vec4 v) {
 	c.b = glm::clamp(v.b * 255.f, 0.f, 255.f);
 	c.a = glm::clamp(v.a * 255.f, 0.f, 255.f);
 	return c;
-}
-
-bool check_if_string_is_number(const char* str) {
-	try {
-		std::stod(str);
-		return true;
-	}
-	catch (...) {
-		return false;
-	}
 }
 
 string get_name_display_entity(const Entity* e) {
@@ -205,218 +195,7 @@ void EditorDoc::init_new() {
 	PropertyFactoryUtil::register_editor(*this, grid_factory);
 
 	cmds = ConsoleCmdGroup::create("");
-	cmds->add("all", [this](const Cmd_Args& args) {
-		auto& objs = eng->get_level()->get_all_objects();
-		for (auto s : objs)
-			args.sys_print(Info, "%lld\n", int64_t(s->get_instance_id()));
-	});
-	cmds->add("sel", [this](const Cmd_Args& args) {
-		auto selected = selection_state->get_selection_as_vector();
-		for (auto s : selected)
-			args.sys_print(Info, "%lld\n", int64_t(s.handle));
-	});
-	cmds->add("pp", [this](const Cmd_Args& args) {
-		const string ents = args.at(1);
-		auto lines = StringUtils::to_lines(ents);
-
-		for (auto& e : lines) {
-			int64_t id = std::stoll(e);
-			Entity* ent = EntityPtr(id).get();
-			if (!ent)
-				continue;
-			const char* comp_name = "<no component>";
-			string ent_name = get_name_display_entity(ent);
-
-			args.sys_print(Info, "%-5lld %-20s %s\n", int64_t(id), comp_name, ent_name.c_str());
-		}
-	});
-
-	cmds->add("fil", [this](const Cmd_Args& args) {
-		const string ents = args.at(2);
-		const string filter = args.at(1);
-
-		auto lines = StringUtils::to_lines(ents);
-		for (auto& e : lines) {
-			int64_t id = std::stoll(e);
-			Entity* ent = EntityPtr(id).get();
-			if (!ent)
-				continue;
-			if (OONameFilter::does_entity_pass_one_filter(filter, ent))
-				args.sys_print(Info, "%lld\n", int64_t(id));
-		}
-	});
-	cmds->add("so", [this](const Cmd_Args& args) {
-		if (args.size() == 1) {
-			selection_state->clear_all_selected();
-			return;
-		}
-		const string ents = args.at(1);
-		auto lines = StringUtils::to_lines(ents);
-		selection_state->clear_all_selected();
-		for (auto& e : lines) {
-			int64_t id = std::stoll(e);
-			selection_state->add_to_entity_selection(EntityPtr(id));
-		}
-	});
-	cmds->add("sfso", [this](const Cmd_Args& args) {
-		auto str = string_format("sel | fil %s | so\n", args.at(1));
-		Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, str);
-	});
-	cmds->add("afso", [this](const Cmd_Args& args) {
-		auto str = string_format("all | fil %s | so\n", args.at(1));
-		Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, str);
-	});
-
-	cmds->add("as", [this](const Cmd_Args& args) {
-		const string ents = args.at(1);
-		auto lines = StringUtils::to_lines(ents);
-		for (auto& e : lines) {
-			int64_t id = std::stoll(e);
-			selection_state->add_to_entity_selection(EntityPtr(id));
-		}
-	});
-	cmds->add("us", [this](const Cmd_Args& args) {
-		const string ents = args.at(1);
-		auto lines = StringUtils::to_lines(ents);
-		for (auto& e : lines) {
-			int64_t id = std::stoll(e);
-			selection_state->remove_from_selection(EntityPtr(id));
-		}
-	});
-	cmds->add("set-to-camera", [this](const Cmd_Args& args) {
-		if (ed_cam.get_is_using_ortho()) {
-			return;
-		}
-		if (!selection_state->has_only_one_selected())
-			return;
-		auto ent = selection_state->get_only_one_selected();
-		if (ent.get()) {
-			glm::mat4 cam_transform = glm::inverse(vs_setup.view);
-			ent->set_ws_transform(cam_transform);
-			manipulate->update_pivot_and_cached();
-		}
-	});
-	cmds->add("set-field", [this](const Cmd_Args& args) {
-		const string ents = args.at(3);
-		nlohmann::json jsonObj;
-		if (check_if_string_is_number(args.at(2)))
-			jsonObj[args.at(1)] = std::stod(args.at(2));
-		else if (strcmp(args.at(2), "true") == 0)
-			jsonObj[args.at(1)] = true;
-		else if (strcmp(args.at(2), "false") == 0)
-			jsonObj[args.at(1)] = false;
-		else
-			jsonObj[args.at(1)] = args.at(2);
-
-		const string filter = args.at(1);
-
-		auto lines = StringUtils::to_lines(ents);
-		for (auto& e : lines) {
-			int64_t id = std::stoll(e);
-			Entity* ent = EntityPtr(id).get();
-			if (!ent)
-				continue;
-			{ ReadSerializerBackendJson2 reader("", jsonObj, *AssetDatabase::loader, *ent); }
-			if (ent->get_components().size() > 0) {
-				ReadSerializerBackendJson2 reader("", jsonObj, *AssetDatabase::loader, *ent->get_components().at(0));
-			}
-			ent->invalidate_transform(nullptr);
-		}
-	});
-
-	cmds->add("set-box", [this](const Cmd_Args& args) {
-		glm::vec3 min{};
-		glm::vec3 max{};
-		for (int i = 0; i < 3; i++)
-			min[i] = std::atof(args.at(i + 1));
-		for (int i = 0; i < 3; i++)
-			max[i] = std::atof(args.at(i + 4));
-
-		for (int i = 0; i < 3; i++) {
-			if (min[i] > max[i])
-				std::swap(min[i], max[i]);
-		}
-		if (!selection_state->has_only_one_selected())
-			return;
-		Entity* e = selection_state->get_only_one_selected().get();
-		if (!e)
-			return;
-		MeshComponent* mc = e->get_component<MeshComponent>();
-		if (!mc || !mc->get_model())
-			return;
-		auto bounds = mc->get_model()->get_bounds();
-
-		glm::vec3 set_size = (max - min);
-		vec3 bounds_size = bounds.bmax - bounds.bmin;
-
-		glm::vec3 scale = set_size / bounds_size;
-		glm::vec3 bounds_c = bounds.get_center();
-
-		glm::vec3 frac = glm::abs(bounds.bmin / bounds_size);
-
-		glm::vec3 set_center = frac * set_size + min;
-		e->set_ws_transform(set_center, glm::quat(), scale);
-	});
-	cmds->add("bone-list", [this](const Cmd_Args& args) {
-		if (!selection_state->has_only_one_selected())
-			return;
-		Entity* e = selection_state->get_only_one_selected().get();
-		if (!e)
-			return;
-		MeshComponent* mc = e->get_component<MeshComponent>();
-		if (!mc || !mc->get_model())
-			return;
-		MSkeleton* skel = mc->get_model()->get_skel();
-		if (!skel)
-			return;
-		auto& bones = skel->get_all_bones();
-		int count = bones.size();
-		sys_print(Info, "%s: num bones: %d\n", mc->get_model()->get_name().c_str(), count);
-		for (int i = 0; i < count; i++) {
-			sys_print(Info, "\t%s\n", bones[i].strname.c_str());
-		}
-	});
-	cmds->add("parent-to", [this](const Cmd_Args& args) {
-		if (!selection_state->has_only_one_selected())
-			return;
-		Entity* e = selection_state->get_only_one_selected().get();
-		if (!e)
-			return;
-		int64_t id = std::stoll(args.at(1));
-		string bonename = args.at(2);
-		EntityPtr parent_to(id);
-		Entity* parent_to_e = parent_to.get();
-		if (!parent_to_e)
-			return;
-		e->parent_to(parent_to_e);
-		e->set_ls_position(glm::vec3(0.f));
-		e->set_parent_bone(bonename.c_str());
-	});
-
-	cmds->add("SET_ORBIT_TARGET", [this](const Cmd_Args&) { set_camera_target_to_sel(); });
-	cmds->add("ed.HideSelected", [this](const Cmd_Args&) {
-		eng->log_to_fullscreen_gui(Info, "Hide selected");
-		auto& selection = selection_state->get_selection();
-		for (auto s : selection) {
-			EntityPtr handle(s);
-			if (handle) {
-				handle->set_hidden_in_editor(true);
-			}
-		}
-	});
-	cmds->add("ed.UnHideAll", [this](const Cmd_Args&) {
-		eng->log_to_fullscreen_gui(Info, "Unhide all");
-		auto level = eng->get_level();
-		if (level) {
-			for (auto e : level->get_all_objects()) {
-				if (e->is_a<Entity>()) {
-					auto ent = e->cast_to<Entity>();
-					if (ent->get_hidden_in_editor())
-						ent->set_hidden_in_editor(false);
-				}
-			}
-		}
-	});
+	add_editor_commands();
 
 	Cmd_Manager::get()->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini  editor.ini");
 
@@ -438,7 +217,7 @@ void EditorDoc::set_document_path(string newAssetName) {
 	}
 	if (assetName.has_value()) {
 		sys_print(Warning, "EditorDoc::set_document_path: already has path\n");
-		//return;
+		// return;
 	}
 	this->assetName = newAssetName;
 }
@@ -558,7 +337,6 @@ EditorDoc::~EditorDoc() {
 
 	EditorDoc::on_deletion.invoke(this);
 }
-
 
 const Entity* select_outermost_entity(const Entity* in) {
 	const Entity* sel = in;
@@ -690,7 +468,6 @@ void EditorDoc::tick(float dt) {
 	vs_setup = ed_cam.make_view();
 }
 
-
 void EditorDoc::imgui_draw() {
 	inputs.reset_keyboard_and_mouse();
 
@@ -701,7 +478,7 @@ void EditorDoc::imgui_draw() {
 	if (!active_mode)
 		active_mode = selection_mode.get();
 
-	ed_cam.tick(inputs,eng->get_dt());
+	ed_cam.tick(inputs, eng->get_dt());
 	manipulate->check_input(inputs);
 	handle_dragger->tick(inputs);
 	gui->draw(inputs);
@@ -937,152 +714,6 @@ void EditorDoc::hook_scene_viewport_draw() {
 	manipulate->update(inputs);
 }
 
-#include "Game/Components/SpawnerComponenth.h"
-
-class SpawnerIProped : public IPropertyEditor
-{
-public:
-	SpawnerIProped(SpawnerComponent* sc, string key) : sc(sc), key2(key) {
-		prop = &hacked_bullshit;
-		hacked_bullshit.name = key2.c_str();
-		value = sc->obj[key];
-		instance = this; // bs
-	}
-	~SpawnerIProped() {
-		if (sc.get())
-			sc->obj[key2] = value;
-	}
-	bool internal_update() {
-		ImguiInputTextCallbackUserStruct user;
-		user.string = &value;
-		if (ImGui::InputText("##input_text", (char*)value.c_str(), value.size() + 1 /* null terminator byte */,
-							 ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user)) {
-			value.resize(strlen(value.c_str())); // imgui messes with buffer size
-			sc->obj[key2] = value;
-			return true;
-		}
-		return false;
-	}
-	PropertyInfo hacked_bullshit;
-	string key2;
-	string value;
-	obj<SpawnerComponent> sc;
-};
-
-class SpawnerModelProp : public IPropertyEditor
-{
-public:
-	SpawnerModelProp(SpawnerComponent* sc) : sc(sc) {
-		prop = &hacked_bullshit;
-		hacked_bullshit.name = "model";
-
-		instance = this; // bs
-
-		assetprop.instance = this;
-		assetprop.prop = &hacked_bullshit2;
-		hacked_bullshit2.type = core_type_id::AssetPtr;
-		hacked_bullshit2.class_type = &Model::StaticType;
-		hacked_bullshit2.offset = offsetof(SpawnerModelProp, model);
-
-		if (sc->obj["model"].is_string()) {
-			string str = sc->obj["model"];
-			if (!str.empty())
-				model = Model::load(str);
-		}
-	}
-	~SpawnerModelProp() {}
-	bool internal_update() {
-		bool res = assetprop.internal_update();
-		if (res) {
-			set_mod();
-		}
-		return res;
-	}
-	bool can_reset() final { return assetprop.can_reset(); }
-	void reset_value() final {
-		assetprop.reset_value();
-		set_mod();
-	}
-	void set_mod() {
-		if (model)
-			sc->obj["model"] = model->get_name();
-		else
-			sc->obj["model"] = "";
-
-		sc->set_model();
-	}
-
-	AssetPropertyEditor assetprop;
-	Model* model = nullptr;
-
-	PropertyInfo hacked_bullshit;
-	PropertyInfo hacked_bullshit2;
-
-	obj<SpawnerComponent> sc;
-};
-
-void EdPropertyGrid::refresh_grid() {
-	grid.clear_all();
-
-	auto& ss = ed_doc.selection_state;
-
-	if (!ss->has_any_selected())
-		return;
-
-	if (ss->has_only_one_selected() && ss->get_only_one_selected() /* can return null...*/) {
-		auto entity = ss->get_only_one_selected();
-		assert(entity);
-		sys_print(Debug, "EdPropertyGrid::refresh_grid: adding to grid: %s\n", entity->get_type().classname);
-
-		auto ti = &entity->get_type();
-		while (ti) {
-			if (ti->props) {
-				grid.add_property_list_to_grid(ti->props, entity.get());
-			}
-			ti = ti->super_typeinfo;
-		}
-
-		auto& comps = entity->get_components();
-
-		if (!comps.empty() && serialize_this_objects_children(entity.get())) {
-			if (selected_component == 0)
-				selected_component = comps[0]->get_instance_id();
-			if (eng->get_object(selected_component) == nullptr ||
-				eng->get_object(selected_component)->cast_to<Component>() == nullptr ||
-				eng->get_object(selected_component)->cast_to<Component>()->get_owner() != entity.get())
-				selected_component = comps[0]->get_instance_id();
-
-			ASSERT(selected_component != 0);
-
-			auto c = eng->get_object(selected_component)->cast_to<Component>();
-			sys_print(Debug, "EdPropertyGrid::refresh_grid: adding to grid: %s\n", c->get_type().classname);
-
-			ASSERT(c);
-			ti = &c->get_type();
-			while (ti) {
-				if (ti->props)
-					grid.add_property_list_to_grid(ti->props, c);
-				ti = ti->super_typeinfo;
-			}
-
-			if (c->is_a<SpawnerComponent>()) {
-				auto sc = (SpawnerComponent*)c;
-				for (auto& [name, prop] : sc->obj.items()) {
-					if (!prop.is_string())
-						continue;
-					if (name[0] == '_')
-						continue;
-					if (name == "model")
-						grid.add_iproped_manual(new SpawnerModelProp(sc));
-					else
-						grid.add_iproped_manual(new SpawnerIProped(sc, name));
-				}
-			}
-		}
-	}
-}
-
-
 void EditorDoc::set_camera_target_to_sel() {
 	if (selection_state->has_only_one_selected()) {
 		auto ptr = selection_state->get_only_one_selected();
@@ -1149,11 +780,6 @@ void EditorDoc::hook_menu_bar() {
 	}
 }
 
-EditorUILayout::EditorUILayout(EditorDoc& doc) : doc(&doc) {
-
-	doc.ed_cam.on_ortho_state_change.add(this, [&]() { cube.rotation.begin_interpolate(); });
-}
-
 glm::ivec2 ndc_to_screen_coord(glm::vec3 ndc) {
 	ndc.y *= -1;
 	auto coordx = ndc.x * 0.5 + 0.5;
@@ -1166,235 +792,6 @@ glm::ivec2 ndc_to_screen_coord(glm::vec3 ndc) {
 	coordy *= vp_size.y;
 
 	return {coordx, coordy};
-}
-
-bool EditorUILayout::draw(EditorInputs& inputs) {
-	const float dt = eng->get_dt();
-
-	RenderWindow& window = UiSystem::inst->window;
-	cube.rotation.set_current((glm::mat3)doc->vs_setup.view);
-	cube.draw(window, dt);
-	// paint
-	if (doc->dragger.get_is_dragging()) {
-		auto rect = doc->dragger.get_drag_rect();
-		// builder.draw_solid_rect({ rect.x,rect.y }, { rect.w,rect.h }, { 200,200,200,50 });
-		rect.x -= UiSystem::inst->get_vp_rect().get_pos().x;
-		rect.y -= UiSystem::inst->get_vp_rect().get_pos().y;
-
-		RectangleShape shape;
-		shape.rect = rect;
-		Uint8 c = test1.get_integer();
-		Uint8 a = test2.get_integer();
-		shape.color = {c, c, c, a};
-		window.draw(shape);
-	}
-
-	bool do_mouse_click =
-		Input::was_mouse_released(0) && UiSystem::inst->is_vp_hovered() && !doc->dragger.get_is_dragging();
-	int x = Input::get_mouse_pos().x;
-	int y = Input::get_mouse_pos().y;
-
-	if (!inputs.can_use_mouse_click())
-		do_mouse_click = false;
-
-	if (!eng->get_level())
-		return false;
-
-	const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
-	if (!font)
-		font = UiSystem::inst->defaultFont;
-	auto objs = get_objs();
-	std::sort(objs.begin(), objs.end(), [](const obj& a, const obj& b) -> bool { return a.pos.z < b.pos.z; });
-	const Entity* clicked = nullptr;
-	for (const auto o : objs) {
-		string name = get_name_display_entity(o.e);
-
-		const int icon_size = 16;
-		InlineVec<Texture*, 6> icons;
-		auto e = o.e;
-
-		bool found_script = false;
-		for (auto c : o.e->get_components()) {
-			if (c->dont_serialize_or_edit_this())
-				continue;
-			const char* s = c->get_editor_outliner_icon();
-			if (c->get_type().get_is_lua_class()) {
-				found_script = true;
-				s = "eng/editor/script_lua.png";
-			}
-			if (!*s)
-				continue;
-			auto tex = g_assets.find_global_sync<Texture>(s);
-			icons.push_back(tex.get());
-		}
-		if (!(found_script || editor_draw_name_text.get_bool()))
-			continue;
-
-		auto size = GuiHelpers::calc_text_size_no_wrap(name, font);
-
-		const int text_offset = (icon_size + 1) * icons.size();
-		size.w += text_offset;
-
-		const auto coord = ndc_to_screen_coord(o.pos);
-		const auto coordx = coord.x - size.w / 2;
-		const auto coordy = coord.y - size.h / 2;
-
-		const auto vp_pos = UiSystem::inst->get_vp_rect().get_pos();
-
-		Color32 color = {50, 50, 50, (uint8_t)editor_draw_name_text_alpha.get_integer()};
-		if (o.e->get_selected_in_editor())
-			color = {255, 180, 0, 150};
-
-		if (do_mouse_click) {
-			Rect2d r(coordx - 3, coordy - 3, size.w + 6, size.h + 6);
-			if (r.is_point_inside(x - vp_pos.x, y - vp_pos.y)) {
-
-				clicked = o.e;
-			}
-		}
-		glm::ivec2 textofs = {0, font->base};
-
-		RectangleShape shape;
-		shape.rect = Rect2d({coordx - 3, coordy - 3}, {size.w + 6, size.h + 6});
-		shape.color = color;
-		window.draw(shape);
-
-		// builder.draw_solid_rect({ coordx - 3,coordy - 3 }, { size.w + 6,size.h + 6 }, color);
-		for (int i = 0; i < icons.size(); i++) {
-			const int ofs = (i) * (icon_size + 1);
-
-			shape.rect = Rect2d({coordx + ofs, coordy}, {icon_size, icon_size});
-			shape.texture = icons[i];
-			shape.color = COLOR_WHITE;
-			window.draw(shape);
-		}
-
-		TextShape tshape;
-		tshape.rect = Rect2d(glm::ivec2{coordx + 1 + text_offset, coordy + 1} + textofs, {});
-		tshape.font = font;
-		tshape.text = name;
-		tshape.color = COLOR_BLACK;
-		window.draw(shape);
-		tshape.rect = Rect2d(glm::ivec2{coordx + text_offset, coordy} + textofs, {});
-		tshape.color = COLOR_WHITE;
-		window.draw(tshape);
-	}
-	if (clicked) {
-		inputs.eat_mouse_click();
-		if (Input::is_shift_down()) {
-			doc->do_mouse_selection(MouseSelectionAction::ADD_SELECT, clicked, true);
-		} else if (Input::is_ctrl_down()) {
-			doc->do_mouse_selection(MouseSelectionAction::UNSELECT, clicked, true);
-		} else {
-			doc->do_mouse_selection(MouseSelectionAction::SELECT_ONLY, clicked, true);
-		}
-		return true;
-	} else {
-		// if(do_mouse_click)
-		//	mouse_down_delegate.invoke(x-ws_position.x, y-ws_position.y, button_clicked);
-	}
-	return false;
-}
-
-void EditorUILayout::do_box_select(MouseSelectionAction action) {
-	if (!editor_draw_name_text.get_bool())
-		return;
-	if (!eng->get_level())
-		return;
-
-	auto objs = get_objs();
-	assert(doc->dragger.get_is_dragging());
-	const auto vp_size = UiSystem::inst->get_vp_rect().get_size();
-	const auto vp_pos = UiSystem::inst->get_vp_rect().get_pos();
-	auto area = doc->dragger.get_drag_rect();
-	area.x -= vp_pos.x;
-	area.y -= vp_pos.y;
-
-	for (auto o : objs) {
-		const char* name = (o.e->get_editor_name().c_str());
-		const bool is_prefab_root =
-			false; // o.e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
-		if (!*name) {
-			if (is_prefab_root) {
-				// name = o.e->get_object_prefab().get_name().c_str();
-			} else {
-				if (auto m = o.e->get_component<MeshComponent>()) {
-					if (m->get_model())
-						name = m->get_model()->get_name().c_str();
-				}
-			}
-		}
-		if (!*name) {
-			name = o.e->get_type().classname;
-		}
-		const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
-		if (!font)
-			font = UiSystem::inst->defaultFont;
-		const int icon_size = 16;
-		InlineVec<Texture*, 6> icons;
-		auto e = o.e;
-		if (is_prefab_root) {
-			const char* s = "eng/editor/prefab_p.png";
-			auto tex = g_assets.find_global_sync<Texture>(s);
-			icons.push_back(tex.get());
-		}
-
-		for (auto c : o.e->get_components()) {
-			if (c->dont_serialize_or_edit_this())
-				continue;
-			const char* s = c->get_editor_outliner_icon();
-			if (!*s)
-				continue;
-			auto tex = g_assets.find_global_sync<Texture>(s);
-			icons.push_back(tex.get());
-		}
-
-		auto size = GuiHelpers::calc_text_size_no_wrap(name, font);
-
-		const int text_offset = (icon_size + 1) * icons.size();
-		size.w += text_offset;
-
-		o.pos.y *= -1;
-		auto coordx = o.pos.x * 0.5 + 0.5;
-		auto coordy = o.pos.y * 0.5 + 0.5;
-
-		coordx *= vp_size.x;
-		coordy *= vp_size.y;
-		// coordx += vp_pos.x;
-		// coordy += vp_pos.y;
-		coordx -= size.w / 2;
-		coordy -= size.h / 2;
-
-		Rect2d r(coordx - 3, coordy - 3, size.w + 6, size.h + 6);
-		if (r.overlaps(area)) {
-			doc->do_mouse_selection(action, e, true);
-		}
-	}
-}
-
-std::vector<EditorUILayout::obj> EditorUILayout::get_objs() {
-	std::vector<obj> objs;
-	auto& all_objs = eng->get_level()->get_all_objects();
-	for (auto o : all_objs) {
-		if (Entity* e = o->cast_to<Entity>()) {
-			if (!this_is_a_serializeable_object(e))
-				continue;
-			obj ob;
-			glm::vec3 todir = glm::vec3(e->get_ws_position()) - doc->vs_setup.origin;
-			float dist = glm::dot(todir, todir);
-			if (dist > 20.0 * 20.0)
-				continue;
-			ob.e = e;
-			glm::vec4 pos = doc->vs_setup.viewproj * glm::vec4(e->get_ws_position(), 1.0);
-			ob.pos = pos / pos.w;
-
-			if (ob.pos.z < 0)
-				continue;
-
-			objs.push_back(ob);
-		}
-	}
-	return objs;
 }
 
 Entity* EditorDoc::spawn_entity() {
@@ -1421,8 +818,6 @@ void EditorDoc::insert_unserialized_into_scene(UnserializedSceneFile& file) {
 void EditorDoc::instantiate_into_scene(BaseUpdater* u) {}
 
 #endif
-
-
 
 void DrawHandlesObject::tick() {
 	if (!ed_show_box_handles.get_bool())

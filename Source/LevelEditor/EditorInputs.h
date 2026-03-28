@@ -2,6 +2,12 @@
 
 #include "IInputReciever.h"
 #include "UI/GUISystemPublic.h"
+enum class MouseSelectionAction
+{
+	SELECT_ONLY,
+	UNSELECT,
+	ADD_SELECT,
+};
 
 class EditorInputs
 {

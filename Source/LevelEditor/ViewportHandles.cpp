@@ -88,8 +88,7 @@ void EViewportHandles::tick(EditorInputs& inputs) {
 			hacked_entity_MFER = eng->get_level()->spawn_entity();
 			hacked_entity_MFER->dont_serialize_or_edit = true;
 			hacked_entity_MFER->set_editor_name("___handle_marker");
-		}
-		else {
+		} else {
 
 			auto pos = hacked->get_ws_position();
 			int index = dragging_state.index;
@@ -115,8 +114,7 @@ void EViewportHandles::tick(EditorInputs& inputs) {
 			if (modify_origin) {
 				position += (localspace[index / 2] * glm::vec3(dir));
 				scale[index / 2] -= scale[index / 2] * localspace[index / 2] / extents[index / 2];
-			}
-			else {
+			} else {
 				scale[index / 2] +=
 					scale[index / 2] * (localspace[index / 2] - extents[index / 2]) / extents[index / 2];
 			}
@@ -148,8 +146,7 @@ void EViewportHandles::tick(EditorInputs& inputs) {
 		for (auto& [key, value] : items) {
 			if (!value.was_wanted_this_frame) {
 				unused.push_back(key);
-			}
-			else
+			} else
 				value.was_wanted_this_frame = false;
 		}
 		for (auto key : unused) {
@@ -230,7 +227,7 @@ void EViewportHandles::tick(EditorInputs& inputs) {
 	}
 }
 
-inline glm::vec3 EViewportHandles::ActiveItem::get_position_for_handle(int idx, bool use_new) {
+glm::vec3 EViewportHandles::ActiveItem::get_position_for_handle(int idx, bool use_new) {
 	glm::vec3 local(0.5);
 	int i = idx / 2;
 	local[i] = (idx & 1) ? 0.0 : 1.0;
@@ -241,7 +238,7 @@ inline glm::vec3 EViewportHandles::ActiveItem::get_position_for_handle(int idx, 
 	return transformed;
 }
 
-inline glm::vec3 EViewportHandles::ActiveItem::get_normal_for_handle(int idx) {
+glm::vec3 EViewportHandles::ActiveItem::get_normal_for_handle(int idx) {
 	glm::vec3 local(0);
 	int i = idx / 2;
 	local[i] = (idx & 1) ? -1 : 1.0;

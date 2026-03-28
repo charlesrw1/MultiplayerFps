@@ -45,7 +45,7 @@
 #include "LevelSerialization/SerializeNew.h"
 #include "DragDropPreview.h"
 #include "DragDetector.h"
-
+#include "EditorUILayout.h"
 extern ConfigVar g_mousesens;
 
 extern ConfigVar ed_has_snap;
@@ -56,7 +56,7 @@ extern ConfigVar ed_rotation_snap_exp;
 extern ConfigVar ed_scale_snap_exp;
 extern ConfigVar ed_scale_snap;
 
-
+extern ConfigVar editor_draw_name_text;
 
 enum TransformType
 {
@@ -64,20 +64,13 @@ enum TransformType
 	ROTATION,
 	SCALE
 };
-enum class MouseSelectionAction
-{
-	SELECT_ONLY,
-	UNSELECT,
-	ADD_SELECT,
-};
-
+extern glm::ivec2 ndc_to_screen_coord(glm::vec3 ndc);
 extern bool std_string_input_text(const char* label, std::string& str, int flags);
 const ImColor non_owner_source_color = ImColor(252, 226, 131);
 
 class EditorDoc;
 
 template <typename T> using uptr = std::unique_ptr<T>;
-
 
 // orbit and ortho camera
 /*
@@ -87,41 +80,8 @@ EditorCamera
 
 */
 
-
 #include "UI/GUISystemPublic.h"
 #include "UI/Widgets/EditorCube.h"
-class guiEditorCube;
-class guiText;
-class EditorUILayout
-{
-public:
-	EditorUILayout(EditorDoc& doc);
-
-	bool draw(EditorInputs& inputs);
-	void do_box_select(MouseSelectionAction action);
-	Rect2d convert_rect(Rect2d screenSpaceRect) {
-		Rect2d out = screenSpaceRect;
-		auto pos = UiSystem::inst->get_vp_rect().get_pos();
-		out.x -= pos.x;
-		out.y -= pos.y;
-		return out;
-	}
-	struct obj
-	{
-		glm::vec3 pos = glm::vec3(0.f);
-		const Entity* e = nullptr;
-	};
-	std::vector<EditorUILayout::obj> get_objs();
-
-	guiEditorCube cube;
-	EditorDoc* doc = nullptr;
-};
-
-
-
-
-
-
 
 #include "Render/DrawPublic.h"
 
@@ -153,43 +113,40 @@ class LEPlugin;
 class EditorUILayout;
 class Model;
 
-
-
-class IEditorCameraApi {
+class IEditorCameraApi
+{
 public:
 	virtual void set_look_at(glm::vec3 pos, glm::vec3 look) = 0;
-	virtual glm::vec3 get_positon() = 0;
-	virtual Ray unproject_ray(int x, int y) = 0;
-	virtual bool is_ortho() = 0;
+	virtual glm::vec3 get_positon() const = 0;
+	virtual Ray unproject_ray(int x, int y) const = 0;
+	virtual bool is_ortho() const = 0;
 };
-class ISelectionApi {
+class ISelectionApi
+{
 public:
-	virtual std::vector<EntityPtr> get_selected() = 0;
+	virtual std::vector<EntityPtr> get_selected() const = 0;
 	virtual void clear_selected() = 0;
-	virtual viewMulticastDelegate<> on_selection_changed() = 0;
+	virtual viewMulticastDelegate<> on_selection_changed() const = 0;
 };
-
-
-class IEditorApi2 {
+class IDocumentApi
+{
 public:
-
-	virtual IEditorCameraApi* camera() = 0;
-	virtual ISelectionApi* selection() = 0;
 	virtual void save() = 0;
 	virtual void undo() = 0;
 	virtual void redo() = 0;
-	virtual std::string get_document_name() = 0;
-
-	// commands
-	// mouse pick, box pick
-
-	// save, undo, redo
-
-	// get document name
-
-	// camera interface
+	virtual std::string get_document_name() const = 0;
 };
-
+class ICommandApi
+{
+};
+class IEditorApi2
+{
+public:
+	virtual IEditorCameraApi* camera() = 0;
+	virtual ISelectionApi* selection() = 0;
+	virtual IDocumentApi* document() = 0;
+};
+extern string get_name_display_entity(const Entity* e);
 class EditorDoc : public IEditorTool
 {
 public:
@@ -228,7 +185,7 @@ public:
 	Ray unproject_mouse_to_ray(int mx, int my);
 
 	const char* get_save_file_extension() const { return "tmap"; }
-
+	void add_editor_commands();
 	bool is_this_object_not_inherited(const BaseUpdater* b) const {
 		return this_is_a_serializeable_object(b); // not inherted meaning i can edit it
 	}
@@ -299,7 +256,6 @@ private:
 	opt<string> assetName;
 
 	EditorInputs inputs;
-
 };
 
 #endif

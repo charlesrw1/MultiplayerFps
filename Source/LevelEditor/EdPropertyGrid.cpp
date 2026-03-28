@@ -10,6 +10,91 @@
 #include "Framework/MyImguiLib.h"
 #include "Game/Components/SpawnerComponenth.h"
 
+#include "Game/Components/SpawnerComponenth.h"
+#include "PropertyEditors.h"
+
+class SpawnerIProped : public IPropertyEditor
+{
+public:
+	SpawnerIProped(SpawnerComponent* sc, string key) : sc(sc), key2(key) {
+		prop = &hacked_bullshit;
+		hacked_bullshit.name = key2.c_str();
+		value = sc->obj[key];
+		instance = this; // bs
+	}
+	~SpawnerIProped() {
+		if (sc.get())
+			sc->obj[key2] = value;
+	}
+	bool internal_update() {
+		ImguiInputTextCallbackUserStruct user;
+		user.string = &value;
+		if (ImGui::InputText("##input_text", (char*)value.c_str(), value.size() + 1 /* null terminator byte */,
+							 ImGuiInputTextFlags_CallbackResize, imgui_input_text_callback_function, &user)) {
+			value.resize(strlen(value.c_str())); // imgui messes with buffer size
+			sc->obj[key2] = value;
+			return true;
+		}
+		return false;
+	}
+	PropertyInfo hacked_bullshit;
+	string key2;
+	string value;
+	obj<SpawnerComponent> sc;
+};
+
+class SpawnerModelProp : public IPropertyEditor
+{
+public:
+	SpawnerModelProp(SpawnerComponent* sc) : sc(sc) {
+		prop = &hacked_bullshit;
+		hacked_bullshit.name = "model";
+
+		instance = this; // bs
+
+		assetprop.instance = this;
+		assetprop.prop = &hacked_bullshit2;
+		hacked_bullshit2.type = core_type_id::AssetPtr;
+		hacked_bullshit2.class_type = &Model::StaticType;
+		hacked_bullshit2.offset = offsetof(SpawnerModelProp, model);
+
+		if (sc->obj["model"].is_string()) {
+			string str = sc->obj["model"];
+			if (!str.empty())
+				model = Model::load(str);
+		}
+	}
+	~SpawnerModelProp() {}
+	bool internal_update() {
+		bool res = assetprop.internal_update();
+		if (res) {
+			set_mod();
+		}
+		return res;
+	}
+	bool can_reset() final { return assetprop.can_reset(); }
+	void reset_value() final {
+		assetprop.reset_value();
+		set_mod();
+	}
+	void set_mod() {
+		if (model)
+			sc->obj["model"] = model->get_name();
+		else
+			sc->obj["model"] = "";
+
+		sc->set_model();
+	}
+
+	AssetPropertyEditor assetprop;
+	Model* model = nullptr;
+
+	PropertyInfo hacked_bullshit;
+	PropertyInfo hacked_bullshit2;
+
+	obj<SpawnerComponent> sc;
+};
+
 void EdPropertyGrid::draw_components(Entity* entity) {
 	ASSERT(selected_component != 0);
 
@@ -29,7 +114,7 @@ void EdPropertyGrid::draw_components(Entity* entity) {
 		ImGuiSelectableFlags selectable_flags =
 			ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 		if (ImGui::Selectable("##selectednode", ec->get_instance_id() == selected_component, selectable_flags,
-			ImVec2(0, 0))) {
+							  ImVec2(0, 0))) {
 			on_select_component(ec);
 		}
 
@@ -102,8 +187,7 @@ void EdPropertyGrid::draw() {
 				on_property_change.invoke();
 			}
 
-		}
-		else {
+		} else {
 			ImGui::Text("Nothing selected\n");
 		}
 	}
@@ -115,12 +199,10 @@ void EdPropertyGrid::draw() {
 		if (!ss->has_any_selected()) {
 			ImGui::Text("Nothing selected\n");
 			selected_component = 0;
-		}
-		else if (!ss->has_only_one_selected()) {
+		} else if (!ss->has_only_one_selected()) {
 			ImGui::Text("Select 1 entity to see components\n");
 			selected_component = 0;
-		}
-		else {
+		} else {
 			Entity* ent = ss->get_only_one_selected().get();
 			ASSERT(ent);
 
@@ -130,15 +212,15 @@ void EdPropertyGrid::draw() {
 					selected_component = comps[0]->get_instance_id();
 
 				uint32_t ent_list_flags = ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
-					ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable |
-					ImGuiTableFlags_Sortable;
+										  ImGuiTableFlags_ScrollY | ImGuiTableFlags_Resizable |
+										  ImGuiTableFlags_Sortable;
 				if (ImGui::BeginTable("animadfedBrowserlist", 1, ent_list_flags)) {
 
 					ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 0.0f, 0);
 
 					ImGui::TableNextRow();
 					ImGui::TableNextColumn();
-					ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, Color32{ 59, 0, 135 }.to_uint());
+					ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0, Color32{59, 0, 135}.to_uint());
 					ImGuiSelectableFlags selectable_flags =
 						ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
 
@@ -176,8 +258,7 @@ void EdPropertyGrid::draw() {
 											ed_doc.command_mgr->add_command(
 												new CreateComponentCommand(ed_doc, ent, comp_type));
 										}
-									}
-									else if (type == mesh_metadata) {
+									} else if (type == mesh_metadata) {
 										ed_doc.command_mgr->add_command(new CreateMeshComponentCommand(
 											ed_doc, ent, g_assets.find_sync<Model>(resource->filename).get()));
 									}
@@ -191,6 +272,56 @@ void EdPropertyGrid::draw() {
 		}
 	}
 	ImGui::End();
+}
+
+void EdPropertyGrid::refresh_grid() {
+	grid.clear_all();
+
+	auto& ss = ed_doc.selection_state;
+
+	if (!ss->has_any_selected())
+		return;
+
+	if (ss->has_only_one_selected() && ss->get_only_one_selected() /* can return null...*/) {
+		auto entity = ss->get_only_one_selected();
+		assert(entity);
+		sys_print(Debug, "EdPropertyGrid::refresh_grid: adding to grid: %s\n", entity->get_type().classname);
+
+		grid.add_class_to_grid(entity.get());
+
+		auto& comps = entity->get_components();
+
+		if (!comps.empty() && serialize_this_objects_children(entity.get())) {
+			if (selected_component == 0)
+				selected_component = comps[0]->get_instance_id();
+			if (eng->get_object(selected_component) == nullptr ||
+				eng->get_object(selected_component)->cast_to<Component>() == nullptr ||
+				eng->get_object(selected_component)->cast_to<Component>()->get_owner() != entity.get())
+				selected_component = comps[0]->get_instance_id();
+
+			ASSERT(selected_component != 0);
+
+			auto c = eng->get_object(selected_component)->cast_to<Component>();
+			sys_print(Debug, "EdPropertyGrid::refresh_grid: adding to grid: %s\n", c->get_type().classname);
+
+			ASSERT(c);
+			grid.add_class_to_grid(c);
+
+			if (c->is_a<SpawnerComponent>()) {
+				auto sc = (SpawnerComponent*)c;
+				for (auto& [name, prop] : sc->obj.items()) {
+					if (!prop.is_string())
+						continue;
+					if (name[0] == '_')
+						continue;
+					if (name == "model")
+						grid.add_iproped_manual(new SpawnerModelProp(sc));
+					else
+						grid.add_iproped_manual(new SpawnerIProped(sc, name));
+				}
+			}
+		}
+	}
 }
 
 EdPropertyGrid::EdPropertyGrid(EditorDoc& ed_doc, const FnFactory<IPropertyEditor>& factory)

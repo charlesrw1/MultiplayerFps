@@ -111,11 +111,13 @@
     <ClCompile Include="Source\Game\TopDownShooter\TopDownPlayer.cpp" />
     <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
     <ClCompile Include="Source\Game\TP\TPGame.cpp" />
+    <ClCompile Include="Source\LevelEditor\AddEditorCommands.cpp" />
     <ClCompile Include="Source\LevelEditor\Commands.cpp" />
     <ClCompile Include="Source\LevelEditor\DecalStampTool.cpp" />
     <ClCompile Include="Source\LevelEditor\DragDetector.cpp" />
     <ClCompile Include="Source\LevelEditor\DragDropPreview.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
+    <ClCompile Include="Source\LevelEditor\EditorUILayout.cpp" />
     <ClCompile Include="Source\LevelEditor\EdPropertyGrid.cpp" />
     <ClCompile Include="Source\LevelEditor\FoliagePaintTool.cpp" />
     <ClCompile Include="Source\LevelEditor\LevelEditorCamera.cpp" />
@@ -253,6 +255,7 @@
     <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h" />
     <ClInclude Include="Source\LevelEditor\EditorInputs.h" />
     <ClInclude Include="Source\LevelEditor\EditorModes.h" />
+    <ClInclude Include="Source\LevelEditor\EditorUILayout.h" />
     <ClInclude Include="Source\LevelEditor\EdPropertyGrid.h" />
     <ClInclude Include="Source\LevelEditor\IEditorApi.h" />
     <ClInclude Include="Source\LevelEditor\IInputReciever.h" />

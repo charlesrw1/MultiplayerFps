@@ -465,6 +465,8 @@
     <ClCompile Include="Source\LevelEditor\FoliagePaintTool.cpp" />
     <ClCompile Include="Source\LevelEditor\EdPropertyGrid.cpp" />
     <ClCompile Include="Source\User_Camera.cpp" />
+    <ClCompile Include="Source\LevelEditor\AddEditorCommands.cpp" />
+    <ClCompile Include="Source\LevelEditor\EditorUILayout.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation\AnimationTypes.h">
@@ -1107,6 +1109,7 @@
     <ClInclude Include="Source\Assets\FileWatcher.h" />
     <ClInclude Include="Source\LevelEditor\DragDetector.h" />
     <ClInclude Include="Source\LevelEditor\DragDropPreview.h" />
+    <ClInclude Include="Source\LevelEditor\EditorUILayout.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />
