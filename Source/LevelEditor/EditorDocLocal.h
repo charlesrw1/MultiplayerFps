@@ -67,7 +67,7 @@ enum TransformType
 extern glm::ivec2 ndc_to_screen_coord(glm::vec3 ndc);
 extern bool std_string_input_text(const char* label, std::string& str, int flags);
 const ImColor non_owner_source_color = ImColor(252, 226, 131);
-
+extern Bounds transform_bounds(glm::mat4 transform, Bounds b);
 class EditorDoc;
 
 template <typename T> using uptr = std::unique_ptr<T>;
@@ -231,7 +231,6 @@ public:
 	std::unique_ptr<DrawHandlesObject> draw_handles;
 	View_Setup vs_setup;
 	EditorCamera ed_cam;
-	DragDetector dragger;
 	IEditorMode* active_mode = nullptr;
 	EntityVisiblityFilter vis_filter;
 

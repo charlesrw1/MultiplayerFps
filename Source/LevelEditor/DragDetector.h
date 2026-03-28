@@ -7,7 +7,7 @@ struct DragDetector : public IInputReciever
 	DragDetector() {}
 	string get_name() final { return "drag detector"; }
 	void on_focused_tick(EditorInputs& inputs) final;
-	void tick(EditorInputs& inputs, bool can_start_drag);
+	void tick(EditorInputs& inputs);
 	bool get_is_dragging() const;
 	Rect2d get_drag_rect() const;
 

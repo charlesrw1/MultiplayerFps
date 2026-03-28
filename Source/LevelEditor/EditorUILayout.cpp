@@ -21,22 +21,12 @@ bool EditorUILayout::draw(EditorInputs& inputs) {
 	cube.rotation.set_current((glm::mat3)doc->vs_setup.view);
 	cube.draw(window, dt);
 	// paint
-	if (doc->dragger.get_is_dragging()) {
-		auto rect = doc->dragger.get_drag_rect();
-		// builder.draw_solid_rect({ rect.x,rect.y }, { rect.w,rect.h }, { 200,200,200,50 });
-		rect.x -= UiSystem::inst->get_vp_rect().get_pos().x;
-		rect.y -= UiSystem::inst->get_vp_rect().get_pos().y;
+	if (doc->active_mode)
+		doc->active_mode->draw_ui();
 
-		RectangleShape shape;
-		shape.rect = rect;
-		Uint8 c = test1.get_integer();
-		Uint8 a = test2.get_integer();
-		shape.color = {c, c, c, a};
-		window.draw(shape);
-	}
 
 	bool do_mouse_click =
-		Input::was_mouse_released(0) && UiSystem::inst->is_vp_hovered() && !doc->dragger.get_is_dragging();
+		Input::was_mouse_released(0) && UiSystem::inst->is_vp_hovered();// && !doc->dragger.get_is_dragging();
 	int x = Input::get_mouse_pos().x;
 	int y = Input::get_mouse_pos().y;
 
@@ -142,17 +132,17 @@ bool EditorUILayout::draw(EditorInputs& inputs) {
 	return false;
 }
 
-void EditorUILayout::do_box_select(MouseSelectionAction action) {
+void EditorUILayout::do_box_select(MouseSelectionAction action, Rect2d area) {
 	if (!editor_draw_name_text.get_bool())
 		return;
 	if (!eng->get_level())
 		return;
 
 	auto objs = get_objs();
-	assert(doc->dragger.get_is_dragging());
+
 	const auto vp_size = UiSystem::inst->get_vp_rect().get_size();
 	const auto vp_pos = UiSystem::inst->get_vp_rect().get_pos();
-	auto area = doc->dragger.get_drag_rect();
+
 	area.x -= vp_pos.x;
 	area.y -= vp_pos.y;
 

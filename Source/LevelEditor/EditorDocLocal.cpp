@@ -122,63 +122,6 @@ void EditorDoc::init_new() {
 	eng->get_level()->validate();
 	command_mgr = std::make_unique<UndoRedoSystem>();
 
-	dragger.on_drag_end().add(this, [this](Rect2d rect) {
-		auto type = MouseSelectionAction::ADD_SELECT;
-		if (Input::is_shift_down())
-			type = MouseSelectionAction::ADD_SELECT;
-		else if (Input::is_ctrl_down())
-			type = MouseSelectionAction::UNSELECT;
-		else {
-			selection_state->clear_all_selected();
-		}
-
-		auto newRect = gui->convert_rect(rect);
-		vector<EntityPtr> ents;
-		if (ed_cam.get_is_using_ortho()) {
-
-			const Bounds camb = ed_cam.get_ortho_selection_bounds(newRect);
-
-			auto& allobjs = eng->get_level()->get_all_objects();
-
-			for (auto obj : allobjs) {
-
-				if (auto m = obj->cast_to<MeshComponent>()) {
-					if (m->get_model() && m->get_is_visible() && !m->get_owner()->get_hidden_in_editor() &&
-						!m->get_is_skybox() /*skipskybox*/) {
-						auto thisbounds = m->get_model()->get_bounds();
-						thisbounds = transform_bounds(m->get_owner()->get_ws_transform(), thisbounds);
-						if (thisbounds.intersect(camb))
-							ents.push_back(m->get_owner());
-					}
-
-				} else if (auto b = obj->cast_to<BillboardComponent>()) {
-					if (!b->get_owner()->get_hidden_in_editor()) {
-						auto thisbounds =
-							Bounds(b->get_ws_position() - glm::vec3(0.5), b->get_ws_position() + glm::vec3(0.5));
-						if (thisbounds.intersect(camb))
-							ents.push_back(b->get_owner());
-					}
-				}
-			}
-			// rect.x to world space:
-
-		} else {
-			auto selection = idraw->mouse_box_select_for_editor(newRect.x, newRect.y, newRect.w, newRect.h);
-			for (auto handle : selection) {
-				if (handle.is_valid()) {
-					auto component_ptr = idraw->get_scene()->get_read_only_object(handle)->owner;
-					if (component_ptr) {
-						auto owner = component_ptr->get_owner();
-						ASSERT(owner);
-						ents.push_back(owner);
-					}
-				}
-			}
-		}
-		do_mouse_selection(type, ents, true);
-
-		gui->do_box_select(type);
-	});
 
 	command_mgr->on_command_execute_or_undo.add(this, [&]() { set_has_editor_changes(); });
 	gui = std::make_unique<EditorUILayout>(*this);

@@ -18,7 +18,7 @@ void DragDetector::on_focused_tick(EditorInputs& inputs) {
 	end_drag_func(inputs);
 }
 
-void DragDetector::tick(EditorInputs& inputs, bool can_start_drag) {
+void DragDetector::tick(EditorInputs& inputs) {
 	const bool can_start = inputs.can_use_mouse_click();
 
 	if (Input::was_mouse_pressed(0)) {

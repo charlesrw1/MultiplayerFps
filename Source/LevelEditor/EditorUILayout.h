@@ -10,8 +10,8 @@ public:
 	EditorUILayout(EditorDoc& doc);
 
 	bool draw(EditorInputs& inputs);
-	void do_box_select(MouseSelectionAction action);
-	Rect2d convert_rect(Rect2d screenSpaceRect) {
+	void do_box_select(MouseSelectionAction action, Rect2d area);
+	Rect2d convert_rect(Rect2d screenSpaceRect) const {
 		Rect2d out = screenSpaceRect;
 		auto pos = UiSystem::inst->get_vp_rect().get_pos();
 		out.x -= pos.x;

@@ -1,10 +1,13 @@
 #pragma once
 #include "IInputReciever.h"
 #include "AllHeader.h"
+#include "DragDetector.h"
 class IEditorMode
 {
 public:
 	virtual void tick(EditorInputs& inputs) = 0;
+
+	virtual void draw_ui()  {}
 };
 
 class FoliagePaintTool : public IInputReciever, public IEditorMode
@@ -51,8 +54,12 @@ private:
 class SelectionMode : public IEditorMode
 {
 public:
-	SelectionMode(EditorDoc& doc) : doc(doc) {}
+	SelectionMode(EditorDoc& doc);
 	void tick(EditorInputs& inputs);
+
+	void draw_ui() final;
+
 	EditorDoc& doc;
+	DragDetector dragger;
 };
 
