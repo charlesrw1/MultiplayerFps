@@ -30,19 +30,6 @@ void TOUCH_ASSET(const Cmd_Args& args) {
 	}
 }
 
-#include <chrono>
-int64_t filetime_to_unix_seconds(uint64_t filetime) {
-	// Epoch difference between Jan 1, 1601 and Jan 1, 1970 in 100-ns units
-	constexpr uint64_t EPOCH_DIFF_100NS = 116444736000000000ULL;
-
-	// Convert FILETIME (100-ns intervals) to seconds since Unix epoch
-	uint64_t ticks_since_unix_epoch_100ns = filetime - EPOCH_DIFF_100NS;
-	return static_cast<int64_t>(ticks_since_unix_epoch_100ns / 10'000'000ULL);
-}
-int64_t get_unix_time_seconds() {
-	return std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch())
-		.count();
-}
 
 // Ill just put this code here
 // DECLARE_ENGINE_CMD_CAT("sys.", ls)
@@ -153,8 +140,6 @@ AssetRegistrySystem& AssetRegistrySystem::get() {
 	return inst;
 }
 
-ConfigVar asset_registry_reindex_period("asset_registry_reindex_period", "20", CVAR_DEV | CVAR_FLOAT,
-										"time in seconds of registry reindexing");
 
 static std::vector<std::string> split(const std::string& str, char delimiter) {
 	std::vector<std::string> tokens;
@@ -182,21 +167,14 @@ void AssetFilesystemNode::sort_R() {
 		c.second.sort_R();
 }
 
-static HANDLE directoryChangeHandle = 0;
 extern ConfigVar g_project_base;
 #include "Framework/StringUtils.h"
 void AssetRegistrySystem::init() {
-
 	string dir = g_project_base.get_string();
 
-	last_time_check = get_unix_time_seconds();
-
-	directoryChangeHandle = FindFirstChangeNotificationA(dir.c_str(), // directory to watch
-														 TRUE,		  //  watch subtree
-														 FILE_NOTIFY_CHANGE_LAST_WRITE);
-
-	if (directoryChangeHandle == INVALID_HANDLE_VALUE) {
-		Fatalf("ERROR: AssetRegistrySystem::init: FindFirstChangeNotificationA failed: %s\n", GetLastError());
+	if (!file_watcher_.init(dir)) {
+		Fatalf("AssetRegistrySystem: FileWatcher::init failed for dir '%s' (error %lu)\n",
+			dir.c_str(), GetLastError());
 	}
 
 	reindex_all_assets();
@@ -229,25 +207,7 @@ void AssetRegistrySystem::init() {
 #include "Render/MaterialPublic.h"
 #include "Render/Model.h"
 #include "Scripting/ScriptManager.h"
-#include <future>
 using ChangedPaths = std::vector<std::string>;
-std::vector<std::string> async_launch_check_filesystem_changes(int64_t last_time_check) {
-	std::vector<std::string> out;
-	for (const string& file : FileSys::find_game_files()) {
-		auto gamepath = FileSys::get_game_path_from_full_path(file);
-		auto filePtr = FileSys::open_read_game(gamepath);
-		if (!filePtr)
-			continue;
-		int64_t in_unix_time = filetime_to_unix_seconds(filePtr->get_timestamp());
-		filePtr->close();
-		if (in_unix_time >= last_time_check) {
-			out.push_back(gamepath);
-		}
-	}
-	return out;
-}
-static std::future<ChangedPaths> future_changed_paths;
-static bool is_waiting_on_future = false;
 
 bool update_on_changed_paths(ChangedPaths changes) {
 
@@ -298,48 +258,13 @@ bool update_on_changed_paths(ChangedPaths changes) {
 }
 
 void AssetRegistrySystem::update() {
-	if (is_waiting_on_future) {
-		if (future_changed_paths.wait_for(std::chrono::milliseconds(1)) == std::future_status::ready) {
-			ChangedPaths changes = future_changed_paths.get();
-			bool wants_reindex = update_on_changed_paths(changes);
-			if (wants_reindex)
-				reindex_all_assets();
-			is_waiting_on_future = false;
-		}
-	}
-
-	double time_now = TimeSinceStart();
-	{
-		auto status = WaitForMultipleObjects(1, &directoryChangeHandle, TRUE, 0);
-		if (status == WAIT_TIMEOUT)
-			return;
-		if (status == WAIT_FAILED) {
-			sys_print(Error, "WaitForMultipleObjects failed: %s\n", GetLastError());
-			return;
-		}
-		sys_print(Debug, "status == WAIT_OBJECT_0 (%f) (%f)\n", float(time_now), float(last_reindex_time));
-		const float period = 5.0;
-		if ((time_now - last_reindex_time) <= period || is_waiting_on_future) {
-			if (FindNextChangeNotification(directoryChangeHandle) == FALSE) {
-				sys_print(Error, "FindNextChangeNotification failed: %d\n", GetLastError());
-			}
-			sys_print(Debug, "skip reindex %f %f\n", float(time_now), float(time_now - last_reindex_time));
-			return;
-		}
-
-		ASSERT(status == WAIT_OBJECT_0);
-
-		future_changed_paths = std::async(std::launch::async, async_launch_check_filesystem_changes, last_time_check);
-		is_waiting_on_future = true;
-
-		last_time_check = get_unix_time_seconds();
-		last_reindex_time = time_now;
-		if (FindNextChangeNotification(directoryChangeHandle) == FALSE) {
-			sys_print(Error, "FindNextChangeNotification failed: %d\n", GetLastError());
-		}
-
-		sys_print(Debug, "AssetRegistrySystem::update: time %f\n", float(TimeSinceStart() - time_now));
-	}
+	auto changed = file_watcher_.poll(150);
+	if (changed.empty())
+		return;
+	sys_print(Debug, "AssetRegistrySystem: %zu file(s) changed\n", changed.size());
+	bool wants_reindex = update_on_changed_paths(changed);
+	if (wants_reindex)
+		reindex_all_assets();
 }
 
 void AssetRegistrySystem::reindex_all_assets() {

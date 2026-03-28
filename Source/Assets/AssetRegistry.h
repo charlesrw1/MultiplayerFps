@@ -6,6 +6,7 @@
 #include "Framework/ConsoleCmdGroup.h"
 #include "IAsset.h"
 #include "EngineEditorState.h"
+#include "Assets/FileWatcher.h"
 
 // All assets that you want showing in the asset browser should be registered here
 
@@ -80,8 +81,8 @@ private:
 	std::unique_ptr<AssetFilesystemNode> root;
 	std::vector<AssetFilesystemNode*> linear_list;
 	std::vector<std::unique_ptr<AssetMetadata>> all_assettypes;
-	double last_reindex_time = 0.f;
-	int64_t last_time_check = 0;
+	double last_reindex_time = 0.0;
+	FileWatcher file_watcher_;
 	friend class HackedAsyncAssetRegReindex;
 };
 

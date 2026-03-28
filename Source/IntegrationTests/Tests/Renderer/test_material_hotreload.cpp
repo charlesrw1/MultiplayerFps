@@ -172,11 +172,11 @@ GAME_TEST("renderer/hotreload_master_material", 30.f, test_hotreload_master_mate
 // Test 3: OS file-watcher driven hot reload (editor build only)
 // ---------------------------------------------------------------------------
 // Writes a red .mi, writes green over it, then waits for AssetRegistrySystem's
-// Win32 FindFirstChangeNotification watcher to detect the change and call
-// reload_sync automatically.  No manual reload call in the test.
+// ReadDirectoryChangesW watcher to detect the change and reload automatically.
+// No manual reload call in the test.
 //
-// Note: the watcher has a 5-second rate-limit between cycles; the 45-second
-// timeout covers worst-case latency.
+// The watcher debounces at 150 ms; reload should arrive well under 1 s.
+// Timeout of 3 s gives ample headroom.
 
 #ifdef EDITOR_BUILD
 static TestTask test_hotreload_os_filewatcher(TestContext& t) {
@@ -227,5 +227,69 @@ static TestTask test_hotreload_os_filewatcher(TestContext& t) {
 	co_await t.wait_ticks(1); // let GPU material buffer catch up
 	co_await t.capture_screenshot("hotreload_os_after"); // golden: green cube
 }
-GAME_TEST("renderer/hotreload_os_filewatcher", 5.f, test_hotreload_os_filewatcher);
+GAME_TEST("renderer/hotreload_os_filewatcher", 3.f, test_hotreload_os_filewatcher);
+
+// ---------------------------------------------------------------------------
+// Test 4: Rapid-save deduplication (editor build only)
+// ---------------------------------------------------------------------------
+// Writes a .mi three times in quick succession and verifies on_material_loaded
+// fires exactly once — proving FileWatcher's per-path debounce is working.
+// Without debounce the delegate would fire three times (one per write).
+
+static TestTask test_hotreload_rapid_save_dedup(TestContext& t) {
+	eng->load_level("");
+
+	MeshComponent* mesh = setup_test_scene();
+
+	const std::string inst_path = "mats/test_hotreload_rapid.mi";
+	ScopedTempFile guard(inst_path);
+
+	const std::string base_mi =
+		"TYPE MaterialInstance\n"
+		"PARENT defaultPBR.mm\n"
+		"VAR colorMult 255 0 0 255\n";
+	t.require(write_game_file(inst_path, base_mi), "wrote initial .mi");
+
+	auto mat = g_assets.find_sync_sptr<MaterialInstance>(inst_path);
+	t.require(mat != nullptr, "rapid-dedup .mi loaded");
+	mesh->set_material_override(mat.get());
+
+	co_await t.wait_ticks(1);
+
+	// Count reloads for our specific material instance.
+	int reload_count = 0;
+	MaterialInstance* expected = mat.get();
+	MaterialInstance::on_material_loaded.add(
+		&reload_count, [&reload_count, expected](MaterialInstance* m) {
+			if (m == expected)
+				++reload_count;
+		});
+
+	// Write three times with tiny gaps — all within the 150 ms debounce window.
+	const std::string v1 =
+		"TYPE MaterialInstance\n"
+		"PARENT defaultPBR.mm\n"
+		"VAR colorMult 0 255 0 255\n";
+	const std::string v2 =
+		"TYPE MaterialInstance\n"
+		"PARENT defaultPBR.mm\n"
+		"VAR colorMult 0 0 255 255\n";
+	const std::string v3 =
+		"TYPE MaterialInstance\n"
+		"PARENT defaultPBR.mm\n"
+		"VAR colorMult 255 255 0 255\n";
+	t.require(write_game_file(inst_path, v1), "rapid write 1");
+	co_await t.wait_ticks(1);
+	t.require(write_game_file(inst_path, v2), "rapid write 2");
+	co_await t.wait_ticks(1);
+	t.require(write_game_file(inst_path, v3), "rapid write 3");
+
+	// Wait past the debounce window — one reload should arrive.
+	co_await t.wait_seconds(0.5f);
+
+	MaterialInstance::on_material_loaded.remove(&reload_count);
+
+	t.check(reload_count == 1, "material reloaded exactly once despite 3 rapid writes");
+}
+GAME_TEST("renderer/hotreload_rapid_save_dedup", 5.f, test_hotreload_rapid_save_dedup);
 #endif
