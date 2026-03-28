@@ -37,7 +37,18 @@ public:
 			return;
 		if (type == LogType::Debug)
 			return; // too noisy
-		send_raw(message);
+
+		string message_to_send;
+		if (type == LogType::Error)
+			message_to_send = "[Error] " + message;
+		else if (type == LogType::Warning)
+			message_to_send = "[Warning] " + message;
+		else if (type == LogType::Info)
+			message_to_send = "[Info] " + message;
+		else
+			message_to_send = message;
+
+		send_raw(message_to_send);
 	}
 
 	void send_raw(const std::string& s) {
