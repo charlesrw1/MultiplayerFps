@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="IntegrationTests.Game" tests="11" failures="2">
-  <testcase name="game/boot">
-  </testcase>
-  <testcase name="game/level_load">
-  </testcase>
-  <testcase name="renderer/screenshot_smoke">
-    <failure message="FAIL: screenshot failed: smoke_demo_level_1"/>
-  </testcase>
+<testsuite name="IntegrationTests.Game" tests="16" failures="0">
   <testcase name="renderer/ssr_smoke">
-    <failure message="FAIL: screenshot failed: ssr_smoke"/>
+  </testcase>
+  <testcase name="renderer/hotreload_material_instance">
+  </testcase>
+  <testcase name="renderer/hotreload_master_material">
+  </testcase>
+  <testcase name="renderer/hotreload_os_filewatcher">
+  </testcase>
+  <testcase name="renderer/hotreload_rapid_save_dedup">
   </testcase>
   <testcase name="filesys/write_read_roundtrip">
   </testcase>
@@ -17,6 +17,14 @@
   <testcase name="filesys/exist_false">
   </testcase>
   <testcase name="filesys/delete_game_file">
+  </testcase>
+  <testcase name="framework/lua_repl_exec">
+  </testcase>
+  <testcase name="framework/lua_repl_continue">
+  </testcase>
+  <testcase name="framework/lua_repl_error_captured">
+  </testcase>
+  <testcase name="framework/lua_repl_no_cmd">
   </testcase>
   <testcase name="game/time_advances">
   </testcase>

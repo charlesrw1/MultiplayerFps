@@ -436,8 +436,8 @@ void EditorDoc::set_document_path(string newAssetName) {
 		return;
 	}
 	if (assetName.has_value()) {
-		sys_print(Warning, "EditorDoc::set_document_path: already has path, skipping\n");
-		return;
+		sys_print(Warning, "EditorDoc::set_document_path: already has path\n");
+		//return;
 	}
 	this->assetName = newAssetName;
 }

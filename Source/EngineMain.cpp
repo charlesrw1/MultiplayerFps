@@ -464,7 +464,7 @@ bool GameEngineLocal::load_level(string mapname) {
 		sys_print(Warning, "GameEngineLocal::load_level: level is in update period, can't change level here.\n");
 		return false;
 	}
-	const bool wants_empty = mapname == "<empty>";
+	const bool wants_empty = mapname == "<empty>" || mapname.empty();
 
 	double start_time = GetTime();
 
@@ -916,14 +916,14 @@ int benchmark_free_list() {
 }
 
 int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
-	//material_print_debug.set_bool(true);
+	// material_print_debug.set_bool(true);
 	// developer_mode.set_bool(false);
-	//log_shader_compiles.set_bool(false);
-	//log_all_asset_loads.set_bool(true);
+	// log_shader_compiles.set_bool(false);
+	// log_all_asset_loads.set_bool(true);
 	eng_local.init(options, argc, argv);
 	// developer_mode.set_bool(true);
 	// log_all_asset_loads.set_bool(false);
-	//log_destroy_game_objects.set_bool(false);
+	// log_destroy_game_objects.set_bool(false);
 	// loglevel.set_integer(1);
 
 	// c->buzzer();
@@ -1379,13 +1379,12 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 			if (FileSys::does_file_exist(path.c_str(), FileSys::FULL_SYSTEM)) {
 				for (auto s : sizes)
 					ImGui::GetIO().Fonts->AddFontFromFileTTF(path.c_str(), s);
-			}
-			else {
+			} else {
 				sys_print(Error, ".ttf for imgui not found: %s\n", path.c_str());
 			}
 		};
-		add_font_to_imgui("eng/inconsolata_bold.ttf", { 14.0,24.0 });
-		add_font_to_imgui("inter_regular.ttf", { 14.0,18.0 });
+		add_font_to_imgui("eng/inconsolata_bold.ttf", {14.0, 24.0});
+		add_font_to_imgui("inter_regular.ttf", {14.0, 18.0});
 		ImGui::GetIO().Fonts->Build();
 	};
 	build_imgui_fonts();
@@ -1437,7 +1436,6 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 		set_runner(options.pending_test_runnner.release(), options.skip_swap);
 		if (get_app()) {
 			ASSERT(!is_editor_app.get_bool());
-			app->run_integration_tests();
 		}
 	}
 
@@ -1780,7 +1778,21 @@ void GameEngineLocal::loop() {
 #ifdef EDITOR_BUILD
 			if (test_runner) {
 				if (test_runner->tick(dt)) {
-					_exit(test_runner->exit_code());
+					int code = test_runner->exit_code();
+					test_runner = nullptr;
+					// C++ tests done — kick off Lua tests; they will call Quit() when finished
+
+					bool call_exit = true;
+					if (get_app()) {
+						const bool has_integration_tests = app->run_integration_tests();
+						if (has_integration_tests) 
+							call_exit = false;
+						else {
+							sys_print(Info, "App doesnt have any lua integration tests, exiting. (run_integration_tests should return true if this is wrong)\n");
+						}
+					}
+					if(call_exit)
+						_exit(code);
 				}
 			}
 #endif

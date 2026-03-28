@@ -47,6 +47,11 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
+    <ClCompile Include="Source\Assets\FileWatcher.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Source\Assets\IAsset.cpp" />
     <ClCompile Include="Source\Debug_Console.cpp" />
     <ClCompile Include="Source\EditorPopups.cpp" />
@@ -180,6 +185,7 @@
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
     <ClInclude Include="Source\Assets\AssetRegistryLocal.h" />
+    <ClInclude Include="Source\Assets\FileWatcher.h" />
     <ClInclude Include="Source\Assets\HackedReloader.h" />
     <ClInclude Include="Source\Assets\IAsset.h" />
     <ClInclude Include="Source\DebugConsole.h" />
@@ -225,14 +231,25 @@
     <ClInclude Include="Source\Game\Components\RagdollComponent.h" />
     <ClInclude Include="Source\Game\Components\SpawnerComponenth.h" />
     <ClInclude Include="Source\Game\EntityPtr.h" />
+    <ClInclude Include="Source\Game\GameplayStatic.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TDChest.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
     <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
     <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h" />
+    <ClInclude Include="Source\LevelEditor\EditorInputs.h" />
+    <ClInclude Include="Source\LevelEditor\EditorModes.h" />
+    <ClInclude Include="Source\LevelEditor\EdPropertyGrid.h" />
+    <ClInclude Include="Source\LevelEditor\IEditorApi.h" />
+    <ClInclude Include="Source\LevelEditor\IInputReciever.h" />
+    <ClInclude Include="Source\LevelEditor\LevelEditorCamera.h" />
+    <ClInclude Include="Source\LevelEditor\ManipulateTransformTool.h" />
     <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h" />
+    <ClInclude Include="Source\LevelEditor\OrthoCamera.h" />
     <ClInclude Include="Source\LevelEditor\PropertyEditors.h" />
+    <ClInclude Include="Source\LevelEditor\SelectionState.h" />
     <ClInclude Include="Source\LevelEditor\TagManager.h" />
+    <ClInclude Include="Source\LevelEditor\ViewportHandles.h" />
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Source\Render\BufferTest\glbuffer.h" />
     <ClInclude Include="Source\Render\BufferTest\gl_bufferlock.h" />
@@ -330,6 +347,7 @@
     <ClInclude Include="Source\Input\InputSystem.h" />
     <ClInclude Include="Source\Level.h" />
     <ClInclude Include="Source\Physics\Physics2Local.h" />
+    <ClInclude Include="Source\Render\ViewSetup.h" />
     <ClInclude Include="Source\Scripting\LuaTestRunner.h" />
     <ClInclude Include="Source\Scripting\ScriptFunctionCodegen.h" />
     <ClInclude Include="Source\Scripting\ScriptingStdLib.h" />
@@ -359,7 +377,7 @@
     <ClInclude Include="Source\Render\Shader.h" />
     <ClInclude Include="Source\Render\Texture.h" />
     <ClInclude Include="Source\Sound\SoundPublic.h" />
-    <ClInclude Include="Source\Types.h" />
+    <ClInclude Include="Source\User_Camera.h" />
     <ClInclude Include="Source\UI\BaseGUI.h" />
     <ClInclude Include="Source\UI\Gui.h" />
     <ClInclude Include="Source\UI\GUISystemPublic.h" />

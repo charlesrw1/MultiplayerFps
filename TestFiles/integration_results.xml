@@ -1,15 +1,15 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-<testsuite name="IntegrationTests.Game" tests="11" failures="2">
-  <testcase name="game/boot">
-  </testcase>
-  <testcase name="game/level_load">
-  </testcase>
-  <testcase name="renderer/screenshot_smoke">
-    <failure message="FAIL: screenshot failed: smoke_demo_level_1"/>
-  </testcase>
+<testsuite name="IntegrationTests.Game" tests="16" failures="0">
   <testcase name="renderer/ssr_smoke">
-    <failure message="FAIL: screenshot failed: ssr_smoke"/>
+  </testcase>
+  <testcase name="renderer/hotreload_material_instance">
+  </testcase>
+  <testcase name="renderer/hotreload_master_material">
+  </testcase>
+  <testcase name="renderer/hotreload_os_filewatcher">
+  </testcase>
+  <testcase name="renderer/hotreload_rapid_save_dedup">
   </testcase>
   <testcase name="filesys/write_read_roundtrip">
   </testcase>
@@ -19,6 +19,14 @@
   </testcase>
   <testcase name="filesys/delete_game_file">
   </testcase>
+  <testcase name="framework/lua_repl_exec">
+  </testcase>
+  <testcase name="framework/lua_repl_continue">
+  </testcase>
+  <testcase name="framework/lua_repl_error_captured">
+  </testcase>
+  <testcase name="framework/lua_repl_no_cmd">
+  </testcase>
   <testcase name="game/time_advances">
   </testcase>
   <testcase name="game/dt_positive">
@@ -26,10 +34,12 @@
   <testcase name="game/get_entity_invalid_handle">
   </testcase>
 </testsuite>
-<testsuite name="IntegrationTests.Editor" tests="2" failures="0">
+<testsuite name="IntegrationTests.Editor" tests="3" failures="0">
   <testcase name="editor/serialize_round_trip">
   </testcase>
   <testcase name="editor/undo_noop">
+  </testcase>
+  <testcase name="editor/does_new_assets_appear">
   </testcase>
 </testsuite>
 </testsuites>

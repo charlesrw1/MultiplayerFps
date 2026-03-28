@@ -77,6 +77,8 @@ public:
 	// Load and execute Lua source text directly, without touching the filesystem.
 	// Used by reload_one_file and directly by tests.
 	void reload_from_content(const std::string& source, const std::string& chunkname);
+	// Connect to a MobDebug server (ZeroBrane/VS Code). Call after load_script_files().
+	void activate_debugger(const char* host, int port);
 
 private:
 	bool had_changes = false;
