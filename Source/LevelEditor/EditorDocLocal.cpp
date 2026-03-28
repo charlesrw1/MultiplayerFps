@@ -122,7 +122,7 @@ void EditorDoc::init_new() {
 	eng->get_level()->validate();
 	command_mgr = std::make_unique<UndoRedoSystem>();
 
-	dragger.on_drag_end.add(this, [this](Rect2d rect) {
+	dragger.on_drag_end().add(this, [this](Rect2d rect) {
 		auto type = MouseSelectionAction::ADD_SELECT;
 		if (Input::is_shift_down())
 			type = MouseSelectionAction::ADD_SELECT;
@@ -325,7 +325,7 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 	set_window_title();
 }
 
-EditorDoc::EditorDoc() : ed_cam(inputs), dragger(*this), vis_filter(*this) {
+EditorDoc::EditorDoc() : vis_filter(*this) {
 	assert(eng->get_level());
 }
 

@@ -70,3 +70,20 @@ TEST(MulticastDelegateTest, MultipleInvocations) {
 		d.invoke();
 	EXPECT_EQ(count, 10);
 }
+
+TEST(MulticastDelegateTest, view_delegate) {
+	MulticastDelegate<> d;
+	viewMulticastDelegate<> view(d);
+
+	int count = 0;
+	int key = 0;
+	view.add(&key, [&]() { count++; });
+	for (int i = 0; i < 10; i++)
+		d.invoke();
+
+	EXPECT_EQ(count, 10);
+	view.remove(&key);
+	d.invoke();
+	EXPECT_EQ(count, 10);
+	EXPECT_TRUE(!d.has_any_listeners());
+}

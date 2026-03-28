@@ -5,7 +5,7 @@ void DragDetector::end_drag_func(EditorInputs& inputs) {
 		if (get_is_dragging()) {
 			printf("end drag\n");
 			inputs.set_focus(nullptr);
-			on_drag_end.invoke(get_drag_rect());
+			on_drag_end_internal.invoke(get_drag_rect());
 			inputs.eat_mouse_click();
 		}
 		is_dragging = false;

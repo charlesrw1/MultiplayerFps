@@ -14,7 +14,7 @@ class EditorCamera : public IInputReciever
 {
 public:
 	static EditorCamera* inst;
-	EditorCamera(EditorInputs& inputs) { inst = this; }
+	EditorCamera() { inst = this; }
 	~EditorCamera() { inst = nullptr; }
 	string get_name() final { return "editor camera"; }
 
