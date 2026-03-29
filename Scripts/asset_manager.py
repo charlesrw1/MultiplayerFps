@@ -103,10 +103,27 @@ class AssetManager:
                 lines.append(f"{colored_name} {BLUE}[DIR]{RESET}")
             else:
                 # Asset: green with type
+                # For materials, show if it's an instance (.mi) or master (.mm)
+                display_type = type_str
+                if type_str == "MATERIAL":
+                    display_type = self._get_material_type(cwd, name)
+
                 colored_name = f"{GREEN}{name:<{max_name_len}}{RESET}"
-                lines.append(f"{colored_name} {type_str}")
+                lines.append(f"{colored_name} {display_type}")
 
         return "\n".join(lines)
+
+    def _get_material_type(self, directory: Path, material_name: str) -> str:
+        """Determine if material is a master (.mm) or instance (.mi)"""
+        mi_file = directory / (material_name + ".mi")
+        mm_file = directory / (material_name + ".mm")
+
+        if mi_file.exists():
+            return "MATERIAL (instance)"
+        elif mm_file.exists():
+            return "MATERIAL (master)"
+        else:
+            return "MATERIAL"
 
     def cp(self, src: str, dst: str) -> None:
         """
