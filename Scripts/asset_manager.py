@@ -424,3 +424,31 @@ class AssetManager:
             except (FileNotFoundError, subprocess.TimeoutExpired):
                 # ripgrep not available, skip reference updates for this file
                 pass
+
+    def find_files(self, pattern: str) -> List[str]:
+        """
+        Find files matching a pattern in the asset root.
+        Supports wildcards: * matches any characters, ? matches single character
+        Pattern matching is case-insensitive for better usability.
+        Returns list of relative paths from asset root.
+        """
+        import fnmatch
+        import os
+
+        matches = []
+        pattern_lower = pattern.lower()
+
+        for root, dirs, files in os.walk(self.asset_root):
+            for filename in files:
+                full_path = Path(root) / filename
+                rel_path = full_path.relative_to(self.asset_root)
+                rel_path_str = str(rel_path)
+
+                # Case-insensitive matching against filename
+                if fnmatch.fnmatch(filename.lower(), pattern_lower):
+                    matches.append(rel_path_str)
+                # Also match against relative path (for directory patterns like "models/*")
+                elif fnmatch.fnmatch(rel_path_str.lower(), pattern_lower):
+                    matches.append(rel_path_str)
+
+        return sorted(matches)

@@ -163,6 +163,34 @@ class AssetCLI(cmd.Cmd):
         except Exception as e:
             print(f"Error: {e}")
 
+    def do_find(self, arg):
+        """Find files matching a pattern: find <pattern>
+        Supports wildcards: * (any chars), ? (single char)
+        Examples: find "*.png", find "sword*", find "models/*"
+        """
+        if not arg:
+            print("Usage: find <pattern>")
+            print("Examples:")
+            print("  find *.png       - find all PNG files")
+            print("  find sword*      - find files starting with 'sword'")
+            print("  find models/*    - find files in models directory")
+            return
+
+        try:
+            results = self.manager.find_files(arg)
+            if results:
+                print(f"Found {len(results)} file(s):")
+                for result in results:
+                    print(f"  {result}")
+            else:
+                print(f"No files matching: {arg}")
+        except Exception as e:
+            print(f"Error: {e}")
+
+    def complete_find(self, text, line, begidx, endidx):
+        """Tab completion for find command - suggest filenames"""
+        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=False)
+
     def default(self, line):
         """Handle ! prefix for shell commands"""
         if line.startswith("!"):

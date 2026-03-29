@@ -279,3 +279,93 @@ def test_mv_file_not_found(temp_asset_dir):
     manager = AssetManager(temp_asset_dir)
     with pytest.raises(FileNotFoundError):
         manager.mv("nonexistent.txt", "/tmp/dest.txt")
+
+def test_find_files_by_extension(temp_asset_dir):
+    """find_files returns files matching extension pattern"""
+    (temp_asset_dir / "rock.png").touch()
+    (temp_asset_dir / "sword.png").touch()
+    (temp_asset_dir / "rock.dds").touch()
+    (temp_asset_dir / "config.txt").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    results = manager.find_files("*.png")
+
+    assert len(results) == 2
+    assert "rock.png" in results
+    assert "sword.png" in results
+    assert "rock.dds" not in results
+    assert "config.txt" not in results
+
+def test_find_files_by_prefix(temp_asset_dir):
+    """find_files returns files matching prefix pattern"""
+    (temp_asset_dir / "sword.mis").touch()
+    (temp_asset_dir / "sword.glb").touch()
+    (temp_asset_dir / "rock.png").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    results = manager.find_files("sword*")
+
+    assert len(results) == 2
+    assert "sword.mis" in results
+    assert "sword.glb" in results
+    assert "rock.png" not in results
+
+def test_find_files_in_subdirectory(temp_asset_dir):
+    """find_files supports directory patterns"""
+    (temp_asset_dir / "models").mkdir()
+    (temp_asset_dir / "models" / "my_model.glb").touch()
+    (temp_asset_dir / "models" / "sword.glb").touch()
+    (temp_asset_dir / "textures").mkdir()
+    (temp_asset_dir / "textures" / "rock.png").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    results = manager.find_files("models/*")
+
+    assert len(results) == 2
+    assert "models/my_model.glb" in results
+    assert "models/sword.glb" in results
+    assert "textures/rock.png" not in results
+
+def test_find_files_nested_path(temp_asset_dir):
+    """find_files returns files in nested directories"""
+    (temp_asset_dir / "models" / "weapons").mkdir(parents=True)
+    (temp_asset_dir / "models" / "weapons" / "sword.glb").touch()
+    (temp_asset_dir / "models" / "my_model.glb").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    results = manager.find_files("models/weapons/*")
+
+    assert len(results) == 1
+    assert "models/weapons/sword.glb" in results
+
+def test_find_files_case_insensitive(temp_asset_dir):
+    """find_files is case-insensitive"""
+    (temp_asset_dir / "Rock.PNG").touch()
+    (temp_asset_dir / "Sword.GLB").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    results = manager.find_files("*.png")
+
+    assert "Rock.PNG" in results
+
+def test_find_files_empty_result(temp_asset_dir):
+    """find_files returns empty list if no matches"""
+    (temp_asset_dir / "rock.png").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    results = manager.find_files("*.dds")
+
+    assert results == []
+
+def test_find_files_wildcard_question_mark(temp_asset_dir):
+    """find_files supports ? wildcard for single character"""
+    (temp_asset_dir / "rock.png").touch()
+    (temp_asset_dir / "rock.dds").touch()
+    (temp_asset_dir / "ro.png").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    results = manager.find_files("ro?k.png")
+
+    assert len(results) == 1
+    assert "rock.png" in results
+    assert "ro.png" not in results

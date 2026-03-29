@@ -164,7 +164,9 @@
       "Bash(/Users/charlie/source/MultiplayerFps/.venv/bin/pip list:*)",
       "Bash(/Users/charlie/source/MultiplayerFps/.venv/bin/pip install:*)",
       "Bash(/Users/charlie/source/MultiplayerFps/.venv/bin/python -m pytest tests/test_asset_cli.py -v)",
-      "Bash(source ../.venv/bin/activate)"
+      "Bash(source ../.venv/bin/activate)",
+      "Bash(/tmp/final_verification.py:*)",
+      "Bash(/tmp/test_find_cli.py:*)"
     ]
   },
   "enabledPlugins": {
