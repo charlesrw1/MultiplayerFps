@@ -1,6 +1,7 @@
 import cmd
 from pathlib import Path
 from asset_manager import AssetManager
+from asset_types import group_files, get_asset_type
 
 class AssetCLI(cmd.Cmd):
     """Asset-aware file management REPL"""
@@ -161,26 +162,45 @@ class AssetCLI(cmd.Cmd):
         pass
 
     def _get_path_completions(self, text, include_files=True, include_dirs=True):
-        """Get completion matches for paths in current directory"""
+        """Get completion matches for paths in current directory.
+        For files, shows asset groups (e.g., 'rock' not 'rock.tis', 'rock.png', 'rock.dds')"""
         cwd = self.manager.pwd()
-        matches = []
+        matches = set()
 
         try:
-            # List all items in current directory
+            # Separate directories and files
+            dirs = []
+            files = []
+
             for item in sorted(cwd.iterdir()):
-                name = item.name
-                # Include if matches text prefix
-                if name.startswith(text):
-                    if item.is_dir() and include_dirs:
-                        matches.append(name + "/")
-                    elif item.is_file() and include_files:
-                        matches.append(name)
-                    elif item.is_dir() and not include_files:
-                        matches.append(name + "/")
+                if item.is_dir():
+                    dirs.append(item.name)
+                elif item.is_file():
+                    files.append(item.name)
+
+            # Add directories
+            if include_dirs:
+                for dirname in dirs:
+                    if dirname.startswith(text):
+                        matches.add(dirname + "/")
+
+            # For files, show asset groups instead of individual files
+            if include_files and files:
+                groups = group_files(files)
+                for asset_name in groups.keys():
+                    if asset_name.startswith(text):
+                        matches.add(asset_name)
+
+                # If no asset groups match, fall back to non-asset files
+                if not matches or not any(m.startswith(text) for m in matches if not m.endswith("/")):
+                    for filename in files:
+                        if filename.startswith(text) and get_asset_type(filename) is None:
+                            matches.add(filename)
+
         except (OSError, PermissionError):
             pass
 
-        return matches
+        return sorted(list(matches))
 
     def complete_cd(self, text, line, begidx, endidx):
         """Tab completion for cd command - directories only"""
