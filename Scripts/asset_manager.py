@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Optional, List, Dict
+import shutil
 from asset_types import get_asset_type, get_asset_group, group_files, AssetType
 
 class AssetManager:
@@ -58,3 +59,72 @@ class AssetManager:
             lines.append(f"{asset['asset']} [{type_str}]\n  {files_str}")
 
         return "\n".join(lines)
+
+    def cp(self, src: str, dst: str) -> None:
+        """
+        Copy a source file. For assets, copies only the source file (e.g., .png not .dds)
+        """
+        src_path = self.current_dir / src
+
+        if not src_path.exists():
+            raise FileNotFoundError(f"File not found: {src}")
+
+        # Determine what to copy based on file type
+        src_asset_type = get_asset_type(src)
+
+        if src_asset_type == AssetType.TEXTURE:
+            # Copy only source files: .png, .jpeg, .hdr
+            if src_path.suffix.lower() not in [".png", ".jpeg", ".hdr"]:
+                # If user specified import settings or compiled, copy the source instead
+                group = get_asset_group(src)
+                for ext in [".png", ".jpeg", ".hdr"]:
+                    candidate = src_path.parent / (group + ext)
+                    if candidate.exists():
+                        src_path = candidate
+                        break
+
+        elif src_asset_type == AssetType.MODEL:
+            # Copy only .glb source
+            if src_path.suffix.lower() != ".glb":
+                group = get_asset_group(src)
+                glb_file = src_path.parent / (group + ".glb")
+                if glb_file.exists():
+                    src_path = glb_file
+
+        # For maps and materials, copy as-is
+
+        shutil.copy2(src_path, dst)
+
+    def trash(self, path: str) -> None:
+        """
+        Trash/delete a file. For assets, deletes the compiled and source versions
+        (e.g., .dds and .png for textures, but keeps .tis import settings)
+        """
+        target = self.current_dir / path
+
+        if not target.exists():
+            raise FileNotFoundError(f"File not found: {path}")
+
+        asset_type = get_asset_type(path)
+        group = get_asset_group(path)
+
+        to_delete = [target]
+
+        if asset_type == AssetType.TEXTURE:
+            # Delete .dds, .hdr, .png, .jpeg but keep .tis
+            for ext in [".dds", ".hdr", ".png", ".jpeg"]:
+                candidate = target.parent / (group + ext)
+                if candidate.exists() and candidate != target:
+                    to_delete.append(candidate)
+
+        elif asset_type == AssetType.MODEL:
+            # Delete .cmdl and .glb but keep .mis
+            for ext in [".cmdl", ".glb"]:
+                candidate = target.parent / (group + ext)
+                if candidate.exists() and candidate != target:
+                    to_delete.append(candidate)
+
+        # For maps and materials, delete only the specified file
+
+        for file_path in to_delete:
+            file_path.unlink()

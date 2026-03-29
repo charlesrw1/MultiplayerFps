@@ -91,3 +91,63 @@ def test_ls_format_string(temp_asset_dir):
 
     # Output should contain asset name and file list
     assert "rock" in output
+
+def test_cp_copies_source_only(temp_asset_dir):
+    """cp copies only the source file for an asset"""
+    # Create texture with source, import settings, compiled
+    (temp_asset_dir / "rock.tis").touch()  # import settings
+    (temp_asset_dir / "rock.png").touch()  # source
+    (temp_asset_dir / "rock.dds").touch()  # compiled
+
+    dest_dir = temp_asset_dir / "backup"
+    dest_dir.mkdir()
+
+    manager = AssetManager(temp_asset_dir)
+    manager.cp("rock.png", str(dest_dir / "rock.png"))
+
+    # Only the source file should be copied
+    assert (dest_dir / "rock.png").exists()
+    assert not (dest_dir / "rock.tis").exists()
+    assert not (dest_dir / "rock.dds").exists()
+
+def test_cp_model_copies_source(temp_asset_dir):
+    """cp for model copies .glb source"""
+    (temp_asset_dir / "sword.mis").touch()
+    (temp_asset_dir / "sword.glb").touch()
+    (temp_asset_dir / "sword.cmdl").touch()
+
+    dest_dir = temp_asset_dir / "backup"
+    dest_dir.mkdir()
+
+    manager = AssetManager(temp_asset_dir)
+    manager.cp("sword.glb", str(dest_dir / "sword.glb"))
+
+    assert (dest_dir / "sword.glb").exists()
+    assert not (dest_dir / "sword.mis").exists()
+
+def test_cp_file_not_found(temp_asset_dir):
+    """cp raises error if file doesn't exist"""
+    manager = AssetManager(temp_asset_dir)
+    with pytest.raises(FileNotFoundError):
+        manager.cp("nonexistent.png", "/tmp/dest.png")
+
+def test_trash_removes_compiled_and_source(temp_asset_dir):
+    """trash removes compiled and source, keeps import settings"""
+    (temp_asset_dir / "rock.tis").touch()
+    (temp_asset_dir / "rock.png").touch()
+    (temp_asset_dir / "rock.dds").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    manager.trash("rock.png")
+
+    # Source and compiled deleted
+    assert not (temp_asset_dir / "rock.png").exists()
+    assert not (temp_asset_dir / "rock.dds").exists()
+    # Import settings kept
+    assert (temp_asset_dir / "rock.tis").exists()
+
+def test_trash_file_not_found(temp_asset_dir):
+    """trash raises error if file doesn't exist"""
+    manager = AssetManager(temp_asset_dir)
+    with pytest.raises(FileNotFoundError):
+        manager.trash("nonexistent.png")
