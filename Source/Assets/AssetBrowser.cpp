@@ -339,6 +339,7 @@ void AssetBrowser::draw_browser_grid() {
 	uint32_t ent_list_flags =
 		ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY;
 
+	// Filter without loading thumbnails (fast path)
 	std::vector<AssetFilesystemNode*> items2;
 	{
 		std::vector<AssetFilesystemNode*> items;
@@ -346,37 +347,38 @@ void AssetBrowser::draw_browser_grid() {
 
 		const int name_filter_len = strlen(asset_name_filter);
 		for (auto& c : items) {
-			{
-				auto& asset = c->asset;
-				if (!filter_match_case && name_filter_len > 0) {
-					std::string path = asset.filename;
-					for (int i = 0; i < path.size(); i++)
-						path[i] = tolower(path[i]);
-					if (path.find(all_lower_cast_filter_name, 0) == std::string::npos)
-						continue;
-				} else if (name_filter_len > 0) {
-					if (asset.filename.find(asset_name_filter) == std::string::npos)
-						continue;
-				}
-			}
-			Texture* t = thumbnails.get_thumbnail(c->asset);
-			if (!t)
+			auto& asset = c->asset;
+			// Check type filter first (fast check)
+			if (!should_type_show(1 << asset.type->self_index))
 				continue;
+			// Check name filter
+			if (!filter_match_case && name_filter_len > 0) {
+				std::string path = asset.filename;
+				for (int i = 0; i < path.size(); i++)
+					path[i] = tolower(path[i]);
+				if (path.find(all_lower_cast_filter_name, 0) == std::string::npos)
+					continue;
+			} else if (name_filter_len > 0) {
+				if (asset.filename.find(asset_name_filter) == std::string::npos)
+					continue;
+			}
+			// Only add to items2, don't load thumbnails yet
 			items2.push_back(c);
 		}
 	}
+
 	ImGuiListClipper clipper;
 	clipper.Begin(glm::ceil(items2.size() / float(boxes)));
 
 	auto draw_item = [&](const int item_idx) {
 		auto& c = items2.at(item_idx);
 		Texture* t = thumbnails.get_thumbnail(c->asset);
-		ASSERT(t);
+		// Skip items without thumbnails
+		if (!t)
+			return;
 		ImGui::TableNextColumn();
 		ImGui::PushID(c);
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-		//	ImGui::ImageButton(ImTextureID(uint64_t(t->get_internal_render_handle())), ImVec2(64, 64),ImVec2(0, 1),
-		// ImVec2(1, 0));
 		string only_filename = c->asset.filename;
 		StringUtils::get_filename(only_filename);
 
@@ -416,7 +418,6 @@ void AssetBrowser::draw_browser_grid() {
 		}
 
 		while (clipper.Step()) {
-
 			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
 				draw_in_row(i);
 			}
