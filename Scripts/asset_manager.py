@@ -33,3 +33,28 @@ class AssetManager:
             raise NotADirectoryError(f"Not a directory: {target}")
 
         self.current_dir = target
+
+    def ls(self) -> List[Dict]:
+        """List assets in current directory, grouped by asset"""
+        if not self.current_dir.exists():
+            return []
+
+        files = [f.name for f in self.current_dir.iterdir() if f.is_file()]
+        grouped = group_files(files)
+
+        # Return as sorted list
+        return [grouped[key] for key in sorted(grouped.keys())]
+
+    def format_ls(self) -> str:
+        """Format ls output for display"""
+        assets = self.ls()
+        if not assets:
+            return ""
+
+        lines = []
+        for asset in assets:
+            type_str = asset["type"].value.upper()
+            files_str = ", ".join(sorted(asset["files"]))
+            lines.append(f"{asset['asset']} [{type_str}]\n  {files_str}")
+
+        return "\n".join(lines)

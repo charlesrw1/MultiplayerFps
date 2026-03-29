@@ -48,3 +48,46 @@ def test_cd_invalid():
         manager = AssetManager(Path(tmpdir))
         with pytest.raises(FileNotFoundError):
             manager.cd("nonexistent")
+
+def test_ls_groups_assets(temp_asset_dir):
+    """ls returns grouped assets, one line per asset"""
+    # Create test files
+    (temp_asset_dir / "rock.tis").touch()
+    (temp_asset_dir / "rock.png").touch()
+    (temp_asset_dir / "rock.dds").touch()
+    (temp_asset_dir / "sword.mis").touch()
+    (temp_asset_dir / "sword.glb").touch()
+    (temp_asset_dir / "other.txt").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    result = manager.ls()
+
+    # Each asset appears once with all its files
+    assert len(result) == 2  # rock and sword
+
+    rock_entry = [e for e in result if e["asset"] == "rock"][0]
+    assert rock_entry["type"].value == "texture"
+    assert set(rock_entry["files"]) == {"rock.tis", "rock.png", "rock.dds"}
+
+    sword_entry = [e for e in result if e["asset"] == "sword"][0]
+    assert sword_entry["type"].value == "model"
+
+    # other.txt not in results
+    assert not any(e["asset"] == "other" for e in result)
+
+def test_ls_empty(temp_asset_dir):
+    """ls returns empty list if no assets"""
+    manager = AssetManager(temp_asset_dir)
+    assert manager.ls() == []
+
+def test_ls_format_string(temp_asset_dir):
+    """format_ls returns human-readable output"""
+    (temp_asset_dir / "rock.tis").touch()
+    (temp_asset_dir / "rock.png").touch()
+    (temp_asset_dir / "rock.dds").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    output = manager.format_ls()
+
+    # Output should contain asset name and file list
+    assert "rock" in output
