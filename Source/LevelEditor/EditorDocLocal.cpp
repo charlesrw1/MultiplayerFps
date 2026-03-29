@@ -285,6 +285,9 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 		if (name.size() > 8 && name.substr(name.size() - 8) == ".tprefab") {
 			editing_prefab = true;
 		}
+
+
+		//eng->load_level("eng/template.tmap");
 	} else {
 		assetName = std::nullopt;
 	}

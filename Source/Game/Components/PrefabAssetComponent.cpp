@@ -36,6 +36,7 @@ void PrefabAssetComponent::start() {
 			if (auto entity = dynamic_cast<Entity*>(base_updater)) {
 				// Parent the entity to this component's owner
 				entity->parent_to(owner);
+				entity->dont_serialize_or_edit = true;
 				spawned_entities.push_back(entity->get_self_ptr());
 			}
 		}

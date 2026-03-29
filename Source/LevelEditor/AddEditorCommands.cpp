@@ -229,4 +229,18 @@ void EditorDoc::add_editor_commands() {
 			}
 		}
 	});
+	cmds->add("make-prefab-and-replace", [this](const Cmd_Args& args) {
+		if (args.size() < 2) {
+			args.sys_print(Warning, "Usage: make-prefab-and-replace <prefab_path>\n");
+			return;
+		}
+		auto selection = selection_state->get_selection_as_vector();
+		if (selection.empty()) {
+			args.sys_print(Warning, "No entities selected\n");
+			return;
+		}
+		std::string prefab_path = args.at(1);
+		auto cmd = new MakePrefabAndReplaceCommand(*this, selection, prefab_path);
+		command_mgr->add_command(cmd);
+	});
 }

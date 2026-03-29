@@ -207,10 +207,6 @@ public:
 	void imgui_draw() final;
 	const View_Setup* get_vs() final { return &vs_setup; }
 
-	std::string get_full_output_path() {
-		return get_doc_name().empty() ? "Maps/<unnamed map>" : "Maps/" + get_doc_name();
-	}
-
 	void do_mouse_selection(MouseSelectionAction action, const Entity* e, bool select_root_most_entity);
 	void do_mouse_selection(MouseSelectionAction action, vector<EntityPtr> ents, bool select_root_most_entity);
 
@@ -238,7 +234,7 @@ public:
 	void exit_eyedropper_mode();
 	void* get_active_eyedropper_user_id() { return active_eyedropper_user_id; }
 
-	bool is_editing_scene() const { return true; }
+	bool is_editing_scene() const { return !is_editing_prefab(); }
 	bool is_editing_prefab() const { return editing_prefab; }
 
 	IEditorApi2& get_editor_api() final { return *editor_api2; }

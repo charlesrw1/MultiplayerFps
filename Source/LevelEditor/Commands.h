@@ -333,4 +333,21 @@ public:
 	std::unique_ptr<SerializedSceneFile> prefab_text;
 };
 
+class MakePrefabAndReplaceCommand : public Command
+{
+public:
+	EditorDoc& ed_doc;
+	MakePrefabAndReplaceCommand(EditorDoc& ed_doc, const std::vector<EntityPtr>& selection, const std::string& prefab_path);
+	bool is_valid() final { return !prefab_path.empty() && !selection.empty(); }
+
+	void execute() final;
+	void undo() final;
+	std::string to_string() final { return "Make Prefab and Replace"; }
+
+	std::string prefab_path;
+	std::vector<EntityPtr> selection;
+	std::unique_ptr<SerializedSceneFile> original_selection;
+	std::vector<EntityPtr> spawned_prefab_instances;
+};
+
 #endif

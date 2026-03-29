@@ -601,3 +601,89 @@ void MakePrefabFromSelectionCommand::undo() {
 	sys_print(Info, "Undo make prefab: file %s persists (manual deletion needed if unwanted)\n",
 		save_path.c_str());
 }
+
+MakePrefabAndReplaceCommand::MakePrefabAndReplaceCommand(EditorDoc& ed_doc,
+	const std::vector<EntityPtr>& selection, const std::string& prefab_path)
+	: ed_doc(ed_doc), prefab_path(prefab_path), selection(selection) {}
+
+void MakePrefabAndReplaceCommand::execute() {
+	// Step 1: Collect entity pointers and serialize
+	std::vector<Entity*> entities;
+	for (auto& ptr : selection) {
+		if (auto entity = ptr.get()) {
+			entities.push_back(entity);
+		}
+	}
+
+	if (entities.empty()) {
+		sys_print(Warning, "No entities to save to prefab\n");
+		return;
+	}
+
+	// Step 2: Serialize and save to prefab file
+	try {
+		auto serialized = NewSerialization::serialize_to_text("make_prefab_replace", entities, false);
+		original_selection = std::make_unique<SerializedSceneFile>(serialized);
+
+		if (!PrefabFile::save_text(prefab_path, serialized.text)) {
+			sys_print(Warning, "Failed to save prefab to: %s\n", prefab_path.c_str());
+			original_selection = nullptr;
+			return;
+		}
+	} catch (const std::exception& e) {
+		sys_print(Warning, "Failed to serialize prefab: %s\n", e.what());
+		return;
+	}
+
+	// Step 3: Delete the original entities
+	for (auto& ptr : selection) {
+		if (auto entity = ptr.get()) {
+			entity->destroy();
+		}
+	}
+
+	// Step 4: Load and instantiate the prefab
+	std::string text = PrefabFile::load_text(prefab_path);
+	if (text.empty()) {
+		sys_print(Warning, "Failed to load prefab immediately after save: %s\n", prefab_path.c_str());
+		return;
+	}
+
+	try {
+		UnserializedSceneFile unserialized = unserialize_entities_from_text("instantiate_prefab_replace", text,
+			AssetDatabase::loader, false);
+
+		ed_doc.insert_unserialized_into_scene(unserialized);
+
+		// Collect spawned entity handles for undo
+		for (auto base : unserialized.all_obj_vec) {
+			if (auto entity = dynamic_cast<Entity*>(base)) {
+				spawned_prefab_instances.push_back(entity->get_self_ptr());
+			}
+		}
+	} catch (const std::exception& e) {
+		sys_print(Warning, "Failed to instantiate prefab %s: %s\n", prefab_path.c_str(), e.what());
+	}
+}
+
+void MakePrefabAndReplaceCommand::undo() {
+	// Destroy spawned instances
+	for (auto& h : spawned_prefab_instances) {
+		if (auto entity = h.get()) {
+			entity->destroy();
+		}
+	}
+	spawned_prefab_instances.clear();
+
+	// Restore original entities from serialization
+	if (original_selection) {
+		try {
+			// Clone the serialization for deserialization
+			UnserializedSceneFile unserialized = unserialize_entities_from_text("undo_prefab_replace",
+				original_selection->text, AssetDatabase::loader, true);
+			ed_doc.insert_unserialized_into_scene(unserialized);
+		} catch (const std::exception& e) {
+			sys_print(Warning, "Failed to restore original entities during undo: %s\n", e.what());
+		}
+	}
+}

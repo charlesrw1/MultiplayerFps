@@ -13,9 +13,10 @@ public:
 
 	void start() override;
 	void stop() override;
-
 	// Path to the .tprefab file (relative to game dir, e.g., "Prefabs/my_prefab.tprefab")
-	REF std::string prefab_path;
+	
+	REFLECT(hide)
+	std::string prefab_path;
 
 private:
 	// Runtime-only: entities spawned from the prefab
