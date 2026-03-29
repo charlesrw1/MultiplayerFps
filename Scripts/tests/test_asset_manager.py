@@ -321,6 +321,32 @@ def test_mv_only_updates_valid_reference_formats(temp_asset_dir):
     invalid_content = (temp_asset_dir / "invalid_ref.txt").read_text()
     assert "default_pbr" in invalid_content  # Should still have old name
 
+def test_mv_updates_references_when_moving_to_subdirectory(temp_asset_dir):
+    """mv updates references with new path when moving file to subdirectory"""
+    # Initialize files as specified in requirement
+    (temp_asset_dir / "my_material.mm").write_text("master material")
+    (temp_asset_dir / "my_material_inst.mi").write_text("PARENT my_material.mm\nother config")
+
+    # Create subdirectory
+    folder = temp_asset_dir / "folder"
+    folder.mkdir()
+
+    manager = AssetManager(temp_asset_dir)
+    # Move my_material.mm to folder/
+    updated_refs = manager.mv("my_material.mm", "folder/")
+
+    # Verify file was moved
+    assert not (temp_asset_dir / "my_material.mm").exists()
+    assert (folder / "my_material.mm").exists()
+
+    # Verify reference was updated to new path
+    inst_content = (temp_asset_dir / "my_material_inst.mi").read_text()
+    assert "PARENT folder/my_material.mm" in inst_content
+    assert "PARENT my_material.mm" not in inst_content
+
+    # Verify the file with updated reference was tracked
+    assert "my_material_inst.mi" in updated_refs
+
 def test_find_files_by_extension(temp_asset_dir):
     """find_files returns files matching extension pattern"""
     (temp_asset_dir / "rock.png").touch()

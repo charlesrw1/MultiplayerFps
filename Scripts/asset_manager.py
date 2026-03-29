@@ -375,7 +375,9 @@ class AssetManager:
                     files_to_move.append(candidate)
                     old_filename = candidate.name
                     new_filename = dst_group + ext
-                    old_to_new[old_filename] = new_filename
+                    # Use relative path from asset_root for the new name
+                    new_relative_path = (move_to_dir / new_filename).relative_to(self.asset_root)
+                    old_to_new[old_filename] = str(new_relative_path).replace("\\", "/")
 
         elif asset_type == AssetType.MODEL:
             # Move all model-related files: .mis, .glb, .cmdl
@@ -385,13 +387,17 @@ class AssetManager:
                     files_to_move.append(candidate)
                     old_filename = candidate.name
                     new_filename = dst_group + ext
-                    old_to_new[old_filename] = new_filename
+                    # Use relative path from asset_root for the new name
+                    new_relative_path = (move_to_dir / new_filename).relative_to(self.asset_root)
+                    old_to_new[old_filename] = str(new_relative_path).replace("\\", "/")
 
         elif asset_type == AssetType.MAP:
             # Move .tmap only
             if src_file_path.exists():
                 files_to_move.append(src_file_path)
-                old_to_new[src_file_path.name] = Path(dst).name
+                new_filename = Path(dst).name
+                new_relative_path = (move_to_dir / new_filename).relative_to(self.asset_root)
+                old_to_new[src_file_path.name] = str(new_relative_path).replace("\\", "/")
 
         elif asset_type == AssetType.MATERIAL:
             # Move all material files: .mm, .mi, .glsl
@@ -401,11 +407,15 @@ class AssetManager:
                     files_to_move.append(candidate)
                     old_filename = candidate.name
                     new_filename = dst_group + ext
-                    old_to_new[old_filename] = new_filename
+                    # Use relative path from asset_root for the new name
+                    new_relative_path = (move_to_dir / new_filename).relative_to(self.asset_root)
+                    old_to_new[old_filename] = str(new_relative_path).replace("\\", "/")
         else:
             # Unknown type, just move the one file
             files_to_move.append(src_file_path)
-            old_to_new[src_file_path.name] = Path(dst).name
+            new_filename = Path(dst).name
+            new_relative_path = (move_to_dir / new_filename).relative_to(self.asset_root)
+            old_to_new[src_file_path.name] = str(new_relative_path).replace("\\", "/")
 
         # Move all related files
         for file_path in files_to_move:
