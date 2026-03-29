@@ -235,6 +235,29 @@ class AssetCLI(cmd.Cmd):
         """Tab completion for references command - files only"""
         return self._get_path_completions(text, include_files=True, include_dirs=False)
 
+    def complete_ls(self, text, line, begidx, endidx):
+        """Tab completion for ls command - shows directories and asset groups"""
+        cwd = self.manager.pwd()
+        matches = set()
+
+        try:
+            # List directories
+            for item in sorted(cwd.iterdir()):
+                if item.is_dir() and item.name.startswith(text):
+                    matches.add(item.name + "/")
+
+            # List asset groups
+            files = [f.name for f in cwd.iterdir() if f.is_file()]
+            if files:
+                groups = group_files(files)
+                for asset_name in groups.keys():
+                    if asset_name.startswith(text):
+                        matches.add(asset_name)
+        except (OSError, PermissionError):
+            pass
+
+        return sorted(list(matches))
+
 def main():
     """Main entry point - starts REPL or accepts asset root argument"""
     import sys
