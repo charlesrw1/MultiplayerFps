@@ -86,36 +86,9 @@ public:
 
 	REF bool generate_auto_lods = false;
 
-	// type=BoneRenameContainer
-	// this renames bones in this asset using this dataclass
-	// each entry in the array is "my_current_bone renamed_bone", with a space in between
-	// REF AssetPtr<DataClass> bone_rename_dataclass;
-	// REF AssetPtr<DataClass> bone_reparent;
 	REF float animations_set_fps = 30.0;
 
 	REF BoneRenameContainer bone_rename;
 	REF BoneReparentContainer bone_reparent;
 
-	// static const PropertyInfoList* get_props() {
-	//
-	//	MAKE_VECTORCALLBACK_ATOM(float, lodScreenSpaceSizes);
-	//	MAKE_VECTORCALLBACK_ATOM(std::string, additionalAnimationGlbFiles);
-	//	MAKE_VECTORCALLBACK_ATOM(AssetPtr<MaterialInstance>, myMaterials);
-	//	MAKE_VECTORCALLBACK_ATOM(std::string, keepBones);
-	//	MAKE_VECTORCALLBACK(AnimImportSettings, animations);
-	//	START_PROPS(ModelImportSettings)
-	//		REG_STDSTRING(srcGlbFile, PROP_DEFAULT),
-	//		REG_STDVECTOR(myMaterials, PROP_DEFAULT),
-	//		REG_STDVECTOR(lodScreenSpaceSizes, PROP_DEFAULT),
-	//		REG_BOOL(useSharedSkeleton, PROP_DEFAULT, "0"),
-	//		REG_ASSET_PTR(shareSkeletonWithThis, PROP_DEFAULT),
-	//		REG_STDVECTOR(keepBones, PROP_DEFAULT),
-	//		REG_ASSET_PTR(mirrorTableAsset, PROP_DEFAULT),
-	//		REG_STDVECTOR(additionalAnimationGlbFiles, PROP_DEFAULT),
-	//		REG_ASSET_PTR(bone_rename_dataclass,PROP_DEFAULT),
-	//		REG_ASSET_PTR(bone_reparent, PROP_DEFAULT),
-	//		REG_FLOAT(animations_set_fps, PROP_DEFAULT, "30.0"),
-	//		REG_STDVECTOR(animations, PROP_SERIALIZE),
-	//	END_PROPS(ModelImportSettings)
-	//}
 };
