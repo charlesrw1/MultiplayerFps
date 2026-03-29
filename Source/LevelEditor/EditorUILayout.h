@@ -2,14 +2,16 @@
 #include "AllHeader.h"
 #include "UI/GUISystemPublic.h"
 #include "UI/Widgets/EditorCube.h"
+#include <functional>
 class guiEditorCube;
 class guiText;
+class IEditorApi2;
 class EditorUILayout
 {
 public:
-	EditorUILayout(EditorDoc& doc);
+	EditorUILayout(IEditorApi2& doc);
 
-	bool draw(EditorInputs& inputs);
+	bool draw(EditorInputs& inputs, std::function<void()> draw_window);
 	void do_box_select(MouseSelectionAction action, Rect2d area);
 	Rect2d convert_rect(Rect2d screenSpaceRect) const {
 		Rect2d out = screenSpaceRect;
@@ -26,5 +28,5 @@ public:
 	std::vector<EditorUILayout::obj> get_objs();
 
 	guiEditorCube cube;
-	EditorDoc* doc = nullptr;
+	IEditorApi2& doc;
 };

@@ -3,7 +3,6 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "External/ImGuizmo.h"
 
-
 uint32_t color_to_uint(Color32 c) {
 	return c.r | c.g << 8 | c.b << 16 | c.a << 24;
 }
@@ -24,7 +23,7 @@ ManipulateTransformTool::ManipulateTransformTool(EditorDoc& ed) : ed_doc(ed) {
 	ed_doc.selection_state->on_selection_changed.add(this, &ManipulateTransformTool::on_selection_changed);
 
 	// refresh cached data
-	ed_doc.prop_editor->on_property_change.add(this, &ManipulateTransformTool::on_prop_change);
+	ed_doc.prop_editor->get_on_property_changed().add(this, [this]() { on_prop_change(); });
 }
 
 void ManipulateTransformTool::on_close() {
@@ -92,8 +91,7 @@ void ManipulateTransformTool::update_pivot_and_cached() {
 	static bool selectFirstOnly = true;
 	if (world_space_of_selected.size() == 1 || (!world_space_of_selected.empty() && selectFirstOnly)) {
 		pivot_transform = world_space_of_selected.begin()->second;
-	}
-	else if (world_space_of_selected.size() > 1) {
+	} else if (world_space_of_selected.size() > 1) {
 		glm::vec3 v = glm::vec3(0.f);
 		for (auto s : world_space_of_selected) {
 			v += glm::vec3(s.second[3]);
@@ -191,8 +189,7 @@ void ManipulateTransformTool::update(EditorInputs& inputs) {
 				out = out | OPERATION::TRANSLATE_Y;
 			if (axis_mask & 4)
 				out = out | OPERATION::TRANSLATE_Z;
-		}
-		else if (op == ImGuizmo::ROTATE) {
+		} else if (op == ImGuizmo::ROTATE) {
 			if (axis_mask & 1)
 				out = out | OPERATION::ROTATE_X;
 			if (axis_mask & 2)
@@ -201,8 +198,7 @@ void ManipulateTransformTool::update(EditorInputs& inputs) {
 				out = out | OPERATION::ROTATE_Z;
 			if (axis_mask == 0xff)
 				out = OPERATION::ROTATE;
-		}
-		else if (op == ImGuizmo::SCALE) {
+		} else if (op == ImGuizmo::SCALE) {
 			if (axis_mask & 1)
 				out = out | OPERATION::SCALE_X;
 			if (axis_mask & 2)
@@ -221,14 +217,13 @@ void ManipulateTransformTool::update(EditorInputs& inputs) {
 	float* model = glm::value_ptr(current_transform_of_group);
 	ImGuizmo::SetOrthographic(using_ortho);
 	bool good = ImGuizmo::Manipulate(get_force_gizmo_on(), view, proj, get_real_op_mask(mask_to_use, axis_mask), mode,
-		model, nullptr, (snap.x > 0) ? &snap.x : nullptr);
+									 model, nullptr, (snap.x > 0) ? &snap.x : nullptr);
 
 	has_any_changed |= good;
 
 	if (ImGuizmo::IsUsingAny() && state == SELECTED) {
 		begin_drag(); // was not being used last frame, but now using
-	}
-	else if (!ImGuizmo::IsUsingAny() && state == MANIPULATING_OBJS) {
+	} else if (!ImGuizmo::IsUsingAny() && state == MANIPULATING_OBJS) {
 		end_drag(); // was using last frame, but now not using. this also saves off transforms into a undoable command
 	}
 	if (state == MANIPULATING_OBJS) {
@@ -274,37 +269,32 @@ void ManipulateTransformTool::check_input(EditorInputs& inputs) {
 		force_operation = ImGuizmo::ROTATE;
 
 		set_force_gizmo_on(true);
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_G)) {
+	} else if (Input::was_key_pressed(SDL_SCANCODE_G)) {
 
 		reset_group_to_pre_transform();
 
 		force_operation = ImGuizmo::TRANSLATE;
 
 		set_force_gizmo_on(true);
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_X) && get_force_gizmo_on()) {
+	} else if (Input::was_key_pressed(SDL_SCANCODE_X) && get_force_gizmo_on()) {
 		reset_group_to_pre_transform();
 		if (has_shift)
 			axis_mask = 2 | 4;
 		else
 			axis_mask = 1;
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_Y) && get_force_gizmo_on()) {
+	} else if (Input::was_key_pressed(SDL_SCANCODE_Y) && get_force_gizmo_on()) {
 		reset_group_to_pre_transform();
 		if (has_shift)
 			axis_mask = 1 | 4;
 		else
 			axis_mask = 2;
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_Z) && get_force_gizmo_on()) {
+	} else if (Input::was_key_pressed(SDL_SCANCODE_Z) && get_force_gizmo_on()) {
 		reset_group_to_pre_transform();
 		if (has_shift)
 			axis_mask = 1 | 2;
 		else
 			axis_mask = 4;
-	}
-	else if (Input::was_key_pressed(SDL_SCANCODE_S) && !Input::is_ctrl_down()) {
+	} else if (Input::was_key_pressed(SDL_SCANCODE_S) && !Input::is_ctrl_down()) {
 		reset_group_to_pre_transform();
 		force_operation = ImGuizmo::SCALE;
 		mode = ImGuizmo::LOCAL; // local scaling only

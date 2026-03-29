@@ -120,13 +120,22 @@ public:
 	virtual glm::vec3 get_positon() const = 0;
 	virtual Ray unproject_ray(int x, int y) const = 0;
 	virtual bool is_ortho() const = 0;
+	virtual View_Setup get_view_setup() const = 0;
 };
 class ISelectionApi
 {
 public:
+	// INTERFACE
 	virtual std::vector<EntityPtr> get_selected() const = 0;
-	virtual void clear_selected() = 0;
 	virtual viewMulticastDelegate<> on_selection_changed() const = 0;
+	virtual void clear_selected() = 0;
+	virtual void add_select(EntityPtr ptr) = 0;
+	virtual void remove_select(EntityPtr ptr) = 0;
+	virtual bool is_selected(EntityPtr ptr) const = 0;
+
+	// HELPERS
+	void do_selection(MouseSelectionAction action, EntityPtr ptr) { do_selection(action, std::vector<EntityPtr>{ptr}); }
+	void do_selection(MouseSelectionAction action, std::vector<EntityPtr> ptrs);
 };
 class IDocumentApi
 {
@@ -136,8 +145,22 @@ public:
 	virtual void redo() = 0;
 	virtual std::string get_document_name() const = 0;
 };
+
+class EntitySnapshot
+{
+public:
+private:
+	std::string serialized;
+};
 class ICommandApi
 {
+public:
+	// spawn your entity, intialize it, then call this.
+	virtual void add_spawned_entity_command(Entity* e) = 0;
+	virtual void remove_entity(Entity* e) = 0;
+	virtual EntitySnapshot make_entity_snapshot(Entity* e) = 0;
+	virtual void commit_entity_changes(Entity* e) = 0;
+	virtual void set_editor_hidden(Entity* e) = 0;
 };
 class IEditorApi2
 {
@@ -146,6 +169,71 @@ public:
 	virtual ISelectionApi* selection() = 0;
 	virtual IDocumentApi* document() = 0;
 };
+
+class CameraApiImpl : public IEditorCameraApi
+{
+public:
+	CameraApiImpl(EditorCamera* cam) : cam(cam) {}
+
+	void set_look_at(glm::vec3 pos, glm::vec3 look) final {
+		// Set camera to look at 'look' from position 'pos'
+		cam->set_orbit_target(look, glm::distance(pos, look));
+	}
+
+	glm::vec3 get_positon() const final { return cam->make_view().origin; }
+
+	Ray unproject_ray(int x, int y) const final { return cam->unproject_mouse(x, y); }
+
+	bool is_ortho() const final { return cam->get_is_using_ortho(); }
+
+	View_Setup get_view_setup() const final { return cam->make_view(); }
+
+	EditorCamera* cam = nullptr;
+};
+
+class DocumentApiImpl : public IDocumentApi
+{
+public:
+	DocumentApiImpl(EditorDoc* doc) : doc(doc) {}
+
+	void save() final;
+	void undo() final;
+	void redo() final;
+	std::string get_document_name() const final;
+
+	EditorDoc* doc = nullptr;
+};
+
+class SelectionApiImpl : public ISelectionApi
+{
+public:
+	SelectionApiImpl(SelectionState* ss) : ss(ss) {}
+
+	std::vector<EntityPtr> get_selected() const final { return ss->get_selection_as_vector(); }
+	viewMulticastDelegate<> on_selection_changed() const final { return ss->on_selection_changed; }
+	void add_select(EntityPtr ptr) final { ss->add_to_entity_selection(ptr); }
+	void remove_select(EntityPtr ptr) final { ss->remove_from_selection(ptr); }
+	void clear_selected() final { ss->clear_all_selected(); }
+	bool is_selected(EntityPtr ptr) const final { return ss->is_entity_selected(ptr); }
+
+	SelectionState* ss = nullptr;
+};
+
+class EditorApi2Impl : public IEditorApi2
+{
+public:
+	EditorApi2Impl(CameraApiImpl* cam, SelectionApiImpl* sel, DocumentApiImpl* doc)
+		: cam_impl(cam), sel_impl(sel), doc_impl(doc) {}
+
+	IEditorCameraApi* camera() final { return cam_impl; }
+	ISelectionApi* selection() final { return sel_impl; }
+	IDocumentApi* document() final { return doc_impl; }
+
+	CameraApiImpl* cam_impl = nullptr;
+	SelectionApiImpl* sel_impl = nullptr;
+	DocumentApiImpl* doc_impl = nullptr;
+};
+
 extern string get_name_display_entity(const Entity* e);
 class EditorDoc : public IEditorTool
 {
@@ -206,6 +294,8 @@ public:
 
 	bool is_editing_scene() const { return true; }
 
+	IEditorApi2& get_editor_api() { return *editor_api2; }
+
 	string get_name();
 
 	Entity* spawn_entity();
@@ -218,8 +308,14 @@ public:
 	void set_camera_target_to_sel();
 	string get_doc_name() const final { return assetName.value_or("<unnamed>"); }
 
-	std::unique_ptr<UndoRedoSystem> command_mgr;
 	std::unique_ptr<SelectionState> selection_state;
+	std::unique_ptr<SelectionApiImpl> sel_api_impl;
+	std::unique_ptr<CameraApiImpl> cam_api_impl;
+	std::unique_ptr<DocumentApiImpl> doc_api_impl;
+	std::unique_ptr<EditorApi2Impl> editor_api2;
+
+	std::unique_ptr<UndoRedoSystem> command_mgr;
+
 	std::unique_ptr<EdPropertyGrid> prop_editor;
 	std::unique_ptr<ManipulateTransformTool> manipulate;
 	std::unique_ptr<DragDropPreview> drag_drop_preview;

@@ -9,24 +9,25 @@ ConfigVar editor_draw_name_text("editor_draw_name_text", "0", CVAR_BOOL,
 								"draw text above every entities head in editor");
 ConfigVar editor_draw_name_text_alpha("editor_draw_name_text_alpha", "150", CVAR_INTEGER, "", 0, 255);
 
-EditorUILayout::EditorUILayout(EditorDoc& doc) : doc(&doc) {
+EditorUILayout::EditorUILayout(IEditorApi2& doc) : doc(doc) {
 
-	doc.ed_cam.on_ortho_state_change.add(this, [&]() { cube.rotation.begin_interpolate(); });
+	// doc.ed_cam.on_ortho_state_change.add(this, [&]() { cube.rotation.begin_interpolate(); });
 }
 
-bool EditorUILayout::draw(EditorInputs& inputs) {
+bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_window) {
 	const float dt = eng->get_dt();
 
 	RenderWindow& window = UiSystem::inst->window;
-	cube.rotation.set_current((glm::mat3)doc->vs_setup.view);
+	cube.rotation.set_current((glm::mat3)doc.camera()->get_view_setup().view);
 	cube.draw(window, dt);
 	// paint
-	if (doc->active_mode)
-		doc->active_mode->draw_ui();
 
+	// if (doc->active_mode)
+	//	doc->active_mode->draw_ui();
+	draw_window();
 
 	bool do_mouse_click =
-		Input::was_mouse_released(0) && UiSystem::inst->is_vp_hovered();// && !doc->dragger.get_is_dragging();
+		Input::was_mouse_released(0) && UiSystem::inst->is_vp_hovered(); // && !doc->dragger.get_is_dragging();
 	int x = Input::get_mouse_pos().x;
 	int y = Input::get_mouse_pos().y;
 
@@ -117,12 +118,13 @@ bool EditorUILayout::draw(EditorInputs& inputs) {
 	}
 	if (clicked) {
 		inputs.eat_mouse_click();
+		auto* selection = doc.selection();
 		if (Input::is_shift_down()) {
-			doc->do_mouse_selection(MouseSelectionAction::ADD_SELECT, clicked, true);
+			selection->do_selection(MouseSelectionAction::ADD_SELECT, clicked);
 		} else if (Input::is_ctrl_down()) {
-			doc->do_mouse_selection(MouseSelectionAction::UNSELECT, clicked, true);
+			selection->do_selection(MouseSelectionAction::UNSELECT, clicked);
 		} else {
-			doc->do_mouse_selection(MouseSelectionAction::SELECT_ONLY, clicked, true);
+			selection->do_selection(MouseSelectionAction::SELECT_ONLY, clicked);
 		}
 		return true;
 	} else {
@@ -146,6 +148,7 @@ void EditorUILayout::do_box_select(MouseSelectionAction action, Rect2d area) {
 	area.x -= vp_pos.x;
 	area.y -= vp_pos.y;
 
+	auto* selection = doc.selection();
 	for (auto o : objs) {
 		const char* name = (o.e->get_editor_name().c_str());
 		const bool is_prefab_root =
@@ -203,7 +206,7 @@ void EditorUILayout::do_box_select(MouseSelectionAction action, Rect2d area) {
 
 		Rect2d r(coordx - 3, coordy - 3, size.w + 6, size.h + 6);
 		if (r.overlaps(area)) {
-			doc->do_mouse_selection(action, e, true);
+			selection->do_selection(action, e);
 		}
 	}
 }
@@ -211,17 +214,18 @@ void EditorUILayout::do_box_select(MouseSelectionAction action, Rect2d area) {
 std::vector<EditorUILayout::obj> EditorUILayout::get_objs() {
 	std::vector<obj> objs;
 	auto& all_objs = eng->get_level()->get_all_objects();
+	View_Setup setup = doc.camera()->get_view_setup();
 	for (auto o : all_objs) {
 		if (Entity* e = o->cast_to<Entity>()) {
 			if (!this_is_a_serializeable_object(e))
 				continue;
 			obj ob;
-			glm::vec3 todir = glm::vec3(e->get_ws_position()) - doc->vs_setup.origin;
+			glm::vec3 todir = glm::vec3(e->get_ws_position()) - setup.origin;
 			float dist = glm::dot(todir, todir);
 			if (dist > 20.0 * 20.0)
 				continue;
 			ob.e = e;
-			glm::vec4 pos = doc->vs_setup.viewproj * glm::vec4(e->get_ws_position(), 1.0);
+			glm::vec4 pos = setup.viewproj * glm::vec4(e->get_ws_position(), 1.0);
 			ob.pos = pos / pos.w;
 
 			if (ob.pos.z < 0)

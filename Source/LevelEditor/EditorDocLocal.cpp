@@ -122,11 +122,35 @@ void EditorDoc::init_new() {
 	eng->get_level()->validate();
 	command_mgr = std::make_unique<UndoRedoSystem>();
 
-
 	command_mgr->on_command_execute_or_undo.add(this, [&]() { set_has_editor_changes(); });
-	gui = std::make_unique<EditorUILayout>(*this);
+
+	// Initialize API implementations
 	selection_state = std::make_unique<SelectionState>(*this);
-	prop_editor = std::make_unique<EdPropertyGrid>(*this, grid_factory);
+	sel_api_impl = std::make_unique<SelectionApiImpl>(selection_state.get());
+	cam_api_impl = std::make_unique<CameraApiImpl>(&ed_cam);
+	doc_api_impl = std::make_unique<DocumentApiImpl>(this);
+	editor_api2 = std::make_unique<EditorApi2Impl>(cam_api_impl.get(), sel_api_impl.get(), doc_api_impl.get());
+
+	gui = std::make_unique<EditorUILayout>(*editor_api2);
+	prop_editor = std::make_unique<EdPropertyGrid>(grid_factory);
+
+	// Connect EdPropertyGrid callbacks to EditorDoc events
+	selection_state->on_selection_changed.add(prop_editor.get(),
+											  [prop_ed = prop_editor.get(), api = sel_api_impl.get()]() {
+												  if (api) {
+													  prop_ed->refresh_grid(*api);
+												  }
+											  });
+	post_node_changes.add(prop_editor.get(), [prop_ed = prop_editor.get(), api = sel_api_impl.get()]() {
+		if (api) {
+			prop_ed->refresh_grid(*api);
+		}
+	});
+	on_close.add(prop_editor.get(), [prop_ed = prop_editor.get()]() { prop_ed->on_close(); });
+	on_component_deleted.add(prop_editor.get(),
+							 [prop_ed = prop_editor.get()](uint64_t comp) { prop_ed->on_ec_deleted(comp); });
+	on_component_created.add(prop_editor.get(),
+							 [prop_ed = prop_editor.get()](Component* c) { prop_ed->on_select_component(c); });
 	manipulate = std::make_unique<ManipulateTransformTool>(*this);
 	drag_drop_preview = std::make_unique<DragDropPreview>();
 	foliage_tool = std::make_unique<FoliagePaintTool>(*this);
@@ -379,7 +403,6 @@ void EditorDoc::check_inputs() {
 	}
 }
 
-
 ConfigVar draw_coords_under_mouse("draw_coords_under_mouse", "0", CVAR_BOOL, "");
 
 void EditorDoc::tick(float dt) {
@@ -400,7 +423,10 @@ void EditorDoc::imgui_draw() {
 	ed_cam.tick(inputs, eng->get_dt());
 	manipulate->check_input(inputs);
 	handle_dragger->tick(inputs);
-	gui->draw(inputs);
+	gui->draw(inputs, [&]() {
+		if (active_mode)
+			active_mode->draw_ui();
+	});
 	active_mode->tick(inputs); // selection,foliage, or decal
 	check_inputs();
 	draw_handles->tick();
@@ -437,7 +463,7 @@ void EditorDoc::imgui_draw() {
 		draw_text("Manipulate Stolen");
 	}
 
-	prop_editor->draw();
+	prop_editor->draw(*sel_api_impl);
 
 	IEditorTool::imgui_draw();
 
@@ -866,7 +892,36 @@ void EntityVisiblityFilter::tick() {
 	do_stuff(SpawnerComponent::StaticType, res);
 	ImGui::End();
 }
-IEditorTool* IEditorTool::create(string mapname)
-{
+IEditorTool* IEditorTool::create(string mapname) {
 	return EditorDoc::create_scene(mapname);
+}
+void ISelectionApi::do_selection(MouseSelectionAction action, std::vector<EntityPtr> ptrs) {
+	if (action == MouseSelectionAction::ADD_SELECT) {
+		for (EntityPtr p : ptrs)
+			add_select(p);
+	} else if (action == MouseSelectionAction::SELECT_ONLY) {
+		clear_selected();
+		for (EntityPtr p : ptrs)
+			add_select(p);
+	} else {
+		for (EntityPtr p : ptrs)
+			remove_select(p);
+	}
+}
+
+void DocumentApiImpl::save() {
+	doc->save();
+}
+
+void DocumentApiImpl::undo() {
+	if (doc->command_mgr)
+		doc->command_mgr->undo();
+}
+
+void DocumentApiImpl::redo() {
+	// TODO: Implement redo when UndoRedoSystem supports it
+}
+
+std::string DocumentApiImpl::get_document_name() const {
+	return doc->get_doc_name();
 }
