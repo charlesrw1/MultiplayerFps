@@ -361,8 +361,8 @@ class AssetCLI(cmd.Cmd):
         return self._get_path_completions(text, line, begidx, endidx, include_files=False, include_dirs=True)
 
     def complete_cat(self, text, line, begidx, endidx):
-        """Tab completion for cat command - files only"""
-        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=False)
+        """Tab completion for cat command - files and dirs for navigation"""
+        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=True)
 
     def complete_cp(self, text, line, begidx, endidx):
         """Tab completion for cp command - all paths"""
@@ -373,81 +373,16 @@ class AssetCLI(cmd.Cmd):
         return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=True)
 
     def complete_trash(self, text, line, begidx, endidx):
-        """Tab completion for trash command - files only"""
-        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=False)
+        """Tab completion for trash command - files and dirs for navigation"""
+        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=True)
 
     def complete_references(self, text, line, begidx, endidx):
-        """Tab completion for references command - files only"""
-        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=False)
+        """Tab completion for references command - files and dirs for navigation"""
+        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=True)
 
     def complete_ls(self, text, line, begidx, endidx):
-        """Tab completion for ls command - shows directories and asset groups, with subdirectory support"""
-        cwd = self.manager.pwd()
-        matches = set()
-
-        try:
-            # Extract the full argument to the ls command
-            # Readline may split on "/" treating it as a word boundary
-            # We need to reconstruct the full path if it was split
-
-            # Start with what readline gave us
-            arg = line[begidx:endidx]
-
-            # Look backward from begidx to find any "/" that marks this as a path
-            # Continue backward until we hit a space (argument boundary) or "/" pattern
-            search_start = begidx - 1
-            while search_start >= 0 and line[search_start] != ' ':
-                if line[search_start] == '/':
-                    # Found a "/" before our text, so this might be part of a path
-                    # Go back to the last space to get the full argument
-                    arg_boundary = search_start - 1
-                    while arg_boundary >= 0 and line[arg_boundary] != ' ':
-                        arg_boundary -= 1
-                    arg_boundary += 1  # Position after the space
-                    arg = line[arg_boundary:endidx]
-                    break
-                search_start -= 1
-
-            # Handle paths with directories (e.g., "models/my<TAB>")
-            if "/" in arg:
-                path_parts = arg.rsplit("/", 1)
-                dir_path = path_parts[0]
-                search_text = path_parts[1] if len(path_parts) > 1 else ""
-                target_dir = cwd / dir_path
-                prefix = dir_path + "/"
-            else:
-                target_dir = cwd
-                search_text = arg
-                prefix = ""
-
-            if not target_dir.is_dir():
-                return []
-
-            # List directories
-            # When arg contains "/", we return only the suffix (the prefix is already typed)
-            # When arg doesn't contain "/", we include the prefix since the prefix is what we're completing
-            if "/" in arg:
-                # Prefix is already on screen, return only the suffix
-                suffix_prefix = ""
-            else:
-                # Prefix needed to complete the word
-                suffix_prefix = prefix
-
-            for item in sorted(target_dir.iterdir()):
-                if item.is_dir() and item.name.startswith(search_text):
-                    matches.add(suffix_prefix + item.name + "/")
-
-            # List asset groups
-            files = [f.name for f in target_dir.iterdir() if f.is_file()]
-            if files:
-                groups = group_files(files)
-                for asset_name in groups.keys():
-                    if asset_name.startswith(search_text):
-                        matches.add(suffix_prefix + asset_name)
-        except (OSError, PermissionError):
-            pass
-
-        return sorted(list(matches))
+        """Tab completion for ls command - directories and asset groups"""
+        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=True)
 
 def main():
     """Main entry point - starts REPL or accepts asset root argument"""

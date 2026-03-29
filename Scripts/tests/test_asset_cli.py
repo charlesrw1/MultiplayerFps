@@ -142,3 +142,24 @@ def test_cp_completion_with_subdirectory(cli_with_test_data):
     assert "weapons/" in completions
     # Should NOT have duplicated paths
     assert not any("models/models" in c for c in completions)
+
+def test_trash_completion_shows_dirs(cli_with_test_data):
+    """Tab completion for trash shows directories for navigation"""
+    completions = cli_with_test_data.complete_trash("", "trash ", 6, 6)
+    assert "models/" in completions
+    assert "materials/" in completions
+
+def test_trash_completion_subdir(cli_with_test_data):
+    """Tab completion for trash navigates into subdirectories"""
+    completions = cli_with_test_data.complete_trash("", "trash models/", 6, 13)
+    assert "sword" in completions or "weapons/" in completions
+
+def test_cat_completion_shows_dirs(cli_with_test_data):
+    """Tab completion for cat shows directories for navigation"""
+    completions = cli_with_test_data.complete_cat("", "cat ", 4, 4)
+    assert "models/" in completions
+
+def test_references_completion_shows_dirs(cli_with_test_data):
+    """Tab completion for references shows directories for navigation"""
+    completions = cli_with_test_data.complete_references("", "references ", 11, 11)
+    assert "models/" in completions
