@@ -113,8 +113,15 @@ class AssetCLI(cmd.Cmd):
 
         src, dst = parts
         try:
-            self.manager.mv(src, dst)
+            updated_refs = self.manager.mv(src, dst)
             print(f"Moved {src} and related files to {dst}")
+
+            if updated_refs:
+                print(f"Updated references in {len(updated_refs)} file(s):")
+                for ref_file in updated_refs:
+                    print(f"  {ref_file}")
+            else:
+                print("No references found to update")
         except (FileNotFoundError, RuntimeError) as e:
             print(f"Error: {e}")
 

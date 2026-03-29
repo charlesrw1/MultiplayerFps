@@ -284,7 +284,7 @@ class AssetManager:
 
         target.mkdir(parents=True, exist_ok=False)
 
-    def mv(self, src: str, dst: str) -> None:
+    def mv(self, src: str, dst: str) -> List[str]:
         """
         Move file and ALL related asset files, then update all references.
         Can accept filename (my_model.glb) or asset name (my_model).
@@ -293,6 +293,7 @@ class AssetManager:
         Or: mv rock models (moves rock into models directory)
         Or: mv models/my_model . (moves my_model from models to current)
         Updates all references to moved files throughout the asset root.
+        Returns list of files that had references updated.
         """
         src_path = self.current_dir / src
         dst_path = Path(dst)
@@ -400,6 +401,7 @@ class AssetManager:
             file_path.rename(new_path)
 
         # Fix references: for each old filename, find references and update them
+        files_with_updated_references = []
         for old_name, new_name in old_to_new.items():
             try:
                 result = subprocess.run(
@@ -418,12 +420,18 @@ class AssetManager:
                                     content = ref_path.read_text()
                                     updated = content.replace(old_name, new_name)
                                     ref_path.write_text(updated)
+                                    # Track this file as having references updated
+                                    rel_path = str(ref_path.relative_to(self.asset_root))
+                                    if rel_path not in files_with_updated_references:
+                                        files_with_updated_references.append(rel_path)
                                 except (IOError, OSError):
                                     # Skip files that can't be read/written
                                     pass
             except (FileNotFoundError, subprocess.TimeoutExpired):
                 # ripgrep not available, skip reference updates for this file
                 pass
+
+        return sorted(files_with_updated_references)
 
     def find_files(self, pattern: str) -> List[str]:
         """
