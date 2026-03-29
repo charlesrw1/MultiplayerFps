@@ -22,15 +22,17 @@ class AssetCLI(cmd.Cmd):
         self.update_prompt()
 
     def update_prompt(self):
-        """Update prompt to show current directory"""
+        """Update prompt to show full path relative to asset root"""
         cwd = self.manager.pwd()
         root = self.manager.asset_root
         try:
             rel = cwd.relative_to(root)
             if rel == Path("."):
+                # At root, show root name only
                 self.prompt = f"{root.name}> "
             else:
-                self.prompt = f"{rel}> "
+                # Show root name + relative path with trailing slash
+                self.prompt = f"{root.name}/{rel}> "
         except ValueError:
             self.prompt = f"{cwd.name}> "
 
