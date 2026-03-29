@@ -151,3 +151,50 @@ def test_trash_file_not_found(temp_asset_dir):
     manager = AssetManager(temp_asset_dir)
     with pytest.raises(FileNotFoundError):
         manager.trash("nonexistent.png")
+
+def test_cat_reads_file(temp_asset_dir):
+    """cat reads and returns file contents"""
+    test_file = temp_asset_dir / "test.txt"
+    test_file.write_text("Hello, World!")
+
+    manager = AssetManager(temp_asset_dir)
+    content = manager.cat("test.txt")
+
+    assert content == "Hello, World!"
+
+def test_cat_file_not_found(temp_asset_dir):
+    """cat raises error if file doesn't exist"""
+    manager = AssetManager(temp_asset_dir)
+    with pytest.raises(FileNotFoundError):
+        manager.cat("nonexistent.txt")
+
+def test_find_references(temp_asset_dir):
+    """find_references returns list of files that reference a given file"""
+    # Create asset
+    (temp_asset_dir / "rock.dds").touch()
+
+    # Create files that reference the asset
+    shader = temp_asset_dir / "shader.glsl"
+    shader.write_text("texture rock.dds\nother content")
+
+    material = temp_asset_dir / "material.mi"
+    material.write_text("baseTexture: rock.dds")
+
+    config = temp_asset_dir / "config.txt"
+    config.write_text("something else")
+
+    manager = AssetManager(temp_asset_dir)
+    refs = manager.find_references("rock.dds")
+
+    assert "shader.glsl" in refs
+    assert "material.mi" in refs
+    assert len(refs) == 2
+
+def test_find_references_returns_empty_if_none(temp_asset_dir):
+    """find_references returns empty list if no references"""
+    (temp_asset_dir / "unused.dds").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    refs = manager.find_references("unused.dds")
+
+    assert refs == []

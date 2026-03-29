@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Optional, List, Dict
 import shutil
+import subprocess
 from asset_types import get_asset_type, get_asset_group, group_files, AssetType
 
 class AssetManager:
@@ -128,3 +129,49 @@ class AssetManager:
 
         for file_path in to_delete:
             file_path.unlink()
+
+    def cat(self, filename: str) -> str:
+        """Read and return file contents"""
+        file_path = self.current_dir / filename
+
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {filename}")
+
+        return file_path.read_text()
+
+    def find_references(self, filename: str) -> List[str]:
+        """
+        Find all files in asset root that reference this file using ripgrep.
+        Returns list of filenames that contain references.
+        Search is scoped to asset_root only.
+        """
+        if not (self.current_dir / filename).exists():
+            raise FileNotFoundError(f"File not found: {filename}")
+
+        # Escape filename for regex, handle backslashes on Windows
+        escaped_name = filename.replace("\\", "\\\\")
+
+        try:
+            result = subprocess.run(
+                ["rg", "--files-with-matches", escaped_name, str(self.asset_root)],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode == 0:
+                # Convert absolute paths to relative filenames
+                refs = []
+                for line in result.stdout.strip().split("\n"):
+                    if line:
+                        ref_path = Path(line)
+                        refs.append(ref_path.name)
+                return refs
+            else:
+                return []
+
+        except FileNotFoundError:
+            # ripgrep not installed
+            raise RuntimeError("ripgrep (rg) is not installed. Install it to use reference finding.")
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Reference search timed out")
