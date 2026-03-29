@@ -182,20 +182,37 @@ class AssetCLI(cmd.Cmd):
         """Don't repeat last command on empty line"""
         pass
 
-    def _get_path_completions(self, text, include_files=True, include_dirs=True):
+    def _get_path_completions(self, text, line, include_files=True, include_dirs=True):
         """Get completion matches for paths, supporting subdirectories.
         For files, shows asset groups (e.g., 'rock' not 'rock.tis', 'rock.png', 'rock.dds')
-        Supports paths with directories: 'models/my<TAB>' suggests files in models/"""
+        Supports paths with directories: 'models/my<TAB>' suggests files in models/
+
+        Args:
+            text: the partial text being completed (might be just last word)
+            line: the full command line
+            include_files: whether to include files/assets
+            include_dirs: whether to include directories
+        """
         cwd = self.manager.pwd()
         matches = set()
 
         try:
+            # Parse the line to get the full argument being completed
+            # For "mv models/my_model", we want to work with the full path
+            parts = line.split()
+            if len(parts) < 2:
+                # Not enough arguments yet
+                return []
+
+            # Get the argument being completed (usually the second part for commands like mv, cp, etc.)
+            full_arg = parts[-1] if text else ""
+
             # Handle paths with directories (e.g., "models/my_model")
-            if "/" in text:
+            if "/" in full_arg:
                 # Split into directory and search text
-                parts = text.rsplit("/", 1)
-                dir_path = parts[0]
-                search_text = parts[1] if len(parts) > 1 else ""
+                path_parts = full_arg.rsplit("/", 1)
+                dir_path = path_parts[0]
+                search_text = path_parts[1] if len(path_parts) > 1 else ""
 
                 # Navigate to the subdirectory
                 target_dir = cwd / dir_path
@@ -245,27 +262,27 @@ class AssetCLI(cmd.Cmd):
 
     def complete_cd(self, text, line, begidx, endidx):
         """Tab completion for cd command - directories only"""
-        return self._get_path_completions(text, include_files=False, include_dirs=True)
+        return self._get_path_completions(text, line, include_files=False, include_dirs=True)
 
     def complete_cat(self, text, line, begidx, endidx):
         """Tab completion for cat command - files only"""
-        return self._get_path_completions(text, include_files=True, include_dirs=False)
+        return self._get_path_completions(text, line, include_files=True, include_dirs=False)
 
     def complete_cp(self, text, line, begidx, endidx):
         """Tab completion for cp command - all paths"""
-        return self._get_path_completions(text, include_files=True, include_dirs=True)
+        return self._get_path_completions(text, line, include_files=True, include_dirs=True)
 
     def complete_mv(self, text, line, begidx, endidx):
         """Tab completion for mv command - all paths"""
-        return self._get_path_completions(text, include_files=True, include_dirs=True)
+        return self._get_path_completions(text, line, include_files=True, include_dirs=True)
 
     def complete_trash(self, text, line, begidx, endidx):
         """Tab completion for trash command - files only"""
-        return self._get_path_completions(text, include_files=True, include_dirs=False)
+        return self._get_path_completions(text, line, include_files=True, include_dirs=False)
 
     def complete_references(self, text, line, begidx, endidx):
         """Tab completion for references command - files only"""
-        return self._get_path_completions(text, include_files=True, include_dirs=False)
+        return self._get_path_completions(text, line, include_files=True, include_dirs=False)
 
     def complete_ls(self, text, line, begidx, endidx):
         """Tab completion for ls command - shows directories and asset groups, with subdirectory support"""
@@ -273,11 +290,18 @@ class AssetCLI(cmd.Cmd):
         matches = set()
 
         try:
+            # Parse the line to get the full argument being completed
+            parts = line.split()
+            if len(parts) < 2:
+                full_arg = ""
+            else:
+                full_arg = parts[-1] if text else ""
+
             # Handle paths with directories (e.g., "models/my<TAB>")
-            if "/" in text:
-                parts = text.rsplit("/", 1)
-                dir_path = parts[0]
-                search_text = parts[1] if len(parts) > 1 else ""
+            if "/" in full_arg:
+                path_parts = full_arg.rsplit("/", 1)
+                dir_path = path_parts[0]
+                search_text = path_parts[1] if len(path_parts) > 1 else ""
                 target_dir = cwd / dir_path
                 prefix = dir_path + "/"
             else:
