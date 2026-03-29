@@ -25,6 +25,49 @@ class AssetManager:
         ext = Path(filename).suffix.lower()
         return ext in self.VALID_REFERENCE_FORMATS
 
+    def _smart_replace(self, content: str, old_str: str, new_str: str) -> str:
+        """
+        Replace old_str with new_str only if old_str is surrounded by quotes or spaces.
+        This prevents catastrophic breakage of paths by replacing substrings in the middle of other paths.
+
+        Valid replacements:
+        - 'path:"old_str"' -> 'path:"new_str"'
+        - 'path: old_str ' -> 'path: new_str '
+        - ' old_str ' -> ' new_str '
+        - 'old_str ' (at start) -> 'new_str '
+        - ' old_str' (at end) -> ' new_str'
+
+        Invalid (won't be replaced):
+        - 'some/path/old_str/more' -> stays as is
+        - 'prefixold_strsuffix' -> stays as is
+        """
+        result = []
+        i = 0
+        old_len = len(old_str)
+
+        while i < len(content):
+            # Try to find old_str at position i
+            if content[i:i+old_len] == old_str:
+                # Check if it's surrounded by valid context
+                # Before: start of string or quote/space
+                before_ok = i == 0 or content[i-1] in {'"', ' ', '\n', '\t'}
+                # After: end of string or quote/space
+                after_ok = i + old_len >= len(content) or content[i+old_len] in {'"', ' ', '\n', '\t'}
+
+                if before_ok and after_ok:
+                    # Valid context - replace
+                    result.append(new_str)
+                    i += old_len
+                else:
+                    # Invalid context - keep original
+                    result.append(content[i])
+                    i += 1
+            else:
+                result.append(content[i])
+                i += 1
+
+        return ''.join(result)
+
     def pwd(self) -> Path:
         """Print working directory"""
         return self.current_dir
@@ -426,14 +469,27 @@ class AssetManager:
         # Fix references: for each old filename, find references and update them
         # Only update references that match valid reference formats (.cmdl, .dds, .mm, .mi, .tmap)
         files_with_updated_references = []
+
+        # Build a mapping of old paths to new paths for reference updates
+        # We need to handle both the old filename and the old full path
+        old_paths_to_new = {}
         for old_name, new_name in old_to_new.items():
+            # Calculate the old path from asset_root to the file
+            old_relative_path = str(src_dir.relative_to(self.asset_root) / old_name).replace("\\", "/")
+            old_paths_to_new[old_relative_path] = new_name
+            # Also map the filename alone for cases where it's referenced without path
+            old_paths_to_new[old_name] = new_name
+
+        for search_str, replace_str in old_paths_to_new.items():
             # Only process files in valid reference formats
+            # Check using the simple filename (old_name)
+            old_name = Path(search_str).name
             if not self._is_valid_reference_format(old_name):
                 continue
 
             try:
                 result = subprocess.run(
-                    ["rg", "--files-with-matches", old_name, str(self.asset_root)],
+                    ["rg", "--files-with-matches", search_str, str(self.asset_root)],
                     capture_output=True,
                     text=True,
                     timeout=30
@@ -446,11 +502,9 @@ class AssetManager:
                             if ref_path.exists() and ref_path not in files_to_move:
                                 try:
                                     content = ref_path.read_text()
-                                    # Only replace the exact filename in valid format
-                                    # This ensures we only update proper references like:
-                                    # "my_model.cmdl", "my_texture.dds", "my_mat.mm", etc.
-                                    # NOT invalid references like "my_model" or "my_model.glb"
-                                    updated = content.replace(old_name, new_name)
+                                    # Use smart replacement: only replace if surrounded by quotes or spaces
+                                    # This prevents catastrophic breakage from replacing substrings in paths
+                                    updated = self._smart_replace(content, search_str, replace_str)
 
                                     if updated != content:  # Only write if something changed
                                         ref_path.write_text(updated)

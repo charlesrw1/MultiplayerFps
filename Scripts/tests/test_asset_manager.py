@@ -567,3 +567,29 @@ def test_find_assets_glob_still_works(temp_asset_dir):
     assert len(results) == 2
     asset_names = {r["asset"] for r in results}
     assert asset_names == {"rock", "sword"}
+
+def test_mv_updates_quoted_references_from_subdir_to_root(temp_asset_dir):
+    """mv updates references with quoted paths when moving from subdirectory to root"""
+    # Initialize files
+    materials_dir = temp_asset_dir / "materials"
+    materials_dir.mkdir()
+    (materials_dir / "my_material.mm").write_text("master material")
+
+    # Create map file with quoted reference to material in subdirectory
+    (temp_asset_dir / "my_map.tmap").write_text('some_material:"materials/my_material.mm"')
+
+    manager = AssetManager(temp_asset_dir)
+    # Move material from subdirectory to root
+    updated_refs = manager.mv("materials/my_material.mm", ".")
+
+    # Verify file was moved
+    assert not (materials_dir / "my_material.mm").exists()
+    assert (temp_asset_dir / "my_material.mm").exists()
+
+    # Verify reference was updated from quoted path to new location
+    map_content = (temp_asset_dir / "my_map.tmap").read_text()
+    assert 'some_material:"my_material.mm"' in map_content
+    assert 'some_material:"materials/my_material.mm"' not in map_content
+
+    # Verify the file with updated reference was tracked
+    assert "my_map.tmap" in updated_refs
