@@ -287,18 +287,42 @@ class AssetManager:
     def mv(self, src: str, dst: str) -> None:
         """
         Move file and ALL related asset files, then update all references.
-        For example, moving rock.png also moves rock.tis and rock.dds to stone.tis/png/dds.
-        Or: mv rock materials (moves rock into materials directory keeping same name)
+        Can accept filename (my_model.glb) or asset name (my_model).
+        For example: mv rock stone (renames rock.* to stone.*)
+        Or: mv rock materials (moves rock into materials directory)
         Updates all references to moved files throughout the asset root.
         """
         src_path = self.current_dir / src
         dst_path = Path(dst)
 
-        if not src_path.exists():
-            raise FileNotFoundError(f"File not found: {src}")
+        # Check if src is a filename or asset name
+        if src_path.exists() and src_path.is_file():
+            # It's a filename that exists
+            asset_type = get_asset_type(src)
+            src_group = get_asset_group(src)
+        else:
+            # Try to find as asset name
+            asset_type = get_asset_type(src)
+            src_group = get_asset_group(src)
 
-        asset_type = get_asset_type(src)
-        src_group = get_asset_group(src)
+            # If not a known file type, try as asset name
+            if asset_type is None:
+                src_group = src
+                # Find the asset group to determine type
+                all_files = [f.name for f in self.current_dir.iterdir() if f.is_file()]
+                groups = group_files(all_files)
+                if src_group in groups:
+                    asset_type = groups[src_group]["type"]
+                else:
+                    raise FileNotFoundError(f"File or asset not found: {src}")
+            else:
+                # Known type but file doesn't exist - try to find related files
+                all_files = [f.name for f in self.current_dir.iterdir() if f.is_file()]
+                groups = group_files(all_files)
+                if src_group not in groups:
+                    raise FileNotFoundError(f"File or asset not found: {src}")
+
+        # Now we have asset_type and src_group, continue with the move
 
         # If dst is a directory, move into it with same name; otherwise it's a rename
         dst_dir = self.current_dir / dst if not dst_path.is_absolute() else dst_path
