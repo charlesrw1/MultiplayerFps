@@ -103,6 +103,7 @@
     <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
     <ClCompile Include="Source\Game\Components\ParticleComponent.cpp" />
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
+    <ClCompile Include="Source\Game\Components\PrefabAssetComponent.cpp" />
     <ClCompile Include="Source\Game\Components\RagdollComponent.cpp" />
     <ClCompile Include="Source\Game\Components\SpawnerComponenth.cpp" />
     <ClCompile Include="Source\Game\Entities\BikeEntity.cpp" />
@@ -113,6 +114,7 @@
     <ClCompile Include="Source\Game\EntityComponent.cpp" />
     <ClCompile Include="Source\Game\Game.cpp" />
     <ClCompile Include="Source\Game\LevelAssets.cpp" />
+    <ClCompile Include="Source\Game\Prefab.cpp" />
     <ClCompile Include="Source\Game\TopDownShooter\TopDownPlayer.cpp" />
     <ClCompile Include="Source\Game\TopDownShooter\TopDownShooterGame.cpp" />
     <ClCompile Include="Source\Game\TP\TPGame.cpp" />
@@ -301,8 +303,10 @@
     <ClInclude Include="Source\Game\Components\MeshbuilderComponent.h" />
     <ClInclude Include="Source\Game\Components\MeshComponent.h" />
     <ClInclude Include="Source\Game\Components\PhysicsComponents.h" />
+    <ClInclude Include="Source\Game\Components\PrefabAssetComponent.h" />
     <ClInclude Include="Source\Debug.h" />
     <ClInclude Include="Source\Game\LevelAssets.h" />
+    <ClInclude Include="Source\Game\Prefab.h" />
     <ClInclude Include="Source\Game\TopDownShooter\TopDownShooterGame.h" />
     <ClInclude Include="Source\LevelEditor\Commands.h" />
     <ClInclude Include="Source\LevelEditor\EditorDocLocal.h" />

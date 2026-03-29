@@ -301,4 +301,36 @@ public:
 	int setTo = 0;
 };
 
+class InstantiatePrefabCommand : public Command
+{
+public:
+	EditorDoc& ed_doc;
+	InstantiatePrefabCommand(EditorDoc& ed_doc, const std::string& prefab_path, const glm::mat4& transform);
+	bool is_valid() final { return !prefab_path.empty(); }
+
+	void execute() final;
+	void undo() final;
+	std::string to_string() final { return "Instantiate Prefab"; }
+
+	std::string prefab_path;
+	glm::mat4 transform;
+	std::vector<EntityPtr> handles;
+};
+
+class MakePrefabFromSelectionCommand : public Command
+{
+public:
+	EditorDoc& ed_doc;
+	MakePrefabFromSelectionCommand(EditorDoc& ed_doc, const std::vector<EntityPtr>& selection, const std::string& save_path);
+	bool is_valid() final { return !save_path.empty() && !selection.empty(); }
+
+	void execute() final;
+	void undo() final;
+	std::string to_string() final { return "Make Prefab From Selection"; }
+
+	std::string save_path;
+	std::vector<EntityPtr> selection;
+	std::unique_ptr<SerializedSceneFile> prefab_text;
+};
+
 #endif

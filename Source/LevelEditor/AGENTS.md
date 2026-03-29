@@ -39,6 +39,8 @@ Undo/redo stack using the command pattern.
 - Commands wrap mutations: move entity, change property value, add/remove component, etc.
 - `EditorDocLocal` calls `push_command(cmd)` to execute and record
 - Ctrl+Z / Ctrl+Y undo/redo
+- `InstantiatePrefabCommand` — Spawn entities from a `.tprefab` file at a transform; undoable
+- `MakePrefabFromSelectionCommand` — Serialize selected entities to a `.tprefab` file
 
 ### `SelectionState` (SelectionState.h)
 Tracks the current editor selection.

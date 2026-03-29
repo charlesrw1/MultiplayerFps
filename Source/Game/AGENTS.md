@@ -11,6 +11,7 @@ Entity-component system, game logic, player controllers, physics integration, an
 - `BaseUpdater.h/cpp` — Base class providing `update()` scheduling
 - `Game.cpp` — Main game loop integration
 - `LevelAssets.h/cpp` — Level asset loading and management
+- `Prefab.h/cpp` — `PrefabFile` helper for reading/writing `.tprefab` files; `PrefabAssetMetadata` for asset browser registration
 
 ### Components (`Components/`)
 - `MeshComponent` — Attaches a `Model` + `Material` to an entity; registers with `RenderScenePublic`
@@ -28,6 +29,7 @@ Entity-component system, game logic, player controllers, physics integration, an
 - `SpawnerComponent` — Runtime entity spawning
 - `MeshbuilderComponent` — Debug/procedural mesh drawing via `MeshBuilder`
 - `GraphCurveComponent` — In-world curve graph visualization
+- `PrefabAssetComponent` — Loads and spawns entities from a `.tprefab` file as children at runtime
 
 ### Entities (`Entities/`)
 - `Player` — Player character entity

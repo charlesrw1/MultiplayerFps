@@ -3,6 +3,8 @@
 #include <unordered_set>
 #include "Framework/MapUtil.h"
 #include "EditorDocLocal.h"
+#include "Game/Prefab.h"
+#include "glm/glm.hpp"
 void validate_remove_entities(EditorDoc& ed_doc, std::vector<EntityPtr>& input) {
 	bool had_errors = false;
 	for (int i = 0; i < input.size(); i++) {
@@ -517,4 +519,85 @@ void CreateEntityCommand::execute() {
 	Entity* e = doc.spawn_entity();
 	ptr = e;
 	post_create(e);
+}
+
+InstantiatePrefabCommand::InstantiatePrefabCommand(EditorDoc& ed_doc, const std::string& prefab_path,
+	const glm::mat4& transform)
+	: ed_doc(ed_doc), prefab_path(prefab_path), transform(transform) {}
+
+void InstantiatePrefabCommand::execute() {
+	std::string text = PrefabFile::load_text(prefab_path);
+	if (text.empty()) {
+		sys_print(Warning, "Failed to load prefab: %s\n", prefab_path.c_str());
+		return;
+	}
+
+	try {
+		UnserializedSceneFile unserialized = unserialize_entities_from_text("instantiate_prefab", text,
+			AssetDatabase::loader, false);
+
+		ed_doc.insert_unserialized_into_scene(unserialized);
+
+		// Collect and store entity handles for undo
+		// Apply transform offset to root entities
+		for (auto base : unserialized.all_obj_vec) {
+			if (auto entity = dynamic_cast<Entity*>(base)) {
+				if (!entity->get_parent()) {
+					// Root entity: apply transform
+					entity->set_ws_transform(transform);
+				}
+				handles.push_back(entity->get_self_ptr());
+			}
+		}
+	} catch (const std::exception& e) {
+		sys_print(Warning, "Failed to deserialize prefab %s: %s\n", prefab_path.c_str(), e.what());
+	}
+}
+
+void InstantiatePrefabCommand::undo() {
+	for (auto& h : handles) {
+		if (auto entity = h.get()) {
+			entity->destroy();
+		}
+	}
+	handles.clear();
+}
+
+MakePrefabFromSelectionCommand::MakePrefabFromSelectionCommand(EditorDoc& ed_doc,
+	const std::vector<EntityPtr>& selection, const std::string& save_path)
+	: ed_doc(ed_doc), save_path(save_path), selection(selection) {}
+
+void MakePrefabFromSelectionCommand::execute() {
+	std::vector<Entity*> entities;
+	for (auto& ptr : selection) {
+		if (auto entity = ptr.get()) {
+			entities.push_back(entity);
+		}
+	}
+
+	if (entities.empty()) {
+		sys_print(Warning, "No entities to save to prefab\n");
+		return;
+	}
+
+	// Serialize entities to text (no IDs - fresh instantiation)
+	try {
+		auto serialized = NewSerialization::serialize_to_text("make_prefab", entities, false);
+		prefab_text = std::make_unique<SerializedSceneFile>(serialized);
+
+		// Save to file
+		if (!PrefabFile::save_text(save_path, serialized.text)) {
+			sys_print(Warning, "Failed to save prefab to: %s\n", save_path.c_str());
+			prefab_text = nullptr;
+		}
+	} catch (const std::exception& e) {
+		sys_print(Warning, "Failed to serialize prefab: %s\n", e.what());
+	}
+}
+
+void MakePrefabFromSelectionCommand::undo() {
+	// Note: File undo is not easily reversible, so we just log it.
+	// In a more robust system, we might want to back up the original file first.
+	sys_print(Info, "Undo make prefab: file %s persists (manual deletion needed if unwanted)\n",
+		save_path.c_str());
 }
