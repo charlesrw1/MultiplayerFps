@@ -48,42 +48,50 @@ class AssetManager:
         return [grouped[key] for key in sorted(grouped.keys())]
 
     def format_ls(self) -> str:
-        """Format ls output for display - shows one file per asset"""
-        assets = self.ls()
-        if not assets:
-            return ""
+        """Format ls output in 2-column layout with colors for folders and assets"""
+        cwd = self.pwd()
 
-        lines = []
+        # Collect directories and assets
+        items = []
+
+        try:
+            # Get all items in current directory
+            for item in sorted(cwd.iterdir()):
+                if item.is_dir():
+                    items.append(("dir", item.name, None))
+        except (OSError, PermissionError):
+            pass
+
+        # Get assets from ls()
+        assets = self.ls()
         for asset in assets:
             type_str = asset["type"].value.upper()
-            # Pick one representative file per asset type
-            files = sorted(asset["files"])
-            representative_file = self._pick_representative_file(asset["type"], files)
-            lines.append(f"{asset['asset']} [{type_str}] {representative_file}")
+            items.append(("asset", asset["asset"], type_str))
+
+        if not items:
+            return ""
+
+        # Format as 2 columns with colors
+        # ANSI colors
+        BLUE = "\033[34m"      # Directories
+        GREEN = "\033[32m"     # Assets
+        RESET = "\033[0m"
+
+        lines = []
+        # Calculate column width based on longest name
+        max_name_len = max(len(item[1]) for item in items) + 2
+
+        for item_type, name, type_str in items:
+            if item_type == "dir":
+                # Directory: blue with [DIR] label
+                colored_name = f"{BLUE}{name:<{max_name_len}}{RESET}"
+                lines.append(f"{colored_name} {BLUE}[DIR]{RESET}")
+            else:
+                # Asset: green with type
+                colored_name = f"{GREEN}{name:<{max_name_len}}{RESET}"
+                lines.append(f"{colored_name} {type_str}")
 
         return "\n".join(lines)
-
-    def _pick_representative_file(self, asset_type: AssetType, files: List[str]) -> str:
-        """Pick one representative file for an asset group"""
-        # Prefer source files over import settings or compiled versions
-        source_priority = {
-            AssetType.TEXTURE: [".png", ".jpeg", ".hdr"],  # source files first
-            AssetType.MODEL: [".glb"],  # source file
-            AssetType.MAP: [".tmap"],
-            AssetType.MATERIAL: [".glsl", ".mm"],  # source files
-        }
-
-        # Get priority list for this asset type
-        priorities = source_priority.get(asset_type, [])
-
-        # Return first file matching the priority
-        for ext in priorities:
-            for f in files:
-                if f.endswith(ext):
-                    return f
-
-        # If no priority match, return first file
-        return files[0] if files else ""
 
     def cp(self, src: str, dst: str) -> None:
         """
