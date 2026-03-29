@@ -164,8 +164,9 @@ class AssetCLI(cmd.Cmd):
             print(f"Error: {e}")
 
     def do_find(self, arg):
-        """Find files matching a pattern: find <pattern>
+        """Find assets matching a pattern: find <pattern>
         Supports wildcards: * (any chars), ? (single char)
+        Shows results in 2-column format like ls (asset name and type)
         Examples: find "*.png", find "sword*", find "models/*"
         """
         if not arg:
@@ -177,13 +178,46 @@ class AssetCLI(cmd.Cmd):
             return
 
         try:
-            results = self.manager.find_files(arg)
+            results = self.manager.find_assets(arg)
             if results:
-                print(f"Found {len(results)} file(s):")
-                for result in results:
-                    print(f"  {result}")
+                # Format output like ls with 2-column layout
+                # ANSI colors
+                GREEN = "\033[32m"     # Assets
+                RESET = "\033[0m"
+
+                lines = []
+                # Calculate column width based on longest asset path
+                max_name_len = max(len(asset.get("path", asset["asset"])) for asset in results) + 2
+
+                for asset in results:
+                    asset_path = asset.get("path", asset["asset"])
+                    type_str = asset["type"].value.upper()
+
+                    # For materials, show if it's .mi or .mm
+                    if type_str == "MATERIAL":
+                        # Check if this is an instance or master material
+                        asset_group = asset["asset"]
+                        target_dir = self.manager.pwd()
+                        # Try to determine the directory from the path
+                        if "/" in asset_path:
+                            dir_part = asset_path.rsplit("/", 1)[0]
+                            target_dir = self.manager.asset_root / dir_part
+
+                        mi_file = target_dir / (asset_group + ".mi")
+                        mm_file = target_dir / (asset_group + ".mm")
+
+                        if mi_file.exists():
+                            type_str = "MATERIAL (instance)"
+                        elif mm_file.exists():
+                            type_str = "MATERIAL (master)"
+
+                    colored_name = f"{GREEN}{asset_path:<{max_name_len}}{RESET}"
+                    lines.append(f"{colored_name} {type_str}")
+
+                print(f"Found {len(results)} asset(s):")
+                print("\n".join(lines))
             else:
-                print(f"No files matching: {arg}")
+                print(f"No assets matching: {arg}")
         except Exception as e:
             print(f"Error: {e}")
 

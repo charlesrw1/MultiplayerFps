@@ -369,3 +369,78 @@ def test_find_files_wildcard_question_mark(temp_asset_dir):
     assert len(results) == 1
     assert "rock.png" in results
     assert "ro.png" not in results
+
+def test_find_assets_groups_files(temp_asset_dir):
+    """find_assets returns assets grouped, not individual files"""
+    # Create a texture asset with multiple files
+    (temp_asset_dir / "rock.tis").touch()
+    (temp_asset_dir / "rock.png").touch()
+    (temp_asset_dir / "rock.dds").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    results = manager.find_assets("rock*")
+
+    # Should return only 1 asset, not 3 files
+    assert len(results) == 1
+    assert results[0]["asset"] == "rock"
+    assert results[0]["type"].value == "texture"
+    # Should contain all related files
+    assert "rock.tis" in results[0]["files"]
+    assert "rock.png" in results[0]["files"]
+    assert "rock.dds" in results[0]["files"]
+
+def test_find_assets_with_subdirectories(temp_asset_dir):
+    """find_assets returns assets in subdirectories with correct paths"""
+    models_dir = temp_asset_dir / "models" / "weapons"
+    models_dir.mkdir(parents=True)
+
+    (models_dir / "sword.mis").touch()
+    (models_dir / "sword.glb").touch()
+    (models_dir / "sword.cmdl").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    results = manager.find_assets("models/*")
+
+    assert len(results) == 1
+    assert results[0]["asset"] == "sword"
+    assert results[0]["path"] == "models/weapons/sword"
+    assert results[0]["type"].value == "model"
+
+def test_find_assets_multiple_assets(temp_asset_dir):
+    """find_assets returns multiple assets without duplication"""
+    models_dir = temp_asset_dir / "models"
+    models_dir.mkdir()
+
+    (models_dir / "my_model.mis").touch()
+    (models_dir / "my_model.glb").touch()
+    (models_dir / "sword.mis").touch()
+    (models_dir / "sword.glb").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    results = manager.find_assets("models/*")
+
+    # Should return 2 assets, not 4 files
+    assert len(results) == 2
+    asset_names = {r["asset"] for r in results}
+    assert asset_names == {"my_model", "sword"}
+
+def test_find_assets_by_extension(temp_asset_dir):
+    """find_assets finds assets by file extension pattern"""
+    (temp_asset_dir / "rock.png").touch()
+    (temp_asset_dir / "sword.glb").touch()
+    (temp_asset_dir / "config.txt").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    results = manager.find_assets("*.png")
+
+    assert len(results) == 1
+    assert results[0]["asset"] == "rock"
+
+def test_find_assets_empty_result(temp_asset_dir):
+    """find_assets returns empty list if no matches"""
+    (temp_asset_dir / "rock.png").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    results = manager.find_assets("*.dds")
+
+    assert results == []

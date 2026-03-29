@@ -452,3 +452,63 @@ class AssetManager:
                     matches.append(rel_path_str)
 
         return sorted(matches)
+
+    def find_assets(self, pattern: str) -> List[Dict]:
+        """
+        Find assets matching a pattern, grouped by asset name.
+        Returns list of asset info dicts with 'asset', 'type', 'files', and 'path' keys.
+        Similar to ls() but searches across subdirectories.
+        """
+        import fnmatch
+        import os
+
+        pattern_lower = pattern.lower()
+        assets = []
+        asset_names_seen = set()
+
+        # Walk through all directories
+        for root, dirs, files in os.walk(self.asset_root):
+            rel_dir = Path(root).relative_to(self.asset_root)
+            rel_dir_str = str(rel_dir) if str(rel_dir) != "." else ""
+
+            # Group files in this directory
+            file_names = [f for f in files]
+            if not file_names:
+                continue
+
+            try:
+                grouped = group_files(file_names)
+
+                # Check each asset to see if any of its files match the pattern
+                for asset_name in sorted(grouped.keys()):
+                    asset_info = grouped[asset_name]
+                    matches_pattern = False
+
+                    # Check if any file in this asset matches the pattern
+                    for file_name in asset_info.get("files", []):
+                        full_path_str = f"{rel_dir_str}/{file_name}" if rel_dir_str else file_name
+
+                        # Case-insensitive matching
+                        if fnmatch.fnmatch(file_name.lower(), pattern_lower) or \
+                           fnmatch.fnmatch(full_path_str.lower(), pattern_lower):
+                            matches_pattern = True
+                            break
+
+                    if matches_pattern:
+                        # Create unique key for this asset
+                        if rel_dir_str:
+                            asset_key = f"{rel_dir_str}/{asset_name}"
+                            display_path = asset_key
+                        else:
+                            asset_key = asset_name
+                            display_path = asset_name
+
+                        if asset_key not in asset_names_seen:
+                            asset_names_seen.add(asset_key)
+                            asset_info_copy = asset_info.copy()
+                            asset_info_copy["path"] = display_path
+                            assets.append(asset_info_copy)
+            except (OSError, PermissionError):
+                pass
+
+        return sorted(assets, key=lambda a: a.get("path", a["asset"]))
