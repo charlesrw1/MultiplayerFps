@@ -199,28 +199,27 @@ class AssetCLI(cmd.Cmd):
         matches = set()
 
         try:
-            # Extract the full argument to the command by parsing the line
-            # This handles cases where "/" causes readline to split into separate words
-            # line format: "<command> <arg1> [<arg2>]"
-            # We need to find which argument position we're completing
+            # Extract the full argument to the command
+            # Readline may split on "/" treating it as a word boundary
+            # We need to reconstruct the full path if it was split
 
-            # Split the line to identify the command
-            parts = line.split()
-            if not parts:
-                return []
+            # Start with what readline gave us
+            full_arg = line[begidx:endidx]
 
-            cmd = parts[0]  # e.g., "mv", "cp", "cd", etc.
-
-            # Find where the command ends and arguments begin
-            cmd_start = line.find(cmd)
-            arg_start = cmd_start + len(cmd)
-            # Skip whitespace after command
-            while arg_start < len(line) and line[arg_start] == ' ':
-                arg_start += 1
-
-            # Extract the text from arg_start to the cursor (endidx)
-            # This gives us the full path being completed, including any "/"
-            full_arg = line[arg_start:endidx]
+            # Look backward from begidx to find any "/" that marks this as a path
+            # Continue backward until we hit a space (argument boundary) or "/" pattern
+            search_start = begidx - 1
+            while search_start >= 0 and line[search_start] != ' ':
+                if line[search_start] == '/':
+                    # Found a "/" before our text, so this might be part of a path
+                    # Go back to the last space to get the full argument
+                    arg_boundary = search_start - 1
+                    while arg_boundary >= 0 and line[arg_boundary] != ' ':
+                        arg_boundary -= 1
+                    arg_boundary += 1  # Position after the space
+                    full_arg = line[arg_boundary:endidx]
+                    break
+                search_start -= 1
 
             # Handle paths with directories (e.g., "models/my_model")
             if "/" in full_arg:
@@ -251,24 +250,33 @@ class AssetCLI(cmd.Cmd):
                 elif item.is_file():
                     files.append(item.name)
 
+            # When full_arg contains "/", we return only the suffix (the prefix is already typed)
+            # When full_arg doesn't contain "/", we include the prefix since the prefix is what we're completing
+            if "/" in full_arg:
+                # Prefix is already on screen, return only the suffix
+                suffix_prefix = ""
+            else:
+                # Prefix needed to complete the word
+                suffix_prefix = prefix
+
             # Add directories
             if include_dirs:
                 for dirname in dirs:
                     if dirname.startswith(search_text):
-                        matches.add(prefix + dirname + "/")
+                        matches.add(suffix_prefix + dirname + "/")
 
             # For files, show asset groups instead of individual files
             if include_files and files:
                 groups = group_files(files)
                 for asset_name in groups.keys():
                     if asset_name.startswith(search_text):
-                        matches.add(prefix + asset_name)
+                        matches.add(suffix_prefix + asset_name)
 
                 # If no asset groups match, fall back to non-asset files
-                if not any(m.startswith(prefix) for m in matches if not m.endswith("/")):
+                if not any(m.startswith(suffix_prefix) for m in matches if not m.endswith("/")):
                     for filename in files:
                         if filename.startswith(search_text) and get_asset_type(filename) is None:
-                            matches.add(prefix + filename)
+                            matches.add(suffix_prefix + filename)
 
         except (OSError, PermissionError):
             pass
@@ -306,21 +314,26 @@ class AssetCLI(cmd.Cmd):
 
         try:
             # Extract the full argument to the ls command
-            # line format: "ls <arg>"
-            # Split on first whitespace to get command and argument parts
-            parts = line.split(None, 1)
-            if len(parts) < 2:
-                arg = ""
-            else:
-                # Find where the argument starts in the line
-                cmd = parts[0]  # "ls"
-                cmd_start = line.find(cmd)
-                arg_start = cmd_start + len(cmd)
-                # Skip whitespace after command
-                while arg_start < len(line) and line[arg_start] == ' ':
-                    arg_start += 1
-                # Argument is from arg_start to cursor position (endidx)
-                arg = line[arg_start:endidx]
+            # Readline may split on "/" treating it as a word boundary
+            # We need to reconstruct the full path if it was split
+
+            # Start with what readline gave us
+            arg = line[begidx:endidx]
+
+            # Look backward from begidx to find any "/" that marks this as a path
+            # Continue backward until we hit a space (argument boundary) or "/" pattern
+            search_start = begidx - 1
+            while search_start >= 0 and line[search_start] != ' ':
+                if line[search_start] == '/':
+                    # Found a "/" before our text, so this might be part of a path
+                    # Go back to the last space to get the full argument
+                    arg_boundary = search_start - 1
+                    while arg_boundary >= 0 and line[arg_boundary] != ' ':
+                        arg_boundary -= 1
+                    arg_boundary += 1  # Position after the space
+                    arg = line[arg_boundary:endidx]
+                    break
+                search_start -= 1
 
             # Handle paths with directories (e.g., "models/my<TAB>")
             if "/" in arg:
@@ -338,9 +351,18 @@ class AssetCLI(cmd.Cmd):
                 return []
 
             # List directories
+            # When arg contains "/", we return only the suffix (the prefix is already typed)
+            # When arg doesn't contain "/", we include the prefix since the prefix is what we're completing
+            if "/" in arg:
+                # Prefix is already on screen, return only the suffix
+                suffix_prefix = ""
+            else:
+                # Prefix needed to complete the word
+                suffix_prefix = prefix
+
             for item in sorted(target_dir.iterdir()):
                 if item.is_dir() and item.name.startswith(search_text):
-                    matches.add(prefix + item.name + "/")
+                    matches.add(suffix_prefix + item.name + "/")
 
             # List asset groups
             files = [f.name for f in target_dir.iterdir() if f.is_file()]
@@ -348,7 +370,7 @@ class AssetCLI(cmd.Cmd):
                 groups = group_files(files)
                 for asset_name in groups.keys():
                     if asset_name.startswith(search_text):
-                        matches.add(prefix + asset_name)
+                        matches.add(suffix_prefix + asset_name)
         except (OSError, PermissionError):
             pass
 
