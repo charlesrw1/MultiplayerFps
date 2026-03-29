@@ -10,6 +10,27 @@
 #include "AssetRegistryLocal.h"
 
 #include "AssetDatabase.h"
+
+// Case-insensitive substring search without allocations
+static inline bool contains_case_insensitive(std::string_view haystack, std::string_view needle) {
+	if (needle.empty())
+		return true;
+	if (haystack.size() < needle.size())
+		return false;
+
+	for (size_t i = 0; i <= haystack.size() - needle.size(); ++i) {
+		bool match = true;
+		for (size_t j = 0; j < needle.size(); ++j) {
+			if (tolower(haystack[i + j]) != tolower(needle[j])) {
+				match = false;
+				break;
+			}
+		}
+		if (match)
+			return true;
+	}
+	return false;
+}
 AssetBrowser::AssetBrowser() {
 	asset_name_filter[0] = 0;
 	folder_closed = g_assets.find_global_sync<Texture>("eng/editor/folder_closed.png").get();
@@ -46,15 +67,14 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 			if (!b->should_type_show(1 << asset.type->self_index)) {
 				continue;
 			}
-			if (!b->filter_match_case && name_filter_len > 0) {
-				std::string path = asset.filename;
-				for (int i = 0; i < path.size(); i++)
-					path[i] = tolower(path[i]);
-				if (path.find(b->all_lower_cast_filter_name, 0) == std::string::npos)
-					continue;
-			} else if (name_filter_len > 0) {
-				if (asset.filename.find(b->asset_name_filter) == std::string::npos)
-					continue;
+			if (name_filter_len > 0) {
+				if (b->filter_match_case) {
+					if (asset.filename.find(b->asset_name_filter) == std::string::npos)
+						continue;
+				} else {
+					if (!contains_case_insensitive(asset.filename, b->all_lower_cast_filter_name))
+						continue;
+				}
 			}
 
 			ImGui::PushID(node);
@@ -241,15 +261,14 @@ static void draw_browser_tree_view(AssetBrowser* b) {
 		if (!b->should_type_show(1 << asset.type->self_index)) {
 			continue;
 		}
-		if (!b->filter_match_case && name_filter_len > 0) {
-			std::string path = asset.filename;
-			for (int i = 0; i < path.size(); i++)
-				path[i] = tolower(path[i]);
-			if (path.find(b->all_lower_cast_filter_name, 0) == std::string::npos)
-				continue;
-		} else if (name_filter_len > 0) {
-			if (asset.filename.find(b->asset_name_filter) == std::string::npos)
-				continue;
+		if (name_filter_len > 0) {
+			if (b->filter_match_case) {
+				if (asset.filename.find(b->asset_name_filter) == std::string::npos)
+					continue;
+			} else {
+				if (!contains_case_insensitive(asset.filename, b->all_lower_cast_filter_name))
+					continue;
+			}
 		}
 		linear2.push_back(node);
 	}
@@ -352,15 +371,14 @@ void AssetBrowser::draw_browser_grid() {
 			if (!should_type_show(1 << asset.type->self_index))
 				continue;
 			// Check name filter
-			if (!filter_match_case && name_filter_len > 0) {
-				std::string path = asset.filename;
-				for (int i = 0; i < path.size(); i++)
-					path[i] = tolower(path[i]);
-				if (path.find(all_lower_cast_filter_name, 0) == std::string::npos)
-					continue;
-			} else if (name_filter_len > 0) {
-				if (asset.filename.find(asset_name_filter) == std::string::npos)
-					continue;
+			if (name_filter_len > 0) {
+				if (filter_match_case) {
+					if (asset.filename.find(asset_name_filter) == std::string::npos)
+						continue;
+				} else {
+					if (!contains_case_insensitive(asset.filename, all_lower_cast_filter_name))
+						continue;
+				}
 			}
 			// Only add to items2, don't load thumbnails yet
 			items2.push_back(c);
