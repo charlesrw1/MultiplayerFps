@@ -198,3 +198,84 @@ def test_find_references_returns_empty_if_none(temp_asset_dir):
     refs = manager.find_references("unused.dds")
 
     assert refs == []
+
+def test_mv_moves_file(temp_asset_dir):
+    """mv moves file to new location"""
+    (temp_asset_dir / "old.txt").write_text("content")
+    dest = temp_asset_dir / "new.txt"
+
+    manager = AssetManager(temp_asset_dir)
+    manager.mv("old.txt", str(dest))
+
+    assert not (temp_asset_dir / "old.txt").exists()
+    assert dest.exists()
+    assert dest.read_text() == "content"
+
+def test_mv_texture_moves_all_related_files(temp_asset_dir):
+    """mv moves all texture files together: .tis, .png, .dds"""
+    # Create all related files for texture asset
+    (temp_asset_dir / "rock.tis").write_text("import settings")
+    (temp_asset_dir / "rock.png").write_text("source")
+    (temp_asset_dir / "rock.dds").write_text("compiled")
+
+    manager = AssetManager(temp_asset_dir)
+    # Move just one file; all related files should move
+    manager.mv("rock.png", str(temp_asset_dir / "stone.png"))
+
+    # All files moved with new name
+    assert not (temp_asset_dir / "rock.tis").exists()
+    assert not (temp_asset_dir / "rock.png").exists()
+    assert not (temp_asset_dir / "rock.dds").exists()
+
+    assert (temp_asset_dir / "stone.tis").exists()
+    assert (temp_asset_dir / "stone.png").exists()
+    assert (temp_asset_dir / "stone.dds").exists()
+
+def test_mv_model_moves_all_related_files(temp_asset_dir):
+    """mv moves all model files together: .mis, .glb, .cmdl"""
+    (temp_asset_dir / "sword.mis").write_text("import")
+    (temp_asset_dir / "sword.glb").write_text("source")
+    (temp_asset_dir / "sword.cmdl").write_text("compiled")
+
+    manager = AssetManager(temp_asset_dir)
+    manager.mv("sword.glb", str(temp_asset_dir / "axe.glb"))
+
+    assert not (temp_asset_dir / "sword.mis").exists()
+    assert (temp_asset_dir / "axe.mis").exists()
+    assert (temp_asset_dir / "axe.glb").exists()
+    assert (temp_asset_dir / "axe.cmdl").exists()
+
+def test_mv_fixes_references(temp_asset_dir):
+    """mv updates all references to moved files in asset root"""
+    # Create asset
+    (temp_asset_dir / "rock.tis").write_text("")
+    (temp_asset_dir / "rock.png").write_text("")
+    (temp_asset_dir / "rock.dds").write_text("compiled")
+
+    # Create files that reference the asset by various filenames
+    shader = temp_asset_dir / "shader.glsl"
+    shader.write_text("use rock.dds and rock.png in one file")
+
+    material = temp_asset_dir / "material.mi"
+    material.write_text("texture: rock.dds")
+
+    # Move the asset
+    manager = AssetManager(temp_asset_dir)
+    manager.mv("rock.png", str(temp_asset_dir / "stone.png"))
+
+    # Check that all references were updated
+    shader_content = shader.read_text()
+    assert "stone.dds" in shader_content
+    assert "stone.png" in shader_content
+    assert "rock.dds" not in shader_content
+    assert "rock.png" not in shader_content
+
+    material_content = material.read_text()
+    assert "stone.dds" in material_content
+    assert "rock.dds" not in material_content
+
+def test_mv_file_not_found(temp_asset_dir):
+    """mv raises error if source doesn't exist"""
+    manager = AssetManager(temp_asset_dir)
+    with pytest.raises(FileNotFoundError):
+        manager.mv("nonexistent.txt", "/tmp/dest.txt")

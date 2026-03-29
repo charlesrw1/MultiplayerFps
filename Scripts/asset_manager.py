@@ -175,3 +175,95 @@ class AssetManager:
             raise RuntimeError("ripgrep (rg) is not installed. Install it to use reference finding.")
         except subprocess.TimeoutExpired:
             raise RuntimeError("Reference search timed out")
+
+    def mv(self, src: str, dst: str) -> None:
+        """
+        Move file and ALL related asset files, then update all references.
+        For example, moving rock.png also moves rock.tis and rock.dds to stone.tis/png/dds.
+        Updates all references to moved files throughout the asset root.
+        """
+        src_path = self.current_dir / src
+        dst_path = Path(dst)
+
+        if not src_path.exists():
+            raise FileNotFoundError(f"File not found: {src}")
+
+        asset_type = get_asset_type(src)
+        src_group = get_asset_group(src)
+        dst_group = get_asset_group(dst_path.name)
+
+        # Get all related files for this asset
+        files_to_move = []
+        old_to_new = {}  # Track old filename -> new filename for reference updates
+
+        if asset_type == AssetType.TEXTURE:
+            # Move all texture-related files: .tis, .png, .jpeg, .hdr, .dds
+            for ext in [".tis", ".png", ".jpeg", ".hdr", ".dds"]:
+                candidate = src_path.parent / (src_group + ext)
+                if candidate.exists():
+                    files_to_move.append(candidate)
+                    old_filename = candidate.name
+                    new_filename = dst_group + ext
+                    old_to_new[old_filename] = new_filename
+
+        elif asset_type == AssetType.MODEL:
+            # Move all model-related files: .mis, .glb, .cmdl
+            for ext in [".mis", ".glb", ".cmdl"]:
+                candidate = src_path.parent / (src_group + ext)
+                if candidate.exists():
+                    files_to_move.append(candidate)
+                    old_filename = candidate.name
+                    new_filename = dst_group + ext
+                    old_to_new[old_filename] = new_filename
+
+        elif asset_type == AssetType.MAP:
+            # Move .tmap only
+            if src_path.exists():
+                files_to_move.append(src_path)
+                old_to_new[src_path.name] = Path(dst).name
+
+        elif asset_type == AssetType.MATERIAL:
+            # Move all material files: .mm, .mi, .glsl
+            for ext in [".mm", ".mi", ".glsl"]:
+                candidate = src_path.parent / (src_group + ext)
+                if candidate.exists():
+                    files_to_move.append(candidate)
+                    old_filename = candidate.name
+                    new_filename = dst_group + ext
+                    old_to_new[old_filename] = new_filename
+        else:
+            # Unknown type, just move the one file
+            files_to_move.append(src_path)
+            old_to_new[src_path.name] = Path(dst).name
+
+        # Move all related files
+        for file_path in files_to_move:
+            ext = file_path.suffix
+            new_path = src_path.parent / (dst_group + ext)
+            file_path.rename(new_path)
+
+        # Fix references: for each old filename, find references and update them
+        for old_name, new_name in old_to_new.items():
+            try:
+                result = subprocess.run(
+                    ["rg", "--files-with-matches", old_name, str(self.asset_root)],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+
+                if result.returncode == 0:
+                    for ref_file in result.stdout.strip().split("\n"):
+                        if ref_file:
+                            ref_path = Path(ref_file)
+                            if ref_path.exists() and ref_path not in files_to_move:
+                                try:
+                                    content = ref_path.read_text()
+                                    updated = content.replace(old_name, new_name)
+                                    ref_path.write_text(updated)
+                                except (IOError, OSError):
+                                    # Skip files that can't be read/written
+                                    pass
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                # ripgrep not available, skip reference updates for this file
+                pass
