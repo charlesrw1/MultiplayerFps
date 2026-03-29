@@ -160,6 +160,52 @@ class AssetCLI(cmd.Cmd):
         """Don't repeat last command on empty line"""
         pass
 
+    def _get_path_completions(self, text, include_files=True, include_dirs=True):
+        """Get completion matches for paths in current directory"""
+        cwd = self.manager.pwd()
+        matches = []
+
+        try:
+            # List all items in current directory
+            for item in sorted(cwd.iterdir()):
+                name = item.name
+                # Include if matches text prefix
+                if name.startswith(text):
+                    if item.is_dir() and include_dirs:
+                        matches.append(name + "/")
+                    elif item.is_file() and include_files:
+                        matches.append(name)
+                    elif item.is_dir() and not include_files:
+                        matches.append(name + "/")
+        except (OSError, PermissionError):
+            pass
+
+        return matches
+
+    def complete_cd(self, text, line, begidx, endidx):
+        """Tab completion for cd command - directories only"""
+        return self._get_path_completions(text, include_files=False, include_dirs=True)
+
+    def complete_cat(self, text, line, begidx, endidx):
+        """Tab completion for cat command - files only"""
+        return self._get_path_completions(text, include_files=True, include_dirs=False)
+
+    def complete_cp(self, text, line, begidx, endidx):
+        """Tab completion for cp command - all paths"""
+        return self._get_path_completions(text, include_files=True, include_dirs=True)
+
+    def complete_mv(self, text, line, begidx, endidx):
+        """Tab completion for mv command - all paths"""
+        return self._get_path_completions(text, include_files=True, include_dirs=True)
+
+    def complete_trash(self, text, line, begidx, endidx):
+        """Tab completion for trash command - files only"""
+        return self._get_path_completions(text, include_files=True, include_dirs=False)
+
+    def complete_references(self, text, line, begidx, endidx):
+        """Tab completion for references command - files only"""
+        return self._get_path_completions(text, include_files=True, include_dirs=False)
+
 def main():
     """Main entry point - starts REPL or accepts asset root argument"""
     import sys
