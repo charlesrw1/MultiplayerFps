@@ -331,33 +331,7 @@ bool FileSys::create_directory(std::string_view relative_path, WhereEnum where) 
 	}
 }
 
-int64_t FileSys::get_file_size(std::string_view relative_path, WhereEnum where) {
-	auto full_path = get_full_path_helper(relative_path, where);
-	WIN32_FILE_ATTRIBUTE_DATA file_info;
 
-	if (!GetFileAttributesExA(full_path.c_str(), GetFileExInfoStandard, &file_info)) {
-		return -1;
-	}
-
-	// Combine low and high parts of file size
-	ULARGE_INTEGER size;
-	size.LowPart = file_info.nFileSizeLow;
-	size.HighPart = file_info.nFileSizeHigh;
-	return (int64_t)size.QuadPart;
-}
-
-uint64_t FileSys::get_file_timestamp(std::string_view relative_path, WhereEnum where) {
-	auto full_path = get_full_path_helper(relative_path, where);
-	WIN32_FILE_ATTRIBUTE_DATA file_info;
-
-	if (!GetFileAttributesExA(full_path.c_str(), GetFileExInfoStandard, &file_info)) {
-		return 0;
-	}
-
-	// Convert FILETIME to uint64_t
-	return (uint64_t)file_info.ftLastWriteTime.dwLowDateTime |
-		   ((uint64_t)file_info.ftLastWriteTime.dwHighDateTime << 32);
-}
 // stick it here for windows.h
 void start_play_process() {
 

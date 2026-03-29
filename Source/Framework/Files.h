@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 #include <vector>
-
+#include <string_view>
 class IFile
 {
 public:
@@ -100,6 +100,4 @@ public:
 	static bool move_file(std::string_view src_relative, std::string_view dst_relative, WhereEnum where);
 	static bool does_directory_exist(std::string_view relative_path, WhereEnum where);
 	static bool create_directory(std::string_view relative_path, WhereEnum where);
-	static int64_t get_file_size(std::string_view relative_path, WhereEnum where);
-	static uint64_t get_file_timestamp(std::string_view relative_path, WhereEnum where);
 };
