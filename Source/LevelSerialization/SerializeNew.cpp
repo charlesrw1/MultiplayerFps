@@ -105,9 +105,6 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 		obj["objs"].push_back(out);
 		// printf("%s\n", obj.dump(1).c_str());
 	}
-	if (prefab_name && *prefab_name) {
-		obj["__prefab_name"] = prefab_name;
-	}
 	SerializedSceneFile outfile;
 	outfile.text = "!json\n" + obj.dump(1);
 

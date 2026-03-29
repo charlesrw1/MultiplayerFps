@@ -541,7 +541,6 @@ class ThumbnailRenderer
 public:
 	ThumbnailRenderer(int size);
 	void render(Model* m, MaterialInstance* override_mat);
-	void render(const std::vector<std::pair<const Model*, glm::mat4>>& models);
 	void output_to_path(std::string path);
 
 private:
@@ -677,12 +676,6 @@ public:
 									 std::string path) final {
 		matman.pre_render_update(); // hack fixme
 		thumbnailRenderer->render(model, override_mat);
-		thumbnailRenderer->output_to_path(path);
-	}
-	void editor_render_thumbnail_for_prefab(const std::vector<std::pair<const Model*, glm::mat4>>& models, int w, int h,
-											std::string path) final {
-		matman.pre_render_update(); // hack fixme
-		thumbnailRenderer->render(models);
 		thumbnailRenderer->output_to_path(path);
 	}
 #endif

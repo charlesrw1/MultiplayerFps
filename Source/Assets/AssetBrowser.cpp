@@ -10,32 +10,6 @@
 #include "AssetRegistryLocal.h"
 
 #include "AssetDatabase.h"
-#include "Game/Prefab.h"
-#include "LevelSerialization/SerializeNew.h"
-#include "Game/Entity.h"
-#include "Game/Components/MeshComponent.h"
-#include "Render/DrawPublic.h"
-
-// Case-insensitive substring search without allocations
-static inline bool contains_case_insensitive(std::string_view haystack, std::string_view needle) {
-	if (needle.empty())
-		return true;
-	if (haystack.size() < needle.size())
-		return false;
-
-	for (size_t i = 0; i <= haystack.size() - needle.size(); ++i) {
-		bool match = true;
-		for (size_t j = 0; j < needle.size(); ++j) {
-			if (tolower(haystack[i + j]) != tolower(needle[j])) {
-				match = false;
-				break;
-			}
-		}
-		if (match)
-			return true;
-	}
-	return false;
-}
 AssetBrowser::AssetBrowser() {
 	asset_name_filter[0] = 0;
 	folder_closed = g_assets.find_global_sync<Texture>("eng/editor/folder_closed.png").get();
@@ -72,14 +46,15 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 			if (!b->should_type_show(1 << asset.type->self_index)) {
 				continue;
 			}
-			if (name_filter_len > 0) {
-				if (b->filter_match_case) {
-					if (asset.filename.find(b->asset_name_filter) == std::string::npos)
-						continue;
-				} else {
-					if (!contains_case_insensitive(asset.filename, b->all_lower_cast_filter_name))
-						continue;
-				}
+			if (!b->filter_match_case && name_filter_len > 0) {
+				std::string path = asset.filename;
+				for (int i = 0; i < path.size(); i++)
+					path[i] = tolower(path[i]);
+				if (path.find(b->all_lower_cast_filter_name, 0) == std::string::npos)
+					continue;
+			} else if (name_filter_len > 0) {
+				if (asset.filename.find(b->asset_name_filter) == std::string::npos)
+					continue;
 			}
 
 			ImGui::PushID(node);
@@ -266,14 +241,15 @@ static void draw_browser_tree_view(AssetBrowser* b) {
 		if (!b->should_type_show(1 << asset.type->self_index)) {
 			continue;
 		}
-		if (name_filter_len > 0) {
-			if (b->filter_match_case) {
-				if (asset.filename.find(b->asset_name_filter) == std::string::npos)
-					continue;
-			} else {
-				if (!contains_case_insensitive(asset.filename, b->all_lower_cast_filter_name))
-					continue;
-			}
+		if (!b->filter_match_case && name_filter_len > 0) {
+			std::string path = asset.filename;
+			for (int i = 0; i < path.size(); i++)
+				path[i] = tolower(path[i]);
+			if (path.find(b->all_lower_cast_filter_name, 0) == std::string::npos)
+				continue;
+		} else if (name_filter_len > 0) {
+			if (asset.filename.find(b->asset_name_filter) == std::string::npos)
+				continue;
 		}
 		linear2.push_back(node);
 	}
@@ -363,7 +339,6 @@ void AssetBrowser::draw_browser_grid() {
 	uint32_t ent_list_flags =
 		ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY;
 
-	// Filter without loading thumbnails (fast path)
 	std::vector<AssetFilesystemNode*> items2;
 	{
 		std::vector<AssetFilesystemNode*> items;
@@ -371,37 +346,37 @@ void AssetBrowser::draw_browser_grid() {
 
 		const int name_filter_len = strlen(asset_name_filter);
 		for (auto& c : items) {
-			auto& asset = c->asset;
-			// Check type filter first (fast check)
-			if (!should_type_show(1 << asset.type->self_index))
-				continue;
-			// Check name filter
-			if (name_filter_len > 0) {
-				if (filter_match_case) {
-					if (asset.filename.find(asset_name_filter) == std::string::npos)
+			{
+				auto& asset = c->asset;
+				if (!filter_match_case && name_filter_len > 0) {
+					std::string path = asset.filename;
+					for (int i = 0; i < path.size(); i++)
+						path[i] = tolower(path[i]);
+					if (path.find(all_lower_cast_filter_name, 0) == std::string::npos)
 						continue;
-				} else {
-					if (!contains_case_insensitive(asset.filename, all_lower_cast_filter_name))
+				} else if (name_filter_len > 0) {
+					if (asset.filename.find(asset_name_filter) == std::string::npos)
 						continue;
 				}
 			}
-			// Only add to items2, don't load thumbnails yet
+			Texture* t = thumbnails.get_thumbnail(c->asset);
+			if (!t)
+				continue;
 			items2.push_back(c);
 		}
 	}
-
 	ImGuiListClipper clipper;
 	clipper.Begin(glm::ceil(items2.size() / float(boxes)));
 
 	auto draw_item = [&](const int item_idx) {
 		auto& c = items2.at(item_idx);
 		Texture* t = thumbnails.get_thumbnail(c->asset);
-		// Skip items without thumbnails
-		if (!t)
-			return;
+		ASSERT(t);
 		ImGui::TableNextColumn();
 		ImGui::PushID(c);
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+		//	ImGui::ImageButton(ImTextureID(uint64_t(t->get_internal_render_handle())), ImVec2(64, 64),ImVec2(0, 1),
+		// ImVec2(1, 0));
 		string only_filename = c->asset.filename;
 		StringUtils::get_filename(only_filename);
 
@@ -441,6 +416,7 @@ void AssetBrowser::draw_browser_grid() {
 		}
 
 		while (clipper.Step()) {
+
 			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
 				draw_in_row(i);
 			}
@@ -551,15 +527,14 @@ void AssetBrowser::imgui_draw() {
 	}
 	ImGui::End();
 }
+#include "Render/DrawPublic.h"
 
 #include "Framework/MapUtil.h"
 #include "Render/MaterialPublic.h"
 #include "Render/MaterialLocal.h"
 Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset) {
 	auto asset_class = asset.type->get_asset_class_type();
-	// Support thumbnails for Models, Materials, and Prefabs
-	const bool is_prefab = asset.type->get_type_name() == "Prefab";
-	if (asset_class != &Model::StaticType && asset_class != &MaterialInstance::StaticType && !is_prefab)
+	if (asset_class != &Model::StaticType && asset_class != &MaterialInstance::StaticType)
 		return nullptr;
 
 	if (MapUtil::contains(cache, asset.filename)) {
@@ -582,7 +557,7 @@ Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset) {
 		MaterialInstance* override_mat{};
 		if (asset_class == &Model::StaticType) {
 			the_model = Model::load(asset.filename);
-		} else if (asset_class == &MaterialInstance::StaticType) {
+		} else {
 			auto mat = MaterialInstance::load(asset.filename);
 			if (mat && mat->impl && mat->impl->get_master_impl() &&
 				mat->impl->get_master_impl()->usage == MaterialUsage::Default) {
@@ -591,47 +566,9 @@ Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset) {
 			} else {
 				return nullptr;
 			}
-		} else if (is_prefab) {
-			// For prefabs, load the prefab file and render all meshes with their transforms
-			string prefab_text = PrefabFile::load_text(asset.filename);
-			if (!prefab_text.empty()) {
-				try {
-					// Parse the prefab to find all entities with meshes
-					auto unserialized =
-						unserialize_entities_from_text("prefab_thumbnail", prefab_text, AssetDatabase::loader, false);
-
-					// Collect all models and their transforms
-					std::vector<std::pair<const Model*, glm::mat4>> meshes_to_render;
-
-					for (auto base_updater : unserialized.all_obj_vec) {
-						if (auto entity = base_updater->cast_to<Entity>()) {
-							if (auto mesh_comp = entity->get_component<MeshComponent>()) {
-								if (auto model = mesh_comp->get_model()) {
-									std::pair<const Model*, glm::mat4> mesh_pair;
-									mesh_pair.first = model;
-									mesh_pair.second = entity->get_ws_transform();
-									meshes_to_render.push_back(mesh_pair);
-								}
-							}
-						}
-					}
-
-					// Render all collected meshes with their transforms in a single thumbnail
-					if (!meshes_to_render.empty()) {
-						idraw->editor_render_thumbnail_for_prefab(meshes_to_render, 128, 128,
-																  FileSys::get_full_path_from_game_path(thumnail_path));
-					}
-					unserialized.delete_objs();
-				}
-				catch (const std::exception&) {
-					// If prefab parsing fails, return nullptr
-					return nullptr;
-				}
-			} else {
-				return nullptr;
-			}
 		}
 		if (the_model) {
+			// hmm..
 			idraw->editor_render_thumbnail_for(the_model, override_mat, 128, 128,
 											   FileSys::get_full_path_from_game_path(thumnail_path));
 		}
