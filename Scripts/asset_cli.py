@@ -22,19 +22,23 @@ class AssetCLI(cmd.Cmd):
         self.update_prompt()
 
     def update_prompt(self):
-        """Update prompt to show full path relative to asset root"""
+        """Update prompt to show full path relative to asset root with color"""
         cwd = self.manager.pwd()
         root = self.manager.asset_root
+        # ANSI color codes
+        CYAN = "\033[36m"      # Cyan for path
+        RESET = "\033[0m"
         try:
             rel = cwd.relative_to(root)
             if rel == Path("."):
                 # At root, show root name only
-                self.prompt = f"{root.name}> "
+                path_str = f"{root.name}"
             else:
                 # Show root name + relative path with trailing slash
-                self.prompt = f"{root.name}/{rel}> "
+                path_str = f"{root.name}/{rel}"
+            self.prompt = f"{CYAN}{path_str}>{RESET} "
         except ValueError:
-            self.prompt = f"{cwd.name}> "
+            self.prompt = f"{CYAN}{cwd.name}>{RESET} "
 
     def do_pwd(self, arg):
         """Print working directory"""
