@@ -131,20 +131,33 @@ def test_cp_file_not_found(temp_asset_dir):
     with pytest.raises(FileNotFoundError):
         manager.cp("nonexistent.png", "/tmp/dest.png")
 
-def test_trash_removes_compiled_and_source(temp_asset_dir):
-    """trash removes compiled and source, keeps import settings"""
+def test_trash_removes_all_related_files(temp_asset_dir):
+    """trash removes all related files for an asset group"""
     (temp_asset_dir / "rock.tis").touch()
     (temp_asset_dir / "rock.png").touch()
     (temp_asset_dir / "rock.dds").touch()
 
     manager = AssetManager(temp_asset_dir)
-    manager.trash("rock.png")
+    manager.trash("rock")
 
-    # Source and compiled deleted
+    assert not (temp_asset_dir / "rock.tis").exists()
     assert not (temp_asset_dir / "rock.png").exists()
     assert not (temp_asset_dir / "rock.dds").exists()
-    # Import settings kept
-    assert (temp_asset_dir / "rock.tis").exists()
+
+def test_trash_from_subdirectory_path(temp_asset_dir):
+    """trash accepts subdirectory paths like 'materials/my_texture'"""
+    subdir = temp_asset_dir / "materials"
+    subdir.mkdir()
+    (subdir / "my_texture.tis").touch()
+    (subdir / "my_texture.png").touch()
+    (subdir / "my_texture.dds").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    manager.trash("materials/my_texture")
+
+    assert not (subdir / "my_texture.tis").exists()
+    assert not (subdir / "my_texture.png").exists()
+    assert not (subdir / "my_texture.dds").exists()
 
 def test_trash_file_not_found(temp_asset_dir):
     """trash raises error if file doesn't exist"""

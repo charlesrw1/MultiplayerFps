@@ -218,34 +218,66 @@ class AssetManager:
 
     def trash(self, path: str) -> None:
         """
-        Trash/delete a file. For assets, deletes the compiled and source versions
-        (e.g., .dds and .png for textures, but keeps .tis import settings)
+        Trash/delete a file or asset group. Accepts filename or asset name, with optional
+        subdirectory path (e.g., 'materials/my_texture'). Deletes all related files.
         """
-        target = self.current_dir / path
+        # Split path into directory part and name part
+        path_parts = path.split("/")
+        if len(path_parts) > 1:
+            src_dir = self.current_dir / "/".join(path_parts[:-1])
+            name = path_parts[-1]
+        else:
+            src_dir = self.current_dir
+            name = path
 
-        if not target.exists():
-            raise FileNotFoundError(f"File not found: {path}")
+        # Determine asset type and group - try as filename first, then as asset name
+        asset_type = get_asset_type(name)
+        group = get_asset_group(name)
 
-        asset_type = get_asset_type(path)
-        group = get_asset_group(path)
+        if asset_type is None:
+            # Treat as asset name - find by scanning the directory
+            all_files = [f.name for f in src_dir.iterdir() if f.is_file()] if src_dir.is_dir() else []
+            groups = group_files(all_files)
+            if name not in groups:
+                raise FileNotFoundError(f"File or asset not found: {path}")
+            asset_type = groups[name]["type"]
+            group = name
 
-        to_delete = [target]
+        # Build list of files to delete based on asset type
+        to_delete = []
 
         if asset_type == AssetType.TEXTURE:
-            # Delete .dds, .hdr, .png, .jpeg but keep .tis
-            for ext in [".dds", ".hdr", ".png", ".jpeg"]:
-                candidate = target.parent / (group + ext)
-                if candidate.exists() and candidate != target:
+            for ext in [".tis", ".dds", ".hdr", ".png", ".jpeg"]:
+                candidate = src_dir / (group + ext)
+                if candidate.exists():
                     to_delete.append(candidate)
 
         elif asset_type == AssetType.MODEL:
-            # Delete .cmdl and .glb but keep .mis
-            for ext in [".cmdl", ".glb"]:
-                candidate = target.parent / (group + ext)
-                if candidate.exists() and candidate != target:
+            for ext in [".mis", ".cmdl", ".glb"]:
+                candidate = src_dir / (group + ext)
+                if candidate.exists():
                     to_delete.append(candidate)
 
-        # For maps and materials, delete only the specified file
+        elif asset_type == AssetType.MATERIAL:
+            for ext in [".mm", ".mi", ".glsl"]:
+                candidate = src_dir / (group + ext)
+                if candidate.exists():
+                    to_delete.append(candidate)
+
+        elif asset_type == AssetType.MAP:
+            candidate = src_dir / (group + ".tmap")
+            if candidate.exists():
+                to_delete.append(candidate)
+
+        else:
+            # Unknown type - delete the specific file
+            target = src_dir / name
+            if not target.exists():
+                raise FileNotFoundError(f"File not found: {path}")
+            to_delete.append(target)
+
+        if not to_delete:
+            raise FileNotFoundError(f"File or asset not found: {path}")
 
         for file_path in to_delete:
             file_path.unlink()
