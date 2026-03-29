@@ -11,41 +11,31 @@ public:
 	viewMulticastDelegate<> get_on_property_changed() { return on_property_change_internal; }
 
 	// Event callbacks
-	void on_ec_deleted(uint64_t comp) {
-		if (selected_component == comp)
-			selected_component = 0;
-		if (last_api)
-			refresh_grid(*last_api);
-	}
-	void on_close() { grid.clear_all(); }
-
-	void on_select_component(Component* ec) {
-		selected_component = ec->get_instance_id();
-		if (last_api)
-			refresh_grid(*last_api);
-	}
-
 	void refresh_grid(const ISelectionApi& api);
 
+	bool property_grid_has_rows() const { return grid_cache.row_count() > 0; }
 private:
 	MulticastDelegate<> on_property_change_internal;
-	const ISelectionApi* last_api = nullptr;
 
-	Component* get_selected_component() const {
-		if (selected_component == 0)
-			return nullptr;
-		auto o = eng->get_object(selected_component);
-		if (!o)
-			return nullptr;
-		return o->cast_to<Component>();
+	void on_select_component(const ISelectionApi& api,Component* ec) {
+		refresh_grid(api);
 	}
+	Component* get_selected_component(Entity* e) const;
 
 	void draw_components(const ISelectionApi& api, Entity* entity);
 
-	uint64_t selected_component = 0;
-	uint64_t component_context_menu = 0;
-	PropertyGrid grid;
-	const FnFactory<IPropertyEditor>& factory;
 	string component_filter;
 	bool component_set_keyboard_focus = true;
+
+	struct GridWithClasses {
+	public:
+		GridWithClasses(const FnFactory<IPropertyEditor>& factory) : grid(factory) {}
+		bool set_what_i_want_and_draw(std::vector<obj<BaseUpdater>> objs);
+		int row_count() const { return grid.rows.size(); }
+	private:
+		std::vector<obj<BaseUpdater>> cached_from_prev;
+		PropertyGrid grid;
+	};
+
+	GridWithClasses grid_cache;
 };

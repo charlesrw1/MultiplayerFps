@@ -1091,7 +1091,6 @@
     <ClInclude Include="Source\UI\Gui.h" />
     <ClInclude Include="Source\EngineMain.h" />
     <ClInclude Include="Source\Render\RenderConfigVars.h" />
-    <ClInclude Include="Source\LevelEditor\IEditorApi.h" />
     <ClInclude Include="Source\LevelEditor\OrthoCamera.h" />
     <ClInclude Include="Source\LevelEditor\LevelEditorCamera.h" />
     <ClInclude Include="Source\LevelEditor\IInputReciever.h" />
@@ -1108,6 +1107,7 @@
     <ClInclude Include="Source\LevelEditor\DragDropPreview.h" />
     <ClInclude Include="Source\LevelEditor\EditorUILayout.h" />
     <ClInclude Include="Source\Logging.h" />
+    <ClInclude Include="Source\LevelEditor\IEditorApi.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

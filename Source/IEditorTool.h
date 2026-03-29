@@ -12,73 +12,7 @@ struct View_Setup;
 // Base editor tool class
 #include "Game/EntityPtr.h"
 
-class IEntitySnapshot {
-public:
-	virtual ~IEntitySnapshot() {}
-};
-
-class IEditorEntity {
-public:
-};
-
-class IEditorEvents {
-public:
-	virtual viewMulticastDelegate<> on_selection_changed() = 0;
-};
-
-class Entity;
-class IEditorApi {
-public:
-	virtual Entity* add_entity() = 0;
-	virtual void remove_entity(Entity* e) = 0;
-
-	virtual void clear_select() = 0;
-	virtual void add_select(std::vector<EntityPtr> entities) = 0;
-	virtual std::vector<EntityPtr> get_all_entities() = 0;
-	virtual bool is_selected(EntityPtr ptr) = 0;
-	virtual std::vector<EntityPtr> get_selected() = 0;
-	virtual void save() = 0;
-	virtual void undo() = 0;
-	virtual std::string get_document_name() = 0;
-	virtual void set_document_name(const std::string& name) = 0;
-	virtual void clear_hide() = 0;
-	virtual void add_hide(EntityPtr ptr) = 0;
-
-	// for grouping multiple comamnds in 1 undoable block
-	virtual void start_command_group_scope() = 0;
-	virtual void end_command_group_scope() = 0;
-
-	virtual std::unique_ptr<IEntitySnapshot> make_entity_snapshot(Entity* e) = 0;
-	virtual void commit_entity_changes(std::unique_ptr<IEntitySnapshot> snap) = 0;
-
-	void hide_selected() {
-		auto selected = get_selected();
-		for (EntityPtr e : selected)
-			add_hide(e);
-	}
-	void save_as(const std::string& name) {
-		set_document_name(name);
-		save();
-	}
-	bool not_selected(EntityPtr ptr) {
-		return !is_selected(ptr);
-	}
-	void select_all() {
-		add_select(get_all_entities());
-	}
-	void inverse_select() {
-		auto all = get_all_entities();
-		std::vector<EntityPtr> select_these;
-		for (EntityPtr e : all) {
-			if (!is_selected(e)) {
-				select_these.push_back(e);
-			}
-		}
-		clear_select();
-		add_select(select_these);
-	}
-};
-
+class IEditorApi2;
 class IEditorTool
 {
 public:
@@ -89,6 +23,7 @@ public:
 	// if save is called when !current_document_has_path(), then it will open a popup to pick a save directory
 	bool save();
 	void draw_menu_bar();
+	virtual IEditorApi2& get_editor_api() = 0;
 
 	// called every render frame while open
 	virtual void tick(float dt) {}

@@ -146,11 +146,7 @@ void EditorDoc::init_new() {
 			prop_ed->refresh_grid(*api);
 		}
 	});
-	on_close.add(prop_editor.get(), [prop_ed = prop_editor.get()]() { prop_ed->on_close(); });
-	on_component_deleted.add(prop_editor.get(),
-							 [prop_ed = prop_editor.get()](uint64_t comp) { prop_ed->on_ec_deleted(comp); });
-	on_component_created.add(prop_editor.get(),
-							 [prop_ed = prop_editor.get()](Component* c) { prop_ed->on_select_component(c); });
+
 	manipulate = std::make_unique<ManipulateTransformTool>(*this);
 	drag_drop_preview = std::make_unique<DragDropPreview>();
 	foliage_tool = std::make_unique<FoliagePaintTool>(*this);
