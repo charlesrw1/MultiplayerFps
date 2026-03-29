@@ -9,3 +9,6 @@ r.ssr 0
 r.ssao 0
 dt 1
 r.include_cubemaps 1
+
+vid.width 600
+vid.height 400

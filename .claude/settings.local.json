@@ -130,7 +130,13 @@
       "Bash(powershell.exe -Command \"Select-String -Path 'C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\globals_report.json' -Pattern 'EditorDocLocal.cpp' | Select-Object -First 3\")",
       "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Scripts/clang-format-all.ps1\")",
       "Bash(grep -n \"editor_render_thumbnail\" C:/Users/charl/source/repos/CsRemake/Source/Render/*.h)",
-      "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Scripts/build_and_test.ps1\")"
+      "Bash(powershell.exe -NoProfile -ExecutionPolicy Bypass -Command \"Scripts/build_and_test.ps1\")",
+      "Bash(pwsh.exe -Command \"& ''.\\\\Scripts\\\\clang-format-all.ps1''\")",
+      "Read(//mnt/c/Users/charl/source/repos/**)",
+      "Bash(cmd.exe /c \"Scripts\\\\build_and_test.ps1\")",
+      "Bash(powershell.exe -Command \"& ''''.\\\\Scripts\\\\clang-format-all.ps1''''\")",
+      "Bash(powershell.exe -Command \"& ''.\\\\Scripts\\\\build_and_test.ps1''\")",
+      "Bash(powershell.exe -Command \"& ''''.\\\\Scripts\\\\integration_test.ps1''''\")"
     ]
   },
   "enabledPlugins": {
