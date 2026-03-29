@@ -56,6 +56,18 @@ class AssetCLI(cmd.Cmd):
         except (FileNotFoundError, NotADirectoryError, ValueError) as e:
             print(f"Error: {e}")
 
+    def do_mkdir(self, arg):
+        """Create a directory: mkdir <path>"""
+        if not arg:
+            print("Usage: mkdir <path>")
+            return
+
+        try:
+            self.manager.mkdir(arg)
+            print(f"Created directory: {arg}")
+        except (FileExistsError, ValueError) as e:
+            print(f"Error: {e}")
+
     def do_ls(self, arg):
         """List assets in current directory or specified path: ls [path]"""
         try:

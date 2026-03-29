@@ -269,6 +269,21 @@ class AssetManager:
 
         return sorted(list(all_refs))
 
+    def mkdir(self, path: str) -> None:
+        """Create a directory within asset root"""
+        target = self.current_dir / path
+
+        # Ensure target is within asset root
+        try:
+            target.resolve().relative_to(self.asset_root)
+        except ValueError:
+            raise ValueError(f"Cannot create directory outside asset root: {target}")
+
+        if target.exists():
+            raise FileExistsError(f"Directory already exists: {path}")
+
+        target.mkdir(parents=True, exist_ok=False)
+
     def mv(self, src: str, dst: str) -> None:
         """
         Move file and ALL related asset files, then update all references.
