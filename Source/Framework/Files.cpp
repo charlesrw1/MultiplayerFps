@@ -253,6 +253,111 @@ bool FileSys::delete_game_file(std::string filepath) {
 		return false;
 	}
 }
+
+// Helper function to get full path from relative path and WhereEnum
+static std::string get_full_path_helper(std::string_view rel, FileSys::WhereEnum where) {
+	return FileSys::get_path(where) + ("/" + std::string(rel));
+}
+
+bool FileSys::copy_file(std::string_view src_relative, std::string_view dst_relative, WhereEnum where) {
+	auto src_full = get_full_path_helper(src_relative, where);
+	auto dst_full = get_full_path_helper(dst_relative, where);
+
+	sys_print(Debug, "FileSys::copy_file: %s -> %s\n", src_full.c_str(), dst_full.c_str());
+	if (CopyFileA(src_full.c_str(), dst_full.c_str(), FALSE)) {
+		sys_print(Info, "Copied file %s -> %s\n", src_full.c_str(), dst_full.c_str());
+		return true;
+	} else {
+		sys_print(Error, "FileSys::copy_file: failed to copy %s -> %s\n", src_full.c_str(), dst_full.c_str());
+		return false;
+	}
+}
+
+bool FileSys::move_file(std::string_view src_relative, std::string_view dst_relative, WhereEnum where) {
+	auto src_full = get_full_path_helper(src_relative, where);
+	auto dst_full = get_full_path_helper(dst_relative, where);
+
+	sys_print(Debug, "FileSys::move_file: %s -> %s\n", src_full.c_str(), dst_full.c_str());
+	if (MoveFileExA(src_full.c_str(), dst_full.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+		sys_print(Info, "Moved file %s -> %s\n", src_full.c_str(), dst_full.c_str());
+		return true;
+	} else {
+		sys_print(Error, "FileSys::move_file: failed to move %s -> %s\n", src_full.c_str(), dst_full.c_str());
+		return false;
+	}
+}
+
+bool FileSys::does_directory_exist(std::string_view relative_path, WhereEnum where) {
+	auto full_path = get_full_path_helper(relative_path, where);
+	DWORD attrs = GetFileAttributesA(full_path.c_str());
+	return (attrs != INVALID_FILE_ATTRIBUTES) && (attrs & FILE_ATTRIBUTE_DIRECTORY);
+}
+
+// Helper to recursively create directories
+static bool create_directory_recursive(const std::string& path) {
+	// Check if directory already exists
+	DWORD attrs = GetFileAttributesA(path.c_str());
+	if (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY)) {
+		return true;
+	}
+
+	// Find the parent directory
+	size_t last_slash = path.find_last_of("/\\");
+	if (last_slash == std::string::npos) {
+		// No parent directory, try to create it
+		return CreateDirectoryA(path.c_str(), nullptr) != 0;
+	}
+
+	// Recursively create parent
+	std::string parent = path.substr(0, last_slash);
+	if (!create_directory_recursive(parent)) {
+		return false;
+	}
+
+	// Create this directory
+	return CreateDirectoryA(path.c_str(), nullptr) != 0;
+}
+
+bool FileSys::create_directory(std::string_view relative_path, WhereEnum where) {
+	auto full_path = get_full_path_helper(relative_path, where);
+	sys_print(Debug, "FileSys::create_directory: %s\n", full_path.c_str());
+
+	if (create_directory_recursive(full_path)) {
+		sys_print(Info, "Created directory %s\n", full_path.c_str());
+		return true;
+	} else {
+		sys_print(Error, "FileSys::create_directory: failed to create %s\n", full_path.c_str());
+		return false;
+	}
+}
+
+int64_t FileSys::get_file_size(std::string_view relative_path, WhereEnum where) {
+	auto full_path = get_full_path_helper(relative_path, where);
+	WIN32_FILE_ATTRIBUTE_DATA file_info;
+
+	if (!GetFileAttributesExA(full_path.c_str(), GetFileExInfoStandard, &file_info)) {
+		return -1;
+	}
+
+	// Combine low and high parts of file size
+	ULARGE_INTEGER size;
+	size.LowPart = file_info.nFileSizeLow;
+	size.HighPart = file_info.nFileSizeHigh;
+	return (int64_t)size.QuadPart;
+}
+
+uint64_t FileSys::get_file_timestamp(std::string_view relative_path, WhereEnum where) {
+	auto full_path = get_full_path_helper(relative_path, where);
+	WIN32_FILE_ATTRIBUTE_DATA file_info;
+
+	if (!GetFileAttributesExA(full_path.c_str(), GetFileExInfoStandard, &file_info)) {
+		return 0;
+	}
+
+	// Convert FILETIME to uint64_t
+	return (uint64_t)file_info.ftLastWriteTime.dwLowDateTime |
+		   ((uint64_t)file_info.ftLastWriteTime.dwHighDateTime << 32);
+}
 // stick it here for windows.h
 void start_play_process() {
 

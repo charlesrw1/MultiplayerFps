@@ -65,3 +65,171 @@ static TestTask test_filesys_delete_game_file(TestContext& t) {
 	t.check(!still_exists, "file no longer exists after deletion");
 }
 GAME_TEST("filesys/delete_game_file", 5.f, test_filesys_delete_game_file);
+
+// Test copy_file
+static TestTask test_filesys_copy_file(TestContext& t) {
+	const char* src_path = "filesys_copy_src_test.bin";
+	const char* dst_path = "filesys_copy_dst_test.bin";
+	const char test_data[] = "copy_test_data_12345";
+
+	// Write source file
+	{
+		auto wf = FileSys::open_write_game(src_path);
+		t.require(wf != nullptr, "open_write_game succeeded for copy src");
+		wf->write(test_data, sizeof(test_data));
+	}
+	co_await t.wait_ticks(1);
+
+	// Copy the file
+	bool copied = FileSys::copy_file(src_path, dst_path, FileSys::GAME_DIR);
+	t.check(copied, "copy_file returned true");
+	co_await t.wait_ticks(1);
+
+	// Verify both files exist
+	t.check(FileSys::does_file_exist(src_path, FileSys::GAME_DIR), "source file still exists after copy");
+	t.check(FileSys::does_file_exist(dst_path, FileSys::GAME_DIR), "destination file exists after copy");
+
+	// Verify contents match
+	auto rf = FileSys::open_read_game(dst_path);
+	t.require(rf != nullptr, "opened copied file for reading");
+	t.check(rf->size() == sizeof(test_data), "copied file size matches original");
+
+	char buf[64] = {};
+	rf->read(buf, sizeof(test_data));
+	t.check(std::memcmp(buf, test_data, sizeof(test_data)) == 0, "copied file contents match original");
+
+	// Cleanup
+	FileSys::delete_game_file(src_path);
+	FileSys::delete_game_file(dst_path);
+}
+GAME_TEST("filesys/copy_file", 5.f, test_filesys_copy_file);
+
+// Test move_file
+static TestTask test_filesys_move_file(TestContext& t) {
+	const char* src_path = "filesys_move_src_test.bin";
+	const char* dst_path = "filesys_move_dst_test.bin";
+	const char test_data[] = "move_test_data_12345";
+
+	// Write source file
+	{
+		auto wf = FileSys::open_write_game(src_path);
+		t.require(wf != nullptr, "open_write_game succeeded for move src");
+		wf->write(test_data, sizeof(test_data));
+	}
+	co_await t.wait_ticks(1);
+
+	// Move the file
+	bool moved = FileSys::move_file(src_path, dst_path, FileSys::GAME_DIR);
+	t.check(moved, "move_file returned true");
+	co_await t.wait_ticks(1);
+
+	// Verify source is gone and destination exists
+	t.check(!FileSys::does_file_exist(src_path, FileSys::GAME_DIR), "source file no longer exists after move");
+	t.check(FileSys::does_file_exist(dst_path, FileSys::GAME_DIR), "destination file exists after move");
+
+	// Verify contents are correct
+	auto rf = FileSys::open_read_game(dst_path);
+	t.require(rf != nullptr, "opened moved file for reading");
+	char buf[64] = {};
+	rf->read(buf, sizeof(test_data));
+	t.check(std::memcmp(buf, test_data, sizeof(test_data)) == 0, "moved file contents are intact");
+
+	// Cleanup
+	FileSys::delete_game_file(dst_path);
+}
+GAME_TEST("filesys/move_file", 5.f, test_filesys_move_file);
+
+// Test does_directory_exist
+static TestTask test_filesys_directory_exists(TestContext& t) {
+	// Check for known directories that should exist
+	bool game_dir_exists = FileSys::does_directory_exist("", FileSys::GAME_DIR);
+	t.check(game_dir_exists, "game directory exists");
+
+	// Check for directory that definitely doesn't exist
+	bool fake_dir_exists = FileSys::does_directory_exist("nonexistent_dir_xyz123", FileSys::GAME_DIR);
+	t.check(!fake_dir_exists, "nonexistent directory does not exist");
+	co_return;
+}
+GAME_TEST("filesys/directory_exists", 5.f, test_filesys_directory_exists);
+
+// Test create_directory
+static TestTask test_filesys_create_directory(TestContext& t) {
+	const char* test_dir = "filesys_test_new_dir";
+	const char* nested_dir = "filesys_test_new_dir/nested";
+
+	// Verify directory doesn't exist yet
+	t.check(!FileSys::does_directory_exist(test_dir, FileSys::GAME_DIR),
+			"test directory doesn't exist before creation");
+
+	// Create the directory
+	bool created = FileSys::create_directory(test_dir, FileSys::GAME_DIR);
+	t.check(created, "create_directory returned true");
+	co_await t.wait_ticks(1);
+
+	// Verify it now exists
+	t.check(FileSys::does_directory_exist(test_dir, FileSys::GAME_DIR), "directory exists after creation");
+
+	// Test nested directory creation
+	bool nested_created = FileSys::create_directory(nested_dir, FileSys::GAME_DIR);
+	t.check(nested_created, "nested create_directory returned true");
+	co_await t.wait_ticks(1);
+
+	t.check(FileSys::does_directory_exist(nested_dir, FileSys::GAME_DIR), "nested directory exists after creation");
+}
+GAME_TEST("filesys/create_directory", 5.f, test_filesys_create_directory);
+
+// Test get_file_size
+static TestTask test_filesys_get_file_size(TestContext& t) {
+	const char* path = "filesys_size_test.bin";
+	const char test_data[] = "size_test_data_123";
+	const size_t data_len = sizeof(test_data);
+
+	// Write file with known size
+	{
+		auto wf = FileSys::open_write_game(path);
+		t.require(wf != nullptr, "open_write_game succeeded for size test");
+		wf->write(test_data, data_len);
+	}
+	co_await t.wait_ticks(1);
+
+	// Get file size
+	int64_t file_size = FileSys::get_file_size(path, FileSys::GAME_DIR);
+	t.check(file_size == (int64_t)data_len, "get_file_size returns correct size");
+
+	// Test nonexistent file
+	int64_t missing_size = FileSys::get_file_size("nonexistent_file_xyz.bin", FileSys::GAME_DIR);
+	t.check(missing_size == -1, "get_file_size returns -1 for nonexistent file");
+
+	// Cleanup
+	FileSys::delete_game_file(path);
+}
+GAME_TEST("filesys/get_file_size", 5.f, test_filesys_get_file_size);
+
+// Test get_file_timestamp
+static TestTask test_filesys_get_file_timestamp(TestContext& t) {
+	const char* path = "filesys_timestamp_test.bin";
+	const char test_data[] = "timestamp_test";
+
+	// Get current time reference (rough)
+	uint64_t before_write = GetTickCount64();
+
+	// Write file
+	{
+		auto wf = FileSys::open_write_game(path);
+		t.require(wf != nullptr, "open_write_game succeeded for timestamp test");
+		wf->write(test_data, sizeof(test_data));
+	}
+	co_await t.wait_ticks(1);
+
+	// Get file timestamp
+	uint64_t timestamp = FileSys::get_file_timestamp(path, FileSys::GAME_DIR);
+	t.check(timestamp > 0, "get_file_timestamp returns non-zero for existing file");
+
+	// Test nonexistent file
+	uint64_t missing_timestamp = FileSys::get_file_timestamp("nonexistent_file_xyz.bin", FileSys::GAME_DIR);
+	t.check(missing_timestamp == 0, "get_file_timestamp returns 0 for nonexistent file");
+
+	// Cleanup
+	FileSys::delete_game_file(path);
+}
+GAME_TEST("filesys/get_file_timestamp", 5.f, test_filesys_get_file_timestamp);
