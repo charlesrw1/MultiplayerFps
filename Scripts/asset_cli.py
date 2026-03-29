@@ -183,17 +183,37 @@ class AssetCLI(cmd.Cmd):
         pass
 
     def _get_path_completions(self, text, include_files=True, include_dirs=True):
-        """Get completion matches for paths in current directory.
-        For files, shows asset groups (e.g., 'rock' not 'rock.tis', 'rock.png', 'rock.dds')"""
+        """Get completion matches for paths, supporting subdirectories.
+        For files, shows asset groups (e.g., 'rock' not 'rock.tis', 'rock.png', 'rock.dds')
+        Supports paths with directories: 'models/my<TAB>' suggests files in models/"""
         cwd = self.manager.pwd()
         matches = set()
 
         try:
-            # Separate directories and files
+            # Handle paths with directories (e.g., "models/my_model")
+            if "/" in text:
+                # Split into directory and search text
+                parts = text.rsplit("/", 1)
+                dir_path = parts[0]
+                search_text = parts[1] if len(parts) > 1 else ""
+
+                # Navigate to the subdirectory
+                target_dir = cwd / dir_path
+                if not target_dir.is_dir():
+                    return []
+
+                prefix = dir_path + "/"
+            else:
+                # Current directory
+                target_dir = cwd
+                search_text = text
+                prefix = ""
+
+            # Separate directories and files in target directory
             dirs = []
             files = []
 
-            for item in sorted(cwd.iterdir()):
+            for item in sorted(target_dir.iterdir()):
                 if item.is_dir():
                     dirs.append(item.name)
                 elif item.is_file():
@@ -202,21 +222,21 @@ class AssetCLI(cmd.Cmd):
             # Add directories
             if include_dirs:
                 for dirname in dirs:
-                    if dirname.startswith(text):
-                        matches.add(dirname + "/")
+                    if dirname.startswith(search_text):
+                        matches.add(prefix + dirname + "/")
 
             # For files, show asset groups instead of individual files
             if include_files and files:
                 groups = group_files(files)
                 for asset_name in groups.keys():
-                    if asset_name.startswith(text):
-                        matches.add(asset_name)
+                    if asset_name.startswith(search_text):
+                        matches.add(prefix + asset_name)
 
                 # If no asset groups match, fall back to non-asset files
-                if not matches or not any(m.startswith(text) for m in matches if not m.endswith("/")):
+                if not any(m.startswith(prefix) for m in matches if not m.endswith("/")):
                     for filename in files:
-                        if filename.startswith(text) and get_asset_type(filename) is None:
-                            matches.add(filename)
+                        if filename.startswith(search_text) and get_asset_type(filename) is None:
+                            matches.add(prefix + filename)
 
         except (OSError, PermissionError):
             pass
@@ -248,23 +268,38 @@ class AssetCLI(cmd.Cmd):
         return self._get_path_completions(text, include_files=True, include_dirs=False)
 
     def complete_ls(self, text, line, begidx, endidx):
-        """Tab completion for ls command - shows directories and asset groups"""
+        """Tab completion for ls command - shows directories and asset groups, with subdirectory support"""
         cwd = self.manager.pwd()
         matches = set()
 
         try:
+            # Handle paths with directories (e.g., "models/my<TAB>")
+            if "/" in text:
+                parts = text.rsplit("/", 1)
+                dir_path = parts[0]
+                search_text = parts[1] if len(parts) > 1 else ""
+                target_dir = cwd / dir_path
+                prefix = dir_path + "/"
+            else:
+                target_dir = cwd
+                search_text = text
+                prefix = ""
+
+            if not target_dir.is_dir():
+                return []
+
             # List directories
-            for item in sorted(cwd.iterdir()):
-                if item.is_dir() and item.name.startswith(text):
-                    matches.add(item.name + "/")
+            for item in sorted(target_dir.iterdir()):
+                if item.is_dir() and item.name.startswith(search_text):
+                    matches.add(prefix + item.name + "/")
 
             # List asset groups
-            files = [f.name for f in cwd.iterdir() if f.is_file()]
+            files = [f.name for f in target_dir.iterdir() if f.is_file()]
             if files:
                 groups = group_files(files)
                 for asset_name in groups.keys():
-                    if asset_name.startswith(text):
-                        matches.add(asset_name)
+                    if asset_name.startswith(search_text):
+                        matches.add(prefix + asset_name)
         except (OSError, PermissionError):
             pass
 
