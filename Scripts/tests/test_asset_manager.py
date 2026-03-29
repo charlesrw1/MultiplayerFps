@@ -444,3 +444,59 @@ def test_find_assets_empty_result(temp_asset_dir):
     results = manager.find_assets("*.dds")
 
     assert results == []
+
+def test_find_assets_fuzzy_matching(temp_asset_dir):
+    """find_assets uses fuzzy/substring matching when no wildcards"""
+    (temp_asset_dir / "my_model.mis").touch()
+    (temp_asset_dir / "my_model.glb").touch()
+    (temp_asset_dir / "my_model.cmdl").touch()
+    (temp_asset_dir / "sword.glb").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    # Fuzzy match: "my_model" should find "my_model" even without wildcards
+    results = manager.find_assets("my_model")
+
+    assert len(results) == 1
+    assert results[0]["asset"] == "my_model"
+
+def test_find_assets_fuzzy_partial_match(temp_asset_dir):
+    """find_assets fuzzy matching works with partial names"""
+    (temp_asset_dir / "my_model_v1.mis").touch()
+    (temp_asset_dir / "my_model_v1.glb").touch()
+    (temp_asset_dir / "my_model_v2.mis").touch()
+    (temp_asset_dir / "my_model_v2.glb").touch()
+    (temp_asset_dir / "sword.glb").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    # Fuzzy: "model" should find both "my_model_v1" and "my_model_v2"
+    results = manager.find_assets("model")
+
+    assert len(results) == 2
+    asset_names = {r["asset"] for r in results}
+    assert asset_names == {"my_model_v1", "my_model_v2"}
+
+def test_find_assets_fuzzy_case_insensitive(temp_asset_dir):
+    """find_assets fuzzy matching is case-insensitive"""
+    (temp_asset_dir / "MyModel.mis").touch()
+    (temp_asset_dir / "MyModel.glb").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    # Fuzzy: "mymodel" should find "MyModel"
+    results = manager.find_assets("mymodel")
+
+    assert len(results) == 1
+    assert results[0]["asset"] == "MyModel"
+
+def test_find_assets_glob_still_works(temp_asset_dir):
+    """find_assets glob matching still works with wildcards"""
+    (temp_asset_dir / "rock.png").touch()
+    (temp_asset_dir / "sword.png").touch()
+    (temp_asset_dir / "shield.dds").touch()
+
+    manager = AssetManager(temp_asset_dir)
+    # Glob: "*.png" should only find PNG files
+    results = manager.find_assets("*.png")
+
+    assert len(results) == 2
+    asset_names = {r["asset"] for r in results}
+    assert asset_names == {"rock", "sword"}

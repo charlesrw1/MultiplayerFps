@@ -458,11 +458,21 @@ class AssetManager:
         Find assets matching a pattern, grouped by asset name.
         Returns list of asset info dicts with 'asset', 'type', 'files', and 'path' keys.
         Similar to ls() but searches across subdirectories.
+
+        Matching behavior:
+        - If pattern contains wildcards (* or ?), uses glob matching
+        - Otherwise, uses fuzzy/substring matching (case-insensitive)
+
+        Examples:
+        - find "my_model" → fuzzy match, finds "my_model", "my_model_v2", etc.
+        - find "*.png" → glob match, finds only .png files
+        - find "sword*" → glob match, finds "sword", "sword_master", etc.
         """
         import fnmatch
         import os
 
         pattern_lower = pattern.lower()
+        use_glob = "*" in pattern or "?" in pattern  # Check if pattern has wildcards
         assets = []
         asset_names_seen = set()
 
@@ -488,11 +498,18 @@ class AssetManager:
                     for file_name in asset_info.get("files", []):
                         full_path_str = f"{rel_dir_str}/{file_name}" if rel_dir_str else file_name
 
-                        # Case-insensitive matching
-                        if fnmatch.fnmatch(file_name.lower(), pattern_lower) or \
-                           fnmatch.fnmatch(full_path_str.lower(), pattern_lower):
-                            matches_pattern = True
-                            break
+                        if use_glob:
+                            # Glob matching: use fnmatch
+                            if fnmatch.fnmatch(file_name.lower(), pattern_lower) or \
+                               fnmatch.fnmatch(full_path_str.lower(), pattern_lower):
+                                matches_pattern = True
+                                break
+                        else:
+                            # Fuzzy/substring matching: check if pattern is in filename
+                            if pattern_lower in file_name.lower() or \
+                               pattern_lower in full_path_str.lower():
+                                matches_pattern = True
+                                break
 
                     if matches_pattern:
                         # Create unique key for this asset
