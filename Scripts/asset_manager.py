@@ -48,7 +48,7 @@ class AssetManager:
         return [grouped[key] for key in sorted(grouped.keys())]
 
     def format_ls(self) -> str:
-        """Format ls output for display"""
+        """Format ls output for display - shows one file per asset"""
         assets = self.ls()
         if not assets:
             return ""
@@ -56,10 +56,34 @@ class AssetManager:
         lines = []
         for asset in assets:
             type_str = asset["type"].value.upper()
-            files_str = ", ".join(sorted(asset["files"]))
-            lines.append(f"{asset['asset']} [{type_str}]\n  {files_str}")
+            # Pick one representative file per asset type
+            files = sorted(asset["files"])
+            representative_file = self._pick_representative_file(asset["type"], files)
+            lines.append(f"{asset['asset']} [{type_str}] {representative_file}")
 
         return "\n".join(lines)
+
+    def _pick_representative_file(self, asset_type: AssetType, files: List[str]) -> str:
+        """Pick one representative file for an asset group"""
+        # Prefer source files over import settings or compiled versions
+        source_priority = {
+            AssetType.TEXTURE: [".png", ".jpeg", ".hdr"],  # source files first
+            AssetType.MODEL: [".glb"],  # source file
+            AssetType.MAP: [".tmap"],
+            AssetType.MATERIAL: [".glsl", ".mm"],  # source files
+        }
+
+        # Get priority list for this asset type
+        priorities = source_priority.get(asset_type, [])
+
+        # Return first file matching the priority
+        for ext in priorities:
+            for f in files:
+                if f.endswith(ext):
+                    return f
+
+        # If no priority match, return first file
+        return files[0] if files else ""
 
     def cp(self, src: str, dst: str) -> None:
         """
