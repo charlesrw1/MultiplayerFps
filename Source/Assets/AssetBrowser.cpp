@@ -74,7 +74,7 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 				}
 				if (ImGui::GetIO().MouseClickedCount[0] == 2) {
 					// auto assetType = type->get_asset_class_type();
-					if (type->get_type_name() == "Map") {
+					if (type->get_type_name() == "Map" || type->get_type_name() == "Prefab") {
 						Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, ("open-editor " + asset.filename).c_str());
 					} else {
 						sys_print(Warning, "AssetBrowser: Asset is not a standard IAsset, can't edit.\n");
@@ -174,7 +174,7 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 			auto type = asset.type;
 			if (ImGui::GetIO().MouseClickedCount[0] == 2) {
 				// auto assetType = type->get_asset_class_type();
-				if (type->get_type_name() == "Map") {
+				if (type->get_type_name() == "Map" || type->get_type_name() == "Prefab") {
 					Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, ("open-editor " + asset.filename).c_str());
 				} else {
 					sys_print(Warning, "AssetBrowser: Asset is not a standard IAsset, can't edit.\n");

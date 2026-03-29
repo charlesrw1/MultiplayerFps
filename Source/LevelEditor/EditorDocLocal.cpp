@@ -280,6 +280,11 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 
 	if (scene.has_value()) {
 		assetName = scene.value();
+		// Detect if editing a prefab (.tprefab file)
+		const auto& name = scene.value();
+		if (name.size() > 8 && name.substr(name.size() - 8) == ".tprefab") {
+			editing_prefab = true;
+		}
 	} else {
 		assetName = std::nullopt;
 	}

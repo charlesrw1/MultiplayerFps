@@ -32,6 +32,7 @@ Main editor document. Inherits `IEditorTool`.
   - Gizmo mode toggle (W/E/R for translate/rotate/scale)
   - Property panel showing reflected properties of selection
   - Outliner integration (click in outliner selects in viewport and vice versa)
+- **Prefab editing mode** — When a `.tprefab` file is double-clicked in the asset browser, `EditorDoc` loads it as a level with `editing_prefab = true`. The window title shows `[Prefab]` label. Saving writes back to the `.tprefab` file (via `get_save_file_extension()` override) instead of `.tmap`.
 
 ### Command System (`Commands.h`)
 Undo/redo stack using the command pattern.

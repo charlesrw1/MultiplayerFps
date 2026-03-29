@@ -218,7 +218,7 @@ public:
 	void duplicate_selected_and_select_them();
 	Ray unproject_mouse_to_ray(int mx, int my);
 
-	const char* get_save_file_extension() const { return "tmap"; }
+	const char* get_save_file_extension() const { return editing_prefab ? "tprefab" : "tmap"; }
 	void add_editor_commands();
 	bool is_this_object_not_inherited(const BaseUpdater* b) const {
 		return this_is_a_serializeable_object(b); // not inherted meaning i can edit it
@@ -239,6 +239,7 @@ public:
 	void* get_active_eyedropper_user_id() { return active_eyedropper_user_id; }
 
 	bool is_editing_scene() const { return true; }
+	bool is_editing_prefab() const { return editing_prefab; }
 
 	IEditorApi2& get_editor_api() final { return *editor_api2; }
 
@@ -252,7 +253,11 @@ public:
 	bool get_using_ortho() const { return ed_cam.get_is_using_ortho(); }
 	void validate_fileids_before_serialize();
 	void set_camera_target_to_sel();
-	string get_doc_name() const final { return assetName.value_or("<unnamed>"); }
+	string get_doc_name() const final {
+		string name = assetName.value_or("<unnamed>");
+		if (editing_prefab) name += " [Prefab]";
+		return name;
+	}
 
 	std::unique_ptr<SelectionState> selection_state;
 	std::unique_ptr<SelectionApiImpl> sel_api_impl;
@@ -292,6 +297,7 @@ private:
 
 	bool eye_dropper_active = false;
 	void* active_eyedropper_user_id = nullptr; // for id purposes only
+	bool editing_prefab = false;
 	FnFactory<IPropertyEditor> grid_factory;
 	uptr<ConsoleCmdGroup> cmds;
 	opt<string> assetName;
