@@ -212,6 +212,7 @@ class AssetManager:
         """
         Move file and ALL related asset files, then update all references.
         For example, moving rock.png also moves rock.tis and rock.dds to stone.tis/png/dds.
+        Or: mv rock materials (moves rock into materials directory keeping same name)
         Updates all references to moved files throughout the asset root.
         """
         src_path = self.current_dir / src
@@ -222,7 +223,17 @@ class AssetManager:
 
         asset_type = get_asset_type(src)
         src_group = get_asset_group(src)
-        dst_group = get_asset_group(dst_path.name)
+
+        # If dst is a directory, move into it with same name; otherwise it's a rename
+        dst_dir = self.current_dir / dst if not dst_path.is_absolute() else dst_path
+        if dst_dir.is_dir():
+            # Moving into a directory - keep same asset name
+            dst_group = src_group
+            move_to_dir = dst_dir
+        else:
+            # Renaming the asset
+            dst_group = get_asset_group(dst_path.name)
+            move_to_dir = dst_path.parent if dst_path.is_absolute() else self.current_dir
 
         # Get all related files for this asset
         files_to_move = []
@@ -271,7 +282,7 @@ class AssetManager:
         # Move all related files
         for file_path in files_to_move:
             ext = file_path.suffix
-            new_path = src_path.parent / (dst_group + ext)
+            new_path = move_to_dir / (dst_group + ext)
             file_path.rename(new_path)
 
         # Fix references: for each old filename, find references and update them
