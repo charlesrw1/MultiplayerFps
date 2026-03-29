@@ -404,31 +404,48 @@ class AssetManager:
         files_with_updated_references = []
         for old_name, new_name in old_to_new.items():
             try:
-                result = subprocess.run(
-                    ["rg", "--files-with-matches", old_name, str(self.asset_root)],
-                    capture_output=True,
-                    text=True,
-                    timeout=30
-                )
+                # Search for both the full filename and just the asset name (without extension)
+                # This catches references like "PARENT default_pbr.mm" and "PARENT default_pbr"
+                old_asset_name = Path(old_name).stem  # e.g., "default_pbr" from "default_pbr.mm"
+                new_asset_name = Path(new_name).stem
 
-                if result.returncode == 0:
-                    for ref_file in result.stdout.strip().split("\n"):
-                        if ref_file:
-                            ref_path = Path(ref_file)
-                            if ref_path.exists() and ref_path not in files_to_move:
-                                try:
-                                    content = ref_path.read_text()
-                                    updated = content.replace(old_name, new_name)
-                                    ref_path.write_text(updated)
-                                    # Track this file as having references updated
-                                    rel_path = str(ref_path.relative_to(self.asset_root))
-                                    if rel_path not in files_with_updated_references:
-                                        files_with_updated_references.append(rel_path)
-                                except (IOError, OSError):
-                                    # Skip files that can't be read/written
-                                    pass
-            except (FileNotFoundError, subprocess.TimeoutExpired):
-                # ripgrep not available, skip reference updates for this file
+                # Search patterns to find (full name and asset name)
+                search_patterns = [old_name, old_asset_name]
+                replace_patterns = [(old_name, new_name), (old_asset_name, new_asset_name)]
+
+                for search_pattern in search_patterns:
+                    try:
+                        result = subprocess.run(
+                            ["rg", "--files-with-matches", search_pattern, str(self.asset_root)],
+                            capture_output=True,
+                            text=True,
+                            timeout=30
+                        )
+
+                        if result.returncode == 0:
+                            for ref_file in result.stdout.strip().split("\n"):
+                                if ref_file:
+                                    ref_path = Path(ref_file)
+                                    if ref_path.exists() and ref_path not in files_to_move:
+                                        try:
+                                            content = ref_path.read_text()
+                                            # Replace both patterns: full filename and asset name
+                                            for old_pat, new_pat in replace_patterns:
+                                                content = content.replace(old_pat, new_pat)
+
+                                            ref_path.write_text(content)
+                                            # Track this file as having references updated
+                                            rel_path = str(ref_path.relative_to(self.asset_root))
+                                            if rel_path not in files_with_updated_references:
+                                                files_with_updated_references.append(rel_path)
+                                        except (IOError, OSError):
+                                            # Skip files that can't be read/written
+                                            pass
+                    except (FileNotFoundError, subprocess.TimeoutExpired):
+                        # ripgrep not available, skip reference updates for this file
+                        pass
+            except Exception:
+                # Skip on any other error
                 pass
 
         return sorted(files_with_updated_references)
