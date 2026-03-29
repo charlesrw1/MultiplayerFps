@@ -27,6 +27,7 @@
 #include "UI/UIBuilder.h"
 #include "PropertyEditors.h"
 #include "LevelSerialization/SerializeNew.h"
+#include "Assets/AssetDatabase.h"
 #include "EditorPopupTemplate.h"
 #include "Framework/StringUtils.h"
 #include "EditorPopupTemplate.h"
@@ -284,10 +285,46 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 		const auto& name = scene.value();
 		if (name.size() > 8 && name.substr(name.size() - 8) == ".tprefab") {
 			editing_prefab = true;
+
+			// Save the prefab content before clearing the level
+			std::vector<Entity*> prefab_entities;
+			auto& all_objects = eng->get_level()->get_all_objects();
+			for (auto obj : all_objects) {
+				if (auto entity = dynamic_cast<Entity*>(obj)) {
+					prefab_entities.push_back(entity);
+				}
+			}
+			SerializedSceneFile prefab_content;
+			if (!prefab_entities.empty()) {
+				try {
+					prefab_content = NewSerialization::serialize_to_text("prefab_edit_backup", prefab_entities, false);
+				} catch (const std::exception& e) {
+					sys_print(Warning, "Failed to backup prefab content: %s\n", e.what());
+				}
+			}
+
+			// Load the template level (clears current level)
+			eng->load_level("eng/template.tmap");
+
+			// Mark all template entities as dont_serialize_or_edit
+			auto& template_objects = eng->get_level()->get_all_objects();
+			for (auto obj : template_objects) {
+				if (auto entity = dynamic_cast<Entity*>(obj)) {
+					entity->dont_serialize_or_edit = true;
+				}
+			}
+
+			// Restore the prefab content into the scene
+			if (!prefab_content.text.empty()) {
+				try {
+					UnserializedSceneFile unserialized = unserialize_entities_from_text("prefab_edit_restore",
+						prefab_content.text, AssetDatabase::loader, false);
+					insert_unserialized_into_scene(unserialized);
+				} catch (const std::exception& e) {
+					sys_print(Warning, "Failed to restore prefab content: %s\n", e.what());
+				}
+			}
 		}
-
-
-		//eng->load_level("eng/template.tmap");
 	} else {
 		assetName = std::nullopt;
 	}
