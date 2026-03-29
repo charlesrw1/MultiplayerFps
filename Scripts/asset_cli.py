@@ -57,12 +57,15 @@ class AssetCLI(cmd.Cmd):
             print(f"Error: {e}")
 
     def do_ls(self, arg):
-        """List assets in current directory"""
-        output = self.manager.format_ls()
-        if output:
-            print(output)
-        else:
-            print("No assets found")
+        """List assets in current directory or specified path: ls [path]"""
+        try:
+            output = self.manager.format_ls(arg)
+            if output:
+                print(output)
+            else:
+                print("No assets or directories found")
+        except NotADirectoryError as e:
+            print(f"Error: {e}")
 
     def do_cat(self, arg):
         """Show file contents: cat <filename>"""

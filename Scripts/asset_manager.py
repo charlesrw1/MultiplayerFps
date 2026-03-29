@@ -36,20 +36,35 @@ class AssetManager:
 
         self.current_dir = target
 
-    def ls(self) -> List[Dict]:
-        """List assets in current directory, grouped by asset"""
-        if not self.current_dir.exists():
+    def ls(self, path: str = "") -> List[Dict]:
+        """List assets in specified directory (or current if empty), grouped by asset"""
+        if path:
+            # List a specific directory
+            target_dir = self.current_dir / path
+            if not target_dir.is_dir():
+                raise NotADirectoryError(f"Not a directory: {path}")
+        else:
+            target_dir = self.current_dir
+
+        if not target_dir.exists():
             return []
 
-        files = [f.name for f in self.current_dir.iterdir() if f.is_file()]
+        files = [f.name for f in target_dir.iterdir() if f.is_file()]
         grouped = group_files(files)
 
         # Return as sorted list
         return [grouped[key] for key in sorted(grouped.keys())]
 
-    def format_ls(self) -> str:
+    def format_ls(self, path: str = "") -> str:
         """Format ls output in 2-column layout with colors for folders and assets"""
-        cwd = self.pwd()
+        if path:
+            # List a specific directory
+            target_dir = self.current_dir / path
+            if not target_dir.is_dir():
+                raise NotADirectoryError(f"Not a directory: {path}")
+            cwd = target_dir
+        else:
+            cwd = self.pwd()
 
         # Collect directories and assets
         items = []
@@ -63,7 +78,7 @@ class AssetManager:
             pass
 
         # Get assets from ls()
-        assets = self.ls()
+        assets = self.ls(path)
         for asset in assets:
             type_str = asset["type"].value.upper()
             items.append(("asset", asset["asset"], type_str))
