@@ -288,28 +288,42 @@ class AssetManager:
         """
         Move file and ALL related asset files, then update all references.
         Can accept filename (my_model.glb) or asset name (my_model).
+        Supports paths with directories: models/my_model, subdirs/rock, etc.
         For example: mv rock stone (renames rock.* to stone.*)
-        Or: mv rock materials (moves rock into materials directory)
+        Or: mv rock models (moves rock into models directory)
+        Or: mv models/my_model . (moves my_model from models to current)
         Updates all references to moved files throughout the asset root.
         """
         src_path = self.current_dir / src
         dst_path = Path(dst)
 
-        # Check if src is a filename or asset name
-        if src_path.exists() and src_path.is_file():
+        # Determine source directory and asset name/filename
+        # Handle paths with directories like "models/my_model"
+        src_parts = src.split("/")
+        if len(src_parts) > 1:
+            # Path includes directories
+            src_dir = self.current_dir / "/".join(src_parts[:-1])
+            src_name = src_parts[-1]
+        else:
+            src_dir = self.current_dir
+            src_name = src
+
+        # Check if src is a filename or asset name in src_dir
+        src_file_path = src_dir / src_name
+        if src_file_path.exists() and src_file_path.is_file():
             # It's a filename that exists
-            asset_type = get_asset_type(src)
-            src_group = get_asset_group(src)
+            asset_type = get_asset_type(src_name)
+            src_group = get_asset_group(src_name)
         else:
             # Try to find as asset name
-            asset_type = get_asset_type(src)
-            src_group = get_asset_group(src)
+            asset_type = get_asset_type(src_name)
+            src_group = get_asset_group(src_name)
 
             # If not a known file type, try as asset name
             if asset_type is None:
-                src_group = src
+                src_group = src_name
                 # Find the asset group to determine type
-                all_files = [f.name for f in self.current_dir.iterdir() if f.is_file()]
+                all_files = [f.name for f in src_dir.iterdir() if f.is_file()]
                 groups = group_files(all_files)
                 if src_group in groups:
                     asset_type = groups[src_group]["type"]
@@ -317,7 +331,7 @@ class AssetManager:
                     raise FileNotFoundError(f"File or asset not found: {src}")
             else:
                 # Known type but file doesn't exist - try to find related files
-                all_files = [f.name for f in self.current_dir.iterdir() if f.is_file()]
+                all_files = [f.name for f in src_dir.iterdir() if f.is_file()]
                 groups = group_files(all_files)
                 if src_group not in groups:
                     raise FileNotFoundError(f"File or asset not found: {src}")
@@ -342,7 +356,7 @@ class AssetManager:
         if asset_type == AssetType.TEXTURE:
             # Move all texture-related files: .tis, .png, .jpeg, .hdr, .dds
             for ext in [".tis", ".png", ".jpeg", ".hdr", ".dds"]:
-                candidate = src_path.parent / (src_group + ext)
+                candidate = src_dir / (src_group + ext)
                 if candidate.exists():
                     files_to_move.append(candidate)
                     old_filename = candidate.name
@@ -352,7 +366,7 @@ class AssetManager:
         elif asset_type == AssetType.MODEL:
             # Move all model-related files: .mis, .glb, .cmdl
             for ext in [".mis", ".glb", ".cmdl"]:
-                candidate = src_path.parent / (src_group + ext)
+                candidate = src_dir / (src_group + ext)
                 if candidate.exists():
                     files_to_move.append(candidate)
                     old_filename = candidate.name
@@ -361,14 +375,14 @@ class AssetManager:
 
         elif asset_type == AssetType.MAP:
             # Move .tmap only
-            if src_path.exists():
-                files_to_move.append(src_path)
-                old_to_new[src_path.name] = Path(dst).name
+            if src_file_path.exists():
+                files_to_move.append(src_file_path)
+                old_to_new[src_file_path.name] = Path(dst).name
 
         elif asset_type == AssetType.MATERIAL:
             # Move all material files: .mm, .mi, .glsl
             for ext in [".mm", ".mi", ".glsl"]:
-                candidate = src_path.parent / (src_group + ext)
+                candidate = src_dir / (src_group + ext)
                 if candidate.exists():
                     files_to_move.append(candidate)
                     old_filename = candidate.name
@@ -376,8 +390,8 @@ class AssetManager:
                     old_to_new[old_filename] = new_filename
         else:
             # Unknown type, just move the one file
-            files_to_move.append(src_path)
-            old_to_new[src_path.name] = Path(dst).name
+            files_to_move.append(src_file_path)
+            old_to_new[src_file_path.name] = Path(dst).name
 
         # Move all related files
         for file_path in files_to_move:
