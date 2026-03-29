@@ -246,15 +246,16 @@ def test_mv_model_moves_all_related_files(temp_asset_dir):
     assert (temp_asset_dir / "axe.cmdl").exists()
 
 def test_mv_fixes_references(temp_asset_dir):
-    """mv updates all references to moved files in asset root"""
+    """mv updates references to moved files only in valid reference formats"""
     # Create asset
     (temp_asset_dir / "rock.tis").write_text("")
     (temp_asset_dir / "rock.png").write_text("")
     (temp_asset_dir / "rock.dds").write_text("compiled")
 
-    # Create files that reference the asset by various filenames
+    # Create files that reference the asset
+    # Note: Only .dds (compiled format) should be referenced, not .png (source format)
     shader = temp_asset_dir / "shader.glsl"
-    shader.write_text("use rock.dds and rock.png in one file")
+    shader.write_text("use rock.dds in shader")
 
     material = temp_asset_dir / "material.mi"
     material.write_text("texture: rock.dds")
@@ -263,12 +264,15 @@ def test_mv_fixes_references(temp_asset_dir):
     manager = AssetManager(temp_asset_dir)
     manager.mv("rock.png", str(temp_asset_dir / "stone.png"))
 
-    # Check that all references were updated
+    # Check that .dds references were updated (valid format)
     shader_content = shader.read_text()
     assert "stone.dds" in shader_content
-    assert "stone.png" in shader_content
     assert "rock.dds" not in shader_content
-    assert "rock.png" not in shader_content
+
+    # Check material references were updated
+    material_content = material.read_text()
+    assert "stone.dds" in material_content
+    assert "rock.dds" not in material_content
 
     material_content = material.read_text()
     assert "stone.dds" in material_content
@@ -279,6 +283,43 @@ def test_mv_file_not_found(temp_asset_dir):
     manager = AssetManager(temp_asset_dir)
     with pytest.raises(FileNotFoundError):
         manager.mv("nonexistent.txt", "/tmp/dest.txt")
+
+def test_valid_reference_formats(temp_asset_dir):
+    """Only specific file formats are valid for references"""
+    manager = AssetManager(temp_asset_dir)
+
+    # Valid formats
+    assert manager._is_valid_reference_format("my_model.cmdl") == True
+    assert manager._is_valid_reference_format("my_texture.dds") == True
+    assert manager._is_valid_reference_format("my_mat.mm") == True
+    assert manager._is_valid_reference_format("my_mat.mi") == True
+    assert manager._is_valid_reference_format("my_map.tmap") == True
+
+    # Invalid formats
+    assert manager._is_valid_reference_format("my_model") == False  # No extension
+    assert manager._is_valid_reference_format("my_model.glb") == False  # Source format
+    assert manager._is_valid_reference_format("my_model.mis") == False  # Settings, not reference
+    assert manager._is_valid_reference_format("my_texture.png") == False  # Source format
+    assert manager._is_valid_reference_format("my_texture.tis") == False  # Settings, not reference
+    assert manager._is_valid_reference_format("my_file.txt") == False  # Invalid format
+
+def test_mv_only_updates_valid_reference_formats(temp_asset_dir):
+    """mv only updates references in valid formats, not invalid ones"""
+    # Create files with both valid and invalid references
+    (temp_asset_dir / "default_pbr.mm").write_text("master material")
+    (temp_asset_dir / "valid_ref.mi").write_text("PARENT default_pbr.mm")
+    (temp_asset_dir / "invalid_ref.txt").write_text("reference: default_pbr")  # Invalid - no extension
+
+    manager = AssetManager(temp_asset_dir)
+    updated_refs = manager.mv("default_pbr", "custom_pbr")
+
+    # Check that valid reference was updated
+    assert "valid_ref.mi" in updated_refs
+    assert "PARENT custom_pbr.mm" in (temp_asset_dir / "valid_ref.mi").read_text()
+
+    # Check that invalid reference was NOT updated (file not in valid format)
+    invalid_content = (temp_asset_dir / "invalid_ref.txt").read_text()
+    assert "default_pbr" in invalid_content  # Should still have old name
 
 def test_find_files_by_extension(temp_asset_dir):
     """find_files returns files matching extension pattern"""

@@ -7,10 +7,23 @@ from asset_types import get_asset_type, get_asset_group, group_files, AssetType
 class AssetManager:
     """Manages asset-aware file operations within an asset root directory"""
 
+    # Valid reference formats: only these file extensions can be referenced
+    VALID_REFERENCE_FORMATS = {".cmdl", ".dds", ".mm", ".mi", ".tmap"}
+
     def __init__(self, asset_root: Path):
         """Initialize with asset root directory (typically Data/)"""
         self.asset_root = Path(asset_root).resolve()
         self.current_dir = self.asset_root
+
+    def _is_valid_reference_format(self, filename: str) -> bool:
+        """
+        Check if a filename is in a valid reference format.
+        Valid formats: .cmdl, .dds, .mm, .mi, .tmap
+        Examples: my_model.cmdl, my_texture.dds, my_mat.mm, my_mat.mi, my_map.tmap
+        Invalid: my_model (no extension), my_model.glb (source format)
+        """
+        ext = Path(filename).suffix.lower()
+        return ext in self.VALID_REFERENCE_FORMATS
 
     def pwd(self) -> Path:
         """Print working directory"""
@@ -401,51 +414,45 @@ class AssetManager:
             file_path.rename(new_path)
 
         # Fix references: for each old filename, find references and update them
+        # Only update references that match valid reference formats (.cmdl, .dds, .mm, .mi, .tmap)
         files_with_updated_references = []
         for old_name, new_name in old_to_new.items():
+            # Only process files in valid reference formats
+            if not self._is_valid_reference_format(old_name):
+                continue
+
             try:
-                # Search for both the full filename and just the asset name (without extension)
-                # This catches references like "PARENT default_pbr.mm" and "PARENT default_pbr"
-                old_asset_name = Path(old_name).stem  # e.g., "default_pbr" from "default_pbr.mm"
-                new_asset_name = Path(new_name).stem
+                result = subprocess.run(
+                    ["rg", "--files-with-matches", old_name, str(self.asset_root)],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
 
-                # Search patterns to find (full name and asset name)
-                search_patterns = [old_name, old_asset_name]
-                replace_patterns = [(old_name, new_name), (old_asset_name, new_asset_name)]
+                if result.returncode == 0:
+                    for ref_file in result.stdout.strip().split("\n"):
+                        if ref_file:
+                            ref_path = Path(ref_file)
+                            if ref_path.exists() and ref_path not in files_to_move:
+                                try:
+                                    content = ref_path.read_text()
+                                    # Only replace the exact filename in valid format
+                                    # This ensures we only update proper references like:
+                                    # "my_model.cmdl", "my_texture.dds", "my_mat.mm", etc.
+                                    # NOT invalid references like "my_model" or "my_model.glb"
+                                    updated = content.replace(old_name, new_name)
 
-                for search_pattern in search_patterns:
-                    try:
-                        result = subprocess.run(
-                            ["rg", "--files-with-matches", search_pattern, str(self.asset_root)],
-                            capture_output=True,
-                            text=True,
-                            timeout=30
-                        )
-
-                        if result.returncode == 0:
-                            for ref_file in result.stdout.strip().split("\n"):
-                                if ref_file:
-                                    ref_path = Path(ref_file)
-                                    if ref_path.exists() and ref_path not in files_to_move:
-                                        try:
-                                            content = ref_path.read_text()
-                                            # Replace both patterns: full filename and asset name
-                                            for old_pat, new_pat in replace_patterns:
-                                                content = content.replace(old_pat, new_pat)
-
-                                            ref_path.write_text(content)
-                                            # Track this file as having references updated
-                                            rel_path = str(ref_path.relative_to(self.asset_root))
-                                            if rel_path not in files_with_updated_references:
-                                                files_with_updated_references.append(rel_path)
-                                        except (IOError, OSError):
-                                            # Skip files that can't be read/written
-                                            pass
-                    except (FileNotFoundError, subprocess.TimeoutExpired):
-                        # ripgrep not available, skip reference updates for this file
-                        pass
-            except Exception:
-                # Skip on any other error
+                                    if updated != content:  # Only write if something changed
+                                        ref_path.write_text(updated)
+                                        # Track this file as having references updated
+                                        rel_path = str(ref_path.relative_to(self.asset_root))
+                                        if rel_path not in files_with_updated_references:
+                                            files_with_updated_references.append(rel_path)
+                                except (IOError, OSError):
+                                    # Skip files that can't be read/written
+                                    pass
+            except (FileNotFoundError, subprocess.TimeoutExpired):
+                # ripgrep not available, skip reference updates for this file
                 pass
 
         return sorted(files_with_updated_references)
