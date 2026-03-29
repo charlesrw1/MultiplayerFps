@@ -352,6 +352,10 @@ class AssetCLI(cmd.Cmd):
 
         return sorted(list(matches))
 
+    def complete_mkdir(self, text, line, begidx, endidx):
+        """Tab completion for mkdir command - directories only"""
+        return self._get_path_completions(text, line, begidx, endidx, include_files=False, include_dirs=True)
+
     def complete_cd(self, text, line, begidx, endidx):
         """Tab completion for cd command - directories only"""
         return self._get_path_completions(text, line, begidx, endidx, include_files=False, include_dirs=True)
