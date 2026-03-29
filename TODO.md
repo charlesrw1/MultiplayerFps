@@ -1,5 +1,56 @@
-For this task ONLY look inside Source/Render and Source/Framework and Source/IntegrationTests and Shaders/. DO NOT look elsewhere without asking.
+task: implement an "asset aware" file management CLI tool
+make with python. script will be itself a running repl.
+commands:
+	ls
+	cd
+	mv
+	cp
+	trash
+	cat
+	!<powershell>
+	pwd
+	references
+	
+	
+The reason for this is my on disk structure stores lots of duplicate files than for human consumption
+For example, textures are stored as a .tis, a source .png/.jpeg and a compiled .dds
+same with models (.mis,.cmdl,.glb)
 
-When I have SSR enabled (which requires TAA and ddgi_half_res), and resize the screen _slowly_ then it shows lots of nans/infs, im assuming from motion vectors. can you look into this?
+Goal: only print each asset once
 
-When I just resize the screen from 1000 -> 1500, it doesnt do this. but if im _dragging_ the editor viewport window then this happens.
+ALSO: commands like cp should only copy the .mis or the .tis
+trash: should remove the .tis/.png and .dds
+mv: heres the big one
+	need to fixup references
+	so if you move a .dds, then ripgrep for all references in the asset folder and fix them
+	
+	
+references:
+	print every asset that references this one
+
+Write a python script to do this.
+
+Asset root: Data/ directory (or user configured)
+
+Assset types:
+texture: 
+	.tis import settings
+	.dds/.hdr compiled
+	.png/.jpeg/.hdr source
+model:
+	.mis import settings
+	.cmdl compiled
+	.glb source
+map:
+	.tmap
+material:
+	.mm master (keep)
+	.mi instance (keep)	
+	.glsl output shader (hide)
+	
+REPL stores no state. no caching, every action is done fresh.
+
+Note: mv should move ALL related asset files together (import settings, source, compiled).
+Then fix all references to those files.
+	
+

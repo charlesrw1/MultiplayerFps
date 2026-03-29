@@ -199,9 +199,28 @@ class AssetCLI(cmd.Cmd):
         matches = set()
 
         try:
-            # Extract the full argument being completed using begidx/endidx
-            # This gives us the exact text from the command line including directory paths
-            full_arg = line[begidx:endidx]
+            # Extract the full argument to the command by parsing the line
+            # This handles cases where "/" causes readline to split into separate words
+            # line format: "<command> <arg1> [<arg2>]"
+            # We need to find which argument position we're completing
+
+            # Split the line to identify the command
+            parts = line.split()
+            if not parts:
+                return []
+
+            cmd = parts[0]  # e.g., "mv", "cp", "cd", etc.
+
+            # Find where the command ends and arguments begin
+            cmd_start = line.find(cmd)
+            arg_start = cmd_start + len(cmd)
+            # Skip whitespace after command
+            while arg_start < len(line) and line[arg_start] == ' ':
+                arg_start += 1
+
+            # Extract the text from arg_start to the cursor (endidx)
+            # This gives us the full path being completed, including any "/"
+            full_arg = line[arg_start:endidx]
 
             # Handle paths with directories (e.g., "models/my_model")
             if "/" in full_arg:
@@ -286,19 +305,33 @@ class AssetCLI(cmd.Cmd):
         matches = set()
 
         try:
-            # Extract the full argument being completed using begidx/endidx
-            full_arg = line[begidx:endidx]
+            # Extract the full argument to the ls command
+            # line format: "ls <arg>"
+            # Split on first whitespace to get command and argument parts
+            parts = line.split(None, 1)
+            if len(parts) < 2:
+                arg = ""
+            else:
+                # Find where the argument starts in the line
+                cmd = parts[0]  # "ls"
+                cmd_start = line.find(cmd)
+                arg_start = cmd_start + len(cmd)
+                # Skip whitespace after command
+                while arg_start < len(line) and line[arg_start] == ' ':
+                    arg_start += 1
+                # Argument is from arg_start to cursor position (endidx)
+                arg = line[arg_start:endidx]
 
             # Handle paths with directories (e.g., "models/my<TAB>")
-            if "/" in full_arg:
-                path_parts = full_arg.rsplit("/", 1)
+            if "/" in arg:
+                path_parts = arg.rsplit("/", 1)
                 dir_path = path_parts[0]
                 search_text = path_parts[1] if len(path_parts) > 1 else ""
                 target_dir = cwd / dir_path
                 prefix = dir_path + "/"
             else:
                 target_dir = cwd
-                search_text = full_arg
+                search_text = arg
                 prefix = ""
 
             if not target_dir.is_dir():
