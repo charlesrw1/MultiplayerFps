@@ -74,7 +74,7 @@ UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_
 // instanced prefabs cant be deleted) also checks for fully unique ids.
 
 SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs,
-														bool write_ids) {
+														bool write_ids, const char* prefab_name) {
 	double now = GetTime();
 
 	nlohmann::json obj;
@@ -104,6 +104,9 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 			out["__retid"] = ent->get_instance_id();
 		obj["objs"].push_back(out);
 		// printf("%s\n", obj.dump(1).c_str());
+	}
+	if (prefab_name && *prefab_name) {
+		obj["__prefab_name"] = prefab_name;
 	}
 	SerializedSceneFile outfile;
 	outfile.text = "!json\n" + obj.dump(1);

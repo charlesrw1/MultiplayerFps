@@ -111,6 +111,8 @@ public:
 	// hm.
 	virtual void editor_render_thumbnail_for(Model* model, MaterialInstance* override_mat, int w, int h,
 											 std::string disk_path) = 0;
+	virtual void editor_render_thumbnail_for_prefab(const std::vector<std::pair<const Model*, glm::mat4>>& models,
+													int w, int h, std::string disk_path) = 0;
 #endif
 };
 

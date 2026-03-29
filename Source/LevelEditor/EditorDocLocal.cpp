@@ -43,6 +43,7 @@
 #include "Framework/PropertyEd.h"
 
 #include "Game/Components/SpawnerComponenth.h"
+#include "Game/Components/PrefabAssetComponent.h"
 
 MulticastDelegate<EditorDoc*> EditorDoc::on_creation;
 MulticastDelegate<EditorDoc*> EditorDoc::on_deletion;
@@ -87,10 +88,16 @@ Color32 to_color32(glm::vec4 v) {
 
 string get_name_display_entity(const Entity* e) {
 	string name = (e->get_editor_name().c_str());
-	const bool is_prefab_root = false; // o.e->get_object_prefab_spawn_type() == EntityPrefabSpawnType::RootOfPrefab;
 	if (name.empty()) {
-		if (is_prefab_root) {
-			// name = o.e->get_object_prefab().get_name().c_str();
+		if (auto prefab = e->get_component<PrefabAssetComponent>()) {
+			// Extract filename from path (e.g., "Prefabs/my_prefab.tprefab" -> "my_prefab.tprefab")
+			string prefab_path = prefab->prefab_path;
+			size_t last_slash = prefab_path.find_last_of("/\\");
+			if (last_slash != string::npos) {
+				name = prefab_path.substr(last_slash + 1);
+			} else {
+				name = prefab_path;
+			}
 		} else {
 			if (auto m = e->get_component<MeshComponent>()) {
 				if (m->get_model())
@@ -290,7 +297,7 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 			std::vector<Entity*> prefab_entities;
 			auto& all_objects = eng->get_level()->get_all_objects();
 			for (auto obj : all_objects) {
-				if (auto entity = dynamic_cast<Entity*>(obj)) {
+				if (auto entity = obj->cast_to<Entity>()) {
 					prefab_entities.push_back(entity);
 				}
 			}
@@ -298,18 +305,19 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 			if (!prefab_entities.empty()) {
 				try {
 					prefab_content = NewSerialization::serialize_to_text("prefab_edit_backup", prefab_entities, false);
-				} catch (const std::exception& e) {
+				}
+				catch (const std::exception& e) {
 					sys_print(Warning, "Failed to backup prefab content: %s\n", e.what());
 				}
 			}
 
 			// Load the template level (clears current level)
-			eng->load_level("eng/template.tmap");
+			eng->load_level("template.tmap");
 
 			// Mark all template entities as dont_serialize_or_edit
 			auto& template_objects = eng->get_level()->get_all_objects();
 			for (auto obj : template_objects) {
-				if (auto entity = dynamic_cast<Entity*>(obj)) {
+				if (auto entity = obj->cast_to<Entity>()) {
 					entity->dont_serialize_or_edit = true;
 				}
 			}
@@ -317,10 +325,11 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 			// Restore the prefab content into the scene
 			if (!prefab_content.text.empty()) {
 				try {
-					UnserializedSceneFile unserialized = unserialize_entities_from_text("prefab_edit_restore",
-						prefab_content.text, AssetDatabase::loader, false);
+					UnserializedSceneFile unserialized = unserialize_entities_from_text(
+						"prefab_edit_restore", prefab_content.text, AssetDatabase::loader, false);
 					insert_unserialized_into_scene(unserialized);
-				} catch (const std::exception& e) {
+				}
+				catch (const std::exception& e) {
 					sys_print(Warning, "Failed to restore prefab content: %s\n", e.what());
 				}
 			}
@@ -679,7 +688,9 @@ void EditorDoc::hook_scene_viewport_draw() {
 
 			if (const ImGuiPayload* dummy = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")) {
 
-				if (resource->type->get_type_name() == "Spawner-Entity") {
+				if (resource->type->get_type_name() == "Prefab") {
+					command_mgr->add_command(new InstantiatePrefabCommand(*this, resource->filename, drop_transform));
+				} else if (resource->type->get_type_name() == "Spawner-Entity") {
 					command_mgr->add_command(new CreateSpawnerCommand(*this, resource->filename, drop_transform));
 				} else if (resource->type->get_asset_class_type()->is_a(Entity::StaticType)) {
 					command_mgr->add_command(

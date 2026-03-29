@@ -3438,6 +3438,83 @@ void ThumbnailRenderer::render(Model* model, MaterialInstance* override_mat) {
 	draw.render_level_to_target(cmdparams);
 }
 
+void ThumbnailRenderer::render(const std::vector<std::pair<const Model*, glm::mat4>>& models) {
+	ASSERT(!eng->get_is_in_overlapped_period());
+	if (models.empty())
+		return;
+
+	pass.clear();
+	auto& scene = draw.scene;
+
+	// Calculate bounding sphere for all models to frame the camera
+	glm::vec3 combined_center(0);
+	float max_radius = 0.1f;
+
+	// Add all models to the render pass
+	for (const auto& model_pair : models) {
+		const Model* model = model_pair.first;
+		const glm::mat4& transform = model_pair.second;
+
+		if (!model || model->get_num_lods() == 0)
+			continue;
+
+		// Update bounding sphere for camera positioning
+		glm::vec4 sphere = model->get_bounding_sphere();
+		glm::vec3 sphere_center = glm::vec3(transform * glm::vec4(glm::vec3(sphere), 1.0f));
+		combined_center += sphere_center;
+		max_radius = std::max(max_radius, glm::length(sphere_center) + sphere.w);
+
+		// Add model parts to render pass
+		auto& lod = model->get_lod(0);
+		const int pstart = lod.part_ofs;
+		const int pend = pstart + lod.part_count;
+		auto& proxy = scene.proxy_list.get(object.id);
+		proxy.proxy.model = const_cast<Model*>(model);
+		proxy.proxy.transform = transform;
+
+		for (int j = pstart; j < pend; j++) {
+			auto& part = model->get_part(j);
+			const MaterialInstance* mat = model->get_material_for_part(part);
+
+			if (!mat || !mat->is_valid_to_use() || !mat->get_master_material()->is_compilied_shader_valid)
+				mat = matman.get_fallback();
+
+			pass.add_object(proxy.proxy, object, mat, 0, j, 0, 0, false);
+		}
+	}
+
+	pass.make_batches(scene);
+	build_standard_cpu(list, pass, scene.proxy_list);
+
+	const int w = size;
+	const int h = size;
+
+	auto set_pass = [&]() {
+		RenderPassState passState;
+		auto color_infos = {ColorTargetInfo(color)};
+		passState.color_infos = color_infos;
+		passState.depth_info = depth;
+		passState.set_clear_both(true);
+		IGraphicsDevice::inst->set_render_pass(passState);
+	};
+	set_pass();
+
+	// Position camera to frame all models
+	combined_center /= static_cast<float>(models.size());
+	float fov_rad = glm::radians(thumbnail_fov.get_float());
+	float c_mult = 2.0f / fov_rad;
+	glm::vec3 cam_pos = combined_center + glm::normalize(glm::vec3(1, 1, 1)) * max_radius * c_mult;
+
+	View_Setup viewSetup =
+		View_Setup(glm::lookAt(cam_pos, combined_center, glm::vec3(0, 1, 0)), fov_rad, 0.01, 100.0, w, h);
+
+	Render_Level_Params cmdparams(viewSetup, &list, &pass, Render_Level_Params::FORWARD_PASS);
+	cmdparams.upload_constants = true;
+	cmdparams.provied_constant_buffer = draw.ubo.current_frame;
+	cmdparams.draw_viewmodel = true;
+	draw.render_level_to_target(cmdparams);
+}
+
 void ThumbnailRenderer::output_to_path(std::string path) {
 	const int w = size;
 	const int h = size;

@@ -541,6 +541,7 @@ class ThumbnailRenderer
 public:
 	ThumbnailRenderer(int size);
 	void render(Model* m, MaterialInstance* override_mat);
+	void render(const std::vector<std::pair<const Model*, glm::mat4>>& models);
 	void output_to_path(std::string path);
 
 private:
@@ -676,6 +677,12 @@ public:
 									 std::string path) final {
 		matman.pre_render_update(); // hack fixme
 		thumbnailRenderer->render(model, override_mat);
+		thumbnailRenderer->output_to_path(path);
+	}
+	void editor_render_thumbnail_for_prefab(const std::vector<std::pair<const Model*, glm::mat4>>& models, int w, int h,
+											std::string path) final {
+		matman.pre_render_update(); // hack fixme
+		thumbnailRenderer->render(models);
 		thumbnailRenderer->output_to_path(path);
 	}
 #endif
@@ -887,9 +894,8 @@ public:
 	OpenglRenderDevice& get_device() { return device; }
 	Program_Manager& get_prog_man() { return device.get_prog_man(); }
 
-	bool wants_disable_temporal_effects_this_frame() const {
-		return disable_taa_this_frame;
-	}
+	bool wants_disable_temporal_effects_this_frame() const { return disable_taa_this_frame; }
+
 private:
 	RenderWindowBackendLocal* windowDrawer = nullptr;
 #ifdef EDITOR_BUILD

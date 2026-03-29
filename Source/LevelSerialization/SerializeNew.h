@@ -63,7 +63,7 @@ class NewSerialization
 public:
 	// throws SerializeInputError on bad input
 	static SerializedSceneFile serialize_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs,
-												 bool write_ids);
+												 bool write_ids, const char* prefab_name = nullptr);
 	static UnserializedSceneFile unserialize_from_text(const char* debug_tag, const std::string& text,
 													   IAssetLoadingInterface& load, bool keepid);
 	static UnserializedSceneFile unserialize_from_json(const char* debug_tag, SerializedForDiffing& json,

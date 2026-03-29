@@ -7,9 +7,10 @@
 #include <cassert>
 
 static EditorDoc* get_doc() {
-	assert(eng_local.editorState && "editorState is null — not in editor mode?");
-	auto* doc = static_cast<EditorDoc*>(eng_local.editorState->get_tool());
-	assert(doc && "editor tool is null");
+	auto* tool = eng->get_tool();
+	assert(tool && "editor tool is null — not in editor mode?");
+	auto* doc = static_cast<EditorDoc*>(tool);
+	assert(doc && "editor tool is not EditorDoc");
 	return doc;
 }
 

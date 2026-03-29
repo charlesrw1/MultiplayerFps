@@ -10,6 +10,11 @@
 #include "AssetRegistryLocal.h"
 
 #include "AssetDatabase.h"
+#include "Game/Prefab.h"
+#include "LevelSerialization/SerializeNew.h"
+#include "Game/Entity.h"
+#include "Game/Components/MeshComponent.h"
+#include "Render/DrawPublic.h"
 
 // Case-insensitive substring search without allocations
 static inline bool contains_case_insensitive(std::string_view haystack, std::string_view needle) {
@@ -546,14 +551,15 @@ void AssetBrowser::imgui_draw() {
 	}
 	ImGui::End();
 }
-#include "Render/DrawPublic.h"
 
 #include "Framework/MapUtil.h"
 #include "Render/MaterialPublic.h"
 #include "Render/MaterialLocal.h"
 Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset) {
 	auto asset_class = asset.type->get_asset_class_type();
-	if (asset_class != &Model::StaticType && asset_class != &MaterialInstance::StaticType)
+	// Support thumbnails for Models, Materials, and Prefabs
+	const bool is_prefab = asset.type->get_type_name() == "Prefab";
+	if (asset_class != &Model::StaticType && asset_class != &MaterialInstance::StaticType && !is_prefab)
 		return nullptr;
 
 	if (MapUtil::contains(cache, asset.filename)) {
@@ -576,7 +582,7 @@ Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset) {
 		MaterialInstance* override_mat{};
 		if (asset_class == &Model::StaticType) {
 			the_model = Model::load(asset.filename);
-		} else {
+		} else if (asset_class == &MaterialInstance::StaticType) {
 			auto mat = MaterialInstance::load(asset.filename);
 			if (mat && mat->impl && mat->impl->get_master_impl() &&
 				mat->impl->get_master_impl()->usage == MaterialUsage::Default) {
@@ -585,9 +591,47 @@ Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset) {
 			} else {
 				return nullptr;
 			}
+		} else if (is_prefab) {
+			// For prefabs, load the prefab file and render all meshes with their transforms
+			string prefab_text = PrefabFile::load_text(asset.filename);
+			if (!prefab_text.empty()) {
+				try {
+					// Parse the prefab to find all entities with meshes
+					auto unserialized =
+						unserialize_entities_from_text("prefab_thumbnail", prefab_text, AssetDatabase::loader, false);
+
+					// Collect all models and their transforms
+					std::vector<std::pair<const Model*, glm::mat4>> meshes_to_render;
+
+					for (auto base_updater : unserialized.all_obj_vec) {
+						if (auto entity = base_updater->cast_to<Entity>()) {
+							if (auto mesh_comp = entity->get_component<MeshComponent>()) {
+								if (auto model = mesh_comp->get_model()) {
+									std::pair<const Model*, glm::mat4> mesh_pair;
+									mesh_pair.first = model;
+									mesh_pair.second = entity->get_ws_transform();
+									meshes_to_render.push_back(mesh_pair);
+								}
+							}
+						}
+					}
+
+					// Render all collected meshes with their transforms in a single thumbnail
+					if (!meshes_to_render.empty()) {
+						idraw->editor_render_thumbnail_for_prefab(meshes_to_render, 128, 128,
+																  FileSys::get_full_path_from_game_path(thumnail_path));
+					}
+					unserialized.delete_objs();
+				}
+				catch (const std::exception&) {
+					// If prefab parsing fails, return nullptr
+					return nullptr;
+				}
+			} else {
+				return nullptr;
+			}
 		}
 		if (the_model) {
-			// hmm..
 			idraw->editor_render_thumbnail_for(the_model, override_mat, 128, 128,
 											   FileSys::get_full_path_from_game_path(thumnail_path));
 		}

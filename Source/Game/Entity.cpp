@@ -286,7 +286,7 @@ Component* Entity::create_component(const ClassTypeInfo* info) {
 	ec->entity_owner = this;
 	all_components.push_back(ec);
 	eng->get_level()->add_and_init_created_runtime_component(ec);
-	ASSERT(ec->init_state == initialization_state::CALLED_START);
+	ASSERT(ec->init_state != initialization_state::CONSTRUCTOR);
 	return ec;
 }
 

@@ -1,10 +1,12 @@
 #ifdef EDITOR_BUILD
 #include "Commands.h"
 #include <unordered_set>
+#include <limits>
 #include "Framework/MapUtil.h"
 #include "EditorDocLocal.h"
 #include "Game/Prefab.h"
 #include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 void validate_remove_entities(EditorDoc& ed_doc, std::vector<EntityPtr>& input) {
 	bool had_errors = false;
 	for (int i = 0; i < input.size(); i++) {
@@ -521,35 +523,24 @@ void CreateEntityCommand::execute() {
 	post_create(e);
 }
 
-InstantiatePrefabCommand::InstantiatePrefabCommand(EditorDoc& ed_doc, const std::string& prefab_path,
-	const glm::mat4& transform)
-	: ed_doc(ed_doc), prefab_path(prefab_path), transform(transform) {}
+#include "Game/Components/PrefabAssetComponent.h"
+static Entity* spawn_prefab(EditorDoc& ed_doc, const std::string& path, const glm::mat4 transform) {
+	auto ent = ed_doc.spawn_entity()->create_component<PrefabAssetComponent>();
+	ent->update_path(path);
+	ent->get_owner()->set_ws_transform(transform);
+	return ent->get_owner();
+}
 
+InstantiatePrefabCommand::InstantiatePrefabCommand(EditorDoc& ed_doc, const std::string& prefab_path,
+												   const glm::mat4& transform)
+	: ed_doc(ed_doc), prefab_path(prefab_path), transform(transform) {}
 void InstantiatePrefabCommand::execute() {
-	std::string text = PrefabFile::load_text(prefab_path);
-	if (text.empty()) {
-		sys_print(Warning, "Failed to load prefab: %s\n", prefab_path.c_str());
-		return;
-	}
 
 	try {
-		UnserializedSceneFile unserialized = unserialize_entities_from_text("instantiate_prefab", text,
-			AssetDatabase::loader, false);
-
-		ed_doc.insert_unserialized_into_scene(unserialized);
-
-		// Collect and store entity handles for undo
-		// Apply transform offset to root entities
-		for (auto base : unserialized.all_obj_vec) {
-			if (auto entity = dynamic_cast<Entity*>(base)) {
-				if (!entity->get_parent()) {
-					// Root entity: apply transform
-					entity->set_ws_transform(transform);
-				}
-				handles.push_back(entity->get_self_ptr());
-			}
-		}
-	} catch (const std::exception& e) {
+		auto e = spawn_prefab(ed_doc, prefab_path, transform);
+		handles.push_back(e);
+	}
+	catch (const std::exception& e) {
 		sys_print(Warning, "Failed to deserialize prefab %s: %s\n", prefab_path.c_str(), e.what());
 	}
 }
@@ -564,7 +555,8 @@ void InstantiatePrefabCommand::undo() {
 }
 
 MakePrefabFromSelectionCommand::MakePrefabFromSelectionCommand(EditorDoc& ed_doc,
-	const std::vector<EntityPtr>& selection, const std::string& save_path)
+															   const std::vector<EntityPtr>& selection,
+															   const std::string& save_path)
 	: ed_doc(ed_doc), save_path(save_path), selection(selection) {}
 
 void MakePrefabFromSelectionCommand::execute() {
@@ -582,7 +574,13 @@ void MakePrefabFromSelectionCommand::execute() {
 
 	// Serialize entities to text (no IDs - fresh instantiation)
 	try {
-		auto serialized = NewSerialization::serialize_to_text("make_prefab", entities, false);
+		// Extract filename from path for display in JSON metadata
+		std::string prefab_name = save_path;
+		size_t last_slash = prefab_name.find_last_of("/\\");
+		if (last_slash != std::string::npos) {
+			prefab_name = prefab_name.substr(last_slash + 1);
+		}
+		auto serialized = NewSerialization::serialize_to_text("make_prefab", entities, false, prefab_name.c_str());
 		prefab_text = std::make_unique<SerializedSceneFile>(serialized);
 
 		// Save to file
@@ -590,20 +588,21 @@ void MakePrefabFromSelectionCommand::execute() {
 			sys_print(Warning, "Failed to save prefab to: %s\n", save_path.c_str());
 			prefab_text = nullptr;
 		}
-	} catch (const std::exception& e) {
+	}
+	catch (const std::exception& e) {
 		sys_print(Warning, "Failed to serialize prefab: %s\n", e.what());
 	}
+	ed_doc.post_node_changes.invoke();
 }
 
 void MakePrefabFromSelectionCommand::undo() {
 	// Note: File undo is not easily reversible, so we just log it.
 	// In a more robust system, we might want to back up the original file first.
-	sys_print(Info, "Undo make prefab: file %s persists (manual deletion needed if unwanted)\n",
-		save_path.c_str());
+	sys_print(Info, "Undo make prefab: file %s persists (manual deletion needed if unwanted)\n", save_path.c_str());
 }
 
-MakePrefabAndReplaceCommand::MakePrefabAndReplaceCommand(EditorDoc& ed_doc,
-	const std::vector<EntityPtr>& selection, const std::string& prefab_path)
+MakePrefabAndReplaceCommand::MakePrefabAndReplaceCommand(EditorDoc& ed_doc, const std::vector<EntityPtr>& selection,
+														 const std::string& prefab_path)
 	: ed_doc(ed_doc), prefab_path(prefab_path), selection(selection) {}
 
 void MakePrefabAndReplaceCommand::execute() {
@@ -620,50 +619,70 @@ void MakePrefabAndReplaceCommand::execute() {
 		return;
 	}
 
-	// Step 2: Serialize and save to prefab file
+	// Step 2: Calculate bounding box and center of all entities
+	glm::vec3 bbox_min(std::numeric_limits<float>::infinity());
+	glm::vec3 bbox_max(-std::numeric_limits<float>::infinity());
+
+	for (auto entity : entities) {
+		glm::vec3 pos = entity->get_ws_position();
+		bbox_min = glm::min(bbox_min, pos);
+		bbox_max = glm::max(bbox_max, pos);
+	}
+
+	bbox_center = (bbox_min + bbox_max) * 0.5f;
+
+	// Step 3: Store original positions and offset entities to center at origin
+	std::vector<glm::vec3> original_positions;
+	for (auto entity : entities) {
+		original_positions.push_back(entity->get_ws_position());
+		glm::vec3 new_pos = entity->get_ws_position() - bbox_center;
+		entity->set_ws_position(new_pos);
+	}
+
+	// Step 4: Serialize and save to prefab file (with centered entities)
 	try {
-		auto serialized = NewSerialization::serialize_to_text("make_prefab_replace", entities, false);
+		// Extract filename from path for display in JSON metadata
+		std::string prefab_name = prefab_path;
+		size_t last_slash = prefab_name.find_last_of("/\\");
+		if (last_slash != std::string::npos) {
+			prefab_name = prefab_name.substr(last_slash + 1);
+		}
+		auto serialized =
+			NewSerialization::serialize_to_text("make_prefab_replace", entities, false, prefab_name.c_str());
 		original_selection = std::make_unique<SerializedSceneFile>(serialized);
 
 		if (!PrefabFile::save_text(prefab_path, serialized.text)) {
 			sys_print(Warning, "Failed to save prefab to: %s\n", prefab_path.c_str());
 			original_selection = nullptr;
+			// Restore positions on failure
+			for (size_t i = 0; i < entities.size(); ++i) {
+				entities[i]->set_ws_position(original_positions[i]);
+			}
 			return;
 		}
-	} catch (const std::exception& e) {
+	}
+	catch (const std::exception& e) {
 		sys_print(Warning, "Failed to serialize prefab: %s\n", e.what());
+		// Restore positions on failure
+		for (size_t i = 0; i < entities.size(); ++i) {
+			entities[i]->set_ws_position(original_positions[i]);
+		}
 		return;
 	}
 
-	// Step 3: Delete the original entities
+	// Step 5: Delete the original entities (which were offset)
 	for (auto& ptr : selection) {
 		if (auto entity = ptr.get()) {
 			entity->destroy();
 		}
 	}
 
-	// Step 4: Load and instantiate the prefab
-	std::string text = PrefabFile::load_text(prefab_path);
-	if (text.empty()) {
-		sys_print(Warning, "Failed to load prefab immediately after save: %s\n", prefab_path.c_str());
-		return;
-	}
+	// Step 6: Spawn prefab at the original center point (to restore the placement)
+	glm::mat4 spawn_transform = glm::translate(glm::mat4(1.0f), bbox_center);
+	auto e = spawn_prefab(ed_doc, prefab_path, spawn_transform);
+	spawned_prefab_instances.push_back(e);
 
-	try {
-		UnserializedSceneFile unserialized = unserialize_entities_from_text("instantiate_prefab_replace", text,
-			AssetDatabase::loader, false);
-
-		ed_doc.insert_unserialized_into_scene(unserialized);
-
-		// Collect spawned entity handles for undo
-		for (auto base : unserialized.all_obj_vec) {
-			if (auto entity = dynamic_cast<Entity*>(base)) {
-				spawned_prefab_instances.push_back(entity->get_self_ptr());
-			}
-		}
-	} catch (const std::exception& e) {
-		sys_print(Warning, "Failed to instantiate prefab %s: %s\n", prefab_path.c_str(), e.what());
-	}
+	ed_doc.post_node_changes.invoke();
 }
 
 void MakePrefabAndReplaceCommand::undo() {
@@ -679,10 +698,19 @@ void MakePrefabAndReplaceCommand::undo() {
 	if (original_selection) {
 		try {
 			// Clone the serialization for deserialization
-			UnserializedSceneFile unserialized = unserialize_entities_from_text("undo_prefab_replace",
-				original_selection->text, AssetDatabase::loader, true);
+			UnserializedSceneFile unserialized = unserialize_entities_from_text(
+				"undo_prefab_replace", original_selection->text, AssetDatabase::loader, true);
 			ed_doc.insert_unserialized_into_scene(unserialized);
-		} catch (const std::exception& e) {
+
+			// Apply bbox_center offset to restored entities to place them back at original positions
+			for (auto obj : unserialized.all_obj_vec) {
+				if (auto entity = dynamic_cast<Entity*>(obj)) {
+					glm::vec3 current_pos = entity->get_ws_position();
+					entity->set_ws_position(current_pos + bbox_center);
+				}
+			}
+		}
+		catch (const std::exception& e) {
 			sys_print(Warning, "Failed to restore original entities during undo: %s\n", e.what());
 		}
 	}

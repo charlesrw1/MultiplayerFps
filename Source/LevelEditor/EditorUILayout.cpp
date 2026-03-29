@@ -36,6 +36,8 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 
 	if (!eng->get_level())
 		return false;
+	if (!editor_draw_name_text.get_bool())
+		return false;
 
 	const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
 	if (!font)

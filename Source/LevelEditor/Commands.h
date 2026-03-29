@@ -321,7 +321,8 @@ class MakePrefabFromSelectionCommand : public Command
 {
 public:
 	EditorDoc& ed_doc;
-	MakePrefabFromSelectionCommand(EditorDoc& ed_doc, const std::vector<EntityPtr>& selection, const std::string& save_path);
+	MakePrefabFromSelectionCommand(EditorDoc& ed_doc, const std::vector<EntityPtr>& selection,
+								   const std::string& save_path);
 	bool is_valid() final { return !save_path.empty() && !selection.empty(); }
 
 	void execute() final;
@@ -337,7 +338,8 @@ class MakePrefabAndReplaceCommand : public Command
 {
 public:
 	EditorDoc& ed_doc;
-	MakePrefabAndReplaceCommand(EditorDoc& ed_doc, const std::vector<EntityPtr>& selection, const std::string& prefab_path);
+	MakePrefabAndReplaceCommand(EditorDoc& ed_doc, const std::vector<EntityPtr>& selection,
+								const std::string& prefab_path);
 	bool is_valid() final { return !prefab_path.empty() && !selection.empty(); }
 
 	void execute() final;
@@ -348,6 +350,7 @@ public:
 	std::vector<EntityPtr> selection;
 	std::unique_ptr<SerializedSceneFile> original_selection;
 	std::vector<EntityPtr> spawned_prefab_instances;
+	glm::vec3 bbox_center = glm::vec3(0.0f);
 };
 
 #endif

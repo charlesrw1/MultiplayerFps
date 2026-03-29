@@ -3,7 +3,8 @@
 
 // PrefabFile — Simple file I/O for .tprefab files
 // Not an IAsset — just string-based path and serialization text
-class PrefabFile {
+class PrefabFile
+{
 public:
 	// Load serialized entity text from a .tprefab file
 	// Returns empty string on failure
@@ -19,10 +20,12 @@ public:
 #include "Framework/Util.h"
 
 // AssetMetadata for .tprefab files in the asset browser
-class PrefabAssetMetadata : public AssetMetadata {
+class PrefabAssetMetadata : public AssetMetadata
+{
 public:
+	PrefabAssetMetadata() { extensions.push_back("tprefab"); }
 	std::string get_type_name() const override { return "Prefab"; }
 	Color32 get_browser_color() const override { return {255, 200, 100}; }
 };
 
-#endif  // EDITOR_BUILD
+#endif // EDITOR_BUILD

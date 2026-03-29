@@ -30,7 +30,6 @@ void TOUCH_ASSET(const Cmd_Args& args) {
 	}
 }
 
-
 // Ill just put this code here
 // DECLARE_ENGINE_CMD_CAT("sys.", ls)
 void SYS_LS_CMD(const Cmd_Args& args) {
@@ -140,7 +139,6 @@ AssetRegistrySystem& AssetRegistrySystem::get() {
 	return inst;
 }
 
-
 static std::vector<std::string> split(const std::string& str, char delimiter) {
 	std::vector<std::string> tokens;
 	std::stringstream ss(str);
@@ -173,8 +171,7 @@ void AssetRegistrySystem::init() {
 	string dir = g_project_base.get_string();
 
 	if (!file_watcher_.init(dir)) {
-		Fatalf("AssetRegistrySystem: FileWatcher::init failed for dir '%s' (error %lu)\n",
-			dir.c_str(), GetLastError());
+		Fatalf("AssetRegistrySystem: FileWatcher::init failed for dir '%s' (error %lu)\n", dir.c_str(), GetLastError());
 	}
 
 	reindex_all_assets();
@@ -252,12 +249,14 @@ void AssetRegistrySystem::update() {
 	if (changed.empty())
 		return;
 
-	auto* texMeta   = (AssetMetadata*)find_for_classtype(ClassBase::find_class("Texture"));
+	auto* texMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("Texture"));
 	auto* modelMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("Model"));
-	auto* matMeta   = (AssetMetadata*)find_for_classtype(ClassBase::find_class("MaterialInstance"));
+	auto* matMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("MaterialInstance"));
 	auto* soundMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SoundFile"));
-	auto* fontMeta  = (AssetMetadata*)find_for_classtype(ClassBase::find_class("GuiFont"));
-	auto* mapMeta   = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SceneAsset"));
+	auto* fontMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("GuiFont"));
+	auto* mapMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SceneAsset"));
+	auto* prefabMeta = (AssetMetadata*)find_type("Prefab");
+	assert(prefabMeta);
 
 	bool tree_dirty = false;
 
@@ -311,6 +310,8 @@ void AssetRegistrySystem::update() {
 			aod.type = fontMeta;
 		else if (ext == "cmdl")
 			aod.type = modelMeta;
+		else if (ext == "tprefab")
+			aod.type = prefabMeta;
 		else if (ext == "mis") {
 			StringUtils::remove_extension(aod.filename);
 			aod.filename += ".cmdl";
@@ -346,12 +347,14 @@ void AssetRegistrySystem::reindex_all_assets() {
 
 	root = std::make_unique<AssetFilesystemNode>();
 
-	auto* texMeta   = (AssetMetadata*)find_for_classtype(ClassBase::find_class("Texture"));
+	auto* texMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("Texture"));
 	auto* modelMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("Model"));
-	auto* matMeta   = (AssetMetadata*)find_for_classtype(ClassBase::find_class("MaterialInstance"));
-	auto* mapMeta   = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SceneAsset"));
+	auto* matMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("MaterialInstance"));
+	auto* mapMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SceneAsset"));
 	auto* soundMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SoundFile"));
-	auto* fontMeta  = (AssetMetadata*)find_for_classtype(ClassBase::find_class("GuiFont"));
+	auto* fontMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("GuiFont"));
+	auto* prefabMeta = (AssetMetadata*)find_type("Prefab");
+	assert(prefabMeta);
 
 	// Use a set to deduplicate model entries: both .cmdl and .mis map to the same .cmdl asset.
 	std::unordered_set<std::string> model_paths;
@@ -359,7 +362,7 @@ void AssetRegistrySystem::reindex_all_assets() {
 	auto add = [&](AssetOnDisk aod) { root->add_path(aod, split(aod.filename, '/')); };
 
 	for (const auto& full : FileSys::find_game_files()) {
-		auto gp  = FileSys::get_game_path_from_full_path(full);
+		auto gp = FileSys::get_game_path_from_full_path(full);
 		auto ext = get_extension_no_dot(gp);
 
 		if (ext == "cmdl" || ext == "mis") {
@@ -375,12 +378,21 @@ void AssetRegistrySystem::reindex_all_assets() {
 
 		AssetOnDisk aod;
 		aod.filename = std::move(gp);
-		if      (ext == "hdr" || ext == "dds") aod.type = texMeta;
-		else if (ext == "tmap")                aod.type = mapMeta;
-		else if (ext == "mm" || ext == "mi")   aod.type = matMeta;
-		else if (ext == "wav")                 aod.type = soundMeta;
-		else if (ext == "fnt")                 aod.type = fontMeta;
-		else continue;
+		if (ext == "hdr" || ext == "dds")
+			aod.type = texMeta;
+		else if (ext == "tmap")
+			aod.type = mapMeta;
+		else if (ext == "mm" || ext == "mi")
+			aod.type = matMeta;
+		else if (ext == "wav")
+			aod.type = soundMeta;
+		else if (ext == "fnt")
+			aod.type = fontMeta;
+		else if (ext == "tprefab")
+			aod.type = prefabMeta;
+
+		else
+			continue;
 
 		add(std::move(aod));
 	}
@@ -388,7 +400,7 @@ void AssetRegistrySystem::reindex_all_assets() {
 	for (auto& m : model_paths) {
 		AssetOnDisk aod;
 		aod.filename = m;
-		aod.type     = modelMeta;
+		aod.type = modelMeta;
 		add(std::move(aod));
 	}
 
@@ -399,7 +411,7 @@ void AssetRegistrySystem::reindex_all_assets() {
 		for (auto& e : extras) {
 			AssetOnDisk aod;
 			aod.filename = std::move(e);
-			aod.type     = type.get();
+			aod.type = type.get();
 			add(std::move(aod));
 		}
 	}
@@ -408,8 +420,7 @@ void AssetRegistrySystem::reindex_all_assets() {
 	root->set_parent_R();
 	rebuild_linear_list_();
 
-	sys_print(Debug, "AssetRegistry: reindexed %zu assets in %.1f ms\n",
-	          linear_list.size(), (GetTime() - t0) * 1000.0);
+	sys_print(Debug, "AssetRegistry: reindexed %zu assets in %.1f ms\n", linear_list.size(), (GetTime() - t0) * 1000.0);
 }
 
 const ClassTypeInfo* AssetRegistrySystem::find_asset_type_for_ext(const std::string& ext) {
@@ -420,99 +431,6 @@ const ClassTypeInfo* AssetRegistrySystem::find_asset_type_for_ext(const std::str
 				return type->get_asset_class_type();
 	}
 	return nullptr;
-}
-
-void HackedAsyncAssetRegReindex::post_load() {
-	AssetRegistrySystem::get().root = std::move(root);
-	AssetRegistrySystem::get().linear_list = {};
-	auto recurse = [](auto&& self, vector<AssetFilesystemNode*>& outlist, AssetFilesystemNode* node) -> void {
-		if (node->children.empty())
-			outlist.push_back(node);
-		for (auto a : node->sorted_list)
-			self(self, outlist, a);
-	};
-	recurse(recurse, AssetRegistrySystem::get().linear_list, AssetRegistrySystem::get().root.get());
-}
-#include <unordered_set>
-#include "Framework/MapUtil.h"
-bool HackedAsyncAssetRegReindex::load_asset(IAssetLoadingInterface*, AssetFilesystemNode& rootToClone) {
-	std::vector<AssetOnDisk> diskAssets;
-	auto& all_assettypes = AssetRegistrySystem::get().all_assettypes;
-	AssetMetadata* texMetadata =
-		(AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("Texture"));
-	AssetMetadata* modelMeta =
-		(AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("Model"));
-	AssetMetadata* matMeta =
-		(AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("MaterialInstance"));
-	AssetMetadata* mapMeta =
-		(AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("SceneAsset"));
-	AssetMetadata* soundMeta =
-		(AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("SoundFile"));
-	AssetMetadata* fontMeta =
-		(AssetMetadata*)AssetRegistrySystem::get().find_for_classtype(ClassBase::find_class("GuiFont"));
-
-	std::unordered_set<string> models;
-	for (const auto& file : FileSys::find_game_files()) {
-		auto ext = get_extension_no_dot(file);
-		auto gamepath = FileSys::get_game_path_from_full_path(file);
-		AssetOnDisk aod;
-		aod.filename = std::move(gamepath);
-		if (ext == "hdr" || ext == "dds") {
-			aod.type = texMetadata;
-			diskAssets.push_back(aod);
-		} else if (ext == "tmap") {
-			aod.type = mapMeta;
-			diskAssets.push_back(aod);
-		} else if (ext == "mm" || ext == "mi") {
-			aod.type = matMeta;
-			diskAssets.push_back(aod);
-		} else if (ext == "cmdl") {
-			models.insert(aod.filename);
-		} else if (ext == "mis") {
-			auto& file = aod.filename;
-			StringUtils::remove_extension(file);
-			file += ".cmdl";
-			models.insert(file);
-		} else if (ext == "wav") {
-			aod.type = soundMeta;
-			diskAssets.push_back(aod);
-		} else if (ext == "fnt") {
-			aod.type = fontMeta;
-			diskAssets.push_back(aod);
-		}
-	}
-	for (auto& m : models) {
-		AssetOnDisk aod;
-		aod.filename = std::move(m);
-		aod.type = modelMeta;
-		diskAssets.push_back(aod);
-	}
-
-	for (int i = 0; i < all_assettypes.size(); i++) {
-		auto type = all_assettypes[i].get();
-		std::vector<std::string> extraAssets;
-		type->fill_extra_assets(extraAssets);
-		for (int j = 0; j < extraAssets.size(); j++) {
-			AssetOnDisk aod;
-			aod.filename = std::move(extraAssets[j]);
-			aod.type = type;
-			diskAssets.push_back(aod);
-		}
-	}
-
-	root = std::make_unique<AssetFilesystemNode>(rootToClone);
-
-	root->set_is_used_to_false_R();
-	for (auto& a : diskAssets) {
-		auto& filename = a.filename;
-		std::vector<std::string> path = split(filename, '/');
-		root->add_path(a, path);
-	}
-	root->remove_unused_R();
-	root->sort_R();
-	root->set_parent_R();
-
-	return true;
 }
 
 #endif
