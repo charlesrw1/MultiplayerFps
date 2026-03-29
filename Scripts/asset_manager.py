@@ -49,10 +49,10 @@ class AssetManager:
             # Try to find old_str at position i
             if content[i:i+old_len] == old_str:
                 # Check if it's surrounded by valid context
-                # Before: start of string or quote/space
-                before_ok = i == 0 or content[i-1] in {'"', ' ', '\n', '\t'}
-                # After: end of string or quote/space
-                after_ok = i + old_len >= len(content) or content[i+old_len] in {'"', ' ', '\n', '\t'}
+                # Before: start of string or quote/space/colon
+                before_ok = i == 0 or content[i-1] in {'"', ' ', '\n', '\t', ':'}
+                # After: end of string or quote/space/colon
+                after_ok = i + old_len >= len(content) or content[i+old_len] in {'"', ' ', '\n', '\t', ':'}
 
                 if before_ok and after_ok:
                     # Valid context - replace

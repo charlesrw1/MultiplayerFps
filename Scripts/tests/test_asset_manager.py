@@ -593,3 +593,23 @@ def test_mv_updates_quoted_references_from_subdir_to_root(temp_asset_dir):
 
     # Verify the file with updated reference was tracked
     assert "my_map.tmap" in updated_refs
+
+def test_mv_updates_colon_separated_references(temp_asset_dir):
+    """mv updates references that use colon separator like 'my_model:models/file.cmdl'"""
+    models_dir = temp_asset_dir / "models"
+    models_dir.mkdir()
+    materials_dir = temp_asset_dir / "materials"
+    materials_dir.mkdir()
+
+    (models_dir / "space_marine_model.cmdl").write_text("compiled model")
+    (materials_dir / "default_pbr.mm").write_text("material")
+
+    map_content = 'my_model:models/space_marine_model.cmdl\n\nmat_override:"materials/default_pbr.mm"'
+    (temp_asset_dir / "my_map.tmap").write_text(map_content)
+
+    manager = AssetManager(temp_asset_dir)
+    manager.mv("models/space_marine_model.cmdl", ".")
+
+    map_result = (temp_asset_dir / "my_map.tmap").read_text()
+    assert "my_model:space_marine_model.cmdl" in map_result
+    assert "models/space_marine_model.cmdl" not in map_result
