@@ -206,39 +206,68 @@ class AssetManager:
     def find_references(self, filename: str) -> List[str]:
         """
         Find all files in asset root that reference this file using ripgrep.
+        Can accept either a filename (my_model.glb) or asset name (my_model).
         Returns list of filenames that contain references.
         Search is scoped to asset_root only.
         """
-        if not (self.current_dir / filename).exists():
-            raise FileNotFoundError(f"File not found: {filename}")
+        # Check if input is a filename or asset name
+        file_path = self.current_dir / filename
+        files_to_search = []
 
-        # Escape filename for regex, handle backslashes on Windows
-        escaped_name = filename.replace("\\", "\\\\")
+        if file_path.exists():
+            # It's a filename - search for this specific file
+            files_to_search = [filename]
+        else:
+            # Might be an asset name - find all files in this asset group
+            asset_type = get_asset_type(filename)
+            if asset_type is not None:
+                # It's a known asset type - search for all related files
+                asset_group = get_asset_group(filename)
+                # Get all files in current directory
+                all_files = [f.name for f in self.current_dir.iterdir() if f.is_file()]
+                groups = group_files(all_files)
+                if asset_group in groups:
+                    files_to_search = groups[asset_group]["files"]
 
-        try:
-            result = subprocess.run(
-                ["rg", "--files-with-matches", escaped_name, str(self.asset_root)],
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
+            if not files_to_search:
+                # Try as asset name without extension
+                asset_group = filename
+                all_files = [f.name for f in self.current_dir.iterdir() if f.is_file()]
+                groups = group_files(all_files)
+                if asset_group in groups:
+                    files_to_search = groups[asset_group]["files"]
 
-            if result.returncode == 0:
-                # Convert absolute paths to relative filenames
-                refs = []
-                for line in result.stdout.strip().split("\n"):
-                    if line:
-                        ref_path = Path(line)
-                        refs.append(ref_path.name)
-                return refs
-            else:
-                return []
+            if not files_to_search:
+                raise FileNotFoundError(f"File or asset not found: {filename}")
 
-        except FileNotFoundError:
-            # ripgrep not installed
-            raise RuntimeError("ripgrep (rg) is not installed. Install it to use reference finding.")
-        except subprocess.TimeoutExpired:
-            raise RuntimeError("Reference search timed out")
+        # Search for references to any of the files
+        all_refs = set()
+        for search_file in files_to_search:
+            # Escape filename for regex, handle backslashes on Windows
+            escaped_name = search_file.replace("\\", "\\\\")
+
+            try:
+                result = subprocess.run(
+                    ["rg", "--files-with-matches", escaped_name, str(self.asset_root)],
+                    capture_output=True,
+                    text=True,
+                    timeout=30
+                )
+
+                if result.returncode == 0:
+                    # Convert absolute paths to relative filenames
+                    for line in result.stdout.strip().split("\n"):
+                        if line:
+                            ref_path = Path(line)
+                            all_refs.add(ref_path.name)
+
+            except FileNotFoundError:
+                # ripgrep not installed
+                raise RuntimeError("ripgrep (rg) is not installed. Install it to use reference finding.")
+            except subprocess.TimeoutExpired:
+                raise RuntimeError("Reference search timed out")
+
+        return sorted(list(all_refs))
 
     def mv(self, src: str, dst: str) -> None:
         """
