@@ -1,16 +1,69 @@
-import cmd
+import subprocess
 from pathlib import Path
 from asset_manager import AssetManager
 from asset_types import group_files, get_asset_type
 
-class AssetCLI(cmd.Cmd):
+from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.formatted_text import FormattedText
+
+
+class AssetCompleter(Completer):
+    """Tab completion for asset CLI commands"""
+
+    def __init__(self, cli):
+        self.cli = cli
+
+    def get_completions(self, document, complete_event):
+        """Generate completions for the current document"""
+        text = document.text_before_cursor
+        parts = text.split(None, 1)
+
+        if not parts:
+            # Complete command names from empty line
+            for cmd in sorted(self.cli.commands.keys()):
+                yield Completion(cmd)
+            return
+
+        command = parts[0]
+        rest = parts[1] if len(parts) > 1 else ""
+
+        # If completing the command itself (no space after command yet)
+        if len(parts) == 1 and not text.endswith(" "):
+            for cmd in sorted(self.cli.commands.keys()):
+                if cmd.startswith(command):
+                    yield Completion(cmd, start_position=-len(command))
+            return
+
+        # Complete arguments to a command
+        if command not in self.cli.commands:
+            return
+
+        # Determine completion rules based on command
+        include_files = True
+        include_dirs = True
+
+        if command in ["cd", "mkdir"]:
+            include_files = False
+            include_dirs = True
+        elif command == "find":
+            include_files = True
+            include_dirs = False
+
+        # Get completions - this returns full paths
+        completions = self.cli._get_completions_for(rest, include_files, include_dirs)
+
+        # Yield completions, replacing the entire rest text
+        for comp in completions:
+            if not rest or comp.startswith(rest):
+                yield Completion(comp, start_position=-len(rest))
+
+
+class AssetCLI:
     """Asset-aware file management REPL"""
 
-    intro = "Asset File Manager - asset-aware file operations\nType 'help' for commands"
-    prompt = "assets> "
-
     def __init__(self, asset_root=None):
-        super().__init__()
         if asset_root:
             self.manager = AssetManager(Path(asset_root))
         else:
@@ -19,26 +72,110 @@ class AssetCLI(cmd.Cmd):
             if not default_root.exists():
                 default_root = Path.cwd()
             self.manager = AssetManager(default_root)
-        self.update_prompt()
 
-    def update_prompt(self):
-        """Update prompt to show full path relative to asset root with color"""
+        # Command dispatch map
+        self.commands = {
+            "pwd": self.do_pwd,
+            "cd": self.do_cd,
+            "ls": self.do_ls,
+            "mkdir": self.do_mkdir,
+            "cat": self.do_cat,
+            "cp": self.do_cp,
+            "mv": self.do_mv,
+            "trash": self.do_trash,
+            "find": self.do_find,
+            "references": self.do_references,
+            "help": self.do_help,
+            "exit": self.do_exit,
+            "quit": self.do_quit,
+        }
+
+    def _get_prompt(self):
+        """Get the prompt text with color formatting (for prompt_toolkit)"""
         cwd = self.manager.pwd()
         root = self.manager.asset_root
-        # ANSI color codes
-        CYAN = "\033[36m"      # Cyan for path
-        RESET = "\033[0m"
         try:
             rel = cwd.relative_to(root)
             if rel == Path("."):
-                # At root, show root name only
                 path_str = f"{root.name}"
             else:
-                # Show root name + relative path with trailing slash
                 path_str = f"{root.name}/{rel}"
-            self.prompt = f"{CYAN}{path_str}>{RESET} "
         except ValueError:
-            self.prompt = f"{CYAN}{cwd.name}>{RESET} "
+            path_str = f"{cwd.name}"
+
+        return FormattedText([("ansicyan", f"{path_str}>"), ("", " ")])
+
+    def _get_prompt_text(self):
+        """Get the prompt text as plain string (for fallback input)"""
+        cwd = self.manager.pwd()
+        root = self.manager.asset_root
+        try:
+            rel = cwd.relative_to(root)
+            if rel == Path("."):
+                path_str = f"{root.name}"
+            else:
+                path_str = f"{root.name}/{rel}"
+        except ValueError:
+            path_str = f"{cwd.name}"
+
+        return f"{path_str}> "
+
+    def run(self):
+        """Start the REPL"""
+        print("Asset File Manager - asset-aware file operations")
+        print("Type 'help' for commands")
+
+        # Try to use prompt_toolkit; fall back to simple input if console unavailable
+        try:
+            from prompt_toolkit.output.win32 import NoConsoleScreenBufferError
+            history_file = Path.home() / ".asset_cli_history"
+            session = PromptSession(
+                history=FileHistory(str(history_file)),
+                completer=AssetCompleter(self),
+            )
+            use_prompt_toolkit = True
+        except (ImportError, NoConsoleScreenBufferError):
+            use_prompt_toolkit = False
+
+        while True:
+            try:
+                # Get input from either prompt_toolkit or built-in input()
+                if use_prompt_toolkit:
+                    try:
+                        line = session.prompt(self._get_prompt())
+                    except NoConsoleScreenBufferError:
+                        use_prompt_toolkit = False
+                        line = input(self._get_prompt_text())
+                else:
+                    line = input(self._get_prompt_text())
+
+                line = line.strip()
+
+                if not line:
+                    continue
+
+                # Handle shell commands
+                if line.startswith("!"):
+                    self.do_shell(line[1:])
+                    continue
+
+                # Parse command and arguments
+                parts = line.split(None, 1)
+                command = parts[0]
+                arg = parts[1] if len(parts) > 1 else ""
+
+                # Dispatch command
+                if command in self.commands:
+                    result = self.commands[command](arg)
+                    if result is True:  # Exit sentinel
+                        break
+                else:
+                    print(f"Unknown command: {command}")
+
+            except KeyboardInterrupt:
+                continue
+            except EOFError:
+                break
 
     def do_pwd(self, arg):
         """Print working directory"""
@@ -52,7 +189,6 @@ class AssetCLI(cmd.Cmd):
 
         try:
             self.manager.cd(arg)
-            self.update_prompt()
         except (FileNotFoundError, NotADirectoryError, ValueError) as e:
             print(f"Error: {e}")
 
@@ -147,7 +283,7 @@ class AssetCLI(cmd.Cmd):
             refs = self.manager.find_references(arg)
             if refs:
                 print("Referenced by:")
-                for ref in sorted(set(refs)):  # Remove duplicates
+                for ref in sorted(set(refs)):
                     print(f"  {ref}")
             else:
                 print("No references found")
@@ -156,7 +292,6 @@ class AssetCLI(cmd.Cmd):
 
     def do_shell(self, arg):
         """Execute PowerShell command: !<command>"""
-        import subprocess
         try:
             result = subprocess.run(
                 ["powershell", "-Command", arg],
@@ -187,25 +322,19 @@ class AssetCLI(cmd.Cmd):
         try:
             results = self.manager.find_assets(arg)
             if results:
-                # Format output like ls with 2-column layout
-                # ANSI colors
-                GREEN = "\033[32m"     # Assets
+                GREEN = "\033[32m"
                 RESET = "\033[0m"
 
                 lines = []
-                # Calculate column width based on longest asset path
                 max_name_len = max(len(asset.get("path", asset["asset"])) for asset in results) + 2
 
                 for asset in results:
                     asset_path = asset.get("path", asset["asset"])
                     type_str = asset["type"].value.upper()
 
-                    # For materials, show if it's .mi or .mm
                     if type_str == "MATERIAL":
-                        # Check if this is an instance or master material
                         asset_group = asset["asset"]
                         target_dir = self.manager.pwd()
-                        # Try to determine the directory from the path
                         if "/" in asset_path:
                             dir_part = asset_path.rsplit("/", 1)[0]
                             target_dir = self.manager.asset_root / dir_part
@@ -228,16 +357,24 @@ class AssetCLI(cmd.Cmd):
         except Exception as e:
             print(f"Error: {e}")
 
-    def complete_find(self, text, line, begidx, endidx):
-        """Tab completion for find command - suggest filenames"""
-        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=False)
-
-    def default(self, line):
-        """Handle ! prefix for shell commands"""
-        if line.startswith("!"):
-            self.do_shell(line[1:])
+    def do_help(self, arg):
+        """Show help for all commands or a specific command"""
+        if arg:
+            if arg in self.commands:
+                cmd_func = self.commands[arg]
+                doc = cmd_func.__doc__
+                print(f"{arg}: {doc if doc else 'No help available'}")
+            else:
+                print(f"Unknown command: {arg}")
         else:
-            print(f"Unknown command: {line}")
+            print("Available commands:")
+            for cmd in sorted(self.commands.keys()):
+                if cmd not in ["exit", "quit"]:  # Don't show internal commands in list
+                    cmd_func = self.commands[cmd]
+                    doc = cmd_func.__doc__
+                    print(f"  {cmd:<15} {doc if doc else ''}")
+            print("\nType 'help <command>' for more info")
+            print("Use '!<command>' to run PowerShell commands")
 
     def do_exit(self, arg):
         """Exit the CLI"""
@@ -247,53 +384,27 @@ class AssetCLI(cmd.Cmd):
         """Exit the CLI"""
         return True
 
-    def emptyline(self):
-        """Don't repeat last command on empty line"""
-        pass
-
-    def _get_path_completions(self, text, line, begidx, endidx, include_files=True, include_dirs=True):
+    def _get_completions_for(self, partial_arg, include_files=True, include_dirs=True):
         """Get completion matches for paths, supporting subdirectories.
         For files, shows asset groups (e.g., 'rock' not 'rock.tis', 'rock.png', 'rock.dds')
         Supports paths with directories: 'models/my<TAB>' suggests files in models/
 
         Args:
-            text: the partial text being completed (might be just last word)
-            line: the full command line
-            begidx: beginning index of text in line
-            endidx: ending index of text in line
+            partial_arg: the partial text being completed
             include_files: whether to include files/assets
             include_dirs: whether to include directories
+
+        Returns:
+            List of completion strings (full paths)
         """
         cwd = self.manager.pwd()
         matches = set()
 
         try:
-            # Extract the full argument to the command
-            # Readline may split on "/" treating it as a word boundary
-            # We need to reconstruct the full path if it was split
-
-            # Start with what readline gave us
-            full_arg = line[begidx:endidx]
-
-            # Look backward from begidx to find any "/" that marks this as a path
-            # Continue backward until we hit a space (argument boundary) or "/" pattern
-            search_start = begidx - 1
-            while search_start >= 0 and line[search_start] != ' ':
-                if line[search_start] == '/':
-                    # Found a "/" before our text, so this might be part of a path
-                    # Go back to the last space to get the full argument
-                    arg_boundary = search_start - 1
-                    while arg_boundary >= 0 and line[arg_boundary] != ' ':
-                        arg_boundary -= 1
-                    arg_boundary += 1  # Position after the space
-                    full_arg = line[arg_boundary:endidx]
-                    break
-                search_start -= 1
-
             # Handle paths with directories (e.g., "models/my_model")
-            if "/" in full_arg:
+            if "/" in partial_arg:
                 # Split into directory and search text
-                path_parts = full_arg.rsplit("/", 1)
+                path_parts = partial_arg.rsplit("/", 1)
                 dir_path = path_parts[0]
                 search_text = path_parts[1] if len(path_parts) > 1 else ""
 
@@ -306,7 +417,7 @@ class AssetCLI(cmd.Cmd):
             else:
                 # Current directory
                 target_dir = cwd
-                search_text = full_arg
+                search_text = partial_arg
                 prefix = ""
 
             # Separate directories and files in target directory
@@ -319,70 +430,30 @@ class AssetCLI(cmd.Cmd):
                 elif item.is_file():
                     files.append(item.name)
 
-            # When full_arg contains "/", we return only the suffix (the prefix is already typed)
-            # When full_arg doesn't contain "/", we include the prefix since the prefix is what we're completing
-            if "/" in full_arg:
-                # Prefix is already on screen, return only the suffix
-                suffix_prefix = ""
-            else:
-                # Prefix needed to complete the word
-                suffix_prefix = prefix
-
             # Add directories
             if include_dirs:
                 for dirname in dirs:
                     if dirname.startswith(search_text):
-                        matches.add(suffix_prefix + dirname + "/")
+                        matches.add(prefix + dirname + "/")
 
             # For files, show asset groups instead of individual files
             if include_files and files:
                 groups = group_files(files)
                 for asset_name in groups.keys():
                     if asset_name.startswith(search_text):
-                        matches.add(suffix_prefix + asset_name)
+                        matches.add(prefix + asset_name)
 
                 # If no asset groups match, fall back to non-asset files
-                if not any(m.startswith(suffix_prefix) for m in matches if not m.endswith("/")):
+                if not any(m.startswith(prefix) for m in matches if not m.endswith("/")):
                     for filename in files:
                         if filename.startswith(search_text) and get_asset_type(filename) is None:
-                            matches.add(suffix_prefix + filename)
+                            matches.add(prefix + filename)
 
         except (OSError, PermissionError):
             pass
 
         return sorted(list(matches))
 
-    def complete_mkdir(self, text, line, begidx, endidx):
-        """Tab completion for mkdir command - directories only"""
-        return self._get_path_completions(text, line, begidx, endidx, include_files=False, include_dirs=True)
-
-    def complete_cd(self, text, line, begidx, endidx):
-        """Tab completion for cd command - directories only"""
-        return self._get_path_completions(text, line, begidx, endidx, include_files=False, include_dirs=True)
-
-    def complete_cat(self, text, line, begidx, endidx):
-        """Tab completion for cat command - files and dirs for navigation"""
-        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=True)
-
-    def complete_cp(self, text, line, begidx, endidx):
-        """Tab completion for cp command - all paths"""
-        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=True)
-
-    def complete_mv(self, text, line, begidx, endidx):
-        """Tab completion for mv command - all paths"""
-        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=True)
-
-    def complete_trash(self, text, line, begidx, endidx):
-        """Tab completion for trash command - files and dirs for navigation"""
-        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=True)
-
-    def complete_references(self, text, line, begidx, endidx):
-        """Tab completion for references command - files and dirs for navigation"""
-        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=True)
-
-    def complete_ls(self, text, line, begidx, endidx):
-        """Tab completion for ls command - directories and asset groups"""
-        return self._get_path_completions(text, line, begidx, endidx, include_files=True, include_dirs=True)
 
 def main():
     """Main entry point - starts REPL or accepts asset root argument"""
@@ -393,7 +464,8 @@ def main():
         asset_root = Path(sys.argv[1])
 
     cli = AssetCLI(asset_root)
-    cli.cmdloop()
+    cli.run()
+
 
 if __name__ == "__main__":
     main()
