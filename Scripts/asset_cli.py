@@ -98,6 +98,9 @@ class AssetCLI:
                 default_root = Path.cwd()
             self.manager = AssetManager(default_root)
 
+        # Undo support - holds the last operation's UndoRecord
+        self._undo_record = None
+
         # Command dispatch map
         self.commands = {
             "pwd": self.do_pwd,
@@ -110,6 +113,7 @@ class AssetCLI:
             "trash": self.do_trash,
             "find": self.do_find,
             "references": self.do_references,
+            "undo": self.do_undo,
             "help": self.do_help,
             "exit": self.do_exit,
             "quit": self.do_quit,
@@ -224,7 +228,8 @@ class AssetCLI:
             return
 
         try:
-            self.manager.mkdir(arg)
+            undo_record = self.manager.mkdir(arg)
+            self._undo_record = undo_record
             print(f"Created directory: {arg}")
         except (FileExistsError, ValueError) as e:
             print(f"Error: {e}")
@@ -260,7 +265,8 @@ class AssetCLI:
 
         src, dst = parts
         try:
-            self.manager.cp(src, dst)
+            undo_record = self.manager.cp(src, dst)
+            self._undo_record = undo_record
             print(f"Copied {src} to {dst}")
         except FileNotFoundError as e:
             print(f"Error: {e}")
@@ -274,7 +280,8 @@ class AssetCLI:
 
         src, dst = parts
         try:
-            updated_refs = self.manager.mv(src, dst)
+            updated_refs, undo_record = self.manager.mv(src, dst)
+            self._undo_record = undo_record
             print(f"Moved {src} and related files to {dst}")
 
             if updated_refs:
@@ -293,7 +300,8 @@ class AssetCLI:
             return
 
         try:
-            self.manager.trash(arg)
+            undo_record = self.manager.trash(arg)
+            self._undo_record = undo_record
             print(f"Deleted {arg}")
         except FileNotFoundError as e:
             print(f"Error: {e}")
@@ -313,6 +321,19 @@ class AssetCLI:
             else:
                 print("No references found")
         except (FileNotFoundError, RuntimeError) as e:
+            print(f"Error: {e}")
+
+    def do_undo(self, arg):
+        """Undo the last modifying operation (mv, cp, mkdir, or trash)"""
+        if self._undo_record is None:
+            print("Nothing to undo")
+            return
+
+        try:
+            self.manager.undo(self._undo_record)
+            print(f"Undid {self._undo_record.operation}")
+            self._undo_record = None
+        except (FileNotFoundError, OSError, ValueError) as e:
             print(f"Error: {e}")
 
     def do_shell(self, arg):

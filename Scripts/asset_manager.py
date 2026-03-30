@@ -1,8 +1,41 @@
 from pathlib import Path
 from typing import Optional, List, Dict
+from dataclasses import dataclass, field
 import shutil
 import subprocess
 from asset_types import get_asset_type, get_asset_group, group_files, AssetType
+
+
+@dataclass
+class FileMove:
+    """Record of a single file that was moved/renamed."""
+    old_path: Path
+    new_path: Path
+
+
+@dataclass
+class ReferenceEdit:
+    """Record of a reference file before its content was overwritten during mv."""
+    file_path: Path
+    original_content: str
+
+
+@dataclass
+class DeletedFile:
+    """Record of a file before it was deleted during trash."""
+    path: Path
+    content: bytes
+
+
+@dataclass
+class UndoRecord:
+    """Complete record of a modifying operation for undo support."""
+    operation: str  # "mv" | "cp" | "mkdir" | "trash"
+    file_moves: List[FileMove] = field(default_factory=list)
+    reference_edits: List[ReferenceEdit] = field(default_factory=list)
+    created_file: Optional[Path] = None
+    created_dir: Optional[Path] = None
+    deleted_files: List[DeletedFile] = field(default_factory=list)
 
 class AssetManager:
     """Manages asset-aware file operations within an asset root directory"""
@@ -181,9 +214,10 @@ class AssetManager:
         else:
             return "MATERIAL"
 
-    def cp(self, src: str, dst: str) -> None:
+    def cp(self, src: str, dst: str) -> UndoRecord:
         """
         Copy a source file. For assets, copies only the source file (e.g., .png not .dds)
+        Returns UndoRecord for undo support.
         """
         src_path = self.current_dir / src
 
@@ -214,12 +248,22 @@ class AssetManager:
 
         # For maps and materials, copy as-is
 
-        shutil.copy2(src_path, dst)
+        # Resolve destination to absolute path
+        if Path(dst).is_absolute():
+            dst_path = Path(dst)
+        else:
+            dst_path = self.current_dir / dst
 
-    def trash(self, path: str) -> None:
+        shutil.copy2(src_path, dst_path)
+
+        # Record the created file for undo
+        return UndoRecord(operation="cp", created_file=dst_path.resolve())
+
+    def trash(self, path: str) -> UndoRecord:
         """
         Trash/delete a file or asset group. Accepts filename or asset name, with optional
         subdirectory path (e.g., 'materials/my_texture'). Deletes all related files.
+        Returns UndoRecord for undo support.
         """
         # Split path into directory part and name part
         path_parts = path.split("/")
@@ -279,8 +323,14 @@ class AssetManager:
         if not to_delete:
             raise FileNotFoundError(f"File or asset not found: {path}")
 
+        # Snapshot file contents before deletion for undo
+        deleted_files = []
         for file_path in to_delete:
+            content = file_path.read_bytes()
+            deleted_files.append(DeletedFile(path=file_path, content=content))
             file_path.unlink()
+
+        return UndoRecord(operation="trash", deleted_files=deleted_files)
 
     def cat(self, filename: str) -> str:
         """Read and return file contents"""
@@ -378,8 +428,8 @@ class AssetManager:
 
         return sorted(list(all_refs))
 
-    def mkdir(self, path: str) -> None:
-        """Create a directory within asset root"""
+    def mkdir(self, path: str) -> UndoRecord:
+        """Create a directory within asset root. Returns UndoRecord for undo support."""
         target = self.current_dir / path
 
         # Ensure target is within asset root
@@ -392,8 +442,9 @@ class AssetManager:
             raise FileExistsError(f"Directory already exists: {path}")
 
         target.mkdir(parents=True, exist_ok=False)
+        return UndoRecord(operation="mkdir", created_dir=target.resolve())
 
-    def mv(self, src: str, dst: str) -> List[str]:
+    def mv(self, src: str, dst: str) -> tuple:
         """
         Move file and ALL related asset files, then update all references.
         Can accept filename (my_model.glb) or asset name (my_model).
@@ -402,7 +453,7 @@ class AssetManager:
         Or: mv rock models (moves rock into models directory)
         Or: mv models/my_model . (moves my_model from models to current)
         Updates all references to moved files throughout the asset root.
-        Returns list of files that had references updated.
+        Returns tuple: (list of files that had references updated, UndoRecord)
         """
         src_path = self.current_dir / src
         dst_path = Path(dst)
@@ -518,6 +569,13 @@ class AssetManager:
             new_relative_path = (move_to_dir / new_filename).relative_to(self.asset_root)
             old_to_new[src_file_path.name] = str(new_relative_path).replace("\\", "/")
 
+        # Record file moves for undo
+        file_moves = []
+        for file_path in files_to_move:
+            ext = file_path.suffix
+            new_path = move_to_dir / (dst_group + ext)
+            file_moves.append(FileMove(old_path=file_path.resolve(), new_path=new_path.resolve()))
+
         # Move all related files
         for file_path in files_to_move:
             ext = file_path.suffix
@@ -527,6 +585,7 @@ class AssetManager:
         # Fix references: for each old filename, find references and update them
         # Only update references that match valid reference formats (.cmdl, .dds, .mm, .mi, .tmap)
         files_with_updated_references = []
+        reference_edits = []
 
         # Build a mapping of old paths to new paths for reference updates
         # We need to handle both the old filename and the old full path
@@ -565,6 +624,8 @@ class AssetManager:
                                     updated = self._smart_replace(content, search_str, replace_str)
 
                                     if updated != content:  # Only write if something changed
+                                        # Snapshot original content before overwriting
+                                        reference_edits.append(ReferenceEdit(file_path=ref_path.resolve(), original_content=content))
                                         ref_path.write_text(updated)
                                         # Track this file as having references updated
                                         rel_path = str(ref_path.relative_to(self.asset_root))
@@ -577,7 +638,37 @@ class AssetManager:
                 # ripgrep not available, skip reference updates for this file
                 pass
 
-        return sorted(files_with_updated_references)
+        undo_record = UndoRecord(operation="mv", file_moves=file_moves, reference_edits=reference_edits)
+        return (sorted(files_with_updated_references), undo_record)
+
+    def undo(self, record: UndoRecord) -> None:
+        """Undo a previous operation using its UndoRecord."""
+        if record.operation == "mv":
+            # Restore reference files first (reverse content changes)
+            for edit in record.reference_edits:
+                edit.file_path.write_text(edit.original_content)
+            # Then rename files back
+            for move in record.file_moves:
+                move.new_path.rename(move.old_path)
+
+        elif record.operation == "cp":
+            # Remove the created file
+            record.created_file.unlink()
+
+        elif record.operation == "mkdir":
+            # Remove the created directory (only if empty)
+            record.created_dir.rmdir()
+
+        elif record.operation == "trash":
+            # Restore deleted files
+            for deleted in record.deleted_files:
+                # Ensure parent directory exists
+                deleted.path.parent.mkdir(parents=True, exist_ok=True)
+                # Restore file with original content
+                deleted.path.write_bytes(deleted.content)
+
+        else:
+            raise ValueError(f"Unknown undo operation: {record.operation}")
 
     def find_files(self, pattern: str) -> List[str]:
         """
