@@ -357,7 +357,7 @@ class AssetManager:
 
             try:
                 result = subprocess.run(
-                    ["rg", "--files-with-matches", escaped_name, str(self.asset_root)],
+                    ["rg", "-F", "--files-with-matches", escaped_name, str(self.asset_root)],
                     capture_output=True,
                     text=True,
                     timeout=30
@@ -547,7 +547,7 @@ class AssetManager:
 
             try:
                 result = subprocess.run(
-                    ["rg", "--files-with-matches", search_str, str(self.asset_root)],
+                    ["rg", "-F", "--files-with-matches", search_str, str(self.asset_root)],
                     capture_output=True,
                     text=True,
                     timeout=30

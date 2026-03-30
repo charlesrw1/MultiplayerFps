@@ -29,6 +29,16 @@ class TestMoveCommand:
             (src_dir / "WoodSiding3Color.dds").write_text("dds data")
             (src_dir / "WoodSiding3Color.tis").write_text("tis data")
 
+            # Create reference files that reference this texture
+            (data_dir / "empireWoodSiding.mi").write_text(
+                """TYPE MaterialInstance
+PARENT defaultEmpire.mm
+VAR Albedo WoodSiding3Color.dds
+VAR Normalmap empire_textures/WoodSiding3Normal.dds
+"""
+            )
+            (data_dir / "default_bundle.bundle").write_text("references WoodSiding3Color.dds")
+
             # Create destination directory structure
             dst_base = data_dir / "materials" / "wood_siding"
             dst_base.mkdir(parents=True, exist_ok=True)
@@ -124,6 +134,26 @@ class TestMoveCommand:
 
         # Verify source files are gone
         assert not (temp_asset_dir / "empire_textures" / "WoodSiding3Color.png").exists()
+
+    def test_references_updated_after_move(self, temp_asset_dir):
+        """Test that references to the asset are updated after moving"""
+        manager = AssetManager(temp_asset_dir)
+
+        # Move the asset
+        updated_refs = manager.mv("empire_textures/WoodSiding3Color", "materials/wood_siding/wood_siding_color")
+
+        # Verify that references were found and updated
+        assert len(updated_refs) > 0, "Should have found references to update"
+
+        # Check that the reference file was updated
+        mi_content = (temp_asset_dir / "empireWoodSiding.mi").read_text()
+        assert "materials/wood_siding/wood_siding_color.dds" in mi_content, \
+            f"Reference in .mi file should be updated. Content: {mi_content}"
+
+        # Check that the bundle file was updated
+        bundle_content = (temp_asset_dir / "default_bundle.bundle").read_text()
+        assert "materials/wood_siding/wood_siding_color.dds" in bundle_content, \
+            f"Reference in .bundle file should be updated. Content: {bundle_content}"
 
 
 if __name__ == "__main__":
