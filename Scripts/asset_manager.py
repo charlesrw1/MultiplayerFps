@@ -295,35 +295,50 @@ class AssetManager:
         """
         Find all files in asset root that reference this file using ripgrep.
         Can accept either a filename (my_model.glb) or asset name (my_model).
+        Also supports subdirectory paths (mats/wht_tile or mats/wht_tile.glb).
         Returns list of filenames that contain references.
         Search is scoped to asset_root only.
         """
+        # Parse filename to handle subdirectory paths (e.g., "mats/wht_tile")
+        if "/" in filename:
+            dir_path, asset_name = filename.rsplit("/", 1)
+            target_dir = self.current_dir / dir_path
+        else:
+            asset_name = filename
+            target_dir = self.current_dir
+
         # Check if input is a filename or asset name
-        file_path = self.current_dir / filename
+        file_path = target_dir / asset_name
         files_to_search = []
 
         if file_path.exists():
             # It's a filename - search for this specific file
-            files_to_search = [filename]
+            files_to_search = [asset_name]
         else:
             # Might be an asset name - find all files in this asset group
-            asset_type = get_asset_type(filename)
+            asset_type = get_asset_type(asset_name)
             if asset_type is not None:
                 # It's a known asset type - search for all related files
-                asset_group = get_asset_group(filename)
-                # Get all files in current directory
-                all_files = [f.name for f in self.current_dir.iterdir() if f.is_file()]
-                groups = group_files(all_files)
-                if asset_group in groups:
-                    files_to_search = groups[asset_group]["files"]
+                asset_group = get_asset_group(asset_name)
+                # Get all files in target directory
+                try:
+                    all_files = [f.name for f in target_dir.iterdir() if f.is_file()]
+                    groups = group_files(all_files)
+                    if asset_group in groups:
+                        files_to_search = groups[asset_group]["files"]
+                except (FileNotFoundError, NotADirectoryError):
+                    pass
 
             if not files_to_search:
                 # Try as asset name without extension
-                asset_group = filename
-                all_files = [f.name for f in self.current_dir.iterdir() if f.is_file()]
-                groups = group_files(all_files)
-                if asset_group in groups:
-                    files_to_search = groups[asset_group]["files"]
+                asset_group = asset_name
+                try:
+                    all_files = [f.name for f in target_dir.iterdir() if f.is_file()]
+                    groups = group_files(all_files)
+                    if asset_group in groups:
+                        files_to_search = groups[asset_group]["files"]
+                except (FileNotFoundError, NotADirectoryError):
+                    pass
 
             if not files_to_search:
                 raise FileNotFoundError(f"File or asset not found: {filename}")
@@ -331,8 +346,14 @@ class AssetManager:
         # Search for references to any of the files
         all_refs = set()
         for search_file in files_to_search:
+            # For subdirectory paths, include the directory in the search
+            if "/" in filename:
+                search_term = f"{dir_path}/{search_file}"
+            else:
+                search_term = search_file
+
             # Escape filename for regex, handle backslashes on Windows
-            escaped_name = search_file.replace("\\", "\\\\")
+            escaped_name = search_term.replace("\\", "\\\\")
 
             try:
                 result = subprocess.run(
