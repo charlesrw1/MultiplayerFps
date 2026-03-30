@@ -321,7 +321,8 @@ class AssetCLI:
             result = subprocess.run(
                 ["powershell", "-Command", arg],
                 capture_output=True,
-                text=True
+                text=True,
+                cwd=self.manager.pwd()
             )
             if result.stdout:
                 print(result.stdout, end="")
