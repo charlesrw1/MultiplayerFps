@@ -16,6 +16,7 @@ EXTENSION_MAP: Dict[str, AssetType] = {
     ".hdr": AssetType.TEXTURE,
     ".png": AssetType.TEXTURE,
     ".jpeg": AssetType.TEXTURE,
+    ".jpg": AssetType.TEXTURE,
     # Models
     ".mis": AssetType.MODEL,
     ".cmdl": AssetType.MODEL,

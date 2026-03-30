@@ -120,6 +120,28 @@ VAR Normalmap empire_textures/WoodSiding3Normal.dds
         assert not (temp_asset_dir / "empire_textures" / "WoodSiding3Color.dds").exists()
         assert not (temp_asset_dir / "empire_textures" / "WoodSiding3Color.tis").exists()
 
+    def test_move_texture_with_jpg(self, temp_asset_dir):
+        """Test moving a texture that has .jpg extension"""
+        manager = AssetManager(temp_asset_dir)
+
+        # Create a texture with .jpg instead of .png
+        src_dir = temp_asset_dir / "empire_textures"
+        (src_dir / "TestTexture.jpg").write_text("jpg data")
+        (src_dir / "TestTexture.dds").write_text("dds data")
+
+        # Move it
+        updated_refs, undo_record = manager.mv("empire_textures/TestTexture", "materials/TestTexture")
+
+        # Verify files were moved (including .jpg)
+        assert (temp_asset_dir / "materials" / "TestTexture.jpg").exists(), \
+            "TestTexture.jpg should be moved to materials/"
+        assert (temp_asset_dir / "materials" / "TestTexture.dds").exists(), \
+            "TestTexture.dds should be moved to materials/"
+        assert not (src_dir / "TestTexture.jpg").exists(), \
+            "Original TestTexture.jpg should be gone"
+        assert not (src_dir / "TestTexture.dds").exists(), \
+            "Original TestTexture.dds should be gone"
+
     def test_move_into_existing_directory(self, temp_asset_dir):
         """Test moving into an existing directory (old functionality) still works"""
         manager = AssetManager(temp_asset_dir)

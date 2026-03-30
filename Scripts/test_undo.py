@@ -84,6 +84,30 @@ VAR Normalmap empire_textures/WoodSiding3Normal.dds
         assert "WoodSiding3Color.dds" in mi_content
         assert "NewName.dds" not in mi_content
 
+    def test_undo_mv_with_jpg(self, temp_asset_dir):
+        """Test that undo restores .jpg files"""
+        manager = AssetManager(temp_asset_dir)
+        manager.cd("empire_textures")
+
+        # Create a texture with .jpg
+        (temp_asset_dir / "empire_textures" / "JpegTexture.jpg").write_text("jpg data")
+        (temp_asset_dir / "empire_textures" / "JpegTexture.dds").write_text("dds data")
+
+        # Move it
+        updated_refs, undo_record = manager.mv("JpegTexture", "RenamedJpeg")
+
+        # Verify files are moved
+        assert not (temp_asset_dir / "empire_textures" / "JpegTexture.jpg").exists()
+        assert (temp_asset_dir / "empire_textures" / "RenamedJpeg.jpg").exists()
+
+        # Undo
+        manager.undo(undo_record)
+
+        # Verify files are back including .jpg
+        assert (temp_asset_dir / "empire_textures" / "JpegTexture.jpg").exists()
+        assert (temp_asset_dir / "empire_textures" / "JpegTexture.dds").exists()
+        assert not (temp_asset_dir / "empire_textures" / "RenamedJpeg.jpg").exists()
+
     def test_undo_mv_cross_directory(self, temp_asset_dir):
         """Test undo for mv across directories"""
         manager = AssetManager(temp_asset_dir)
@@ -220,6 +244,28 @@ class TestUndoTrash:
         assert (temp_asset_dir / "test_texture.png").exists()
         assert (temp_asset_dir / "test_texture.dds").exists()
         assert (temp_asset_dir / "test_texture.tis").exists()
+
+    def test_undo_trash_jpg_files(self, temp_asset_dir):
+        """Test that trash and undo work with .jpg files"""
+        manager = AssetManager(temp_asset_dir)
+
+        # Create a texture with .jpg
+        (temp_asset_dir / "jpg_texture.jpg").write_text("jpg data")
+        (temp_asset_dir / "jpg_texture.dds").write_text("dds data")
+
+        # Trash the asset
+        undo_record = manager.trash("jpg_texture")
+
+        # Verify files are gone
+        assert not (temp_asset_dir / "jpg_texture.jpg").exists()
+        assert not (temp_asset_dir / "jpg_texture.dds").exists()
+
+        # Undo
+        manager.undo(undo_record)
+
+        # Verify .jpg is restored
+        assert (temp_asset_dir / "jpg_texture.jpg").exists()
+        assert (temp_asset_dir / "jpg_texture.dds").exists()
 
     def test_undo_trash_content_preserved(self, temp_asset_dir):
         """Test that undo preserves original file content"""

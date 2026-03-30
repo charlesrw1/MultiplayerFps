@@ -228,11 +228,11 @@ class AssetManager:
         src_asset_type = get_asset_type(src)
 
         if src_asset_type == AssetType.TEXTURE:
-            # Copy only source files: .png, .jpeg, .hdr
-            if src_path.suffix.lower() not in [".png", ".jpeg", ".hdr"]:
+            # Copy only source files: .png, .jpeg, .jpg, .hdr
+            if src_path.suffix.lower() not in [".png", ".jpeg", ".jpg", ".hdr"]:
                 # If user specified import settings or compiled, copy the source instead
                 group = get_asset_group(src)
-                for ext in [".png", ".jpeg", ".hdr"]:
+                for ext in [".png", ".jpeg", ".jpg", ".hdr"]:
                     candidate = src_path.parent / (group + ext)
                     if candidate.exists():
                         src_path = candidate
@@ -291,7 +291,7 @@ class AssetManager:
         to_delete = []
 
         if asset_type == AssetType.TEXTURE:
-            for ext in [".tis", ".dds", ".hdr", ".png", ".jpeg"]:
+            for ext in [".tis", ".dds", ".hdr", ".png", ".jpeg", ".jpg"]:
                 candidate = src_dir / (group + ext)
                 if candidate.exists():
                     to_delete.append(candidate)
@@ -520,8 +520,8 @@ class AssetManager:
         old_to_new = {}  # Track old filename -> new filename for reference updates
 
         if asset_type == AssetType.TEXTURE:
-            # Move all texture-related files: .tis, .png, .jpeg, .hdr, .dds
-            for ext in [".tis", ".png", ".jpeg", ".hdr", ".dds"]:
+            # Move all texture-related files: .tis, .png, .jpeg, .jpg, .hdr, .dds
+            for ext in [".tis", ".png", ".jpeg", ".jpg", ".hdr", ".dds"]:
                 candidate = src_dir / (src_group + ext)
                 if candidate.exists():
                     files_to_move.append(candidate)
