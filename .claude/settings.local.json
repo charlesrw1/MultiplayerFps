@@ -136,7 +136,19 @@
       "Bash(cmd.exe /c \"Scripts\\\\build_and_test.ps1\")",
       "Bash(powershell.exe -Command \"& ''''.\\\\Scripts\\\\clang-format-all.ps1''''\")",
       "Bash(powershell.exe -Command \"& ''.\\\\Scripts\\\\build_and_test.ps1''\")",
-      "Bash(powershell.exe -Command \"& ''''.\\\\Scripts\\\\integration_test.ps1''''\")"
+      "Bash(powershell.exe -Command \"& ''''.\\\\Scripts\\\\integration_test.ps1''''\")",
+      "Bash(grep -E '\\\\.\\(lua|md\\)$')",
+      "Bash(sed -i '$d' \"D:/Data/scripts/fps_game/detection_system.lua\")",
+      "Bash(sed -i '$d' \"D:/Data/scripts/fps_game/entity_spawner.lua\")",
+      "Bash(sed -i '$d' \"D:/Data/scripts/fps_game/ai_state_machine.lua\")",
+      "Bash(sed -i '$d' \"D:/Data/scripts/fps_game/health_system.lua\")",
+      "Bash(sed -i '$d' \"D:/Data/scripts/fps_game/weapons.lua\")",
+      "Bash(grep:*)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -Command \"& .\\\\Scripts\\\\build_and_test.ps1\")",
+      "Bash(Select-String -Pattern \"\\(PASSED|FAILED|ParseText|Error\\)\")",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File Scripts/build_and_test.ps1)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File Scripts/integration_tests.ps1)",
+      "Bash(powershell.exe -ExecutionPolicy Bypass -File Scripts/integration_test.ps1)"
     ]
   },
   "enabledPlugins": {

@@ -30,6 +30,8 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 		auto line = StringUtils::strip(lines.at(i));
 		if (line.empty())
 			continue;
+		// Save the original stripped line before replacements for annotation checking
+		auto original_stripped_line = line;
 		StringUtils::replace(line, "---", "--- ");
 		StringUtils::replace(line, ":", " : ");
 		StringUtils::replace(line, "=", " = ");
@@ -52,7 +54,8 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 		};
 
 		// Parse class definition
-		if (tokens.at(0) == "---" && tokens.size() > 2 && tokens.at(1) == "@class") {
+		// Check original stripped line starts with "---@class" to avoid matching comments containing "@class"
+		if (StringUtils::starts_with(original_stripped_line, "---@class") && tokens.size() > 2 && tokens.at(1) == "@class") {
 
 			// printf("found class: %s\n", tokens.at(2).c_str());
 
@@ -94,7 +97,8 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 
 		}
 		// Parse property type annotation
-		else if (tokens.size() >= 3 && tokens.at(0) == "---" && tokens.at(1) == "@type") {
+		// Check original stripped line starts with "---@type" to avoid matching comments containing "@type"
+		else if (StringUtils::starts_with(original_stripped_line, "---@type") && tokens.size() >= 3 && tokens.at(1) == "@type") {
 
 			// printf("found property type %s %d\n",tokens.at(2).c_str(), i + 1);
 

@@ -152,6 +152,36 @@ TEST(ParseText, FileEndsInsideClassStillEmitted) {
 	ASSERT_EQ(r[0].props.size(), 1u);
 }
 
+TEST(ParseText, ClassWithCommentBetweenAnnotationAndTable) {
+	// Comments between annotation and table should not break parsing
+	const char* src = "---@class Foo : Bar\n"
+					  "--- This is a comment\n"
+					  "Foo = {\n"
+					  "}\n";
+	auto r = ScriptLoadingUtil::parse_text(src);
+	ASSERT_EQ(r.size(), 1u);
+	EXPECT_EQ(r[0].name, "Foo");
+	ASSERT_EQ(r[0].inherited.size(), 1u);
+	EXPECT_EQ(r[0].inherited[0], "Bar");
+}
+
+TEST(ParseText, CommentContainingClassKeywordNotMisidentified) {
+	// Comments containing "@class" should not be treated as annotations
+	const char* src = "---@class Foo : Bar\n"
+					  "--- Note: Use @class to define types\n"
+					  "Foo = {\n"
+					  "---@type number\n"
+					  "value = 0,\n"
+					  "}\n";
+	auto r = ScriptLoadingUtil::parse_text(src);
+	ASSERT_EQ(r.size(), 1u);
+	EXPECT_EQ(r[0].name, "Foo");
+	ASSERT_EQ(r[0].inherited.size(), 1u);
+	EXPECT_EQ(r[0].inherited[0], "Bar");
+	ASSERT_EQ(r[0].props.size(), 1u);
+	EXPECT_EQ(r[0].props[0].name, "value");
+}
+
 TEST(ParseText, TypeAnnotationNotCarriedAcrossProperties) {
 	// A @type annotation applies only to the immediately following property.
 	const char* src = "---@class Foo\n"
