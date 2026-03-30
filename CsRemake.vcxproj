@@ -40,7 +40,6 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Source\Assets\AssetBrowser.cpp" />
-    <ClCompile Include="Source\Assets\AssetBundle.cpp" />
     <ClCompile Include="Source\Assets\AssetDatabase.cpp" />
     <ClCompile Include="Source\Assets\AssetRegistry.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>

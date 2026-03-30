@@ -132,9 +132,6 @@
     <ClCompile Include="Source\Assets\AssetBrowser.cpp">
       <Filter>Source\Assets</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Assets\AssetBundle.cpp">
-      <Filter>Source\Assets</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Assets\AssetDatabase.cpp">
       <Filter>Source\Assets</Filter>
     </ClCompile>

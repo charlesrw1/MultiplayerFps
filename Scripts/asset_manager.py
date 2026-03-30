@@ -457,7 +457,12 @@ class AssetManager:
         else:
             # Renaming the asset
             dst_group = get_asset_group(dst_path.name)
-            move_to_dir = dst_path.parent if dst_path.is_absolute() else self.current_dir
+            if dst_path.is_absolute():
+                move_to_dir = dst_path.parent
+            else:
+                # For relative paths, resolve them relative to current_dir
+                resolved_dst = (self.current_dir / dst_path).resolve()
+                move_to_dir = resolved_dst.parent
 
         # Get all related files for this asset
         files_to_move = []
