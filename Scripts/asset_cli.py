@@ -12,8 +12,22 @@ from prompt_toolkit.formatted_text import FormattedText
 class AssetCompleter(Completer):
     """Tab completion for asset CLI commands"""
 
+    COMPLETION_THRESHOLD = 100
+
     def __init__(self, cli):
         self.cli = cli
+
+    def _count_items_in_dir(self, directory):
+        """Count files and directories in a directory without loading all of them"""
+        try:
+            count = 0
+            for _ in directory.iterdir():
+                count += 1
+                if count > self.COMPLETION_THRESHOLD:
+                    return count
+            return count
+        except (OSError, PermissionError):
+            return 0
 
     def get_completions(self, document, complete_event):
         """Generate completions for the current document"""
@@ -38,6 +52,17 @@ class AssetCompleter(Completer):
 
         # Complete arguments to a command
         if command not in self.cli.commands:
+            return
+
+        # Determine target directory for file count check
+        cwd = self.cli.manager.pwd()
+        target_dir = cwd
+        if "/" in rest:
+            dir_path = rest.rsplit("/", 1)[0]
+            target_dir = cwd / dir_path
+
+        # Skip completions if directory has too many items (slow)
+        if self._count_items_in_dir(target_dir) > self.COMPLETION_THRESHOLD:
             return
 
         # Determine completion rules based on command
