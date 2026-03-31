@@ -272,7 +272,9 @@ class AssetCLI:
             print(f"Error: {e}")
 
     def do_mv(self, arg):
-        """Move file and all related files: mv <src> <dst>"""
+        """Move file and all related files: mv <src> <dst>
+        Supports wildcards: mv pattern* directory/
+        """
         parts = arg.split()
         if len(parts) != 2:
             print("Usage: mv <src> <dst>")
@@ -280,16 +282,55 @@ class AssetCLI:
 
         src, dst = parts
         try:
-            updated_refs, undo_record = self.manager.mv(src, dst)
-            self._undo_record = undo_record
-            print(f"Moved {src} and related files to {dst}")
+            # Check if src contains wildcards
+            if "*" in src or "?" in src:
+                # Wildcard move: find all matching assets and move each
+                matches = self.manager.find_assets(src)
 
-            if updated_refs:
-                print(f"Updated references in {len(updated_refs)} file(s):")
-                for ref_file in updated_refs:
-                    print(f"  {ref_file}")
+                if not matches:
+                    print(f"No assets matching: {src}")
+                    return
+
+                # Collect results from all moves
+                all_updated_refs = []
+                all_file_moves = []
+                all_reference_edits = []
+
+                for asset_info in matches:
+                    asset_path = asset_info.get("path", asset_info["asset"])
+
+                    try:
+                        updated_refs, undo_record = self.manager.mv(asset_path, dst)
+                        all_updated_refs.extend(updated_refs)
+                        all_file_moves.extend(undo_record.file_moves)
+                        all_reference_edits.extend(undo_record.reference_edits)
+                    except (FileNotFoundError, RuntimeError) as e:
+                        print(f"Error moving {asset_path}: {e}")
+
+                # Create composite undo record
+                from asset_manager import UndoRecord
+                composite_record = UndoRecord(
+                    operation="mv",
+                    file_moves=all_file_moves,
+                    reference_edits=all_reference_edits
+                )
+                self._undo_record = composite_record
+
+                print(f"Moved {len(matches)} asset(s) matching '{src}' to {dst}")
+                if all_updated_refs:
+                    print(f"Updated references in {len(set(all_updated_refs))} file(s)")
             else:
-                print("No references found to update")
+                # Single file move
+                updated_refs, undo_record = self.manager.mv(src, dst)
+                self._undo_record = undo_record
+                print(f"Moved {src} and related files to {dst}")
+
+                if updated_refs:
+                    print(f"Updated references in {len(updated_refs)} file(s):")
+                    for ref_file in updated_refs:
+                        print(f"  {ref_file}")
+                else:
+                    print("No references found to update")
         except (FileNotFoundError, RuntimeError) as e:
             print(f"Error: {e}")
 
