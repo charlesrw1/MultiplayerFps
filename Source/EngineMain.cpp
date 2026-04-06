@@ -51,7 +51,6 @@
 #include "DebugConsole.h"
 #include "Scripting/ScriptManager.h"
 #include "Scripting/ScriptFunctionCodegen.h"
-#include "Assets/AssetBundle.h"
 #include "Framework/StringUtils.h"
 #include "Scripting/ScriptManager.h"
 #include "EngineMain.h"

@@ -374,6 +374,10 @@ public:
 				pitch_modifiers.at(spi.voice_index).speedFactor = spi.pitch_multiply;
 				low_pass_mods.at(spi.voice_index).alpha = spi.lowpass_filter;
 				SDL_UnlockAudio();
+
+				// Apply volume multiplier (SDL_mixer uses 0-128 scale)
+				int volume_level = int(glm::clamp(spi.volume_multiply * spi.computedAttenuation, 0.f, 1.f) * 128.f);
+				Mix_Volume(spi.voice_index, volume_level);
 			}
 
 			if (spi.spatialize) {

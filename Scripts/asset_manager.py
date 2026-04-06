@@ -1,3 +1,4 @@
+#type:ignore
 from pathlib import Path
 from typing import Optional, List, Dict
 from dataclasses import dataclass, field
@@ -83,9 +84,10 @@ class AssetManager:
             if content[i:i+old_len] == old_str:
                 # Check if it's surrounded by valid context
                 # Before: start of string or quote/space/colon
-                before_ok = i == 0 or content[i-1] in {'"', ' ', '\n', '\t', ':'}
+                white_space_chars = {'"', ' ', '\n', '\t', ':','\r'}
+                before_ok = i == 0 or content[i-1] in white_space_chars
                 # After: end of string or quote/space/colon
-                after_ok = i + old_len >= len(content) or content[i+old_len] in {'"', ' ', '\n', '\t', ':'}
+                after_ok = i + old_len >= len(content) or content[i+old_len] in white_space_chars
 
                 if before_ok and after_ok:
                     # Valid context - replace

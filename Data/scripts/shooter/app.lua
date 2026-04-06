@@ -69,7 +69,7 @@ function FpsGameApplication:on_map_changed()
         local enemy = eent:create_component(EnemyController)
         enemy:init(emove)
         local emesh = eent:create_component(MeshComponent)
-        emesh:set_model(Model.load("SWAT_Model.cmdl"))
+        emesh:set_model(Model.load("characters/swat_model/swat_model.cmdl"))
     end
 
     -- Spawn door trigger

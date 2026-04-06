@@ -7,7 +7,7 @@
 // header/implementation directly into this translation unit without
 // pulling in the full engine link.
 
-#define EDITOR_BUILD
+
 #include "Assets/FileWatcher.h"
 #include "Assets/FileWatcher.cpp"
 #undef EDITOR_BUILD

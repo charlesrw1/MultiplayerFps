@@ -151,9 +151,19 @@ void COMPILE_TEX(const Cmd_Args& args) {
 }
 #include "Framework/StringUtils.h"
 #define WITH_TEXTURE_COMPILE
+
+std::string turn_gamepath_into_src_path(const std::string& gamepath, const std::string& src_file) {
+	auto dir = StringUtils::get_directory(gamepath);
+	if (!dir.empty())
+		dir += "/";
+	dir += src_file;
+	return dir;
+}
+
 bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* loading, Color32& outColor) {
 #ifdef WITH_TEXTURE_COMPILE
 	TextureImportSettings* tis = nullptr;
+
 	{
 		auto texfile = FileSys::open_read_game(gamepath);
 		auto tisfile = FileSys::open_read_game(strip_extension(gamepath) + ".tis");
@@ -196,17 +206,17 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 		if (!needsCompile) {
 			return true;
 		}
-		auto src_file = FileSys::open_read(tis->src_file.c_str(), FileSys::GAME_DIR);
+
+		const auto dir = turn_gamepath_into_src_path(gamepath, tis->src_file);
+
+		auto src_file = FileSys::open_read(dir.c_str(), FileSys::GAME_DIR);
 		if (!src_file) {
 			sys_print(Debug, "%s skipping compile because src_file==null\n", gamepath.c_str());
 			return false;
 		}
 	}
 	{
-		auto dir = StringUtils::get_directory(gamepath);
-		if (!dir.empty())
-			dir += "/";
-		dir += tis->src_file;
+		const auto dir = turn_gamepath_into_src_path(gamepath, tis->src_file);
 
 		auto imageFile = FileSys::open_read_game(dir);
 		if (imageFile) {

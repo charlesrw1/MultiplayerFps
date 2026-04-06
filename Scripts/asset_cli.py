@@ -1,3 +1,4 @@
+#type:ignore
 import subprocess
 from pathlib import Path
 from asset_manager import AssetManager

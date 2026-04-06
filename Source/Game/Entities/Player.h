@@ -173,7 +173,7 @@ public:
 	HealthComponent* health{};
 	SpotLightComponent* spotlight{};
 
-	BikeEntity* bike = nullptr;
+	//BikeEntity* bike = nullptr;
 
 	MulticastDelegate<int> score_update_delegate;
 

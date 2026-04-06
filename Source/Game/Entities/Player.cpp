@@ -107,6 +107,7 @@ void bike_view_menu() {
 ADD_TO_DEBUG_MENU(bike_view_menu);
 
 void Player::get_view(glm::mat4& viewMat, float& fov) {
+#if 0
 	if (g_thirdperson.get_bool()) {
 
 		auto dir = bike->bike_direction;
@@ -139,6 +140,7 @@ void Player::get_view(glm::mat4& viewMat, float& fov) {
 		// ang = view_angles;
 		fov = g_fov.get_float();
 	}
+#endif
 }
 
 glm::vec3 GetRecoilAmtTriangle(glm::vec3 maxrecoil, float t, float peakt) {
@@ -465,6 +467,7 @@ void Player::on_jump_callback() {
 }
 
 void Player::update() {
+#if 0
 	vec2 moveAction = {};
 	moveAction.x = Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTX);
 	moveAction.y = Input::get_con_axis(SDL_CONTROLLER_AXIS_LEFTY);
@@ -483,6 +486,7 @@ void Player::update() {
 		view_angles.y = fmod(view_angles.y, TWOPI);
 	}
 	// set_ws_position(bike->get_ws_position());
+#endif
 }
 
 void Player::on_foot_update() {

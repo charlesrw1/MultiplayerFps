@@ -810,9 +810,10 @@ static Animation_Set* load_animation_set_for_gltf_skin(cgltf_data* data, cgltf_s
 
 	return set;
 }
+extern std::string turn_gamepath_into_src_path(const std::string& gamepath, const std::string& src_file);
 
 #include "ModelAsset2.h"
-ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is) {
+ModelDefData new_import_settings_to_modeldef_data(const std::string& gamepath, ModelImportSettings* is) {
 	ModelDefData mdd;
 	mdd.use_mesh_as_collision = is->meshAsCollision;
 	mdd.use_mesh_as_cvx_collision = is->meshAsConvex;
@@ -828,7 +829,7 @@ ModelDefData new_import_settings_to_modeldef_data(ModelImportSettings* is) {
 		is->lodScreenSpaceSizes = {0.1, 0.01, 0.005}; // idk random
 	}
 
-	mdd.model_source = is->srcGlbFile;
+	mdd.model_source = turn_gamepath_into_src_path(gamepath,is->srcGlbFile);
 	LODDef lodd;
 	mdd.loddefs.push_back(lodd);
 	for (int i = 0; i < is->lodScreenSpaceSizes.size(); i++) {
@@ -921,7 +922,7 @@ extern void write_model_import_settings(ModelImportSettings* mis, const std::str
 
 ModelDefData new_import_settings_to_modeldef_data(const string& mis_path, IFile* file,
 												  IAssetLoadingInterface* loading) {
-	ModelImportSettings* impSettings = nullptr;
+	std::unique_ptr<ModelImportSettings> impSettings = nullptr;
 
 	std::string to_str(file->size(), ' ');
 	file->read(to_str.data(), file->size());
@@ -930,7 +931,7 @@ ModelDefData new_import_settings_to_modeldef_data(const string& mis_path, IFile*
 		MakeObjectFromPathGeneric objmaker;
 		ReadSerializerBackendJson reader("read_modeldef", to_str, objmaker, *loading);
 		if (reader.get_root_obj()) {
-			impSettings = reader.get_root_obj()->cast_to<ModelImportSettings>();
+			impSettings.reset(reader.get_root_obj()->cast_to<ModelImportSettings>());
 		}
 		if (!impSettings) {
 			throw std::runtime_error("couldn't open dict");
@@ -941,8 +942,7 @@ ModelDefData new_import_settings_to_modeldef_data(const string& mis_path, IFile*
 			throw std::runtime_error("couldn't open dict");
 		}
 	}
-	ModelDefData mdd = new_import_settings_to_modeldef_data(impSettings);
-	delete impSettings;
+	ModelDefData mdd = new_import_settings_to_modeldef_data(mis_path,impSettings.get());
 	return mdd;
 }
 ModelDefData ModelCompileHelper::parse_definition_file(const std::string& game_path, IAssetLoadingInterface* loading) {
@@ -3080,7 +3080,7 @@ bool ModelCompilier::does_model_need_compile(const char* game_path, ModelDefData
 }
 
 ModelCompilier::Ret ModelCompilier::compile_from_settings(const std::string& output, ModelImportSettings* settings) {
-	ModelDefData def_data = new_import_settings_to_modeldef_data(settings);
+	ModelDefData def_data = new_import_settings_to_modeldef_data(output,settings);
 	return ModelCompileHelper::compile_model(output, def_data);
 }
 ModelCompilier::Ret ModelCompilier::compile(const char* game_path, IAssetLoadingInterface* loading) {

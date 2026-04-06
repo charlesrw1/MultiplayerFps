@@ -21,6 +21,7 @@ public:
 
 	REF bool is_generated = false; // was this not sourced from a file, if so skip it
 	REF std::string src_file;	   // relative filepath, must be in same directory
+
 	REF bool is_normalmap = false;
 	REF bool is_srgb = false;
 	REF int resize_width = 0; // ie 1024, 2048 etc resize source image

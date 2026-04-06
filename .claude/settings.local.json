@@ -170,7 +170,9 @@
       "Bash(/tmp/test_fuzzy_find.py:*)",
       "Bash(/tmp/test_mv_references.py:*)",
       "Bash(/tmp/test_mv_feedback.py:*)",
-      "Bash(/tmp/test_references_tab.py:*)"
+      "Bash(/tmp/test_references_tab.py:*)",
+      "Bash(powershell.exe:*)",
+      "Bash(ffmpeg -version)"
     ]
   },
   "enabledPlugins": {
