@@ -258,6 +258,16 @@ public:
 			using PitchMod = PlaybackSpeedEffectHandler<int16_t>;
 			using LowPass = LowPassFilter<int16_t>;
 
+			// Apply immediate mute for one-shot sounds to prevent clicks on early stop
+			if (spi->is_oneshot && spi->asset) {
+				float duration = spi->asset->get_duration();
+				// If we haven't reached the natural fade-out point yet, mute before halting
+				float fade_out_start = glm::max(0.f, duration - spi->fade_out_time);
+				if (spi->time_elapsed < fade_out_start) {
+					Mix_Volume(spi->voice_index, 0);
+				}
+			}
+
 			Mix_UnregisterEffect(spi->voice_index, PitchMod::mixEffectFuncCallback);
 			Mix_UnregisterEffect(spi->voice_index, LowPass::mixEffectFuncCallback);
 			Mix_HaltChannel(spi->voice_index);
@@ -291,11 +301,7 @@ public:
 				continue;
 			}
 
-			// spi->time_elapsed += dt;
-			// if (spi->time_elapsed > asset->duration && !spi->looping) {
-			//    end_sound_object_play(spi);
-			//    continue;
-			//}
+			spi->time_elapsed += dt;
 			if (spi->attenuate) {
 				float dist_sq = glm::dot(spi->spatial_pos - listener_position, spi->spatial_pos - listener_position);
 				if (dist_sq >= spi->maxRadius * spi->maxRadius) {
@@ -375,8 +381,27 @@ public:
 				low_pass_mods.at(spi.voice_index).alpha = spi.lowpass_filter;
 				SDL_UnlockAudio();
 
+				// Compute envelope multiplier for one-shot sounds (fade in/out)
+				float envelope_mult = 1.0f;
+				if (spi.is_oneshot && spi.asset) {
+					float duration = spi.asset->get_duration();
+					float elapsed = spi.time_elapsed;
+
+					// Fade in
+					if (elapsed < spi.fade_in_time && spi.fade_in_time > 0.0f) {
+						envelope_mult *= elapsed / spi.fade_in_time;
+					}
+
+					// Fade out (starts at: duration - fade_out_time)
+					float fade_out_start = glm::max(0.f, duration - spi.fade_out_time);
+					if (elapsed > fade_out_start && spi.fade_out_time > 0.0f) {
+						float fade_out_progress = (elapsed - fade_out_start) / spi.fade_out_time;
+						envelope_mult *= (1.0f - glm::clamp(fade_out_progress, 0.f, 1.f));
+					}
+				}
+
 				// Apply volume multiplier (SDL_mixer uses 0-128 scale)
-				int volume_level = int(glm::clamp(spi.volume_multiply * spi.computedAttenuation, 0.f, 1.f) * 128.f);
+				int volume_level = int(glm::clamp(spi.volume_multiply * spi.computedAttenuation * envelope_mult, 0.f, 1.f) * 128.f);
 				Mix_Volume(spi.voice_index, volume_level);
 			}
 

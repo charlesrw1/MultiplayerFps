@@ -181,7 +181,7 @@ void BikeObject::update_tick(ControlInput ci)
 		}
 		if (best_gear != gear.current_high_gear) {
 			gear.current_high_gear = best_gear;
-			gear_shift_cooldown = 0.2f;
+			gear_shift_cooldown = 0.9f;
 			just_shifted = true;
 		} else {
 			just_shifted = false;
@@ -442,7 +442,7 @@ void BikePlayer::evaluate(BikeObject* my_bike)
 	// --- Sound ---
 	// Freewheel loop: fade in when coasting, fade out when pedalling
 	const float fw_target = ci.is_coasting() ? 1.f : 0.f;
-	freewheel_player->volume_multiply = damp_dt_independent(fw_target, freewheel_player->volume_multiply, 0.02f, dt);
+	freewheel_player->volume_multiply = damp_dt_independent(fw_target, freewheel_player->volume_multiply, 0.005f, dt);
 	// pitch scales with speed: 1.0 at ~30 km/h (8.3 m/s), linear from 0.3 at standstill
 	freewheel_player->pitch_multiply = 0.3f + my_bike->speed * 0.085f;
 	freewheel_player->update();
@@ -450,7 +450,7 @@ void BikePlayer::evaluate(BikeObject* my_bike)
 	// Gear change one-shot
 	if (my_bike->just_shifted) {
 		static const SoundFile* gear_snd = SoundFile::load("sounds/gear_change.wav");
-		isound->play_sound(gear_snd, 1.f, 1.f, 0.f, 0.f, SndAtn::Linear, false, false, {});
+		isound->play_sound(gear_snd, 0.2,1.3f, 0.f, 0.f, SndAtn::Linear, false, false, {});
 	}
 
 	bp_for_debug = this;

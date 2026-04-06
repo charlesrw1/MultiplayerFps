@@ -18,7 +18,7 @@ class SoundFile : public IAsset
 public:
 	CLASS_BODY(SoundFile);
 	REF static SoundFile* load(std::string path);
-	REF float get_duration() { return duration; }
+	REF float get_duration() const { return duration; }
 
 private:
 	Mix_Chunk* internal_data = nullptr;
@@ -49,6 +49,8 @@ public:
 	bool attenuate = true;
 	bool spatialize = true;
 	float lowpass_filter = 0.f; // if >0 and <1, then implments a low pass filter
+	float fade_in_time = 0.1f;  // fade-in duration in seconds (one-shot sounds only)
+	float fade_out_time = 0.2f; // fade-out duration in seconds (one-shot sounds only)
 
 	// after changes, call update
 	void update();
