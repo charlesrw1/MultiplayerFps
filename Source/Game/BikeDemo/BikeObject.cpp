@@ -80,13 +80,14 @@ BikeObject::ControlInput BikeObject::update_tick(ControlInput ci)
 		s.actual_power = glm::min(ci.power, glm::max(0.f, s.power_ceiling));
 		ci.power = s.actual_power;
 
+		const float recovery_percentage = 0.85;
 		// W' drain (watts above FTP cost W')
 		if (s.actual_power > s.effective_ftp) {
 			s.w_prime -= (s.actual_power - s.effective_ftp) * dt;
 			s.w_prime  = glm::max(0.f, s.w_prime);
-		} else if (s.actual_power < s.effective_ftp * 0.75f) {
+		} else if (s.actual_power < s.effective_ftp * recovery_percentage) {
 			// Recovery in zone 2 and below (~22 J/s at full zone 1 effort)
-			const float zone2_factor = 1.f - s.actual_power / (s.effective_ftp * 0.75f);
+			const float zone2_factor = 1.f - s.actual_power / (s.effective_ftp * recovery_percentage);
 			s.w_prime += 22.f * zone2_factor * dt;
 			s.w_prime  = glm::min(s.w_prime, r.w_prime_max);
 		}
@@ -99,21 +100,33 @@ BikeObject::ControlInput BikeObject::update_tick(ControlInput ci)
 			s.glycogen  = glm::max(0.f, s.glycogen);
 		}
 
+		// Lactate / O2-debt: accumulates from efforts above FTP, decays tau~5min (300s).
+		// This raises the HR floor during recovery from repeated hard efforts.
+		if (s.actual_power > s.effective_ftp)
+			s.lactate += (s.actual_power - s.effective_ftp) * dt;
+		s.lactate = damp_dt_independent(0.f, s.lactate, 0.9967f, dt);  // exp(-1/300) ≈ 0.9967
+		s.lactate = glm::min(s.lactate, 20000.f);
+		// Scale: ~0.002 bpm/J → 10kJ debt ≈ 20bpm floor elevation
+		const float lactate_hr = s.lactate * 0.002f;
+
 		// HR target from power fraction (0 = rest, 1.0 ~ at FTP, >1 above FTP)
 		const float power_frac = glm::clamp(s.actual_power / (s.effective_ftp * 1.15f), 0.f, 1.f);
-		const float hr_target_base = r.hr_rest + (r.hr_max - r.hr_rest) * power_frac;
+		const float hr_target_from_power = r.hr_rest + (r.hr_max - r.hr_rest) * power_frac;
 
-		// Cardiac drift: rises with glycogen depletion, recovers at rest
+		// Cardiac drift: rises with glycogen depletion, recovers at rest (long-term)
 		const float drift_target = (1.f - s.glycogen) * 18.f;  // max ~18 bpm drift
 		// tau ~120s: smoothing = exp(-1/120) ≈ 0.9917
 		s.hr_drift = damp_dt_independent(drift_target, s.hr_drift, 0.9917f, dt);
 
-		const float hr_target = hr_target_base + s.hr_drift;
+		// HR floor from lactate — HR cannot fall below this even at 0W
+		// drift is added once after the max(), so it applies to both paths
+		const float hr_floor = r.hr_rest + lactate_hr;
+		const float hr_target = glm::max(hr_target_from_power, hr_floor) + s.hr_drift;
 
 		// Asymmetric smoothing: rise tau=45s, fall tau=90s
 		// damp_dt_independent(a, b, smoothing, dt) = mix(a, b, smoothing^dt)
 		// smoothing = exp(-1/tau)
-		const float tau_coeff = (s.hr_current < hr_target) ? 0.97802f : 0.98896f; // exp(-1/45), exp(-1/90)
+		const float tau_coeff = (s.hr_current < hr_target) ? exp(-1/30.0) : exp(-1/60.0); // exp(-1/45), exp(-1/90)
 		s.hr_current = damp_dt_independent(hr_target, s.hr_current, tau_coeff, dt);
 		s.hr_current = glm::clamp(s.hr_current, r.hr_rest, r.hr_max + 5.f);
 

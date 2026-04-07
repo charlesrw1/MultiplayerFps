@@ -95,6 +95,7 @@
     <ClCompile Include="Source\Game\BikeDemo\BikeApplication.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeCamera.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeObject.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeUI.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeWind.cpp" />
     <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
     <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
