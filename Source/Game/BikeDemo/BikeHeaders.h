@@ -7,6 +7,61 @@
 #include "Sound/SoundPublic.h"
 
 class CharacterController;
+class Texture;
+
+// ============================================================
+// Rider stats — fixed per-archetype attributes
+// ============================================================
+struct RiderStats {
+	float base_ftp     = 280.f;    // W — functional threshold power
+	float w_prime_max  = 20000.f;  // J — anaerobic work capacity
+	float sprint_watts = 1100.f;   // W — hard ceiling on peak power
+	float hr_rest      = 55.f;     // bpm
+	float hr_max       = 185.f;    // bpm
+};
+
+// ============================================================
+// Stamina state — runtime physiology
+// ============================================================
+struct StaminaState {
+	float glycogen     = 1.f;      // [0,1] — 1.0 = fresh, depletes irreversibly
+	float w_prime      = 20000.f;  // J     — recoverable anaerobic reservoir
+	float hr_current   = 55.f;     // bpm   — lagging HR
+	float hr_drift     = 0.f;      // bpm   — cardiac drift from glycogen depletion
+	float hr_pulse_phase = 0.f;    // rad   — oscillates at HR rate, drives UI pulsing
+
+	// Derived (recomputed each tick)
+	float effective_ftp   = 280.f;
+	float power_ceiling   = 1100.f;
+	float actual_power    = 0.f;
+
+	const char* legs_descriptor() const {
+		if (glycogen > 0.85f) return "Fresh";
+		if (glycogen > 0.70f) return "Good";
+		if (glycogen > 0.55f) return "Fading";
+		if (glycogen > 0.40f) return "Struggling";
+		return "Cooked";
+	}
+
+	// 0..3 bars of W' remaining
+	int w_prime_bars(float w_prime_max_) const {
+		const float frac = w_prime / w_prime_max_;
+		if (frac > 0.66f) return 3;
+		if (frac > 0.33f) return 2;
+		if (frac > 0.10f) return 1;
+		return 0;
+	}
+
+	// HR zone 0..4
+	int hr_zone(float hr_rest_, float hr_max_) const {
+		const float frac = (hr_current + hr_drift - hr_rest_) / (hr_max_ - hr_rest_);
+		if (frac < 0.60f) return 0;
+		if (frac < 0.70f) return 1;
+		if (frac < 0.80f) return 2;
+		if (frac < 0.90f) return 3;
+		return 4;
+	}
+};
 
 // Discrete power levels available to the player (watts)
 static constexpr int BIKE_POWER_LEVELS[] = {50, 100, 150, 200, 225, 250, 275, 300, 325, 350, 400, 450, 500, 600, 800, 1000 };
@@ -53,7 +108,8 @@ public:
 	void evaluate(BikeObject* my_bike) final;
 	void update_camera(BikeObject* bike, float steer, float brake_amount);
 	void update_wind(BikeObject* bike);
-	void draw_power_meter(float current_watts, int power_idx, bool coasting, bool speed_hold, float speed_hold_watts);
+	void draw_power_meter(float current_watts, int power_idx, bool coasting, bool speed_hold, float speed_hold_watts, float actual_watts, float power_ceiling);
+	void draw_stamina_ui(const StaminaState& s, const RiderStats& r);
 
 	// camera
 	CameraComponent* cc = nullptr;
@@ -102,6 +158,9 @@ public:
 	// cadence bob
 	float cadence_bob_phase = 0.f;
 
+	// stamina UI
+	Texture* heart_icon_tex = nullptr;
+
 	// speed lines (animated, flow outward)
 	static constexpr int MAX_SPEEDLINES = 48;
 	float sl_phases[MAX_SPEEDLINES] = {};  // per-line 0→1 phase (0=inner, 1=outer)
@@ -148,6 +207,8 @@ public:
 
 	BikeAnimDriver anim;
 	std::unique_ptr<IBikeInput> input;
+	RiderStats rider;
+	StaminaState stamina;
 
 	void start() final;
 	void update() final;
@@ -162,7 +223,7 @@ public:
 
 		bool is_coasting() const { return power == 0.0; }
 	};
-	void update_tick(ControlInput input);
+	ControlInput update_tick(ControlInput input);
 	float get_wind_along_bike() const;
 	glm::vec3 get_wind_along_bike_vector() const;
 

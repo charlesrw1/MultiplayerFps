@@ -254,9 +254,9 @@ void MeshBuilder::Push2dCircle(glm::vec2 center, float radius, int segments, Col
 		glm::vec2 p = center + glm::vec2(cos(angle), sin(angle)) * radius;
 		AddVertex(MbVertex(glm::vec3(p, 0), color));
 	}
-	// Triangle fan: close by wrapping last ring vertex back to first
+	// Triangle fan: reversed winding (CW in math = CCW in screen-space Y-down) to match Push2dQuad
 	for (int i = 0; i < segments; i++) {
-		AddTriangle(base, base + 1 + i, base + 1 + (i + 1) % segments);
+		AddTriangle(base, base + 1 + (i + 1) % segments, base + 1 + i);
 	}
 }
 void MeshBuilder::AddSphere(vec3 origin, float radius, int xsegments, int ysegments, Color32 color) {

@@ -50,7 +50,7 @@ void BikeObject::update()
 		input->evaluate(this);
 }
 
-void BikeObject::update_tick(ControlInput ci)
+BikeObject::ControlInput BikeObject::update_tick(ControlInput ci)
 {
 	const float dt = eng->get_dt();
 
@@ -62,6 +62,65 @@ void BikeObject::update_tick(ControlInput ci)
 	const float roll_resist    = 0.004f;  // dimensionless rolling resistance coeff
 	const float gravity        = 9.81f;
 	const float max_brake_decel = 7.f;   // m/s^2 at full brake lever
+
+	// --- Stamina tick ---
+	{
+		StaminaState& s = stamina;
+		const RiderStats& r = rider;
+
+		// Effective FTP: glycogen_factor 1.0 (fresh) → 0.55 (cooked)
+		const float glycogen_factor = 0.55f + 0.45f * s.glycogen;
+		s.effective_ftp = r.base_ftp * glycogen_factor;
+
+		// Power ceiling: scales down as W' depletes
+		const float w_frac = s.w_prime / r.w_prime_max;
+		s.power_ceiling = s.effective_ftp + (r.sprint_watts - s.effective_ftp) * w_frac;
+
+		// Clamp requested power to physiological ceiling
+		s.actual_power = glm::min(ci.power, glm::max(0.f, s.power_ceiling));
+		ci.power = s.actual_power;
+
+		// W' drain (watts above FTP cost W')
+		if (s.actual_power > s.effective_ftp) {
+			s.w_prime -= (s.actual_power - s.effective_ftp) * dt;
+			s.w_prime  = glm::max(0.f, s.w_prime);
+		} else if (s.actual_power < s.effective_ftp * 0.75f) {
+			// Recovery in zone 2 and below (~22 J/s at full zone 1 effort)
+			const float zone2_factor = 1.f - s.actual_power / (s.effective_ftp * 0.75f);
+			s.w_prime += 22.f * zone2_factor * dt;
+			s.w_prime  = glm::min(s.w_prime, r.w_prime_max);
+		}
+
+		// Glycogen drain — disproportionately faster above FTP
+		// At FTP (ratio=1), depletes ~0.35 over 70min.  Sprint (ratio~3) is 5x faster.
+		if (s.actual_power > 0.f) {
+			const float ratio = s.actual_power / s.effective_ftp;
+			s.glycogen -= 0.0000833f * glm::pow(ratio, 1.5f) * dt;
+			s.glycogen  = glm::max(0.f, s.glycogen);
+		}
+
+		// HR target from power fraction (0 = rest, 1.0 ~ at FTP, >1 above FTP)
+		const float power_frac = glm::clamp(s.actual_power / (s.effective_ftp * 1.15f), 0.f, 1.f);
+		const float hr_target_base = r.hr_rest + (r.hr_max - r.hr_rest) * power_frac;
+
+		// Cardiac drift: rises with glycogen depletion, recovers at rest
+		const float drift_target = (1.f - s.glycogen) * 18.f;  // max ~18 bpm drift
+		// tau ~120s: smoothing = exp(-1/120) ≈ 0.9917
+		s.hr_drift = damp_dt_independent(drift_target, s.hr_drift, 0.9917f, dt);
+
+		const float hr_target = hr_target_base + s.hr_drift;
+
+		// Asymmetric smoothing: rise tau=45s, fall tau=90s
+		// damp_dt_independent(a, b, smoothing, dt) = mix(a, b, smoothing^dt)
+		// smoothing = exp(-1/tau)
+		const float tau_coeff = (s.hr_current < hr_target) ? 0.97802f : 0.98896f; // exp(-1/45), exp(-1/90)
+		s.hr_current = damp_dt_independent(hr_target, s.hr_current, tau_coeff, dt);
+		s.hr_current = glm::clamp(s.hr_current, r.hr_rest, r.hr_max + 5.f);
+
+		// Heart pulse phase — increments at HR rate (bpm → rad/s)
+		s.hr_pulse_phase += (s.hr_current / 60.f) * 6.2832f * dt;
+		if (s.hr_pulse_phase > 6.2832f) s.hr_pulse_phase -= 6.2832f;
+	}
 
 	// --- Drive force:  P = F*v  =>  F = P/v ---
 	// Clamp min speed to avoid division by zero on standing start
@@ -207,6 +266,8 @@ void BikeObject::update_tick(ControlInput ci)
 	const glm::quat orient       = roll_quat * base_orient;
 
 	get_owner()->set_ws_position_rotation(pos, orient);
+
+	return ci;
 }
 
 float BikeObject::get_wind_along_bike() const
