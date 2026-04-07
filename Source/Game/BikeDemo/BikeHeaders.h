@@ -116,6 +116,7 @@ public:
 
 	glm::vec3 bike_direction = glm::vec3(0.f, 0, 1.f);
 	float speed = 0.f;
+	float speed_smoothed = 0.f; // low-pass filtered speed, used for gear cadence checks
 	float current_turn = 0.0;
 	float cadence = 0.f;	// cadence at gear
 	float current_roll = 0.0;

@@ -65,14 +65,14 @@ static float steer_speed_gate_lo   = 6.2f;   // m/s — speed_factor = 0 below t
 static float steer_speed_gate_hi   = 18.f;   // m/s — speed_factor = 1 above this
 static float steer_lean_threshold  = 0.55f;  // stick fraction at which inertia starts
 static float steer_lean_range      = 0.35f;  // stick range over which inertia ramps to full
-static float steer_build_lo        = 0.070f; // build smoothing at low speed (snappy)
-static float steer_build_hi        = 0.120f; // build smoothing at high speed (gradual)
+static float steer_build_lo        = 0.152f; // build smoothing at low speed (snappy)
+static float steer_build_hi        = 0.185f; // build smoothing at high speed (gradual)
 static float steer_release_lo      = 0.000f; // release smoothing when not committed
-static float steer_release_hi      = 0.007f;  // release smoothing when deeply committed
+static float steer_release_hi      = 0.500f;  // release smoothing when deeply committed
 static float steer_max_deg         = 45.f;   // max physical steer angle (degrees)
 static float steer_min_radius      = 1.5f;   // minimum turn radius (m)
 static float steer_radius_coeff    = 0.09f;  // speed² coefficient for min radius
-
+static float bike_gear_shift_cooldown = 3.f;
 void BikeObject::update_tick(ControlInput ci)
 {
 	const float dt = eng->get_dt();
@@ -167,6 +167,7 @@ void BikeObject::update_tick(ControlInput ci)
 	current_roll = damp_dt_independent(target_roll, current_roll, 0.02f, dt);
 
 	// --- Auto gear selection (target ~90 RPM = 1.5 rev/s) ---
+	speed_smoothed = damp_dt_independent(speed, speed_smoothed, 0.04f, dt);
 	gear_shift_cooldown = glm::max(0.f, gear_shift_cooldown - dt);
 	just_shifted = false;
 	const float target_cadence_rps = 1.5f;
@@ -175,16 +176,17 @@ void BikeObject::update_tick(ControlInput ci)
 		float best_diff = FLT_MAX;
 		for (int i = 0; i < (int)gear.back_cogs.size(); i++) {
 			const float ratio = (float)gear.front_cogs[gear.current_low_gear] / (float)gear.back_cogs[i];
-			const float cad   = speed / (ratio * wheel_circ);
+			const float cad   = speed_smoothed / (ratio * wheel_circ);
 			const float diff  = glm::abs(cad - target_cadence_rps);
 			if (diff < best_diff) { best_diff = diff; best_gear = i; }
 		}
-		if (best_gear != gear.current_high_gear) {
+		const float cur_ratio       = (float)gear.front_cogs[gear.current_low_gear] / (float)gear.back_cogs[gear.current_high_gear];
+		const float cur_cadence_rpm = (speed_smoothed > 0.1f) ? (speed_smoothed / (cur_ratio * wheel_circ)) * 60.f : 0.f;
+		const bool outside_range    = cur_cadence_rpm < 80.f || cur_cadence_rpm > 95.f;
+		if (best_gear != gear.current_high_gear && outside_range) {
 			gear.current_high_gear = best_gear;
-			gear_shift_cooldown = 0.9f;
+			gear_shift_cooldown = bike_gear_shift_cooldown;
 			just_shifted = true;
-		} else {
-			just_shifted = false;
 		}
 	}
 	const float gear_ratio = (float)gear.front_cogs[gear.current_low_gear]
@@ -279,7 +281,8 @@ static float bike_camera_gradient_fast = 0.002f; // snap up on climb
 static float bike_camera_gradient_slow = 0.015f; // lazy return on descent/flat
 static float bike_fov_fast = 0.003f;             // widen on acceleration
 static float bike_fov_slow = 0.02f;              // slow bleed back
-
+static float bike_fov_brake = 8.f;               // degrees to narrow FOV at full brake
+static float free_wheel_fade = 0.0002;
 // Asymmetric damp: different smoothing depending on direction of change
 static float damp_asymmetric(float target, float current, float fast, float slow, float dt) {
 	float smoothing = (target > current) ? fast : slow;
@@ -348,6 +351,7 @@ void bike_object_debug() {
 		ImGui::InputFloat("bike_camera_brake_slow",    &bike_camera_brake_slow);
 		ImGui::InputFloat("bike_fov_fast",             &bike_fov_fast);
 		ImGui::InputFloat("bike_fov_slow",             &bike_fov_slow);
+		ImGui::InputFloat("bike_fov_brake",            &bike_fov_brake);
 		DAMP_IMGUI(steer_build_lo);
 		DAMP_IMGUI(steer_build_hi);
 		DAMP_IMGUI(steer_release_lo);
@@ -357,7 +361,8 @@ void bike_object_debug() {
 		ImGui::DragFloat("steer_speed_gate_lo", &steer_speed_gate_lo, 0.1);
 		ImGui::DragFloat("steer_speed_gate_hi", &steer_speed_gate_hi, 0.1);
 
-
+		ImGui::InputFloat("free_wheel_fade", &free_wheel_fade);
+		ImGui::InputFloat("bike_gear_shift_cooldown", &bike_gear_shift_cooldown);
 
 #undef DAMP_IMGUI
 	}
@@ -442,9 +447,8 @@ void BikePlayer::evaluate(BikeObject* my_bike)
 	// --- Sound ---
 	// Freewheel loop: fade in when coasting, fade out when pedalling
 	const float fw_target = ci.is_coasting() ? 1.f : 0.f;
-	freewheel_player->volume_multiply = damp_dt_independent(fw_target, freewheel_player->volume_multiply, 0.005f, dt);
-	// pitch scales with speed: 1.0 at ~30 km/h (8.3 m/s), linear from 0.3 at standstill
-	freewheel_player->pitch_multiply = 0.3f + my_bike->speed * 0.085f;
+	freewheel_player->volume_multiply = damp_dt_independent(fw_target, freewheel_player->volume_multiply, free_wheel_fade, dt);
+	freewheel_player->pitch_multiply = 0.8f + my_bike->speed * 0.04f;
 	freewheel_player->update();
 
 	// Gear change one-shot
@@ -520,7 +524,7 @@ void BikePlayer::update_camera(BikeObject* bike, float steer, float brake_amount
 	smooth_aim_pos = damp_dt_independent(look_target, smooth_aim_pos, 0.005f, dt);
 
 	// Speed-based FOV
-	const float fov_target = 65.f + glm::clamp(bike->speed * 0.4f, 0.f, 20.f);
+	const float fov_target = 65.f + glm::clamp(bike->speed * 0.4f, 0.f, 20.f) - brake_amount * bike_fov_brake;
 	fov_smoothed = damp_asymmetric(fov_target, fov_smoothed, bike_fov_fast, bike_fov_slow, dt);
 	cc->set_fov(fov_smoothed);
 
