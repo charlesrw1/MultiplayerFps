@@ -178,6 +178,12 @@ bool Input::last_recieved_input_from_con() {
 	return inst->recieved_input_from_this.has_value() && inst->recieved_input_from_this.value() != -1;
 }
 
+void Input::rumble(uint16_t low_freq, uint16_t high_freq, uint32_t duration_ms) {
+	auto device = inst->get_device_ptr(inst->default_dev_index.value_or(-1));
+	if (device)
+		SDL_GameControllerRumble(device, low_freq, high_freq, duration_ms);
+}
+
 bool Input::is_key_down(SDL_Scancode key) {
 	assert(key >= 0 && key < SDL_NUM_SCANCODES);
 	return inst->keyPressedReleasedState[key].is_down;

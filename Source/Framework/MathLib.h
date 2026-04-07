@@ -44,6 +44,12 @@ inline glm::vec4 colorvec_linear_to_srgb(const glm::vec4& color) {
 	return glm::vec4(to_srgb(color.x), to_srgb(color.y), to_srgb(color.z), color.w /* dont correct w?*/);
 }
 
+// Map value from [in_lo, in_hi] to [out_lo, out_hi], clamped to output range.
+inline float map_range(float v, float in_lo, float in_hi, float out_lo, float out_hi) {
+	const float t = glm::clamp((v - in_lo) / (in_hi - in_lo), 0.f, 1.f);
+	return glm::mix(out_lo, out_hi, t);
+}
+
 // smoothing = [0,1] where 0 is no smoothing and 1.0 is max smoothing
 template <typename T> static T damp_dt_independent(T a, T b, float smoothing, float dt) {
 	float alpha = pow(smoothing, dt);

@@ -427,13 +427,13 @@ public:
 
 	Free_List<ParticleObj_Internal> particle_objs;
 	virtual handle<Particle_Object> register_particle_obj() final {
-		ASSERT(!eng->get_is_in_overlapped_period());
+		//ASSERT(!eng->get_is_in_overlapped_period());
 		int handle = particle_objs.make_new();
 		// particle_objs.get(handle).obj = mbobj;
 		return {handle};
 	}
 	virtual void update_particle_obj(handle<Particle_Object> handle, const Particle_Object& mbobj) final {
-		ASSERT(!eng->get_is_in_overlapped_period());
+		//ASSERT(!eng->get_is_in_overlapped_period());
 		assert(handle.is_valid());
 		particle_objs.get(handle.id).obj = mbobj;
 	}

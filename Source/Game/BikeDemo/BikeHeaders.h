@@ -3,6 +3,7 @@
 #include "Game/Entity.h"
 #include <array>
 #include "Framework/MulticastDelegate.h"
+#include "Framework/MeshBuilder.h"
 #include "Sound/SoundPublic.h"
 
 class CharacterController;
@@ -50,6 +51,9 @@ class BikePlayer : public IBikeInput {
 public:
 	BikePlayer();
 	void evaluate(BikeObject* my_bike) final;
+	void update_camera(BikeObject* bike, float steer, float brake_amount);
+	void update_wind(BikeObject* bike);
+	void draw_power_meter(float current_watts, int power_idx, bool coasting, bool speed_hold, float speed_hold_watts);
 
 	// camera
 	CameraComponent* cc = nullptr;
@@ -61,11 +65,14 @@ public:
 	float gradient_pitch = 0.f;
 	float brake_pitch    = 0.f;
 	float lead_yaw       = 0.f;
-	float fov_smoothed   = 65.f;
+	float fov_smoothed      = 65.f;
+	float current_power     = 0.f;   // power output this frame (0 when coasting)
 
 	// power control state
-	int power_level_idx = 4;   // index into BIKE_POWER_LEVELS, default 300W
-	bool is_coasting = false;
+	int   power_level_idx  = 4;    // index into BIKE_POWER_LEVELS, default 300W
+	bool  is_coasting      = false;
+	float power_hold_timer  = 0.f; // how long dpad/key has been held
+	float power_repeat_timer = 0.f; // accumulator for repeat firings
 
 	// speed hold (hold X / V)
 	bool  speed_hold_active = false;
@@ -74,11 +81,54 @@ public:
 
 	// sound
 	SoundPlayer* freewheel_player = nullptr;
+	SoundPlayer* wind_player      = nullptr;
+	SoundPlayer* pedal_player     = nullptr;
+
+	// road bump fx state
+	float prev_gradient   = 0.f;
+	// pitch spring: impulse forces camera down, springs back
+	float bump_pitch_disp = 0.f;
+	float bump_pitch_vel  = 0.f;
+	// vertical spring: impulse pushes camera up, springs back
+	float bump_vert_disp  = 0.f;
+	float bump_vert_vel   = 0.f;
+	// camera shake: random offset decaying over time
+	glm::vec3 shake_offset{};
+	float shake_magnitude = 0.f;
+
+	// camera roll on cornering
+	float camera_roll = 0.f;
+
+	// cadence bob
+	float cadence_bob_phase = 0.f;
+
+	// speed lines (animated, flow outward)
+	static constexpr int MAX_SPEEDLINES = 48;
+	float sl_phases[MAX_SPEEDLINES] = {};  // per-line 0→1 phase (0=inner, 1=outer)
+	float sl_angles[MAX_SPEEDLINES] = {};  // per-line fixed base angle (radians)
+	bool  sl_initialized = false;
+	MeshBuilder speedlines_mb{};
+	handle<Particle_Object> speedlines_handle{};
+
+	// wind lines
+	struct WindLine {
+		glm::vec3 pos;
+		float lifetime;
+		float max_life;
+		float wave_phase;   // unused, reserved
+		float wave_speed;   // per-streak speed multiplier
+		float radius;       // spawn/death distance from player
+		float len;          // ribbon length
+		float width;        // ribbon max half-width
+		float alpha;        // max alpha (0-255)
+	};
+	static constexpr int WIND_LINE_COUNT = 20;
+	WindLine wind_lines[WIND_LINE_COUNT] = {};
+	bool wind_initialized = false;
+	MeshBuilder wind_mb{};
+	handle<Particle_Object> wind_handle{};
 
 	~BikePlayer();
-
-private:
-	void update_camera(BikeObject* bike, float steer, float brake_amount);
 };
 class AnimatorObject;
 class BikeAnimDriver {
@@ -113,6 +163,9 @@ public:
 		bool is_coasting() const { return power == 0.0; }
 	};
 	void update_tick(ControlInput input);
+	float get_wind_along_bike() const;
+	glm::vec3 get_wind_along_bike_vector() const;
+
 
 	glm::vec3 bike_direction = glm::vec3(0.f, 0, 1.f);
 	float speed = 0.f;
@@ -122,6 +175,8 @@ public:
 	float current_roll = 0.0;
 	float current_steer = 0.f; // inertia-smoothed steer, persists briefly after input release
 	float terrain_gradient    = 0.f;   // radians, + = uphill, - = downhill
+	float prev_gradient       = 0.f;   // last frame gradient, for bump detection
+	float bump_impulse        = 0.f;   // magnitude of bump this frame (speed-scaled)
 	float gear_shift_cooldown = 0.f;   // seconds remaining until next shift is allowed
 	bool  just_shifted        = false; // set true for one tick when a shift occurs
 	GearSelector gear;

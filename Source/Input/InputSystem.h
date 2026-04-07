@@ -51,6 +51,7 @@ public:
 	static SDL_GameControllerType get_con_type();
 	static SDL_GameControllerType get_con_type_idx(int idx);
 	static bool last_recieved_input_from_con();
+	static void rumble(uint16_t low_freq, uint16_t high_freq, uint32_t duration_ms);
 	static MulticastDelegate<int /* index */, bool /* connected/disconnected */> on_con_status;
 	static MulticastDelegate<int /* controller index or -1 if keyboard */>
 		on_any_input; // invoked on any input recieved from a device

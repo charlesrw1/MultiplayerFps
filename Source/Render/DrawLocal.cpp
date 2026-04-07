@@ -2407,12 +2407,13 @@ void Renderer::render_level_to_target(const Render_Level_Params& params) {
 void Renderer::render_particles() {
 	device.reset_states();
 	auto& pobjs = scene.particle_objs.objects;
-
+	auto* default_mat = MaterialInstance::load("particle_default.mm");
+	assert(default_mat);
 	for (auto& p_ : pobjs) {
 		auto& p = p_.type_;
 		const MaterialInstance* mat = p.obj.material;
 		if (!mat)
-			continue;
+			mat = default_mat;
 
 		RenderPipelineState state;
 		state.program = matman.get_mat_shader(nullptr, mat, 0);
