@@ -16,6 +16,8 @@ glm::vec3 wind_direction    = glm::vec3(1.f, 0.f, 0.f);
 float     wind_speed        = 4.f;
 float     wind_gust_factor  = 0.f;   // [0,1] Perlin-driven
 float     wind_elapsed_time = 0.f;
+float     ambient_temp      = 35.f;  // °C — 18 = neutral, 35 = hot race day
+float     sun_exposure      = 0.9f;  // [0,1] — 0 = full shade/overcast, 1 = full sun
 
 // Per-streak property ranges (interpolated by radius at spawn time)
 static float radius_min   =  6.f;
@@ -202,6 +204,11 @@ void BikePlayer::update_wind(BikeObject* bike)
 
 static void bike_wind_debug()
 {
+	ImGui::SeparatorText("Environment");
+	{
+		ImGui::DragFloat("ambient_temp",  &ambient_temp,  0.5f, -5.f, 45.f);
+		ImGui::DragFloat("sun_exposure",  &sun_exposure,  0.02f, 0.f,  1.f);
+	}
 	ImGui::SeparatorText("Wind");
 	{
 		ImGui::DragFloat3("wind_direction", &wind_direction.x,  0.05f);

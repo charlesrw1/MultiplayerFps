@@ -149,6 +149,26 @@ void BikePlayer::draw_stamina_ui(const StaminaState& s, const RiderStats& r)
 		}
 	}
 
+	// ---- Heat vignette: warm orange/yellow tint at screen edges ----
+	if (s.heat_stress > 0.05f) {
+		static const int HEAT_LAYERS = 5;
+		for (int i = 0; i < HEAT_LAYERS; i++) {
+			const float t       = (float)(HEAT_LAYERS - 1 - i) / (float)(HEAT_LAYERS - 1);
+			const float layer_a = s.heat_stress * t * t * 0.30f;
+			const int   inset   = i * 22;
+			const int   x0      = inset;
+			const int   y0      = inset;
+			const int   w_      = sw - inset * 2;
+			const int   h_      = sh - inset * 2;
+			const int   thick   = 22;
+			Gui::set_color(0.95f, 0.55f, 0.05f, layer_a);
+			Gui::rectangle(x0,              y0,              w_,    thick);
+			Gui::rectangle(x0,              y0 + h_ - thick, w_,    thick);
+			Gui::rectangle(x0,              y0 + thick,      thick, h_ - thick * 2);
+			Gui::rectangle(x0 + w_ - thick, y0 + thick,      thick, h_ - thick * 2);
+		}
+	}
+
 	// ---- HR panel (bottom-left) ----
 	constexpr int HUD_X   = 12;
 	constexpr int HUD_Y_B = 20;
@@ -206,9 +226,46 @@ void BikePlayer::draw_stamina_ui(const StaminaState& s, const RiderStats& r)
 		Gui::circle(dot_x, wprime_y, DOT_R, 12);
 	}
 
-	// ---- Legs descriptor ----
+	// ---- Heat indicator (above W' dots, only when significant) ----
 	constexpr int LEGS_Y_OFFSET = 18;
-	const int   legs_y = wprime_y - LEGS_Y_OFFSET;
+	int legs_y = wprime_y - LEGS_Y_OFFSET;
+
+	if (s.heat_stress > 0.05f) {
+		// 4 small heat bars (like signal bars) colored orange→red
+		constexpr int BAR_W = 4;
+		constexpr int BAR_GAP = 2;
+		constexpr int BAR_MAX_H = 12;
+		constexpr int NUM_HEAT_BARS = 4;
+		const int heat_x = HUD_X;
+		const int heat_y = legs_y - 2;
+		const int filled_bars = (int)(s.heat_stress * NUM_HEAT_BARS + 0.5f);
+
+		for (int i = 0; i < NUM_HEAT_BARS; i++) {
+			const int bar_h = 3 + (i * (BAR_MAX_H - 3)) / (NUM_HEAT_BARS - 1);
+			const int bx    = heat_x + i * (BAR_W + BAR_GAP);
+			const int by    = heat_y - bar_h;
+			const bool lit  = i < filled_bars;
+			if (lit)
+				Gui::set_color(glm::mix(0.95f, 0.85f, (float)i / NUM_HEAT_BARS),
+				               glm::mix(0.65f, 0.10f, (float)i / NUM_HEAT_BARS),
+				               0.05f, 0.95f);
+			else
+				Gui::set_color(0.25f, 0.15f, 0.05f, 0.5f);
+			Gui::rectangle(bx, by, BAR_W, bar_h);
+		}
+
+		// "HOT" label to the right of bars
+		const int label_x = heat_x + NUM_HEAT_BARS * (BAR_W + BAR_GAP) + 3;
+		const int label_y_pos = heat_y - 9;
+		Gui::set_color(0.f, 0.f, 0.f, 0.7f);
+		Gui::print("HOT", label_x + 1, label_y_pos + 1);
+		Gui::set_color(0.95f, glm::mix(0.65f, 0.10f, s.heat_stress), 0.05f, 0.9f);
+		Gui::print("HOT", label_x, label_y_pos);
+
+		legs_y -= (BAR_MAX_H + 6);  // push legs descriptor up to make room
+	}
+
+	// ---- Legs descriptor ----
 	const char* desc   = s.legs_descriptor();
 	Gui::set_color(0.f, 0.f, 0.f, 0.8f);
 	Gui::print(desc, HUD_X + 1, legs_y + 1);

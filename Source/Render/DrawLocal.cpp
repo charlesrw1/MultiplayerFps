@@ -4172,12 +4172,12 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 
 		render_particles();
 	};
+	draw_forward_pass();
 
 	// no fog in cubemaps?
 	if (!params.is_cubemap_view)
 		draw_height_fog(scene_color_handle);
 
-	draw_forward_pass();
 
 	// cubemap views end here
 	// dont need to draw post processing or UI stuff

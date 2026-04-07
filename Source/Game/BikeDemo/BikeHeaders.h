@@ -27,6 +27,7 @@ struct StaminaState {
 	float glycogen     = 1.f;      // [0,1] — 1.0 = fresh, depletes irreversibly
 	float w_prime      = 20000.f;  // J     — recoverable anaerobic reservoir
 	float lactate      = 0.f;      // J     — O2-debt accumulator; raises HR floor, decays ~5min
+	float heat_stress  = 0.f;      // [0,1] — thermoregulatory load; driven by temp, sun, effort, cooled by airspeed
 	float hr_current   = 55.f;     // bpm   — lagging HR
 	float hr_drift     = 0.f;      // bpm   — cardiac drift from glycogen depletion (long-term)
 	float hr_pulse_phase = 0.f;    // rad   — oscillates at HR rate, drives UI pulsing

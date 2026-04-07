@@ -329,8 +329,11 @@ static void bike_status_debug()
 			s.glycogen * 100.f, s.effective_ftp, s.legs_descriptor());
 		ImGui::Text("W':           %.0f / %.0f J  (%d bars)  ceiling=%.0fW",
 			s.w_prime, r.w_prime_max, s.w_prime_bars(r.w_prime_max), s.power_ceiling);
-		ImGui::Text("HR:           %.0f bpm  (drift +%.1f  lactate +%.1f)  zone %d",
-			s.hr_current, s.hr_drift, s.lactate * 0.002f, s.hr_zone(r.hr_rest, r.hr_max));
+		ImGui::Text("HR:           %.0f bpm  (drift +%.1f  lactate +%.1f  heat +%.1f)  zone %d",
+			s.hr_current, s.hr_drift, s.lactate * 0.002f, s.heat_stress * 20.f,
+			s.hr_zone(r.hr_rest, r.hr_max));
+		ImGui::Text("Heat stress:  %.1f%%   eff_FTP=%.0fW (heat factor %.2f)",
+			s.heat_stress * 100.f, s.effective_ftp, 1.f - s.heat_stress * 0.12f);
 	}
 
 	ImGui::SeparatorText("Speed Hold");

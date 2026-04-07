@@ -6,6 +6,8 @@
 extern glm::vec3 wind_direction;
 extern float     wind_speed;
 extern float     wind_gust_factor;
+extern float     ambient_temp;
+extern float     sun_exposure;
 #include "Game/Components/MeshComponent.h"
 #include "Render/Model.h"
 #include "Framework/MathLib.h"
@@ -68,9 +70,30 @@ BikeObject::ControlInput BikeObject::update_tick(ControlInput ci)
 		StaminaState& s = stamina;
 		const RiderStats& r = rider;
 
-		// Effective FTP: glycogen_factor 1.0 (fresh) → 0.55 (cooked)
+		// --- Heat stress tick ---
+		// Heat sources: solar radiation + warm air + metabolic effort heat
+		// Cooling:      convective air flow (apparent airspeed past body)
+		// Net drives heat_stress [0,1] up or down.
+		{
+			const float temp_above_neutral = glm::max(0.f, ambient_temp - 18.f);
+			const float solar_heat   = sun_exposure * 0.00025f;
+			const float ambient_heat = temp_above_neutral * 0.000015f;
+			const float effort_heat  = s.actual_power * 0.0000005f;
+
+			// Convective cooling: apparent airspeed past body
+			// Even stationary there's ~1 m/s of natural convection (min floor)
+			const float air_flow  = glm::max(1.f, speed - get_wind_along_bike());
+			const float cooling   = air_flow * 0.000035f;
+
+			const float net = solar_heat + ambient_heat + effort_heat - cooling;
+			s.heat_stress += net * dt;
+			s.heat_stress  = glm::clamp(s.heat_stress, 0.f, 1.f);
+		}
+
+		// Effective FTP: glycogen depletes it, heat suppresses it further (−12% at max heat)
 		const float glycogen_factor = 0.55f + 0.45f * s.glycogen;
-		s.effective_ftp = r.base_ftp * glycogen_factor;
+		const float heat_ftp_factor = 1.f - s.heat_stress * 0.12f;
+		s.effective_ftp = r.base_ftp * glycogen_factor * heat_ftp_factor;
 
 		// Power ceiling: scales down as W' depletes
 		const float w_frac = s.w_prime / r.w_prime_max;
@@ -92,11 +115,11 @@ BikeObject::ControlInput BikeObject::update_tick(ControlInput ci)
 			s.w_prime  = glm::min(s.w_prime, r.w_prime_max);
 		}
 
-		// Glycogen drain — disproportionately faster above FTP
-		// At FTP (ratio=1), depletes ~0.35 over 70min.  Sprint (ratio~3) is 5x faster.
+		// Glycogen drain — disproportionately faster above FTP; heat adds ~30% at max stress
 		if (s.actual_power > 0.f) {
-			const float ratio = s.actual_power / s.effective_ftp;
-			s.glycogen -= 0.0000833f * glm::pow(ratio, 1.5f) * dt;
+			const float ratio      = s.actual_power / s.effective_ftp;
+			const float heat_mult  = 1.f + s.heat_stress * 0.30f;
+			s.glycogen -= 0.0000833f * glm::pow(ratio, 1.5f) * heat_mult * dt;
 			s.glycogen  = glm::max(0.f, s.glycogen);
 		}
 
@@ -111,10 +134,12 @@ BikeObject::ControlInput BikeObject::update_tick(ControlInput ci)
 
 		// HR target from power fraction (0 = rest, 1.0 ~ at FTP, >1 above FTP)
 		const float power_frac = glm::clamp(s.actual_power / (s.effective_ftp * 1.15f), 0.f, 1.f);
-		const float hr_target_from_power = r.hr_rest + (r.hr_max - r.hr_rest) * power_frac;
+		// Heat raises HR directly: skin vasodilation competes for cardiac output (+20bpm at max heat)
+		const float heat_hr = s.heat_stress * 20.f;
+		const float hr_target_from_power = r.hr_rest + (r.hr_max - r.hr_rest) * power_frac + heat_hr;
 
-		// Cardiac drift: rises with glycogen depletion, recovers at rest (long-term)
-		const float drift_target = (1.f - s.glycogen) * 18.f;  // max ~18 bpm drift
+		// Cardiac drift: rises with glycogen depletion; heat makes it worse (doubles at max heat)
+		const float drift_target = (1.f - s.glycogen) * 18.f * (1.f + s.heat_stress);
 		// tau ~120s: smoothing = exp(-1/120) ≈ 0.9917
 		s.hr_drift = damp_dt_independent(drift_target, s.hr_drift, 0.9917f, dt);
 

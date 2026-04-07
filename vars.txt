@@ -50,5 +50,3 @@ ignore_folders 1
 
 g_agent_repl 1
 dt 0
-
-open-editor maps/bike_test_map.tmap
