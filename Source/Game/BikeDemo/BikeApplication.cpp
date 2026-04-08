@@ -35,8 +35,9 @@ static float sh_power_max  = 800.f;
 static float free_wheel_fade = 0.0002f;
 
 // Debug pointers (set each frame in evaluate)
-static BikeObject* bo_for_debug = nullptr;
-static BikePlayer* bp_for_debug = nullptr;
+static BikeObject*        bo_for_debug = nullptr;
+static BikePlayer*        bp_for_debug = nullptr;
+static BikeGameApplication* g_bike_app = nullptr;
 
 // ============================================================
 // Helpers
@@ -54,11 +55,44 @@ static float apply_deadzone(float val, float dz) {
 void BikeGameApplication::start()
 {
 	GameplayStatic::change_level("maps/bike_test_map.tmap");
+	course.build_from_spawners();
 	create_player(glm::vec3(0.f));
 }
 
 void BikeGameApplication::update()
 {
+	g_bike_app = this;
+	if (course.is_built) {
+		update_course_positions();
+		sort_riders();
+	}
+}
+
+void BikeGameApplication::update_course_positions()
+{
+	for (auto* r : all_riders) {
+		r->course_dist_m = course.project(
+			r->get_ws_position(),
+			&r->lateral_pos,
+			&r->course_segment,
+			r->course_segment);
+	}
+}
+
+void BikeGameApplication::sort_riders()
+{
+	riders_sorted = all_riders;
+	std::sort(riders_sorted.begin(), riders_sorted.end(),
+		[](const BikeObject* a, const BikeObject* b) {
+			return a->course_dist_m > b->course_dist_m;
+		});
+	for (int i = 0; i < (int)riders_sorted.size(); ++i)
+		riders_sorted[i]->race_position = i + 1;
+}
+
+void BikeGameApplication::debug_draw_course() const
+{
+	course.debug_draw();
 }
 
 BikeObject* BikeGameApplication::create_player(glm::vec3 pos)
@@ -67,6 +101,8 @@ BikeObject* BikeGameApplication::create_player(glm::vec3 pos)
 	e->set_ws_position(pos);
 	auto bo = e->create_component<BikeObject>();
 	bo->input = std::make_unique<BikePlayer>();
+	all_riders.push_back(bo);
+	riders_sorted.push_back(bo);
 	return bo;
 }
 
@@ -361,3 +397,35 @@ static void bike_status_debug()
 	}
 }
 ADD_TO_DEBUG_MENU(bike_status_debug);
+
+// ============================================================
+// Debug menu: Course / Race State
+// ============================================================
+
+static void bike_course_debug()
+{
+	if (!g_bike_app) return;
+	const BikeCourse& c = g_bike_app->course;
+
+	if (!c.is_built) {
+		ImGui::TextColored({1,0.4f,0.4f,1}, "Course not built — no bike_waypoint spawners in level?");
+		return;
+	}
+
+	ImGui::Text("Waypoints: %d   Length: %.0f m", (int)c.waypoints.size(), c.total_length_m);
+
+	ImGui::SeparatorText("Riders");
+	const auto& sorted = g_bike_app->riders_sorted;
+	for (int i = 0; i < (int)sorted.size(); ++i) {
+		const BikeObject* r = sorted[i];
+		ImGui::Text("P%d  dist=%.0f m  lat=%+.2f m  seg=%d",
+			r->race_position, r->course_dist_m, r->lateral_pos, r->course_segment);
+	}
+
+	ImGui::SeparatorText("Visualisation");
+	static bool draw_course = false;
+	ImGui::Checkbox("Draw course spline", &draw_course);
+	if (draw_course)
+		c.debug_draw();
+}
+ADD_TO_DEBUG_MENU(bike_course_debug);

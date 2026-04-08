@@ -1,6 +1,7 @@
 #pragma once
 #include "Game/EntityPtr.h"
 #include "Game/Entity.h"
+#include "BikeCourse.h"
 #include <array>
 #include "Framework/MulticastDelegate.h"
 #include "Framework/MeshBuilder.h"
@@ -275,6 +276,12 @@ public:
 	float crash_timer       = 0.f;    // seconds until rider can resume after a crash
 	float corner_warn_timer = 0.f;    // seconds the corner has been over the grip limit
 
+	// Course state (updated each frame by BikeGameApplication before input runs)
+	float course_dist_m  = 0.f;   // arc-length from course start (m)
+	float lateral_pos    = 0.f;   // signed offset from road centre, +ve = road-right (m)
+	int   course_segment = 0;     // nearest waypoint segment index (cached)
+	int   race_position  = 0;     // 1-indexed finishing position in sorted rider list
+
 	EntityPtr fork_entity;
 
 	glm::vec3 prev_front_wheel_pos{};
@@ -292,4 +299,16 @@ public:
 	void update() final;
 
 	BikeObject* create_player(glm::vec3 pos);
+
+	BikeCourse course;
+
+	// All riders (player + AI), populated by create_player / create_ai
+	std::vector<BikeObject*> all_riders;
+	// Sorted front-to-back by course_dist_m each frame (index 0 = race leader)
+	std::vector<BikeObject*> riders_sorted;
+
+private:
+	void update_course_positions();
+	void sort_riders();
+	void debug_draw_course() const;
 };
