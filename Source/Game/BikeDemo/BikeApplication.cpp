@@ -24,7 +24,7 @@ extern float     gust_speed_amp;
 
 // Steering expo: >1 compresses small deflections for finer control near center.
 // At expo=2: half-stick → 25% input. At expo=1: linear. At expo=3: half-stick → 12.5%.
-static float steer_expo = 2.0f;
+static float steer_expo = 3.5f;
 
 // Speed hold tuning
 static float sh_power_up   = 0.012f;

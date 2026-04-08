@@ -43,10 +43,10 @@ static float steer_build_lo        = 0.04f;  // build smoothing at low speed (sn
 static float steer_build_hi        = 0.15f;  // build smoothing at high speed (gradual, tau ~0.7s)
 static float steer_vel_scale       = 4.f;    // stick units/s at which velocity boost is fully applied
 static float steer_vel_boost       = 0.01f;  // smoothing floor when flicking fast (lower = snappier)
-static float steer_release_lo      = 0.000f; // release smoothing when not committed (instant)
+static float steer_release_lo      = 0.015f; // release smoothing when not committed (slight decay, kills oscillation)
 static float steer_release_hi      = 0.08f;  // release smoothing when deeply committed (tau ~0.4s)
 static float steer_max_deg         = 45.f;   // max physical steer angle at low speed (degrees)
-static float steer_max_deg_hi      = 10.f;   // max physical steer angle at high speed (degrees)
+static float steer_max_deg_hi      = 6.f;    // max physical steer angle at high speed (degrees)
 static float steer_max_speed_lo    = 3.f;    // m/s — full steer range below this
 static float steer_max_speed_hi    = 20.f;   // m/s — minimum steer range above this
 static float steer_min_radius      = 1.5f;   // minimum turn radius (m)
