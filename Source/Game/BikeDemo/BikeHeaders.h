@@ -100,10 +100,34 @@ public:
 	virtual void evaluate(BikeObject* my_bike) {}
 };
 #include "Game/Components/CameraComponent.h"
+// Forward declare so BikeAI can hold a pointer to the course.
+class BikeCourse;
+
 class BikeAI : public IBikeInput {
 public:
-	// ai logic, then feeds into bike character
-	// state machine logic
+	void evaluate(BikeObject* my_bike) final;
+
+	// Set once after construction — points to the application-owned course.
+	BikeCourse* course = nullptr;
+
+	// ---- Waypoint following ----
+	float lookahead_dist_base = 3.f;   // min lookahead distance (m)
+	float lookahead_dist_per_ms = 1.5f; // additional metres per m/s of speed
+
+	// ---- PID steering ----
+	float steer_kp = 1.8f;
+	float steer_ki = 0.f;
+	float steer_kd = 0.25f;
+	float steer_integral  = 0.f;
+	float prev_steer_err  = 0.f;
+
+	// ---- Power ----
+	float target_power_watts   = 250.f;  // set by strategy layer (Layer 6); fixed for now
+	float actual_power_command = 250.f;  // smoothed toward target
+	static constexpr float POWER_SLEW = 0.05f; // damp rate
+
+	// ---- Debug ----
+	glm::vec3 dbg_lookahead_pt{};  // world-space lookahead point, drawn in debug
 };
 class BikePlayer : public IBikeInput {
 public:
@@ -299,6 +323,7 @@ public:
 	void update() final;
 
 	BikeObject* create_player(glm::vec3 pos);
+	BikeObject* create_ai(glm::vec3 pos);
 
 	BikeCourse course;
 

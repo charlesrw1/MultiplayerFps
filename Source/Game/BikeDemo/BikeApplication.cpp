@@ -57,6 +57,7 @@ void BikeGameApplication::start()
 	GameplayStatic::change_level("maps/bike_test_map.tmap");
 	course.build_from_spawners();
 	create_player(glm::vec3(0.f));
+	create_ai(glm::vec3(5.f, 0.f, 0.f));
 }
 
 void BikeGameApplication::update()
@@ -100,6 +101,19 @@ BikeObject* BikeGameApplication::create_player(glm::vec3 pos)
 	e->set_ws_position(pos);
 	auto bo = e->create_component<BikeObject>();
 	bo->input = std::make_unique<BikePlayer>();
+	all_riders.push_back(bo);
+	riders_sorted.push_back(bo);
+	return bo;
+}
+
+BikeObject* BikeGameApplication::create_ai(glm::vec3 pos)
+{
+	Entity* e = GameplayStatic::spawn_entity();
+	e->set_ws_position(pos);
+	auto bo  = e->create_component<BikeObject>();
+	auto ai  = std::make_unique<BikeAI>();
+	ai->course = &course;
+	bo->input  = std::move(ai);
 	all_riders.push_back(bo);
 	riders_sorted.push_back(bo);
 	return bo;
@@ -423,8 +437,19 @@ static void bike_course_debug()
 
 	ImGui::SeparatorText("Visualisation");
 	static bool draw_course = false;
+	static bool draw_ai_lookahead = true;
 	ImGui::Checkbox("Draw course spline", &draw_course);
+	ImGui::Checkbox("Draw AI lookahead points", &draw_ai_lookahead);
 	if (draw_course)
 		c.debug_draw();
+	if (draw_ai_lookahead) {
+		for (auto* r : g_bike_app->all_riders) {
+			if (auto* ai = dynamic_cast<BikeAI*>(r->input.get())) {
+				Debug::add_sphere(ai->dbg_lookahead_pt, 0.4f, COLOR_CYAN, -1.f);
+				Debug::add_line(r->get_ws_position(), ai->dbg_lookahead_pt,
+				                Color32(0, 0xff, 0xff, 0x88), -1.f);
+			}
+		}
+	}
 }
 ADD_TO_DEBUG_MENU(bike_course_debug);

@@ -92,6 +92,7 @@
     <ClCompile Include="Source\Framework\StringUtils.cpp" />
     <ClCompile Include="Source\Framework\Util.cpp" />
     <ClCompile Include="Source\Game\BaseUpdater.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeAI.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeApplication.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeCourse.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeCamera.cpp" />
