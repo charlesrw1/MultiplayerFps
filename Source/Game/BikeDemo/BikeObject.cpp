@@ -45,14 +45,24 @@ static float steer_vel_scale       = 4.f;    // stick units/s at which velocity 
 static float steer_vel_boost       = 0.01f;  // smoothing floor when flicking fast (lower = snappier)
 static float steer_release_lo      = 0.015f; // release smoothing when not committed (slight decay, kills oscillation)
 static float steer_release_hi      = 0.08f;  // release smoothing when deeply committed (tau ~0.4s)
-static float steer_max_deg         = 45.f;   // max physical steer angle at low speed (degrees)
-static float steer_max_deg_hi      = 6.f;    // max physical steer angle at high speed (degrees)
-static float steer_max_speed_lo    = 3.f;    // m/s — full steer range below this
-static float steer_max_speed_hi    = 20.f;   // m/s — minimum steer range above this
+static float steer_max_deg         = 45.f;   // max steer angle at/below reference speed (degrees)
+static float steer_max_deg_hi      = 3.f;    // minimum steer angle floor at very high speed (degrees)
+static float steer_ref_speed       = 5.f;    // m/s — speed at which full steer authority begins decaying
+static float steer_speed_power     = 2.0f;   // falloff exponent: 2 = quadratic (car-like), 1 = linear
 static float steer_min_radius      = 1.5f;   // minimum turn radius (m)
 static float steer_radius_coeff    = 0.04f;  // speed² coefficient for min radius (lower = more responsive at speed)
 static float lean_max_deg          = 32.f;   // visual lean cap (degrees) — prevents extreme angles
 static float bike_gear_shift_cooldown = 3.f;
+
+// Returns the maximum steer angle (radians) at the given speed.
+// Uses a speed^power falloff so authority shrinks as (ref_speed/speed)^power —
+// same relationship car racing games use to make high-speed steering feel less twitchy.
+static float compute_max_steer_rad(float speed)
+{
+	const float safe_speed = glm::max(speed, steer_ref_speed);
+	const float t          = glm::pow(steer_ref_speed / safe_speed, steer_speed_power);
+	return glm::radians(steer_max_deg_hi + (steer_max_deg - steer_max_deg_hi) * t);
+}
 
 // Pedal stroke
 static float stroke_amp = 1.0f;  // 0=constant power, 1=full realistic lurch (power only on downstroke)
@@ -241,8 +251,7 @@ void BikeObject::tick_physics(ControlInput& ci, float dt)
 		// Corner overspeed → crash
 		const float wheelbase     = BIKE_WHEELBASE;
 		const float min_turn_r    = glm::max(steer_min_radius, speed * speed * steer_radius_coeff);
-		const float max_steer_rad = glm::radians(glm::mix(steer_max_deg, steer_max_deg_hi,
-		                              glm::smoothstep(steer_max_speed_lo, steer_max_speed_hi, speed)));
+		const float max_steer_rad = compute_max_steer_rad(speed);
 		const float steer_angle   = current_steer * max_steer_rad;
 		if (!is_crashed && glm::abs(steer_angle) > 0.001f && speed > 3.f) {
 			const float turn_r      = glm::max(wheelbase / glm::abs(glm::tan(steer_angle)), min_turn_r);
@@ -344,8 +353,7 @@ void BikeObject::tick_steer(const ControlInput& ci, float dt)
 
 	// Steering geometry → yaw bike_direction
 	const float wheelbase     = BIKE_WHEELBASE;
-	const float max_steer_rad = glm::radians(glm::mix(steer_max_deg, steer_max_deg_hi,
-	                              glm::smoothstep(steer_max_speed_lo, steer_max_speed_hi, speed)));
+	const float max_steer_rad = compute_max_steer_rad(speed);
 	const float min_turn_r    = glm::max(steer_min_radius, speed * speed * steer_radius_coeff);
 	const float steer_angle   = current_steer * max_steer_rad;
 
@@ -420,8 +428,7 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	static constexpr float FORK_LEG       = BIKE_FRONT_Z - FORK_HINGE_FWD; // ~0.63884
 	const float ray_up    = 1.5f;
 	const float ray_reach = 4.0f;
-	const float steer_max_rad_t = glm::radians(glm::mix(steer_max_deg, steer_max_deg_hi,
-	                                glm::smoothstep(steer_max_speed_lo, steer_max_speed_hi, speed)));
+	const float steer_max_rad_t = compute_max_steer_rad(speed);
 	const float steer_angle_t   = current_steer * steer_max_rad_t;
 	const glm::vec3 steered_front_dir = glm::normalize(
 	    glm::mat3(glm::rotate(glm::mat4(1.f), -steer_angle_t, glm::vec3(0, 1, 0))) * bike_direction);
@@ -482,9 +489,8 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	// Fork steer rotation
 	if (fork_entity) {
 		static constexpr float HEAD_TUBE_RAD = glm::radians(17.77f);
-		const float max_steer_rad = glm::radians(glm::mix(steer_max_deg, steer_max_deg_hi,
-		                              glm::smoothstep(steer_max_speed_lo, steer_max_speed_hi, speed)));
-		const float fork_angle = current_steer* max_steer_rad;// (steer_input_raw + wobble_steer)* max_steer_rad;
+		const float max_steer_rad = compute_max_steer_rad(speed);
+		const float fork_angle = current_steer * max_steer_rad;// (steer_input_raw + wobble_steer)* max_steer_rad;
 		const float fork_visual  = fork_angle - current_roll * glm::sin(HEAD_TUBE_RAD);
 		fork_entity->set_ls_euler_rotation(glm::vec3(HEAD_TUBE_RAD, -fork_visual, 0.f));
 	}
@@ -527,11 +533,13 @@ static void bike_physics_debug()
 		ImGui::DragFloat("steer_speed_gate_lo",  &steer_speed_gate_lo,  0.1f);
 		ImGui::DragFloat("steer_speed_gate_hi",  &steer_speed_gate_hi,  0.1f);
 		ImGui::DragFloat("steer_max_deg",        &steer_max_deg,        0.5f, 5.f,  45.f);
-		ImGui::DragFloat("steer_max_deg_hi",     &steer_max_deg_hi,     0.5f, 1.f,  20.f);
-		ImGui::DragFloat("steer_max_speed_lo",   &steer_max_speed_lo,   0.1f, 0.f,  10.f);
-		ImGui::DragFloat("steer_max_speed_hi",   &steer_max_speed_hi,   0.5f, 5.f,  40.f);
+		ImGui::DragFloat("steer_max_deg_hi",     &steer_max_deg_hi,     0.5f, 0.5f, 15.f);
+		ImGui::DragFloat("steer_ref_speed",      &steer_ref_speed,      0.1f, 1.f,  15.f);
+		ImGui::DragFloat("steer_speed_power",    &steer_speed_power,    0.1f, 0.5f,  5.f);
+		ImGui::Text("  power=1: linear  2: car-like v^2  3: cubic");
 		if (s_bike_debug)
-			ImGui::Text("current max steer: %.1f deg  (speed %.1f m/s)", glm::degrees(glm::radians(glm::mix(steer_max_deg, steer_max_deg_hi, glm::smoothstep(steer_max_speed_lo, steer_max_speed_hi, s_bike_debug->speed)))), s_bike_debug->speed);
+			ImGui::Text("current max steer: %.1f deg  (speed %.1f m/s)",
+			            glm::degrees(compute_max_steer_rad(s_bike_debug->speed)), s_bike_debug->speed);
 		ImGui::DragFloat("steer_radius_coeff",   &steer_radius_coeff,   0.005f, 0.f,   0.2f);
 		ImGui::DragFloat("lean_max_deg",         &lean_max_deg,         0.5f,   5.f,  50.f);
 		ImGui::DragFloat("steer_vel_scale",      &steer_vel_scale,      0.1f,   0.5f, 20.f);
