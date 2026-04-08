@@ -157,6 +157,10 @@ public:
 	// camera roll on cornering
 	float camera_roll = 0.f;
 
+	// reverse view (RS click)
+	bool  reverse_view = false;
+	float reverse_yaw  = 0.f;  // smoothly transitions 0 ↔ π
+
 	// cadence bob
 	float cadence_bob_phase = 0.f;
 
@@ -226,9 +230,20 @@ public:
 		bool is_coasting() const { return power == 0.0; }
 	};
 	ControlInput update_tick(ControlInput input);
+
+	// Sub-tick functions (called in order by update_tick)
+	void tick_stamina(ControlInput& ci, float dt);
+	void tick_physics(ControlInput& ci, float dt);
+	void tick_steer(const ControlInput& ci, float dt);
+	void tick_gears(float dt);
+	void tick_transform(const ControlInput& ci, float dt);
 	float get_wind_along_bike() const;
 	glm::vec3 get_wind_along_bike_vector() const;
 
+
+	// Cross-tick communication (written by one sub-tick, read by another)
+	float     steer_input_raw      = 0.f;       // resolved raw stick input (0 when crashed)
+	glm::vec3 terrain_forward_dir  = {0,0,1};   // terrain-aligned forward from last raycast
 
 	glm::vec3 bike_direction = glm::vec3(0.f, 0, 1.f);
 	float speed = 0.f;
@@ -237,6 +252,7 @@ public:
 	float cadence = 0.f;	// cadence at gear
 	float current_roll = 0.0;
 	float current_steer = 0.f; // inertia-smoothed steer, persists briefly after input release
+	float prev_steer_input = 0.f; // raw steer last frame, for stick velocity calculation
 	float terrain_gradient    = 0.f;   // radians, + = uphill, - = downhill
 	float prev_gradient       = 0.f;   // last frame gradient, for bump detection
 	float bump_impulse        = 0.f;   // magnitude of bump this frame (speed-scaled)
@@ -244,6 +260,23 @@ public:
 	bool  just_shifted        = false; // set true for one tick when a shift occurs
 	GearSelector gear;
 
+	float wobble_steer = 0.f;
+	float wobble_vel   = 0.f;
+	float wobble_timer = 0.f;
+	float stroke_phase       = 0.f;  // pedal cycle phase (0..2π per revolution)
+	float stroke_speed_smooth = 0.f; // heavily smoothed speed for phase advancement (breaks feedback loop)
+
+	float surface_traction  = 1.0f;   // [0,1] — road grip: 1=dry tarmac, 0.6=wet, 0.3=gravel
+	float rear_skid         = 0.f;    // [0,1] — rear wheel lock from heavy braking (recoverable)
+	bool  is_crashed        = false;  // true when corner overspeed exceeded the grip limit
+	float crash_timer       = 0.f;    // seconds until rider can resume after a crash
+	float corner_warn_timer = 0.f;    // seconds the corner has been over the grip limit
+
+	EntityPtr fork_entity;
+
+	glm::vec3 prev_front_wheel_pos{};
+	glm::vec3 prev_rear_wheel_pos{};
+	bool wheel_history_initialized = false;
 };
 
 

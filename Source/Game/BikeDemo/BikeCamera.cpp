@@ -102,10 +102,16 @@ void BikePlayer::update_camera(BikeObject* bike, float steer, float brake_amount
 	const glm::vec3 bike_pos = bike->get_owner()->get_ws_position();
 	const glm::vec3 fwd      = bike->bike_direction;
 
-	const float cam_dist      = 5.5f;
+	const float cam_dist      = 2.5f;
 	const float default_pitch = glm::radians(20.f);
 	const float rider_height  = 1.1f;
 	const glm::vec3 pivot     = bike_pos + glm::vec3(0, rider_height, 0);
+
+	// --- Reverse view (RS click) ---
+	if (Input::was_con_button_pressed(SDL_CONTROLLER_BUTTON_RIGHTSTICK))
+		reverse_view = !reverse_view;
+	const float reverse_yaw_target = reverse_view ? glm::pi<float>() : 0.f;
+	reverse_yaw = damp_dt_independent(reverse_yaw_target, reverse_yaw, 0.005f, dt);
 
 	// --- Right stick orbital control ---
 	const float rx = apply_deadzone_cam((float)Input::get_con_axis(SDL_CONTROLLER_AXIS_RIGHTX), 0.15f);
@@ -130,7 +136,7 @@ void BikePlayer::update_camera(BikeObject* bike, float steer, float brake_amount
 	lead_yaw = damp_dt_independent(-steer * glm::radians(bike_camera_lead), lead_yaw, bike_camera_lead_interp, dt);
 
 	// --- Orbit position ---
-	const glm::quat yaw_rot     = glm::angleAxis(camera_yaw, glm::vec3(0, 1, 0));
+	const glm::quat yaw_rot     = glm::angleAxis(camera_yaw + reverse_yaw, glm::vec3(0, 1, 0));
 	const glm::vec3 yawed_dir   = yaw_rot * (-fwd);
 	const glm::vec3 orbit_right = glm::normalize(glm::cross(yawed_dir, glm::vec3(0, 1, 0)));
 	const float total_pitch     = camera_pitch + gradient_pitch + brake_pitch;
@@ -138,10 +144,11 @@ void BikePlayer::update_camera(BikeObject* bike, float steer, float brake_amount
 	const glm::vec3 orbit_dir   = glm::normalize(pitch_rot * yawed_dir);
 	const glm::vec3 target_pos  = pivot + orbit_dir * cam_dist;
 
-	// --- Look-ahead target ---
+	// --- Look-ahead target (flips to look behind when in reverse view) ---
 	const float look_ahead      = 3.0f + bike->speed * 0.5f;
 	const glm::quat lead_rot    = glm::angleAxis(lead_yaw, glm::vec3(0, 1, 0));
-	const glm::vec3 look_target = pivot + (lead_rot * fwd) * look_ahead;
+	const glm::vec3 look_fwd    = glm::angleAxis(reverse_yaw, glm::vec3(0, 1, 0)) * fwd;
+	const glm::vec3 look_target = pivot + (lead_rot * look_fwd) * look_ahead;
 
 	if (!camera_initialized) {
 		camera_pos         = target_pos;

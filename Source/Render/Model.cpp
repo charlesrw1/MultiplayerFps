@@ -190,8 +190,10 @@ void IMPORT_MODEL_FUNC(const Cmd_Args& args) {
 	}
 
 	auto savepath = strip_extension(args.at(1)) + ".mis";
+	string glb_path = args.at(1);
+	StringUtils::get_filename(glb_path);
 	ModelImportSettings mis;
-	mis.srcGlbFile = args.at(1);
+	mis.srcGlbFile = glb_path+".glb";
 	write_model_import_settings(&mis, savepath);
 
 	ModelCompilier::compile(savepath.c_str(), AssetDatabase::loader);

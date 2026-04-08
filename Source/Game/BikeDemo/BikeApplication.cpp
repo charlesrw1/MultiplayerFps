@@ -22,6 +22,10 @@ extern float     wind_speed;
 extern float     wind_gust_factor;
 extern float     gust_speed_amp;
 
+// Steering expo: >1 compresses small deflections for finer control near center.
+// At expo=2: half-stick → 25% input. At expo=1: linear. At expo=3: half-stick → 12.5%.
+static float steer_expo = 2.0f;
+
 // Speed hold tuning
 static float sh_power_up   = 0.012f;
 static float sh_power_down = 0.025f;
@@ -185,7 +189,7 @@ void BikePlayer::evaluate(BikeObject* my_bike)
 		power_hold_timer   = 0.f;
 		power_repeat_timer = 0.f;
 	}
-	is_coasting = coast_btn || kb_coast;
+	is_coasting = coast_btn || kb_coast || brake_amount > 0.f || kb_brake;
 
 	// --- Speed hold ---
 	const bool want_speed_hold = (speed_hold_btn || kb_speed_hold) && !is_coasting;
@@ -202,6 +206,11 @@ void BikePlayer::evaluate(BikeObject* my_bike)
 	if (kb_left)  steer_combined -= 1.f;
 	if (kb_right) steer_combined += 1.f;
 	steer_combined = glm::clamp(steer_combined, -1.f, 1.f);
+
+	// Expo curve: compresses small deflections for finer gamepad control near centre.
+	// Keyboard is already binary (±1) so skip it there.
+	if (!kb_left && !kb_right && glm::abs(steer_combined) > 0.0001f)
+		steer_combined = glm::sign(steer_combined) * glm::pow(glm::abs(steer_combined), steer_expo);
 
 	// --- Fill ControlInput ---
 	BikeObject::ControlInput ci;
@@ -257,7 +266,7 @@ void BikePlayer::evaluate(BikeObject* my_bike)
 
 	// --- Sound: wind ambient ---
 	{
-		const float eff_spd = -my_bike->get_wind_along_bike();// wind_speed* (1.f + wind_gust_factor * gust_speed_amp);
+		const float eff_spd = my_bike->speed-my_bike->get_wind_along_bike();// wind_speed* (1.f + wind_gust_factor * gust_speed_amp);
 		const float vol_target = glm::clamp(eff_spd / 10.f, 0.f, 1.f)*0.8 + 0.4;
 		wind_player->volume_multiply = damp_dt_independent(vol_target, wind_player->volume_multiply, 0.04f, dt);
 		wind_player->pitch_multiply  = 0.75f + vol_target * 0.5f;
@@ -335,6 +344,10 @@ static void bike_status_debug()
 		ImGui::Text("Heat stress:  %.1f%%   eff_FTP=%.0fW (heat factor %.2f)",
 			s.heat_stress * 100.f, s.effective_ftp, 1.f - s.heat_stress * 0.12f);
 	}
+
+	ImGui::SeparatorText("Steering");
+	ImGui::DragFloat("steer_expo", &steer_expo, 0.05f, 1.f, 4.f);
+	ImGui::Text("  half-stick → %.0f%% input  (1=linear, 2=quad, 3=cubic)", glm::pow(0.5f, steer_expo) * 100.f);
 
 	ImGui::SeparatorText("Speed Hold");
 	{
