@@ -207,7 +207,7 @@ void BikeObject::tick_physics(ControlInput& ci, float dt)
 	// Forces
 	const float wind_along_bike  = get_wind_along_bike();
 	const float apparent_speed   = speed - wind_along_bike;
-	const float drag             = 0.5f * BIKE_AIR_DENSITY * BIKE_CDA * apparent_speed * glm::abs(apparent_speed);
+	const float drag             = 0.5f * BIKE_AIR_DENSITY * (BIKE_CDA * draft_factor) * apparent_speed * glm::abs(apparent_speed);
 	const float rolling          = (speed > 0.05f) ? (BIKE_ROLL_RESIST * BIKE_MASS * BIKE_GRAVITY) : 0.f;
 	const float normal_force_brk = BIKE_MASS * BIKE_GRAVITY * glm::cos(terrain_gradient);
 	const float kinetic_friction = traction_mu * 0.7f * normal_force_brk;

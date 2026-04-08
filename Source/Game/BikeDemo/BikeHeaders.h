@@ -306,6 +306,10 @@ public:
 	int   course_segment = 0;     // nearest waypoint segment index (cached)
 	int   race_position  = 0;     // 1-indexed finishing position in sorted rider list
 
+	// Drafting (written by BikeGameApplication::update_drafting before physics runs)
+	// 1.0 = no draft (open air), 0.65 = full draft at ideal position
+	float draft_factor = 1.0f;
+
 	EntityPtr fork_entity;
 
 	glm::vec3 prev_front_wheel_pos{};
@@ -335,5 +339,6 @@ public:
 private:
 	void update_course_positions();
 	void sort_riders();
+	void update_drafting();
 	void debug_draw_course() const;
 };

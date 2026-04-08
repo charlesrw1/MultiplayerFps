@@ -66,6 +66,7 @@ void BikeGameApplication::update()
 	if (course.is_built) {
 		update_course_positions();
 		sort_riders();
+		update_drafting();
 	}
 }
 
@@ -88,6 +89,49 @@ void BikeGameApplication::sort_riders()
 		});
 	for (int i = 0; i < (int)riders_sorted.size(); ++i)
 		riders_sorted[i]->race_position = i + 1;
+}
+
+// ============================================================
+// Drafting constants
+// ============================================================
+static constexpr float DRAFT_LONG_MIN    =  0.3f;  // min longitudinal gap to benefit (m)
+static constexpr float DRAFT_LONG_MAX    =  8.0f;  // no benefit beyond this (m)
+static constexpr float DRAFT_LAT_MAX     =  1.2f;  // no benefit beyond this lateral offset (m)
+static constexpr float DRAFT_MAX_BENEFIT =  0.35f; // max CdA reduction (35%)
+static constexpr float DRAFT_FLOOR       =  0.55f; // minimum draft_factor (hard floor)
+static constexpr int   DRAFT_STACK_CHECK =  5;     // how many riders ahead to check for stacking
+
+void BikeGameApplication::update_drafting()
+{
+	const int n = (int)riders_sorted.size();
+
+	for (int i = 0; i < n; ++i) {
+		BikeObject* me = riders_sorted[i];
+
+		float total_benefit  = 0.f;
+		float stack_weight   = 1.f;
+
+		// riders_sorted is front-to-back (index 0 = leader), so riders ahead are at lower indices
+		for (int j = i - 1; j >= 0 && (i - j) <= DRAFT_STACK_CHECK; --j) {
+			const BikeObject* ahead = riders_sorted[j];
+
+			const float long_gap = ahead->course_dist_m - me->course_dist_m;
+			const float lat_gap  = glm::abs(ahead->lateral_pos - me->lateral_pos);
+
+			if (long_gap < DRAFT_LONG_MIN || long_gap > DRAFT_LONG_MAX) continue;
+			if (lat_gap  >= DRAFT_LAT_MAX)                               continue;
+
+			// Benefit falls off linearly with both gaps
+			const float long_factor = 1.f - (long_gap - DRAFT_LONG_MIN) / (DRAFT_LONG_MAX - DRAFT_LONG_MIN);
+			const float lat_factor  = 1.f - lat_gap / DRAFT_LAT_MAX;
+			const float benefit     = long_factor * lat_factor * DRAFT_MAX_BENEFIT;
+
+			total_benefit += benefit * stack_weight;
+			stack_weight  *= 0.5f;  // each additional rider in the stack contributes half as much
+		}
+
+		me->draft_factor = glm::max(DRAFT_FLOOR, 1.f - total_benefit);
+	}
 }
 
 void BikeGameApplication::debug_draw_course() const
@@ -431,8 +475,8 @@ static void bike_course_debug()
 	const auto& sorted = g_bike_app->riders_sorted;
 	for (int i = 0; i < (int)sorted.size(); ++i) {
 		const BikeObject* r = sorted[i];
-		ImGui::Text("P%d  dist=%.0f m  lat=%+.2f m  seg=%d",
-			r->race_position, r->course_dist_m, r->lateral_pos, r->course_segment);
+		ImGui::Text("P%d  dist=%.0f m  lat=%+.2f m  draft=%.2f",
+			r->race_position, r->course_dist_m, r->lateral_pos, r->draft_factor);
 	}
 
 	ImGui::SeparatorText("Visualisation");
