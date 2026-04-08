@@ -66,6 +66,14 @@ static float wobble_instability  = 0.8f;   // mild inverted-pendulum: wobble_ste
 static float wobble_counter      = 4.0f;   // player steer input cancels wobble_vel
 static float wobble_damping      = 0.15f;  // smoothing base for vel decay (lower = faster decay)
 
+// Crosswind buffeting
+static float crosswind_gust_kick       = 0.08f;  // steer-vel kick per gust event
+static float crosswind_gust_interval_lo = 3.f;   // min seconds between gusts
+static float crosswind_gust_interval_hi = 8.f;   // max seconds between gusts
+static float crosswind_vel_decay       = 0.002f; // wind_vel decay (tau ~0.07 s)
+static float crosswind_steer_decay     = 0.004f; // wind_steer decay (tau ~0.1 s)
+static float crosswind_speed_stable    = 12.f;   // m/s — gyro stability 65% reduction at this speed
+
 // Traction tuning
 static float traction_mu           = 1.0f;   // dry-road tire µ (was 0.8 — lean compensation justifies raising)
 static float traction_lean_comp    = 0.20f;  // bicycle lean handles most cornering; ~0.2 of car centripetal demand reaches the tire
@@ -303,7 +311,36 @@ void BikeObject::tick_steer(const ControlInput& ci, float dt)
 		wobble_steer = damp_dt_independent(0.f, wobble_steer, steer_decay, dt);
 		wobble_steer = glm::clamp(wobble_steer + wobble_vel * dt, -0.6f, 0.6f);
 	}
-	current_steer = glm::clamp(current_steer + wobble_steer, -1.f, 1.f);
+	// Crosswind gusts: periodic random kicks from the wind's lateral component.
+	// wind_gust_factor is too biased/slow to use directly — instead fire discrete
+	// gust events on a random timer, like wobble kicks.
+	{
+		crosswind_gust_timer -= dt;
+		if (crosswind_gust_timer <= 0.f) {
+			const glm::vec3 wdir       = glm::length(wind_direction) > 0.001f
+			                             ? glm::normalize(wind_direction) : glm::vec3(0.f);
+			const glm::vec3 b_right    = glm::normalize(glm::cross(bike_direction, glm::vec3(0, 1, 0)));
+			// How perpendicular the wind is to the bike: 0 = head/tailwind, ±1 = pure crosswind.
+			// This is both the direction of the kick and its scale.
+			const float perp_component = glm::dot(wdir, b_right);
+
+			const float speed_stab = 1.f - glm::clamp(speed / crosswind_speed_stable, 0.f, 1.f) * 0.65f;
+			const float kick       = crosswind_gust_kick * wind_speed * speed_stab
+			                         * (0.5f + 0.5f * ((float)rand() / RAND_MAX));
+			wind_vel += perp_component * kick;
+
+			const float interval = crosswind_gust_interval_lo
+			    + (crosswind_gust_interval_hi - crosswind_gust_interval_lo)
+			      * ((float)rand() / RAND_MAX);
+			crosswind_gust_timer = interval;
+		}
+		wind_vel   = damp_dt_independent(0.f, wind_vel,   crosswind_vel_decay,   dt);
+		wind_steer = glm::clamp(wind_steer + wind_vel * dt, -0.15f, 0.15f);
+		wind_steer = damp_dt_independent(0.f, wind_steer, crosswind_steer_decay, dt);
+
+		GameplayStatic::debug_text(string_format("wind_steer=%.3f  gust_t=%.1f", wind_steer, crosswind_gust_timer));
+	}
+	current_steer = glm::clamp(current_steer + wobble_steer + wind_steer, -1.f, 1.f);
 
 	// Steering geometry → yaw bike_direction
 	const float wheelbase     = BIKE_WHEELBASE;
@@ -512,6 +549,17 @@ static void bike_physics_debug()
 		if (s_bike_debug)
 			ImGui::Text("wobble: steer=%.3f vel=%.3f timer=%.2f",
 				s_bike_debug->wobble_steer, s_bike_debug->wobble_vel, s_bike_debug->wobble_timer);
+	}
+	ImGui::SeparatorText("Crosswind Gusts");
+	{
+		ImGui::DragFloat("crosswind_gust_kick",         &crosswind_gust_kick,         0.005f, 0.f,  0.5f);
+		ImGui::DragFloat2("crosswind_interval lo/hi",   &crosswind_gust_interval_lo,  0.5f,   0.5f, 30.f);
+		ImGui::DragFloat("crosswind_vel_decay",         &crosswind_vel_decay,         0.0005f, 0.f,  0.02f);
+		ImGui::DragFloat("crosswind_steer_decay",       &crosswind_steer_decay,       0.001f, 0.f,  0.02f);
+		ImGui::DragFloat("crosswind_speed_stable",      &crosswind_speed_stable,      0.5f,   1.f,  30.f);
+		if (s_bike_debug)
+			ImGui::Text("wind_steer=%.3f  vel=%.3f  gust_t=%.1f",
+				s_bike_debug->wind_steer, s_bike_debug->wind_vel, s_bike_debug->crosswind_gust_timer);
 	}
 	ImGui::SeparatorText("Pedal Stroke");
 	{

@@ -255,13 +255,15 @@ void BikePlayer::update_camera(BikeObject* bike, float steer, float brake_amount
 		}
 	}
 
-	const glm::vec3 cam_right = glm::normalize(glm::cross(base_fwd, glm::vec3(0, 1, 0)));
-	const glm::quat pitch_spring_rot = glm::angleAxis(bump_pitch_disp + bob_pitch, cam_right);
-	const glm::vec3 cam_fwd   = glm::normalize(pitch_spring_rot * base_fwd);
-	const glm::vec3 cam_up_raw = glm::cross(cam_right, cam_fwd);
-	const glm::quat roll_rot  = glm::angleAxis(camera_roll, cam_fwd);
-	const glm::vec3 cam_up    = roll_rot * cam_up_raw;
-	const glm::vec3 final_pos = bumped_pos + orbit_up * bob_vert;
+	const glm::vec3 cam_right_pre = glm::normalize(glm::cross(base_fwd, glm::vec3(0, 1, 0)));
+	const glm::quat pitch_spring_rot = glm::angleAxis(bump_pitch_disp + bob_pitch, cam_right_pre);
+	const glm::vec3 cam_fwd    = glm::normalize(pitch_spring_rot * base_fwd);
+	const glm::vec3 cam_up_raw = glm::cross(cam_right_pre, cam_fwd);
+	// Roll must rotate both right and up around fwd — rotating only one produces a non-orthonormal matrix
+	const glm::quat roll_rot   = glm::angleAxis(camera_roll, cam_fwd);
+	const glm::vec3 cam_right  = roll_rot * cam_right_pre;
+	const glm::vec3 cam_up     = roll_rot * cam_up_raw;
+	const glm::vec3 final_pos  = bumped_pos + orbit_up * bob_vert;
 
 	cc->get_owner()->set_ws_transform(glm::mat4(
 		glm::vec4(cam_right, 0.f),

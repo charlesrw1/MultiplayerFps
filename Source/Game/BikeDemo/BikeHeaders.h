@@ -263,6 +263,9 @@ public:
 	float wobble_steer = 0.f;
 	float wobble_vel   = 0.f;
 	float wobble_timer = 0.f;
+	float wind_steer          = 0.f;  // crosswind handlebar perturbation
+	float wind_vel            = 0.f;  // rate of change of wind_steer
+	float crosswind_gust_timer = 0.f; // countdown to next gust event
 	float stroke_phase       = 0.f;  // pedal cycle phase (0..2π per revolution)
 	float stroke_speed_smooth = 0.f; // heavily smoothed speed for phase advancement (breaks feedback loop)
 
