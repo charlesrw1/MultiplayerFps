@@ -4,14 +4,20 @@
 #include "Game/Entity.h"
 #include "Debug.h"
 #include "Framework/Util.h"
+#include "Physics/ChannelsAndPresets.h"
 #include <glm/gtc/constants.hpp>
 #include <algorithm>
 #include <cstdlib>
 #include <cfloat>
+#include <cmath>
 
 static const glm::vec3 WORLD_UP = { 0.f, 1.f, 0.f };
 
-// Catmull-Rom spline through four control points, parameter t in [0,1] covers p1->p2.
+// Terrain snap ray: cast this far above and below the placed waypoint position.
+static constexpr float SNAP_CAST_UP   = 200.f;
+static constexpr float SNAP_CAST_DOWN = 200.f;
+
+// Catmull-Rom: smooth curve through p1->p2, using p0 and p3 as tangent guides.
 static glm::vec3 catmull_rom(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t)
 {
 	return 0.5f * (
@@ -41,6 +47,7 @@ void BikeCourse::build_from_spawners()
 		return ia < ib;
 	});
 
+	// Extract positions and road half-widths
 	std::vector<glm::vec3> positions;
 	std::vector<float>     half_widths;
 	positions.reserve(spawners.size());
@@ -52,18 +59,35 @@ void BikeCourse::build_from_spawners()
 		half_widths.push_back(hw);
 	}
 
-	build(positions, half_widths);
+	// Terrain-snap each position downward
+	const int terrain_mask = (1 << (int)PL::Default) | (1 << (int)PL::StaticObject);
+	int snapped = 0;
+	for (auto& pos : positions) {
+		const glm::vec3 ray_start = pos + glm::vec3(0.f, SNAP_CAST_UP,   0.f);
+		const glm::vec3 ray_end   = pos - glm::vec3(0.f, SNAP_CAST_DOWN, 0.f);
+		HitResult hit = GameplayStatic::cast_ray(ray_start, ray_end, terrain_mask, nullptr);
+		if (hit.hit) {
+			pos.y = hit.pos.y;
+			++snapped;
+		}
+	}
+	sys_print(Info, "BikeCourse: snapped %d / %d waypoints to terrain\n", snapped, (int)positions.size());
+
+	build(positions, half_widths, /*loop=*/true);
 }
 
 // ============================================================
 // build
 // ============================================================
 
-void BikeCourse::build(const std::vector<glm::vec3>& positions, const std::vector<float>& road_half_widths)
+void BikeCourse::build(const std::vector<glm::vec3>& positions,
+                       const std::vector<float>&     road_half_widths,
+                       bool                          loop)
 {
 	waypoints.clear();
 	total_length_m = 0.f;
 	is_built       = false;
+	is_loop        = loop;
 
 	const int n = (int)positions.size();
 	if (n < 2) {
@@ -74,14 +98,18 @@ void BikeCourse::build(const std::vector<glm::vec3>& positions, const std::vecto
 	waypoints.resize(n);
 
 	for (int i = 0; i < n; ++i) {
-		BikeWaypoint& wp    = waypoints[i];
-		wp.position         = positions[i];
-		wp.road_half_width  = (i < (int)road_half_widths.size()) ? road_half_widths[i] : 4.f;
+		BikeWaypoint& wp   = waypoints[i];
+		wp.position        = positions[i];
+		wp.road_half_width = (i < (int)road_half_widths.size()) ? road_half_widths[i] : 4.f;
 
-		// Forward: direction toward the next node (last node reuses direction from previous)
+		// Forward: direction toward the next node.
+		// For the last node in a non-loop, reuse the direction from the previous node.
+		// For the last node in a loop, point toward the first node.
 		glm::vec3 fwd;
 		if (i < n - 1)
 			fwd = positions[i + 1] - positions[i];
+		else if (loop)
+			fwd = positions[0] - positions[i];
 		else
 			fwd = positions[i] - positions[i - 1];
 
@@ -94,35 +122,40 @@ void BikeCourse::build(const std::vector<glm::vec3>& positions, const std::vecto
 		wp.forward  = fwd;
 		wp.gradient = glm::asin(glm::clamp(fwd.y, -1.f, 1.f));
 
-		// Road-right: perpendicular to forward in the horizontal plane
-		glm::vec3 right = glm::cross(WORLD_UP, fwd);
+		// Road-right: perpendicular to forward in the horizontal plane.
+		glm::vec3 right  = glm::cross(WORLD_UP, fwd);
 		const float rlen = glm::length(right);
 		wp.right = (rlen > 1e-4f) ? (right / rlen) : glm::vec3(1, 0, 0);
 
-		// Arc-length accumulation
-		if (i == 0) {
+		// Arc-length from start
+		if (i == 0)
 			wp.dist_from_start = 0.f;
-		} else {
-			wp.dist_from_start = waypoints[i - 1].dist_from_start
-			                     + glm::distance(positions[i], positions[i - 1]);
-		}
+		else
+			wp.dist_from_start = waypoints[i - 1].dist_from_start + glm::distance(positions[i], positions[i - 1]);
 	}
 
-	total_length_m = waypoints.back().dist_from_start;
-	is_built       = true;
+	// Total length: add wrap segment if this is a loop
+	if (loop)
+		total_length_m = waypoints.back().dist_from_start + glm::distance(positions[n - 1], positions[0]);
+	else
+		total_length_m = waypoints.back().dist_from_start;
 
-	sys_print(Info, "BikeCourse::build: %d waypoints, %.0f m total length\n", n, total_length_m);
+	is_built = true;
+
+	sys_print(Info, "BikeCourse::build: %d waypoints, %.0f m total%s\n",
+	          n, total_length_m, loop ? " (loop)" : "");
 }
 
 // ============================================================
 // project
 // ============================================================
 
-float BikeCourse::project(glm::vec3 world_pos, float* out_lateral, int* out_segment, int hint_segment) const
+float BikeCourse::project(glm::vec3 world_pos, float* out_lateral, int* out_segment) const
 {
 	if ((int)waypoints.size() < 2) return 0.f;
 
-	const int num_segs = (int)waypoints.size() - 1;
+	const int n        = (int)waypoints.size();
+	const int num_segs = is_loop ? n : n - 1;
 
 	float best_dist_sq = FLT_MAX;
 	float best_dist_m  = 0.f;
@@ -131,39 +164,40 @@ float BikeCourse::project(glm::vec3 world_pos, float* out_lateral, int* out_segm
 
 	for (int i = 0; i < num_segs; ++i) {
 		const glm::vec3& a  = waypoints[i].position;
-		const glm::vec3& b  = waypoints[i + 1].position;
+		const glm::vec3& b  = waypoints[(i + 1) % n].position;
 		const glm::vec3  ab = b - a;
-		const float ab_len_sq = glm::dot(ab, ab);
+		const float ab_sq   = glm::dot(ab, ab);
 
 		float t = 0.f;
-		if (ab_len_sq > 1e-8f)
-			t = glm::clamp(glm::dot(world_pos - a, ab) / ab_len_sq, 0.f, 1.f);
+		if (ab_sq > 1e-8f)
+			t = glm::clamp(glm::dot(world_pos - a, ab) / ab_sq, 0.f, 1.f);
 
-		const glm::vec3 closest  = a + t * ab;
-		const glm::vec3 diff     = world_pos - closest;
-		const float     dist_sq  = glm::dot(diff, diff);
+		const glm::vec3 closest = a + t * ab;
+		const glm::vec3 diff    = world_pos - closest;
+		const float     dist_sq = glm::dot(diff, diff);
 
 		if (dist_sq < best_dist_sq) {
 			best_dist_sq = dist_sq;
 			best_seg     = i;
 			best_t       = t;
 
-			const float seg_len = waypoints[i + 1].dist_from_start - waypoints[i].dist_from_start;
-			best_dist_m = waypoints[i].dist_from_start + t * seg_len;
+			// Arc-length at closest point
+			const float seg_arc_start = waypoints[i].dist_from_start;
+			const float seg_arc_end   = (i < n - 1) ? waypoints[i + 1].dist_from_start : total_length_m;
+			best_dist_m = seg_arc_start + t * (seg_arc_end - seg_arc_start);
 		}
 	}
 
 	if (out_segment) *out_segment = best_seg;
 
 	if (out_lateral) {
-		const glm::vec3& a  = waypoints[best_seg].position;
-		const glm::vec3& b  = waypoints[best_seg + 1].position;
+		const int next_idx       = (best_seg + 1) % n;
+		const glm::vec3& a       = waypoints[best_seg].position;
+		const glm::vec3& b       = waypoints[next_idx].position;
 		const glm::vec3  closest = a + best_t * (b - a);
 		const glm::vec3  offset  = world_pos - closest;
-
-		// Interpolate the right vector across the segment
-		const glm::vec3 right = glm::normalize(
-			glm::mix(waypoints[best_seg].right, waypoints[best_seg + 1].right, best_t));
+		const glm::vec3  right   = glm::normalize(
+			glm::mix(waypoints[best_seg].right, waypoints[next_idx].right, best_t));
 		*out_lateral = glm::dot(offset, right);
 	}
 
@@ -178,37 +212,64 @@ BikeWaypoint BikeCourse::sample(float dist_m) const
 {
 	if (waypoints.empty()) return {};
 
-	dist_m = glm::clamp(dist_m, 0.f, total_length_m);
-
 	const int n = (int)waypoints.size();
 
-	// Binary search: find segment i such that waypoints[i].dist_from_start <= dist_m
-	int lo = 0, hi = n - 2;
-	while (lo < hi) {
-		const int mid = (lo + hi + 1) / 2;
-		if (waypoints[mid].dist_from_start <= dist_m)
-			lo = mid;
-		else
-			hi = mid - 1;
+	// Wrap for loops; clamp for open courses
+	if (is_loop && total_length_m > 0.f)
+		dist_m = std::fmod(dist_m, total_length_m);
+	if (dist_m < 0.f) dist_m += total_length_m;
+	dist_m = glm::clamp(dist_m, 0.f, total_length_m);
+
+	// Find which segment dist_m falls in
+	int   seg_idx;
+	float seg_arc_start, seg_arc_end;
+
+	if (is_loop && dist_m >= waypoints[n - 1].dist_from_start) {
+		// Wrap segment: from waypoints[n-1] back to waypoints[0]
+		seg_idx       = n - 1;
+		seg_arc_start = waypoints[n - 1].dist_from_start;
+		seg_arc_end   = total_length_m;
+	} else {
+		// Binary search: largest i where waypoints[i].dist_from_start <= dist_m
+		int lo = 0, hi = n - 2;
+		while (lo < hi) {
+			const int mid = (lo + hi + 1) / 2;
+			if (waypoints[mid].dist_from_start <= dist_m)
+				lo = mid;
+			else
+				hi = mid - 1;
+		}
+		seg_idx       = lo;
+		seg_arc_start = waypoints[seg_idx].dist_from_start;
+		seg_arc_end   = waypoints[seg_idx + 1].dist_from_start;
 	}
-	const int i = lo;
 
-	const BikeWaypoint& wp0 = waypoints[i];
-	const BikeWaypoint& wp1 = waypoints[glm::min(i + 1, n - 1)];
-	const float seg_len = wp1.dist_from_start - wp0.dist_from_start;
-	const float t = (seg_len > 1e-6f) ? glm::clamp((dist_m - wp0.dist_from_start) / seg_len, 0.f, 1.f) : 0.f;
+	const float seg_len = seg_arc_end - seg_arc_start;
+	const float t = (seg_len > 1e-6f)
+	                ? glm::clamp((dist_m - seg_arc_start) / seg_len, 0.f, 1.f)
+	                : 0.f;
 
-	// Catmull-Rom for position, falls back to linear at the endpoints
+	const int   next_idx = (seg_idx + 1) % n;
+	const BikeWaypoint& wp0 = waypoints[seg_idx];
+	const BikeWaypoint& wp1 = waypoints[next_idx];
+
+	// Catmull-Rom for position.
+	// Loops always have valid neighbours via modular indexing.
+	// Non-loops fall back to linear at the endpoints.
 	glm::vec3 pos;
-	if (i == 0 || i >= n - 2) {
+	if (is_loop) {
+		const glm::vec3& p0 = waypoints[(seg_idx - 1 + n) % n].position;
+		const glm::vec3& p1 = wp0.position;
+		const glm::vec3& p2 = wp1.position;
+		const glm::vec3& p3 = waypoints[(seg_idx + 2) % n].position;
+		pos = catmull_rom(p0, p1, p2, p3, t);
+	} else if (seg_idx == 0 || seg_idx >= n - 2) {
 		pos = glm::mix(wp0.position, wp1.position, t);
 	} else {
-		pos = catmull_rom(
-			waypoints[i - 1].position,
-			wp0.position,
-			wp1.position,
-			waypoints[glm::min(i + 2, n - 1)].position,
-			t);
+		pos = catmull_rom(waypoints[seg_idx - 1].position,
+		                  wp0.position,
+		                  wp1.position,
+		                  waypoints[seg_idx + 2].position, t);
 	}
 
 	BikeWaypoint result;
@@ -227,7 +288,10 @@ BikeWaypoint BikeCourse::sample(float dist_m) const
 
 glm::vec3 BikeCourse::lookahead(float from_dist_m, float ahead_m) const
 {
-	return sample(from_dist_m + ahead_m).position;
+	float target = from_dist_m + ahead_m;
+	if (is_loop && total_length_m > 0.f)
+		target = std::fmod(target, total_length_m);
+	return sample(target).position;
 }
 
 // ============================================================
@@ -238,10 +302,12 @@ void BikeCourse::debug_draw() const
 {
 	if (!is_built || (int)waypoints.size() < 2) return;
 
-	const int n = (int)waypoints.size();
+	const int n        = (int)waypoints.size();
+	const int num_segs = is_loop ? n : n - 1;
 
-	for (int i = 0; i < n - 1; ++i) {
-		const BikeWaypoint& wp = waypoints[i];
+	for (int i = 0; i < num_segs; ++i) {
+		const BikeWaypoint& wp   = waypoints[i];
+		const BikeWaypoint& next = waypoints[(i + 1) % n];
 
 		// Colour by gradient: yellow = uphill, blue = downhill, green = flat
 		const float grad_deg = glm::degrees(wp.gradient);
@@ -250,7 +316,11 @@ void BikeCourse::debug_draw() const
 		else if (grad_deg < -2.f) line_color = Color32(0x66, 0xaa, 0xff, 0xff); // blue
 		else                      line_color = COLOR_GREEN;
 
-		Debug::add_line(wp.position, waypoints[i + 1].position, line_color, -1.f);
+		// Highlight the wrap-around segment in pink so it's obvious
+		if (is_loop && i == n - 1)
+			line_color = Color32(0xff, 0x66, 0xff, 0xff);
+
+		Debug::add_line(wp.position, next.position, line_color, -1.f);
 
 		// Road-width tick marks every 5th waypoint
 		if (i % 5 == 0) {
