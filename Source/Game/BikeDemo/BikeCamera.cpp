@@ -102,7 +102,7 @@ void BikePlayer::update_camera(BikeObject* bike, float steer, float brake_amount
 	const glm::vec3 bike_pos = bike->get_owner()->get_ws_position();
 	const glm::vec3 fwd      = bike->bike_direction;
 
-	const float cam_dist      = 2.5f;
+	const float cam_dist      = 1.5f;
 	const float default_pitch = glm::radians(20.f);
 	const float rider_height  = 1.1f;
 	const glm::vec3 pivot     = bike_pos + glm::vec3(0, rider_height, 0);
@@ -156,7 +156,7 @@ void BikePlayer::update_camera(BikeObject* bike, float steer, float brake_amount
 		camera_initialized = true;
 	}
 
-	const float pos_lag = 0.015f + bike->speed * 0.002f;
+	const float pos_lag = 0.005f + bike->speed * 0.001f;
 	camera_pos     = damp_dt_independent(target_pos,  camera_pos,     pos_lag, dt);
 	smooth_aim_pos = damp_dt_independent(look_target, smooth_aim_pos, 0.005f,  dt);
 

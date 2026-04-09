@@ -122,12 +122,18 @@ public:
 	float prev_steer_err  = 0.f;
 
 	// ---- Power ----
-	float target_power_watts   = 250.f;  // set by strategy layer (Layer 6); fixed for now
-	float actual_power_command = 250.f;  // smoothed toward target
+	float target_power_watts   = 150.f;  // set by strategy layer (Layer 6); fixed for now
+	float actual_power_command = 150.f;  // smoothed toward target
 	static constexpr float POWER_SLEW = 0.05f; // damp rate
 
 	// ---- Debug ----
 	glm::vec3 dbg_lookahead_pt{};  // world-space lookahead point, drawn in debug
+	float dbg_steer_pre_boids    = 0.f;  // PID steer before boid forces
+	float dbg_steer_final        = 0.f;  // final clamped steer submitted to physics
+	float dbg_power_base         = 0.f;  // smoothed target power before boid modifications
+	float dbg_power_align_nudge  = 0.f;  // speed-alignment nudge from pack average
+	float dbg_power_seek_bonus   = 0.f;  // gap-close bonus toward rider ahead
+	float dbg_power_final        = 0.f;  // total power submitted to physics
 };
 class BikePlayer : public IBikeInput {
 public:
@@ -188,6 +194,15 @@ public:
 
 	// cadence bob
 	float cadence_bob_phase = 0.f;
+
+	// Boid debug (written each frame during evaluate, read by debug menu)
+	float dbg_boid_sep_steer      = 0.f;
+	float dbg_boid_align_steer    = 0.f;
+	float dbg_boid_cohesion_steer = 0.f;
+	float dbg_boid_align_power    = 0.f;
+	float dbg_draft_seek_power    = 0.f;
+	float dbg_steer_before_boids  = 0.f;
+	float dbg_steer_final         = 0.f;
 
 	// stamina UI
 	Texture* heart_icon_tex = nullptr;
@@ -310,6 +325,27 @@ public:
 	// 1.0 = no draft (open air), 0.65 = full draft at ideal position
 	float draft_factor = 1.0f;
 
+	// Lateral position history for boid derivative term (written at end of update_boids)
+	float prev_lateral_pos = 0.f;
+
+	// Pack context (written by BikeGameApplication::update_gaps each frame)
+	float       gap_to_ahead_m       = 999.f;   // gap to locked rider_ahead (m)
+	float       gap_to_behind_m      = 999.f;   // gap to immediate rider behind (m)
+	BikeObject* rider_ahead          = nullptr;  // sticky locked target ahead; null if none in range
+	BikeObject* rider_behind         = nullptr;  // immediate rider behind (simple, not sticky)
+	float       rider_ahead_switch_t = 0.f;      // urgency-weighted time accumulating toward switch
+
+	// Boid outputs (written by BikeGameApplication::update_boids, read by input handlers)
+	float boid_separation_steer  = 0.f;  // lateral push away from overlapping riders
+	float boid_align_steer       = 0.f;  // steer nudge to match pack heading direction
+	float boid_cohesion_steer    = 0.f;  // steer nudge toward rider-ahead's lateral (paceline)
+	float boid_align_power_nudge = 0.f;  // W to add/subtract so rider converges to pack speed
+	float boid_long_sep_power    = 0.f;  // W shed when side-by-side (slightly behind yields)
+
+	// Cohesion PD debug terms (written alongside boid_cohesion_steer)
+	float dbg_cohesion_lat_err = 0.f;  // kp term input: lateral offset to rider ahead
+	float dbg_cohesion_lat_vel = 0.f;  // kd term input: my lateral velocity
+
 	EntityPtr fork_entity;
 
 	glm::vec3 prev_front_wheel_pos{};
@@ -339,6 +375,8 @@ public:
 private:
 	void update_course_positions();
 	void sort_riders();
+	void update_gaps();
 	void update_drafting();
+	void update_boids();
 	void debug_draw_course() const;
 };

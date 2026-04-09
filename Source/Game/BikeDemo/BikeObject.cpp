@@ -52,6 +52,8 @@ static float steer_speed_power     = 2.0f;   // falloff exponent: 2 = quadratic 
 static float steer_min_radius      = 1.5f;   // minimum turn radius (m)
 static float steer_radius_coeff    = 0.04f;  // speed² coefficient for min radius (lower = more responsive at speed)
 static float lean_max_deg          = 32.f;   // visual lean cap (degrees) — prevents extreme angles
+static float lean_steer_min        = 0.12f;  // steer fraction below which there is zero lean
+static float lean_steer_full       = 0.45f;  // steer fraction at which lean reaches its full physics value
 static float bike_gear_shift_cooldown = 3.f;
 
 // Returns the maximum steer angle (radians) at the given speed.
@@ -116,7 +118,6 @@ void BikeObject::start()
 void BikeObject::update()
 {
 	s_bike_debug = this;
-	GameplayStatic::reset_debug_text_height();
 	if (input)
 		input->evaluate(this);
 }
@@ -267,8 +268,8 @@ void BikeObject::tick_physics(ControlInput& ci, float dt)
 
 	// Debug
 	const float eff_wind_speed = wind_speed * (1.f + wind_gust_factor * 1.5f);
-	GameplayStatic::debug_text(string_format("wind_along_bike = %+.2f m/s (eff %.1f)", wind_along_bike, eff_wind_speed));
-	GameplayStatic::debug_text(string_format("apparent_speed = %.2f m/s", apparent_speed));
+	//GameplayStatic::debug_text(string_format("wind_along_bike = %+.2f m/s (eff %.1f)", wind_along_bike, eff_wind_speed));
+	//GameplayStatic::debug_text(string_format("apparent_speed = %.2f m/s", apparent_speed));
 }
 
 // ------------------------------------------------------------
@@ -296,7 +297,7 @@ void BikeObject::tick_steer(const ControlInput& ci, float dt)
 	else
 		current_steer = damp_dt_independent(steer_input_raw, current_steer, rel_smoothing, dt);
 
-	GameplayStatic::debug_text(string_format("speed_factor=%.2f inertia=%.2f steer=%.3f", speed_factor, inertia, current_steer));
+	//GameplayStatic::debug_text(string_format("speed_factor=%.2f inertia=%.2f steer=%.3f", speed_factor, inertia, current_steer));
 
 	// Uphill wobble
 	{
@@ -347,7 +348,7 @@ void BikeObject::tick_steer(const ControlInput& ci, float dt)
 		wind_steer = glm::clamp(wind_steer + wind_vel * dt, -0.15f, 0.15f);
 		wind_steer = damp_dt_independent(0.f, wind_steer, crosswind_steer_decay, dt);
 
-		GameplayStatic::debug_text(string_format("wind_steer=%.3f  gust_t=%.1f", wind_steer, crosswind_gust_timer));
+		//GameplayStatic::debug_text(string_format("wind_steer=%.3f  gust_t=%.1f", wind_steer, crosswind_gust_timer));
 	}
 	current_steer = glm::clamp(current_steer + wobble_steer + wind_steer, -1.f, 1.f);
 
@@ -365,13 +366,16 @@ void BikeObject::tick_steer(const ControlInput& ci, float dt)
 	}
 
 	// Visual lean
+	// lean_scale: smoothstep ramp so tiny corrections produce no lean;
+	// only real committed turns tilt the bike.
 	float target_roll = 0.f;
 	if (glm::abs(steer_angle) > 0.001f && speed > 0.1f) {
 		const float turn_r            = glm::max(wheelbase / glm::abs(glm::tan(steer_angle)), min_turn_r);
 		const float centripetal_accel = (speed * speed) / turn_r;
 		const float lean_speed_scale  = glm::smoothstep(0.f, 8.f, speed);
 		const float lean_uncapped     = atanf(centripetal_accel / BIKE_GRAVITY) * lean_speed_scale;
-		target_roll = glm::sign(current_steer) * glm::min(lean_uncapped, glm::radians(lean_max_deg));
+		const float lean_scale        = glm::smoothstep(lean_steer_min, lean_steer_full, glm::abs(current_steer));
+		target_roll = glm::sign(current_steer) * glm::min(lean_uncapped, glm::radians(lean_max_deg)) * lean_scale;
 	}
 	current_roll = damp_dt_independent(target_roll, current_roll, 0.01f, dt);
 }
@@ -542,6 +546,12 @@ static void bike_physics_debug()
 			            glm::degrees(compute_max_steer_rad(s_bike_debug->speed)), s_bike_debug->speed);
 		ImGui::DragFloat("steer_radius_coeff",   &steer_radius_coeff,   0.005f, 0.f,   0.2f);
 		ImGui::DragFloat("lean_max_deg",         &lean_max_deg,         0.5f,   5.f,  50.f);
+		ImGui::DragFloat("lean_steer_min",       &lean_steer_min,       0.01f,  0.f,   0.5f);
+		ImGui::DragFloat("lean_steer_full",      &lean_steer_full,      0.01f,  0.1f,  1.0f);
+		if (s_bike_debug)
+			ImGui::Text("  lean_scale = %.2f  (current_steer=%.3f)",
+				glm::smoothstep(lean_steer_min, lean_steer_full, glm::abs(s_bike_debug->current_steer)),
+				s_bike_debug->current_steer);
 		ImGui::DragFloat("steer_vel_scale",      &steer_vel_scale,      0.1f,   0.5f, 20.f);
 		ImGui::DragFloat("steer_vel_boost",      &steer_vel_boost,      0.002f, 0.f,  0.1f);
 	}

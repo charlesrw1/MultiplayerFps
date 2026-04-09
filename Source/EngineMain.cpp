@@ -831,7 +831,7 @@ void GameEngineLocal::cleanup() {
 		SDL_DestroyWindow(window);
 	}
 }
-
+ConfigVar debug_menu_width("debug.menu_width", "275", CVAR_INTEGER | CVAR_UNBOUNDED, "");
 class Debug_Interface_Impl : public Debug_Interface
 {
 public:
@@ -869,7 +869,7 @@ public:
 
 	void draw() {
 		ImVec2 winsize = ImGui::GetMainViewport()->Size;
-		int width = 275;
+		int width = debug_menu_width.get_integer();
 		ImGui::SetNextWindowPos(ImVec2(winsize.x - width - 10, 50));
 		ImGui::SetNextWindowSize(ImVec2(width, 700));
 		ImGui::SetNextWindowBgAlpha(0.3);

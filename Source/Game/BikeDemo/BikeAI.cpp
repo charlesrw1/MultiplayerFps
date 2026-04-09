@@ -3,6 +3,13 @@
 #include "Debug.h"
 #include "GameEnginePublic.h"
 
+// Tunable constants defined in BikeApplication.cpp, exposed here for AI use.
+extern float AI_GAP_TARGET;
+extern float AI_GAP_KP;
+extern float AI_GAP_KD;
+extern float AI_GAP_MAX_PULL;
+extern float AI_GAP_MAX_PUSH;
+
 // ============================================================
 // BikeAI::evaluate
 // ============================================================
@@ -47,15 +54,49 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	                      + steer_kd * d_err;
 	prev_steer_err = lateral_err;
 
-	// ---- Power (smoothed toward target) ----
+	// ---- Power (smoothed toward target, boid alignment + draft-seek added on top) ----
 	actual_power_command = damp_dt_independent(
 		target_power_watts, actual_power_command, POWER_SLEW, dt);
 
+	float power_out = actual_power_command;
+	dbg_power_base = actual_power_command;
+
+	// Speed-alignment nudge: match rider-ahead speed (chain propagation from update_boids)
+	power_out += my_bike->boid_align_power_nudge;
+	dbg_power_align_nudge = my_bike->boid_align_power_nudge;
+
+	// Longitudinal separation: yield power when side-by-side with another rider
+	power_out += my_bike->boid_long_sep_power;
+
+	// Gap following PD using rider_ahead (sticky locking handled in update_gaps).
+	// KP: gap_err (too far = +, too close = -).
+	// KD: relative speed = rider_ahead->speed - my_speed (gap growing = +, closing = -).
+	float gap_bonus = 0.f;
+	if (my_bike->rider_ahead) {
+		const float gap_ahead = my_bike->gap_to_ahead_m;
+		if (gap_ahead < AI_GAP_TARGET + 30.f) {
+			const float gap_err  = gap_ahead - AI_GAP_TARGET;
+			const float gap_rate = my_bike->rider_ahead->speed - speed;
+			gap_bonus = glm::clamp(gap_err * AI_GAP_KP + gap_rate * AI_GAP_KD,
+			                       -AI_GAP_MAX_PUSH, AI_GAP_MAX_PULL);
+			power_out += gap_bonus;
+		}
+	}
+	dbg_power_seek_bonus = gap_bonus;
+
 	// ---- Fill ControlInput ----
+	// Boid steer forces blended on top of PID path steer.
+	// Priority (highest first): separation > cohesion (paceline) > alignment (heading match).
+	const float boid_steer = my_bike->boid_separation_steer
+	                       + my_bike->boid_cohesion_steer
+	                       + my_bike->boid_align_steer;
+	dbg_steer_pre_boids = steer_out;
 	BikeObject::ControlInput ci;
-	ci.steer        = glm::clamp(steer_out, -1.f, 1.f);
-	ci.brake_amount = 0.f;
-	ci.power        = actual_power_command;
+	ci.steer        = glm::clamp(steer_out + boid_steer, -1.f, 1.f);
+	dbg_steer_final  = ci.steer;
+	ci.brake_amount  = 0.f;
+	ci.power         = power_out;
+	dbg_power_final  = power_out;
 
 	my_bike->update_tick(ci);
 }
