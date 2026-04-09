@@ -96,6 +96,8 @@ void BikeGameApplication::update()
 		update_gaps();
 		update_drafting();
 		update_boids();
+		if (paceline_active)
+			update_paceline();
 	}
 	apply_debug_follow_camera();
 }
@@ -310,7 +312,20 @@ void BikeGameApplication::update_boids()
 		float             long_sep_power   = 0.f;
 		glm::vec3         dir_sum          = glm::vec3(0.f);
 		int               dir_cnt          = 0;
-		const BikeObject* cohesion_target  = me->rider_ahead;  // smart sticky rider_ahead
+
+		// Cohesion target: use sticky rider_ahead, but skip any rider who is
+		// currently drifting back (they're moving out of the line — don't follow them).
+		const BikeObject* cohesion_target  = me->rider_ahead;
+		{
+			const BikeObject* candidate = cohesion_target;
+			while (candidate) {
+				const BikeAI* cai = dynamic_cast<const BikeAI*>(candidate->input.get());
+				if (!cai || cai->paceline_state != PacelineState::DriftingBack)
+					break;  // found a non-drifting rider (or player) → use them
+				candidate = candidate->rider_ahead;  // walk further up the chain
+			}
+			cohesion_target = candidate;
+		}
 
 		for (int j = 0; j < n; ++j) {
 			if (j == i) continue;
@@ -375,14 +390,32 @@ void BikeGameApplication::update_boids()
 		// If no rider is within range (leader, or pack spread out) → no cohesion force.
 		float cohesion_steer = 0.f;
 		if (cohesion_target) {
-			const float lat_err = cohesion_target->lateral_pos - me->lateral_pos;
+			// Double echelon: blend the cohesion lateral target between rider-ahead's
+			// position and this rider's preferred lane. lane_strength=0 → pure follow-wheel.
+			float lat_target = cohesion_target->lateral_pos;
+			const BikeAI* my_ai = dynamic_cast<const BikeAI*>(me->input.get());
+			if (my_ai && my_ai->lane_strength > 0.f)
+				lat_target = glm::mix(lat_target, my_ai->preferred_lateral, my_ai->lane_strength);
+
+			const float lat_err = lat_target - me->lateral_pos;
 			const float lat_vel = (dt > 1e-6f) ? (me->lateral_pos - me->prev_lateral_pos) / dt : 0.f;
 			cohesion_steer = glm::clamp(-(lat_err * BOID_COHESION_KP + lat_vel * BOID_COHESION_KD), -1.f, 1.f);
 			me->dbg_cohesion_lat_err = lat_err;
 			me->dbg_cohesion_lat_vel = lat_vel;
 		} else {
-			me->dbg_cohesion_lat_err = 0.f;
-			me->dbg_cohesion_lat_vel = 0.f;
+			// No rider ahead: if echelon mode, drift toward preferred_lateral on our own
+			const BikeAI* my_ai = dynamic_cast<const BikeAI*>(me->input.get());
+			if (my_ai && my_ai->lane_strength > 0.f && my_ai->preferred_lateral != 0.f) {
+				const float lat_err = my_ai->preferred_lateral - me->lateral_pos;
+				const float lat_vel = (dt > 1e-6f) ? (me->lateral_pos - me->prev_lateral_pos) / dt : 0.f;
+				cohesion_steer = glm::clamp(-(lat_err * BOID_COHESION_KP * my_ai->lane_strength
+				                              + lat_vel * BOID_COHESION_KD), -1.f, 1.f);
+				me->dbg_cohesion_lat_err = lat_err;
+				me->dbg_cohesion_lat_vel = lat_vel;
+			} else {
+				me->dbg_cohesion_lat_err = 0.f;
+				me->dbg_cohesion_lat_vel = 0.f;
+			}
 		}
 		me->boid_cohesion_steer = cohesion_steer;
 
@@ -397,6 +430,134 @@ void BikeGameApplication::update_boids()
 
 		// Save lateral position for derivative computation next frame
 		me->prev_lateral_pos = me->lateral_pos;
+	}
+}
+
+// ============================================================
+// Paceline rotation constants
+// ============================================================
+static float PACELINE_PULL_MIN_S    = 6.f;   // minimum pull duration (seconds)
+static float PACELINE_PULL_RANGE_S  = 9.f;   // randomised on top: total = min + rand*range
+static float PACELINE_PEEL_OFFSET   = 2.4f;  // lateral offset from centre while peeling/drifting
+static float PACELINE_PULL_POWER    = 220.f; // watts while pulling at front
+static float PACELINE_DRIFT_POWER   = 90.f;  // watts while drifting to back
+static float PACELINE_PEEL_KP       = 0.50f; // proportional steer toward peel target
+static float PACELINE_PEEL_KD       = 0.40f; // derivative damp on peel steer
+static float PACELINE_DRIFT_KP      = 0.30f; // proportional steer while holding peel offset
+static float PACELINE_DRIFT_KD      = 0.30f; // derivative damp while drifting
+
+// Lateral offset (m) within which a rider is considered "clear" of the paceline.
+static float PACELINE_PEEL_CLEAR    = 0.7f;
+// Approximate road half-width — clamp peel target within this.
+static float PACELINE_ROAD_HW       = 3.8f;
+// Echelon lane width: ±this value from road centre
+static float ECHELON_LANE_OFFSET    = 1.5f;
+static float ECHELON_LANE_STRENGTH  = 0.30f; // blend strength in cohesion
+
+void BikeGameApplication::update_paceline()
+{
+	const int   n  = (int)riders_sorted.size();
+	const float dt = eng->get_dt();
+
+	for (int i = 0; i < n; ++i) {
+		BikeObject* me = riders_sorted[i];
+		BikeAI*     ai = dynamic_cast<BikeAI*>(me->input.get());
+		if (!ai) continue;  // skip player
+
+		// ---- Determine if this AI is at the virtual front of the AI group ----
+		// "Front" means: no FOLLOWING or PULLING AI is within 10m ahead.
+		// (Player, peeling, and drifting-back riders are ignored.)
+		auto is_at_front = [&]() -> bool {
+			for (int j = i - 1; j >= 0; --j) {
+				const BikeObject* other = riders_sorted[j];
+				if (other->course_dist_m - me->course_dist_m > 10.f) break;
+				const BikeAI* oai = dynamic_cast<const BikeAI*>(other->input.get());
+				if (!oai) continue;  // player: ignore
+				if (oai->paceline_state == PacelineState::Peeling ||
+				    oai->paceline_state == PacelineState::DriftingBack) continue;
+				return false;  // FOLLOWING or PULLING AI ahead → not front
+			}
+			return true;
+		};
+
+		// ---- Determine if this AI is at the virtual back of the AI group ----
+		// "Back" means: no FOLLOWING or PULLING AI is within 30m behind.
+		auto is_at_back = [&]() -> bool {
+			for (int j = i + 1; j < n; ++j) {
+				const BikeObject* other = riders_sorted[j];
+				if (me->course_dist_m - other->course_dist_m > 30.f) break;
+				const BikeAI* oai = dynamic_cast<const BikeAI*>(other->input.get());
+				if (!oai) continue;  // player: ignore
+				if (oai->paceline_state == PacelineState::DriftingBack) continue;
+				return false;  // a non-drifting AI is still behind
+			}
+			return true;
+		};
+
+		const float lat_vel = (dt > 1e-6f) ? (me->lateral_pos - me->prev_lateral_pos) / dt : 0.f;
+
+		switch (ai->paceline_state) {
+
+		case PacelineState::Following:
+			if (is_at_front()) {
+				ai->paceline_state = PacelineState::Pulling;
+				ai->pull_timer     = 0.f;
+				// Randomise pull duration
+				ai->pull_duration  = PACELINE_PULL_MIN_S + (float)(rand() % 1000) * 0.001f * PACELINE_PULL_RANGE_S;
+				ai->target_power_watts = PACELINE_PULL_POWER;
+			}
+			break;
+
+		case PacelineState::Pulling:
+			ai->target_power_watts = PACELINE_PULL_POWER;
+			ai->pull_timer += dt;
+			if (ai->pull_timer >= ai->pull_duration) {
+				// Choose peel direction: away from road centre (or to the right if centred)
+				ai->peel_dir        = (me->lateral_pos <= 0.f) ? -1.f : 1.f;
+				ai->peel_lateral_tgt = ai->peel_dir * PACELINE_PEEL_OFFSET;
+				ai->peel_lateral_tgt = glm::clamp(ai->peel_lateral_tgt,
+				                                   -(PACELINE_ROAD_HW - 0.4f),
+				                                    PACELINE_ROAD_HW - 0.4f);
+				ai->paceline_state  = PacelineState::Peeling;
+			}
+			break;
+
+		case PacelineState::Peeling: {
+			// Override cohesion steer: drive hard toward the peel lateral target.
+			const float lat_err    = ai->peel_lateral_tgt - me->lateral_pos;
+			const float peel_steer = glm::clamp(
+			    -(lat_err * PACELINE_PEEL_KP + lat_vel * PACELINE_PEEL_KD), -1.f, 1.f);
+			me->boid_cohesion_steer = peel_steer;
+
+			// Cut power while peeling
+			ai->target_power_watts = PACELINE_DRIFT_POWER;
+
+			// Transition once we've moved far enough laterally from centre
+			if (glm::abs(me->lateral_pos - ai->peel_lateral_tgt) < PACELINE_PEEL_CLEAR)
+				ai->paceline_state = PacelineState::DriftingBack;
+			break;
+		}
+
+		case PacelineState::DriftingBack: {
+			// Hold lateral offset while drifting to the rear.
+			const float lat_err     = ai->peel_lateral_tgt - me->lateral_pos;
+			const float drift_steer = glm::clamp(
+			    -(lat_err * PACELINE_DRIFT_KP + lat_vel * PACELINE_DRIFT_KD), -1.f, 1.f);
+			me->boid_cohesion_steer = drift_steer;
+
+			// Run at reduced power to drift backward through the pack
+			ai->target_power_watts = PACELINE_DRIFT_POWER;
+
+			// Transition back to Following when at the back of the AI group
+			if (is_at_back()) {
+				ai->paceline_state      = PacelineState::Following;
+				ai->pull_timer          = 0.f;
+				ai->target_power_watts  = 200.f;   // resume normal tempo
+				ai->peel_lateral_tgt    = 0.f;
+			}
+			break;
+		}
+		}
 	}
 }
 
@@ -423,6 +584,15 @@ BikeObject* BikeGameApplication::create_ai(glm::vec3 pos)
 	auto bo  = e->create_component<BikeObject>();
 	auto ai  = std::make_unique<BikeAI>();
 	ai->course = &course;
+
+	// Echelon lane assignment: alternate AI riders between ±ECHELON_LANE_OFFSET.
+	// Index into all_riders at this point (player is always index 0).
+	if (echelon_mode) {
+		const int ai_idx = (int)all_riders.size();  // 1-based since player is 0
+		ai->preferred_lateral = (ai_idx % 2 == 0) ? ECHELON_LANE_OFFSET : -ECHELON_LANE_OFFSET;
+		ai->lane_strength     = ECHELON_LANE_STRENGTH;
+	}
+
 	bo->input  = std::move(ai);
 	all_riders.push_back(bo);
 	riders_sorted.push_back(bo);
@@ -990,6 +1160,34 @@ static void bike_boid_debug()
 	ImGui::DragFloat("player sep scale", &player_boid_sep_scale, 0.01f, 0.f, 2.f);
 	ImGui::DragFloat("player coh scale", &player_boid_coh_scale, 0.01f, 0.f, 2.f);
 	ImGui::DragFloat("player aln scale", &player_boid_aln_scale, 0.01f, 0.f, 2.f);
+
+	ImGui::SeparatorText("Paceline Rotation");
+	ImGui::Checkbox("paceline_active", &g_bike_app->paceline_active);
+	ImGui::SameLine();
+	ImGui::Checkbox("echelon_mode (restart needed)", &g_bike_app->echelon_mode);
+	ImGui::DragFloat("pull min s",      &PACELINE_PULL_MIN_S,    0.5f,  2.f,  60.f);
+	ImGui::DragFloat("pull range s",    &PACELINE_PULL_RANGE_S,  0.5f,  0.f,  60.f);
+	ImGui::DragFloat("pull power W",    &PACELINE_PULL_POWER,    5.f,   50.f, 600.f);
+	ImGui::DragFloat("drift power W",   &PACELINE_DRIFT_POWER,   5.f,   20.f, 300.f);
+	ImGui::DragFloat("peel offset m",   &PACELINE_PEEL_OFFSET,   0.1f,  0.5f,   4.f);
+	ImGui::DragFloat("peel clear m",    &PACELINE_PEEL_CLEAR,    0.05f, 0.1f,   2.f);
+	ImGui::DragFloat("peel kp",         &PACELINE_PEEL_KP,       0.02f, 0.f,    2.f);
+	ImGui::DragFloat("peel kd",         &PACELINE_PEEL_KD,       0.02f, 0.f,    2.f);
+	ImGui::DragFloat("drift kp",        &PACELINE_DRIFT_KP,      0.02f, 0.f,    2.f);
+	ImGui::DragFloat("drift kd",        &PACELINE_DRIFT_KD,      0.02f, 0.f,    2.f);
+	ImGui::DragFloat("echelon lane m",  &ECHELON_LANE_OFFSET,    0.1f,  0.3f,   3.5f);
+	ImGui::DragFloat("echelon strength",&ECHELON_LANE_STRENGTH,  0.01f, 0.f,    1.f);
+
+	// Per-AI paceline state readout
+	ImGui::SeparatorText("Paceline state per AI");
+	for (auto* r : g_bike_app->all_riders) {
+		const BikeAI* ai = dynamic_cast<const BikeAI*>(r->input.get());
+		if (!ai) { ImGui::TextDisabled("P%d [Player]", r->race_position); continue; }
+		ImGui::Text("P%d  %-10s  pull=%.1f/%.1fs  lat=%+.2f  tgt=%+.2f  pref=%+.2f",
+			r->race_position, paceline_state_name(ai->paceline_state),
+			ai->pull_timer, ai->pull_duration,
+			r->lateral_pos, ai->peel_lateral_tgt, ai->preferred_lateral);
+	}
 
 	if (!draw_boids) return;
 

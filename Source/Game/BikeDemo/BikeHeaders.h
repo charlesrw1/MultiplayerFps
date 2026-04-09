@@ -103,6 +103,26 @@ public:
 // Forward declare so BikeAI can hold a pointer to the course.
 class BikeCourse;
 
+// ============================================================
+// Paceline rotation state machine
+// ============================================================
+enum class PacelineState {
+	Following,      // normal: follow the rider ahead, take draft
+	Pulling,        // at front of the AI group, doing work
+	Peeling,        // done pulling: steer hard to one side to move out of the line
+	DriftingBack,   // running at reduced power, drifting to the back of the group
+};
+
+static const char* paceline_state_name(PacelineState s) {
+	switch (s) {
+	case PacelineState::Following:    return "Following";
+	case PacelineState::Pulling:      return "Pulling";
+	case PacelineState::Peeling:      return "Peeling";
+	case PacelineState::DriftingBack: return "DriftBack";
+	}
+	return "?";
+}
+
 class BikeAI : public IBikeInput {
 public:
 	void evaluate(BikeObject* my_bike) final;
@@ -125,6 +145,20 @@ public:
 	float target_power_watts   = 150.f;  // set by strategy layer (Layer 6); fixed for now
 	float actual_power_command = 150.f;  // smoothed toward target
 	static constexpr float POWER_SLEW = 0.05f; // damp rate
+
+	// ---- Paceline rotation ----
+	PacelineState paceline_state  = PacelineState::Following;
+	float pull_timer              = 0.f;   // elapsed seconds in Pulling state
+	float pull_duration           = 10.f;  // randomised seconds to pull before peeling
+	float peel_dir                = 1.f;   // +1 = peel toward positive lateral, -1 = negative
+	float peel_lateral_tgt        = 0.f;   // absolute lateral target while peeling/drifting
+
+	// ---- Double echelon lane assignment ----
+	// preferred_lateral = 0 → single paceline (default)
+	// preferred_lateral = ±1.5 → double echelon lane assignment
+	// lane_strength blends cohesion between following rider-ahead and returning to lane
+	float preferred_lateral       = 0.f;
+	float lane_strength           = 0.f;
 
 	// ---- Debug ----
 	glm::vec3 dbg_lookahead_pt{};  // world-space lookahead point, drawn in debug
@@ -372,11 +406,17 @@ public:
 	// Sorted front-to-back by course_dist_m each frame (index 0 = race leader)
 	std::vector<BikeObject*> riders_sorted;
 
+	// Paceline/echelon mode: when true, AIs are assigned alternating preferred_lateral lanes
+	// and the pull-through rotation is active.
+	bool paceline_active  = false;
+	bool echelon_mode     = false;
+
 private:
 	void update_course_positions();
 	void sort_riders();
 	void update_gaps();
 	void update_drafting();
 	void update_boids();
+	void update_paceline();
 	void debug_draw_course() const;
 };

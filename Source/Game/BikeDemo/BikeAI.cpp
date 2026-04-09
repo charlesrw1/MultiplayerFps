@@ -61,9 +61,18 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	float power_out = actual_power_command;
 	dbg_power_base = actual_power_command;
 
+	// While peeling or drifting back, suppress boid power nudges and gap-following so
+	// the rider actually slows down and drifts through the pack.
+	const bool in_paceline_exit = (paceline_state == PacelineState::Peeling ||
+	                               paceline_state == PacelineState::DriftingBack);
+
 	// Speed-alignment nudge: match rider-ahead speed (chain propagation from update_boids)
-	power_out += my_bike->boid_align_power_nudge;
-	dbg_power_align_nudge = my_bike->boid_align_power_nudge;
+	if (!in_paceline_exit) {
+		power_out += my_bike->boid_align_power_nudge;
+		dbg_power_align_nudge = my_bike->boid_align_power_nudge;
+	} else {
+		dbg_power_align_nudge = 0.f;
+	}
 
 	// Longitudinal separation: yield power when side-by-side with another rider
 	power_out += my_bike->boid_long_sep_power;
@@ -71,8 +80,9 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	// Gap following PD using rider_ahead (sticky locking handled in update_gaps).
 	// KP: gap_err (too far = +, too close = -).
 	// KD: relative speed = rider_ahead->speed - my_speed (gap growing = +, closing = -).
+	// Suppressed while peeling/drifting — the rider needs to LOSE ground, not close it.
 	float gap_bonus = 0.f;
-	if (my_bike->rider_ahead) {
+	if (my_bike->rider_ahead && !in_paceline_exit) {
 		const float gap_ahead = my_bike->gap_to_ahead_m;
 		if (gap_ahead < AI_GAP_TARGET + 30.f) {
 			const float gap_err  = gap_ahead - AI_GAP_TARGET;
