@@ -358,8 +358,8 @@ void BikeGameApplication::update_boids()
 
 				sep_accum += dir_away * long_weight * (kp_term + kd_term);
 
-				// Longitudinal power yield
-				const float yield = (signed_gap > 0.f ? -1.f : 1.f) * long_weight * BOID_SEP_POWER_MAX;
+				// Longitudinal power yield: behind rider (+signed_gap) pushes, ahead rider yields.
+				const float yield = (signed_gap > 0.f ? 1.f : -1.f) * long_weight * BOID_SEP_POWER_MAX;
 				long_sep_power += yield;
 			}
 
@@ -399,7 +399,7 @@ void BikeGameApplication::update_boids()
 
 			const float lat_err = lat_target - me->lateral_pos;
 			const float lat_vel = (dt > 1e-6f) ? (me->lateral_pos - me->prev_lateral_pos) / dt : 0.f;
-			cohesion_steer = glm::clamp(-(lat_err * BOID_COHESION_KP + lat_vel * BOID_COHESION_KD), -1.f, 1.f);
+			cohesion_steer = glm::clamp(-(lat_err * BOID_COHESION_KP - lat_vel * BOID_COHESION_KD), -1.f, 1.f);
 			me->dbg_cohesion_lat_err = lat_err;
 			me->dbg_cohesion_lat_vel = lat_vel;
 		} else {
@@ -409,7 +409,7 @@ void BikeGameApplication::update_boids()
 				const float lat_err = my_ai->preferred_lateral - me->lateral_pos;
 				const float lat_vel = (dt > 1e-6f) ? (me->lateral_pos - me->prev_lateral_pos) / dt : 0.f;
 				cohesion_steer = glm::clamp(-(lat_err * BOID_COHESION_KP * my_ai->lane_strength
-				                              + lat_vel * BOID_COHESION_KD), -1.f, 1.f);
+				                              - lat_vel * BOID_COHESION_KD), -1.f, 1.f);
 				me->dbg_cohesion_lat_err = lat_err;
 				me->dbg_cohesion_lat_vel = lat_vel;
 			} else {
@@ -465,12 +465,13 @@ void BikeGameApplication::update_paceline()
 		if (!ai) continue;  // skip player
 
 		// ---- Determine if this AI is at the virtual front of the AI group ----
-		// "Front" means: no FOLLOWING or PULLING AI is within 10m ahead.
+		// "Front" means: no FOLLOWING or PULLING AI is anywhere ahead (no distance limit).
+		// The distance cutoff was removed: a Puller can accelerate far ahead, and without
+		// this fix every Follower would eventually see "nobody within Xm" and cascade-promote.
 		// (Player, peeling, and drifting-back riders are ignored.)
 		auto is_at_front = [&]() -> bool {
 			for (int j = i - 1; j >= 0; --j) {
 				const BikeObject* other = riders_sorted[j];
-				if (other->course_dist_m - me->course_dist_m > 10.f) break;
 				const BikeAI* oai = dynamic_cast<const BikeAI*>(other->input.get());
 				if (!oai) continue;  // player: ignore
 				if (oai->paceline_state == PacelineState::Peeling ||
@@ -510,10 +511,24 @@ void BikeGameApplication::update_paceline()
 
 		case PacelineState::Pulling:
 			ai->target_power_watts = PACELINE_PULL_POWER;
+			// If a stable rider (Following or Pulling) appears ahead, immediately revert
+			// to Following so we catch the wheel rather than continuing a solo pull.
+			if (me->rider_ahead) {
+				const BikeAI* ahead_ai = dynamic_cast<const BikeAI*>(me->rider_ahead->input.get());
+				const bool ahead_stable = !ahead_ai ||  // player counts as stable
+				    (ahead_ai->paceline_state == PacelineState::Following ||
+				     ahead_ai->paceline_state == PacelineState::Pulling);
+				if (ahead_stable) {
+					ai->paceline_state     = PacelineState::Following;
+					ai->pull_timer         = 0.f;
+					ai->target_power_watts = 200.f;
+					break;
+				}
+			}
 			ai->pull_timer += dt;
 			if (ai->pull_timer >= ai->pull_duration) {
 				// Choose peel direction: away from road centre (or to the right if centred)
-				ai->peel_dir        = (me->lateral_pos <= 0.f) ? -1.f : 1.f;
+				ai->peel_dir        = (me->lateral_pos < 0.f) ? -1.f : 1.f;
 				ai->peel_lateral_tgt = ai->peel_dir * PACELINE_PEEL_OFFSET;
 				ai->peel_lateral_tgt = glm::clamp(ai->peel_lateral_tgt,
 				                                   -(PACELINE_ROAD_HW - 0.4f),
@@ -526,7 +541,7 @@ void BikeGameApplication::update_paceline()
 			// Override cohesion steer: drive hard toward the peel lateral target.
 			const float lat_err    = ai->peel_lateral_tgt - me->lateral_pos;
 			const float peel_steer = glm::clamp(
-			    -(lat_err * PACELINE_PEEL_KP + lat_vel * PACELINE_PEEL_KD), -1.f, 1.f);
+			    -(lat_err * PACELINE_PEEL_KP - lat_vel * PACELINE_PEEL_KD), -1.f, 1.f);
 			me->boid_cohesion_steer = peel_steer;
 
 			// Cut power while peeling
@@ -542,7 +557,7 @@ void BikeGameApplication::update_paceline()
 			// Hold lateral offset while drifting to the rear.
 			const float lat_err     = ai->peel_lateral_tgt - me->lateral_pos;
 			const float drift_steer = glm::clamp(
-			    -(lat_err * PACELINE_DRIFT_KP + lat_vel * PACELINE_DRIFT_KD), -1.f, 1.f);
+			    -(lat_err * PACELINE_DRIFT_KP - lat_vel * PACELINE_DRIFT_KD), -1.f, 1.f);
 			me->boid_cohesion_steer = drift_steer;
 
 			// Run at reduced power to drift backward through the pack
