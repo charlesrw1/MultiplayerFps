@@ -3,12 +3,14 @@
 #include "Render/ModelManager.h"
 #include "Game/Entity.h"
 #include "Framework/Serializer.h"
+#include "Physics/Physics2.h"
 
 #include <glm/gtx/norm.hpp>
 #include <cmath>
 #include <algorithm>
 
-static constexpr int CURVE_SEGMENTS = 20;
+static constexpr int   ROAD_SEGMENTS      = 20;    // subdivisions per edge for terrain following
+static constexpr float ROAD_GROUND_OFFSET = 0.08f; // lift above terrain surface
 
 // ---- helpers ----------------------------------------------------------------
 
@@ -18,10 +20,16 @@ static glm::vec3 bezier_cubic(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec
     return u*u*u*p0 + 3.f*u*u*t*p1 + 3.f*u*t*t*p2 + t*t*t*p3;
 }
 
-static glm::vec3 bezier_tangent(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t)
+// Downward raycast to find terrain height at x/z; returns pt with y snapped + offset.
+// Falls back to the original y + offset if terrain is not hit.
+static glm::vec3 snap_to_terrain(glm::vec3 pt)
 {
-    float u = 1.f - t;
-    return 3.f*u*u*(p1-p0) + 6.f*u*t*(p2-p1) + 3.f*t*t*(p3-p2);
+    world_query_result res;
+    glm::vec3 from = glm::vec3(pt.x, pt.y + 200.f, pt.z);
+    glm::vec3 to   = glm::vec3(pt.x, pt.y - 200.f, pt.z);
+    if (g_physics.trace_ray(res, from, to, nullptr, UINT32_MAX))
+        return glm::vec3(pt.x, res.hit_pos.y + ROAD_GROUND_OFFSET, pt.z);
+    return glm::vec3(pt.x, pt.y + ROAD_GROUND_OFFSET, pt.z);
 }
 
 // Build a quad strip between a sequence of center-line points
@@ -262,18 +270,19 @@ void RoadNetworkComponent::rebuild_mesh()
 
         float half_w = edge.width * 0.5f;
 
-        if (!edge.curved) {
-            std::vector<glm::vec3> pts = { na->position, nb->position };
-            push_road_strip(builder, pts, half_w);
-        } else {
-            std::vector<glm::vec3> pts;
-            pts.reserve(CURVE_SEGMENTS + 1);
-            for (int i = 0; i <= CURVE_SEGMENTS; i++) {
-                float t = float(i) / float(CURVE_SEGMENTS);
-                pts.push_back(bezier_cubic(na->position, edge.ctrl_a, edge.ctrl_b, nb->position, t));
-            }
-            push_road_strip(builder, pts, half_w);
+        // Sample centerline (both straight and curved use ROAD_SEGMENTS subdivisions
+        // so downward raycasts can conform each point to terrain)
+        std::vector<glm::vec3> pts;
+        pts.reserve(ROAD_SEGMENTS + 1);
+        for (int i = 0; i <= ROAD_SEGMENTS; i++) {
+            float t = float(i) / float(ROAD_SEGMENTS);
+            glm::vec3 p = edge.curved
+                ? bezier_cubic(na->position, edge.ctrl_a, edge.ctrl_b, nb->position, t)
+                : glm::mix(na->position, nb->position, t);
+            pts.push_back(snap_to_terrain(p));
         }
+
+        push_road_strip(builder, pts, half_w);
     }
 
     // --- Intersection caps ---
@@ -290,17 +299,21 @@ void RoadNetworkComponent::rebuild_mesh()
         for (auto* e : conn)
             max_hw = std::max(max_hw, e->width * 0.5f);
 
-        // Lift the cap slightly above the road strips to avoid Z-fighting
-        static constexpr float CAP_LIFT = 0.02f;
-        glm::vec3 cap_origin = node.position + glm::vec3(0.f, CAP_LIFT, 0.f);
+        // Snap center and rim verts to terrain; add a small extra lift so the cap
+        // sits just above the road strips that meet here.
+        static constexpr float CAP_EXTRA = 0.02f;
+        glm::vec3 cap_origin = snap_to_terrain(node.position);
+        cap_origin.y += CAP_EXTRA;
 
         const int N = 16;
         uint16_t center = builder.add_vertex(cap_origin, {0.5f, 0.5f}, up);
         uint16_t first = 0, prev = 0;
         for (int i = 0; i < N; i++) {
             float angle = float(i) / float(N) * 2.f * PI;
-            glm::vec3 rim = cap_origin + glm::vec3(std::cos(angle) * max_hw, 0.f, std::sin(angle) * max_hw);
-            glm::vec2 uv  = { std::cos(angle) * 0.5f + 0.5f, std::sin(angle) * 0.5f + 0.5f };
+            glm::vec3 rim_xz = node.position + glm::vec3(std::cos(angle) * max_hw, 0.f, std::sin(angle) * max_hw);
+            glm::vec3 rim    = snap_to_terrain(rim_xz);
+            rim.y += CAP_EXTRA;
+            glm::vec2 uv = { std::cos(angle) * 0.5f + 0.5f, std::sin(angle) * 0.5f + 0.5f };
             uint16_t v = builder.add_vertex(rim, uv, up);
             if (i == 0) first = v;
             // Winding: (center, v, prev) so normal faces up (+Y)
