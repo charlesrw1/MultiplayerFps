@@ -67,6 +67,12 @@ static float bump_shake_impulse  = 0.04f;
 static float bump_shake_decay    = 8.f;
 static float bump_rumble_scale   = 600.f;
 
+// Crack FX (always active, not gated by bump enable flags)
+static float crack_shake_impulse = 0.15f;
+static float crack_pitch_impulse = 0.8f;
+static float crack_vert_impulse  = 0.12f;
+static float crack_rumble_scale  = 40000.f;
+
 // Wind camera shake (camera-side parameter, driven by wind state)
 static float wind_camera_shake_deg = 0.2f;
 
@@ -214,6 +220,20 @@ void BikePlayer::update_camera(BikeObject* bike, float steer, float brake_amount
 	if (bump_enable_rumble && bump > 0.f) {
 		const uint16_t intensity = (uint16_t)glm::clamp(bump * bump_rumble_scale, 0.f, 65535.f);
 		Input::rumble(intensity / 2, intensity, 80);
+	}
+
+	// --- Crack decal FX (always active, scaled by crack_impulse = strength * speed_mult) ---
+	if (bike->crack_impulse > 0.f) {
+		const float ci = bike->crack_impulse;
+		bump_pitch_vel -= crack_pitch_impulse * ci;
+		bump_vert_vel  += crack_vert_impulse  * ci;
+		shake_magnitude += crack_shake_impulse * ci;
+		shake_offset = glm::vec3(
+			((float)rand() / RAND_MAX * 2.f - 1.f),
+			((float)rand() / RAND_MAX * 2.f - 1.f),
+			((float)rand() / RAND_MAX * 2.f - 1.f)) * shake_magnitude;
+		const uint16_t cr = (uint16_t)glm::clamp(crack_rumble_scale * ci, 0.f, 65535.f);
+		Input::rumble(cr / 2, cr, 120);
 	}
 
 	// --- Camera roll ---
@@ -403,6 +423,13 @@ static void bike_camera_debug()
 		ImGui::DragFloat("shake_impulse", &bump_shake_impulse, 0.001f);
 		ImGui::DragFloat("shake_decay",   &bump_shake_decay,   0.1f);
 		ImGui::DragFloat("rumble_scale",  &bump_rumble_scale,  10.f);
+	}
+	ImGui::SeparatorText("Crack FX");
+	{
+		ImGui::DragFloat("crack_shake_impulse", &crack_shake_impulse, 0.005f, 0.f, 1.f);
+		ImGui::DragFloat("crack_pitch_impulse", &crack_pitch_impulse, 0.01f,  0.f, 5.f);
+		ImGui::DragFloat("crack_vert_impulse",  &crack_vert_impulse,  0.005f, 0.f, 1.f);
+		ImGui::DragFloat("crack_rumble_scale",  &crack_rumble_scale,  500.f,  0.f, 65535.f);
 	}
 	ImGui::SeparatorText("Wind Camera");
 	{

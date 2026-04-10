@@ -62,6 +62,14 @@ void DecalComponent::set_material(MaterialInstance* mat) {
 	material.ptr = mat;
 	sync_render_data();
 }
+
+static const std::string s_empty_str;
+const std::string& DecalComponent::get_material_path() const {
+	const auto* raw = material.get_unsafe();
+	if (!raw) return s_empty_str;
+	return raw->get_name();
+}
+
 #include "UI/GUISystemPublic.h"
 class DecalComponentEditorUi : public IComponentEditorUi
 {

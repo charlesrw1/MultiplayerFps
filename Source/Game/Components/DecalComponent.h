@@ -19,6 +19,7 @@ public:
 	void on_sync_render_data() final;
 
 	REF void set_material(MaterialInstance* mat);
+	const std::string& get_material_path() const;
 
 #ifdef EDITOR_BUILD
 	void editor_on_change_property() final;

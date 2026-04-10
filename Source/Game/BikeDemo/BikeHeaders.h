@@ -331,6 +331,8 @@ public:
 	float terrain_gradient    = 0.f;   // radians, + = uphill, - = downhill
 	float prev_gradient       = 0.f;   // last frame gradient, for bump detection
 	float bump_impulse        = 0.f;   // magnitude of bump this frame (speed-scaled)
+	float crack_impulse       = 0.f;   // set by app when bike crosses a crack decal
+	float crack_cooldown      = 0.f;   // seconds until crack can retrigger
 	float gear_shift_cooldown = 0.f;   // seconds remaining until next shift is allowed
 	bool  just_shifted        = false; // set true for one tick when a shift occurs
 	GearSelector gear;
@@ -418,12 +420,22 @@ public:
 	bool paceline_active  = false;
 	bool echelon_mode     = false;
 
+	// Crack decal instances collected at map load
+	struct CrackDecalInstance {
+		glm::vec3 pos;
+		float     trigger_radius;  // derived from decal WS scale * type radius_mult
+		int       type_idx;
+	};
+	std::vector<CrackDecalInstance> crack_instances;
+
 private:
+	void collect_crack_decals();
 	void update_course_positions();
 	void sort_riders();
 	void update_gaps();
 	void update_drafting();
 	void update_boids();
 	void update_paceline();
+	void update_crack_triggers();
 	void debug_draw_course() const;
 };

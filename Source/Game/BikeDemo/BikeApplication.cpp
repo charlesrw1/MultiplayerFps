@@ -2,6 +2,7 @@
 
 #include "Render/Texture.h"
 #include "Game/GameplayStatic.h"
+#include "Game/Components/DecalComponent.h"
 #include "Game/Components/PhysicsComponents.h"
 #include "Game/Entities/CharacterController.h"
 #include "Input/InputSystem.h"
@@ -53,13 +54,52 @@ static float apply_deadzone(float val, float dz) {
 }
 
 // ============================================================
+// Crack type registry — add rows here for crack2, crack3, etc.
+// ============================================================
+
+struct CrackTypeConfig {
+	const char* material_path;
+	float strength;     // base impulse magnitude (speed-scaled at trigger time)
+	float radius_mult;  // multiplier on the decal's natural XZ footprint for the trigger zone
+	float cooldown_dist;  // metres to travel before same crack can retrigger (speed-invariant)
+	int   count;        // populated by collect_crack_decals, read-only
+};
+
+static constexpr int NUM_CRACK_TYPES = 1;
+extern CrackTypeConfig crack_types[NUM_CRACK_TYPES];  // defined near update_crack_triggers
+
+// ============================================================
 // BikeGameApplication
 // ============================================================
+
+void BikeGameApplication::collect_crack_decals()
+{
+	crack_instances.clear();
+	auto components = GameplayStatic::find_components(&DecalComponent::StaticType);
+	for (auto* c : components) {
+		auto* dc = static_cast<DecalComponent*>(c);
+		const std::string& path = dc->get_material_path();
+		for (int ti = 0; ti < NUM_CRACK_TYPES; ++ti) {
+			if (path == crack_types[ti].material_path) {
+				// Use the decal's XZ world-space footprint as the natural trigger size.
+				// Decals are unit-box projections, so XZ scale = real-world extent in metres.
+				const glm::vec3 ws_scale = dc->get_owner()->get_ws_scale();
+				const float footprint_r  = glm::max(ws_scale.x, ws_scale.z) * 0.5f;
+				const float trigger_r    = footprint_r * crack_types[ti].radius_mult;
+				crack_instances.push_back({ dc->get_owner()->get_ws_position(), trigger_r, ti });
+				crack_types[ti].count++;
+				break;
+			}
+		}
+	}
+	sys_print(Debug, "BikeApp: collected %d crack decal(s)\n", (int)crack_instances.size());
+}
 
 void BikeGameApplication::start()
 {
 	GameplayStatic::change_level("maps/bike_test_map.tmap");
 	course.build_from_spawners();
+	collect_crack_decals();
 
 	// Spawn player at the course start
 	const glm::vec3 start_pos = course.is_built
@@ -99,6 +139,7 @@ void BikeGameApplication::update()
 		if (paceline_active)
 			update_paceline();
 	}
+	update_crack_triggers();
 	apply_debug_follow_camera();
 }
 
@@ -274,9 +315,9 @@ static float BOID_COHESION_KP     = 0.14f;
 static float BOID_COHESION_KD     = 0.40f;
 
 // Player boid scale multipliers (applied on top of the shared raw values)
-static float player_boid_sep_scale = 0.8f;
-static float player_boid_coh_scale = 0.4f;
-static float player_boid_aln_scale = 0.3f;
+static float player_boid_sep_scale = 0.0f;
+static float player_boid_coh_scale = 0.0f;
+static float player_boid_aln_scale = 0.0f;
 
 // Speed alignment — each rider matches rider-ahead speed (chain propagation, not pack average)
 static float BOID_SPEED_RADIUS = 20.f;   // max gap to still react to rider ahead
@@ -1360,3 +1401,83 @@ static void bike_boid_debug()
 	}
 }
 ADD_TO_DEBUG_MENU(bike_boid_debug);
+
+// ============================================================
+// Crack trigger: fire bump FX when a rider rolls over a crack decal
+// ============================================================
+
+// Per-type crack configuration (add more rows for crack2, crack3, etc.)
+CrackTypeConfig crack_types[NUM_CRACK_TYPES] = {
+	{ "materials/decals/crack1_decal.mi", 0.5f, 1.0f, 0.8f, 0 },
+	//  material                          str   rmul  dist  count
+};
+
+// Speed scaling: impulse = strength * clamp(speed / speed_ref, speed_min_mult, speed_max_mult)
+static float crack_speed_ref      = 10.f;   // m/s at which mult = 1.0
+static float crack_speed_min_mult = 0.2f;   // minimum multiplier (stationary)
+static float crack_speed_max_mult = 2.5f;   // cap at high speed
+
+static bool  crack_debug_draw = false;
+
+void BikeGameApplication::update_crack_triggers()
+{
+	if (crack_instances.empty()) return;
+	const float dt = eng->get_dt();
+
+	for (auto* bike : all_riders) {
+		if (bike->crack_cooldown > 0.f) {
+			bike->crack_cooldown -= dt;
+			bike->crack_impulse = 0.f;
+			continue;
+		}
+		bike->crack_impulse = 0.f;
+
+		const glm::vec3 bpos = bike->get_owner()->get_ws_position();
+		for (const auto& ci : crack_instances) {
+			const CrackTypeConfig& cfg = crack_types[ci.type_idx];
+			const float r2 = ci.trigger_radius * ci.trigger_radius;
+			const float dx = bpos.x - ci.pos.x;
+			const float dz = bpos.z - ci.pos.z;
+			if (dx * dx + dz * dz < r2) {
+				const float speed_mult = glm::clamp(bike->speed / crack_speed_ref,
+				                                    crack_speed_min_mult, crack_speed_max_mult);
+				bike->crack_impulse  = cfg.strength * speed_mult;
+				// cooldown_dist / speed keeps retrigger rate constant per metre travelled
+				static constexpr float MIN_SPEED_FOR_COOLDOWN = 1.f; // m/s floor
+				bike->crack_cooldown = cfg.cooldown_dist / glm::max(bike->speed, MIN_SPEED_FOR_COOLDOWN);
+				break;
+			}
+		}
+	}
+
+	if (crack_debug_draw) {
+		for (const auto& ci : crack_instances) {
+			Debug::add_sphere(ci.pos + glm::vec3(0, 0.1f, 0),
+			                  ci.trigger_radius,
+			                  Color32(0xff, 0x44, 0x00, 0xcc), -1.f);
+		}
+	}
+}
+
+static void crack_debug_menu()
+{
+	ImGui::SeparatorText("Crack Triggers");
+	ImGui::Checkbox("debug draw", &crack_debug_draw);
+	ImGui::DragFloat("speed_ref",      &crack_speed_ref,      0.5f,  1.f, 40.f);
+	ImGui::DragFloat("speed_min_mult", &crack_speed_min_mult, 0.01f, 0.f, 1.f);
+	ImGui::DragFloat("speed_max_mult", &crack_speed_max_mult, 0.05f, 1.f, 5.f);
+	for (int ti = 0; ti < NUM_CRACK_TYPES; ++ti) {
+		CrackTypeConfig& cfg = crack_types[ti];
+		ImGui::PushID(ti);
+		char label[64];
+		snprintf(label, sizeof(label), "Type %d (%d found): %s", ti, cfg.count, cfg.material_path);
+		if (ImGui::CollapsingHeader(label)) {
+			ImGui::DragFloat("strength",    &cfg.strength,    0.05f, 0.f,  5.f);
+			ImGui::DragFloat("radius_mult", &cfg.radius_mult, 0.05f, 0.1f, 5.f);
+			ImGui::DragFloat("cooldown_dist (m)", &cfg.cooldown_dist, 0.1f, 0.1f, 20.f);
+			ImGui::TextDisabled("(radius_mult scales each decal's natural XZ footprint)");
+		}
+		ImGui::PopID();
+	}
+}
+ADD_TO_DEBUG_MENU(crack_debug_menu);
