@@ -83,8 +83,10 @@ void main()
 
 #ifdef _FRAGMENT_SHADER
 
+#ifdef DECAL_ALBEDO_WRITE
 layout (location = 1) out vec4 GBUFFER_OUT_Albedo_AO;
-#ifdef DECAL_EMISSIVE_WRITE		
+#endif
+#ifdef DECAL_EMISSIVE_WRITE
 layout (location = 3) out vec4 GBUFFER_OUT_Emissive;
 #endif
 #ifdef DECAL_NORMAL_WRITE
@@ -175,7 +177,9 @@ void main()
 		discard;
 	#endif	// !ALPHATEST
 	
-	GBUFFER_OUT_Albedo_AO = vec4(BASE_COLOR,OPACITY);//vec4(vec3(-proj.z),0.0);//vec2(FS_IN_Texcoord)*val,0.0, 0.0);
+	#ifdef DECAL_ALBEDO_WRITE
+	GBUFFER_OUT_Albedo_AO = vec4(BASE_COLOR,OPACITY);
+	#endif
 	#ifdef DECAL_EMISSIVE_WRITE
 	GBUFFER_OUT_Emissive = vec4(EMISSIVE,0.0);
 	#endif
