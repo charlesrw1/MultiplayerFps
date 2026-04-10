@@ -293,6 +293,15 @@ static float AI_GAP_MAX_PUSH      = 40.f;   // max watts shed when too close
 
 static float BOID_SEP_MULT_SIMPLE = 1.0;
 
+// Hard steer cutoff — blocks any steer that closes the gap once a rider enters the
+// inner exclusion zone.  Operates entirely on steer commands; no position snapping.
+// Outer radius: beyond this, no hard limit (soft boid sep handles it).
+// Inner radius: below this the bikes are already overlapping; allow any steer so they
+//               can escape rather than getting locked with zero steer.
+static float HARD_SEP_LONG_RADIUS = 3.0f;  // m — longitudinal range (side-by-side check)
+static float HARD_SEP_OUTER_LAT   = 0.7f;  // m — engage hard clamp inside this lateral gap
+static float HARD_SEP_INNER_LAT   = 0.05f; // m — disengage (escape) when already overlapping
+
 void BikeGameApplication::update_boids()
 {
 	const int   n  = (int)riders_sorted.size();
@@ -426,6 +435,25 @@ void BikeGameApplication::update_boids()
 			                         ? me->rider_ahead->speed : me->speed;
 			const float raw_nudge = glm::clamp((target_speed - me->speed) * BOID_SPEED_KP, -BOID_SPEED_MAX, BOID_SPEED_MAX);
 			me->boid_align_power_nudge = damp_dt_independent(raw_nudge, me->boid_align_power_nudge, BOID_SPEED_SMOOTH, dt);
+		}
+
+		// Hard steer limits — block any steer that would close the gap when a neighbour is
+		// already inside the exclusion zone.  Reset each frame; narrowed by each nearby rider.
+		me->hard_steer_min = -1.f;
+		me->hard_steer_max =  1.f;
+		for (int j = 0; j < n; ++j) {
+			if (j == i) continue;
+			const BikeObject* other = riders_sorted[j];
+			const float h_long  = glm::abs(other->course_dist_m - me->course_dist_m);
+			if (h_long >= HARD_SEP_LONG_RADIUS) continue;
+			const float lat_diff = other->lateral_pos - me->lateral_pos; // +ve = other is right
+			const float h_lat    = glm::abs(lat_diff);
+			if (h_lat >= HARD_SEP_OUTER_LAT) continue;
+			if (h_lat <  HARD_SEP_INNER_LAT) continue; // already overlapping — let them escape
+			if (lat_diff > 0.f)
+				me->hard_steer_max = 0.f; // other to my right: block rightward steer
+			else
+				me->hard_steer_min = 0.f; // other to my left:  block leftward steer
 		}
 
 		// Save lateral position for derivative computation next frame

@@ -163,6 +163,7 @@ public:
 	// ---- Debug ----
 	glm::vec3 dbg_lookahead_pt{};  // world-space lookahead point, drawn in debug
 	float dbg_steer_pre_boids    = 0.f;  // PID steer before boid forces
+	float dbg_steer_pre_hard     = 0.f;  // steer after boids, before hard clamp
 	float dbg_steer_final        = 0.f;  // final clamped steer submitted to physics
 	float dbg_power_base         = 0.f;  // smoothed target power before boid modifications
 	float dbg_power_align_nudge  = 0.f;  // speed-alignment nudge from pack average
@@ -375,6 +376,12 @@ public:
 	float boid_cohesion_steer    = 0.f;  // steer nudge toward rider-ahead's lateral (paceline)
 	float boid_align_power_nudge = 0.f;  // W to add/subtract so rider converges to pack speed
 	float boid_long_sep_power    = 0.f;  // W shed when side-by-side (slightly behind yields)
+
+	// Hard steer limits (written by BikeGameApplication::update_boids, applied by BikeAI)
+	// Clamp the final steer command to prevent the bike from steering into a neighbour.
+	// [-1, +1] at rest; narrowed to [0,+1] or [-1,0] when a rider is in the exclusion zone.
+	float hard_steer_min = -1.f;
+	float hard_steer_max =  1.f;
 
 	// Cohesion PD debug terms (written alongside boid_cohesion_steer)
 	float dbg_cohesion_lat_err = 0.f;  // kp term input: lateral offset to rider ahead

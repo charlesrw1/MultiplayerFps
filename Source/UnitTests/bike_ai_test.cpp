@@ -442,3 +442,98 @@ TEST(BikeAIPaceline, IsAtFront_CascadeRegression)
     EXPECT_FALSE(is_at_front(r, 2)) << "3rd rider must not cascade to Pulling";
     EXPECT_FALSE(is_at_front(r, 3)) << "4th rider must not cascade to Pulling";
 }
+
+// ---------------------------------------------------------------------------
+// Hard steer cutoff
+// Params match BikeApplication.cpp:
+//   HARD_SEP_LONG_RADIUS = 3.0m
+//   HARD_SEP_OUTER_LAT   = 0.7m
+//   HARD_SEP_INNER_LAT   = 0.05m
+//
+// The update_boids loop narrows [hard_steer_min, hard_steer_max] to [0, +1] or
+// [-1, 0] when a neighbour is inside the zone.  BikeAI clamps the final steer
+// into this window.  These tests replicate that logic.
+// ---------------------------------------------------------------------------
+struct HardClampState {
+    float hard_min = -1.f;
+    float hard_max =  1.f;
+};
+
+static const float HARD_LONG  = 3.0f;
+static const float HARD_OUTER = 0.7f;
+static const float HARD_INNER = 0.05f;
+
+// Apply one neighbour to the hard clamp state (mirrors the inner loop in update_boids)
+static void apply_hard_neighbour(HardClampState& s,
+                                  float me_lat, float me_dist,
+                                  float other_lat, float other_dist)
+{
+    const float h_long   = std::abs(other_dist - me_dist);
+    if (h_long >= HARD_LONG)  return;
+    const float lat_diff = other_lat - me_lat;
+    const float h_lat    = std::abs(lat_diff);
+    if (h_lat >= HARD_OUTER)  return;
+    if (h_lat <  HARD_INNER)  return;  // already overlapping — allow escape
+    if (lat_diff > 0.f)
+        s.hard_max = 0.f;  // other to right: block rightward steer
+    else
+        s.hard_min = 0.f;  // other to left: block leftward steer
+}
+
+TEST(BikeAIHardSteer, OtherToRight_BlocksRightSteer)
+{
+    HardClampState s;
+    apply_hard_neighbour(s, 0.f, 0.f, 0.4f, 1.0f);  // other is 0.4m to the right
+    EXPECT_EQ(s.hard_max, 0.f)  << "max should be clamped to 0 (no right steer)";
+    EXPECT_EQ(s.hard_min, -1.f) << "min should be unchanged (left steer still allowed)";
+}
+
+TEST(BikeAIHardSteer, OtherToLeft_BlocksLeftSteer)
+{
+    HardClampState s;
+    apply_hard_neighbour(s, 0.f, 0.f, -0.4f, 1.0f);  // other is 0.4m to the left
+    EXPECT_EQ(s.hard_min, 0.f)  << "min should be clamped to 0 (no left steer)";
+    EXPECT_EQ(s.hard_max, 1.f)  << "max should be unchanged (right steer still allowed)";
+}
+
+TEST(BikeAIHardSteer, OutsideLateralZone_NoClamp)
+{
+    HardClampState s;
+    apply_hard_neighbour(s, 0.f, 0.f, 0.8f, 1.0f);  // 0.8m > HARD_OUTER=0.7m
+    EXPECT_EQ(s.hard_max, 1.f);
+    EXPECT_EQ(s.hard_min, -1.f);
+}
+
+TEST(BikeAIHardSteer, OutsideLongitudinalZone_NoClamp)
+{
+    HardClampState s;
+    apply_hard_neighbour(s, 0.f, 0.f, 0.4f, 4.0f);  // 4.0m > HARD_LONG=3.0m
+    EXPECT_EQ(s.hard_max, 1.f);
+    EXPECT_EQ(s.hard_min, -1.f);
+}
+
+TEST(BikeAIHardSteer, AlreadyOverlapping_AllowsEscape)
+{
+    HardClampState s;
+    apply_hard_neighbour(s, 0.f, 0.f, 0.02f, 1.0f);  // 0.02m < HARD_INNER=0.05m
+    EXPECT_EQ(s.hard_max, 1.f)  << "overlapping riders must be allowed to escape freely";
+    EXPECT_EQ(s.hard_min, -1.f);
+}
+
+TEST(BikeAIHardSteer, SteerClampedByWindow)
+{
+    // Desired steer = -0.6 (rightward), other to my right → max clamped to 0
+    HardClampState s;
+    apply_hard_neighbour(s, 0.f, 0.f, 0.4f, 1.0f);
+    const float final_steer = std::max(s.hard_min, std::min(s.hard_max, -0.6f));
+    EXPECT_NEAR(final_steer, 0.f, 1e-6f) << "rightward steer into neighbour must be zeroed";
+}
+
+TEST(BikeAIHardSteer, SteerAwayFromNeighbour_Allowed)
+{
+    // Desired steer = +0.6 (leftward), other to my right → max=0 but steer is positive
+    HardClampState s;
+    apply_hard_neighbour(s, 0.f, 0.f, 0.4f, 1.0f);
+    const float final_steer = std::max(s.hard_min, std::min(s.hard_max, 0.6f));
+    EXPECT_NEAR(final_steer, 0.6f, 1e-6f) << "steer away from neighbour should pass through unmodified";
+}
