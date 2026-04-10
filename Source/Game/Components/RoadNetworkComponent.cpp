@@ -33,11 +33,11 @@ static void push_road_strip(ModelBuilder& builder,
 
     const glm::vec3 up(0.f, 1.f, 0.f);
 
-    // Cumulative length for UV v-coord
+    // Cumulative arc-length for UV v-coord (tiles once per road-width so no stretching)
     std::vector<float> cum(pts.size(), 0.f);
     for (int i = 1; i < (int)pts.size(); i++)
         cum[i] = cum[i-1] + glm::distance(pts[i], pts[i-1]);
-    float total = cum.back() > 0.001f ? cum.back() : 1.f;
+    const float tile_len = half_w * 2.f > 0.001f ? half_w * 2.f : 1.f;
 
     uint16_t prev_l = 0, prev_r = 0;
     for (int i = 0; i < (int)pts.size(); i++) {
@@ -50,7 +50,7 @@ static void push_road_strip(ModelBuilder& builder,
             dir = glm::normalize(pts[i+1] - pts[i-1]);
 
         glm::vec3 right = glm::normalize(glm::cross(dir, up)) * half_w;
-        float v = cum[i] / total;
+        float v = cum[i] / tile_len;
 
         uint16_t vl = builder.add_vertex(pts[i] - right, {0.f, v}, up);
         uint16_t vr = builder.add_vertex(pts[i] + right, {1.f, v}, up);
@@ -290,19 +290,24 @@ void RoadNetworkComponent::rebuild_mesh()
         for (auto* e : conn)
             max_hw = std::max(max_hw, e->width * 0.5f);
 
+        // Lift the cap slightly above the road strips to avoid Z-fighting
+        static constexpr float CAP_LIFT = 0.02f;
+        glm::vec3 cap_origin = node.position + glm::vec3(0.f, CAP_LIFT, 0.f);
+
         const int N = 16;
-        uint16_t center = builder.add_vertex(node.position, {0.5f, 0.5f}, up);
+        uint16_t center = builder.add_vertex(cap_origin, {0.5f, 0.5f}, up);
         uint16_t first = 0, prev = 0;
         for (int i = 0; i < N; i++) {
             float angle = float(i) / float(N) * 2.f * PI;
-            glm::vec3 rim = node.position + glm::vec3(std::cos(angle) * max_hw, 0.f, std::sin(angle) * max_hw);
+            glm::vec3 rim = cap_origin + glm::vec3(std::cos(angle) * max_hw, 0.f, std::sin(angle) * max_hw);
             glm::vec2 uv  = { std::cos(angle) * 0.5f + 0.5f, std::sin(angle) * 0.5f + 0.5f };
             uint16_t v = builder.add_vertex(rim, uv, up);
             if (i == 0) first = v;
-            if (i > 0) builder.add_triangle(center, prev, v);
+            // Winding: (center, v, prev) so normal faces up (+Y)
+            if (i > 0) builder.add_triangle(center, v, prev);
             prev = v;
         }
-        builder.add_triangle(center, prev, first);
+        builder.add_triangle(center, first, prev);
     }
 
     // Upload / refresh GPU model

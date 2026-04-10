@@ -151,23 +151,49 @@ int RoadBuilderTool::pick_edge(glm::ivec2 mouse_screen) const
     return best_id;
 }
 
+bool RoadBuilderTool::pick_ctrl_pt(glm::ivec2 mouse_screen, int& out_edge_id, bool& out_is_a) const
+{
+    auto* level = eng->get_level();
+    if (!level) return false;
+    auto* comp = static_cast<const RoadNetworkComponent*>(
+        level->find_first_component(&RoadNetworkComponent::StaticType));
+    if (!comp) return false;
+
+    const float HIT_R = 10.f;
+    float best = HIT_R * HIT_R;
+    bool found = false;
+
+    for (const auto& e : comp->get_edges()) {
+        if (!e.curved) continue;
+        for (int k = 0; k < 2; k++) {
+            glm::vec3 wp = (k == 0) ? e.ctrl_a : e.ctrl_b;
+            ImVec2 s = world_to_screen(wp);
+            float dx = s.x - float(mouse_screen.x);
+            float dy = s.y - float(mouse_screen.y);
+            float d2 = dx*dx + dy*dy;
+            if (d2 < best) {
+                best = d2;
+                out_edge_id = e.id;
+                out_is_a    = (k == 0);
+                found = true;
+            }
+        }
+    }
+    return found;
+}
+
 bool RoadBuilderTool::ray_to_ground(int mx, int my, glm::vec3& out) const
 {
     // First try physics raycast to find actual ground
-    Ray ray = doc.unproject_mouse_to_ray(mx, my);
+    glm::vec3 dir = doc.unproject_mouse_to_ray(mx, my).dir;
+    glm::vec3 pos = doc.get_vs()->origin;
+
     world_query_result res;
-    if (g_physics.trace_ray(res, ray.pos, ray.pos + ray.dir * 2000.f, nullptr, UINT32_MAX)) {
+    if (g_physics.trace_ray(res, pos, pos - dir * 2000.f, nullptr, UINT32_MAX)) {
         out = res.hit_pos;
         return true;
     }
-
-    // Fall back to y=0 plane
-    float denom = ray.dir.y;
-    if (std::abs(denom) < 0.0001f) return false;
-    float t = -ray.pos.y / denom;
-    if (t < 0.f) return false;
-    out = ray.pos + ray.dir * t;
-    return true;
+    return false;
 }
 
 glm::vec3 RoadBuilderTool::apply_snap(glm::vec3 pos) const
@@ -189,9 +215,12 @@ void RoadBuilderTool::draw_overlay(const RoadNetworkComponent* net) const
 
     const glm::ivec2 mouse = Input::get_mouse_pos();
 
-    // Recompute hovered IDs each frame (mutable)
+    // Recompute hovered IDs each frame (mutable); ctrl pts take precedence over edges
     hovered_node = pick_node(mouse);
-    hovered_edge = (hovered_node < 0) ? pick_edge(mouse) : -1;
+    bool has_ctrl_hover = (sub_mode == SubMode::PlaceNode) &&
+                          pick_ctrl_pt(mouse, hovered_ctrl_edge, hovered_ctrl_is_a);
+    if (!has_ctrl_hover) hovered_ctrl_edge = -1;
+    hovered_edge = (hovered_node < 0 && !has_ctrl_hover) ? pick_edge(mouse) : -1;
 
     // ---- Edges ----
     for (const auto& e : net->get_edges()) {
@@ -220,9 +249,17 @@ void RoadBuilderTool::draw_overlay(const RoadNetworkComponent* net) const
             }
             dl->AddPolyline(pts.data(), (int)pts.size(), col, 0, 2.f);
 
-            // Control point handles (editor-only, small dots)
-            dl->AddCircleFilled(world_to_screen(e.ctrl_a), 4.f, COL_CTRL_PT);
-            dl->AddCircleFilled(world_to_screen(e.ctrl_b), 4.f, COL_CTRL_PT);
+            // Control point handles (editor-only, draggable dots)
+            bool ca_hov = (hovered_ctrl_edge == e.id &&  hovered_ctrl_is_a);
+            bool cb_hov = (hovered_ctrl_edge == e.id && !hovered_ctrl_is_a);
+            bool ca_drag = (drag_ctrl_edge_id == e.id &&  drag_ctrl_is_a);
+            bool cb_drag = (drag_ctrl_edge_id == e.id && !drag_ctrl_is_a);
+            ImU32 col_ca = (ca_drag || ca_hov) ? IM_COL32(255,220,40,240) : COL_CTRL_PT;
+            ImU32 col_cb = (cb_drag || cb_hov) ? IM_COL32(255,220,40,240) : COL_CTRL_PT;
+            float r_ca = (ca_drag || ca_hov) ? 7.f : 4.f;
+            float r_cb = (cb_drag || cb_hov) ? 7.f : 4.f;
+            dl->AddCircleFilled(world_to_screen(e.ctrl_a), r_ca, col_ca);
+            dl->AddCircleFilled(world_to_screen(e.ctrl_b), r_cb, col_cb);
             dl->AddLine(world_to_screen(na->position), world_to_screen(e.ctrl_a), COL_CTRL_PT, 1.f);
             dl->AddLine(world_to_screen(nb->position), world_to_screen(e.ctrl_b), COL_CTRL_PT, 1.f);
         }
@@ -301,6 +338,7 @@ void RoadBuilderTool::tick(EditorInputs& inputs)
             sub_mode = SubMode::PlaceNode;
             connect_src_id = -1;
             dragging = false;
+            drag_ctrl_edge_id = -1;
         }
         if (Input::was_key_pressed(SDL_SCANCODE_C)) {
             sub_mode = (sub_mode == SubMode::Connect) ? SubMode::PlaceNode : SubMode::Connect;
@@ -335,6 +373,32 @@ void RoadBuilderTool::tick(EditorInputs& inputs)
     // -----------------------------------------------------------------------
     case SubMode::PlaceNode:
     {
+        // -- Drag control point (highest priority) --
+        if (lmb_pressed && inputs.can_use_mouse_click() && drag_ctrl_edge_id < 0) {
+            int cedge; bool cis_a;
+            if (pick_ctrl_pt(mouse, cedge, cis_a)) {
+                drag_ctrl_edge_id = cedge;
+                drag_ctrl_is_a    = cis_a;
+                inputs.eat_mouse_click();
+            }
+        }
+
+        if (drag_ctrl_edge_id >= 0) {
+            glm::vec3 new_pos;
+            if (ray_to_ground(mouse.x, mouse.y, new_pos)) {
+                if (auto* edge = net->find_edge(drag_ctrl_edge_id)) {
+                    glm::vec3 ca = edge->ctrl_a;
+                    glm::vec3 cb = edge->ctrl_b;
+                    if (drag_ctrl_is_a) ca = apply_snap(new_pos);
+                    else                cb = apply_snap(new_pos);
+                    net->set_edge_control_points(drag_ctrl_edge_id, ca, cb);
+                    net->rebuild_mesh();
+                }
+            }
+            if (lmb_released) drag_ctrl_edge_id = -1;
+            return;
+        }
+
         // -- Drag existing node --
         if (lmb_pressed && inputs.can_use_mouse_click()) {
             if (hovered_node >= 0) {

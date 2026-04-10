@@ -34,6 +34,8 @@ private:
     int  pick_node(glm::ivec2 mouse_screen) const;
     // Hit-test: returns edge id whose midpoint is near mouse or -1
     int  pick_edge(glm::ivec2 mouse_screen) const;
+    // Hit-test: returns true if a curved edge control point is under mouse
+    bool pick_ctrl_pt(glm::ivec2 mouse_screen, int& out_edge_id, bool& out_is_a) const;
 
     // Ground-plane raycast (y = component_y). Returns true on hit.
     bool ray_to_ground(int mx, int my, glm::vec3& out) const;
@@ -53,14 +55,19 @@ private:
     // Connect mode: id of the first selected node (-1 = none)
     int connect_src_id = -1;
 
-    // Drag state
-    bool     dragging   = false;
+    // Node drag state
+    bool     dragging     = false;
     int      drag_node_id = -1;
-    glm::vec3 drag_offset  = {};
+
+    // Control-point drag state
+    int  drag_ctrl_edge_id = -1;
+    bool drag_ctrl_is_a    = false;
 
     // Hovered / selected for visual feedback
-    mutable int hovered_node = -1;
-    mutable int hovered_edge = -1;
+    mutable int  hovered_node      = -1;
+    mutable int  hovered_edge      = -1;
+    mutable int  hovered_ctrl_edge = -1;
+    mutable bool hovered_ctrl_is_a = false;
 
     // MeshBuilder overlay registered in scene (drawn in 3D)
     MeshBuilder              mb;
