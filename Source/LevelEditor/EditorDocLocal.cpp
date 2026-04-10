@@ -159,6 +159,7 @@ void EditorDoc::init_new() {
 	drag_drop_preview = std::make_unique<DragDropPreview>();
 	foliage_tool = std::make_unique<FoliagePaintTool>(*this);
 	stamp_tool = std::make_unique<DecalStampTool>(*this);
+	road_tool = std::make_unique<RoadBuilderTool>(*this);
 	handle_dragger = std::make_unique<EViewportHandles>(*this);
 	selection_mode = std::make_unique<SelectionMode>(*this);
 	draw_handles = std::make_unique<DrawHandlesObject>(*this);
@@ -772,6 +773,9 @@ void EditorDoc::hook_menu_bar() {
 		}
 		if (ImGui::MenuItem("Decal Stamp", nullptr, active_mode == stamp_tool.get())) {
 			active_mode = stamp_tool.get();
+		}
+		if (ImGui::MenuItem("Road Builder", nullptr, active_mode == road_tool.get())) {
+			active_mode = road_tool.get();
 		}
 		ImGui::EndMenu();
 	}

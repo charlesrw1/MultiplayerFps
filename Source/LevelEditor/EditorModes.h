@@ -50,6 +50,10 @@ private:
 	EntityPtr preview;
 	EditorDoc& doc;
 };
+// Road network editor (Cities-Skylines style)
+// Full definition in RoadBuilderTool.h
+class RoadBuilderTool;
+
 // the default tool
 class SelectionMode : public IEditorMode
 {

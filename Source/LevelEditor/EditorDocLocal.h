@@ -47,6 +47,7 @@
 #include "DragDetector.h"
 #include "EditorUILayout.h"
 #include "IEditorApi.h"
+#include "RoadBuilderTool.h"
 
 extern ConfigVar g_mousesens;
 
@@ -271,6 +272,7 @@ public:
 	std::unique_ptr<EditorUILayout> gui;
 	std::unique_ptr<EViewportHandles> handle_dragger;
 	std::unique_ptr<SelectionMode> selection_mode;
+	std::unique_ptr<RoadBuilderTool> road_tool;
 	std::unique_ptr<DrawHandlesObject> draw_handles;
 	View_Setup vs_setup;
 	EditorCamera ed_cam;

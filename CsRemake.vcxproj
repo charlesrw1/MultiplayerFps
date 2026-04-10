@@ -138,6 +138,8 @@
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
     <ClCompile Include="Source\LevelEditor\OrthoCamera.cpp" />
     <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp" />
+    <ClCompile Include="Source\LevelEditor\RoadBuilderTool.cpp" />
+    <ClCompile Include="Source\Game\Components\RoadNetworkComponent.cpp" />
     <ClCompile Include="Source\LevelEditor\SceneExport.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
@@ -309,6 +311,8 @@
     <ClInclude Include="Source\Game\Components\LightComponents.h" />
     <ClInclude Include="Source\Game\Components\MeshbuilderComponent.h" />
     <ClInclude Include="Source\Game\Components\MeshComponent.h" />
+    <ClInclude Include="Source\Game\Components\RoadNetworkComponent.h" />
+    <ClInclude Include="Source\LevelEditor\RoadBuilderTool.h" />
     <ClInclude Include="Source\Game\Components\PhysicsComponents.h" />
     <ClInclude Include="Source\Game\Components\PrefabAssetComponent.h" />
     <ClInclude Include="Source\Debug.h" />

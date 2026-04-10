@@ -101,8 +101,10 @@
     <ClCompile Include="GpuTimer.cpp" />
     <ClCompile Include="Tests\Renderer\test_basic.cpp" />
     <ClCompile Include="Tests\Renderer\test_material_hotreload.cpp" />
+    <ClCompile Include="Tests\Renderer\test_dynamic_model.cpp" />
     <ClCompile Include="Tests\Editor\test_serialize.cpp" />
     <ClCompile Include="Tests\Editor\test_prefabs.cpp" />
+    <ClCompile Include="Tests\Editor\test_road_network.cpp" />
     <ClCompile Include="Tests\Framework\test_filesys.cpp" />
     <ClCompile Include="Tests\Game\test_engine.cpp" />
   </ItemGroup>
