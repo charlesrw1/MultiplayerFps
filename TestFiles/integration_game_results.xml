@@ -1,36 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="IntegrationTests.Game" tests="16" failures="1">
-  <testcase name="renderer/ssr_smoke">
-  </testcase>
-  <testcase name="renderer/hotreload_material_instance">
-  </testcase>
-  <testcase name="renderer/hotreload_master_material">
-  </testcase>
-  <testcase name="renderer/hotreload_os_filewatcher">
-  </testcase>
-  <testcase name="renderer/hotreload_rapid_save_dedup">
-  </testcase>
-  <testcase name="filesys/write_read_roundtrip">
-  </testcase>
-  <testcase name="filesys/exist_true">
-  </testcase>
-  <testcase name="filesys/exist_false">
-  </testcase>
-  <testcase name="filesys/delete_game_file">
-  </testcase>
-  <testcase name="filesys/copy_file">
-  </testcase>
-  <testcase name="filesys/move_file">
-  </testcase>
-  <testcase name="filesys/directory_exists">
-  </testcase>
-  <testcase name="filesys/create_directory">
-    <failure message="FAIL: test directory doesn't exist before creation"/>
-  </testcase>
-  <testcase name="game/time_advances">
-  </testcase>
-  <testcase name="game/dt_positive">
-  </testcase>
-  <testcase name="game/get_entity_invalid_handle">
+<testsuite name="IntegrationTests.Game" tests="1" failures="0">
+  <testcase name="renderer/dynamic_model_render">
   </testcase>
 </testsuite>

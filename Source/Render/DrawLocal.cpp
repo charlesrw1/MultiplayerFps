@@ -962,6 +962,42 @@ void BuildSceneData_CpuFast::on_fastpath_material_removed(MaterialInstance* mat)
 	}
 }
 
+void BuildSceneData_CpuFast::on_model_removed(Model* m) {
+	// Collect all fast-path cache entries keyed on this model (one per material combo).
+	std::vector<int> removed_indices;
+	std::vector<ModelAndMatTextureSet> keys_to_erase;
+	for (auto& [key, data] : mod_data) {
+		if (key.m == m) {
+			removed_indices.push_back(data.ptr_ofs);
+			keys_to_erase.push_back(key);
+		}
+	}
+	if (removed_indices.empty())
+		return;
+
+	sys_print(Debug, "BuildSceneData: nulling %d fast-path entries for removed model\n",
+	          (int)removed_indices.size());
+
+	for (int idx : removed_indices)
+		mod_data_ptrs.at(idx) = nullptr;
+	for (const auto& key : keys_to_erase)
+		mod_data.erase(key);
+
+	// Invalidate all proxy objects that referenced any of those cache slots.
+	// Set to -1 (not in fast path) rather than re-resolving — the model is gone.
+	auto& proxies = draw.scene.proxy_list.objects;
+	for (auto& [_, obj] : proxies) {
+		for (int idx : removed_indices) {
+			if (obj.fastcpu_index == idx) {
+				sys_print(Warning, "BuildSceneData: proxy still referencing removed model '%s', nulling fastcpu_index\n",
+				          m->get_name().c_str());
+				obj.fastcpu_index = -1;
+				break;
+			}
+		}
+	}
+}
+
 /*
 Defined in Shaders/SharedGpuTypes.txt
 

@@ -409,6 +409,7 @@ public:
 											std::span<int> mdcounts) const;
 
 	void on_fastpath_material_removed(MaterialInstance* mat);
+	void on_model_removed(Model* m);
 	void rebuild_models() {
 		sys_print(Warning, "force rebuild models flag set\n");
 		force_rebuild = true;

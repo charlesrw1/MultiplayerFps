@@ -172,7 +172,12 @@
       "Bash(/tmp/test_mv_feedback.py:*)",
       "Bash(/tmp/test_references_tab.py:*)",
       "Bash(powershell.exe:*)",
-      "Bash(ffmpeg -version)"
+      "Bash(ffmpeg -version)",
+      "Bash(x64/Debug/IntegrationTests.exe --help)",
+      "Bash(x64/Debug/IntegrationTests.exe --mode=game --test=\"*dynamic*\" --promote)",
+      "Bash(x64/Debug/IntegrationTests.exe --mode=editor --test=\"*dynamic*\" --promote)",
+      "Bash(git stash:*)",
+      "Bash(grep -E '\\\\.mm$|\\\\.mi$')"
     ]
   },
   "enabledPlugins": {

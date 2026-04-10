@@ -5,6 +5,7 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
+#include "DynamicModelPtr.h"
 #include "glm/gtc/quaternion.hpp"
 #include "Framework/Util.h"
 #include "DrawTypedefs.h"
@@ -80,6 +81,48 @@ public:
 	bool is_material_transparent() const { return material_idx & (1 << 30); }
 	int get_material_idx_to_use() const { return material_idx & ~(1 << 30); }
 	void set_material_transparent() { material_idx |= (1 << 30); }
+};
+
+/// Accumulates vertices and indexed triangles for use with
+/// ModelMan::create_dynamic_model() / refresh_dynamic_model().
+/// Vertex indices are 16-bit, so at most 65535 unique vertices per builder.
+class ModelBuilder {
+public:
+    /// Adds a vertex with position, UV, and surface normal.
+    /// The normal is normalized and packed as int16 (same encoding used by
+    /// loaded .cmdl models).  Returns the 0-based vertex index; pass this
+    /// value to add_triangle() or add_quad().
+    uint16_t add_vertex(glm::vec3 pos,
+                        glm::vec2 uv     = {0.f, 0.f},
+                        glm::vec3 normal = {0.f, 1.f, 0.f});
+
+    /// Records three previously-added vertex indices as a CCW-wound triangle.
+    void add_triangle(uint16_t a, uint16_t b, uint16_t c);
+
+    /// Convenience wrapper: splits a quad into two CCW triangles
+    /// (a,b,c) and (a,c,d).
+    void add_quad(uint16_t a, uint16_t b, uint16_t c, uint16_t d);
+
+    /// Begin a new submesh using mat (nullptr = engine fallback material).
+    /// All subsequent add_triangle/add_quad calls belong to this submesh.
+    /// If never called, all geometry forms a single submesh with the fallback.
+    void begin_submesh(std::shared_ptr<MaterialInstance> mat = nullptr);
+
+    int get_vertex_count()  const { return (int)vertices.size(); }
+    int get_index_count()   const { return (int)indices.size();  }
+    int get_submesh_count() const { return submesh_entries.empty() ? 1 : (int)submesh_entries.size(); }
+
+    /// Per-submesh descriptor recorded by begin_submesh().
+    struct SubMeshEntry {
+        std::shared_ptr<MaterialInstance> material; // null → engine fallback
+        int index_start = 0; // first index in builder.indices for this submesh
+    };
+
+private:
+    std::vector<ModelVertex>  vertices;
+    std::vector<uint16_t>     indices;
+    std::vector<SubMeshEntry> submesh_entries;
+    friend class ModelMan;
 };
 
 struct ModelTag
@@ -164,6 +207,11 @@ public:
 	// otherwise checks the 1st render material for a physics material
 	REF PhysicsMaterialWrapper* get_physics_material_to_use() const;
 
+	/// Returns true if this model was created via ModelMan::create_dynamic_model()
+	/// rather than loaded from disk.  Dynamic models must be freed with
+	/// ModelMan::free_dynamic_model() or held via DynamicModelUniquePtr.
+	bool is_dynamic() const { return is_dynamic_model; }
+
 private:
 	bool load_internal(IAssetLoadingInterface* loading);
 
@@ -190,6 +238,11 @@ private:
 	bool has_any_transparent_materials = false;
 
 	PhysicsMaterialWrapper* physics_material = nullptr;
+
+	/// True for models created via ModelMan::create_dynamic_model().
+	/// Checked by DynamicModelDeleter and free_dynamic_model() to guard
+	/// against accidentally freeing asset-system models.
+	bool is_dynamic_model = false;
 
 	friend class ModelMan;
 	friend class ModelCompileHelper;
