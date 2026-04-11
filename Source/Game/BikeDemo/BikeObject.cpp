@@ -36,15 +36,15 @@ static constexpr float BIKE_WHEELBASE   = BIKE_FRONT_Z - BIKE_REAR_Z; // ~0.9884
 // ============================================================
 
 static float steer_speed_gate_lo   = 4.f;    // m/s — speed_factor = 0 below this
-static float steer_speed_gate_hi   = 18.f;   // m/s — speed_factor = 1 above this
-static float steer_lean_threshold  = 0.70f;  // stick fraction at which inertia starts (higher = less sticky)
-static float steer_lean_range      = 0.25f;  // stick range over which inertia ramps to full
-static float steer_build_lo        = 0.04f;  // build smoothing at low speed (snappy, tau ~0.2s)
-static float steer_build_hi        = 0.15f;  // build smoothing at high speed (gradual, tau ~0.7s)
+static float steer_speed_gate_hi   = 14.f;   // m/s — speed_factor = 1 above this
+static float steer_lean_threshold  = 0.40f;  // input fraction at which committed-turn inertia starts
+static float steer_lean_range      = 0.35f;  // input range over which inertia ramps to full
+static float steer_build_lo        = 0.04f;  // build smoothing for micro/small inputs (snappy)
+static float steer_build_hi        = 0.12f;  // build smoothing for large committed inputs at high speed
 static float steer_vel_scale       = 4.f;    // stick units/s at which velocity boost is fully applied
 static float steer_vel_boost       = 0.01f;  // smoothing floor when flicking fast (lower = snappier)
-static float steer_release_lo      = 0.015f; // release smoothing when not committed (slight decay, kills oscillation)
-static float steer_release_hi      = 0.08f;  // release smoothing when deeply committed (tau ~0.4s)
+static float steer_release_lo      = 0.012f; // release smoothing when not committed
+static float steer_release_hi      = 0.05f;  // release smoothing when deeply committed (gradual corner exit)
 static float steer_max_deg         = 45.f;   // max steer angle at/below reference speed (degrees)
 static float steer_max_deg_hi      = 3.f;    // minimum steer angle floor at very high speed (degrees)
 static float steer_ref_speed       = 5.f;    // m/s — speed at which full steer authority begins decaying
@@ -54,6 +54,11 @@ static float steer_radius_coeff    = 0.04f;  // speed² coefficient for min radi
 static float lean_max_deg          = 32.f;   // visual lean cap (degrees) — prevents extreme angles
 static float lean_steer_min        = 0.12f;  // steer fraction below which there is zero lean
 static float lean_steer_full       = 0.45f;  // steer fraction at which lean reaches its full physics value
+static float bar_scale_lo_steer    = 5.0f;   // handlebar visual amplifier at near-zero steer
+static float bar_scale_hi_steer    = 1.2f;   // handlebar visual amplifier at full steer input
+static float bar_visual_lean_min   = 0.15f;  // residual bar scale at full lean
+static float bar_lean_fade_lo      = 0.35f;  // lean fraction where bar fade begins [0,1]
+static float bar_lean_fade_hi      = 0.90f;  // lean fraction where bar is at minimum [0,1]
 static float bike_gear_shift_cooldown = 3.f;
 
 // Returns the maximum steer angle (radians) at the given speed.
@@ -300,21 +305,28 @@ void BikeObject::tick_physics(ControlInput& ci, float dt)
 // ------------------------------------------------------------
 void BikeObject::tick_steer(const ControlInput& ci, float dt)
 {
-	// Committed steer with speed-based inertia
 	const float speed_range  = glm::max(steer_speed_gate_hi - steer_speed_gate_lo, 0.001f);
 	const float speed_factor = glm::clamp((speed - steer_speed_gate_lo) / speed_range, 0.f, 1.f);
-	const float lean_depth   = glm::clamp((glm::abs(current_steer) - steer_lean_threshold)
-	                             / glm::max(steer_lean_range, 0.001f), 0.f, 1.f);
-	const float inertia      = speed_factor * lean_depth;
 
 	steer_input_raw = is_crashed ? 0.f : ci.steer;
 
-	// Stick velocity boost: fast flick → snappier build
+	// Build inertia from INPUT magnitude × speed — small inputs are always snappy at any speed.
+	// Only large committed inputs at high speed slow down to steer_build_hi.
+	const float input_depth  = glm::clamp((glm::abs(steer_input_raw) - steer_lean_threshold)
+	                             / glm::max(steer_lean_range, 0.001f), 0.f, 1.f);
+	const float build_inertia = speed_factor * input_depth;
+
+	// Release inertia from CURRENT_STEER depth — committed corners exit smoothly, not snapped.
+	const float release_depth  = glm::clamp((glm::abs(current_steer) - steer_lean_threshold)
+	                               / glm::max(steer_lean_range, 0.001f), 0.f, 1.f);
+	const float release_inertia = speed_factor * release_depth;
+
+	// Stick velocity boost: fast flick overrides build smoothing → even snappier
 	const float stick_vel       = glm::abs(steer_input_raw - prev_steer_input) / glm::max(dt, 0.001f);
 	const float stick_vel_t     = glm::clamp(stick_vel / steer_vel_scale, 0.f, 1.f);
-	const float base_build      = glm::mix(steer_build_lo, steer_build_hi, speed_factor);
+	const float base_build      = glm::mix(steer_build_lo, steer_build_hi, build_inertia);
 	const float build_smoothing = glm::mix(base_build, steer_vel_boost, stick_vel_t);
-	const float rel_smoothing   = glm::mix(steer_release_lo, steer_release_hi, inertia);
+	const float rel_smoothing   = glm::mix(steer_release_lo, steer_release_hi, release_inertia);
 	prev_steer_input = steer_input_raw;
 
 	if (glm::abs(steer_input_raw) > glm::abs(current_steer))
@@ -322,7 +334,7 @@ void BikeObject::tick_steer(const ControlInput& ci, float dt)
 	else
 		current_steer = damp_dt_independent(steer_input_raw, current_steer, rel_smoothing, dt);
 
-	//GameplayStatic::debug_text(string_format("speed_factor=%.2f inertia=%.2f steer=%.3f", speed_factor, inertia, current_steer));
+	//GameplayStatic::debug_text(string_format("spd=%.1f build_i=%.2f rel_i=%.2f steer=%.3f", speed_factor, build_inertia, release_inertia, current_steer));
 
 	// Uphill wobble
 	{
@@ -539,8 +551,15 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	if (fork_entity) {
 		static constexpr float HEAD_TUBE_RAD = glm::radians(17.77f);
 		const float max_steer_rad = compute_max_steer_rad(speed);
-		const float fork_angle = current_steer * max_steer_rad;// (steer_input_raw + wobble_steer)* max_steer_rad;
-		const float fork_visual  = fork_angle - current_roll * glm::sin(HEAD_TUBE_RAD);
+		const float fork_angle    = current_steer * max_steer_rad;
+		// Non-linear steer response: large amplification at small steer, smaller at full steer.
+		// Then lean fade reduces bars further toward neutral at full lean.
+		const float steer_abs  = glm::abs(current_steer);
+		const float steer_scale = glm::mix(bar_scale_lo_steer, bar_scale_hi_steer, steer_abs);
+		const float lean_frac  = glm::clamp(glm::abs(current_roll) / glm::radians(lean_max_deg), 0.f, 1.f);
+		const float lean_fade  = glm::smoothstep(bar_lean_fade_lo, bar_lean_fade_hi, lean_frac);
+		const float bar_scale  = glm::mix(steer_scale, bar_visual_lean_min, lean_fade);
+		const float fork_visual = fork_angle * bar_scale - current_roll * glm::sin(HEAD_TUBE_RAD);
 		fork_entity->set_ls_euler_rotation(glm::vec3(HEAD_TUBE_RAD, -fork_visual, 0.f));
 	}
 }
@@ -577,8 +596,9 @@ static void bike_physics_debug()
 		DAMP_IMGUI(steer_release_lo);
 		DAMP_IMGUI(steer_release_hi);
 #undef DAMP_IMGUI
-		ImGui::DragFloat("steer_lean_threshold", &steer_lean_threshold, 0.05f);
-		ImGui::DragFloat("steer_lean_range",     &steer_lean_range,     0.05f);
+		ImGui::DragFloat("steer_lean_threshold", &steer_lean_threshold, 0.02f, 0.f, 1.f);
+		ImGui::Text("  input < threshold -> snappy at any speed");
+		ImGui::DragFloat("steer_lean_range",     &steer_lean_range,     0.02f, 0.f, 1.f);
 		ImGui::DragFloat("steer_speed_gate_lo",  &steer_speed_gate_lo,  0.1f);
 		ImGui::DragFloat("steer_speed_gate_hi",  &steer_speed_gate_hi,  0.1f);
 		ImGui::DragFloat("steer_max_deg",        &steer_max_deg,        0.5f, 5.f,  45.f);
@@ -599,6 +619,19 @@ static void bike_physics_debug()
 				s_bike_debug->current_steer);
 		ImGui::DragFloat("steer_vel_scale",      &steer_vel_scale,      0.1f,   0.5f, 20.f);
 		ImGui::DragFloat("steer_vel_boost",      &steer_vel_boost,      0.002f, 0.f,  0.1f);
+		ImGui::SeparatorText("Handlebar Visual");
+		ImGui::DragFloat("bar_scale_lo_steer",  &bar_scale_lo_steer,  0.1f, 0.5f, 12.f);
+		ImGui::DragFloat("bar_scale_hi_steer",  &bar_scale_hi_steer,  0.1f, 0.1f,  6.f);
+		ImGui::DragFloat("bar_visual_lean_min", &bar_visual_lean_min, 0.02f, 0.f,  1.f);
+		ImGui::DragFloat("bar_lean_fade_lo",    &bar_lean_fade_lo,    0.01f, 0.f,  1.f);
+		ImGui::DragFloat("bar_lean_fade_hi",    &bar_lean_fade_hi,    0.01f, 0.f,  1.f);
+		if (s_bike_debug) {
+			const float sa    = glm::abs(s_bike_debug->current_steer);
+			const float ss    = glm::mix(bar_scale_lo_steer, bar_scale_hi_steer, sa);
+			const float lf    = glm::clamp(glm::abs(s_bike_debug->current_roll) / glm::radians(lean_max_deg), 0.f, 1.f);
+			const float bscl  = glm::mix(ss, bar_visual_lean_min, glm::smoothstep(bar_lean_fade_lo, bar_lean_fade_hi, lf));
+			ImGui::Text("  steer=%.2f steer_scale=%.2f  lean_frac=%.2f  bar_scale=%.2f", sa, ss, lf, bscl);
+		}
 	}
 	ImGui::SeparatorText("Uphill Wobble");
 	{
