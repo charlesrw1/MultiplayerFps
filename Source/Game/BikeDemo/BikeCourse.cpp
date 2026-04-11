@@ -509,37 +509,150 @@ static void sample_edge(
 }
 
 // Compute and store racing_line_lateral on each waypoint.
-// Uses signed curvature (from forward-vector cross product) box-blurred over window_m metres.
+//
+// Algorithm: detect corners by accumulating heading change, then for each corner assign
+// a lateral profile that puts the AI on the OUTSIDE at entry, transitions to the INSIDE
+// at the apex, and returns to the OUTSIDE at the exit.  Extended "approach zones" in front
+// of and behind each corner ramp the offset to zero on the adjacent straights.
+// A final Gaussian smooth removes any discontinuities at segment boundaries.
+//
+//   Right turn (+dyaw): inside = road-right (+lateral) at apex,
+//                       outside = road-left  (-lateral) at entry/exit.
+//   Left turn  (-dyaw): inside = road-left  (-lateral) at apex,
+//                       outside = road-right (+lateral) at entry/exit.
 static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
-                                float strength = 0.65f, float window_m = 20.f)
+                                float strength = 0.82f)
 {
 	const int n = (int)wps.size();
 	if (n < 3) return;
 
-	// Per-waypoint signed curvature: y-component of cross(fwd[i], fwd[i+1])
-	std::vector<float> curv(n, 0.f);
-	for (int i = 0; i < n; ++i) {
-		const glm::vec3& fa = wps[i].forward;
-		const glm::vec3& fb = wps[(i + 1) % n].forward;
-		curv[i] = fa.z * fb.x - fa.x * fb.z;  // cross product Y component
+	// --- per-step signed heading change ---
+	std::vector<float> yaw(n);
+	for (int i = 0; i < n; ++i)
+		yaw[i] = std::atan2(wps[i].forward.x, wps[i].forward.z);
+
+	std::vector<float> dyaw(n, 0.f);
+	const int wrap_n = loop ? n : n - 1;
+	for (int i = 0; i < wrap_n; ++i) {
+		const int j = (i + 1) % n;
+		float d = yaw[j] - yaw[i];
+		if (d >  glm::pi<float>()) d -= 2.f * glm::pi<float>();
+		if (d < -glm::pi<float>()) d += 2.f * glm::pi<float>();
+		dyaw[i] = d;
 	}
 
-	// Box-blur curvature over ±window waypoints (derived from window_m)
-	// Average waypoint spacing ≈ sample_step_m; approximate here as 0.5 m.
-	const float avg_spacing = (n > 1) ? (wps[n-1].dist_from_start / (n - 1)) : 0.5f;
-	const int   half_win    = glm::max(1, (int)(window_m * 0.5f / glm::max(avg_spacing, 0.1f)));
+	const float avg_sp = (n > 1) ? (wps[n - 1].dist_from_start / float(n - 1)) : 0.5f;
 
+	// Tuning
+	// per-step heading-change threshold to enter a corner run (rad)
+	const float curv_thresh = glm::radians(1.5f);
+	// ignore corners whose total turn is below this (rad, ~10°)
+	const float min_total   = glm::radians(10.f);
+	// gap of non-turning waypoints to merge across (keeps chicanes as one segment)
+	const int   merge_n     = glm::max(1, (int)(4.f / avg_sp));
+	// approach/exit ramp length (m) — how far outside the AI holds before/after a corner
+	const int   extend_n    = glm::max(2, (int)(22.f / avg_sp));
+	// Gaussian smooth radius (m)
+	const float smooth_m    = 12.f;
+	const int   smooth_n    = glm::max(2, (int)(smooth_m / avg_sp));
+
+	// --- detect corner segments ---
+	struct Corner { int s, e; float sign; };
+	std::vector<Corner> corners;
+
+	int i = 0;
+	while (i < n - 1) {
+		if (std::abs(dyaw[i]) < curv_thresh) { ++i; continue; }
+
+		const float sg    = (dyaw[i] > 0.f) ? 1.f : -1.f;
+		const int   start = i;
+		float total       = 0.f;
+
+		while (i < n - 1) {
+			if (std::abs(dyaw[i]) >= curv_thresh && ((dyaw[i] > 0.f) == (sg > 0.f))) {
+				total += std::abs(dyaw[i]);
+				++i;
+			} else {
+				// Try to bridge a short gap to merge adjacent same-sign runs (chicanes etc.)
+				bool merged = false;
+				for (int look = 1; look <= merge_n && (i + look) < n - 1; ++look) {
+					if (std::abs(dyaw[i + look]) >= curv_thresh &&
+					    ((dyaw[i + look] > 0.f) == (sg > 0.f))) {
+						for (int g = 0; g <= look; ++g) total += std::abs(dyaw[i + g]);
+						i += look + 1;
+						merged = true;
+						break;
+					}
+				}
+				if (!merged) break;
+			}
+		}
+
+		if (total >= min_total)
+			corners.push_back({ start, i - 1, sg });
+	}
+
+	// --- assign raw lateral values ---
+	// Profile within a corner: -sign at entry (t=0), +sign at apex (t=0.5), -sign at exit (t=1)
+	// using the parabola   f(t) = 8t(1-t) - 1   which maps [0,1] → [-1,+1,-1].
+	std::vector<float> raw(n, 0.f);
+	std::vector<bool>  owned(n, false);
+
+	for (const auto& c : corners) {
+		const int   s   = c.s;
+		const int   e   = glm::min(c.e, n - 1);
+		const float sg  = c.sign;
+		const int   len = e - s + 1;
+
+		// Within the corner
+		for (int k = s; k <= e; ++k) {
+			const float t = (len > 1) ? float(k - s) / float(len - 1) : 0.5f;
+			raw[k]   = sg * (8.f * t * (1.f - t) - 1.f) * strength * wps[k].road_half_width;
+			owned[k] = true;
+		}
+
+		// Approach zone before the corner: ramp from outside → 0 (further away)
+		for (int d = 1; d <= extend_n; ++d) {
+			const int k = s - d;
+			if (!loop && k < 0) break;
+			const int ki = loop ? (((k % n) + n) % n) : k;
+			if (owned[ki]) break;  // stop at another corner's body
+			// fade: 1 adjacent to corner, 0 at extend_n distance
+			const float fade   = float(extend_n - d + 1) / float(extend_n + 1);
+			const float target = -sg * fade * strength * wps[ki].road_half_width;
+			if (std::abs(target) > std::abs(raw[ki])) raw[ki] = target;
+		}
+
+		// Exit zone after the corner: ramp from outside → 0
+		for (int d = 1; d <= extend_n; ++d) {
+			const int k = e + d;
+			if (!loop && k >= n) break;
+			const int ki = loop ? (k % n) : k;
+			if (owned[ki]) break;
+			const float fade   = float(extend_n - d + 1) / float(extend_n + 1);
+			const float target = -sg * fade * strength * wps[ki].road_half_width;
+			if (std::abs(target) > std::abs(raw[ki])) raw[ki] = target;
+		}
+	}
+
+	// --- Gaussian smooth to remove discontinuities at segment boundaries ---
+	const float sigma2 = float(smooth_n) * float(smooth_n);
+	std::vector<float> smoothed(n, 0.f);
 	for (int i = 0; i < n; ++i) {
-		float sum = 0.f; int count = 0;
-		for (int d = -half_win; d <= half_win; ++d) {
+		float sum = 0.f, w_sum = 0.f;
+		for (int d = -smooth_n * 2; d <= smooth_n * 2; ++d) {
 			int j = i + d;
 			if (loop) j = ((j % n) + n) % n;
-			else j = glm::clamp(j, 0, n - 1);
-			sum += curv[j]; ++count;
+			else if (j < 0 || j >= n) continue;
+			const float w = std::exp(-float(d * d) / (2.f * sigma2));
+			sum   += raw[j] * w;
+			w_sum += w;
 		}
-		const float smooth = (count > 0) ? sum / count : 0.f;
-		wps[i].racing_line_lateral = smooth * wps[i].road_half_width * strength;
+		smoothed[i] = w_sum > 0.f ? sum / w_sum : 0.f;
 	}
+
+	for (int i = 0; i < n; ++i)
+		wps[i].racing_line_lateral = smoothed[i];
 }
 
 // ============================================================
