@@ -21,44 +21,51 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float dt    = eng->get_dt();
 	const float speed = my_bike->speed;
 
-	// ---- Stanley path tracker ----
-	// Corrects two errors simultaneously at the current position — no distant lookahead
-	// that wraps around corners and causes overshoot.
+	// ---- Adaptive lookahead racing-line follower ----
 	//
-	// heading_err: cross(path_fwd, bike_dir).y — positive = bike heading right of path → steer left
-	// lat_err:     lateral_pos - racing_line_lateral — positive = right of line → steer left
+	// Core insight: a fixed long lookahead wraps around sharp corners (the target is
+	// already past the apex), causing late turn-in and overshoot. Instead, cap the
+	// lookahead by the upcoming corner radius so the AI commits to entry earlier.
 	//
-	// steer = -(heading_err + atan(k * lat_err / speed))
-	//
-	// At high speed the atan term shrinks → mainly heading correction (anticipates the turn).
-	// At low speed the atan grows → strong lateral snap to line.
+	// On a straight (large min_r): full speed-scaled lookahead distance.
+	// In a tight corner (small min_r): lookahead shrinks to ~0.4*R so the target
+	// stays on the current arc and the AI follows the racing line cleanly.
 
-	const BikeWaypoint cur_wp  = course->sample(my_bike->course_dist_m);
-	dbg_lookahead_pt = cur_wp.position + cur_wp.right * cur_wp.racing_line_lateral;
+	// 1. Sample curvature ahead (short window) to get corner radius.
+	//    Clamp min_r to avoid path-noise spikes from junction kinks.
+	const float corner_scan_m = glm::max(corner_look_m, speed * 0.8f);
+	const float raw_min_r     = course->min_turn_radius_ahead(my_bike->course_dist_m, corner_scan_m);
+	const float min_r         = glm::max(raw_min_r, 3.f);  // noise floor: ignore kinks < 3 m radius
 
-	// Heading error: y-component of cross(path_forward, bike_direction)
-	const glm::vec3& pf = cur_wp.forward;
-	const glm::vec3& bd = my_bike->bike_direction;
-	const float heading_err = pf.z * bd.x - pf.x * bd.z;  // sin of signed angle
+	// 2. Lookahead distance: speed-based baseline capped by corner geometry.
+	const float look_base     = lookahead_dist_base + speed * lookahead_dist_per_ms;
+	const float look_corner   = 0.45f * min_r;             // tighter corners → shorter look
+	const float lookahead_dist = glm::min(look_base, look_corner);
 
-	// Lateral error: how far right of the racing line we are (metres)
-	const float lat_err = my_bike->lateral_pos - cur_wp.racing_line_lateral;
+	const glm::vec3 lookahead_pt = course->racing_line_lookahead(my_bike->course_dist_m, lookahead_dist);
+	dbg_lookahead_pt = lookahead_pt;
 
-	const float safe_speed = glm::max(speed, 0.5f);
-	const float steer_out  = glm::clamp(
-		-heading_err - glm::atan(stanley_k * lat_err / safe_speed),
-		-1.f, 1.f);
+	// 3. Lateral steering error toward the racing-line lookahead point.
+	const glm::vec3 bike_right = glm::normalize(glm::cross(my_bike->bike_direction, glm::vec3(0, 1, 0)));
+	const glm::vec3 to_target  = lookahead_pt - my_bike->get_ws_position();
+	const float dist_to_tgt    = glm::length(to_target);
+	const float lateral_err    = (dist_to_tgt > 0.01f)
+	                             ? glm::dot(glm::normalize(to_target), bike_right) : 0.f;
+
+	// 4. Stanley lateral correction on top: corrects position error at the current point.
+	//    Dividing by speed keeps this term finite; clamping safe_speed prevents blow-up at rest.
+	const BikeWaypoint cur_wp = course->sample(my_bike->course_dist_m);
+	const float lat_err       = my_bike->lateral_pos - cur_wp.racing_line_lateral;
+	const float safe_speed    = glm::max(speed, 2.f);  // higher floor than before — avoids saturation at low speed
+	const float stanley_corr  = glm::atan(stanley_k * lat_err / safe_speed);
+
+	const float steer_out = glm::clamp(lateral_err - stanley_corr, -1.f, 1.f);
 
 	// ---- Corner braking ----
-	// Sample upcoming curvature, compute the max safe speed for the tightest corner found.
-	// v_max = sqrt(corner_speed_k * g * R * traction)
-	// corner_speed_k ≈ 1/traction_lean_comp (default 5.0) to match crash physics.
-	const float look_m = glm::max(corner_look_m, speed * 1.5f);
-	const float min_r  = course->min_turn_radius_ahead(my_bike->course_dist_m, look_m);
-	const float v_max  = glm::sqrt(corner_speed_k * 9.81f * min_r * my_bike->surface_traction);
+	// v_max = sqrt(corner_speed_k * g * R * traction); corner_speed_k ≈ 1/traction_lean_comp.
+	const float v_max        = glm::sqrt(corner_speed_k * 9.81f * min_r * my_bike->surface_traction);
 	const float brake_amount = (speed > v_max)
-		? glm::clamp((speed - v_max) / 3.f, 0.f, 0.8f)
-		: 0.f;
+	                           ? glm::clamp((speed - v_max) / 3.f, 0.f, 0.8f) : 0.f;
 
 	// ---- Power (smoothed toward target, boid alignment + draft-seek added on top) ----
 	actual_power_command = damp_dt_independent(
