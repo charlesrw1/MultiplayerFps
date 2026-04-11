@@ -430,12 +430,15 @@ static void sample_edge(
 			out_widths.push_back(half_w);
 		}
 	} else {
-		// Cubic Bezier: determine control points based on traversal direction
+		// Cubic Bezier: determine control points based on traversal direction.
+		// pos_a is always the traversal start, pos_b the traversal end.
+		// When going A→B: ctrl_a is near start, ctrl_b is near end.
+		// When going B→A: ctrl_b is near start (node_b), ctrl_a is near end (node_a).
 		glm::vec3 p0, p1, p2, p3;
 		if (going_a_to_b) {
 			p0 = pos_a; p1 = edge.ctrl_a; p2 = edge.ctrl_b; p3 = pos_b;
 		} else {
-			p0 = pos_b; p1 = edge.ctrl_b; p2 = edge.ctrl_a; p3 = pos_a;
+			p0 = pos_a; p1 = edge.ctrl_b; p2 = edge.ctrl_a; p3 = pos_b;
 		}
 
 		// Pre-sample to build arc-length table
@@ -630,6 +633,21 @@ void BikeCourse::build_from_road_network(
 	if (positions.size() < 2) {
 		sys_print(Warning, "BikeCourse::build_from_road_network: sampling produced < 2 points\n");
 		return;
+	}
+
+	// Snap every sampled point down to terrain so the course follows the road surface.
+	// Mirrors the snap done in rebuild_mesh() inside RoadNetworkComponent.
+	{
+		const int terrain_mask = (1 << (int)PL::Default) | (1 << (int)PL::StaticObject);
+		int snapped = 0;
+		for (auto& p : positions) {
+			const glm::vec3 from = p + glm::vec3(0.f, SNAP_CAST_UP,   0.f);
+			const glm::vec3 to   = p - glm::vec3(0.f, SNAP_CAST_DOWN, 0.f);
+			HitResult hit = GameplayStatic::cast_ray(from, to, terrain_mask, nullptr);
+			if (hit.hit) { p.y = hit.pos.y; ++snapped; }
+		}
+		sys_print(Info, "BikeCourse (road network): snapped %d / %d samples to terrain\n",
+		          snapped, (int)positions.size());
 	}
 
 	build(positions, half_widths, loop);
