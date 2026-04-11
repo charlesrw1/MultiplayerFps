@@ -21,9 +21,12 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float dt    = eng->get_dt();
 	const float speed = my_bike->speed;
 
-	// ---- Lookahead point on the spline ----
+	// ---- Lookahead point on the racing line ----
+	// Steers toward the precomputed racing-line offset (inside corners) rather than
+	// the road centre. Boid separation forces still move riders off the ideal line
+	// when the pack demands it.
 	const float lookahead_dist = lookahead_dist_base + speed * lookahead_dist_per_ms;
-	const glm::vec3 lookahead_pt = course->lookahead(my_bike->course_dist_m, lookahead_dist);
+	const glm::vec3 lookahead_pt = course->racing_line_lookahead(my_bike->course_dist_m, lookahead_dist);
 	dbg_lookahead_pt = lookahead_pt;
 
 	// ---- PID steering ----

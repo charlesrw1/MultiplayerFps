@@ -2,6 +2,8 @@
 
 #include "Render/Texture.h"
 #include "Game/GameplayStatic.h"
+#include "Game/Components/RoadNetworkComponent.h"
+#include "Game/Components/SpawnerComponenth.h"
 #include "Game/Components/DecalComponent.h"
 #include "Game/Components/PhysicsComponents.h"
 #include "Game/Entities/CharacterController.h"
@@ -98,7 +100,36 @@ void BikeGameApplication::collect_crack_decals()
 void BikeGameApplication::start()
 {
 	GameplayStatic::change_level("maps/bike_test_map.tmap");
-	course.build_from_spawners();
+
+	// Prefer road-network routing if a RoadNetworkComponent exists in the level.
+	// Route-hint waypoints ("bike_waypoint" spawners) pick the path through the graph.
+	// Falls back to the old pure-spline build if no road network is present.
+	{
+		auto road_comps = GameplayStatic::find_components(&RoadNetworkComponent::StaticType);
+		auto spawners   = GameplayStatic::find_spawners_in_class("bike_waypoint");
+
+		if (!road_comps.empty() && !spawners.empty()) {
+			auto* rnc = static_cast<RoadNetworkComponent*>(road_comps[0]);
+
+			// Sort spawners by name (integer order)
+			std::sort(spawners.begin(), spawners.end(), [](SpawnerComponent* a, SpawnerComponent* b) {
+				return std::atoi(a->get_owner()->get_editor_name().c_str())
+				     < std::atoi(b->get_owner()->get_editor_name().c_str());
+			});
+
+			std::vector<glm::vec3> hints;
+			hints.reserve(spawners.size());
+			for (auto* s : spawners)
+				hints.push_back(s->get_ws_position());
+
+			sys_print(Info, "BikeApp: building course from road network (%d hints)\n", (int)hints.size());
+			course.build_from_road_network(*rnc, hints, 0.5f, /*loop=*/true);
+		} else {
+			sys_print(Info, "BikeApp: no road network found, falling back to spawner spline\n");
+			course.build_from_spawners();
+		}
+	}
+
 	collect_crack_decals();
 
 	// Spawn player at the course start
