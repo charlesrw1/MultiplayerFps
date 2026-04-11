@@ -66,6 +66,11 @@ static float compute_max_steer_rad(float speed)
 	return glm::radians(steer_max_deg_hi + (steer_max_deg - steer_max_deg_hi) * t);
 }
 
+// Crack visual pitch spring (cosmetic only)
+static float crack_vis_pitch_impulse = 5;  // rad/s applied per unit crack_impulse
+static float crack_vis_spring        = 340;               // spring constant
+static float crack_vis_damp          = 10.f;                // damping
+
 // Pedal stroke
 static float stroke_amp = 1.0f;  // 0=constant power, 1=full realistic lurch (power only on downstroke)
 
@@ -488,7 +493,15 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 	const glm::vec3 terrain_up  = glm::normalize(glm::cross(right, terrain_forward_dir));
 	const glm::quat base_orient = glm::quat(glm::mat3(right, terrain_up, -terrain_forward_dir));
 	const glm::quat orient      = glm::angleAxis(current_roll, terrain_forward_dir) * base_orient;
-	get_owner()->set_ws_position_rotation(pos, orient);
+
+	// Cosmetic crack pitch spring — fires on crack_impulse, springs back to neutral
+	if (crack_impulse > 0.f)
+		crack_pitch_vel -= crack_vis_pitch_impulse * crack_impulse;
+	crack_pitch_vel  += (-crack_vis_spring * crack_pitch_disp - crack_vis_damp * crack_pitch_vel) * dt;
+	crack_pitch_disp += crack_pitch_vel * dt;
+	const glm::quat crack_pitch_rot = glm::angleAxis(crack_pitch_disp, right);
+
+	get_owner()->set_ws_position_rotation(pos, crack_pitch_rot * orient);
 
 	// Fork steer rotation
 	if (fork_entity) {
@@ -590,6 +603,14 @@ static void bike_physics_debug()
 	ImGui::SeparatorText("Gear");
 	{
 		ImGui::InputFloat("shift_cooldown", &bike_gear_shift_cooldown);
+	}
+	ImGui::SeparatorText("Crack Visual Pitch");
+	{
+		ImGui::DragFloat("crack_vis_pitch_impulse (deg)", &crack_vis_pitch_impulse, 0.001f, 0.f, glm::radians(20.f));
+		ImGui::DragFloat("crack_vis_spring",              &crack_vis_spring,        1.f,    10.f, 400.f);
+		ImGui::DragFloat("crack_vis_damp",                &crack_vis_damp,          0.1f,   0.f,  30.f);
+		if (s_bike_debug)
+			ImGui::Text("pitch_disp=%.3f rad  vel=%.2f", s_bike_debug->crack_pitch_disp, s_bike_debug->crack_pitch_vel);
 	}
 	ImGui::SeparatorText("Traction");
 	{

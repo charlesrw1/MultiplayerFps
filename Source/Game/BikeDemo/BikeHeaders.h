@@ -333,6 +333,10 @@ public:
 	float bump_impulse        = 0.f;   // magnitude of bump this frame (speed-scaled)
 	float crack_impulse       = 0.f;   // set by app when bike crosses a crack decal
 	float crack_cooldown      = 0.f;   // seconds until crack can retrigger
+
+	// Cosmetic crack pitch spring (visual only, does not affect physics)
+	float crack_pitch_disp    = 0.f;   // current angular displacement (radians)
+	float crack_pitch_vel     = 0.f;   // angular velocity (rad/s)
 	float gear_shift_cooldown = 0.f;   // seconds remaining until next shift is allowed
 	bool  just_shifted        = false; // set true for one tick when a shift occurs
 	GearSelector gear;
