@@ -63,6 +63,11 @@ public:
 	// Offsets the spline centre by the precomputed racing_line_lateral at that point.
 	glm::vec3 racing_line_lookahead(float from_dist_m, float ahead_m) const;
 
+	// Samples the path over [from_dist_m, from_dist_m + ahead_m] and returns
+	// the minimum turn radius found (metres). Very large value = straight section.
+	// Used by AI to compute safe cornering speed.
+	float min_turn_radius_ahead(float from_dist_m, float ahead_m) const;
+
 	// Draw the spline in the debug overlay (gradient-coloured, with road-width tick marks).
 	void debug_draw() const;
 };

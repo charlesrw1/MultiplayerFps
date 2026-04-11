@@ -300,6 +300,36 @@ glm::vec3 BikeCourse::lookahead(float from_dist_m, float ahead_m) const
 }
 
 // ============================================================
+// min_turn_radius_ahead
+// ============================================================
+
+float BikeCourse::min_turn_radius_ahead(float from_dist_m, float ahead_m) const
+{
+	if (!is_built || waypoints.size() < 2) return 1e6f;
+
+	static constexpr float STEP = 2.f;
+	float min_r       = 1e6f;
+	float prev_yaw    = FLT_MAX;
+
+	for (float d = 0.f; d <= ahead_m + STEP; d += STEP) {
+		const BikeWaypoint wp = sample(from_dist_m + d);
+		const float yaw = std::atan2(wp.forward.x, wp.forward.z);
+
+		if (prev_yaw < FLT_MAX) {
+			float dyaw = yaw - prev_yaw;
+			// Wrap to [-π, π]
+			if (dyaw >  glm::pi<float>()) dyaw -= 2.f * glm::pi<float>();
+			if (dyaw < -glm::pi<float>()) dyaw += 2.f * glm::pi<float>();
+			const float curvature = glm::abs(dyaw) / STEP;
+			if (curvature > 1e-5f)
+				min_r = glm::min(min_r, 1.f / curvature);
+		}
+		prev_yaw = yaw;
+	}
+	return min_r;
+}
+
+// ============================================================
 // racing_line_lookahead
 // ============================================================
 

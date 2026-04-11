@@ -1264,6 +1264,39 @@ static void bike_boid_debug()
 	ImGui::DragFloat("target switch delay s", &AI_TARGET_SWITCH_DELAY,   0.1f, 0.f, 10.f);
 	ImGui::DragFloat("target switch delta m", &AI_TARGET_SWITCH_DELTA_M, 0.5f, 0.1f, 20.f);
 
+	// Apply Stanley / corner tuning to all AI riders
+	ImGui::SeparatorText("AI Cornering (Stanley)");
+	{
+		static float s_stanley_k      = 0.5f;
+		static float s_corner_look_m  = 30.f;
+		static float s_corner_speed_k = 5.0f;
+		bool changed = false;
+		changed |= ImGui::DragFloat("stanley_k",      &s_stanley_k,      0.02f, 0.05f, 5.f);
+		ImGui::SameLine(); ImGui::TextDisabled("lat gain");
+		changed |= ImGui::DragFloat("corner_look_m",  &s_corner_look_m,  1.f,   5.f,  80.f);
+		changed |= ImGui::DragFloat("corner_speed_k", &s_corner_speed_k, 0.1f,  1.f,  20.f);
+		ImGui::SameLine(); ImGui::TextDisabled("~1/traction_lean_comp");
+		if (changed) {
+			for (auto* r : g_bike_app->all_riders) {
+				if (auto* ai = dynamic_cast<BikeAI*>(r->input.get())) {
+					ai->stanley_k      = s_stanley_k;
+					ai->corner_look_m  = s_corner_look_m;
+					ai->corner_speed_k = s_corner_speed_k;
+				}
+			}
+		}
+		// Show live corner data for first AI
+		for (auto* r : g_bike_app->all_riders) {
+			if (auto* ai = dynamic_cast<BikeAI*>(r->input.get())) {
+				const float look = glm::max(s_corner_look_m, r->speed * 1.5f);
+				const float min_r = g_bike_app->course.min_turn_radius_ahead(r->course_dist_m, look);
+				const float v_max = glm::sqrt(s_corner_speed_k * 9.81f * min_r * r->surface_traction);
+				ImGui::Text("  min_r=%.1fm  v_max=%.1fm/s  spd=%.1f", min_r, v_max, r->speed);
+				break;
+			}
+		}
+	}
+
 	ImGui::SeparatorText("AI Gap Following");
 	ImGui::DragFloat("gap target m",   &AI_GAP_TARGET,   0.1f,  0.5f, 20.f);
 	ImGui::DragFloat("gap kp W/m",     &AI_GAP_KP,       0.5f,  0.f,  40.f);

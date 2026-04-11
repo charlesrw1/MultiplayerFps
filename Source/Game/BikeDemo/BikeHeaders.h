@@ -134,12 +134,14 @@ public:
 	float lookahead_dist_base = 3.f;   // min lookahead distance (m)
 	float lookahead_dist_per_ms = 1.5f; // additional metres per m/s of speed
 
-	// ---- PID steering ----
-	float steer_kp = 1.8f;
-	float steer_ki = 0.f;
-	float steer_kd = 0.25f;
-	float steer_integral  = 0.f;
-	float prev_steer_err  = 0.f;
+	// ---- Stanley path tracker ----
+	// Steers by correcting both heading error (angle to path tangent) and
+	// lateral error (distance from racing line), not a distant lookahead point.
+	float stanley_k      = 0.5f;   // lateral gain: atan(k * lat_err / speed)
+	float corner_look_m  = 30.f;   // metres ahead to scan for corners
+	// v_max in corner = sqrt(corner_speed_k * g * R * traction)
+	// Set to ~1/traction_lean_comp (default 0.20) = 5.0 to match crash physics
+	float corner_speed_k = 5.0f;
 
 	// ---- Power ----
 	float target_power_watts   = 150.f;  // set by strategy layer (Layer 6); fixed for now

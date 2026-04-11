@@ -21,41 +21,44 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float dt    = eng->get_dt();
 	const float speed = my_bike->speed;
 
-	// ---- Lookahead point on the racing line ----
-	// Steers toward the precomputed racing-line offset (inside corners) rather than
-	// the road centre. Boid separation forces still move riders off the ideal line
-	// when the pack demands it.
-	const float lookahead_dist = lookahead_dist_base + speed * lookahead_dist_per_ms;
-	const glm::vec3 lookahead_pt = course->racing_line_lookahead(my_bike->course_dist_m, lookahead_dist);
-	dbg_lookahead_pt = lookahead_pt;
+	// ---- Stanley path tracker ----
+	// Corrects two errors simultaneously at the current position — no distant lookahead
+	// that wraps around corners and causes overshoot.
+	//
+	// heading_err: cross(path_fwd, bike_dir).y — positive = bike heading right of path → steer left
+	// lat_err:     lateral_pos - racing_line_lateral — positive = right of line → steer left
+	//
+	// steer = -(heading_err + atan(k * lat_err / speed))
+	//
+	// At high speed the atan term shrinks → mainly heading correction (anticipates the turn).
+	// At low speed the atan grows → strong lateral snap to line.
 
-	// ---- PID steering ----
-	// Error: signed lateral angle toward the lookahead point in bike-local space.
-	// We project (lookahead - bike_pos) onto bike_right to get a signed lateral error.
-	// Normalising by distance prevents blow-up when the point is very close.
-	const glm::vec3 to_target   = lookahead_pt - my_bike->get_ws_position();
-	const float     dist_to_tgt = glm::length(to_target);
-	const float     steer_err   = (dist_to_tgt > 0.01f)
-	                              ? glm::dot(glm::normalize(to_target), my_bike->terrain_forward_dir)
-	                              : 0.f;
+	const BikeWaypoint cur_wp  = course->sample(my_bike->course_dist_m);
+	dbg_lookahead_pt = cur_wp.position + cur_wp.right * cur_wp.racing_line_lateral;
 
-	// We actually want the lateral component (dot with right), not the forward component.
-	// Re-derive: right = cross(forward, world_up) in bike frame.
-	// bike_right is not stored explicitly, so reconstruct from bike_direction.
-	const glm::vec3 bike_right = glm::normalize(
-		glm::cross(my_bike->bike_direction, glm::vec3(0, 1, 0)));
-	const float lateral_err = (dist_to_tgt > 0.01f)
-	                          ? glm::dot(glm::normalize(to_target), bike_right)
-	                          : 0.f;
+	// Heading error: y-component of cross(path_forward, bike_direction)
+	const glm::vec3& pf = cur_wp.forward;
+	const glm::vec3& bd = my_bike->bike_direction;
+	const float heading_err = pf.z * bd.x - pf.x * bd.z;  // sin of signed angle
 
-	// PID
-	steer_integral += lateral_err * dt;
-	steer_integral  = glm::clamp(steer_integral, -2.f, 2.f);  // anti-windup
-	const float d_err   = (dt > 1e-6f) ? (lateral_err - prev_steer_err) / dt : 0.f;
-	const float steer_out = steer_kp * lateral_err
-	                      + steer_ki * steer_integral
-	                      + steer_kd * d_err;
-	prev_steer_err = lateral_err;
+	// Lateral error: how far right of the racing line we are (metres)
+	const float lat_err = my_bike->lateral_pos - cur_wp.racing_line_lateral;
+
+	const float safe_speed = glm::max(speed, 0.5f);
+	const float steer_out  = glm::clamp(
+		-heading_err - glm::atan(stanley_k * lat_err / safe_speed),
+		-1.f, 1.f);
+
+	// ---- Corner braking ----
+	// Sample upcoming curvature, compute the max safe speed for the tightest corner found.
+	// v_max = sqrt(corner_speed_k * g * R * traction)
+	// corner_speed_k ≈ 1/traction_lean_comp (default 5.0) to match crash physics.
+	const float look_m = glm::max(corner_look_m, speed * 1.5f);
+	const float min_r  = course->min_turn_radius_ahead(my_bike->course_dist_m, look_m);
+	const float v_max  = glm::sqrt(corner_speed_k * 9.81f * min_r * my_bike->surface_traction);
+	const float brake_amount = (speed > v_max)
+		? glm::clamp((speed - v_max) / 3.f, 0.f, 0.8f)
+		: 0.f;
 
 	// ---- Power (smoothed toward target, boid alignment + draft-seek added on top) ----
 	actual_power_command = damp_dt_independent(
@@ -113,8 +116,9 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	// This is the last-resort override — soft separation should have handled it already.
 	ci.steer        = glm::clamp(steer_after_boids, my_bike->hard_steer_min, my_bike->hard_steer_max);
 	dbg_steer_final  = ci.steer;
-	ci.brake_amount  = 0.f;
-	ci.power         = power_out;
+	// Braking suppresses power output — don't add gap/boid bonuses while braking hard.
+	ci.brake_amount  = brake_amount;
+	ci.power         = (brake_amount > 0.1f) ? 0.f : power_out;
 	dbg_power_final  = power_out;
 
 	my_bike->update_tick(ci);
