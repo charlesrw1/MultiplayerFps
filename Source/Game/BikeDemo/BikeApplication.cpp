@@ -1164,16 +1164,35 @@ static void apply_debug_follow_camera()
 		GameplayStatic::debug_text(string_format("[Player] coh kp_in(lat_err):%.2f  kd_in(lat_vel):%.2f",
 			bo->dbg_cohesion_lat_err, bo->dbg_cohesion_lat_vel));
 	} else if (ai) {
-		GameplayStatic::debug_text(string_format("[AI] steer_final:  %.2f", ai->dbg_steer_final));
-		GameplayStatic::debug_text(string_format("[AI] pid_pre_boid: %.2f", ai->dbg_steer_pre_boids));
-		GameplayStatic::debug_text(string_format("[AI] sep:%.2f coh:%.2f aln:%.2f",
+		// --- Path-following breakdown ---
+		GameplayStatic::debug_text(string_format("[AI] look=%.1fm  min_r=%.1fm  v_max=%.1fm/s  spd=%.1fm/s",
+			ai->dbg_lookahead_dist, ai->dbg_min_r, ai->dbg_v_max, bo->speed));
+		GameplayStatic::debug_text(string_format("[AI] lat_err=%+.2fm  stanley=%+.2f  ff=%+.2f",
+			ai->dbg_lat_err, ai->dbg_stanley_corr, ai->dbg_curvature_ff));
+		GameplayStatic::debug_text(string_format("[AI] steer: path=%+.2f  pre_boid=%+.2f  final=%+.2f  brake=%.2f",
+			ai->dbg_steer_pre_boids, ai->dbg_steer_pre_hard, ai->dbg_steer_final, ai->dbg_brake_amount));
+		GameplayStatic::debug_text(string_format("[AI] sep:%+.2f coh:%+.2f aln:%+.2f",
 			bo->boid_separation_steer, bo->boid_cohesion_steer, bo->boid_align_steer));
-		GameplayStatic::debug_text(string_format("[AI] coh kp_in(lat_err):%.2f  kd_in(lat_vel):%.2f",
-			bo->dbg_cohesion_lat_err, bo->dbg_cohesion_lat_vel));
 		GameplayStatic::debug_text(string_format("[AI] power base:%.0fW  align:%+.0fW  seek:%+.0fW  = %.0fW",
 			ai->dbg_power_base, ai->dbg_power_align_nudge, ai->dbg_power_seek_bonus, ai->dbg_power_final));
 		GameplayStatic::debug_text(string_format("[AI] locked_gap: %.2fm  switch_t: %.1fs",
 			bo->gap_to_ahead_m, bo->rider_ahead_switch_t));
+
+		// --- Visual overlays for selected AI ---
+		// Lookahead point + line
+		Debug::add_sphere(ai->dbg_lookahead_pt, 0.35f, Color32(0x00, 0xff, 0xff, 0xff), -1.f);
+		Debug::add_line(bo->get_ws_position(), ai->dbg_lookahead_pt, Color32(0x00, 0xff, 0xff, 0xaa), -1.f);
+
+		// Racing line reference point at the bike's current course position (lateral error line)
+		if (g_bike_app && g_bike_app->course.is_built) {
+			const BikeWaypoint cur_wp = g_bike_app->course.sample(bo->course_dist_m);
+			const glm::vec3 rl_ref = cur_wp.position + cur_wp.right * cur_wp.racing_line_lateral;
+			// White dot on the racing line closest to the bike, red line showing lateral error
+			Debug::add_sphere(rl_ref, 0.25f, Color32(0xff, 0xff, 0xff, 0xff), -1.f);
+			const glm::vec3 bike_pos = bo->get_ws_position();
+			const glm::vec3 bike_on_road = cur_wp.position + cur_wp.right * bo->lateral_pos;
+			Debug::add_line(bike_on_road, rl_ref, Color32(0xff, 0x33, 0x33, 0xff), -1.f);
+		}
 	}
 }
 
@@ -1268,20 +1287,24 @@ static void bike_boid_debug()
 	ImGui::SeparatorText("AI Cornering (Stanley)");
 	{
 		static float s_stanley_k      = 0.5f;
-		static float s_corner_look_m  = 30.f;
-		static float s_corner_speed_k = 5.0f;
+		static float s_corner_look_m  = 50.f;
+		static float s_corner_speed_k = 0.5f;
+		static float s_curvature_ff_k = 5.0f;
 		bool changed = false;
-		changed |= ImGui::DragFloat("stanley_k",      &s_stanley_k,      0.02f, 0.05f, 5.f);
+		changed |= ImGui::DragFloat("stanley_k",      &s_stanley_k,      0.02f, 0.05f,  5.f);
 		ImGui::SameLine(); ImGui::TextDisabled("lat gain");
-		changed |= ImGui::DragFloat("corner_look_m",  &s_corner_look_m,  1.f,   5.f,  80.f);
-		changed |= ImGui::DragFloat("corner_speed_k", &s_corner_speed_k, 0.1f,  1.f,  20.f);
-		ImGui::SameLine(); ImGui::TextDisabled("~1/traction_lean_comp");
+		changed |= ImGui::DragFloat("corner_look_m",  &s_corner_look_m,  1.f,   5.f,  120.f);
+		changed |= ImGui::DragFloat("corner_speed_k", &s_corner_speed_k, 0.05f, 0.1f,   5.f);
+		ImGui::SameLine(); ImGui::TextDisabled("v_max=sqrt(k*g*R)");
+		changed |= ImGui::DragFloat("curvature_ff_k", &s_curvature_ff_k, 0.5f,  0.f,  30.f);
+		ImGui::SameLine(); ImGui::TextDisabled("anticipatory corner steer");
 		if (changed) {
 			for (auto* r : g_bike_app->all_riders) {
 				if (auto* ai = dynamic_cast<BikeAI*>(r->input.get())) {
 					ai->stanley_k      = s_stanley_k;
 					ai->corner_look_m  = s_corner_look_m;
 					ai->corner_speed_k = s_corner_speed_k;
+					ai->curvature_ff_k = s_curvature_ff_k;
 				}
 			}
 		}

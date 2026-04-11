@@ -722,11 +722,11 @@ void BikeCourse::debug_draw() const
 			Debug::add_line(left_edge, right_edge, Color32(0xff, 0xff, 0xff, 0x66), -1.f);
 		}
 
-		// Racing line (cyan dots every 10th waypoint)
-		if (i % 10 == 0 && wp.racing_line_lateral != 0.f) {
-			const glm::vec3 rl_pt = wp.position + wp.right * wp.racing_line_lateral;
-			Debug::add_line(rl_pt - glm::vec3(0, 0.3f, 0), rl_pt + glm::vec3(0, 0.3f, 0),
-			                Color32(0x00, 0xff, 0xff, 0xff), -1.f);
+		// Racing line — continuous orange line connecting all racing-line points
+		{
+			const glm::vec3 rl_cur  = wp.position   + wp.right   * wp.racing_line_lateral;
+			const glm::vec3 rl_next = next.position + next.right * next.racing_line_lateral;
+			Debug::add_line(rl_cur, rl_next, Color32(0xff, 0x99, 0x00, 0xff), -1.f);
 		}
 	}
 }

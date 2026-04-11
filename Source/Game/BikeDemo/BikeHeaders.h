@@ -174,6 +174,14 @@ public:
 	float dbg_power_align_nudge  = 0.f;  // speed-alignment nudge from pack average
 	float dbg_power_seek_bonus   = 0.f;  // gap-close bonus toward rider ahead
 	float dbg_power_final        = 0.f;  // total power submitted to physics
+	// Path-following breakdown (set each frame, read by debug camera overlay)
+	float dbg_lat_err            = 0.f;  // lateral distance from racing line (m, +ve = right of line)
+	float dbg_stanley_corr       = 0.f;  // Stanley correction steer term
+	float dbg_curvature_ff       = 0.f;  // curvature feedforward steer term
+	float dbg_brake_amount       = 0.f;  // brake command [0,1]
+	float dbg_min_r              = 0.f;  // nearest corner radius (m) from scan window
+	float dbg_v_max              = 0.f;  // safe cornering speed (m/s) for that radius
+	float dbg_lookahead_dist     = 0.f;  // actual lookahead distance used this frame (m)
 };
 class BikePlayer : public IBikeInput {
 public:

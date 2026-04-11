@@ -43,7 +43,9 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float lookahead_dist = glm::min(look_base, look_corner);
 
 	const glm::vec3 lookahead_pt = course->racing_line_lookahead(my_bike->course_dist_m, lookahead_dist);
-	dbg_lookahead_pt = lookahead_pt;
+	dbg_lookahead_pt  = lookahead_pt;
+	dbg_lookahead_dist = lookahead_dist;
+	dbg_min_r          = min_r;
 
 	// 3. Lateral steering error toward the racing-line lookahead point.
 	const glm::vec3 bike_right = glm::normalize(glm::cross(my_bike->bike_direction, glm::vec3(0, 1, 0)));
@@ -76,11 +78,18 @@ void BikeAI::evaluate(BikeObject* my_bike)
 
 	const float steer_out = glm::clamp(lateral_err - stanley_corr + curvature_ff, -1.f, 1.f);
 
+	// Store path-following breakdown for debug overlay
+	dbg_lat_err      = lat_err;
+	dbg_stanley_corr = stanley_corr;
+	dbg_curvature_ff = curvature_ff;
+
 	// ---- Corner braking ----
 	// v_max = sqrt(corner_speed_k * g * R * traction); corner_speed_k ≈ 1/traction_lean_comp.
 	const float v_max        = glm::sqrt(corner_speed_k * 9.81f * min_r * my_bike->surface_traction);
 	const float brake_amount = (speed > v_max)
 	                           ? glm::clamp((speed - v_max) / 3.f, 0.f, 0.8f) : 0.f;
+	dbg_v_max        = v_max;
+	dbg_brake_amount = brake_amount;
 
 	// ---- Power (smoothed toward target, boid alignment + draft-seek added on top) ----
 	actual_power_command = damp_dt_independent(
