@@ -337,6 +337,10 @@ public:
 	// Cosmetic crack pitch spring (visual only, does not affect physics)
 	float crack_pitch_disp    = 0.f;   // current angular displacement (radians)
 	float crack_pitch_vel     = 0.f;   // angular velocity (rad/s)
+
+	// Bump steer spring — handlebar kickback from road irregularities
+	float bump_steer_disp     = 0.f;   // lateral steer displacement [-1,1] fraction
+	float bump_steer_vel      = 0.f;   // rate of change
 	float gear_shift_cooldown = 0.f;   // seconds remaining until next shift is allowed
 	bool  just_shifted        = false; // set true for one tick when a shift occurs
 	GearSelector gear;

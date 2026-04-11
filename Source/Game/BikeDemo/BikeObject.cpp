@@ -67,9 +67,21 @@ static float compute_max_steer_rad(float speed)
 }
 
 // Crack visual pitch spring (cosmetic only)
-static float crack_vis_pitch_impulse = 5;  // rad/s applied per unit crack_impulse
-static float crack_vis_spring        = 340;               // spring constant
-static float crack_vis_damp          = 10.f;                // damping
+static float crack_vis_pitch_impulse = 5;    // rad/s applied per unit crack_impulse
+static float crack_vis_spring        = 340;  // spring constant
+static float crack_vis_damp          = 10.f; // damping
+
+// Bump steer: handlebar kickback from road irregularities
+static float bump_steer_thresh  = 0.003f;  // minimum total_bump before steer kick fires
+static float bump_steer_kick    = 60.f;    // vel impulse (steer-frac/s) per unit excess bump
+static float bump_steer_spring  = 200.f;   // stiffness — snaps back to centre
+static float bump_steer_damp    = 14.f;    // damping
+static float bump_steer_max     = 0.18f;   // max displacement as fraction of full steer
+
+// Bump speed / power loss
+static float bump_speed_thresh  = 0.003f;  // minimum total_bump before speed is shed
+static float bump_speed_loss    = 0.06f;   // m/s lost per unit excess bump (direct KE loss)
+static float bump_rolling_scale = 12.f;    // extra resistive force (N) per unit bump — raises effective Crr
 
 // Pedal stroke
 static float stroke_amp = 1.0f;  // 0=constant power, 1=full realistic lurch (power only on downstroke)
@@ -238,8 +250,16 @@ void BikeObject::tick_physics(ControlInput& ci, float dt)
 		if (crash_timer <= 0.f) { is_crashed = false; crash_timer = 0.f; corner_warn_timer = 0.f; }
 	}
 
-	const float net_force = is_crashed ? 0.f : (drive_force - drag - rolling - braking - slope_force);
+	// Crack decals raise effective rolling resistance and shed kinetic energy
+	const float excess_bump     = glm::max(0.f, crack_impulse - bump_speed_thresh);
+	const float bump_resistance = crack_impulse * bump_rolling_scale;  // extra resistive N
+
+	const float net_force = is_crashed ? 0.f : (drive_force - drag - rolling - bump_resistance - braking - slope_force);
 	speed = glm::max(0.f, speed + (net_force / BIKE_MASS) * dt);
+
+	// Direct KE loss: energy absorbed by frame/body on sharp bumps
+	if (excess_bump > 0.f)
+		speed = glm::max(0.f, speed - excess_bump * bump_speed_loss);
 
 	// Traction / slip
 	{
@@ -355,7 +375,19 @@ void BikeObject::tick_steer(const ControlInput& ci, float dt)
 
 		//GameplayStatic::debug_text(string_format("wind_steer=%.3f  gust_t=%.1f", wind_steer, crosswind_gust_timer));
 	}
-	current_steer = glm::clamp(current_steer + wobble_steer + wind_steer, -1.f, 1.f);
+	// Bump steer: crack decals kick the handlebar with a random-signed impulse
+	{
+		const float excess_bump = glm::max(0.f, crack_impulse - bump_steer_thresh);
+		if (excess_bump > 0.f) {
+			const float kick_dir = (rand() & 1) ? 1.f : -1.f;
+			bump_steer_vel += kick_dir * excess_bump * bump_steer_kick;
+		}
+		bump_steer_vel  += (-bump_steer_spring * bump_steer_disp - bump_steer_damp * bump_steer_vel) * dt;
+		bump_steer_disp += bump_steer_vel * dt;
+		bump_steer_disp  = glm::clamp(bump_steer_disp, -bump_steer_max, bump_steer_max);
+	}
+
+	current_steer = glm::clamp(current_steer + wobble_steer + wind_steer + bump_steer_disp, -1.f, 1.f);
 
 	// Steering geometry → yaw bike_direction
 	const float wheelbase     = BIKE_WHEELBASE;
@@ -603,6 +635,22 @@ static void bike_physics_debug()
 	ImGui::SeparatorText("Gear");
 	{
 		ImGui::InputFloat("shift_cooldown", &bike_gear_shift_cooldown);
+	}
+	ImGui::SeparatorText("Bump Steer");
+	{
+		ImGui::DragFloat("bump_steer_thresh",  &bump_steer_thresh,  0.0005f, 0.f,   0.05f);
+		ImGui::DragFloat("bump_steer_kick",    &bump_steer_kick,    1.f,     0.f,   200.f);
+		ImGui::DragFloat("bump_steer_spring",  &bump_steer_spring,  5.f,     10.f,  500.f);
+		ImGui::DragFloat("bump_steer_damp",    &bump_steer_damp,    0.5f,    0.f,   40.f);
+		ImGui::DragFloat("bump_steer_max",     &bump_steer_max,     0.005f,  0.f,   0.5f);
+		if (s_bike_debug)
+			ImGui::Text("disp=%.3f  vel=%.2f", s_bike_debug->bump_steer_disp, s_bike_debug->bump_steer_vel);
+	}
+	ImGui::SeparatorText("Bump Speed/Power Loss");
+	{
+		ImGui::DragFloat("bump_speed_thresh",  &bump_speed_thresh,  0.0005f, 0.f,  0.05f);
+		ImGui::DragFloat("bump_speed_loss",    &bump_speed_loss,    0.002f,  0.f,  0.5f);
+		ImGui::DragFloat("bump_rolling_scale", &bump_rolling_scale, 0.5f,    0.f,  50.f);
 	}
 	ImGui::SeparatorText("Crack Visual Pitch");
 	{

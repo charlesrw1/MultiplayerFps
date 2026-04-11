@@ -3323,6 +3323,11 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		state.depth_writes = false;
 		device.set_pipeline(state);
 
+		if (!scene.skylights.empty()) {
+			device.shader().set_vec3("sky_color", scene.skylights.at(0).ambientCube[2]);
+			device.shader().set_vec3("ground_color", scene.skylights.at(0).ambientCube[3]);
+		}
+
 		bind_texture_ptr(0, tex.scene_gbuffer0);
 		bind_texture_ptr(1, tex.scene_gbuffer1);
 		bind_texture_ptr(2, tex.scene_gbuffer2);

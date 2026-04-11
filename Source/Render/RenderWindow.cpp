@@ -139,7 +139,7 @@ void RenderWindow::draw(LineShape line_shape) {
 	meshbuilder.AddVertex(MbVertex(glm::vec3(p1, 0), line_shape.color));
 	meshbuilder.AddVertex(MbVertex(glm::vec3(p2, 0), line_shape.color));
 	meshbuilder.AddVertex(MbVertex(glm::vec3(p3, 0), line_shape.color));
-	meshbuilder.AddQuad(base, base + 1, base + 2, base + 3);
+	meshbuilder.AddQuad(base, base + 3, base + 2, base + 1);
 	auto mat = (MaterialInstance*)UiSystem::inst->get_default_ui_mat();
 	add_draw_call(mat, start, nullptr);
 }
