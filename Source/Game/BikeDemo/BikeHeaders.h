@@ -138,10 +138,13 @@ public:
 	// Steers by correcting both heading error (angle to path tangent) and
 	// lateral error (distance from racing line), not a distant lookahead point.
 	float stanley_k      = 0.5f;   // lateral gain: atan(k * lat_err / speed)
-	float corner_look_m  = 30.f;   // metres ahead to scan for corners
+	float corner_look_m  = 50.f;   // metres ahead to scan for corners (wider = earlier braking)
 	// v_max in corner = sqrt(corner_speed_k * g * R * traction)
-	// Set to ~1/traction_lean_comp (default 0.20) = 5.0 to match crash physics
-	float corner_speed_k = 5.0f;
+	// For a bicycle: v_max ≈ sqrt(mu * g * R) where mu ≈ 0.5 → corner_speed_k ≈ 0.5
+	float corner_speed_k = 0.5f;
+	// Curvature feedforward: steer proportional to upcoming bend so AI turns in early.
+	// curvature in rad/m (1/R), gain maps ~0.05 rad/m (R=20m) to ~0.25 steer.
+	float curvature_ff_k = 5.0f;
 
 	// ---- Power ----
 	float target_power_watts   = 150.f;  // set by strategy layer (Layer 6); fixed for now

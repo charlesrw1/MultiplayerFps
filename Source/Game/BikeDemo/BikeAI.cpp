@@ -59,7 +59,22 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float safe_speed    = glm::max(speed, 2.f);  // higher floor than before — avoids saturation at low speed
 	const float stanley_corr  = glm::atan(stanley_k * lat_err / safe_speed);
 
-	const float steer_out = glm::clamp(lateral_err - stanley_corr, -1.f, 1.f);
+	// 5. Curvature feedforward: compare path heading near vs far within the lookahead window.
+	//    Gives the AI anticipatory steering — it starts turning before lateral drift accumulates.
+	//    signed curvature +ve = right-hand bend, so steer right to match.
+	const float ff_near_d = glm::min(lookahead_dist * 0.5f, 5.f);
+	const float ff_far_d  = lookahead_dist;
+	const BikeWaypoint wp_ff_near = course->sample(my_bike->course_dist_m + ff_near_d);
+	const BikeWaypoint wp_ff_far  = course->sample(my_bike->course_dist_m + ff_far_d);
+	const float yaw_near = std::atan2(wp_ff_near.forward.x, wp_ff_near.forward.z);
+	const float yaw_far  = std::atan2(wp_ff_far.forward.x, wp_ff_far.forward.z);
+	float dyaw = yaw_far - yaw_near;
+	if (dyaw >  glm::pi<float>()) dyaw -= 2.f * glm::pi<float>();
+	if (dyaw < -glm::pi<float>()) dyaw += 2.f * glm::pi<float>();
+	const float signed_curvature = dyaw / glm::max(ff_far_d - ff_near_d, 0.1f);  // rad/m
+	const float curvature_ff     = curvature_ff_k * signed_curvature;
+
+	const float steer_out = glm::clamp(lateral_err - stanley_corr + curvature_ff, -1.f, 1.f);
 
 	// ---- Corner braking ----
 	// v_max = sqrt(corner_speed_k * g * R * traction); corner_speed_k ≈ 1/traction_lean_comp.
