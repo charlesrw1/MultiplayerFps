@@ -26,7 +26,7 @@ static constexpr float BIKE_CDA         = 0.3f;
 static constexpr float BIKE_AIR_DENSITY = 1.225f;
 static constexpr float BIKE_ROLL_RESIST = 0.004f;
 static constexpr float BIKE_GRAVITY     = 9.81f;
-static constexpr float BIKE_MAX_BRAKE   = 7.f;
+static  float BIKE_MAX_BRAKE   = 1.8f;
 static constexpr float BIKE_REAR_Z      = -0.449f;
 static constexpr float BIKE_FRONT_Z     =  0.5394f;
 static constexpr float BIKE_WHEELBASE   = BIKE_FRONT_Z - BIKE_REAR_Z; // ~0.9884
@@ -596,6 +596,7 @@ static void bike_physics_debug()
 		DAMP_IMGUI(steer_release_lo);
 		DAMP_IMGUI(steer_release_hi);
 #undef DAMP_IMGUI
+		ImGui::DragFloat("bike_brake", &BIKE_MAX_BRAKE, 0.05, 0, 8);
 		ImGui::DragFloat("steer_lean_threshold", &steer_lean_threshold, 0.02f, 0.f, 1.f);
 		ImGui::Text("  input < threshold -> snappy at any speed");
 		ImGui::DragFloat("steer_lean_range",     &steer_lean_range,     0.02f, 0.f, 1.f);
