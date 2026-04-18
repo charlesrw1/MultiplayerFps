@@ -622,10 +622,21 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 			(k_apex > e) ? k_apex + extend_n : glm::max(e, k_apex + extend_n / 2),
 			n - 1);
 
-		// Entry ramp: s → k_apex  (outside → inside)
-		const int entry_len = k_apex - s;
-		for (int k = s; k <= k_apex && k < n; ++k) {
-			const float t = (entry_len > 0) ? float(k - s) / float(entry_len) : 1.f;
+		// Approach on road A (s → k_junc-1): constant outside.
+		// Do NOT ramp here — ramping across the junction creates a squiggle because
+		// the right vector rotates at the corner, making the same lateral value map to
+		// a completely different world-space direction on road B.
+		for (int k = s; k < k_junc && k < n; ++k) {
+			raw[k]   = -sg * strength * wps[k].road_half_width;
+			owned[k] = true;
+		}
+
+		// Road B cut: k_junc → k_apex  (outside → inside, entirely on the outgoing road)
+		// Starting from outside on road B (-sg) and ramping to inside (+sg*hw at apex).
+		// This is where the actual racing-line cut happens — no right-vector discontinuity.
+		const int entry_b_len = k_apex - k_junc;
+		for (int k = k_junc; k <= k_apex && k < n; ++k) {
+			const float t = (entry_b_len > 0) ? float(k - k_junc) / float(entry_b_len) : 1.f;
 			raw[k]   = sg * (-std::cos(glm::pi<float>() * t)) * strength * wps[k].road_half_width;
 			owned[k] = true;
 		}
