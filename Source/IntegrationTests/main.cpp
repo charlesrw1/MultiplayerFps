@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
 	mainOptions.no_console_print = true;
 
 	if (mode == "game") {
-		// g_application_class.set_string("TestGameApp");
+		g_application_class.set_string("TestGameApp");
 		auto tests = TestRegistry::get_filtered(TestMode::Game, test_filter.c_str());
 		mainOptions.pending_test_runnner.reset(new GameTestRunner("Game", tests, cfg));
 		mainOptions.vars_file = "test_game_vars.txt";

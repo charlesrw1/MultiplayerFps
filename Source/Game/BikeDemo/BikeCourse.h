@@ -70,4 +70,10 @@ public:
 
 	// Draw the spline in the debug overlay (gradient-coloured, with road-width tick marks).
 	void debug_draw() const;
+
+	// Compute and stamp racing_line_lateral on every waypoint.
+	// Exposed publicly so unit tests can call it on synthetic waypoint arrays.
+	// strength in [0,1]: fraction of road_half_width used for the swing.
+	static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
+	                                float strength = 0.82f);
 };

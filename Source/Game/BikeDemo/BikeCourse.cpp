@@ -508,20 +508,21 @@ static void sample_edge(
 	}
 }
 
-// Compute and store racing_line_lateral on each waypoint.
+// Compute and stamp racing_line_lateral on every waypoint.
 //
-// Algorithm: detect corners by accumulating heading change, then for each corner assign
-// a lateral profile that puts the AI on the OUTSIDE at entry, transitions to the INSIDE
-// at the apex, and returns to the OUTSIDE at the exit.  Extended "approach zones" in front
-// of and behind each corner ramp the offset to zero on the adjacent straights.
-// A final Gaussian smooth removes any discontinuities at segment boundaries.
+// Sign convention:
+//   Right turn (sg=+1): inside = road-right, so apex lateral > 0.
+//   Left  turn (sg=-1): inside = road-left,  so apex lateral < 0.
 //
-//   Right turn (+dyaw): inside = road-right (+lateral) at apex,
-//                       outside = road-left  (-lateral) at entry/exit.
-//   Left turn  (-dyaw): inside = road-left  (-lateral) at apex,
-//                       outside = road-right (+lateral) at entry/exit.
-static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
-                                float strength = 0.82f)
+// Apex placement:
+//   dyaw[k] is the heading change from waypoint k to k+1.  The maximum |dyaw| (the
+//   spike) sits at k_spike — still on the INCOMING road.  The junction exit is at
+//   k_spike+1.  For a turn of total angle θ with road half-width hw, geometry shows
+//   that the inside edges of the two roads meet hw·tan(θ/2) metres past the junction
+//   along the outgoing road.  We find the waypoint at that distance and use it as the
+//   true apex, so the AI actually clips the inside corner of the intersection.
+void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
+                                     float strength)
 {
 	const int n = (int)wps.size();
 	if (n < 3) return;
@@ -543,36 +544,36 @@ static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 
 	const float avg_sp = (n > 1) ? (wps[n - 1].dist_from_start / float(n - 1)) : 0.5f;
 
-	// Tuning constants (all in metres unless noted)
-	const float curv_thresh = glm::radians(1.5f);  // min heading change per step to start a corner
-	const float min_total   = glm::radians(8.f);   // ignore corners < 8° total turn
-	const int   merge_n     = glm::max(1, (int)(4.f  / avg_sp));  // gap to bridge when merging runs
-	const int   extend_n    = glm::max(2, (int)(28.f / avg_sp));  // approach/exit outside ramp
-	const int   smooth_n    = glm::max(2, (int)(5.f  / avg_sp));  // Gaussian σ — kept small to preserve apex peak
+	// Tuning constants
+	const float curv_thresh = glm::radians(1.5f);
+	const float min_total   = glm::radians(8.f);
+	const int   merge_n     = glm::max(1, (int)(4.f  / avg_sp));
+	const int   extend_n    = glm::max(2, (int)(30.f / avg_sp));
+	const int   smooth_n    = glm::max(1, (int)(1.f  / avg_sp));  // σ=1 m — tight enough to keep apex peak
 
 	// --- detect corner segments ---
-	struct Corner { int s, e; float sign; };
+	struct Corner { int s, e; float sign, total_rad; };
 	std::vector<Corner> corners;
 
-	int i = 0;
-	while (i < n - 1) {
-		if (std::abs(dyaw[i]) < curv_thresh) { ++i; continue; }
+	int ci = 0;
+	while (ci < n - 1) {
+		if (std::abs(dyaw[ci]) < curv_thresh) { ++ci; continue; }
 
-		const float sg    = (dyaw[i] > 0.f) ? 1.f : -1.f;
-		const int   start = i;
+		const float sg    = (dyaw[ci] > 0.f) ? 1.f : -1.f;
+		const int   start = ci;
 		float total       = 0.f;
 
-		while (i < n - 1) {
-			if (std::abs(dyaw[i]) >= curv_thresh && ((dyaw[i] > 0.f) == (sg > 0.f))) {
-				total += std::abs(dyaw[i]);
-				++i;
+		while (ci < n - 1) {
+			if (std::abs(dyaw[ci]) >= curv_thresh && ((dyaw[ci] > 0.f) == (sg > 0.f))) {
+				total += std::abs(dyaw[ci]);
+				++ci;
 			} else {
 				bool merged = false;
-				for (int look = 1; look <= merge_n && (i + look) < n - 1; ++look) {
-					if (std::abs(dyaw[i + look]) >= curv_thresh &&
-					    ((dyaw[i + look] > 0.f) == (sg > 0.f))) {
-						for (int g = 0; g <= look; ++g) total += std::abs(dyaw[i + g]);
-						i += look + 1;
+				for (int look = 1; look <= merge_n && (ci + look) < n - 1; ++look) {
+					if (std::abs(dyaw[ci + look]) >= curv_thresh &&
+					    ((dyaw[ci + look] > 0.f) == (sg > 0.f))) {
+						for (int g = 0; g <= look; ++g) total += std::abs(dyaw[ci + g]);
+						ci += look + 1;
 						merged = true;
 						break;
 					}
@@ -582,52 +583,62 @@ static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 		}
 
 		if (total >= min_total)
-			corners.push_back({ start, i - 1, sg });
+			corners.push_back({ start, ci - 1, sg, total });
 	}
 
 	// --- assign raw lateral values ---
-	//
-	// For each corner we find the TRUE apex (waypoint of maximum |dyaw|, i.e. peak curvature),
-	// then apply a cosine ramp from outside→apex on the entry side and apex→outside on the exit.
-	// This correctly places the inside offset at the geometric apex regardless of where it falls
-	// within the detected segment (which was the bug when using a fixed t=0.5 midpoint).
-	//
-	// Profile:   entry side  -cos(π·t)   maps t:[0→1] to lateral:[-1→+1]  (outside to inside)
-	//            exit  side   cos(π·t)   maps t:[0→1] to lateral:[+1→-1]  (inside to outside)
-	// All values multiplied by sg·strength·road_half_width.
-
 	std::vector<float> raw(n, 0.f);
 	std::vector<bool>  owned(n, false);
 
 	for (const auto& c : corners) {
-		const int   s  = c.s;
-		const int   e  = glm::min(c.e, n - 1);
-		const float sg = c.sign;
+		const int   s         = c.s;
+		const int   e         = glm::min(c.e, n - 1);
+		const float sg        = c.sign;
+		const float theta     = c.total_rad;
 
-		// Find the true apex: the waypoint with the largest heading-change in this segment.
-		int apex = s;
-		float peak = 0.f;
-		for (int k = s; k <= e; ++k) {
-			if (std::abs(dyaw[k]) > peak) { peak = std::abs(dyaw[k]); apex = k; }
-		}
+		// Find the dyaw spike (index of max |dyaw| in the detected range).
+		// dyaw[k_spike] is the heading change from k_spike → k_spike+1, so the
+		// geometric junction exit is at k_spike+1.
+		int   k_spike = s;
+		float peak    = 0.f;
+		for (int k = s; k <= e; ++k)
+			if (std::abs(dyaw[k]) > peak) { peak = std::abs(dyaw[k]); k_spike = k; }
 
-		// Entry side: s → apex (cosine from outside → inside)
-		const int entry_len = apex - s;
-		for (int k = s; k <= apex; ++k) {
+		const int k_junc = glm::min(k_spike + 1, n - 1);  // first waypoint on outgoing road
+
+		// Distance along the outgoing road to the true geometric apex:
+		//   inside edges of the two roads meet at hw·tan(θ/2) metres past the junction.
+		// For very sharp hairpins tan(θ/2) can be large; cap at 4·hw to stay sane.
+		const float hw_junc   = wps[k_junc].road_half_width;
+		const float half_th   = theta * 0.5f;
+		const float apex_dist = glm::min(hw_junc * std::tan(half_th), hw_junc * 4.f);
+		const int   apex_off  = glm::max(0, (int)std::round(apex_dist / avg_sp));
+		const int   k_apex    = glm::min(k_junc + apex_off, n - 1);
+
+		// Determine exit extent: beyond k_apex, fade back to outside.
+		// If the detected segment end (e) is already past k_apex use that; otherwise
+		// extend by extend_n steps so the post-apex straight gets a ramp back out.
+		const int k_exit_end = glm::min(
+			(k_apex > e) ? k_apex + extend_n : glm::max(e, k_apex + extend_n / 2),
+			n - 1);
+
+		// Entry ramp: s → k_apex  (outside → inside)
+		const int entry_len = k_apex - s;
+		for (int k = s; k <= k_apex && k < n; ++k) {
 			const float t = (entry_len > 0) ? float(k - s) / float(entry_len) : 1.f;
 			raw[k]   = sg * (-std::cos(glm::pi<float>() * t)) * strength * wps[k].road_half_width;
 			owned[k] = true;
 		}
 
-		// Exit side: apex → e (cosine from inside → outside)
-		const int exit_len = e - apex;
-		for (int k = apex; k <= e; ++k) {
-			const float t = (exit_len > 0) ? float(k - apex) / float(exit_len) : 0.f;
+		// Exit ramp: k_apex → k_exit_end  (inside → outside)
+		const int exit_len = k_exit_end - k_apex;
+		for (int k = k_apex; k <= k_exit_end && k < n; ++k) {
+			const float t = (exit_len > 0) ? float(k - k_apex) / float(exit_len) : 0.f;
 			raw[k]   = sg * std::cos(glm::pi<float>() * t) * strength * wps[k].road_half_width;
 			owned[k] = true;
 		}
 
-		// Approach zone before the corner: hold outside, fade to 0 at extend_n distance
+		// Approach zone: waypoints before s, fade outside offset to zero
 		for (int d = 1; d <= extend_n; ++d) {
 			const int k = s - d;
 			if (!loop && k < 0) break;
@@ -638,9 +649,9 @@ static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 			if (std::abs(target) > std::abs(raw[ki])) raw[ki] = target;
 		}
 
-		// Exit zone after the corner: hold outside, fade to 0
+		// Post-exit zone: waypoints after k_exit_end, fade outside to zero
 		for (int d = 1; d <= extend_n; ++d) {
-			const int k = e + d;
+			const int k = k_exit_end + d;
 			if (!loop && k >= n) break;
 			const int ki = loop ? (k % n) : k;
 			if (owned[ki]) break;
@@ -650,8 +661,7 @@ static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 		}
 	}
 
-	// --- Gaussian smooth (small σ=5 m) to soften boundary discontinuities
-	//     without destroying the apex peak ---
+	// --- Gaussian smooth (σ=3 m) to remove hard boundaries without killing the apex ---
 	const float sigma2 = float(smooth_n) * float(smooth_n);
 	std::vector<float> smoothed(n, 0.f);
 	for (int i = 0; i < n; ++i) {
@@ -813,7 +823,7 @@ void BikeCourse::build_from_road_network(
 
 	// Compute racing line offsets now that waypoints are built
 	if (is_built)
-		compute_racing_line(waypoints, is_loop);
+		BikeCourse::compute_racing_line(waypoints, is_loop);
 }
 
 // ============================================================

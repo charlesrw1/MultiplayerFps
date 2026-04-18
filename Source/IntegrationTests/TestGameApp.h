@@ -13,6 +13,7 @@ public:
 	CLASS_BODY(TestGameApp, scriptable);
 
 	void start() override {
+		if (!eng->get_level()) return;
 		auto ent = eng->get_level()->spawn_entity();
 		auto cam = ent->create_component<CameraComponent>();
 		cam->set_is_enabled(true);
