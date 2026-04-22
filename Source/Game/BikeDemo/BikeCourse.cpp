@@ -438,35 +438,173 @@ static int nearest_node_id(const std::vector<RoadNode>& nodes, glm::vec3 pos)
 	return best_id;
 }
 
-// Densely sample a single road edge at step_m intervals, appending to out_positions/out_widths.
-// node_from/node_to are positions for the edge endpoints.
-// skip_first skips the very first sample (avoids duplicate junction points).
+// ============================================================
+// Corner-fillet helpers for build_from_road_network
+// ============================================================
+
+// Actual spline tangent of a road edge at one of its traversal endpoints.
+// at_traversal_end=false → unit tangent leaving the start node (t=0 derivative)
+// at_traversal_end=true  → unit tangent arriving at the end node (t=1 derivative)
+static glm::vec3 edge_tangent_at(
+	const RoadEdge& edge,
+	glm::vec3 pos_a, glm::vec3 pos_b,
+	bool going_a_to_b,
+	bool at_traversal_end)
+{
+	if (!edge.curved) {
+		glm::vec3 d = going_a_to_b ? (pos_b - pos_a) : (pos_a - pos_b);
+		const float len = glm::length(d);
+		return len > 1e-4f ? d / len : glm::vec3(0, 0, 1);
+	}
+	// Bezier traversal: p0=start, p1=ctrl near start, p2=ctrl near end, p3=end
+	glm::vec3 p0, p1, p2, p3;
+	if (going_a_to_b) {
+		p0 = pos_a; p1 = edge.ctrl_a; p2 = edge.ctrl_b; p3 = pos_b;
+	} else {
+		p0 = pos_b; p1 = edge.ctrl_b; p2 = edge.ctrl_a; p3 = pos_a;
+	}
+	// Cubic bezier derivative: at t=0 → 3*(p1-p0), at t=1 → 3*(p3-p2)
+	const glm::vec3 tan = at_traversal_end ? (p3 - p2) : (p1 - p0);
+	const float len = glm::length(tan);
+	return len > 1e-4f ? tan / len : glm::vec3(0, 0, 1);
+}
+
+struct FilletInfo {
+	bool      active       = false;
+	glm::vec3 center       = {};
+	float     radius       = 0.f;
+	glm::vec3 pt_in        = {};    // arc entry: point on incoming road centerline
+	glm::vec3 pt_out       = {};    // arc exit:  point on outgoing road centerline
+	float     in_cutback   = 0.f;   // meters trimmed from END of incoming edge
+	float     out_cutback  = 0.f;   // meters trimmed from START of outgoing edge
+	float     arc_angle    = 0.f;   // full deflection angle (radians)
+	bool      left_turn    = false;
+	float     width_in     = 0.f;
+	float     width_out    = 0.f;
+};
+
+static constexpr float FILLET_MIN_ANGLE_RAD = 10.f * glm::pi<float>() / 180.f;
+
+// Compute fillet arc for a junction between two road centerlines.
+// d_in  = unit tangent arriving at junction (pointing TOWARD junction)
+// d_out = unit tangent leaving junction   (pointing AWAY from junction)
+// in/out edge lengths are used only for the guard check.
+static FilletInfo compute_fillet(
+	glm::vec3 junction_pos,
+	glm::vec3 d_in, glm::vec3 d_out,
+	float width_in, float width_out,
+	float in_edge_len, float out_edge_len)
+{
+	FilletInfo fi;
+
+	// Full deflection angle between the two road directions
+	const float cos_phi = glm::clamp(glm::dot(d_in, d_out), -1.f, 1.f);
+	const float phi     = std::acos(cos_phi);
+	if (phi < FILLET_MIN_ANGLE_RAD) return fi;
+
+	const float theta     = phi * 0.5f;       // half-deflection
+	const float sin_theta = std::sin(theta);
+	const float tan_theta = std::tan(theta);
+	if (sin_theta < 1e-4f || tan_theta < 1e-4f) return fi;
+
+	const float R       = glm::max(width_in, width_out);
+	const float cutback = R / tan_theta;      // arc-length trimmed from each edge
+
+	// Disable if fillet would consume more than 80% of either edge
+	if (cutback > 0.8f * in_edge_len || cutback > 0.8f * out_edge_len) return fi;
+
+	// Bisector of d_in and d_out points toward the inside of the corner
+	const glm::vec3 hv_raw = d_in + d_out;
+	const float hv_len = glm::length(hv_raw);
+	if (hv_len < 1e-4f) return fi;   // ~180-degree U-turn — skip
+
+	fi.active      = true;
+	fi.center      = junction_pos + (hv_raw / hv_len) * (R / sin_theta);
+	fi.radius      = R;
+	fi.pt_in       = junction_pos - d_in  * cutback;
+	fi.pt_out      = junction_pos + d_out * cutback;
+	fi.in_cutback  = cutback;
+	fi.out_cutback = cutback;
+	fi.arc_angle   = phi;
+	fi.left_turn   = (glm::cross(d_in, d_out).y > 0.f);
+	fi.width_in    = width_in;
+	fi.width_out   = width_out;
+	return fi;
+}
+
+// Append dense arc samples sweeping from fi.pt_in to fi.pt_out.
+// i=0 (= pt_in) is skipped — caller guarantees pt_in is already the last entry.
+// include_last: if false, also skip i=steps (= pt_out); used for the loop-seam arc
+// to avoid duplicating the very first position in the array.
+static void sample_arc_into(
+	const FilletInfo& fi,
+	float step_m,
+	std::vector<glm::vec3>& out_positions,
+	std::vector<float>&     out_widths,
+	bool include_last = true)
+{
+	const float arc_len = fi.radius * fi.arc_angle;
+	const int   steps   = glm::max(2, (int)(arc_len / step_m));
+
+	const glm::vec3 from_c_in  = fi.pt_in  - fi.center;
+	const glm::vec3 from_c_out = fi.pt_out - fi.center;
+	const float angle_in  = std::atan2(from_c_in.z,  from_c_in.x);
+	const float angle_out = std::atan2(from_c_out.z, from_c_out.x);
+
+	float delta = angle_out - angle_in;
+	if (fi.left_turn) {
+		if (delta < 0.f) delta += 2.f * glm::pi<float>();
+	} else {
+		if (delta > 0.f) delta -= 2.f * glm::pi<float>();
+	}
+
+	const int end_i = include_last ? steps : steps - 1;
+	for (int i = 1; i <= end_i; ++i) {
+		const float t     = (float)i / steps;
+		const float alpha = angle_in + t * delta;
+		const float y     = glm::mix(fi.pt_in.y, fi.pt_out.y, t);
+		out_positions.push_back({ fi.center.x + fi.radius * std::cos(alpha),
+		                          y,
+		                          fi.center.z + fi.radius * std::sin(alpha) });
+		out_widths.push_back(glm::mix(fi.width_in, fi.width_out, t));
+	}
+}
+
+// ============================================================
+// Densely sample a single road edge into out_positions/out_widths.
+// trim_start_m / trim_end_m: arc-length to skip from the start / end of the
+// edge (used to carve out the region replaced by a fillet arc).
+// skip_first: when true, the sample at the start of the effective range is
+// omitted because it is already the last entry written by the previous arc.
+// ============================================================
 static void sample_edge(
 	const RoadEdge& edge,
 	glm::vec3 pos_a, glm::vec3 pos_b,
-	bool going_a_to_b,   // traversal direction
+	bool going_a_to_b,
 	float step_m,
 	bool skip_first,
+	float trim_start_m,
+	float trim_end_m,
 	std::vector<glm::vec3>& out_positions,
 	std::vector<float>&     out_widths)
 {
 	const float half_w = edge.width * 0.5f;
 
 	if (!edge.curved) {
-		// Straight edge: uniform subdivisions
 		const float seg_len = glm::distance(pos_a, pos_b);
 		if (seg_len < 1e-4f) return;
-		const int steps = glm::max(1, (int)(seg_len / step_m));
+		const float eff_start = trim_start_m;
+		const float eff_end   = seg_len - trim_end_m;
+		if (eff_end <= eff_start + 1e-4f) return;
+		const float eff_len = eff_end - eff_start;
+		const int steps = glm::max(1, (int)(eff_len / step_m));
 		for (int i = (skip_first ? 1 : 0); i <= steps; ++i) {
-			const float t = (float)i / steps;
-			out_positions.push_back(glm::mix(pos_a, pos_b, t));
+			const float arc = eff_start + (float)i / steps * eff_len;
+			out_positions.push_back(glm::mix(pos_a, pos_b, arc / seg_len));
 			out_widths.push_back(half_w);
 		}
 	} else {
-		// Cubic Bezier: determine control points based on traversal direction.
-		// pos_a is always the traversal start, pos_b the traversal end.
-		// When going A→B: ctrl_a is near start, ctrl_b is near end.
-		// When going B→A: ctrl_b is near start (node_b), ctrl_a is near end (node_a).
+		// Cubic Bezier — build arc-length table, then sample the trimmed range.
 		glm::vec3 p0, p1, p2, p3;
 		if (going_a_to_b) {
 			p0 = pos_a; p1 = edge.ctrl_a; p2 = edge.ctrl_b; p3 = pos_b;
@@ -474,9 +612,8 @@ static void sample_edge(
 			p0 = pos_a; p1 = edge.ctrl_b; p2 = edge.ctrl_a; p3 = pos_b;
 		}
 
-		// Pre-sample to build arc-length table
 		static constexpr int PRESAMPLE = 100;
-		std::vector<float> arc(PRESAMPLE + 1, 0.f);
+		std::vector<float>     arc(PRESAMPLE + 1, 0.f);
 		std::vector<glm::vec3> pts(PRESAMPLE + 1);
 		pts[0] = p0;
 		for (int k = 1; k <= PRESAMPLE; ++k) {
@@ -488,24 +625,26 @@ static void sample_edge(
 		const float total_len = arc[PRESAMPLE];
 		if (total_len < 1e-4f) return;
 
-		const int steps = glm::max(1, (int)(total_len / step_m));
-		for (int i = (skip_first ? 1 : 0); i <= steps; ++i) {
-			const float want = (float)i / steps * total_len;
-			// Binary search in arc table
+		const float eff_start = trim_start_m;
+		const float eff_end   = total_len - trim_end_m;
+		if (eff_end <= eff_start + 1e-4f) return;
+		const float eff_len = eff_end - eff_start;
+		const int steps = glm::max(1, (int)(eff_len / step_m));
+
+		auto arc_lookup = [&](float want) -> glm::vec3 {
 			int lo = 0, hi = PRESAMPLE;
 			while (lo < hi) {
 				const int mid = (lo + hi + 1) / 2;
 				(arc[mid] <= want) ? lo = mid : hi = mid - 1;
 			}
-			glm::vec3 pt;
-			if (lo >= PRESAMPLE) {
-				pt = pts[PRESAMPLE];
-			} else {
-				const float seg = arc[lo + 1] - arc[lo];
-				const float frac = (seg > 1e-6f) ? (want - arc[lo]) / seg : 0.f;
-				pt = glm::mix(pts[lo], pts[lo + 1], frac);
-			}
-			out_positions.push_back(pt);
+			if (lo >= PRESAMPLE) return pts[PRESAMPLE];
+			const float seg  = arc[lo + 1] - arc[lo];
+			const float frac = (seg > 1e-6f) ? (want - arc[lo]) / seg : 0.f;
+			return glm::mix(pts[lo], pts[lo + 1], frac);
+		};
+
+		for (int i = (skip_first ? 1 : 0); i <= steps; ++i) {
+			out_positions.push_back(arc_lookup(eff_start + (float)i / steps * eff_len));
 			out_widths.push_back(half_w);
 		}
 	}
@@ -855,14 +994,77 @@ void BikeCourse::build_from_road_network(
 	sys_print(Info, "BikeCourse: routed %d road nodes across %d hints\n",
 	          (int)full_node_path.size(), num_hints);
 
-	// Dense-sample all edges in the path
+	const int path_n   = (int)full_node_path.size();
+	const int seg_count = loop ? path_n : path_n - 1;
+
+	// ---- Pre-compute fillet arcs at each junction node ----
+	// fillets[s] describes the fillet AT node full_node_path[s], between
+	// the incoming segment (s-1 → s) and the outgoing segment (s → s+1).
+	std::vector<FilletInfo> fillets(path_n);
+	{
+		const int fi_first = loop ? 0 : 1;
+		const int fi_last  = loop ? path_n : path_n - 1;
+
+		for (int s = fi_first; s < fi_last; ++s) {
+			const int prev = (s - 1 + path_n) % path_n;
+			const int next = (s + 1) % path_n;
+
+			const int id_prev = full_node_path[prev];
+			const int id_cur  = full_node_path[s];
+			const int id_next = full_node_path[next];
+
+			if (!node_pos.count(id_prev) || !node_pos.count(id_cur) || !node_pos.count(id_next)) continue;
+
+			const glm::vec3& p_prev = node_pos[id_prev];
+			const glm::vec3& p_cur  = node_pos[id_cur];
+			const glm::vec3& p_next = node_pos[id_next];
+
+			// Incoming edge (prev → cur)
+			const RoadEdge* ep_in = edge_lookup.count({id_prev, id_cur}) ? edge_lookup[{id_prev, id_cur}] : nullptr;
+			glm::vec3 d_in;
+			float     hw_in, len_in;
+			if (ep_in) {
+				const bool gab = (ep_in->node_a_id == id_prev);
+				d_in   = edge_tangent_at(*ep_in, p_prev, p_cur, gab, /*at_end=*/true);
+				hw_in  = ep_in->width * 0.5f;
+				len_in = glm::distance(p_prev, p_cur);
+			} else {
+				const glm::vec3 dv = p_cur - p_prev;
+				len_in = glm::length(dv);
+				d_in   = len_in > 1e-4f ? dv / len_in : glm::vec3(0, 0, 1);
+				hw_in  = 3.f;
+			}
+
+			// Outgoing edge (cur → next)
+			const RoadEdge* ep_out = edge_lookup.count({id_cur, id_next}) ? edge_lookup[{id_cur, id_next}] : nullptr;
+			glm::vec3 d_out;
+			float     hw_out, len_out;
+			if (ep_out) {
+				const bool gab = (ep_out->node_a_id == id_cur);
+				d_out   = edge_tangent_at(*ep_out, p_cur, p_next, gab, /*at_end=*/false);
+				hw_out  = ep_out->width * 0.5f;
+				len_out = glm::distance(p_cur, p_next);
+			} else {
+				const glm::vec3 dv = p_next - p_cur;
+				len_out = glm::length(dv);
+				d_out   = len_out > 1e-4f ? dv / len_out : glm::vec3(0, 0, 1);
+				hw_out  = 3.f;
+			}
+
+			fillets[s] = compute_fillet(p_cur, d_in, d_out, hw_in, hw_out, len_in, len_out);
+		}
+
+		int n_fillets = 0;
+		for (const auto& f : fillets) if (f.active) ++n_fillets;
+		sys_print(Info, "BikeCourse: applied %d corner fillets across %d junctions\n",
+		          n_fillets, fi_last - fi_first);
+	}
+
+	// ---- Dense-sample all edges, carving fillet zones and inserting arcs ----
 	std::vector<glm::vec3> positions;
 	std::vector<float>     half_widths;
-	positions.reserve(full_node_path.size() * 10);
+	positions.reserve(full_node_path.size() * 12);
 	half_widths.reserve(positions.capacity());
-
-	const int path_n = (int)full_node_path.size();
-	const int seg_count = loop ? path_n : path_n - 1;
 
 	for (int s = 0; s < seg_count; ++s) {
 		const int id_a = full_node_path[s];
@@ -870,23 +1072,46 @@ void BikeCourse::build_from_road_network(
 
 		if (!node_pos.count(id_a) || !node_pos.count(id_b)) continue;
 
-		const RoadEdge* ep = edge_lookup.count({id_a, id_b}) ? edge_lookup[{id_a, id_b}] : nullptr;
-		const bool skip_first = (s > 0);  // avoid duplicate at junction
+		const FilletInfo& fi_start = fillets[s];
+		const FilletInfo& fi_end   = fillets[(s + 1) % path_n];
 
+		const float trim_start = fi_start.active ? fi_start.out_cutback : 0.f;
+		const float trim_end   = fi_end.active   ? fi_end.in_cutback    : 0.f;
+
+		// skip_first: at s==0 (start of path/loop) always include the first sample;
+		// for s>0 the junction/pt_out was already written by the previous edge or arc.
+		const bool skip_first = (s > 0);
+
+		const RoadEdge* ep = edge_lookup.count({id_a, id_b}) ? edge_lookup[{id_a, id_b}] : nullptr;
 		if (ep) {
 			const bool going_a_to_b = (ep->node_a_id == id_a);
 			sample_edge(*ep, node_pos[id_a], node_pos[id_b],
 			            going_a_to_b, sample_step_m, skip_first,
+			            trim_start, trim_end,
 			            positions, half_widths);
 		} else {
-			// No edge found (shouldn't happen if A* is correct): straight fallback
+			// Straight fallback (no matching edge — shouldn't happen for valid A* paths)
 			const glm::vec3 pa = node_pos[id_a], pb = node_pos[id_b];
-			const float len = glm::distance(pa, pb);
-			const int steps = glm::max(1, (int)(len / sample_step_m));
-			for (int i = (skip_first ? 1 : 0); i <= steps; ++i) {
-				positions.push_back(glm::mix(pa, pb, (float)i / steps));
-				half_widths.push_back(3.f);
+			const float seg_len = glm::distance(pa, pb);
+			const float eff_s = trim_start, eff_e = seg_len - trim_end;
+			if (eff_e > eff_s + 1e-4f) {
+				const float eff_len = eff_e - eff_s;
+				const int steps = glm::max(1, (int)(eff_len / sample_step_m));
+				for (int i = (skip_first ? 1 : 0); i <= steps; ++i) {
+					const float arc = eff_s + (float)i / steps * eff_len;
+					positions.push_back(glm::mix(pa, pb, arc / seg_len));
+					half_widths.push_back(3.f);
+				}
 			}
+		}
+
+		// After sampling this edge, insert the fillet arc at the end node (if any).
+		// For a loop, the arc at node 0 is inserted last; we omit its final sample
+		// (pt_out[0]) to avoid duplicating the very first position in the array.
+		if (fi_end.active) {
+			const bool is_loop_seam = (loop && (s + 1) % path_n == 0);
+			sample_arc_into(fi_end, sample_step_m, positions, half_widths,
+			                /*include_last=*/!is_loop_seam);
 		}
 	}
 
