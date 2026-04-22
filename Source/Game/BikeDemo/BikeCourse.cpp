@@ -513,8 +513,10 @@ static FilletInfo compute_fillet(
 	// Disable if fillet would consume more than 80% of either edge
 	if (cutback > 0.8f * in_edge_len || cutback > 0.8f * out_edge_len) return fi;
 
-	// Bisector of d_in and d_out points toward the inside of the corner
-	const glm::vec3 hv_raw = d_in + d_out;
+	// -d_in + d_out bisects the angle looking "backward" along incoming and
+	// "forward" along outgoing — this points toward the inside of the corner.
+	// (d_in + d_out would point to the outside.)
+	const glm::vec3 hv_raw = d_out - d_in;
 	const float hv_len = glm::length(hv_raw);
 	if (hv_len < 1e-4f) return fi;   // ~180-degree U-turn — skip
 
@@ -526,7 +528,8 @@ static FilletInfo compute_fillet(
 	fi.in_cutback  = cutback;
 	fi.out_cutback = cutback;
 	fi.arc_angle   = phi;
-	fi.left_turn   = (glm::cross(d_in, d_out).y > 0.f);
+	// cross(d_in, d_out).y < 0 → left turn (CCW from above)
+	fi.left_turn   = (glm::cross(d_in, d_out).y < 0.f);
 	fi.width_in    = width_in;
 	fi.width_out   = width_out;
 	return fi;
