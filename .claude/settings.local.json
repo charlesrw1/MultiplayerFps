@@ -177,7 +177,10 @@
       "Bash(x64/Debug/IntegrationTests.exe --mode=game --test=\"*dynamic*\" --promote)",
       "Bash(x64/Debug/IntegrationTests.exe --mode=editor --test=\"*dynamic*\" --promote)",
       "Bash(git stash:*)",
-      "Bash(grep -E '\\\\.mm$|\\\\.mi$')"
+      "Bash(grep -E '\\\\.mm$|\\\\.mi$')",
+      "Bash(git checkout *)",
+      "Bash(x64/Debug/UnitTests.exe --gtest_filter=\"RacingLine*\" --gtest_color=no)",
+      "Bash(MSBuild Source/UnitTests/UnitTests.vcxproj /p:Configuration=Debug /p:Platform=x64 /t:Build /m /nologo /v:minimal)"
     ]
   },
   "enabledPlugins": {

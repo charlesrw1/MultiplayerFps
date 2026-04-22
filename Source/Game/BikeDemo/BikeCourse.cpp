@@ -284,6 +284,7 @@ BikeWaypoint BikeCourse::sample(float dist_m) const
 	result.dist_from_start      = dist_m;
 	result.gradient             = glm::mix(wp0.gradient,             wp1.gradient,             t);
 	result.racing_line_lateral  = glm::mix(wp0.racing_line_lateral,  wp1.racing_line_lateral,  t);
+	result.racing_line_pos      = glm::mix(wp0.racing_line_pos,      wp1.racing_line_pos,      t);
 	return result;
 }
 
@@ -338,8 +339,7 @@ glm::vec3 BikeCourse::racing_line_lookahead(float from_dist_m, float ahead_m) co
 	float target = from_dist_m + ahead_m;
 	if (is_loop && total_length_m > 0.f)
 		target = std::fmod(target, total_length_m);
-	const BikeWaypoint wp = sample(target);
-	return wp.position + wp.right * wp.racing_line_lateral;
+	return sample(target).racing_line_pos;
 }
 
 // ============================================================
@@ -688,8 +688,13 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 		smoothed[i] = w_sum > 0.f ? sum / w_sum : 0.f;
 	}
 
-	for (int i = 0; i < n; ++i)
+	for (int i = 0; i < n; ++i) {
 		wps[i].racing_line_lateral = smoothed[i];
+		// Stamp absolute world position now, while we have both position and right at
+		// the same waypoint. This avoids the junction artefact where right rotates
+		// sharply and position + right * lateral jumps in world space.
+		wps[i].racing_line_pos = wps[i].position + wps[i].right * smoothed[i];
+	}
 }
 
 // ============================================================
@@ -872,11 +877,8 @@ void BikeCourse::debug_draw() const
 			Debug::add_line(left_edge, right_edge, Color32(0xff, 0xff, 0xff, 0x66), -1.f);
 		}
 
-		// Racing line — continuous orange line connecting all racing-line points
-		{
-			const glm::vec3 rl_cur  = wp.position   + wp.right   * wp.racing_line_lateral;
-			const glm::vec3 rl_next = next.position + next.right * next.racing_line_lateral;
-			Debug::add_line(rl_cur, rl_next, Color32(0xff, 0x99, 0x00, 0xff), -1.f);
-		}
+		// Racing line — use absolute world positions to avoid junction artefacts
+		Debug::add_line(wp.racing_line_pos, next.racing_line_pos,
+		                Color32(0xff, 0x99, 0x00, 0xff), -1.f);
 	}
 }

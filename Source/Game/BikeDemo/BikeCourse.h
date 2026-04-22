@@ -12,7 +12,8 @@ struct BikeWaypoint {
 	float     road_half_width    = 4.f;           // half the usable road width (m)
 	float     dist_from_start    = 0.f;           // arc-length from start to this node (m)
 	float     gradient           = 0.f;           // road gradient in radians (+ve = uphill)
-	float     racing_line_lateral = 0.f;          // ideal racing-line offset from centre (+ve = road-right)
+	float     racing_line_lateral = 0.f;          // ideal racing-line offset from centre (+ve = road-right) — kept for AI error computation
+	glm::vec3 racing_line_pos     = {};            // absolute world-space position on the racing line (use this for all rendering)
 };
 
 // The course spline built from level waypoint spawners.
@@ -71,7 +72,8 @@ public:
 	// Draw the spline in the debug overlay (gradient-coloured, with road-width tick marks).
 	void debug_draw() const;
 
-	// Compute and stamp racing_line_lateral on every waypoint.
+	// Compute and stamp racing_line_lateral (road-relative scalar) and racing_line_pos
+	// (absolute world position) on every waypoint.
 	// Exposed publicly so unit tests can call it on synthetic waypoint arrays.
 	// strength in [0,1]: fraction of road_half_width used for the swing.
 	static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,

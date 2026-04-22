@@ -26,6 +26,10 @@ static constexpr ImU32 COL_EDGE_DEFAULT  = IM_COL32(120, 180, 255, 180);
 static constexpr ImU32 COL_EDGE_HOVERED  = IM_COL32(255, 200,  40, 200);
 static constexpr ImU32 COL_PREVIEW       = IM_COL32(200, 255, 100, 180);
 static constexpr ImU32 COL_CTRL_PT      = IM_COL32(255, 120,  50, 200);
+static constexpr ImU32 COL_HINT         = IM_COL32(255,  50, 200, 230);
+static constexpr ImU32 COL_COURSE_CTR   = IM_COL32(100, 255, 100, 160);
+static constexpr ImU32 COL_RACING_LINE  = IM_COL32(255, 153,   0, 230);
+static constexpr ImU32 COL_ROAD_WIDTH   = IM_COL32(255, 255, 255,  80);
 
 // ---- construction -----------------------------------------------------------
 
@@ -313,12 +317,65 @@ void RoadBuilderTool::draw_overlay(const RoadNetworkComponent* net) const
             dl->AddCircle(s, NODE_DRAW_RADIUS, COL_PREVIEW, 0, 1.5f);
         }
     }
+
+    // ---- Course Preview: center line + racing line ----
+    if (course_preview.is_built) {
+        const auto& wps = course_preview.waypoints;
+        const int   n   = (int)wps.size();
+        const int   num_segs = course_preview.is_loop ? n : n - 1;
+
+        for (int i = 0; i < num_segs; ++i) {
+            const BikeWaypoint& wp   = wps[i];
+            const BikeWaypoint& next = wps[(i + 1) % n];
+
+            // Center line
+            dl->AddLine(world_to_screen(wp.position), world_to_screen(next.position),
+                        COL_COURSE_CTR, 1.5f);
+
+            // Road-width tick every 10th waypoint
+            if (show_road_widths && i % 10 == 0) {
+                ImVec2 l = world_to_screen(wp.position - wp.right * wp.road_half_width);
+                ImVec2 r = world_to_screen(wp.position + wp.right * wp.road_half_width);
+                dl->AddLine(l, r, COL_ROAD_WIDTH, 1.f);
+            }
+
+            // Racing line — use pre-baked world positions, not lateral offsets
+            if (show_racing_line) {
+                dl->AddLine(world_to_screen(wp.racing_line_pos),
+                            world_to_screen(next.racing_line_pos),
+                            COL_RACING_LINE, 2.f);
+            }
+        }
+    }
+
+    // ---- Route hint markers ----
+    for (int i = 0; i < (int)route_hints.size(); ++i) {
+        ImVec2 s = world_to_screen(route_hints[i]);
+        dl->AddCircleFilled(s, 8.f, COL_HINT);
+        dl->AddCircle(s, 8.f, IM_COL32(255, 255, 255, 200), 0, 1.5f);
+        char buf[8]; std::snprintf(buf, sizeof(buf), "%d", i);
+        dl->AddText({ s.x + 10.f, s.y - 8.f }, IM_COL32(255, 255, 255, 255), buf);
+    }
+
+    // ---- Ghost hint in CourseRoute mode ----
+    if (sub_mode == SubMode::CourseRoute) {
+        glm::vec3 world_mouse;
+        if (ray_to_ground(mouse.x, mouse.y, world_mouse)) {
+            world_mouse = apply_snap(world_mouse);
+            ImVec2 s = world_to_screen(world_mouse);
+            dl->AddCircle(s, 8.f, COL_HINT, 0, 1.5f);
+        }
+    }
 }
 
 // ---- tick (main update) -----------------------------------------------------
 
 void RoadBuilderTool::tick(EditorInputs& inputs)
 {
+    // Redraw 3D course debug lines every frame
+    if (course_preview.is_built)
+        course_preview.debug_draw();
+
     if (!UiSystem::inst->is_vp_hovered()) return;
 
     auto* net = get_or_create_component();
@@ -493,6 +550,19 @@ void RoadBuilderTool::tick(EditorInputs& inputs)
         break;
     }
 
+    // -----------------------------------------------------------------------
+    case SubMode::CourseRoute:
+    {
+        if (lmb_pressed && inputs.can_use_mouse_click()) {
+            glm::vec3 hit_pos;
+            if (ray_to_ground(mouse.x, mouse.y, hit_pos)) {
+                route_hints.push_back(apply_snap(hit_pos));
+            }
+            inputs.eat_mouse_click();
+        }
+        break;
+    }
+
     } // switch
 }
 
@@ -536,6 +606,110 @@ void RoadBuilderTool::draw_ui()
 
         if (sub_mode == SubMode::Connect && connect_src_id >= 0)
             ImGui::TextColored(ImVec4(0.4f, 1.f, 0.4f, 1.f), "Click destination node (or empty to place one)");
+
+        ImGui::Separator();
+
+        // ---- Course Preview ----
+        if (ImGui::CollapsingHeader("Course Preview")) {
+            ImGui::TextDisabled("Place ordered route hints, then Build Course.");
+            ImGui::Spacing();
+
+            // Sub-mode button
+            bool in_route = (sub_mode == SubMode::CourseRoute);
+            if (in_route) ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.8f, 0.3f, 0.8f, 1.f));
+            if (ImGui::Button("Place Route Hints")) {
+                sub_mode = in_route ? SubMode::PlaceNode : SubMode::CourseRoute;
+            }
+            if (in_route) ImGui::PopStyleColor();
+            if (in_route) ImGui::SameLine(), ImGui::TextColored(ImVec4(1.f, 0.4f, 1.f, 1.f), "Click viewport to add");
+
+            ImGui::Spacing();
+
+            // Route hints list
+            if (route_hints.empty()) {
+                ImGui::TextDisabled("No route hints placed.");
+            } else {
+                for (int i = 0; i < (int)route_hints.size(); ++i) {
+                    ImGui::PushID(i);
+                    ImGui::TextColored(ImVec4(1.f, 0.4f, 1.f, 1.f), "[%d]", i);
+                    ImGui::SameLine();
+                    ImGui::Text("(%.1f, %.1f, %.1f)", route_hints[i].x, route_hints[i].y, route_hints[i].z);
+                    ImGui::SameLine();
+                    if (ImGui::SmallButton("X")) {
+                        route_hints.erase(route_hints.begin() + i);
+                        --i;
+                    }
+                    ImGui::PopID();
+                }
+            }
+
+            ImGui::Spacing();
+            ImGui::Checkbox("Loop", &course_loop);
+
+            // Auto-rebuild racing line when strength changes
+            if (ImGui::SliderFloat("RL strength", &rl_strength, 0.f, 1.f, "%.2f")
+                    && course_preview.is_built) {
+                BikeCourse::compute_racing_line(course_preview.waypoints,
+                                                course_preview.is_loop, rl_strength);
+            }
+
+            static float sample_step = 0.5f;
+            ImGui::SliderFloat("Sample step (m)", &sample_step, 0.2f, 5.f, "%.1f");
+
+            ImGui::Checkbox("Show racing line overlay", &show_racing_line);
+            ImGui::Checkbox("Show road width ticks", &show_road_widths);
+
+            ImGui::Spacing();
+
+            // Find without creating — don't spawn a component just because the panel is open
+            auto* find_net = [this]() -> RoadNetworkComponent* {
+                auto* level = eng->get_level();
+                if (!level) return nullptr;
+                auto* c = level->find_first_component(&RoadNetworkComponent::StaticType);
+                return static_cast<RoadNetworkComponent*>(c);
+            }();
+
+            const bool has_net   = (find_net != nullptr);
+            const bool has_hints = (route_hints.size() >= 2);
+
+            if (!has_net)   ImGui::TextColored(ImVec4(1.f, 0.4f, 0.2f, 1.f), "No road network in scene");
+            if (!has_hints) ImGui::TextColored(ImVec4(1.f, 0.4f, 0.2f, 1.f), "Need >= 2 route hints");
+
+            ImGui::BeginDisabled(!has_net || !has_hints);
+            if (ImGui::Button("Build Course")) {
+                course_preview = BikeCourse{};
+                course_preview.build_from_road_network(*find_net, route_hints, sample_step, course_loop);
+                if (course_preview.is_built)
+                    BikeCourse::compute_racing_line(course_preview.waypoints,
+                                                    course_preview.is_loop, rl_strength);
+            }
+            ImGui::EndDisabled();
+
+            ImGui::SameLine();
+
+            ImGui::BeginDisabled(!course_preview.is_built);
+            if (ImGui::Button("Rebuild RL")) {
+                BikeCourse::compute_racing_line(course_preview.waypoints,
+                                                course_preview.is_loop, rl_strength);
+            }
+            ImGui::EndDisabled();
+
+            ImGui::SameLine();
+
+            if (ImGui::Button("Clear")) {
+                route_hints.clear();
+                course_preview = BikeCourse{};
+            }
+
+            if (course_preview.is_built) {
+                ImGui::Spacing();
+                ImGui::TextColored(ImVec4(0.4f, 1.f, 0.4f, 1.f),
+                    "Course: %.0f m, %d wpts%s",
+                    course_preview.total_length_m,
+                    (int)course_preview.waypoints.size(),
+                    course_preview.is_loop ? " (loop)" : "");
+            }
+        }
     }
     ImGui::End();
 }

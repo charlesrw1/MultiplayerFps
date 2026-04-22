@@ -1186,7 +1186,7 @@ static void apply_debug_follow_camera()
 		// Racing line reference point at the bike's current course position (lateral error line)
 		if (g_bike_app && g_bike_app->course.is_built) {
 			const BikeWaypoint cur_wp = g_bike_app->course.sample(bo->course_dist_m);
-			const glm::vec3 rl_ref = cur_wp.position + cur_wp.right * cur_wp.racing_line_lateral;
+			const glm::vec3 rl_ref = cur_wp.racing_line_pos;
 			// White dot on the racing line closest to the bike, red line showing lateral error
 			Debug::add_sphere(rl_ref, 0.25f, Color32(0xff, 0xff, 0xff, 0xff), -1.f);
 			const glm::vec3 bike_pos = bo->get_ws_position();

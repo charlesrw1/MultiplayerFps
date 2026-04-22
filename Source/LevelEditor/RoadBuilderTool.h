@@ -5,17 +5,18 @@
 #include "Render/DrawPublic.h"
 #include "Render/RenderObj.h"
 #include "Framework/Handle.h"
+#include "Game/BikeDemo/BikeCourse.h"
 
 class RoadNetworkComponent;
 
 /// Cities-Skylines-style road network editor.
 /// Activated via Mode > Road Builder in the menu bar.
 /// Provides: place/drag nodes, connect with straight or curved roads,
-/// delete nodes/edges, and snapping.
+/// delete nodes/edges, snapping, and a course-preview debug view.
 class RoadBuilderTool : public IEditorMode
 {
 public:
-    enum class SubMode { PlaceNode, Connect, Delete };
+    enum class SubMode { PlaceNode, Connect, Delete, CourseRoute };
 
     explicit RoadBuilderTool(EditorDoc& doc);
     ~RoadBuilderTool();
@@ -72,6 +73,14 @@ private:
     // MeshBuilder overlay registered in scene (drawn in 3D)
     MeshBuilder              mb;
     handle<MeshBuilder_Object> mb_handle;
+
+    // ---- Course preview ----
+    BikeCourse             course_preview;
+    std::vector<glm::vec3> route_hints;
+    bool                   course_loop      = true;
+    float                  rl_strength      = 0.82f;
+    bool                   show_racing_line = true;
+    bool                   show_road_widths = true;
 };
 
 #endif // EDITOR_BUILD
