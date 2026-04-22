@@ -72,10 +72,12 @@ public:
 	// Draw the spline in the debug overlay (gradient-coloured, with road-width tick marks).
 	void debug_draw() const;
 
-	// Compute and stamp racing_line_lateral (road-relative scalar) and racing_line_pos
-	// (absolute world position) on every waypoint.
-	// Exposed publicly so unit tests can call it on synthetic waypoint arrays.
-	// strength in [0,1]: fraction of road_half_width used for the swing.
+	// Iterative minimum-curvature path optimisation.
+	// Pulls the racing line tight inside the road corridor until curvature is minimised.
+	// Produces outside-entry / late-apex / outside-exit naturally — no corner detection.
+	// strength: fraction of road_half_width available to the racing line (0=centred, 1=full width).
+	// num_iters: optimisation iterations — more = tighter/smoother, diminishing returns above ~300.
 	static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
-	                                float strength = 0.82f);
+	                                float strength  = 0.82f,
+	                                int   num_iters = 200);
 };

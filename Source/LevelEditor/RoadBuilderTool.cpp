@@ -645,21 +645,23 @@ void RoadBuilderTool::draw_ui()
 
             ImGui::Spacing();
             ImGui::Checkbox("Loop", &course_loop);
+            ImGui::SliderFloat("Sample step (m)", &sample_step, 0.2f, 5.f, "%.2f");
 
-            // Auto-rebuild racing line when strength changes
-            if (ImGui::SliderFloat("RL strength", &rl_strength, 0.f, 1.f, "%.2f")
-                    && course_preview.is_built) {
+            ImGui::Separator();
+            ImGui::TextDisabled("Racing line (iterative min-curvature)");
+
+            bool rl_dirty = false;
+            rl_dirty |= ImGui::SliderFloat("RL width", &rl_strength, 0.f, 1.f, "%.2f");
+            rl_dirty |= ImGui::SliderInt("RL iterations", &rl_iters, 50, 600);
+            if (rl_dirty && course_preview.is_built) {
                 BikeCourse::compute_racing_line(course_preview.waypoints,
-                                                course_preview.is_loop, rl_strength);
+                                                course_preview.is_loop, rl_strength, rl_iters);
             }
 
-            static float sample_step = 0.5f;
-            ImGui::SliderFloat("Sample step (m)", &sample_step, 0.2f, 5.f, "%.1f");
-
             ImGui::Checkbox("Show racing line overlay", &show_racing_line);
-            ImGui::Checkbox("Show road width ticks", &show_road_widths);
+            ImGui::Checkbox("Show road width ticks",   &show_road_widths);
 
-            ImGui::Spacing();
+            ImGui::Separator();
 
             // Find without creating — don't spawn a component just because the panel is open
             auto* find_net = [this]() -> RoadNetworkComponent* {
@@ -672,30 +674,37 @@ void RoadBuilderTool::draw_ui()
             const bool has_net   = (find_net != nullptr);
             const bool has_hints = (route_hints.size() >= 2);
 
-            if (!has_net)   ImGui::TextColored(ImVec4(1.f, 0.4f, 0.2f, 1.f), "No road network in scene");
-            if (!has_hints) ImGui::TextColored(ImVec4(1.f, 0.4f, 0.2f, 1.f), "Need >= 2 route hints");
+            if (!has_net)   ImGui::TextColored(ImVec4(1.f, 0.5f, 0.2f, 1.f), "No road network in scene");
+            if (!has_hints) ImGui::TextColored(ImVec4(1.f, 0.5f, 0.2f, 1.f), "Need >= 2 route hints");
 
             ImGui::BeginDisabled(!has_net || !has_hints);
             if (ImGui::Button("Build Course")) {
                 course_preview = BikeCourse{};
                 course_preview.build_from_road_network(*find_net, route_hints, sample_step, course_loop);
-                if (course_preview.is_built)
+                if (course_preview.is_built) {
                     BikeCourse::compute_racing_line(course_preview.waypoints,
-                                                    course_preview.is_loop, rl_strength);
+                                                    course_preview.is_loop, rl_strength, rl_iters);
+                } else {
+                    ImGui::SetNextWindowSize({ 300.f, 0.f });
+                    ImGui::OpenPopup("build_failed");
+                }
             }
             ImGui::EndDisabled();
+            if (ImGui::BeginPopupModal("build_failed", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+                ImGui::Text("Course build failed — check road network\nconnectivity and route hint positions.");
+                if (ImGui::Button("OK")) ImGui::CloseCurrentPopup();
+                ImGui::EndPopup();
+            }
 
             ImGui::SameLine();
-
             ImGui::BeginDisabled(!course_preview.is_built);
             if (ImGui::Button("Rebuild RL")) {
                 BikeCourse::compute_racing_line(course_preview.waypoints,
-                                                course_preview.is_loop, rl_strength);
+                                                course_preview.is_loop, rl_strength, rl_iters);
             }
             ImGui::EndDisabled();
 
             ImGui::SameLine();
-
             if (ImGui::Button("Clear")) {
                 route_hints.clear();
                 course_preview = BikeCourse{};
@@ -704,10 +713,10 @@ void RoadBuilderTool::draw_ui()
             if (course_preview.is_built) {
                 ImGui::Spacing();
                 ImGui::TextColored(ImVec4(0.4f, 1.f, 0.4f, 1.f),
-                    "Course: %.0f m, %d wpts%s",
+                    "%.0f m  |  %d waypoints%s",
                     course_preview.total_length_m,
                     (int)course_preview.waypoints.size(),
-                    course_preview.is_loop ? " (loop)" : "");
+                    course_preview.is_loop ? "  (loop)" : "");
             }
         }
     }

@@ -180,7 +180,8 @@
       "Bash(grep -E '\\\\.mm$|\\\\.mi$')",
       "Bash(git checkout *)",
       "Bash(x64/Debug/UnitTests.exe --gtest_filter=\"RacingLine*\" --gtest_color=no)",
-      "Bash(MSBuild Source/UnitTests/UnitTests.vcxproj /p:Configuration=Debug /p:Platform=x64 /t:Build /m /nologo /v:minimal)"
+      "Bash(MSBuild Source/UnitTests/UnitTests.vcxproj /p:Configuration=Debug /p:Platform=x64 /t:Build /m /nologo /v:minimal)",
+      "Bash(trash Source/UnitTests/bike_course_racing_line_test.cpp)"
     ]
   },
   "enabledPlugins": {

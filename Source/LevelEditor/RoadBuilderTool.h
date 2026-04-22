@@ -79,6 +79,8 @@ private:
     std::vector<glm::vec3> route_hints;
     bool                   course_loop      = true;
     float                  rl_strength      = 0.82f;
+    int                    rl_iters         = 200;
+    float                  sample_step      = 0.5f;
     bool                   show_racing_line = true;
     bool                   show_road_widths = true;
 };
