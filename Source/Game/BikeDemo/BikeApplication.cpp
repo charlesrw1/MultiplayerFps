@@ -156,6 +156,25 @@ void BikeGameApplication::start()
 	}
 }
 
+void BikeGameApplication::rebuild_course()
+{
+	auto road_comps = GameplayStatic::find_components(&RoadNetworkComponent::StaticType);
+	auto spawners   = GameplayStatic::find_spawners_in_class("bike_waypoint");
+
+	if (!road_comps.empty() && !spawners.empty()) {
+		auto* rnc = static_cast<RoadNetworkComponent*>(road_comps[0]);
+		std::sort(spawners.begin(), spawners.end(), [](SpawnerComponent* a, SpawnerComponent* b) {
+			return std::atoi(a->get_owner()->get_editor_name().c_str())
+			     < std::atoi(b->get_owner()->get_editor_name().c_str());
+		});
+		std::vector<glm::vec3> hints;
+		for (auto* s : spawners) hints.push_back(s->get_ws_position());
+		course.build_from_road_network(*rnc, hints, 0.5f, /*loop=*/true);
+	} else {
+		course.build_from_spawners();
+	}
+}
+
 void BikeGameApplication::update()
 {
 	GameplayStatic::reset_debug_text_height();
@@ -1094,6 +1113,18 @@ static void bike_course_debug()
 		ImGui::Text("P%d  dist=%.0f m  lat=%+.2f m  draft=%.2f",
 			r->race_position, r->course_dist_m, r->lateral_pos, r->draft_factor);
 	}
+
+	ImGui::SeparatorText("Corner Fillets");
+	BikeCourse& course_rw = g_bike_app->course;
+	ImGui::Checkbox("Fillet enabled", &course_rw.fillet_enabled);
+	ImGui::DragFloat("Min angle (deg)", &course_rw.fillet_min_angle_deg, 0.5f, 0.f, 89.f, "%.1f");
+	ImGui::Text("%d fillets active", (int)course_rw.debug_fillets.size());
+	if (ImGui::Button("Rebuild Course"))
+		g_bike_app->rebuild_course();
+	static bool draw_fillets = false;
+	ImGui::Checkbox("Draw fillet geometry", &draw_fillets);
+	if (draw_fillets)
+		c.debug_draw_fillets();
 
 	ImGui::SeparatorText("Visualisation");
 	static bool draw_course = false;

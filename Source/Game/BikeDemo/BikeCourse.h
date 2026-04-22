@@ -16,14 +16,26 @@ struct BikeWaypoint {
 	glm::vec3 racing_line_pos     = {};            // absolute world-space position on the racing line (use this for all rendering)
 };
 
+// Fillet arc stored for debug visualisation after build_from_road_network.
+struct FilletDebugInfo {
+	glm::vec3 center, pt_in, pt_out;
+	float     radius, arc_angle;
+	bool      left_turn;
+};
+
 // The course spline built from level waypoint spawners.
 // All per-frame AI queries go through this class.
 class BikeCourse {
 public:
-	std::vector<BikeWaypoint> waypoints;
-	float total_length_m = 0.f;
-	bool  is_built       = false;
-	bool  is_loop        = false;  // true: last waypoint connects back to first
+	std::vector<BikeWaypoint>   waypoints;
+	std::vector<FilletDebugInfo> debug_fillets;  // populated by build_from_road_network
+	float total_length_m      = 0.f;
+	bool  is_built            = false;
+	bool  is_loop             = false;  // true: last waypoint connects back to first
+
+	// Fillet parameters — change and call build_from_road_network to re-apply.
+	bool  fillet_enabled       = true;
+	float fillet_min_angle_deg = 10.f;  // junctions with less deflection are not filleted
 
 	// Load "bike_waypoint" spawners from the current level, sort by editor_name (integer).
 	// Raycasts each waypoint down to the terrain surface, then builds as a loop.
@@ -71,6 +83,10 @@ public:
 
 	// Draw the spline in the debug overlay (gradient-coloured, with road-width tick marks).
 	void debug_draw() const;
+
+	// Draw fillet arc geometry (centers, tangent points, radius lines).
+	// Call from the debug menu after build_from_road_network.
+	void debug_draw_fillets() const;
 
 	// Iterative minimum-curvature path optimisation.
 	// Pulls the racing line tight inside the road corridor until curvature is minimised.

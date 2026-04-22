@@ -449,6 +449,8 @@ public:
 	};
 	std::vector<CrackDecalInstance> crack_instances;
 
+	void rebuild_course();  // re-runs course build with current fillet params (call from debug menu)
+
 private:
 	void collect_crack_decals();
 	void update_course_positions();

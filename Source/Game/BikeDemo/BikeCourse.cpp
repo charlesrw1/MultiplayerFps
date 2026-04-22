@@ -447,23 +447,27 @@ static int nearest_node_id(const std::vector<RoadNode>& nodes, glm::vec3 pos)
 // at_traversal_end=true  → unit tangent arriving at the end node (t=1 derivative)
 static glm::vec3 edge_tangent_at(
 	const RoadEdge& edge,
-	glm::vec3 pos_a, glm::vec3 pos_b,
+	glm::vec3 pos_a, glm::vec3 pos_b,  // pos_a = traversal start, pos_b = traversal end
 	bool going_a_to_b,
 	bool at_traversal_end)
 {
 	if (!edge.curved) {
-		glm::vec3 d = going_a_to_b ? (pos_b - pos_a) : (pos_a - pos_b);
+		// Straight edge: tangent is always the traversal direction pos_a→pos_b.
+		// going_a_to_b is irrelevant — a straight edge has one direction.
+		const glm::vec3 d = pos_b - pos_a;
 		const float len = glm::length(d);
 		return len > 1e-4f ? d / len : glm::vec3(0, 0, 1);
 	}
-	// Bezier traversal: p0=start, p1=ctrl near start, p2=ctrl near end, p3=end
+	// Bezier: pos_a is traversal start, pos_b is traversal end.
+	// When going B→A the ctrl points are swapped, but p0/p3 stay at traversal start/end.
+	// (Matches the same layout used in sample_edge.)
 	glm::vec3 p0, p1, p2, p3;
 	if (going_a_to_b) {
 		p0 = pos_a; p1 = edge.ctrl_a; p2 = edge.ctrl_b; p3 = pos_b;
 	} else {
-		p0 = pos_b; p1 = edge.ctrl_b; p2 = edge.ctrl_a; p3 = pos_a;
+		p0 = pos_a; p1 = edge.ctrl_b; p2 = edge.ctrl_a; p3 = pos_b;
 	}
-	// Cubic bezier derivative: at t=0 → 3*(p1-p0), at t=1 → 3*(p3-p2)
+	// Cubic bezier derivative: at t=0 → direction (p1-p0), at t=1 → direction (p3-p2)
 	const glm::vec3 tan = at_traversal_end ? (p3 - p2) : (p1 - p0);
 	const float len = glm::length(tan);
 	return len > 1e-4f ? tan / len : glm::vec3(0, 0, 1);
@@ -483,8 +487,6 @@ struct FilletInfo {
 	float     width_out    = 0.f;
 };
 
-static constexpr float FILLET_MIN_ANGLE_RAD = 10.f * glm::pi<float>() / 180.f;
-
 // Compute fillet arc for a junction between two road centerlines.
 // d_in  = unit tangent arriving at junction (pointing TOWARD junction)
 // d_out = unit tangent leaving junction   (pointing AWAY from junction)
@@ -493,14 +495,15 @@ static FilletInfo compute_fillet(
 	glm::vec3 junction_pos,
 	glm::vec3 d_in, glm::vec3 d_out,
 	float width_in, float width_out,
-	float in_edge_len, float out_edge_len)
+	float in_edge_len, float out_edge_len,
+	float min_angle_rad)
 {
 	FilletInfo fi;
 
 	// Full deflection angle between the two road directions
 	const float cos_phi = glm::clamp(glm::dot(d_in, d_out), -1.f, 1.f);
 	const float phi     = std::acos(cos_phi);
-	if (phi < FILLET_MIN_ANGLE_RAD) return fi;
+	if (phi < min_angle_rad) return fi;
 
 	const float theta     = phi * 0.5f;       // half-deflection
 	const float sin_theta = std::sin(theta);
@@ -1003,6 +1006,11 @@ void BikeCourse::build_from_road_network(
 	// ---- Pre-compute fillet arcs at each junction node ----
 	// fillets[s] describes the fillet AT node full_node_path[s], between
 	// the incoming segment (s-1 → s) and the outgoing segment (s → s+1).
+	const float fillet_min_rad = fillet_enabled
+		? (fillet_min_angle_deg * glm::pi<float>() / 180.f)
+		: glm::pi<float>() + 1.f;   // > pi — no deflection can exceed this, disables all fillets
+
+	debug_fillets.clear();
 	std::vector<FilletInfo> fillets(path_n);
 	{
 		const int fi_first = loop ? 0 : 1;
@@ -1054,11 +1062,16 @@ void BikeCourse::build_from_road_network(
 				hw_out  = 3.f;
 			}
 
-			fillets[s] = compute_fillet(p_cur, d_in, d_out, hw_in, hw_out, len_in, len_out);
+			fillets[s] = compute_fillet(p_cur, d_in, d_out, hw_in, hw_out, len_in, len_out,
+			                            fillet_min_rad);
 		}
 
 		int n_fillets = 0;
-		for (const auto& f : fillets) if (f.active) ++n_fillets;
+		for (const auto& f : fillets) {
+			if (!f.active) continue;
+			++n_fillets;
+			debug_fillets.push_back({ f.center, f.pt_in, f.pt_out, f.radius, f.arc_angle, f.left_turn });
+		}
 		sys_print(Info, "BikeCourse: applied %d corner fillets across %d junctions\n",
 		          n_fillets, fi_last - fi_first);
 	}
@@ -1174,7 +1187,7 @@ void BikeCourse::debug_draw() const
 		Debug::add_line(wp.position, next.position, line_color, -1.f);
 
 		// Road-width tick marks every 5th waypoint
-		if (i % 5 == 0) {
+		if (1) {
 			const glm::vec3 left_edge  = wp.position - wp.right * wp.road_half_width;
 			const glm::vec3 right_edge = wp.position + wp.right * wp.road_half_width;
 			Debug::add_line(left_edge, right_edge, Color32(0xff, 0xff, 0xff, 0x66), -1.f);
@@ -1183,5 +1196,48 @@ void BikeCourse::debug_draw() const
 		// Racing line — use absolute world positions to avoid junction artefacts
 		Debug::add_line(wp.racing_line_pos, next.racing_line_pos,
 		                Color32(0xff, 0x99, 0x00, 0xff), -1.f);
+	}
+}
+
+// ============================================================
+// debug_draw_fillets
+// ============================================================
+
+void BikeCourse::debug_draw_fillets() const
+{
+	for (const auto& f : debug_fillets) {
+		// Center: red sphere + vertical pole
+		Debug::add_sphere(f.center, 0.6f, Color32(0xff, 0x00, 0x00, 0xff), -1.f);
+		Debug::add_line(f.center, f.center + glm::vec3(0, 3, 0), Color32(0xff, 0x00, 0x00, 0xff), -1.f);
+
+		// pt_in (orange) and pt_out (yellow) markers
+		Debug::add_sphere(f.pt_in,  0.4f, Color32(0xff, 0x80, 0x00, 0xff), -1.f);
+		Debug::add_sphere(f.pt_out, 0.4f, Color32(0xff, 0xff, 0x00, 0xff), -1.f);
+
+		// Radius lines: center → pt_in (orange) and center → pt_out (yellow)
+		Debug::add_line(f.center, f.pt_in,  Color32(0xff, 0x80, 0x00, 0xaa), -1.f);
+		Debug::add_line(f.center, f.pt_out, Color32(0xff, 0xff, 0x00, 0xaa), -1.f);
+
+		// Arc approximation: step in small increments and draw chords
+		const glm::vec3 from_c_in  = f.pt_in  - f.center;
+		const glm::vec3 from_c_out = f.pt_out - f.center;
+		const float angle_in  = std::atan2(from_c_in.z,  from_c_in.x);
+		const float angle_out = std::atan2(from_c_out.z, from_c_out.x);
+		float delta = angle_out - angle_in;
+		if (f.left_turn) { if (delta < 0.f) delta += 2.f * glm::pi<float>(); }
+		else             { if (delta > 0.f) delta -= 2.f * glm::pi<float>(); }
+
+		constexpr int ARC_SEGS = 16;
+		glm::vec3 prev_pt = f.pt_in;
+		for (int k = 1; k <= ARC_SEGS; ++k) {
+			const float t  = (float)k / ARC_SEGS;
+			const float a  = angle_in + t * delta;
+			const float y  = glm::mix(f.pt_in.y, f.pt_out.y, t);
+			const glm::vec3 cur_pt = { f.center.x + f.radius * std::cos(a),
+			                           y,
+			                           f.center.z + f.radius * std::sin(a) };
+			Debug::add_line(prev_pt, cur_pt, Color32(0x00, 0xff, 0xff, 0xff), -1.f);
+			prev_pt = cur_pt;
+		}
 	}
 }
