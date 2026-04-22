@@ -1082,6 +1082,11 @@ void BikeCourse::build_from_road_network(
 	positions.reserve(full_node_path.size() * 12);
 	half_widths.reserve(positions.capacity());
 
+	// Tracks the positions[] index range for each fillet arc so we can force
+	// exact radial right-vectors on those waypoints after build().
+	struct FilletRange { int start_idx, end_idx; glm::vec3 center; bool left_turn; };
+	std::vector<FilletRange> fillet_ranges;
+
 	for (int s = 0; s < seg_count; ++s) {
 		const int id_a = full_node_path[s];
 		const int id_b = full_node_path[(s + 1) % path_n];
@@ -1126,8 +1131,14 @@ void BikeCourse::build_from_road_network(
 		// (pt_out[0]) to avoid duplicating the very first position in the array.
 		if (fi_end.active) {
 			const bool is_loop_seam = (loop && (s + 1) % path_n == 0);
+			// Record pt_in index (last edge sample) before pushing arc samples.
+			const int pt_in_idx = (int)positions.size() - 1;
 			sample_arc_into(fi_end, sample_step_m, positions, half_widths,
 			                /*include_last=*/!is_loop_seam);
+			// pt_out is positions[0] for the loop-seam arc (added by edge s=0).
+			const int pt_out_idx = is_loop_seam ? 0 : (int)positions.size() - 1;
+			if (pt_in_idx >= 0)
+				fillet_ranges.push_back({ pt_in_idx, pt_out_idx, fi_end.center, fi_end.left_turn });
 		}
 	}
 
@@ -1152,6 +1163,35 @@ void BikeCourse::build_from_road_network(
 	}
 
 	build(positions, half_widths, loop);
+
+	// Force exact radial right-vectors on fillet arc waypoints (including pt_in / pt_out).
+	// build() approximates right from chord direction; on arcs the exact perpendicular is
+	// the radial direction from the fillet center.
+	//   left_turn  → center is to the LEFT  → right points AWAY  from center (+radial)
+	//   right_turn → center is to the RIGHT → right points TOWARD center     (−radial)
+	if (is_built) {
+		for (const auto& fr : fillet_ranges) {
+			auto fix_right = [&](int idx) {
+				if (idx < 0 || idx >= (int)waypoints.size()) return;
+				BikeWaypoint& wp = waypoints[idx];
+				glm::vec3 radial = wp.position - fr.center;
+				radial.y = 0.f;
+				const float rlen = glm::length(radial);
+				if (rlen < 1e-4f) return;
+				wp.right = (fr.left_turn ? 1.f : -1.f) * (radial / rlen);
+			};
+			if (fr.start_idx <= fr.end_idx) {
+				for (int i = fr.start_idx; i <= fr.end_idx; ++i)
+					fix_right(i);
+			} else {
+				// Loop-seam wrap: [start_idx .. size-1] then [0 .. end_idx]
+				for (int i = fr.start_idx; i < (int)waypoints.size(); ++i)
+					fix_right(i);
+				for (int i = 0; i <= fr.end_idx; ++i)
+					fix_right(i);
+			}
+		}
+	}
 
 	// Compute racing line offsets now that waypoints are built
 	if (is_built)

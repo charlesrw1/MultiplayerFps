@@ -717,6 +717,9 @@ void RoadBuilderTool::draw_ui()
                     course_preview.total_length_m,
                     (int)course_preview.waypoints.size(),
                     course_preview.is_loop ? "  (loop)" : "");
+
+                course_preview.debug_draw_fillets();
+
             }
         }
     }
