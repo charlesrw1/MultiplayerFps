@@ -601,8 +601,9 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 
 		const glm::vec3 cross       = glm::cross(ba / la, bc / lc);
 		const float kappa_unsigned  = glm::length(cross) / (0.5f * ac);
-		// cross.y < 0 → counterclockwise in XZ → left turn → κ > 0
-		const float sign_val = (cross.y < 0.f) ? 1.f : -1.f;
+		// cross.y > 0 → counterclockwise in XZ (left turn) → κ > 0
+		// Verified: going +Z, curving toward -X (left): cross(ba,bc).y = +1
+		const float sign_val = (cross.y > 0.f) ? 1.f : -1.f;
 		kappa[i] = sign_val * kappa_unsigned;
 	}
 
@@ -614,7 +615,7 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 	// ----------------------------------------------------------------
 	// Phase 2 — Corner detection: contiguous run of |κ| > threshold.
 	// ----------------------------------------------------------------
-	static constexpr float KAPPA_THRESH  = 0.005f; // radius < 200 m → corner
+	static constexpr float KAPPA_THRESH  = 0.008f; // radius < 125 m → corner
 	static constexpr float MU_LATERAL    = 0.55f;
 	static constexpr float G_ACC         = 9.81f;
 	static constexpr float BIKE_DECEL    = 7.0f;
@@ -719,7 +720,8 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 	// Phase 4 — Wide box-blur to smooth corner entry/exit transitions
 	// and handle chicane compromises naturally.
 	// ----------------------------------------------------------------
-	rl_smooth_scalar(target, loop, 10);
+	rl_smooth_scalar(target, loop, 16);
+	rl_smooth_scalar(target, loop, 16);  // two passes for a wide effective kernel
 
 	for (int i = 0; i < n; ++i)
 		target[i] = glm::clamp(target[i], -wps[i].road_half_width * strength, wps[i].road_half_width * strength);
