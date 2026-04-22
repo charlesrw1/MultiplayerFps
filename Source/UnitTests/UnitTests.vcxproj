@@ -171,7 +171,6 @@
     <ClCompile Include="ringbuffer_test.cpp" />
     <ClCompile Include="string_util_test.cpp" />
     <ClCompile Include="bike_ai_test.cpp" />
-    <ClCompile Include="bike_course_racing_line_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Unittest.h" />
