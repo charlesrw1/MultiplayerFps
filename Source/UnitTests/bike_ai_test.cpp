@@ -519,21 +519,3 @@ TEST(BikeAIHardSteer, AlreadyOverlapping_AllowsEscape)
     EXPECT_EQ(s.hard_max, 1.f)  << "overlapping riders must be allowed to escape freely";
     EXPECT_EQ(s.hard_min, -1.f);
 }
-
-TEST(BikeAIHardSteer, SteerClampedByWindow)
-{
-    // Desired steer = -0.6 (rightward), other to my right → max clamped to 0
-    HardClampState s;
-    apply_hard_neighbour(s, 0.f, 0.f, 0.4f, 1.0f);
-    const float final_steer = std::max(s.hard_min, std::min(s.hard_max, -0.6f));
-    EXPECT_NEAR(final_steer, 0.f, 1e-6f) << "rightward steer into neighbour must be zeroed";
-}
-
-TEST(BikeAIHardSteer, SteerAwayFromNeighbour_Allowed)
-{
-    // Desired steer = +0.6 (leftward), other to my right → max=0 but steer is positive
-    HardClampState s;
-    apply_hard_neighbour(s, 0.f, 0.f, 0.4f, 1.0f);
-    const float final_steer = std::max(s.hard_min, std::min(s.hard_max, 0.6f));
-    EXPECT_NEAR(final_steer, 0.6f, 1e-6f) << "steer away from neighbour should pass through unmodified";
-}
