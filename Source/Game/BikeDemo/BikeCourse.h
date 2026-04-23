@@ -14,6 +14,7 @@ struct BikeWaypoint {
 	float     gradient           = 0.f;           // road gradient in radians (+ve = uphill)
 	float     racing_line_lateral = 0.f;          // ideal racing-line offset from centre (+ve = road-right) — kept for AI error computation
 	glm::vec3 racing_line_pos     = {};            // absolute world-space position on the racing line (use this for all rendering)
+	float     speed_mps           = 0.f;           // target speed on the racing line (m/s) — from gradient-aware kinematic profile
 };
 
 // Fillet arc stored for debug visualisation after build_from_road_network.

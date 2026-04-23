@@ -502,8 +502,8 @@ static FilletInfo compute_fillet(
 
 	// Full deflection angle between the two road directions
 	const float cos_phi = glm::clamp(glm::dot(d_in, d_out), -1.f, 1.f);
-	const float phi     = std::acos(cos_phi);
-	if (phi < min_angle_rad) return fi;
+	const float phi     = PI-std::acos(cos_phi);
+	if ((PI-phi) < min_angle_rad) return fi;
 
 	const float theta     = phi * 0.5f;       // half-deflection
 	const float sin_theta = std::sin(theta);
@@ -679,54 +679,25 @@ static void rl_smooth_scalar(std::vector<float>& v, bool loop, int r)
 	v = out;
 }
 
-// ============================================================
-// compute_racing_line — production-quality
-// ============================================================
-//
-// Matches the approach used by iRacing / Gran Turismo / F1-series AI:
-//
-// Phase 1 — Signed curvature profile (Menger formula, noise-smoothed).
-//           κ > 0 = left turn  (inside = −right)
-//           κ < 0 = right turn (inside = +right)
-//
-// Phase 2 — Corner detection. Apex = local max |κ| in each corner
-//           region.  Physics-based braking/accel distances come from
-//           bicycle tyre dynamics (mu_lat, g, max_decel/accel).
-//
-// Phase 3 — Outside-inside-outside target offsets.
-//           Entry zone  → outside edge (opposite apex side).
-//           Apex        → inside  edge.
-//           Exit zone   → outside edge.
-//           Smoothstep blends entry→apex and apex→exit.
-//           Dominant-corner rule merges overlapping zones.
-//
-// Phase 4 — Wide box-blur smooths the raw targets so compound corners
-//           and chicanes blend naturally.
-//
-// Phase 5 — Gauss-Seidel minimum-curvature relaxation seeded from the
-//           corner-aware targets.  Eliminates residual kinks and
-//           produces the globally minimum-curvature path that stays
-//           inside the road corridor — naturally outside-in-outside.
-//
-// Bike dynamics constants (matched to BikeObject):
-//   mu_lateral = 0.55   road tyre lateral friction
-//   g          = 9.81 m/s²
-//   max_decel  = 7.0  m/s²  (hard brake — matches BikeObject)
-//   max_accel  = 3.0  m/s²  (conservative exit acceleration)
-
 void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
                                      float strength, int num_iters)
 {
 	const int n = (int)wps.size();
 	if (n < 3) return;
 
-	// Total arc-length used only for loop-wrap arithmetic in Phase 3.
 	const float total_len = loop && n > 1
 		? wps.back().dist_from_start + glm::distance(wps.back().position, wps[0].position)
 		: wps.back().dist_from_start;
 
+	// Bike dynamics constants (matched to BikeObject physics).
+	static constexpr float MU_LATERAL = 0.55f;  // road tyre lateral friction
+	static constexpr float G_ACC      = 9.81f;
+	static constexpr float BIKE_DECEL = 7.0f;   // hard braking (m/s²)
+	static constexpr float BIKE_ACCEL = 3.0f;   // conservative exit acceleration (m/s²)
+	static constexpr float V_MAX_FLAT = 20.f;   // ~72 km/h, fast road cycling absolute cap
+
 	// ----------------------------------------------------------------
-	// Phase 1 — Signed curvature at every waypoint.
+	// Phase 1 — Signed curvature at every centerline waypoint.
 	// ----------------------------------------------------------------
 	std::vector<float> kappa(n, 0.f);
 	for (int i = 0; i < n; ++i) {
@@ -737,44 +708,113 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 		const glm::vec3 a  = wps[im].position;
 		const glm::vec3 b  = wps[i].position;
 		const glm::vec3 c  = wps[ip].position;
-		const glm::vec3 ba = a - b;
-		const glm::vec3 bc = c - b;
-		const float la  = glm::length(ba);
-		const float lc  = glm::length(bc);
-		const float ac  = glm::distance(a, c);
+		const glm::vec3 ba = a - b, bc = c - b;
+		const float la = glm::length(ba), lc = glm::length(bc), ac = glm::distance(a, c);
 		if (la < 1e-4f || lc < 1e-4f || ac < 1e-4f) continue;
 
-		const glm::vec3 cross       = glm::cross(ba / la, bc / lc);
-		const float kappa_unsigned  = glm::length(cross) / (0.5f * ac);
-		// cross.y > 0 → counterclockwise in XZ (left turn) → κ > 0
-		// Verified: going +Z, curving toward -X (left): cross(ba,bc).y = +1
-		const float sign_val = (cross.y > 0.f) ? 1.f : -1.f;
-		kappa[i] = sign_val * kappa_unsigned;
+		const glm::vec3 cr      = glm::cross(ba / la, bc / lc);
+		const float     kappa_u = glm::length(cr) / (0.5f * ac);
+		kappa[i] = (cr.y > 0.f ? 1.f : -1.f) * kappa_u;
+	}
+	rl_smooth_scalar(kappa, loop, 6);
+	rl_smooth_scalar(kappa, loop, 6);
+
+	// ----------------------------------------------------------------
+	// Phase 2 — Arc-length table + gradient-aware centerline speed profile.
+	//
+	// v_lat[i] = max cornering speed on a slope:
+	//   v = sqrt(mu * g * cos(gradient) / |kappa|)
+	// cos(gradient) scales available lateral grip with road normal force.
+	//
+	// Forward/backward kinematic passes propagate limits along the course:
+	//   uphill   → harder to accelerate, easier to brake
+	//   downhill → easier to accelerate, harder to brake (longer distances)
+	//
+	// The resulting speed[] profile is queried in Phase 3 so each corner's
+	// braking/accel zone is sized from the real approach/exit speed rather
+	// than the na?ve v_apex²/(2a) formula.
+	// ----------------------------------------------------------------
+	std::vector<float> ds(n, 0.f);
+	for (int i = 0; i < n; ++i) {
+		const int nxt = loop ? (i + 1) % n : std::min(i + 1, n - 1);
+		ds[i] = glm::distance(wps[i].position, wps[nxt].position);
 	}
 
-	// Two box-blur passes to kill quantisation noise from dense sampling
-	// without collapsing tight-corner peaks.
-	rl_smooth_scalar(kappa, loop, 6);
-	rl_smooth_scalar(kappa, loop, 6);
+	// kappa_floor keeps lateral speed capped at V_MAX_FLAT on long straights.
+	const float kappa_floor = MU_LATERAL * G_ACC / (V_MAX_FLAT * V_MAX_FLAT);
+
+	std::vector<float> speed(n);
+	for (int i = 0; i < n; ++i) {
+		const float kabs   = std::max(kappa_floor, std::abs(kappa[i]));
+		const float mu_eff = MU_LATERAL * std::cos(std::abs(wps[i].gradient));
+		speed[i] = std::sqrt(mu_eff * G_ACC / kabs);
+	}
+
+	// Sweep 2n elements per pass so loop wrap-around constraints converge in one outer iteration.
+	const int sw_s = loop ? 0     : 1;
+	const int sw_e = loop ? 2 * n : n - 1;  // exclusive upper bound
+
+	for (int pass = 0; pass < (loop ? 2 : 1); ++pass) {
+		for (int i = sw_s; i < sw_e; ++i) {
+			const int cur  = loop ? i % n : i;
+			const int prev = loop ? (i - 1 + n) % n : cur - 1;
+			const float a_eff = std::max(0.3f, BIKE_ACCEL - G_ACC * std::sin(wps[cur].gradient));
+			speed[cur] = std::min(speed[cur],
+				std::sqrt(speed[prev] * speed[prev] + 2.f * a_eff * ds[prev]));
+		}
+		for (int i = sw_e - 1; i >= sw_s; --i) {
+			const int cur = loop ? i % n : i;
+			const int nxt = loop ? (i + 1) % n : cur + 1;
+			const float d_eff = std::max(1.f, BIKE_DECEL + G_ACC * std::sin(wps[cur].gradient));
+			speed[cur] = std::min(speed[cur],
+				std::sqrt(speed[nxt] * speed[nxt] + 2.f * d_eff * ds[cur]));
+		}
+	}
 
 	// ----------------------------------------------------------------
-	// Phase 2 — Corner detection: contiguous run of |κ| > threshold.
+	// Phase 3 — Corner detection with gradient-aware zone sizing.
+	//
+	// Apex speed: v = sqrt(mu * g * cos(grad) * R)
+	//   On a hill the tyre's normal force is m*g*cos(grad), so available
+	//   lateral grip — and maximum corner speed — scales with cos(grad).
+	//
+	// Braking zone: (v_approach² - v_apex²) / (2 * eff_decel)
+	//   where v_approach is read from the speed profile ~bk_dist before
+	//   the apex, and eff_decel = BIKE_DECEL + g*sin(grad) (uphill shortens,
+	//   downhill extends the braking distance).
+	//   This formula is typically 2–4× larger than the old v_apex²/(2a),
+	//   so the OIO entry zone stretches back to where braking actually starts.
 	// ----------------------------------------------------------------
-	static constexpr float KAPPA_THRESH  = 0.008f; // radius < 125 m → corner
-	static constexpr float MU_LATERAL    = 0.55f;
-	static constexpr float G_ACC         = 9.81f;
-	static constexpr float BIKE_DECEL    = 7.0f;
-	static constexpr float BIKE_ACCEL    = 3.0f;
+	static constexpr float KAPPA_THRESH = 0.008f; // radius < 125 m → corner
 
 	struct Corner {
 		int   apex_idx;
-		float apex_kappa;   // signed κ at apex
-		float braking_dist; // m before apex (turn-in to apex)
-		float accel_dist;   // m after  apex (apex to exit complete)
+		float apex_kappa;
+		float braking_dist;
+		float accel_dist;
 	};
 	std::vector<Corner> corners;
 
 	{
+		auto scan_back = [&](int from, float dist) -> int {
+			int cur = from; float rem = dist; int guard = n;
+			while (rem > 0.f && --guard >= 0) {
+				const int prev = loop ? (cur - 1 + n) % n : std::max(0, cur - 1);
+				if (prev == cur) break;
+				rem -= ds[prev]; cur = prev;
+			}
+			return cur;
+		};
+		auto scan_fwd = [&](int from, float dist) -> int {
+			int cur = from; float rem = dist; int guard = n;
+			while (rem > 0.f && --guard >= 0) {
+				const int nxt = loop ? (cur + 1) % n : std::min(n - 1, cur + 1);
+				if (nxt == cur) break;
+				rem -= ds[cur]; cur = nxt;
+			}
+			return cur;
+		};
+
 		int i = 0;
 		while (i < n) {
 			if (std::abs(kappa[i]) < KAPPA_THRESH) { ++i; continue; }
@@ -790,25 +830,36 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 			}
 			if (peak_abs < 1e-6f) continue;
 
-			const float radius  = 1.f / peak_abs;
-			const float v_apex  = std::sqrt(MU_LATERAL * G_ACC * radius);
-			const float bk_dist = glm::clamp(v_apex * v_apex / (2.f * BIKE_DECEL), 5.f, 120.f);
-			const float ac_dist = glm::clamp(v_apex * v_apex / (2.f * BIKE_ACCEL), 5.f, 150.f);
+			const float grad_a = wps[apex_idx].gradient;
+			const float mu_eff = MU_LATERAL * std::cos(grad_a);
+			const float radius = 1.f / peak_abs;
+			const float v_apex = std::sqrt(mu_eff * G_ACC * radius);
+
+			const float eff_d = std::max(1.f,  BIKE_DECEL + G_ACC * std::sin(grad_a));
+			const float eff_a = std::max(0.3f, BIKE_ACCEL - G_ACC * std::sin(grad_a));
+
+			// Rough initial zones for approach/exit lookup in the speed profile.
+			const float bk_rough = glm::clamp(v_apex * v_apex / (2.f * eff_d), 5.f, 200.f);
+			const float ac_rough = glm::clamp(v_apex * v_apex / (2.f * eff_a), 5.f, 250.f);
+
+			const float v_app = speed[scan_back(apex_idx, bk_rough)];
+			const float v_ex  = speed[scan_fwd (apex_idx, ac_rough)];
+			const float v_c2  = v_apex * v_apex;
+
+			const float bk_dist = glm::clamp(std::max(0.f, v_app*v_app - v_c2) / (2.f * eff_d), 5.f, 200.f);
+			const float ac_dist = glm::clamp(std::max(0.f, v_ex *v_ex  - v_c2) / (2.f * eff_a), 5.f, 250.f);
+
 			corners.push_back({ apex_idx, kappa[apex_idx], bk_dist, ac_dist });
 		}
 
-		// For loops: check if the corner at the very end connects to one at the very
-		// start (seam-crossing corner).  Merge by keeping only the sharper apex.
+		// Seam-crossing corner merge for loops: keep the sharper apex.
 		if (loop && corners.size() >= 2) {
 			const Corner& first = corners.front();
 			const Corner& last  = corners.back();
 			const float d_first = wps[first.apex_idx].dist_from_start;
 			const float d_last  = wps[last.apex_idx].dist_from_start;
 			const bool same_sign = (first.apex_kappa >= 0.f) == (last.apex_kappa >= 0.f);
-			// If the last apex is within accel_dist of the seam AND first within braking_dist of seam
 			if (same_sign && d_last + last.accel_dist >= total_len && d_first <= first.braking_dist) {
-				// Keep the one with tighter curvature; the other becomes an
-				// extension of it (Phase 3 loop-wrap handles the rest).
 				if (std::abs(last.apex_kappa) >= std::abs(first.apex_kappa))
 					corners.erase(corners.begin());
 				else
@@ -818,23 +869,21 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 	}
 
 	// ----------------------------------------------------------------
-	// Phase 3 — Assign target lateral offsets (outside-inside-outside).
-	//   sign_k =  1 → left turn  : inside = –right (offset < 0), outside = +right (offset > 0)
-	//   sign_k = –1 → right turn : inside = +right (offset > 0), outside = –right (offset < 0)
-	//   inside_off  = –sign_k * hw
-	//   outside_off = +sign_k * hw
+	// Phase 4 — Outside-inside-outside lateral target offsets.
+	//   sign_k =  1 (left turn):  outside = +hw, inside = −hw
+	//   sign_k = −1 (right turn): outside = −hw, inside = +hw
+	// Dominant-corner rule: largest |offset| wins at each waypoint so
+	// consecutive corners naturally produce a compromise line.
 	// ----------------------------------------------------------------
 	std::vector<float> target(n, 0.f);
 
 	for (const Corner& c : corners) {
-		const float d_apex  = wps[c.apex_idx].dist_from_start;
-		const float sign_k  = (c.apex_kappa >= 0.f) ? 1.f : -1.f;
+		const float d_apex = wps[c.apex_idx].dist_from_start;
+		const float sign_k = (c.apex_kappa >= 0.f) ? 1.f : -1.f;
 
 		for (int i = 0; i < n; ++i) {
 			const float hw = wps[i].road_half_width * strength;
 
-			// Signed arc-length distance from this waypoint to the apex,
-			// wrapped into [−total/2, +total/2] for loop-safe comparison.
 			float d_rel = wps[i].dist_from_start - d_apex;
 			if (loop && total_len > 0.f) {
 				while (d_rel >  0.5f * total_len) d_rel -= total_len;
@@ -846,61 +895,54 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 			float t_offset = 0.f;
 
 			if (d_rel >= -c.braking_dist && d_rel <= 0.f) {
-				// Entry (braking) zone: outside → inside via smoothstep
 				const float t = (d_rel + c.braking_dist) / c.braking_dist;
 				t_offset = glm::mix(out_off, in_off, glm::smoothstep(0.f, 1.f, t));
 			} else if (d_rel > 0.f && d_rel <= c.accel_dist) {
-				// Exit (acceleration) zone: inside → outside via smoothstep
 				const float t = d_rel / c.accel_dist;
 				t_offset = glm::mix(in_off, out_off, glm::smoothstep(0.f, 1.f, t));
 			}
 
-			// Dominant-corner rule: the corner with the larger offset wins.
 			if (std::abs(t_offset) > std::abs(target[i]))
 				target[i] = t_offset;
 		}
 	}
 
 	// ----------------------------------------------------------------
-	// Phase 4 — Wide box-blur to smooth corner entry/exit transitions
-	// and handle chicane compromises naturally.
+	// Phase 5 — Wide box-blur to smooth entry/exit transitions and
+	// blend chicanes/consecutive corners naturally.
 	// ----------------------------------------------------------------
 	rl_smooth_scalar(target, loop, 16);
-	rl_smooth_scalar(target, loop, 16);  // two passes for a wide effective kernel
+	rl_smooth_scalar(target, loop, 16);
 
 	for (int i = 0; i < n; ++i)
-		target[i] = glm::clamp(target[i], -wps[i].road_half_width * strength, wps[i].road_half_width * strength);
+		target[i] = glm::clamp(target[i],
+		                       -wps[i].road_half_width * strength,
+		                        wps[i].road_half_width * strength);
 
 	// ----------------------------------------------------------------
-	// Phase 5 — Minimum-curvature Gauss-Seidel relaxation.
-	//   Seeded from corner targets (not from centerline), so the solver
-	//   starts close to the answer and converges in far fewer iterations.
-	//   Each step projects point i to the foot of the perpendicular
-	//   through its neighbours (zero local curvature), then clamps to
-	//   the corridor.  Result: globally minimum curvature path that
-	//   respects the outside-inside-outside pattern.
+	// Phase 6 — Gauss-Seidel minimum-curvature relaxation.
+	// Seeded from the physics-derived corner targets; converges to the
+	// globally minimum-curvature path inside the road corridor.
 	// ----------------------------------------------------------------
 	std::vector<glm::vec3> rl(n);
 	for (int i = 0; i < n; ++i)
 		rl[i] = wps[i].position + wps[i].right * target[i];
 
-	const int i_start = loop ? 0 : 1;
-	const int i_end   = loop ? n : n - 1;
+	const int gs_s = loop ? 0 : 1;
+	const int gs_e = loop ? n : n - 1;
 
 	for (int iter = 0; iter < num_iters; ++iter) {
-		for (int i = i_start; i < i_end; ++i) {
+		for (int i = gs_s; i < gs_e; ++i) {
 			const int prev = loop ? (i + n - 1) % n : i - 1;
-			const int next = loop ? (i + 1) % n     : i + 1;
+			const int nxt  = loop ? (i + 1) % n     : i + 1;
 
-			const glm::vec3 ab    = rl[next] - rl[prev];
+			const glm::vec3 ab    = rl[nxt] - rl[prev];
 			const float     ab_sq = glm::dot(ab, ab);
 			glm::vec3 ideal;
-			if (ab_sq < 1e-8f) {
+			if (ab_sq < 1e-8f)
 				ideal = rl[i];
-			} else {
-				const float t = glm::dot(rl[i] - rl[prev], ab) / ab_sq;
-				ideal = rl[prev] + t * ab;
-			}
+			else
+				ideal = rl[prev] + glm::dot(rl[i] - rl[prev], ab) / ab_sq * ab;
 
 			const float hw  = wps[i].road_half_width * strength;
 			const float lat = glm::clamp(glm::dot(ideal - wps[i].position, wps[i].right), -hw, hw);
@@ -909,11 +951,62 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 	}
 
 	// ----------------------------------------------------------------
-	// Stamp results
+	// Phase 7 — Speed profile on the actual racing line.
+	//
+	// Re-derives curvature from rl[] (tighter than the centerline), then
+	// runs the same gradient-aware forward/backward passes to produce a
+	// physically accurate speed target at every waypoint.
+	// Stored in wps[i].speed_mps for AI throttle/brake targeting.
 	// ----------------------------------------------------------------
-	for (int i = 0; i < n; ++i) {
-		wps[i].racing_line_pos     = rl[i];
-		wps[i].racing_line_lateral = glm::dot(rl[i] - wps[i].position, wps[i].right);
+	{
+		std::vector<float> rl_kappa(n, 0.f);
+		for (int i = 0; i < n; ++i) {
+			const int im = loop ? (i - 1 + n) % n : std::max(0, i - 1);
+			const int ip = loop ? (i + 1) % n     : std::min(n - 1, i + 1);
+			if (im == i || ip == i) continue;
+			const glm::vec3 ba = rl[im] - rl[i], bc = rl[ip] - rl[i];
+			const float la = glm::length(ba), lc = glm::length(bc);
+			const float ac = glm::distance(rl[im], rl[ip]);
+			if (la < 1e-4f || lc < 1e-4f || ac < 1e-4f) continue;
+			rl_kappa[i] = glm::length(glm::cross(ba / la, bc / lc)) / (0.5f * ac);
+		}
+		rl_smooth_scalar(rl_kappa, loop, 3);
+
+		std::vector<float> rl_ds(n, 0.f);
+		for (int i = 0; i < n; ++i) {
+			const int nxt = loop ? (i + 1) % n : std::min(i + 1, n - 1);
+			rl_ds[i] = glm::distance(rl[i], rl[nxt]);
+		}
+
+		std::vector<float> rl_speed(n);
+		for (int i = 0; i < n; ++i) {
+			const float kabs   = std::max(kappa_floor, rl_kappa[i]);
+			const float mu_eff = MU_LATERAL * std::cos(std::abs(wps[i].gradient));
+			rl_speed[i] = std::sqrt(mu_eff * G_ACC / kabs);
+		}
+
+		for (int pass = 0; pass < (loop ? 2 : 1); ++pass) {
+			for (int i = sw_s; i < sw_e; ++i) {
+				const int cur  = loop ? i % n : i;
+				const int prev = loop ? (i - 1 + n) % n : cur - 1;
+				const float a_eff = std::max(0.3f, BIKE_ACCEL - G_ACC * std::sin(wps[cur].gradient));
+				rl_speed[cur] = std::min(rl_speed[cur],
+					std::sqrt(rl_speed[prev] * rl_speed[prev] + 2.f * a_eff * rl_ds[prev]));
+			}
+			for (int i = sw_e - 1; i >= sw_s; --i) {
+				const int cur = loop ? i % n : i;
+				const int nxt = loop ? (i + 1) % n : cur + 1;
+				const float d_eff = std::max(1.f, BIKE_DECEL + G_ACC * std::sin(wps[cur].gradient));
+				rl_speed[cur] = std::min(rl_speed[cur],
+					std::sqrt(rl_speed[nxt] * rl_speed[nxt] + 2.f * d_eff * rl_ds[cur]));
+			}
+		}
+
+		for (int i = 0; i < n; ++i) {
+			wps[i].racing_line_pos     = rl[i];
+			wps[i].racing_line_lateral = glm::dot(rl[i] - wps[i].position, wps[i].right);
+			wps[i].speed_mps           = rl_speed[i];
+		}
 	}
 }
 
