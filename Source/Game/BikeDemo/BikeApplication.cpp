@@ -1098,19 +1098,65 @@ static void bike_course_debug()
 		c.debug_draw_fillets();
 
 	ImGui::SeparatorText("Visualisation");
-	static bool draw_course = false;
-	static bool draw_ai_lookahead = true;
-	ImGui::Checkbox("Draw course spline", &draw_course);
-	ImGui::Checkbox("Draw AI lookahead points", &draw_ai_lookahead);
+	static bool draw_course         = false;
+	static bool draw_projections    = true;   // sphere on spline at each rider's course_dist_m
+	static bool draw_lookahead_all  = true;   // lookahead sphere for every rider
+	ImGui::Checkbox("Draw course spline",          &draw_course);
+	ImGui::Checkbox("Draw course projections",     &draw_projections);
+	ImGui::Indent();
+	ImGui::TextDisabled("Yellow = player  Orange = AI");
+	ImGui::TextDisabled("Sphere on spline, line to actual position.");
+	ImGui::TextDisabled("Gap shows projection error.");
+	ImGui::Unindent();
+	ImGui::Checkbox("Draw lookahead (all riders)", &draw_lookahead_all);
+	ImGui::Indent();
+	ImGui::TextDisabled("Cyan = player  Light cyan = AI");
+	ImGui::Unindent();
+
 	if (draw_course)
 		c.debug_draw();
-	if (draw_ai_lookahead) {
-		for (auto* r : g_bike_app->all_riders) {
+
+	// Lookahead parameters mirror BikeAI defaults so the player's dot is comparable.
+	static constexpr float LOOK_BASE_M  = 10.f;
+	static constexpr float LOOK_PER_MS  = 2.0f;
+	static constexpr float CORNER_SCAN  = 50.f;
+	static constexpr float CORNER_COEFF = 2.5f;
+
+	for (auto* r : g_bike_app->all_riders) {
+		const bool is_player = (dynamic_cast<BikePlayer*>(r->input.get()) != nullptr);
+
+		if (draw_projections) {
+			// Sphere ON the spline at course_dist_m. Distance from rider to this sphere
+			// is the projection error — should be small except at wide racing-line offsets.
+			const BikeWaypoint proj = c.sample(r->course_dist_m);
+			const glm::vec3    proj_pos = proj.position + glm::vec3(0, 0.4f, 0);
+			const Color32 col = is_player
+			    ? Color32(0xff, 0xff, 0x00, 0xff)   // yellow  = player
+			    : Color32(0xff, 0x88, 0x00, 0xff);  // orange  = AI
+			Debug::add_sphere(proj_pos, 0.4f, col, -1.f);
+			Debug::add_line(r->get_ws_position(), proj_pos,
+			                Color32(col.r, col.g, col.b, 0x55), -1.f);
+		}
+
+		if (draw_lookahead_all) {
+			glm::vec3 lookahead_pt;
 			if (auto* ai = dynamic_cast<BikeAI*>(r->input.get())) {
-				Debug::add_sphere(ai->dbg_lookahead_pt, 0.4f, COLOR_CYAN, -1.f);
-				Debug::add_line(r->get_ws_position(), ai->dbg_lookahead_pt,
-				                Color32(0, 0xff, 0xff, 0x88), -1.f);
+				lookahead_pt = ai->dbg_lookahead_pt;  // already computed this frame
+			} else {
+				// Compute the same lookahead the AI would use, applied to the player.
+				const float scan    = glm::max(CORNER_SCAN, r->speed * 0.8f);
+				const float raw_r   = c.min_turn_radius_ahead(r->course_dist_m, scan);
+				const float min_r   = glm::max(raw_r, 3.f);
+				const float look_d  = glm::min(LOOK_BASE_M + r->speed * LOOK_PER_MS,
+				                               CORNER_COEFF * min_r);
+				lookahead_pt = c.racing_line_lookahead(r->course_dist_m, look_d);
 			}
+			const Color32 col = is_player
+			    ? Color32(0x00, 0xff, 0xff, 0xff)   // cyan       = player
+			    : Color32(0x88, 0xff, 0xff, 0xff);  // light cyan = AI
+			Debug::add_sphere(lookahead_pt, 0.55f, col, -1.f);
+			Debug::add_line(r->get_ws_position(), lookahead_pt,
+			                Color32(col.r, col.g, col.b, 0x77), -1.f);
 		}
 	}
 }
