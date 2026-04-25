@@ -197,6 +197,15 @@ private:
 extern WindSystem g_wind;
 
 // ============================================================
+// Strategic context (distilled intent from rule-based strategic layer)
+// ============================================================
+struct BikeStrategicState {
+	float desired_effort_fraction = 1.0f;  // ×FTP: 0.5=easy, 1.0=tempo, 1.2=attack
+	float target_lateral          = 0.f;   // preferred lateral position for echelon/peel
+	int   tactical_objective      = 0;     // 0=Hold, 1=Follow, 2=Pull, 3=Peel, 4=DriftBack, 5=Attack, 6=Recover, 7=Sprint
+};
+
+// ============================================================
 // Paceline rotation state machine
 // ============================================================
 enum class PacelineState {
@@ -264,6 +273,13 @@ public:
 	float dbg_min_r              = 0.f;  // nearest corner radius (m) from scan window
 	float dbg_v_max              = 0.f;  // safe cornering speed (m/s) for that radius
 	float dbg_lookahead_dist     = 0.f;  // actual lookahead distance used this frame (m)
+
+	// Hard steer clamp — set by BikeGameApplication::update_boids each frame
+	float hard_steer_min = -1.f;
+	float hard_steer_max =  1.f;
+
+	// For BC recording: pointer to full rider list (set by create_ai)
+	const std::vector<BikeObject*>* all_riders = nullptr;
 };
 
 // ============================================================
@@ -280,14 +296,16 @@ struct BikeNNFeatures {
 	static BikeNNFeatures extract(BikeObject* bike, const BikeCourse* course);
 };
 
-// Writes (features[7], steer_label[1]) records to a binary file for offline training.
+struct BikeObservation;  // forward declaration — defined below
+
+// Writes (obs[60], action[3]) records to a binary file for offline BC training.
 class BikeNNRecorder {
 public:
 	~BikeNNRecorder() { close(); }
 	void open(const char* path);
 	void close();
-	// Records one sample if enabled and frame_skip allows it.
-	void try_record(const BikeNNFeatures& f, float steer_label);
+	// Records one sample (60-float obs + 3-float action) if enabled and frame_skip allows it.
+	void try_record(const BikeObservation& obs, float steer, float power, float brake);
 
 	bool  enabled    = false;
 	int   frame_skip = 1;   // record every N frames
@@ -297,6 +315,98 @@ private:
 	FILE* file_ = nullptr;
 };
 extern BikeNNRecorder g_nn_recorder;
+
+// ============================================================
+// Rider sensor grid — 9 ego-centric rays, handles any rider count
+// ============================================================
+struct BikeSensorGrid {
+	static constexpr int NUM_SENSORS = 9;
+	float dist_norm[NUM_SENSORS]      = {};  // [0,1]: 1.0 = nothing in range
+	float rel_speed_norm[NUM_SENSORS] = {};  // [-1,1]: (other.speed - self.speed) / 10
+
+	// Sensor angles (radians from forward, positive = right)
+	static constexpr float ANGLES[NUM_SENSORS] = {
+		-0.70f, -0.35f, 0.0f, +0.35f, +0.70f,  // forward arc (5)
+		-1.57f, +1.57f,                           // sides       (2)
+		-2.79f, +2.79f                            // rear arc    (2)
+	};
+	static constexpr float HALF_WIDTH     = 0.18f;  // sector half-angle (rad)
+	static constexpr float MAX_RANGE_FWD  = 30.f;   // forward/side sensors (m)
+	static constexpr float MAX_RANGE_REAR = 15.f;   // rear sensors (m)
+
+	void compute(BikeObject* self, const std::vector<BikeObject*>& all_riders);
+};
+
+// ============================================================
+// Full 60-float observation for PPO training
+// ============================================================
+static constexpr int BIKE_OBS_DIM = 60;
+
+struct BikeObservation {
+	float v[BIKE_OBS_DIM] = {};
+
+	// Layout:
+	//  0- 4  self state (speed, lateral, sin/cos heading_err, draft)
+	//  5- 6  road margins at current pos (left, right) / road_hw
+	//  7-31  track lookahead: 5 samples × {curvature, rl_offset, left_margin, right_margin, gradient}
+	// 32-49  rider sensors: 9 rays × {dist_norm, rel_speed_norm}
+	// 50-52  wind: cos, sin (relative to bike heading), speed/10
+	// 53-55  group context: pos_in_group_norm, group_rank_norm, group_size_norm
+	// 56-59  strategic: desired_effort_fraction, target_lateral/hw, race_pos_norm, tactical_objective/4
+
+	static BikeObservation extract(BikeObject* bike, const BikeCourse* course,
+	                                const std::vector<BikeObject*>& all_riders);
+};
+
+// ============================================================
+// PPO LSTM inference input — 60-float observation, 3 outputs (steer/power/brake)
+// ============================================================
+class BikePPOInput : public IBikeInput {
+public:
+	~BikePPOInput() override = default;
+	void evaluate(BikeObject* my_bike) final;
+	bool load_weights(const char* path);
+	void reset_hidden_state();
+
+	BikeCourse* course = nullptr;
+	const std::vector<BikeObject*>* all_riders = nullptr;
+	bool weights_loaded = false;
+
+	float dbg_steer = 0.f;
+	float dbg_power = 0.f;
+	float dbg_brake = 0.f;
+
+private:
+	static constexpr int H = 64;
+
+	float norm_mean_[BIKE_OBS_DIM]  = {};
+	float norm_std_ [BIKE_OBS_DIM]  = {};
+
+	// Linear1: BIKE_OBS_DIM → H
+	float W1_[H][BIKE_OBS_DIM] = {};
+	float b1_[H]               = {};
+
+	// LSTM: H → H  (PyTorch gate order: i, f, g, o)
+	float W_ih_[4 * H][H] = {};
+	float W_hh_[4 * H][H] = {};
+	float b_ih_[4 * H]    = {};
+	float b_hh_[4 * H]    = {};
+
+	// Linear2: H → H
+	float W2_[H][H] = {};
+	float b2_[H]    = {};
+
+	// Output heads: H → 1
+	float W_steer_[H] = {}; float b_steer_ = 0.f;
+	float W_power_[H] = {}; float b_power_ = 0.f;
+	float W_brake_[H] = {}; float b_brake_ = 0.f;
+
+	// LSTM hidden state — persists across frames, reset on episode start
+	float h_[H] = {};
+	float c_[H] = {};
+
+	void forward(const float* obs_norm, float& steer, float& power, float& brake);
+};
 
 // IBikeInput implementation that runs neural net inference for steering.
 // Power management is a simplified constant-power slew (no gap following).
@@ -479,6 +589,15 @@ public:
 	int   course_segment = 0;     // nearest waypoint segment index (cached)
 	int   race_position  = 0;     // 1-indexed finishing position in sorted rider list
 
+	// Group context (written by BikeGameApplication::update_groups each frame)
+	int   group_id           = 0;
+	float pos_in_group_norm  = 0.f;  // 0=front of group, 1=back
+	float group_rank_norm    = 0.f;  // 0=leading group, 1=last group
+	float group_size_norm    = 0.f;  // group_size / total_riders
+
+	// Strategic context (set by strategic layer or paceline logic)
+	BikeStrategicState strategic_state;
+
 	// Drafting (written by BikeGameApplication::update_drafting before physics runs)
 	// 1.0 = no draft (open air), 0.65 = full draft at ideal position
 	float draft_factor = 1.0f;
@@ -499,16 +618,6 @@ public:
 	float boid_cohesion_steer    = 0.f;  // steer nudge toward rider-ahead's lateral (paceline)
 	float boid_align_power_nudge = 0.f;  // W to add/subtract so rider converges to pack speed
 	float boid_long_sep_power    = 0.f;  // W shed when side-by-side (slightly behind yields)
-
-	// Hard steer limits (written by BikeGameApplication::update_boids, applied by BikeAI)
-	// Clamp the final steer command to prevent the bike from steering into a neighbour.
-	// [-1, +1] at rest; narrowed to [0,+1] or [-1,0] when a rider is in the exclusion zone.
-	float hard_steer_min = -1.f;
-	float hard_steer_max =  1.f;
-
-	// Cohesion PD debug terms (written alongside boid_cohesion_steer)
-	float dbg_cohesion_lat_err = 0.f;  // kp term input: lateral offset to rider ahead
-	float dbg_cohesion_lat_vel = 0.f;  // kd term input: my lateral velocity
 
 	EntityPtr fork_entity;
 
@@ -541,7 +650,8 @@ public:
 	bool paceline_active  = false;
 	bool echelon_mode     = false;
 	int  num_ai           = 5;
-	bool use_nn_ai        = true;  // when true, AI riders use BikeNNInput instead of BikeAI
+	bool use_nn_ai        = false;  // when true, AI riders use BikeNNInput instead of BikeAI
+	bool use_ppo_ai       = false;  // when true, AI riders use BikePPOInput (LSTM PPO)
 
 	// Crack decal instances collected at map load
 	struct CrackDecalInstance {
@@ -558,6 +668,7 @@ private:
 	void collect_crack_decals();
 	void update_course_positions();
 	void sort_riders();
+	void update_groups();
 	void update_gaps();
 	void update_drafting();
 	void update_boids();

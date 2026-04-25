@@ -176,6 +176,7 @@ void BikeGameApplication::update()
 	if (course.is_built) {
 		update_course_positions();
 		sort_riders();
+		update_groups();
 		update_gaps();
 		update_drafting();
 		update_boids();
@@ -206,6 +207,54 @@ void BikeGameApplication::sort_riders()
 		});
 	for (int i = 0; i < (int)riders_sorted.size(); ++i)
 		riders_sorted[i]->race_position = i + 1;
+}
+
+// ============================================================
+// Group context
+// ============================================================
+
+static constexpr float GROUP_GAP_M = 8.f;  // gap > this splits riders into separate groups
+
+void BikeGameApplication::update_groups()
+{
+	const int n = (int)riders_sorted.size();
+	if (n == 0) return;
+
+	// Scan riders front-to-back; start a new group when the gap to the next rider exceeds GROUP_GAP_M.
+	// riders_sorted[0] = race leader (highest course_dist_m).
+	int group_id    = 0;
+	int group_start = 0;
+
+	// Temporary arrays to avoid two passes
+	std::vector<int> gids(n);
+	std::vector<int> gsizes;
+
+	gids[0] = 0;
+	for (int i = 1; i < n; ++i) {
+		const float gap = riders_sorted[i - 1]->course_dist_m - riders_sorted[i]->course_dist_m;
+		if (gap > GROUP_GAP_M) {
+			gsizes.push_back(i - group_start);
+			++group_id;
+			group_start = i;
+		}
+		gids[i] = group_id;
+	}
+	gsizes.push_back(n - group_start);
+	const int num_groups = group_id + 1;
+
+	int pos_in_group = 0;
+	for (int i = 0; i < n; ++i) {
+		if (i > 0 && gids[i] != gids[i - 1])
+			pos_in_group = 0;
+
+		BikeObject* b = riders_sorted[i];
+		b->group_id          = gids[i];
+		const int gsz        = gsizes[gids[i]];
+		b->pos_in_group_norm = (gsz > 1) ? (float)pos_in_group / (float)(gsz - 1) : 0.f;
+		b->group_rank_norm   = (num_groups > 1) ? (float)gids[i] / (float)(num_groups - 1) : 0.f;
+		b->group_size_norm   = (float)gsz / (float)n;
+		++pos_in_group;
+	}
 }
 
 // ============================================================
@@ -494,8 +543,6 @@ void BikeGameApplication::update_boids()
 			const float lat_err = lat_target - me->lateral_pos;
 			const float lat_vel = (dt > 1e-6f) ? (me->lateral_pos - me->prev_lateral_pos) / dt : 0.f;
 			cohesion_steer = glm::clamp(-(lat_err * BOID_COHESION_KP - lat_vel * BOID_COHESION_KD), -1.f, 1.f);
-			me->dbg_cohesion_lat_err = lat_err;
-			me->dbg_cohesion_lat_vel = lat_vel;
 		} else {
 			// No rider ahead: if echelon mode, drift toward preferred_lateral on our own
 			const BikeAI* my_ai = dynamic_cast<const BikeAI*>(me->input.get());
@@ -504,11 +551,6 @@ void BikeGameApplication::update_boids()
 				const float lat_vel = (dt > 1e-6f) ? (me->lateral_pos - me->prev_lateral_pos) / dt : 0.f;
 				cohesion_steer = glm::clamp(-(lat_err * BOID_COHESION_KP * my_ai->lane_strength
 				                              - lat_vel * BOID_COHESION_KD), -1.f, 1.f);
-				me->dbg_cohesion_lat_err = lat_err;
-				me->dbg_cohesion_lat_vel = lat_vel;
-			} else {
-				me->dbg_cohesion_lat_err = 0.f;
-				me->dbg_cohesion_lat_vel = 0.f;
 			}
 		}
 		me->boid_cohesion_steer = cohesion_steer;
@@ -522,23 +564,25 @@ void BikeGameApplication::update_boids()
 			me->boid_align_power_nudge = damp_dt_independent(raw_nudge, me->boid_align_power_nudge, BOID_SPEED_SMOOTH, dt);
 		}
 
-		// Hard steer limits — block any steer that would close the gap when a neighbour is
-		// already inside the exclusion zone.  Reset each frame; narrowed by each nearby rider.
-		me->hard_steer_min = -1.f;
-		me->hard_steer_max =  1.f;
-		for (int j = 0; j < n; ++j) {
-			if (j == i) continue;
-			const BikeObject* other = riders_sorted[j];
-			const float h_long  = glm::abs(other->course_dist_m - me->course_dist_m);
-			if (h_long >= HARD_SEP_LONG_RADIUS) continue;
-			const float lat_diff = other->lateral_pos - me->lateral_pos; // +ve = other is right
-			const float h_lat    = glm::abs(lat_diff);
-			if (h_lat >= HARD_SEP_OUTER_LAT) continue;
-			if (h_lat <  HARD_SEP_INNER_LAT) continue; // already overlapping — let them escape
-			if (lat_diff > 0.f)
-				me->hard_steer_max = 0.f; // other to my right: block rightward steer
-			else
-				me->hard_steer_min = 0.f; // other to my left:  block leftward steer
+		// Hard steer clamp — only for scripted BikeAI riders; PPO agents learn proximity via obs
+		BikeAI* ai_rider = dynamic_cast<BikeAI*>(me->input.get());
+		if (ai_rider) {
+			ai_rider->hard_steer_min = -1.f;
+			ai_rider->hard_steer_max =  1.f;
+			for (int j = 0; j < n; ++j) {
+				if (j == i) continue;
+				const BikeObject* other = riders_sorted[j];
+				const float h_long  = glm::abs(other->course_dist_m - me->course_dist_m);
+				if (h_long >= HARD_SEP_LONG_RADIUS) continue;
+				const float lat_diff = other->lateral_pos - me->lateral_pos;
+				const float h_lat    = glm::abs(lat_diff);
+				if (h_lat >= HARD_SEP_OUTER_LAT) continue;
+				if (h_lat <  HARD_SEP_INNER_LAT) continue;
+				if (lat_diff > 0.f)
+					ai_rider->hard_steer_max = 0.f;
+				else
+					ai_rider->hard_steer_min = 0.f;
+			}
 		}
 
 		// Save lateral position for derivative computation next frame
@@ -686,6 +730,30 @@ void BikeGameApplication::update_paceline()
 			break;
 		}
 		}
+
+		// Sync BikeStrategicState from current paceline state (used by BikeObservation)
+		switch (ai->paceline_state) {
+		case PacelineState::Following:
+			me->strategic_state.tactical_objective      = 1;
+			me->strategic_state.desired_effort_fraction = 0.70f;
+			me->strategic_state.target_lateral          = 0.f;
+			break;
+		case PacelineState::Pulling:
+			me->strategic_state.tactical_objective      = 2;
+			me->strategic_state.desired_effort_fraction = 0.80f;
+			me->strategic_state.target_lateral          = 0.f;
+			break;
+		case PacelineState::Peeling:
+			me->strategic_state.tactical_objective      = 3;
+			me->strategic_state.desired_effort_fraction = 0.30f;
+			me->strategic_state.target_lateral          = ai->peel_lateral_tgt;
+			break;
+		case PacelineState::DriftingBack:
+			me->strategic_state.tactical_objective      = 4;
+			me->strategic_state.desired_effort_fraction = 0.30f;
+			me->strategic_state.target_lateral          = ai->peel_lateral_tgt;
+			break;
+		}
 	}
 }
 
@@ -711,14 +779,21 @@ BikeObject* BikeGameApplication::create_ai(glm::vec3 pos)
 	e->set_ws_position(pos);
 	auto bo = e->create_component<BikeObject>();
 
-	if (use_nn_ai) {
+	if (use_ppo_ai) {
+		auto ppo        = std::make_unique<BikePPOInput>();
+		ppo->course     = &course;
+		ppo->all_riders = &all_riders;
+		ppo->load_weights("D:/Data/bike_ppo_weights.bin");
+		bo->input = std::move(ppo);
+	} else if (use_nn_ai) {
 		auto nn    = std::make_unique<BikeNNInput>();
 		nn->course = &course;
 		nn->load_weights("D:/Data/bike_nn_weights.bin");
 		bo->input = std::move(nn);
 	} else {
-		auto ai    = std::make_unique<BikeAI>();
-		ai->course = &course;
+		auto ai         = std::make_unique<BikeAI>();
+		ai->course      = &course;
+		ai->all_riders  = &all_riders;
 		// Echelon lane assignment: alternate AI riders between ±ECHELON_LANE_OFFSET.
 		// Index into all_riders at this point (player is always index 0).
 		if (echelon_mode) {
@@ -1239,15 +1314,22 @@ static void bike_nn_debug()
 	}
 
 	ImGui::SeparatorText("Inference");
-	ImGui::Checkbox("Use NN AI (respawn to apply)", &g_bike_app->use_nn_ai);
+	ImGui::Checkbox("Use NN AI (respawn to apply)",  &g_bike_app->use_nn_ai);
+	ImGui::Checkbox("Use PPO AI (respawn to apply)", &g_bike_app->use_ppo_ai);
 	if (ImGui::Button("Reload NN Weights (live riders)")) {
 		for (auto* r : g_bike_app->all_riders) {
 			if (auto* nn = dynamic_cast<BikeNNInput*>(r->input.get()))
 				nn->load_weights(NN_WEIGHTS_PATH);
 		}
 	}
+	if (ImGui::Button("Reload PPO Weights (live riders)")) {
+		for (auto* r : g_bike_app->all_riders) {
+			if (auto* ppo = dynamic_cast<BikePPOInput*>(r->input.get()))
+				ppo->load_weights("D:/Data/bike_ppo_weights.bin");
+		}
+	}
 
-	// Per-rider NN steer readout
+	// Per-rider readout
 	bool any_nn = false;
 	for (int i = 0; i < (int)g_bike_app->all_riders.size(); ++i) {
 		BikeObject* r = g_bike_app->all_riders[i];
@@ -1255,6 +1337,12 @@ static void bike_nn_debug()
 			if (!any_nn) { ImGui::SeparatorText("NN riders"); any_nn = true; }
 			ImGui::Text("Rider %d  steer=%.3f  weights=%s",
 				i, nn->dbg_steer, nn->weights_loaded ? "ok" : "MISSING");
+		}
+		if (auto* ppo = dynamic_cast<BikePPOInput*>(r->input.get())) {
+			if (!any_nn) { ImGui::SeparatorText("PPO riders"); any_nn = true; }
+			ImGui::Text("Rider %d  steer=%.3f  power=%.2f  brake=%.2f  weights=%s",
+				i, ppo->dbg_steer, ppo->dbg_power, ppo->dbg_brake,
+				ppo->weights_loaded ? "ok" : "MISSING");
 		}
 	}
 }
@@ -1307,8 +1395,6 @@ static void apply_debug_follow_camera()
 		GameplayStatic::debug_text(string_format("[Player] before_boids:  %.2f", bp->dbg_steer_before_boids));
 		GameplayStatic::debug_text(string_format("[Player] sep:%.2f coh:%.2f aln:%.2f",
 			bp->dbg_boid_sep_steer, bp->dbg_boid_cohesion_steer, bp->dbg_boid_align_steer));
-		GameplayStatic::debug_text(string_format("[Player] coh kp_in(lat_err):%.2f  kd_in(lat_vel):%.2f",
-			bo->dbg_cohesion_lat_err, bo->dbg_cohesion_lat_vel));
 	} else if (ai) {
 		// --- Path-following breakdown ---
 		GameplayStatic::debug_text(string_format("[AI] look=%.1fm  min_r=%.1fm  v_max=%.1fm/s  spd=%.1fm/s",

@@ -102,10 +102,10 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	}
 	dbg_power_seek_bonus = gap_bonus;
 
-	// ---- Record training data ----
-	if (g_nn_recorder.enabled) {
-		const BikeNNFeatures feat = BikeNNFeatures::extract(my_bike, course);
-		g_nn_recorder.try_record(feat, steer_out);
+	// ---- Record training data (full 60-float obs + 3-float action) ----
+	if (g_nn_recorder.enabled && all_riders) {
+		const BikeObservation obs = BikeObservation::extract(my_bike, course, *all_riders);
+		g_nn_recorder.try_record(obs, steer_out, power_out, brake_amount);
 	}
 
 	// ---- Fill ControlInput ----
@@ -119,10 +119,7 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float steer_after_boids = glm::clamp(steer_out, -1.f, 1.f);
 	dbg_steer_pre_hard = steer_after_boids;
 
-	// Hard steer cutoff: if a neighbour is inside the exclusion zone, the boid update
-	// has narrowed hard_steer_min/max to block any steer that would close the gap further.
-	// This is the last-resort override — soft separation should have handled it already.
-	ci.steer        = glm::clamp(steer_after_boids, my_bike->hard_steer_min, my_bike->hard_steer_max);
+	ci.steer        = glm::clamp(steer_after_boids, hard_steer_min, hard_steer_max);
 	dbg_steer_final  = ci.steer;
 	// Braking suppresses power output — don't add gap/boid bonuses while braking hard.
 	ci.brake_amount  = brake_amount;

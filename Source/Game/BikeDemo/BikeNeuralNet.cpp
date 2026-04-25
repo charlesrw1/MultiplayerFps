@@ -37,17 +37,19 @@ void BikeNNRecorder::close()
 	}
 }
 
-void BikeNNRecorder::try_record(const BikeNNFeatures& f, float steer_label)
+void BikeNNRecorder::try_record(const BikeObservation& obs, float steer, float power, float brake)
 {
 	if (!enabled || !file_) return;
 	++frame_count;
 	if (frame_count % frame_skip != 0) return;
 
-	// 7 feature floats + 1 label = 8 floats per sample
-	float buf[BIKENN_INPUT_DIM + 1];
-	memcpy(buf, f.v, sizeof(float) * BIKENN_INPUT_DIM);
-	buf[BIKENN_INPUT_DIM] = steer_label;
-	fwrite(buf, sizeof(float), BIKENN_INPUT_DIM + 1, file_);
+	// 60-float obs + 3-float action = 63 floats per sample
+	float buf[BIKE_OBS_DIM + 3];
+	memcpy(buf, obs.v, sizeof(float) * BIKE_OBS_DIM);
+	buf[BIKE_OBS_DIM + 0] = steer;
+	buf[BIKE_OBS_DIM + 1] = power;
+	buf[BIKE_OBS_DIM + 2] = brake;
+	fwrite(buf, sizeof(float), BIKE_OBS_DIM + 3, file_);
 	++sample_count;
 }
 
@@ -86,6 +88,133 @@ BikeNNFeatures BikeNNFeatures::extract(BikeObject* bike, const BikeCourse* cours
 	out.v[4] = 1.f / glm::max(course->min_turn_radius_ahead(bike->course_dist_m, 10.f),  1.f);
 	out.v[5] = 1.f / glm::max(course->min_turn_radius_ahead(bike->course_dist_m, 25.f),  1.f);
 	out.v[6] = 1.f / glm::max(course->min_turn_radius_ahead(bike->course_dist_m, 50.f),  1.f);
+
+	return out;
+}
+
+// ============================================================
+// BikeSensorGrid::compute
+// ============================================================
+
+constexpr float BikeSensorGrid::ANGLES[BikeSensorGrid::NUM_SENSORS];
+
+void BikeSensorGrid::compute(BikeObject* self, const std::vector<BikeObject*>& all_riders)
+{
+	for (int i = 0; i < NUM_SENSORS; ++i) {
+		dist_norm[i]      = 1.0f;
+		rel_speed_norm[i] = 0.0f;
+	}
+
+	// Horizontal ego frame
+	const glm::vec3 up      = glm::vec3(0.f, 1.f, 0.f);
+	const glm::vec2 fwd_h   = glm::normalize(glm::vec2(self->bike_direction.x, self->bike_direction.z));
+	if (glm::length(fwd_h) < 1e-4f) return;
+	// right = cross(fwd, up) projected horizontal: (-fz, fx)
+	const glm::vec2 right_h = glm::vec2(-fwd_h.y, fwd_h.x);
+
+	const glm::vec3 self_pos = self->get_ws_position();
+
+	static constexpr float PI = 3.14159265f;
+
+	for (BikeObject* other : all_riders) {
+		if (other == self) continue;
+
+		const glm::vec3 delta = other->get_ws_position() - self_pos;
+		const glm::vec2 delta_h(delta.x, delta.z);
+		const float dist = glm::length(delta_h);
+		if (dist < 0.01f) continue;
+
+		const float fwd_comp   = glm::dot(delta_h, fwd_h);
+		const float right_comp = glm::dot(delta_h, right_h);
+		const float bearing    = std::atan2(right_comp, fwd_comp);
+
+		for (int i = 0; i < NUM_SENSORS; ++i) {
+			float ad = bearing - ANGLES[i];
+			if (ad >  PI) ad -= 2.f * PI;
+			if (ad < -PI) ad += 2.f * PI;
+			if (std::abs(ad) > HALF_WIDTH) continue;
+
+			const float max_range = (i >= 7) ? MAX_RANGE_REAR : MAX_RANGE_FWD;
+			if (dist > max_range) continue;
+
+			const float d_norm = dist / max_range;
+			if (d_norm < dist_norm[i]) {
+				dist_norm[i]      = d_norm;
+				rel_speed_norm[i] = glm::clamp((other->speed - self->speed) / 10.f, -1.f, 1.f);
+			}
+		}
+	}
+}
+
+// ============================================================
+// BikeObservation::extract
+// ============================================================
+
+BikeObservation BikeObservation::extract(BikeObject* bike, const BikeCourse* course,
+                                          const std::vector<BikeObject*>& all_riders)
+{
+	BikeObservation out;
+	const float d = bike->course_dist_m;
+	const BikeWaypoint wp = course->sample(d);
+
+	const glm::vec3 up    = glm::vec3(0.f, 1.f, 0.f);
+	const float road_hw   = wp.road_half_width;
+
+	// ----- 0-4: Self state -----
+	out.v[0] = bike->speed / 20.f;
+	out.v[1] = bike->lateral_pos / road_hw;
+	out.v[2] = glm::dot(bike->bike_direction, wp.right);    // sin(heading_err)
+	out.v[3] = glm::dot(bike->bike_direction, wp.forward);  // cos(heading_err)
+	out.v[4] = bike->draft_factor;
+
+	// ----- 5-6: Current road margins -----
+	out.v[5] = (road_hw + bike->lateral_pos)  / road_hw;  // left margin
+	out.v[6] = (road_hw - bike->lateral_pos)  / road_hw;  // right margin
+
+	// ----- 7-31: Track lookahead (5 samples × 5 features) -----
+	static constexpr float LOOK_DISTS[5] = { 5.f, 10.f, 20.f, 35.f, 60.f };
+	for (int i = 0; i < 5; ++i) {
+		const BikeWaypoint wa = course->sample(d + LOOK_DISTS[i]);
+		const BikeWaypoint wb = course->sample(d + LOOK_DISTS[i] + 3.f);
+		// signed curvature: cross(wa.fwd, wb.fwd).y / step gives 1/R in rad/m
+		const float curv = glm::clamp(glm::cross(wa.forward, wb.forward).y / 3.f, -1.f, 1.f);
+		const float hw_a = wa.road_half_width;
+		out.v[7 + i * 5 + 0] = curv;
+		out.v[7 + i * 5 + 1] = wa.racing_line_lateral / hw_a;
+		out.v[7 + i * 5 + 2] = (hw_a + wa.racing_line_lateral) / hw_a;  // left margin
+		out.v[7 + i * 5 + 3] = (hw_a - wa.racing_line_lateral) / hw_a;  // right margin
+		out.v[7 + i * 5 + 4] = wa.gradient * 5.f;  // scale radians: ±0.2 rad → ±1.0
+	}
+
+	// ----- 32-49: Rider sensor grid -----
+	BikeSensorGrid sensors;
+	sensors.compute(bike, all_riders);
+	for (int i = 0; i < BikeSensorGrid::NUM_SENSORS; ++i) {
+		out.v[32 + i * 2 + 0] = sensors.dist_norm[i];
+		out.v[32 + i * 2 + 1] = sensors.rel_speed_norm[i];
+	}
+
+	// ----- 50-52: Wind (relative to bike heading) -----
+	{
+		const glm::vec2 fwd_h  = glm::normalize(glm::vec2(bike->bike_direction.x, bike->bike_direction.z));
+		const glm::vec2 wdir_h = glm::vec2(g_wind.wind_direction.x, g_wind.wind_direction.z);
+		// convention: angle=0 → headwind (wind blows against bike front)
+		out.v[50] = -glm::dot(wdir_h, fwd_h);          // cos: +1=headwind, -1=tailwind
+		out.v[51] =  glm::dot(wdir_h, glm::vec2(-fwd_h.y, fwd_h.x));  // sin: +1=from left
+		out.v[52] = g_wind.wind_speed / 10.f;
+	}
+
+	// ----- 53-55: Group context -----
+	out.v[53] = bike->pos_in_group_norm;
+	out.v[54] = bike->group_rank_norm;
+	out.v[55] = bike->group_size_norm;
+
+	// ----- 56-59: Strategic context -----
+	const int n_riders = (int)all_riders.size();
+	out.v[56] = bike->strategic_state.desired_effort_fraction;
+	out.v[57] = bike->strategic_state.target_lateral / road_hw;
+	out.v[58] = (n_riders > 1) ? (float)(bike->race_position - 1) / (float)(n_riders - 1) : 0.f;
+	out.v[59] = (float)bike->strategic_state.tactical_objective / 4.f;
 
 	return out;
 }
@@ -411,4 +540,135 @@ float BikeNNTrainer::train_and_save(const char* data_path, const char* weights_p
 
 	sys_print(Debug, "BikeNNTrainer: weights saved to '%s'\n", weights_path);
 	return final_loss;
+}
+
+// ============================================================
+// BikePPOInput — LSTM actor inference (60-float obs, 3 outputs)
+// ============================================================
+
+void BikePPOInput::reset_hidden_state()
+{
+	memset(h_, 0, sizeof(h_));
+	memset(c_, 0, sizeof(c_));
+}
+
+bool BikePPOInput::load_weights(const char* path)
+{
+	FILE* f = fopen(path, "rb");
+	if (!f) {
+		sys_print(Warning, "BikePPOInput: cannot open weights '%s'\n", path);
+		return false;
+	}
+
+	bool ok = true;
+	ok &= fread(norm_mean_, sizeof(float), BIKE_OBS_DIM,   f) == (size_t)BIKE_OBS_DIM;
+	ok &= fread(norm_std_,  sizeof(float), BIKE_OBS_DIM,   f) == (size_t)BIKE_OBS_DIM;
+	ok &= fread(W1_,        sizeof(float), H * BIKE_OBS_DIM, f) == (size_t)(H * BIKE_OBS_DIM);
+	ok &= fread(b1_,        sizeof(float), H,               f) == (size_t)H;
+	ok &= fread(W_ih_,      sizeof(float), 4 * H * H,       f) == (size_t)(4 * H * H);
+	ok &= fread(W_hh_,      sizeof(float), 4 * H * H,       f) == (size_t)(4 * H * H);
+	ok &= fread(b_ih_,      sizeof(float), 4 * H,           f) == (size_t)(4 * H);
+	ok &= fread(b_hh_,      sizeof(float), 4 * H,           f) == (size_t)(4 * H);
+	ok &= fread(W2_,        sizeof(float), H * H,           f) == (size_t)(H * H);
+	ok &= fread(b2_,        sizeof(float), H,               f) == (size_t)H;
+	ok &= fread(W_steer_,   sizeof(float), H,               f) == (size_t)H;
+	ok &= fread(&b_steer_,  sizeof(float), 1,               f) == (size_t)1;
+	ok &= fread(W_power_,   sizeof(float), H,               f) == (size_t)H;
+	ok &= fread(&b_power_,  sizeof(float), 1,               f) == (size_t)1;
+	ok &= fread(W_brake_,   sizeof(float), H,               f) == (size_t)H;
+	ok &= fread(&b_brake_,  sizeof(float), 1,               f) == (size_t)1;
+	fclose(f);
+
+	weights_loaded = ok;
+	if (ok) {
+		reset_hidden_state();
+		sys_print(Debug, "BikePPOInput: loaded weights from '%s'\n", path);
+	} else {
+		sys_print(Warning, "BikePPOInput: truncated weights file '%s'\n", path);
+	}
+	return ok;
+}
+
+static inline float elu(float x)  { return x > 0.f ? x : std::exp(x) - 1.f; }
+static inline float sigmoid(float x) { return 1.f / (1.f + std::exp(-x)); }
+
+void BikePPOInput::forward(const float* obs_norm, float& out_steer, float& out_power, float& out_brake)
+{
+	// --- Linear1: BIKE_OBS_DIM → H, ELU ---
+	float a1[H];
+	for (int i = 0; i < H; ++i) {
+		float s = b1_[i];
+		for (int j = 0; j < BIKE_OBS_DIM; ++j)
+			s += W1_[i][j] * obs_norm[j];
+		a1[i] = elu(s);
+	}
+
+	// --- LSTM step: H → H ---
+	// gates[0:H]=i, [H:2H]=f, [2H:3H]=g, [3H:4H]=o  (PyTorch gate order)
+	float gates[4 * H];
+	for (int i = 0; i < 4 * H; ++i) {
+		float s = b_ih_[i] + b_hh_[i];
+		for (int j = 0; j < H; ++j)
+			s += W_ih_[i][j] * a1[j] + W_hh_[i][j] * h_[j];
+		gates[i] = s;
+	}
+	for (int i = 0; i < H; ++i) {
+		const float gate_i = sigmoid(gates[i]);
+		const float gate_f = sigmoid(gates[H  + i]);
+		const float gate_g = std::tanh (gates[2*H + i]);
+		const float gate_o = sigmoid(gates[3*H + i]);
+		c_[i] = gate_f * c_[i] + gate_i * gate_g;
+		h_[i] = gate_o * std::tanh(c_[i]);
+	}
+
+	// --- Linear2: H → H, ELU ---
+	float a2[H];
+	for (int i = 0; i < H; ++i) {
+		float s = b2_[i];
+		for (int j = 0; j < H; ++j)
+			s += W2_[i][j] * h_[j];
+		a2[i] = elu(s);
+	}
+
+	// --- Output heads ---
+	float raw_steer = b_steer_, raw_power = b_power_, raw_brake = b_brake_;
+	for (int j = 0; j < H; ++j) {
+		raw_steer += W_steer_[j] * a2[j];
+		raw_power += W_power_[j] * a2[j];
+		raw_brake += W_brake_[j] * a2[j];
+	}
+	out_steer = std::tanh(raw_steer);
+	out_power = sigmoid(raw_power);
+	out_brake = sigmoid(raw_brake);
+}
+
+void BikePPOInput::evaluate(BikeObject* my_bike)
+{
+	if (!course || !course->is_built || !all_riders) return;
+
+	float steer = 0.f, power_frac = 0.5f, brake = 0.f;
+
+	if (weights_loaded) {
+		const BikeObservation obs = BikeObservation::extract(my_bike, course, *all_riders);
+
+		// Normalize using saved training stats
+		float obs_norm[BIKE_OBS_DIM];
+		for (int i = 0; i < BIKE_OBS_DIM; ++i)
+			obs_norm[i] = (obs.v[i] - norm_mean_[i]) / (norm_std_[i] + 1e-8f);
+
+		forward(obs_norm, steer, power_frac, brake);
+	}
+
+	dbg_steer = steer;
+	dbg_power = power_frac;
+	dbg_brake = brake;
+
+	const float effective_ftp = my_bike->stamina.effective_ftp;
+	const float power_w = power_frac * effective_ftp * 1.3f;
+
+	BikeObject::ControlInput ci;
+	ci.steer        = glm::clamp(steer, -1.f, 1.f);
+	ci.power        = power_w;
+	ci.brake_amount = glm::clamp(brake, 0.f, 1.f);
+	my_bike->update_tick(ci);
 }
