@@ -648,14 +648,15 @@ void RoadBuilderTool::draw_ui()
             ImGui::SliderFloat("Sample step (m)", &sample_step, 0.2f, 5.f, "%.2f");
 
             ImGui::Separator();
-            ImGui::TextDisabled("Racing line (iterative min-curvature)");
+            ImGui::TextDisabled("Racing line (hinge-spring physics)");
 
             bool rl_dirty = false;
-            rl_dirty |= ImGui::SliderFloat("RL width", &rl_strength, 0.f, 1.f, "%.2f");
-            rl_dirty |= ImGui::SliderInt("RL iterations", &rl_iters, 50, 600);
+            rl_dirty |= ImGui::DragFloat("RL k (stiffness)", &rl_k, 0.01f);
+            rl_dirty |= ImGui::DragFloat("RL mass",          &rl_mass, 0.1f);
+            rl_dirty |= ImGui::DragInt("RL iterations",      &rl_iters, 10,1, 5000);
             if (rl_dirty && course_preview.is_built) {
                 BikeCourse::compute_racing_line(course_preview.waypoints,
-                                                course_preview.is_loop, rl_strength, rl_iters);
+                                                course_preview.is_loop, rl_k, rl_mass, rl_dt, rl_iters);
             }
 
             ImGui::Checkbox("Show racing line overlay", &show_racing_line);
@@ -683,7 +684,7 @@ void RoadBuilderTool::draw_ui()
                 course_preview.build_from_road_network(*find_net, route_hints, sample_step, course_loop);
                 if (course_preview.is_built) {
                     BikeCourse::compute_racing_line(course_preview.waypoints,
-                                                    course_preview.is_loop, rl_strength, rl_iters);
+                                                    course_preview.is_loop, rl_k, rl_mass, rl_dt, rl_iters);
                 } else {
                     ImGui::SetNextWindowSize({ 300.f, 0.f });
                     ImGui::OpenPopup("build_failed");
@@ -700,7 +701,7 @@ void RoadBuilderTool::draw_ui()
             ImGui::BeginDisabled(!course_preview.is_built);
             if (ImGui::Button("Rebuild RL")) {
                 BikeCourse::compute_racing_line(course_preview.waypoints,
-                                                course_preview.is_loop, rl_strength, rl_iters);
+                                                course_preview.is_loop, rl_k, rl_mass, rl_dt, rl_iters);
             }
             ImGui::EndDisabled();
 

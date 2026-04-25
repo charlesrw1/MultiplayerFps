@@ -78,9 +78,11 @@ private:
     BikeCourse             course_preview;
     std::vector<glm::vec3> route_hints;
     bool                   course_loop      = true;
-    float                  rl_strength      = 0.82f;
-    int                    rl_iters         = 200;
-    float                  sample_step      = 0.5f;
+    float                  rl_k             = 14.0f;
+    float                  rl_mass          = 99.0f;
+    float                  rl_dt            = 1/60.f;
+    int                    rl_iters         = 4000;
+    float                  sample_step      = 4.f;
     bool                   show_racing_line = true;
     bool                   show_road_widths = true;
 };

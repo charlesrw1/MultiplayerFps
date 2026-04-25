@@ -14,7 +14,6 @@ struct BikeWaypoint {
 	float     gradient           = 0.f;           // road gradient in radians (+ve = uphill)
 	float     racing_line_lateral = 0.f;          // ideal racing-line offset from centre (+ve = road-right) — kept for AI error computation
 	glm::vec3 racing_line_pos     = {};            // absolute world-space position on the racing line (use this for all rendering)
-	float     speed_mps           = 0.f;           // target speed on the racing line (m/s) — from gradient-aware kinematic profile
 };
 
 // Fillet arc stored for debug visualisation after build_from_road_network.
@@ -89,12 +88,15 @@ public:
 	// Call from the debug menu after build_from_road_network.
 	void debug_draw_fillets() const;
 
-	// Iterative minimum-curvature path optimisation.
-	// Pulls the racing line tight inside the road corridor until curvature is minimised.
-	// Produces outside-entry / late-apex / outside-exit naturally — no corner detection.
-	// strength: fraction of road_half_width available to the racing line (0=centred, 1=full width).
-	// num_iters: optimisation iterations — more = tighter/smoother, diminishing returns above ~300.
+	// Hinge-spring physics simulation that slides each waypoint laterally to find
+	// the ideal racing line (outside-entry / late-apex / outside-exit).
+	// k:         spring stiffness of each hinge
+	// mass:      mass of each waypoint
+	// dt:        time step per iteration (lerp factor = dt/100)
+	// num_iters: simulation steps — more = better convergence
 	static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
-	                                float strength  = 0.82f,
-	                                int   num_iters = 200);
+	                                float k         = 1.0f,
+	                                float mass      = 1.0f,
+	                                float dt        = 10.0f,
+	                                int   num_iters = 400);
 };

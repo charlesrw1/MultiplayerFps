@@ -1,4 +1,4 @@
-// Unit tests for BikeCourse::compute_racing_line
+// Unit tests for BikeCourse::compute_racing_line (hinge-spring physics)
 // Tests operate on synthetic waypoint arrays — no level loading required.
 #include "IntegrationTests/TestContext.h"
 #include "IntegrationTests/TestRegistry.h"
@@ -90,7 +90,6 @@ GAME_TEST("racing_line/straight_zero_lateral", 5.f, test_straight_road_zero_late
 static TestTask test_90deg_right_turn_apex(TestContext& t) {
 	const float hw    = 4.f;
 	const float step  = 0.5f;
-	const float str   = 0.82f;
 
 	// Road A: east (+X), 10 m = 20 pts
 	std::vector<glm::vec3> positions;
@@ -101,7 +100,7 @@ static TestTask test_90deg_right_turn_apex(TestContext& t) {
 		positions.push_back({ 20 * step, 0.f, -i * step });
 
 	auto wps = make_waypoints(positions, hw, false);
-	BikeCourse::compute_racing_line(wps, false, str);
+	BikeCourse::compute_racing_line(wps, false);
 
 	// 1. Apex is the maximum-lateral waypoint — should be on road B, inside the turn.
 	//    Expected: ~hw*tan(45°)=4 m past junction → index ~28.
@@ -111,7 +110,7 @@ static TestTask test_90deg_right_turn_apex(TestContext& t) {
 
 	// 2. Apex lateral is strongly positive (inside = road-right = west for south-going road).
 	const float apex_lat = wps[apex_idx].racing_line_lateral;
-	t.check(apex_lat > hw * str * 0.5f, "90° right apex lateral is strongly inside (> 50% of max)");
+	t.check(apex_lat > hw * 0.5f, "90° right apex lateral is strongly inside (> 50% of hw)");
 
 	// 3. Approach on road A is negative (outside = north side of east-going road).
 	float worst_approach = 0.f;
@@ -138,7 +137,6 @@ GAME_TEST("racing_line/90deg_right_turn_apex", 5.f, test_90deg_right_turn_apex);
 static TestTask test_90deg_left_turn_apex(TestContext& t) {
 	const float hw   = 4.f;
 	const float step = 0.5f;
-	const float str  = 0.82f;
 
 	// Road A: east (+X)
 	std::vector<glm::vec3> positions;
@@ -149,13 +147,13 @@ static TestTask test_90deg_left_turn_apex(TestContext& t) {
 		positions.push_back({ 20 * step, 0.f, i * step });
 
 	auto wps = make_waypoints(positions, hw, false);
-	BikeCourse::compute_racing_line(wps, false, str);
+	BikeCourse::compute_racing_line(wps, false);
 
 	const int apex_idx = peak_lateral_idx(wps);
 	t.check(apex_idx > 20, "90° left apex is on road B (past junction)");
 
 	const float apex_lat = wps[apex_idx].racing_line_lateral;
-	t.check(apex_lat < -hw * str * 0.5f, "90° left apex lateral is strongly inside (strongly negative)");
+	t.check(apex_lat < -hw * 0.5f, "90° left apex lateral is strongly inside (strongly negative)");
 
 	// Approach (road A) should be positive (outside = south side for east-going road, left turn)
 	float worst_approach = 0.f;
@@ -183,7 +181,6 @@ GAME_TEST("racing_line/90deg_left_turn_apex", 5.f, test_90deg_left_turn_apex);
 static TestTask test_150deg_sharp_right_turn(TestContext& t) {
 	const float hw   = 4.f;
 	const float step = 0.5f;
-	const float str  = 0.82f;
 
 	// 150° right turn: road A goes east (+X), road B goes at 150° clockwise from east.
 	// 150° clockwise from east in XZ plane: direction = (cos(-150°), 0, sin(-150°))
@@ -200,13 +197,13 @@ static TestTask test_150deg_sharp_right_turn(TestContext& t) {
 		positions.push_back(junction + dir_b * (i * step));
 
 	auto wps = make_waypoints(positions, hw, false);
-	BikeCourse::compute_racing_line(wps, false, str);
+	BikeCourse::compute_racing_line(wps, false);
 
 	const int apex_idx = peak_lateral_idx(wps);
 	t.check(apex_idx > 20, "150° sharp right: apex is past junction (on road B)");
 
 	const float apex_lat = wps[apex_idx].racing_line_lateral;
-	t.check(apex_lat > hw * str * 0.4f,
+	t.check(apex_lat > hw * 0.4f,
 	        "150° sharp right: apex lateral is significantly inside");
 
 	co_return;
