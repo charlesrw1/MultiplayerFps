@@ -91,25 +91,17 @@ static int arc_to_seg_idx(const std::vector<BikeWaypoint>& wps, float d)
 // ============================================================
 
 float BikeCourse::project(glm::vec3 world_pos, float* out_lateral, int* out_segment,
-                           glm::vec3 world_forward, float prev_dist_m) const
+                           float prev_dist_m) const
 {
 	if ((int)waypoints.size() < 2) return 0.f;
 
 	const int n        = (int)waypoints.size();
 	const int num_segs = is_loop ? n : n - 1;
 
-	// --- Heading setup ---
-	// Heading weight penalises segments facing the wrong way.  This disambiguates
-	// the two arms of a 90° corner when both are equidistant in world-space.
-	// The penalty is mild (÷0.05 at worst = 20×) so a genuine nearby segment
-	// still wins over a far-away aligned one.
-	const bool  use_heading = (glm::dot(world_forward, world_forward) > 0.25f);
-	const glm::vec2 fwd2d   = use_heading
-	                          ? glm::normalize(glm::vec2(world_forward.x, world_forward.z))
-	                          : glm::vec2(0.f);
-
-	// Score one segment; returns heading-weighted dist_sq and sets t.
-	// raw_dist_sq is also returned separately (needed for the fallback threshold).
+	// Score one segment by plain world-space dist_sq. Sets t and raw_dist_sq.
+	// No heading weight: fillet arcs rotate heading continuously, so any
+	// heading penalty destabilises the projection as the bike rounds the curve.
+	// The arc-length window (below) is sufficient to prevent far-loop aliasing.
 	auto score_seg = [&](int i, float& out_t, float& raw_dist_sq) -> float {
 		const glm::vec3& a  = waypoints[i].position;
 		const glm::vec3& b  = waypoints[(i + 1) % n].position;
@@ -123,12 +115,6 @@ float BikeCourse::project(glm::vec3 world_pos, float* out_lateral, int* out_segm
 		out_t = t;
 		const glm::vec3 closest = a + t * ab;
 		raw_dist_sq             = glm::dot(world_pos - closest, world_pos - closest);
-
-		if (use_heading && ab_sq > 1e-8f) {
-			const glm::vec2 seg2d         = glm::normalize(glm::vec2(ab.x, ab.z));
-			const float     heading_match = glm::max(glm::dot(seg2d, fwd2d), 0.05f);
-			return raw_dist_sq / heading_match;
-		}
 		return raw_dist_sq;
 	};
 

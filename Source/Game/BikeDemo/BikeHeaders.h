@@ -131,8 +131,8 @@ public:
 	BikeCourse* course = nullptr;
 
 	// ---- Waypoint following ----
-	float lookahead_dist_base = 3.f;   // min lookahead distance (m)
-	float lookahead_dist_per_ms = 1.5f; // additional metres per m/s of speed
+	float lookahead_dist_base = 10.f;  // min lookahead distance (m)
+	float lookahead_dist_per_ms = 2.0f; // additional metres per m/s of speed
 
 	// ---- Stanley path tracker ----
 	// Steers by correcting both heading error (angle to path tangent) and
