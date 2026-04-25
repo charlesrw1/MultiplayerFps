@@ -156,7 +156,8 @@ void BikeGameApplication::update_course_positions()
 		r->course_dist_m = course.project(
 			r->get_ws_position(),
 			&r->lateral_pos,
-			&r->course_segment);
+			&r->course_segment,
+			r->bike_direction);
 	}
 }
 

@@ -228,3 +228,88 @@ TEST(RacingLine, Turn30Gentle_ApexPastJunction)
     EXPECT_GT(max_road_b, 0.f)
         << "30° right turn apex lateral must be positive (inside) on road B";
 }
+
+// ─────────────────────────────────────────────────────────────
+// project() — heading-weighted disambiguation at a 90° corner
+//
+// Course: approach east (X+), then exit south (Z-).
+// Bike is at (9.8, 0, -0.3) — just before the apex in world-space,
+// but the exit segment [(10,0,0)→(10,0,-0.5)] is geometrically closer
+// (dist_sq≈0.04) than the approach segment (dist_sq≈0.09).
+//
+// Without heading:  exit road wins → course_dist jumps past corner.
+// With heading=(1,0,0) (still going east): approach must win.
+// With heading=(0,0,-1) (now going south): exit must win.
+// ─────────────────────────────────────────────────────────────
+
+// Build a minimal BikeCourse with straight approach + straight exit.
+static BikeCourse make_corner_course()
+{
+    const float step = 0.5f;
+    std::vector<glm::vec3> pos;
+    // Approach: east, 0→10m
+    for (int i = 0; i <= 20; ++i)
+        pos.push_back({ i * step, 0.f, 0.f });
+    // Exit: south from (10,0,0), 0→10m
+    for (int i = 1; i <= 20; ++i)
+        pos.push_back({ 20 * step, 0.f, -i * step });
+
+    const int n = (int)pos.size();
+    std::vector<BikeWaypoint> wps(n);
+    for (int i = 0; i < n; ++i) {
+        wps[i].position = pos[i];
+        glm::vec3 fwd;
+        if (i < n - 1) fwd = pos[i + 1] - pos[i];
+        else            fwd = pos[i]     - pos[i - 1];
+        fwd = glm::normalize(fwd);
+        wps[i].forward           = fwd;
+        wps[i].right             = glm::normalize(glm::cross(glm::vec3(0,1,0), fwd));
+        wps[i].road_half_width   = 4.f;
+        wps[i].dist_from_start   = (i == 0) ? 0.f
+            : wps[i-1].dist_from_start + glm::distance(pos[i], pos[i-1]);
+        wps[i].racing_line_pos   = pos[i];
+    }
+
+    BikeCourse c;
+    c.waypoints     = wps;
+    c.total_length_m = wps.back().dist_from_start;
+    c.is_built      = true;
+    c.is_loop       = false;
+    return c;
+}
+
+TEST(BikeCourseProject, Corner90_HeadingEast_StaysOnApproach)
+{
+    BikeCourse c = make_corner_course();
+
+    // Bike at the inner corner: exit road is geometrically closer without heading.
+    const glm::vec3 pos = { 9.8f, 0.f, -0.3f };
+
+    // Without heading: exit road wins (dist_sq ≈ 0.04 < 0.09)
+    float dist_no_heading = c.project(pos);
+    // With heading east: approach should win
+    float dist_heading = c.project(pos, nullptr, nullptr, glm::vec3(1.f, 0.f, 0.f));
+
+    // Approach road ends at arc=10m; exit starts there.
+    // Heading-corrected result must keep us on approach (<= 10m).
+    EXPECT_LE(dist_heading, 10.0f)
+        << "heading east: projection must stay on approach road (arc <= 10m)";
+
+    // Without heading the exit typically wins and dist > 10m
+    // (confirms the original bug exists in global search)
+    EXPECT_GT(dist_no_heading, 10.0f)
+        << "without heading hint the exit road wins, causing the premature jump";
+}
+
+TEST(BikeCourseProject, Corner90_HeadingSouth_MovesToExit)
+{
+    BikeCourse c = make_corner_course();
+
+    // Same world position, but now the bike has turned south.
+    const glm::vec3 pos = { 9.8f, 0.f, -0.3f };
+    float dist = c.project(pos, nullptr, nullptr, glm::vec3(0.f, 0.f, -1.f));
+
+    // Heading south → exit road is correctly chosen (arc > 10m)
+    EXPECT_GT(dist, 10.0f)
+        << "heading south: projection must move onto exit road (arc > 10m)";
+}

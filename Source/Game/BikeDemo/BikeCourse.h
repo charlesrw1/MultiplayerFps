@@ -65,11 +65,16 @@ public:
 
 	// Project a world-space position onto the nearest point on the course.
 	// Returns arc-length (course_dist_m) of that point.
-	// out_lateral: signed offset from road centre, +ve = road-right
-	// out_segment: index of the waypoint segment that was nearest
+	// out_lateral:   signed offset from road centre, +ve = road-right
+	// out_segment:   index of the waypoint segment that was nearest
+	// world_forward: optional travel direction of the querying object.
+	//   When non-zero, segments anti-aligned with this direction are penalised,
+	//   preventing the projection from jumping to the wrong arm of a sharp corner
+	//   (e.g. the exit road appearing closer in world-space before the bike has turned).
 	float project(glm::vec3 world_pos,
-	              float* out_lateral = nullptr,
-	              int*   out_segment = nullptr) const;
+	              float*     out_lateral   = nullptr,
+	              int*       out_segment   = nullptr,
+	              glm::vec3  world_forward = glm::vec3(0.f)) const;
 
 	// Interpolated waypoint at a given arc-length (Catmull-Rom for position, lerp for the rest).
 	// Wraps when is_loop is true.

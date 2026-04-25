@@ -68,13 +68,28 @@ void BikeCourse::rebuild_racing_line()
 // project
 // ============================================================
 
-float BikeCourse::project(glm::vec3 world_pos, float* out_lateral, int* out_segment) const
+float BikeCourse::project(glm::vec3 world_pos, float* out_lateral, int* out_segment,
+                           glm::vec3 world_forward) const
 {
 	if ((int)waypoints.size() < 2) return 0.f;
 
 	const int n        = (int)waypoints.size();
 	const int num_segs = is_loop ? n : n - 1;
 
+	// Heading-weighted projection: when the caller provides a travel direction,
+	// divide each segment's dist_sq by its heading alignment score.  Segments
+	// anti-aligned with the bike's heading are penalised so the projection
+	// cannot jump to the wrong arm of a sharp 90° corner.
+	// heading_sq_len > 0 only when world_forward is a real direction.
+	const float heading_sq_len = glm::dot(world_forward, world_forward);
+	const bool  use_heading    = (heading_sq_len > 0.25f);  // require roughly unit length
+
+	// XZ components only — ignore vertical for heading comparison.
+	const glm::vec2 fwd2d = use_heading
+	                        ? glm::normalize(glm::vec2(world_forward.x, world_forward.z))
+	                        : glm::vec2(0.f);
+
+	float best_score   = FLT_MAX;  // score = dist_sq / heading_match (or just dist_sq)
 	float best_dist_sq = FLT_MAX;
 	float best_dist_m  = 0.f;
 	float best_t       = 0.f;
@@ -94,7 +109,19 @@ float BikeCourse::project(glm::vec3 world_pos, float* out_lateral, int* out_segm
 		const glm::vec3 diff    = world_pos - closest;
 		const float     dist_sq = glm::dot(diff, diff);
 
-		if (dist_sq < best_dist_sq) {
+		float score = dist_sq;
+		if (use_heading && ab_sq > 1e-8f) {
+			// Normalise segment direction in XZ and compare to bike heading.
+			// heading_match in (0,1]: 1 = perfectly aligned, near 0 = anti-aligned.
+			// Clamp to 0.05 so a fully anti-aligned segment is only 20× penalised,
+			// not infinitely so — allows recovery if the bike has reversed or stalled.
+			const glm::vec2 seg2d = glm::normalize(glm::vec2(ab.x, ab.z));
+			const float heading_match = glm::max(glm::dot(seg2d, fwd2d), 0.05f);
+			score = dist_sq / heading_match;
+		}
+
+		if (score < best_score) {
+			best_score   = score;
 			best_dist_sq = dist_sq;
 			best_seg     = i;
 			best_t       = t;
