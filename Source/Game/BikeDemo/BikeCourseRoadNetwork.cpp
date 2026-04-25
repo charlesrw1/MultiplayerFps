@@ -565,11 +565,48 @@ void BikeCourse::build_from_road_network(
 		          snapped, (int)positions.size());
 	}
 
-	build(positions, half_widths, loop);
+	// Populate waypoints from sampled positions.
+	waypoints.clear();
+	total_length_m = 0.f;
+	is_built       = false;
+	is_loop        = loop;
+
+	const int n = (int)positions.size();
+	waypoints.resize(n);
+	for (int i = 0; i < n; ++i) {
+		BikeWaypoint& wp   = waypoints[i];
+		wp.position        = positions[i];
+		wp.road_half_width = (i < (int)half_widths.size()) ? half_widths[i] : 4.f;
+
+		glm::vec3 fwd;
+		if      (i < n - 1) fwd = positions[i + 1] - positions[i];
+		else if (loop)      fwd = positions[0]     - positions[i];
+		else                fwd = positions[i]     - positions[i - 1];
+
+		const float fwd_len = glm::length(fwd);
+		fwd = (fwd_len > 1e-4f) ? fwd / fwd_len
+		    : (i > 0 ? waypoints[i - 1].forward : glm::vec3(0, 0, 1));
+
+		wp.forward  = fwd;
+		wp.gradient = glm::asin(glm::clamp(fwd.y, -1.f, 1.f));
+
+		const glm::vec3 right = glm::cross(WORLD_UP, fwd);
+		const float     rlen  = glm::length(right);
+		wp.right = (rlen > 1e-4f) ? (right / rlen) : glm::vec3(1, 0, 0);
+
+		wp.dist_from_start = (i == 0) ? 0.f
+		    : waypoints[i - 1].dist_from_start + glm::distance(positions[i], positions[i - 1]);
+	}
+	total_length_m = loop
+	    ? waypoints.back().dist_from_start + glm::distance(positions[n - 1], positions[0])
+	    : waypoints.back().dist_from_start;
+	is_built = true;
+	sys_print(Info, "BikeCourse: %d waypoints, %.0f m total%s\n",
+	          n, total_length_m, loop ? " (loop)" : "");
 
 	// Force exact radial right-vectors on fillet arc waypoints (including pt_in / pt_out).
-	// build() approximates right from chord direction; on arcs the exact perpendicular is
-	// the radial direction from the fillet center.
+	// The chord-direction approximation above is corrected here for arc sections: the exact
+	// perpendicular is the radial direction from the fillet center.
 	//   left_turn  → center is to the LEFT  → right points AWAY  from center (+radial)
 	//   right_turn → center is to the RIGHT → right points TOWARD center     (−radial)
 	if (is_built) {
@@ -598,5 +635,5 @@ void BikeCourse::build_from_road_network(
 
 	// Compute racing line offsets now that waypoints are built
 	if (is_built)
-		BikeCourse::compute_racing_line(waypoints, is_loop);
+		BikeCourse::compute_racing_line(waypoints, is_loop, rl_k, rl_mass, rl_dt, rl_num_iters);
 }

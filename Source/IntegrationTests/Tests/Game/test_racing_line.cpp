@@ -11,7 +11,7 @@
 static const glm::vec3 WORLD_UP = { 0.f, 1.f, 0.f };
 
 // Build a BikeWaypoint array from a list of positions + uniform half-width.
-// Computes forward, right, dist_from_start exactly as BikeCourse::build() does.
+// Computes forward, right, dist_from_start exactly as BikeCourse::build_from_road_network() does.
 static std::vector<BikeWaypoint> make_waypoints(const std::vector<glm::vec3>& positions,
                                                  float hw, bool loop)
 {

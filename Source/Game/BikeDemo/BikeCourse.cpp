@@ -1,6 +1,7 @@
 #include "BikeCourse.h"
 #include "Game/GameplayStatic.h"
 #include "Game/Components/SpawnerComponenth.h"
+#include "Game/Components/RoadNetworkComponent.h"
 #include "Debug.h"
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
@@ -9,10 +10,6 @@
 #include <cmath>
 
 static const glm::vec3 WORLD_UP = { 0.f, 1.f, 0.f };
-
-// Terrain snap ray: cast this far above and below the placed waypoint position.
-static constexpr float SNAP_CAST_UP   = 200.f;
-static constexpr float SNAP_CAST_DOWN = 200.f;
 
 // Catmull-Rom: smooth curve through p1->p2, using p0 and p3 as tangent guides.
 static glm::vec3 catmull_rom(glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t)
@@ -37,113 +34,34 @@ void BikeCourse::build_from_spawners()
 		return;
 	}
 
-	// Sort by editor_name parsed as integer
-	std::sort(spawners.begin(), spawners.end(), [](SpawnerComponent* a, SpawnerComponent* b) {
-		int ia = std::atoi(a->get_owner()->get_editor_name().c_str());
-		int ib = std::atoi(b->get_owner()->get_editor_name().c_str());
-		return ia < ib;
-	});
-
-	// Extract positions and road half-widths
-	std::vector<glm::vec3> positions;
-	std::vector<float>     half_widths;
-	positions.reserve(spawners.size());
-	half_widths.reserve(spawners.size());
-
-	for (auto* s : spawners) {
-		positions.push_back(s->get_ws_position());
-		float hw = s->has_key("road_half_width") ? s->get_float("road_half_width") : 4.f;
-		half_widths.push_back(hw);
-	}
-
-	// Terrain-snap each position downward
-	const int terrain_mask = (1 << (int)PL::Default) | (1 << (int)PL::StaticObject);
-	int snapped = 0;
-	for (auto& pos : positions) {
-		const glm::vec3 ray_start = pos + glm::vec3(0.f, SNAP_CAST_UP,   0.f);
-		const glm::vec3 ray_end   = pos - glm::vec3(0.f, SNAP_CAST_DOWN, 0.f);
-		HitResult hit = GameplayStatic::cast_ray(ray_start, ray_end, terrain_mask, nullptr);
-		if (hit.hit) {
-			pos.y = hit.pos.y;
-			++snapped;
-		}
-	}
-	sys_print(Info, "BikeCourse: snapped %d / %d waypoints to terrain\n", snapped, (int)positions.size());
-
-	build(positions, half_widths, /*loop=*/true);
-
-	if (is_built)
-		BikeCourse::compute_racing_line(waypoints, is_loop);
-}
-
-// ============================================================
-// build
-// ============================================================
-
-void BikeCourse::build(const std::vector<glm::vec3>& positions,
-                       const std::vector<float>&     road_half_widths,
-                       bool                          loop)
-{
-	waypoints.clear();
-	total_length_m = 0.f;
-	is_built       = false;
-	is_loop        = loop;
-
-	const int n = (int)positions.size();
-	if (n < 2) {
-		sys_print(Warning, "BikeCourse::build: need at least 2 waypoints, got %d\n", n);
+	auto road_comps = GameplayStatic::find_components(&RoadNetworkComponent::StaticType);
+	if (road_comps.empty()) {
+		sys_print(Warning, "BikeCourse: no road network found in level\n");
 		return;
 	}
 
-	waypoints.resize(n);
+	std::sort(spawners.begin(), spawners.end(), [](SpawnerComponent* a, SpawnerComponent* b) {
+		return std::atoi(a->get_owner()->get_editor_name().c_str())
+		     < std::atoi(b->get_owner()->get_editor_name().c_str());
+	});
 
-	for (int i = 0; i < n; ++i) {
-		BikeWaypoint& wp   = waypoints[i];
-		wp.position        = positions[i];
-		wp.road_half_width = (i < (int)road_half_widths.size()) ? road_half_widths[i] : 4.f;
+	std::vector<glm::vec3> hints;
+	hints.reserve(spawners.size());
+	for (auto* s : spawners)
+		hints.push_back(s->get_ws_position());
 
-		// Forward: direction toward the next node.
-		// For the last node in a non-loop, reuse the direction from the previous node.
-		// For the last node in a loop, point toward the first node.
-		glm::vec3 fwd;
-		if (i < n - 1)
-			fwd = positions[i + 1] - positions[i];
-		else if (loop)
-			fwd = positions[0] - positions[i];
-		else
-			fwd = positions[i] - positions[i - 1];
+	build_from_road_network(*static_cast<RoadNetworkComponent*>(road_comps[0]),
+	                        hints, sample_step_m, /*loop=*/true);
+}
 
-		const float fwd_len = glm::length(fwd);
-		if (fwd_len > 1e-4f)
-			fwd /= fwd_len;
-		else
-			fwd = (i > 0) ? waypoints[i - 1].forward : glm::vec3(0, 0, 1);
+// ============================================================
+// rebuild_racing_line
+// ============================================================
 
-		wp.forward  = fwd;
-		wp.gradient = glm::asin(glm::clamp(fwd.y, -1.f, 1.f));
-
-		// Road-right: perpendicular to forward in the horizontal plane.
-		glm::vec3 right  = glm::cross(WORLD_UP, fwd);
-		const float rlen = glm::length(right);
-		wp.right = (rlen > 1e-4f) ? (right / rlen) : glm::vec3(1, 0, 0);
-
-		// Arc-length from start
-		if (i == 0)
-			wp.dist_from_start = 0.f;
-		else
-			wp.dist_from_start = waypoints[i - 1].dist_from_start + glm::distance(positions[i], positions[i - 1]);
-	}
-
-	// Total length: add wrap segment if this is a loop
-	if (loop)
-		total_length_m = waypoints.back().dist_from_start + glm::distance(positions[n - 1], positions[0]);
-	else
-		total_length_m = waypoints.back().dist_from_start;
-
-	is_built = true;
-
-	sys_print(Info, "BikeCourse::build: %d waypoints, %.0f m total%s\n",
-	          n, total_length_m, loop ? " (loop)" : "");
+void BikeCourse::rebuild_racing_line()
+{
+	if (!is_built || waypoints.empty()) return;
+	BikeCourse::compute_racing_line(waypoints, is_loop, rl_k, rl_mass, rl_dt, rl_num_iters);
 }
 
 // ============================================================

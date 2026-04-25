@@ -2,8 +2,6 @@
 
 #include "Render/Texture.h"
 #include "Game/GameplayStatic.h"
-#include "Game/Components/RoadNetworkComponent.h"
-#include "Game/Components/SpawnerComponenth.h"
 #include "Game/Components/DecalComponent.h"
 #include "Game/Components/PhysicsComponents.h"
 #include "Game/Entities/CharacterController.h"
@@ -101,34 +99,7 @@ void BikeGameApplication::start()
 {
 	GameplayStatic::change_level("maps/bike_test_map.tmap");
 
-	// Prefer road-network routing if a RoadNetworkComponent exists in the level.
-	// Route-hint waypoints ("bike_waypoint" spawners) pick the path through the graph.
-	// Falls back to the old pure-spline build if no road network is present.
-	{
-		auto road_comps = GameplayStatic::find_components(&RoadNetworkComponent::StaticType);
-		auto spawners   = GameplayStatic::find_spawners_in_class("bike_waypoint");
-
-		if (!road_comps.empty() && !spawners.empty()) {
-			auto* rnc = static_cast<RoadNetworkComponent*>(road_comps[0]);
-
-			// Sort spawners by name (integer order)
-			std::sort(spawners.begin(), spawners.end(), [](SpawnerComponent* a, SpawnerComponent* b) {
-				return std::atoi(a->get_owner()->get_editor_name().c_str())
-				     < std::atoi(b->get_owner()->get_editor_name().c_str());
-			});
-
-			std::vector<glm::vec3> hints;
-			hints.reserve(spawners.size());
-			for (auto* s : spawners)
-				hints.push_back(s->get_ws_position());
-
-			sys_print(Info, "BikeApp: building course from road network (%d hints)\n", (int)hints.size());
-			course.build_from_road_network(*rnc, hints, 0.5f, /*loop=*/true);
-		} else {
-			sys_print(Info, "BikeApp: no road network found, falling back to spawner spline\n");
-			course.build_from_spawners();
-		}
-	}
+	course.build_from_spawners();
 
 	collect_crack_decals();
 
@@ -158,21 +129,7 @@ void BikeGameApplication::start()
 
 void BikeGameApplication::rebuild_course()
 {
-	auto road_comps = GameplayStatic::find_components(&RoadNetworkComponent::StaticType);
-	auto spawners   = GameplayStatic::find_spawners_in_class("bike_waypoint");
-
-	if (!road_comps.empty() && !spawners.empty()) {
-		auto* rnc = static_cast<RoadNetworkComponent*>(road_comps[0]);
-		std::sort(spawners.begin(), spawners.end(), [](SpawnerComponent* a, SpawnerComponent* b) {
-			return std::atoi(a->get_owner()->get_editor_name().c_str())
-			     < std::atoi(b->get_owner()->get_editor_name().c_str());
-		});
-		std::vector<glm::vec3> hints;
-		for (auto* s : spawners) hints.push_back(s->get_ws_position());
-		course.build_from_road_network(*rnc, hints, 0.5f, /*loop=*/true);
-	} else {
-		course.build_from_spawners();
-	}
+	course.build_from_spawners();
 }
 
 void BikeGameApplication::update()
@@ -1114,13 +1071,26 @@ static void bike_course_debug()
 			r->race_position, r->course_dist_m, r->lateral_pos, r->draft_factor);
 	}
 
-	ImGui::SeparatorText("Corner Fillets");
+	ImGui::SeparatorText("Road Network");
 	BikeCourse& course_rw = g_bike_app->course;
+	ImGui::SliderFloat("Sample step (m)", &course_rw.sample_step_m, 0.2f, 5.f, "%.2f");
+
+	ImGui::SeparatorText("Corner Fillets");
 	ImGui::Checkbox("Fillet enabled", &course_rw.fillet_enabled);
 	ImGui::DragFloat("Min angle (deg)", &course_rw.fillet_min_angle_deg, 0.5f, 0.f, 89.f, "%.1f");
 	ImGui::Text("%d fillets active", (int)course_rw.debug_fillets.size());
 	if (ImGui::Button("Rebuild Course"))
 		g_bike_app->rebuild_course();
+
+	ImGui::SeparatorText("Racing Line");
+	bool rl_dirty = false;
+	rl_dirty |= ImGui::DragFloat("RL k (stiffness)", &course_rw.rl_k,    0.1f,  0.1f, 200.f, "%.2f");
+	rl_dirty |= ImGui::DragFloat("RL mass",          &course_rw.rl_mass, 1.f,   1.f, 500.f,  "%.1f");
+	rl_dirty |= ImGui::DragInt ("RL iterations",     &course_rw.rl_num_iters, 50, 100, 20000);
+	if (rl_dirty)
+		course_rw.rebuild_racing_line();
+	if (ImGui::Button("Rebuild Racing Line"))
+		course_rw.rebuild_racing_line();
 	static bool draw_fillets = false;
 	ImGui::Checkbox("Draw fillet geometry", &draw_fillets);
 	if (draw_fillets)

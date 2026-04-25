@@ -33,9 +33,22 @@ public:
 	bool  is_built            = false;
 	bool  is_loop             = false;  // true: last waypoint connects back to first
 
+	// Road network build parameters — change and call build_from_road_network to re-apply.
+	float sample_step_m        = 0.5f;  // dense-sample spacing along road edges (m)
+
 	// Fillet parameters — change and call build_from_road_network to re-apply.
 	bool  fillet_enabled       = true;
 	float fillet_min_angle_deg = 10.f;  // junctions with less deflection are not filleted
+
+	// Racing line physics parameters — change and call rebuild_racing_line() to re-apply
+	// without a full course rebuild, or they are picked up automatically on build_from_road_network.
+	float rl_k         = 14.0f;    // hinge spring stiffness
+	float rl_mass      = 99.0f;    // waypoint mass
+	float rl_dt        = 1.f/60.f; // time step per iteration
+	int   rl_num_iters = 5000;     // simulation steps — more = better convergence
+
+	// Re-run the racing line simulation on the current waypoints using the stored rl_* params.
+	void rebuild_racing_line();
 
 	// Load "bike_waypoint" spawners from the current level, sort by editor_name (integer).
 	// Raycasts each waypoint down to the terrain surface, then builds as a loop.
@@ -49,12 +62,6 @@ public:
 	                              const std::vector<glm::vec3>& route_hints,
 	                              float sample_step_m = 0.5f,
 	                              bool  loop = false);
-
-	// Build from raw positions and per-node half-widths.
-	// If loop is true, connects the last waypoint back to the first.
-	void build(const std::vector<glm::vec3>& positions,
-	           const std::vector<float>&     road_half_widths,
-	           bool                          loop = false);
 
 	// Project a world-space position onto the nearest point on the course.
 	// Returns arc-length (course_dist_m) of that point.
@@ -95,8 +102,9 @@ public:
 	// dt:        time step per iteration (lerp factor = dt/100)
 	// num_iters: simulation steps — more = better convergence
 	static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
-	                                float k         = 1.0f,
-	                                float mass      = 1.0f,
-	                                float dt        = 10.0f,
-	                                int   num_iters = 400);
+	                                float k         = 14.0f,
+	                                float mass      = 99.0f,
+	                                float dt        = 1.0f/60.f,
+	                                int   num_iters = 5000);
+
 };
