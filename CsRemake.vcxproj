@@ -111,6 +111,7 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Source\Game\BikeDemo\BikeCamera.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeNeuralNet.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeObject.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeUI.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeWind.cpp" />

@@ -42,8 +42,8 @@ public:
 
 	// Racing line physics parameters — change and call rebuild_racing_line() to re-apply
 	// without a full course rebuild, or they are picked up automatically on build_from_road_network.
-	float rl_k         = 14.0f;    // hinge spring stiffness
-	float rl_mass      = 99.0f;    // waypoint mass
+	float rl_k         = 0.50f;    // hinge spring stiffness
+	float rl_mass      = 2.0f;    // waypoint mass
 	float rl_dt        = 1.f/60.f; // time step per iteration
 	int   rl_num_iters = 5000;     // simulation steps — more = better convergence
 
@@ -109,8 +109,8 @@ public:
 	// dt:        time step per iteration (lerp factor = dt/100)
 	// num_iters: simulation steps — more = better convergence
 	static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
-	                                float k         = 14.0f,
-	                                float mass      = 99.0f,
+	                                float k         = 2.0f,
+	                                float mass      = 0.50f,
 	                                float dt        = 1.0f/60.f,
 	                                int   num_iters = 5000);
 

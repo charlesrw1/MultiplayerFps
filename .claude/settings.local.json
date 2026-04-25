@@ -184,7 +184,8 @@
       "Bash(trash Source/UnitTests/bike_course_racing_line_test.cpp)",
       "WebFetch(domain:www.mysticgg.com)",
       "WebFetch(domain:vamos.sourceforge.net)",
-      "Skill(update-config)"
+      "Skill(update-config)",
+      "Bash(grep -n \"Core.lib\\\\|AdditionalDependencies\\\\|AdditionalLibrary\\\\|Core\\\\\\\\\" C:/Users/charl/source/repos/CsRemake/Source/UnitTests/UnitTests.vcxproj)"
     ]
   },
   "enabledPlugins": {

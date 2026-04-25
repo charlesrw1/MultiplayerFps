@@ -265,6 +265,86 @@ public:
 	float dbg_v_max              = 0.f;  // safe cornering speed (m/s) for that radius
 	float dbg_lookahead_dist     = 0.f;  // actual lookahead distance used this frame (m)
 };
+
+// ============================================================
+// Neural net steering POC — behavior cloning from BikeAI
+// ============================================================
+static constexpr int BIKENN_INPUT_DIM  = 7;
+static constexpr int BIKENN_HIDDEN_DIM = 32;
+
+// Feature vector extracted from BikeObject + BikeCourse each frame.
+// Used identically by the recorder and the inference path.
+struct BikeNNFeatures {
+	float v[BIKENN_INPUT_DIM];
+	// Fills v[] from current bike state.  Requires course->is_built.
+	static BikeNNFeatures extract(BikeObject* bike, const BikeCourse* course);
+};
+
+// Writes (features[7], steer_label[1]) records to a binary file for offline training.
+class BikeNNRecorder {
+public:
+	~BikeNNRecorder() { close(); }
+	void open(const char* path);
+	void close();
+	// Records one sample if enabled and frame_skip allows it.
+	void try_record(const BikeNNFeatures& f, float steer_label);
+
+	bool  enabled    = false;
+	int   frame_skip = 1;   // record every N frames
+	int   frame_count = 0;
+	int   sample_count = 0;
+private:
+	FILE* file_ = nullptr;
+};
+extern BikeNNRecorder g_nn_recorder;
+
+// IBikeInput implementation that runs neural net inference for steering.
+// Power management is a simplified constant-power slew (no gap following).
+class BikeNNInput : public IBikeInput {
+public:
+	~BikeNNInput() override = default;
+	void evaluate(BikeObject* my_bike) final;
+
+	BikeCourse* course = nullptr;
+
+	// Load weights written by BikeNNTrainer::train_and_save.
+	// Returns false on failure (evaluate will fall back to steer=0).
+	bool load_weights(const char* path);
+	bool weights_loaded = false;
+
+	float target_power_watts   = 250.f;
+	float actual_power_command = 150.f;
+	static constexpr float POWER_SLEW = 0.05f;
+
+	float dbg_steer = 0.f;
+
+private:
+	float mean_[BIKENN_INPUT_DIM]                        = {};
+	float std_ [BIKENN_INPUT_DIM]                        = {};
+	float W1_  [BIKENN_HIDDEN_DIM][BIKENN_INPUT_DIM]     = {};
+	float b1_  [BIKENN_HIDDEN_DIM]                       = {};
+	float W2_  [BIKENN_HIDDEN_DIM]                       = {};
+	float b2_                                            = 0.f;
+
+	float forward(const BikeNNFeatures& f) const;
+};
+
+// Trains a BikeNNInput-compatible MLP from recorded data entirely in C++.
+// Call train_and_save() from the debug menu after recording enough laps.
+class BikeNNTrainer {
+public:
+	struct TrainParams {
+		int   epochs     = 500;
+		float lr         = 1e-3f;
+		int   batch_size = 64;
+	};
+
+	// Reads data_path, runs Adam training, writes weights to weights_path.
+	// Reports progress via sys_print.  Blocks for ~50-200 ms typical.
+	// Returns final mean-squared error, or <0 on I/O failure.
+	float train_and_save(const char* data_path, const char* weights_path,
+	                     const TrainParams& p = {});
+};
 class BikePlayer : public IBikeInput {
 public:
 	BikePlayer();
@@ -460,7 +540,8 @@ public:
 	// and the pull-through rotation is active.
 	bool paceline_active  = false;
 	bool echelon_mode     = false;
-	int  num_ai           = 8;
+	int  num_ai           = 5;
+	bool use_nn_ai        = true;  // when true, AI riders use BikeNNInput instead of BikeAI
 
 	// Crack decal instances collected at map load
 	struct CrackDecalInstance {

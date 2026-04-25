@@ -2,6 +2,7 @@
 #include "Framework/MathLib.h"
 #include "Debug.h"
 #include "GameEnginePublic.h"
+#include <glm/gtx/vector_angle.hpp>
 
 // Tunable constants defined in BikeApplication.cpp, exposed here for AI use.
 extern float AI_GAP_TARGET;
@@ -100,6 +101,12 @@ void BikeAI::evaluate(BikeObject* my_bike)
 		}
 	}
 	dbg_power_seek_bonus = gap_bonus;
+
+	// ---- Record training data ----
+	if (g_nn_recorder.enabled) {
+		const BikeNNFeatures feat = BikeNNFeatures::extract(my_bike, course);
+		g_nn_recorder.try_record(feat, steer_out);
+	}
 
 	// ---- Fill ControlInput ----
 	// Boid steer forces blended on top of PID path steer.

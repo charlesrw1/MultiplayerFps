@@ -709,19 +709,26 @@ BikeObject* BikeGameApplication::create_ai(glm::vec3 pos)
 {
 	Entity* e = GameplayStatic::spawn_entity();
 	e->set_ws_position(pos);
-	auto bo  = e->create_component<BikeObject>();
-	auto ai  = std::make_unique<BikeAI>();
-	ai->course = &course;
+	auto bo = e->create_component<BikeObject>();
 
-	// Echelon lane assignment: alternate AI riders between ±ECHELON_LANE_OFFSET.
-	// Index into all_riders at this point (player is always index 0).
-	if (echelon_mode) {
-		const int ai_idx = (int)all_riders.size();  // 1-based since player is 0
-		ai->preferred_lateral = (ai_idx % 2 == 0) ? ECHELON_LANE_OFFSET : -ECHELON_LANE_OFFSET;
-		ai->lane_strength     = ECHELON_LANE_STRENGTH;
+	if (use_nn_ai) {
+		auto nn    = std::make_unique<BikeNNInput>();
+		nn->course = &course;
+		nn->load_weights("D:/Data/bike_nn_weights.bin");
+		bo->input = std::move(nn);
+	} else {
+		auto ai    = std::make_unique<BikeAI>();
+		ai->course = &course;
+		// Echelon lane assignment: alternate AI riders between ±ECHELON_LANE_OFFSET.
+		// Index into all_riders at this point (player is always index 0).
+		if (echelon_mode) {
+			const int ai_idx = (int)all_riders.size();
+			ai->preferred_lateral = (ai_idx % 2 == 0) ? ECHELON_LANE_OFFSET : -ECHELON_LANE_OFFSET;
+			ai->lane_strength     = ECHELON_LANE_STRENGTH;
+		}
+		bo->input = std::move(ai);
 	}
 
-	bo->input  = std::move(ai);
 	all_riders.push_back(bo);
 	riders_sorted.push_back(bo);
 	return bo;
@@ -1189,6 +1196,69 @@ static void bike_course_debug()
 	}
 }
 ADD_TO_DEBUG_MENU(bike_course_debug);
+
+// ============================================================
+// Debug menu: Neural Net Steering POC
+// ============================================================
+
+static const char* NN_DATA_PATH    = "D:/Data/bike_nn_data.bin";
+static const char* NN_WEIGHTS_PATH = "D:/Data/bike_nn_weights.bin";
+
+static void bike_nn_debug()
+{
+	if (!g_bike_app) return;
+
+	ImGui::SeparatorText("Recording");
+	ImGui::Text("Samples recorded: %d", g_nn_recorder.sample_count);
+	ImGui::DragInt("Frame skip", &g_nn_recorder.frame_skip, 1, 1, 10);
+
+	if (!g_nn_recorder.enabled) {
+		if (ImGui::Button("Start Recording")) {
+			g_nn_recorder.open(NN_DATA_PATH);
+			g_nn_recorder.enabled = true;
+		}
+	} else {
+		ImGui::TextColored({0.2f, 1.f, 0.2f, 1.f}, "RECORDING");
+		if (ImGui::Button("Stop Recording")) {
+			g_nn_recorder.enabled = false;
+			g_nn_recorder.close();
+		}
+	}
+
+	ImGui::SeparatorText("Training");
+	static BikeNNTrainer::TrainParams train_params;
+	ImGui::DragInt  ("Epochs",     &train_params.epochs,     10, 10,  5000);
+	ImGui::DragFloat("LR",         &train_params.lr,         0.0001f, 1e-5f, 0.1f, "%.5f");
+	ImGui::DragInt  ("Batch size", &train_params.batch_size, 8, 8, 512);
+
+	if (ImGui::Button("Train & Save Weights")) {
+		BikeNNTrainer trainer;
+		const float mse = trainer.train_and_save(NN_DATA_PATH, NN_WEIGHTS_PATH, train_params);
+		if (mse >= 0.f)
+			sys_print(Debug, "BikeNN train finished: mse=%.6f\n", mse);
+	}
+
+	ImGui::SeparatorText("Inference");
+	ImGui::Checkbox("Use NN AI (respawn to apply)", &g_bike_app->use_nn_ai);
+	if (ImGui::Button("Reload NN Weights (live riders)")) {
+		for (auto* r : g_bike_app->all_riders) {
+			if (auto* nn = dynamic_cast<BikeNNInput*>(r->input.get()))
+				nn->load_weights(NN_WEIGHTS_PATH);
+		}
+	}
+
+	// Per-rider NN steer readout
+	bool any_nn = false;
+	for (int i = 0; i < (int)g_bike_app->all_riders.size(); ++i) {
+		BikeObject* r = g_bike_app->all_riders[i];
+		if (auto* nn = dynamic_cast<BikeNNInput*>(r->input.get())) {
+			if (!any_nn) { ImGui::SeparatorText("NN riders"); any_nn = true; }
+			ImGui::Text("Rider %d  steer=%.3f  weights=%s",
+				i, nn->dbg_steer, nn->weights_loaded ? "ok" : "MISSING");
+		}
+	}
+}
+ADD_TO_DEBUG_MENU(bike_nn_debug);
 
 // ============================================================
 // Debug camera follow state — file scope so update() can read it
