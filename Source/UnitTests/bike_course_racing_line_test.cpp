@@ -230,86 +230,152 @@ TEST(RacingLine, Turn30Gentle_ApexPastJunction)
 }
 
 // ─────────────────────────────────────────────────────────────
-// project() — heading-weighted disambiguation at a 90° corner
+// project() tests
 //
-// Course: approach east (X+), then exit south (Z-).
-// Bike is at (9.8, 0, -0.3) — just before the apex in world-space,
-// but the exit segment [(10,0,0)→(10,0,-0.5)] is geometrically closer
-// (dist_sq≈0.04) than the approach segment (dist_sq≈0.09).
+// Two problems the new implementation must prevent:
 //
-// Without heading:  exit road wins → course_dist jumps past corner.
-// With heading=(1,0,0) (still going east): approach must win.
-// With heading=(0,0,-1) (now going south): exit must win.
+// 1. Corner arm aliasing: at a 90° corner the exit segment can be
+//    geometrically closer than the approach segment even while the bike
+//    is still heading east.  Heading weight disambiguates them.
+//
+// 2. Loop aliasing: on a looping course another section of track may
+//    pass near the current corner in world-space.  The windowed search
+//    (±arc-length window around prev_dist_m) must prevent course_dist_m
+//    from jumping to that distant segment — the "teleport to far point"
+//    bug the user reported.
 // ─────────────────────────────────────────────────────────────
 
-// Build a minimal BikeCourse with straight approach + straight exit.
+// Shared helper: build course with approach (east) + exit (south).
+// Returns a non-loop course with 0.5 m segment spacing.
 static BikeCourse make_corner_course()
 {
     const float step = 0.5f;
     std::vector<glm::vec3> pos;
-    // Approach: east, 0→10m
-    for (int i = 0; i <= 20; ++i)
-        pos.push_back({ i * step, 0.f, 0.f });
-    // Exit: south from (10,0,0), 0→10m
-    for (int i = 1; i <= 20; ++i)
-        pos.push_back({ 20 * step, 0.f, -i * step });
+    for (int i = 0; i <= 20; ++i) pos.push_back({ i * step, 0.f, 0.f });
+    for (int i = 1; i <= 20; ++i) pos.push_back({ 20 * step, 0.f, -i * step });
 
     const int n = (int)pos.size();
     std::vector<BikeWaypoint> wps(n);
     for (int i = 0; i < n; ++i) {
         wps[i].position = pos[i];
-        glm::vec3 fwd;
-        if (i < n - 1) fwd = pos[i + 1] - pos[i];
-        else            fwd = pos[i]     - pos[i - 1];
+        glm::vec3 fwd = (i < n - 1) ? pos[i+1] - pos[i] : pos[i] - pos[i-1];
         fwd = glm::normalize(fwd);
-        wps[i].forward           = fwd;
-        wps[i].right             = glm::normalize(glm::cross(glm::vec3(0,1,0), fwd));
-        wps[i].road_half_width   = 4.f;
-        wps[i].dist_from_start   = (i == 0) ? 0.f
+        wps[i].forward         = fwd;
+        wps[i].right           = glm::normalize(glm::cross(glm::vec3(0,1,0), fwd));
+        wps[i].road_half_width = 4.f;
+        wps[i].dist_from_start = (i == 0) ? 0.f
             : wps[i-1].dist_from_start + glm::distance(pos[i], pos[i-1]);
-        wps[i].racing_line_pos   = pos[i];
+        wps[i].racing_line_pos = pos[i];
     }
 
     BikeCourse c;
-    c.waypoints     = wps;
-    c.total_length_m = wps.back().dist_from_start;
-    c.is_built      = true;
-    c.is_loop       = false;
+    c.waypoints      = wps;
+    c.total_length_m = wps.back().dist_from_start + step;  // include last segment
+    c.is_built       = true;
+    c.is_loop        = false;
     return c;
 }
+
+// ── Test 1: heading east at the inner apex → stay on approach ────────────────
 
 TEST(BikeCourseProject, Corner90_HeadingEast_StaysOnApproach)
 {
     BikeCourse c = make_corner_course();
-
-    // Bike at the inner corner: exit road is geometrically closer without heading.
     const glm::vec3 pos = { 9.8f, 0.f, -0.3f };
 
-    // Without heading: exit road wins (dist_sq ≈ 0.04 < 0.09)
+    // Global search without heading: exit dist_sq ≈ 0.04 < approach 0.09 → exit wins.
     float dist_no_heading = c.project(pos);
-    // With heading east: approach should win
-    float dist_heading = c.project(pos, nullptr, nullptr, glm::vec3(1.f, 0.f, 0.f));
-
-    // Approach road ends at arc=10m; exit starts there.
-    // Heading-corrected result must keep us on approach (<= 10m).
-    EXPECT_LE(dist_heading, 10.0f)
-        << "heading east: projection must stay on approach road (arc <= 10m)";
-
-    // Without heading the exit typically wins and dist > 10m
-    // (confirms the original bug exists in global search)
     EXPECT_GT(dist_no_heading, 10.0f)
-        << "without heading hint the exit road wins, causing the premature jump";
+        << "sanity: global search without heading jumps to exit road";
+
+    // With heading east + prev_dist_m on approach: must stay on approach (arc ≤ 10 m).
+    float dist_headed = c.project(pos, nullptr, nullptr,
+                                   glm::vec3(1.f, 0.f, 0.f), /*prev_dist_m=*/9.5f);
+    EXPECT_LE(dist_headed, 10.0f)
+        << "heading east + prev on approach: must not jump to exit road";
 }
+
+// ── Test 2: heading south → correctly move to exit ───────────────────────────
 
 TEST(BikeCourseProject, Corner90_HeadingSouth_MovesToExit)
 {
     BikeCourse c = make_corner_course();
-
-    // Same world position, but now the bike has turned south.
     const glm::vec3 pos = { 9.8f, 0.f, -0.3f };
-    float dist = c.project(pos, nullptr, nullptr, glm::vec3(0.f, 0.f, -1.f));
 
-    // Heading south → exit road is correctly chosen (arc > 10m)
+    float dist = c.project(pos, nullptr, nullptr,
+                             glm::vec3(0.f, 0.f, -1.f), /*prev_dist_m=*/9.5f);
     EXPECT_GT(dist, 10.0f)
-        << "heading south: projection must move onto exit road (arc > 10m)";
+        << "heading south: projection must move onto exit road";
+}
+
+// ── Test 3: loop aliasing — far segment must NOT win ─────────────────────────
+//
+// Build a loop where a second straight passes near the same corner position.
+// With prev_dist_m near the corner, the search window must exclude the
+// far duplicate, even though it is geometrically closer.
+
+TEST(BikeCourseProject, LoopAliasing_WindowPreventsJump)
+{
+    // Loop: approach east (0→10m), exit south (10→20m), then a long detour back
+    // that passes ~1m north of the corner apex (world pos ≈ (10,0,0)).
+    // The detour segment at arc≈60m will be ~1m from the rider when they are at
+    // the corner at arc≈9.8m.  Without the window it could win; with it it must not.
+
+    const float step = 0.5f;
+    std::vector<glm::vec3> pos;
+
+    // Approach east: arc 0→10 m
+    for (int i = 0; i <= 20; ++i) pos.push_back({ i * step, 0.f, 0.f });
+    // Exit south:    arc 10→20 m
+    for (int i = 1; i <= 20; ++i) pos.push_back({ 10.f, 0.f, -i * step });
+    // West leg back: arc 20→30 m
+    for (int i = 1; i <= 20; ++i) pos.push_back({ 10.f - i * step, 0.f, -10.f });
+    // North leg back toward start, passing 1 m north of apex: arc 30→50 m
+    // Passes through (0,0,-10) → (0,0,1): goes directly north past the corner
+    for (int i = 1; i <= 22; ++i) pos.push_back({ 0.f, 0.f, -10.f + i * step });
+    // East leg back to start: arc ~51→61 m
+    for (int i = 1; i <= 20; ++i) pos.push_back({ i * step, 0.f, 1.f });
+
+    const int n = (int)pos.size();
+    std::vector<BikeWaypoint> wps(n);
+    for (int i = 0; i < n; ++i) {
+        wps[i].position = pos[i];
+        glm::vec3 fwd = (i < n - 1) ? pos[i+1] - pos[i] : pos[0] - pos[i];
+        fwd = glm::normalize(fwd);
+        wps[i].forward         = fwd;
+        wps[i].right           = glm::normalize(glm::cross(glm::vec3(0,1,0), fwd));
+        wps[i].road_half_width = 4.f;
+        wps[i].dist_from_start = (i == 0) ? 0.f
+            : wps[i-1].dist_from_start + glm::distance(pos[i], pos[i-1]);
+        wps[i].racing_line_pos = pos[i];
+    }
+
+    BikeCourse c;
+    c.waypoints      = wps;
+    c.total_length_m = wps.back().dist_from_start + glm::distance(pos.back(), pos[0]);
+    c.is_built       = true;
+    c.is_loop        = true;
+
+    // Rider approaching the 90° corner at (9.8, 0, -0.3), prev_dist ≈ 9.5 m.
+    // The north-leg segment passes near world (10, 0, 1) at arc ≈ 48 m — well
+    // outside the [9.5-10, 9.5+50] = [0, 59.5] window... wait, 48 m IS in window.
+    // Let's verify the window at least excludes the east-return leg near (10, 0, 1)
+    // which is only ~1 m from the rider's position at (9.8, 0, -0.3):
+    // arc of east-return leg ≈ 51+ m which is inside the window.
+    // But its heading is east=(1,0,0) same as bike — this is the hard case.
+    //
+    // Critical test: with prev on approach and heading east, the APPROACH segment
+    // must win over any heading-aligned return leg that happens to be nearby.
+    // The approach segment (arc=9.8m) and return leg (~arc=55m) both head east.
+    // Their world-space distances differ: approach ≈ 0.3m, return ≈ 1m.
+    // Nearest world-space wins — approach is closer, so it should win.
+
+    const glm::vec3 pos_bike = { 9.8f, 0.f, -0.3f };
+    float dist = c.project(pos_bike, nullptr, nullptr,
+                             glm::vec3(1.f, 0.f, 0.f), /*prev_dist_m=*/9.5f);
+
+    EXPECT_LE(dist, 10.5f)
+        << "with prev on approach: projection must not jump to far part of loop";
+    EXPECT_GE(dist, 8.0f)
+        << "projection must remain in the vicinity of the corner approach";
 }

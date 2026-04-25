@@ -68,71 +68,151 @@ void BikeCourse::rebuild_racing_line()
 // project
 // ============================================================
 
+// ============================================================
+// project — internal helpers
+// ============================================================
+
+// Binary search: largest segment index i where waypoints[i].dist_from_start <= d.
+// Assumes waypoints are sorted by dist_from_start (always true after build).
+static int arc_to_seg_idx(const std::vector<BikeWaypoint>& wps, float d)
+{
+	const int n = (int)wps.size();
+	int lo = 0, hi = n - 2;
+	while (lo < hi) {
+		const int mid = (lo + hi + 1) / 2;
+		if (wps[mid].dist_from_start <= d) lo = mid;
+		else                               hi = mid - 1;
+	}
+	return lo;
+}
+
+// ============================================================
+// project
+// ============================================================
+
 float BikeCourse::project(glm::vec3 world_pos, float* out_lateral, int* out_segment,
-                           glm::vec3 world_forward) const
+                           glm::vec3 world_forward, float prev_dist_m) const
 {
 	if ((int)waypoints.size() < 2) return 0.f;
 
 	const int n        = (int)waypoints.size();
 	const int num_segs = is_loop ? n : n - 1;
 
-	// Heading-weighted projection: when the caller provides a travel direction,
-	// divide each segment's dist_sq by its heading alignment score.  Segments
-	// anti-aligned with the bike's heading are penalised so the projection
-	// cannot jump to the wrong arm of a sharp 90° corner.
-	// heading_sq_len > 0 only when world_forward is a real direction.
-	const float heading_sq_len = glm::dot(world_forward, world_forward);
-	const bool  use_heading    = (heading_sq_len > 0.25f);  // require roughly unit length
+	// --- Heading setup ---
+	// Heading weight penalises segments facing the wrong way.  This disambiguates
+	// the two arms of a 90° corner when both are equidistant in world-space.
+	// The penalty is mild (÷0.05 at worst = 20×) so a genuine nearby segment
+	// still wins over a far-away aligned one.
+	const bool  use_heading = (glm::dot(world_forward, world_forward) > 0.25f);
+	const glm::vec2 fwd2d   = use_heading
+	                          ? glm::normalize(glm::vec2(world_forward.x, world_forward.z))
+	                          : glm::vec2(0.f);
 
-	// XZ components only — ignore vertical for heading comparison.
-	const glm::vec2 fwd2d = use_heading
-	                        ? glm::normalize(glm::vec2(world_forward.x, world_forward.z))
-	                        : glm::vec2(0.f);
-
-	float best_score   = FLT_MAX;  // score = dist_sq / heading_match (or just dist_sq)
-	float best_dist_sq = FLT_MAX;
-	float best_dist_m  = 0.f;
-	float best_t       = 0.f;
-	int   best_seg     = 0;
-
-	for (int i = 0; i < num_segs; ++i) {
+	// Score one segment; returns heading-weighted dist_sq and sets t.
+	// raw_dist_sq is also returned separately (needed for the fallback threshold).
+	auto score_seg = [&](int i, float& out_t, float& raw_dist_sq) -> float {
 		const glm::vec3& a  = waypoints[i].position;
 		const glm::vec3& b  = waypoints[(i + 1) % n].position;
 		const glm::vec3  ab = b - a;
-		const float ab_sq   = glm::dot(ab, ab);
+		const float      ab_sq = glm::dot(ab, ab);
 
 		float t = 0.f;
 		if (ab_sq > 1e-8f)
 			t = glm::clamp(glm::dot(world_pos - a, ab) / ab_sq, 0.f, 1.f);
 
+		out_t = t;
 		const glm::vec3 closest = a + t * ab;
-		const glm::vec3 diff    = world_pos - closest;
-		const float     dist_sq = glm::dot(diff, diff);
+		raw_dist_sq             = glm::dot(world_pos - closest, world_pos - closest);
 
-		float score = dist_sq;
 		if (use_heading && ab_sq > 1e-8f) {
-			// Normalise segment direction in XZ and compare to bike heading.
-			// heading_match in (0,1]: 1 = perfectly aligned, near 0 = anti-aligned.
-			// Clamp to 0.05 so a fully anti-aligned segment is only 20× penalised,
-			// not infinitely so — allows recovery if the bike has reversed or stalled.
-			const glm::vec2 seg2d = glm::normalize(glm::vec2(ab.x, ab.z));
-			const float heading_match = glm::max(glm::dot(seg2d, fwd2d), 0.05f);
-			score = dist_sq / heading_match;
+			const glm::vec2 seg2d         = glm::normalize(glm::vec2(ab.x, ab.z));
+			const float     heading_match = glm::max(glm::dot(seg2d, fwd2d), 0.05f);
+			return raw_dist_sq / heading_match;
 		}
+		return raw_dist_sq;
+	};
 
+	float best_score      = FLT_MAX;
+	float best_raw_dist_sq = FLT_MAX;
+	float best_dist_m     = 0.f;
+	float best_t          = 0.f;
+	int   best_seg        = 0;
+
+	// Update best if this segment scores better.
+	auto try_seg = [&](int i) {
+		float t, raw_dsq;
+		const float score = score_seg(i, t, raw_dsq);
 		if (score < best_score) {
-			best_score   = score;
-			best_dist_sq = dist_sq;
-			best_seg     = i;
-			best_t       = t;
-
-			// Arc-length at closest point
-			const float seg_arc_start = waypoints[i].dist_from_start;
-			const float seg_arc_end   = (i < n - 1) ? waypoints[i + 1].dist_from_start : total_length_m;
-			best_dist_m = seg_arc_start + t * (seg_arc_end - seg_arc_start);
+			best_score       = score;
+			best_raw_dist_sq = raw_dsq;
+			best_seg         = i;
+			best_t           = t;
+			const float arc0 = waypoints[i].dist_from_start;
+			const float arc1 = (i < n - 1) ? waypoints[i + 1].dist_from_start : total_length_m;
+			best_dist_m      = arc0 + t * (arc1 - arc0);
 		}
+	};
+
+	// Search a contiguous range of segment indices [i_lo, i_hi) with loop-wrap.
+	auto search_range = [&](int i_lo, int i_hi) {
+		for (int ii = i_lo; ii < i_hi; ++ii)
+			try_seg((ii % n + n) % n);
+	};
+
+	// --- Windowed search (primary path when prev_dist_m is known) ---
+	//
+	// Restricts the search to an arc-length window around the previous position.
+	// Prevents the global scan from matching a distant part of the loop that
+	// happens to be close in world-space (the classic loop-aliasing bug that
+	// causes course_dist_m to teleport to the far side of the circuit).
+	//
+	// Falls back to the full global search only if the rider is more than
+	// FALLBACK_DIST_M from every segment in the window (off-track recovery).
+
+	static constexpr float BACK_M         = 10.f;   // allow 10 m backward (braking / noise)
+	static constexpr float FORWARD_M      = 50.f;   // allow 50 m forward  (high-speed frame)
+	static constexpr float FALLBACK_DIST_M = 30.f;  // global fallback if >30 m from road
+
+	bool used_window = false;
+
+	if (prev_dist_m >= 0.f && total_length_m > 1.f) {
+		const float win_lo = prev_dist_m - BACK_M;
+		const float win_hi = prev_dist_m + FORWARD_M;
+
+		if (!is_loop) {
+			const int i0 = arc_to_seg_idx(waypoints, glm::max(win_lo, 0.f));
+			const int i1 = arc_to_seg_idx(waypoints, glm::min(win_hi, total_length_m)) + 1;
+			search_range(i0, i1);
+		} else {
+			// Loop: window may wrap past 0 or past total_length_m.
+			if (win_lo < 0.f) {
+				// Wraps past start — two sub-ranges.
+				const float lo_w = win_lo + total_length_m;
+				search_range(arc_to_seg_idx(waypoints, lo_w), n);
+				search_range(0, arc_to_seg_idx(waypoints, win_hi) + 1);
+			} else if (win_hi >= total_length_m) {
+				// Wraps past end — two sub-ranges.
+				const float hi_w = win_hi - total_length_m;
+				search_range(arc_to_seg_idx(waypoints, win_lo), n);
+				search_range(0, arc_to_seg_idx(waypoints, hi_w) + 1);
+			} else {
+				// No wrap.
+				search_range(arc_to_seg_idx(waypoints, win_lo),
+				             arc_to_seg_idx(waypoints, win_hi) + 1);
+			}
+		}
+		used_window = true;
 	}
 
+	// --- Global fallback ---
+	// Used on the first frame (no prev_dist_m) and as a recovery search when
+	// the rider is far from every segment in the window (crash / teleport).
+	if (!used_window || best_raw_dist_sq > FALLBACK_DIST_M * FALLBACK_DIST_M) {
+		best_score = best_raw_dist_sq = FLT_MAX;
+		search_range(0, num_segs);
+	}
+
+	// --- Fill outputs ---
 	if (out_segment) *out_segment = best_seg;
 
 	if (out_lateral) {

@@ -157,7 +157,8 @@ void BikeGameApplication::update_course_positions()
 			r->get_ws_position(),
 			&r->lateral_pos,
 			&r->course_segment,
-			r->bike_direction);
+			r->bike_direction,
+			r->course_dist_m);   // prev_dist_m: restricts search to ±window, prevents loop aliasing
 	}
 }
 

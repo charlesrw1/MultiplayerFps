@@ -34,7 +34,7 @@ public:
 	bool  is_loop             = false;  // true: last waypoint connects back to first
 
 	// Road network build parameters — change and call build_from_road_network to re-apply.
-	float sample_step_m        = 0.5f;  // dense-sample spacing along road edges (m)
+	float sample_step_m        = 4.0f;  // dense-sample spacing along road edges (m)
 
 	// Fillet parameters — change and call build_from_road_network to re-apply.
 	bool  fillet_enabled       = true;
@@ -68,13 +68,18 @@ public:
 	// out_lateral:   signed offset from road centre, +ve = road-right
 	// out_segment:   index of the waypoint segment that was nearest
 	// world_forward: optional travel direction of the querying object.
-	//   When non-zero, segments anti-aligned with this direction are penalised,
-	//   preventing the projection from jumping to the wrong arm of a sharp corner
-	//   (e.g. the exit road appearing closer in world-space before the bike has turned).
+	//   When non-zero, segments anti-aligned with this direction are penalised
+	//   to prevent the wrong arm of a sharp corner from stealing the projection.
+	// prev_dist_m:   arc-length from the previous frame (pass course_dist_m).
+	//   When >= 0, the search is restricted to [prev-10m, prev+50m] in arc-length,
+	//   preventing the global search from matching a distant part of the loop
+	//   that happens to be close in world-space.  Falls back to global search
+	//   only if the rider is more than 30m from every segment in the window.
 	float project(glm::vec3 world_pos,
 	              float*     out_lateral   = nullptr,
 	              int*       out_segment   = nullptr,
-	              glm::vec3  world_forward = glm::vec3(0.f)) const;
+	              glm::vec3  world_forward = glm::vec3(0.f),
+	              float      prev_dist_m   = -1.f) const;
 
 	// Interpolated waypoint at a given arc-length (Catmull-Rom for position, lerp for the rest).
 	// Wraps when is_loop is true.
