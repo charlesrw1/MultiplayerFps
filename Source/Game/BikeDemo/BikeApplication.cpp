@@ -17,15 +17,11 @@
 #include "UI/Gui.h"
 #include <algorithm>
 
-// Shared wind state (defined in BikeWind.cpp)
-extern glm::vec3 wind_direction;
-extern float     wind_speed;
-extern float     wind_gust_factor;
-extern float     gust_speed_amp;
+// Wind state is accessed via the global WindSystem: g_wind.wind_speed, etc.
 
 // Steering expo: >1 compresses small deflections for finer control near center.
 // At expo=2: half-stick → 25% input. At expo=1: linear. At expo=3: half-stick → 12.5%.
-static float steer_expo = 3.5f;
+static float steer_expo = 1.25f;
 
 // Speed hold tuning
 static float sh_power_up   = 0.012f;
@@ -35,9 +31,9 @@ static float sh_power_max  = 800.f;
 // Freewheel sound fade
 static float free_wheel_fade = 0.0002f;
 
-// Debug pointers (set each frame in evaluate)
-static BikeObject*          bo_for_debug = nullptr;
-static BikePlayer*          bp_for_debug = nullptr;
+// Debug pointers (set each frame in evaluate; bp_for_debug is non-static so BikeCamera.cpp can extern it)
+static BikeObject* bo_for_debug = nullptr;
+BikePlayer*        bp_for_debug = nullptr;
 static BikeGameApplication* g_bike_app   = nullptr;
 
 // Forward declare — defined later alongside the boid debug menu
@@ -730,20 +726,7 @@ BikePlayer::BikePlayer()
 
 	heart_icon_tex = Texture::load("ui/heart_icon.png");
 
-	// Speed lines particle object
-	{
-		speedlines_handle = idraw->get_scene()->register_particle_obj();
-		Particle_Object spo{};
-		spo.meshbuilder = &speedlines_mb;
-		idraw->get_scene()->update_particle_obj(speedlines_handle, spo);
-	}
-	// Wind lines particle object
-	{
-		wind_handle = idraw->get_scene()->register_particle_obj();
-		Particle_Object wpo{};
-		wpo.meshbuilder = &wind_mb;
-		idraw->get_scene()->update_particle_obj(wind_handle, wpo);
-	}
+	g_wind.init();
 }
 
 BikePlayer::~BikePlayer()
@@ -751,8 +734,8 @@ BikePlayer::~BikePlayer()
 	isound->remove_sound_player(freewheel_player);
 	isound->remove_sound_player(wind_player);
 	isound->remove_sound_player(pedal_player);
-	idraw->get_scene()->remove_particle_obj(speedlines_handle);
-	idraw->get_scene()->remove_particle_obj(wind_handle);
+	g_wind.shutdown();
+	// speedlines particle obj cleaned up by BikeSpeedlinesFx dtor
 }
 
 // ============================================================
@@ -859,9 +842,9 @@ void BikePlayer::evaluate(BikeObject* my_bike)
 
 	if (speed_hold_active) {
 		const float v            = glm::max(my_bike->speed, 0.3f);
-		const float eff_wind_spd = wind_speed * (1.f + wind_gust_factor * 1.5f);
-		const glm::vec3 wdir_n   = glm::length(wind_direction) > 0.001f
-		                           ? glm::normalize(wind_direction) : glm::vec3(0.f);
+		const float eff_wind_spd = g_wind.wind_speed * (1.f + g_wind.wind_gust_factor * 1.5f);
+		const glm::vec3 wdir_n   = glm::length(g_wind.wind_direction) > 0.001f
+		                           ? glm::normalize(g_wind.wind_direction) : glm::vec3(0.f);
 		const float wind_along   = glm::dot(wdir_n, my_bike->bike_direction) * eff_wind_spd;
 		const float app_speed    = my_bike->speed - wind_along;
 		const float drag         = 0.5f * 1.225f * 0.3f * app_speed * glm::abs(app_speed);
@@ -898,7 +881,7 @@ void BikePlayer::evaluate(BikeObject* my_bike)
 	my_bike->update_tick(ci);
 
 	// --- Wind ---
-	update_wind(my_bike);
+	g_wind.update(my_bike, cam.camera_pos);
 
 	// --- Camera ---
 	if (!g_follow_rider)
@@ -975,8 +958,8 @@ static void bike_status_debug()
 		my_bike->gear.current_high_gear + 1,
 		my_bike->gear.front_cogs[my_bike->gear.current_low_gear],
 		my_bike->gear.back_cogs[my_bike->gear.current_high_gear]);
-	const float eff_ws       = wind_speed * (1.f + wind_gust_factor * 1.5f);
-	const glm::vec3 wdn      = glm::length(wind_direction) > 0.001f ? glm::normalize(wind_direction) : glm::vec3(0.f);
+	const float eff_ws       = g_wind.wind_speed * (1.f + g_wind.wind_gust_factor * 1.5f);
+	const glm::vec3 wdn      = glm::length(g_wind.wind_direction) > 0.001f ? glm::normalize(g_wind.wind_direction) : glm::vec3(0.f);
 	const float wind_comp    = glm::dot(wdn, my_bike->bike_direction) * eff_ws;
 	const float app_spd      = my_bike->speed - wind_comp;
 	const float aero_drag_N  = 0.5f * 1.225f * 0.3f * app_spd * glm::abs(app_spd);
@@ -1263,22 +1246,8 @@ static void bike_boid_debug()
 
 	// Build label list: "Player" for BikePlayer, "AI #N" for BikeAI
 	ImGui::Text("Select rider:");
-	for (int i = 0; i < (int)all.size(); ++i) {
-		const bool is_ai = (dynamic_cast<BikeAI*>(all[i]->input.get()) != nullptr);
-		char label[32];
-		if (is_ai) {
-			// Count which AI number this is
-			int ai_n = 0;
-			for (int k = 0; k < i; ++k)
-				if (dynamic_cast<BikeAI*>(all[k]->input.get())) ++ai_n;
-			snprintf(label, sizeof(label), "AI #%d", ai_n + 1);
-		} else {
-			snprintf(label, sizeof(label), "Player");
-		}
-		ImGui::SameLine();
-		if (ImGui::RadioButton(label, selected_idx == i))
-			selected_idx = i;
-	}
+	ImGui::SameLine();
+	ImGui::InputInt("##label", &selected_idx,1);	
 	selected_idx = glm::clamp(selected_idx, 0, (int)all.size() - 1);
 	BikeObject* bo = all[selected_idx];
 
@@ -1286,11 +1255,8 @@ static void bike_boid_debug()
 	g_follow_idx = selected_idx;
 	ImGui::Checkbox("Follow selected rider (camera)", &g_follow_rider);
 	if (g_follow_rider) {
-		ImGui::SameLine();
 		ImGui::SetNextItemWidth(70.f); ImGui::DragFloat("dist",   &g_follow_dist,   0.05f, 0.5f, 10.f);
-		ImGui::SameLine();
 		ImGui::SetNextItemWidth(70.f); ImGui::DragFloat("height", &g_follow_height, 0.05f, 0.5f,  5.f);
-		ImGui::SameLine();
 		ImGui::SetNextItemWidth(70.f); ImGui::DragFloat("pitch°", &g_follow_pitch,  0.5f,  0.f, 80.f);
 	}
 

@@ -104,6 +104,99 @@ public:
 class BikeCourse;
 
 // ============================================================
+// Camera state — per-frame state, owned by BikePlayer
+// ============================================================
+struct BikeCameraState {
+	glm::vec3 camera_pos{};
+	glm::vec3 smooth_aim_pos{};
+	bool  camera_initialized = false;
+	float camera_yaw         = 0.f;
+	float camera_pitch       = 0.f;
+	float gradient_pitch     = 0.f;
+	float brake_pitch        = 0.f;
+	float lead_yaw           = 0.f;
+	float fov_smoothed       = 65.f;
+	float camera_roll        = 0.f;
+	bool  reverse_view       = false;
+	float reverse_yaw        = 0.f;
+	float cadence_bob_phase  = 0.f;
+	// Road bump springs
+	float bump_pitch_disp    = 0.f;
+	float bump_pitch_vel     = 0.f;
+	float bump_vert_disp     = 0.f;
+	float bump_vert_vel      = 0.f;
+	glm::vec3 shake_offset{};
+	float shake_magnitude    = 0.f;
+};
+
+// ============================================================
+// SpeedlinesFx — screen-space radial speed lines (owned by BikePlayer)
+// ============================================================
+class BikeSpeedlinesFx {
+public:
+	BikeSpeedlinesFx();
+	~BikeSpeedlinesFx();
+	void update(float speed, float fov_deg,
+	            glm::vec3 final_pos, glm::vec3 cam_right, glm::vec3 cam_up, glm::vec3 cam_fwd,
+	            float dt);
+
+	// Tuning — exposed for debug menu via bp->speedlines
+	bool  lines_enabled    = true;
+	int   lines_count      = 32;
+	float lines_speed_min  = 10.f;
+	float lines_speed_full = 22.f;
+	float lines_inner      = 0.55f;
+	float lines_outer      = 1.0f;
+	float lines_max_len    = 0.22f;
+	float lines_width      = 0.004f;
+	float lines_phase_rate = 1.4f;
+	float lines_alpha_peak = 200.f;
+
+private:
+	static constexpr int MAX_SPEEDLINES = 48;
+	float sl_phases[MAX_SPEEDLINES] = {};
+	float sl_angles[MAX_SPEEDLINES] = {};
+	bool  sl_initialized = false;
+	MeshBuilder speedlines_mb{};
+	handle<Particle_Object> speedlines_handle{};
+};
+
+// ============================================================
+// WindSystem — world wind state + visual streak FX
+// ============================================================
+class BikeObject;
+class WindSystem {
+public:
+	void init();      // register particle obj — call from BikePlayer ctor
+	void shutdown();  // remove particle obj  — call from BikePlayer dtor
+	void update(BikeObject* bike, glm::vec3 camera_pos);
+
+	// World state (read by BikeCamera, BikeApplication, BikeObject)
+	glm::vec3 wind_direction    = glm::vec3(1.f, 0.f, 0.f);
+	float     wind_speed        = 4.f;
+	float     wind_gust_factor  = 0.f;
+	float     wind_elapsed_time = 0.f;
+	float     ambient_temp      = 35.f;
+	float     sun_exposure      = 0.9f;
+	float     gust_speed_amp    = 1.5f;
+
+	struct WindLine {
+		glm::vec3 pos;
+		float lifetime, max_life, wave_phase, wave_speed;
+		float radius, len, width, alpha;
+	};
+	static constexpr int WIND_LINE_COUNT = 20;
+
+private:
+	WindLine    wind_lines[WIND_LINE_COUNT] = {};
+	bool        wind_initialized = false;
+	MeshBuilder wind_mb{};
+	handle<Particle_Object> wind_handle{};
+};
+
+extern WindSystem g_wind;
+
+// ============================================================
 // Paceline rotation state machine
 // ============================================================
 enum class PacelineState {
@@ -165,6 +258,11 @@ public:
 	float preferred_lateral       = 0.f;
 	float lane_strength           = 0.f;
 
+	// Smoothed lookahead distance (m) — low-pass filters the raw min-radius-based
+	// cap so the lookahead point doesn't jump every time a corner waypoint crosses
+	// the scan-window boundary.  Initialised to 0; seeds itself on first frame.
+	float smooth_lookahead_dist = 0.f;
+
 	// ---- Debug ----
 	glm::vec3 dbg_lookahead_pt{};  // world-space lookahead point, drawn in debug
 	float dbg_steer_pre_boids    = 0.f;  // PID steer before boid forces
@@ -186,62 +284,29 @@ public:
 class BikePlayer : public IBikeInput {
 public:
 	BikePlayer();
+	~BikePlayer();
 	void evaluate(BikeObject* my_bike) final;
 	void update_camera(BikeObject* bike, float steer, float brake_amount);
-	void update_wind(BikeObject* bike);
 	void draw_power_meter(float current_watts, int power_idx, bool coasting, bool speed_hold, float speed_hold_watts, float actual_watts, float power_ceiling);
 	void draw_stamina_ui(const StaminaState& s, const RiderStats& r);
 
-	// camera
 	CameraComponent* cc = nullptr;
-	glm::vec3 camera_pos{};
-	glm::vec3 smooth_aim_pos{};  // lagged look-at target
-	bool camera_initialized = false;
-	float camera_yaw     = 0.f;
-	float camera_pitch   = 0.f;
-	float gradient_pitch = 0.f;
-	float brake_pitch    = 0.f;
-	float lead_yaw       = 0.f;
-	float fov_smoothed      = 65.f;
-	float current_power     = 0.f;   // power output this frame (0 when coasting)
+	BikeCameraState  cam;
+	BikeSpeedlinesFx speedlines;
 
-	// power control state
-	int   power_level_idx  = 4;    // index into BIKE_POWER_LEVELS, default 300W
-	bool  is_coasting      = false;
-	float power_hold_timer  = 0.f; // how long dpad/key has been held
-	float power_repeat_timer = 0.f; // accumulator for repeat firings
+	float current_power      = 0.f;
+	int   power_level_idx    = 4;
+	bool  is_coasting        = false;
+	float power_hold_timer   = 0.f;
+	float power_repeat_timer = 0.f;
 
-	// speed hold (hold X / V)
 	bool  speed_hold_active = false;
-	float speed_hold_target = 0.f;  // m/s to maintain
-	float speed_hold_power  = 0.f;  // smoothed power output (W)
+	float speed_hold_target = 0.f;
+	float speed_hold_power  = 0.f;
 
-	// sound
 	SoundPlayer* freewheel_player = nullptr;
 	SoundPlayer* wind_player      = nullptr;
 	SoundPlayer* pedal_player     = nullptr;
-
-	// road bump fx state
-	float prev_gradient   = 0.f;
-	// pitch spring: impulse forces camera down, springs back
-	float bump_pitch_disp = 0.f;
-	float bump_pitch_vel  = 0.f;
-	// vertical spring: impulse pushes camera up, springs back
-	float bump_vert_disp  = 0.f;
-	float bump_vert_vel   = 0.f;
-	// camera shake: random offset decaying over time
-	glm::vec3 shake_offset{};
-	float shake_magnitude = 0.f;
-
-	// camera roll on cornering
-	float camera_roll = 0.f;
-
-	// reverse view (RS click)
-	bool  reverse_view = false;
-	float reverse_yaw  = 0.f;  // smoothly transitions 0 ↔ π
-
-	// cadence bob
-	float cadence_bob_phase = 0.f;
 
 	// Boid debug (written each frame during evaluate, read by debug menu)
 	float dbg_boid_sep_steer      = 0.f;
@@ -252,36 +317,7 @@ public:
 	float dbg_steer_before_boids  = 0.f;
 	float dbg_steer_final         = 0.f;
 
-	// stamina UI
 	Texture* heart_icon_tex = nullptr;
-
-	// speed lines (animated, flow outward)
-	static constexpr int MAX_SPEEDLINES = 48;
-	float sl_phases[MAX_SPEEDLINES] = {};  // per-line 0→1 phase (0=inner, 1=outer)
-	float sl_angles[MAX_SPEEDLINES] = {};  // per-line fixed base angle (radians)
-	bool  sl_initialized = false;
-	MeshBuilder speedlines_mb{};
-	handle<Particle_Object> speedlines_handle{};
-
-	// wind lines
-	struct WindLine {
-		glm::vec3 pos;
-		float lifetime;
-		float max_life;
-		float wave_phase;   // unused, reserved
-		float wave_speed;   // per-streak speed multiplier
-		float radius;       // spawn/death distance from player
-		float len;          // ribbon length
-		float width;        // ribbon max half-width
-		float alpha;        // max alpha (0-255)
-	};
-	static constexpr int WIND_LINE_COUNT = 20;
-	WindLine wind_lines[WIND_LINE_COUNT] = {};
-	bool wind_initialized = false;
-	MeshBuilder wind_mb{};
-	handle<Particle_Object> wind_handle{};
-
-	~BikePlayer();
 };
 class AnimatorObject;
 class BikeAnimDriver {

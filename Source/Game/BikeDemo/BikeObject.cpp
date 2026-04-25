@@ -3,12 +3,7 @@
 
 #include "Game/GameplayStatic.h"
 
-// Defined in BikeWind.cpp
-extern glm::vec3 wind_direction;
-extern float     wind_speed;
-extern float     wind_gust_factor;
-extern float     ambient_temp;
-extern float     sun_exposure;
+// Wind state accessed via g_wind (defined in BikeWind.cpp)
 #include "Game/Components/MeshComponent.h"
 #include "Render/Model.h"
 #include "Framework/MathLib.h"
@@ -46,19 +41,19 @@ static float steer_vel_boost       = 0.01f;  // smoothing floor when flicking fa
 static float steer_release_lo      = 0.012f; // release smoothing when not committed
 static float steer_release_hi      = 0.05f;  // release smoothing when deeply committed (gradual corner exit)
 static float steer_max_deg         = 45.f;   // max steer angle at/below reference speed (degrees)
-static float steer_max_deg_hi      = 3.f;    // minimum steer angle floor at very high speed (degrees)
-static float steer_ref_speed       = 5.f;    // m/s — speed at which full steer authority begins decaying
+static float steer_max_deg_hi      = 4.f;    // minimum steer angle floor at very high speed (degrees)
+static float steer_ref_speed       = 2.5f;    // m/s — speed at which full steer authority begins decaying
 static float steer_speed_power     = 2.0f;   // falloff exponent: 2 = quadratic (car-like), 1 = linear
 static float steer_min_radius      = 1.5f;   // minimum turn radius (m)
-static float steer_radius_coeff    = 0.04f;  // speed² coefficient for min radius (lower = more responsive at speed)
+static float steer_radius_coeff    = 0.15f;  // speed² coefficient for min radius (lower = more responsive at speed)
 static float lean_max_deg          = 32.f;   // visual lean cap (degrees) — prevents extreme angles
 static float lean_steer_min        = 0.12f;  // steer fraction below which there is zero lean
 static float lean_steer_full       = 0.45f;  // steer fraction at which lean reaches its full physics value
-static float bar_scale_lo_steer    = 5.0f;   // handlebar visual amplifier at near-zero steer
-static float bar_scale_hi_steer    = 1.2f;   // handlebar visual amplifier at full steer input
-static float bar_visual_lean_min   = 0.15f;  // residual bar scale at full lean
-static float bar_lean_fade_lo      = 0.35f;  // lean fraction where bar fade begins [0,1]
-static float bar_lean_fade_hi      = 0.90f;  // lean fraction where bar is at minimum [0,1]
+static float bar_scale_lo_steer    = 1.5f;   // handlebar visual amplifier at near-zero steer
+static float bar_scale_hi_steer    = 1.0f;   // handlebar visual amplifier at full steer input
+static float bar_visual_lean_min   = 1.5f;  // residual bar scale at full lean
+static float bar_lean_fade_lo      = 0.0f;  // lean fraction where bar fade begins [0,1]
+static float bar_lean_fade_hi      = 1.f;  // lean fraction where bar is at minimum [0,1]
 static float bike_gear_shift_cooldown = 3.f;
 
 // Returns the maximum steer angle (radians) at the given speed.
@@ -163,8 +158,8 @@ void BikeObject::tick_stamina(ControlInput& ci, float dt)
 
 	// Heat stress: solar + ambient + effort heat vs. convective cooling from airspeed
 	{
-		const float temp_above_neutral = glm::max(0.f, ambient_temp - 18.f);
-		const float solar_heat   = sun_exposure * 0.00025f;
+		const float temp_above_neutral = glm::max(0.f, g_wind.ambient_temp - 18.f);
+		const float solar_heat   = g_wind.sun_exposure * 0.00025f;
 		const float ambient_heat = temp_above_neutral * 0.000015f;
 		const float effort_heat  = s.actual_power * 0.0000005f;
 		const float air_flow     = glm::max(1.f, speed - get_wind_along_bike());
@@ -297,7 +292,7 @@ void BikeObject::tick_physics(ControlInput& ci, float dt)
 	}
 
 	// Debug
-	const float eff_wind_speed = wind_speed * (1.f + wind_gust_factor * 1.5f);
+	const float eff_wind_speed = g_wind.wind_speed * (1.f + g_wind.wind_gust_factor * 1.5f);
 	//GameplayStatic::debug_text(string_format("wind_along_bike = %+.2f m/s (eff %.1f)", wind_along_bike, eff_wind_speed));
 	//GameplayStatic::debug_text(string_format("apparent_speed = %.2f m/s", apparent_speed));
 }
@@ -364,15 +359,15 @@ void BikeObject::tick_steer(const ControlInput& ci, float dt)
 	{
 		crosswind_gust_timer -= dt;
 		if (crosswind_gust_timer <= 0.f) {
-			const glm::vec3 wdir       = glm::length(wind_direction) > 0.001f
-			                             ? glm::normalize(wind_direction) : glm::vec3(0.f);
+			const glm::vec3 wdir       = glm::length(g_wind.wind_direction) > 0.001f
+			                             ? glm::normalize(g_wind.wind_direction) : glm::vec3(0.f);
 			const glm::vec3 b_right    = glm::normalize(glm::cross(bike_direction, glm::vec3(0, 1, 0)));
 			// How perpendicular the wind is to the bike: 0 = head/tailwind, ±1 = pure crosswind.
 			// This is both the direction of the kick and its scale.
 			const float perp_component = glm::dot(wdir, b_right);
 
 			const float speed_stab = 1.f - glm::clamp(speed / crosswind_speed_stable, 0.f, 1.f) * 0.65f;
-			const float kick       = crosswind_gust_kick * wind_speed * speed_stab
+			const float kick       = crosswind_gust_kick * g_wind.wind_speed * speed_stab
 			                         * (0.5f + 0.5f * ((float)rand() / RAND_MAX));
 			wind_vel += perp_component * kick;
 
@@ -566,9 +561,9 @@ void BikeObject::tick_transform(const ControlInput& ci, float dt)
 
 float BikeObject::get_wind_along_bike() const
 {
-	const float eff_wind_speed = wind_speed * (1.f + wind_gust_factor * 1.5f);
-	const glm::vec3 wdir_norm = glm::length(wind_direction) > 0.001f
-		? glm::normalize(wind_direction) : glm::vec3(0.f);
+	const float eff_wind_speed = g_wind.wind_speed * (1.f + g_wind.wind_gust_factor * 1.5f);
+	const glm::vec3 wdir_norm = glm::length(g_wind.wind_direction) > 0.001f
+		? glm::normalize(g_wind.wind_direction) : glm::vec3(0.f);
 	const float wind_along_bike = glm::dot(wdir_norm, bike_direction) * eff_wind_speed;
 
 	return wind_along_bike;
@@ -576,10 +571,10 @@ float BikeObject::get_wind_along_bike() const
 
 glm::vec3 BikeObject::get_wind_along_bike_vector() const
 {
-	const float eff_wind_speed = wind_speed * (1.f + wind_gust_factor * 1.5f);
+	const float eff_wind_speed = g_wind.wind_speed * (1.f + g_wind.wind_gust_factor * 1.5f);
 
 
-	return wind_direction * eff_wind_speed - bike_direction*speed;
+	return g_wind.wind_direction * eff_wind_speed - bike_direction*speed;
 }
 
 // ============================================================

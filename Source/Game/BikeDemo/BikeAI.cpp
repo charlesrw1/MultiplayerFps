@@ -40,9 +40,18 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	// 2. Lookahead distance: speed-based baseline, capped only by very tight corners.
 	// The corner cap uses 2.5*R so the lookahead points to the corner EXIT, not
 	// to a point still on the arc (0.45*R was only 1.35m on a 3m fillet — far too close).
-	const float look_base      = lookahead_dist_base + speed * lookahead_dist_per_ms;
-	const float look_corner    = 2.5f * min_r;
-	const float lookahead_dist = glm::min(look_base, look_corner);
+	const float look_base   = lookahead_dist_base + speed * lookahead_dist_per_ms;
+	const float look_corner = 2.5f * min_r;
+	const float look_raw    = glm::min(look_base, look_corner);
+
+	// Low-pass filter: min_turn_radius_ahead samples at 2m steps over 4m-spaced
+	// waypoints, so as the bike moves the scan-window boundary crosses junctions
+	// and min_r jumps.  Smoothing removes this high-frequency noise so the
+	// lookahead point glides rather than bobbing.
+	// Seed on first frame (smooth_lookahead_dist starts at 0).
+	if (smooth_lookahead_dist < 0.1f) smooth_lookahead_dist = look_raw;
+	smooth_lookahead_dist = damp_dt_independent(look_raw, smooth_lookahead_dist, 0.1f, dt);
+	const float lookahead_dist = smooth_lookahead_dist;
 
 	const glm::vec3 lookahead_pt = course->racing_line_lookahead(my_bike->course_dist_m, lookahead_dist);
 	dbg_lookahead_pt  = lookahead_pt;
