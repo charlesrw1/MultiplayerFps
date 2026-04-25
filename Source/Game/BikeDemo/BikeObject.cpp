@@ -45,7 +45,7 @@ static float steer_max_deg_hi      = 4.f;    // minimum steer angle floor at ver
 static float steer_ref_speed       = 2.5f;    // m/s — speed at which full steer authority begins decaying
 static float steer_speed_power     = 2.0f;   // falloff exponent: 2 = quadratic (car-like), 1 = linear
 static float steer_min_radius      = 1.5f;   // minimum turn radius (m)
-static float steer_radius_coeff    = 0.15f;  // speed² coefficient for min radius (lower = more responsive at speed)
+static float steer_radius_coeff    = 0.11f;  // speed² coefficient for min radius (lower = more responsive at speed)
 static float lean_max_deg          = 32.f;   // visual lean cap (degrees) — prevents extreme angles
 static float lean_steer_min        = 0.12f;  // steer fraction below which there is zero lean
 static float lean_steer_full       = 0.45f;  // steer fraction at which lean reaches its full physics value
@@ -73,7 +73,7 @@ static float crack_vis_damp          = 10.f; // damping
 
 // Bump steer: handlebar kickback from road irregularities
 static float bump_steer_thresh  = 0.003f;  // minimum total_bump before steer kick fires
-static float bump_steer_kick    = 60.f;    // vel impulse (steer-frac/s) per unit excess bump
+static float bump_steer_kick    = 1.f;    // vel impulse (steer-frac/s) per unit excess bump
 static float bump_steer_spring  = 200.f;   // stiffness — snaps back to centre
 static float bump_steer_damp    = 14.f;    // damping
 static float bump_steer_max     = 0.18f;   // max displacement as fraction of full steer

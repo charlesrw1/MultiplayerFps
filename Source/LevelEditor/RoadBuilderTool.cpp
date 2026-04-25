@@ -2,6 +2,7 @@
 #include "RoadBuilderTool.h"
 #include "EditorDocLocal.h"
 #include "Game/Components/RoadNetworkComponent.h"
+#include "Game/Components/SpawnerComponenth.h"
 #include "Input/InputSystem.h"
 #include "UI/GUISystemPublic.h"
 #include "Physics/Physics2.h"
@@ -10,6 +11,7 @@
 #include "Level.h"
 #include <cmath>
 #include <algorithm>
+#include <string>
 
 // Screen-space radius for node hit-testing (pixels)
 static constexpr float NODE_HIT_RADIUS   = 12.f;
@@ -710,6 +712,34 @@ void RoadBuilderTool::draw_ui()
                 route_hints.clear();
                 course_preview = BikeCourse{};
             }
+
+            ImGui::Spacing();
+            ImGui::BeginDisabled(!has_hints);
+            if (ImGui::Button("Bake Waypoints to Level")) {
+                // Remove all existing bike_waypoint spawner entities
+                std::vector<Entity*> to_remove;
+                for (auto* obj : eng->get_level()->get_all_objects()) {
+                    if (auto* s = obj->cast_to<SpawnerComponent>()) {
+                        if (s->get_spawner_type() == "bike_waypoint")
+                            to_remove.push_back(s->get_owner());
+                    }
+                }
+                for (auto* e : to_remove)
+                    doc.remove_scene_object(e);
+
+                // Spawn one bike_waypoint entity per route hint, named by index
+                for (int i = 0; i < (int)route_hints.size(); ++i) {
+                    Entity* e = doc.spawn_entity();
+                    e->set_editor_name(std::to_string(i));
+                    auto* sc = static_cast<SpawnerComponent*>(
+                        doc.attach_component(&SpawnerComponent::StaticType, e));
+                    sc->set("bike_waypoint");
+                    e->set_ws_position(route_hints[i]);
+                }
+                sys_print(Info, "RoadBuilder: baked %d bike_waypoint spawners (removed %d old)\n",
+                          (int)route_hints.size(), (int)to_remove.size());
+            }
+            ImGui::EndDisabled();
 
             if (course_preview.is_built) {
                 ImGui::Spacing();

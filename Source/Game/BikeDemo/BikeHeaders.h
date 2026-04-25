@@ -224,23 +224,16 @@ public:
 	BikeCourse* course = nullptr;
 
 	// ---- Waypoint following ----
-	float lookahead_dist_base = 10.f;  // min lookahead distance (m)
-	float lookahead_dist_per_ms = 2.0f; // additional metres per m/s of speed
+	float lookahead_dist_base   = 1.5f;  // min lookahead distance (m)
+	float lookahead_dist_per_ms = 0.5f;  // additional metres per m/s of speed
+	float steer_k               = 2.3f;   // gain on lateral error — higher = harder correction
 
-	// ---- Stanley path tracker ----
-	// Steers by correcting both heading error (angle to path tangent) and
-	// lateral error (distance from racing line), not a distant lookahead point.
-	float stanley_k      = 0.5f;   // lateral gain: atan(k * lat_err / speed)
 	float corner_look_m  = 50.f;   // metres ahead to scan for corners (wider = earlier braking)
 	// v_max in corner = sqrt(corner_speed_k * g * R * traction)
-	// For a bicycle: v_max ≈ sqrt(mu * g * R) where mu ≈ 0.5 → corner_speed_k ≈ 0.5
-	float corner_speed_k = 0.5f;
-	// Curvature feedforward: steer proportional to upcoming bend so AI turns in early.
-	// curvature in rad/m (1/R), gain maps ~0.05 rad/m (R=20m) to ~0.25 steer.
-	float curvature_ff_k = 5.0f;
+	float corner_speed_k = 15.f;
 
 	// ---- Power ----
-	float target_power_watts   = 150.f;  // set by strategy layer (Layer 6); fixed for now
+	float target_power_watts   = 250.f;  // set by strategy layer (Layer 6); fixed for now
 	float actual_power_command = 150.f;  // smoothed toward target
 	static constexpr float POWER_SLEW = 0.05f; // damp rate
 
@@ -258,11 +251,6 @@ public:
 	float preferred_lateral       = 0.f;
 	float lane_strength           = 0.f;
 
-	// Smoothed lookahead distance (m) — low-pass filters the raw min-radius-based
-	// cap so the lookahead point doesn't jump every time a corner waypoint crosses
-	// the scan-window boundary.  Initialised to 0; seeds itself on first frame.
-	float smooth_lookahead_dist = 0.f;
-
 	// ---- Debug ----
 	glm::vec3 dbg_lookahead_pt{};  // world-space lookahead point, drawn in debug
 	float dbg_steer_pre_boids    = 0.f;  // PID steer before boid forces
@@ -272,10 +260,6 @@ public:
 	float dbg_power_align_nudge  = 0.f;  // speed-alignment nudge from pack average
 	float dbg_power_seek_bonus   = 0.f;  // gap-close bonus toward rider ahead
 	float dbg_power_final        = 0.f;  // total power submitted to physics
-	// Path-following breakdown (set each frame, read by debug camera overlay)
-	float dbg_lat_err            = 0.f;  // lateral distance from racing line (m, +ve = right of line)
-	float dbg_stanley_corr       = 0.f;  // Stanley correction steer term
-	float dbg_curvature_ff       = 0.f;  // curvature feedforward steer term
 	float dbg_brake_amount       = 0.f;  // brake command [0,1]
 	float dbg_min_r              = 0.f;  // nearest corner radius (m) from scan window
 	float dbg_v_max              = 0.f;  // safe cornering speed (m/s) for that radius
@@ -476,6 +460,7 @@ public:
 	// and the pull-through rotation is active.
 	bool paceline_active  = false;
 	bool echelon_mode     = false;
+	int  num_ai           = 8;
 
 	// Crack decal instances collected at map load
 	struct CrackDecalInstance {
@@ -486,6 +471,7 @@ public:
 	std::vector<CrackDecalInstance> crack_instances;
 
 	void rebuild_course();  // re-runs course build with current fillet params (call from debug menu)
+	void respawn_ai();      // destroy existing AI riders and re-spawn num_ai of them
 
 private:
 	void collect_crack_decals();

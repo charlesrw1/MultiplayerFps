@@ -106,10 +106,9 @@ void BikeGameApplication::start()
 	create_player(start_pos);
 
 	// Spawn AI riders staggered 5 m apart behind the player
-	static constexpr int   NUM_AI        = 8;
 	static constexpr float AI_GAP_M      = 5.f;   // spacing along course (m)
 	static constexpr float AI_LAT_SPREAD = 1.2f;  // lateral spread so they don't all overlap
-	for (int i = 0; i < NUM_AI; ++i) {
+	for (int i = 0; i < num_ai; ++i) {
 		const float dist   = -(i + 1) * AI_GAP_M;  // behind player
 		glm::vec3   pos    = start_pos;
 		if (course.is_built) {
@@ -126,6 +125,47 @@ void BikeGameApplication::start()
 void BikeGameApplication::rebuild_course()
 {
 	course.build_from_spawners();
+}
+
+void BikeGameApplication::respawn_ai()
+{
+	// Destroy all non-player AI riders and remove them from the rider lists.
+	for (auto it = all_riders.begin(); it != all_riders.end(); ) {
+		BikeObject* bo = *it;
+		if (dynamic_cast<BikeAI*>(bo->input.get())) {
+			bo->get_owner()->destroy();
+			it = all_riders.erase(it);
+		} else {
+			++it;
+		}
+	}
+	riders_sorted.erase(
+		std::remove_if(riders_sorted.begin(), riders_sorted.end(),
+			[&](BikeObject* r) {
+				for (auto* a : all_riders)
+					if (a == r) return false;
+				return true;
+			}),
+		riders_sorted.end());
+
+	// Re-spawn the requested number of AI behind the player.
+	const glm::vec3 start_pos = all_riders.empty()
+		? glm::vec3(0.f)
+		: all_riders[0]->get_ws_position();
+
+	static constexpr float AI_GAP_M      = 5.f;
+	static constexpr float AI_LAT_SPREAD = 1.2f;
+	for (int i = 0; i < num_ai; ++i) {
+		const float dist = -(i + 1) * AI_GAP_M;
+		glm::vec3   pos  = start_pos;
+		if (course.is_built) {
+			const float d  = glm::mod(dist + course.total_length_m, course.total_length_m);
+			const BikeWaypoint wp = course.sample(d);
+			const float lat = ((i % 3) - 1) * AI_LAT_SPREAD * 0.5f;
+			pos = wp.position + wp.right * lat;
+		}
+		create_ai(pos);
+	}
 }
 
 void BikeGameApplication::update()
@@ -1047,6 +1087,11 @@ static void bike_course_debug()
 
 	ImGui::Text("Waypoints: %d   Length: %.0f m", (int)c.waypoints.size(), c.total_length_m);
 
+	ImGui::SeparatorText("AI Count");
+	ImGui::SliderInt("num_ai", &g_bike_app->num_ai, 0, 20);
+	if (ImGui::Button("Respawn AI"))
+		g_bike_app->respawn_ai();
+
 	ImGui::SeparatorText("Riders");
 	const auto& sorted = g_bike_app->riders_sorted;
 	for (int i = 0; i < (int)sorted.size(); ++i) {
@@ -1198,9 +1243,7 @@ static void apply_debug_follow_camera()
 		// --- Path-following breakdown ---
 		GameplayStatic::debug_text(string_format("[AI] look=%.1fm  min_r=%.1fm  v_max=%.1fm/s  spd=%.1fm/s",
 			ai->dbg_lookahead_dist, ai->dbg_min_r, ai->dbg_v_max, bo->speed));
-		GameplayStatic::debug_text(string_format("[AI] lat_err=%+.2fm  stanley=%+.2f  ff=%+.2f",
-			ai->dbg_lat_err, ai->dbg_stanley_corr, ai->dbg_curvature_ff));
-		GameplayStatic::debug_text(string_format("[AI] steer: path=%+.2f  pre_boid=%+.2f  final=%+.2f  brake=%.2f",
+GameplayStatic::debug_text(string_format("[AI] steer: path=%+.2f  pre_boid=%+.2f  final=%+.2f  brake=%.2f",
 			ai->dbg_steer_pre_boids, ai->dbg_steer_pre_hard, ai->dbg_steer_final, ai->dbg_brake_amount));
 		GameplayStatic::debug_text(string_format("[AI] sep:%+.2f coh:%+.2f aln:%+.2f",
 			bo->boid_separation_steer, bo->boid_cohesion_steer, bo->boid_align_steer));
@@ -1297,28 +1340,24 @@ static void bike_boid_debug()
 	ImGui::DragFloat("target switch delay s", &AI_TARGET_SWITCH_DELAY,   0.1f, 0.f, 10.f);
 	ImGui::DragFloat("target switch delta m", &AI_TARGET_SWITCH_DELTA_M, 0.5f, 0.1f, 20.f);
 
-	// Apply Stanley / corner tuning to all AI riders
-	ImGui::SeparatorText("AI Cornering (Stanley)");
+	// Apply corner tuning to all AI riders
+	ImGui::SeparatorText("AI Cornering");
 	{
-		static float s_stanley_k      = 0.5f;
+		static float s_steer_k        = 2.f;
 		static float s_corner_look_m  = 50.f;
 		static float s_corner_speed_k = 0.5f;
-		static float s_curvature_ff_k = 5.0f;
 		bool changed = false;
-		changed |= ImGui::DragFloat("stanley_k",      &s_stanley_k,      0.02f, 0.05f,  5.f);
-		ImGui::SameLine(); ImGui::TextDisabled("lat gain");
+		changed |= ImGui::DragFloat("steer_k",        &s_steer_k,        0.1f,  0.1f,  10.f);
+		ImGui::SameLine(); ImGui::TextDisabled("lateral error gain");
 		changed |= ImGui::DragFloat("corner_look_m",  &s_corner_look_m,  1.f,   5.f,  120.f);
 		changed |= ImGui::DragFloat("corner_speed_k", &s_corner_speed_k, 0.05f, 0.1f,   5.f);
 		ImGui::SameLine(); ImGui::TextDisabled("v_max=sqrt(k*g*R)");
-		changed |= ImGui::DragFloat("curvature_ff_k", &s_curvature_ff_k, 0.5f,  0.f,  30.f);
-		ImGui::SameLine(); ImGui::TextDisabled("anticipatory corner steer");
 		if (changed) {
 			for (auto* r : g_bike_app->all_riders) {
 				if (auto* ai = dynamic_cast<BikeAI*>(r->input.get())) {
-					ai->stanley_k      = s_stanley_k;
+					ai->steer_k        = s_steer_k;
 					ai->corner_look_m  = s_corner_look_m;
 					ai->corner_speed_k = s_corner_speed_k;
-					ai->curvature_ff_k = s_curvature_ff_k;
 				}
 			}
 		}
