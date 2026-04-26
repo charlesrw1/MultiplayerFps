@@ -1,7 +1,9 @@
 #include "BikeHeaders.h"
 
 #include "Render/Texture.h"
+#include "Render/Model.h"
 #include "Game/GameplayStatic.h"
+#include "Game/Components/MeshComponent.h"
 #include "Game/Components/DecalComponent.h"
 #include "Game/Components/PhysicsComponents.h"
 #include "Game/Entities/CharacterController.h"
@@ -98,6 +100,17 @@ void BikeGameApplication::start()
 	course.build_from_spawners();
 
 	collect_crack_decals();
+
+	// Spawn finish line prop at the course start/finish position
+	if (course.is_built) {
+		const BikeWaypoint start_wp = course.sample(0.f);
+		const float yaw = std::atan2(start_wp.forward.x, start_wp.forward.z);
+		Entity* finish_e = GameplayStatic::spawn_entity();
+		finish_e->set_ws_position_rotation(start_wp.position,
+			glm::angleAxis(yaw, glm::vec3(0.f, 1.f, 0.f)));
+		finish_e->create_component<MeshComponent>()->set_model(
+			Model::load("props/race_props/finish_line.cmdl"));
+	}
 
 	// Spawn player at the course start
 	const glm::vec3 start_pos = course.is_built
