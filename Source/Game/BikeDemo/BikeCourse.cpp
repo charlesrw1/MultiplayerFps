@@ -215,6 +215,13 @@ float BikeCourse::project(glm::vec3 world_pos, float* out_lateral, int* out_segm
 	return best_dist_m;
 }
 
+float BikeCourse::get_road_half_width(int segment) const
+{
+	if (segment < 0 || segment >= (int)waypoints.size())
+		return 2.f;
+	return waypoints.at(segment).road_half_width;
+}
+
 // ============================================================
 // sample
 // ============================================================
@@ -291,7 +298,10 @@ BikeWaypoint BikeCourse::sample(float dist_m) const
 	result.dist_from_start      = dist_m;
 	result.gradient             = glm::mix(wp0.gradient,             wp1.gradient,             t);
 	result.racing_line_lateral  = glm::mix(wp0.racing_line_lateral,  wp1.racing_line_lateral,  t);
-	result.racing_line_pos      = glm::mix(wp0.racing_line_pos,      wp1.racing_line_pos,      t);
+	// Derive racing_line_pos from the Catmull-Rom position rather than linearly
+	// interpolating stored world-space positions — avoids the racing line cutting
+	// across curves (especially visible at the loop seam on looping circuits).
+	result.racing_line_pos      = result.position + result.right * result.racing_line_lateral;
 	return result;
 }
 

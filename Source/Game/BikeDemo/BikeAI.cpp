@@ -57,8 +57,8 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	// ---- Corner braking ----
 	// v_max = sqrt(corner_speed_k * g * R * traction); corner_speed_k ≈ 1/traction_lean_comp.
 	const float v_max        = glm::sqrt(corner_speed_k * 9.81f * min_r * my_bike->surface_traction);
-	const float brake_amount = 0.f;// (speed > v_max)
-	                           //? glm::clamp((speed - v_max) / 3.f, 0.f, 0.8f) : 0.f;
+	const float brake_amount = (speed > v_max)
+	                           ? glm::clamp((speed - v_max) / 3.f, 0.f, 0.8f) : 0.f;
 	dbg_v_max        = v_max;
 	dbg_brake_amount = brake_amount;
 

@@ -91,8 +91,28 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 		for (int i = first; i < last; ++i) {
 			vel[i] += (force[i] / mass - vel[i]) * lerp;
 			const float d_alpha = glm::dot(vel[i], wps[i].right);
-			const float hw      = wps[i].road_half_width;
+			// 0.9 keeps the racing line off the road edge — full-edge positions
+			// cause AI crashes and produce hard-to-recover training episodes.
+			const float hw      = wps[i].road_half_width * 0.9f;
 			alpha[i] = glm::clamp(alpha[i] + d_alpha, -hw, hw);
+		}
+	}
+
+	// For loop circuits: apply a few mild Laplacian smoothing passes (loop-aware)
+	// to remove any residual kink at the seam where alpha[n-1] meets alpha[0].
+	// The blend is small enough to preserve the physics solution everywhere else.
+	if (loop) {
+		for (int pass = 0; pass < 8; ++pass) {
+			std::vector<float> a2(n);
+			for (int i = 0; i < n; ++i) {
+				const int im = (i - 1 + n) % n;
+				const int ip = (i + 1) % n;
+				const float hw = wps[i].road_half_width * 0.9f;
+				a2[i] = glm::clamp(
+					alpha[i] + 0.15f * (0.5f * (alpha[im] + alpha[ip]) - alpha[i]),
+					-hw, hw);
+			}
+			alpha = std::move(a2);
 		}
 	}
 

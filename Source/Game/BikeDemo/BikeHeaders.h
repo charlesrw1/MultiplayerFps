@@ -371,10 +371,11 @@ public:
 	glm::vec3 bike_direction = glm::vec3(0.f, 0, 1.f);
 	float speed = 0.f;
 	float speed_smoothed = 0.f; // low-pass filtered speed, used for gear cadence checks
-	float current_turn = 0.0;
+	float turn_rate = 0.f;   // rad/s, written by update_tick() from physics each frame
 	float cadence = 0.f;	// cadence at gear
 	float current_roll = 0.0;
-	float current_steer = 0.f; // inertia-smoothed steer, persists briefly after input release
+	float current_steer    = 0.f;  // inertia-smoothed steer, persists briefly after input release
+	float steer_committed  = 0.f;  // current_steer after inertia but before wobble/wind/bump — written by update_tick()
 	float prev_steer_input = 0.f; // raw steer last frame, for stick velocity calculation
 	float terrain_gradient    = 0.f;   // radians, + = uphill, - = downhill
 	float prev_gradient       = 0.f;   // last frame gradient, for bump detection
@@ -427,8 +428,9 @@ public:
 	// 1.0 = no draft (open air), 0.65 = full draft at ideal position
 	float draft_factor = 1.0f;
 
-	// Lateral position history for boid derivative term (written at end of update_boids)
+	// Lateral position history and velocity (written at end of update_boids)
 	float prev_lateral_pos = 0.f;
+	float lateral_vel      = 0.f;  // m/s, positive = moving road-right
 
 	// Pack context (written by BikeGameApplication::update_gaps each frame)
 	float       gap_to_ahead_m       = 999.f;   // gap to locked rider_ahead (m)
@@ -474,7 +476,7 @@ public:
 	// and the pull-through rotation is active.
 	bool paceline_active  = false;
 	bool echelon_mode     = false;
-	int  num_ai           = 5;
+	int  num_ai           = 0;
 
 	// Crack decal instances collected at map load
 	struct CrackDecalInstance {

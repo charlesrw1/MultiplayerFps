@@ -42,8 +42,8 @@ public:
 
 	// Racing line physics parameters — change and call rebuild_racing_line() to re-apply
 	// without a full course rebuild, or they are picked up automatically on build_from_road_network.
-	float rl_k         = 0.50f;    // hinge spring stiffness
-	float rl_mass      = 2.0f;    // waypoint mass
+	float rl_k         = 2.f;    // hinge spring stiffness
+	float rl_mass      = 0.5f;    // waypoint mass
 	float rl_dt        = 1.f/60.f; // time step per iteration
 	int   rl_num_iters = 5000;     // simulation steps — more = better convergence
 
@@ -77,6 +77,8 @@ public:
 	              float*     out_lateral = nullptr,
 	              int*       out_segment = nullptr,
 	              float      prev_dist_m = -1.f) const;
+
+	float get_road_half_width(int segment) const;
 
 	// Interpolated waypoint at a given arc-length (Catmull-Rom for position, lerp for the rest).
 	// Wraps when is_loop is true.

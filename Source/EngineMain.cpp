@@ -104,6 +104,8 @@ ConfigVar g_dontsimphysics("stop_physics", "0", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar developer_mode("developer_mode", "1", CVAR_DEV | CVAR_BOOL,
 						 "enables dev mode features like compiling assets when loading");
 ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in update loop", 0.0001, 5.0);
+ConfigVar g_engine_ticks_per_frame("engine.ticks_per_frame", "1", CVAR_INTEGER,
+    "game ticks to simulate per render frame; render+present are skipped for all but the last", 1, 10000);
 ConfigVar ui_disable_screen_log("ui.disable_screen_log", "0", CVAR_BOOL, "");
 
 double GetTime() {
@@ -1522,6 +1524,17 @@ void GameEngineLocal::loop() {
 
 		if (g_window_fullscreen.was_changed())
 			Canvas::set_window_fullscreen(g_window_fullscreen.get_bool());
+
+		if (g_engine_ticks_per_frame.get_integer() <= 1) {
+			sub_tick_index_ = -1;
+		}
+		else {
+			if (sub_tick_index_ <= 0)
+				sub_tick_index_ = g_engine_ticks_per_frame.get_integer();
+			sub_tick_index_ -= 1;
+
+			frame_time = tick_interval;
+		}
 	};
 
 	auto do_overlapped_update = [&](bool& shouldDrawNext, SceneDrawParamsEx& drawparamsNext, View_Setup& setupNext,
@@ -1604,10 +1617,10 @@ void GameEngineLocal::loop() {
 		g_physics.sync_render_data();
 		idraw->sync_update();
 	};
-	auto wait_for_swap = [&](const bool /*unused*/) {
+	auto wait_for_swap = [&](const bool skiprender) {
 		// ZoneScopedN("SwapWindow");
 		GPUSCOPESTART(gl_swap_window_scope);
-		if (!skip_swap)
+		if (!(skip_swap || skiprender))
 			SDL_GL_SwapWindow(window);
 	};
 
@@ -1619,8 +1632,6 @@ void GameEngineLocal::loop() {
 
 	for (;;) {
 		try {
-			const bool skip_rendering = false; // rendering always runs; only swap is skipped
-
 			// update time
 			const double now = GetTime();
 			double dt = now - last;
@@ -1656,6 +1667,8 @@ void GameEngineLocal::loop() {
 			frame_start();
 			if (AgentREPL::inst && AgentREPL::inst->is_running())
 				AgentREPL::inst->poll();
+
+			const bool skip_rendering = !draw_this_frame();
 			// overlapped update (game+render)
 			do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering);
 

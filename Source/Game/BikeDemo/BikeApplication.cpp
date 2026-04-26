@@ -214,7 +214,7 @@ void BikeGameApplication::sort_riders()
 // ============================================================
 
 static constexpr float GROUP_GAP_M = 8.f;  // gap > this splits riders into separate groups
-
+static bool show_bike_groups = true;
 void BikeGameApplication::update_groups()
 {
 	const int n = (int)riders_sorted.size();
@@ -241,6 +241,25 @@ void BikeGameApplication::update_groups()
 	}
 	gsizes.push_back(n - group_start);
 	const int num_groups = group_id + 1;
+
+	if (show_bike_groups) {
+		for (int i = 0; i < num_groups; i++) {
+			Bounds b;
+			bool found_bounds = false;
+			for (int r = 0; r < n; r++) {
+				if (gids.at(r) == i) {
+					Bounds rider_bounds = Bounds(riders_sorted.at(r)->prev_front_wheel_pos, riders_sorted.at(r)->prev_rear_wheel_pos);
+					if (!found_bounds)
+						b = Bounds(rider_bounds);
+					else
+						b = bounds_union(b, rider_bounds);
+					found_bounds = true;
+				}
+			}
+			if (found_bounds)
+				Debug::add_box(b.get_center(), (b.bmax - b.bmin), COLOR_PINK, -1);
+		}
+	}
 
 	int pos_in_group = 0;
 	for (int i = 0; i < n; ++i) {
@@ -585,7 +604,8 @@ void BikeGameApplication::update_boids()
 			}
 		}
 
-		// Save lateral position for derivative computation next frame
+		// Save lateral position and compute velocity for observation
+		me->lateral_vel      = (dt > 1e-6f) ? (me->lateral_pos - me->prev_lateral_pos) / dt : 0.f;
 		me->prev_lateral_pos = me->lateral_pos;
 	}
 }

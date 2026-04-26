@@ -328,6 +328,7 @@ void BikeObject::tick_steer(const ControlInput& ci, float dt)
 		current_steer = damp_dt_independent(steer_input_raw, current_steer, build_smoothing, dt);
 	else
 		current_steer = damp_dt_independent(steer_input_raw, current_steer, rel_smoothing, dt);
+	steer_committed = current_steer;  // snapshot before wobble/wind/bump disturbances
 
 	//GameplayStatic::debug_text(string_format("spd=%.1f build_i=%.2f rel_i=%.2f steer=%.3f", speed_factor, build_inertia, release_inertia, current_steer));
 
@@ -402,10 +403,11 @@ void BikeObject::tick_steer(const ControlInput& ci, float dt)
 	const float min_turn_r    = glm::max(steer_min_radius, speed * speed * steer_radius_coeff);
 	const float steer_angle   = current_steer * max_steer_rad;
 
+	turn_rate = 0.f;
 	if (glm::abs(steer_angle) > 0.001f) {
-		const float radius    = glm::max(wheelbase / glm::abs(glm::tan(steer_angle)), min_turn_r);
-		const float turn_rate = (speed / radius) * glm::sign(current_steer);
-		const float angle     = -turn_rate * dt;
+		const float radius = glm::max(wheelbase / glm::abs(glm::tan(steer_angle)), min_turn_r);
+		turn_rate          = (speed / radius) * glm::sign(current_steer);
+		const float angle  = -turn_rate * dt;
 		bike_direction = glm::normalize(glm::mat3(glm::rotate(glm::mat4(1.f), angle, glm::vec3(0,1,0))) * bike_direction);
 	}
 
