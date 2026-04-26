@@ -102,12 +102,6 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	}
 	dbg_power_seek_bonus = gap_bonus;
 
-	// ---- Record training data (full 60-float obs + 3-float action) ----
-	if (g_nn_recorder.enabled && all_riders) {
-		const BikeObservation obs = BikeObservation::extract(my_bike, course, *all_riders);
-		g_nn_recorder.try_record(obs, steer_out, power_out, brake_amount);
-	}
-
 	// ---- Fill ControlInput ----
 	// Boid steer forces blended on top of PID path steer.
 	// Priority (highest first): separation > cohesion (paceline) > alignment (heading match).
