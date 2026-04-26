@@ -98,10 +98,10 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 		}
 	}
 
-	// For loop circuits: apply a few mild Laplacian smoothing passes (loop-aware)
-	// to remove any residual kink at the seam where alpha[n-1] meets alpha[0].
-	// The blend is small enough to preserve the physics solution everywhere else.
+	// For loop circuits: two-stage smoothing to eliminate the seam kink.
 	if (loop) {
+		// Stage 1: mild global passes to propagate any local imbalances.
+		// The blend is small enough to preserve the physics solution everywhere else.
 		for (int pass = 0; pass < 8; ++pass) {
 			std::vector<float> a2(n);
 			for (int i = 0; i < n; ++i) {
@@ -110,6 +110,26 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 				const float hw = wps[i].road_half_width * 0.9f;
 				a2[i] = glm::clamp(
 					alpha[i] + 0.15f * (0.5f * (alpha[im] + alpha[ip]) - alpha[i]),
+					-hw, hw);
+			}
+			alpha = std::move(a2);
+		}
+
+		// Stage 2: targeted seam stitching.
+		// The global loop constraint (alpha[n-1] ↔ alpha[0]) converges slowest in
+		// the Jacobi simulation; the 8 global passes above only reduce the boundary
+		// jump by ~73%.  30 passes at w=0.3 on a ±sw window reduce it by 0.7^30 ≈ 2e-5
+		// (essentially zero) without distorting the solution far from the seam.
+		const int sw = std::min(n / 4, 12);
+		for (int pass = 0; pass < 30; ++pass) {
+			std::vector<float> a2 = alpha;
+			for (int k = -sw; k <= sw; ++k) {
+				const int i  = ((k % n) + n) % n;
+				const int im = (i - 1 + n) % n;
+				const int ip = (i + 1) % n;
+				const float hw = wps[i].road_half_width * 0.9f;
+				a2[i] = glm::clamp(
+					alpha[i] + 0.3f * (0.5f * (alpha[im] + alpha[ip]) - alpha[i]),
 					-hw, hw);
 			}
 			alpha = std::move(a2);
