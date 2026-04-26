@@ -37,6 +37,7 @@ static float free_wheel_fade = 0.0002f;
 static BikeObject* bo_for_debug = nullptr;
 BikePlayer*        bp_for_debug = nullptr;
 static BikeGameApplication* g_bike_app   = nullptr;
+BikeAIParams g_ai_params;
 
 // Forward declare — defined later alongside the boid debug menu
 static void apply_debug_follow_camera();
@@ -104,7 +105,7 @@ void BikeGameApplication::start()
 	// Spawn finish line prop at the course start/finish position
 	if (course.is_built) {
 		const BikeWaypoint start_wp = course.sample(0.f);
-		const float yaw = std::atan2(start_wp.forward.x, start_wp.forward.z);
+		const float yaw = std::atan2(start_wp.forward.x, start_wp.forward.z)+PI/2;
 		Entity* finish_e = GameplayStatic::spawn_entity();
 		finish_e->set_ws_position_rotation(start_wp.position,
 			glm::angleAxis(yaw, glm::vec3(0.f, 1.f, 0.f)));
@@ -1216,9 +1217,12 @@ static void bike_course_debug()
 
 	ImGui::SeparatorText("Racing Line");
 	bool rl_dirty = false;
-	rl_dirty |= ImGui::DragFloat("RL k (stiffness)", &course_rw.rl_k,    0.1f,  0.1f, 200.f, "%.2f");
-	rl_dirty |= ImGui::DragFloat("RL mass",          &course_rw.rl_mass, 1.f,   1.f, 500.f,  "%.1f");
-	rl_dirty |= ImGui::DragInt ("RL iterations",     &course_rw.rl_num_iters, 50, 100, 20000);
+	rl_dirty |= ImGui::DragFloat("RL k (stiffness)",   &course_rw.rl_k,            0.1f,  0.1f, 200.f,  "%.2f");
+	rl_dirty |= ImGui::DragFloat("RL mass",            &course_rw.rl_mass,         1.f,   1.f,  500.f,  "%.1f");
+	rl_dirty |= ImGui::DragInt  ("RL iterations",      &course_rw.rl_num_iters,    50,    100,  20000);
+	rl_dirty |= ImGui::DragInt  ("RL smooth passes",   &course_rw.rl_smooth_passes, 1,     0,    100);
+	ImGui::SameLine(); ImGui::TextDisabled("removes kinks from uneven waypoint spacing");
+	rl_dirty |= ImGui::DragFloat("RL smooth weight",   &course_rw.rl_smooth_w,     0.01f, 0.f,  1.f,   "%.2f");
 	if (rl_dirty)
 		course_rw.rebuild_racing_line();
 	if (ImGui::Button("Rebuild Racing Line"))
@@ -1342,14 +1346,21 @@ static void apply_debug_follow_camera()
 			bp->dbg_boid_sep_steer, bp->dbg_boid_cohesion_steer, bp->dbg_boid_align_steer));
 	} else if (ai) {
 		// --- Path-following breakdown ---
-		GameplayStatic::debug_text(string_format("[AI] look=%.1fm  min_r=%.1fm  v_max=%.1fm/s  spd=%.1fm/s",
-			ai->dbg_lookahead_dist, ai->dbg_min_r, ai->dbg_v_max, bo->speed));
-GameplayStatic::debug_text(string_format("[AI] steer: path=%+.2f  pre_boid=%+.2f  final=%+.2f  brake=%.2f",
-			ai->dbg_steer_pre_boids, ai->dbg_steer_pre_hard, ai->dbg_steer_final, ai->dbg_brake_amount));
+		GameplayStatic::debug_text(string_format("[AI] spd=%.1fm/s  look=%.1fm  near_r=%.1fm",
+			bo->speed, ai->dbg_lookahead_dist, ai->dbg_min_r));
+		// Upcoming corner: distance, radius, safe speed, brake demand
+		if (ai->dbg_brake_dist_m > 0.f)
+			GameplayStatic::debug_text(string_format("[AI] corner in %.0fm  r=%.1fm  v_max=%.1fm/s  brake=%.2f",
+				ai->dbg_brake_dist_m, ai->dbg_brake_corner_r, ai->dbg_v_max, ai->dbg_brake_amount));
+		else
+			GameplayStatic::debug_text(string_format("[AI] corner: clear for %.0fm",
+				(float)(ai->BRAKE_SCAN_STEPS * ai->BRAKE_SCAN_STEP_M)));
+		GameplayStatic::debug_text(string_format("[AI] steer: near=%+.2f  far=%+.2f  edge=%+.2f  final=%+.2f",
+			ai->dbg_steer_near, ai->dbg_steer_far, ai->dbg_edge_steer, ai->dbg_steer_final));
 		GameplayStatic::debug_text(string_format("[AI] sep:%+.2f coh:%+.2f aln:%+.2f",
 			bo->boid_separation_steer, bo->boid_cohesion_steer, bo->boid_align_steer));
-		GameplayStatic::debug_text(string_format("[AI] power base:%.0fW  align:%+.0fW  seek:%+.0fW  = %.0fW",
-			ai->dbg_power_base, ai->dbg_power_align_nudge, ai->dbg_power_seek_bonus, ai->dbg_power_final));
+		GameplayStatic::debug_text(string_format("[AI] power base:%.0fW  align:%+.0fW  seek:%+.0fW  cmd=%.0fW  actual=%.0fW",
+			ai->dbg_power_base, ai->dbg_power_align_nudge, ai->dbg_power_seek_bonus, ai->dbg_power_final, bo->stamina.actual_power));
 		GameplayStatic::debug_text(string_format("[AI] locked_gap: %.2fm  switch_t: %.1fs",
 			bo->gap_to_ahead_m, bo->rider_ahead_switch_t));
 
@@ -1372,6 +1383,64 @@ GameplayStatic::debug_text(string_format("[AI] steer: path=%+.2f  pre_boid=%+.2f
 }
 
 // ============================================================
+// Rider snapshot — record all riders and teleport back
+// ============================================================
+
+struct BikeRiderSnapshot {
+	glm::vec3 position;
+	glm::vec3 bike_direction;
+	float speed;
+	float course_dist_m;
+	float lateral_pos;
+	int   course_segment;
+	float actual_power_command;  // AI only; ignored for player
+};
+
+static std::vector<BikeRiderSnapshot> s_rider_snapshots;
+
+static void snapshot_record()
+{
+	if (!g_bike_app) return;
+	s_rider_snapshots.clear();
+	for (BikeObject* bo : g_bike_app->all_riders) {
+		BikeRiderSnapshot snap;
+		snap.position             = bo->get_ws_position();
+		snap.bike_direction       = bo->bike_direction;
+		snap.speed                = bo->speed;
+		snap.course_dist_m        = bo->course_dist_m;
+		snap.lateral_pos          = bo->lateral_pos;
+		snap.course_segment       = bo->course_segment;
+		snap.actual_power_command = 0.f;
+		if (auto* ai = dynamic_cast<BikeAI*>(bo->input.get()))
+			snap.actual_power_command = ai->actual_power_command;
+		s_rider_snapshots.push_back(snap);
+	}
+}
+
+static void snapshot_restore()
+{
+	if (!g_bike_app || s_rider_snapshots.empty()) return;
+	const int n = (int)glm::min(g_bike_app->all_riders.size(), s_rider_snapshots.size());
+	for (int i = 0; i < n; ++i) {
+		BikeObject* bo           = g_bike_app->all_riders[i];
+		const BikeRiderSnapshot& snap = s_rider_snapshots[i];
+		bo->get_owner()->set_ws_position(snap.position);
+		bo->bike_direction  = snap.bike_direction;
+		bo->speed           = snap.speed;
+		bo->course_dist_m   = snap.course_dist_m;
+		bo->lateral_pos     = snap.lateral_pos;
+		bo->course_segment  = snap.course_segment;
+		// Reset transient physics state so the bike doesn't carry over a crash or spin
+		bo->current_steer   = 0.f;
+		bo->steer_committed = 0.f;
+		bo->is_crashed      = false;
+		bo->crash_timer     = 0.f;
+		if (auto* ai = dynamic_cast<BikeAI*>(bo->input.get()))
+			ai->actual_power_command = snap.actual_power_command;
+	}
+}
+
+// ============================================================
 // Debug menu: Boid visualisation
 // ============================================================
 
@@ -1381,6 +1450,19 @@ static void bike_boid_debug()
 	const auto& all    = g_bike_app->all_riders;
 	const auto& sorted = g_bike_app->riders_sorted;
 	if (all.empty()) return;
+
+	// ---- Snapshot ----
+	ImGui::SeparatorText("Segment Replay");
+	if (ImGui::Button("Record positions"))
+		snapshot_record();
+	ImGui::SameLine();
+	const bool has_snap = !s_rider_snapshots.empty();
+	if (!has_snap) ImGui::BeginDisabled();
+	if (ImGui::Button("Teleport to recorded"))
+		snapshot_restore();
+	if (!has_snap) ImGui::EndDisabled();
+	if (has_snap)
+		ImGui::SameLine(), ImGui::TextDisabled("(%d riders saved)", (int)s_rider_snapshots.size());
 
 	// ---- Rider picker ----
 	static int  selected_idx  = 0;          // index into all_riders
@@ -1441,38 +1523,26 @@ static void bike_boid_debug()
 	ImGui::DragFloat("target switch delay s", &AI_TARGET_SWITCH_DELAY,   0.1f, 0.f, 10.f);
 	ImGui::DragFloat("target switch delta m", &AI_TARGET_SWITCH_DELTA_M, 0.5f, 0.1f, 20.f);
 
-	// Apply corner tuning to all AI riders
 	ImGui::SeparatorText("AI Cornering");
-	{
-		static float s_steer_k        = 2.f;
-		static float s_corner_look_m  = 50.f;
-		static float s_corner_speed_k = 0.5f;
-		bool changed = false;
-		changed |= ImGui::DragFloat("steer_k",        &s_steer_k,        0.1f,  0.1f,  10.f);
-		ImGui::SameLine(); ImGui::TextDisabled("lateral error gain");
-		changed |= ImGui::DragFloat("corner_look_m",  &s_corner_look_m,  1.f,   5.f,  120.f);
-		changed |= ImGui::DragFloat("corner_speed_k", &s_corner_speed_k, 0.05f, 0.1f,   5.f);
-		ImGui::SameLine(); ImGui::TextDisabled("v_max=sqrt(k*g*R)");
-		if (changed) {
-			for (auto* r : g_bike_app->all_riders) {
-				if (auto* ai = dynamic_cast<BikeAI*>(r->input.get())) {
-					ai->steer_k        = s_steer_k;
-					ai->corner_look_m  = s_corner_look_m;
-					ai->corner_speed_k = s_corner_speed_k;
-				}
-			}
-		}
-		// Show live corner data for first AI
-		for (auto* r : g_bike_app->all_riders) {
-			if (auto* ai = dynamic_cast<BikeAI*>(r->input.get())) {
-				const float look = glm::max(s_corner_look_m, r->speed * 1.5f);
-				const float min_r = g_bike_app->course.min_turn_radius_ahead(r->course_dist_m, look);
-				const float v_max = glm::sqrt(s_corner_speed_k * 9.81f * min_r * r->surface_traction);
-				ImGui::Text("  min_r=%.1fm  v_max=%.1fm/s  spd=%.1f", min_r, v_max, r->speed);
-				break;
-			}
-		}
-	}
+	ImGui::DragFloat("steer_k",               &g_ai_params.steer_k,               0.1f,  0.1f, 10.f);
+	ImGui::SameLine(); ImGui::TextDisabled("lateral error gain");
+	ImGui::DragFloat("corner_look_m",         &g_ai_params.corner_look_m,         1.f,   5.f, 120.f);
+	ImGui::DragFloat("corner_speed_k",        &g_ai_params.corner_speed_k,        0.05f, 0.1f,  5.f);
+	ImGui::SameLine(); ImGui::TextDisabled("v_max=sqrt(k*g*R)");
+	ImGui::DragFloat("anticipation dist scale", &g_ai_params.anticipation_dist_scale, 0.1f, 1.f, 5.f);
+	ImGui::SameLine(); ImGui::TextDisabled("far lookahead = near * this");
+	ImGui::DragFloat("anticipation k",          &g_ai_params.anticipation_k,          0.05f, 0.f, 1.f);
+	ImGui::SameLine(); ImGui::TextDisabled("0=disabled 1=all-far");
+
+	ImGui::SeparatorText("AI Boundary Avoidance");
+	ImGui::DragFloat("edge predict t", &g_ai_params.edge_predict_t, 0.05f, 0.1f, 3.f);
+	ImGui::SameLine(); ImGui::TextDisabled("seconds ahead to project arc");
+	ImGui::DragFloat("edge safety m",  &g_ai_params.edge_safety_m,  0.05f, 0.f,  2.f);
+	ImGui::SameLine(); ImGui::TextDisabled("margin inside road edge");
+	ImGui::DragFloat("edge steer k",   &g_ai_params.edge_steer_k,   0.05f, 0.f,  5.f);
+	ImGui::SameLine(); ImGui::TextDisabled("P gain: steer per metre beyond safe zone");
+	ImGui::DragFloat("edge vel damp",  &g_ai_params.edge_vel_damp,  0.05f, 0.f,  3.f);
+	ImGui::SameLine(); ImGui::TextDisabled("D gain: damp correction when already returning");
 
 	ImGui::SeparatorText("AI Gap Following");
 	ImGui::DragFloat("gap target m",   &AI_GAP_TARGET,   0.1f,  0.5f, 20.f);

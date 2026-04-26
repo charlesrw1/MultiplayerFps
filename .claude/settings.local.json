@@ -185,7 +185,12 @@
       "WebFetch(domain:www.mysticgg.com)",
       "WebFetch(domain:vamos.sourceforge.net)",
       "Skill(update-config)",
-      "Bash(grep -n \"Core.lib\\\\|AdditionalDependencies\\\\|AdditionalLibrary\\\\|Core\\\\\\\\\" C:/Users/charl/source/repos/CsRemake/Source/UnitTests/UnitTests.vcxproj)"
+      "Bash(grep -n \"Core.lib\\\\|AdditionalDependencies\\\\|AdditionalLibrary\\\\|Core\\\\\\\\\" C:/Users/charl/source/repos/CsRemake/Source/UnitTests/UnitTests.vcxproj)",
+      "Bash(git lfs *)",
+      "Bash(grep -v \"^Gym\\\\|^Please\\\\|^Users\\\\|^See\\\\|^$\\\\|gymnasium\\\\|Warning\\\\|warn\\\\|Wrapping\")",
+      "PowerShell(cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake; powershell.exe -File Scripts/build_and_test.ps1 2>&1 | Select-Object -Last 40)",
+      "PowerShell(cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake; powershell.exe -File Scripts/build_and_test.ps1 2>&1 | Select-Object -Last 25)",
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; cat \"{}\"')"
     ]
   },
   "enabledPlugins": {

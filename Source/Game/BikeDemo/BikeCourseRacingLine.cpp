@@ -35,7 +35,8 @@ ADD_TO_DEBUG_MENU(raceline_debug);
 // ──────────────────────────────────────────────────────────────────────────────
 
 void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
-                                     float k, float mass, float dt, int num_iters)
+                                     float k, float mass, float dt, int num_iters,
+                                     int smooth_passes, float smooth_w)
 {
 	const int n = (int)wps.size();
 	if (n < 3) return;
@@ -98,28 +99,29 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 		}
 	}
 
-	// For loop circuits: two-stage smoothing to eliminate the seam kink.
-	if (loop) {
-		// Stage 1: mild global passes to propagate any local imbalances.
-		// The blend is small enough to preserve the physics solution everywhere else.
-		for (int pass = 0; pass < 8; ++pass) {
+	// Stage 1: global Laplacian smoothing — applied to all courses (loop and non-loop).
+	// Removes kinks caused by irregular waypoint spacing (clustered waypoints at junctions
+	// produce disproportionately large spring forces, leaving local overshoots).
+	// smooth_w^smooth_passes: at defaults (0.25, 20) a spike decays by 0.75^20 ≈ 0.003.
+	if (smooth_passes > 0 && smooth_w > 0.f) {
+		for (int pass = 0; pass < smooth_passes; ++pass) {
 			std::vector<float> a2(n);
 			for (int i = 0; i < n; ++i) {
-				const int im = (i - 1 + n) % n;
-				const int ip = (i + 1) % n;
+				const int im = loop ? (i - 1 + n) % n : glm::max(i - 1, 0);
+				const int ip = loop ? (i + 1) % n     : glm::min(i + 1, n - 1);
 				const float hw = wps[i].road_half_width * 0.9f;
 				a2[i] = glm::clamp(
-					alpha[i] + 0.15f * (0.5f * (alpha[im] + alpha[ip]) - alpha[i]),
+					alpha[i] + smooth_w * (0.5f * (alpha[im] + alpha[ip]) - alpha[i]),
 					-hw, hw);
 			}
 			alpha = std::move(a2);
 		}
+	}
 
-		// Stage 2: targeted seam stitching.
-		// The global loop constraint (alpha[n-1] ↔ alpha[0]) converges slowest in
-		// the Jacobi simulation; the 8 global passes above only reduce the boundary
-		// jump by ~73%.  30 passes at w=0.3 on a ±sw window reduce it by 0.7^30 ≈ 2e-5
-		// (essentially zero) without distorting the solution far from the seam.
+	// Stage 2: targeted seam stitching for loop circuits.
+	// The Jacobi sim converges slowest at the loop boundary; 30 passes at w=0.3
+	// over a ±sw window reduce any residual jump by 0.7^30 ≈ 2e-5 (essentially zero).
+	if (loop) {
 		const int sw = std::min(n / 4, 12);
 		for (int pass = 0; pass < 30; ++pass) {
 			std::vector<float> a2 = alpha;

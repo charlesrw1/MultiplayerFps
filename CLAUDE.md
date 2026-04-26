@@ -34,6 +34,20 @@ _NEVER_ read source files in External/ _unless_ given permission. ONLY read AGEN
 
 Limit the source files you read to the module you are working on. DONT use tokens liberally.
 
+## BikeDemo sign conventions (DO NOT get these wrong)
+
+**World axes:** +Y = up. +Z = forward (default bike_direction). +X = world right.
+
+**bike_right = cross(bike_direction, up)** — this points LEFT in world space (+Z bike → cross(+Z,+Y) = -X). It is misnamed. Do not treat it as "right".
+
+**Steer sign:** positive steer = turn LEFT. This is consistent with bike_right pointing left — the racing line follower steers toward bike_right and it works.
+
+**lateral_pos:** signed metres from road centre. +ve = road-right (+X for a +Z road). BikeWaypoint::right = actual world right (+X for +Z road).
+
+**Corrective steer to return to road centre:**
+- Bike to the road-right (lateral_pos > 0) → need to turn left → **positive** steer = `+sign(lateral_pos)`
+- Never use `-sign(lateral_pos)` for a "steer toward centre" correction — that turns the wrong way.
+
 
 
 

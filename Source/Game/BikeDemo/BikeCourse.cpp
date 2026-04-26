@@ -61,7 +61,7 @@ void BikeCourse::build_from_spawners()
 void BikeCourse::rebuild_racing_line()
 {
 	if (!is_built || waypoints.empty()) return;
-	BikeCourse::compute_racing_line(waypoints, is_loop, rl_k, rl_mass, rl_dt, rl_num_iters);
+	BikeCourse::compute_racing_line(waypoints, is_loop, rl_k, rl_mass, rl_dt, rl_num_iters, rl_smooth_passes, rl_smooth_w);
 }
 
 // ============================================================
@@ -325,24 +325,29 @@ float BikeCourse::min_turn_radius_ahead(float from_dist_m, float ahead_m) const
 {
 	if (!is_built || waypoints.size() < 2) return 1e6f;
 
-	static constexpr float STEP = 2.f;
-	float min_r       = 1e6f;
-	float prev_yaw    = FLT_MAX;
+	// Central-difference curvature: sample yaw at d±AVG_HALF_M instead of adjacent
+	// steps. This averages the heading change over a 6m window, washing out kinks
+	// narrower than that without distorting genuine corners.
+	static constexpr float STEP       = 2.f;
+	static constexpr float AVG_HALF_M = 3.f;
+
+	float min_r = 1e6f;
 
 	for (float d = 0.f; d <= ahead_m + STEP; d += STEP) {
-		const BikeWaypoint wp = sample(from_dist_m + d);
-		const float yaw = std::atan2(wp.forward.x, wp.forward.z);
+		const float yaw_back = std::atan2(
+			sample(from_dist_m + d - AVG_HALF_M).forward.x,
+			sample(from_dist_m + d - AVG_HALF_M).forward.z);
+		const float yaw_fwd  = std::atan2(
+			sample(from_dist_m + d + AVG_HALF_M).forward.x,
+			sample(from_dist_m + d + AVG_HALF_M).forward.z);
 
-		if (prev_yaw < FLT_MAX) {
-			float dyaw = yaw - prev_yaw;
-			// Wrap to [-π, π]
-			if (dyaw >  glm::pi<float>()) dyaw -= 2.f * glm::pi<float>();
-			if (dyaw < -glm::pi<float>()) dyaw += 2.f * glm::pi<float>();
-			const float curvature = glm::abs(dyaw) / STEP;
-			if (curvature > 1e-5f)
-				min_r = glm::min(min_r, 1.f / curvature);
-		}
-		prev_yaw = yaw;
+		float dyaw = yaw_fwd - yaw_back;
+		if (dyaw >  glm::pi<float>()) dyaw -= 2.f * glm::pi<float>();
+		if (dyaw < -glm::pi<float>()) dyaw += 2.f * glm::pi<float>();
+
+		const float curvature = glm::abs(dyaw) / (2.f * AVG_HALF_M);
+		if (curvature > 1e-5f)
+			min_r = glm::min(min_r, 1.f / curvature);
 	}
 	return min_r;
 }

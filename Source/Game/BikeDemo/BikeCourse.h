@@ -42,10 +42,14 @@ public:
 
 	// Racing line physics parameters — change and call rebuild_racing_line() to re-apply
 	// without a full course rebuild, or they are picked up automatically on build_from_road_network.
-	float rl_k         = 2.f;    // hinge spring stiffness
-	float rl_mass      = 0.5f;    // waypoint mass
-	float rl_dt        = 1.f/60.f; // time step per iteration
-	int   rl_num_iters = 5000;     // simulation steps — more = better convergence
+	float rl_k           = 2.f;    // hinge spring stiffness
+	float rl_mass        = 0.5f;   // waypoint mass
+	float rl_dt          = 1.f/60.f; // time step per iteration
+	int   rl_num_iters   = 5000;   // simulation steps — more = better convergence
+	// Post-smoothing: removes kinks caused by irregular waypoint spacing.
+	// Applied to all courses before seam stitching.
+	int   rl_smooth_passes = 20;   // laplacian passes after simulation
+	float rl_smooth_w      = 0.25f; // blend weight per pass (0=off, 1=full laplacian)
 
 	// Re-run the racing line simulation on the current waypoints using the stored rl_* params.
 	void rebuild_racing_line();
@@ -111,9 +115,11 @@ public:
 	// dt:        time step per iteration (lerp factor = dt/100)
 	// num_iters: simulation steps — more = better convergence
 	static void compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
-	                                float k         = 2.0f,
-	                                float mass      = 0.50f,
-	                                float dt        = 1.0f/60.f,
-	                                int   num_iters = 5000);
+	                                float k            = 2.0f,
+	                                float mass         = 0.50f,
+	                                float dt           = 1.0f/60.f,
+	                                int   num_iters    = 5000,
+	                                int   smooth_passes = 20,
+	                                float smooth_w      = 0.25f);
 
 };

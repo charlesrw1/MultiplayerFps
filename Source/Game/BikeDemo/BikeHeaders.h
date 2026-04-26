@@ -225,6 +225,32 @@ static const char* paceline_state_name(PacelineState s) {
 	return "?";
 }
 
+// ============================================================
+// BikeAIParams — global tuning knobs shared by all AI riders.
+// Edit via the debug menu; never loop through riders to set these.
+// ============================================================
+struct BikeAIParams {
+	// Waypoint following
+	float lookahead_dist_base   = 1.5f;
+	float lookahead_dist_per_ms = 0.5f;
+	float steer_k               = 2.0f;
+
+	// Corner scanning
+	float corner_look_m  = 20.f;
+	float corner_speed_k = 2.2f;
+
+	// Steering anticipation
+	float anticipation_dist_scale = 2.0f;
+	float anticipation_k          = 1.0f;
+
+	// Track boundary avoidance (PD controller on lateral position)
+	float edge_predict_t  = 1.0f;  // seconds ahead to project arc
+	float edge_safety_m   = 0.8f;  // danger zone margin inside road edge (m)
+	float edge_steer_k    = 1.0f;  // P gain: steer per metre beyond safe zone
+	float edge_vel_damp   = 0.4f;  // D gain: reduce correction as lateral_vel approaches centre
+};
+extern BikeAIParams g_ai_params;
+
 class BikeAI : public IBikeInput {
 public:
 	void evaluate(BikeObject* my_bike) final;
@@ -232,52 +258,51 @@ public:
 	// Set once after construction — points to the application-owned course.
 	BikeCourse* course = nullptr;
 
-	// ---- Waypoint following ----
-	float lookahead_dist_base   = 1.5f;  // min lookahead distance (m)
-	float lookahead_dist_per_ms = 0.5f;  // additional metres per m/s of speed
-	float steer_k               = 2.3f;   // gain on lateral error — higher = harder correction
+	// Braking scan constants
+	static constexpr int   BRAKE_SCAN_STEPS  = 8;
+	static constexpr float BRAKE_SCAN_STEP_M = 10.f;
 
-	float corner_look_m  = 50.f;   // metres ahead to scan for corners (wider = earlier braking)
-	// v_max in corner = sqrt(corner_speed_k * g * R * traction)
-	float corner_speed_k = 15.f;
-
-	// ---- Power ----
-	float target_power_watts   = 250.f;  // set by strategy layer (Layer 6); fixed for now
-	float actual_power_command = 150.f;  // smoothed toward target
-	static constexpr float POWER_SLEW = 0.05f; // damp rate
+	// ---- Per-rider state ----
+	float target_power_watts   = 250.f;
+	float actual_power_command = 150.f;
+	static constexpr float POWER_SLEW = 0.05f;
 
 	// ---- Paceline rotation ----
 	PacelineState paceline_state  = PacelineState::Following;
-	float pull_timer              = 0.f;   // elapsed seconds in Pulling state
-	float pull_duration           = 10.f;  // randomised seconds to pull before peeling
-	float peel_dir                = 1.f;   // +1 = peel toward positive lateral, -1 = negative
-	float peel_lateral_tgt        = 0.f;   // absolute lateral target while peeling/drifting
+	float pull_timer              = 0.f;
+	float pull_duration           = 10.f;
+	float peel_dir                = 1.f;
+	float peel_lateral_tgt        = 0.f;
 
 	// ---- Double echelon lane assignment ----
-	// preferred_lateral = 0 → single paceline (default)
-	// preferred_lateral = ±1.5 → double echelon lane assignment
-	// lane_strength blends cohesion between following rider-ahead and returning to lane
-	float preferred_lateral       = 0.f;
-	float lane_strength           = 0.f;
+	float preferred_lateral = 0.f;
+	float lane_strength     = 0.f;
 
-	// ---- Debug ----
-	glm::vec3 dbg_lookahead_pt{};  // world-space lookahead point, drawn in debug
-	float dbg_steer_pre_boids    = 0.f;  // PID steer before boid forces
-	float dbg_steer_pre_hard     = 0.f;  // steer after boids, before hard clamp
-	float dbg_steer_final        = 0.f;  // final clamped steer submitted to physics
-	float dbg_power_base         = 0.f;  // smoothed target power before boid modifications
-	float dbg_power_align_nudge  = 0.f;  // speed-alignment nudge from pack average
-	float dbg_power_seek_bonus   = 0.f;  // gap-close bonus toward rider ahead
-	float dbg_power_final        = 0.f;  // total power submitted to physics
-	float dbg_brake_amount       = 0.f;  // brake command [0,1]
-	float dbg_min_r              = 0.f;  // nearest corner radius (m) from scan window
-	float dbg_v_max              = 0.f;  // safe cornering speed (m/s) for that radius
-	float dbg_lookahead_dist     = 0.f;  // actual lookahead distance used this frame (m)
-
-	// Hard steer clamp — set by BikeGameApplication::update_boids each frame
+	// ---- Hard steer clamp — set by BikeGameApplication::update_boids each frame ----
 	float hard_steer_min = -1.f;
 	float hard_steer_max =  1.f;
 
+	// ---- Debug ----
+	glm::vec3 dbg_lookahead_pt{};
+	float dbg_steer_pre_boids    = 0.f;
+	float dbg_steer_pre_hard     = 0.f;
+	float dbg_steer_final        = 0.f;
+	float dbg_power_base         = 0.f;
+	float dbg_power_align_nudge  = 0.f;
+	float dbg_power_seek_bonus   = 0.f;
+	float dbg_power_final        = 0.f;
+	float dbg_brake_amount       = 0.f;
+	float dbg_brake_dist_m       = 0.f;
+	float dbg_brake_corner_r     = 0.f;
+	float dbg_min_r              = 0.f;
+	float dbg_v_max              = 0.f;
+	float dbg_lookahead_dist     = 0.f;
+	float dbg_steer_near         = 0.f;
+	float dbg_steer_far          = 0.f;
+	float dbg_edge_steer         = 0.f;
+	float dbg_edge_brake         = 0.f;
+	float dbg_pred_lateral       = 0.f;
+	bool  dbg_off_track          = false;
 };
 
 class BikePlayer : public IBikeInput {
