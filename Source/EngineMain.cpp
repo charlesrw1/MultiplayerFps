@@ -33,6 +33,7 @@
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl2.h"
+#include "Framework/EditorTheme.h"
 #include "UI/UILoader.h"
 #include "UI/Widgets/Layouts.h"
 #include "UI/OnScreenLogGui.h"
@@ -1247,6 +1248,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 		ImGui::GetIO().Fonts->Build();
 	};
 	build_imgui_fonts();
+	apply_editor_dark_theme();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
 	print_time("imgui font");

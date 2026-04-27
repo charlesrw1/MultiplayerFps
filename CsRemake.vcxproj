@@ -75,6 +75,7 @@
     <ClCompile Include="Source\Framework\Jobs.cpp" />
     <ClCompile Include="Source\Framework\MathLib.cpp" />
     <ClCompile Include="Source\Framework\MeshBuilder.cpp" />
+    <ClCompile Include="Source\Framework\EditorTheme.cpp" />
     <ClCompile Include="Source\Framework\MyImguiLib.cpp" />
     <ClCompile Include="Source\Framework\Profilier.cpp" />
     <ClCompile Include="Source\Framework\PropertyEd.cpp" />
