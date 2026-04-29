@@ -99,6 +99,20 @@ glm::mat4 EditorCamera::make_friendly_imguizmo_matrix() {
 	return (get_is_using_ortho()) ? ortho_camera.get_friendly_proj_matrix(aratio)
 		: vs_setup.make_opengl_perspective_with_near_far();
 }
+void EditorCamera::set_ortho_view(glm::vec3 eye_dir) {
+	const float DIST = 70.0f; // matches numpad KP1/3/7 distances
+	mode = OrthoMode;
+	ortho_camera.set_position_and_front(camera.orbit_target + eye_dir * DIST, -eye_dir);
+	interp.start_interp(vs_setup);
+	on_ortho_state_change.invoke();
+}
+
+void EditorCamera::set_perspective_view() {
+	go_to_cam_mode();
+	ortho_camera.on_ortho_set.invoke();
+	on_ortho_state_change.invoke();
+}
+
 EditorCamera* EditorCamera::inst = nullptr;
 void ed_cam_debug() {
 	if (EditorCamera::inst)

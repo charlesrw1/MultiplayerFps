@@ -7,6 +7,12 @@ public:
 	virtual Ray unproject_ray(int x, int y) const = 0;
 	virtual bool is_ortho() const = 0;
 	virtual View_Setup get_view_setup() const = 0;
+
+	// Snap to an orthographic view. eye_dir is the direction FROM the orbit centre TO the camera.
+	// e.g. (0,1,0) → top-down view,  (0,0,1) → front view.
+	virtual void set_ortho_view(glm::vec3 eye_dir) = 0;
+	// Return to free-look perspective mode.
+	virtual void set_perspective_view() = 0;
 };
 class ISelectionApi
 {

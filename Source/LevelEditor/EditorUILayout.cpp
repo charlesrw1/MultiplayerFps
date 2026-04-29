@@ -1,5 +1,6 @@
 #include "EditorUILayout.h"
 #include "EditorDocLocal.h"
+#include "Game/Components/SpawnerComponenth.h"
 
 #include "UI/UILoader.h"
 
@@ -19,7 +20,10 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 
 	RenderWindow& window = UiSystem::inst->window;
 	cube.rotation.set_current((glm::mat3)doc.camera()->get_view_setup().view);
-	cube.draw(window, dt);
+	cube.is_ortho = doc.camera()->is_ortho();
+	// cube coords are viewport-local; subtract vp origin before passing mouse pos
+	const glm::ivec2 vp_mouse = Input::get_mouse_pos() - UiSystem::inst->get_vp_rect().get_pos();
+	cube.draw(window, dt, vp_mouse);
 	// paint
 
 	// if (doc->active_mode)
@@ -31,13 +35,23 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 	int x = Input::get_mouse_pos().x;
 	int y = Input::get_mouse_pos().y;
 
+	// Nav cube click: cube coords are viewport-local, so convert mouse before testing
+	if (do_mouse_click) {
+		const glm::ivec2 vp_origin = UiSystem::inst->get_vp_rect().get_pos();
+		auto result = cube.test_click({x - vp_origin.x, y - vp_origin.y});
+		if (result.hit) {
+			inputs.eat_mouse_click();
+			doc.camera()->set_ortho_view(result.eye_dir);
+			return true;
+		}
+	}
+
 	if (!inputs.can_use_mouse_click())
 		do_mouse_click = false;
 
 	if (!eng->get_level())
 		return false;
-	if (!editor_draw_name_text.get_bool())
-		return false;
+	const bool show_all_labels = editor_draw_name_text.get_bool();
 
 	const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
 	if (!font)
@@ -66,7 +80,8 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 			auto tex = g_assets.find_global_sync<Texture>(s);
 			icons.push_back(tex.get());
 		}
-		if (!(found_script || editor_draw_name_text.get_bool()))
+		const bool is_spawner = o.e->get_component<SpawnerComponent>() != nullptr;
+		if (!(found_script || show_all_labels || is_spawner))
 			continue;
 
 		auto size = GuiHelpers::calc_text_size_no_wrap(name, font);
@@ -137,10 +152,9 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 }
 
 void EditorUILayout::do_box_select(MouseSelectionAction action, Rect2d area) {
-	if (!editor_draw_name_text.get_bool())
-		return;
 	if (!eng->get_level())
 		return;
+	const bool show_all_labels = editor_draw_name_text.get_bool();
 
 	auto objs = get_objs();
 
@@ -206,6 +220,9 @@ void EditorUILayout::do_box_select(MouseSelectionAction action, Rect2d area) {
 		coordx -= size.w / 2;
 		coordy -= size.h / 2;
 
+		const bool is_spawner = o.e->get_component<SpawnerComponent>() != nullptr;
+		if (!show_all_labels && !is_spawner)
+			continue;
 		Rect2d r(coordx - 3, coordy - 3, size.w + 6, size.h + 6);
 		if (r.overlaps(area)) {
 			selection->do_selection(action, e);

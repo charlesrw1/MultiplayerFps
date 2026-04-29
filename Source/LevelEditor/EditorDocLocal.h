@@ -135,6 +135,9 @@ public:
 
 	View_Setup get_view_setup() const final { return cam->make_view(); }
 
+	void set_ortho_view(glm::vec3 eye_dir) final { cam->set_ortho_view(eye_dir); }
+	void set_perspective_view() final { cam->set_perspective_view(); }
+
 	EditorCamera* cam = nullptr;
 };
 

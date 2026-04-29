@@ -37,6 +37,7 @@
 #include "Game/Components/LightComponents.h"
 #include "Framework/StringUtils.h"
 #include "EditorPopups.h"
+#include "Render/RenderConfigVars.h"
 #include <glm/gtc/type_ptr.hpp>
 #include "Input/InputSystem.h"
 #include "Game/Components/DecalComponent.h"
@@ -557,97 +558,109 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 		return ImTextureID(
 			uint64_t(g_assets.find_global_sync<Texture>("eng/editor/" + str).get()->get_internal_render_handle()));
 	};
-	auto magnet_on = get_icon("magnet_on.png");
-	auto magnet_off = get_icon("magnet_off.png");
-	auto localcoord = get_icon("local_coord.png");
-	auto globalcoord = get_icon("global_coord.png");
-	auto boundingbox = get_icon("bounding_box_pivot.png");
-	auto pivotcenter = get_icon("pivot_center.png");
-	auto showtext_off = get_icon("show_text_off.png");
-	auto showtext_on = get_icon("show_text_on.png");
-	auto translate = get_icon("translate.png");
-	auto cursor = get_icon("cursor.png");
-	auto rotation = get_icon("rotate.png");
-	auto scale = get_icon("scale.png");
-	auto size = ImVec2(16, 16);
-	auto push_active_style = [](bool b, bool dont_pop_prev = false) {
-		if (!dont_pop_prev)
-			ImGui::PopStyleColor(1);
-		if (b)
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.5, 0.5, 0.5, 0.5));
-		else
-			ImGui::PushStyleColor(ImGuiCol_Button, 0);
+
+	if (!ImGui::BeginMenuBar()) return;
+
+	// Sizes and shared style — icon_sz must match actual texture size to avoid bilinear blur
+	const ImVec2 icon_sz(16, 16);
+	const int icon_pad = -1;
+	const ImVec4 col_active   = ImGui::GetStyle().Colors[ImGuiCol_Header];
+	const ImVec4 col_hov_act  = ImGui::GetStyle().Colors[ImGuiCol_HeaderHovered];
+	const ImVec4 col_inactive = ImVec4(0, 0, 0, 0);
+	const ImVec4 col_hov      = ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered];
+
+	// Helper: styled icon button with tooltip.  Returns true when clicked.
+	auto toolbar_btn = [&](ImTextureID icon, bool active, const char* tip, const char* shortcut = nullptr) -> bool {
+		ImGui::PushStyleColor(ImGuiCol_Button,        active ? col_active   : col_inactive);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, active ? col_hov_act  : col_hov);
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
+		bool clicked = ImGui::ImageButton(icon, icon_sz, ImVec2(0, 0), ImVec2(1, 1), icon_pad);
+		ImGui::PopStyleColor(3);
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+			ImGui::BeginTooltip();
+			ImGui::TextUnformatted(tip);
+			if (shortcut) {
+				ImGui::SameLine();
+				ImGui::TextDisabled("  [%s]", shortcut);
+			}
+			ImGui::EndTooltip();
+		}
+		return clicked;
 	};
-	if (ImGui::BeginMenuBar()) {
-		ImGui::PushStyleColor(ImGuiCol_Button, 0);
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1, 1, 1, 0.5));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
 
-		auto optype = manipulate->get_operation_type();
-		push_active_style(optype == 0, true);
-		if (ImGui::ImageButton(cursor, size)) {
-			manipulate->set_operation_type({});
-		}
-		push_active_style(optype == ImGuizmo::TRANSLATE);
-		if (ImGui::ImageButton(translate, size)) {
-			manipulate->set_operation_type(ImGuizmo::TRANSLATE);
-		}
-		push_active_style(optype == ImGuizmo::ROTATE);
-		if (ImGui::ImageButton(rotation, size)) {
-			manipulate->set_operation_type(ImGuizmo::ROTATE);
-		}
-		push_active_style(optype == ImGuizmo::SCALE);
-		if (ImGui::ImageButton(scale, size)) {
-			manipulate->set_operation_type(ImGuizmo::SCALE);
-		}
-		ImGui::Separator();
+	// ── Gizmo mode ───────────────────────────────────────────────────────
+	auto optype = manipulate->get_operation_type();
 
-		push_active_style(ed_has_snap.get_bool());
-		if (ed_has_snap.get_bool()) {
-			if (ImGui::ImageButton(magnet_on, size)) {
-				ed_has_snap.set_bool(false);
-			}
-		} else {
-			if (ImGui::ImageButton(magnet_off, size)) {
-				ed_has_snap.set_bool(true);
-			}
-		}
+	if (toolbar_btn(get_icon("cursor.png"),    optype == 0,                    "Select",    "Q"))
+		manipulate->set_operation_type({});
+	if (toolbar_btn(get_icon("translate.png"), optype == ImGuizmo::TRANSLATE,  "Translate", "W"))
+		manipulate->set_operation_type(ImGuizmo::TRANSLATE);
+	if (toolbar_btn(get_icon("rotate.png"),    optype == ImGuizmo::ROTATE,     "Rotate",    "E"))
+		manipulate->set_operation_type(ImGuizmo::ROTATE);
+	if (toolbar_btn(get_icon("scale.png"),     optype == ImGuizmo::SCALE,      "Scale",     "R"))
+		manipulate->set_operation_type(ImGuizmo::SCALE);
 
-		push_active_style(false);
-		auto mode = manipulate->get_mode();
-		if (mode == ImGuizmo::MODE::LOCAL) {
-			if (ImGui::ImageButton(localcoord, size)) {
-				manipulate->set_mode(ImGuizmo::MODE::WORLD);
-			}
-		} else {
-			if (ImGui::ImageButton(globalcoord, size)) {
-				manipulate->set_mode(ImGuizmo::MODE::LOCAL);
-			}
-		}
+	ImGui::Separator();
 
-		{
-			ImVec4 tintColor(0.6, 0.6, 0.6, 1.0);
-			if (ed_show_box_handles.get_bool())
-				tintColor = ImVec4(1.1, 1.1, 1.1, 1);
-			if (ImGui::ImageButton(boundingbox, size, ImVec2(), ImVec2(1, 1), -1, ImVec4(), tintColor)) {
-				ed_show_box_handles.set_bool(!ed_show_box_handles.get_bool());
-			}
-		}
+	// ── Snapping ─────────────────────────────────────────────────────────
+	const bool snap_on = ed_has_snap.get_bool();
+	if (toolbar_btn(snap_on ? get_icon("magnet_on.png") : get_icon("magnet_off.png"),
+	                snap_on, "Snap to Grid", "Ctrl"))
+		ed_has_snap.set_bool(!snap_on);
 
-		auto& drawtext = editor_draw_name_text;
-		push_active_style(drawtext.get_bool());
-		if (drawtext.get_bool()) {
-			if (ImGui::ImageButton(showtext_on, size)) {
-				drawtext.set_bool(false);
-			}
-		} else {
-			if (ImGui::ImageButton(showtext_off, size)) {
-				drawtext.set_bool(true);
-			}
-		}
+	// ── Coordinate space ─────────────────────────────────────────────────
+	const bool is_local = manipulate->get_mode() == ImGuizmo::MODE::LOCAL;
+	if (toolbar_btn(is_local ? get_icon("local_coord.png") : get_icon("global_coord.png"),
+	                false, is_local ? "Local Space (click for World)" : "World Space (click for Local)"))
+		manipulate->set_mode(is_local ? ImGuizmo::MODE::WORLD : ImGuizmo::MODE::LOCAL);
 
-		ImGui::EndMenuBar();
-		ImGui::PopStyleColor(4);
+	ImGui::Separator();
+
+	// ── Overlay toggles ──────────────────────────────────────────────────
+	const bool show_handles = ed_show_box_handles.get_bool();
+	if (toolbar_btn(get_icon("bounding_box_pivot.png"), show_handles, "Show Bounding Box Handles"))
+		ed_show_box_handles.set_bool(!show_handles);
+
+	const bool show_text = editor_draw_name_text.get_bool();
+	if (toolbar_btn(show_text ? get_icon("show_text_on.png") : get_icon("show_text_off.png"),
+	                show_text, "Show Entity Labels"))
+		editor_draw_name_text.set_bool(!show_text);
+
+	ImGui::Separator();
+
+	// ── Debug view dropdown (stays open so you can cycle modes) ──────────
+	struct DebugMode { const char* name; int mode; };
+	static const DebugMode debug_modes[] = {
+		{"Lit",           0},  {"Wireframe",      4},  {"Albedo",        5},
+		{"Normals",       1},  {"AO",             3},  {"Diffuse Light", 6},
+		{"Specular Light",7},  {"Lighting Only",  9},  {"Overdraw",     12},
+		{"Lightmap UV",  10},  {"Object ID",      8},  {"Material ID",   2},
+		{"Draw ID",      11},  {"Outlined",      100},
+	};
+	const int cur_dbg = r_debug_mode.get_integer();
+	const char* view_label = "Lit";
+	for (auto& m : debug_modes) if (m.mode == cur_dbg) { view_label = m.name; break; }
+
+	const bool dbg_active = cur_dbg != 0;
+	ImGui::PushStyleColor(ImGuiCol_Button,        dbg_active ? col_active   : col_inactive);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, dbg_active ? col_hov_act  : col_hov);
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
+	if (ImGui::Button(view_label))
+		ImGui::OpenPopup("##dbg_view");
+	ImGui::PopStyleColor(3);
+
+	ImGui::EndMenuBar();
+
+	// Popup rendered outside the menu bar scope so it can overlap freely
+	if (ImGui::BeginPopup("##dbg_view")) {
+		for (int i = 0; i < (int)(sizeof(debug_modes)/sizeof(debug_modes[0])); i++) {
+			if (i == 1) ImGui::Separator(); // separator after "Lit"
+			auto& m = debug_modes[i];
+			bool sel = r_debug_mode.get_integer() == m.mode;
+			if (ImGui::Selectable(m.name, sel, ImGuiSelectableFlags_DontClosePopups))
+				r_debug_mode.set_integer(m.mode);
+		}
+		ImGui::EndPopup();
 	}
 }
 

@@ -26,6 +26,9 @@ public:
 
 	void tick(EditorInputs& inputs, float dt);
 	View_Setup make_view() const;
+	void set_ortho_view(glm::vec3 eye_dir);
+	void set_perspective_view();
+
 	void set_orbit_target(glm::vec3 v, float r) {
 		if (mode == OrthoMode)
 			r = camera.distance * 0.25f;

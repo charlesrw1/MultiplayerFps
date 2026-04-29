@@ -123,7 +123,8 @@ void EdPropertyGrid::draw(const ISelectionApi& api) {
 
 				std::vector<obj<BaseUpdater>> what_i_want;
 				what_i_want.push_back(ent);
-				what_i_want.push_back(selected);
+				if(selected)
+					what_i_want.push_back(selected);
 
 
 				const bool changed = grid_cache.set_what_i_want_and_draw(what_i_want);
