@@ -34,7 +34,7 @@ public:
 	bool  is_loop             = false;  // true: last waypoint connects back to first
 
 	// Road network build parameters — change and call build_from_road_network to re-apply.
-	float sample_step_m        = 4.0f;  // dense-sample spacing along road edges (m)
+	float sample_step_m        = 3.0f;  // dense-sample spacing along road edges (m)
 
 	// Fillet parameters — change and call build_from_road_network to re-apply.
 	bool  fillet_enabled       = true;
@@ -48,7 +48,7 @@ public:
 	int   rl_num_iters   = 5000;   // simulation steps — more = better convergence
 	// Post-smoothing: removes kinks caused by irregular waypoint spacing.
 	// Applied to all courses before seam stitching.
-	int   rl_smooth_passes = 20;   // laplacian passes after simulation
+	int   rl_smooth_passes = 0;    // laplacian passes after simulation
 	float rl_smooth_w      = 0.25f; // blend weight per pass (0=off, 1=full laplacian)
 
 	// Re-run the racing line simulation on the current waypoints using the stored rl_* params.

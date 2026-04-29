@@ -248,6 +248,10 @@ struct BikeAIParams {
 	float edge_safety_m   = 0.8f;  // danger zone margin inside road edge (m)
 	float edge_steer_k    = 1.0f;  // P gain: steer per metre beyond safe zone
 	float edge_vel_damp   = 0.4f;  // D gain: reduce correction as lateral_vel approaches centre
+
+	// Off-track recovery: braking + committed steer when past the road edge
+	float edge_off_brake_k   = 0.5f;  // brake fraction per metre past road edge
+	float edge_off_brake_max = 0.6f;  // maximum brake fraction during off-track recovery
 };
 extern BikeAIParams g_ai_params;
 
@@ -267,12 +271,6 @@ public:
 	float actual_power_command = 150.f;
 	static constexpr float POWER_SLEW = 0.05f;
 
-	// ---- Paceline rotation ----
-	PacelineState paceline_state  = PacelineState::Following;
-	float pull_timer              = 0.f;
-	float pull_duration           = 10.f;
-	float peel_dir                = 1.f;
-	float peel_lateral_tgt        = 0.f;
 
 	// ---- Double echelon lane assignment ----
 	float preferred_lateral = 0.f;
@@ -288,8 +286,6 @@ public:
 	float dbg_steer_pre_hard     = 0.f;
 	float dbg_steer_final        = 0.f;
 	float dbg_power_base         = 0.f;
-	float dbg_power_align_nudge  = 0.f;
-	float dbg_power_seek_bonus   = 0.f;
 	float dbg_power_final        = 0.f;
 	float dbg_brake_amount       = 0.f;
 	float dbg_brake_dist_m       = 0.f;
@@ -303,6 +299,8 @@ public:
 	float dbg_edge_brake         = 0.f;
 	float dbg_pred_lateral       = 0.f;
 	bool  dbg_off_track          = false;
+	float dbg_avoid_steer        = 0.f;
+	float dbg_avoid_brake        = 0.f;
 };
 
 class BikePlayer : public IBikeInput {
@@ -332,13 +330,6 @@ public:
 	SoundPlayer* wind_player      = nullptr;
 	SoundPlayer* pedal_player     = nullptr;
 
-	// Boid debug (written each frame during evaluate, read by debug menu)
-	float dbg_boid_sep_steer      = 0.f;
-	float dbg_boid_align_steer    = 0.f;
-	float dbg_boid_cohesion_steer = 0.f;
-	float dbg_boid_align_power    = 0.f;
-	float dbg_draft_seek_power    = 0.f;
-	float dbg_steer_before_boids  = 0.f;
 	float dbg_steer_final         = 0.f;
 
 	Texture* heart_icon_tex = nullptr;
@@ -457,19 +448,12 @@ public:
 	float prev_lateral_pos = 0.f;
 	float lateral_vel      = 0.f;  // m/s, positive = moving road-right
 
-	// Pack context (written by BikeGameApplication::update_gaps each frame)
-	float       gap_to_ahead_m       = 999.f;   // gap to locked rider_ahead (m)
-	float       gap_to_behind_m      = 999.f;   // gap to immediate rider behind (m)
-	BikeObject* rider_ahead          = nullptr;  // sticky locked target ahead; null if none in range
-	BikeObject* rider_behind         = nullptr;  // immediate rider behind (simple, not sticky)
-	float       rider_ahead_switch_t = 0.f;      // urgency-weighted time accumulating toward switch
-
-	// Boid outputs (written by BikeGameApplication::update_boids, read by input handlers)
-	float boid_separation_steer  = 0.f;  // lateral push away from overlapping riders
-	float boid_align_steer       = 0.f;  // steer nudge to match pack heading direction
-	float boid_cohesion_steer    = 0.f;  // steer nudge toward rider-ahead's lateral (paceline)
-	float boid_align_power_nudge = 0.f;  // W to add/subtract so rider converges to pack speed
+	// Pack outputs (written by BikeGameApplication::update_boids, read by input handlers)
 	float boid_long_sep_power    = 0.f;  // W shed when side-by-side (slightly behind yields)
+
+	// Collision avoidance outputs (written by BikeGameApplication::update_boids, read by BikeAI::evaluate)
+	float avoidance_sep_steer = 0.f;  // predictive soft lateral push away from nearby riders
+	float avoidance_brake     = 0.f;  // [0,1] brake pressure when squeezed with no lateral escape
 
 	EntityPtr fork_entity;
 
@@ -497,10 +481,7 @@ public:
 	// Sorted front-to-back by course_dist_m each frame (index 0 = race leader)
 	std::vector<BikeObject*> riders_sorted;
 
-	// Paceline/echelon mode: when true, AIs are assigned alternating preferred_lateral lanes
-	// and the pull-through rotation is active.
-	bool paceline_active  = false;
-	bool echelon_mode     = false;
+
 	int  num_ai           = 0;
 
 	// Crack decal instances collected at map load
@@ -519,10 +500,9 @@ private:
 	void update_course_positions();
 	void sort_riders();
 	void update_groups();
-	void update_gaps();
 	void update_drafting();
 	void update_boids();
-	void update_paceline();
+	void update_gap_regulation();
 	void update_crack_triggers();
 	void debug_draw_course() const;
 };

@@ -4,13 +4,6 @@
 #include "GameEnginePublic.h"
 #include <glm/gtx/vector_angle.hpp>
 
-// Tunable constants defined in BikeApplication.cpp, exposed here for AI use.
-extern float AI_GAP_TARGET;
-extern float AI_GAP_KP;
-extern float AI_GAP_KD;
-extern float AI_GAP_MAX_PULL;
-extern float AI_GAP_MAX_PUSH;
-
 // Rotate a vector around the world Y axis (CCW positive when viewed from above,
 // matching glm::rotate(mat4, angle, vec3(0,1,0))).
 static glm::vec3 rotate_y(glm::vec3 v, float angle_rad) {
@@ -88,14 +81,14 @@ void BikeAI::evaluate(BikeObject* my_bike)
 
 	float steer_out = glm::clamp(steer_near + p.anticipation_k * (steer_far - steer_near), -1.f, 1.f);
 
-	// ---- Track boundary avoidance (PD) ----
-	// P term: proportional to how far beyond the safe zone (predicted or current).
-	// D term: lateral_vel approaching centre reduces correction, preventing overshoot.
-	// Always additive — never overrides steer_out, so heading alignment from the
-	// racing-line steer stays active and naturally damps the return oscillation.
+	// ---- Track boundary avoidance (PD) + off-track recovery ----
+	// While on-track (within safety margin): additive edge steer — racing-line following stays active.
+	// Once past the road edge: override steer entirely and brake to scrub lateral momentum.
+	// Overriding prevents the racing-line from fighting recovery and causing oscillation.
 	//
 	// Sign: positive steer = turn left. lateral_pos > 0 = road-right.
 	// corrective_vel > 0 means already moving toward centre.
+	float edge_brake = 0.f;
 	{
 		const float cur_lateral = my_bike->lateral_pos;
 		const float road_hw     = course->get_road_half_width(my_bike->course_segment);
@@ -127,10 +120,35 @@ void BikeAI::evaluate(BikeObject* my_bike)
 			edge_steer = glm::sign(worst_lateral) * glm::clamp(pd, 0.f, 1.f);
 		}
 
+		const float abs_off_excess = glm::max(glm::abs(cur_lateral) - road_hw, 0.f);
+		if (abs_off_excess > 0.f) {
+			steer_out = edge_steer;
+			edge_brake = glm::clamp(abs_off_excess * p.edge_off_brake_k, 0.f, p.edge_off_brake_max);
+		} else {
+			steer_out = glm::clamp(steer_out + edge_steer, -1.f, 1.f);
+		}
+
 		dbg_edge_steer = edge_steer;
-		dbg_edge_brake = 0.f;
-		steer_out = glm::clamp(steer_out + edge_steer, -1.f, 1.f);
+		dbg_edge_brake = edge_brake;
 	}
+
+	// ---- Side-by-side avoidance steer (only fires when truly abreast) ----
+	// Suppress if it would push toward the predicted edge-danger zone.
+	// The edge avoidance above already computed dbg_pred_lateral; if that prediction shows
+	// danger, don't let a lateral push from a nearby rider fight the recovery steer.
+	// Sign: positive steer = road-left.  steer_toward_edge sign = -sign(pred_lateral).
+	// Suppress sep_steer when it has the same sign as steer_toward_edge.
+	float sep_steer = my_bike->avoidance_sep_steer;
+	{
+		const float road_hw   = course->get_road_half_width(my_bike->course_segment);
+		const float safe_edge = road_hw - p.edge_safety_m;
+		if (glm::abs(dbg_pred_lateral) > safe_edge && sep_steer != 0.f) {
+			if (glm::sign(sep_steer) == -glm::sign(dbg_pred_lateral))
+				sep_steer = 0.f;
+		}
+	}
+	dbg_avoid_steer = sep_steer;
+	steer_out = glm::clamp(steer_out + sep_steer, -1.f, 1.f);
 
 	// ---- Anticipatory braking ----
 	const float max_decel = 0.8f * 7.f * my_bike->surface_traction;
@@ -154,38 +172,17 @@ void BikeAI::evaluate(BikeObject* my_bike)
 			}
 		}
 	}
+	// Collision avoidance brake: raise if the yield system detects a squeeze
+	dbg_avoid_brake = my_bike->avoidance_brake;
+	brake_amount = glm::max(brake_amount, my_bike->avoidance_brake);
+	// Off-track recovery brake
+	brake_amount = glm::max(brake_amount, edge_brake);
 	dbg_brake_amount = brake_amount;
 
 	// ---- Power ----
 	actual_power_command = damp_dt_independent(target_power_watts, actual_power_command, POWER_SLEW, dt);
-
-	float power_out = actual_power_command;
+	float power_out = actual_power_command + my_bike->boid_long_sep_power;
 	dbg_power_base = actual_power_command;
-
-	const bool in_paceline_exit = (paceline_state == PacelineState::Peeling ||
-	                               paceline_state == PacelineState::DriftingBack);
-
-	if (!in_paceline_exit) {
-		power_out += my_bike->boid_align_power_nudge;
-		dbg_power_align_nudge = my_bike->boid_align_power_nudge;
-	} else {
-		dbg_power_align_nudge = 0.f;
-	}
-
-	power_out += my_bike->boid_long_sep_power;
-
-	float gap_bonus = 0.f;
-	if (my_bike->rider_ahead && !in_paceline_exit) {
-		const float gap_ahead = my_bike->gap_to_ahead_m;
-		if (gap_ahead < AI_GAP_TARGET + 30.f) {
-			const float gap_err  = gap_ahead - AI_GAP_TARGET;
-			const float gap_rate = my_bike->rider_ahead->speed - speed;
-			gap_bonus = glm::clamp(gap_err * AI_GAP_KP + gap_rate * AI_GAP_KD,
-			                       -AI_GAP_MAX_PUSH, AI_GAP_MAX_PULL);
-			power_out += gap_bonus;
-		}
-	}
-	dbg_power_seek_bonus = gap_bonus;
 
 	// ---- Fill ControlInput ----
 	dbg_steer_pre_boids = steer_out;

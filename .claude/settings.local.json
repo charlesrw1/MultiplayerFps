@@ -190,7 +190,16 @@
       "Bash(grep -v \"^Gym\\\\|^Please\\\\|^Users\\\\|^See\\\\|^$\\\\|gymnasium\\\\|Warning\\\\|warn\\\\|Wrapping\")",
       "PowerShell(cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake; powershell.exe -File Scripts/build_and_test.ps1 2>&1 | Select-Object -Last 40)",
       "PowerShell(cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake; powershell.exe -File Scripts/build_and_test.ps1 2>&1 | Select-Object -Last 25)",
-      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; cat \"{}\"')"
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; cat \"{}\"')",
+      "Read(//c/Users/charl/Desktop/**)",
+      "Read(//c/Users/charl/Downloads/**)",
+      "Read(//d/Data/**)",
+      "Bash(awk -F',' 'NR>1 && $6==1 {print NR, $0}' /d/Data/ai_debug_dump.csv)",
+      "Bash(awk -F',' 'NR>1 && $2>=1 && $2<=2 && $1>=28 && $1<=32' /d/Data/ai_debug_dump.csv)",
+      "Bash(awk -F',' 'NR>1 && $2>0 && $3==1 && $5==1' /d/Data/ai_debug_dump.csv)",
+      "Bash(awk -F',' 'NR>1 && $2>0 && $3==1 && $5==1 {count[$2]++} END {for \\(r in count\\) print \"rider\",r,\"off_track_frames:\",count[r]}' /d/Data/ai_debug_dump.csv)",
+      "Bash(awk *)",
+      "PowerShell(cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake; powershell.exe -File Scripts/build_and_test.ps1 2>&1 | Select-Object -Last 30)"
     ]
   },
   "enabledPlugins": {
