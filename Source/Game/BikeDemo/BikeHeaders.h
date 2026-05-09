@@ -252,6 +252,15 @@ struct BikeAIParams {
 	// Off-track recovery: braking + committed steer when past the road edge
 	float edge_off_brake_k   = 0.5f;  // brake fraction per metre past road edge
 	float edge_off_brake_max = 0.6f;  // maximum brake fraction during off-track recovery
+
+	// Boid flocking — used by non-leader AI followers
+	float boid_influence_m         = 20.f;  // longitudinal radius to count as a neighbor (m)
+	float boid_separation_radius_m =  2.0f; // lateral gap below which separation kicks in (m)
+	float boid_separation_k        =  0.5f; // lateral separation force scale
+	float boid_cohesion_k          =  0.3f; // pull toward group average lateral position
+	float boid_alignment_k         =  0.4f; // weight of average neighbor heading [0,1]
+	float boid_turn_k              =  2.0f; // steer strength per radian of heading error
+	float boid_max_turn_rate       =  0.7f; // rad/s — maximum direct boid turn rate
 };
 extern BikeAIParams g_ai_params;
 
@@ -271,6 +280,9 @@ public:
 	float actual_power_command = 150.f;
 	static constexpr float POWER_SLEW = 0.05f;
 
+
+	// ---- Leader / boid state (set by update_boids each frame) ----
+	bool  is_leader = false;  // true: front N riders per group — use racing-line steering
 
 	// ---- Double echelon lane assignment ----
 	float preferred_lateral = 0.f;
@@ -301,6 +313,8 @@ public:
 	bool  dbg_off_track          = false;
 	float dbg_avoid_steer        = 0.f;
 	float dbg_avoid_brake        = 0.f;
+	bool  dbg_is_boid_mode       = false;
+	float dbg_boid_turn_rate     = 0.f;
 };
 
 class BikePlayer : public IBikeInput {
@@ -455,6 +469,14 @@ public:
 	float avoidance_sep_steer = 0.f;  // predictive soft lateral push away from nearby riders
 	float avoidance_brake     = 0.f;  // [0,1] brake pressure when squeezed with no lateral escape
 
+	// Boid desired heading (written by update_boids for non-leader AI, cleared for leaders)
+	bool      boid_forces_active = false;
+	glm::vec3 boid_desired_dir   = glm::vec3(0, 0, 1);
+
+	// Direct-steer override (written by BikeAI::evaluate, read by tick_steer)
+	bool  boid_steer_override     = false;
+	float boid_turn_rate_override = 0.f;  // rad/s, same sign convention as turn_rate
+
 	EntityPtr fork_entity;
 
 	glm::vec3 prev_front_wheel_pos{};
@@ -482,7 +504,8 @@ public:
 	std::vector<BikeObject*> riders_sorted;
 
 
-	int  num_ai           = 0;
+	int  num_ai                 = 5;
+	int  num_leaders_per_group  = 2;   // first N AI riders per group use racing-line; rest use boid logic
 
 	// Crack decal instances collected at map load
 	struct CrackDecalInstance {

@@ -1,0 +1,10 @@
+docs_dir = "docs"
+
+[sources]
+paths = [
+    "Source/**/*.h",
+    "Source/**/*.cpp",
+    "Scripts/**/*.py",
+    "Scripts/**/*.ps1",
+    "Data/scripts/**/*.lua",
+]

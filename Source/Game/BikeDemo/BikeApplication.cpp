@@ -586,6 +586,81 @@ void BikeGameApplication::update_boids()
 	const int   n  = (int)riders_sorted.size();
 	const float dt = eng->get_dt();
 
+	// ---- Leader assignment: first num_leaders_per_group AI riders per group are leaders ----
+	{
+		int max_gid = 0;
+		for (BikeObject* r : riders_sorted) max_gid = std::max(max_gid, r->group_id);
+		std::vector<int> leader_cnt(max_gid + 1, 0);
+		for (BikeObject* r : riders_sorted) {
+			BikeAI* ai = dynamic_cast<BikeAI*>(r->input.get());
+			if (!ai) continue;
+			ai->is_leader = (leader_cnt[r->group_id] < num_leaders_per_group);
+			++leader_cnt[r->group_id];
+		}
+	}
+
+	// ---- Boid desired direction for non-leader AI followers ----
+	// Each non-leader AI gets a desired world-space heading from alignment + cohesion + separation.
+	// BikeAI::evaluate reads boid_forces_active / boid_desired_dir and applies them via the
+	// direct turn-rate override path in tick_steer (no handlebar inertia).
+	for (int i = 0; i < n; ++i) {
+		BikeObject* me = riders_sorted[i];
+		BikeAI* ai = dynamic_cast<BikeAI*>(me->input.get());
+		me->boid_forces_active = false;
+		if (!ai || ai->is_leader) continue;
+
+		const BikeWaypoint cur_wp    = course.sample(me->course_dist_m);
+		const glm::vec3 course_right = cur_wp.right;  // actual world right (+X for +Z road)
+
+		glm::vec3 align_sum = glm::vec3(0.f);
+		float     coh_lat   = 0.f;
+		float     sep_lat   = 0.f;
+		int       nbr_count = 0;
+
+		for (int j = 0; j < n; ++j) {
+			if (j == i) continue;
+			const BikeObject* other = riders_sorted[j];
+			if (other->group_id != me->group_id) continue;
+			const float long_gap = glm::abs(other->course_dist_m - me->course_dist_m);
+			if (long_gap > g_ai_params.boid_influence_m) continue;
+
+			const float lat_gap = other->lateral_pos - me->lateral_pos;  // + = other road-right of me
+			align_sum += other->bike_direction;
+			coh_lat   += other->lateral_pos;
+			++nbr_count;
+
+			// Separation: push away from riders within the separation radius
+			const float abs_lat = glm::abs(lat_gap);
+			if (abs_lat < g_ai_params.boid_separation_radius_m && abs_lat > 0.01f) {
+				const float str = (1.f - abs_lat / g_ai_params.boid_separation_radius_m)
+				                  * g_ai_params.boid_separation_k;
+				sep_lat -= glm::sign(lat_gap) * str;  // push away: if other road-right, push road-left
+			}
+		}
+
+		if (nbr_count == 0) continue;  // isolated — boid_forces_active stays false, AI uses racing line
+
+		// Alignment: blend toward average neighbor heading, weighted against course forward
+		const glm::vec3 avg_align = (glm::length(align_sum) > 0.01f)
+		                            ? glm::normalize(align_sum) : cur_wp.forward;
+		const glm::vec3 base_dir  = glm::normalize(
+		    avg_align     * g_ai_params.boid_alignment_k +
+		    cur_wp.forward * (1.f - g_ai_params.boid_alignment_k));
+
+		// Cohesion: lateral pull toward group average position
+		const float avg_lat   = coh_lat / (float)nbr_count;
+		const float coh_force = (avg_lat - me->lateral_pos) * g_ai_params.boid_cohesion_k;
+
+		// Combined lateral correction (clamped so the direction vector stays sensible)
+		const float total_lat = glm::clamp(coh_force + sep_lat, -1.5f, 1.5f);
+
+		// Build desired direction: base heading + lateral nudge projected onto course_right
+		const glm::vec3 desired_raw = base_dir + course_right * total_lat;
+		me->boid_forces_active = true;
+		me->boid_desired_dir   = (glm::length(desired_raw) > 0.01f)
+		                         ? glm::normalize(desired_raw) : cur_wp.forward;
+	}
+
 	for (int i = 0; i < n; ++i) {
 		BikeObject* me = riders_sorted[i];
 
@@ -1122,13 +1197,31 @@ static void bike_course_debug()
 	ImGui::SliderInt("num_ai", &g_bike_app->num_ai, 0, 20);
 	if (ImGui::Button("Respawn AI"))
 		g_bike_app->respawn_ai();
+	ImGui::SliderInt("Leaders per group", &g_bike_app->num_leaders_per_group, 0, 5);
+	ImGui::SameLine(); ImGui::TextDisabled("(leaders use racing line; rest use boid flocking)");
+
+	ImGui::SeparatorText("Boid Flocking Params");
+	{
+		BikeAIParams& p = g_ai_params;
+		ImGui::DragFloat("boid_influence_m",         &p.boid_influence_m,         0.5f,  1.f,  50.f, "%.1f");
+		ImGui::DragFloat("boid_separation_radius_m", &p.boid_separation_radius_m, 0.05f, 0.1f, 10.f, "%.2f");
+		ImGui::DragFloat("boid_separation_k",        &p.boid_separation_k,        0.02f, 0.f,   3.f, "%.2f");
+		ImGui::DragFloat("boid_cohesion_k",          &p.boid_cohesion_k,          0.02f, 0.f,   2.f, "%.2f");
+		ImGui::DragFloat("boid_alignment_k",         &p.boid_alignment_k,         0.02f, 0.f,   1.f, "%.2f");
+		ImGui::DragFloat("boid_turn_k",              &p.boid_turn_k,              0.05f, 0.1f, 10.f, "%.2f");
+		ImGui::DragFloat("boid_max_turn_rate",       &p.boid_max_turn_rate,       0.02f, 0.1f,  3.f, "%.2f");
+	}
 
 	ImGui::SeparatorText("Riders");
 	const auto& sorted = g_bike_app->riders_sorted;
 	for (int i = 0; i < (int)sorted.size(); ++i) {
 		const BikeObject* r = sorted[i];
-		ImGui::Text("P%d  dist=%.0f m  lat=%+.2f m  draft=%.2f",
-			r->race_position, r->course_dist_m, r->lateral_pos, r->draft_factor);
+		const BikeAI*     ai = dynamic_cast<const BikeAI*>(r->input.get());
+		const char* mode = ai
+		    ? (ai->is_leader ? "LEADER" : (r->boid_forces_active ? "boid" : "solo"))
+		    : "player";
+		ImGui::Text("P%d  dist=%.0f m  lat=%+.2f m  draft=%.2f  [%s]",
+			r->race_position, r->course_dist_m, r->lateral_pos, r->draft_factor, mode);
 	}
 
 	ImGui::SeparatorText("Road Network");
@@ -1269,9 +1362,13 @@ static void apply_debug_follow_camera()
 	if (bp) {
 		GameplayStatic::debug_text(string_format("[Player] steer_final:   %.2f", bp->dbg_steer_final));
 	} else if (ai) {
-		// --- Path-following breakdown ---
-		GameplayStatic::debug_text(string_format("[AI] spd=%.1fm/s  look=%.1fm  near_r=%.1fm",
-			bo->speed, ai->dbg_lookahead_dist, ai->dbg_min_r));
+		// --- Mode and path-following breakdown ---
+		const char* ai_mode = ai->is_leader ? "LEADER" : (ai->dbg_is_boid_mode ? "BOID" : "solo");
+		GameplayStatic::debug_text(string_format("[AI:%s] spd=%.1fm/s  look=%.1fm  near_r=%.1fm",
+			ai_mode, bo->speed, ai->dbg_lookahead_dist, ai->dbg_min_r));
+		if (ai->dbg_is_boid_mode)
+			GameplayStatic::debug_text(string_format("[AI:BOID] steer=%.2f  turn_rate=%.3f rad/s",
+				ai->dbg_steer_near, ai->dbg_boid_turn_rate));
 		// Upcoming corner: distance, radius, safe speed, brake demand
 		if (ai->dbg_brake_dist_m > 0.f)
 			GameplayStatic::debug_text(string_format("[AI] corner in %.0fm  r=%.1fm  v_max=%.1fm/s  brake=%.2f",
