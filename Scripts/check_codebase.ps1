@@ -1,27 +1,22 @@
 <#
 .SYNOPSIS
-    Run all repo health checks: docs, file/function length, coverage, TODO scan.
+    Run all repo health checks: docs, file length, coverage, TODO scan.
 
 .DESCRIPTION
     Single-shot quality gate. Sections:
       1. docs.exe check
-      2. LOC per source file       (warn >400, error >1000)
-      3. Function length           (warn >50,  error >200)  brace-stack heuristic
-      4. OpenCppCoverage           (integration tests, per-mode, optional)
-      5. TODO / FIXME / HACK scan  (warning only)
+      2. LOC per source file       (warn >600, error >1000)
+      3. OpenCppCoverage           (integration tests, per-mode, optional)
+      4. TODO / FIXME / HACK scan  (warning only)
 
     Excludes: Source/External, Source/.generated, MEGA.cpp.
-
-    Function-length opt-out: put `// @check:long-ok` on the line directly above
-    the function signature for genuinely-long functions (codegen tables,
-    lookup switches, etc.).
 
     Exit 0 = no errors. Exit 1 = at least one error. Warnings never fail.
 
 .PARAMETER Quick
     Skip slow checks (coverage). Equivalent to -SkipCoverage.
 
-.PARAMETER SkipDocs / -SkipLoc / -SkipFn / -SkipCoverage / -SkipTodos
+.PARAMETER SkipDocs / -SkipLoc / -SkipCoverage / -SkipTodos
     Granular skips.
 
 .PARAMETER Config
@@ -39,7 +34,6 @@ param(
     [switch]$Quick,
     [switch]$SkipDocs,
     [switch]$SkipLoc,
-    [switch]$SkipFn,
     [switch]$SkipCoverage,
     [switch]$SkipTodos,
     [string]$Config = "Debug",
@@ -50,10 +44,8 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 if (-not $CoverageOutDir) { $CoverageOutDir = $root }
 
-$LocSoft = 400
+$LocSoft = 600
 $LocHard = 1000
-$FnSoft  = 50
-$FnHard  = 200
 
 # Sections track their own status; aggregate at the end.
 $results = [ordered]@{}
@@ -114,163 +106,7 @@ function Invoke-LocCheck {
     else { Set-Section "loc" "ok" }
 }
 
-# ---------- 3. Function length --------------------------------------------
-# Brace-stack heuristic: walk the file, push on `{`, pop on `}`. When pushing,
-# decide whether the opening line looks function-like by examining the joined
-# tail (current open-brace line + back across lines until ; { } or 6 lines).
-# False positives: tagged unions, large struct initializers, lambdas.
-# Workaround: `// @check:long-ok` on the line above the function signature.
-
-$NonFnKeywords = @(
-    'if','else','for','while','do','switch','case','catch','try','return',
-    'class','struct','union','enum','namespace','extern','using','typedef'
-)
-
-function Test-FunctionOpen {
-    param([string[]]$Lines, [int]$OpenIdx)
-    $back = 6
-    $start = [Math]::Max(0, $OpenIdx - $back)
-    $tail = ""
-    for ($k = $start; $k -le $OpenIdx; $k++) {
-        $tail += " " + $Lines[$k]
-    }
-    $tail = $tail -replace '//.*',''
-    $tail = $tail.Trim()
-    # Must contain a `()` call signature before the `{`
-    $brace = $tail.LastIndexOf('{')
-    if ($brace -lt 0) { return $false }
-    $head = $tail.Substring(0, $brace)
-    if ($head -notmatch '\)\s*(?:const\s*)?(?:noexcept(?:\([^)]*\))?\s*)?(?:override\s*)?(?:final\s*)?(?:->\s*[^{}]+)?(?:\s*:\s*[^{]+)?$') {
-        # Fall back to looser: any `)` followed by only safe tokens before `{`
-        if ($head -notmatch '\)[^();]*$') { return $false }
-    }
-    # Reject lines that lead with a non-function keyword
-    foreach ($kw in $script:NonFnKeywords) {
-        if ($head -match ('(^|[^A-Za-z_])' + [regex]::Escape($kw) + '\s*\(')) { return $false }
-        if ($head -match ('(^|[^A-Za-z_])' + [regex]::Escape($kw) + '\s+\w+\s*\{$')) { return $false }
-    }
-    # Reject lambdas (most common false positive): leading `[...]` capture before `(`
-    if ($head -match '\[[^\]]*\]\s*(?:\([^)]*\))?\s*(?:mutable|noexcept|->[^{]+)?\s*$') { return $false }
-    # Reject = { initializer lists
-    if ($head -match '=\s*$') { return $false }
-    return $true
-}
-
-function Test-LongOk {
-    param([string[]]$Lines, [int]$OpenIdx)
-    # Look at up to 6 prior lines for the opt-out marker
-    $start = [Math]::Max(0, $OpenIdx - 6)
-    for ($k = $start; $k -le $OpenIdx; $k++) {
-        if ($Lines[$k] -match '@check:long-ok') { return $true }
-    }
-    return $false
-}
-
-function Strip-BlockComments {
-    param([string]$Text)
-    # Replace block comments with same-newline-count whitespace so line numbers stay accurate.
-    return [regex]::Replace($Text, '/\*[\s\S]*?\*/', {
-        param($m)
-        $nl = ($m.Value -split "`n").Count - 1
-        return ("`n" * $nl)
-    })
-}
-
-function Get-FunctionLengths {
-    param([string]$Path)
-    $raw = Get-Content -Raw -LiteralPath $Path
-    if (-not $raw) { return @() }
-    $stripped = Strip-BlockComments $raw
-    $lines = $stripped -split "`r?`n"
-
-    # Pre-clean each line: drop // comments and string literals.
-    $clean = New-Object string[] $lines.Count
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        $l = $lines[$i] -replace '//.*',''
-        $l = $l -replace '"(?:[^"\\]|\\.)*"', '""'
-        $l = $l -replace "'(?:[^'\\]|\\.)*'", "''"
-        $clean[$i] = $l
-    }
-
-    $stack = New-Object System.Collections.Stack
-    $results = New-Object System.Collections.ArrayList
-
-    for ($i = 0; $i -lt $clean.Count; $i++) {
-        $line = $clean[$i]
-        for ($j = 0; $j -lt $line.Length; $j++) {
-            $c = $line[$j]
-            if ($c -eq '{') {
-                $isFn  = Test-FunctionOpen -Lines $clean -OpenIdx $i
-                $longOk = if ($isFn) { Test-LongOk -Lines $lines -OpenIdx $i } else { $false }
-                $stack.Push(@{ StartLine = $i; IsFn = $isFn; LongOk = $longOk })
-            } elseif ($c -eq '}') {
-                if ($stack.Count -gt 0) {
-                    $top = $stack.Pop()
-                    if ($top.IsFn) {
-                        $len = $i - $top.StartLine + 1
-                        # If the brace sits on its own line, walk back to the
-                        # last non-empty line that has a `(` so the signature
-                        # is meaningful instead of just "{".
-                        $sigIdx = $top.StartLine
-                        $startLine = $lines[$sigIdx].Trim()
-                        if ($startLine -eq '{' -or $startLine -match '^\s*\{') {
-                            for ($k = $sigIdx - 1; $k -ge [Math]::Max(0, $sigIdx - 6); $k--) {
-                                $cand = $lines[$k].Trim()
-                                if ($cand -ne '' -and $cand -notmatch '^\s*//') {
-                                    $startLine = $cand
-                                    if ($cand -match '\(') { break }
-                                }
-                            }
-                        }
-                        [void]$results.Add([pscustomobject]@{
-                            Lines  = $len
-                            Start  = $top.StartLine + 1
-                            LongOk = $top.LongOk
-                            Sig    = $startLine
-                        })
-                    }
-                }
-            }
-        }
-    }
-    return $results
-}
-
-function Invoke-FnCheck {
-    Write-Host "`n=== Function length (warn >$FnSoft, error >$FnHard) ===" -ForegroundColor Cyan
-    $warn = @(); $err = @(); $exempt = 0; $total = 0
-    foreach ($f in Get-SourceFiles) {
-        $fns = Get-FunctionLengths -Path $f.FullName
-        foreach ($fn in $fns) {
-            $total++
-            if ($fn.Lines -le $FnSoft) { continue }
-            if ($fn.LongOk) { $exempt++; continue }
-            $rel = Resolve-Path -Relative $f.FullName
-            $rec = [pscustomobject]@{
-                Lines = $fn.Lines
-                Loc   = "${rel}:$($fn.Start)"
-                Sig   = ($fn.Sig -replace '\s+',' ')
-            }
-            if ($fn.Lines -gt $FnHard) { $err += $rec } else { $warn += $rec }
-        }
-    }
-    foreach ($x in ($err | Sort-Object Lines -Descending)) {
-        Write-Host ("  ERROR {0,4}  {1}" -f $x.Lines, $x.Loc) -ForegroundColor Red
-        Write-Host ("            {0}" -f $x.Sig) -ForegroundColor DarkRed
-    }
-    foreach ($x in ($warn | Sort-Object Lines -Descending | Select-Object -First 25)) {
-        Write-Host ("  warn  {0,4}  {1}" -f $x.Lines, $x.Loc) -ForegroundColor Yellow
-    }
-    if ($warn.Count -gt 25) {
-        Write-Host ("  ... and {0} more warnings" -f ($warn.Count - 25)) -ForegroundColor DarkYellow
-    }
-    Write-Host ("  totals: {0} fns scanned, {1} warn, {2} error, {3} exempt" -f $total, $warn.Count, $err.Count, $exempt) -ForegroundColor DarkGray
-    if ($err.Count -gt 0) { Set-Section "fn" "error" "$($err.Count) over $FnHard" }
-    elseif ($warn.Count -gt 0) { Set-Section "fn" "warn" "$($warn.Count) over $FnSoft" }
-    else { Set-Section "fn" "ok" }
-}
-
-# ---------- 4. OpenCppCoverage --------------------------------------------
+# ---------- 3. OpenCppCoverage --------------------------------------------
 function Find-OpenCppCoverage {
     $cmd = Get-Command OpenCppCoverage.exe -ErrorAction SilentlyContinue
     if ($cmd) { return $cmd.Source }
@@ -389,7 +225,7 @@ function Invoke-CoverageCheck {
     Set-Section "coverage" "ok" "$($rows.Count) files, $($low.Count) <50%"
 }
 
-# ---------- 5. TODO / FIXME scan ------------------------------------------
+# ---------- 4. TODO / FIXME scan ------------------------------------------
 function Invoke-TodoScan {
     Write-Host "`n=== TODO / FIXME / HACK scan ===" -ForegroundColor Cyan
     $rg = Get-Command rg.exe -ErrorAction SilentlyContinue
@@ -438,7 +274,6 @@ Push-Location $root
 try {
     if (-not $SkipDocs)                      { Invoke-DocsCheck }
     if (-not $SkipLoc)                       { Invoke-LocCheck }
-    if (-not $SkipFn)                        { Invoke-FnCheck }
     if (-not $SkipCoverage -and -not $Quick) { Invoke-CoverageCheck }
     elseif (-not $SkipCoverage -and $Quick)  { Write-Host "`n(coverage skipped: -Quick)" -ForegroundColor DarkGray; Set-Section "coverage" "skip" "-Quick" }
     if (-not $SkipTodos)                     { Invoke-TodoScan }

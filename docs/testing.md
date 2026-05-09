@@ -104,6 +104,32 @@ The framework lives in `Data/scripts/integration_test_framework.lua`. The C++ `T
 
 ---
 
+## Repo health check — `check_codebase.ps1`
+
+[[Scripts/check_codebase.ps1]] is the single-shot quality gate. Sections, in order:
+
+By default: skip code coverage! with `-Quick` only check code coverage on request.
+
+1. **`docs.exe check`** — wiki-link + `@docs` ref validation. Errors fail the run.
+2. **LOC per file** — warn >600, error >1000. Excludes `Source/External`, `.generated`, `MEGA.cpp`.
+3. **OpenCppCoverage** — builds App.exe, runs integration tests for `game` + `editor`, writes `coverage_<mode>.xml` (Cobertura) + `coverage_summary.md` (per-file matrix sorted ascending by best mode). Skipped if OpenCppCoverage isn't installed (`winget install OpenCppCoverage.OpenCppCoverage`).
+4. **TODO/FIXME/HACK scan** — `rg`-based, warning only.
+
+```powershell
+# Full run (includes coverage build + both test passes — slow)
+powershell Scripts/check_codebase.ps1
+
+# Skip coverage
+powershell Scripts/check_codebase.ps1 -Quick
+
+# Granular skips
+powershell Scripts/check_codebase.ps1 -SkipDocs -SkipLoc -SkipCoverage -SkipTodos
+```
+
+Exit 0 = no errors. Exit 1 = at least one section errored. Warnings never fail. The summary block at the end lists each section's status (`ok` / `warn` / `error` / `skip`).
+
+---
+
 ## Known Pre-Existing Failures
 
 - `ScriptManagerTest.SyntaxErrorLeavesCleanStack` — flaky, suspected isolation issue.
