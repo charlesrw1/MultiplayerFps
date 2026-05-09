@@ -1,25 +1,25 @@
-// Source/IntegrationTests/GameTestRunner.cpp
+// Source/IntegrationTests/TestRunner.cpp
 #define _CRT_SECURE_NO_WARNINGS
-#include "GameTestRunner.h"
+#include "TestRunner.h"
 #include "GpuTimer.h"
 #include <cstdio>
 #include <ctime>
 #include <direct.h>
 #include "GameEnginePublic.h"
-#include "Framework/StringUtils.h"
-GameTestRunner::GameTestRunner(std::string_view name, std::vector<TestEntry> tests, const TestRunnerConfig& cfg)
-	: tests_(std::move(tests)), cfg_(cfg), name(name) {
-	screenshot_cfg_.promote = cfg.promote;
-	screenshot_cfg_.interactive = cfg.interactive;
-	is_this_editor_mode = name == "Editor";
 
-	ctx_.is_editor_mode = is_this_editor_mode;
+static const char* mode_name(TestMode m) {
+	return m == TestMode::Editor ? "editor" : "game";
 }
 
-bool GameTestRunner::tick(float dt) {
-	// First call: kick off the first test
+TestRunner::TestRunner(TestMode mode, std::vector<TestEntry> tests, const TestRunnerConfig& cfg)
+	: tests_(std::move(tests)), cfg_(cfg), mode_(mode) {
+	screenshot_cfg_.promote = cfg.promote;
+	screenshot_cfg_.interactive = cfg.interactive;
+	ctx_.is_editor_mode = (mode == TestMode::Editor);
+}
 
-	const std::string xml_path = "TestFiles/integration_" + StringUtils::to_lower(name.data()) + "_results.xml";
+bool TestRunner::tick(float dt) {
+	const std::string xml_path = std::string("TestFiles/integration_") + mode_name(mode_) + "_results.xml";
 
 	if (current_idx_ < 0) {
 		start_next_test();
@@ -91,7 +91,7 @@ bool GameTestRunner::tick(float dt) {
 	return false;
 }
 
-void GameTestRunner::start_next_test() {
+void TestRunner::start_next_test() {
 	++current_idx_;
 	if (current_idx_ >= (int)tests_.size())
 		return;
@@ -99,11 +99,11 @@ void GameTestRunner::start_next_test() {
 	printf("\n==> [%d/%d] %s\n", current_idx_ + 1, (int)tests_.size(), entry.name);
 	elapsed_ = 0.f;
 	ctx_ = TestContext{};
-	ctx_.is_editor_mode = is_this_editor_mode;
+	ctx_.is_editor_mode = (mode_ == TestMode::Editor);
 	task_.emplace(entry.fn(ctx_));
 }
 
-void GameTestRunner::finish_current_test(const char* reason) {
+void TestRunner::finish_current_test(const char* reason) {
 	auto& entry = tests_[current_idx_];
 	bool passed = ctx_.checks_failed == 0 && reason == nullptr;
 	if (reason)
@@ -122,14 +122,14 @@ void GameTestRunner::finish_current_test(const char* reason) {
 		++failed_count_;
 }
 
-void GameTestRunner::write_results_xml(const char* path) {
-	printf("\n=== %s Tests: %d passed, %d failed ===\n", name.data(), passed_count_, failed_count_);
+void TestRunner::write_results_xml(const char* path) {
+	printf("\n=== %s Tests: %d passed, %d failed ===\n", mode_name(mode_), passed_count_, failed_count_);
 	_mkdir("TestFiles");
 	FILE* f = fopen(path, "w");
 	if (!f)
 		return;
 	fprintf(f, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
-	fprintf(f, "<testsuite name=\"IntegrationTests.%s\" tests=\"%d\" failures=\"%d\">\n", name.data(),
+	fprintf(f, "<testsuite name=\"IntegrationTests.%s\" tests=\"%d\" failures=\"%d\">\n", mode_name(mode_),
 			(int)results_.size(), failed_count_);
 	for (auto& r : results_) {
 		fprintf(f, "  <testcase name=\"%s\">\n", r.name.c_str());

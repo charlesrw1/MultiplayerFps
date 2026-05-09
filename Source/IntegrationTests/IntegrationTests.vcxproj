@@ -93,7 +93,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="TestContext.cpp" />
     <ClCompile Include="TestRegistry.cpp" />
-    <ClCompile Include="GameTestRunner.cpp" />
+    <ClCompile Include="TestRunner.cpp" />
     <ClCompile Include="EditorTestContext.cpp" />
     <ClCompile Include="Screenshot.cpp" />
     <ClCompile Include="RenderDump.cpp" />
@@ -113,7 +113,7 @@
     <ClInclude Include="TestTask.h" />
     <ClInclude Include="TestRegistry.h" />
     <ClInclude Include="TestContext.h" />
-    <ClInclude Include="GameTestRunner.h" />
+    <ClInclude Include="TestRunner.h" />
     <ClInclude Include="TestGameApp.h" />
     <ClInclude Include="EditorTestContext.h" />
     <ClInclude Include="Screenshot.h" />

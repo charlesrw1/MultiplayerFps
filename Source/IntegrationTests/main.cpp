@@ -3,7 +3,7 @@
 #include <string>
 #include "ITestRunner.h"
 #include "TestRegistry.h"
-#include "GameTestRunner.h"
+#include "TestRunner.h"
 #include "TestGameApp.h"
 #include "EngineMain.h"
 #include "Framework/Config.h"
@@ -64,12 +64,12 @@ int main(int argc, char** argv) {
 	if (mode == "game") {
 		g_application_class.set_string("TestGameApp");
 		auto tests = TestRegistry::get_filtered(TestMode::Game, test_filter.c_str());
-		mainOptions.pending_test_runnner.reset(new GameTestRunner("Game", tests, cfg));
+		mainOptions.pending_test_runnner.reset(new TestRunner(TestMode::Game, tests, cfg));
 		mainOptions.vars_file = "test_game_vars.txt";
 		mainOptions.log_file = "test_game_output.log";
 	} else if (mode == "editor") {
 		auto tests = TestRegistry::get_filtered(TestMode::Editor, test_filter.c_str());
-		mainOptions.pending_test_runnner.reset(new GameTestRunner("Editor", tests, cfg));
+		mainOptions.pending_test_runnner.reset(new TestRunner(TestMode::Editor, tests, cfg));
 		mainOptions.vars_file = "test_editor_vars.txt";
 		mainOptions.log_file = "test_editor_output.log";
 		mainOptions.init_file = "";

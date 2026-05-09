@@ -1,4 +1,4 @@
-// Source/IntegrationTests/GameTestRunner.h
+// Source/IntegrationTests/TestRunner.h
 #pragma once
 #include "ITestRunner.h"
 #include "TestRegistry.h"
@@ -9,10 +9,12 @@
 #include <string>
 #include <optional>
 
-class GameTestRunner : public ITestRunner
+// Single mode-agnostic test runner. The mode parameter is used only to set
+// `ctx.is_editor_mode` and to derive the output XML file name.
+class TestRunner : public ITestRunner
 {
 public:
-	GameTestRunner(std::string_view name, std::vector<TestEntry> tests, const TestRunnerConfig& cfg);
+	TestRunner(TestMode mode, std::vector<TestEntry> tests, const TestRunnerConfig& cfg);
 
 	bool tick(float dt) override;
 	int exit_code() const override { return failed_count_ > 0 ? 1 : 0; }
@@ -25,7 +27,7 @@ private:
 	std::vector<TestEntry> tests_;
 	TestRunnerConfig cfg_;
 	ScreenshotConfig screenshot_cfg_;
-	std::string_view name;
+	TestMode mode_;
 
 	int current_idx_ = -1;
 	float elapsed_ = 0.f;
@@ -42,6 +44,4 @@ private:
 		std::vector<std::string> failures;
 	};
 	std::vector<Result> results_;
-
-	bool is_this_editor_mode = false;
 };

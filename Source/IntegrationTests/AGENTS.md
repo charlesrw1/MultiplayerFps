@@ -7,7 +7,7 @@ C++20 coroutine-based integration testing framework. Tests run inside the full g
 - `TestRegistry.h` — Test registration; `TestEntry`, `TestMode`, `TestRunnerConfig`
 - `TestContext.h` — Awaitable primitives and assertion helpers
 - `TestTask.h` — C++20 coroutine promise type for test functions
-- `GameTestRunner.h/cpp` — Main test execution loop
+- `TestRunner.h/cpp` — Main test execution loop
 - `TestGameApp.h` — Application entry point for test runs
 - `EditorTestContext.h/cpp` — Editor-mode test context
 - `GpuTimer.h/cpp` — GPU performance measurement
@@ -47,9 +47,9 @@ Injected into every test function. Provides assertions and awaitable suspension 
 ### `TestTask` (TestTask.h)
 C++20 coroutine return type for test functions.
 - Custom `promise_type` with `initial_suspend`, `final_suspend`, `yield_value`
-- `resume()` — Called by `GameTestRunner` each frame to advance the test coroutine
+- `resume()` — Called by `TestRunner` each frame to advance the test coroutine
 
-### `GameTestRunner` (GameTestRunner.h)
+### `TestRunner` (TestRunner.h)
 Drives test execution each game tick.
 - Creates `TestContext`, launches `TestTask` coroutine
 - Calls `task.resume()` each frame until complete or timed out
@@ -80,6 +80,6 @@ EDITOR_TEST("editor_test_name", timeout_seconds, [](TestContext& ctx) -> TestTas
 
 - **Coroutine-based tests** — Tests are C++20 coroutines; `co_await` suspends the test and returns control to the game loop, resuming on the next qualifying frame. This allows natural "wait N frames" / "wait for event" patterns without threads.
 - **Screenshot regression** — `co_await ctx.screenshot("name")` captures a frame and diffs against a stored baseline image. Baselines stored under `Tests/Baselines/`.
-- **Timeout enforcement** — Each `TestEntry` has `timeout_seconds`; `GameTestRunner` aborts and fails the test if it exceeds this.
+- **Timeout enforcement** — Each `TestEntry` has `timeout_seconds`; `TestRunner` aborts and fails the test if it exceeds this.
 - **Two modes** — `TestMode::Game` runs in the normal game runtime; `TestMode::Editor` runs with the editor active, enabling editor workflow tests.
 - **Run via** — `Scripts/build_and_test.ps1` builds and runs the test binary. Exit code 0 = all pass.
