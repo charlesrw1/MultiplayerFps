@@ -19,6 +19,7 @@
 #include "UI/Gui.h"
 #include <algorithm>
 #include <fstream>
+#include <random>
 
 // Wind state is accessed via the global WindSystem: g_wind.wind_speed, etc.
 
@@ -245,6 +246,13 @@ struct AIDebugFrame {
     float lookahead_pt_x, lookahead_pt_y, lookahead_pt_z;
     float lookahead_dist;     // distance from rider to lookahead pt
     int   has_wheel;          // 1 = follower (wheel-anchored target), 0 = leader (racing-line)
+    int   wheel_idx;          // index of wheel rider, or -1 if none
+    int   paceline_state;     // 0=Following 1=Pulling 2=Peeling 3=DriftingBack
+    float paceline_timer_s;
+    float lat_offset;         // smoothed
+    float lat_offset_target;  // resolver pick this frame
+    float lat_offset_bias;
+    float corner_factor;
 };
 
 static constexpr int   AI_DBG_MAX_FRAMES = 100000;
@@ -334,6 +342,18 @@ static void ai_debug_record(BikeGameApplication* app)
             fr.lookahead_pt_z    = ai->dbg_lookahead_pt.z;
             fr.lookahead_dist    = ai->dbg_lookahead_dist;
             fr.has_wheel         = ai->dbg_has_wheel ? 1 : 0;
+            fr.wheel_idx         = -1;
+            if (ai->wheel) {
+                for (int wj = 0; wj < n; ++wj) if (all[wj] == ai->wheel) { fr.wheel_idx = wj; break; }
+            }
+            fr.paceline_state    = (int)ai->paceline_state;
+            fr.paceline_timer_s  = ai->paceline_timer_s;
+            fr.lat_offset        = ai->lat_offset;
+            fr.lat_offset_target = ai->dbg_lat_offset_target;
+            fr.lat_offset_bias   = ai->lat_offset_bias;
+            fr.corner_factor     = ai->dbg_corner_factor;
+        } else {
+            fr.wheel_idx = -1;
         }
 
         s_ai_dbg_frames.push_back(fr);
@@ -357,7 +377,8 @@ static void ai_debug_dump(BikeGameApplication* app)
              "power_base,power_final,actual_power,boid_long_sep_power,"
              "avoidance_sep_steer,avoidance_brake,"
              "nearest_lat_sep_m,nearest_long_gap_m,"
-             "lookahead_pt_x,lookahead_pt_y,lookahead_pt_z,lookahead_dist,has_wheel\n";
+             "lookahead_pt_x,lookahead_pt_y,lookahead_pt_z,lookahead_dist,has_wheel,"
+             "wheel_idx,paceline_state,paceline_timer_s,lat_offset,lat_offset_target,lat_offset_bias,corner_factor\n";
         for (const auto& fr : s_ai_dbg_frames) {
             f << fr.time_s              << ','
               << fr.rider_idx           << ',' << (int)fr.is_ai         << ','
@@ -376,7 +397,10 @@ static void ai_debug_dump(BikeGameApplication* app)
               << fr.avoidance_sep_steer << ',' << fr.avoidance_brake    << ','
               << fr.nearest_lat_sep_m   << ',' << fr.nearest_long_gap_m << ','
               << fr.lookahead_pt_x      << ',' << fr.lookahead_pt_y     << ',' << fr.lookahead_pt_z << ','
-              << fr.lookahead_dist      << ',' << fr.has_wheel          << '\n';
+              << fr.lookahead_dist      << ',' << fr.has_wheel          << ','
+              << fr.wheel_idx           << ',' << fr.paceline_state     << ',' << fr.paceline_timer_s << ','
+              << fr.lat_offset          << ',' << fr.lat_offset_target  << ',' << fr.lat_offset_bias  << ','
+              << fr.corner_factor       << '\n';
         }
         sys_print(Debug, "AI debug recorder: wrote %d frames to D:/Data/ai_debug_dump.csv\n",
                   (int)s_ai_dbg_frames.size());
@@ -414,7 +438,9 @@ void BikeGameApplication::update()
 		update_groups();
 		update_drafting();
 		update_wheel_picking();
-		update_boids();
+		update_paceline();
+		update_clear_air();
+		update_avoidance();
 		update_gap_regulation();
 
 	}
@@ -620,6 +646,14 @@ void BikeGameApplication::update_wheel_picking()
 			BikeObject* other = riders_sorted[j];
 			if (other->group_id != me->group_id) continue;
 
+			// Skip riders in transient states — Peeling drifts sideways, DriftingBack
+			// is a slow rider exiting the rotation. Following them just yanks the chain
+			// off the line until they re-enter Following.
+			if (BikeAI* oai = dynamic_cast<BikeAI*>(other->input.get())) {
+				if (oai->paceline_state == PacelineState::Peeling ||
+				    oai->paceline_state == PacelineState::DriftingBack) continue;
+			}
+
 			const float signed_long = other->course_dist_m - me->course_dist_m;
 			if (signed_long < p.wheel_long_min || signed_long > p.wheel_long_max) continue;
 
@@ -650,85 +684,200 @@ void BikeGameApplication::update_wheel_picking()
 	}
 }
 
-void BikeGameApplication::update_boids()
+// ============================================================
+// Paceline tactical FSM — Following / Pulling / Peeling / DriftingBack.
+//
+// Wheel-picker is the "what wheel am I on" decision. This is "what am I doing
+// strategically" — it modifies the wheel result (forces a peel-side lat_offset,
+// scales target_power) and gates pull re-entry.
+//
+// Cascade-safe promotion: Pulling riders accelerate, so the gap to the next
+// rider can exceed wheel_long_max within seconds. is_at_front() walks ALL
+// riders ahead in the same group with no distance cutoff; only Peeling and
+// DriftingBack are skipped (transient sideways/slow states). Without this,
+// every following rider eventually self-promotes when its puller pulls away.
+// See [[bike/bikeai#Tactical FSM]].
+// ============================================================
+void BikeGameApplication::update_paceline()
+{
+	const BikeAIParams& p = g_ai_params;
+	const float dt = eng->get_dt();
+	const int   n  = (int)riders_sorted.size();
+
+	auto is_at_front = [&](int idx) -> bool {
+		BikeObject* me = riders_sorted[idx];
+		for (int j = idx - 1; j >= 0; --j) {
+			BikeObject* other = riders_sorted[j];
+			if (other->group_id != me->group_id) continue;
+			BikeAI* oai = dynamic_cast<BikeAI*>(other->input.get());
+			if (!oai) return false;  // player counts as a stable wheel
+			if (oai->paceline_state == PacelineState::Peeling ||
+			    oai->paceline_state == PacelineState::DriftingBack) continue;
+			return false;
+		}
+		return true;
+	};
+
+	for (int i = 0; i < n; ++i) {
+		BikeObject* me = riders_sorted[i];
+		BikeAI*     ai = dynamic_cast<BikeAI*>(me->input.get());
+		if (!ai) continue;
+
+		ai->paceline_timer_s += dt;
+		if (ai->pull_cooldown_s > 0.f)
+			ai->pull_cooldown_s = glm::max(0.f, ai->pull_cooldown_s - dt);
+
+		const bool at_front = is_at_front(i);
+
+		switch (ai->paceline_state) {
+		case PacelineState::Following:
+			// Becoming a leader by emergence triggers a pull (unless still cooling down).
+			if (at_front && ai->pull_cooldown_s <= 0.f) {
+				ai->paceline_state   = PacelineState::Pulling;
+				ai->paceline_timer_s = 0.f;
+			}
+			break;
+
+		case PacelineState::Pulling:
+			// Pull until duration elapses, then peel off. If a stable rider appears
+			// ahead (someone moved up), drop back to Following without peeling.
+			if (!at_front) {
+				ai->paceline_state   = PacelineState::Following;
+				ai->paceline_timer_s = 0.f;
+			} else if (ai->paceline_timer_s >= p.pull_duration_s) {
+				ai->paceline_state   = PacelineState::Peeling;
+				ai->paceline_timer_s = 0.f;
+				// Peel AWAY from road centre (right if exactly centred). Matches
+				// the BikeAIPaceline.PeelDir tests.
+				ai->peel_side_sign = (me->lateral_pos < 0.f) ? -1.f : +1.f;
+			}
+			break;
+
+		case PacelineState::Peeling:
+			if (ai->paceline_timer_s >= p.peel_duration_s) {
+				ai->paceline_state   = PacelineState::DriftingBack;
+				ai->paceline_timer_s = 0.f;
+			}
+			break;
+
+		case PacelineState::DriftingBack:
+			// Done drifting once we've found a stable wheel, or after a hard cap.
+			if (ai->wheel || ai->paceline_timer_s >= p.drift_duration_s) {
+				ai->paceline_state   = PacelineState::Following;
+				ai->paceline_timer_s = 0.f;
+				ai->pull_cooldown_s  = p.pull_cooldown_s;
+			}
+			break;
+		}
+	}
+}
+
+// ============================================================
+// Clear-air resolver — pick lat_offset from open slots around the wheel.
+// Default ideal slot = 0 (best draft) + personality bias. If neighbors block
+// it within [clear_air_long_window × clear_air_lat_window], shift to the
+// candidate offset with the most open air. Smoothed over clear_air_damp_tau.
+// Peeling state forces lat_offset toward ±peel_offset_m, bypassing the search.
+// See [[bike/bikeai#Lateral offset rule]].
+// ============================================================
+void BikeGameApplication::update_clear_air()
+{
+	const BikeAIParams& p = g_ai_params;
+	const float dt = eng->get_dt();
+	const int   n  = (int)riders_sorted.size();
+	// Damping coefficient — frame-rate independent low-pass.
+	const float lerp = (p.clear_air_damp_tau > 1e-3f)
+	                   ? (1.f - glm::exp(-dt / p.clear_air_damp_tau))
+	                   : 1.f;
+
+	for (int i = 0; i < n; ++i) {
+		BikeObject* me = riders_sorted[i];
+		BikeAI*     ai = dynamic_cast<BikeAI*>(me->input.get());
+		if (!ai) continue;
+
+		// Peeling: forced offset, no search.
+		if (ai->paceline_state == PacelineState::Peeling) {
+			const float target = ai->peel_side_sign * p.peel_offset_m;
+			ai->dbg_lat_offset_target = target;
+			ai->lat_offset += (target - ai->lat_offset) * lerp;
+			continue;
+		}
+
+		// Leader: lat_offset is unused (racing line is the target). Decay toward 0
+		// so re-acquiring a wheel starts from the bias-neutral position.
+		if (!ai->wheel) {
+			ai->dbg_lat_offset_target = ai->lat_offset_bias;
+			ai->lat_offset += (ai->lat_offset_bias - ai->lat_offset) * lerp;
+			continue;
+		}
+
+		// Follower: search candidate offsets in the wheel's road frame.
+		const BikeWaypoint wheel_wp    = course.sample(ai->wheel->course_dist_m);
+		const glm::vec3    wheel_pos   = ai->wheel->get_ws_position();
+		const glm::vec3    wheel_fwd   = ai->wheel->bike_direction;
+		const glm::vec3    wheel_right = wheel_wp.right;
+		const float        road_hw     = course.get_road_half_width(ai->wheel->course_segment);
+		const float        safe_lat    = road_hw - p.edge_safety_m;
+		const float        bias        = ai->lat_offset_bias;
+
+		const int   half_steps  = (int)glm::ceil(p.clear_air_max_offset / glm::max(p.clear_air_step, 0.05f));
+		const float lat_inv     = 1.f / glm::max(p.clear_air_lat_window,  1e-3f);
+		const float long_inv    = 1.f / glm::max(p.clear_air_long_window, 1e-3f);
+
+		float best_score  = FLT_MAX;
+		float best_offset = bias;
+
+		for (int s = -half_steps; s <= half_steps; ++s) {
+			const float cand = bias + (float)s * p.clear_air_step;
+			const float cand_world_lat = ai->wheel->lateral_pos + cand;
+			if (glm::abs(cand_world_lat) > safe_lat) continue;
+
+			const glm::vec3 cand_pos = wheel_pos
+			                         - wheel_fwd   * ai->long_gap
+			                         + wheel_right * cand;
+
+			float occ = 0.f;
+			for (int j = 0; j < n; ++j) {
+				if (j == i) continue;
+				BikeObject* other = riders_sorted[j];
+				if (other == ai->wheel) continue;
+				if (other->group_id != me->group_id) continue;
+
+				const glm::vec3 d    = other->get_ws_position() - cand_pos;
+				const float dl   = glm::dot(d, wheel_fwd);
+				const float dlat = glm::dot(d, wheel_right);
+				if (glm::abs(dl)   > p.clear_air_long_window) continue;
+				if (glm::abs(dlat) > p.clear_air_lat_window)  continue;
+				const float lat_close  = 1.f - glm::abs(dlat) * lat_inv;
+				const float long_close = 1.f - glm::abs(dl)   * long_inv;
+				occ += lat_close * long_close;
+			}
+			const float score = occ + p.clear_air_center_bias * glm::abs(cand - bias);
+			if (score < best_score) { best_score = score; best_offset = cand; }
+		}
+
+		ai->dbg_lat_offset_target = best_offset;
+		ai->lat_offset += (best_offset - ai->lat_offset) * lerp;
+
+		// Final road clamp on the smoothed value (the resolver already filtered
+		// out off-road candidates, but a small overshoot can still slip through
+		// because it tracks the wheel's prior frame).
+		const float lat_world = ai->wheel->lateral_pos + ai->lat_offset;
+		if (glm::abs(lat_world) > safe_lat)
+			ai->lat_offset = glm::sign(lat_world) * safe_lat - ai->wheel->lateral_pos;
+	}
+}
+
+// ============================================================
+// Predictive lateral avoidance + priority-yield clamp + side-by-side power yield.
+// Reflex layer: catches surges, brake events, line changes the clear-air resolver
+// (which acts on a longer 1.5s timescale) cannot react to in time.
+// See [[bike/bikeai#Rider-rider avoidance]].
+// ============================================================
+void BikeGameApplication::update_avoidance()
 {
 	const int   n  = (int)riders_sorted.size();
 	const float dt = eng->get_dt();
-
-	// ---- Leader assignment: first num_leaders_per_group AI riders per group are leaders ----
-	{
-		int max_gid = 0;
-		for (BikeObject* r : riders_sorted) max_gid = std::max(max_gid, r->group_id);
-		std::vector<int> leader_cnt(max_gid + 1, 0);
-		for (BikeObject* r : riders_sorted) {
-			BikeAI* ai = dynamic_cast<BikeAI*>(r->input.get());
-			if (!ai) continue;
-			ai->is_leader = (leader_cnt[r->group_id] < num_leaders_per_group);
-			++leader_cnt[r->group_id];
-		}
-	}
-
-	// ---- Boid desired direction for non-leader AI followers ----
-	// Each non-leader AI gets a desired world-space heading from alignment + cohesion + separation.
-	// BikeAI::evaluate reads boid_forces_active / boid_desired_dir and applies them via the
-	// direct turn-rate override path in tick_steer (no handlebar inertia).
-	for (int i = 0; i < n; ++i) {
-		BikeObject* me = riders_sorted[i];
-		BikeAI* ai = dynamic_cast<BikeAI*>(me->input.get());
-		me->boid_forces_active = false;
-		if (!ai || ai->is_leader) continue;
-
-		const BikeWaypoint cur_wp    = course.sample(me->course_dist_m);
-		const glm::vec3 course_right = cur_wp.right;  // actual world right (+X for +Z road)
-
-		glm::vec3 align_sum = glm::vec3(0.f);
-		float     coh_lat   = 0.f;
-		float     sep_lat   = 0.f;
-		int       nbr_count = 0;
-
-		for (int j = 0; j < n; ++j) {
-			if (j == i) continue;
-			const BikeObject* other = riders_sorted[j];
-			if (other->group_id != me->group_id) continue;
-			const float long_gap = glm::abs(other->course_dist_m - me->course_dist_m);
-			if (long_gap > g_ai_params.boid_influence_m) continue;
-
-			const float lat_gap = other->lateral_pos - me->lateral_pos;  // + = other road-right of me
-			align_sum += other->bike_direction;
-			coh_lat   += other->lateral_pos;
-			++nbr_count;
-
-			// Separation: push away from riders within the separation radius
-			const float abs_lat = glm::abs(lat_gap);
-			if (abs_lat < g_ai_params.boid_separation_radius_m && abs_lat > 0.01f) {
-				const float str = (1.f - abs_lat / g_ai_params.boid_separation_radius_m)
-				                  * g_ai_params.boid_separation_k;
-				sep_lat -= glm::sign(lat_gap) * str;  // push away: if other road-right, push road-left
-			}
-		}
-
-		if (nbr_count == 0) continue;  // isolated — boid_forces_active stays false, AI uses racing line
-
-		// Alignment: blend toward average neighbor heading, weighted against course forward
-		const glm::vec3 avg_align = (glm::length(align_sum) > 0.01f)
-		                            ? glm::normalize(align_sum) : cur_wp.forward;
-		const glm::vec3 base_dir  = glm::normalize(
-		    avg_align     * g_ai_params.boid_alignment_k +
-		    cur_wp.forward * (1.f - g_ai_params.boid_alignment_k));
-
-		// Cohesion: lateral pull toward group average position
-		const float avg_lat   = coh_lat / (float)nbr_count;
-		const float coh_force = (avg_lat - me->lateral_pos) * g_ai_params.boid_cohesion_k;
-
-		// Combined lateral correction (clamped so the direction vector stays sensible)
-		const float total_lat = glm::clamp(coh_force + sep_lat, -1.5f, 1.5f);
-
-		// Build desired direction: base heading + lateral nudge projected onto course_right
-		const glm::vec3 desired_raw = base_dir + course_right * total_lat;
-		me->boid_forces_active = true;
-		me->boid_desired_dir   = (glm::length(desired_raw) > 0.01f)
-		                         ? glm::normalize(desired_raw) : cur_wp.forward;
-	}
 
 	for (int i = 0; i < n; ++i) {
 		BikeObject* me = riders_sorted[i];
@@ -752,12 +901,15 @@ void BikeGameApplication::update_boids()
 		// Weighted by (1 - long_gap/AVOID_LONG_MAX) so single-file trains get zero push.
 		// BikeAI reads avoidance_sep_steer and adds it after edge avoidance.
 		{
+			BikeAI* me_ai = dynamic_cast<BikeAI*>(me->input.get());
 			float avoid_accum = 0.f;
 			const float full_sep = (AVOID_BIKE_HALF_W + AVOID_CLEARANCE) * 2.f;
 
 			for (int j = 0; j < n; ++j) {
 				if (j == i) continue;
 				const BikeObject* other = riders_sorted[j];
+				// Skip my wheel: drafting it intentionally; clear-air resolver handles offset.
+				if (me_ai && other == me_ai->wheel) continue;
 				const float long_gap = glm::abs(other->course_dist_m - me->course_dist_m);
 				if (long_gap >= AVOID_LONG_MAX) continue;
 				const float long_weight = 1.f - long_gap / AVOID_LONG_MAX;
@@ -813,6 +965,9 @@ void BikeGameApplication::update_boids()
 
 			for (int j = 0; j < i; ++j) {  // only higher-priority riders
 				const BikeObject* other = riders_sorted[j];
+				// Skip my wheel: I'm intentionally drafting it. The clamp would otherwise
+				// prevent me from converging onto the wheel's lateral track.
+				if (other == ai_rider->wheel) continue;
 				const float long_gap = glm::abs(other->course_dist_m - me->course_dist_m);
 				if (long_gap >= YIELD_LONG_RADIUS) continue;
 				const float lat_diff = other->lateral_pos - me->lateral_pos;  // +ve: other road-right
@@ -864,28 +1019,37 @@ void BikeGameApplication::update_boids()
 // See [[bike/bikeai#Power]].
 // ============================================================
 
-static float GAP_POWER_K         = 20.f;   // W correction per metre of gap error
-static float GAP_POWER_MAX_DELTA = 150.f;  // max ±W applied on top of wheel rider's power
+static float GAP_POWER_K         = 50.f;   // W correction per metre of gap error
+static float GAP_POWER_MAX_DELTA = 250.f;  // max ±W applied on top of wheel rider's power
 static float GAP_FREE_POWER_W    = 250.f;  // power when leader (no wheel)
 
 void BikeGameApplication::update_gap_regulation()
 {
+	const BikeAIParams& p = g_ai_params;
 	for (BikeObject* me : all_riders) {
 		BikeAI* ai = dynamic_cast<BikeAI*>(me->input.get());
 		if (!ai) continue;
 
-		if (!ai->wheel) {
-			ai->target_power_watts = GAP_FREE_POWER_W;
-			continue;
+		// Base target: match wheel power + P on gap, or free power if leader.
+		float base = GAP_FREE_POWER_W;
+		if (ai->wheel) {
+			const glm::vec3 to_wheel = ai->wheel->get_ws_position() - me->get_ws_position();
+			const float gap_m      = glm::dot(to_wheel, me->bike_direction);
+			const float gap_err    = gap_m - ai->long_gap;  // +ve = too far back
+			const float correction = glm::clamp(gap_err * GAP_POWER_K,
+			                                    -GAP_POWER_MAX_DELTA, GAP_POWER_MAX_DELTA);
+			base = ai->wheel->stamina.actual_power + correction;
 		}
 
-		const glm::vec3 to_wheel = ai->wheel->get_ws_position() - me->get_ws_position();
-		const float gap_m  = glm::dot(to_wheel, me->bike_direction);
-		const float gap_err    = gap_m - ai->long_gap;  // +ve = too far back
-		const float correction = glm::clamp(gap_err * GAP_POWER_K,
-		                                    -GAP_POWER_MAX_DELTA, GAP_POWER_MAX_DELTA);
-		ai->target_power_watts = glm::clamp(ai->wheel->stamina.actual_power + correction,
-		                                    50.f, 1000.f);
+		// Tactical FSM modifies the base.
+		switch (ai->paceline_state) {
+		case PacelineState::Pulling:      base *= p.pull_power_frac;          break;
+		case PacelineState::Peeling:      base += p.peel_power_delta_w;       break;
+		case PacelineState::DriftingBack: base *= p.drift_power_frac;         break;
+		case PacelineState::Following:    /* unchanged */                     break;
+		}
+
+		ai->target_power_watts = glm::clamp(base, 50.f, 1000.f);
 	}
 }
 
@@ -907,6 +1071,11 @@ BikeObject* BikeGameApplication::create_player(glm::vec3 pos)
 
 BikeObject* BikeGameApplication::create_ai(glm::vec3 pos)
 {
+	// Deterministic seed so same spawn order produces same biases each run.
+	// ±0.1m keeps even biased riders within ~half a draft cone of the wheel's exact track.
+	static std::mt19937 s_bias_rng(0xC0FFEEu);
+	static std::uniform_real_distribution<float> s_bias_dist(-0.1f, 0.1f);
+
 	Entity* e = GameplayStatic::spawn_entity();
 	e->set_ws_position(pos);
 	auto bo = e->create_component<BikeObject>();
@@ -914,6 +1083,7 @@ BikeObject* BikeGameApplication::create_ai(glm::vec3 pos)
 	{
 		auto ai    = std::make_unique<BikeAI>();
 		ai->course = &course;
+		ai->lat_offset_bias = s_bias_dist(s_bias_rng);
 
 		bo->input = std::move(ai);
 	}
@@ -1238,19 +1408,57 @@ static void bike_course_debug()
 	ImGui::SliderInt("num_ai", &g_bike_app->num_ai, 0, 20);
 	if (ImGui::Button("Respawn AI"))
 		g_bike_app->respawn_ai();
-	ImGui::SliderInt("Leaders per group", &g_bike_app->num_leaders_per_group, 0, 5);
-	ImGui::SameLine(); ImGui::TextDisabled("(leaders use racing line; rest use boid flocking)");
 
-	ImGui::SeparatorText("Boid Flocking Params");
+	ImGui::SeparatorText("Wheel picker");
 	{
 		BikeAIParams& p = g_ai_params;
-		ImGui::DragFloat("boid_influence_m",         &p.boid_influence_m,         0.5f,  1.f,  50.f, "%.1f");
-		ImGui::DragFloat("boid_separation_radius_m", &p.boid_separation_radius_m, 0.05f, 0.1f, 10.f, "%.2f");
-		ImGui::DragFloat("boid_separation_k",        &p.boid_separation_k,        0.02f, 0.f,   3.f, "%.2f");
-		ImGui::DragFloat("boid_cohesion_k",          &p.boid_cohesion_k,          0.02f, 0.f,   2.f, "%.2f");
-		ImGui::DragFloat("boid_alignment_k",         &p.boid_alignment_k,         0.02f, 0.f,   1.f, "%.2f");
-		ImGui::DragFloat("boid_turn_k",              &p.boid_turn_k,              0.05f, 0.1f, 10.f, "%.2f");
-		ImGui::DragFloat("boid_max_turn_rate",       &p.boid_max_turn_rate,       0.02f, 0.1f,  3.f, "%.2f");
+		ImGui::DragFloat("wheel_long_min",     &p.wheel_long_min,     0.05f, 0.f,   5.f, "%.2f");
+		ImGui::DragFloat("wheel_long_max",     &p.wheel_long_max,     0.1f,  1.f,  20.f, "%.1f");
+		ImGui::DragFloat("wheel_lat_max",      &p.wheel_lat_max,      0.05f, 0.5f,  6.f, "%.2f");
+		ImGui::DragFloat("wheel_long_gap",     &p.wheel_long_gap,     0.05f, 0.5f, 10.f, "%.2f");
+		ImGui::DragFloat("wheel_w_long",       &p.wheel_w_long,       0.05f, 0.f,   5.f, "%.2f");
+		ImGui::DragFloat("wheel_w_lat",        &p.wheel_w_lat,        0.05f, 0.f,   5.f, "%.2f");
+		ImGui::DragFloat("wheel_w_draft",      &p.wheel_w_draft,      0.05f, 0.f,   5.f, "%.2f");
+		ImGui::DragFloat("wheel_stickiness",   &p.wheel_stickiness,   0.05f, 0.f,   3.f, "%.2f");
+		ImGui::DragFloat("wheel_score_thresh", &p.wheel_score_thresh, 0.05f,-2.f,   2.f, "%.2f");
+	}
+
+	ImGui::SeparatorText("Clear-air resolver");
+	{
+		BikeAIParams& p = g_ai_params;
+		ImGui::DragFloat("clear_air_lat_window",  &p.clear_air_lat_window,  0.05f, 0.1f, 3.f, "%.2f");
+		ImGui::DragFloat("clear_air_long_window", &p.clear_air_long_window, 0.05f, 0.1f, 3.f, "%.2f");
+		ImGui::DragFloat("clear_air_center_bias", &p.clear_air_center_bias, 0.01f, 0.f,  1.f, "%.2f");
+		ImGui::DragFloat("clear_air_damp_tau",    &p.clear_air_damp_tau,    0.05f, 0.1f, 5.f, "%.2f");
+		ImGui::DragFloat("clear_air_max_offset",  &p.clear_air_max_offset,  0.05f, 0.1f, 3.f, "%.2f");
+		ImGui::DragFloat("clear_air_step",        &p.clear_air_step,        0.05f, 0.1f, 1.f, "%.2f");
+		ImGui::DragFloat("corner_factor_r_full",  &p.corner_factor_r_full,  1.f,   5.f, 200.f, "%.0f");
+		ImGui::DragFloat("corner_factor_min",     &p.corner_factor_min,     0.01f, 0.f,  1.f, "%.2f");
+		ImGui::DragFloat("follower_lat_k",        &p.follower_lat_k,        0.05f, 0.f,  3.f, "%.2f");
+		ImGui::SameLine(); ImGui::TextDisabled("near-field lat error → steer (followers)");
+		ImGui::DragFloat("follower_lat_d_k",      &p.follower_lat_d_k,      0.02f, 0.f,  2.f, "%.2f");
+		ImGui::SameLine(); ImGui::TextDisabled("damp lateral velocity");
+	}
+
+	ImGui::SeparatorText("Gap Regulation");
+	{
+		ImGui::DragFloat("GAP_POWER_K",         &GAP_POWER_K,         1.f,   0.f, 200.f, "%.0f");
+		ImGui::SameLine(); ImGui::TextDisabled("W correction per metre of gap error");
+		ImGui::DragFloat("GAP_POWER_MAX_DELTA", &GAP_POWER_MAX_DELTA, 5.f,  10.f, 600.f, "%.0f");
+		ImGui::DragFloat("GAP_FREE_POWER_W",    &GAP_FREE_POWER_W,    5.f,  50.f, 800.f, "%.0f");
+	}
+
+	ImGui::SeparatorText("Paceline FSM");
+	{
+		BikeAIParams& p = g_ai_params;
+		ImGui::DragFloat("pull_cooldown_s",    &p.pull_cooldown_s,    0.5f,  0.f, 60.f, "%.1f");
+		ImGui::DragFloat("pull_duration_s",    &p.pull_duration_s,    1.f,   1.f,120.f, "%.0f");
+		ImGui::DragFloat("peel_duration_s",    &p.peel_duration_s,    0.1f,  0.5f, 8.f, "%.1f");
+		ImGui::DragFloat("drift_duration_s",   &p.drift_duration_s,   0.5f,  1.f, 30.f, "%.1f");
+		ImGui::DragFloat("peel_offset_m",      &p.peel_offset_m,      0.05f, 0.1f, 3.f, "%.2f");
+		ImGui::DragFloat("peel_power_delta_w", &p.peel_power_delta_w, 5.f, -200.f, 0.f, "%.0f");
+		ImGui::DragFloat("drift_power_frac",   &p.drift_power_frac,   0.02f, 0.3f, 1.f, "%.2f");
+		ImGui::DragFloat("pull_power_frac",    &p.pull_power_frac,    0.02f, 0.5f, 1.5f,"%.2f");
 	}
 
 	ImGui::SeparatorText("Riders");
@@ -1259,7 +1467,7 @@ static void bike_course_debug()
 		const BikeObject* r = sorted[i];
 		const BikeAI*     ai = dynamic_cast<const BikeAI*>(r->input.get());
 		const char* mode = ai
-		    ? (ai->is_leader ? "LEADER" : (r->boid_forces_active ? "boid" : "solo"))
+		    ? (ai->wheel ? paceline_state_name(ai->paceline_state) : "LEAD")
 		    : "player";
 		ImGui::Text("P%d  dist=%.0f m  lat=%+.2f m  draft=%.2f  [%s]",
 			r->race_position, r->course_dist_m, r->lateral_pos, r->draft_factor, mode);
@@ -1404,12 +1612,12 @@ static void apply_debug_follow_camera()
 		GameplayStatic::debug_text(string_format("[Player] steer_final:   %.2f", bp->dbg_steer_final));
 	} else if (ai) {
 		// --- Mode and path-following breakdown ---
-		const char* ai_mode = ai->is_leader ? "LEADER" : (ai->dbg_is_boid_mode ? "BOID" : "solo");
-		GameplayStatic::debug_text(string_format("[AI:%s] spd=%.1fm/s  look=%.1fm  near_r=%.1fm",
-			ai_mode, bo->speed, ai->dbg_lookahead_dist, ai->dbg_min_r));
-		if (ai->dbg_is_boid_mode)
-			GameplayStatic::debug_text(string_format("[AI:BOID] steer=%.2f  turn_rate=%.3f rad/s",
-				ai->dbg_steer_near, ai->dbg_boid_turn_rate));
+		const char* ai_mode = ai->wheel ? paceline_state_name(ai->paceline_state) : "LEAD";
+		GameplayStatic::debug_text(string_format("[AI:%s] spd=%.1fm/s  look=%.1fm  near_r=%.1fm  cf=%.2f",
+			ai_mode, bo->speed, ai->dbg_lookahead_dist, ai->dbg_min_r, ai->dbg_corner_factor));
+		GameplayStatic::debug_text(string_format("[AI] lat_off=%+.2f→%+.2f  bias=%+.2f  pace=%s t=%.1fs",
+			ai->lat_offset, ai->dbg_lat_offset_target, ai->lat_offset_bias,
+			paceline_state_name(ai->paceline_state), ai->paceline_timer_s));
 		// Upcoming corner: distance, radius, safe speed, brake demand
 		if (ai->dbg_brake_dist_m > 0.f)
 			GameplayStatic::debug_text(string_format("[AI] corner in %.0fm  r=%.1fm  v_max=%.1fm/s  brake=%.2f",

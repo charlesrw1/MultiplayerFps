@@ -253,29 +253,49 @@ struct BikeAIParams {
 	float edge_off_brake_k   = 0.5f;  // brake fraction per metre past road edge
 	float edge_off_brake_max = 0.6f;  // maximum brake fraction during off-track recovery
 
-	// Boid flocking — used by non-leader AI followers
-	float boid_influence_m         = 20.f;  // longitudinal radius to count as a neighbor (m)
-	float boid_separation_radius_m =  2.0f; // lateral gap below which separation kicks in (m)
-	float boid_separation_k        =  0.5f; // lateral separation force scale
-	float boid_cohesion_k          =  0.3f; // pull toward group average lateral position
-	float boid_alignment_k         =  0.4f; // weight of average neighbor heading [0,1]
-	float boid_turn_k              =  2.0f; // steer strength per radian of heading error
-	float boid_max_turn_rate       =  0.7f; // rad/s — maximum direct boid turn rate
-
 	// Wheel picker — see [[bike/bikeai#Wheel picking]]
+	// long_max is wider than the canonical 8m to allow chains to re-form after a
+	// gap opens (gap-regulation P-control then closes the gap via power). lat_max
+	// must be ≥ 2*clear_air_max_offset so two riders in opposite lanes can still
+	// see each other as candidates.
 	float wheel_long_min     = 0.3f;  // min longitudinal gap for a candidate (m)
-	float wheel_long_max     = 8.0f;  // max longitudinal gap (m)
-	float wheel_lat_max      = 2.0f;  // lateral overlap window (m)
+	float wheel_long_max     = 15.0f; // max longitudinal gap (m)
+	float wheel_lat_max      = 3.0f;  // lateral overlap window (m)
 	float wheel_long_gap     = 1.5f;  // ideal wheel-to-wheel target gap (m)
 	float wheel_w_long       = 1.0f;  // score weight: closeness to ideal long_gap
 	float wheel_w_lat        = 1.5f;  // score weight: lateral alignment to my offset
 	float wheel_w_draft      = 0.8f;  // score weight: draft potential (1 - draft_factor)
-	float wheel_stickiness   = 0.5f;  // score bonus for keeping current wheel
+	float wheel_stickiness   = 1.0f;  // score bonus for keeping current wheel
 	float wheel_score_thresh = 0.0f;  // if best score below this, no wheel (leader)
 
 	// Corner factor — pulls lat_offset → 0 in tight corners
 	float corner_factor_r_full = 30.f;  // radius (m) at which corner_factor = 1
 	float corner_factor_min    = 0.3f;  // floor on corner_factor (very tight corners)
+
+	// Follower near-field lateral correction (PD-based steering converges slowly
+	// because lookahead is far; this term injects road-frame lat_err directly
+	// into steer for tight wheel-hugging). Only fires for followers.
+	float follower_lat_k       = 0.5f;  // steer per metre of lateral error from wheel's track
+	float follower_lat_d_k     = 0.2f;  // steer per (m/s) of lateral velocity (damping)
+
+	// Clear-air resolver — see [[bike/bikeai#Lateral offset rule]]
+	float clear_air_lat_window  = 1.0f;   // m — lateral half-window of overlap penalty
+	float clear_air_long_window = 1.0f;   // m — longitudinal half-window of overlap penalty
+	float clear_air_center_bias = 0.05f;  // score penalty per m of |offset - bias| (prefers draft)
+	float clear_air_damp_tau    = 1.5f;   // s  — low-pass time constant on lat_offset
+	float clear_air_max_offset  = 0.7f;   // m  — search range each side of bias
+	                                      //       (must be ≤ wheel_lat_max/2 or chains break)
+	float clear_air_step        = 0.35f;  // m  — candidate spacing
+
+	// Paceline FSM — see [[bike/bikeai#Tactical FSM]]
+	float pull_cooldown_s    = 8.f;    // min seconds between pulls (per rider)
+	float pull_duration_s    = 30.f;   // max time spent at front before peeling
+	float peel_duration_s    = 2.5f;   // time spent steering to the side
+	float drift_duration_s   = 6.f;    // max drift-back duration (cap)
+	float peel_offset_m      = 1.0f;   // |lat_offset| while peeling
+	float peel_power_delta_w = -50.f;  // ΔW vs Following while peeling
+	float drift_power_frac   = 0.70f;  // multiplier on Following power while drifting back
+	float pull_power_frac    = 1.00f;  // multiplier on Following power while pulling
 };
 extern BikeAIParams g_ai_params;
 
@@ -296,15 +316,19 @@ public:
 	static constexpr float POWER_SLEW = 0.05f;
 
 
-	// ---- Leader / boid state (set by update_boids each frame) ----
-	bool  is_leader = false;  // true: front N riders per group — use racing-line steering
-
 	// ---- Wheel-following state (set by BikeGameApplication::update_wheel_picking each frame) ----
 	// wheel == null  →  I'm a leader; target = racing-line lookahead.
 	// wheel != null  →  follow this rider's road frame at offset (long_gap, lat_offset).
-	BikeObject* wheel      = nullptr;
-	float       lat_offset = 0.f;  // m — road-relative offset from the wheel's track (+ve = road-right)
-	float       long_gap   = 1.5f; // m — target longitudinal spacing behind wheel
+	BikeObject* wheel           = nullptr;
+	float       lat_offset      = 0.f;  // m — smoothed road-relative offset from the wheel's track
+	float       lat_offset_bias = 0.f;  // m — per-rider personality preference (~±0.2)
+	float       long_gap        = 1.5f; // m — target longitudinal spacing behind wheel
+
+	// ---- Paceline FSM (set by BikeGameApplication::update_paceline each frame) ----
+	PacelineState paceline_state    = PacelineState::Following;
+	float         paceline_timer_s  = 0.f;     // seconds spent in current state
+	float         pull_cooldown_s   = 0.f;     // seconds remaining before another pull is allowed
+	float         peel_side_sign    = 1.f;     // +1 = peel road-right, -1 = road-left
 
 	// ---- Double echelon lane assignment ----
 	float preferred_lateral = 0.f;
@@ -335,11 +359,10 @@ public:
 	bool  dbg_off_track          = false;
 	float dbg_avoid_steer        = 0.f;
 	float dbg_avoid_brake        = 0.f;
-	bool  dbg_is_boid_mode       = false;
-	float dbg_boid_turn_rate     = 0.f;
 	bool  dbg_has_wheel          = false;
 	float dbg_wheel_score        = 0.f;
 	float dbg_corner_factor      = 1.f;
+	float dbg_lat_offset_target  = 0.f;
 };
 
 class BikePlayer : public IBikeInput {
@@ -494,14 +517,6 @@ public:
 	float avoidance_sep_steer = 0.f;  // predictive soft lateral push away from nearby riders
 	float avoidance_brake     = 0.f;  // [0,1] brake pressure when squeezed with no lateral escape
 
-	// Boid desired heading (written by update_boids for non-leader AI, cleared for leaders)
-	bool      boid_forces_active = false;
-	glm::vec3 boid_desired_dir   = glm::vec3(0, 0, 1);
-
-	// Direct-steer override (written by BikeAI::evaluate, read by tick_steer)
-	bool  boid_steer_override     = false;
-	float boid_turn_rate_override = 0.f;  // rad/s, same sign convention as turn_rate
-
 	EntityPtr fork_entity;
 
 	glm::vec3 prev_front_wheel_pos{};
@@ -530,7 +545,6 @@ public:
 
 
 	int  num_ai                 = 5;
-	int  num_leaders_per_group  = 2;   // first N AI riders per group use racing-line; rest use boid logic
 
 	// Crack decal instances collected at map load
 	struct CrackDecalInstance {
@@ -550,7 +564,9 @@ private:
 	void update_groups();
 	void update_drafting();
 	void update_wheel_picking();
-	void update_boids();
+	void update_clear_air();
+	void update_paceline();
+	void update_avoidance();
 	void update_gap_regulation();
 	void update_crack_triggers();
 	void debug_draw_course() const;

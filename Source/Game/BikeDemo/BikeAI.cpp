@@ -62,8 +62,6 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	// Wheel-following: wheel != null  →  follower; null  →  leader (racing-line).
 	const bool follower = (wheel != nullptr);
 	dbg_has_wheel    = follower;
-	dbg_is_boid_mode = follower;  // legacy HUD slot
-	my_bike->boid_steer_override = false;  // override path retired
 
 	// Lookahead distances (shared by leader + follower; followers need full anticipation
 	// or they ride the chord into corners and overshoot).
@@ -100,7 +98,23 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float steer_far  = angle_to_pt(far_pt)  * p.steer_k - heading_err * 0.5f;
 	dbg_steer_near = steer_near;
 	dbg_steer_far  = steer_far;
-	const float steer_out_raw = steer_near + p.anticipation_k * (steer_far - steer_near);
+	float steer_out_raw = steer_near + p.anticipation_k * (steer_far - steer_near);
+
+	// Followers: add direct road-frame lateral PD onto the wheel's track. The PD
+	// lookahead converges slowly when lateral error is small (atan(err/look_dist)
+	// goes to zero), so it never cleanly hugs the wheel. This term gives explicit
+	// pull-toward-the-wheel proportional to the actual lat error.
+	// Sign: lat_err > 0 means I'm road-right of the wheel's track → need road-LEFT
+	// (positive) steer → steer += +lat_err * k.
+	if (follower) {
+		const float target_lat_world = wheel->lateral_pos + lat_offset * corner_factor;
+		const float lat_err = my_bike->lateral_pos - target_lat_world;
+		// D term: damp my own lateral velocity (the wheel's lat_vel cancels out
+		// when both are tracking the same line).
+		steer_out_raw += lat_err * p.follower_lat_k
+		              - my_bike->lateral_vel * p.follower_lat_d_k;
+	}
+
 	float steer_out = glm::clamp(steer_out_raw, -1.f, 1.f);
 
 	// ---- Track boundary avoidance (PD) + off-track recovery ----
@@ -215,8 +229,6 @@ void BikeAI::evaluate(BikeObject* my_bike)
 
 	// All riders go through the normal handlebar-inertia steer path.
 	// Off-track recovery bypasses the priority-yield clamp so the bike can escape the edge.
-	my_bike->boid_steer_override = false;
-	dbg_boid_turn_rate           = 0.f;
 	ci.steer = dbg_off_track
 	    ? steer_after_boids
 	    : glm::clamp(steer_after_boids, hard_steer_min, hard_steer_max);

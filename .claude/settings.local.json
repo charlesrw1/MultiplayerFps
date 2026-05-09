@@ -241,7 +241,9 @@
       "PowerShell(& Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 60)",
       "PowerShell(& Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 15)",
       "PowerShell(& Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 6)",
-      "PowerShell(& Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 4)"
+      "PowerShell(& Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 4)",
+      "Bash(sort -k2)",
+      "Bash(sort -k2nr)"
     ]
   },
   "enabledPlugins": {

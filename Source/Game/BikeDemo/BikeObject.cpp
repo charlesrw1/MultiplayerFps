@@ -300,36 +300,6 @@ void BikeObject::tick_physics(ControlInput& ci, float dt)
 // ------------------------------------------------------------
 void BikeObject::tick_steer(const ControlInput& ci, float dt)
 {
-	// Boid direct-steer override: bypass all handlebar inertia, wobble, and wind noise.
-	// The boid AI writes boid_turn_rate_override (rad/s, positive = LEFT) and this
-	// path applies it directly, decaying noise states so re-entry to normal mode is clean.
-	if (boid_steer_override) {
-		turn_rate = boid_turn_rate_override;
-		if (glm::abs(turn_rate) > 0.001f) {
-			const float angle = -turn_rate * dt;
-			bike_direction = glm::normalize(
-			    glm::mat3(glm::rotate(glm::mat4(1.f), angle, glm::vec3(0, 1, 0))) * bike_direction);
-		}
-		current_steer   = damp_dt_independent(0.f, current_steer,   0.05f, dt);
-		steer_committed = current_steer;
-		wobble_steer    = damp_dt_independent(0.f, wobble_steer, 0.1f, dt);
-		wobble_vel      = damp_dt_independent(0.f, wobble_vel,   0.1f, dt);
-		wind_steer      = damp_dt_independent(0.f, wind_steer,   0.1f, dt);
-		wind_vel        = damp_dt_independent(0.f, wind_vel,     0.1f, dt);
-		bump_steer_disp = damp_dt_independent(0.f, bump_steer_disp, 0.1f, dt);
-		bump_steer_vel  = damp_dt_independent(0.f, bump_steer_vel,  0.1f, dt);
-		// Visual lean from centripetal acceleration at this turn rate
-		float target_roll_boid = 0.f;
-		if (glm::abs(turn_rate) > 0.001f && speed > 0.1f) {
-			const float r_boid = speed / glm::abs(turn_rate);
-			target_roll_boid = glm::sign(turn_rate) *
-			    glm::min(atanf((speed * speed / glm::max(r_boid, 0.5f)) / BIKE_GRAVITY),
-			             glm::radians(lean_max_deg));
-		}
-		current_roll = damp_dt_independent(target_roll_boid, current_roll, 0.01f, dt);
-		return;
-	}
-
 	const float speed_range  = glm::max(steer_speed_gate_hi - steer_speed_gate_lo, 0.001f);
 	const float speed_factor = glm::clamp((speed - steer_speed_gate_lo) / speed_range, 0.f, 1.f);
 
