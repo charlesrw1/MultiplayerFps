@@ -2,6 +2,8 @@ This is a game engine project. Uses C++ VS2019, OpenGL, SDL2, vcpkg. No CMAKE.
 
 Write tests. Testing documentation found at [[testing]].
 
+Use Scripts/build_and_test.ps1 to build and run unit tests.
+
 Use git to save progress. Write summaries in the message of all commits. Use git worktrees.
 
 When possible, use parallel subagents with git worktrees.
@@ -24,8 +26,8 @@ Limit the source files you read to the module you are working on. Be brief, spar
 
 All project documentation lives under `docs/`. Documentation is _meant_ for AI agents to use, not humans. Writing should help AI use the code. Documentation should be concise. Do not over explain everything with excessive writing, only key points and edge cases. Prefer docs/ over inline comments. The `docs.exe` CLI validates wiki-style `[[file#section]]` links and `@docs` source-code refs and is used for searching the documentation. See [[tooling/docs-cli]] for the full reference. Quick index at [[README]]. 
 
-- **Before editing a source file** — run `docs.exe context <relative/path/to/file>` to see which docs the file is pinned to and which docs mention it.
-- **Looking for a topic** — `docs.exe locate <query>` returns matching headers across the wiki.
+
+- **Looking for a topic** — use rg.exe in docs/ to find relevant content such as matching for a path or topic.
 - **Before every commit** — `docs.exe check` must exit 0. The pre-commit clang-format step + `docs check` are both required.
 - **When adding a new doc** — add a one-line entry to [[README]]. If it documents internals, sprinkle `// @docs [[file#section]]` comments in the relevant source-file headers so `docs context` surfaces it.
 

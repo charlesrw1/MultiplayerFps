@@ -236,7 +236,11 @@
       "Bash(es.exe -p \"docs.exe\")",
       "PowerShell(& \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\docs.exe\" check)",
       "Bash(es.exe docs.exe)",
-      "Bash(/c/Users/charl/AppData/Local/Programs/Python/Python311/Scripts/docs.exe check *)"
+      "Bash(/c/Users/charl/AppData/Local/Programs/Python/Python311/Scripts/docs.exe check *)",
+      "PowerShell(& 'C:\\\\Program Files \\(x86\\)\\\\Microsoft Visual Studio\\\\2019\\\\Community\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe' CsRemake.sln /p:Configuration=Debug /p:Platform=x64 /m /nologo /verbosity:minimal /clp:ErrorsOnly`;WarningsOnly`;Summary 2>&1 | Select-Object -Last 80)",
+      "PowerShell(& Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 60)",
+      "PowerShell(& Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 15)",
+      "PowerShell(& Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 6)"
     ]
   },
   "enabledPlugins": {

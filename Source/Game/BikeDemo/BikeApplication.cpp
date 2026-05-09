@@ -400,6 +400,7 @@ void BikeGameApplication::update()
 		sort_riders();
 		update_groups();
 		update_drafting();
+		update_wheel_picking();
 		update_boids();
 		update_gap_regulation();
 
@@ -580,6 +581,61 @@ static float YIELD_OUTER_LAT    = 1.3f;   // m — engage clamp inside this late
 static float YIELD_INNER_LAT    = 0.05f;  // m — disengage when already overlapping (escape)
 static float YIELD_SQUEEZE_M    = 0.35f;  // m — available road width below this triggers brake
 static float YIELD_BRAKE_K      = 0.55f;  // brake fraction when fully squeezed
+
+// ============================================================
+// Wheel picking — choose the rider directly ahead I'm following.
+// Score candidates in (group, ahead by [long_min, long_max], lateral overlap) and
+// pick the highest. Sets BikeAI::wheel each frame; null = leader.
+// See [[bike/bikeai#Wheel picking]].
+// ============================================================
+void BikeGameApplication::update_wheel_picking()
+{
+	const BikeAIParams& p = g_ai_params;
+	const int n = (int)riders_sorted.size();
+
+	for (int i = 0; i < n; ++i) {
+		BikeObject* me = riders_sorted[i];
+		BikeAI* ai = dynamic_cast<BikeAI*>(me->input.get());
+		if (!ai) continue;
+
+		BikeObject* best       = nullptr;
+		float       best_score = -FLT_MAX;
+		const float long_norm  = glm::max(0.5f, p.wheel_long_max - p.wheel_long_min);
+
+		for (int j = 0; j < n; ++j) {
+			if (j == i) continue;
+			BikeObject* other = riders_sorted[j];
+			if (other->group_id != me->group_id) continue;
+
+			const float signed_long = other->course_dist_m - me->course_dist_m;
+			if (signed_long < p.wheel_long_min || signed_long > p.wheel_long_max) continue;
+
+			const float lat_gap = glm::abs(other->lateral_pos - (me->lateral_pos + ai->lat_offset));
+			if (lat_gap > p.wheel_lat_max) continue;
+
+			// Score components in [0,1]
+			const float long_close = 1.f - glm::clamp(glm::abs(signed_long - p.wheel_long_gap)
+			                                           / long_norm, 0.f, 1.f);
+			const float lat_align  = 1.f - lat_gap / p.wheel_lat_max;
+			const float draft_b    = 1.f - other->draft_factor;  // 0 = open air, ~0.45 = full draft
+
+			float score = p.wheel_w_long  * long_close
+			            + p.wheel_w_lat   * lat_align
+			            + p.wheel_w_draft * draft_b;
+			if (other == ai->wheel) score += p.wheel_stickiness;
+
+			if (score > best_score) { best_score = score; best = other; }
+		}
+
+		if (best && best_score >= p.wheel_score_thresh) {
+			ai->wheel = best;
+		} else {
+			ai->wheel = nullptr;
+		}
+		ai->dbg_has_wheel   = (ai->wheel != nullptr);
+		ai->dbg_wheel_score = (best ? best_score : 0.f);
+	}
+}
 
 void BikeGameApplication::update_boids()
 {
@@ -790,61 +846,33 @@ void BikeGameApplication::update_boids()
 
 
 // ============================================================
-// Gap regulation — cone scan to find wheel ahead, P-control power on gap error.
-// Uses a forward cone cast (no riders_sorted dependency) so it works on loops
-// and is robust to sort-order glitches.
+// Gap regulation — match the explicit wheel rider's power, with P-control on
+// gap error. wheel == null  →  leader, holds tactical free power.
+// See [[bike/bikeai#Power]].
 // ============================================================
 
-static float GAP_TARGET_M        = 1.5f;   // desired wheel-to-wheel gap (m)
-static float GAP_CONE_HALF_DEG   = 40.f;   // cone half-angle (catches laterally offset riders)
-static float GAP_CONE_MAX_M      = 25.f;   // max scan range (m)
 static float GAP_POWER_K         = 20.f;   // W correction per metre of gap error
-static float GAP_POWER_MAX_DELTA = 150.f;  // max ±W applied on top of ahead rider's power
-static float GAP_FREE_POWER_W    = 250.f;  // power when nobody is ahead in cone (front rider / solo)
+static float GAP_POWER_MAX_DELTA = 150.f;  // max ±W applied on top of wheel rider's power
+static float GAP_FREE_POWER_W    = 250.f;  // power when leader (no wheel)
 
 void BikeGameApplication::update_gap_regulation()
 {
-	const float cos_cone = glm::cos(glm::radians(GAP_CONE_HALF_DEG));
-
 	for (BikeObject* me : all_riders) {
 		BikeAI* ai = dynamic_cast<BikeAI*>(me->input.get());
 		if (!ai) continue;
 
-		const glm::vec3 my_pos = me->get_ws_position();
-		const glm::vec3 my_fwd = me->bike_direction;
-
-		float best_gap_m    = FLT_MAX;
-		float ahead_power_w = GAP_FREE_POWER_W;
-		bool  found         = false;
-
-		for (BikeObject* other : all_riders) {
-			if (other == me) continue;
-
-			const glm::vec3 to_other = other->get_ws_position() - my_pos;
-			// Forward projection: positive = other is ahead of me
-			const float gap_m = glm::dot(to_other, my_fwd);
-			if (gap_m <= 0.01f || gap_m > GAP_CONE_MAX_M) continue;
-
-			// Cone angle check
-			const float dist3d = glm::length(to_other);
-			if (dist3d < 0.01f) continue;
-			if (gap_m / dist3d < cos_cone) continue;
-
-			if (gap_m < best_gap_m) {
-				best_gap_m    = gap_m;
-				ahead_power_w = other->stamina.actual_power;
-				found         = true;
-			}
-		}
-
-		if (found) {
-			const float gap_err    = best_gap_m - GAP_TARGET_M;  // +ve = too far back
-			const float correction = glm::clamp(gap_err * GAP_POWER_K,
-			                                    -GAP_POWER_MAX_DELTA, GAP_POWER_MAX_DELTA);
-			ai->target_power_watts = glm::clamp(ahead_power_w + correction, 50.f, 1000.f);
-		} else {
+		if (!ai->wheel) {
 			ai->target_power_watts = GAP_FREE_POWER_W;
+			continue;
 		}
+
+		const glm::vec3 to_wheel = ai->wheel->get_ws_position() - me->get_ws_position();
+		const float gap_m  = glm::dot(to_wheel, me->bike_direction);
+		const float gap_err    = gap_m - ai->long_gap;  // +ve = too far back
+		const float correction = glm::clamp(gap_err * GAP_POWER_K,
+		                                    -GAP_POWER_MAX_DELTA, GAP_POWER_MAX_DELTA);
+		ai->target_power_watts = glm::clamp(ai->wheel->stamina.actual_power + correction,
+		                                    50.f, 1000.f);
 	}
 }
 
@@ -1713,6 +1741,14 @@ static void ai_recorder_debug_menu()
 		ImGui::EndDisabled();
 	}
 	ImGui::TextDisabled("Outputs: D:/Data/ai_debug_dump.csv  +  ai_debug_course.csv");
+
+	// Course / racing-line audit — independent of AI recording.
+	if (ImGui::Button("Dump course audit CSV")) {
+		if (g_bike_app && g_bike_app->course.is_built)
+			g_bike_app->course.dump_audit_csv("D:/Data/bike_course_audit.csv");
+	}
+	ImGui::SameLine();
+	ImGui::TextDisabled("D:/Data/bike_course_audit.csv");
 
 	if (frame_count == 0) return;
 

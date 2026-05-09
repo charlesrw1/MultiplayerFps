@@ -29,6 +29,9 @@ class BikeCourse {
 public:
 	std::vector<BikeWaypoint>   waypoints;
 	std::vector<FilletDebugInfo> debug_fillets;  // populated by build_from_road_network
+	// Index ranges (start_idx, end_idx, both inclusive) into waypoints for each fillet arc.
+	// start_idx > end_idx means the arc wraps the loop seam.
+	std::vector<std::pair<int,int>> arc_ranges;
 	float total_length_m      = 0.f;
 	bool  is_built            = false;
 	bool  is_loop             = false;  // true: last waypoint connects back to first
@@ -103,6 +106,12 @@ public:
 
 	// Draw the spline in the debug overlay (gradient-coloured, with road-width tick marks).
 	void debug_draw() const;
+
+	// Dump every waypoint to CSV with source tag (edge/arc), heading/curvature deltas,
+	// racing-line saturation flag, and lateral/world jumps from the previous waypoint.
+	// Use this to localise raceline/fillet glitches: large d_heading or d_rl_world rows
+	// are where the spline jumps. Returns true on success.
+	bool dump_audit_csv(const char* path) const;
 
 	// Draw fillet arc geometry (centers, tangent points, radius lines).
 	// Call from the debug menu after build_from_road_network.

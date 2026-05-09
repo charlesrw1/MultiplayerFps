@@ -48,6 +48,26 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 	const int last  = loop ? n : n - 1;
 	const float lerp = dt / 100.f;
 
+	// Density-independent hinge force: dividing by the per-segment length (as the
+	// physically-correct bending-energy formula does) makes densely-sampled regions
+	// (fillet arcs ~2.3 m) generate ~40% stronger forces than sparse straights
+	// (~3.2 m), pulling arc waypoints to the apex harder than the surrounding line.
+	// The result is a discontinuity at every arc/edge boundary that no amount of
+	// post-Laplacian smoothing can repair (the sim re-creates the imbalance each
+	// iteration). Normalizing by the average segment length removes the bias while
+	// preserving the relative strength: arcs still pull hardest because their
+	// hinge angles are largest.
+	float total_seg_len = 0.f;
+	int   seg_count     = 0;
+	for (int i = 0; i < (loop ? n : n - 1); ++i) {
+		const int ip = loop ? (i + 1) % n : i + 1;
+		total_seg_len += glm::distance(wps[i].position, wps[ip].position);
+		++seg_count;
+	}
+	const float inv_seg_len = (seg_count > 0 && total_seg_len > 1e-4f)
+	    ? (float)seg_count / total_seg_len
+	    : 1.f;
+
 	std::vector<glm::vec3> force(n);
 
 	for (int iter = 0; iter < num_iters; ++iter) {
@@ -82,7 +102,7 @@ void BikeCourse::compute_racing_line(std::vector<BikeWaypoint>& wps, bool loop,
 			const float cos_a       = glm::dot(glm::normalize(-v21), v23n);
 			const float hinge_angle = std::acos(glm::clamp(cos_a, -1.f, 1.f));
 
-			const glm::vec3 F3 = -glm::cross(v23n, binormal) * (hinge_angle * k / v23_len);
+			const glm::vec3 F3 = -glm::cross(v23n, binormal) * (hinge_angle * k * inv_seg_len);
 
 			force[i]  += 2.f * F3;   // m2: target = -F2/mass = +2F3/mass → inward at apex
 			force[im] -= F3;          // m1: target = -F3/mass → outward on approach

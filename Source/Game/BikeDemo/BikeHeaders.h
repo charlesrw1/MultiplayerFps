@@ -237,7 +237,7 @@ struct BikeAIParams {
 
 	// Corner scanning
 	float corner_look_m  = 20.f;
-	float corner_speed_k = 2.2f;
+	float corner_speed_k = 1.4f;
 
 	// Steering anticipation
 	float anticipation_dist_scale = 2.0f;
@@ -261,6 +261,21 @@ struct BikeAIParams {
 	float boid_alignment_k         =  0.4f; // weight of average neighbor heading [0,1]
 	float boid_turn_k              =  2.0f; // steer strength per radian of heading error
 	float boid_max_turn_rate       =  0.7f; // rad/s — maximum direct boid turn rate
+
+	// Wheel picker — see [[bike/bikeai#Wheel picking]]
+	float wheel_long_min     = 0.3f;  // min longitudinal gap for a candidate (m)
+	float wheel_long_max     = 8.0f;  // max longitudinal gap (m)
+	float wheel_lat_max      = 2.0f;  // lateral overlap window (m)
+	float wheel_long_gap     = 1.5f;  // ideal wheel-to-wheel target gap (m)
+	float wheel_w_long       = 1.0f;  // score weight: closeness to ideal long_gap
+	float wheel_w_lat        = 1.5f;  // score weight: lateral alignment to my offset
+	float wheel_w_draft      = 0.8f;  // score weight: draft potential (1 - draft_factor)
+	float wheel_stickiness   = 0.5f;  // score bonus for keeping current wheel
+	float wheel_score_thresh = 0.0f;  // if best score below this, no wheel (leader)
+
+	// Corner factor — pulls lat_offset → 0 in tight corners
+	float corner_factor_r_full = 30.f;  // radius (m) at which corner_factor = 1
+	float corner_factor_min    = 0.3f;  // floor on corner_factor (very tight corners)
 };
 extern BikeAIParams g_ai_params;
 
@@ -283,6 +298,13 @@ public:
 
 	// ---- Leader / boid state (set by update_boids each frame) ----
 	bool  is_leader = false;  // true: front N riders per group — use racing-line steering
+
+	// ---- Wheel-following state (set by BikeGameApplication::update_wheel_picking each frame) ----
+	// wheel == null  →  I'm a leader; target = racing-line lookahead.
+	// wheel != null  →  follow this rider's road frame at offset (long_gap, lat_offset).
+	BikeObject* wheel      = nullptr;
+	float       lat_offset = 0.f;  // m — road-relative offset from the wheel's track (+ve = road-right)
+	float       long_gap   = 1.5f; // m — target longitudinal spacing behind wheel
 
 	// ---- Double echelon lane assignment ----
 	float preferred_lateral = 0.f;
@@ -315,6 +337,9 @@ public:
 	float dbg_avoid_brake        = 0.f;
 	bool  dbg_is_boid_mode       = false;
 	float dbg_boid_turn_rate     = 0.f;
+	bool  dbg_has_wheel          = false;
+	float dbg_wheel_score        = 0.f;
+	float dbg_corner_factor      = 1.f;
 };
 
 class BikePlayer : public IBikeInput {
@@ -524,6 +549,7 @@ private:
 	void sort_riders();
 	void update_groups();
 	void update_drafting();
+	void update_wheel_picking();
 	void update_boids();
 	void update_gap_regulation();
 	void update_crack_triggers();

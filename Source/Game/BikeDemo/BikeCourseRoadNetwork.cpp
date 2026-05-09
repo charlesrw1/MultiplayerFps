@@ -633,6 +633,12 @@ void BikeCourse::build_from_road_network(
 		}
 	}
 
+	// Stash arc waypoint ranges for audit dumps.
+	arc_ranges.clear();
+	arc_ranges.reserve(fillet_ranges.size());
+	for (const auto& fr : fillet_ranges)
+		arc_ranges.emplace_back(fr.start_idx, fr.end_idx);
+
 	// Compute racing line offsets now that waypoints are built
 	if (is_built)
 		BikeCourse::compute_racing_line(waypoints, is_loop, rl_k, rl_mass, rl_dt, rl_num_iters, rl_smooth_passes, rl_smooth_w);

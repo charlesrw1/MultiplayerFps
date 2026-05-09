@@ -46,62 +46,62 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	dbg_min_r = min_r;
 
 	const glm::vec3 up = glm::vec3(0, 1, 0);
+	const glm::vec3 bike_right = glm::normalize(glm::cross(my_bike->bike_direction, up));
 
-	// Boid mode: non-leader riders with active group forces use direct heading from boid_desired_dir.
-	// Leaders (and isolated riders with no boid data) fall back to racing-line following.
-	const bool in_boid_mode = !is_leader && my_bike->boid_forces_active;
-	dbg_is_boid_mode = in_boid_mode;
-	my_bike->boid_steer_override = false;
+	// corner_factor — pulls lat_offset toward 0 in tight corners.
+	// See [[bike/bikeai#Target position]].
+	const float corner_factor = glm::clamp(min_r / p.corner_factor_r_full,
+	                                       p.corner_factor_min, 1.f);
+	dbg_corner_factor = corner_factor;
 
-	float steer_out = 0.f;
+	// Heading error vs course tangent — common to leader + follower steer.
+	const BikeWaypoint cur_wp  = course->sample(my_bike->course_dist_m);
+	const glm::vec3 path_right = glm::normalize(glm::cross(cur_wp.forward, up));
+	const float heading_err    = glm::dot(my_bike->bike_direction, path_right);
 
-	if (in_boid_mode) {
-		// Convert boid desired heading to a steer_out value.
-		// cross_y > 0  →  boid_desired_dir is to the RIGHT of bike_direction
-		// positive steer = LEFT, so steer = -(angle to right) * k
-		const glm::vec3 want_dir  = my_bike->boid_desired_dir;
-		const float cross_y       = glm::dot(glm::cross(my_bike->bike_direction, want_dir), up);
-		const float dot_cd        = glm::dot(my_bike->bike_direction, want_dir);
-		const float angle_err     = glm::atan(cross_y, dot_cd);  // + = right of current heading
-		steer_out = glm::clamp(-angle_err * p.boid_turn_k, -1.f, 1.f);
-		dbg_steer_near     = steer_out;
-		dbg_steer_far      = steer_out;
-		dbg_lookahead_dist = 0.f;
+	// Wheel-following: wheel != null  →  follower; null  →  leader (racing-line).
+	const bool follower = (wheel != nullptr);
+	dbg_has_wheel    = follower;
+	dbg_is_boid_mode = follower;  // legacy HUD slot
+	my_bike->boid_steer_override = false;  // override path retired
+
+	// Lookahead distances (shared by leader + follower; followers need full anticipation
+	// or they ride the chord into corners and overshoot).
+	const float look_base = p.lookahead_dist_base + speed * p.lookahead_dist_per_ms;
+	const float look_anti = look_base * p.anticipation_dist_scale;
+
+	auto angle_to_pt = [&](glm::vec3 pt) {
+		const glm::vec3 to = pt - my_bike->get_ws_position();
+		const float d = glm::length(to);
+		if (d < 0.01f) return 0.f;
+		return glm::atan(glm::dot(to / d, bike_right),
+		                  glm::dot(to / d, my_bike->bike_direction));
+	};
+
+	glm::vec3 near_pt, far_pt;
+	if (follower) {
+		// Follower: same lookahead pattern as leader, but the target lane tracks the
+		// wheel's road-relative lateral position plus my desired offset. Long gap is
+		// regulated by power, not by aiming at a chord behind the wheel.
+		const float target_lat = wheel->lateral_pos + lat_offset * corner_factor;
+		const BikeWaypoint near_wp = course->sample(my_bike->course_dist_m + look_base);
+		const BikeWaypoint far_wp  = course->sample(my_bike->course_dist_m + look_anti);
+		near_pt = near_wp.position + near_wp.right * target_lat;
+		far_pt  = far_wp.position  + far_wp.right  * target_lat;
 	} else {
-		// Racing-line following (leaders and isolated fallback)
-		const float look_base        = p.lookahead_dist_base + speed * p.lookahead_dist_per_ms;
-		const glm::vec3 lookahead_pt = course->racing_line_lookahead(my_bike->course_dist_m, look_base);
-		dbg_lookahead_pt   = lookahead_pt;
-		dbg_lookahead_dist = look_base;
-
-		const glm::vec3 bike_right = glm::normalize(glm::cross(my_bike->bike_direction, up));
-		const glm::vec3 to_target  = lookahead_pt - my_bike->get_ws_position();
-		const float dist_to_tgt    = glm::length(to_target);
-
-		const float angle_to_target = (dist_to_tgt > 0.01f)
-		    ? glm::atan(glm::dot(glm::normalize(to_target), bike_right),
-		                glm::dot(glm::normalize(to_target), my_bike->bike_direction))
-		    : 0.f;
-
-		const BikeWaypoint cur_wp  = course->sample(my_bike->course_dist_m);
-		const glm::vec3 path_right = glm::normalize(glm::cross(cur_wp.forward, up));
-		const float heading_err    = glm::dot(my_bike->bike_direction, path_right);
-
-		const float steer_near = angle_to_target * p.steer_k - heading_err * 0.5f;
-
-		const glm::vec3 anti_pt  = course->racing_line_lookahead(my_bike->course_dist_m, look_base * p.anticipation_dist_scale);
-		const glm::vec3 to_anti  = anti_pt - my_bike->get_ws_position();
-		const float dist_to_anti = glm::length(to_anti);
-		float steer_far = steer_near;
-		if (dist_to_anti > 0.01f) {
-			const float angle_anti = glm::atan(glm::dot(glm::normalize(to_anti), bike_right),
-			                                    glm::dot(glm::normalize(to_anti), my_bike->bike_direction));
-			steer_far = angle_anti * p.steer_k - heading_err * 0.5f;
-		}
-		dbg_steer_near = steer_near;
-		dbg_steer_far  = steer_far;
-		steer_out = glm::clamp(steer_near + p.anticipation_k * (steer_far - steer_near), -1.f, 1.f);
+		// Leader: track the racing line.
+		near_pt = course->racing_line_lookahead(my_bike->course_dist_m, look_base);
+		far_pt  = course->racing_line_lookahead(my_bike->course_dist_m, look_anti);
 	}
+	dbg_lookahead_pt   = near_pt;
+	dbg_lookahead_dist = look_base;
+
+	const float steer_near = angle_to_pt(near_pt) * p.steer_k - heading_err * 0.5f;
+	const float steer_far  = angle_to_pt(far_pt)  * p.steer_k - heading_err * 0.5f;
+	dbg_steer_near = steer_near;
+	dbg_steer_far  = steer_far;
+	const float steer_out_raw = steer_near + p.anticipation_k * (steer_far - steer_near);
+	float steer_out = glm::clamp(steer_out_raw, -1.f, 1.f);
 
 	// ---- Track boundary avoidance (PD) + off-track recovery ----
 	// While on-track (within safety margin): additive edge steer — racing-line following stays active.
@@ -213,20 +213,13 @@ void BikeAI::evaluate(BikeObject* my_bike)
 	const float steer_after_boids = glm::clamp(steer_out, -1.f, 1.f);
 	dbg_steer_pre_hard = steer_after_boids;
 
-	// Boid mode uses a direct turn-rate override in tick_steer instead of the handlebar inertia path.
-	// Off-track recovery always falls back to normal physics steer so the bike can escape the edge.
-	if (in_boid_mode && !dbg_off_track) {
-		const float tr = steer_after_boids * p.boid_max_turn_rate;
-		my_bike->boid_steer_override     = true;
-		my_bike->boid_turn_rate_override = glm::clamp(tr, -p.boid_max_turn_rate, p.boid_max_turn_rate);
-		dbg_boid_turn_rate = my_bike->boid_turn_rate_override;
-		ci.steer = 0.f;
-	} else {
-		my_bike->boid_steer_override = false;
-		ci.steer = dbg_off_track
-		    ? steer_after_boids
-		    : glm::clamp(steer_after_boids, hard_steer_min, hard_steer_max);
-	}
+	// All riders go through the normal handlebar-inertia steer path.
+	// Off-track recovery bypasses the priority-yield clamp so the bike can escape the edge.
+	my_bike->boid_steer_override = false;
+	dbg_boid_turn_rate           = 0.f;
+	ci.steer = dbg_off_track
+	    ? steer_after_boids
+	    : glm::clamp(steer_after_boids, hard_steer_min, hard_steer_max);
 	dbg_steer_final  = ci.steer;
 	ci.brake_amount  = brake_amount;
 	ci.power         = (brake_amount > 0.1f) ? 0.f : power_out;

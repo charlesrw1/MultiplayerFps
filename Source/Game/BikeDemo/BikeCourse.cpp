@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cfloat>
 #include <cmath>
+#include <fstream>
 
 static const glm::vec3 WORLD_UP = { 0.f, 1.f, 0.f };
 
@@ -362,4 +363,90 @@ glm::vec3 BikeCourse::racing_line_lookahead(float from_dist_m, float ahead_m) co
 	if (is_loop && total_length_m > 0.f)
 		target = std::fmod(target, total_length_m);
 	return sample(target).racing_line_pos;
+}
+
+// ============================================================
+// dump_audit_csv — racing-line / fillet diagnostic dump
+// ============================================================
+//
+// Per-row diagnostics so glitches localise:
+//   source             0=edge sample, 1=fillet arc sample
+//   step_m             distance to previous waypoint (jumps in spacing show up as outliers)
+//   d_heading_deg      change in xz-heading vs previous waypoint
+//   curvature_inv_m    d_heading_rad / step_m (1/R), high values = tight bend
+//   alpha_clamped      1 if racing_line_lateral is at the ±0.9·hw cap (line saturating)
+//   d_rl_lat           change in racing_line_lateral vs previous waypoint
+//   d_rl_world_m       3D distance between consecutive racing_line_pos values
+//
+// Sort by abs(d_rl_world_m) or abs(d_heading_deg) to find the worst rows.
+bool BikeCourse::dump_audit_csv(const char* path) const
+{
+	std::ofstream f(path);
+	if (!f.is_open()) {
+		sys_print(Warning, "BikeCourse::dump_audit_csv: failed to open %s\n", path);
+		return false;
+	}
+
+	// Build per-waypoint source flag from arc_ranges (handles loop-seam wrap).
+	const int n = (int)waypoints.size();
+	std::vector<int> src(n, 0);
+	for (const auto& [a, b] : arc_ranges) {
+		if (a <= b) {
+			for (int i = a; i <= b && i < n; ++i) src[i] = 1;
+		} else {
+			for (int i = a; i < n; ++i) src[i] = 1;
+			for (int i = 0; i <= b && i < n; ++i) src[i] = 1;
+		}
+	}
+
+	f << "wp_idx,source,pos_x,pos_y,pos_z,fwd_x,fwd_y,fwd_z,right_x,right_z,"
+	     "road_hw,dist_from_start,step_m,d_heading_deg,curvature_inv_m,"
+	     "rl_lateral,alpha_clamped,rl_pos_x,rl_pos_y,rl_pos_z,d_rl_lat,d_rl_world_m\n";
+
+	auto wrap_prev = [&](int i) {
+		if (i > 0) return i - 1;
+		return is_loop ? (n - 1) : 0;
+	};
+
+	const float to_deg = 180.f / glm::pi<float>();
+	for (int i = 0; i < n; ++i) {
+		const BikeWaypoint& wp = waypoints[i];
+		const int   pi      = wrap_prev(i);
+		const BikeWaypoint& wprev = waypoints[pi];
+		const bool  has_prev = (i > 0) || is_loop;
+
+		const float step_m = has_prev ? glm::distance(wp.position, wprev.position) : 0.f;
+
+		// xz-only heading delta
+		float d_head_deg = 0.f;
+		if (has_prev) {
+			const glm::vec2 a(wprev.forward.x, wprev.forward.z);
+			const glm::vec2 b(wp.forward.x,    wp.forward.z);
+			const float al = glm::length(a), bl = glm::length(b);
+			if (al > 1e-4f && bl > 1e-4f) {
+				const float dot = glm::clamp(glm::dot(a, b) / (al * bl), -1.f, 1.f);
+				d_head_deg = std::acos(dot) * to_deg;
+			}
+		}
+		const float curvature = (step_m > 1e-3f) ? (d_head_deg / to_deg / step_m) : 0.f;
+
+		const float hw_cap     = wp.road_half_width * 0.9f;
+		const int   clamped    = (std::abs(wp.racing_line_lateral) >= hw_cap - 1e-3f) ? 1 : 0;
+		const float d_rl_lat   = has_prev ? (wp.racing_line_lateral - wprev.racing_line_lateral) : 0.f;
+		const float d_rl_world = has_prev ? glm::distance(wp.racing_line_pos, wprev.racing_line_pos) : 0.f;
+
+		f << i                   << ',' << src[i]               << ','
+		  << wp.position.x       << ',' << wp.position.y        << ',' << wp.position.z      << ','
+		  << wp.forward.x        << ',' << wp.forward.y         << ',' << wp.forward.z       << ','
+		  << wp.right.x          << ',' << wp.right.z           << ','
+		  << wp.road_half_width  << ',' << wp.dist_from_start   << ','
+		  << step_m              << ',' << d_head_deg           << ',' << curvature          << ','
+		  << wp.racing_line_lateral << ',' << clamped           << ','
+		  << wp.racing_line_pos.x   << ',' << wp.racing_line_pos.y << ',' << wp.racing_line_pos.z << ','
+		  << d_rl_lat            << ',' << d_rl_world           << '\n';
+	}
+
+	sys_print(Info, "BikeCourse::dump_audit_csv: wrote %d rows to %s (%d arcs)\n",
+	          n, path, (int)arc_ranges.size());
+	return true;
 }
