@@ -1,35 +1,27 @@
 # External Module
 
-Third-party libraries. **Do not read source files in this directory** — use only this AGENTS.md for context.
+Third-party libraries bundled in-tree. **Do not read source files here** — use this file as the substitute.
 
 ## Libraries
 
-### Graphics & Rendering
-- **glad** (`glad.c`, `glad/`) — OpenGL function loader; must be initialized before any GL calls
-- **imgui** (`imgui.*`) — Dear ImGui immediate-mode GUI; core, demo, tables, draw list, widgets
-- **imgui_impl_opengl3** — ImGui OpenGL 3.x backend
-- **imgui_impl_sdl2** — ImGui SDL2 platform backend
-- **ImGuizmo** (`ImGuizmo.*`) — 3D transform gizmos (translate/rotate/scale) in-viewport; used by LevelEditor
-- **ImSequencer** (`ImSequencer.*`) — Timeline/sequencer widget for animation editing
-- **imnodes** (`imnodes.*`) — Node graph editor widget; used for animation graph UI
+Graphics / UI:
+- **glad** — OpenGL function loader. Must call `gladLoadGLLoader(...)` once after GL context creation, before any GL call.
+- **imgui** — Dear ImGui immediate-mode GUI (core + demo + tables + widgets). Requires both the OpenGL3 and SDL2 backends initialized.
+- **imgui_impl_opengl3**, **imgui_impl_sdl2** — ImGui backends for our GL3 + SDL2 setup.
+- **ImGuizmo** — In-viewport translate/rotate/scale gizmos; used by LevelEditor.
+- **ImSequencer** — Timeline widget; used for animation editing.
+- **imnodes** — Node-graph widget; used for the animation graph UI.
 
-### Asset Formats
-- **cgltf** (`cgltf.h`, `cgltf_write.*`) — Single-header GLTF/GLB parser and writer; used by AssetCompile
-- **stb_image** (`stb_image.h`) — Image loading (PNG, JPG, BMP, TGA, etc.)
-- **stb_image_write** (`stb_image_write.h`) — Image saving
-- **tinyexr** (`tinyexr.h`) — OpenEXR HDR image format support
-- **miniz** (`miniz.c/h`) — ZIP compression/decompression
+Asset formats:
+- **cgltf** (parser + writer) — Sole GLTF/GLB reader/writer. AssetCompile owns all GLTF I/O.
+- **stb_image** / **stb_image_write** — PNG/JPG/BMP/TGA load + save.
+- **tinyexr** — OpenEXR HDR images.
+- **miniz** — ZIP compression.
 
-### Utilities
-- **json** (`json.hpp`) — nlohmann/json; used for serialization and config
-- **tracy** (`tracy/`) — Frame/zone profiler; wrap zones with `ZoneScoped` / `FrameMark`
-- **KHR** (`KHR/`) — Khronos extension headers required by cgltf
+Utilities:
+- **json** (nlohmann) — Serialization and config.
+- **tracy** — Frame/zone profiler. Opt-in: define `TRACY_ENABLE` to activate; wrap with `ZoneScoped` / `FrameMark`.
+- **KHR/** — Khronos extension headers required by cgltf.
 
-### Build Artifacts
-- **x64/** — Prebuilt binaries/libs for 64-bit Windows
-
-## Usage Notes
-- ImGui must be initialized with both the OpenGL3 and SDL2 backends before use
-- tracy profiling is opt-in; define `TRACY_ENABLE` to activate
-- cgltf is the sole GLTF parser; AssetCompile owns all GLTF reading/writing
-- glad must be called once after OpenGL context creation: `gladLoadGLLoader(...)`
+Build artifacts:
+- **x64/** — Prebuilt 64-bit Windows binaries/libs.

@@ -1,85 +1,38 @@
 # IntegrationTests Module
 
-C++20 coroutine-based integration testing framework. Tests run inside the full game/editor runtime with real GPU, level loading, and screenshot regression.
+C++20 coroutine integration test framework. Built as a static lib and `/WHOLEARCHIVE`-linked into `App.exe` so static-init `TestRegistrar` ctors keep tests alive. Running tests / CLI / vars.txt sectioning lives in [[docs/testing.md]] — this file covers what's relevant when editing code *inside* the module.
 
-## Key Files
+## Architecture
 
-- `TestRegistry.h` — Test registration; `TestEntry`, `TestMode`, `TestRunnerConfig`
-- `TestContext.h` — Awaitable primitives and assertion helpers
-- `TestTask.h` — C++20 coroutine promise type for test functions
-- `TestRunner.h/cpp` — Main test execution loop
-- `TestGameApp.h` — Application entry point for test runs
-- `EditorTestContext.h/cpp` — Editor-mode test context
-- `GpuTimer.h/cpp` — GPU performance measurement
-- `RenderDump.h/cpp` — Capture and compare render state
-- `StateDump.h/cpp` — Capture and compare game state
-- `Screenshot.h/cpp` — Screenshot capture and diff
-- `Tests/Game/test_engine.cpp` — Engine integration tests
-- `Tests/Renderer/test_basic.cpp` — Renderer tests
-- `Tests/Renderer/test_material_hotreload.cpp` — Material hot reload tests (instance reload, master shader reload, OS file-watcher reload)
-- `Tests/Framework/test_filesys.cpp` — File system tests
+- **Coroutine task model** — Tests are `TestTask` coroutines (custom `promise_type`). `co_await` on an awaitable suspends the test; `TestRunner` resumes it once per frame from inside the engine loop, so tests run in the real runtime with real GPU/level/tick timing — no threads.
+- **Static-init registration** — `GAME_TEST` / `EDITOR_TEST` macros expand to a file-scope `TestRegistrar` whose ctor pushes a `TestEntry` into a global registry. Hence the `/WHOLEARCHIVE` requirement on the App link.
+- **Mode-agnostic runner** — One `TestRunner` implementation. The mode (`Game` / `Editor`) is just a filter over the registry plus a different `vars.txt` section selected by `EngineMain` before engine init.
+- **Lua phase** — After the C++ phase finishes, the same runner resumes `_lua_run_all_tests` (from `Data/scripts/integration_test_framework.lua`) as a coroutine, ticked per-frame, results merged into the same XML. Glob filters apply to both phases.
+- **Awaitables** — `tick(n)`, `seconds(t)`, `wait_for(delegate)`, `load_level(path)`, `screenshot(name)`. Add new ones as small awaitable types in `TestContext.h`; they only need `await_ready/suspend/resume` plus whatever per-frame state the runner pokes at.
+- **Failure model** — `check()` records and continues; `require()` throws `TestAbortException` which the promise catches and marks the test failed. Per-test `timeout_seconds` enforced by the runner.
 
-## Key Classes
+## Screenshot / golden machinery
 
-### `TestRegistry` (TestRegistry.h)
-Global static registry for all tests.
-- `register_test(entry)` — Register a `TestEntry`
-- `get_filtered(config)` → list of matching `TestEntry`
-- `TestMode` enum: `Game`, `Editor`
-- `TestEntry`: `name`, `timeout_seconds`, `mode`, `TestFn` (coroutine factory)
-- `TestRunnerConfig`: `filter` (name substring), `promote` (fail-fast), `interactive`, `timing_assert`
+- `Screenshot.cpp`: `glReadPixels` → stb PNG → pixel-diff vs golden.
+- Goldens live in `TestFiles/goldens/` (committed). Output lives in `TestFiles/screenshots/` (gitignored).
+- `--promote` writes/overwrites the golden instead of comparing — that's the only way new baselines get created.
+- `STB_IMAGE_IMPLEMENTATION` / `STB_IMAGE_WRITE_IMPLEMENTATION` are already defined in `Source/External/External.cpp`. Do NOT redefine them here — just include the headers.
 
-### `TestContext` (TestContext.h)
-Injected into every test function. Provides assertions and awaitable suspension points.
+## EditorTestContext
 
-**Assertions:**
-- `check(condition, msg)` — Records pass/fail, continues test execution
-- `require(condition, msg)` — Throws on failure, aborts test immediately
-- `checks_passed`, `checks_failed`, `failures` — Result tracking
+Helpers for editor-mode tests (`entity_count`, `save_level`, `undo`, etc.). Two things that aren't obvious from the header:
 
-**Awaitables (use with `co_await`):**
-- `tick(n)` → `TickAwaitable` — Suspend for N engine ticks
-- `seconds(t)` → `SecondAwaitable` — Suspend for N seconds of game time
-- `wait_for(delegate)` → `DelegateAwaitable` — Suspend until a delegate fires
-- `load_level(path)` → `LevelAwaitable` — Suspend until level is fully loaded
-- `screenshot(name)` → `ScreenshotAwaitable` — Capture screenshot and compare to baseline
+- Getting the doc:
+  ```cpp
+  auto* doc = static_cast<EditorDoc*>(eng_local.editorState->get_tool());
+  ```
+  pulls `GameEngineLocal.h` and `LevelEditor/EditorDocLocal.h`.
+- `save_level(path)` is `set_document_path(path)` + `save_document_internal()`. The path is **game-relative** (e.g. `"TestFiles/tmp.tmap"`), not absolute.
 
-### `TestTask` (TestTask.h)
-C++20 coroutine return type for test functions.
-- Custom `promise_type` with `initial_suspend`, `final_suspend`, `yield_value`
-- `resume()` — Called by `TestRunner` each frame to advance the test coroutine
+## Conventions / gotchas
 
-### `TestRunner` (TestRunner.h)
-Drives test execution each game tick.
-- Creates `TestContext`, launches `TestTask` coroutine
-- Calls `task.resume()` each frame until complete or timed out
-- Reports pass/fail counts; exits process with error code on failure
-
-### `GpuTimer` (GpuTimer.h)
-Wraps OpenGL timer queries to measure GPU time for a code block.
-- Used in performance-sensitive renderer tests to assert frame time budgets
-
-## Test Registration Macros
-
-```cpp
-// Register a game-mode test
-GAME_TEST("test_name", timeout_seconds, [](TestContext& ctx) -> TestTask {
-    co_await ctx.load_level("Levels/Test.lvl");
-    co_await ctx.tick(10);
-    ctx.check(some_condition, "expected X");
-    co_await ctx.screenshot("baseline_name");
-});
-
-// Register an editor-mode test
-EDITOR_TEST("editor_test_name", timeout_seconds, [](TestContext& ctx) -> TestTask {
-    // editor-specific operations
-});
-```
-
-## Key Concepts
-
-- **Coroutine-based tests** — Tests are C++20 coroutines; `co_await` suspends the test and returns control to the game loop, resuming on the next qualifying frame. This allows natural "wait N frames" / "wait for event" patterns without threads.
-- **Screenshot regression** — `co_await ctx.screenshot("name")` captures a frame and diffs against a stored baseline image. Baselines stored under `Tests/Baselines/`.
-- **Timeout enforcement** — Each `TestEntry` has `timeout_seconds`; `TestRunner` aborts and fails the test if it exceeds this.
-- **Two modes** — `TestMode::Game` runs in the normal game runtime; `TestMode::Editor` runs with the editor active, enabling editor workflow tests.
-- **Run via** — `Scripts/build_and_test.ps1` builds and runs the test binary. Exit code 0 = all pass.
+- `AdditionalIncludeDirectories` is `$(SolutionDir)Source\`, so include as `"IntegrationTests/TestContext.h"`, never bare `"TestContext.h"`.
+- Directory creation uses `_mkdir("TestFiles")` from `<direct.h>`, **not** `std::filesystem` (matches the rest of the engine).
+- Test-runner status lines must be prefixed `[TEST]` — that's the sentinel `integration_test.ps1` greps for and the only thing that survives when `-ShowEngineLog` is off. Don't route them through the logger.
+- Level API for queries: `eng->get_level()->get_all_objects()` → `const hash_map<BaseUpdater*>&`.
+- One XML per mode: `TestFiles/integration_<mode>_results.xml`. Both C++ and Lua phases append into the same file.

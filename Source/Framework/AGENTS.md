@@ -1,116 +1,51 @@
 # Framework Module
 
-Core engine infrastructure: reflection, serialization, memory, collections, math, job system, UI utilities, and logging.
+Core engine infrastructure: reflection, serialization, memory, collections, math, job system, UI utilities, and logging. Glob the directory for files; this doc covers concepts, not file lists.
 
-## Key Files
+## Reflection
 
-### Reflection & Class System
-- `ClassBase.h` — Base class; `CLASS_BODY()` macro, `is_a<T>()`, `cast_to<T>()`
-- `ClassTypeInfo.h` — Runtime type info per class
-- `ClassTypePtr.h/cpp` — Weak pointer to class instances
-- `AddClassToFactory.h` — Factory auto-registration
-- `Reflection2.h` — `REFLECT()` macro system
-- `ReflectionProp.h` — `PropertyInfo`, `core_type_id` enum
-- `ReflectionMacros.h` — Macro helpers
-- `StructReflection.h` — `STRUCT_BODY()` for plain data types
-- `ArrayReflection.h`, `VectorReflect2.h` — Container reflection
-- `UniquePtrReflection.h` — `unique_ptr<>` reflection
-- `EnumDefReflection.h/cpp` — Enum reflection
-
-### Serialization
-- `Serializer.h/cpp` — Abstract serializer interface
-- `SerializerJson.h/cpp`, `SerializerJson2.h/cpp` — JSON serialization
-- `SerializerBinary.h/cpp` — Binary serialization
-- `BinaryReadWrite.h` — Low-level binary I/O
-- `DictParser.h/cpp`, `DictWriter.h` — Key/value config format
-- `SerializedForDiffing.h` — Diffable serialization
-
-### Memory
-- `ArenaAllocator.h`, `ArenaStd.h`, `MemArena.h` — Pool/arena allocators
-- `PoolAllocator.h` — Fixed-size object pools
-- `FreeList.h` — Intrusive free list
-- `Handle.h` — Type-safe integer handles for object references
-- `SharedPtr.h` — Reference-counted smart pointer
-- `Optional.h` — `opt<T>` optional value type
-
-### Collections
-- `Hashmap.h` — Open-addressing hash map
-- `Hashset.h/cpp` — Hash set
-- `InlineVec.h` — Small-buffer-optimized vector
-- `RingBuffer.h` — Circular buffer
-
-### String
-- `StringName.h/cpp` — Interned strings (hash-based, zero-copy compare)
-- `StringUtil.h/cpp`, `StringUtils.h/cpp` — Utilities (split, trim, format, etc.)
-
-### Math & Geometry
-- `MathLib.h` — vec2/vec3/vec4, quat, mat4, common math functions
-- `Curve.h` — Float/vector animation curves (sampled by time)
-- `BVH.h`, `BVHBuild.cpp` — Bounding volume hierarchy for spatial queries
-- `Rect2d.h` — 2D axis-aligned rectangle
-
-### Mesh Building
-- `MeshBuilder.h/cpp` — Runtime debug/procedural mesh generation
-- `MeshBuilderImpl.h` — Internal vertex/index management
-
-### UI & Tools
-- `MyImguiLib.h/cpp` — ImGui helper wrappers
-- `PropertyEd.h/cpp` — Generic property grid (reads `PropertyInfoList`)
-- `PropertyPtr.h/cpp` — Property binding pointers
-- `CurveEditorImgui.h/cpp` — In-editor curve visualization and editing
-- `ConsoleCmdGroup.h` — Console command registration
-- `NodeMenuItem.h` — Contextual menu item generation
-- `BoolButton.h` — Toggle button widget
-- `MulticastDelegate.h` — Multicast event/delegate system
-
-### Utilities
-- `Files.h/cpp` — File I/O (read, write, exists, enumerate)
-- `Util.h/cpp` — General utilities
-- `Bytepacker.h` — Bit/byte packing helpers
-- `Range.h` — Integer/float range type
-- `ScopedBoolean.h` — RAII bool scope guard
-- `Profilier.h/cpp` — CPU profiling zones
-- `Jobs.h/cpp` — Fiber/task-based job system
-- `Factory.h`, `FnFactory.h` — Type-keyed factory patterns
-- `Config.h/cpp` — Runtime config variables (`vars.txt` / `init.txt`)
-- `Log.h` — Logging macros
-
-## Key Concepts
-
-### Reflection System
-Every game class inherits from `ClassBase` and uses `CLASS_BODY()`:
+Every game class inherits `ClassBase` with `CLASS_BODY()`:
 ```cpp
 class Foo : public ClassBase {
     CLASS_BODY(Foo);
     REFLECT() float speed = 1.f; REF
 };
 ```
-- `CLASS_BODY(T)` generates: `StaticType`, `get_type()`, `get_props()`, factory registration
-- `REFLECT()` / `REF` marks properties; code-gen (`Scripts/`) produces `MEGA.cpp`
-- `PropertyInfo` holds: name, byte offset, `core_type_id`, flags, range hints
-- Flags: `PROP_EDITABLE`, `PROP_SERIALIZE`, `PROP_EDITOR_ONLY`, `PROP_INSTANCE_EDITABLE`
-- `is_a<T>()` — Safe runtime type check; `cast_to<T>()` — Checked downcast
+- `CLASS_BODY(T)` generates `StaticType`, `get_type()`, `get_props()`, and factory registration.
+- `REFLECT()` / `REF` mark properties; the python codegen in `Scripts/` parses headers and emits `Source/MEGA.cpp`. If reflection is missing at runtime, MEGA is stale — re-run codegen.
+- `PropertyInfo` holds name, byte offset, `core_type_id`, flags, range hints.
+- Flags: `PROP_EDITABLE`, `PROP_SERIALIZE`, `PROP_EDITOR_ONLY`, `PROP_INSTANCE_EDITABLE`.
+- `is_a<T>()` for safe runtime checks; `cast_to<T>()` for checked downcasts.
+- Container/struct reflection: `STRUCT_BODY()` for plain data, plus dedicated headers for arrays, vectors, `unique_ptr`, and enums.
 
-### Serialization
-`Serializer` is abstract; `SerializerJson` / `SerializerBinary` are the concrete implementations.
-- `serialize(Serializer&)` virtual method on `ClassBase` drives save/load
-- Use `DictParser` / `DictWriter` for human-readable config files (`vars.txt`, `init.txt`)
+## Serialization
 
-### Handle System (`Handle.h`)
-Type-safe integer handles used instead of raw pointers for render objects, assets, etc.
-- Prevents dangling pointer bugs across frame boundaries
-- `handle<T>` — Wraps a typed integer ID; invalid = 0
+`Serializer` is abstract; JSON and binary backends exist. `ClassBase::serialize(Serializer&)` virtual drives save/load. `DictParser` / `DictWriter` handle the human-readable key/value format used by `vars.txt` and `init.txt`. `SerializedForDiffing` produces stable output for diff tooling.
 
-### Job System (`Jobs.h`)
-Fiber-based parallel task scheduling.
-- Submit tasks with `Jobs::run(fn)` / `Jobs::run_and_wait(fn_list)`
-- Used by renderer for parallel culling and by asset compiler for parallel mesh processing
+## Memory
 
-### Config System (`Config.h`)
-Runtime configuration variables backed by `vars.txt` / `init.txt`.
-- Variables declared with `CONFIG_VAR(type, name, default)`
-- Read at startup; can be overridden per-level
+Arena/pool allocators and intrusive free lists are preferred over `new`/`delete` for hot paths and per-frame data. `handle<T>` is a type-safe integer ID (invalid = 0) used instead of raw pointers for render objects and assets — survives across frames where pointers may dangle. `SharedPtr` is the in-house refcounted smart pointer; `opt<T>` is the optional type.
 
-### StringName (`StringName.h`)
-Interned string type. All `StringName` instances with equal content share a pointer — equality is pointer comparison.
-Use for identifiers (bone names, tag names, asset names) where string equality is performance-critical.
+## Collections & Strings
+
+Open-addressing `Hashmap`/`Hashset`, small-buffer-optimized `InlineVec`, and `RingBuffer`. `StringName` is the interned string type: equal content means equal pointer, so equality is a pointer compare — use for bone/tag/asset identifiers in hot paths.
+
+## Math & Geometry
+
+`MathLib.h` provides vec2/3/4, quat, mat4. `Curve` samples float/vector animation curves by time. `BVH` is the spatial-query acceleration structure. `Rect2d` is 2D AABB. See [[bike/sign_conventions]] for project-wide axis conventions (+Y up, +Z forward, +X world-right).
+
+## Job System
+
+Fiber-based task scheduling in `Jobs.h`. Submit with `Jobs::run` / `Jobs::run_and_wait`. Used by renderer for parallel culling and by the asset compiler for mesh processing. Tasks may suspend on fiber boundaries — do not hold non-fiber-safe locks across submits.
+
+## Config
+
+`CONFIG_VAR(type, name, default)` declares a runtime variable backed by `vars.txt` / `init.txt`. Read at startup; can be overridden per-level. `g_project_base` must be `"Data"` (relative), not an absolute path, when running game/tests.
+
+## UI / Tools
+
+ImGui wrappers, a generic property grid driven by `PropertyInfoList`, an in-editor curve editor, console-command registration, and a multicast delegate system. `PropertyEd` reads reflection metadata directly — adding a `REFLECT()` field is enough to surface it in the editor.
+
+## Misc Utilities
+
+File I/O, bit/byte packing, integer/float ranges, RAII bool scope guard, CPU profiling zones, type-keyed factories, and logging macros.
