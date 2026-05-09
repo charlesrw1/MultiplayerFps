@@ -240,6 +240,11 @@ struct AIDebugFrame {
     // Nearest rider (longitudinally closest within 10 m)
     float nearest_lat_sep_m;
     float nearest_long_gap_m;
+
+    // Lookahead point fed to the steer PD (BikeAI::dbg_lookahead_pt)
+    float lookahead_pt_x, lookahead_pt_y, lookahead_pt_z;
+    float lookahead_dist;     // distance from rider to lookahead pt
+    int   has_wheel;          // 1 = follower (wheel-anchored target), 0 = leader (racing-line)
 };
 
 static constexpr int   AI_DBG_MAX_FRAMES = 100000;
@@ -324,6 +329,11 @@ static void ai_debug_record(BikeGameApplication* app)
             fr.min_r             = ai->dbg_min_r;
             fr.power_base        = ai->dbg_power_base;
             fr.power_final       = ai->dbg_power_final;
+            fr.lookahead_pt_x    = ai->dbg_lookahead_pt.x;
+            fr.lookahead_pt_y    = ai->dbg_lookahead_pt.y;
+            fr.lookahead_pt_z    = ai->dbg_lookahead_pt.z;
+            fr.lookahead_dist    = ai->dbg_lookahead_dist;
+            fr.has_wheel         = ai->dbg_has_wheel ? 1 : 0;
         }
 
         s_ai_dbg_frames.push_back(fr);
@@ -346,7 +356,8 @@ static void ai_debug_dump(BikeGameApplication* app)
              "brake_amount,avoid_brake,brake_dist_m,v_max_corner,brake_corner_r,min_r,"
              "power_base,power_final,actual_power,boid_long_sep_power,"
              "avoidance_sep_steer,avoidance_brake,"
-             "nearest_lat_sep_m,nearest_long_gap_m\n";
+             "nearest_lat_sep_m,nearest_long_gap_m,"
+             "lookahead_pt_x,lookahead_pt_y,lookahead_pt_z,lookahead_dist,has_wheel\n";
         for (const auto& fr : s_ai_dbg_frames) {
             f << fr.time_s              << ','
               << fr.rider_idx           << ',' << (int)fr.is_ai         << ','
@@ -363,7 +374,9 @@ static void ai_debug_dump(BikeGameApplication* app)
               << fr.power_base          << ',' << fr.power_final        << ',' << fr.actual_power      << ','
               << fr.boid_long_sep_power << ','
               << fr.avoidance_sep_steer << ',' << fr.avoidance_brake    << ','
-              << fr.nearest_lat_sep_m   << ',' << fr.nearest_long_gap_m << '\n';
+              << fr.nearest_lat_sep_m   << ',' << fr.nearest_long_gap_m << ','
+              << fr.lookahead_pt_x      << ',' << fr.lookahead_pt_y     << ',' << fr.lookahead_pt_z << ','
+              << fr.lookahead_dist      << ',' << fr.has_wheel          << '\n';
         }
         sys_print(Debug, "AI debug recorder: wrote %d frames to D:/Data/ai_debug_dump.csv\n",
                   (int)s_ai_dbg_frames.size());
@@ -1281,7 +1294,7 @@ static void bike_course_debug()
 		c.debug_draw_fillets();
 
 	ImGui::SeparatorText("Visualisation");
-	static bool draw_course         = false;
+	static bool draw_course         = true;
 	static bool draw_projections    = true;   // sphere on spline at each rider's course_dist_m
 	static bool draw_lookahead_all  = true;   // lookahead sphere for every rider
 	ImGui::Checkbox("Draw course spline",          &draw_course);
@@ -1545,6 +1558,9 @@ static void bike_boid_debug()
 	ImGui::DragFloat("power max W",&SIDE_BY_SIDE_POWER_W, 5.f,   0.f, 200.f);
 
 	ImGui::SeparatorText("AI Cornering");
+	ImGui::DragFloat("lookahead_dist_base",   &g_ai_params.lookahead_dist_base,   0.1f,  0.1f, 20.f);
+	ImGui::SameLine(); ImGui::TextDisabled("base lookahead m (+ speed*per_ms)");
+	ImGui::DragFloat("lookahead_dist_per_ms", &g_ai_params.lookahead_dist_per_ms, 0.05f, 0.f,  3.f);
 	ImGui::DragFloat("steer_k",               &g_ai_params.steer_k,               0.1f,  0.1f, 10.f);
 	ImGui::SameLine(); ImGui::TextDisabled("lateral error gain");
 	ImGui::DragFloat("corner_look_m",         &g_ai_params.corner_look_m,         1.f,   5.f, 120.f);

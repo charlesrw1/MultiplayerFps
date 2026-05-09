@@ -231,8 +231,8 @@ static const char* paceline_state_name(PacelineState s) {
 // ============================================================
 struct BikeAIParams {
 	// Waypoint following
-	float lookahead_dist_base   = 1.5f;
-	float lookahead_dist_per_ms = 0.5f;
+	float lookahead_dist_base   = 0.8f;
+	float lookahead_dist_per_ms = 0.4f;
 	float steer_k               = 2.0f;
 
 	// Corner scanning
