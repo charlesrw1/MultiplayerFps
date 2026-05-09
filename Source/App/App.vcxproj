@@ -176,7 +176,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\lib\manual-link\SDL2main.lib;Shell32.lib</AdditionalDependencies>
-      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
+      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -196,7 +196,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\lib\manual-link\SDL2main.lib;Shell32.lib</AdditionalDependencies>
-      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
+      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
@@ -216,7 +216,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>$(VcpkgRoot)\installed\$(VcpkgTriplet)\lib\manual-link\SDL2main.lib;Shell32.lib</AdditionalDependencies>
-      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
+      <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -229,6 +229,10 @@
     </ProjectReference>
     <ProjectReference Include="..\External\External.vcxproj">
       <Project>{8d0a22ce-2c78-4f41-9cdc-94d0abe8e634}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\IntegrationTests\IntegrationTests.vcxproj">
+      <Project>{a1b2c3d4-e5f6-7890-abcd-ef1234567890}</Project>
+      <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -12,7 +12,6 @@ extern ConfigVar g_fakemovedebug;
 extern ConfigVar g_drawdebugmenu;
 extern ConfigVar g_drawimguidemo;
 extern ConfigVar g_slomo;
-extern ConfigVar g_run_tests;
 
 extern ConfigVar g_window_w;
 extern ConfigVar g_window_h;
@@ -53,8 +52,6 @@ public:
 	REF virtual void stop() {}
 	REF virtual void on_map_changed() {}
 
-	// returns true if the class has integration tests to run. otherwise false, and integration test mode will exit.
-	REF virtual bool run_integration_tests() { return false; }
 	// misc callbacks
 	REF virtual void on_controller_status(int index, bool connected) {}
 

@@ -22,6 +22,25 @@ std::vector<TestEntry> TestRegistry::get_filtered(TestMode mode, const char* glo
 	return out;
 }
 
+std::vector<TestEntry> TestRegistry::get_filtered(TestMode mode, const std::vector<std::string>& patterns) {
+	std::vector<TestEntry> out;
+	for (auto& e : all()) {
+		if (e.mode != mode)
+			continue;
+		if (patterns.empty()) {
+			out.push_back(e);
+			continue;
+		}
+		for (auto& p : patterns) {
+			if (test_glob_match(p.c_str(), e.name)) {
+				out.push_back(e);
+				break;
+			}
+		}
+	}
+	return out;
+}
+
 bool test_glob_match(const char* pattern, const char* str) {
 	if (!pattern || pattern[0] == '\0')
 		return true;

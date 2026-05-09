@@ -475,8 +475,13 @@ public:
 	}
 
 	void execute_cmd(const std::string& msg) final { execute_string(msg.c_str()); }
-	void execute_file(Cmd_Execute_Mode mode, const char* path) {
-
+	void execute_file(Cmd_Execute_Mode mode, const char* path) override {
+		execute_file_impl(mode, path, nullptr);
+	}
+	void execute_file_section(Cmd_Execute_Mode mode, const char* path, const char* section) override {
+		execute_file_impl(mode, path, section);
+	}
+	void execute_file_impl(Cmd_Execute_Mode mode, const char* path, const char* section) {
 		auto file = FileSys::open_read_engine(path);
 		if (!file) {
 			sys_print(Error, "couldn't open config file to execute: %s\n", path);
@@ -485,6 +490,9 @@ public:
 
 		DictParser parser;
 		parser.load_from_file(file.get());
+
+		// If a section is requested, skip lines until we enter that section.
+		bool active = (section == nullptr); // when no section requested, run everything
 
 		StringView view;
 		while (parser.read_line(view)) {
@@ -496,6 +504,19 @@ public:
 			if (view.str_start[0] == '#' || (view.str_len == 1 && view.str_start[0] == '\r'))
 				continue;
 			if (view.str_len >= 2 && view.str_start[0] == '/' && view.str_start[1] == '/')
+				continue;
+
+			// Section header: `[name]`
+			if (view.str_len >= 2 && view.str_start[0] == '[' && view.str_start[view.str_len - 1] == ']') {
+				if (section) {
+					const int name_len = view.str_len - 2;
+					active = (name_len > 0 && (int)strlen(section) == name_len &&
+							  std::strncmp(view.str_start + 1, section, name_len) == 0);
+				}
+				continue;
+			}
+
+			if (!active)
 				continue;
 
 			std::string str = std::string(view.str_start, view.str_len);

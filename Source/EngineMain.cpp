@@ -56,7 +56,12 @@
 #include "EngineMain.h"
 #include "EditorPopupTemplate.h"
 #include "Animation/SkeletonData.h"
+#include "IntegrationTests/TestRegistry.h"
+#include "IntegrationTests/TestRunner.h"
+#include "IntegrationTests/StateDump.h"
+#include "Framework/Util.h"
 #include <mutex>
+#include <fstream>
 
 #include "Logging.h"
 
@@ -735,28 +740,100 @@ int benchmark_free_list() {
 	return 0;
 }
 
+// --tests <mode> [pattern...]   pattern may be a glob or "@file" reading newline-separated globs.
+struct TestModeArgs {
+	bool present = false;
+	std::string mode; // "game" or "editor"
+	std::vector<std::string> patterns;
+	bool promote = false;
+	bool interactive = false;
+	bool timing_assert = false;
+};
+
+static void read_pattern_file(const char* path, std::vector<std::string>& out) {
+	std::ifstream in(path);
+	if (!in) {
+		fprintf(stderr, "[--tests] could not open pattern file: %s\n", path);
+		return;
+	}
+	std::string line;
+	while (std::getline(in, line)) {
+		// strip CR + leading/trailing whitespace
+		while (!line.empty() && (line.back() == '\r' || line.back() == ' ' || line.back() == '\t'))
+			line.pop_back();
+		size_t start = 0;
+		while (start < line.size() && (line[start] == ' ' || line[start] == '\t'))
+			++start;
+		if (start)
+			line.erase(0, start);
+		if (line.empty() || line[0] == '#')
+			continue;
+		out.push_back(line);
+	}
+}
+
+static TestModeArgs parse_test_mode_args(int argc, char** argv) {
+	TestModeArgs out;
+	for (int i = 1; i < argc; ++i) {
+		std::string a = argv[i];
+		if (a == "--tests") {
+			out.present = true;
+			if (i + 1 < argc)
+				out.mode = argv[++i];
+			// consume positional patterns until next "--flag"
+			while (i + 1 < argc) {
+				std::string p = argv[i + 1];
+				if (p.size() >= 2 && p[0] == '-' && p[1] == '-')
+					break;
+				++i;
+				if (!p.empty() && p[0] == '@')
+					read_pattern_file(p.c_str() + 1, out.patterns);
+				else
+					out.patterns.push_back(p);
+			}
+		} else if (a == "--promote") {
+			out.promote = true;
+		} else if (a == "--interactive") {
+			out.interactive = true;
+		} else if (a == "--timing-assert") {
+			out.timing_assert = true;
+		}
+	}
+	return out;
+}
+
 int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
-	// material_print_debug.set_bool(true);
-	// developer_mode.set_bool(false);
-	// log_shader_compiles.set_bool(false);
-	// log_all_asset_loads.set_bool(true);
+	const TestModeArgs test_args = parse_test_mode_args(argc, argv);
+	if (test_args.present) {
+		if (test_args.mode != "game" && test_args.mode != "editor") {
+			fprintf(stderr, "Usage: App.exe --tests <game|editor> [pattern...]   (got mode '%s')\n",
+					test_args.mode.c_str());
+			return 1;
+		}
+		options.vars_section = (test_args.mode == "editor") ? "editor_test" : "game_test";
+		options.log_file = std::string("test_") + test_args.mode + "_output.log";
+		// editor mode loaded its tool harness without an init.txt previously
+		if (test_args.mode == "editor")
+			options.init_file = "";
+
+		set_assert_hook([](const char* cond) {
+			fprintf(stderr, "\n[ASSERT FAILED] %s\n", cond);
+			print_stack_trace();
+		});
+
+		const TestMode mode = (test_args.mode == "editor") ? TestMode::Editor : TestMode::Game;
+		auto tests = TestRegistry::get_filtered(mode, test_args.patterns);
+
+		TestRunnerConfig cfg;
+		cfg.promote = test_args.promote;
+		cfg.interactive = test_args.interactive;
+		cfg.timing_assert = test_args.timing_assert;
+		options.pending_test_runnner = std::make_unique<TestRunner>(mode, std::move(tests), cfg);
+	}
+
 	eng_local.init(options, argc, argv);
-
-	// developer_mode.set_bool(true);
-	// log_all_asset_loads.set_bool(false);
-	// log_destroy_game_objects.set_bool(false);
-	// loglevel.set_integer(1);
-
-	// c->buzzer();
-	// int val = c->get_value("hello");
-	// assert(val == 1);
-	// assert(c->myStr == "hello");
-
-	// texture_loading_benchmark();
-
 	eng_local.loop();
 	eng_local.cleanup();
-
 	return 0;
 }
 
@@ -1156,7 +1233,11 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	Profiler::init();
 
 	Cmd_Manager::inst->set_set_unknown_variables(true);
-	Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, options.vars_file.c_str());
+	if (!options.vars_section.empty())
+		Cmd_Manager::inst->execute_file_section(Cmd_Execute_Mode::NOW, options.vars_file.c_str(),
+											   options.vars_section.c_str());
+	else
+		Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, options.vars_file.c_str());
 	print_time("execute vars file");
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
@@ -1639,22 +1720,9 @@ void GameEngineLocal::loop() {
 #ifdef EDITOR_BUILD
 			if (test_runner) {
 				if (test_runner->tick(dt)) {
-					int code = test_runner->exit_code();
+					const int code = test_runner->exit_code();
 					test_runner = nullptr;
-					// C++ tests done — kick off Lua tests; they will call Quit() when finished
-
-					bool call_exit = true;
-					if (get_app()) {
-						const bool has_integration_tests = app->run_integration_tests();
-						if (has_integration_tests)
-							call_exit = false;
-						else {
-							sys_print(Info, "App doesnt have any lua integration tests, exiting. "
-											"(run_integration_tests should return true if this is wrong)\n");
-						}
-					}
-					if (call_exit)
-						_exit(code);
+					_exit(code);
 				}
 			}
 #endif

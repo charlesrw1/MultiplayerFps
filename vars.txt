@@ -1,5 +1,13 @@
+# Sectioned vars file. Engine selects exactly one section based on launch mode.
+#   [app]          - normal app launch (default)
+#   [game_test]    - --tests game
+#   [editor_test]  - --tests editor
+#
+# Sections are independent: there is no fall-through or inheritance. If a var
+# matters in multiple modes, list it in each section.
 
-#net vars
+[app]
+# net vars
 sv.tick_rate 66.0
 sv.snapshot_rate 30.0
 cl.interp 0.07
@@ -26,7 +34,6 @@ godot_lightmap_engine_path "C:/Users/charl/Documents/lightmapexporter/"
 g_project_base "Data"
 #g_project_base "D:/Data"
 
-
 g_application_class "BikeGameApplication"
 is_editor_app 0
 
@@ -51,3 +58,63 @@ ignore_folders 1
 dt 0
 
 debug.menu_width 400
+
+
+[game_test]
+# Mirrors [app] for the shared engine defaults, then overrides for headless tests.
+sv.tick_rate 66.0
+sv.snapshot_rate 30.0
+cl.interp 0.07
+cl.fake_lag 50
+cl.fake_loss 0
+
+gpu.draw_collision_tris 0
+gpu.draw_sv_colliders 0
+gpu.draw_viewmodel 1
+view.tp 0
+dbg.fly 0
+
+view.sens 0.005
+
+g_entry_level "mainMenuMap.tmap"
+ed_default_sky_material "indoorHdriSky"
+g_project_name DevEngine
+
+godot_lightmap_engine_path "C:/Users/charl/Documents/lightmapexporter/"
+g_project_base "Data"
+
+g_draw_grid 0
+enable_gl_debug_output 1
+g_draw_physx_scene 0
+g_prefab_factory ThePrefabFactory
+disable_texture_loads 0
+g_debug_skeletons 0
+ed_decal_active 0
+r.drawdecals 1
+draw_real_grid 0
+ignore_folders 1
+debug.menu_width 400
+
+# game-test overrides
+g_application_class "Application"
+is_editor_app 0
+r.taa 0
+ui.disable_screen_log 1
+disable_render_time_tick 1
+r.ddgi_halfres 0
+r.ssr 0
+r.ssao 0
+dt 1
+r.include_cubemaps 1
+vid.width 600
+vid.height 400
+
+
+[editor_test]
+g_project_base "Data"
+is_editor_app 1
+r.taa 0
+ui.disable_screen_log 1
+disable_render_time_tick 1
+vid.width 600
+vid.height 400

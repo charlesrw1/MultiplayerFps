@@ -38,6 +38,8 @@ public:
 	static void register_test(TestEntry e);
 	// Returns tests matching mode and glob filter (empty filter = all)
 	static std::vector<TestEntry> get_filtered(TestMode mode, const char* glob);
+	// Returns tests matching mode and ANY of the supplied glob patterns. Empty list = all tests for the mode.
+	static std::vector<TestEntry> get_filtered(TestMode mode, const std::vector<std::string>& patterns);
 };
 
 // Registers a test at static-init time

@@ -9,6 +9,9 @@ class ITestRunner;
 struct MainConfigurationOptions {
 	bool no_console_print = false;
 	std::string vars_file = "vars.txt";
+	// If non-empty, only the matching `[section]` block in `vars_file` is executed.
+	// Empty = legacy behaviour (run all lines, regardless of section headers).
+	std::string vars_section = "app";
 	std::string init_file = "init.txt";
 	std::string log_file = "output.log";
 

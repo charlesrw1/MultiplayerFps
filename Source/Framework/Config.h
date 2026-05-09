@@ -147,6 +147,10 @@ public:
 	virtual void append_cmd(uptr<SystemCommand> command) = 0;
 
 	virtual void execute_file(Cmd_Execute_Mode mode, const char* path) = 0;
+	// Execute only lines under [section] in the given file. Lines outside any
+	// section header (and lines under other section headers) are skipped.
+	// Section header syntax: a line of the form `[name]`.
+	virtual void execute_file_section(Cmd_Execute_Mode mode, const char* path, const char* section) = 0;
 	virtual void execute_buffer() = 0;
 	virtual void set_set_unknown_variables(bool b) = 0;
 	// returns string of match if one match exists, otherwise null
