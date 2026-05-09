@@ -24,8 +24,7 @@ Limit the source files you read to the module you are working on. Be brief, spar
 
 ## Documentation
 
-All project documentation lives under `docs/`. Documentation is _meant_ for AI agents to use, not humans. Writing should help AI use the code. Documentation should be concise. Do not over explain everything with excessive writing, only key points and edge cases. Prefer docs/ over inline comments. The `docs.exe` CLI validates wiki-style `[[file#section]]` links and `@docs` source-code refs and is used for searching the documentation. See [[tooling/docs-cli]] for the full reference. Quick index at [[README]]. 
-
+Project documentation lives under `docs/`. Documentation is _meant_ for AI agents to use, not humans. Writing should help AI use the code. Documentation should be concise, do not use execessive markdown or formatting. Do not use excessive writing, only key points and edge cases. use `// @docs [[file#section]` source comments to link do docs. The `docs.exe` CLI validates wiki-style `[[file#section]]` links and `@docs` source-code refs and is used for searching the documentation. See [[tooling/docs-cli]] for the full reference. Quick index at [[README]]. 
 
 - **Looking for a topic** — use rg.exe in docs/ to find relevant content such as matching for a path or topic.
 - **Before every commit** — `docs.exe check` must exit 0. The pre-commit clang-format step + `docs check` are both required.
