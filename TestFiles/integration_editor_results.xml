@@ -1,12 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="IntegrationTests.Editor" tests="12" failures="0">
-  <testcase name="editor/dynamic_model_lifecycle">
+<testsuite name="IntegrationTests.editor" tests="12" failures="0">
+  <testcase name="editor/road_network_basic">
   </testcase>
-  <testcase name="editor/serialize_round_trip">
-  </testcase>
-  <testcase name="editor/undo_noop">
-  </testcase>
-  <testcase name="editor/does_new_assets_appear">
+  <testcase name="editor/road_network_roundtrip">
   </testcase>
   <testcase name="editor/prefab_mode_detection">
   </testcase>
@@ -20,8 +16,12 @@
   </testcase>
   <testcase name="editor/prefab_roundtrip_edit">
   </testcase>
-  <testcase name="editor/road_network_basic">
+  <testcase name="editor/serialize_round_trip">
   </testcase>
-  <testcase name="editor/road_network_roundtrip">
+  <testcase name="editor/undo_noop">
+  </testcase>
+  <testcase name="editor/does_new_assets_appear">
+  </testcase>
+  <testcase name="editor/dynamic_model_lifecycle">
   </testcase>
 </testsuite>

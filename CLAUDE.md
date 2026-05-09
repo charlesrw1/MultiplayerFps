@@ -1,14 +1,12 @@
 This is a game engine project. Uses C++ VS2019, OpenGL, SDL2, vcpkg. No CMAKE.
 
-Write tests. Testing documentation found at [[docs/testing.md]].
+Write tests. Testing documentation found at [[docs/testing.md]]. Use Scripts/build_and_test.ps1 to build and run unit tests. Use Scripts/integration_tests.ps1 to build and run integration tests (with cli options).
 
-Use Scripts/build_and_test.ps1 to build and run unit tests.
-
-Use git to save progress. Write summaries in the message of all commits. Use git worktrees.
+Use git to commit after you are done. Write summaries in the message of all commits. Use git worktrees.
 
 When possible, use parallel subagents with git worktrees.
 
-DO NOT use new/delete/malloc etc UNLESS given permission. ALWAYS use MODERN C++ 17/20. unique_ptr, shared_ptr, etc.
+DO NOT use new/delete/malloc etc UNLESS given permission. Always use modern C++ 17/20. unique_ptr, shared_ptr, etc.
 
 WHEN USING PYTHON: use powershell.exe to launch "py" alias. DO NOT use python from bash.
 
@@ -26,7 +24,7 @@ Limit the source files you read to the module you are working on. Be brief, spar
 
 Project documentation lives under `docs/`. Documentation is _meant_ for AI agents to use, not humans. Writing should help AI use the code. Documentation should be concise, do not use execessive markdown or formatting. Do not use excessive writing, only key points and edge cases. use `// @docs [[file#section]` source comments to link do docs. The `docs.exe` CLI validates wiki-style `[[file#section]]` links and `@docs` source-code refs and is used for searching the documentation. See [[tooling/docs-cli]] for the full reference. Quick index at [[README]].
 
-`docs.exe` is on PATH (installed at `~/AppData/Local/Programs/Python/Python311/Scripts/docs.exe`). Invoke via `powershell.exe -NoProfile -Command "docs.exe check"` from the Bash tool — calling `docs.exe` directly through Bash will fail because PATH isn't loaded; do not prefix with `./` or a relative path.
+Invoke `docs.exe` via `powershell.exe -NoProfile -Command "docs.exe check"` from the Bash tool, otherwise will fail.
 
 - **Looking for a topic** — use rg.exe in docs/ to find relevant content such as matching for a path or topic.
 - **Before every commit** — `docs.exe check` must exit 0. The pre-commit clang-format step + `docs check` are both required.

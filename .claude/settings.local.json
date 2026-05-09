@@ -243,7 +243,21 @@
       "PowerShell(& Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 6)",
       "PowerShell(& Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 4)",
       "Bash(sort -k2)",
-      "Bash(sort -k2nr)"
+      "Bash(sort -k2nr)",
+      "Bash(rg.exe *)",
+      "Bash(git rm *)",
+      "Bash(git status *)",
+      "Bash(git check-ignore *)",
+      "PowerShell($msbuild = \"C:\\\\Program Files \\(x86\\)\\\\Microsoft Visual Studio\\\\2019\\\\Community\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\"; & $msbuild \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\CsRemake.sln\" /t:App /p:Configuration=Debug /p:Platform=x64 /v:minimal /m 2>&1 | Select-Object -Last 200)",
+      "PowerShell(Push-Location \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\"; & \"x64\\\\Debug\\\\App.exe\" --tests game \"game/time_advances\" 2>&1 | Select-Object -Last 80; Write-Host \"exit=$LASTEXITCODE\"; Pop-Location)",
+      "PowerShell(Push-Location \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\"; & \"x64\\\\Debug\\\\App.exe\" --tests editor \"editor/undo_noop\" 2>&1 | Select-Object -Last 30; Write-Host \"exit=$LASTEXITCODE\"; Pop-Location)",
+      "PowerShell(Get-Help *)",
+      "Bash(x64\\\\Debug\\\\docs.exe check *)",
+      "Bash(powershell *)",
+      "Bash(where.exe OpenCppCoverage.exe)",
+      "Bash(Get-ChildItem Source -Directory)",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(where.exe rg.exe)"
     ]
   },
   "enabledPlugins": {
