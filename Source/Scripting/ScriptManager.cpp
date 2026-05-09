@@ -371,6 +371,10 @@ void ScriptManager::reload_all_scripts() {
 		// lib/ holds require-style modules (mobdebug, socket, etc.) — not auto-executed
 		if (file.find("/lib/") != string::npos || file.find("\\lib\\") != string::npos)
 			continue;
+		// tests/ is loaded explicitly via load_test_scripts() in test mode only,
+		// so add_test() calls don't fire in normal app runs
+		if (file.find("/tests/") != string::npos || file.find("\\tests\\") != string::npos)
+			continue;
 		if (StringUtils::get_extension_no_dot(file) == "lua") {
 			sys_print(Debug, "ScriptManager::load_script_files: found lua file %s\n", file.c_str());
 			files.push_back(FileSys::get_game_path_from_full_path(file));
@@ -380,6 +384,21 @@ void ScriptManager::reload_all_scripts() {
 		reload_one_file(strFilePath);
 	}
 	had_changes = true;
+	check_for_reload();
+}
+
+void ScriptManager::load_test_scripts() {
+	sys_print(Info, "ScriptManager::load_test_scripts\n");
+	std::vector<string> files;
+	for (auto& file : FileSys::find_game_files_path("scripts/tests")) {
+		if (StringUtils::get_extension_no_dot(file) == "lua") {
+			sys_print(Debug, "ScriptManager::load_test_scripts: found lua file %s\n", file.c_str());
+			files.push_back(FileSys::get_game_path_from_full_path(file));
+		}
+	}
+	for (auto& strFilePath : files) {
+		reload_one_file(strFilePath);
+	}
 	check_for_reload();
 }
 ScriptManager* ScriptManager::inst = nullptr;

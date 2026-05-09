@@ -828,7 +828,9 @@ int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 		cfg.promote = test_args.promote;
 		cfg.interactive = test_args.interactive;
 		cfg.timing_assert = test_args.timing_assert;
-		options.pending_test_runnner = std::make_unique<TestRunner>(mode, std::move(tests), cfg);
+		auto runner = std::make_unique<TestRunner>(mode, std::move(tests), cfg);
+		runner->set_lua_patterns(test_args.patterns);
+		options.pending_test_runnner = std::move(runner);
 	}
 
 	eng_local.init(options, argc, argv);
@@ -1274,6 +1276,8 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 
 	ScriptManager::inst = new ScriptManager();
 	ScriptManager::inst->load_script_files();
+	if (options.pending_test_runnner)
+		ScriptManager::inst->load_test_scripts();
 	print_time("script init");
 
 	// renderer init

@@ -65,6 +65,9 @@ public:
 	void update();
 	void check_for_reload();
 	void load_script_files();
+	// Loads Data/scripts/tests/**/*.lua. Called only in --tests mode so
+	// add_test(...) calls at file scope don't fire in normal app runs.
+	void load_test_scripts();
 	void init_this_class_type(ClassTypeInfo* classTypeInfo);
 	void set_class_type_global(ClassTypeInfo* type);
 	void set_enum_global(const std::string& name, const EnumTypeInfo*);

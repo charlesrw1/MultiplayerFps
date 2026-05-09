@@ -85,32 +85,3 @@ function FpsGameApplication:advance_level(next_index)
         GameplayStatic.change_level(LEVELS[current_level_index])
     end
 end
-
-
-function FpsGameApplication:run_integration_tests()
-    add_test("shooter/player_spawns", function()
-        GameplayStatic.change_level("demo_level_0.tmap")
-        coroutine.yield(1.5)
-        assert(GameplayStatic.find_by_name("player") ~= nil, "player entity should exist after level load")
-    end)
-
-    add_test("shooter/enemies_spawned", function()
-        GameplayStatic.change_level("demo_level_0.tmap")
-        coroutine.yield(1.5)
-        local app = Application.get_app()
-        assert(app:get_enemies_alive() == 3, "demo_level_0 should spawn 3 enemies, got: " .. tostring(app:get_enemies_alive()))
-    end)
-
-    _runner = coroutine.create(run_all_tests)
-    coroutine.resume(_runner)
-end
-
-function FpsGameApplication:update()
-    if _runner and coroutine.status(_runner) ~= "dead" then
-        _wait_remaining = _wait_remaining - GameplayStatic.get_dt()
-        if _wait_remaining <= 0 then
-            local ok, wait = coroutine.resume(_runner)
-            _wait_remaining = wait or 0.0
-        end
-    end
-end
