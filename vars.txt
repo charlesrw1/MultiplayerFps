@@ -108,7 +108,7 @@ dt 1
 r.include_cubemaps 1
 vid.width 600
 vid.height 400
-
+colorLog 0
 
 [editor_test]
 g_project_base "Data"
@@ -118,3 +118,4 @@ ui.disable_screen_log 1
 disable_render_time_tick 1
 vid.width 600
 vid.height 400
+colorLog 0

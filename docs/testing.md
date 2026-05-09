@@ -11,25 +11,29 @@ Unit tests — [[Scripts/build_and_test.ps1]]:
 powershell Scripts/build_and_test.ps1 -Configuration Debug -Platform x64
 ```
 
-Integration tests (game pass + editor pass) — [[Scripts/integration_test.ps1]]:
+Integration tests — always go through [[Scripts/integration_test.ps1]] (it builds + runs both passes and writes the XML). Do not invoke `App.exe --tests` directly unless debugging the runner itself.
+
+Use integration tests as both a full "test suite" and as a way to interactively test out a feature autonomously by writing the test and running it in isolation and ensuring correct output or dumping stuff to disk to evaluate later.
+
 ```powershell
-powershell Scripts/integration_test.ps1 -Config Debug
+# Both passes, all tests
+powershell Scripts/integration_test.ps1
+
+# One mode
+powershell Scripts/integration_test.ps1 -Mode game
+powershell Scripts/integration_test.ps1 -Mode editor
+
+# Filter by glob (matches C++ and Lua names; `*` = any sequence)
+powershell Scripts/integration_test.ps1 -Mode game -Pattern "game/boot"
+powershell Scripts/integration_test.ps1 -Pattern "renderer/*","racing_line/*"
+
+# Glob list from file (one per line, `#` comments)
+powershell Scripts/integration_test.ps1 -PatternFile smoke.txt
 ```
 
-Or invoke `App.exe` directly:
-```
-x64\Debug\App.exe --tests game [pattern...]
-x64\Debug\App.exe --tests editor [pattern...]
-```
+Switches: `-Config Release` (default Debug), `-Promote` (rewrite screenshot goldens), `-Interactive` (keep window visible), `-TimingAssert` (fail on slow GPU timings), `-ShowEngineLog` (forward App.exe's full engine output to the console — off by default; only `[TEST] ...` sentinel lines pass through). Empty `-Pattern` = all tests for the selected mode(s). `Get-Help Scripts/integration_test.ps1 -Examples` for the same list inline.
 
-`<pattern>` is a glob (`*` matches any sequence). Empty = all tests for the mode. Patterns starting with `@` read newline-separated globs from a file (`#` for comments). Mix and repeat freely:
-```
-App.exe --tests game racing_line/* renderer/*
-App.exe --tests game @smoke.txt
-App.exe --tests game racing_line/smoke @extra.txt
-```
-
-Other CLI flags: `--promote` (write current screenshots as new goldens), `--interactive` (keep window visible), `--timing-assert` (fail on slow GPU timings).
+The runner always prints a parsed XML summary at the end (per-test PASS/FAIL list) and writes the full uncoloured engine log to `test_<mode>_output.log` next to App.exe's working directory regardless of `-ShowEngineLog`. Log lines are prefixed `[Error]`, `[Warning]`, `[Debug]`, `[Info]` so they grep cleanly. Test-runner status lines (`[TEST] ==> [N/M] ...`, `[TEST]   PASS/FAIL ...`, `[TEST] === <mode> Tests: ... ===`) are emitted on stdout/stderr only — they don't go through the logger and don't appear in the .log file.
 
 > `build_and_test.ps1` calls `check_deps` (runs `dumpbin /SYMBOLS`). Don't combine with the integration runner — call `integration_test.ps1` directly.
 

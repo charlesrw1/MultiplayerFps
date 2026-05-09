@@ -19,7 +19,6 @@ CsRemake/
   docs/               — documentation
   TestFiles/          — test inputs/goldens/outputs (partially gitignored)
   vars.txt            — runtime config (loaded at startup)
-  test_game_vars.txt  — config for integration test runs
   CsRemake.vcxproj    — main library project (all engine source)
 ```
 
@@ -31,7 +30,7 @@ CsRemake/
 - **Add source:** add `<ClCompile>` + `<ClInclude>` to `CsRemake.vcxproj`.
 - **Codegen:** `py Scripts/codegen.py` — parses C++ headers, writes `Source/.generated/MEGA.gen.cpp` (Lua bindings). Rerun after adding/removing `REF` / `CLASS_BODY`.
 - **Unit tests:** `powershell Scripts/build_and_test.ps1 -Configuration Debug -Platform x64`.
-- **Integration tests:** `powershell Scripts/integration_test.ps1 -Config Debug` — see [[testing]].
+- **Integration tests:** `powershell Scripts/integration_test.ps1 -Config Debug` — see [[testing.md]].
 - **Clang-format:** `powershell Scripts/clang-format-all.ps1` — required pre-commit.
 
 ---

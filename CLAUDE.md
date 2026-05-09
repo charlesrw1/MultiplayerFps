@@ -1,6 +1,6 @@
 This is a game engine project. Uses C++ VS2019, OpenGL, SDL2, vcpkg. No CMAKE.
 
-Write tests. Testing documentation found at [[testing]].
+Write tests. Testing documentation found at [[docs/testing.md]].
 
 Use Scripts/build_and_test.ps1 to build and run unit tests.
 
@@ -12,7 +12,7 @@ DO NOT use new/delete/malloc etc UNLESS given permission. ALWAYS use MODERN C++ 
 
 WHEN USING PYTHON: use powershell.exe to launch "py" alias. DO NOT use python from bash.
 
-Uses code generation for ClassBase system, similar to Unreal UOBJECTS. The python codegen script is located under Scripts/. It generates MEGA.cpp in Source/ by parsing headers. See [[codegen]].
+Uses code generation for ClassBase system, similar to Unreal UOBJECTS. The python codegen script is located under Scripts/. It generates MEGA.cpp in Source/ by parsing headers.
 
 vars.txt and init.txt store configuration used at runtime.
 
@@ -24,7 +24,9 @@ Limit the source files you read to the module you are working on. Be brief, spar
 
 ## Documentation
 
-Project documentation lives under `docs/`. Documentation is _meant_ for AI agents to use, not humans. Writing should help AI use the code. Documentation should be concise, do not use execessive markdown or formatting. Do not use excessive writing, only key points and edge cases. use `// @docs [[file#section]` source comments to link do docs. The `docs.exe` CLI validates wiki-style `[[file#section]]` links and `@docs` source-code refs and is used for searching the documentation. See [[tooling/docs-cli]] for the full reference. Quick index at [[README]]. 
+Project documentation lives under `docs/`. Documentation is _meant_ for AI agents to use, not humans. Writing should help AI use the code. Documentation should be concise, do not use execessive markdown or formatting. Do not use excessive writing, only key points and edge cases. use `// @docs [[file#section]` source comments to link do docs. The `docs.exe` CLI validates wiki-style `[[file#section]]` links and `@docs` source-code refs and is used for searching the documentation. See [[tooling/docs-cli]] for the full reference. Quick index at [[README]].
+
+`docs.exe` is on PATH (installed at `~/AppData/Local/Programs/Python/Python311/Scripts/docs.exe`). Invoke via `powershell.exe -NoProfile -Command "docs.exe check"` from the Bash tool — calling `docs.exe` directly through Bash will fail because PATH isn't loaded; do not prefix with `./` or a relative path.
 
 - **Looking for a topic** — use rg.exe in docs/ to find relevant content such as matching for a path or topic.
 - **Before every commit** — `docs.exe check` must exit 0. The pre-commit clang-format step + `docs check` are both required.

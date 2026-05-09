@@ -56,7 +56,7 @@ bool TestRunner::tick(float dt) {
 
 		// Timeout guard
 		if (elapsed_ > entry.timeout_seconds) {
-			fprintf(stderr, "[TIMEOUT] %s (%.1fs)\n", entry.name, elapsed_);
+			fprintf(stderr, "[TEST] [TIMEOUT] %s (%.1fs)\n", entry.name, elapsed_);
 			finish_current_test("TIMEOUT");
 			start_next_test();
 			if (current_idx_ >= (int)tests_.size()) {
@@ -130,7 +130,7 @@ void TestRunner::start_next_test() {
 	if (current_idx_ >= (int)tests_.size())
 		return;
 	auto& entry = tests_[current_idx_];
-	printf("\n==> [%d/%d] %s\n", current_idx_ + 1, (int)tests_.size(), entry.name);
+	printf("\n[TEST] ==> [%d/%d] %s\n", current_idx_ + 1, (int)tests_.size(), entry.name);
 	elapsed_ = 0.f;
 	ctx_ = TestContext{};
 	ctx_.is_editor_mode = (mode_ == TestMode::Editor);
@@ -143,11 +143,11 @@ void TestRunner::finish_current_test(const char* reason) {
 	if (reason)
 		ctx_.failures.push_back(reason);
 	if (passed) {
-		printf("  PASS  %s  (%d checks)\n", entry.name, ctx_.checks_passed);
+		printf("[TEST]   PASS  %s  (%d checks)\n", entry.name, ctx_.checks_passed);
 	} else {
-		fprintf(stderr, "  FAIL  %s\n", entry.name);
+		fprintf(stderr, "[TEST]   FAIL  %s\n", entry.name);
 		for (auto& f : ctx_.failures)
-			fprintf(stderr, "    %s\n", f.c_str());
+			fprintf(stderr, "[TEST]     %s\n", f.c_str());
 	}
 	results_.push_back({entry.name, passed, ctx_.failures});
 	if (passed)
@@ -157,7 +157,7 @@ void TestRunner::finish_current_test(const char* reason) {
 }
 
 void TestRunner::write_results_xml(const char* path) {
-	printf("\n=== %s Tests: %d passed, %d failed ===\n", mode_name(mode_), passed_count_, failed_count_);
+	printf("\n[TEST] === %s Tests: %d passed, %d failed ===\n", mode_name(mode_), passed_count_, failed_count_);
 	_mkdir("TestFiles");
 	FILE* f = fopen(path, "w");
 	if (!f)
@@ -227,7 +227,7 @@ void TestRunner::start_lua_phase() {
 	phase_ = Phase::Lua;
 	lua_wait_ = 0.f;
 	lua_done_ = false;
-	printf("\n=== Lua Tests ===\n");
+	printf("\n[TEST] === Lua Tests ===\n");
 }
 
 bool TestRunner::tick_lua(float dt) {
@@ -268,7 +268,7 @@ bool TestRunner::tick_lua(float dt) {
 	}
 	// error
 	const char* msg = lua_tostring(co, -1);
-	fprintf(stderr, "[Lua test runner error] %s\n", msg ? msg : "(no message)");
+	fprintf(stderr, "[TEST] [Lua test runner error] %s\n", msg ? msg : "(no message)");
 	results_.push_back({"_lua_runner", false, {msg ? msg : "lua error"}});
 	++failed_count_;
 	lua_done_ = true;
@@ -280,10 +280,10 @@ void TestRunner::report(const std::string& name, bool passed, const std::string&
 	if (!passed)
 		failures.push_back(message);
 	if (passed) {
-		printf("  PASS  %s\n", name.c_str());
+		printf("[TEST]   PASS  %s\n", name.c_str());
 		++passed_count_;
 	} else {
-		fprintf(stderr, "  FAIL  %s\n    %s\n", name.c_str(), message.c_str());
+		fprintf(stderr, "[TEST]   FAIL  %s\n[TEST]     %s\n", name.c_str(), message.c_str());
 		++failed_count_;
 	}
 	results_.push_back({name, passed, std::move(failures)});
