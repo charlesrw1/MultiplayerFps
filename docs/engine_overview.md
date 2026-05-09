@@ -44,8 +44,9 @@ Key cvars:
 - `g_application_class` — Lua class name to instantiate as Application.
 - `g_entry_level` — first level (asset name). Startup runs `map <g_entry_level>`.
 - `g_project_base` — data dir. **Use `"Data"` (relative), not absolute paths.**
-- `g_run_tests` — if true, calls `app->run_integration_tests()` after startup.
 - `is_editor_app` — if true, opens editor UI.
+
+`vars.txt` is sectioned: `[app]` runs on a normal launch, `[game_test]` on `App.exe --tests game`, `[editor_test]` on `--tests editor`. Sections are independent; the engine selects exactly one. See [[testing]].
 
 Commands:
 - `map <mapname>` — open for play.
@@ -113,7 +114,9 @@ static const PropertyInfoList* get_props() {
 start() → on_map_changed() → [per frame: pre_update(), update()] → stop()
 ```
 
-`on_map_changed()` also fires on subsequent level changes. After `start()`, if `g_run_tests`, `run_integration_tests()` runs.
+`on_map_changed()` also fires on subsequent level changes.
+
+Integration tests are launched via the engine CLI (`App.exe --tests <mode>`); they no longer go through the Application class. See [[testing]].
 
 Lua subclass:
 
