@@ -21,4 +21,3 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 ## Tooling
 
 - [[tooling/docs-cli]] — the `docs` CLI: validate links, locate sections, find inbound refs
-- [[tooling/agent_repl]] — TCP REPL for issuing console / Lua commands to a running engine

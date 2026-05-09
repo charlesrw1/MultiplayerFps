@@ -44,5 +44,4 @@ private:
 	std::vector<Result> results_;
 
 	bool is_this_editor_mode = false;
-	bool debug_break_entered_ = false;
 };

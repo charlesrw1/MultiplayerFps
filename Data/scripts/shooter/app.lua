@@ -101,31 +101,6 @@ function FpsGameApplication:run_integration_tests()
         assert(app:get_enemies_alive() == 3, "demo_level_0 should spawn 3 enemies, got: " .. tostring(app:get_enemies_alive()))
     end)
 
-    -- Verify the Lua file-based REPL: pre-write cmd.lua that prints a known
-    -- value and self-resumes via continue.txt, then check output.txt.
-    add_test("framework/lua_repl_break", function()
-        os.execute('mkdir "TestFiles\\debug" 2>nul')
-        os.remove("TestFiles/debug/output.txt")
-        os.remove("TestFiles/debug/continue.txt")
-
-        -- Pre-write command: print a sentinel and then create continue.txt
-        local cmd = io.open("TestFiles/debug/cmd.lua", "w")
-        assert(cmd ~= nil, "should be able to write TestFiles/debug/cmd.lua")
-        cmd:write("print('lua_repl_break_ok')\n")
-        cmd:write("local f = io.open('TestFiles/debug/continue.txt', 'w')\n")
-        cmd:write("f:close()\n")
-        cmd:close()
-
-        debug_break()
-
-        local out = io.open("TestFiles/debug/output.txt", "r")
-        assert(out ~= nil, "output.txt should exist after debug_break")
-        local content = out:read("*a")
-        out:close()
-        assert(content:find("lua_repl_break_ok") ~= nil,
-            "output.txt should contain expected print output, got: " .. tostring(content))
-    end)
-
     _runner = coroutine.create(run_all_tests)
     coroutine.resume(_runner)
 end

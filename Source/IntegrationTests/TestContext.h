@@ -19,9 +19,6 @@ struct TestWaitState
 	bool delegate_fired = false;
 	bool screenshot_pending = false;
 	std::string screenshot_name;
-	bool dump_state_pending = false;
-	std::string dump_state_label;
-	bool debug_break_pending = false;
 };
 
 struct TestContext
@@ -73,35 +70,10 @@ struct TestContext
 		void await_resume() noexcept {}
 	};
 
-	struct DumpStateAwaitable
-	{
-		TestWaitState& wait;
-		const char* label;
-		bool await_ready() const noexcept { return false; }
-		void await_suspend(std::coroutine_handle<>) noexcept {
-			wait.dump_state_pending = true;
-			wait.dump_state_label = label;
-			wait.wait_ticks = 0;
-		}
-		void await_resume() noexcept {}
-	};
-	struct DebugBreakAwaitable
-	{
-		TestWaitState& wait;
-		bool await_ready() const noexcept { return false; }
-		void await_suspend(std::coroutine_handle<>) noexcept { wait.debug_break_pending = true; }
-		void await_resume() noexcept {}
-	};
-
 	TickAwaitable wait_ticks(int n) { return {wait, n}; }
 	SecondAwaitable wait_seconds(float t) { return {wait, t}; }
 	DelegateAwaitable wait_for(MulticastDelegate<>& d) { return {wait, d}; }
 	ScreenshotAwaitable capture_screenshot(const char* name) { return {wait, name}; }
-	DumpStateAwaitable dump_state(const char* label) { return {wait, label}; }
-	// Pauses the test and opens an AgentREPL socket for AI agent inspection.
-	// Connect to 127.0.0.1:9999. Send "resume" to let the test continue.
-	// See Framework/AgentREPL.h for the full protocol.
-	DebugBreakAwaitable debug_break() { return {wait}; }
 
 	ScopedGpuTimer gpu_timer(const char* name);
 

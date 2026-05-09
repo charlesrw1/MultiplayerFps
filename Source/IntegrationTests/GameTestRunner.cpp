@@ -7,8 +7,6 @@
 #include <direct.h>
 #include "GameEnginePublic.h"
 #include "Framework/StringUtils.h"
-#include "StateDump.h"
-#include "Framework/AgentREPL.h"
 GameTestRunner::GameTestRunner(std::string_view name, std::vector<TestEntry> tests, const TestRunnerConfig& cfg)
 	: tests_(std::move(tests)), cfg_(cfg), name(name) {
 	screenshot_cfg_.promote = cfg.promote;
@@ -48,36 +46,6 @@ bool GameTestRunner::tick(float dt) {
 			return true;
 		}
 		return false;
-	}
-
-	// Debug break: agent socket REPL (co_await t.debug_break())
-	if (ctx_.wait.debug_break_pending) {
-		if (!debug_break_entered_) {
-			debug_break_entered_ = true;
-			if (!AgentREPL::inst || !AgentREPL::inst->is_running()) {
-				if (!AgentREPL::inst)
-					AgentREPL::inst = new AgentREPL();
-				AgentREPL::inst->start();
-			}
-			sys_print(Info, "[AgentREPL] debug_break in test '%s' — connect to 127.0.0.1:9999\n",
-					  tests_[current_idx_].name);
-		}
-		if (AgentREPL::inst && AgentREPL::inst->take_resume_requested()) {
-			ctx_.wait.debug_break_pending = false;
-			debug_break_entered_ = false;
-		}
-		return false;
-	}
-
-	// State dump: requested via co_await t.dump_state("label")
-	if (ctx_.wait.dump_state_pending) {
-		ctx_.wait.dump_state_pending = false;
-		std::string full_label = std::string(tests_[current_idx_].name) + "_" + ctx_.wait.dump_state_label;
-		// sanitize label for use as filename
-		for (char& c : full_label)
-			if (c == '/' || c == '\\' || c == ':' || c == ' ')
-				c = '_';
-		print_engine_state(full_label.c_str());
 	}
 
 	// Screenshot: capture after the frame that rendered (wait_ticks reached 0)
@@ -131,7 +99,6 @@ void GameTestRunner::start_next_test() {
 	printf("\n==> [%d/%d] %s\n", current_idx_ + 1, (int)tests_.size(), entry.name);
 	elapsed_ = 0.f;
 	ctx_ = TestContext{};
-	debug_break_entered_ = false;
 	ctx_.is_editor_mode = is_this_editor_mode;
 	task_.emplace(entry.fn(ctx_));
 }

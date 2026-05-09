@@ -463,7 +463,6 @@
     <ClCompile Include="Source\LevelEditor\EditorUILayout.cpp" />
     <ClCompile Include="Source\Framework\MathLib.cpp" />
     <ClCompile Include="Source\Logging.cpp" />
-    <ClCompile Include="Source\Framework\AgentREPL.cpp" />
     <ClCompile Include="Source\Game\Components\PrefabAssetComponent.cpp" />
     <ClCompile Include="Source\Game\Prefab.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeApplication.cpp" />

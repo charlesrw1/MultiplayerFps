@@ -16,7 +16,6 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "Framework/MathLib.h"
 #include "Framework/Config.h"
-#include "Framework/AgentREPL.h"
 #include "Framework/ClassBase.h"
 #include "Framework/MeshBuilder.h"
 #include "Framework/Files.h"
@@ -79,7 +78,6 @@ ConfigVar g_editor_cfg_folder("g_editor_cfg_folder", "Cfg", CVAR_DEV,
 ConfigVar loglevel("loglevel", "4", CVAR_INTEGER, "(0=disable,4=all)", 0, 4);
 ConfigVar colorLog("colorLog", "1", CVAR_BOOL, "");
 ConfigVar g_application_class("g_application_class", "Application", CVAR_DEV, "");
-ConfigVar g_agent_repl("g_agent_repl", "0", CVAR_BOOL | CVAR_DEV, "start AgentREPL on 127.0.0.1:9999 at engine init");
 ConfigVar with_threading("with_threading", "1", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar is_editor_app("is_editor_app", "0", CVAR_BOOL, "");
 ConfigVar g_drawconsole("drawconsole", "0", CVAR_BOOL, "draw the console");
@@ -744,10 +742,6 @@ int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 	// log_all_asset_loads.set_bool(true);
 	eng_local.init(options, argc, argv);
 
-	if (g_agent_repl.get_bool()) {
-		AgentREPL::inst = new AgentREPL();
-		AgentREPL::inst->start();
-	}
 	// developer_mode.set_bool(true);
 	// log_all_asset_loads.set_bool(false);
 	// log_destroy_game_objects.set_bool(false);
@@ -1667,8 +1661,6 @@ void GameEngineLocal::loop() {
 
 			// update input, console cmd buffer, could change maps etc.
 			frame_start();
-			if (AgentREPL::inst && AgentREPL::inst->is_running())
-				AgentREPL::inst->poll();
 
 			const bool skip_rendering = !draw_this_frame();
 			// overlapped update (game+render)

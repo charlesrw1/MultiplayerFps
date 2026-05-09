@@ -43,8 +43,6 @@ Injected into every test function. Provides assertions and awaitable suspension 
 - `wait_for(delegate)` → `DelegateAwaitable` — Suspend until a delegate fires
 - `load_level(path)` → `LevelAwaitable` — Suspend until level is fully loaded
 - `screenshot(name)` → `ScreenshotAwaitable` — Capture screenshot and compare to baseline
-- `dump_state(name)` → `DumpStateAwaitable` — Capture game state snapshot
-- `debug_break()` → `DebugBreakAwaitable` — Break into debugger (interactive mode only)
 
 ### `TestTask` (TestTask.h)
 C++20 coroutine return type for test functions.
