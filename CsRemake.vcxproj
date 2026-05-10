@@ -90,6 +90,10 @@
     <ClCompile Include="Source\Game\BaseUpdater.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeAI.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeApplication.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_AIDebug.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Debug.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Pack.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Player.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeCourse.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeCourseDebug.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
