@@ -176,6 +176,7 @@
     <ClCompile Include="Source\Render\GpuAllocator.cpp" />
     <ClCompile Include="Source\Render\GpuCullingTest.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />
+    <ClCompile Include="Source\Render\MaterialLocal_ShaderGen.cpp" />
     <ClCompile Include="Source\Render\Model.cpp" />
     <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
     <ClCompile Include="Source\Render\RenderExtra.cpp" />

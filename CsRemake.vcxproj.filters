@@ -333,6 +333,9 @@
     <ClCompile Include="Source\Render\MaterialLocal.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Render\MaterialLocal_ShaderGen.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Render\Model.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
