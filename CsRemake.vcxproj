@@ -442,6 +442,26 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
+    <ClCompile Include="Source\AssetCompile\ModelCompile_Skeleton.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Source\AssetCompile\ModelCompile_Mesh.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Source\AssetCompile\ModelCompile_Animation.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Source\AssetCompile\ModelCompile_Output.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
