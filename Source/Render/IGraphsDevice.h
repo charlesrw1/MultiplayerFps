@@ -124,6 +124,9 @@ public:
 	virtual int get_compressed_stride() const = 0;
 
 	virtual void clear_image() = 0;
+
+	// Returns approximate GPU memory usage in bytes (for stats / diagnostics).
+	virtual int get_mem_usage() const { return 0; }
 };
 
 // used for vertex,index,uniform, and shader storage buffers
@@ -136,6 +139,9 @@ public:
 	virtual void release() = 0;
 
 	virtual uint32_t get_internal_handle() = 0;
+
+	// Returns the current buffer size in bytes (for stats / diagnostics).
+	virtual int get_buf_size() const { return 0; }
 };
 
 // like a VAO in opengl.
