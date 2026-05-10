@@ -171,6 +171,15 @@
     </ClCompile>
     <ClCompile Include="Source\Render\DecalBatcher.cpp" />
     <ClCompile Include="Source\Render\DrawLocal.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal_Device.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal_Init.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal_RenderPass.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal_Scene.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal_Lighting.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal_Editor.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal_SceneDraw.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal_SceneDrawInternal.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal_Debug.cpp" />
     <ClCompile Include="Source\Render\EnvProbe.cpp" />
     <ClCompile Include="Source\Render\Frustum.cpp" />
     <ClCompile Include="Source\Render\GpuAllocator.cpp" />
