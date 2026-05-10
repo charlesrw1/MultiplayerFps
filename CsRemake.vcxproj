@@ -177,6 +177,7 @@
     <ClCompile Include="Source\Render\GpuCullingTest.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />
     <ClCompile Include="Source\Render\Model.cpp" />
+    <ClCompile Include="Source\Render\ModelDynamic.cpp" />
     <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
     <ClCompile Include="Source\Render\RenderExtra.cpp" />
     <ClCompile Include="Source\Render\RenderGiManager.cpp" />
