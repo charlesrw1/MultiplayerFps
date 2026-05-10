@@ -450,6 +450,9 @@
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\EngineMain.cpp" />
+    <ClCompile Include="Source\EngineMain_Commands.cpp" />
+    <ClCompile Include="Source\EngineMain_Loop.cpp" />
+    <ClCompile Include="Source\EngineMain_Debug.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\Physics\Physics2Local.cpp" />
     <ClCompile Include="Source\Render\Editor\TextureEditor.cpp">
