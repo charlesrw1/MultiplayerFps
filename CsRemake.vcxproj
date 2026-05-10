@@ -90,6 +90,10 @@
     <ClCompile Include="Source\Game\BaseUpdater.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeAI.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeApplication.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_AIDebug.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Debug.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Pack.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Player.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeCourse.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeCourseDebug.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
@@ -185,7 +189,9 @@
     <ClCompile Include="Source\Render\GpuAllocator.cpp" />
     <ClCompile Include="Source\Render\GpuCullingTest.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />
+    <ClCompile Include="Source\Render\MaterialLocal_ShaderGen.cpp" />
     <ClCompile Include="Source\Render\Model.cpp" />
+    <ClCompile Include="Source\Render\ModelDynamic.cpp" />
     <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
     <ClCompile Include="Source\Render\RenderExtra.cpp" />
     <ClCompile Include="Source\Render\RenderGiManager.cpp" />
@@ -451,6 +457,26 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
+    <ClCompile Include="Source\AssetCompile\ModelCompile_Skeleton.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Source\AssetCompile\ModelCompile_Mesh.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Source\AssetCompile\ModelCompile_Animation.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Source\AssetCompile\ModelCompile_Output.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
@@ -459,6 +485,9 @@
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level.cpp" />
     <ClCompile Include="Source\EngineMain.cpp" />
+    <ClCompile Include="Source\EngineMain_Commands.cpp" />
+    <ClCompile Include="Source\EngineMain_Loop.cpp" />
+    <ClCompile Include="Source\EngineMain_Debug.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\Physics\Physics2Local.cpp" />
     <ClCompile Include="Source\Render\Editor\TextureEditor.cpp">

@@ -360,6 +360,9 @@
     <ClCompile Include="Source\Render\MaterialLocal.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Render\MaterialLocal_ShaderGen.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Render\Model.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
@@ -493,6 +496,10 @@
     <ClCompile Include="Source\Game\Components\PrefabAssetComponent.cpp" />
     <ClCompile Include="Source\Game\Prefab.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeApplication.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_AIDebug.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Debug.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Pack.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Player.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\Animation\AnimationTypes.h">
