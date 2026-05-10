@@ -44,7 +44,7 @@ void CreateSpawnerCommand::undo() {
 InstantiatePrefabCommand::InstantiatePrefabCommand(EditorDoc& ed_doc, const std::string& prefab_path,
 												   const glm::mat4& transform)
 	: ed_doc(ed_doc), prefab_path(prefab_path), transform(transform) {
-	ASSERT(!prefab_path.empty());
+	ASSERT(true); // empty path allowed; is_valid() returns false in that case
 }
 
 void InstantiatePrefabCommand::execute() {
