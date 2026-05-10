@@ -17,8 +17,6 @@
 #include "Framework/Files.h"
 #include "Framework/BinaryReadWrite.h"
 
-#include "Memory.h"
-
 #include "Framework/Config.h"
 #include <algorithm>
 
@@ -56,50 +54,16 @@ REGISTER_ASSETMETADATA_MACRO(ModelAssetMetadata);
 #endif
 
 Model::~Model() {
+	ASSERT(true); // always safe to destruct
 	if (get_name() == "eng/cube.cmdl") {
 		printf("");
 	}
 }
 Model* Model::load(std::string path) {
+	ASSERT(!path.empty());
 	return g_assets.find_sync<Model>(path).get();
 }
 Model::Model() {}
-
-static const int MODEL_FORMAT_VERSION = 18;
-
-static const int STATIC_VERTEX_SIZE = 4'000'000;
-static const int STATIC_INDEX_SIZE = 6'000'000;
-#include "IGraphsDevice.h"
-void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts) {
-
-	vbuffer.alloc.init_clear(sizeof(ModelVertex) * STATIC_VERTEX_SIZE);
-
-	CreateBufferArgs args;
-	args.flags = BUFFER_USE_AS_VB;
-	args.size = sizeof(ModelVertex) * STATIC_VERTEX_SIZE;
-	vbuffer.ptr = IGraphicsDevice::inst->create_buffer(args);
-
-	const int index_size = MODEL_BUFFER_INDEX_TYPE_SIZE;
-	ibuffer.alloc.init_clear(index_size * STATIC_INDEX_SIZE);
-
-	args.flags = BUFFER_USE_AS_IB;
-	args.size = index_size * STATIC_INDEX_SIZE;
-	ibuffer.ptr = IGraphicsDevice::inst->create_buffer(args);
-}
-
-bool Model::has_lightmap_coords() const {
-	return isLightmapped != Model::LightmapType::None;
-}
-
-bool Model::has_bones() const {
-	return skel != nullptr;
-}
-
-int Model::bone_for_name(StringName name) const {
-	if (!get_skel())
-		return -1;
-	return get_skel()->get_bone_index(name);
-}
 
 // FIXME broke
 void ModelMan::compact_memory() {
@@ -118,9 +82,9 @@ void ModelMan::compact_memory() {
 	//		move to end
 	//		wrap ptr
 	// [CCC.........DAAB..]
-	
+
 	// theres an edge case where no models are loaded, but that will never happen (default models)
-	
+
 	// do indices first
 	std::sort(models.begin(), models.end(), [](Model* a, Model* b)->bool
 		{
@@ -168,6 +132,8 @@ void ModelMan::compact_memory() {
 #include "Framework/SerializerJson.h"
 
 void write_model_import_settings(ModelImportSettings* mis, const std::string& savepath) {
+	ASSERT(mis != nullptr);
+	ASSERT(!savepath.empty());
 
 	MakePathForGenericObj pathmaker;
 	WriteSerializerBackendJson writer("write_mis", pathmaker, *mis, true);
@@ -184,6 +150,7 @@ void write_model_import_settings(ModelImportSettings* mis, const std::string& sa
 	}
 }
 void IMPORT_MODEL_FUNC(const Cmd_Args& args) {
+	ASSERT(true); // console command handler
 	if (args.size() != 2) {
 		sys_print(Error, "usage: IMPORT_MODEL <.glb path>");
 		return;
@@ -199,6 +166,7 @@ void IMPORT_MODEL_FUNC(const Cmd_Args& args) {
 	ModelCompilier::compile(savepath.c_str(), AssetDatabase::loader);
 }
 void import_model_lightmapped(const Cmd_Args& args) {
+	ASSERT(true); // console command handler
 	if (args.size() != 4) {
 		sys_print(Error, "usage: import_model_lightmapped <.glb path> <lm x> <lm y>");
 		return;
@@ -223,6 +191,7 @@ void import_model_lightmapped(const Cmd_Args& args) {
 void export_one_model(const Model& model, const char* export_path);
 
 void ModelMan::add_commands(ConsoleCmdGroup& group) {
+	ASSERT(true); // registration, always safe
 	group.add("compact_vertex_buffer", [this](const Cmd_Args&) { compact_memory(); });
 	group.add("print_vertex_usage", [this](const Cmd_Args&) { print_usage(); });
 
@@ -335,547 +304,13 @@ void ModelMan::add_commands(ConsoleCmdGroup& group) {
 #endif
 }
 
-void MainVbIbAllocator::print_usage() const {
-	auto print_facts = [](const char* name, const buffer& b, int element_size) {
-		// float used_percentage = 1.0;
-		// if (b.allocated > 0)
-		//	used_percentage = (double)b.used_total / (double)b.allocated;
-		// used_percentage *= 100.0;
-		//
-		// int used_elements = b.used_total / element_size;
-		// int allocated_elements = b.allocated / element_size;
-		// sys_print(Info, "	%s: %d/%d (%.1f%%) (bytes:%d) (%d:%d)\n", name, used_elements, allocated_elements,
-		// used_percentage, b.used_total, b.tail, b.head);
-	};
-	sys_print(Info, "MainVbIbAllocator::print_usage\n");
-
-	print_facts("IndexBuffer", ibuffer, MODEL_BUFFER_INDEX_TYPE_SIZE);
-	print_facts("VertexBuffer", vbuffer, sizeof(ModelVertex));
-}
 void ModelMan::print_usage() const {
+	ASSERT(true); // always callable
 	allocator.print_usage();
 }
 
-gpuAllocSpan MainVbIbAllocator::append_to_v_buffer(const uint8_t* data, size_t size) {
-	return append_buf_shared(data, size, "Vertex", vbuffer, GL_ARRAY_BUFFER);
-}
-gpuAllocSpan MainVbIbAllocator::append_to_i_buffer(const uint8_t* data, size_t size) {
-	return append_buf_shared(data, size, "Index", ibuffer, GL_ELEMENT_ARRAY_BUFFER);
-}
-
-gpuAllocSpan MainVbIbAllocator::append_buf_shared(const uint8_t* data, size_t size, const char* name, buffer& buf,
-												  uint32_t target) {
-	auto out_of_memory = [&]() {
-		// sys_print(Error, "%s buffer overflow %d/%d !!!\n", name, int(size + buf.used_total), int(buf.allocated));
-		std::fflush(stdout);
-		std::abort();
-	};
-
-	// fixme
-	// also for different vertex layouts etc
-	int align_size = MODEL_BUFFER_INDEX_TYPE_SIZE;
-	if (target == GL_ARRAY_BUFFER)
-		align_size = sizeof(ModelVertex);
-
-	const gpuAllocSpan my_ptr = buf.alloc.allocate(size, align_size);
-	if (my_ptr.size == 0) // fixme
-		out_of_memory();
-
-	buf.ptr->sub_upload(data, size, my_ptr.aligned_start);
-
-	return my_ptr;
-}
-
-glm::vec4 bounds_to_sphere(Bounds b) {
-	glm::vec3 center = b.get_center();
-	glm::vec3 mindiff = center - b.bmin;
-	glm::vec3 maxdiff = b.bmax - center;
-	float radius = glm::max(glm::length(mindiff), glm::length(maxdiff));
-	return glm::vec4(center, radius);
-}
-
-extern ConfigVar developer_mode;
-
-void Model::uninstall() {
-	lods.resize(0);
-	parts.clear();
-
-	data = RawMeshData(); // so destructor gets called and memory is freed
-	// skel.reset(nullptr);	// dont uninstall because of pointers...
-	if (skel) {
-		skel->uninstall();
-	}
-	collision.reset();
-	tags.clear();
-	// for (auto mat : materials) {
-	//	mat->dec_ref_count_and_uninstall_if_zero();
-	//}
-	materials.clear();
-
-	// DONT reset the UID
-	// dont do this 'uid = 0'
-
-	g_modelMgr.remove_model_from_list(this);
-
-	set_is_loaded(false);
-}
-
-void Model::post_load() {
-	ASSERT(get_is_loaded());
-	if (did_load_fail()) {
-		return;
-	}
-	//	ASSERT(uid == 0);
-	g_modelMgr.upload_model(this);
-	Model::on_model_loaded.invoke(this);
-}
-
-MulticastDelegate<Model*> Model::on_model_loaded;
-
-#include "AssetCompile/ModelCompilierLocal.h"
-
-PhysicsMaterialWrapper* Model::get_physics_material_to_use() const {
-	if (physics_material)
-		return physics_material;
-	if (get_num_materials() > 0) {
-		// can return null here
-		return get_material(0)->get_physics_material();
-	}
-	return nullptr;
-}
-
-// Format definied in ModelCompilier.cpp
-bool Model::load_internal(IAssetLoadingInterface* loading) {
-	auto file = FileSys::open_read_game(get_name().c_str());
-	if (!file) {
-		sys_print(Error, "model %s does not exist\n", get_name().c_str());
-		return false;
-	}
-
-	BinaryReader read(file.get());
-
-	uint32_t magic = read.read_int32();
-	if (magic != 'CMDL') {
-		sys_print(Error, "bad model format\n");
-		return false;
-	}
-	uint32_t version = read.read_int32();
-	if (version != MODEL_FORMAT_VERSION) {
-		sys_print(Error, "out of date format\n");
-		return false;
-	}
-	uint8_t isLightmappedByte = read.read_byte();
-	assert(isLightmappedByte >= 0 && isLightmappedByte <= 2);
-	isLightmapped = (Model::LightmapType)isLightmappedByte;
-	lightmapX = (int16_t)read.read_int32();
-	lightmapY = (int16_t)read.read_int32();
-
-	read.read_struct(&skeleton_root_transform);
-
-	read.read_struct(&aabb);
-	bounding_sphere = bounds_to_sphere(aabb);
-
-	int num_lods = read.read_int32();
-	lods.reserve(num_lods);
-	for (int i = 0; i < num_lods; i++) {
-		MeshLod mlod;
-		read.read_struct(&mlod);
-		lods.push_back(mlod);
-	}
-	int num_parts = read.read_int32();
-	parts.reserve(num_parts);
-	for (int i = 0; i < num_parts; i++) {
-		Submesh submesh;
-		read.read_struct(&submesh);
-		parts.push_back(submesh);
-	}
-
-	uint32_t DEBUG_MARKER = read.read_int32();
-	assert(DEBUG_MARKER == 'HELP');
-
-	int num_materials = read.read_int32();
-	materials.resize(num_materials);
-	std::string buffer;
-	for (int i = 0; i < num_materials; i++) {
-		read.read_string(buffer);
-
-		// materials.push_back(imaterials->find_material_instance(buffer.c_str()));
-		materials[i] = g_assets.find_sync_sptr<MaterialInstance>(
-			buffer); // loading->load_asset(&MaterialInstance::StaticType, buffer);
-
-		if (!materials[i]->is_valid_to_use()) {
-			sys_print(Error, "model doesn't have material %s\n", buffer.c_str());
-			materials.back() = imaterials->get_fallback_sptr();
-		}
-	}
-
-	int num_locators = read.read_int32();
-	tags.reserve(num_locators);
-	for (int i = 0; i < num_locators; i++) {
-		ModelTag tag;
-		read.read_string(tag.name);
-		read.read_struct(&tag.transform);
-		tag.bone_index = read.read_int32();
-		tags.push_back(tag);
-	}
-
-	int num_indicies = read.read_int32();
-	data.indicies.resize(num_indicies);
-	read.read_bytes_ptr(data.indicies.data(), num_indicies * MODEL_BUFFER_INDEX_TYPE_SIZE);
-
-	int num_verticies = read.read_int32();
-	data.verts.resize(num_verticies);
-	read.read_bytes_ptr(data.verts.data(), num_verticies * sizeof(ModelVertex));
-
-	DEBUG_MARKER = read.read_int32();
-	assert(DEBUG_MARKER == 'HELP');
-
-	bool has_physics = read.read_byte();
-	if (has_physics) {
-		collision = std::make_unique<PhysicsBodyDefinition>();
-		auto& body = *collision.get();
-		body.shapes.resize(read.read_int32());
-		for (int i = 0; i < body.shapes.size(); i++) {
-			read.read_bytes_ptr(&body.shapes[i], sizeof(physics_shape_def));
-			g_physics.load_physics_into_shape(read, body.shapes[i]);
-			DEBUG_MARKER = read.read_int32();
-			assert(DEBUG_MARKER == 'HELP');
-		}
-	}
-
-	DEBUG_MARKER = read.read_int32();
-	assert(DEBUG_MARKER == 'HELP');
-
-	int num_bones = read.read_int32();
-	if (num_bones > 0) {
-
-		skel = std::make_unique<MSkeleton>();
-		skel->bone_dat.reserve(num_bones);
-		for (int i = 0; i < num_bones; i++) {
-			BoneData bd;
-			read.read_string(bd.strname);
-			bd.name = StringName(bd.strname.c_str());
-			bd.parent = read.read_int32();
-			bd.retarget_type = (RetargetBoneType)read.read_int32();
-			read.read_struct(&bd.posematrix);
-			read.read_struct(&bd.invposematrix);
-			read.read_struct(&bd.localtransform);
-			read.read_struct(&bd.rot);
-			skel->bone_dat.push_back(bd);
-		}
-
-		int num_anims = read.read_int32();
-		for (int i = 0; i < num_anims; i++) {
-
-			uint32_t DEBUG_MARKER = read.read_int32();
-			assert(DEBUG_MARKER == 'HELP');
-
-			AnimationSeq* aseq = new AnimationSeq;
-			std::string name;
-			read.read_string(name);
-			aseq->duration = read.read_float();
-			aseq->average_linear_velocity = read.read_float();
-			aseq->num_frames = read.read_int32();
-			aseq->is_additive_clip = read.read_byte();
-			aseq->has_rootmotion = read.read_byte();
-
-			aseq->channel_offsets.resize(num_bones);
-			read.read_bytes_ptr(aseq->channel_offsets.data(), num_bones * sizeof(ChannelOffset));
-			uint32_t packed_size = read.read_int32();
-			aseq->pose_data.resize(packed_size);
-			read.read_bytes_ptr(aseq->pose_data.data(), packed_size * sizeof(float));
-
-			MSkeleton::refed_clip rc;
-			rc.ptr = aseq;
-			skel->clips.insert({std::move(name), rc});
-		}
-
-		int num_includes = read.read_int32();
-		for (int i = 0; i < num_includes; i++) {
-			std::string str;
-			read.read_string(str);
-		}
-
-		bool has_mirror_map = read.read_byte();
-		if (has_mirror_map) {
-			skel->mirroring_table.resize(num_bones);
-			read.read_bytes_ptr(skel->mirroring_table.data(), num_bones * sizeof(int16_t));
-		}
-
-		DEBUG_MARKER = read.read_int32();
-		assert(DEBUG_MARKER == 'E');
-	}
-
-	// collision data goes here
-	return true;
-}
-
-bool Model::load_asset(IAssetLoadingInterface* loading) {
-	const auto& path = get_name();
-
-#ifdef EDITOR_BUILD
-	if (developer_mode.get_bool()) {
-		std::string model_def = strip_extension(path.c_str());
-		model_def += ".mis";
-
-		ModelCompilier::Ret ret = ModelCompilier::compile(model_def.c_str(), loading);
-		if (ret == ModelCompilier::CompileErr) {
-			sys_print(Error, "compilier failed on model %s\n", model_def.c_str());
-		} else if (ret == ModelCompilier::CompileGood) {
-			Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, string_format("model_info %s", path.c_str()));
-		}
-	}
-#endif
-
-	bool good = load_internal(loading);
-	if (good)
-		return true;
-	return false;
-}
-
-void Model::move_construct(IAsset* _src) {
-	const bool had_skel = skel != nullptr;
-	uninstall();
-
-	assert(!get_is_loaded());
-
-	assert(had_skel == (skel != nullptr));
-	Model* src = (Model*)_src;
-	// ASSERT(this->uid == 0);
-	assert(src);
-
-	for (int i = 0; i < src->lods.size(); i++)
-		this->lods.push_back(src->lods[i]);
-	parts = std::move(src->parts);
-	index_alloc_ptr = src->index_alloc_ptr;
-	vertex_alloc_ptr = src->vertex_alloc_ptr;
-	aabb = src->aabb;
-	bounding_sphere = src->bounding_sphere;
-	data = std::move(src->data);
-
-	if (bool(skel) != bool(src->skel)) {
-		throw std::runtime_error(
-			"Model::move_construct: cant reaload a model to a skeletal model or vice versa. restart the game.\n");
-	}
-	if (skel) {
-		assert(src->skel);
-		skel->move_construct(*src->skel);
-	}
-	if (collision) {
-		collision->uninstall_shapes();
-	}
-	collision = std::move(src->collision);
-
-	tags = std::move(src->tags);
-	materials = std::move(src->materials);
-	skeleton_root_transform = src->skeleton_root_transform;
-	isLightmapped = src->isLightmapped;
-	lightmapX = src->lightmapX;
-	lightmapY = src->lightmapY;
-	src->uninstall();
-
-	set_is_loaded(true);
-}
-
-#if 0
-bool ModelMan::append_to_buffer(Gpu_Buffer& buf,  char* input_data, uint32_t input_length)
-{
-	if (input_length + buf.used > buf.allocated) {
-		printf("Index buffer overflow\n");
-		ASSERT(0);
-		return false;
-	}
-	glBindBuffer(buf.target, buf.handle);
-	glBufferSubData(buf.target, buf.used, input_length, input_data);
-	buf.used += input_length;
-	return true;
-}
-#endif
-
-void ModelMan::set_v_attributes() {}
-
-void ModelMan::init() {
-	allocator.init(STATIC_INDEX_SIZE, STATIC_VERTEX_SIZE);
-
-	{
-		using gvat = GraphicsVertexAttribType;
-		const int stride = sizeof(ModelVertex);
-
-		CreateVertexInputArgs args;
-		args.index = allocator.ibuffer.ptr;
-		args.vertex = allocator.vbuffer.ptr;
-		args.index_type = VertexInputIndexType::uint16;
-		auto animated_layout = {
-			VertexLayout(POSITION_LOC, 3, gvat::float32, stride, offsetof(ModelVertex, pos)),
-			VertexLayout(UV_LOC, 2, gvat::float32, stride, offsetof(ModelVertex, uv)),
-			VertexLayout(NORMAL_LOC, 3, gvat::i16_normalized, stride, offsetof(ModelVertex, normal[0])),
-			VertexLayout(TANGENT_LOC, 3, gvat::u16, stride, offsetof(ModelVertex, tangent[0])),
-			VertexLayout(JOINT_LOC, 4, gvat::u8, stride, offsetof(ModelVertex, color[0])),
-			VertexLayout(WEIGHT_OR_COLOR_LOC, 4, gvat::u8_normalized, stride, offsetof(ModelVertex, color2[0])),
-		};
-		args.layout = animated_layout;
-		animated_vertex_input = IGraphicsDevice::inst->create_vertex_input(args);
-	}
-	{
-		using gvat = GraphicsVertexAttribType;
-		const int stride = sizeof(ModelVertex);
-
-		CreateVertexInputArgs args;
-		args.index = allocator.ibuffer.ptr;
-		args.vertex = allocator.vbuffer.ptr;
-		args.index_type = VertexInputIndexType::uint16;
-		auto lightmapped_layout = {
-			VertexLayout(POSITION_LOC, 3, gvat::float32, stride, offsetof(ModelVertex, pos)),
-			VertexLayout(UV_LOC, 2, gvat::float32, stride, offsetof(ModelVertex, uv)),
-			VertexLayout(NORMAL_LOC, 3, gvat::i16_normalized, stride, offsetof(ModelVertex, normal[0])),
-			VertexLayout(TANGENT_LOC, 3, gvat::u16, stride, offsetof(ModelVertex, tangent[0])),
-			VertexLayout(LIGHTMAPCOORD_LOC, 2, gvat::u16_normalized, stride, offsetof(ModelVertex, color[0])),
-			VertexLayout(WEIGHT_OR_COLOR_LOC, 4, gvat::u8_normalized, stride, offsetof(ModelVertex, color2[0])),
-		};
-		args.layout = lightmapped_layout;
-		lightmapped_vertex_input = IGraphicsDevice::inst->create_vertex_input(args);
-	}
-
-	create_default_models();
-	auto& a = g_assets;
-	LIGHT_CONE = a.find_global_sync<Model>("eng/LIGHT_CONE.cmdl").get();
-	LIGHT_SPHERE = a.find_global_sync<Model>("eng/LIGHT_SPHERE.cmdl").get();
-	LIGHT_DOME = a.find_global_sync<Model>("eng/LIGHT_DOME.cmdl").get();
-
-	if (!LIGHT_CONE || !LIGHT_SPHERE || !LIGHT_DOME)
-		Fatalf("!!! ModelMan::init: couldn't load default LIGHT_x volumes (used for gbuffer lighting)\n");
-}
-
-void ModelMan::create_default_models() {
-	error_model = g_assets.find_global_sync<Model>("eng/question.cmdl").get();
-	if (!error_model)
-		Fatalf("couldnt load error model (question.cmdl)\n");
-	defaultPlane = g_assets.find_global_sync<Model>("eng/plane.cmdl").get();
-	if (!defaultPlane)
-		Fatalf("couldnt load defaultPlane model\n");
-
-	_sprite = new Model;
-	_sprite->aabb = Bounds(glm::vec3(-0.5), glm::vec3(0.5));
-	_sprite->bounding_sphere = bounds_to_sphere(_sprite->aabb);
-	_sprite->materials.push_back(imaterials->get_fallback_sptr());
-	{
-		ModelVertex corners[4];
-		corners[0].pos = glm::vec3(0.5, 0.5, 0.0);
-		corners[0].uv = glm::vec2(1.0, 0.0);
-		corners[0].normal[0] = 0;
-		corners[0].normal[1] = 0;
-		corners[0].normal[2] = INT16_MAX;
-
-		corners[1].pos = glm::vec3(-0.5, 0.5, 0.0);
-		corners[1].uv = glm::vec2(0.0, 0.0);
-		corners[1].normal[0] = 0;
-		corners[1].normal[1] = 0;
-		corners[1].normal[2] = INT16_MAX;
-
-		corners[2].pos = glm::vec3(-0.5, -0.5, 0.0);
-		corners[2].uv = glm::vec2(0.0, 1.0);
-		corners[2].normal[0] = 0;
-		corners[2].normal[1] = 0;
-		corners[2].normal[2] = INT16_MAX;
-
-		corners[3].pos = glm::vec3(0.5, -0.5, 0.0);
-		corners[3].uv = glm::vec2(1.0, 1.0);
-		corners[3].normal[0] = 0;
-		corners[3].normal[1] = 0;
-		corners[3].normal[2] = INT16_MAX;
-
-		_sprite->data.verts.push_back(corners[0]);
-		_sprite->data.verts.push_back(corners[1]);
-		_sprite->data.verts.push_back(corners[2]);
-		_sprite->data.verts.push_back(corners[3]);
-		_sprite->data.indicies.push_back(0);
-		_sprite->data.indicies.push_back(1);
-		_sprite->data.indicies.push_back(2);
-		_sprite->data.indicies.push_back(0);
-		_sprite->data.indicies.push_back(2);
-		_sprite->data.indicies.push_back(3);
-
-		Submesh sm;
-		sm.base_vertex = 0;
-		sm.element_count = 6;
-		sm.element_offset = 0;
-		sm.material_idx = 0;
-		sm.vertex_count = 4;
-		MeshLod lod;
-		lod.end_percentage = 1.0;
-		lod.part_count = 1;
-		lod.part_ofs = 0;
-
-		_sprite->set_globally_referenced();
-		_sprite->parts.push_back(sm);
-		_sprite->lods.push_back(lod);
-		upload_model(_sprite);
-
-		g_assets.install_system_asset(_sprite, "_SPRITE");
-	}
-}
-#include "Render/MaterialLocal.h"
-#include "DrawLocal.h"
-// Uploads the models vertex and index data to the gpu
-// and sets the models ptrs/offsets into the global vertex buffer
-bool ModelMan::upload_model(Model* mesh) {
-	ASSERT(mesh);
-	ASSERT(all_models.find(mesh) == nullptr);
-	all_models.insert(mesh);
-
-	if (mesh->uid == 0)
-		mesh->uid = cur_mesh_id++;
-	else {
-		sys_print(Debug, "model reloaded: %s\n", mesh->get_name().c_str());
-		BuildSceneData_CpuFast::inst->rebuild_models(); // force rebuild models...
-	}
-
-	// sys_print(Debug, "uploading mode: %s\n", mesh->get_name().c_str());
-
-	if (mesh->parts.size() == 0) {
-		sys_print(Warning, "ModelMan::upload_model: model has not parts (%s)\n", mesh->get_name().c_str());
-		return false;
-	}
-
-	size_t indiciesbufsize{};
-	const uint8_t* const ibufferdata = mesh->data.get_index_data(&indiciesbufsize);
-	mesh->index_alloc_ptr = allocator.append_to_i_buffer(
-		ibufferdata, indiciesbufsize); // dont divide by sizeof(uint16_2), this is an pointer
-
-	size_t vertbufsize{};
-	const uint8_t* const v_bufferdata = mesh->data.get_vertex_data(&vertbufsize);
-	mesh->vertex_alloc_ptr = allocator.append_to_v_buffer(v_bufferdata, vertbufsize);
-	// mesh->merged_vert_offset /= sizeof(ModelVertex);
-
-	bool has_transparent = false;
-	for (int i = 0; i < mesh->parts.size(); i++) {
-		auto& part = mesh->parts.at(i);
-		auto mat = mesh->materials.at(part.get_material_idx_to_use()).get();
-		if (mat && mat->impl && mat->impl->get_master_impl() && mat->impl->get_master_impl()->is_translucent()) {
-			has_transparent = true;
-			part.set_material_transparent();
-		}
-	}
-	mesh->has_any_transparent_materials = has_transparent;
-
-	return true;
-}
-
-void ModelMan::remove_model_from_list(Model* m) {
-	ASSERT(m);
-
-	// Null any fast-path render cache entries keyed on this model before the
-	// pointer becomes invalid, so the renderer never dereferences a freed Model.
-	if (BuildSceneData_CpuFast::inst)
-		BuildSceneData_CpuFast::inst->on_model_removed(m);
-
-	allocator.ibuffer.alloc.free(m->index_alloc_ptr);
-	allocator.vbuffer.alloc.free(m->vertex_alloc_ptr);
-	m->index_alloc_ptr = {};
-	m->vertex_alloc_ptr = {};
-
-	all_models.remove(m);
-	ASSERT(!all_models.find(m));
+void ModelMan::set_v_attributes() {
+	ASSERT(true); // stub
 }
 
 ModelMan::ModelMan() : all_models(6) {}

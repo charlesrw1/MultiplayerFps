@@ -1,0 +1,179 @@
+// Top-level draw() for CurveEditorImgui: ImGui window, sidebar table, curve list, popups.
+
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include "imgui.h"
+#include "imgui_internal.h"
+#include "CurveEditorImgui.h"
+#include "MyImguiLib.h"
+
+extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
+
+void CurveEditorImgui::draw()
+{
+	ASSERT(!window_name.empty());
+
+	set_scrubber_this_frame = false;
+	if (!ImGui::Begin(window_name.c_str())) {
+		ImGui::End();
+		return;
+	}
+
+	uint32_t ent_list_flags =
+		ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
+		ImGuiTableFlags_RowBg     | ImGuiTableFlags_Resizable |
+		ImGuiTableFlags_Sortable;
+
+	const int num_cols = 2;
+	bool open_curve_popup = false;
+
+	if (ImGui::BeginTable("curveedit", num_cols, ent_list_flags)) {
+		ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed,   100.0f, 0);
+		ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthStretch,   0.0f, 0);
+
+		ImGui::TableNextRow();
+		ImGui::TableNextColumn();
+
+		// --- Left panel: options button, events row, curve list ---
+		{
+			uint32_t inner_flags = ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable;
+			if (ImGui::BeginTable("flags", 1, inner_flags)) {
+				ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch, 50.0f, 0);
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+
+				// Options popup
+				if (ImGui::Button("Options.."))
+					ImGui::OpenPopup("curve_ed_options");
+				if (ImGui::BeginPopup("curve_ed_options")) {
+					ImGui::Checkbox("Snap X to grid", &enable_grid_snapping_x);
+					if (enable_grid_snapping_x) {
+						ImGui::SameLine();
+						ImGui::InputFloat("##amtx", &grid_snap_size.x, 0.1f);
+						if (grid_snap_size.x < 0.001f)
+							grid_snap_size.x = 0.001f;
+					}
+					ImGui::Checkbox("Snap Y to grid", &enable_grid_snapping_y);
+					if (enable_grid_snapping_y) {
+						ImGui::SameLine();
+						ImGui::InputFloat("##amty", &grid_snap_size.y, 0.1f);
+						if (grid_snap_size.y < 0.001f)
+							grid_snap_size.y = 0.001f;
+					}
+					ImGui::InputFloat("Max X", &max_x_value);
+					if (max_x_value <= 0.001f)
+						max_x_value = 0.001f;
+					ImGui::InputFloat("Min Y", &min_y_value);
+					ImGui::InputFloat("Max Y", &max_y_value);
+					if (max_y_value <= min_y_value)
+						max_y_value = min_y_value + 0.01f;
+					ImGui::Checkbox("Snap Time to grid", &snap_scrubber_to_grid);
+					ImGui::EndPopup();
+				}
+				ImGui::Separator();
+
+				// Events row
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+
+				ImGuiSelectableFlags sel_flags =
+					ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+				if (ImGui::Selectable("##selecteddevent", selecting_event, sel_flags, ImVec2(0, 24)))
+					set_selected_event(-1, false);
+				if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[1])
+					set_selected_event(-1, false);
+				ImGui::SameLine();
+				ImGui::Checkbox("##check", &drawing_events);
+				ImGui::SameLine();
+				ImGui::Text("Events");
+
+				ImGui::Separator();
+
+				// Curve rows
+				for (int row_n = 0; row_n < (int)curves.size(); row_n++) {
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+					auto& res = curves[row_n];
+
+					ImGui::PushID(res.curve_id);
+					ImGuiSelectableFlags sf =
+						ImGuiSelectableFlags_SpanAllColumns | ImGuiSelectableFlags_AllowItemOverlap;
+					if (ImGui::Selectable("##selectednode", is_curve_selected(row_n), sf, ImVec2(0, 24)))
+						set_selected_curve(row_n);
+					if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClicked[1]) {
+						open_curve_popup = true;
+						set_selected_curve(row_n);
+					}
+					ImGui::SameLine();
+					ImGui::Checkbox("##check", &res.visible);
+					ImGui::SameLine();
+					ImGui::TextColored(color32_to_imvec4(res.color), res.name.c_str());
+					ImGui::PopID();
+				}
+
+				// Optional "Add row" button
+				if (show_add_curve_button) {
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn();
+
+					ImGuiStyle& style = ImGui::GetStyle();
+					float size  = ImGui::CalcTextSize("Add row").x + style.FramePadding.x * 2.0f;
+					float avail = ImGui::GetContentRegionAvail().x;
+					float off   = (avail - size) * 0.5f;
+					if (off > 0.0f)
+						ImGui::SetCursorPosX(ImGui::GetCursorPosX() + off);
+					if (ImGui::Button("Add row")) {
+						EditingCurve ed;
+						ed.name = "unnamed_row";
+						add_curve(ed);
+					}
+				}
+
+				ImGui::EndTable();
+			}
+		}
+
+		// --- Right panel: the curve editor canvas ---
+		ImGui::TableNextColumn();
+		BASE_SCREENPOS = ImGui::GetCursorScreenPos();
+		WINDOW_SIZE    = ImGui::GetContentRegionAvail();
+		draw_editor_space();
+
+		ImGui::EndTable();
+	}
+
+	// Open curve popup deferred (must happen outside the table row)
+	if (open_curve_popup)
+		ImGui::OpenPopup("curve_popup");
+
+	// --- curve_popup (right-click on a curve row in the sidebar) ---
+	if (ImGui::BeginPopup("curve_popup")) {
+		if (!is_selected_curve_valid()) {
+			sys_print(Warning, "curve_popup bad selected_curve\n");
+			set_selected_curve(-1);
+			ImGui::CloseCurrentPopup();
+		} else {
+			auto& curve = curves.at(selected_curve_or_event);
+
+			ImGui::InputText("##name",
+							 (char*)curve.name.data(),
+							 curve.name.size() + 1 /* null terminator */,
+							 ImGuiInputTextFlags_CallbackResize,
+							 imgui_std_string_resize, &curve.name);
+
+			ImVec4 v4 = color32_to_imvec4(curve.color);
+			ImGui::ColorEdit3("##color", &v4.x, ImGuiColorEditFlags_NoInputs);
+			curve.color.r = (uint8_t)(v4.x * 255);
+			curve.color.g = (uint8_t)(v4.y * 255);
+			curve.color.b = (uint8_t)(v4.z * 255);
+
+			if (ImGui::Button("Delete")) {
+				curves.erase(curves.begin() + selected_curve_or_event);
+				set_selected_curve(-1);
+				ImGui::CloseCurrentPopup();
+			}
+		}
+		ImGui::EndPopup();
+	}
+
+	ImGui::End();
+}

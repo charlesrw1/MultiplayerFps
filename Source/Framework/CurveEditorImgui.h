@@ -170,6 +170,14 @@ private:
 	}
 
 	void draw_editor_space();
+	void draw_editor_background_and_grid(ImDrawList* drawlist, ImVec2 canvas_pos, ImVec2 canvas_size,
+	                                     ImVec2 grid_size, ImVec2 subgrid_size, ImVec2 dxdy_grid,
+	                                     ImVec2 grid, float TIMELINE_HEIGHT,
+	                                     ImU32 col_grid, ImU32 col_subdiv);
+	void draw_curves_and_points(ImDrawList* drawlist, bool can_start_dragging);
+	void draw_events_and_event_popups(ImDrawList* drawlist, bool& is_any_event_hovered);
+	void draw_editor_input_and_scrubber(ImDrawList* drawlist, bool is_window_focused_and_mouse_in_region,
+	                                    bool is_any_event_hovered);
 
 	std::vector<EditingCurve> curves;
 	std::vector<std::unique_ptr<SequencerEditorItem>> events;

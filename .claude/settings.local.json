@@ -257,7 +257,21 @@
       "Bash(where.exe OpenCppCoverage.exe)",
       "Bash(Get-ChildItem Source -Directory)",
       "Bash(Select-Object -ExpandProperty Name)",
-      "Bash(where.exe rg.exe)"
+      "Bash(where.exe rg.exe)",
+      "PowerShell(cd \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\.claude\\\\worktrees\\\\agent-a9656ee82b696b2b3\"; Scripts\\\\build_and_test.ps1 2>&1 | Where-Object { $_ -match \"error C\" } | Select-Object -First 60)",
+      "Bash(grep -rn \"struct Render_Lists\\\\|class Render_Lists\" \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\.claude\\\\worktrees\\\\agent-a9656ee82b696b2b3\\\\Source\\\\Render\" -g \"*.h\")",
+      "Bash(grep -rn \"struct Render_Pass\\\\b\\\\|class Render_Pass\\\\b\" \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\.claude\\\\worktrees\\\\agent-a9656ee82b696b2b3\\\\Source\\\\Render\" -g \"*.h\")",
+      "PowerShell(cd \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\.claude\\\\worktrees\\\\agent-a9656ee82b696b2b3\"; Scripts\\\\build_and_test.ps1 2>&1 | Where-Object { $_ -match \"error C|Build failed\" } | Select-Object -First 40)",
+      "Bash(git *)",
+      "PowerShell(git *)",
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake-wt-material\\\\Source\\\\Render\\\\MaterialLocal.cpp\"\\).Count; \\(Get-Content \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake-wt-material\\\\Source\\\\Render\\\\MaterialLocal_ShaderGen.cpp\"\\).Count)",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake-wt-material\"; powershell.exe -NoProfile -File \"Scripts\\\\build_and_test.ps1\" 2>&1)",
+      "PowerShell(Set-Location \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\"; powershell.exe -NoProfile -File \"Scripts\\\\build_and_test.ps1\" 2>&1 | Select-Object -Last 30)",
+      "PowerShell(cmd /c dir \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake-wt-drawlocal\\\\Source\\\\Render\" | findstr DrawLocal)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake-wt-bikeapp\\\\\" -Recurse | Where-Object { $_.Name -match \"vcxproj\" } | Select-Object FullName)",
+      "PowerShell(cd \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake-wt-bikeapp\"; powershell.exe -NoProfile -File Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 80)",
+      "PowerShell(cd \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake-wt-bikeapp\"; powershell.exe -NoProfile -Command \"docs.exe check\")",
+      "PowerShell(cd \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake-wt-bikeapp\"; & \"C:\\\\Program Files \\(x86\\)\\\\Microsoft Visual Studio\\\\2019\\\\Community\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" CsRemake.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /nologo 2>&1 | Where-Object { $_ -match \"error|warning|BikeApplication\" } | Select-Object -First 40)"
     ]
   },
   "enabledPlugins": {

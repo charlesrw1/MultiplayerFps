@@ -2,9 +2,7 @@ This is a game engine project. Uses C++ VS2019, OpenGL, SDL2, vcpkg. No CMAKE.
 
 Write tests. Testing documentation found at [[docs/testing.md]]. Use Scripts/build_and_test.ps1 to build and run unit tests. Use Scripts/integration_tests.ps1 to build and run integration tests (with cli options).
 
-Use git to commit after you are done. Write summaries in the message of all commits. Use git worktrees.
-
-When possible, use parallel subagents with git worktrees.
+Use git to commit after you are done. Write summaries in the message of all commits. 
 
 DO NOT use new/delete/malloc etc UNLESS given permission. Always use modern C++ 17/20. unique_ptr, shared_ptr, etc.
 
@@ -19,6 +17,8 @@ vcpkg is located in ~\source\vcpkg\vcpkg.exe
 _NEVER_ read source files in External/ _unless_ given permission. ONLY read AGENTS.md in External/ for summary.
 
 Limit the source files you read to the module you are working on. Be brief, spare tokens.
+
+Every function should have at least 1 ASSERT(), documenting its preconditions and invariants. 
 
 ## Documentation
 

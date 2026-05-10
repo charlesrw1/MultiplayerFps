@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -56,10 +56,16 @@
     <ClCompile Include="Source\EditorPopups.cpp" />
     <ClCompile Include="Source\EditorPopupTemplate.cpp" />
     <ClCompile Include="Source\Framework\BVHBuild.cpp" />
+    <ClCompile Include="Source\Framework\BakedCurve.cpp" />
     <ClCompile Include="Source\Framework\ClassBase.cpp" />
     <ClCompile Include="Source\Framework\ClassTypePtr.cpp" />
     <ClCompile Include="Source\Framework\Config.cpp" />
     <ClCompile Include="Source\Framework\CurveEditorImgui.cpp" />
+    <ClCompile Include="Source\Framework\CurveEditorImgui_Curves.cpp" />
+    <ClCompile Include="Source\Framework\CurveEditorImgui_Events.cpp" />
+    <ClCompile Include="Source\Framework\CurveEditorImgui_Grid.cpp" />
+    <ClCompile Include="Source\Framework\CurveEditorImgui_Input.cpp" />
+    <ClCompile Include="Source\Framework\CurveEditorImgui_UI.cpp" />
     <ClCompile Include="Source\Framework\DictParser.cpp" />
     <ClCompile Include="Source\Framework\EnumDefReflection.cpp" />
     <ClCompile Include="Source\Framework\Files.cpp">
@@ -74,6 +80,9 @@
     <ClCompile Include="Source\Framework\MyImguiLib.cpp" />
     <ClCompile Include="Source\Framework\Profilier.cpp" />
     <ClCompile Include="Source\Framework\PropertyEd.cpp" />
+    <ClCompile Include="Source\Framework\PropertyEdArray.cpp" />
+    <ClCompile Include="Source\Framework\PropertyEdGroup.cpp" />
+    <ClCompile Include="Source\Framework\PropertyEdWidgets.cpp" />
     <ClCompile Include="Source\Framework\PropertyPtr.cpp" />
     <ClCompile Include="Source\Framework\ReflectionProp.cpp" />
     <ClCompile Include="Source\Framework\Serializer.cpp" />
@@ -93,6 +102,9 @@
     <ClCompile Include="Source\Game\BikeDemo\BikeApplication_AIDebug.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Debug.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Pack.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_PackAI.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_PackAvoid.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_PackDebug.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Player.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeCourse.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeCourseDebug.cpp">
@@ -112,6 +124,9 @@
     </ClCompile>
     <ClCompile Include="Source\Game\BikeDemo\BikeCamera.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeObject.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeObject_Physics.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeObject_Stamina.cpp" />
+    <ClCompile Include="Source\Game\BikeDemo\BikeObject_Steer.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeUI.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeWind.cpp" />
     <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
@@ -120,16 +135,23 @@
     <ClCompile Include="Source\Game\Components\DecalComponent.cpp" />
     <ClCompile Include="Source\Game\Components\GraphCurveComponent.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents.cpp" />
+    <ClCompile Include="Source\Game\Components\LightComponents_Environment.cpp" />
+    <ClCompile Include="Source\Game\Components\LightComponents_GiScene.cpp" />
+    <ClCompile Include="Source\Game\Components\LightComponents_Lightmap.cpp" />
     <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp" />
     <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
     <ClCompile Include="Source\Game\Components\ParticleComponent.cpp" />
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
+    <ClCompile Include="Source\Game\Components\PhysicsJoints.cpp" />
+    <ClCompile Include="Source\Game\Components\PhysicsShapes.cpp" />
     <ClCompile Include="Source\Game\Components\PrefabAssetComponent.cpp" />
     <ClCompile Include="Source\Game\Components\RagdollComponent.cpp" />
     <ClCompile Include="Source\Game\Components\SpawnerComponenth.cpp" />
     <ClCompile Include="Source\Game\Entities\BikeEntity.cpp" />
     <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
     <ClCompile Include="Source\Game\Entities\Player.cpp" />
+    <ClCompile Include="Source\Game\Entities\Player_CameraPath.cpp" />
+    <ClCompile Include="Source\Game\Entities\Player_GameplayStatic.cpp" />
     <ClCompile Include="Source\Game\Entities\PlayerAnimDriver.cpp" />
     <ClCompile Include="Source\Game\Entity.cpp" />
     <ClCompile Include="Source\Game\EntityComponent.cpp" />
@@ -141,19 +163,31 @@
     <ClCompile Include="Source\Game\TP\TPGame.cpp" />
     <ClCompile Include="Source\LevelEditor\AddEditorCommands.cpp" />
     <ClCompile Include="Source\LevelEditor\Commands.cpp" />
+    <ClCompile Include="Source\LevelEditor\CommandsComponent.cpp" />
+    <ClCompile Include="Source\LevelEditor\CommandsPrefab.cpp" />
+    <ClCompile Include="Source\LevelEditor\CommandsUndoRedo.cpp" />
     <ClCompile Include="Source\LevelEditor\DecalStampTool.cpp" />
     <ClCompile Include="Source\LevelEditor\DragDetector.cpp" />
     <ClCompile Include="Source\LevelEditor\DragDropPreview.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
+    <ClCompile Include="Source\LevelEditor\EditorDocInput.cpp" />
+    <ClCompile Include="Source\LevelEditor\EditorDocScene.cpp" />
+    <ClCompile Include="Source\LevelEditor\EditorDocViewport.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorUILayout.cpp" />
     <ClCompile Include="Source\LevelEditor\EdPropertyGrid.cpp" />
     <ClCompile Include="Source\LevelEditor\FoliagePaintTool.cpp" />
     <ClCompile Include="Source\LevelEditor\LevelEditorCamera.cpp" />
     <ClCompile Include="Source\LevelEditor\ManipulateTransformTool.cpp" />
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp" />
+    <ClCompile Include="Source\LevelEditor\ObjectOutlinerContextMenu.cpp" />
+    <ClCompile Include="Source\LevelEditor\ObjectOutlinerDraw.cpp" />
+    <ClCompile Include="Source\LevelEditor\ObjectOutlinerFilter.cpp" />
     <ClCompile Include="Source\LevelEditor\OrthoCamera.cpp" />
     <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp" />
     <ClCompile Include="Source\LevelEditor\RoadBuilderTool.cpp" />
+    <ClCompile Include="Source\LevelEditor\RoadBuilderTool_Helpers.cpp" />
+    <ClCompile Include="Source\LevelEditor\RoadBuilderTool_Overlay.cpp" />
+    <ClCompile Include="Source\LevelEditor\RoadBuilderTool_Tick.cpp" />
     <ClCompile Include="Source\Game\Components\RoadNetworkComponent.cpp" />
     <ClCompile Include="Source\LevelEditor\SceneExport.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
@@ -184,26 +218,42 @@
     <ClCompile Include="Source\Render\DrawLocal_SceneDraw.cpp" />
     <ClCompile Include="Source\Render\DrawLocal_SceneDrawInternal.cpp" />
     <ClCompile Include="Source\Render\DrawLocal_Debug.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal_BatchScene.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal_CullShadow.cpp" />
     <ClCompile Include="Source\Render\EnvProbe.cpp" />
     <ClCompile Include="Source\Render\Frustum.cpp" />
     <ClCompile Include="Source\Render\GpuAllocator.cpp" />
     <ClCompile Include="Source\Render\GpuCullingTest.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal.cpp" />
+    <ClCompile Include="Source\Render\MaterialLocal_Loading.cpp" />
+    <ClCompile Include="Source\Render\MaterialLocal_Manager.cpp" />
+    <ClCompile Include="Source\Render\MaterialLocal_Shader.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal_ShaderGen.cpp" />
     <ClCompile Include="Source\Render\Model.cpp" />
+    <ClCompile Include="Source\Render\ModelGpuUpload.cpp" />
+    <ClCompile Include="Source\Render\ModelLoad.cpp" />
     <ClCompile Include="Source\Render\ModelDynamic.cpp" />
     <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
+    <ClCompile Include="Source\Render\OpenGlBufferImpl.cpp" />
+    <ClCompile Include="Source\Render\OpenGlTextureImpl.cpp" />
     <ClCompile Include="Source\Render\RenderExtra.cpp" />
+    <ClCompile Include="Source\Render\RenderExtra_LightCookieAtlas.cpp" />
+    <ClCompile Include="Source\Render\RenderExtra_SSR.cpp" />
     <ClCompile Include="Source\Render\RenderGiManager.cpp" />
     <ClCompile Include="Source\Render\RenderScene.cpp" />
     <ClCompile Include="Source\Render\RenderWindow.cpp" />
     <ClCompile Include="Source\Render\RT\RaytraceTest.cpp" />
+    <ClCompile Include="Source\Render\RT\RaytraceTest_BVH.cpp" />
+    <ClCompile Include="Source\Render\RT\RaytraceTest_Probe.cpp" />
+    <ClCompile Include="Source\Render\RT\RaytraceTest_Shade.cpp" />
     <ClCompile Include="Source\Render\Shader.cpp" />
     <ClCompile Include="Source\Render\Shadowmap.cpp" />
     <ClCompile Include="Source\Render\Ssao.cpp" />
     <ClCompile Include="Source\Render\Texture.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
     </ClCompile>
+    <ClCompile Include="Source\Render\TextureDDS.cpp" />
+    <ClCompile Include="Source\Render\TextureUpload.cpp" />
     <ClCompile Include="Source\Render\Volumetricfog.cpp" />
     <ClCompile Include="Source\Scripting\LuaTestRunner.cpp" />
     <ClCompile Include="Source\Scripting\ScriptFunctionCodegen.cpp" />
@@ -472,6 +522,7 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
+    <ClCompile Include="Source\AssetCompile\ModelCompile_AnimSkeleton.cpp" />
     <ClCompile Include="Source\AssetCompile\ModelCompile_Output.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
@@ -488,6 +539,8 @@
     <ClCompile Include="Source\EngineMain_Commands.cpp" />
     <ClCompile Include="Source\EngineMain_Loop.cpp" />
     <ClCompile Include="Source\EngineMain_Debug.cpp" />
+    <ClCompile Include="Source\EngineMain_Init.cpp" />
+    <ClCompile Include="Source\EngineMain_ViewSetup.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\Physics\Physics2Local.cpp" />
     <ClCompile Include="Source\Render\Editor\TextureEditor.cpp">

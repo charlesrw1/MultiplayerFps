@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -165,6 +165,9 @@
     <ClCompile Include="maputil_test.cpp" />
     <ClCompile Include="pool_allocator_test.cpp" />
     <ClCompile Include="scripting_test.cpp" />
+    <ClCompile Include="scripting_manager_test.cpp" />
+    <ClCompile Include="scripting_classreg_test.cpp" />
+    <ClCompile Include="scripting_lua_dispatch_test.cpp" />
     <ClCompile Include="hashmap_test.cpp" />
     <ClCompile Include="inlinevec_test.cpp" />
     <ClCompile Include="main.cpp" />
