@@ -21,16 +21,6 @@
 // shadow culling, and object-removal callbacks.
 // -----------------------------------------------------------------------
 
-// Pack/unpack a visibility flag and LOD index into a single byte.
-inline void split_input_lod_arr(uint8_t in, bool& is_vis, int8_t& lod) {
-	ASSERT(true); // trivial helper, always valid
-	is_vis = bool(in & 1);
-	lod = int8_t(in >> 1);
-}
-inline void pack_input_lod_arr(uint8_t& out, bool is_vis, int8_t lod) {
-	ASSERT(lod >= 0);
-	out = uint8_t(is_vis) | uint8_t(lod << 1);
-}
 
 inline int next_pow2(uint32_t x) {
 	ASSERT(x > 0);

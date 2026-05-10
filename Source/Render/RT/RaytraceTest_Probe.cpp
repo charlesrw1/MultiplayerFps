@@ -249,7 +249,7 @@ void DdgiTesting::execute() {
 // ---------------------------------------------------------------------------
 
 void DdgiTesting::calculate_lum_for_spec() {
-    ASSERT(lum_calc.is_valid());
+    ASSERT(lum_calc != -1);
     const int num = RenderGiManager::inst->get_num_cubemaps();
     if (num == 0)
         return;

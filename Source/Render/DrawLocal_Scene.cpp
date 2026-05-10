@@ -25,6 +25,7 @@
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
 #include <algorithm>
+
 glm::vec4 to_vec4(Color32 color) {
 	return glm::vec4(color.r, color.g, color.b, color.a) / 255.f;
 }

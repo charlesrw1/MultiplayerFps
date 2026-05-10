@@ -50,7 +50,7 @@ bool Model::has_bones() const {
 }
 
 int Model::bone_for_name(StringName name) const {
-	ASSERT(name.is_valid());
+	ASSERT(!name.is_null());
 	if (!get_skel())
 		return -1;
 	return get_skel()->get_bone_index(name);

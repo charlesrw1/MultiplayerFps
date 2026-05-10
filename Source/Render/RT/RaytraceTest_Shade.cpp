@@ -144,7 +144,7 @@ void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_
 // ---------------------------------------------------------------------------
 
 void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap_view) {
-    ASSERT(ssao && shade_fs.is_valid());
+    ASSERT(ssao && shade_fs != -1);
     auto& device = draw.get_device();
 
     RenderPipelineState state;
@@ -168,7 +168,7 @@ ConfigVar r_ddgi_halfres_blend("r.ddgi_halfres_blend", "0.8", CVAR_FLOAT,
                                "[0,1] blend input into ddgi temporal accumulation");
 
 void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
-    ASSERT(ssao && shade_fs_halfres.is_valid());
+    ASSERT(ssao && shade_fs_halfres != -1);
     auto& device = draw.get_device();
 
     const glm::ivec2 texel_offset = get_half_res_offset();
@@ -288,7 +288,7 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view) {
 // ---------------------------------------------------------------------------
 
 void DdgiTesting::render_rt() {
-    ASSERT(raytrace_test.is_valid());
+    ASSERT(raytrace_test != -1);
     GPUFUNCTIONSTART;
 
     if (!verts) {

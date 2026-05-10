@@ -33,6 +33,19 @@
 #include <span>
 
 // ---------------------------------------------------------------------------
+// LOD visibility helpers — used by DrawLocal_Scene.cpp and DrawLocal_CullShadow.cpp
+// ---------------------------------------------------------------------------
+inline void pack_input_lod_arr(uint8_t& out, bool is_vis, int8_t lod) {
+	ASSERT(lod >= 0);
+	out = uint8_t(is_vis) | uint8_t(lod << 1);
+}
+inline void split_input_lod_arr(uint8_t in, bool& is_vis, int8_t& lod) {
+	ASSERT(true);
+	is_vis = bool(in & 1);
+	lod = int8_t(in >> 1);
+}
+
+// ---------------------------------------------------------------------------
 // Sub-headers
 // ---------------------------------------------------------------------------
 

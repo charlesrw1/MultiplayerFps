@@ -1,4 +1,5 @@
 #include "BikeHeaders.h"
+#include "BikeObject_Local.h"
 #include "Framework/MathLib.h"
 #include "Framework/Config.h"
 #include "Physics/Physics2.h"
@@ -7,32 +8,18 @@
 // Wind state accessed via g_wind (defined in BikeWind.cpp)
 
 // ============================================================
-// Physics constants
+// Physics-only constants (not shared with other BikeObject files)
 // ============================================================
-static constexpr float BIKE_MASS        = 83.f;
-static constexpr float BIKE_WHEEL_CIRC  = 2.1f;
 static constexpr float BIKE_CDA         = 0.3f;
 static constexpr float BIKE_AIR_DENSITY = 1.225f;
 static constexpr float BIKE_ROLL_RESIST = 0.004f;
-static constexpr float BIKE_GRAVITY     = 9.81f;
 static           float BIKE_MAX_BRAKE   = 1.8f;
-static constexpr float BIKE_REAR_Z      = -0.449f;
-static constexpr float BIKE_FRONT_Z     =  0.5394f;
-static constexpr float BIKE_WHEELBASE   = BIKE_FRONT_Z - BIKE_REAR_Z;
 
 // Traction tuning
 static float traction_mu           = 1.0f;   // dry-road tire µ
 static float traction_lean_comp    = 0.20f;  // bicycle lean handles most cornering
 static float traction_build_rate   = 2.0f;   // slide builds at (slip_ratio-1) × this per second
 static float traction_recover_rate = 1.5f;   // slide recovers at this per second
-
-// Steering geometry helpers (used for corner overspeed check)
-static float steer_min_radius   = 1.5f;
-static float steer_radius_coeff = 0.11f;
-static float steer_max_deg      = 45.f;
-static float steer_max_deg_hi   = 4.f;
-static float steer_ref_speed    = 2.5f;
-static float steer_speed_power  = 2.0f;
 
 // Bump speed / power loss
 static float bump_speed_thresh  = 0.003f;  // minimum total_bump before speed is shed

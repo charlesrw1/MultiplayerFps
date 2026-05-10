@@ -1,4 +1,5 @@
 #include "BikeHeaders.h"
+#include "BikeObject_Local.h"
 #include "Debug.h"
 
 #include "Game/GameplayStatic.h"
@@ -13,16 +14,6 @@
 #include <cfloat>
 
 // ============================================================
-// Physics constants
-// ============================================================
-static constexpr float BIKE_MASS        = 83.f;
-static constexpr float BIKE_WHEEL_CIRC  = 2.1f;
-static constexpr float BIKE_GRAVITY     = 9.81f;
-static constexpr float BIKE_REAR_Z      = -0.449f;
-static constexpr float BIKE_FRONT_Z     =  0.5394f;
-static constexpr float BIKE_WHEELBASE   = BIKE_FRONT_Z - BIKE_REAR_Z; // ~0.9884
-
-// ============================================================
 // Transform / crack tuning vars
 // ============================================================
 
@@ -31,33 +22,8 @@ static float crack_vis_pitch_impulse = 5;    // rad/s applied per unit crack_imp
 static float crack_vis_spring        = 340;  // spring constant
 static float crack_vis_damp          = 10.f; // damping
 
-// Handlebar visual scale (used in tick_transform fork steer section)
-static float bar_scale_lo_steer    = 1.5f;
-static float bar_scale_hi_steer    = 1.0f;
-static float bar_visual_lean_min   = 1.5f;
-static float bar_lean_fade_lo      = 0.0f;
-static float bar_lean_fade_hi      = 1.f;
-static float lean_max_deg          = 32.f;
-
 // Gear shift cooldown
 static float bike_gear_shift_cooldown = 3.f;
-
-// Steering max for tick_transform (fork visual + raycasts)
-static float steer_max_deg      = 45.f;
-static float steer_max_deg_hi   = 4.f;
-static float steer_ref_speed    = 2.5f;
-static float steer_speed_power  = 2.0f;
-
-// Returns the maximum steer angle (radians) at the given speed.
-// Uses a speed^power falloff so authority shrinks as (ref_speed/speed)^power —
-// same relationship car racing games use to make high-speed steering feel less twitchy.
-static float compute_max_steer_rad(float speed)
-{
-	ASSERT(speed >= 0.f);
-	const float safe_speed = glm::max(speed, steer_ref_speed);
-	const float t          = glm::pow(steer_ref_speed / safe_speed, steer_speed_power);
-	return glm::radians(steer_max_deg_hi + (steer_max_deg - steer_max_deg_hi) * t);
-}
 
 static BikeObject* s_bike_debug = nullptr;  // set each tick for debug menu
 

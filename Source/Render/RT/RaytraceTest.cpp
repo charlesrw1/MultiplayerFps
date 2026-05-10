@@ -4,6 +4,7 @@
 //   RaytraceTest_Probe.cpp — probe trace/gather/execute
 //   RaytraceTest_Shade.cpp — shading/lighting passes
 #include "RaytraceTest.h"
+#include "RaytraceTest_internal.h"
 #include "Render/DrawLocal.h"
 #include "Render/Model.h"
 #include "Render/MaterialLocal.h"
@@ -12,9 +13,7 @@
 
 #include "imgui.h"
 
-const int MAX_RAYS = 256;
-const int ddgiIRRADTILE = 8;
-const int ddgiDEPTHTILE = 16;
+// MAX_RAYS, ddgiIRRADTILE, ddgiDEPTHTILE defined in RaytraceTest_internal.h (included by split files)
 
 using std::vector;
 

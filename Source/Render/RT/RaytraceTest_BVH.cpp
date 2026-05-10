@@ -16,7 +16,7 @@
 
 using std::vector;
 
-const int MAX_MATERIALS = 256; // must match shader constant
+static constexpr int RT_MAX_MATERIALS = 256; // RT material slot limit; must match shader constant
 
 extern float relocate_normal_dist;
 
@@ -197,7 +197,7 @@ void DdgiTesting::build_world() {
 
     std::vector<glm::vec4> materialsdata;
     auto& allmats = matman.get_material_table()->get_all_mat_array();
-    materialsdata.resize(MAX_MATERIALS);
+    materialsdata.resize(RT_MAX_MATERIALS);
     for (int i = 0; i < allmats.size(); i++) {
         if (!allmats.at(i))
             continue;
@@ -205,7 +205,7 @@ void DdgiTesting::build_world() {
         if (m->gpu_buffer_offset == MaterialImpl::INVALID_MAPPING)
             continue;
         const int INDEX = m->get_material_index_from_buffer_ofs();
-        ASSERT(INDEX >= 0 && INDEX < MAX_MATERIALS);
+        ASSERT(INDEX >= 0 && INDEX < RT_MAX_MATERIALS);
 
         auto vec = color32_to_vec4(get_color_of_material_for_export(allmats.at(i)));
         auto linear = glm::pow(vec, glm::vec4(2.2));

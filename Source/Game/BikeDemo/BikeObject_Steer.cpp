@@ -1,4 +1,5 @@
 #include "BikeHeaders.h"
+#include "BikeObject_Local.h"
 #include "Framework/MathLib.h"
 #include "Framework/Config.h"
 #include "imgui.h"
@@ -7,32 +8,33 @@
 
 // ============================================================
 // Steering / physics tuning vars
+// Defined non-static so BikeObject.cpp and BikeObject_Physics.cpp can extern them.
 // ============================================================
 
-static float steer_speed_gate_lo   = 4.f;    // m/s — speed_factor = 0 below this
-static float steer_speed_gate_hi   = 14.f;   // m/s — speed_factor = 1 above this
-static float steer_lean_threshold  = 0.40f;  // input fraction at which committed-turn inertia starts
-static float steer_lean_range      = 0.35f;  // input range over which inertia ramps to full
-static float steer_build_lo        = 0.04f;  // build smoothing for micro/small inputs (snappy)
-static float steer_build_hi        = 0.12f;  // build smoothing for large committed inputs at high speed
-static float steer_vel_scale       = 4.f;    // stick units/s at which velocity boost is fully applied
-static float steer_vel_boost       = 0.01f;  // smoothing floor when flicking fast (lower = snappier)
-static float steer_release_lo      = 0.012f; // release smoothing when not committed
-static float steer_release_hi      = 0.05f;  // release smoothing when deeply committed (gradual corner exit)
-static float steer_max_deg         = 45.f;   // max steer angle at/below reference speed (degrees)
-static float steer_max_deg_hi      = 4.f;    // minimum steer angle floor at very high speed (degrees)
-static float steer_ref_speed       = 2.5f;    // m/s — speed at which full steer authority begins decaying
-static float steer_speed_power     = 2.0f;   // falloff exponent: 2 = quadratic (car-like), 1 = linear
-static float steer_min_radius      = 1.5f;   // minimum turn radius (m)
-static float steer_radius_coeff    = 0.11f;  // speed² coefficient for min radius (lower = more responsive at speed)
-static float lean_max_deg          = 32.f;   // visual lean cap (degrees) — prevents extreme angles
-static float lean_steer_min        = 0.12f;  // steer fraction below which there is zero lean
-static float lean_steer_full       = 0.45f;  // steer fraction at which lean reaches its full physics value
-static float bar_scale_lo_steer    = 1.5f;   // handlebar visual amplifier at near-zero steer
-static float bar_scale_hi_steer    = 1.0f;   // handlebar visual amplifier at full steer input
-static float bar_visual_lean_min   = 1.5f;  // residual bar scale at full lean
-static float bar_lean_fade_lo      = 0.0f;  // lean fraction where bar fade begins [0,1]
-static float bar_lean_fade_hi      = 1.f;  // lean fraction where bar is at minimum [0,1]
+static float steer_speed_gate_lo   = 4.f;
+static float steer_speed_gate_hi   = 14.f;
+static float steer_lean_threshold  = 0.40f;
+static float steer_lean_range      = 0.35f;
+static float steer_build_lo        = 0.04f;
+static float steer_build_hi        = 0.12f;
+static float steer_vel_scale       = 4.f;
+static float steer_vel_boost       = 0.01f;
+static float steer_release_lo      = 0.012f;
+static float steer_release_hi      = 0.05f;
+float steer_max_deg         = 45.f;
+float steer_max_deg_hi      = 4.f;
+float steer_ref_speed       = 2.5f;
+float steer_speed_power     = 2.0f;
+float steer_min_radius      = 1.5f;
+float steer_radius_coeff    = 0.11f;
+float lean_max_deg          = 32.f;
+static float lean_steer_min        = 0.12f;
+static float lean_steer_full       = 0.45f;
+float bar_scale_lo_steer    = 1.5f;
+float bar_scale_hi_steer    = 1.0f;
+float bar_visual_lean_min   = 1.5f;
+float bar_lean_fade_lo      = 0.0f;
+float bar_lean_fade_hi      = 1.f;
 
 // Low-speed uphill wobble
 static float wobble_speed_max    = 4.5f;   // m/s — fully active below this
@@ -58,17 +60,9 @@ static float bump_steer_spring  = 200.f;   // stiffness — snaps back to centre
 static float bump_steer_damp    = 14.f;    // damping
 static float bump_steer_max     = 0.18f;   // max displacement as fraction of full steer
 
-static constexpr float BIKE_GRAVITY   = 9.81f;
-static constexpr float BIKE_REAR_Z    = -0.449f;
-static constexpr float BIKE_FRONT_Z   =  0.5394f;
-static constexpr float BIKE_WHEELBASE = BIKE_FRONT_Z - BIKE_REAR_Z;
-
 static BikeObject* s_steer_debug = nullptr;  // set each tick for debug menu
 
-// Returns the maximum steer angle (radians) at the given speed.
-// Uses a speed^power falloff so authority shrinks as (ref_speed/speed)^power —
-// same relationship car racing games use to make high-speed steering feel less twitchy.
-static float compute_max_steer_rad(float speed)
+float compute_max_steer_rad(float speed)
 {
 	ASSERT(speed >= 0.f);
 	const float safe_speed = glm::max(speed, steer_ref_speed);
