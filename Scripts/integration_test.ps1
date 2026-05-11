@@ -45,6 +45,14 @@
     sentinel lines (`[TEST] ...`); the full uncoloured log is always written
     to test_<mode>_output.log regardless.
 
+.PARAMETER Debugger
+    Attach Visual Studio 2026 to App.exe at the start of each pass. Uses DTE
+    to attach to an already-running VS instance (whichever one is registered
+    in the ROT); falls back to vsjitdebugger.exe if no VS is running. In this
+    mode App.exe runs as a child process with stdout/stderr streamed directly
+    to the console (filtering is bypassed - read test_<mode>_output.log for
+    the structured log).
+
 .EXAMPLE
     Scripts/integration_test.ps1
     Build and run both game + editor passes (all tests, concise output).
@@ -52,6 +60,10 @@
 .EXAMPLE
     Scripts/integration_test.ps1 -Mode editor -Pattern "editor/prefab*"
     Run prefab editor tests.
+
+.EXAMPLE
+    Scripts/integration_test.ps1 -Mode game -Pattern "game/boot" -Debugger
+    Attach the running VS 2026 instance to App.exe for the game pass.
 
 .EXAMPLE
     Scripts/integration_test.ps1 -ShowEngineLog
@@ -84,7 +96,8 @@ param(
     [switch]$Promote,
     [switch]$Interactive,
     [switch]$TimingAssert,
-    [switch]$ShowEngineLog
+    [switch]$ShowEngineLog,
+    [switch]$Debugger
 )
 
 $ErrorActionPreference = "Stop"
@@ -106,6 +119,45 @@ $exe = "$root\x64\$Config\App.exe"
 if (-not (Test-Path $exe)) { Write-Error "Binary not found: $exe"; exit 1 }
 
 # ---- Helpers ---------------------------------------------------------------
+function Attach-VSDebugger([int]$targetPid, [int]$timeoutSeconds = 15) {
+    # Try to grab a running VS instance from the ROT. VS 2026 Insiders
+    # registers as VisualStudio.DTE.18.0; we also probe older ProgIDs so this
+    # still works on a Dev17 install if someone hasn't upgraded yet.
+    $dte = $null
+    foreach ($progId in @("VisualStudio.DTE.18.0", "VisualStudio.DTE.17.0", "VisualStudio.DTE")) {
+        try {
+            $dte = [Runtime.InteropServices.Marshal]::GetActiveObject($progId)
+            Write-Host "Attaching VS debugger ($progId) to PID $targetPid..." -ForegroundColor Cyan
+            break
+        } catch {
+            continue
+        }
+    }
+
+    if (-not $dte) {
+        Write-Warning "No running VS instance found - launching vsjitdebugger.exe (pick a debugger in the prompt)."
+        Start-Process "vsjitdebugger.exe" -ArgumentList "-p", $targetPid | Out-Null
+        return
+    }
+
+    $deadline = (Get-Date).AddSeconds($timeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            foreach ($p in $dte.Debugger.LocalProcesses) {
+                if ($p.ProcessID -eq $targetPid) {
+                    $p.Attach()
+                    Write-Host "Attached." -ForegroundColor Green
+                    return
+                }
+            }
+        } catch {
+            # RPC_E_CALL_REJECTED is common while VS is busy; retry.
+        }
+        Start-Sleep -Milliseconds 250
+    }
+    Write-Warning "Could not attach VS debugger to PID $targetPid within ${timeoutSeconds}s."
+}
+
 function Run-Pass([string]$mode) {
     Write-Host "`n=== $mode pass ===" -ForegroundColor Cyan
     $args = @("--tests", $mode)
@@ -114,6 +166,16 @@ function Run-Pass([string]$mode) {
     if ($Promote)      { $args += "--promote" }
     if ($Interactive)  { $args += "--interactive" }
     if ($TimingAssert) { $args += "--timing-assert" }
+
+    if ($Debugger) {
+        # Launch as a separate process so we can grab its PID and attach VS
+        # before user-code-of-interest runs. Output filtering is dropped here -
+        # the full engine log is still on disk via test_<mode>_output.log.
+        $proc = Start-Process -FilePath $exe -ArgumentList $args -PassThru -NoNewWindow
+        Attach-VSDebugger $proc.Id
+        $proc.WaitForExit()
+        return $proc.ExitCode
+    }
 
     # Stream App.exe output to the host directly (Out-Host) so it does NOT get
     # captured into this function's pipeline output. Without this, every stdout
