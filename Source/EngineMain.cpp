@@ -11,7 +11,6 @@
 #include "IEditorTool.h"
 #include "User_Camera.h"
 #include "glm/ext/matrix_transform.hpp"
-#include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/euler_angles.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "Framework/MathLib.h"
@@ -52,7 +51,6 @@
 #include "Scripting/ScriptManager.h"
 #include "Scripting/ScriptFunctionCodegen.h"
 #include "Framework/StringUtils.h"
-#include "Scripting/ScriptManager.h"
 #include "EngineMain.h"
 #include "EditorPopupTemplate.h"
 #include "Animation/SkeletonData.h"
@@ -61,9 +59,6 @@
 #include "IntegrationTests/StateDump.h"
 #include "Framework/Util.h"
 #include <mutex>
-#include <fstream>
-
-#include "Logging.h"
 
 // ---------------------------------------------------------------------------
 // Global singletons

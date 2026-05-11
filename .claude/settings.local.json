@@ -307,7 +307,8 @@
       "PowerShell(.\\\\Scripts\\\\lua_check.ps1 -Path .\\\\Data\\\\scripts\\\\bike_player.lua -Level Error)",
       "PowerShell(.\\\\Scripts\\\\lua_check.ps1 -Path $env:TEMP\\\\lua_check_smoke\\\\bad.lua -Level Warning)",
       "PowerShell(.\\\\Scripts\\\\lua_check.ps1 -Path $env:TEMP\\\\lua_check_smoke\\\\syntax_err.lua -Level Hint)",
-      "PowerShell(.\\\\Scripts\\\\lua_check.ps1 -Path $env:TEMP\\\\lua_check_smoke -Level Warning)"
+      "PowerShell(.\\\\Scripts\\\\lua_check.ps1 -Path $env:TEMP\\\\lua_check_smoke -Level Warning)",
+      "Bash(Get-Location)"
     ]
   },
   "enabledPlugins": {

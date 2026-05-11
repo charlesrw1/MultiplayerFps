@@ -31,7 +31,8 @@ public:
 	void set_call_init_in_editor(bool b) { call_init_in_editor = b; }
 	bool get_call_init_in_editor() const { return call_init_in_editor; }
 	REF void destroy();
-	REF Entity* get_owner() const { return entity_owner; }
+	REFLECT(no_nil)
+	Entity* get_owner() const { return entity_owner; }
 	const glm::mat4& get_ws_transform();
 	glm::vec3 get_ws_position() { return get_ws_transform()[3]; }
 	// helper function which calls eng->get_level()->add_to_sync_render_data_list(this)

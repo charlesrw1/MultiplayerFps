@@ -332,6 +332,7 @@
     <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h" />
     <ClInclude Include="Source\Game\TP\DefaultGameHeader.h" />
     <ClInclude Include="Source\Game\TP\TPGame.h" />
+    <ClInclude Include="Source\ITestRunner.h" />
     <ClInclude Include="Source\LevelEditor\DragDetector.h" />
     <ClInclude Include="Source\LevelEditor\DragDropPreview.h" />
     <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h" />
