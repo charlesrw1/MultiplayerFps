@@ -120,8 +120,24 @@ void DecalBatcher::draw_decals() {
 	setup2.depth_info = draw.tex.scene_depth;
 	IGraphicsDevice::inst->set_render_pass(setup2);
 
-	const int ROUGH_METAL_TEX_INDEX = 2;
-	glColorMaski(ROUGH_METAL_TEX_INDEX, GL_TRUE, GL_TRUE, GL_FALSE, GL_FALSE); // disable writes to mat id
+	// Per-attachment color masks: gate writes to G-buffer locations the decal material did not
+	// declare an output for. Without this, a blended decal whose shader omits e.g. `DECAL_ALBEDO_WRITE`
+	// produces UB source values into the bound-but-undeclared attachments. Locations are:
+	//   0=normal, 1=albedo, 2=roughmetal (BA carries material id, never written by decals),
+	//   3=emissive, 4=editor_id (never written), 5=scene_motion (never written).
+	auto apply_decal_color_masks = [](const MasterMaterialImpl* mm) {
+		const GLboolean T = GL_TRUE, F = GL_FALSE;
+		const GLboolean n = mm->decal_affect_normal     ? T : F;
+		const GLboolean a = mm->decal_affect_albedo     ? T : F;
+		const GLboolean r = mm->decal_affect_roughmetal ? T : F;
+		const GLboolean e = mm->decal_affect_emissive   ? T : F;
+		glColorMaski(0, n, n, n, n);
+		glColorMaski(1, a, a, a, a);
+		glColorMaski(2, r, r, F, F);
+		glColorMaski(3, e, e, e, e);
+		glColorMaski(4, F, F, F, F);
+		glColorMaski(5, F, F, F, F);
+	};
 
 	draw.bind_texture_ptr(20 /* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/,
 						  draw.tex.scene_depth);
@@ -145,6 +161,7 @@ void DecalBatcher::draw_decals() {
 		state.vao = vao;
 		state.blend = l->get_master_material()->blend;
 		draw.get_device().set_pipeline(state);
+		apply_decal_color_masks(l->get_master_material());
 		auto& texs = l->impl->get_textures();
 		for (int j = 0; j < texs.size(); j++)
 			draw.bind_texture_ptr(j, texs[j]->gpu_ptr);
@@ -159,5 +176,6 @@ void DecalBatcher::draw_decals() {
 	}
 	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
 
-	glColorMaski(ROUGH_METAL_TEX_INDEX, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	for (GLuint i = 0; i < 6; i++)
+		glColorMaski(i, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
 }
