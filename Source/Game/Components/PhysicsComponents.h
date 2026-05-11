@@ -43,6 +43,13 @@ public:
 	REF virtual void on_event(PhysicsBodyEventArg event) {}
 };
 
+// Canonical encoding of "what kind of physics object is this?".
+// Static    — RigidStatic; immovable, scene-query only.
+// Kinematic — RigidDynamic with eKINEMATIC; moved by user code, not the simulation.
+// Dynamic   — RigidDynamic; driven by the simulation (gravity, forces, joints).
+// Orthogonal: PhysicsBody::set_is_enable() gates whether the actor ticks at all.
+NEWENUM(BodyType, uint8_t){Static, Kinematic, Dynamic};
+
 class PhysicsBody : public Component
 {
 public:
@@ -56,8 +63,19 @@ public:
 	void update() override;
 	void on_changed_transform() override;
 
-	REF bool get_is_kinematic() const { return !is_static && !simulate_physics; }
-	void set_is_kinematic(bool kinematic);
+	// --- Canonical body-type API. Prefer these. ---
+	REF BodyType get_body_type() const {
+		if (is_static)
+			return BodyType::Static;
+		return simulate_physics ? BodyType::Dynamic : BodyType::Kinematic;
+	}
+	REF void set_body_type(BodyType t);
+
+	// --- Deprecated bool API. Kept REF for Lua backwards-compat (heavy use in
+	// Data/scripts). Each setter computes the equivalent BodyType and dispatches
+	// through set_body_type() so the canonical funnel still owns the transition. ---
+	REF bool get_is_kinematic() const { return get_body_type() == BodyType::Kinematic; }
+	REF void set_is_kinematic(bool kinematic);
 
 	REF bool get_is_simulating() const { return simulate_physics; }
 	REF void set_is_simulating(bool is_simulating);
@@ -100,6 +118,12 @@ public:
 
 	physx::PxRigidActor* get_physx_actor() const { return physxActor; }
 
+	// Introspection (mostly for tests / asserts): read the underlying PhysX actor's
+	// type, not the configured field. These can diverge before apply_actor_config
+	// runs, so use these — not get_is_static() etc. — to check what physics actually sees.
+	bool get_is_actor_static() const;
+	bool get_is_actor_kinematic() const;
+
 	// allocate but DO NOT FREE IPhysicsEventCallback. ownership is taken
 	// this is for lua code, c++ use on_trigger. bs fixme etc
 	//
@@ -127,6 +151,10 @@ protected:
 
 private:
 	void on_actor_type_change();
+	// Single funnel: reconciles physxActor with (enabled, simulate_physics, is_static).
+	// Rebuilds the actor when static<->dynamic, otherwise just toggles flags. Call
+	// after mutating any of the three fields.
+	void apply_actor_config();
 
 	void force_set_transform(const glm::mat4& m);
 
@@ -142,7 +170,6 @@ private:
 	virtual void add_editor_shapes() {}
 
 	bool has_initialized() const { return physxActor != nullptr; }
-	bool get_is_actor_static() const;
 	physx::PxRigidDynamic* get_dynamic_actor() const;
 	void set_shape_flags(physx::PxShape* shape);
 

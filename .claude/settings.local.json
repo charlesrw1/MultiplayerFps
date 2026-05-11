@@ -308,7 +308,11 @@
       "PowerShell(.\\\\Scripts\\\\lua_check.ps1 -Path $env:TEMP\\\\lua_check_smoke\\\\bad.lua -Level Warning)",
       "PowerShell(.\\\\Scripts\\\\lua_check.ps1 -Path $env:TEMP\\\\lua_check_smoke\\\\syntax_err.lua -Level Hint)",
       "PowerShell(.\\\\Scripts\\\\lua_check.ps1 -Path $env:TEMP\\\\lua_check_smoke -Level Warning)",
-      "Bash(Get-Location)"
+      "Bash(Get-Location)",
+      "PowerShell(& \"$PWD\\\\Scripts\\\\build_and_test.ps1\")",
+      "PowerShell(& \"$PWD\\\\Scripts\\\\integration_tests.ps1\" --tests game)",
+      "PowerShell(& \"$PWD\\\\Scripts\\\\integration_test.ps1\" -Mode game)",
+      "PowerShell(& \"$PWD\\\\Scripts\\\\integration_test.ps1\" -Mode editor)"
     ]
   },
   "enabledPlugins": {

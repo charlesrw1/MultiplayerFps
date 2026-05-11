@@ -337,7 +337,7 @@ void start_play_process() {
 
 	const std::string pathToProcess = "./x64/Debug/App.exe";
 
-	std::string commandLine = pathToProcess + " -is_editor_app  0";
+	std::string commandLine = pathToProcess;
 
 	STARTUPINFOA startup = {};
 	PROCESS_INFORMATION out = {};

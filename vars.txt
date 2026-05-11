@@ -25,11 +25,10 @@ g_project_name DevEngine
 
 # project vars
 godot_lightmap_engine_path "C:/Users/charl/Documents/lightmapexporter/"
-#g_project_base "Data"
-g_project_base "D:/Data"
+g_project_base "Data"
+#g_project_base "D:/Data"
 
 g_application_class "BikeGameApplication"
-is_editor_app 1
 
 g_draw_grid 0
 
@@ -82,7 +81,6 @@ debug.menu_width 400
 
 # game-test overrides
 g_application_class "Application"
-is_editor_app 0
 r.taa 0
 ui.disable_screen_log 1
 disable_render_time_tick 1
@@ -98,7 +96,6 @@ r.enable_vsync 0
 
 [editor_test]
 g_project_base "Data"
-is_editor_app 1
 r.taa 0
 ui.disable_screen_log 1
 disable_render_time_tick 1

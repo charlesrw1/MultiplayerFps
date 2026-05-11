@@ -70,7 +70,6 @@ extern ConfigVar g_window_w;
 extern ConfigVar g_window_h;
 extern ConfigVar g_project_name;
 extern ConfigVar g_application_class;
-extern ConfigVar is_editor_app;
 extern ConfigVar developer_mode;
 extern void add_events_test(Model* model);
 double GetTime();
@@ -231,6 +230,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 
 	this->argc = argc;
 	this->argv = argv;
+	this->m_is_editor_app = options.editor_mode;
 
 	FileSys::init();
 
@@ -277,15 +277,23 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;
-	for (int i = 1; i < argc; i++) {
+	int i = 1;
+	auto needs_value = [&](const char* flag) {
+		if (i + 1 >= argc) {
+			sys_print(Error, "missing value for %s\n", flag);
+			return false;
+		}
+		return true;
+	};
+	for (; i < argc; i++) {
 		if (strcmp(argv[i], "-x") == 0) {
-			startx = atoi(argv[++i]);
+			if (needs_value("-x")) startx = atoi(argv[++i]);
 		} else if (strcmp(argv[i], "-y") == 0) {
-			starty = atoi(argv[++i]);
+			if (needs_value("-y")) starty = atoi(argv[++i]);
 		} else if (strcmp(argv[i], "-w") == 0) {
-			g_window_w.set_integer(atoi(argv[++i]));
+			if (needs_value("-w")) g_window_w.set_integer(atoi(argv[++i]));
 		} else if (strcmp(argv[i], "-h") == 0) {
-			g_window_h.set_integer(atoi(argv[++i]));
+			if (needs_value("-h")) g_window_h.set_integer(atoi(argv[++i]));
 		} else if (strcmp(argv[i], "-VISUALSTUDIO") == 0) {
 			const char* projName = g_project_name.get_string();
 			SDL_SetWindowTitle(window, string_format("%s - VISUAL STUDIO\n", projName));
@@ -392,7 +400,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 #ifdef EDITOR_BUILD
 	AssetRegistrySystem::get().init();
 
-	if (is_editor_app.get_bool()) {
+	if (m_is_editor_app) {
 		AssetBrowser::inst = new AssetBrowser();
 		loaded_in_tool_mode = true;
 		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -408,7 +416,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	if (options.pending_test_runnner.get()) {
 		set_runner(options.pending_test_runnner.release(), options.skip_swap);
 		if (get_app()) {
-			ASSERT(!is_editor_app.get_bool());
+			ASSERT(!m_is_editor_app);
 		}
 	}
 

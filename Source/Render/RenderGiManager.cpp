@@ -1,8 +1,8 @@
 #include "Render/RenderGiManager.h"
-extern ConfigVar is_editor_app;
+#include "GameEnginePublic.h"
 
 RenderGiManager::RenderGiManager() {
-	if (is_editor_app.get_bool()) {
+	if (eng->is_editor_app()) {
 		CreateTextureArgs args;
 		args.width = CUBEMAP_WIDTH;
 		args.height = CUBEMAP_WIDTH;

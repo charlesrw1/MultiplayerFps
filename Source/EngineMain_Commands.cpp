@@ -280,7 +280,7 @@ void GameEngineLocal::add_commands() {
 		if (!eng_local.is_editor_state()) {
 			sys_print(
 				Error,
-				"OpenEditorToolCommand: didnt launch in editor mode, use 'is_editor_app 1' in cfg or command line\n");
+				"OpenEditorToolCommand: didnt launch in editor mode, pass --editor on the command line\n");
 			return;
 		}
 		string mapname = "<empty>";

@@ -70,6 +70,7 @@ public:
 		/* added is_loading... to work with constructors before level gets set */
 		return loaded_in_tool_mode;
 	}
+	bool is_editor_app() const final { return m_is_editor_app; }
 	bool is_editor_state() const { return loaded_in_tool_mode; }
 	bool is_host() const final { return true; }
 
@@ -118,6 +119,7 @@ public:
 	bool show_console = false;
 	bool dedicated_server = false;
 	bool loaded_in_tool_mode = false;
+	bool m_is_editor_app = false;
 	bool is_drawing_to_window_viewport() const;
 
 	int argc = 0;

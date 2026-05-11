@@ -70,6 +70,21 @@ Debug_Console* Debug_Console::inst = nullptr;
 GameEngineLocal eng_local;
 GameEnginePublic* eng = &eng_local;
 
+std::string get_cli_arg(const std::string& name, const std::string& default_value) {
+	const int argc = eng_local.argc;
+	char** argv = eng_local.argv;
+	if (!argv) return default_value;
+	for (int i = 1; i < argc; i++) {
+		if (argv[i][0] != '-') continue;
+		if (name == argv[i] + 1) {
+			if (i + 1 >= argc) return default_value;
+			if (argv[i + 1][0] == '-') return default_value;
+			return argv[i + 1];
+		}
+	}
+	return default_value;
+}
+
 double program_time_start;
 
 // ---------------------------------------------------------------------------
@@ -88,7 +103,6 @@ ConfigVar loglevel("loglevel", "4", CVAR_INTEGER, "(0=disable,4=all)", 0, 4);
 ConfigVar colorLog("colorLog", "1", CVAR_BOOL, "");
 ConfigVar g_application_class("g_application_class", "Application", CVAR_DEV, "");
 ConfigVar with_threading("with_threading", "1", CVAR_BOOL | CVAR_DEV, "");
-ConfigVar is_editor_app("is_editor_app", "0", CVAR_BOOL, "");
 ConfigVar g_drawconsole("drawconsole", "0", CVAR_BOOL, "draw the console");
 ConfigVar g_project_name("g_project_name", "CsRemakeEngine", CVAR_DEV,
 						 "the project name of the game, used for save file folders");
@@ -220,6 +234,7 @@ struct TestModeArgs {
 	bool promote = false;
 	bool interactive = false;
 	bool timing_assert = false;
+	bool editor = false; // --editor (launch editor app)
 };
 
 static void read_pattern_file(const char* path, std::vector<std::string>& out) {
@@ -271,6 +286,8 @@ static TestModeArgs parse_test_mode_args(int argc, char** argv) {
 			out.interactive = true;
 		} else if (a == "--timing-assert") {
 			out.timing_assert = true;
+		} else if (a == "--editor") {
+			out.editor = true;
 		}
 	}
 	return out;
@@ -283,6 +300,7 @@ static TestModeArgs parse_test_mode_args(int argc, char** argv) {
 int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 	ASSERT(argc >= 1 && argv);
 	const TestModeArgs test_args = parse_test_mode_args(argc, argv);
+	options.editor_mode = test_args.editor;
 	if (test_args.present) {
 		if (test_args.mode != "game" && test_args.mode != "editor") {
 			fprintf(stderr, "Usage: App.exe --tests <game|editor> [pattern...]   (got mode '%s')\n",
@@ -291,8 +309,10 @@ int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 		}
 		options.vars_section = (test_args.mode == "editor") ? "editor_test" : "game_test";
 		options.log_file = std::string("test_") + test_args.mode + "_output.log";
-		if (test_args.mode == "editor")
+		if (test_args.mode == "editor") {
 			options.init_file = "";
+			options.editor_mode = true;
+		}
 
 		set_assert_hook([](const char* cond) {
 			fprintf(stderr, "\n[ASSERT FAILED] %s\n", cond);

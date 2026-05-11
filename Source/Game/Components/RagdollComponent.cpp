@@ -39,6 +39,15 @@ void RagdollComponent::enable() {
 		auto phys = b.ptr.get();
 		if (!phys || phys->is_a<AdvancedJointComponent>())
 			continue;
+		// enable_with_initial_transforms ASSERTs has_initialized && !static && simulating.
+		// Configure the body to dynamic+simulating before enabling so a misconfigured
+		// ragdoll body warns instead of crashing the asserts.
+		if (phys->get_is_static() || !phys->get_is_simulating()) {
+			sys_print(Warning, "RagdollComponent::enable: body %s is not dynamic+simulating, forcing\n",
+					  phys->get_owner()->get_editor_name().c_str());
+			phys->set_is_static(false);
+			phys->set_is_simulating(true);
+		}
 		auto ls = compose_transform(b.bindPosePos, b.bindPoseRot, glm::vec3(1));
 		phys->enable_with_initial_transforms(this_ws * animator->get_last_global_bonemats().at(b.bone_index) * ls,
 											 this_ws * animator->get_global_bonemats().at(b.bone_index) * ls,

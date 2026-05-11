@@ -78,6 +78,7 @@ public:
 	virtual ImGuiContext* get_imgui_context() const = 0;
 	virtual bool is_host() const = 0;
 	virtual bool is_editor_level() const = 0;
+	virtual bool is_editor_app() const = 0;
 	virtual bool load_level(string mapname) = 0;
 	virtual void log_to_fullscreen_gui(LogType type, const char* msg) = 0;
 	virtual IEditorTool* get_tool() = 0;
@@ -113,3 +114,7 @@ protected:
 extern ConfigVar g_engine_ticks_per_frame;
 
 extern GameEnginePublic* eng;
+
+// Looks up "-<name> <value>" in the process CLI argv. Returns the value, or
+// default_value if the flag is missing or has no following value.
+std::string get_cli_arg(const std::string& name, const std::string& default_value);

@@ -51,6 +51,9 @@ glm::vec3 calc_angular_vel(const glm::quat& q1, const glm::quat& q2, float dt) {
 
 void PhysicsBody::enable_with_initial_transforms(const glm::mat4& t0, const glm::mat4& t1, float dt) {
 	ASSERT(dt > 0.f);
+	ASSERT(has_initialized());        // actor must exist; configure shape/type before enabling
+	ASSERT(!get_is_actor_static());   // velocities only meaningful on a dynamic actor
+	ASSERT(simulate_physics);         // kinematic bodies don't track velocity
 	set_is_enable(true);
 	auto rot0 = glm::quat_cast(t0);
 	auto rot1 = glm::quat_cast(t1);
@@ -79,20 +82,9 @@ void PhysicsBody::add_triggered_callback(IPhysicsEventCallback* callback) {
 }
 
 void PhysicsBody::update() {
+	// interpolation is currently disabled (see fetch_new_transform `if (0 && ...)`).
+	// keep ticking off until that path is rebuilt.
 	set_ticking(false);
-	return;
-	if (!enabled || !get_is_simulating() || !interpolate_visuals) {
-		return;
-	}
-
-	// interpolate
-	float alpha = eng->get_frame_remainder() / eng->get_fixed_tick_interval();
-	auto ip = glm::mix(last_position, next_position, alpha);
-	auto iq = glm::slerp(last_rot, next_rot, alpha);
-	auto mat = glm::translate(glm::mat4(1), ip);
-	mat = mat * glm::mat4_cast(iq);
-
-	get_owner()->set_ws_transform(mat);
 }
 
 void PhysicsBody::set_linear_velocity(const glm::vec3& v) {
@@ -164,6 +156,17 @@ void PhysicsBody::on_actor_type_change() {
 	assert(has_initialized());
 
 	on_shape_changes();
+
+	// Any joint that already references the released actor must be rebuilt against
+	// the new one. We only walk this entity's own joints — joints on OTHER entities
+	// that target this body are not refreshed here (TODO: needs reverse lookup).
+	// refresh_joint() is idempotent: free_joint handles a null joint, so it is safe
+	// to call even on joints whose own start() hasn't run yet.
+	for (auto* c : get_owner()->get_components()) {
+		if (c && c->is_a<PhysicsJointComponent>()) {
+			((PhysicsJointComponent*)c)->refresh_joint();
+		}
+	}
 }
 
 void PhysicsBody::update_bone_parent_animator() {
@@ -225,7 +228,8 @@ void PhysicsBody::stop() {
 		physxActor = nullptr;
 	}
 	assert(!physxActor);
-	simulate_physics = false;
+	// Don't reset configured fields here — a re-start() should pick up whatever
+	// was configured (matches behaviour of is_static / enabled which are also kept).
 	update_bone_parent_animator();
 }
 
@@ -275,6 +279,13 @@ bool PhysicsBody::get_is_actor_static() const {
 	if (!physxActor)
 		return false;
 	return physxActor->getType() == physx::PxActorType::eRIGID_STATIC;
+}
+
+bool PhysicsBody::get_is_actor_kinematic() const {
+	if (!physxActor || get_is_actor_static())
+		return false;
+	auto dyn = (physx::PxRigidDynamic*)physxActor;
+	return dyn->getRigidBodyFlags().isSet(physx::PxRigidBodyFlag::eKINEMATIC);
 }
 
 void PhysicsBody::apply_impulse(const glm::vec3& worldspace, const glm::vec3& impulse) {
@@ -408,38 +419,42 @@ void PhysicsBody::add_box_shape_to_actor(const glm::mat4& localTransform, const 
 	set_shape_flags(shape);
 }
 
+void PhysicsBody::set_body_type(BodyType t) {
+	ASSERT(get_owner());
+	const bool new_static = (t == BodyType::Static);
+	const bool new_simulate = (t == BodyType::Dynamic);
+	if (new_static == is_static && new_simulate == simulate_physics)
+		return;
+	is_static = new_static;
+	simulate_physics = new_simulate;
+	apply_actor_config();
+}
+
+// Deprecated bool setters — dispatch through the canonical enum path.
+// Each setter preserves "set only what the caller asked" semantics by computing
+// the resulting BodyType from the OTHER currently-set field.
 void PhysicsBody::set_is_simulating(bool simulate_physics) {
 	ASSERT(get_owner());
-	if (simulate_physics != this->simulate_physics) {
-		this->simulate_physics = simulate_physics;
-		if (has_initialized()) {
-			if (get_is_actor_static()) {
-				sys_print(Warning, "set_simulating set on a static PhysicsActor\n");
-			} else {
-				auto dyn = get_dynamic_actor();
-				dyn->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, !this->simulate_physics);
-
-				next_position = get_owner()->get_ls_position();
-				next_rot = get_owner()->get_ls_rotation();
-
-				update_bone_parent_animator();
-			}
-		}
+	if (is_static) {
+		// Legacy callers don't expect set_is_simulating to flip is_static. Keep the
+		// no-op behaviour; apply_actor_config's canonicalization guard means the
+		// field/actor cannot diverge.
+		return;
 	}
+	set_body_type(simulate_physics ? BodyType::Dynamic : BodyType::Kinematic);
 }
 
 void PhysicsBody::set_is_enable(bool enabled) {
 	ASSERT(get_owner());
-	if (enabled != this->enabled) {
-		this->enabled = enabled;
-		if (has_initialized()) {
-			physxActor->setActorFlag(PxActorFlag::eDISABLE_SIMULATION, !enabled);
-			if (!enabled)
-				get_owner()->set_is_top_level(false);
+	// enabled is orthogonal to body type — funnel directly through apply_actor_config.
+	if (enabled == this->enabled)
+		return;
+	this->enabled = enabled;
+	apply_actor_config();
+}
 
-			update_bone_parent_animator();
-		}
-	}
+void PhysicsBody::set_is_kinematic(bool kinematic) {
+	set_body_type(kinematic ? BodyType::Kinematic : BodyType::Dynamic);
 }
 
 void PhysicsBody::set_physics_layer(PhysicsLayer l) {
@@ -533,11 +548,49 @@ void PhysicsBody::set_send_hit(bool send_hit) {
 	this->send_hit = send_hit;
 }
 void PhysicsBody::set_is_static(bool is_static) {
-	ASSERT(get_owner());
-	if (this->is_static != is_static) {
-		this->is_static = is_static;
-		on_actor_type_change();
+	if (is_static) {
+		set_body_type(BodyType::Static);
+	} else {
+		// Switching out of Static — preserve the caller's simulate_physics intent.
+		set_body_type(simulate_physics ? BodyType::Dynamic : BodyType::Kinematic);
 	}
+}
+
+void PhysicsBody::apply_actor_config() {
+	ASSERT(get_owner());
+	// Canonicalize the "illegal" combo (static + simulate) so get_is_simulating() can't lie.
+	if (is_static && simulate_physics) {
+		simulate_physics = false;
+	}
+	if (!has_initialized()) {
+		// Pre-start: fields are picked up by start() -> on_actor_type_change().
+		return;
+	}
+	const bool want_static = is_static;
+	const bool have_static = get_is_actor_static();
+	if (want_static != have_static) {
+		// Actor kind change requires a full rebuild. on_actor_type_change reads
+		// the current fields to set both eKINEMATIC and eDISABLE_SIMULATION, and
+		// refreshes joints attached to this entity.
+		on_actor_type_change();
+		// Top-level mirrors "this body drives the entity transform".
+		const bool drives_transform = enabled && !is_static && simulate_physics;
+		get_owner()->set_is_top_level(drives_transform);
+		update_bone_parent_animator();
+		return;
+	}
+	// Same actor kind: cheap in-place flag updates.
+	physxActor->setActorFlag(PxActorFlag::eDISABLE_SIMULATION, !enabled);
+	if (!have_static) {
+		auto dyn = (PxRigidDynamic*)physxActor;
+		dyn->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, !simulate_physics);
+		// Resync interpolation latches when sim/kinematic mode flips.
+		next_position = get_owner()->get_ls_position();
+		next_rot = get_owner()->get_ls_rotation();
+	}
+	const bool drives_transform = enabled && !is_static && simulate_physics;
+	get_owner()->set_is_top_level(drives_transform);
+	update_bone_parent_animator();
 }
 
 MeshBuilderComponent* PhysicsBody::get_editor_meshbuilder() const {

@@ -43,7 +43,9 @@ Key cvars:
 - `g_application_class` — Lua class name to instantiate as Application.
 - `g_entry_level` — first level (asset name). Startup runs `map <g_entry_level>`.
 - `g_project_base` — data dir. **Use `"Data"` (relative), not absolute paths.**
-- `is_editor_app` — if true, opens editor UI.
+
+Launch flags:
+- `--editor` — open editor UI (default: game mode). Implicit when `--tests editor` is used.
 
 `vars.txt` is sectioned: `[app]` runs on a normal launch, `[game_test]` on `App.exe --tests game`, `[editor_test]` on `--tests editor`. Sections are independent; the engine selects exactly one. See [[testing]].
 

@@ -17,6 +17,7 @@ struct MainConfigurationOptions {
 
 	std::unique_ptr<ITestRunner> pending_test_runnner;
 	bool skip_swap = false;
+	bool editor_mode = false;
 };
 
 int game_engine_main(MainConfigurationOptions& config_options, int argc, char** argv);
