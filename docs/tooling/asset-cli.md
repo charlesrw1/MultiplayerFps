@@ -2,7 +2,7 @@
 
 Interactive shell for browsing/editing the asset tree under `Data/`. Understands **asset groups** (a logical asset = all sibling files sharing a stem, e.g. `rock.glb` + `rock.cmdl` + `rock.dds` + `rock.tis`) and rewrites references on rename/move.
 
-Launch: `py Scripts/asset_cli.py [asset_root]`. Default root = `./Data` (falls back to cwd if absent). History at `~/.asset_cli_history`. Tab-completion via `prompt_toolkit`; falls back to plain `input()` if no console buffer.
+Launch: `py [[Scripts/asset_cli.py]] [asset_root]`. Default root = `./Data` (falls back to cwd if absent). History at `~/.asset_cli_history`. Tab-completion via `prompt_toolkit`; falls back to plain `input()` if no console buffer.
 
 Backed by `asset_manager.AssetManager` (mutations) and `asset_types` (extension → `AssetType`, group_files).
 
@@ -55,9 +55,3 @@ Wildcard `mv` (`mv pattern* dst/`) iterates `find_assets` results, accumulates p
 - `cp` does **not** copy related files in the asset group — it's a literal single-file copy. Use `mv` for group semantics; there is no `cp`-group.
 - `_smart_replace` won't touch references where the old path is embedded mid-token. If a tool writes refs without quoting/spacing, `mv` will silently miss them.
 - Materials: `find` distinguishes master vs instance by probing for `.mm`/`.mi` in the resolved dir, not from the asset_group itself.
-
-## Tests
-
-- `Scripts/tests/test_asset_cli.py` — REPL command surface
-- `Scripts/test_asset_cli_mv.py` — mv + reference rewriting
-- `Scripts/test_undo.py` — undo coverage across ops

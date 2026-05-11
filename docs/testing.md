@@ -136,7 +136,7 @@ Install the **Coverage Gutters** extension (`ryanluker.vscode-coverage-gutters`)
 - **Coverage Gutters: Watch** — auto-refreshes when XMLs change.
 - To swap editor↔game XML: re-order `coverage-gutters.coverageFileNames` (first match wins), then **Remove Coverage** + **Display Coverage**.
 
-Pretty HTML report: `py Scripts/coverage_to_html.py` writes `TestFiles/coverage/coverage_summary.html` (filterable, per-module).
+Pretty HTML report: `py [[Scripts/coverage_to_html.py]]` writes `TestFiles/coverage/coverage_summary.html` (filterable, per-module).
 
 ---
 

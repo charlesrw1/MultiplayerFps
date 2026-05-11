@@ -2,6 +2,41 @@
 # Auto-managed by `docs bless`. Hand-edit at your own risk.
 
 [[validation]]
+doc = "bike/bikecourse.md"
+source = "Source/Game/BikeDemo/BikeCourse.h"
+sha = "912b2dfd2e200b1edde66914939d3441dbf19273"
+
+[[validation]]
+doc = "engine_overview.md"
+source = "Source/Framework/MeshBuilder.h"
+sha = "9bdf9d6ef06dcedde3bc9c8455bc49e50e81fb24"
+
+[[validation]]
+doc = "engine_overview.md"
+source = "Source/Game/Entities/Player.h"
+sha = "b515f6dc8ce2088270d54a64af4c9b103d744d9a"
+
+[[validation]]
+doc = "engine_overview.md"
+source = "Source/GameEnginePublic.h"
+sha = "795546f74fde9db68f1220c422265384610d5764"
+
+[[validation]]
+doc = "engine_overview.md"
+source = "Source/Physics/Physics2.h"
+sha = "749be8fc63b1538fa9ed4386c521aded7dbe773c"
+
+[[validation]]
+doc = "engine_overview.md"
+source = "Source/Render/RenderWindow.h"
+sha = "a27033293887168dc697f2a5d8750f1b52cc8f26"
+
+[[validation]]
+doc = "engine_overview.md"
+source = "Source/UI/GUISystemPublic.h"
+sha = "171763393119cdc1fa2596c4ae133c70036e1755"
+
+[[validation]]
 doc = "testing.md"
 source = "Scripts/build_and_test.ps1"
 sha = "04a28d50d5b65a31ee8013afd47fd356837e6fc5"
@@ -13,5 +48,15 @@ sha = "863bca876532a219c5b6dcaf7c1e906151f92bfe"
 
 [[validation]]
 doc = "testing.md"
+source = "Scripts/coverage_to_html.py"
+sha = "76f13be84e5611e4247adfb3ca548240b75aff42"
+
+[[validation]]
+doc = "testing.md"
 source = "Scripts/integration_test.ps1"
 sha = "d50642894f56c8f0076ad7d5cfcff0249cf72819"
+
+[[validation]]
+doc = "tooling/asset-cli.md"
+source = "Scripts/asset_cli.py"
+sha = "d599fb9ce8322c3a66c1b6a5f39a44656bcc9d8d"

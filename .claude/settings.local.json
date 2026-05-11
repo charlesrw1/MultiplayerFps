@@ -302,7 +302,8 @@
       "PowerShell(Scripts\\\\check_codebase.ps1 -SkipDocs -SkipLoc -SkipTodos 2>&1 | Out-String)",
       "PowerShell(Out-Null *)",
       "PowerShell(Scripts/integration_test.ps1 -Mode editor -Pattern \"editor/inherited_entity_not_deletable\",\"editor/prefab_save_extension_correct\" -Config Debug 2>&1 | Select-Object -Last 80)",
-      "PowerShell(\\(Get-Item coverage_summary.html\\).Length; Test-Path coverage_summary.html)"
+      "PowerShell(\\(Get-Item coverage_summary.html\\).Length; Test-Path coverage_summary.html)",
+      "Bash(where.exe git *)"
     ]
   },
   "enabledPlugins": {

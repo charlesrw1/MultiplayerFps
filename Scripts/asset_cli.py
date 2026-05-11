@@ -9,7 +9,6 @@ from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.formatted_text import FormattedText
 
-
 class AssetCompleter(Completer):
     """Tab completion for asset CLI commands"""
 
