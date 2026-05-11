@@ -6,8 +6,11 @@
 #include "LevelEditor/EditorDocLocal.h"
 #include "Framework/Files.h"
 #include "Game/Prefab.h"
+#include "Game/Components/PrefabAssetComponent.h"
 #include "LevelSerialization/SerializeNew.h"
 #include "Assets/AssetDatabase.h"
+#include "Level.h"
+#include <glm/gtc/matrix_transform.hpp>
 
 // Test that prefab mode is detected when opening a .tprefab file
 static TestTask test_prefab_edit_mode_detection(TestContext& t) {
@@ -269,3 +272,157 @@ static TestTask test_editor_prefab_roundtrip_edit(TestContext& t) {
 	co_await t.wait_ticks(1);
 }
 EDITOR_TEST("editor/prefab_roundtrip_edit", 30.f, test_editor_prefab_roundtrip_edit);
+
+// Inherited entities (children spawned by a PrefabAssetComponent) carry dont_serialize_or_edit
+// and must be protected from RemoveEntitiesCommand. The prefab root itself is editable; only its
+// deserialized children are inherited. Regression guard for the can_delete_this_object gate
+// described in LevelEditor/AGENTS.md.
+static TestTask test_inherited_entity_not_deletable(TestContext& t) {
+	const std::string prefab_path = "_test_inherited_protect.tprefab";
+	const char* prefab_path_cstr = prefab_path.c_str();
+	FileSys::delete_game_file(prefab_path_cstr);
+
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "open-editor eng/template.tmap");
+	co_await t.wait_ticks(4);
+
+	EditorDoc* editor = static_cast<EditorDoc*>(eng->get_tool());
+	t.require(editor != nullptr, "editor available");
+
+	// Build a one-entity prefab and write it to disk
+	EntityPtr seed = editor->spawn_entity();
+	seed->set_editor_name("InheritedChild");
+	seed->set_ls_position({3.0f, 0.0f, 0.0f});
+	seed->create_component<MeshComponent>();
+	co_await t.wait_ticks(1);
+
+	SerializedSceneFile prefab_ser;
+	try {
+		prefab_ser = NewSerialization::serialize_to_text("inh_test_prefab", {seed.get()}, false, prefab_path.c_str());
+	}
+	catch (const std::exception&) {
+		t.require(false, "serialize prefab failed");
+		co_return;
+	}
+	t.require(PrefabFile::save_text(prefab_path_cstr, prefab_ser.text), "prefab saved to disk");
+
+	seed->destroy();
+	co_await t.wait_ticks(1);
+
+	int count_before = t.editor().entity_count();
+
+	// Spawn the prefab through the undoable command path
+	auto* instantiate = new InstantiatePrefabCommand(*editor, prefab_path, glm::mat4(1.0f));
+	editor->command_mgr->add_command(instantiate);
+	co_await t.wait_ticks(2);
+
+	t.check(t.editor().entity_count() > count_before, "prefab spawn added entities to level");
+
+	// Find the prefab root — the entity carrying PrefabAssetComponent
+	Entity* prefab_root = nullptr;
+	for (auto obj : eng->get_level()->get_all_objects()) {
+		if (auto* ent = obj->cast_to<Entity>()) {
+			if (ent->get_component<PrefabAssetComponent>()) {
+				prefab_root = ent;
+				break;
+			}
+		}
+	}
+	t.require(prefab_root != nullptr, "prefab root entity present");
+
+	t.check(!editor->is_this_object_inherited(prefab_root), "prefab root itself is editable");
+
+	const auto& children = prefab_root->get_children();
+	t.require(!children.empty(), "prefab root has at least one inherited child");
+
+	Entity* inherited_child = children.front();
+	t.require(inherited_child != nullptr, "inherited child non-null");
+
+	t.check(inherited_child->dont_serialize_or_edit, "inherited child has dont_serialize_or_edit set");
+	t.check(editor->is_this_object_inherited(inherited_child), "is_this_object_inherited true for prefab child");
+	t.check(!editor->can_delete_this_object(inherited_child), "can_delete_this_object false for prefab child");
+
+	// Direct construction: command must report invalid for an inherited-only input
+	EntityPtr child_ptr = inherited_child->get_self_ptr();
+	auto* remove_direct = new RemoveEntitiesCommand(*editor, std::vector<EntityPtr>{child_ptr});
+	t.check(!remove_direct->is_valid(), "RemoveEntitiesCommand on inherited child is_valid()==false");
+	delete remove_direct;
+
+	// Queue an invalid removal through the manager; the child must still be alive after the flush
+	auto* remove_queued = new RemoveEntitiesCommand(*editor, std::vector<EntityPtr>{child_ptr});
+	editor->command_mgr->add_command(remove_queued);
+	co_await t.wait_ticks(2);
+
+	t.check(child_ptr.get() != nullptr, "inherited child still alive after queued remove attempt");
+
+	FileSys::delete_game_file(prefab_path_cstr);
+	co_await t.wait_ticks(1);
+}
+EDITOR_TEST("editor/inherited_entity_not_deletable", 20.f, test_inherited_entity_not_deletable);
+
+// Opening a .tprefab and calling save() must write back as .tprefab, never as a sibling .tmap.
+// The save path comes from set_document_path + get_save_file_extension(); regression guard for
+// the interaction documented in LevelEditor/AGENTS.md.
+static TestTask test_prefab_save_extension_correct(TestContext& t) {
+	const std::string prefab_path = "_test_save_ext.tprefab";
+	const std::string sibling_tmap_path = "_test_save_ext.tmap";
+	const char* prefab_path_cstr = prefab_path.c_str();
+	const char* sibling_tmap_cstr = sibling_tmap_path.c_str();
+	FileSys::delete_game_file(prefab_path_cstr);
+	FileSys::delete_game_file(sibling_tmap_cstr);
+
+	// Build the prefab via the editor and write it to disk
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "open-editor eng/template.tmap");
+	co_await t.wait_ticks(4);
+
+	EditorDoc* editor = static_cast<EditorDoc*>(eng->get_tool());
+	t.require(editor != nullptr, "editor available");
+
+	EntityPtr seed = editor->spawn_entity();
+	seed->set_editor_name("SavedPrefabEntity");
+	seed->set_ls_position({1.5f, 0.0f, 0.0f});
+	seed->create_component<MeshComponent>();
+	co_await t.wait_ticks(1);
+
+	SerializedSceneFile prefab_ser;
+	try {
+		prefab_ser = NewSerialization::serialize_to_text("save_ext_prefab", {seed.get()}, false, prefab_path.c_str());
+	}
+	catch (const std::exception&) {
+		t.require(false, "serialize prefab failed");
+		co_return;
+	}
+	t.require(PrefabFile::save_text(prefab_path_cstr, prefab_ser.text), "prefab saved to disk");
+
+	// Open the prefab — assetName is set, editing_prefab=true
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, (std::string("open-editor ") + prefab_path_cstr).c_str());
+	co_await t.wait_ticks(5);
+
+	editor = static_cast<EditorDoc*>(eng->get_tool());
+	t.require(editor != nullptr, "editor available after opening prefab");
+	t.require(editor->is_editing_prefab(), "editor entered prefab mode");
+	t.check(std::string(editor->get_save_file_extension()) == "tprefab",
+			"get_save_file_extension reports tprefab in prefab mode");
+
+	std::string original_text = PrefabFile::load_text(prefab_path_cstr);
+	t.require(!original_text.empty(), "prefab text non-empty on disk before save");
+
+	// Save without touching the path — should write back to the same .tprefab
+	bool save_ok = editor->save();
+	t.check(save_ok, "save() returns true when path is already known");
+
+	co_await t.wait_ticks(2);
+
+	t.check(FileSys::does_file_exist(prefab_path_cstr, FileSys::GAME_DIR),
+			"prefab file still exists at .tprefab path after save");
+
+	t.check(!FileSys::does_file_exist(sibling_tmap_cstr, FileSys::GAME_DIR),
+			"no sibling .tmap was created during save");
+
+	std::string reloaded = PrefabFile::load_text(prefab_path_cstr);
+	t.check(!reloaded.empty(), "prefab content non-empty after save+reload");
+
+	FileSys::delete_game_file(prefab_path_cstr);
+	FileSys::delete_game_file(sibling_tmap_cstr);
+	co_await t.wait_ticks(1);
+}
+EDITOR_TEST("editor/prefab_save_extension_correct", 25.f, test_prefab_save_extension_correct);

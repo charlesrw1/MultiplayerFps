@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuite name="IntegrationTests.editor" tests="12" failures="0">
-  <testcase name="editor/road_network_basic">
-  </testcase>
-  <testcase name="editor/road_network_roundtrip">
-  </testcase>
   <testcase name="editor/prefab_mode_detection">
   </testcase>
   <testcase name="editor/prefab_command_validity">
@@ -15,6 +11,10 @@
   <testcase name="editor/prefab_create_and_replace">
   </testcase>
   <testcase name="editor/prefab_roundtrip_edit">
+  </testcase>
+  <testcase name="editor/inherited_entity_not_deletable">
+  </testcase>
+  <testcase name="editor/prefab_save_extension_correct">
   </testcase>
   <testcase name="editor/serialize_round_trip">
   </testcase>

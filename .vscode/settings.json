@@ -1,0 +1,13 @@
+{
+  "coverage-gutters.coverageBaseDir": "TestFiles/coverage",
+  "coverage-gutters.coverageFileNames": [
+    "coverage_editor.xml",
+    "coverage_game.xml",
+    "coverage.xml",
+    "lcov.info",
+    "cov.xml"
+  ],
+  "coverage-gutters.showLineCoverage": true,
+  "coverage-gutters.showRulerCoverage": true,
+  "coverage-gutters.showGutterCoverage": true
+}

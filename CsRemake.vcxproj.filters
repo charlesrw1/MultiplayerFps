@@ -315,7 +315,7 @@
     <ClCompile Include="Source\Render\DecalBatcher.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Render\DrawLocal.cpp">
+    <ClCompile Include="Source\Render\DrawLocal_Misc.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
     <ClCompile Include="Source\Render\DrawLocal_Device.cpp">

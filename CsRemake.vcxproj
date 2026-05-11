@@ -198,7 +198,7 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Source\Render\DecalBatcher.cpp" />
-    <ClCompile Include="Source\Render\DrawLocal.cpp" />
+    <ClCompile Include="Source\Render\DrawLocal_Misc.cpp" />
     <ClCompile Include="Source\Render\DrawLocal_Device.cpp" />
     <ClCompile Include="Source\Render\DrawLocal_Init.cpp" />
     <ClCompile Include="Source\Render\DrawLocal_RenderPass.cpp" />

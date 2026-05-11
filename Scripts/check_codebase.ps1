@@ -23,7 +23,7 @@
     Build configuration for coverage runs. Default Debug.
 
 .PARAMETER CoverageOutDir
-    Where to write coverage XML + coverage_summary.md. Default: repo root.
+    Where to write coverage XML + coverage_summary.md. Default: TestFiles/coverage.
 
 .EXAMPLE
     Scripts/check_codebase.ps1 -Quick
@@ -42,7 +42,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-if (-not $CoverageOutDir) { $CoverageOutDir = $root }
+if (-not $CoverageOutDir) { $CoverageOutDir = Join-Path $root "TestFiles\coverage" }
+if (-not (Test-Path $CoverageOutDir)) { New-Item -ItemType Directory -Path $CoverageOutDir -Force | Out-Null }
 
 $LocSoft = 600
 $LocHard = 1000

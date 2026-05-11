@@ -85,7 +85,7 @@ ConfigVar r_skinned_mats_bone_buffer_size("r.skinned_mats_bone_buffer_size", "25
 
 ConfigVar r_better_depth_batching("r.better_depth_batching", "1", CVAR_BOOL | CVAR_DEV, "");
 ConfigVar r_no_batching("r.no_batching", "0", CVAR_BOOL | CVAR_DEV, "");
-ConfigVar r_ignore_depth_shader("r_ignore_depth_shader", "0", CVAR_BOOL | CVAR_DEV, "");
+ConfigVar r_ignore_depth_shader("r_ignore_depth_shader", "0", CVAR_BOOL | CVAR_DEV, "...");
 
 ConfigVar enable_gl_debug_output("enable_gl_debug_output", "1", CVAR_BOOL, "");
 ConfigVar r_taa_jitter_test("r.taa_jitter_test", "0", CVAR_INTEGER, "", 0, 4);

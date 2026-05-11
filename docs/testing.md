@@ -31,7 +31,7 @@ powershell Scripts/integration_test.ps1 -Pattern "renderer/*","racing_line/*"
 powershell Scripts/integration_test.ps1 -PatternFile smoke.txt
 ```
 
-Switches: `-Config Release` (default Debug), `-Promote` (rewrite screenshot goldens), `-Interactive` (keep window visible), `-TimingAssert` (fail on slow GPU timings), `-ShowEngineLog` (forward App.exe's full engine output to the console — off by default; only `[TEST] ...` sentinel lines pass through). Empty `-Pattern` = all tests for the selected mode(s). `Get-Help Scripts/integration_test.ps1 -Examples` for the same list inline.
+Switches: `-Config Release` (default Debug), `-Promote` (rewrite screenshot goldens), `-Interactive` (keep window visible), `-TimingAssert` (fail on slow GPU timings), `-ShowEngineLog` (forward App.exe's full engine output to the console — off by default; only `[TEST] ...` sentinel lines pass through), `-Debugger` (attach a running VS 2026 instance to App.exe via DTE; falls back to `vsjitdebugger.exe` if no VS is in the ROT — output filtering is bypassed in this mode). Empty `-Pattern` = all tests for the selected mode(s). `Get-Help Scripts/integration_test.ps1 -Examples` for the same list inline.
 
 The runner always prints a parsed XML summary at the end (per-test PASS/FAIL list) and writes the full uncoloured engine log to `test_<mode>_output.log` next to App.exe's working directory regardless of `-ShowEngineLog`. Log lines are prefixed `[Error]`, `[Warning]`, `[Debug]`, `[Info]` so they grep cleanly. Test-runner status lines (`[TEST] ==> [N/M] ...`, `[TEST]   PASS/FAIL ...`, `[TEST] === <mode> Tests: ... ===`) are emitted on stdout/stderr only — they don't go through the logger and don't appear in the .log file.
 
@@ -110,9 +110,9 @@ The framework lives in `Data/scripts/integration_test_framework.lua`. The C++ `T
 
 By default: skip code coverage! with `-Quick` only check code coverage on request.
 
-1. **`docs.exe check`** — wiki-link + `@docs` ref validation. Errors fail the run.
+1. **`docs.exe check`** — wiki-link + `@docs` ref validation + freshness check on doc→source links. Errors fail the run; freshness issues (`stale` / `unblessed` / `orphan`) are warnings only. See [[tooling/docs-cli#Freshness]].
 2. **LOC per file** — warn >600, error >1000. Excludes `Source/External`, `.generated`, `MEGA.cpp`.
-3. **OpenCppCoverage** — builds App.exe, runs integration tests for `game` + `editor`, writes `coverage_<mode>.xml` (Cobertura) + `coverage_summary.md` (per-file matrix sorted ascending by best mode). Skipped if OpenCppCoverage isn't installed (`winget install OpenCppCoverage.OpenCppCoverage`).
+3. **OpenCppCoverage** — builds App.exe, runs integration tests for `game` + `editor`, writes `TestFiles/coverage/coverage_<mode>.xml` (Cobertura) + `TestFiles/coverage/coverage_summary.md` (per-file matrix sorted ascending by best mode). Skipped if OpenCppCoverage isn't installed (`winget install OpenCppCoverage.OpenCppCoverage`).
 4. **TODO/FIXME/HACK scan** — `rg`-based, warning only.
 
 ```powershell
@@ -127,6 +127,16 @@ powershell Scripts/check_codebase.ps1 -SkipDocs -SkipLoc -SkipCoverage -SkipTodo
 ```
 
 Exit 0 = no errors. Exit 1 = at least one section errored. Warnings never fail. The summary block at the end lists each section's status (`ok` / `warn` / `error` / `skip`).
+
+### Viewing coverage in VSCode
+
+Install the **Coverage Gutters** extension (`ryanluker.vscode-coverage-gutters`). `.vscode/settings.json` already points it at `TestFiles/coverage/` and picks up `coverage_editor.xml` first.
+
+- Command Palette → **Coverage Gutters: Display Coverage** — shows gutter marks + status-bar %.
+- **Coverage Gutters: Watch** — auto-refreshes when XMLs change.
+- To swap editor↔game XML: re-order `coverage-gutters.coverageFileNames` (first match wins), then **Remove Coverage** + **Display Coverage**.
+
+Pretty HTML report: `py Scripts/coverage_to_html.py` writes `TestFiles/coverage/coverage_summary.html` (filterable, per-module).
 
 ---
 

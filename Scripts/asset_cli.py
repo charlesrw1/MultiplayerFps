@@ -202,9 +202,7 @@ class AssetCLI:
                 else:
                     print(f"Unknown command: {command}")
 
-            except KeyboardInterrupt:
-                continue
-            except EOFError:
+            except (KeyboardInterrupt, EOFError):
                 break
 
     def do_pwd(self, arg):

@@ -22,7 +22,7 @@ Limit the source files you read to the module you are working on. Be brief, spar
 
 Use ASSERTS() liberaly, documenting its preconditions and invariants. 
 
-Follow DRY, SOLID principles.
+Follow DRY, SOLID principles. SELF DOCUMENTING code. 
 
 ## Documentation
 

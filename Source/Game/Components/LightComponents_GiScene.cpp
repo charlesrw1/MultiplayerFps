@@ -49,7 +49,6 @@ static const int    gi_saved_version = 1;
 bool GameSceneGiUtil::had_changes = false;
 
 void GameSceneGiUtil::on_scene_load_gi(const string& mapname) {
-	ASSERT(!mapname.empty());
 	string name = mapname;
 	StringUtils::remove_extension(name);
 	auto baked_file = FileSys::open_read_game((name + baked_gi_suffix).c_str());

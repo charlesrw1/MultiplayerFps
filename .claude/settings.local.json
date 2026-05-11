@@ -297,7 +297,12 @@
       "PowerShell(Get-Content *)",
       "Bash(echo \"exit=$?\")",
       "PowerShell(jq.bat -e '.hooks.Stop[] | .hooks[] | select\\(.type == \"command\"\\) | .command' \"$env:USERPROFILE\\\\.claude\\\\settings.json\")",
-      "PowerShell(jq.bat --% -e \".hooks.Stop[] | .hooks[] | select\\(.type == \\\\\"command\\\\\"\\) | .command\" C:\\\\Users\\\\charl\\\\.claude\\\\settings.json)"
+      "PowerShell(jq.bat --% -e \".hooks.Stop[] | .hooks[] | select\\(.type == \\\\\"command\\\\\"\\) | .command\" C:\\\\Users\\\\charl\\\\.claude\\\\settings.json)",
+      "PowerShell(Scripts\\\\check_codebase.ps1 2>&1 | Out-String)",
+      "PowerShell(Scripts\\\\check_codebase.ps1 -SkipDocs -SkipLoc -SkipTodos 2>&1 | Out-String)",
+      "PowerShell(Out-Null *)",
+      "PowerShell(Scripts/integration_test.ps1 -Mode editor -Pattern \"editor/inherited_entity_not_deletable\",\"editor/prefab_save_extension_correct\" -Config Debug 2>&1 | Select-Object -Last 80)",
+      "PowerShell(\\(Get-Item coverage_summary.html\\).Length; Test-Path coverage_summary.html)"
     ]
   },
   "enabledPlugins": {

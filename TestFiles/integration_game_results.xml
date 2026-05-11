@@ -1,5 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="IntegrationTests.game" tests="1" failures="0">
-  <testcase name="game/time_advances">
+<testsuite name="IntegrationTests.game" tests="15" failures="0">
+  <testcase name="game/dt_positive">
+  </testcase>
+  <testcase name="filesys/write_read_roundtrip">
+  </testcase>
+  <testcase name="filesys/exist_true">
+  </testcase>
+  <testcase name="filesys/exist_false">
+  </testcase>
+  <testcase name="filesys/delete_game_file">
+  </testcase>
+  <testcase name="filesys/copy_file">
+  </testcase>
+  <testcase name="filesys/move_file">
+  </testcase>
+  <testcase name="filesys/directory_exists">
+  </testcase>
+  <testcase name="filesys/create_directory">
+  </testcase>
+  <testcase name="renderer/dynamic_model_render">
+  </testcase>
+  <testcase name="renderer/hotreload_material_instance">
+  </testcase>
+  <testcase name="renderer/hotreload_master_material">
+  </testcase>
+  <testcase name="renderer/hotreload_os_filewatcher">
+  </testcase>
+  <testcase name="renderer/hotreload_rapid_save_dedup">
+  </testcase>
+  <testcase name="renderer/ssr_smoke">
   </testcase>
 </testsuite>

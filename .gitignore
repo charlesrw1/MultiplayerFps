@@ -41,3 +41,12 @@ TestFiles/timing_*.json
 *.log
 
 todo_local.md
+
+*.bak
+*.binlog
+tlog_*.txt
+
+.claire/
+.claude/worktrees/
+
+TestFiles/coverage/*.html

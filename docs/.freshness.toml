@@ -1,0 +1,17 @@
+# docs freshness manifest
+# Auto-managed by `docs bless`. Hand-edit at your own risk.
+
+[[validation]]
+doc = "testing.md"
+source = "Scripts/build_and_test.ps1"
+sha = "04a28d50d5b65a31ee8013afd47fd356837e6fc5"
+
+[[validation]]
+doc = "testing.md"
+source = "Scripts/check_codebase.ps1"
+sha = "863bca876532a219c5b6dcaf7c1e906151f92bfe"
+
+[[validation]]
+doc = "testing.md"
+source = "Scripts/integration_test.ps1"
+sha = "d50642894f56c8f0076ad7d5cfcff0249cf72819"

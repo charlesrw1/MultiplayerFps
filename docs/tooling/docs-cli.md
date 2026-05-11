@@ -29,7 +29,8 @@
 
 | Command | Purpose |
 |---|---|
-| `docs check` | Validate all links. **Must exit 0 before commit.** |
+| `docs check` | Validate all links + freshness of source refs. **Must exit 0 before commit.** |
+| `docs bless [targets...]` | Record current source-file SHAs for wiki links from the named doc(s). `--all` blesses every tracked link. `--prune` drops manifest entries whose link no longer exists. |
 | `docs locate <query>` | Find headers (substring → fuzzy). |
 | `docs section <ref>` | Print section body + outbound links + inbound refs. File-only ref dumps whole file. |
 | `docs refs <ref>` | Inbound refs only, one per line. |
@@ -39,13 +40,35 @@ All commands accept `--json` for stable machine-readable output. Errors become `
 
 Fuzzy substitutions are reported on stderr as `fuzzy: '…' -> '…'`.
 
+## Freshness
+
+`docs check` flags doc → source wiki links whose source file has changed since the doc was last validated. State lives in `docs/.freshness.toml`, an auto-managed TOML array of validation entries:
+
+```toml
+[validation]]
+doc = "testing.md"
+source = "Scripts/build_and_test.ps1"
+sha = "04a28d50..."   # git blob SHA of the working-tree file; sha256 fallback when not in git
+```
+
+Three warning states (still exit 0):
+
+- `unblessed: <doc> -> <source>` — no manifest entry yet. Run `docs bless <doc>` after reading the source and confirming the doc is accurate.
+- `stale: <doc> -> <source>` — source changed since the recorded SHA. Re-read source, update doc, re-bless.
+- `orphan: <doc> -> <source>` — manifest entry references a doc or link that no longer exists. Clean with `docs bless --prune`.
+
+Only links resolving to paths in `[sources].paths` (from `docs.toml`) participate — doc-to-doc links and external URLs are ignored.
+
+`docs check --strict-freshness` promotes all three warnings to errors (for CI gating). Default behavior keeps them as warnings so they don't block commits.
+
 ## Agent workflow
 
 1. **Before editing a source file** — `docs context <path>`. Read what's pinned.
 2. **Before renaming a section/file** — `docs refs <ref>` to find dependents.
 3. **Finding a topic** — `docs locate <query>`.
 4. **Before commit** — `docs check` must exit 0.
-5. **Adding a new doc** — add one line to [[README]]; for internals docs, sprinkle `@docs` refs in relevant source headers.
+5. **After verifying a doc against its source links** — `docs bless <doc>` to clear stale/unblessed warnings.
+6. **Adding a new doc** — add one line to [[README]]; for internals docs, sprinkle `@docs` refs in relevant source headers.
 
 ## Notes
 

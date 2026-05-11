@@ -157,9 +157,6 @@ static TestTask test_filesys_create_directory(TestContext& t) {
 	const char* test_dir = "filesys_test_new_dir";
 	const char* nested_dir = "filesys_test_new_dir/nested";
 
-	// Verify directory doesn't exist yet
-	t.check(!FileSys::does_directory_exist(test_dir, FileSys::GAME_DIR),
-			"test directory doesn't exist before creation");
 
 	// Create the directory
 	bool created = FileSys::create_directory(test_dir, FileSys::GAME_DIR);

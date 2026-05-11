@@ -1,0 +1,1 @@
+1. right click in orthographic mode hides mouse with no way back
