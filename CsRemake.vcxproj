@@ -87,11 +87,7 @@
     <ClCompile Include="Source\Framework\ReflectionProp.cpp" />
     <ClCompile Include="Source\Framework\Serializer.cpp" />
     <ClCompile Include="Source\Framework\SerializerBinary.cpp" />
-    <ClCompile Include="Source\Framework\SerializerJson.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <BasicRuntimeChecks Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Default</BasicRuntimeChecks>
-      <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MaxSpeed</Optimization>
-    </ClCompile>
+    <ClCompile Include="Source\Framework\SerializerJson.cpp" />
     <ClCompile Include="Source\Framework\SerializerJson2.cpp" />
     <ClCompile Include="Source\Framework\StringName.cpp" />
     <ClCompile Include="Source\Framework\StringUtils.cpp" />
@@ -189,13 +185,7 @@
     <ClCompile Include="Source\LevelEditor\RoadBuilderTool_Overlay.cpp" />
     <ClCompile Include="Source\LevelEditor\RoadBuilderTool_Tick.cpp" />
     <ClCompile Include="Source\Game\Components\RoadNetworkComponent.cpp" />
-    <ClCompile Include="Source\LevelEditor\SceneExport.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-      <Optimization Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MaxSpeed</Optimization>
-      <BasicRuntimeChecks Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Default</BasicRuntimeChecks>
-    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\SceneExport.cpp" />
     <ClCompile Include="Source\LevelEditor\SelectionMode.cpp" />
     <ClCompile Include="Source\LevelEditor\SelectionState.cpp" />
     <ClCompile Include="Source\LevelEditor\ViewportHandles.cpp" />
@@ -501,7 +491,11 @@
     <ClInclude Include="Source\UI\Widgets\Layouts.h" />
   </ItemGroup>
   <ItemGroup>
-    <_WildCardClCompile Include="Source\.generated\**\*.cpp" />
+    <ClCompile Include="Source\.generated\MEGA.gen.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
@@ -568,39 +562,42 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <EnableUnitySupport>true</EnableUnitySupport>
+    <MultiProcCL>true</MultiProcCL>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <EnableUnitySupport>true</EnableUnitySupport>
+    <MultiProcCL>true</MultiProcCL>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|Win32'">
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <EnableUnitySupport>true</EnableUnitySupport>
     <ConfigurationType>StaticLibrary</ConfigurationType>
+    <MultiProcCL>true</MultiProcCL>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
@@ -629,7 +626,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\intermediate\$(ProjectName)\</IntDir>
-    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+    <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
     <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -692,9 +689,6 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
     </ClCompile>
-    <PreBuildEvent>
-      <Command>py "$(ProjectDir)Scripts/codegen.py"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -712,9 +706,6 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
     </ClCompile>
-    <PreBuildEvent>
-      <Command>py "$(ProjectDir)Scripts/codegen.py"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
     <ClCompile>
@@ -732,16 +723,16 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
     </ClCompile>
-    <PreBuildEvent>
-      <Command>py "$(ProjectDir)Scripts/codegen.py"</Command>
-    </PreBuildEvent>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
-  <Target Name="AddWildCardItems" AfterTargets="BuildGenerateSources">
-    <ItemGroup>
-      <ClCompile Include="@(_WildCardClCompile)" />
-    </ItemGroup>
+  <ItemGroup>
+    <_CodegenInputHeader Include="$(ProjectDir)Source\**\*.h" Exclude="$(ProjectDir)Source\.generated\**;$(ProjectDir)Source\External\**" />
+    <_CodegenScript Include="$(ProjectDir)Scripts\codegen.py;$(ProjectDir)Scripts\codegen_run.py;$(ProjectDir)Scripts\codegen_lib.py;$(ProjectDir)Scripts\codegen_generate.py" />
+  </ItemGroup>
+  <Target Name="GenerateMEGA" BeforeTargets="ClCompile" Inputs="@(_CodegenInputHeader);@(_CodegenScript)" Outputs="$(ProjectDir)Source\.generated\MEGA.gen.cpp">
+    <Message Text="Running codegen (inputs changed)..." Importance="high" />
+    <Exec Command="py &quot;$(ProjectDir)Scripts\codegen.py&quot;" WorkingDirectory="$(ProjectDir)" />
   </Target>
 </Project>
