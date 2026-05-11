@@ -2,7 +2,10 @@
 
 #include "../Entity.h"
 #include "../EntityComponent.h"
+#include "Framework/Handle.h"
 #include <json.hpp>
+
+struct Render_Object;
 class SpawnerComponent : public Component
 {
 public:

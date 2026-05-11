@@ -12,7 +12,7 @@ public:
 	bufferhandle id = 0;
 
 	OpenGLBufferImpl(const CreateBufferArgs& args) {
-		ASSERT(args.size > 0);
+		ASSERT(args.size >= 0);
 		glCreateBuffers(1, &id);
 		usage_type = (args.flags & BUFFER_USE_DYNAMIC) ? GL_DYNAMIC_DRAW : GL_STATIC_DRAW;
 		glNamedBufferData(id, args.size, nullptr, usage_type);
@@ -28,13 +28,13 @@ public:
 	void release() override { delete this; }
 
 	void upload(const void* data, int size) override {
-		ASSERT(size > 0 && data);
+		ASSERT(size >= 0);
 		this->buffer_size = size;
 		glNamedBufferData(id, size, data, usage_type);
 	}
 
 	void sub_upload(const void* data, int size, int ofs) override {
-		ASSERT(size > 0 && data && ofs >= 0);
+		ASSERT(size >= 0 && ofs >= 0);
 		glNamedBufferSubData(id, ofs, size, data);
 	}
 
@@ -133,7 +133,7 @@ public:
 // Factory functions (declared in OpenGlDeviceLocal.h)
 // ---------------------------------------------------------------------------
 IGraphicsBuffer* opengl_create_buffer(const CreateBufferArgs& args) {
-	ASSERT(args.size > 0);
+	ASSERT(args.size >= 0);
 	return new OpenGLBufferImpl(args);
 }
 

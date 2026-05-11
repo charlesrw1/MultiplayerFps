@@ -1,4 +1,6 @@
-This is a game engine project. Uses C++ VS2019, OpenGL, SDL2, vcpkg. No CMAKE.
+This is a game engine project. Uses C++ VS2026 , OpenGL, SDL2, vcpkg. No CMAKE.
+
+path to compilier: "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\MSBuild.exe"
 
 Write tests. Testing documentation found at [[docs/testing.md]]. Use Scripts/build_and_test.ps1 to build and run unit tests. Use Scripts/integration_tests.ps1 to build and run integration tests (with cli options).
 
@@ -18,7 +20,9 @@ _NEVER_ read source files in External/ _unless_ given permission. ONLY read AGEN
 
 Limit the source files you read to the module you are working on. Be brief, spare tokens.
 
-Every function should have at least 1 ASSERT(), documenting its preconditions and invariants. 
+Use ASSERTS() liberaly, documenting its preconditions and invariants. 
+
+Follow DRY, SOLID principles.
 
 ## Documentation
 

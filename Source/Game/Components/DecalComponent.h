@@ -2,6 +2,8 @@
 #include "Game/EntityComponent.h"
 
 #include "MeshbuilderComponent.h"
+#include "Assets/IAsset.h"
+#include "Framework/Handle.h"
 
 class MaterialInstance;
 struct Render_Decal;

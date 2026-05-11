@@ -61,7 +61,7 @@ private:
 	void draw_imgui_internal(IEditorTool* edState);
 	bool is_viewport_focused = false;
 	bool is_viewport_hovered = false;
-	Rect2d viewportRect{};
+	Rect2d viewportRect=Rect2d(0,0,1,1);
 	bool game_capturing_mouse = false;
 	// when game goes into focus mode, the mouse position is saved so it can be reset when exiting focus mode
 	int saved_mouse_x = 0, saved_mouse_y = 0;

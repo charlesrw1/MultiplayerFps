@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include <cassert>
 template <typename T> class RingBuffer
 {
 public:

@@ -15,7 +15,7 @@
 #include "Framework/ArenaStd.h"
 #include "IGraphsDevice.h"
 #include "GpuCullingTest.h"
-
+#include <bit>
 // -----------------------------------------------------------------------
 // BuildSceneData_CpuFast – LOD helpers, constructor, build_scene_data,
 // shadow culling, and object-removal callbacks.
@@ -24,6 +24,7 @@
 
 inline int next_pow2(uint32_t x) {
 	ASSERT(x > 0);
+
 	return std::bit_ceil(x);
 }
 

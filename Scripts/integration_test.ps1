@@ -91,9 +91,12 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
 # ---- Build ----------------------------------------------------------------
+# -prerelease ensures VS 2026 Insiders (Dev18) is picked over older stable installs.
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-$msbuild = & $vswhere -latest -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
+$msbuild = & $vswhere -latest -prerelease -requires Microsoft.Component.MSBuild `
+    -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
 if (-not $msbuild) { Write-Error "MSBuild not found"; exit 1 }
+Write-Host "Using MSBuild: $msbuild" -ForegroundColor DarkGray
 
 Write-Host "=== Building App ($Config|x64) ===" -ForegroundColor Cyan
 & $msbuild "$root\CsRemake.sln" /t:App /p:Configuration=$Config /p:Platform=x64 /v:minimal /m

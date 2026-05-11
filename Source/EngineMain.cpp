@@ -69,6 +69,7 @@
 // Global singletons
 // ---------------------------------------------------------------------------
 
+
 Debug_Console* Debug_Console::inst = nullptr;
 
 GameEngineLocal eng_local;
@@ -377,3 +378,5 @@ Application* Application::get_app() {
 	ASSERT(eng);
 	return eng->get_app();
 }
+
+

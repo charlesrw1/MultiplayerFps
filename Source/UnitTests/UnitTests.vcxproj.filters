@@ -13,6 +13,11 @@
     <ClCompile Include="maputil_test.cpp" />
     <ClCompile Include="pool_allocator_test.cpp" />
     <ClCompile Include="scripting_test.cpp" />
+    <ClCompile Include="asset_file_watcher_test.cpp" />
+    <ClCompile Include="scripting_manager_test.cpp" />
+    <ClCompile Include="scripting_classreg_test.cpp" />
+    <ClCompile Include="scripting_lua_dispatch_test.cpp" />
+    <ClCompile Include="bike_ai_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Unittest.h" />

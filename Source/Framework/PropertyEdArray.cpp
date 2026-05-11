@@ -4,6 +4,8 @@
 #include "Assets/AssetDatabase.h"
 #include "MyImguiLib.h"
 #include "Render/Texture.h"
+#include "StructReflection.h"
+#include "FnFactory.h"
 
 // Forward declarations needed by rebuild_child_rows
 IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst,

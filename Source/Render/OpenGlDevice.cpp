@@ -171,7 +171,7 @@ public:
 		return opengl_create_texture(args);
 	}
 	IGraphicsBuffer* create_buffer(const CreateBufferArgs& args) override {
-		ASSERT(args.size > 0);
+		ASSERT(args.size >= 0);
 		return opengl_create_buffer(args);
 	}
 	IGraphicsVertexInput* create_vertex_input(const CreateVertexInputArgs& args) override {

@@ -21,6 +21,7 @@
 #include "Render/DrawPublic.h"
 #include "Render/RenderObj.h"
 #include "UI/Gui.h"
+#include "Debug.h"
 #include <algorithm>
 
 // ============================================================

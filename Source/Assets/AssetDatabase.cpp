@@ -7,7 +7,7 @@
 #include <condition_variable>
 #include <queue>
 #include <functional>
-
+#include <algorithm>
 #include "Framework/Hashset.h"
 #include "Framework/Hashmap.h"
 #include "Framework/Files.h"

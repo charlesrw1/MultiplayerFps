@@ -112,10 +112,10 @@ void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
 			auto size = ImGui::GetWindowSize();
 			size.y -= 50;
 			size.x -= 30;
-			if (size.y < 0)
-				size.y = 0;
-			if (size.x < 0)
-				size.x = 0;
+			if (size.y <= 0)
+				size.y = 1;
+			if (size.x <= 0)
+				size.x = 1;
 
 			auto pos = ImGui::GetCursorPos();
 			auto winpos = ImGui::GetWindowPos();
@@ -140,6 +140,9 @@ void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
 	{
 		// normal game path, scene view was already drawn the the window framebuffer
 		viewportRect = Rect2d(0, 0, g_window_w.get_integer(), g_window_h.get_integer());
+		viewportRect.w = std::max((int)viewportRect.w, 1);
+		viewportRect.h = std::max((int)viewportRect.h, 1);
+
 		assert(is_drawing_to_screen());
 	}
 

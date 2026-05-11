@@ -3,6 +3,8 @@
 #include "LightComponents.h"
 #include "Render/DrawPublic.h"
 #include "Render/Texture.h"
+#include "Render/Model.h"
+#include "Render/RenderObj.h"
 
 #include "MeshComponent.h"
 

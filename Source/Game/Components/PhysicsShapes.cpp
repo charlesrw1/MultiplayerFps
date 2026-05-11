@@ -1,9 +1,12 @@
+#include "Game/Entity.h"
 #include "PhysicsComponents.h"
 #include "GameEnginePublic.h"
 #include "Physics/Physics2.h"
 #include "MeshbuilderComponent.h"
 #include "MeshComponent.h"
 #include "Render/Model.h"
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
 // Implementations for concrete collision shape components:
 // CapsuleComponent, BoxComponent, SphereComponent, MeshColliderComponent

@@ -8,7 +8,7 @@
 
 static bool check_if_string_is_number(const char* str) {
 	try {
-		std::stod(str);
+		int dummy = std::stod(str);
 		return true;
 	}
 	catch (...) {

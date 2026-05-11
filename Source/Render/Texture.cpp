@@ -78,7 +78,7 @@ bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* buffer,
 
 // TextureUpload.cpp
 IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, GraphicsTextureFormat informat,
-                                 bool nearest_filtered = false);
+                                 bool nearest_filtered);
 GraphicsTextureFormat to_format(int n, bool isfloat);
 
 // ---------------------------------------------------------------------------

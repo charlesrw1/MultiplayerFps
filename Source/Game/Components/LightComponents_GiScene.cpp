@@ -13,6 +13,7 @@
 #include "Framework/Files.h"
 #include "Framework/StringUtils.h"
 #include "Framework/BinaryReadWrite.h"
+#include <algorithm>
 
 #include "GameEnginePublic.h"
 #include "Level.h"

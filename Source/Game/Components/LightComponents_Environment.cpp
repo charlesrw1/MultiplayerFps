@@ -5,6 +5,7 @@
 #include "Render/Render_Volumes.h"
 #include "Render/Texture.h"
 #include "Render/MaterialPublic.h"
+#include "Render/Model.h"
 
 #include "BillboardComponent.h"
 #include "MeshComponent.h"

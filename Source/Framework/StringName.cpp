@@ -1,5 +1,6 @@
 #include "Framework/StringName.h"
 
+#include <string>
 #include <unordered_map>
 
 #ifdef EDITOR_BUILD

@@ -1,6 +1,8 @@
 #ifdef EDITOR_BUILD
 #include "PropertyEd.h"
 #include "imgui.h"
+#include "Framework/MathLib.h"
+#include "FnFactory.h"
 
 // ---- primitive property editor widgets ----
 
