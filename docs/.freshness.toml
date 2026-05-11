@@ -59,4 +59,4 @@ sha = "d50642894f56c8f0076ad7d5cfcff0249cf72819"
 [[validation]]
 doc = "tooling/asset-cli.md"
 source = "Scripts/asset_cli.py"
-sha = "d599fb9ce8322c3a66c1b6a5f39a44656bcc9d8d"
+sha = "e3d93fbce92771ec812537795549a9b3fb59dd61"
