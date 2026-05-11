@@ -121,9 +121,11 @@ function Find-OpenCppCoverage {
 
 function Build-App {
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-    $msbuild = & $vswhere -latest -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
-    if (-not $msbuild) { throw "MSBuild not found" }
-    Write-Host "  building App ($Config|x64)" -ForegroundColor DarkGray
+    # -prerelease so VS 2026 Insiders (v145 toolset) is picked up; plain -latest finds VS 2019.
+    $msbuild = & $vswhere -latest -prerelease -requires Microsoft.Component.MSBuild `
+        -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
+    if (-not $msbuild) { throw "MSBuild not found (need VS 2026 Insiders for v145 toolset)" }
+    Write-Host "  building App ($Config|x64) with $msbuild" -ForegroundColor DarkGray
     & $msbuild "$root\CsRemake.sln" /t:App /p:Configuration=$Config /p:Platform=x64 /v:minimal /m | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "App build failed" }
 }

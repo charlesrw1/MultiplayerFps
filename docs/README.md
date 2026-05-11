@@ -21,3 +21,4 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 ## Tooling
 
 - [[tooling/docs-cli]] — the `docs` CLI: validate links, locate sections, find inbound refs
+- [[tooling/asset-cli]] — `asset_cli.py` REPL: asset-group aware mv/cp/trash + reference rewriting, single-step undo
