@@ -19,7 +19,7 @@ class PrimaryAssetLoadingInterface;
 class IAsset : public ClassBase
 {
 public:
-	CLASS_BODY();
+	CLASS_BODY(IAsset);
 
 	IAsset();
 	virtual ~IAsset();

@@ -22,3 +22,4 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 
 - [[tooling/docs-cli]] — the `docs` CLI: validate links, locate sections, find inbound refs
 - [[tooling/asset-cli]] — `asset_cli.py` REPL: asset-group aware mv/cp/trash + reference rewriting, single-step undo
+- [[tooling/lua-check]] — `lua_check.ps1`: run sumneko lua-language-server `--check` from CLI, shares `.luarc.json` with VSCode

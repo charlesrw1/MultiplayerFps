@@ -49,10 +49,11 @@ public:
 	// USE IN RUNTIME! use create_sub_component to setup object in the constructor
 	// this calls on_init()
 	template <typename T> T* create_component();
-	REFLECT(lua_generic)
+	REFLECT(lua_generic, no_nil)
 	Component* create_component(const ClassTypeInfo* info);
 	// will also parent to this
-	REF Entity* create_child_entity();
+	REFLECT(no_nil)
+	Entity* create_child_entity();
 	template <typename T> T* create_entity_with_component();
 	// ONLY USE in serialization!
 	void add_component_from_unserialization(Component* component);

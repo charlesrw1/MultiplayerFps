@@ -18,6 +18,7 @@ class ClassBase;
 struct PropHashTable;
 struct ClassTypeInfo
 {
+	STRUCT_BODY(ClassTypeInfo);
 public:
 	typedef ClassBase* (*CreateObjectFunc)();
 	typedef PropertyInfoList (*GetPropsFunc)();
@@ -107,6 +108,8 @@ private:
 class ClassBase
 {
 public:
+	CLASS_BODY(ClassBase);
+
 	static ClassTypeInfo StaticType;
 	const static bool CreateDefaultObject;	/* = false, default setting */
 

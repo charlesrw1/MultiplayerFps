@@ -116,7 +116,7 @@ class IAssetLoadingInterface;
 class Model : public IAsset
 {
 public:
-	CLASS_BODY();
+	CLASS_BODY(Model);
 
 	~Model() override;
 

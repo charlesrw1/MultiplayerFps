@@ -1,5 +1,7 @@
 
 import unittest
+import shutil
+import tempfile
 
 import codegen_run as cg
 
@@ -18,19 +20,19 @@ CLASSBASE = "ClassBase"
 class TestTypeBuilder:
     def __init__(self):
         self.dict : dict[str,cg.ClassDef] = {}
-        self.dict[CLASSBASE] = cg.ClassDef([CLASSBASE],cg.ClassDef.TYPE_CLASS)
+        self.dict[CLASSBASE] = cg.ClassDef([CLASSBASE],cg.ClassDef.TYPE_CLASS,False)
         self.CLASS_BASE = self.dict[CLASSBASE]
 
     def add_class(self,name:str,inherits:str) -> cg.ClassDef:
-        c = cg.ClassDef([name,inherits],cg.ClassDef.TYPE_CLASS)
+        c = cg.ClassDef([name,inherits],cg.ClassDef.TYPE_CLASS,False)
         self.dict[name] = c
         return c
     def add_struct(self,name:str) -> cg.ClassDef:
-        c = cg.ClassDef([name],cg.ClassDef.TYPE_STRUCT)
+        c = cg.ClassDef([name],cg.ClassDef.TYPE_STRUCT,False)
         self.dict[name] = c
         return c
     def add_enum(self,name:str) -> cg.ClassDef:
-        c = cg.ClassDef([name],cg.ClassDef.TYPE_ENUM)
+        c = cg.ClassDef([name],cg.ClassDef.TYPE_ENUM,False)
         self.dict[name] = c
         return c
     def finish(self):
@@ -44,9 +46,9 @@ class CodegenUnitTest(unittest.TestCase):
     # test macro parsing
 
     def make_testing_dict(self) -> dict[str,cg.ClassDef]:
-        BASE_CLASS = cg.ClassDef(["Base"],cg.ClassDef.TYPE_CLASS)
-        PLAYER_CLASS = cg.ClassDef(["Player","Base"],cg.ClassDef.TYPE_CLASS)
-        MODEL_CLASS = cg.ClassDef(["Model","Base"],cg.ClassDef.TYPE_CLASS)
+        BASE_CLASS = cg.ClassDef(["Base"],cg.ClassDef.TYPE_CLASS,False)
+        PLAYER_CLASS = cg.ClassDef(["Player","Base"],cg.ClassDef.TYPE_CLASS,False)
+        MODEL_CLASS = cg.ClassDef(["Model","Base"],cg.ClassDef.TYPE_CLASS,False)
 
         typenames : dict[str,cg.ClassDef] = {
             "Base":BASE_CLASS,
@@ -125,8 +127,19 @@ class CodegenUnitTest(unittest.TestCase):
         SOURCE_DIR = "/../TestFiles/CodeGen/"
         DIRS_TO_SKIP = ["./.generated","./External"]
         this_dir = os.path.dirname(os.path.abspath(__file__))
-        os.chdir(this_dir+SOURCE_DIR)
-        cg.do_codegen('.', DIRS_TO_SKIP,True)
+        fixtures = this_dir + SOURCE_DIR
+        # Run codegen in an isolated temp tree so we don't pollute TestFiles/.
+        prev_cwd = os.getcwd()
+        with tempfile.TemporaryDirectory() as tmp:
+            sandbox = os.path.join(tmp, "src")
+            shutil.copytree(fixtures, sandbox, ignore=shutil.ignore_patterns(".generated"))
+            lua_out = os.path.join(tmp, "lua")
+            os.makedirs(lua_out, exist_ok=True)
+            os.chdir(sandbox)
+            try:
+                cg.do_codegen(lua_out, '.', DIRS_TO_SKIP, True)
+            finally:
+                os.chdir(prev_cwd)
 
 
     def test_parse_reflect_macro(self):
@@ -134,6 +147,37 @@ class CodegenUnitTest(unittest.TestCase):
         self.assertTrue(out.custom_type=="xyz")
         out = cg.parse_reflect_macro("REFLECT(hide)")
         self.assertTrue(out.hide)
+
+    def test_reflect_no_nil(self):
+        # default: no_nil is False
+        out = cg.parse_reflect_macro("REFLECT(hide)")
+        self.assertFalse(out.no_nil)
+
+        # standalone
+        out = cg.parse_reflect_macro("REFLECT(no_nil)")
+        self.assertTrue(out.no_nil)
+
+        # combined with other args
+        out = cg.parse_reflect_macro("REFLECT(hide, no_nil)")
+        self.assertTrue(out.hide and out.no_nil)
+
+        # lua type string suppresses |nil for pointer-like types
+        import codegen_generate as cgen
+        class FakeName:
+            classname = "Entity"
+        t_other = cg.CppType("Entity", FakeName(), cg.OTHER_CLASS_TYPE, is_ptr=True)
+        self.assertEqual(cgen.get_lua_type_string(t_other), "Entity|nil")
+        self.assertEqual(cgen.get_lua_type_string(t_other, True), "Entity")
+
+        t_handle = cg.CppType("Handle<Entity>", None, cg.HANDLE_PTR_TYPE,
+                              templates=[cg.CppType("Entity", FakeName(), cg.OTHER_CLASS_TYPE)])
+        self.assertEqual(cgen.get_lua_type_string(t_handle), "Entity|nil")
+        self.assertEqual(cgen.get_lua_type_string(t_handle, True), "Entity")
+
+        # array element no_nil propagates through templates
+        t_arr = cg.CppType("std::vector<Entity*>", None, cg.ARRAY_TYPE, templates=[t_other])
+        self.assertEqual(cgen.get_lua_type_string(t_arr), "Entity|nil[]")
+        self.assertEqual(cgen.get_lua_type_string(t_arr, True), "Entity[]")
     def test_type_parse(self):
         out = cg.parse_type("std::vector<int>",{})
         self.assertTrue(out.type==cg.ARRAY_TYPE)
@@ -142,9 +186,9 @@ class CodegenUnitTest(unittest.TestCase):
         self.assertTrue(len(out.template_args)==1 and out.template_args[0].type == cg.INT_TYPE)
 
 
-        BASE_CLASS = cg.ClassDef(["Base"],cg.ClassDef.TYPE_CLASS)
-        PLAYER_CLASS = cg.ClassDef(["Player","Base"],cg.ClassDef.TYPE_CLASS)
-        MODEL_CLASS = cg.ClassDef(["Model","Base"],cg.ClassDef.TYPE_CLASS)
+        BASE_CLASS = cg.ClassDef(["Base"],cg.ClassDef.TYPE_CLASS,False)
+        PLAYER_CLASS = cg.ClassDef(["Player","Base"],cg.ClassDef.TYPE_CLASS,False)
+        MODEL_CLASS = cg.ClassDef(["Model","Base"],cg.ClassDef.TYPE_CLASS,False)
 
         typenames : dict[str,cg.ClassDef] = {
             "Base":BASE_CLASS,
@@ -183,9 +227,9 @@ class CodegenUnitTest(unittest.TestCase):
 
 
     def test_parse_property(self):
-        BASE_CLASS = cg.ClassDef(["Base"],cg.ClassDef.TYPE_CLASS)
-        PLAYER_CLASS = cg.ClassDef(["Player","Base"],cg.ClassDef.TYPE_CLASS)
-        MODEL_CLASS = cg.ClassDef(["Model","Base"],cg.ClassDef.TYPE_CLASS)
+        BASE_CLASS = cg.ClassDef(["Base"],cg.ClassDef.TYPE_CLASS,False)
+        PLAYER_CLASS = cg.ClassDef(["Player","Base"],cg.ClassDef.TYPE_CLASS,False)
+        MODEL_CLASS = cg.ClassDef(["Model","Base"],cg.ClassDef.TYPE_CLASS,False)
 
         typenames : dict[str,cg.ClassDef] = {
             "Base":BASE_CLASS,
@@ -229,7 +273,8 @@ class MyTester(unittest.TestCase):
         DIRS_TO_SKIP = ["./.generated","./External"]
         this_dir = os.path.dirname(os.path.abspath(__file__))
         os.chdir(this_dir+SOURCE_DIR)
-        cg.do_codegen('.', DIRS_TO_SKIP,True)
+        with tempfile.TemporaryDirectory() as lua_out:
+            cg.do_codegen(lua_out, '.', DIRS_TO_SKIP, True)
 
 
         """

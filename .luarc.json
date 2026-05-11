@@ -1,0 +1,42 @@
+{
+    "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+    "runtime": {
+        "version": "LuaJIT"
+    },
+    "workspace": {
+        "library": [
+            "Data/scripts"
+        ],
+        "ignoreDir": [
+            ".claude",
+            ".git",
+            ".vs",
+            "External",
+            "x64",
+            "Debug",
+            "Release",
+            "Data/scripts/lib"
+        ],
+        "checkThirdParty": false
+    },
+    "diagnostics": {
+        "disable": [
+            "lowercase-global",
+            "missing-fields"
+        ],
+        "globals": [
+            "vec_add",
+            "vec_sub",
+            "vec_mult",
+            "vec_multf",
+            "normalize",
+            "cross"
+        ]
+    },
+    "telemetry": {
+        "enable": false
+    },
+    "hint": {
+        "enable": false
+    }
+}

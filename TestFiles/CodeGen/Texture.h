@@ -40,7 +40,7 @@ inline int get_mip_map_count(int width, int height)
 class Texture : public IAsset
 {
 public:
-	CLASS_BODY();
+	CLASS_BODY(Texture);
 	
 	~Texture() {}
 

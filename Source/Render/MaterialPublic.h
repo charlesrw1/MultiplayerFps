@@ -30,7 +30,8 @@ public:
 
 	// aight this is unsafe as crap, but whatever. for lua
 	// dynamic materials, can set parameters through code
-	REF static MaterialInstance* alloc_dynamic_mat(MaterialInstance* from);
+	REFLECT(no_nil)
+	static MaterialInstance* alloc_dynamic_mat(MaterialInstance* from);
 	REF static void free_dynamic_mat(MaterialInstance* mat);
 
 	// ONLY valid for dynamic materials! (is_this_a_dynamic_material())

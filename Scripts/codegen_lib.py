@@ -100,6 +100,7 @@ class Property:
         self.hint = ""
         self.is_getter = False
         self.is_setter = False
+        self.no_nil = False  # Lua stub: omit |nil from pointer return/arg/field types
 
     def get_flags(self):
         if not self.transient and not self.hide:
@@ -221,6 +222,8 @@ def parse_reflect_macro(line : str) -> Property:
                 current_prop.is_getter = True
             elif t=="setter":
                 current_prop.is_setter = True
+            elif t=="no_nil":
+                current_prop.no_nil = True
             else:
                 raise Exception(f"unexpected REFLECT(...) arg \"{t}\"")
 

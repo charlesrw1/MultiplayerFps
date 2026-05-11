@@ -22,7 +22,8 @@ class GameplayStatic : public ClassBase
 public:
 	CLASS_BODY(GameplayStatic);
 
-	REF static Entity* spawn_entity();
+	REFLECT(no_nil)
+	static Entity* spawn_entity();
 
 	// spatialize=R/L ear panning
 	// attenuation=distance attenuation

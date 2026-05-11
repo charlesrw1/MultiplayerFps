@@ -621,8 +621,9 @@ def write_class_old(typenames:dict[str,ClassDef],newclass : ClassDef)->str:
 
     return output
 
-def get_lua_type_string(new_type:CppType) -> str:
+def get_lua_type_string(new_type:CppType, no_nil:bool=False) -> str:
     output = ""
+    nil_suffix = "" if no_nil else "|nil"
     type_of_template :str= ""
     if len(new_type.template_args)>0:
         type_of_template = new_type.template_args[0].get_raw_type_string()
@@ -640,19 +641,19 @@ def get_lua_type_string(new_type:CppType) -> str:
         assert(new_type.typename!=None)
         output += f"{new_type.typename.classname}"
     elif new_type.type == ASSET_PTR_TYPE or new_type.type == HANDLE_PTR_TYPE:
-        output += f"{type_of_template}|nil"
+        output += f"{type_of_template}{nil_suffix}"
     elif new_type.type == STRING_TYPE or new_type.type == STRINGNAME_TYPE:
         output += f"string"
     elif new_type.type == OTHER_CLASS_TYPE:
         assert(new_type.typename!=None)
-        output += f"{new_type.typename.classname}|nil"
+        output += f"{new_type.typename.classname}{nil_suffix}"
     elif new_type.type == VEC3_TYPE:
         output += "lVec3"
     elif new_type.type == QUAT_TYPE:
         output += "lQuat"
     elif new_type.type == ARRAY_TYPE:
         assert(len(new_type.template_args)==1)
-        output += get_lua_type_string(new_type.template_args[0])+"[]"
+        output += get_lua_type_string(new_type.template_args[0], no_nil)+"[]"
     else:
         output += "any"
     return output
@@ -674,24 +675,24 @@ def write_lua_class(newclass:ClassDef) -> str:
         for p in newclass.properties:
             if p.new_type.type != FUNCTION_TYPE:
                 output += f"---@field {p.name} "
-                output += get_lua_type_string(p.new_type)           
+                output += get_lua_type_string(p.new_type, p.no_nil)
                 output += "\n"
         output +=  newclass.classname + " = {\n}\n"
 
         for p in newclass.properties:
             if p.new_type.type == FUNCTION_TYPE:
                 if p.lua_generic and p.return_type.type != NONE_TYPE:
-                    output += f"---@generic T : {get_lua_type_string(p.return_type)}\n"
+                    output += f"---@generic T : {get_lua_type_string(p.return_type, p.no_nil)}\n"
                 if p.return_type.type != NONE_TYPE:
                     if p.lua_generic:
                         output += "---@return T\n"
-                    else:               
-                        output += "---@return " + get_lua_type_string(p.return_type) + "\n"
+                    else:
+                        output += "---@return " + get_lua_type_string(p.return_type, p.no_nil) + "\n"
                 for argType,argName in p.func_args:
                     if p.lua_generic and argType.type == OTHER_CLASS_TYPE and argType.typename != None and argType.typename.classname == "ClassTypeInfo":
                         output += f"---@param {argName} T\n"
                     else:
-                        output += "---@param " + argName + " " + get_lua_type_string(argType) + "\n"
+                        output += "---@param " + argName + " " + get_lua_type_string(argType, p.no_nil) + "\n"
                 output += f"function {newclass.classname}"
                 if p.is_static:
                     output += "."
@@ -715,7 +716,7 @@ def write_lua_class(newclass:ClassDef) -> str:
                 # invoker
                 count = 0
                 for t in p.new_type.template_args:
-                    output += f"---@param arg{count} {get_lua_type_string(t)}\n"
+                    output += f"---@param arg{count} {get_lua_type_string(t, p.no_nil)}\n"
                     count += 1
                 output += f"function {newclass.classname}:invoke_{p.name}("
                 for i in range(count):
@@ -765,6 +766,7 @@ def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,
         time_now = datetime.now()
         timestamp_str = time_now.strftime("%Y-%m-%d %H:%M:%S")
         luaFile.write(f"--- GENERATED LUA FILE FROM C++ CLASSES v{VERSION} {timestamp_str}\n")
+        luaFile.write("---@diagnostic disable\n")
 
         if len(classes)>0:
             for c in classes:

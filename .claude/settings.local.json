@@ -303,7 +303,11 @@
       "PowerShell(Out-Null *)",
       "PowerShell(Scripts/integration_test.ps1 -Mode editor -Pattern \"editor/inherited_entity_not_deletable\",\"editor/prefab_save_extension_correct\" -Config Debug 2>&1 | Select-Object -Last 80)",
       "PowerShell(\\(Get-Item coverage_summary.html\\).Length; Test-Path coverage_summary.html)",
-      "Bash(where.exe git *)"
+      "Bash(where.exe git *)",
+      "PowerShell(.\\\\Scripts\\\\lua_check.ps1 -Path .\\\\Data\\\\scripts\\\\bike_player.lua -Level Error)",
+      "PowerShell(.\\\\Scripts\\\\lua_check.ps1 -Path $env:TEMP\\\\lua_check_smoke\\\\bad.lua -Level Warning)",
+      "PowerShell(.\\\\Scripts\\\\lua_check.ps1 -Path $env:TEMP\\\\lua_check_smoke\\\\syntax_err.lua -Level Hint)",
+      "PowerShell(.\\\\Scripts\\\\lua_check.ps1 -Path $env:TEMP\\\\lua_check_smoke -Level Warning)"
     ]
   },
   "enabledPlugins": {

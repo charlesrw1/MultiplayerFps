@@ -19,7 +19,7 @@ sha = "b515f6dc8ce2088270d54a64af4c9b103d744d9a"
 [[validation]]
 doc = "engine_overview.md"
 source = "Source/GameEnginePublic.h"
-sha = "795546f74fde9db68f1220c422265384610d5764"
+sha = "84192ce457948881d17d4d1cf4b41e3f33429fcf"
 
 [[validation]]
 doc = "engine_overview.md"
@@ -60,3 +60,8 @@ sha = "d50642894f56c8f0076ad7d5cfcff0249cf72819"
 doc = "tooling/asset-cli.md"
 source = "Scripts/asset_cli.py"
 sha = "e3d93fbce92771ec812537795549a9b3fb59dd61"
+
+[[validation]]
+doc = "tooling/lua-check.md"
+source = "Scripts/codegen_generate.py"
+sha = "9eb730c4c0b8027f77864c0d82e8519dc3fdd9a4"

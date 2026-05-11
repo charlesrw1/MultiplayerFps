@@ -16,7 +16,7 @@ class MaterialImpl;
 class MaterialInstance : public IAsset
 {
 public:
-	CLASS_BODY();
+	CLASS_BODY(MaterialInstance);
 
 	MaterialInstance();
 	virtual ~MaterialInstance() override;
