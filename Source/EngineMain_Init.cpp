@@ -186,8 +186,11 @@ void GameEngineLocal::open_tool(string mapname) {
 			sys_print(Debug, "EditorState::open_tool: replacing current tool\n");
 		this->editor_tool.reset(IEditorTool::create(mapname));
 	} else {
-		sys_print(Warning, "EditorState::open_tool: creation returned null\n");
-		this->editor_tool = nullptr;
+		// Keep the current editor_tool intact so a failed open doesn't destroy
+		// the user's in-progress document. load_level returns false WITHOUT
+		// running insert_this_map_as_level when the asset is missing, so the
+		// existing `level` is also untouched.
+		sys_print(Error, "EditorState::open_tool: failed to load '%s', keeping current document\n", mapname.c_str());
 	}
 }
 

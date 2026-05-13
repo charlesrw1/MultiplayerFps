@@ -9,6 +9,7 @@
 #include "Assets/AssetRegistry.h"
 #include "Assets/AssetRegistryLocal.h"
 #include "Render/Model.h"
+#include "Logging.h"
 namespace fs = std::filesystem;
 
 // Serialize round-trip: load a level, save it, reload, check entity count matches
@@ -37,6 +38,59 @@ static TestTask test_serialize_round_trip(TestContext& t) {
 
 }
 EDITOR_TEST("editor/serialize_round_trip", 15.f, test_serialize_round_trip);
+
+
+// Captures Error/Warning log lines for the lifetime of the sink so tests can
+// assert that a failing operation reported something. Strings are kept in a
+// vector so a test can check for substrings if needed.
+class TestLogCaptureSink : public LogSink
+{
+public:
+	std::vector<std::string> errors_and_warnings;
+	void log(LogType type, const std::string& message) override {
+		if (type == LogType::Error || type == LogType::Warning)
+			errors_and_warnings.push_back(message);
+	}
+};
+
+// Opening a map that does not exist must not blow away the document the user
+// already has open, and it must report the failure to the log.
+static TestTask test_open_invalid_map(TestContext& t) {
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "open-editor eng/template.tmap");
+	co_await t.wait_ticks(4);
+	t.require(eng->get_level() != nullptr, "valid level loaded before invalid open");
+	t.require(eng->get_tool() != nullptr, "editor tool open before invalid open");
+
+	Level* level_before = eng->get_level();
+	IEditorTool* tool_before = eng->get_tool();
+	int entity_count_before = t.editor().entity_count();
+
+	auto sink = std::make_shared<TestLogCaptureSink>();
+	Logger::inst->add_sink(sink);
+
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "open-editor _no_such_map_invalid_path_.tmap");
+	co_await t.wait_ticks(4);
+
+	Logger::inst->remove_sink(sink.get());
+
+	t.check(!sink->errors_and_warnings.empty(), "an error or warning was logged for the invalid open");
+	t.check(eng->get_level() == level_before, "current level was not replaced by the invalid open");
+	t.check(eng->get_tool() == tool_before, "current editor tool was not closed by the invalid open");
+	t.check(t.editor().entity_count() == entity_count_before, "entity count unchanged after invalid open");
+}
+EDITOR_TEST("editor/test_open_invalid_map", 10.f, test_open_invalid_map);
+
+// Opening with no map argument loads a blank scene — verify the editor is up
+// with a valid (but empty) level. The engine emits unrelated GL warnings
+// during map load, so we don't assert on global log silence here.
+static TestTask test_open_empty_map(TestContext& t) {
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "open-editor");
+	co_await t.wait_ticks(4);
+
+	t.check(eng->get_level() != nullptr, "level exists after opening empty map");
+	t.check(eng->get_tool() != nullptr, "editor tool exists after opening empty map");
+}
+EDITOR_TEST("editor/test_open_empty_map", 10.f, test_open_empty_map);
 
 // Undo with no commands queued should not crash or change entity count
 static TestTask test_undo_noop(TestContext& t) {
