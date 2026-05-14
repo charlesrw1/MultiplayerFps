@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="IntegrationTests.editor" tests="17" failures="0">
+<testsuite name="IntegrationTests.editor" tests="23" failures="0">
   <testcase name="editor/prefab_mode_detection">
   </testcase>
   <testcase name="editor/prefab_command_validity">
@@ -16,7 +16,19 @@
   </testcase>
   <testcase name="editor/prefab_save_extension_correct">
   </testcase>
+  <testcase name="editor/prefab_flatten_on_drop">
+  </testcase>
+  <testcase name="editor/prefab_drop_then_undo_no_crash">
+  </testcase>
+  <testcase name="editor/prefab_auto_flatten_on_load">
+  </testcase>
+  <testcase name="editor/make_prefab_replace_refused_in_prefab_mode">
+  </testcase>
   <testcase name="editor/serialize_round_trip">
+  </testcase>
+  <testcase name="editor/test_open_invalid_map">
+  </testcase>
+  <testcase name="editor/test_open_empty_map">
   </testcase>
   <testcase name="editor/undo_noop">
   </testcase>

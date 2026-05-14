@@ -125,6 +125,10 @@
     <ClCompile Include="Source\Game\BikeDemo\BikeObject_Steer.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeUI.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeWind.cpp" />
+    <ClCompile Include="Source\Game\ObsGame\ObsGameApplication.cpp" />
+    <ClCompile Include="Source\Game\ObsGame\ObsPlayer.cpp" />
+    <ClCompile Include="Source\Game\ObsGame\ObsHand.cpp" />
+    <ClCompile Include="Source\Game\ObsGame\ObsCamera.cpp" />
     <ClCompile Include="Source\Game\CarGame\CarGame.cpp" />
     <ClCompile Include="Source\Game\Components\BillboardComponent.cpp" />
     <ClCompile Include="Source\Game\Components\CameraComponent.cpp" />
@@ -318,6 +322,7 @@
     <ClInclude Include="Source\Framework\Jobs.h" />
     <ClInclude Include="Source\Framework\VectorReflect2.h" />
     <ClInclude Include="Source\Game\BikeDemo\BikeHeaders.h" />
+    <ClInclude Include="Source\Game\ObsGame\ObsGameHeaders.h" />
     <ClInclude Include="Source\Game\CarGame\CarGame.h" />
     <ClInclude Include="Source\Game\CarGame\CarGui.h" />
     <ClInclude Include="Source\Game\Components\GraphCurveComponent.h" />

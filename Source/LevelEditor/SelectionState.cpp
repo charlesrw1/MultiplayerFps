@@ -22,8 +22,10 @@ SelectionState::SelectionState(EditorDoc& ed_doc) {
  std::vector<EntityPtr> SelectionState::get_selection_as_vector() const {
 	std::vector<EntityPtr> out;
 	for (auto e : selected_entity_handles) {
+		auto* obj = eng->get_object(e);
+		if (!obj) continue; // stale handle — selection not yet validated; skip safely
+		ASSERT(obj->is_a<Entity>());
 		out.push_back(EntityPtr(e));
-		ASSERT(eng->get_object(e)->is_a<Entity>());
 	}
 	return out;
 }

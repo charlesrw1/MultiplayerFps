@@ -350,8 +350,16 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 				}
 			}
 
-			// Load the template level (clears current level)
-			eng->load_level("template.tmap");
+			// Load the template level (clears current level). If template.tmap can't be
+			// loaded, load_level returns false and leaves the level untouched — fall back to
+			// an empty level so the subsequent mark + restore steps operate on a cleared
+			// level. Without this fallback the original prefab entities remain, the mark
+			// loop stamps them un-editable, and the restore step inserts a duplicate set.
+			if (!eng->load_level("template.tmap")) {
+				sys_print(Warning,
+						  "init_for_scene: template.tmap load failed; opening prefab without template background\n");
+				eng->load_level("");
+			}
 
 			// Mark all template entities as dont_serialize_or_edit
 			auto& template_objects = eng->get_level()->get_all_objects();
@@ -371,6 +379,40 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 				catch (const std::exception& e) {
 					sys_print(Warning, "Failed to restore prefab content: %s\n", e.what());
 				}
+			}
+
+			// Auto-flatten any pre-existing PrefabAssetComponent in the loaded prefab.
+			// Prefab-in-prefab is unsupported (serializer skips parented entities), so any
+			// nested reference in the file is broken data. Inline it now: unparent the
+			// runtime-spawned children (preserving world transform), clear their inherited
+			// flag, then destroy the prefab-root entity. Fixed-point loop handles depth.
+			int flatten_pass_count = 0;
+			while (true) {
+				ASSERT(flatten_pass_count < 100); // pathological deep nesting guard
+				PrefabAssetComponent* found = nullptr;
+				for (auto obj : eng->get_level()->get_all_objects()) {
+					if (auto* pac = obj->cast_to<PrefabAssetComponent>()) {
+						found = pac;
+						break;
+					}
+				}
+				if (!found) break;
+
+				Entity* owner = found->get_owner();
+				ASSERT(owner);
+				std::vector<Entity*> children_snap(owner->get_children().begin(),
+												   owner->get_children().end());
+				for (Entity* child : children_snap) {
+					glm::mat4 ws = child->get_ws_transform();
+					child->parent_to(nullptr);
+					child->set_ws_transform(ws);
+					child->dont_serialize_or_edit = false;
+				}
+				sys_print(Warning,
+						  "Auto-flattening prefab-in-prefab on load: '%s' (%d entities promoted to root)\n",
+						  found->prefab_path.c_str(), (int)children_snap.size());
+				owner->destroy();
+				flatten_pass_count++;
 			}
 		}
 	} else {

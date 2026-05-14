@@ -6,6 +6,8 @@
 #include "LevelSerialization/SerializeNew.h"
 #include "Game/Prefab.h"
 #include "Game/Components/PrefabAssetComponent.h"
+#include "Assets/AssetDatabase.h"
+#include "Level.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include <limits>
@@ -49,6 +51,41 @@ InstantiatePrefabCommand::InstantiatePrefabCommand(EditorDoc& ed_doc, const std:
 
 void InstantiatePrefabCommand::execute() {
 	ASSERT(!prefab_path.empty());
+	// Prefab-in-prefab: flatten the dropped prefab into root-level entities of the outer prefab.
+	// Nested prefab references can't survive serialization (SerializeNew skips parented entities),
+	// so we materialize the inner prefab's contents in-place instead.
+	if (ed_doc.is_editing_prefab()) {
+		sys_print(Warning,
+				  "Prefab-in-prefab not supported: flattening '%s' into separate entities of the outer prefab\n",
+				  prefab_path.c_str());
+
+		std::string prefab_text = PrefabFile::load_text(prefab_path);
+		if (prefab_text.empty()) {
+			sys_print(Warning, "Failed to load prefab for flatten: %s\n", prefab_path.c_str());
+			return;
+		}
+
+		try {
+			UnserializedSceneFile unserialized = unserialize_entities_from_text(
+				"prefab_flatten", prefab_text, AssetDatabase::loader, false);
+			ed_doc.insert_unserialized_into_scene(unserialized);
+
+			for (auto base_updater : unserialized.all_obj_vec) {
+				if (auto entity = base_updater->cast_to<Entity>()) {
+					if (entity->get_parent())
+						continue; // inner-prefab children inherit through their root; skip
+					entity->set_ws_transform(transform * entity->get_ls_transform());
+					handles.push_back(entity);
+				}
+			}
+		}
+		catch (const std::exception& e) {
+			sys_print(Warning, "Failed to flatten prefab %s: %s\n", prefab_path.c_str(), e.what());
+		}
+		ed_doc.post_node_changes.invoke();
+		return;
+	}
+
 	try {
 		auto e = spawn_prefab(ed_doc, prefab_path, transform);
 		handles.push_back(e);
@@ -56,6 +93,7 @@ void InstantiatePrefabCommand::execute() {
 	catch (const std::exception& e) {
 		sys_print(Warning, "Failed to deserialize prefab %s: %s\n", prefab_path.c_str(), e.what());
 	}
+	ed_doc.post_node_changes.invoke();
 }
 
 void InstantiatePrefabCommand::undo() {
@@ -66,6 +104,7 @@ void InstantiatePrefabCommand::undo() {
 		}
 	}
 	handles.clear();
+	ed_doc.post_node_changes.invoke();
 }
 
 MakePrefabFromSelectionCommand::MakePrefabFromSelectionCommand(EditorDoc& ed_doc,
@@ -119,6 +158,10 @@ MakePrefabAndReplaceCommand::MakePrefabAndReplaceCommand(EditorDoc& ed_doc, cons
 														 const std::string& prefab_path)
 	: ed_doc(ed_doc), prefab_path(prefab_path), selection(selection) {
 	ASSERT(!prefab_path.empty());
+}
+
+bool MakePrefabAndReplaceCommand::is_valid() {
+	return !prefab_path.empty() && !selection.empty() && !ed_doc.is_editing_prefab();
 }
 
 void MakePrefabAndReplaceCommand::execute() {

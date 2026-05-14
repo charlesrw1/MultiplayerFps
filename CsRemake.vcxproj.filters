@@ -525,6 +525,10 @@
     <ClCompile Include="Source\Game\BikeDemo\BikeObject_Steer.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeUI.cpp" />
     <ClCompile Include="Source\Game\BikeDemo\BikeWind.cpp" />
+    <ClCompile Include="Source\Game\ObsGame\ObsGameApplication.cpp" />
+    <ClCompile Include="Source\Game\ObsGame\ObsPlayer.cpp" />
+    <ClCompile Include="Source\Game\ObsGame\ObsHand.cpp" />
+    <ClCompile Include="Source\Game\ObsGame\ObsCamera.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents_Environment.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents_GiScene.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents_Lightmap.cpp" />
@@ -1218,6 +1222,7 @@
     <ClInclude Include="Source\Game\Components\PrefabAssetComponent.h" />
     <ClInclude Include="Source\Game\Prefab.h" />
     <ClInclude Include="Source\Game\BikeDemo\BikeHeaders.h" />
+    <ClInclude Include="Source\Game\ObsGame\ObsGameHeaders.h" />
     <ClInclude Include="Source\Game\Components\RoadNetworkComponent.h" />
     <ClInclude Include="Source\LevelEditor\RoadBuilderTool.h" />
     <ClInclude Include="Source\ITestRunner.h" />

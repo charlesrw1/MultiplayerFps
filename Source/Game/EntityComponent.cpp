@@ -86,6 +86,7 @@ void Component::shutdown_updater() {
 
 void Component::activate_internal_step2() {
 	ASSERT(init_state == initialization_state::HAS_ID);
+	ASSERT(entity_owner);
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
 		start();
 		init_updater();

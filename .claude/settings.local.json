@@ -312,7 +312,21 @@
       "PowerShell(& \"$PWD\\\\Scripts\\\\build_and_test.ps1\")",
       "PowerShell(& \"$PWD\\\\Scripts\\\\integration_tests.ps1\" --tests game)",
       "PowerShell(& \"$PWD\\\\Scripts\\\\integration_test.ps1\" -Mode game)",
-      "PowerShell(& \"$PWD\\\\Scripts\\\\integration_test.ps1\" -Mode editor)"
+      "PowerShell(& \"$PWD\\\\Scripts\\\\integration_test.ps1\" -Mode editor)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\docs\" -Filter \"*.md\")",
+      "Bash(Select-Object Name)",
+      "Bash(Out-String)",
+      "Bash(findstr /S /M \"ObsGame\" C:/Users/charl/source/repos/CsRemake/UnitTests.vcxproj C:/Users/charl/source/repos/CsRemake/UnitTests/UnitTests.vcxproj)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" C:/Users/charl/source/repos/CsRemake/CsRemake.sln /t:UnitTests /p:Configuration=Debug /p:Platform=x64 /v:minimal /nologo 2>&1 | Out-String)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" C:/Users/charl/source/repos/CsRemake/CsRemake.sln /t:IntegrationTests /p:Configuration=Debug /p:Platform=x64 /v:minimal /nologo 2>&1 | Out-String)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" C:/Users/charl/source/repos/CsRemake/CsRemake.sln /t:App /p:Configuration=Debug /p:Platform=x64 /v:minimal /nologo 2>&1 | Out-String)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\" -Directory)",
+      "PowerShell(.\\\\x64\\\\Debug\\\\App.exe --tests editor \"editor/test_open_invalid_map\" \"editor/test_open_empty_map\" 2>&1 | Where-Object { $_ -match '^\\\\[TEST\\\\]|FAIL|fail|invalid|empty' } | Select-Object -Last 80)",
+      "PowerShell(.\\\\x64\\\\Debug\\\\App.exe --tests editor \"editor/test_open_invalid_map\" \"editor/test_open_empty_map\" 2>&1 | Where-Object { $_ -match '^\\\\[TEST\\\\]|CHECK FAILED' })",
+      "PowerShell(Get-Process *)",
+      "WebFetch(domain:blog.maximeheckel.com)",
+      "Bash(\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" CsRemake.sln /t:UnitTests /p:Configuration=Debug /p:Platform=x64 /v:minimal)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" CsRemake.sln /t:UnitTests /p:Configuration=Debug /p:Platform=x64 /v:minimal | Select-Object -Last 80)"
     ]
   },
   "enabledPlugins": {

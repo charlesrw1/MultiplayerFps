@@ -234,6 +234,12 @@ void EditorDoc::add_editor_commands() {
 			args.sys_print(Warning, "Usage: make-prefab-and-replace <prefab_path>\n");
 			return;
 		}
+		if (is_editing_prefab()) {
+			args.sys_print(Warning,
+						   "make-prefab-and-replace: refused in prefab edit mode (would spawn a "
+						   "PrefabAssetComponent reference inside a prefab)\n");
+			return;
+		}
 		auto selection = selection_state->get_selection_as_vector();
 		if (selection.empty()) {
 			args.sys_print(Warning, "No entities selected\n");

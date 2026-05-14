@@ -340,7 +340,10 @@ public:
 	EditorDoc& ed_doc;
 	MakePrefabAndReplaceCommand(EditorDoc& ed_doc, const std::vector<EntityPtr>& selection,
 								const std::string& prefab_path);
-	bool is_valid() final { return !prefab_path.empty() && !selection.empty(); }
+	// Refuse in prefab edit mode: replacing selection with a PrefabAssetComponent reference
+	// would re-introduce prefab-in-prefab data that the editor explicitly forbids. Defined
+	// in CommandsPrefab.cpp because the check needs the EditorDoc full type.
+	bool is_valid() final;
 
 	void execute() final;
 	void undo() final;

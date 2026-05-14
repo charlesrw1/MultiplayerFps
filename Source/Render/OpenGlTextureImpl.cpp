@@ -274,7 +274,7 @@ public:
 	uint32_t get_internal_handle() override { return id; }
 
 	void sub_image_upload(int level, int x, int y, int w, int h, int size, const void* data) override {
-		ASSERT(w > 0 && h > 0 && data);
+		ASSERT(w > 0 && h > 0);
 		if (is_compressed())
 			glCompressedTextureSubImage2D(id, level, x, y, w, h, internal_format_gl, size, data);
 		else {
@@ -285,7 +285,7 @@ public:
 	}
 
 	void sub_image_upload_3d(int z, int level, int x, int y, int w, int h, int size, const void* data) final {
-		ASSERT(w > 0 && h > 0 && data);
+		ASSERT(w > 0 && h > 0);
 		if (is_compressed())
 			glCompressedTextureSubImage3D(id, level, x, y, z, w, h, 1, internal_format_gl, size, data);
 		else {
