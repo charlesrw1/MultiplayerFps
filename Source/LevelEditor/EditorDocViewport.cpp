@@ -107,6 +107,16 @@ void EditorDoc::imgui_draw() {
 	if (manipulate->get_is_using_for_custom()) {
 		draw_text("Manipulate Stolen");
 	}
+	// Tells the user their map has entities the loader couldn't instantiate. They're
+	// being held verbatim and will round-trip on save, but they aren't editable here.
+	if (auto level = eng->get_level()) {
+		const int n = (int)level->preserved_unknown_objs.size();
+		if (n > 0) {
+			std::string warn = "Unresolved entities in map: " + std::to_string(n) +
+							   " (preserved as opaque blobs — see Commands > Unresolved Entities)";
+			draw_text(warn.c_str());
+		}
+	}
 
 	prop_editor->draw(*sel_api_impl);
 
@@ -377,6 +387,30 @@ void EditorDoc::hook_menu_bar() {
 		ImGui::Separator();
 		if (ImGui::MenuItem("Play")) {
 			start_play_process();
+		}
+
+		ImGui::Separator();
+		// Lists __typename of every entity the loader stashed because the class wasn't found.
+		// Greyed out + tagged with count when empty so users learn it exists before they hit a problem.
+		{
+			auto level = eng->get_level();
+			const int n = level ? (int)level->preserved_unknown_objs.size() : 0;
+			const std::string label = "Unresolved Entities (" + std::to_string(n) + ")";
+			if (ImGui::BeginMenu(label.c_str(), n > 0)) {
+				ImGui::TextDisabled("Preserved verbatim on save; not editable here.");
+				ImGui::Separator();
+				for (const auto& blob : level->preserved_unknown_objs) {
+					const char* type = "<no __typename>";
+					std::string buf;
+					auto it = blob.find("__typename");
+					if (it != blob.end() && it->is_string()) {
+						buf = it->get<std::string>();
+						type = buf.c_str();
+					}
+					ImGui::TextUnformatted(type);
+				}
+				ImGui::EndMenu();
+			}
 		}
 
 		ImGui::EndMenu();

@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <unordered_set>
+#include <json.hpp>
 #include "Framework/Hashmap.h"
 #include "Framework/Hashset.h"
 #include "Framework/ScopedBoolean.h"
@@ -50,6 +51,11 @@ public:
 	void validate();
 	Entity* find_initial_entity_by_name(const string& name) const;
 	Component* find_first_component(const ClassTypeInfo* type) const;
+
+	// Raw entity JSON for objs whose __typename couldn't be instantiated at load.
+	// Spliced back into the file on save so deleted/renamed component types survive
+	// a round-trip instead of being silently dropped from the .tmap.
+	std::vector<nlohmann::json> preserved_unknown_objs;
 
 private:
 	void insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene, bool addSpawnNames);

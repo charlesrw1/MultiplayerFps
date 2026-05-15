@@ -10,6 +10,7 @@
 #include "Assets/AssetRegistryLocal.h"
 #include "Render/Model.h"
 #include "Logging.h"
+#include "Level.h"
 namespace fs = std::filesystem;
 
 // Serialize round-trip: load a level, save it, reload, check entity count matches
@@ -117,3 +118,57 @@ static TestTask test_does_new_asset_appear(TestContext& t) {
 	t.check(!found_in_2, "newly deleted file found in asset registry");
 }
 EDITOR_TEST("editor/does_new_assets_appear", 5.f, test_does_new_asset_appear);
+
+// Loading a .tmap whose JSON references a component class that doesn't exist in the
+// build must not throw — the entity is stashed verbatim on Level::preserved_unknown_objs
+// and gets spliced back into the file on the next save so it round-trips intact.
+static TestTask test_preserve_unknown_typename(TestContext& t) {
+	const char* kInputPath = "_temp_serialize_unknown_in.tmap";
+	const char* kOutputPath = "_temp_serialize_unknown_out.tmap";
+	FileSys::delete_game_file(kInputPath);
+	FileSys::delete_game_file(kOutputPath);
+
+	// Hand-craft: one real component + one unknown-typename entity.
+	const char* kInput =
+		"!json\n"
+		"{\n"
+		" \"__version\": 1,\n"
+		" \"objs\": [\n"
+		"  { \"__typename\": \"SpotLightComponent\" },\n"
+		"  { \"__typename\": \"DefinitelyNotARealComponent_xyz\", \"some_field\": 42 }\n"
+		" ]\n"
+		"}\n";
+	{
+		auto f = FileSys::open_write_game(kInputPath);
+		t.require(f != nullptr, "open input tmap for write");
+		f->write(kInput, strlen(kInput));
+	}
+
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, (std::string("open-editor ") + kInputPath).c_str());
+	co_await t.wait_ticks(4);
+	t.require(eng->get_level() != nullptr, "level loaded despite unknown typename");
+
+	t.check(eng->get_level()->preserved_unknown_objs.size() == 1,
+			"preserved_unknown_objs has the one unknown entity");
+
+	t.editor().save_level(kOutputPath);
+	co_await t.wait_ticks(1);
+
+	// Read the saved file back as raw text and confirm both names landed in the output.
+	auto fr = FileSys::open_read_game(kOutputPath);
+	t.require(fr != nullptr, "open saved tmap for read");
+	std::string saved;
+	saved.resize(fr->size());
+	if (!saved.empty())
+		fr->read(saved.data(), saved.size());
+	t.check(saved.find("SpotLightComponent") != std::string::npos, "saved file contains real component name");
+	t.check(saved.find("DefinitelyNotARealComponent_xyz") != std::string::npos,
+			"saved file preserved unknown component name");
+	// The unknown blob is round-tripped verbatim, so inner fields must survive too.
+	t.check(saved.find("some_field") != std::string::npos, "preserved blob retained its inner field name");
+	t.check(saved.find("42") != std::string::npos, "preserved blob retained its inner field value");
+
+	FileSys::delete_game_file(kInputPath);
+	FileSys::delete_game_file(kOutputPath);
+}
+EDITOR_TEST("editor/preserve_unknown_typename", 15.f, test_preserve_unknown_typename);

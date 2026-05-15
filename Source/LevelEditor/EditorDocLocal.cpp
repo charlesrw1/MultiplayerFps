@@ -261,7 +261,8 @@ bool EditorDoc::save_document_internal() {
 		if (auto e = o->cast_to<Entity>())
 			all_ents.push_back(e);
 	string debug_tag = "saving:" + assetName.value_or("<new>");
-	auto serialized = NewSerialization::serialize_to_text(debug_tag.c_str(), all_ents, false);
+	auto serialized = NewSerialization::serialize_to_text(debug_tag.c_str(), all_ents, false, nullptr,
+														  &eng->get_level()->preserved_unknown_objs);
 	assert(assetName.has_value());
 	const string path = assetName.value();
 

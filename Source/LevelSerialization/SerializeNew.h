@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <json.hpp>
 #include "Framework/ClassBase.h"
 #include "Framework/Reflection2.h"
 #include "Framework/SerializedForDiffing.h"
@@ -21,13 +22,15 @@ public:
 	UnserializedSceneFile() = default;
 	~UnserializedSceneFile() { delete_objs(); }
 	UnserializedSceneFile(UnserializedSceneFile&& other) noexcept
-		: all_obj_vec(std::move(other.all_obj_vec)), ownership_transferred(other.ownership_transferred) {
+		: all_obj_vec(std::move(other.all_obj_vec)), unknown_objs(std::move(other.unknown_objs)),
+		  ownership_transferred(other.ownership_transferred) {
 		other.ownership_transferred = true; // moved-from owns nothing
 	}
 	UnserializedSceneFile& operator=(UnserializedSceneFile&& other) noexcept {
 		if (this != &other) {
 			delete_objs();
 			all_obj_vec = std::move(other.all_obj_vec);
+			unknown_objs = std::move(other.unknown_objs);
 			ownership_transferred = other.ownership_transferred;
 			other.ownership_transferred = true;
 		}
@@ -42,6 +45,9 @@ public:
 	void mark_ownership_transferred() { ownership_transferred = true; }
 
 	std::vector<BaseUpdater*> all_obj_vec;
+	// Raw entity JSON for objs whose __typename couldn't be instantiated. The loader
+	// preserves them so they round-trip through save without being lost.
+	std::vector<nlohmann::json> unknown_objs;
 
 private:
 	bool ownership_transferred = false;
@@ -69,7 +75,8 @@ class NewSerialization
 public:
 	// throws SerializeInputError on bad input
 	static SerializedSceneFile serialize_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs,
-												 bool write_ids, const char* prefab_name = nullptr);
+												 bool write_ids, const char* prefab_name = nullptr,
+												 const std::vector<nlohmann::json>* preserved_unknown_objs = nullptr);
 	static UnserializedSceneFile unserialize_from_text(const char* debug_tag, const std::string& text, bool keepid);
 	static UnserializedSceneFile unserialize_from_json(const char* debug_tag, SerializedForDiffing& json, bool keepid);
 };

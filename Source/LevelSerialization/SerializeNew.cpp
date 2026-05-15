@@ -69,8 +69,15 @@ UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_
 		// Hold both as unique_ptr until fully built so a throw in the reader can't leak.
 		auto e = std::make_unique<Entity>();
 		std::unique_ptr<Component> c(ClassBase::create_class<Component>(type.c_str()));
-		if (!c)
-			throw SerializeInputError(std::string(debug_tag) + ": unknown component type '" + type + "'");
+		if (!c) {
+			// Class is missing from this build (deleted, renamed, branch mismatch). Stash the raw
+			// JSON so a later save can splice it back verbatim instead of losing the entity.
+			sys_print(Warning,
+					  "%s: unknown component type '%s' — preserving as opaque blob for round-trip\n",
+					  debug_tag, type.c_str());
+			outfile.unknown_objs.push_back(ent);
+			continue;
+		}
 		e->add_component_from_unserialization(c.get());
 		std::unordered_set<std::string> consumed;
 		{
@@ -133,7 +140,8 @@ UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_
 // instanced prefabs cant be deleted) also checks for fully unique ids.
 
 SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs,
-														bool write_ids, const char* prefab_name) {
+														bool write_ids, const char* prefab_name,
+														const std::vector<nlohmann::json>* preserved_unknown_objs) {
 	double now = GetTime();
 
 	nlohmann::json obj;
@@ -163,6 +171,12 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 		if (write_ids)
 			out["__retid"] = ent->get_instance_id();
 		obj["objs"].push_back(out);
+	}
+	// Splice preserved unknown-typename blobs back in verbatim. Opt-in (nullptr default)
+	// so command/undo serializers don't drag every preserved blob into a partial snapshot.
+	if (preserved_unknown_objs) {
+		for (const auto& blob : *preserved_unknown_objs)
+			obj["objs"].push_back(blob);
 	}
 	SerializedSceneFile outfile;
 	outfile.text = "!json\n" + obj.dump(1);

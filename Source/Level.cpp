@@ -295,6 +295,12 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 		} else
 			ASSERT(!"Non Eentity/Component?");
 	}
+	// Take ownership of any unknown-typename JSON blobs the reader stashed. They round-trip
+	// to the next save so unresolved component types aren't silently dropped from the .tmap.
+	preserved_unknown_objs.insert(preserved_unknown_objs.end(),
+								  std::make_move_iterator(scene.unknown_objs.begin()),
+								  std::make_move_iterator(scene.unknown_objs.end()));
+	scene.unknown_objs.clear();
 	// Ownership of the BaseUpdater* now lives in all_world_ents.
 	scene.mark_ownership_transferred();
 }
