@@ -183,7 +183,7 @@ void EditorCamera::tick(EditorInputs& inputs, float dt) {
 		if (get_is_using_ortho() && ortho_camera.can_take_input()) {
 			inputs.set_focus(this);
 		}
-		else if (Input::is_mouse_down(2)) {
+		else if (!get_is_using_ortho() && Input::is_mouse_down(2)) {
 			UiSystem::inst->set_game_capture_mouse(true);
 			inputs.set_focus(this);
 		}
@@ -210,8 +210,10 @@ void EditorCamera::tick(EditorInputs& inputs, float dt) {
 			glm::vec3 up = ortho_camera.up;
 			camera.orbit_target += glm::dot(side, diff) * side + glm::dot(up, diff) * up;
 
-			if (!ortho_camera.can_take_input())
+			if (!ortho_camera.can_take_input()) {
 				inputs.set_focus(nullptr); // release focus
+				UiSystem::inst->set_game_capture_mouse(false); // defensive: ortho never wants captured mouse
+			}
 		}
 		else {
 			camera.orbit_mode = (Input::is_mouse_down(1) && UiSystem::inst->is_vp_hovered()) ||
@@ -260,22 +262,17 @@ View_Setup EditorCamera::InterpolateManager::get_interp(View_Setup current, glm:
 	const float dt = eng->get_dt();
 	if (from.is_ortho && current.is_ortho) {
 		alpha += dt * 3.0;
+		const float a = evaluate_easing(Easing::CubicEaseInOut, alpha);
 
 		View_Setup out = current;
-		const float dist = glm::length(orbit - from.origin);
 
 		glm::quat from_quat = glm::conjugate(glm::quat_cast(from.view));
 		glm::quat dest_quat = glm::conjugate(glm::quat_cast(current.view));
-
-		glm::quat slerped = glm::slerp(from_quat, dest_quat, evaluate_easing(Easing::CubicEaseInOut, alpha));
+		glm::quat slerped = glm::slerp(from_quat, dest_quat, a);
 		glm::mat3 rot = glm::mat3_cast(slerped);
-
 		glm::vec3 forward = -rot[2];
 
-		glm::vec3 want_pos = orbit - forward * dist;
-
-		GameplayStatic::debug_text(string_format("%f %f %f", forward.x, forward.y, forward.z));
-		GameplayStatic::debug_text(string_format("%f %f %f", want_pos.x, want_pos.y, want_pos.z));
+		glm::vec3 want_pos = glm::mix(from.origin, current.origin, a);
 
 		glm::mat3 R = glm::transpose(rot);
 		glm::mat4 view(1.0f);

@@ -54,8 +54,14 @@ public:
 	void apply_snapshot(const CameraSnapshot& s);
 
 	void set_orbit_target(glm::vec3 v, float r) {
-		if (mode == OrthoMode)
+		if (mode == OrthoMode) {
 			r = camera.distance * 0.25f;
+			// Shift ortho camera so target sits on the view plane; preserve depth along front.
+			// Without this, the per-frame rebuild of vs_setup from ortho_camera.position snaps
+			// the view back as soon as the interp completes.
+			const float front_depth = glm::dot(ortho_camera.position - v, ortho_camera.front);
+			ortho_camera.position = v + ortho_camera.front * front_depth;
+		}
 		camera.set_orbit_target(v, r);
 
 		interp.start_interp(vs_setup);

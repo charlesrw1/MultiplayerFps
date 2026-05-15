@@ -339,7 +339,8 @@
       "PowerShell(.\\\\Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 8)",
       "PowerShell(.\\\\Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 6)",
       "Bash(grep -vE \"//|fixme\")",
-      "Bash(grep -v \"//\")"
+      "Bash(grep -v \"//\")",
+      "Bash(Select-Object -Last 50)"
     ]
   },
   "enabledPlugins": {
