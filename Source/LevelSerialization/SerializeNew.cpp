@@ -31,11 +31,27 @@ void require_field(const nlohmann::json& j, const char* key, const char* what) {
 }
 } // namespace
 
+// On-disk scene/prefab schema version. Bump when the layout changes; readers
+// reject versions newer than this. Missing __version is treated as v1.
+static constexpr int kSerializeFormatVersion = 1;
+
 UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_tag, SerializedForDiffing& json,
 															  bool keepid) {
 	UnserializedSceneFile outfile;
 	auto& obj = json.jsonObj;
 	require_object(obj, debug_tag);
+
+	int version = 1;
+	if (obj.contains("__version")) {
+		const auto& vf = obj["__version"];
+		if (!vf.is_number_integer())
+			throw SerializeInputError(std::string(debug_tag) + ": '__version' must be an integer");
+		version = vf.get<int>();
+	}
+	if (version < 1 || version > kSerializeFormatVersion)
+		throw SerializeInputError(std::string(debug_tag) + ": unsupported scene file version " +
+								  std::to_string(version));
+
 	require_field(obj, "objs", debug_tag);
 	auto& objarr = obj["objs"];
 	if (!objarr.is_array())
@@ -98,6 +114,7 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 	double now = GetTime();
 
 	nlohmann::json obj;
+	obj["__version"] = kSerializeFormatVersion;
 	obj["objs"] = nlohmann::json::array();
 	for (auto ent : input_objs) {
 		if (ent->get_components().size() == 0)
