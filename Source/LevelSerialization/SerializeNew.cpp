@@ -25,19 +25,20 @@ UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_
 	if (obj["objs"].is_array()) {
 		auto& objarr = obj["objs"];
 		for (auto& ent : objarr) {
-			string type = ent["__typename"];
-			Entity* e = new Entity;
-			Component* c = ClassBase::create_class<Component>(type.c_str());
+			std::string type = ent["__typename"];
+			// Hold both as unique_ptr until fully built so a throw in the reader can't leak.
+			auto e = std::make_unique<Entity>();
+			std::unique_ptr<Component> c(ClassBase::create_class<Component>(type.c_str()));
 			ASSERT(c);
-			e->add_component_from_unserialization(c);
+			e->add_component_from_unserialization(c.get());
 			{ ReadSerializerBackendJson2 reader("", ent, *e); }
 			{ ReadSerializerBackendJson2 reader("", ent, *c); }
 			if (keepid && ent["__retid"].is_number()) {
 				int64_t instid = ent["__retid"];
 				e->post_unserialization(instid);
 			}
-			outfile.all_obj_vec.push_back(e);
-			outfile.all_obj_vec.push_back(c);
+			outfile.all_obj_vec.push_back(e.release());
+			outfile.all_obj_vec.push_back(c.release());
 		}
 		return outfile;
 	}
@@ -98,8 +99,10 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 }
 
 void UnserializedSceneFile::delete_objs() {
-	for (auto& o : all_obj_vec)
-		delete o;
+	if (!ownership_transferred) {
+		for (auto& o : all_obj_vec)
+			delete o;
+	}
 	all_obj_vec.clear();
 }
 

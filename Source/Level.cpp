@@ -295,6 +295,8 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 		} else
 			ASSERT(!"Non Eentity/Component?");
 	}
+	// Ownership of the BaseUpdater* now lives in all_world_ents.
+	scene.mark_ownership_transferred();
 }
 
 void Level::add_and_init_created_runtime_component(Component* c) {
