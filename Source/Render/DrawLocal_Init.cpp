@@ -223,36 +223,6 @@ void imgui_stat_hook() {
 	ImGui::Separator();
 }
 
-void Renderer::unload_unused_models_test() {
-	ArenaScope scope(mem_arena);
-
-	// unload unused models
-	std::unordered_set<Model*> used;
-	for (auto& [handle, obj] : scene.proxy_list.objects) {
-		used.insert(obj.proxy.model);
-	}
-	// cross reference
-	auto& all_models = g_modelMgr.get_all_models();
-	std::span<Model*> remove = mem_arena.alloc_bottom_span<Model*>(all_models.num_used);
-	int removed_count = 0;
-	for (const auto& mod : all_models) {
-		Model* non_const = (Model*)mod; // fixme
-		if (!non_const->get_is_loaded())
-			continue;
-		if (non_const->is_this_globally_referenced())
-			continue;
-		if (SetUtil::contains(used, non_const))
-			continue;
-		// want unload
-		remove[removed_count++] = non_const;
-	}
-	for (int i = 0; i < removed_count; i++) {
-		auto non_const = remove[i];
-		sys_print(Debug, "unloading model %s...\n", non_const->get_name().c_str());
-		non_const->uninstall();
-	}
-}
-
 glm::vec2 Renderer::get_taa_jitter() const {
 	return r_taa_manager.calc_frame_jitter(current_frame_view.width, current_frame_view.height);
 }
@@ -474,7 +444,6 @@ void Renderer::init() {
 	// brdf_lut->type = Texture_Type::TEXTYPE_2D;
 	// FIXME
 	consoleCommands = ConsoleCmdGroup::create("");
-	consoleCommands->add("unload-unused-models", [this](const Cmd_Args& args) { unload_unused_models_test(); });
 	consoleCommands->add("print_gfx_mem", [](const Cmd_Args&) { sys_print(Info, "%d\n", total_gfx_mem_usage); });
 	consoleCommands->add("cot", [this](const Cmd_Args& args) { debug_tex_out.output_tex = nullptr; });
 	consoleCommands->add("ot", [this](const Cmd_Args& args) {

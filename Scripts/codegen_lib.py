@@ -40,8 +40,7 @@ OLD_VOID_STRUCT_TYPE = 41 # old, get rid of this
 
 
 # ptr types
-ASSET_PTR_TYPE = 50  
-SOFTASSET_PTR_TYPE = 51
+ASSET_PTR_TYPE = 50
 HANDLE_PTR_TYPE = 52 # entities/components
 UNIQUE_PTR_TYPE = 53 # std::uniqueptr to a class type
 RAW_PTR_TYPE = 54
@@ -291,7 +290,6 @@ STANDARD_CPP_TYPES: dict[str, int] = {
     "MulticastDelegate": MULTICAST_TYPE,
 
     "AssetPtr": ASSET_PTR_TYPE,
-    "SoftAssetPtr": SOFTASSET_PTR_TYPE,
     "obj": HANDLE_PTR_TYPE,
     "EntityPtr": HANDLE_PTR_TYPE,
     "uptr" : UNIQUE_PTR_TYPE,

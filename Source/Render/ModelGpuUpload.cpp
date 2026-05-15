@@ -210,7 +210,6 @@ void ModelMan::create_default_models() {
 		lod.part_count = 1;
 		lod.part_ofs = 0;
 
-		_sprite->set_globally_referenced();
 		_sprite->parts.push_back(sm);
 		_sprite->lods.push_back(lod);
 		upload_model(_sprite);

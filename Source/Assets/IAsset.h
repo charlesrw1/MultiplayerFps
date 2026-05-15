@@ -6,7 +6,6 @@
 #include "Framework/Reflection2.h"
 #include <cassert>
 
-class GcMarkingInterface;
 class IAssetLoadingInterface;
 class PrimaryAssetLoadingInterface;
 class TestAssetLoadingInterface;
@@ -36,19 +35,6 @@ public:
 
 	void editor_set_newly_made_path(const std::string& path) { this->path = path; }
 
-	bool is_this_globally_referenced() const { return persistent_flag; }
-	void set_globally_referenced() { persistent_flag = true; }
-
-	int get_reference_count() const { return internal_reference_count; }
-	void inc_ref_count() { internal_reference_count += 1; }
-	void dec_ref_count_and_uninstall_if_zero() {
-		internal_reference_count -= 1;
-		if (internal_reference_count <= 0) {
-			uninstall();
-		}
-	}
-	void dec_ref_count() { internal_reference_count -= 1; }
-
 protected:
 	void set_is_loaded(bool b) { is_loaded = b; }
 
@@ -64,20 +50,14 @@ private:
 	// this is only called on the main thread
 	void set_not_loaded_main_thread() { is_loaded = false; }
 
-	int internal_reference_count = 0;
 	std::string path;		  // filepath or name of asset
 	bool load_failed = false; // did the asset fail to load
 	bool is_loaded = false;	  // is the asset's data in memory
 	bool is_from_disk = true; // otherwise created at runtime
-	bool persistent_flag = false;
-	bool used_flag = false;
 
 	friend class AssetDatabaseImpl;
-	friend class LoadJob;
 	friend class AssetDatabase;
-	friend class AssetBackend;
 	friend class AssetRegistrySystem;
-	friend class GcMarkingInterface;
 	friend class PrimaryAssetLoadingInterface;
 	friend class TestAssetLoadingInterface;
 };

@@ -215,8 +215,6 @@ void GameEngineLocal::cleanup() {
 
 	isound->cleanup();
 
-	g_assets.quit();
-
 	// could get fatal error before initializing this stuff
 	if (gl_context && window) {
 		SDL_GL_DeleteContext(gl_context);

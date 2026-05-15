@@ -30,7 +30,6 @@ enum class core_type_id : uint8_t
 	List,
 	ActualStruct, // not the fake struct...
 	AssetPtr,
-	SoftAssetPtr,
 	ObjHandlePtr,
 	ClassTypeInfo,
 	StringName, // hashed string
@@ -158,8 +157,6 @@ PropertyInfo make_objhandleptr_property(const char* name, uint16_t offset, int f
 										const ClassTypeInfo* type);
 PropertyInfo make_classtypeinfo_property(const char* name, uint16_t offset, int flags, const char* tooltip,
 										 const ClassTypeInfo* type);
-PropertyInfo make_softassetptr_property_new(const char* name, uint16_t offset, int flags, const char* tooltip,
-											const ClassTypeInfo* type);
 
 FunctionInfo make_lua_function_info(const char* name, bool is_static, bool is_virtual, int (*ptr)(lua_State*));
 

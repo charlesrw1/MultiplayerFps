@@ -22,7 +22,6 @@ class SharedAssetPropertyEditor : public IPropertyEditor
 public:
 	virtual std::string get_str() = 0;
 	virtual void set_asset(const std::string& str) = 0;
-	virtual bool is_soft_editor() const { return false; }
 	virtual bool get_failed_load() const { return false; }
 	virtual bool internal_update();
 	virtual int extra_row_count() { return 0; }

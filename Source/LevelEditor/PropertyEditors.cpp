@@ -14,7 +14,7 @@
 
 #include "imgui_internal.h"
 bool SharedAssetPropertyEditor::internal_update() {
-	assert(prop->class_type && prop->type == core_type_id::AssetPtr || prop->type == core_type_id::SoftAssetPtr);
+	assert(prop->class_type && prop->type == core_type_id::AssetPtr);
 	if (!has_init) {
 		has_init = true;
 		asset_str = get_str();
@@ -36,34 +36,19 @@ bool SharedAssetPropertyEditor::internal_update() {
 	color.g *= 0.4;
 	color.b *= 0.4;
 
-	if (is_soft_editor()) {
-		float border = 2.f;
-		drawlist->AddRectFilled(ImVec2(min.x - style.FramePadding.x * 0.5f - border, min.y - border),
-								ImVec2(min.x + width + border, min.y + sz.y + style.FramePadding.y * 2.0 + border),
-								(Color32{255, 229, 99}).to_uint());
-	}
-
 	drawlist->AddRectFilled(ImVec2(min.x - style.FramePadding.x * 0.5f, min.y),
 							ImVec2(min.x + width, min.y + sz.y + style.FramePadding.y * 2.0), color.to_uint());
 	auto cursor = ImGui::GetCursorPos();
 
-	if (is_soft_editor())
-		ImGui::TextColored(ImColor((Color32{255, 229, 99}).to_uint()), asset_str.c_str());
-	else {
-		if (get_failed_load())
-			ImGui::TextColored(ImColor((Color32{255, 141, 133}).to_uint()), asset_str.c_str());
-		else
-			ImGui::Text(asset_str.c_str());
-	}
+	if (get_failed_load())
+		ImGui::TextColored(ImColor((Color32{255, 141, 133}).to_uint()), asset_str.c_str());
+	else
+		ImGui::Text(asset_str.c_str());
 	ImGui::SetCursorPos(cursor);
 	ImGui::InvisibleButton("##adfad", ImVec2(width, sz.y + style.FramePadding.y * 2.f));
 	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
 		ImGui::BeginTooltip();
-		if (is_soft_editor())
-			ImGui::Text(string_format("SoftAssetPtr: Drag and drop %s asset here", metadata->get_type_name().c_str()));
-		else {
-			ImGui::Text(string_format("Drag and drop %s asset here", metadata->get_type_name().c_str()));
-		}
+		ImGui::Text(string_format("Drag and drop %s asset here", metadata->get_type_name().c_str()));
 		ImGui::EndTooltip();
 
 		if (ImGui::GetIO().MouseClicked[0]) {

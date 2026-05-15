@@ -1,27 +1,16 @@
 #include "AssetDatabase.h"
 #include <vector>
 #include <unordered_map>
-#include <thread>
 #include "Framework/Config.h"
-#include <mutex>
-#include <condition_variable>
-#include <queue>
-#include <functional>
 #include <algorithm>
-#include "Framework/Hashset.h"
-#include "Framework/Hashmap.h"
 #include "Framework/Files.h"
 #include "Framework/MapUtil.h"
 
-using std::function;
 using std::string;
 using std::unordered_map;
 using std::vector;
-template <typename T> using uptr = std::unique_ptr<T>;
 
 ConfigVar log_all_asset_loads("log_all_asset_loads", "0", CVAR_BOOL, "");
-ConfigVar log_finish_job_func("log_finish_job_func", "0", CVAR_BOOL, "");
-void AssetDatabase::quit() {}
 class AssetDatabaseImpl
 {
 public:
@@ -30,15 +19,12 @@ public:
 
 	void install_system_direct(IAsset* asset, const std::string& name) {
 		asset->path = name;
-		asset->persistent_flag = true;
 		asset->is_loaded = true;
 		asset->is_from_disk = false;
 		std::shared_ptr<IAsset> sptr(asset);
 		ASSERT(!MapUtil::contains(allAssets, name));
 		allAssets.insert({name, std::move(sptr)});
 	}
-
-	void tick_asyncs_standard() {}
 
 	std::shared_ptr<IAsset> load_asset_sync_sptr(const std::string& str, const ClassTypeInfo* type, bool is_system) {
 		if (str.empty())
@@ -62,7 +48,6 @@ public:
 				sys_print(Error, "2 assets with same name but different type: %s\n", str.c_str());
 				return nullptr;
 			}
-			existing->persistent_flag |= is_system;
 			return existing;
 		} else {
 			// asset doesnt exist
@@ -72,7 +57,6 @@ public:
 				std::shared_ptr<IAsset> sptr(existing);
 				allAssets.insert({str, sptr});
 			}
-			existing->persistent_flag |= is_system;
 			existing->is_loaded = true;
 			bool success = existing->load_asset(g_assets.loader);
 			existing->load_failed = !success;
@@ -160,10 +144,6 @@ public:
 		}
 	}
 
-	void quit() {
-		sys_print(Info, "quitting asset loader\n");
-		// backend.signal_end_work();
-	}
 	bool is_asset_loaded(const string& path) { return MapUtil::contains(allAssets, path); }
 	void get_assets_of_type(std::vector<IAsset*>& out, const ClassTypeInfo* type) {
 		for (auto& [path, ptr] : allAssets) {
@@ -211,20 +191,8 @@ void AssetDatabase::init() {
 	impl = new AssetDatabaseImpl; // dont make it a uptr because blah blah
 	AssetDatabase::loader = new PrimaryAssetLoadingInterface(*impl);
 }
-void AssetDatabase::reset_testing() {}
-void AssetDatabase::finish_all_jobs() {
-	// impl->finish_all_jobs();
-}
-
-void AssetDatabase::remove_system_reference(IAsset* asset) {
-	// asset->is_system = false;
-	// impl->remove_asset_direct(asset);
-}
 bool AssetDatabase::is_asset_loaded(const std::string& path) {
 	return impl->is_asset_loaded(path);
-}
-void AssetDatabase::mark_unreferences() {
-	// impl->mark_assets_as_unreferenced();
 }
 std::shared_ptr<IAsset> AssetDatabase::find_sync_sptr(const string& path, const ClassTypeInfo* classType,
 													  bool system_asset) {
@@ -241,9 +209,6 @@ GenericAssetPtr AssetDatabase::find_sync(const std::string& path, const ClassTyp
 	return impl->load_asset_sync(path, classType, is_system);
 }
 
-void AssetDatabase::remove_unreferences() {
-	// impl->uninstall_unreferenced_assets();
-}
 void AssetDatabase::print_usage() {
 	impl->print_assets();
 }

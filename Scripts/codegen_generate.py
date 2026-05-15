@@ -91,9 +91,6 @@ def output_macro_for_prop(typenames : dict[str,ClassDef],cpptype:CppType,name:st
         #return f"REG_ENUM({name},{flags},{hint},{classname})"
         return f"make_enum_property({name_offset_flags},sizeof({raw_str}),&::EnumTrait<{enumtype.classname}>::StaticEnumType, {hint})"
 
-    elif type == SOFTASSET_PTR_TYPE:
-        #return f"REG_SOFT_ASSET_PTR({name},{flags})"
-        return f'make_softassetptr_property_new({name_offset_flags},{tooltip},&{type_of_template})'
     elif type == CLASSTYPEINFO_TYPE:
         #return f'make_struct_property({name_offset_flags}, "ClassTypePtr", {type_of_template}.classname)'
         #return f"REG_CLASSTYPE_PTR({name},{flags})"
@@ -186,8 +183,6 @@ def write_one_property_generic(type:CppType, name_offset_flags_tooltip:str, prop
         return f"make_unique_ptr_property({noft_and_type})"
     elif type.type == ASSET_PTR_TYPE:
         return f"make_asset_ptr_property({noft_and_type})"
-    elif type.type == SOFTASSET_PTR_TYPE:
-        return f"make_soft_asset_ptr_property({noft_and_type})"
     elif type.type == RAW_PTR_TYPE:
         return f"make_raw_ptr_property()"
     elif type.type == HANDLE_PTR_TYPE:

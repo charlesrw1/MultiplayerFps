@@ -13,7 +13,6 @@ public:
 
 	REF AssetPtr<SoundFile> soundfx;
 	REF AssetPtr<AnimationSeqAsset> openanim;
-	// REF SoftAssetPtr<AnimationSeqAsset> delayedLoadAnim;
 
 	MeshComponent* m = nullptr;
 	void start() { m = get_owner()->get_component<MeshComponent>(); }

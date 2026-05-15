@@ -51,7 +51,6 @@ void DdgiTesting::render_probes() {
     device.set_pipeline(state);
 
     Model* m = Model::load("sphere.cmdl");
-    m->set_globally_referenced();
 
     device.bind_texture_ptr(0, probe_irradiance);
     set_shit_fuck();

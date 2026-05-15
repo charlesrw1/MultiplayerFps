@@ -187,9 +187,6 @@ IPropertyEditor* create_ipropertyed(const FnFactory<IPropertyEditor>& factory, P
 	case core_type_id::AssetPtr: {
 		out = factory.create("AssetPtr");
 	} break;
-	case core_type_id::SoftAssetPtr: {
-		out = factory.create("SoftAssetPtr");
-	} break;
 	case core_type_id::ClassTypeInfo: {
 		out = factory.create("ClassTypePtr");
 	} break;

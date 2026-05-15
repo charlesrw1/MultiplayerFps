@@ -88,9 +88,6 @@ void Model::uninstall() {
 	}
 	collision.reset();
 	tags.clear();
-	// for (auto mat : materials) {
-	//	mat->dec_ref_count_and_uninstall_if_zero();
-	//}
 	materials.clear();
 
 	// DONT reset the UID

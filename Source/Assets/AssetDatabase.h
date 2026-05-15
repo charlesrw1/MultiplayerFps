@@ -1,10 +1,8 @@
 #pragma once
 #include "IAsset.h"
 
-#include <functional>
 #include <string>
 
-struct PendingLoadJob;
 using std::string;
 
 class IAssetLoadingInterface
@@ -22,28 +20,10 @@ public:
 	static IAssetLoadingInterface* loader;
 
 	void init();
-	void quit();
-
-	void reset_testing();
-
-	void clear_used_flags();
-	void load_asset_bundle_sync();
-	void load_asset_bundle_async();
-	void tick_update(
-		float max_time); // if an async load is happening, updates it. also calls post loads. stays under max_time
-
-	// wait for everything to finish, then tick_async
-	void finish_all_jobs();
-	// garbage collection. after marking unrefernces, use IAssetLoadingInterface to touch objects.
-	// then remove unreferences will remove the unreferenced stuff (also will traverse asset dependencies to mark those
-	// too)
-	void mark_unreferences();	// this unreferences objects
-	void remove_unreferences(); // this removes unreferences objects
 
 	// appends an IAsset with a path to the global registry
 	// will set the lifetime to global until removed
 	void install_system_asset(IAsset* assetPtr, const std::string& name);
-	void remove_system_reference(IAsset* asset);
 	bool is_asset_loaded(const std::string& path);
 
 	// sync asset loading
@@ -88,9 +68,5 @@ extern AssetDatabase g_assets;
 // sync load to the default channel (usually 0)
 template <typename T> T* default_asset_load(const std::string& path) {
 	auto res = g_assets.find_sync<T>(path);
-	return res.get();
-}
-template <typename T> T* find_global_asset_s(const std::string& path) {
-	auto res = g_assets.find_global_sync<T>(path);
 	return res.get();
 }

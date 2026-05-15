@@ -141,14 +141,6 @@ PropertyInfo make_assetptr_property_new(const char* name, uint16_t offset, int f
 	p.class_type = type;
 	return p;
 }
-PropertyInfo make_softassetptr_property_new(const char* name, uint16_t offset, int flags, const char* tooltip,
-											const ClassTypeInfo* type) {
-	PropertyInfo p(name, offset, flags);
-	p.tooltip = tooltip;
-	p.type = core_type_id::SoftAssetPtr;
-	p.class_type = type;
-	return p;
-}
 PropertyInfo make_objhandleptr_property(const char* name, uint16_t offset, int flags, const char* tooltip,
 										const ClassTypeInfo* type) {
 	PropertyInfo p(name, offset, flags);
