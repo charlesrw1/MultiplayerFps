@@ -94,9 +94,13 @@ UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_
 
 UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_tag, const std::string& text,
 															  bool keepid) {
+	static constexpr const char* kPrefix = "!json\n";
+	static constexpr size_t kPrefixLen = 6;
+	if (!StringUtils::starts_with(text, kPrefix))
+		throw SerializeInputError(std::string(debug_tag) + ": unsupported scene format prefix");
 	SerializedForDiffing sfd;
 	try {
-		sfd.jsonObj = nlohmann::json::parse(text);
+		sfd.jsonObj = nlohmann::json::parse(text.begin() + kPrefixLen, text.end());
 	} catch (const nlohmann::json::exception& e) {
 		throw SerializeInputError(std::string(debug_tag) + ": malformed JSON: " + e.what());
 	}
@@ -155,12 +159,6 @@ void UnserializedSceneFile::delete_objs() {
 			delete o;
 	}
 	all_obj_vec.clear();
-}
-
-UnserializedSceneFile unserialize_entities_from_text(const char* debug_tag, const std::string& text, bool keepid) {
-	if (!StringUtils::starts_with(text, "!json\n"))
-		throw SerializeInputError(std::string(debug_tag) + ": unsupported scene format prefix");
-	return NewSerialization::unserialize_from_text(debug_tag, text.substr(6), keepid);
 }
 
 // TODO prefabs

@@ -372,7 +372,7 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 			// Restore the prefab content into the scene
 			if (!prefab_content.text.empty()) {
 				try {
-					UnserializedSceneFile unserialized = unserialize_entities_from_text(
+					UnserializedSceneFile unserialized = NewSerialization::unserialize_from_text(
 						"prefab_edit_restore", prefab_content.text, false);
 					insert_unserialized_into_scene(unserialized);
 				}

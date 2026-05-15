@@ -48,8 +48,6 @@ private:
 	friend class Level;
 };
 
-UnserializedSceneFile unserialize_entities_from_text(const char* debug_tag, const std::string& text, bool keepid);
-
 class SerializedSceneFile
 {
 public:

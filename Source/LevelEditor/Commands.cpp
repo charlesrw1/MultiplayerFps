@@ -103,7 +103,7 @@ void RemoveEntitiesCommand::execute() {
 void RemoveEntitiesCommand::undo() {
 	ASSERT(is_valid());
 
-	auto restored = unserialize_entities_from_text("remove_entities_undo", scene->text, true /* restore id*/);
+	auto restored = NewSerialization::unserialize_from_text("remove_entities_undo", scene->text, true /* restore id*/);
 
 	ed_doc.insert_unserialized_into_scene(restored);
 
@@ -291,7 +291,7 @@ DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vecto
 void DuplicateEntitiesCommand::execute() {
 	ASSERT(is_valid());
 	UnserializedSceneFile duplicated =
-		unserialize_entities_from_text("duplicate_entities", scene->text, false /* dont keep id*/);
+		NewSerialization::unserialize_from_text("duplicate_entities", scene->text, false /* dont keep id*/);
 
 	ed_doc.insert_unserialized_into_scene(duplicated);
 

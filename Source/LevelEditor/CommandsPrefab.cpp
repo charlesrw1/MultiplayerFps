@@ -66,7 +66,7 @@ void InstantiatePrefabCommand::execute() {
 		}
 
 		try {
-			UnserializedSceneFile unserialized = unserialize_entities_from_text(
+			UnserializedSceneFile unserialized = NewSerialization::unserialize_from_text(
 				"prefab_flatten", prefab_text, false);
 			ed_doc.insert_unserialized_into_scene(unserialized);
 
@@ -256,7 +256,7 @@ void MakePrefabAndReplaceCommand::undo() {
 	// Restore original entities from serialization
 	if (original_selection) {
 		try {
-			UnserializedSceneFile unserialized = unserialize_entities_from_text(
+			UnserializedSceneFile unserialized = NewSerialization::unserialize_from_text(
 				"undo_prefab_replace", original_selection->text, true);
 			ed_doc.insert_unserialized_into_scene(unserialized);
 

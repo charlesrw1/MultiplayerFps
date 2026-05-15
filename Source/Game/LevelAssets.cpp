@@ -77,9 +77,6 @@ ConfigVar g_prefab_factory("g_prefab_factory", "", CVAR_DEV, "");
 string get_string_from_file(IFile* fileptr) {
 	string textForm = std::string(fileptr->size(), ' ');
 	fileptr->read((void*)textForm.data(), textForm.size());
-	if (StringUtils::starts_with(textForm, "!json\n")) {
-		textForm = textForm.substr(5);
-	}
 	return textForm;
 }
 
