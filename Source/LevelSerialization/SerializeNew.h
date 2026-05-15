@@ -23,6 +23,7 @@ public:
 	~UnserializedSceneFile() { delete_objs(); }
 	UnserializedSceneFile(UnserializedSceneFile&& other) noexcept
 		: all_obj_vec(std::move(other.all_obj_vec)), unknown_objs(std::move(other.unknown_objs)),
+		  unknown_field_warnings(std::move(other.unknown_field_warnings)),
 		  ownership_transferred(other.ownership_transferred) {
 		other.ownership_transferred = true; // moved-from owns nothing
 	}
@@ -31,6 +32,7 @@ public:
 			delete_objs();
 			all_obj_vec = std::move(other.all_obj_vec);
 			unknown_objs = std::move(other.unknown_objs);
+			unknown_field_warnings = std::move(other.unknown_field_warnings);
 			ownership_transferred = other.ownership_transferred;
 			other.ownership_transferred = true;
 		}
@@ -48,6 +50,10 @@ public:
 	// Raw entity JSON for objs whose __typename couldn't be instantiated. The loader
 	// preserves them so they round-trip through save without being lost.
 	std::vector<nlohmann::json> unknown_objs;
+	// One pre-formatted "<typename>.<field>" string per JSON key the reflection readers
+	// didn't consume on an otherwise-resolved entity. Surfaced in the editor so stale/
+	// typo'd fields aren't only logged.
+	std::vector<std::string> unknown_field_warnings;
 
 private:
 	bool ownership_transferred = false;

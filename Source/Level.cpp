@@ -301,6 +301,10 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 								  std::make_move_iterator(scene.unknown_objs.begin()),
 								  std::make_move_iterator(scene.unknown_objs.end()));
 	scene.unknown_objs.clear();
+	unknown_field_warnings.insert(unknown_field_warnings.end(),
+								  std::make_move_iterator(scene.unknown_field_warnings.begin()),
+								  std::make_move_iterator(scene.unknown_field_warnings.end()));
+	scene.unknown_field_warnings.clear();
 	// Ownership of the BaseUpdater* now lives in all_world_ents.
 	scene.mark_ownership_transferred();
 }

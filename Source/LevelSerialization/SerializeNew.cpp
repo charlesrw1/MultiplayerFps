@@ -98,6 +98,7 @@ UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_
 			if (consumed.count(key) == 0) {
 				sys_print(Warning, "%s: unknown field '%s' on '%s' (typo or stale field?)\n",
 						  debug_tag, key.c_str(), type.c_str());
+				outfile.unknown_field_warnings.push_back(type + "." + key);
 			}
 		}
 		if (keepid && ent.contains("__retid")) {

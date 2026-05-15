@@ -56,6 +56,10 @@ public:
 	// Spliced back into the file on save so deleted/renamed component types survive
 	// a round-trip instead of being silently dropped from the .tmap.
 	std::vector<nlohmann::json> preserved_unknown_objs;
+	// "<typename>.<field>" entries captured by the loader for keys the reflection
+	// readers didn't consume. Surfaced in the editor UI so the user sees the issue
+	// in addition to the console warning. Cleared on close_level.
+	std::vector<std::string> unknown_field_warnings;
 
 private:
 	void insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene, bool addSpawnNames);

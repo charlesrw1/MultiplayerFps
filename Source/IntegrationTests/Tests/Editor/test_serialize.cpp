@@ -134,7 +134,7 @@ static TestTask test_preserve_unknown_typename(TestContext& t) {
 		"{\n"
 		" \"__version\": 1,\n"
 		" \"objs\": [\n"
-		"  { \"__typename\": \"SpotLightComponent\" },\n"
+		"  { \"__typename\": \"SpotLightComponent\", \"definitely_not_a_real_field_qq\": 7 },\n"
 		"  { \"__typename\": \"DefinitelyNotARealComponent_xyz\", \"some_field\": 42 }\n"
 		" ]\n"
 		"}\n";
@@ -150,6 +150,14 @@ static TestTask test_preserve_unknown_typename(TestContext& t) {
 
 	t.check(eng->get_level()->preserved_unknown_objs.size() == 1,
 			"preserved_unknown_objs has the one unknown entity");
+	{
+		const auto& warns = eng->get_level()->unknown_field_warnings;
+		bool found = false;
+		for (const auto& w : warns)
+			if (w.find("definitely_not_a_real_field_qq") != std::string::npos)
+				found = true;
+		t.check(found, "unknown_field_warnings recorded the typo'd field on the real component");
+	}
 
 	t.editor().save_level(kOutputPath);
 	co_await t.wait_ticks(1);

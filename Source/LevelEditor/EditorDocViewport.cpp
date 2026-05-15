@@ -116,6 +116,14 @@ void EditorDoc::imgui_draw() {
 							   " (preserved as opaque blobs — see Commands > Unresolved Entities)";
 			draw_text(warn.c_str());
 		}
+		// Fields whose JSON key didn't match any reflected property on the resolved type.
+		// Usually a typo or a stale field from an older version of the component.
+		const int nf = (int)level->unknown_field_warnings.size();
+		if (nf > 0) {
+			std::string warn = "Map has " + std::to_string(nf) +
+							   " unknown field(s) — see Commands > Unknown Fields";
+			draw_text(warn.c_str());
+		}
 	}
 
 	prop_editor->draw(*sel_api_impl);
@@ -409,6 +417,20 @@ void EditorDoc::hook_menu_bar() {
 					}
 					ImGui::TextUnformatted(type);
 				}
+				ImGui::EndMenu();
+			}
+		}
+		// Lists every JSON key the loader saw but no reflected property consumed.
+		// Same UX as the unresolved-entities menu: count in the label, greyed when zero.
+		{
+			auto level = eng->get_level();
+			const int nf = level ? (int)level->unknown_field_warnings.size() : 0;
+			const std::string label = "Unknown Fields (" + std::to_string(nf) + ")";
+			if (ImGui::BeginMenu(label.c_str(), nf > 0)) {
+				ImGui::TextDisabled("Loaded value was dropped; likely a typo or stale field.");
+				ImGui::Separator();
+				for (const auto& w : level->unknown_field_warnings)
+					ImGui::TextUnformatted(w.c_str());
 				ImGui::EndMenu();
 			}
 		}
