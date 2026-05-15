@@ -1,10 +1,6 @@
 #include "SerializeNew.h"
 #include "AssetCompile/Someutils.h"
-#include <stdexcept>
 #include "Assets/AssetDatabase.h"
-#include <unordered_map>
-#include <unordered_set>
-#include <stdexcept>
 #include "Level.h"
 #include "Game/Entity.h"
 #include "Game/EntityComponent.h"
@@ -13,26 +9,15 @@
 #include "Framework/StringUtils.h"
 #include "Framework/Log.h"
 #include "Framework/ReflectionProp.h"
-#include "Framework/DictParser.h"
 #include "Framework/ClassBase.h"
 #include "Framework/Util.h"
-#include "Framework/DictWriter.h"
-#include "Framework/ReflectionProp.h"
 #include "Framework/SerializedForDiffing.h"
 #include "Framework/SerializerJson2.h"
-#include "Framework/SerializerBinary.h"
 
 #include <json.hpp>
+#include <stdexcept>
+#include <vector>
 
-using std::to_string;
-
-template <typename T> T* cast_to(ClassBase* ptr) {
-	return ptr ? ptr->cast_to<T>() : nullptr;
-}
-
-// factory method for components
-// factory method for prefabs
-// both defined in lua
 UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_tag, SerializedForDiffing& json,
 															  bool keepid) {
 	UnserializedSceneFile outfile;
@@ -58,7 +43,7 @@ UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_
 	}
 	throw std::runtime_error("invalid json");
 }
-using std::vector;
+
 UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_tag, const std::string& text,
 															  bool keepid) {
 
@@ -93,7 +78,7 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 			if (writer.get_output().is_object())
 				out.update(writer.get_output());
 		}
-		auto c = ent->get_components().at(0);
+		auto c = ent->get_components()[0];
 		{
 			WriteSerializerBackendJson2 writer("", *c);
 			if (writer.get_output().is_object())
@@ -103,14 +88,11 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 		if (write_ids)
 			out["__retid"] = ent->get_instance_id();
 		obj["objs"].push_back(out);
-		// printf("%s\n", obj.dump(1).c_str());
 	}
 	SerializedSceneFile outfile;
 	outfile.text = "!json\n" + obj.dump(1);
 
 	sys_print(Debug, "NewSerialization::serialize_to_text: took %f\n", float(GetTime() - now));
-	// std::cout << out.text << '\n';
-	now = GetTime();
 
 	return outfile;
 }

@@ -15,6 +15,7 @@
 #include <functional>
 #include "LevelSerialization/SerializeNew.h"
 #include <unordered_map>
+#include <unordered_set>
 class Command
 {
 public:
