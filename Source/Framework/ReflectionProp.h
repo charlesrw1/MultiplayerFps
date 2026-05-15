@@ -76,6 +76,7 @@ struct ParsedHintStr
 // Structured per-property attributes populated by codegen from REFLECT(...) kwargs.
 // Unset means "no constraint": min/max use sentinel +/-FLT_MAX, step==0 disables stepping.
 // Strings are owned by static codegen output, never heap-allocated.
+// @docs [[reflection_macros]]
 struct PropertyAttributes
 {
 	float min  = -FLT_MAX;

@@ -1,6 +1,7 @@
 #pragma once
 #include "ReflectionProp.h"
 
+// REFLECT(...) flags reference: @docs [[reflection_macros]]
 // Codegen-only helper: applies a PropertyAttributes literal to a PropertyInfo returned
 // by one of the make_*_property factories. Kept inline so it inlines to a struct copy.
 inline PropertyInfo apply_attrs(PropertyInfo prop, const PropertyAttributes& a) {

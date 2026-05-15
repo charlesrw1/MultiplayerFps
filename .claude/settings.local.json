@@ -349,7 +349,21 @@
       "Bash(cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake *)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\" -Recurse -Directory -Name)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\" | Select-Object -First 20 | ForEach-Object { $_.Name })",
-      "Bash(Select-String -Pattern \"error|unresolved\" -SimpleMatch)"
+      "Bash(Select-String -Pattern \"error|unresolved\" -SimpleMatch)",
+      "Bash(~/source/vcpkg/vcpkg.exe list *)",
+      "Bash(grep -n \"Source\\\\\\\\\\\\\\\\Input\\\\\\\\\\\\\\\\\\\\|Input\\\\\\\\\\\\\\\\.*\\\\\\\\.cpp\\\\|Input\\\\\\\\\\\\\\\\.*\\\\\\\\.h\" CsRemake.vcxproj)",
+      "Bash(grep -n \"Source\\\\\\\\\\\\\\\\Animation\\\\\\\\\\\\\\\\\" CsRemake.vcxproj)",
+      "Bash(grep -n \"Source/Animation\\\\\\\\|Source/Game/BikeDemo\" CsRemake.vcxproj)",
+      "Bash(\"C:/Program Files/Microsoft Visual Studio/18/Insiders/MSBuild/Current/Bin/MSBuild.exe\" CsRemake.sln -t:CsRemake -p:Configuration=Debug -p:Platform=x64 -v:minimal -m)",
+      "Bash(\"C:/Program Files/Microsoft Visual Studio/18/Insiders/MSBuild/Current/Bin/MSBuild.exe\" CsRemake.vcxproj -p:Configuration=Debug -p:Platform=x64 -v:minimal -m)",
+      "Bash(\"C:/Program Files/Microsoft Visual Studio/18/Insiders/MSBuild/Current/Bin/MSBuild.exe\" CsRemake.sln -p:Configuration=Debug -p:Platform=x64 -v:minimal -m)",
+      "Bash(x64/Debug/UnitTests.exe)",
+      "Bash(Scripts/build_and_test.ps1 -Configuration Debug -Platform x64)",
+      "PowerShell(.\\\\Scripts\\\\build_and_test.ps1 -Configuration Debug -Platform x64 2>&1 | Select-Object -Last 60)",
+      "PowerShell(.\\\\Scripts\\\\build_and_test.ps1 -Configuration Debug -Platform x64 2>&1 | Select-Object -Last 10)",
+      "Bash(findstr /n \"insert_unserialized_entities_into_level\" Source\\\\Level.cpp)",
+      "Bash(findstr /n \"class BaseUpdater\" Source\\\\Game\\\\BaseUpdater.h)",
+      "Bash(findstr /n \"class Component\" Source\\\\Game\\\\EntityComponent.h)"
     ]
   },
   "enabledPlugins": {
