@@ -340,7 +340,13 @@
       "PowerShell(.\\\\Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 6)",
       "Bash(grep -vE \"//|fixme\")",
       "Bash(grep -v \"//\")",
-      "Bash(Select-Object -Last 50)"
+      "Bash(Select-Object -Last 50)",
+      "Bash(es.exe *)",
+      "Bash(winget search *)",
+      "Bash(winget show *)",
+      "Bash(Select-Object -First 40)",
+      "PowerShell(es.exe spawner -path C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake | Select-Object -First 50)",
+      "Bash(cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake *)"
     ]
   },
   "enabledPlugins": {

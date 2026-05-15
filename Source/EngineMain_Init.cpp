@@ -207,8 +207,9 @@ void GameEngineLocal::open_tool(string mapname) {
 #ifdef EDITOR_BUILD
 		// Only commit to recents after the new doc actually loaded — failed
 		// load_level leaves the old doc destroyed but we shouldn't pollute the
-		// list with a switch that didn't really complete.
-		if (!outgoing_path.empty())
+		// list with a switch that didn't really complete. Skip recording while
+		// a test runner is active so integration tests don't churn the list.
+		if (!outgoing_path.empty() && !test_runner)
 			g_editor_recents.record(outgoing_path, outgoing_cam);
 #endif
 	} else {

@@ -17,6 +17,5 @@ Double-clicking a `.tprefab` loads it into `EditorDoc` with `editing_prefab = tr
 
 ## Gotchas
 
-- All editor code is `#ifdef EDITOR_BUILD` — excluded from game/test builds. Don't reference editor types from runtime code.
 - ImGuizmo returns the updated matrix per frame; apply it via a `MoveCommand`, not by writing the transform directly (otherwise undo breaks mid-drag).
 - Outliner re-parent is drag-and-drop; the icon column comes from each component's `get_editor_outliner_icon()`.
