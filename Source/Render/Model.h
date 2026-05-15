@@ -156,7 +156,6 @@ public:
 	void uninstall() override;
 	void post_load() override;
 	bool load_asset() override;
-	void move_construct(IAsset* other) override;
 
 	int get_uid() const { return uid; }
 	int bone_for_name(StringName name) const;

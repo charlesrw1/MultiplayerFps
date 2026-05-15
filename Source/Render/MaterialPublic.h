@@ -47,8 +47,6 @@ public:
 	void uninstall();
 	void post_load();
 	bool load_asset();
-	void sweep_references() const;
-	void move_construct(IAsset* other);
 
 	REF void set_physics_material(PhysicsMaterialWrapper* material) { this->physics_mat = material; }
 	PhysicsMaterialWrapper* get_physics_material() const { return physics_mat; }
@@ -58,6 +56,10 @@ public:
 
 protected:
 	PhysicsMaterialWrapper* physics_mat = nullptr;
+	// Set true the first time post_load() runs successfully; persists across
+	// uninstall so subsequent post_load() calls know they are a reload and
+	// should cascade to dependents and notify the material manager.
+	bool first_post_load_done = false;
 
 	friend class MaterialManagerLocal;
 };

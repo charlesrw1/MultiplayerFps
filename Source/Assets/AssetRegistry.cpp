@@ -260,13 +260,26 @@ void AssetRegistrySystem::update() {
 
 	bool tree_dirty = false;
 
+	// Helper: skip hot-reload when the watcher fires for a deletion. In-place
+	// reload destroys the asset's old impl before calling load_asset(); on a
+	// missing-file failure the asset is then left with a null impl, which any
+	// downstream consumer would crash on. Leaving the stale data in memory until
+	// the file reappears is strictly safer.
+	auto file_exists = [](const std::string& rel) {
+		auto f = FileSys::open_read_game(rel);
+		const bool ok = (f != nullptr);
+		if (f)
+			f->close();
+		return ok;
+	};
+
 	for (auto rel_path : changed) {
 		sys_print(Info, "AssetRegistry: file changed: %s\n", rel_path.c_str());
 		auto ext = StringUtils::get_extension_no_dot(rel_path);
 
 		// Hot-reload in-memory assets
 		if (ext == "mm" || ext == "mi") {
-			if (g_assets.is_asset_loaded(rel_path)) {
+			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {
 				auto asset = g_assets.find<MaterialInstance>(rel_path);
 				g_assets.reload<MaterialInstance>(asset);
 			}
@@ -274,7 +287,7 @@ void AssetRegistrySystem::update() {
 			std::string cmdl = rel_path;
 			StringUtils::remove_extension(cmdl);
 			cmdl += ".cmdl";
-			if (g_assets.is_asset_loaded(cmdl)) {
+			if (g_assets.is_asset_loaded(cmdl) && file_exists(rel_path)) {
 				auto asset = g_assets.find<Model>(cmdl);
 				g_assets.reload<Model>(asset);
 			}
@@ -282,12 +295,12 @@ void AssetRegistrySystem::update() {
 			std::string dds = rel_path;
 			StringUtils::remove_extension(dds);
 			dds += ".dds";
-			if (g_assets.is_asset_loaded(dds)) {
+			if (g_assets.is_asset_loaded(dds) && file_exists(rel_path)) {
 				auto asset = g_assets.find<Texture>(dds);
 				g_assets.reload<Texture>(asset);
 			}
 		} else if (ext == "wav") {
-			if (g_assets.is_asset_loaded(rel_path)) {
+			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {
 				auto asset = g_assets.find<SoundFile>(rel_path);
 				g_assets.reload<SoundFile>(asset);
 			}

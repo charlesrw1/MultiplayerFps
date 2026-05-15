@@ -36,13 +36,14 @@ protected:
 	void set_is_loaded(bool b) { is_loaded = b; }
 
 private:
-	// you can allocate a UserStruct in load_asset and have access to it in post_load. It will get deleted for you if
-	// non nullptr
-	virtual bool load_asset() = 0; // called on loader thread
-	virtual void post_load() = 0;								  // called on main thread after load_asset is executed
-	// called on the main thread to destroy and uninstall any used resources
+	// Hot-reload is in-place: AssetDatabase::reload() runs uninstall() then load_asset()
+	// then post_load() on the same instance. The IAsset* address stays stable across reload,
+	// so anyone holding a raw pointer keeps a valid pointer — only the data inside changes.
+	// On reload, uninstall() must release everything load_asset()/post_load() allocated;
+	// load_asset() is called with internal state cleared.
+	virtual bool load_asset() = 0;
+	virtual void post_load() = 0;
 	virtual void uninstall() = 0;
-	virtual void move_construct(IAsset* other) = 0;
 
 	// this is only called on the main thread
 	void set_not_loaded_main_thread() { is_loaded = false; }

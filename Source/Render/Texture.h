@@ -22,7 +22,6 @@ public:
 	void uninstall() override;
 	void post_load() override;
 	bool load_asset() override;
-	void move_construct(IAsset* src) override;
 
 	glm::ivec2 get_size() const;
 	texhandle get_internal_render_handle() const;

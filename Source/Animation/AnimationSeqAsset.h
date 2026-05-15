@@ -17,7 +17,6 @@ public:
 	void uninstall() override;
 	void post_load() override {}
 	bool load_asset() override;
-	void move_construct(IAsset* _other) override;
 	std::shared_ptr<Model> srcModel;
 	const AnimationSeq* seq = nullptr;
 };

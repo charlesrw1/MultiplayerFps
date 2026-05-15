@@ -27,8 +27,6 @@ private:
 	bool load_asset();
 
 	void uninstall();
-	void move_construct(IAsset* o) { *this = std::move(*(SoundFile*)o); }
-	void sweep_references() const {}
 
 	friend class SoundSystemLocal;
 };

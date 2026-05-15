@@ -6,28 +6,18 @@ MSkeleton::~MSkeleton() {
 		delete clip.second.ptr;
 	}
 }
-void MSkeleton::move_construct(MSkeleton& other) {
-	// fixme: edge case where you reload a model with more/less bones but have leftover stale animations from prev
-	remaps = std::move(other.remaps);
-	mirroring_table = std::move(other.mirroring_table);
-	bone_dat = std::move(other.bone_dat);
-	for (auto& [anim_name, clip] : other.clips) {
-		assert(clip.ptr);
-		auto findMe = clips.find(anim_name);
-		if (findMe != clips.end()) {
-			assert(findMe->second.ptr);
-			*findMe->second.ptr = std::move(*clip.ptr); // move construct it
-		} else {
-			clips.insert({anim_name, clip});
-			clip.ptr = nullptr; // steal it
-		}
-	}
-}
 void MSkeleton::uninstall() {
+	// Full reset: caller (Model) wants to reuse this MSkeleton instance for
+	// stable get_skel() address across reload, but with the contents wiped.
+	// AnimationSeq pointers held outside (e.g. AnimationSeqAsset::seq) are
+	// invalidated by this — those assets must be reloaded too on Model reload.
 	for (auto& [c, clip] : clips) {
-		if (clip.ptr)
-			*clip.ptr = AnimationSeq();
+		delete clip.ptr;
 	}
+	clips.clear();
+	bone_dat.clear();
+	mirroring_table.clear();
+	remaps.clear();
 }
 bool MSkeleton::is_skeleton_the_same(const MSkeleton& other) const {
 	if (get_num_bones() != other.get_num_bones())

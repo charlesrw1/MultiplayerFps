@@ -58,9 +58,8 @@ bool AnimationSeqAsset::load_asset() {
 		return false;
 }
 
-void AnimationSeqAsset::move_construct(IAsset* _other) {
-	auto other = (AnimationSeqAsset*)_other;
-
-	*this = std::move(*other);
+void AnimationSeqAsset::uninstall() {
+	// Drop the cached pointer; load_asset will re-resolve it on reload.
+	srcModel.reset();
+	seq = nullptr;
 }
-void AnimationSeqAsset::uninstall() {}

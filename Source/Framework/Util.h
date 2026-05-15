@@ -6,6 +6,9 @@
 void handle_assert_internal(const char* msg);
 typedef void (*AssertHookFn)(const char* condition);
 void set_assert_hook(AssertHookFn fn);
+// Tell the assert handler where to append crash output (e.g. test_game_output.log).
+// std::abort() bypasses C++ stream flush, so we write directly via fopen/fclose.
+void set_assert_log_path(const char* path);
 #ifdef WITH_ASSERT
 #define ASSERT(x)                                                                                                      \
 	do {                                                                                                               \

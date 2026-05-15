@@ -1,4 +1,4 @@
-// ModelLoad.cpp — Model asset loading, binary deserialisation, move_construct, uninstall
+// ModelLoad.cpp — Model asset loading, binary deserialisation, uninstall
 // Split from Model.cpp to keep file sizes under 600 LOC.
 
 #include "Model.h"
@@ -82,7 +82,8 @@ void Model::uninstall() {
 	parts.clear();
 
 	data = RawMeshData(); // so destructor gets called and memory is freed
-	// skel.reset(nullptr);	// dont uninstall because of pointers...
+	// Keep the unique_ptr<MSkeleton> alive across reload so anyone caching
+	// model->get_skel() keeps a valid address. Clear its contents.
 	if (skel) {
 		skel->uninstall();
 	}
@@ -214,8 +215,10 @@ bool Model::load_internal() {
 
 	int num_bones = read.read_int32();
 	if (num_bones > 0) {
-
-		skel = std::make_unique<MSkeleton>();
+		// Reuse the existing MSkeleton instance (its contents were cleared by
+		// Model::uninstall on reload) so model->get_skel() keeps its address.
+		if (!skel)
+			skel = std::make_unique<MSkeleton>();
 		skel->bone_dat.reserve(num_bones);
 		for (int i = 0; i < num_bones; i++) {
 			BoneData bd;
@@ -299,47 +302,3 @@ bool Model::load_asset() {
 	return false;
 }
 
-void Model::move_construct(IAsset* _src) {
-	ASSERT(_src != nullptr);
-	const bool had_skel = skel != nullptr;
-	uninstall();
-
-	assert(!get_is_loaded());
-
-	assert(had_skel == (skel != nullptr));
-	Model* src = (Model*)_src;
-	// ASSERT(this->uid == 0);
-	assert(src);
-
-	for (int i = 0; i < src->lods.size(); i++)
-		this->lods.push_back(src->lods[i]);
-	parts = std::move(src->parts);
-	index_alloc_ptr = src->index_alloc_ptr;
-	vertex_alloc_ptr = src->vertex_alloc_ptr;
-	aabb = src->aabb;
-	bounding_sphere = src->bounding_sphere;
-	data = std::move(src->data);
-
-	if (bool(skel) != bool(src->skel)) {
-		throw std::runtime_error(
-			"Model::move_construct: cant reaload a model to a skeletal model or vice versa. restart the game.\n");
-	}
-	if (skel) {
-		assert(src->skel);
-		skel->move_construct(*src->skel);
-	}
-	if (collision) {
-		collision->uninstall_shapes();
-	}
-	collision = std::move(src->collision);
-
-	tags = std::move(src->tags);
-	materials = std::move(src->materials);
-	skeleton_root_transform = src->skeleton_root_transform;
-	isLightmapped = src->isLightmapped;
-	lightmapX = src->lightmapX;
-	lightmapY = src->lightmapY;
-	src->uninstall();
-
-	set_is_loaded(true);
-}

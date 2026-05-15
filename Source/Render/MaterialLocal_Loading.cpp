@@ -440,4 +440,5 @@ void MaterialImpl::post_load(MaterialInstance* self) {
 		ASSERT(masterImpl->self == self);
 	}
 	matman.add_to_dirty_list(self);
+	has_called_post_load_already = true;
 }

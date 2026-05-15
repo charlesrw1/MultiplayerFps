@@ -77,24 +77,29 @@ public:
 	void reload_asset_sync(IAsset* asset) {
 		if (!asset)
 			return;
-		auto asset2 = (IAsset*)asset->get_type().alloc();
-		asset2->path = asset->path;
-		asset2->is_loaded = true;
-		bool success = asset2->load_asset();
-		asset2->load_failed = !success;
+		// In-place reload: same instance keeps the same address so anyone holding
+		// a raw IAsset* / Texture* / Model* / MaterialInstance* remains valid.
+		asset->uninstall();
+		asset->load_failed = false;
+		asset->is_loaded = true;
+		bool success = false;
+		try {
+			success = asset->load_asset();
+		}
+		catch (...) {
+			sys_print(Error, "reload load_asset threw\n");
+			success = false;
+		}
+		asset->load_failed = !success;
 		if (success) {
 			try {
-				//	asset2->post_load();
-				asset->move_construct(asset2);
 				asset->post_load();
-				ASSERT(asset->get_is_loaded());
 			}
 			catch (...) {
-				sys_print(Error, "post load reload failed\n");
+				sys_print(Error, "reload post_load threw\n");
+				asset->load_failed = true;
 			}
 		}
-		delete asset2;
-		asset2 = nullptr;
 	}
 
 	void print_assets() {

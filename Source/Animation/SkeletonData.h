@@ -143,7 +143,6 @@ class MSkeleton
 public:
 	MSkeleton() = default;
 	~MSkeleton();
-	void move_construct(MSkeleton& other);
 	void uninstall();
 
 	bool is_skeleton_the_same(const MSkeleton& other) const;
@@ -171,7 +170,6 @@ public:
 	const std::unordered_map<std::string, refed_clip>& get_all_clips() const { return clips; }
 
 private:
-	// if adding data, update move_construct
 	std::vector<std::unique_ptr<BoneIndexRetargetMap>> remaps;
 	std::vector<BoneData> bone_dat;
 	std::vector<int16_t> mirroring_table;

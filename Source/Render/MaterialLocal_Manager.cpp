@@ -116,6 +116,12 @@ void MaterialManagerLocal::pre_render_update() {
 		if (!mat)
 			continue;
 
+		if (!mat->impl) {
+			sys_print(Error, "pre_render_update: material '%s' in dirty list with null impl — skipping\n",
+					  mat->get_name().c_str());
+			continue;
+		}
+
 		if (mat->impl->masterImpl.get())
 			mat_shader_table.recompile_for_material(mat->impl->masterImpl.get());
 

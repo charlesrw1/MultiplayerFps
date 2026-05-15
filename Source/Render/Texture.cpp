@@ -90,21 +90,6 @@ using std::vector;
 
 #include "GameEnginePublic.h"
 
-void Texture::move_construct(IAsset* _src) {
-	ASSERT(_src);
-	assert(!eng->get_is_in_overlapped_period());
-	Texture* src = (Texture*)_src;
-	uninstall();
-	assert(!gpu_ptr);
-	gpu_ptr  = src->gpu_ptr;
-	loaddata = std::move(src->loaddata);
-	src->gpu_ptr = nullptr; // steal without triggering uninstall
-#ifdef EDITOR_BUILD
-	simplifiedColor    = src->simplifiedColor;
-	hasSimplifiedColor = src->hasSimplifiedColor;
-#endif
-}
-
 glm::ivec2 Texture::get_size() const {
 	ASSERT(true); // gpu_ptr may be null before post_load
 	if (gpu_ptr) {

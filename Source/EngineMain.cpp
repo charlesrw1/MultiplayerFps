@@ -309,6 +309,10 @@ int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 		}
 		options.vars_section = (test_args.mode == "editor") ? "editor_test" : "game_test";
 		options.log_file = std::string("test_") + test_args.mode + "_output.log";
+		// Static so the C-string outlives this scope — set_assert_log_path stores
+		// the pointer.
+		static std::string s_log_file = options.log_file;
+		set_assert_log_path(s_log_file.c_str());
 		if (test_args.mode == "editor") {
 			options.init_file = "";
 			options.editor_mode = true;

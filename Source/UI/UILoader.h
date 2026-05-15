@@ -33,13 +33,15 @@ public:
 	friend class GuiFontLoader;
 	friend class GuiHelpers;
 
-	void uninstall() override { character_to_glyph.clear(); }
+	void uninstall() override {
+		character_to_glyph.clear();
+		font_texture.reset();
+		ptSz = 20;
+		lineHeight = 0;
+		base = 0;
+	}
 	bool load_asset();
 	void post_load();
-	void move_construct(IAsset* _other) {
-		GuiFont* other = (GuiFont*)_other;
-		*this = std::move(*other);
-	}
 
 	REF static GuiFont* load(const std::string& name) { return g_assets.find<GuiFont>(name).get(); }
 };

@@ -76,23 +76,13 @@ bool MaterialInstance::is_this_a_dynamic_material() const {
 }
 
 bool MaterialInstance::load_asset() {
-	if (!impl) {
-		impl = std::make_unique<MaterialImpl>();
-		bool good = impl->load_from_file(this);
-		assert(!good || impl && impl->is_valid());
-
-		if (!good)
-			impl.reset();
-		return good;
-	} else {
-		sweep_references();
-	}
-	return impl.get();
-}
-
-void MaterialInstance::sweep_references() const {
-	if (!impl)
-		return;
+	ASSERT(!impl); // reload path always uninstalls first; initial path starts with impl null
+	impl = std::make_unique<MaterialImpl>();
+	bool good = impl->load_from_file(this);
+	assert(!good || (impl && impl->is_valid()));
+	if (!good)
+		impl.reset();
+	return good;
 }
 
 void MaterialInstance::uninstall() {
@@ -105,45 +95,29 @@ void MaterialInstance::post_load() {
 	if (did_load_fail())
 		return;
 	assert(impl);
-	if (!impl->has_called_post_load_already) {
-		assert(impl->is_valid());
-		impl->post_load(this);
-		impl->has_called_post_load_already = true;
+	ASSERT(impl->is_valid());
+
+	const bool is_reload = first_post_load_done;
+	impl->post_load(this);
+	first_post_load_done = true;
+
+	if (is_reload) {
+		// Cascade: re-load every child instance whose master is *this*.
+		// Address of *this* is stable across reload so child->impl->masterMaterial
+		// pointer comparison still works (the shared_ptr's stored ptr is unchanged).
+		std::vector<IAsset*> ar;
+		g_assets.get_assets_of_type(ar, &MaterialInstance::StaticType);
+		for (auto a : ar) {
+			if (a == this)
+				continue;
+			auto* mi = static_cast<MaterialInstance*>(a);
+			if (mi->impl && mi->impl->masterMaterial.get() == this)
+				g_assets.reload(mi);
+		}
+		matman.on_reloaded_material(this);
 	}
 
 	MaterialInstance::on_material_loaded.invoke(this);
-}
-
-// BLECH!!
-void MaterialInstance::move_construct(IAsset* _other) {
-	ASSERT(_other);
-	auto other = (MaterialInstance*)_other;
-
-	std::shared_ptr<MaterialInstance> myParentMat = impl->masterMaterial;
-	*this = std::move(*other);
-	impl->self = this;
-	if (impl->masterImpl) {
-		impl->masterImpl->self = this;
-	} else {
-		std::shared_ptr<MaterialInstance> newParent =
-			g_assets.find_sync_sptr<MaterialInstance>(impl->masterMaterial->get_name());
-		assert(newParent);
-		impl->masterMaterial = newParent;
-		assert(impl->is_valid());
-	}
-
-	std::vector<IAsset*> ar;
-	g_assets.get_assets_of_type(ar, &MaterialInstance::StaticType);
-	for (auto a : ar) {
-		if (a == this)
-			continue;
-		MaterialInstance* mi = (MaterialInstance*)a;
-		if (mi->impl && mi->impl->masterMaterial.get() == this) {
-			g_assets.reload(mi);
-		}
-	}
-
-	matman.on_reloaded_material(this);
 }
 
 MaterialInstance* MaterialInstance::load(const std::string& path) {
