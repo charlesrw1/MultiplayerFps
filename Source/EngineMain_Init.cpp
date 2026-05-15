@@ -45,6 +45,7 @@
 #include "Framework/SysPrint.h"
 #include "Game/Components/ParticleMgr.h"
 #include "Game/Components/GameAnimationMgr.h"
+#include "Navigation/RuntimeNavManager.h"
 #include "tracy/public/tracy/Tracy.hpp"
 #include "tracy/public/tracy/TracyOpenGL.hpp"
 #include "Framework/Jobs.h"
@@ -369,6 +370,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	g_modelMgr.init();
 	GameAnimationMgr::inst = new GameAnimationMgr;
 	ParticleMgr::inst = new ParticleMgr;
+	RuntimeNavManager::inst = new RuntimeNavManager;
 
 	Model::on_model_loaded.add(this, [](Model* mod) { add_events_test(mod); });
 	print_time("init mods,sounds");

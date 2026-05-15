@@ -54,6 +54,7 @@ public:
 	REF AnimatorObject* create_animator(agBuilder* data);
 
 	bool get_is_visible() const { return is_visible; }
+	bool get_nav_static() const { return nav_static; }
 	bool get_casts_shadows() const { return cast_shadows; }
 	bool get_is_skybox() const { return is_skybox; }
 	REF void set_material_override(const MaterialInstance* mi);
@@ -95,6 +96,8 @@ private:
 	REF bool add_collision_if_available = true;
 	REF bool ignore_in_baking = false;
 	REF bool ignore_in_cubemap = false;
+	// Include this mesh's triangles when baking the navmesh. Defaults true for static level geometry.
+	REF bool nav_static = true;
 	REFLECT(hide);
 	bool lightmapped = false;
 	REFLECT(hide);

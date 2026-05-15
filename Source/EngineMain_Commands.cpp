@@ -26,6 +26,7 @@
 #include "Game/Entity.h"
 #include "Game/LevelAssets.h"
 #include "Game/Components/CameraComponent.h"
+#include "Navigation/LevelNavUtil.h"
 #include "Physics/Physics2.h"
 #include "Assets/AssetBrowser.h"
 #include "Sound/SoundPublic.h"
@@ -221,6 +222,8 @@ void GameEngineLocal::add_commands() {
 	});
 	commands->add("save_baked_gi", [](const Cmd_Args&) { GameSceneGiUtil::save_to_disk(); });
 	commands->add("bake_probes", [](const Cmd_Args&) { GameSceneGiUtil::bake_all_cubemaps(); });
+	commands->add("bake_nav", [](const Cmd_Args&) { LevelNavUtil::bake_all_volumes(); });
+	commands->add("save_baked_nav", [](const Cmd_Args&) { LevelNavUtil::save_to_disk(); });
 	// commands->add("close_ed", close_editor);
 	commands->add("load_imgui_ini", load_imgui_ini);
 	commands->add("dump_imgui_ini", dump_imgui_ini);

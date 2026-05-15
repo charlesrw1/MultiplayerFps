@@ -554,6 +554,20 @@
     <ClCompile Include="Source\Sound\SoundComponent.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
     <ClInclude Include="Source\Sound\SoundLocal.h" />
+    <ClCompile Include="Source\Navigation\RuntimeNavManager.cpp" />
+    <ClCompile Include="Source\Navigation\LevelNavUtil.cpp" />
+    <ClCompile Include="Source\Navigation\NavMeshVolumeComponent.cpp" />
+    <ClCompile Include="Source\Navigation\NavMeshSettingsComponent.cpp" />
+    <ClCompile Include="Source\Navigation\NavAgentComponent.cpp" />
+    <ClCompile Include="Source\Navigation\NavMeshBaker.cpp" />
+    <ClCompile Include="Source\Navigation\NavMeshDebugDraw.cpp" />
+    <ClInclude Include="Source\Navigation\RuntimeNavManager.h" />
+    <ClInclude Include="Source\Navigation\LevelNavUtil.h" />
+    <ClInclude Include="Source\Navigation\NavMeshVolumeComponent.h" />
+    <ClInclude Include="Source\Navigation\NavMeshSettingsComponent.h" />
+    <ClInclude Include="Source\Navigation\NavAgentComponent.h" />
+    <ClInclude Include="Source\Navigation\NavMeshBaker.h" />
+    <ClInclude Include="Source\Navigation\NavMeshDebugDraw.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

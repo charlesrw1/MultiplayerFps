@@ -10,6 +10,8 @@
 #include "GameEnginePublic.h"
 #include "tracy/public/tracy/Tracy.hpp"
 #include "Game/Components/LightComponents.h"
+#include "Navigation/LevelNavUtil.h"
+#include "Navigation/NavMeshDebugDraw.h"
 
 Level::~Level() {
 	assert(all_world_ents.num_used == 0);
@@ -44,6 +46,7 @@ void Level::update_level() {
 	deferred_delete_list.clear();
 
 	GameSceneGiUtil::check_changes();
+	NavDebugDraw::tick();
 }
 void Level::sync_level_render_data() {
 	ZoneScoped;
@@ -155,6 +158,7 @@ void Level::start(string source_name, UnserializedSceneFile* source) {
 	sys_print(Debug, "Level::start: took %f\n", float(end - start));
 
 	GameSceneGiUtil::on_scene_load_gi(source_name);
+	LevelNavUtil::on_scene_load_nav(source_name);
 }
 
 void Level::remove_from_update_list(Component* ec) {

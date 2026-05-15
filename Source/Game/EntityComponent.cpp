@@ -47,6 +47,10 @@ public:
 
 		filepaths.push_back("AreaishLightComponent");
 
+		filepaths.push_back("NavMeshVolumeComponent");
+		filepaths.push_back("NavMeshSettingsComponent");
+		filepaths.push_back("NavAgentComponent");
+
 		filepaths.push_back("daf");
 	}
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Component::StaticType; }

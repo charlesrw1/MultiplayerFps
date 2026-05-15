@@ -95,6 +95,7 @@
     <ClCompile Include="Tests\Game\test_engine.cpp" />
     <ClCompile Include="Tests\Physics\test_physicsbody_lifecycle.cpp" />
     <ClCompile Include="Tests\Assets\test_asset_system.cpp" />
+    <ClCompile Include="Tests\Navigation\test_nav.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TestTask.h" />

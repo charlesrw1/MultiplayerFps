@@ -7,6 +7,7 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 - [[engine_overview]] — engine architecture, build system, ECS, application lifecycle
 - [[testing]] — running unit + integration tests, framework details
 - [[scripting_system]] — Lua / C++ scriptable class system
+- [[reflection_macros]] — every `REFLECT(...)` flag the codegen accepts (min/max/category/readonly/no_nil/...)
 
 ## Rendering & Assets
 
@@ -18,6 +19,10 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 ## Bike Demo
 
 - [[bike/sign_conventions]] — DO NOT get these wrong (axes, steer sign, lateral_pos)
+
+## AI
+
+- [[navigation]] — Recast/Detour navmesh system: components, baker, sidecar format, debug cvars
 
 ## Tooling
 
