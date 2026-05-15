@@ -72,8 +72,27 @@ UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_
 		if (!c)
 			throw SerializeInputError(std::string(debug_tag) + ": unknown component type '" + type + "'");
 		e->add_component_from_unserialization(c.get());
-		{ ReadSerializerBackendJson2 reader(debug_tag, ent, *e); }
-		{ ReadSerializerBackendJson2 reader(debug_tag, ent, *c); }
+		std::unordered_set<std::string> consumed;
+		{
+			ReadSerializerBackendJson2 reader(debug_tag, ent, *e);
+			consumed.insert(reader.get_consumed_keys().begin(), reader.get_consumed_keys().end());
+		}
+		{
+			ReadSerializerBackendJson2 reader(debug_tag, ent, *c);
+			consumed.insert(reader.get_consumed_keys().begin(), reader.get_consumed_keys().end());
+		}
+		// Flag any JSON keys neither reader consumed and not a reserved __* meta key — this is
+		// almost always a typo (`"radiuss"`) or a stale field from an older version of the type.
+		// Warns by default; bumping to throw is gated on the format version (see __version=2 bump).
+		for (auto it = ent.begin(); it != ent.end(); ++it) {
+			const std::string& key = it.key();
+			if (key.size() >= 2 && key[0] == '_' && key[1] == '_')
+				continue; // __typename, __retid, __version, etc. handled outside reflection
+			if (consumed.count(key) == 0) {
+				sys_print(Warning, "%s: unknown field '%s' on '%s' (typo or stale field?)\n",
+						  debug_tag, key.c_str(), type.c_str());
+			}
+		}
 		if (keepid && ent.contains("__retid")) {
 			const auto& idfield = ent["__retid"];
 			if (!idfield.is_number_integer())

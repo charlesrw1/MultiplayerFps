@@ -12,6 +12,31 @@ EXTRA_DEBUG_PRINT = False
 
 VERSION = 1
 
+# If True, parse_type_from_tokens raises on unknown types instead of degrading silently to
+# OLD_VOID_STRUCT_TYPE. Off by default to preserve current behaviour (we know `Serializer` is
+# forward-declared and currently relies on the degradation). Set via codegen.py --strict.
+STRICT_UNKNOWN_TYPES = False
+
+class CodegenError(Exception):
+    """Structured codegen error with file:line:col context.
+
+    Top-level codegen formats these as 'file:line:col: error: message' so editors recognise them.
+    """
+    def __init__(self, message: str, path: str = "", line: int = 0, col: int = 0):
+        self.path = path
+        self.line_num = line
+        self.col = col
+        self.message = message
+        super().__init__(self._format())
+
+    def _format(self) -> str:
+        loc = self.path or "<input>"
+        if self.line_num:
+            loc += f":{self.line_num}"
+            if self.col:
+                loc += f":{self.col}"
+        return f"{loc}: error: {self.message}"
+
 # where are enums reeee
 
 NONE_TYPE = 0 # also stand in for void
@@ -101,6 +126,38 @@ class Property:
         self.is_setter = False
         self.no_nil = False  # Lua stub: omit |nil from pointer return/arg/field types
 
+        # Structured editor/UX attributes from REFLECT(min=, max=, step=, category=, hidden, readonly).
+        # None means "unset"; codegen skips emitting them.
+        self.attr_min : float|None = None
+        self.attr_max : float|None = None
+        self.attr_step : float|None = None
+        self.attr_category : str|None = None
+        self.attr_hidden : bool = False
+        self.attr_readonly : bool = False
+
+    def has_any_attrs(self) -> bool:
+        return (self.attr_min is not None or self.attr_max is not None or self.attr_step is not None
+                or self.attr_category is not None or self.attr_hidden or self.attr_readonly)
+
+    def emit_attrs_struct(self) -> str:
+        """Emits a C++ PropertyAttributes brace-initializer literal, or '' if no attrs set."""
+        if not self.has_any_attrs():
+            return ""
+        fields : list[str] = []
+        if self.attr_min is not None:
+            fields.append(f".min={self.attr_min}f")
+        if self.attr_max is not None:
+            fields.append(f".max={self.attr_max}f")
+        if self.attr_step is not None:
+            fields.append(f".step={self.attr_step}f")
+        if self.attr_category is not None:
+            fields.append(f'.category="{self.attr_category}"')
+        if self.attr_hidden:
+            fields.append(".hidden=true")
+        if self.attr_readonly:
+            fields.append(".readonly=true")
+        return "PropertyAttributes{" + ",".join(fields) + "}"
+
     def get_flags(self):
         if not self.transient and not self.hide:
             return "PROP_DEFAULT"
@@ -155,8 +212,17 @@ class ClassDef:
             return
         if len(self.supername) == 0:
             return
+        if self.supername not in typenames:
+            raise CodegenError(
+                f"class '{self.classname}' inherits from unknown type '{self.supername}' "
+                f"(forgot CLASS_BODY or wrong include?)",
+                path=self.source_file, line=self.source_file_line)
         self.super_type_def = typenames[self.supername]
         for t in self.interfaces_names:
+            if t not in typenames:
+                raise CodegenError(
+                    f"class '{self.classname}' uses unknown interface '{t}'",
+                    path=self.source_file, line=self.source_file_line)
             self.interface_defs.append(typenames[t])
     def is_self_derived_from(self,other:"ClassDef"):
         assert(other.object_type==ClassDef.TYPE_CLASS)
@@ -223,6 +289,26 @@ def parse_reflect_macro(line : str) -> Property:
                 current_prop.is_setter = True
             elif t=="no_nil":
                 current_prop.no_nil = True
+            elif t=="min":
+                if next(token_iter) != "=":
+                    raise Exception("expected '=' after 'min'")
+                current_prop.attr_min = float(next(token_iter))
+            elif t=="max":
+                if next(token_iter) != "=":
+                    raise Exception("expected '=' after 'max'")
+                current_prop.attr_max = float(next(token_iter))
+            elif t=="step":
+                if next(token_iter) != "=":
+                    raise Exception("expected '=' after 'step'")
+                current_prop.attr_step = float(next(token_iter))
+            elif t=="category":
+                if next(token_iter) != "=":
+                    raise Exception("expected '=' after 'category'")
+                current_prop.attr_category = next(token_iter)
+            elif t=="hidden":
+                current_prop.attr_hidden = True
+            elif t=="readonly":
+                current_prop.attr_readonly = True
             else:
                 raise Exception(f"unexpected REFLECT(...) arg \"{t}\"")
 
@@ -322,6 +408,12 @@ STANDARD_CPP_TYPES: dict[str, int] = {
     "quat": QUAT_TYPE,
 
     "Color32":COLOR32_TYPE,
+}
+
+# Smart-pointer aliases that imply a fixed target template arg when none is written.
+# Example: `EntityPtr` parses as `obj<Entity>`. Add new entries here rather than special-casing parse_type_from_tokens.
+TEMPLATED_POINTER_DEFAULTS : dict[str, tuple[str, int]] = {
+    "EntityPtr": ("Entity", OTHER_CLASS_TYPE),
 }
 
 def parse_class_decl(line:str) -> list[str]:
@@ -484,9 +576,10 @@ def parse_type_from_tokens(idx: int, tokens:list[str], typenames: dict[str, Clas
         elif thetype.object_type == ClassDef.TYPE_STRUCT:
             base_type = STRUCT_TYPE
     else:
+        if STRICT_UNKNOWN_TYPES:
+            raise CodegenError(f"unknown type '{base}' (no declaration found and not a builtin)")
         print(f"unknown type, assuming struct: {base}")
         base_type = OLD_VOID_STRUCT_TYPE
-       # raise Exception(f"cant parse type: {base}")
 
     template_args : list[CppType]= []
     if idx < len(tokens) and tokens[idx] == "<":
@@ -501,10 +594,16 @@ def parse_type_from_tokens(idx: int, tokens:list[str], typenames: dict[str, Clas
                 idx += 1
         # end of template args
 
-    # hack
-    if base_type== HANDLE_PTR_TYPE and base=="EntityPtr":
-        assert(len(template_args)==0)
-        template_args.append(CppType("Entity",typenames["Entity"],OTHER_CLASS_TYPE))
+    # Declarative template-arg defaults: some "smart pointer" aliases imply a fixed
+    # template argument that isn't written in source (e.g. EntityPtr == obj<Entity>).
+    # Each entry: (alias name -> (default target class name, target enum kind)).
+    default_target = TEMPLATED_POINTER_DEFAULTS.get(base)
+    if default_target is not None and len(template_args) == 0:
+        target_name, target_kind = default_target
+        if target_name in typenames:
+            template_args.append(CppType(target_name, typenames[target_name], target_kind))
+        else:
+            raise RuntimeError(f"templated alias '{base}' implies target '{target_name}' but type is unknown")
 
     # skip pointer or reference
     is_pointer = False
@@ -591,10 +690,17 @@ def parse_property(cur_line: str, file: enumerate[str], typenames: dict[str, Cla
         cur_line = " ".join(tokens[1:])
     
 
-    # BS hack:
-    if cur_line.endswith(","):
-        _, next_line = next(file)
-        cur_line += remove_comment_from_end(next_line.strip())
+    # Continuation: extend while the line ends with a trailing comma (template arg or
+    # initializer list broken across lines). Loops so multi-line continuations work, not
+    # only one as the old code did. Bounded to 16 iterations as a safety net.
+    for _ in range(16):
+        if not cur_line.endswith(","):
+            break
+        try:
+            _, next_line = next(file)
+        except StopIteration:
+            break
+        cur_line += ' ' + remove_comment_from_end(next_line.strip())
                         
     # Determine if function or variable
     assignment_sign = cur_line.find("=")
@@ -669,9 +775,6 @@ def parse_file(file_path:str, typenames:dict[str,ClassDef]):
                         classes.append(current_class)
                         current_class = None
                     current_class = find_class_in_typenames(line,file_iter,typenames)  # valid if current class is none
-                    
-                    if current_class != None and current_class.classname=="BeamComponent":
-                        pass
                     if current_class != None:
                         current_class.tooltip = combine_comments(current_comments)
                         current_comments.clear()
@@ -734,8 +837,12 @@ def parse_file(file_path:str, typenames:dict[str,ClassDef]):
                 else:
                     current_comments.clear()
 
+        except CodegenError as e:
+            # Promote a generic CodegenError into one carrying our file/line context.
+            raise CodegenError(e.message, path=file_path, line=line_num)
         except Exception as e:
-            raise Exception("{}:{}:\"{}\"-{}".format(file_path, line_num, orig_line.strip(), e.args[0]))
+            # Wrap unstructured errors so the user still gets a compiler-style location.
+            raise CodegenError(f"{e.args[0]} (near: '{orig_line.strip()}')", path=file_path, line=line_num)
     if current_class != None:
         classes.append(current_class)
     return (classes,additional_includes)

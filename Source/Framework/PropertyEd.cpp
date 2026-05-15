@@ -112,7 +112,7 @@ public:
 
 		for (int i = 0; i < prop_list->count; i++) {
 			auto& prop = prop_list->list[i];
-			if (!prop.can_edit())
+			if (!prop.can_edit() || prop.attrs.hidden)
 				continue;
 			bool passed_mask_check = (prop.flags & flagmask) != 0;
 			if (!passed_mask_check)
@@ -292,7 +292,15 @@ void IGridRow::update(PropertyGrid* parentGrid, float header_ofs) {
 bool IPropertyEditor::update() {
 	ASSERT(prop && instance);
 	ImGui::PushID(this);
+	const bool readonly = prop->attrs.readonly;
+	if (readonly)
+		ImGui::BeginDisabled();
 	bool ret = internal_update();
+	if (readonly) {
+		ImGui::EndDisabled();
+		// Discard any edits that slipped through (defensive — BeginDisabled blocks input).
+		ret = false;
+	}
 	ImGui::PopID();
 	return ret;
 }

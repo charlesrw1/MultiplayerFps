@@ -1,6 +1,13 @@
 #pragma once
 #include "ReflectionProp.h"
 
+// Codegen-only helper: applies a PropertyAttributes literal to a PropertyInfo returned
+// by one of the make_*_property factories. Kept inline so it inlines to a struct copy.
+inline PropertyInfo apply_attrs(PropertyInfo prop, const PropertyAttributes& a) {
+	prop.attrs = a;
+	return prop;
+}
+
 #define REG_INT(name, flags, hint)                                                                                     \
 	make_integer_property(#name, offsetof(TYPE_FROM_START, name), flags, sizeof(TYPE_FROM_START::name), hint)
 #define REG_FLOAT(name, flags, hint) make_float_property(#name, offsetof(TYPE_FROM_START, name), flags, hint)

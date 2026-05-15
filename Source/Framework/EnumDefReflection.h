@@ -36,6 +36,8 @@ struct EnumTypeInfo
 	EnumIterator begin() const { return EnumIterator(0, this); }
 	EnumIterator end() const { return EnumIterator(str_count, this); }
 	const EnumIntPair* find_for_value(int64_t value) const;
+	// Lookup by short (unqualified) value name, e.g. "Realtime" — returns nullptr if no match.
+	const EnumIntPair* find_for_name(const char* name) const;
 
 	const char* name = "";
 	const EnumIntPair* strs = nullptr;

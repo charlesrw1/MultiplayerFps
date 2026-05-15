@@ -82,7 +82,7 @@ GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, 
 	auto list = proplist;
 	for (int i = 0; i < list->count; i++) {
 		auto& prop = list->list[i];
-		if (!prop.can_edit())
+		if (!prop.can_edit() || prop.attrs.hidden)
 			continue;
 		bool passed_mask_check = (prop.flags & property_flag_mask) != 0;
 		if (!passed_mask_check)
@@ -105,7 +105,7 @@ GroupRow::GroupRow(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, 
 
 	for (int i = 0; i < list->count; i++) {
 		auto& prop = list->list[i];
-		if (!prop.can_edit())
+		if (!prop.can_edit() || prop.attrs.hidden)
 			continue;
 		bool passed_mask_check = (prop.flags & property_flag_mask) != 0;
 		if (!passed_mask_check)

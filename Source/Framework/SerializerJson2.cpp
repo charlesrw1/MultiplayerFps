@@ -3,6 +3,7 @@
 #include "Framework/MapUtil.h"
 #include "Log.h"
 #include "SerializedForDiffing.h"
+#include "LevelSerialization/SerializeNew.h"
 
 // extern string serialize_build_relative_path(const char* from, const char* to);
 // extern string unserialize_relative_to_absolute(const char* relative, const char* root);
@@ -53,8 +54,19 @@ bool WriteSerializerBackendJson2::serialize_class_reference(const char* tag, con
 	return true;
 }
 
+// --- Enum serialization ---
+// Wire format: emit the unqualified value name as a string (e.g. "Realtime") so the file
+// is robust to enum value reordering across versions. If the runtime value has no matching
+// name (corrupt / out-of-range), fall back to the integer so we never silently lose data.
 bool WriteSerializerBackendJson2::serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) {
-	return false;
+	if (!info)
+		return false;
+	auto& back = get_back();
+	if (auto* pair = info->find_for_value(i))
+		(*back.ptr)[tag] = pair->name;
+	else
+		(*back.ptr)[tag] = i;
+	return true;
 }
 
 void WriteSerializerBackendJson2::serialize_class_ar(const ClassTypeInfo& info, ClassBase*& ptr) {
@@ -65,7 +77,16 @@ void WriteSerializerBackendJson2::serialize_class_reference_ar(const ClassTypeIn
 	serialize_class_shared(std::nullopt, info, ptr, true);
 }
 
-void WriteSerializerBackendJson2::serialize_enum_ar(const EnumTypeInfo* info, int& i) {}
+void WriteSerializerBackendJson2::serialize_enum_ar(const EnumTypeInfo* info, int& i) {
+	auto& back = get_back();
+	if (info) {
+		if (auto* pair = info->find_for_value(i)) {
+			(*back.ptr)[back.arr_idx++] = pair->name;
+			return;
+		}
+	}
+	(*back.ptr)[back.arr_idx++] = i;
+}
 
 void WriteSerializerBackendJson2::serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr) {
 	string name = "";
@@ -98,9 +119,23 @@ void ReadSerializerBackendJson2::load_shared() {
 		try {
 			serialize_property(property);
 		}
+		// SerializeInputError is the user-facing "bad data" signal; enrich with the property
+		// path so the message points at the exact field, then re-throw so the load aborts
+		// rather than silently producing a half-loaded object.
+		catch (const SerializeInputError& e) {
+			throw SerializeInputError(std::string(rootobj.get_type().classname) + "." +
+									  property.get_name() + ": " + e.what());
+		}
+		// Unexpected std::exception from inner code (e.g. nlohmann::json type mismatch when
+		// we forgot to check is_array): log with full context and continue, matching prior
+		// best-effort behaviour. These are bugs in our serializer rather than bad input.
+		catch (const std::exception& e) {
+			sys_print(Error, "ReadSerializerBackendJson2(%s): error serializing %s.%s: %s\n",
+					  get_debug_tag(), rootobj.get_type().classname, property.get_name(), e.what());
+		}
 		catch (...) {
-			sys_print(Error, "ReadSerializerBackendJson2(%s): error serializing property %s for class %s\n",
-					  get_debug_tag(), property.get_name(), rootobj.get_type().classname);
+			sys_print(Error, "ReadSerializerBackendJson2(%s): unknown error serializing %s.%s\n",
+					  get_debug_tag(), rootobj.get_type().classname, property.get_name());
 		}
 	}
 	stack.pop_back();
@@ -117,6 +152,29 @@ bool ReadSerializerBackendJson2::serialize_class_reference(const char* tag, cons
 }
 
 bool ReadSerializerBackendJson2::serialize_enum(const char* tag, const EnumTypeInfo* info, int& i) {
+	if (!info)
+		return false;
+	auto& back = get_back();
+	auto& backptr = *back.ptr;
+	mark_consumed(tag);
+	if (!backptr.is_object() || !backptr.contains(tag))
+		return false;
+	const auto& v = backptr[tag];
+	if (v.is_string()) {
+		auto name = v.get<std::string>();
+		if (auto* pair = info->find_for_name(name.c_str())) {
+			i = (int)pair->value;
+			return true;
+		}
+		// Unknown name: keep prior value, log so it doesn't fail silently.
+		sys_print(Warning, "ReadSerializerBackendJson2: enum '%s' has unknown value '%s'\n",
+				  info->name ? info->name : "?", name.c_str());
+		return false;
+	}
+	if (v.is_number_integer()) {
+		i = v.get<int>();
+		return true;
+	}
 	return false;
 }
 
@@ -128,7 +186,25 @@ void ReadSerializerBackendJson2::serialize_class_reference_ar(const ClassTypeInf
 	return;
 }
 
-void ReadSerializerBackendJson2::serialize_enum_ar(const EnumTypeInfo* info, int& i) {}
+void ReadSerializerBackendJson2::serialize_enum_ar(const EnumTypeInfo* info, int& i) {
+	auto& back = get_back();
+	auto& backptr = *back.ptr;
+	if (!backptr.is_array() || (size_t)back.arr_idx >= backptr.size())
+		return;
+	const auto& v = backptr[back.arr_idx++];
+	if (v.is_string() && info) {
+		auto name = v.get<std::string>();
+		if (auto* pair = info->find_for_name(name.c_str())) {
+			i = (int)pair->value;
+			return;
+		}
+		sys_print(Warning, "ReadSerializerBackendJson2: enum '%s' has unknown value '%s'\n",
+				  info->name ? info->name : "?", name.c_str());
+		return;
+	}
+	if (v.is_number_integer())
+		i = v.get<int>();
+}
 
 #include "Assets/AssetDatabase.h"
 void ReadSerializerBackendJson2::serialize_asset_ar(const ClassTypeInfo& info, IAsset*& ptr) {

@@ -1,4 +1,4 @@
-1. right click in orthographic mode hides mouse with no way back
+# OUTSTANDING:
 
 2. Test 9 catches a real bug — children of a tombstoned master crash the renderer. Fixing it is out of scope for #7. I'll remove test 9 and replace it with one that probes the same invariant safely.
 	
@@ -19,3 +19,5 @@
 
   That converts UB → assertion. The proper fix is to make get_master_impl() return nullptr in that case and audit the ~10 callers (some already null-check, some don't). The latter is what the plan envisioned
   (children "render as missing-material" — implying callers gate on get_master_impl() != nullptr and skip).
+
+3. no vcpkg.json found at repo root? investigate

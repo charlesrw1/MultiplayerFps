@@ -3,6 +3,8 @@
 #include "Serializer.h"
 #include <json.hpp>
 #include <optional> // just to try it out :)
+#include <unordered_set>
+#include <string>
 #include "glm/gtc/quaternion.hpp"
 
 #include "SerializerJson.h"
@@ -253,6 +255,7 @@ public:
 	bool serialize_dict(const char* tag) final {
 		auto& back = get_back();
 		auto& backptr = *back.ptr;
+		mark_consumed(tag);
 		if (!backptr.contains(tag))
 			return false;
 		stack.push_back(&backptr[tag]);
@@ -261,6 +264,7 @@ public:
 	bool serialize_array(const char* tag, int& sz) final {
 		auto& back = get_back();
 		auto& backptr = *back.ptr;
+		mark_consumed(tag);
 		if (!backptr.contains(tag))
 			return false;
 		sz = backptr[tag].size();
@@ -288,12 +292,24 @@ public:
 
 	bool is_loading() final { return true; }
 
+	// Keys consumed at the JSON object passed to the constructor (top-level of this read).
+	// SerializeNew unions these across the Entity + Component readers and reports the diff
+	// against the actual JSON keys as "unknown fields" — catches typos like `"radiuss"`.
+	const std::unordered_set<std::string>& get_consumed_keys() const { return consumed_keys; }
+
 private:
 	void load_shared();
+	// Stack size 1 means we're reading directly from the root object passed in; nested
+	// dicts/arrays push deeper frames, and their keys are tracked by their parent's read.
+	void mark_consumed(const char* tag) {
+		if (stack.size() == 1 && tag && *tag)
+			consumed_keys.emplace(tag);
+	}
 
 	nlohmann::json& get_json(const char* tag) {
 		auto& back = get_back();
 		auto& backptr = *back.ptr;
+		mark_consumed(tag);
 		return backptr[tag];
 	}
 	nlohmann::json& get_json_ar() {
@@ -311,6 +327,7 @@ private:
 	template <typename T> bool read_from_dict(const char* tag, T& t) {
 		auto& back = get_back();
 		auto& backptr = *back.ptr;
+		mark_consumed(tag);
 		if (backptr.contains(tag)) {
 			t = backptr[tag];
 			return true;
@@ -321,4 +338,5 @@ private:
 	ClassBase& rootobj;
 	std::vector<JsonStack> stack;
 	nlohmann::json* obj = nullptr;
+	std::unordered_set<std::string> consumed_keys;
 };

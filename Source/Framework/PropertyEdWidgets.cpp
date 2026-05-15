@@ -39,10 +39,15 @@ bool FloatEditor::internal_update() {
 	ASSERT(prop->type == core_type_id::Float);
 
 	float* ptr = (float*)((char*)instance + prop->offset);
+	const PropertyAttributes& a = prop->attrs;
 
-	if (ImGui::InputFloat("##input_float", ptr, 0.05))
-		return true;
-	return false;
+	// If min/max are set, use a clamped DragFloat; otherwise InputFloat preserves prior behaviour.
+	if (a.has_min() || a.has_max()) {
+		float step = a.has_step() ? a.step : 0.05f;
+		return ImGui::DragFloat("##input_float", ptr, step, a.min, a.max);
+	}
+	float step = a.has_step() ? a.step : 0.05f;
+	return ImGui::InputFloat("##input_float", ptr, step);
 }
 
 bool EnumEditor::internal_update() {
@@ -88,8 +93,17 @@ bool IntegerEditor::internal_update() {
 		   prop->type == core_type_id::Int64);
 
 	int val = prop->get_int(instance);
+	const PropertyAttributes& a = prop->attrs;
 
-	bool ret = ImGui::InputInt("##input_int", &val);
+	bool ret = false;
+	if (a.has_min() || a.has_max()) {
+		float speed = a.has_step() ? a.step : 1.0f;
+		int imin = (a.min <= (float)INT_MIN) ? INT_MIN : (int)a.min;
+		int imax = (a.max >= (float)INT_MAX) ? INT_MAX : (int)a.max;
+		ret = ImGui::DragInt("##input_int", &val, speed, imin, imax);
+	} else {
+		ret = ImGui::InputInt("##input_int", &val);
+	}
 
 	prop->set_int(instance, val);
 	return ret;

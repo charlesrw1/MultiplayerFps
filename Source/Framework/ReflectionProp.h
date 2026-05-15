@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include <cfloat>
 #include "Framework/EnumDefReflection.h"
 #include "Framework/StringUtil.h"
 #include "Framework/Factory.h"
@@ -72,6 +73,23 @@ struct ParsedHintStr
 	int step_i = 1;
 };
 
+// Structured per-property attributes populated by codegen from REFLECT(...) kwargs.
+// Unset means "no constraint": min/max use sentinel +/-FLT_MAX, step==0 disables stepping.
+// Strings are owned by static codegen output, never heap-allocated.
+struct PropertyAttributes
+{
+	float min  = -FLT_MAX;
+	float max  =  FLT_MAX;
+	float step = 0.f;
+	const char* category = nullptr;
+	bool hidden   = false;
+	bool readonly = false;
+
+	bool has_min()  const { return min  != -FLT_MAX; }
+	bool has_max()  const { return max  !=  FLT_MAX; }
+	bool has_step() const { return step != 0.f; }
+};
+
 class DictWriter;
 class DictParser;
 struct PropertyInfo;
@@ -103,6 +121,7 @@ struct PropertyInfo
 	const EnumTypeInfo* enum_type = nullptr;
 	const StructTypeInfo* struct_type = nullptr;
 	const ClassTypeInfo* class_type = nullptr; // used for objtype,assetptr,classtype
+	PropertyAttributes attrs;
 
 	// SerializePropFunc_t serialize_func = nullptr;
 	// UnSerializePropFunc_t unserialize_func = nullptr;

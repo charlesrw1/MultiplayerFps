@@ -13,6 +13,7 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 - [[rendering/materials]] — `.mm` / `.mi` authoring + material system internals
 - [[rendering/decals]] — decal materials, write flags, parallax occlusion mapping
 - [[rendering/model_importing]] — `.glb` import, `.mis` settings, `.cmdl` paths
+- [[rendering/ddgi_baking]] — DDGI probe-volume + global bias parameters for baking
 
 ## Bike Demo
 

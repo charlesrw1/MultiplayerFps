@@ -63,3 +63,13 @@ const EnumIntPair* EnumTypeInfo::find_for_value(int64_t value) const {
 			return &strs[i];
 	return nullptr;
 }
+
+#include <cstring>
+const EnumIntPair* EnumTypeInfo::find_for_name(const char* name) const {
+	if (!name)
+		return nullptr;
+	for (int i = 0; i < str_count; i++)
+		if (strs[i].name && std::strcmp(strs[i].name, name) == 0)
+			return &strs[i];
+	return nullptr;
+}

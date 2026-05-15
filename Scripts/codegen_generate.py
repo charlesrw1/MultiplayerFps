@@ -126,7 +126,11 @@ def write_prop(typenames:dict[str,ClassDef],prop : Property,newclass:ClassDef) -
    
     offset_str = f"offsetof({newclass.classname}, {prop.name})"
 
-    return output_macro_for_prop(typenames,prop.new_type,prop.name,prop.get_flags(),offset_str,prop.custom_type,prop.hint,prop.nameoverride, prop.tooltip)
+    base = output_macro_for_prop(typenames,prop.new_type,prop.name,prop.get_flags(),offset_str,prop.custom_type,prop.hint,prop.nameoverride, prop.tooltip)
+    attrs = prop.emit_attrs_struct()
+    if attrs:
+        return f"apply_attrs({base},{attrs})"
+    return base
 
 
 
@@ -135,7 +139,11 @@ def write_class_property(newclass:ClassDef,p:Property)->str:
     name_str = f"\"{p.name}\""
     name_and_offset = name_str + "," + offset_str + ",\"" + p.tooltip + "\""
     name_offset_flags = name_and_offset + ","+p.get_flags()
-    return write_one_property_generic(p.new_type,name_offset_flags,p.name)
+    base = write_one_property_generic(p.new_type,name_offset_flags,p.name)
+    attrs = p.emit_attrs_struct()
+    if attrs:
+        return f"apply_attrs({base},{attrs})"
+    return base
 
 def write_array_callback(newclass:ClassDef, p:Property)->str:
     assert(p.new_type.type==ARRAY_TYPE)

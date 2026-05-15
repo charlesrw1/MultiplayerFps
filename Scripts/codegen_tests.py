@@ -148,6 +148,77 @@ class CodegenUnitTest(unittest.TestCase):
         out = cg.parse_reflect_macro("REFLECT(hide)")
         self.assertTrue(out.hide)
 
+    def test_codegen_error_format(self):
+        # CodegenError formats as a compiler-style file:line:col: error: msg
+        e = cg.CodegenError("oops", path="foo.h", line=42)
+        self.assertIn("foo.h:42:", str(e))
+        self.assertIn("error: oops", str(e))
+        # No location info → still includes a placeholder
+        e2 = cg.CodegenError("naked")
+        self.assertIn("error: naked", str(e2))
+
+    def test_strict_unknown_type_errors(self):
+        # In strict mode, an unknown type raises CodegenError instead of silent degrade.
+        # Flag lives on codegen_lib, not the codegen_run alias used here.
+        import codegen_lib
+        t = self.make_testing_dict()
+        try:
+            codegen_lib.STRICT_UNKNOWN_TYPES = True
+            with self.assertRaises(cg.CodegenError):
+                cg.parse_type("Mysterion", t)
+            # Sanity: a known type still parses fine.
+            cpp = cg.parse_type("int", t)
+            self.assertEqual(cpp.type, cg.INT_TYPE)
+        finally:
+            codegen_lib.STRICT_UNKNOWN_TYPES = False
+
+    def test_fixup_missing_parent_errors(self):
+        # Unknown supername must produce a CodegenError naming both child + missing parent.
+        b = TestTypeBuilder()
+        bad = b.add_class("BadChild", "DoesNotExist")
+        with self.assertRaises(cg.CodegenError) as ctx:
+            b.finish()
+        msg = str(ctx.exception)
+        self.assertIn("BadChild", msg)
+        self.assertIn("DoesNotExist", msg)
+
+    def test_entityptr_default_target(self):
+        # EntityPtr with no template arg gets Entity auto-filled via the declarative table.
+        b = TestTypeBuilder()
+        b.add_class("Entity", CLASSBASE)
+        b.finish()
+        cpp = cg.parse_type("EntityPtr", b.dict)
+        self.assertEqual(cpp.type, cg.HANDLE_PTR_TYPE)
+        self.assertEqual(len(cpp.template_args), 1)
+        self.assertEqual(cpp.template_args[0].typename.classname, "Entity")
+
+    def test_reflect_attributes(self):
+        # min/max/step parse as floats
+        out = cg.parse_reflect_macro("REFLECT(min=0, max=1, step=0.01)")
+        self.assertEqual(out.attr_min, 0.0)
+        self.assertEqual(out.attr_max, 1.0)
+        self.assertAlmostEqual(out.attr_step, 0.01)
+        self.assertTrue(out.has_any_attrs())
+
+        # category is a string, hidden/readonly are flags
+        out = cg.parse_reflect_macro('REFLECT(category="Physics", hidden, readonly)')
+        self.assertEqual(out.attr_category, "Physics")
+        self.assertTrue(out.attr_hidden)
+        self.assertTrue(out.attr_readonly)
+
+        # absence: no attrs, empty emit string
+        out = cg.parse_reflect_macro("REFLECT(hide)")
+        self.assertFalse(out.has_any_attrs())
+        self.assertEqual(out.emit_attrs_struct(), "")
+
+        # emit shape contains designated-init fields and a category string literal
+        out = cg.parse_reflect_macro('REFLECT(min=-2.5, max=2.5, category="Speed")')
+        emitted = out.emit_attrs_struct()
+        self.assertIn(".min=-2.5f", emitted)
+        self.assertIn(".max=2.5f", emitted)
+        self.assertIn('.category="Speed"', emitted)
+        self.assertTrue(emitted.startswith("PropertyAttributes{"))
+
     def test_reflect_no_nil(self):
         # default: no_nil is False
         out = cg.parse_reflect_macro("REFLECT(hide)")

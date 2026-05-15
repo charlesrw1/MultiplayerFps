@@ -158,6 +158,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="delegate_test.cpp" />
+    <ClCompile Include="enum_reflection_test.cpp" />
     <ClCompile Include="framwork_test.cpp" />
     <ClCompile Include="freelist_test.cpp" />
     <ClCompile Include="handle_test.cpp" />
