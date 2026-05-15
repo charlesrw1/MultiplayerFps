@@ -34,8 +34,8 @@ static inline bool contains_case_insensitive(std::string_view haystack, std::str
 
 AssetBrowser::AssetBrowser() {
 	asset_name_filter[0] = 0;
-	folder_closed = g_assets.find_global_sync<Texture>("eng/editor/folder_closed.png").get();
-	folder_open = g_assets.find_global_sync<Texture>("eng/editor/folder_open.png").get();
+	folder_closed = g_assets.find<Texture>("eng/editor/folder_closed.png").get();
+	folder_open = g_assets.find<Texture>("eng/editor/folder_open.png").get();
 	if (!folder_closed || !folder_open)
 		Fatalf("no folder icons\n");
 

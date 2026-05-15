@@ -364,7 +364,7 @@ ProcessNodesAndMeshOutput process_nodes_and_mesh(cgltf_data* data, const Skeleto
 class ModelCompileHelper
 {
 public:
-	static ModelDefData parse_definition_file(const std::string& deffile, IAssetLoadingInterface* loading);
+	static ModelDefData parse_definition_file(const std::string& deffile);
 
 	static ModelCompilier::Ret compile_model(const std::string& defname, const ModelDefData& data);
 

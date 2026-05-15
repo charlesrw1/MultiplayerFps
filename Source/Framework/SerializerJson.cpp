@@ -228,8 +228,8 @@ bool WriteSerializerBackendJson::serialize_asset(const char* tag, const ClassTyp
 	return true;
 }
 ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, nlohmann::json& json_obj,
-													 IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
-	: objmaker(objmaker), loader(loader), debug_tag(debug_tag) {
+													 IMakeObjectFromPath& objmaker)
+	: objmaker(objmaker), debug_tag(debug_tag) {
 	this->obj = &json_obj;
 	load_shared();
 	this->obj = nullptr;
@@ -327,8 +327,8 @@ void ReadSerializerBackendJson::load_shared() {
 }
 
 ReadSerializerBackendJson::ReadSerializerBackendJson(const char* debug_tag, const string& text,
-													 IMakeObjectFromPath& objmaker, IAssetLoadingInterface& loader)
-	: objmaker(objmaker), loader(loader), debug_tag(debug_tag) {
+													 IMakeObjectFromPath& objmaker)
+	: objmaker(objmaker), debug_tag(debug_tag) {
 	auto objStack = nlohmann::json::parse(text);
 	this->obj = &objStack;
 	load_shared();
@@ -365,7 +365,7 @@ void ReadSerializerBackendJson::serialize_asset_ar(const ClassTypeInfo& info, IA
 	if (path.empty())
 		ptr = nullptr;
 	else
-		ptr = loader.load_asset(&info, path);
+		ptr = g_assets.generic_find(path, &info).get_unsafe();
 }
 bool ReadSerializerBackendJson::serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr) {
 	string path = "";
@@ -375,7 +375,7 @@ bool ReadSerializerBackendJson::serialize_asset(const char* tag, const ClassType
 	if (path.empty())
 		ptr = nullptr;
 	else
-		ptr = loader.load_asset(&info, path);
+		ptr = g_assets.generic_find(path, &info).get_unsafe();
 	return true;
 }
 #include <variant>

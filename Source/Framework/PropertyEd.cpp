@@ -269,7 +269,7 @@ void IGridRow::update(PropertyGrid* parentGrid, float header_ofs) {
 
 		ImGui::TableNextColumn();
 		if (has_reset_button()) {
-			auto reset_img = g_assets.find_global_sync<Texture>("eng/icon/undo.png");
+			auto reset_img = g_assets.find<Texture>("eng/icon/undo.png");
 			if (my_imgui_image_button(reset_img, 14)) {
 				on_reset();
 				parentGrid->set_rows_had_changes();

@@ -15,13 +15,13 @@
 #include "DebugConsole.h"
 #include <SDL2/SDL.h>
 UiSystem::UiSystem() {
-	ui_default = g_assets.find_global_sync<MaterialInstance>("eng/uiDefault.mm").get();
+	ui_default = g_assets.find<MaterialInstance>("eng/uiDefault.mm").get();
 	if (!ui_default)
 		Fatalf("Couldnt find default ui material");
-	defaultFont = g_assets.find_global_sync<GuiFont>("eng/sengo24.fnt");
+	defaultFont = g_assets.find<GuiFont>("eng/sengo24.fnt");
 	if (!defaultFont)
 		Fatalf("couldnt load default font");
-	fontDefaultMat = g_assets.find_global_sync<MaterialInstance>("eng/fontDefault.mm");
+	fontDefaultMat = g_assets.find<MaterialInstance>("eng/fontDefault.mm");
 	if (!fontDefaultMat)
 		Fatalf("couldnt load default font material");
 }

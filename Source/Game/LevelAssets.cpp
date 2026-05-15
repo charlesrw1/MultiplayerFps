@@ -99,7 +99,7 @@ uptr<UnserializedSceneFile> load_level_asset(string path) {
 		return nullptr;
 	}
 	UnserializedSceneFile* out = new UnserializedSceneFile(
-		NewSerialization::unserialize_from_json(path.c_str() /*debug tag*/, blah, *g_assets.loader, false));
+		NewSerialization::unserialize_from_json(path.c_str() /*debug tag*/, blah, false));
 
 	return uptr<UnserializedSceneFile>(out);
 }

@@ -373,7 +373,7 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 			if (!prefab_content.text.empty()) {
 				try {
 					UnserializedSceneFile unserialized = unserialize_entities_from_text(
-						"prefab_edit_restore", prefab_content.text, AssetDatabase::loader, false);
+						"prefab_edit_restore", prefab_content.text, false);
 					insert_unserialized_into_scene(unserialized);
 				}
 				catch (const std::exception& e) {

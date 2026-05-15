@@ -12,7 +12,7 @@
 #include "LevelEditor/PropertyEditors.h"
 #include "Framework/FnFactory.h"
 
-extern bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface*, Color32&);
+extern bool compile_texture_asset(const std::string& gamepath, Color32&);
 
 class TextureImportSettings : public ClassBase
 {

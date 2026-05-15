@@ -444,7 +444,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		}
 
 		if (r_debug_mode.get_integer() == DEBUG_OUTLINED) {
-			auto mat = g_assets.find_global_sync<MaterialInstance>("eng/editorEdgeDetect.mm");
+			auto mat = g_assets.find<MaterialInstance>("eng/editorEdgeDetect.mm");
 			if (mat.get() && mat->impl->gpu_buffer_offset != mat->impl->INVALID_MAPPING)
 				postProcesses.push_back(mat.get());
 		}

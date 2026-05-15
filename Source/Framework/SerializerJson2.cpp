@@ -82,8 +82,8 @@ bool WriteSerializerBackendJson2::serialize_asset(const char* tag, const ClassTy
 	return true;
 }
 ReadSerializerBackendJson2::ReadSerializerBackendJson2(const char* debug_tag, nlohmann::json& json_obj,
-													   IAssetLoadingInterface& loader, ClassBase& obj)
-	: loader(loader), debug_tag(debug_tag), rootobj(obj) {
+													   ClassBase& obj)
+	: debug_tag(debug_tag), rootobj(obj) {
 	this->obj = &json_obj;
 	load_shared();
 	this->obj = nullptr;
@@ -137,7 +137,7 @@ void ReadSerializerBackendJson2::serialize_asset_ar(const ClassTypeInfo& info, I
 	if (path.empty())
 		ptr = nullptr;
 	else
-		ptr = loader.load_asset(&info, path);
+		ptr = g_assets.generic_find(path, &info).get_unsafe();
 }
 bool ReadSerializerBackendJson2::serialize_asset(const char* tag, const ClassTypeInfo& info, IAsset*& ptr) {
 	string path = "";
@@ -147,6 +147,6 @@ bool ReadSerializerBackendJson2::serialize_asset(const char* tag, const ClassTyp
 	if (path.empty())
 		ptr = nullptr;
 	else
-		ptr = loader.load_asset(&info, path);
+		ptr = g_assets.generic_find(path, &info).get_unsafe();
 	return true;
 }

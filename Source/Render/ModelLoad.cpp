@@ -111,8 +111,7 @@ void Model::post_load() {
 MulticastDelegate<Model*> Model::on_model_loaded;
 
 // Format defined in ModelCompilier.cpp
-bool Model::load_internal(IAssetLoadingInterface* loading) {
-	ASSERT(loading != nullptr || true); // loading may be null in some code paths
+bool Model::load_internal() {
 	auto file = FileSys::open_read_game(get_name().c_str());
 	if (!file) {
 		sys_print(Error, "model %s does not exist\n", get_name().c_str());
@@ -277,8 +276,7 @@ bool Model::load_internal(IAssetLoadingInterface* loading) {
 	return true;
 }
 
-bool Model::load_asset(IAssetLoadingInterface* loading) {
-	ASSERT(loading != nullptr || true); // loading may be null in some code paths
+bool Model::load_asset() {
 	const auto& path = get_name();
 
 #ifdef EDITOR_BUILD
@@ -286,7 +284,7 @@ bool Model::load_asset(IAssetLoadingInterface* loading) {
 		std::string model_def = strip_extension(path.c_str());
 		model_def += ".mis";
 
-		ModelCompilier::Ret ret = ModelCompilier::compile(model_def.c_str(), loading);
+		ModelCompilier::Ret ret = ModelCompilier::compile(model_def.c_str());
 		if (ret == ModelCompilier::CompileErr) {
 			sys_print(Error, "compilier failed on model %s\n", model_def.c_str());
 		} else if (ret == ModelCompilier::CompileGood) {
@@ -295,7 +293,7 @@ bool Model::load_asset(IAssetLoadingInterface* loading) {
 	}
 #endif
 
-	bool good = load_internal(loading);
+	bool good = load_internal();
 	if (good)
 		return true;
 	return false;

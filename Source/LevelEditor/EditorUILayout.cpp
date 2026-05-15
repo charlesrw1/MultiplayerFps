@@ -53,7 +53,7 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 		return false;
 	const bool show_all_labels = editor_draw_name_text.get_bool();
 
-	const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+	const GuiFont* font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
 	if (!font)
 		font = UiSystem::inst->defaultFont;
 	auto objs = get_objs();
@@ -77,7 +77,7 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 			}
 			if (!*s)
 				continue;
-			auto tex = g_assets.find_global_sync<Texture>(s);
+			auto tex = g_assets.find<Texture>(s);
 			icons.push_back(tex.get());
 		}
 		const bool is_spawner = o.e->get_component<SpawnerComponent>() != nullptr;
@@ -182,7 +182,7 @@ void EditorUILayout::do_box_select(MouseSelectionAction action, Rect2d area) {
 		if (!*name) {
 			name = o.e->get_type().classname;
 		}
-		const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+		const GuiFont* font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
 		if (!font)
 			font = UiSystem::inst->defaultFont;
 		const int icon_size = 16;
@@ -190,7 +190,7 @@ void EditorUILayout::do_box_select(MouseSelectionAction action, Rect2d area) {
 		auto e = o.e;
 		if (is_prefab_root) {
 			const char* s = "eng/editor/prefab_p.png";
-			auto tex = g_assets.find_global_sync<Texture>(s);
+			auto tex = g_assets.find<Texture>(s);
 			icons.push_back(tex.get());
 		}
 
@@ -200,7 +200,7 @@ void EditorUILayout::do_box_select(MouseSelectionAction action, Rect2d area) {
 			const char* s = c->get_editor_outliner_icon();
 			if (!*s)
 				continue;
-			auto tex = g_assets.find_global_sync<Texture>(s);
+			auto tex = g_assets.find<Texture>(s);
 			icons.push_back(tex.get());
 		}
 

@@ -81,7 +81,7 @@ void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_onl
 
 			if (count > 0 && !ptr->m->get_is_loaded()) {
 				sys_print(Debug, "emergency model reload %s\n", ptr->m->get_name().c_str());
-				g_assets.reload_sync<Model>(ptr->m);
+				g_assets.reload<Model>(ptr->m);
 			}
 		}
 	}

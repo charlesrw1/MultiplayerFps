@@ -34,7 +34,7 @@ template <typename T> T* cast_to(ClassBase* ptr) {
 // factory method for prefabs
 // both defined in lua
 UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_tag, SerializedForDiffing& json,
-															  IAssetLoadingInterface& load, bool keepid) {
+															  bool keepid) {
 	UnserializedSceneFile outfile;
 	auto& obj = json.jsonObj;
 	if (obj["objs"].is_array()) {
@@ -45,8 +45,8 @@ UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_
 			Component* c = ClassBase::create_class<Component>(type.c_str());
 			ASSERT(c);
 			e->add_component_from_unserialization(c);
-			{ ReadSerializerBackendJson2 reader("", ent, load, *e); }
-			{ ReadSerializerBackendJson2 reader("", ent, load, *c); }
+			{ ReadSerializerBackendJson2 reader("", ent, *e); }
+			{ ReadSerializerBackendJson2 reader("", ent, *c); }
 			if (keepid && ent["__retid"].is_number()) {
 				int64_t instid = ent["__retid"];
 				e->post_unserialization(instid);
@@ -60,11 +60,11 @@ UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_
 }
 using std::vector;
 UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_tag, const std::string& text,
-															  IAssetLoadingInterface& load, bool keepid) {
+															  bool keepid) {
 
 	SerializedForDiffing sfd;
 	sfd.jsonObj = nlohmann::json::parse(text);
-	return unserialize_from_json(debug_tag, sfd, load, keepid);
+	return unserialize_from_json(debug_tag, sfd, keepid);
 }
 
 // what it expects: list of entities that are serializable. cant be non serialized objects
@@ -115,24 +115,16 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 	return outfile;
 }
 
-class UnserializationWrapper;
-Entity* unserialize_entities_from_text_internal(UnserializedSceneFile& scene, const std::string& text,
-												const std::string& rootpath, PrefabAsset* prefab, Entity* starting_root,
-												IAssetLoadingInterface* load);
-
 void UnserializedSceneFile::delete_objs() {
 	for (auto& o : all_obj_vec)
 		delete o;
 	all_obj_vec.clear();
 }
 
-UnserializedSceneFile unserialize_entities_from_text(const char* debug_tag, const std::string& text,
-													 IAssetLoadingInterface* load, bool keepid) {
-	if (!load)
-		load = AssetDatabase::loader;
+UnserializedSceneFile unserialize_entities_from_text(const char* debug_tag, const std::string& text, bool keepid) {
 	if (StringUtils::starts_with(text, "!json\n")) {
 		auto fixedtext = text.substr(5);
-		return NewSerialization::unserialize_from_text(debug_tag, fixedtext, *load, keepid);
+		return NewSerialization::unserialize_from_text(debug_tag, fixedtext, keepid);
 	} else {
 		sys_print(Error, "unserialize_entities_from_text: old format not supported\n");
 		return UnserializedSceneFile();

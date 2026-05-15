@@ -60,11 +60,11 @@ bool ArrayRow::draw_row_controls() {
 	if (header && !header->can_edit_array())
 		return false;
 	bool ret = false;
-	auto trashimg = g_assets.find_global_sync<Texture>("eng/icon/trash.png");
-	auto addimg = g_assets.find_global_sync<Texture>("eng/icon/plus.png");
+	auto trashimg = g_assets.find<Texture>("eng/icon/trash.png");
+	auto addimg = g_assets.find<Texture>("eng/icon/plus.png");
 
-	auto visible_icon = g_assets.find_global_sync<Texture>("eng/icon/visible.png");
-	auto hidden_icon = g_assets.find_global_sync<Texture>("eng/icon/hidden.png");
+	auto visible_icon = g_assets.find<Texture>("eng/icon/visible.png");
+	auto hidden_icon = g_assets.find<Texture>("eng/icon/hidden.png");
 
 	bool are_any_open = are_any_nodes_open();
 

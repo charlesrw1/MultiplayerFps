@@ -63,7 +63,7 @@ guiEditorCube::guiEditorCube() {
 	textures.resize(6);
 	for (int i = 0; i < 6; i++) {
 		string path = "eng/editor/" + imgs[i] + ".png";
-		textures.at(i) = g_assets.find_global_sync<Texture>(path).get();
+		textures.at(i) = g_assets.find<Texture>(path).get();
 	}
 }
 

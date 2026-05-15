@@ -147,8 +147,7 @@ ModelDefData new_import_settings_to_modeldef_data(const std::string& gamepath, M
 #include "Framework/StringUtils.h"
 extern void write_model_import_settings(ModelImportSettings* mis, const std::string& savepath);
 
-ModelDefData new_import_settings_to_modeldef_data(const string& mis_path, IFile* file,
-												  IAssetLoadingInterface* loading) {
+ModelDefData new_import_settings_to_modeldef_data(const string& mis_path, IFile* file) {
 	std::unique_ptr<ModelImportSettings> impSettings = nullptr;
 
 	std::string to_str(file->size(), ' ');
@@ -156,7 +155,7 @@ ModelDefData new_import_settings_to_modeldef_data(const string& mis_path, IFile*
 	if (to_str.find("!json") == 0) {
 		to_str = to_str.substr(6);
 		MakeObjectFromPathGeneric objmaker;
-		ReadSerializerBackendJson reader("read_modeldef", to_str, objmaker, *loading);
+		ReadSerializerBackendJson reader("read_modeldef", to_str, objmaker);
 		if (reader.get_root_obj()) {
 			impSettings.reset(reader.get_root_obj()->cast_to<ModelImportSettings>());
 		}
@@ -173,7 +172,7 @@ ModelDefData new_import_settings_to_modeldef_data(const string& mis_path, IFile*
 	return mdd;
 }
 
-ModelDefData ModelCompileHelper::parse_definition_file(const std::string& game_path, IAssetLoadingInterface* loading) {
+ModelDefData ModelCompileHelper::parse_definition_file(const std::string& game_path) {
 	{
 		std::string pathNew = strip_extension(game_path);
 		pathNew += ".mis"; // model import settings
@@ -181,14 +180,13 @@ ModelDefData ModelCompileHelper::parse_definition_file(const std::string& game_p
 		if (!filenew)
 			throw std::runtime_error("couldn't open dict");
 
-		return new_import_settings_to_modeldef_data(pathNew, filenew.get(), loading);
+		return new_import_settings_to_modeldef_data(pathNew, filenew.get());
 	}
 }
 
 static bool compile_everything = false;
 
-bool ModelCompilier::does_model_need_compile(const char* game_path, ModelDefData& def_data, bool needs_def,
-											 IAssetLoadingInterface* loading) {
+bool ModelCompilier::does_model_need_compile(const char* game_path, ModelDefData& def_data, bool needs_def) {
 	auto file = FileSys::open_read_game(game_path);
 	if (!file) {
 		sys_print(Error, "coudln't open model def file %s\n", game_path);
@@ -231,7 +229,7 @@ bool ModelCompilier::does_model_need_compile(const char* game_path, ModelDefData
 	if (needs_compile && !needs_def)
 		return true;
 
-	def_data = ModelCompileHelper::parse_definition_file(game_path, loading);
+	def_data = ModelCompileHelper::parse_definition_file(game_path);
 
 	auto check_timestamp_file = [](uint64_t cmdl_time, const std::string& full_path) -> bool {
 		auto input_file = FileSys::open_read_game(full_path.c_str());
@@ -275,11 +273,11 @@ ModelCompilier::Ret ModelCompilier::compile_from_settings(const std::string& out
 	return ModelCompileHelper::compile_model(output, def_data);
 }
 
-ModelCompilier::Ret ModelCompilier::compile(const char* game_path, IAssetLoadingInterface* loading) {
+ModelCompilier::Ret ModelCompilier::compile(const char* game_path) {
 
 	ModelDefData def;
 	try {
-		bool needs_compile = does_model_need_compile(game_path, def, true, loading);
+		bool needs_compile = does_model_need_compile(game_path, def, true);
 		if (!needs_compile)
 			return Ret::Skipped;
 	}

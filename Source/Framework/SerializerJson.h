@@ -236,14 +236,11 @@ private:
 	nlohmann::json obj;
 };
 
-class IAssetLoadingInterface;
 class ReadSerializerBackendJson : public Serializer
 {
 public:
-	ReadSerializerBackendJson(const char* debug_tag, const std::string& text, IMakeObjectFromPath& objmaker,
-							  IAssetLoadingInterface& loader);
-	ReadSerializerBackendJson(const char* debug_tag, nlohmann::json& json_obj, IMakeObjectFromPath& objmaker,
-							  IAssetLoadingInterface& loader);
+	ReadSerializerBackendJson(const char* debug_tag, const std::string& text, IMakeObjectFromPath& objmaker);
+	ReadSerializerBackendJson(const char* debug_tag, nlohmann::json& json_obj, IMakeObjectFromPath& objmaker);
 
 	const char* debug_tag = "";
 	const char* get_debug_tag() final { return debug_tag; }
@@ -420,7 +417,6 @@ private:
 								bool is_only_reference);
 
 	const std::string* current_root_path = nullptr;
-	IAssetLoadingInterface& loader;
 	ClassBase* rootobj = nullptr;
 	IMakeObjectFromPath& objmaker;
 	std::vector<JsonStack> stack;

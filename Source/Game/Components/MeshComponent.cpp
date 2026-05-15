@@ -89,7 +89,7 @@ int MeshComponent::get_index_of_bone(StringName bonename) const {
 }
 
 void MeshComponent::set_model_str(const char* model_path) {
-	Model* modelnext = g_assets.find_sync<Model>(model_path).get();
+	Model* modelnext = g_assets.find<Model>(model_path).get();
 	if (modelnext != model.get()) {
 		model = modelnext;
 		sync_render_data();

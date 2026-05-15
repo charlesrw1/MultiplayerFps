@@ -140,9 +140,9 @@ bool GroupRow::draw_row_controls() {
 	bool canmoveup = row_index > 0;
 	bool canmovedown = (row_index != array_->get_size() - 1);
 
-	auto moveup = g_assets.find_global_sync<Texture>("eng/icon/moveup.png");
-	auto movedown = g_assets.find_global_sync<Texture>("eng/icon/movedown.png");
-	auto trash1 = g_assets.find_global_sync<Texture>("eng/icon/trash1.png");
+	auto moveup = g_assets.find<Texture>("eng/icon/moveup.png");
+	auto movedown = g_assets.find<Texture>("eng/icon/movedown.png");
+	auto trash1 = g_assets.find<Texture>("eng/icon/trash1.png");
 
 	ImGui::PushStyleColor(ImGuiCol_Button, 0);
 	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint_grp({245, 242, 242, 55}));

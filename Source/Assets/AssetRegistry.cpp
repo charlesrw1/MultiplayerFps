@@ -22,7 +22,7 @@ void TOUCH_ASSET(const Cmd_Args& args) {
 	}
 	auto type = AssetRegistrySystem::get().find_asset_type_for_ext(get_extension_no_dot(args.at(1)));
 	if (type) {
-		auto res = g_assets.find_sync(args.at(1), type, 0);
+		auto res = g_assets.generic_find(args.at(1), type);
 		if (!res)
 			sys_print(Error, "TOUCH_ASSET failed\n");
 	} else {
@@ -192,9 +192,9 @@ void AssetRegistrySystem::init() {
 			return;
 		}
 		const bool was_loaded = g_assets.is_asset_loaded(args.at(1));
-		auto asset = g_assets.find_sync(args.at(1), assetType);
+		auto asset = g_assets.generic_find(args.at(1), assetType);
 		if (was_loaded) {
-			g_assets.reload_sync(asset);
+			g_assets.reload(asset);
 		}
 	});
 }
@@ -267,29 +267,29 @@ void AssetRegistrySystem::update() {
 		// Hot-reload in-memory assets
 		if (ext == "mm" || ext == "mi") {
 			if (g_assets.is_asset_loaded(rel_path)) {
-				auto asset = g_assets.find_sync<MaterialInstance>(rel_path);
-				g_assets.reload_sync<MaterialInstance>(asset);
+				auto asset = g_assets.find<MaterialInstance>(rel_path);
+				g_assets.reload<MaterialInstance>(asset);
 			}
 		} else if (ext == "mis" || ext == "glb") {
 			std::string cmdl = rel_path;
 			StringUtils::remove_extension(cmdl);
 			cmdl += ".cmdl";
 			if (g_assets.is_asset_loaded(cmdl)) {
-				auto asset = g_assets.find_sync<Model>(cmdl);
-				g_assets.reload_sync<Model>(asset);
+				auto asset = g_assets.find<Model>(cmdl);
+				g_assets.reload<Model>(asset);
 			}
 		} else if (ext == "png" || ext == "jpg" || ext == "tis") {
 			std::string dds = rel_path;
 			StringUtils::remove_extension(dds);
 			dds += ".dds";
 			if (g_assets.is_asset_loaded(dds)) {
-				auto asset = g_assets.find_sync<Texture>(dds);
-				g_assets.reload_sync<Texture>(asset);
+				auto asset = g_assets.find<Texture>(dds);
+				g_assets.reload<Texture>(asset);
 			}
 		} else if (ext == "wav") {
 			if (g_assets.is_asset_loaded(rel_path)) {
-				auto asset = g_assets.find_sync<SoundFile>(rel_path);
-				g_assets.reload_sync<SoundFile>(asset);
+				auto asset = g_assets.find<SoundFile>(rel_path);
+				g_assets.reload<SoundFile>(asset);
 			}
 		} else if (ext == "lua") {
 			ScriptManager::inst->reload_one_file(rel_path);

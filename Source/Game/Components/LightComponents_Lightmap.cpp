@@ -203,7 +203,7 @@ void LightmapComponent::do_import() {
 
 	lightmapTexture = Texture::load(filename);
 	if (lightmapTexture) {
-		g_assets.reload_sync<Texture>(lightmapTexture);
+		g_assets.reload<Texture>(lightmapTexture);
 	} else {
 		sys_print(Warning, "LightmapComponent::do_import: failed to texture load?\n");
 	}

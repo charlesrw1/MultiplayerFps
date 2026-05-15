@@ -28,7 +28,7 @@
 #include "IGraphsDevice.h"
 
 // TextureEditor.cpp
-extern bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface*, Color32& outColor);
+extern bool compile_texture_asset(const std::string& gamepath, Color32& outColor);
 
 // ---------------------------------------------------------------------------
 // Editor-only: PNG/HDR write wrappers and asset metadata registration
@@ -165,7 +165,7 @@ void Texture::post_load() {
 
 extern ConfigVar developer_mode;
 
-bool Texture::load_asset(IAssetLoadingInterface* loading) {
+bool Texture::load_asset() {
 	const auto& path = get_name();
 	ASSERT(!path.empty());
 	assert(path != "_white" &&
@@ -175,7 +175,7 @@ bool Texture::load_asset(IAssetLoadingInterface* loading) {
 
 #ifdef EDITOR_BUILD
 	if (developer_mode.get_bool() && !force_nearest) {
-		bool good = compile_texture_asset(path, loading, this->simplifiedColor);
+		bool good = compile_texture_asset(path, this->simplifiedColor);
 		if (good)
 			this->hasSimplifiedColor = true;
 	}
@@ -258,7 +258,7 @@ Texture* Texture::force_load_for_ui(const string& name) {
 	Texture* t       = Texture::install_system(name);
 	t->set_loaded_manually_unsafe(name);
 	t->force_nearest = true; // hack
-	const bool good  = t->load_asset(nullptr /*hope nobody uses this*/);
+	const bool good  = t->load_asset();
 	if (good)
 		t->post_load();
 	return t;
@@ -270,5 +270,5 @@ Texture::~Texture() {}
 #include "Assets/AssetDatabase.h"
 Texture* Texture::load(const std::string& path) {
 	ASSERT(!path.empty());
-	return g_assets.find_sync<Texture>(path).get();
+	return g_assets.find<Texture>(path).get();
 }

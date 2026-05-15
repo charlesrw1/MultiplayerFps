@@ -57,7 +57,7 @@ void GameplayStatic::reset_debug_text_height() {
 
 void GameplayStatic::debug_text(string text) {
 	ASSERT(!text.empty());
-	auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+	auto font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
 	auto draw_text = [&](const char* s) {
 		string str = s;
 		TextShape shape;

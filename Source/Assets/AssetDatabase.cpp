@@ -26,18 +26,18 @@ public:
 		allAssets.insert({name, std::move(sptr)});
 	}
 
-	std::shared_ptr<IAsset> load_asset_sync_sptr(const std::string& str, const ClassTypeInfo* type, bool is_system) {
+	std::shared_ptr<IAsset> load_asset_sync_sptr(const std::string& str, const ClassTypeInfo* type) {
 		if (str.empty())
 			return nullptr;
 		auto existing = find_in_all_assets_sptr(str);
 		if (existing) {
 			return existing;
 		}
-		load_asset_sync(str, type, is_system);
+		load_asset_sync(str, type);
 		return find_in_all_assets_sptr(str);
 	}
 
-	IAsset* load_asset_sync(const std::string& str, const ClassTypeInfo* type, bool is_system) {
+	IAsset* load_asset_sync(const std::string& str, const ClassTypeInfo* type) {
 		assert(type->is_a(IAsset::StaticType));
 		if (str.empty())
 			return nullptr;
@@ -58,7 +58,7 @@ public:
 				allAssets.insert({str, sptr});
 			}
 			existing->is_loaded = true;
-			bool success = existing->load_asset(g_assets.loader);
+			bool success = existing->load_asset();
 			existing->load_failed = !success;
 			if (success) {
 				try {
@@ -80,7 +80,7 @@ public:
 		auto asset2 = (IAsset*)asset->get_type().alloc();
 		asset2->path = asset->path;
 		asset2->is_loaded = true;
-		bool success = asset2->load_asset(g_assets.loader);
+		bool success = asset2->load_asset();
 		asset2->load_failed = !success;
 		if (success) {
 			try {
@@ -175,38 +175,24 @@ AssetDatabase::AssetDatabase() {}
 AssetDatabase::~AssetDatabase() {}
 AssetDatabase g_assets;
 
-class PrimaryAssetLoadingInterface : public IAssetLoadingInterface
-{
-public:
-	PrimaryAssetLoadingInterface(AssetDatabaseImpl& frontend);
-	IAsset* load_asset(const ClassTypeInfo* type, string path) override;
-	void touch_asset(const IAsset* asset) override;
-
-private:
-	AssetDatabaseImpl& impl;
-};
-
 void AssetDatabase::init() {
-	// init the loader thread
 	impl = new AssetDatabaseImpl; // dont make it a uptr because blah blah
-	AssetDatabase::loader = new PrimaryAssetLoadingInterface(*impl);
 }
 bool AssetDatabase::is_asset_loaded(const std::string& path) {
 	return impl->is_asset_loaded(path);
 }
-std::shared_ptr<IAsset> AssetDatabase::find_sync_sptr(const string& path, const ClassTypeInfo* classType,
-													  bool system_asset) {
-	return impl->load_asset_sync_sptr(path, classType, system_asset);
+std::shared_ptr<IAsset> AssetDatabase::find_sync_sptr(const string& path, const ClassTypeInfo* classType) {
+	return impl->load_asset_sync_sptr(path, classType);
 }
-void AssetDatabase::reload_sync(IAsset* asset) {
+void AssetDatabase::reload(IAsset* asset) {
 	impl->reload_asset_sync(asset);
 }
 
 void AssetDatabase::install_system_asset(IAsset* assetPtr, const std::string& name) {
 	impl->install_system_direct(assetPtr, name);
 }
-GenericAssetPtr AssetDatabase::find_sync(const std::string& path, const ClassTypeInfo* classType, bool is_system) {
-	return impl->load_asset_sync(path, classType, is_system);
+GenericAssetPtr AssetDatabase::generic_find(const std::string& path, const ClassTypeInfo* classType) {
+	return impl->load_asset_sync(path, classType);
 }
 
 void AssetDatabase::print_usage() {
@@ -224,13 +210,3 @@ void AssetDatabase::dump_loaded_assets_to_disk(const std::string& path) {
 void AssetDatabase::get_assets_of_type(std::vector<IAsset*>& out, const ClassTypeInfo* type) {
 	impl->get_assets_of_type(out, type);
 }
-PrimaryAssetLoadingInterface::PrimaryAssetLoadingInterface(AssetDatabaseImpl& frontend) : impl(frontend) {}
-IAsset* PrimaryAssetLoadingInterface::load_asset(const ClassTypeInfo* type, string path) {
-	return impl.load_asset_sync(path, type, false);
-}
-
-void PrimaryAssetLoadingInterface::touch_asset(const IAsset* asset) {
-	assert(0);
-}
-
-IAssetLoadingInterface* AssetDatabase::loader = nullptr;

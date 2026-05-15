@@ -100,7 +100,7 @@ void AssetPropertyEditor::set_asset(const std::string& str) {
 		*ptr = nullptr;
 	} else {
 		auto classtype = prop->class_type;
-		auto asset = g_assets.find_sync(str, classtype, 0).get(); // loader->load_asset(resource->filename);
+		auto asset = g_assets.generic_find(str, classtype).get(); // loader->load_asset(resource->filename);
 		*ptr = asset;
 	}
 }

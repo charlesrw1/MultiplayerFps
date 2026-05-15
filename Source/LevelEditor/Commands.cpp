@@ -103,8 +103,7 @@ void RemoveEntitiesCommand::execute() {
 void RemoveEntitiesCommand::undo() {
 	ASSERT(is_valid());
 
-	auto restored = unserialize_entities_from_text("remove_entities_undo", scene->text, AssetDatabase::loader,
-												   true /* restore id*/);
+	auto restored = unserialize_entities_from_text("remove_entities_undo", scene->text, true /* restore id*/);
 
 	ed_doc.insert_unserialized_into_scene(restored);
 
@@ -153,7 +152,7 @@ void CreateStaticMeshCommand::execute() {
 	ed_doc.on_entity_created.invoke(handle);
 	ed_doc.post_node_changes.invoke();
 
-	Model* modelP = g_assets.find_sync<Model>(modelname).get();
+	Model* modelP = g_assets.find<Model>(modelname).get();
 	if (modelP) {
 		if (ent) {
 			auto mesh_ent = ent->cast_to<Entity>();
@@ -291,8 +290,8 @@ DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vecto
 
 void DuplicateEntitiesCommand::execute() {
 	ASSERT(is_valid());
-	UnserializedSceneFile duplicated = unserialize_entities_from_text("duplicate_entities", scene->text,
-																	  AssetDatabase::loader, false /* dont keep id*/);
+	UnserializedSceneFile duplicated =
+		unserialize_entities_from_text("duplicate_entities", scene->text, false /* dont keep id*/);
 
 	ed_doc.insert_unserialized_into_scene(duplicated);
 

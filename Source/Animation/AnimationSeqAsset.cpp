@@ -38,7 +38,7 @@ public:
 REGISTER_ASSETMETADATA_MACRO(AnimationSeqAssetMetadata);
 #endif
 
-bool AnimationSeqAsset::load_asset(IAssetLoadingInterface* load) {
+bool AnimationSeqAsset::load_asset() {
 	auto& path = get_name();
 	auto pos = path.rfind('/');
 	if (pos == std::string::npos) {

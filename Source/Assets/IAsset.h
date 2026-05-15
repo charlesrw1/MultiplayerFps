@@ -6,9 +6,6 @@
 #include "Framework/Reflection2.h"
 #include <cassert>
 
-class IAssetLoadingInterface;
-class PrimaryAssetLoadingInterface;
-class TestAssetLoadingInterface;
 class IAsset : public ClassBase
 {
 public:
@@ -41,7 +38,7 @@ protected:
 private:
 	// you can allocate a UserStruct in load_asset and have access to it in post_load. It will get deleted for you if
 	// non nullptr
-	virtual bool load_asset(IAssetLoadingInterface* loading) = 0; // called on loader thread
+	virtual bool load_asset() = 0; // called on loader thread
 	virtual void post_load() = 0;								  // called on main thread after load_asset is executed
 	// called on the main thread to destroy and uninstall any used resources
 	virtual void uninstall() = 0;
@@ -58,8 +55,6 @@ private:
 	friend class AssetDatabaseImpl;
 	friend class AssetDatabase;
 	friend class AssetRegistrySystem;
-	friend class PrimaryAssetLoadingInterface;
-	friend class TestAssetLoadingInterface;
 };
 
 template <typename T> class AssetPtr

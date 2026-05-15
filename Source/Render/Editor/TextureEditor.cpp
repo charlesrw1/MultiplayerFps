@@ -45,7 +45,7 @@ void SetClipboardText(const std::string& text) {
 
 	CloseClipboard();
 
-	// Do NOT free hMem after SetClipboardData — clipboard owns it now
+	// Do NOT free hMem after SetClipboardData ï¿½ clipboard owns it now
 }
 #include "Framework/StringUtils.h"
 void OpenInNotepad(const string& name) {
@@ -100,7 +100,7 @@ void IMPORT_TEX(const Cmd_Args& args) {
 
 	Color32 dummy;
 	path = strip_extension(gamepath) + ".dds";
-	compile_texture_asset(path, AssetDatabase::loader, dummy);
+	compile_texture_asset(path, dummy);
 }
 #include "AssetCompile/Someutils.h"
 void IMPORT_TEX_FOLDER(const Cmd_Args& args) {
@@ -136,7 +136,7 @@ void IMPORT_TEX_FOLDER(const Cmd_Args& args) {
 			write_texture_import_settings(&tis, path);
 
 			Color32 dummy;
-			compile_texture_asset(path, AssetDatabase::loader, dummy);
+			compile_texture_asset(path, dummy);
 		}
 	}
 }
@@ -147,7 +147,7 @@ void COMPILE_TEX(const Cmd_Args& args) {
 		return;
 	}
 	Color32 dummy;
-	compile_texture_asset(args.at(1), AssetDatabase::loader, dummy);
+	compile_texture_asset(args.at(1), dummy);
 }
 #include "Framework/StringUtils.h"
 #define WITH_TEXTURE_COMPILE
@@ -160,7 +160,7 @@ std::string turn_gamepath_into_src_path(const std::string& gamepath, const std::
 	return dir;
 }
 
-bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* loading, Color32& outColor) {
+bool compile_texture_asset(const std::string& gamepath, Color32& outColor) {
 #ifdef WITH_TEXTURE_COMPILE
 	TextureImportSettings* tis = nullptr;
 
@@ -179,7 +179,7 @@ bool compile_texture_asset(const std::string& gamepath, IAssetLoadingInterface* 
 		if (to_str.find("!json") == 0) {
 			to_str = to_str.substr(6);
 			MakeObjectFromPathGeneric objmaker;
-			ReadSerializerBackendJson reader("compile_texture_asset", to_str, objmaker, *loading);
+			ReadSerializerBackendJson reader("compile_texture_asset", to_str, objmaker);
 			if (reader.get_root_obj()) {
 				tis = reader.get_root_obj()->cast_to<TextureImportSettings>();
 			}

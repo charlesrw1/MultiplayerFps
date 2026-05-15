@@ -13,7 +13,6 @@
 
 class MasterMaterialImpl;
 class Texture;
-class IAssetLoadingInterface;
 class MaterialImpl;
 class PhysicsMaterialWrapper;
 
@@ -47,8 +46,8 @@ public:
 	// IAsset interface
 	void uninstall();
 	void post_load();
-	bool load_asset(IAssetLoadingInterface* loading);
-	void sweep_references(IAssetLoadingInterface* loading) const;
+	bool load_asset();
+	void sweep_references() const;
 	void move_construct(IAsset* other);
 
 	REF void set_physics_material(PhysicsMaterialWrapper* material) { this->physics_mat = material; }

@@ -16,7 +16,7 @@ public:
 		if (ui_disable_screen_log.get_bool())
 			return;
 
-		auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+		auto font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
 
 		float time_now = GetTime();
 		float total_time = time_at_full_opacity + time_to_fade;

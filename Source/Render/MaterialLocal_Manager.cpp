@@ -93,15 +93,15 @@ void MaterialManagerLocal::init() {
 	materialBufferSize = MATERIAL_SIZE * MAX_MATERIALS;
 	mat_offset_table = std::make_unique<AllMaterialTable>(MAX_MATERIALS);
 
-	fallback = g_assets.find_sync_sptr<MaterialInstance>("eng/fallback.mm", true);
+	fallback = g_assets.find_sync_sptr<MaterialInstance>("eng/fallback.mm");
 	if (!fallback)
 		Fatalf("couldnt load the fallback master material\n");
 
-	defaultBillboard = g_assets.find_sync_sptr<MaterialInstance>("eng/billboardDefault.mm", true);
+	defaultBillboard = g_assets.find_sync_sptr<MaterialInstance>("eng/billboardDefault.mm");
 	if (!defaultBillboard)
 		Fatalf("couldnt load the default billboard material\n");
 
-	pp_editor_select_mat = g_assets.find_sync_sptr<MaterialInstance>("eng/defaultEditorSelect.mm", true);
+	pp_editor_select_mat = g_assets.find_sync_sptr<MaterialInstance>("eng/defaultEditorSelect.mm");
 	if (!pp_editor_select_mat)
 		Fatalf("couldnt load the default editor select material\n");
 }

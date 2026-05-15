@@ -91,7 +91,7 @@ const char* get_master_shader_path(MaterialUsage usage) {
 	return master_shader_path;
 }
 
-void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file, IAssetLoadingInterface* loading) {
+void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file) {
 	ASSERT(file);
 
 	DictParser in;
@@ -308,11 +308,11 @@ void MaterialImpl::init_from(const std::shared_ptr<MaterialInstance>& parent) {
 	texture_bindings.resize(parent_master->num_texture_bindings, nullptr);
 }
 
-void MaterialImpl::load_master(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading) {
+void MaterialImpl::load_master(MaterialInstance* self, IFile* file) {
 	ASSERT(self && file);
 	masterImpl = std::make_unique<MasterMaterialImpl>();
 	masterImpl->self = self;
-	masterImpl->load_from_file(self->get_name(), file, loading);
+	masterImpl->load_from_file(self->get_name(), file);
 
 	params.resize(masterImpl->param_defs.size());
 	for (int i = 0; i < (int)masterImpl->param_defs.size(); i++)
@@ -320,7 +320,7 @@ void MaterialImpl::load_master(MaterialInstance* self, IFile* file, IAssetLoadin
 	texture_bindings.resize(masterImpl->num_texture_bindings, nullptr);
 }
 
-void MaterialImpl::load_instance(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading) {
+void MaterialImpl::load_instance(MaterialInstance* self, IFile* file) {
 	ASSERT(self && file);
 	const auto& fullpath = self->get_name();
 
@@ -411,7 +411,7 @@ void MaterialImpl::load_instance(MaterialInstance* self, IFile* file, IAssetLoad
 	}
 }
 
-bool MaterialImpl::load_from_file(MaterialInstance* self, IAssetLoadingInterface* loading) {
+bool MaterialImpl::load_from_file(MaterialInstance* self) {
 	ASSERT(self);
 	this->self = self;
 	const auto& name = self->get_name();
@@ -420,9 +420,9 @@ bool MaterialImpl::load_from_file(MaterialInstance* self, IAssetLoadingInterface
 		if (!file)
 			throw MasterMaterialExcept("couldn't mm/mi open file");
 		if (has_extension(name, "mm")) {
-			load_master(self, file.get(), loading);
+			load_master(self, file.get());
 		} else {
-			load_instance(self, file.get(), loading);
+			load_instance(self, file.get());
 		}
 	}
 	catch (MasterMaterialExcept exppt) {

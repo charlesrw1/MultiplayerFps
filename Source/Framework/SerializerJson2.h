@@ -163,12 +163,10 @@ private:
 	nlohmann::json obj;
 };
 
-class IAssetLoadingInterface;
 class ReadSerializerBackendJson2 : public Serializer
 {
 public:
-	ReadSerializerBackendJson2(const char* debug_tag, nlohmann::json& json_obj, IAssetLoadingInterface& loader,
-							   ClassBase& obj);
+	ReadSerializerBackendJson2(const char* debug_tag, nlohmann::json& json_obj, ClassBase& obj);
 
 	const char* debug_tag = "";
 	const char* get_debug_tag() final { return debug_tag; }
@@ -320,7 +318,6 @@ private:
 		return false;
 	}
 
-	IAssetLoadingInterface& loader;
 	ClassBase& rootobj;
 	std::vector<JsonStack> stack;
 	nlohmann::json* obj = nullptr;

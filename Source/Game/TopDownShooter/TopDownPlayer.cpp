@@ -207,7 +207,7 @@ void TopDownPlayer::update() {
 	glm::vec3 displacement = (move_front * move.y + move_side * move.x) * move_speed * dt;
 	ccontroller->move(displacement, dt, 0.005f, flags, outvel);
 
-	auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+	auto font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
 	int start = 10;
 	auto draw_text = [&](const char* s) {
 		string str = s;

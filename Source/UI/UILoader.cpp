@@ -31,7 +31,7 @@ REGISTER_ASSETMETADATA_MACRO(FontAssetMetadata);
 #include "Framework/StringUtils.h"
 
 void GuiFont::post_load() {}
-bool GuiFont::load_asset(IAssetLoadingInterface* load) {
+bool GuiFont::load_asset() {
 
 	auto& path = get_name();
 	auto file = FileSys::open_read_game(path.c_str());

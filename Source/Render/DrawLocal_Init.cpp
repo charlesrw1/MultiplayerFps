@@ -415,7 +415,7 @@ void Renderer::init() {
 	shadowmap.init();
 	ssao.init();
 	print_time("draw:miscinit");
-	// lens_dirt = &whg_assets.find_global_sync<Texture>("eng/lens_dirt_fine.png").get();
+	// lens_dirt = &whg_assets.find<Texture>("eng/lens_dirt_fine.png").get();
 	lens_dirt = Texture::load("_white");
 	print_time("draw:lensdirt");
 
@@ -454,7 +454,7 @@ void Renderer::init() {
 		}
 		const char* texture_name = args.at(1);
 
-		debug_tex_out.output_tex = g_assets.find_sync<Texture>(texture_name).get();
+		debug_tex_out.output_tex = g_assets.find<Texture>(texture_name).get();
 		debug_tex_out.scale = 1.f;
 		debug_tex_out.alpha = 1.f;
 		debug_tex_out.mip = 1.f;
@@ -496,7 +496,7 @@ void Renderer::init() {
 		float alpha = atof(args.at(2));
 		float mip = atof(args.at(3));
 		const char* texture_name = args.at(4);
-		debug_tex_out.output_tex = g_assets.find_sync<Texture>(texture_name).get();
+		debug_tex_out.output_tex = g_assets.find<Texture>(texture_name).get();
 		debug_tex_out.scale = scale;
 		debug_tex_out.alpha = alpha;
 		debug_tex_out.mip = mip;

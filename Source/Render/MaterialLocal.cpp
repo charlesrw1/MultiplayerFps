@@ -75,24 +75,22 @@ bool MaterialInstance::is_this_a_dynamic_material() const {
 	return impl && impl->is_dynamic_material;
 }
 
-bool MaterialInstance::load_asset(IAssetLoadingInterface* loading) {
-	ASSERT(loading);
+bool MaterialInstance::load_asset() {
 	if (!impl) {
 		impl = std::make_unique<MaterialImpl>();
-		bool good = impl->load_from_file(this, loading);
+		bool good = impl->load_from_file(this);
 		assert(!good || impl && impl->is_valid());
 
 		if (!good)
 			impl.reset();
 		return good;
 	} else {
-		sweep_references(loading);
+		sweep_references();
 	}
 	return impl.get();
 }
 
-void MaterialInstance::sweep_references(IAssetLoadingInterface* loading) const {
-	ASSERT(loading);
+void MaterialInstance::sweep_references() const {
 	if (!impl)
 		return;
 }
@@ -141,7 +139,7 @@ void MaterialInstance::move_construct(IAsset* _other) {
 			continue;
 		MaterialInstance* mi = (MaterialInstance*)a;
 		if (mi->impl && mi->impl->masterMaterial.get() == this) {
-			g_assets.reload_sync(mi);
+			g_assets.reload(mi);
 		}
 	}
 
@@ -150,7 +148,7 @@ void MaterialInstance::move_construct(IAsset* _other) {
 
 MaterialInstance* MaterialInstance::load(const std::string& path) {
 	ASSERT(!path.empty());
-	return g_assets.find_sync<MaterialInstance>(path).get();
+	return g_assets.find<MaterialInstance>(path).get();
 }
 
 MaterialInstance* MaterialInstance::alloc_dynamic_mat(MaterialInstance* from) {

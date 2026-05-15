@@ -164,7 +164,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 
 		if (is_prefab_root) {
 			const char* s = "eng/editor/prefab_p.png";
-			auto tex = g_assets.find_global_sync<Texture>(s);
+			auto tex = g_assets.find<Texture>(s);
 			if (tex) {
 				my_imgui_image(tex, -1);
 				ImGui::SameLine(0, 0);
@@ -175,7 +175,7 @@ void ObjectOutliner::IteratorDraw::draw(EditorDoc& ed_doc)
 			if (c->dont_serialize_or_edit_this()) continue;
 			const char* s = c->get_editor_outliner_icon();
 			if (!*s) continue;
-			auto tex = g_assets.find_global_sync<Texture>(s);
+			auto tex = g_assets.find<Texture>(s);
 			if (tex) {
 				my_imgui_image(tex, -1);
 				ImGui::SameLine(0, 0);

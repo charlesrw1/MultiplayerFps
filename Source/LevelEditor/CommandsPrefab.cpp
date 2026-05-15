@@ -67,7 +67,7 @@ void InstantiatePrefabCommand::execute() {
 
 		try {
 			UnserializedSceneFile unserialized = unserialize_entities_from_text(
-				"prefab_flatten", prefab_text, AssetDatabase::loader, false);
+				"prefab_flatten", prefab_text, false);
 			ed_doc.insert_unserialized_into_scene(unserialized);
 
 			for (auto base_updater : unserialized.all_obj_vec) {
@@ -257,7 +257,7 @@ void MakePrefabAndReplaceCommand::undo() {
 	if (original_selection) {
 		try {
 			UnserializedSceneFile unserialized = unserialize_entities_from_text(
-				"undo_prefab_replace", original_selection->text, AssetDatabase::loader, true);
+				"undo_prefab_replace", original_selection->text, true);
 			ed_doc.insert_unserialized_into_scene(unserialized);
 
 			// Apply bbox_center offset to restored entities to place them back at original positions

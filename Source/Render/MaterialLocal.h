@@ -116,7 +116,7 @@ public:
 	bool is_translucent() const { return blend != BlendState::OPAQUE; }
 	bool render_in_forward_pass() const { return is_translucent(); }
 	bool is_alphatested() const { return alpha_tested; }
-	void load_from_file(const std::string& fullpath, IFile* file, IAssetLoadingInterface* loading);
+	void load_from_file(const std::string& fullpath, IFile* file);
 #ifdef EDITOR_BUILD
 	// generated glsl fragment and vertex shader
 	std::string create_glsl_shader(std::string& vs_code, std::string& fs_code,
@@ -171,9 +171,9 @@ public:
 	bool is_this_currently_uploaded() const { return gpu_buffer_offset != INVALID_MAPPING; }
 	const std::vector<Texture*>& get_textures() const { return texture_bindings; }
 	void init_from(const std::shared_ptr<MaterialInstance>& ptr);
-	bool load_from_file(MaterialInstance* self, IAssetLoadingInterface* loading);
-	void load_instance(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
-	void load_master(MaterialInstance* self, IFile* file, IAssetLoadingInterface* loading);
+	bool load_from_file(MaterialInstance* self);
+	void load_instance(MaterialInstance* self, IFile* file);
+	void load_master(MaterialInstance* self, IFile* file);
 	void post_load(MaterialInstance* self);
 	MaterialParameterValue* find_parameter(StringName name) {
 		auto master = get_master_impl();

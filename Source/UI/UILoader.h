@@ -18,7 +18,6 @@ struct GuiFontGlyph
 	int16_t yofs{};
 	int16_t advance{};
 };
-class IAssetLoadingInterface;
 class GuiFont : public IAsset
 {
 public:
@@ -35,12 +34,12 @@ public:
 	friend class GuiHelpers;
 
 	void uninstall() override { character_to_glyph.clear(); }
-	bool load_asset(IAssetLoadingInterface*);
+	bool load_asset();
 	void post_load();
 	void move_construct(IAsset* _other) {
 		GuiFont* other = (GuiFont*)_other;
 		*this = std::move(*other);
 	}
 
-	REF static GuiFont* load(const std::string& name) { return g_assets.find_sync<GuiFont>(name).get(); }
+	REF static GuiFont* load(const std::string& name) { return g_assets.find<GuiFont>(name).get(); }
 };

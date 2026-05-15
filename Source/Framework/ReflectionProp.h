@@ -178,7 +178,6 @@ struct PropertyListInstancePair
 };
 
 struct Prop_Flag_Overrides;
-class IAssetLoadingInterface;
 class BinaryReader;
 class FileWriter;
 

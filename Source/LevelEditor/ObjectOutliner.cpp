@@ -146,11 +146,11 @@ void ObjectOutliner::on_selection_change()
 
 void ObjectOutliner::init()
 {
-	hidden = g_assets.find_global_sync<Texture>("eng/editor/hidden.png");
-	visible = g_assets.find_global_sync<Texture>("eng/editor/visible.png");
+	hidden = g_assets.find<Texture>("eng/editor/hidden.png");
+	visible = g_assets.find<Texture>("eng/editor/visible.png");
 
-	folderOpen = g_assets.find_global_sync<Texture>("eng/editor/folder_open.png").get();
-	folderClosed = g_assets.find_global_sync<Texture>("eng/editor/folder_closed.png").get();
+	folderOpen = g_assets.find<Texture>("eng/editor/folder_open.png").get();
+	folderClosed = g_assets.find<Texture>("eng/editor/folder_closed.png").get();
 }
 
 bool ObjectOutliner::IteratorDraw::step()

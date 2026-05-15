@@ -28,13 +28,13 @@ class ParticleDefinition : public IAsset
 public:
 	CLASS_BODY(ParticleDefinition);
 
-	bool load_asset(IAssetLoadingInterface* loading) final { return true; }
+	bool load_asset() final { return true; }
 	void post_load() final {}
 	void uninstall() final {}
 	void move_construct(IAsset* other) final {}
 
 	REF static ParticleDefinition* create(std::string name) {
-		auto particle = g_assets.find_sync<ParticleDefinition>(name).get();
+		auto particle = g_assets.find<ParticleDefinition>(name).get();
 		*particle = ParticleDefinition();
 		particle->editor_set_newly_made_path(name);
 		return particle;

@@ -39,7 +39,7 @@ void PrefabAssetComponent::update_path(std::string new_path) {
 	// keepid=false: assign new instance IDs (this is runtime instantiation, not persistence)
 	try {
 		UnserializedSceneFile unserialized =
-			unserialize_entities_from_text("prefab_instantiate", prefab_text, AssetDatabase::loader, false);
+			unserialize_entities_from_text("prefab_instantiate", prefab_text, false);
 
 		// Instantiate all deserialized entities and parent them to this component's owner
 		Entity* owner = get_owner();

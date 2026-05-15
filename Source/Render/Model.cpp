@@ -61,7 +61,7 @@ Model::~Model() {
 }
 Model* Model::load(std::string path) {
 	ASSERT(!path.empty());
-	return g_assets.find_sync<Model>(path).get();
+	return g_assets.find<Model>(path).get();
 }
 Model::Model() {}
 
@@ -163,7 +163,7 @@ void IMPORT_MODEL_FUNC(const Cmd_Args& args) {
 	mis.srcGlbFile = glb_path+".glb";
 	write_model_import_settings(&mis, savepath);
 
-	ModelCompilier::compile(savepath.c_str(), AssetDatabase::loader);
+	ModelCompilier::compile(savepath.c_str());
 }
 void import_model_lightmapped(const Cmd_Args& args) {
 	ASSERT(true); // console command handler
@@ -179,7 +179,7 @@ void import_model_lightmapped(const Cmd_Args& args) {
 		mis.lightmapSizeX = std::stoi(args.at(2));
 		mis.lightmapSizeY = std::stoi(args.at(3));
 		write_model_import_settings(&mis, savepath);
-		ModelCompilier::compile(savepath.c_str(), AssetDatabase::loader);
+		ModelCompilier::compile(savepath.c_str());
 	}
 	catch (...) {
 		sys_print(Error, "usage: import_model_lightmapped err\n");

@@ -22,9 +22,9 @@ SoundSystemPublic* isound = &soundsys_local;
 ConfigVar snd_max_voices("snd.max_voices", "16", CVAR_INTEGER | CVAR_DEV, 0, 64);
 #include "Assets/AssetDatabase.h"
 SoundFile* SoundFile::load(std::string s) {
-	return g_assets.find_sync<SoundFile>(s).get();
+	return g_assets.find<SoundFile>(s).get();
 }
-bool SoundFile::load_asset(IAssetLoadingInterface*) {
+bool SoundFile::load_asset() {
 	std::string pathfull = FileSys::get_full_path_from_game_path(get_name());
 	Mix_Chunk* data = Mix_LoadWAV(pathfull.c_str());
 	if (!data) {

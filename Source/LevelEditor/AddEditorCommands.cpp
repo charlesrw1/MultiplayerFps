@@ -128,9 +128,9 @@ void EditorDoc::add_editor_commands() {
 			Entity* ent = EntityPtr(id).get();
 			if (!ent)
 				continue;
-			{ ReadSerializerBackendJson2 reader("", jsonObj, *AssetDatabase::loader, *ent); }
+			{ ReadSerializerBackendJson2 reader("", jsonObj, *ent); }
 			if (ent->get_components().size() > 0) {
-				ReadSerializerBackendJson2 reader("", jsonObj, *AssetDatabase::loader, *ent->get_components().at(0));
+				ReadSerializerBackendJson2 reader("", jsonObj, *ent->get_components().at(0));
 			}
 			ent->invalidate_transform(nullptr);
 		}

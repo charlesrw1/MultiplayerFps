@@ -316,7 +316,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			// system
 			if (!proxy.model->get_is_loaded()) {
 				sys_print(Debug, "emergency model reload %s\n", proxy.model->get_name().c_str());
-				g_assets.reload_sync<Model>(proxy.model);
+				g_assets.reload<Model>(proxy.model);
 			}
 			if (proxy.model->get_num_lods() == 0)
 				continue;

@@ -186,7 +186,7 @@ void AnimatorObject::set_int_variable(StringName name, int f) {
 #include "Render/RenderWindow.h"
 #include "UI/GUISystemPublic.h"
 void AnimatorObject::debug_print(int start_y) {
-	auto font = g_assets.find_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+	auto font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
 	int start = start_y;
 	auto draw_text = [&](const char* s) {
 		string str = s;

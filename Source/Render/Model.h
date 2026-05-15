@@ -143,7 +143,6 @@ extern glm::vec4 bounds_to_sphere(Bounds b);
 class PhysicsMaterialWrapper;
 class MSkeleton;
 class PhysicsBodyDefinition;
-class IAssetLoadingInterface;
 class Model : public IAsset
 {
 public:
@@ -156,7 +155,7 @@ public:
 
 	void uninstall() override;
 	void post_load() override;
-	bool load_asset(IAssetLoadingInterface* loading) override;
+	bool load_asset() override;
 	void move_construct(IAsset* other) override;
 
 	int get_uid() const { return uid; }
@@ -213,7 +212,7 @@ public:
 	bool is_dynamic() const { return is_dynamic_model; }
 
 private:
-	bool load_internal(IAssetLoadingInterface* loading);
+	bool load_internal();
 
 	int uid = 0;
 	InlineVec<MeshLod, 2> lods;

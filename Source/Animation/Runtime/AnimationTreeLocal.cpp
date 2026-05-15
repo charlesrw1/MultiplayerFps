@@ -18,17 +18,17 @@
 
 void post_load_map_callback_generic(bool make_plane) {
 	auto dome = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
-	dome->set_model(g_assets.find_sync<Model>("eng/skydome.cmdl").get());
+	dome->set_model(g_assets.find<Model>("eng/skydome.cmdl").get());
 	dome->get_owner()->set_ls_transform(glm::vec3(0), {}, glm::vec3(10000.0));
 	dome->set_is_skybox(true); // FIXME
 	dome->set_casts_shadows(false);
-	// dome->Mesh->set_material_override(g_assets.find_sync<MaterialInstance>(ed_default_sky_material.get_string()).get());
+	// dome->Mesh->set_material_override(g_assets.find<MaterialInstance>(ed_default_sky_material.get_string()).get());
 
 	if (make_plane) {
 		auto plane = eng->get_level()->spawn_entity()->create_component<MeshComponent>();
 		plane->set_model(g_modelMgr.get_default_plane_model());
 		plane->get_owner()->set_ws_transform({}, {}, glm::vec3(20.f));
-		plane->set_material_override((g_assets.find_sync<MaterialInstance>("eng/defaultWhite.mi").get()));
+		plane->set_material_override((g_assets.find<MaterialInstance>("eng/defaultWhite.mi").get()));
 	}
 
 	auto sun = eng->get_level()->spawn_entity()->create_component<SunLightComponent>();

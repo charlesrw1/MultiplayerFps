@@ -128,7 +128,7 @@ void EditorDoc::imgui_draw() {
 				pos = dir.pos;
 
 			auto& win = UiSystem::inst->window;
-			const GuiFont* font = g_assets.find_global_sync<GuiFont>("eng/fonts/monospace12.fnt").get();
+			const GuiFont* font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
 
 			TextShape text;
 			text.font = font;
@@ -153,7 +153,7 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 	ASSERT(manipulate);
 	auto get_icon = [](std::string str) -> ImTextureID {
 		return ImTextureID(
-			uint64_t(g_assets.find_global_sync<Texture>("eng/editor/" + str).get()->get_internal_render_handle()));
+			uint64_t(g_assets.find<Texture>("eng/editor/" + str).get()->get_internal_render_handle()));
 	};
 
 	if (!ImGui::BeginMenuBar()) return;

@@ -1,7 +1,7 @@
 // Source/IntegrationTests/Tests/Renderer/test_material_hotreload.cpp
 //
 // Integration tests for material hot reloading.
-// Tests 1-2: manual reload via g_assets.reload_sync  (GAME_TEST)
+// Tests 1-2: manual reload via g_assets.reload  (GAME_TEST)
 // Test 3:    OS file-watcher driven reload            (EDITOR_TEST, editor build only)
 //
 // First-run: launch with --promote to capture screenshot baselines.
@@ -70,9 +70,9 @@ static MeshComponent* setup_test_scene() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 1: MaterialInstance (.mi) hot reload via reload_sync
+// Test 1: MaterialInstance (.mi) hot reload via reload
 // ---------------------------------------------------------------------------
-// Writes a red .mi, screenshots it, rewrites it blue, calls reload_sync,
+// Writes a red .mi, screenshots it, rewrites it blue, calls reload,
 // screenshots again.  Baselines: red cube then blue cube.
 
 static TestTask test_hotreload_material_instance(TestContext& t) {
@@ -102,7 +102,7 @@ static TestTask test_hotreload_material_instance(TestContext& t) {
 		"VAR colorMult 0 0 255 255\n";
 	t.require(write_game_file(inst_path, blue_mi), "overwrote with blue .mi");
 
-	g_assets.reload_sync(mat.get());
+	g_assets.reload(mat.get());
 
 	co_await t.wait_ticks(1);
 	co_await t.capture_screenshot("hotreload_inst_after"); // golden: blue cube
@@ -110,10 +110,10 @@ static TestTask test_hotreload_material_instance(TestContext& t) {
 GAME_TEST("renderer/hotreload_material_instance", 20.f, test_hotreload_material_instance);
 
 // ---------------------------------------------------------------------------
-// Test 2: MasterMaterial (.mm) hot reload via reload_sync
+// Test 2: MasterMaterial (.mm) hot reload via reload
 // ---------------------------------------------------------------------------
 // Writes a minimal .mm with solid-red GLSL, screenshots it, rewrites with
-// solid-green GLSL, calls reload_sync (triggers shader recompile and cascades
+// solid-green GLSL, calls reload (triggers shader recompile and cascades
 // to all dependent instances), screenshots again.
 
 static TestTask test_hotreload_master_material(TestContext& t) {
@@ -159,9 +159,9 @@ static TestTask test_hotreload_master_material(TestContext& t) {
 		"_FS_END\n";
 	t.require(write_game_file(master_path, green_mm), "overwrote with green .mm");
 
-	// reload_sync re-parses the .mm, recompiles the shader, and auto-reloads
+	// reload re-parses the .mm, recompiles the shader, and auto-reloads
 	// all MaterialInstances that point to this master.
-	g_assets.reload_sync(mat.get());
+	g_assets.reload(mat.get());
 
 	co_await t.wait_ticks(1); // extra ticks for shader compile latency
 	co_await t.capture_screenshot("hotreload_master_after"); // golden: solid green
