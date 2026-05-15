@@ -171,6 +171,7 @@
     <ClCompile Include="Source\LevelEditor\DragDropPreview.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocInput.cpp" />
+    <ClCompile Include="Source\LevelEditor\EditorRecents.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocScene.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorDocViewport.cpp" />
     <ClCompile Include="Source\LevelEditor\EditorUILayout.cpp" />
@@ -348,6 +349,7 @@
     <ClInclude Include="Source\LevelEditor\IEditorApi.h" />
     <ClInclude Include="Source\LevelEditor\IInputReciever.h" />
     <ClInclude Include="Source\LevelEditor\LevelEditorCamera.h" />
+    <ClInclude Include="Source\LevelEditor\EditorRecents.h" />
     <ClInclude Include="Source\LevelEditor\ManipulateTransformTool.h" />
     <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h" />
     <ClInclude Include="Source\LevelEditor\OrthoCamera.h" />

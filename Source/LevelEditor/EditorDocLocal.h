@@ -202,6 +202,7 @@ public:
 	void check_inputs();
 	bool save_document_internal() final;
 	void hook_menu_bar() final;
+	void hook_menu_bar_file_menu() final;
 	void hook_imgui_newframe() final { ImGuizmo::BeginFrame(); }
 	void hook_scene_viewport_draw() final;
 	void hook_pre_scene_viewport_draw() final;
@@ -258,6 +259,9 @@ public:
 		if (editing_prefab) name += " [Prefab]";
 		return name;
 	}
+	// Raw asset path (empty if unnamed). Used by EditorRecents to record
+	// which document the user is leaving.
+	string get_asset_path() const { return assetName.value_or(""); }
 
 	std::unique_ptr<SelectionState> selection_state;
 	std::unique_ptr<SelectionApiImpl> sel_api_impl;

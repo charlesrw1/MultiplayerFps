@@ -52,6 +52,10 @@
 #include "DebugConsole.h"
 #include "Scripting/ScriptManager.h"
 #include "Scripting/ScriptFunctionCodegen.h"
+#ifdef EDITOR_BUILD
+#include "LevelEditor/EditorDocLocal.h"
+#include "LevelEditor/EditorRecents.h"
+#endif
 #include "Framework/StringUtils.h"
 #include "EngineMain.h"
 #include "EditorPopupTemplate.h"
@@ -180,11 +184,33 @@ static std::string append_strings(int c, char** str) {
 void GameEngineLocal::open_tool(string mapname) {
 	ASSERT(!mapname.empty());
 
+#ifdef EDITOR_BUILD
+	// Snapshot the doc we are about to leave BEFORE load_level runs — load_level
+	// internally calls editor_tool.reset(), so by the time we get back here the
+	// outgoing doc is already destroyed.
+	std::string outgoing_path;
+	CameraSnapshot outgoing_cam;
+	if (auto* old = dynamic_cast<EditorDoc*>(this->editor_tool.get())) {
+		outgoing_path = old->get_asset_path();
+		if (!outgoing_path.empty() && outgoing_path != mapname)
+			outgoing_cam = old->ed_cam.snapshot();
+		else
+			outgoing_path.clear();
+	}
+#endif
+
 	const bool good = load_level(mapname);
 	if (good) {
 		if (this->editor_tool)
 			sys_print(Debug, "EditorState::open_tool: replacing current tool\n");
 		this->editor_tool.reset(IEditorTool::create(mapname));
+#ifdef EDITOR_BUILD
+		// Only commit to recents after the new doc actually loaded — failed
+		// load_level leaves the old doc destroyed but we shouldn't pollute the
+		// list with a switch that didn't really complete.
+		if (!outgoing_path.empty())
+			g_editor_recents.record(outgoing_path, outgoing_cam);
+#endif
 	} else {
 		// Keep the current editor_tool intact so a failed open doesn't destroy
 		// the user's in-progress document. load_level returns false WITHOUT

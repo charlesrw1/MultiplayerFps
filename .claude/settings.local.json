@@ -326,7 +326,20 @@
       "PowerShell(Get-Process *)",
       "WebFetch(domain:blog.maximeheckel.com)",
       "Bash(\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" CsRemake.sln /t:UnitTests /p:Configuration=Debug /p:Platform=x64 /v:minimal)",
-      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" CsRemake.sln /t:UnitTests /p:Configuration=Debug /p:Platform=x64 /v:minimal | Select-Object -Last 80)"
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" CsRemake.sln /t:UnitTests /p:Configuration=Debug /p:Platform=x64 /v:minimal | Select-Object -Last 80)",
+      "PowerShell(.\\\\Scripts\\\\build_and_test.ps1 -Configuration Debug -Platform x64)",
+      "PowerShell(.\\\\Scripts\\\\integration_test.ps1 -Mode editor)",
+      "Bash(\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" Source/App/App.vcxproj -p:Configuration=Debug -p:Platform=x64 -nologo -v:m -m)",
+      "Bash(\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" Source/App/App.vcxproj -p:Configuration=Debug -p:Platform=x64 -nologo -v:m -m -t:Build)",
+      "Bash(\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" Source/App/App.vcxproj -p:Configuration=Debug -p:Platform=x64 -nologo -v:n -m -t:Build)",
+      "Bash(tee /tmp/test_run.txt)",
+      "Bash(Select-String -Pattern \"error\")",
+      "Bash(Select-Object -First 30)",
+      "PowerShell(.\\\\Scripts\\\\build_and_test.ps1)",
+      "PowerShell(.\\\\Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 8)",
+      "PowerShell(.\\\\Scripts\\\\build_and_test.ps1 2>&1 | Select-Object -Last 6)",
+      "Bash(grep -vE \"//|fixme\")",
+      "Bash(grep -v \"//\")"
     ]
   },
   "enabledPlugins": {

@@ -25,8 +25,8 @@ g_project_name DevEngine
 
 # project vars
 godot_lightmap_engine_path "C:/Users/charl/Documents/lightmapexporter/"
-#g_project_base "Data"
-g_project_base "D:/Data"
+g_project_base "Data"
+#g_project_base "D:/Data"
 
 g_application_class "EngineTesterAppImpl"
 #g_application_class "BikeGameApplication"
@@ -67,7 +67,6 @@ g_entry_level "mainMenuMap.tmap"
 ed_default_sky_material "indoorHdriSky"
 g_project_name DevEngine
 
-godot_lightmap_engine_path "C:/Users/charl/Documents/lightmapexporter/"
 g_project_base "Data"
 
 g_draw_grid 0

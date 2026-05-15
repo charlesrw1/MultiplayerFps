@@ -1,5 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="IntegrationTests.game" tests="1" failures="0">
-  <testcase name="obsgame/smoke">
+<testsuite name="IntegrationTests.game" tests="11" failures="0">
+  <testcase name="assets/failed_load_path_preserved">
+  </testcase>
+  <testcase name="assets/failed_load_tombstone_stable">
+  </testcase>
+  <testcase name="assets/find_missing_returns_null">
+  </testcase>
+  <testcase name="assets/find_missing_unsafe_returns_tombstone">
+  </testcase>
+  <testcase name="assets/texture_reload_pointer_stable">
+  </testcase>
+  <testcase name="assets/model_reload_pointer_stable">
+  </testcase>
+  <testcase name="assets/material_reload_precondition">
+  </testcase>
+  <testcase name="assets/master_reload_cascades_to_instances">
+  </testcase>
+  <testcase name="assets/corrupted_master_reload_tombstones">
+  </testcase>
+  <testcase name="assets/model_reload_walks_scene">
+  </testcase>
+  <testcase name="assets/animator_survives_model_reload">
   </testcase>
 </testsuite>

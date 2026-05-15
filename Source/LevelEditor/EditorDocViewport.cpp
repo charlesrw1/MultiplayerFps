@@ -2,6 +2,8 @@
 // Logical split from EditorDocLocal.cpp.
 #ifdef EDITOR_BUILD
 #include "EditorDocLocal.h"
+#include "EditorRecents.h"
+#include "Framework/Config.h"
 #include "imgui.h"
 #include "glad/glad.h"
 #include "External/ImGuizmo.h"
@@ -391,6 +393,28 @@ void EditorDoc::hook_menu_bar() {
 		}
 		if (ImGui::MenuItem("Road Builder", nullptr, active_mode == road_tool.get())) {
 			active_mode = road_tool.get();
+		}
+		ImGui::EndMenu();
+	}
+}
+
+void EditorDoc::hook_menu_bar_file_menu() {
+	if (ImGui::BeginMenu("Open Recent")) {
+		const int count = g_editor_recents.size();
+		if (count == 0) {
+			ImGui::MenuItem("(empty)", nullptr, false, false);
+		} else {
+			for (int slot = 1; slot <= count; ++slot) {
+				auto entry = g_editor_recents.at_slot(slot);
+				if (!entry) continue;
+				// imgui-time tear-down of the editor doc isn't safe; defer the
+				// open through the command buffer (same pattern as AssetBrowser
+				// double-click). Camera restore happens inside the `recent` handler.
+				if (ImGui::MenuItem(entry->path.c_str())) {
+					std::string cmd = "recent " + std::to_string(slot);
+					Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, cmd.c_str());
+				}
+			}
 		}
 		ImGui::EndMenu();
 	}

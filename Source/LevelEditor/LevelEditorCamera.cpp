@@ -113,6 +113,45 @@ void EditorCamera::set_perspective_view() {
 	on_ortho_state_change.invoke();
 }
 
+CameraSnapshot EditorCamera::snapshot() const {
+	CameraSnapshot s;
+	s.is_ortho = (mode == OrthoMode);
+	s.position = camera.position;
+	s.front = camera.front;
+	s.up = camera.up;
+	s.yaw = camera.yaw;
+	s.pitch = camera.pitch;
+	s.orbit_target = camera.orbit_target;
+	s.distance = camera.distance;
+	s.orbit_mode = camera.orbit_mode;
+	s.ortho_position = ortho_camera.position;
+	s.ortho_front = ortho_camera.front;
+	s.ortho_up = ortho_camera.up;
+	s.ortho_side = ortho_camera.side;
+	s.ortho_width = ortho_camera.width;
+	return s;
+}
+
+void EditorCamera::apply_snapshot(const CameraSnapshot& s) {
+	camera.position = s.position;
+	camera.front = s.front;
+	camera.up = s.up;
+	camera.yaw = s.yaw;
+	camera.pitch = s.pitch;
+	camera.orbit_target = s.orbit_target;
+	camera.distance = s.distance;
+	camera.orbit_mode = s.orbit_mode;
+	ortho_camera.position = s.ortho_position;
+	ortho_camera.front = s.ortho_front;
+	ortho_camera.up = s.ortho_up;
+	ortho_camera.side = s.ortho_side;
+	ortho_camera.width = s.ortho_width;
+	mode = s.is_ortho ? OrthoMode : CamMode;
+	interp.start_interp(vs_setup);
+	if (s.is_ortho)
+		on_ortho_state_change.invoke();
+}
+
 EditorCamera* EditorCamera::inst = nullptr;
 void ed_cam_debug() {
 	if (EditorCamera::inst)

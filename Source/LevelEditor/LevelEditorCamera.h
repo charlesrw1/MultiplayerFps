@@ -10,6 +10,27 @@ class EditorInputs;
 #include "AllHeader.h"
 using std::string;
 
+// Serializable snapshot of an EditorCamera's pose; used by EditorRecents to
+// restore camera state when re-opening a recent document.
+struct CameraSnapshot {
+	bool is_ortho = false;
+	// User_Camera (perspective) state
+	glm::vec3 position{0};
+	glm::vec3 front{1, 0, 0};
+	glm::vec3 up{0, 1, 0};
+	float yaw = 0;
+	float pitch = 0;
+	glm::vec3 orbit_target{0};
+	float distance = 0;
+	bool orbit_mode = false;
+	// OrthoCamera state (only meaningful when is_ortho)
+	glm::vec3 ortho_position{0};
+	glm::vec3 ortho_front{1, 0, 0};
+	glm::vec3 ortho_up{0, 1, 0};
+	glm::vec3 ortho_side{0, 0, 1};
+	float ortho_width = 25.0f;
+};
+
 class EditorCamera : public IInputReciever
 {
 public:
@@ -28,6 +49,9 @@ public:
 	View_Setup make_view() const;
 	void set_ortho_view(glm::vec3 eye_dir);
 	void set_perspective_view();
+
+	CameraSnapshot snapshot() const;
+	void apply_snapshot(const CameraSnapshot& s);
 
 	void set_orbit_target(glm::vec3 v, float r) {
 		if (mode == OrthoMode)

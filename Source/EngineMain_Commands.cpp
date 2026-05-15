@@ -48,6 +48,10 @@
 #include "tracy/public/tracy/TracyOpenGL.hpp"
 #include "Framework/Jobs.h"
 #include "EditorPopups.h"
+#ifdef EDITOR_BUILD
+#include "LevelEditor/EditorDocLocal.h"
+#include "LevelEditor/EditorRecents.h"
+#endif
 #include "DebugConsole.h"
 #include "Scripting/ScriptManager.h"
 #include "Scripting/ScriptFunctionCodegen.h"
@@ -186,6 +190,9 @@ extern void COMPILE_TEX(const Cmd_Args& args);
 extern void dump_render_memory_usage();
 void GameEngineLocal::add_commands() {
 	commands = ConsoleCmdGroup::create("");
+#ifdef EDITOR_BUILD
+	g_editor_recents.load();
+#endif
 	commands->add("print_assets", [](const Cmd_Args&) { g_assets.print_usage(); });
 #ifdef EDITOR_BUILD
 	commands->add("import-tex-folder", IMPORT_TEX_FOLDER);
@@ -289,6 +296,37 @@ void GameEngineLocal::add_commands() {
 
 		open_tool(mapname);
 	});
+
+#ifdef EDITOR_BUILD
+	commands->add("recent", [&](const Cmd_Args& args) {
+		if (!eng_local.is_editor_state()) {
+			args.sys_print(Error, "recent: editor not active (pass --editor)\n");
+			return;
+		}
+		if (args.size() == 1) {
+			g_editor_recents.print_list(args);
+			return;
+		}
+		if (args.size() != 2) {
+			args.sys_print(Warning, "usage: recent | recent <slot>\n");
+			return;
+		}
+		const int slot = std::atoi(args.at(1));
+		auto entry = g_editor_recents.at_slot(slot);
+		if (!entry) {
+			args.sys_print(Warning, "recent: invalid slot %d (have %d entries)\n", slot, g_editor_recents.size());
+			return;
+		}
+		// Copy by value: open_tool may push to the deque, invalidating element refs.
+		const string path = entry->path;
+		const CameraSnapshot cam = entry->camera;
+		open_tool(path);
+		if (auto* doc = dynamic_cast<EditorDoc*>(this->editor_tool.get())) {
+			if (doc->get_asset_path() == path)
+				doc->ed_cam.apply_snapshot(cam);
+		}
+	});
+#endif
 
 	commands->add("bind", bind_key);
 

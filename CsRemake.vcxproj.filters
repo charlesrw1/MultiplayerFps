@@ -481,6 +481,7 @@
     <ClCompile Include="Source\LevelEditor\DragDetector.cpp" />
     <ClCompile Include="Source\LevelEditor\DecalStampTool.cpp" />
     <ClCompile Include="Source\LevelEditor\LevelEditorCamera.cpp" />
+    <ClCompile Include="Source\LevelEditor\EditorRecents.cpp" />
     <ClCompile Include="Source\LevelEditor\ManipulateTransformTool.cpp" />
     <ClCompile Include="Source\LevelEditor\OrthoCamera.cpp" />
     <ClCompile Include="Source\LevelEditor\SelectionMode.cpp" />
@@ -1204,6 +1205,7 @@
     <ClInclude Include="Source\Render\RenderConfigVars.h" />
     <ClInclude Include="Source\LevelEditor\OrthoCamera.h" />
     <ClInclude Include="Source\LevelEditor\LevelEditorCamera.h" />
+    <ClInclude Include="Source\LevelEditor\EditorRecents.h" />
     <ClInclude Include="Source\LevelEditor\IInputReciever.h" />
     <ClInclude Include="Source\Render\ViewSetup.h" />
     <ClInclude Include="Source\LevelEditor\EditorInputs.h" />
