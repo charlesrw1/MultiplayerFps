@@ -16,40 +16,74 @@
 
 #include <json.hpp>
 #include <stdexcept>
+#include <unordered_set>
 #include <vector>
+
+namespace {
+// Validation helpers — throw SerializeInputError with the failing field path on mismatch.
+void require_object(const nlohmann::json& j, const char* what) {
+	if (!j.is_object())
+		throw SerializeInputError(std::string(what) + ": expected JSON object");
+}
+void require_field(const nlohmann::json& j, const char* key, const char* what) {
+	if (!j.is_object() || !j.contains(key))
+		throw SerializeInputError(std::string(what) + ": missing field '" + key + "'");
+}
+} // namespace
 
 UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_tag, SerializedForDiffing& json,
 															  bool keepid) {
 	UnserializedSceneFile outfile;
 	auto& obj = json.jsonObj;
-	if (obj["objs"].is_array()) {
-		auto& objarr = obj["objs"];
-		for (auto& ent : objarr) {
-			std::string type = ent["__typename"];
-			// Hold both as unique_ptr until fully built so a throw in the reader can't leak.
-			auto e = std::make_unique<Entity>();
-			std::unique_ptr<Component> c(ClassBase::create_class<Component>(type.c_str()));
-			ASSERT(c);
-			e->add_component_from_unserialization(c.get());
-			{ ReadSerializerBackendJson2 reader("", ent, *e); }
-			{ ReadSerializerBackendJson2 reader("", ent, *c); }
-			if (keepid && ent["__retid"].is_number()) {
-				int64_t instid = ent["__retid"];
-				e->post_unserialization(instid);
-			}
-			outfile.all_obj_vec.push_back(e.release());
-			outfile.all_obj_vec.push_back(c.release());
+	require_object(obj, debug_tag);
+	require_field(obj, "objs", debug_tag);
+	auto& objarr = obj["objs"];
+	if (!objarr.is_array())
+		throw SerializeInputError(std::string(debug_tag) + ": 'objs' must be an array");
+
+	std::unordered_set<uint64_t> seen_ids;
+	for (auto& ent : objarr) {
+		require_object(ent, debug_tag);
+		require_field(ent, "__typename", debug_tag);
+		const auto& typefield = ent["__typename"];
+		if (!typefield.is_string())
+			throw SerializeInputError(std::string(debug_tag) + ": '__typename' must be a string");
+		std::string type = typefield.get<std::string>();
+
+		// Hold both as unique_ptr until fully built so a throw in the reader can't leak.
+		auto e = std::make_unique<Entity>();
+		std::unique_ptr<Component> c(ClassBase::create_class<Component>(type.c_str()));
+		if (!c)
+			throw SerializeInputError(std::string(debug_tag) + ": unknown component type '" + type + "'");
+		e->add_component_from_unserialization(c.get());
+		{ ReadSerializerBackendJson2 reader(debug_tag, ent, *e); }
+		{ ReadSerializerBackendJson2 reader(debug_tag, ent, *c); }
+		if (keepid && ent.contains("__retid")) {
+			const auto& idfield = ent["__retid"];
+			if (!idfield.is_number_integer())
+				throw SerializeInputError(std::string(debug_tag) + ": '__retid' must be an integer");
+			uint64_t instid = idfield.get<uint64_t>();
+			if (instid == 0)
+				throw SerializeInputError(std::string(debug_tag) + ": '__retid' may not be 0");
+			if (!seen_ids.insert(instid).second)
+				throw SerializeInputError(std::string(debug_tag) + ": duplicate '__retid' " +
+										  std::to_string(instid));
+			e->post_unserialization(instid);
 		}
-		return outfile;
+		outfile.all_obj_vec.push_back(e.release());
+		outfile.all_obj_vec.push_back(c.release());
 	}
-	throw std::runtime_error("invalid json");
+	return outfile;
 }
 
 UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_tag, const std::string& text,
 															  bool keepid) {
-
 	SerializedForDiffing sfd;
-	sfd.jsonObj = nlohmann::json::parse(text);
+	try {
+		sfd.jsonObj = nlohmann::json::parse(text);
+	} catch (const nlohmann::json::exception& e) {
+		throw SerializeInputError(std::string(debug_tag) + ": malformed JSON: " + e.what());
+	}
 	return unserialize_from_json(debug_tag, sfd, keepid);
 }
 
@@ -75,13 +109,13 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 
 		nlohmann::json out;
 		{
-			WriteSerializerBackendJson2 writer("", *ent);
+			WriteSerializerBackendJson2 writer(debug_tag, *ent);
 			if (writer.get_output().is_object())
 				out.update(writer.get_output());
 		}
 		auto c = ent->get_components()[0];
 		{
-			WriteSerializerBackendJson2 writer("", *c);
+			WriteSerializerBackendJson2 writer(debug_tag, *c);
 			if (writer.get_output().is_object())
 				out.update(writer.get_output());
 		}
@@ -107,13 +141,9 @@ void UnserializedSceneFile::delete_objs() {
 }
 
 UnserializedSceneFile unserialize_entities_from_text(const char* debug_tag, const std::string& text, bool keepid) {
-	if (StringUtils::starts_with(text, "!json\n")) {
-		auto fixedtext = text.substr(5);
-		return NewSerialization::unserialize_from_text(debug_tag, fixedtext, keepid);
-	} else {
-		sys_print(Error, "unserialize_entities_from_text: old format not supported\n");
-		return UnserializedSceneFile();
-	}
+	if (!StringUtils::starts_with(text, "!json\n"))
+		throw SerializeInputError(std::string(debug_tag) + ": unsupported scene format prefix");
+	return NewSerialization::unserialize_from_text(debug_tag, text.substr(6), keepid);
 }
 
 // TODO prefabs

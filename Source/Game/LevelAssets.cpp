@@ -90,16 +90,11 @@ uptr<UnserializedSceneFile> load_level_asset(string path) {
 		return nullptr;
 	}
 	string textForm = get_string_from_file(fileptr.get());
-	SerializedForDiffing blah;
 	try {
-		blah.jsonObj = nlohmann::json::parse(textForm);
-	}
-	catch (...) {
-		sys_print(Error, "error parsing json %s\n", path.c_str());
+		return std::make_unique<UnserializedSceneFile>(
+			NewSerialization::unserialize_from_text(path.c_str() /*debug tag*/, textForm, false));
+	} catch (const SerializeInputError& e) {
+		sys_print(Error, "load_level_asset: %s: %s\n", path.c_str(), e.what());
 		return nullptr;
 	}
-	UnserializedSceneFile* out = new UnserializedSceneFile(
-		NewSerialization::unserialize_from_json(path.c_str() /*debug tag*/, blah, false));
-
-	return uptr<UnserializedSceneFile>(out);
 }
