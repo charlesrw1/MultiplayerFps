@@ -104,6 +104,11 @@ public:
 	// callback: returns true if interrupted, false if not. guaranteed to fire.
 	void play_animation(const AnimationSeqAsset* seq, float play_speed, float start_pos, function<void(bool)> callback);
 	void stop_animation_in_slot(StringName slot);
+
+	// Called from Model::post_load (reload path) by the scene-walk in AssetDatabase::reload.
+	// Forwards to every reachable agBaseNode in the graph so that nodes caching pointers
+	// into MSkeleton (seq, remap) or bone indices invalidate themselves before the next update.
+	void refresh_after_model_reload(Model* reloaded);
 	// void add_simulating_physics_object(Entity* obj);
 	// void remove_simulating_physics_object(Entity* obj);
 	// REF void set_update_owner_position_to_root(bool b) { update_owner_position_to_root = b; }

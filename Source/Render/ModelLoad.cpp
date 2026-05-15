@@ -33,6 +33,11 @@
 #include "AssetCompile/Someutils.h"
 #include "Assets/AssetRegistry.h"
 #include "Assets/AssetDatabase.h"
+#include "Level.h"
+#include "Game/Entity.h"
+#include "Game/EntityComponent.h"
+#include "Game/BaseUpdater.h"
+#include "GameEnginePublic.h"
 #include "AssetCompile/ModelCompilierLocal.h"
 
 static const int MODEL_FORMAT_VERSION = 18;
@@ -95,17 +100,33 @@ void Model::uninstall() {
 	// dont do this 'uid = 0'
 
 	g_modelMgr.remove_model_from_list(this);
-
-	set_is_loaded(false);
 }
 
 void Model::post_load() {
-	ASSERT(get_is_loaded());
 	if (did_load_fail()) {
 		return;
 	}
 	//	ASSERT(uid == 0);
 	g_modelMgr.upload_model(this);
+
+	const bool is_reload = first_post_load_done;
+	first_post_load_done = true;
+
+	if (is_reload) {
+		// Hot-reload of an already-loaded model.  Walk the live scene and tell every
+		// component that may cache anything derived from this model's skeleton/data
+		// (animator clip ptrs, bone-index caches, retarget maps) to invalidate.
+		// Done here — not via a delegate — so components do not need lifecycle hooks.
+		Level* lvl = eng ? eng->get_level() : nullptr;
+		if (lvl) {
+			for (BaseUpdater* bu : lvl->get_all_objects()) {
+				if (bu && bu->get_type().is_a(Component::StaticType)) {
+					static_cast<Component*>(bu)->refresh_after_model_reload(this);
+				}
+			}
+		}
+	}
+
 	Model::on_model_loaded.invoke(this);
 }
 

@@ -35,7 +35,7 @@ public:
 	REF static ParticleDefinition* create(std::string name) {
 		auto particle = g_assets.find<ParticleDefinition>(name).get();
 		*particle = ParticleDefinition();
-		particle->editor_set_newly_made_path(name);
+		particle->init_runtime_unmanaged(name);
 		return particle;
 	}
 

@@ -103,6 +103,13 @@ public:
 	CLASS_BODY(agBaseNode);
 	virtual void reset() = 0;
 	virtual void get_pose(agGetPoseCtx& ctx) = 0;
+
+	// Called by AnimatorObject::refresh_after_model_reload when a Model that the
+	// animator references (its own model or any clipFrom) has been hot-reloaded.
+	// Container nodes override to forward to their child inputs; leaf nodes that
+	// cache pointers (seq, remap) or bone indices override to invalidate them.
+	// Default no-op so unaware leaves (e.g. agSlotClipInternal) need no override.
+	virtual void refresh_after_model_reload(Model* reloaded) {}
 };
 struct BoneIndexRetargetMap;
 class agClipNode : public agBaseNode
@@ -112,6 +119,7 @@ public:
 
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
+	void refresh_after_model_reload(Model* reloaded) final;
 	REF void set_clip(const Model* m, string clipName);
 	void set_clip(const AnimationSeqAsset* asset);
 	REF void set_looping(bool b) { looping = b; }
@@ -135,6 +143,7 @@ public:
 
 	void reset() final {}
 	void get_pose(agGetPoseCtx& ctx) final;
+	void refresh_after_model_reload(Model* reloaded) final;
 	void set_clip(const AnimationSeqAsset* asset);
 
 	int frame = 0;
@@ -151,6 +160,7 @@ public:
 	CLASS_BODY(agBlendNode);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
+	void refresh_after_model_reload(Model* reloaded) override;
 	REF void set_inputs(agBaseNode* inp0, agBaseNode* inp1) {
 		this->input0 = inp0;
 		this->input1 = inp1;
@@ -169,6 +179,7 @@ public:
 
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
+	void refresh_after_model_reload(Model* reloaded) final;
 
 	REF void set_inputs(agBaseNode* inp0, agBaseNode* inp1) {
 		this->input0 = inp0;
@@ -195,6 +206,7 @@ class agAddNode : public agBaseNode
 public:
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
+	void refresh_after_model_reload(Model* reloaded) final;
 	agBaseNode* input0 = nullptr;
 	agBaseNode* input1 = nullptr;
 	ValueType alpha = 0.f;
@@ -204,6 +216,7 @@ class agIk2Bone : public agBaseNode
 public:
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
+	void refresh_after_model_reload(Model* reloaded) final;
 
 	agBaseNode* input = nullptr;
 	ValueType target = glm::vec3(0.f);
@@ -224,6 +237,7 @@ class agModifyBone : public agBaseNode
 public:
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
+	void refresh_after_model_reload(Model* reloaded) final;
 
 	agBaseNode* input = nullptr;
 	ValueType translationVal = glm::vec3(0.f);
@@ -242,6 +256,7 @@ class agCopyBone : public agBaseNode
 public:
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
+	void refresh_after_model_reload(Model* reloaded) final;
 	agBaseNode* input = nullptr;
 	StringName sourceBone;
 	StringName targetBone;
@@ -275,6 +290,7 @@ public:
 	CLASS_BODY(agStatemachineBase);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
+	void refresh_after_model_reload(Model* reloaded) override;
 	REF virtual void update(agGetPoseCtx* ctx, bool wantsReset) {} // ABSTRACT CLASS
 	// each update, use set_pose to set what state is active
 	REF void set_pose(agBaseNode* pose);
@@ -309,6 +325,7 @@ class agSlotPlayer : public agStatemachineBase
 {
 public:
 	void update(agGetPoseCtx* ctx, bool wantsReset) final;
+	void refresh_after_model_reload(Model* reloaded) final;
 	bool updateChildrenWhenPlaying = false;
 	StringName slotName;
 	agBaseNode* input = nullptr;

@@ -14,6 +14,7 @@ public:
 };
 struct PropertyInfoList;
 class Entity;
+class Model;
 class Component : public BaseUpdater
 {
 public:
@@ -31,6 +32,13 @@ public:
 	void set_call_init_in_editor(bool b) { call_init_in_editor = b; }
 	bool get_call_init_in_editor() const { return call_init_in_editor; }
 	REF void destroy();
+
+	// Invoked by the scene walk in Model::post_load (reload path).  Default no-op.
+	// Override if this component caches anything derived from a Model's contents
+	// (bone indices, retarget maps, mesh-derived data) that becomes invalid when
+	// the named model is hot-reloaded.  Implementations must NOT subscribe to a
+	// delegate — the scene walk drives the call.
+	virtual void refresh_after_model_reload(Model* reloaded) {}
 	REFLECT(no_nil)
 	Entity* get_owner() const { return entity_owner; }
 	const glm::mat4& get_ws_transform();

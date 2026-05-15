@@ -163,7 +163,7 @@ Model* ModelMan::create_dynamic_model(const ModelBuilder& builder,
     // Mark as dynamic so free_dynamic_model() can assert correct ownership,
     // then mark as loaded so the model is valid to pass to rendering systems.
     m->is_dynamic_model = true;
-    m->set_loaded_manually_unsafe(debug_name);
+    m->init_runtime_unmanaged(debug_name);
 
     // Upload vertex/index data to the shared GPU buffers and register the
     // model in the all_models set (same path as asset-loaded models).

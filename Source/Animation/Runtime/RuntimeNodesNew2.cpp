@@ -1,9 +1,89 @@
 #include "RuntimeNodesNew2.h"
 #include "Animation/AnimationUtil.h"
 #include "AnimationTreeLocal.h"
+#include "Render/Model.h"
+#include "Framework/Util.h"
 
 void agClipNode::reset() {
 	anim_time = 0.0;
+}
+
+void agClipNode::refresh_after_model_reload(Model* reloaded) {
+	// remap was cached against ctx.get_skeleton()'s remaps[] vector, which is
+	// wiped by MSkeleton::uninstall on any Model reload (the animator's model
+	// or clipFrom).  Always invalidate; next get_pose regenerates.
+	remap = nullptr;
+	has_init = false;
+	if (clipFrom == reloaded) {
+		// `seq` lived in clipFrom->get_skel()->clips, now wiped.  We have no
+		// stored clip name to re-resolve, so null the dangling ptr.  Next
+		// get_pose throws "no sequence"; caller must re-issue set_clip.
+		sys_print(Error, "agClipNode: clipFrom '%s' reloaded; seq invalidated. set_clip must be called again.\n",
+				  reloaded ? reloaded->get_name().c_str() : "<null>");
+		seq = nullptr;
+		clipFrom = nullptr;
+	}
+}
+
+void agEvaluateClip::refresh_after_model_reload(Model* reloaded) {
+	remap = nullptr;
+	has_init = false;
+	if (clipFrom == reloaded) {
+		sys_print(Error, "agEvaluateClip: clipFrom '%s' reloaded; seq invalidated.\n",
+				  reloaded ? reloaded->get_name().c_str() : "<null>");
+		seq = nullptr;
+		clipFrom = nullptr;
+	}
+}
+
+void agBlendNode::refresh_after_model_reload(Model* reloaded) {
+	if (input0)
+		input0->refresh_after_model_reload(reloaded);
+	if (input1)
+		input1->refresh_after_model_reload(reloaded);
+}
+void agBlendMasked::refresh_after_model_reload(Model* reloaded) {
+	if (input0)
+		input0->refresh_after_model_reload(reloaded);
+	if (input1)
+		input1->refresh_after_model_reload(reloaded);
+}
+void agAddNode::refresh_after_model_reload(Model* reloaded) {
+	if (input0)
+		input0->refresh_after_model_reload(reloaded);
+	if (input1)
+		input1->refresh_after_model_reload(reloaded);
+}
+void agIk2Bone::refresh_after_model_reload(Model* reloaded) {
+	if (input)
+		input->refresh_after_model_reload(reloaded);
+	// bone_idx / other_bone_idx were resolved against the animator's skel; the
+	// skel address is stable but bone names may have moved.  Force re-resolve.
+	has_init = false;
+	bone_idx = -1;
+	other_bone_idx = -1;
+}
+void agModifyBone::refresh_after_model_reload(Model* reloaded) {
+	if (input)
+		input->refresh_after_model_reload(reloaded);
+	has_init = false;
+	bone_index = -1;
+}
+void agCopyBone::refresh_after_model_reload(Model* reloaded) {
+	if (input)
+		input->refresh_after_model_reload(reloaded);
+	has_init = false;
+	source_bone_idx = -1;
+	target_bone_idx = -1;
+}
+void agStatemachineBase::refresh_after_model_reload(Model* reloaded) {
+	if (currentTree)
+		currentTree->refresh_after_model_reload(reloaded);
+}
+void agSlotPlayer::refresh_after_model_reload(Model* reloaded) {
+	agStatemachineBase::refresh_after_model_reload(reloaded);
+	if (input)
+		input->refresh_after_model_reload(reloaded);
 }
 
 static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip, bool has_sync_group,

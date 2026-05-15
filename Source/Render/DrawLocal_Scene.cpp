@@ -314,7 +314,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 			// possible for model to not be loaded here. ie user caches a model ptr, not in render system.
 			// model is unloaded because its not "used", then user tries using the ptr without going through asset
 			// system
-			if (!proxy.model->get_is_loaded()) {
+			if (!proxy.model->is_valid_to_use()) {
 				sys_print(Debug, "emergency model reload %s\n", proxy.model->get_name().c_str());
 				g_assets.reload<Model>(proxy.model);
 			}

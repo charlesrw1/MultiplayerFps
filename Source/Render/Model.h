@@ -242,6 +242,10 @@ private:
 	/// against accidentally freeing asset-system models.
 	bool is_dynamic_model = false;
 
+	// Latched true the first time post_load runs successfully.  Gates the
+	// scene-walk-refresh in post_load: fires only on reload, not initial load.
+	bool first_post_load_done = false;
+
 	friend class ModelMan;
 	friend class ModelCompileHelper;
 	friend class ModelEditorTool;

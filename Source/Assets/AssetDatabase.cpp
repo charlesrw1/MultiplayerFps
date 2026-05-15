@@ -19,8 +19,8 @@ public:
 
 	void install_system_direct(IAsset* asset, const std::string& name) {
 		asset->path = name;
-		asset->is_loaded = true;
-		asset->is_from_disk = false;
+		asset->load_attempted = true;
+		asset->load_failed = false;
 		std::shared_ptr<IAsset> sptr(asset);
 		ASSERT(!MapUtil::contains(allAssets, name));
 		allAssets.insert({name, std::move(sptr)});
@@ -43,7 +43,7 @@ public:
 			return nullptr;
 
 		auto existing = find_in_all_assets(str);
-		if (existing && existing->is_loaded) {
+		if (existing && existing->load_attempted) {
 			if (!existing->get_type().is_a(*type)) {
 				sys_print(Error, "2 assets with same name but different type: %s\n", str.c_str());
 				return nullptr;
@@ -57,9 +57,16 @@ public:
 				std::shared_ptr<IAsset> sptr(existing);
 				allAssets.insert({str, sptr});
 			}
-			existing->is_loaded = true;
-			bool success = existing->load_asset();
+			bool success = false;
+			try {
+				success = existing->load_asset();
+			}
+			catch (...) {
+				sys_print(Error, "load_asset threw for %s\n", str.c_str());
+				success = false;
+			}
 			existing->load_failed = !success;
+			existing->load_attempted = true; // set AFTER load_asset (tombstone needs this true so second find returns same instance)
 			if (success) {
 				try {
 					existing->post_load();
@@ -81,7 +88,7 @@ public:
 		// a raw IAsset* / Texture* / Model* / MaterialInstance* remains valid.
 		asset->uninstall();
 		asset->load_failed = false;
-		asset->is_loaded = true;
+		// load_attempted stays whatever it was; we set it after load_asset returns.
 		bool success = false;
 		try {
 			success = asset->load_asset();
@@ -91,6 +98,7 @@ public:
 			success = false;
 		}
 		asset->load_failed = !success;
+		asset->load_attempted = true;
 		if (success) {
 			try {
 				asset->post_load();
@@ -107,7 +115,7 @@ public:
 		std::string usename;
 		std::string usetype;
 		for (auto& [name, type] : allAssets) { // structured bindings r cool
-			if (!type->is_loaded)
+			if (!type->load_attempted)
 				continue;
 			usename = name;
 			if (usename.size() > 32) {
@@ -134,7 +142,7 @@ public:
 		};
 		std::vector<std::pair<IAsset*, int>> list;
 		for (auto& [name, type] : allAssets) { // structured bindings r cool
-			if (!type->is_loaded)
+			if (!type->load_attempted)
 				continue;
 			list.push_back({type.get(), get_i(type.get())});
 		}

@@ -6,6 +6,39 @@
 #include "Framework/Reflection2.h"
 #include <cassert>
 
+// IAsset — base class for engine assets (Texture, Model, MaterialInstance, ...).
+//
+// Commitments of this asset system (read before changing AssetDatabase):
+//
+//   1. Load once, keep forever.  The asset map grows monotonically until shutdown.
+//      No GC, no refcount, no eviction.  CPU-side asset structs are small; heavy
+//      data (GPU pixels, vertex buffers) is managed by the renderer on its own
+//      residency policy and is independent of asset lifetime.
+//
+//   2. Addresses are stable across reload.  Hot-reload runs uninstall() + load_asset()
+//      + post_load() on the same instance.  Anyone holding a Texture* / Model* /
+//      MaterialInstance* keeps a valid pointer across reload — only the data inside
+//      changes.  Sub-objects exposed by accessors (e.g. Model::get_skel()) must
+//      preserve this same guarantee.
+//
+//   3. Failed loads survive serialization round-trip.  When a path fails to load,
+//      a tombstone instance is left in the AssetDatabase map with `path` set and
+//      `did_load_fail() == true`.  Maps with broken references load, edit, and
+//      save back byte-for-byte.
+//
+//   4. Sync only.  No async loading.  find<T>(path) blocks on the calling thread.
+//
+//   5. Reload cascades live in concrete post_load() (see MaterialInstance for
+//      the pattern): if your asset type has dependents that need refreshing on
+//      reload, gate the cascade on a "have we run post_load before?" flag so it
+//      fires only on reload, not on initial load.  Runtime components that hold
+//      sub-object pointers do NOT subscribe to delegates — the reload path walks
+//      the scene and calls a passive refresh_after_<asset>_reload(...) method on
+//      each affected component.
+//
+// If you violate any of (1)-(3), AssetPtr<T> users may get dangling pointers or
+// silent serialization data loss — both have caused bugs before.
+
 class IAsset : public ClassBase
 {
 public:
@@ -17,23 +50,21 @@ public:
 	const std::string& get_name() const { return path; }
 	REF std::string get_name_l() { return path; }
 
-	bool is_loaded_in_memory() const { return is_loaded; }
+	bool was_load_attempted() const { return load_attempted; }
 	bool did_load_fail() const { return load_failed; }
+	bool is_valid_to_use() const { return load_attempted && !load_failed; }
 
-	bool is_valid_to_use() const { return is_loaded && !load_failed; }
-
-	bool get_is_loaded() const { return is_loaded; }
-
-	void set_loaded_manually_unsafe(const std::string& path) {
-		this->path = path;
-		is_loaded = true;
-		load_failed = false;
+	// Marks this IAsset as a runtime asset that is NOT owned by AssetDatabase.
+	// Intended for the dynamic-pool path only (ModelMan dynamic models,
+	// DynamicMaterialAllocator dynamic materials, ParticleDefinition::create
+	// resetting an existing instance).  Sets `path` and `load_attempted = true`
+	// so the asset reads as valid_to_use.  Asset-DB-managed assets go through
+	// AssetDatabase::install_runtime instead.
+	void init_runtime_unmanaged(const std::string& name) {
+		this->path = name;
+		this->load_attempted = true;
+		this->load_failed = false;
 	}
-
-	void editor_set_newly_made_path(const std::string& path) { this->path = path; }
-
-protected:
-	void set_is_loaded(bool b) { is_loaded = b; }
 
 private:
 	// Hot-reload is in-place: AssetDatabase::reload() runs uninstall() then load_asset()
@@ -45,17 +76,12 @@ private:
 	virtual void post_load() = 0;
 	virtual void uninstall() = 0;
 
-	// this is only called on the main thread
-	void set_not_loaded_main_thread() { is_loaded = false; }
-
-	std::string path;		  // filepath or name of asset
-	bool load_failed = false; // did the asset fail to load
-	bool is_loaded = false;	  // is the asset's data in memory
-	bool is_from_disk = true; // otherwise created at runtime
+	std::string path;			  // filepath or name of asset; set on insert into AssetDatabase, never cleared
+	bool load_attempted = false;  // true only after load_asset has returned (or thrown); never reverts
+	bool load_failed = false;	  // did the most recent load_asset attempt fail
 
 	friend class AssetDatabaseImpl;
 	friend class AssetDatabase;
-	friend class AssetRegistrySystem;
 };
 
 template <typename T> class AssetPtr

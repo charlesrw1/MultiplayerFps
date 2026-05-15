@@ -38,6 +38,13 @@ agBaseNode& AnimatorObject::get_root_node() const {
 	assert(graph.get_root());
 	return *graph.get_root();
 }
+void AnimatorObject::refresh_after_model_reload(Model* reloaded) {
+	if (auto* root = graph.get_root())
+		root->refresh_after_model_reload(reloaded);
+	for (auto* n : graph.get_cache_nodes())
+		if (n)
+			n->refresh_after_model_reload(reloaded);
+}
 AnimatorObject::AnimatorObject(const Model& model, agBuilder& ingraph, Entity* ent) : model(model), graph(ingraph) {
 	if (!model.get_skel()) {
 		sys_print(Error, "AnimatorObject(): model doesnt have skeleton\n");

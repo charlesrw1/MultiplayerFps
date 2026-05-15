@@ -347,8 +347,8 @@ MaterialInstance* DynamicMaterialAllocator::allocate_dynamic() {
 	outstanding_dynamic_mats += 1;
 
 	ASSERT(first);
-	first->set_loaded_manually_unsafe("*dm");
-	assert(first->get_is_loaded());
+	first->init_runtime_unmanaged("*dm");
+	assert(first->is_valid_to_use());
 	return first;
 }
 

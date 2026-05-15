@@ -41,6 +41,7 @@ public:
 	void update() final;
 	void stop() final;
 	void on_changed_transform() final;
+	void refresh_after_model_reload(Model* reloaded) final;
 #ifdef EDITOR_BUILD
 	void editor_on_change_property() final;
 #endif // EDITOR_BUILD

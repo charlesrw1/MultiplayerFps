@@ -241,7 +241,8 @@ Texture* Texture::install_system(const std::string& path) {
 Texture* Texture::force_load_for_ui(const string& name) {
 	ASSERT(!name.empty());
 	Texture* t       = Texture::install_system(name);
-	t->set_loaded_manually_unsafe(name);
+	// install_system already called install_system_asset, which set the path
+	// and load_attempted=true.  Now run the actual file load on top.
 	t->force_nearest = true; // hack
 	const bool good  = t->load_asset();
 	if (good)

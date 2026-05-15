@@ -76,8 +76,8 @@ static TestTask test_dynamic_model_lifecycle(TestContext& t) {
     t.check(dyn_quad->get_num_parts() == 1, "quad model: 1 submesh");
     t.check(dyn_tri->get_num_lods()  == 1,  "triangle model: 1 LOD");
     t.check(dyn_quad->get_num_lods() == 1,  "quad model: 1 LOD");
-    t.check(dyn_tri->is_loaded_in_memory(),  "triangle model reports loaded");
-    t.check(dyn_quad->is_loaded_in_memory(), "quad model reports loaded");
+    t.check(dyn_tri->is_valid_to_use(),  "triangle model reports valid");
+    t.check(dyn_quad->is_valid_to_use(), "quad model reports valid");
 
     // ---- Free first model via explicit reset (RAII) ----------------------
     dyn_tri.reset();
