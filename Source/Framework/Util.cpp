@@ -1,6 +1,7 @@
 #include "Util.h"
 #include <cstdio>
 #include <cstdlib>
+#include <csignal>
 #include <stdexcept>
 
 #ifdef _WIN32
@@ -12,6 +13,8 @@
 #include <windows.h>
 #include <DbgHelp.h>
 #include <share.h>
+#include <crtdbg.h>
+#include <cstring>
 #pragma comment(lib, "DbgHelp.lib")
 #endif
 
@@ -149,6 +152,74 @@ static void crash_write(FILE* log, const char* fmt, ...) {
 	}
 }
 
+// Derive the .dmp path from s_assert_log_path by swapping the extension. If
+// the log path is unset, falls back to crash_<pid>_<ticks>.dmp in CWD. Writes
+// the result into out_path. Returns true on success.
+static bool derive_dump_path(char* out_path, size_t out_len) {
+	if (s_assert_log_path && *s_assert_log_path) {
+		const size_t n = std::strlen(s_assert_log_path);
+		if (n + 5 >= out_len) return false;
+		std::memcpy(out_path, s_assert_log_path, n + 1);
+		char* dot = std::strrchr(out_path, '.');
+		const char* slash_a = std::strrchr(out_path, '/');
+		const char* slash_b = std::strrchr(out_path, '\\');
+		const char* last_slash = slash_a > slash_b ? slash_a : slash_b;
+		if (dot && (!last_slash || dot > last_slash)) {
+			std::strcpy(dot, ".dmp");
+		} else {
+			std::strcat(out_path, ".dmp");
+		}
+		return true;
+	}
+	// Fixed name so CREATE_ALWAYS overwrites instead of accumulating one
+	// crash_<pid>_<ticks>.dmp per run. PID/ticks are recoverable from the
+	// dump's process-info stream if needed.
+	_snprintf_s(out_path, out_len, _TRUNCATE, "crash_app.dmp");
+	return true;
+}
+
+// Writes a minidump rich enough for post-mortem variable inspection: locals,
+// parameters, and pointer targets reachable from the stack are captured via
+// MiniDumpWithIndirectlyReferencedMemory. Wrapped in __try because
+// MiniDumpWriteDump can itself fault on severely corrupted process state.
+// @docs [[debugging/crash_dumps]]
+static bool write_minidump_to(const char* path, EXCEPTION_POINTERS* ep) {
+	HANDLE file = CreateFileA(path, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+	                          FILE_ATTRIBUTE_NORMAL, nullptr);
+	if (file == INVALID_HANDLE_VALUE)
+		return false;
+
+	MINIDUMP_EXCEPTION_INFORMATION mei{};
+	mei.ThreadId = GetCurrentThreadId();
+	mei.ExceptionPointers = ep;
+	mei.ClientPointers = FALSE;
+
+	const MINIDUMP_TYPE flags = (MINIDUMP_TYPE)(
+		MiniDumpWithDataSegs |
+		MiniDumpWithHandleData |
+		MiniDumpWithThreadInfo |
+		MiniDumpWithProcessThreadData |
+		MiniDumpWithIndirectlyReferencedMemory |
+		MiniDumpWithUnloadedModules);
+
+	BOOL ok = FALSE;
+	__try {
+		ok = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), file,
+		                       flags, ep ? &mei : nullptr, nullptr, nullptr);
+	} __except (EXCEPTION_EXECUTE_HANDLER) {
+		ok = FALSE;
+	}
+	CloseHandle(file);
+	return ok == TRUE;
+}
+
+static const char* write_minidump(EXCEPTION_POINTERS* ep, char* out_path, size_t out_len) {
+	if (!derive_dump_path(out_path, out_len))
+		return nullptr;
+	return write_minidump_to(out_path, ep) ? out_path : nullptr;
+}
+
+// @docs [[debugging/crash_dumps]]
 static LONG WINAPI app_unhandled_exception_filter(EXCEPTION_POINTERS* ep) {
 	FILE* log = nullptr;
 	if (s_assert_log_path)
@@ -170,6 +241,16 @@ static LONG WINAPI app_unhandled_exception_filter(EXCEPTION_POINTERS* ep) {
 	crash_write(log, "[CRASH] stack (%u frames, raw addresses):", (unsigned)n);
 	for (USHORT i = 0; i < n; ++i)
 		crash_write(log, "[CRASH] [%02u] 0x%p", (unsigned)i, frames[i]);
+
+	// Write the minidump BEFORE symbolisation: dbghelp's Sym* calls have been
+	// observed to deadlock inside the unhandled-exception filter on some
+	// shipping toolchains. If we crash again during symbolisation we still
+	// have a dump on disk that an agent can analyse with cdb.exe.
+	char dump_path[MAX_PATH] = {};
+	if (const char* p = write_minidump(ep, dump_path, sizeof(dump_path)))
+		crash_write(log, "[CRASH] dump=%s", p);
+	else
+		crash_write(log, "[CRASH] minidump write FAILED (err=%lu)", GetLastError());
 
 	HANDLE proc = GetCurrentProcess();
 	SymSetOptions(SymGetOptions() | SYMOPT_LOAD_LINES | SYMOPT_DEFERRED_LOADS);
@@ -207,6 +288,34 @@ static LONG WINAPI app_unhandled_exception_filter(EXCEPTION_POINTERS* ep) {
 void install_crash_handler() {
 #ifdef _WIN32
 	SetUnhandledExceptionFilter(app_unhandled_exception_filter);
+	// Suppress modal popups so headless test runs don't hang waiting for a
+	// click: WerFault's "App stopped working" dialog, the CRT abort() message
+	// box, and debug-CRT _CrtDbgReport asserts. Our SEH filter + assert path
+	// already write a minidump and the symbolised stack to the engine log;
+	// the popups add nothing and freeze the integration_test.ps1 pipeline.
+	SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+	_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+#ifdef _DEBUG
+	_CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+	_CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+	_CrtSetReportMode(_CRT_ERROR,  _CRTDBG_MODE_FILE);
+	_CrtSetReportFile(_CRT_ERROR,  _CRTDBG_FILE_STDERR);
+#endif
+	// Backstop: if abort() fires without going through the SEH filter (e.g.
+	// after the filter has already returned, or from a thread the filter
+	// didn't see), terminate immediately with a non-zero code instead of
+	// allowing the CRT to invoke WER.
+	std::signal(SIGABRT, [](int) { _exit(3); });
+#endif
+}
+
+bool write_snapshot_minidump(const char* path) {
+#ifdef _WIN32
+	if (!path || !*path) return false;
+	return write_minidump_to(path, nullptr);
+#else
+	(void)path;
+	return false;
 #endif
 }
 

@@ -115,6 +115,11 @@ $msbuild = & $vswhere -latest -prerelease -requires Microsoft.Component.MSBuild 
 if (-not $msbuild) { Write-Error "MSBuild not found"; exit 1 }
 Write-Host "Using MSBuild: $msbuild" -ForegroundColor DarkGray
 
+# Kill orphan processes from a previous hung run — they would hold App.exe
+# open (LNK1168) or keep a hidden WerFault dialog alive.
+Get-Process App, WerFault, vsjitdebugger -ErrorAction SilentlyContinue |
+    Stop-Process -Force -ErrorAction SilentlyContinue
+
 Write-Host "=== Building App ($Config|x64) ===" -ForegroundColor Cyan
 & $msbuild "$root\CsRemake.sln" /t:App /p:Configuration=$Config /p:Platform=x64 /v:minimal /m
 if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
@@ -164,6 +169,16 @@ function Attach-VSDebugger([int]$targetPid, [int]$timeoutSeconds = 15) {
 
 function Run-Pass([string]$mode) {
     Write-Host "`n=== $mode pass ===" -ForegroundColor Cyan
+    # Clear stale crash artefacts so Analyze-Dump/Dump-LogTail can only ever
+    # report data from THIS run. The log file is opened in append mode by
+    # the engine (Util.cpp _fsopen "ab"), so without this it grows unbounded
+    # across runs and mixes failure context from prior crashes.
+    Remove-Item -Force -ErrorAction SilentlyContinue `
+        "$root\test_${mode}_output.dmp", `
+        "$root\test_${mode}_output.log"
+    Get-ChildItem -Path $root -Filter "crash_*.dmp" -ErrorAction SilentlyContinue |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+
     $args = @("--tests", $mode)
     foreach ($p in $Pattern)     { $args += $p }
     foreach ($f in $PatternFile) { $args += "@$f" }
@@ -202,6 +217,20 @@ function Run-Pass([string]$mode) {
         $ErrorActionPreference = $prevEAP
     }
     return $LASTEXITCODE
+}
+
+function Analyze-Dump([string]$mode) {
+    # The SEH filter writes test_<mode>_output.dmp next to the log on an
+    # unhandled exception. Print a first-look summary via dbg.ps1; the AI can
+    # run further queries against the dump itself for deeper inspection.
+    $dump = "$root\test_${mode}_output.dmp"
+    if (-not (Test-Path $dump)) { return }
+    Write-Host "`n=== $mode minidump: $dump ===" -ForegroundColor Yellow
+    Write-Host "--- stack (kP 30) ---" -ForegroundColor DarkYellow
+    & "$PSScriptRoot\dbg.ps1" $dump "kP 30"
+    Write-Host "--- frame 0 locals ---" -ForegroundColor DarkYellow
+    & "$PSScriptRoot\dbg.ps1" $dump ".frame 0; dx -r2 @`$curframe.LocalVariables"
+    Write-Host "[CRASH] for deeper inspection: Scripts\dbg.ps1 $dump '<cdb command>'" -ForegroundColor Yellow
 }
 
 function Dump-LogTail([string]$mode) {
@@ -265,6 +294,7 @@ foreach ($kv in $exits.GetEnumerator()) {
         # full uncoloured engine log on disk will contain it. Dump the tail so the
         # agent gets a stack trace without having to know about the log file.
         Dump-LogTail $kv.Key
+        Analyze-Dump $kv.Key
     }
 }
 Write-Host "  log files: test_<mode>_output.log (uncoloured, [Error]/[Warning]/... tagged)" -ForegroundColor DarkGray
