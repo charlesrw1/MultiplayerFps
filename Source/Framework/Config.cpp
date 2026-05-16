@@ -294,7 +294,16 @@ static StringView strip_string_view(StringView sv) {
 		if (!(c == ' ' || c == '\t' || c == '\r'))
 			break;
 	}
-	return StringView(sv.str_start + i, sv.str_len - i);
+	int end = sv.str_len;
+	// Right-strip too — otherwise CRLF files leave a trailing '\r' that breaks
+	// `[section]` header detection in execute_file_impl.
+	while (end > i) {
+		char c = sv.str_start[end - 1];
+		if (!(c == ' ' || c == '\t' || c == '\r'))
+			break;
+		--end;
+	}
+	return StringView(sv.str_start + i, end - i);
 }
 #include "Framework/StringUtils.h"
 class Cmd_Manager_Impl : public Cmd_Manager
