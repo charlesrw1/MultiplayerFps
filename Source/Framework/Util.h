@@ -9,6 +9,12 @@ void set_assert_hook(AssertHookFn fn);
 // Tell the assert handler where to append crash output (e.g. test_game_output.log).
 // std::abort() bypasses C++ stream flush, so we write directly via fopen/fclose.
 void set_assert_log_path(const char* path);
+// Install SetUnhandledExceptionFilter that prints a [CRASH] header + symbolised
+// stack trace to stderr and (if set_assert_log_path was called) the engine log,
+// then exits non-zero. Without this, an SEH crash (e.g. access violation) under
+// a test runner just exits with 0xC0000005 and no diagnostic — agents see only
+// "program crashed" with nothing to investigate. No-op on non-Windows.
+void install_crash_handler();
 #ifdef WITH_ASSERT
 #define ASSERT(x)                                                                                                      \
 	do {                                                                                                               \

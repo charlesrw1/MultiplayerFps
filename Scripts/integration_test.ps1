@@ -14,8 +14,12 @@
 
     App.exe also writes test_<mode>_output.log next to the working directory
     with the full uncoloured engine log (every line is prefixed with [Error],
-    [Warning], [Debug] or [Info]). Console stdout/stderr only carries the
-    test-runner sentinel lines (`[TEST] ...`) plus any unfiltered prints.
+    [Warning], [Debug] or [Info]). Console stdout/stderr carries the
+    test-runner sentinel lines (`[TEST] ...`) plus any [CRASH]/[Error]/[Fatal]
+    lines and stack frames so unhandled SEH exceptions are visible inline.
+    On a non-zero pass exit, the tail of test_<mode>_output.log is also
+    dumped to the host so agents see the full crash context without having
+    to know to read the log file.
 
 .PARAMETER Config
     Build configuration. Defaults to "Debug". Use "Release" for release builds.
@@ -181,14 +185,39 @@ function Run-Pass([string]$mode) {
     # captured into this function's pipeline output. Without this, every stdout
     # line ends up in the function's return value alongside the exit code,
     # which breaks the `-ne 0` exit-code check downstream.
-    if ($ShowEngineLog) {
-        & $exe @args 2>&1 | Out-Host
-    } else {
-        & $exe @args 2>&1 |
-            Where-Object { $_ -is [string] -and $_ -match '^\[TEST\]' } |
-            Out-Host
+    # PS 5.1 + $ErrorActionPreference="Stop" + native stderr is hostile: any
+    # write to stderr by App.exe surfaces as a NativeCommandError that
+    # terminates the pipeline. Drop EAP to Continue around the exe run so
+    # [CRASH] stack dumps print in full (would otherwise stop after one line).
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        if ($ShowEngineLog) {
+            & $exe @args 2>&1 | Out-Host
+        } else {
+            # Stdout: filter to test-runner sentinels. Stderr: untouched, flows to host.
+            & $exe @args | Where-Object { $_ -match '^\[TEST\]' } | Out-Host
+        }
+    } finally {
+        $ErrorActionPreference = $prevEAP
     }
     return $LASTEXITCODE
+}
+
+function Dump-LogTail([string]$mode) {
+    $log = "$root\test_${mode}_output.log"
+    if (-not (Test-Path $log)) {
+        Write-Host "  (no log file at $log)" -ForegroundColor DarkYellow
+        return
+    }
+    # Stream the tail and surface only crash/error/assert lines — the full log is
+    # ~thousands of lines of init chatter, and the agent only cares about the
+    # failure context. Belt-and-braces in case stderr was redirected or filtered.
+    Write-Host "`n=== $mode crash/error lines from $log ===" -ForegroundColor Yellow
+    Get-Content -Path $log -Tail 400 |
+        Where-Object { $_ -match '\[CRASH\]|\[Error\]|\[Fatal\]|Assertion failed:' } |
+        Out-Host
+    Write-Host "=== end $mode log tail ===" -ForegroundColor Yellow
 }
 
 function Print-XmlSummary([string]$mode, [string]$xml) {
@@ -230,7 +259,13 @@ $failed = $false
 foreach ($kv in $exits.GetEnumerator()) {
     $xml = "$root\TestFiles\integration_$($kv.Key)_results.xml"
     Print-XmlSummary $kv.Key $xml
-    if ($kv.Value -ne 0) { $failed = $true }
+    if ($kv.Value -ne 0) {
+        $failed = $true
+        # Belt-and-braces: even if a crash line slipped past the regex above, the
+        # full uncoloured engine log on disk will contain it. Dump the tail so the
+        # agent gets a stack trace without having to know about the log file.
+        Dump-LogTail $kv.Key
+    }
 }
 Write-Host "  log files: test_<mode>_output.log (uncoloured, [Error]/[Warning]/... tagged)" -ForegroundColor DarkGray
 

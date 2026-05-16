@@ -190,7 +190,12 @@ int MaterialImpl::get_texture_id_hash() {
 	ASSERT(self);
 	if (texture_id_hash.has_value())
 		return texture_id_hash.value();
-	texture_id_hash = matman.compute_tex_hash_for(this);
+	// Material is still in matman.dirty_list — texture_bindings slots may be null
+	// and gpu_buffer_offset may not be assigned yet. Force the flush now so the
+	// hash AND the GPU material buffer match what callers (sort key, batching
+	// cache) will use this frame. flush_dirty_material assigns texture_id_hash.
+	matman.flush_dirty_material(self);
+	ASSERT(texture_id_hash.has_value());
 	return texture_id_hash.value();
 }
 

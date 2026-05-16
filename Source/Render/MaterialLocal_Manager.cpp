@@ -110,59 +110,71 @@ void MaterialManagerLocal::init() {
 // MaterialManagerLocal – pre_render_update (material buffer uploads)
 // ---------------------------------------------------------------------------
 
-void MaterialManagerLocal::pre_render_update() {
+void MaterialManagerLocal::flush_dirty_material(MaterialInstance* mat) {
 	ASSERT(gpuMatBufferPtr);
-	for (auto mat : dirty_list) {
-		if (!mat)
-			continue;
+	if (!mat)
+		return;
+	// Idempotent: if this material isn't dirty, nothing to do.
+	if (!dirty_list.find(mat))
+		return;
 
-		if (!mat->impl) {
-			sys_print(Error, "pre_render_update: material '%s' in dirty list with null impl — skipping\n",
-					  mat->get_name().c_str());
-			continue;
-		}
-
-		if (mat->impl->masterImpl.get())
-			mat_shader_table.recompile_for_material(mat->impl->masterImpl.get());
-
-		auto check_buffer_offset = [&]() {
-			const int gpu_buffer_offset = mat->impl->gpu_buffer_offset;
-			if (gpu_buffer_offset == MaterialImpl::INVALID_MAPPING) {
-				mat_offset_table->register_material(mat);
-			}
-		};
-		check_buffer_offset();
-
-		std::array<std::byte, MATERIAL_SIZE> data_to_upload = {};
-
-		auto mm = mat->get_master_material();
-		ASSERT(mm);
-		auto& params = mat->impl->params;
-		ASSERT(mm->param_defs.size() == mat->impl->params.size());
-		for (int i = 0; i < (int)params.size(); i++) {
-			auto& param = params[i];
-			auto& def = mm->param_defs[i];
-			if (param.type == MatParamType::Texture2D)
-				mat->impl->texture_bindings.at(def.offset) = param.tex.get();
-			else {
-				if (param.type == MatParamType::Float) {
-					ASSERT(def.offset >= 0 && def.offset < MATERIAL_SIZE - 4);
-					memcpy(data_to_upload.data() + def.offset, &param.scalar, sizeof(float));
-				} else if (param.type == MatParamType::FloatVec) {
-					ASSERT(def.offset >= 0 && def.offset < MATERIAL_SIZE - (int)sizeof(glm::vec4));
-					memcpy(data_to_upload.data() + def.offset, &param.vector, sizeof(glm::vec4));
-				} else if (param.type == MatParamType::Vector) {
-					ASSERT(def.offset >= 0 && def.offset < MATERIAL_SIZE - (int)sizeof(Color32));
-					memcpy(data_to_upload.data() + def.offset, &param.color32, sizeof(Color32));
-				} else
-					ASSERT(0);
-			}
-		}
-		mat->impl->texture_id_hash = binding_hasher.get_texture_hash_id_for_material(mat->impl.get());
-
-		const int offset = mat->impl->gpu_buffer_offset * sizeof(uint);
-		gpuMatBufferPtr->sub_upload(data_to_upload.data(), data_to_upload.size(), offset);
+	if (!mat->impl) {
+		sys_print(Error, "flush_dirty_material: material '%s' in dirty list with null impl — skipping\n",
+				  mat->get_name().c_str());
+		dirty_list.remove(mat);
+		return;
 	}
 
+	if (mat->impl->masterImpl.get())
+		mat_shader_table.recompile_for_material(mat->impl->masterImpl.get());
+
+	if (mat->impl->gpu_buffer_offset == MaterialImpl::INVALID_MAPPING)
+		mat_offset_table->register_material(mat);
+
+	std::array<std::byte, MATERIAL_SIZE> data_to_upload = {};
+
+	auto mm = mat->get_master_material();
+	ASSERT(mm);
+	auto& params = mat->impl->params;
+	ASSERT(mm->param_defs.size() == mat->impl->params.size());
+	for (int i = 0; i < (int)params.size(); i++) {
+		auto& param = params[i];
+		auto& def = mm->param_defs[i];
+		if (param.type == MatParamType::Texture2D)
+			mat->impl->texture_bindings.at(def.offset) = param.tex.get();
+		else {
+			if (param.type == MatParamType::Float) {
+				ASSERT(def.offset >= 0 && def.offset < MATERIAL_SIZE - 4);
+				memcpy(data_to_upload.data() + def.offset, &param.scalar, sizeof(float));
+			} else if (param.type == MatParamType::FloatVec) {
+				ASSERT(def.offset >= 0 && def.offset < MATERIAL_SIZE - (int)sizeof(glm::vec4));
+				memcpy(data_to_upload.data() + def.offset, &param.vector, sizeof(glm::vec4));
+			} else if (param.type == MatParamType::Vector) {
+				ASSERT(def.offset >= 0 && def.offset < MATERIAL_SIZE - (int)sizeof(Color32));
+				memcpy(data_to_upload.data() + def.offset, &param.color32, sizeof(Color32));
+			} else
+				ASSERT(0);
+		}
+	}
+	mat->impl->texture_id_hash = binding_hasher.get_texture_hash_id_for_material(mat->impl.get());
+
+	const int offset = mat->impl->gpu_buffer_offset * sizeof(uint);
+	gpuMatBufferPtr->sub_upload(data_to_upload.data(), data_to_upload.size(), offset);
+
+	// Remove last so on-demand callers (MaterialImpl::get_texture_id_hash) and the
+	// per-frame pre_render_update don't double-process the same material.
+	dirty_list.remove(mat);
+}
+
+void MaterialManagerLocal::pre_render_update() {
+	ASSERT(gpuMatBufferPtr);
+	// Snapshot the dirty list — flush_dirty_material mutates it during iteration.
+	std::vector<MaterialInstance*> snapshot;
+	for (auto mat : dirty_list) {
+		if (mat)
+			snapshot.push_back(mat);
+	}
+	for (auto* mat : snapshot)
+		flush_dirty_material(mat);
 	dirty_list.clear_all();
 }

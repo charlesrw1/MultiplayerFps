@@ -336,6 +336,11 @@ public:
 	IGraphicsBuffer* get_gpu_material_buffer() { return gpuMatBufferPtr; }
 	void add_to_dirty_list(MaterialInstance* mat);
 	void remove_from_dirty_list_if_it_is(MaterialInstance* mat);
+	// Force-flushes a single material's dirty state synchronously: resolves texture
+	// bindings, allocates a gpu_buffer_offset if needed, computes texture_id_hash,
+	// and uploads the material data. Removes the material from dirty_list. Safe to
+	// call at any time; idempotent for already-clean materials.
+	void flush_dirty_material(MaterialInstance* mat);
 	void free_material_instance(MaterialInstance* m);
 	int get_next_master_id() { return ++current_master_id; }
 	MaterialInstance* get_default_editor_sel_PP() { return pp_editor_select_mat.get(); }
