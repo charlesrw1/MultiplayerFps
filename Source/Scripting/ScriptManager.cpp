@@ -3,7 +3,11 @@
 #include "Framework/Files.h"
 #include "Framework/MapUtil.h"
 #include <cassert>
+#include <cstring>
 #include "Framework/Config.h"
+#include "Game/EntityComponent.h"
+#include <new>
+#include <string>
 
 extern "C"
 {
@@ -104,15 +108,17 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 
 			pendingType = tokens.at(2);
 		}
-		// Parse property assignment
+		// Parse property assignment — only record fields preceded by ---@type.
+		// Untyped table entries are intentionally dropped so they never reach reflection
+		// synthesis (no warnings, no editor rows). Lua scripts can still read/write them
+		// at runtime via the per-instance table; they're just not engine-visible.
 		else if (inClass && tokens.size() >= 3 && (tokens.at(1) == "=" || tokens.at(1) == ",")) {
-
-			// printf("found property name %s %d\n", tokens.at(0).c_str(), i + 1);
-
-			ParseProperty prop;
-			prop.name = tokens.at(0);
-			prop.type_str = pendingType;
-			currentClass.properties.push_back(prop);
+			if (!pendingType.empty()) {
+				ParseProperty prop;
+				prop.name = tokens.at(0);
+				prop.type_str = pendingType;
+				currentClass.properties.push_back(prop);
+			}
 			pendingType.clear();
 		}
 		// End of class table
@@ -264,18 +270,133 @@ void ScriptManager::free_class_table(int id) {
 	luaL_unref(lua, LUA_REGISTRYINDEX, id);
 }
 #include "Game/LevelAssets.h"
-void ScriptManager::check_for_reload() {
-	if (had_changes) {
-		lua_settop(lua, 0);
-		for (auto& [name, c] : lua_classes) {
-			if (c->get_and_clear_had_changes())
-				c->init_lua_type();
-		}
-		ClassBase::post_changes_class_init();
-		had_changes = false;
+// Forward decls — full bodies live near LuaClassTypeInfo::init_lua_type below.
+static void construct_lua_field(const PropertyInfo& pi, uint8_t* p);
+static void destruct_lua_field(const PropertyInfo& pi, uint8_t* p);
+static void apply_template_default(lua_State* L, int template_idx, const PropertyInfo& pi, uint8_t* p);
+static void destroy_shadow_for(LuaClassTypeInfo* cti, Component* comp);
 
-		// PrefabAsset::init_prefab_factory();
+// Snapshot of one PROP_LUA_BACKED field's value, used to preserve overlapping fields
+// (matched by name + core_type_id) across a Lua class reload.
+struct LuaFieldSnapshot
+{
+	core_type_id type;
+	float       f = 0;
+	int32_t     i = 0;
+	int8_t      b = 0;
+	std::string s;
+};
+
+struct LuaInstanceSnapshot
+{
+	Component* inst = nullptr;
+	std::unordered_map<std::string, LuaFieldSnapshot> values;
+};
+
+static LuaFieldSnapshot snapshot_field(const PropertyInfo& pi, uint8_t* p) {
+	LuaFieldSnapshot v;
+	v.type = pi.type;
+	switch (pi.type) {
+	case core_type_id::Float: v.f = *(float*)p; break;
+	case core_type_id::Int32:
+	case core_type_id::Enum32: v.i = *(int32_t*)p; break;
+	case core_type_id::Bool: v.b = *(int8_t*)p; break;
+	case core_type_id::StdString: v.s = *(std::string*)p; break;
+	default: break;
 	}
+	return v;
+}
+
+static void restore_field(const LuaFieldSnapshot& v, const PropertyInfo& pi, uint8_t* p) {
+	if (v.type != pi.type)
+		return; // type changed across reload — fall through to template default
+	switch (pi.type) {
+	case core_type_id::Float: *(float*)p = v.f; break;
+	case core_type_id::Int32:
+	case core_type_id::Enum32: *(int32_t*)p = v.i; break;
+	case core_type_id::Bool: *(int8_t*)p = v.b; break;
+	case core_type_id::StdString: *(std::string*)p = v.s; break;
+	default: break;
+	}
+}
+
+void ScriptManager::check_for_reload() {
+	if (!had_changes)
+		return;
+	lua_settop(lua, 0);
+
+	// Find classes whose source changed this cycle (clears their per-class flag).
+	std::vector<LuaClassTypeInfo*> changed;
+	for (auto& [name, c] : lua_classes) {
+		if (c->get_and_clear_had_changes())
+			changed.push_back(c.get());
+	}
+
+	// Phase 1: snapshot every live instance's current field values against the OLD layout.
+	std::unordered_map<LuaClassTypeInfo*, std::vector<LuaInstanceSnapshot>> per_class;
+	for (auto* cti : changed) {
+		auto& snaps = per_class[cti];
+		for (auto* inst : cti->get_live_instances()) {
+			LuaInstanceSnapshot snap;
+			snap.inst = inst;
+			uint8_t* shadow = inst->get_lua_field_shadow();
+			if (shadow) {
+				for (auto& pi : cti->get_lua_props_storage())
+					snap.values.emplace(pi.name, snapshot_field(pi, shadow + pi.offset));
+			}
+			snaps.push_back(std::move(snap));
+		}
+	}
+
+	// Phase 2: tear down each live instance's old shadow (runs string dtors) before
+	// the class's lua_props_storage is rewritten by init_lua_type().
+	for (auto& [cti, snaps] : per_class) {
+		for (auto& snap : snaps)
+			destroy_shadow_for(cti, snap.inst);
+	}
+
+	// Phase 2.5: commit any new parsed_properties staged by reload_from_content.
+	// Must happen AFTER snapshot phase 1 (which read pi.name pointers into the old
+	// parsed_properties storage) and BEFORE synthesize re-reads from parsed_properties.
+	for (auto* cti : changed) {
+		if (!cti->pending_parsed_properties.empty() || !cti->parsed_properties.empty())
+			cti->parsed_properties = std::move(cti->pending_parsed_properties);
+	}
+
+	// Phase 3: rebuild type metadata (metatables + synthesized lua_props_storage).
+	for (auto* cti : changed)
+		cti->init_lua_type();
+
+	// Phase 4: reallocate each live instance's shadow against the NEW layout,
+	// seed with template defaults, then overlay snapshot values where (name,type) match.
+	for (auto& [cti, snaps] : per_class) {
+		if (cti->get_lua_field_shadow_size() == 0) {
+			// New class has no Lua-backed fields; live instances simply keep null shadow.
+			continue;
+		}
+		lua_rawgeti(lua, LUA_REGISTRYINDEX, cti->get_template_lua_table());
+		int tmpl_idx = lua_gettop(lua);
+		for (auto& snap : snaps) {
+			auto buf = std::make_unique<uint8_t[]>(cti->get_lua_field_shadow_size());
+			std::memset(buf.get(), 0, cti->get_lua_field_shadow_size());
+			for (auto& pi : cti->get_lua_props_storage()) {
+				uint8_t* p = buf.get() + pi.offset;
+				construct_lua_field(pi, p);
+				apply_template_default(lua, tmpl_idx, pi, p);
+				auto it = snap.values.find(pi.name);
+				if (it != snap.values.end())
+					restore_field(it->second, pi, p);
+			}
+			snap.inst->take_lua_field_shadow(std::move(buf));
+		}
+		lua_pop(lua, 1);
+	}
+
+	ClassBase::post_changes_class_init();
+	had_changes = false;
+
+	if (!changed.empty())
+		on_class_reloaded.invoke();
 }
 #include <iostream>
 void printStackTrace(lua_State* L) {
@@ -358,6 +479,15 @@ void ScriptManager::reload_from_content(const std::string& source, const std::st
 			lua_classes.insert({c->get_name(), std::move(c)});
 		} else {
 			lua_classes[c->get_name()]->set_had_changes();
+		}
+	}
+	// Capture parsed property metadata for every (re)parsed class so init_lua_type()
+	// can synthesize PROP_LUA_BACKED reflection for Component subclasses, picking up
+	// any added/removed/renamed fields on reload.
+	for (auto& t : outTypes) {
+		auto found = MapUtil::get_opt(lua_classes, t.name);
+		if (found) {
+			(*found)->set_parsed_properties(std::move(t.props));
 		}
 	}
 }
@@ -565,6 +695,207 @@ static void dump_lua_table(lua_State* L, int index, int depth = 0) {
 		lua_pop(L, 1); // pop value, keep key for next lua_next
 	}
 }
+// Maps a Lua ---@type annotation string to a (core_type_id, optional EnumTypeInfo*) pair.
+// Returns true on a recognized scalar/enum. Unrecognized types (vec3, tables, asset refs, etc.)
+// are deferred to a later feature pass.
+static bool lua_type_str_to_core_type(const string& type_str, core_type_id& out_type,
+									  const EnumTypeInfo*& out_enum) {
+	out_enum = nullptr;
+	if (type_str == "number" || type_str == "float") {
+		out_type = core_type_id::Float;
+		return true;
+	}
+	if (type_str == "integer" || type_str == "int") {
+		out_type = core_type_id::Int32;
+		return true;
+	}
+	if (type_str == "boolean" || type_str == "bool") {
+		out_type = core_type_id::Bool;
+		return true;
+	}
+	if (type_str == "string") {
+		out_type = core_type_id::StdString;
+		return true;
+	}
+	if (auto e = EnumRegistry::find_enum_type(type_str)) {
+		out_type = core_type_id::Enum32;
+		out_enum = e;
+		return true;
+	}
+	return false;
+}
+
+// Returns the byte size required to store a value of the given core_type_id in the
+// per-instance shadow buffer. std::string is constructed/destructed via placement new
+// when the buffer is (re)allocated.
+static uint32_t lua_backed_size_for_type(core_type_id t) {
+	switch (t) {
+	case core_type_id::Bool: return 1;
+	case core_type_id::Int32:
+	case core_type_id::Enum32:
+	case core_type_id::Float: return 4;
+	case core_type_id::StdString: return sizeof(std::string);
+	default: ASSERT(0); return 0;
+	}
+}
+
+// Returns 4-byte alignment for primitives, alignof(std::string) for strings.
+static uint32_t lua_backed_align_for_type(core_type_id t) {
+	if (t == core_type_id::StdString) return alignof(std::string);
+	if (t == core_type_id::Bool) return 1;
+	return 4;
+}
+
+static uint32_t align_up(uint32_t v, uint32_t a) { return (v + a - 1) & ~(a - 1); }
+
+static void synthesize_layout_from_parsed(LuaClassTypeInfo* self,
+										  vector<PropertyInfo>& storage,
+										  PropertyInfoList& list_out,
+										  uint32_t& shadow_size_out,
+										  const string& classname,
+										  const vector<ParseProperty>& parsed_properties);
+
+void LuaClassTypeInfo::synthesize_lua_props_unchecked_for_test() {
+	// Mirror what ScriptManager::check_for_reload does: commit any pending parsed
+	// properties staged by set_parsed_properties() before synthesis reads them.
+	if (!pending_parsed_properties.empty() || !parsed_properties.empty())
+		parsed_properties = std::move(pending_parsed_properties);
+	synthesize_layout_from_parsed(this, lua_props_storage, lua_props_list,
+								  lua_field_shadow_size, lua_classname, parsed_properties);
+}
+
+void LuaClassTypeInfo::synthesize_lua_props_for_component_subclass() {
+	lua_props_storage.clear();
+	lua_props_list = {};
+	lua_field_shadow_size = 0;
+
+	// Only synthesize for classes whose super chain reaches Component. We walk the
+	// chain by pointer rather than calling ClassTypeInfo::is_a() because the latter
+	// compares id ranges set by ClassBase::post_changes_class_init() — which on the
+	// reload path runs AFTER init_lua_type(), so ids are still zeroed here.
+	auto component_ti = ClassBase::find_class("Component");
+	if (!component_ti)
+		return;
+	const ClassTypeInfo* p = this->super_typeinfo;
+	while (p && p != component_ti)
+		p = p->super_typeinfo;
+	if (!p)
+		return;
+	synthesize_layout_from_parsed(this, lua_props_storage, lua_props_list,
+								  lua_field_shadow_size, lua_classname, parsed_properties);
+}
+
+static void synthesize_layout_from_parsed(LuaClassTypeInfo* /*self*/,
+										  vector<PropertyInfo>& lua_props_storage,
+										  PropertyInfoList& lua_props_list,
+										  uint32_t& lua_field_shadow_size,
+										  const string& lua_classname,
+										  const vector<ParseProperty>& parsed_properties) {
+	lua_props_storage.clear();
+	lua_props_list = {};
+	lua_field_shadow_size = 0;
+	uint32_t cursor = 0;
+	for (auto& parsed : parsed_properties) {
+		core_type_id ctype;
+		const EnumTypeInfo* einfo = nullptr;
+		if (!lua_type_str_to_core_type(parsed.type_str, ctype, einfo)) {
+			sys_print(Warning, "LuaClassTypeInfo[%s]: skipping field '%s' with unsupported ---@type '%s'\n",
+					  lua_classname.c_str(), parsed.name.c_str(), parsed.type_str.c_str());
+			continue;
+		}
+		const uint32_t align = lua_backed_align_for_type(ctype);
+		const uint32_t size  = lua_backed_size_for_type(ctype);
+		cursor = align_up(cursor, align);
+
+		PropertyInfo pi;
+		// PropertyInfo holds a raw `const char*` to the name; the parsed_properties vector
+		// owns the storage for the string for as long as this class exists.
+		pi.name = parsed.name.c_str();
+		pi.offset = (uint16_t)cursor;
+		pi.flags = PROP_DEFAULT | PROP_LUA_BACKED;
+		pi.type = ctype;
+		pi.enum_type = einfo;
+		lua_props_storage.push_back(pi);
+		cursor += size;
+	}
+	if (!lua_props_storage.empty()) {
+		lua_props_list.list = lua_props_storage.data();
+		lua_props_list.count = (int)lua_props_storage.size();
+		lua_props_list.type_name = lua_classname.c_str();
+		lua_field_shadow_size = cursor;
+	}
+}
+
+// Placement-construct one PROP_LUA_BACKED field within a freshly-allocated shadow buffer.
+// Primitives are left zero-initialized by the caller's memset; only non-POD types need work.
+static void construct_lua_field(const PropertyInfo& pi, uint8_t* p) {
+	if (pi.type == core_type_id::StdString)
+		new (p) std::string();
+}
+
+// Inverse of construct_lua_field. Called before freeing the shadow buffer or
+// reallocating it for a new layout.
+static void destruct_lua_field(const PropertyInfo& pi, uint8_t* p) {
+	if (pi.type == core_type_id::StdString)
+		((std::string*)p)->~basic_string();
+}
+
+// Reads a default value for `pi` from the class's template Lua table (top of stack at
+// `template_idx`) and writes it into `p` (already constructed). Missing/wrong-type
+// template entries leave `p` at its constructed default.
+static void apply_template_default(lua_State* L, int template_idx, const PropertyInfo& pi, uint8_t* p) {
+	lua_getfield(L, template_idx, pi.name);
+	if (!lua_isnil(L, -1)) {
+		switch (pi.type) {
+		case core_type_id::Float:
+			*(float*)p = (float)lua_tonumber(L, -1);
+			break;
+		case core_type_id::Int32:
+		case core_type_id::Enum32:
+			*(int32_t*)p = (int32_t)lua_tointeger(L, -1);
+			break;
+		case core_type_id::Bool:
+			*(int8_t*)p = lua_toboolean(L, -1) ? 1 : 0;
+			break;
+		case core_type_id::StdString:
+			if (lua_isstring(L, -1))
+				*(std::string*)p = lua_tostring(L, -1);
+			break;
+		default:
+			break;
+		}
+	}
+	lua_pop(L, 1);
+}
+
+// Walks every field in the class's lua_props_storage, runs destructors, returns the buffer to nullptr.
+static void destroy_shadow_for(LuaClassTypeInfo* cti, Component* comp) {
+	uint8_t* shadow = comp->get_lua_field_shadow();
+	if (!shadow)
+		return;
+	for (auto& pi : cti->get_lua_props_storage())
+		destruct_lua_field(pi, shadow + pi.offset);
+	comp->take_lua_field_shadow(nullptr);
+}
+
+// Allocates + initializes a shadow buffer for `cti`, pulling defaults from the
+// already-loaded template_lua_table. Caller must hand the result to the Component.
+static std::unique_ptr<uint8_t[]> allocate_and_init_shadow(lua_State* L, LuaClassTypeInfo* cti) {
+	if (cti->get_lua_field_shadow_size() == 0)
+		return nullptr;
+	auto buf = std::make_unique<uint8_t[]>(cti->get_lua_field_shadow_size());
+	std::memset(buf.get(), 0, cti->get_lua_field_shadow_size());
+	lua_rawgeti(L, LUA_REGISTRYINDEX, cti->get_template_lua_table());
+	int tmpl_idx = lua_gettop(L);
+	for (auto& pi : cti->get_lua_props_storage()) {
+		uint8_t* p = buf.get() + pi.offset;
+		construct_lua_field(pi, p);
+		apply_template_default(L, tmpl_idx, pi, p);
+	}
+	lua_pop(L, 1);
+	return buf;
+}
+
 void LuaClassTypeInfo::init_lua_type() {
 	// assert(template_lua_table == 0);
 	auto L = ScriptManager::inst->get_lua_state();
@@ -595,6 +926,11 @@ void LuaClassTypeInfo::init_lua_type() {
 		assert(lua_gettop(L) == 0);
 		ScriptManager::inst->set_class_type_global(this);
 	}
+	// Synthesize PROP_LUA_BACKED reflection from the most recent parse. Must happen AFTER
+	// the metatable is rebuilt, BEFORE live-instance shadow buffers are reallocated by
+	// the reload-merge path in check_for_reload().
+	synthesize_lua_props_for_component_subclass();
+	this->props = get_lua_props_list();
 }
 
 ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c) {
@@ -639,7 +975,33 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c) {
 
 	lua_pop(L, 2);
 	check_top(0);
+
+	// For Component subclasses with PROP_LUA_BACKED fields, allocate the shadow
+	// buffer and pull initial values from the template Lua table. The instance Lua
+	// table still holds the same defaults (copied above) for script-side reads;
+	// editor edits and serialization read/write only the shadow buffer.
+	if (luaInfo->lua_field_shadow_size > 0) {
+		if (Component* comp = out->cast_to<Component>()) {
+			comp->take_lua_field_shadow(allocate_and_init_shadow(L, luaInfo));
+			comp->set_lua_owner_type(luaInfo);
+			luaInfo->register_lua_instance(comp);
+		}
+	}
 	return out;
+}
+
+void ScriptManager::on_component_destructed(Component* c) {
+	if (!ScriptManager::inst || !c)
+		return;
+	// Don't rely on c->get_type() here: by the time ~Component runs, the most-derived
+	// (scriptable) destructor has already executed and the vtable has been downgraded
+	// to Component's, so get_type() returns Component::StaticType. Use the cached
+	// lua_owner_type pointer captured by lua_class_alloc instead.
+	auto* lti = const_cast<LuaClassTypeInfo*>(c->get_lua_owner_type());
+	if (!lti)
+		return;
+	destroy_shadow_for(lti, c);
+	lti->unregister_lua_instance(c);
 }
 static void stack_dump(lua_State* L) {
 	int top = lua_gettop(L); // Get the index of the top element

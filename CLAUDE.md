@@ -1,8 +1,12 @@
 This is a game engine project. Uses C++ VS2026 , OpenGL, SDL2, vcpkg. No CMAKE.
 
-path to compilier: "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\MSBuild.exe"
+path to compilier: "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\MSBuild.exe"'
+
+NEVER use VS compilier under "C:\Program Files (x86)\...", that is old compilier.
 
 Write tests. Testing documentation found at [[docs/testing.md]]. Use Scripts/build_and_test.ps1 to build and run unit tests. Use Scripts/integration_tests.ps1 to build and run integration tests (with cli options).
+
+When a test crashes, use `Scripts/dbg.ps1 <dump> '<cdb cmd>'` to inspect locals/pointers/stack frames/etc.. See [[docs/debugging/crash_dumps.md]] for commands.
 
 Use git to commit after you are done. Write summaries in the message of all commits. 
 

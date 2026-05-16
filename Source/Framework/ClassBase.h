@@ -127,6 +127,11 @@ public:
 	bool is_class_referenced_from_lua() const;
 	void free_table_registry_id();
 
+	// Used by PROP_LUA_BACKED reflection. Returns a per-instance byte buffer in which
+	// Lua-authored fields are stored (offsets defined by LuaClassTypeInfo). Default null
+	// for plain C++ classes; Component overrides to return its lua_field_shadow.
+	virtual uint8_t* get_lua_field_shadow() const { return nullptr; }
+
 private:
 	// this is used for interop with lua
 	// this is the table id returned by luaL_ref in the registry

@@ -15,6 +15,7 @@ public:
 struct PropertyInfoList;
 class Entity;
 class Model;
+class LuaClassTypeInfo;
 class Component : public BaseUpdater
 {
 public:
@@ -64,6 +65,7 @@ protected:
 #endif
 
 private:
+	std::unique_ptr<uint8_t[]> lua_field_shadow;
 	void set_owner(Entity* e) {
 		ASSERT(entity_owner == nullptr);
 		entity_owner = e;
@@ -74,6 +76,23 @@ private:
 
 	void destroy_internal();
 
+public:
+	// Per-instance byte buffer that backs PROP_LUA_BACKED fields for Lua-defined
+	// Component subclasses. Set once by LuaClassTypeInfo::lua_class_alloc when
+	// instantiating a scriptable Component; left null for plain C++ components.
+	// Layout (offsets, sizes) is owned by lua_owner_type.
+	//
+	// lua_owner_type is captured at alloc time and used during ~Component to drive
+	// cleanup, because get_type() inside a base-class dtor returns Component's
+	// StaticType (virtual dispatch is downgraded as derived dtors finish), making
+	// the live-instance unregister unreachable otherwise.
+	uint8_t* get_lua_field_shadow() const override { return lua_field_shadow.get(); }
+	void take_lua_field_shadow(std::unique_ptr<uint8_t[]> buf) { lua_field_shadow = std::move(buf); }
+	void set_lua_owner_type(const LuaClassTypeInfo* t) { lua_owner_type = t; }
+	const LuaClassTypeInfo* get_lua_owner_type() const { return lua_owner_type; }
+
+private:
+	const LuaClassTypeInfo* lua_owner_type = nullptr;
 	Entity* entity_owner = nullptr;
 	bool call_init_in_editor = false;
 	bool tick_enabled = false;

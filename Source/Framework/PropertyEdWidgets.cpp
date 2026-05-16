@@ -9,7 +9,7 @@
 bool StringEditor::internal_update() {
 	ASSERT(prop->type == core_type_id::StdString);
 
-	auto str = (std::string*)((char*)instance + prop->offset);
+	auto str = (std::string*)prop->get_ptr(instance);
 
 	ImguiInputTextCallbackUserStruct user;
 	user.string = str;
@@ -24,21 +24,21 @@ bool StringEditor::internal_update() {
 bool StringEditor::can_reset() {
 	ASSERT(prop->type == core_type_id::StdString);
 
-	auto str = (std::string*)((char*)instance + prop->offset);
+	auto str = (std::string*)prop->get_ptr(instance);
 	return *str != prop->range_hint;
 }
 
 void StringEditor::reset_value() {
 	ASSERT(prop->type == core_type_id::StdString);
 
-	auto str = (std::string*)((char*)instance + prop->offset);
+	auto str = (std::string*)prop->get_ptr(instance);
 	*str = prop->range_hint;
 }
 
 bool FloatEditor::internal_update() {
 	ASSERT(prop->type == core_type_id::Float);
 
-	float* ptr = (float*)((char*)instance + prop->offset);
+	float* ptr = (float*)prop->get_ptr(instance);
 	const PropertyAttributes& a = prop->attrs;
 
 	// If min/max are set, use a clamped DragFloat; otherwise InputFloat preserves prior behaviour.

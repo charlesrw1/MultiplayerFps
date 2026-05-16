@@ -28,6 +28,7 @@
 #include "Framework/Rect2d.h"
 #include "Framework/AddClassToFactory.h"
 #include "Game/EntityComponent.h"
+#include "Scripting/ScriptManager.h"
 #include "UI/UIBuilder.h"
 #include "PropertyEditors.h"
 #include "LevelSerialization/SerializeNew.h"
@@ -183,6 +184,14 @@ void EditorDoc::init_new() {
 			prop_ed->refresh_grid(*api);
 		}
 	});
+
+	// Hot-reloading a Lua class reallocates LuaClassTypeInfo::lua_props_storage and
+	// rewrites ti->props, freeing the PropertyInfo entries the cached grid rows point
+	// at. Drop the cache so the next draw rebuilds against the new layout.
+	if (ScriptManager::inst) {
+		ScriptManager::inst->on_class_reloaded.add(prop_editor.get(),
+												   [prop_ed = prop_editor.get()]() { prop_ed->invalidate_cache(); });
+	}
 
 	manipulate = std::make_unique<ManipulateTransformTool>(*this);
 	drag_drop_preview = std::make_unique<DragDropPreview>();
@@ -435,6 +444,8 @@ EditorDoc::EditorDoc() : vis_filter(*this) {
 EditorDoc::~EditorDoc() {
 	// level will get unloaded in the main loop
 	sys_print(Debug, "deleting map file for editor...\n");
+	if (ScriptManager::inst && prop_editor)
+		ScriptManager::inst->on_class_reloaded.remove(prop_editor.get());
 	command_mgr->clear_all();
 	on_close.invoke();
 

@@ -14,6 +14,12 @@ public:
 	void refresh_grid(const ISelectionApi& api);
 
 	bool property_grid_has_rows() const { return grid_cache.row_count() > 0; }
+
+	// Drop the cached object/row state so the next draw rebuilds from scratch.
+	// Called when something invalidates the PropertyInfo* / PropertyInfoList*
+	// pointers the cached rows hold (e.g. Lua class hot-reload reallocates
+	// LuaClassTypeInfo::lua_props_storage).
+	void invalidate_cache() { grid_cache.invalidate(); }
 private:
 	MulticastDelegate<> on_property_change_internal;
 
@@ -32,6 +38,7 @@ private:
 		GridWithClasses(const FnFactory<IPropertyEditor>& factory) : grid(factory) {}
 		bool set_what_i_want_and_draw(std::vector<obj<BaseUpdater>> objs);
 		int row_count() const { return grid.rows.size(); }
+		void invalidate() { cached_from_prev.clear(); grid.clear_all(); }
 	private:
 		std::vector<obj<BaseUpdater>> cached_from_prev;
 		PropertyGrid grid;

@@ -56,6 +56,11 @@ enum SerializedPropFlags
 	// DONT USE
 	PROP_IS_ENTITY_COMPONENT_TRANSFORM = 16,
 	PROP_READ_ONLY_IF_NATIVE = 32, // marks a prop as being read-only only if its from native component
+
+	// Storage lives in the owning ClassBase's lua_field_shadow buffer (offset is index into that buffer),
+	// not at (inst + offset). Set on synthesized PropertyInfo for Lua-defined Component subclasses so the
+	// reflection-backed editor + serializer can read/write Lua-authored fields with no code changes.
+	PROP_LUA_BACKED = 64,
 };
 
 struct ParsedHintStr
@@ -129,7 +134,7 @@ struct PropertyInfo
 	// int(*call_function)(lua_State* L) = nullptr;
 	// const multicast_funcs* multicast = nullptr;
 
-	uint8_t* get_ptr(const void* inst) const { return (uint8_t*)inst + offset; }
+	uint8_t* get_ptr(const void* inst) const;
 
 	float get_float(const void* ptr) const;
 	void set_float(void* ptr, float f) const;

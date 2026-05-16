@@ -24,6 +24,10 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 
 - [[navigation]] — Recast/Detour navmesh system: components, baker, sidecar format, debug cvars
 
+## Debugging
+
+- [[debugging/crash_dumps]] — minidump capture on SEH crashes + `analyze_dump.ps1` for cdb-driven inspection
+
 ## Tooling
 
 - [[tooling/docs-cli]] — the `docs` CLI: validate links, locate sections, find inbound refs

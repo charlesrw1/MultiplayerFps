@@ -2,13 +2,18 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
+#include <memory>
 using std::string;
 using std::unordered_map;
 using std::vector;
 #include "Framework/ClassTypeInfo.h"
 #include "Framework/ReflectionProp.h"
 #include "Framework/ConsoleCmdGroup.h"
+#include "Framework/MulticastDelegate.h"
 #include <stdexcept>
+
+class Component;
 
 struct ParseProperty
 {
@@ -44,11 +49,49 @@ public:
 	}
 	void set_had_changes() { had_changes = true; }
 
+	// Stage the next ParseProperty list. Held in `pending_parsed_properties` and only
+	// committed into `parsed_properties` from inside ScriptManager::check_for_reload, AFTER
+	// the live-instance snapshot has been taken — that snapshot reads pi.name pointers
+	// into the old parsed_properties' string storage, so we must not destroy it earlier.
+	void set_parsed_properties(vector<ParseProperty> props) { pending_parsed_properties = std::move(props); }
+
+	// Reflection accessors used by the reload-merge pass + tests.
+	uint32_t get_lua_field_shadow_size() const { return lua_field_shadow_size; }
+	const PropertyInfoList* get_lua_props_list() const { return lua_props_list.list ? &lua_props_list : nullptr; }
+	const vector<PropertyInfo>& get_lua_props_storage() const { return lua_props_storage; }
+	int get_template_lua_table() const { return template_lua_table; }
+
+	// Live-instance bookkeeping for hot-reload field migration. Inserted in lua_class_alloc,
+	// erased in the Component dtor hook (Component::~Component calls unregister_lua_instance).
+	void register_lua_instance(Component* c) { live_instances.insert(c); }
+	void unregister_lua_instance(Component* c) { live_instances.erase(c); }
+	const std::unordered_set<Component*>& get_live_instances() const { return live_instances; }
+
+	// Test-only: runs the layout/typing logic against parsed_properties without
+	// requiring ClassBase::find_class("Component") to succeed (which needs the full
+	// engine registry init). Production code uses init_lua_type() instead.
+	void synthesize_lua_props_unchecked_for_test();
+
 private:
+	friend class ScriptManager;
+
 	bool had_changes = false;
 	int template_lua_table = 0;
 	static ClassBase* lua_class_alloc(const ClassTypeInfo* c);
 	string lua_classname;
+
+	// Cached parse + synthesized reflection metadata for Component subclasses.
+	// parsed_properties owns the const char* strings referenced by lua_props_storage entries,
+	// so its lifetime must outlive snapshot reads in check_for_reload.
+	vector<ParseProperty> parsed_properties;
+	vector<ParseProperty> pending_parsed_properties; // committed by ScriptManager::check_for_reload
+	vector<PropertyInfo>  lua_props_storage;
+	PropertyInfoList      lua_props_list = {};
+	uint32_t              lua_field_shadow_size = 0;
+
+	std::unordered_set<Component*> live_instances;
+
+	void synthesize_lua_props_for_component_subclass();
 };
 class LuaRuntimeError : public std::runtime_error
 {
@@ -82,6 +125,17 @@ public:
 	void reload_from_content(const std::string& source, const std::string& chunkname);
 	// Connect to a MobDebug server (ZeroBrane/VS Code). Call after load_script_files().
 	void activate_debugger(const char* host, int port);
+
+	// Called from Component::~Component to drop the instance from its LuaClassTypeInfo
+	// live set and run destructors over any non-POD shadow fields (e.g. std::string).
+	// No-op when c's type is not Lua-defined or no ScriptManager is alive.
+	static void on_component_destructed(Component* c);
+
+	// Fires at the end of check_for_reload() when at least one Lua class was rebuilt.
+	// Listeners must drop any cached `const PropertyInfo*` / `PropertyInfoList*` they
+	// hold into LuaClassTypeInfo storage — phase 3 reallocates lua_props_storage and
+	// rewrites ti->props, freeing the old PropertyInfo entries.
+	MulticastDelegate<> on_class_reloaded;
 
 private:
 	bool had_changes = false;

@@ -44,6 +44,20 @@ if ($exitCode -eq 0) {
 } else {
     Write-Host ""
     Write-Error "Tests FAILED (exit $exitCode)"
+
+    # The SEH filter writes crash_*.dmp into the working directory on an
+    # unhandled exception. Print a first-look summary via dbg.ps1; the AI can
+    # run further queries against the dump itself for deeper inspection.
+    $dumps = Get-ChildItem -Path $RepoRoot -Filter "*.dmp" -ErrorAction SilentlyContinue |
+             Where-Object { $_.LastWriteTime -gt (Get-Date).AddMinutes(-10) }
+    foreach ($dump in $dumps) {
+        Write-Host "`n=== minidump: $($dump.FullName) ===" -ForegroundColor Yellow
+        Write-Host "--- stack (kP 30) ---" -ForegroundColor DarkYellow
+        & "$PSScriptRoot\dbg.ps1" $dump.FullName "kP 30"
+        Write-Host "--- frame 0 locals ---" -ForegroundColor DarkYellow
+        & "$PSScriptRoot\dbg.ps1" $dump.FullName ".frame 0; dx -r2 @`$curframe.LocalVariables"
+        Write-Host "[CRASH] for deeper inspection: Scripts\dbg.ps1 $($dump.FullName) '<cdb command>'" -ForegroundColor Yellow
+    }
 }
 
 exit $exitCode

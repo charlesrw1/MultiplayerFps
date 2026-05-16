@@ -390,7 +390,17 @@
       "PowerShell(& Scripts/build_and_test.ps1 -SkipTests 2>&1 | Select-Object -Last 40)",
       "Bash(xargs -0 grep -l \"Level\\\\|level\\\\|streaming\\\\|Streaming\")",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\" -Force)",
-      "Bash(Select-Object Name, FullName)"
+      "Bash(Select-Object Name, FullName)",
+      "PowerShell(.\\\\Scripts\\\\build_and_test.ps1 -Configuration Debug 2>&1 | Select-Object -Last 80)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" .\\\\CsRemake.sln /t:UnitTests /p:Configuration=Debug /p:Platform=x64 /v:minimal 2>&1 | Select-Object -Last 40)",
+      "PowerShell(& .\\\\Scripts\\\\dbg.ps1 .\\\\crash_selftest.dmp \"kP 12\")",
+      "PowerShell(& .\\\\Scripts\\\\dbg.ps1 .\\\\crash_selftest.dmp \".frame 1; dx -r2 @`$curframe.LocalVariables\")",
+      "PowerShell(\"=== STACK ===\")",
+      "PowerShell(\"\")",
+      "PowerShell(\"=== LOCALS in run_crash_self_test ===\")",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" .\\\\CsRemake.sln /t:UnitTests /p:Configuration=Debug /p:Platform=x64 /v:minimal 2>&1)",
+      "PowerShell(\"---\")"
     ]
   },
   "enabledPlugins": {

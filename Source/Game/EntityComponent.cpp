@@ -6,6 +6,7 @@
 #include "GameEnginePublic.h"
 #include "Framework/ReflectionMacros.h"
 #include "Framework/Serializer.h"
+#include "Scripting/ScriptManager.h"
 #include <stdexcept>
 
 #ifdef EDITOR_BUILD
@@ -52,6 +53,14 @@ public:
 		filepaths.push_back("NavAgentComponent");
 
 		filepaths.push_back("daf");
+
+		// Also surface every Lua-defined Component subclass so script-authored components
+		// show up in the same add-component picker as the C++ ones above.
+		for (auto it = ClassBase::get_subclasses(&Component::StaticType); !it.is_end(); it.next()) {
+			auto* ti = it.get_type();
+			if (ti && ti->get_is_lua_class() && ti->has_allocate_func())
+				filepaths.push_back(ti->classname);
+		}
 	}
 	virtual const ClassTypeInfo* get_asset_class_type() const { return &Component::StaticType; }
 };
@@ -128,6 +137,10 @@ void Component::destroy_internal() {
 
 Component::~Component() {
 	ASSERT(init_state != initialization_state::CALLED_START);
+	// Drop ourselves from any Lua live-instance set and run destructors over
+	// non-POD PROP_LUA_BACKED fields (e.g. std::string) before lua_field_shadow's
+	// unique_ptr releases the raw byte buffer.
+	ScriptManager::on_component_destructed(this);
 }
 
 const glm::mat4& Component::get_ws_transform() {

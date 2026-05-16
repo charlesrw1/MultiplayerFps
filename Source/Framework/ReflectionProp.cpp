@@ -1,4 +1,5 @@
 #include "Framework/ReflectionProp.h"
+#include "Framework/ClassBase.h"
 #include "Framework/DictParser.h"
 #include "Framework/DictWriter.h"
 #include "Framework/Util.h"
@@ -6,6 +7,16 @@
 #include "Framework/ArrayReflection.h"
 #include <glm/glm.hpp>
 #include <glm/gtx/quaternion.hpp>
+
+uint8_t* PropertyInfo::get_ptr(const void* inst) const {
+	if (flags & PROP_LUA_BACKED) {
+		// inst must be a ClassBase whose shadow buffer holds Lua-backed fields
+		uint8_t* shadow = static_cast<const ClassBase*>(inst)->get_lua_field_shadow();
+		ASSERT(shadow && "PROP_LUA_BACKED requires owner to provide a shadow buffer");
+		return shadow + offset;
+	}
+	return (uint8_t*)inst + offset;
+}
 
 inline std::string string_view_to_std_string(StringView view) {
 	return std::string(view.str_start, view.str_len);
@@ -180,25 +191,26 @@ bool IListCallback::get_is_new_list_type() const {
 float PropertyInfo::get_float(const void* ptr) const {
 	ASSERT(type == core_type_id::Float);
 
-	return *(float*)((char*)ptr + offset);
+	return *(float*)get_ptr(ptr);
 }
 
 void PropertyInfo::set_float(void* ptr, float f) const {
 	ASSERT(type == core_type_id::Float);
 
-	*(float*)((char*)ptr + offset) = f;
+	*(float*)get_ptr(ptr) = f;
 }
 
 uint64_t PropertyInfo::get_int(const void* ptr) const {
 	ASSERT(is_integral_type());
+	uint8_t* p = get_ptr(ptr);
 	if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
-		return *(int8_t*)((char*)ptr + offset);
+		return *(int8_t*)p;
 	} else if (type == core_type_id::Int16 || type == core_type_id::Enum16) {
-		return *(uint16_t*)((char*)ptr + offset);
+		return *(uint16_t*)p;
 	} else if (type == core_type_id::Int32 || type == core_type_id::Enum32) {
-		return *(uint32_t*)((char*)ptr + offset);
+		return *(uint32_t*)p;
 	} else if (type == core_type_id::Int64) {
-		return *(uint64_t*)((char*)ptr + offset);
+		return *(uint64_t*)p;
 	} else {
 		ASSERT(0);
 		return 0;
@@ -207,14 +219,15 @@ uint64_t PropertyInfo::get_int(const void* ptr) const {
 
 void PropertyInfo::set_int(void* ptr, uint64_t i) const {
 	ASSERT(is_integral_type());
+	uint8_t* p = get_ptr(ptr);
 	if (type == core_type_id::Bool || type == core_type_id::Int8 || type == core_type_id::Enum8) {
-		*(int8_t*)((char*)ptr + offset) = i;
+		*(int8_t*)p = i;
 	} else if (type == core_type_id::Int16 || type == core_type_id::Enum16) {
-		*(uint16_t*)((char*)ptr + offset) = i;
+		*(uint16_t*)p = i;
 	} else if (type == core_type_id::Int32 || type == core_type_id::Enum32) {
-		*(uint32_t*)((char*)ptr + offset) = i;
+		*(uint32_t*)p = i;
 	} else if (type == core_type_id::Int64) {
-		*(uint64_t*)((char*)ptr + offset) = i; // ERROR NARROWING
+		*(uint64_t*)p = i; // ERROR NARROWING
 	} else {
 		ASSERT(0);
 	}

@@ -15,6 +15,11 @@ void set_assert_log_path(const char* path);
 // a test runner just exits with 0xC0000005 and no diagnostic — agents see only
 // "program crashed" with nothing to investigate. No-op on non-Windows.
 void install_crash_handler();
+// Writes a minidump of the current process state to `path`. No-op on
+// non-Windows; returns false on failure. Useful for capturing a snapshot
+// from a probe point without crashing — and used by the crash-dump smoke
+// test to validate the underlying dbghelp pipeline.
+bool write_snapshot_minidump(const char* path);
 #ifdef WITH_ASSERT
 #define ASSERT(x)                                                                                                      \
 	do {                                                                                                               \
