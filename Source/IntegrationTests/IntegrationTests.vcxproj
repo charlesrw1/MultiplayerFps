@@ -96,6 +96,7 @@
     <ClCompile Include="Tests\Physics\test_physicsbody_lifecycle.cpp" />
     <ClCompile Include="Tests\Assets\test_asset_system.cpp" />
     <ClCompile Include="Tests\Navigation\test_nav.cpp" />
+    <ClCompile Include="Tests\Level\test_static_strip.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="TestTask.h" />

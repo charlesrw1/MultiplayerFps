@@ -85,6 +85,9 @@ public:
 	void set_add_collision(bool add_col) { this->add_collision_if_available = true; }
 	bool get_add_collision() const { return add_collision_if_available; }
 
+	// public so the static-prop bake (free function below) can call it without becoming a friend.
+	void populate_render_object(struct Render_Object& out, const glm::mat4& ws_transform) const;
+
 private:
 	void update_physics_mesh();
 

@@ -299,14 +299,17 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 
 #endif
 	// Pre-pass: identify static-prop entities that will be stripped from all_world_ents.
-	// Their components are also marked so the insert+init loops skip them entirely.
-	// See `is_strippable_static_prop` for eligibility rules.
+	// Components are also added to strip_set so the insert+init loops skip them; they get
+	// freed during the bake loop via their owner Entity (we never iterate Components in the
+	// bake — they're at later indices in objs and would be dangling pointers by then).
 	std::unordered_set<BaseUpdater*> strip_set;
+	std::vector<Entity*> strip_entities;
 	const bool can_strip = !eng->is_editor_level() && !r_disable_static_strip.get_bool();
 	if (can_strip) {
 		for (auto* o : objs) {
 			if (auto* e = o->cast_to<Entity>()) {
 				if (is_strippable_static_prop(e)) {
+					strip_entities.push_back(e);
 					strip_set.insert(e);
 					for (auto* c : e->get_components())
 						strip_set.insert(c);
@@ -357,11 +360,11 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 	// Bake stripped static-prop entities into the pool. Render + (optional) physics handles
 	// outlive the source Entity/Component, which we then free directly — they were never
 	// inserted into all_world_ents and never had start() called, so we bypass destroy().
-	if (!strip_set.empty()) {
-		for (auto* o : objs) {
-			if (!o) continue;
-			auto* e = o->cast_to<Entity>();
-			if (!e || !strip_set.count(e)) continue;
+	// Walk strip_entities (built in the pre-pass) instead of objs: the matching Components
+	// also live in objs but get freed via their owner here, so iterating objs and calling
+	// cast_to on a Component pointer that we've already freed would touch a dangling vtable.
+	if (!strip_entities.empty()) {
+		for (Entity* e : strip_entities) {
 			ASSERT(e->get_components().size() == 1);
 			auto* mc = (MeshComponent*)e->get_components().front();
 			ASSERT(mc && &mc->get_type() == &MeshComponent::StaticType);
@@ -380,8 +383,9 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 			delete mc;
 			delete e;
 		}
-		// Null out stripped entries so the unknown_objs / mark_ownership_transferred path
-		// doesn't try to revisit them. (scene.all_obj_vec ownership is transferred below.)
+		// Null out stripped entries so the ownership-transfer path doesn't touch dangling pointers.
+		// strip_set contains the (now-deleted) Entity AND Component pointers; comparing the dangling
+		// pointer values is fine (we never dereference them).
 		for (auto& o : objs) {
 			if (o && strip_set.count(o)) o = nullptr;
 		}

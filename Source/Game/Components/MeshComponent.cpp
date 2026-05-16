@@ -120,19 +120,10 @@ void MeshComponent::set_material_override(const MaterialInstance* mi) {
 	sync_render_data();
 }
 
-void MeshComponent::on_sync_render_data() {
-	if (!draw_handle.is_valid())
-		draw_handle = idraw->get_scene()->register_obj();
-	Render_Object obj;
+void MeshComponent::populate_render_object(Render_Object& obj, const glm::mat4& ws_transform) const {
 	obj.model = model.get();
 	obj.visible = is_visible;
-#ifdef EDITOR_BUILD
-	obj.visible &= !get_owner()->get_hidden_in_editor();
-	obj.outline = get_owner()->get_is_any_selected_in_editor();
-#endif //  EDITOR_BUILD
-
-	obj.transform = get_ws_transform();
-	obj.owner = this;
+	obj.transform = ws_transform;
 	obj.is_skybox = is_skybox;
 	obj.shadow_caster = cast_shadows;
 	obj.ignore_in_baking = ignore_in_baking;
@@ -151,22 +142,28 @@ void MeshComponent::on_sync_render_data() {
 	float p = dist_cull_percentage / 100.f;
 	obj.dist_cull_2 = p * p;
 	obj.sort_first = sort_first;
+}
+
+void MeshComponent::on_sync_render_data() {
+	if (!draw_handle.is_valid())
+		draw_handle = idraw->get_scene()->register_obj();
+	Render_Object obj;
+	populate_render_object(obj, get_ws_transform());
+	obj.owner = this;
+#ifdef EDITOR_BUILD
+	obj.visible &= !get_owner()->get_hidden_in_editor();
+	obj.outline = get_owner()->get_is_any_selected_in_editor();
+#endif //  EDITOR_BUILD
 	idraw->get_scene()->update_obj(draw_handle, obj);
 }
 
-// Mirror of MeshComponent::on_sync_render_data minus the Component-lifetime bookkeeping.
-// Static props have no animator and no editor selection state; they're set once at load and never updated.
+// Reuses MeshComponent::populate_render_object so the static-prop bake stays bit-identical
+// to the live sync path. Owner is null because we delete the source Component immediately.
 handle<Render_Object> bake_static_meshcomponent_render(const MeshComponent& mc, const glm::mat4& ws_transform) {
 	handle<Render_Object> h = idraw->get_scene()->register_obj();
 	Render_Object obj;
-	obj.model = (Model*)mc.get_model();
-	obj.visible = mc.get_is_visible();
-	obj.transform = ws_transform;
-	obj.owner = nullptr; // no Component to point at
-	obj.is_skybox = mc.get_is_skybox();
-	obj.shadow_caster = mc.get_casts_shadows();
-	if (auto* mat = mc.get_material_override())
-		obj.mat_override = (MaterialInstance*)mat;
+	mc.populate_render_object(obj, ws_transform);
+	obj.owner = nullptr;
 	idraw->get_scene()->update_obj(h, obj);
 	return h;
 }
