@@ -22,7 +22,7 @@ Runs `--check_format=json` with `--check_out_path` pointing at a fresh temp dir 
 
 - `runtime.version` = `"LuaJIT"` (matches the embedded host; gives `bit`, `jit` globals).
 - `workspace.library` = `["Data/scripts"]` so `lua_stubs.lua` annotations resolve from anywhere (e.g. files under `TestFiles/`).
-- `workspace.ignoreDir` excludes `.claude`, `External`, build dirs, and `Data/scripts/lib` (LuaSocket/mobdebug — third-party, noisy).
+- `workspace.ignoreDir` excludes `.claude`, `External`, build dirs, and `Data/scripts/lib` (LuaSocket and other third-party modules — noisy).
 - `diagnostics.disable` = `["lowercase-global", "missing-fields"]`. Lowercase globals are intentional in this codebase (vec_add alias style); missing-fields fires on every `{}` table literal.
 - `diagnostics.globals` whitelists the `vec_*`/`normalize`/`cross` aliases from `bike_player.lua`.
 

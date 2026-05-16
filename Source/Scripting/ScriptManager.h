@@ -123,7 +123,8 @@ public:
 	// Load and execute Lua source text directly, without touching the filesystem.
 	// Used by reload_one_file and directly by tests.
 	void reload_from_content(const std::string& source, const std::string& chunkname);
-	// Connect to a MobDebug server (ZeroBrane/VS Code). Call after load_script_files().
+	// Start EmmyLuaDebugger TCP listener so VS Code (tangzx.emmylua) can attach.
+	// Call after load_script_files(). See docs/scripting/vscode_debugger.md.
 	void activate_debugger(const char* host, int port);
 
 	// Called from Component::~Component to drop the instance from its LuaClassTypeInfo

@@ -15,20 +15,25 @@ extern "C"
 #include <lauxlib.h>
 }
 
+// @docs [[scripting/vscode_debugger]]
 static ConfigVar g_lua_debug("g_lua_debug", "0", CVAR_BOOL,
-							 "Start MobDebug on script load (requires ZeroBrane/DAP server on port g_lua_debug_port)");
-static ConfigVar g_lua_debug_host("g_lua_debug_host", "localhost", 0, "MobDebug server host");
-static ConfigVar g_lua_debug_port("g_lua_debug_port", "8172", CVAR_INTEGER | CVAR_UNBOUNDED, "MobDebug server port");
-// Extra directory to add to Lua package.cpath for loading socket/core.dll and mime/core.dll.
-// Set to your vcpkg bin dir, e.g.: C:/Users/you/source/vcpkg/installed/x64-windows/bin
+							 "Start EmmyLuaDebugger on script load; attach VS Code (tangzx.emmylua) to g_lua_debug_port");
+static ConfigVar g_lua_debug_host("g_lua_debug_host", "localhost", 0, "EmmyLuaDebugger listen host");
+static ConfigVar g_lua_debug_port("g_lua_debug_port", "9966", CVAR_INTEGER | CVAR_UNBOUNDED,
+								  "EmmyLuaDebugger listen port (VS Code attach)");
+static ConfigVar g_lua_debug_wait("g_lua_debug_wait", "0", CVAR_BOOL,
+								  "Block on emmy_core.waitIDE() at startup so early breakpoints land before scripts run");
+// Extra directory to add to Lua package.cpath for loading native Lua C modules
+// (emmy_core.dll for the debugger, socket/core.dll, mime/core.dll).
+// Set to a dir containing those dlls, e.g.: C:/Users/you/source/vcpkg/installed/x64-windows/bin
 static ConfigVar g_lua_cpath_extra("g_lua_cpath_extra", "", 0,
-								   "Extra dir appended to Lua package.cpath for C socket extensions");
+								   "Extra dir appended to Lua package.cpath for native Lua C modules");
 
 ScriptManager::ScriptManager() {
 	lua = luaL_newstate();
 	luaL_openlibs(lua);
 
-	// Add Data/scripts/lib/ to package.path so require("mobdebug"), require("socket"), etc. work.
+	// Add Data/scripts/lib/ to package.path so require("socket"), etc. work.
 	// Files in lib/ are module-style (not auto-executed by reload_all_scripts).
 	lua_getglobal(lua, "package");
 	lua_getfield(lua, -1, "path");
@@ -242,7 +247,7 @@ void ScriptManager::reload_all_scripts() {
 	for (auto& file : FileSys::find_game_files_path("scripts")) {
 		if (file.find("lua_stubs.lua") != string::npos)
 			continue;
-		// lib/ holds require-style modules (mobdebug, socket, etc.) — not auto-executed
+		// lib/ holds require-style modules (socket, etc.) — not auto-executed
 		if (file.find("/lib/") != string::npos || file.find("\\lib\\") != string::npos)
 			continue;
 		// tests/ is loaded explicitly via load_test_scripts() in test mode only,
@@ -303,10 +308,15 @@ void ScriptManager::load_script_files() {
 }
 
 void ScriptManager::activate_debugger(const char* host, int port) {
-	sys_print(Info, "ScriptManager: starting MobDebug, connecting to %s:%d\n", host, port);
-	std::string code = std::string("require('mobdebug').start('") + host + "'," + std::to_string(port) + ")";
+	const bool wait = g_lua_debug_wait.get_bool();
+	sys_print(Info, "ScriptManager: starting EmmyLuaDebugger on %s:%d (wait=%d)\n", host, port, wait ? 1 : 0);
+	std::string code = "local ok, dbg = pcall(require, 'emmy_core')\n";
+	code += "if not ok then error('emmy_core not found on package.cpath; set g_lua_cpath_extra to a dir containing emmy_core.dll: ' .. tostring(dbg)) end\n";
+	code += "dbg.tcpListen('" + std::string(host) + "', " + std::to_string(port) + ")\n";
+	if (wait)
+		code += "dbg.waitIDE()\n";
 	if (luaL_dostring(lua, code.c_str()) != LUA_OK) {
-		sys_print(Error, "ScriptManager: MobDebug start failed: %s\n", lua_tostring(lua, -1));
+		sys_print(Error, "ScriptManager: EmmyLuaDebugger start failed: %s\n", lua_tostring(lua, -1));
 		lua_pop(lua, 1);
 	}
 }

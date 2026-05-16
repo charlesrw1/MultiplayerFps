@@ -1,0 +1,17 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "EmmyLua Attach (localhost:9966)",
+      "type": "emmylua_new",
+      "request": "attach",
+      "host": "localhost",
+      "port": 9966,
+      "ext": [".lua"],
+      "ideConnectDebugger": true,
+      "sourcePaths": [
+        "${workspaceFolder}/Data/scripts"
+      ]
+    }
+  ]
+}

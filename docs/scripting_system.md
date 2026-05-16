@@ -16,6 +16,10 @@
 | `Data/scripts/lua_stubs.lua` | Generated LSP type annotations for every `scriptable` C++ class — see [[#Lua Stubs]] |
 | `Source/Testheader.h` | `InterfaceClass` — built-in scriptable test class |
 
+## Debugger
+
+VS Code attach via EmmyLuaDebugger — see [[scripting/vscode_debugger]].
+
 ## Lua Stubs
 
 `Data/scripts/lua_stubs.lua` is the **authoritative API surface** for AI/LSP: every `scriptable` C++ class, method signature, parameter type, return type, and `REFLECT`'d enum constant is emitted here. Consult it before guessing a method name.

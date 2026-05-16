@@ -27,6 +27,7 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 ## Debugging
 
 - [[debugging/crash_dumps]] — minidump capture on SEH crashes + `analyze_dump.ps1` for cdb-driven inspection
+- [[scripting/vscode_debugger]] — attach VS Code (EmmyLuaDebugger) to a running build to step Lua scripts
 
 ## Tooling
 

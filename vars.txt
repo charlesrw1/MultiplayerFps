@@ -25,11 +25,11 @@ g_project_name DevEngine
 
 # project vars
 godot_lightmap_engine_path "C:/Users/charl/Documents/lightmapexporter/"
-#g_project_base "Data"
-g_project_base "D:/Data"
+g_project_base "Data"
+#g_project_base "D:/Data"
 
-g_application_class "EngineTesterAppImpl"
-#g_application_class "BikeGameApplication"
+#g_application_class "EngineTesterAppImpl"
+g_application_class "BikeGameApplication"
 #g_application_class "ObsGameApplication"
 
 g_draw_grid 0
@@ -51,6 +51,13 @@ ignore_folders 1
 dt 0
 
 debug.menu_width 400
+
+# Lua debugger (VS Code via EmmyLuaDebugger). See docs/scripting/vscode_debugger.md.
+g_lua_cpath_extra "C:/Users/charl/source/vcpkg/installed/x64-windows/bin"
+g_lua_debug 1
+g_lua_debug_host "localhost"
+g_lua_debug_port 9966
+g_lua_debug_wait 0
 
 
 [game_test]
