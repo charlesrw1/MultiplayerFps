@@ -1,6 +1,8 @@
 {
   "permissions": {
     "allow": [
+      "Bash(es *)",
+      "Bash(winget search *)",
       "Bash(find /c/Users/charl/source/repos/CsRemake -name *test* -o -name *Test*)",
       "Bash(vcpkg list:*)",
       "Bash(where vcpkg:*)",
@@ -385,7 +387,10 @@
       "PowerShell(& \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\Scripts\\\\integration_test.ps1\" -Mode game 2>&1 | Select-Object -Last 50; \"exit=$LASTEXITCODE\")",
       "PowerShell(.\\\\Scripts\\\\integration_test.ps1 -Mode editor 2>&1 | Select-Object -Last 30)",
       "Bash(Select-Object -Last 30)",
-      "PowerShell(& Scripts/build_and_test.ps1 -SkipTests 2>&1 | Select-Object -Last 40)"
+      "PowerShell(& Scripts/build_and_test.ps1 -SkipTests 2>&1 | Select-Object -Last 40)",
+      "Bash(xargs -0 grep -l \"Level\\\\|level\\\\|streaming\\\\|Streaming\")",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\" -Force)",
+      "Bash(Select-Object Name, FullName)"
     ]
   },
   "enabledPlugins": {

@@ -375,6 +375,16 @@ void GameEngineLocal::loop() {
 			// update input, console cmd buffer, could change maps etc.
 			frame_start();
 
+#ifdef EDITOR_BUILD
+			// In editor mode, if no tool got opened (e.g. via -open-editor in
+			// init.txt, recents, or a script), open an empty map so the viewport
+			// shows the editor's grey clear instead of the bare-framebuffer green.
+			// Skip during tests — they manage their own editor doc lifecycle.
+			if (is_editor_state() && !editor_tool && !test_runner && !is_test_mode()) {
+				open_tool("<empty>");
+			}
+#endif
+
 			const bool skip_rendering = !draw_this_frame();
 			// overlapped update (game+render)
 			do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering);
