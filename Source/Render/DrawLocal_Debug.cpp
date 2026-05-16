@@ -1,6 +1,5 @@
 ﻿#include "DrawLocal.h"
 #include "Framework/Util.h"
-#include "glad/glad.h"
 #include "Render/Texture.h"
 #include "imgui.h"
 #include "glm/ext/matrix_transform.hpp"
@@ -142,14 +141,12 @@ float Renderer::get_scene_depth_for_editor(int x, int y) {
 		return {-1};
 	}
 
-	glFlush();
-	glFinish();
+	gfx().wait_for_gpu_idle();
 
 	const size_t size = cur_h * cur_w;
 	float* buffer_pixels = new float[size];
 
-	glGetTextureImage(tex.scene_depth->get_internal_handle(), 0, GL_DEPTH_COMPONENT, GL_FLOAT, size * sizeof(float),
-					  buffer_pixels);
+	gfx().download_texture_2d(tex.scene_depth, 0, buffer_pixels, int(size * sizeof(float)));
 
 	y = cur_h - y - 1;
 
@@ -176,12 +173,10 @@ std::vector<handle<Render_Object>> Renderer::mouse_box_select_for_editor(int x, 
 		sys_print(Error, "Renderer::mouse_box_select_for_editor: invalid mouse coords\n");
 		return {};
 	}
-	glFlush();
-	glFinish();
+	gfx().wait_for_gpu_idle();
 	const int size = cur_h * cur_w * 4;
 	std::vector<uint8_t> bufferPixels(size, 0);
-	glGetTextureImage(tex.editor_id_buffer->get_internal_handle(), 0, GL_RGBA, GL_UNSIGNED_BYTE, size,
-					  bufferPixels.data());
+	gfx().download_texture_2d(tex.editor_id_buffer, 0, bufferPixels.data(), size);
 	y = cur_h - y - 1;
 	std::unordered_set<int> found;
 	const int skip_pixels = 4; // check every 4 pixels
@@ -211,40 +206,4 @@ std::vector<handle<Render_Object>> Renderer::mouse_box_select_for_editor(int x, 
 }
 #endif
 
-bool CheckGlErrorInternal_(const char* file, int line) {
-	GLenum error_code = glGetError();
-	bool has_error = 0;
-	while (error_code != GL_NO_ERROR) {
-		has_error = true;
-		const char* error_name = "Unknown error";
-		switch (error_code) {
-		case GL_INVALID_ENUM:
-			error_name = "GL_INVALID_ENUM";
-			break;
-		case GL_INVALID_VALUE:
-			error_name = "GL_INVALID_VALUE";
-			break;
-		case GL_INVALID_OPERATION:
-			error_name = "GL_INVALID_OPERATION";
-			break;
-		case GL_STACK_OVERFLOW:
-			error_name = "GL_STACK_OVERFLOW";
-			break;
-		case GL_STACK_UNDERFLOW:
-			error_name = "GL_STACK_UNDERFLOW";
-			break;
-		case GL_OUT_OF_MEMORY:
-			error_name = "GL_OUT_OF_MEMORY";
-			break;
-		case GL_INVALID_FRAMEBUFFER_OPERATION:
-			error_name = "GL_INVALID_FRAMEBUFFER_OPERATION";
-			break;
-		default:
-			break;
-		}
-		sys_print(Error, "%s | %s (%d)\n", error_name, file, line);
-
-		error_code = glGetError();
-	}
-	return has_error;
-}
+// CheckGlErrorInternal_ moved to OpenGlDevice.cpp (Phase 1.1 wrap).

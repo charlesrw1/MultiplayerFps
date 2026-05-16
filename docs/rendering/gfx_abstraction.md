@@ -48,3 +48,28 @@ Counts come from `rg "get_internal_handle\(\)"` at start of Phase 0. Verify befo
 **Risk.** All identified sites are routable through Phase 1 wrap additions. None require a redesign-pass extension. Plan estimate of "17 known" was low — actual count is ~75 raw calls across ~25 files, but they cluster into the ~12 API additions listed above.
 
 The null/passthrough backend (Phase 1.5) will assert that every `get_internal_handle()` call comes from inside `Source/Render/Opengl*` or sits on an explicit accept-list.
+
+## Phase 1 sub-phases
+
+Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-phases — each builds, tests, and is committed independently so regressions can be bisected to one subsystem.
+
+| Sub-phase | Scope | gl-call count | API additions | Status |
+| --------- | ----- | -------------:| ------------- | ------ |
+| **1.1** | `DrawLocal_Misc.cpp`, `DrawLocal_Debug.cpp` | ~14 | scissor, draw_elements_base_vertex, bind_uniform_buffer_base_raw, wait_for_gpu_idle, download_texture; move `CheckGlErrorInternal_` to backend | in progress |
+| 1.2 | `EnvProbe.cpp`, `Ssao.cpp` | ~206 | bind_image_for_compute, bind_storage_buffer_base_raw, copy_texture, generate_mipmaps, sampler-already-existing migration | not started |
+| 1.3 | `Volumetricfog.cpp`, `RenderExtra_SSR.cpp`, `GpuCullingTest.cpp`, `RT/RaytraceTest_Probe.cpp`, `RT/RaytraceTest_Shade.cpp` | ~147 | dispatch_compute, memory_barrier, sampler create/destroy | not started |
+| 1.4 | `DrawLocal_BatchScene.cpp`, `DrawLocal_Lighting.cpp`, `DrawLocal_RenderPass.cpp` | ~70 | bind_indirect_buffer, bind_parameter_buffer, multi_draw_elements_indirect (count), color-mask state | not started |
+| 1.5a | `DecalBatcher.cpp` | ~12 | per-attachment color masks as immediate setters (baked in 2c) | not started |
+| 1.6 | `DrawLocal_SceneDrawInternal.cpp` (orchestration) | ~14 | leftover binding + draw glue | not started |
+| 1.7 | `Shader.cpp` migration → inside `Source/Render/Opengl*` | 71 | shader compile/link entirely backend-internal; expose `IGraphicsShader` + `create_shader(...)` | not started |
+| 1.8 | Window/swapchain + ImGui wrap | ~30 (`SDL_GL_*`, `gladLoad*`, swap, vsync, imgui_render) | factory move from `EngineMain_Init.cpp`; `set_vsync`, `present`, `imgui_render` | not started |
+| 1.9 | `r.gpu.no_legacy_calls=1` assertion test + rip per-subsystem `r.gfx.wrap.*` flags | — | gates phase boundary | not started |
+| **1.5 (post-1.x)** | Null/passthrough leak-detector backend | — | gate that proves the wrap is complete | not started |
+
+Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
+
+## Sub-phase 1.1 status
+
+- API added: `set_scissor`, `disable_scissor`, `draw_elements_base_vertex`, `bind_uniform_buffer_base_raw`, `wait_for_gpu_idle`, `download_texture_2d`.
+- `CheckGlErrorInternal_` body moved to `OpenGlDevice.cpp`; `DrawLocal_Debug.cpp` no longer includes `glad.h`.
+- `DrawLocal_Misc.cpp` and `DrawLocal_Debug.cpp` contain zero direct `gl*` calls.

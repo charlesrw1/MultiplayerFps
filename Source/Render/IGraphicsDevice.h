@@ -276,6 +276,34 @@ public:
 	virtual IGraphicsTexture* create_texture(const CreateTextureArgs& args) = 0;
 	virtual IGraphicsBuffer* create_buffer(const CreateBufferArgs& args) = 0;
 	virtual IGraphicsVertexInput* create_vertex_input(const CreateVertexInputArgs& args) = 0;
+
+	// ---- Phase 1 wrap surface (GL-shaped). Methods are added per sub-phase.
+
+	// Scissor rect. Coordinates in pixels, origin bottom-left to match GL.
+	virtual void set_scissor(int x, int y, int w, int h) = 0;
+	virtual void disable_scissor() = 0;
+
+	// Draw an indexed primitive batch. byte_offset is the byte offset into the
+	// currently bound index buffer (matches glDrawElementsBaseVertex's indices*).
+	virtual void draw_elements_base_vertex(GraphicsPrimitiveType mode, int count,
+										   VertexInputIndexType index_type,
+										   int byte_offset, int base_vertex) = 0;
+
+	// Transitional: binds a GL UBO handle to a binding point. Will be replaced
+	// by bind_uniform_buffer(int, IGraphicsBuffer*, int, int) once UBOs migrate
+	// off raw bufferhandle in a later sub-phase. The _raw suffix flags the leak.
+	virtual void bind_uniform_buffer_base_raw(int slot, uint32_t buffer_handle) = 0;
+
+	// Block until all submitted GPU work has completed. Debug/editor readback
+	// only; do NOT call on hot paths. Wraps glFlush + glFinish.
+	virtual void wait_for_gpu_idle() = 0;
+
+	// Read back a 2D texture's mip 0 image into dest. dest_size_bytes must
+	// match width * height * bytes-per-pixel for the texture's format. Backend
+	// infers GL format/type from tex->get_texture_format(). Currently supports
+	// depth32f and rgba8 (editor pick/depth paths). Debug/editor only.
+	virtual void download_texture_2d(IGraphicsTexture* tex, int mip,
+									 void* dest, int dest_size_bytes) = 0;
 };
 
 // Global accessor for the active graphics device. Initialize the OpenGL backend

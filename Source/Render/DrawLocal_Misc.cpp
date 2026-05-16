@@ -1,6 +1,6 @@
 #include "DrawLocal.h"
 #include "Framework/Util.h"
-#include "glad/glad.h"
+#include "glad/glad.h" // GL_* constants still referenced; gl* calls go through IGraphicsDevice
 #include "Render/Texture.h"
 #include "imgui.h"
 #include "glm/ext/matrix_transform.hpp"
@@ -122,26 +122,25 @@ public:
 
 	void render() {
 		// return;
-		glBindBufferBase(GL_UNIFORM_BUFFER, 0, draw.ubo.current_frame);
+		gfx().bind_uniform_buffer_base_raw(0, draw.ubo.current_frame);
 		auto& device = draw.get_device();
 		for (int i = 0; i < (int)drawCmds.size(); i++) {
-			const GLenum mode = GL_TRIANGLES;
-
 			UIDrawCmdUnion& cmd = drawCmds[i];
 			switch (cmd.type) {
 			case UiDrawCmdType::DrawCall: {
 				UiDrawCallCmd& drawCmd = cmd.drawCmd;
-				glDrawElementsBaseVertex(mode, drawCmd.index_count, GL_UNSIGNED_INT,
-										 (void*)(drawCmd.index_start * sizeof(int)), drawCmd.base_vertex);
+				gfx().draw_elements_base_vertex(GraphicsPrimitiveType::Triangles, drawCmd.index_count,
+												VertexInputIndexType::uint32,
+												drawCmd.index_start * (int)sizeof(int),
+												drawCmd.base_vertex);
 				draw.stats.total_draw_calls++;
 			} break;
 			case UiDrawCmdType::SetScissor: {
 				UiSetScissorCmd& r = cmd.scissorCmd;
-				glEnable(GL_SCISSOR_TEST);
-				glScissor(r.x, r.y, r.w, r.h);
+				gfx().set_scissor(r.x, r.y, r.w, r.h);
 			} break;
 			case UiDrawCmdType::ClearScissor:
-				glDisable(GL_SCISSOR_TEST);
+				gfx().disable_scissor();
 				break;
 			case UiDrawCmdType::SetPipeline: {
 				MaterialInstance* mat = cmd.pipelineCmd.mat;
@@ -178,7 +177,7 @@ public:
 			draw.stats.total_draw_calls++;
 		}
 
-		glDisable(GL_SCISSOR_TEST);
+		gfx().disable_scissor();
 
 		device.reset_states();
 	}

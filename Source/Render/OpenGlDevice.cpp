@@ -188,9 +188,85 @@ public:
 		return opengl_create_vertex_input(args);
 	}
 
+	// ---- Phase 1 wrap impls -----------------------------------------------
+
+	void set_scissor(int x, int y, int w, int h) override {
+		ASSERT(w >= 0 && h >= 0);
+		glEnable(GL_SCISSOR_TEST);
+		glScissor(x, y, w, h);
+	}
+	void disable_scissor() override { glDisable(GL_SCISSOR_TEST); }
+
+	void draw_elements_base_vertex(GraphicsPrimitiveType mode, int count,
+								   VertexInputIndexType index_type,
+								   int byte_offset, int base_vertex) override {
+		ASSERT(count >= 0 && byte_offset >= 0);
+		const GLenum gl_mode =
+			(mode == GraphicsPrimitiveType::Triangles)     ? GL_TRIANGLES :
+			(mode == GraphicsPrimitiveType::TriangleStrip) ? GL_TRIANGLE_STRIP :
+															 GL_LINES;
+		const GLenum gl_type = (index_type == VertexInputIndexType::uint16)
+								   ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+		draw.get_device().draw_elements_base_vertex(gl_mode, count, gl_type,
+													(const void*)(intptr_t)byte_offset,
+													base_vertex);
+	}
+
+	void bind_uniform_buffer_base_raw(int slot, uint32_t buffer_handle) override {
+		ASSERT(slot >= 0);
+		glBindBufferBase(GL_UNIFORM_BUFFER, slot, buffer_handle);
+	}
+
+	void wait_for_gpu_idle() override {
+		glFlush();
+		glFinish();
+	}
+
+	void download_texture_2d(IGraphicsTexture* tex, int mip,
+							 void* dest, int dest_size_bytes) override {
+		ASSERT(tex != nullptr && dest != nullptr && dest_size_bytes > 0);
+		GLenum fmt = 0;
+		GLenum type = 0;
+		switch (tex->get_texture_format()) {
+		case GraphicsTextureFormat::depth32f:
+		case GraphicsTextureFormat::depth24f:
+		case GraphicsTextureFormat::depth16f:
+			fmt = GL_DEPTH_COMPONENT; type = GL_FLOAT; break;
+		case GraphicsTextureFormat::rgba8:
+			fmt = GL_RGBA; type = GL_UNSIGNED_BYTE; break;
+		default:
+			ASSERT(!"download_texture_2d: unsupported format (extend mapping)");
+			return;
+		}
+		glGetTextureImage(tex->get_internal_handle(), mip, fmt, type, dest_size_bytes, dest);
+	}
+
 private:
 	opt<RenderPassState> cur_pass;
 };
+
+// ---- Moved from DrawLocal_Debug.cpp so glGetError stays inside the backend.
+bool CheckGlErrorInternal_(const char* file, int line) {
+	GLenum error_code = glGetError();
+	bool has_error = false;
+	while (error_code != GL_NO_ERROR) {
+		has_error = true;
+		const char* error_name = "Unknown error";
+		switch (error_code) {
+		case GL_INVALID_ENUM:                  error_name = "GL_INVALID_ENUM"; break;
+		case GL_INVALID_VALUE:                 error_name = "GL_INVALID_VALUE"; break;
+		case GL_INVALID_OPERATION:             error_name = "GL_INVALID_OPERATION"; break;
+		case GL_STACK_OVERFLOW:                error_name = "GL_STACK_OVERFLOW"; break;
+		case GL_STACK_UNDERFLOW:               error_name = "GL_STACK_UNDERFLOW"; break;
+		case GL_OUT_OF_MEMORY:                 error_name = "GL_OUT_OF_MEMORY"; break;
+		case GL_INVALID_FRAMEBUFFER_OPERATION: error_name = "GL_INVALID_FRAMEBUFFER_OPERATION"; break;
+		default: break;
+		}
+		sys_print(Error, "%s | %s (%d)\n", error_name, file, line);
+		error_code = glGetError();
+	}
+	return has_error;
+}
 
 void gfx_init_opengl() {
 	ASSERT(g_gfx_instance == nullptr);
