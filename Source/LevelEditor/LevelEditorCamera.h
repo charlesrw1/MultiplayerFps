@@ -51,7 +51,8 @@ public:
 	void set_perspective_view();
 
 	CameraSnapshot snapshot() const;
-	void apply_snapshot(const CameraSnapshot& s);
+	// teleport=true skips the easing interp and snaps straight to s.
+	void apply_snapshot(const CameraSnapshot& s, bool teleport = false);
 
 	void set_orbit_target(glm::vec3 v, float r) {
 		if (mode == OrthoMode) {

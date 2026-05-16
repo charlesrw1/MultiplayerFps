@@ -20,6 +20,7 @@
 #include "Framework/MeshBuilder.h"
 #include "Framework/Files.h"
 #include "Render/DrawPublic.h"
+#include "Render/DrawLocal.h"
 #include "Render/Texture.h"
 #include "Render/MaterialPublic.h"
 #include "Game/Entities/Player.h"
@@ -220,6 +221,14 @@ void GameEngineLocal::add_commands() {
 	});
 	commands->add("save_baked_gi", [](const Cmd_Args&) { GameSceneGiUtil::save_to_disk(); });
 	commands->add("bake_probes", [](const Cmd_Args&) { GameSceneGiUtil::bake_all_cubemaps(); });
+	// Mirrors the "refresh" button in the DDGI debug menu (RaytraceTest.cpp).
+	commands->add("bake_ddgi", [](const Cmd_Args&) {
+		if (!draw.ddgi) {
+			sys_print(Warning, "bake_ddgi: DDGI subsystem not initialised\n");
+			return;
+		}
+		draw.ddgi->execute();
+	});
 	commands->add("bake_nav", [](const Cmd_Args&) { LevelNavUtil::bake_all_volumes(); });
 	commands->add("save_baked_nav", [](const Cmd_Args&) { LevelNavUtil::save_to_disk(); });
 	// commands->add("close_ed", close_editor);

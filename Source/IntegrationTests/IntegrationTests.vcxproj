@@ -93,6 +93,7 @@
     <ClCompile Include="Tests\Editor\test_serialize.cpp" />
     <ClCompile Include="Tests\Editor\test_prefabs.cpp" />
     <ClCompile Include="Tests\Editor\test_lua_component.cpp" />
+    <ClCompile Include="Tests\Editor\test_bake_gi.cpp" />
     <ClCompile Include="Tests\Framework\test_filesys.cpp" />
     <ClCompile Include="Tests\Game\test_engine.cpp" />
     <ClCompile Include="Tests\Physics\test_physicsbody_lifecycle.cpp" />

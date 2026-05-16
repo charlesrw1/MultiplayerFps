@@ -81,5 +81,12 @@ static TestTask test_demo_level_1_shots(TestContext& t)
 		r_debug_mode.set_integer(0);
 		debug_sun_shadow.set_bool(false);
 	}
+
+	// Debug-texture view of the SSAO blur buffer from the decal_and_shadow_test camera.
+	spawn_camera_at_named_entity(t, "decal_and_shadow_test");
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "ot _ssao_blur");
+	co_await t.wait_ticks(5);
+	co_await t.capture_screenshot("decal_and_shadow_test_ssao_blur");
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "cot");
 }
 GAME_TEST("renderer/demo_level_1_shots", 60.f, test_demo_level_1_shots);

@@ -132,7 +132,7 @@ CameraSnapshot EditorCamera::snapshot() const {
 	return s;
 }
 
-void EditorCamera::apply_snapshot(const CameraSnapshot& s) {
+void EditorCamera::apply_snapshot(const CameraSnapshot& s, bool teleport) {
 	camera.position = s.position;
 	camera.front = s.front;
 	camera.up = s.up;
@@ -147,7 +147,8 @@ void EditorCamera::apply_snapshot(const CameraSnapshot& s) {
 	ortho_camera.side = s.ortho_side;
 	ortho_camera.width = s.ortho_width;
 	mode = s.is_ortho ? OrthoMode : CamMode;
-	interp.start_interp(vs_setup);
+	if (!teleport)
+		interp.start_interp(vs_setup);
 	if (s.is_ortho)
 		on_ortho_state_change.invoke();
 }

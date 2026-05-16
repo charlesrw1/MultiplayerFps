@@ -94,7 +94,7 @@ ui.disable_screen_log 1
 disable_render_time_tick 1
 r.ddgi_halfres 0
 r.ssr 0
-r.ssao 0
+r.ssao 1
 dt 1
 r.include_cubemaps 1
 vid.width 600
