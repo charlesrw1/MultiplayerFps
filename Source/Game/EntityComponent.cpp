@@ -54,11 +54,16 @@ public:
 
 		filepaths.push_back("daf");
 
-		// Also surface every Lua-defined Component subclass so script-authored components
-		// show up in the same add-component picker as the C++ ones above.
+		// Surface only Lua-defined Component subclasses whose annotation block
+		// contains a `---editor` tag (see ScriptLoadingUtil::parse_text).
+		// Untagged Lua components remain fully usable from script but stay out
+		// of the editor picker to keep authoring-only types from cluttering it.
 		for (auto it = ClassBase::get_subclasses(&Component::StaticType); !it.is_end(); it.next()) {
 			auto* ti = it.get_type();
-			if (ti && ti->get_is_lua_class() && ti->has_allocate_func())
+			if (!ti || !ti->get_is_lua_class() || !ti->has_allocate_func())
+				continue;
+			auto* lua_ti = static_cast<const LuaClassTypeInfo*>(ti);
+			if (lua_ti->is_editor_placeable())
 				filepaths.push_back(ti->classname);
 		}
 	}

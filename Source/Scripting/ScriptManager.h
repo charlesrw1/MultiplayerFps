@@ -25,6 +25,10 @@ struct ParseType
 	string name;
 	vector<string> inherited;
 	vector<ParseProperty> props;
+	// True when the class's `---@class` annotation block contained a bare
+	// `---editor` line. Gates whether Component subclasses show up in the
+	// editor add-component picker. See LuaClassTypeInfo::is_editor_placeable.
+	bool editor_placeable = false;
 };
 // parses the script
 class ScriptLoadingUtil
@@ -55,6 +59,12 @@ public:
 	// into the old parsed_properties' string storage, so we must not destroy it earlier.
 	void set_parsed_properties(vector<ParseProperty> props) { pending_parsed_properties = std::move(props); }
 
+	// Whether this Lua-defined Component subclass should appear in the editor's
+	// add-component picker. Set from the `---editor` annotation tag on each
+	// reload. Defaults to false so script-only helpers stay out of the picker.
+	void set_editor_placeable(bool b) { editor_placeable = b; }
+	bool is_editor_placeable() const { return editor_placeable; }
+
 	// Reflection accessors used by the reload-merge pass + tests.
 	uint32_t get_lua_field_shadow_size() const { return lua_field_shadow_size; }
 	const PropertyInfoList* get_lua_props_list() const { return lua_props_list.list ? &lua_props_list : nullptr; }
@@ -76,6 +86,7 @@ private:
 	friend class ScriptManager;
 
 	bool had_changes = false;
+	bool editor_placeable = false;
 	int template_lua_table = 0;
 	static ClassBase* lua_class_alloc(const ClassTypeInfo* c);
 	string lua_classname;

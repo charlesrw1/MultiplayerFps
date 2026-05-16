@@ -65,6 +65,35 @@ TEST_F(LuaComponentReflectionTest, ParserOnlyCapturesTypedFields) {
 	EXPECT_EQ(out[0].props[1].type_str, "string");
 }
 
+TEST_F(LuaComponentReflectionTest, ParserDetectsEditorTag) {
+	// `---editor` between @class and the table opener opts the class into the
+	// editor add-component picker. Untagged classes default to false.
+	auto tagged = ScriptLoadingUtil::parse_text("---@class FpDoor : Component\n"
+												"---editor\n"
+												"FpDoor = {\n"
+												"  ---@type number\n"
+												"  hp = 0,\n"
+												"}\n");
+	ASSERT_EQ(tagged.size(), 1u);
+	EXPECT_TRUE(tagged[0].editor_placeable);
+
+	auto untagged = ScriptLoadingUtil::parse_text("---@class FpHidden : Component\n"
+												  "FpHidden = {\n"
+												  "  ---@type number\n"
+												  "  hp = 0,\n"
+												  "}\n");
+	ASSERT_EQ(untagged.size(), 1u);
+	EXPECT_FALSE(untagged[0].editor_placeable);
+
+	// `---editorial` (or any non-`editor` word) must not flip the flag.
+	auto lookalike = ScriptLoadingUtil::parse_text("---@class FpLook : Component\n"
+												   "---editorial note\n"
+												   "FpLook = {\n"
+												   "}\n");
+	ASSERT_EQ(lookalike.size(), 1u);
+	EXPECT_FALSE(lookalike[0].editor_placeable);
+}
+
 TEST_F(LuaComponentReflectionTest, ParserConsumesTypeAnnotationOncePerField) {
 	// A single ---@type annotation applies to the NEXT field only, never carries over.
 	auto out = ScriptLoadingUtil::parse_text("---@class C\n"

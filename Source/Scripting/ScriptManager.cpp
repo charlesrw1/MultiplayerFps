@@ -237,6 +237,7 @@ void ScriptManager::reload_from_content(const std::string& source, const std::st
 		auto found = MapUtil::get_opt(lua_classes, t.name);
 		if (found) {
 			(*found)->set_parsed_properties(std::move(t.props));
+			(*found)->set_editor_placeable(t.editor_placeable);
 		}
 	}
 }

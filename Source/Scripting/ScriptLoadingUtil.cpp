@@ -9,6 +9,7 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 		string name;
 		vector<string> inherited;
 		vector<ParseProperty> properties;
+		bool editor_placeable = false;
 	};
 	vector<ParseType> out;
 
@@ -34,7 +35,7 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 
 		auto append_class = [&]() {
 			if (!currentClass.name.empty()) {
-				out.push_back({currentClass.name, currentClass.inherited, currentClass.properties});
+				out.push_back({currentClass.name, currentClass.inherited, currentClass.properties, currentClass.editor_placeable});
 				currentClass = PendingClass();
 			}
 			inClass = false;
@@ -46,7 +47,7 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 		if (StringUtils::starts_with(original_stripped_line, "---@class") && tokens.size() > 2 && tokens.at(1) == "@class") {
 			if (inClass && !currentClass.name.empty()) {
 				// Save previous class
-				out.push_back({currentClass.name, currentClass.inherited, currentClass.properties});
+				out.push_back({currentClass.name, currentClass.inherited, currentClass.properties, currentClass.editor_placeable});
 				currentClass = PendingClass();
 			}
 			currentClass.name = tokens.at(2);
@@ -80,6 +81,15 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 		else if (StringUtils::starts_with(original_stripped_line, "---@type") && tokens.size() >= 3 && tokens.at(1) == "@type") {
 			pendingType = tokens.at(2);
 		}
+		// Bare `---editor` annotation — opts the class in to the editor's
+		// add-component picker. Must appear after `---@class` and before the
+		// class table opener. We accept any trailing whitespace/content after
+		// the tag word, but require that the (re-spaced) second token is exactly
+		// "editor" so things like "---editorial" don't match.
+		else if (StringUtils::starts_with(original_stripped_line, "---editor") && !currentClass.name.empty()
+				 && tokens.size() >= 2 && tokens.at(1) == "editor") {
+			currentClass.editor_placeable = true;
+		}
 		// Parse property assignment — only record fields preceded by ---@type.
 		// Untyped table entries are intentionally dropped so they never reach reflection
 		// synthesis (no warnings, no editor rows). Lua scripts can still read/write them
@@ -100,7 +110,7 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 	}
 	// Handle last class if file doesn't end with }
 	if (inClass && !currentClass.name.empty()) {
-		out.push_back({currentClass.name, currentClass.inherited, currentClass.properties});
+		out.push_back({currentClass.name, currentClass.inherited, currentClass.properties, currentClass.editor_placeable});
 	}
 
 	return out;
