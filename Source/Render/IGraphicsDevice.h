@@ -304,6 +304,17 @@ public:
 	// depth32f and rgba8 (editor pick/depth paths). Debug/editor only.
 	virtual void download_texture_2d(IGraphicsTexture* tex, int mip,
 									 void* dest, int dest_size_bytes) = 0;
+
+	// Non-indexed draw. mode + count follow glDrawArrays semantics.
+	virtual void draw_arrays(GraphicsPrimitiveType mode, int first, int count) = 0;
+
+	// Bind a texture to a sampler/texture slot.
+	virtual void bind_texture(int slot, IGraphicsTexture* tex) = 0;
+
+	// Bind a UBO to a binding point. Non-raw variant for buffers created via
+	// create_buffer; the raw variant above is the bridge for the global
+	// ubo.current_frame still on bufferhandle.
+	virtual void bind_uniform_buffer_base(int slot, IGraphicsBuffer* buf) = 0;
 };
 
 // Global accessor for the active graphics device. Initialize the OpenGL backend

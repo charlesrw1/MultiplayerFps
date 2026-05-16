@@ -56,6 +56,7 @@ public:
 #include "Framework/Rect2d.h"
 class Texture;
 class IGraphicsTexture;
+class IGraphicsBuffer;
 class ShadowMapAtlas
 {
 public:
@@ -177,8 +178,8 @@ public:
 	bool targets_dirty = false;
 };
 
-// uses old fbohandle and texhandle instead of being wrapped in IGraphicsTexture
-// Nvidia wrote the hbao code and im afraid to break it so just leaving it for now
+// HBAO. Render targets are IGraphicsTextures; per-pass framebuffers managed
+// by gfx().set_render_pass (Phase 1.2a wrap).
 class SSAO_System
 {
 public:
@@ -190,15 +191,6 @@ public:
 
 	int width = 0, height = 0;
 	const static int RANDOM_ELEMENTS = 16;
-
-	struct framebuffers
-	{
-		fbohandle depthlinear = 0;
-		fbohandle viewnormal = 0;
-		fbohandle hbao2_deinterleave = 0;
-		fbohandle hbao2_calc = 0;
-		fbohandle finalresolve = 0;
-	} fbo;
 
 	struct programs
 	{
@@ -214,13 +206,11 @@ public:
 	{
 		IGraphicsTexture* result = nullptr;
 		IGraphicsTexture* blurred = nullptr;
-
-		texhandle random = 0;
+		IGraphicsTexture* random = nullptr;
 		IGraphicsTexture* viewnormal = nullptr;
-		// texhandle viewnormal = 0;
-		texhandle depthlinear = 0;
-		texhandle deptharray = 0;
-		texhandle resultarray = 0;
+		IGraphicsTexture* depthlinear = nullptr;
+		IGraphicsTexture* deptharray = nullptr;
+		IGraphicsTexture* resultarray = nullptr;
 
 		Texture* result_vts_handle = nullptr;
 		Texture* blur_vts_handle = nullptr;
@@ -230,7 +220,7 @@ public:
 
 	struct uniform_buffers
 	{
-		bufferhandle data = 0;
+		IGraphicsBuffer* data = nullptr;
 	} ubo;
 
 	struct params

@@ -222,6 +222,25 @@ public:
 		glFinish();
 	}
 
+	void draw_arrays(GraphicsPrimitiveType mode, int first, int count) override {
+		ASSERT(first >= 0 && count >= 0);
+		const GLenum gl_mode =
+			(mode == GraphicsPrimitiveType::Triangles)     ? GL_TRIANGLES :
+			(mode == GraphicsPrimitiveType::TriangleStrip) ? GL_TRIANGLE_STRIP :
+															 GL_LINES;
+		draw.get_device().draw_arrays(gl_mode, first, count);
+	}
+
+	void bind_texture(int slot, IGraphicsTexture* tex) override {
+		ASSERT(slot >= 0);
+		draw.get_device().bind_texture_ptr(slot, tex);
+	}
+
+	void bind_uniform_buffer_base(int slot, IGraphicsBuffer* buf) override {
+		ASSERT(slot >= 0 && buf != nullptr);
+		glBindBufferBase(GL_UNIFORM_BUFFER, slot, buf->get_internal_handle());
+	}
+
 	void download_texture_2d(IGraphicsTexture* tex, int mip,
 							 void* dest, int dest_size_bytes) override {
 		ASSERT(tex != nullptr && dest != nullptr && dest_size_bytes > 0);

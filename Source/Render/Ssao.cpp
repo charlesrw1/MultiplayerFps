@@ -1,6 +1,5 @@
 #include "DrawLocal.h"
 #include "imgui.h"
-#include "glad/glad.h"
 #include "glm/gtc/type_ptr.hpp"
 #include "GameEnginePublic.h"
 #include <random>
@@ -30,8 +29,12 @@ void SSAO_System::init() {
 	make_render_targets(true, g_window_w.get_integer(), g_window_h.get_integer());
 	reload_shaders();
 
-	glCreateBuffers(1, &ubo.data);
-	glNamedBufferStorage(ubo.data, sizeof(gpu::HBAOData), nullptr, GL_DYNAMIC_STORAGE_BIT);
+	{
+		CreateBufferArgs args;
+		args.size = sizeof(gpu::HBAOData);
+		args.flags = BUFFER_USE_DYNAMIC;
+		ubo.data = gfx().create_buffer(args);
+	}
 
 	std::mt19937 rmt;
 
@@ -57,11 +60,16 @@ void SSAO_System::init() {
 #undef SCALE
 	}
 
-	glCreateTextures(GL_TEXTURE_2D, 1, &texture.random);
-	glTextureStorage2D(texture.random, 1, GL_RGBA16_SNORM, 4, 4);
-	glTextureSubImage2D(texture.random, 0, 0, 0, 4, 4, GL_RGBA, GL_SHORT, hbaoRandomShort);
-	glTextureParameteri(texture.random, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(texture.random, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	{
+		CreateTextureArgs args;
+		args.format = GraphicsTextureFormat::rgba16_snorm;
+		args.width = 4;
+		args.height = 4;
+		args.sampler_type = GraphicsSamplerType::NearestClamped;
+		texture.random = gfx().create_texture(args);
+		texture.random->sub_image_upload(0, 0, 0, 4, 4,
+										 (int)sizeof(hbaoRandomShort), hbaoRandomShort);
+	}
 }
 
 Shader make_program(const char* vert, const char* frag, const std::string& defines = "") {
@@ -82,38 +90,22 @@ void SSAO_System::reload_shaders() {
 
 void SSAO_System::make_render_targets(bool initial, int width, int height) {
 	if (!initial) {
-		glDeleteTextures(1, &texture.depthlinear);
-		glDeleteFramebuffers(1, &fbo.depthlinear);
-		// glDeleteTextures(1, &texture.viewnormal);
-		glDeleteFramebuffers(1, &fbo.viewnormal);
-
-		// glDeleteTextures(1, &texture.result);
-		// glDeleteTextures(1, &texture.blur);
+		safe_release(texture.depthlinear);
+		safe_release(texture.viewnormal);
 		safe_release(texture.blurred);
 		safe_release(texture.result);
-		safe_release(texture.viewnormal);
-
-		glDeleteFramebuffers(1, &fbo.finalresolve);
-
-		glDeleteFramebuffers(1, &fbo.hbao2_deinterleave);
-
-		glDeleteTextures(1, &texture.deptharray);
-
-		glDeleteTextures(1, &texture.resultarray);
-
-		glDeleteFramebuffers(1, &fbo.hbao2_calc);
+		safe_release(texture.deptharray);
+		safe_release(texture.resultarray);
 	}
 
-	glCreateTextures(GL_TEXTURE_2D, 1, &texture.depthlinear);
-	glTextureStorage2D(texture.depthlinear, 1, GL_RG32F, width, height);
-	glTextureParameteri(texture.depthlinear, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.depthlinear, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.depthlinear, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(texture.depthlinear, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	glCreateFramebuffers(1, &fbo.depthlinear);
-	glNamedFramebufferTexture(fbo.depthlinear, GL_COLOR_ATTACHMENT0, texture.depthlinear, 0);
-
+	{
+		CreateTextureArgs args;
+		args.width = width;
+		args.height = height;
+		args.format = GraphicsTextureFormat::rg32f;
+		args.sampler_type = GraphicsSamplerType::NearestClamped;
+		texture.depthlinear = gfx().create_texture(args);
+	}
 	{
 		CreateTextureArgs args;
 		args.width = width;
@@ -122,79 +114,47 @@ void SSAO_System::make_render_targets(bool initial, int width, int height) {
 		args.sampler_type = GraphicsSamplerType::NearestClamped;
 		texture.viewnormal = gfx().create_texture(args);
 	}
-	// glCreateTextures(GL_TEXTURE_2D, 1, &texture.viewnormal);
-	// glTextureStorage2D(texture.viewnormal, 1, GL_RGBA8, width, height);
-	// glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	// glTextureParameteri(texture.viewnormal, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	// glTextureParameteri(texture.viewnormal, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	// glTextureParameteri(texture.viewnormal, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	{
+		CreateTextureArgs args;
+		args.width = width;
+		args.height = height;
+		args.format = GraphicsTextureFormat::rg16f;
+		args.sampler_type = GraphicsSamplerType::LinearClamped;
+		texture.result = gfx().create_texture(args);
+		texture.blurred = gfx().create_texture(args);
+	}
 
-	glCreateFramebuffers(1, &fbo.viewnormal);
-	glNamedFramebufferTexture(fbo.viewnormal, GL_COLOR_ATTACHMENT0, texture.viewnormal->get_internal_handle(), 0);
+	const int quarterWidth = ((width + 3) / 4);
+	const int quarterHeight = ((height + 3) / 4);
 
-	// glCreateTextures(GL_TEXTURE_2D, 1, &texture.result);
-	// glTextureStorage2D(texture.result, 1, GL_RG16F, width, height);
-	// glTextureParameteri(texture.result, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	// glTextureParameteri(texture.result, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	CreateTextureArgs resultArgs;
-	resultArgs.width = width;
-	resultArgs.height = height;
-	resultArgs.sampler_type = GraphicsSamplerType::LinearClamped;
-	resultArgs.format = GraphicsTextureFormat::rg16f;
-	texture.result = gfx().create_texture(resultArgs);
-	texture.blurred = gfx().create_texture(resultArgs);
-
-	//	glCreateTextures(GL_TEXTURE_2D, 1, &texture.blur);
-	// glTextureStorage2D(texture.blur, 1, GL_RG16F, width, height);
-	// glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	// glTextureParameteri(texture.blur, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-	glCreateFramebuffers(1, &fbo.finalresolve);
-	glNamedFramebufferTexture(fbo.finalresolve, GL_COLOR_ATTACHMENT0, texture.result->get_internal_handle(), 0);
-	glNamedFramebufferTexture(fbo.finalresolve, GL_COLOR_ATTACHMENT1, texture.blurred->get_internal_handle(), 0);
-
-	GLenum drawbuffers[NUM_MRT];
-	for (int layer = 0; layer < NUM_MRT; layer++)
-		drawbuffers[layer] = GL_COLOR_ATTACHMENT0 + layer;
-	glCreateFramebuffers(1, &fbo.hbao2_deinterleave);
-	glNamedFramebufferDrawBuffers(fbo.hbao2_deinterleave, NUM_MRT, drawbuffers);
-
-	int quarterWidth = ((width + 3) / 4);
-	int quarterHeight = ((height + 3) / 4);
-
-	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.deptharray);
-	glTextureStorage3D(texture.deptharray, 1, GL_R32F, quarterWidth, quarterHeight, RANDOM_ELEMENTS);
-	glTextureParameteri(texture.deptharray, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.deptharray, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.deptharray, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(texture.deptharray, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	glCreateTextures(GL_TEXTURE_2D_ARRAY, 1, &texture.resultarray);
-	glTextureStorage3D(texture.resultarray, 1, GL_RG16F, quarterWidth, quarterHeight, RANDOM_ELEMENTS);
-	glTextureParameteri(texture.resultarray, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.resultarray, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(texture.resultarray, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTextureParameteri(texture.resultarray, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	glCreateFramebuffers(1, &fbo.hbao2_calc);
-	// glNamedFramebufferTexture(fbo.hbao2_calc, GL_COLOR_ATTACHMENT0, texture.resultarray, 0);
-
-	// render viewspace normals and linear depth
-	// deinterleave
-	// render hbao for each layer
-	// reinterleave
-	// blur
+	{
+		CreateTextureArgs args;
+		args.type = GraphicsTextureType::t2DArray;
+		args.width = quarterWidth;
+		args.height = quarterHeight;
+		args.depth_3d = RANDOM_ELEMENTS;
+		args.format = GraphicsTextureFormat::r32f;
+		args.sampler_type = GraphicsSamplerType::NearestClamped;
+		texture.deptharray = gfx().create_texture(args);
+	}
+	{
+		CreateTextureArgs args;
+		args.type = GraphicsTextureType::t2DArray;
+		args.width = quarterWidth;
+		args.height = quarterHeight;
+		args.depth_3d = RANDOM_ELEMENTS;
+		args.format = GraphicsTextureFormat::rg16f;
+		args.sampler_type = GraphicsSamplerType::NearestClamped;
+		texture.resultarray = gfx().create_texture(args);
+	}
 
 	this->width = width;
 	this->height = height;
 
 	texture.blur_vts_handle->update_specs_ptr(texture.result);
 	texture.result_vts_handle->update_specs_ptr(texture.blurred);
-	// FIXME
 	texture.view_normal_vts_handle->update_specs_ptr(texture.viewnormal);
-	// texture.view_normal_vts_handle->update_specs(texture.viewnormal, width, height, 4, {});
-	// texture.linear_depth_vts_handle->update_specs(texture.depthlinear, width, height, 4, {});
+	// texture.linear_depth_vts_handle->update_specs(texture.depthlinear, ...) -- not wired
 }
 
 #define USE_AO_LAYERED_SINGLEPASS 2
@@ -261,7 +221,7 @@ void SSAO_System::update_ubo() {
 	}
 #endif
 
-	glNamedBufferSubData(ubo.data, 0, sizeof(gpu::HBAOData), &data);
+	ubo.data->sub_upload(&data, (int)sizeof(gpu::HBAOData), 0);
 }
 ConfigVar r_ssao_blur("r.ssao_blur", "1", CVAR_BOOL | CVAR_DEV, "option to disable ssao blur for debug");
 void SSAO_System::render() {
@@ -279,13 +239,14 @@ void SSAO_System::render() {
 	const int quarterWidth = ((width + 3) / 4);
 	const int quarterHeight = ((height + 3) / 4);
 
-	//*glViewport(0, 0, width, height);
 	auto& device = draw.get_device();
 
 	// linearize depth, writes to texture.depthlinear
 	{
-		RenderPassSetup setup("depthlinear", fbo.depthlinear, false, false, 0, 0, width, height);
-		auto scope = device.start_render_pass(setup);
+		auto targets = {ColorTargetInfo(texture.depthlinear)};
+		RenderPassState pass;
+		pass.color_infos = targets;
+		gfx().set_render_pass(pass);
 
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
@@ -296,21 +257,21 @@ void SSAO_System::render() {
 
 		float near = viewsetup.near;
 		float far = viewsetup.far;
-		//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.depthlinear);
-		// prog.linearize_depth.use();
 		shader.set_vec4("clipInfo", glm::vec4(near * far, near - far, far, 1.0));
 		shader.set_float("zNear", near);
 
-		glBindTextureUnit(0, draw.tex.scene_depth->get_internal_handle());
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		gfx().bind_texture(0, draw.tex.scene_depth);
+		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
 		glCheckError();
 	}
 
 	// create viewspace normals, writes to texture.viewnormal
 	{
-		RenderPassSetup setup("viewnormal", fbo.viewnormal, false, false, 0, 0, width, height);
-		auto scope = device.start_render_pass(setup);
+		auto targets = {ColorTargetInfo(texture.viewnormal)};
+		RenderPassState pass;
+		pass.color_infos = targets;
+		gfx().set_render_pass(pass);
 
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
@@ -319,21 +280,16 @@ void SSAO_System::render() {
 		device.set_pipeline(state);
 		auto shader = device.shader();
 
-		//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.viewnormal);
-		// prog.make_viewspace_normals.use();
 		shader.set_int("projOrtho", 0);
 		shader.set_vec4("projInfo", data.projInfo);
 		shader.set_vec2("InvFullResolution", data.InvFullResolution);
-		glBindTextureUnit(0, texture.depthlinear);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		gfx().bind_texture(0, texture.depthlinear);
+		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	}
 
-	// deinterleave, writes to texture.deptharray
+	// deinterleave, writes to texture.deptharray (each call attaches NUM_MRT
+	// distinct array layers as separate color attachments and one quad fills them all).
 	{
-		RenderPassSetup setup("hbao2_deinterleave", fbo.hbao2_deinterleave, false, false, 0, 0, quarterWidth,
-							  quarterHeight);
-		auto scope = device.start_render_pass(setup);
-
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
@@ -341,30 +297,30 @@ void SSAO_System::render() {
 		device.set_pipeline(state);
 		auto shader = device.shader();
 
-		//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_deinterleave);
-		//*glViewport(0, 0, quarterWidth, quarterHeight);
-		glBindTextureUnit(0, texture.depthlinear);
-		// prog.hbao_deinterleave.use();
-		// two passes
+		gfx().bind_texture(0, texture.depthlinear);
 		for (int i = 0; i < RANDOM_ELEMENTS; i += NUM_MRT) {
+			ColorTargetInfo targets_arr[NUM_MRT] = {
+				ColorTargetInfo(texture.deptharray, i + 0, 0),
+				ColorTargetInfo(texture.deptharray, i + 1, 0),
+				ColorTargetInfo(texture.deptharray, i + 2, 0),
+				ColorTargetInfo(texture.deptharray, i + 3, 0),
+				ColorTargetInfo(texture.deptharray, i + 4, 0),
+				ColorTargetInfo(texture.deptharray, i + 5, 0),
+				ColorTargetInfo(texture.deptharray, i + 6, 0),
+				ColorTargetInfo(texture.deptharray, i + 7, 0),
+			};
+			RenderPassState pass;
+			pass.color_infos = std::span<const ColorTargetInfo>(targets_arr, NUM_MRT);
+			gfx().set_render_pass(pass);
+
 			shader.set_vec4("info", glm::vec4(float(i % 4) + 0.5f, float(i / 4) + 0.5f, data.InvFullResolution.x,
 											  data.InvFullResolution.y));
-
-			for (int layer = 0; layer < NUM_MRT; layer++) {
-				glNamedFramebufferTextureLayer(fbo.hbao2_deinterleave, GL_COLOR_ATTACHMENT0 + layer, texture.deptharray,
-											   0, i + layer);
-			}
-			// glFramebufferTexture(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + layer, texture.depthview[i + layer], 0);
-
-			glDrawArrays(GL_TRIANGLES, 0, 3);
+			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 		}
 	}
 
-	// calculate hbao, writes to texture.resultarray
+	// calculate hbao, writes to texture.resultarray (one layer at a time).
 	{
-		RenderPassSetup setup("hbao2_calc", fbo.hbao2_calc, false, false, 0, 0, quarterWidth, quarterHeight);
-		auto scope = device.start_render_pass(setup);
-
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
@@ -372,75 +328,75 @@ void SSAO_System::render() {
 		device.set_pipeline(state);
 		auto shader = device.shader();
 
+		gfx().bind_texture(0, texture.deptharray);
+		gfx().bind_texture(1, texture.viewnormal);
+		gfx().bind_uniform_buffer_base(0, ubo.data);
+
 		for (int i = 0; i < RANDOM_ELEMENTS; i++) {
+			auto targets = {ColorTargetInfo(texture.resultarray, i, 0)};
+			RenderPassState pass;
+			pass.color_infos = targets;
+			gfx().set_render_pass(pass);
+
 			shader.set_uint("primitive_id_custom", i);
-			glNamedFramebufferTextureLayer(fbo.hbao2_calc, GL_COLOR_ATTACHMENT0, texture.resultarray, 0, i);
-
-			//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.hbao2_calc);
-			//*glViewport(0, 0, quarterWidth, quarterHeight);
-			glBindTextureUnit(0, texture.deptharray);
-			glBindTextureUnit(1, texture.viewnormal->get_internal_handle());
-
-			glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.data);
-
-			// prog.hbao_calc.use();
-
-			glDrawArrays(GL_TRIANGLES, 0, 3);
+			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 		}
 	}
 
+	// reinterleave, writes to texture.result
 	{
-		RenderPassSetup setup("finalresolve+blur", fbo.finalresolve, false, false, 0, 0, width, height);
-		auto scope = device.start_render_pass(setup);
+		auto targets = {ColorTargetInfo(texture.result)};
+		RenderPassState pass;
+		pass.color_infos = targets;
+		gfx().set_render_pass(pass);
 
-		// reinterleave, writes to texture.result
+		RenderPipelineState state;
+		state.vao = draw.get_empty_vao();
+		state.depth_testing = state.depth_writes = false;
+		state.program = prog.hbao_reinterleave;
+		device.set_pipeline(state);
+
+		gfx().bind_texture(0, texture.resultarray);
+		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
+	}
+
+	// depth aware blur — bounce result→blurred (horizontal), then blurred→result (vertical).
+	if (r_ssao_blur.get_bool()) {
+		RenderPipelineState state;
+		state.vao = draw.get_empty_vao();
+		state.depth_testing = state.depth_writes = false;
+		state.program = prog.hbao_blur;
+
+		// horizontal pass: read .result, write .blurred
 		{
-			RenderPipelineState state;
-			state.vao = draw.get_empty_vao();
-			state.depth_testing = state.depth_writes = false;
-			state.program = prog.hbao_reinterleave;
+			auto targets = {ColorTargetInfo(texture.blurred)};
+			RenderPassState pass;
+			pass.color_infos = targets;
+			gfx().set_render_pass(pass);
+
 			device.set_pipeline(state);
 			auto shader = device.shader();
-
-			//*glBindFramebuffer(GL_FRAMEBUFFER, fbo.finalresolve);
-			//*glViewport(0, 0, width, height);
-			glNamedFramebufferDrawBuffer(fbo.finalresolve, GL_COLOR_ATTACHMENT0);
-			//*glDrawBuffer(GL_COLOR_ATTACHMENT0);
-			// prog.hbao_reinterleave.use();
-
-			glBindTextureUnit(0, texture.resultarray);
-
-			glDrawArrays(GL_TRIANGLES, 0, 3);
-		}
-
-		// depth aware blur, writes to texture.result
-		if (r_ssao_blur.get_bool()) {
-			RenderPipelineState state;
-			state.vao = draw.get_empty_vao();
-			state.depth_testing = state.depth_writes = false;
-			state.program = prog.hbao_blur;
-			device.set_pipeline(state);
-			auto shader = device.shader();
-
-			// prog.hbao_blur.use();
-			// framebuffer = fbo.finalresolve
-			glNamedFramebufferDrawBuffer(fbo.finalresolve, GL_COLOR_ATTACHMENT1);
-			//*glDrawBuffer(GL_COLOR_ATTACHMENT1);
-			glBindTextureUnit(0, texture.result->get_internal_handle());
+			gfx().bind_texture(0, texture.result);
 			shader.set_float("g_Sharpness", tweak.blur_sharpness);
 			shader.set_vec2("g_InvResolutionDirection", glm::vec2(1.0f / float(width), 0));
-			glDrawArrays(GL_TRIANGLES, 0, 3); // read from .result and write to .blur
+			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
+		}
 
-			glNamedFramebufferDrawBuffer(fbo.finalresolve, GL_COLOR_ATTACHMENT0);
-			//*glDrawBuffer(GL_COLOR_ATTACHMENT0);
-			glBindTextureUnit(0, texture.blurred->get_internal_handle());
+		// vertical pass: read .blurred, write .result
+		{
+			auto targets = {ColorTargetInfo(texture.result)};
+			RenderPassState pass;
+			pass.color_infos = targets;
+			gfx().set_render_pass(pass);
+
+			device.set_pipeline(state);
+			auto shader = device.shader();
+			gfx().bind_texture(0, texture.blurred);
+			shader.set_float("g_Sharpness", tweak.blur_sharpness);
 			shader.set_vec2("g_InvResolutionDirection", glm::vec2(0, 1.0f / float(height)));
-			glDrawArrays(GL_TRIANGLES, 0, 3); // read from .blur and write to .result
+			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 		}
 	}
 
 	device.reset_states();
-	//*glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	// glEnable(GL_DEPTH_TEST);
-	// glUseProgram(0);
 }

@@ -123,6 +123,7 @@ public:
 		case GraphicsTextureFormat::r32f:            return GL_RED;
 		case GraphicsTextureFormat::rg32f:           return GL_RG;
 		case GraphicsTextureFormat::r11f_g11f_b10f:  return GL_RGB;
+		case GraphicsTextureFormat::rgba16_snorm:    return GL_RGBA;
 		case GraphicsTextureFormat::bc1:
 		case GraphicsTextureFormat::bc3:
 		case GraphicsTextureFormat::bc4:
@@ -317,6 +318,9 @@ public:
 		if (my_fmt == GraphicsTextureFormat::r11f_g11f_b10f)
 			return GL_UNSIGNED_INT_10F_11F_11F_REV;
 		using gtf = GraphicsTextureFormat;
+		// SNORM texture storage takes normalized int16 input data, not float.
+		if (my_fmt == gtf::rgba16_snorm)
+			return GL_SHORT;
 		if (my_fmt == gtf::rg16f || my_fmt == gtf::r16f || my_fmt == gtf::rgb16f)
 			return float_input_is_16f ? GL_HALF_FLOAT : GL_FLOAT;
 		if (is_float_type())
@@ -329,7 +333,7 @@ public:
 		using gtf = GraphicsTextureFormat;
 		auto types = {
 			gtf::r16f, gtf::rg16f, gtf::rgb16f, gtf::rgba16f, gtf::r32f, gtf::rg32f,
-			gtf::depth16f, gtf::depth24f, gtf::depth32f, gtf::r11f_g11f_b10f, gtf::rgba16_snorm,
+			gtf::depth16f, gtf::depth24f, gtf::depth32f, gtf::r11f_g11f_b10f,
 		};
 		for (auto t : types)
 			if (t == my_fmt)
