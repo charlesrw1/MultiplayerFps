@@ -89,6 +89,7 @@
     <ClCompile Include="Tests\Renderer\test_basic.cpp" />
     <ClCompile Include="Tests\Renderer\test_material_hotreload.cpp" />
     <ClCompile Include="Tests\Renderer\test_dynamic_model.cpp" />
+    <ClCompile Include="Tests\Renderer\test_demo_level_shots.cpp" />
     <ClCompile Include="Tests\Editor\test_serialize.cpp" />
     <ClCompile Include="Tests\Editor\test_prefabs.cpp" />
     <ClCompile Include="Tests\Editor\test_lua_component.cpp" />

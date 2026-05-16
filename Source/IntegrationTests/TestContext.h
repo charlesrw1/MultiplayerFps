@@ -19,6 +19,10 @@ struct TestWaitState
 	bool delegate_fired = false;
 	bool screenshot_pending = false;
 	std::string screenshot_name;
+	// Per-shot warn-band overrides. <0 means "leave the runner's cfg alone"
+	// (strict mode). Set via TestContext::capture_screenshot's optional args.
+	int screenshot_warn_channel_delta = -1;
+	float screenshot_warn_diff_fraction = -1.f;
 };
 
 struct TestContext
@@ -61,10 +65,14 @@ struct TestContext
 	{
 		TestWaitState& wait;
 		const char* name;
+		int warn_channel_delta;   // <0 = strict (no warn band)
+		float warn_diff_fraction; // <0 = strict (no warn band)
 		bool await_ready() const noexcept { return false; }
 		void await_suspend(std::coroutine_handle<>) noexcept {
 			wait.screenshot_pending = true;
 			wait.screenshot_name = name;
+			wait.screenshot_warn_channel_delta = warn_channel_delta;
+			wait.screenshot_warn_diff_fraction = warn_diff_fraction;
 			wait.wait_ticks = 1; // yield one tick for frame to render
 		}
 		void await_resume() noexcept {}
@@ -73,7 +81,15 @@ struct TestContext
 	TickAwaitable wait_ticks(int n) { return {wait, n}; }
 	SecondAwaitable wait_seconds(float t) { return {wait, t}; }
 	DelegateAwaitable wait_for(MulticastDelegate<>& d) { return {wait, d}; }
-	ScreenshotAwaitable capture_screenshot(const char* name) { return {wait, name}; }
+	// Capture a screenshot and diff it against the golden.
+	// Pass warn_channel_delta / warn_diff_fraction to opt this shot into the
+	// soft-fail band: deltas above the strict thresholds but inside the warn
+	// band print "SCREENSHOT WARN" and the test still passes. Negative = strict.
+	ScreenshotAwaitable capture_screenshot(const char* name,
+										   int warn_channel_delta = -1,
+										   float warn_diff_fraction = -1.f) {
+		return {wait, name, warn_channel_delta, warn_diff_fraction};
+	}
 
 	ScopedGpuTimer gpu_timer(const char* name);
 

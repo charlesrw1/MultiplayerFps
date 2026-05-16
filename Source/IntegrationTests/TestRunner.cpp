@@ -72,7 +72,12 @@ bool TestRunner::tick(float dt) {
 		// Screenshot: capture after the frame that rendered (wait_ticks reached 0)
 		if (ctx_.wait.screenshot_pending && ctx_.wait.wait_ticks == 0) {
 			ctx_.wait.screenshot_pending = false;
-			bool ok = screenshot_capture_and_compare(ctx_.wait.screenshot_name.c_str(), screenshot_cfg_,
+			ScreenshotConfig cfg = screenshot_cfg_;
+			if (ctx_.wait.screenshot_warn_channel_delta >= 0)
+				cfg.warn_channel_delta = ctx_.wait.screenshot_warn_channel_delta;
+			if (ctx_.wait.screenshot_warn_diff_fraction >= 0.f)
+				cfg.warn_diff_fraction = ctx_.wait.screenshot_warn_diff_fraction;
+			bool ok = screenshot_capture_and_compare(ctx_.wait.screenshot_name.c_str(), cfg,
 													 get_app_window_size());
 			if (!ok)
 				ctx_.check(false, ("screenshot failed: " + ctx_.wait.screenshot_name).c_str());

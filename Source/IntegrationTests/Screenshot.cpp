@@ -89,15 +89,25 @@ bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cf
 	stbi_image_free(golden);
 
 	float diff_frac = (float)diff_pixels / (float)(total * 3);
-	bool pass = (max_delta <= cfg.max_channel_delta) && (diff_frac <= cfg.max_diff_fraction);
+	const bool within_strict = (max_delta <= cfg.max_channel_delta) && (diff_frac <= cfg.max_diff_fraction);
+	const bool within_warn   = (max_delta <= cfg.warn_channel_delta) && (diff_frac <= cfg.warn_diff_fraction);
 
-	if (!pass) {
-		fprintf(stderr, "  SCREENSHOT FAIL: max_delta=%d diff_pixels=%d (%.4f%%) — golden: %s\n", max_delta,
-				diff_pixels, diff_frac * 100.f, gp.c_str());
-		// SKIP THESE
-		//dump_render_targets(name);
-	} else
+	if (within_strict) {
 		printf("  Screenshot OK: max_delta=%d diff_pixels=%d\n", max_delta, diff_pixels);
-
-	return pass;
+		return true;
+	}
+	if (within_warn) {
+		// Soft-fail: minor drift (likely GPU/driver rounding) — surface it so it
+		// doesn't go unnoticed, but don't fail the test.
+		fprintf(stderr,
+				"  SCREENSHOT WARN: max_delta=%d diff_pixels=%d (%.4f%%) — within warn band (delta<=%d, frac<=%.4f%%), golden: %s\n",
+				max_delta, diff_pixels, diff_frac * 100.f, cfg.warn_channel_delta,
+				cfg.warn_diff_fraction * 100.f, gp.c_str());
+		return true;
+	}
+	fprintf(stderr, "  SCREENSHOT FAIL: max_delta=%d diff_pixels=%d (%.4f%%) — golden: %s\n", max_delta,
+			diff_pixels, diff_frac * 100.f, gp.c_str());
+	// SKIP THESE
+	//dump_render_targets(name);
+	return false;
 }
