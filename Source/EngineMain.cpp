@@ -302,6 +302,7 @@ int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 	const TestModeArgs test_args = parse_test_mode_args(argc, argv);
 	options.editor_mode = test_args.editor;
 	if (test_args.present) {
+		eng_local.m_is_test_mode = true;
 		if (test_args.mode != "game" && test_args.mode != "editor") {
 			fprintf(stderr, "Usage: App.exe --tests <game|editor> [pattern...]   (got mode '%s')\n",
 					test_args.mode.c_str());

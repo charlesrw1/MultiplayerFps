@@ -193,7 +193,7 @@ void GameEngineLocal::open_tool(string mapname) {
 	CameraSnapshot outgoing_cam;
 	if (auto* old = dynamic_cast<EditorDoc*>(this->editor_tool.get())) {
 		outgoing_path = old->get_asset_path();
-		if (!outgoing_path.empty() && outgoing_path != mapname)
+		if (!outgoing_path.empty() && outgoing_path != "<empty>" && outgoing_path != mapname)
 			outgoing_cam = old->ed_cam.snapshot();
 		else
 			outgoing_path.clear();
@@ -210,7 +210,7 @@ void GameEngineLocal::open_tool(string mapname) {
 		// load_level leaves the old doc destroyed but we shouldn't pollute the
 		// list with a switch that didn't really complete. Skip recording while
 		// a test runner is active so integration tests don't churn the list.
-		if (!outgoing_path.empty() && !test_runner)
+		if (!outgoing_path.empty() && !is_test_mode())
 			g_editor_recents.record(outgoing_path, outgoing_cam);
 #endif
 	} else {
@@ -229,6 +229,16 @@ void GameEngineLocal::open_tool(string mapname) {
 void GameEngineLocal::cleanup() {
 	ASSERT(true); // always valid to call cleanup
 #ifdef EDITOR_BUILD
+	// Snapshot the current doc into recents before tearing it down — open_tool
+	// only records on doc-switch, so a user who opens one map and quits would
+	// otherwise lose that map from the recents list.
+	if (!is_test_mode()) {
+		if (auto* doc = dynamic_cast<EditorDoc*>(editor_tool.get())) {
+			const std::string path = doc->get_asset_path();
+			if (!path.empty() && path != "<empty>")
+				g_editor_recents.record(path, doc->ed_cam.snapshot());
+		}
+	}
 	if (editor_tool)
 		editor_tool.reset();
 #endif
@@ -383,6 +393,10 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init();
 	print_time("imgui init");
+
+#ifdef EDITOR_BUILD
+	g_editor_recents.load();
+#endif
 
 	auto build_imgui_fonts = []() {
 		auto add_font_to_imgui = [&](std::string data_path, std::vector<float> sizes) -> void {

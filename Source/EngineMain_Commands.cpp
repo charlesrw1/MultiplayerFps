@@ -191,9 +191,7 @@ extern void COMPILE_TEX(const Cmd_Args& args);
 extern void dump_render_memory_usage();
 void GameEngineLocal::add_commands() {
 	commands = ConsoleCmdGroup::create("");
-#ifdef EDITOR_BUILD
-	g_editor_recents.load();
-#endif
+
 	commands->add("print_assets", [](const Cmd_Args&) { g_assets.print_usage(); });
 #ifdef EDITOR_BUILD
 	commands->add("import-tex-folder", IMPORT_TEX_FOLDER);

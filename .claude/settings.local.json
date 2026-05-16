@@ -383,7 +383,9 @@
       "PowerShell(Get-Content -Path \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\test_game_output.log\" -Tail 5 | Out-Host; \"ok\")",
       "PowerShell(& \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\Scripts\\\\integration_test.ps1\" -Mode game -Pattern \"smoke/crash_av\" 2>&1; \"exit=$LASTEXITCODE\")",
       "PowerShell(& \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\Scripts\\\\integration_test.ps1\" -Mode game 2>&1 | Select-Object -Last 50; \"exit=$LASTEXITCODE\")",
-      "PowerShell(.\\\\Scripts\\\\integration_test.ps1 -Mode editor 2>&1 | Select-Object -Last 30)"
+      "PowerShell(.\\\\Scripts\\\\integration_test.ps1 -Mode editor 2>&1 | Select-Object -Last 30)",
+      "Bash(Select-Object -Last 30)",
+      "PowerShell(& Scripts/build_and_test.ps1 -SkipTests 2>&1 | Select-Object -Last 40)"
     ]
   },
   "enabledPlugins": {

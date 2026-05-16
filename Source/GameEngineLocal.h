@@ -120,6 +120,8 @@ public:
 	bool dedicated_server = false;
 	bool loaded_in_tool_mode = false;
 	bool m_is_editor_app = false;
+	bool m_is_test_mode = false;
+	bool is_test_mode() const { return m_is_test_mode; }
 	bool is_drawing_to_window_viewport() const;
 
 	int argc = 0;
