@@ -254,6 +254,8 @@
     <ClCompile Include="Source\Scripting\ScriptFunctionCodegen.cpp" />
     <ClCompile Include="Source\Scripting\ScriptingStdLib.cpp" />
     <ClCompile Include="Source\Scripting\ScriptManager.cpp" />
+    <ClCompile Include="Source\Scripting\ScriptLoadingUtil.cpp" />
+    <ClCompile Include="Source\Scripting\LuaClassTypeInfo.cpp" />
     <ClCompile Include="Source\UI\BaseGUI.cpp" />
     <ClCompile Include="Source\UI\GUISystemLocal.cpp" />
     <ClCompile Include="Source\UI\Gui.cpp" />

@@ -408,6 +408,12 @@
     <ClCompile Include="Source\Scripting\ScriptManager.cpp">
       <Filter>Source\Scripting</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Scripting\ScriptLoadingUtil.cpp">
+      <Filter>Source\Scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Scripting\LuaClassTypeInfo.cpp">
+      <Filter>Source\Scripting</Filter>
+    </ClCompile>
     <ClCompile Include="Source\UI\BaseGUI.cpp">
       <Filter>Source\UI</Filter>
     </ClCompile>
