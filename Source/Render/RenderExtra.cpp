@@ -9,7 +9,7 @@ ConfigVar shadow_map_quality("r.shadow_map_quality", "0", CVAR_INTEGER, "", 0, 1
 ConfigVar r_shadows("r.shadows", "1", CVAR_BOOL, "");
 
 ShadowMapAtlas::ShadowMapAtlas() {
-	ASSERT(IGraphicsDevice::inst != nullptr);
+	ASSERT(gfx_is_initialized());
 
 	int size = 1024;
 	if (shadow_map_quality.get_integer())
@@ -25,7 +25,7 @@ ShadowMapAtlas::ShadowMapAtlas() {
 	args.type = GraphicsTextureType::t2D;
 	args.sampler_type = GraphicsSamplerType::AtlasShadowmap;
 	safe_release(atlas);
-	atlas = IGraphicsDevice::inst->create_texture(args);
+	atlas = gfx().create_texture(args);
 
 	vtsHandle->update_specs_ptr(atlas);
 
@@ -77,7 +77,7 @@ IGraphicsTexture* ShadowMapAtlas::get_atlas_texture() {
 }
 
 ShadowMapManager::ShadowMapManager() {
-	ASSERT(IGraphicsDevice::inst != nullptr);
+	ASSERT(gfx_is_initialized());
 	glCreateBuffers(1, &frame_view);
 }
 
@@ -94,7 +94,7 @@ struct LightSortObj
 };
 
 void ShadowMapManager::update() {
-	ASSERT(IGraphicsDevice::inst != nullptr);
+	ASSERT(gfx_is_initialized());
 
 	auto& memarena = draw.get_arena();
 	auto& lights = draw.scene.light_list.objects;
@@ -148,7 +148,7 @@ void ShadowMapManager::update() {
 }
 
 void ShadowMapManager::get_lights_to_render(std::vector<handle<Render_Light>>& vec) {
-	ASSERT(IGraphicsDevice::inst != nullptr);
+	ASSERT(gfx_is_initialized());
 
 	// if light is static and was updated, render
 	// if light is dynamic and was updated or had dynamic in frustum last update, render
@@ -193,7 +193,7 @@ void ShadowMapManager::get_lights_to_render(std::vector<handle<Render_Light>>& v
 void cull_and_draw_spot(Frustum f);
 extern ConfigVar r_spot_near;
 void ShadowMapManager::do_render(Render_Lists& list, handle<Render_Light> handle, bool any_dynamic_in_frustum) {
-	ASSERT(IGraphicsDevice::inst != nullptr);
+	ASSERT(gfx_is_initialized());
 
 	if (!r_shadows.get_bool())
 		return;
@@ -206,7 +206,7 @@ void ShadowMapManager::do_render(Render_Lists& list, handle<Render_Light> handle
 
 		RenderPassState pass_setup;
 		pass_setup.depth_info = atlas.get_atlas_texture();
-		IGraphicsDevice::inst->set_render_pass(pass_setup);
+		gfx().set_render_pass(pass_setup);
 
 		assert(light.shadow_array_handle != -1);
 		Rect2d rect = atlas.get_atlas_rect(light.shadow_array_handle);

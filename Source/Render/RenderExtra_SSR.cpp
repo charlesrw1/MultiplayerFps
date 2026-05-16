@@ -6,7 +6,7 @@
 
 SSRSystem* SSRSystem::inst = nullptr;
 SSRSystem::SSRSystem() {
-	ASSERT(IGraphicsDevice::inst != nullptr);
+	ASSERT(gfx_is_initialized());
 
 	ssr_compute = draw.get_prog_man().create_raster("fullscreenquad.txt", "ssr_f.txt");
 	hiz_downsample = draw.get_prog_man().create_compute("DepthPyramidC.txt");
@@ -85,7 +85,7 @@ void SSRSystem::do_downsample() {
 		auto targets = {ColorTargetInfo(draw.tex.scene_color_mipchain, -1, i)};
 		RenderPassState rp;
 		rp.color_infos = targets;
-		IGraphicsDevice::inst->set_render_pass(rp);
+		gfx().set_render_pass(rp);
 		int mip_to_fetch = (i == 0) ? 0 : i - 1;
 		device.shader().set_int("mip_level", mip_to_fetch);
 		device.shader().set_vec2("myimg_size", size);
@@ -140,7 +140,7 @@ void SSRSystem::do_upsample() {
 	auto targets = {ColorTargetInfo(draw.tex.last_reflection_accum)};
 	RenderPassState rp;
 	rp.color_infos = targets;
-	IGraphicsDevice::inst->set_render_pass(rp);
+	gfx().set_render_pass(rp);
 	device.set_viewport(0, 0, viewsetup.width, viewsetup.height);
 
 	glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -158,7 +158,7 @@ void SSRSystem::do_upsample() {
 	auto targets2 = {ColorTargetInfo(draw.tex.scene_color)};
 	rp;
 	rp.color_infos = targets2;
-	IGraphicsDevice::inst->set_render_pass(rp);
+	gfx().set_render_pass(rp);
 	device.set_viewport(0, 0, viewsetup.width, viewsetup.height);
 	device.bind_texture_ptr(0, draw.tex.ddgi_accum);
 	device.bind_texture_ptr(1, draw.tex.scene_depth);
@@ -183,7 +183,7 @@ void SSRSystem::do_temporal() {
 	// now do temporal upsample
 	auto targets2 = {ColorTargetInfo(draw.tex.reflection_accum)};
 	rp.color_infos = targets2;
-	IGraphicsDevice::inst->set_render_pass(rp);
+	gfx().set_render_pass(rp);
 
 	RenderPipelineState state{};
 	state.blend = BlendState::OPAQUE;
@@ -303,7 +303,7 @@ void SSRSystem::execute_compute() {
 	auto targets = {ColorTargetInfo(draw.tex.halfres_scene_color, -1, 0)};
 	RenderPassState rp;
 	rp.color_infos = targets;
-	IGraphicsDevice::inst->set_render_pass(rp);
+	gfx().set_render_pass(rp);
 
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
@@ -381,7 +381,7 @@ void SSRSystem::init_depth_pyramid(int w, int h) {
 	args.sampler_type = GraphicsSamplerType::NearestClamped;
 	args.format = GraphicsTextureFormat::r32f;
 
-	depth_pyramid = IGraphicsDevice::inst->create_texture(args);
+	depth_pyramid = gfx().create_texture(args);
 
 	auto t = Texture::load("_depth_pyramid2");
 	t->update_specs_ptr(depth_pyramid);

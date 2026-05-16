@@ -2,8 +2,8 @@
 
 GpuCullingTest::GpuCullingTest() {
 
-	matindirect = IGraphicsDevice::inst->create_buffer({});
-	cull_data = IGraphicsDevice::inst->create_buffer({});
+	matindirect = gfx().create_buffer({});
+	cull_data = gfx().create_buffer({});
 	cull_compute = draw.get_prog_man().create_compute("CullCompute.txt", "MAINVIEW");
 	cull_compute_cascade = draw.get_prog_man().create_compute("CullCompute.txt", "SHADOW_CASCADE");
 	cull_compute_spot = draw.get_prog_man().create_compute("CullCompute.txt", "SHADOW_SPOT");
@@ -11,7 +11,7 @@ GpuCullingTest::GpuCullingTest() {
 	build_pyramid = draw.get_prog_man().create_compute("DepthPyramidC.txt");
 	cpu_vis_array_to_mdi = draw.get_prog_man().create_compute("cpu_vis_to_mdi.txt");
 	debug_overlays = draw.get_prog_man().create_raster("fullscreenquad.txt", "debugCull.txt");
-	vis_bitarray = IGraphicsDevice::inst->create_buffer({});
+	vis_bitarray = gfx().create_buffer({});
 	zero_instances_mdi = draw.get_prog_man().create_compute("zero_instances_mdi.txt");
 	compaction = draw.get_prog_man().create_compute("compact_mdi.txt");
 
@@ -78,7 +78,7 @@ void GpuCullingTest::debug_overlay() {
 		pass_state.wants_color_clear = true;
 		auto color_infos = {ColorTargetInfo(draw.tex.output_composite)};
 		pass_state.color_infos = color_infos;
-		IGraphicsDevice::inst->set_render_pass(pass_state);
+		gfx().set_render_pass(pass_state);
 	};
 	set_composite_pass();
 
@@ -273,7 +273,7 @@ void GpuCullingTest::init_depth_pyramid(int w, int h) {
 	args.sampler_type = GraphicsSamplerType::DepthPyramid;
 	args.format = GraphicsTextureFormat::r32f;
 
-	depth_pyramid = IGraphicsDevice::inst->create_texture(args);
+	depth_pyramid = gfx().create_texture(args);
 
 	auto t = Texture::load("_depth_pyramid");
 	t->update_specs_ptr(depth_pyramid);

@@ -6,7 +6,7 @@
 #include <random>
 
 #include "Assets/AssetDatabase.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 
 void draw_hbao_menu() {
 	ImGui::DragFloat("radius", &draw.ssao.tweak.radius, 0.05, 0.f);
@@ -120,7 +120,7 @@ void SSAO_System::make_render_targets(bool initial, int width, int height) {
 		args.height = height;
 		args.format = GraphicsTextureFormat::rgba8;
 		args.sampler_type = GraphicsSamplerType::NearestClamped;
-		texture.viewnormal = IGraphicsDevice::inst->create_texture(args);
+		texture.viewnormal = gfx().create_texture(args);
 	}
 	// glCreateTextures(GL_TEXTURE_2D, 1, &texture.viewnormal);
 	// glTextureStorage2D(texture.viewnormal, 1, GL_RGBA8, width, height);
@@ -142,8 +142,8 @@ void SSAO_System::make_render_targets(bool initial, int width, int height) {
 	resultArgs.height = height;
 	resultArgs.sampler_type = GraphicsSamplerType::LinearClamped;
 	resultArgs.format = GraphicsTextureFormat::rg16f;
-	texture.result = IGraphicsDevice::inst->create_texture(resultArgs);
-	texture.blurred = IGraphicsDevice::inst->create_texture(resultArgs);
+	texture.result = gfx().create_texture(resultArgs);
+	texture.blurred = gfx().create_texture(resultArgs);
 
 	//	glCreateTextures(GL_TEXTURE_2D, 1, &texture.blur);
 	// glTextureStorage2D(texture.blur, 1, GL_RG16F, width, height);

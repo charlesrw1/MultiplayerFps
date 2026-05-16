@@ -20,7 +20,7 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
@@ -230,7 +230,6 @@ glm::vec2 Renderer::get_taa_jitter() const {
 void Renderer::check_hardware_options() {
 	bool supports_compression = false;
 	bool supports_sprase_tex = false;
-	bool supports_bindless = false;
 	bool supports_filter_minmax = false;
 	bool supports_atomic64 = false;
 	bool supports_int64 = false;
@@ -239,9 +238,7 @@ void Renderer::check_hardware_options() {
 	glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
 	for (int i = 0; i < num_extensions; i++) {
 		const char* ext = (char*)glGetStringi(GL_EXTENSIONS, i);
-		if (strcmp(ext, "GL_ARB_bindless_texture") == 0)
-			supports_bindless = true;
-		else if (strcmp(ext, "GL_ARB_sparse_texture") == 0)
+		if (strcmp(ext, "GL_ARB_sparse_texture") == 0)
 			supports_sprase_tex = true;
 		else if (strcmp(ext, "GL_EXT_texture_compression_s3tc") == 0)
 			supports_compression = true;
@@ -256,7 +253,6 @@ void Renderer::check_hardware_options() {
 	sys_print(Debug, "###########################\n");
 	sys_print(Debug, "#### Extension support ####\n");
 	sys_print(Debug, "###########################\n");
-	sys_print(Debug, "-GL_ARB_bindless_texture: %s\n", (supports_bindless) ? "yes" : "no");
 	sys_print(Debug, "-GL_ARB_sparse_texture: %s\n", (supports_sprase_tex) ? "yes" : "no");
 	sys_print(Debug, "-GL_ARB_texture_filter_minmax: %s\n", (supports_filter_minmax) ? "yes" : "no");
 	sys_print(Debug, "-GL_EXT_texture_compression_s3tc: %s\n", (supports_compression) ? "yes" : "no");
@@ -309,7 +305,7 @@ void Renderer::create_default_textures() {
 		args.num_mip_maps = 1;
 		args.sampler_type = GraphicsSamplerType::LinearDefault;
 		args.format = GraphicsTextureFormat::rgba8;
-		handle = IGraphicsDevice::inst->create_texture(args);
+		handle = gfx().create_texture(args);
 		handle->sub_image_upload(0, 0, 0, 1, 1, sizeof(uint8_t) * 4, data);
 	};
 	create_defeault(white_texture, wdata);
@@ -349,11 +345,6 @@ void Renderer::create_default_textures() {
 	tex.read_scene_color_for_transparents_handle = Texture::install_system("_read_scene_color");
 }
 
-class FuckerBobberThing : public ThingerBobber
-{
-public:
-	void set_depth_write_enabled(bool b) final { draw.get_device().set_depth_write_enabled(b); }
-};
 extern int total_gfx_mem_usage;
 void Renderer::init() {
 	sys_print(Info, "--------- Initializing Renderer ---------\n");
@@ -366,7 +357,7 @@ void Renderer::init() {
 		start = now;
 	};
 
-	IGraphicsDevice::inst = IGraphicsDevice::create_opengl_device(new FuckerBobberThing());
+	gfx_init_opengl();
 
 	print_time("draw:device");
 
@@ -429,7 +420,7 @@ void Renderer::init() {
 	auto create_uniform_buffer = [&](IGraphicsBuffer*& ptr) {
 		CreateBufferArgs args;
 		args.flags = BUFFER_USE_DYNAMIC;
-		ptr = IGraphicsDevice::inst->create_buffer(args);
+		ptr = gfx().create_buffer(args);
 	};
 	create_uniform_buffer(buf.lighting_uniforms);
 	create_uniform_buffer(buf.decal_uniforms);
@@ -535,7 +526,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 		args.width = s_w;
 		args.height = s_h;
 		args.sampler_type = GraphicsSamplerType::NearestClamped;
-		ptr = IGraphicsDevice::inst->create_texture(args);
+		ptr = gfx().create_texture(args);
 	};
 	auto delete_and_create_texture_halfresmips = [&](IGraphicsTexture*& ptr, GraphicsTextureFormat format,
 													 int num_mips) {
@@ -547,7 +538,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 		args.width = s_w / 2;
 		args.height = s_h / 2;
 		args.sampler_type = GraphicsSamplerType::LinearDefault;
-		ptr = IGraphicsDevice::inst->create_texture(args);
+		ptr = gfx().create_texture(args);
 	};
 
 	auto delete_and_create_texture_half_res = [&](IGraphicsTexture*& ptr, GraphicsTextureFormat format) {
@@ -559,7 +550,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 		args.width = s_w / 2;
 		args.height = s_h / 2;
 		args.sampler_type = GraphicsSamplerType::NearestClamped;
-		ptr = IGraphicsDevice::inst->create_texture(args);
+		ptr = gfx().create_texture(args);
 	};
 
 	using gtf = GraphicsTextureFormat;
@@ -649,7 +640,7 @@ void Renderer::init_bloom_buffers() {
 		args.num_mip_maps = 1;
 		args.sampler_type = GraphicsSamplerType::LinearClamped;
 		safe_release(bc.texture);
-		bc.texture = IGraphicsDevice::inst->create_texture(args);
+		bc.texture = gfx().create_texture(args);
 
 		bc.isize = {x, y};
 		bc.fsize = {fx, fy};

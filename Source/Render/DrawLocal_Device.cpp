@@ -20,7 +20,7 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
@@ -276,7 +276,7 @@ void Program_Manager::recompile_do(program_def& def) {
 		//	CreateProgramArgs args;
 		//	args.file_name = def.vert;
 		//	args.defines = def.defines;
-		//	def.program = IGraphicsDevice::inst->create_program(args);
+		//	def.program = gfx().create_program(args);
 		//	def.shader_obj.ID = def.program->get_internal_handle();
 		//	def.compile_failed = false;
 		//}

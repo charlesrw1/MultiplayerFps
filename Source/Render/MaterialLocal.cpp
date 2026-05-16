@@ -10,7 +10,7 @@
 #include <fstream>
 #include <array>
 #include "glad/glad.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "Assets/AssetRegistry.h"
 #include "Assets/AssetDatabase.h"
 #include "Framework/StringUtils.h"

@@ -11,13 +11,13 @@ RenderGiManager::RenderGiManager() {
 		args.num_mip_maps = Texture::get_mip_map_count(CUBEMAP_WIDTH, CUBEMAP_WIDTH);
 		args.sampler_type = GraphicsSamplerType::CubemapDefault;
 		args.depth_3d = MAX_CUBEMAPS * 6;
-		editable_cubemap_array = IGraphicsDevice::inst->create_texture(args);
+		editable_cubemap_array = gfx().create_texture(args);
 
 		auto cm = Texture::install_system("_cubemaps");
 		cm->update_specs_ptr(editable_cubemap_array);
 	}
 
-	cubemap_volume_buffer = IGraphicsDevice::inst->create_buffer({});
+	cubemap_volume_buffer = gfx().create_buffer({});
 
 	dummy_temp_cubemap = new Texture;
 }
@@ -58,7 +58,7 @@ void RenderGiManager::render_frame_tick() {
 						// blit.src.layer = face;
 						// blit.src.x = blit.src.y = blit.dest.x = blit.dest.y = 0;
 						// blit.src.w = blit.src.h = blit.dest.w = blit.dest.h = CUBEMAP_WIDTH;
-						// IGraphicsDevice::inst->blit_textures(blit);
+						// gfx().blit_textures(blit);
 						// glCheckError();
 
 						glCopyImageSubData(dummy_temp_cubemap->gpu_ptr->get_internal_handle(), GL_TEXTURE_CUBE_MAP, mip,

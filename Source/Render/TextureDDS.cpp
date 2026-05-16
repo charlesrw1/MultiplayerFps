@@ -3,7 +3,7 @@
 // (BC6, R11G11B10F, RG16F, cubemap arrays). Called from Texture::post_load.
 
 #include "Texture.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "Framework/Util.h"
 #include <cstdint>
 
@@ -271,7 +271,7 @@ bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* buffer,
 		args.num_mip_maps = numMipmaps;
 		args.format       = fmt;
 		args.sampler_type = GraphicsSamplerType::AnisotropyDefault;
-		return IGraphicsDevice::inst->create_texture(args);
+		return gfx().create_texture(args);
 	};
 	out_ptr = create_gpu_texture();
 	const bool compressed = out_ptr->is_compressed();
@@ -375,7 +375,7 @@ bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffe
 			if (numMipmaps > 1)
 				sys_print(Warning, "specilized format has more than 1 mipmap\n");
 		}
-		return IGraphicsDevice::inst->create_texture(args);
+		return gfx().create_texture(args);
 	};
 	out_ptr = create_gpu_texture();
 

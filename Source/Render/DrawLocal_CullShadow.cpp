@@ -13,7 +13,7 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include "Framework/ArenaAllocator.h"
 #include "Framework/ArenaStd.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "GpuCullingTest.h"
 #include <bit>
 // -----------------------------------------------------------------------
@@ -29,18 +29,18 @@ inline int next_pow2(uint32_t x) {
 }
 
 BuildSceneData_CpuFast::BuildSceneData_CpuFast() {
-	ASSERT(IGraphicsDevice::inst != nullptr);
+	ASSERT(gfx_is_initialized());
 
-	gpu.cmd_list = IGraphicsDevice::inst->create_buffer({});
-	gpu.cullobj_buf = IGraphicsDevice::inst->create_buffer({});
-	gpu.gbuffer_batches = IGraphicsDevice::inst->create_buffer({});
-	gpu.gbuffer_count = IGraphicsDevice::inst->create_buffer({});
-	gpu.gbuffer_draw_to_batch = IGraphicsDevice::inst->create_buffer({});
-	gpu.glinst_to_inst = IGraphicsDevice::inst->create_buffer({});
-	gpu.mod_data_gpu = IGraphicsDevice::inst->create_buffer({});
-	gpu.shadows_count = IGraphicsDevice::inst->create_buffer({});
-	gpu.shadow_batches = IGraphicsDevice::inst->create_buffer({});
-	gpu.shadow_draw_to_batch = IGraphicsDevice::inst->create_buffer({});
+	gpu.cmd_list = gfx().create_buffer({});
+	gpu.cullobj_buf = gfx().create_buffer({});
+	gpu.gbuffer_batches = gfx().create_buffer({});
+	gpu.gbuffer_count = gfx().create_buffer({});
+	gpu.gbuffer_draw_to_batch = gfx().create_buffer({});
+	gpu.glinst_to_inst = gfx().create_buffer({});
+	gpu.mod_data_gpu = gfx().create_buffer({});
+	gpu.shadows_count = gfx().create_buffer({});
+	gpu.shadow_batches = gfx().create_buffer({});
+	gpu.shadow_draw_to_batch = gfx().create_buffer({});
 }
 
 void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_only) {

@@ -20,7 +20,7 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
@@ -155,7 +155,7 @@ LightListCuller::LightListCuller() {
 	auto create_buffer = [&]() {
 		CreateBufferArgs args;
 		args.flags = BUFFER_USE_DYNAMIC;
-		return IGraphicsDevice::inst->create_buffer(args);
+		return gfx().create_buffer(args);
 	};
 	light_indirection = create_buffer();
 	light_count_buffer = create_buffer();
@@ -315,7 +315,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		auto targets = {ColorTargetInfo(tex.scene_color)};
 		RenderPassState rp;
 		rp.color_infos = targets;
-		IGraphicsDevice::inst->set_render_pass(rp);
+		gfx().set_render_pass(rp);
 	};
 	start_render_pass();
 

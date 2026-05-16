@@ -366,7 +366,7 @@
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\GpuAllocator.h" />
     <ClInclude Include="Source\Render\GpuCullingTest.h" />
-    <ClInclude Include="Source\Render\IGraphsDevice.h" />
+    <ClInclude Include="Source\Render\IGraphicsDevice.h" />
     <ClInclude Include="Source\Render\ModelManager.h" />
     <ClInclude Include="Source\Render\RectPackerUtil.h" />
     <ClInclude Include="Source\Render\RenderConfigVars.h" />

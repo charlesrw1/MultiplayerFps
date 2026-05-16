@@ -83,7 +83,7 @@ void LightCookieAtlas::update() {
 		args.type = GraphicsTextureType::t2D;
 		args.width = ATLAS_WIDTH;
 		args.height = height;
-		atlas = IGraphicsDevice::inst->create_texture(args);
+		atlas = gfx().create_texture(args);
 		atlasheight = height;
 
 		Texture::load("_cookieatlas")->update_specs_ptr(atlas);
@@ -92,7 +92,7 @@ void LightCookieAtlas::update() {
 		setup.set_clear_both(true);
 		auto colorinfos = {ColorTargetInfo(atlas)};
 		setup.color_infos = colorinfos;
-		IGraphicsDevice::inst->set_render_pass(setup);
+		gfx().set_render_pass(setup);
 
 		for (auto& [t, r] : rects) {
 			blit_texture_into_thing_because_reasons(t->gpu_ptr, atlas, r);

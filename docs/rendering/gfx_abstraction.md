@@ -1,0 +1,50 @@
+# Graphics Device Abstraction
+
+Migration of all rendering behind `IGraphicsDevice` (Source/Render/IGraphicsDevice.h) so an SDL3 GPU backend can sit alongside the current OpenGL backend.
+
+Global accessor: `gfx()` (free function). The OpenGL singleton is built by `gfx_init_opengl()` during `Renderer::init` and torn down by `gfx_shutdown()`.
+
+## Phase plan
+
+1. **Wrap.** Every `gl*` call moves behind `IGraphicsDevice`. API stays GL-shaped — by-name uniforms, apply-at-draw pipeline state, immediate draws. Goal: zero `gl*` calls outside `Source/Render/Opengl*`. No behavior changes.
+2. **Redesign.** With everything funneled through the interface, reshape the API on the OpenGL backend only — synthetic UBOs, baked pipeline objects, command encoder, frame lifecycle, transfer ring buffers.
+3. **Port.** Add the SDL3 GPU backend against the redesigned interface. GLSL → SPIR-V via glslang/shaderc at runtime (dev) or prebaked blobs (release).
+
+A **null/passthrough leak-detector backend** lands at the end of Phase 1 (1.5) as the gate that proves the wrap is complete.
+
+## Phase 0 status
+
+- `IGraphsDevice.h` → `IGraphicsDevice.h` (typo fix).
+- `IGraphicsDevice::inst` (public static) → `gfx()` free function + `gfx_init_opengl()/gfx_shutdown()/gfx_is_initialized()`.
+- Insult comment, `ThingerBobber`, and `FUUUUUUUCK` factory param removed. The OpenGL impl now reaches `draw.get_device().set_depth_write_enabled(true)` directly inside `set_render_pass` to keep `OpenglRenderDevice`'s cached state in sync after `glClear`. Transitional coupling; cleanly removed when `OpenglRenderDevice` folds into the OpenGL backend in Phase 2.
+- `bindlesstexhandle` typedef + `supports_bindless` extension flag removed (zero production callers).
+
+## `get_internal_handle()` spike
+
+Used to pull a raw GL handle out of an `IGraphicsTexture` / `IGraphicsBuffer` / `IGraphicsVertexInput` so a direct `gl*` call can consume it. Every such caller is either wrap-routable (a new abstraction method covers it) or needs a redesign-pass extension.
+
+Counts come from `rg "get_internal_handle\(\)"` at start of Phase 0. Verify before editing.
+
+| Site / category                                                                 | Calls | Phase 1 routing                                                                   |
+| ------------------------------------------------------------------------------- | ----: | --------------------------------------------------------------------------------- |
+| `glBindBufferBase(GL_SHADER_STORAGE_BUFFER, …)` — Lighting, Volumetricfog, DecalBatcher, BatchScene, RenderPass, GpuCullingTest, RT/*, RenderGiManager | ~35   | `gfx().bind_storage_buffer(slot, IGraphicsBuffer*, offset, size)` (Phase 1) |
+| `glBindBufferBase(GL_UNIFORM_BUFFER, …)` — GpuCullingTest, RT                  |   ~3  | `gfx().bind_uniform_buffer(slot, IGraphicsBuffer*, offset, size)`                 |
+| `glBindBuffer(GL_DRAW_INDIRECT_BUFFER, …)` — BatchScene, DecalBatcher           |   ~2  | `gfx().bind_indirect_buffer(IGraphicsBuffer*)` (or fold into draw call)           |
+| `glBindBuffer(GL_PARAMETER_BUFFER, …)` — BatchScene, RenderPass                 |   ~2  | `gfx().bind_parameter_buffer(IGraphicsBuffer*)` (for MDEI w/ count)               |
+| `glBindBuffer(GL_SHADER_STORAGE_BUFFER, …)` non-base — RT_Probe, RenderGiManager |  ~3  | `gfx().map_buffer_range / write_buffer` — Phase 2e ring buffer                    |
+| `glBindImageTexture(…)` — GpuCullingTest, RenderExtra_SSR, RT_Probe             |   ~5  | `gfx().bind_image_for_compute(slot, IGraphicsTexture*, mip, layer, access)`       |
+| `glBindTextureUnit(…)` — Ssao                                                   |   ~4  | `gfx().bind_texture_ptr(slot, IGraphicsTexture*)` (existing on OpenglRenderDevice; lift to gfx()) |
+| `glNamedFramebufferTexture(…)` — Ssao, dead-code in SceneDraw/RenderPass        |   ~3  | Already covered by `RenderPassState`; finish migrating Ssao.                      |
+| `glNamedBufferData(…)` mid-frame on dynamic buffer — DrawLocal_Scene            |   1   | Phase 1: `IGraphicsBuffer::upload`. Phase 2e: route via ring buffer.              |
+| `glGetTextureImage(…)` — SceneDraw_Debug (depth/editor-id readback), Screenshot test, GiScene cubemap save | ~5 | `gfx().download_texture(IGraphicsTexture*, mip, …)` — new API (debug/test path only) |
+| `glCopyImageSubData(…)` — TextureUpload (mip copy), RenderGiManager (cube copy) |   2   | `gfx().copy_texture(src, dest, region)` (Phase 1)                                 |
+| `glGenerateTextureMipmap(…)` — TextureUpload                                    |   1   | `gfx().generate_mipmaps(IGraphicsTexture*)`                                       |
+| `SaveCubeArrayToDDS / save_float_texture_as_dds` — GiScene baking               |   3   | Bake path is offline-ish; route through `gfx().download_texture` + DDS encoder.   |
+| `IGraphicsTexture* tex; tex_id(tex)` — OpenGlDevice impl-internal               |   1   | Stays inside backend. Not a leak.                                                 |
+| `state.vao = vao_ptr->get_internal_handle()` — RenderPass, BatchScene, EnvProbe, RT_Shade | ~4 | Pipeline-state already takes a `vertexarrayhandle`; in Phase 2c `bind_pipeline(IGraphicsRasterPipeline*)` swallows it. For Phase 1 wrap: change `RenderPipelineState::vao` to `IGraphicsVertexInput*` and resolve inside the backend. |
+| `RenderDump.cpp` integration test — pulls handle for `glReadPixels`            |   1   | Test-side. Move to `gfx().download_texture` once available.                       |
+| Commented-out callers                                                           |   ~9  | Delete during wrap.                                                               |
+
+**Risk.** All identified sites are routable through Phase 1 wrap additions. None require a redesign-pass extension. Plan estimate of "17 known" was low — actual count is ~75 raw calls across ~25 files, but they cluster into the ~12 API additions listed above.
+
+The null/passthrough backend (Phase 1.5) will assert that every `get_internal_handle()` call comes from inside `Source/Render/Opengl*` or sits on an explicit accept-list.

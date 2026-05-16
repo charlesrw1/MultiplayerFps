@@ -41,7 +41,7 @@ void DdgiTesting::render_probes() {
         auto color_infos = {ColorTargetInfo(draw.tex.output_composite)};
         pass_state.color_infos = color_infos;
         pass_state.depth_info = draw.tex.scene_depth;
-        IGraphicsDevice::inst->set_render_pass(pass_state);
+        gfx().set_render_pass(pass_state);
     };
     set_composite_pass();
 
@@ -175,7 +175,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     auto targets = {ColorTargetInfo(draw.tex.halfres_scene_color)};
     RenderPassState rp;
     rp.color_infos = targets;
-    IGraphicsDevice::inst->set_render_pass(rp);
+    gfx().set_render_pass(rp);
 
     RenderPipelineState state;
     state.vao = draw.get_empty_vao();
@@ -196,7 +196,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
 
         auto targets2 = {ColorTargetInfo(draw.tex.ddgi_accum)};
         rp.color_infos = targets2;
-        IGraphicsDevice::inst->set_render_pass(rp);
+        gfx().set_render_pass(rp);
 
         state.blend = BlendState::OPAQUE;
         state.program = temporal_upsample;
@@ -238,7 +238,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     // Apply accumulated half-res ddgi to scene
     auto targets3 = {ColorTargetInfo(draw.tex.scene_color)};
     rp.color_infos = targets3;
-    IGraphicsDevice::inst->set_render_pass(rp);
+    gfx().set_render_pass(rp);
     state.program = apply_halfres_accum_to_scene;
     state.blend = BlendState::ADD;
     device.set_pipeline(state);
@@ -300,7 +300,7 @@ void DdgiTesting::render_rt() {
         pass_state.wants_color_clear = true;
         auto color_infos = {ColorTargetInfo(draw.tex.output_composite)};
         pass_state.color_infos = color_infos;
-        IGraphicsDevice::inst->set_render_pass(pass_state);
+        gfx().set_render_pass(pass_state);
     };
     set_composite_pass();
 

@@ -2,7 +2,7 @@
 // and format helpers. Also contains development benchmark utilities.
 
 #include "Texture.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "Framework/Util.h"
 
 #include "glad/glad.h"
@@ -60,7 +60,7 @@ IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, Grap
 			args.sampler_type = GraphicsSamplerType::NearestDefault;
 		else
 			args.sampler_type = GraphicsSamplerType::AnisotropyDefault;
-		return IGraphicsDevice::inst->create_texture(args);
+		return gfx().create_texture(args);
 	};
 	IGraphicsTexture* ptr = create_gpu_texture();
 	ASSERT(!ptr->is_compressed()); // compressed data must take the DDS path

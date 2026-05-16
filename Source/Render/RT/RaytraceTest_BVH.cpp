@@ -233,18 +233,18 @@ void DdgiTesting::build_world() {
     CreateBufferArgs args;
     args.flags = GraphicsBufferUseFlags::BUFFER_USE_AS_STORAGE_READ;
     args.size = all_verticies.size() * sizeof(glm::vec4);
-    verts = IGraphicsDevice::inst->create_buffer(args);
+    verts = gfx().create_buffer(args);
     verts->upload(all_verticies.data(), args.size);
 
     args.size = sizeof(int) * as.indicies.size();
-    references = IGraphicsDevice::inst->create_buffer(args);
+    references = gfx().create_buffer(args);
     references->upload(as.indicies.data(), args.size);
 
     args.size = nodes.size() * sizeof(GPUBVHNode);
-    this->nodes = IGraphicsDevice::inst->create_buffer(args);
+    this->nodes = gfx().create_buffer(args);
     this->nodes->upload(nodes.data(), args.size);
 
     args.size = materialsdata.size() * sizeof(glm::vec4);
-    this->materials = IGraphicsDevice::inst->create_buffer(args);
+    this->materials = gfx().create_buffer(args);
     this->materials->upload(materialsdata.data(), args.size);
 }

@@ -4,19 +4,27 @@
 // OpenGlBufferImpl.cpp; accessed here only through the IGraphics* interfaces
 // and factory functions declared in OpenGlDeviceLocal.h.
 #include "OpenGlDeviceLocal.h"
+#include "DrawLocal.h"
 
 // ---------------------------------------------------------------------------
 // Global state (definitions)
 // ---------------------------------------------------------------------------
 int total_gfx_mem_usage = 0;
 
-IGraphicsDevice* IGraphicsDevice::inst = nullptr;
+static IGraphicsDevice* g_gfx_instance = nullptr;
+
+IGraphicsDevice& gfx() {
+	ASSERT(g_gfx_instance != nullptr);
+	return *g_gfx_instance;
+}
+bool gfx_is_initialized() { return g_gfx_instance != nullptr; }
+
 extern ConfigVar log_shader_compiles;
 
 OpenglDataStatic opengl_stats;
 
 void dump_render_memory_usage() {
-	ASSERT(IGraphicsDevice::inst != nullptr);
+	ASSERT(g_gfx_instance != nullptr);
 	opengl_stats.dump_to_disk("r_mem_usage.csv");
 }
 
@@ -36,8 +44,7 @@ public:
 	fbohandle shared_framebuffer   = 0;
 	fbohandle shared_framebuffer_2 = 0;
 
-	OpenGLDeviceImpl(ThingerBobber* f) : thinger_bobber(f) {
-		ASSERT(f != nullptr);
+	OpenGLDeviceImpl() {
 		glGenFramebuffers(1, &shared_framebuffer);
 		glGenFramebuffers(1, &shared_framebuffer_2);
 		g_swapchain_sentinel = opengl_make_swapchain_sentinel();
@@ -129,7 +136,9 @@ public:
 			GLbitfield mask{};
 			if (state.wants_depth_clear) mask |= GL_DEPTH_BUFFER_BIT;
 			if (state.wants_color_clear)  mask |= GL_COLOR_BUFFER_BIT;
-			thinger_bobber->set_depth_write_enabled(true);
+			// glClear obeys glDepthMask; force depth-write on, routed through
+			// OpenglRenderDevice so its cached state stays in sync.
+			draw.get_device().set_depth_write_enabled(true);
 			glClear(mask);
 		}
 	}
@@ -180,13 +189,17 @@ public:
 	}
 
 private:
-	ThingerBobber* thinger_bobber = nullptr;
 	opt<RenderPassState> cur_pass;
 };
 
-IGraphicsDevice* IGraphicsDevice::create_opengl_device(ThingerBobber* f) {
-	ASSERT(f != nullptr);
-	return new OpenGLDeviceImpl(f);
+void gfx_init_opengl() {
+	ASSERT(g_gfx_instance == nullptr);
+	g_gfx_instance = new OpenGLDeviceImpl();
+}
+
+void gfx_shutdown() {
+	delete g_gfx_instance;
+	g_gfx_instance = nullptr;
 }
 
 // ---------------------------------------------------------------------------

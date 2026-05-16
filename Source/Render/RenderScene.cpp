@@ -293,7 +293,7 @@ void Render_Scene::init() {
 
 	depth_prepass_rlist.init(0, 0);
 
-	gpu_instance_buffer = IGraphicsDevice::inst->create_buffer({});
+	gpu_instance_buffer = gfx().create_buffer({});
 
 	// glCreateBuffers(1, &gpu_render_instance_buffer);
 	glCreateBuffers(1, &gpu_skinned_mats_buffer);

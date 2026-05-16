@@ -42,7 +42,7 @@ ConfigVar r_ddgi_halfres("r.ddgi_halfres", "1", CVAR_BOOL, "");
 // ---------------------------------------------------------------------------
 
 DdgiTesting::DdgiTesting() {
-    ASSERT(IGraphicsDevice::inst);
+    ASSERT(gfx_is_initialized());
     raytrace_test = draw.get_prog_man().create_raster("fullscreenquad.txt", "rtF.txt");
 
     gather_shader = draw.get_prog_man().create_compute("gather_C.txt");
@@ -66,11 +66,11 @@ DdgiTesting::DdgiTesting() {
     temporal_upsample = draw.get_prog_man().create_raster("fullscreenquad.txt", "temporal_upsample_ddgi.txt");
     apply_halfres_accum_to_scene = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgi_apply_upsampled.txt");
 
-    ddgi_probe_relocation_offsets = IGraphicsDevice::inst->create_buffer({});
-    ddgi_globals = IGraphicsDevice::inst->create_buffer({});
-    ddgi_volumes = IGraphicsDevice::inst->create_buffer({});
+    ddgi_probe_relocation_offsets = gfx().create_buffer({});
+    ddgi_globals = gfx().create_buffer({});
+    ddgi_volumes = gfx().create_buffer({});
 
-    ddgi_probe_avg_value = IGraphicsDevice::inst->create_buffer({});
+    ddgi_probe_avg_value = gfx().create_buffer({});
 
     Texture::install_system("_ddgi");
     Texture::install_system("_ddgi_d");

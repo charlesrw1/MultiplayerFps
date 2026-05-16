@@ -28,7 +28,7 @@
 
 #include "Framework/ConsoleCmdGroup.h"
 #include <array>
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 
 #include <span>
 

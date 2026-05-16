@@ -4,7 +4,7 @@
 #include "Render/Texture.h"
 #include "Render/Model.h"
 #include "glad/glad.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "Assets/AssetDatabase.h"
 
 #include <array>
@@ -86,7 +86,7 @@ void MaterialManagerLocal::init() {
 		CreateBufferArgs args;
 		args.size = MATERIAL_SIZE * MAX_MATERIALS;
 		args.flags = GraphicsBufferUseFlags(BUFFER_USE_DYNAMIC | BUFFER_USE_AS_STORAGE_READ);
-		return IGraphicsDevice::inst->create_buffer(args);
+		return gfx().create_buffer(args);
 	};
 	gpuMatBufferPtr = create_buffer();
 

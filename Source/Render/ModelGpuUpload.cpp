@@ -18,7 +18,7 @@
 #include "Render/MaterialPublic.h"
 #include "Render/MaterialLocal.h"
 #include "DrawLocal.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 
 static const int STATIC_VERTEX_SIZE = 4'000'000;
 static const int STATIC_INDEX_SIZE  = 6'000'000;
@@ -31,14 +31,14 @@ void MainVbIbAllocator::init(uint32_t num_indicies, uint32_t num_verts) {
 	CreateBufferArgs args;
 	args.flags = BUFFER_USE_AS_VB;
 	args.size = sizeof(ModelVertex) * STATIC_VERTEX_SIZE;
-	vbuffer.ptr = IGraphicsDevice::inst->create_buffer(args);
+	vbuffer.ptr = gfx().create_buffer(args);
 
 	const int index_size = MODEL_BUFFER_INDEX_TYPE_SIZE;
 	ibuffer.alloc.init_clear(index_size * STATIC_INDEX_SIZE);
 
 	args.flags = BUFFER_USE_AS_IB;
 	args.size = index_size * STATIC_INDEX_SIZE;
-	ibuffer.ptr = IGraphicsDevice::inst->create_buffer(args);
+	ibuffer.ptr = gfx().create_buffer(args);
 }
 
 gpuAllocSpan MainVbIbAllocator::append_to_v_buffer(const uint8_t* data, size_t size) {
@@ -97,7 +97,7 @@ void MainVbIbAllocator::print_usage() const {
 }
 
 void ModelMan::init() {
-	ASSERT(IGraphicsDevice::inst != nullptr);
+	ASSERT(gfx_is_initialized());
 	allocator.init(STATIC_INDEX_SIZE, STATIC_VERTEX_SIZE);
 
 	{
@@ -117,7 +117,7 @@ void ModelMan::init() {
 			VertexLayout(WEIGHT_OR_COLOR_LOC, 4, gvat::u8_normalized, stride, offsetof(ModelVertex, color2[0])),
 		};
 		args.layout = animated_layout;
-		animated_vertex_input = IGraphicsDevice::inst->create_vertex_input(args);
+		animated_vertex_input = gfx().create_vertex_input(args);
 	}
 	{
 		using gvat = GraphicsVertexAttribType;
@@ -136,7 +136,7 @@ void ModelMan::init() {
 			VertexLayout(WEIGHT_OR_COLOR_LOC, 4, gvat::u8_normalized, stride, offsetof(ModelVertex, color2[0])),
 		};
 		args.layout = lightmapped_layout;
-		lightmapped_vertex_input = IGraphicsDevice::inst->create_vertex_input(args);
+		lightmapped_vertex_input = gfx().create_vertex_input(args);
 	}
 
 	create_default_models();

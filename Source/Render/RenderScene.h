@@ -155,7 +155,7 @@ public:
 	std::vector<int> command_count;
 	// bufferhandle gpu_command_count = 0;
 
-	// maps the gl_DrawID to submesh material (dynamically uniform for bindless)
+	// maps the gl_DrawID to submesh material
 	bufferhandle gldrawid_to_submesh_material;
 	// maps gl_baseinstance + gl_instance to the render object instance (for transforms, animation, etc.)
 	bufferhandle glinstance_to_instance;

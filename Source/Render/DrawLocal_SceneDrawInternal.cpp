@@ -20,7 +20,7 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
@@ -59,7 +59,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		auto color_infos = {ColorTargetInfo(tex.output_composite)};
 		pass_state.color_infos = color_infos;
 		pass_state.wants_color_clear = true;
-		IGraphicsDevice::inst->set_render_pass(pass_state);
+		gfx().set_render_pass(pass_state);
 
 		// draw_ui_local.render();
 
@@ -71,10 +71,10 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 			GraphicsBlitInfo blitInfo;
 			blitInfo.dest.w = blitInfo.src.w = cur_w;
 			blitInfo.dest.h = blitInfo.src.h = cur_h;
-			blitInfo.dest.texture = IGraphicsDevice::inst->get_swapchain_texture();
+			blitInfo.dest.texture = gfx().get_swapchain_texture();
 			blitInfo.src.texture = tex.output_composite;
 			blitInfo.filter = GraphicsFilterType::Nearest;
-			IGraphicsDevice::inst->blit_textures(blitInfo);
+			gfx().blit_textures(blitInfo);
 		}
 		return;
 	}
@@ -101,7 +101,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		RenderPassState setup2;
 		setup2.depth_info = tex.scene_depth;
 		setup2.set_clear_both(true);
-		IGraphicsDevice::inst->set_render_pass(setup2);
+		gfx().set_render_pass(setup2);
 
 		if (r_skip_depth_prepass.get_bool())
 			return;	// do it here so framebuffer depth/color is cleared even if no prepass
@@ -162,7 +162,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		setup2.depth_info = tex.scene_depth;
 		setup2.wants_color_clear = (clear_color); // depth clear done in prepass above
 		setup2.wants_depth_clear = (clear_depth);
-		IGraphicsDevice::inst->set_render_pass(setup2);
+		gfx().set_render_pass(setup2);
 
 		Render_Level_Params cmdparams(view_to_use, &scene.gbuffer_rlist, &scene.gbuffer_pass,
 									  Render_Level_Params::OPAQUE);
@@ -231,7 +231,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		blitInfo.set_width_height_both(cur_w, cur_h);
 		blitInfo.src.texture = tex.scene_color;
 		blitInfo.dest.texture = tex.scene_gbuffer0;
-		IGraphicsDevice::inst->blit_textures(blitInfo);
+		gfx().blit_textures(blitInfo);
 	};
 
 	if (r_taa_enabled.get_bool())
@@ -257,7 +257,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		auto color_infos = {ColorTargetInfo(tex.scene_gbuffer0)};
 		RenderPassState pass;
 		pass.color_infos = color_infos;
-		IGraphicsDevice::inst->set_render_pass(pass);
+		gfx().set_render_pass(pass);
 
 		RenderPipelineState state;
 		state.program = prog.taa_resolve;
@@ -286,7 +286,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		blitinfo.set_width_height_both(cur_w, cur_h);
 		blitinfo.src.texture = tex.scene_gbuffer0;
 		blitinfo.dest.texture = tex.scene_color;
-		IGraphicsDevice::inst->blit_textures(blitinfo);
+		gfx().blit_textures(blitinfo);
 
 		// glNamedFramebufferTexture(fbo.taa_blit, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
 		// glBlitNamedFramebuffer(fbo.taa_resolve, fbo.taa_blit, 0, 0, cur_w, cur_h,
@@ -308,7 +308,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		auto color_info = {ColorTargetInfo(scene_color_handle)};
 		state.depth_info = tex.scene_depth;
 		state.color_infos = color_info;
-		IGraphicsDevice::inst->set_render_pass(state);
+		gfx().set_render_pass(state);
 
 		Render_Level_Params params(view_to_use, &scene.transparent_rlist, &scene.transparent_pass,
 								   Render_Level_Params::FORWARD_PASS);
@@ -340,7 +340,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 			RenderPassState state;
 			state.depth_info = tex.editor_selection_depth_buffer;
 			state.wants_depth_clear = true;
-			IGraphicsDevice::inst->set_render_pass(state);
+			gfx().set_render_pass(state);
 		};
 		create_editor_pass();
 
@@ -369,7 +369,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 			rp.color_infos = targets;
 			rp.depth_info = tex.scene_depth;
 
-			IGraphicsDevice::inst->set_render_pass(rp);
+			gfx().set_render_pass(rp);
 		};
 		start_render_pass();
 
@@ -400,7 +400,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 			pass_state.wants_color_clear = true;
 			auto color_infos = {ColorTargetInfo(read_from_texture)};
 			pass_state.color_infos = color_infos;
-			IGraphicsDevice::inst->set_render_pass(pass_state);
+			gfx().set_render_pass(pass_state);
 		};
 		set_composite_pass();
 
@@ -484,10 +484,10 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		blitInfo.dest.y = 0;
 		blitInfo.dest.w = blitInfo.src.w = cur_w;
 		blitInfo.dest.h = blitInfo.src.h = cur_h;
-		blitInfo.dest.texture = IGraphicsDevice::inst->get_swapchain_texture();
+		blitInfo.dest.texture = gfx().get_swapchain_texture();
 		blitInfo.src.texture = read_from_texture;
 		blitInfo.filter = GraphicsFilterType::Nearest;
-		IGraphicsDevice::inst->blit_textures(blitInfo);
+		gfx().blit_textures(blitInfo);
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
@@ -509,7 +509,7 @@ IGraphicsTexture* Renderer::do_post_process_stack(const std::vector<MaterialInst
 		RenderPassState pass_setup;
 		auto color_infos = {ColorTargetInfo(renderToTexture)};
 		pass_setup.color_infos = color_infos;
-		IGraphicsDevice::inst->set_render_pass(pass_setup);
+		gfx().set_render_pass(pass_setup);
 
 		//		glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderToTexture->get_internal_handle(),
 		// 0);

@@ -6,7 +6,7 @@
 #include "Render/Texture.h"
 #include "Render/Model.h"
 #include "glad/glad.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "Assets/AssetRegistry.h"
 #include "Assets/AssetDatabase.h"
 #include "Framework/StringUtils.h"

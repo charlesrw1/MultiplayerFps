@@ -21,7 +21,7 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
 #include "GpuCullingTest.h"
 

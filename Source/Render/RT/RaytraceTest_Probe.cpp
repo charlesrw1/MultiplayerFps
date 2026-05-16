@@ -37,7 +37,7 @@ void DdgiTesting::create_textures_raybuffer(int probe_width, int probe_height) {
     targs.num_mip_maps = 1;
     targs.format = GraphicsTextureFormat::r11f_g11f_b10f;
     targs.sampler_type = GraphicsSamplerType::LinearNoMipmaps;
-    probe_irradiance = IGraphicsDevice::inst->create_texture(targs);
+    probe_irradiance = gfx().create_texture(targs);
     probe_irradiance->sub_image_upload(0, 0, 0, targs.width, targs.height, 0, nullptr);
 
     auto handle = Texture::load("_ddgi");
@@ -46,7 +46,7 @@ void DdgiTesting::create_textures_raybuffer(int probe_width, int probe_height) {
     targs.width = tiles_wide * ddgiDEPTHTILE;
     targs.height = tiles_height * ddgiDEPTHTILE;
     targs.format = GraphicsTextureFormat::rg16f;
-    probe_depth = IGraphicsDevice::inst->create_texture(targs);
+    probe_depth = gfx().create_texture(targs);
     probe_depth->sub_image_upload(0, 0, 0, targs.width, targs.height, 0, nullptr);
 
     handle = Texture::load("_ddgi_d");
@@ -122,7 +122,7 @@ void DdgiTesting::execute() {
 
     CreateBufferArgs args{};
     args.size = total_num_probes * MAX_RAYS * sizeof(RayBufferStruct);
-    IGraphicsBuffer* ray_buffer = IGraphicsDevice::inst->create_buffer(args);
+    IGraphicsBuffer* ray_buffer = gfx().create_buffer(args);
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ray_buffer->get_internal_handle());
 
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, draw.buf.lighting_uniforms->get_internal_handle());
@@ -132,7 +132,7 @@ void DdgiTesting::execute() {
     auto& device = draw.get_device();
 
     IGraphicsBuffer* invalid_count_buf{};
-    invalid_count_buf = IGraphicsDevice::inst->create_buffer({});
+    invalid_count_buf = gfx().create_buffer({});
     glm::ivec4 counter_num = {};
     invalid_count_buf->upload(&counter_num, sizeof(glm::ivec4));
     glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, invalid_count_buf->get_internal_handle());
@@ -142,7 +142,7 @@ void DdgiTesting::execute() {
     {
         device.set_shader(relocate_shader);
 
-        IGraphicsBuffer* relocate_param_buf = IGraphicsDevice::inst->create_buffer({});
+        IGraphicsBuffer* relocate_param_buf = gfx().create_buffer({});
         relocate_param_buf->upload(relocate_params.data(), relocate_params.size() * sizeof(vec4));
         glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 14, relocate_param_buf->get_internal_handle());
 

@@ -12,7 +12,7 @@
 #include "Render/ModelManager.h"
 #include "tracy/public/tracy/Tracy.hpp"
 #include "Framework/ArenaAllocator.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
 

@@ -5,8 +5,6 @@
 #include <string_view>
 #include <optional>
 
-// A FAILED HALF IMPLMENTED GARBAGE F*KING REFACTOR
-
 enum BindingBits
 {
 	BINDING_FRAGMENT = 1,
@@ -263,17 +261,9 @@ struct GraphicsBlitInfo
 		src.h = dest.h = h;
 	}
 };
-class ThingerBobber
-{
-public:
-	virtual void set_depth_write_enabled(bool b) = 0;
-};
 class IGraphicsDevice
 {
 public:
-	static IGraphicsDevice* inst;
-	static IGraphicsDevice* create_opengl_device(ThingerBobber* FUUUUUUUCK);
-
 	virtual ~IGraphicsDevice() {}
 
 	virtual GraphicsDeviceType get_device_type() = 0;
@@ -287,4 +277,12 @@ public:
 	virtual IGraphicsBuffer* create_buffer(const CreateBufferArgs& args) = 0;
 	virtual IGraphicsVertexInput* create_vertex_input(const CreateVertexInputArgs& args) = 0;
 };
+
+// Global accessor for the active graphics device. Initialize the OpenGL backend
+// with gfx_init_opengl() during renderer init; tear it down with gfx_shutdown()
+// before exit. gfx() asserts initialization.
+IGraphicsDevice& gfx();
+bool gfx_is_initialized();
+void gfx_init_opengl();
+void gfx_shutdown();
 #endif

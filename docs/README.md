@@ -15,6 +15,7 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 - [[rendering/decals]] — decal materials, write flags, parallax occlusion mapping
 - [[rendering/model_importing]] — `.glb` import, `.mis` settings, `.cmdl` paths
 - [[rendering/ddgi_baking]] — DDGI probe-volume + global bias parameters for baking
+- [[rendering/gfx_abstraction]] — IGraphicsDevice migration plan (wrap → redesign → SDL3 GPU port)
 
 ## Bike Demo
 

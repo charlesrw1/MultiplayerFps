@@ -20,7 +20,7 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
@@ -45,13 +45,13 @@ ThumbnailRenderer::ThumbnailRenderer(int size) : pass(pass_type::TRANSPARENT) {
 	colorArgs.height = h;
 	colorArgs.format = GraphicsTextureFormat::rgba8;
 	colorArgs.sampler_type = GraphicsSamplerType::NearestClamped;
-	this->color = IGraphicsDevice::inst->create_texture(colorArgs);
+	this->color = gfx().create_texture(colorArgs);
 	CreateTextureArgs depthArgs;
 	depthArgs.width = w;
 	depthArgs.height = h;
 	depthArgs.format = GraphicsTextureFormat::depth32f;
 	depthArgs.sampler_type = GraphicsSamplerType::NearestClamped;
-	this->depth = IGraphicsDevice::inst->create_texture(depthArgs);
+	this->depth = gfx().create_texture(depthArgs);
 
 	vts_handle = Texture::install_system("_test_thumbnail");
 	vts_handle->update_specs_ptr(this->color);
@@ -93,7 +93,7 @@ void ThumbnailRenderer::render(Model* model, MaterialInstance* override_mat) {
 		passState.color_infos = color_infos;
 		passState.depth_info = depth;
 		passState.set_clear_both(true);
-		IGraphicsDevice::inst->set_render_pass(passState);
+		gfx().set_render_pass(passState);
 	};
 	set_pass();
 

@@ -20,7 +20,7 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
@@ -37,7 +37,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle) {
 	//	RenderPassSetup setup("bloompass", fbo.bloom, false, false, 0, 0, cur_w, cur_h);
 	//	auto scope = device.start_render_pass(setup);
 
-	/// IGraphicsDevice* device = IGraphicsDevice::inst;
+	/// IGraphicsDevice* device = (&gfx());
 
 	{
 		RenderPipelineState state;
@@ -61,7 +61,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle) {
 				auto color_infos = {ColorTargetInfo(bc.texture)};
 				RenderPassState pass;
 				pass.color_infos = color_infos;
-				IGraphicsDevice::inst->set_render_pass(pass);
+				gfx().set_render_pass(pass);
 			};
 			setup_pass();
 
@@ -95,7 +95,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle) {
 				auto color_infos = {ColorTargetInfo(bc.texture)};
 				RenderPassState pass;
 				pass.color_infos = color_infos;
-				IGraphicsDevice::inst->set_render_pass(pass);
+				gfx().set_render_pass(pass);
 			};
 			setup_pass();
 
@@ -410,9 +410,9 @@ static void build_standard_cpu(Render_Lists& list, Render_Pass& src, Free_List<R
 }
 void Render_Lists_Gpu_Culled::init(uint32_t drawidsz, uint32_t instbufsz) {
 	Render_Lists::init(drawidsz, instbufsz);
-	inst_to_obj = IGraphicsDevice::inst->create_buffer({});
-	count_buffer = IGraphicsDevice::inst->create_buffer({});
-	batches_buf = IGraphicsDevice::inst->create_buffer({});
+	inst_to_obj = gfx().create_buffer({});
+	count_buffer = gfx().create_buffer({});
+	batches_buf = gfx().create_buffer({});
 }
 
 ConfigVar collapse_draw_calls("collapse_draw_calls", "1", CVAR_BOOL | CVAR_DEV, "");

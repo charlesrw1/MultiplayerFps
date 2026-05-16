@@ -4,7 +4,7 @@
 #include "Render/Texture.h"
 #include "Framework/MeshBuilder.h"
 #include "DrawLocal.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 using glm::mat4;
 using glm::vec3;
 
@@ -43,13 +43,13 @@ void EnviornmentMapHelper::init() {
 
 	CreateBufferArgs bargs;
 	bargs.flags = BUFFER_USE_AS_VB;
-	vertex_buffer = IGraphicsDevice::inst->create_buffer(bargs);
+	vertex_buffer = gfx().create_buffer(bargs);
 	vertex_buffer->upload(cube_verts, sizeof(cube_verts));
 	auto cube_layout = {VertexLayout(0, 3, GraphicsVertexAttribType::float32, 3 * sizeof(float), 0)};
 	CreateVertexInputArgs vargs;
 	vargs.vertex = vertex_buffer;
 	vargs.layout = cube_layout;
-	vertex_input = IGraphicsDevice::inst->create_vertex_input(vargs);
+	vertex_input = gfx().create_vertex_input(vargs);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -119,7 +119,7 @@ void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, sc
 				assert(t->gpu_ptr);
 				auto color_infos = {ColorTargetInfo(t->gpu_ptr, i, mip)};
 				pass.color_infos = color_infos;
-				IGraphicsDevice::inst->set_render_pass(pass);
+				gfx().set_render_pass(pass);
 				device.set_viewport(0, 0, size, size);
 
 				shader.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);

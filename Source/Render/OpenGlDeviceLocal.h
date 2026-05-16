@@ -3,7 +3,7 @@
 // Included by OpenGlDevice.cpp, OpenGlTextureImpl.cpp, OpenGlBufferImpl.cpp.
 // Do NOT include from any public header.
 
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "DrawLocal.h"
 #include "Framework/StringUtils.h"
 #include "Framework/BinaryReadWrite.h"

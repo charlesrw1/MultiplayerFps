@@ -1,4 +1,4 @@
-﻿# Coverage summary (integration tests)
+﻿﻿# Coverage summary (integration tests)
 
 Generated: 2026-05-15 23:52
 Sorted ascending by best per-file coverage. - = file not seen by that mode.
@@ -265,7 +265,7 @@ Sorted ascending by best per-file coverage. - = file not seen by that mode.
 | Users\charl\source\repos\CsRemake\Source\Game\Components\PrefabAssetComponent.cpp |   0% |  68% |
 | Users\charl\source\repos\CsRemake\Source\Render\DrawLocal.h |  55% |  68% |
 | Users\charl\source\repos\CsRemake\Source\Game\Entity.cpp |  47% |  69% |
-| Users\charl\source\repos\CsRemake\Source\Render\IGraphsDevice.h |  69% |  69% |
+| Users\charl\source\repos\CsRemake\Source\Render\IGraphicsDevice.h |  69% |  69% |
 | Users\charl\source\repos\CsRemake\Source\Render\ModelDynamic.cpp |  70% |  70% |
 | Users\charl\source\repos\CsRemake\Source\Render\DrawLocal_Device.cpp |  70% |  65% |
 | Users\charl\source\repos\CsRemake\Source\Render\GpuCullingTest.cpp |  71% |  71% |

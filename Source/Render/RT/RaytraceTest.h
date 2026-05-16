@@ -1,6 +1,6 @@
 #pragma once
 #include "Render/DrawTypedefs.h"
-#include "../IGraphsDevice.h"
+#include "../IGraphicsDevice.h"
 #include <array>
 #include "Framework/BVH.h"
 

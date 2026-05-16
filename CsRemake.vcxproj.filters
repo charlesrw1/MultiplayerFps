@@ -827,7 +827,7 @@
     <ClInclude Include="Source\Render\GpuCullingTest.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\IGraphsDevice.h">
+    <ClInclude Include="Source\Render\IGraphicsDevice.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\ModelManager.h">

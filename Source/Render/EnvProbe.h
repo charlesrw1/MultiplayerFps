@@ -5,7 +5,7 @@
 #include "Framework/Util.h"
 #include <string>
 #include "Texture.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 class EnvCubemap
 {
 public:

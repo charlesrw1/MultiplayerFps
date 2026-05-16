@@ -25,7 +25,7 @@
 #include "tinyexr.h"
 #undef APIENTRY
 
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 
 // TextureEditor.cpp
 extern bool compile_texture_asset(const std::string& gamepath, Color32& outColor);
@@ -122,7 +122,7 @@ void Texture::post_load() {
 			args.format       = GraphicsTextureFormat::rgba8;
 			args.sampler_type = GraphicsSamplerType::LinearDefault;
 
-			handle = IGraphicsDevice::inst->create_texture(args);
+			handle = gfx().create_texture(args);
 			handle->sub_image_upload(0, 0, 0, 2, 2, sizeof(uint8_t) * 4 * 4, data);
 		};
 		create_defeault(gpu_ptr, missing_tex);

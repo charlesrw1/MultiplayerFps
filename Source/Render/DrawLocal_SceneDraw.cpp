@@ -20,7 +20,7 @@
 #include "tracy/public/tracy/Tracy.hpp"
 #include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
-#include "IGraphsDevice.h"
+#include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
@@ -39,7 +39,7 @@ void Renderer::draw_height_fog(IGraphicsTexture* target) {
 		RenderPassState state;
 		auto color_info = {ColorTargetInfo(target)};
 		state.color_infos = color_info;
-		IGraphicsDevice::inst->set_render_pass(state);
+		gfx().set_render_pass(state);
 
 		RenderPipelineState setup;
 		setup.blend = BlendState::BLEND;
@@ -78,7 +78,7 @@ void Renderer::draw_height_fog(IGraphicsTexture* target) {
 	RenderPassState state;
 	auto color_info = {ColorTargetInfo(target)};
 	state.color_infos = color_info;
-	IGraphicsDevice::inst->set_render_pass(state);
+	gfx().set_render_pass(state);
 
 	RenderPipelineState setup;
 	setup.blend = BlendState::BLEND;
@@ -234,7 +234,7 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 		args.sampler_type = GraphicsSamplerType::CubemapDefault;
 		args.num_mip_maps = num_mips;
 		args.width = args.height = specular_cubemap_size;
-		cubemap->gpu_ptr = IGraphicsDevice::inst->create_texture(args);
+		cubemap->gpu_ptr = gfx().create_texture(args);
 		// glCreateTextures(GL_TEXTURE_CUBE_MAP, 1, &cubemap->gl_id);
 		// glTextureStorage2D(cubemap->gl_id, num_mips, GL_RGB16F, specular_cubemap_size, specular_cubemap_size);
 		// glTextureParameteri(cubemap->gl_id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -301,7 +301,7 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 		blit.dest.layer = i; // face index
 		blit.src.x = blit.src.y = blit.dest.x = blit.dest.y = 0;
 		blit.src.w = blit.src.h = blit.dest.w = blit.dest.h = specular_cubemap_size;
-		IGraphicsDevice::inst->blit_textures(blit);
+		gfx().blit_textures(blit);
 	}
 
 	//	glDeleteFramebuffers(1, &cubemap_fbo);

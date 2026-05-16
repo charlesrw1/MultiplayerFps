@@ -10,8 +10,8 @@ extern const GLenum MODEL_INDEX_TYPE_GL;
 DecalBatcher::DecalBatcher() {
 	CreateBufferArgs args;
 	args.flags = GraphicsBufferUseFlags::BUFFER_USE_DYNAMIC;
-	indirection_buffer = IGraphicsDevice::inst->create_buffer(args);
-	multidraw_commands = IGraphicsDevice::inst->create_buffer(args);
+	indirection_buffer = gfx().create_buffer(args);
+	multidraw_commands = gfx().create_buffer(args);
 }
 
 void DecalBatcher::build_batches() {
@@ -117,7 +117,7 @@ void DecalBatcher::draw_decals() {
 	};
 	setup2.color_infos = color_targets;
 	setup2.depth_info = draw.tex.scene_depth;
-	IGraphicsDevice::inst->set_render_pass(setup2);
+	gfx().set_render_pass(setup2);
 
 	// Per-attachment color masks: gate writes to G-buffer locations the decal material did not
 	// declare an output for. Without this, a blended decal whose shader omits e.g. `DECAL_ALBEDO_WRITE`
