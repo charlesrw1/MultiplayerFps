@@ -7,6 +7,7 @@
 #include <memory>
 #include "Framework/StructReflection.h"
 #include "Assets/IAsset.h"
+#include "Framework/Handle.h"
 
 class PhysicsFilterPresetBase;
 class Model;
@@ -82,6 +83,7 @@ public:
 	void set_ignore_baking(bool ignore) { this->ignore_in_baking = ignore; }
 	void set_ignore_cubemap_view(bool ignore) { this->ignore_in_cubemap = ignore; }
 	void set_add_collision(bool add_col) { this->add_collision_if_available = true; }
+	bool get_add_collision() const { return add_collision_if_available; }
 
 private:
 	void update_physics_mesh();
@@ -113,6 +115,11 @@ private:
 
 	void update_animator_instance();
 };
+
+// Bake the render side of a static MeshComponent into the scene without keeping the Component alive.
+// Used by Level's static-prop strip path: caller registers the handle, then frees the Entity+Component.
+// Lifetime: caller owns the returned handle and must release via idraw->get_scene()->remove_obj.
+handle<Render_Object> bake_static_meshcomponent_render(const MeshComponent& mc, const glm::mat4& ws_transform);
 
 // this is just for previewing in the editor, use AnimatorObject on the MeshComponent for actual animation
 class AnimationSeqAsset;

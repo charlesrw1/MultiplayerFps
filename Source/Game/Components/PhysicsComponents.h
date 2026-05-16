@@ -281,6 +281,15 @@ public:
 #endif
 };
 
+// Bake a static mesh-collider RigidStatic without owning a PhysicsBody Component.
+// Used by Level's static-prop strip path. Returns nullptr when the model has no usable
+// collision (matches `add_collision_if_available && model->get_physics_body()` semantics).
+// userData on the returned actor is set to nullptr — world_query_result::component will be
+// null for raycasts that hit a stripped prop.
+// Caller owns the actor and must release via release_static_meshcomponent_physics().
+physx::PxRigidActor* bake_static_meshcomponent_physics(const Model* model, const glm::mat4& ws_transform);
+void release_static_meshcomponent_physics(physx::PxRigidActor* actor);
+
 struct JointAnchor
 {
 	STRUCT_BODY();

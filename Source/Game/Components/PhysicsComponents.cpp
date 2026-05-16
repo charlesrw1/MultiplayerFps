@@ -419,6 +419,65 @@ void PhysicsBody::add_box_shape_to_actor(const glm::mat4& localTransform, const 
 	set_shape_flags(shape);
 }
 
+// Mirrors the slice of (PhysicsBody::on_actor_type_change + add_model_shape_to_actor)
+// needed for a static mesh prop. Default physics layer = PL::Default; not configurable
+// because eligibility intentionally excludes anything that would care.
+physx::PxRigidActor* bake_static_meshcomponent_physics(const Model* model, const glm::mat4& ws_transform) {
+	ASSERT(model);
+	if (!model->get_physics_body())
+		return nullptr; // no usable collision; matches MeshColliderComponent's "skip if no body"
+
+	glm::vec3 p, s; glm::quat q;
+	decompose_transform(ws_transform, p, q, s);
+	PxTransform t;
+	t.p = glm_to_physx(p);
+	t.q = glm_to_physx(q);
+	t.q.normalize();
+
+	auto* factory = physics_local_impl->physics_factory;
+	PxRigidStatic* actor = factory->createRigidStatic(t);
+	actor->userData = nullptr;          // see header comment — null on purpose
+	actor->setActorFlag(PxActorFlag::eDISABLE_SIMULATION, false);
+
+	PxMaterial* material_to_use = physics_local_impl->default_material;
+	if (auto* wrapper = model->get_physics_material_to_use())
+		material_to_use = wrapper->material;
+	ASSERT(material_to_use);
+
+	PxFilterData filter;
+	filter.word0 = (1ul << uint32_t(PL::Default));
+	filter.word1 = get_collision_mask_for_physics_layer(PL::Default);
+
+	auto* body = model->get_physics_body();
+	for (auto& shape : body->shapes) {
+		PxShape* px_shape = nullptr;
+		PxMeshScale scale;
+		scale.scale = glm_to_physx(s);
+		if (shape.shape == ShapeType_e::ConvexShape) {
+			px_shape = PxRigidActorExt::createExclusiveShape(
+				*actor, PxConvexMeshGeometry(shape.convex_mesh, scale), *material_to_use);
+		} else if (shape.shape == ShapeType_e::MeshShape) {
+			px_shape = PxRigidActorExt::createExclusiveShape(
+				*actor, PxTriangleMeshGeometry(shape.tri_mesh, scale), *material_to_use);
+		}
+		if (px_shape) {
+			px_shape->setFlags(PxShapeFlag::eSCENE_QUERY_SHAPE | PxShapeFlag::eSIMULATION_SHAPE | PxShapeFlag::eVISUALIZATION);
+			px_shape->setQueryFilterData(filter);
+			px_shape->setSimulationFilterData(filter);
+		}
+	}
+
+	physics_local_impl->scene->addActor(*actor);
+	return actor;
+}
+
+void release_static_meshcomponent_physics(physx::PxRigidActor* actor) {
+	if (!actor)
+		return;
+	physics_local_impl->scene->removeActor(*(physx::PxActor*)actor);
+	actor->release();
+}
+
 void PhysicsBody::set_body_type(BodyType t) {
 	ASSERT(get_owner());
 	const bool new_static = (t == BodyType::Static);

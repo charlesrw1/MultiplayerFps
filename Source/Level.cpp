@@ -10,8 +10,43 @@
 #include "GameEnginePublic.h"
 #include "tracy/public/tracy/Tracy.hpp"
 #include "Game/Components/LightComponents.h"
+#include "Game/Components/MeshComponent.h"
+#include "Game/Components/PhysicsComponents.h"
+#include "Render/DrawPublic.h"
+namespace physx { class PxRigidActor; }
 #include "Navigation/LevelNavUtil.h"
 #include "Navigation/NavMeshDebugDraw.h"
+
+ConfigVar r_disable_static_strip("r_disable_static_strip", "0", CVAR_BOOL | CVAR_DEV,
+								  "If true, skip the runtime static-prop strip pass — every Entity stays in all_world_ents.");
+
+void StaticPropPool::clear_and_release() {
+	for (auto& p : props) {
+		if (p.render.is_valid())
+			idraw->get_scene()->remove_obj(p.render);
+		if (p.physics_actor)
+			release_static_meshcomponent_physics((physx::PxRigidActor*)p.physics_actor);
+	}
+	props.clear();
+}
+
+namespace {
+// Eligibility per plan: anonymous bare Entity with exactly one bare MeshComponent and no children.
+// Runtime-only. Conservative on purpose; opting out is "give it a name" or "subclass it".
+bool is_strippable_static_prop(const Entity* e) {
+	if (!e) return false;
+	if (&e->get_type() != &Entity::StaticType) return false;
+	if (!e->get_editor_name().empty()) return false;
+	if (e->has_tag()) return false;
+	if (!e->get_children().empty()) return false;
+	if (e->get_parent() != nullptr) return false;
+	const auto& comps = e->get_components();
+	if (comps.size() != 1) return false;
+	auto* mc = comps.front();
+	if (!mc || &mc->get_type() != &MeshComponent::StaticType) return false;
+	return true;
+}
+} // namespace
 
 Level::~Level() {
 	assert(all_world_ents.num_used == 0);
@@ -232,6 +267,7 @@ void Level::close_level() {
 	}
 	ASSERT(all_world_ents.num_used == 0);
 	all_world_ents.clear_all();
+	static_pool.clear_and_release();
 }
 #include "Framework/Log.h"
 #include "Framework/MapUtil.h"
@@ -262,9 +298,27 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 	}
 
 #endif
+	// Pre-pass: identify static-prop entities that will be stripped from all_world_ents.
+	// Their components are also marked so the insert+init loops skip them entirely.
+	// See `is_strippable_static_prop` for eligibility rules.
+	std::unordered_set<BaseUpdater*> strip_set;
+	const bool can_strip = !eng->is_editor_level() && !r_disable_static_strip.get_bool();
+	if (can_strip) {
+		for (auto* o : objs) {
+			if (auto* e = o->cast_to<Entity>()) {
+				if (is_strippable_static_prop(e)) {
+					strip_set.insert(e);
+					for (auto* c : e->get_components())
+						strip_set.insert(c);
+				}
+			}
+		}
+	}
+
 	{
 		for (auto& o : objs) {
 			ASSERT(o);
+			if (strip_set.count(o)) continue;
 			if (o->get_instance_id() != 0) {
 				ASSERT(all_world_ents.find(o->get_instance_id()) == nullptr);
 			} else {
@@ -279,6 +333,7 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 
 	for (int i = 0; i < objs.size(); i++) {
 		BaseUpdater* o = objs[i];
+		if (!o || strip_set.count(o)) continue;
 		assert(o->get_instance_id() != 0);
 		auto ent = o;
 		if (Entity* e = ent->cast_to<Entity>())
@@ -299,6 +354,39 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 		} else
 			ASSERT(!"Non Eentity/Component?");
 	}
+	// Bake stripped static-prop entities into the pool. Render + (optional) physics handles
+	// outlive the source Entity/Component, which we then free directly — they were never
+	// inserted into all_world_ents and never had start() called, so we bypass destroy().
+	if (!strip_set.empty()) {
+		for (auto* o : objs) {
+			if (!o) continue;
+			auto* e = o->cast_to<Entity>();
+			if (!e || !strip_set.count(e)) continue;
+			ASSERT(e->get_components().size() == 1);
+			auto* mc = (MeshComponent*)e->get_components().front();
+			ASSERT(mc && &mc->get_type() == &MeshComponent::StaticType);
+
+			StaticProp prop;
+			if (mc->get_model()) {
+				prop.render = bake_static_meshcomponent_render(*mc, e->get_ws_transform());
+				if (mc->get_add_collision())
+					prop.physics_actor = bake_static_meshcomponent_physics(mc->get_model(), e->get_ws_transform());
+			}
+			static_pool.add(prop);
+
+			// Free MC + Entity. Both are at init_state == CONSTRUCTOR (never post_unserialized
+			// for stripped objs) so destructors only assert they were never started — true here.
+			e->all_components.clear(); // friend access; clear before delete to avoid stale iteration
+			delete mc;
+			delete e;
+		}
+		// Null out stripped entries so the unknown_objs / mark_ownership_transferred path
+		// doesn't try to revisit them. (scene.all_obj_vec ownership is transferred below.)
+		for (auto& o : objs) {
+			if (o && strip_set.count(o)) o = nullptr;
+		}
+	}
+
 	// Take ownership of any unknown-typename JSON blobs the reader stashed. They round-trip
 	// to the next save so unresolved component types aren't silently dropped from the .tmap.
 	preserved_unknown_objs.insert(preserved_unknown_objs.end(),

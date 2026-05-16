@@ -8,6 +8,7 @@
 #include "Framework/InlineVec.h"
 #include "Framework/ConsoleCmdGroup.h"
 #include "Game/EntityPtr.h"
+#include "Framework/Handle.h"
 class SceneAsset;
 class Entity;
 class GameMode;
@@ -16,7 +17,29 @@ class SerializedSceneFile;
 class BaseUpdater;
 class ClassTypeInfo;
 class Component;
+struct Render_Object;
 using std::string;
+
+// One stripped static prop. Render handle is owned; physics_actor is an opaque
+// physx::PxRigidActor* (void* to keep PhysX out of Level.h). Either field may be unset:
+// physics is null when the source model had no collision body.
+struct StaticProp
+{
+	handle<Render_Object> render;
+	void* physics_actor = nullptr;
+};
+
+// Owned by Level; populated at runtime load by the static-prop strip path
+// (see Level::insert_unserialized_entities_into_level_internal). Released in close_level.
+class StaticPropPool
+{
+public:
+	void add(const StaticProp& p) { props.push_back(p); }
+	int size() const { return (int)props.size(); }
+	void clear_and_release(); // unregisters render objects and releases physics actors
+private:
+	std::vector<StaticProp> props;
+};
 class Level
 {
 public:
@@ -61,7 +84,11 @@ public:
 	// in addition to the console warning. Cleared on close_level.
 	std::vector<std::string> unknown_field_warnings;
 
+	const StaticPropPool& get_static_pool() const { return static_pool; }
+
 private:
+	StaticPropPool static_pool;
+
 	void insert_unserialized_entities_into_level_internal(UnserializedSceneFile& scene, bool addSpawnNames);
 	std::unordered_map<string, obj<Entity>> spawnNameToEntity;
 	// all entities/components in the map

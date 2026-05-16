@@ -154,6 +154,23 @@ void MeshComponent::on_sync_render_data() {
 	idraw->get_scene()->update_obj(draw_handle, obj);
 }
 
+// Mirror of MeshComponent::on_sync_render_data minus the Component-lifetime bookkeeping.
+// Static props have no animator and no editor selection state; they're set once at load and never updated.
+handle<Render_Object> bake_static_meshcomponent_render(const MeshComponent& mc, const glm::mat4& ws_transform) {
+	handle<Render_Object> h = idraw->get_scene()->register_obj();
+	Render_Object obj;
+	obj.model = (Model*)mc.get_model();
+	obj.visible = mc.get_is_visible();
+	obj.transform = ws_transform;
+	obj.owner = nullptr; // no Component to point at
+	obj.is_skybox = mc.get_is_skybox();
+	obj.shadow_caster = mc.get_casts_shadows();
+	if (auto* mat = mc.get_material_override())
+		obj.mat_override = (MaterialInstance*)mat;
+	idraw->get_scene()->update_obj(h, obj);
+	return h;
+}
+
 void MeshComponent::update_animator_instance() {
 	animator.reset();
 	auto modToUse = (model.did_fail()) ? g_modelMgr.get_error_model() : model.get();
