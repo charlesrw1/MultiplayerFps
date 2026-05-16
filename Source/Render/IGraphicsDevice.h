@@ -315,6 +315,19 @@ public:
 	// create_buffer; the raw variant above is the bridge for the global
 	// ubo.current_frame still on bufferhandle.
 	virtual void bind_uniform_buffer_base(int slot, IGraphicsBuffer* buf) = 0;
+
+	// Clamp the mip range visible to sampling. Used by the specular-prefilter
+	// pass to read mip N-1 while rendering into mip N of the same cubemap.
+	// Wraps glTextureParameteri(GL_TEXTURE_BASE_LEVEL/MAX_LEVEL).
+	virtual void set_mip_range(IGraphicsTexture* tex, int base, int max) = 0;
+
+	// Read back a sub-image at (mip, layer) into dest. layer selects the cube
+	// face for tCubemap (0..5) or array slice for t2DArray/tCubemapArray; pass
+	// -1 for non-layered textures. dest_size_bytes must match the layer's
+	// pixel-format size. Backend infers format/type from get_texture_format().
+	// Currently supports rgb16f, rgba8, depth* (debug/editor/bake paths).
+	virtual void download_texture(IGraphicsTexture* tex, int mip, int layer,
+								  void* dest, int dest_size_bytes) = 0;
 };
 
 // Global accessor for the active graphics device. Initialize the OpenGL backend

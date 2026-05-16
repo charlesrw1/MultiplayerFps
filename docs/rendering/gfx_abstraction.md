@@ -57,7 +57,7 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | --------- | ----- | -------------:| ------------- | ------ |
 | **1.1** | `DrawLocal_Misc.cpp`, `DrawLocal_Debug.cpp` | ~14 | scissor, draw_elements_base_vertex, bind_uniform_buffer_base_raw, wait_for_gpu_idle, download_texture; move `CheckGlErrorInternal_` to backend | done |
 | **1.2a** | `Ssao.cpp` | ~100 | draw_arrays, bind_texture, bind_uniform_buffer_base; migrate raw FBOs to `gfx().set_render_pass`; migrate raw textures + UBO to `IGraphicsTexture` / `IGraphicsBuffer`; fix `rgba16_snorm` input type in backend | done |
-| 1.2b | `EnvProbe.cpp` | ~106 | cubemap mip clamping, temp render target, `glReadPixels`, BRDFIntegration (defer shader-coupled lines to 1.7) | not started |
+| 1.2b | `EnvProbe.cpp` | ~106 | cubemap mip clamping, temp render target, `glReadPixels`, BRDFIntegration (defer shader-coupled lines to 1.7) | done |
 | 1.3 | `Volumetricfog.cpp`, `RenderExtra_SSR.cpp`, `GpuCullingTest.cpp`, `RT/RaytraceTest_Probe.cpp`, `RT/RaytraceTest_Shade.cpp` | ~147 | dispatch_compute, memory_barrier, sampler create/destroy | not started |
 | 1.4 | `DrawLocal_BatchScene.cpp`, `DrawLocal_Lighting.cpp`, `DrawLocal_RenderPass.cpp` | ~70 | bind_indirect_buffer, bind_parameter_buffer, multi_draw_elements_indirect (count), color-mask state | not started |
 | 1.5a | `DecalBatcher.cpp` | ~12 | per-attachment color masks as immediate setters (baked in 2c) | not started |
@@ -74,6 +74,15 @@ Migration rule per sub-phase: any GL call still needed by a non-backend caller b
 - API added: `set_scissor`, `disable_scissor`, `draw_elements_base_vertex`, `bind_uniform_buffer_base_raw`, `wait_for_gpu_idle`, `download_texture_2d`.
 - `CheckGlErrorInternal_` body moved to `OpenGlDevice.cpp`; `DrawLocal_Debug.cpp` no longer includes `glad.h`.
 - `DrawLocal_Misc.cpp` and `DrawLocal_Debug.cpp` contain zero direct `gl*` calls.
+
+## Sub-phase 1.2b status
+
+- API added: `set_mip_range(IGraphicsTexture*, base, max)` (specular prefilter clamps sampling to mip 0 while writing into higher mips of the same cubemap); `download_texture(tex, mip, layer, dest, dest_size_bytes)` extending `download_texture_2d` with a layer parameter for cube-face readback (uses `glGetTextureSubImage` when `layer >= 0`, `glGetTextureImage` otherwise). `rgb16f` added to the readback format map (irradiance bake).
+- `compute_specular_new`: removed direct `glTextureParameteri` / `glActiveTexture` / `glBindTexture` / trailing depth+cull resets. Now uses `gfx().set_mip_range` + `gfx().bind_texture(0, cubemap)` + `gfx().draw_arrays`. Existing per-face `RenderPassState` with `ColorTargetInfo(tex, face, mip)` continues to work via the shared FBO's `glNamedFramebufferTextureLayer` path.
+- `compute_irradiance_new`: temp 16×16 RGB16F cubemap created via `gfx().create_texture(tCubemap, CubemapDefault sampler)` (replaces raw `glCreateTextures` + storage + parameter setup); per-face FBO attachment replaced with `gfx().set_render_pass`; per-face `glReadPixels` replaced with `gfx().download_texture(temp_tex, 0, face, ...)`; `glFlush+glFinish` → `gfx().wait_for_gpu_idle()`; temp texture destroyed via `safe_release`.
+- Defensive `glBindFramebuffer(GL_FRAMEBUFFER, 0)` at end of `init()` deleted (FBO 0 is the default; the renderer sets its own FBO before any draws).
+- BRDFIntegration (`BRDFIntegration::run` + `drawdebug`) intentionally left at raw GL — shader-coupled (raw `Shader` + raw `lut_id` consumed by SSR, RT, RenderPass passes). Migrates with `Shader.cpp` in sub-phase 1.7.
+- `EnvProbe.cpp` outside BRDFIntegration contains zero direct `gl*` calls. `editor/bake_probes_test` passes within the screenshot warn band (3 pixels diff at delta≤80, golden unchanged).
 
 ## Sub-phase 1.2a status
 

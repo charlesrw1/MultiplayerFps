@@ -260,6 +260,44 @@ public:
 		glGetTextureImage(tex->get_internal_handle(), mip, fmt, type, dest_size_bytes, dest);
 	}
 
+	void set_mip_range(IGraphicsTexture* tex, int base, int max) override {
+		ASSERT(tex != nullptr && base >= 0 && max >= base);
+		const texhandle id = tex->get_internal_handle();
+		glTextureParameteri(id, GL_TEXTURE_BASE_LEVEL, base);
+		glTextureParameteri(id, GL_TEXTURE_MAX_LEVEL, max);
+	}
+
+	void download_texture(IGraphicsTexture* tex, int mip, int layer,
+						  void* dest, int dest_size_bytes) override {
+		ASSERT(tex != nullptr && dest != nullptr && dest_size_bytes > 0);
+		GLenum fmt = 0;
+		GLenum type = 0;
+		switch (tex->get_texture_format()) {
+		case GraphicsTextureFormat::depth32f:
+		case GraphicsTextureFormat::depth24f:
+		case GraphicsTextureFormat::depth16f:
+			fmt = GL_DEPTH_COMPONENT; type = GL_FLOAT; break;
+		case GraphicsTextureFormat::rgba8:
+			fmt = GL_RGBA; type = GL_UNSIGNED_BYTE; break;
+		case GraphicsTextureFormat::rgb16f:
+			fmt = GL_RGB; type = GL_FLOAT; break;
+		default:
+			ASSERT(!"download_texture: unsupported format (extend mapping)");
+			return;
+		}
+		const glm::ivec2 sz = tex->get_size();
+		int w = std::max(1, sz.x >> mip);
+		int h = std::max(1, sz.y >> mip);
+		if (layer < 0) {
+			glGetTextureImage(tex->get_internal_handle(), mip, fmt, type,
+							  dest_size_bytes, dest);
+		} else {
+			glGetTextureSubImage(tex->get_internal_handle(), mip,
+								 0, 0, layer, w, h, 1, fmt, type,
+								 dest_size_bytes, dest);
+		}
+	}
+
 private:
 	opt<RenderPassState> cur_pass;
 };

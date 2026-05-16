@@ -1,6 +1,7 @@
 #include "EnvProbe.h"
 #include "glad/glad.h"
 #include <glm/ext.hpp>
+#include <vector>
 #include "Render/Texture.h"
 #include "Framework/MeshBuilder.h"
 #include "DrawLocal.h"
@@ -51,8 +52,6 @@ void EnviornmentMapHelper::init() {
 	vargs.layout = cube_layout;
 	vertex_input = gfx().create_vertex_input(vargs);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 	cubemap_projection = glm::perspective(glm::radians(90.f), 1.f, 0.1f, 100.f);
 	cubemap_views[0] = glm::lookAt(vec3(0), vec3(1, 0, 0), vec3(0, -1, 0));
 	cubemap_views[1] = glm::lookAt(vec3(0), vec3(-1, 0, 0), vec3(0, -1, 0));
@@ -69,83 +68,50 @@ void EnviornmentMapHelper::init() {
 // convolutes a rendered cubemap
 void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, scene drawn to mip level 0
 ) {
-	const uint32_t temp_id = t->gpu_ptr->get_internal_handle();
+	ASSERT(t && t->gpu_ptr);
 	const glm::ivec2 size_vec = t->gpu_ptr->get_size();
-
-	assert(t);
 	int size = size_vec.x;
 	const int num_mips = Texture::get_mip_map_count(size, size);
 
-	glTextureParameteri(temp_id, GL_TEXTURE_BASE_LEVEL, 0);
-	glTextureParameteri(temp_id, GL_TEXTURE_MAX_LEVEL, 0);
-
-	//*glDepthMask(GL_FALSE);
-	//*glDisable(GL_DEPTH_TEST);
-
-	//*glBindVertexArray(vao);
-	//*glDisable(GL_CULL_FACE);
+	// Clamp sampling to mip 0 so the prefilter shader only ever reads the
+	// freshly rendered scene level, never a higher mip we are about to write.
+	gfx().set_mip_range(t->gpu_ptr, 0, 0);
 
 	auto& device = draw.get_device();
 	device.reset_states();
 
 	{
-		// RenderPassSetup setup("compute_specular_new", temp_fbo, false, false, 0, 0, size, size);
-		// auto scope = device.start_render_pass(setup);
-
 		RenderPipelineState state;
-		state.depth_testing = state.depth_testing = false;
+		state.depth_testing = state.depth_writes = false;
 		state.vao = vertex_input->get_internal_handle();
 		state.backface_culling = false;
 		state.program = prefilter_specular_new;
 		device.set_pipeline(state);
 		auto shader = device.shader();
 
-		//*glBindFramebuffer(GL_FRAMEBUFFER, temp_fbo);
-
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, temp_id); // bind texture, mip reading is limited to highest
-
-		//*prefilter_specular_new.use();
+		gfx().bind_texture(0, t->gpu_ptr);
 
 		for (int mip = 1 /* skip mip level 0*/; mip < num_mips; mip++) {
 			size >>= 1;
 
-			// glViewport(0, 0, size, size);
 			float roughness = (float)mip / (MAX_MIP_ROUGHNESS - 1);
 			shader.set_float("roughness", roughness);
 
 			for (int i = 0; i < 6; i++) {
 				RenderPassState pass;
-				assert(t->gpu_ptr);
 				auto color_infos = {ColorTargetInfo(t->gpu_ptr, i, mip)};
 				pass.color_infos = color_infos;
 				gfx().set_render_pass(pass);
 				device.set_viewport(0, 0, size, size);
 
 				shader.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
-				// glFramebufferTexture2D(temp_fbo, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, cm_id,
-				// mip);
-
-				// glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, t->gl_id, mip, i);
-
-				glDrawArrays(GL_TRIANGLES, 0, 36);
+				gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 36);
 			}
 		}
 	}
 
-	glTextureParameteri(temp_id, GL_TEXTURE_BASE_LEVEL, 0);
-	glTextureParameteri(temp_id, GL_TEXTURE_MAX_LEVEL, num_mips);
-
-	// glDeleteFramebuffers(1, &temp_fbo);
-
+	gfx().set_mip_range(t->gpu_ptr, 0, num_mips);
 	device.reset_states();
-
-	glDepthMask(GL_TRUE);
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
-	glBindVertexArray(0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-	//*glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 // causes pipeline stall to read back texture
@@ -153,36 +119,21 @@ void EnviornmentMapHelper::compute_irradiance_new(
 	Texture* t,				  // in cubemap, scene draw to mip level 0
 	glm::vec3 ambient_cube[6] // out 6 vec3s representing irradiance of cubemap
 ) {
-	const uint32_t temp_id_input = t->gpu_ptr->get_internal_handle();
-	const glm::ivec2 size_vec = t->gpu_ptr->get_size();
+	ASSERT(t && t->gpu_ptr);
+	constexpr int irrad_size = 16;
 
-	texhandle temp_tex{};
-	const uint32_t irrad_size = 16;
-
-	glCreateTextures(GL_TEXTURE_CUBE_MAP, 1, &temp_tex);
-	glTextureStorage2D(temp_tex, 1 /* 1 level*/, GL_RGB16F, irrad_size, irrad_size);
-
-	glTextureParameteri(temp_tex, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(temp_tex, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(temp_tex, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	glTextureParameteri(temp_tex, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTextureParameteri(temp_tex, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	//* prefilter_irradiance.use();
-
-	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP, temp_id_input); // bind the read cubemap, mip0 is the original scene render
-
-	fbohandle temp_fbo{};
-	glCreateFramebuffers(1, &temp_fbo);
-	//* glBindFramebuffer(GL_FRAMEBUFFER, temp_fbo);
+	CreateTextureArgs tex_args;
+	tex_args.type = GraphicsTextureType::tCubemap;
+	tex_args.format = GraphicsTextureFormat::rgb16f;
+	tex_args.width = irrad_size;
+	tex_args.height = irrad_size;
+	tex_args.num_mip_maps = 1;
+	tex_args.sampler_type = GraphicsSamplerType::CubemapDefault;
+	IGraphicsTexture* temp_tex = gfx().create_texture(tex_args);
 
 	auto& device = draw.get_device();
 	device.reset_states();
 	{
-		RenderPassSetup setup("compute_irradiance_new", temp_fbo, false, false, 0, 0, irrad_size, irrad_size);
-		auto scope = device.start_render_pass(setup);
-
 		RenderPipelineState state;
 		state.program = prefilter_irradiance;
 		state.depth_testing = state.depth_writes = false;
@@ -191,26 +142,23 @@ void EnviornmentMapHelper::compute_irradiance_new(
 		device.set_pipeline(state);
 		auto shader = device.shader();
 
-		//*glViewport(0, 0, irrad_size, irrad_size);
-		//*glBindVertexArray(vao);
-		//*glDisable(GL_CULL_FACE);
-		//*glDisable(GL_DEPTH_TEST);
-		//*glDepthMask(GL_FALSE);
+		gfx().bind_texture(0, t->gpu_ptr);
 
 		for (int i = 0; i < 6; i++) {
+			RenderPassState pass;
+			auto color_infos = {ColorTargetInfo(temp_tex, i, 0)};
+			pass.color_infos = color_infos;
+			gfx().set_render_pass(pass);
+
 			shader.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
-
-			glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, temp_tex, 0 /* first mip*/, i);
-
-			glDrawArrays(GL_TRIANGLES, 0, 36);
+			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 36);
 		}
-		glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
 	}
 
-	glFlush();
-	glFinish();
+	gfx().wait_for_gpu_idle();
 
-	float* input = new float[irrad_size * irrad_size * 3 * 6];
+	constexpr int face_floats = irrad_size * irrad_size * 3;
+	std::vector<float> input(face_floats * 6);
 	float weights[6];
 	glm::vec3 dirs[6];
 	for (int i = 0; i < 6; i++) {
@@ -218,12 +166,10 @@ void EnviornmentMapHelper::compute_irradiance_new(
 		ambient_cube[i] = glm::vec3(0.f);
 		dirs[i] = -cubemap_views[i][2];
 
-		glNamedFramebufferTextureLayer(temp_fbo, GL_COLOR_ATTACHMENT0, temp_tex, 0 /* first mip*/, i);
-		const int ofs = i * irrad_size * irrad_size * 3;
-		glReadPixels(0, 0, irrad_size, irrad_size, GL_RGB, GL_FLOAT, (void*)&input[ofs]);
+		const int ofs = i * face_floats;
+		gfx().download_texture(temp_tex, 0, i, &input[ofs], face_floats * sizeof(float));
 	}
 	for (int i = 0; i < 6; i++) {
-		glm::mat4 inv = glm::inverse(cubemap_projection * cubemap_views[i]);
 		glm::vec3 up = cubemap_views[i][1];
 		glm::vec3 right = cubemap_views[i][0];
 
@@ -248,18 +194,8 @@ void EnviornmentMapHelper::compute_irradiance_new(
 		ambient_cube[dir] /= weights[dir];
 	}
 
-	glDeleteFramebuffers(1, &temp_fbo);
-
-	glEnable(GL_CULL_FACE);
-	//*glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	glEnable(GL_DEPTH_TEST);
-	glDepthMask(GL_TRUE);
-
 	device.reset_states();
-
-	glDeleteTextures(1, &temp_tex);
-
-	delete[] input;
+	safe_release(temp_tex);
 }
 
 void BRDFIntegration::drawdebug() {
