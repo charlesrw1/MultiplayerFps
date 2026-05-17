@@ -6,7 +6,7 @@ layout(location = 0) out vec4 FS_OUT_Color;
 layout(binding = 0) uniform sampler2D probe_texture;
 in vec3 FS_IN_Normal;
 in vec3 FS_IN_Fragpos;
-layout(std140, binding = 16) uniform MeshDebugProbeFragPushConstsUbo { MeshDebugProbeFragPushConsts pc; };
+layout(std140, binding = 16) uniform MeshDebugProbeFragPushConstsUbo { MeshDebugProbeFragPushConsts pcf; };
 
 // File-scope declarations referenced by ddgiShared.txt's `calculate_irradiance`
 // (not called here, but the function still needs the identifiers to resolve).
@@ -23,7 +23,7 @@ void main()
 
 	vec2 uv = OctahedralEncode(normalize(FS_IN_Normal));
 
-	vec2 final_uv = get_irrad_probe_uv(uv, pc.probe_coord.xyz, pc.vol_grid.xyz, pc.vol_offset);
+	vec2 final_uv = get_irrad_probe_uv(uv, pcf.probe_coord.xyz, pcf.vol_grid.xyz, pcf.vol_offset);
 
 
 	vec3 outc = texture(probe_texture,final_uv).rgb;

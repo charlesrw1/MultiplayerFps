@@ -9,7 +9,7 @@ layout (location = 3) in vec3 VS_IN_Tangent;
 out vec3 FS_IN_Normal;
 out vec3 FS_IN_Fragpos;
 
-layout(std140, binding = 12) uniform MeshSimpleVertPushConstsUbo { MeshSimpleVertPushConsts pc; };
+layout(std140, binding = 12) uniform MeshSimpleVertPushConstsUbo { MeshSimpleVertPushConsts pcv; };
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
@@ -19,7 +19,7 @@ void main()
 {
 	FS_IN_Normal = VS_IN_Normal;
 	FS_IN_Fragpos = VS_IN_Postion;
-	vec4 pos =  g.viewproj *  pc.Model * vec4(VS_IN_Postion, 1.0);
+	vec4 pos =  g.viewproj *  pcv.Model * vec4(VS_IN_Postion, 1.0);
 
 	#ifdef SKYBOX
 	gl_Position = pos.xyww;	// so z will always = 1

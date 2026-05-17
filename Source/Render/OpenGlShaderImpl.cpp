@@ -437,6 +437,115 @@ public:
 
 	void release() override { delete this; }
 	uint32_t get_internal_handle() override { return program_id; }
+
+	// Returns true if `type` is a sampler / texture-only uniform (sampler2D,
+	// samplerCube, samplerBuffer, isampler*, usampler*, sampler2DArray,
+	// shadow-sampler variants, ...). Conservative whitelist of types this
+	// engine actually uses in shaders; extend if a new family appears.
+	static bool is_sampler_type(GLenum t) {
+		switch (t) {
+		case GL_SAMPLER_2D:
+		case GL_SAMPLER_2D_ARRAY:
+		case GL_SAMPLER_3D:
+		case GL_SAMPLER_CUBE:
+		case GL_SAMPLER_CUBE_MAP_ARRAY:
+		case GL_SAMPLER_2D_SHADOW:
+		case GL_SAMPLER_2D_ARRAY_SHADOW:
+		case GL_SAMPLER_CUBE_SHADOW:
+		case GL_SAMPLER_BUFFER:
+		case GL_INT_SAMPLER_2D:
+		case GL_INT_SAMPLER_2D_ARRAY:
+		case GL_INT_SAMPLER_3D:
+		case GL_INT_SAMPLER_CUBE:
+		case GL_UNSIGNED_INT_SAMPLER_2D:
+		case GL_UNSIGNED_INT_SAMPLER_2D_ARRAY:
+		case GL_UNSIGNED_INT_SAMPLER_3D:
+		case GL_UNSIGNED_INT_SAMPLER_CUBE:
+			return true;
+		default:
+			return false;
+		}
+	}
+	// Storage textures = image* uniforms (writable, used with imageLoad /
+	// imageStore from compute / fragment).
+	static bool is_image_type(GLenum t) {
+		switch (t) {
+		case GL_IMAGE_2D:
+		case GL_IMAGE_2D_ARRAY:
+		case GL_IMAGE_3D:
+		case GL_IMAGE_CUBE:
+		case GL_INT_IMAGE_2D:
+		case GL_INT_IMAGE_3D:
+		case GL_UNSIGNED_INT_IMAGE_2D:
+		case GL_UNSIGNED_INT_IMAGE_3D:
+		case GL_UNSIGNED_INT_IMAGE_2D_ARRAY:
+			return true;
+		default:
+			return false;
+		}
+	}
+
+	Reflection reflect() override {
+		Reflection out{};
+
+		// Walk GL_UNIFORM: separates sampler / image uniforms; counts
+		// per-stage via GL_REFERENCED_BY_*_SHADER props.
+		GLint num_uniforms = 0;
+		glGetProgramInterfaceiv(program_id, GL_UNIFORM, GL_ACTIVE_RESOURCES, &num_uniforms);
+		const GLenum uniform_props[] = {
+			GL_TYPE,
+			GL_REFERENCED_BY_VERTEX_SHADER,
+			GL_REFERENCED_BY_FRAGMENT_SHADER,
+			GL_REFERENCED_BY_COMPUTE_SHADER,
+			GL_BLOCK_INDEX,
+		};
+		for (GLint i = 0; i < num_uniforms; i++) {
+			GLint values[5] = {0};
+			glGetProgramResourceiv(program_id, GL_UNIFORM, i,
+								   (GLsizei)std::size(uniform_props), uniform_props,
+								   (GLsizei)std::size(values), nullptr, values);
+			// Skip uniforms that belong to a named uniform block -- those
+			// are counted under GL_UNIFORM_BLOCK below. Default-block
+			// uniforms (BLOCK_INDEX == -1) are the sampler / image bindings.
+			if (values[4] != -1)
+				continue;
+			const GLenum type = (GLenum)values[0];
+			const bool sampler = is_sampler_type(type);
+			const bool image   = is_image_type(type);
+			if (!sampler && !image)
+				continue;
+			auto bump = [&](PerStageCounts& s) {
+				if (sampler) s.num_samplers++;
+				else         s.num_storage_textures++;
+			};
+			if (values[1]) bump(out.vertex);
+			if (values[2]) bump(out.fragment);
+			if (values[3]) bump(out.compute);
+		}
+
+		auto count_blocks = [&](GLenum iface, int PerStageCounts::*field) {
+			GLint count = 0;
+			glGetProgramInterfaceiv(program_id, iface, GL_ACTIVE_RESOURCES, &count);
+			const GLenum props[] = {
+				GL_REFERENCED_BY_VERTEX_SHADER,
+				GL_REFERENCED_BY_FRAGMENT_SHADER,
+				GL_REFERENCED_BY_COMPUTE_SHADER,
+			};
+			for (GLint i = 0; i < count; i++) {
+				GLint refs[3] = {0};
+				glGetProgramResourceiv(program_id, iface, i,
+									   (GLsizei)std::size(props), props,
+									   (GLsizei)std::size(refs), nullptr, refs);
+				if (refs[0]) out.vertex.*field   += 1;
+				if (refs[1]) out.fragment.*field += 1;
+				if (refs[2]) out.compute.*field  += 1;
+			}
+		};
+		count_blocks(GL_UNIFORM_BLOCK,         &PerStageCounts::num_uniform_buffers);
+		count_blocks(GL_SHADER_STORAGE_BLOCK,  &PerStageCounts::num_storage_buffers);
+
+		return out;
+	}
 };
 
 IGraphicsShader* wrap_or_fail(uint32_t program_id) {

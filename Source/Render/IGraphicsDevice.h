@@ -226,6 +226,27 @@ public:
 	virtual ~IGraphicsShader() {}
 	virtual void release() = 0;
 	virtual uint32_t get_internal_handle() = 0;
+
+	// Per-stage resource counts (Phase 2 B2). Required by
+	// SDL_GPUShaderCreateInfo, which wants {num_samplers,
+	// num_storage_textures, num_storage_buffers, num_uniform_buffers}
+	// up-front for each stage. OpenGL impl walks GL_UNIFORM,
+	// GL_UNIFORM_BLOCK, GL_SHADER_STORAGE_BLOCK with
+	// GL_REFERENCED_BY_{VERTEX,FRAGMENT,COMPUTE}_SHADER.
+	struct PerStageCounts
+	{
+		int num_samplers         = 0; // sampler*/image-only-read uniforms
+		int num_storage_textures = 0; // image* (writable images)
+		int num_storage_buffers  = 0; // SSBO blocks
+		int num_uniform_buffers  = 0; // UBO blocks
+	};
+	struct Reflection
+	{
+		PerStageCounts vertex;
+		PerStageCounts fragment;
+		PerStageCounts compute;
+	};
+	virtual Reflection reflect() = 0;
 };
 
 // Standalone sampler object. Bound to a texture slot via gfx().bind_sampler;

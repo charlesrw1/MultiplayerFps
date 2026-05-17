@@ -261,11 +261,14 @@ struct TemporalParams {
 //   CS slot 0..3 -> bindings 20..23
 //
 // GLSL declaration template (one block per stage that uses push consts):
-//   layout(std140, binding = 12) uniform XVertPushConstsUbo { XVertPushConsts pc; };
-//   ... vert shader reads pc.ViewProj, pc.Model, ...
+//   layout(std140, binding = 12) uniform XVertPushConstsUbo { XVertPushConsts pcv; };
+//   ... vert shader reads pcv.ViewProj, pcv.Model, ...
 //
-// Block instance name convention: `pc` when only one block in the shader,
-// `pcv`/`pcf`/`pcc` when multiple stages each have one.
+// Block instance name convention: ALWAYS stage-specific -- `pcv` (vertex),
+// `pcf` (fragment), `pcc` (compute). UBO block instance names are program-
+// global to the GL linker, so identical instance names in different stages
+// of the same program collide ("Anonymous member name used for global
+// variable or other anonymous member").
 
 // MbSimpleV.txt / MbSimpleF.txt (debug meshbuilder line draws -- see
 // DrawLocal_Lighting.cpp). Vert needs Model + ViewProj; frag needs an
