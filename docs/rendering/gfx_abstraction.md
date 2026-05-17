@@ -604,7 +604,8 @@ each shader in the group so the std140 layout is identical at link time.
 
 | Group | Members | Cadence | UBO storage | Struct name | Fields ≈ |
 | --- | --- | --- | --- | --- | --- |
-| **A. Lit + compositor + bloom** | `SunLightAccumulationF`, `LightAccumulationFullScreen`, `SampleCubemapsF`, `ShadowmapSampling` (include), `AmbientLightingF`, `CombineF`, `BloomDownsampleF`, `BloomUpsampleF` | mostly once/frame; bloom iterates per-mip (re-upload in loop) | `ubo.lit_compositor_params` | `LitCompositorParams` | 3 + 3 + 1 + 7 + 2 + 7 + 2 + 1 ≈ 26 (dedupe across shaders, e.g. `specular_ao_intensity`) |
+| **A. Lit + compositor** | `SunLightAccumulationF`, `LightAccumulationFullScreen`, `SampleCubemapsF`, `ShadowmapSampling` (include), `AmbientLightingF`, `CombineF` | once each | `ubo.lit_compositor_params` | `LitCompositorParams` | 3 + 3 + 1 + 7 + 2 + 7 ≈ 23 (dedupe, e.g. `specular_ao_intensity`) |
+| **B. Bloom** (pilot landed) | `BloomDownsampleF`, `BloomUpsampleF` | N (per-mip; separate UBOs because each shader iterates with its own params) | `ubo.bloom_downsample_params`, `ubo.bloom_upsample_params` | `BloomDownsampleParams`, `BloomUpsampleParams` | 2, 1 |
 | **C. Temporal upsample** | `TaaResolveF`, `temporal_upsample_ddgi`, `temporal_upsample_ssr` | once each | `ubo.temporal_params` | `TemporalParams` (union; shared `doc_*`/`amt`/`lastViewProj`/`*_flicker`/`use_reproject`/`dilate_velocity`; +TAA jitters; +SSR weight) | 11 ∪ 10 ∪ 11 ≈ 14 unique |
 | **D. SSR pipeline** | `ssr_f`, `blur_ssr`, `ssr_downsample`, `ssr_upsample`, `ssr_apply_upsampled`, `reflectionShared` | once each (downsample/upsample iterate per-mip — re-upload in loop) | `ubo.ssr_params` | `SsrParams` | 17 + 2 + 3 + 4 + 1 + 2 ≈ 25 |
 | **E. DDGI runtime** | `ddgiShadeF`, `bilateral_upsample_ddgi`, `ddgi_apply_upsampled`, `ddgiShadeDebugF` | once each | `ubo.ddgi_params` | `DdgiRuntimeParams` | 5 + 3 + 2 + 4 = 14 |
@@ -629,23 +630,14 @@ Notes:
   (the struct name; std140 block-name identity is required for sharing
   across stages in OpenGL).
 
-**Sweep order:** H → C → E → F → A → D → G → J → K. SSAO blur (H) first
-because it's the smallest pure-once-per-frame case (4 fields) and exercises
-the shared-include pattern without iteration. A (lit+compositor+bloom) is
-big and refolds the bloom pilot — sequenced after the pattern is bedded
-in. SSR (D) and Bake (J) are the largest and saved for last.
-
-**Bloom pilot refold.** Group A absorbs the two separate
-`bloom_*_params` UBOs from the pilot. When A lands, the bloom-iter
-upload pattern stays the same — only the struct and slot move into the
-group's union. The shader-side block name changes from
-`BloomDownsampleParams` / `BloomUpsampleParams` to the group's shared
-`LitCompositorParams`; bloom-only fields (`srcResolution`, `mipLevel`,
-`filterRadius`) live alongside the lit-accumulation + composite fields
-in that union. Inside the bloom mip loop, each iteration re-uploads the
-whole struct with updated bloom fields (the non-bloom fields are
-preserved CPU-side in a shadow `LitCompositorParams` instance held by
-`Renderer`).
+**Sweep order:** H → C → E → F → A → D → G → J → K. SSAO blur (H) first —
+smallest pure-once-per-frame case (4 fields), exercises the shared-include
+pattern without iteration. A (lit+compositor) follows once the include
+pattern is locked. B (Bloom) already landed as the pilot; it stays
+separate because both shaders iterate per-mip — folding them into A's
+once-per-frame union would force a whole-struct re-upload on every mip
+step, clobbering the lit/compositor fields. SSR (D) and Bake (J) are the
+largest and saved for last.
 
 ### 2c — Pipeline-state consolidation — done
 
