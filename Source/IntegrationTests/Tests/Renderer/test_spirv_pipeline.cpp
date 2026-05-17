@@ -43,7 +43,14 @@ SpirvCounts reflect_spirv(const SpirvBlob& blob, const char* tag) {
 	SpirvCounts c;
 	try {
 		spirv_cross::Compiler comp(blob.code.data(), blob.code.size());
-		auto res = comp.get_shader_resources();
+		// Filter to statically-referenced resources only. GL's reflection
+		// (GL_REFERENCED_BY_*_SHADER) reports the linker-active set; the
+		// default get_shader_resources() reports every *declared* resource
+		// including dead samplers like VfogScatteringC's probe_irradiance
+		// (declared, never sampled). SDL3's SDL_GPUShaderCreateInfo wants
+		// the active count, so the SDL3 backend must use the same filter.
+		const auto active = comp.get_active_interface_variables();
+		const auto res    = comp.get_shader_resources(active);
 		c.num_samplers         = (int)res.sampled_images.size();
 		c.num_storage_textures = (int)res.storage_images.size();
 		c.num_storage_buffers  = (int)res.storage_buffers.size();
