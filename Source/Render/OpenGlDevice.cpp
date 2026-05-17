@@ -165,20 +165,23 @@ public:
 		}
 
 		glViewport(0, 0, min_width, min_height);
-		if (state.wants_color_clear || state.wants_depth_clear) {
-			glClearDepth(state.clear_depth_val);
-			if (state.use_gray_clear)
-				glClearColor(0.1, 0.1, 0.1, 1);
-			else
-				glClearColor(0, 0.5, 0, 1);
-			GLbitfield mask{};
-			if (state.wants_depth_clear) mask |= GL_DEPTH_BUFFER_BIT;
-			if (state.wants_color_clear)  mask |= GL_COLOR_BUFFER_BIT;
-			// glClear obeys glDepthMask; force depth-write on, routed through
-			// OpenglRenderDevice so its cached state stays in sync.
-			draw.get_device().set_depth_write_enabled(true);
-			glClear(mask);
+
+		// Per-attachment color clears (load-op on each ColorTargetInfo).
+		bool any_color_clear = false;
+		for (int i = 0; i < (int)state.color_infos.size(); i++) {
+			const ColorTargetInfo& info = state.color_infos[i];
+			if (!info.wants_clear) continue;
+			any_color_clear = true;
+			glClearBufferfv(GL_COLOR, i, &info.clear_color.x);
 		}
+
+		if (state.wants_depth_clear) {
+			// glClearBuffer obeys glDepthMask; force depth-write on, routed
+			// through OpenglRenderDevice so its cached state stays in sync.
+			draw.get_device().set_depth_write_enabled(true);
+			glClearBufferfv(GL_DEPTH, 0, &state.clear_depth_val);
+		}
+		(void)any_color_clear;
 	}
 
 	void blit_textures(const GraphicsBlitInfo& info) override {
@@ -450,10 +453,6 @@ public:
 		const GLenum gl_type = (index_type == VertexInputIndexType::uint16)
 								   ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 		glDrawElements(gl_mode, count, gl_type, (const void*)(intptr_t)byte_offset);
-	}
-
-	void set_clear_color(float r, float g, float b, float a) override {
-		glClearColor(r, g, b, a);
 	}
 
 	void bind_storage_buffer_range_raw(int slot, uint32_t buffer_handle,

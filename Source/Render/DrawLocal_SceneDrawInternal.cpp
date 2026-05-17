@@ -56,9 +56,10 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		// auto scope = device.start_render_pass(setup);
 
 		RenderPassState pass_state;
-		auto color_infos = {ColorTargetInfo(tex.output_composite)};
+		ColorTargetInfo composite_target(tex.output_composite);
+		composite_target.wants_clear = true; // clear to black (default)
+		auto color_infos = {composite_target};
 		pass_state.color_infos = color_infos;
-		pass_state.wants_color_clear = true;
 		gfx().set_render_pass(pass_state);
 
 		// draw_ui_local.render();
@@ -100,7 +101,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 
 		RenderPassState setup2;
 		setup2.depth_info = tex.scene_depth;
-		setup2.set_clear_both(true);
+		setup2.wants_depth_clear = true;
 		gfx().set_render_pass(setup2);
 
 		if (r_skip_depth_prepass.get_bool())
@@ -147,20 +148,26 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		// view_to_use.height); auto scope = device.start_render_pass(setup);
 
 		RenderPassState setup2;
-		auto color_targets = {
+		std::array<ColorTargetInfo, 6> color_targets = {
 			ColorTargetInfo(tex.scene_gbuffer0),   ColorTargetInfo(tex.scene_gbuffer1),
 			ColorTargetInfo(tex.scene_gbuffer2),   ColorTargetInfo(tex.scene_color),
 			ColorTargetInfo(tex.editor_id_buffer), ColorTargetInfo(tex.scene_motion),
 		};
-		std::span ct_span = color_targets;
 
+		// Per-attachment clear-to-gray (previously RenderPassState::use_gray_clear).
+		if (clear_color) {
+			for (auto& ct : color_targets) {
+				ct.wants_clear = true;
+				ct.clear_color = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);
+			}
+		}
+
+		std::span<const ColorTargetInfo> ct_span = color_targets;
 		if (dont_attach_velocity.get_bool())
 			ct_span = std::span<const ColorTargetInfo>(ct_span.data(), ct_span.size() - 1);
 
-		setup2.use_gray_clear = true;
 		setup2.color_infos = ct_span;
 		setup2.depth_info = tex.scene_depth;
-		setup2.wants_color_clear = (clear_color); // depth clear done in prepass above
 		setup2.wants_depth_clear = (clear_depth);
 		gfx().set_render_pass(setup2);
 
@@ -397,8 +404,9 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		GPUSCOPESTART(composite_pass_scope);
 		auto set_composite_pass = [&]() {
 			RenderPassState pass_state;
-			pass_state.wants_color_clear = true;
-			auto color_infos = {ColorTargetInfo(read_from_texture)};
+			ColorTargetInfo target(read_from_texture);
+			target.wants_clear = true; // clear to black (default)
+			auto color_infos = {target};
 			pass_state.color_infos = color_infos;
 			gfx().set_render_pass(pass_state);
 		};

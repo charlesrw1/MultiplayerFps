@@ -75,8 +75,9 @@ void GpuCullingTest::debug_overlay() {
 	auto& device = draw.get_device();
 	auto set_composite_pass = [&]() {
 		RenderPassState pass_state;
-		pass_state.wants_color_clear = true;
-		auto color_infos = {ColorTargetInfo(draw.tex.output_composite)};
+		ColorTargetInfo target(draw.tex.output_composite);
+		target.wants_clear = true; // clear to black (default)
+		auto color_infos = {target};
 		pass_state.color_infos = color_infos;
 		gfx().set_render_pass(pass_state);
 	};

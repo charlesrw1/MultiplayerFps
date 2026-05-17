@@ -89,10 +89,12 @@ void ThumbnailRenderer::render(Model* model, MaterialInstance* override_mat) {
 	// auto scope = draw.get_device().start_render_pass(setup);
 	auto set_pass = [&]() {
 		RenderPassState passState;
-		auto color_infos = {ColorTargetInfo(color)};
+		ColorTargetInfo color_target(color);
+		color_target.wants_clear = true; // clear to black (default)
+		auto color_infos = {color_target};
 		passState.color_infos = color_infos;
 		passState.depth_info = depth;
-		passState.set_clear_both(true);
+		passState.wants_depth_clear = true;
 		gfx().set_render_pass(passState);
 	};
 	set_pass();

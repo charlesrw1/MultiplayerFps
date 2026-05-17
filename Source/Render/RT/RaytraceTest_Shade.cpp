@@ -37,8 +37,7 @@ void DdgiTesting::render_probes() {
 
     auto set_composite_pass = [&]() {
         RenderPassState pass_state;
-        pass_state.wants_color_clear = false;
-        auto color_infos = {ColorTargetInfo(draw.tex.output_composite)};
+        auto color_infos = {ColorTargetInfo(draw.tex.output_composite)}; // no clear
         pass_state.color_infos = color_infos;
         pass_state.depth_info = draw.tex.scene_depth;
         gfx().set_render_pass(pass_state);
@@ -297,8 +296,9 @@ void DdgiTesting::render_rt() {
     auto& device = draw.get_device();
     auto set_composite_pass = [&]() {
         RenderPassState pass_state;
-        pass_state.wants_color_clear = true;
-        auto color_infos = {ColorTargetInfo(draw.tex.output_composite)};
+        ColorTargetInfo target(draw.tex.output_composite);
+        target.wants_clear = true; // clear to black (default)
+        auto color_infos = {target};
         pass_state.color_infos = color_infos;
         gfx().set_render_pass(pass_state);
     };

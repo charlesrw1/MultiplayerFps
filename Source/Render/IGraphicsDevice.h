@@ -222,6 +222,11 @@ struct ColorTargetInfo
 	IGraphicsTexture* texture = nullptr;
 	int layer = -1;
 	int mip = 0;
+
+	// Load-op: if wants_clear, the pass begins by clearing this attachment to
+	// clear_color. Mirrors SDL_GPUColorTargetInfo.{load_op, clear_color}.
+	bool wants_clear = false;
+	glm::vec4 clear_color = glm::vec4(0, 0, 0, 1);
 };
 
 struct RenderPassState
@@ -230,13 +235,8 @@ struct RenderPassState
 	IGraphicsTexture* depth_info = nullptr;
 	int depth_layer = -1;
 
-	void set_clear_both(bool b) { wants_color_clear = wants_depth_clear = b; }
-
-	bool wants_color_clear = false;
 	bool wants_depth_clear = false;
 	float clear_depth_val = 0.0;
-
-	bool use_gray_clear = false;
 };
 
 struct VertexLayout
@@ -490,9 +490,6 @@ public:
 	virtual void draw_elements(GraphicsPrimitiveType mode, int count,
 							   VertexInputIndexType index_type,
 							   int byte_offset) = 0;
-
-	// Set the clear color used by subsequent color clears. Wraps glClearColor.
-	virtual void set_clear_color(float r, float g, float b, float a) = 0;
 
 	// Bind a sub-range of a raw GL buffer to an SSBO slot. Wraps
 	// glBindBufferRange(GL_SHADER_STORAGE_BUFFER, …). The _raw suffix flags

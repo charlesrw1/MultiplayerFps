@@ -89,8 +89,9 @@ void LightCookieAtlas::update() {
 		Texture::load("_cookieatlas")->update_specs_ptr(atlas);
 
 		RenderPassState setup;
-		setup.set_clear_both(true);
-		auto colorinfos = {ColorTargetInfo(atlas)};
+		ColorTargetInfo target(atlas);
+		target.wants_clear = true; // clear to black (default)
+		auto colorinfos = {target};
 		setup.color_infos = colorinfos;
 		gfx().set_render_pass(setup);
 

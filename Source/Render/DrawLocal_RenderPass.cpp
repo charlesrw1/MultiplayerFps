@@ -51,14 +51,15 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle) {
 
 		device.bind_texture(0, scene_color_handle);
 		// glBindTextureUnit(0, scene_color_handle);
-		gfx().set_clear_color(0, 0, 0, 1);
 		for (int i = 0; i < tex.number_bloom_mips; i++) {
 			auto& bc = tex.bloom_chain[i];
 
 			// glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0,bc.texture->get_internal_handle(), 0);
 
 			auto setup_pass = [&]() {
-				auto color_infos = {ColorTargetInfo(bc.texture)};
+				ColorTargetInfo target(bc.texture);
+				target.wants_clear = true; // clear to black (default)
+				auto color_infos = {target};
 				RenderPassState pass;
 				pass.color_infos = color_infos;
 				gfx().set_render_pass(pass);
