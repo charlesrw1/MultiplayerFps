@@ -423,6 +423,14 @@ public:
 	// reset MDI count/visibility buffers between frames. Wraps
 	// glClearNamedBufferData.
 	virtual void clear_buffer_uint32(IGraphicsBuffer* buf, uint32_t value) = 0;
+
+	// ---- Phase 1.3c wrap surface (buffer readback) -------------------------
+
+	// Read [offset, offset+size) bytes from buf into dest. Callers are
+	// responsible for issuing the right memory_barrier()/wait_for_gpu_idle()
+	// beforehand so the data is visible. Debug/editor/GI-relocate readback
+	// only; never call on a hot path. Wraps glGetNamedBufferSubData.
+	virtual void download_buffer(IGraphicsBuffer* buf, int offset, int size, void* dest) = 0;
 };
 
 // Global accessor for the active graphics device. Initialize the OpenGL backend

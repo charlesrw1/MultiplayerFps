@@ -97,7 +97,7 @@ void DdgiTesting::set_reflection_uniforms() {
         const int num_cubemaps = RenderGiManager::inst->get_num_cubemaps();
         IGraphicsBuffer* const cubemap_volume_buffer = RenderGiManager::inst->get_cubemap_volume_buffer();
 
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, cubemap_volume_buffer->get_internal_handle());
+        gfx().bind_storage_buffer_base(11, cubemap_volume_buffer);
         draw.bind_texture_ptr(8, cubemap_array);
         device.shader().set_int("num_cubemaps", num_cubemaps);
     }
@@ -156,7 +156,7 @@ void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap
 
     draw_lighting_shared(ssao, for_cubemap_view);
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }
 
 // ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     device.shader().set_ivec2("halfres_texel_offset", texel_offset);
     device.shader().set_bool("wants_half_res", true);
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
     {
         GPUSCOPESTART(temporal_upsample_ddgi);
@@ -230,7 +230,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
         the_shader.set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
         the_shader.set_ivec2("halfres_texel_offset", texel_offset);
 
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
     }
 
     GPUSCOPESTART(ddgihalfres_apply);
@@ -257,7 +257,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
 
     set_reflection_uniforms();
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
     std::swap(draw.tex.ddgi_accum, draw.tex.last_ddgi_accum);
     increment_half_res_offset_index();
@@ -309,10 +309,10 @@ void DdgiTesting::render_rt() {
     state.vao = draw.get_empty_vao();
     device.set_pipeline(state);
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, verts->get_internal_handle());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, nodes->get_internal_handle());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, references->get_internal_handle());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, materials->get_internal_handle());
+    gfx().bind_storage_buffer_base(3, verts);
+    gfx().bind_storage_buffer_base(5, nodes);
+    gfx().bind_storage_buffer_base(6, references);
+    gfx().bind_storage_buffer_base(7, materials);
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }

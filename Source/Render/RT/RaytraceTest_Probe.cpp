@@ -74,10 +74,10 @@ void DdgiTesting::compute_avg_probe_value() {
     const int groups = glm::ceil(num_probes / 64.f);
     printf("compute_avg_probe_value %d\n", groups);
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 15, ddgi_probe_avg_value->get_internal_handle());
-    glDispatchCompute(groups, 1, 1);
+    gfx().bind_storage_buffer_base(15, ddgi_probe_avg_value);
+    gfx().dispatch_compute(groups, 1, 1);
 
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    gfx().memory_barrier(BARRIER_SHADER_STORAGE);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,10 +92,10 @@ void DdgiTesting::execute() {
         build_world();
     double start = GetTime();
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, verts->get_internal_handle());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, nodes->get_internal_handle());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, references->get_internal_handle());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, materials->get_internal_handle());
+    gfx().bind_storage_buffer_base(3, verts);
+    gfx().bind_storage_buffer_base(5, nodes);
+    gfx().bind_storage_buffer_base(6, references);
+    gfx().bind_storage_buffer_base(7, materials);
 
     auto [volumes, total_num_probes, relocate_params] = find_volumes();
     if (volumes.size() == 0)
@@ -123,9 +123,9 @@ void DdgiTesting::execute() {
     CreateBufferArgs args{};
     args.size = total_num_probes * MAX_RAYS * sizeof(RayBufferStruct);
     IGraphicsBuffer* ray_buffer = gfx().create_buffer(args);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, ray_buffer->get_internal_handle());
+    gfx().bind_storage_buffer_base(1, ray_buffer);
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, draw.buf.lighting_uniforms->get_internal_handle());
+    gfx().bind_storage_buffer_base(11, draw.buf.lighting_uniforms);
 
     create_textures_raybuffer(width_probe_space, height_probe_space);
 
@@ -135,7 +135,7 @@ void DdgiTesting::execute() {
     invalid_count_buf = gfx().create_buffer({});
     glm::ivec4 counter_num = {};
     invalid_count_buf->upload(&counter_num, sizeof(glm::ivec4));
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 10, invalid_count_buf->get_internal_handle());
+    gfx().bind_storage_buffer_base(10, invalid_count_buf);
 
     // Probe relocation pass
     Random r(13);
@@ -144,28 +144,26 @@ void DdgiTesting::execute() {
 
         IGraphicsBuffer* relocate_param_buf = gfx().create_buffer({});
         relocate_param_buf->upload(relocate_params.data(), relocate_params.size() * sizeof(vec4));
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 14, relocate_param_buf->get_internal_handle());
+        gfx().bind_storage_buffer_base(14, relocate_param_buf);
 
         set_shit_fuck();
         device.shader().set_float("ray_sample_randomness", r.RandF(0, TWOPI));
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 13, ddgi_probe_relocation_offsets->get_internal_handle());
+        gfx().bind_storage_buffer_base(13, ddgi_probe_relocation_offsets);
         const int total_probes = total_num_probes;
         const int groups = glm::ceil(total_probes / 64.f);
-        glDispatchCompute(groups, 1, 1);
+        gfx().dispatch_compute(groups, 1, 1);
 
         {
             temp_probe_relocate_thing.resize(total_num_probes);
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-            glBindBuffer(GL_SHADER_STORAGE_BUFFER, ddgi_probe_relocation_offsets->get_internal_handle());
-            glm::vec4* ptr = (glm::vec4*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-            for (int i = 0; i < total_num_probes; i++)
-                temp_probe_relocate_thing.at(i) = ptr[i];
-            glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+            gfx().memory_barrier(BARRIER_SHADER_STORAGE);
+            gfx().download_buffer(ddgi_probe_relocation_offsets, 0,
+                                  total_num_probes * (int)sizeof(glm::vec4),
+                                  temp_probe_relocate_thing.data());
         }
 
         relocate_param_buf->release();
     }
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    gfx().memory_barrier(BARRIER_SHADER_STORAGE);
 
     // Trace + gather loop
     for (int i = 0; i < bounces; i++) {
@@ -192,49 +190,42 @@ void DdgiTesting::execute() {
         const int groups = total_probes;
 
         printf("trace %d\n", i);
-        glDispatchCompute(groups, 1, 1);
+        gfx().dispatch_compute(groups, 1, 1);
 
         if (!skip_gather) {
             device.set_shader(gather_shader);
             set_shit_fuck();
             device.shader().set_int("num_runs_so_far", glm::max(0, i - 1));
 
-            glBindImageTexture(0, probe_irradiance->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY,
-                               GL_R11F_G11F_B10F);
-
-            glBindImageTexture(1, probe_depth->get_internal_handle(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG16F);
+            gfx().bind_image_for_compute(0, probe_irradiance, 0, 0, GraphicsImageAccess::WriteOnly);
+            gfx().bind_image_for_compute(1, probe_depth, 0, 0, GraphicsImageAccess::WriteOnly);
 
             glCheckError();
-            glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+            gfx().memory_barrier(BARRIER_SHADER_STORAGE | BARRIER_SHADER_IMAGE_ACCESS);
 
             printf("gather %d\n", i);
 
             const int gather_groups = total_probes;
-            glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 14,
-                             ddgi_probe_relocation_offsets->get_internal_handle());
+            gfx().bind_storage_buffer_base(14, ddgi_probe_relocation_offsets);
 
-            glDispatchCompute(gather_groups, 1, 1);
+            gfx().dispatch_compute(gather_groups, 1, 1);
             glCheckError();
 
             if (i == 0) {
-                glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-                glBindBuffer(GL_SHADER_STORAGE_BUFFER, invalid_count_buf->get_internal_handle());
-                glm::ivec4* ptr = (glm::ivec4*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
-                glm::ivec4 result = *ptr;
-                glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+                gfx().memory_barrier(BARRIER_SHADER_STORAGE);
+                glm::ivec4 result{};
+                gfx().download_buffer(invalid_count_buf, 0, (int)sizeof(glm::ivec4), &result);
                 printf("total_probes %d\n", total_probes);
                 printf("invalid probes: %d\n", result.y);
                 printf("no_depth_needed probes: %d\n", result.x);
             }
         }
 
-        glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        gfx().memory_barrier(BARRIER_SHADER_STORAGE | BARRIER_SHADER_IMAGE_ACCESS);
     }
 
     if (do_flush_after)
-        glFinish();
+        gfx().wait_for_gpu_idle();
     float time = GetTime() - start;
     sys_print(Debug, "sfasdf asdf sadftime: %f\n", time);
 
@@ -269,8 +260,8 @@ void DdgiTesting::calculate_lum_for_spec() {
 
     IGraphicsBuffer* const cubemap_volume_buffer = RenderGiManager::inst->get_cubemap_volume_buffer();
 
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 11, cubemap_volume_buffer->get_internal_handle());
-    glDispatchCompute(groups, 1, 1);
+    gfx().bind_storage_buffer_base(11, cubemap_volume_buffer);
+    gfx().dispatch_compute(groups, 1, 1);
 
-    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT);
+    gfx().memory_barrier(BARRIER_SHADER_STORAGE);
 }

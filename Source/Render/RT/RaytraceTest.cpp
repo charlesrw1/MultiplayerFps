@@ -86,9 +86,9 @@ void set_shit_fuck() {
     ASSERT(draw.ddgi);
     auto self = draw.ddgi.get();
 
-    glBindBufferBase(GL_UNIFORM_BUFFER, 8, self->ddgi_globals->get_internal_handle());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 9, self->ddgi_volumes->get_internal_handle());
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 12, self->ddgi_probe_relocation_offsets->get_internal_handle());
+    gfx().bind_uniform_buffer_base(8, self->ddgi_globals);
+    gfx().bind_storage_buffer_base(9, self->ddgi_volumes);
+    gfx().bind_storage_buffer_base(12, self->ddgi_probe_relocation_offsets);
 }
 
 // ---------------------------------------------------------------------------

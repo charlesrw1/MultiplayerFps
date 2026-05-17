@@ -381,6 +381,11 @@ public:
 							   GL_UNSIGNED_INT, &value);
 	}
 
+	void download_buffer(IGraphicsBuffer* buf, int offset, int size, void* dest) override {
+		ASSERT(buf != nullptr && dest != nullptr && offset >= 0 && size > 0);
+		glGetNamedBufferSubData(buf->get_internal_handle(), offset, size, dest);
+	}
+
 	void download_texture(IGraphicsTexture* tex, int mip, int layer,
 						  void* dest, int dest_size_bytes) override {
 		ASSERT(tex != nullptr && dest != nullptr && dest_size_bytes > 0);
