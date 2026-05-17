@@ -51,13 +51,13 @@ layout (binding = 4, std430) readonly buffer LightTiledIndicies_Buffer {
 #endif
 
 
-#if TILED == 0
-uniform int num_lights = 0;
-#elif TILED == 1
-
-#elif TILED == 2
-uniform int num_lights = 0;
-uniform int light_indirect_offset = 0;
+#if TILED == 0 || TILED == 2
+#include "ShaderBufferShared.txt"
+layout (binding = 7, std140) uniform LitCompositorParamsUbo { LitCompositorParams params; };
+#define num_lights            params.num_lights
+#endif
+#if TILED == 2
+#define light_indirect_offset params.light_indirect_offset
 #endif
 
 void main()

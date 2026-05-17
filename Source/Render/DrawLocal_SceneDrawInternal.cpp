@@ -421,11 +421,16 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		bind_texture_ptr(1, bloom_tex);
 		bind_texture_ptr(2, lens_dirt->gpu_ptr);
 
-		shader()->set_int("tonemap_type", pp_tonemap_type);
-		shader()->set_float("contrast_tweak", pp_contrast);
-		shader()->set_float("saturation_tweak", pp_saturation);
-		shader()->set_float("bloom_lerp", pp_bloom_add);
-		shader()->set_float("exposure", pp_exposure);
+		{
+			gpu::LitCompositorParams lp{};
+			lp.tonemap_type     = pp_tonemap_type;
+			lp.contrast_tweak   = pp_contrast;
+			lp.saturation_tweak = pp_saturation;
+			lp.bloom_lerp       = pp_bloom_add;
+			lp.exposure         = pp_exposure;
+			ubo.lit_compositor_params->upload(&lp, sizeof(lp));
+			gfx().bind_uniform_buffer_base(7, ubo.lit_compositor_params);
+		}
 
 		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	};

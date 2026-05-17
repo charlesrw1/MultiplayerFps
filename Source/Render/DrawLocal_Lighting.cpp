@@ -196,8 +196,12 @@ void LightListCuller::draw_lights() {
 	gfx().bind_storage_buffer_base(3, light_count_buffer);
 	gfx().bind_storage_buffer_base(4, light_indirection);
 
-	if (r_light_use_tiled.get_integer() != 1)
-		draw.shader()->set_int("num_lights", draw.scene.light_list.objects.size());
+	if (r_light_use_tiled.get_integer() != 1) {
+		gpu::LitCompositorParams lp{};
+		lp.num_lights = (int)draw.scene.light_list.objects.size();
+		draw.ubo.lit_compositor_params->upload(&lp, sizeof(lp));
+		gfx().bind_uniform_buffer_base(7, draw.ubo.lit_compositor_params);
+	}
 
 	if (r_light_use_tiled.get_integer() == 2) { // MAIN PATH
 		// its sometimes 2x faster than normal tiled to do this "dumb" way. okay i guess.
@@ -216,9 +220,12 @@ void LightListCuller::draw_lights() {
 			for (int x = 0; x < tile_count.x; x++) {
 				const int index = y * tile_count.x + x;
 				const int count = counts.at(index);
-				draw.shader()->set_int("num_lights", count);
 				const int light_offset = index * gpu::MAX_TILE_LIGHTS;
-				draw.shader()->set_int("light_indirect_offset", light_offset);
+				gpu::LitCompositorParams lp{};
+				lp.num_lights = count;
+				lp.light_indirect_offset = light_offset;
+				draw.ubo.lit_compositor_params->upload(&lp, sizeof(lp));
+				gfx().bind_uniform_buffer_base(7, draw.ubo.lit_compositor_params);
 
 				const int y_to_use = tile_count.y - y - 1;
 				glm::vec2 ofs = glm::floor(glm::vec2(x * tile_size.x, y_to_use * tile_size.y));
@@ -340,8 +347,11 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		gfx().set_pipeline(state);
 
 		if (!scene.skylights.empty()) {
-			gfx().get_active_shader()->set_vec3("sky_color", scene.skylights.at(0).ambientCube[2]);
-			gfx().get_active_shader()->set_vec3("ground_color", scene.skylights.at(0).ambientCube[3]);
+			gpu::LitCompositorParams lp{};
+			lp.sky_color    = glm::vec4(scene.skylights.at(0).ambientCube[2], 0);
+			lp.ground_color = glm::vec4(scene.skylights.at(0).ambientCube[3], 0);
+			ubo.lit_compositor_params->upload(&lp, sizeof(lp));
+			gfx().bind_uniform_buffer_base(7, ubo.lit_compositor_params);
 		}
 
 		bind_texture_ptr(0, tex.scene_gbuffer0);
@@ -381,9 +391,14 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		bind_texture_ptr(4, draw.shadowmap.texture.shadow_array);
 		gfx().bind_uniform_buffer_base(8, draw.shadowmap.ubo.info);
 
-		shader()->set_vec3("uSunDirection", sun_internal->sun.direction);
-		shader()->set_vec3("uSunColor", sun_internal->sun.color);
-		shader()->set_float("uEpsilon", sun_internal->sun.epsilon);
+		{
+			gpu::LitCompositorParams lp{};
+			lp.uSunDirection = glm::vec4(sun_internal->sun.direction, 0);
+			lp.uSunColor     = glm::vec4(sun_internal->sun.color, 0);
+			lp.uEpsilon      = sun_internal->sun.epsilon;
+			ubo.lit_compositor_params->upload(&lp, sizeof(lp));
+			gfx().bind_uniform_buffer_base(7, ubo.lit_compositor_params);
+		}
 
 		// fullscreen shader, no vao used
 		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);

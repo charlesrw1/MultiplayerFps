@@ -27,10 +27,10 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 
 #include "commonUtil.txt"
 #include "pbrShared.txt"
-
-
-uniform vec3 sky_color = vec3(0.2);
-uniform vec3 ground_color = vec3(0.1);
+#include "ShaderBufferShared.txt"
+layout (binding = 7, std140) uniform LitCompositorParamsUbo { LitCompositorParams params; };
+#define sky_color    params.sky_color.xyz
+#define ground_color params.ground_color.xyz
 
 void main()
 {

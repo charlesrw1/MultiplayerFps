@@ -146,6 +146,39 @@ struct BakeParams {
     int   _pad2;                  //  60 .. 64  (struct size 64, /16)
 };
 
+// ---- A. Lit + compositor ---------------------------------------------------
+// Active lit/compositor shaders (sun, ambient, tile-lighting, tonemap composite).
+// Each shader reads only its subset:
+//   SunLightAccumulationF       : uSunDirection, uSunColor, uEpsilon
+//   AmbientLightingF            : sky_color, ground_color
+//   LightAccumulationFullScreen : num_lights, light_indirect_offset
+//                                 (TILED=1 variant reads its own locals from
+//                                  the tiled SSBO; the per-tile loop in
+//                                  LightListCuller::draw_lights re-uploads
+//                                  for TILED=2)
+//   CombineF                    : tonemap_type, contrast_tweak, saturation_tweak,
+//                                 bloom_lerp, exposure
+// Note: the doc plan also listed `SampleCubemapsF` (reflection_accumulation)
+// but its only callsite is commented out — dead shader, skipped. Same for
+// the shared `specular_ao_intensity` from reflectionShared.txt: in practice
+// reflectionShared is included only by group E shaders, so it stays in
+// DdgiRuntimeParams when group E lands.
+// Bound at slot 7. TILED=2 loop re-uploads per tile.
+struct LitCompositorParams {
+    vec4 uSunDirection;          //   0 .. 16  (xyz used; SunLightAccumulationF)
+    vec4 uSunColor;              //  16 .. 32  (xyz used; SunLightAccumulationF)
+    vec4 sky_color;              //  32 .. 48  (xyz used; AmbientLightingF)
+    vec4 ground_color;           //  48 .. 64  (xyz used; AmbientLightingF)
+    float uEpsilon;              //  64        (SunLightAccumulationF)
+    float contrast_tweak;        //  68        (CombineF)
+    float saturation_tweak;      //  72        (CombineF)
+    float bloom_lerp;            //  76        (CombineF)
+    float exposure;              //  80        (CombineF)
+    int   tonemap_type;          //  84        (CombineF)
+    int   num_lights;            //  88        (LightAccumulationFullScreen TILED=0/2)
+    int   light_indirect_offset; //  92 .. 96  (LightAccumulationFullScreen TILED=2; size 96, /16)
+};
+
 // ---- C. Temporal upsample --------------------------------------------------
 // Union of fields previously set by name on TaaResolveF, temporal_upsample_ddgi,
 // and temporal_upsample_ssr. Each shader reads only the fields it needs:

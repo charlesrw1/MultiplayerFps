@@ -113,13 +113,15 @@ vec3 color_contrast (vec3 color, float amt) {
 	return (color - ACEScc_MIDGRAY) * amt + ACEScc_MIDGRAY;
 }
 
-uniform float contrast_tweak = 1.0;
-uniform float saturation_tweak = 1.0;
-uniform int tonemap_type = 0;
-uniform float exposure = 1.0;
-uniform float max_white = 1.0;
-uniform float bloom_lerp = 0.05;
-uniform vec3 tint_tweak = vec3(1.0);
+#include "ShaderBufferShared.txt"
+layout (binding = 7, std140) uniform LitCompositorParamsUbo { LitCompositorParams params; };
+#define contrast_tweak   params.contrast_tweak
+#define saturation_tweak params.saturation_tweak
+#define tonemap_type     params.tonemap_type
+#define exposure         params.exposure
+#define bloom_lerp       params.bloom_lerp
+const float max_white = 1.0;       // never set from C++; shader default
+const vec3 tint_tweak = vec3(1.0); // never set from C++; shader default
 void main()
 {
 	vec3 scene = texture(scene_lit, texCoord).rgb;

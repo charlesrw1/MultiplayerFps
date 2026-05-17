@@ -261,6 +261,7 @@ public:
 		IGraphicsBuffer* cull_params = nullptr;      // group F: cull / MDI compact / depth pyramid / debugCull
 		IGraphicsBuffer* ssr_params = nullptr;       // group D: ssr_f / ssr_downsample / ssr_upsample
 		IGraphicsBuffer* bake_params = nullptr;      // group J: probe / GI bake (trace + gather + probeLumCalc)
+		IGraphicsBuffer* lit_compositor_params = nullptr; // group A: sun + ambient + tiled-light + combine
 	} ubo;
 
 	struct buffers

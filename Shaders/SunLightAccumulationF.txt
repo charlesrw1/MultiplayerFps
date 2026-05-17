@@ -27,10 +27,11 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
 
-// sun variables
-uniform vec3 uSunDirection;
-uniform vec3 uSunColor=vec3(30.0);
-uniform float uEpsilon = 0.005;
+#include "ShaderBufferShared.txt"
+layout (binding = 7, std140) uniform LitCompositorParamsUbo { LitCompositorParams params; };
+#define uSunDirection params.uSunDirection.xyz
+#define uSunColor     params.uSunColor.xyz
+#define uEpsilon      params.uEpsilon
 #include "commonUtil.txt"
 #include "pbrShared.txt"
 
