@@ -71,7 +71,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 			GraphicsBlitInfo blitInfo;
 			blitInfo.dest.w = blitInfo.src.w = cur_w;
 			blitInfo.dest.h = blitInfo.src.h = cur_h;
-			blitInfo.dest.texture = gfx().get_swapchain_texture();
+			blitInfo.dest.texture = gfx().acquire_swapchain_texture();
 			blitInfo.src.texture = tex.output_composite;
 			blitInfo.filter = GraphicsFilterType::Nearest;
 			gfx().blit_textures(blitInfo);
@@ -477,7 +477,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		blitInfo.dest.y = 0;
 		blitInfo.dest.w = blitInfo.src.w = cur_w;
 		blitInfo.dest.h = blitInfo.src.h = cur_h;
-		blitInfo.dest.texture = gfx().get_swapchain_texture();
+		blitInfo.dest.texture = gfx().acquire_swapchain_texture();
 		blitInfo.src.texture = read_from_texture;
 		blitInfo.filter = GraphicsFilterType::Nearest;
 		gfx().blit_textures(blitInfo);

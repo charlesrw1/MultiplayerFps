@@ -79,6 +79,7 @@ static void lua_error_loop(string msg, auto&& frame_start, auto&& wait_for_swap,
 	while (1) {
 		SDL_Delay(10);
 
+		gfx().begin_frame();
 		frame_start();
 
 		if (Input::was_key_pressed(SDL_SCANCODE_RETURN))
@@ -340,7 +341,7 @@ void GameEngineLocal::loop() {
 		// ZoneScopedN("SwapWindow");
 		GPUSCOPESTART(gl_swap_window_scope);
 		if (!(skip_swap || skiprender))
-			gfx().present();
+			gfx().submit_and_present();
 	};
 
 	double last = GetTime() - 0.1;
@@ -351,6 +352,8 @@ void GameEngineLocal::loop() {
 
 	for (;;) {
 		try {
+			gfx().begin_frame();
+
 			// update time
 			const double now = GetTime();
 			double dt = now - last;

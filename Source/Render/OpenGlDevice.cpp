@@ -193,9 +193,9 @@ public:
 // ---------------------------------------------------------------------------
 ConfigVar use_multiple_fbos("use_multiple_fbos", "1", CVAR_BOOL, "");
 
-// Sentinel value returned by get_swapchain_texture(). It has id == 0 and no
-// GL resources. Used only as a pointer identity for comparison in render-pass
-// and blit code.
+// Sentinel value returned by acquire_swapchain_texture(). It has id == 0 and
+// no GL resources. Used only as a pointer identity for comparison in
+// render-pass and blit code.
 static IGraphicsTexture* g_swapchain_sentinel = nullptr;
 
 class OpenGLDeviceImpl : public IGraphicsDevice
@@ -207,6 +207,13 @@ public:
 	// SDL3 backend (which DOES care) doesn't trip on it later.
 	enum class PassMode { None, Render, Compute };
 	PassMode current_pass = PassMode::None;
+
+	// Phase 2d frame lifecycle. `in_frame` toggles on begin_frame /
+	// submit_and_present so the encoder boundary is observable. OpenGL is
+	// lenient — pass ops outside a frame are tolerated (init-time BRDF
+	// integration runs before the main loop) — but submit_and_present asserts
+	// the pairing so an unbalanced loop is caught.
+	bool in_frame = false;
 
 	fbohandle shared_framebuffer   = 0;
 	fbohandle shared_framebuffer_2 = 0;
@@ -278,7 +285,7 @@ public:
 
 	// ---- State-cache setters (formerly OpenglRenderDevice methods) ---------
 
-	void bind_texture_unit_raw(int slot, uint32_t id) override {
+	void bind_texture_unit_internal(int slot, uint32_t id) {
 		ASSERT(slot >= 0 && slot < MAX_SAMPLER_BINDINGS);
 		bool invalid = is_bit_invalid(TEXTURE0_BIT + slot);
 		if (invalid || textures_bound[slot] != id) {
@@ -289,7 +296,7 @@ public:
 		}
 	}
 
-	void set_vao_raw(vertexarrayhandle vao) override {
+	void set_vao_internal(vertexarrayhandle vao) {
 		bool invalid = is_bit_invalid(VAO_BIT);
 		if (invalid || vao != current_vao) {
 			set_bit_valid(VAO_BIT);
@@ -299,7 +306,7 @@ public:
 		}
 	}
 
-	void set_blend_state(BlendState blend) override {
+	void set_blend_state_internal(BlendState blend) {
 		bool invalid = is_bit_invalid(BLENDING_BIT);
 		if (invalid || blend != blending) {
 			if (blend == BlendState::OPAQUE)
@@ -326,7 +333,7 @@ public:
 		}
 	}
 
-	void set_show_backfaces(bool show_backfaces) override {
+	void set_show_backfaces_internal(bool show_backfaces) {
 		bool invalid = is_bit_invalid(BACKFACE_BIT);
 		if (invalid || show_backfaces != this->show_backface) {
 			if (show_backfaces) glDisable(GL_CULL_FACE); else glEnable(GL_CULL_FACE);
@@ -371,7 +378,7 @@ public:
 		}
 	}
 
-	void set_shader_ptr(IGraphicsShader* shader) override {
+	void set_shader_internal(IGraphicsShader* shader) {
 		if (shader == nullptr) {
 			active_program = nullptr;
 			glUseProgram(0);
@@ -420,12 +427,12 @@ public:
 	}
 
 	void set_pipeline(const RenderPipelineState& s) override {
-		set_shader_ptr(s.program);
-		set_blend_state(s.blend);
-		set_vao_raw(s.vao ? s.vao->get_internal_handle() : 0);
+		set_shader_internal(s.program);
+		set_blend_state_internal(s.blend);
+		set_vao_internal(s.vao ? s.vao->get_internal_handle() : 0);
 		set_cull_front_face_internal(s.cull_front_face);
 		set_depth_test_enabled_internal(s.depth_testing);
-		set_show_backfaces(!s.backface_culling);
+		set_show_backfaces_internal(!s.backface_culling);
 		set_depth_write_enabled(s.depth_writes);
 		set_depth_less_than_internal(s.depth_less_than);
 		set_polygon_offset_internal(s.polygon_offset_enabled, s.polygon_offset_factor, s.polygon_offset_units);
@@ -570,9 +577,22 @@ public:
 							   opengl_filter_to_gl(info.filter));
 	}
 
-	IGraphicsTexture* get_swapchain_texture() override {
+	IGraphicsTexture* acquire_swapchain_texture() override {
 		ASSERT(g_swapchain_sentinel != nullptr);
 		return g_swapchain_sentinel;
+	}
+
+	void begin_frame() override {
+		in_frame = true;
+		current_pass = PassMode::None;
+	}
+
+	void submit_and_present() override {
+		ASSERT(in_frame && "submit_and_present without begin_frame");
+		ASSERT(window != nullptr);
+		SDL_GL_SwapWindow(window);
+		current_pass = PassMode::None;
+		in_frame = false;
 	}
 
 	IGraphicsTexture* create_texture(const CreateTextureArgs& args) override {
@@ -674,7 +694,7 @@ public:
 
 	void bind_texture(int slot, IGraphicsTexture* tex) override {
 		ASSERT(slot >= 0);
-		bind_texture_unit_raw(slot, tex ? tex->get_internal_handle() : 0);
+		bind_texture_unit_internal(slot, tex ? tex->get_internal_handle() : 0);
 	}
 
 	void bind_uniform_buffer_base(int slot, IGraphicsBuffer* buf) override {
@@ -863,11 +883,6 @@ public:
 
 	void set_vsync(bool enable) override {
 		SDL_GL_SetSwapInterval(enable ? 1 : 0);
-	}
-
-	void present() override {
-		ASSERT(window != nullptr);
-		SDL_GL_SwapWindow(window);
 	}
 
 	void imgui_init() override {

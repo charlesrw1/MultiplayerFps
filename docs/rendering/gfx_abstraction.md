@@ -537,10 +537,17 @@ Landed across four sequential commits (see Sub-phase 2c status below).
   architecturally awkward (two abstraction boundaries instead of one). Cache
   state, invalid-bits, blend/depth/cull/program/vao/texture setters all moved
   inside the `IGraphicsDevice` impl, exposed on the interface as
-  `set_pipeline` / `set_shader_ptr` / `set_blend_state` / `set_show_backfaces`
-  / `set_depth_write_enabled` / `set_vao_raw` / `bind_texture_unit_raw` /
-  `get_active_shader` / `reset_state_cache` / `set_viewport` /
-  `clear_framebuffer`. Renderer no longer holds a `device` member; per-frame
+  `set_pipeline` / `set_depth_write_enabled` / `get_active_shader` /
+  `reset_state_cache` / `set_viewport` / `clear_framebuffer`. The individual
+  state-cache setters (`set_shader_ptr`, `set_blend_state`,
+  `set_show_backfaces`, `set_vao_raw`, `bind_texture_unit_raw`) were demoted
+  to private internals of the backend in a follow-up: every external caller
+  now goes through `set_pipeline(RenderPipelineState)` or
+  `bind_texture(IGraphicsTexture*)`. The matching `Renderer::set_shader`,
+  `Renderer::set_blend_state`, `Renderer::set_show_backfaces`,
+  `Renderer::bind_vao`, and the `Renderer::bind_texture(int,int)` raw-id
+  forwarder went with them; `Renderer::bind_texture_ptr` survives as a thin
+  forward to `gfx().bind_texture`. Renderer no longer holds a `device` member; per-frame
   stats bump `draw.stats` directly. `draw.get_device()` kept as a transitional
   shim that returns `gfx()`.
 - **RenderPipelineState::vao** is now `IGraphicsVertexInput*` (was
@@ -578,15 +585,31 @@ Open follow-ups: `line_width` / `fill_mode` fold (above); the
 `DrawLocal_RenderPass.cpp` setter still untested — units now stored on the
 struct verbatim and forwarded to `glPolygonOffset`.
 
-### 2d — Command encoder + frame lifecycle
+### 2d — Command encoder + frame lifecycle — done
 
-- `gfx().begin_frame()`, `gfx().acquire_swapchain_texture()` (once/frame),
-  `gfx().submit_and_present()`. OpenGL: `SDL_GL_SwapWindow`; SDL3 GPU later:
-  submit + present.
-- Render/compute pass split already enforced (Sub-phase 1.4g). 2d formalizes
-  it on the encoder.
+- `gfx().begin_frame()` / `gfx().acquire_swapchain_texture()` /
+  `gfx().submit_and_present()` added to `IGraphicsDevice`. ✕`present()`
+  deleted; ✕`get_swapchain_texture()` renamed to `acquire_swapchain_texture()`
+  (the SDL3 GPU model is acquire-once-per-frame; the returned pointer is
+  still referenced multiple times by blit + render-pass code).
+- OpenGL backend: `begin_frame()` sets `in_frame=true` and clears the
+  PassMode tracker; `submit_and_present()` asserts the pairing and wraps
+  `SDL_GL_SwapWindow`. Init-time GPU work (BRDF LUT integration in
+  `EnviornmentMapHelper::init`) runs before any `begin_frame()` — OpenGL is
+  lenient about pass ops outside a frame; the SDL3 backend will need init
+  GPU work wrapped in an explicit begin/submit pair.
+- Caller migration in `EngineMain_Loop.cpp`: `gfx().begin_frame()` at the top
+  of each iteration of the main loop (and of `lua_error_loop`); the
+  `wait_for_swap` lambda now calls `submit_and_present()` instead of
+  `present()`. `skip_swap` / `skip_rendering` still suppress the present;
+  the leftover `in_frame=true` is harmless because `begin_frame()` is
+  idempotent.
 - Single-threaded recording. Revisit only if profiling shows recording is the
   bottleneck (it isn't today).
+
+Render/compute pass split was already runtime-checked inside the backend's
+PassMode tracker (Sub-phase 1.4g); the lifecycle methods now sit alongside it
+so the encoder boundary is observable from the interface.
 
 ### 2e — Per-frame buffer update model
 

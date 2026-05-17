@@ -416,28 +416,38 @@ public:
 	virtual ~IGraphicsDevice() {}
 
 	virtual GraphicsDeviceType get_device_type() = 0;
-	virtual IGraphicsTexture* get_swapchain_texture() = 0;
+
+	// ---- Phase 2d frame lifecycle / command encoder ----------------------
+	//
+	// Frame pairing: `begin_frame()` -> ... -> `submit_and_present()`.
+	// Acquire the swapchain target via `acquire_swapchain_texture()` exactly
+	// once per frame (the returned pointer can be referenced multiple times).
+	//
+	// On SDL3 GPU these map to: AcquireGPUCommandBuffer / AcquireGPUSwapchainTexture
+	// / SubmitGPUCommandBuffer + Present. On OpenGL: begin/acquire are bookkeeping
+	// only and submit_and_present wraps SDL_GL_SwapWindow.
+	//
+	// Render/compute pass split is enforced inside this frame window
+	// (see set_render_pass / begin_compute_pass). Init-time GPU work that
+	// predates the main loop is tolerated by the OpenGL backend; SDL3 backend
+	// will require wrapping such work in begin/submit pairs explicitly.
+	virtual void begin_frame() = 0;
+	virtual IGraphicsTexture* acquire_swapchain_texture() = 0;
+	virtual void submit_and_present() = 0;
 
 	// ---- Pipeline state ---------------------------------------------------
 	// Apply the pipeline state struct. Backend diffs against cached state and
 	// emits only the deltas. Bind state cleared by reset_state_cache().
 	virtual void set_pipeline(const RenderPipelineState& state) = 0;
 
-	// Individual state-cache setters. These are the GL-shaped fallback paths
-	// for code that needs to flip a single bit without rebuilding the whole
-	// pipeline struct (notably depth-write toggles before glClear, and
-	// re-binding the active shader for compute/uniform writes). Phase 2 may
-	// fold the remaining callers into set_pipeline.
-	virtual void set_shader_ptr(IGraphicsShader* shader) = 0;
-	virtual void set_blend_state(BlendState blend) = 0;
-	virtual void set_show_backfaces(bool show_backfaces) = 0;
+	// Depth-write toggle. Still exposed as an immediate setter because
+	// clear_framebuffer needs to ensure the depth-mask is enabled around
+	// glClear independent of the cached pipeline state.
 	virtual void set_depth_write_enabled(bool enabled) = 0;
-	virtual void set_vao_raw(vertexarrayhandle vao) = 0;
-	virtual void bind_texture_unit_raw(int slot, uint32_t id) = 0;
 
 	// Returns the currently-bound shader (or nullptr). Used by uniform-setter
 	// call sites that want to write into the active program without restating
-	// the pipeline. Identical pointer to the last set_pipeline/set_shader_ptr.
+	// the pipeline. Identical pointer to the last set_pipeline.
 	virtual IGraphicsShader* get_active_shader() = 0;
 
 	// Force the cached pipeline state to dirty so the next set_pipeline rebinds
@@ -582,10 +592,6 @@ public:
 	// Toggle swap-interval. true = vsync on (interval 1), false = off (0).
 	// Wraps SDL_GL_SetSwapInterval.
 	virtual void set_vsync(bool enable) = 0;
-
-	// Present the backbuffer (end-of-frame swap). Wraps SDL_GL_SwapWindow on
-	// the window owned by the backend.
-	virtual void present() = 0;
 
 	// ImGui platform/renderer lifecycle. The backend owns the platform
 	// (SDL2) + renderer (OpenGL3) backends; callers do not include the
