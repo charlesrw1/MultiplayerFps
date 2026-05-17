@@ -12,14 +12,8 @@ struct Vfog_Light
 	glm::vec4 color;
 	glm::vec4 direction_coneangle;
 };
-struct Vfog_Params
-{
-	glm::ivec4 volumesize;
-	glm::vec4 volspread_frustumend;
-	glm::vec4 reprojection;
-	glm::mat4 last_frame_viewproj;
-	glm::vec4 density_ani;
-};
+
+static_assert(sizeof(gpu::VfogParams) == 144, "std140");
 
 static IGraphicsTexture* make_volfog_volume(glm::ivec3 size) {
 	CreateTextureArgs args;
@@ -43,7 +37,7 @@ void Volumetric_Fog_System::init() {
 	texture.last_volume = make_volfog_volume(voltexturesize);
 
 	CreateBufferArgs bargs;
-	bargs.size = sizeof(Vfog_Params);
+	bargs.size = sizeof(gpu::VfogParams);
 	bargs.flags = BUFFER_USE_DYNAMIC;
 	buffer.param = gfx().create_buffer(bargs);
 }
@@ -63,16 +57,16 @@ void Volumetric_Fog_System::compute() {
 
 	GPUFUNCTIONSTART;
 
-	Vfog_Params params{};
+	gpu::VfogParams params{};
 
 	const auto& last_vs = draw.last_frame_main_view;
 
 	params.volumesize = glm::ivec4(voltexturesize, 0);
-	params.volspread_frustumend = vec4(spread, frustum_end, 0, 0);
-	params.last_frame_viewproj = last_vs.viewproj;
+	params.spread_frustumend = vec4(spread, frustum_end, 0, 0);
+	params.last_viewproj = last_vs.viewproj;
 	params.reprojection = vec4(temporal_sequence, 0.1, 0, 0);
-
 	params.density_ani = glm::vec4(draw.volfog.density, draw.volfog.anisotropy, falloff, offset);
+	params.num_lights = (int)draw.scene.light_list.objects.size();
 
 	buffer.param->sub_upload(&params, sizeof(params), 0);
 
@@ -86,8 +80,6 @@ void Volumetric_Fog_System::compute() {
 		{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(prog.lightcalc); gfx().set_pipeline(ps); }
 
 		draw.bind_texture_ptr(0, texture.last_volume);
-
-		draw.shader()->set_int("num_lights", draw.scene.light_list.objects.size());
 
 		gfx().bind_image_for_compute(2, texture.volume, 0, -1, GraphicsImageAccess::WriteOnly);
 		draw.bind_texture_ptr(1, draw.spotShadows->get_atlas().get_atlas_texture());

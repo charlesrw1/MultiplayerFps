@@ -33,6 +33,24 @@ struct BloomParams {
     float filterRadius;
 };
 
+// ---- G. Volumetric fog -----------------------------------------------------
+// Used by VfogScatteringC (scatter pass) and VfogRaymarchC (raymarch pass).
+// Bound at slot 4 (compute-shader UBO pool — distinct from the raster-side
+// heightfog `FogUniforms` also at slot 4). The two shaders previously had
+// per-file Vfog_Params copies with drifted field names (`density_ani` vs
+// `den_ani`, `last_viewproj` vs `last_view`) — canonicalised here.
+struct VfogParams {
+    ivec4 volumesize;            //   0
+    vec4  spread_frustumend;     //  16
+    vec4  reprojection;          //  32
+    mat4  last_viewproj;         //  48 .. 112
+    vec4  density_ani;           // 112 .. 128
+    int   num_lights;            // 128
+    int   _pad0;                 // 132
+    int   _pad1;                 // 136
+    int   _pad2;                 // 140 .. 144 (struct size 144, /16)
+};
+
 // ---- C. Temporal upsample --------------------------------------------------
 // Union of fields previously set by name on TaaResolveF, temporal_upsample_ddgi,
 // and temporal_upsample_ssr. Each shader reads only the fields it needs:

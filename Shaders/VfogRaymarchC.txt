@@ -2,16 +2,11 @@ layout(local_size_x = 8, local_size_y=8,local_size_z=1) in;
 layout(rgba16f,binding =2) uniform image3D  VolumeTexture;
 layout(rgba16f,binding =5) uniform image3D  OutputVolumeTexture;
 
-struct Vfog_Params
-{
-	ivec4 volumesize;
-	vec4 spread_frustumend;
-	vec4 reprojection;
-	mat4 last_view;
-	vec4 den_ani;
-};
+#include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
+
 layout (binding = 4, std140) uniform Vfog_Param_Buffer {
-	Vfog_Params fogparam;
+	VfogParams fogparam;
 };
 
 
@@ -29,7 +24,6 @@ void WriteOutput(ivec3 pos, vec4 colordensity)
 	imageStore(VolumeTexture,pos,finalval);
 }
 
-#include "SharedGpuTypes.txt"
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };

@@ -11,6 +11,7 @@ layout(binding = 1) uniform sampler2DShadow shadow_map_atlas;
 #define PI 3.14159
 
 #include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
 
 float ComputeScattering(float lightDotView)
 {
@@ -27,17 +28,8 @@ float phase_function(vec3 Wo, vec3 Wi, float g)
     return (1.0 / (4.0 * PI)) * (1.0 - g * g) / max(pow(denom, 1.5), 0.0001);
 }
 
-struct Vfog_Params
-{
-	ivec4 volumesize;
-	vec4 spread_frustumend;
-	vec4 reprojection;
-	mat4 last_viewproj;
-	vec4 density_ani;
-};
-
 layout (binding = 4, std140) uniform Vfog_Param_Buffer {
-	Vfog_Params fogparam;
+	VfogParams fogparam;
 };
 
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
@@ -51,7 +43,6 @@ layout (binding = 15, std430) readonly buffer DDgiProbeAvgBuf {
 };
 
 
-uniform int num_lights=0;
 
 
 
@@ -83,9 +74,6 @@ const vec3 halton_map[TEMPORAL_FRAMES] = vec3[](
 
 layout(binding = 4) uniform sampler2D probe_irradiance;
 layout(binding = 5) uniform sampler2D probe_depth;
-uniform vec3 volume_spacing;
-uniform vec3 volume_origin;
-uniform ivec3 vol_grid;
 #include "VfogShared.txt"
 
 vec3 get_worldpos_new(ivec3 fragcoords,vec3 invpixelsize, vec3 poffset)
@@ -211,7 +199,7 @@ vec3 get_inscattering(vec3 worldspace)
 
 
 	vec3 accum = vec3(0.0);
-	for(int light_index = 0;light_index<num_lights;light_index++) {
+	for(int light_index = 0;light_index<fogparam.num_lights;light_index++) {
 	
 		vec4 _position_radius = light_objects[light_index].position_radius;
 		vec3 position = _position_radius.xyz;
