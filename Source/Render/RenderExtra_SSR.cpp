@@ -253,7 +253,7 @@ void draw_imgui_for_cvar(ConfigVar& var) {
 	}
 }
 
-static float ssr_brdf_bias = 0.95;
+static float ssr_brdf_bias = 1.0;
 static float ssr_mip_bias = 2;
 static float ssr_max_roughness = 0.7;
 static int random_repeat = 32;

@@ -90,3 +90,30 @@ static TestTask test_demo_level_1_shots(TestContext& t)
 	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "cot");
 }
 GAME_TEST("renderer/demo_level_1_shots", 60.f, test_demo_level_1_shots);
+
+// SSR + TAA capture from the ssr_test camera. Separate test so it can toggle
+// r.ssr/r.taa on without disturbing the baseline shots above, then restore.
+static TestTask test_demo_level_1_ssr_shot(TestContext& t)
+{
+	const bool prev_ssr      = enable_ssr.get_bool();
+	const bool prev_taa      = r_taa_enabled.get_bool();
+	const bool prev_halfres  = r_ddgi_halfres.get_bool();
+
+	enable_ssr.set_bool(true);
+	r_taa_enabled.set_bool(true);
+	r_ddgi_halfres.set_bool(true);
+
+	eng->load_level("maps/demo_level_1.tmap");
+	co_await t.wait_ticks(2);
+
+	spawn_camera_at_named_entity(t, "ssr_test");
+	// TAA needs several frames to converge before the screenshot is stable.
+	co_await t.wait_ticks(16);
+	// SSR + TAA jitter naturally — soft-fail band covers observed ~max_delta=16, ~0.017% pixels.
+	co_await t.capture_screenshot("ssr_test", 24, 0.001f);
+
+	enable_ssr.set_bool(prev_ssr);
+	r_taa_enabled.set_bool(prev_taa);
+	r_ddgi_halfres.set_bool(prev_halfres);
+}
+GAME_TEST("renderer/demo_level_1_ssr_shot", 60.f, test_demo_level_1_ssr_shot);
