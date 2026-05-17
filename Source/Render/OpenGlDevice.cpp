@@ -79,6 +79,13 @@ static IGraphicsTexture* g_swapchain_sentinel = nullptr;
 class OpenGLDeviceImpl : public IGraphicsDevice
 {
 public:
+	// Tracks the implicit pass mode (see IGraphicsDevice::begin_compute_pass).
+	// OpenGL doesn't care; the state machine exists to catch missing
+	// begin_compute_pass() / set_render_pass() at OpenGL build time so the
+	// SDL3 backend (which DOES care) doesn't trip on it later.
+	enum class PassMode { None, Render, Compute };
+	PassMode current_pass = PassMode::None;
+
 	fbohandle shared_framebuffer   = 0;
 	fbohandle shared_framebuffer_2 = 0;
 
@@ -153,6 +160,7 @@ public:
 	void set_render_pass(const RenderPassState& state) override {
 		ASSERT(shared_framebuffer != 0);
 		cur_pass = state;
+		current_pass = PassMode::Render;
 
 		int min_width  = 100'000;
 		int min_height = 100'000;
@@ -277,8 +285,17 @@ public:
 		glBindBufferBase(GL_UNIFORM_BUFFER, slot, buf->get_internal_handle());
 	}
 
+	void begin_compute_pass() override {
+		// SDL3 GPU: ends any open render/compute pass; the actual SDL3
+		// BeginGPUComputePass is deferred until the first dispatch_compute so
+		// writable-resource bindings are known by then. OpenGL: pure state flip.
+		current_pass = PassMode::Compute;
+	}
+
 	void dispatch_compute(int groups_x, int groups_y, int groups_z) override {
 		ASSERT(groups_x >= 0 && groups_y >= 0 && groups_z >= 0);
+		ASSERT(current_pass == PassMode::Compute &&
+			   "dispatch_compute outside compute pass — call begin_compute_pass() first");
 		glDispatchCompute(groups_x, groups_y, groups_z);
 	}
 

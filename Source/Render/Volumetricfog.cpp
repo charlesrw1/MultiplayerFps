@@ -76,6 +76,7 @@ void Volumetric_Fog_System::compute() {
 
 	buffer.param->sub_upload(&params, sizeof(params), 0);
 
+	gfx().begin_compute_pass();
 	gfx().bind_uniform_buffer_base(4, buffer.param);
 	gfx().bind_uniform_buffer_base(0, draw.ubo.current_frame);
 	gfx().bind_storage_buffer_base(3, draw.buf.lighting_uniforms);

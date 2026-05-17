@@ -373,6 +373,19 @@ public:
 
 	// ---- Phase 1.3a wrap surface (compute) --------------------------------
 
+	// Begin a compute pass. Backend implicitly ends any open render or compute
+	// pass first. Compute calls (`dispatch_compute`, `bind_image_for_compute`,
+	// `memory_barrier`) are only legal between `begin_compute_pass()` and the
+	// next `set_render_pass(...)` / next `begin_compute_pass()`.
+	//
+	// Why this exists: SDL3 GPU requires explicit `BeginGPUComputePass` /
+	// `EndGPUComputePass` and forbids mixing draws with compute. Surfacing the
+	// begin/end pair would noise every caller for zero portability gain, so the
+	// boundary is implicit — `set_render_pass()` switches to render mode,
+	// `begin_compute_pass()` switches to compute, backend emits the SDL3
+	// begin/end transitions automatically. OpenGL backend is a pure state flip.
+	virtual void begin_compute_pass() = 0;
+
 	// Launch a compute dispatch. Wraps glDispatchCompute.
 	virtual void dispatch_compute(int groups_x, int groups_y, int groups_z) = 0;
 

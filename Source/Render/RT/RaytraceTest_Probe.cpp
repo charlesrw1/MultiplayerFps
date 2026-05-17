@@ -64,6 +64,7 @@ void DdgiTesting::compute_avg_probe_value() {
 
     if (!probe_depth || !probe_irradiance)
         return;
+    gfx().begin_compute_pass();
     auto& device = draw.get_device();
     device.bind_texture(2, probe_irradiance->get_internal_handle());
     device.bind_texture(3, probe_depth->get_internal_handle());
@@ -92,6 +93,7 @@ void DdgiTesting::execute() {
         build_world();
     double start = GetTime();
 
+    gfx().begin_compute_pass();
     gfx().bind_storage_buffer_base(3, verts);
     gfx().bind_storage_buffer_base(5, nodes);
     gfx().bind_storage_buffer_base(6, references);
@@ -246,6 +248,7 @@ void DdgiTesting::calculate_lum_for_spec() {
         return;
     if (!probe_depth || !probe_irradiance)
         return;
+    gfx().begin_compute_pass();
     auto& device = draw.get_device();
     device.bind_texture(2, probe_irradiance->get_internal_handle());
     device.bind_texture(3, probe_depth->get_internal_handle());

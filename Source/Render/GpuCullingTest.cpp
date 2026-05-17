@@ -113,6 +113,8 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 	if (cull.num_objects <= 0)
 		return;
 
+	gfx().begin_compute_pass();
+
 	// pass1: testing against last frame
 	// pass2: testing against cur frame
 
@@ -303,6 +305,7 @@ static bool projectSphere(vec3 C, float r, float znear, float P00, float P11, ve
 void GpuCullingTest::downsample_depth() {
 	GPUSCOPESTART(downsample);
 
+	gfx().begin_compute_pass();
 	draw.get_device().set_shader(build_pyramid);
 	const int levels = Texture::get_mip_map_count(actual_depth_size.x, actual_depth_size.y);
 	int width = actual_depth_size.x;

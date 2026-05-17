@@ -30,6 +30,7 @@ void SSRSystem::compute_depth() {
 	GPUSCOPESTART(ssr_compute_depth_pyramid);
 	ASSERT(depth_pyramid != nullptr);
 
+	gfx().begin_compute_pass();
 	draw.get_device().set_shader(hiz_downsample);
 	const int levels = Texture::get_mip_map_count(actual_depth_size.x, actual_depth_size.y);
 	int width = actual_depth_size.x;
