@@ -521,7 +521,7 @@ Lands after the Phase 1.9 static-scan gate is clean (it is).
 **Strategy change from the original plan.** The earlier proposal was a
 load-time GLSL preprocessor that rewrote every plain `uniform` into a
 synthetic `_AutoUniforms` block at compile, keeping `set_float(name, ...)`
-working. That approach was rejected: it keeps a name-based setter layer
+working. That approach was _rejected_: it keeps a name-based setter layer
 forever, requires a permanent GLSL parser-rewriter in the load path, and
 the final SDL3 code looks identical to manual migration anyway (CPU
 struct → UBO upload → bind). We migrate each shader explicitly instead.
@@ -579,8 +579,63 @@ Migrated `BloomDownsampleF` + `BloomUpsampleF`. New struct defs +
 source touched → cached binary stale by timestamp). 185 unit tests + 80
 integration tests green.
 
-Sweep is one shader at a time; ~80 files remaining, ~390 plain-uniform
-declarations to migrate.
+### 2a UBO group plan
+
+Original per-shader UBO design (one struct per shader) was rejected as too
+fragmented — most candidate shaders run **once per frame** and share related
+field sets. Consolidate into per-group UBOs instead. **Group sharing rule:**
+
+- Shader runs **once per frame** → put it in a group; the group's single
+  UBO is uploaded once near the start of the pipeline stage and read by
+  every shader in the group.
+- Shader runs **N times per frame in a loop** (per-mip, per-light) →
+  *don't* share with unrelated shaders; iterate uploads on a dedicated
+  buffer (the bloom-pilot pattern). Inside a shader-group, if all
+  iterating shaders run sequentially in the same loop body, they can
+  share — re-upload between iterations.
+- Shader runs **per-draw** (material/meshbuilder/UI) → never share; each
+  draw owns its params, dispatched by the material system. May migrate to
+  push constants later.
+
+All groups share **UBO binding slot 7**. The buffer bound to that slot
+swaps per group. Group-shared struct definitions live in a single shader
+include (`Shaders/<group>_params.glsl`); the same `#include` is used by
+each shader in the group so the std140 layout is identical at link time.
+
+| Group | Members | Cadence | UBO storage | Struct name | Fields ≈ |
+| --- | --- | --- | --- | --- | --- |
+| **A. Bloom** (done) | `BloomDownsampleF`, `BloomUpsampleF` | N (per-mip) | `ubo.bloom_downsample_params`, `ubo.bloom_upsample_params` | `BloomDownsampleParams`, `BloomUpsampleParams` | 2, 1 |
+| **B. Compositor** | `AmbientLightingF`, `CombineF` | once each | `ubo.compositor_params` | `CompositorParams` (union) | 2 + 7 = 9 |
+| **C. Temporal upsample** | `TaaResolveF`, `temporal_upsample_ddgi`, `temporal_upsample_ssr` | once each | `ubo.temporal_params` | `TemporalParams` (union; shared `doc_*`/`amt`/`lastViewProj`/`*_flicker`/`use_reproject`/`dilate_velocity`; +TAA jitters; +SSR weight) | 11 ∪ 10 ∪ 11 ≈ 14 unique |
+| **D. SSR pipeline** | `ssr_f`, `blur_ssr`, `ssr_downsample`, `ssr_upsample`, `ssr_apply_upsampled`, `reflectionShared` | once each (downsample/upsample iterate per-mip — re-upload in loop) | `ubo.ssr_params` | `SsrParams` | 17 + 2 + 3 + 4 + 1 + 2 ≈ 25 |
+| **E. DDGI runtime** | `ddgiShadeF`, `bilateral_upsample_ddgi`, `ddgi_apply_upsampled`, `ddgiShadeDebugF` | once each | `ubo.ddgi_params` | `DdgiRuntimeParams` | 5 + 3 + 2 + 4 = 14 |
+| **F. Cull pipeline** | `CullCompute`, `compact_mdi`, `cpu_vis_to_mdi`, `zero_instances_mdi`, `debugCull`, `DepthPyramidC` | 1–3 cull passes (re-upload per pass); DepthPyramid iterates per-mip | `ubo.cull_params` | `CullParams` | 5 + 2 + 1 + 1 + 3 + 4 = 16 |
+| **G. Volumetric fog** | `VfogScatteringC`, `VfogRaymarchC` | once each | `ubo.volfog_pass_params` (separate from existing `buf.fog_uniforms` at binding 4) | `VolfogPassParams` | 4 + n |
+| **H. SSAO blur** | `BilateralBlurF`, `hbao/linearizedepth` | once each | `ubo.ssao_blur_params` | `SsaoBlurParams` | 3 + 1 = 4 |
+| **I. Sun + cubemap lighting** | `SunLightAccumulationF`, `LightAccumulationFullScreen`, `SampleCubemapsF`, `ShadowmapSampling` (helper include) | once each | `ubo.sun_lighting_params` | `SunLightingParams` | 3 + 3 + 1 + 7 ≈ 12 |
+| **J. Probe / GI baking** | `compute_irrad_pos_C`, `get_best_cubemap_C`, `probeLumCalc_C`, `avgProbeCalc_C`, `trace_C`, `gather_C`, `PerlinGenF` | once each (editor / bake time) | `ubo.bake_params` | `BakeParams` | 4 + 4 + 1 + n + 5 + 1 + 6 ≈ 22 |
+| **K. Raytrace debug** | `Raytracing/RaytracedShadows`, `Raytracing/RaytracedReflections`, `Raytracing/RaytraceSphere` | once each (debug / one-off) | `ubo.rt_debug_params` | `RtDebugParams` | 4 + 4 + 8 = 16 |
+| **PER-DRAW** (own UBO each) | `MbSimpleV/F`, `MbTexturedV/F`, `MeshSimpleV`, `SimpleMeshV`, `MeshDebugProbeF`, `fullscreen_quad_textureF`, `Helpers/EqrtCubemap*`, `Helpers/PrefilterSpecular*`, `LightAccumulationV/F`, all `MASTER/*` material shaders | per-draw / per-instance / per-light | `ubo.<shader>_params` each (or push-const later) | `<Shader>Params` | varies |
+
+Notes:
+- A group's UBO size is fixed at the union of its fields' std140 layout.
+  Adding a field grows the buffer and recompiles consumers. Empty groups
+  start with the buffer allocated but unbound.
+- Helper includes (`ShadowmapSampling.txt`, `reflectionShared.txt`)
+  contribute their uniforms to whichever group includes them; they don't
+  get their own UBO.
+- `MASTER/*` material shaders are codegen-output; their `indirect_material_offset`
+  + per-master tweakables migrate when the master-material pipeline lands.
+- Naming convention: struct = `<Group>Params` (PascalCase); UBO member =
+  `ubo.<group>_params` (snake_case); shader-side block name = `<Group>Params`
+  (the struct name; std140 block-name identity is required for sharing
+  across stages in OpenGL).
+
+**Sweep order:** B → H → C → E → F → D → G → I → J → K. Compositor (B)
+first because it's small (9 fields, 2 shaders) and exercises the include
+pattern. Temporal (C) and DDGI (E) are next because they share lots of
+common fields. SSR (D) and Bake (J) are the largest and saved for after
+the pattern is bedded in.
 
 ### 2c — Pipeline-state consolidation — done
 
