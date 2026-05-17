@@ -143,11 +143,53 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.7b** | Move `Shader.cpp` compile/link bodies into `OpenGlShaderImpl.cpp` | ~50 | source-loader + `glCreateShader/Compile/Attach/Link/Delete` move into backend; `Shader::compile*` stays in `Shader.h` but bodies live in backend TU | done |
 | **1.7c** | Uniform setters onto `IGraphicsShader` | ~12 | `IGraphicsShader::{use,set_int,set_float,set_mat4,…,set_block_binding}` (DSA `glProgramUniform*`); `Shader::set_*` forward through `gfx_handle`; binary-cache paths populate `gfx_shader` via `opengl_wrap_program_handle` | done |
 | **1.7d** | Program-binary cache + delete `Shader` struct | ~20 | move `glProgramBinary`/`glGetProgramBinary` cache paths in `recompile_shared`/`recompile_normal` into backend; delete `Shader` struct; `RenderPipelineState::program` becomes `IGraphicsShader*` (lifted from Phase 2c) | done |
-| 1.8 | Window/swapchain + ImGui wrap | ~30 (`SDL_GL_*`, `gladLoad*`, swap, vsync, imgui_render) | factory move from `EngineMain_Init.cpp`; `set_vsync`, `present`, `imgui_render` | not started |
-| 1.9 | `r.gpu.no_legacy_calls=1` assertion test + rip per-subsystem `r.gfx.wrap.*` flags | — | gates phase boundary | not started |
+| **1.8** | Window/swapchain + ImGui wrap | ~10 (`SDL_GL_*`, `gladLoad*`, swap, vsync, imgui_render) | `gfx_opengl_pre_window_setup`; `gfx_init_opengl(SDL_Window*)`; `set_vsync`, `present`, `imgui_init`, `imgui_shutdown`, `imgui_new_frame`, `imgui_render_draw_data`, `imgui_process_event` | done |
+| 1.9 | `r.gpu.no_legacy_calls=1` assertion test + rip per-subsystem `r.gfx.wrap.*` flags | — | gates phase boundary | deferred — many non-`Render/` callers (MeshBuilder, Profilier, GiScene, DdsExport, IntegrationTests GPU helpers, BufferTest) still issue raw `gl*`; needs either an accept-list or a follow-on migration pass |
 | **1.5 (post-1.x)** | Null/passthrough leak-detector backend | — | gate that proves the wrap is complete | not started |
 
 Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
+
+## Sub-phase 1.8 status
+
+- API added on `IGraphicsDevice`: `set_vsync(bool)` (wraps `SDL_GL_SetSwapInterval`),
+  `present()` (wraps `SDL_GL_SwapWindow`), and the ImGui platform/renderer
+  lifecycle — `imgui_init`, `imgui_shutdown`, `imgui_new_frame`,
+  `imgui_render_draw_data`, `imgui_process_event(const SDL_Event*)`. The
+  backend hides the `imgui_impl_sdl2.h` + `imgui_impl_opengl3.h` includes from
+  the rest of the codebase; `imgui_render_draw_data` binds the default
+  framebuffer internally before issuing the GL3 draw (mirrors the SDL3 GPU
+  model where the swapchain texture is acquired by the encoder pre-draw).
+- Free-function init split: `gfx_opengl_pre_window_setup()` sets the
+  `SDL_GL_SetAttribute` (major/minor/depth/double-buffer) — MUST run before
+  `SDL_CreateWindow`. `gfx_init_opengl(SDL_Window*)` now takes the window,
+  creates the `SDL_GLContext`, calls `gladLoadGLLoader`, sets the default
+  swap interval, and constructs `OpenGLDeviceImpl`. The backend owns the GL
+  context for the rest of the process; `gfx_shutdown()` destroys the device
+  AND `SDL_GL_DeleteContext`s the context.
+- `init_sdl_window` in `EngineMain_Init.cpp` collapses from manual SDL_GL_*
+  setup + glad load + ImGui platform init down to: `SDL_Init` →
+  `gfx_opengl_pre_window_setup()` → `SDL_CreateWindow(... SDL_WINDOW_OPENGL ...)`
+  → `gfx_init_opengl(window)`. Renderer init no longer calls
+  `gfx_init_opengl`; it asserts `gfx_is_initialized()` instead, because the
+  device is live before the renderer comes up.
+- `GameEngineLocal::gl_context` field deleted (was only ever read by ImGui
+  init, which now lives in the backend). The `SDL_Window* window` member
+  stays in `GameEngineLocal` — non-GL SDL2 ops (`SDL_GetWindowSize`,
+  `SDL_SetWindowFullscreen`, `SDL_SetWindowTitle`, `SDL_WarpMouseInWindow`)
+  still consume it directly.
+- Caller migrations: `EngineMain_Loop.cpp::loop` — `SDL_GL_SwapWindow` →
+  `gfx().present()`; `ImGui_ImplSDL2_ProcessEvent` →
+  `gfx().imgui_process_event`; the explicit `glBindFramebuffer(0)` +
+  `ImGui_ImplOpenGL3_RenderDrawData` pair → `gfx().imgui_render_draw_data()`
+  (FBO 0 bind moved into the backend impl). `GUISystemLocal.cpp` —
+  `ImGui_ImplSDL2_NewFrame` + `ImGui_ImplOpenGL3_NewFrame` →
+  `gfx().imgui_new_frame()`. `DrawLocal_SceneDraw.cpp::sync_update` —
+  the `enable_vsync` cvar branch collapses to `gfx().set_vsync(...)`.
+- `glad/glad.h` include dropped from `EngineMain_Loop.cpp` and
+  `EngineMain_Init.cpp`. ImGui platform/renderer impl headers no longer
+  included anywhere outside `OpenGlDevice.cpp`.
+- 184 unit tests + 80 integration tests green; `bake_probes_test` screenshot
+  within its soft-fail band (max_delta=68, 8 pixel diff, 0.001%).
 
 ## Sub-phase 1.7d status
 
@@ -353,12 +395,12 @@ Lands after Phase 1.5 null-backend gate is clean.
 ### 2a — Synthetic UBOs
 
 Reflect every uniform at program-link via `glGetProgramInterface*`. Generate a
-per-stage std140 `_AutoUniforms` block; rewrite the program's uniform usage
+per-stage std430 `_AutoUniforms` block; rewrite the program's uniform usage
 to read from it (preferred: GLSL preprocessor pass before compile).
 `set_float` / `set_vec3` / `set_mat4(name, ...)` continue to work — a
 name → `(slot, offset)` resolution table is built at link time; setters write
-into a CPU scratch buffer that flushes to the UBO at draw time. std140
-padding enforced (vec3→16, mat4→64, etc.). On
+into a CPU scratch buffer that flushes to the UBO at draw time. std430
+padding enforced. On
 `Program_Manager::recompile_all` the reflection table is rebuilt and any 2c
 SDL3-cache pipelines referencing the program are invalidated.
 

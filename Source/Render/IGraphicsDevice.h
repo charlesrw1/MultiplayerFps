@@ -509,6 +509,26 @@ public:
 													int max_draw_count,
 													int stride) = 0;
 
+	// ---- Phase 1.8 wrap surface (window / swapchain / imgui) ---------------
+
+	// Toggle swap-interval. true = vsync on (interval 1), false = off (0).
+	// Wraps SDL_GL_SetSwapInterval.
+	virtual void set_vsync(bool enable) = 0;
+
+	// Present the backbuffer (end-of-frame swap). Wraps SDL_GL_SwapWindow on
+	// the window owned by the backend.
+	virtual void present() = 0;
+
+	// ImGui platform/renderer lifecycle. The backend owns the platform
+	// (SDL2) + renderer (OpenGL3) backends; callers do not include the
+	// imgui_impl_* headers. `imgui_render_draw_data` binds the default
+	// framebuffer internally before issuing the draw.
+	virtual void imgui_init() = 0;
+	virtual void imgui_shutdown() = 0;
+	virtual void imgui_new_frame() = 0;
+	virtual void imgui_render_draw_data() = 0;
+	virtual bool imgui_process_event(const union SDL_Event* event) = 0;
+
 	// ---- Shader factory ---------------------------------------------------
 
 	// Compile + link a GPU program. Path arguments are passed through to the
@@ -579,11 +599,23 @@ public:
 
 };
 
-// Global accessor for the active graphics device. Initialize the OpenGL backend
-// with gfx_init_opengl() during renderer init; tear it down with gfx_shutdown()
-// before exit. gfx() asserts initialization.
+struct SDL_Window;
+
+// Global accessor for the active graphics device.
+//
+// OpenGL backend init order (engine startup):
+//   1. gfx_opengl_pre_window_setup()  — sets GL context attribs (major/minor,
+//      depth bits, double-buffer). MUST be called before SDL_CreateWindow.
+//   2. SDL_CreateWindow(..., SDL_WINDOW_OPENGL | ...)
+//   3. gfx_init_opengl(window)        — creates SDL_GL context, loads glad,
+//      constructs the device. The backend takes ownership of the GL context
+//      for the rest of the process lifetime.
+// Tear down with gfx_shutdown() (destroys the device and the GL context).
+//
+// gfx() asserts initialization.
 IGraphicsDevice& gfx();
 bool gfx_is_initialized();
-void gfx_init_opengl();
+void gfx_opengl_pre_window_setup();
+void gfx_init_opengl(SDL_Window* window);
 void gfx_shutdown();
 #endif

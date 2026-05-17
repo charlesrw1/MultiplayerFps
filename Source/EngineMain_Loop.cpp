@@ -1,6 +1,5 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <SDL2/SDL.h>
-#include "glad/glad.h"
 #include <cstdio>
 #include <vector>
 #include <string>
@@ -27,8 +26,7 @@
 #include "Physics/Physics2.h"
 #include "Sound/SoundPublic.h"
 #include "imgui.h"
-#include "imgui_impl_opengl3.h"
-#include "imgui_impl_sdl2.h"
+#include "Render/IGraphicsDevice.h"
 #include "UI/UILoader.h"
 #include "UI/Widgets/Layouts.h"
 #include "UI/OnScreenLogGui.h"
@@ -192,7 +190,7 @@ void GameEngineLocal::loop() {
 		UiSystem::inst->pre_events();
 		SDL_Event event;
 		while (SDL_PollEvent(&event)) {
-			ImGui_ImplSDL2_ProcessEvent(&event);
+			gfx().imgui_process_event(&event);
 			Input::inst->handle_event(event);
 			UiSystem::inst->handle_event(event);
 
@@ -321,8 +319,7 @@ void GameEngineLocal::loop() {
 
 		ImGui::Render();
 		if (!skip_rendering) {
-			glBindFramebuffer(GL_FRAMEBUFFER, 0);
-			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+			gfx().imgui_render_draw_data();
 		}
 	};
 	auto do_sync_update = [&]() {
@@ -343,7 +340,7 @@ void GameEngineLocal::loop() {
 		// ZoneScopedN("SwapWindow");
 		GPUSCOPESTART(gl_swap_window_scope);
 		if (!(skip_swap || skiprender))
-			SDL_GL_SwapWindow(window);
+			gfx().present();
 	};
 
 	double last = GetTime() - 0.1;

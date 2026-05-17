@@ -4,8 +4,7 @@
 #include <algorithm>
 #include "Render/MaterialPublic.h"
 #include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_opengl3.h"
+#include "Render/IGraphicsDevice.h"
 #include "EditorPopups.h"
 #include "Framework/MyImguiLib.h"
 #include "Assets/AssetBrowser.h"
@@ -52,8 +51,7 @@ void UiSystem::draw_imgui_interfaces(IEditorTool* edState) {
 
 	// draw imgui interfaces
 	// if a tool is active, game screen gets drawn to an imgui viewport
-	ImGui_ImplSDL2_NewFrame();
-	ImGui_ImplOpenGL3_NewFrame();
+	gfx().imgui_new_frame();
 	ImGui::NewFrame();
 #ifdef EDITOR_BUILD
 	if (edState)

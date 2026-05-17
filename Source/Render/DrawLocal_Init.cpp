@@ -358,7 +358,10 @@ void Renderer::init() {
 		start = now;
 	};
 
-	gfx_init_opengl();
+	// gfx_init_opengl(window) is called by the engine right after SDL_CreateWindow
+	// (init_sdl_window in EngineMain_Init.cpp) — by the time the renderer comes
+	// up the device is already live.
+	ASSERT(gfx_is_initialized());
 
 	print_time("draw:device");
 

@@ -5,6 +5,10 @@
 // and factory functions declared in OpenGlDeviceLocal.h.
 #include "OpenGlDeviceLocal.h"
 #include "DrawLocal.h"
+#include <SDL2/SDL.h>
+#include "imgui.h"
+#include "imgui_impl_sdl2.h"
+#include "imgui_impl_opengl3.h"
 
 // ---------------------------------------------------------------------------
 // Global state (definitions)
@@ -478,6 +482,50 @@ public:
 		glDrawElements(gl_mode, count, gl_type, (const void*)(intptr_t)byte_offset);
 	}
 
+	// ---- Phase 1.8 wrap impls (window / swapchain / imgui) ---------------
+
+	SDL_Window*   window     = nullptr;
+	SDL_GLContext gl_context = nullptr;
+
+	void set_vsync(bool enable) override {
+		SDL_GL_SetSwapInterval(enable ? 1 : 0);
+	}
+
+	void present() override {
+		ASSERT(window != nullptr);
+		SDL_GL_SwapWindow(window);
+	}
+
+	void imgui_init() override {
+		ASSERT(window != nullptr && gl_context != nullptr);
+		ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
+		ImGui_ImplOpenGL3_Init();
+	}
+
+	void imgui_shutdown() override {
+		ImGui_ImplOpenGL3_Shutdown();
+		ImGui_ImplSDL2_Shutdown();
+	}
+
+	void imgui_new_frame() override {
+		ImGui_ImplSDL2_NewFrame();
+		ImGui_ImplOpenGL3_NewFrame();
+	}
+
+	void imgui_render_draw_data() override {
+		// Bind the default framebuffer (window backbuffer) so the imgui pass
+		// lands on the screen rather than whichever offscreen target the last
+		// scene pass left bound. Mirrors the SDL3 GPU model where the swapchain
+		// texture is acquired and bound by the encoder before imgui draws.
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	}
+
+	bool imgui_process_event(const SDL_Event* event) override {
+		ASSERT(event != nullptr);
+		return ImGui_ImplSDL2_ProcessEvent(event);
+	}
+
 	void multi_draw_elements_indirect_count(GraphicsPrimitiveType mode,
 											VertexInputIndexType index_type,
 											int indirect_byte_offset,
@@ -524,14 +572,48 @@ bool CheckGlErrorInternal_(const char* file, int line) {
 	return has_error;
 }
 
-void gfx_init_opengl() {
+void gfx_opengl_pre_window_setup() {
+	// SDL_GL attribute setup MUST run before SDL_CreateWindow so the window
+	// gets created with a compatible GL pixel format. After this returns the
+	// engine is responsible for SDL_CreateWindow(..., SDL_WINDOW_OPENGL | ...);
+	// gfx_init_opengl(window) then takes over context creation + glad load.
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+}
+
+void gfx_init_opengl(SDL_Window* window) {
 	ASSERT(g_gfx_instance == nullptr);
-	g_gfx_instance = new OpenGLDeviceImpl();
+	ASSERT(window != nullptr);
+
+	SDL_GLContext ctx = SDL_GL_CreateContext(window);
+	if (!ctx)
+		Fatalf("gfx_init_opengl: SDL_GL_CreateContext failed: %s\n", SDL_GetError());
+
+	sys_print(Debug, "OpenGL loaded\n");
+	gladLoadGLLoader(SDL_GL_GetProcAddress);
+	sys_print(Debug, "Vendor: %s\n",   glGetString(GL_VENDOR));
+	sys_print(Debug, "Renderer: %s\n", glGetString(GL_RENDERER));
+	sys_print(Debug, "Version: %s\n\n", glGetString(GL_VERSION));
+
+	SDL_GL_SetSwapInterval(0);
+
+	auto* impl = new OpenGLDeviceImpl();
+	impl->window     = window;
+	impl->gl_context = ctx;
+	g_gfx_instance = impl;
 }
 
 void gfx_shutdown() {
-	delete g_gfx_instance;
-	g_gfx_instance = nullptr;
+	if (g_gfx_instance) {
+		auto* impl = static_cast<OpenGLDeviceImpl*>(g_gfx_instance);
+		SDL_GLContext ctx = impl->gl_context;
+		delete impl;
+		g_gfx_instance = nullptr;
+		if (ctx)
+			SDL_GL_DeleteContext(ctx);
+	}
 }
 
 // ---------------------------------------------------------------------------

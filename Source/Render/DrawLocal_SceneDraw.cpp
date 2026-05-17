@@ -104,12 +104,8 @@ void Renderer::deferred_decal_pass() {
 void Renderer::sync_update() {
 	ZoneScoped;
 
-	if (enable_vsync.was_changed()) {
-		if (enable_vsync.get_bool())
-			SDL_GL_SetSwapInterval(1);
-		else
-			SDL_GL_SetSwapInterval(0);
-	}
+	if (enable_vsync.was_changed())
+		gfx().set_vsync(enable_vsync.get_bool());
 
 	scene.execute_deferred_deletes();
 

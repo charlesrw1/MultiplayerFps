@@ -1,6 +1,5 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <SDL2/SDL.h>
-#include "glad/glad.h"
 #include <cstdio>
 #include <vector>
 #include <string>
@@ -21,6 +20,7 @@
 #include "Framework/MeshBuilder.h"
 #include "Framework/Files.h"
 #include "Render/DrawPublic.h"
+#include "Render/IGraphicsDevice.h"
 #include "Render/Texture.h"
 #include "Render/MaterialPublic.h"
 #include "Game/Entities/Player.h"
@@ -31,8 +31,6 @@
 #include "Assets/AssetBrowser.h"
 #include "Sound/SoundPublic.h"
 #include "imgui.h"
-#include "imgui_impl_opengl3.h"
-#include "imgui_impl_sdl2.h"
 #include "Framework/EditorTheme.h"
 #include "UI/UILoader.h"
 #include "UI/Widgets/Layouts.h"
@@ -118,11 +116,9 @@ void GameEngineLocal::init_sdl_window() {
 		exit(-1);
 	}
 
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 6);
-
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+	// Backend sets the GL context attribs (major/minor/depth/double-buffer)
+	// before the window is created — see gfx_opengl_pre_window_setup docs.
+	gfx_opengl_pre_window_setup();
 
 	const char* title = g_project_name.get_string();
 	window = SDL_CreateWindow(title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, g_window_w.get_integer(),
@@ -132,15 +128,8 @@ void GameEngineLocal::init_sdl_window() {
 		exit(-1);
 	}
 
-	gl_context = SDL_GL_CreateContext(window);
-
-	sys_print(Debug, "OpenGL loaded\n");
-	gladLoadGLLoader(SDL_GL_GetProcAddress);
-	sys_print(Debug, "Vendor: %s\n", glGetString(GL_VENDOR));
-	sys_print(Debug, "Renderer: %s\n", glGetString(GL_RENDERER));
-	sys_print(Debug, "Version: %s\n\n", glGetString(GL_VERSION));
-
-	SDL_GL_SetSwapInterval(0);
+	// Backend creates the GL context, loads glad, takes over swap-interval.
+	gfx_init_opengl(window);
 }
 
 // ---------------------------------------------------------------------------
@@ -254,8 +243,10 @@ void GameEngineLocal::cleanup() {
 	isound->cleanup();
 
 	// could get fatal error before initializing this stuff
-	if (gl_context && window) {
-		SDL_GL_DeleteContext(gl_context);
+	if (window) {
+		if (gfx_is_initialized())
+			gfx().imgui_shutdown();
+		gfx_shutdown();
 		SDL_DestroyWindow(window);
 	}
 }
@@ -390,8 +381,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	TIMESTAMP("init everything");
 
 	ImGui::SetCurrentContext(imgui_context);
-	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
-	ImGui_ImplOpenGL3_Init();
+	gfx().imgui_init();
 	print_time("imgui init");
 
 #ifdef EDITOR_BUILD
