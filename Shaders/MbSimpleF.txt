@@ -1,18 +1,19 @@
+#include "ShaderBufferShared.txt"
 
 out vec4 FS_OUT_Color;
 
 in vec4 FS_IN_Color;
 
 #ifdef USE_SOLID_COLOR
-vec4 solid_color;
+layout(std140, binding = 16) uniform MbSimpleFragPushConstsUbo { MbSimpleFragPushConsts pc; };
 #endif
 
 void main()
 {
 #ifdef USE_SOLID_COLOR
-	FS_OUT_Color = pow(solid_color,vec4(2.2));
+	FS_OUT_Color = pow(pc.solid_color,vec4(2.2));
 #else
 	FS_OUT_Color = pow(vec4(FS_IN_Color.rgb,1.0),vec4(2.2));
 #endif
 }
-	
+

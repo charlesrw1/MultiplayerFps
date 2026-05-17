@@ -46,9 +46,13 @@ void Renderer::draw_meshbuilders() {
 			state.vao = dd.vao;
 			gfx().set_pipeline(state);
 
-			shader()->set_mat4("ViewProj", current_frame_view.viewproj);
-			shader()->set_mat4("Model", mb.transform);
-			shader()->set_vec4("solid_color", color32_to_vec4(mb.background_color));
+			gpu::MbSimpleVertPushConsts pcv{};
+			pcv.ViewProj = current_frame_view.viewproj;
+			pcv.Model    = mb.transform;
+			gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
+			gpu::MbSimpleFragPushConsts pcf{};
+			pcf.solid_color = color32_to_vec4(mb.background_color);
+			gfx().push_fragment_constants(0, &pcf, sizeof(pcf));
 
 			gfx().set_line_width(3);
 			dd.draw(MeshBuilderDD::LINES);
@@ -62,8 +66,10 @@ void Renderer::draw_meshbuilders() {
 		state.vao = dd.vao;
 		gfx().set_pipeline(state);
 
-		shader()->set_mat4("ViewProj", current_frame_view.viewproj);
-		shader()->set_mat4("Model", mb.transform);
+		gpu::MbSimpleVertPushConsts pcv{};
+		pcv.ViewProj = current_frame_view.viewproj;
+		pcv.Model    = mb.transform;
+		gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
 		dd.draw(MeshBuilderDD::LINES);
 	}
 }

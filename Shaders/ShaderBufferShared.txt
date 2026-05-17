@@ -248,6 +248,36 @@ struct TemporalParams {
     ivec2 halfres_texel_offset;         // 104 .. 112  (struct size 112, /16)
 };
 
+// ---------------------------------------------------------------------------
+// Push-constant blocks (Phase 2 B1).
+// ---------------------------------------------------------------------------
+// Per-shader, per-draw uniform data uploaded via
+// gfx().push_{vertex,fragment,compute}_constants(slot, &pc, sizeof(pc)).
+// Mirrors SDL3 GPU's SDL_PushGPU*UniformData. Max 128 B per block.
+//
+// Binding mapping (see IGraphicsDevice.h::kGfxPushConstBindingBase):
+//   VS slot 0..3 -> bindings 12..15
+//   FS slot 0..3 -> bindings 16..19
+//   CS slot 0..3 -> bindings 20..23
+//
+// GLSL declaration template (one block per stage that uses push consts):
+//   layout(std140, binding = 12) uniform XVertPushConstsUbo { XVertPushConsts pc; };
+//   ... vert shader reads pc.ViewProj, pc.Model, ...
+//
+// Block instance name convention: `pc` when only one block in the shader,
+// `pcv`/`pcf`/`pcc` when multiple stages each have one.
+
+// MbSimpleV.txt / MbSimpleF.txt (debug meshbuilder line draws -- see
+// DrawLocal_Lighting.cpp). Vert needs Model + ViewProj; frag needs an
+// optional solid override colour (USE_SOLID_COLOR define).
+struct MbSimpleVertPushConsts {
+    mat4 ViewProj;               //   0 ..  64
+    mat4 Model;                  //  64 .. 128   (struct size 128)
+};
+struct MbSimpleFragPushConsts {
+    vec4 solid_color;            //   0 ..  16   (struct size 16)
+};
+
 #ifdef __cplusplus
 };
 #endif
