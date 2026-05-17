@@ -466,6 +466,15 @@ public:
 													int max_draw_count,
 													int stride) = 0;
 
+	// ---- Phase 1.5a wrap surface (decals) ----------------------------------
+
+	// Per-attachment color write mask. attachment is the draw-buffer index of
+	// the currently active framebuffer (matches glColorMaski's `buf` slot).
+	// Used by the decal pass to gate writes to G-buffer locations the decal
+	// material did not declare an output for. Immediate setter for now;
+	// Phase 2c bakes color masks into IGraphicsRasterPipeline.
+	virtual void set_color_write_mask(int attachment, bool r, bool g, bool b, bool a) = 0;
+
 	// ---- Phase 1.4c wrap surface (orchestration) ---------------------------
 
 	// glMultiDrawElementsIndirect. `indirect` is interpreted as a byte offset

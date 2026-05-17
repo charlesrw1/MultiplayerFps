@@ -399,6 +399,12 @@ public:
 		}
 	}
 
+	void set_color_write_mask(int attachment, bool r, bool g, bool b, bool a) override {
+		ASSERT(attachment >= 0);
+		glColorMaski((GLuint)attachment, r ? GL_TRUE : GL_FALSE, g ? GL_TRUE : GL_FALSE,
+					 b ? GL_TRUE : GL_FALSE, a ? GL_TRUE : GL_FALSE);
+	}
+
 	void multi_draw_elements_indirect(GraphicsPrimitiveType mode,
 									  VertexInputIndexType index_type,
 									  const void* indirect,

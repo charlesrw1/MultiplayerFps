@@ -1,5 +1,11 @@
 # Graphics Device Abstraction
 
+This is the canonical migration doc. The earlier strategy doc at
+`~/.claude/plans/i-want-to-put-idempotent-fairy.md` is historical — Phase 2c
+decisions there are superseded by **Pipeline model** below.
+
+sdl3 gpu api (for reference): https://github.com/libsdl-org/SDL/blob/main/include/SDL3/SDL_gpu.h
+
 Migration of all rendering behind `IGraphicsDevice` (Source/Render/IGraphicsDevice.h) so an SDL3 GPU backend can sit alongside the current OpenGL backend.
 
 Global accessor: `gfx()` (free function). The OpenGL singleton is built by `gfx_init_opengl()` during `Renderer::init` and torn down by `gfx_shutdown()`.
@@ -7,10 +13,72 @@ Global accessor: `gfx()` (free function). The OpenGL singleton is built by `gfx_
 ## Phase plan
 
 1. **Wrap.** Every `gl*` call moves behind `IGraphicsDevice`. API stays GL-shaped — by-name uniforms, apply-at-draw pipeline state, immediate draws. Goal: zero `gl*` calls outside `Source/Render/Opengl*`. No behavior changes.
-2. **Redesign.** With everything funneled through the interface, reshape the API on the OpenGL backend only — synthetic UBOs, baked pipeline objects, command encoder, frame lifecycle, transfer ring buffers.
+2. **Redesign.** With everything funneled through the interface, reshape the API on the OpenGL backend only — synthetic UBOs, combined texture+sampler binding, pipeline-state consolidation, command encoder, frame lifecycle, transfer ring buffers.
 3. **Port.** Add the SDL3 GPU backend against the redesigned interface. GLSL → SPIR-V via glslang/shaderc at runtime (dev) or prebaked blobs (release).
 
 A **null/passthrough leak-detector backend** lands at the end of Phase 1 (1.5) as the gate that proves the wrap is complete.
+
+## Pipeline model
+
+Locked-in decisions that shape every later phase.
+
+**Struct-in, no pipeline objects exposed.** `gfx().set_pipeline(const RenderPipelineState&)`
+stays as the entry point. **No** `IGraphicsRasterPipeline*` / `IGraphicsComputePipeline*`
+interface types — pipeline handles never cross the abstraction boundary.
+
+- OpenGL backend: keeps the existing invalid-bits state cache in
+  `OpenglRenderDevice` (DrawLocal_Device.h:148+). `set_pipeline` diffs against
+  cached state, emits `glUseProgram` / `glBindVertexArray` / etc. only on change.
+- SDL3 backend: hashes the struct contents, looks up an internal
+  `unordered_map<hash, SDL_GPUGraphicsPipeline*>`, creates + caches on miss,
+  binds the cached pipeline. The map is private to the backend translation unit.
+- Hot-reload: `Program_Manager::recompile_all` invalidates SDL3 cache entries
+  referencing the recompiled program. OpenGL backend cache is unaffected.
+
+**Statemachine setters fold onto `RenderPipelineState` in Phase 2c.** SDL3 GPU
+treats these as pipeline-create fields, not runtime state. Move them to the
+struct so the SDL3 backend can read them at hash time:
+
+| Current immediate setter                          | Becomes field on `RenderPipelineState`                            | Caller                                       |
+| ------------------------------------------------- | ----------------------------------------------------------------- | -------------------------------------------- |
+| `set_color_write_mask(att, r,g,b,a)`              | `ColorWriteMask color_write_masks[MAX_COLOR_ATTACHMENTS]` (default write-all) | DecalBatcher.cpp:131-136,176 (material-driven variants — ≤16 unique masks) |
+| `set_polygon_offset(enabled, factor, units)`      | `polygon_offset_{enabled, factor, units}`                         | shadow-bias passes                           |
+| `set_line_width(float)`                           | `line_width` (default 1.f; SDL3 silently ignores)                 | debug meshbuilder                            |
+
+After 2c, the struct is hashable by raw bytes (no padding hazards if laid out
+carefully); SDL3 caching key is `XXH3_64bits(&state, sizeof(state))`.
+
+Already on the struct today: blend, depth test/write/func, cull mode, program,
+vao. Phase 2c additionally migrates `vao` to `IGraphicsVertexInput*` and
+`program` to `IGraphicsShader*` (the latter depends on Sub-phase 1.7).
+
+**Indirect-buffer binds move onto the draw call itself.** `bind_indirect_buffer`
+and `bind_parameter_buffer` are deleted in 2c. The buffer pointer becomes a
+parameter:
+
+```cpp
+multi_draw_elements_indirect(mode, idx_type, IGraphicsBuffer* indirect,
+                             int byte_offset, int draw_count, int stride);
+multi_draw_elements_indirect_count(mode, idx_type,
+                                   IGraphicsBuffer* indirect, int indirect_off,
+                                   IGraphicsBuffer* count,    int count_off,
+                                   int max_draw_count, int stride);
+```
+
+Matches `SDL_DrawGPUIndexedPrimitivesIndirect(cmdbuf, buffer, offset, draw_count)`.
+
+OpenGL backend caching contract: tracks the last-bound `IGraphicsBuffer*` for
+`GL_DRAW_INDIRECT_BUFFER` and `GL_PARAMETER_BUFFER` internally (same invalid-bits
+style as `OpenglRenderDevice`). The indirect-draw entry points only issue
+`glBindBuffer(...)` when the pointer differs — back-to-back MDI on the same
+indirect buffer emits zero rebinds. SDL3 backend doesn't need this (buffer goes
+straight into the draw call). **Lifetime invariant:** when an `IGraphicsBuffer`
+is `release()`d, the backend clears it from cached indirect/parameter slots so
+a later draw can't re-bind a dangling handle. Same rule applies to any future
+cached buffer slots if they get the same treatment.
+
+**Setters that stay immediate** (genuinely dynamic state on both backends):
+`set_scissor` / `disable_scissor`.
 
 ## Phase 0 status
 
@@ -41,7 +109,7 @@ Counts come from `rg "get_internal_handle\(\)"` at start of Phase 0. Verify befo
 | `glGenerateTextureMipmap(…)` — TextureUpload                                    |   1   | `gfx().generate_mipmaps(IGraphicsTexture*)`                                       |
 | `SaveCubeArrayToDDS / save_float_texture_as_dds` — GiScene baking               |   3   | Bake path is offline-ish; route through `gfx().download_texture` + DDS encoder.   |
 | `IGraphicsTexture* tex; tex_id(tex)` — OpenGlDevice impl-internal               |   1   | Stays inside backend. Not a leak.                                                 |
-| `state.vao = vao_ptr->get_internal_handle()` — RenderPass, BatchScene, EnvProbe, RT_Shade | ~4 | Pipeline-state already takes a `vertexarrayhandle`; in Phase 2c `bind_pipeline(IGraphicsRasterPipeline*)` swallows it. For Phase 1 wrap: change `RenderPipelineState::vao` to `IGraphicsVertexInput*` and resolve inside the backend. |
+| `state.vao = vao_ptr->get_internal_handle()` — RenderPass, BatchScene, EnvProbe, RT_Shade | ~4 | Phase 2c: `RenderPipelineState::vao` becomes `IGraphicsVertexInput*`; backend resolves to GL handle / SDL3 layout at bind. No exposed pipeline object — see [Pipeline model](#pipeline-model). |
 | `RenderDump.cpp` integration test — pulls handle for `glReadPixels`            |   1   | Test-side. Move to `gfx().download_texture` once available.                       |
 | Commented-out callers                                                           |   ~9  | Delete during wrap.                                                               |
 
@@ -68,7 +136,7 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.4e** | API drift correction: migrate remaining raw `bufferhandle` fields (`ubo.current_frame`, `ShadowMapManager::frame_view`, `CascadeShadowMapSystem::ubo.{info,frame_view[4]}`, `RenderScene::gpu_skinned_mats_buffer`, `Render_Lists::{gpu_command_list, gldrawid_to_submesh_material, glinstance_to_instance}`, `GpuCullingTest::mdi_buf`, `Render_Level_Params::provied_constant_buffer`) → `IGraphicsBuffer*`; delete entire `_raw` API surface; add `bind_storage_buffer_range(IGraphicsBuffer*, …)` | — | `bind_storage_buffer_range`; delete `bind_{uniform,storage}_buffer_base_raw`, `bind_storage_buffer_range_raw`, `bind_indirect_buffer_raw`, `{upload,sub_upload}_buffer_raw` | done |
 | **1.4f** | API drift correction: move texture-scoped ops onto `IGraphicsTexture` | — | `IGraphicsTexture::{set_mip_range, download}`; delete `IGraphicsDevice::{set_mip_range, download_texture, download_texture_2d}` | done |
 | **1.4g** | API drift correction: implicit render/compute pass separation (SDL3 GPU prep) | — | `IGraphicsDevice::begin_compute_pass()`; backend tracks `PassMode`; `set_render_pass()` flips to Render; assert in `dispatch_compute()` | done |
-| 1.5a | `DecalBatcher.cpp` | ~12 | per-attachment color masks as immediate setters (baked in 2c) | not started |
+| **1.5a** | `DecalBatcher.cpp` | ~12 | per-attachment color masks as immediate setters (baked in 2c) | done |
 | 1.6 | `DrawLocal_SceneDrawInternal.cpp` (orchestration) | ~14 | leftover binding + draw glue | not started |
 | 1.7 | `Shader.cpp` migration → inside `Source/Render/Opengl*` | 71 | shader compile/link entirely backend-internal; expose `IGraphicsShader` + `create_shader(...)` | not started |
 | 1.8 | Window/swapchain + ImGui wrap | ~30 (`SDL_GL_*`, `gladLoad*`, swap, vsync, imgui_render) | factory move from `EngineMain_Init.cpp`; `set_vsync`, `present`, `imgui_render` | not started |
@@ -76,6 +144,12 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.5 (post-1.x)** | Null/passthrough leak-detector backend | — | gate that proves the wrap is complete | not started |
 
 Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
+
+## Sub-phase 1.5a status
+
+- API added: `set_color_write_mask(int attachment, bool r, bool g, bool b, bool a)` — per-attachment color mask (wraps `glColorMaski`). Immediate setter; Phase 2c folds the mask onto `RenderPipelineState::color_write_masks` (see [Pipeline model](#pipeline-model)) so decal materials carry their own per-attachment write mask as part of pipeline state.
+- `DecalBatcher.cpp`: 6× `glColorMaski` in `apply_decal_color_masks` → `gfx().set_color_write_mask`; trailing 6× restore loop → same. 2× `glBindBufferBase(GL_SHADER_STORAGE_BUFFER, …)` on `IGraphicsBuffer*` (`draw.buf.decal_uniforms`, `indirection_buffer`) → `bind_storage_buffer_base`. `glBindBuffer(GL_DRAW_INDIRECT_BUFFER, multidraw_commands)` → `bind_indirect_buffer`; matching unbind → `bind_indirect_buffer(nullptr)`. `glMultiDrawElementsIndirect(GL_TRIANGLES, MODEL_INDEX_TYPE_GL, …)` → `multi_draw_elements_indirect(Triangles, MODEL_INDEX_TYPE, …)`. Dropped `extern const GLenum MODEL_INDEX_TYPE_GL`.
+- `DecalBatcher.cpp` contains zero direct `gl*` calls. 184 unit tests + full integration suite (80 tests) green.
 
 ## Sub-phases 1.4d–1.4g status (API drift corrections)
 
@@ -125,14 +199,14 @@ flushes per-slot `{tex, sampler}` table at draw time as combined bindings);
 
 ## Sub-phase 1.4b status
 
-- API added: `bind_parameter_buffer(IGraphicsBuffer*)` over `GL_PARAMETER_BUFFER` (nullptr unbinds); `set_polygon_offset(bool enabled, float factor, float units)` over `glEnable/Disable(GL_POLYGON_OFFSET_FILL)` + `glPolygonOffset` (Phase 2c bakes into `IGraphicsRasterPipeline`); `multi_draw_elements_indirect_count(mode, index_type, indirect_byte_offset, count_byte_offset, max_draw_count, stride)` wrapping `glMultiDrawElementsIndirectCount`.
+- API added: `bind_parameter_buffer(IGraphicsBuffer*)` over `GL_PARAMETER_BUFFER` (nullptr unbinds); `set_polygon_offset(bool enabled, float factor, float units)` over `glEnable/Disable(GL_POLYGON_OFFSET_FILL)` + `glPolygonOffset` (Phase 2c folds onto `RenderPipelineState::polygon_offset_*`); `multi_draw_elements_indirect_count(mode, index_type, indirect_byte_offset, count_byte_offset, max_draw_count, stride)` wrapping `glMultiDrawElementsIndirectCount`. Both `bind_indirect_buffer` and `bind_parameter_buffer` are deleted in 2c — the buffer pointer moves onto the indirect draw call itself (see [Pipeline model](#pipeline-model)).
 - `DrawLocal_BatchScene.cpp`: 3× `glBindBufferBase(GL_SHADER_STORAGE_BUFFER, …)` on `IGraphicsBuffer*` → `bind_storage_buffer_base`; `scene.gpu_skinned_mats_buffer` (still a raw `bufferhandle` on `RenderScene`) routed via `bind_storage_buffer_base_raw`; `glBindBuffer(GL_PARAMETER_BUFFER)` → `bind_parameter_buffer`; `glBindBuffer(GL_DRAW_INDIRECT_BUFFER)` → `bind_indirect_buffer` (set + unbind); `glMultiDrawElementsIndirectCount` → `multi_draw_elements_indirect_count`; `glEnable(GL_POLYGON_OFFSET_FILL)`/`glPolygonOffset`/`glDisable` → `set_polygon_offset`.
 - Local `MODEL_INDEX_TYPE = VertexInputIndexType::uint16` mirror introduced (matches the file-local `MODEL_INDEX_TYPE_GL` constant still referenced by other passes). `glad/glad.h` include dropped.
 - `DrawLocal_BatchScene.cpp` contains zero direct `gl*` calls. 184 unit tests + full integration suite green.
 
 ## Sub-phase 1.4a status
 
-- API added: `set_line_width(float)` (debug meshbuilder line width); `bind_indirect_buffer(IGraphicsBuffer*)` over `GL_DRAW_INDIRECT_BUFFER` — `nullptr` unbinds. Phase 2c folds indirect binding into pipeline/encoder state.
+- API added: `set_line_width(float)` (debug meshbuilder line width — Phase 2c folds onto `RenderPipelineState::line_width`); `bind_indirect_buffer(IGraphicsBuffer*)` over `GL_DRAW_INDIRECT_BUFFER` — `nullptr` unbinds. Phase 2c moves the indirect-buffer pointer onto the draw call (see [Pipeline model](#pipeline-model)).
 - `DrawLocal_Lighting.cpp`: 4× `glBindBufferBase(GL_SHADER_STORAGE_BUFFER, …)` → `bind_storage_buffer_base` (all 4 buffers are already `IGraphicsBuffer*`); 2× `glBindBufferBase(GL_UNIFORM_BUFFER, …)` for `ubo.current_frame` / `shadowmap.ubo.info` → `bind_uniform_buffer_base_raw`; 4× `glDrawArrays(GL_TRIANGLES, 0, 3)` → `draw_arrays(Triangles, 0, 3)`; `glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0)` → `bind_indirect_buffer(nullptr)`; debug meshbuilder `glLineWidth` pair → `set_line_width`. `glad/glad.h` include dropped.
 - `DrawLocal_Lighting.cpp` contains zero direct `gl*` calls. 184 unit tests + full integration suite green.
 
@@ -176,3 +250,134 @@ flushes per-slot `{tex, sampler}` table at draw time as combined bindings);
 - The finalresolve pass that swapped `glNamedFramebufferDrawBuffer` between `ATT0`/`ATT1` is now three single-attachment passes (reinterleave→result, blur-H→blurred, blur-V→result).
 - Backend correctness fix: `OpenGLTextureImpl` now returns `GL_SHORT` (not `GL_FLOAT`) input type for `rgba16_snorm`, and supplies `GL_RGBA` as the input format. `is_float_type()` no longer claims SNORM is float. Required to upload the HBAO random rotation texture via `IGraphicsTexture::sub_image_upload`.
 - `Ssao.cpp` contains zero direct `gl*` calls (only `glCheckError()` macro → backend `CheckGlErrorInternal_`).
+
+## Phase 2 — Redesign (planned)
+
+With every call funneled through the interface, the API itself reshapes —
+each redesign is one API change + one backend change, not 45 call-site edits.
+Lands after Phase 1.5 null-backend gate is clean.
+
+### 2a — Synthetic UBOs
+
+Reflect every uniform at program-link via `glGetProgramInterface*`. Generate a
+per-stage std140 `_AutoUniforms` block; rewrite the program's uniform usage
+to read from it (preferred: GLSL preprocessor pass before compile).
+`set_float` / `set_vec3` / `set_mat4(name, ...)` continue to work — a
+name → `(slot, offset)` resolution table is built at link time; setters write
+into a CPU scratch buffer that flushes to the UBO at draw time. std140
+padding enforced (vec3→16, mat4→64, etc.). On
+`Program_Manager::recompile_all` the reflection table is rebuilt and any 2c
+SDL3-cache pipelines referencing the program are invalidated.
+
+### 2b — Combined texture-sampler binding
+
+`bind_texture(slot, IGraphicsTexture*, IGraphicsSampler*)` at the interface.
+SDL3 GPU is combined-binding; OpenGL backend keeps split internally
+(`glBindTextureUnit` + `glBindSampler`).
+
+### 2c — Pipeline-state consolidation
+
+No exposed pipeline object — see [Pipeline model](#pipeline-model). Concrete work:
+
+- Add fields to `RenderPipelineState`: `color_write_masks[]`,
+  `polygon_offset_{enabled, factor, units}`, `line_width`.
+- Migrate `RenderPipelineState::vao` from `vertexarrayhandle` to
+  `IGraphicsVertexInput*`; resolve to GL handle inside the backend.
+- Migrate `RenderPipelineState::program` from `program_handle` to
+  `IGraphicsShader*` (depends on Sub-phase 1.7).
+- Delete: `set_color_write_mask`, `set_polygon_offset`, `set_line_width`,
+  `bind_indirect_buffer`, `bind_parameter_buffer`.
+- Add buffer-pointer params to indirect draws:
+  `multi_draw_elements_indirect(..., IGraphicsBuffer* indirect, offset, ...)`
+  and `_count` variant with both buffer pointers.
+- OpenGL backend: extend invalid-bits cache to cover the new fields and the
+  cached indirect/parameter slots (lifetime-aware — see [Pipeline model](#pipeline-model)).
+- SDL3 backend: hash the struct, cache `SDL_GPUGraphicsPipeline*` internally.
+  Decal mask variants ≤16 per material.
+- Investigate the "polygon offset units does nothing?" comment near
+  `DrawLocal_RenderPass.cpp:290` — may be a latent bug.
+
+### 2d — Command encoder + frame lifecycle
+
+- `gfx().begin_frame()`, `gfx().acquire_swapchain_texture()` (once/frame),
+  `gfx().submit_and_present()`. OpenGL: `SDL_GL_SwapWindow`; SDL3 GPU later:
+  submit + present.
+- Render/compute pass split already enforced (Sub-phase 1.4g). 2d formalizes
+  it on the encoder.
+- Single-threaded recording. Revisit only if profiling shows recording is the
+  bottleneck (it isn't today).
+
+### 2e — Per-frame buffer update model
+
+Mid-frame `glNamedBufferSubData` on GPU-active buffers (DrawLocal_SceneDraw.cpp:138,
+DrawLocal_RenderPass.cpp:477-485, Ssao.cpp:264, Render_Lists per-frame upload
+in 1.4e) is GL-driver-papered-over today. SDL3 GPU needs explicit transfer
+buffers / ring buffers.
+
+Promote `BUFFER_USE_DYNAMIC` (`IGraphicsDevice.h:46`) into a real per-frame
+ring. `IGraphicsBuffer::sub_upload(offset, size, data)` on a DYNAMIC buffer
+routes through the ring on SDL3; OpenGL keeps `glNamedBufferSubData`.
+Testable on OpenGL by simulating frame-in-flight and asserting no in-flight
+stomping.
+
+### 2f — Shader reflection struct
+
+`IGraphicsShader::reflect()` → vertex inputs, UBO/SSBO bindings, sampler
+bindings. OpenGL uses `glGetProgramInterface*`; SDL3 GPU later uses
+SPIRV-Cross. New `test_shader_reflection.cpp` covering 5 representative
+shaders (Master*Shader.txt) asserting `reflect()` matches direct GL queries.
+
+### Phase 2 verify
+
+- `test_pipeline_cache.cpp` — bike demo creates ≤200 unique pipelines; decal
+  variants ≤16.
+- Synthetic UBO round-trip: every setter type, std140 offsets match shader.
+- Visual diff on recorded frame: no decal MRT corruption, no depth-test
+  regression.
+- Per-frame buffer ring: 3-frames-in-flight stress test, no overwrite of
+  in-flight data.
+
+## Phase 3 — SDL3 GPU backend port (planned)
+
+Interface is now SDL3-GPU-shaped. This phase is implementation + backend-
+specific fallbacks.
+
+- Add glslang or shaderc via vcpkg for GLSL → SPIR-V cross-compile.
+- Blob strategy: pre-compiled SPIR-V for release; runtime-compile in dev
+  (`Program_Manager::recompile_all` requires it).
+- Implement `gfx_init_sdl3gpu()` next to `gfx_init_opengl()`.
+- Reverse-Z: depth already `[0,1]`, no change.
+- Y-flip: SDL3 NDC is +Y down. Flip projection matrix in the SDL3 backend's
+  view constants; flip cull-mode winding; audit shaders consuming
+  `gl_FragCoord.y` or screen-UV-from-NDC directly. Post-process passes that
+  sample `gl_FragCoord`/resolution need verification.
+- Filter-minmax (`GL_TEXTURE_REDUCTION_MODE_ARB`) — replace HiZ sampler with a
+  compute min/max pre-pass.
+- RT test path (`Source/Render/RT/RaytraceTest_*.cpp`): port to SSBO-indexed
+  texture array, or tag OpenGL-only and refuse to load on SDL3 GPU.
+
+### Phase 3 verify
+
+`test_sdl3_parity.cpp` runs the same scene on both backends, captures
+screenshots via `t.capture_screenshot` (test_obs_smoke.cpp:60), asserts
+perceptual diff < threshold (SSIM ≥ 0.98 per pass) for each G-buffer MRT,
+shadow cascades, deferred lighting, decal blend, SSAO, SSR, TAA, bloom,
+post-composite.
+
+## Phase 3.5 — Tessellation terrain replacement (planned)
+
+SDL3 GPU has no tess shaders. Adaptive view-dependent factors in
+`MaterialLocal_Shader.cpp:81` (`Program_Manager::create_single_file(...,
+is_tesselation=true)`) → per-frame compute pre-pass writing displaced
+vertex/index buffers, then indirect draw with a regular vertex shader. Sized
+to worst-case LOD. Treat as a sub-project.
+
+## Out of scope
+
+- WebGPU / Emscripten target. SDL3 GPU doesn't target WebGPU. If web becomes
+  real later, that's a second backend against this same interface with stricter
+  constraints (no SSBO baseline, limited compute). Worth pressure-testing the
+  Phase 2 API against WebGPU's binding model on paper before locking it.
+- DX12 / Metal / mobile Vulkan — implicitly covered by SDL3 GPU's backends.
+- SDL2 → SDL3 windowing + ImGui platform layer migration — required before
+  Phase 3 but a separate parallel work stream.

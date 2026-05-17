@@ -5,7 +5,6 @@
 #include <algorithm>
 
 extern ConfigVar r_drawdecals;
-extern const GLenum MODEL_INDEX_TYPE_GL;
 
 DecalBatcher::DecalBatcher() {
 	CreateBufferArgs args;
@@ -125,28 +124,26 @@ void DecalBatcher::draw_decals() {
 	//   0=normal, 1=albedo, 2=roughmetal (BA carries material id, never written by decals),
 	//   3=emissive, 4=editor_id (never written), 5=scene_motion (never written).
 	auto apply_decal_color_masks = [](const MasterMaterialImpl* mm) {
-		const GLboolean T = GL_TRUE, F = GL_FALSE;
-		const GLboolean n = mm->decal_affect_normal     ? T : F;
-		const GLboolean a = mm->decal_affect_albedo     ? T : F;
-		const GLboolean r = mm->decal_affect_roughmetal ? T : F;
-		const GLboolean e = mm->decal_affect_emissive   ? T : F;
-		glColorMaski(0, n, n, n, n);
-		glColorMaski(1, a, a, a, a);
-		glColorMaski(2, r, r, F, F);
-		glColorMaski(3, e, e, e, e);
-		glColorMaski(4, F, F, F, F);
-		glColorMaski(5, F, F, F, F);
+		const bool n = mm->decal_affect_normal;
+		const bool a = mm->decal_affect_albedo;
+		const bool r = mm->decal_affect_roughmetal;
+		const bool e = mm->decal_affect_emissive;
+		gfx().set_color_write_mask(0, n, n, n, n);
+		gfx().set_color_write_mask(1, a, a, a, a);
+		gfx().set_color_write_mask(2, r, r, false, false);
+		gfx().set_color_write_mask(3, e, e, e, e);
+		gfx().set_color_write_mask(4, false, false, false, false);
+		gfx().set_color_write_mask(5, false, false, false, false);
 	};
 
 	draw.bind_texture_ptr(20 /* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/,
 						  draw.tex.scene_depth);
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, draw.buf.decal_uniforms->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, indirection_buffer->get_internal_handle());
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, multidraw_commands->get_internal_handle());
+	gfx().bind_storage_buffer_base(5, draw.buf.decal_uniforms);
+	gfx().bind_storage_buffer_base(6, indirection_buffer);
+	gfx().bind_indirect_buffer(multidraw_commands);
 
 	vertexarrayhandle vao = g_modelMgr.get_vao_ptr(VaoType::Animated)->get_internal_handle();
-	const GLenum index_type = MODEL_INDEX_TYPE_GL;
 
 	int cur_offset = 0;
 	for (int i = 0; i < draws.size(); i++) {
@@ -168,13 +165,13 @@ void DecalBatcher::draw_decals() {
 		draw.shader().set_uint("decal_indirect_offset", cur_offset);
 
 		const int dei_size = sizeof(gpu::DrawElementsIndirectCommand);
-		glMultiDrawElementsIndirect(GL_TRIANGLES, index_type, (void*)int64_t(cur_offset * dei_size), ddraw.count,
-									dei_size);
+		gfx().multi_draw_elements_indirect(GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
+										   (const void*)int64_t(cur_offset * dei_size), ddraw.count, dei_size);
 
 		cur_offset += ddraw.count;
 	}
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+	gfx().bind_indirect_buffer(nullptr);
 
-	for (GLuint i = 0; i < 6; i++)
-		glColorMaski(i, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	for (int i = 0; i < 6; i++)
+		gfx().set_color_write_mask(i, true, true, true, true);
 }
