@@ -45,21 +45,31 @@ LINKS = Path(__file__).resolve().parent / "shader_links.json"
 
 RX_VARYING = re.compile(
     r"""^(?P<indent>[ \t]*)
+        (?P<layout>layout\s*\(\s*location\s*=\s*(?P<existing>\d+)\s*\)\s+)?
         (?P<interp>(?:flat|noperspective|smooth|centroid)[ \t]+)?
         (?P<inout>in|out)[ \t]+
         (?:highp[ \t]+|mediump[ \t]+|lowp[ \t]+)?
         (?P<type>vec[234]|mat[234]|float|int|uint|ivec[234]|uvec[234]|bool|double|dvec[234]|dmat[234])
         [ \t]+(?P<name>[A-Za-z_][A-Za-z0-9_]*)
-        [ \t]*;""",
+        [ \t]*;(?P<trailing>.*)$""",
     re.VERBOSE,
 )
-RX_HAS_LAYOUT = re.compile(r"^\s*layout\s*\(\s*location\b")
 
 RX_IFDEF = re.compile(r"^\s*#\s*ifdef\s+([A-Za-z_][A-Za-z0-9_]*)")
 RX_IFNDEF = re.compile(r"^\s*#\s*ifndef\s+([A-Za-z_][A-Za-z0-9_]*)")
 RX_IF = re.compile(r"^\s*#\s*if\b")
 RX_ENDIF = re.compile(r"^\s*#\s*endif\b")
 RX_ELSE = re.compile(r"^\s*#\s*el(?:se|if)\b")
+
+def _extract_trailing(raw: str) -> str:
+    """Return the text after the first `;` in the raw line, including any
+    inline `// comment` — preserved so the rewrite doesn't lose authoring
+    notes attached to varying decls."""
+    semi = raw.find(";")
+    if semi < 0:
+        return ""
+    return raw[semi + 1:].rstrip("\r\n")
+
 
 TYPE_SLOTS = {
     "mat2": 2, "mat3": 3, "mat4": 4,
@@ -153,14 +163,13 @@ def parse_varyings(path: Path, default_stage: str, master: bool) -> list[dict]:
     line (top-level decls outside any stage gate are skipped — they're
     UBOs/SSBOs, not stage I/O)."""
     text = path.read_text(encoding="utf-8")
+    raw_lines = text.splitlines()
     stripped = strip_comments(text)
     line_stages = walk_stage_blocks(stripped, master)
 
     out: list[dict] = []
     for i, scan in enumerate(stripped):
         if not scan.strip():
-            continue
-        if RX_HAS_LAYOUT.match(scan):
             continue
         m = RX_VARYING.match(scan)
         if not m:
@@ -171,12 +180,18 @@ def parse_varyings(path: Path, default_stage: str, master: bool) -> list[dict]:
             # uniform/SSBO/struct. Skip.
             continue
         inout = m.group("inout")
+        existing_raw = m.group("existing")
+        existing = int(existing_raw) if existing_raw is not None else None
         if stage == STAGE_VERTEX and inout == "in":
-            # Vertex attribute. Should already have explicit location.
-            raise SystemExit(
-                f"{path}:{i+1}: vertex attribute '{m.group('name')}' has no "
-                f"explicit layout(location). Fix manually."
-            )
+            # Vertex attribute. Pre-existing location is required and we
+            # never touch them (they're driven by the engine's vertex
+            # input layout). Skip cleanly if present; assert otherwise.
+            if existing is None:
+                raise SystemExit(
+                    f"{path}:{i+1}: vertex attribute '{m.group('name')}' has no "
+                    f"explicit layout(location). Fix manually."
+                )
+            continue
         out.append({
             "line_idx": i,
             "indent": m.group("indent"),
@@ -185,6 +200,8 @@ def parse_varyings(path: Path, default_stage: str, master: bool) -> list[dict]:
             "type": m.group("type"),
             "name": m.group("name"),
             "stage": stage,
+            "existing": existing,
+            "trailing": _extract_trailing(raw_lines[i]),
         })
     return out
 
@@ -281,6 +298,7 @@ def assign_component_varyings(
       path -> list of parsed varying decls (cached for rewrite step)
     """
     type_by_name: dict[str, str] = {}
+    existing_by_name: dict[str, int] = {}
     decls_by_path: dict[str, list[dict]] = {}
     for rel in sorted(comp):
         p = file_path(rel)
@@ -291,7 +309,7 @@ def assign_component_varyings(
         default_stage = {
             "vertex": STAGE_VERTEX,
             "fragment": STAGE_FRAGMENT,
-            "master": "neutral",  # decided per-line
+            "master": "neutral",
         }[r]
         decls = parse_varyings(p, default_stage, master)
         decls_by_path[rel] = decls
@@ -309,13 +327,52 @@ def assign_component_varyings(
                     f"{prior} vs {v['type']} in component {sorted(comp)}"
                 )
             type_by_name[v["name"]] = v["type"]
+            if v["existing"] is not None:
+                prior_loc = existing_by_name.get(v["name"])
+                if prior_loc is not None and prior_loc != v["existing"]:
+                    raise SystemExit(
+                        f"varying '{v['name']}' has conflicting pre-existing "
+                        f"locations {prior_loc} vs {v['existing']} across "
+                        f"{sorted(comp)}"
+                    )
+                existing_by_name[v["name"]] = v["existing"]
 
-    loc: dict[str, int] = {}
-    cursor = 0
-    for name in sorted(type_by_name):
+    return _pack_locations(type_by_name, existing_by_name, "varying"), decls_by_path
+
+
+def _pack_locations(
+    type_by_name: dict[str, str],
+    existing_by_name: dict[str, int],
+    kind: str,
+) -> dict[str, int]:
+    """Assign locations:
+      - Names with a pre-existing layout keep that location (reserved).
+      - Remaining names are placed alphabetically into the first free
+        contiguous slot run that fits their slot_count.
+      - If two pre-existing names collide on the same slot, error out —
+        that is a pre-existing source bug worth surfacing.
+    """
+    # Pre-existing layouts may overlap legitimately across mutually-
+    # exclusive #ifdef branches (e.g. MasterDeferred FORWARD vs deferred
+    # GBUFFER outputs both at location 0). We trust the source author for
+    # those — only auto-assigned slots are required to be collision-free.
+    reserved_for_packing: set[int] = set()
+    for name, base in existing_by_name.items():
+        span = slot_count(type_by_name[name])
+        for s in range(base, base + span):
+            reserved_for_packing.add(s)
+
+    loc: dict[str, int] = dict(existing_by_name)
+    pending = sorted(n for n in type_by_name if n not in existing_by_name)
+    for name in pending:
+        span = slot_count(type_by_name[name])
+        cursor = 0
+        while not all((cursor + s) not in reserved_for_packing for s in range(span)):
+            cursor += 1
+        for s in range(span):
+            reserved_for_packing.add(cursor + s)
         loc[name] = cursor
-        cursor += slot_count(type_by_name[name])
-    return loc, decls_by_path
+    return loc
 
 
 def rewrite_file(
@@ -324,18 +381,27 @@ def rewrite_file(
     varying_loc: dict[str, int],
 ) -> bool:
     """Rewrite a single file. Color-attachment locations (fragment `out`s)
-    are assigned alphabetically within this file starting at 0."""
+    are assigned per-file, respecting any pre-existing layout(location)
+    on those outs."""
     if not decls:
         return False
     text = path.read_text(encoding="utf-8")
     lines = text.splitlines(keepends=True)
 
-    # Color attachments — gather and assign per-file.
-    color_names = sorted({
-        v["name"] for v in decls
-        if v["stage"] == STAGE_FRAGMENT and v["inout"] == "out"
-    })
-    color_loc = {n: i for i, n in enumerate(color_names)}
+    color_type: dict[str, str] = {}
+    color_existing: dict[str, int] = {}
+    for v in decls:
+        if v["stage"] == STAGE_FRAGMENT and v["inout"] == "out":
+            color_type[v["name"]] = v["type"]
+            if v["existing"] is not None:
+                prior = color_existing.get(v["name"])
+                if prior is not None and prior != v["existing"]:
+                    raise SystemExit(
+                        f"{path}: color attachment '{v['name']}' has "
+                        f"conflicting pre-existing locations"
+                    )
+                color_existing[v["name"]] = v["existing"]
+    color_loc = _pack_locations(color_type, color_existing, "color attachment")
 
     changed = False
     for v in decls:
@@ -348,11 +414,21 @@ def rewrite_file(
         elif v["stage"] == STAGE_FRAGMENT and v["inout"] == "out":
             loc = color_loc[v["name"]]
         else:
-            continue  # Should not happen given parse_varyings filters.
+            continue
         if loc is None:
             raise SystemExit(f"no location for {v['name']} in {path}")
+        # Skip if pre-existing layout already matches our assignment.
+        if v["existing"] == loc:
+            continue
         line = lines[v["line_idx"]]
-        body = line[len(v["indent"]):]
+        # Recompose the line: indent + layout(...) + interp + inout type name;
+        # plus any trailing inline comment / whitespace, plus the original
+        # line ending so we preserve LF vs CRLF.
+        eol = "\r\n" if line.endswith("\r\n") else ("\n" if line.endswith("\n") else "")
+        body = (
+            f"{v['interp']}{v['inout']} {v['type']} {v['name']};"
+            f"{v['trailing']}{eol}"
+        )
         new_line = f"{v['indent']}layout(location = {loc}) {body}"
         if new_line != line:
             lines[v["line_idx"]] = new_line

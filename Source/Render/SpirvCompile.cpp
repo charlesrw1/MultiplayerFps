@@ -69,6 +69,16 @@ SpirvBlob compile_glsl_to_spirv(SpirvStage stage,
 	const char* src_name = debug_name.c_str();
 	shader.setStringsWithLengthsAndNames(&src_str, &src_len, &src_name, 1);
 
+	// Shaders are authored for OpenGL semantics (gl_VertexID, gl_InstanceID).
+	// Vulkan SPIR-V exposes the same vertex/instance index under gl_VertexIndex
+	// / gl_InstanceIndex. Alias them via preamble so the existing source tree
+	// compiles unchanged for both backends. glslang's setPreamble injects the
+	// text immediately after the #version directive.
+	shader.setPreamble(
+		"#define gl_VertexID gl_VertexIndex\n"
+		"#define gl_InstanceID gl_InstanceIndex\n"
+	);
+
 	// Vulkan client, SPIR-V target. Matches what SDL_GPU_SHADERFORMAT_SPIRV
 	// expects from SDL3 GPU's Vulkan backend.
 	shader.setEnvInput(glslang::EShSourceGlsl, lang, glslang::EShClientVulkan, 100);
