@@ -57,9 +57,9 @@ void MeshBuilder::End() {}
 void MeshBuilderDD::draw(uint32_t prim_type) {
 	if (!vao || num_indicies <= 0)
 		return;
-	// Caller is expected to have set state.vao = dd.vao->get_internal_handle()
-	// in their RenderPipelineState before set_pipeline. This call only issues the
-	// draw — VAO/IBO/VBO are bound via the pipeline.
+	// Caller is expected to have set state.vao = dd.vao on their
+	// RenderPipelineState before set_pipeline. This call only issues the draw —
+	// VAO/IBO/VBO are bound via the pipeline.
 	gfx().draw_elements(static_cast<GraphicsPrimitiveType>(prim_type),
 						num_indicies, VertexInputIndexType::uint32, 0);
 }

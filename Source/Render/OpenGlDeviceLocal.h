@@ -66,5 +66,9 @@ IGraphicsShader* opengl_create_shader_single_file_tess(const std::string& shared
 // Format mapping helper — also used by OpenglDataStatic::dump_to_disk
 const char* opengl_texture_format_to_str(GraphicsTextureFormat fmt);
 
+// Notify backend that an IGraphicsBuffer is being released so it can clear any
+// cached binds (indirect/parameter slots) — see Phase 2c "lifetime invariant".
+void opengl_backend_buffer_released(IGraphicsBuffer* buf);
+
 // Filter enum to GL enum — used by blit_textures
 GLenum opengl_filter_to_gl(GraphicsFilterType type);

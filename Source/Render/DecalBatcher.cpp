@@ -123,17 +123,17 @@ void DecalBatcher::draw_decals() {
 	// produces UB source values into the bound-but-undeclared attachments. Locations are:
 	//   0=normal, 1=albedo, 2=roughmetal (BA carries material id, never written by decals),
 	//   3=emissive, 4=editor_id (never written), 5=scene_motion (never written).
-	auto apply_decal_color_masks = [](const MasterMaterialImpl* mm) {
+	auto fill_decal_color_masks = [](const MasterMaterialImpl* mm, RenderPipelineState& s) {
 		const bool n = mm->decal_affect_normal;
 		const bool a = mm->decal_affect_albedo;
 		const bool r = mm->decal_affect_roughmetal;
 		const bool e = mm->decal_affect_emissive;
-		gfx().set_color_write_mask(0, n, n, n, n);
-		gfx().set_color_write_mask(1, a, a, a, a);
-		gfx().set_color_write_mask(2, r, r, false, false);
-		gfx().set_color_write_mask(3, e, e, e, e);
-		gfx().set_color_write_mask(4, false, false, false, false);
-		gfx().set_color_write_mask(5, false, false, false, false);
+		s.color_write_masks[0] = {n, n, n, n};
+		s.color_write_masks[1] = {a, a, a, a};
+		s.color_write_masks[2] = {r, r, false, false};
+		s.color_write_masks[3] = {e, e, e, e};
+		s.color_write_masks[4] = {false, false, false, false};
+		s.color_write_masks[5] = {false, false, false, false};
 	};
 
 	draw.bind_texture_ptr(20 /* FIXME, defined to be bound at spot 20, also in MasterDecalShader.txt*/,
@@ -141,9 +141,8 @@ void DecalBatcher::draw_decals() {
 
 	gfx().bind_storage_buffer_base(5, draw.buf.decal_uniforms);
 	gfx().bind_storage_buffer_base(6, indirection_buffer);
-	gfx().bind_indirect_buffer(multidraw_commands);
 
-	vertexarrayhandle vao = g_modelMgr.get_vao_ptr(VaoType::Animated)->get_internal_handle();
+	IGraphicsVertexInput* vao = g_modelMgr.get_vao_ptr(VaoType::Animated);
 
 	int cur_offset = 0;
 	for (int i = 0; i < draws.size(); i++) {
@@ -156,8 +155,8 @@ void DecalBatcher::draw_decals() {
 		state.program = draw.get_prog_man().get_obj(program);
 		state.vao = vao;
 		state.blend = l->get_master_material()->blend;
-		draw.get_device().set_pipeline(state);
-		apply_decal_color_masks(l->get_master_material());
+		fill_decal_color_masks(l->get_master_material(), state);
+		gfx().set_pipeline(state);
 		auto& texs = l->impl->get_textures();
 		for (int j = 0; j < texs.size(); j++)
 			draw.bind_texture_ptr(j, texs[j]->gpu_ptr);
@@ -166,12 +165,11 @@ void DecalBatcher::draw_decals() {
 
 		const int dei_size = sizeof(gpu::DrawElementsIndirectCommand);
 		gfx().multi_draw_elements_indirect(GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
-										   (const void*)int64_t(cur_offset * dei_size), ddraw.count, dei_size);
+										   multidraw_commands, cur_offset * dei_size,
+										   ddraw.count, dei_size);
 
 		cur_offset += ddraw.count;
 	}
-	gfx().bind_indirect_buffer(nullptr);
-
-	for (int i = 0; i < 6; i++)
-		gfx().set_color_write_mask(i, true, true, true, true);
+	// Color masks reset automatically: next set_pipeline elsewhere will install
+	// the default (write-all) RenderPipelineState::color_write_masks.
 }

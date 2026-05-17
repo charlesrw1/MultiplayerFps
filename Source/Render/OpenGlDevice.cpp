@@ -32,6 +32,15 @@ void dump_render_memory_usage() {
 	opengl_stats.dump_to_disk("r_mem_usage.csv");
 }
 
+// Forward declare so the class def below can reference and the buffer-impl TU
+// can dispatch into it via opengl_backend_buffer_released below.
+class OpenGLDeviceImpl;
+static void opengl_clear_cached_buffer_binds(IGraphicsBuffer* buf);
+
+void opengl_backend_buffer_released(IGraphicsBuffer* buf) {
+	if (g_gfx_instance) opengl_clear_cached_buffer_binds(buf);
+}
+
 // ---------------------------------------------------------------------------
 // Capability dump + debug-output enable (called once at engine init)
 // ---------------------------------------------------------------------------
@@ -214,6 +223,12 @@ public:
 	bool cullfrontface = false;
 	vertexarrayhandle current_vao = 0;
 
+	// Cached Phase 2c pipeline fields.
+	bool poly_offset_enabled_cached = false;
+	float poly_offset_factor_cached = 0.f;
+	float poly_offset_units_cached = 0.f;
+	RenderPipelineState::ColorWriteMask color_write_masks_cached[RenderPipelineState::MAX_COLOR_ATTACHMENTS]{};
+
 	enum cache_bit
 	{
 		PROGRAM_BIT,
@@ -224,7 +239,10 @@ public:
 		DEPTHWRITE_BIT,
 		DEPTHLESS_THAN_BIT,
 		VAO_BIT,
-		TEXTURE0_BIT,
+		POLY_OFFSET_BIT,
+		COLOR_MASK0_BIT,
+		// COLOR_MASK0..MAX_COLOR_ATTACHMENTS-1 reserved
+		TEXTURE0_BIT = COLOR_MASK0_BIT + RenderPipelineState::MAX_COLOR_ATTACHMENTS,
 	};
 	uint64_t invalid_bits = UINT64_MAX;
 	bool is_bit_invalid(uint32_t bit) { return invalid_bits & (1ull << bit); }
@@ -371,15 +389,48 @@ public:
 
 	IGraphicsShader* get_active_shader() override { return active_program; }
 
+	void set_polygon_offset_internal(bool enabled, float factor, float units) {
+		bool invalid = is_bit_invalid(POLY_OFFSET_BIT);
+		if (invalid || enabled != poly_offset_enabled_cached ||
+			factor != poly_offset_factor_cached || units != poly_offset_units_cached) {
+			if (enabled) {
+				glEnable(GL_POLYGON_OFFSET_FILL);
+				glPolygonOffset(factor, units);
+			} else {
+				glDisable(GL_POLYGON_OFFSET_FILL);
+			}
+			poly_offset_enabled_cached = enabled;
+			poly_offset_factor_cached = factor;
+			poly_offset_units_cached = units;
+			set_bit_valid(POLY_OFFSET_BIT);
+		}
+	}
+
+	void set_color_write_mask_internal(int slot, const RenderPipelineState::ColorWriteMask& m) {
+		ASSERT(slot >= 0 && slot < RenderPipelineState::MAX_COLOR_ATTACHMENTS);
+		bool invalid = is_bit_invalid(COLOR_MASK0_BIT + slot);
+		auto& c = color_write_masks_cached[slot];
+		if (invalid || m.r != c.r || m.g != c.g || m.b != c.b || m.a != c.a) {
+			glColorMaski((GLuint)slot,
+						 m.r ? GL_TRUE : GL_FALSE, m.g ? GL_TRUE : GL_FALSE,
+						 m.b ? GL_TRUE : GL_FALSE, m.a ? GL_TRUE : GL_FALSE);
+			c = m;
+			set_bit_valid(COLOR_MASK0_BIT + slot);
+		}
+	}
+
 	void set_pipeline(const RenderPipelineState& s) override {
 		set_shader_ptr(s.program);
 		set_blend_state(s.blend);
-		set_vao_raw(s.vao);
+		set_vao_raw(s.vao ? s.vao->get_internal_handle() : 0);
 		set_cull_front_face_internal(s.cull_front_face);
 		set_depth_test_enabled_internal(s.depth_testing);
 		set_show_backfaces(!s.backface_culling);
 		set_depth_write_enabled(s.depth_writes);
 		set_depth_less_than_internal(s.depth_less_than);
+		set_polygon_offset_internal(s.polygon_offset_enabled, s.polygon_offset_factor, s.polygon_offset_units);
+		for (int i = 0; i < RenderPipelineState::MAX_COLOR_ATTACHMENTS; i++)
+			set_color_write_mask_internal(i, s.color_write_masks[i]);
 	}
 
 	void reset_state_cache() override {
@@ -728,47 +779,51 @@ public:
 		glLineWidth(width);
 	}
 
-	void bind_indirect_buffer(IGraphicsBuffer* buf) override {
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, buf ? buf->get_internal_handle() : 0);
-	}
-
-	void bind_parameter_buffer(IGraphicsBuffer* buf) override {
-		glBindBuffer(GL_PARAMETER_BUFFER, buf ? buf->get_internal_handle() : 0);
-	}
-
-	void set_polygon_offset(bool enabled, float factor, float units) override {
-		if (enabled) {
-			glEnable(GL_POLYGON_OFFSET_FILL);
-			glPolygonOffset(factor, units);
-		} else {
-			glDisable(GL_POLYGON_OFFSET_FILL);
-		}
-	}
-
 	void set_polygon_fill_mode(GraphicsFillMode mode) override {
 		glPolygonMode(GL_FRONT_AND_BACK,
 					  mode == GraphicsFillMode::Line ? GL_LINE : GL_FILL);
 	}
 
-	void set_color_write_mask(int attachment, bool r, bool g, bool b, bool a) override {
-		ASSERT(attachment >= 0);
-		glColorMaski((GLuint)attachment, r ? GL_TRUE : GL_FALSE, g ? GL_TRUE : GL_FALSE,
-					 b ? GL_TRUE : GL_FALSE, a ? GL_TRUE : GL_FALSE);
+	// Phase 2c: cache last-bound indirect/parameter buffer so back-to-back
+	// MDI calls against the same buffer emit zero rebinds.
+	IGraphicsBuffer* current_indirect = nullptr;
+	IGraphicsBuffer* current_parameter = nullptr;
+
+	void bind_indirect_internal(IGraphicsBuffer* buf) {
+		if (buf == current_indirect) return;
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, buf ? buf->get_internal_handle() : 0);
+		current_indirect = buf;
+	}
+
+	void bind_parameter_internal(IGraphicsBuffer* buf) {
+		if (buf == current_parameter) return;
+		glBindBuffer(GL_PARAMETER_BUFFER, buf ? buf->get_internal_handle() : 0);
+		current_parameter = buf;
 	}
 
 	void multi_draw_elements_indirect(GraphicsPrimitiveType mode,
 									  VertexInputIndexType index_type,
-									  const void* indirect,
+									  IGraphicsBuffer* indirect,
+									  int byte_offset,
 									  int draw_count,
-									  int stride) override {
-		ASSERT(draw_count >= 0 && stride > 0);
+									  int stride,
+									  const void* client_ptr = nullptr) override {
+		ASSERT(draw_count >= 0 && stride > 0 && byte_offset >= 0);
 		const GLenum gl_mode =
 			(mode == GraphicsPrimitiveType::Triangles)     ? GL_TRIANGLES :
 			(mode == GraphicsPrimitiveType::TriangleStrip) ? GL_TRIANGLE_STRIP :
 															 GL_LINES;
 		const GLenum gl_type = (index_type == VertexInputIndexType::uint16)
 								   ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
-		glMultiDrawElementsIndirect(gl_mode, gl_type, indirect, draw_count, stride);
+		if (indirect) {
+			bind_indirect_internal(indirect);
+			glMultiDrawElementsIndirect(gl_mode, gl_type,
+										(const void*)(intptr_t)byte_offset, draw_count, stride);
+		} else {
+			// Client-side MDI fallback (legacy path).
+			bind_indirect_internal(nullptr);
+			glMultiDrawElementsIndirect(gl_mode, gl_type, client_ptr, draw_count, stride);
+		}
 		draw.stats.total_draw_calls++;
 	}
 
@@ -847,10 +902,13 @@ public:
 
 	void multi_draw_elements_indirect_count(GraphicsPrimitiveType mode,
 											VertexInputIndexType index_type,
+											IGraphicsBuffer* indirect,
 											int indirect_byte_offset,
+											IGraphicsBuffer* count,
 											int count_byte_offset,
 											int max_draw_count,
 											int stride) override {
+		ASSERT(indirect != nullptr && count != nullptr);
 		ASSERT(indirect_byte_offset >= 0 && count_byte_offset >= 0 && max_draw_count >= 0 && stride > 0);
 		const GLenum gl_mode =
 			(mode == GraphicsPrimitiveType::Triangles)     ? GL_TRIANGLES :
@@ -858,6 +916,8 @@ public:
 															 GL_LINES;
 		const GLenum gl_type = (index_type == VertexInputIndexType::uint16)
 								   ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+		bind_indirect_internal(indirect);
+		bind_parameter_internal(count);
 		glMultiDrawElementsIndirectCount(gl_mode, gl_type,
 										 (const void*)(intptr_t)indirect_byte_offset,
 										 (GLintptr)count_byte_offset,
@@ -867,6 +927,12 @@ public:
 private:
 	opt<RenderPassState> cur_pass;
 };
+
+static void opengl_clear_cached_buffer_binds(IGraphicsBuffer* buf) {
+	auto* impl = static_cast<OpenGLDeviceImpl*>(g_gfx_instance);
+	if (impl->current_indirect == buf) impl->current_indirect = nullptr;
+	if (impl->current_parameter == buf) impl->current_parameter = nullptr;
+}
 
 // ---- Moved from DrawLocal_Debug.cpp so glGetError stays inside the backend.
 bool CheckGlErrorInternal_(const char* file, int line) {

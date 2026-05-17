@@ -149,6 +149,32 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 
 Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
 
+## Sub-phase 2c status
+
+Pipeline-state consolidation. Landed across four commits:
+
+1. **Fold OpenglRenderDevice into the IGraphicsDevice backend.** Single
+   abstraction boundary; the cache, the resource factory, and the draw entry
+   points all live in `OpenGLDeviceImpl`. `DrawLocal_Device.{h,cpp}` is now
+   zero-`gl*` and dropped from the leak scanner's accept-list. Default GL
+   state (cubemap-seamless, depth-test, cull-face, reverse-Z clip,
+   clear-depth=0) set inside the impl constructor — no
+   `Renderer::InitGlState` step needed.
+2. **`RenderPipelineState::vao` → `IGraphicsVertexInput*`.** Backend resolves
+   to GL handle inside `set_pipeline`. `Renderer::get_empty_vao()` returns the
+   pointer.
+3. **Fold per-pipeline immediate setters.** `polygon_offset_*` and
+   `color_write_masks[]` move onto `RenderPipelineState`; immediate
+   `set_color_write_mask` and `set_polygon_offset` deleted. `setup_batch` /
+   `setup_batch2` take a `poly_offset_factor` parameter so the shadow pass
+   sets it per-pipeline rather than wrapping the loop in immediate state.
+4. **Indirect buffer onto draw call.** `multi_draw_elements_indirect{,_count}`
+   take `IGraphicsBuffer*` plus byte offsets. ✕`bind_indirect_buffer` and
+   ✕`bind_parameter_buffer` deleted. OpenGL backend caches last-bound buffer
+   per slot and clears it on buffer release.
+
+185 unit tests + integration suite green after each step.
+
 ## Sub-phase 1.9 status
 
 The Phase 1 boundary gate. After 1.8 the doc claimed only 5 files leaked raw
@@ -502,27 +528,55 @@ padding enforced. On
 `Program_Manager::recompile_all` the reflection table is rebuilt and any 2c
 SDL3-cache pipelines referencing the program are invalidated.
 
-### 2c — Pipeline-state consolidation
+### 2c — Pipeline-state consolidation — done
 
-No exposed pipeline object — see [Pipeline model](#pipeline-model). Concrete work:
+Landed across four sequential commits (see Sub-phase 2c status below).
 
-- Add fields to `RenderPipelineState`: `color_write_masks[]`,
-  `polygon_offset_{enabled, factor, units}`, `line_width`.
-- Migrate `RenderPipelineState::vao` from `vertexarrayhandle` to
-  `IGraphicsVertexInput*`; resolve to GL handle inside the backend.
-- Migrate `RenderPipelineState::program` from `program_handle` to
-  `IGraphicsShader*` (depends on Sub-phase 1.7).
-- Delete: `set_color_write_mask`, `set_polygon_offset`, `set_line_width`,
-  `bind_indirect_buffer`, `bind_parameter_buffer`.
-- Add buffer-pointer params to indirect draws:
-  `multi_draw_elements_indirect(..., IGraphicsBuffer* indirect, offset, ...)`
-  and `_count` variant with both buffer pointers.
-- OpenGL backend: extend invalid-bits cache to cover the new fields and the
-  cached indirect/parameter slots (lifetime-aware — see [Pipeline model](#pipeline-model)).
-- SDL3 backend: hash the struct, cache `SDL_GPUGraphicsPipeline*` internally.
-  Decal mask variants ≤16 per material.
-- Investigate the "polygon offset units does nothing?" comment near
-  `DrawLocal_RenderPass.cpp:290` — may be a latent bug.
+- **OpenglRenderDevice folded into OpenGLDeviceImpl.** The GL state cache used
+  to live on a separate class held by `Renderer`; SDL3 GPU made that
+  architecturally awkward (two abstraction boundaries instead of one). Cache
+  state, invalid-bits, blend/depth/cull/program/vao/texture setters all moved
+  inside the `IGraphicsDevice` impl, exposed on the interface as
+  `set_pipeline` / `set_shader_ptr` / `set_blend_state` / `set_show_backfaces`
+  / `set_depth_write_enabled` / `set_vao_raw` / `bind_texture_unit_raw` /
+  `get_active_shader` / `reset_state_cache` / `set_viewport` /
+  `clear_framebuffer`. Renderer no longer holds a `device` member; per-frame
+  stats bump `draw.stats` directly. `draw.get_device()` kept as a transitional
+  shim that returns `gfx()`.
+- **RenderPipelineState::vao** is now `IGraphicsVertexInput*` (was
+  `vertexarrayhandle`). Backend resolves to GL handle inside set_pipeline.
+- **Folded onto `RenderPipelineState`:** `polygon_offset_{enabled,factor,units}`
+  and a per-attachment `color_write_masks[]` array (default write-all). Decal
+  pass builds the mask array on each pipeline; the explicit
+  "reset all masks to true" loop is gone (the next set_pipeline elsewhere
+  installs the default). Shadow + decal passes thread the polygon offset
+  factor through `setup_batch` / `setup_batch2` rather than calling an
+  immediate setter; ✕`set_color_write_mask` and ✕`set_polygon_offset` deleted
+  from the interface.
+- **`set_line_width` and `set_polygon_fill_mode` stay immediate.** The
+  wireframe debug pass straddles many draws across `gbuffer_pass` invocations,
+  so folding these onto pipeline state would require either plumbing through
+  every nested helper or a push/pop stack — out of scope for 2c. SDL3 GPU has
+  no line-width equivalent (silently capped to 1) and no equivalent for
+  polygon-mode line; the wireframe path will be re-expressed when that backend
+  lands.
+- **Indirect-buffer binds folded onto draw calls.** ✕`bind_indirect_buffer`
+  and ✕`bind_parameter_buffer` deleted; `multi_draw_elements_indirect` and
+  `_count` now take `IGraphicsBuffer*` (plus byte offsets) directly. OpenGL
+  backend caches `current_indirect` / `current_parameter` and skips
+  `glBindBuffer` if unchanged. Lifetime-aware: `OpenGLBufferImpl::~` calls
+  `opengl_backend_buffer_released` to clear those slots, so a stale pointer
+  can never re-bind a dangling handle. The client-side MDI fallback (used
+  when `use_client_buffer_mdi` is set) is preserved via a `client_ptr`
+  parameter on `multi_draw_elements_indirect`.
+- **SDL3 hash-keyed pipeline cache** still deferred (the SDL3 backend itself
+  is Phase 3). Pipeline state is now structurally ready: every field that
+  SDL3 GPU bakes at pipeline-create time lives on the struct.
+
+Open follow-ups: `line_width` / `fill_mode` fold (above); the
+"polygon offset units does nothing?" comment near the historic
+`DrawLocal_RenderPass.cpp` setter still untested — units now stored on the
+struct verbatim and forwarded to `glPolygonOffset`.
 
 ### 2d — Command encoder + frame lifecycle
 

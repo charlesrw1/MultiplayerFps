@@ -83,7 +83,7 @@ void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, sc
 	{
 		RenderPipelineState state;
 		state.depth_testing = state.depth_writes = false;
-		state.vao = vertex_input->get_internal_handle();
+		state.vao = vertex_input;
 		state.backface_culling = false;
 		state.program = draw.get_prog_man().get_obj(prefilter_specular_new);
 		device.set_pipeline(state);
@@ -138,7 +138,7 @@ void EnviornmentMapHelper::compute_irradiance_new(
 		state.program = draw.get_prog_man().get_obj(prefilter_irradiance);
 		state.depth_testing = state.depth_writes = false;
 		state.backface_culling = false;
-		state.vao = vertex_input->get_internal_handle();
+		state.vao = vertex_input;
 		device.set_pipeline(state);
 		IGraphicsShader* shader = device.get_active_shader();
 
@@ -250,7 +250,7 @@ void BRDFIntegration::run() {
 
 	RenderPipelineState state;
 	state.program = integrate_shader;
-	state.vao = dd.vao ? dd.vao->get_internal_handle() : 0;
+	state.vao = dd.vao;
 	state.depth_testing = false;
 	state.depth_writes = false;
 	state.backface_culling = false;

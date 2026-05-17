@@ -46,7 +46,7 @@ void DdgiTesting::render_probes() {
 
     RenderPipelineState state = RenderPipelineState();
     state.program = draw.get_prog_man().get_obj(debug_probes);
-    state.vao = g_modelMgr.get_vao_ptr(VaoType::Animated)->get_internal_handle();
+    state.vao = g_modelMgr.get_vao_ptr(VaoType::Animated);
     device.set_pipeline(state);
 
     Model* m = Model::load("sphere.cmdl");

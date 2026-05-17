@@ -392,7 +392,22 @@ struct RenderPipelineState
 	// IGraphicsShader* — set_pipeline can bind without indirection and Phase 2c
 	// SDL3 pipeline-cache hashing can read the pointer straight from the struct.
 	IGraphicsShader* program = nullptr;
-	vertexarrayhandle vao = 0;
+	// Phase 2c: was vertexarrayhandle. Backend resolves to GL handle / SDL3
+	// vertex-layout state at bind time. Pipeline cache hashes the pointer.
+	IGraphicsVertexInput* vao = nullptr;
+
+	// Phase 2c: folded from former immediate setters. SDL3 GPU bakes these at
+	// pipeline-create time; OpenGL backend keeps them in the invalid-bits cache.
+
+	// Polygon offset for shadow bias / decals.
+	bool polygon_offset_enabled = false;
+	float polygon_offset_factor = 0.f;
+	float polygon_offset_units = 0.f;
+	// Per-attachment color write mask (RGBA). Indices match the active
+	// framebuffer's draw-buffer slots. Default: write-all.
+	static const int MAX_COLOR_ATTACHMENTS = 8;
+	struct ColorWriteMask { bool r = true, g = true, b = true, a = true; };
+	ColorWriteMask color_write_masks[MAX_COLOR_ATTACHMENTS]{};
 };
 
 class IGraphicsDevice
@@ -536,34 +551,28 @@ public:
 
 	// ---- Phase 1.4a wrap surface (lighting) --------------------------------
 
-	// Wraps glLineWidth. Used by debug meshbuilder line rendering.
+	// Wraps glLineWidth. Used by debug meshbuilder line rendering. Kept as an
+	// immediate setter (not on RenderPipelineState) because the wireframe pass
+	// straddles many draws; SDL3 GPU silently caps to 1.
 	virtual void set_line_width(float width) = 0;
 
-	// Bind a buffer to GL_DRAW_INDIRECT_BUFFER for the next MDI draw, or
-	// nullptr to unbind. Wraps glBindBuffer(GL_DRAW_INDIRECT_BUFFER, ...).
-	// Phase 2c folds indirect binding into pipeline/encoder state.
-	virtual void bind_indirect_buffer(IGraphicsBuffer* buf) = 0;
-
-	// ---- Phase 1.4b wrap surface (batched indirect draws) ------------------
-
-	// Bind a buffer to GL_PARAMETER_BUFFER (supplies per-batch draw counts to
-	// glMultiDrawElementsIndirectCount). nullptr unbinds. Phase 2c folds
-	// parameter binding into pipeline/encoder state.
-	virtual void bind_parameter_buffer(IGraphicsBuffer* buf) = 0;
-
-	// Immediate polygon-offset state for shadow biasing. enabled toggles
-	// GL_POLYGON_OFFSET_FILL; factor/units mirror glPolygonOffset.
-	// Phase 2c bakes polygon offset into IGraphicsRasterPipeline.
-	virtual void set_polygon_offset(bool enabled, float factor, float units) = 0;
+	// ---- Phase 1.4b / 2c wrap surface (batched indirect draws) -------------
+	//
+	// Indirect-buffer binding folded onto the draw-call signatures in Phase 2c
+	// (was bind_indirect_buffer / bind_parameter_buffer). OpenGL backend
+	// caches the last-bound buffer per slot — back-to-back MDI calls against
+	// the same indirect buffer emit zero rebinds. SDL3 GPU treats the buffer
+	// pointer as a draw-call parameter directly.
 
 	// glMultiDrawElementsIndirectCount: pulls `<= max_draw_count` indirect
-	// draws from the currently bound GL_DRAW_INDIRECT_BUFFER starting at
-	// `indirect_byte_offset`, using the count at `count_byte_offset` in the
-	// bound GL_PARAMETER_BUFFER. `stride` is the byte stride between commands
-	// (typically sizeof(DrawElementsIndirectCommand)).
+	// draws from `indirect` starting at `indirect_byte_offset`, using the
+	// count at `count_byte_offset` in `count`. `stride` is the byte stride
+	// between commands (typically sizeof(DrawElementsIndirectCommand)).
 	virtual void multi_draw_elements_indirect_count(GraphicsPrimitiveType mode,
 													VertexInputIndexType index_type,
+													IGraphicsBuffer* indirect,
 													int indirect_byte_offset,
+													IGraphicsBuffer* count,
 													int count_byte_offset,
 													int max_draw_count,
 													int stride) = 0;
@@ -614,22 +623,11 @@ public:
 	virtual IGraphicsShader* create_shader_single_file_tess(const std::string& shared_path,
 															 const std::string& defines = {}) = 0;
 
-	// ---- Phase 1.6 wrap surface (scene-draw orchestration) ----------------
-
 	// Polygon rasterization fill mode (Fill = solid, Line = wireframe).
-	// Wraps glPolygonMode(GL_FRONT_AND_BACK, ...). Used by the wireframe
-	// debug pass. Immediate setter for now; Phase 2c bakes onto
-	// RenderPipelineState::fill_mode.
+	// Wraps glPolygonMode. Kept immediate (not on RenderPipelineState) because
+	// the wireframe debug pass straddles many draws; SDL3 GPU has no equivalent
+	// and the wireframe pass will be re-expressed when that backend lands.
 	virtual void set_polygon_fill_mode(GraphicsFillMode mode) = 0;
-
-	// ---- Phase 1.5a wrap surface (decals) ----------------------------------
-
-	// Per-attachment color write mask. attachment is the draw-buffer index of
-	// the currently active framebuffer (matches glColorMaski's `buf` slot).
-	// Used by the decal pass to gate writes to G-buffer locations the decal
-	// material did not declare an output for. Immediate setter for now;
-	// Phase 2c bakes color masks into IGraphicsRasterPipeline.
-	virtual void set_color_write_mask(int attachment, bool r, bool g, bool b, bool a) = 0;
 
 	// Copy a (mip, layer) sub-image between two textures (same format, same
 	// dimensions). Wraps glCopyImageSubData; SDL3 backend uses
@@ -641,15 +639,18 @@ public:
 
 	// ---- Phase 1.4c wrap surface (orchestration) ---------------------------
 
-	// glMultiDrawElementsIndirect. `indirect` is interpreted as a byte offset
-	// into the bound GL_DRAW_INDIRECT_BUFFER when one is bound, or as a CPU
-	// pointer when buffer 0 is bound (client-side MDI). draw_count = number
-	// of commands; stride = byte stride between commands.
+	// glMultiDrawElementsIndirect against a GPU buffer at `byte_offset`. If
+	// `indirect` is nullptr, the call falls back to client-side MDI reading
+	// from `client_ptr` (legacy path used by Render_Lists when
+	// use_client_buffer_mdi is set). draw_count = number of commands; stride
+	// = byte stride between commands.
 	virtual void multi_draw_elements_indirect(GraphicsPrimitiveType mode,
 											  VertexInputIndexType index_type,
-											  const void* indirect,
+											  IGraphicsBuffer* indirect,
+											  int byte_offset,
 											  int draw_count,
-											  int stride) = 0;
+											  int stride,
+											  const void* client_ptr = nullptr) = 0;
 
 	// glDrawElementsInstancedBaseVertexBaseInstance. byte_offset is the byte
 	// offset into the bound index buffer (matches glDraw*Elements's indices*).

@@ -120,9 +120,10 @@ public:
 	void create_shaders();
 
 	void render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled, bool force_show_backface,
-							  bool depth_less_than_op);
+							  bool depth_less_than_op, float poly_offset_factor = 0.f);
 	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, bool depth_test_enabled,
-							  bool force_show_backfaces, bool depth_less_than_op);
+							  bool force_show_backfaces, bool depth_less_than_op,
+							  float poly_offset_factor = 0.f);
 
 	void scene_draw_internal(SceneDrawParamsEx params, View_Setup view);
 	IGraphicsTexture* do_post_process_stack(const std::vector<MaterialInstance*>& stack);
@@ -267,7 +268,7 @@ public:
 		IGraphicsVertexInput* default_{};
 	} vao;
 
-	vertexarrayhandle get_empty_vao() { return vao.default_ ? vao.default_->get_internal_handle() : 0; }
+	IGraphicsVertexInput* get_empty_vao() { return vao.default_; }
 
 	const View_Setup& get_current_frame_vs() const { return current_frame_view; }
 	View_Setup current_frame_view;

@@ -114,7 +114,7 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 }
 
 void setup_batch(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled, bool force_show_backfaces,
-				 bool depth_less_than_op, const int i, const int offset) {
+				 bool depth_less_than_op, const int i, const int offset, float poly_offset_factor = 0.f) {
 	const auto& batch = pass.batches[i];
 	const auto& mesh_batch = pass.mesh_batches[batch.first];
 
@@ -129,14 +129,19 @@ void setup_batch(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled,
 
 	RenderPipelineState state;
 	state.program = draw.get_prog_man().get_obj(program);
-	state.vao = vao_ptr->get_internal_handle();
+	state.vao = vao_ptr;
 	state.backface_culling = !show_backface && !force_show_backfaces;
 	state.blend = blend;
 	state.depth_testing = depth_test_enabled;
 	// state.depth_writes = depth_write_enabled;
 	state.depth_writes = !mat->get_master_material()->is_translucent();
 	state.depth_less_than = depth_less_than_op;
-	draw.get_device().set_pipeline(state);
+	if (poly_offset_factor != 0.f) {
+		state.polygon_offset_enabled = true;
+		state.polygon_offset_factor = poly_offset_factor;
+		state.polygon_offset_units = 4.f;
+	}
+	gfx().set_pipeline(state);
 
 	draw.shader()->set_int("indirect_material_offset", offset);
 
@@ -180,18 +185,9 @@ int setup_execute_render_lists(Render_Lists& list, Render_Pass& pass) {
 		const int size = pass.mesh_batches.size() * sizeof(int);
 		gfx().bind_storage_buffer_range(6, list.gldrawid_to_submesh_material, size, size);
 		const int command_size = list.commands.size() * sizeof(gpu::DrawElementsIndirectCommand);
-		gfx().bind_indirect_buffer(list.gpu_command_list);
 		offset_command_bytes = command_size;
-
-		auto buf = list.get_count_buf();
-		ASSERT(buf);
-		gfx().bind_parameter_buffer(buf);
 	} else {
 		gfx().bind_storage_buffer_base(6, list.gldrawid_to_submesh_material);
-		if (use_client_buffer_mdi.get_bool())
-			gfx().bind_indirect_buffer(nullptr);
-		else
-			gfx().bind_indirect_buffer(list.gpu_command_list);
 	}
 
 	if (scene.has_lightmap && scene.lightmapObj.lightmap_texture) {
@@ -205,7 +201,8 @@ int setup_execute_render_lists(Render_Lists& list, Render_Pass& pass) {
 }
 
 void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled,
-									bool force_show_backfaces, bool depth_less_than_op) {
+									bool force_show_backfaces, bool depth_less_than_op,
+									float poly_offset_factor) {
 	const int offset_buffer_start = setup_execute_render_lists(list, pass);
 	int offset = 0;
 	const int DEIcmdSz = sizeof(gpu::DrawElementsIndirectCommand);
@@ -214,37 +211,42 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass, bool 
 		const int incr = pass.batches[i].count;
 		if (count != 0) {
 
-			setup_batch(list, pass, depth_test_enabled, force_show_backfaces, depth_less_than_op, i, offset);
-
-			const void* indirect_ptr = nullptr;
-			if (use_client_buffer_mdi.get_bool())
-				indirect_ptr = (const void*)(list.commands.data() + offset);
-			else
-				indirect_ptr = (const void*)(intptr_t)(offset_buffer_start + offset * DEIcmdSz);
+			setup_batch(list, pass, depth_test_enabled, force_show_backfaces, depth_less_than_op, i, offset,
+						poly_offset_factor);
 
 			if (0) {
+				auto count_buf = list.get_count_buf();
+				ASSERT(count_buf);
 				gfx().multi_draw_elements_indirect_count(
 					GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
-					offset_buffer_start + offset * DEIcmdSz, i * (int)sizeof(uint32), count,
-					sizeof(gpu::DrawElementsIndirectCommand));
+					list.gpu_command_list, offset_buffer_start + offset * DEIcmdSz,
+					count_buf, i * (int)sizeof(uint32),
+					count, sizeof(gpu::DrawElementsIndirectCommand));
+			} else if (use_client_buffer_mdi.get_bool()) {
+				gfx().multi_draw_elements_indirect(
+					GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
+					nullptr, 0, count, sizeof(gpu::DrawElementsIndirectCommand),
+					(const void*)(list.commands.data() + offset));
 			} else {
 				gfx().multi_draw_elements_indirect(
 					GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
-					indirect_ptr, count, sizeof(gpu::DrawElementsIndirectCommand));
+					list.gpu_command_list, offset_buffer_start + offset * DEIcmdSz,
+					count, sizeof(gpu::DrawElementsIndirectCommand));
 			}
 			stats.total_draw_calls++;
 		}
 		offset += incr;
 	}
-	gfx().bind_indirect_buffer(nullptr);
 }
 
 void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled,
-									bool force_show_backfaces, bool depth_less_than_op) {
+									bool force_show_backfaces, bool depth_less_than_op,
+									float poly_offset_factor) {
 	setup_execute_render_lists(list, pass);
 	int offset = 0;
 	for (int i = 0; i < pass.batches.size(); i++) {
-		setup_batch(list, pass, depth_test_enabled, force_show_backfaces, depth_less_than_op, i, offset);
+		setup_batch(list, pass, depth_test_enabled, force_show_backfaces, depth_less_than_op, i, offset,
+					poly_offset_factor);
 
 		const int count = list.command_count[i];
 		const auto& batch = pass.batches[i];
@@ -282,11 +284,8 @@ void Renderer::render_level_to_target(const Render_Level_Params& params) {
 
 	gfx().bind_uniform_buffer_base(0, what_ubo);
 
-	if (params.pass == Render_Level_Params::SHADOWMAP) {
-		gfx().set_polygon_offset(true, params.offset_poly_units, 4 /* this does nothing?*/);
-		//*glCullFace(GL_FRONT);
-		//*glDisable(GL_CULL_FACE);
-	}
+	const float poly_offset_factor =
+		(params.pass == Render_Level_Params::SHADOWMAP) ? params.offset_poly_units : 0.f;
 
 	if (params.pass == Render_Level_Params::FORWARD_PASS) {
 		// fixme, for lit transparents
@@ -313,17 +312,18 @@ void Renderer::render_level_to_target(const Render_Level_Params& params) {
 		const bool depth_testing = true;
 		// const bool depth_writes = params.pass != Render_Level_Params::TRANSLUCENT;
 		if (dont_use_mdi.get_bool()) {
-			render_lists_old_way(*params.rl, *params.rp, depth_testing, force_backface_state, depth_less_than);
+			render_lists_old_way(*params.rl, *params.rp, depth_testing, force_backface_state, depth_less_than,
+								 poly_offset_factor);
 		} else {
-			execute_render_lists(*params.rl, *params.rp, depth_testing, force_backface_state, depth_less_than);
+			execute_render_lists(*params.rl, *params.rp, depth_testing, force_backface_state, depth_less_than,
+								 poly_offset_factor);
 		}
 	}
 
 	// glClearDepth(1.0);
 	// glDepthFunc(GL_LESS);
-	gfx().set_polygon_offset(false, 0, 0);
-	// glCullFace(GL_BACK);
-	// glEnable(GL_CULL_FACE);
+	// Polygon offset reset implicitly: each pipeline state carries its own
+	// polygon_offset_* fields, and reset_state_cache below dirties everything.
 
 	gfx().reset_state_cache();
 }
@@ -341,7 +341,7 @@ void Renderer::render_particles() {
 
 		RenderPipelineState state;
 		state.program = draw.get_prog_man().get_obj(matman.get_mat_shader(nullptr, mat, 0));
-		state.vao = p.dd.vao ? p.dd.vao->get_internal_handle() : 0;
+		state.vao = p.dd.vao;
 		state.backface_culling = mat->get_master_material()->backface;
 		state.blend = mat->get_master_material()->blend;
 		state.depth_testing = true;

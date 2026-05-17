@@ -153,7 +153,7 @@ public:
 				pipe.depth_testing = false;
 				pipe.depth_writes = false;
 				pipe.program = draw.get_prog_man().get_obj(matman.get_mat_shader(nullptr, mat, 0));
-				pipe.vao = mb_draw_data.vao ? mb_draw_data.vao->get_internal_handle() : 0;
+				pipe.vao = mb_draw_data.vao;
 				device.set_pipeline(pipe);
 
 				draw.shader()->set_mat4("UIViewProj", view_proj);

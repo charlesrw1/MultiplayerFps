@@ -43,7 +43,7 @@ void Renderer::draw_meshbuilders() {
 			state.program = get_prog_man().get_obj(prog.simple_solid_color);
 			state.depth_testing = mb.depth_tested;
 			state.depth_writes = false;
-			state.vao = dd.vao ? dd.vao->get_internal_handle() : 0;
+			state.vao = dd.vao;
 			gfx().set_pipeline(state);
 
 			shader()->set_mat4("ViewProj", current_frame_view.viewproj);
@@ -59,7 +59,7 @@ void Renderer::draw_meshbuilders() {
 		state.program = get_prog_man().get_obj(prog.simple);
 		state.depth_testing = mb.depth_tested;
 		state.depth_writes = false;
-		state.vao = dd.vao ? dd.vao->get_internal_handle() : 0;
+		state.vao = dd.vao;
 		gfx().set_pipeline(state);
 
 		shader()->set_mat4("ViewProj", current_frame_view.viewproj);
@@ -325,7 +325,6 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 	const bool wants_ssao = !is_cubemap_view && enable_ssao.get_bool();
 	IGraphicsTexture* const ssao_tex = (wants_ssao) ? ssao.texture.result : white_texture; // skip ssao in cubemap view
 	gfx().bind_uniform_buffer_base(0, ubo.current_frame);
-	gfx().bind_indirect_buffer(nullptr);
 
 	gfx().reset_state_cache();
 	if (ddgi_test.get_bool()) {

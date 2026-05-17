@@ -130,7 +130,7 @@ void DebuggingTextureOutput::draw_out() {
 	dd.init_from(mb);
 
 	// Re-bind pipeline with dd's vao so the draw consumes MeshBuilder geometry.
-	state.vao = dd.vao ? dd.vao->get_internal_handle() : 0;
+	state.vao = dd.vao;
 	device.set_pipeline(state);
 	dd.draw(MeshBuilderDD::TRIANGLES);
 	dd.free();

@@ -93,7 +93,7 @@ void BuildSceneData_CpuFast::upload_gpu_cmds(int sum_count) {
 }
 
 void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, bool depth_less_than_op,
-				  bool force_backface, Model* m, bool overdraw_vis) {
+				  bool force_backface, Model* m, bool overdraw_vis, float poly_offset_factor = 0.f) {
 	ASSERT(mat != nullptr);
 	ASSERT(m != nullptr);
 
@@ -126,12 +126,17 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 
 	RenderPipelineState state;
 	state.program = draw.get_prog_man().get_obj(program);
-	state.vao = vao_ptr->get_internal_handle();
+	state.vao = vao_ptr;
 	state.backface_culling = !show_backface && !force_backface;
 	state.blend = blend;
 	state.depth_testing = depth_tests;
 	state.depth_writes = !master->is_translucent();
 	state.depth_less_than = depth_less_than_op;
+	if (poly_offset_factor != 0.f) {
+		state.polygon_offset_enabled = true;
+		state.polygon_offset_factor = poly_offset_factor;
+		state.polygon_offset_units = 4.f; // historic value; comment claimed "this does nothing?"
+	}
 
 	gfx().set_pipeline(state);
 
@@ -153,9 +158,7 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 	if (gpu.num_cullobjs <= 0)
 		return;
 
-	if (flags & IS_SHADOW) {
-		gfx().set_polygon_offset(true, poly_factor, 4 /* this does nothing?*/);
-	}
+	const float effective_poly_offset = (flags & IS_SHADOW) ? poly_factor : 0.f;
 
 	auto do_draw_internal = [&](std::vector<Multidraw_Batch>& batches, const bool is_depth) {
 		bool force_backface = false;
@@ -174,8 +177,6 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 		gfx().bind_storage_buffer_base(5, gpu.glinst_to_inst);
 
 		const int command_size = (int)out_cmds.size() * sizeof(gpu::DrawElementsIndirectCommand);
-		gfx().bind_parameter_buffer(gpu.gbuffer_count);
-		gfx().bind_indirect_buffer(gpu.cmd_list);
 
 		const int offset_buffer_start = command_size;
 		int offset = 0;
@@ -187,27 +188,27 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 			if (count != 0) {
 
 				setup_batch2(cmd_to_extra.at(mat_ofs).material, offset, is_depth, want_less_than, force_backface,
-							 cmd_to_extra.at(mat_ofs).model, flags & OVERDRAWVIS);
+							 cmd_to_extra.at(mat_ofs).model, flags & OVERDRAWVIS, effective_poly_offset);
 
 				const int indirect_byte_offset = offset_buffer_start + offset * DEIcmdSz;
 				gfx().multi_draw_elements_indirect_count(
 					GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
-					indirect_byte_offset, i * (int)sizeof(uint32), count,
-					sizeof(gpu::DrawElementsIndirectCommand));
+					gpu.cmd_list, indirect_byte_offset,
+					gpu.gbuffer_count, i * (int)sizeof(uint32),
+					count, sizeof(gpu::DrawElementsIndirectCommand));
 
 				draw.stats.total_draw_calls += 1;
 			}
 			offset += incr;
 		}
-		gfx().bind_indirect_buffer(nullptr);
 	};
 
 	if (flags & IS_SHADOW)
 		do_draw_internal(shadow_pass.batches, true);
 	else
 		do_draw_internal(gbuffer_pass.batches, false);
-
-	gfx().set_polygon_offset(false, 0, 0);
+	// Polygon offset reset implicitly: each pipeline state carries its own
+	// polygon_offset_* fields; the next non-shadow set_pipeline disables it.
 }
 
 void BuildSceneData_CpuFast::do_shadow_draw(float factor, bool less_than) {

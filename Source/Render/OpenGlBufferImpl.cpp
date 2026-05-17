@@ -23,6 +23,9 @@ public:
 	~OpenGLBufferImpl() override {
 		glDeleteBuffers(1, &id);
 		opengl_stats.all_buffers.remove(static_cast<IGraphicsBuffer*>(this));
+		// Phase 2c: clear cached indirect/parameter binds so a stale pointer
+		// can never be re-bound after release.
+		opengl_backend_buffer_released(static_cast<IGraphicsBuffer*>(this));
 	}
 
 	void release() override { delete this; }
