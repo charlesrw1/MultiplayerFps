@@ -83,23 +83,20 @@ void DdgiTesting::render_probes() {
 // Reflection / cubemap uniforms
 // ---------------------------------------------------------------------------
 
-void DdgiTesting::set_reflection_uniforms() {
+void DdgiTesting::fill_reflection_params(gpu::DdgiRuntimeParams& out_params) {
     ASSERT(RenderGiManager::inst);
-    auto& device = draw.get_device();
 
     extern ConfigVar r_specular_ao_intensity;
-    device.get_active_shader()->set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
-    device.get_active_shader()->set_int("lum_adjust_mode", lum_adjust_mode);
+    out_params.specular_ao_intensity = r_specular_ao_intensity.get_float();
+    out_params.lum_adjust_mode = lum_adjust_mode;
 
-    {
-        IGraphicsTexture* const cubemap_array = RenderGiManager::inst->get_cubemap_array_texture();
-        const int num_cubemaps = RenderGiManager::inst->get_num_cubemaps();
-        IGraphicsBuffer* const cubemap_volume_buffer = RenderGiManager::inst->get_cubemap_volume_buffer();
+    IGraphicsTexture* const cubemap_array = RenderGiManager::inst->get_cubemap_array_texture();
+    const int num_cubemaps = RenderGiManager::inst->get_num_cubemaps();
+    IGraphicsBuffer* const cubemap_volume_buffer = RenderGiManager::inst->get_cubemap_volume_buffer();
 
-        gfx().bind_storage_buffer_base(11, cubemap_volume_buffer);
-        draw.bind_texture_ptr(8, cubemap_array);
-        device.get_active_shader()->set_int("num_cubemaps", num_cubemaps);
-    }
+    gfx().bind_storage_buffer_base(11, cubemap_volume_buffer);
+    draw.bind_texture_ptr(8, cubemap_array);
+    out_params.num_cubemaps = num_cubemaps;
 
     draw.bind_texture_ptr(7, EnviornmentMapHelper::get().integrator.get_texture());
     draw.bind_texture_ptr(9, draw.scene.skylights.at(0).skylight.generated_cube->gpu_ptr);
@@ -109,9 +106,8 @@ void DdgiTesting::set_reflection_uniforms() {
 // Shared shading uniforms
 // ---------------------------------------------------------------------------
 
-void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_view) {
+void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_view, gpu::DdgiRuntimeParams& out_params) {
     ASSERT(ssao);
-    auto& device = draw.get_device();
 
     theglobals.view_bias = view_bias;
     theglobals.normal_bias = normal_bias;
@@ -126,15 +122,13 @@ void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_
     draw.bind_texture_ptr(5, probe_depth);
     draw.bind_texture_ptr(6, ssao);
 
-    extern ConfigVar r_specular_ao_intensity;
-    device.get_active_shader()->set_bool("include_cubemaps", !for_cubemap_view && include_cubemaps.get_bool());
+    out_params.include_cubemaps = (!for_cubemap_view && include_cubemaps.get_bool()) ? 1 : 0;
 
     set_shit_fuck();
 
-    device.get_active_shader()->set_ivec3("selected_probe_pos", selected_probe);
-    device.get_active_shader()->set_float("irrad_mult", irrad_mult);
-    device.get_active_shader()->set_bool("wants_half_res", false);
-    set_reflection_uniforms();
+    out_params.selected_probe_pos = glm::ivec4(selected_probe, 0);
+    out_params.irrad_mult = irrad_mult;
+    fill_reflection_params(out_params);
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +147,10 @@ void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap
     state.depth_writes = false;
     device.set_pipeline(state);
 
-    draw_lighting_shared(ssao, for_cubemap_view);
+    gpu::DdgiRuntimeParams dp{};
+    draw_lighting_shared(ssao, for_cubemap_view, dp);
+    draw.ubo.ddgi_runtime_params->upload(&dp, sizeof(dp));
+    gfx().bind_uniform_buffer_base(7, draw.ubo.ddgi_runtime_params);
 
     gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }
@@ -184,9 +181,11 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     state.depth_writes = false;
     device.set_pipeline(state);
 
-    draw_lighting_shared(ssao, false);
-    device.get_active_shader()->set_ivec2("halfres_texel_offset", texel_offset);
-    device.get_active_shader()->set_bool("wants_half_res", true);
+    gpu::DdgiRuntimeParams dp{};
+    draw_lighting_shared(ssao, false, dp);
+    dp.halfres_texel_offset = glm::ivec2(texel_offset.x, texel_offset.y);
+    draw.ubo.ddgi_runtime_params->upload(&dp, sizeof(dp));
+    gfx().bind_uniform_buffer_base(7, draw.ubo.ddgi_runtime_params);
 
     gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
@@ -249,14 +248,19 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     draw.bind_texture_ptr(3, draw.tex.scene_depth);
     draw.bind_texture_ptr(4, ssao);
     draw.bind_texture_ptr(5, draw.tex.ddgi_accum);
-    device.get_active_shader()->set_vec2("ssr_lum_range", ssr_lum_range);
     extern ConfigVar enable_ssr;
     if (enable_ssr.get_bool())
         draw.bind_texture_ptr(6, draw.tex.reflection_accum);
     else
         draw.bind_texture_ptr(6, draw.black_texture);
 
-    set_reflection_uniforms();
+    {
+        gpu::DdgiRuntimeParams dp_apply{};
+        dp_apply.ssr_lum_range = ssr_lum_range;
+        fill_reflection_params(dp_apply);
+        draw.ubo.ddgi_runtime_params->upload(&dp_apply, sizeof(dp_apply));
+        gfx().bind_uniform_buffer_base(7, draw.ubo.ddgi_runtime_params);
+    }
 
     gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 

@@ -4,6 +4,8 @@
 #include <array>
 #include "Framework/BVH.h"
 
+namespace gpu { struct DdgiRuntimeParams; }  // defined in Shaders/ShaderBufferShared.txt
+
 struct GPUBVHNode
 {
 	glm::vec4 min;
@@ -85,8 +87,8 @@ public:
 private:
 	void draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap_view);
 	void draw_lighting_halfres(IGraphicsTexture* ssao);
-	void draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap);
-	void set_reflection_uniforms();
+	void draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap, gpu::DdgiRuntimeParams& out_params);
+	void fill_reflection_params(gpu::DdgiRuntimeParams& out_params);  // formerly set_reflection_uniforms; also binds the cubemap texture/SSBO
 
 	void compute_avg_probe_value();
 

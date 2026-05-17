@@ -179,6 +179,34 @@ struct LitCompositorParams {
     int   light_indirect_offset; //  92 .. 96  (LightAccumulationFullScreen TILED=2; size 96, /16)
 };
 
+// ---- E. DDGI runtime -------------------------------------------------------
+// Active DDGI lighting/composite pass shaders.
+//   ddgiShadeF (regular + HALFRES_DDGI variants) : selected_probe_pos,
+//     irrad_mult, include_cubemaps, halfres_texel_offset (HALFRES only),
+//     + reflectionShared fields (specular_ao_intensity, lum_adjust_mode,
+//     num_cubemaps).
+//   ddgi_apply_upsampled : specular_ao_intensity, ssr_lum_range +
+//     reflectionShared fields.
+//   reflectionShared.txt is a helper include — it relies on the including
+//   shader having bound DdgiRuntimeParams at slot 7, and reads
+//   params.lum_adjust_mode / params.num_cubemaps directly.
+// Bound at slot 7. Each callsite uploads its full subset before dispatch.
+// Out of scope: bilateral_upsample_ddgi.txt and ddgiShadeDebugF.txt —
+// both have programs created but never dispatched; dead.
+struct DdgiRuntimeParams {
+    vec2  ssr_lum_range;         //   0 .. 8   (ddgi_apply_upsampled)
+    int   _pad0;                 //   8        pad to ivec4 16B align
+    int   _pad1;                 //  12
+    ivec4 selected_probe_pos;    //  16 .. 32  (ddgiShadeF; xyz used)
+    float specular_ao_intensity; //  32        (ddgiShadeF + ddgi_apply_upsampled + reflectionShared)
+    float irrad_mult;            //  36        (ddgiShadeF)
+    int   lum_adjust_mode;       //  40        (reflectionShared)
+    int   num_cubemaps;          //  44        (reflectionShared)
+    int   include_cubemaps;      //  48        (ddgiShadeF; bool, 4B std140)
+    int   _pad2;                 //  52        pad before ivec2 (8B align)
+    ivec2 halfres_texel_offset;  //  56 .. 64  (ddgiShadeF HALFRES; struct size 64, /16)
+};
+
 // ---- C. Temporal upsample --------------------------------------------------
 // Union of fields previously set by name on TaaResolveF, temporal_upsample_ddgi,
 // and temporal_upsample_ssr. Each shader reads only the fields it needs:

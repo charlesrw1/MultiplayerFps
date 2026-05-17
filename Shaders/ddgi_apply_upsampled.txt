@@ -3,6 +3,9 @@
 layout(location = 0) out vec4 FS_OUT_Color;
 
 #include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
+
+layout (binding = 7, std140) uniform DdgiRuntimeParamsUbo { DdgiRuntimeParams params; };
 
 layout(binding = 0) uniform sampler2D GBUFFER0;		// ws normal (xyz)
 layout(binding = 1) uniform sampler2D GBUFFER1;		// albedo
@@ -26,7 +29,7 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 #include "ddgiShared.txt"
 #include "reflectionShared.txt"
 
-uniform float specular_ao_intensity = 3.0;
+#define specular_ao_intensity params.specular_ao_intensity
 
 #if 1
 bool is_ssr_texel_valid(vec3 ssrin)
@@ -62,7 +65,7 @@ vec3 pbr_calculate_reflection_for_ssr(vec3 Albedo, float Roughness, float Metaln
         return specular;
 }
 
-uniform vec2 ssr_lum_range = vec2(0.0,0.1);
+#define ssr_lum_range params.ssr_lum_range
 
 void main()
 {

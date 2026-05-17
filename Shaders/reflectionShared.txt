@@ -3,8 +3,10 @@
 layout(binding = 7) uniform sampler2D PBR_brdflut;
 layout(binding = 8) uniform samplerCubeArray probes;
 layout(binding = 9) uniform samplerCube skyprobe;
-uniform int lum_adjust_mode = 4;	// 4 looks the best
-uniform int num_cubemaps = 0;
+// lum_adjust_mode and num_cubemaps now live in DdgiRuntimeParams; the
+// including shader is expected to bind DdgiRuntimeParamsUbo at slot 7.
+#define lum_adjust_mode params.lum_adjust_mode
+#define num_cubemaps    params.num_cubemaps
 struct R_ReflectionVolume {
 	mat4 transform;
 	vec4 size;

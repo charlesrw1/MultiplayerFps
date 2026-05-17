@@ -262,6 +262,7 @@ public:
 		IGraphicsBuffer* ssr_params = nullptr;       // group D: ssr_f / ssr_downsample / ssr_upsample
 		IGraphicsBuffer* bake_params = nullptr;      // group J: probe / GI bake (trace + gather + probeLumCalc)
 		IGraphicsBuffer* lit_compositor_params = nullptr; // group A: sun + ambient + tiled-light + combine
+		IGraphicsBuffer* ddgi_runtime_params = nullptr;   // group E: ddgiShadeF + ddgi_apply_upsampled + reflectionShared
 	} ubo;
 
 	struct buffers
