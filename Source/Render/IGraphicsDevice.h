@@ -441,6 +441,30 @@ public:
 	// nullptr to unbind. Wraps glBindBuffer(GL_DRAW_INDIRECT_BUFFER, ...).
 	// Phase 2c folds indirect binding into pipeline/encoder state.
 	virtual void bind_indirect_buffer(IGraphicsBuffer* buf) = 0;
+
+	// ---- Phase 1.4b wrap surface (batched indirect draws) ------------------
+
+	// Bind a buffer to GL_PARAMETER_BUFFER (supplies per-batch draw counts to
+	// glMultiDrawElementsIndirectCount). nullptr unbinds. Phase 2c folds
+	// parameter binding into pipeline/encoder state.
+	virtual void bind_parameter_buffer(IGraphicsBuffer* buf) = 0;
+
+	// Immediate polygon-offset state for shadow biasing. enabled toggles
+	// GL_POLYGON_OFFSET_FILL; factor/units mirror glPolygonOffset.
+	// Phase 2c bakes polygon offset into IGraphicsRasterPipeline.
+	virtual void set_polygon_offset(bool enabled, float factor, float units) = 0;
+
+	// glMultiDrawElementsIndirectCount: pulls `<= max_draw_count` indirect
+	// draws from the currently bound GL_DRAW_INDIRECT_BUFFER starting at
+	// `indirect_byte_offset`, using the count at `count_byte_offset` in the
+	// bound GL_PARAMETER_BUFFER. `stride` is the byte stride between commands
+	// (typically sizeof(DrawElementsIndirectCommand)).
+	virtual void multi_draw_elements_indirect_count(GraphicsPrimitiveType mode,
+													VertexInputIndexType index_type,
+													int indirect_byte_offset,
+													int count_byte_offset,
+													int max_draw_count,
+													int stride) = 0;
 };
 
 // Global accessor for the active graphics device. Initialize the OpenGL backend

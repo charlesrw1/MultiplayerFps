@@ -395,6 +395,38 @@ public:
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, buf ? buf->get_internal_handle() : 0);
 	}
 
+	void bind_parameter_buffer(IGraphicsBuffer* buf) override {
+		glBindBuffer(GL_PARAMETER_BUFFER, buf ? buf->get_internal_handle() : 0);
+	}
+
+	void set_polygon_offset(bool enabled, float factor, float units) override {
+		if (enabled) {
+			glEnable(GL_POLYGON_OFFSET_FILL);
+			glPolygonOffset(factor, units);
+		} else {
+			glDisable(GL_POLYGON_OFFSET_FILL);
+		}
+	}
+
+	void multi_draw_elements_indirect_count(GraphicsPrimitiveType mode,
+											VertexInputIndexType index_type,
+											int indirect_byte_offset,
+											int count_byte_offset,
+											int max_draw_count,
+											int stride) override {
+		ASSERT(indirect_byte_offset >= 0 && count_byte_offset >= 0 && max_draw_count >= 0 && stride > 0);
+		const GLenum gl_mode =
+			(mode == GraphicsPrimitiveType::Triangles)     ? GL_TRIANGLES :
+			(mode == GraphicsPrimitiveType::TriangleStrip) ? GL_TRIANGLE_STRIP :
+															 GL_LINES;
+		const GLenum gl_type = (index_type == VertexInputIndexType::uint16)
+								   ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+		glMultiDrawElementsIndirectCount(gl_mode, gl_type,
+										 (const void*)(intptr_t)indirect_byte_offset,
+										 (GLintptr)count_byte_offset,
+										 max_draw_count, stride);
+	}
+
 	void download_texture(IGraphicsTexture* tex, int mip, int layer,
 						  void* dest, int dest_size_bytes) override {
 		ASSERT(tex != nullptr && dest != nullptr && dest_size_bytes > 0);

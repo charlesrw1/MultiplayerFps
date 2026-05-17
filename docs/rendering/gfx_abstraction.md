@@ -62,7 +62,7 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.3b** | `RenderExtra_SSR.cpp`, `GpuCullingTest.cpp` | ~52 | `IGraphicsSampler` + bind_sampler, glClearNamedBufferData wrapper | done |
 | 1.3c | `RT/RaytraceTest_Probe.cpp`, `RT/RaytraceTest_Shade.cpp` | ~45 | buffer map/unmap for readback (probe relocation, invalid-count) | not started |
 | **1.4a** | `DrawLocal_Lighting.cpp` | ~10 | set_line_width, bind_indirect_buffer (nullptr unbinds) | done |
-| 1.4b | `DrawLocal_BatchScene.cpp` | ~10 | bind_parameter_buffer, multi_draw_elements_indirect_count, polygon-offset state | not started |
+| **1.4b** | `DrawLocal_BatchScene.cpp` | ~10 | bind_parameter_buffer, multi_draw_elements_indirect_count, set_polygon_offset | done |
 | 1.4c | `DrawLocal_RenderPass.cpp` | ~50 | bind_storage_buffer_range_raw, multi_draw_elements_indirect (no count), draw_elements, draw_elements_instanced_base_vertex_base_instance, glNamedBufferData/SubData on raw handles | not started |
 | 1.5a | `DecalBatcher.cpp` | ~12 | per-attachment color masks as immediate setters (baked in 2c) | not started |
 | 1.6 | `DrawLocal_SceneDrawInternal.cpp` (orchestration) | ~14 | leftover binding + draw glue | not started |
@@ -72,6 +72,13 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.5 (post-1.x)** | Null/passthrough leak-detector backend | — | gate that proves the wrap is complete | not started |
 
 Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
+
+## Sub-phase 1.4b status
+
+- API added: `bind_parameter_buffer(IGraphicsBuffer*)` over `GL_PARAMETER_BUFFER` (nullptr unbinds); `set_polygon_offset(bool enabled, float factor, float units)` over `glEnable/Disable(GL_POLYGON_OFFSET_FILL)` + `glPolygonOffset` (Phase 2c bakes into `IGraphicsRasterPipeline`); `multi_draw_elements_indirect_count(mode, index_type, indirect_byte_offset, count_byte_offset, max_draw_count, stride)` wrapping `glMultiDrawElementsIndirectCount`.
+- `DrawLocal_BatchScene.cpp`: 3× `glBindBufferBase(GL_SHADER_STORAGE_BUFFER, …)` on `IGraphicsBuffer*` → `bind_storage_buffer_base`; `scene.gpu_skinned_mats_buffer` (still a raw `bufferhandle` on `RenderScene`) routed via `bind_storage_buffer_base_raw`; `glBindBuffer(GL_PARAMETER_BUFFER)` → `bind_parameter_buffer`; `glBindBuffer(GL_DRAW_INDIRECT_BUFFER)` → `bind_indirect_buffer` (set + unbind); `glMultiDrawElementsIndirectCount` → `multi_draw_elements_indirect_count`; `glEnable(GL_POLYGON_OFFSET_FILL)`/`glPolygonOffset`/`glDisable` → `set_polygon_offset`.
+- Local `MODEL_INDEX_TYPE = VertexInputIndexType::uint16` mirror introduced (matches the file-local `MODEL_INDEX_TYPE_GL` constant still referenced by other passes). `glad/glad.h` include dropped.
+- `DrawLocal_BatchScene.cpp` contains zero direct `gl*` calls. 184 unit tests + full integration suite green.
 
 ## Sub-phase 1.4a status
 

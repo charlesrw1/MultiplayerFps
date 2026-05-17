@@ -1,6 +1,5 @@
 #include "DrawLocal.h"
 #include "Framework/Util.h"
-#include "glad/glad.h"
 #include "Render/Texture.h"
 #include "glm/ext/matrix_transform.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -16,8 +15,8 @@
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
 
-// Index type used for model element buffers.
-extern const GLenum MODEL_INDEX_TYPE_GL;
+// Index type used for model element buffers. Matches MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT.
+static constexpr VertexInputIndexType MODEL_INDEX_TYPE = VertexInputIndexType::uint16;
 
 // -----------------------------------------------------------------------
 // BuildSceneData_CpuFast – batch rebuilding, GPU upload, and draw dispatch
@@ -158,8 +157,7 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 		return;
 
 	if (flags & IS_SHADOW) {
-		glEnable(GL_POLYGON_OFFSET_FILL);
-		glPolygonOffset(poly_factor, 4 /* this does nothing?*/);
+		gfx().set_polygon_offset(true, poly_factor, 4 /* this does nothing?*/);
 	}
 
 	auto do_draw_internal = [&](std::vector<Multidraw_Batch>& batches, const bool is_depth) {
@@ -173,14 +171,14 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 
 		IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
 		auto& scene = draw.scene;
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_instance_buffer->get_internal_handle());
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, material_buffer->get_internal_handle());
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, gpu.glinst_to_inst->get_internal_handle());
+		gfx().bind_storage_buffer_base(2, scene.gpu_instance_buffer);
+		gfx().bind_storage_buffer_base_raw(3, scene.gpu_skinned_mats_buffer);
+		gfx().bind_storage_buffer_base(4, material_buffer);
+		gfx().bind_storage_buffer_base(5, gpu.glinst_to_inst);
 
 		const int command_size = (int)out_cmds.size() * sizeof(gpu::DrawElementsIndirectCommand);
-		glBindBuffer(GL_PARAMETER_BUFFER, gpu.gbuffer_count->get_internal_handle());
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, gpu.cmd_list->get_internal_handle());
+		gfx().bind_parameter_buffer(gpu.gbuffer_count);
+		gfx().bind_indirect_buffer(gpu.cmd_list);
 
 		const int offset_buffer_start = command_size;
 		int offset = 0;
@@ -194,18 +192,17 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 				setup_batch2(cmd_to_extra.at(mat_ofs).material, offset, is_depth, want_less_than, force_backface,
 							 cmd_to_extra.at(mat_ofs).model, flags & OVERDRAWVIS);
 
-				const GLenum index_type = MODEL_INDEX_TYPE_GL;
-
-				void* indirect_ptr = (void*)(int64_t(offset_buffer_start + offset * DEIcmdSz));
-
-				glMultiDrawElementsIndirectCount(GL_TRIANGLES, index_type, indirect_ptr, i * sizeof(uint32), count,
-												 sizeof(gpu::DrawElementsIndirectCommand));
+				const int indirect_byte_offset = offset_buffer_start + offset * DEIcmdSz;
+				gfx().multi_draw_elements_indirect_count(
+					GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
+					indirect_byte_offset, i * (int)sizeof(uint32), count,
+					sizeof(gpu::DrawElementsIndirectCommand));
 
 				draw.stats.total_draw_calls += 1;
 			}
 			offset += incr;
 		}
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+		gfx().bind_indirect_buffer(nullptr);
 	};
 
 	if (flags & IS_SHADOW)
@@ -213,7 +210,7 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 	else
 		do_draw_internal(gbuffer_pass.batches, false);
 
-	glDisable(GL_POLYGON_OFFSET_FILL);
+	gfx().set_polygon_offset(false, 0, 0);
 }
 
 void BuildSceneData_CpuFast::do_shadow_draw(float factor, bool less_than) {
