@@ -140,7 +140,7 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.5a** | `DecalBatcher.cpp` | ~12 | per-attachment color masks as immediate setters (baked in 2c) | done |
 | **1.6** | `DrawLocal_SceneDrawInternal.cpp` (orchestration) | ~14 | set_polygon_fill_mode; migrate `render_bloom_chain` to `IGraphicsTexture*` | done |
 | **1.7a** | `IGraphicsShader` interface + factory scaffolding | — | `IGraphicsShader`; `create_shader_{vert_frag,vert_frag_geo,compute,single_file,single_file_tess}`; `OpenGlShaderImpl.cpp`; route compute + shared-tess paths in `Program_Manager::recompile_do` through factory | done |
-| 1.7b | Move `Shader.cpp` compile/link bodies into `OpenGlShaderImpl.cpp` | ~50 | source-loader + `glCreateShader/Compile/Attach/Link/Delete` move into backend; `Shader::compile*` becomes thin wrappers | not started |
+| **1.7b** | Move `Shader.cpp` compile/link bodies into `OpenGlShaderImpl.cpp` | ~50 | source-loader + `glCreateShader/Compile/Attach/Link/Delete` move into backend; `Shader::compile*` stays in `Shader.h` but bodies live in backend TU | done |
 | 1.7c | Uniform setters onto `IGraphicsShader` | ~12 | `IGraphicsShader::{use,set_int,set_float,set_mat4,…,set_block_binding}`; migrate `device.shader().set_*` callers; delete `Shader::set_*` | not started |
 | 1.7d | Program-binary cache + delete `Shader` struct | ~20 | move `glProgramBinary`/`glGetProgramBinary` cache paths in `recompile_shared`/`recompile_normal` into backend; delete `Shader` struct; `RenderPipelineState::program` becomes `IGraphicsShader*` (lifts into Phase 2c) | not started |
 | 1.8 | Window/swapchain + ImGui wrap | ~30 (`SDL_GL_*`, `gladLoad*`, swap, vsync, imgui_render) | factory move from `EngineMain_Init.cpp`; `set_vsync`, `present`, `imgui_render` | not started |
@@ -148,6 +148,14 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.5 (post-1.x)** | Null/passthrough leak-detector backend | — | gate that proves the wrap is complete | not started |
 
 Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
+
+## Sub-phase 1.7b status
+
+- Source-loader (`SourceAndLinenums`, `read_and_add_recursive`, `get_definess_with_directive`, `count_characters`, `get_source`, `make_shader`) moved from `Shader.cpp` into `OpenGlShaderImpl.cpp` (anonymous namespace).
+- All five `Shader::compile*` static method bodies moved from `Shader.cpp` into `OpenGlShaderImpl.cpp`. `Shader.h` is unchanged so external callers (Program_Manager's binary-cache fallback, EnvProbe BRDFIntegration, etc.) continue to compile. Linker resolves the statics in the backend TU.
+- `Shader.cpp` shrinks from 517 lines to ~45 lines — only uniform setters + `use()` + `set_block_binding` remain (12 GL calls, migrate in 1.7c).
+- `opengl_create_shader_*` factory bodies still delegate to `Shader::compile*` — same TU now, so it's just an internal call.
+- 184 unit tests + integration suite green.
 
 ## Sub-phase 1.7a status
 
