@@ -58,7 +58,9 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.1** | `DrawLocal_Misc.cpp`, `DrawLocal_Debug.cpp` | ~14 | scissor, draw_elements_base_vertex, bind_uniform_buffer_base_raw, wait_for_gpu_idle, download_texture; move `CheckGlErrorInternal_` to backend | done |
 | **1.2a** | `Ssao.cpp` | ~100 | draw_arrays, bind_texture, bind_uniform_buffer_base; migrate raw FBOs to `gfx().set_render_pass`; migrate raw textures + UBO to `IGraphicsTexture` / `IGraphicsBuffer`; fix `rgba16_snorm` input type in backend | done |
 | 1.2b | `EnvProbe.cpp` | ~106 | cubemap mip clamping, temp render target, `glReadPixels`, BRDFIntegration (defer shader-coupled lines to 1.7) | done |
-| 1.3 | `Volumetricfog.cpp`, `RenderExtra_SSR.cpp`, `GpuCullingTest.cpp`, `RT/RaytraceTest_Probe.cpp`, `RT/RaytraceTest_Shade.cpp` | ~147 | dispatch_compute, memory_barrier, sampler create/destroy | not started |
+| **1.3a** | `Volumetricfog.cpp` | ~33 | dispatch_compute, memory_barrier (flag enum), bind_image_for_compute, bind_storage_buffer_base (+ `_raw`); t3D path in backend; add WRAP_R to LinearClamped sampler | done |
+| 1.3b | `RenderExtra_SSR.cpp`, `GpuCullingTest.cpp` | ~52 | `IGraphicsSampler` + bind_sampler, glClearNamedBufferData wrapper | not started |
+| 1.3c | `RT/RaytraceTest_Probe.cpp`, `RT/RaytraceTest_Shade.cpp` | ~45 | buffer map/unmap for readback (probe relocation, invalid-count) | not started |
 | 1.4 | `DrawLocal_BatchScene.cpp`, `DrawLocal_Lighting.cpp`, `DrawLocal_RenderPass.cpp` | ~70 | bind_indirect_buffer, bind_parameter_buffer, multi_draw_elements_indirect (count), color-mask state | not started |
 | 1.5a | `DecalBatcher.cpp` | ~12 | per-attachment color masks as immediate setters (baked in 2c) | not started |
 | 1.6 | `DrawLocal_SceneDrawInternal.cpp` (orchestration) | ~14 | leftover binding + draw glue | not started |
@@ -74,6 +76,15 @@ Migration rule per sub-phase: any GL call still needed by a non-backend caller b
 - API added: `set_scissor`, `disable_scissor`, `draw_elements_base_vertex`, `bind_uniform_buffer_base_raw`, `wait_for_gpu_idle`, `download_texture_2d`.
 - `CheckGlErrorInternal_` body moved to `OpenGlDevice.cpp`; `DrawLocal_Debug.cpp` no longer includes `glad.h`.
 - `DrawLocal_Misc.cpp` and `DrawLocal_Debug.cpp` contain zero direct `gl*` calls.
+
+## Sub-phase 1.3a status
+
+- API added: `dispatch_compute(x,y,z)`; `memory_barrier(uint32_t bits)` over the `GraphicsMemoryBarrierBits` flag enum (`BARRIER_SHADER_STORAGE`, `BARRIER_SHADER_IMAGE_ACCESS`, `BARRIER_COMMAND`, `BARRIER_TEXTURE_FETCH`); `bind_image_for_compute(slot, tex, mip, layer, access)` over `GraphicsImageAccess` (image format inferred from `tex->get_texture_format()`, `layer == -1` → layered/`GL_TRUE`); `bind_storage_buffer_base(slot, IGraphicsBuffer*)` and `bind_storage_buffer_base_raw(slot, uint32_t)` (raw escape for `draw.ubo.current_frame` + the soon-to-migrate MDI buffer).
+- Backend fix: `OpenGLTextureImpl` now routes `tCubemap` and `t3D` through `glTextureStorage3D` (previously only `t2DArray` / `tCubemapArray`). `LinearClamped` sampler now sets `GL_TEXTURE_WRAP_R` (harmless for 2D, required for the volfog 3D textures).
+- `Volumetric_Fog_System`: `texhandle volume/last_volume` → `IGraphicsTexture*` (t3D, rgba16f, LinearClamped); `bufferhandle param` → `IGraphicsBuffer*` (sized + `BUFFER_USE_DYNAMIC`, per-frame `sub_upload`). Lightcalc + raymarch passes now use `gfx().bind_image_for_compute` + `dispatch_compute` + `memory_barrier(BARRIER_SHADER_IMAGE_ACCESS)`. UBO/SSBO binds route through `bind_uniform_buffer_base` / `bind_storage_buffer_base` (raw variant only for `draw.ubo.current_frame`).
+- `DrawLocal_SceneDraw.cpp::draw_height_fog` consumer updated: `glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, volfog.buffer.param)` → `gfx().bind_storage_buffer_base(4, volfog.buffer.param)`; `bind_texture(1, volfog.texture.volume)` (texhandle overload) → `bind_texture_ptr(1, volfog.texture.volume)`.
+- Trailing `glDepthMask`/`glEnable`/`glBindVertexArray`/`glBindTexture` cleanup deleted — `device.reset_states()` (which preceded the original cleanup) already restores those.
+- `Volumetricfog.cpp` contains zero direct `gl*` calls; `glad/glad.h` include dropped. All 184 unit tests + full integration suite (80 tests) green; `bake_probes` + `demo_level_1` screenshots within their soft-fail bands.
 
 ## Sub-phase 1.2b status
 

@@ -91,6 +91,21 @@ enum class GraphicsFilterType : int8_t
 	Nearest,
 	MipmapLinear,
 };
+
+enum class GraphicsImageAccess : int8_t
+{
+	ReadOnly,
+	WriteOnly,
+	ReadWrite,
+};
+
+enum GraphicsMemoryBarrierBits : uint32_t
+{
+	BARRIER_SHADER_STORAGE = 1 << 0,
+	BARRIER_SHADER_IMAGE_ACCESS = 1 << 1,
+	BARRIER_COMMAND = 1 << 2,
+	BARRIER_TEXTURE_FETCH = 1 << 3,
+};
 enum class GraphicsTextureEdge : int8_t
 {
 	Repeat,
@@ -328,6 +343,30 @@ public:
 	// Currently supports rgb16f, rgba8, depth* (debug/editor/bake paths).
 	virtual void download_texture(IGraphicsTexture* tex, int mip, int layer,
 								  void* dest, int dest_size_bytes) = 0;
+
+	// ---- Phase 1.3a wrap surface (compute) --------------------------------
+
+	// Launch a compute dispatch. Wraps glDispatchCompute.
+	virtual void dispatch_compute(int groups_x, int groups_y, int groups_z) = 0;
+
+	// Memory barrier. bits is a bitwise-OR of GraphicsMemoryBarrierBits.
+	// Wraps glMemoryBarrier with the corresponding GL_*_BARRIER_BIT mask.
+	virtual void memory_barrier(uint32_t bits) = 0;
+
+	// Bind a texture mip+layer to an image slot for compute read/write/RW.
+	// layer == -1 binds all layers (3D / 2D-array / cubemap as a layered image,
+	// glBindImageTexture's `layered=GL_TRUE`). layer >= 0 binds a single slice
+	// (`layered=GL_FALSE, layer=layer`). The image format is inferred from
+	// tex->get_texture_format().
+	virtual void bind_image_for_compute(int slot, IGraphicsTexture* tex,
+										int mip, int layer,
+										GraphicsImageAccess access) = 0;
+
+	// Bind an SSBO to a binding slot. Non-raw variant for buffers created via
+	// create_buffer; _raw is the transitional bridge for sites still holding a
+	// raw bufferhandle (e.g. draw.ubo.current_frame, batch-built MDI buffer).
+	virtual void bind_storage_buffer_base(int slot, IGraphicsBuffer* buf) = 0;
+	virtual void bind_storage_buffer_base_raw(int slot, uint32_t buffer_handle) = 0;
 };
 
 // Global accessor for the active graphics device. Initialize the OpenGL backend

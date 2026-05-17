@@ -26,7 +26,7 @@ public:
 
 	struct buffers
 	{
-		bufferhandle param;
+		IGraphicsBuffer* param = nullptr;
 	} buffer;
 
 	struct programs
@@ -38,8 +38,8 @@ public:
 
 	struct textures
 	{
-		texhandle volume;
-		texhandle last_volume;
+		IGraphicsTexture* volume = nullptr;
+		IGraphicsTexture* last_volume = nullptr;
 	} texture;
 
 	void init();

@@ -267,6 +267,67 @@ public:
 		glTextureParameteri(id, GL_TEXTURE_MAX_LEVEL, max);
 	}
 
+	void dispatch_compute(int groups_x, int groups_y, int groups_z) override {
+		ASSERT(groups_x >= 0 && groups_y >= 0 && groups_z >= 0);
+		glDispatchCompute(groups_x, groups_y, groups_z);
+	}
+
+	void memory_barrier(uint32_t bits) override {
+		ASSERT(bits != 0);
+		GLbitfield mask = 0;
+		if (bits & BARRIER_SHADER_STORAGE)      mask |= GL_SHADER_STORAGE_BARRIER_BIT;
+		if (bits & BARRIER_SHADER_IMAGE_ACCESS) mask |= GL_SHADER_IMAGE_ACCESS_BARRIER_BIT;
+		if (bits & BARRIER_COMMAND)             mask |= GL_COMMAND_BARRIER_BIT;
+		if (bits & BARRIER_TEXTURE_FETCH)       mask |= GL_TEXTURE_FETCH_BARRIER_BIT;
+		glMemoryBarrier(mask);
+	}
+
+	static GLenum image_access_to_gl(GraphicsImageAccess access) {
+		switch (access) {
+		case GraphicsImageAccess::ReadOnly:  return GL_READ_ONLY;
+		case GraphicsImageAccess::WriteOnly: return GL_WRITE_ONLY;
+		case GraphicsImageAccess::ReadWrite: return GL_READ_WRITE;
+		}
+		ASSERT(0 && "image_access_to_gl: unknown access");
+		return GL_READ_WRITE;
+	}
+
+	static GLenum image_format_to_gl(GraphicsTextureFormat fmt) {
+		switch (fmt) {
+		case GraphicsTextureFormat::r8:             return GL_R8;
+		case GraphicsTextureFormat::rg8:            return GL_RG8;
+		case GraphicsTextureFormat::rgba8:          return GL_RGBA8;
+		case GraphicsTextureFormat::r16f:           return GL_R16F;
+		case GraphicsTextureFormat::rg16f:          return GL_RG16F;
+		case GraphicsTextureFormat::rgba16f:        return GL_RGBA16F;
+		case GraphicsTextureFormat::r32f:           return GL_R32F;
+		case GraphicsTextureFormat::rg32f:          return GL_RG32F;
+		case GraphicsTextureFormat::r11f_g11f_b10f: return GL_R11F_G11F_B10F;
+		case GraphicsTextureFormat::rgba16_snorm:   return GL_RGBA16_SNORM;
+		default: break;
+		}
+		ASSERT(0 && "image_format_to_gl: format not supported as compute image");
+		return GL_R32F;
+	}
+
+	void bind_image_for_compute(int slot, IGraphicsTexture* tex, int mip, int layer,
+								GraphicsImageAccess access) override {
+		ASSERT(slot >= 0 && tex != nullptr && mip >= 0);
+		const GLboolean layered = (layer == -1) ? GL_TRUE : GL_FALSE;
+		const GLint     layer_idx = (layer == -1) ? 0 : layer;
+		glBindImageTexture(slot, tex->get_internal_handle(), mip, layered, layer_idx,
+						   image_access_to_gl(access), image_format_to_gl(tex->get_texture_format()));
+	}
+
+	void bind_storage_buffer_base(int slot, IGraphicsBuffer* buf) override {
+		ASSERT(slot >= 0 && buf != nullptr);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, slot, buf->get_internal_handle());
+	}
+	void bind_storage_buffer_base_raw(int slot, uint32_t buffer_handle) override {
+		ASSERT(slot >= 0);
+		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, slot, buffer_handle);
+	}
+
 	void download_texture(IGraphicsTexture* tex, int mip, int layer,
 						  void* dest, int dest_size_bytes) override {
 		ASSERT(tex != nullptr && dest != nullptr && dest_size_bytes > 0);

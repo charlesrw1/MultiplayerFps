@@ -190,7 +190,9 @@ public:
 		my_type          = args.type;
 		my_fmt           = args.format;
 		internal_format_gl = to_format(args.format);
-		if (args.type == GraphicsTextureType::t2DArray || args.type == GraphicsTextureType::tCubemapArray)
+		if (args.type == GraphicsTextureType::t2DArray ||
+			args.type == GraphicsTextureType::tCubemapArray ||
+			args.type == GraphicsTextureType::t3D)
 			glTextureStorage3D(id, args.num_mip_maps, internal_format_gl, x, y, args.depth_3d);
 		else
 			glTextureStorage2D(id, args.num_mip_maps, internal_format_gl, x, y);
@@ -218,6 +220,7 @@ public:
 			glTextureParameteri(id, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 			glTextureParameteri(id, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 			glTextureParameteri(id, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glTextureParameteri(id, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 			break;
 		case GraphicsSamplerType::NearestClamped:
 			glTextureParameteri(id, GL_TEXTURE_MIN_FILTER, GL_NEAREST);

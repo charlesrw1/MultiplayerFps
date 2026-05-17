@@ -49,10 +49,10 @@ void Renderer::draw_height_fog(IGraphicsTexture* target) {
 		setup.vao = get_empty_vao();
 		get_device().set_pipeline(setup);
 
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, volfog.buffer.param);
+		gfx().bind_storage_buffer_base(4, volfog.buffer.param);
 
 		bind_texture_ptr(0, tex.scene_depth);
-		bind_texture(1, volfog.texture.volume);
+		bind_texture_ptr(1, volfog.texture.volume);
 
 		glDrawArrays(GL_TRIANGLES, 0, 3);
 	}
