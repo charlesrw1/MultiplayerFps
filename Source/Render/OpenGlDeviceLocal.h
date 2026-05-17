@@ -63,6 +63,11 @@ IGraphicsShader* opengl_create_shader_single_file(const std::string& shared_path
 IGraphicsShader* opengl_create_shader_single_file_tess(const std::string& shared_path,
 													   const std::string& defines);
 
+// Wrap an existing GL program id in an IGraphicsShader. Phase 1.7c transitional
+// helper for binary-cache paths whose GL calls still live in DrawLocal_Device.cpp
+// (1.7d migrates them into this TU).
+IGraphicsShader* opengl_wrap_program_handle(uint32_t program_id);
+
 // Format mapping helper — also used by OpenglDataStatic::dump_to_disk
 const char* opengl_texture_format_to_str(GraphicsTextureFormat fmt);
 

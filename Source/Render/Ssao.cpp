@@ -72,12 +72,6 @@ void SSAO_System::init() {
 	}
 }
 
-Shader make_program(const char* vert, const char* frag, const std::string& defines = "") {
-	Shader ret{};
-	Shader::compile(&ret, vert, frag, defines);
-	return ret;
-}
-
 void SSAO_System::reload_shaders() {
 	auto& prog_man = draw.get_prog_man();
 	prog.hbao_calc = prog_man.create_raster("fullscreenquad.txt", "hbao/hbao.txt");

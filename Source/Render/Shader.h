@@ -3,6 +3,8 @@
 #include <string>
 #include "glm/glm.hpp"
 
+class IGraphicsShader;
+
 enum class ShaderResult
 {
 	SHADER_SUCCESS,
@@ -13,7 +15,11 @@ enum class ShaderResult
 class Shader
 {
 public:
+	// Mirror of gfx_handle->get_internal_handle() when gfx_handle is set, or
+	// the raw GL program id for binary-cache paths (1.7d folds them in).
+	// Callers should prefer gfx_handle for new code.
 	unsigned int ID = 0;
+	IGraphicsShader* gfx_handle = nullptr;
 
 	static ShaderResult compile(Shader* shader, const std::string& vertpath, const std::string& frag,
 								std::string shader_defines = {});

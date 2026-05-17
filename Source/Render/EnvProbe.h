@@ -25,7 +25,7 @@ public:
 	void drawdebug();
 
 	uint32_t lut_id;
-	Shader integrate_shader;
+	IGraphicsShader* integrate_shader = nullptr;
 	uint32_t fbo, depth;
 	uint32_t quadvbo, quadvao;
 

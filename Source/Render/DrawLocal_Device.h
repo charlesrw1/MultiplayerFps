@@ -104,7 +104,9 @@ public:
 	program_handle create_compute(const std::string& compute, const std::string& defines = {});
 	Shader get_obj(program_handle handle) const {
 		assert(handle >= 0 && handle < programs.size());
-		return programs[handle].shader_obj;
+		Shader s = programs[handle].shader_obj;
+		s.gfx_handle = programs[handle].gfx_shader;
+		return s;
 	}
 	bool did_shader_fail(program_handle handle) const {
 		assert(handle >= 0 && handle < programs.size());
@@ -146,6 +148,11 @@ private:
 	void recompile_shared(program_def& def);
 	void recompile(program_def& def);
 	void recompile_do(program_def& def);
+
+	// Drain the prior compiled program before the next compile installs a
+	// new one. Single-rooted ownership: gfx_shader owns when set, otherwise
+	// the raw shader_obj.ID does (binary-cache paths until 1.7d).
+	void release_prior_program(program_def& def);
 };
 
 // ---------------------------------------------------------------------------

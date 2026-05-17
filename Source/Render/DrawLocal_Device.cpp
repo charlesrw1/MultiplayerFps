@@ -1,4 +1,5 @@
 ﻿#include "DrawLocal.h"
+#include "OpenGlDeviceLocal.h"
 #include "Framework/Util.h"
 #include "glad/glad.h"
 #include "Render/Texture.h"
@@ -125,6 +126,16 @@ string compute_hash_for_program_def(Program_Manager::program_def& def) {
 	return StringUtils::alphanumeric_hash(inp);
 }
 
+void Program_Manager::release_prior_program(program_def& def) {
+	if (def.gfx_shader) {
+		safe_release(def.gfx_shader);
+	} else if (def.shader_obj.ID != 0) {
+		glDeleteProgram(def.shader_obj.ID);
+	}
+	def.shader_obj.ID = 0;
+	def.shader_obj.gfx_handle = nullptr;
+}
+
 void Program_Manager::recompile(program_def& def) {
 	double start = GetTime();
 	recompile_do(def);
@@ -149,9 +160,6 @@ void Program_Manager::recompile_shared(program_def& def) {
 			vector<uint8_t> bytes(len, 0);
 			reader.read_bytes_ptr(bytes.data(), bytes.size());
 
-			if (def.shader_obj.ID != 0) {
-				glDeleteProgram(def.shader_obj.ID);
-			}
 			def.shader_obj.ID = glCreateProgram();
 			glProgramBinary(def.shader_obj.ID, sourceType, bytes.data(), bytes.size());
 			glValidateProgram(def.shader_obj.ID);
@@ -165,6 +173,7 @@ void Program_Manager::recompile_shared(program_def& def) {
 				glGetProgramInfoLog(def.shader_obj.ID, logLength, nullptr, log.data());
 				sys_print(Error, "Program_Manager::recompile: loading binary failed: %s\n", log.data());
 			} else {
+				def.gfx_shader = opengl_wrap_program_handle(def.shader_obj.ID);
 				return; // done
 			}
 		}
@@ -176,6 +185,7 @@ void Program_Manager::recompile_shared(program_def& def) {
 		Shader::compile_vert_frag_single_file(&def.shader_obj, def.vert, def.defines) != ShaderResult::SHADER_SUCCESS;
 
 	if (!def.compile_failed) {
+		def.gfx_shader = opengl_wrap_program_handle(def.shader_obj.ID);
 		const auto program = def.shader_obj.ID;
 		GLint length = 0;
 		glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
@@ -217,9 +227,6 @@ void Program_Manager::recompile_normal(program_def& def) {
 			vector<uint8_t> bytes(len, 0);
 			reader.read_bytes_ptr(bytes.data(), bytes.size());
 
-			if (def.shader_obj.ID != 0) {
-				glDeleteProgram(def.shader_obj.ID);
-			}
 			def.shader_obj.ID = glCreateProgram();
 			glProgramBinary(def.shader_obj.ID, sourceType, bytes.data(), bytes.size());
 			glValidateProgram(def.shader_obj.ID);
@@ -233,6 +240,7 @@ void Program_Manager::recompile_normal(program_def& def) {
 				glGetProgramInfoLog(def.shader_obj.ID, logLength, nullptr, log.data());
 				sys_print(Error, "Program_Manager::recompile: loading binary failed: %s\n", log.data());
 			} else {
+				def.gfx_shader = opengl_wrap_program_handle(def.shader_obj.ID);
 				return; // done
 			}
 		}
@@ -247,6 +255,7 @@ void Program_Manager::recompile_normal(program_def& def) {
 			Shader::compile(&def.shader_obj, def.vert, def.frag, def.defines) != ShaderResult::SHADER_SUCCESS;
 
 	if (!def.compile_failed) {
+		def.gfx_shader = opengl_wrap_program_handle(def.shader_obj.ID);
 		const auto program = def.shader_obj.ID;
 		GLint length = 0;
 		glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
@@ -270,52 +279,25 @@ void Program_Manager::recompile_normal(program_def& def) {
 }
 
 void Program_Manager::recompile_do(program_def& def) {
+	release_prior_program(def);
+
 	// look in shader cache, only for "shared shaders" now, these are the main materials so whatev
 	if (def.is_shared() && !def.is_tesselation) {
-		// if (!def.program) {
-		//	CreateProgramArgs args;
-		//	args.file_name = def.vert;
-		//	args.defines = def.defines;
-		//	def.program = gfx().create_program(args);
-		//	def.shader_obj.ID = def.program->get_internal_handle();
-		//	def.compile_failed = false;
-		//}
-
 		recompile_shared(def);
 		return;
 	}
 
-	// Free the prior program (if any) before installing the new IGraphicsShader.
-	// Ownership lives in exactly one place: gfx_shader if non-null, else the
-	// raw shader_obj.ID (binary-cache path, 1.7d).
-	auto release_prior_program = [&]() {
-		if (def.gfx_shader) {
-			safe_release(def.gfx_shader);
-		} else if (def.shader_obj.ID != 0) {
-			glDeleteProgram(def.shader_obj.ID);
-		}
-		def.shader_obj.ID = 0;
-	};
-
 	if (def.is_compute) {
-		release_prior_program();
 		def.gfx_shader = gfx().create_shader_compute(def.vert, def.defines);
 		def.compile_failed = (def.gfx_shader == nullptr);
 		def.shader_obj.ID = def.gfx_shader ? def.gfx_shader->get_internal_handle() : 0;
 	} else if (def.is_shared()) {
 		assert(def.is_tesselation);
-		release_prior_program();
 		def.gfx_shader = gfx().create_shader_single_file_tess(def.vert, def.defines);
 		def.compile_failed = (def.gfx_shader == nullptr);
 		def.shader_obj.ID = def.gfx_shader ? def.gfx_shader->get_internal_handle() : 0;
 	} else {
 		recompile_normal(def);
-
-		// if (!def.geo.empty())
-		//	def.compile_failed = !Shader::compile(def.shader_obj, def.vert, def.frag, def.geo, def.defines);
-		// else
-		//	def.compile_failed = Shader::compile(&def.shader_obj, def.vert, def.frag, def.defines) !=
-		// ShaderResult::SHADER_SUCCESS;
 	}
 }
 

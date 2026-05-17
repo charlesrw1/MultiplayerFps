@@ -6,6 +6,7 @@
 #include "OpenGlDeviceLocal.h"
 #include "Shader.h"
 #include "glad/glad.h"
+#include <glm/gtc/type_ptr.hpp>
 #include <fstream>
 #include <sstream>
 
@@ -466,7 +467,55 @@ public:
 
 	void release() override { delete this; }
 	uint32_t get_internal_handle() override { return program_id; }
+
+	void use() override { glUseProgram(program_id); }
+
+	void set_bool(const char* name, bool value) override {
+		glProgramUniform1i(program_id, glGetUniformLocation(program_id, name), (int)value);
+	}
+	void set_int(const char* name, int value) override {
+		glProgramUniform1i(program_id, glGetUniformLocation(program_id, name), value);
+	}
+	void set_uint(const char* name, unsigned int value) override {
+		glProgramUniform1ui(program_id, glGetUniformLocation(program_id, name), value);
+	}
+	void set_float(const char* name, float value) override {
+		glProgramUniform1f(program_id, glGetUniformLocation(program_id, name), value);
+	}
+	void set_mat4(const char* name, const glm::mat4& value) override {
+		glProgramUniformMatrix4fv(program_id, glGetUniformLocation(program_id, name), 1, GL_FALSE,
+								  glm::value_ptr(value));
+	}
+	void set_vec2(const char* name, const glm::vec2& value) override {
+		glProgramUniform2f(program_id, glGetUniformLocation(program_id, name), value.x, value.y);
+	}
+	void set_vec3(const char* name, const glm::vec3& value) override {
+		glProgramUniform3f(program_id, glGetUniformLocation(program_id, name), value.r, value.g, value.b);
+	}
+	void set_vec4(const char* name, const glm::vec4& value) override {
+		glProgramUniform4f(program_id, glGetUniformLocation(program_id, name), value.x, value.y, value.z, value.w);
+	}
+	void set_ivec2(const char* name, const glm::ivec2& value) override {
+		glProgramUniform2i(program_id, glGetUniformLocation(program_id, name), value.x, value.y);
+	}
+	void set_ivec3(const char* name, const glm::ivec3& value) override {
+		glProgramUniform3i(program_id, glGetUniformLocation(program_id, name), value.x, value.y, value.z);
+	}
+	void set_block_binding(const char* name, int binding) override {
+		glUniformBlockBinding(program_id, glGetUniformBlockIndex(program_id, name), binding);
+	}
 };
+
+// Wrap an already-created GL program id in an OpenGLShaderImpl. Used by the
+// program-binary cache paths in Program_Manager::recompile_{shared,normal} so
+// every program_def can route uniform setters through IGraphicsShader. Phase
+// 1.7d folds those binary-cache paths into the backend; once that lands, this
+// helper becomes an internal implementation detail.
+IGraphicsShader* opengl_wrap_program_handle(uint32_t program_id) {
+	if (program_id == 0)
+		return nullptr;
+	return new OpenGLShaderImpl(program_id);
+}
 
 static IGraphicsShader* wrap_or_fail(const Shader& temp, ShaderResult result) {
 	if (result != ShaderResult::SHADER_SUCCESS || temp.ID == 0)

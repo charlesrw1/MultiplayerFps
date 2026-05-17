@@ -242,7 +242,8 @@ void BRDFIntegration::run() {
 
 									   -1, -1, 0, -1, 1,  0, 1, 1, 0};
 
-	Shader::compile(&integrate_shader, "MbTexturedV.txt", "Helpers/PreIntegrateF.txt");
+	safe_release(integrate_shader);
+	integrate_shader = gfx().create_shader_vert_frag("MbTexturedV.txt", "Helpers/PreIntegrateF.txt");
 	const int LUT_SIZE = EnviornmentMapHelper::BRDF_PREINTEGRATE_LUT_SIZE;
 	glGenBuffers(1, &quadvbo);
 	glGenVertexArrays(1, &quadvao);
@@ -287,12 +288,12 @@ void BRDFIntegration::run() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glCheckError();
 	glDisable(GL_CULL_FACE);
-	Shader& s = integrate_shader;
-	s.use();
+	IGraphicsShader* s = integrate_shader;
+	s->use();
 
-	s.set_mat4("Model", mat4(1));
+	s->set_mat4("Model", mat4(1));
 	glCheckError();
-	s.set_mat4("ViewProj", mat4(1));
+	s->set_mat4("ViewProj", mat4(1));
 	dd.draw(MeshBuilderDD::TRIANGLES);
 	glCheckError();
 
