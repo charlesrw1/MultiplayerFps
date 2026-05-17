@@ -559,6 +559,8 @@
     <ClCompile Include="Source\Render\OpenGlBufferImpl.cpp" />
     <ClCompile Include="Source\Render\OpenGlShaderImpl.cpp" />
     <ClCompile Include="Source\Render\OpenGlTextureImpl.cpp" />
+    <ClCompile Include="Source\Render\ShaderSourceLoader.cpp" />
+    <ClCompile Include="Source\Render\SpirvCompile.cpp" />
     <ClCompile Include="Source\Render\RenderExtra_LightCookieAtlas.cpp" />
     <ClCompile Include="Source\Render\RenderExtra_SSR.cpp" />
     <ClCompile Include="Source\Render\RT\RaytraceTest_BVH.cpp" />

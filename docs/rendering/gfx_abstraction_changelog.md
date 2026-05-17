@@ -8,6 +8,70 @@ Order is reverse-chronological: most recent at the top. Within each entry,
 the body is the as-landed implementation summary (API additions, caller
 migrations, deviations from plan, test status).
 
+## Sub-phase P3.1 status — toolchain spike (glslang + SPIRV-Cross)
+
+Goal: prove the GLSL → SPIR-V → reflection pipeline end-to-end before any
+SDL3 backend code lands. No `IGraphicsDevice` changes; OpenGL backend
+behavior is unchanged.
+
+- **vcpkg**: `glslang` + `spirv-cross` installed (`x64-windows` triplet,
+  static libs). Linked from `Source/Render/SpirvCompile.cpp` and the new
+  integration test via `#pragma comment(lib, ...)` — vcpkg's MSBuild
+  integration injects the lib search path, so no `<AdditionalDependencies>`
+  edits were needed.
+- **`Source/Render/ShaderSourceLoader.{h,cpp}`** — lifted from the anon
+  namespace of `OpenGlShaderImpl.cpp`. Same logic (recursive `#include`
+  resolution from `Shaders\\`, per-line origin tracking for driver-error
+  back-mapping, comma-list `#define` formatter), now consumable by both the
+  OpenGL backend and the new SPIR-V path. `version_prefix` is now a
+  parameter (defaults to `"#version 460 core\n"` for OpenGL; SPIR-V callers
+  pass `"#version 460\n"` to avoid the `core` keyword on Vulkan profile).
+  `SHADER_PATH` constant re-introduced privately in `OpenGlShaderImpl.cpp`
+  (renamed `OPENGL_SHADER_PATH` to dodge a unity-build collision) for the
+  binary-cache timestamp check.
+- **`Source/Render/SpirvCompile.{h,cpp}`** — `compile_glsl_to_spirv(stage,
+  glsl_source, debug_name) → SpirvBlob {code, error}`. Targets Vulkan 1.2 /
+  SPIR-V 1.5. Strips debug info; optimizer disabled (spike scope). Process
+  init / shutdown is mutex-guarded and idempotent.
+- **`Source/IntegrationTests/Tests/Renderer/test_spirv_pipeline.cpp`** —
+  five GAME_TESTs: smoke (fullscreenquad VS), MbTextured (vert+frag),
+  Bloom (vert+frag), CullCompute (compute), VfogScattering (compute). Each
+  compiles GLSL → SPIR-V, runs SPIRV-Cross reflection, cross-checks
+  resource counts against `IGraphicsShader::reflect()` (the B2 GL-side
+  reflection).
+
+**As-landed test results** — the spike's actual deliverable is the list
+of Phase 3 prep work it discovered. Tests are committed in their
+failing state so the work isn't lost:
+
+| Test | Result | Finding |
+| --- | --- | --- |
+| `renderer/spirv_cull_compute` | ✅ PASS | Full round-trip; 6/6 reflection counts match GL exactly. |
+| `renderer/spirv_smoke` | ❌ FAIL | `fullscreenquad.txt:2` — `out vec2 texCoord` needs `layout(location=0)`. SPIR-V / Vulkan profile rejects implicit input/output linkage. |
+| `renderer/spirv_mb_textured` | ❌ FAIL | `MbTexturedV.txt:386` — same: stage I/O needs explicit `layout(location=N)`. |
+| `renderer/spirv_bloom` | ❌ FAIL | Inherits the `fullscreenquad.txt` issue above. |
+| `renderer/spirv_vfog` | ❌ FAIL | Compiles cleanly to SPIR-V; CS sampler count differs between `glGetProgramInterfaceiv` (GL-side) and `spirv_cross::Compiler::get_shader_resources().sampled_images.size()` (SPIRV-Cross side). Root cause not yet identified — candidates: helper-include sampler that GL counts and SPIRV-Cross prunes as unused, or `samplerCube` vs `sampler2D` classification differ. |
+
+**Follow-up work surfaced (not done in P3.1):**
+
+1. **Explicit `layout(location=N)` sweep.** Every vertex-stage `out` and
+   fragment-stage `in` across all shaders needs an explicit location
+   binding. Strict-superset GLSL change — the OpenGL backend will accept
+   it without complaint, so this can land independently as P3.1.5 ahead
+   of any other Phase 3 work. Scope to map out first (grep `^out vec` /
+   `^in vec` across `Shaders/`).
+2. **GL ↔ SPIRV-Cross reflection-count delta.** Investigate the
+   `VfogScatteringC` discrepancy. If the SDL3 backend trusts SPIRV-Cross
+   counts for `SDL_GPUShaderCreateInfo`, any GL-side reflection mismatch
+   has to be either understood (and tolerated) or fixed at the source.
+3. **App.exe runtime DLLs (pre-existing B5 gap).** App.exe failed to
+   launch on a clean Debug build until `SDL3.dll`, `SDL3_mixer.dll`,
+   `lua.dll`, `meshoptimizer.dll`, and the `PhysX*.dll` set were copied
+   from `~/source/vcpkg/installed/x64-windows/debug/bin/` into
+   `x64/Debug/`. `<VcpkgApplocalDeps>true</>` should be set on
+   `App.vcxproj` (and the other consuming projects) so vcpkg auto-stages
+   DLLs into the output directory.
+
 ## Sub-phase B5 status — SDL2 → SDL3 + SDL3_mixer
 
 Single-sweep migration. No SDL2 DLL remains in the binary.
