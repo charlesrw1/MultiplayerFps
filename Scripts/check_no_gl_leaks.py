@@ -25,9 +25,6 @@ ACCEPT_PATHS = (
     "Source/External/",
     # The OpenGL backend itself.
     "Source/Render/OpenGl",
-    # Transitional: invalid-bits state cache, folded into backend in Phase 2.
-    "Source/Render/DrawLocal_Device.h",
-    "Source/Render/DrawLocal_Device.cpp",
     # OpenGL-only: GPU timer queries + debug groups have no SDL3 GPU equivalent.
     "Source/Framework/Profilier.cpp",
     "Source/IntegrationTests/GpuTimer.h",

@@ -202,10 +202,50 @@ public:
 	fbohandle shared_framebuffer   = 0;
 	fbohandle shared_framebuffer_2 = 0;
 
+	// ---- GL state cache (folded in from OpenglRenderDevice in Phase 2c) ----
+	static const int MAX_SAMPLER_BINDINGS = 32;
+	IGraphicsShader* active_program = nullptr;
+	texhandle textures_bound[MAX_SAMPLER_BINDINGS]{};
+	BlendState blending = BlendState::OPAQUE;
+	bool show_backface = false;
+	bool depth_test_enabled = true;
+	bool depth_write_enabled = true;
+	bool depth_less_than_enabled = true;
+	bool cullfrontface = false;
+	vertexarrayhandle current_vao = 0;
+
+	enum cache_bit
+	{
+		PROGRAM_BIT,
+		BLENDING_BIT,
+		BACKFACE_BIT,
+		CULLFRONTFACE_BIT,
+		DEPTHTEST_BIT,
+		DEPTHWRITE_BIT,
+		DEPTHLESS_THAN_BIT,
+		VAO_BIT,
+		TEXTURE0_BIT,
+	};
+	uint64_t invalid_bits = UINT64_MAX;
+	bool is_bit_invalid(uint32_t bit) { return invalid_bits & (1ull << bit); }
+	void set_bit_valid(uint32_t bit) { invalid_bits &= ~(1ull << bit); }
+	void set_bit_invalid(uint32_t bit) { invalid_bits |= (1ull << bit); }
+	void invalidate_all() { invalid_bits = UINT64_MAX; }
+
 	OpenGLDeviceImpl() {
 		glGenFramebuffers(1, &shared_framebuffer);
 		glGenFramebuffers(1, &shared_framebuffer_2);
 		g_swapchain_sentinel = opengl_make_swapchain_sentinel();
+
+		// Default GL state (was Renderer::InitGlState in DrawLocal_Device.cpp).
+		glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+		glEnable(GL_DEPTH_TEST);
+		glEnable(GL_CULL_FACE);
+		glClearColor(0.5f, 0.3f, 0.2f, 1.f);
+		glDepthFunc(GL_LEQUAL);
+		// Reverse-Z setup: output [0,1] (not [-1,1]); clear depth to 0.
+		glClipControl(GL_LOWER_LEFT, GL_ZERO_TO_ONE);
+		glClearDepth(0.0);
 	}
 
 	~OpenGLDeviceImpl() override {
@@ -217,6 +257,152 @@ public:
 	}
 
 	GraphicsDeviceType get_device_type() override { return GraphicsDeviceType::OpenGl; }
+
+	// ---- State-cache setters (formerly OpenglRenderDevice methods) ---------
+
+	void bind_texture_unit_raw(int slot, uint32_t id) override {
+		ASSERT(slot >= 0 && slot < MAX_SAMPLER_BINDINGS);
+		bool invalid = is_bit_invalid(TEXTURE0_BIT + slot);
+		if (invalid || textures_bound[slot] != id) {
+			set_bit_valid(TEXTURE0_BIT + slot);
+			glBindTextureUnit(slot, id);
+			textures_bound[slot] = id;
+			draw.stats.texture_binds++;
+		}
+	}
+
+	void set_vao_raw(vertexarrayhandle vao) override {
+		bool invalid = is_bit_invalid(VAO_BIT);
+		if (invalid || vao != current_vao) {
+			set_bit_valid(VAO_BIT);
+			current_vao = vao;
+			glBindVertexArray(vao);
+			draw.stats.vertex_array_changes++;
+		}
+	}
+
+	void set_blend_state(BlendState blend) override {
+		bool invalid = is_bit_invalid(BLENDING_BIT);
+		if (invalid || blend != blending) {
+			if (blend == BlendState::OPAQUE)
+				glDisable(GL_BLEND);
+			else if (blend == BlendState::ADD) {
+				if (invalid || blending == BlendState::OPAQUE) glEnable(GL_BLEND);
+				glBlendFunc(GL_ONE, GL_ONE);
+			} else if (blend == BlendState::BLEND) {
+				if (invalid || blending == BlendState::OPAQUE) glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			} else if (blend == BlendState::MULT) {
+				if (invalid || blending == BlendState::OPAQUE) glEnable(GL_BLEND);
+				glBlendFunc(GL_DST_COLOR, GL_ZERO);
+			} else if (blend == BlendState::SCREEN) {
+				if (invalid || blending == BlendState::OPAQUE) glEnable(GL_BLEND);
+				glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_COLOR);
+			} else if (blend == BlendState::PREMULT_BLEND) {
+				if (invalid || blending == BlendState::OPAQUE) glEnable(GL_BLEND);
+				glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+			}
+			blending = blend;
+			set_bit_valid(BLENDING_BIT);
+			draw.stats.blend_changes++;
+		}
+	}
+
+	void set_show_backfaces(bool show_backfaces) override {
+		bool invalid = is_bit_invalid(BACKFACE_BIT);
+		if (invalid || show_backfaces != this->show_backface) {
+			if (show_backfaces) glDisable(GL_CULL_FACE); else glEnable(GL_CULL_FACE);
+			set_bit_valid(BACKFACE_BIT);
+			this->show_backface = show_backfaces;
+		}
+	}
+
+	void set_depth_test_enabled_internal(bool enabled) {
+		bool invalid = is_bit_invalid(DEPTHTEST_BIT);
+		if (invalid || enabled != this->depth_test_enabled) {
+			if (enabled) glEnable(GL_DEPTH_TEST); else glDisable(GL_DEPTH_TEST);
+			set_bit_valid(DEPTHTEST_BIT);
+			this->depth_test_enabled = enabled;
+		}
+	}
+
+	void set_depth_write_enabled(bool enabled) override {
+		bool invalid = is_bit_invalid(DEPTHWRITE_BIT);
+		if (invalid || enabled != this->depth_write_enabled) {
+			if (enabled) glDepthMask(GL_TRUE); else glDepthMask(GL_FALSE);
+			set_bit_valid(DEPTHWRITE_BIT);
+			this->depth_write_enabled = enabled;
+		}
+	}
+
+	void set_cull_front_face_internal(bool enabled) {
+		bool invalid = is_bit_invalid(CULLFRONTFACE_BIT);
+		if (invalid || enabled != this->cullfrontface) {
+			if (enabled) glCullFace(GL_FRONT); else glCullFace(GL_BACK);
+			set_bit_valid(CULLFRONTFACE_BIT);
+			this->cullfrontface = enabled;
+		}
+	}
+
+	void set_depth_less_than_internal(bool less_than) {
+		bool invalid = is_bit_invalid(DEPTHLESS_THAN_BIT);
+		if (invalid || less_than != this->depth_less_than_enabled) {
+			if (less_than) glDepthFunc(GL_LEQUAL); else glDepthFunc(GL_GEQUAL);
+			set_bit_valid(DEPTHLESS_THAN_BIT);
+			this->depth_less_than_enabled = less_than;
+		}
+	}
+
+	void set_shader_ptr(IGraphicsShader* shader) override {
+		if (shader == nullptr) {
+			active_program = nullptr;
+			glUseProgram(0);
+			set_bit_valid(PROGRAM_BIT);
+			return;
+		}
+		bool invalid = is_bit_invalid(PROGRAM_BIT);
+		if (invalid || shader != active_program) {
+			set_bit_valid(PROGRAM_BIT);
+			active_program = shader;
+			shader->use();
+			draw.stats.program_changes++;
+		}
+	}
+
+	IGraphicsShader* get_active_shader() override { return active_program; }
+
+	void set_pipeline(const RenderPipelineState& s) override {
+		set_shader_ptr(s.program);
+		set_blend_state(s.blend);
+		set_vao_raw(s.vao);
+		set_cull_front_face_internal(s.cull_front_face);
+		set_depth_test_enabled_internal(s.depth_testing);
+		set_show_backfaces(!s.backface_culling);
+		set_depth_write_enabled(s.depth_writes);
+		set_depth_less_than_internal(s.depth_less_than);
+	}
+
+	void reset_state_cache() override {
+		active_program = nullptr;
+		invalidate_all();
+	}
+
+	void set_viewport(int x, int y, int w, int h) override {
+		glViewport(x, y, w, h);
+	}
+
+	void clear_framebuffer(bool clear_depth, bool clear_color, float depth_value) override {
+		if (!clear_depth && !clear_color) return;
+		glClearDepth(depth_value);
+		glClearColor(0, 0, 0, 1);
+		GLbitfield mask = 0;
+		if (clear_depth) mask |= GL_DEPTH_BUFFER_BIT;
+		if (clear_color) mask |= GL_COLOR_BUFFER_BIT;
+		// glDepthMask gates glClear too — sync the cached state.
+		set_depth_write_enabled(true);
+		glClear(mask);
+		draw.stats.framebuffer_clears++;
+	}
 
 	// Returns the GL handle of tex, which must be an OpenGLTextureImpl.
 	// We retrieve it via the public interface so this TU does not need the
@@ -297,11 +483,12 @@ public:
 		}
 
 		if (state.wants_depth_clear) {
-			// glClearBuffer obeys glDepthMask; force depth-write on, routed
-			// through OpenglRenderDevice so its cached state stays in sync.
-			draw.get_device().set_depth_write_enabled(true);
+			// glClearBuffer obeys glDepthMask; force depth-write on through the
+			// cached setter so the next draw doesn't think it's still disabled.
+			set_depth_write_enabled(true);
 			glClearBufferfv(GL_DEPTH, 0, &state.clear_depth_val);
 		}
+		draw.stats.framebuffer_changes++;
 		(void)any_color_clear;
 	}
 
@@ -414,9 +601,9 @@ public:
 															 GL_LINES;
 		const GLenum gl_type = (index_type == VertexInputIndexType::uint16)
 								   ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
-		draw.get_device().draw_elements_base_vertex(gl_mode, count, gl_type,
-													(const void*)(intptr_t)byte_offset,
-													base_vertex);
+		glDrawElementsBaseVertex(gl_mode, count, gl_type,
+								 (const void*)(intptr_t)byte_offset, base_vertex);
+		draw.stats.total_draw_calls++;
 	}
 
 	void wait_for_gpu_idle() override {
@@ -430,12 +617,13 @@ public:
 			(mode == GraphicsPrimitiveType::Triangles)     ? GL_TRIANGLES :
 			(mode == GraphicsPrimitiveType::TriangleStrip) ? GL_TRIANGLE_STRIP :
 															 GL_LINES;
-		draw.get_device().draw_arrays(gl_mode, first, count);
+		glDrawArrays(gl_mode, first, count);
+		draw.stats.total_draw_calls++;
 	}
 
 	void bind_texture(int slot, IGraphicsTexture* tex) override {
 		ASSERT(slot >= 0);
-		draw.get_device().bind_texture_ptr(slot, tex);
+		bind_texture_unit_raw(slot, tex ? tex->get_internal_handle() : 0);
 	}
 
 	void bind_uniform_buffer_base(int slot, IGraphicsBuffer* buf) override {
@@ -581,6 +769,7 @@ public:
 		const GLenum gl_type = (index_type == VertexInputIndexType::uint16)
 								   ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 		glMultiDrawElementsIndirect(gl_mode, gl_type, indirect, draw_count, stride);
+		draw.stats.total_draw_calls++;
 	}
 
 	void draw_elements_instanced_base_vertex_base_instance(

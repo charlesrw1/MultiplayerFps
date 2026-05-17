@@ -33,7 +33,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 
 	mem_arena.free_bottom();
 	stats = Render_Stats();
-	device.reset_states();
+	gfx().reset_state_cache();
 
 	if (view.width < 4 || view.height < 4) {
 		sys_print(Error, "framebuffer too small for scene draw internal\n");
@@ -268,7 +268,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		RenderPipelineState state;
 		state.program = get_prog_man().get_obj(prog.taa_resolve);
 		state.vao = get_empty_vao();
-		device.set_pipeline(state);
+		gfx().set_pipeline(state);
 		shader()->set_float("amt", r_taa_blend.get_float());
 		shader()->set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
 		shader()->set_mat4("lastViewProj", last_frame_main_view.viewproj);
@@ -354,7 +354,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		render_level_to_target(params);
 	}
 
-	device.reset_states();
+	gfx().reset_state_cache();
 
 	// mesh builder stuff
 	auto draw_mesh_builders = [&]() {
@@ -408,7 +408,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		RenderPipelineState state;
 		state.program = get_prog_man().get_obj(prog.combine);
 		state.vao = get_empty_vao();
-		device.set_pipeline(state);
+		gfx().set_pipeline(state);
 
 		IGraphicsTexture* bloom_tex = tex.bloom_chain[0].texture;
 		if (!enable_bloom.get_bool())
@@ -444,6 +444,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 				postProcesses.push_back(mat);
 		}
 
+		static const int DEBUG_OUTLINED = 100; // uses objID; not in the gpu:: enum
 		if (r_debug_mode.get_integer() == DEBUG_OUTLINED) {
 			auto mat = g_assets.find<MaterialInstance>("eng/editorEdgeDetect.mm");
 			if (mat.get() && mat->impl->gpu_buffer_offset != mat->impl->INVALID_MAPPING)
@@ -483,10 +484,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	}
 }
 
-IGraphicsShader* Renderer::shader() {
-	return device.shader();
-}
-
 IGraphicsTexture* Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postProcessMats) {
 	ZoneScoped;
 
@@ -512,7 +509,7 @@ IGraphicsTexture* Renderer::do_post_process_stack(const std::vector<MaterialInst
 		state.depth_testing = state.depth_writes = false;
 		state.vao = get_empty_vao();
 		state.backface_culling = false;
-		device.set_pipeline(state);
+		gfx().set_pipeline(state);
 
 		auto& texs = mat->impl->get_textures();
 

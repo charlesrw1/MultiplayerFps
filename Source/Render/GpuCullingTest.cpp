@@ -88,12 +88,12 @@ void GpuCullingTest::debug_overlay() {
 	state.vao = draw.get_empty_vao();
 	device.set_pipeline(state);
 	gfx().bind_uniform_buffer_base(5, cull_data);
-	device.shader()->set_int("lod_bias", lod_bias);
-	device.shader()->set_bool("output_depth", output_depth);
+	device.get_active_shader()->set_int("lod_bias", lod_bias);
+	device.get_active_shader()->set_bool("output_depth", output_depth);
 
-	device.shader()->set_vec4("debug_pos", glm::vec4(debug_pos, debug_radius));
+	device.get_active_shader()->set_vec4("debug_pos", glm::vec4(debug_pos, debug_radius));
 
-	device.bind_texture_ptr(0, depth_pyramid);
+	device.bind_texture(0, depth_pyramid);
 	gfx().bind_sampler(0, hiZSampler);
 	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	gfx().bind_sampler(0, nullptr);
@@ -170,26 +170,26 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 	auto& device = draw.get_device();
 	if (is_for_shadow) {
 		if (frustum.is_ortho) {
-			device.set_shader(cull_compute_cascade);
+			draw.set_shader(cull_compute_cascade);
 		} else {
-			device.set_shader(cull_compute_spot);
+			draw.set_shader(cull_compute_spot);
 		}
 	} else
-		device.set_shader(cull_compute);
+		draw.set_shader(cull_compute);
 	const int co_size = cull.num_objects;
 	const int groups = glm::ceil(int(co_size) / 256.f);
 
 	const bool is_ortho =
 		draw.get_current_frame_vs().is_ortho; // this check should go elsewhere? or not, ortho is pretty special case
-	device.shader()->set_bool("occlusion_cull", do_occlusion_culling && !is_ortho && !is_for_shadow);
-	device.shader()->set_bool("second_pass", pass == Phase::Pass2);
+	device.get_active_shader()->set_bool("occlusion_cull", do_occlusion_culling && !is_ortho && !is_for_shadow);
+	device.get_active_shader()->set_bool("second_pass", pass == Phase::Pass2);
 
-	device.bind_texture_ptr(0, depth_pyramid);
+	device.bind_texture(0, depth_pyramid);
 	gfx().bind_sampler(0, hiZSampler);
-	device.shader()->set_int("lod_bias", lod_bias);
-	device.shader()->set_int("force_lod", r_force_lod.get_integer());
+	device.get_active_shader()->set_int("lod_bias", lod_bias);
+	device.get_active_shader()->set_int("force_lod", r_force_lod.get_integer());
 
-	device.shader()->set_float("radius_bias", radius_bias);
+	device.get_active_shader()->set_float("radius_bias", radius_bias);
 
 	gfx().bind_storage_buffer_base(2, input.cmd_buf);
 	gfx().bind_storage_buffer_base(3, input.glinst_to_inst);
@@ -306,7 +306,7 @@ void GpuCullingTest::downsample_depth() {
 	GPUSCOPESTART(downsample);
 
 	gfx().begin_compute_pass();
-	draw.get_device().set_shader(build_pyramid);
+	draw.set_shader(build_pyramid);
 	const int levels = Texture::get_mip_map_count(actual_depth_size.x, actual_depth_size.y);
 	int width = actual_depth_size.x;
 	int height = actual_depth_size.y;
@@ -314,9 +314,9 @@ void GpuCullingTest::downsample_depth() {
 	for (int level = 0; level < levels; level++) {
 		gfx().bind_image_for_compute(1, depth_pyramid, level, 0, GraphicsImageAccess::WriteOnly);
 		if (level == 0)
-			draw.get_device().bind_texture_ptr(0, draw.tex.scene_depth);
+			gfx().bind_texture(0, draw.tex.scene_depth);
 		else {
-			draw.get_device().bind_texture_ptr(0, depth_pyramid);
+			gfx().bind_texture(0, depth_pyramid);
 		}
 
 		int groups_x = glm::ceil(width / 32.f);

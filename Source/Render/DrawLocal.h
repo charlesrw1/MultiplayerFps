@@ -49,7 +49,7 @@ inline void split_input_lod_arr(uint8_t in, bool& is_vis, int8_t& lod) {
 // Sub-headers
 // ---------------------------------------------------------------------------
 
-#include "Render/DrawLocal_Device.h"   // RenderPipelineState, Program_Manager, OpenglRenderDevice, Render_Stats
+#include "Render/DrawLocal_Device.h"   // Program_Manager, Render_Stats (RenderPipelineState now in IGraphicsDevice.h)
 #include "Render/DrawLocal_Batching.h" // CPU-fast batching, GpuCullInput, BuildSceneData_CpuFast
 #include "Render/DrawLocal_Helpers.h"  // Texture3d, Render_Level_Params, DecalBatcher, LightListCuller, etc.
 
@@ -305,8 +305,17 @@ public:
 
 	Render_Stats stats;
 
-	OpenglRenderDevice& get_device() { return device; }
-	Program_Manager& get_prog_man() { return device.get_prog_man(); }
+	Program_Manager& get_prog_man() { return prog_man; }
+	// Transitional shim — the OpenGL state cache used to live on a separate
+	// OpenglRenderDevice class; Phase 2c folded it into the IGraphicsDevice
+	// backend. Callers prefer gfx() directly; this stays so the migration
+	// can land in one commit.
+	IGraphicsDevice& get_device() { return gfx(); }
+
+	// Per-frame stats lifecycle. Called from the renderer at the start of a
+	// new frame; clears Renderer::stats and tells the backend to forget any
+	// cached state (post-imgui, post-compute paths that bypass set_pipeline).
+	void on_frame_start();
 
 	bool wants_disable_temporal_effects_this_frame() const { return disable_taa_this_frame; }
 
@@ -323,7 +332,6 @@ private:
 	void init_bloom_buffers();
 	void render_bloom_chain(IGraphicsTexture* scene_color);
 
-	void InitGlState();
 	void InitFramebuffers(bool create_composite_texture, int s_w, int s_h);
 
 	void draw_height_fog(IGraphicsTexture* target);
@@ -331,7 +339,7 @@ private:
 	int cur_w = 0;
 	int cur_h = 0;
 
-	OpenglRenderDevice device;
+	Program_Manager prog_man;
 
 	// current world time for shaders/fx fed in by SceneParamsEx on draw_scene()
 	float current_time = 0.0;

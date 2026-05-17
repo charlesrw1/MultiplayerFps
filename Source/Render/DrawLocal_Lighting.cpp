@@ -44,7 +44,7 @@ void Renderer::draw_meshbuilders() {
 			state.depth_testing = mb.depth_tested;
 			state.depth_writes = false;
 			state.vao = dd.vao ? dd.vao->get_internal_handle() : 0;
-			device.set_pipeline(state);
+			gfx().set_pipeline(state);
 
 			shader()->set_mat4("ViewProj", current_frame_view.viewproj);
 			shader()->set_mat4("Model", mb.transform);
@@ -60,7 +60,7 @@ void Renderer::draw_meshbuilders() {
 		state.depth_testing = mb.depth_tested;
 		state.depth_writes = false;
 		state.vao = dd.vao ? dd.vao->get_internal_handle() : 0;
-		device.set_pipeline(state);
+		gfx().set_pipeline(state);
 
 		shader()->set_mat4("ViewProj", current_frame_view.viewproj);
 		shader()->set_mat4("Model", mb.transform);
@@ -327,7 +327,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 	gfx().bind_uniform_buffer_base(0, ubo.current_frame);
 	gfx().bind_indirect_buffer(nullptr);
 
-	device.reset_states();
+	gfx().reset_state_cache();
 	if (ddgi_test.get_bool()) {
 		ddgi->draw_lighting(ssao_tex, is_cubemap_view);
 	} else if (!r_no_indirect.get_bool()) {
@@ -338,11 +338,11 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 			BlendState::ADD; // does a mult of (albedo+ao) with the indirect lighting already in tex.scene_color
 		state.depth_testing = false;
 		state.depth_writes = false;
-		device.set_pipeline(state);
+		gfx().set_pipeline(state);
 
 		if (!scene.skylights.empty()) {
-			device.shader()->set_vec3("sky_color", scene.skylights.at(0).ambientCube[2]);
-			device.shader()->set_vec3("ground_color", scene.skylights.at(0).ambientCube[3]);
+			gfx().get_active_shader()->set_vec3("sky_color", scene.skylights.at(0).ambientCube[2]);
+			gfx().get_active_shader()->set_vec3("ground_color", scene.skylights.at(0).ambientCube[3]);
 		}
 
 		bind_texture_ptr(0, tex.scene_gbuffer0);
@@ -354,7 +354,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		// fullscreen shader, no vao used
 		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	}
-	device.reset_states();
+	gfx().reset_state_cache();
 
 	lightListCuller->draw_lights();
 
@@ -373,7 +373,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		}
 		state.depth_testing = false;
 		state.depth_writes = false;
-		device.set_pipeline(state);
+		gfx().set_pipeline(state);
 
 		bind_texture_ptr(0, tex.scene_gbuffer0);
 		bind_texture_ptr(1, tex.scene_gbuffer1);
@@ -399,7 +399,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 	//	state.blend = BlendState::ADD;
 	//	state.depth_testing = false;
 	//	state.depth_writes = false;
-	//	device.set_pipeline(state);
+	//	gfx().set_pipeline(state);
 	//	bind_texture_ptr(4, ssao_tex);
 	//	bind_texture_ptr(5, reflectionProbeTex->gpu_ptr);
 	//	bind_texture(6, EnviornmentMapHelper::get().integrator.get_texture());

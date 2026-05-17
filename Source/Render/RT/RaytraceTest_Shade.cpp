@@ -51,13 +51,13 @@ void DdgiTesting::render_probes() {
 
     Model* m = Model::load("sphere.cmdl");
 
-    device.bind_texture_ptr(0, probe_irradiance);
+    device.bind_texture(0, probe_irradiance);
     set_shit_fuck();
     if (draw_real_grid.get_integer() == 2) {
         for (auto& vol : myvolumes) {
             auto ddgiGRID = vol.size_offset;
-            device.shader()->set_ivec3("vol_grid", ddgiGRID);
-            device.shader()->set_int("vol_offset", ddgiGRID.w);
+            device.get_active_shader()->set_ivec3("vol_grid", ddgiGRID);
+            device.get_active_shader()->set_int("vol_offset", ddgiGRID.w);
 
             for (int x = 0; x < ddgiGRID.x; x++) {
                 for (int y = 0; y < ddgiGRID.y; y++) {
@@ -68,8 +68,8 @@ void DdgiTesting::render_probes() {
 
                         glm::mat4 tr = glm::translate(glm::mat4(1), glm::vec3(x, y, z) * glm::vec3(vol.density) +
                                                                         glm::vec3(vol.origin_priority) + ofs);
-                        device.shader()->set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
-                        device.shader()->set_ivec3("probe_coord", {x, y, z});
+                        device.get_active_shader()->set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
+                        device.get_active_shader()->set_ivec3("probe_coord", {x, y, z});
 
                         draw_model_simple_no_material(m);
                     }
@@ -88,8 +88,8 @@ void DdgiTesting::set_reflection_uniforms() {
     auto& device = draw.get_device();
 
     extern ConfigVar r_specular_ao_intensity;
-    device.shader()->set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
-    device.shader()->set_int("lum_adjust_mode", lum_adjust_mode);
+    device.get_active_shader()->set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
+    device.get_active_shader()->set_int("lum_adjust_mode", lum_adjust_mode);
 
     {
         IGraphicsTexture* const cubemap_array = RenderGiManager::inst->get_cubemap_array_texture();
@@ -98,7 +98,7 @@ void DdgiTesting::set_reflection_uniforms() {
 
         gfx().bind_storage_buffer_base(11, cubemap_volume_buffer);
         draw.bind_texture_ptr(8, cubemap_array);
-        device.shader()->set_int("num_cubemaps", num_cubemaps);
+        device.get_active_shader()->set_int("num_cubemaps", num_cubemaps);
     }
 
     draw.bind_texture_ptr(7, EnviornmentMapHelper::get().integrator.get_texture());
@@ -127,13 +127,13 @@ void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_
     draw.bind_texture_ptr(6, ssao);
 
     extern ConfigVar r_specular_ao_intensity;
-    device.shader()->set_bool("include_cubemaps", !for_cubemap_view && include_cubemaps.get_bool());
+    device.get_active_shader()->set_bool("include_cubemaps", !for_cubemap_view && include_cubemaps.get_bool());
 
     set_shit_fuck();
 
-    device.shader()->set_ivec3("selected_probe_pos", selected_probe);
-    device.shader()->set_float("irrad_mult", irrad_mult);
-    device.shader()->set_bool("wants_half_res", false);
+    device.get_active_shader()->set_ivec3("selected_probe_pos", selected_probe);
+    device.get_active_shader()->set_float("irrad_mult", irrad_mult);
+    device.get_active_shader()->set_bool("wants_half_res", false);
     set_reflection_uniforms();
 }
 
@@ -185,8 +185,8 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     device.set_pipeline(state);
 
     draw_lighting_shared(ssao, false);
-    device.shader()->set_ivec2("halfres_texel_offset", texel_offset);
-    device.shader()->set_bool("wants_half_res", true);
+    device.get_active_shader()->set_ivec2("halfres_texel_offset", texel_offset);
+    device.get_active_shader()->set_bool("wants_half_res", true);
 
     gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
@@ -217,7 +217,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
         extern float taa_doc_bias;
         extern float taa_doc_pow;
 
-        IGraphicsShader* the_shader = device.shader();
+        IGraphicsShader* the_shader = device.get_active_shader();
         the_shader->set_float("amt", r_ddgi_halfres_blend.get_float());
         the_shader->set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
         the_shader->set_mat4("lastViewProj", draw.last_frame_main_view.viewproj);
@@ -247,7 +247,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     draw.bind_texture_ptr(3, draw.tex.scene_depth);
     draw.bind_texture_ptr(4, ssao);
     draw.bind_texture_ptr(5, draw.tex.ddgi_accum);
-    device.shader()->set_vec2("ssr_lum_range", ssr_lum_range);
+    device.get_active_shader()->set_vec2("ssr_lum_range", ssr_lum_range);
     extern ConfigVar enable_ssr;
     if (enable_ssr.get_bool())
         draw.bind_texture_ptr(6, draw.tex.reflection_accum);

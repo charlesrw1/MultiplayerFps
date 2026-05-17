@@ -31,18 +31,7 @@ enum class MaterialUsage : int8_t
 	Particle,
 };
 
-#undef OPAQUE // windows header leaking
-enum class BlendState : int8_t
-{
-	OPAQUE,
-	BLEND,
-	ADD,
-	MULT,
-
-	// just for fun testing
-	SCREEN,
-	PREMULT_BLEND
-};
+// BlendState moved to DrawTypedefs.h so IGraphicsDevice.h can reference it.
 
 // Parameter types
 enum class MatParamType : int8_t

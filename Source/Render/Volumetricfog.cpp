@@ -83,7 +83,7 @@ void Volumetric_Fog_System::compute() {
 
 	ivec3 groups = ceil(vec3(voltexturesize) / vec3(8, 8, 1));
 	{
-		draw.get_device().set_shader(prog.lightcalc);
+		draw.set_shader(prog.lightcalc);
 
 		draw.bind_texture_ptr(0, texture.last_volume);
 

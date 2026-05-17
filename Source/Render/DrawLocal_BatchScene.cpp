@@ -133,7 +133,7 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 	state.depth_writes = !master->is_translucent();
 	state.depth_less_than = depth_less_than_op;
 
-	draw.get_device().set_pipeline(state);
+	gfx().set_pipeline(state);
 
 	auto& textures = mat->impl->get_textures();
 

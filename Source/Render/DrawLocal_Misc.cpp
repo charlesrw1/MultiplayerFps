@@ -160,13 +160,13 @@ public:
 
 				auto& texs = mat->impl->get_textures();
 				for (int i = 0; i < (int)texs.size(); i++)
-					device.bind_texture_ptr(i, texs[i]->gpu_ptr);
+					device.bind_texture(i, texs[i]->gpu_ptr);
 			} break;
 			case UiDrawCmdType::SetTexture:
 				if (cmd.textureCmd.tex)
-					device.bind_texture_ptr(cmd.textureCmd.binding, cmd.textureCmd.tex->gpu_ptr);
+					device.bind_texture(cmd.textureCmd.binding, cmd.textureCmd.tex->gpu_ptr);
 				else
-					device.bind_texture_ptr(cmd.textureCmd.binding, draw.white_texture);
+					device.bind_texture(cmd.textureCmd.binding, draw.white_texture);
 				break;
 			case UiDrawCmdType::SetModelMatrix:
 				break;
@@ -179,7 +179,7 @@ public:
 
 		gfx().disable_scissor();
 
-		device.reset_states();
+		device.reset_state_cache();
 	}
 
 private:

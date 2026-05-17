@@ -78,7 +78,7 @@ void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, sc
 	t->gpu_ptr->set_mip_range(0, 0);
 
 	auto& device = draw.get_device();
-	device.reset_states();
+	device.reset_state_cache();
 
 	{
 		RenderPipelineState state;
@@ -87,7 +87,7 @@ void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, sc
 		state.backface_culling = false;
 		state.program = draw.get_prog_man().get_obj(prefilter_specular_new);
 		device.set_pipeline(state);
-		IGraphicsShader* shader = device.shader();
+		IGraphicsShader* shader = device.get_active_shader();
 
 		gfx().bind_texture(0, t->gpu_ptr);
 
@@ -111,7 +111,7 @@ void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, sc
 	}
 
 	t->gpu_ptr->set_mip_range(0, num_mips);
-	device.reset_states();
+	device.reset_state_cache();
 }
 
 // causes pipeline stall to read back texture
@@ -132,7 +132,7 @@ void EnviornmentMapHelper::compute_irradiance_new(
 	IGraphicsTexture* temp_tex = gfx().create_texture(tex_args);
 
 	auto& device = draw.get_device();
-	device.reset_states();
+	device.reset_state_cache();
 	{
 		RenderPipelineState state;
 		state.program = draw.get_prog_man().get_obj(prefilter_irradiance);
@@ -140,7 +140,7 @@ void EnviornmentMapHelper::compute_irradiance_new(
 		state.backface_culling = false;
 		state.vao = vertex_input->get_internal_handle();
 		device.set_pipeline(state);
-		IGraphicsShader* shader = device.shader();
+		IGraphicsShader* shader = device.get_active_shader();
 
 		gfx().bind_texture(0, t->gpu_ptr);
 
@@ -194,7 +194,7 @@ void EnviornmentMapHelper::compute_irradiance_new(
 		ambient_cube[dir] /= weights[dir];
 	}
 
-	device.reset_states();
+	device.reset_state_cache();
 	safe_release(temp_tex);
 }
 

@@ -247,7 +247,7 @@ void SSAO_System::render() {
 		state.depth_testing = state.depth_writes = false;
 		state.program = draw.get_prog_man().get_obj(prog.linearize_depth);
 		device.set_pipeline(state);
-		IGraphicsShader* shader = device.shader();
+		IGraphicsShader* shader = device.get_active_shader();
 
 		float near = viewsetup.near;
 		float far = viewsetup.far;
@@ -272,7 +272,7 @@ void SSAO_System::render() {
 		state.depth_testing = state.depth_writes = false;
 		state.program = draw.get_prog_man().get_obj(prog.make_viewspace_normals);
 		device.set_pipeline(state);
-		IGraphicsShader* shader = device.shader();
+		IGraphicsShader* shader = device.get_active_shader();
 
 		shader->set_int("projOrtho", 0);
 		shader->set_vec4("projInfo", data.projInfo);
@@ -289,7 +289,7 @@ void SSAO_System::render() {
 		state.depth_testing = state.depth_writes = false;
 		state.program = draw.get_prog_man().get_obj(prog.hbao_deinterleave);
 		device.set_pipeline(state);
-		IGraphicsShader* shader = device.shader();
+		IGraphicsShader* shader = device.get_active_shader();
 
 		gfx().bind_texture(0, texture.depthlinear);
 		for (int i = 0; i < RANDOM_ELEMENTS; i += NUM_MRT) {
@@ -320,7 +320,7 @@ void SSAO_System::render() {
 		state.depth_testing = state.depth_writes = false;
 		state.program = draw.get_prog_man().get_obj(prog.hbao_calc);
 		device.set_pipeline(state);
-		IGraphicsShader* shader = device.shader();
+		IGraphicsShader* shader = device.get_active_shader();
 
 		gfx().bind_texture(0, texture.deptharray);
 		gfx().bind_texture(1, texture.viewnormal);
@@ -369,7 +369,7 @@ void SSAO_System::render() {
 			gfx().set_render_pass(pass);
 
 			device.set_pipeline(state);
-			IGraphicsShader* shader = device.shader();
+			IGraphicsShader* shader = device.get_active_shader();
 			gfx().bind_texture(0, texture.result);
 			shader->set_float("g_Sharpness", tweak.blur_sharpness);
 			shader->set_vec2("g_InvResolutionDirection", glm::vec2(1.0f / float(width), 0));
@@ -384,7 +384,7 @@ void SSAO_System::render() {
 			gfx().set_render_pass(pass);
 
 			device.set_pipeline(state);
-			IGraphicsShader* shader = device.shader();
+			IGraphicsShader* shader = device.get_active_shader();
 			gfx().bind_texture(0, texture.blurred);
 			shader->set_float("g_Sharpness", tweak.blur_sharpness);
 			shader->set_vec2("g_InvResolutionDirection", glm::vec2(0, 1.0f / float(height)));
@@ -392,5 +392,5 @@ void SSAO_System::render() {
 		}
 	}
 
-	device.reset_states();
+	device.reset_state_cache();
 }

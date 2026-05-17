@@ -376,6 +376,25 @@ struct GraphicsBlitInfo
 		src.h = dest.h = h;
 	}
 };
+// Pipeline state struct. set_pipeline diffs this against an internal cache and
+// emits only the deltas (program / blend / depth / vao / etc).
+struct RenderPipelineState
+{
+	RenderPipelineState() = default;
+
+	bool backface_culling = true;
+	bool cull_front_face = false;
+	bool depth_testing = true;
+	bool depth_less_than = false;
+	bool depth_writes = true;
+	BlendState blend = BlendState::OPAQUE;
+	// Phase 1.7d: was program_handle (int index into Program_Manager). Now an
+	// IGraphicsShader* — set_pipeline can bind without indirection and Phase 2c
+	// SDL3 pipeline-cache hashing can read the pointer straight from the struct.
+	IGraphicsShader* program = nullptr;
+	vertexarrayhandle vao = 0;
+};
+
 class IGraphicsDevice
 {
 public:
@@ -383,6 +402,43 @@ public:
 
 	virtual GraphicsDeviceType get_device_type() = 0;
 	virtual IGraphicsTexture* get_swapchain_texture() = 0;
+
+	// ---- Pipeline state ---------------------------------------------------
+	// Apply the pipeline state struct. Backend diffs against cached state and
+	// emits only the deltas. Bind state cleared by reset_state_cache().
+	virtual void set_pipeline(const RenderPipelineState& state) = 0;
+
+	// Individual state-cache setters. These are the GL-shaped fallback paths
+	// for code that needs to flip a single bit without rebuilding the whole
+	// pipeline struct (notably depth-write toggles before glClear, and
+	// re-binding the active shader for compute/uniform writes). Phase 2 may
+	// fold the remaining callers into set_pipeline.
+	virtual void set_shader_ptr(IGraphicsShader* shader) = 0;
+	virtual void set_blend_state(BlendState blend) = 0;
+	virtual void set_show_backfaces(bool show_backfaces) = 0;
+	virtual void set_depth_write_enabled(bool enabled) = 0;
+	virtual void set_vao_raw(vertexarrayhandle vao) = 0;
+	virtual void bind_texture_unit_raw(int slot, uint32_t id) = 0;
+
+	// Returns the currently-bound shader (or nullptr). Used by uniform-setter
+	// call sites that want to write into the active program without restating
+	// the pipeline. Identical pointer to the last set_pipeline/set_shader_ptr.
+	virtual IGraphicsShader* get_active_shader() = 0;
+
+	// Force the cached pipeline state to dirty so the next set_pipeline rebinds
+	// everything. Call after a pass that bypassed the cache (raw glUseProgram /
+	// raw glBindVertexArray inside ImGui / compute paths) so the cache doesn't
+	// elide a needed bind on the next draw.
+	virtual void reset_state_cache() = 0;
+
+	// Viewport rect (pixels, origin bottom-left). Wraps glViewport.
+	virtual void set_viewport(int x, int y, int w, int h) = 0;
+
+	// Clear the currently-bound framebuffer's color and/or depth attachments.
+	// Routes through set_depth_write_enabled(true) when clearing depth so the
+	// cached depth-mask state stays in sync. Wraps glClear.
+	virtual void clear_framebuffer(bool clear_depth, bool clear_color, float depth_value = 0.f) = 0;
+
 
 	// render passes describe what you are rendering to
 	virtual void set_render_pass(const RenderPassState& state) = 0;

@@ -10,3 +10,16 @@ typedef uint32_t indexbufferhandle;
 typedef uint32_t vertexarrayhandle;
 
 typedef int program_handle;
+
+// Pipeline blend modes. Lives here (not MaterialLocal.h) so IGraphicsDevice.h
+// can reference it without pulling material internals.
+#undef OPAQUE // windows header leaking
+enum class BlendState : int8_t
+{
+	OPAQUE,
+	BLEND,
+	ADD,
+	MULT,
+	SCREEN,
+	PREMULT_BLEND
+};

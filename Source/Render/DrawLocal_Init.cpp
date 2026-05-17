@@ -120,6 +120,7 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, IGraphic
 	constants.current_and_prev_jitter = glm::vec4(cur_jit.x, cur_jit.y, prev_jit.x, prev_jit.y);
 
 	constants.debug_options = r_debug_mode.get_integer();
+	static const int DEBUG_OUTLINED = 100; // uses objID; not in the gpu:: enum
 	if (r_debug_mode.get_integer() == DEBUG_OUTLINED)
 		constants.debug_options = gpu::DEBUG_OBJID;
 
@@ -250,8 +251,8 @@ void Renderer::init() {
 		gfx_opengl_enable_debug_output();
 	}
 
-	InitGlState();
-
+	// Default GL state (cubemap-seamless, depth-test, cull-face, reverse-Z clip)
+	// now set inside the OpenGLDeviceImpl constructor — no Renderer step needed.
 	print_time("draw:init_state");
 
 	BuildSceneData_CpuFast::inst = new BuildSceneData_CpuFast;

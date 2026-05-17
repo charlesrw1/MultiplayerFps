@@ -32,7 +32,7 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 	if (!enable_bloom.get_bool())
 		return;
 
-	// device.reset_states();
+	// gfx().reset_state_cache();
 
 	//	RenderPassSetup setup("bloompass", fbo.bloom, false, false, 0, 0, cur_w, cur_h);
 	//	auto scope = device.start_render_pass(setup);
@@ -43,13 +43,13 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
 		state.program = draw.get_prog_man().get_obj(prog.bloom_downsample);
-		device.set_pipeline(state);
+		gfx().set_pipeline(state);
 
 		//*set_shader(prog.bloom_downsample);
 		float src_x = cur_w;
 		float src_y = cur_h;
 
-		device.bind_texture_ptr(0, scene_color);
+		gfx().bind_texture(0, scene_color);
 		for (int i = 0; i < tex.number_bloom_mips; i++) {
 			auto& bc = tex.bloom_chain[i];
 
@@ -70,13 +70,13 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 			src_x = bc.fsize.x;
 			src_y = bc.fsize.y;
 
-			device.set_viewport(0, 0, src_x, src_y);
-			device.clear_framebuffer(false, true /* clear color*/);
+			gfx().set_viewport(0, 0, src_x, src_y);
+			gfx().clear_framebuffer(false, true /* clear color*/);
 
 			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
 			// glBindTextureUnit(0, bc.texture->get_internal_handle());
-			device.bind_texture_ptr(0, bc.texture);
+			gfx().bind_texture(0, bc.texture);
 		}
 	}
 
@@ -85,7 +85,7 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 		state.vao = get_empty_vao();
 		state.program = draw.get_prog_man().get_obj(prog.bloom_upsample);
 		state.blend = BlendState::ADD;
-		device.set_pipeline(state);
+		gfx().set_pipeline(state);
 
 		for (int i = tex.number_bloom_mips - 1; i > 0; i--) {
 			auto& bc = tex.bloom_chain[i - 1];
@@ -100,17 +100,17 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 			setup_pass();
 
 			vec2 destsize = bc.fsize;
-			device.set_viewport(0, 0, destsize.x, destsize.y);
+			gfx().set_viewport(0, 0, destsize.x, destsize.y);
 
 			// glBindTextureUnit(0, bc.texture->get_internal_handle());
-			device.bind_texture_ptr(0, bc.texture);
+			gfx().bind_texture(0, bc.texture);
 			shader()->set_float("filterRadius", 0.0001f);
 
 			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 		}
 	}
 
-	// device.reset_states();
+	// gfx().reset_state_cache();
 }
 
 void setup_batch(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled, bool force_show_backfaces,
@@ -267,7 +267,7 @@ void Renderer::render_level_to_target(const Render_Level_Params& params) {
 	ZoneScoped;
 	// TracyGpuZone("render_to_target");
 
-	device.reset_states();
+	gfx().reset_state_cache();
 
 	IGraphicsBuffer* what_ubo = params.provied_constant_buffer;
 	{
@@ -325,11 +325,11 @@ void Renderer::render_level_to_target(const Render_Level_Params& params) {
 	// glCullFace(GL_BACK);
 	// glEnable(GL_CULL_FACE);
 
-	device.reset_states();
+	gfx().reset_state_cache();
 }
 
 void Renderer::render_particles() {
-	device.reset_states();
+	gfx().reset_state_cache();
 	auto& pobjs = scene.particle_objs.objects;
 	auto* default_mat = MaterialInstance::load("particle_default.mm");
 	assert(default_mat);
@@ -347,7 +347,7 @@ void Renderer::render_particles() {
 		state.depth_testing = true;
 		state.depth_writes = state.blend == BlendState::OPAQUE;
 		state.depth_less_than = false;
-		device.set_pipeline(state);
+		gfx().set_pipeline(state);
 
 		shader()->set_uint("FS_IN_Matid", mat->impl->gpu_buffer_offset);
 		shader()->set_mat4("Model", p.obj.transform);
