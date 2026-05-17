@@ -159,7 +159,10 @@ void setup_batch(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled,
 	}
 	gfx().set_pipeline(state);
 
-	draw.shader()->set_int("indirect_material_offset", offset);
+	gpu::MasterDeferredPushConsts pc{};
+	pc.indirect_material_offset = (uint32_t)offset;
+	gfx().push_vertex_constants(0, &pc, sizeof(pc));
+	gfx().push_fragment_constants(0, &pc, sizeof(pc));
 
 	auto& textures = mat->impl->get_textures();
 
@@ -361,9 +364,13 @@ void Renderer::render_particles() {
 		state.depth_less_than = false;
 		gfx().set_pipeline(state);
 
-		shader()->set_uint("FS_IN_Matid", mat->impl->gpu_buffer_offset);
-		shader()->set_mat4("Model", p.obj.transform);
-		shader()->set_mat4("ViewProj", current_frame_view.viewproj);
+		gpu::MasterParticleVertPushConsts pcv{};
+		pcv.ViewProj = current_frame_view.viewproj;
+		pcv.Model    = p.obj.transform;
+		gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
+		gpu::MasterParticleFragPushConsts pcf{};
+		pcf.FS_IN_Matid = mat->impl->gpu_buffer_offset;
+		gfx().push_fragment_constants(0, &pcf, sizeof(pcf));
 
 		auto& textures = mat->impl->get_textures();
 		for (int i = 0; i < textures.size(); i++) {

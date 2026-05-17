@@ -2,6 +2,7 @@
 // ******** START "include "SharedGpuTypes.txt"" ********
 
 #include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
 
 // ******** END "include "SharedGpuTypes.txt"" ********
 
@@ -24,15 +25,14 @@ out vec3 FS_IN_FragPos;
 out vec2 FS_IN_Texcoord;
 
 
-uniform mat4 ViewProj=mat4(1);
-uniform mat4 Model=mat4(1);
+layout(std140, binding = 12) uniform MasterParticleVertPushConstsUbo { MasterParticleVertPushConsts pc; };
 
 void main()
 {
 	FS_IN_Color = VS_IN_Color;
-	FS_IN_FragPos = vec3(Model * vec4(VS_IN_Postion,1.0));
+	FS_IN_FragPos = vec3(pc.Model * vec4(VS_IN_Postion,1.0));
 	FS_IN_Texcoord = VS_IN_TexCoord;
-	vec4 pos = ViewProj * vec4(FS_IN_FragPos, 1.0);
+	vec4 pos = pc.ViewProj * vec4(FS_IN_FragPos, 1.0);
 	
 	gl_Position = pos;
 }
@@ -49,7 +49,8 @@ in vec2 FS_IN_Texcoord;
 
 // fake inputs
 uniform uint FS_IN_Objid = 0;
-uniform uint FS_IN_Matid = 0;
+layout(std140, binding = 16) uniform MasterParticleFragPushConstsUbo { MasterParticleFragPushConsts _pc; };
+uint FS_IN_Matid = 0;	// initialised from push consts at top of main()
 
 // standard outputs for UI
 vec3 EMISSIVE = vec3(0.0);		// emissive color
@@ -61,6 +62,7 @@ ___USER_FS_CODE___
 
 void main()
 {
+	FS_IN_Matid = _pc.FS_IN_Matid;
 	FSmain();
 	
 	FS_OUT_Color = vec4(EMISSIVE*FS_IN_Color.rgb, OPACITY*FS_IN_Color.a);

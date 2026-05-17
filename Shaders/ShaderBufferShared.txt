@@ -278,6 +278,32 @@ struct MbSimpleFragPushConsts {
     vec4 solid_color;            //   0 ..  16   (struct size 16)
 };
 
+// MasterDeferredShader.txt (every opaque MDI batch in setup_batch -- see
+// DrawLocal_RenderPass.cpp). VS reads indirect_material_offset to index
+// indirect_materials[]; FS reads the same value only under
+// DEBUG_SHADER + DEBUG_DRAWID for draw-id colour visualisation. Single
+// struct mirrored across both stages (push_vertex_constants and
+// push_fragment_constants get the same blob per draw).
+struct MasterDeferredPushConsts {
+    uint indirect_material_offset; //   0 ..   4   (struct size 16, padded)
+    uint _pad0;
+    uint _pad1;
+    uint _pad2;
+};
+
+// MasterParticleShader.txt (render_particles -- see DrawLocal_RenderPass.cpp).
+// VS needs Model + ViewProj; FS exposes FS_IN_Matid to user fragment code.
+struct MasterParticleVertPushConsts {
+    mat4 ViewProj;               //   0 ..  64
+    mat4 Model;                  //  64 .. 128   (struct size 128)
+};
+struct MasterParticleFragPushConsts {
+    uint FS_IN_Matid;            //   0 ..   4   (struct size 16, padded)
+    uint _pad0;
+    uint _pad1;
+    uint _pad2;
+};
+
 #ifdef __cplusplus
 };
 #endif

@@ -2,6 +2,7 @@
 // ******** START "include "SharedGpuTypes.txt"" ********
 
 #include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
 
 // ******** END "include "SharedGpuTypes.txt"" ********
 
@@ -106,7 +107,7 @@ vec3 randColor(int number){
 }
 
 
-uniform int indirect_material_offset = 0;
+layout(std140, binding = 12) uniform MasterDeferredVertPushConstsUbo { MasterDeferredPushConsts pc; };
 
 // standard vertex shader outputs
 vec3 WORLD_POSITION_OFFSET = vec3(0.0);
@@ -151,7 +152,7 @@ void main()
 	FS_IN_Objid = obj_index;
 	FS_IN_Matid = indirect_instance[(gl_BaseInstance + gl_InstanceID)*2+1];
 #else
-	FS_IN_Matid = indirect_materials[indirect_material_offset + gl_DrawID];
+	FS_IN_Matid = indirect_materials[pc.indirect_material_offset + gl_DrawID];
 	uint obj_index = indirect_instance[gl_BaseInstance + gl_InstanceID]; 
 	FS_IN_Objid = obj_index;
 #endif
@@ -319,7 +320,7 @@ in vec4 FS_IN_VertexColor;
 in mat3 FS_IN_TBN;
 
 
-uniform int indirect_material_offset = 0;
+layout(std140, binding = 16) uniform MasterDeferredFragPushConstsUbo { MasterDeferredPushConsts pc; };
 
 vec3 randColor(uint number){
     return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
@@ -548,7 +549,7 @@ void main()
 			#endif	
 		}
 		else if(g.debug_options == DEBUG_DRAWID) {
-			GBUFFER_OUT_Emissive.rgb = randColor(indirect_material_offset+279343)*normal_mult_debug;
+			GBUFFER_OUT_Emissive.rgb = randColor(pc.indirect_material_offset+279343)*normal_mult_debug;
 		}
 		else if(g.debug_options == DEBUG_OVERDRAW) {
 			GBUFFER_OUT_Emissive.rgba = vec4(0.08);
