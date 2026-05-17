@@ -153,7 +153,7 @@ void DecalBatcher::draw_decals() {
 		RenderPipelineState state;
 		state.depth_testing = true;
 		state.depth_writes = false;
-		state.program = program;
+		state.program = draw.get_prog_man().get_obj(program);
 		state.vao = vao;
 		state.blend = l->get_master_material()->blend;
 		draw.get_device().set_pipeline(state);
@@ -162,7 +162,7 @@ void DecalBatcher::draw_decals() {
 		for (int j = 0; j < texs.size(); j++)
 			draw.bind_texture_ptr(j, texs[j]->gpu_ptr);
 
-		draw.shader().set_uint("decal_indirect_offset", cur_offset);
+		draw.shader()->set_uint("decal_indirect_offset", cur_offset);
 
 		const int dei_size = sizeof(gpu::DrawElementsIndirectCommand);
 		gfx().multi_draw_elements_indirect(GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,

@@ -17,7 +17,7 @@
 #include "glm/glm.hpp"
 #include "User_Camera.h"
 
-#include "Render/Shader.h"
+#include "Render/IGraphicsDevice.h"
 #include "Render/EnvProbe.h"
 #include "Render/Texture.h"
 #include "Render/DrawTypedefs.h"
@@ -285,7 +285,7 @@ public:
 	void set_shader(program_handle handle);
 	void set_blend_state(BlendState blend);
 	void set_show_backfaces(bool show_backfaces);
-	Shader shader();
+	IGraphicsShader* shader();
 
 	void draw_meshbuilders();
 

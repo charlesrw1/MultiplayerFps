@@ -45,7 +45,7 @@ void Renderer::draw_height_fog(IGraphicsTexture* target) {
 		setup.blend = BlendState::BLEND;
 		setup.depth_testing = false;
 		setup.depth_writes = false;
-		setup.program = prog.volfog_apply;
+		setup.program = get_prog_man().get_obj(prog.volfog_apply);
 		setup.vao = get_empty_vao();
 		get_device().set_pipeline(setup);
 
@@ -84,7 +84,7 @@ void Renderer::draw_height_fog(IGraphicsTexture* target) {
 	setup.blend = BlendState::BLEND;
 	setup.depth_testing = false;
 	setup.depth_writes = false;
-	setup.program = prog.height_fog;
+	setup.program = get_prog_man().get_obj(prog.height_fog);
 	setup.vao = get_empty_vao();
 	get_device().set_pipeline(setup);
 

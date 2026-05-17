@@ -42,7 +42,7 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 	{
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
-		state.program = prog.bloom_downsample;
+		state.program = draw.get_prog_man().get_obj(prog.bloom_downsample);
 		device.set_pipeline(state);
 
 		//*set_shader(prog.bloom_downsample);
@@ -65,8 +65,8 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 			};
 			setup_pass();
 
-			shader().set_vec2("srcResolution", vec2(src_x, src_y));
-			shader().set_int("mipLevel", i);
+			shader()->set_vec2("srcResolution", vec2(src_x, src_y));
+			shader()->set_int("mipLevel", i);
 			src_x = bc.fsize.x;
 			src_y = bc.fsize.y;
 
@@ -83,7 +83,7 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 	{
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
-		state.program = prog.bloom_upsample;
+		state.program = draw.get_prog_man().get_obj(prog.bloom_upsample);
 		state.blend = BlendState::ADD;
 		device.set_pipeline(state);
 
@@ -104,7 +104,7 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 
 			// glBindTextureUnit(0, bc.texture->get_internal_handle());
 			device.bind_texture_ptr(0, bc.texture);
-			shader().set_float("filterRadius", 0.0001f);
+			shader()->set_float("filterRadius", 0.0001f);
 
 			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 		}
@@ -128,7 +128,7 @@ void setup_batch(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled,
 	IGraphicsVertexInput* vao_ptr = g_modelMgr.get_vao_ptr(vaoType);
 
 	RenderPipelineState state;
-	state.program = program;
+	state.program = draw.get_prog_man().get_obj(program);
 	state.vao = vao_ptr->get_internal_handle();
 	state.backface_culling = !show_backface && !force_show_backfaces;
 	state.blend = blend;
@@ -138,7 +138,7 @@ void setup_batch(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled,
 	state.depth_less_than = depth_less_than_op;
 	draw.get_device().set_pipeline(state);
 
-	draw.shader().set_int("indirect_material_offset", offset);
+	draw.shader()->set_int("indirect_material_offset", offset);
 
 	auto& textures = mat->impl->get_textures();
 
@@ -340,7 +340,7 @@ void Renderer::render_particles() {
 			mat = default_mat;
 
 		RenderPipelineState state;
-		state.program = matman.get_mat_shader(nullptr, mat, 0);
+		state.program = draw.get_prog_man().get_obj(matman.get_mat_shader(nullptr, mat, 0));
 		state.vao = p.dd.VAO; // meshbuilder->VAO;
 		state.backface_culling = mat->get_master_material()->backface;
 		state.blend = mat->get_master_material()->blend;
@@ -349,9 +349,9 @@ void Renderer::render_particles() {
 		state.depth_less_than = false;
 		device.set_pipeline(state);
 
-		shader().set_uint("FS_IN_Matid", mat->impl->gpu_buffer_offset);
-		shader().set_mat4("Model", p.obj.transform);
-		shader().set_mat4("ViewProj", current_frame_view.viewproj);
+		shader()->set_uint("FS_IN_Matid", mat->impl->gpu_buffer_offset);
+		shader()->set_mat4("Model", p.obj.transform);
+		shader()->set_mat4("ViewProj", current_frame_view.viewproj);
 
 		auto& textures = mat->impl->get_textures();
 		for (int i = 0; i < textures.size(); i++) {

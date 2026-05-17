@@ -149,7 +149,7 @@ void DdgiTesting::execute() {
         gfx().bind_storage_buffer_base(14, relocate_param_buf);
 
         set_shit_fuck();
-        device.shader().set_float("ray_sample_randomness", r.RandF(0, TWOPI));
+        device.shader()->set_float("ray_sample_randomness", r.RandF(0, TWOPI));
         gfx().bind_storage_buffer_base(13, ddgi_probe_relocation_offsets);
         const int total_probes = total_num_probes;
         const int groups = glm::ceil(total_probes / 64.f);
@@ -175,17 +175,17 @@ void DdgiTesting::execute() {
         device.bind_texture(3, probe_depth->get_internal_handle());
 
         device.set_shader(trace_shader);
-        device.shader().set_bool("do_irrad_calcs", i != 0);
+        device.shader()->set_bool("do_irrad_calcs", i != 0);
         set_shit_fuck();
-        device.shader().set_float("ray_sample_randomness", r.RandF(0, TWOPI));
-        device.shader().set_int("num_lights", draw.scene.light_list.objects.size());
+        device.shader()->set_float("ray_sample_randomness", r.RandF(0, TWOPI));
+        device.shader()->set_int("num_lights", draw.scene.light_list.objects.size());
 
         if (draw.scene.suns.size() > 0) {
             auto& sun = draw.scene.suns.at(0).sun;
-            device.shader().set_vec4("light_sun_dir", vec4(sun.direction, 1));
-            device.shader().set_vec4("light_sun_color", vec4(sun.color, 0));
+            device.shader()->set_vec4("light_sun_dir", vec4(sun.direction, 1));
+            device.shader()->set_vec4("light_sun_color", vec4(sun.color, 0));
         } else {
-            device.shader().set_vec4("light_sun_dir", vec4(0, 0, 0, -1));
+            device.shader()->set_vec4("light_sun_dir", vec4(0, 0, 0, -1));
         }
 
         const int total_probes = total_num_probes;
@@ -197,7 +197,7 @@ void DdgiTesting::execute() {
         if (!skip_gather) {
             device.set_shader(gather_shader);
             set_shit_fuck();
-            device.shader().set_int("num_runs_so_far", glm::max(0, i - 1));
+            device.shader()->set_int("num_runs_so_far", glm::max(0, i - 1));
 
             gfx().bind_image_for_compute(0, probe_irradiance, 0, 0, GraphicsImageAccess::WriteOnly);
             gfx().bind_image_for_compute(1, probe_depth, 0, 0, GraphicsImageAccess::WriteOnly);
@@ -256,7 +256,7 @@ void DdgiTesting::calculate_lum_for_spec() {
     device.set_shader(lum_calc);
     set_shit_fuck();
     const int num_cubemaps = RenderGiManager::inst->get_num_cubemaps();
-    device.shader().set_int("num_cubemaps", num_cubemaps);
+    device.shader()->set_int("num_cubemaps", num_cubemaps);
 
     const int groups = glm::ceil(num / 64.f);
     printf("$$$$$$$$$$$$$$$$$$calculate_lum_for_spec %d\n", groups);

@@ -85,9 +85,9 @@ void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, sc
 		state.depth_testing = state.depth_writes = false;
 		state.vao = vertex_input->get_internal_handle();
 		state.backface_culling = false;
-		state.program = prefilter_specular_new;
+		state.program = draw.get_prog_man().get_obj(prefilter_specular_new);
 		device.set_pipeline(state);
-		auto shader = device.shader();
+		IGraphicsShader* shader = device.shader();
 
 		gfx().bind_texture(0, t->gpu_ptr);
 
@@ -95,7 +95,7 @@ void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, sc
 			size >>= 1;
 
 			float roughness = (float)mip / (MAX_MIP_ROUGHNESS - 1);
-			shader.set_float("roughness", roughness);
+			shader->set_float("roughness", roughness);
 
 			for (int i = 0; i < 6; i++) {
 				RenderPassState pass;
@@ -104,7 +104,7 @@ void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, sc
 				gfx().set_render_pass(pass);
 				device.set_viewport(0, 0, size, size);
 
-				shader.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
+				shader->set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
 				gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 36);
 			}
 		}
@@ -135,12 +135,12 @@ void EnviornmentMapHelper::compute_irradiance_new(
 	device.reset_states();
 	{
 		RenderPipelineState state;
-		state.program = prefilter_irradiance;
+		state.program = draw.get_prog_man().get_obj(prefilter_irradiance);
 		state.depth_testing = state.depth_writes = false;
 		state.backface_culling = false;
 		state.vao = vertex_input->get_internal_handle();
 		device.set_pipeline(state);
-		auto shader = device.shader();
+		IGraphicsShader* shader = device.shader();
 
 		gfx().bind_texture(0, t->gpu_ptr);
 
@@ -150,7 +150,7 @@ void EnviornmentMapHelper::compute_irradiance_new(
 			pass.color_infos = color_infos;
 			gfx().set_render_pass(pass);
 
-			shader.set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
+			shader->set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
 			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 36);
 		}
 	}

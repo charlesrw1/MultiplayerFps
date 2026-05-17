@@ -2,7 +2,7 @@
 // GPU device abstraction: pipeline state, render pass, stats, program manager, OpenglRenderDevice.
 
 #include "Render/DrawTypedefs.h"
-#include "Render/Shader.h"
+#include "Render/IGraphicsDevice.h"
 #include "Framework/Util.h"
 
 #include "glad/glad.h"
@@ -11,8 +11,6 @@
 
 class IGraphicsTexture;
 class IGraphicsBuffer;
-class IGraphicsProgram;
-class IGraphicsShader;
 class Renderer;
 
 // ---------------------------------------------------------------------------
@@ -41,9 +39,6 @@ struct Render_Stats
 struct RenderPipelineState
 {
 	RenderPipelineState() = default;
-	RenderPipelineState(bool backface_culling, bool cull_front_face, bool depth_testing, bool depth_less_than,
-						bool depth_writes, BlendState blend_state, program_handle shader, vertexarrayhandle vao,
-						fbohandle framebuffer);
 
 	bool backface_culling = true;
 	bool cull_front_face = false;
@@ -51,7 +46,10 @@ struct RenderPipelineState
 	bool depth_less_than = false;
 	bool depth_writes = true;
 	BlendState blend = BlendState::OPAQUE;
-	program_handle program = 0;
+	// Phase 1.7d: was program_handle (int index into Program_Manager). Now an
+	// IGraphicsShader* — set_pipeline can bind without indirection and Phase 2c
+	// SDL3 pipeline-cache hashing can read the pointer straight from the struct.
+	IGraphicsShader* program = nullptr;
 	vertexarrayhandle vao = 0;
 };
 
@@ -102,11 +100,9 @@ public:
 	program_handle create_raster_geo(const std::string& frag, const std::string& vert, const std::string& geo = nullptr,
 									 const std::string& defines = {});
 	program_handle create_compute(const std::string& compute, const std::string& defines = {});
-	Shader get_obj(program_handle handle) const {
+	IGraphicsShader* get_obj(program_handle handle) const {
 		assert(handle >= 0 && handle < programs.size());
-		Shader s = programs[handle].shader_obj;
-		s.gfx_handle = programs[handle].gfx_shader;
-		return s;
+		return programs[handle].gfx_shader;
 	}
 	bool did_shader_fail(program_handle handle) const {
 		assert(handle >= 0 && handle < programs.size());
@@ -126,13 +122,7 @@ public:
 		bool is_tesselation = false;
 
 		bool is_shared() const { return !vert.empty() && frag.empty() && !is_compute; }
-		// Phase 1.7a: gfx_shader owns the program for compute + single-file-tess
-		// paths (routed through gfx().create_shader_*). The legacy binary-cache
-		// paths in recompile_shared / recompile_normal still own the GL id via
-		// shader_obj.ID directly; gfx_shader stays nullptr there until 1.7d.
-		// shader_obj.ID is always the read mirror used by callers / set_pipeline.
 		IGraphicsShader* gfx_shader = nullptr;
-		Shader shader_obj;
 	};
 	std::vector<program_def> programs;
 
@@ -144,15 +134,8 @@ public:
 	}
 
 private:
-	void recompile_normal(program_def& def);
-	void recompile_shared(program_def& def);
 	void recompile(program_def& def);
 	void recompile_do(program_def& def);
-
-	// Drain the prior compiled program before the next compile installs a
-	// new one. Single-rooted ownership: gfx_shader owns when set, otherwise
-	// the raw shader_obj.ID does (binary-cache paths until 1.7d).
-	void release_prior_program(program_def& def);
 };
 
 // ---------------------------------------------------------------------------
@@ -163,11 +146,7 @@ class OpenglRenderDevice
 {
 public:
 	OpenglRenderDevice() { memset(textures_bound, 0, sizeof(textures_bound)); }
-	Shader shader() const {
-		if (active_program == -1)
-			return Shader();
-		return prog_man.get_obj(active_program);
-	}
+	IGraphicsShader* shader() const { return active_program; }
 	Program_Manager& get_prog_man() { return prog_man; }
 
 	void set_pipeline(const RenderPipelineState& pipeline);
@@ -189,7 +168,7 @@ public:
 	const Render_Stats& get_stats() { return lastStats; }
 
 	void reset_states() {
-		active_program = -1;
+		active_program = nullptr;
 		invalidate_all();
 	}
 	void on_frame_start() {
@@ -206,6 +185,7 @@ public:
 			bind_texture(bind, ptr->get_internal_handle());
 	}
 	void set_shader(program_handle handle);
+	void set_shader_ptr(IGraphicsShader* shader);
 	void set_depth_write_enabled(bool enabled);
 
 private:
@@ -222,7 +202,7 @@ private:
 	friend struct GpuRenderPassScope;
 
 	static const int MAX_SAMPLER_BINDINGS = 32;
-	program_handle active_program = -1;
+	IGraphicsShader* active_program = nullptr;
 	texhandle textures_bound[MAX_SAMPLER_BINDINGS];
 	BlendState blending = BlendState::OPAQUE;
 	bool show_backface = false;

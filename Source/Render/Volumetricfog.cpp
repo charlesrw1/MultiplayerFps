@@ -87,7 +87,7 @@ void Volumetric_Fog_System::compute() {
 
 		draw.bind_texture_ptr(0, texture.last_volume);
 
-		draw.shader().set_int("num_lights", draw.scene.light_list.objects.size());
+		draw.shader()->set_int("num_lights", draw.scene.light_list.objects.size());
 
 		gfx().bind_image_for_compute(2, texture.volume, 0, -1, GraphicsImageAccess::WriteOnly);
 		draw.bind_texture_ptr(1, draw.spotShadows->get_atlas().get_atlas_texture());

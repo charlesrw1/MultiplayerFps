@@ -21,9 +21,9 @@ void blit_texture_into_thing_because_reasons(IGraphicsTexture* srct, IGraphicsTe
 	state.depth_testing = false;
 	state.depth_writes = false;
 	state.vao = draw.get_empty_vao();
-	state.program = draw.prog.fullscreen_draw_texture;
+	state.program = draw.get_prog_man().get_obj(draw.prog.fullscreen_draw_texture);
 	device.set_pipeline(state);
-	device.shader().set_ivec2("viewport_size", glm::ivec2(dest.w, dest.h));
+	device.shader()->set_ivec2("viewport_size", glm::ivec2(dest.w, dest.h));
 
 	device.bind_texture_ptr(0, srct);
 

@@ -87,14 +87,15 @@ void DebuggingTextureOutput::draw_out() {
 	using gtt = GraphicsTextureType;
 	auto type = output_tex->gpu_ptr->get_texture_type();
 
+	auto& pm = draw.get_prog_man();
 	if (type == gtt::t2D)
-		state.program = (draw.prog.tex_debug_2d);
+		state.program = pm.get_obj(draw.prog.tex_debug_2d);
 	else if (type == gtt::t2DArray)
-		state.program = (draw.prog.tex_debug_2d_array);
+		state.program = pm.get_obj(draw.prog.tex_debug_2d_array);
 	else if (type == gtt::tCubemap)
-		state.program = (draw.prog.tex_debug_cubemap);
+		state.program = pm.get_obj(draw.prog.tex_debug_cubemap);
 	else if (type == gtt::tCubemapArray)
-		state.program = (draw.prog.tex_debug_cubemap_array);
+		state.program = pm.get_obj(draw.prog.tex_debug_cubemap_array);
 	else {
 		sys_print(Error, "can only debug 2d and 2d array textures\n");
 		output_tex = nullptr;
@@ -109,12 +110,12 @@ void DebuggingTextureOutput::draw_out() {
 
 	device.set_pipeline(state);
 
-	draw.shader().set_mat4("Model", mat4(1));
+	draw.shader()->set_mat4("Model", mat4(1));
 	glm::mat4 proj = glm::ortho(0.f, cur_w, cur_h, 0.f);
-	draw.shader().set_mat4("ViewProj", proj);
+	draw.shader()->set_mat4("ViewProj", proj);
 
-	draw.shader().set_float("alpha", alpha);
-	draw.shader().set_float("mip_slice", mip);
+	draw.shader()->set_float("alpha", alpha);
+	draw.shader()->set_float("mip_slice", mip);
 
 	draw.bind_texture_ptr(0, output_tex->gpu_ptr);
 

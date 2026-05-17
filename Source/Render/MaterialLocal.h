@@ -3,7 +3,7 @@
 #include <vector>
 #include <unordered_set>
 #include "Framework/Handle.h"
-#include "Shader.h"
+#include "DrawTypedefs.h"
 #include <unordered_map>
 #include "Framework/Files.h"
 

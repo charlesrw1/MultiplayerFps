@@ -245,14 +245,14 @@ void SSAO_System::render() {
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
-		state.program = prog.linearize_depth;
+		state.program = draw.get_prog_man().get_obj(prog.linearize_depth);
 		device.set_pipeline(state);
-		auto shader = device.shader();
+		IGraphicsShader* shader = device.shader();
 
 		float near = viewsetup.near;
 		float far = viewsetup.far;
-		shader.set_vec4("clipInfo", glm::vec4(near * far, near - far, far, 1.0));
-		shader.set_float("zNear", near);
+		shader->set_vec4("clipInfo", glm::vec4(near * far, near - far, far, 1.0));
+		shader->set_float("zNear", near);
 
 		gfx().bind_texture(0, draw.tex.scene_depth);
 		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
@@ -270,13 +270,13 @@ void SSAO_System::render() {
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
-		state.program = prog.make_viewspace_normals;
+		state.program = draw.get_prog_man().get_obj(prog.make_viewspace_normals);
 		device.set_pipeline(state);
-		auto shader = device.shader();
+		IGraphicsShader* shader = device.shader();
 
-		shader.set_int("projOrtho", 0);
-		shader.set_vec4("projInfo", data.projInfo);
-		shader.set_vec2("InvFullResolution", data.InvFullResolution);
+		shader->set_int("projOrtho", 0);
+		shader->set_vec4("projInfo", data.projInfo);
+		shader->set_vec2("InvFullResolution", data.InvFullResolution);
 		gfx().bind_texture(0, texture.depthlinear);
 		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	}
@@ -287,9 +287,9 @@ void SSAO_System::render() {
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
-		state.program = prog.hbao_deinterleave;
+		state.program = draw.get_prog_man().get_obj(prog.hbao_deinterleave);
 		device.set_pipeline(state);
-		auto shader = device.shader();
+		IGraphicsShader* shader = device.shader();
 
 		gfx().bind_texture(0, texture.depthlinear);
 		for (int i = 0; i < RANDOM_ELEMENTS; i += NUM_MRT) {
@@ -307,7 +307,7 @@ void SSAO_System::render() {
 			pass.color_infos = std::span<const ColorTargetInfo>(targets_arr, NUM_MRT);
 			gfx().set_render_pass(pass);
 
-			shader.set_vec4("info", glm::vec4(float(i % 4) + 0.5f, float(i / 4) + 0.5f, data.InvFullResolution.x,
+			shader->set_vec4("info", glm::vec4(float(i % 4) + 0.5f, float(i / 4) + 0.5f, data.InvFullResolution.x,
 											  data.InvFullResolution.y));
 			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 		}
@@ -318,9 +318,9 @@ void SSAO_System::render() {
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
-		state.program = prog.hbao_calc;
+		state.program = draw.get_prog_man().get_obj(prog.hbao_calc);
 		device.set_pipeline(state);
-		auto shader = device.shader();
+		IGraphicsShader* shader = device.shader();
 
 		gfx().bind_texture(0, texture.deptharray);
 		gfx().bind_texture(1, texture.viewnormal);
@@ -332,7 +332,7 @@ void SSAO_System::render() {
 			pass.color_infos = targets;
 			gfx().set_render_pass(pass);
 
-			shader.set_uint("primitive_id_custom", i);
+			shader->set_uint("primitive_id_custom", i);
 			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 		}
 	}
@@ -347,7 +347,7 @@ void SSAO_System::render() {
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
-		state.program = prog.hbao_reinterleave;
+		state.program = draw.get_prog_man().get_obj(prog.hbao_reinterleave);
 		device.set_pipeline(state);
 
 		gfx().bind_texture(0, texture.resultarray);
@@ -359,7 +359,7 @@ void SSAO_System::render() {
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();
 		state.depth_testing = state.depth_writes = false;
-		state.program = prog.hbao_blur;
+		state.program = draw.get_prog_man().get_obj(prog.hbao_blur);
 
 		// horizontal pass: read .result, write .blurred
 		{
@@ -369,10 +369,10 @@ void SSAO_System::render() {
 			gfx().set_render_pass(pass);
 
 			device.set_pipeline(state);
-			auto shader = device.shader();
+			IGraphicsShader* shader = device.shader();
 			gfx().bind_texture(0, texture.result);
-			shader.set_float("g_Sharpness", tweak.blur_sharpness);
-			shader.set_vec2("g_InvResolutionDirection", glm::vec2(1.0f / float(width), 0));
+			shader->set_float("g_Sharpness", tweak.blur_sharpness);
+			shader->set_vec2("g_InvResolutionDirection", glm::vec2(1.0f / float(width), 0));
 			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 		}
 
@@ -384,10 +384,10 @@ void SSAO_System::render() {
 			gfx().set_render_pass(pass);
 
 			device.set_pipeline(state);
-			auto shader = device.shader();
+			IGraphicsShader* shader = device.shader();
 			gfx().bind_texture(0, texture.blurred);
-			shader.set_float("g_Sharpness", tweak.blur_sharpness);
-			shader.set_vec2("g_InvResolutionDirection", glm::vec2(0, 1.0f / float(height)));
+			shader->set_float("g_Sharpness", tweak.blur_sharpness);
+			shader->set_vec2("g_InvResolutionDirection", glm::vec2(0, 1.0f / float(height)));
 			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 		}
 	}

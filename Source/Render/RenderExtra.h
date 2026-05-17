@@ -3,7 +3,6 @@
 #include "Framework/Config.h"
 #include "glm/glm.hpp"
 #include "Framework/Util.h"
-#include "Shader.h"
 #include "../Shaders/SharedGpuTypes.txt"
 #include "DrawTypedefs.h"
 #include <unordered_map>

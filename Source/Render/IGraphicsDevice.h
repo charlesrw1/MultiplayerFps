@@ -215,9 +215,8 @@ public:
 
 // Compiled+linked GPU program (vert+frag / vert+frag+geo / vert+frag+tess /
 // compute). Owns the underlying GL program (or future SDL3 GPU shader objects).
-// Created via gfx().create_shader_*; destroyed via release(). Phase 1.7 wraps
-// the existing Shader.cpp compile/link pipeline; phase 2c migrates
-// RenderPipelineState::program from program_handle to IGraphicsShader*.
+// Created via gfx().create_shader_*; destroyed via release(). Bound as part of
+// RenderPipelineState; cf. Pipeline model in docs/rendering/gfx_abstraction.md.
 class IGraphicsShader
 {
 public:
@@ -510,13 +509,13 @@ public:
 													int max_draw_count,
 													int stride) = 0;
 
-	// ---- Phase 1.7a wrap surface (shader factory) -------------------------
+	// ---- Shader factory ---------------------------------------------------
 
-	// Compile + link a GPU program. Each variant matches one of the
-	// Shader::compile* overloads. Path arguments are passed through to the
+	// Compile + link a GPU program. Path arguments are passed through to the
 	// shader source loader (resolved relative to the shader root). Defines is
-	// a comma-separated list of #define names (matches Shader::compile's
-	// shader_defines parameter).
+	// a comma-separated list of #define names. vert+frag, vert+frag+geo, and
+	// single-file (non-tess) variants transparently consult the program-binary
+	// cache; compute and single-file-tess always recompile.
 	//
 	// On compile/link failure: returns nullptr (caller is expected to mark
 	// the program as failed and continue running with a fallback). On success:

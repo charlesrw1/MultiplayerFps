@@ -1,11 +1,11 @@
 #ifndef ENVPROBE_H
 #define ENVPROBE_H
 
-#include "Shader.h"
 #include "Framework/Util.h"
 #include <string>
 #include "Texture.h"
 #include "IGraphicsDevice.h"
+#include "DrawTypedefs.h"
 class EnvCubemap
 {
 public:

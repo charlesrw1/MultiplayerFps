@@ -40,14 +40,14 @@ void Renderer::draw_meshbuilders() {
 
 		if (mb.use_background_color) {
 			RenderPipelineState state;
-			state.program = prog.simple_solid_color;
+			state.program = get_prog_man().get_obj(prog.simple_solid_color);
 			state.depth_testing = mb.depth_tested;
 			state.depth_writes = false;
 			device.set_pipeline(state);
 
-			shader().set_mat4("ViewProj", current_frame_view.viewproj);
-			shader().set_mat4("Model", mb.transform);
-			shader().set_vec4("solid_color", color32_to_vec4(mb.background_color));
+			shader()->set_mat4("ViewProj", current_frame_view.viewproj);
+			shader()->set_mat4("Model", mb.transform);
+			shader()->set_vec4("solid_color", color32_to_vec4(mb.background_color));
 
 			gfx().set_line_width(3);
 			dd.draw(MeshBuilderDD::LINES);
@@ -55,13 +55,13 @@ void Renderer::draw_meshbuilders() {
 		}
 
 		RenderPipelineState state;
-		state.program = prog.simple;
+		state.program = get_prog_man().get_obj(prog.simple);
 		state.depth_testing = mb.depth_tested;
 		state.depth_writes = false;
 		device.set_pipeline(state);
 
-		shader().set_mat4("ViewProj", current_frame_view.viewproj);
-		shader().set_mat4("Model", mb.transform);
+		shader()->set_mat4("ViewProj", current_frame_view.viewproj);
+		shader()->set_mat4("Model", mb.transform);
 		dd.draw(MeshBuilderDD::LINES);
 	}
 }
@@ -167,12 +167,13 @@ void LightListCuller::draw_lights() {
 
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
+	auto& pm = draw.get_prog_man();
 	if (r_light_use_tiled.get_integer() == 1)
-		state.program = draw.prog.light_accumulation_fullscreen_tiled;
+		state.program = pm.get_obj(draw.prog.light_accumulation_fullscreen_tiled);
 	else if (r_light_use_tiled.get_integer() == 2)
-		state.program = draw.prog.light_accumulation_fullscreen_tiled2;
+		state.program = pm.get_obj(draw.prog.light_accumulation_fullscreen_tiled2);
 	else
-		state.program = draw.prog.light_accumulation_fullscreen;
+		state.program = pm.get_obj(draw.prog.light_accumulation_fullscreen);
 	state.blend = BlendState::ADD;
 	state.depth_testing = false;
 	state.depth_writes = false;
@@ -194,7 +195,7 @@ void LightListCuller::draw_lights() {
 	gfx().bind_storage_buffer_base(4, light_indirection);
 
 	if (r_light_use_tiled.get_integer() != 1)
-		draw.shader().set_int("num_lights", draw.scene.light_list.objects.size());
+		draw.shader()->set_int("num_lights", draw.scene.light_list.objects.size());
 
 	if (r_light_use_tiled.get_integer() == 2) { // MAIN PATH
 		// its sometimes 2x faster than normal tiled to do this "dumb" way. okay i guess.
@@ -213,9 +214,9 @@ void LightListCuller::draw_lights() {
 			for (int x = 0; x < tile_count.x; x++) {
 				const int index = y * tile_count.x + x;
 				const int count = counts.at(index);
-				draw.shader().set_int("num_lights", count);
+				draw.shader()->set_int("num_lights", count);
 				const int light_offset = index * gpu::MAX_TILE_LIGHTS;
-				draw.shader().set_int("light_indirect_offset", light_offset);
+				draw.shader()->set_int("light_indirect_offset", light_offset);
 
 				const int y_to_use = tile_count.y - y - 1;
 				glm::vec2 ofs = glm::floor(glm::vec2(x * tile_size.x, y_to_use * tile_size.y));
@@ -330,7 +331,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 	} else if (!r_no_indirect.get_bool()) {
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
-		state.program = prog.ambient_accumulation;
+		state.program = get_prog_man().get_obj(prog.ambient_accumulation);
 		state.blend =
 			BlendState::ADD; // does a mult of (albedo+ao) with the indirect lighting already in tex.scene_color
 		state.depth_testing = false;
@@ -338,8 +339,8 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		device.set_pipeline(state);
 
 		if (!scene.skylights.empty()) {
-			device.shader().set_vec3("sky_color", scene.skylights.at(0).ambientCube[2]);
-			device.shader().set_vec3("ground_color", scene.skylights.at(0).ambientCube[3]);
+			device.shader()->set_vec3("sky_color", scene.skylights.at(0).ambientCube[2]);
+			device.shader()->set_vec3("ground_color", scene.skylights.at(0).ambientCube[3]);
 		}
 
 		bind_texture_ptr(0, tex.scene_gbuffer0);
@@ -362,10 +363,10 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		RenderPipelineState state;
 		state.vao = get_empty_vao();
 		if (debug_sun_shadow.get_bool()) {
-			state.program = prog.sunlight_accumulation_debug;
+			state.program = get_prog_man().get_obj(prog.sunlight_accumulation_debug);
 			state.blend = BlendState::OPAQUE;
 		} else {
-			state.program = prog.sunlight_accumulation;
+			state.program = get_prog_man().get_obj(prog.sunlight_accumulation);
 			state.blend = BlendState::ADD;
 		}
 		state.depth_testing = false;
@@ -379,9 +380,9 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		bind_texture_ptr(4, draw.shadowmap.texture.shadow_array);
 		gfx().bind_uniform_buffer_base(8, draw.shadowmap.ubo.info);
 
-		shader().set_vec3("uSunDirection", sun_internal->sun.direction);
-		shader().set_vec3("uSunColor", sun_internal->sun.color);
-		shader().set_float("uEpsilon", sun_internal->sun.epsilon);
+		shader()->set_vec3("uSunDirection", sun_internal->sun.direction);
+		shader()->set_vec3("uSunColor", sun_internal->sun.color);
+		shader()->set_float("uEpsilon", sun_internal->sun.epsilon);
 
 		// fullscreen shader, no vao used
 		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);

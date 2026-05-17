@@ -125,7 +125,7 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 	}
 
 	RenderPipelineState state;
-	state.program = program;
+	state.program = draw.get_prog_man().get_obj(program);
 	state.vao = vao_ptr->get_internal_handle();
 	state.backface_culling = !show_backface && !force_backface;
 	state.blend = blend;

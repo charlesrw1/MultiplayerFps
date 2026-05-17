@@ -142,12 +142,61 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.7a** | `IGraphicsShader` interface + factory scaffolding | — | `IGraphicsShader`; `create_shader_{vert_frag,vert_frag_geo,compute,single_file,single_file_tess}`; `OpenGlShaderImpl.cpp`; route compute + shared-tess paths in `Program_Manager::recompile_do` through factory | done |
 | **1.7b** | Move `Shader.cpp` compile/link bodies into `OpenGlShaderImpl.cpp` | ~50 | source-loader + `glCreateShader/Compile/Attach/Link/Delete` move into backend; `Shader::compile*` stays in `Shader.h` but bodies live in backend TU | done |
 | **1.7c** | Uniform setters onto `IGraphicsShader` | ~12 | `IGraphicsShader::{use,set_int,set_float,set_mat4,…,set_block_binding}` (DSA `glProgramUniform*`); `Shader::set_*` forward through `gfx_handle`; binary-cache paths populate `gfx_shader` via `opengl_wrap_program_handle` | done |
-| 1.7d | Program-binary cache + delete `Shader` struct | ~20 | move `glProgramBinary`/`glGetProgramBinary` cache paths in `recompile_shared`/`recompile_normal` into backend; delete `Shader` struct; `RenderPipelineState::program` becomes `IGraphicsShader*` (lifts into Phase 2c) | not started |
+| **1.7d** | Program-binary cache + delete `Shader` struct | ~20 | move `glProgramBinary`/`glGetProgramBinary` cache paths in `recompile_shared`/`recompile_normal` into backend; delete `Shader` struct; `RenderPipelineState::program` becomes `IGraphicsShader*` (lifted from Phase 2c) | done |
 | 1.8 | Window/swapchain + ImGui wrap | ~30 (`SDL_GL_*`, `gladLoad*`, swap, vsync, imgui_render) | factory move from `EngineMain_Init.cpp`; `set_vsync`, `present`, `imgui_render` | not started |
 | 1.9 | `r.gpu.no_legacy_calls=1` assertion test + rip per-subsystem `r.gfx.wrap.*` flags | — | gates phase boundary | not started |
 | **1.5 (post-1.x)** | Null/passthrough leak-detector backend | — | gate that proves the wrap is complete | not started |
 
 Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
+
+## Sub-phase 1.7d status
+
+- Program-binary cache (load + timestamp check + `glProgramBinary` /
+  `glGetProgramBinary` save) moved from `Program_Manager::recompile_shared` /
+  `recompile_normal` (DrawLocal_Device.cpp) into anonymous-namespace helpers
+  in `OpenGlShaderImpl.cpp` (`try_load_program_binary`, `save_program_binary`,
+  `make_cache_filename`). Caching is now transparent inside the factories —
+  `opengl_create_shader_vert_frag`, `opengl_create_shader_vert_frag_geo`, and
+  `opengl_create_shader_single_file` do load → fallback-compile → save in one
+  call. Compute and single-file-tess factories skip the cache (matches prior
+  behavior — those paths never cached).
+- `Program_Manager` collapsed: `recompile_shared` / `recompile_normal` /
+  `compute_hash_for_program_def` / `release_prior_program` deleted. `recompile_do`
+  is now a simple dispatch — release prior `gfx_shader`, then call the
+  appropriate `gfx().create_shader_*`. All five compile branches funnel through
+  the backend factory; no `gl*` calls remain in `DrawLocal_Device.cpp` along
+  the shader path.
+- `Shader.h` and `Shader.cpp` deleted. The legacy `Shader::compile*` static
+  methods became free anonymous-namespace functions in `OpenGlShaderImpl.cpp`
+  returning `uint32_t` program-id (0 on failure); the uniform setters + `use()`
+  live entirely on `OpenGLShaderImpl` (Sub-phase 1.7c moved those). Removed
+  `#include "Render/Shader.h"` from DrawLocal.h, EnvProbe.h, MaterialLocal.h,
+  RenderExtra.h, DrawLocal_Device.h.
+- `Program_Manager::program_def` now holds only `IGraphicsShader* gfx_shader`
+  (no more `Shader shader_obj` mirror). `Program_Manager::get_obj(handle)`
+  returns `IGraphicsShader*` instead of `Shader`. `Renderer::shader()` and
+  `OpenglRenderDevice::shader()` return `IGraphicsShader*`; uniform-setter
+  call sites switched from `.set_X` to `->set_X`.
+- `RenderPipelineState::program` migrated from `program_handle` (int) to
+  `IGraphicsShader*`. This was originally scheduled for Phase 2c — lifted into
+  1.7d so the program field can be hashed straight from the struct in the
+  Phase 2c SDL3 pipeline cache. All 30+ `state.program = X` callers (RenderPass,
+  BatchScene, SceneDrawInternal, Lighting, RenderPass bloom, Misc, Debug,
+  SSAO, SSR, EnvProbe, DecalBatcher, GpuCullingTest, RaytraceTest_Shade,
+  LightCookieAtlas, etc.) wrap the handle via
+  `draw.get_prog_man().get_obj(handle)`. Default value is `nullptr`.
+- `OpenglRenderDevice::set_pipeline` calls a new `set_shader_ptr(IGraphicsShader*)`
+  internal that diffs against the cached `active_program` (now also
+  `IGraphicsShader*`). `set_shader(program_handle)` survives as a thin wrapper
+  for the compute-dispatch call sites (`GpuCullingTest`, `Volumetricfog`,
+  `RaytraceTest_Probe`, `RenderExtra_SSR::hiz_downsample`) — keeps the
+  `program_handle` API surface intact for non-pipeline contexts.
+- The transitional `opengl_wrap_program_handle` helper is gone — no
+  out-of-backend callers wrap a raw GL program id anymore.
+- The long-form `RenderPipelineState(bool, bool, ..., program_handle, ...)`
+  constructor (unused) removed.
+- 184 unit tests + integration suite (80 tests) green; `bake_probes_test`
+  screenshot within its soft-fail band (max_delta=68, 3 pixel diff).
 
 ## Sub-phase 1.7c status
 

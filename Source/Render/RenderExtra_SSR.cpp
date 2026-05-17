@@ -46,10 +46,10 @@ void SSRSystem::compute_depth() {
 
 		int groups_x = glm::ceil(width / 32.f);
 		int groups_y = glm::ceil(height / 32.f);
-		draw.shader().set_float("width", width);
-		draw.shader().set_float("height", height);
+		draw.shader()->set_float("width", width);
+		draw.shader()->set_float("height", height);
 		const int level_to_sample = level == 0 ? 0 : level - 1;
-		draw.shader().set_int("level", level_to_sample);
+		draw.shader()->set_int("level", level_to_sample);
 
 		gfx().dispatch_compute(groups_x, groups_y, 1);
 
@@ -72,7 +72,7 @@ void SSRSystem::do_downsample() {
 	auto& device = draw.get_device();
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
-	state.program = ssr_downsample;
+	state.program = draw.get_prog_man().get_obj(ssr_downsample);
 	state.blend = BlendState::OPAQUE;
 	state.depth_testing = false;
 	state.depth_writes = false;
@@ -87,9 +87,9 @@ void SSRSystem::do_downsample() {
 		rp.color_infos = targets;
 		gfx().set_render_pass(rp);
 		int mip_to_fetch = (i == 0) ? 0 : i - 1;
-		device.shader().set_int("mip_level", mip_to_fetch);
-		device.shader().set_vec2("myimg_size", size);
-		device.shader().set_vec2("inv_prev_size", inv_presize);
+		device.shader()->set_int("mip_level", mip_to_fetch);
+		device.shader()->set_vec2("myimg_size", size);
+		device.shader()->set_vec2("inv_prev_size", inv_presize);
 		if (i == 0)
 			device.bind_texture_ptr(0, draw.tex.last_scene_color);
 		else
@@ -115,7 +115,7 @@ void SSRSystem::do_upsample() {
 	auto& device = draw.get_device();
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
-	state.program = ssr_upsample;
+	state.program = draw.get_prog_man().get_obj(ssr_upsample);
 	state.blend = BlendState::ADD;
 	state.depth_testing = false;
 	state.depth_writes = false;
@@ -132,10 +132,10 @@ void SSRSystem::do_upsample() {
 	device.bind_texture_ptr(6, draw.tex.scene_color_mipchain);
 
 	static int frame = 0;
-	device.shader().set_int("temporal_frame", (frame++) % 4);
-	device.shader().set_bool("debug_toggle", debug_toggle);
-	device.shader().set_int("res_mode", r_ssr_res.get_integer());
-	device.shader().set_int("num_samples_to_get", r_ssr_num_samples.get_integer());
+	device.shader()->set_int("temporal_frame", (frame++) % 4);
+	device.shader()->set_bool("debug_toggle", debug_toggle);
+	device.shader()->set_int("res_mode", r_ssr_res.get_integer());
+	device.shader()->set_int("num_samples_to_get", r_ssr_num_samples.get_integer());
 
 	auto targets = {ColorTargetInfo(draw.tex.last_reflection_accum)};
 	RenderPassState rp;
@@ -148,12 +148,12 @@ void SSRSystem::do_upsample() {
 	// now do blur and output
 
 	state.vao = draw.get_empty_vao();
-	state.program = ssr_blur;
+	state.program = draw.get_prog_man().get_obj(ssr_blur);
 	state.blend = BlendState::ADD;
 	state.depth_testing = false;
 	state.depth_writes = false;
 	device.set_pipeline(state);
-	device.shader().set_vec2("texelSize", inv_presize);
+	device.shader()->set_vec2("texelSize", inv_presize);
 
 	auto targets2 = {ColorTargetInfo(draw.tex.scene_color)};
 	rp;
@@ -187,7 +187,7 @@ void SSRSystem::do_temporal() {
 
 	RenderPipelineState state{};
 	state.blend = BlendState::OPAQUE;
-	state.program = temporal_upsample;
+	state.program = draw.get_prog_man().get_obj(temporal_upsample);
 	device.set_pipeline(state);
 	auto& vs = draw.current_frame_view;
 	device.set_viewport(0, 0, vs.width, vs.height);
@@ -207,18 +207,18 @@ void SSRSystem::do_temporal() {
 	extern float taa_doc_bias;
 	extern float taa_doc_pow;
 
-	auto the_shader = device.shader();
-	the_shader.set_float("amt", ssr_temporal_blend.get_float());
-	the_shader.set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
-	the_shader.set_mat4("lastViewProj", draw.last_frame_main_view.viewproj);
-	the_shader.set_bool("use_reproject", r_taa_reproject.get_bool());
-	the_shader.set_float("doc_mult", taa_doc_mult);
-	the_shader.set_float("doc_vel_bias", taa_doc_vel_bias);
-	the_shader.set_float("doc_bias", taa_doc_bias);
-	the_shader.set_float("doc_pow", taa_doc_pow);
-	the_shader.set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
-	the_shader.set_ivec2("halfres_texel_offset", get_frame_offset());
-	the_shader.set_float("ssr_nonoccluded_weight_mult", ssr_nonoccluded_weight_mult);
+	IGraphicsShader* the_shader = device.shader();
+	the_shader->set_float("amt", ssr_temporal_blend.get_float());
+	the_shader->set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
+	the_shader->set_mat4("lastViewProj", draw.last_frame_main_view.viewproj);
+	the_shader->set_bool("use_reproject", r_taa_reproject.get_bool());
+	the_shader->set_float("doc_mult", taa_doc_mult);
+	the_shader->set_float("doc_vel_bias", taa_doc_vel_bias);
+	the_shader->set_float("doc_bias", taa_doc_bias);
+	the_shader->set_float("doc_pow", taa_doc_pow);
+	the_shader->set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
+	the_shader->set_ivec2("halfres_texel_offset", get_frame_offset());
+	the_shader->set_float("ssr_nonoccluded_weight_mult", ssr_nonoccluded_weight_mult);
 	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }
 
@@ -307,28 +307,28 @@ void SSRSystem::execute_compute() {
 
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
-	state.program = ssr_compute;
+	state.program = draw.get_prog_man().get_obj(ssr_compute);
 	state.blend = BlendState::OPAQUE;
 	state.depth_testing = false;
 	state.depth_writes = false;
 	device.set_pipeline(state);
-	device.shader().set_int("MAX_STEPS", max_steps);
-	device.shader().set_float("max_distance", max_dist);
-	device.shader().set_float("bias", bias);
-	device.shader().set_float("step_size", step_size);
-	device.shader().set_float("max_thickness", max_thick);
-	device.shader().set_bool("debug_toggle", debug_toggle);
+	device.shader()->set_int("MAX_STEPS", max_steps);
+	device.shader()->set_float("max_distance", max_dist);
+	device.shader()->set_float("bias", bias);
+	device.shader()->set_float("step_size", step_size);
+	device.shader()->set_float("max_thickness", max_thick);
+	device.shader()->set_bool("debug_toggle", debug_toggle);
 	auto time = GetTime();
 	static int index = 0;
-	device.shader().set_float("temporalTime", float(index++));
+	device.shader()->set_float("temporalTime", float(index++));
 	r_ssr_res.set_integer(2);
-	device.shader().set_int("res_mode", r_ssr_res.get_integer());
-	device.shader().set_float("ssr_max_roughness", ssr_max_roughness);
-	device.shader().set_float("ssr_brdf_bias", ssr_brdf_bias);
-	device.shader().set_float("ssr_mip_bias", ssr_mip_bias);
-	device.shader().set_int("random_repeat", random_repeat);
-	device.shader().set_int("traces_per_pixel", traces_per_pixel);
-	device.shader().set_mat4("lastViewProj", draw.last_frame_main_view.viewproj);
+	device.shader()->set_int("res_mode", r_ssr_res.get_integer());
+	device.shader()->set_float("ssr_max_roughness", ssr_max_roughness);
+	device.shader()->set_float("ssr_brdf_bias", ssr_brdf_bias);
+	device.shader()->set_float("ssr_mip_bias", ssr_mip_bias);
+	device.shader()->set_int("random_repeat", random_repeat);
+	device.shader()->set_int("traces_per_pixel", traces_per_pixel);
+	device.shader()->set_mat4("lastViewProj", draw.last_frame_main_view.viewproj);
 
 	glm::ivec2 texel_offset{};
 	if (r_ssr_res.get_integer() == 1) {
@@ -341,9 +341,9 @@ void SSRSystem::execute_compute() {
 	} else {
 		device.set_viewport(0, 0, viewsetup.width, viewsetup.height);
 	}
-	device.shader().set_ivec2("texel_offset", get_frame_offset());
+	device.shader()->set_ivec2("texel_offset", get_frame_offset());
 
-	device.shader().set_mat4("g_proj", viewsetup.proj);
+	device.shader()->set_mat4("g_proj", viewsetup.proj);
 	device.bind_texture_ptr(0, draw.tex.scene_gbuffer0);
 	device.bind_texture_ptr(1, draw.tex.scene_gbuffer1);
 	device.bind_texture_ptr(2, draw.tex.scene_gbuffer2);

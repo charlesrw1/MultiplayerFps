@@ -152,11 +152,11 @@ public:
 				pipe.cull_front_face = false;
 				pipe.depth_testing = false;
 				pipe.depth_writes = false;
-				pipe.program = matman.get_mat_shader(nullptr, mat, 0);
+				pipe.program = draw.get_prog_man().get_obj(matman.get_mat_shader(nullptr, mat, 0));
 				pipe.vao = mb_draw_data.VAO;
 				device.set_pipeline(pipe);
 
-				draw.shader().set_mat4("UIViewProj", view_proj);
+				draw.shader()->set_mat4("UIViewProj", view_proj);
 
 				auto& texs = mat->impl->get_textures();
 				for (int i = 0; i < (int)texs.size(); i++)

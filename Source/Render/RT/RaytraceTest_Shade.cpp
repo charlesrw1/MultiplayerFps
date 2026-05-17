@@ -45,7 +45,7 @@ void DdgiTesting::render_probes() {
     set_composite_pass();
 
     RenderPipelineState state = RenderPipelineState();
-    state.program = debug_probes;
+    state.program = draw.get_prog_man().get_obj(debug_probes);
     state.vao = g_modelMgr.get_vao_ptr(VaoType::Animated)->get_internal_handle();
     device.set_pipeline(state);
 
@@ -56,8 +56,8 @@ void DdgiTesting::render_probes() {
     if (draw_real_grid.get_integer() == 2) {
         for (auto& vol : myvolumes) {
             auto ddgiGRID = vol.size_offset;
-            device.shader().set_ivec3("vol_grid", ddgiGRID);
-            device.shader().set_int("vol_offset", ddgiGRID.w);
+            device.shader()->set_ivec3("vol_grid", ddgiGRID);
+            device.shader()->set_int("vol_offset", ddgiGRID.w);
 
             for (int x = 0; x < ddgiGRID.x; x++) {
                 for (int y = 0; y < ddgiGRID.y; y++) {
@@ -68,8 +68,8 @@ void DdgiTesting::render_probes() {
 
                         glm::mat4 tr = glm::translate(glm::mat4(1), glm::vec3(x, y, z) * glm::vec3(vol.density) +
                                                                         glm::vec3(vol.origin_priority) + ofs);
-                        device.shader().set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
-                        device.shader().set_ivec3("probe_coord", {x, y, z});
+                        device.shader()->set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
+                        device.shader()->set_ivec3("probe_coord", {x, y, z});
 
                         draw_model_simple_no_material(m);
                     }
@@ -88,8 +88,8 @@ void DdgiTesting::set_reflection_uniforms() {
     auto& device = draw.get_device();
 
     extern ConfigVar r_specular_ao_intensity;
-    device.shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
-    device.shader().set_int("lum_adjust_mode", lum_adjust_mode);
+    device.shader()->set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
+    device.shader()->set_int("lum_adjust_mode", lum_adjust_mode);
 
     {
         IGraphicsTexture* const cubemap_array = RenderGiManager::inst->get_cubemap_array_texture();
@@ -98,7 +98,7 @@ void DdgiTesting::set_reflection_uniforms() {
 
         gfx().bind_storage_buffer_base(11, cubemap_volume_buffer);
         draw.bind_texture_ptr(8, cubemap_array);
-        device.shader().set_int("num_cubemaps", num_cubemaps);
+        device.shader()->set_int("num_cubemaps", num_cubemaps);
     }
 
     draw.bind_texture(7, EnviornmentMapHelper::get().integrator.get_texture());
@@ -127,13 +127,13 @@ void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_
     draw.bind_texture_ptr(6, ssao);
 
     extern ConfigVar r_specular_ao_intensity;
-    device.shader().set_bool("include_cubemaps", !for_cubemap_view && include_cubemaps.get_bool());
+    device.shader()->set_bool("include_cubemaps", !for_cubemap_view && include_cubemaps.get_bool());
 
     set_shit_fuck();
 
-    device.shader().set_ivec3("selected_probe_pos", selected_probe);
-    device.shader().set_float("irrad_mult", irrad_mult);
-    device.shader().set_bool("wants_half_res", false);
+    device.shader()->set_ivec3("selected_probe_pos", selected_probe);
+    device.shader()->set_float("irrad_mult", irrad_mult);
+    device.shader()->set_bool("wants_half_res", false);
     set_reflection_uniforms();
 }
 
@@ -147,7 +147,7 @@ void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap
 
     RenderPipelineState state;
     state.vao = draw.get_empty_vao();
-    state.program = shade_fs;
+    state.program = draw.get_prog_man().get_obj(shade_fs);
     state.blend = BlendState::ADD;
     state.depth_testing = false;
     state.depth_writes = false;
@@ -178,15 +178,15 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
 
     RenderPipelineState state;
     state.vao = draw.get_empty_vao();
-    state.program = shade_fs_halfres;
+    state.program = draw.get_prog_man().get_obj(shade_fs_halfres);
     state.blend = BlendState::OPAQUE;
     state.depth_testing = false;
     state.depth_writes = false;
     device.set_pipeline(state);
 
     draw_lighting_shared(ssao, false);
-    device.shader().set_ivec2("halfres_texel_offset", texel_offset);
-    device.shader().set_bool("wants_half_res", true);
+    device.shader()->set_ivec2("halfres_texel_offset", texel_offset);
+    device.shader()->set_bool("wants_half_res", true);
 
     gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
@@ -198,7 +198,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
         gfx().set_render_pass(rp);
 
         state.blend = BlendState::OPAQUE;
-        state.program = temporal_upsample;
+        state.program = draw.get_prog_man().get_obj(temporal_upsample);
         device.set_pipeline(state);
 
         draw.bind_texture_ptr(0, draw.tex.halfres_scene_color);
@@ -217,17 +217,17 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
         extern float taa_doc_bias;
         extern float taa_doc_pow;
 
-        auto the_shader = device.shader();
-        the_shader.set_float("amt", r_ddgi_halfres_blend.get_float());
-        the_shader.set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
-        the_shader.set_mat4("lastViewProj", draw.last_frame_main_view.viewproj);
-        the_shader.set_bool("use_reproject", r_taa_reproject.get_bool());
-        the_shader.set_float("doc_mult", taa_doc_mult);
-        the_shader.set_float("doc_vel_bias", taa_doc_vel_bias);
-        the_shader.set_float("doc_bias", taa_doc_bias);
-        the_shader.set_float("doc_pow", taa_doc_pow);
-        the_shader.set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
-        the_shader.set_ivec2("halfres_texel_offset", texel_offset);
+        IGraphicsShader* the_shader = device.shader();
+        the_shader->set_float("amt", r_ddgi_halfres_blend.get_float());
+        the_shader->set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
+        the_shader->set_mat4("lastViewProj", draw.last_frame_main_view.viewproj);
+        the_shader->set_bool("use_reproject", r_taa_reproject.get_bool());
+        the_shader->set_float("doc_mult", taa_doc_mult);
+        the_shader->set_float("doc_vel_bias", taa_doc_vel_bias);
+        the_shader->set_float("doc_bias", taa_doc_bias);
+        the_shader->set_float("doc_pow", taa_doc_pow);
+        the_shader->set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
+        the_shader->set_ivec2("halfres_texel_offset", texel_offset);
 
         gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
     }
@@ -238,7 +238,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     auto targets3 = {ColorTargetInfo(draw.tex.scene_color)};
     rp.color_infos = targets3;
     gfx().set_render_pass(rp);
-    state.program = apply_halfres_accum_to_scene;
+    state.program = draw.get_prog_man().get_obj(apply_halfres_accum_to_scene);
     state.blend = BlendState::ADD;
     device.set_pipeline(state);
     draw.bind_texture_ptr(0, draw.tex.scene_gbuffer0);
@@ -247,7 +247,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     draw.bind_texture_ptr(3, draw.tex.scene_depth);
     draw.bind_texture_ptr(4, ssao);
     draw.bind_texture_ptr(5, draw.tex.ddgi_accum);
-    device.shader().set_vec2("ssr_lum_range", ssr_lum_range);
+    device.shader()->set_vec2("ssr_lum_range", ssr_lum_range);
     extern ConfigVar enable_ssr;
     if (enable_ssr.get_bool())
         draw.bind_texture_ptr(6, draw.tex.reflection_accum);
@@ -305,7 +305,7 @@ void DdgiTesting::render_rt() {
     set_composite_pass();
 
     RenderPipelineState state;
-    state.program = raytrace_test;
+    state.program = draw.get_prog_man().get_obj(raytrace_test);
     state.vao = draw.get_empty_vao();
     device.set_pipeline(state);
 

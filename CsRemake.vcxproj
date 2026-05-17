@@ -242,7 +242,6 @@
     <ClCompile Include="Source\Render\RT\RaytraceTest_BVH.cpp" />
     <ClCompile Include="Source\Render\RT\RaytraceTest_Probe.cpp" />
     <ClCompile Include="Source\Render\RT\RaytraceTest_Shade.cpp" />
-    <ClCompile Include="Source\Render\Shader.cpp" />
     <ClCompile Include="Source\Render\Shadowmap.cpp" />
     <ClCompile Include="Source\Render\Ssao.cpp" />
     <ClCompile Include="Source\Render\Texture.cpp">
@@ -489,7 +488,6 @@
     <ClInclude Include="Source\Render\Render_Light.h" />
     <ClInclude Include="Source\Render\Render_Sun.h" />
     <ClInclude Include="Source\Render\Render_Volumes.h" />
-    <ClInclude Include="Source\Render\Shader.h" />
     <ClInclude Include="Source\Render\Texture.h" />
     <ClInclude Include="Source\Sound\SoundPublic.h" />
     <ClInclude Include="Source\User_Camera.h" />

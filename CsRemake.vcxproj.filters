@@ -384,9 +384,6 @@
     <ClCompile Include="Source\Render\RT\RaytraceTest.cpp">
       <Filter>Source\Render\RT</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Render\Shader.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Render\Shadowmap.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
@@ -1171,9 +1168,6 @@
       <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\Render_Volumes.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\Shader.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\Texture.h">

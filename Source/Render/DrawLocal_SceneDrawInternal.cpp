@@ -266,18 +266,18 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		gfx().set_render_pass(pass);
 
 		RenderPipelineState state;
-		state.program = prog.taa_resolve;
+		state.program = get_prog_man().get_obj(prog.taa_resolve);
 		state.vao = get_empty_vao();
 		device.set_pipeline(state);
-		shader().set_float("amt", r_taa_blend.get_float());
-		shader().set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
-		shader().set_mat4("lastViewProj", last_frame_main_view.viewproj);
-		shader().set_bool("use_reproject", r_taa_reproject.get_bool());
-		shader().set_float("doc_mult", taa_doc_mult);
-		shader().set_float("doc_vel_bias", taa_doc_vel_bias);
-		shader().set_float("doc_bias", taa_doc_bias);
-		shader().set_float("doc_pow", taa_doc_pow);
-		shader().set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
+		shader()->set_float("amt", r_taa_blend.get_float());
+		shader()->set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
+		shader()->set_mat4("lastViewProj", last_frame_main_view.viewproj);
+		shader()->set_bool("use_reproject", r_taa_reproject.get_bool());
+		shader()->set_float("doc_mult", taa_doc_mult);
+		shader()->set_float("doc_vel_bias", taa_doc_vel_bias);
+		shader()->set_float("doc_bias", taa_doc_bias);
+		shader()->set_float("doc_pow", taa_doc_pow);
+		shader()->set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
 
 		bind_texture_ptr(0, tex.scene_color);
 		bind_texture_ptr(1, tex.last_scene_color);
@@ -406,7 +406,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		set_composite_pass();
 
 		RenderPipelineState state;
-		state.program = prog.combine;
+		state.program = get_prog_man().get_obj(prog.combine);
 		state.vao = get_empty_vao();
 		device.set_pipeline(state);
 
@@ -417,11 +417,11 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		bind_texture_ptr(1, bloom_tex);
 		bind_texture_ptr(2, lens_dirt->gpu_ptr);
 
-		shader().set_int("tonemap_type", pp_tonemap_type);
-		shader().set_float("contrast_tweak", pp_contrast);
-		shader().set_float("saturation_tweak", pp_saturation);
-		shader().set_float("bloom_lerp", pp_bloom_add);
-		shader().set_float("exposure", pp_exposure);
+		shader()->set_int("tonemap_type", pp_tonemap_type);
+		shader()->set_float("contrast_tweak", pp_contrast);
+		shader()->set_float("saturation_tweak", pp_saturation);
+		shader()->set_float("bloom_lerp", pp_bloom_add);
+		shader()->set_float("exposure", pp_exposure);
 
 		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	};
@@ -483,7 +483,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	}
 }
 
-Shader Renderer::shader() {
+IGraphicsShader* Renderer::shader() {
 	return device.shader();
 }
 
@@ -507,7 +507,7 @@ IGraphicsTexture* Renderer::do_post_process_stack(const std::vector<MaterialInst
 		auto mat = postProcessMats[i];
 
 		RenderPipelineState state;
-		state.program = matman.get_mat_shader(nullptr, mat, 0);
+		state.program = get_prog_man().get_obj(matman.get_mat_shader(nullptr, mat, 0));
 		state.blend = mat->get_master_material()->blend;
 		state.depth_testing = state.depth_writes = false;
 		state.vao = get_empty_vao();

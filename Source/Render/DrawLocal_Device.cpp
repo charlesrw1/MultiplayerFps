@@ -118,24 +118,6 @@ void Program_Manager::recompile_all() {
 	for (int i = 0; i < programs.size(); i++)
 		recompile(programs[i]);
 }
-#include "Framework/StringUtils.h"
-#include "Framework/BinaryReadWrite.h"
-//
-string compute_hash_for_program_def(Program_Manager::program_def& def) {
-	string inp = def.vert + def.frag + def.geo + def.defines;
-	return StringUtils::alphanumeric_hash(inp);
-}
-
-void Program_Manager::release_prior_program(program_def& def) {
-	if (def.gfx_shader) {
-		safe_release(def.gfx_shader);
-	} else if (def.shader_obj.ID != 0) {
-		glDeleteProgram(def.shader_obj.ID);
-	}
-	def.shader_obj.ID = 0;
-	def.shader_obj.gfx_handle = nullptr;
-}
-
 void Program_Manager::recompile(program_def& def) {
 	double start = GetTime();
 	recompile_do(def);
@@ -144,161 +126,21 @@ void Program_Manager::recompile(program_def& def) {
 		sys_print(Debug, "Program_Manager::recompile: compiled/loaded %s in %f\n", def.vert.c_str(), time);
 }
 
-void Program_Manager::recompile_shared(program_def& def) {
-	string hashed_path = compute_hash_for_program_def(def) + ".bin";
-	auto binFile = FileSys::open_read(hashed_path.c_str(), FileSys::SHADER_CACHE);
-	auto shaderFile = FileSys::open_read_engine(def.vert.c_str());
-	if (shaderFile && binFile) {
-		if (shaderFile->get_timestamp() <= binFile->get_timestamp()) {
-			if (log_shader_compiles.get_bool())
-				sys_print(Debug, "Program_Manager::recompile: loading cached binary: %s\n", hashed_path.data());
-
-			// load cached binary
-			BinaryReader reader(binFile.get());
-			auto sourceType = reader.read_int32();
-			auto len = reader.read_int32();
-			vector<uint8_t> bytes(len, 0);
-			reader.read_bytes_ptr(bytes.data(), bytes.size());
-
-			def.shader_obj.ID = glCreateProgram();
-			glProgramBinary(def.shader_obj.ID, sourceType, bytes.data(), bytes.size());
-			glValidateProgram(def.shader_obj.ID);
-
-			GLint success = 0;
-			glGetProgramiv(def.shader_obj.ID, GL_LINK_STATUS, &success);
-			if (success == GL_FALSE) {
-				GLint logLength = 0;
-				glGetProgramiv(def.shader_obj.ID, GL_INFO_LOG_LENGTH, &logLength);
-				std::vector<GLchar> log(logLength);
-				glGetProgramInfoLog(def.shader_obj.ID, logLength, nullptr, log.data());
-				sys_print(Error, "Program_Manager::recompile: loading binary failed: %s\n", log.data());
-			} else {
-				def.gfx_shader = opengl_wrap_program_handle(def.shader_obj.ID);
-				return; // done
-			}
-		}
-	}
-	binFile.reset();
-
-	// fail path
-	def.compile_failed =
-		Shader::compile_vert_frag_single_file(&def.shader_obj, def.vert, def.defines) != ShaderResult::SHADER_SUCCESS;
-
-	if (!def.compile_failed) {
-		def.gfx_shader = opengl_wrap_program_handle(def.shader_obj.ID);
-		const auto program = def.shader_obj.ID;
-		GLint length = 0;
-		glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
-		if (log_shader_compiles.get_bool())
-			sys_print(Debug, "Program_Manager::recompile: saving cached binary: %s\n", hashed_path.data());
-		vector<uint8_t> bytes(length, 0);
-		GLenum outType = 0;
-		glGetProgramBinary(def.shader_obj.ID, bytes.size(), nullptr, &outType, bytes.data());
-		FileWriter writer(bytes.size() + 8);
-		writer.write_int32(outType);
-		writer.write_int32(bytes.size());
-		writer.write_bytes_ptr(bytes.data(), bytes.size());
-		auto outFile = FileSys::open_write(hashed_path.c_str(), FileSys::SHADER_CACHE);
-		if (outFile) {
-			outFile->write(writer.get_buffer(), writer.get_size());
-		} else {
-			sys_print(Error, "Program_Manager::recompile: couldnt open file to write program binary: %s\n",
-					  hashed_path.data());
-		}
-	}
-}
-
-void Program_Manager::recompile_normal(program_def& def) {
-	string hashed_path = compute_hash_for_program_def(def) + ".bin";
-	auto binFile = FileSys::open_read(hashed_path.c_str(), FileSys::SHADER_CACHE);
-	auto shaderFile = FileSys::open_read_engine(("Shaders\\" + def.vert).c_str());
-	auto shaderFileF = FileSys::open_read_engine(("Shaders\\" + def.frag).c_str());
-
-	if (shaderFile && binFile) {
-		if (shaderFile->get_timestamp() <= binFile->get_timestamp() &&
-			shaderFileF->get_timestamp() <= binFile->get_timestamp()) {
-			if (log_shader_compiles.get_bool())
-				sys_print(Debug, "Program_Manager::recompile: loading cached binary: %s\n", hashed_path.data());
-
-			// load cached binary
-			BinaryReader reader(binFile.get());
-			auto sourceType = reader.read_int32();
-			auto len = reader.read_int32();
-			vector<uint8_t> bytes(len, 0);
-			reader.read_bytes_ptr(bytes.data(), bytes.size());
-
-			def.shader_obj.ID = glCreateProgram();
-			glProgramBinary(def.shader_obj.ID, sourceType, bytes.data(), bytes.size());
-			glValidateProgram(def.shader_obj.ID);
-
-			GLint success = 0;
-			glGetProgramiv(def.shader_obj.ID, GL_LINK_STATUS, &success);
-			if (success == GL_FALSE) {
-				GLint logLength = 0;
-				glGetProgramiv(def.shader_obj.ID, GL_INFO_LOG_LENGTH, &logLength);
-				std::vector<GLchar> log(logLength);
-				glGetProgramInfoLog(def.shader_obj.ID, logLength, nullptr, log.data());
-				sys_print(Error, "Program_Manager::recompile: loading binary failed: %s\n", log.data());
-			} else {
-				def.gfx_shader = opengl_wrap_program_handle(def.shader_obj.ID);
-				return; // done
-			}
-		}
-	}
-	binFile.reset();
-
-	// fail path
-	if (!def.geo.empty())
-		def.compile_failed = !Shader::compile(def.shader_obj, def.vert, def.frag, def.geo, def.defines);
-	else
-		def.compile_failed =
-			Shader::compile(&def.shader_obj, def.vert, def.frag, def.defines) != ShaderResult::SHADER_SUCCESS;
-
-	if (!def.compile_failed) {
-		def.gfx_shader = opengl_wrap_program_handle(def.shader_obj.ID);
-		const auto program = def.shader_obj.ID;
-		GLint length = 0;
-		glGetProgramiv(program, GL_PROGRAM_BINARY_LENGTH, &length);
-		if (log_shader_compiles.get_bool())
-			sys_print(Debug, "Program_Manager::recompile: saving cached binary: %s\n", hashed_path.data());
-		vector<uint8_t> bytes(length, 0);
-		GLenum outType = 0;
-		glGetProgramBinary(def.shader_obj.ID, bytes.size(), nullptr, &outType, bytes.data());
-		FileWriter writer(bytes.size() + 8);
-		writer.write_int32(outType);
-		writer.write_int32(bytes.size());
-		writer.write_bytes_ptr(bytes.data(), bytes.size());
-		auto outFile = FileSys::open_write(hashed_path.c_str(), FileSys::SHADER_CACHE);
-		if (outFile) {
-			outFile->write(writer.get_buffer(), writer.get_size());
-		} else {
-			sys_print(Error, "Program_Manager::recompile: couldnt open file to write program binary: %s\n",
-					  hashed_path.data());
-		}
-	}
-}
-
 void Program_Manager::recompile_do(program_def& def) {
-	release_prior_program(def);
+	safe_release(def.gfx_shader);
 
-	// look in shader cache, only for "shared shaders" now, these are the main materials so whatev
-	if (def.is_shared() && !def.is_tesselation) {
-		recompile_shared(def);
-		return;
-	}
-
-	if (def.is_compute) {
+	if (def.is_compute)
 		def.gfx_shader = gfx().create_shader_compute(def.vert, def.defines);
-		def.compile_failed = (def.gfx_shader == nullptr);
-		def.shader_obj.ID = def.gfx_shader ? def.gfx_shader->get_internal_handle() : 0;
-	} else if (def.is_shared()) {
-		assert(def.is_tesselation);
+	else if (def.is_shared() && def.is_tesselation)
 		def.gfx_shader = gfx().create_shader_single_file_tess(def.vert, def.defines);
-		def.compile_failed = (def.gfx_shader == nullptr);
-		def.shader_obj.ID = def.gfx_shader ? def.gfx_shader->get_internal_handle() : 0;
-	} else {
-		recompile_normal(def);
-	}
+	else if (def.is_shared())
+		def.gfx_shader = gfx().create_shader_single_file(def.vert, def.defines);
+	else if (!def.geo.empty())
+		def.gfx_shader = gfx().create_shader_vert_frag_geo(def.vert, def.frag, def.geo, def.defines);
+	else
+		def.gfx_shader = gfx().create_shader_vert_frag(def.vert, def.frag, def.defines);
+
+	def.compile_failed = (def.gfx_shader == nullptr);
 }
 
 void Renderer::bind_vao(uint32_t vao) {
@@ -414,15 +256,21 @@ void OpenglRenderDevice::set_cull_front_face(bool enabled) {
 }
 
 void OpenglRenderDevice::set_shader(program_handle handle) {
-	if (handle == -1) {
-		active_program = handle;
+	set_shader_ptr(handle == -1 ? nullptr : prog_man.get_obj(handle));
+}
+
+void OpenglRenderDevice::set_shader_ptr(IGraphicsShader* shader) {
+	if (shader == nullptr) {
+		active_program = nullptr;
 		glUseProgram(0);
+		set_bit_valid(PROGRAM_BIT);
+		return;
 	}
 	bool invalid = is_bit_invalid(PROGRAM_BIT);
-	if (invalid || handle != active_program) {
+	if (invalid || shader != active_program) {
 		set_bit_valid(PROGRAM_BIT);
-		active_program = handle;
-		prog_man.get_obj(handle).use();
+		active_program = shader;
+		shader->use();
 		activeStats.program_changes++;
 	}
 }
@@ -476,7 +324,7 @@ void OpenglRenderDevice::set_depth_less_than(bool less_than) {
 }
 
 void OpenglRenderDevice::set_pipeline(const RenderPipelineState& s) {
-	set_shader(s.program);
+	set_shader_ptr(s.program);
 	set_blend_state(s.blend);
 	set_vao(s.vao);
 	set_cull_front_face(s.cull_front_face);
