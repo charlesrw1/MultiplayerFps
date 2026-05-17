@@ -386,6 +386,15 @@ public:
 		glGetNamedBufferSubData(buf->get_internal_handle(), offset, size, dest);
 	}
 
+	void set_line_width(float width) override {
+		ASSERT(width > 0.0f);
+		glLineWidth(width);
+	}
+
+	void bind_indirect_buffer(IGraphicsBuffer* buf) override {
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, buf ? buf->get_internal_handle() : 0);
+	}
+
 	void download_texture(IGraphicsTexture* tex, int mip, int layer,
 						  void* dest, int dest_size_bytes) override {
 		ASSERT(tex != nullptr && dest != nullptr && dest_size_bytes > 0);

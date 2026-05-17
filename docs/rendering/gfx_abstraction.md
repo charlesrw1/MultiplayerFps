@@ -61,7 +61,9 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.3a** | `Volumetricfog.cpp` | ~33 | dispatch_compute, memory_barrier (flag enum), bind_image_for_compute, bind_storage_buffer_base (+ `_raw`); t3D path in backend; add WRAP_R to LinearClamped sampler | done |
 | **1.3b** | `RenderExtra_SSR.cpp`, `GpuCullingTest.cpp` | ~52 | `IGraphicsSampler` + bind_sampler, glClearNamedBufferData wrapper | done |
 | 1.3c | `RT/RaytraceTest_Probe.cpp`, `RT/RaytraceTest_Shade.cpp` | ~45 | buffer map/unmap for readback (probe relocation, invalid-count) | not started |
-| 1.4 | `DrawLocal_BatchScene.cpp`, `DrawLocal_Lighting.cpp`, `DrawLocal_RenderPass.cpp` | ~70 | bind_indirect_buffer, bind_parameter_buffer, multi_draw_elements_indirect (count), color-mask state | not started |
+| **1.4a** | `DrawLocal_Lighting.cpp` | ~10 | set_line_width, bind_indirect_buffer (nullptr unbinds) | done |
+| 1.4b | `DrawLocal_BatchScene.cpp` | ~10 | bind_parameter_buffer, multi_draw_elements_indirect_count, polygon-offset state | not started |
+| 1.4c | `DrawLocal_RenderPass.cpp` | ~50 | bind_storage_buffer_range_raw, multi_draw_elements_indirect (no count), draw_elements, draw_elements_instanced_base_vertex_base_instance, glNamedBufferData/SubData on raw handles | not started |
 | 1.5a | `DecalBatcher.cpp` | ~12 | per-attachment color masks as immediate setters (baked in 2c) | not started |
 | 1.6 | `DrawLocal_SceneDrawInternal.cpp` (orchestration) | ~14 | leftover binding + draw glue | not started |
 | 1.7 | `Shader.cpp` migration → inside `Source/Render/Opengl*` | 71 | shader compile/link entirely backend-internal; expose `IGraphicsShader` + `create_shader(...)` | not started |
@@ -70,6 +72,12 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.5 (post-1.x)** | Null/passthrough leak-detector backend | — | gate that proves the wrap is complete | not started |
 
 Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
+
+## Sub-phase 1.4a status
+
+- API added: `set_line_width(float)` (debug meshbuilder line width); `bind_indirect_buffer(IGraphicsBuffer*)` over `GL_DRAW_INDIRECT_BUFFER` — `nullptr` unbinds. Phase 2c folds indirect binding into pipeline/encoder state.
+- `DrawLocal_Lighting.cpp`: 4× `glBindBufferBase(GL_SHADER_STORAGE_BUFFER, …)` → `bind_storage_buffer_base` (all 4 buffers are already `IGraphicsBuffer*`); 2× `glBindBufferBase(GL_UNIFORM_BUFFER, …)` for `ubo.current_frame` / `shadowmap.ubo.info` → `bind_uniform_buffer_base_raw`; 4× `glDrawArrays(GL_TRIANGLES, 0, 3)` → `draw_arrays(Triangles, 0, 3)`; `glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0)` → `bind_indirect_buffer(nullptr)`; debug meshbuilder `glLineWidth` pair → `set_line_width`. `glad/glad.h` include dropped.
+- `DrawLocal_Lighting.cpp` contains zero direct `gl*` calls. 184 unit tests + full integration suite green.
 
 ## Sub-phase 1.1 status
 

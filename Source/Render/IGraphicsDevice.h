@@ -431,6 +431,16 @@ public:
 	// beforehand so the data is visible. Debug/editor/GI-relocate readback
 	// only; never call on a hot path. Wraps glGetNamedBufferSubData.
 	virtual void download_buffer(IGraphicsBuffer* buf, int offset, int size, void* dest) = 0;
+
+	// ---- Phase 1.4a wrap surface (lighting) --------------------------------
+
+	// Wraps glLineWidth. Used by debug meshbuilder line rendering.
+	virtual void set_line_width(float width) = 0;
+
+	// Bind a buffer to GL_DRAW_INDIRECT_BUFFER for the next MDI draw, or
+	// nullptr to unbind. Wraps glBindBuffer(GL_DRAW_INDIRECT_BUFFER, ...).
+	// Phase 2c folds indirect binding into pipeline/encoder state.
+	virtual void bind_indirect_buffer(IGraphicsBuffer* buf) = 0;
 };
 
 // Global accessor for the active graphics device. Initialize the OpenGL backend

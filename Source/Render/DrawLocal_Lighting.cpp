@@ -1,6 +1,5 @@
 ﻿#include "DrawLocal.h"
 #include "Framework/Util.h"
-#include "glad/glad.h"
 #include "Render/Texture.h"
 #include "imgui.h"
 #include "glm/ext/matrix_transform.hpp"
@@ -50,9 +49,9 @@ void Renderer::draw_meshbuilders() {
 			shader().set_mat4("Model", mb.transform);
 			shader().set_vec4("solid_color", color32_to_vec4(mb.background_color));
 
-			glLineWidth(3);
+			gfx().set_line_width(3);
 			dd.draw(MeshBuilderDD::LINES);
-			glLineWidth(1);
+			gfx().set_line_width(1);
 		}
 
 		RenderPipelineState state;
@@ -189,10 +188,10 @@ void LightListCuller::draw_lights() {
 		cookieAtlas = draw.white_texture;
 	draw.bind_texture_ptr(5, cookieAtlas);
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, draw.buf.lighting_uniforms->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, tiled_uniforms->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, light_count_buffer->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, light_indirection->get_internal_handle());
+	gfx().bind_storage_buffer_base(1, draw.buf.lighting_uniforms);
+	gfx().bind_storage_buffer_base(2, tiled_uniforms);
+	gfx().bind_storage_buffer_base(3, light_count_buffer);
+	gfx().bind_storage_buffer_base(4, light_indirection);
 
 	if (r_light_use_tiled.get_integer() != 1)
 		draw.shader().set_int("num_lights", draw.scene.light_list.objects.size());
@@ -221,14 +220,14 @@ void LightListCuller::draw_lights() {
 				const int y_to_use = tile_count.y - y - 1;
 				glm::vec2 ofs = glm::floor(glm::vec2(x * tile_size.x, y_to_use * tile_size.y));
 				device.set_viewport(ofs.x, ofs.y, tile_size.x, tile_size.y);
-				glDrawArrays(GL_TRIANGLES, 0, 3);
+				gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 			}
 		}
 		device.set_viewport(0, 0, w, h);
 	} else { // UNUSED/OPTIONAL
 
 		// fullscreen shader, no vao used
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	}
 }
 
@@ -322,8 +321,8 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 	// auto scope = device.start_render_pass(setup);
 	const bool wants_ssao = !is_cubemap_view && enable_ssao.get_bool();
 	IGraphicsTexture* const ssao_tex = (wants_ssao) ? ssao.texture.result : white_texture; // skip ssao in cubemap view
-	glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+	gfx().bind_uniform_buffer_base_raw(0, ubo.current_frame);
+	gfx().bind_indirect_buffer(nullptr);
 
 	device.reset_states();
 	if (ddgi_test.get_bool()) {
@@ -350,7 +349,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		bind_texture_ptr(4, ssao_tex);
 
 		// fullscreen shader, no vao used
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	}
 	device.reset_states();
 
@@ -378,14 +377,14 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		bind_texture_ptr(2, tex.scene_gbuffer2);
 		bind_texture_ptr(3, tex.scene_depth);
 		bind_texture_ptr(4, draw.shadowmap.texture.shadow_array);
-		glBindBufferBase(GL_UNIFORM_BUFFER, 8, draw.shadowmap.ubo.info);
+		gfx().bind_uniform_buffer_base_raw(8, draw.shadowmap.ubo.info);
 
 		shader().set_vec3("uSunDirection", sun_internal->sun.direction);
 		shader().set_vec3("uSunColor", sun_internal->sun.color);
 		shader().set_float("uEpsilon", sun_internal->sun.epsilon);
 
 		// fullscreen shader, no vao used
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	}
 
 	// const Texture* reflectionProbeTex = scene.get_reflection_probe_for_render(view_to_use.origin);
