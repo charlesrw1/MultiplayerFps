@@ -1,6 +1,5 @@
 ﻿#include "DrawLocal.h"
 #include "Framework/Util.h"
-#include "glad/glad.h"
 #include "Render/Texture.h"
 #include "imgui.h"
 #include "glm/ext/matrix_transform.hpp"
@@ -25,6 +24,7 @@
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
 #include <algorithm>
+
 void Renderer::render_bloom_chain(texhandle scene_color_handle) {
 	ZoneScoped;
 	GPUFUNCTIONSTART;
@@ -51,7 +51,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle) {
 
 		device.bind_texture(0, scene_color_handle);
 		// glBindTextureUnit(0, scene_color_handle);
-		glClearColor(0, 0, 0, 1);
+		gfx().set_clear_color(0, 0, 0, 1);
 		for (int i = 0; i < tex.number_bloom_mips; i++) {
 			auto& bc = tex.bloom_chain[i];
 
@@ -73,7 +73,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle) {
 			device.set_viewport(0, 0, src_x, src_y);
 			device.clear_framebuffer(false, true /* clear color*/);
 
-			glDrawArrays(GL_TRIANGLES, 0, 3);
+			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
 			// glBindTextureUnit(0, bc.texture->get_internal_handle());
 			device.bind_texture_ptr(0, bc.texture);
@@ -106,7 +106,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle) {
 			device.bind_texture_ptr(0, bc.texture);
 			shader().set_float("filterRadius", 0.0001f);
 
-			glDrawArrays(GL_TRIANGLES, 0, 3);
+			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 		}
 	}
 
@@ -158,9 +158,10 @@ void draw_model_simple_no_material(Model* model) {
 	auto& lod = model->get_lod(0);
 	for (int p = 0; p < lod.part_count; p++) {
 		auto& part = model->get_part(p);
-		glDrawElementsBaseVertex(GL_TRIANGLES, part.element_count, MODEL_INDEX_TYPE_GL,
-								 (void*)int64_t(part.element_offset + model->get_merged_index_ptr()),
-								 part.base_vertex + model->get_merged_vertex_ofs());
+		gfx().draw_elements_base_vertex(
+			GraphicsPrimitiveType::Triangles, part.element_count, MODEL_INDEX_TYPE,
+			part.element_offset + model->get_merged_index_ptr(),
+			part.base_vertex + model->get_merged_vertex_ofs());
 	}
 }
 
@@ -170,32 +171,32 @@ int setup_execute_render_lists(Render_Lists& list, Render_Pass& pass) {
 
 	IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, scene.gpu_instance_buffer->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, scene.gpu_skinned_mats_buffer);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, material_buffer->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, list.glinstance_to_instance);
+	gfx().bind_storage_buffer_base(2, scene.gpu_instance_buffer);
+	gfx().bind_storage_buffer_base_raw(3, scene.gpu_skinned_mats_buffer);
+	gfx().bind_storage_buffer_base(4, material_buffer);
+	gfx().bind_storage_buffer_base_raw(5, list.glinstance_to_instance);
 	int offset_command_bytes = 0;
 	if (0) {
 		const int size = pass.mesh_batches.size() * sizeof(int);
-		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material, size, size);
+		gfx().bind_storage_buffer_range_raw(6, list.gldrawid_to_submesh_material, size, size);
 		const int command_size = list.commands.size() * sizeof(gpu::DrawElementsIndirectCommand);
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, list.gpu_command_list);
+		gfx().bind_indirect_buffer_raw(list.gpu_command_list);
 		offset_command_bytes = command_size;
-		// glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
+		// gfx().bind_storage_buffer_base_raw(6, list.gldrawid_to_submesh_material);
 		// if (use_client_buffer_mdi.get_bool())
-		//	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+		//	gfx().bind_indirect_buffer(nullptr);
 		// else
-		//	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, list.gpu_command_list);
+		//	gfx().bind_indirect_buffer_raw(list.gpu_command_list);
 
 		auto buf = list.get_count_buf();
 		ASSERT(buf);
-		glBindBuffer(GL_PARAMETER_BUFFER, buf->get_internal_handle());
+		gfx().bind_parameter_buffer(buf);
 	} else {
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, list.gldrawid_to_submesh_material);
+		gfx().bind_storage_buffer_base_raw(6, list.gldrawid_to_submesh_material);
 		if (use_client_buffer_mdi.get_bool())
-			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+			gfx().bind_indirect_buffer(nullptr);
 		else
-			glBindBuffer(GL_DRAW_INDIRECT_BUFFER, list.gpu_command_list);
+			gfx().bind_indirect_buffer_raw(list.gpu_command_list);
 	}
 
 	if (scene.has_lightmap && scene.lightmapObj.lightmap_texture) {
@@ -220,26 +221,27 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass, bool 
 
 			setup_batch(list, pass, depth_test_enabled, force_show_backfaces, depth_less_than_op, i, offset);
 
-			const GLenum index_type = MODEL_INDEX_TYPE_GL;
-
-			void* indirect_ptr = nullptr;
+			const void* indirect_ptr = nullptr;
 			if (use_client_buffer_mdi.get_bool())
-				indirect_ptr = (void*)(list.commands.data() + offset);
+				indirect_ptr = (const void*)(list.commands.data() + offset);
 			else
-				indirect_ptr = (void*)(int64_t(offset_buffer_start + offset * DEIcmdSz));
+				indirect_ptr = (const void*)(intptr_t)(offset_buffer_start + offset * DEIcmdSz);
 
 			if (0) {
-				glMultiDrawElementsIndirectCount(GL_TRIANGLES, index_type, indirect_ptr, i * sizeof(uint32), count,
-												 sizeof(gpu::DrawElementsIndirectCommand));
+				gfx().multi_draw_elements_indirect_count(
+					GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
+					offset_buffer_start + offset * DEIcmdSz, i * (int)sizeof(uint32), count,
+					sizeof(gpu::DrawElementsIndirectCommand));
 			} else {
-				glMultiDrawElementsIndirect(GL_TRIANGLES, index_type, indirect_ptr, count,
-											sizeof(gpu::DrawElementsIndirectCommand));
+				gfx().multi_draw_elements_indirect(
+					GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
+					indirect_ptr, count, sizeof(gpu::DrawElementsIndirectCommand));
 			}
 			stats.total_draw_calls++;
 		}
 		offset += incr;
 	}
-	glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0);
+	gfx().bind_indirect_buffer(nullptr);
 }
 
 void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled,
@@ -251,12 +253,12 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool 
 
 		const int count = list.command_count[i];
 		const auto& batch = pass.batches[i];
-		const GLenum index_type = MODEL_INDEX_TYPE_GL;
 		for (int dc = 0; dc < batch.count; dc++) {
 			auto& cmd = list.commands.at(offset + dc);
 
-			glDrawElementsInstancedBaseVertexBaseInstance(
-				GL_TRIANGLES, cmd.count, index_type, (void*)(int64_t(cmd.firstIndex * MODEL_BUFFER_INDEX_TYPE_SIZE)),
+			gfx().draw_elements_instanced_base_vertex_base_instance(
+				GraphicsPrimitiveType::Triangles, cmd.count, MODEL_INDEX_TYPE,
+				cmd.firstIndex * MODEL_BUFFER_INDEX_TYPE_SIZE,
 				cmd.primCount, cmd.baseVertex, cmd.baseInstance);
 
 			stats.total_draw_calls++;
@@ -283,11 +285,10 @@ void Renderer::render_level_to_target(const Render_Level_Params& params) {
 			upload_ubo_view_constants(params.view, what_ubo, params.wireframe_secondpass);
 	}
 
-	glBindBufferBase(GL_UNIFORM_BUFFER, 0, what_ubo);
+	gfx().bind_uniform_buffer_base_raw(0, what_ubo);
 
 	if (params.pass == Render_Level_Params::SHADOWMAP) {
-		glEnable(GL_POLYGON_OFFSET_FILL);
-		glPolygonOffset(params.offset_poly_units, 4 /* this does nothing?*/);
+		gfx().set_polygon_offset(true, params.offset_poly_units, 4 /* this does nothing?*/);
 		//*glCullFace(GL_FRONT);
 		//*glDisable(GL_CULL_FACE);
 	}
@@ -325,7 +326,7 @@ void Renderer::render_level_to_target(const Render_Level_Params& params) {
 
 	// glClearDepth(1.0);
 	// glDepthFunc(GL_LESS);
-	glDisable(GL_POLYGON_OFFSET_FILL);
+	gfx().set_polygon_offset(false, 0, 0);
 	// glCullFace(GL_BACK);
 	// glEnable(GL_CULL_FACE);
 
@@ -366,7 +367,8 @@ void Renderer::render_particles() {
 			bind_texture_ptr(i, gfx_tex);
 		}
 
-		glDrawElements(GL_TRIANGLES, p.dd.num_indicies, GL_UNSIGNED_INT, (void*)0);
+		gfx().draw_elements(GraphicsPrimitiveType::Triangles, p.dd.num_indicies,
+							VertexInputIndexType::uint32, 0);
 	}
 }
 
@@ -399,14 +401,16 @@ static void build_standard_cpu(Render_Lists& list, Render_Pass& src, Free_List<R
 	// then dispatch a compute that looks in glinstance_to_instance, finds instance vis status
 	// then increments
 
-	glNamedBufferData(list.gldrawid_to_submesh_material, sizeof(uint32_t) * draw_to_material.size(),
-					  draw_to_material.data(), GL_DYNAMIC_DRAW);
+	gfx().upload_buffer_raw(list.gldrawid_to_submesh_material,
+							sizeof(uint32_t) * draw_to_material.size(),
+							draw_to_material.data());
 
-	glNamedBufferData(list.glinstance_to_instance, sizeof(uint32_t) * objCount, glinstance_to_instance,
-					  GL_DYNAMIC_DRAW);
+	gfx().upload_buffer_raw(list.glinstance_to_instance,
+							sizeof(uint32_t) * objCount, glinstance_to_instance);
 
 	const int command_list_size_bytes = sizeof(gpu::DrawElementsIndirectCommand) * list.commands.size();
-	glNamedBufferData(list.gpu_command_list, command_list_size_bytes, list.commands.data(), GL_DYNAMIC_DRAW);
+	gfx().upload_buffer_raw(list.gpu_command_list, command_list_size_bytes,
+							list.commands.data());
 }
 void Render_Lists_Gpu_Culled::init(uint32_t drawidsz, uint32_t instbufsz) {
 	Render_Lists::init(drawidsz, instbufsz);
@@ -474,13 +478,17 @@ static void build_cascade_cpu(Render_Lists& shadowlist, Render_Pass& shadowpass,
 	if (collapse_draw_calls.get_bool())
 		collapse_commands(shadowlist, draw_to_material);
 
-	glNamedBufferData(shadowlist.gldrawid_to_submesh_material, sizeof(uint32_t) * draw_to_material.size(),
-					  draw_to_material.data(), GL_DYNAMIC_DRAW);
+	gfx().upload_buffer_raw(shadowlist.gldrawid_to_submesh_material,
+							sizeof(uint32_t) * draw_to_material.size(),
+							draw_to_material.data());
 
-	glNamedBufferData(shadowlist.glinstance_to_instance, sizeof(uint32_t) * objCount, nullptr, GL_DYNAMIC_DRAW);
-	glNamedBufferSubData(shadowlist.glinstance_to_instance, 0, sizeof(uint32_t) * objCount, glinstance_to_instance);
+	gfx().upload_buffer_raw(shadowlist.glinstance_to_instance,
+							sizeof(uint32_t) * objCount, nullptr);
+	gfx().sub_upload_buffer_raw(shadowlist.glinstance_to_instance, 0,
+								sizeof(uint32_t) * objCount, glinstance_to_instance);
 
 	auto& list = shadowlist;
 	const int command_list_size_bytes = sizeof(gpu::DrawElementsIndirectCommand) * list.commands.size();
-	glNamedBufferData(list.gpu_command_list, command_list_size_bytes, list.commands.data(), GL_DYNAMIC_DRAW);
+	gfx().upload_buffer_raw(list.gpu_command_list, command_list_size_bytes,
+							list.commands.data());
 }

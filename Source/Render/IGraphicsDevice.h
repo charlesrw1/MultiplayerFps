@@ -465,6 +465,55 @@ public:
 													int count_byte_offset,
 													int max_draw_count,
 													int stride) = 0;
+
+	// ---- Phase 1.4c wrap surface (orchestration) ---------------------------
+
+	// glMultiDrawElementsIndirect. `indirect` is interpreted as a byte offset
+	// into the bound GL_DRAW_INDIRECT_BUFFER when one is bound, or as a CPU
+	// pointer when buffer 0 is bound (client-side MDI). draw_count = number
+	// of commands; stride = byte stride between commands.
+	virtual void multi_draw_elements_indirect(GraphicsPrimitiveType mode,
+											  VertexInputIndexType index_type,
+											  const void* indirect,
+											  int draw_count,
+											  int stride) = 0;
+
+	// glDrawElementsInstancedBaseVertexBaseInstance. byte_offset is the byte
+	// offset into the bound index buffer (matches glDraw*Elements's indices*).
+	virtual void draw_elements_instanced_base_vertex_base_instance(
+		GraphicsPrimitiveType mode, int count, VertexInputIndexType index_type,
+		int byte_offset, int instance_count, int base_vertex,
+		uint32_t base_instance) = 0;
+
+	// glDrawElements. byte_offset is the byte offset into the bound index
+	// buffer (matches glDrawElements's indices*).
+	virtual void draw_elements(GraphicsPrimitiveType mode, int count,
+							   VertexInputIndexType index_type,
+							   int byte_offset) = 0;
+
+	// Set the clear color used by subsequent color clears. Wraps glClearColor.
+	virtual void set_clear_color(float r, float g, float b, float a) = 0;
+
+	// Bind a sub-range of a raw GL buffer to an SSBO slot. Wraps
+	// glBindBufferRange(GL_SHADER_STORAGE_BUFFER, …). The _raw suffix flags
+	// that the buffer still lives as a raw `bufferhandle`; folds into
+	// IGraphicsBuffer* in a later sub-phase.
+	virtual void bind_storage_buffer_range_raw(int slot, uint32_t buffer_handle,
+											   int offset, int size) = 0;
+
+	// Bind a raw GL buffer to GL_DRAW_INDIRECT_BUFFER (handle 0 unbinds).
+	// _raw escape for sites whose buffer is still a `bufferhandle`.
+	virtual void bind_indirect_buffer_raw(uint32_t buffer_handle) = 0;
+
+	// glNamedBufferData on a raw buffer handle. _raw escape for sites whose
+	// buffer is still a `bufferhandle`; folds into IGraphicsBuffer::upload
+	// (and Phase 2e's ring buffer) once those buffers migrate.
+	virtual void upload_buffer_raw(uint32_t buffer_handle, int size,
+								   const void* data) = 0;
+
+	// glNamedBufferSubData on a raw buffer handle. _raw escape; see above.
+	virtual void sub_upload_buffer_raw(uint32_t buffer_handle, int offset,
+									   int size, const void* data) = 0;
 };
 
 // Global accessor for the active graphics device. Initialize the OpenGL backend

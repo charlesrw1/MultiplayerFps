@@ -408,6 +408,78 @@ public:
 		}
 	}
 
+	void multi_draw_elements_indirect(GraphicsPrimitiveType mode,
+									  VertexInputIndexType index_type,
+									  const void* indirect,
+									  int draw_count,
+									  int stride) override {
+		ASSERT(draw_count >= 0 && stride > 0);
+		const GLenum gl_mode =
+			(mode == GraphicsPrimitiveType::Triangles)     ? GL_TRIANGLES :
+			(mode == GraphicsPrimitiveType::TriangleStrip) ? GL_TRIANGLE_STRIP :
+															 GL_LINES;
+		const GLenum gl_type = (index_type == VertexInputIndexType::uint16)
+								   ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+		glMultiDrawElementsIndirect(gl_mode, gl_type, indirect, draw_count, stride);
+	}
+
+	void draw_elements_instanced_base_vertex_base_instance(
+		GraphicsPrimitiveType mode, int count, VertexInputIndexType index_type,
+		int byte_offset, int instance_count, int base_vertex,
+		uint32_t base_instance) override {
+		ASSERT(count >= 0 && byte_offset >= 0 && instance_count >= 0);
+		const GLenum gl_mode =
+			(mode == GraphicsPrimitiveType::Triangles)     ? GL_TRIANGLES :
+			(mode == GraphicsPrimitiveType::TriangleStrip) ? GL_TRIANGLE_STRIP :
+															 GL_LINES;
+		const GLenum gl_type = (index_type == VertexInputIndexType::uint16)
+								   ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+		glDrawElementsInstancedBaseVertexBaseInstance(
+			gl_mode, count, gl_type, (const void*)(intptr_t)byte_offset,
+			instance_count, base_vertex, base_instance);
+	}
+
+	void draw_elements(GraphicsPrimitiveType mode, int count,
+					   VertexInputIndexType index_type,
+					   int byte_offset) override {
+		ASSERT(count >= 0 && byte_offset >= 0);
+		const GLenum gl_mode =
+			(mode == GraphicsPrimitiveType::Triangles)     ? GL_TRIANGLES :
+			(mode == GraphicsPrimitiveType::TriangleStrip) ? GL_TRIANGLE_STRIP :
+															 GL_LINES;
+		const GLenum gl_type = (index_type == VertexInputIndexType::uint16)
+								   ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+		glDrawElements(gl_mode, count, gl_type, (const void*)(intptr_t)byte_offset);
+	}
+
+	void set_clear_color(float r, float g, float b, float a) override {
+		glClearColor(r, g, b, a);
+	}
+
+	void bind_storage_buffer_range_raw(int slot, uint32_t buffer_handle,
+									   int offset, int size) override {
+		ASSERT(slot >= 0 && offset >= 0 && size > 0);
+		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, slot, buffer_handle, offset, size);
+	}
+
+	void bind_indirect_buffer_raw(uint32_t buffer_handle) override {
+		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, buffer_handle);
+	}
+
+	void upload_buffer_raw(uint32_t buffer_handle, int size,
+						   const void* data) override {
+		ASSERT(buffer_handle != 0 && size >= 0);
+		glNamedBufferData(buffer_handle, size, data, GL_DYNAMIC_DRAW);
+	}
+
+	void sub_upload_buffer_raw(uint32_t buffer_handle, int offset, int size,
+							   const void* data) override {
+		ASSERT(buffer_handle != 0 && offset >= 0 && size >= 0);
+		if (size == 0)
+			return;
+		glNamedBufferSubData(buffer_handle, offset, size, data);
+	}
+
 	void multi_draw_elements_indirect_count(GraphicsPrimitiveType mode,
 											VertexInputIndexType index_type,
 											int indirect_byte_offset,

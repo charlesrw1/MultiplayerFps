@@ -1,11 +1,14 @@
 #pragma once
 #include "Render/Model.h"
+#include "Render/IGraphicsDevice.h"
 #include "Framework/Hashset.h"
 #include "GpuAllocator.h"
 #include <vector>
 
 // use 16 bit indicies
 const int MODEL_BUFFER_INDEX_TYPE_SIZE = sizeof(uint16_t);
+// Index type used for model element buffers. Mirrors MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT.
+constexpr VertexInputIndexType MODEL_INDEX_TYPE = VertexInputIndexType::uint16;
 class IGraphicsBuffer;
 class MainVbIbAllocator
 {
