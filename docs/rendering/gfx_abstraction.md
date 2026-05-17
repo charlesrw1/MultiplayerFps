@@ -666,6 +666,67 @@ once-per-frame union would force a whole-struct re-upload on every mip
 step, clobbering the lit/compositor fields. SSR (D) and Bake (J) are the
 largest and saved for last.
 
+### 2a status — done (group migrations) + dead-shader sweep
+
+All 10 listed groups landed on `refactor/gfx-abstraction`. The actual
+order differed from the planned sweep: B (pilot relock) → C → G → K → F →
+D → J → A → E → H. Each group is one commit, building on the
+canonical pattern (struct in `Shaders/ShaderBufferShared.txt`, nested
+UBO block at slot 7, direct `params.X` access in shader bodies).
+
+Group-specific deviations worth knowing:
+
+- **G (Volfog)** uses the existing volfog UBO at slot 4, not slot 7 — its
+  data was already in a UBO; migration just folded the lone
+  `set_int("num_lights")` into the same struct and moved that struct
+  into the shared header.
+- **K (Raytrace debug)** had no live shaders — all three programs were
+  created but never dispatched. Closed by deletion rather than migration.
+- **H (SSAO/HBAO)** was the originally-skipped group; relanded later
+  with the full SSAO/HBAO pipeline (5 shaders, not the 2 in the doc
+  plan — `BilateralBlurF` was dead and the rest of HBAO needed to come
+  along). See [[#2a follow-up]] below for the `#define` shadow-class
+  gotcha that broke `linearizedepth.txt` first time round.
+- **D (SSR)** skipped `ssr_apply_upsampled` (never created) and
+  `blur_ssr` (created but dispatch sits past an unconditional `return`).
+- **E (DDGI)** refactored `set_reflection_uniforms()` and
+  `draw_lighting_shared()` to fill a passed-in `gpu::DdgiRuntimeParams&`
+  instead of calling `set_*(name)`. `reflectionShared.txt` is now a
+  helper-include that relies on the including shader having bound
+  `DdgiRuntimeParamsUbo` at slot 7.
+
+Dead-shader sweep (separate commit `3cd5bad9`) removed 7 unreachable
+shaders + their program slots + the unreachable dispatch tail in
+`do_upsample`: `cpu_vis_to_mdi`, `ssr_apply_upsampled`,
+`bilateral_upsample_ddgi`, `ddgiShadeDebugF`, `get_best_cubemap_C`,
+`blur_ssr`, `SampleCubemapsF`.
+
+**What 2a does NOT close:** the endgame milestone ("delete the name-based
+setter methods from IGraphicsShader") still has ~25 call-sites blocking
+it — the PER-DRAW row of the group table is untouched (mesh-builder,
+debug-texture display, EnvProbe cubemap bake, decal indirect, cookie
+atlas, DDGI debug-probe vis). Per the original doc, those wait for the
+push-constants design.
+
+### 2a follow-up — `#define` macro-shadow gotcha
+
+The early A/E commits used `#define <name> params.<name>` aliases inside
+shaders to keep the diff small. That backfired on H: `linearizedepth.txt`
+has a function parameter literally named `clipInfo` (shadowing the
+file-scope uniform), and `#define clipInfo params.clipInfo` mangled the
+function signature to `vec4 params.clipInfo` — silent compile failure,
+garbage depth-linearize output, solid red SSAO + a 4x4 grid pattern
+across the screen.
+
+Pattern locked going forward: **use `params.X` directly in shader
+bodies. No `#define` aliasing for UBO fields.** Existing A/E `#define`s
+are tolerated (no name conflicts there) but new migrations should not
+introduce them. Two HBAO-shader-side cleanups also fell out of this:
+file-scope global initializers reading from the UBO got moved into
+functions/main, because some drivers handle UBO-vs-default-block
+differently for that pattern (`g_Float2Offset`, `g_Jitter`,
+`uvOffset`/`invResolution`).
+
 ### 2c — Pipeline-state consolidation — done
 
 Landed across four sequential commits (see Sub-phase 2c status below).
