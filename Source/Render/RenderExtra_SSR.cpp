@@ -92,9 +92,14 @@ void SSRSystem::do_downsample() {
 		rp.color_infos = targets;
 		gfx().set_render_pass(rp);
 		int mip_to_fetch = (i == 0) ? 0 : i - 1;
-		device.get_active_shader()->set_int("mip_level", mip_to_fetch);
-		device.get_active_shader()->set_vec2("myimg_size", size);
-		device.get_active_shader()->set_vec2("inv_prev_size", inv_presize);
+		{
+			gpu::SsrParams sp{};
+			sp.mip_level = mip_to_fetch;
+			sp.myimg_size = glm::vec2(size);
+			sp.inv_prev_size = inv_presize;
+			draw.ubo.ssr_params->upload(&sp, sizeof(sp));
+			gfx().bind_uniform_buffer_base(7, draw.ubo.ssr_params);
+		}
 		if (i == 0)
 			device.bind_texture(0, draw.tex.last_scene_color);
 		else
@@ -137,10 +142,15 @@ void SSRSystem::do_upsample() {
 	device.bind_texture(6, draw.tex.scene_color_mipchain);
 
 	static int frame = 0;
-	device.get_active_shader()->set_int("temporal_frame", (frame++) % 4);
-	device.get_active_shader()->set_bool("debug_toggle", debug_toggle);
-	device.get_active_shader()->set_int("res_mode", r_ssr_res.get_integer());
-	device.get_active_shader()->set_int("num_samples_to_get", r_ssr_num_samples.get_integer());
+	{
+		gpu::SsrParams sp{};
+		sp.temporal_frame = (frame++) % 4;
+		sp.debug_toggle = debug_toggle ? 1 : 0;
+		sp.res_mode = r_ssr_res.get_integer();
+		sp.num_samples_to_get = r_ssr_num_samples.get_integer();
+		draw.ubo.ssr_params->upload(&sp, sizeof(sp));
+		gfx().bind_uniform_buffer_base(7, draw.ubo.ssr_params);
+	}
 
 	auto targets = {ColorTargetInfo(draw.tex.last_reflection_accum)};
 	RenderPassState rp;
@@ -322,23 +332,8 @@ void SSRSystem::execute_compute() {
 	state.depth_testing = false;
 	state.depth_writes = false;
 	device.set_pipeline(state);
-	device.get_active_shader()->set_int("MAX_STEPS", max_steps);
-	device.get_active_shader()->set_float("max_distance", max_dist);
-	device.get_active_shader()->set_float("bias", bias);
-	device.get_active_shader()->set_float("step_size", step_size);
-	device.get_active_shader()->set_float("max_thickness", max_thick);
-	device.get_active_shader()->set_bool("debug_toggle", debug_toggle);
-	auto time = GetTime();
 	static int index = 0;
-	device.get_active_shader()->set_float("temporalTime", float(index++));
 	r_ssr_res.set_integer(2);
-	device.get_active_shader()->set_int("res_mode", r_ssr_res.get_integer());
-	device.get_active_shader()->set_float("ssr_max_roughness", ssr_max_roughness);
-	device.get_active_shader()->set_float("ssr_brdf_bias", ssr_brdf_bias);
-	device.get_active_shader()->set_float("ssr_mip_bias", ssr_mip_bias);
-	device.get_active_shader()->set_int("random_repeat", random_repeat);
-	device.get_active_shader()->set_int("traces_per_pixel", traces_per_pixel);
-	device.get_active_shader()->set_mat4("lastViewProj", draw.last_frame_main_view.viewproj);
 
 	glm::ivec2 texel_offset{};
 	if (r_ssr_res.get_integer() == 1) {
@@ -351,9 +346,31 @@ void SSRSystem::execute_compute() {
 	} else {
 		device.set_viewport(0, 0, viewsetup.width, viewsetup.height);
 	}
-	device.get_active_shader()->set_ivec2("texel_offset", get_frame_offset());
-
-	device.get_active_shader()->set_mat4("g_proj", viewsetup.proj);
+	{
+		gpu::SsrParams sp{};
+		sp.lastViewProj = draw.last_frame_main_view.viewproj;
+		sp.g_proj = viewsetup.proj;
+		sp.MAX_STEPS = max_steps;
+		sp.max_distance = max_dist;
+		sp.bias = bias;
+		sp.step_size = step_size;
+		sp.max_thickness = max_thick;
+		sp.temporalTime = float(index++);
+		sp.ssr_max_roughness = ssr_max_roughness;
+		sp.ssr_brdf_bias = ssr_brdf_bias;
+		sp.ssr_mip_bias = ssr_mip_bias;
+		sp.random_repeat = random_repeat;
+		sp.max_ssr_iters = 100;            // shader default; never overridden previously
+		sp.num_traces_per_pixel = 1;       // matches dead-set "traces_per_pixel" no-op behavior
+		sp.debug_toggle = debug_toggle ? 1 : 0;
+		sp.res_mode = r_ssr_res.get_integer();
+		{
+			auto fo = get_frame_offset();
+			sp.texel_offset = glm::ivec2(fo.x, fo.y);
+		}
+		draw.ubo.ssr_params->upload(&sp, sizeof(sp));
+		gfx().bind_uniform_buffer_base(7, draw.ubo.ssr_params);
+	}
 	device.bind_texture(0, draw.tex.scene_gbuffer0);
 	device.bind_texture(1, draw.tex.scene_gbuffer1);
 	device.bind_texture(2, draw.tex.scene_gbuffer2);

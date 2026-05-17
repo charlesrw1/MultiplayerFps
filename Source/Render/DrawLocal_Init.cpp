@@ -317,6 +317,7 @@ void Renderer::init() {
 	create_uniform_buffer(ubo.bloom_params);
 	create_uniform_buffer(ubo.temporal_params);
 	create_uniform_buffer(ubo.cull_params);
+	create_uniform_buffer(ubo.ssr_params);
 
 	on_level_start();
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);

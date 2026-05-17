@@ -4,9 +4,11 @@ layout(location = 0) out vec4 FS_OUT_Color;
 
 
 #include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
+layout (binding = 7, std140) uniform SsrParamsUbo { SsrParams params; };
 #include "commonUtil.txt"
 
 
@@ -19,7 +21,6 @@ layout(binding=5) uniform sampler2D SceneColor; // used to sample reflected colo
 layout(binding=6) uniform sampler2D SceneColorMipChain; // used to sample reflected color
 
 
-uniform int max_ssr_iters = 100;
 const float MAX_THICKNESS = 0.05;
 
 // SSR code from: https://sugulee.wordpress.com/2021/01/19/screen-space-reflections-implementation-and-optimization-part-2-hi-z-tracing-method/
@@ -79,7 +80,7 @@ float FindIntersection_Linear(
 	vec4 rayStartPos = rayPosInTS;
 
     int hitIndex = -1;
-    for(int i = 0;i<=max_dist && i<max_ssr_iters;i += 4)
+    for(int i = 0;i<=max_dist && i<params.max_ssr_iters;i += 4)
     {
         float depth0 = 0;
         float depth1 = 0;
@@ -160,7 +161,7 @@ float FindIntersection_HiZ(
     bool isBackwardRay = vReflDirInTS.z>0;
     float rayDir = isBackwardRay ? 1 : -1;
 
-    while(level >= stopLevel && ray.z*rayDir <= maxZ*rayDir && iter < max_ssr_iters)
+    while(level >= stopLevel && ray.z*rayDir <= maxZ*rayDir && iter < uint(params.max_ssr_iters))
     {
 		if(ray.x < 0.0 || ray.x > 1.0 || ray.y < 0.0 || ray.y > 1.0)
 			return 0.0;
@@ -210,7 +211,6 @@ vec4 ComputeReflectedColor(float intensity, vec3 intersection, vec4 skyColor, sa
 	vec4 scene = pow(texture(sceneColor, uv),vec4(1/2.2));
 	return mix(skyColor, scene, intensity);
 }
-uniform mat4 g_proj;	// i dont store this in GlobalData
 
 // Compute the position, the reflection direction, maxTraceDistance of the sample in texture space.
 void ComputePosAndReflection(
@@ -233,7 +233,7 @@ void ComputePosAndReflection(
 
     vec4 vReflectionEndPosInVS = samplePosInVS + vReflectionInVS * 1000.0;
 	vReflectionEndPosInVS /= (vReflectionEndPosInVS.z > 0 ? (-vReflectionEndPosInVS.z) : 1);
-    vec4 vReflectionEndPosInCS = g_proj * vec4(vReflectionEndPosInVS.xyz, 1.0);
+    vec4 vReflectionEndPosInCS = params.g_proj * vec4(vReflectionEndPosInVS.xyz, 1.0);
     vReflectionEndPosInCS /= vReflectionEndPosInCS.w;
     vec3 vReflectionDir = normalize((vReflectionEndPosInCS - samplePosInCS).xyz);
 
@@ -299,12 +299,6 @@ void kernel_screen_space_reflection_hi_z()
     FS_OUT_Color = finalColor;// vec4(vReflDirInTS,1.0);
 }
 
-uniform int MAX_STEPS = 60;
-uniform float step_size = 0.05;
-uniform float max_distance = 100.0;
-uniform float bias = 3.0;
-uniform float max_thickness = 0.5;
-uniform float temporalTime=0;
 float Halton(int index_, int base)
 {
     float f = 1.0;
@@ -366,13 +360,12 @@ vec2 HaltonJittered(vec2 uv, int frame)
 
     return fract(h + jitter);
 }
-uniform int random_repeat =32;
 vec4 ScreenSpaceReflectionDirection(vec2 uv, vec3 world_normal, float roughness, float brdfBias, int temp_add)
 {
     // Randomize it a little
     //vec2 jitter = RandN2(uv + vec2(temporalTime));
 	
-	int sampleIndex = int(temporalTime + temp_add)%random_repeat;	// low repeat count!
+	int sampleIndex = int(params.temporalTime + temp_add) % params.random_repeat;	// low repeat count!
 	vec2 jitter = HaltonJittered(uv,sampleIndex);
 	
     vec2 Xi = jitter;
@@ -382,18 +375,12 @@ vec4 ScreenSpaceReflectionDirection(vec2 uv, vec3 world_normal, float roughness,
 	return vec4(H,t.w);
 }
 // 1.7ms
-uniform bool debug_toggle = false;
-uniform float ssr_brdf_bias = 0.92;
-uniform float ssr_mip_bias = 5.0;
-uniform float ssr_max_roughness = 0.7;
-
-uniform mat4 lastViewProj;
 vec2 reproject_to_last(vec2 uv, float depth)
 {
 	uv = uv*2.0 - vec2(1.0);
 	vec4 worldspace = g.inv_viewproj * vec4(uv.x,uv.y,depth,1.0);
 	worldspace /= worldspace.w;
-	vec4 lastClipspace = lastViewProj * vec4(worldspace.xyz,1.0);
+	vec4 lastClipspace = params.lastViewProj * vec4(worldspace.xyz,1.0);
 	lastClipspace /= lastClipspace.w;
 	
 	vec2 reproject_uv = lastClipspace.xy*0.5 + vec2(0.5);
@@ -412,8 +399,8 @@ vec3 sample_last_frame_scene_color(vec2 uv, float depth, float mip)
 
 vec3 do_raymarch(vec2 uv, vec3 reflDir_1_VS, float roughness, vec3 viewPos, vec3 normalVS, int rayIndex)
 {
-	
-	vec4 refl_and_pdf = ScreenSpaceReflectionDirection(uv,reflDir_1_VS,roughness,ssr_brdf_bias,rayIndex);
+
+	vec4 refl_and_pdf = ScreenSpaceReflectionDirection(uv,reflDir_1_VS,roughness,params.ssr_brdf_bias,rayIndex);
 	//refl_and_pdf.w *= max(dot(normalVS, refl_and_pdf.xyz),0.0);
 	vec3 reflDirVS = refl_and_pdf.xyz;
 	//vec3 normalVSRough = (g.view * vec4(worldH, 0.0)).xyz;
@@ -430,20 +417,20 @@ vec3 do_raymarch(vec2 uv, vec3 reflDir_1_VS, float roughness, vec3 viewPos, vec3
 	//float step_sz_to_use = step_size * (max(dot(normalVS, reflDirVS), 0.2)*2.0);
 	const float jitter_start_amt = mix(0.0,0.3,HaltonJittered(uv,7).y);
 	
-    vec3 rayPosVS = viewPos + normalVS * step_size * (bias) + reflDirVS * jitter_start_amt;
-	float step_sz_to_use = step_size;// * length(rayPosVS - viewPos) / max(dot(normalVS, reflDirVS), 0.1);
+    vec3 rayPosVS = viewPos + normalVS * params.step_size * (params.bias) + reflDirVS * jitter_start_amt;
+	float step_sz_to_use = params.step_size;// * length(rayPosVS - viewPos) / max(dot(normalVS, reflDirVS), 0.1);
 vec3 col = vec3(0.0);
     //vec3 prevPos = rayPosVS;
 
-    for (int i = 0; i < MAX_STEPS; i++)
+    for (int i = 0; i < params.MAX_STEPS; i++)
     {
         rayPosVS += reflDirVS * step_sz_to_use;
 
-        if (length(rayPosVS) > max_distance)
+        if (length(rayPosVS) > params.max_distance)
             break;
 
         // Project ray to screen
-        vec4 rayClip = g_proj * vec4(rayPosVS, 1.0);
+        vec4 rayClip = params.g_proj * vec4(rayPosVS, 1.0);
         vec2 rayUV = rayClip.xy / rayClip.w * 0.5 + 0.5;
 
         // Edge fading
@@ -461,7 +448,7 @@ vec3 col = vec3(0.0);
         float linearSceneZ = -g.near / depthSample; // Replace with proper linearization if needed
 
         // Adaptive thickness
-        float thickness = max_thickness/ max(dot(normalVS, reflDirVS), 0.4);
+        float thickness = params.max_thickness/ max(dot(normalVS, reflDirVS), 0.4);
 
         // Check hit
 		float depth_diff = (rayPosVS.z - linearSceneZ);
@@ -480,7 +467,7 @@ vec3 col = vec3(0.0);
 				
 				const float dist = length(rayPosVS - viewPos);
 				const float footprint = dist * roughness;
-				const float mip = log2(footprint*ssr_mip_bias);
+				const float mip = log2(footprint*params.ssr_mip_bias);
 				
 				col = sample_last_frame_scene_color(rayUV.xy, depthSample,mip);
 				//col =textureLod(SceneColor,rayUV, 0).rgb;// * edgeFade;
@@ -497,9 +484,6 @@ vec3 col = vec3(0.0);
 
     return col;
 }
-uniform int res_mode = 0;
-uniform ivec2 texel_offset = ivec2(0,0);
-uniform int num_traces_per_pixel = 1;
 void ssr_2()
 {
     vec3 col = vec3(0.0,0.0,0.0);
@@ -517,7 +501,7 @@ void ssr_2()
 	//	texelCoord *= 2;
 	//}
 	texelCoord *= 2;
-		texelCoord += texel_offset;
+		texelCoord += params.texel_offset;
 	
     const vec2 invSize = 1.0 / g.viewport_size.xy;
     const vec2 uv = (vec2(texelCoord) + 0.5) * invSize;
@@ -530,7 +514,7 @@ void ssr_2()
         return;
     }
 	float roughness = texelFetch(GBUFFER2,texelCoord,0).g;
-	if(roughness>ssr_max_roughness) {
+	if(roughness>params.ssr_max_roughness) {
 		FS_OUT_Color = vec4(col,1.0);
 		return;
 	}
@@ -556,10 +540,10 @@ void ssr_2()
 	//vec3 reflDirVS = (g.view * vec4(worldReflect, 0.0)).xyz;
 
 	vec3 sum = vec3(0.0);
-	for(int r=0;r<num_traces_per_pixel;r++) {
+	for(int r=0;r<params.num_traces_per_pixel;r++) {
 		sum += do_raymarch(uv, reflDir_1_VS,roughness, viewPos, normalVS,r);
 	}
-	sum /= float(num_traces_per_pixel);
+	sum /= float(params.num_traces_per_pixel);
 	FS_OUT_Color = vec4(
 		sum,
 		1.0);
