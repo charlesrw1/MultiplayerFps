@@ -1,6 +1,5 @@
 ﻿#include "DrawLocal.h"
 #include "Framework/Util.h"
-#include "glad/glad.h"
 #include "Render/Texture.h"
 #include "imgui.h"
 #include "glm/ext/matrix_transform.hpp"
@@ -191,12 +190,12 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	};
 
 	if (is_wireframe_mode) {
-		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		glLineWidth(3);
+		gfx().set_polygon_fill_mode(GraphicsFillMode::Line);
+		gfx().set_line_width(3);
 		gbuffer_pass(GPRF_WIREFRAME_1);
-		glLineWidth(1);
+		gfx().set_line_width(1);
 		gbuffer_pass(GPRF_WIREFRAME_2);
-		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		gfx().set_polygon_fill_mode(GraphicsFillMode::Fill);
 	} else {
 		{
 			GPUSCOPESTART(gbuffer_pass_scope1);
@@ -285,20 +284,14 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		bind_texture_ptr(2, tex.scene_depth);
 		bind_texture_ptr(3, tex.scene_motion);
 		bind_texture_ptr(4, tex.last_scene_motion);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
 		// blit from gbuffer0 to scene color
-		//??
 		GraphicsBlitInfo blitinfo;
 		blitinfo.set_width_height_both(cur_w, cur_h);
 		blitinfo.src.texture = tex.scene_gbuffer0;
 		blitinfo.dest.texture = tex.scene_color;
 		gfx().blit_textures(blitinfo);
-
-		// glNamedFramebufferTexture(fbo.taa_blit, GL_COLOR_ATTACHMENT0, tex.scene_color->get_internal_handle(), 0);
-		// glBlitNamedFramebuffer(fbo.taa_resolve, fbo.taa_blit, 0, 0, cur_w, cur_h,
-		//	0, 0, cur_w, cur_h, GL_COLOR_BUFFER_BIT,
-		//	GL_NEAREST);
 
 		return tex.scene_gbuffer0;
 	};
@@ -392,7 +385,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	// render_transparents(scene_color_handle)
 
 	// Bloom update
-	render_bloom_chain(scene_color_handle->get_internal_handle());
+	render_bloom_chain(scene_color_handle);
 
 	IGraphicsTexture* read_from_texture = tex.output_composite;
 	const auto& view_to_use = current_frame_view;
@@ -420,7 +413,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		IGraphicsTexture* bloom_tex = tex.bloom_chain[0].texture;
 		if (!enable_bloom.get_bool())
 			bloom_tex = black_texture;
-		bind_texture(0, scene_color_handle->get_internal_handle());
+		bind_texture_ptr(0, scene_color_handle);
 		bind_texture_ptr(1, bloom_tex);
 		bind_texture_ptr(2, lens_dirt->gpu_ptr);
 
@@ -430,7 +423,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		shader().set_float("bloom_lerp", pp_bloom_add);
 		shader().set_float("exposure", pp_exposure);
 
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	};
 	do_composite_pass();
 
@@ -479,15 +472,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	if (params.output_to_screen) {
 		GPUSCOPESTART(Blit_composite_to_backbuffer);
 
-		// glBlitNamedFramebuffer(
-		//	fbo.composite,
-		//	0,	/* blit to backbuffer */
-		//	0, 0, cur_w, cur_h,
-		//	0, 0, cur_w, cur_h,
-		//	GL_COLOR_BUFFER_BIT,
-		//	GL_NEAREST
-		//);
-
 		GraphicsBlitInfo blitInfo;
 		blitInfo.dest.y = 0;
 		blitInfo.dest.w = blitInfo.src.w = cur_w;
@@ -497,7 +481,6 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		blitInfo.filter = GraphicsFilterType::Nearest;
 		gfx().blit_textures(blitInfo);
 	}
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 Shader Renderer::shader() {
@@ -519,8 +502,6 @@ IGraphicsTexture* Renderer::do_post_process_stack(const std::vector<MaterialInst
 		pass_setup.color_infos = color_infos;
 		gfx().set_render_pass(pass_setup);
 
-		//		glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderToTexture->get_internal_handle(),
-		// 0);
 		tex.postProcessInput_vts_handle->update_specs_ptr(renderFromTexture);
 
 		auto mat = postProcessMats[i];
@@ -539,13 +520,11 @@ IGraphicsTexture* Renderer::do_post_process_stack(const std::vector<MaterialInst
 			bind_texture_ptr(i, texs[i]->gpu_ptr);
 		}
 
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
 		tex.actual_output_composite = renderToTexture;
 		std::swap(renderFromTexture, renderToTexture);
 	}
 
 	return renderFromTexture;
-
-	// glNamedFramebufferTexture(fbo.composite, GL_COLOR_ATTACHMENT0, renderFromTexture->get_internal_handle(), 0);
 }

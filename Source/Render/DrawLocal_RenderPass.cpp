@@ -25,7 +25,7 @@
 #include "Framework/ArenaStd.h"
 #include <algorithm>
 
-void Renderer::render_bloom_chain(texhandle scene_color_handle) {
+void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 	ZoneScoped;
 	GPUFUNCTIONSTART;
 
@@ -49,8 +49,7 @@ void Renderer::render_bloom_chain(texhandle scene_color_handle) {
 		float src_x = cur_w;
 		float src_y = cur_h;
 
-		device.bind_texture(0, scene_color_handle);
-		// glBindTextureUnit(0, scene_color_handle);
+		device.bind_texture_ptr(0, scene_color);
 		for (int i = 0; i < tex.number_bloom_mips; i++) {
 			auto& bc = tex.bloom_chain[i];
 

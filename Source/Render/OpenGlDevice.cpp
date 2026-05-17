@@ -399,6 +399,11 @@ public:
 		}
 	}
 
+	void set_polygon_fill_mode(GraphicsFillMode mode) override {
+		glPolygonMode(GL_FRONT_AND_BACK,
+					  mode == GraphicsFillMode::Line ? GL_LINE : GL_FILL);
+	}
+
 	void set_color_write_mask(int attachment, bool r, bool g, bool b, bool a) override {
 		ASSERT(attachment >= 0);
 		glColorMaski((GLuint)attachment, r ? GL_TRUE : GL_FALSE, g ? GL_TRUE : GL_FALSE,

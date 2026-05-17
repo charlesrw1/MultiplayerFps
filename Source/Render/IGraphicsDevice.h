@@ -92,6 +92,14 @@ enum class GraphicsFilterType : int8_t
 	MipmapLinear,
 };
 
+// Polygon rasterization fill mode. Mirrors SDL_GPUFillMode.
+// Phase 2c folds this onto RenderPipelineState::fill_mode.
+enum class GraphicsFillMode : int8_t
+{
+	Fill,
+	Line,
+};
+
 enum class GraphicsImageAccess : int8_t
 {
 	ReadOnly,
@@ -465,6 +473,14 @@ public:
 													int count_byte_offset,
 													int max_draw_count,
 													int stride) = 0;
+
+	// ---- Phase 1.6 wrap surface (scene-draw orchestration) ----------------
+
+	// Polygon rasterization fill mode (Fill = solid, Line = wireframe).
+	// Wraps glPolygonMode(GL_FRONT_AND_BACK, ...). Used by the wireframe
+	// debug pass. Immediate setter for now; Phase 2c bakes onto
+	// RenderPipelineState::fill_mode.
+	virtual void set_polygon_fill_mode(GraphicsFillMode mode) = 0;
 
 	// ---- Phase 1.5a wrap surface (decals) ----------------------------------
 

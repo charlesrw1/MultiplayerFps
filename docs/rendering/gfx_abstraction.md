@@ -44,6 +44,7 @@ struct so the SDL3 backend can read them at hash time:
 | `set_color_write_mask(att, r,g,b,a)`              | `ColorWriteMask color_write_masks[MAX_COLOR_ATTACHMENTS]` (default write-all) | DecalBatcher.cpp:131-136,176 (material-driven variants — ≤16 unique masks) |
 | `set_polygon_offset(enabled, factor, units)`      | `polygon_offset_{enabled, factor, units}`                         | shadow-bias passes                           |
 | `set_line_width(float)`                           | `line_width` (default 1.f; SDL3 silently ignores)                 | debug meshbuilder                            |
+| `set_polygon_fill_mode(GraphicsFillMode)`         | `fill_mode` (default `Fill`)                                      | wireframe debug pass                         |
 
 After 2c, the struct is hashable by raw bytes (no padding hazards if laid out
 carefully); SDL3 caching key is `XXH3_64bits(&state, sizeof(state))`.
@@ -137,13 +138,20 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.4f** | API drift correction: move texture-scoped ops onto `IGraphicsTexture` | — | `IGraphicsTexture::{set_mip_range, download}`; delete `IGraphicsDevice::{set_mip_range, download_texture, download_texture_2d}` | done |
 | **1.4g** | API drift correction: implicit render/compute pass separation (SDL3 GPU prep) | — | `IGraphicsDevice::begin_compute_pass()`; backend tracks `PassMode`; `set_render_pass()` flips to Render; assert in `dispatch_compute()` | done |
 | **1.5a** | `DecalBatcher.cpp` | ~12 | per-attachment color masks as immediate setters (baked in 2c) | done |
-| 1.6 | `DrawLocal_SceneDrawInternal.cpp` (orchestration) | ~14 | leftover binding + draw glue | not started |
+| **1.6** | `DrawLocal_SceneDrawInternal.cpp` (orchestration) | ~14 | set_polygon_fill_mode; migrate `render_bloom_chain` to `IGraphicsTexture*` | done |
 | 1.7 | `Shader.cpp` migration → inside `Source/Render/Opengl*` | 71 | shader compile/link entirely backend-internal; expose `IGraphicsShader` + `create_shader(...)` | not started |
 | 1.8 | Window/swapchain + ImGui wrap | ~30 (`SDL_GL_*`, `gladLoad*`, swap, vsync, imgui_render) | factory move from `EngineMain_Init.cpp`; `set_vsync`, `present`, `imgui_render` | not started |
 | 1.9 | `r.gpu.no_legacy_calls=1` assertion test + rip per-subsystem `r.gfx.wrap.*` flags | — | gates phase boundary | not started |
 | **1.5 (post-1.x)** | Null/passthrough leak-detector backend | — | gate that proves the wrap is complete | not started |
 
 Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
+
+## Sub-phase 1.6 status
+
+- API added: `GraphicsFillMode { Fill, Line }` + `set_polygon_fill_mode(GraphicsFillMode)` over `glPolygonMode(GL_FRONT_AND_BACK, …)` — immediate setter; Phase 2c folds onto `RenderPipelineState::fill_mode` (see [Pipeline model](#pipeline-model)).
+- `Renderer::render_bloom_chain` signature migrated from `texhandle` to `IGraphicsTexture*`. Internal `device.bind_texture(0, scene_color_handle)` becomes `bind_texture_ptr(0, scene_color)`.
+- `DrawLocal_SceneDrawInternal.cpp`: wireframe pass `glPolygonMode`/`glLineWidth` pair → `gfx().set_polygon_fill_mode` + `gfx().set_line_width`. 3× `glDrawArrays(GL_TRIANGLES, 0, 3)` (TAA resolve, composite, post-process stack) → `gfx().draw_arrays(Triangles, 0, 3)`. `bind_texture(0, scene_color_handle->get_internal_handle())` → `bind_texture_ptr(0, scene_color_handle)`. Trailing defensive `glBindFramebuffer(GL_FRAMEBUFFER, 0)` deleted (FBO 0 is the default; renderer sets its own FBO before any subsequent draws — same rationale as the EnvProbe::init cleanup deleted in 1.2b). Dead-code comments referencing `glNamedFramebufferTexture` / `glBlitNamedFramebuffer` / `GL_COLOR_BUFFER_BIT` removed. `glad/glad.h` include dropped.
+- `DrawLocal_SceneDrawInternal.cpp` contains zero direct `gl*` calls and zero `get_internal_handle()` calls. 184 unit tests + full integration suite green.
 
 ## Sub-phase 1.5a status
 

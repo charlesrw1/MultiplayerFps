@@ -321,7 +321,7 @@ private:
 	void upload_light_and_decal_buffers();
 
 	void init_bloom_buffers();
-	void render_bloom_chain(texhandle scene_color_handle);
+	void render_bloom_chain(IGraphicsTexture* scene_color);
 
 	void InitGlState();
 	void InitFramebuffers(bool create_composite_texture, int s_w, int s_h);
