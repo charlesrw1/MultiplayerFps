@@ -246,7 +246,6 @@ public:
 	program_handle ssr_compute{};
 	program_handle ssr_downsample{};
 	program_handle ssr_upsample{};
-	program_handle ssr_blur{};
 	program_handle temporal_upsample{};
 	program_handle apply_temporal{};
 

@@ -169,7 +169,6 @@ public:
 		program_handle sunlight_accumulation{};
 		program_handle sunlight_accumulation_debug{};
 		program_handle ambient_accumulation{};
-		program_handle reflection_accumulation{};
 		program_handle light_accumulation_fullscreen{};
 		program_handle light_accumulation_fullscreen_tiled{};
 		program_handle light_accumulation_fullscreen_tiled2{};

@@ -107,15 +107,10 @@ private:
 	program_handle gather_shader{};
 	program_handle relocate_shader{};
 	program_handle lum_calc{};
-	program_handle get_best_cubemap_shader{};
 	program_handle shade_fs_halfres{};
 	program_handle shade_fs{};
 
-	program_handle shade_debug_fs{};
-
 	program_handle avg_probe_calc{};
-
-	program_handle bilateral_upsample{};
 
 	program_handle temporal_upsample{};
 	program_handle apply_halfres_accum_to_scene{};

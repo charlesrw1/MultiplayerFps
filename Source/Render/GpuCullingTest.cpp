@@ -9,7 +9,6 @@ GpuCullingTest::GpuCullingTest() {
 	cull_compute_spot = draw.get_prog_man().create_compute("CullCompute.txt", "SHADOW_SPOT");
 
 	build_pyramid = draw.get_prog_man().create_compute("DepthPyramidC.txt");
-	cpu_vis_array_to_mdi = draw.get_prog_man().create_compute("cpu_vis_to_mdi.txt");
 	debug_overlays = draw.get_prog_man().create_raster("fullscreenquad.txt", "debugCull.txt");
 	vis_bitarray = gfx().create_buffer({});
 	zero_instances_mdi = draw.get_prog_man().create_compute("zero_instances_mdi.txt");

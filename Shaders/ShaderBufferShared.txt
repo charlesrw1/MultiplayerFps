@@ -130,9 +130,8 @@ struct SsrParams {
 //                                       count, *not* the per-frame one set
 //                                       by set_reflection_uniforms())
 // One UBO; each dispatch re-uploads. Bound at slot 7.
-// Out of scope: get_best_cubemap_C (created but never dispatched — dead),
-// avgProbeCalc_C (had no name-uniforms to begin with),
-// compute_irrad_pos_C / PerlinGenF (never created).
+// avgProbeCalc_C lives in the same dispatch family but has no name-uniforms,
+// so it doesn't need a slot in this struct.
 struct BakeParams {
     vec4  light_sun_dir;          //   0 .. 16  (trace_C)
     vec4  light_sun_color;        //  16 .. 32  (trace_C)
@@ -158,11 +157,8 @@ struct BakeParams {
 //                                  for TILED=2)
 //   CombineF                    : tonemap_type, contrast_tweak, saturation_tweak,
 //                                 bloom_lerp, exposure
-// Note: the doc plan also listed `SampleCubemapsF` (reflection_accumulation)
-// but its only callsite is commented out — dead shader, skipped. Same for
-// the shared `specular_ao_intensity` from reflectionShared.txt: in practice
-// reflectionShared is included only by group E shaders, so it stays in
-// DdgiRuntimeParams when group E lands.
+// Note: the shared `specular_ao_intensity` from reflectionShared.txt lives
+// in DdgiRuntimeParams — reflectionShared is included only by group E shaders.
 // Bound at slot 7. TILED=2 loop re-uploads per tile.
 struct LitCompositorParams {
     vec4 uSunDirection;          //   0 .. 16  (xyz used; SunLightAccumulationF)
@@ -191,8 +187,6 @@ struct LitCompositorParams {
 //   shader having bound DdgiRuntimeParams at slot 7, and reads
 //   params.lum_adjust_mode / params.num_cubemaps directly.
 // Bound at slot 7. Each callsite uploads its full subset before dispatch.
-// Out of scope: bilateral_upsample_ddgi.txt and ddgiShadeDebugF.txt —
-// both have programs created but never dispatched; dead.
 struct DdgiRuntimeParams {
     vec2  ssr_lum_range;         //   0 .. 8   (ddgi_apply_upsampled)
     int   _pad0;                 //   8        pad to ivec4 16B align

@@ -12,7 +12,6 @@ SSRSystem::SSRSystem() {
 	hiz_downsample = draw.get_prog_man().create_compute("DepthPyramidC.txt");
 	ssr_downsample = draw.get_prog_man().create_raster("fullscreenquad.txt", "ssr_downsample.txt");
 	ssr_upsample = draw.get_prog_man().create_raster("fullscreenquad.txt", "ssr_upsample.txt");
-	ssr_blur = draw.get_prog_man().create_raster("fullscreenquad.txt", "blur_ssr.txt");
 
 	temporal_upsample = draw.get_prog_man().create_raster("fullscreenquad.txt", "temporal_upsample_ssr.txt");
 
@@ -157,26 +156,6 @@ void SSRSystem::do_upsample() {
 	rp.color_infos = targets;
 	gfx().set_render_pass(rp);
 	device.set_viewport(0, 0, viewsetup.width, viewsetup.height);
-
-	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
-	return;
-	// now do blur and output
-
-	state.vao = draw.get_empty_vao();
-	state.program = draw.get_prog_man().get_obj(ssr_blur);
-	state.blend = BlendState::ADD;
-	state.depth_testing = false;
-	state.depth_writes = false;
-	device.set_pipeline(state);
-	device.get_active_shader()->set_vec2("texelSize", inv_presize);
-
-	auto targets2 = {ColorTargetInfo(draw.tex.scene_color)};
-	rp;
-	rp.color_infos = targets2;
-	gfx().set_render_pass(rp);
-	device.set_viewport(0, 0, viewsetup.width, viewsetup.height);
-	device.bind_texture(0, draw.tex.ddgi_accum);
-	device.bind_texture(1, draw.tex.scene_depth);
 
 	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }

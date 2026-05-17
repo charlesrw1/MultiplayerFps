@@ -128,7 +128,6 @@ public:
 	glm::mat4 prev_view = glm::mat4(1.0);
 
 	program_handle zero_instances_mdi{};
-	program_handle cpu_vis_array_to_mdi{};
 
 	void zero_instances_in_this(IGraphicsBuffer* mdi_buf, int count);
 

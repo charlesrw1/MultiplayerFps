@@ -49,12 +49,8 @@ DdgiTesting::DdgiTesting() {
     shade_fs = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeF.txt");
     shade_fs_halfres = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeF.txt", "HALFRES_DDGI");
 
-    shade_debug_fs = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeDebugF.txt");
-
     trace_shader = draw.get_prog_man().create_compute("trace_C.txt");
     debug_probes = draw.get_prog_man().create_raster("MeshSimpleV.txt", "MeshDebugProbeF.txt");
-
-    get_best_cubemap_shader = draw.get_prog_man().create_compute("get_best_cubemap_C.txt");
 
     relocate_shader = draw.get_prog_man().create_compute("trace_C.txt", "RELOCATE");
 
@@ -62,7 +58,6 @@ DdgiTesting::DdgiTesting() {
 
     avg_probe_calc = draw.get_prog_man().create_compute("avgProbeCalc_C.txt");
 
-    bilateral_upsample = draw.get_prog_man().create_raster("fullscreenquad.txt", "bilateral_upsample_ddgi.txt");
     temporal_upsample = draw.get_prog_man().create_raster("fullscreenquad.txt", "temporal_upsample_ddgi.txt");
     apply_halfres_accum_to_scene = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgi_apply_upsampled.txt");
 

@@ -404,21 +404,4 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	}
 
-	// const Texture* reflectionProbeTex = scene.get_reflection_probe_for_render(view_to_use.origin);
-	//
-	// if (reflectionProbeTex&& !is_cubemap_view) {
-	//	RenderPipelineState state;
-	//	state.vao = get_empty_vao();
-	//	state.program = prog.reflection_accumulation;
-	//	state.blend = BlendState::ADD;
-	//	state.depth_testing = false;
-	//	state.depth_writes = false;
-	//	gfx().set_pipeline(state);
-	//	bind_texture_ptr(4, ssao_tex);
-	//	bind_texture_ptr(5, reflectionProbeTex->gpu_ptr);
-	//	bind_texture(6, EnviornmentMapHelper::get().integrator.get_texture());
-	//	shader().set_float("specular_ao_intensity", r_specular_ao_intensity.get_float());
-	//
-	//	glDrawArrays(GL_TRIANGLES, 0, 3);
-	//}
 }
