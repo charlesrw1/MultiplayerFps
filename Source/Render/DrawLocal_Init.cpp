@@ -320,6 +320,7 @@ void Renderer::init() {
 	create_uniform_buffer(ubo.bake_params);
 	create_uniform_buffer(ubo.lit_compositor_params);
 	create_uniform_buffer(ubo.ddgi_runtime_params);
+	create_uniform_buffer(ubo.ssao_hbao_params);
 
 	on_level_start();
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);

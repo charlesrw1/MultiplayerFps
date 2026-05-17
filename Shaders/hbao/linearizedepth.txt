@@ -18,21 +18,19 @@
  */
  
 
-layout(location=0) uniform vec4 clipInfo; // z_n * z_f,  z_n - z_f,  z_f, perspective = 1 : 0
+#include "ShaderBufferShared.txt"
+layout (binding = 7, std140) uniform SsaoHbaoParamsUbo { SsaoHbaoParams params; };
 
 layout(binding=0)  uniform sampler2D inputTexture;
 
 layout(location=0,index=0) out float out_Color;
 
-
-uniform float zNear =0.01;	// fixme
-
-float reconstructCSZ(float d, vec4 clipInfo) {
-   //return (clipInfo[0] / (clipInfo[1] * d + clipInfo[2]));
+float reconstructCSZ(float d) {
+   //return (params.clipInfo[0] / (params.clipInfo[1] * d + params.clipInfo[2]));
    // 7/30: depth buffer change
-   return zNear / d;
+   return params.zNear / d;
 }
 void main() {
   float depth = texelFetch(inputTexture, ivec2(gl_FragCoord.xy), 0).x;
-  out_Color = reconstructCSZ(depth, clipInfo);
+  out_Color = reconstructCSZ(depth);
 }

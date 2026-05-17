@@ -25,6 +25,8 @@ https://github.com/NVIDIAGameWorks/D3DSamples/tree/master/samples/DeinterleavedT
 */
 
 #include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
+layout (binding = 7, std140) uniform SsaoHbaoParamsUbo { SsaoHbaoParams params; };
 
 // The pragma below is critical for optimal performance
 // in this fragment shader to let the shader compiler
@@ -54,19 +56,21 @@ const float  NUM_DIRECTIONS = 8; // texRandom/g_Jitter initialization depends on
 layout(std140,binding=0) uniform controlBuffer {
   HBAOData   control;
 };
-uniform uint primitive_id_custom = 0;
 
 #if AO_DEINTERLEAVED
 
 #if AO_LAYERED
-  vec2 g_Float2Offset = control.float2Offsets[primitive_id_custom].xy;
-  vec4 g_Jitter       = control.jitters[primitive_id_custom];
-  
+  // Wrap as functions — global-scope initializers reading from a UBO produce
+  // wrong values on some drivers (the original code relied on
+  // primitive_id_custom being a default-block uniform).
+  vec2 g_Float2Offset() { return control.float2Offsets[params.primitive_id_custom].xy; }
+  vec4 g_Jitter()       { return control.jitters[params.primitive_id_custom]; }
+
   layout(binding=0) uniform sampler2DArray texLinearDepth;
   layout(binding=1) uniform sampler2D texViewNormal;
 
   vec3 getQuarterCoord(vec2 UV){
-    return vec3(UV,float(primitive_id_custom));
+    return vec3(UV,float(params.primitive_id_custom));
   }
   #if AO_LAYERED == 1
   
@@ -77,7 +81,7 @@ uniform uint primitive_id_custom = 0;
     #endif
 
     void outputColor(vec4 color) {
-      imageStore(imgOutput, ivec3(ivec2(gl_FragCoord.xy),primitive_id_custom), color);
+      imageStore(imgOutput, ivec3(ivec2(gl_FragCoord.xy),params.primitive_id_custom), color);
     }
   #else
     layout(location=0,index=0) out vec4 out_Color;
@@ -192,7 +196,7 @@ vec4 GetJitter()
 {
 #if AO_DEINTERLEAVED
   // Get the current jitter vector from the per-pass constant buffer
-  return g_Jitter;
+  return g_Jitter();
 #else
   // (cos(Alpha),sin(Alpha),rand1,rand2)
   return textureLod( texRandom, (gl_FragCoord.xy / AO_RANDOMTEX_SIZE), 0);
@@ -247,7 +251,7 @@ void main()
 {
   
 #if AO_DEINTERLEAVED
-  vec2 base = floor(gl_FragCoord.xy) * 4.0 + g_Float2Offset;
+  vec2 base = floor(gl_FragCoord.xy) * 4.0 + g_Float2Offset();
   vec2 uv = base * (control.InvQuarterResolution / 4.0);
 
   vec3 ViewPosition = FetchQuarterResViewPos(uv);

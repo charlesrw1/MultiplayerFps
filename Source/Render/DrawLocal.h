@@ -262,6 +262,7 @@ public:
 		IGraphicsBuffer* bake_params = nullptr;      // group J: probe / GI bake (trace + gather + probeLumCalc)
 		IGraphicsBuffer* lit_compositor_params = nullptr; // group A: sun + ambient + tiled-light + combine
 		IGraphicsBuffer* ddgi_runtime_params = nullptr;   // group E: ddgiShadeF + ddgi_apply_upsampled + reflectionShared
+		IGraphicsBuffer* ssao_hbao_params = nullptr;      // group H: linearizedepth + viewnormal + hbao + hbaoblur + hbaodeinterleave
 	} ubo;
 
 	struct buffers

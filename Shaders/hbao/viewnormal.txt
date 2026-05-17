@@ -19,9 +19,8 @@
 
 in vec2 texCoord;
 
-layout(location=0) uniform vec4 projInfo; 
-layout(location=1) uniform int  projOrtho;
-layout(location=2) uniform vec2 InvFullResolution;
+#include "ShaderBufferShared.txt"
+layout (binding = 7, std140) uniform SsaoHbaoParamsUbo { SsaoHbaoParams params; };
 
 layout(binding=0)  uniform sampler2D texLinearDepth;
 
@@ -31,7 +30,7 @@ layout(location=0,index=0) out vec4 out_Color;
 
 vec3 UVToView(vec2 uv, float eye_z)
 {
-  return vec3((uv * projInfo.xy + projInfo.zw) * (eye_z), eye_z);
+  return vec3((uv * params.projInfo.xy + params.projInfo.zw) * (eye_z), eye_z);
 }
 
 vec3 FetchViewPos(vec2 UV)
@@ -49,10 +48,10 @@ vec3 MinDiff(vec3 P, vec3 Pr, vec3 Pl)
 
 vec3 ReconstructNormal(vec2 UV, vec3 P)
 {
-  vec3 Pr = FetchViewPos(UV + vec2(InvFullResolution.x, 0));
-  vec3 Pl = FetchViewPos(UV + vec2(-InvFullResolution.x, 0));
-  vec3 Pt = FetchViewPos(UV + vec2(0, InvFullResolution.y));
-  vec3 Pb = FetchViewPos(UV + vec2(0, -InvFullResolution.y));
+  vec3 Pr = FetchViewPos(UV + vec2( params.InvFullResolution.x, 0));
+  vec3 Pl = FetchViewPos(UV + vec2(-params.InvFullResolution.x, 0));
+  vec3 Pt = FetchViewPos(UV + vec2(0,  params.InvFullResolution.y));
+  vec3 Pb = FetchViewPos(UV + vec2(0, -params.InvFullResolution.y));
   return normalize(cross(MinDiff(P, Pr, Pl), MinDiff(P, Pt, Pb)));
 }
 

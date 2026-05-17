@@ -201,6 +201,31 @@ struct DdgiRuntimeParams {
     ivec2 halfres_texel_offset;  //  56 .. 64  (ddgiShadeF HALFRES; struct size 64, /16)
 };
 
+// ---- H. SSAO / HBAO pipeline -----------------------------------------------
+// HBAO from NVIDIA gl_ssao sample. The HBAOData SSBO at slot 0 holds the
+// big per-frame constants (radii, jitters, projInfo derivatives, etc.);
+// this struct is the small per-pass tweakables that were previously set
+// by name on each individual sub-pass:
+//   linearizedepth.txt  : clipInfo, zNear
+//   viewnormal.txt      : projInfo, projOrtho, InvFullResolution
+//   hbaodeinterleave.txt: info
+//   hbao.txt            : primitive_id_custom (per-layer in calc loop)
+//   hbaoblur.txt        : g_Sharpness, g_InvResolutionDirection (per-direction)
+// Bound at slot 7. Multiple uploads per frame: once each for the linearize +
+// viewnormal + deinterleave + blurH + blurV passes, and once per array
+// layer inside the calc loop.
+struct SsaoHbaoParams {
+    vec4  clipInfo;                  //   0 .. 16  (linearizedepth)
+    vec4  projInfo;                  //  16 .. 32  (viewnormal)
+    vec4  info;                      //  32 .. 48  (hbaodeinterleave; xy offset, zw invRes)
+    vec2  InvFullResolution;         //  48 .. 56  (viewnormal)
+    vec2  g_InvResolutionDirection;  //  56 .. 64  (hbaoblur)
+    float zNear;                     //  64        (linearizedepth)
+    float g_Sharpness;               //  68        (hbaoblur)
+    int   projOrtho;                 //  72        (viewnormal)
+    uint  primitive_id_custom;       //  76 .. 80  (hbao; struct size 80, /16)
+};
+
 // ---- C. Temporal upsample --------------------------------------------------
 // Union of fields previously set by name on TaaResolveF, temporal_upsample_ddgi,
 // and temporal_upsample_ssr. Each shader reads only the fields it needs:

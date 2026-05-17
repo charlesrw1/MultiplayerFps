@@ -17,9 +17,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-layout(location=0) uniform vec4      info; // xy
-vec2 uvOffset = info.xy;
-vec2 invResolution = info.zw;
+#include "ShaderBufferShared.txt"
+layout (binding = 7, std140) uniform SsaoHbaoParamsUbo { SsaoHbaoParams params; };
 
 layout(binding=0)  uniform sampler2D texLinearDepth;
 
@@ -29,8 +28,8 @@ layout(location=0,index=0) out float out_Color[8];
 
 #if 1
 void main() {
-  vec2 uv = floor(gl_FragCoord.xy) * 4.0 + uvOffset + 0.5;
-  uv *= invResolution;  
+  vec2 uv = floor(gl_FragCoord.xy) * 4.0 + params.info.xy + 0.5;
+  uv *= params.info.zw;
   
   vec4 S0 = textureGather(texLinearDepth, uv, 0);
   vec4 S1 = textureGatherOffset(texLinearDepth, uv, ivec2(2,0), 0);
@@ -46,7 +45,7 @@ void main() {
 }
 #else
 void main() {
-  vec2 uv = floor(gl_FragCoord.xy) * 4.0 + uvOffset;
+  vec2 uv = floor(gl_FragCoord.xy) * 4.0 + params.info.xy;
   ivec2 tc = ivec2(uv);
 
   out_Color[0] = texelFetchOffset(texLinearDepth, tc, 0, ivec2(0,0)).x;
