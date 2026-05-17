@@ -33,6 +33,115 @@ void dump_render_memory_usage() {
 }
 
 // ---------------------------------------------------------------------------
+// Capability dump + debug-output enable (called once at engine init)
+// ---------------------------------------------------------------------------
+void gfx_opengl_dump_capabilities() {
+	bool supports_compression = false;
+	bool supports_sparse_tex = false;
+	bool supports_filter_minmax = false;
+	bool supports_atomic64 = false;
+	bool supports_int64 = false;
+
+	int num_extensions = 0;
+	glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
+	for (int i = 0; i < num_extensions; i++) {
+		const char* ext = (char*)glGetStringi(GL_EXTENSIONS, i);
+		if (strcmp(ext, "GL_ARB_sparse_texture") == 0)
+			supports_sparse_tex = true;
+		else if (strcmp(ext, "GL_EXT_texture_compression_s3tc") == 0)
+			supports_compression = true;
+		else if (strcmp(ext, "GL_ARB_texture_filter_minmax") == 0)
+			supports_filter_minmax = true;
+		else if (strcmp(ext, "GL_NV_shader_atomic_int64") == 0)
+			supports_atomic64 = true;
+		else if (strcmp(ext, "GL_ARB_gpu_shader_int64") == 0)
+			supports_int64 = true;
+	}
+
+	sys_print(Debug, "###########################\n");
+	sys_print(Debug, "#### Extension support ####\n");
+	sys_print(Debug, "###########################\n");
+	sys_print(Debug, "-GL_ARB_sparse_texture: %s\n", supports_sparse_tex ? "yes" : "no");
+	sys_print(Debug, "-GL_ARB_texture_filter_minmax: %s\n", supports_filter_minmax ? "yes" : "no");
+	sys_print(Debug, "-GL_EXT_texture_compression_s3tc: %s\n", supports_compression ? "yes" : "no");
+	sys_print(Debug, "-GL_NV_shader_atomic_int64: %s\n", supports_atomic64 ? "yes" : "no");
+	sys_print(Debug, "-GL_ARB_gpu_shader_int64: %s\n", supports_int64 ? "yes" : "no");
+
+	if (!supports_compression)
+		Fatalf("Opengl driver needs GL_EXT_texture_compression_s3tc\n");
+
+	GLint binary_formats = 0;
+	glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &binary_formats);
+	if (binary_formats == 0)
+		Fatalf("Opengl driver must support program binary. (GL_NUM_PROGRAM_BINARY_FORMATS>0)\n");
+
+	sys_print(Debug, "############################\n");
+	sys_print(Debug, "#### GL Hardware Values ####\n");
+	sys_print(Debug, "############################\n");
+	int max_v = 0;
+	glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &max_v);
+	sys_print(Debug, "-GL_MAX_UNIFORM_BUFFER_BINDINGS: %d\n", max_v);
+	glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &max_v);
+	sys_print(Debug, "-GL_MAX_TEXTURE_IMAGE_UNITS: %d\n", max_v);
+	sys_print(Debug, "-GL_NUM_PROGRAM_BINARY_FORMATS: %d\n", binary_formats);
+	glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &max_v);
+	sys_print(Debug, "-GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS: %d\n", max_v);
+	glGetIntegerv(GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS, &max_v);
+	sys_print(Debug, "-GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS: %d\n", max_v);
+	glGetIntegerv(GL_MAX_FRAGMENT_SHADER_STORAGE_BLOCKS, &max_v);
+	sys_print(Debug, "-GL_MAX_FRAGMENT_SHADER_STORAGE_BLOCKS: %d\n", max_v);
+	glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &max_v);
+	sys_print(Debug, "-GL_MAX_ARRAY_TEXTURE_LAYERS: %d\n", max_v);
+	glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_v);
+	sys_print(Debug, "-GL_MAX_COLOR_ATTACHMENTS: %d\n", max_v);
+	sys_print(Debug, "\n");
+}
+
+static void GLAPIENTRY opengl_debug_message_callback(GLenum source, GLenum type, GLuint id, GLenum severity,
+													 GLsizei /*length*/, GLchar const* message, void const* /*user_param*/) {
+	auto const src_str = [source]() {
+		switch (source) {
+		case GL_DEBUG_SOURCE_API: return "API";
+		case GL_DEBUG_SOURCE_WINDOW_SYSTEM: return "WINDOW SYSTEM";
+		case GL_DEBUG_SOURCE_SHADER_COMPILER: return "SHADER COMPILER";
+		case GL_DEBUG_SOURCE_THIRD_PARTY: return "THIRD PARTY";
+		case GL_DEBUG_SOURCE_APPLICATION: return "APPLICATION";
+		case GL_DEBUG_SOURCE_OTHER: return "OTHER";
+		}
+		return "";
+	}();
+	auto const type_str = [type]() {
+		switch (type) {
+		case GL_DEBUG_TYPE_ERROR: return "ERROR";
+		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR: return "DEPRECATED_BEHAVIOR";
+		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR: return "UNDEFINED_BEHAVIOR";
+		case GL_DEBUG_TYPE_PORTABILITY: return "PORTABILITY";
+		case GL_DEBUG_TYPE_PERFORMANCE: return "PERFORMANCE";
+		case GL_DEBUG_TYPE_MARKER: return "MARKER";
+		case GL_DEBUG_TYPE_OTHER: return "OTHER";
+		}
+		return "";
+	}();
+	auto const severity_str = [severity]() {
+		switch (severity) {
+		case GL_DEBUG_SEVERITY_NOTIFICATION: return "NOTIFICATION";
+		case GL_DEBUG_SEVERITY_LOW: return "LOW";
+		case GL_DEBUG_SEVERITY_MEDIUM: return "MEDIUM";
+		case GL_DEBUG_SEVERITY_HIGH: return "HIGH";
+		}
+		return "";
+	}();
+	sys_print(Error, "%s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
+}
+
+void gfx_opengl_enable_debug_output() {
+	glEnable(GL_DEBUG_OUTPUT);
+	glDebugMessageCallback(opengl_debug_message_callback, nullptr);
+	glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE);
+	glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+}
+
+// ---------------------------------------------------------------------------
 // OpenGLSamplerImpl
 // ---------------------------------------------------------------------------
 static GLenum sampler_filter_to_gl(GraphicsSamplerFilter f) {
@@ -239,6 +348,27 @@ public:
 	IGraphicsVertexInput* create_vertex_input(const CreateVertexInputArgs& args) override {
 		ASSERT(args.vertex != nullptr);
 		return opengl_create_vertex_input(args);
+	}
+
+	void copy_texture(IGraphicsTexture* src, int src_mip, int src_layer,
+					  IGraphicsTexture* dst, int dst_mip, int dst_layer,
+					  int w, int h) override {
+		ASSERT(src && dst);
+		auto to_gl_target = [](GraphicsTextureType t) -> GLenum {
+			switch (t) {
+			case GraphicsTextureType::t2D:           return GL_TEXTURE_2D;
+			case GraphicsTextureType::t2DArray:      return GL_TEXTURE_2D_ARRAY;
+			case GraphicsTextureType::t3D:           return GL_TEXTURE_3D;
+			case GraphicsTextureType::tCubemap:      return GL_TEXTURE_CUBE_MAP;
+			case GraphicsTextureType::tCubemapArray: return GL_TEXTURE_CUBE_MAP_ARRAY;
+			}
+			ASSERT(0); return GL_TEXTURE_2D;
+		};
+		glCopyImageSubData(src->get_internal_handle(), to_gl_target(src->get_texture_type()),
+						   src_mip, 0, 0, src_layer,
+						   dst->get_internal_handle(), to_gl_target(dst->get_texture_type()),
+						   dst_mip, 0, 0, dst_layer,
+						   w, h, 1);
 	}
 
 	IGraphicsShader* create_shader_vert_frag(const std::string& vert_path,

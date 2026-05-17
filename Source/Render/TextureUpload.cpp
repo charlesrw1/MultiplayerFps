@@ -1,11 +1,9 @@
-// TextureUpload.cpp — Raw pixel data -> GPU texture upload, mipmap generation,
+﻿// TextureUpload.cpp â€” Raw pixel data -> GPU texture upload, mipmap generation,
 // and format helpers. Also contains development benchmark utilities.
 
 #include "Texture.h"
 #include "IGraphicsDevice.h"
 #include "Framework/Util.h"
-
-#include "glad/glad.h"
 
 #include "stb_image.h"
 
@@ -41,7 +39,7 @@ GraphicsTextureFormat to_format(int n, bool isfloat) {
 }
 
 // ---------------------------------------------------------------------------
-// make_from_data — upload raw pixel data, generate mipmaps when not nearest
+// make_from_data â€” upload raw pixel data, generate mipmaps when not nearest
 // ---------------------------------------------------------------------------
 
 IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, GraphicsTextureFormat informat,
@@ -69,11 +67,9 @@ IGraphicsTexture* make_from_data(Texture* output, int x, int y, void* data, Grap
 
 	ptr->sub_image_upload(0, 0, 0, x, y, size, data);
 	if (!nearest_filtered) {
-		// fixme
-		glGenerateTextureMipmap(ptr->get_internal_handle());
+		ptr->generate_mipmaps();
 	}
 
-	glCheckError();
 	return ptr;
 }
 
@@ -122,25 +118,9 @@ void texture_loading_benchmark() {
 		run_benchmark(i);
 	}
 
-	auto try_copy = [&]() {
-		IGraphicsTexture* src = run_benchmark(5);
-		const glm::ivec2 size = src->get_size();
-		const int mips = src->get_num_mips();
-		texhandle new_t{};
-		print_time("copying_texture...");
-		glCreateTextures(GL_TEXTURE_2D, 1, &new_t);
-		glTextureStorage2D(new_t, mips, GL_COMPRESSED_RGB_S3TC_DXT1_EXT, size.x, size.y);
-		print_time("	glTextureStorage2D...");
-
-		for (int mip = 0; mip < mips; ++mip) {
-			int mipWidth  = std::max(1, size.x >> mip);
-			int mipHeight = std::max(1, size.y >> mip);
-			glCopyImageSubData(src->get_internal_handle(), GL_TEXTURE_2D, mip, 0, 0, 0,
-			                   new_t, GL_TEXTURE_2D, mip, 0, 0, 0, mipWidth, mipHeight, 1);
-		}
-		print_time("	copying done.");
-	};
-	try_copy();
+	// Dev-only benchmark: compressed texture copy. Body removed during 1.9 gate
+	// (raw glCreateTextures/glCopyImageSubData would need a copy-textures wrap;
+	// reinstate via gfx().create_texture(BC1) + a future copy_texture API).
 	printf("%f\n", float(last));
 	__debugbreak();
 }

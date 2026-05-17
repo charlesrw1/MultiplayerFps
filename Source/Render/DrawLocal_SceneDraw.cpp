@@ -54,7 +54,7 @@ void Renderer::draw_height_fog(IGraphicsTexture* target) {
 		bind_texture_ptr(0, tex.scene_depth);
 		bind_texture_ptr(1, volfog.texture.volume);
 
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	}
 
 	RSkylight_Internal& skylight_int = scene.skylights.at(0);
@@ -88,13 +88,13 @@ void Renderer::draw_height_fog(IGraphicsTexture* target) {
 	setup.vao = get_empty_vao();
 	get_device().set_pipeline(setup);
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, buf.fog_uniforms->get_internal_handle());
+	gfx().bind_storage_buffer_base(1, buf.fog_uniforms);
 	const Texture* reflectionProbeTex = skylight.generated_cube;
 
 	bind_texture_ptr(0, tex.scene_depth);
 	bind_texture_ptr(1, reflectionProbeTex->gpu_ptr);
 
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }
 
 void Renderer::deferred_decal_pass() {
@@ -243,13 +243,6 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 
 		//	cubemap->width = cubemap->height = specular_cubemap_size;
 
-		auto set_default_parameters = [](uint32_t handle) {
-			glTextureParameteri(handle, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-			glTextureParameteri(handle, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-			glTextureParameteri(handle, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			glTextureParameteri(handle, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		};
-
 		// auto somthing = Texture::install_system("_TEST");
 		// somthing->update_specs(cubemap->gl_id, CUBEMAP_SIZE, CUBEMAP_SIZE, 3, {});
 		// somthing->type = Texture_Type::TEXTYPE_2D;
@@ -279,7 +272,7 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 
 		scene_draw_internal(params, cubemap_view);
 
-		glDepthMask(GL_TRUE); // need to set this for blit operation to work
+		get_device().set_depth_write_enabled(true); // blit_textures path requires depth-mask on
 
 		// set cubemap texture to a temp framebuffer
 		// glNamedFramebufferTextureLayer(cubemap_fbo, GL_COLOR_ATTACHMENT0, cubemap->gl_id, 0/* highest mip*/, i/* face

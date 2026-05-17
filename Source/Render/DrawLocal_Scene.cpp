@@ -408,8 +408,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 				// glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs,
 				// gpu_objects, GL_DYNAMIC_DRAW);
 
-				glNamedBufferData(gpu_instance_buffer->get_internal_handle(), num_ren_objs * 64, gpu_objects,
-								  GL_DYNAMIC_DRAW);
+				gpu_instance_buffer->upload(gpu_objects, num_ren_objs * 64);
 			}
 		}
 	};

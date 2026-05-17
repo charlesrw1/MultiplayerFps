@@ -120,8 +120,7 @@ void ThumbnailRenderer::output_to_path(std::string path) {
 	const int w = size;
 	const int h = size;
 	std::vector<unsigned char> pixels(w * h * 4); // RGBA
-	glReadBuffer(GL_COLOR_ATTACHMENT0);
-	glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+	color->download(0, -1, pixels.data(), (int)pixels.size());
 	int success = write_png_wrapper(path.c_str(), w, h, 4, pixels.data(), w * 4);
 }
 #endif

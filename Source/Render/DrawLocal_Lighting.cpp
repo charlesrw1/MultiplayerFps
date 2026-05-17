@@ -43,6 +43,7 @@ void Renderer::draw_meshbuilders() {
 			state.program = get_prog_man().get_obj(prog.simple_solid_color);
 			state.depth_testing = mb.depth_tested;
 			state.depth_writes = false;
+			state.vao = dd.vao ? dd.vao->get_internal_handle() : 0;
 			device.set_pipeline(state);
 
 			shader()->set_mat4("ViewProj", current_frame_view.viewproj);
@@ -58,6 +59,7 @@ void Renderer::draw_meshbuilders() {
 		state.program = get_prog_man().get_obj(prog.simple);
 		state.depth_testing = mb.depth_tested;
 		state.depth_writes = false;
+		state.vao = dd.vao ? dd.vao->get_internal_handle() : 0;
 		device.set_pipeline(state);
 
 		shader()->set_mat4("ViewProj", current_frame_view.viewproj);

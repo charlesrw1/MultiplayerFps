@@ -1,6 +1,8 @@
 #pragma once
 #include "Framework/Util.h"
 class MeshBuilder;
+class IGraphicsBuffer;
+class IGraphicsVertexInput;
 class MeshBuilderDD
 {
 public:
@@ -12,8 +14,8 @@ public:
 	static const uint32_t TRIANGLES;
 	static const uint32_t LINES;
 
-	uint32_t VAO = 0;
-	uint32_t VBO = 0;
-	uint32_t EBO = 0;
+	IGraphicsBuffer* vbo = nullptr;
+	IGraphicsBuffer* ebo = nullptr;
+	IGraphicsVertexInput* vao = nullptr;
 	int num_indicies = 0;
 };

@@ -196,7 +196,6 @@
     <ClCompile Include="Source\LevelEditor\ViewportHandles.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
     <ClCompile Include="Source\Logging.cpp" />
-    <ClCompile Include="Source\Render\BufferTest\glbuffer.cpp" />
     <ClCompile Include="Source\Render\DdsExport.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
@@ -361,8 +360,6 @@
     <ClInclude Include="Source\LevelEditor\ViewportHandles.h" />
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Source\Logging.h" />
-    <ClInclude Include="Source\Render\BufferTest\glbuffer.h" />
-    <ClInclude Include="Source\Render\BufferTest\gl_bufferlock.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\GpuAllocator.h" />
     <ClInclude Include="Source\Render\GpuCullingTest.h" />

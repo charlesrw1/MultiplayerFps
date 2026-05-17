@@ -1,4 +1,4 @@
-#include "DrawLocal.h"
+﻿#include "DrawLocal.h"
 #include "imgui.h"
 #include "glm/gtc/type_ptr.hpp"
 #include "GameEnginePublic.h"
@@ -257,7 +257,7 @@ void SSAO_System::render() {
 		gfx().bind_texture(0, draw.tex.scene_depth);
 		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
-		glCheckError();
+		gfx_check_gl_error();
 	}
 
 	// create viewspace normals, writes to texture.viewnormal
@@ -354,7 +354,7 @@ void SSAO_System::render() {
 		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	}
 
-	// depth aware blur — bounce result→blurred (horizontal), then blurred→result (vertical).
+	// depth aware blur â€” bounce resultâ†’blurred (horizontal), then blurredâ†’result (vertical).
 	if (r_ssao_blur.get_bool()) {
 		RenderPipelineState state;
 		state.vao = draw.get_empty_vao();

@@ -1,4 +1,4 @@
-#include "Render/RenderGiManager.h"
+﻿#include "Render/RenderGiManager.h"
 #include "GameEnginePublic.h"
 
 RenderGiManager::RenderGiManager() {
@@ -59,11 +59,11 @@ void RenderGiManager::render_frame_tick() {
 						// blit.src.x = blit.src.y = blit.dest.x = blit.dest.y = 0;
 						// blit.src.w = blit.src.h = blit.dest.w = blit.dest.h = CUBEMAP_WIDTH;
 						// gfx().blit_textures(blit);
-						// glCheckError();
+						// gfx_check_gl_error();
 
-						glCopyImageSubData(dummy_temp_cubemap->gpu_ptr->get_internal_handle(), GL_TEXTURE_CUBE_MAP, mip,
-										   0, 0, face, editable_cubemap_array->get_internal_handle(),
-										   GL_TEXTURE_CUBE_MAP_ARRAY, mip, 0, 0, 6 * volhandle + face, width, width, 1);
+						gfx().copy_texture(dummy_temp_cubemap->gpu_ptr, mip, face,
+										   editable_cubemap_array, mip, 6 * volhandle + face,
+										   width, width);
 						width /= 2;
 					}
 				}
@@ -100,12 +100,13 @@ void RenderGiManager::update_cubemap_volumes(const std::vector<R_CubemapVolume>&
 	// god dogshit awful
 	// gets the calc'd lum value back to cpu side so i can save it to disk
 	{
-		glBindBuffer(GL_SHADER_STORAGE_BUFFER, cubemap_volume_buffer->get_internal_handle());
-		R_CubemapVolume* ptr = (R_CubemapVolume*)glMapBuffer(GL_SHADER_STORAGE_BUFFER, GL_READ_ONLY);
 		const int num = get_num_cubemaps();
-		for (int i = 0; i < num; i++)
-			cm_volumes[i] = ptr[i];
-		glUnmapBuffer(GL_SHADER_STORAGE_BUFFER);
+		if (num > 0) {
+			std::vector<R_CubemapVolume> tmp(num);
+			gfx().download_buffer(cubemap_volume_buffer, 0, (int)(num * sizeof(R_CubemapVolume)), tmp.data());
+			for (int i = 0; i < num; i++)
+				cm_volumes[i] = tmp[i];
+		}
 	}
 }
 

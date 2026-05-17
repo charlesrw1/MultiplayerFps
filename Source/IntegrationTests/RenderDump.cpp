@@ -7,12 +7,13 @@
 #include <vector>
 #include <cmath>
 #include <direct.h>
-#include "External/glad/glad.h"
 #include "External/stb_image_write.h"
 #include "Render/DrawLocal.h"
 
-// Reads a texture as RGBA float, normalizes to uint8, writes PNG.
-// depth=true uses GL_DEPTH_COMPONENT instead of GL_RGBA.
+// Reads a texture in its native format and writes a normalized RGBA8 PNG.
+// Per-format dispatch routes the download through IGraphicsTexture::download
+// (which uses the texture's native format) and then expands/normalizes the
+// pixels into 4-channel uint8 for PNG output.
 static void dump_one_texture(IGraphicsTexture* tex, const char* path) {
 	if (!tex)
 		return;
@@ -23,45 +24,73 @@ static void dump_one_texture(IGraphicsTexture* tex, const char* path) {
 		return;
 
 	GraphicsTextureFormat fmt = tex->get_texture_format();
-	bool is_depth = (fmt == GraphicsTextureFormat::depth16f || fmt == GraphicsTextureFormat::depth24f ||
-					 fmt == GraphicsTextureFormat::depth32f || fmt == GraphicsTextureFormat::depth24stencil8);
+	using gtf = GraphicsTextureFormat;
+	const int px = w * h;
+	std::vector<unsigned char> out(px * 4, 255);
 
-	uint32_t handle = tex->get_internal_handle();
-	if (handle == 0)
-		return;
+	auto normalize_to_u8 = [&](const std::vector<float>& src, int channels) {
+		float maxv = 1.f;
+		for (float v : src) if (v > maxv) maxv = v;
+		const float scale = (maxv > 1.f) ? (1.f / maxv) : 1.f;
+		for (int i = 0; i < px; ++i) {
+			for (int c = 0; c < 4; ++c) {
+				float v = (c < channels) ? src[i * channels + c] * scale : (c == 3 ? 1.f : 0.f);
+				if (v < 0.f) v = 0.f; if (v > 1.f) v = 1.f;
+				out[i * 4 + c] = (unsigned char)(v * 255.f);
+			}
+		}
+	};
 
-	if (is_depth) {
-		std::vector<float> pixels(w * h);
-		glGetTextureImage(handle, 0, GL_DEPTH_COMPONENT, GL_FLOAT, (int)(w * h * sizeof(float)), pixels.data());
-		std::vector<unsigned char> out(w * h * 4);
-		for (int i = 0; i < w * h; ++i) {
+	switch (fmt) {
+	case gtf::depth16f:
+	case gtf::depth24f:
+	case gtf::depth32f:
+	case gtf::depth24stencil8: {
+		std::vector<float> pixels(px);
+		tex->download(0, -1, pixels.data(), (int)(pixels.size() * sizeof(float)));
+		for (int i = 0; i < px; ++i) {
 			unsigned char v = (unsigned char)(pixels[i] * 255.f);
-			out[i * 4 + 0] = v;
-			out[i * 4 + 1] = v;
-			out[i * 4 + 2] = v;
+			out[i * 4 + 0] = v; out[i * 4 + 1] = v; out[i * 4 + 2] = v; out[i * 4 + 3] = 255;
+		}
+	} break;
+	case gtf::rgba8: {
+		std::vector<unsigned char> pixels(px * 4);
+		tex->download(0, -1, pixels.data(), (int)pixels.size());
+		memcpy(out.data(), pixels.data(), pixels.size());
+	} break;
+	case gtf::rgb8: {
+		std::vector<unsigned char> pixels(px * 3);
+		tex->download(0, -1, pixels.data(), (int)pixels.size());
+		for (int i = 0; i < px; ++i) {
+			out[i * 4 + 0] = pixels[i * 3 + 0];
+			out[i * 4 + 1] = pixels[i * 3 + 1];
+			out[i * 4 + 2] = pixels[i * 3 + 2];
 			out[i * 4 + 3] = 255;
 		}
-		stbi_flip_vertically_on_write(true);
-		stbi_write_png(path, w, h, 4, out.data(), w * 4);
-	} else {
-		std::vector<float> pixels(w * h * 4);
-		glGetTextureImage(handle, 0, GL_RGBA, GL_FLOAT, (int)(w * h * 4 * sizeof(float)), pixels.data());
-		std::vector<unsigned char> out(w * h * 4);
-		// find max to normalize HDR targets
-		float maxv = 1.f;
-		for (int i = 0; i < w * h * 4; ++i)
-			if (pixels[i] > maxv)
-				maxv = pixels[i];
-		float scale = (maxv > 1.f) ? (1.f / maxv) : 1.f;
-		for (int i = 0; i < w * h * 4; ++i) {
-			float v = pixels[i] * scale;
-			if (v < 0.f) v = 0.f;
-			if (v > 1.f) v = 1.f;
-			out[i] = (unsigned char)(v * 255.f);
-		}
-		stbi_flip_vertically_on_write(true);
-		stbi_write_png(path, w, h, 4, out.data(), w * 4);
+	} break;
+	case gtf::rgb16f:
+	case gtf::r11f_g11f_b10f: {
+		std::vector<float> pixels(px * 3);
+		tex->download(0, -1, pixels.data(), (int)(pixels.size() * sizeof(float)));
+		normalize_to_u8(pixels, 3);
+	} break;
+	case gtf::rgba16f: {
+		std::vector<float> pixels(px * 4);
+		tex->download(0, -1, pixels.data(), (int)(pixels.size() * sizeof(float)));
+		normalize_to_u8(pixels, 4);
+	} break;
+	case gtf::rg16f:
+	case gtf::rg32f: {
+		std::vector<float> pixels(px * 2);
+		tex->download(0, -1, pixels.data(), (int)(pixels.size() * sizeof(float)));
+		normalize_to_u8(pixels, 2);
+	} break;
+	default:
+		// Unsupported format — leave PNG zeroed (alpha=255 already set).
+		break;
 	}
+	stbi_flip_vertically_on_write(true);
+	stbi_write_png(path, w, h, 4, out.data(), w * 4);
 }
 
 void dump_render_targets(const char* test_name) {

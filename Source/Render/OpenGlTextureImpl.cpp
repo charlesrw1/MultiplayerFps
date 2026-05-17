@@ -356,6 +356,11 @@ public:
 		glTextureParameteri(id, GL_TEXTURE_MAX_LEVEL, max);
 	}
 
+	void generate_mipmaps() override {
+		ASSERT(id != 0);
+		glGenerateTextureMipmap(id);
+	}
+
 	void download(int mip, int layer, void* dest, int dest_size_bytes) override {
 		ASSERT(dest != nullptr && dest_size_bytes > 0);
 		GLenum fmt = 0;
@@ -367,7 +372,16 @@ public:
 			fmt = GL_DEPTH_COMPONENT; type = GL_FLOAT; break;
 		case GraphicsTextureFormat::rgba8:
 			fmt = GL_RGBA; type = GL_UNSIGNED_BYTE; break;
+		case GraphicsTextureFormat::rgb8:
+			fmt = GL_RGB; type = GL_UNSIGNED_BYTE; break;
 		case GraphicsTextureFormat::rgb16f:
+			fmt = GL_RGB; type = GL_FLOAT; break;
+		case GraphicsTextureFormat::rgba16f:
+			fmt = GL_RGBA; type = GL_FLOAT; break;
+		case GraphicsTextureFormat::rg16f:
+		case GraphicsTextureFormat::rg32f:
+			fmt = GL_RG; type = GL_FLOAT; break;
+		case GraphicsTextureFormat::r11f_g11f_b10f:
 			fmt = GL_RGB; type = GL_FLOAT; break;
 		default:
 			ASSERT(!"IGraphicsTexture::download: unsupported format (extend mapping)");

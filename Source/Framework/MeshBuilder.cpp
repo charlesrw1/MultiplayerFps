@@ -1,17 +1,17 @@
 #include "Framework/MeshBuilder.h"
-#include "glad/glad.h"
 #include "MeshBuilderImpl.h"
+#include "Render/IGraphicsDevice.h"
 #include <glm/gtc/constants.hpp>
 
 static const int MIN_VERTEX_ARRAY_SIZE = 16;
 
-const uint32_t MeshBuilderDD::TRIANGLES = GL_TRIANGLES;
-const uint32_t MeshBuilderDD::LINES = GL_LINES;
+const uint32_t MeshBuilderDD::TRIANGLES = (uint32_t)GraphicsPrimitiveType::Triangles;
+const uint32_t MeshBuilderDD::LINES     = (uint32_t)GraphicsPrimitiveType::Lines;
 
 void MeshBuilderDD::free() {
-	glDeleteVertexArrays(1, &VAO);
-	glDeleteBuffers(1, &VBO);
-	glDeleteBuffers(1, &EBO);
+	safe_release(vao);
+	safe_release(vbo);
+	safe_release(ebo);
 }
 
 void MeshBuilder::Begin(int reserve_verts) {
@@ -25,42 +25,43 @@ void MeshBuilder::Begin(int reserve_verts) {
 void MeshBuilderDD::init_from(MeshBuilder& mb) {
 	if (!mb.wants_new_upload)
 		return;
-	if (VAO == 0) {
-		glGenVertexArrays(1, &VAO);
-		glGenBuffers(1, &VBO);
-		glGenBuffers(1, &EBO);
+	if (!vao) {
+		CreateBufferArgs vb_args;
+		vb_args.flags = (GraphicsBufferUseFlags)(BUFFER_USE_AS_VB | BUFFER_USE_DYNAMIC);
+		vbo = gfx().create_buffer(vb_args);
 
-		glBindVertexArray(VAO);
-		glBindBuffer(GL_ARRAY_BUFFER, VBO);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-		// POSITION (float*3)
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(MbVertex), (void*)0);
-		glEnableVertexAttribArray(0);
-		// Color (uint8*4)
-		glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(MbVertex), (void*)(3 * sizeof(float)));
-		glEnableVertexAttribArray(1);
-		// UV (float * 2)
-		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(MbVertex), (void*)(3 * sizeof(float) + sizeof(Color32)));
-		glEnableVertexAttribArray(2);
+		CreateBufferArgs ib_args;
+		ib_args.flags = (GraphicsBufferUseFlags)(BUFFER_USE_AS_IB | BUFFER_USE_DYNAMIC);
+		ebo = gfx().create_buffer(ib_args);
 
-	} else {
-		glBindVertexArray(VAO);
-		glBindBuffer(GL_ARRAY_BUFFER, VBO);
-		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+		const VertexLayout layout[] = {
+			VertexLayout(0, 3, GraphicsVertexAttribType::float32,        sizeof(MbVertex), 0),
+			VertexLayout(1, 4, GraphicsVertexAttribType::u8_normalized,  sizeof(MbVertex), 3 * sizeof(float)),
+			VertexLayout(2, 2, GraphicsVertexAttribType::float32,        sizeof(MbVertex), 3 * sizeof(float) + sizeof(Color32)),
+		};
+		CreateVertexInputArgs vargs;
+		vargs.vertex     = vbo;
+		vargs.index      = ebo;
+		vargs.layout     = layout;
+		vargs.index_type = VertexInputIndexType::uint32;
+		vao = gfx().create_vertex_input(vargs);
 	}
 	mb.wants_new_upload = false;
-	glBufferData(GL_ARRAY_BUFFER, mb.verticies.size() * sizeof(MbVertex), mb.verticies.data(), GL_STREAM_DRAW);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, mb.indicies.size() * sizeof(uint32_t), mb.indicies.data(), GL_STREAM_DRAW);
+	vbo->upload(mb.verticies.data(), (int)(mb.verticies.size() * sizeof(MbVertex)));
+	ebo->upload(mb.indicies.data(),  (int)(mb.indicies.size()  * sizeof(uint32_t)));
 	num_indicies = mb.indicies.size();
-	glBindVertexArray(0);
 }
 
 void MeshBuilder::End() {}
 
-void MeshBuilderDD::draw(uint32_t gl_type) {
-	glBindVertexArray(VAO);
-	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glDrawElements((GLenum)gl_type, num_indicies, GL_UNSIGNED_INT, (void*)0);
+void MeshBuilderDD::draw(uint32_t prim_type) {
+	if (!vao || num_indicies <= 0)
+		return;
+	// Caller is expected to have set state.vao = dd.vao->get_internal_handle()
+	// in their RenderPipelineState before set_pipeline. This call only issues the
+	// draw — VAO/IBO/VBO are bound via the pipeline.
+	gfx().draw_elements(static_cast<GraphicsPrimitiveType>(prim_type),
+						num_indicies, VertexInputIndexType::uint32, 0);
 }
 
 void MeshBuilder::PushLine(vec3 start, vec3 end, Color32 color) {

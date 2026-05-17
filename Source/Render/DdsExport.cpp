@@ -8,8 +8,9 @@
 #endif
 #include "Framework/StringUtils.h"
 
-// Save OpenGL cubemap array to DDS (RGB32F, uncompressed)
-bool SaveCubeArrayToDDS(GLuint texture, uint32_t width, uint32_t height, uint32_t mipLevels, uint32_t cubeCount,
+// Save cubemap-array (rgb16f native) to DDS as RGB32F (uncompressed). The
+// driver up-converts during readback when the texture is rgb16f.
+bool SaveCubeArrayToDDS(IGraphicsTexture* texture, uint32_t width, uint32_t height, uint32_t mipLevels, uint32_t cubeCount,
 						const char* filename) {
 	const uint32_t facesPerCube = 6;
 	const uint32_t arraySize = cubeCount * facesPerCube;
@@ -30,8 +31,6 @@ bool SaveCubeArrayToDDS(GLuint texture, uint32_t width, uint32_t height, uint32_
 	if (FAILED(hr))
 		return false;
 
-	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, texture);
-
 	for (uint32_t mip = 0; mip < mipLevels; ++mip) {
 		uint32_t mipWidth = std::max(1u, width >> mip);
 		uint32_t mipHeight = std::max(1u, height >> mip);
@@ -42,9 +41,8 @@ bool SaveCubeArrayToDDS(GLuint texture, uint32_t width, uint32_t height, uint32_
 		std::vector<float> buffer(pixelCount * 3);
 
 		for (uint32_t layer = 0; layer < arraySize; ++layer) {
-			// Read mip/layer from OpenGL
-			glGetTextureSubImage(texture, mip, 0, 0, layer, mipWidth, mipHeight, 1, GL_RGB, GL_FLOAT, dataSize,
-								 buffer.data());
+			// Native rgb16f → download maps to (RGB, FLOAT); upcasted to float.
+			texture->download((int)mip, (int)layer, buffer.data(), (int)dataSize);
 
 			const Image* img = image.GetImage(mip, layer, 0);
 			memcpy(img->pixels, buffer.data(), dataSize);
@@ -82,7 +80,7 @@ bool SaveCubeArrayToDDS(GLuint texture, uint32_t width, uint32_t height, uint32_
 	return SUCCEEDED(hr);
 }
 
-bool save_float_texture_as_dds(GLuint texture, uint32_t width, uint32_t height, int mode, const char* filename) {
+bool save_float_texture_as_dds(IGraphicsTexture* texture, uint32_t width, uint32_t height, int mode, const char* filename) {
 
 	using namespace DirectX;
 	// Setup DDS metadata
@@ -101,23 +99,33 @@ bool save_float_texture_as_dds(GLuint texture, uint32_t width, uint32_t height, 
 	if (FAILED(hr))
 		return false;
 
-	glBindTexture(GL_TEXTURE_2D, texture);
+	// Download native-format pixels then pack into the DDS 3-channel float
+	// scratch image. Native is r11f_g11f_b10f (probe_irradiance) or rg16f
+	// (probe_depth). Both round-trip through float in the IGraphicsTexture
+	// download path.
+	const GraphicsTextureFormat src_fmt = texture->get_texture_format();
+	const int src_channels =
+		(src_fmt == GraphicsTextureFormat::rg16f || src_fmt == GraphicsTextureFormat::rg32f) ? 2 : 3;
 
 	for (uint32_t mip = 0; mip < 1; ++mip) {
 		uint32_t mipWidth = std::max(1u, width >> mip);
 		uint32_t mipHeight = std::max(1u, height >> mip);
 
 		size_t pixelCount = mipWidth * mipHeight;
-		size_t dataSize = pixelCount * 3 * sizeof(float);
+		size_t dstSize = pixelCount * 3 * sizeof(float);
 
-		std::vector<float> buffer(pixelCount * 3);
+		std::vector<float> src(pixelCount * src_channels);
+		texture->download((int)mip, -1, src.data(), (int)(src.size() * sizeof(float)));
 
 		for (uint32_t layer = 0; layer < 1; ++layer) {
-			// Read mip/layer from OpenGL
-			glGetTextureImage(texture, mip, GL_RGB, GL_FLOAT, dataSize, buffer.data());
-
 			const Image* img = image.GetImage(mip, layer, 0);
-			memcpy(img->pixels, buffer.data(), dataSize);
+			float* dst = reinterpret_cast<float*>(img->pixels);
+			for (size_t i = 0; i < pixelCount; ++i) {
+				dst[i * 3 + 0] = src[i * src_channels + 0];
+				dst[i * 3 + 1] = src_channels >= 2 ? src[i * src_channels + 1] : 0.f;
+				dst[i * 3 + 2] = src_channels >= 3 ? src[i * src_channels + 2] : 0.f;
+			}
+			(void)dstSize;
 		}
 	}
 

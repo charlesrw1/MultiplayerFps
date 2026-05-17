@@ -214,10 +214,9 @@ void ShadowMapManager::do_render(Render_Lists& list, handle<Render_Light> handle
 		assert(light.shadow_array_handle != -1);
 		Rect2d rect = atlas.get_atlas_rect(light.shadow_array_handle);
 		device.set_viewport(rect.x, rect.y, rect.w, rect.h);
-		glEnable(GL_SCISSOR_TEST);
-		glScissor(rect.x, rect.y, rect.w, rect.h);
+		gfx().set_scissor(rect.x, rect.y, rect.w, rect.h);
 		device.clear_framebuffer(true, true, 0.f /* depth value of 0.f to clear*/);
-		glDisable(GL_SCISSOR_TEST);
+		gfx().disable_scissor();
 
 		View_Setup viewSetup;
 		viewSetup.width = rect.w;

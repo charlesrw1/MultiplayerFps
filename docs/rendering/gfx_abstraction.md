@@ -144,10 +144,108 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.7c** | Uniform setters onto `IGraphicsShader` | ~12 | `IGraphicsShader::{use,set_int,set_float,set_mat4,…,set_block_binding}` (DSA `glProgramUniform*`); `Shader::set_*` forward through `gfx_handle`; binary-cache paths populate `gfx_shader` via `opengl_wrap_program_handle` | done |
 | **1.7d** | Program-binary cache + delete `Shader` struct | ~20 | move `glProgramBinary`/`glGetProgramBinary` cache paths in `recompile_shared`/`recompile_normal` into backend; delete `Shader` struct; `RenderPipelineState::program` becomes `IGraphicsShader*` (lifted from Phase 2c) | done |
 | **1.8** | Window/swapchain + ImGui wrap | ~10 (`SDL_GL_*`, `gladLoad*`, swap, vsync, imgui_render) | `gfx_opengl_pre_window_setup`; `gfx_init_opengl(SDL_Window*)`; `set_vsync`, `present`, `imgui_init`, `imgui_shutdown`, `imgui_new_frame`, `imgui_render_draw_data`, `imgui_process_event` | done |
-| 1.9 | `r.gpu.no_legacy_calls=1` assertion test + rip per-subsystem `r.gfx.wrap.*` flags | — | gates phase boundary | deferred — many non-`Render/` callers (MeshBuilder, Profilier, GiScene, DdsExport, IntegrationTests GPU helpers, BufferTest) still issue raw `gl*`; needs either an accept-list or a follow-on migration pass |
+| **1.9** | static-scan no-legacy-`gl*` gate + migrate every remaining non-backend caller (MeshBuilder, GiScene, DdsExport, Screenshot, RenderDump, RenderExtra, LightCookieAtlas, SceneDraw, Scene, Editor, EnvProbe::BRDFIntegration, Meshlet, TextureUpload, RenderGiManager, DrawLocal_Init) + delete dead `BufferTest/` + delete dead `Meshlet.cpp` body + accept-list Profilier/GpuTimer (OpenGL-only — SDL3 GPU has no timestamp/debug-group API) and `DrawLocal_Device.*` (folded into backend in Phase 2) | — | `copy_texture`, `IGraphicsTexture::generate_mipmaps`, `gfx_opengl_dump_capabilities`, `gfx_opengl_enable_debug_output`; rename `glCheckError` → `gfx_check_gl_error` | done |
 | **1.5 (post-1.x)** | Null/passthrough leak-detector backend | — | gate that proves the wrap is complete | not started |
 
 Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
+
+## Sub-phase 1.9 status
+
+The Phase 1 boundary gate. After 1.8 the doc claimed only 5 files leaked raw
+`gl*`; the actual count was 147 calls across 17 non-backend files (after
+stripping comments). Scope was expanded to migrate every active leak rather
+than accept-list around them.
+
+- Static scanner: `Scripts/check_no_gl_leaks.py` walks `Source/**/*.{h,cpp,c}`
+  (excluding `External/` and the accept-list paths), strips block + line
+  comments, regex-matches `\bgl[A-Z][a-zA-Z0-9_]*\s*\(`. Exits 0 on clean,
+  exits 1 with `file:line:match` on any leak. Wrapped by
+  `Source/UnitTests/legacy_gl_calls_test.cpp` (`LegacyGlCalls.NoneOutsideBackend`)
+  so it lands in the standard unit-test count (185 total now). The original
+  plan's runtime `r.gpu.no_legacy_calls` cvar idea was dropped — would have
+  required intercepting every glad function pointer for one-time gate value.
+- Accept-list (declared in the scanner):
+  - `Source/Framework/Profilier.cpp`, `Source/IntegrationTests/GpuTimer.{h,cpp}`
+    — **OpenGL-only.** GPU timer queries (`glQueryCounter` /
+    `glGetQueryObjectui64v`) and debug groups (`glPushDebugGroup` /
+    `glPopDebugGroup`) have no SDL3 GPU equivalent today. These TUs become
+    no-ops or `#ifdef GFX_BACKEND_OPENGL`-gated when the SDL3 backend lands.
+  - `Source/Render/DrawLocal_Device.{h,cpp}` — transitional invalid-bits
+    state cache, folded into backend in Phase 2.
+- Caller migrations (call-site only, no behavioural change unless noted):
+  - `Framework/MeshBuilder.cpp` — VAO/VBO/EBO → `IGraphicsVertexInput` +
+    `IGraphicsBuffer`. Per-update `upload()` re-specs storage (matches prior
+    `STREAM_DRAW`). `dd.draw()` now issues `gfx().draw_elements` and assumes
+    caller has set `state.vao = dd.vao->get_internal_handle()` in the
+    pipeline — 4 callers updated (Lighting ×2, Debug, EnvProbe).
+  - `Game/Components/LightComponents_GiScene.cpp` + `Render/DdsExport.cpp` —
+    `glBindTexture` + `glGetTextureImage/SubImage` pairs collapsed onto
+    `IGraphicsTexture::download`. `DdsExport` signatures changed from
+    `GLuint` to `IGraphicsTexture*`. Dead helpers `export_float_texture` /
+    `ExportCubemapArrayHDR` deleted.
+  - `IntegrationTests/Screenshot.cpp` + `RenderDump.cpp` — `glGetTextureImage`
+    → `IGraphicsTexture::download`. `RenderDump` now per-format dispatches
+    (rgb16f/rgba16f/r11f/rg16f/depth) and normalises into RGBA8 PNG.
+  - `Render/EnvProbe.cpp` `BRDFIntegration::run` (54 raw calls) — full
+    migration: `lut_id` (uint32) → `IGraphicsTexture* lut_tex` (rgb8,
+    LinearClamped); `depth` (uint32) → `IGraphicsTexture* depth_tex`
+    (depth24f, NearestClamped); raw FBO + framebuffer attach → `set_render_pass`
+    with `wants_clear`/`clear_color`/`wants_depth_clear`; raw quad VAO/VBO
+    dropped (the MeshBuilderDD `dd` is the actual VAO consumed); pipeline now
+    routed via `RenderPipelineState`. `get_texture()` returns `IGraphicsTexture*`;
+    3 consumers (SSR, RT_Shade, RenderPass) switched to `bind_texture_ptr`.
+    Dead `drawdebug()` deleted.
+  - `Render/Meshlet.cpp` — entire file body lived under `#if 0`; replaced
+    with a one-line stub. The static scanner doesn't honour preprocessor
+    branches.
+  - `Render/TextureUpload.cpp` — `glGenerateTextureMipmap` →
+    `IGraphicsTexture::generate_mipmaps` (new API on the interface). The
+    dev-only `try_copy` benchmark (compressed-texture copy via raw
+    `glCreateTextures`/`glCopyImageSubData`) deleted; reinstate when a
+    BC-format texture create + a `copy_texture(src,dst)` helper land.
+  - `Render/RenderGiManager.cpp` — `glCopyImageSubData` cube-face copy →
+    `gfx().copy_texture` (new API on the device, see below). SSBO readback
+    via `glBindBuffer` + `glMapBuffer` + `glUnmapBuffer` → `download_buffer`
+    (existing API). Guards the readback against `num_cubemaps == 0` (the old
+    code silently no-op'd via `glMapBuffer` returning the empty range; new
+    `download_buffer` asserts `size > 0`).
+  - `Render/RenderExtra.cpp` — `glEnable/glScissor/glDisable(GL_SCISSOR_TEST)`
+    → `gfx().set_scissor` / `disable_scissor`.
+  - `Render/RenderExtra_LightCookieAtlas.cpp` — final stray `glDrawArrays`.
+  - `Render/DrawLocal_SceneDraw.cpp` — `glDrawArrays` (×3),
+    `glBindBufferBase(SSBO)` → `bind_storage_buffer_base`, `glDepthMask` →
+    `OpenglRenderDevice::set_depth_write_enabled` (transitional, folds in
+    Phase 2). Dead `set_default_parameters` lambda deleted.
+  - `Render/DrawLocal_Scene.cpp` — `glNamedBufferData` on
+    `gpu_instance_buffer` → `upload()`.
+  - `Render/DrawLocal_Editor.cpp` — thumbnail readback: `glReadBuffer` +
+    `glReadPixels` → `IGraphicsTexture::download`.
+  - `Render/DrawLocal_Init.cpp` — capability dump + GL debug-output enable
+    moved out of `Renderer` into the OpenGL backend
+    (`gfx_opengl_dump_capabilities` / `gfx_opengl_enable_debug_output`,
+    free functions declared next to `gfx_init_opengl`). Empty VAO + dummy VB
+    now allocated via `gfx().create_vertex_input` / `create_buffer`;
+    `vao.default_` is `IGraphicsVertexInput*` (previously raw handle),
+    `buf.default_vb` is `IGraphicsBuffer*`. Stale `glBindFramebuffer(0)` at
+    the top of `InitFramebuffers` deleted.
+- Hygiene: `glCheckError()` macro in `Framework/Util.h` renamed to
+  `gfx_check_gl_error()` (6 files updated) so the scanner regex doesn't
+  need a special case for a macro that's structurally not a `gl*` call.
+- Deletions: `Source/Render/BufferTest/{glbuffer.h,glbuffer.cpp,gl_bufferlock.h}`
+  — persistent-mapped buffer prototype superseded by Phase 2e ring buffer.
+  Project entries removed from `CsRemake.vcxproj` + `.filters`.
+- API additions during this sub-phase: `IGraphicsTexture::generate_mipmaps`;
+  `IGraphicsDevice::copy_texture(src, src_mip, src_layer, dst, dst_mip,
+  dst_layer, w, h)`; download-format table extended to cover `rgb8`,
+  `rgba16f`, `rg16f`/`rg32f`, `r11f_g11f_b10f` so the texture-debug + DDS-bake
+  paths can round-trip native formats.
+- Smoke-test the gate: adding any `gl*` outside `Source/Render/OpenGl*` or
+  the accept-list immediately fails the scanner with `file:line:match`.
+  Verified during 1.9 by re-injecting `glClear(0)` into
+  `DrawLocal_SceneDraw.cpp`.
+- 185 unit tests (incl. new `LegacyGlCalls.NoneOutsideBackend`) + integration
+  suite green; `bake_probes_test` + `demo_level_1_shots` within their
+  soft-fail bands.
 
 ## Sub-phase 1.8 status
 
@@ -403,12 +501,6 @@ into a CPU scratch buffer that flushes to the UBO at draw time. std430
 padding enforced. On
 `Program_Manager::recompile_all` the reflection table is rebuilt and any 2c
 SDL3-cache pipelines referencing the program are invalidated.
-
-### 2b — Combined texture-sampler binding
-
-`bind_texture(slot, IGraphicsTexture*, IGraphicsSampler*)` at the interface.
-SDL3 GPU is combined-binding; OpenGL backend keeps split internally
-(`glBindTextureUnit` + `glBindSampler`).
 
 ### 2c — Pipeline-state consolidation
 

@@ -297,7 +297,7 @@ void Renderer::render_level_to_target(const Render_Level_Params& params) {
 			// uh...
 			bind_texture_ptr(19, black_texture); // expects a cubemap...
 		}
-		bind_texture(18, EnviornmentMapHelper::get().integrator.get_texture());
+		bind_texture_ptr(18, EnviornmentMapHelper::get().integrator.get_texture());
 	}
 
 	if (params.rl && params.rp) {
@@ -341,7 +341,7 @@ void Renderer::render_particles() {
 
 		RenderPipelineState state;
 		state.program = draw.get_prog_man().get_obj(matman.get_mat_shader(nullptr, mat, 0));
-		state.vao = p.dd.VAO; // meshbuilder->VAO;
+		state.vao = p.dd.vao ? p.dd.vao->get_internal_handle() : 0;
 		state.backface_culling = mat->get_master_material()->backface;
 		state.blend = mat->get_master_material()->blend;
 		state.depth_testing = true;

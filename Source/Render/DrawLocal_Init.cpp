@@ -1,6 +1,5 @@
 ﻿#include "DrawLocal.h"
 #include "Framework/Util.h"
-#include "glad/glad.h"
 #include "Render/Texture.h"
 #include "imgui.h"
 #include "glm/ext/matrix_transform.hpp"
@@ -71,8 +70,6 @@ void Renderer::create_shaders() {
 	// volumetric fog shaders
 	volfog.prog.lightcalc = prog_man.create_compute("VfogScatteringC.txt");
 	volfog.prog.raymarch = prog_man.create_compute("VfogRaymarchC.txt");
-
-	glUseProgram(0);
 }
 
 void Renderer::reload_shaders() {
@@ -139,63 +136,6 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, IGraphic
 
 Renderer::Renderer() {}
 
-void debug_message_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length,
-							GLchar const* message, void const* user_param) {
-	auto const src_str = [source]() {
-		switch (source) {
-		case GL_DEBUG_SOURCE_API:
-			return "API";
-		case GL_DEBUG_SOURCE_WINDOW_SYSTEM:
-			return "WINDOW SYSTEM";
-		case GL_DEBUG_SOURCE_SHADER_COMPILER:
-			return "SHADER COMPILER";
-		case GL_DEBUG_SOURCE_THIRD_PARTY:
-			return "THIRD PARTY";
-		case GL_DEBUG_SOURCE_APPLICATION:
-			return "APPLICATION";
-		case GL_DEBUG_SOURCE_OTHER:
-			return "OTHER";
-		}
-		return "";
-	}();
-
-	auto const type_str = [type]() {
-		switch (type) {
-		case GL_DEBUG_TYPE_ERROR:
-			return "ERROR";
-		case GL_DEBUG_TYPE_DEPRECATED_BEHAVIOR:
-			return "DEPRECATED_BEHAVIOR";
-		case GL_DEBUG_TYPE_UNDEFINED_BEHAVIOR:
-			return "UNDEFINED_BEHAVIOR";
-		case GL_DEBUG_TYPE_PORTABILITY:
-			return "PORTABILITY";
-		case GL_DEBUG_TYPE_PERFORMANCE:
-			return "PERFORMANCE";
-		case GL_DEBUG_TYPE_MARKER:
-			return "MARKER";
-		case GL_DEBUG_TYPE_OTHER:
-			return "OTHER";
-		}
-		return "";
-	}();
-
-	auto const severity_str = [severity]() {
-		switch (severity) {
-		case GL_DEBUG_SEVERITY_NOTIFICATION:
-			return "NOTIFICATION";
-		case GL_DEBUG_SEVERITY_LOW:
-			return "LOW";
-		case GL_DEBUG_SEVERITY_MEDIUM:
-			return "MEDIUM";
-		case GL_DEBUG_SEVERITY_HIGH:
-			return "HIGH";
-		}
-		return "";
-	}();
-
-	sys_print(Error, "%s, %s, %s, %d: %s\n", src_str, type_str, severity_str, id, message);
-}
-
 void imgui_stat_hook() {
 	auto& stats = draw.stats;
 	ImGui::Text("Draw calls: %d", stats.total_draw_calls);
@@ -229,70 +169,7 @@ glm::vec2 Renderer::get_taa_jitter() const {
 }
 
 void Renderer::check_hardware_options() {
-	bool supports_compression = false;
-	bool supports_sprase_tex = false;
-	bool supports_filter_minmax = false;
-	bool supports_atomic64 = false;
-	bool supports_int64 = false;
-
-	int num_extensions = 0;
-	glGetIntegerv(GL_NUM_EXTENSIONS, &num_extensions);
-	for (int i = 0; i < num_extensions; i++) {
-		const char* ext = (char*)glGetStringi(GL_EXTENSIONS, i);
-		if (strcmp(ext, "GL_ARB_sparse_texture") == 0)
-			supports_sprase_tex = true;
-		else if (strcmp(ext, "GL_EXT_texture_compression_s3tc") == 0)
-			supports_compression = true;
-		else if (strcmp(ext, "GL_ARB_texture_filter_minmax") == 0)
-			supports_filter_minmax = true;
-		else if (strcmp(ext, "GL_NV_shader_atomic_int64") == 0)
-			supports_atomic64 = true;
-		else if (strcmp(ext, "GL_ARB_gpu_shader_int64") == 0)
-			supports_int64 = true;
-	}
-
-	sys_print(Debug, "###########################\n");
-	sys_print(Debug, "#### Extension support ####\n");
-	sys_print(Debug, "###########################\n");
-	sys_print(Debug, "-GL_ARB_sparse_texture: %s\n", (supports_sprase_tex) ? "yes" : "no");
-	sys_print(Debug, "-GL_ARB_texture_filter_minmax: %s\n", (supports_filter_minmax) ? "yes" : "no");
-	sys_print(Debug, "-GL_EXT_texture_compression_s3tc: %s\n", (supports_compression) ? "yes" : "no");
-	sys_print(Debug, "-GL_NV_shader_atomic_int64: %s\n", (supports_atomic64) ? "yes" : "no");
-	sys_print(Debug, "-GL_ARB_gpu_shader_int64: %s\n", (supports_int64) ? "yes" : "no");
-
-	if (!supports_compression) {
-		Fatalf("Opengl driver needs GL_EXT_texture_compression_s3tc\n");
-	}
-
-	GLint binary_formats;
-	glGetIntegerv(GL_NUM_PROGRAM_BINARY_FORMATS, &binary_formats);
-	if (binary_formats == 0) {
-		Fatalf("Opengl driver must support program binary. (GL_NUM_PROGRAM_BINARY_FORMATS>0)\n");
-	}
-
-	sys_print(Debug, "############################\n");
-	sys_print(Debug, "#### GL Hardware Values ####\n");
-	sys_print(Debug, "############################\n");
-	int max_buffer_bindings = 0;
-	glGetIntegerv(GL_MAX_UNIFORM_BUFFER_BINDINGS, &max_buffer_bindings);
-	sys_print(Debug, "-GL_MAX_UNIFORM_BUFFER_BINDINGS: %d\n", max_buffer_bindings);
-	int max_texture_units = 0;
-	glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &max_texture_units);
-	sys_print(Debug, "-GL_MAX_TEXTURE_IMAGE_UNITS: %d\n", max_texture_units);
-	sys_print(Debug, "-GL_NUM_PROGRAM_BINARY_FORMATS: %d\n", binary_formats);
-	int max_ssbos = 0;
-	glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &max_ssbos);
-	sys_print(Debug, "-GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS: %d\n", max_ssbos);
-	glGetIntegerv(GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS, &max_ssbos);
-	sys_print(Debug, "-GL_MAX_VERTEX_SHADER_STORAGE_BLOCKS: %d\n", max_ssbos);
-	glGetIntegerv(GL_MAX_FRAGMENT_SHADER_STORAGE_BLOCKS, &max_ssbos);
-	sys_print(Debug, "-GL_MAX_FRAGMENT_SHADER_STORAGE_BLOCKS: %d\n", max_ssbos);
-	glGetIntegerv(GL_MAX_ARRAY_TEXTURE_LAYERS, &max_ssbos);
-	sys_print(Debug, "-GL_MAX_ARRAY_TEXTURE_LAYERS: %d\n", max_ssbos);
-	glGetIntegerv(GL_MAX_COLOR_ATTACHMENTS, &max_ssbos);
-	sys_print(Debug, "-GL_MAX_COLOR_ATTACHMENTS: %d\n", max_ssbos);
-
-	sys_print(Debug, "\n");
+	gfx_opengl_dump_capabilities();
 }
 
 void Renderer::create_default_textures() {
@@ -370,10 +247,7 @@ void Renderer::init() {
 
 	// Enable debug output on debug builds
 	if (enable_gl_debug_output.get_bool()) {
-		glEnable(GL_DEBUG_OUTPUT);
-		glDebugMessageCallback(debug_message_callback, nullptr);
-		glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DEBUG_SEVERITY_NOTIFICATION, 0, nullptr, GL_FALSE);
-		glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+		gfx_opengl_enable_debug_output();
 	}
 
 	InitGlState();
@@ -419,12 +293,17 @@ void Renderer::init() {
 	lens_dirt = Texture::load("_white");
 	print_time("draw:lensdirt");
 
-	glGenVertexArrays(1, &vao.default_);
-	glCreateBuffers(1, &buf.default_vb);
-	glNamedBufferStorage(buf.default_vb, 12 * 3, nullptr, 0);
-	glBindVertexArray(vao.default_);
-	glBindBuffer(GL_ARRAY_BUFFER, buf.default_vb);
-	glBindVertexArray(0);
+	// Empty VAO for fullscreen-triangle / gl_VertexID-only draws. The VB is
+	// allocated but never sampled — vertex shaders read gl_VertexID instead.
+	{
+		CreateBufferArgs bargs;
+		bargs.size = 12 * 3;
+		bargs.flags = BUFFER_USE_AS_VB;
+		buf.default_vb = gfx().create_buffer(bargs);
+		CreateVertexInputArgs vargs;
+		vargs.vertex = buf.default_vb;
+		vao.default_ = gfx().create_vertex_input(vargs);
+	}
 
 	auto create_uniform_buffer = [&](IGraphicsBuffer*& ptr) {
 		CreateBufferArgs args;
@@ -523,8 +402,6 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 
 	refresh_render_targets_next_frame = false;
 	disable_taa_this_frame = true;
-
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	auto delete_and_create_texture = [&](IGraphicsTexture*& ptr, GraphicsTextureFormat format) {
 		safe_release(ptr);

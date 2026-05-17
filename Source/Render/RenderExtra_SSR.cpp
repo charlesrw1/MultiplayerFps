@@ -128,7 +128,7 @@ void SSRSystem::do_upsample() {
 	device.bind_texture_ptr(2, draw.tex.last_scene_color);
 	device.bind_texture_ptr(3, draw.tex.scene_gbuffer2);
 	device.bind_texture_ptr(4, draw.tex.scene_depth);
-	device.bind_texture(5, EnviornmentMapHelper::get().integrator.get_texture());
+	device.bind_texture_ptr(5, EnviornmentMapHelper::get().integrator.get_texture());
 	device.bind_texture_ptr(6, draw.tex.scene_color_mipchain);
 
 	static int frame = 0;

@@ -18,19 +18,17 @@
 #include "GameEnginePublic.h"
 #include "Level.h"
 
-#include "glad/glad.h"
+#include "Render/IGraphicsDevice.h"
 
 ////
 // Forward declarations for render-side helpers defined elsewhere
 ////
 
 bool load_dds_file_specialized_format(IGraphicsTexture*& out_ptr, uint8_t* buffer, int len);
-bool SaveCubeArrayToDDS(GLuint texture, uint32_t width, uint32_t height, uint32_t mipLevels, uint32_t cubeCount,
+bool SaveCubeArrayToDDS(IGraphicsTexture* texture, uint32_t width, uint32_t height, uint32_t mipLevels, uint32_t cubeCount,
 						const char* filename);
-bool save_float_texture_as_dds(GLuint texture, uint32_t width, uint32_t height, int mode, const char* filename);
+bool save_float_texture_as_dds(IGraphicsTexture* texture, uint32_t width, uint32_t height, int mode, const char* filename);
 int write_hdr_wrapper(const char* filename, int w, int h, int comp, const float* data);
-void ExportCubemapArrayHDR(GLuint texture, int faceSize, int cubemapCount);
-void export_float_texture(GLuint texture, int width, int height, string name);
 
 ////
 // File-suffix constants shared by save/load
@@ -207,7 +205,7 @@ void GameSceneGiUtil::save_to_disk() {
 
 	auto cubemap_tex = RenderGiManager::inst->get_cubemap_array_texture();
 	const string dir = FileSys::get_game_path() + string("/") + name;
-	SaveCubeArrayToDDS(cubemap_tex->get_internal_handle(), CUBEMAP_WIDTH, CUBEMAP_WIDTH,
+	SaveCubeArrayToDDS(cubemap_tex, CUBEMAP_WIDTH, CUBEMAP_WIDTH,
 					   Texture::get_mip_map_count(CUBEMAP_WIDTH, CUBEMAP_WIDTH), volumes.size(),
 					   (dir + cubemap_suffix).c_str()
 
@@ -215,10 +213,10 @@ void GameSceneGiUtil::save_to_disk() {
 
 	if (draw.ddgi->probe_irradiance) {
 		auto t = draw.ddgi->probe_irradiance;
-		save_float_texture_as_dds(t->get_internal_handle(), t->get_size().x, t->get_size().y, 1,
+		save_float_texture_as_dds(t, t->get_size().x, t->get_size().y, 1,
 								  (dir + irrad_suffix).c_str());
 		t = draw.ddgi->probe_depth;
-		save_float_texture_as_dds(t->get_internal_handle(), t->get_size().x, t->get_size().y, 0,
+		save_float_texture_as_dds(t, t->get_size().x, t->get_size().y, 0,
 								  (dir + depth_suffix).c_str());
 	} else {
 		sys_print(Warning, "no probe irrad/depth to save\n");
@@ -226,75 +224,3 @@ void GameSceneGiUtil::save_to_disk() {
 }
 
 void GameSceneGiUtil::bake_ddgi() {}
-
-////
-// Texture export helpers
-////
-
-void export_float_texture(GLuint texture, int width, int height, string name) {
-	ASSERT(texture != 0);
-	glBindTexture(GL_TEXTURE_2D, texture);
-
-	const int channels = 3; // assuming RGB
-	const int facePixelCount = width * height * channels;
-
-	std::vector<float> faceBuffer(facePixelCount);
-
-	int outputWidth  = width;
-	int outputHeight = height;
-
-	// Read one face layer
-	glGetTextureImage(texture, 0, GL_RGB, GL_FLOAT, faceBuffer.size() * sizeof(float), faceBuffer.data());
-
-	// Save HDR
-	std::string filename = name + ".hdr";
-
-	write_hdr_wrapper(filename.c_str(), outputWidth, outputHeight, channels, faceBuffer.data());
-
-	glBindTexture(GL_TEXTURE_2D, 0);
-}
-
-void ExportCubemapArrayHDR(GLuint texture, int faceSize, int cubemapCount) {
-	ASSERT(texture != 0 && faceSize > 0 && cubemapCount > 0);
-	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, texture);
-
-	const int channels      = 3; // assuming RGBA
-	const int facePixelCount = faceSize * faceSize * channels;
-
-	std::vector<float> faceBuffer(facePixelCount);
-
-	for (int cube = 0; cube < cubemapCount; cube++) {
-		int outputWidth  = faceSize * 6;
-		int outputHeight = faceSize;
-
-		std::vector<float> outputImage(outputWidth * outputHeight * channels);
-
-		for (int face = 0; face < 6; face++) {
-			int layer = cube * 6 + face;
-
-			// Read one face layer
-			glGetTextureSubImage(texture,
-								 0,			  // mip level
-								 0, 0, layer, // x,y,z offset
-								 faceSize, faceSize,
-								 1, // depth = 1 layer
-								 GL_RGB, GL_FLOAT, facePixelCount * sizeof(float), faceBuffer.data());
-
-			// Copy into horizontal strip
-			for (int y = 0; y < faceSize; y++) {
-				float* dst = &outputImage[(y * outputWidth + face * faceSize) * channels];
-
-				float* src = &faceBuffer[(y * faceSize) * channels];
-
-				memcpy(dst, src, faceSize * channels * sizeof(float));
-			}
-		}
-
-		// Save HDR
-		std::string filename = "cubemap_" + std::to_string(cube) + ".hdr";
-
-		write_hdr_wrapper(filename.c_str(), outputWidth, outputHeight, channels, outputImage.data());
-	}
-
-	glBindTexture(GL_TEXTURE_CUBE_MAP_ARRAY, 0);
-}

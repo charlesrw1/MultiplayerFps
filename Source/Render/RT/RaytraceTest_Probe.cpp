@@ -1,4 +1,4 @@
-// DDGI probe execution: trace, gather, relocate, texture allocation, lum calc.
+﻿// DDGI probe execution: trace, gather, relocate, texture allocation, lum calc.
 // Covers: compute_avg_probe_value, create_textures_raybuffer, execute, calculate_lum_for_spec.
 #include "RaytraceTest_internal.h"
 #include "Render/DrawLocal.h"
@@ -82,7 +82,7 @@ void DdgiTesting::compute_avg_probe_value() {
 }
 
 // ---------------------------------------------------------------------------
-// Main execute — relocate + trace + gather loop
+// Main execute â€” relocate + trace + gather loop
 // ---------------------------------------------------------------------------
 
 ConfigVar r_rt_skiprebuild("r.rt_skiprebuild", "0", CVAR_BOOL, "");
@@ -202,7 +202,7 @@ void DdgiTesting::execute() {
             gfx().bind_image_for_compute(0, probe_irradiance, 0, 0, GraphicsImageAccess::WriteOnly);
             gfx().bind_image_for_compute(1, probe_depth, 0, 0, GraphicsImageAccess::WriteOnly);
 
-            glCheckError();
+            gfx_check_gl_error();
             gfx().memory_barrier(BARRIER_SHADER_STORAGE | BARRIER_SHADER_IMAGE_ACCESS);
 
             printf("gather %d\n", i);
@@ -211,7 +211,7 @@ void DdgiTesting::execute() {
             gfx().bind_storage_buffer_base(14, ddgi_probe_relocation_offsets);
 
             gfx().dispatch_compute(gather_groups, 1, 1);
-            glCheckError();
+            gfx_check_gl_error();
 
             if (i == 0) {
                 gfx().memory_barrier(BARRIER_SHADER_STORAGE);

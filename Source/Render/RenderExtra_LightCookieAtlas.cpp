@@ -27,7 +27,7 @@ void blit_texture_into_thing_because_reasons(IGraphicsTexture* srct, IGraphicsTe
 
 	device.bind_texture_ptr(0, srct);
 
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }
 
 void LightCookieAtlas::update() {

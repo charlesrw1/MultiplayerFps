@@ -49,9 +49,6 @@
     <Filter Include="Source\Render">
       <UniqueIdentifier>{b68fff35-1864-5377-ad1f-e04bf7453afe}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source\Render\BufferTest">
-      <UniqueIdentifier>{2c1161c1-2b15-5403-8f35-805e8702372b}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source\Render\RT">
       <UniqueIdentifier>{b4413b7e-8ca6-50c4-bd9e-8c2ab9e609cc}</UniqueIdentifier>
     </Filter>
@@ -305,9 +302,6 @@
     </ClCompile>
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp">
       <Filter>Source\LevelSerialization</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\BufferTest\glbuffer.cpp">
-      <Filter>Source\Render\BufferTest</Filter>
     </ClCompile>
     <ClCompile Include="Source\Render\DdsExport.cpp">
       <Filter>Source\Render</Filter>
@@ -809,12 +803,6 @@
     </ClInclude>
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h">
       <Filter>Source\LevelSerialization</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\BufferTest\glbuffer.h">
-      <Filter>Source\Render\BufferTest</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\BufferTest\gl_bufferlock.h">
-      <Filter>Source\Render\BufferTest</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h">
       <Filter>Source\Render</Filter>

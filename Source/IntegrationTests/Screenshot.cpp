@@ -1,6 +1,5 @@
 // Source/IntegrationTests/Screenshot.cpp
 #include "Screenshot.h"
-#include "External/glad/glad.h"
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -24,19 +23,23 @@ static std::string golden_path(const char* name) {
 }
 
 bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cfg, glm::ivec2 _unused_) {
-	//glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	
-	auto size_to_use = draw.tex.actual_output_composite->get_size();
+	IGraphicsTexture* tex = draw.tex.actual_output_composite;
+	auto size_to_use = tex->get_size();
 	const int w = size_to_use.x;
 	const int h = size_to_use.y;
-	std::vector<unsigned char> pixels(w * h * 4); // RGBA
-	glPixelStorei(GL_PACK_ALIGNMENT, 1);
-	//glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, pixels.data());
+
+	// Native format is rgb8 (3 channels). Download then expand to RGBA so the
+	// rest of this routine + golden goldens stay in RGBA8 land.
+	std::vector<unsigned char> rgb(w * h * 3);
+	tex->download(0, -1, rgb.data(), (int)rgb.size());
+	std::vector<unsigned char> pixels(w * h * 4);
+	for (int i = 0; i < w * h; ++i) {
+		pixels[i * 4 + 0] = rgb[i * 3 + 0];
+		pixels[i * 4 + 1] = rgb[i * 3 + 1];
+		pixels[i * 4 + 2] = rgb[i * 3 + 2];
+		pixels[i * 4 + 3] = 255;
+	}
 	const int stride = w * 4;
-
-
-	glGetTextureImage(draw.tex.actual_output_composite->get_internal_handle(), 0, GL_RGBA, GL_UNSIGNED_BYTE, w*h*4,
-		pixels.data());
 
 
 	_mkdir("TestFiles");

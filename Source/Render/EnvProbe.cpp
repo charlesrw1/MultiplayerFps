@@ -1,4 +1,4 @@
-#include "EnvProbe.h"
+﻿#include "EnvProbe.h"
 #include "glad/glad.h"
 #include <glm/ext.hpp>
 #include <vector>
@@ -198,82 +198,37 @@ void EnviornmentMapHelper::compute_irradiance_new(
 	safe_release(temp_tex);
 }
 
-void BRDFIntegration::drawdebug() {
-
-	return;
-#if 0
-    MeshBuilder mb;
-    mb.Begin();
-    mb.Push2dQuad(vec2(0, 0), vec2(1, 1));
-    mb.End();
-
-    Renderer& d = draw;
-    glCheckError();
-
-    glCheckError();
-    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    glCheckError();
-    glViewport(0, 0, 512, 512);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glCheckError();
-    glDisable(GL_CULL_FACE);
-    Shader& s = d.shader_list[d.S_TEXTURED];
-    s.use();
-    Texture* t = mats.find_texture("frog.jpg");
-    glCheckError();
-    glBindTexture(GL_TEXTURE_2D, t->get_internal_render_handle());
-    glCheckError();
-    s.set_mat4("Model", mat4(1));
-    glCheckError();
-    s.set_mat4("ViewProj", mat4(1));
-    mb.Draw(GL_TRIANGLES);
-    glCheckError();
-
-    glEnable(GL_CULL_FACE);
-    glCheckError();
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    mb.Free();
-    glCheckError();
-#endif
-}
 #include "Framework/MeshBuilderImpl.h"
 void BRDFIntegration::run() {
-	static const float quad_verts[] = {-1, -1, 0, 1,  -1, 0, 1, 1, 0,
-
-									   -1, -1, 0, -1, 1,  0, 1, 1, 0};
-
 	safe_release(integrate_shader);
 	integrate_shader = gfx().create_shader_vert_frag("MbTexturedV.txt", "Helpers/PreIntegrateF.txt");
+
 	const int LUT_SIZE = EnviornmentMapHelper::BRDF_PREINTEGRATE_LUT_SIZE;
-	glGenBuffers(1, &quadvbo);
-	glGenVertexArrays(1, &quadvao);
-	glBindVertexArray(quadvao);
-	glBindBuffer(GL_ARRAY_BUFFER, quadvbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(quad_verts), quad_verts, GL_STATIC_DRAW);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(0);
-	glBindVertexArray(0);
 
-	glGenFramebuffers(1, &fbo);
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-	glGenTextures(1, &lut_id);
-	glBindTexture(GL_TEXTURE_2D, lut_id);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, LUT_SIZE, LUT_SIZE, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, lut_id, 0);
-
-	glGenTextures(1, &depth);
-	glBindTexture(GL_TEXTURE_2D, depth);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, LUT_SIZE, LUT_SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth, 0);
-
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		printf("Framebuffer not complete!\n");
+	safe_release(lut_tex);
+	safe_release(depth_tex);
+	{
+		CreateTextureArgs args;
+		args.type = GraphicsTextureType::t2D;
+		args.format = GraphicsTextureFormat::rgb8;
+		args.width = LUT_SIZE;
+		args.height = LUT_SIZE;
+		args.num_mip_maps = 1;
+		args.sampler_type = GraphicsSamplerType::LinearClamped;
+		lut_tex = gfx().create_texture(args);
+		lut_tex->sub_image_upload(0, 0, 0, LUT_SIZE, LUT_SIZE, 0, nullptr);
+	}
+	{
+		CreateTextureArgs args;
+		args.type = GraphicsTextureType::t2D;
+		args.format = GraphicsTextureFormat::depth24f;
+		args.width = LUT_SIZE;
+		args.height = LUT_SIZE;
+		args.num_mip_maps = 1;
+		args.sampler_type = GraphicsSamplerType::NearestClamped;
+		depth_tex = gfx().create_texture(args);
+		depth_tex->sub_image_upload(0, 0, 0, LUT_SIZE, LUT_SIZE, 0, nullptr);
+	}
 
 	MeshBuilderDD dd;
 	MeshBuilder mb;
@@ -282,24 +237,28 @@ void BRDFIntegration::run() {
 	mb.End();
 	dd.init_from(mb);
 
-	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-	glCheckError();
-	glViewport(0, 0, 512, 512);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glCheckError();
-	glDisable(GL_CULL_FACE);
-	IGraphicsShader* s = integrate_shader;
-	s->use();
+	RenderPassState pass;
+	ColorTargetInfo color(lut_tex);
+	color.wants_clear = true;
+	color.clear_color = glm::vec4(0, 0, 0, 1);
+	auto color_infos = {color};
+	pass.color_infos = color_infos;
+	pass.depth_info = depth_tex;
+	pass.wants_depth_clear = true;
+	pass.clear_depth_val = 1.0f;
+	gfx().set_render_pass(pass);
 
-	s->set_mat4("Model", mat4(1));
-	glCheckError();
-	s->set_mat4("ViewProj", mat4(1));
+	RenderPipelineState state;
+	state.program = integrate_shader;
+	state.vao = dd.vao ? dd.vao->get_internal_handle() : 0;
+	state.depth_testing = false;
+	state.depth_writes = false;
+	state.backface_culling = false;
+	draw.get_device().set_pipeline(state);
+
+	integrate_shader->set_mat4("Model", mat4(1));
+	integrate_shader->set_mat4("ViewProj", mat4(1));
 	dd.draw(MeshBuilderDD::TRIANGLES);
-	glCheckError();
 
-	glEnable(GL_CULL_FACE);
-	glCheckError();
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	dd.free();
-	glCheckError();
 }

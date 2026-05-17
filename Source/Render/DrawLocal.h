@@ -255,7 +255,7 @@ public:
 
 	struct buffers
 	{
-		bufferhandle default_vb{};
+		IGraphicsBuffer* default_vb{};
 
 		IGraphicsBuffer* lighting_uniforms{};
 		IGraphicsBuffer* decal_uniforms{};
@@ -264,10 +264,10 @@ public:
 
 	struct vertex_array_objects
 	{
-		vertexarrayhandle default_{};
+		IGraphicsVertexInput* default_{};
 	} vao;
 
-	vertexarrayhandle get_empty_vao() { return vao.default_; }
+	vertexarrayhandle get_empty_vao() { return vao.default_ ? vao.default_->get_internal_handle() : 0; }
 
 	const View_Setup& get_current_frame_vs() const { return current_frame_view; }
 	View_Setup current_frame_view;

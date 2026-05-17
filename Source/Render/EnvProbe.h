@@ -21,13 +21,11 @@ class BRDFIntegration
 {
 public:
 	void run();
-	uint32_t get_texture() { return lut_id; }
-	void drawdebug();
+	IGraphicsTexture* get_texture() { return lut_tex; }
 
-	uint32_t lut_id;
-	IGraphicsShader* integrate_shader = nullptr;
-	uint32_t fbo, depth;
-	uint32_t quadvbo, quadvao;
+	IGraphicsTexture* lut_tex   = nullptr;
+	IGraphicsTexture* depth_tex = nullptr;
+	IGraphicsShader*  integrate_shader = nullptr;
 
 private:
 };

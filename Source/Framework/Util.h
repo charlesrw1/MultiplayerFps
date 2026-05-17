@@ -32,7 +32,7 @@ bool write_snapshot_minidump(const char* path);
 #define ASSERT(x)
 #endif
 bool CheckGlErrorInternal_(const char* file, int line);
-#define glCheckError() CheckGlErrorInternal_(__FILE__, __LINE__)
+#define gfx_check_gl_error() CheckGlErrorInternal_(__FILE__, __LINE__)
 double GetTime();
 double TimeSinceStart();
 

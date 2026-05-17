@@ -176,6 +176,9 @@ public:
 	// Wraps glTextureParameteri(GL_TEXTURE_BASE_LEVEL/MAX_LEVEL).
 	virtual void set_mip_range(int base, int max) = 0;
 
+	// Auto-generate the mipmap chain from mip 0. Wraps glGenerateTextureMipmap.
+	virtual void generate_mipmaps() = 0;
+
 	// Read back a sub-image at (mip, layer) into dest. layer selects the cube
 	// face for tCubemap (0..5) or array slice for t2DArray/tCubemapArray; pass
 	// -1 for non-layered textures. dest_size_bytes must match the layer's
@@ -572,6 +575,14 @@ public:
 	// Phase 2c bakes color masks into IGraphicsRasterPipeline.
 	virtual void set_color_write_mask(int attachment, bool r, bool g, bool b, bool a) = 0;
 
+	// Copy a (mip, layer) sub-image between two textures (same format, same
+	// dimensions). Wraps glCopyImageSubData; SDL3 backend uses
+	// SDL_BlitGPUTexture or copy pass in compute. Both layers are absolute
+	// (face index for cubemap, slice for array, 0 for plain 2D).
+	virtual void copy_texture(IGraphicsTexture* src, int src_mip, int src_layer,
+							  IGraphicsTexture* dst, int dst_mip, int dst_layer,
+							  int w, int h) = 0;
+
 	// ---- Phase 1.4c wrap surface (orchestration) ---------------------------
 
 	// glMultiDrawElementsIndirect. `indirect` is interpreted as a byte offset
@@ -618,4 +629,10 @@ bool gfx_is_initialized();
 void gfx_opengl_pre_window_setup();
 void gfx_init_opengl(SDL_Window* window);
 void gfx_shutdown();
+
+// OpenGL-specific init helpers. Renderer calls these once at startup. SDL3
+// backend will expose parallel `gfx_sdl3gpu_*` variants; the renderer picks
+// the right pair based on the active backend.
+void gfx_opengl_dump_capabilities();
+void gfx_opengl_enable_debug_output();
 #endif

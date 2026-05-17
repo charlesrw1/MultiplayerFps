@@ -1,4 +1,4 @@
-#include "Framework/Util.h"
+﻿#include "Framework/Util.h"
 #include "glad/glad.h"
 #include "imgui.h"
 #include <chrono>
@@ -178,7 +178,7 @@ void Profiler::start_scope(const char* name, bool gpu) {
 
 	stack.push_back(pe);
 
-	glCheckError();
+	gfx_check_gl_error();
 }
 
 void Profiler::end_scope(const char* name) {
@@ -201,12 +201,12 @@ void Profiler::end_scope(const char* name) {
 	if (e.is_gpu_event) {
 		if (!e.waiting) {
 			glQueryCounter(e.glquery[1], GL_TIMESTAMP);
-			glCheckError();
+			gfx_check_gl_error();
 			e.waiting = true;
 		}
 		int available{};
 		glGetQueryObjectiv(e.glquery[1], GL_QUERY_RESULT_AVAILABLE, &available);
-		glCheckError();
+		gfx_check_gl_error();
 
 		if (available == GL_TRUE) {
 			uint64_t starttime{}, stoptime{};
