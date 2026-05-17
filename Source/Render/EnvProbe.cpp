@@ -75,7 +75,7 @@ void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, sc
 
 	// Clamp sampling to mip 0 so the prefilter shader only ever reads the
 	// freshly rendered scene level, never a higher mip we are about to write.
-	gfx().set_mip_range(t->gpu_ptr, 0, 0);
+	t->gpu_ptr->set_mip_range(0, 0);
 
 	auto& device = draw.get_device();
 	device.reset_states();
@@ -110,7 +110,7 @@ void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, sc
 		}
 	}
 
-	gfx().set_mip_range(t->gpu_ptr, 0, num_mips);
+	t->gpu_ptr->set_mip_range(0, num_mips);
 	device.reset_states();
 }
 
@@ -167,7 +167,7 @@ void EnviornmentMapHelper::compute_irradiance_new(
 		dirs[i] = -cubemap_views[i][2];
 
 		const int ofs = i * face_floats;
-		gfx().download_texture(temp_tex, 0, i, &input[ofs], face_floats * sizeof(float));
+		temp_tex->download(0, i, &input[ofs], face_floats * sizeof(float));
 	}
 	for (int i = 0; i < 6; i++) {
 		glm::vec3 up = cubemap_views[i][1];

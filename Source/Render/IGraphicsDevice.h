@@ -162,6 +162,18 @@ public:
 
 	virtual void clear_image() = 0;
 
+	// Clamp the mip range visible to sampling. Used by the specular-prefilter
+	// pass to read mip N-1 while rendering into mip N of the same cubemap.
+	// Wraps glTextureParameteri(GL_TEXTURE_BASE_LEVEL/MAX_LEVEL).
+	virtual void set_mip_range(int base, int max) = 0;
+
+	// Read back a sub-image at (mip, layer) into dest. layer selects the cube
+	// face for tCubemap (0..5) or array slice for t2DArray/tCubemapArray; pass
+	// -1 for non-layered textures. dest_size_bytes must match the layer's
+	// pixel-format size. Backend infers format/type from get_texture_format().
+	// Currently supports rgb16f, rgba8, depth* (debug/editor/bake paths).
+	virtual void download(int mip, int layer, void* dest, int dest_size_bytes) = 0;
+
 	// Returns approximate GPU memory usage in bytes (for stats / diagnostics).
 	virtual int get_mem_usage() const { return 0; }
 };
@@ -350,13 +362,6 @@ public:
 	// only; do NOT call on hot paths. Wraps glFlush + glFinish.
 	virtual void wait_for_gpu_idle() = 0;
 
-	// Read back a 2D texture's mip 0 image into dest. dest_size_bytes must
-	// match width * height * bytes-per-pixel for the texture's format. Backend
-	// infers GL format/type from tex->get_texture_format(). Currently supports
-	// depth32f and rgba8 (editor pick/depth paths). Debug/editor only.
-	virtual void download_texture_2d(IGraphicsTexture* tex, int mip,
-									 void* dest, int dest_size_bytes) = 0;
-
 	// Non-indexed draw. mode + count follow glDrawArrays semantics.
 	virtual void draw_arrays(GraphicsPrimitiveType mode, int first, int count) = 0;
 
@@ -365,19 +370,6 @@ public:
 
 	// Bind a UBO to a binding point.
 	virtual void bind_uniform_buffer_base(int slot, IGraphicsBuffer* buf) = 0;
-
-	// Clamp the mip range visible to sampling. Used by the specular-prefilter
-	// pass to read mip N-1 while rendering into mip N of the same cubemap.
-	// Wraps glTextureParameteri(GL_TEXTURE_BASE_LEVEL/MAX_LEVEL).
-	virtual void set_mip_range(IGraphicsTexture* tex, int base, int max) = 0;
-
-	// Read back a sub-image at (mip, layer) into dest. layer selects the cube
-	// face for tCubemap (0..5) or array slice for t2DArray/tCubemapArray; pass
-	// -1 for non-layered textures. dest_size_bytes must match the layer's
-	// pixel-format size. Backend infers format/type from get_texture_format().
-	// Currently supports rgb16f, rgba8, depth* (debug/editor/bake paths).
-	virtual void download_texture(IGraphicsTexture* tex, int mip, int layer,
-								  void* dest, int dest_size_bytes) = 0;
 
 	// ---- Phase 1.3a wrap surface (compute) --------------------------------
 

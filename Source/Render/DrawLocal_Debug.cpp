@@ -146,7 +146,7 @@ float Renderer::get_scene_depth_for_editor(int x, int y) {
 	const size_t size = cur_h * cur_w;
 	float* buffer_pixels = new float[size];
 
-	gfx().download_texture_2d(tex.scene_depth, 0, buffer_pixels, int(size * sizeof(float)));
+	tex.scene_depth->download(0, -1, buffer_pixels, int(size * sizeof(float)));
 
 	y = cur_h - y - 1;
 
@@ -176,7 +176,7 @@ std::vector<handle<Render_Object>> Renderer::mouse_box_select_for_editor(int x, 
 	gfx().wait_for_gpu_idle();
 	const int size = cur_h * cur_w * 4;
 	std::vector<uint8_t> bufferPixels(size, 0);
-	gfx().download_texture_2d(tex.editor_id_buffer, 0, bufferPixels.data(), size);
+	tex.editor_id_buffer->download(0, -1, bufferPixels.data(), size);
 	y = cur_h - y - 1;
 	std::unordered_set<int> found;
 	const int skip_pixels = 4; // check every 4 pixels

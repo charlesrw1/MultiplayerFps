@@ -350,6 +350,39 @@ public:
 	int get_num_mips() const override { return mips; }
 	int get_mem_usage() const override { return mem_usage; }
 
+	void set_mip_range(int base, int max) override {
+		ASSERT(base >= 0 && max >= base);
+		glTextureParameteri(id, GL_TEXTURE_BASE_LEVEL, base);
+		glTextureParameteri(id, GL_TEXTURE_MAX_LEVEL, max);
+	}
+
+	void download(int mip, int layer, void* dest, int dest_size_bytes) override {
+		ASSERT(dest != nullptr && dest_size_bytes > 0);
+		GLenum fmt = 0;
+		GLenum type = 0;
+		switch (my_fmt) {
+		case GraphicsTextureFormat::depth32f:
+		case GraphicsTextureFormat::depth24f:
+		case GraphicsTextureFormat::depth16f:
+			fmt = GL_DEPTH_COMPONENT; type = GL_FLOAT; break;
+		case GraphicsTextureFormat::rgba8:
+			fmt = GL_RGBA; type = GL_UNSIGNED_BYTE; break;
+		case GraphicsTextureFormat::rgb16f:
+			fmt = GL_RGB; type = GL_FLOAT; break;
+		default:
+			ASSERT(!"IGraphicsTexture::download: unsupported format (extend mapping)");
+			return;
+		}
+		if (layer < 0) {
+			glGetTextureImage(id, mip, fmt, type, dest_size_bytes, dest);
+		} else {
+			const int w = std::max(1, width  >> mip);
+			const int h = std::max(1, height >> mip);
+			glGetTextureSubImage(id, mip, 0, 0, layer, w, h, 1, fmt, type,
+								 dest_size_bytes, dest);
+		}
+	}
+
 	void clear_image() final {
 		ASSERT(!is_compressed());
 		ASSERT(my_fmt != GraphicsTextureFormat::depth32f);
