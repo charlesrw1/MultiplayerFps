@@ -13,6 +13,7 @@
 
 // shared types with glsl shaders
 #include "../Shaders/SharedGpuTypes.txt"
+#include "../Shaders/ShaderBufferShared.txt"
 
 #include "glm/glm.hpp"
 #include "User_Camera.h"

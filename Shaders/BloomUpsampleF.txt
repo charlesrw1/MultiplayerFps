@@ -8,13 +8,10 @@
 // Remember to add bilinear minification filter for this texture!
 // Remember to use a floating-point texture format (for HDR)!
 // Remember to use edge clamping for this texture!
-layout(binding = 0) uniform sampler2D srcTexture;
+#include "ShaderBufferShared.txt"
 
-layout(binding = 7, std140) uniform BloomParams {
-    vec2  srcResolution;  // unused in upsample
-    int   mipLevel;       // unused in upsample
-    float filterRadius;
-};
+layout(binding = 0) uniform sampler2D srcTexture;
+layout(binding = 7, std140) uniform BloomParamsUbo { BloomParams params; };
 
 in vec2 texCoord;
 out vec3 FS_OUT_Upsample;
@@ -23,8 +20,8 @@ void main()
 {
     // The filter kernel is applied with a radius, specified in texture
     // coordinates, so that the radius will vary across mip resolutions.
-    float x = filterRadius;
-    float y = filterRadius;
+    float x = params.filterRadius;
+    float y = params.filterRadius;
 
     // Take 9 samples around current texel:
     // a - b - c

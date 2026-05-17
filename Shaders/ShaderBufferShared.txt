@@ -1,0 +1,40 @@
+#ifndef SHADER_BUFFER_SHARED_
+#define SHADER_BUFFER_SHARED_
+
+// Per-pass UBO struct definitions shared between C++ and GLSL.
+// Companion file to SharedGpuTypes.txt — same #ifdef __cplusplus pattern.
+// See [[rendering/gfx_abstraction#2a]] for the Phase 2a UBO group plan.
+//
+// Convention:
+//   - Struct name:   <Group>Params           (PascalCase)
+//   - Shader block:  <Group>ParamsUbo { <Group>Params params; }
+//   - C++ access:    gpu::<Group>Params p{};
+//   - All groups share binding slot 7 (the per-pass push-constant analog).
+//
+// std140 padding rules (relevant subset):
+//   - vec2 -> 8B align, vec3/vec4 -> 16B align, mat4 -> 16B align (4 vec4 rows)
+//   - scalar (float/int/uint) -> 4B align
+//   - struct -> 16B align, size padded to 16B multiple
+//   - For the field shapes here (scalars / vec2 / vec3-with-pad / vec4 / mat4),
+//     std140 and std430 produce identical layouts.
+
+#ifdef __cplusplus
+using namespace glm;
+typedef uint32_t uint;
+namespace gpu {
+#endif
+
+// ---- B. Bloom (pilot — done) -----------------------------------------------
+// Used by BloomDownsampleF (srcResolution, mipLevel) and BloomUpsampleF
+// (filterRadius). Both shaders iterate per-mip; each pass re-uploads.
+struct BloomParams {
+    vec2  srcResolution;
+    int   mipLevel;
+    float filterRadius;
+};
+
+#ifdef __cplusplus
+};
+#endif
+
+#endif
