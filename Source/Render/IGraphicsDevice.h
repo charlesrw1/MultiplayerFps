@@ -226,28 +226,6 @@ public:
 	virtual ~IGraphicsShader() {}
 	virtual void release() = 0;
 	virtual uint32_t get_internal_handle() = 0;
-
-	// Make this program current on the device (wraps glUseProgram). Uniform
-	// setters below use DSA-equivalent (glProgramUniform*) so they do NOT
-	// require use() to be called first — but set_pipeline / explicit use()
-	// is still required before issuing a draw call.
-	virtual void use() = 0;
-
-	// Uniform setters. Name lookup happens inside the backend (cached per
-	// shader in Phase 2a — for now each call does glGetUniformLocation).
-	virtual void set_bool(const char* name, bool value) = 0;
-	virtual void set_int(const char* name, int value) = 0;
-	virtual void set_uint(const char* name, unsigned int value) = 0;
-	virtual void set_float(const char* name, float value) = 0;
-	virtual void set_mat4(const char* name, const glm::mat4& value) = 0;
-	virtual void set_vec2(const char* name, const glm::vec2& value) = 0;
-	virtual void set_vec3(const char* name, const glm::vec3& value) = 0;
-	virtual void set_vec4(const char* name, const glm::vec4& value) = 0;
-	virtual void set_ivec2(const char* name, const glm::ivec2& value) = 0;
-	virtual void set_ivec3(const char* name, const glm::ivec3& value) = 0;
-
-	// Wrap glUniformBlockBinding — binds named UBO block to a binding point.
-	virtual void set_block_binding(const char* name, int binding) = 0;
 };
 
 // Standalone sampler object. Bound to a texture slot via gfx().bind_sampler;

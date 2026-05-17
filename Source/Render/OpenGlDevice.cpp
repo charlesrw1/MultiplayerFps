@@ -401,7 +401,7 @@ public:
 		if (invalid || shader != active_program) {
 			set_bit_valid(PROGRAM_BIT);
 			active_program = shader;
-			shader->use();
+			glUseProgram(shader->get_internal_handle());
 			draw.stats.program_changes++;
 		}
 	}
