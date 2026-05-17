@@ -33,6 +33,28 @@ struct BloomParams {
     float filterRadius;
 };
 
+// ---- C. Temporal upsample --------------------------------------------------
+// Union of fields previously set by name on TaaResolveF, temporal_upsample_ddgi,
+// and temporal_upsample_ssr. Each shader reads only the fields it needs:
+//   TAA   : lastViewProj, amt, doc_*, remove_flicker, use_reproject, dilate_velocity
+//   DDGI  : same + halfres_texel_offset
+//   SSR   : same + halfres_texel_offset + ssr_nonoccluded_weight_mult
+// One UBO storage, three call sites — three uploads/frame, all under slot 7.
+struct TemporalParams {
+    mat4 lastViewProj;                  //   0 .. 64
+    float amt;                          //  64
+    float doc_mult;                     //  68
+    float doc_vel_bias;                 //  72
+    float doc_bias;                     //  76
+    float doc_pow;                      //  80
+    float ssr_nonoccluded_weight_mult;  //  84
+    int   remove_flicker;               //  88   bool (4B in std140)
+    int   use_reproject;                //  92
+    int   dilate_velocity;              //  96
+    int   _pad0;                        // 100   pad before ivec2 (8B align)
+    ivec2 halfres_texel_offset;         // 104 .. 112  (struct size 112, /16)
+};
+
 #ifdef __cplusplus
 };
 #endif

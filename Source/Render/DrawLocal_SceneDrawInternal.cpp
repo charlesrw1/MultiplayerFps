@@ -269,15 +269,19 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		state.program = get_prog_man().get_obj(prog.taa_resolve);
 		state.vao = get_empty_vao();
 		gfx().set_pipeline(state);
-		shader()->set_float("amt", r_taa_blend.get_float());
-		shader()->set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
-		shader()->set_mat4("lastViewProj", last_frame_main_view.viewproj);
-		shader()->set_bool("use_reproject", r_taa_reproject.get_bool());
-		shader()->set_float("doc_mult", taa_doc_mult);
-		shader()->set_float("doc_vel_bias", taa_doc_vel_bias);
-		shader()->set_float("doc_bias", taa_doc_bias);
-		shader()->set_float("doc_pow", taa_doc_pow);
-		shader()->set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
+
+		gpu::TemporalParams tp{};
+		tp.lastViewProj = last_frame_main_view.viewproj;
+		tp.amt = r_taa_blend.get_float();
+		tp.doc_mult = taa_doc_mult;
+		tp.doc_vel_bias = taa_doc_vel_bias;
+		tp.doc_bias = taa_doc_bias;
+		tp.doc_pow = taa_doc_pow;
+		tp.remove_flicker = r_taa_flicker_remove.get_bool();
+		tp.use_reproject = r_taa_reproject.get_bool();
+		tp.dilate_velocity = r_taa_dilate_velocity.get_bool();
+		ubo.temporal_params->upload(&tp, sizeof(tp));
+		gfx().bind_uniform_buffer_base(7, ubo.temporal_params);
 
 		bind_texture_ptr(0, tex.scene_color);
 		bind_texture_ptr(1, tex.last_scene_color);

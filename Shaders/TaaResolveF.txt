@@ -1,10 +1,11 @@
 in vec2 texCoord;
 out vec3 FS_OUT_Color;
-uniform float amt;
 #include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
+layout (binding = 7, std140) uniform TemporalParamsUbo { TemporalParams params; };
 
 layout(binding=0) uniform sampler2D sceneColor;
 layout(binding=1) uniform sampler2D lastColor;
@@ -12,17 +13,13 @@ layout(binding=2) uniform sampler2D sceneDepth;
 layout(binding=3) uniform sampler2D sceneMotion;
 layout(binding=4) uniform sampler2D lastSceneMotion;
 
-uniform mat4 lastViewProj;
-uniform vec2 current_jitter;
-uniform vec2 last_jitter;
-
 vec2 reproject_to_last(vec2 uv)
 {
 	float depth = textureLod(sceneDepth,uv,0.0).r;
 	uv = uv*2.0 - vec2(1.0);
 	vec4 worldspace = g.inv_viewproj * vec4(uv.x,uv.y,depth,1.0);
 	worldspace /= worldspace.w;
-	vec4 lastClipspace = lastViewProj * vec4(worldspace.xyz,1.0);
+	vec4 lastClipspace = params.lastViewProj * vec4(worldspace.xyz,1.0);
 	lastClipspace /= lastClipspace.w;
 	
 	vec2 reproject_uv = lastClipspace.xy*0.5 + vec2(0.5);
@@ -76,16 +73,6 @@ vec4 AdjustHDRColor(vec3 color)
         return vec4(color*luminanceWeight, luminanceWeight);
     }
 }
-uniform bool remove_flicker=true;
-uniform bool use_reproject = false;
-
-uniform float doc_mult =  10.0;
-uniform float doc_vel_bias = 0.001;
-uniform float doc_bias = 0.01;
-uniform float doc_pow = 0.4;
-
-uniform bool dilate_velocity = false;
-
 vec2 GetVelocity(vec2 uv)
 {
 	float closestDepth = 100.0;
@@ -129,14 +116,14 @@ void main()
 	
 	vec2 actual_uv = reproject_to_last(input_uv);
 	//uv_to_use = actual_uv;
-	if(use_reproject)
+	if(params.use_reproject != 0)
 		uv_to_use = actual_uv;
 	
 	//vec3 last = SampleTextureCatmullRom5(lastColor,uv_to_use).rgb;
 	vec3 last = textureLod(lastColor,uv_to_use,0).rgb;// looks better than the cubic filter...
 	vec2 lastVelocityUv = textureLod(lastSceneMotion,uv_to_use,0).rg;
 	float vel_len = length(lastVelocityUv-velocity_uv);
-	float velocityDisocclusion = clamp(pow(max((vel_len-doc_vel_bias)*doc_mult-doc_bias, 0.0),doc_pow),0.0,1.0);
+	float velocityDisocclusion = clamp(pow(max((vel_len-params.doc_vel_bias)*params.doc_mult-params.doc_bias, 0.0),params.doc_pow),0.0,1.0);
 	
 
 	// color clamping
@@ -151,17 +138,17 @@ void main()
 	}
 	
 	// luminance weighting to get rid of flickering, subtle effect
-	if(remove_flicker) {
+	if(params.remove_flicker != 0) {
 		vec4 prevAdjust = AdjustHDRColor(last);
 		vec3 prev_clamped = AdjustHDRColor(clamp(last,minColor,maxColor)).rgb;
 		vec4 currentAdjust = AdjustHDRColor(current);
-		vec3 outputColor = (prev_clamped.rgb*amt + currentAdjust.rgb*(1-amt));
-		outputColor /= max((prevAdjust.a*amt+currentAdjust.a*(1-amt)),0.000001);
-		FS_OUT_Color = outputColor;// current * (1-amt) + prev_clamped * amt;
+		vec3 outputColor = (prev_clamped.rgb*params.amt + currentAdjust.rgb*(1-params.amt));
+		outputColor /= max((prevAdjust.a*params.amt+currentAdjust.a*(1-params.amt)),0.000001);
+		FS_OUT_Color = outputColor;
 	}
 	else {
 		vec3 clamped = clamp(last,minColor,maxColor);
-		FS_OUT_Color = current * (1-amt) + clamped*amt;
+		FS_OUT_Color = current * (1-params.amt) + clamped*params.amt;
 	}
 	FS_OUT_Color = mix(FS_OUT_Color,current,velocityDisocclusion);
 	//FS_OUT_Color = vec3(length(velocity_uv_ndc.xy));

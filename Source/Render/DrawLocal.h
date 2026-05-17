@@ -257,6 +257,7 @@ public:
 		// Per-pass params (Phase 2a manual UBO migration; binding 7 is the
 		// "per-pass push-constant analog" slot — see [[rendering/gfx_abstraction#2a]]).
 		IGraphicsBuffer* bloom_params = nullptr;
+		IGraphicsBuffer* temporal_params = nullptr;  // group C: TAA / DDGI / SSR temporal upsample
 	} ubo;
 
 	struct buffers

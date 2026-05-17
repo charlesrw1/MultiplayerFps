@@ -217,17 +217,19 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
         extern float taa_doc_bias;
         extern float taa_doc_pow;
 
-        IGraphicsShader* the_shader = device.get_active_shader();
-        the_shader->set_float("amt", r_ddgi_halfres_blend.get_float());
-        the_shader->set_bool("remove_flicker", r_taa_flicker_remove.get_bool());
-        the_shader->set_mat4("lastViewProj", draw.last_frame_main_view.viewproj);
-        the_shader->set_bool("use_reproject", r_taa_reproject.get_bool());
-        the_shader->set_float("doc_mult", taa_doc_mult);
-        the_shader->set_float("doc_vel_bias", taa_doc_vel_bias);
-        the_shader->set_float("doc_bias", taa_doc_bias);
-        the_shader->set_float("doc_pow", taa_doc_pow);
-        the_shader->set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
-        the_shader->set_ivec2("halfres_texel_offset", texel_offset);
+        gpu::TemporalParams tp{};
+        tp.lastViewProj = draw.last_frame_main_view.viewproj;
+        tp.amt = r_ddgi_halfres_blend.get_float();
+        tp.doc_mult = taa_doc_mult;
+        tp.doc_vel_bias = taa_doc_vel_bias;
+        tp.doc_bias = taa_doc_bias;
+        tp.doc_pow = taa_doc_pow;
+        tp.remove_flicker = r_taa_flicker_remove.get_bool();
+        tp.use_reproject = r_taa_reproject.get_bool();
+        tp.dilate_velocity = r_taa_dilate_velocity.get_bool();
+        tp.halfres_texel_offset = glm::ivec2(texel_offset.x, texel_offset.y);
+        draw.ubo.temporal_params->upload(&tp, sizeof(tp));
+        gfx().bind_uniform_buffer_base(7, draw.ubo.temporal_params);
 
         gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
     }
