@@ -252,6 +252,11 @@ public:
 	struct uniform_buffers
 	{
 		IGraphicsBuffer* current_frame = nullptr;
+
+		// Per-pass params (Phase 2a manual UBO migration; binding 7 is the
+		// "per-pass push-constant analog" slot — see [[rendering/gfx_abstraction#2a]]).
+		IGraphicsBuffer* bloom_downsample_params = nullptr;
+		IGraphicsBuffer* bloom_upsample_params = nullptr;
 	} ubo;
 
 	struct buffers

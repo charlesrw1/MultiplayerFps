@@ -314,6 +314,8 @@ void Renderer::init() {
 	create_uniform_buffer(buf.lighting_uniforms);
 	create_uniform_buffer(buf.decal_uniforms);
 	create_uniform_buffer(buf.fog_uniforms);
+	create_uniform_buffer(ubo.bloom_downsample_params);
+	create_uniform_buffer(ubo.bloom_upsample_params);
 
 	on_level_start();
 	Debug_Interface::get()->add_hook("Render stats", imgui_stat_hook);

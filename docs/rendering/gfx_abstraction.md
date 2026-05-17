@@ -516,17 +516,71 @@ With every call funneled through the interface, the API itself reshapes —
 each redesign is one API change + one backend change, not 45 call-site edits.
 Lands after the Phase 1.9 static-scan gate is clean (it is).
 
-### 2a — Synthetic UBOs
+### 2a — Per-pass UBO migration (manual)
 
-Reflect every uniform at program-link via `glGetProgramInterface*`. Generate a
-per-stage std430 `_AutoUniforms` block; rewrite the program's uniform usage
-to read from it (preferred: GLSL preprocessor pass before compile).
-`set_float` / `set_vec3` / `set_mat4(name, ...)` continue to work — a
-name → `(slot, offset)` resolution table is built at link time; setters write
-into a CPU scratch buffer that flushes to the UBO at draw time. std430
-padding enforced. On
-`Program_Manager::recompile_all` the reflection table is rebuilt and any 2c
-SDL3-cache pipelines referencing the program are invalidated.
+**Strategy change from the original plan.** The earlier proposal was a
+load-time GLSL preprocessor that rewrote every plain `uniform` into a
+synthetic `_AutoUniforms` block at compile, keeping `set_float(name, ...)`
+working. That approach was rejected: it keeps a name-based setter layer
+forever, requires a permanent GLSL parser-rewriter in the load path, and
+the final SDL3 code looks identical to manual migration anyway (CPU
+struct → UBO upload → bind). We migrate each shader explicitly instead.
+
+**Why this works for SDL3:** SPIR-V (Vulkan / DX12 via DXC) rejects
+top-level scalar/vector uniforms. The two replacements are UBOs (any size,
+slot-bound) and push constants (~128B, slot-bound, inline in cmd buffer).
+For OpenGL we model both with UBOs; the SDL3 backend port can promote the
+per-pass slot to a real push-constant block if that's cheaper.
+
+**Pattern (locked by the BloomDownsample / BloomUpsample pilot):**
+
+In the shader:
+```glsl
+layout(binding = 0) uniform sampler2D srcTexture;       // textures get explicit binding too
+
+layout(binding = 7, std140) uniform BloomDownsampleParams {
+    vec2 srcResolution;
+    int  mipLevel;
+};
+```
+
+In C++:
+```cpp
+struct BloomDownsampleParams { glm::vec2 srcResolution; int32_t mipLevel; int32_t _pad0; };
+static_assert(sizeof(BloomDownsampleParams) == 16, "std140");
+constexpr int BLOOM_PARAMS_UBO_BINDING = 7;
+// init: create_uniform_buffer(ubo.bloom_downsample_params);
+// per-draw:
+BloomDownsampleParams p{glm::vec2(src_x, src_y), i, 0};
+ubo.bloom_downsample_params->upload(&p, sizeof(p));
+gfx().bind_uniform_buffer_base(BLOOM_PARAMS_UBO_BINDING, ubo.bloom_downsample_params);
+```
+
+**UBO binding-slot convention** (active shaders surveyed before pilot):
+- `0` — `Ubo_View_Constant_Buffer` (shared view/frame constants, everywhere)
+- `4` — Vfog system
+- `5` — Cull system
+- `7` — **per-pass params slot** (the push-constant analog). Conflicts
+  with SSBO/sampler bindings at the same number are fine — separate slot
+  pools in OpenGL.
+- `8` — DDGI globals
+
+**Endgame:** when every `IGraphicsShader::set_*(name, ...)` call-site is
+gone, delete the name-based setter methods from `IGraphicsShader` and
+`OpenGLShaderImpl`. That's the SDL3-ready milestone.
+
+### 2a pilot status
+
+Migrated `BloomDownsampleF` + `BloomUpsampleF`. New struct defs +
+`BLOOM_PARAMS_UBO_BINDING = 7` live in `DrawLocal_RenderPass.cpp`
+(anonymous namespace) alongside `render_bloom_chain`. Per-pass UBO storage
+(`ubo.bloom_downsample_params`, `ubo.bloom_upsample_params`) is created in
+`Renderer::Init`. Program-binary cache invalidates automatically (shader
+source touched → cached binary stale by timestamp). 185 unit tests + 80
+integration tests green.
+
+Sweep is one shader at a time; ~80 files remaining, ~390 plain-uniform
+declarations to migrate.
 
 ### 2c — Pipeline-state consolidation — done
 

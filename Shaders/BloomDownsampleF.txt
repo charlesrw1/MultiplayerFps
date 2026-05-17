@@ -1,9 +1,12 @@
 
 // From learnopengl, which itself was from infinity ward
 
-uniform sampler2D srcTexture;
-uniform vec2 srcResolution;
-uniform int mipLevel;
+layout(binding = 0) uniform sampler2D srcTexture;
+
+layout(binding = 7, std140) uniform BloomDownsampleParams {
+    vec2 srcResolution;
+    int  mipLevel;
+};
 
 in vec2 texCoord;
 out vec3 FS_OUT_Downsample;

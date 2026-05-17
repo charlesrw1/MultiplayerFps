@@ -8,8 +8,11 @@
 // Remember to add bilinear minification filter for this texture!
 // Remember to use a floating-point texture format (for HDR)!
 // Remember to use edge clamping for this texture!
-uniform sampler2D srcTexture;
-uniform float filterRadius;
+layout(binding = 0) uniform sampler2D srcTexture;
+
+layout(binding = 7, std140) uniform BloomUpsampleParams {
+    float filterRadius;
+};
 
 in vec2 texCoord;
 out vec3 FS_OUT_Upsample;
