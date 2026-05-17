@@ -56,8 +56,9 @@ void DdgiTesting::render_probes() {
     if (draw_real_grid.get_integer() == 2) {
         for (auto& vol : myvolumes) {
             auto ddgiGRID = vol.size_offset;
-            device.get_active_shader()->set_ivec3("vol_grid", ddgiGRID);
-            device.get_active_shader()->set_int("vol_offset", ddgiGRID.w);
+            gpu::MeshDebugProbeFragPushConsts pcf{};
+            pcf.vol_grid   = glm::ivec4(glm::ivec3(ddgiGRID), 0);
+            pcf.vol_offset = ddgiGRID.w;
 
             for (int x = 0; x < ddgiGRID.x; x++) {
                 for (int y = 0; y < ddgiGRID.y; y++) {
@@ -68,8 +69,12 @@ void DdgiTesting::render_probes() {
 
                         glm::mat4 tr = glm::translate(glm::mat4(1), glm::vec3(x, y, z) * glm::vec3(vol.density) +
                                                                         glm::vec3(vol.origin_priority) + ofs);
-                        device.get_active_shader()->set_mat4("Model", glm::scale(tr, glm::vec3(0.2)));
-                        device.get_active_shader()->set_ivec3("probe_coord", {x, y, z});
+                        gpu::MeshSimpleVertPushConsts pcv{};
+                        pcv.Model = glm::scale(tr, glm::vec3(0.2));
+                        gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
+
+                        pcf.probe_coord = glm::ivec4(x, y, z, 0);
+                        gfx().push_fragment_constants(0, &pcf, sizeof(pcf));
 
                         draw_model_simple_no_material(m);
                     }
