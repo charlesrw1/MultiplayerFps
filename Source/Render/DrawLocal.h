@@ -260,6 +260,7 @@ public:
 		IGraphicsBuffer* temporal_params = nullptr;  // group C: TAA / DDGI / SSR temporal upsample
 		IGraphicsBuffer* cull_params = nullptr;      // group F: cull / MDI compact / depth pyramid / debugCull
 		IGraphicsBuffer* ssr_params = nullptr;       // group D: ssr_f / ssr_downsample / ssr_upsample
+		IGraphicsBuffer* bake_params = nullptr;      // group J: probe / GI bake (trace + gather + probeLumCalc)
 	} ubo;
 
 	struct buffers

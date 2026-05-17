@@ -5,8 +5,10 @@ layout(binding =2) uniform sampler2D  probe_irradiance;
 layout(binding =3) uniform sampler2D  probe_depth;
 
 #include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
 
-uniform int num_cubemaps = 0;
+layout (binding = 7, std140) uniform BakeParamsUbo { BakeParams params; };
+
 struct R_ReflectionVolume {
 	mat4 transform;
 	vec4 size;
@@ -66,7 +68,7 @@ float luminance(vec3 v)
 void main()
 {
 	const int global_index = int(gl_GlobalInvocationID.x);
-	if(global_index>=num_cubemaps)
+	if(global_index>=params.num_cubemaps)
 		return;
 		
 	vec3 boxmin = Cubemaps.data[global_index].bounds_min.rgb;

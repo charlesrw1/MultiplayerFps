@@ -18,6 +18,9 @@ layout (binding = 1, std140) readonly buffer RayHitBuffer {
 	RayHitOutput hitbuffer[];
 };
 #include "ddgiShared.txt"
+#include "ShaderBufferShared.txt"
+
+layout (binding = 7, std140) uniform BakeParamsUbo { BakeParams params; };
 
 
 // w component is used for if probe is active (if backface hits are high, disable the probe)
@@ -39,7 +42,6 @@ layout(std430, binding =10) writeonly buffer InvalidCounterBuffer
 } InvalidCounter;
 
 
-uniform int num_runs_so_far = 0;
 
 ivec2 get_probe_texel_base(ivec3 probe_coord, ivec3 vol_grid, int vol_offset, int tile_size)
 {
@@ -185,8 +187,8 @@ void main()
 			
 			if(is_depth_local_innvoc) {
 				vec2 cur_value = imageLoad(probe_depths, coord_store).rg;
-				if(num_runs_so_far!=0)
-					accum.rg = (cur_value*float(num_runs_so_far)+accum.rg)/(num_runs_so_far+1.0);			
+				if(params.num_runs_so_far!=0)
+					accum.rg = (cur_value*float(params.num_runs_so_far)+accum.rg)/(params.num_runs_so_far+1.0);			
 				// Store in probe irradiance texture
 				imageStore(probe_depths, coord_store, vec4(accum.rg,0.0, 1.0));		
 			}
@@ -194,8 +196,8 @@ void main()
 				accum = pow(accum,vec3(1.0/2.2));			
 				accum.r *= global_dist_mult;		
 				vec3 cur_value = imageLoad(probe_irradiance, coord_store).rgb;
-				if(num_runs_so_far!=0)
-					accum = (cur_value*float(num_runs_so_far)+accum)/(num_runs_so_far+1.0);	// running average
+				if(params.num_runs_so_far!=0)
+					accum = (cur_value*float(params.num_runs_so_far)+accum)/(params.num_runs_so_far+1.0);	// running average
 				
 				//accum = vec3(1,0,1);
 				// Store in probe irradiance texture

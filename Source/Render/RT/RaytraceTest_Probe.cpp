@@ -149,7 +149,12 @@ void DdgiTesting::execute() {
         gfx().bind_storage_buffer_base(14, relocate_param_buf);
 
         set_shit_fuck();
-        device.get_active_shader()->set_float("ray_sample_randomness", r.RandF(0, TWOPI));
+        {
+            gpu::BakeParams bp{};
+            bp.ray_sample_randomness = r.RandF(0, TWOPI);
+            draw.ubo.bake_params->upload(&bp, sizeof(bp));
+            gfx().bind_uniform_buffer_base(7, draw.ubo.bake_params);
+        }
         gfx().bind_storage_buffer_base(13, ddgi_probe_relocation_offsets);
         const int total_probes = total_num_probes;
         const int groups = glm::ceil(total_probes / 64.f);
@@ -175,17 +180,21 @@ void DdgiTesting::execute() {
         device.bind_texture(3, probe_depth);
 
         { RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(trace_shader); gfx().set_pipeline(ps); }
-        device.get_active_shader()->set_bool("do_irrad_calcs", i != 0);
         set_shit_fuck();
-        device.get_active_shader()->set_float("ray_sample_randomness", r.RandF(0, TWOPI));
-        device.get_active_shader()->set_int("num_lights", draw.scene.light_list.objects.size());
-
-        if (draw.scene.suns.size() > 0) {
-            auto& sun = draw.scene.suns.at(0).sun;
-            device.get_active_shader()->set_vec4("light_sun_dir", vec4(sun.direction, 1));
-            device.get_active_shader()->set_vec4("light_sun_color", vec4(sun.color, 0));
-        } else {
-            device.get_active_shader()->set_vec4("light_sun_dir", vec4(0, 0, 0, -1));
+        {
+            gpu::BakeParams bp{};
+            bp.do_irrad_calcs = (i != 0) ? 1 : 0;
+            bp.ray_sample_randomness = r.RandF(0, TWOPI);
+            bp.num_lights = (int)draw.scene.light_list.objects.size();
+            if (draw.scene.suns.size() > 0) {
+                auto& sun = draw.scene.suns.at(0).sun;
+                bp.light_sun_dir = vec4(sun.direction, 1);
+                bp.light_sun_color = vec4(sun.color, 0);
+            } else {
+                bp.light_sun_dir = vec4(0, 0, 0, -1);
+            }
+            draw.ubo.bake_params->upload(&bp, sizeof(bp));
+            gfx().bind_uniform_buffer_base(7, draw.ubo.bake_params);
         }
 
         const int total_probes = total_num_probes;
@@ -197,7 +206,12 @@ void DdgiTesting::execute() {
         if (!skip_gather) {
             { RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(gather_shader); gfx().set_pipeline(ps); }
             set_shit_fuck();
-            device.get_active_shader()->set_int("num_runs_so_far", glm::max(0, i - 1));
+            {
+                gpu::BakeParams bp{};
+                bp.num_runs_so_far = glm::max(0, i - 1);
+                draw.ubo.bake_params->upload(&bp, sizeof(bp));
+                gfx().bind_uniform_buffer_base(7, draw.ubo.bake_params);
+            }
 
             gfx().bind_image_for_compute(0, probe_irradiance, 0, 0, GraphicsImageAccess::WriteOnly);
             gfx().bind_image_for_compute(1, probe_depth, 0, 0, GraphicsImageAccess::WriteOnly);
@@ -256,7 +270,12 @@ void DdgiTesting::calculate_lum_for_spec() {
     { RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(lum_calc); gfx().set_pipeline(ps); }
     set_shit_fuck();
     const int num_cubemaps = RenderGiManager::inst->get_num_cubemaps();
-    device.get_active_shader()->set_int("num_cubemaps", num_cubemaps);
+    {
+        gpu::BakeParams bp{};
+        bp.num_cubemaps = num_cubemaps;
+        draw.ubo.bake_params->upload(&bp, sizeof(bp));
+        gfx().bind_uniform_buffer_base(7, draw.ubo.bake_params);
+    }
 
     const int groups = glm::ceil(num / 64.f);
     printf("$$$$$$$$$$$$$$$$$$calculate_lum_for_spec %d\n", groups);

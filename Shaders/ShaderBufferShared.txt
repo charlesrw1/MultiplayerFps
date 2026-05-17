@@ -121,6 +121,31 @@ struct SsrParams {
     vec2  inv_prev_size;         // 216 .. 224  (ssr_downsample; struct size 224, /16)
 };
 
+// ---- J. Probe / GI baking --------------------------------------------------
+// Bake-time (editor) compute shaders. Each shader reads only its subset:
+//   trace_C (incl. RELOCATE variant) : ray_sample_randomness, do_irrad_calcs,
+//                                       num_lights, light_sun_dir, light_sun_color
+//   gather_C                          : num_runs_so_far
+//   probeLumCalc_C                    : num_cubemaps  (this is the per-bake
+//                                       count, *not* the per-frame one set
+//                                       by set_reflection_uniforms())
+// One UBO; each dispatch re-uploads. Bound at slot 7.
+// Out of scope: get_best_cubemap_C (created but never dispatched — dead),
+// avgProbeCalc_C (had no name-uniforms to begin with),
+// compute_irrad_pos_C / PerlinGenF (never created).
+struct BakeParams {
+    vec4  light_sun_dir;          //   0 .. 16  (trace_C)
+    vec4  light_sun_color;        //  16 .. 32  (trace_C)
+    float ray_sample_randomness;  //  32        (trace_C + RELOCATE)
+    int   do_irrad_calcs;         //  36        (trace_C; bool, 4B std140)
+    int   num_lights;             //  40        (trace_C)
+    int   num_runs_so_far;        //  44        (gather_C)
+    int   num_cubemaps;           //  48        (probeLumCalc_C)
+    int   _pad0;                  //  52
+    int   _pad1;                  //  56
+    int   _pad2;                  //  60 .. 64  (struct size 64, /16)
+};
+
 // ---- C. Temporal upsample --------------------------------------------------
 // Union of fields previously set by name on TaaResolveF, temporal_upsample_ddgi,
 // and temporal_upsample_ssr. Each shader reads only the fields it needs:

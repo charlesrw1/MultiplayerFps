@@ -8,6 +8,9 @@ layout(binding =3) uniform sampler2D  probe_depth;
 layout(binding = 5) uniform samplerCube Skylight;
 
 #include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
+
+layout (binding = 7, std140) uniform BakeParamsUbo { BakeParams params; };
 
 struct RayHitOutput {
 	vec4 dir_dist;
@@ -41,9 +44,6 @@ vec3 randColor(int number){
 // for sampling the sky
 
 
-uniform float ray_sample_randomness = 0.0;
-uniform bool do_irrad_calcs = true;
-uniform int num_lights = 0;
 
 layout (binding = 11, std430) readonly buffer LightingObjectUniforms_Buffer {
 	LightingObjectUniforms light_objects[];
@@ -71,7 +71,7 @@ vec3 RTXGISphericalFibonacci(float sampleIndex, float numSamples)
     float sinTheta = sqrt(clamp(1.f - (cosTheta * cosTheta),0.0,1.0));
 
 
-	phi += ray_sample_randomness;
+	phi += params.ray_sample_randomness;
 
     return vec3((cos(phi) * sinTheta), (sin(phi) * sinTheta), cosTheta);
 }
@@ -84,22 +84,19 @@ vec3 RTXGISphericalFibonacci(float sampleIndex, float numSamples)
 #include "pbrShared.txt"
 
 
-uniform vec4 light_sun_dir;
-uniform vec4 light_sun_color;
-
 vec3 evaluate_punctual_lights(vec3 worldspace, vec3 albedo, vec3 normal_t) {
 vec3 output_light_accum = vec3(0.0);
 
-	if(light_sun_dir.w>0) {
-		vec3 sun_dir = light_sun_dir.xyz;
+	if(params.light_sun_dir.w>0) {
+		vec3 sun_dir = params.light_sun_dir.xyz;
 		TraceOut outsun = trace_ray(worldspace, -sun_dir);
 		if(outsun.t < 0) {
-			output_light_accum += pbr_calculate_punctual(light_sun_color.rgb, -sun_dir, worldspace, albedo.xyz, 1, 0, normal_t.xyz);
+			output_light_accum += pbr_calculate_punctual(params.light_sun_color.rgb, -sun_dir, worldspace, albedo.xyz, 1, 0, normal_t.xyz);
 		}
 	}
-	
 
-	for(int light_index=0;light_index<num_lights;light_index++) {
+
+	for(int light_index=0;light_index<params.num_lights;light_index++) {
 
 	
 		vec4 _position_radius = light_objects[light_index].position_radius;
@@ -142,7 +139,7 @@ vec3 output_light_accum = vec3(0.0);
 vec3 evaluate_lighting(vec3 pos, vec3 normal, vec3 albedo)
 {
 	vec3 irrad = vec3(0.0);
-	if(do_irrad_calcs) {
+	if(params.do_irrad_calcs != 0) {
 		vec3 biased_world_position = pos+normal*0.1;
 	
 		irrad =  calculate_irradiance(normal,pos,biased_world_position) * ddgi_global.indirect_boost;
