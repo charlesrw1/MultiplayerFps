@@ -604,15 +604,13 @@ each shader in the group so the std140 layout is identical at link time.
 
 | Group | Members | Cadence | UBO storage | Struct name | Fields ≈ |
 | --- | --- | --- | --- | --- | --- |
-| **A. Bloom** (done) | `BloomDownsampleF`, `BloomUpsampleF` | N (per-mip) | `ubo.bloom_downsample_params`, `ubo.bloom_upsample_params` | `BloomDownsampleParams`, `BloomUpsampleParams` | 2, 1 |
-| **B. Compositor** | `AmbientLightingF`, `CombineF` | once each | `ubo.compositor_params` | `CompositorParams` (union) | 2 + 7 = 9 |
+| **A. Lit + compositor + bloom** | `SunLightAccumulationF`, `LightAccumulationFullScreen`, `SampleCubemapsF`, `ShadowmapSampling` (include), `AmbientLightingF`, `CombineF`, `BloomDownsampleF`, `BloomUpsampleF` | mostly once/frame; bloom iterates per-mip (re-upload in loop) | `ubo.lit_compositor_params` | `LitCompositorParams` | 3 + 3 + 1 + 7 + 2 + 7 + 2 + 1 ≈ 26 (dedupe across shaders, e.g. `specular_ao_intensity`) |
 | **C. Temporal upsample** | `TaaResolveF`, `temporal_upsample_ddgi`, `temporal_upsample_ssr` | once each | `ubo.temporal_params` | `TemporalParams` (union; shared `doc_*`/`amt`/`lastViewProj`/`*_flicker`/`use_reproject`/`dilate_velocity`; +TAA jitters; +SSR weight) | 11 ∪ 10 ∪ 11 ≈ 14 unique |
 | **D. SSR pipeline** | `ssr_f`, `blur_ssr`, `ssr_downsample`, `ssr_upsample`, `ssr_apply_upsampled`, `reflectionShared` | once each (downsample/upsample iterate per-mip — re-upload in loop) | `ubo.ssr_params` | `SsrParams` | 17 + 2 + 3 + 4 + 1 + 2 ≈ 25 |
 | **E. DDGI runtime** | `ddgiShadeF`, `bilateral_upsample_ddgi`, `ddgi_apply_upsampled`, `ddgiShadeDebugF` | once each | `ubo.ddgi_params` | `DdgiRuntimeParams` | 5 + 3 + 2 + 4 = 14 |
 | **F. Cull pipeline** | `CullCompute`, `compact_mdi`, `cpu_vis_to_mdi`, `zero_instances_mdi`, `debugCull`, `DepthPyramidC` | 1–3 cull passes (re-upload per pass); DepthPyramid iterates per-mip | `ubo.cull_params` | `CullParams` | 5 + 2 + 1 + 1 + 3 + 4 = 16 |
 | **G. Volumetric fog** | `VfogScatteringC`, `VfogRaymarchC` | once each | `ubo.volfog_pass_params` (separate from existing `buf.fog_uniforms` at binding 4) | `VolfogPassParams` | 4 + n |
 | **H. SSAO blur** | `BilateralBlurF`, `hbao/linearizedepth` | once each | `ubo.ssao_blur_params` | `SsaoBlurParams` | 3 + 1 = 4 |
-| **I. Sun + cubemap lighting** | `SunLightAccumulationF`, `LightAccumulationFullScreen`, `SampleCubemapsF`, `ShadowmapSampling` (helper include) | once each | `ubo.sun_lighting_params` | `SunLightingParams` | 3 + 3 + 1 + 7 ≈ 12 |
 | **J. Probe / GI baking** | `compute_irrad_pos_C`, `get_best_cubemap_C`, `probeLumCalc_C`, `avgProbeCalc_C`, `trace_C`, `gather_C`, `PerlinGenF` | once each (editor / bake time) | `ubo.bake_params` | `BakeParams` | 4 + 4 + 1 + n + 5 + 1 + 6 ≈ 22 |
 | **K. Raytrace debug** | `Raytracing/RaytracedShadows`, `Raytracing/RaytracedReflections`, `Raytracing/RaytraceSphere` | once each (debug / one-off) | `ubo.rt_debug_params` | `RtDebugParams` | 4 + 4 + 8 = 16 |
 | **PER-DRAW** (own UBO each) | `MbSimpleV/F`, `MbTexturedV/F`, `MeshSimpleV`, `SimpleMeshV`, `MeshDebugProbeF`, `fullscreen_quad_textureF`, `Helpers/EqrtCubemap*`, `Helpers/PrefilterSpecular*`, `LightAccumulationV/F`, all `MASTER/*` material shaders | per-draw / per-instance / per-light | `ubo.<shader>_params` each (or push-const later) | `<Shader>Params` | varies |
@@ -631,11 +629,23 @@ Notes:
   (the struct name; std140 block-name identity is required for sharing
   across stages in OpenGL).
 
-**Sweep order:** B → H → C → E → F → D → G → I → J → K. Compositor (B)
-first because it's small (9 fields, 2 shaders) and exercises the include
-pattern. Temporal (C) and DDGI (E) are next because they share lots of
-common fields. SSR (D) and Bake (J) are the largest and saved for after
-the pattern is bedded in.
+**Sweep order:** H → C → E → F → A → D → G → J → K. SSAO blur (H) first
+because it's the smallest pure-once-per-frame case (4 fields) and exercises
+the shared-include pattern without iteration. A (lit+compositor+bloom) is
+big and refolds the bloom pilot — sequenced after the pattern is bedded
+in. SSR (D) and Bake (J) are the largest and saved for last.
+
+**Bloom pilot refold.** Group A absorbs the two separate
+`bloom_*_params` UBOs from the pilot. When A lands, the bloom-iter
+upload pattern stays the same — only the struct and slot move into the
+group's union. The shader-side block name changes from
+`BloomDownsampleParams` / `BloomUpsampleParams` to the group's shared
+`LitCompositorParams`; bloom-only fields (`srcResolution`, `mipLevel`,
+`filterRadius`) live alongside the lit-accumulation + composite fields
+in that union. Inside the bloom mip loop, each iteration re-uploads the
+whole struct with updated bloom fields (the non-bloom fields are
+preserved CPU-side in a shadow `LitCompositorParams` instance held by
+`Renderer`).
 
 ### 2c — Pipeline-state consolidation — done
 
