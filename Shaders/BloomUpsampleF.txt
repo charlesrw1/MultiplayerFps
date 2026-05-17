@@ -10,7 +10,9 @@
 // Remember to use edge clamping for this texture!
 layout(binding = 0) uniform sampler2D srcTexture;
 
-layout(binding = 7, std140) uniform BloomUpsampleParams {
+layout(binding = 7, std140) uniform BloomParams {
+    vec2  srcResolution;  // unused in upsample
+    int   mipLevel;       // unused in upsample
     float filterRadius;
 };
 

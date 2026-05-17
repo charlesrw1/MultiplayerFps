@@ -3,9 +3,10 @@
 
 layout(binding = 0) uniform sampler2D srcTexture;
 
-layout(binding = 7, std140) uniform BloomDownsampleParams {
-    vec2 srcResolution;
-    int  mipLevel;
+layout(binding = 7, std140) uniform BloomParams {
+    vec2  srcResolution;
+    int   mipLevel;
+    float filterRadius;  // unused in downsample
 };
 
 in vec2 texCoord;

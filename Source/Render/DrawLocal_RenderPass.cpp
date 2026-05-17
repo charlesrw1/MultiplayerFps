@@ -26,22 +26,17 @@
 #include <algorithm>
 
 namespace {
-// std140 layout matches `BloomDownsampleParams` UBO in Shaders/BloomDownsampleF.txt
-// at binding 7. vec2 (8) + int (4) = 12, padded to 16 by std140 block-size rules.
-struct BloomDownsampleParams {
-	glm::vec2 srcResolution;
-	int32_t   mipLevel;
-	int32_t   _pad0;
+// std140 layout matches `BloomParams` UBO at binding 7. Shared by both the
+// downsample and upsample shaders (Shaders/BloomDownsampleF.txt and
+// BloomUpsampleF.txt) — each shader reads only its own subset of fields,
+// the rest are uninitialized/unused per pass. vec2 (8) + int (4) + float (4)
+// = 16 bytes; fits in one std140 block.
+struct BloomParams {
+	glm::vec2 srcResolution;  // downsample
+	int32_t   mipLevel;       // downsample
+	float     filterRadius;   // upsample
 };
-static_assert(sizeof(BloomDownsampleParams) == 16, "std140");
-
-// std140 layout matches `BloomUpsampleParams` UBO in Shaders/BloomUpsampleF.txt
-// at binding 7. Single float at offset 0; block size rounded to 16.
-struct BloomUpsampleParams {
-	float   filterRadius;
-	float   _pad0[3];
-};
-static_assert(sizeof(BloomUpsampleParams) == 16, "std140");
+static_assert(sizeof(BloomParams) == 16, "std140");
 
 constexpr int BLOOM_PARAMS_UBO_BINDING = 7;
 }
@@ -86,11 +81,11 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 			};
 			setup_pass();
 
-			BloomDownsampleParams params{};
+			BloomParams params{};
 			params.srcResolution = glm::vec2(src_x, src_y);
 			params.mipLevel = i;
-			ubo.bloom_downsample_params->upload(&params, sizeof(params));
-			gfx().bind_uniform_buffer_base(BLOOM_PARAMS_UBO_BINDING, ubo.bloom_downsample_params);
+			ubo.bloom_params->upload(&params, sizeof(params));
+			gfx().bind_uniform_buffer_base(BLOOM_PARAMS_UBO_BINDING, ubo.bloom_params);
 			src_x = bc.fsize.x;
 			src_y = bc.fsize.y;
 
@@ -129,10 +124,10 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 			// glBindTextureUnit(0, bc.texture->get_internal_handle());
 			gfx().bind_texture(0, bc.texture);
 
-			BloomUpsampleParams params{};
+			BloomParams params{};
 			params.filterRadius = 0.0001f;
-			ubo.bloom_upsample_params->upload(&params, sizeof(params));
-			gfx().bind_uniform_buffer_base(BLOOM_PARAMS_UBO_BINDING, ubo.bloom_upsample_params);
+			ubo.bloom_params->upload(&params, sizeof(params));
+			gfx().bind_uniform_buffer_base(BLOOM_PARAMS_UBO_BINDING, ubo.bloom_params);
 
 			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 		}

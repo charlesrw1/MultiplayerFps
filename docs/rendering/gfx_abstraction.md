@@ -605,7 +605,7 @@ each shader in the group so the std140 layout is identical at link time.
 | Group | Members | Cadence | UBO storage | Struct name | Fields ≈ |
 | --- | --- | --- | --- | --- | --- |
 | **A. Lit + compositor** | `SunLightAccumulationF`, `LightAccumulationFullScreen`, `SampleCubemapsF`, `ShadowmapSampling` (include), `AmbientLightingF`, `CombineF` | once each | `ubo.lit_compositor_params` | `LitCompositorParams` | 3 + 3 + 1 + 7 + 2 + 7 ≈ 23 (dedupe, e.g. `specular_ao_intensity`) |
-| **B. Bloom** (pilot landed) | `BloomDownsampleF`, `BloomUpsampleF` | N (per-mip; separate UBOs because each shader iterates with its own params) | `ubo.bloom_downsample_params`, `ubo.bloom_upsample_params` | `BloomDownsampleParams`, `BloomUpsampleParams` | 2, 1 |
+| **B. Bloom** (done) | `BloomDownsampleF`, `BloomUpsampleF` | N (per-mip) | `ubo.bloom_params` (single 16-byte buffer; each shader reads only its subset) | `BloomParams` | 4 (2 + 1 + 1, fits one std140 block) |
 | **C. Temporal upsample** | `TaaResolveF`, `temporal_upsample_ddgi`, `temporal_upsample_ssr` | once each | `ubo.temporal_params` | `TemporalParams` (union; shared `doc_*`/`amt`/`lastViewProj`/`*_flicker`/`use_reproject`/`dilate_velocity`; +TAA jitters; +SSR weight) | 11 ∪ 10 ∪ 11 ≈ 14 unique |
 | **D. SSR pipeline** | `ssr_f`, `blur_ssr`, `ssr_downsample`, `ssr_upsample`, `ssr_apply_upsampled`, `reflectionShared` | once each (downsample/upsample iterate per-mip — re-upload in loop) | `ubo.ssr_params` | `SsrParams` | 17 + 2 + 3 + 4 + 1 + 2 ≈ 25 |
 | **E. DDGI runtime** | `ddgiShadeF`, `bilateral_upsample_ddgi`, `ddgi_apply_upsampled`, `ddgiShadeDebugF` | once each | `ubo.ddgi_params` | `DdgiRuntimeParams` | 5 + 3 + 2 + 4 = 14 |
