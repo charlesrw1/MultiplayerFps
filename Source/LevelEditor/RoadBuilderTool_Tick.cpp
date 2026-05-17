@@ -6,7 +6,7 @@
 #include "UI/GUISystemPublic.h"
 #include "GameEnginePublic.h"
 #include "Level.h"
-#include <SDL2/SDL_scancode.h>
+#include <SDL3/SDL_scancode.h>
 
 // ---- tick (main update) -----------------------------------------------------
 

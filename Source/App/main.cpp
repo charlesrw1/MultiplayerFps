@@ -1,4 +1,6 @@
-#include <SDL2/SDL.h>
+#define SDL_MAIN_HANDLED
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 
 #include "EngineMain.h"
 #include "Framework/Util.h"

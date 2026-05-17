@@ -135,8 +135,9 @@ void EditorDoc::imgui_draw() {
 	drag_drop_preview->tick();
 
 	if (draw_coords_under_mouse.get_bool() && UiSystem::inst->is_vp_hovered()) {
-		int x, y;
-		SDL_GetMouseState(&x, &y);
+		float mxf = 0.f, myf = 0.f;
+		SDL_GetMouseState(&mxf, &myf);
+		int x = (int)mxf, y = (int)myf;
 
 		auto size = UiSystem::inst->get_vp_rect().get_pos();
 
@@ -292,8 +293,9 @@ void EditorDoc::hook_scene_viewport_draw() {
 				ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly)) {
 			glm::mat4 drop_transform = glm::mat4(1.f);
 
-			int x, y;
-			SDL_GetMouseState(&x, &y);
+			float mxf = 0.f, myf = 0.f;
+			SDL_GetMouseState(&mxf, &myf);
+			int x = (int)mxf, y = (int)myf;
 			auto size = UiSystem::inst->get_vp_rect().get_pos();
 			const float scene_depth = idraw->get_scene_depth_for_editor(x - size.x, y - size.y);
 

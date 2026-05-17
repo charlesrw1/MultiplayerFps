@@ -148,7 +148,10 @@ void TopDownPlayer::update() {
 		} else {
 			{
 				glm::ivec2 mouse;
-				SDL_GetMouseState(&mouse.x, &mouse.y);
+				float mxf = 0.f, myf = 0.f;
+				SDL_GetMouseState(&mxf, &myf);
+				mouse.x = (int)mxf;
+				mouse.y = (int)myf;
 
 				Ray r;
 				r.dir =

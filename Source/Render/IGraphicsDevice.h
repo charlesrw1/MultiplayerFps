@@ -641,7 +641,7 @@ public:
 	virtual void set_vsync(bool enable) = 0;
 
 	// ImGui platform/renderer lifecycle. The backend owns the platform
-	// (SDL2) + renderer (OpenGL3) backends; callers do not include the
+	// (SDL3) + renderer (OpenGL3) backends; callers do not include the
 	// imgui_impl_* headers. `imgui_render_draw_data` binds the default
 	// framebuffer internally before issuing the draw.
 	virtual void imgui_init() = 0;

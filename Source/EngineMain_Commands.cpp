@@ -1,5 +1,5 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "glad/glad.h"
 #include <cstdio>
 #include <vector>
@@ -33,7 +33,7 @@
 #include "Sound/SoundPublic.h"
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
-#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdl3.h"
 #include "Framework/EditorTheme.h"
 #include "UI/UILoader.h"
 #include "UI/Widgets/Layouts.h"

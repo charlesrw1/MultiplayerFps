@@ -140,7 +140,7 @@
     <ClCompile Include="imgui_demo.cpp" />
     <ClCompile Include="imgui_draw.cpp" />
     <ClCompile Include="imgui_impl_opengl3.cpp" />
-    <ClCompile Include="imgui_impl_sdl2.cpp" />
+    <ClCompile Include="imgui_impl_sdl3.cpp" />
     <ClCompile Include="imgui_tables.cpp" />
     <ClCompile Include="imgui_widgets.cpp" />
     <ClCompile Include="ImGuizmo.cpp" />
@@ -155,7 +155,7 @@
     <ClInclude Include="imgui.h" />
     <ClInclude Include="imgui_impl_opengl3.h" />
     <ClInclude Include="imgui_impl_opengl3_loader.h" />
-    <ClInclude Include="imgui_impl_sdl2.h" />
+    <ClInclude Include="imgui_impl_sdl3.h" />
     <ClInclude Include="imgui_internal.h" />
     <ClInclude Include="ImGuizmo.h" />
     <ClInclude Include="ImSequencer.h" />

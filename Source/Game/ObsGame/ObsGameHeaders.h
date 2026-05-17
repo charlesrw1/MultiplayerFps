@@ -25,7 +25,7 @@
 #include "Game/Components/CameraComponent.h"
 #include "Game/Components/PhysicsComponents.h"
 #include "Game/Entities/CharacterController.h"
-#include <SDL2/SDL_gamecontroller.h>
+#include "Input/Sdl2CompatGamepad.h"
 
 class ObsPlayer;
 class ObsHand;

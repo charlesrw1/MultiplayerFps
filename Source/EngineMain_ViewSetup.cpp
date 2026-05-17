@@ -1,5 +1,5 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "glad/glad.h"
 #include "GameEngineLocal.h"
 #include "glm/ext/matrix_transform.hpp"

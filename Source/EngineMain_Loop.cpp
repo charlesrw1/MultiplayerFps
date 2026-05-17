@@ -1,5 +1,5 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <cstdio>
 #include <vector>
 #include <string>
@@ -196,35 +196,35 @@ void GameEngineLocal::loop() {
 			UiSystem::inst->handle_event(event);
 
 			switch (event.type) {
-			case SDL_QUIT:
+			case SDL_EVENT_QUIT:
 				::Quit();
 				break;
-			case SDL_WINDOWEVENT:
-				if (event.window.event == SDL_WINDOWEVENT_RESIZED) {
-					int x, y;
-					SDL_GetWindowSize(window, &x, &y);
-					if (x % 2 == 1)
-						x -= 1;
-					if (y % 2 == 1)
-						y -= 1;
-					bool changed = false;
-					if (x != g_window_w.get_integer()) {
-						changed = true;
-						g_window_w.set_integer(x);
-					}
-					if (y != g_window_h.get_integer()) {
-						changed = true;
-						g_window_h.set_integer(y);
-					}
-					if (changed)
-						SDL_SetWindowSize(window, x, y);
+			case SDL_EVENT_WINDOW_RESIZED:
+			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
+				int x, y;
+				SDL_GetWindowSize(window, &x, &y);
+				if (x % 2 == 1)
+					x -= 1;
+				if (y % 2 == 1)
+					y -= 1;
+				bool changed = false;
+				if (x != g_window_w.get_integer()) {
+					changed = true;
+					g_window_w.set_integer(x);
 				}
+				if (y != g_window_h.get_integer()) {
+					changed = true;
+					g_window_h.set_integer(y);
+				}
+				if (changed)
+					SDL_SetWindowSize(window, x, y);
 				break;
-			case SDL_KEYUP:
-			case SDL_KEYDOWN:
-			case SDL_MOUSEBUTTONDOWN:
-			case SDL_MOUSEBUTTONUP:
-			case SDL_MOUSEWHEEL:
+			}
+			case SDL_EVENT_KEY_UP:
+			case SDL_EVENT_KEY_DOWN:
+			case SDL_EVENT_MOUSE_BUTTON_DOWN:
+			case SDL_EVENT_MOUSE_BUTTON_UP:
+			case SDL_EVENT_MOUSE_WHEEL:
 				key_event(event);
 				break;
 			default:

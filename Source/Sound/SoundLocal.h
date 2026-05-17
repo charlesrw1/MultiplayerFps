@@ -1,7 +1,8 @@
 #pragma once
 
 #include "SoundPublic.h"
-#include <SDL2/SDL_mixer.h>
+#include <SDL3_mixer/SDL_mixer.h>
+#include <SDL3/SDL.h>
 #include "Framework/Util.h"
 #include "Assets/IAsset.h"
 #include <glm/glm.hpp>
@@ -13,166 +14,47 @@
 #include "Framework/Hashset.h"
 #include "Framework/Files.h"
 
-// reworked https://gist.github.com/hydren/f60d107f144fcb41dd6f898b126e17b2
-
-static inline Uint16 formatSampleSize(Uint16 format) {
-	return (format & 0xFF) / 8;
-}
-
-const int audioChannelCount = 2;
-const double audioFrequency = MIX_DEFAULT_FREQUENCY;
-const int audioFormat = MIX_DEFAULT_FORMAT;
-
-// Get chunk time length (in ms) given its size and current audio format
-static int computeChunkLengthMillisec(int chunkSize) {
-	const Uint32 points = chunkSize / formatSampleSize(audioFormat); // bytes / samplesize == sample points
-	const Uint32 frames = (points / audioChannelCount);				 // sample points / channels == sample frames
-	return ((frames * 1000) / audioFrequency); // (sample frames * 1000) / frequency == play length, in ms
-}
-
-template <typename AudioFormatType> struct PlaybackSpeedEffectHandler
-{
-	const AudioFormatType* chunkData = nullptr; // pointer to the chunk sample data (as array)
-	float speedFactor = 1.f;					// the playback speed factor
-	float position = 0.f;						// current position of the sound, in ms
-	int duration = 0;							// the duration of the sound, in ms
-	int chunkSize = 0;	  // the size of the sound, as a number of indexes (or sample points). thinks of this as a array
-						  // size when using the proper array type (instead of just Uint8*).
-	bool loop = false;	  // flags whether playback should stay looping
-	bool altered = false; // true if this playback has been pitched by this handler
-
-	void init(const Mix_Chunk& chunk, bool loop) {
-		chunkData = reinterpret_cast<AudioFormatType*>(chunk.abuf);
-		position = 0.f;
-		speedFactor = 1.f;
-		chunkSize = chunk.alen / formatSampleSize(audioFormat);
-		duration = computeChunkLengthMillisec(chunk.alen);
-		this->loop = loop;
-		this->altered = false;
-	}
-
-	// processing function to be able to change chunk speed/pitch.
-	void modifyStreamPlaybackSpeed(int mixChannel, void* stream, int length) {
-		AudioFormatType* buffer = static_cast<AudioFormatType*>(stream);
-		const int bufferSize = length / sizeof(AudioFormatType); // buffer size (as array)
-
-		// if there is still sound to be played
-		if (position < duration || loop) {
-			const float delta = 1000.0 / audioFrequency, // normal duration of each sample
-				vdelta = delta * speedFactor;			 // virtual stretched duration, scaled by 'speedFactor'
-
-			// if playback is unaltered and pitch is required (for the first time)
-			if (!altered && speedFactor != 1.0f)
-				altered = true; // flags playback modification and proceed to the pitch routine.
-			ASSERT(speedFactor >= 0.0);
-			if (speedFactor < 0.0)
-				speedFactor = 1.0;
-
-			if (altered) // if unaltered, this pitch routine is skipped
-			{
-				for (int i = 0; i < bufferSize; i += audioChannelCount) {
-					const int j = i / audioChannelCount; // j goes from 0 to size/channelCount, incremented 1 by 1
-					const float x =
-						position + j * vdelta; // get "virtual" index. its corresponding value will be interpolated.
-					const int k = floor(x / delta); // get left index to interpolate from original chunk data (right
-													// index will be this plus 1)
-					const float prop =
-						(x / delta) - k; // get the proportion of the right value (left will be 1.0 minus this)
-
-					// usually just 2 channels: 0 (left) and 1 (right), but who knows...
-					for (int c = 0; c < audioChannelCount; c++) {
-						// check if k will be within bounds
-						if (k * audioChannelCount + audioChannelCount - 1 < chunkSize || loop) {
-							AudioFormatType v0 = chunkData[(k * audioChannelCount + c) % chunkSize],
-											// v_ = chunkData[((k-1) * channelCount + c) % chunkSize],
-											// v2 = chunkData[((k+2) * channelCount + c) % chunkSize],
-								v1 = chunkData[((k + 1) * audioChannelCount + c) % chunkSize];
-
-							// put interpolated value on 'data'
-							// buffer[i + c] = (1 - prop) * v0 + prop * v1;  // linear interpolation
-							buffer[i + c] = v0 + prop * (v1 - v0); // linear interpolation (single multiplication)
-							// buffer[i + c] = v0 + 0.5f * prop * ((prop - 3) * v0 - (prop - 2) * 2 * v1 + (prop - 1) *
-							// v2);  // quadratic interpolation buffer[i + c] = v0 + (prop / 6) * ((3 * prop - prop2 -
-							// 2) * v_ + (prop2 - 2 * prop - 1) * 3 * v0 + (prop - prop2 + 2) * 3 * v1 + (prop2 - 1) *
-							// v2);  // cubic interpolation buffer[i + c] = v0 + 0.5f * prop * ((2 * prop2 - 3 * prop -
-							// 1) * (v0 - v1) + (prop2 - 2 * prop + 1) * (v0 - v_) + (prop2 - prop) * (v2 - v2));  //
-							// cubic spline interpolation
-						} else // if k will be out of bounds (chunk bounds), it means we already finished; thus, we'll
-							   // pass silence
-						{
-							buffer[i + c] = 0;
-						}
-					}
-				}
-			}
-
-			// update position
-			position += (bufferSize / audioChannelCount) * vdelta;
-
-			// reset position if looping
-			if (loop)
-				while (position > duration)
-					position -= duration;
-		} else // if we already played the whole sound but finished earlier than expected by SDL_mixer (due to faster
-			   // playback speed)
-		{
-			// set silence on the buffer since Mix_HaltChannel() poops out some of it for a few ms.
-			for (int i = 0; i < bufferSize; i++)
-				buffer[i] = 0;
-		}
-	}
-
-	// Mix_EffectFunc_t callback that redirects to handler method (handler passed via userData)
-	static void mixEffectFuncCallback(int channel, void* stream, int length, void* userData) {
-		static_cast<PlaybackSpeedEffectHandler*>(userData)->modifyStreamPlaybackSpeed(channel, stream, length);
-	}
-	static void mixEffectDoneCallback(int, void* userData) {}
-};
-
-template <typename AudioFormatType> struct LowPassFilter
+// Low-pass IIR filter applied to float32 samples via MIX_SetTrackCookedCallback.
+// SDL3_mixer cooks all tracks down to float32 before this fires, so we don't
+// need an int16 template specialisation any more.
+struct LowPassFilter
 {
 	float alpha = 0.f;
-	float last_sample[2];
+	float last_sample[2] = {0.f, 0.f};
 	bool seen_first_sample = false;
 	void init(float alpha) {
 		seen_first_sample = false;
 		this->alpha = alpha;
 	}
 
-	void do_effect(int channel, void* stream, int length) {
-		AudioFormatType* buffer = static_cast<AudioFormatType*>(stream);
-		const int bufferSize = length / sizeof(AudioFormatType); // buffer size (as array)
-		if (bufferSize < 2)
+	void do_effect(float* buffer, int samples, int channels) {
+		if (samples < 2 || channels < 1)
 			return;
-		this->alpha = 0.0;
-		if (this->alpha <= 0.000001)
+		if (alpha <= 0.000001f)
 			return;
-
-		const int audioChannelCount = 2;
+		const int ch = (channels > 2) ? 2 : channels;
 		if (!seen_first_sample) {
-			last_sample[0] = buffer[0];
-			last_sample[1] = buffer[1];
+			for (int c = 0; c < ch; c++)
+				last_sample[c] = buffer[c];
 			seen_first_sample = true;
 		}
-		for (int i = 0; i < bufferSize; i += audioChannelCount) {
-			for (int c = 0; c < audioChannelCount; c++) {
-				{
-					buffer[i + c] = buffer[i + c] * (1 - alpha) + last_sample[c] * (alpha);
-					last_sample[c] = buffer[i + c];
-				}
+		for (int i = 0; i < samples; i += channels) {
+			for (int c = 0; c < ch; c++) {
+				buffer[i + c] = buffer[i + c] * (1.f - alpha) + last_sample[c] * alpha;
+				last_sample[c] = buffer[i + c];
 			}
 		}
 	}
 
-	static void mixEffectFuncCallback(int channel, void* stream, int length, void* userData) {
-		((LowPassFilter*)userData)->do_effect(channel, stream, length);
+	static void SDLCALL mixCallback(void* userData, MIX_Track* /*track*/, const SDL_AudioSpec* spec, float* pcm, int samples) {
+		((LowPassFilter*)userData)->do_effect(pcm, samples, spec ? spec->channels : 2);
 	}
 };
 
 struct SoundPlayerInternal : public SoundPlayer
 {
-	bool is_oneshot = false; // else owned by someone
-	int voice_index = -1;
+	bool is_oneshot = false;	// else owned by someone
+	int voice_index = -1;		// slot in SoundSystemLocal::active_voices, -1 if not playing
 	float time_elapsed = 0.0;
 	float computedAttenuation = 0.0;
 	bool should_play = false;
@@ -180,14 +62,6 @@ struct SoundPlayerInternal : public SoundPlayer
 	bool does_have_active_slot() const { return voice_index != -1; }
 	bool wants_to_start_playing() const { return voice_index == -1 && should_play; }
 };
-
-void SoundPlayer::update() {
-	SoundPlayerInternal* self = (SoundPlayerInternal*)this;
-}
-void SoundPlayer::set_play(bool b) {
-	SoundPlayerInternal* self = (SoundPlayerInternal*)this;
-	self->should_play = b;
-}
 
 inline float get_attenuation_factor(SndAtn sa, float minRadius, float maxRadius, float dist) {
 	if (dist <= minRadius)
@@ -215,16 +89,35 @@ public:
 	SoundSystemLocal() : all_sound_players(5) {}
 
 	void init() override {
-		// Initialize SDL_mixer
-		if (Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 2048) < 0) {
-			Fatalf("SDL_mixer could not initialize! SDL_mixer Error: %s\n", Mix_GetError());
+		if (!MIX_Init()) {
+			Fatalf("MIX_Init failed: %s\n", SDL_GetError());
 		}
-		Mix_AllocateChannels(snd_max_voices.get_integer());
-		active_voices.resize(snd_max_voices.get_integer());
-		pitch_modifiers.resize(snd_max_voices.get_integer());
-		low_pass_mods.resize(snd_max_voices.get_integer());
+		mixer = MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
+		if (!mixer) {
+			Fatalf("MIX_CreateMixerDevice failed: %s\n", SDL_GetError());
+		}
+		const int num_voices = snd_max_voices.get_integer();
+		active_voices.resize(num_voices, nullptr);
+		tracks.resize(num_voices, nullptr);
+		low_pass_mods.resize(num_voices);
+		for (int i = 0; i < num_voices; i++) {
+			tracks[i] = MIX_CreateTrack(mixer);
+			if (!tracks[i]) {
+				Fatalf("MIX_CreateTrack failed: %s\n", SDL_GetError());
+			}
+			MIX_SetTrackCookedCallback(tracks[i], LowPassFilter::mixCallback, &low_pass_mods[i]);
+		}
 	}
-	void cleanup() override { Mix_CloseAudio(); }
+	void cleanup() override {
+		for (auto* t : tracks)
+			if (t) MIX_DestroyTrack(t);
+		tracks.clear();
+		if (mixer) {
+			MIX_DestroyMixer(mixer);
+			mixer = nullptr;
+		}
+		MIX_Quit();
+	}
 
 	void begin_sound_object_play(SoundPlayerInternal* spi) {
 		assert(spi->voice_index == -1);
@@ -232,45 +125,37 @@ public:
 		assert(spi->asset->internal_data);
 		// find first free
 		int index = 0;
-		for (; index < active_voices.size(); index++)
+		for (; index < (int)active_voices.size(); index++)
 			if (!active_voices[index])
 				break;
-		if (index == active_voices.size())
+		if (index == (int)active_voices.size())
 			return;
 		spi->voice_index = index;
 		active_voices[index] = spi;
 		spi->time_elapsed = 0.f;
-		using PitchMod = PlaybackSpeedEffectHandler<int16_t>;
-		using LowPass = LowPassFilter<int16_t>;
 
-		Mix_PlayChannel(index, spi->asset->internal_data, (spi->looping) ? -1 : 0);
+		MIX_Track* track = tracks[index];
+		MIX_SetTrackAudio(track, spi->asset->internal_data);
+		MIX_SetTrackLoops(track, spi->looping ? -1 : 0);
+		MIX_SetTrackFrequencyRatio(track, glm::max(spi->pitch_multiply, 0.001f));
+		low_pass_mods[index].init(spi->lowpass_filter);
+		MIX_PlayTrack(track, 0);
 		sys_print(Debug, "playchannel");
-		pitch_modifiers.at(index).init(*spi->asset->internal_data, spi->looping);
-		pitch_modifiers.at(index).speedFactor = spi->pitch_multiply;
-		low_pass_mods.at(index).init(spi->lowpass_filter);
-		Mix_RegisterEffect(index, PitchMod::mixEffectFuncCallback, PitchMod::mixEffectDoneCallback,
-						   &pitch_modifiers.at(index));
-		Mix_RegisterEffect(index, LowPass::mixEffectFuncCallback, nullptr, &low_pass_mods.at(index));
 	}
 
 	void end_sound_object_play(SoundPlayerInternal* spi) {
 		if (spi->voice_index != -1) {
-			using PitchMod = PlaybackSpeedEffectHandler<int16_t>;
-			using LowPass = LowPassFilter<int16_t>;
-
+			MIX_Track* track = tracks[spi->voice_index];
 			// Apply immediate mute for one-shot sounds to prevent clicks on early stop
 			if (spi->is_oneshot && spi->asset) {
 				float duration = spi->asset->get_duration();
-				// If we haven't reached the natural fade-out point yet, mute before halting
 				float fade_out_start = glm::max(0.f, duration - spi->fade_out_time);
 				if (spi->time_elapsed < fade_out_start) {
-					Mix_Volume(spi->voice_index, 0);
+					MIX_SetTrackGain(track, 0.f);
 				}
 			}
-
-			Mix_UnregisterEffect(spi->voice_index, PitchMod::mixEffectFuncCallback);
-			Mix_UnregisterEffect(spi->voice_index, LowPass::mixEffectFuncCallback);
-			Mix_HaltChannel(spi->voice_index);
+			MIX_StopTrack(track, 0);
+			MIX_SetTrackAudio(track, nullptr);
 			active_voices.at(spi->voice_index) = nullptr;
 			spi->voice_index = -1;
 		}
@@ -287,7 +172,7 @@ public:
 	void tick(float dt) override {
 
 		// tick current sounds and end any bad ones
-		for (int i = 0; i < active_voices.size(); i++) {
+		for (int i = 0; i < (int)active_voices.size(); i++) {
 			auto spi = active_voices[i];
 			if (!spi)
 				continue;
@@ -311,13 +196,8 @@ public:
 			}
 		}
 
-		// get sound objects that want to play
-		// sort them by distance
-		// take n closest sounds and halt anything else
-
 		std::vector<SoundPlayerInternal*> sorted_list;
 
-		// to get around deleting in the unorderedmap, im lazy
 		{
 			static std::vector<SoundPlayerInternal*> objs;
 			objs.clear();
@@ -342,17 +222,15 @@ public:
 					continue;
 				}
 
-				// add the handle to the sort list
 				sorted_list.push_back(&spi);
 			}
 		}
-		// sort them
 		std::sort(sorted_list.begin(), sorted_list.end(), [&](SoundPlayerInternal* a, SoundPlayerInternal* b) -> bool {
 			return a->computedAttenuation < b->computedAttenuation;
 		});
 
 		// end any playing clips outside of MAX_VOICES
-		for (int i = active_voices.size(); i < sorted_list.size(); i++) {
+		for (int i = (int)active_voices.size(); i < (int)sorted_list.size(); i++) {
 			auto spi = sorted_list[i];
 			if (spi->voice_index != -1) {
 				end_sound_object_play(spi);
@@ -360,7 +238,7 @@ public:
 		}
 
 		// start any sounds that want to play but arent playing
-		for (int i = 0; i < sorted_list.size() && i < active_voices.size(); i++) {
+		for (int i = 0; i < (int)sorted_list.size() && i < (int)active_voices.size(); i++) {
 			auto& spi = *sorted_list[i];
 
 			ASSERT(spi.asset);
@@ -371,39 +249,36 @@ public:
 			if (spi.voice_index == -1)
 				begin_sound_object_play(&spi);
 
-			{
-				if (spi.pitch_multiply < 0.0) {
-					sys_print(Warning, "negative pitch values not allowed\n");
-					spi.pitch_multiply = 1.0;
-				}
-				SDL_LockAudio();
-				pitch_modifiers.at(spi.voice_index).speedFactor = spi.pitch_multiply;
-				low_pass_mods.at(spi.voice_index).alpha = spi.lowpass_filter;
-				SDL_UnlockAudio();
+			MIX_Track* track = tracks[spi.voice_index];
 
-				// Compute envelope multiplier for one-shot sounds (fade in/out)
-				float envelope_mult = 1.0f;
-				if (spi.is_oneshot && spi.asset) {
-					float duration = spi.asset->get_duration();
-					float elapsed = spi.time_elapsed;
-
-					// Fade in
-					if (elapsed < spi.fade_in_time && spi.fade_in_time > 0.0f) {
-						envelope_mult *= elapsed / spi.fade_in_time;
-					}
-
-					// Fade out (starts at: duration - fade_out_time)
-					float fade_out_start = glm::max(0.f, duration - spi.fade_out_time);
-					if (elapsed > fade_out_start && spi.fade_out_time > 0.0f) {
-						float fade_out_progress = (elapsed - fade_out_start) / spi.fade_out_time;
-						envelope_mult *= (1.0f - glm::clamp(fade_out_progress, 0.f, 1.f));
-					}
-				}
-
-				// Apply volume multiplier (SDL_mixer uses 0-128 scale)
-				int volume_level = int(glm::clamp(spi.volume_multiply * spi.computedAttenuation * envelope_mult, 0.f, 1.f) * 128.f);
-				Mix_Volume(spi.voice_index, volume_level);
+			if (spi.pitch_multiply < 0.0) {
+				sys_print(Warning, "negative pitch values not allowed\n");
+				spi.pitch_multiply = 1.0;
 			}
+			MIX_LockMixer(mixer);
+			MIX_SetTrackFrequencyRatio(track, glm::max(spi.pitch_multiply, 0.001f));
+			low_pass_mods[spi.voice_index].alpha = spi.lowpass_filter;
+			MIX_UnlockMixer(mixer);
+
+			// Envelope multiplier for one-shot sounds (fade in/out)
+			float envelope_mult = 1.0f;
+			if (spi.is_oneshot && spi.asset) {
+				float duration = spi.asset->get_duration();
+				float elapsed = spi.time_elapsed;
+
+				if (elapsed < spi.fade_in_time && spi.fade_in_time > 0.0f) {
+					envelope_mult *= elapsed / spi.fade_in_time;
+				}
+
+				float fade_out_start = glm::max(0.f, duration - spi.fade_out_time);
+				if (elapsed > fade_out_start && spi.fade_out_time > 0.0f) {
+					float fade_out_progress = (elapsed - fade_out_start) / spi.fade_out_time;
+					envelope_mult *= (1.0f - glm::clamp(fade_out_progress, 0.f, 1.f));
+				}
+			}
+
+			const float gain = glm::clamp(spi.volume_multiply * spi.computedAttenuation * envelope_mult, 0.f, 1.f);
+			MIX_SetTrackGain(track, gain);
 
 			if (spi.spatialize) {
 				glm::vec3 v = glm::normalize(spi.spatial_pos - listener_position);
@@ -412,11 +287,12 @@ public:
 				r *= 1.0 / 1.2;
 				l *= 1.0 / 1.2;
 
-				Mix_SetPanning(spi.voice_index, int(spi.computedAttenuation * 255.f * r),
-							   int(spi.computedAttenuation * 255.f * l));
-			} else
-				Mix_SetPanning(spi.voice_index, int(spi.computedAttenuation * 255.f),
-							   int(spi.computedAttenuation * 255.f));
+				MIX_StereoGains g{ float(spi.computedAttenuation * r), float(spi.computedAttenuation * l) };
+				MIX_SetTrackStereo(track, &g);
+			} else {
+				MIX_StereoGains g{ float(spi.computedAttenuation), float(spi.computedAttenuation) };
+				MIX_SetTrackStereo(track, &g);
+			}
 		}
 	}
 
@@ -444,7 +320,6 @@ public:
 		spi->should_play = true;
 		spi->is_oneshot = true;
 	}
-	// retained functions
 	virtual SoundPlayer* register_sound_player() final {
 		SoundPlayerInternal* spi = new SoundPlayerInternal;
 		all_sound_players.insert(spi);
@@ -461,10 +336,11 @@ public:
 	virtual void play_sound_player(handle<SoundPlayer> player) {}
 	virtual void stop_sound_player(handle<SoundPlayer> player) {}
 
+	MIX_Mixer* mixer = nullptr;
 	glm::vec3 listener_position{};
 	glm::vec3 listener_right{};
 	std::vector<SoundPlayerInternal*> active_voices;
+	std::vector<MIX_Track*> tracks;
 	std::unordered_set<SoundPlayerInternal*> all_sound_players;
-	std::vector<PlaybackSpeedEffectHandler<int16_t>> pitch_modifiers;
-	std::vector<LowPassFilter<int16_t>> low_pass_mods;
+	std::vector<LowPassFilter> low_pass_mods;
 };

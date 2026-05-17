@@ -9,7 +9,7 @@
 #include "Animation/SkeletonData.h"
 #include "Animation/Runtime/Animation.h"
 #include "Debug.h"
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "UI/GUISystemPublic.h"
 #include "Assets/AssetDatabase.h"
 #include "Game/Components/ParticleMgr.h"

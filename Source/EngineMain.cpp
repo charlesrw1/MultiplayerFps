@@ -1,5 +1,5 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "glad/glad.h"
 #include <cstdio>
 #include <vector>
@@ -30,7 +30,7 @@
 #include "Sound/SoundPublic.h"
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
-#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdl3.h"
 #include "Framework/EditorTheme.h"
 #include "UI/UILoader.h"
 #include "UI/Widgets/Layouts.h"
@@ -358,7 +358,7 @@ void GameEngineLocal::set_tick_rate(float tick_rate) {
 void GameEngineLocal::key_event(SDL_Event event) {
 	ASSERT(UiSystem::inst && Debug_Console::inst && EditorPopupManager::inst);
 
-	if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
+	if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_GRAVE) {
 		show_console = !show_console;
 
 		if (!UiSystem::inst->is_vp_focused() && Debug_Console::inst->get_is_console_focused()) {
@@ -368,15 +368,15 @@ void GameEngineLocal::key_event(SDL_Event event) {
 		}
 	}
 
-	if ((event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) && ImGui::GetIO().WantCaptureKeyboard)
+	if ((event.type == SDL_EVENT_KEY_DOWN || event.type == SDL_EVENT_KEY_UP) && ImGui::GetIO().WantCaptureKeyboard)
 		return;
 
 	if (EditorPopupManager::inst->has_popup_open())
 		return;
 
-	if (event.type == SDL_KEYDOWN) {
-		SDL_Scancode scancode = event.key.keysym.scancode;
-		vector<string>* keybinds = find_keybinds(scancode, event.key.keysym.mod);
+	if (event.type == SDL_EVENT_KEY_DOWN) {
+		SDL_Scancode scancode = event.key.scancode;
+		vector<string>* keybinds = find_keybinds(scancode, event.key.mod);
 		if (keybinds != nullptr) {
 			for (string& k : *keybinds)
 				Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, k.c_str());

@@ -2,7 +2,7 @@
 #include "Render/IGraphicsDevice.h"
 #include "imgui.h"
 #include <chrono>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <vector>
 #include "Config.h"
 #include <unordered_map>

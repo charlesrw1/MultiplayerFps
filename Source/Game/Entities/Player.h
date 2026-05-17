@@ -133,15 +133,15 @@ public:
 	REF static bool was_key_pressed(int key) { return Input::was_key_pressed(SDL_Scancode(key)); }
 	REF static bool was_key_released(int key) { return Input::was_key_released(SDL_Scancode(key)); }
 	REF static bool is_con_button_down(int con_button) {
-		return Input::is_con_button_down(SDL_GameControllerButton(con_button));
+		return Input::is_con_button_down(SDL_GamepadButton(con_button));
 	}
 	REF static bool was_con_button_pressed(int con_button) {
-		return Input::was_con_button_pressed(SDL_GameControllerButton(con_button));
+		return Input::was_con_button_pressed(SDL_GamepadButton(con_button));
 	}
 	REF static bool was_con_button_released(int con_button) {
-		return Input::was_con_button_released(SDL_GameControllerButton(con_button));
+		return Input::was_con_button_released(SDL_GamepadButton(con_button));
 	}
-	REF static float get_con_axis(int con_axis) { return Input::get_con_axis(SDL_GameControllerAxis(con_axis)); }
+	REF static float get_con_axis(int con_axis) { return Input::get_con_axis(SDL_GamepadAxis(con_axis)); }
 	REF static bool is_any_con_active() { return Input::is_any_con_active(); }
 	REF static bool is_mouse_down(int button) { return Input::is_mouse_down(button); }
 	REF static bool was_mouse_pressed(int button) { return Input::was_mouse_pressed(button); }

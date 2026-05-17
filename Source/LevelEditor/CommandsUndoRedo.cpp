@@ -1,6 +1,6 @@
 #ifdef EDITOR_BUILD
 #include "Commands.h"
-#include <SDL2/SDL_events.h>
+#include <SDL3/SDL_events.h>
 #include "GameEnginePublic.h"
 
 UndoRedoSystem::UndoRedoSystem() {
@@ -10,7 +10,7 @@ UndoRedoSystem::UndoRedoSystem() {
 
 void UndoRedoSystem::on_key_event(const SDL_KeyboardEvent& key) {
 	ASSERT(hist.size() == HIST_SIZE);
-	if (key.keysym.scancode == SDL_SCANCODE_Z && key.keysym.mod & KMOD_CTRL)
+	if (key.scancode == SDL_SCANCODE_Z && key.mod & SDL_KMOD_CTRL)
 		undo();
 }
 

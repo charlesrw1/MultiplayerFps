@@ -12,7 +12,7 @@
 #include "Render/DrawPublic.h"
 #include "Assets/AssetDatabase.h"
 #include "DebugConsole.h"
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 UiSystem::UiSystem() {
 	ui_default = g_assets.find<MaterialInstance>("eng/uiDefault.mm").get();
 	if (!ui_default)
@@ -155,7 +155,7 @@ void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
 void UiSystem::update() {
 	// reset cursor if in relative mode
 	if (is_game_capturing_mouse()) {
-		SDL_WarpMouseInWindow(eng->get_os_window(), saved_mouse_x, saved_mouse_y);
+		SDL_WarpMouseInWindow(eng->get_os_window(), (float)saved_mouse_x, (float)saved_mouse_y);
 	}
 	window.clear(); // clear the window
 	auto rect = get_vp_rect();
@@ -194,10 +194,13 @@ void UiSystem::set_game_capture_mouse(bool b) {
 	if (game_focused) {
 		// reset deltas
 		SDL_GetRelativeMouseState(nullptr, nullptr);
-		SDL_GetMouseState(&saved_mouse_x, &saved_mouse_y);
-		SDL_SetRelativeMouseMode(SDL_TRUE);
+		float mx = 0.f, my = 0.f;
+		SDL_GetMouseState(&mx, &my);
+		saved_mouse_x = (int)mx;
+		saved_mouse_y = (int)my;
+		SDL_SetWindowRelativeMouseMode(eng->get_os_window(), true);
 	} else {
-		SDL_SetRelativeMouseMode(SDL_FALSE);
+		SDL_SetWindowRelativeMouseMode(eng->get_os_window(), false);
 	}
 }
 bool UiSystem::is_game_capturing_mouse() const {

@@ -8,6 +8,96 @@ Order is reverse-chronological: most recent at the top. Within each entry,
 the body is the as-landed implementation summary (API additions, caller
 migrations, deviations from plan, test status).
 
+## Sub-phase B5 status — SDL2 → SDL3 + SDL3_mixer
+
+Single-sweep migration. No SDL2 DLL remains in the binary.
+
+- **vcpkg**: `sdl3` 3.4.0 (upgraded from 3.2.8) + `sdl3-mixer` 3.2.2. Removed
+  `sdl2`, `sdl2-mixer`, `sdl2-image`, `sdl2-ttf`, `sdl2-net` from the install
+  set (sdl3-mixer 3.2.2 requires SDL3 ≥ 3.4.0).
+- **SDL_main**: dropped `SDL2maind.lib` / `SDL2main.lib` `<manual-link>`
+  entries from `Source/App/App.vcxproj` and `Source/UnitTests/UnitTests.vcxproj`.
+  `Source/App/main.cpp` defines `SDL_MAIN_HANDLED` and includes
+  `<SDL3/SDL_main.h>` — SDL3 ships a header-only main shim.
+- **Backward-compat sweep**: `SDL_ENABLE_OLD_NAMES` added to every
+  `PreprocessorDefinitions` block in `CsRemake.vcxproj`, `App.vcxproj`, and
+  `UnitTests.vcxproj`. SDL3 ships `SDL_oldnames.h` (auto-included by the
+  umbrella `<SDL3/SDL.h>` only) that aliases `SDL_CONTROLLER_BUTTON_*` →
+  `SDL_GAMEPAD_BUTTON_*`, `SDL_GameController*` → `SDL_Gamepad*`,
+  `SDL_NUM_SCANCODES` → `SDL_SCANCODE_COUNT`, etc. New
+  `Source/Input/Sdl2CompatGamepad.h` is a thin shim that pulls
+  `<SDL3/SDL_oldnames.h>` for files including subsystem headers directly. This
+  kept ~40 game-side / camera-side / editor-side call-sites unchanged.
+- **Window / GL context** (`Source/Render/OpenGlDevice.cpp`,
+  `Source/EngineMain_Init.cpp`): `SDL_CreateWindow(title, x, y, w, h, flags)` →
+  `SDL_CreateWindow(title, w, h, flags)` (no positional args). `SDL_Init` flags
+  narrowed from `SDL_INIT_EVERYTHING` to `SDL_INIT_VIDEO|EVENTS|GAMEPAD|AUDIO`
+  (single SDL3 init now covers audio for SDL3_mixer). `SDL_GL_DeleteContext` →
+  `SDL_GL_DestroyContext`. `gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)`
+  cast required (SDL3 returns `SDL_FunctionPointer`).
+- **Event loop** (`Source/EngineMain_Loop.cpp`): omnibus `SDL_WINDOWEVENT`
+  split into discrete `SDL_EVENT_WINDOW_*` enums. Resize now handles both
+  `SDL_EVENT_WINDOW_RESIZED` and `SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED`. Key /
+  mouse / wheel events renamed `SDL_KEYDOWN` → `SDL_EVENT_KEY_DOWN`, etc.
+- **Keyboard / mouse** (`Source/Input/InputSystem.{h,cpp}`,
+  `Source/UI/GUISystemLocal.cpp`, `Source/LevelEditor/EditorDocViewport.cpp`,
+  `Source/Game/TopDownShooter/TopDownPlayer.cpp`): `SDL_GetKeyboardState`
+  returns `const bool*` (was `const Uint8*`). `SDL_GetMouseState` /
+  `SDL_GetRelativeMouseState` widened to `float*` — call-sites convert at the
+  boundary. `SDL_BUTTON(i)` → `SDL_BUTTON_MASK(i)`. `event.key.keysym.scancode`
+  → `event.key.scancode`, `event.key.keysym.mod` → `event.key.mod`. `KMOD_CTRL`
+  → `SDL_KMOD_CTRL`. `SDL_SetRelativeMouseMode(bool)` →
+  `SDL_SetWindowRelativeMouseMode(SDL_Window*, bool)`. `SDL_WarpMouseInWindow`
+  args promoted `int` → `float`. `SDL_SetWindowFullscreen` takes plain `bool`
+  (no `SDL_WINDOW_FULLSCREEN_DESKTOP` flag).
+- **Gamepad** (`Source/Input/InputSystem.{h,cpp}`): `SDL_GameController*`
+  family wholesale renamed to `SDL_Gamepad*`. `SDL_NumJoysticks()` →
+  `SDL_GetJoysticks(&count)` (returns array, free with `SDL_free`).
+  `SDL_GameControllerOpen` / `Close` / `FromInstanceID` / `GetButton` / `GetAxis`
+  → `SDL_OpenGamepad` / `SDL_CloseGamepad` / `SDL_GetGamepadFromID` /
+  `SDL_GetGamepadButton` / `SDL_GetGamepadAxis`. Event field `event.cdevice` /
+  `caxis` / `cbutton` → `gdevice` / `gaxis` / `gbutton`. Semantic shift:
+  ADDED/REMOVED `which` is now uniformly an SDL_JoystickID (instance id) in
+  SDL3 — `Device::index` is now an instance id; `default_dev_index` stores the
+  first device's instance id rather than slot 0. 4-gamepad cap enforced by
+  `devices.size() >= 4` rather than `index < 4`.
+- **ImGui platform** (`Source/External/imgui_impl_sdl3.{h,cpp}`): vendored
+  from imgui v1.91.0 (earliest tag with SDL3 backend). Patched for the project's
+  imgui 1.89.4 core — removed `io.AddMouseSourceEvent` calls (added in 1.89.5),
+  removed `SDLK_F13`..`F24` / `SDLK_AC_BACK`/`FORWARD` keymap cases (added in
+  v1.91), renamed `PlatformSetImeDataFn` → `SetPlatformImeDataFn` (signature
+  reverted from `(ctx, vp, data)` to `(vp, data)`), dropped `SDL_TRUE` /
+  `SDL_FALSE` cast on `SDL_CaptureMouse`. `imgui_impl_sdl2.{h,cpp}` deleted.
+  `External.vcxproj` + `CsRemake.vcxproj` + both `.filters` updated.
+- **Audio port** (`Source/Sound/SoundLocal.{h,cpp}`, `Source/Sound/SoundPublic.h`):
+  `Mix_Chunk*` → `MIX_Audio*` (3 type refs in headers). `Mix_OpenAudio(freq,fmt,ch,bufsize)`
+  → `MIX_Init()` + `MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr)`.
+  Channel-index voice model replaced with a pre-allocated `MIX_Track*` pool
+  sized by `snd_max_voices` cvar — each `SoundPlayerInternal::voice_index`
+  indexes into both the `active_voices` and `tracks` vectors.
+  `Mix_PlayChannel(idx, chunk, loops)` →
+  `MIX_SetTrackAudio(track, audio)` + `MIX_SetTrackLoops(track, loops)` +
+  `MIX_PlayTrack(track, 0)`. `Mix_HaltChannel` → `MIX_StopTrack(track, 0)` +
+  `MIX_SetTrackAudio(track, nullptr)` to release the audio binding.
+  `Mix_Volume(idx, 0..128)` → `MIX_SetTrackGain(track, 0..1)`. `Mix_SetPanning`
+  → `MIX_SetTrackStereo(track, MIX_StereoGains{l,r})` (0..1 floats).
+  `Mix_LoadWAV` → `MIX_LoadAudio(mixer, path, /*predecode=*/true)`;
+  `Mix_FreeChunk` → `MIX_DestroyAudio`. Duration computed via
+  `MIX_AudioFramesToMS(MIX_GetAudioDuration(audio))` (SDL3_mixer doesn't expose
+  raw PCM length).
+- **DSP simplification**: the entire `PlaybackSpeedEffectHandler<int16_t>`
+  manual-resample template deleted — pitch is now `MIX_SetTrackFrequencyRatio`
+  (SDL3_mixer's built-in rate-conversion). `LowPassFilter` ported from
+  `int16_t` to plain `float` (SDL3_mixer cooks everything to float32 before
+  the post-mix callback), and registered via `MIX_SetTrackCookedCallback`
+  at track-creation time rather than per-play.
+- **Tests**: 185 unit tests green. Integration suite green for both `game` and
+  `editor` modes (84 game tests, 51 editor tests, ~135 total covering renderer
+  hot-reload, asset rebind, physics, nav, lua, FPS / bike / car / topdown /
+  obs gameplay smokes).
+- **DLL footprint**: post-build inventory shows `SDL3.dll`, `SDL3_mixer.dll`;
+  no `SDL2*.dll`. Static-scanner accept-list unchanged.
+
 ## Sub-phase 2c status
 
 Pipeline-state consolidation. Landed across four commits:

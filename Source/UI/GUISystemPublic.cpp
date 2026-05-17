@@ -24,10 +24,10 @@ void Canvas::draw_rect(lRect rect, Texture* t, lColor color) {
 lRect Canvas::get_window_rect() {
 	return lRect(UiSystem::inst->get_vp_rect());
 }
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "GameEnginePublic.h"
 void Canvas::set_window_fullscreen(bool is_fullscreen) {
-	SDL_SetWindowFullscreen(eng->get_os_window(), (is_fullscreen) ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+	SDL_SetWindowFullscreen(eng->get_os_window(), is_fullscreen);
 }
 
 void Canvas::set_window_title(std::string name) {

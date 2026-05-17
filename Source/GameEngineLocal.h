@@ -1,6 +1,6 @@
 #pragma once
 #include "ITestRunner.h"
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <string>
 #include "User_Camera.h"
 #include "Framework/Config.h"

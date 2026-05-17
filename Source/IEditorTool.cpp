@@ -8,7 +8,7 @@
 #include "Framework/Util.h"
 #include "GameEnginePublic.h"
 #include <cassert>
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 #include "Assets/AssetBrowser.h"
 #include "Assets/AssetRegistry.h"

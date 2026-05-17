@@ -17,7 +17,7 @@
 #include "Framework/MathLib.h"
 #include "Framework/Config.h"
 #include "imgui.h"
-#include <SDL2/SDL_gamecontroller.h>
+#include "Input/Sdl2CompatGamepad.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include "Render/DrawPublic.h"
 #include "Render/RenderObj.h"

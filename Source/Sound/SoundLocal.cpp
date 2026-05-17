@@ -26,18 +26,33 @@ SoundFile* SoundFile::load(std::string s) {
 }
 bool SoundFile::load_asset() {
 	std::string pathfull = FileSys::get_full_path_from_game_path(get_name());
-	Mix_Chunk* data = Mix_LoadWAV(pathfull.c_str());
+	MIX_Audio* data = MIX_LoadAudio(soundsys_local.mixer, pathfull.c_str(), /*predecode=*/true);
 	if (!data) {
 		return false;
 	}
 
 	this->internal_data = data;
-	this->duration = data->alen / 44100.0;
+	// Duration in seconds via SDL_mixer's frame-count helper.
+	Sint64 frames = MIX_GetAudioDuration(data);
+	if (frames <= 0) {
+		this->duration = 0.f;
+	} else {
+		Sint64 ms = MIX_AudioFramesToMS(data, frames);
+		this->duration = (ms > 0) ? float(ms) * 0.001f : 0.f;
+	}
 
 	return true;
 }
 
+void SoundPlayer::update() {}
+void SoundPlayer::set_play(bool b) {
+	SoundPlayerInternal* self = (SoundPlayerInternal*)this;
+	self->should_play = b;
+}
+
 void SoundFile::uninstall() {
-	Mix_FreeChunk(internal_data);
-	internal_data = nullptr;
+	if (internal_data) {
+		MIX_DestroyAudio(internal_data);
+		internal_data = nullptr;
+	}
 }

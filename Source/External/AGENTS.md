@@ -6,8 +6,8 @@ Third-party libraries bundled in-tree. **Do not read source files here** — use
 
 Graphics / UI:
 - **glad** — OpenGL function loader. Must call `gladLoadGLLoader(...)` once after GL context creation, before any GL call.
-- **imgui** — Dear ImGui immediate-mode GUI (core + demo + tables + widgets). Requires both the OpenGL3 and SDL2 backends initialized.
-- **imgui_impl_opengl3**, **imgui_impl_sdl2** — ImGui backends for our GL3 + SDL2 setup.
+- **imgui** — Dear ImGui immediate-mode GUI (core + demo + tables + widgets). Requires both the OpenGL3 and SDL3 backends initialized.
+- **imgui_impl_opengl3**, **imgui_impl_sdl3** — ImGui backends for our GL3 + SDL3 setup.
 - **ImGuizmo** — In-viewport translate/rotate/scale gizmos; used by LevelEditor.
 - **ImSequencer** — Timeline widget; used for animation editing.
 - **imnodes** — Node-graph widget; used for the animation graph UI.

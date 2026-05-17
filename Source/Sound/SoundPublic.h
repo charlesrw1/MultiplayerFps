@@ -10,7 +10,7 @@ NEWENUM(SndAtn, uint8_t){
 	Cubic,	  // (1-x)^3
 	InvCubic, // (1-x)^(1/3)
 };
-struct Mix_Chunk;
+struct MIX_Audio;
 
 class SoundFile : public IAsset
 {
@@ -20,7 +20,7 @@ public:
 	REF float get_duration() const { return duration; }
 
 private:
-	Mix_Chunk* internal_data = nullptr;
+	MIX_Audio* internal_data = nullptr;
 	float duration = 0.0;
 
 	void post_load() {}

@@ -5,9 +5,9 @@
 // and factory functions declared in OpenGlDeviceLocal.h.
 #include "OpenGlDeviceLocal.h"
 #include "DrawLocal.h"
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include "imgui.h"
-#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdl3.h"
 #include "imgui_impl_opengl3.h"
 #include "../External/glad/glad.h"
 // ---------------------------------------------------------------------------
@@ -938,17 +938,17 @@ public:
 
 	void imgui_init() override {
 		ASSERT(window != nullptr && gl_context != nullptr);
-		ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
+		ImGui_ImplSDL3_InitForOpenGL(window, gl_context);
 		ImGui_ImplOpenGL3_Init();
 	}
 
 	void imgui_shutdown() override {
 		ImGui_ImplOpenGL3_Shutdown();
-		ImGui_ImplSDL2_Shutdown();
+		ImGui_ImplSDL3_Shutdown();
 	}
 
 	void imgui_new_frame() override {
-		ImGui_ImplSDL2_NewFrame();
+		ImGui_ImplSDL3_NewFrame();
 		ImGui_ImplOpenGL3_NewFrame();
 	}
 
@@ -963,7 +963,7 @@ public:
 
 	bool imgui_process_event(const SDL_Event* event) override {
 		ASSERT(event != nullptr);
-		return ImGui_ImplSDL2_ProcessEvent(event);
+		return ImGui_ImplSDL3_ProcessEvent(event);
 	}
 
 	void multi_draw_elements_indirect_count(GraphicsPrimitiveType mode,
@@ -1082,7 +1082,7 @@ void gfx_init_opengl(SDL_Window* window) {
 		Fatalf("gfx_init_opengl: SDL_GL_CreateContext failed: %s\n", SDL_GetError());
 
 	sys_print(Debug, "OpenGL loaded\n");
-	gladLoadGLLoader(SDL_GL_GetProcAddress);
+	gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress);
 	sys_print(Debug, "Vendor: %s\n",   glGetString(GL_VENDOR));
 	sys_print(Debug, "Renderer: %s\n", glGetString(GL_RENDERER));
 	sys_print(Debug, "Version: %s\n\n", glGetString(GL_VERSION));
@@ -1102,7 +1102,7 @@ void gfx_shutdown() {
 		delete impl;
 		g_gfx_instance = nullptr;
 		if (ctx)
-			SDL_GL_DeleteContext(ctx);
+			SDL_GL_DestroyContext(ctx);
 	}
 }
 

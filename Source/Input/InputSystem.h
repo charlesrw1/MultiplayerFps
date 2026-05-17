@@ -4,7 +4,10 @@
 #include <vector>
 #include <memory>
 #include "Framework/Optional.h"
-#include <SDL2/SDL_events.h>
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_gamepad.h>
+#include <SDL3/SDL_scancode.h>
+#include "Input/Sdl2CompatGamepad.h"
 #include "glm/glm.hpp"
 using glm::ivec2;
 using glm::vec2;
@@ -36,20 +39,20 @@ public:
 	static bool is_alt_down();
 
 	// uses first controller
-	static bool is_con_button_down(SDL_GameControllerButton button);
-	static bool was_con_button_pressed(SDL_GameControllerButton button);
-	static bool was_con_button_released(SDL_GameControllerButton button);
-	static double get_con_axis(SDL_GameControllerAxis axis);
-	// uses specified controller
-	static bool is_con_button_down_idx(SDL_GameControllerButton b, int idx);
-	static bool was_con_button_pressed_idx(SDL_GameControllerButton b, int idx);
-	static bool was_con_button_released_idx(SDL_GameControllerButton b, int idx);
-	static double get_con_axis_idx(SDL_GameControllerAxis a, int idx);
+	static bool is_con_button_down(SDL_GamepadButton button);
+	static bool was_con_button_pressed(SDL_GamepadButton button);
+	static bool was_con_button_released(SDL_GamepadButton button);
+	static double get_con_axis(SDL_GamepadAxis axis);
+	// uses specified controller (idx = SDL_JoystickID instance id)
+	static bool is_con_button_down_idx(SDL_GamepadButton b, int idx);
+	static bool was_con_button_pressed_idx(SDL_GamepadButton b, int idx);
+	static bool was_con_button_released_idx(SDL_GamepadButton b, int idx);
+	static double get_con_axis_idx(SDL_GamepadAxis a, int idx);
 	static bool is_any_con_active();
 	static int get_num_active_cons();
 	static bool is_con_active(int idx);
-	static SDL_GameControllerType get_con_type();
-	static SDL_GameControllerType get_con_type_idx(int idx);
+	static SDL_GamepadType get_con_type();
+	static SDL_GamepadType get_con_type_idx(int idx);
 	static bool last_recieved_input_from_con();
 	static void rumble(uint16_t low_freq, uint16_t high_freq, uint32_t duration_ms);
 	static MulticastDelegate<int /* index */, bool /* connected/disconnected */> on_con_status;
@@ -71,13 +74,13 @@ private:
 
 	struct Device
 	{
-		Device(SDL_GameController* ptr, int index);
-		int index = -1;
-		SDL_GameController* ptr = nullptr;
+		Device(SDL_Gamepad* ptr, int index);
+		int index = -1; // SDL_JoystickID instance id in SDL3
+		SDL_Gamepad* ptr = nullptr;
 		vector<PressReleaseState> buttonState;
 	};
 	vector<Device> devices;
-	opt<int> default_dev_index;
+	opt<int> default_dev_index; // instance id of default gamepad
 	opt<int> recieved_input_from_this;
 
 	int mouseScrollAcum = 0;
@@ -86,12 +89,12 @@ private:
 	int mouseX = 0;
 	int mouseY = 0;
 
-	const Uint8* keyState = nullptr;
+	const bool* keyState = nullptr; // SDL3: SDL_GetKeyboardState returns const bool*
 	vector<PressReleaseState>
 		keyPressedReleasedState; // 0 = not down, 1 = down, 2 = not down and released, 3 = down and pressed,
 	vector<PressReleaseState> mouseButtonsState;
 
 	opt<int> find_device_for_index(int idx) const;
-	opt<int> find_device_for_ptr(SDL_GameController* ptr) const;
-	SDL_GameController* get_device_ptr(int idx) const;
+	opt<int> find_device_for_ptr(SDL_Gamepad* ptr) const;
+	SDL_Gamepad* get_device_ptr(int idx) const;
 };

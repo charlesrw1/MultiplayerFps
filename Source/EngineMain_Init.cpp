@@ -1,5 +1,5 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 #include <cstdio>
 #include <vector>
 #include <string>
@@ -111,7 +111,7 @@ void GameEngineLocal::init_sdl_window() {
 
 	sys_print(Info, "initializing window...\n");
 
-	if (SDL_Init(SDL_INIT_EVERYTHING)) {
+	if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO)) {
 		sys_print(Error, "init sdl failed: %s\n", SDL_GetError());
 		exit(-1);
 	}
@@ -121,8 +121,8 @@ void GameEngineLocal::init_sdl_window() {
 	gfx_opengl_pre_window_setup();
 
 	const char* title = g_project_name.get_string();
-	window = SDL_CreateWindow(title, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, g_window_w.get_integer(),
-							  g_window_h.get_integer(), SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+	window = SDL_CreateWindow(title, g_window_w.get_integer(), g_window_h.get_integer(),
+							  SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
 	if (!window) {
 		sys_print(Error, "create sdl window failed: %s\n", SDL_GetError());
 		exit(-1);
