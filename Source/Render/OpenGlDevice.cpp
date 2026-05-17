@@ -230,6 +230,12 @@ public:
 	bool cullfrontface = false;
 	vertexarrayhandle current_vao = 0;
 
+	// Push-constant UBOs — lazy-allocated per (stage, slot). One 128-byte UBO
+	// each, orphaned with glInvalidateBufferData on every push to avoid sync.
+	// Stage indices: 0 = vertex, 1 = fragment, 2 = compute. Bound at fixed
+	// UBO bindings (see kGfxPushConstBindingBase in IGraphicsDevice.h).
+	GLuint push_const_ubos[3][IGraphicsDevice::kGfxMaxPushConstSlotsPerStage]{};
+
 	// Cached Phase 2c pipeline fields.
 	bool poly_offset_enabled_cached = false;
 	float poly_offset_factor_cached = 0.f;
@@ -278,6 +284,12 @@ public:
 		if (g_swapchain_sentinel) {
 			g_swapchain_sentinel->release();
 			g_swapchain_sentinel = nullptr;
+		}
+		for (auto& stage : push_const_ubos) {
+			for (GLuint& ubo : stage) {
+				if (ubo) glDeleteBuffers(1, &ubo);
+				ubo = 0;
+			}
 		}
 	}
 
@@ -701,6 +713,34 @@ public:
 		ASSERT(slot >= 0 && buf != nullptr);
 		glBindBufferBase(GL_UNIFORM_BUFFER, slot, buf->get_internal_handle());
 	}
+
+	// ---- Push constants (Phase 2 B1) --------------------------------------
+	// Lazy-create a 128B UBO per (stage, slot), orphan via glInvalidateBufferData
+	// to let the driver rename the storage, then sub-upload and re-bind at the
+	// fixed binding point. Naive impl by design — option 2 of three considered
+	// (see docs/rendering/gfx_abstraction.md B1 perf discussion). Ring buffer
+	// (option 1) is the SDL3-backend path.
+	void push_constants_internal(int stage_idx, int slot, const void* data, int size) {
+		ASSERT(stage_idx >= 0 && stage_idx < 3);
+		ASSERT(slot >= 0 && slot < IGraphicsDevice::kGfxMaxPushConstSlotsPerStage);
+		ASSERT(data != nullptr);
+		ASSERT(size > 0 && size <= IGraphicsDevice::kGfxPushConstMaxBytes);
+		GLuint& ubo = push_const_ubos[stage_idx][slot];
+		if (ubo == 0) {
+			glCreateBuffers(1, &ubo);
+			glNamedBufferData(ubo, IGraphicsDevice::kGfxPushConstMaxBytes,
+							  nullptr, GL_STREAM_DRAW);
+		}
+		glInvalidateBufferData(ubo);
+		glNamedBufferSubData(ubo, 0, size, data);
+		const int binding = IGraphicsDevice::kGfxPushConstBindingBase
+						  + stage_idx * IGraphicsDevice::kGfxMaxPushConstSlotsPerStage
+						  + slot;
+		glBindBufferBase(GL_UNIFORM_BUFFER, binding, ubo);
+	}
+	void push_vertex_constants  (int slot, const void* data, int size) override { push_constants_internal(0, slot, data, size); }
+	void push_fragment_constants(int slot, const void* data, int size) override { push_constants_internal(1, slot, data, size); }
+	void push_compute_constants (int slot, const void* data, int size) override { push_constants_internal(2, slot, data, size); }
 
 	void begin_compute_pass() override {
 		// SDL3 GPU: ends any open render/compute pass; the actual SDL3

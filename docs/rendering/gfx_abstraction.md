@@ -4,6 +4,8 @@ This is the canonical migration doc. The earlier strategy doc at
 `~/.claude/plans/i-want-to-put-idempotent-fairy.md` is historical — Phase 2c
 decisions there are superseded by **Pipeline model** below.
 
+Phase 3 implementation plan (detailed): `~/.claude/plans/review-gfx-abstraction-md-and-sdl3gpu-wh-cuddly-bunny.md`.
+
 sdl3 gpu api (for reference): https://github.com/libsdl-org/SDL/blob/main/include/SDL3/SDL_gpu.h
 
 Migration of all rendering behind `IGraphicsDevice` (Source/Render/IGraphicsDevice.h) so an SDL3 GPU backend can sit alongside the current OpenGL backend.
@@ -840,32 +842,59 @@ shaders (Master*Shader.txt) asserting `reflect()` matches direct GL queries.
 - Per-frame buffer ring: 3-frames-in-flight stress test, no overwrite of
   in-flight data.
 
+## Phase 2 prerequisites (open) — must land before Phase 3
+
+Full breakdown in the Phase 3 plan file. Summary:
+
+| Sub-phase | Scope | Status |
+| --- | --- | --- |
+| **B1** | Push-constant API (`push_{vertex,fragment,compute}_constants(slot, data, size)`) on `IGraphicsDevice`; migrate the 21 remaining `set_*(name, …)` callsites (DecalBatcher, RenderPass, Misc, Lighting, Debug, EnvProbe, RT/RaytraceTest_Shade) to per-shader `<Shader>PushConsts` blocks. Delete `IGraphicsShader::set_{bool,int,uint,float,mat4,vec*,ivec*}` + `set_block_binding` + `use()`. MUST FIT UNDER 128 BYTES. OpenGL impl backs push API with a reserved internal UBO slot + `sub_upload`. | not started |
+| **B2** | `IGraphicsShader::reflect()` → `{num_samplers, num_storage_textures, num_storage_buffers, num_uniform_buffers}` per stage. OpenGL impl via `glGetProgramInterfaceiv`. Required by `SDL_GPUShaderCreateInfo`. | not started |
+| **B3** | Per-frame ring buffer impl for `BUFFER_USE_DYNAMIC` (2e — decision made, impl not done). `IGraphicsBuffer::sub_upload` on DYNAMIC routes through N×size ring, head advances on `begin_frame()`. OpenGL keeps `glNamedBufferSubData`; teeth on SDL3 transfer-buffer path. | **deferred to SDL3 backend** — OpenGL path (`glNamedBufferSubData`) is a no-op on GL, all teeth are on the SDL3 transfer-buffer side. Implement inside the SDL3 backend during Phase 3 rather than as a prereq. |
+| **B4** | `IGraphicsDevice::push_debug_group(const char*) / pop_debug_group()`. SDL3 has `SDL_PushGPUDebugGroup` but no timestamp queries — Profiler GPU-timing stubs on SDL3, debug groups stay live. Drops `Framework/Profilier.cpp` + `IntegrationTests/GpuTimer.{h,cpp}` off the static-scanner accept-list. | not started |
+| **B5** | SDL2 → SDL3 windowing + `imgui_impl_sdl2` → `imgui_impl_sdl3`. Independent of B1–B4 — parallel work stream. Required before Phase 3. | not started |
+
+**Push-constant model (B1):** slot-indexed block uploads, mirroring `SDL_PushGPU{Vertex,Fragment,Compute}UniformData(cmdbuf, slot, data, size)`. The interface is block-shaped (no name-based scalar setter on top). Per-pass group UBOs at slot 7 stay UBOs — push constants are for *per-draw* data only. 21 callsites all per-draw / per-instance, so the migration target is push-const not slot-7 UBO.
+
 ## Phase 3 — SDL3 GPU backend port (planned)
 
-Interface is now SDL3-GPU-shaped. This phase is implementation + backend-
-specific fallbacks.
+Recommended order (full detail in plan file):
 
-- Add glslang or shaderc via vcpkg for GLSL → SPIR-V cross-compile.
-- Blob strategy: pre-compiled SPIR-V for release; runtime-compile in dev
-  (`Program_Manager::recompile_all` requires it).
-- Implement `gfx_init_sdl3gpu()` next to `gfx_init_opengl()`.
-- Reverse-Z: depth already `[0,1]`, no change.
-- Y-flip: SDL3 NDC is +Y down. Flip projection matrix in the SDL3 backend's
-  view constants; flip cull-mode winding; audit shaders consuming
-  `gl_FragCoord.y` or screen-UV-from-NDC directly. Post-process passes that
-  sample `gl_FragCoord`/resolution need verification.
-- Filter-minmax (`GL_TEXTURE_REDUCTION_MODE_ARB`) — replace HiZ sampler with a
-  compute min/max pre-pass.
-- RT test path (`Source/Render/RT/RaytraceTest_*.cpp`): port to SSBO-indexed
-  texture array, or tag OpenGL-only and refuse to load on SDL3 GPU.
+| Step | Scope |
+| --- | --- |
+| **P3.1** | **Toolchain spike.** glslang as DLL (`vcpkg install glslang spirv-cross`; `<VcpkgApplocalDeps>true</>` for auto-copy). Lift source-loader from `OpenGlShaderImpl.cpp` anon namespace to shared `Source/Render/ShaderSourceLoader.{h,cpp}`. New `Source/Render/SpirvCompile.{h,cpp}` (`glslang::InitializeProcess` → `TShader.parse` → `glslang::GlslangToSpv`). Test: 5 shaders (lit master, bloom, cull, vfog, raytrace) round-trip GLSL → SPIR-V → SPIRV-Cross reflection. No backend code. |
+| **P3.2** | **Pipeline cache.** Inside SDL3 backend `set_pipeline`: `unordered_map<XXH3_64bits(&RenderPipelineState), SDL_GPUGraphicsPipeline*>`. Miss → `SDL_CreateGPUGraphicsPipeline` (rasterizer = fill_mode+cull+front_face+depth-bias from polygon_offset_*, depth-stencil, per-attachment blend, color/depth target formats from current pass, vertex input from `IGraphicsVertexInput`). Cache key includes target formats — `set_pipeline` must run inside a render pass (already true). Invalidate on `Program_Manager::recompile_all`. |
+| **P3.3** | **Frame skeleton + command encoder.** `begin_frame` → `SDL_AcquireGPUCommandBuffer`. `acquire_swapchain_texture` → `SDL_WaitAndAcquireGPUSwapchainTexture` (lazy, first call). `submit_and_present` → `SDL_SubmitGPUCommandBuffer`. `set_render_pass` ends any active pass, translates `ColorTargetInfo[]` → `SDL_GPUColorTargetInfo[]` (load_op = CLEAR if wants_clear else LOAD, store_op = STORE), `SDL_BeginGPURenderPass`. `begin_compute_pass` defers `SDL_BeginGPUComputePass` to first dispatch so writable bindings are known. |
+| **P3.4** | **Bind-table flushing.** Per-stage tables: `vert_samplers[N] = (tex, samp)`, `frag_samplers[N]`, `vert/frag/compute_uniform_buffers[N]`, storage buffers, storage textures. `bind_texture`/`bind_sampler`/`bind_*_buffer_*` write the table; draw call flushes via `SDL_BindGPU{Vertex,Fragment,Compute}{Samplers,UniformBuffers,StorageBuffers,StorageTextures}`. Vertex buffers from `IGraphicsVertexInput` layout. Per-draw push constants via `SDL_PushGPU*UniformData` (B1 already exposes the slot-indexed API). |
+| **P3.5** | **Y-flip + winding.** SDL3 NDC is +Y down. Flip projection matrix row 1 inside SDL3 view-constant upload; swap front-face winding in `set_pipeline`; audit `gl_FragCoord.y` / screen-UV-from-NDC consumers (post-process stack — TAA resolve, bloom composite, SSR apply). Visual diff catches regressions via `bake_probes_test` + `demo_level_1_shots`. |
+| **P3.6** | **HiZ filter-minmax replacement.** `GraphicsSamplerReduction::{Min, Max}` has no SDL3 equivalent. Compute min/max pre-pass building reduced mip chains. Consumers: `SSRSystem::hiz_max_sampler`, `GpuCullingTest::hiZSampler`. New `Data/Shaders/HiZReduce.glsl`. |
+
+RT test paths (`Source/Render/RT/*`) port as-is — confirmed they use plain `bind_texture`, no bindless, no texture handles. They come along with the rest of the compute paths in P3.4.
+
+### Backend layout
+
+```
+Source/Render/SDL3Gpu/SDL3GpuDevice.cpp        // gfx_init_sdl3gpu + IGraphicsDevice impl
+Source/Render/SDL3Gpu/SDL3GpuShaderImpl.cpp    // IGraphicsShader impl
+Source/Render/SDL3Gpu/SDL3GpuTextureImpl.cpp   // IGraphicsTexture impl
+Source/Render/SDL3Gpu/SDL3GpuBufferImpl.cpp    // IGraphicsBuffer impl + transfer-buffer ring
+Source/Render/SDL3Gpu/SDL3GpuLocal.h           // pipeline-hash cache, internal helpers
+```
+
+Mirror of the `OpenGl*` layout. Free functions `gfx_sdl3gpu_pre_window_setup()` / `gfx_init_sdl3gpu(SDL_Window*)`; shared `gfx_shutdown()`. Backend selected at engine init (cvar or compile flag — TBD).
 
 ### Phase 3 verify
 
-`test_sdl3_parity.cpp` runs the same scene on both backends, captures
-screenshots via `t.capture_screenshot` (test_obs_smoke.cpp:60), asserts
-perceptual diff < threshold (SSIM ≥ 0.98 per pass) for each G-buffer MRT,
-shadow cascades, deferred lighting, decal blend, SSAO, SSR, TAA, bloom,
-post-composite.
+- `test_pipeline_cache.cpp` — ≤200 unique pipelines in bike demo, ≤16 decal variants.
+- `test_sdl3_parity.cpp` runs the same scene on both backends, captures
+  screenshots via `t.capture_screenshot` (test_obs_smoke.cpp:60), asserts
+  perceptual diff < threshold (SSIM ≥ 0.98 per pass) for each G-buffer MRT,
+  shadow cascades, deferred lighting, decal blend, SSAO, SSR, TAA, bloom,
+  post-composite.
+- `test_dynamic_buffer_ring.cpp` — 3 frames in flight, no slot overwrite.
+- `test_shader_reflection.cpp` — 5 representative shaders, reflection counts match `glGetProgramInterfaceiv`.
+- Existing screenshot suite (`bake_probes_test`, `demo_level_1_shots`) within soft-fail bands on both backends.
+- Static scanner stays green — every new `SDL_GPU*` call lives inside `Source/Render/SDL3Gpu/`.
 
 ## Phase 3.5 — Tessellation terrain replacement (planned)
 
@@ -873,7 +902,8 @@ SDL3 GPU has no tess shaders. Adaptive view-dependent factors in
 `MaterialLocal_Shader.cpp:81` (`Program_Manager::create_single_file(...,
 is_tesselation=true)`) → per-frame compute pre-pass writing displaced
 vertex/index buffers, then indirect draw with a regular vertex shader. Sized
-to worst-case LOD. Treat as a sub-project.
+to worst-case LOD. Treat as a sub-project; only required if any live master
+shader uses `is_tesselation=true` at SDL3-port-time. Verify before shipping.
 
 ## Out of scope
 
@@ -883,4 +913,14 @@ to worst-case LOD. Treat as a sub-project.
   Phase 2 API against WebGPU's binding model on paper before locking it.
 - DX12 / Metal / mobile Vulkan — implicitly covered by SDL3 GPU's backends.
 - SDL2 → SDL3 windowing + ImGui platform layer migration — required before
-  Phase 3 but a separate parallel work stream.
+  Phase 3 but a separate parallel work stream (B5).
+
+### Footnote — D3D12 enablement (out of scope, future P3.9)
+
+SPIR-V is Vulkan-only. SDL3 GPU on Windows picks backend from the shader
+formats supplied to `SDL_CreateGPUDevice`: `SDL_GPU_SHADERFORMAT_SPIRV` →
+Vulkan; `SDL_GPU_SHADERFORMAT_DXIL` → D3D12 (signed DXIL); `SDL_GPU_SHADERFORMAT_MSL` → Metal.
+Phase 3 ships SPIR-V only → SDL3 runs on its Vulkan backend on Windows.
+D3D12 enablement later via `SDL_shadercross` (separate SDL helper lib that
+translates SPIR-V → DXIL/MSL at runtime in dev, prebake DXIL for release).
+Not a Phase 3 blocker.

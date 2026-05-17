@@ -498,6 +498,33 @@ public:
 	// Bind a UBO to a binding point.
 	virtual void bind_uniform_buffer_base(int slot, IGraphicsBuffer* buf) = 0;
 
+	// ---- Push constants (Phase 2 B1) --------------------------------------
+	//
+	// Per-draw / per-dispatch uniform uploads. Mirrors SDL3 GPU's
+	// SDL_PushGPU{Vertex,Fragment,Compute}UniformData(cmdbuf, slot, data, size).
+	// Block-shaped: each call replaces the contents of one (stage, slot) push
+	// block. There is no name-based scalar setter on top — the GLSL declares a
+	// matching `layout(std140, binding = N) uniform <Block> { ... }` and the
+	// C++ side fills a POD struct mirroring the std140 layout.
+	//
+	// Slot count and size are bounded to the SDL3 GPU minimums: 4 slots per
+	// stage, 128 bytes per slot. Exceeding either is an ASSERT.
+	//
+	// OpenGL backend mapping (one UBO binding per stage*slot, kept clear of
+	// the 0..8 data-UBO range used by current_frame/cull/per-pass/shadow):
+	//   binding = kGfxPushConstBindingBase + stage_index * kGfxMaxPushConstSlotsPerStage + slot
+	//   stage_index: 0 = vertex, 1 = fragment, 2 = compute.
+	// gfx_push_const_binding() below is the canonical mapping helper; shader
+	// declarations should use the literal binding number (matching this formula)
+	// for readability.
+	static constexpr int kGfxMaxPushConstSlotsPerStage = 4;
+	static constexpr int kGfxPushConstMaxBytes        = 128;
+	static constexpr int kGfxPushConstBindingBase     = 12;
+
+	virtual void push_vertex_constants  (int slot, const void* data, int size) = 0;
+	virtual void push_fragment_constants(int slot, const void* data, int size) = 0;
+	virtual void push_compute_constants (int slot, const void* data, int size) = 0;
+
 	// ---- Phase 1.3a wrap surface (compute) --------------------------------
 
 	// Begin a compute pass. Backend implicitly ends any open render or compute
