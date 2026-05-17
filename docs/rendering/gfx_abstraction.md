@@ -534,27 +534,54 @@ per-pass slot to a real push-constant block if that's cheaper.
 
 **Pattern (locked by the BloomDownsample / BloomUpsample pilot):**
 
-In the shader:
-```glsl
-layout(binding = 0) uniform sampler2D srcTexture;       // textures get explicit binding too
+Single source of truth for every per-pass struct lives in
+`Shaders/ShaderBufferShared.txt` — same convention as the existing
+`Shaders/SharedGpuTypes.txt` (`#ifdef __cplusplus` wrapper that pulls in
+`using namespace glm`, `typedef uint32_t uint`, and `namespace gpu { … }`).
+The file is `#include`'d directly from C++ headers AND from GLSL via the
+shader-source include preprocessor — one struct declaration is canonical
+for both languages.
 
-layout(binding = 7, std140) uniform BloomDownsampleParams {
-    vec2 srcResolution;
-    int  mipLevel;
+In `Shaders/ShaderBufferShared.txt` (shared, single source of truth):
+```glsl
+struct BloomParams {
+    vec2  srcResolution;
+    int   mipLevel;
+    float filterRadius;
 };
 ```
 
-In C++:
-```cpp
-struct BloomDownsampleParams { glm::vec2 srcResolution; int32_t mipLevel; int32_t _pad0; };
-static_assert(sizeof(BloomDownsampleParams) == 16, "std140");
-constexpr int BLOOM_PARAMS_UBO_BINDING = 7;
-// init: create_uniform_buffer(ubo.bloom_downsample_params);
-// per-draw:
-BloomDownsampleParams p{glm::vec2(src_x, src_y), i, 0};
-ubo.bloom_downsample_params->upload(&p, sizeof(p));
-gfx().bind_uniform_buffer_base(BLOOM_PARAMS_UBO_BINDING, ubo.bloom_downsample_params);
+In each shader (e.g. `BloomDownsampleF.txt`):
+```glsl
+#include "ShaderBufferShared.txt"
+layout(binding = 0) uniform sampler2D srcTexture;       // textures get explicit binding too
+layout(binding = 7, std140) uniform BloomParamsUbo { BloomParams params; };
+// usage: params.srcResolution, params.mipLevel
 ```
+
+In C++ (`DrawLocal_RenderPass.cpp`):
+```cpp
+gpu::BloomParams p{};
+p.srcResolution = glm::vec2(src_x, src_y);
+p.mipLevel = i;
+ubo.bloom_params->upload(&p, sizeof(p));
+gfx().bind_uniform_buffer_base(BLOOM_PARAMS_UBO_BINDING, ubo.bloom_params);
+```
+
+**Why nested-struct (`BloomParamsUbo { BloomParams params; }`) over inline
+fields:** matches the established `Ubo_View_Constant_Buffer { Ubo_View_Constants_Struct g; }`
+pattern; one struct definition shared between GLSL and C++ via
+`#include`; renames update everywhere from a single edit; std140 padding
+correctness is enforced in one place. The cost — an extra `params.`
+prefix at every access site — is the same indirection the View UBO and
+Cull UBO already use, so it stays consistent across the codebase.
+
+**Block-layout keyword:** `std140` for UBO blocks, `std430` for SSBO
+blocks. `std430` on a `uniform` block is non-portable (NVIDIA accepts it,
+AMD/Intel reject; SPIR-V requires `VK_KHR_uniform_buffer_standard_layout`).
+For the param structs in scope (scalars / vec2 / vec3-with-padding / vec4
+/ mat4 — no arrays of scalars or vec3), std140 and std430 produce
+identical layouts, so there's no payload reason to deviate.
 
 **UBO binding-slot convention** (active shaders surveyed before pilot):
 - `0` — `Ubo_View_Constant_Buffer` (shared view/frame constants, everywhere)
