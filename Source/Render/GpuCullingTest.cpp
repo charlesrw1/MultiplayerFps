@@ -168,14 +168,12 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 	zero_instances_in_this(input.cmd_buf, input.num_cmds);
 
 	auto& device = draw.get_device();
-	if (is_for_shadow) {
-		if (frustum.is_ortho) {
-			draw.set_shader(cull_compute_cascade);
-		} else {
-			draw.set_shader(cull_compute_spot);
-		}
-	} else
-		draw.set_shader(cull_compute);
+	{
+		program_handle h = is_for_shadow
+			? (frustum.is_ortho ? cull_compute_cascade : cull_compute_spot)
+			: cull_compute;
+		RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(h); gfx().set_pipeline(ps);
+	}
 	const int co_size = cull.num_objects;
 	const int groups = glm::ceil(int(co_size) / 256.f);
 
@@ -306,7 +304,7 @@ void GpuCullingTest::downsample_depth() {
 	GPUSCOPESTART(downsample);
 
 	gfx().begin_compute_pass();
-	draw.set_shader(build_pyramid);
+	{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(build_pyramid); gfx().set_pipeline(ps); }
 	const int levels = Texture::get_mip_map_count(actual_depth_size.x, actual_depth_size.y);
 	int width = actual_depth_size.x;
 	int height = actual_depth_size.y;
@@ -371,7 +369,7 @@ void GpuCullingTest::compact_draws(const GpuCullInput& input) {
 	// stored in mdi buf after first 2 sections
 	gfx().bind_storage_buffer_base(6, input.draw_to_batch);
 
-	draw.set_shader(compaction);
+	{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(compaction); gfx().set_pipeline(ps); }
 	int groups_x = glm::ceil(input.num_cmds / 32.f);
 	draw.shader()->set_int("num_draws", input.num_batches);
 	draw.shader()->set_int("command_count", input.num_cmds);
@@ -383,7 +381,7 @@ void GpuCullingTest::compact_draws(const GpuCullInput& input) {
 
 void GpuCullingTest::zero_instances_in_this(IGraphicsBuffer* mdi_buf, int count) {
 	gfx().bind_storage_buffer_base(2, mdi_buf);
-	draw.set_shader(zero_instances_mdi);
+	{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(zero_instances_mdi); gfx().set_pipeline(ps); }
 	int groups_x = glm::ceil(count / 256.f);
 	draw.shader()->set_int("draw_count", count);
 	gfx().dispatch_compute(groups_x, 1, 1);

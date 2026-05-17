@@ -31,7 +31,7 @@ void SSRSystem::compute_depth() {
 	ASSERT(depth_pyramid != nullptr);
 
 	gfx().begin_compute_pass();
-	draw.set_shader(hiz_downsample);
+	{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(hiz_downsample); gfx().set_pipeline(ps); }
 	const int levels = Texture::get_mip_map_count(actual_depth_size.x, actual_depth_size.y);
 	int width = actual_depth_size.x;
 	int height = actual_depth_size.y;

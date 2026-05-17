@@ -144,11 +144,7 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 
 	for (int i = 0; i < (int)textures.size(); i++) {
 		Texture* t = textures[i];
-		uint32_t id = 0;
-		if (t->gpu_ptr) {
-			id = t->gpu_ptr->get_internal_handle();
-		}
-		draw.bind_texture(i, id);
+		draw.bind_texture_ptr(i, t->gpu_ptr);
 	}
 }
 

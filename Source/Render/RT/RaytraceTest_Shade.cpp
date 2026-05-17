@@ -102,7 +102,7 @@ void DdgiTesting::set_reflection_uniforms() {
     }
 
     draw.bind_texture_ptr(7, EnviornmentMapHelper::get().integrator.get_texture());
-    draw.bind_texture(9, draw.scene.skylights.at(0).skylight.generated_cube->get_internal_render_handle());
+    draw.bind_texture_ptr(9, draw.scene.skylights.at(0).skylight.generated_cube->gpu_ptr);
 }
 
 // ---------------------------------------------------------------------------

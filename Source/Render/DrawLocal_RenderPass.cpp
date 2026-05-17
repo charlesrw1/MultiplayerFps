@@ -149,11 +149,7 @@ void setup_batch(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled,
 
 	for (int i = 0; i < textures.size(); i++) {
 		Texture* t = textures[i];
-		uint32_t id = 0; // t->gl_id;
-		if (t->gpu_ptr) {
-			id = t->gpu_ptr->get_internal_handle();
-		}
-		draw.bind_texture(i, id);
+		draw.bind_texture_ptr(i, t->gpu_ptr);
 	}
 }
 

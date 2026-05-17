@@ -83,7 +83,7 @@ void Volumetric_Fog_System::compute() {
 
 	ivec3 groups = ceil(vec3(voltexturesize) / vec3(8, 8, 1));
 	{
-		draw.set_shader(prog.lightcalc);
+		{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(prog.lightcalc); gfx().set_pipeline(ps); }
 
 		draw.bind_texture_ptr(0, texture.last_volume);
 
@@ -101,7 +101,7 @@ void Volumetric_Fog_System::compute() {
 		gfx().memory_barrier(BARRIER_SHADER_IMAGE_ACCESS);
 	}
 	{
-		draw.set_shader(prog.raymarch);
+		{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(prog.raymarch); gfx().set_pipeline(ps); }
 
 		gfx().bind_image_for_compute(5, texture.last_volume, 0, -1, GraphicsImageAccess::WriteOnly);
 		gfx().bind_image_for_compute(2, texture.volume, 0, -1, GraphicsImageAccess::ReadOnly);

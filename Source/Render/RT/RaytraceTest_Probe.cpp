@@ -69,7 +69,7 @@ void DdgiTesting::compute_avg_probe_value() {
     device.bind_texture(2, probe_irradiance);
     device.bind_texture(3, probe_depth);
 
-    draw.set_shader(avg_probe_calc);
+    { RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(avg_probe_calc); gfx().set_pipeline(ps); }
     set_shit_fuck();
 
     const int groups = glm::ceil(num_probes / 64.f);
@@ -142,7 +142,7 @@ void DdgiTesting::execute() {
     // Probe relocation pass
     Random r(13);
     {
-        draw.set_shader(relocate_shader);
+        { RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(relocate_shader); gfx().set_pipeline(ps); }
 
         IGraphicsBuffer* relocate_param_buf = gfx().create_buffer({});
         relocate_param_buf->upload(relocate_params.data(), relocate_params.size() * sizeof(vec4));
@@ -169,12 +169,12 @@ void DdgiTesting::execute() {
 
     // Trace + gather loop
     for (int i = 0; i < bounces; i++) {
-        device.bind_texture_unit_raw(5, draw.scene.skylights.at(0).skylight.generated_cube->get_internal_render_handle());
+        device.bind_texture(5, draw.scene.skylights.at(0).skylight.generated_cube->gpu_ptr);
 
         device.bind_texture(2, probe_irradiance);
         device.bind_texture(3, probe_depth);
 
-        draw.set_shader(trace_shader);
+        { RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(trace_shader); gfx().set_pipeline(ps); }
         device.get_active_shader()->set_bool("do_irrad_calcs", i != 0);
         set_shit_fuck();
         device.get_active_shader()->set_float("ray_sample_randomness", r.RandF(0, TWOPI));
@@ -195,7 +195,7 @@ void DdgiTesting::execute() {
         gfx().dispatch_compute(groups, 1, 1);
 
         if (!skip_gather) {
-            draw.set_shader(gather_shader);
+            { RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(gather_shader); gfx().set_pipeline(ps); }
             set_shit_fuck();
             device.get_active_shader()->set_int("num_runs_so_far", glm::max(0, i - 1));
 
@@ -253,7 +253,7 @@ void DdgiTesting::calculate_lum_for_spec() {
     device.bind_texture(2, probe_irradiance);
     device.bind_texture(3, probe_depth);
 
-    draw.set_shader(lum_calc);
+    { RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(lum_calc); gfx().set_pipeline(ps); }
     set_shit_fuck();
     const int num_cubemaps = RenderGiManager::inst->get_num_cubemaps();
     device.get_active_shader()->set_int("num_cubemaps", num_cubemaps);

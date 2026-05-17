@@ -276,16 +276,7 @@ public:
 
 	// graphics_settings
 
-	void bind_vao(uint32_t vao);
-	void bind_texture(int bind, int id);
-	void bind_texture_ptr(int bind, IGraphicsTexture* ptr) {
-		if (ptr)
-			bind_texture(bind, ptr->get_internal_handle());
-	}
-
-	void set_shader(program_handle handle);
-	void set_blend_state(BlendState blend);
-	void set_show_backfaces(bool show_backfaces);
+	void bind_texture_ptr(int bind, IGraphicsTexture* ptr);
 	IGraphicsShader* shader();
 
 	void draw_meshbuilders();

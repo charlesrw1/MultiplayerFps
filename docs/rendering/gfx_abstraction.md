@@ -611,7 +611,7 @@ Render/compute pass split was already runtime-checked inside the backend's
 PassMode tracker (Sub-phase 1.4g); the lifecycle methods now sit alongside it
 so the encoder boundary is observable from the interface.
 
-### 2e — Per-frame buffer update model
+### 2e — Per-frame buffer update model - done/HANDLE THIS IN ABSTRACTION LAYER
 
 Mid-frame `glNamedBufferSubData` on GPU-active buffers (DrawLocal_SceneDraw.cpp:138,
 DrawLocal_RenderPass.cpp:477-485, Ssao.cpp:264, Render_Lists per-frame upload

@@ -7,23 +7,8 @@
 #include "IGraphicsDevice.h"
 #include "Framework/Util.h"
 
-void Renderer::bind_texture(int bind, int id) {
-	gfx().bind_texture_unit_raw(bind, (uint32_t)id);
-}
-
-void Renderer::bind_vao(uint32_t vao) {
-	gfx().set_vao_raw(vao);
-}
-
-void Renderer::set_blend_state(BlendState blend) {
-	gfx().set_blend_state(blend);
-}
-void Renderer::set_show_backfaces(bool show_backfaces) {
-	gfx().set_show_backfaces(show_backfaces);
-}
-
-void Renderer::set_shader(program_handle handle) {
-	gfx().set_shader_ptr(handle == -1 ? nullptr : prog_man.get_obj(handle));
+void Renderer::bind_texture_ptr(int bind, IGraphicsTexture* ptr) {
+	gfx().bind_texture(bind, ptr);
 }
 
 IGraphicsShader* Renderer::shader() {
