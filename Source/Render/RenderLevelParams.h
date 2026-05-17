@@ -2,6 +2,8 @@
 
 #include "Render/DrawPublic.h"
 
+class IGraphicsBuffer;
+
 struct Render_lists_cpufast
 {
 	IGraphicsBuffer* glinst_to_inst{}; // object indirection
@@ -44,7 +46,7 @@ struct Render_Level_Params
 	bool wireframe_secondpass = false;
 
 	bool upload_constants = false;
-	bufferhandle provied_constant_buffer = 0;
+	IGraphicsBuffer* provied_constant_buffer = nullptr;
 
 	// for cascade shadow map ortho!
 	bool wants_non_reverse_z = false;

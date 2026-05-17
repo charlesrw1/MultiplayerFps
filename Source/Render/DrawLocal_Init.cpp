@@ -83,7 +83,7 @@ void Renderer::reload_shaders() {
 	// prog_man.recompile_all();
 }
 
-void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, bufferhandle ubo, bool wireframe_secondpass) {
+void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, IGraphicsBuffer* ubo, bool wireframe_secondpass) {
 	gpu::Ubo_View_Constants_Struct constants;
 	auto& vs = view_to_use;
 	constants.view = vs.view;
@@ -133,7 +133,8 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, bufferha
 		constants.flags |= (1 << 1);
 	}
 
-	glNamedBufferData(ubo, sizeof(gpu::Ubo_View_Constants_Struct), &constants, GL_DYNAMIC_DRAW);
+	ASSERT(ubo != nullptr);
+	ubo->sub_upload(&constants, sizeof(gpu::Ubo_View_Constants_Struct), 0);
 }
 
 Renderer::Renderer() {}
@@ -389,7 +390,12 @@ void Renderer::init() {
 	print_time("draw:create_shaders");
 
 	create_default_textures();
-	glCreateBuffers(1, &ubo.current_frame);
+	{
+		CreateBufferArgs args;
+		args.size = sizeof(gpu::Ubo_View_Constants_Struct);
+		args.flags = BUFFER_USE_DYNAMIC;
+		ubo.current_frame = gfx().create_buffer(args);
+	}
 	InitFramebuffers(true, g_window_w.get_integer(), g_window_h.get_integer());
 	print_time("draw:buffers");
 

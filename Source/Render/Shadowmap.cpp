@@ -27,8 +27,19 @@ void CascadeShadowMapSystem::init() {
 	Debug_Interface::get()->add_hook("shadow map", shadow_map_tweaks);
 
 	make_csm_rendertargets();
-	glCreateBuffers(1, &ubo.info);
-	glCreateBuffers(4, ubo.frame_view);
+	{
+		// Shadowmap_Csm_Ubo_Struct (defined locally in update_matricies): 4 mat4 + 2 vec4.
+		CreateBufferArgs info_args;
+		info_args.size = sizeof(glm::mat4) * 4 + sizeof(glm::vec4) * 2;
+		info_args.flags = BUFFER_USE_DYNAMIC;
+		ubo.info = gfx().create_buffer(info_args);
+
+		CreateBufferArgs view_args;
+		view_args.size = sizeof(gpu::Ubo_View_Constants_Struct);
+		view_args.flags = BUFFER_USE_DYNAMIC;
+		for (int i = 0; i < 4; i++)
+			ubo.frame_view[i] = gfx().create_buffer(view_args);
+	}
 }
 void CascadeShadowMapSystem::make_csm_rendertargets() {
 	if (tweak.quality == 0)
@@ -174,7 +185,8 @@ void CascadeShadowMapSystem::update_matricies() {
 			upload_data.far_planes[i] = farplanes[i];
 		}
 
-		glNamedBufferData(ubo.info, sizeof(Shadowmap_Csm_Ubo_Struct), &upload_data, GL_DYNAMIC_DRAW);
+		static_assert(sizeof(Shadowmap_Csm_Ubo_Struct) == sizeof(glm::mat4) * 4 + sizeof(glm::vec4) * 2);
+		ubo.info->sub_upload(&upload_data, sizeof(Shadowmap_Csm_Ubo_Struct), 0);
 	}
 }
 

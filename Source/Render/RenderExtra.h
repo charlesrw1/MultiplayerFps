@@ -103,7 +103,7 @@ public:
 
 private:
 	ShadowMapAtlas atlas;
-	bufferhandle frame_view = 0;
+	IGraphicsBuffer* frame_view = nullptr;
 };
 
 // rect packed atlas for light cookies+ies
@@ -140,8 +140,8 @@ public:
 
 	struct uniform_buffers
 	{
-		bufferhandle frame_view[4];
-		bufferhandle info;
+		IGraphicsBuffer* frame_view[4] = {};
+		IGraphicsBuffer* info = nullptr;
 	} ubo;
 
 	struct textures

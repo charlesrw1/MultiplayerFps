@@ -122,7 +122,7 @@ public:
 
 	void render() {
 		// return;
-		gfx().bind_uniform_buffer_base_raw(0, draw.ubo.current_frame);
+		gfx().bind_uniform_buffer_base(0, draw.ubo.current_frame);
 		auto& device = draw.get_device();
 		for (int i = 0; i < (int)drawCmds.size(); i++) {
 			UIDrawCmdUnion& cmd = drawCmds[i];

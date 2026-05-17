@@ -77,7 +77,7 @@ void Volumetric_Fog_System::compute() {
 	buffer.param->sub_upload(&params, sizeof(params), 0);
 
 	gfx().bind_uniform_buffer_base(4, buffer.param);
-	gfx().bind_uniform_buffer_base_raw(0, draw.ubo.current_frame);
+	gfx().bind_uniform_buffer_base(0, draw.ubo.current_frame);
 	gfx().bind_storage_buffer_base(3, draw.buf.lighting_uniforms);
 
 	ivec3 groups = ceil(vec3(voltexturesize) / vec3(8, 8, 1));

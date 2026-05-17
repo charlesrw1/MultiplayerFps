@@ -255,7 +255,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 			return tex.scene_color;
 		}
 
-		glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
+		gfx().bind_uniform_buffer_base(0, ubo.current_frame);
 
 		// write to tex.scene_gbuffer0
 		// RenderPassSetup setup("taa_resolve", fbo.taa_resolve, false, false, 0, 0, cur_w, cur_h);

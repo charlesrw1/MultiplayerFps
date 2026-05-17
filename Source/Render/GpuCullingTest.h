@@ -130,7 +130,7 @@ public:
 	program_handle zero_instances_mdi{};
 	program_handle cpu_vis_array_to_mdi{};
 
-	void zero_instances_in_this(bufferhandle mdi_buf, int count);
+	void zero_instances_in_this(IGraphicsBuffer* mdi_buf, int count);
 
 	void do_shadow_cull(const GpuCullInput& input, Frustum f);
 

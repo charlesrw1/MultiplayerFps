@@ -15,9 +15,6 @@
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
 
-// Index type used for model element buffers. Matches MODEL_INDEX_TYPE_GL = GL_UNSIGNED_SHORT.
-static constexpr VertexInputIndexType MODEL_INDEX_TYPE = VertexInputIndexType::uint16;
-
 // -----------------------------------------------------------------------
 // BuildSceneData_CpuFast – batch rebuilding, GPU upload, and draw dispatch
 // -----------------------------------------------------------------------
@@ -172,7 +169,7 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 		IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
 		auto& scene = draw.scene;
 		gfx().bind_storage_buffer_base(2, scene.gpu_instance_buffer);
-		gfx().bind_storage_buffer_base_raw(3, scene.gpu_skinned_mats_buffer);
+		gfx().bind_storage_buffer_base(3, scene.gpu_skinned_mats_buffer);
 		gfx().bind_storage_buffer_base(4, material_buffer);
 		gfx().bind_storage_buffer_base(5, gpu.glinst_to_inst);
 

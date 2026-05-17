@@ -163,7 +163,7 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 	// zero_instances_in_this(multidraw_buffer->get_internal_handle(), cmd_mats.size());	// clear instances to 0, so
 	// they can be incremented
 
-	zero_instances_in_this(input.cmd_buf->get_internal_handle(), input.num_cmds);
+	zero_instances_in_this(input.cmd_buf, input.num_cmds);
 
 	auto& device = draw.get_device();
 	if (is_for_shadow) {
@@ -378,8 +378,8 @@ void GpuCullingTest::compact_draws(const GpuCullInput& input) {
 	gfx().memory_barrier(BARRIER_SHADER_STORAGE | BARRIER_COMMAND);
 }
 
-void GpuCullingTest::zero_instances_in_this(bufferhandle mdi_buf, int count) {
-	gfx().bind_storage_buffer_base_raw(2, mdi_buf);
+void GpuCullingTest::zero_instances_in_this(IGraphicsBuffer* mdi_buf, int count) {
+	gfx().bind_storage_buffer_base(2, mdi_buf);
 	draw.set_shader(zero_instances_mdi);
 	int groups_x = glm::ceil(count / 256.f);
 	draw.shader().set_int("draw_count", count);

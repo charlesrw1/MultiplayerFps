@@ -253,11 +253,6 @@ public:
 													base_vertex);
 	}
 
-	void bind_uniform_buffer_base_raw(int slot, uint32_t buffer_handle) override {
-		ASSERT(slot >= 0);
-		glBindBufferBase(GL_UNIFORM_BUFFER, slot, buffer_handle);
-	}
-
 	void wait_for_gpu_idle() override {
 		glFlush();
 		glFinish();
@@ -364,9 +359,11 @@ public:
 		ASSERT(slot >= 0 && buf != nullptr);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, slot, buf->get_internal_handle());
 	}
-	void bind_storage_buffer_base_raw(int slot, uint32_t buffer_handle) override {
-		ASSERT(slot >= 0);
-		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, slot, buffer_handle);
+	void bind_storage_buffer_range(int slot, IGraphicsBuffer* buf,
+								   int offset, int size) override {
+		ASSERT(slot >= 0 && buf != nullptr && offset >= 0 && size > 0);
+		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, slot,
+						  buf->get_internal_handle(), offset, size);
 	}
 
 	IGraphicsSampler* create_sampler(const CreateSamplerArgs& args) override {
@@ -453,30 +450,6 @@ public:
 		const GLenum gl_type = (index_type == VertexInputIndexType::uint16)
 								   ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 		glDrawElements(gl_mode, count, gl_type, (const void*)(intptr_t)byte_offset);
-	}
-
-	void bind_storage_buffer_range_raw(int slot, uint32_t buffer_handle,
-									   int offset, int size) override {
-		ASSERT(slot >= 0 && offset >= 0 && size > 0);
-		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, slot, buffer_handle, offset, size);
-	}
-
-	void bind_indirect_buffer_raw(uint32_t buffer_handle) override {
-		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, buffer_handle);
-	}
-
-	void upload_buffer_raw(uint32_t buffer_handle, int size,
-						   const void* data) override {
-		ASSERT(buffer_handle != 0 && size >= 0);
-		glNamedBufferData(buffer_handle, size, data, GL_DYNAMIC_DRAW);
-	}
-
-	void sub_upload_buffer_raw(uint32_t buffer_handle, int offset, int size,
-							   const void* data) override {
-		ASSERT(buffer_handle != 0 && offset >= 0 && size >= 0);
-		if (size == 0)
-			return;
-		glNamedBufferSubData(buffer_handle, offset, size, data);
 	}
 
 	void multi_draw_elements_indirect_count(GraphicsPrimitiveType mode,

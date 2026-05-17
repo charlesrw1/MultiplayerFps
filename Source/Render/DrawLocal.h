@@ -250,7 +250,7 @@ public:
 
 	struct uniform_buffers
 	{
-		bufferhandle current_frame{};
+		IGraphicsBuffer* current_frame = nullptr;
 	} ubo;
 
 	struct buffers
@@ -316,7 +316,7 @@ private:
 	std::unique_ptr<ThumbnailRenderer> thumbnailRenderer;
 #endif
 
-	void upload_ubo_view_constants(const View_Setup& view, bufferhandle ubo, bool wireframe_secondpass = false);
+	void upload_ubo_view_constants(const View_Setup& view, IGraphicsBuffer* ubo, bool wireframe_secondpass = false);
 
 	void upload_light_and_decal_buffers();
 

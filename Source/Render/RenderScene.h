@@ -147,18 +147,17 @@ public:
 
 	// commands to input to glMultiDrawElementsIndirect
 	std::vector<gpu::DrawElementsIndirectCommand> commands;
-	bufferhandle gpu_command_list = 0;
+	IGraphicsBuffer* gpu_command_list = nullptr;
 	// command_count is the number of commands per glMultiDrawElementsIndirect command
 	// for now its just set to batches[i].count in the Render_Pass
 	// when calling glMDEI, the offset into commands is the summation of previous command counts essentially
 	// it works like an indirection into commands
 	std::vector<int> command_count;
-	// bufferhandle gpu_command_count = 0;
 
 	// maps the gl_DrawID to submesh material
-	bufferhandle gldrawid_to_submesh_material;
+	IGraphicsBuffer* gldrawid_to_submesh_material = nullptr;
 	// maps gl_baseinstance + gl_instance to the render object instance (for transforms, animation, etc.)
-	bufferhandle glinstance_to_instance;
+	IGraphicsBuffer* glinstance_to_instance = nullptr;
 
 	// where are we getting our objects from
 	const Render_Pass* parent_pass = nullptr;
@@ -581,7 +580,7 @@ public:
 
 	int gpu_skinned_mats_buffer_size = 0; // in matricies (64 bytes)
 	bool gpu_skinned_mats_using_front_buffer = true;
-	bufferhandle gpu_skinned_mats_buffer = 0;
+	IGraphicsBuffer* gpu_skinned_mats_buffer = nullptr;
 
 	IGraphicsBuffer* gpu_instance_buffer = nullptr;
 

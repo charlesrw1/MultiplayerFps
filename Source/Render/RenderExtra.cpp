@@ -78,7 +78,10 @@ IGraphicsTexture* ShadowMapAtlas::get_atlas_texture() {
 
 ShadowMapManager::ShadowMapManager() {
 	ASSERT(gfx_is_initialized());
-	glCreateBuffers(1, &frame_view);
+	CreateBufferArgs args;
+	args.size = sizeof(gpu::Ubo_View_Constants_Struct);
+	args.flags = BUFFER_USE_DYNAMIC;
+	frame_view = gfx().create_buffer(args);
 }
 
 // some stuff to do:

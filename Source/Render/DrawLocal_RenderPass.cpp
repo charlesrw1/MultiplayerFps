@@ -173,31 +173,26 @@ int setup_execute_render_lists(Render_Lists& list, Render_Pass& pass) {
 	IGraphicsBuffer* material_buffer = matman.get_gpu_material_buffer();
 
 	gfx().bind_storage_buffer_base(2, scene.gpu_instance_buffer);
-	gfx().bind_storage_buffer_base_raw(3, scene.gpu_skinned_mats_buffer);
+	gfx().bind_storage_buffer_base(3, scene.gpu_skinned_mats_buffer);
 	gfx().bind_storage_buffer_base(4, material_buffer);
-	gfx().bind_storage_buffer_base_raw(5, list.glinstance_to_instance);
+	gfx().bind_storage_buffer_base(5, list.glinstance_to_instance);
 	int offset_command_bytes = 0;
 	if (0) {
 		const int size = pass.mesh_batches.size() * sizeof(int);
-		gfx().bind_storage_buffer_range_raw(6, list.gldrawid_to_submesh_material, size, size);
+		gfx().bind_storage_buffer_range(6, list.gldrawid_to_submesh_material, size, size);
 		const int command_size = list.commands.size() * sizeof(gpu::DrawElementsIndirectCommand);
-		gfx().bind_indirect_buffer_raw(list.gpu_command_list);
+		gfx().bind_indirect_buffer(list.gpu_command_list);
 		offset_command_bytes = command_size;
-		// gfx().bind_storage_buffer_base_raw(6, list.gldrawid_to_submesh_material);
-		// if (use_client_buffer_mdi.get_bool())
-		//	gfx().bind_indirect_buffer(nullptr);
-		// else
-		//	gfx().bind_indirect_buffer_raw(list.gpu_command_list);
 
 		auto buf = list.get_count_buf();
 		ASSERT(buf);
 		gfx().bind_parameter_buffer(buf);
 	} else {
-		gfx().bind_storage_buffer_base_raw(6, list.gldrawid_to_submesh_material);
+		gfx().bind_storage_buffer_base(6, list.gldrawid_to_submesh_material);
 		if (use_client_buffer_mdi.get_bool())
 			gfx().bind_indirect_buffer(nullptr);
 		else
-			gfx().bind_indirect_buffer_raw(list.gpu_command_list);
+			gfx().bind_indirect_buffer(list.gpu_command_list);
 	}
 
 	if (scene.has_lightmap && scene.lightmapObj.lightmap_texture) {
@@ -275,10 +270,10 @@ void Renderer::render_level_to_target(const Render_Level_Params& params) {
 
 	device.reset_states();
 
-	bufferhandle what_ubo = params.provied_constant_buffer;
+	IGraphicsBuffer* what_ubo = params.provied_constant_buffer;
 	{
 		bool upload = params.upload_constants;
-		if (params.provied_constant_buffer == 0) {
+		if (what_ubo == nullptr) {
 			what_ubo = ubo.current_frame;
 			upload = true;
 		}
@@ -286,7 +281,7 @@ void Renderer::render_level_to_target(const Render_Level_Params& params) {
 			upload_ubo_view_constants(params.view, what_ubo, params.wireframe_secondpass);
 	}
 
-	gfx().bind_uniform_buffer_base_raw(0, what_ubo);
+	gfx().bind_uniform_buffer_base(0, what_ubo);
 
 	if (params.pass == Render_Level_Params::SHADOWMAP) {
 		gfx().set_polygon_offset(true, params.offset_poly_units, 4 /* this does nothing?*/);
@@ -402,16 +397,14 @@ static void build_standard_cpu(Render_Lists& list, Render_Pass& src, Free_List<R
 	// then dispatch a compute that looks in glinstance_to_instance, finds instance vis status
 	// then increments
 
-	gfx().upload_buffer_raw(list.gldrawid_to_submesh_material,
-							sizeof(uint32_t) * draw_to_material.size(),
-							draw_to_material.data());
+	list.gldrawid_to_submesh_material->upload(
+		draw_to_material.data(), sizeof(uint32_t) * draw_to_material.size());
 
-	gfx().upload_buffer_raw(list.glinstance_to_instance,
-							sizeof(uint32_t) * objCount, glinstance_to_instance);
+	list.glinstance_to_instance->upload(
+		glinstance_to_instance, sizeof(uint32_t) * objCount);
 
 	const int command_list_size_bytes = sizeof(gpu::DrawElementsIndirectCommand) * list.commands.size();
-	gfx().upload_buffer_raw(list.gpu_command_list, command_list_size_bytes,
-							list.commands.data());
+	list.gpu_command_list->upload(list.commands.data(), command_list_size_bytes);
 }
 void Render_Lists_Gpu_Culled::init(uint32_t drawidsz, uint32_t instbufsz) {
 	Render_Lists::init(drawidsz, instbufsz);
@@ -479,17 +472,20 @@ static void build_cascade_cpu(Render_Lists& shadowlist, Render_Pass& shadowpass,
 	if (collapse_draw_calls.get_bool())
 		collapse_commands(shadowlist, draw_to_material);
 
-	gfx().upload_buffer_raw(shadowlist.gldrawid_to_submesh_material,
-							sizeof(uint32_t) * draw_to_material.size(),
-							draw_to_material.data());
+	shadowlist.gldrawid_to_submesh_material->upload(
+		draw_to_material.data(), sizeof(uint32_t) * draw_to_material.size());
 
-	gfx().upload_buffer_raw(shadowlist.glinstance_to_instance,
-							sizeof(uint32_t) * objCount, nullptr);
-	gfx().sub_upload_buffer_raw(shadowlist.glinstance_to_instance, 0,
-								sizeof(uint32_t) * objCount, glinstance_to_instance);
+	// Two-step (upload to size, then sub_upload) preserves the original semantics
+	// from when this used glNamedBufferData+glNamedBufferSubData. sub_upload is a
+	// no-op when objCount==0 (matches the original glNamedBufferSubData size==0
+	// path build_cascade_cpu relied on for empty cascades).
+	shadowlist.glinstance_to_instance->upload(nullptr, sizeof(uint32_t) * objCount);
+	if (objCount > 0) {
+		shadowlist.glinstance_to_instance->sub_upload(
+			glinstance_to_instance, sizeof(uint32_t) * objCount, 0);
+	}
 
 	auto& list = shadowlist;
 	const int command_list_size_bytes = sizeof(gpu::DrawElementsIndirectCommand) * list.commands.size();
-	gfx().upload_buffer_raw(list.gpu_command_list, command_list_size_bytes,
-							list.commands.data());
+	list.gpu_command_list->upload(list.commands.data(), command_list_size_bytes);
 }

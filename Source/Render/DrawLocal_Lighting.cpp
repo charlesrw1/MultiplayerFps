@@ -321,7 +321,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 	// auto scope = device.start_render_pass(setup);
 	const bool wants_ssao = !is_cubemap_view && enable_ssao.get_bool();
 	IGraphicsTexture* const ssao_tex = (wants_ssao) ? ssao.texture.result : white_texture; // skip ssao in cubemap view
-	gfx().bind_uniform_buffer_base_raw(0, ubo.current_frame);
+	gfx().bind_uniform_buffer_base(0, ubo.current_frame);
 	gfx().bind_indirect_buffer(nullptr);
 
 	device.reset_states();
@@ -377,7 +377,7 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		bind_texture_ptr(2, tex.scene_gbuffer2);
 		bind_texture_ptr(3, tex.scene_depth);
 		bind_texture_ptr(4, draw.shadowmap.texture.shadow_array);
-		gfx().bind_uniform_buffer_base_raw(8, draw.shadowmap.ubo.info);
+		gfx().bind_uniform_buffer_base(8, draw.shadowmap.ubo.info);
 
 		shader().set_vec3("uSunDirection", sun_internal->sun.direction);
 		shader().set_vec3("uSunColor", sun_internal->sun.color);

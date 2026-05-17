@@ -98,7 +98,7 @@ void Renderer::draw_height_fog(IGraphicsTexture* target) {
 }
 
 void Renderer::deferred_decal_pass() {
-	glBindBufferBase(GL_UNIFORM_BUFFER, 0, ubo.current_frame);
+	gfx().bind_uniform_buffer_base(0, ubo.current_frame);
 	decalBatcher->draw_decals();
 }
 void Renderer::sync_update() {
@@ -135,8 +135,10 @@ void Renderer::sync_update() {
 	if (mgr->get_num_matricies_used() > scene.gpu_skinned_mats_buffer_size / 2)
 		Fatalf("out of animated buffer memory\n");
 
-	glNamedBufferSubData(scene.gpu_skinned_mats_buffer, scene.get_front_bone_buffer_offset() * sizeof(glm::mat4),
-						 sizeof(glm::mat4) * mgr->get_num_matricies_used(), mgr->get_bonemat_ptr(0));
+	scene.gpu_skinned_mats_buffer->sub_upload(
+		mgr->get_bonemat_ptr(0),
+		sizeof(glm::mat4) * mgr->get_num_matricies_used(),
+		scene.get_front_bone_buffer_offset() * sizeof(glm::mat4));
 }
 ConfigVar r_print_light_tiles("r.print_light_tiles", "0", CVAR_BOOL | CVAR_DEV, "");
 

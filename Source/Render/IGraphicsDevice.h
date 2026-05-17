@@ -346,11 +346,6 @@ public:
 										   VertexInputIndexType index_type,
 										   int byte_offset, int base_vertex) = 0;
 
-	// Transitional: binds a GL UBO handle to a binding point. Will be replaced
-	// by bind_uniform_buffer(int, IGraphicsBuffer*, int, int) once UBOs migrate
-	// off raw bufferhandle in a later sub-phase. The _raw suffix flags the leak.
-	virtual void bind_uniform_buffer_base_raw(int slot, uint32_t buffer_handle) = 0;
-
 	// Block until all submitted GPU work has completed. Debug/editor readback
 	// only; do NOT call on hot paths. Wraps glFlush + glFinish.
 	virtual void wait_for_gpu_idle() = 0;
@@ -368,9 +363,7 @@ public:
 	// Bind a texture to a sampler/texture slot.
 	virtual void bind_texture(int slot, IGraphicsTexture* tex) = 0;
 
-	// Bind a UBO to a binding point. Non-raw variant for buffers created via
-	// create_buffer; the raw variant above is the bridge for the global
-	// ubo.current_frame still on bufferhandle.
+	// Bind a UBO to a binding point.
 	virtual void bind_uniform_buffer_base(int slot, IGraphicsBuffer* buf) = 0;
 
 	// Clamp the mip range visible to sampling. Used by the specular-prefilter
@@ -404,11 +397,13 @@ public:
 										int mip, int layer,
 										GraphicsImageAccess access) = 0;
 
-	// Bind an SSBO to a binding slot. Non-raw variant for buffers created via
-	// create_buffer; _raw is the transitional bridge for sites still holding a
-	// raw bufferhandle (e.g. draw.ubo.current_frame, batch-built MDI buffer).
+	// Bind an SSBO to a binding slot.
 	virtual void bind_storage_buffer_base(int slot, IGraphicsBuffer* buf) = 0;
-	virtual void bind_storage_buffer_base_raw(int slot, uint32_t buffer_handle) = 0;
+
+	// Bind a sub-range of an SSBO to a binding slot. Wraps
+	// glBindBufferRange(GL_SHADER_STORAGE_BUFFER, …).
+	virtual void bind_storage_buffer_range(int slot, IGraphicsBuffer* buf,
+										   int offset, int size) = 0;
 
 	// ---- Phase 1.3b wrap surface (samplers + buffer clear) -----------------
 
@@ -491,26 +486,6 @@ public:
 							   VertexInputIndexType index_type,
 							   int byte_offset) = 0;
 
-	// Bind a sub-range of a raw GL buffer to an SSBO slot. Wraps
-	// glBindBufferRange(GL_SHADER_STORAGE_BUFFER, …). The _raw suffix flags
-	// that the buffer still lives as a raw `bufferhandle`; folds into
-	// IGraphicsBuffer* in a later sub-phase.
-	virtual void bind_storage_buffer_range_raw(int slot, uint32_t buffer_handle,
-											   int offset, int size) = 0;
-
-	// Bind a raw GL buffer to GL_DRAW_INDIRECT_BUFFER (handle 0 unbinds).
-	// _raw escape for sites whose buffer is still a `bufferhandle`.
-	virtual void bind_indirect_buffer_raw(uint32_t buffer_handle) = 0;
-
-	// glNamedBufferData on a raw buffer handle. _raw escape for sites whose
-	// buffer is still a `bufferhandle`; folds into IGraphicsBuffer::upload
-	// (and Phase 2e's ring buffer) once those buffers migrate.
-	virtual void upload_buffer_raw(uint32_t buffer_handle, int size,
-								   const void* data) = 0;
-
-	// glNamedBufferSubData on a raw buffer handle. _raw escape; see above.
-	virtual void sub_upload_buffer_raw(uint32_t buffer_handle, int offset,
-									   int size, const void* data) = 0;
 };
 
 // Global accessor for the active graphics device. Initialize the OpenGL backend

@@ -224,9 +224,19 @@ Render_Scene::Render_Scene()
 	  editor_sel_pass(pass_type::DEPTH), shadow_pass(pass_type::DEPTH), depth_prepass(pass_type::DEPTH) {}
 
 void Render_Lists::init(uint32_t drawbufsz, uint32_t instbufsz) {
-	glCreateBuffers(1, &gldrawid_to_submesh_material);
-	glCreateBuffers(1, &glinstance_to_instance);
-	glCreateBuffers(1, &gpu_command_list);
+	// Buffers are re-spec'd each frame via IGraphicsBuffer::upload (current OpenGL
+	// behaviour preserved; SDL3 GPU port replaces this with a per-frame ring
+	// buffer in Phase 2e).
+	CreateBufferArgs storage_args;
+	storage_args.size = 0;
+	storage_args.flags = GraphicsBufferUseFlags(BUFFER_USE_AS_STORAGE_READ | BUFFER_USE_DYNAMIC);
+	gldrawid_to_submesh_material = gfx().create_buffer(storage_args);
+	glinstance_to_instance = gfx().create_buffer(storage_args);
+
+	CreateBufferArgs cmd_args;
+	cmd_args.size = 0;
+	cmd_args.flags = GraphicsBufferUseFlags(BUFFER_USE_AS_INDIRECT | BUFFER_USE_AS_STORAGE_READ | BUFFER_USE_DYNAMIC);
+	gpu_command_list = gfx().create_buffer(cmd_args);
 }
 
 void Render_Lists::build_from(Render_Pass& src, Free_List<ROP_Internal>& proxy_list,
@@ -295,12 +305,14 @@ void Render_Scene::init() {
 
 	gpu_instance_buffer = gfx().create_buffer({});
 
-	// glCreateBuffers(1, &gpu_render_instance_buffer);
-	glCreateBuffers(1, &gpu_skinned_mats_buffer);
-
 	gpu_skinned_mats_buffer_size = r_skinned_mats_bone_buffer_size.get_integer();
-	glNamedBufferData(gpu_skinned_mats_buffer, gpu_skinned_mats_buffer_size * sizeof(glm::mat4), nullptr,
-					  GL_STATIC_DRAW);
+	{
+		// Fixed-size SSBO; bone matrices are sub-uploaded per frame.
+		CreateBufferArgs args;
+		args.size = gpu_skinned_mats_buffer_size * sizeof(glm::mat4);
+		args.flags = BUFFER_USE_AS_STORAGE_READ;
+		gpu_skinned_mats_buffer = gfx().create_buffer(args);
+	}
 }
 
 void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object& proxy) {
