@@ -249,6 +249,27 @@ public:
 	virtual Reflection reflect() = 0;
 };
 
+// GPU timer query. Created via gfx().create_timer_query(); destroyed via
+// release(). See IGraphicsDevice::create_timer_query for the timing model.
+class IGraphicsTimerQuery
+{
+public:
+	virtual ~IGraphicsTimerQuery() {}
+	virtual void release() = 0;
+
+	// Sample current GPU time. Recorded value becomes visible asynchronously.
+	virtual void record_timestamp() = 0;
+
+	// Non-blocking. Returns true once the last record_timestamp() has
+	// completed on the GPU and read_timestamp_ns() can return without
+	// stalling.
+	virtual bool is_available() = 0;
+
+	// Read the last-recorded timestamp in nanoseconds. Blocks (forces a
+	// CPU/GPU sync) if !is_available().
+	virtual uint64_t read_timestamp_ns() = 0;
+};
+
 // Standalone sampler object. Bound to a texture slot via gfx().bind_sampler;
 // when bound, it overrides the sampler params baked into the texture itself.
 class IGraphicsSampler
@@ -660,6 +681,30 @@ public:
 	// the wireframe debug pass straddles many draws; SDL3 GPU has no equivalent
 	// and the wireframe pass will be re-expressed when that backend lands.
 	virtual void set_polygon_fill_mode(GraphicsFillMode mode) = 0;
+
+	// ---- Phase 2 B4: debug groups + GPU timing ----------------------------
+
+	// Named scope marker for GPU debuggers (RenderDoc / Nsight / apitrace).
+	// OpenGL: glPushDebugGroup / glPopDebugGroup. SDL3 GPU:
+	// SDL_PushGPUDebugGroup / SDL_PopGPUDebugGroup. Pairs must balance.
+	// Cheap — leave live in release builds.
+	virtual void push_debug_group(const char* name) = 0;
+	virtual void pop_debug_group() = 0;
+
+	// GPU timer queries. Single-timestamp model — wall-clock-style GPU time
+	// is sampled when record_timestamp() returns; elapsed time between two
+	// calls is computed by the caller as (b.read_timestamp_ns() -
+	// a.read_timestamp_ns()).
+	//
+	// OpenGL: backed by glQueryCounter(GL_TIMESTAMP). SDL3 GPU has no
+	// timestamp queries; that backend returns a stub whose is_available()
+	// is true and read_timestamp_ns() is 0, so Profiler GPU readings show
+	// zero rather than crashing.
+	//
+	// Lifetime: caller owns; release() destroys the underlying GL query
+	// object. Reusable — record_timestamp() can be called repeatedly to
+	// re-arm; only the most recent timestamp is observable.
+	virtual class IGraphicsTimerQuery* create_timer_query() = 0;
 
 	// Copy a (mip, layer) sub-image between two textures (same format, same
 	// dimensions). Wraps glCopyImageSubData; SDL3 backend uses

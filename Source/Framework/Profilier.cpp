@@ -1,5 +1,5 @@
 ﻿#include "Framework/Util.h"
-#include "glad/glad.h"
+#include "Render/IGraphicsDevice.h"
 #include "imgui.h"
 #include <chrono>
 #include <SDL2/SDL.h>
@@ -26,7 +26,8 @@ struct Profile_Event
 
 	uint64_t last_interval_time_gpu = 0;
 	uint64_t gputime = 0; // nanoseconds
-	uint32_t glquery[2];
+	IGraphicsTimerQuery* gpu_query_start = nullptr;
+	IGraphicsTimerQuery* gpu_query_end = nullptr;
 	uint32_t accumulated_gpu = 0;
 	bool waiting = false;
 
@@ -153,7 +154,8 @@ void Profiler::start_scope(const char* name, bool gpu) {
 		pe->name = name;
 		if (gpu) {
 			pe->is_gpu_event = true;
-			glGenQueries(2, pe->glquery);
+			pe->gpu_query_start = gfx().create_timer_query();
+			pe->gpu_query_end   = gfx().create_timer_query();
 		}
 	} else {
 		pe = &find->second;
@@ -170,15 +172,13 @@ void Profiler::start_scope(const char* name, bool gpu) {
 	e.cpustart = std::chrono::duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count();
 
 	if (e.is_gpu_event && !e.waiting) {
-		glQueryCounter(e.glquery[0], GL_TIMESTAMP);
+		e.gpu_query_start->record_timestamp();
 	}
 
 	if (e.is_gpu_event)
-		glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, name);
+		gfx().push_debug_group(name);
 
 	stack.push_back(pe);
-
-	gfx_check_gl_error();
 }
 
 void Profiler::end_scope(const char* name) {
@@ -200,29 +200,20 @@ void Profiler::end_scope(const char* name) {
 
 	if (e.is_gpu_event) {
 		if (!e.waiting) {
-			glQueryCounter(e.glquery[1], GL_TIMESTAMP);
-			gfx_check_gl_error();
+			e.gpu_query_end->record_timestamp();
 			e.waiting = true;
 		}
-		int available{};
-		glGetQueryObjectiv(e.glquery[1], GL_QUERY_RESULT_AVAILABLE, &available);
-		gfx_check_gl_error();
-
-		if (available == GL_TRUE) {
-			uint64_t starttime{}, stoptime{};
-
-			glGetQueryObjectui64v(e.glquery[0], GL_QUERY_RESULT, &starttime);
-			glGetQueryObjectui64v(e.glquery[1], GL_QUERY_RESULT, &stoptime);
-
+		if (e.gpu_query_end->is_available()) {
+			const uint64_t starttime = e.gpu_query_start->read_timestamp_ns();
+			const uint64_t stoptime  = e.gpu_query_end->read_timestamp_ns();
 			e.gputime += stoptime - starttime;
 			e.accumulated_gpu++;
-			// e.queryback = !e.queryback;
 			e.waiting = false;
 		}
 	}
 
 	if (e.is_gpu_event)
-		glPopDebugGroup();
+		gfx().pop_debug_group();
 
 	stack.pop_back();
 }

@@ -2,7 +2,8 @@
 #pragma once
 #include <string>
 #include <vector>
-#include "External/glad/glad.h"
+
+class IGraphicsTimerQuery;
 
 struct GpuTimingResult
 {
@@ -22,7 +23,8 @@ private:
 	std::vector<GpuTimingResult> results_;
 };
 
-// RAII GL timer query. Create before the work, read ms() after co_await wait_ticks(1).
+// RAII GPU timer. Create before the work, read ms() after co_await wait_ticks(1).
+// Backed by two IGraphicsTimerQuery timestamps; elapsed = stop - start.
 class ScopedGpuTimer
 {
 public:
@@ -39,7 +41,8 @@ public:
 
 private:
 	std::string name_;
-	GLuint query_id_ = 0;
+	IGraphicsTimerQuery* start_ = nullptr;
+	IGraphicsTimerQuery* stop_  = nullptr;
 	mutable double cached_ms_ = -1.0;
 	mutable bool result_read_ = false;
 };

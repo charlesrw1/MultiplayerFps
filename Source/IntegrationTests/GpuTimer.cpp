@@ -1,6 +1,7 @@
 // Source/IntegrationTests/GpuTimer.cpp
 #define _CRT_SECURE_NO_WARNINGS
 #include "GpuTimer.h"
+#include "Render/IGraphicsDevice.h"
 #include <cstdio>
 
 GpuTimingLog& GpuTimingLog::get() {
@@ -26,34 +27,40 @@ void GpuTimingLog::write_json(const char* path) {
 }
 
 ScopedGpuTimer::ScopedGpuTimer(const char* name) : name_(name) {
-	glGenQueries(1, &query_id_);
-	glBeginQuery(GL_TIME_ELAPSED, query_id_);
+	start_ = gfx().create_timer_query();
+	stop_  = gfx().create_timer_query();
+	start_->record_timestamp();
 }
 
 ScopedGpuTimer::~ScopedGpuTimer() {
-	if (query_id_) {
-		glEndQuery(GL_TIME_ELAPSED);
-		if (result_read_) {
-			// Caller already read the result via ms() — record it
-			GpuTimingLog::get().record(name_, cached_ms_);
-		}
-		// If not result_read_, caller forgot to read before destruction.
-		// Don't block on GL_QUERY_RESULT here — just clean up.
-		glDeleteQueries(1, &query_id_);
+	if (stop_ && !result_read_) {
+		// End-of-scope: record stop so a later ms() call works. If the caller
+		// already called ms() (result_read_), the stop timestamp is already
+		// recorded and read.
+		stop_->record_timestamp();
 	}
+	if (result_read_) {
+		GpuTimingLog::get().record(name_, cached_ms_);
+	}
+	if (start_) start_->release();
+	if (stop_)  stop_->release();
 }
 
 ScopedGpuTimer::ScopedGpuTimer(ScopedGpuTimer&& o) noexcept
-	: name_(std::move(o.name_)), query_id_(o.query_id_), cached_ms_(o.cached_ms_), result_read_(o.result_read_) {
-	o.query_id_ = 0;
+	: name_(std::move(o.name_)), start_(o.start_), stop_(o.stop_),
+	  cached_ms_(o.cached_ms_), result_read_(o.result_read_) {
+	o.start_ = nullptr;
+	o.stop_  = nullptr;
 }
 
 double ScopedGpuTimer::ms() const {
 	if (result_read_)
 		return cached_ms_;
-	GLuint64 ns = 0;
-	glGetQueryObjectui64v(query_id_, GL_QUERY_RESULT, &ns);
-	cached_ms_ = static_cast<double>(ns) / 1e6;
+	// Record stop now if it hasn't been recorded yet.
+	stop_->record_timestamp();
+	const uint64_t a = start_->read_timestamp_ns();
+	const uint64_t b = stop_->read_timestamp_ns();
+	cached_ms_ = static_cast<double>(b - a) / 1e6;
 	result_read_ = true;
 	return cached_ms_;
 }

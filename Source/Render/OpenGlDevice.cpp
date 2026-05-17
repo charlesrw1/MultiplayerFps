@@ -9,7 +9,7 @@
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_opengl3.h"
-
+#include "../External/glad/glad.h"
 // ---------------------------------------------------------------------------
 // Global state (definitions)
 // ---------------------------------------------------------------------------
@@ -844,6 +844,17 @@ public:
 					  mode == GraphicsFillMode::Line ? GL_LINE : GL_FILL);
 	}
 
+	void push_debug_group(const char* name) override {
+		ASSERT(name);
+		glPushDebugGroup(GL_DEBUG_SOURCE_APPLICATION, 0, -1, name);
+	}
+
+	void pop_debug_group() override {
+		glPopDebugGroup();
+	}
+
+	IGraphicsTimerQuery* create_timer_query() override;
+
 	// Phase 2c: cache last-bound indirect/parameter buffer so back-to-back
 	// MDI calls against the same buffer emit zero rebinds.
 	IGraphicsBuffer* current_indirect = nullptr;
@@ -987,6 +998,45 @@ static void opengl_clear_cached_buffer_binds(IGraphicsBuffer* buf) {
 	auto* impl = static_cast<OpenGLDeviceImpl*>(g_gfx_instance);
 	if (impl->current_indirect == buf) impl->current_indirect = nullptr;
 	if (impl->current_parameter == buf) impl->current_parameter = nullptr;
+}
+
+// GL_TIMESTAMP query wrapper. SDL3 backend will return a stub (no SDL3 GPU
+// timestamp query API exists).
+class OpenGLTimerQueryImpl : public IGraphicsTimerQuery
+{
+public:
+	OpenGLTimerQueryImpl() { glGenQueries(1, &query_id); }
+	~OpenGLTimerQueryImpl() override {
+		if (query_id) glDeleteQueries(1, &query_id);
+	}
+	void release() override { delete this; }
+
+	void record_timestamp() override {
+		glQueryCounter(query_id, GL_TIMESTAMP);
+		armed = true;
+	}
+
+	bool is_available() override {
+		if (!armed) return false;
+		GLint avail = 0;
+		glGetQueryObjectiv(query_id, GL_QUERY_RESULT_AVAILABLE, &avail);
+		return avail == GL_TRUE;
+	}
+
+	uint64_t read_timestamp_ns() override {
+		ASSERT(armed);
+		GLuint64 ns = 0;
+		glGetQueryObjectui64v(query_id, GL_QUERY_RESULT, &ns);
+		return ns;
+	}
+
+private:
+	GLuint query_id = 0;
+	bool armed = false;
+};
+
+IGraphicsTimerQuery* OpenGLDeviceImpl::create_timer_query() {
+	return new OpenGLTimerQueryImpl();
 }
 
 // ---- Moved from DrawLocal_Debug.cpp so glGetError stays inside the backend.
