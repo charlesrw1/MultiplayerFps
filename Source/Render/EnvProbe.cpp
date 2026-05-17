@@ -87,15 +87,15 @@ void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, sc
 		state.backface_culling = false;
 		state.program = draw.get_prog_man().get_obj(prefilter_specular_new);
 		device.set_pipeline(state);
-		IGraphicsShader* shader = device.get_active_shader();
 
 		gfx().bind_texture(0, t->gpu_ptr);
 
 		for (int mip = 1 /* skip mip level 0*/; mip < num_mips; mip++) {
 			size >>= 1;
 
-			float roughness = (float)mip / (MAX_MIP_ROUGHNESS - 1);
-			shader->set_float("roughness", roughness);
+			gpu::PrefilterSpecularFragPushConsts pcf{};
+			pcf.roughness = (float)mip / (MAX_MIP_ROUGHNESS - 1);
+			gfx().push_fragment_constants(0, &pcf, sizeof(pcf));
 
 			for (int i = 0; i < 6; i++) {
 				RenderPassState pass;
@@ -104,7 +104,9 @@ void EnviornmentMapHelper::compute_specular_new(Texture* t // in-out cubemap, sc
 				gfx().set_render_pass(pass);
 				device.set_viewport(0, 0, size, size);
 
-				shader->set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
+				gpu::EqrtCubemapVertPushConsts pcv{};
+				pcv.ViewProj = cubemap_projection * cubemap_views[i];
+				gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
 				gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 36);
 			}
 		}
@@ -140,7 +142,6 @@ void EnviornmentMapHelper::compute_irradiance_new(
 		state.backface_culling = false;
 		state.vao = vertex_input;
 		device.set_pipeline(state);
-		IGraphicsShader* shader = device.get_active_shader();
 
 		gfx().bind_texture(0, t->gpu_ptr);
 
@@ -150,7 +151,9 @@ void EnviornmentMapHelper::compute_irradiance_new(
 			pass.color_infos = color_infos;
 			gfx().set_render_pass(pass);
 
-			shader->set_mat4("ViewProj", cubemap_projection * cubemap_views[i]);
+			gpu::EqrtCubemapVertPushConsts pcv{};
+			pcv.ViewProj = cubemap_projection * cubemap_views[i];
+			gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
 			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 36);
 		}
 	}
@@ -256,8 +259,10 @@ void BRDFIntegration::run() {
 	state.backface_culling = false;
 	draw.get_device().set_pipeline(state);
 
-	integrate_shader->set_mat4("Model", mat4(1));
-	integrate_shader->set_mat4("ViewProj", mat4(1));
+	gpu::MbTexturedVertPushConsts pcv{};
+	pcv.Model    = mat4(1);
+	pcv.ViewProj = mat4(1);
+	gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
 	dd.draw(MeshBuilderDD::TRIANGLES);
 
 	dd.free();

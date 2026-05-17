@@ -1,12 +1,13 @@
+#include "ShaderBufferShared.txt"
 
 layout (location = 0) in vec3 VS_IN_Postion;
 
 out vec3 FS_IN_Fragpos;
 
-uniform mat4 ViewProj;
+layout(std140, binding = 12) uniform EqrtCubemapVertPushConstsUbo { EqrtCubemapVertPushConsts pc; };
 
 void main()
 {
-	gl_Position = ViewProj*vec4(VS_IN_Postion,1.0);
+	gl_Position = pc.ViewProj*vec4(VS_IN_Postion,1.0);
 	FS_IN_Fragpos = VS_IN_Postion;
 }

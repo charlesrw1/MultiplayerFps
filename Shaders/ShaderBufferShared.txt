@@ -278,6 +278,18 @@ struct MbSimpleFragPushConsts {
     vec4 solid_color;            //   0 ..  16   (struct size 16)
 };
 
+// Helpers/EqrtCubemapV.txt (env-probe cubemap face renders) +
+// Helpers/PrefilterSpecularNewF.txt (specular prefilter) -- see EnvProbe.cpp.
+struct EqrtCubemapVertPushConsts {
+    mat4 ViewProj;               //   0 ..  64   (struct size 64)
+};
+struct PrefilterSpecularFragPushConsts {
+    float roughness;             //   0 ..   4
+    float _pad0;
+    float _pad1;
+    float _pad2;                 //   (struct size 16)
+};
+
 // MasterDeferredShader.txt (every opaque MDI batch in setup_batch -- see
 // DrawLocal_RenderPass.cpp). VS reads indirect_material_offset to index
 // indirect_materials[]; FS reads the same value only under
