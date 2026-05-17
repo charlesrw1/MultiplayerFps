@@ -291,6 +291,21 @@ struct MasterDeferredPushConsts {
     uint _pad2;
 };
 
+// MbTexturedV.txt / MbTexturedF.txt (debug texture viewer -- see
+// Renderer::draw_output_tex in DrawLocal_Debug.cpp). VS needs Model +
+// ViewProj; FS needs alpha + mip_slice (other named uniforms in the file
+// stay at compile-time defaults and have no C++ callers).
+struct MbTexturedVertPushConsts {
+    mat4 ViewProj;               //   0 ..  64
+    mat4 Model;                  //  64 .. 128   (struct size 128)
+};
+struct MbTexturedFragPushConsts {
+    float alpha;                 //   0 ..   4
+    float mip_slice;             //   4 ..   8
+    float _pad0;
+    float _pad1;                 //   (struct size 16)
+};
+
 // MasterParticleShader.txt (render_particles -- see DrawLocal_RenderPass.cpp).
 // VS needs Model + ViewProj; FS exposes FS_IN_Matid to user fragment code.
 struct MasterParticleVertPushConsts {

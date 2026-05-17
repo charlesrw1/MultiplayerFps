@@ -110,12 +110,14 @@ void DebuggingTextureOutput::draw_out() {
 
 	device.set_pipeline(state);
 
-	draw.shader()->set_mat4("Model", mat4(1));
-	glm::mat4 proj = glm::ortho(0.f, cur_w, cur_h, 0.f);
-	draw.shader()->set_mat4("ViewProj", proj);
-
-	draw.shader()->set_float("alpha", alpha);
-	draw.shader()->set_float("mip_slice", mip);
+	gpu::MbTexturedVertPushConsts pcv{};
+	pcv.ViewProj = glm::ortho(0.f, cur_w, cur_h, 0.f);
+	pcv.Model    = mat4(1);
+	gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
+	gpu::MbTexturedFragPushConsts pcf{};
+	pcf.alpha     = alpha;
+	pcf.mip_slice = mip;
+	gfx().push_fragment_constants(0, &pcf, sizeof(pcf));
 
 	draw.bind_texture_ptr(0, output_tex->gpu_ptr);
 

@@ -1,3 +1,4 @@
+#include "ShaderBufferShared.txt"
 
 out vec4 FS_OUT_Color;
 
@@ -19,14 +20,13 @@ layout(binding = 0) uniform samplerCubeArray the_texture;
 #endif
 
 
-uniform float near = 0.01; 
-uniform float far  = 100.0; 
-uniform float alpha = 1.0;
-uniform float mip_slice = 0.0;
-uniform bool linearize_depth = false;
-uniform bool fetch_texel = false;
-uniform int texture_width = 100;
-uniform int texture_height = 100;
+layout(std140, binding = 16) uniform MbTexturedFragPushConstsUbo { MbTexturedFragPushConsts pc; };
+const float near = 0.01;
+const float far  = 100.0;
+const bool linearize_depth = false;
+const bool fetch_texel = false;
+const int  texture_width = 100;
+const int  texture_height = 100;
   
 float LinearizeDepth(float depth) 
 {
@@ -39,32 +39,32 @@ void main()
 	vec4 tex_color = vec4(0.0);
 	
 #ifdef TEXTURE_2D_VERSION
-	if(mip_slice < 0) {
+	if(pc.mip_slice < 0) {
 		tex_color = texture(the_texture, FS_IN_TexCoord);
 	}
 	else {
 		if(fetch_texel) {
 			ivec2 coords = ivec2(FS_IN_TexCoord.x * texture_width, FS_IN_TexCoord.y * texture_height);
-			tex_color = texelFetch(the_texture, coords, int(mip_slice));
+			tex_color = texelFetch(the_texture, coords, int(pc.mip_slice));
 		}
 		else {
-			tex_color = vec4(textureLod(the_texture, FS_IN_TexCoord, mip_slice));
+			tex_color = vec4(textureLod(the_texture, FS_IN_TexCoord, pc.mip_slice));
 		}
 	}
 #endif
 
 #ifdef TEXTURE_2D_ARRAY_VERSION
-	tex_color = texture(the_texture, vec3(FS_IN_TexCoord,mip_slice));
+	tex_color = texture(the_texture, vec3(FS_IN_TexCoord,pc.mip_slice));
 #endif
 
 #ifdef TEXTURE_CUBEMAP_VERSION
-	tex_color = textureLod(the_texture, vec3(FS_IN_TexCoord,1.0), mip_slice);
+	tex_color = textureLod(the_texture, vec3(FS_IN_TexCoord,1.0), pc.mip_slice);
 #endif
 #ifdef TEXTURE_CUBEMAP_ARRAY_VERSION
-	tex_color = textureLod(the_texture, vec4(FS_IN_TexCoord,1.0,mip_slice),0.0);
+	tex_color = textureLod(the_texture, vec4(FS_IN_TexCoord,1.0,pc.mip_slice),0.0);
 #endif
 
 
-FS_OUT_Color = vec4(tex_color.rgb, alpha);
+FS_OUT_Color = vec4(tex_color.rgb, pc.alpha);
 }
 	
