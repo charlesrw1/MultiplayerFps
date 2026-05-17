@@ -1,0 +1,409 @@
+{
+  "raster": [
+    {
+      "vert": "Helpers/EqrtCubemapV.txt",
+      "frag": "Helpers/PrefilterIrradianceF.txt",
+      "defines": [],
+      "site": "Source/Render/EnvProbe.cpp:21"
+    },
+    {
+      "vert": "Helpers/EqrtCubemapV.txt",
+      "frag": "Helpers/PrefilterSpecularNewF.txt",
+      "defines": [],
+      "site": "Source/Render/EnvProbe.cpp:23"
+    },
+    {
+      "vert": "MbSimpleV.txt",
+      "frag": "MbSimpleF.txt",
+      "defines": [],
+      "site": "Source/Render/DrawLocal_Init.cpp:33"
+    },
+    {
+      "vert": "MbSimpleV.txt",
+      "frag": "MbSimpleF.txt",
+      "defines": [
+        "USE_SOLID_COLOR"
+      ],
+      "site": "Source/Render/DrawLocal_Init.cpp:34"
+    },
+    {
+      "vert": "MbTexturedV.txt",
+      "frag": "Helpers/PreIntegrateF.txt",
+      "defines": [],
+      "site": "Source/Render/EnvProbe.cpp:207"
+    },
+    {
+      "vert": "MbTexturedV.txt",
+      "frag": "MbTexturedF.txt",
+      "defines": [
+        "TEXTURE_2D_ARRAY_VERSION"
+      ],
+      "site": "Source/Render/DrawLocal_Init.cpp:37"
+    },
+    {
+      "vert": "MbTexturedV.txt",
+      "frag": "MbTexturedF.txt",
+      "defines": [
+        "TEXTURE_2D_VERSION"
+      ],
+      "site": "Source/IntegrationTests/Tests/Renderer/test_shader_reflection.cpp:18"
+    },
+    {
+      "vert": "MbTexturedV.txt",
+      "frag": "MbTexturedF.txt",
+      "defines": [
+        "TEXTURE_2D_VERSION"
+      ],
+      "site": "Source/IntegrationTests/Tests/Renderer/test_spirv_pipeline.cpp:110"
+    },
+    {
+      "vert": "MbTexturedV.txt",
+      "frag": "MbTexturedF.txt",
+      "defines": [
+        "TEXTURE_2D_VERSION"
+      ],
+      "site": "Source/Render/DrawLocal_Init.cpp:36"
+    },
+    {
+      "vert": "MbTexturedV.txt",
+      "frag": "MbTexturedF.txt",
+      "defines": [
+        "TEXTURE_CUBEMAP_ARRAY_VERSION"
+      ],
+      "site": "Source/Render/DrawLocal_Init.cpp:40"
+    },
+    {
+      "vert": "MbTexturedV.txt",
+      "frag": "MbTexturedF.txt",
+      "defines": [
+        "TEXTURE_CUBEMAP_VERSION"
+      ],
+      "site": "Source/Render/DrawLocal_Init.cpp:38"
+    },
+    {
+      "vert": "MeshSimpleV.txt",
+      "frag": "MeshDebugProbeF.txt",
+      "defines": [],
+      "site": "Source/Render/RT/RaytraceTest.cpp:53"
+    },
+    {
+      "vert": "SimpleMeshV.txt",
+      "frag": "UnlitF.txt",
+      "defines": [
+        "MDI"
+      ],
+      "site": "Source/Render/DrawLocal_Init.cpp:48"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "AmbientLightingF.txt",
+      "defines": [],
+      "site": "Source/Render/DrawLocal_Init.cpp:63"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "BloomDownsampleF.txt",
+      "defines": [],
+      "site": "Source/IntegrationTests/Tests/Renderer/test_shader_reflection.cpp:49"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "BloomDownsampleF.txt",
+      "defines": [],
+      "site": "Source/IntegrationTests/Tests/Renderer/test_spirv_pipeline.cpp:143"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "BloomDownsampleF.txt",
+      "defines": [],
+      "site": "Source/Render/DrawLocal_Init.cpp:43"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "BloomUpsampleF.txt",
+      "defines": [],
+      "site": "Source/Render/DrawLocal_Init.cpp:44"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "CombineF.txt",
+      "defines": [],
+      "site": "Source/Render/DrawLocal_Init.cpp:45"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "HeightFogF.txt",
+      "defines": [],
+      "site": "Source/Render/DrawLocal_Init.cpp:65"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "LightAccumulationFullScreen.txt",
+      "defines": [
+        "SHADOWED"
+      ],
+      "site": "Source/Render/DrawLocal_Init.cpp:53"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "LightAccumulationFullScreen.txt",
+      "defines": [
+        "SHADOWED",
+        "TILED 1"
+      ],
+      "site": "Source/Render/DrawLocal_Init.cpp:55"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "LightAccumulationFullScreen.txt",
+      "defines": [
+        "SHADOWED",
+        "TILED 2"
+      ],
+      "site": "Source/Render/DrawLocal_Init.cpp:57"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "SunLightAccumulationF.txt",
+      "defines": [],
+      "site": "Source/Render/DrawLocal_Init.cpp:59"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "SunLightAccumulationF.txt",
+      "defines": [
+        "DEBUG"
+      ],
+      "site": "Source/Render/DrawLocal_Init.cpp:61"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "TaaResolveF.txt",
+      "defines": [],
+      "site": "Source/Render/DrawLocal_Init.cpp:46"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "VolfogApplyF.txt",
+      "defines": [],
+      "site": "Source/Render/DrawLocal_Init.cpp:66"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "ddgiShadeF.txt",
+      "defines": [],
+      "site": "Source/Render/RT/RaytraceTest.cpp:49"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "ddgiShadeF.txt",
+      "defines": [
+        "HALFRES_DDGI"
+      ],
+      "site": "Source/Render/RT/RaytraceTest.cpp:50"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "ddgi_apply_upsampled.txt",
+      "defines": [],
+      "site": "Source/Render/RT/RaytraceTest.cpp:62"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "debugCull.txt",
+      "defines": [],
+      "site": "Source/Render/GpuCullingTest.cpp:12"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "fullscreen_quad_textureF.txt",
+      "defines": [],
+      "site": "Source/Render/DrawLocal_Init.cpp:50"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "hbao/hbao.txt",
+      "defines": [],
+      "site": "Source/Render/Ssao.cpp:77"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "hbao/hbaoblur.txt",
+      "defines": [],
+      "site": "Source/Render/Ssao.cpp:78"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "hbao/hbaodeinterleave.txt",
+      "defines": [],
+      "site": "Source/Render/Ssao.cpp:79"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "hbao/hbaoreinterleave.txt",
+      "defines": [],
+      "site": "Source/Render/Ssao.cpp:80"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "hbao/linearizedepth.txt",
+      "defines": [],
+      "site": "Source/Render/Ssao.cpp:81"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "hbao/viewnormal.txt",
+      "defines": [],
+      "site": "Source/Render/Ssao.cpp:82"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "rtF.txt",
+      "defines": [],
+      "site": "Source/Render/RT/RaytraceTest.cpp:46"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "ssr_downsample.txt",
+      "defines": [],
+      "site": "Source/Render/RenderExtra_SSR.cpp:13"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "ssr_f.txt",
+      "defines": [],
+      "site": "Source/Render/RenderExtra_SSR.cpp:11"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "ssr_upsample.txt",
+      "defines": [],
+      "site": "Source/Render/RenderExtra_SSR.cpp:14"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "temporal_upsample_ddgi.txt",
+      "defines": [],
+      "site": "Source/Render/RT/RaytraceTest.cpp:61"
+    },
+    {
+      "vert": "fullscreenquad.txt",
+      "frag": "temporal_upsample_ssr.txt",
+      "defines": [],
+      "site": "Source/Render/RenderExtra_SSR.cpp:16"
+    }
+  ],
+  "compute": [
+    {
+      "compute": "CullCompute.txt",
+      "defines": [
+        "MAINVIEW"
+      ],
+      "site": "Source/IntegrationTests/Tests/Renderer/test_shader_reflection.cpp:81"
+    },
+    {
+      "compute": "CullCompute.txt",
+      "defines": [
+        "MAINVIEW"
+      ],
+      "site": "Source/IntegrationTests/Tests/Renderer/test_spirv_pipeline.cpp:168"
+    },
+    {
+      "compute": "CullCompute.txt",
+      "defines": [
+        "MAINVIEW"
+      ],
+      "site": "Source/Render/GpuCullingTest.cpp:7"
+    },
+    {
+      "compute": "CullCompute.txt",
+      "defines": [
+        "SHADOW_CASCADE"
+      ],
+      "site": "Source/Render/GpuCullingTest.cpp:8"
+    },
+    {
+      "compute": "CullCompute.txt",
+      "defines": [
+        "SHADOW_SPOT"
+      ],
+      "site": "Source/Render/GpuCullingTest.cpp:9"
+    },
+    {
+      "compute": "DepthPyramidC.txt",
+      "defines": [],
+      "site": "Source/IntegrationTests/Tests/Renderer/test_shader_reflection.cpp:112"
+    },
+    {
+      "compute": "DepthPyramidC.txt",
+      "defines": [],
+      "site": "Source/Render/GpuCullingTest.cpp:11"
+    },
+    {
+      "compute": "DepthPyramidC.txt",
+      "defines": [],
+      "site": "Source/Render/RenderExtra_SSR.cpp:12"
+    },
+    {
+      "compute": "VfogRaymarchC.txt",
+      "defines": [],
+      "site": "Source/Render/DrawLocal_Init.cpp:71"
+    },
+    {
+      "compute": "VfogScatteringC.txt",
+      "defines": [],
+      "site": "Source/IntegrationTests/Tests/Renderer/test_spirv_pipeline.cpp:193"
+    },
+    {
+      "compute": "VfogScatteringC.txt",
+      "defines": [],
+      "site": "Source/Render/DrawLocal_Init.cpp:70"
+    },
+    {
+      "compute": "avgProbeCalc_C.txt",
+      "defines": [],
+      "site": "Source/Render/RT/RaytraceTest.cpp:59"
+    },
+    {
+      "compute": "compact_mdi.txt",
+      "defines": [],
+      "site": "Source/Render/GpuCullingTest.cpp:15"
+    },
+    {
+      "compute": "gather_C.txt",
+      "defines": [],
+      "site": "Source/Render/RT/RaytraceTest.cpp:48"
+    },
+    {
+      "compute": "probeLumCalc_C.txt",
+      "defines": [],
+      "site": "Source/Render/RT/RaytraceTest.cpp:57"
+    },
+    {
+      "compute": "trace_C.txt",
+      "defines": [],
+      "site": "Source/Render/RT/RaytraceTest.cpp:52"
+    },
+    {
+      "compute": "trace_C.txt",
+      "defines": [
+        "RELOCATE"
+      ],
+      "site": "Source/Render/RT/RaytraceTest.cpp:55"
+    },
+    {
+      "compute": "zero_instances_mdi.txt",
+      "defines": [],
+      "site": "Source/Render/GpuCullingTest.cpp:14"
+    }
+  ],
+  "single_file_call_sites": [],
+  "master_shaders": [
+    "MASTER/MasterDeferredShader.txt",
+    "MASTER/MasterTerrainShader.txt",
+    "MASTER/MasterDecalShader.txt",
+    "MASTER/MasterUIShader.txt",
+    "MASTER/MasterPostProcessShader.txt",
+    "MASTER/MasterParticleShader.txt"
+  ]
+}
