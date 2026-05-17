@@ -16,7 +16,7 @@ Global accessor: `gfx()` (free function). The OpenGL singleton is built by `gfx_
 2. **Redesign.** With everything funneled through the interface, reshape the API on the OpenGL backend only — synthetic UBOs, combined texture+sampler binding, pipeline-state consolidation, command encoder, frame lifecycle, transfer ring buffers.
 3. **Port.** Add the SDL3 GPU backend against the redesigned interface. GLSL → SPIR-V via glslang/shaderc at runtime (dev) or prebaked blobs (release).
 
-A **null/passthrough leak-detector backend** lands at the end of Phase 1 (1.5) as the gate that proves the wrap is complete.
+The Phase 1 boundary is gated by a **static `gl*` scanner** (`Scripts/check_no_gl_leaks.py` + the `LegacyGlCalls.NoneOutsideBackend` unit test) landed in sub-phase 1.9. The originally-planned null/passthrough runtime backend was superseded — see the 1.5 row below.
 
 ## Pipeline model
 
@@ -116,7 +116,7 @@ Counts come from `rg "get_internal_handle\(\)"` at start of Phase 0. Verify befo
 
 **Risk.** All identified sites are routable through Phase 1 wrap additions. None require a redesign-pass extension. Plan estimate of "17 known" was low — actual count is ~75 raw calls across ~25 files, but they cluster into the ~12 API additions listed above.
 
-The null/passthrough backend (Phase 1.5) will assert that every `get_internal_handle()` call comes from inside `Source/Render/Opengl*` or sits on an explicit accept-list.
+The static-scan gate (Phase 1.9) asserts that every `gl*` call lives inside `Source/Render/Opengl*` or sits on an explicit accept-list. `get_internal_handle()` escapes are not yet enforced — a future runtime null/passthrough backend could cover that.
 
 ## Phase 1 sub-phases
 
@@ -145,7 +145,7 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.7d** | Program-binary cache + delete `Shader` struct | ~20 | move `glProgramBinary`/`glGetProgramBinary` cache paths in `recompile_shared`/`recompile_normal` into backend; delete `Shader` struct; `RenderPipelineState::program` becomes `IGraphicsShader*` (lifted from Phase 2c) | done |
 | **1.8** | Window/swapchain + ImGui wrap | ~10 (`SDL_GL_*`, `gladLoad*`, swap, vsync, imgui_render) | `gfx_opengl_pre_window_setup`; `gfx_init_opengl(SDL_Window*)`; `set_vsync`, `present`, `imgui_init`, `imgui_shutdown`, `imgui_new_frame`, `imgui_render_draw_data`, `imgui_process_event` | done |
 | **1.9** | static-scan no-legacy-`gl*` gate + migrate every remaining non-backend caller (MeshBuilder, GiScene, DdsExport, Screenshot, RenderDump, RenderExtra, LightCookieAtlas, SceneDraw, Scene, Editor, EnvProbe::BRDFIntegration, Meshlet, TextureUpload, RenderGiManager, DrawLocal_Init) + delete dead `BufferTest/` + delete dead `Meshlet.cpp` body + accept-list Profilier/GpuTimer (OpenGL-only — SDL3 GPU has no timestamp/debug-group API) and `DrawLocal_Device.*` (folded into backend in Phase 2) | — | `copy_texture`, `IGraphicsTexture::generate_mipmaps`, `gfx_opengl_dump_capabilities`, `gfx_opengl_enable_debug_output`; rename `glCheckError` → `gfx_check_gl_error` | done |
-| **1.5 (post-1.x)** | Null/passthrough leak-detector backend | — | gate that proves the wrap is complete | not started |
+| ~~1.5 (post-1.x)~~ | ~~Null/passthrough leak-detector backend~~ | — | ~~gate that proves the wrap is complete~~ | **superseded** by the 1.9 static-scan gate (`Scripts/check_no_gl_leaks.py` + `LegacyGlCalls.NoneOutsideBackend`). A runtime null backend would still be useful for catching `get_internal_handle()` escapes inside future non-OpenGL backends, but is no longer load-bearing for Phase 1 completion. |
 
 Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
 
@@ -488,7 +488,7 @@ flushes per-slot `{tex, sampler}` table at draw time as combined bindings);
 
 With every call funneled through the interface, the API itself reshapes —
 each redesign is one API change + one backend change, not 45 call-site edits.
-Lands after Phase 1.5 null-backend gate is clean.
+Lands after the Phase 1.9 static-scan gate is clean (it is).
 
 ### 2a — Synthetic UBOs
 
