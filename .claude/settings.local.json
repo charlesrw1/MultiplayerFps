@@ -405,7 +405,11 @@
       "Bash(grep -E \"^c:.*\\\\\\\\\\\\\\\\fps\\\\\\\\\\\\\\\\|error\")",
       "PowerShell($path = \"C:/Users/charl/source/repos/CsRemake/Data/maps/demo_level_1.tmap\"; $bytes = [System.IO.File]::ReadAllBytes\\($path\\); $out = New-Object System.Collections.Generic.List[byte]; foreach \\($b in $bytes\\) { if \\($b -ne 0x0D\\) { $out.Add\\($b\\) } }; [System.IO.File]::WriteAllBytes\\($path, $out.ToArray\\(\\)\\); Write-Output \"before: $\\($bytes.Length\\) bytes  after: $\\($out.Count\\) bytes\"; $check = [System.IO.File]::ReadAllBytes\\($path\\)[0..9]; Write-Output \\($check | ForEach-Object { $_.ToString\\('x2'\\) }\\))",
       "Bash(xxd \"C:/Users/charl/source/repos/CsRemake/Data/test/static_strip_fixture.tmap\")",
-      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" \"$PWD\\\\CsRemake.sln\" /t:App /p:Configuration=Debug /p:Platform=x64 /v:minimal /m)"
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" \"$PWD\\\\CsRemake.sln\" /t:App /p:Configuration=Debug /p:Platform=x64 /v:minimal /m)",
+      "Bash(winget install *)",
+      "Read(//c/tmp/**)",
+      "Bash(mkdir -p trashtest)",
+      "Bash(touch trashtest/a.txt trashtest/b.txt)"
     ]
   },
   "enabledPlugins": {
