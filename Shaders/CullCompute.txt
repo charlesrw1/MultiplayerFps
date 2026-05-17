@@ -2,6 +2,8 @@
 layout (local_size_x = 256) in;
 
 #include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
+layout (binding = 7, std140) uniform CullParamsUbo { CullParams params; };
 
 // draw calls
 layout(binding = 2, std430) buffer DrawElementsIndirectCommand_Buffer {
@@ -94,12 +96,6 @@ bool projectSphere(vec3 C, float r, float znear, float P00, float P11, out vec4 
 
 	return true;
 }
-uniform int lod_bias = 1;
-uniform float radius_bias = 1;
-
-uniform bool occlusion_cull = false;
-uniform bool second_pass = false;
-uniform int force_lod = -1;
 layout(binding = 0) uniform sampler2D depth_pyramid;
 void main()
 {
@@ -120,7 +116,7 @@ void main()
 		// save to visarray
 	uint dword_index = gID/32;	// 2bits per entry
 	uint visword_shift = (gID % 32);
-	if(second_pass) {
+	if(params.second_pass != 0) {
 		uint and_word = ~(1<<visword_shift);
 		uint word = atomicAnd(visbits[dword_index],and_word);
 		if(bool(word&(1<<visword_shift))) {
@@ -152,7 +148,7 @@ void main()
 	
 #ifdef MAINVIEW
 	// occlusion cull, from vkguide
-	if(occlusion_cull) {
+	if(params.occlusion_cull != 0) {
 		vec3 vs_center = (cull.view * vec4(center,1.0)).xyz;
 		vs_center.y *= -1;
 		vs_center.z *= -1;	// [0,+inf]
@@ -202,7 +198,7 @@ void main()
 			break;
 		}
 	}
-	lod_wanted = (force_lod>=0)?min(force_lod,num_lods-1) : lod_wanted;
+	lod_wanted = (params.force_lod>=0)?min(params.force_lod,num_lods-1) : lod_wanted;
 	//lod_wanted = 0;
 	
 	int part_ofs = int(model_info[model_ofs+1+(lod_wanted*3)]);

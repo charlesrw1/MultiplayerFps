@@ -46,10 +46,15 @@ void SSRSystem::compute_depth() {
 
 		int groups_x = glm::ceil(width / 32.f);
 		int groups_y = glm::ceil(height / 32.f);
-		draw.shader()->set_float("width", width);
-		draw.shader()->set_float("height", height);
 		const int level_to_sample = level == 0 ? 0 : level - 1;
-		draw.shader()->set_int("level", level_to_sample);
+		{
+			gpu::CullParams cp{};
+			cp.pyr_width = (float)width;
+			cp.pyr_height = (float)height;
+			cp.pyr_level = level_to_sample;
+			draw.ubo.cull_params->upload(&cp, sizeof(cp));
+			gfx().bind_uniform_buffer_base(7, draw.ubo.cull_params);
+		}
 
 		gfx().dispatch_compute(groups_x, groups_y, 1);
 

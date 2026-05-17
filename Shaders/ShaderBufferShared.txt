@@ -51,6 +51,35 @@ struct VfogParams {
     int   _pad2;                 // 140 .. 144 (struct size 144, /16)
 };
 
+// ---- F. Cull pipeline ------------------------------------------------------
+// Union of fields set by name on the GPU cull / MDI compaction / depth-pyramid
+// / debug-cull shaders. Each shader reads only its subset:
+//   CullCompute       : lod_bias, force_lod, occlusion_cull, second_pass,
+//                       radius_bias
+//   compact_mdi       : num_draws, command_count
+//   zero_instances_mdi: draw_count
+//   debugCull         : lod_bias, output_depth, debug_pos
+//   DepthPyramidC     : pyr_width, pyr_height, pyr_level (shared by cull + SSR hi-z)
+// Cull dispatches 1-3x/frame, DepthPyramidC iterates per mip — each pass
+// re-uploads. Bound at the per-pass slot 7.
+// (Distinct from the existing CullDataBuffer at slot 5 which carries the
+//  per-cull SSBO data: frustum planes, view matrix, pyramid dims.)
+struct CullParams {
+    vec4  debug_pos;          //   0 .. 16   (debugCull)
+    int   lod_bias;           //  16         (CullCompute + debugCull)
+    int   force_lod;          //  20         (CullCompute)
+    int   occlusion_cull;     //  24         (CullCompute; bool, 4B std140)
+    int   second_pass;        //  28         (CullCompute; bool)
+    float radius_bias;        //  32         (CullCompute)
+    int   output_depth;       //  36         (debugCull; bool)
+    int   num_draws;          //  40         (compact_mdi)
+    int   command_count;      //  44         (compact_mdi)
+    int   draw_count;         //  48         (zero_instances_mdi)
+    int   pyr_level;          //  52         (DepthPyramidC)
+    float pyr_width;          //  56         (DepthPyramidC)
+    float pyr_height;         //  60 .. 64   (DepthPyramidC; struct size 64, /16)
+};
+
 // ---- C. Temporal upsample --------------------------------------------------
 // Union of fields previously set by name on TaaResolveF, temporal_upsample_ddgi,
 // and temporal_upsample_ssr. Each shader reads only the fields it needs:

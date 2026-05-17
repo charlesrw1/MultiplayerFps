@@ -258,6 +258,7 @@ public:
 		// "per-pass push-constant analog" slot — see [[rendering/gfx_abstraction#2a]]).
 		IGraphicsBuffer* bloom_params = nullptr;
 		IGraphicsBuffer* temporal_params = nullptr;  // group C: TAA / DDGI / SSR temporal upsample
+		IGraphicsBuffer* cull_params = nullptr;      // group F: cull / MDI compact / depth pyramid / debugCull
 	} ubo;
 
 	struct buffers

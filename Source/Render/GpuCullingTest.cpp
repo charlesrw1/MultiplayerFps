@@ -88,10 +88,14 @@ void GpuCullingTest::debug_overlay() {
 	state.vao = draw.get_empty_vao();
 	device.set_pipeline(state);
 	gfx().bind_uniform_buffer_base(5, cull_data);
-	device.get_active_shader()->set_int("lod_bias", lod_bias);
-	device.get_active_shader()->set_bool("output_depth", output_depth);
-
-	device.get_active_shader()->set_vec4("debug_pos", glm::vec4(debug_pos, debug_radius));
+	{
+		gpu::CullParams cp{};
+		cp.lod_bias = lod_bias;
+		cp.output_depth = output_depth;
+		cp.debug_pos = glm::vec4(debug_pos, debug_radius);
+		draw.ubo.cull_params->upload(&cp, sizeof(cp));
+		gfx().bind_uniform_buffer_base(7, draw.ubo.cull_params);
+	}
 
 	device.bind_texture(0, depth_pyramid);
 	gfx().bind_sampler(0, hiZSampler);
@@ -179,15 +183,19 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 
 	const bool is_ortho =
 		draw.get_current_frame_vs().is_ortho; // this check should go elsewhere? or not, ortho is pretty special case
-	device.get_active_shader()->set_bool("occlusion_cull", do_occlusion_culling && !is_ortho && !is_for_shadow);
-	device.get_active_shader()->set_bool("second_pass", pass == Phase::Pass2);
 
 	device.bind_texture(0, depth_pyramid);
 	gfx().bind_sampler(0, hiZSampler);
-	device.get_active_shader()->set_int("lod_bias", lod_bias);
-	device.get_active_shader()->set_int("force_lod", r_force_lod.get_integer());
-
-	device.get_active_shader()->set_float("radius_bias", radius_bias);
+	{
+		gpu::CullParams cp{};
+		cp.occlusion_cull = (do_occlusion_culling && !is_ortho && !is_for_shadow) ? 1 : 0;
+		cp.second_pass = (pass == Phase::Pass2) ? 1 : 0;
+		cp.lod_bias = lod_bias;
+		cp.force_lod = r_force_lod.get_integer();
+		cp.radius_bias = radius_bias;
+		draw.ubo.cull_params->upload(&cp, sizeof(cp));
+		gfx().bind_uniform_buffer_base(7, draw.ubo.cull_params);
+	}
 
 	gfx().bind_storage_buffer_base(2, input.cmd_buf);
 	gfx().bind_storage_buffer_base(3, input.glinst_to_inst);
@@ -319,10 +327,15 @@ void GpuCullingTest::downsample_depth() {
 
 		int groups_x = glm::ceil(width / 32.f);
 		int groups_y = glm::ceil(height / 32.f);
-		draw.shader()->set_float("width", width);
-		draw.shader()->set_float("height", height);
 		const int level_to_sample = level == 0 ? 0 : level - 1;
-		draw.shader()->set_int("level", level_to_sample);
+		{
+			gpu::CullParams cp{};
+			cp.pyr_width = (float)width;
+			cp.pyr_height = (float)height;
+			cp.pyr_level = level_to_sample;
+			draw.ubo.cull_params->upload(&cp, sizeof(cp));
+			gfx().bind_uniform_buffer_base(7, draw.ubo.cull_params);
+		}
 
 		gfx().dispatch_compute(groups_x, groups_y, 1);
 
@@ -371,8 +384,13 @@ void GpuCullingTest::compact_draws(const GpuCullInput& input) {
 
 	{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(compaction); gfx().set_pipeline(ps); }
 	int groups_x = glm::ceil(input.num_cmds / 32.f);
-	draw.shader()->set_int("num_draws", input.num_batches);
-	draw.shader()->set_int("command_count", input.num_cmds);
+	{
+		gpu::CullParams cp{};
+		cp.num_draws = input.num_batches;
+		cp.command_count = input.num_cmds;
+		draw.ubo.cull_params->upload(&cp, sizeof(cp));
+		gfx().bind_uniform_buffer_base(7, draw.ubo.cull_params);
+	}
 
 	gfx().dispatch_compute(groups_x, 1, 1);
 
@@ -383,7 +401,12 @@ void GpuCullingTest::zero_instances_in_this(IGraphicsBuffer* mdi_buf, int count)
 	gfx().bind_storage_buffer_base(2, mdi_buf);
 	{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(zero_instances_mdi); gfx().set_pipeline(ps); }
 	int groups_x = glm::ceil(count / 256.f);
-	draw.shader()->set_int("draw_count", count);
+	{
+		gpu::CullParams cp{};
+		cp.draw_count = count;
+		draw.ubo.cull_params->upload(&cp, sizeof(cp));
+		gfx().bind_uniform_buffer_base(7, draw.ubo.cull_params);
+	}
 	gfx().dispatch_compute(groups_x, 1, 1);
 
 	gfx().memory_barrier(BARRIER_SHADER_STORAGE | BARRIER_COMMAND);
