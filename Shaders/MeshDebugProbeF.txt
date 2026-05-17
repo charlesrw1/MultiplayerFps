@@ -4,8 +4,8 @@ layout(location = 0) out vec4 FS_OUT_Color;
 
 
 layout(binding = 0) uniform sampler2D probe_texture;
-in vec3 FS_IN_Normal;
-in vec3 FS_IN_Fragpos;
+layout(location = 1) in vec3 FS_IN_Normal;
+layout(location = 0) in vec3 FS_IN_Fragpos;
 layout(std140, binding = 16) uniform MeshDebugProbeFragPushConstsUbo { MeshDebugProbeFragPushConsts pcf; };
 
 // File-scope declarations referenced by ddgiShared.txt's `calculate_irradiance`

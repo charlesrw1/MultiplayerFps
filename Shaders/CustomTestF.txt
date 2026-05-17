@@ -1,17 +1,17 @@
 
 layout (location = 0) out vec4 FS_OUT_Color;
 
-flat in uint FS_IN_Objid;
-flat in uint FS_IN_Matid;
-in vec3 FS_IN_FragPos;
-in vec3 FS_IN_Normal;
-in vec2 FS_IN_Texcoord;
-in vec3 FS_IN_BoneColor;
-in vec4 FS_IN_NDC;
+layout(location = 5) flat in uint FS_IN_Objid;
+layout(location = 2) flat in uint FS_IN_Matid;
+layout(location = 1) in vec3 FS_IN_FragPos;
+layout(location = 4) in vec3 FS_IN_Normal;
+layout(location = 9) in vec2 FS_IN_Texcoord;
+layout(location = 0) in vec3 FS_IN_BoneColor;
+layout(location = 3) in vec4 FS_IN_NDC;
 
 
 #ifdef NORMALMAPPED
-in mat3 FS_IN_TBN;
+layout(location = 6) in mat3 FS_IN_TBN;
 #endif
 
 #include "SharedGpuTypes.txt"

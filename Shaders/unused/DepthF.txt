@@ -2,7 +2,7 @@
 #include "SharedGpuTypes.txt"
 
 #ifdef ALPHATEST
-in vec2 FS_IN_Texcoord;
+layout(location = 1) in vec2 FS_IN_Texcoord;
 uniform sampler2D basecolor;
 #endif
 
@@ -13,7 +13,7 @@ float dither_pattern[16] = {
 4.0 / 17.0, 12.0 / 17.0,  2.0 / 17.0, 10.0 / 17.0,
 16.0 / 17.0,  8.0 / 17.0, 14.0 / 17.0,  6.0 / 17.0
 };
-flat in uint FS_IN_Objid;
+layout(location = 0) flat in uint FS_IN_Objid;
 
 layout (binding = 2, std140) readonly buffer Object_Data_Buffer {
 	Object_Instance g_objects[];

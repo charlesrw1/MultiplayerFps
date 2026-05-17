@@ -15,7 +15,7 @@ layout (binding = 4, std430) readonly buffer GlobalMaterialBuffer {
 
 #ifdef _VERTEX_SHADER
 
-out vec2 FS_IN_Texcoord;
+layout(location = 0) out vec2 FS_IN_Texcoord;
 
 void main()
 {
@@ -35,7 +35,7 @@ void main()
 
 layout (location = 0) out vec4 FS_OUT_Color;
 
-in vec2 FS_IN_Texcoord;
+layout(location = 0) in vec2 FS_IN_Texcoord;
 
 uniform uint FS_IN_Matid = 0;
 

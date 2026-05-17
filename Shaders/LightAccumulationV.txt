@@ -1,7 +1,7 @@
 
 layout (location = 0) in vec3 VS_IN_Postion;
-out vec3 FS_IN_FragPos;
-out vec4 FS_IN_NDC;
+layout(location = 0) out vec3 FS_IN_FragPos;
+layout(location = 1) out vec4 FS_IN_NDC;
 
 #include "SharedGpuTypes.txt"
 

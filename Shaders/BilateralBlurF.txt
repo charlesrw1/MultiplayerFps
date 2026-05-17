@@ -9,9 +9,9 @@ uniform float zNear;
 
 #define KERNEL_RADIUS 1.0
 
-out float FS_OUT_Color;
+layout(location = 0) out float FS_OUT_Color;
 
-in vec2 FS_IN_TexCoord;
+layout(location = 0) in vec2 FS_IN_TexCoord;
 
 
 float ViewSpaceZFromDepth(float d)

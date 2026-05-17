@@ -6,8 +6,8 @@ layout (location = 1) in vec2 VS_IN_TexCoord;
 layout (location = 2) in vec3 VS_IN_Normal;
 layout (location = 3) in vec3 VS_IN_Tangent;
 
-out vec3 FS_IN_Normal;
-out vec3 FS_IN_Fragpos;
+layout(location = 1) out vec3 FS_IN_Normal;
+layout(location = 0) out vec3 FS_IN_Fragpos;
 
 layout(std140, binding = 12) uniform MeshSimpleVertPushConstsUbo { MeshSimpleVertPushConsts pcv; };
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {

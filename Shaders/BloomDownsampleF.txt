@@ -6,8 +6,8 @@
 layout(binding = 0) uniform sampler2D srcTexture;
 layout(binding = 7, std140) uniform BloomParamsUbo { BloomParams params; };
 
-in vec2 texCoord;
-out vec3 FS_OUT_Downsample;
+layout(location = 0) in vec2 texCoord;
+layout(location = 0) out vec3 FS_OUT_Downsample;
 
 vec3 PowVec3(vec3 v, float p)
 {

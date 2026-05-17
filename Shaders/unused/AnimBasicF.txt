@@ -1,11 +1,11 @@
 
 
-out vec4 FS_OUT_Color;
+layout(location = 0) out vec4 FS_OUT_Color;
 
-in vec3 FS_IN_FragPos;
-in vec3 FS_IN_Normal;
-in vec2 FS_IN_Texcoord;
-in vec3 FS_IN_BoneColor;
+layout(location = 2) in vec3 FS_IN_FragPos;
+layout(location = 5) in vec3 FS_IN_Normal;
+layout(location = 11) in vec2 FS_IN_Texcoord;
+layout(location = 0) in vec3 FS_IN_BoneColor;
 
 uniform vec3 view_pos;
 uniform vec3 view_front;
@@ -51,11 +51,11 @@ vec3 apply_simple_fog(vec3 input_color, float ndc_z)
 }
 
 #ifdef VERTEX_COLOR
-in vec4 FS_IN_Color;
+layout(location = 1) in vec4 FS_IN_Color;
 #endif
 
 #ifdef LIGHTMAPPED
-in vec2 FS_IN_TexCoord2;
+layout(location = 10) in vec2 FS_IN_TexCoord2;
 uniform sampler2D lightmap;
 #endif
 

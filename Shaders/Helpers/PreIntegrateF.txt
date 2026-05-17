@@ -1,6 +1,6 @@
 
-in vec2 FS_IN_TexCoord;
-out vec4 FS_OUT_FragColor;
+layout(location = 1) in vec2 FS_IN_TexCoord;
+layout(location = 0) out vec4 FS_OUT_FragColor;
 
 #define PI 3.1415926536
 

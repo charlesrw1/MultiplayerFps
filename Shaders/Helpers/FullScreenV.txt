@@ -5,7 +5,7 @@ layout (location = 1) in vec2 a_texcoords;
 layout (location = 2) in vec4 a_color;
 
 
-out vec3 FS_IN_Fragpos;
+layout(location = 0) out vec3 FS_IN_Fragpos;
 
 void main()
 {

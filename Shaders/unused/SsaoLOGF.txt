@@ -1,7 +1,7 @@
 
-out float FragColor;
+layout(location = 0) out float FragColor;
 
-in vec2 FS_IN_TexCoord;
+layout(location = 0) in vec2 FS_IN_TexCoord;
 
 uniform sampler2D scene_depth;
 uniform sampler2D noise_texture;

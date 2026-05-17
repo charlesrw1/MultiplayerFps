@@ -16,21 +16,21 @@ layout (location = 7) in vec2 VS_IN_TexCoord2;
 layout (location = 3) in vec3 VS_IN_Tangent;
 //#endif
 
-flat out uint FS_IN_Objid;
-flat out uint FS_IN_Matid;
-out vec3 FS_IN_FragPos;
-out vec3 FS_IN_Normal;
-out vec2 FS_IN_Texcoord;
-out vec3 FS_IN_BoneColor;
-out vec4 FS_IN_NDC;
+layout(location = 6) flat out uint FS_IN_Objid;
+layout(location = 3) flat out uint FS_IN_Matid;
+layout(location = 2) out vec3 FS_IN_FragPos;
+layout(location = 5) out vec3 FS_IN_Normal;
+layout(location = 11) out vec2 FS_IN_Texcoord;
+layout(location = 0) out vec3 FS_IN_BoneColor;
+layout(location = 4) out vec4 FS_IN_NDC;
 #ifdef VERTEX_COLOR
-out vec4 FS_IN_Color;
+layout(location = 1) out vec4 FS_IN_Color;
 #endif
 #ifdef LIGHTMAPPED
-out vec2 FS_IN_TexCoord2;
+layout(location = 10) out vec2 FS_IN_TexCoord2;
 #endif
 #ifdef NORMALMAPPED
-out mat3 FS_IN_TBN;
+layout(location = 7) out mat3 FS_IN_TBN;
 #endif
 
 vec3 randColor(int number){

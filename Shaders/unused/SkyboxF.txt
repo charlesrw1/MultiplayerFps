@@ -1,6 +1,6 @@
 
-out vec3 FS_OUT_Color;
-in vec3 FS_IN_Fragpos;
+layout(location = 0) out vec3 FS_OUT_Color;
+layout(location = 0) in vec3 FS_IN_Fragpos;
 uniform samplerCube cube;
 
 

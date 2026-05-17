@@ -84,22 +84,22 @@ layout (location = 5) in vec4 VS_IN_BoneWeights;
 #endif // !LIGHTMAPPED
 
 
-flat out uint FS_IN_Objid;
-flat out uint FS_IN_Matid;
-out vec3 FS_IN_FragPos;
-out vec3 FS_IN_Normal;
-out vec2 FS_IN_Texcoord;
-out vec3 FS_IN_BoneColor;
-out vec4 FS_IN_NDC;
+layout(location = 7) flat out uint FS_IN_Objid;
+layout(location = 4) flat out uint FS_IN_Matid;
+layout(location = 2) out vec3 FS_IN_FragPos;
+layout(location = 6) out vec3 FS_IN_Normal;
+layout(location = 12) out vec2 FS_IN_Texcoord;
+layout(location = 0) out vec3 FS_IN_BoneColor;
+layout(location = 5) out vec4 FS_IN_NDC;
 #ifndef NO_TAA
-out vec4 FS_IN_PrevNDC;// for motion vectors
+layout(location = 8) out vec4 FS_IN_PrevNDC;// for motion vectors
 #endif
-out mat3 FS_IN_TBN;
+layout(location = 9) out mat3 FS_IN_TBN;
 #ifdef LIGHTMAPPED
-out vec2 FS_IN_LightmapCoord;
+layout(location = 3) out vec2 FS_IN_LightmapCoord;
 #endif
 #ifndef ANIMATED
-out vec4 FS_IN_VertexColor;
+layout(location = 13) out vec4 FS_IN_VertexColor;
 #endif
 
 vec3 randColor(int number){
@@ -300,24 +300,24 @@ void main()
 	layout(location = 4) out vec4 GBUFFER_OUT_EditorID;
 #endif
 
-flat in uint FS_IN_DrawId;
-flat in uint FS_IN_Objid;
-flat in uint FS_IN_Matid;
-in vec3 FS_IN_FragPos;
-in vec3 FS_IN_Normal;
-in vec2 FS_IN_Texcoord;
-in vec3 FS_IN_BoneColor;
-in vec4 FS_IN_NDC;
+layout(location = 1) flat in uint FS_IN_DrawId;
+layout(location = 7) flat in uint FS_IN_Objid;
+layout(location = 4) flat in uint FS_IN_Matid;
+layout(location = 2) in vec3 FS_IN_FragPos;
+layout(location = 6) in vec3 FS_IN_Normal;
+layout(location = 12) in vec2 FS_IN_Texcoord;
+layout(location = 0) in vec3 FS_IN_BoneColor;
+layout(location = 5) in vec4 FS_IN_NDC;
 #ifndef NO_TAA
-in vec4 FS_IN_PrevNDC;
+layout(location = 8) in vec4 FS_IN_PrevNDC;
 #endif
-in vec2 FS_IN_LightmapCoord;
+layout(location = 3) in vec2 FS_IN_LightmapCoord;
 #ifndef ANIMATED
-in vec4 FS_IN_VertexColor;
+layout(location = 13) in vec4 FS_IN_VertexColor;
 #endif
 
 
-in mat3 FS_IN_TBN;
+layout(location = 9) in mat3 FS_IN_TBN;
 
 
 layout(std140, binding = 16) uniform MasterDeferredFragPushConstsUbo { MasterDeferredPushConsts pcf; };

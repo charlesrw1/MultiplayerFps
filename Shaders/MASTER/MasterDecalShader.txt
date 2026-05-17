@@ -34,13 +34,13 @@ layout (location = 4) in ivec4 VS_IN_BoneIndicies;
 layout (location = 5) in vec4 VS_IN_BoneWeights;
 
 
-out vec3 FS_IN_FragPos;
-out vec3 FS_IN_Normal;
-out vec4 FS_IN_NDC;
+layout(location = 0) out vec3 FS_IN_FragPos;
+layout(location = 2) out vec3 FS_IN_Normal;
+layout(location = 1) out vec4 FS_IN_NDC;
 
-out mat3 FS_IN_TBN;
+layout(location = 3) out mat3 FS_IN_TBN;
 
-flat out uint decal_index;
+layout(location = 6) flat out uint decal_index;
 
 vec3 randColor(int number){
     return fract(sin(vec3(number+1)*vec3(12.8787, 1.97, 20.73739)));
@@ -113,11 +113,11 @@ vec3 WorldPosFromDepth(vec2 TexCoord, float depth) {
     return viewSpacePosition.xyz;
 }
 
-in vec3 FS_IN_FragPos;
-in vec3 FS_IN_Normal;
-in vec4 FS_IN_NDC;
-in mat3 FS_IN_TBN;
-flat in uint decal_index;
+layout(location = 0) in vec3 FS_IN_FragPos;
+layout(location = 2) in vec3 FS_IN_Normal;
+layout(location = 1) in vec4 FS_IN_NDC;
+layout(location = 3) in mat3 FS_IN_TBN;
+layout(location = 6) flat in uint decal_index;
 
 // "fake" FS_IN variables
 uint FS_IN_Objid = 0;

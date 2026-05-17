@@ -1,5 +1,5 @@
-in vec2 texCoord;
-out vec3 FS_OUT_Color;
+layout(location = 0) in vec2 texCoord;
+layout(location = 0) out vec3 FS_OUT_Color;
 #include "SharedGpuTypes.txt"
 #include "ShaderBufferShared.txt"
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {

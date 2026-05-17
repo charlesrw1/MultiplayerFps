@@ -17,7 +17,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-in vec2 texCoord;
+layout(location = 0) in vec2 texCoord;
 
 #include "ShaderBufferShared.txt"
 layout (binding = 7, std140) uniform SsaoHbaoParamsUbo { SsaoHbaoParams params; };

@@ -34,9 +34,9 @@ uniform float MaxRadiusPixels = 100.0;
 uniform int NumDirections = 6;
 uniform int NumSamples = 4;
 
-in vec2 FS_IN_TexCoord;
+layout(location = 0) in vec2 FS_IN_TexCoord;
 
-out float FS_OUT_frag0;
+layout(location = 0) out float FS_OUT_frag0;
 
 float ViewSpaceZFromDepth(float d)
 {

@@ -18,8 +18,8 @@ uniform vec3 samples[KERNEL_SIZE];
 uniform mat4 projection;
 uniform mat4 invprojection;
 
-in vec2 FS_IN_TexCoord;
-out vec3 FS_OUT_frag0;
+layout(location = 0) in vec2 FS_IN_TexCoord;
+layout(location = 0) out vec3 FS_OUT_frag0;
 
 float ViewSpaceZFromDepth(float d)
 {

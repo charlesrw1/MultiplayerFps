@@ -1,6 +1,6 @@
 
 
-out vec4 FS_OUT_Color;
+layout(location = 0) out vec4 FS_OUT_Color;
 
 // from: https://www.shadertoy.com/view/slB3z3
 

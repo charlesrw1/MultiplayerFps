@@ -25,7 +25,7 @@ layout (binding = 7, std140) uniform SsaoHbaoParamsUbo { SsaoHbaoParams params; 
 
 layout(binding=0) uniform sampler2D texSource;
 
-in vec2 texCoord;
+layout(location = 0) in vec2 texCoord;
 
 layout(location=0,index=0) out vec4 out_Color;
 

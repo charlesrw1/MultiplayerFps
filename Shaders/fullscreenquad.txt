@@ -1,4 +1,4 @@
-out vec2 texCoord;
+layout(location = 0) out vec2 texCoord;
 
 void main()
 {

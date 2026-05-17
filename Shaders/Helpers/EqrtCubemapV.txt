@@ -2,7 +2,7 @@
 
 layout (location = 0) in vec3 VS_IN_Postion;
 
-out vec3 FS_IN_Fragpos;
+layout(location = 0) out vec3 FS_IN_Fragpos;
 
 layout(std140, binding = 12) uniform EqrtCubemapVertPushConstsUbo { EqrtCubemapVertPushConsts pcv; };
 

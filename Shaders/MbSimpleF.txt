@@ -1,8 +1,8 @@
 #include "ShaderBufferShared.txt"
 
-out vec4 FS_OUT_Color;
+layout(location = 0) out vec4 FS_OUT_Color;
 
-in vec4 FS_IN_Color;
+layout(location = 0) in vec4 FS_IN_Color;
 
 #ifdef USE_SOLID_COLOR
 layout(std140, binding = 16) uniform MbSimpleFragPushConstsUbo { MbSimpleFragPushConsts pcf; };
