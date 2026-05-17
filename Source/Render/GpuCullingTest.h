@@ -123,7 +123,7 @@ public:
 	glm::ivec2 depth_size = {};
 	glm::ivec2 actual_depth_size = {};
 
-	uint32 hiZSampler{};
+	IGraphicsSampler* hiZSampler = nullptr;
 
 	glm::mat4 prev_view = glm::mat4(1.0);
 

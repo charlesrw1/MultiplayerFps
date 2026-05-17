@@ -57,6 +57,7 @@ public:
 class Texture;
 class IGraphicsTexture;
 class IGraphicsBuffer;
+class IGraphicsSampler;
 class ShadowMapAtlas
 {
 public:
@@ -241,7 +242,7 @@ public:
 	static SSRSystem* inst;
 	SSRSystem();
 	void execute_compute();
-	uint32 hiz_max_sampler{};
+	IGraphicsSampler* hiz_max_sampler = nullptr;
 	program_handle hiz_downsample{};
 	program_handle ssr_compute{};
 	program_handle ssr_downsample{};

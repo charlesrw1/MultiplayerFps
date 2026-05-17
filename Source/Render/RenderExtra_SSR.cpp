@@ -17,14 +17,13 @@ SSRSystem::SSRSystem() {
 	temporal_upsample = draw.get_prog_man().create_raster("fullscreenquad.txt", "temporal_upsample_ssr.txt");
 
 	Texture::install_system("_depth_pyramid2");
-	glGenSamplers(1, &hiz_max_sampler);
-	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	glSamplerParameteri(hiz_max_sampler, GL_TEXTURE_REDUCTION_MODE_ARB,
-						GL_MAX); // max, takes the closest value to the camera. depth buffer stored in reverse-Z [1,0]
+	CreateSamplerArgs sargs;
+	sargs.min_filter = GraphicsSamplerFilter::LinearMipmapNearest;
+	sargs.mag_filter = GraphicsSamplerFilter::Linear;
+	sargs.wrap       = GraphicsSamplerWrap::ClampToEdge;
+	// max, takes the closest value to the camera. depth buffer stored in reverse-Z [1,0]
+	sargs.reduction  = GraphicsSamplerReduction::Max;
+	hiz_max_sampler  = gfx().create_sampler(sargs);
 }
 
 void SSRSystem::compute_depth() {
@@ -35,9 +34,9 @@ void SSRSystem::compute_depth() {
 	const int levels = Texture::get_mip_map_count(actual_depth_size.x, actual_depth_size.y);
 	int width = actual_depth_size.x;
 	int height = actual_depth_size.y;
-	glBindSampler(0, hiz_max_sampler);
+	gfx().bind_sampler(0, hiz_max_sampler);
 	for (int level = 0; level < levels; level++) {
-		glBindImageTexture(1, depth_pyramid->get_internal_handle(), level, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+		gfx().bind_image_for_compute(1, depth_pyramid, level, 0, GraphicsImageAccess::WriteOnly);
 		if (level == 0)
 			draw.get_device().bind_texture_ptr(0, draw.tex.scene_depth);
 		else {
@@ -51,17 +50,17 @@ void SSRSystem::compute_depth() {
 		const int level_to_sample = level == 0 ? 0 : level - 1;
 		draw.shader().set_int("level", level_to_sample);
 
-		glDispatchCompute(groups_x, groups_y, 1);
+		gfx().dispatch_compute(groups_x, groups_y, 1);
 
 		width /= 2.0;
 		height /= 2.0;
 		width = glm::max(width, 1);
 		height = glm::max(height, 1);
 
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+		gfx().memory_barrier(BARRIER_SHADER_IMAGE_ACCESS | BARRIER_TEXTURE_FETCH);
 	}
 
-	glBindSampler(0, 0);
+	gfx().bind_sampler(0, nullptr);
 }
 
 void SSRSystem::do_downsample() {
@@ -95,7 +94,7 @@ void SSRSystem::do_downsample() {
 		else
 			device.bind_texture_ptr(0, draw.tex.scene_color_mipchain);
 		device.set_viewport(0, 0, size.x, size.y);
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
 		inv_presize = 1.f / glm::vec2(size);
 	}
@@ -143,7 +142,7 @@ void SSRSystem::do_upsample() {
 	gfx().set_render_pass(rp);
 	device.set_viewport(0, 0, viewsetup.width, viewsetup.height);
 
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	return;
 	// now do blur and output
 
@@ -163,7 +162,7 @@ void SSRSystem::do_upsample() {
 	device.bind_texture_ptr(0, draw.tex.ddgi_accum);
 	device.bind_texture_ptr(1, draw.tex.scene_depth);
 
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }
 
 ConfigVar ssr_temporal_blend("r.ssr_temporal_blend", "0.75", CVAR_FLOAT, "", 0, 1);
@@ -219,7 +218,7 @@ void SSRSystem::do_temporal() {
 	the_shader.set_bool("dilate_velocity", r_taa_dilate_velocity.get_bool());
 	the_shader.set_ivec2("halfres_texel_offset", get_frame_offset());
 	the_shader.set_float("ssr_nonoccluded_weight_mult", ssr_nonoccluded_weight_mult);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
+	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }
 
 static int max_steps = 40;
@@ -347,14 +346,14 @@ void SSRSystem::execute_compute() {
 	device.bind_texture_ptr(0, draw.tex.scene_gbuffer0);
 	device.bind_texture_ptr(1, draw.tex.scene_gbuffer1);
 	device.bind_texture_ptr(2, draw.tex.scene_gbuffer2);
-	glBindSampler(3, hiz_max_sampler);
+	gfx().bind_sampler(3, hiz_max_sampler);
 	device.bind_texture_ptr(3, depth_pyramid);
 	device.bind_texture_ptr(4, draw.tex.scene_depth);
 	device.bind_texture_ptr(5, draw.tex.last_scene_color);
 	device.bind_texture_ptr(6, draw.tex.scene_color_mipchain);
 
-	glDrawArrays(GL_TRIANGLES, 0, 3);
-	glBindSampler(3, 0);
+	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
+	gfx().bind_sampler(3, nullptr);
 
 	// do_upsample();
 

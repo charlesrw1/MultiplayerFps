@@ -112,6 +112,30 @@ enum class GraphicsTextureEdge : int8_t
 	Clamp
 };
 
+enum class GraphicsSamplerFilter : int8_t
+{
+	Nearest,
+	Linear,
+	LinearMipmapNearest,
+	LinearMipmapLinear,
+};
+
+enum class GraphicsSamplerWrap : int8_t
+{
+	Repeat,
+	ClampToEdge,
+};
+
+// Per-sample reduction. Min/Max wrap GL_TEXTURE_REDUCTION_MODE_ARB (filter-minmax,
+// used by HiZ depth pyramids). SDL3 GPU has no equivalent; replaced with a
+// compute min/max pre-pass in Phase 3.
+enum class GraphicsSamplerReduction : int8_t
+{
+	WeightedAverage,
+	Min,
+	Max,
+};
+
 template <typename T> inline void safe_release(T*& ptr) {
 	if (ptr) {
 		ptr->release();
@@ -166,6 +190,24 @@ public:
 	virtual void release() = 0;
 
 	virtual uint32_t get_internal_handle() = 0;
+};
+
+// Standalone sampler object. Bound to a texture slot via gfx().bind_sampler;
+// when bound, it overrides the sampler params baked into the texture itself.
+class IGraphicsSampler
+{
+public:
+	virtual ~IGraphicsSampler() {}
+	virtual void release() = 0;
+	virtual uint32_t get_internal_handle() = 0;
+};
+
+struct CreateSamplerArgs
+{
+	GraphicsSamplerFilter min_filter = GraphicsSamplerFilter::Linear;
+	GraphicsSamplerFilter mag_filter = GraphicsSamplerFilter::Linear;
+	GraphicsSamplerWrap   wrap       = GraphicsSamplerWrap::ClampToEdge;
+	GraphicsSamplerReduction reduction = GraphicsSamplerReduction::WeightedAverage;
 };
 
 struct ColorTargetInfo
@@ -367,6 +409,20 @@ public:
 	// raw bufferhandle (e.g. draw.ubo.current_frame, batch-built MDI buffer).
 	virtual void bind_storage_buffer_base(int slot, IGraphicsBuffer* buf) = 0;
 	virtual void bind_storage_buffer_base_raw(int slot, uint32_t buffer_handle) = 0;
+
+	// ---- Phase 1.3b wrap surface (samplers + buffer clear) -----------------
+
+	virtual IGraphicsSampler* create_sampler(const CreateSamplerArgs& args) = 0;
+
+	// Bind a sampler to a texture slot; overrides the bound texture's own
+	// sampler params for the duration of the bind. Pass nullptr to unbind
+	// (revert to texture-default sampling). Wraps glBindSampler.
+	virtual void bind_sampler(int slot, IGraphicsSampler* sampler) = 0;
+
+	// Fill a buffer with a repeated 32-bit value (currently R32UI). Used to
+	// reset MDI count/visibility buffers between frames. Wraps
+	// glClearNamedBufferData.
+	virtual void clear_buffer_uint32(IGraphicsBuffer* buf, uint32_t value) = 0;
 };
 
 // Global accessor for the active graphics device. Initialize the OpenGL backend

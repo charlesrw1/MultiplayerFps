@@ -29,6 +29,44 @@ void dump_render_memory_usage() {
 }
 
 // ---------------------------------------------------------------------------
+// OpenGLSamplerImpl
+// ---------------------------------------------------------------------------
+static GLenum sampler_filter_to_gl(GraphicsSamplerFilter f) {
+	switch (f) {
+	case GraphicsSamplerFilter::Nearest:             return GL_NEAREST;
+	case GraphicsSamplerFilter::Linear:              return GL_LINEAR;
+	case GraphicsSamplerFilter::LinearMipmapNearest: return GL_LINEAR_MIPMAP_NEAREST;
+	case GraphicsSamplerFilter::LinearMipmapLinear:  return GL_LINEAR_MIPMAP_LINEAR;
+	}
+	ASSERT(0 && "sampler_filter_to_gl: unknown filter");
+	return GL_LINEAR;
+}
+
+class OpenGLSamplerImpl : public IGraphicsSampler
+{
+public:
+	uint32_t id = 0;
+
+	OpenGLSamplerImpl(const CreateSamplerArgs& args) {
+		glGenSamplers(1, &id);
+		glSamplerParameteri(id, GL_TEXTURE_MIN_FILTER, sampler_filter_to_gl(args.min_filter));
+		glSamplerParameteri(id, GL_TEXTURE_MAG_FILTER, sampler_filter_to_gl(args.mag_filter));
+		const GLenum wrap = (args.wrap == GraphicsSamplerWrap::ClampToEdge) ? GL_CLAMP_TO_EDGE : GL_REPEAT;
+		glSamplerParameteri(id, GL_TEXTURE_WRAP_S, wrap);
+		glSamplerParameteri(id, GL_TEXTURE_WRAP_T, wrap);
+		glSamplerParameteri(id, GL_TEXTURE_WRAP_R, wrap);
+		if (args.reduction == GraphicsSamplerReduction::Min)
+			glSamplerParameteri(id, GL_TEXTURE_REDUCTION_MODE_ARB, GL_MIN);
+		else if (args.reduction == GraphicsSamplerReduction::Max)
+			glSamplerParameteri(id, GL_TEXTURE_REDUCTION_MODE_ARB, GL_MAX);
+	}
+	~OpenGLSamplerImpl() override { glDeleteSamplers(1, &id); }
+
+	void release() override { delete this; }
+	uint32_t get_internal_handle() override { return id; }
+};
+
+// ---------------------------------------------------------------------------
 // OpenGLDeviceImpl
 // ---------------------------------------------------------------------------
 ConfigVar use_multiple_fbos("use_multiple_fbos", "1", CVAR_BOOL, "");
@@ -326,6 +364,21 @@ public:
 	void bind_storage_buffer_base_raw(int slot, uint32_t buffer_handle) override {
 		ASSERT(slot >= 0);
 		glBindBufferBase(GL_SHADER_STORAGE_BUFFER, slot, buffer_handle);
+	}
+
+	IGraphicsSampler* create_sampler(const CreateSamplerArgs& args) override {
+		return new OpenGLSamplerImpl(args);
+	}
+
+	void bind_sampler(int slot, IGraphicsSampler* sampler) override {
+		ASSERT(slot >= 0);
+		glBindSampler(slot, sampler ? sampler->get_internal_handle() : 0);
+	}
+
+	void clear_buffer_uint32(IGraphicsBuffer* buf, uint32_t value) override {
+		ASSERT(buf != nullptr);
+		glClearNamedBufferData(buf->get_internal_handle(), GL_R32UI, GL_RED_INTEGER,
+							   GL_UNSIGNED_INT, &value);
 	}
 
 	void download_texture(IGraphicsTexture* tex, int mip, int layer,

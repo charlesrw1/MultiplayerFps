@@ -59,7 +59,7 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.2a** | `Ssao.cpp` | ~100 | draw_arrays, bind_texture, bind_uniform_buffer_base; migrate raw FBOs to `gfx().set_render_pass`; migrate raw textures + UBO to `IGraphicsTexture` / `IGraphicsBuffer`; fix `rgba16_snorm` input type in backend | done |
 | 1.2b | `EnvProbe.cpp` | ~106 | cubemap mip clamping, temp render target, `glReadPixels`, BRDFIntegration (defer shader-coupled lines to 1.7) | done |
 | **1.3a** | `Volumetricfog.cpp` | ~33 | dispatch_compute, memory_barrier (flag enum), bind_image_for_compute, bind_storage_buffer_base (+ `_raw`); t3D path in backend; add WRAP_R to LinearClamped sampler | done |
-| 1.3b | `RenderExtra_SSR.cpp`, `GpuCullingTest.cpp` | ~52 | `IGraphicsSampler` + bind_sampler, glClearNamedBufferData wrapper | not started |
+| **1.3b** | `RenderExtra_SSR.cpp`, `GpuCullingTest.cpp` | ~52 | `IGraphicsSampler` + bind_sampler, glClearNamedBufferData wrapper | done |
 | 1.3c | `RT/RaytraceTest_Probe.cpp`, `RT/RaytraceTest_Shade.cpp` | ~45 | buffer map/unmap for readback (probe relocation, invalid-count) | not started |
 | 1.4 | `DrawLocal_BatchScene.cpp`, `DrawLocal_Lighting.cpp`, `DrawLocal_RenderPass.cpp` | ~70 | bind_indirect_buffer, bind_parameter_buffer, multi_draw_elements_indirect (count), color-mask state | not started |
 | 1.5a | `DecalBatcher.cpp` | ~12 | per-attachment color masks as immediate setters (baked in 2c) | not started |
@@ -76,6 +76,14 @@ Migration rule per sub-phase: any GL call still needed by a non-backend caller b
 - API added: `set_scissor`, `disable_scissor`, `draw_elements_base_vertex`, `bind_uniform_buffer_base_raw`, `wait_for_gpu_idle`, `download_texture_2d`.
 - `CheckGlErrorInternal_` body moved to `OpenGlDevice.cpp`; `DrawLocal_Debug.cpp` no longer includes `glad.h`.
 - `DrawLocal_Misc.cpp` and `DrawLocal_Debug.cpp` contain zero direct `gl*` calls.
+
+## Sub-phase 1.3b status
+
+- API added: `IGraphicsSampler` + `create_sampler(CreateSamplerArgs)` (filter / wrap / reduction); `bind_sampler(slot, IGraphicsSampler*)` (nullptr unbinds); `clear_buffer_uint32(IGraphicsBuffer*, uint32_t)` wrapping `glClearNamedBufferData` (R32UI). `GraphicsSamplerReduction::{WeightedAverage, Min, Max}` carries the filter-minmax intent (`GL_TEXTURE_REDUCTION_MODE_ARB`); SDL3 GPU has no equivalent — Phase 3 swaps the HiZ samplers for a compute min/max pre-pass.
+- `SSRSystem::hiz_max_sampler`: raw `uint32` → `IGraphicsSampler*` (LinearMipmapNearest/Linear, ClampToEdge, reduction=Max — depth in reverse-Z, max==closest). All compute-depth + ssr_compute binds route through `gfx().bind_sampler`. Trailing `glDrawArrays`/`glBindSampler` migrated.
+- `GpuCullingTest::hiZSampler`: raw `uint32` → `IGraphicsSampler*` (reduction=Min — conservative far-depth for cull). `glBindBufferBase`/`glBindImageTexture`/`glDispatchCompute`/`glMemoryBarrier`/`glDrawArrays`/`glClearNamedBufferData` calls in `debug_overlay`, `do_cull`, `downsample_depth`, `compact_draws`, `zero_instances_in_this`, `build_data` migrated to the abstraction. `zero_instances_in_this` still takes a raw `bufferhandle` (called with `input.cmd_buf->get_internal_handle()`); routed via `bind_storage_buffer_base_raw`. Cleanup of the raw-handle signature deferred to 1.4 where the MDI binding lands.
+- Sampler lifetime: both subsystems are global singletons that already leak (no destructors clean up shaders/buffers either); no behavioural change.
+- `RenderExtra_SSR.cpp` and `GpuCullingTest.cpp` contain zero direct `gl*` calls. 184 unit tests + full integration suite green.
 
 ## Sub-phase 1.3a status
 

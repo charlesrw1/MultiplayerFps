@@ -17,13 +17,13 @@ GpuCullingTest::GpuCullingTest() {
 
 	Texture::install_system("_depth_pyramid");
 
-	glGenSamplers(1, &hiZSampler);
-	glSamplerParameteri(hiZSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
-	glSamplerParameteri(hiZSampler, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	glSamplerParameteri(hiZSampler, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glSamplerParameteri(hiZSampler, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glSamplerParameteri(hiZSampler, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-	glSamplerParameteri(hiZSampler, GL_TEXTURE_REDUCTION_MODE_ARB, GL_MIN);
+	CreateSamplerArgs sargs;
+	sargs.min_filter = GraphicsSamplerFilter::LinearMipmapNearest;
+	sargs.mag_filter = GraphicsSamplerFilter::Linear;
+	sargs.wrap       = GraphicsSamplerWrap::ClampToEdge;
+	// min reduction — depth pyramid stored reverse-Z, sample the farthest depth for cull conservativeness
+	sargs.reduction  = GraphicsSamplerReduction::Min;
+	hiZSampler       = gfx().create_sampler(sargs);
 }
 
 GpuCullingTest::~GpuCullingTest() {}
@@ -86,16 +86,16 @@ void GpuCullingTest::debug_overlay() {
 	state.program = debug_overlays;
 	state.vao = draw.get_empty_vao();
 	device.set_pipeline(state);
-	glBindBufferBase(GL_UNIFORM_BUFFER, 5, cull_data->get_internal_handle());
+	gfx().bind_uniform_buffer_base(5, cull_data);
 	device.shader().set_int("lod_bias", lod_bias);
 	device.shader().set_bool("output_depth", output_depth);
 
 	device.shader().set_vec4("debug_pos", glm::vec4(debug_pos, debug_radius));
 
 	device.bind_texture_ptr(0, depth_pyramid);
-	glBindSampler(0, hiZSampler);
-	glDrawArrays(GL_TRIANGLES, 0, 3);
-	glBindSampler(0, 0);
+	gfx().bind_sampler(0, hiZSampler);
+	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
+	gfx().bind_sampler(0, nullptr);
 }
 void GpuCullingTest::copy_cpu(Render_Lists_Gpu_Culled& list) {}
 void GpuCullingTest::do_cull_for_scene(const GpuCullInput& input, Phase pass) {
@@ -182,24 +182,24 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 	device.shader().set_bool("second_pass", pass == Phase::Pass2);
 
 	device.bind_texture_ptr(0, depth_pyramid);
-	glBindSampler(0, hiZSampler);
+	gfx().bind_sampler(0, hiZSampler);
 	device.shader().set_int("lod_bias", lod_bias);
 	device.shader().set_int("force_lod", r_force_lod.get_integer());
 
 	device.shader().set_float("radius_bias", radius_bias);
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, input.cmd_buf->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, input.glinst_to_inst->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, input.mod_data->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, input.obj_data_buf->get_internal_handle());
-	glBindBufferBase(GL_UNIFORM_BUFFER, 5, cull_data->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 7, vis_bitarray->get_internal_handle());
+	gfx().bind_storage_buffer_base(2, input.cmd_buf);
+	gfx().bind_storage_buffer_base(3, input.glinst_to_inst);
+	gfx().bind_storage_buffer_base(6, input.mod_data);
+	gfx().bind_storage_buffer_base(4, input.obj_data_buf);
+	gfx().bind_uniform_buffer_base(5, cull_data);
+	gfx().bind_storage_buffer_base(7, vis_bitarray);
 
-	glDispatchCompute(groups, 1, 1);
+	gfx().dispatch_compute(groups, 1, 1);
 
-	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
+	gfx().memory_barrier(BARRIER_SHADER_STORAGE | BARRIER_COMMAND);
 
-	glBindSampler(0, 0);
+	gfx().bind_sampler(0, nullptr);
 
 	compact_draws(input);
 }
@@ -212,8 +212,7 @@ void GpuCullingTest::build_data(const GpuCullInput& input) {
 
 	const int words_needed = glm::ceil(cull.num_objects / 32.f);
 	vis_bitarray->upload(nullptr, words_needed * 4);
-	uint32 value = 0;
-	glClearNamedBufferData(vis_bitarray->get_internal_handle(), GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &value);
+	gfx().clear_buffer_uint32(vis_bitarray, 0);
 
 	do_cull_for_scene(input, Phase::Pass1);
 }
@@ -307,10 +306,9 @@ void GpuCullingTest::downsample_depth() {
 	const int levels = Texture::get_mip_map_count(actual_depth_size.x, actual_depth_size.y);
 	int width = actual_depth_size.x;
 	int height = actual_depth_size.y;
-	glBindSampler(0, hiZSampler);
+	gfx().bind_sampler(0, hiZSampler);
 	for (int level = 0; level < levels; level++) {
-		// glBindImageTexture()
-		glBindImageTexture(1, depth_pyramid->get_internal_handle(), level, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+		gfx().bind_image_for_compute(1, depth_pyramid, level, 0, GraphicsImageAccess::WriteOnly);
 		if (level == 0)
 			draw.get_device().bind_texture_ptr(0, draw.tex.scene_depth);
 		else {
@@ -324,17 +322,17 @@ void GpuCullingTest::downsample_depth() {
 		const int level_to_sample = level == 0 ? 0 : level - 1;
 		draw.shader().set_int("level", level_to_sample);
 
-		glDispatchCompute(groups_x, groups_y, 1);
+		gfx().dispatch_compute(groups_x, groups_y, 1);
 
 		width /= 2.0;
 		height /= 2.0;
 		width = glm::max(width, 1);
 		height = glm::max(height, 1);
 
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+		gfx().memory_barrier(BARRIER_SHADER_IMAGE_ACCESS | BARRIER_TEXTURE_FETCH);
 	}
 
-	glBindSampler(0, 0);
+	gfx().bind_sampler(0, nullptr);
 	if (0) {
 		glm::vec3 center = glm::vec3(0, 5, 0);
 		float radius = 1.0;
@@ -359,35 +357,34 @@ void GpuCullingTest::downsample_depth() {
 }
 
 void GpuCullingTest::compact_draws(const GpuCullInput& input) {
-	GLuint zero = 0;
-	glClearNamedBufferData(input.count_buf->get_internal_handle(), GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, &zero);
+	gfx().clear_buffer_uint32(input.count_buf, 0);
 
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, input.cmd_buf->get_internal_handle());
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 3, input.batches_buf->get_internal_handle());
+	gfx().bind_storage_buffer_base(2, input.cmd_buf);
+	gfx().bind_storage_buffer_base(3, input.batches_buf);
 	// glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 4, mat_buf);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 5, input.count_buf->get_internal_handle());
+	gfx().bind_storage_buffer_base(5, input.count_buf);
 
 	// stored in mdi buf after first 2 sections
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 6, input.draw_to_batch->get_internal_handle());
+	gfx().bind_storage_buffer_base(6, input.draw_to_batch);
 
 	draw.set_shader(compaction);
 	int groups_x = glm::ceil(input.num_cmds / 32.f);
 	draw.shader().set_int("num_draws", input.num_batches);
 	draw.shader().set_int("command_count", input.num_cmds);
 
-	glDispatchCompute(groups_x, 1, 1);
+	gfx().dispatch_compute(groups_x, 1, 1);
 
-	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
+	gfx().memory_barrier(BARRIER_SHADER_STORAGE | BARRIER_COMMAND);
 }
 
 void GpuCullingTest::zero_instances_in_this(bufferhandle mdi_buf, int count) {
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, mdi_buf);
+	gfx().bind_storage_buffer_base_raw(2, mdi_buf);
 	draw.set_shader(zero_instances_mdi);
 	int groups_x = glm::ceil(count / 256.f);
 	draw.shader().set_int("draw_count", count);
-	glDispatchCompute(groups_x, 1, 1);
+	gfx().dispatch_compute(groups_x, 1, 1);
 
-	glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_COMMAND_BARRIER_BIT);
+	gfx().memory_barrier(BARRIER_SHADER_STORAGE | BARRIER_COMMAND);
 }
 
 void GpuCullingTest::do_shadow_cull(const GpuCullInput& input, Frustum f) {
