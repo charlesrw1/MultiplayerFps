@@ -278,6 +278,27 @@ struct MbSimpleFragPushConsts {
     vec4 solid_color;            //   0 ..  16   (struct size 16)
 };
 
+// MasterUIShader.txt (UI material draws -- see DrawLocal_Misc.cpp).
+struct MasterUIVertPushConsts {
+    mat4 UIViewProj;             //   0 ..  64   (struct size 64)
+};
+
+// MasterDecalShader.txt (decal MDI batches -- see DecalBatcher.cpp).
+struct MasterDecalVertPushConsts {
+    uint decal_indirect_offset;  //   0 ..   4   (struct size 16, padded)
+    uint _pad0;
+    uint _pad1;
+    uint _pad2;
+};
+
+// fullscreen_quad_textureF.txt (light-cookie atlas blits -- see
+// RenderExtra_LightCookieAtlas.cpp::blit_texture_into_thing_because_reasons).
+struct FullscreenDrawTextureFragPushConsts {
+    ivec2 viewport_size;         //   0 ..   8
+    int _pad0;
+    int _pad1;                   //   (struct size 16)
+};
+
 // Helpers/EqrtCubemapV.txt (env-probe cubemap face renders) +
 // Helpers/PrefilterSpecularNewF.txt (specular prefilter) -- see EnvProbe.cpp.
 struct EqrtCubemapVertPushConsts {

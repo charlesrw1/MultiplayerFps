@@ -156,7 +156,9 @@ public:
 				pipe.vao = mb_draw_data.vao;
 				device.set_pipeline(pipe);
 
-				draw.shader()->set_mat4("UIViewProj", view_proj);
+				gpu::MasterUIVertPushConsts pcv{};
+				pcv.UIViewProj = view_proj;
+				gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
 
 				auto& texs = mat->impl->get_textures();
 				for (int i = 0; i < (int)texs.size(); i++)

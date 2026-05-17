@@ -2,6 +2,7 @@
 // ******** START "include "SharedGpuTypes.txt"" ********
 
 #include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
 
 // ******** END "include "SharedGpuTypes.txt"" ********
 
@@ -46,11 +47,11 @@ vec3 randColor(int number){
 }
 
 
-uniform uint decal_indirect_offset = 0;
+layout(std140, binding = 12) uniform MasterDecalVertPushConstsUbo { MasterDecalVertPushConsts pc; };
 
 void main()
 {
-	uint decal_index_in = indirect_decal_indicies[decal_indirect_offset+gl_DrawID];
+	uint decal_index_in = indirect_decal_indicies[pc.decal_indirect_offset+gl_DrawID];
 	decal_index = decal_index_in;
 
 	vec3 local_pos = vec3(0.0);

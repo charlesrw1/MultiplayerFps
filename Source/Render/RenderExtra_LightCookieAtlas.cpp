@@ -23,7 +23,9 @@ void blit_texture_into_thing_because_reasons(IGraphicsTexture* srct, IGraphicsTe
 	state.vao = draw.get_empty_vao();
 	state.program = draw.get_prog_man().get_obj(draw.prog.fullscreen_draw_texture);
 	device.set_pipeline(state);
-	device.get_active_shader()->set_ivec2("viewport_size", glm::ivec2(dest.w, dest.h));
+	gpu::FullscreenDrawTextureFragPushConsts pcf{};
+	pcf.viewport_size = glm::ivec2(dest.w, dest.h);
+	gfx().push_fragment_constants(0, &pcf, sizeof(pcf));
 
 	device.bind_texture(0, srct);
 
