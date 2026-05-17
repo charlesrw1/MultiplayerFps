@@ -139,12 +139,27 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.4g** | API drift correction: implicit render/compute pass separation (SDL3 GPU prep) | — | `IGraphicsDevice::begin_compute_pass()`; backend tracks `PassMode`; `set_render_pass()` flips to Render; assert in `dispatch_compute()` | done |
 | **1.5a** | `DecalBatcher.cpp` | ~12 | per-attachment color masks as immediate setters (baked in 2c) | done |
 | **1.6** | `DrawLocal_SceneDrawInternal.cpp` (orchestration) | ~14 | set_polygon_fill_mode; migrate `render_bloom_chain` to `IGraphicsTexture*` | done |
-| 1.7 | `Shader.cpp` migration → inside `Source/Render/Opengl*` | 71 | shader compile/link entirely backend-internal; expose `IGraphicsShader` + `create_shader(...)` | not started |
+| **1.7a** | `IGraphicsShader` interface + factory scaffolding | — | `IGraphicsShader`; `create_shader_{vert_frag,vert_frag_geo,compute,single_file,single_file_tess}`; `OpenGlShaderImpl.cpp`; route compute + shared-tess paths in `Program_Manager::recompile_do` through factory | done |
+| 1.7b | Move `Shader.cpp` compile/link bodies into `OpenGlShaderImpl.cpp` | ~50 | source-loader + `glCreateShader/Compile/Attach/Link/Delete` move into backend; `Shader::compile*` becomes thin wrappers | not started |
+| 1.7c | Uniform setters onto `IGraphicsShader` | ~12 | `IGraphicsShader::{use,set_int,set_float,set_mat4,…,set_block_binding}`; migrate `device.shader().set_*` callers; delete `Shader::set_*` | not started |
+| 1.7d | Program-binary cache + delete `Shader` struct | ~20 | move `glProgramBinary`/`glGetProgramBinary` cache paths in `recompile_shared`/`recompile_normal` into backend; delete `Shader` struct; `RenderPipelineState::program` becomes `IGraphicsShader*` (lifts into Phase 2c) | not started |
 | 1.8 | Window/swapchain + ImGui wrap | ~30 (`SDL_GL_*`, `gladLoad*`, swap, vsync, imgui_render) | factory move from `EngineMain_Init.cpp`; `set_vsync`, `present`, `imgui_render` | not started |
 | 1.9 | `r.gpu.no_legacy_calls=1` assertion test + rip per-subsystem `r.gfx.wrap.*` flags | — | gates phase boundary | not started |
 | **1.5 (post-1.x)** | Null/passthrough leak-detector backend | — | gate that proves the wrap is complete | not started |
 
 Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
+
+## Sub-phase 1.7a status
+
+Scaffolding only — no `gl*` calls actually move into the backend yet. Sub-phase 1.7 was split into four parts because the work involves the interface, the source-loader, the uniform-setter surface (used by every render subsystem), and the program-binary cache (which lives in `DrawLocal_Device.cpp` and runs *alongside* `Shader::compile*` on the same `program_def`). Doing all four at once made the diff unbisectable.
+
+- Interface: `IGraphicsShader { release(); get_internal_handle(); }`. Phase 2c migrates `RenderPipelineState::program` from `program_handle` (int) to `IGraphicsShader*`; for now it stays as an integer that indexes `Program_Manager::programs`.
+- Factory: 5 methods on `IGraphicsDevice` — `create_shader_vert_frag`, `create_shader_vert_frag_geo`, `create_shader_compute`, `create_shader_single_file`, `create_shader_single_file_tess`. Returns `IGraphicsShader*` (heap), or `nullptr` on compile/link failure.
+- `OpenGlShaderImpl.cpp` houses `OpenGLShaderImpl` and the 5 factory bodies. **For 1.7a, factory bodies delegate to the legacy `Shader::compile*` helpers** and wrap the resulting GL handle. The actual `glCreateShader` / `glCompileShader` / `glAttachShader` / `glLinkProgram` calls migrate in 1.7b.
+- `Program_Manager::program_def` gains `IGraphicsShader* gfx_shader`. The compute and shared+tesselation paths in `recompile_do` now route through `gfx().create_shader_*`; `def.gfx_shader` owns the program, `def.shader_obj.ID` mirrors `gfx_shader->get_internal_handle()` so `Shader::use()` and the existing uniform setters keep working.
+- Binary-cache paths (`recompile_shared` + `recompile_normal`) untouched — they still own the program via raw `def.shader_obj.ID`. `def.gfx_shader` stays `nullptr` there. Ownership stays single-rooted by branch (a given `program_def` always takes the same recompile branch on every recompile).
+- Lifetime: `release_prior_program()` lambda in `recompile_do` drains the prior program before installing the new one — releases via `safe_release(gfx_shader)` if the previous compile produced an `IGraphicsShader`, else falls back to raw `glDeleteProgram(shader_obj.ID)`.
+- 184 unit tests + integration suite (80 tests) green; bake_probes + demo_level_1 screenshots within their soft-fail bands.
 
 ## Sub-phase 1.6 status
 

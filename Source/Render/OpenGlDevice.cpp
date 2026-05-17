@@ -237,6 +237,30 @@ public:
 		return opengl_create_vertex_input(args);
 	}
 
+	IGraphicsShader* create_shader_vert_frag(const std::string& vert_path,
+											 const std::string& frag_path,
+											 const std::string& defines) override {
+		return opengl_create_shader_vert_frag(vert_path, frag_path, defines);
+	}
+	IGraphicsShader* create_shader_vert_frag_geo(const std::string& vert_path,
+												  const std::string& frag_path,
+												  const std::string& geo_path,
+												  const std::string& defines) override {
+		return opengl_create_shader_vert_frag_geo(vert_path, frag_path, geo_path, defines);
+	}
+	IGraphicsShader* create_shader_compute(const std::string& compute_path,
+											const std::string& defines) override {
+		return opengl_create_shader_compute(compute_path, defines);
+	}
+	IGraphicsShader* create_shader_single_file(const std::string& shared_path,
+												const std::string& defines) override {
+		return opengl_create_shader_single_file(shared_path, defines);
+	}
+	IGraphicsShader* create_shader_single_file_tess(const std::string& shared_path,
+													 const std::string& defines) override {
+		return opengl_create_shader_single_file_tess(shared_path, defines);
+	}
+
 	// ---- Phase 1 wrap impls -----------------------------------------------
 
 	void set_scissor(int x, int y, int w, int h) override {

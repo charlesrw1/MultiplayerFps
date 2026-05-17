@@ -230,6 +230,7 @@
     <ClCompile Include="Source\Render\ModelDynamic.cpp" />
     <ClCompile Include="Source\Render\OpenGlDevice.cpp" />
     <ClCompile Include="Source\Render\OpenGlBufferImpl.cpp" />
+    <ClCompile Include="Source\Render\OpenGlShaderImpl.cpp" />
     <ClCompile Include="Source\Render\OpenGlTextureImpl.cpp" />
     <ClCompile Include="Source\Render\RenderExtra.cpp" />
     <ClCompile Include="Source\Render\RenderExtra_LightCookieAtlas.cpp" />

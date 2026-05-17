@@ -566,6 +566,7 @@
     <ClCompile Include="Source\Render\ModelLoad.cpp" />
     <ClCompile Include="Source\Render\ModelDynamic.cpp" />
     <ClCompile Include="Source\Render\OpenGlBufferImpl.cpp" />
+    <ClCompile Include="Source\Render\OpenGlShaderImpl.cpp" />
     <ClCompile Include="Source\Render\OpenGlTextureImpl.cpp" />
     <ClCompile Include="Source\Render\RenderExtra_LightCookieAtlas.cpp" />
     <ClCompile Include="Source\Render\RenderExtra_SSR.cpp" />

@@ -285,13 +285,29 @@ void Program_Manager::recompile_do(program_def& def) {
 		return;
 	}
 
+	// Free the prior program (if any) before installing the new IGraphicsShader.
+	// Ownership lives in exactly one place: gfx_shader if non-null, else the
+	// raw shader_obj.ID (binary-cache path, 1.7d).
+	auto release_prior_program = [&]() {
+		if (def.gfx_shader) {
+			safe_release(def.gfx_shader);
+		} else if (def.shader_obj.ID != 0) {
+			glDeleteProgram(def.shader_obj.ID);
+		}
+		def.shader_obj.ID = 0;
+	};
+
 	if (def.is_compute) {
-		def.compile_failed =
-			Shader::compute_compile(&def.shader_obj, def.vert, def.defines) != ShaderResult::SHADER_SUCCESS;
+		release_prior_program();
+		def.gfx_shader = gfx().create_shader_compute(def.vert, def.defines);
+		def.compile_failed = (def.gfx_shader == nullptr);
+		def.shader_obj.ID = def.gfx_shader ? def.gfx_shader->get_internal_handle() : 0;
 	} else if (def.is_shared()) {
 		assert(def.is_tesselation);
-		def.compile_failed = Shader::compile_vert_frag_tess_single_file(&def.shader_obj, def.vert, def.defines) !=
-							 ShaderResult::SHADER_SUCCESS;
+		release_prior_program();
+		def.gfx_shader = gfx().create_shader_single_file_tess(def.vert, def.defines);
+		def.compile_failed = (def.gfx_shader == nullptr);
+		def.shader_obj.ID = def.gfx_shader ? def.gfx_shader->get_internal_handle() : 0;
 	} else {
 		recompile_normal(def);
 

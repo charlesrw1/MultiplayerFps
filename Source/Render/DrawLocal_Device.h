@@ -12,6 +12,7 @@
 class IGraphicsTexture;
 class IGraphicsBuffer;
 class IGraphicsProgram;
+class IGraphicsShader;
 class Renderer;
 
 // ---------------------------------------------------------------------------
@@ -123,6 +124,12 @@ public:
 		bool is_tesselation = false;
 
 		bool is_shared() const { return !vert.empty() && frag.empty() && !is_compute; }
+		// Phase 1.7a: gfx_shader owns the program for compute + single-file-tess
+		// paths (routed through gfx().create_shader_*). The legacy binary-cache
+		// paths in recompile_shared / recompile_normal still own the GL id via
+		// shader_obj.ID directly; gfx_shader stays nullptr there until 1.7d.
+		// shader_obj.ID is always the read mirror used by callers / set_pipeline.
+		IGraphicsShader* gfx_shader = nullptr;
 		Shader shader_obj;
 	};
 	std::vector<program_def> programs;

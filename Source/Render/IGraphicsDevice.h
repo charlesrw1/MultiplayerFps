@@ -2,6 +2,7 @@
 #if 1
 #include "MaterialPublic.h"
 #include <span>
+#include <string>
 #include <string_view>
 #include <optional>
 
@@ -209,6 +210,19 @@ public:
 	virtual ~IGraphicsVertexInput() {}
 	virtual void release() = 0;
 
+	virtual uint32_t get_internal_handle() = 0;
+};
+
+// Compiled+linked GPU program (vert+frag / vert+frag+geo / vert+frag+tess /
+// compute). Owns the underlying GL program (or future SDL3 GPU shader objects).
+// Created via gfx().create_shader_*; destroyed via release(). Phase 1.7 wraps
+// the existing Shader.cpp compile/link pipeline; phase 2c migrates
+// RenderPipelineState::program from program_handle to IGraphicsShader*.
+class IGraphicsShader
+{
+public:
+	virtual ~IGraphicsShader() {}
+	virtual void release() = 0;
 	virtual uint32_t get_internal_handle() = 0;
 };
 
@@ -473,6 +487,32 @@ public:
 													int count_byte_offset,
 													int max_draw_count,
 													int stride) = 0;
+
+	// ---- Phase 1.7a wrap surface (shader factory) -------------------------
+
+	// Compile + link a GPU program. Each variant matches one of the
+	// Shader::compile* overloads. Path arguments are passed through to the
+	// shader source loader (resolved relative to the shader root). Defines is
+	// a comma-separated list of #define names (matches Shader::compile's
+	// shader_defines parameter).
+	//
+	// On compile/link failure: returns nullptr (caller is expected to mark
+	// the program as failed and continue running with a fallback). On success:
+	// returns a heap-allocated IGraphicsShader owning the underlying program.
+	// Caller releases via IGraphicsShader::release().
+	virtual IGraphicsShader* create_shader_vert_frag(const std::string& vert_path,
+													 const std::string& frag_path,
+													 const std::string& defines = {}) = 0;
+	virtual IGraphicsShader* create_shader_vert_frag_geo(const std::string& vert_path,
+														  const std::string& frag_path,
+														  const std::string& geo_path,
+														  const std::string& defines = {}) = 0;
+	virtual IGraphicsShader* create_shader_compute(const std::string& compute_path,
+													const std::string& defines = {}) = 0;
+	virtual IGraphicsShader* create_shader_single_file(const std::string& shared_path,
+														const std::string& defines = {}) = 0;
+	virtual IGraphicsShader* create_shader_single_file_tess(const std::string& shared_path,
+															 const std::string& defines = {}) = 0;
 
 	// ---- Phase 1.6 wrap surface (scene-draw orchestration) ----------------
 

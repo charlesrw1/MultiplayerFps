@@ -46,6 +46,23 @@ IGraphicsTexture*     opengl_create_texture(const CreateTextureArgs& args);
 IGraphicsBuffer*      opengl_create_buffer(const CreateBufferArgs& args);
 IGraphicsVertexInput* opengl_create_vertex_input(const CreateVertexInputArgs& args);
 
+// Shader factories — implemented in OpenGlShaderImpl.cpp. Phase 1.7a thin
+// wrappers around the legacy Shader::compile* helpers; the GL calls migrate
+// into the backend in 1.7b.
+IGraphicsShader* opengl_create_shader_vert_frag(const std::string& vert_path,
+												const std::string& frag_path,
+												const std::string& defines);
+IGraphicsShader* opengl_create_shader_vert_frag_geo(const std::string& vert_path,
+													const std::string& frag_path,
+													const std::string& geo_path,
+													const std::string& defines);
+IGraphicsShader* opengl_create_shader_compute(const std::string& compute_path,
+											  const std::string& defines);
+IGraphicsShader* opengl_create_shader_single_file(const std::string& shared_path,
+												  const std::string& defines);
+IGraphicsShader* opengl_create_shader_single_file_tess(const std::string& shared_path,
+													   const std::string& defines);
+
 // Format mapping helper — also used by OpenglDataStatic::dump_to_disk
 const char* opengl_texture_format_to_str(GraphicsTextureFormat fmt);
 
