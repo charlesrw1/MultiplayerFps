@@ -64,6 +64,10 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.4a** | `DrawLocal_Lighting.cpp` | ~10 | set_line_width, bind_indirect_buffer (nullptr unbinds) | done |
 | **1.4b** | `DrawLocal_BatchScene.cpp` | ~10 | bind_parameter_buffer, multi_draw_elements_indirect_count, set_polygon_offset | done |
 | **1.4c** | `DrawLocal_RenderPass.cpp` | ~50 | bind_storage_buffer_range_raw, bind_indirect_buffer_raw, multi_draw_elements_indirect, draw_elements, draw_elements_instanced_base_vertex_base_instance, set_clear_color, upload_buffer_raw, sub_upload_buffer_raw | done |
+| **1.4d** | API drift correction: per-attachment clear color on `ColorTargetInfo` (mirrors `SDL_GPUColorTargetInfo`); deletes `set_clear_color` + `RenderPassState::{wants_color_clear, use_gray_clear, set_clear_both}` | — | `ColorTargetInfo::{wants_clear, clear_color}` | done |
+| **1.4e** | API drift correction: migrate remaining raw `bufferhandle` fields (`ubo.current_frame`, `ShadowMapManager::frame_view`, `CascadeShadowMapSystem::ubo.{info,frame_view[4]}`, `RenderScene::gpu_skinned_mats_buffer`, `Render_Lists::{gpu_command_list, gldrawid_to_submesh_material, glinstance_to_instance}`, `GpuCullingTest::mdi_buf`, `Render_Level_Params::provied_constant_buffer`) → `IGraphicsBuffer*`; delete entire `_raw` API surface; add `bind_storage_buffer_range(IGraphicsBuffer*, …)` | — | `bind_storage_buffer_range`; delete `bind_{uniform,storage}_buffer_base_raw`, `bind_storage_buffer_range_raw`, `bind_indirect_buffer_raw`, `{upload,sub_upload}_buffer_raw` | done |
+| **1.4f** | API drift correction: move texture-scoped ops onto `IGraphicsTexture` | — | `IGraphicsTexture::{set_mip_range, download}`; delete `IGraphicsDevice::{set_mip_range, download_texture, download_texture_2d}` | done |
+| **1.4g** | API drift correction: implicit render/compute pass separation (SDL3 GPU prep) | — | `IGraphicsDevice::begin_compute_pass()`; backend tracks `PassMode`; `set_render_pass()` flips to Render; assert in `dispatch_compute()` | done |
 | 1.5a | `DecalBatcher.cpp` | ~12 | per-attachment color masks as immediate setters (baked in 2c) | not started |
 | 1.6 | `DrawLocal_SceneDrawInternal.cpp` (orchestration) | ~14 | leftover binding + draw glue | not started |
 | 1.7 | `Shader.cpp` migration → inside `Source/Render/Opengl*` | 71 | shader compile/link entirely backend-internal; expose `IGraphicsShader` + `create_shader(...)` | not started |
@@ -72,6 +76,45 @@ Total `gl*` site count is ~800 across ~25 files. Phase 1 lands as discrete sub-p
 | **1.5 (post-1.x)** | Null/passthrough leak-detector backend | — | gate that proves the wrap is complete | not started |
 
 Migration rule per sub-phase: any GL call still needed by a non-backend caller becomes an `IGraphicsDevice` method (with a `_raw` suffix when the parameter is still a `bufferhandle`/`vertexarrayhandle`; those raw escape hatches disappear in Phase 2 once the corresponding resources route through `IGraphicsBuffer*` / `IGraphicsVertexInput*`).
+
+## Sub-phases 1.4d–1.4g status (API drift corrections)
+
+Folded in from the now-removed `FIXES_TO_API.md`. Four shapes had leaked into the
+interface during 1.1–1.4c that wouldn't survive contact with SDL3 GPU; corrected
+before resuming the migration at 1.5a.
+
+- **1.4d** — `ColorTargetInfo` now carries `wants_clear` + `clear_color` per
+  attachment (mirrors `SDL_GPUColorTargetInfo.{load_op, clear_color}`); SDL3
+  port hands the struct straight to the backend without state-cache fixup.
+  Removed `RenderPassState::use_gray_clear`/`wants_color_clear` and the device
+  `set_clear_color` setter. Multi-attachment grey-clear in the gbuffer pass now
+  loops over attachments to set the gray on each.
+- **1.4e** — Migrated every remaining raw `bufferhandle` field to
+  `IGraphicsBuffer*` (UBOs sized at create + per-frame `sub_upload`; per-frame
+  SSBOs use `upload` re-spec for now — Phase 2e ring buffer is the real fix).
+  Whole `_raw` API surface deleted. New non-raw
+  `bind_storage_buffer_range(IGraphicsBuffer*, offset, size)` replaces the
+  range_raw variant. `Render_Lists::init` now allocates 0-sized buffers; the
+  per-frame `upload(data, size)` re-specs storage (preserves OpenGL semantics;
+  flagged for Phase 2e ring-buffer migration so SDL3 GPU — which has fixed-size
+  transfer destinations — doesn't trip on it).
+- **1.4f** — `set_mip_range` and `download_texture[_2d]` moved off
+  `IGraphicsDevice` onto `IGraphicsTexture`. `download(mip, layer, dest, size)`
+  collapses the 2D/layered overloads (`layer=-1` for non-layered).
+- **1.4g** — Implicit render/compute pass separation. New
+  `begin_compute_pass()` flips pass mode; `set_render_pass()` flips back. SDL3
+  backend will emit `End{Render,Compute}GPUPass` on transition and defer
+  `BeginGPUComputePass` to the first dispatch so writable bindings are known by
+  then. OpenGL backend asserts mode in `dispatch_compute` to catch missing
+  begin calls. No `end_*` API — boundaries are bookkeeping only.
+
+Decided to stay GL-shaped (backend absorbs the impedance, no API change):
+`memory_barrier(GraphicsMemoryBarrierBits)` (SDL3 auto-tracks transitions →
+no-op there); `bind_image_for_compute(..., GraphicsImageAccess)` (SDL3 derives
+R/W from pipeline decl); split `bind_texture` + `bind_sampler` (SDL3 backend
+flushes per-slot `{tex, sampler}` table at draw time as combined bindings);
+`set_line_width` (SDL3 silently no-ops); synchronous `download_*` /
+`wait_for_gpu_idle` (SDL3 builds the fence dance internally).
 
 ## Sub-phase 1.4c status
 
