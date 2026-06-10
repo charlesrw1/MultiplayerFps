@@ -169,7 +169,8 @@ glm::vec2 Renderer::get_taa_jitter() const {
 }
 
 void Renderer::check_hardware_options() {
-	gfx_opengl_dump_capabilities();
+	if (g_gfx_instance->get_device_type() == GraphicsDeviceType::OpenGl)
+		gfx_opengl_dump_capabilities();
 }
 
 void Renderer::create_default_textures() {
@@ -246,7 +247,7 @@ void Renderer::init() {
 	check_hardware_options();
 
 	// Enable debug output on debug builds
-	if (enable_gl_debug_output.get_bool()) {
+	if (g_gfx_instance->get_device_type() == GraphicsDeviceType::OpenGl && enable_gl_debug_output.get_bool()) {
 		gfx_opengl_enable_debug_output();
 	}
 
