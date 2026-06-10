@@ -158,6 +158,7 @@ bool Texture::load_asset() {
 	if (disable_texture_loads.get_bool())
 		return true;
 
+
 #ifdef EDITOR_BUILD
 	if (developer_mode.get_bool() && !force_nearest) {
 		bool good = compile_texture_asset(path, this->simplifiedColor);

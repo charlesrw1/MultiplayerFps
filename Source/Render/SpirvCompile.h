@@ -67,6 +67,8 @@ struct HlslResourceBinding
 	uint32_t spirv_binding = 0;
 	uint32_t register_index = 0;
 	HlslRegisterKind kind{};
+	bool is_image = false; // true for image2D/image3D/etc (vs SSBO) - distinguishes
+	                        // num_storage_textures from num_storage_buffers in reflect()
 };
 
 struct HlslBlob

@@ -130,14 +130,14 @@ void count_bindings(const std::vector<HlslResourceBinding>& bindings, IGraphicsS
 		switch (b.kind) {
 		case HlslRegisterKind::CBV: out.num_uniform_buffers++; break;
 		case HlslRegisterKind::Sampler: out.num_samplers++; break;
-		case HlslRegisterKind::UAV: out.num_storage_buffers++; break;
+		case HlslRegisterKind::UAV: (b.is_image ? out.num_storage_textures : out.num_storage_buffers)++; break;
 		case HlslRegisterKind::SRV: {
 			bool has_sampler = false;
 			for (auto& s : bindings)
 				if (s.kind == HlslRegisterKind::Sampler && s.spirv_binding == b.spirv_binding)
 					has_sampler = true;
 			if (!has_sampler)
-				out.num_storage_buffers++;
+				(b.is_image ? out.num_storage_textures : out.num_storage_buffers)++;
 			break;
 		}
 		}
@@ -163,6 +163,8 @@ IGraphicsShader::Reflection Dx11ShaderImpl::reflect() {
 	count_bindings(vs_bindings, out.vertex);
 	count_bindings(ps_bindings, out.fragment);
 	count_bindings(cs_bindings, out.compute);
+	for (auto& b : cs_bindings)
+		sys_print(Debug, "cs_binding: %s spirv=%u reg=%u kind=%d is_image=%d\n", b.name.c_str(), b.spirv_binding, b.register_index, (int)b.kind, b.is_image);
 	return out;
 }
 

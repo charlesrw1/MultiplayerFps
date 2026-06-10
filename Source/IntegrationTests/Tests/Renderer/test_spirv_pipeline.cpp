@@ -52,8 +52,13 @@ SpirvCounts reflect_spirv(const SpirvBlob& blob, const char* tag) {
 		const auto active = comp.get_active_interface_variables();
 		const auto res    = comp.get_shader_resources(active);
 		c.num_samplers         = (int)res.sampled_images.size();
-		c.num_storage_textures = (int)res.storage_images.size();
 		c.num_storage_buffers  = (int)res.storage_buffers.size();
+		// Storage images (UniformConstant) and UBOs (Uniform) aren't reliably
+		// included in glslang's OpEntryPoint interface list even at SPIR-V 1.5
+		// (see SpirvCompile.cpp's spirv_to_hlsl), so `active` can omit an
+		// in-use image2D/image3D. Use the unfiltered resource list instead -
+		// shaders here only declare images they actually imageStore/imageLoad.
+		c.num_storage_textures = (int)comp.get_shader_resources().storage_images.size();
 		c.num_uniform_buffers  = (int)res.uniform_buffers.size();
 	} catch (const std::exception& e) {
 		sys_print(Error, "spirv-cross threw on %s: %s\n", tag, e.what());
@@ -201,6 +206,10 @@ static TestTask test_spirv_vfog(TestContext& t) {
 	t.require(shader != nullptr, "VfogScatteringC GL shader compiled");
 	auto gl = shader->reflect();
 	shader->release();
+
+	sys_print(Debug, "spirv_vfog: cs samplers=%d images=%d ubo=%d ssbo=%d | gl samplers=%d images=%d ubo=%d ssbo=%d\n",
+		cs.num_samplers, cs.num_storage_textures, cs.num_uniform_buffers, cs.num_storage_buffers,
+		gl.compute.num_samplers, gl.compute.num_storage_textures, gl.compute.num_uniform_buffers, gl.compute.num_storage_buffers);
 
 	t.check(cs.num_samplers         == gl.compute.num_samplers,         "CS sampler count matches GL");
 	t.check(cs.num_storage_textures == gl.compute.num_storage_textures, "CS image count matches GL");

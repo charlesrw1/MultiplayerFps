@@ -156,8 +156,8 @@ layout(location = 4) out vec4 GBUFFER_OUT_EditorID;
 
 
 // "fake" FS_IN variables
-uniform uint FS_IN_Objid = 0;
-uniform uint FS_IN_Matid = 0;
+uint FS_IN_Objid = 0;
+uint FS_IN_Matid = 0;
 vec3 FS_IN_Normal;
 mat3 FS_IN_TBN;
 

@@ -204,7 +204,7 @@ int Dx11Texture::get_compressed_stride() const {
 // Repacks tightly-packed 3-channel source data into 4-channel (alpha = max),
 // for the rgb8 -> RGBA8_UNORM and rgb16f -> RGBA16_FLOAT widen cases.
 namespace {
-std::vector<uint8_t> widen_rgb_to_rgba(const void* data, int w, int h, bool is_16f, std::vector<uint8_t>& storage) {
+void widen_rgb_to_rgba(const void* data, int w, int h, bool is_16f, std::vector<uint8_t>& storage) {
 	const int src_channels = 3;
 	const int dst_channels = 4;
 	const int comp_size = is_16f ? 2 : 1;
@@ -220,7 +220,6 @@ std::vector<uint8_t> widen_rgb_to_rgba(const void* data, int w, int h, bool is_1
 			dst[i * dst_channels + 3] = 0xFF;
 		}
 	}
-	return storage;
 }
 
 // TEMP D7 diagnostic: D3D11_3SDKLayers raises a SEH exception (ReportCorruption)
@@ -273,7 +272,8 @@ void Dx11Texture::sub_image_upload(int level, int x, int y, int w, int h, int si
 	if (fmt_info.is_compressed) {
 		row_pitch = (UINT)((w + 3) / 4) * get_compressed_stride();
 	} else if (fmt_info.widen_rgb_to_rgba) {
-		upload_data = widen_rgb_to_rgba(data, w, h, is_16f, widened).data();
+		widen_rgb_to_rgba(data, w, h, is_16f, widened);
+		upload_data = widened.data();
 		row_pitch = (UINT)w * 4 * (is_16f ? 2 : 1);
 	} else {
 		row_pitch = (UINT)(size / h);

@@ -48,7 +48,7 @@ layout(location = 1) in vec3 FS_IN_FragPos;
 layout(location = 2) in vec2 FS_IN_Texcoord;
 
 // fake inputs
-uniform uint FS_IN_Objid = 0;
+uint FS_IN_Objid = 0;
 layout(std140, binding = 16) uniform MasterParticleFragPushConstsUbo { MasterParticleFragPushConsts pcf; };
 uint FS_IN_Matid = 0;	// initialised from push consts at top of main()
 

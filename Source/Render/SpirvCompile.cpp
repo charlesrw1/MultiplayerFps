@@ -167,6 +167,7 @@ struct PendingResource
 	std::string name;
 	uint32_t orig_binding = 0;
 	bool cbv = false, srv = false, uav = false, sampler = false;
+	bool is_image = false;
 };
 
 // GLSL/SPIR-V binding decorations share one namespace across all resource
@@ -212,7 +213,8 @@ void assign_registers(spirv_cross::CompilerHLSL& comp, std::vector<PendingResour
 }
 
 void add_pending(std::vector<PendingResource>& out, const spirv_cross::Compiler& comp,
-				  const spirv_cross::Resource& res, bool cbv, bool srv, bool uav, bool sampler) {
+				  const spirv_cross::Resource& res, bool cbv, bool srv, bool uav, bool sampler,
+				  bool is_image = false) {
 	if (!comp.has_decoration(res.id, spv::DecorationBinding))
 		return;
 	PendingResource p;
@@ -220,6 +222,7 @@ void add_pending(std::vector<PendingResource>& out, const spirv_cross::Compiler&
 	p.name = res.name;
 	p.orig_binding = comp.get_decoration(res.id, spv::DecorationBinding);
 	p.cbv = cbv; p.srv = srv; p.uav = uav; p.sampler = sampler;
+	p.is_image = is_image;
 	out.push_back(std::move(p));
 }
 
@@ -251,7 +254,14 @@ HlslBlob spirv_to_hlsl(const SpirvBlob& spirv, const std::string& debug_name) {
 		const auto resources = comp.get_shader_resources(active);
 
 		std::vector<PendingResource> pending;
-		for (const auto& r : resources.uniform_buffers)
+		// Uniform buffers are handled from the *unfiltered* resource list:
+		// glslang's OpEntryPoint interface list doesn't reliably include
+		// Uniform-storage-class blocks, so an in-use UBO at binding>=14 (e.g.
+		// the binding=16 fragment push-constants convention) can be missing
+		// from `active` and skip the b0-b13 remap below, producing X4567
+		// ("manual bind to slot 16 failed"). Remapping an unused UBO's
+		// decoration is harmless - compile() simply won't emit it.
+		for (const auto& r : comp.get_shader_resources().uniform_buffers)
 			add_pending(pending, comp, r, /*cbv*/true, false, false, false);
 		for (const auto& r : resources.storage_buffers) {
 			const bool read_only = comp.has_decoration(r.id, spv::DecorationNonWritable);
@@ -259,7 +269,7 @@ HlslBlob spirv_to_hlsl(const SpirvBlob& spirv, const std::string& debug_name) {
 		}
 		for (const auto& r : resources.storage_images) {
 			const bool read_only = comp.has_decoration(r.id, spv::DecorationNonWritable);
-			add_pending(pending, comp, r, false, /*srv*/read_only, /*uav*/!read_only, false);
+			add_pending(pending, comp, r, false, /*srv*/read_only, /*uav*/!read_only, false, /*is_image*/true);
 		}
 		for (const auto& r : resources.separate_images)
 			add_pending(pending, comp, r, false, /*srv*/true, false, false);
@@ -296,6 +306,7 @@ HlslBlob spirv_to_hlsl(const SpirvBlob& spirv, const std::string& debug_name) {
 			b.spirv_binding = p.orig_binding;
 			b.register_index = comp.get_decoration(p.id, spv::DecorationBinding);
 			b.kind = primary_kind(p);
+			b.is_image = p.is_image;
 			out.bindings.push_back(b);
 			if (p.cbv && p.sampler) ASSERT(false && "cbv+sampler resource unexpected");
 			// Sampled images need a second binding entry for the Sampler register.
