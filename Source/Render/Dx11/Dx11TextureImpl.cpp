@@ -219,6 +219,11 @@ std::vector<uint8_t> widen_rgb_to_rgba(const void* data, int w, int h, bool is_1
 
 void Dx11Texture::sub_image_upload(int level, int x, int y, int w, int h, int size, const void* data) {
 	ASSERT(w > 0 && h > 0 && resource);
+	// GL's glTexSubImage2D(..., nullptr) with no PBO bound is a no-op (used by
+	// callers like BRDFIntegration::run to allocate an uninitialized texture).
+	// UpdateSubresource requires non-null pSrcData, so mirror that as a no-op.
+	if (!data)
+		return;
 	D3D11_BOX box{};
 	box.left = x; box.right = x + w;
 	box.top = y; box.bottom = y + h;

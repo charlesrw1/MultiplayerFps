@@ -57,6 +57,13 @@
     to the console (filtering is bypassed - read test_<mode>_output.log for
     the structured log).
 
+.PARAMETER Backend
+    "opengl" (default), "dx11", or "both". Toggles r.render_backend in the
+    [game_test]/[editor_test] sections of vars.txt for the duration of the
+    run (restored on exit, even on failure). "both" runs the full requested
+    pass set on opengl, then again on dx11. dx11 always forces
+    r_indirect_loop 1 (DX11 has no MultiDrawIndirect).
+
 .EXAMPLE
     Scripts/integration_test.ps1
     Build and run both game + editor passes (all tests, concise output).
@@ -101,11 +108,61 @@ param(
     [switch]$Interactive,
     [switch]$TimingAssert,
     [switch]$ShowEngineLog,
-    [switch]$Debugger
+    [switch]$Debugger,
+    # "opengl" (default), "dx11", or "both" (run the full pass set on opengl,
+    # then again on dx11). Toggled via r.render_backend in the [game_test] /
+    # [editor_test] sections of vars.txt, restored on exit.
+    [ValidateSet("opengl", "dx11", "both")]
+    [string]$Backend = "opengl"
 )
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
+
+# ---- vars.txt backend toggle -----------------------------------------------
+# Sets r.render_backend (and ensures r_indirect_loop 1, required by the DX11
+# backend - it has no MultiDrawIndirect equivalent) inside the [game_test] and
+# [editor_test] sections of vars.txt. Restored verbatim via $origVarsContent
+# in the finally block at the bottom of this script.
+$varsPath = "$root\vars.txt"
+$origVarsContent = Get-Content -Raw $varsPath
+
+function Set-VarsRenderBackend([string]$backend) {
+    $lines = Get-Content $varsPath
+    $sectionStarts = @{}
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($lines[$i] -match '^\[(game_test|editor_test)\]\s*$') {
+            $sectionStarts[$i] = $Matches[1]
+        }
+    }
+    # Process bottom-up so inserts don't invalidate earlier indices.
+    foreach ($start in ($sectionStarts.Keys | Sort-Object -Descending)) {
+        $end = $lines.Count
+        foreach ($other in $sectionStarts.Keys) {
+            if ($other -gt $start -and $other -lt $end) { $end = $other }
+        }
+        $backendLine = -1
+        $indirectLine = -1
+        for ($i = $start + 1; $i -lt $end; $i++) {
+            if ($lines[$i] -match '^r\.render_backend\s+\S+') { $backendLine = $i }
+            if ($lines[$i] -match '^r_indirect_loop\s+\S+')   { $indirectLine = $i }
+        }
+        if ($backendLine -ge 0) {
+            $lines[$backendLine] = "r.render_backend $backend"
+        } else {
+            $lines = $lines[0..$start] + "r.render_backend $backend" + $lines[($start + 1)..($lines.Count - 1)]
+            if ($indirectLine -ge $start) { $indirectLine++ }
+        }
+        if ($backend -eq "dx11") {
+            if ($indirectLine -ge 0) {
+                $lines[$indirectLine] = "r_indirect_loop 1"
+            } else {
+                $lines = $lines[0..$start] + "r_indirect_loop 1" + $lines[($start + 1)..($lines.Count - 1)]
+            }
+        }
+    }
+    Set-Content -Path $varsPath -Value $lines
+}
 
 # ---- Build ----------------------------------------------------------------
 # -prerelease ensures VS 2026 Insiders (Dev18) is picked over older stable installs.
@@ -277,35 +334,50 @@ function Print-XmlSummary([string]$mode, [string]$xml) {
     }
 }
 
-# ---- Run passes -----------------------------------------------------------
-$exits = [ordered]@{}
-if ($Mode -eq "" -or $Mode -eq "game")   { $exits["game"]   = Run-Pass "game" }
-if ($Mode -eq "" -or $Mode -eq "editor") { $exits["editor"] = Run-Pass "editor" }
-if ($exits.Count -eq 0) {
-    Write-Error "Mode must be 'game', 'editor', or empty (both). Got '$Mode'."
-    exit 1
-}
+# ---- Run passes -------------------------------------------------------------
+$backends = if ($Backend -eq "both") { @("opengl", "dx11") } else { @($Backend) }
+$anyFailed = $false
+$failedCodes = @()
 
-# ---- Summary --------------------------------------------------------------
-Write-Host "`n=== Summary ===" -ForegroundColor Cyan
-$failed = $false
-foreach ($kv in $exits.GetEnumerator()) {
-    $xml = "$root\TestFiles\integration_$($kv.Key)_results.xml"
-    Print-XmlSummary $kv.Key $xml
-    if ($kv.Value -ne 0) {
-        $failed = $true
-        # Belt-and-braces: even if a crash line slipped past the regex above, the
-        # full uncoloured engine log on disk will contain it. Dump the tail so the
-        # agent gets a stack trace without having to know about the log file.
-        Dump-LogTail $kv.Key
-        Analyze-Dump $kv.Key
+try {
+    foreach ($be in $backends) {
+        Set-VarsRenderBackend $be
+        if ($backends.Count -gt 1) {
+            Write-Host "`n##### Backend: $be #####" -ForegroundColor Magenta
+        }
+
+        $exits = [ordered]@{}
+        if ($Mode -eq "" -or $Mode -eq "game")   { $exits["game"]   = Run-Pass "game" }
+        if ($Mode -eq "" -or $Mode -eq "editor") { $exits["editor"] = Run-Pass "editor" }
+        if ($exits.Count -eq 0) {
+            Write-Error "Mode must be 'game', 'editor', or empty (both). Got '$Mode'."
+            exit 1
+        }
+
+        # ---- Summary --------------------------------------------------------
+        Write-Host "`n=== Summary ($be) ===" -ForegroundColor Cyan
+        foreach ($kv in $exits.GetEnumerator()) {
+            $xml = "$root\TestFiles\integration_$($kv.Key)_results.xml"
+            Print-XmlSummary $kv.Key $xml
+            if ($kv.Value -ne 0) {
+                $anyFailed = $true
+                $failedCodes += "$be/$($kv.Key)=$($kv.Value)"
+                # Belt-and-braces: even if a crash line slipped past the regex above, the
+                # full uncoloured engine log on disk will contain it. Dump the tail so the
+                # agent gets a stack trace without having to know about the log file.
+                Dump-LogTail $kv.Key
+                Analyze-Dump $kv.Key
+            }
+        }
     }
+} finally {
+    Set-Content -Path $varsPath -Value $origVarsContent -NoNewline
 }
-Write-Host "  log files: test_<mode>_output.log (uncoloured, [Error]/[Warning]/... tagged)" -ForegroundColor DarkGray
 
-if ($failed) {
-    $codes = ($exits.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join " "
-    Write-Host "`nINTEGRATION TESTS FAILED ($codes)" -ForegroundColor Red
+Write-Host "`n  log files: test_<mode>_output.log (uncoloured, [Error]/[Warning]/... tagged)" -ForegroundColor DarkGray
+
+if ($anyFailed) {
+    Write-Host "`nINTEGRATION TESTS FAILED ($($failedCodes -join ' '))" -ForegroundColor Red
     exit 1
 } else {
     Write-Host "`nAll integration tests passed." -ForegroundColor Green

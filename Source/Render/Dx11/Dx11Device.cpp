@@ -4,8 +4,14 @@
 // imgui/tail). See docs/rendering/gfx_abstraction_nextsteps.md.
 
 #include "Dx11Local.h"
+#include "Framework/Config.h"
 #include "Framework/Util.h"
 #include "Render/SpirvCompile.h"
+
+// Declared in DrawLocal_RenderPass.cpp / DrawLocal_Helpers.h. Avoid including
+// that header here - it pulls in the GL-side render scene headers, which
+// conflict with <d3d11_1.h>'s windows.h macros.
+extern ConfigVar r_indirect_loop;
 
 #include <SDL3/SDL.h>
 
@@ -634,6 +640,8 @@ IGraphicsTimerQuery* Dx11DeviceImpl::create_timer_query() {
 void gfx_init_dx11(SDL_Window* window) {
 	ASSERT(g_gfx_instance == nullptr);
 	ASSERT(window != nullptr);
+	ASSERT(r_indirect_loop.get_bool() &&
+		"Dx11: r_indirect_loop must be 1 (DX11 has no MultiDrawIndirect; see multi_draw_elements_indirect)");
 
 	HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
 	ASSERT(hwnd != nullptr && "gfx_init_dx11: window has no Win32 HWND property");
