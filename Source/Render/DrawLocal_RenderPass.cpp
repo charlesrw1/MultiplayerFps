@@ -449,9 +449,9 @@ static void build_standard_cpu(Render_Lists& list, Render_Pass& src, Free_List<R
 }
 void Render_Lists_Gpu_Culled::init(uint32_t drawidsz, uint32_t instbufsz) {
 	Render_Lists::init(drawidsz, instbufsz);
-	inst_to_obj = gfx().create_buffer({});
-	count_buffer = gfx().create_buffer({});
-	batches_buf = gfx().create_buffer({});
+	inst_to_obj = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
+	count_buffer = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
+	batches_buf = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
 }
 
 ConfigVar collapse_draw_calls("collapse_draw_calls", "1", CVAR_BOOL | CVAR_DEV, "");

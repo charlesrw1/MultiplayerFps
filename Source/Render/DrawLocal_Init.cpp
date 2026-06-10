@@ -311,9 +311,16 @@ void Renderer::init() {
 		args.flags = BUFFER_USE_DYNAMIC;
 		ptr = gfx().create_buffer(args);
 	};
-	create_uniform_buffer(buf.lighting_uniforms);
-	create_uniform_buffer(buf.decal_uniforms);
-	create_uniform_buffer(buf.fog_uniforms);
+	// These are bound via bind_storage_buffer_base (SSBO), which on DX11
+	// requires the buffer to be created with a shader-resource view.
+	auto create_storage_uniform_buffer = [&](IGraphicsBuffer*& ptr) {
+		CreateBufferArgs args;
+		args.flags = GraphicsBufferUseFlags(BUFFER_USE_AS_STORAGE_READ | BUFFER_USE_DYNAMIC);
+		ptr = gfx().create_buffer(args);
+	};
+	create_storage_uniform_buffer(buf.lighting_uniforms);
+	create_storage_uniform_buffer(buf.decal_uniforms);
+	create_storage_uniform_buffer(buf.fog_uniforms);
 	create_uniform_buffer(ubo.bloom_params);
 	create_uniform_buffer(ubo.temporal_params);
 	create_uniform_buffer(ubo.cull_params);

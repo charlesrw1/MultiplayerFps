@@ -10,7 +10,8 @@ GpuCullingTest::GpuCullingTest() {
 
 	build_pyramid = draw.get_prog_man().create_compute("DepthPyramidC.txt");
 	debug_overlays = draw.get_prog_man().create_raster("fullscreenquad.txt", "debugCull.txt");
-	vis_bitarray = gfx().create_buffer({});
+	// Needs a UAV (clear_buffer_uint32 + compute shader read/write).
+	vis_bitarray = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
 	zero_instances_mdi = draw.get_prog_man().create_compute("zero_instances_mdi.txt");
 	compaction = draw.get_prog_man().create_compute("compact_mdi.txt");
 

@@ -134,7 +134,7 @@ void DdgiTesting::execute() {
     auto& device = draw.get_device();
 
     IGraphicsBuffer* invalid_count_buf{};
-    invalid_count_buf = gfx().create_buffer({});
+    invalid_count_buf = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
     glm::ivec4 counter_num = {};
     invalid_count_buf->upload(&counter_num, sizeof(glm::ivec4));
     gfx().bind_storage_buffer_base(10, invalid_count_buf);

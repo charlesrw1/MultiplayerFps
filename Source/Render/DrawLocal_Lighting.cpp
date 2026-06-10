@@ -161,7 +161,8 @@ inline bool cull_sphere_by_frustum(const std::array<FrustumPlane, 4>& planes, gl
 LightListCuller::LightListCuller() {
 	auto create_buffer = [&]() {
 		CreateBufferArgs args;
-		args.flags = BUFFER_USE_DYNAMIC;
+		// Bound via bind_storage_buffer_base (SSBO) in draw_lights.
+		args.flags = GraphicsBufferUseFlags(BUFFER_USE_AS_STORAGE_READ | BUFFER_USE_DYNAMIC);
 		return gfx().create_buffer(args);
 	};
 	light_indirection = create_buffer();

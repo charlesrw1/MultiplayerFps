@@ -303,7 +303,7 @@ void Render_Scene::init() {
 
 	depth_prepass_rlist.init(0, 0);
 
-	gpu_instance_buffer = gfx().create_buffer({});
+	gpu_instance_buffer = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
 
 	gpu_skinned_mats_buffer_size = r_skinned_mats_bone_buffer_size.get_integer();
 	{

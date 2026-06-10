@@ -139,6 +139,13 @@ ID3D11BlendState* Dx11StateCache::get_blend_state(BlendState blend, const Render
 
 ID3D11InputLayout* Dx11StateCache::get_input_layout(Dx11VertexInput* vao, Dx11ShaderImpl* shader) {
 	ASSERT(vao != nullptr && shader != nullptr);
+	// get_empty_vao() has no attributes (e.g. fullscreen-triangle passes that
+	// generate vertices in the VS from SV_VertexID). CreateInputLayout rejects
+	// a NULL pInputElementDescs even for NumElements==0, so skip it entirely;
+	// IASetInputLayout(nullptr) is valid when the VS declares no inputs.
+	if (vao->elements.empty())
+		return nullptr;
+
 	auto key = std::make_pair(vao, shader);
 	auto it = input_layout_cache.find(key);
 	if (it != input_layout_cache.end())
@@ -148,6 +155,21 @@ ID3D11InputLayout* Dx11StateCache::get_input_layout(Dx11VertexInput* vao, Dx11Sh
 	HRESULT hr = g_dx11_device->CreateInputLayout(vao->elements.data(), (UINT)vao->elements.size(),
 												   shader->vs_bytecode.data(), shader->vs_bytecode.size(),
 												   layout.GetAddressOf());
+	if (FAILED(hr)) {
+		Microsoft::WRL::ComPtr<ID3D11InfoQueue> iq;
+		if (SUCCEEDED(g_dx11_device.As(&iq))) {
+			UINT64 n = iq->GetNumStoredMessages();
+			for (UINT64 i = 0; i < n; i++) {
+				SIZE_T len = 0;
+				iq->GetMessage(i, nullptr, &len);
+				std::vector<uint8_t> mbuf(len);
+				D3D11_MESSAGE* msg = (D3D11_MESSAGE*)mbuf.data();
+				iq->GetMessage(i, msg, &len);
+				sys_print(Error, "Dx11 InfoQueue: %.*s\n", (int)msg->DescriptionByteLength, msg->pDescription);
+			}
+			iq->ClearStoredMessages();
+		}
+	}
 	ASSERT(SUCCEEDED(hr) && "Dx11: CreateInputLayout failed");
 	auto* ptr = layout.Get();
 	input_layout_cache[key] = std::move(layout);

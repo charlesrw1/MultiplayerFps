@@ -8,8 +8,11 @@ extern ConfigVar r_drawdecals;
 
 DecalBatcher::DecalBatcher() {
 	CreateBufferArgs args;
-	args.flags = GraphicsBufferUseFlags::BUFFER_USE_DYNAMIC;
+	// Bound as a storage buffer (binding 6, see draw_decals).
+	args.flags = GraphicsBufferUseFlags(BUFFER_USE_AS_STORAGE_READ | BUFFER_USE_DYNAMIC);
 	indirection_buffer = gfx().create_buffer(args);
+	// Source for multi_draw_elements_indirect.
+	args.flags = GraphicsBufferUseFlags(BUFFER_USE_AS_INDIRECT | BUFFER_USE_AS_STORAGE_READ | BUFFER_USE_DYNAMIC);
 	multidraw_commands = gfx().create_buffer(args);
 }
 

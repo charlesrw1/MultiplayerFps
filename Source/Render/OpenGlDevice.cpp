@@ -1059,6 +1059,10 @@ IGraphicsTimerQuery* OpenGLDeviceImpl::create_timer_query() {
 
 // ---- Moved from DrawLocal_Debug.cpp so glGetError stays inside the backend.
 bool CheckGlErrorInternal_(const char* file, int line) {
+	// gfx_check_gl_error() call sites are sprinkled through backend-agnostic
+	// render code; under DX11 there's no GL context and glGetError is unbound.
+	if (gfx().get_device_type() != GraphicsDeviceType::OpenGl)
+		return false;
 	GLenum error_code = glGetError();
 	bool has_error = false;
 	while (error_code != GL_NO_ERROR) {

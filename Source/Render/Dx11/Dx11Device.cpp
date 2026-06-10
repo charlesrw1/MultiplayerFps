@@ -473,8 +473,11 @@ public:
 
 	// ---- Buffer clear/readback (D2) ----------------------------------------------
 	void clear_buffer_uint32(IGraphicsBuffer* buf, uint32_t value) override {
+		Dx11Buffer* b = (Dx11Buffer*)buf;
+		if (b->buffer_size == 0)
+			return;
 		const UINT values[4] = {value, value, value, value};
-		context->ClearUnorderedAccessViewUint(((Dx11Buffer*)buf)->get_uav(), values);
+		context->ClearUnorderedAccessViewUint(b->get_uav(), values);
 	}
 	void download_buffer(IGraphicsBuffer* buf, int offset, int size, void* dest) override {
 		ASSERT(size >= 0 && offset >= 0);
@@ -686,6 +689,20 @@ void gfx_init_dx11(SDL_Window* window) {
 
 	hr = impl->context.As(&impl->annotation);
 	ASSERT(SUCCEEDED(hr) && "Dx11: ID3DUserDefinedAnnotation query failed");
+
+#ifdef _DEBUG
+	// Under a debugger (e.g. integration tests run via cdb), the SDK debug
+	// layer's CORRUPTION/ERROR/WARNING messages can raise a first-chance SEH
+	// exception that our crash handler treats as fatal. Log them instead.
+	{
+		Microsoft::WRL::ComPtr<ID3D11InfoQueue> info_queue;
+		if (SUCCEEDED(impl->device.As(&info_queue))) {
+			info_queue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, FALSE);
+			info_queue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, FALSE);
+			info_queue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, FALSE);
+		}
+	}
+#endif
 
 	impl->create_backbuffer_rtv();
 	spirv_compile_init();

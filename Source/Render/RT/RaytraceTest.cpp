@@ -61,11 +61,11 @@ DdgiTesting::DdgiTesting() {
     temporal_upsample = draw.get_prog_man().create_raster("fullscreenquad.txt", "temporal_upsample_ddgi.txt");
     apply_halfres_accum_to_scene = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgi_apply_upsampled.txt");
 
-    ddgi_probe_relocation_offsets = gfx().create_buffer({});
+    ddgi_probe_relocation_offsets = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
     ddgi_globals = gfx().create_buffer({});
-    ddgi_volumes = gfx().create_buffer({});
+    ddgi_volumes = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
 
-    ddgi_probe_avg_value = gfx().create_buffer({});
+    ddgi_probe_avg_value = gfx().create_buffer({.flags = BUFFER_USE_AS_STORAGE_READ});
 
     Texture::install_system("_ddgi");
     Texture::install_system("_ddgi_d");

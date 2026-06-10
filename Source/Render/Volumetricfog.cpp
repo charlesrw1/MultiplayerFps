@@ -38,7 +38,9 @@ void Volumetric_Fog_System::init() {
 
 	CreateBufferArgs bargs;
 	bargs.size = sizeof(gpu::VfogParams);
-	bargs.flags = BUFFER_USE_DYNAMIC;
+	// Bound via both bind_uniform_buffer_base (compute()) and
+	// bind_storage_buffer_base (volfog_apply pass in DrawLocal_SceneDraw.cpp).
+	bargs.flags = GraphicsBufferUseFlags(BUFFER_USE_AS_STORAGE_READ | BUFFER_USE_DYNAMIC);
 	buffer.param = gfx().create_buffer(bargs);
 }
 

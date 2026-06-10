@@ -11,30 +11,36 @@ namespace {
 DXGI_FORMAT dx11_vertex_attrib_format(GraphicsVertexAttribType type, int count) {
 	using gvat = GraphicsVertexAttribType;
 	ASSERT(count >= 1 && count <= 4);
+	// DXGI has no 3-channel 8/16-bit formats (only 32-bit RGB exists). count==3
+	// for those types reads the 4-channel format instead - the input assembler
+	// fetches 1 extra component, which the shader simply ignores. Callers must
+	// ensure the vertex layout has >=1 byte/word of valid data after the 3rd
+	// component (true for ModelVertex: normal[3]/tangent[3] are followed by
+	// other attributes within the same stride).
 	switch (type) {
 	case gvat::u8:
-		switch (count) { case 1: return DXGI_FORMAT_R8_UINT; case 2: return DXGI_FORMAT_R8G8_UINT; case 4: return DXGI_FORMAT_R8G8B8A8_UINT; }
+		switch (count) { case 1: return DXGI_FORMAT_R8_UINT; case 2: return DXGI_FORMAT_R8G8_UINT; case 3: case 4: return DXGI_FORMAT_R8G8B8A8_UINT; }
 		break;
 	case gvat::u8_normalized:
-		switch (count) { case 1: return DXGI_FORMAT_R8_UNORM; case 2: return DXGI_FORMAT_R8G8_UNORM; case 4: return DXGI_FORMAT_R8G8B8A8_UNORM; }
+		switch (count) { case 1: return DXGI_FORMAT_R8_UNORM; case 2: return DXGI_FORMAT_R8G8_UNORM; case 3: case 4: return DXGI_FORMAT_R8G8B8A8_UNORM; }
 		break;
 	case gvat::i8:
-		switch (count) { case 1: return DXGI_FORMAT_R8_SINT; case 2: return DXGI_FORMAT_R8G8_SINT; case 4: return DXGI_FORMAT_R8G8B8A8_SINT; }
+		switch (count) { case 1: return DXGI_FORMAT_R8_SINT; case 2: return DXGI_FORMAT_R8G8_SINT; case 3: case 4: return DXGI_FORMAT_R8G8B8A8_SINT; }
 		break;
 	case gvat::i8_normalized:
-		switch (count) { case 1: return DXGI_FORMAT_R8_SNORM; case 2: return DXGI_FORMAT_R8G8_SNORM; case 4: return DXGI_FORMAT_R8G8B8A8_SNORM; }
+		switch (count) { case 1: return DXGI_FORMAT_R8_SNORM; case 2: return DXGI_FORMAT_R8G8_SNORM; case 3: case 4: return DXGI_FORMAT_R8G8B8A8_SNORM; }
 		break;
 	case gvat::u16:
-		switch (count) { case 1: return DXGI_FORMAT_R16_UINT; case 2: return DXGI_FORMAT_R16G16_UINT; case 4: return DXGI_FORMAT_R16G16B16A16_UINT; }
+		switch (count) { case 1: return DXGI_FORMAT_R16_UINT; case 2: return DXGI_FORMAT_R16G16_UINT; case 3: case 4: return DXGI_FORMAT_R16G16B16A16_UINT; }
 		break;
 	case gvat::u16_normalized:
-		switch (count) { case 1: return DXGI_FORMAT_R16_UNORM; case 2: return DXGI_FORMAT_R16G16_UNORM; case 4: return DXGI_FORMAT_R16G16B16A16_UNORM; }
+		switch (count) { case 1: return DXGI_FORMAT_R16_UNORM; case 2: return DXGI_FORMAT_R16G16_UNORM; case 3: case 4: return DXGI_FORMAT_R16G16B16A16_UNORM; }
 		break;
 	case gvat::i16:
-		switch (count) { case 1: return DXGI_FORMAT_R16_SINT; case 2: return DXGI_FORMAT_R16G16_SINT; case 4: return DXGI_FORMAT_R16G16B16A16_SINT; }
+		switch (count) { case 1: return DXGI_FORMAT_R16_SINT; case 2: return DXGI_FORMAT_R16G16_SINT; case 3: case 4: return DXGI_FORMAT_R16G16B16A16_SINT; }
 		break;
 	case gvat::i16_normalized:
-		switch (count) { case 1: return DXGI_FORMAT_R16_SNORM; case 2: return DXGI_FORMAT_R16G16_SNORM; case 4: return DXGI_FORMAT_R16G16B16A16_SNORM; }
+		switch (count) { case 1: return DXGI_FORMAT_R16_SNORM; case 2: return DXGI_FORMAT_R16G16_SNORM; case 3: case 4: return DXGI_FORMAT_R16G16B16A16_SNORM; }
 		break;
 	case gvat::float32:
 		switch (count) { case 1: return DXGI_FORMAT_R32_FLOAT; case 2: return DXGI_FORMAT_R32G32_FLOAT; case 3: return DXGI_FORMAT_R32G32B32_FLOAT; case 4: return DXGI_FORMAT_R32G32B32A32_FLOAT; }
@@ -65,11 +71,17 @@ UINT dx11_buffer_misc_flags(GraphicsBufferUseFlags flags) {
 
 } // namespace
 
-void Dx11Buffer::recreate(int size, const void* initial_data) {
-	ASSERT(size >= 0);
+void Dx11Buffer::recreate(int orig_size, const void* initial_data) {
+	ASSERT(orig_size >= 0);
 	buf.Reset();
 	srv_cache.Reset();
 	uav_cache.Reset();
+	// D3D11 constant buffers must have ByteWidth that's a multiple of 16; pad
+	// up here so polyglot GLSL/HLSL UBO structs (whose sizeof() isn't always
+	// 16-aligned) still work. The extra bytes are uninitialized but unused.
+	int size = orig_size;
+	if (bind_flags & D3D11_BIND_CONSTANT_BUFFER)
+		size = (size + 15) & ~15;
 	buffer_size = size;
 	if (size == 0)
 		return;
@@ -82,15 +94,42 @@ void Dx11Buffer::recreate(int size, const void* initial_data) {
 	if (usage == D3D11_USAGE_DYNAMIC)
 		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
+	// If padding was added, copy initial_data (orig_size bytes) into a
+	// zero-filled padded buffer to avoid reading past its end.
+	std::vector<uint8_t> padded;
+	if (initial_data && size != orig_size) {
+		padded.resize(size, 0);
+		memcpy(padded.data(), initial_data, orig_size);
+		initial_data = padded.data();
+	}
+
 	D3D11_SUBRESOURCE_DATA init{};
 	init.pSysMem = initial_data;
 	HRESULT hr = g_dx11_device->CreateBuffer(&desc, initial_data ? &init : nullptr, buf.GetAddressOf());
+	if (FAILED(hr)) {
+		Microsoft::WRL::ComPtr<ID3D11InfoQueue> iq;
+		if (SUCCEEDED(g_dx11_device.As(&iq))) {
+			UINT64 n = iq->GetNumStoredMessages();
+			for (UINT64 i = 0; i < n; i++) {
+				SIZE_T len = 0;
+				iq->GetMessage(i, nullptr, &len);
+				std::vector<uint8_t> mbuf(len);
+				D3D11_MESSAGE* msg = (D3D11_MESSAGE*)mbuf.data();
+				iq->GetMessage(i, msg, &len);
+				sys_print(Error, "Dx11 InfoQueue: %.*s\n", (int)msg->DescriptionByteLength, msg->pDescription);
+			}
+			iq->ClearStoredMessages();
+		}
+	}
 	ASSERT(SUCCEEDED(hr) && "Dx11: CreateBuffer failed");
 }
 
 void Dx11Buffer::upload(const void* data, int size) {
 	ASSERT(size >= 0);
-	if (size != buffer_size) {
+	// recreate() pads constant-buffer sizes to a multiple of 16, so compare
+	// against the padded size to avoid recreating the buffer on every upload.
+	int padded_size = (bind_flags & D3D11_BIND_CONSTANT_BUFFER) ? (size + 15) & ~15 : size;
+	if (padded_size != buffer_size) {
 		recreate(size, data);
 		return;
 	}
@@ -129,6 +168,8 @@ void Dx11Buffer::sub_upload(const void* data, int size, int offset) {
 
 ID3D11ShaderResourceView* Dx11Buffer::get_srv() {
 	ASSERT((bind_flags & D3D11_BIND_SHADER_RESOURCE) && "Dx11: buffer was not created with storage-read flag");
+	if (buffer_size == 0)
+		return nullptr;
 	if (srv_cache)
 		return srv_cache.Get();
 	D3D11_SHADER_RESOURCE_VIEW_DESC desc{};
@@ -143,6 +184,8 @@ ID3D11ShaderResourceView* Dx11Buffer::get_srv() {
 
 ID3D11UnorderedAccessView* Dx11Buffer::get_uav() {
 	ASSERT((bind_flags & D3D11_BIND_UNORDERED_ACCESS) && "Dx11: buffer was not created with a UAV-capable flag");
+	if (buffer_size == 0)
+		return nullptr;
 	if (uav_cache)
 		return uav_cache.Get();
 	D3D11_UNORDERED_ACCESS_VIEW_DESC desc{};
@@ -200,9 +243,13 @@ ID3D11UnorderedAccessView* Dx11Buffer::get_uav_range(int offset, int size) {
 IGraphicsBuffer* dx11_create_buffer(const CreateBufferArgs& args) {
 	ASSERT(args.size >= 0);
 	Dx11Buffer* b = new Dx11Buffer();
-	b->usage = (args.flags & BUFFER_USE_DYNAMIC) ? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT;
 	b->bind_flags = dx11_buffer_bind_flags(args.flags);
 	b->misc_flags = dx11_buffer_misc_flags(args.flags);
+	// D3D11_USAGE_DYNAMIC is incompatible with D3D11_BIND_UNORDERED_ACCESS;
+	// storage buffers must use DEFAULT + UpdateSubresource (upload/sub_upload
+	// already branch on `usage` for this).
+	b->usage = (args.flags & BUFFER_USE_DYNAMIC) && !(b->bind_flags & D3D11_BIND_UNORDERED_ACCESS)
+		? D3D11_USAGE_DYNAMIC : D3D11_USAGE_DEFAULT;
 	b->recreate(args.size, nullptr);
 	return b;
 }

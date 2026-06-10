@@ -100,6 +100,7 @@ public:
 	int mips = 1;
 	int mem_usage = 0;
 	bool is_backbuffer = false;
+	bool generates_mips = false; // D3D11_RESOURCE_MISC_GENERATE_MIPS set
 	GraphicsTextureType my_type{};
 	GraphicsTextureFormat my_fmt{};
 	Dx11FormatInfo fmt_info{};

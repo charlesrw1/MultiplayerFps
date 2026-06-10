@@ -3,7 +3,7 @@
 
 layout(location = 0) in vec3 FS_IN_Fragpos;
 layout(location = 0) out vec4 FS_OUT_FragColor;
-uniform samplerCube cubemap;
+layout(binding = 0) uniform samplerCube cubemap;
 layout(std140, binding = 16) uniform PrefilterSpecularFragPushConstsUbo { PrefilterSpecularFragPushConsts pcf; };
 #define PI 3.1415926536
 

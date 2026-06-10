@@ -142,8 +142,15 @@ Dx11Texture::Dx11Texture(const CreateTextureArgs& args) {
 		bind_flags |= D3D11_BIND_UNORDERED_ACCESS;
 
 	UINT misc_flags = 0;
-	if ((bind_flags & D3D11_BIND_RENDER_TARGET) && (bind_flags & D3D11_BIND_SHADER_RESOURCE))
+	// D3D11_RESOURCE_MISC_GENERATE_MIPS is for textures whose mip chain is
+	// generated at runtime via GenerateMips() (single mip supplied at
+	// creation). It also restricts UpdateSubresource to whole-subresource,
+	// mip-0-only updates - incompatible with assets (e.g. DDS) that upload a
+	// full pre-baked mip chain.
+	if (mips == 1 && (bind_flags & D3D11_BIND_RENDER_TARGET) && (bind_flags & D3D11_BIND_SHADER_RESOURCE)) {
 		misc_flags |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
+		generates_mips = true;
+	}
 	if (my_type == GraphicsTextureType::tCubemap || my_type == GraphicsTextureType::tCubemapArray)
 		misc_flags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
 
@@ -215,6 +222,36 @@ std::vector<uint8_t> widen_rgb_to_rgba(const void* data, int w, int h, bool is_1
 	}
 	return storage;
 }
+
+// TEMP D7 diagnostic: D3D11_3SDKLayers raises a SEH exception (ReportCorruption)
+// for invalid-parameter UpdateSubresource calls regardless of
+// ID3D11InfoQueue::SetBreakOnSeverity, so the only way to read the actual
+// validation message under a debugger is to catch it here, drain the info
+// queue, and re-throw.
+int dx11_dump_info_queue_and_continue(ID3D11Device* dev) {
+	Microsoft::WRL::ComPtr<ID3D11InfoQueue> iq;
+	if (SUCCEEDED(dev->QueryInterface(IID_PPV_ARGS(iq.GetAddressOf())))) {
+		UINT64 n = iq->GetNumStoredMessages();
+		for (UINT64 i = 0; i < n; i++) {
+			SIZE_T len = 0;
+			iq->GetMessage(i, nullptr, &len);
+			std::vector<uint8_t> buf(len);
+			D3D11_MESSAGE* msg = (D3D11_MESSAGE*)buf.data();
+			iq->GetMessage(i, msg, &len);
+			sys_print(Error, "Dx11 InfoQueue: %.*s\n", (int)msg->DescriptionByteLength, msg->pDescription);
+		}
+		iq->ClearStoredMessages();
+	}
+	return EXCEPTION_EXECUTE_HANDLER;
+}
+
+void update_subresource_diag(ID3D11DeviceContext* ctx, ID3D11Device* dev, ID3D11Resource* resource, int level,
+							  const D3D11_BOX* box, const void* data, UINT row_pitch) {
+	__try {
+		ctx->UpdateSubresource(resource, level, box, data, row_pitch, 0);
+	} __except (dx11_dump_info_queue_and_continue(dev)) {
+	}
+}
 } // namespace
 
 void Dx11Texture::sub_image_upload(int level, int x, int y, int w, int h, int size, const void* data) {
@@ -241,7 +278,19 @@ void Dx11Texture::sub_image_upload(int level, int x, int y, int w, int h, int si
 	} else {
 		row_pitch = (UINT)(size / h);
 	}
-	g_dx11_context->UpdateSubresource(resource.Get(), level, &box, upload_data, row_pitch, 0);
+	// Block-compressed formats require box coords aligned to the 4x4 block
+	// size; small mips (1x1/2x2) violate that. Such uploads always cover the
+	// whole mip, so pass a null box (whole-subresource update) instead.
+	// D3D11 debug-layer requires pDstBox == nullptr (whole-subresource update)
+	// for resources created with D3D11_RESOURCE_MISC_GENERATE_MIPS, and for
+	// block-compressed formats a box smaller than 4x4 (small mips). Both
+	// cases here always cover the whole mip (x==y==0).
+	const bool whole_subresource = generates_mips ||
+		(fmt_info.is_compressed && (x != 0 || y != 0 || (w % 4) != 0 || (h % 4) != 0));
+	Microsoft::WRL::ComPtr<ID3D11Device> dev;
+	resource->GetDevice(dev.GetAddressOf());
+	update_subresource_diag(g_dx11_context.Get(), dev.Get(), resource.Get(), level,
+							 whole_subresource ? nullptr : &box, upload_data, row_pitch);
 }
 
 void Dx11Texture::sub_image_upload_3d(int z, int level, int x, int y, int w, int h, int size, const void* data) {
