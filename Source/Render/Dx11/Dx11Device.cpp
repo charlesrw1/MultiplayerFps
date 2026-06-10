@@ -45,6 +45,10 @@ public:
 	Dx11VertexInput* current_vao = nullptr;
 	GraphicsFillMode current_fill_mode = GraphicsFillMode::Fill;
 	D3D11_VIEWPORT current_viewport{};
+	// Height of the currently-bound render target(s), used to flip the
+	// bottom-left-origin (x, y) passed to set_viewport/set_scissor (GL
+	// convention, see IGraphicsDevice.h) into DX11's top-left-origin space.
+	int current_rt_height = 0;
 
 	ID3D11RenderTargetView* current_rtvs[RenderPipelineState::MAX_COLOR_ATTACHMENTS]{};
 	int num_current_rtvs = 0;
@@ -144,13 +148,18 @@ public:
 		num_current_rtvs = n;
 		current_dsv = dsv;
 
-		if (min_w != INT_MAX)
+		if (min_w != INT_MAX) {
+			current_rt_height = min_h;
 			set_viewport(0, 0, min_w, min_h);
+		}
 	}
 
+	// x/y/w/h are in GL convention (origin bottom-left of the render target,
+	// see IGraphicsDevice.h); RSSetViewports is top-left-origin, so flip y
+	// against current_rt_height (set by set_render_pass).
 	void set_viewport(int x, int y, int w, int h) override {
 		current_viewport.TopLeftX = (float)x;
-		current_viewport.TopLeftY = (float)y;
+		current_viewport.TopLeftY = (float)(current_rt_height - (y + h));
 		current_viewport.Width = (float)w;
 		current_viewport.Height = (float)h;
 		current_viewport.MinDepth = 0.f;
@@ -307,11 +316,12 @@ public:
 	IGraphicsSampler* create_sampler(const CreateSamplerArgs& args) override { return dx11_create_sampler(args); }
 
 	// ---- Scissor / draws (D3) ------------------------------------------------
-	// Note: GL scissor origin is bottom-left, DX11 RSSetScissorRects is
-	// top-left. Coordinate-space audit deferred to D4.
+	// x/y/w/h are in GL convention (origin bottom-left, see IGraphicsDevice.h);
+	// RSSetScissorRects is top-left-origin, so flip y against current_rt_height
+	// (set by set_render_pass), matching set_viewport.
 	void set_scissor(int x, int y, int w, int h) override {
 		ASSERT(w >= 0 && h >= 0);
-		D3D11_RECT rect{ x, y, x + w, y + h };
+		D3D11_RECT rect{ x, current_rt_height - (y + h), x + w, current_rt_height - y };
 		context->RSSetScissorRects(1, &rect);
 	}
 	void disable_scissor() override {
