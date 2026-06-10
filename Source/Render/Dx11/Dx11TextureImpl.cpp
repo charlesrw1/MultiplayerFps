@@ -509,3 +509,8 @@ IGraphicsTexture* dx11_create_texture(const CreateTextureArgs& args) {
 IGraphicsSampler* dx11_create_sampler(const CreateSamplerArgs& args) {
 	return new Dx11SamplerImpl(args);
 }
+
+ID3D11SamplerState* dx11_sampler_state(IGraphicsSampler* sampler) {
+	ASSERT(sampler != nullptr);
+	return ((Dx11SamplerImpl*)sampler)->sampler.Get();
+}

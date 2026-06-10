@@ -122,56 +122,27 @@ void save_cache(const std::string& cache_filename, std::span<const StageResult> 
 }
 
 // ---------------------------------------------------------------------------
-// Dx11ShaderImpl
+// Dx11ShaderImpl::reflect() — see Dx11Local.h for the class definition (shared
+// with D3's set_pipeline / flush_binds).
 // ---------------------------------------------------------------------------
-class Dx11ShaderImpl : public IGraphicsShader
-{
-public:
-	void release() override { delete this; }
-	uint32_t get_internal_handle() override { return 0; }
-
-	// reflect() is diagnostic-only on this backend (no SDL3 GPU shader-create
-	// info to fill in). Approximates GL's PerStageCounts from the HLSL
-	// resource-binding table: a Sampler-kind binding always pairs with an SRV
-	// of the same spirv_binding for sampled_images, so SRVs with a matching
-	// Sampler are textures and SRVs without one are SSBOs. UAVs cannot be
-	// distinguished (storage image vs SSBO) from this table alone and are
-	// counted as storage buffers.
-	static void count_bindings(const std::vector<HlslResourceBinding>& bindings, PerStageCounts& out) {
-		for (auto& b : bindings) {
-			switch (b.kind) {
-			case HlslRegisterKind::CBV: out.num_uniform_buffers++; break;
-			case HlslRegisterKind::Sampler: out.num_samplers++; break;
-			case HlslRegisterKind::UAV: out.num_storage_buffers++; break;
-			case HlslRegisterKind::SRV: {
-				bool has_sampler = false;
-				for (auto& s : bindings)
-					if (s.kind == HlslRegisterKind::Sampler && s.spirv_binding == b.spirv_binding)
-						has_sampler = true;
-				if (!has_sampler)
-					out.num_storage_buffers++;
-				break;
-			}
-			}
+void count_bindings(const std::vector<HlslResourceBinding>& bindings, IGraphicsShader::PerStageCounts& out) {
+	for (auto& b : bindings) {
+		switch (b.kind) {
+		case HlslRegisterKind::CBV: out.num_uniform_buffers++; break;
+		case HlslRegisterKind::Sampler: out.num_samplers++; break;
+		case HlslRegisterKind::UAV: out.num_storage_buffers++; break;
+		case HlslRegisterKind::SRV: {
+			bool has_sampler = false;
+			for (auto& s : bindings)
+				if (s.kind == HlslRegisterKind::Sampler && s.spirv_binding == b.spirv_binding)
+					has_sampler = true;
+			if (!has_sampler)
+				out.num_storage_buffers++;
+			break;
+		}
 		}
 	}
-
-	Reflection reflect() override {
-		Reflection out{};
-		count_bindings(vs_bindings, out.vertex);
-		count_bindings(ps_bindings, out.fragment);
-		count_bindings(cs_bindings, out.compute);
-		return out;
-	}
-
-	Microsoft::WRL::ComPtr<ID3D11VertexShader> vs;
-	Microsoft::WRL::ComPtr<ID3D11PixelShader> ps;
-	Microsoft::WRL::ComPtr<ID3D11ComputeShader> cs;
-	// Kept for lazy ID3D11InputLayout creation in D3 (input layouts are built
-	// against the VS bytecode, not just its reflection).
-	std::vector<uint8_t> vs_bytecode;
-	std::vector<HlslResourceBinding> vs_bindings, ps_bindings, cs_bindings;
-};
+}
 
 Dx11ShaderImpl* make_vert_frag_shader(const StageResult& vert, const StageResult& frag) {
 	Dx11ShaderImpl* shader = new Dx11ShaderImpl();
@@ -186,6 +157,14 @@ Dx11ShaderImpl* make_vert_frag_shader(const StageResult& vert, const StageResult
 }
 
 } // namespace
+
+IGraphicsShader::Reflection Dx11ShaderImpl::reflect() {
+	Reflection out{};
+	count_bindings(vs_bindings, out.vertex);
+	count_bindings(ps_bindings, out.fragment);
+	count_bindings(cs_bindings, out.compute);
+	return out;
+}
 
 IGraphicsShader* dx11_create_shader_vert_frag(const std::string& vert_path, const std::string& frag_path,
 											   const std::string& defines) {

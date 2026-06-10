@@ -9,6 +9,10 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
+#include <climits>
+#include <cstring>
+
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
 
@@ -20,6 +24,10 @@ namespace {
 
 #define DX11_STUB ASSERT(false && "Dx11: not yet implemented")
 
+UINT dx11_index_stride(VertexInputIndexType t) {
+	return t == VertexInputIndexType::uint16 ? 2 : 4;
+}
+
 class Dx11DeviceImpl : public IGraphicsDevice
 {
 public:
@@ -27,6 +35,33 @@ public:
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
 	Microsoft::WRL::ComPtr<IDXGISwapChain> swapchain;
 	Dx11Texture* backbuffer = nullptr;
+
+	enum class PassMode { None, Render, Compute };
+	PassMode current_pass = PassMode::None;
+
+	Dx11StateCache state_cache;
+	RenderPipelineState current_pipeline;
+	IGraphicsShader* current_shader = nullptr;
+	Dx11VertexInput* current_vao = nullptr;
+	GraphicsFillMode current_fill_mode = GraphicsFillMode::Fill;
+	D3D11_VIEWPORT current_viewport{};
+
+	ID3D11RenderTargetView* current_rtvs[RenderPipelineState::MAX_COLOR_ATTACHMENTS]{};
+	int num_current_rtvs = 0;
+	ID3D11DepthStencilView* current_dsv = nullptr;
+
+	// ---- Bind tables (D3) ---------------------------------------------------
+	// Slot indices are SPIR-V/GLSL binding numbers; flush_*_bindings() maps
+	// each shader's resource-binding table (spirv_binding -> register_index)
+	// onto the actual HLSL register at draw/dispatch time. 32 covers the
+	// engine's data slots (0-11) plus the push-constant range
+	// (kGfxPushConstBindingBase=12 .. +2*4+3=23).
+	static constexpr int MAX_BIND_SLOTS = 32;
+	ID3D11ShaderResourceView* bound_srv[MAX_BIND_SLOTS]{};
+	ID3D11UnorderedAccessView* bound_uav[MAX_BIND_SLOTS]{};
+	ID3D11SamplerState* bound_sampler[MAX_BIND_SLOTS]{};
+	ID3D11Buffer* bound_cbuf[MAX_BIND_SLOTS]{};
+	Microsoft::WRL::ComPtr<ID3D11Buffer> push_const_bufs[3][IGraphicsDevice::kGfxMaxPushConstSlotsPerStage];
 
 	~Dx11DeviceImpl() override {
 		if (backbuffer) {
@@ -54,8 +89,10 @@ public:
 		if (!backbuffer)
 			backbuffer = new Dx11Texture();
 		backbuffer->rtv = rtv;
+		backbuffer->resource = back_tex;
 		backbuffer->width = (int)desc.Width;
 		backbuffer->height = (int)desc.Height;
+		backbuffer->mips = 1;
 	}
 
 	// ---- Frame lifecycle ---------------------------------------------------
@@ -68,43 +105,200 @@ public:
 		swapchain->Present(0, 0);
 	}
 
-	// ---- Render pass / clear (D1 scope) ------------------------------------
+	// ---- Render pass / clear (D2/D3 scope) ----------------------------------
 	void set_render_pass(const RenderPassState& state) override {
-		ASSERT(state.depth_info == nullptr && "Dx11: depth targets are D2");
-		ASSERT(state.color_infos.size() <= 1 && "Dx11: MRT is D2/D3");
+		ASSERT(state.color_infos.size() <= RenderPipelineState::MAX_COLOR_ATTACHMENTS);
+		current_pass = PassMode::Render;
 
-		ID3D11RenderTargetView* rtv = nullptr;
-		if (!state.color_infos.empty()) {
-			const ColorTargetInfo& info = state.color_infos[0];
-			ASSERT(info.texture == backbuffer && "Dx11: only the swapchain target is wired up in D1");
-			rtv = backbuffer->rtv.Get();
+		ID3D11RenderTargetView* rtvs[RenderPipelineState::MAX_COLOR_ATTACHMENTS] = {};
+		const int n = (int)state.color_infos.size();
+		int min_w = INT_MAX, min_h = INT_MAX;
+		for (int i = 0; i < n; i++) {
+			const ColorTargetInfo& info = state.color_infos[i];
+			Dx11Texture* tex = (Dx11Texture*)info.texture;
+			rtvs[i] = (tex == backbuffer) ? backbuffer->rtv.Get() : tex->get_rtv(info.mip, info.layer);
+			glm::ivec2 sz = tex->get_size();
+			min_w = std::min(min_w, sz.x);
+			min_h = std::min(min_h, sz.y);
 			if (info.wants_clear) {
 				const float c[4] = { info.clear_color.r, info.clear_color.g, info.clear_color.b, info.clear_color.a };
-				context->ClearRenderTargetView(rtv, c);
+				context->ClearRenderTargetView(rtvs[i], c);
 			}
 		}
-		context->OMSetRenderTargets(rtv ? 1 : 0, rtv ? &rtv : nullptr, nullptr);
+
+		ID3D11DepthStencilView* dsv = nullptr;
+		if (state.depth_info) {
+			Dx11Texture* dtex = (Dx11Texture*)state.depth_info;
+			dsv = dtex->get_dsv(0, state.depth_layer);
+			glm::ivec2 sz = dtex->get_size();
+			min_w = std::min(min_w, sz.x);
+			min_h = std::min(min_h, sz.y);
+			if (state.wants_depth_clear) {
+				set_depth_write_enabled(true);
+				context->ClearDepthStencilView(dsv, D3D11_CLEAR_DEPTH, state.clear_depth_val, 0);
+			}
+		}
+
+		context->OMSetRenderTargets(n, n > 0 ? rtvs : nullptr, dsv);
+		std::memcpy(current_rtvs, rtvs, sizeof(rtvs));
+		num_current_rtvs = n;
+		current_dsv = dsv;
+
+		if (min_w != INT_MAX)
+			set_viewport(0, 0, min_w, min_h);
 	}
 
 	void set_viewport(int x, int y, int w, int h) override {
-		D3D11_VIEWPORT vp{};
-		vp.TopLeftX = (float)x;
-		vp.TopLeftY = (float)y;
-		vp.Width = (float)w;
-		vp.Height = (float)h;
-		vp.MinDepth = 0.f;
-		vp.MaxDepth = 1.f;
-		context->RSSetViewports(1, &vp);
+		current_viewport.TopLeftX = (float)x;
+		current_viewport.TopLeftY = (float)y;
+		current_viewport.Width = (float)w;
+		current_viewport.Height = (float)h;
+		current_viewport.MinDepth = 0.f;
+		current_viewport.MaxDepth = 1.f;
+		context->RSSetViewports(1, &current_viewport);
 	}
 
-	void clear_framebuffer(bool clear_depth, bool clear_color, float depth_value) override { DX11_STUB; }
-	void blit_textures(const GraphicsBlitInfo& info) override { DX11_STUB; }
+	void clear_framebuffer(bool clear_depth, bool clear_color, float depth_value) override {
+		if (!clear_depth && !clear_color)
+			return;
+		if (clear_color) {
+			const float c[4] = { 0, 0, 0, 1 };
+			for (int i = 0; i < num_current_rtvs; i++)
+				if (current_rtvs[i])
+					context->ClearRenderTargetView(current_rtvs[i], c);
+		}
+		if (clear_depth && current_dsv) {
+			set_depth_write_enabled(true);
+			context->ClearDepthStencilView(current_dsv, D3D11_CLEAR_DEPTH, depth_value, 0);
+		}
+	}
+
+	void blit_textures(const GraphicsBlitInfo& info) override {
+		ASSERT(info.src.texture && info.dest.texture);
+		ASSERT(info.src.w == info.dest.w && info.src.h == info.dest.h &&
+			   "Dx11: scaled blit (different src/dest sizes) deferred to D5");
+		Dx11Texture* src = (Dx11Texture*)info.src.texture;
+		Dx11Texture* dst = (Dx11Texture*)info.dest.texture;
+		UINT src_sub = D3D11CalcSubresource(info.src.mip, std::max(info.src.layer, 0), src->mips);
+		UINT dst_sub = D3D11CalcSubresource(info.dest.mip, std::max(info.dest.layer, 0), dst->mips);
+		D3D11_BOX box{};
+		box.left = (UINT)info.src.x;
+		box.right = (UINT)(info.src.x + info.src.w);
+		box.top = (UINT)info.src.y;
+		box.bottom = (UINT)(info.src.y + info.src.h);
+		box.front = 0;
+		box.back = 1;
+		context->CopySubresourceRegion(dst->resource.Get(), dst_sub, info.dest.x, info.dest.y, 0,
+										src->resource.Get(), src_sub, &box);
+	}
 
 	// ---- Pipeline state (D3) ------------------------------------------------
-	void set_pipeline(const RenderPipelineState& state) override { DX11_STUB; }
-	void set_depth_write_enabled(bool enabled) override { DX11_STUB; }
-	IGraphicsShader* get_active_shader() override { DX11_STUB; return nullptr; }
-	void reset_state_cache() override { DX11_STUB; }
+	void set_pipeline(const RenderPipelineState& s) override {
+		current_pipeline = s;
+		current_shader = s.program;
+		Dx11ShaderImpl* shader = (Dx11ShaderImpl*)s.program;
+		ASSERT(shader != nullptr);
+
+		if (shader->cs) {
+			context->CSSetShader(shader->cs.Get(), nullptr, 0);
+			return;
+		}
+
+		ASSERT(shader->vs && shader->ps);
+		context->VSSetShader(shader->vs.Get(), nullptr, 0);
+		context->PSSetShader(shader->ps.Get(), nullptr, 0);
+
+		ID3D11RasterizerState* rs = state_cache.get_rasterizer_state(
+			s.backface_culling, s.cull_front_face, current_fill_mode,
+			s.polygon_offset_enabled, s.polygon_offset_factor, s.polygon_offset_units);
+		context->RSSetState(rs);
+
+		ID3D11DepthStencilState* ds = state_cache.get_depth_stencil_state(s.depth_testing, s.depth_writes, s.depth_less_than);
+		context->OMSetDepthStencilState(ds, 0);
+
+		ID3D11BlendState* bs = state_cache.get_blend_state(s.blend, s.color_write_masks);
+		const float blend_factor[4] = { 0, 0, 0, 0 };
+		context->OMSetBlendState(bs, blend_factor, 0xFFFFFFFFu);
+
+		if (s.vao) {
+			Dx11VertexInput* vao = (Dx11VertexInput*)s.vao;
+			ID3D11InputLayout* layout = state_cache.get_input_layout(vao, shader);
+			context->IASetInputLayout(layout);
+			ID3D11Buffer* vb = vao->vertex_buffer.Get();
+			UINT stride = vao->vertex_stride;
+			UINT offset = 0;
+			context->IASetVertexBuffers(0, 1, &vb, &stride, &offset);
+			if (vao->index_buffer)
+				context->IASetIndexBuffer(vao->index_buffer.Get(), dx11_index_format(vao->index_type), 0);
+			current_vao = vao;
+		}
+	}
+
+	void set_depth_write_enabled(bool enabled) override {
+		current_pipeline.depth_writes = enabled;
+		ID3D11DepthStencilState* ds = state_cache.get_depth_stencil_state(
+			current_pipeline.depth_testing, enabled, current_pipeline.depth_less_than);
+		context->OMSetDepthStencilState(ds, 0);
+	}
+
+	IGraphicsShader* get_active_shader() override { return current_shader; }
+
+	void reset_state_cache() override {
+		current_shader = nullptr;
+		current_vao = nullptr;
+	}
+
+	// ---- Bind-table flush (D3) -----------------------------------------------
+	// Maps each spirv_binding -> register_index for the given stage's bindings,
+	// reading from the bound_* tables populated by bind_texture/bind_sampler/
+	// bind_uniform_buffer_base/bind_storage_buffer_*/push_constants_internal.
+	void flush_stage(const std::vector<HlslResourceBinding>& bindings,
+					 void (ID3D11DeviceContext::*set_srv)(UINT, UINT, ID3D11ShaderResourceView* const*),
+					 void (ID3D11DeviceContext::*set_samp)(UINT, UINT, ID3D11SamplerState* const*),
+					 void (ID3D11DeviceContext::*set_cb)(UINT, UINT, ID3D11Buffer* const*)) {
+		for (auto& b : bindings) {
+			ASSERT(b.spirv_binding >= 0 && b.spirv_binding < MAX_BIND_SLOTS);
+			switch (b.kind) {
+			case HlslRegisterKind::CBV: {
+				ID3D11Buffer* buf = bound_cbuf[b.spirv_binding];
+				(context.Get()->*set_cb)((UINT)b.register_index, 1, &buf);
+				break;
+			}
+			case HlslRegisterKind::SRV: {
+				ID3D11ShaderResourceView* srv = bound_srv[b.spirv_binding];
+				(context.Get()->*set_srv)((UINT)b.register_index, 1, &srv);
+				break;
+			}
+			case HlslRegisterKind::Sampler: {
+				ID3D11SamplerState* samp = bound_sampler[b.spirv_binding];
+				(context.Get()->*set_samp)((UINT)b.register_index, 1, &samp);
+				break;
+			}
+			case HlslRegisterKind::UAV:
+				break; // handled separately for compute (CSSetUnorderedAccessViews)
+			}
+		}
+	}
+
+	void flush_render_bindings(Dx11ShaderImpl* shader) {
+		flush_stage(shader->vs_bindings, &ID3D11DeviceContext::VSSetShaderResources,
+					&ID3D11DeviceContext::VSSetSamplers, &ID3D11DeviceContext::VSSetConstantBuffers);
+		flush_stage(shader->ps_bindings, &ID3D11DeviceContext::PSSetShaderResources,
+					&ID3D11DeviceContext::PSSetSamplers, &ID3D11DeviceContext::PSSetConstantBuffers);
+	}
+
+	void flush_compute_bindings(Dx11ShaderImpl* shader) {
+		flush_stage(shader->cs_bindings, &ID3D11DeviceContext::CSSetShaderResources,
+					&ID3D11DeviceContext::CSSetSamplers, &ID3D11DeviceContext::CSSetConstantBuffers);
+		for (auto& b : shader->cs_bindings) {
+			if (b.kind == HlslRegisterKind::UAV) {
+				ASSERT(b.spirv_binding >= 0 && b.spirv_binding < MAX_BIND_SLOTS);
+				ID3D11UnorderedAccessView* uav = bound_uav[b.spirv_binding];
+				UINT initial = (UINT)-1;
+				context->CSSetUnorderedAccessViews((UINT)b.register_index, 1, &uav, &initial);
+			}
+		}
+	}
 
 	// ---- Resources (D2) ------------------------------------------------------
 	IGraphicsTexture* create_texture(const CreateTextureArgs& args) override { return dx11_create_texture(args); }
@@ -113,35 +307,148 @@ public:
 	IGraphicsSampler* create_sampler(const CreateSamplerArgs& args) override { return dx11_create_sampler(args); }
 
 	// ---- Scissor / draws (D3) ------------------------------------------------
-	void set_scissor(int x, int y, int w, int h) override { DX11_STUB; }
-	void disable_scissor() override { DX11_STUB; }
-	void draw_elements_base_vertex(GraphicsPrimitiveType mode, int count, VertexInputIndexType index_type, int byte_offset, int base_vertex) override { DX11_STUB; }
-	void draw_arrays(GraphicsPrimitiveType mode, int first, int count) override { DX11_STUB; }
-	void draw_elements(GraphicsPrimitiveType mode, int count, VertexInputIndexType index_type, int byte_offset) override { DX11_STUB; }
-	void draw_elements_indirect(GraphicsPrimitiveType mode, VertexInputIndexType index_type, IGraphicsBuffer* indirect, int byte_offset) override { DX11_STUB; }
-	void draw_elements_instanced_base_vertex_base_instance(GraphicsPrimitiveType mode, int count, VertexInputIndexType index_type, int byte_offset, int instance_count, int base_vertex, uint32_t base_instance) override { DX11_STUB; }
-	void multi_draw_elements_indirect(GraphicsPrimitiveType mode, VertexInputIndexType index_type, IGraphicsBuffer* indirect, int byte_offset, int draw_count, int stride, const void* client_ptr) override { DX11_STUB; }
+	// Note: GL scissor origin is bottom-left, DX11 RSSetScissorRects is
+	// top-left. Coordinate-space audit deferred to D4.
+	void set_scissor(int x, int y, int w, int h) override {
+		ASSERT(w >= 0 && h >= 0);
+		D3D11_RECT rect{ x, y, x + w, y + h };
+		context->RSSetScissorRects(1, &rect);
+	}
+	void disable_scissor() override {
+		D3D11_RECT rect{ (LONG)current_viewport.TopLeftX, (LONG)current_viewport.TopLeftY,
+						 (LONG)(current_viewport.TopLeftX + current_viewport.Width),
+						 (LONG)(current_viewport.TopLeftY + current_viewport.Height) };
+		context->RSSetScissorRects(1, &rect);
+	}
+
+	void draw_elements_base_vertex(GraphicsPrimitiveType mode, int count, VertexInputIndexType index_type, int byte_offset, int base_vertex) override {
+		ASSERT(count >= 0 && byte_offset >= 0 && current_shader);
+		ASSERT((byte_offset % dx11_index_stride(index_type)) == 0);
+		flush_render_bindings((Dx11ShaderImpl*)current_shader);
+		context->IASetPrimitiveTopology(dx11_primitive_topology(mode));
+		context->DrawIndexed((UINT)count, (UINT)(byte_offset / dx11_index_stride(index_type)), base_vertex);
+	}
+	void draw_arrays(GraphicsPrimitiveType mode, int first, int count) override {
+		ASSERT(first >= 0 && count >= 0 && current_shader);
+		flush_render_bindings((Dx11ShaderImpl*)current_shader);
+		context->IASetPrimitiveTopology(dx11_primitive_topology(mode));
+		context->Draw((UINT)count, (UINT)first);
+	}
+	void draw_elements(GraphicsPrimitiveType mode, int count, VertexInputIndexType index_type, int byte_offset) override {
+		draw_elements_base_vertex(mode, count, index_type, byte_offset, 0);
+	}
+	void draw_elements_indirect(GraphicsPrimitiveType mode, VertexInputIndexType index_type, IGraphicsBuffer* indirect, int byte_offset) override {
+		ASSERT(indirect != nullptr && byte_offset >= 0 && current_shader);
+		flush_render_bindings((Dx11ShaderImpl*)current_shader);
+		context->IASetPrimitiveTopology(dx11_primitive_topology(mode));
+		context->DrawIndexedInstancedIndirect(((Dx11Buffer*)indirect)->buf.Get(), (UINT)byte_offset);
+	}
+	void draw_elements_instanced_base_vertex_base_instance(GraphicsPrimitiveType mode, int count, VertexInputIndexType index_type, int byte_offset, int instance_count, int base_vertex, uint32_t base_instance) override {
+		ASSERT(count >= 0 && byte_offset >= 0 && instance_count >= 0 && current_shader);
+		ASSERT((byte_offset % dx11_index_stride(index_type)) == 0);
+		flush_render_bindings((Dx11ShaderImpl*)current_shader);
+		context->IASetPrimitiveTopology(dx11_primitive_topology(mode));
+		context->DrawIndexedInstanced((UINT)count, (UINT)instance_count,
+									   (UINT)(byte_offset / dx11_index_stride(index_type)), base_vertex, base_instance);
+	}
+	// CPU loop over draw_elements_indirect (M0 indirect-loop path; matches the
+	// r_indirect_loop=1 GL path that vars.txt already forces). DX11 has no
+	// MultiDrawElementsIndirect equivalent.
+	void multi_draw_elements_indirect(GraphicsPrimitiveType mode, VertexInputIndexType index_type, IGraphicsBuffer* indirect, int byte_offset, int draw_count, int stride, const void* client_ptr) override {
+		ASSERT(indirect != nullptr && "Dx11: client-side MDI fallback not supported (r_indirect_loop required)");
+		ASSERT(draw_count >= 0 && stride > 0 && byte_offset >= 0);
+		for (int i = 0; i < draw_count; i++)
+			draw_elements_indirect(mode, index_type, indirect, byte_offset + i * stride);
+	}
 	void multi_draw_elements_indirect_count(GraphicsPrimitiveType mode, VertexInputIndexType index_type, IGraphicsBuffer* indirect, int indirect_byte_offset, IGraphicsBuffer* count, int count_byte_offset, int max_draw_count, int stride) override { DX11_STUB; }
 
-	void wait_for_gpu_idle() override { DX11_STUB; }
+	void wait_for_gpu_idle() override {
+		context->Flush();
+		Microsoft::WRL::ComPtr<ID3D11Query> query;
+		D3D11_QUERY_DESC desc{};
+		desc.Query = D3D11_QUERY_EVENT;
+		HRESULT hr = device->CreateQuery(&desc, query.GetAddressOf());
+		ASSERT(SUCCEEDED(hr) && "Dx11: CreateQuery(EVENT) failed");
+		context->End(query.Get());
+		BOOL data = FALSE;
+		while (context->GetData(query.Get(), &data, sizeof(data), 0) != S_OK) {}
+	}
 
 	// ---- Binds (D3) -----------------------------------------------------------
-	void bind_texture(int slot, IGraphicsTexture* tex) override { DX11_STUB; }
-	void bind_uniform_buffer_base(int slot, IGraphicsBuffer* buf) override { DX11_STUB; }
-	void bind_sampler(int slot, IGraphicsSampler* sampler) override { DX11_STUB; }
-	void bind_storage_buffer_base(int slot, IGraphicsBuffer* buf) override { DX11_STUB; }
-	void bind_storage_buffer_range(int slot, IGraphicsBuffer* buf, int offset, int size) override { DX11_STUB; }
-	void bind_image_for_compute(int slot, IGraphicsTexture* tex, int mip, int layer, GraphicsImageAccess access) override { DX11_STUB; }
+	void bind_texture(int slot, IGraphicsTexture* tex) override {
+		ASSERT(slot >= 0 && slot < MAX_BIND_SLOTS);
+		bound_srv[slot] = tex ? ((Dx11Texture*)tex)->get_srv() : nullptr;
+	}
+	void bind_uniform_buffer_base(int slot, IGraphicsBuffer* buf) override {
+		ASSERT(slot >= 0 && slot < MAX_BIND_SLOTS && buf != nullptr);
+		bound_cbuf[slot] = ((Dx11Buffer*)buf)->buf.Get();
+	}
+	void bind_sampler(int slot, IGraphicsSampler* sampler) override {
+		ASSERT(slot >= 0 && slot < MAX_BIND_SLOTS);
+		bound_sampler[slot] = sampler ? dx11_sampler_state(sampler) : nullptr;
+	}
+	void bind_storage_buffer_base(int slot, IGraphicsBuffer* buf) override {
+		ASSERT(slot >= 0 && slot < MAX_BIND_SLOTS && buf != nullptr);
+		Dx11Buffer* b = (Dx11Buffer*)buf;
+		bound_srv[slot] = b->get_srv();
+		bound_uav[slot] = b->get_uav();
+	}
+	void bind_storage_buffer_range(int slot, IGraphicsBuffer* buf, int offset, int size) override {
+		ASSERT(slot >= 0 && slot < MAX_BIND_SLOTS && buf != nullptr && offset >= 0 && size > 0);
+		Dx11Buffer* b = (Dx11Buffer*)buf;
+		bound_srv[slot] = b->get_srv_range(offset, size);
+		bound_uav[slot] = b->get_uav_range(offset, size);
+	}
+	void bind_image_for_compute(int slot, IGraphicsTexture* tex, int mip, int layer, GraphicsImageAccess access) override {
+		ASSERT(slot >= 0 && slot < MAX_BIND_SLOTS && tex != nullptr && mip >= 0);
+		bound_uav[slot] = ((Dx11Texture*)tex)->get_uav(mip, layer);
+	}
 
 	// ---- Push constants (D3) ---------------------------------------------------
-	void push_vertex_constants(int slot, const void* data, int size) override { DX11_STUB; }
-	void push_fragment_constants(int slot, const void* data, int size) override { DX11_STUB; }
-	void push_compute_constants(int slot, const void* data, int size) override { DX11_STUB; }
+	// Lazily create one D3D11_USAGE_DYNAMIC cbuffer per (stage, slot), Map/
+	// memcpy/Unmap (WRITE_DISCARD) on every call, and bind it into bound_cbuf
+	// at the kGfxPushConstBindingBase-derived slot for the next flush.
+	void push_constants_internal(int stage_idx, int slot, const void* data, int size) {
+		ASSERT(stage_idx >= 0 && stage_idx < 3);
+		ASSERT(slot >= 0 && slot < IGraphicsDevice::kGfxMaxPushConstSlotsPerStage);
+		ASSERT(data != nullptr && size > 0 && size <= IGraphicsDevice::kGfxPushConstMaxBytes);
+		auto& buf = push_const_bufs[stage_idx][slot];
+		if (!buf) {
+			D3D11_BUFFER_DESC desc{};
+			desc.ByteWidth = IGraphicsDevice::kGfxPushConstMaxBytes;
+			desc.Usage = D3D11_USAGE_DYNAMIC;
+			desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+			desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+			HRESULT hr = device->CreateBuffer(&desc, nullptr, buf.GetAddressOf());
+			ASSERT(SUCCEEDED(hr) && "Dx11: push-constant CreateBuffer failed");
+		}
+		D3D11_MAPPED_SUBRESOURCE mapped{};
+		HRESULT hr = context->Map(buf.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+		ASSERT(SUCCEEDED(hr) && "Dx11: push-constant Map failed");
+		std::memcpy(mapped.pData, data, size);
+		context->Unmap(buf.Get(), 0);
+
+		const int binding = IGraphicsDevice::kGfxPushConstBindingBase
+						   + stage_idx * IGraphicsDevice::kGfxMaxPushConstSlotsPerStage + slot;
+		ASSERT(binding < MAX_BIND_SLOTS);
+		bound_cbuf[binding] = buf.Get();
+	}
+	void push_vertex_constants(int slot, const void* data, int size) override { push_constants_internal(0, slot, data, size); }
+	void push_fragment_constants(int slot, const void* data, int size) override { push_constants_internal(1, slot, data, size); }
+	void push_compute_constants(int slot, const void* data, int size) override { push_constants_internal(2, slot, data, size); }
 
 	// ---- Compute (D3) -----------------------------------------------------------
-	void begin_compute_pass() override { DX11_STUB; }
-	void dispatch_compute(int groups_x, int groups_y, int groups_z) override { DX11_STUB; }
-	void memory_barrier(uint32_t bits) override { DX11_STUB; }
+	void begin_compute_pass() override { current_pass = PassMode::Compute; }
+	void dispatch_compute(int groups_x, int groups_y, int groups_z) override {
+		ASSERT(groups_x >= 0 && groups_y >= 0 && groups_z >= 0);
+		ASSERT(current_pass == PassMode::Compute && current_shader &&
+			   "dispatch_compute outside compute pass — call begin_compute_pass() first");
+		flush_compute_bindings((Dx11ShaderImpl*)current_shader);
+		context->Dispatch((UINT)groups_x, (UINT)groups_y, (UINT)groups_z);
+	}
+	// DX11's immediate context tracks UAV/SRV hazards automatically between
+	// dispatches/draws; no explicit barrier API exists (unlike GL).
+	void memory_barrier(uint32_t bits) override { ASSERT(bits != 0); }
 
 	// ---- Buffer clear/readback (D2) ----------------------------------------------
 	void clear_buffer_uint32(IGraphicsBuffer* buf, uint32_t value) override {
@@ -175,9 +482,31 @@ public:
 	}
 
 	// ---- Misc state (D3/D4) -------------------------------------------------------
-	void set_line_width(float width) override { DX11_STUB; }
-	void set_polygon_fill_mode(GraphicsFillMode mode) override { DX11_STUB; }
-	void copy_texture(IGraphicsTexture* src, int src_mip, int src_layer, IGraphicsTexture* dst, int dst_mip, int dst_layer, int w, int h) override { DX11_STUB; }
+	// DX11 line rasterization is always 1px (no glLineWidth equivalent); SDL3
+	// GPU silently caps too. Accept and ignore.
+	void set_line_width(float width) override { ASSERT(width > 0.0f); }
+
+	void set_polygon_fill_mode(GraphicsFillMode mode) override {
+		current_fill_mode = mode;
+		ID3D11RasterizerState* rs = state_cache.get_rasterizer_state(
+			current_pipeline.backface_culling, current_pipeline.cull_front_face, mode,
+			current_pipeline.polygon_offset_enabled, current_pipeline.polygon_offset_factor,
+			current_pipeline.polygon_offset_units);
+		context->RSSetState(rs);
+	}
+
+	void copy_texture(IGraphicsTexture* src, int src_mip, int src_layer, IGraphicsTexture* dst, int dst_mip, int dst_layer, int w, int h) override {
+		ASSERT(src && dst);
+		Dx11Texture* s = (Dx11Texture*)src;
+		Dx11Texture* d = (Dx11Texture*)dst;
+		UINT src_sub = D3D11CalcSubresource(src_mip, std::max(src_layer, 0), s->mips);
+		UINT dst_sub = D3D11CalcSubresource(dst_mip, std::max(dst_layer, 0), d->mips);
+		D3D11_BOX box{};
+		box.left = 0; box.right = (UINT)w;
+		box.top = 0; box.bottom = (UINT)h;
+		box.front = 0; box.back = 1;
+		context->CopySubresourceRegion(d->resource.Get(), dst_sub, 0, 0, 0, s->resource.Get(), src_sub, &box);
+	}
 
 	// ---- Debug groups + timer queries (D5) -----------------------------------------
 	void push_debug_group(const char* name) override {}

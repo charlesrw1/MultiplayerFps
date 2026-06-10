@@ -14,13 +14,17 @@
 #endif
 
 #include "Render/IGraphicsDevice.h"
+#include "Render/SpirvCompile.h"
 
 #include <d3d11.h>
 #include <wrl/client.h>
 #include <map>
+#include <vector>
 
 #undef near
 #undef far
+// wingdi.h defines OPAQUE as a macro (=2), colliding with BlendState::OPAQUE.
+#undef OPAQUE
 
 // Device/context globals, set by gfx_init_dx11 and used by every Dx11*Impl.cpp
 // factory (none of them can see Dx11DeviceImpl, which is anonymous-namespace).
@@ -109,12 +113,46 @@ private:
 };
 
 // ---------------------------------------------------------------------------
+// Pipeline helpers (Dx11PipelineImpl.cpp)
+// ---------------------------------------------------------------------------
+D3D11_PRIMITIVE_TOPOLOGY dx11_primitive_topology(GraphicsPrimitiveType mode);
+DXGI_FORMAT dx11_index_format(VertexInputIndexType type);
+
+class Dx11VertexInput;
+class Dx11ShaderImpl;
+
+// Caches D3D11 fixed-function state objects (rasterizer/depth-stencil/blend)
+// and ID3D11InputLayout objects, keyed by their defining fields. Driver-level
+// CreateXState calls already dedupe identical descs, but caching here avoids
+// the ComPtr churn + desc rebuild on every set_pipeline call.
+class Dx11StateCache
+{
+public:
+	ID3D11RasterizerState* get_rasterizer_state(bool backface_culling, bool cull_front_face,
+												 GraphicsFillMode fill_mode, bool poly_offset_enabled,
+												 float poly_offset_factor, float poly_offset_units);
+	ID3D11DepthStencilState* get_depth_stencil_state(bool depth_testing, bool depth_writes, bool depth_less_than);
+	ID3D11BlendState* get_blend_state(BlendState blend, const RenderPipelineState::ColorWriteMask masks[RenderPipelineState::MAX_COLOR_ATTACHMENTS]);
+	// Built against the VS bytecode (input layouts are validated against the
+	// vertex shader's input signature). Cached per (vao, shader) pair.
+	ID3D11InputLayout* get_input_layout(Dx11VertexInput* vao, Dx11ShaderImpl* shader);
+
+private:
+	std::map<std::vector<uint8_t>, Microsoft::WRL::ComPtr<ID3D11RasterizerState>> rasterizer_cache;
+	std::map<std::vector<uint8_t>, Microsoft::WRL::ComPtr<ID3D11DepthStencilState>> depth_stencil_cache;
+	std::map<std::vector<uint8_t>, Microsoft::WRL::ComPtr<ID3D11BlendState>> blend_cache;
+	std::map<std::pair<Dx11VertexInput*, Dx11ShaderImpl*>, Microsoft::WRL::ComPtr<ID3D11InputLayout>> input_layout_cache;
+};
+
+// ---------------------------------------------------------------------------
 // Factory functions, mirroring OpenGlDeviceLocal.h's opengl_create_* family.
 // ---------------------------------------------------------------------------
 IGraphicsBuffer* dx11_create_buffer(const CreateBufferArgs& args);
 IGraphicsVertexInput* dx11_create_vertex_input(const CreateVertexInputArgs& args);
 IGraphicsTexture* dx11_create_texture(const CreateTextureArgs& args);
 IGraphicsSampler* dx11_create_sampler(const CreateSamplerArgs& args);
+// Underlying ID3D11SamplerState for a sampler created by dx11_create_sampler.
+ID3D11SamplerState* dx11_sampler_state(IGraphicsSampler* sampler);
 
 IGraphicsShader* dx11_create_shader_vert_frag(const std::string& vert_path,
 											  const std::string& frag_path,
@@ -143,6 +181,35 @@ public:
 	VertexInputIndexType index_type{};
 };
 
+// ---------------------------------------------------------------------------
+// Dx11ShaderImpl (Dx11ShaderImpl.cpp). Public so D3's set_pipeline / flush_binds
+// can read vs/ps/cs handles, the VS bytecode (for ID3D11InputLayout creation),
+// and the per-stage HLSL resource-binding tables (for register-slot binds).
+// ---------------------------------------------------------------------------
+class Dx11ShaderImpl : public IGraphicsShader
+{
+public:
+	void release() override { delete this; }
+	uint32_t get_internal_handle() override { return 0; }
+
+	// reflect() is diagnostic-only on this backend (no SDL3 GPU shader-create
+	// info to fill in). Approximates GL's PerStageCounts from the HLSL
+	// resource-binding table: a Sampler-kind binding always pairs with an SRV
+	// of the same spirv_binding for sampled_images, so SRVs with a matching
+	// Sampler are textures and SRVs without one are SSBOs. UAVs cannot be
+	// distinguished (storage image vs SSBO) from this table alone and are
+	// counted as storage buffers.
+	Reflection reflect() override;
+
+	Microsoft::WRL::ComPtr<ID3D11VertexShader> vs;
+	Microsoft::WRL::ComPtr<ID3D11PixelShader> ps;
+	Microsoft::WRL::ComPtr<ID3D11ComputeShader> cs;
+	// Kept for lazy ID3D11InputLayout creation in D3 (input layouts are built
+	// against the VS bytecode, not just its reflection).
+	std::vector<uint8_t> vs_bytecode;
+	std::vector<HlslResourceBinding> vs_bindings, ps_bindings, cs_bindings;
+};
+
 class Dx11Buffer : public IGraphicsBuffer
 {
 public:
@@ -166,8 +233,15 @@ public:
 	// binds. Only valid when the corresponding bind flag was set at creation.
 	ID3D11ShaderResourceView* get_srv();
 	ID3D11UnorderedAccessView* get_uav();
+	// Raw-buffer SRV/UAV over [offset, offset+size) (byte units, must be
+	// 4-byte aligned). Used by bind_storage_buffer_range; not cached on the
+	// whole-buffer paths since the range varies per call.
+	ID3D11ShaderResourceView* get_srv_range(int offset, int size);
+	ID3D11UnorderedAccessView* get_uav_range(int offset, int size);
 
 private:
 	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv_cache;
 	Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> uav_cache;
+	std::map<std::pair<int, int>, Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>> srv_range_cache;
+	std::map<std::pair<int, int>, Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView>> uav_range_cache;
 };

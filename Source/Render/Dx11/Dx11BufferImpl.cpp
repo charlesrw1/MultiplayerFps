@@ -155,6 +155,48 @@ ID3D11UnorderedAccessView* Dx11Buffer::get_uav() {
 	return uav_cache.Get();
 }
 
+ID3D11ShaderResourceView* Dx11Buffer::get_srv_range(int offset, int size) {
+	ASSERT((bind_flags & D3D11_BIND_SHADER_RESOURCE) && "Dx11: buffer was not created with storage-read flag");
+	ASSERT(offset >= 0 && size > 0 && (offset % 4) == 0 && (size % 4) == 0);
+	auto key = std::make_pair(offset, size);
+	auto it = srv_range_cache.find(key);
+	if (it != srv_range_cache.end())
+		return it->second.Get();
+	D3D11_SHADER_RESOURCE_VIEW_DESC desc{};
+	desc.Format = DXGI_FORMAT_R32_TYPELESS;
+	desc.ViewDimension = D3D11_SRV_DIMENSION_BUFFEREX;
+	desc.BufferEx.FirstElement = (UINT)(offset / 4);
+	desc.BufferEx.NumElements = (UINT)(size / 4);
+	desc.BufferEx.Flags = D3D11_BUFFEREX_SRV_FLAG_RAW;
+	Microsoft::WRL::ComPtr<ID3D11ShaderResourceView> srv;
+	HRESULT hr = g_dx11_device->CreateShaderResourceView(buf.Get(), &desc, srv.GetAddressOf());
+	ASSERT(SUCCEEDED(hr) && "Dx11: CreateShaderResourceView (buffer range) failed");
+	auto* ptr = srv.Get();
+	srv_range_cache[key] = std::move(srv);
+	return ptr;
+}
+
+ID3D11UnorderedAccessView* Dx11Buffer::get_uav_range(int offset, int size) {
+	ASSERT((bind_flags & D3D11_BIND_UNORDERED_ACCESS) && "Dx11: buffer was not created with a UAV-capable flag");
+	ASSERT(offset >= 0 && size > 0 && (offset % 4) == 0 && (size % 4) == 0);
+	auto key = std::make_pair(offset, size);
+	auto it = uav_range_cache.find(key);
+	if (it != uav_range_cache.end())
+		return it->second.Get();
+	D3D11_UNORDERED_ACCESS_VIEW_DESC desc{};
+	desc.Format = DXGI_FORMAT_R32_TYPELESS;
+	desc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
+	desc.Buffer.FirstElement = (UINT)(offset / 4);
+	desc.Buffer.NumElements = (UINT)(size / 4);
+	desc.Buffer.Flags = D3D11_BUFFER_UAV_FLAG_RAW;
+	Microsoft::WRL::ComPtr<ID3D11UnorderedAccessView> uav;
+	HRESULT hr = g_dx11_device->CreateUnorderedAccessView(buf.Get(), &desc, uav.GetAddressOf());
+	ASSERT(SUCCEEDED(hr) && "Dx11: CreateUnorderedAccessView (buffer range) failed");
+	auto* ptr = uav.Get();
+	uav_range_cache[key] = std::move(uav);
+	return ptr;
+}
+
 IGraphicsBuffer* dx11_create_buffer(const CreateBufferArgs& args) {
 	ASSERT(args.size >= 0);
 	Dx11Buffer* b = new Dx11Buffer();
