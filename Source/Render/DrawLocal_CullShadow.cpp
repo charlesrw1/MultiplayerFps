@@ -297,16 +297,20 @@ void BuildSceneData_CpuFast::on_model_removed(Model* m) {
 	for (const auto& key : keys_to_erase)
 		mod_data.erase(key);
 
-	// Invalidate all proxy objects that referenced any of those cache slots.
-	// Set to -1 (not in fast path) rather than re-resolving — the model is gone.
+	// Invalidate all proxy objects that referenced this model.
+	// Set fastcpu_index to -1 (not in fast path) and clear proxy.model rather
+	// than re-resolving — the model is gone and the pointer would dangle.
 	auto& proxies = draw.scene.proxy_list.objects;
 	for (auto& [_, obj] : proxies) {
-		for (int idx : removed_indices) {
-			if (obj.fastcpu_index == idx) {
-				sys_print(Warning, "BuildSceneData: proxy still referencing removed model '%s', nulling fastcpu_index\n",
-				          m->get_name().c_str());
-				obj.fastcpu_index = -1;
-				break;
+		if (obj.proxy.model == m) {
+			sys_print(Warning, "BuildSceneData: proxy still referencing removed model '%s', nulling fastcpu_index and proxy.model\n",
+			          m->get_name().c_str());
+			obj.proxy.model = nullptr;
+			for (int idx : removed_indices) {
+				if (obj.fastcpu_index == idx) {
+					obj.fastcpu_index = -1;
+					break;
+				}
 			}
 		}
 	}

@@ -742,6 +742,17 @@ public:
 							   VertexInputIndexType index_type,
 							   int byte_offset) = 0;
 
+	// glDrawElementsIndirect: a single indexed draw whose parameters
+	// (gpu::DrawElementsIndirectCommand) are read from `indirect` at
+	// `byte_offset`. This is the per-command building block for the
+	// MultiDrawElementsIndirect-loop path (r_indirect_loop / DX11): callers
+	// loop over the CPU-known command count and issue one of these per
+	// command, relying on culled commands (primCount == 0) being GPU no-ops.
+	virtual void draw_elements_indirect(GraphicsPrimitiveType mode,
+										VertexInputIndexType index_type,
+										IGraphicsBuffer* indirect,
+										int byte_offset) = 0;
+
 };
 
 struct SDL_Window;

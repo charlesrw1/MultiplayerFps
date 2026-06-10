@@ -173,9 +173,13 @@ function Run-Pass([string]$mode) {
     # report data from THIS run. The log file is opened in append mode by
     # the engine (Util.cpp _fsopen "ab"), so without this it grows unbounded
     # across runs and mixes failure context from prior crashes.
+    # Also remove the prior results XML: if the process crashes before
+    # write_results_xml() runs, a stale XML from a previous successful run
+    # would make Print-XmlSummary report "N/N passed" for a run that crashed.
     Remove-Item -Force -ErrorAction SilentlyContinue `
         "$root\test_${mode}_output.dmp", `
-        "$root\test_${mode}_output.log"
+        "$root\test_${mode}_output.log", `
+        "$root\TestFiles\integration_${mode}_results.xml"
     Get-ChildItem -Path $root -Filter "crash_*.dmp" -ErrorAction SilentlyContinue |
         Remove-Item -Force -ErrorAction SilentlyContinue
 

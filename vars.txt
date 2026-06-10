@@ -8,6 +8,7 @@
 
 [app]
 
+r_indirect_loop 1
 # render vars
 gpu.draw_collision_tris 0
 gpu.draw_sv_colliders 0
@@ -62,6 +63,7 @@ g_lua_debug_wait 0
 
 [game_test]
 
+r_indirect_loop 1
 gpu.draw_collision_tris 0
 gpu.draw_sv_colliders 0
 gpu.draw_viewmodel 1
@@ -103,6 +105,8 @@ colorLog 0
 r.enable_vsync 0
 
 [editor_test]
+
+r_indirect_loop 1
 g_project_base "Data"
 r.taa 0
 ui.disable_screen_log 1

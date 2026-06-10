@@ -32,6 +32,7 @@ extern ConfigVar enable_bloom;
 extern ConfigVar enable_volumetric_fog;
 extern ConfigVar enable_ssao;
 extern ConfigVar use_halfres_reflections;
+extern ConfigVar r_indirect_loop;
 
 // ---------------------------------------------------------------------------
 // 3-D texture wrapper + Perlin generator

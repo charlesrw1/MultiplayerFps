@@ -131,6 +131,15 @@ public:
 
 	void zero_instances_in_this(IGraphicsBuffer* mdi_buf, int count);
 
+	// Zero primCount for `count` DrawElementsIndirectCommands starting at
+	// command index `cmd_offset` in mdi_buf. Used to clear the compacted
+	// (second-half) region of cmd_buf before compact_draws() writes into it,
+	// so stale commands left over from a previous compaction don't linger past
+	// this frame's (smaller) visible count -- the indirect-loop draw path
+	// (r_indirect_loop) has no GPU-known count to bound the loop and relies
+	// on primCount == 0 being a no-op for unused trailing slots.
+	void zero_command_primcounts(IGraphicsBuffer* mdi_buf, int cmd_offset, int count);
+
 	void do_shadow_cull(const GpuCullInput& input, Frustum f);
 
 private:

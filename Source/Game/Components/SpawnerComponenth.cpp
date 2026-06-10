@@ -19,7 +19,9 @@ string SpawnerComponent::get_spawner_type() {
 	if (obj.is_null())
 		return "__none";
 	auto& t = obj["_type"];
-	return t.is_string() ? t : "__none";
+	if (t.is_string())
+		return t.get<string>();
+	return "__none";
 }
 
 void SpawnerComponent::serialize(Serializer& s) {

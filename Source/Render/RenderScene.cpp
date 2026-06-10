@@ -324,6 +324,8 @@ void Render_Scene::update_obj(handle<Render_Object> handle, const Render_Object&
 		if (proxy.model) {
 			parts = proxy.model->get_num_parts();
 			in.has_transparents = proxy.model->get_has_any_transparent_materials();
+			ASSERT(parts > 0);
+			ASSERT(proxy.model->get_num_materials() > 0);
 		}
 		if (proxy.mat_override && proxy.mat_override->impl && proxy.mat_override->impl->is_transparent_material()) {
 			in.fastcpu_index = -1; // skip, material is transparent

@@ -116,8 +116,8 @@ string get_name_display_entity(const Entity* e) {
 				if (m->get_model())
 					name = m->get_model()->get_name();
 			}
-			if (auto m = e->get_component<SpawnerComponent>()) {
-				name = m->get_spawner_type();
+			if (auto spawner = e->get_component<SpawnerComponent>()) {
+				name = spawner->get_spawner_type();
 			}
 		}
 	}

@@ -101,8 +101,10 @@ bool screenshot_capture_and_compare(const char* name, const ScreenshotConfig& cf
 	}
 	if (within_warn) {
 		// Soft-fail: minor drift (likely GPU/driver rounding) — surface it so it
-		// doesn't go unnoticed, but don't fail the test.
-		fprintf(stderr,
+		// doesn't go unnoticed, but don't fail the test. Use stdout, not stderr:
+		// PowerShell 5.1 renders any stderr line from a native exe as a red
+		// NativeCommandError, which looks like a failure even though this passes.
+		printf(
 				"  SCREENSHOT WARN: max_delta=%d diff_pixels=%d (%.4f%%) — within warn band (delta<=%d, frac<=%.4f%%), golden: %s\n",
 				max_delta, diff_pixels, diff_frac * 100.f, cfg.warn_channel_delta,
 				cfg.warn_diff_fraction * 100.f, gp.c_str());

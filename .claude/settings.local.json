@@ -409,7 +409,22 @@
       "Bash(winget install *)",
       "Read(//c/tmp/**)",
       "Bash(mkdir -p trashtest)",
-      "Bash(touch trashtest/a.txt trashtest/b.txt)"
+      "Bash(touch trashtest/a.txt trashtest/b.txt)",
+      "Read(//c/Users/charl/AppData/Local/Temp/**)",
+      "PowerShell(.\\\\Scripts\\\\integration_test.ps1 2>&1 | Select-Object -First 60)",
+      "Bash(cmd /c App.exe --tests game game/boot)",
+      "PowerShell(cd x64\\\\Debug; .\\\\App.exe --tests game game/boot; Write-Host \"EXIT=$LASTEXITCODE\")",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/18/Insiders/VC/Tools/MSVC\"/*/bin/Hostx64/x64/dumpbin.exe /dependents App.exe)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/18/Insiders/VC/Tools/MSVC\"/*/bin/Hostx64/x64/dumpbin.exe -dependents App.exe)",
+      "Read(//c/Users/charl/source/vcpkg/installed/**)",
+      "PowerShell(cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\x64\\\\Debug; .\\\\App.exe --tests game game/boot; Write-Host \"EXIT=$LASTEXITCODE\")",
+      "Bash(cp *)",
+      "PowerShell(cd C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\x64\\\\Debug; .\\\\App.exe --tests game game/boot 2>&1 | Select-Object -Last 15; Write-Host \"EXIT=$LASTEXITCODE\")",
+      "PowerShell(.\\\\Scripts\\\\integration_test.ps1 2>&1 | Select-Object -Last 30)",
+      "Bash(magick.exe compare *)",
+      "Bash(magick.exe identify *)",
+      "Bash(tasklist)",
+      "PowerShell(Get-WinEvent *)"
     ]
   },
   "enabledPlugins": {

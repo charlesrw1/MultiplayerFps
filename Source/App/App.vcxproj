@@ -32,7 +32,12 @@
     <ProjectGuid>{fe7dd3ab-5396-4f37-8912-301151683844}</ProjectGuid>
     <RootNamespace>App</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <VcpkgApplocalDeps>true</VcpkgApplocalDeps>
+    <!-- vcpkg's own AppLocalFromInstalled hook is broken on this toolset (registers
+         copied DLLs in the .write tlog without ever actually copying them via
+         CopyFilesToOutputDirectory, which doesn't exist here) - this causes
+         IncrementalClean to delete DLLs that our PostBuildEvent just copied.
+         Disabled; Scripts/copy_vcpkg_dlls.ps1 (App's PostBuildEvent) handles it. -->
+    <VcpkgApplocalDeps>false</VcpkgApplocalDeps>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -228,6 +233,12 @@
       <AdditionalDependencies>Shell32.lib</AdditionalDependencies>
       <AdditionalOptions>/WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\Core.lib /WHOLEARCHIVE:$(SolutionDir)$(Platform)\$(Configuration)\IntegrationTests.lib "$(SolutionDir)$(Platform)\$(Configuration)\External.lib"</AdditionalOptions>
     </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <PostBuildEvent>
+      <Command>powershell -ExecutionPolicy Bypass -NoProfile -File "$(SolutionDir)Scripts\copy_vcpkg_dlls.ps1" -VcpkgBinDir "$(_ZVcpkgCurrentInstalledDir)$(_ZVcpkgConfigSubdir)bin" -OutDir "$(OutDir.TrimEnd('\'))"</Command>
+      <Message>Copy vcpkg DLL deps to output (vcpkg's AppLocalFromInstalled hook is broken on this toolset)</Message>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />

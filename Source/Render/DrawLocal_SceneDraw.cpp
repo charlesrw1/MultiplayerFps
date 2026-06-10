@@ -141,7 +141,7 @@ ConfigVar r_print_light_tiles("r.print_light_tiles", "0", CVAR_BOOL | CVAR_DEV, 
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view) {
 	GPUSCOPESTART(scene_draw_scope);
 
-	if (view.width > 5000 || view.height > 5000 || view.height == 0 || view.width == 0) {
+	if (view.width > 5000 || view.height > 5000 || view.height <= 4|| view.width <= 4) {
 		// something went wrong
 		view.width = 100;
 		view.height = 100;

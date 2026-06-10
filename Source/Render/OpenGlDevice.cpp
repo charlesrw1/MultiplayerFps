@@ -898,6 +898,22 @@ public:
 		draw.stats.total_draw_calls++;
 	}
 
+	void draw_elements_indirect(GraphicsPrimitiveType mode,
+								VertexInputIndexType index_type,
+								IGraphicsBuffer* indirect,
+								int byte_offset) override {
+		ASSERT(indirect != nullptr && byte_offset >= 0);
+		const GLenum gl_mode =
+			(mode == GraphicsPrimitiveType::Triangles)     ? GL_TRIANGLES :
+			(mode == GraphicsPrimitiveType::TriangleStrip) ? GL_TRIANGLE_STRIP :
+															 GL_LINES;
+		const GLenum gl_type = (index_type == VertexInputIndexType::uint16)
+								   ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+		bind_indirect_internal(indirect);
+		glDrawElementsIndirect(gl_mode, gl_type, (const void*)(intptr_t)byte_offset);
+		draw.stats.total_draw_calls++;
+	}
+
 	void draw_elements_instanced_base_vertex_base_instance(
 		GraphicsPrimitiveType mode, int count, VertexInputIndexType index_type,
 		int byte_offset, int instance_count, int base_vertex,

@@ -209,6 +209,11 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 
 	gfx().bind_sampler(0, nullptr);
 
+	// Clear primCount in the compacted (second-half) region of cmd_buf before
+	// compact_draws() writes into it; otherwise commands left over from a
+	// previous compaction linger past this frame's (smaller) visible count.
+	zero_command_primcounts(input.cmd_buf, input.num_cmds, input.num_cmds);
+
 	compact_draws(input);
 }
 #include "Framework/ArenaAllocator.h"
@@ -403,6 +408,22 @@ void GpuCullingTest::zero_instances_in_this(IGraphicsBuffer* mdi_buf, int count)
 	{
 		gpu::CullParams cp{};
 		cp.draw_count = count;
+		draw.ubo.cull_params->upload(&cp, sizeof(cp));
+		gfx().bind_uniform_buffer_base(7, draw.ubo.cull_params);
+	}
+	gfx().dispatch_compute(groups_x, 1, 1);
+
+	gfx().memory_barrier(BARRIER_SHADER_STORAGE | BARRIER_COMMAND);
+}
+
+void GpuCullingTest::zero_command_primcounts(IGraphicsBuffer* mdi_buf, int cmd_offset, int count) {
+	gfx().bind_storage_buffer_base(2, mdi_buf);
+	{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(zero_instances_mdi); gfx().set_pipeline(ps); }
+	int groups_x = glm::ceil(count / 256.f);
+	{
+		gpu::CullParams cp{};
+		cp.draw_count = count;
+		cp.cmd_offset = cmd_offset;
 		draw.ubo.cull_params->upload(&cp, sizeof(cp));
 		gfx().bind_uniform_buffer_base(7, draw.ubo.cull_params);
 	}

@@ -43,6 +43,7 @@ function Attach-VSDebugger {
             }
         } catch {
             # RPC_E_CALL_REJECTED is common while VS is busy; retry.
+            Write-Host "Attach attempt failed: $($_.Exception.Message)" -ForegroundColor DarkYellow
         }
         Start-Sleep -Milliseconds 250
     }

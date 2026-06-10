@@ -186,6 +186,11 @@ void draw_model_simple_no_material(Model* model) {
 }
 
 ConfigVar use_client_buffer_mdi("use_client_buffer_mdi", "0", CVAR_BOOL, "");
+
+// M0 (DX11/DX12 de-risk): replace MultiDrawElementsIndirect with a CPU loop of
+// single draw_elements_indirect calls, args staying GPU-resident. DX11 has no
+// MDI equivalent, so this is the shape the DX11/DX12 backends will always use.
+ConfigVar r_indirect_loop("r_indirect_loop", "0", CVAR_BOOL, "");
 int setup_execute_render_lists(Render_Lists& list, Render_Pass& pass) {
 	auto& scene = draw.scene;
 
@@ -237,6 +242,24 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass, bool 
 					list.gpu_command_list, offset_buffer_start + offset * DEIcmdSz,
 					count_buf, i * (int)sizeof(uint32),
 					count, sizeof(gpu::DrawElementsIndirectCommand));
+			} else if (r_indirect_loop.get_bool()) {
+				// M0 indirect-loop path (DX11/DX12 shape): count is CPU-known,
+				// culled commands have primCount == 0 and are GPU no-ops.
+				// glDrawElementsIndirect always reports gl_DrawID == 0, so
+				// MasterShader's `indirect_materials[indirect_material_offset
+				// + gl_DrawID]` lookup must be re-pushed per command with
+				// indirect_material_offset == offset + dc (setup_batch already
+				// pushed offset + 0 for dc == 0).
+				gpu::MasterDeferredPushConsts pc{};
+				for (int dc = 0; dc < count; dc++) {
+					pc.indirect_material_offset = (uint32_t)(offset + dc);
+					gfx().push_vertex_constants(0, &pc, sizeof(pc));
+					gfx().push_fragment_constants(0, &pc, sizeof(pc));
+
+					gfx().draw_elements_indirect(
+						GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
+						list.gpu_command_list, offset_buffer_start + (offset + dc) * DEIcmdSz);
+				}
 			} else if (use_client_buffer_mdi.get_bool()) {
 				gfx().multi_draw_elements_indirect(
 					GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,

@@ -187,11 +187,22 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 							 cmd_to_extra.at(mat_ofs).model, flags & OVERDRAWVIS, effective_poly_offset);
 
 				const int indirect_byte_offset = offset_buffer_start + offset * DEIcmdSz;
-				gfx().multi_draw_elements_indirect_count(
-					GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
-					gpu.cmd_list, indirect_byte_offset,
-					gpu.gbuffer_count, i * (int)sizeof(uint32),
-					count, sizeof(gpu::DrawElementsIndirectCommand));
+				if (r_indirect_loop.get_bool()) {
+					// M0 indirect-loop path (DX11/DX12 shape): count is
+					// CPU-known, culled commands have primCount == 0 and are
+					// GPU no-ops.
+					for (int dc = 0; dc < count; dc++) {
+						gfx().draw_elements_indirect(
+							GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
+							gpu.cmd_list, indirect_byte_offset + dc * DEIcmdSz);
+					}
+				} else {
+					gfx().multi_draw_elements_indirect_count(
+						GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
+						gpu.cmd_list, indirect_byte_offset,
+						gpu.gbuffer_count, i * (int)sizeof(uint32),
+						count, sizeof(gpu::DrawElementsIndirectCommand));
+				}
 
 				draw.stats.total_draw_calls += 1;
 			}

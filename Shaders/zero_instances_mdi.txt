@@ -16,5 +16,5 @@ void main()
 	// cull object id
 	if(gID>=params.draw_count)
 		return;
-	draw_cmd_out[gID].primCount = 0;
+	draw_cmd_out[params.cmd_offset + gID].primCount = 0;
 }

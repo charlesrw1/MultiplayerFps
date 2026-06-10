@@ -77,7 +77,8 @@ struct CullParams {
     int   draw_count;         //  48         (zero_instances_mdi)
     int   pyr_level;          //  52         (DepthPyramidC)
     float pyr_width;          //  56         (DepthPyramidC)
-    float pyr_height;         //  60 .. 64   (DepthPyramidC; struct size 64, /16)
+    float pyr_height;         //  60         (DepthPyramidC)
+    int   cmd_offset;         //  64 .. 68   (zero_instances_mdi: draw_cmd_out[cmd_offset + gID]; struct size 64, /16)
 };
 
 // ---- D. SSR pipeline -------------------------------------------------------

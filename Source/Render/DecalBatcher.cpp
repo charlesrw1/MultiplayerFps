@@ -161,14 +161,28 @@ void DecalBatcher::draw_decals() {
 		for (int j = 0; j < texs.size(); j++)
 			draw.bind_texture_ptr(j, texs[j]->gpu_ptr);
 
-		gpu::MasterDecalVertPushConsts pcv{};
-		pcv.decal_indirect_offset = (uint32_t)cur_offset;
-		gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
-
 		const int dei_size = sizeof(gpu::DrawElementsIndirectCommand);
-		gfx().multi_draw_elements_indirect(GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
-										   multidraw_commands, cur_offset * dei_size,
-										   ddraw.count, dei_size);
+		if (r_indirect_loop.get_bool()) {
+			// M0 indirect-loop path (DX11/DX12 shape). glDrawElementsIndirect
+			// always reports gl_DrawID == 0, so MasterDecalShader's
+			// `indirect_decal_indicies[pcv.decal_indirect_offset + gl_DrawID]`
+			// lookup must be re-pushed per command with decal_indirect_offset
+			// == cur_offset + dc.
+			gpu::MasterDecalVertPushConsts pcv{};
+			for (int dc = 0; dc < ddraw.count; dc++) {
+				pcv.decal_indirect_offset = (uint32_t)(cur_offset + dc);
+				gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
+				gfx().draw_elements_indirect(GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
+											  multidraw_commands, (cur_offset + dc) * dei_size);
+			}
+		} else {
+			gpu::MasterDecalVertPushConsts pcv{};
+			pcv.decal_indirect_offset = (uint32_t)cur_offset;
+			gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
+			gfx().multi_draw_elements_indirect(GraphicsPrimitiveType::Triangles, MODEL_INDEX_TYPE,
+											   multidraw_commands, cur_offset * dei_size,
+											   ddraw.count, dei_size);
+		}
 
 		cur_offset += ddraw.count;
 	}

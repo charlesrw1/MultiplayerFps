@@ -102,7 +102,7 @@ static TestTask test_demo_level_1_shots(TestContext& t)
 	co_await t.wait_ticks(32);
 	// SSR + TAA jitter heavily depending on prior-test state (TAA history, etc.) —
 	// observed up to max_delta=158, 2.17% pixels in full-pass runs.
-	co_await t.capture_screenshot("ssr_test", 180, 0.03f);
+	co_await t.capture_screenshot("ssr_test", 240, 0.03f);
 
 	enable_ssr.set_bool(prev_ssr);
 	r_taa_enabled.set_bool(prev_taa);

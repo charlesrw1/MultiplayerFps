@@ -205,6 +205,11 @@ static TestTask test_editor_nav_bake(TestContext& t) {
 	co_await t.wait_ticks(4);
 	t.require(eng->get_level() != nullptr, "level loaded for editor bake test");
 
+	// some comment
+	// another line
+	// 
+	// asdfasdf
+	// 
 	// Build a 20 x 20 m flat ground quad as a dynamic model. CCW from +Y so the baker
 	// keeps the triangles after the slope check.
 	ModelBuilder b;
