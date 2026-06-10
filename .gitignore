@@ -17,6 +17,7 @@ Source/.generated/
 *.hdr
 *.dll
 *.bin
+*.dx11bin
 *.7z
 *.obj
 *.pdb
