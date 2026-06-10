@@ -208,3 +208,41 @@ static TestTask test_spirv_vfog(TestContext& t) {
 	t.check(cs.num_storage_buffers  == gl.compute.num_storage_buffers,  "CS SSBO count matches GL");
 }
 GAME_TEST("renderer/spirv_vfog", 15.f, test_spirv_vfog);
+
+// ============================================================================
+// P3.1 D6: SPIR-V -> HLSL -> DXBC leg (DX11 backend toolchain, D0). Compiles
+// the same shaders used above through spirv_to_hlsl + compile_hlsl_to_dxbc
+// and checks both stages produce non-empty output with a populated
+// resource-binding table. Runs on any host (D3DCompile doesn't need a D3D
+// device), independent of which backend is active.
+// ============================================================================
+static TestTask test_spirv_hlsl_dxbc(TestContext& t) {
+	eng->load_level("");
+	co_await t.wait_ticks(1);
+
+	spirv_compile_init();
+
+	const ShaderSource vsrc = load_shader_source("fullscreenquad.txt", "", true, "#version 460\n");
+	t.require(!vsrc.empty(), "fullscreenquad VS source load");
+	const SpirvBlob vspirv = compile_glsl_to_spirv(SpirvStage::Vertex, vsrc.source, "fullscreenquad.txt");
+	t.require(vspirv.ok(), "fullscreenquad VS -> SPIR-V");
+
+	const HlslBlob vhlsl = spirv_to_hlsl(vspirv, "fullscreenquad.txt");
+	t.require(vhlsl.ok(), "fullscreenquad VS SPIR-V -> HLSL");
+
+	const DxbcBlob vdxbc = compile_hlsl_to_dxbc(vhlsl.source, "vs_5_0", "fullscreenquad.txt");
+	t.check(vdxbc.ok(), "fullscreenquad VS HLSL -> DXBC");
+
+	const ShaderSource fsrc = load_shader_source("BloomDownsampleF.txt", "", true, "#version 460\n");
+	t.require(!fsrc.empty(), "BloomDownsampleF source load");
+	const SpirvBlob fspirv = compile_glsl_to_spirv(SpirvStage::Fragment, fsrc.source, "BloomDownsampleF.txt");
+	t.require(fspirv.ok(), "BloomDownsampleF -> SPIR-V");
+
+	const HlslBlob fhlsl = spirv_to_hlsl(fspirv, "BloomDownsampleF.txt");
+	t.require(fhlsl.ok(), "BloomDownsampleF SPIR-V -> HLSL");
+	t.check(!fhlsl.bindings.empty(), "BloomDownsampleF HLSL resource-binding table populated");
+
+	const DxbcBlob fdxbc = compile_hlsl_to_dxbc(fhlsl.source, "ps_5_0", "BloomDownsampleF.txt");
+	t.check(fdxbc.ok(), "BloomDownsampleF HLSL -> DXBC");
+}
+GAME_TEST("renderer/spirv_hlsl_dxbc", 15.f, test_spirv_hlsl_dxbc);

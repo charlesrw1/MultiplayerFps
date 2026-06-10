@@ -11,7 +11,13 @@ notes — split out to keep this file readable): [[gfx_abstraction_changelog]].
 
 sdl3 gpu api (for reference): https://github.com/libsdl-org/SDL/blob/main/include/SDL3/SDL_gpu.h
 
-Migration of all rendering behind `IGraphicsDevice` (Source/Render/IGraphicsDevice.h) so an SDL3 GPU backend can sit alongside the current OpenGL backend.
+Migration of all rendering behind `IGraphicsDevice` (Source/Render/IGraphicsDevice.h) so additional backends can sit alongside the current OpenGL backend.
+
+**M1 status**: the second backend shipped is **DX11** (`Source/Render/Dx11/`,
+`r.render_backend dx11`), not the SDL3-GPU port originally planned in Phase 3
+below — see [[gfx_abstraction_nextsteps]] for the DX11 punch list/status.
+SDL3 itself landed (B5) for windowing + `imgui_impl_sdl3`. Phase 1/2 history
+below is unaffected (backend-agnostic GL-side work).
 
 Global accessor: `gfx()` (free function). The OpenGL singleton is built by `gfx_init_opengl()` during `Renderer::init` and torn down by `gfx_shutdown()`.
 

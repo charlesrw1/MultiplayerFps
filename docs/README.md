@@ -15,8 +15,9 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 - [[rendering/decals]] — decal materials, write flags, parallax occlusion mapping
 - [[rendering/model_importing]] — `.glb` import, `.mis` settings, `.cmdl` paths
 - [[rendering/ddgi_baking]] — DDGI probe-volume + global bias parameters for baking
-- [[rendering/gfx_abstraction]] — IGraphicsDevice migration plan (wrap → redesign → SDL3 GPU port)
+- [[rendering/gfx_abstraction]] — IGraphicsDevice migration plan (wrap → redesign → DX11/DX12 backends)
 - [[rendering/gfx_abstraction_changelog]] — per-sub-phase status entries for Phase 1 + Phase 2 (as-landed notes split from the design doc)
+- [[rendering/gfx_abstraction_nextsteps]] — DX11 backend (M1) status / punch list
 
 ## Bike Demo
 
