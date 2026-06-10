@@ -139,6 +139,7 @@
     <ClCompile Include="imgui.cpp" />
     <ClCompile Include="imgui_demo.cpp" />
     <ClCompile Include="imgui_draw.cpp" />
+    <ClCompile Include="imgui_impl_dx11.cpp" />
     <ClCompile Include="imgui_impl_opengl3.cpp" />
     <ClCompile Include="imgui_impl_sdl3.cpp" />
     <ClCompile Include="imgui_tables.cpp" />
@@ -153,6 +154,7 @@
     <ClInclude Include="cgltf.h" />
     <ClInclude Include="cgltf_write.h" />
     <ClInclude Include="imgui.h" />
+    <ClInclude Include="imgui_impl_dx11.h" />
     <ClInclude Include="imgui_impl_opengl3.h" />
     <ClInclude Include="imgui_impl_opengl3_loader.h" />
     <ClInclude Include="imgui_impl_sdl3.h" />

@@ -9,6 +9,9 @@
 
 #include <SDL3/SDL.h>
 
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_dx11.h"
+
 #include <algorithm>
 #include <climits>
 #include <cstring>
@@ -34,7 +37,9 @@ public:
 	Microsoft::WRL::ComPtr<ID3D11Device> device;
 	Microsoft::WRL::ComPtr<ID3D11DeviceContext> context;
 	Microsoft::WRL::ComPtr<IDXGISwapChain> swapchain;
+	Microsoft::WRL::ComPtr<ID3DUserDefinedAnnotation> annotation;
 	Dx11Texture* backbuffer = nullptr;
+	SDL_Window* window = nullptr;
 
 	enum class PassMode { None, Render, Compute };
 	PassMode current_pass = PassMode::None;
@@ -106,7 +111,7 @@ public:
 		return backbuffer;
 	}
 	void submit_and_present() override {
-		swapchain->Present(0, 0);
+		swapchain->Present(vsync_enabled ? 1 : 0, 0);
 	}
 
 	// ---- Render pass / clear (D2/D3 scope) ----------------------------------
@@ -519,17 +524,47 @@ public:
 	}
 
 	// ---- Debug groups + timer queries (D5) -----------------------------------------
-	void push_debug_group(const char* name) override {}
-	void pop_debug_group() override {}
-	IGraphicsTimerQuery* create_timer_query() override { DX11_STUB; return nullptr; }
+	void push_debug_group(const char* name) override {
+		ASSERT(name);
+		wchar_t wname[256];
+		int len = MultiByteToWideChar(CP_UTF8, 0, name, -1, wname, (int)(sizeof(wname) / sizeof(wname[0])));
+		if (len <= 0)
+			return;
+		annotation->BeginEvent(wname);
+	}
+	void pop_debug_group() override {
+		annotation->EndEvent();
+	}
+	IGraphicsTimerQuery* create_timer_query() override;
 
 	// ---- Window / vsync / imgui (D5) -------------------------------------------------
-	void set_vsync(bool enable) override { DX11_STUB; }
-	void imgui_init() override { DX11_STUB; }
-	void imgui_shutdown() override { DX11_STUB; }
-	void imgui_new_frame() override { DX11_STUB; }
-	void imgui_render_draw_data() override { DX11_STUB; }
-	bool imgui_process_event(const union SDL_Event* event) override { DX11_STUB; return false; }
+	bool vsync_enabled = false;
+	void set_vsync(bool enable) override { vsync_enabled = enable; }
+	void imgui_init() override {
+		ASSERT(window != nullptr);
+		ImGui_ImplSDL3_InitForD3D(window);
+		ImGui_ImplDX11_Init(device.Get(), context.Get());
+	}
+	void imgui_shutdown() override {
+		ImGui_ImplDX11_Shutdown();
+		ImGui_ImplSDL3_Shutdown();
+	}
+	void imgui_new_frame() override {
+		ImGui_ImplDX11_NewFrame();
+		ImGui_ImplSDL3_NewFrame();
+	}
+	void imgui_render_draw_data() override {
+		// Mirrors the GL backend: bind the backbuffer so imgui lands on the
+		// swapchain regardless of which offscreen target the last scene pass
+		// left bound.
+		ID3D11RenderTargetView* rtv = backbuffer->rtv.Get();
+		context->OMSetRenderTargets(1, &rtv, nullptr);
+		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+	}
+	bool imgui_process_event(const SDL_Event* event) override {
+		ASSERT(event != nullptr);
+		return ImGui_ImplSDL3_ProcessEvent(event);
+	}
 
 	// ---- Shader factory (D2) -----------------------------------------------------------
 	IGraphicsShader* create_shader_vert_frag(const std::string& vert_path, const std::string& frag_path, const std::string& defines) override { return dx11_create_shader_vert_frag(vert_path, frag_path, defines); }
@@ -538,6 +573,59 @@ public:
 	IGraphicsShader* create_shader_single_file(const std::string& shared_path, const std::string& defines) override { return dx11_create_shader_single_file(shared_path, defines); }
 	IGraphicsShader* create_shader_single_file_tess(const std::string& shared_path, const std::string& defines) override { DX11_STUB; return nullptr; }
 };
+
+// ID3D11Query TIMESTAMP wrapper. DX11 timestamps are only meaningful relative
+// to a TIMESTAMP_DISJOINT query's frequency/disjoint flag, so each instance
+// brackets its own timestamp with a disjoint query (one extra query per
+// record_timestamp(), but keeps the IGraphicsTimerQuery interface
+// self-contained, matching OpenGLTimerQueryImpl's single-call model).
+class Dx11TimerQueryImpl : public IGraphicsTimerQuery
+{
+public:
+	Dx11TimerQueryImpl() {
+		D3D11_QUERY_DESC ts_desc{};
+		ts_desc.Query = D3D11_QUERY_TIMESTAMP;
+		g_dx11_device->CreateQuery(&ts_desc, timestamp.GetAddressOf());
+
+		D3D11_QUERY_DESC disjoint_desc{};
+		disjoint_desc.Query = D3D11_QUERY_TIMESTAMP_DISJOINT;
+		g_dx11_device->CreateQuery(&disjoint_desc, disjoint.GetAddressOf());
+	}
+	void release() override { delete this; }
+
+	void record_timestamp() override {
+		g_dx11_context->Begin(disjoint.Get());
+		g_dx11_context->End(timestamp.Get());
+		g_dx11_context->End(disjoint.Get());
+		armed = true;
+	}
+
+	bool is_available() override {
+		if (!armed) return false;
+		D3D11_QUERY_DATA_TIMESTAMP_DISJOINT data;
+		return g_dx11_context->GetData(disjoint.Get(), &data, sizeof(data), 0) == S_OK;
+	}
+
+	uint64_t read_timestamp_ns() override {
+		ASSERT(armed);
+		D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjoint_data;
+		while (g_dx11_context->GetData(disjoint.Get(), &disjoint_data, sizeof(disjoint_data), 0) != S_OK) {}
+		UINT64 ticks = 0;
+		while (g_dx11_context->GetData(timestamp.Get(), &ticks, sizeof(ticks), 0) != S_OK) {}
+		if (disjoint_data.Disjoint || disjoint_data.Frequency == 0)
+			return 0;
+		return (uint64_t)((double)ticks * 1e9 / (double)disjoint_data.Frequency);
+	}
+
+private:
+	Microsoft::WRL::ComPtr<ID3D11Query> timestamp;
+	Microsoft::WRL::ComPtr<ID3D11Query> disjoint;
+	bool armed = false;
+};
+
+IGraphicsTimerQuery* Dx11DeviceImpl::create_timer_query() {
+	return new Dx11TimerQueryImpl();
+}
 
 #undef DX11_STUB
 
@@ -576,6 +664,7 @@ void gfx_init_dx11(SDL_Window* window) {
 	D3D_FEATURE_LEVEL got_fl{};
 
 	auto* impl = new Dx11DeviceImpl();
+	impl->window = window;
 	HRESULT hr = D3D11CreateDeviceAndSwapChain(
 		nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, create_flags,
 		&requested_fl, 1, D3D11_SDK_VERSION,
@@ -586,6 +675,9 @@ void gfx_init_dx11(SDL_Window* window) {
 
 	g_dx11_device = impl->device;
 	g_dx11_context = impl->context;
+
+	hr = impl->context.As(&impl->annotation);
+	ASSERT(SUCCEEDED(hr) && "Dx11: ID3DUserDefinedAnnotation query failed");
 
 	impl->create_backbuffer_rtv();
 	spirv_compile_init();
