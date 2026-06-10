@@ -116,20 +116,28 @@ void GameEngineLocal::init_sdl_window() {
 		exit(-1);
 	}
 
-	// Backend sets the GL context attribs (major/minor/depth/double-buffer)
-	// before the window is created — see gfx_opengl_pre_window_setup docs.
-	gfx_opengl_pre_window_setup();
+	const bool use_dx11 = !strcmp(g_render_backend.get_string(), "dx11");
+
+	SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE;
+	if (!use_dx11) {
+		// GL backend sets the GL context attribs (major/minor/depth/double-buffer)
+		// before the window is created — see gfx_opengl_pre_window_setup docs.
+		gfx_opengl_pre_window_setup();
+		window_flags |= SDL_WINDOW_OPENGL;
+	}
 
 	const char* title = g_project_name.get_string();
-	window = SDL_CreateWindow(title, g_window_w.get_integer(), g_window_h.get_integer(),
-							  SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE);
+	window = SDL_CreateWindow(title, g_window_w.get_integer(), g_window_h.get_integer(), window_flags);
 	if (!window) {
 		sys_print(Error, "create sdl window failed: %s\n", SDL_GetError());
 		exit(-1);
 	}
 
-	// Backend creates the GL context, loads glad, takes over swap-interval.
-	gfx_init_opengl(window);
+	if (use_dx11)
+		gfx_init_dx11(window);
+	else
+		// Backend creates the GL context, loads glad, takes over swap-interval.
+		gfx_init_opengl(window);
 }
 
 // ---------------------------------------------------------------------------
@@ -292,11 +300,9 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	tick_interval = 1.0 / 60.0;
 	is_hosting_game = false;
 
-	init_sdl_window();
-	print_time("init sdl window");
-
-	Profiler::init();
-
+	// Loaded before init_sdl_window() so g_render_backend (vars.txt) is known
+	// before window/context creation (DX11 needs no SDL_WINDOW_OPENGL flag or
+	// GL context attribs; OpenGL needs both set up pre-window-creation).
 	Cmd_Manager::inst->set_set_unknown_variables(true);
 	if (!options.vars_section.empty())
 		Cmd_Manager::inst->execute_file_section(Cmd_Execute_Mode::NOW, options.vars_file.c_str(),
@@ -304,6 +310,11 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	else
 		Cmd_Manager::inst->execute_file(Cmd_Execute_Mode::NOW, options.vars_file.c_str());
 	print_time("execute vars file");
+
+	init_sdl_window();
+	print_time("init sdl window");
+
+	Profiler::init();
 
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;

@@ -1,6 +1,7 @@
 #pragma once
 #if 1
 #include "MaterialPublic.h"
+#include "Framework/Config.h"
 #include <span>
 #include <string>
 #include <string_view>
@@ -36,6 +37,7 @@ enum class GraphicsDeviceType
 {
 	Unknown,
 	OpenGl,
+	Dx11,
 };
 
 enum GraphicsBufferUseFlags
@@ -437,6 +439,11 @@ public:
 
 	virtual GraphicsDeviceType get_device_type() = 0;
 
+	// Backend-specific teardown, called by gfx_shutdown() before the device is
+	// deleted (e.g. OpenGL destroys its SDL_GLContext here). Default is a
+	// no-op; DX11 needs nothing extra since ComPtr members release in ~dtor.
+	virtual void shutdown_backend() {}
+
 	// ---- Phase 2d frame lifecycle / command encoder ----------------------
 	//
 	// Frame pairing: `begin_frame()` -> ... -> `submit_and_present()`.
@@ -780,4 +787,20 @@ void gfx_shutdown();
 // the right pair based on the active backend.
 void gfx_opengl_dump_capabilities();
 void gfx_opengl_enable_debug_output();
+
+// Active backend pointer, owned by whichever gfx_init_* ran. Defined in
+// GraphicsDeviceCommon.cpp.
+extern IGraphicsDevice* g_gfx_instance;
+
+// Selects the render backend ("opengl" or "dx11"). Read once at startup
+// before window creation (EngineMain_Init.cpp loads vars.txt before
+// init_sdl_window for this reason) — CVAR_READONLY, not changeable at
+// runtime. Defined in GraphicsDeviceCommon.cpp.
+extern ConfigVar g_render_backend;
+
+// DX11 backend init. Window is created WITHOUT SDL_WINDOW_OPENGL (no GL
+// context attribs needed beforehand, unlike gfx_opengl_pre_window_setup).
+// Creates the D3D11 device/context/swapchain (feature level 11_1) and the
+// backbuffer RTV. Tear down via gfx_shutdown().
+void gfx_init_dx11(SDL_Window* window);
 #endif

@@ -15,13 +15,8 @@
 // ---------------------------------------------------------------------------
 int total_gfx_mem_usage = 0;
 
-static IGraphicsDevice* g_gfx_instance = nullptr;
-
-IGraphicsDevice& gfx() {
-	ASSERT(g_gfx_instance != nullptr);
-	return *g_gfx_instance;
-}
-bool gfx_is_initialized() { return g_gfx_instance != nullptr; }
+// g_gfx_instance, gfx(), gfx_is_initialized(), gfx_shutdown() now live in
+// GraphicsDeviceCommon.cpp (shared with the DX11 backend).
 
 extern ConfigVar log_shader_compiles;
 
@@ -294,6 +289,13 @@ public:
 	}
 
 	GraphicsDeviceType get_device_type() override { return GraphicsDeviceType::OpenGl; }
+
+	void shutdown_backend() override {
+		if (gl_context) {
+			SDL_GL_DestroyContext(gl_context);
+			gl_context = nullptr;
+		}
+	}
 
 	// ---- State-cache setters (formerly OpenglRenderDevice methods) ---------
 
@@ -1109,17 +1111,6 @@ void gfx_init_opengl(SDL_Window* window) {
 	impl->window     = window;
 	impl->gl_context = ctx;
 	g_gfx_instance = impl;
-}
-
-void gfx_shutdown() {
-	if (g_gfx_instance) {
-		auto* impl = static_cast<OpenGLDeviceImpl*>(g_gfx_instance);
-		SDL_GLContext ctx = impl->gl_context;
-		delete impl;
-		g_gfx_instance = nullptr;
-		if (ctx)
-			SDL_GL_DestroyContext(ctx);
-	}
 }
 
 // ---------------------------------------------------------------------------
