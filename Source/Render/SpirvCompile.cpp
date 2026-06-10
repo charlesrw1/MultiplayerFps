@@ -8,6 +8,24 @@
 #include <glslang/Public/ResourceLimits.h>
 #include <glslang/SPIRV/GlslangToSpv.h>
 
+#include <spirv_cross/spirv_hlsl.hpp>
+
+// d3dcompiler.h pulls in <windows.h>, which defines min/max macros that
+// collide with std::/glm:: min/max calls in other TUs of this unity build.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <d3dcompiler.h>
+#include <wrl/client.h>
+
+// windows.h's old memory-model macros collide with `near`/`far` parameter
+// and local-variable names elsewhere in this unity build.
+#undef near
+#undef far
+
 #include <mutex>
 
 // Static libs from vcpkg. Linker picks up via vcpkg's MSBuild-integration
@@ -16,11 +34,19 @@
 #  pragma comment(lib, "glslangd.lib")
 #  pragma comment(lib, "glslang-default-resource-limitsd.lib")
 #  pragma comment(lib, "SPIRVd.lib")
+#  pragma comment(lib, "spirv-cross-cored.lib")
+#  pragma comment(lib, "spirv-cross-glsld.lib")
+#  pragma comment(lib, "spirv-cross-hlsld.lib")
 #else
 #  pragma comment(lib, "glslang.lib")
 #  pragma comment(lib, "glslang-default-resource-limits.lib")
 #  pragma comment(lib, "SPIRV.lib")
+#  pragma comment(lib, "spirv-cross-core.lib")
+#  pragma comment(lib, "spirv-cross-glsl.lib")
+#  pragma comment(lib, "spirv-cross-hlsl.lib")
 #endif
+
+#pragma comment(lib, "d3dcompiler.lib")
 
 namespace {
 
@@ -116,5 +142,106 @@ SpirvBlob compile_glsl_to_spirv(SpirvStage stage,
 	if (out.code.empty()) {
 		out.error = std::string("GlslangToSpv produced empty SPIR-V for ") + debug_name;
 	}
+	return out;
+}
+
+namespace {
+
+// Records one resource's (name, spirv binding, register kind) into `out`.
+// `register_index` mirrors the spirv binding: with no HLSL_BINDING_AUTO_*
+// flags set, SPIRV-Cross's HLSL backend uses the SPIR-V binding decoration
+// directly as the register index within each type's register space (t/s/b/u
+// are independent spaces, so no cross-type collisions from the shared GLSL
+// binding namespace).
+void add_binding(std::vector<HlslResourceBinding>& out, const spirv_cross::Compiler& comp,
+				  const spirv_cross::Resource& res, HlslRegisterKind kind) {
+	if (!comp.has_decoration(res.id, spv::DecorationBinding))
+		return;
+	HlslResourceBinding b;
+	b.name = res.name;
+	b.spirv_binding = comp.get_decoration(res.id, spv::DecorationBinding);
+	b.register_index = b.spirv_binding;
+	b.kind = kind;
+	out.push_back(std::move(b));
+}
+
+} // namespace
+
+HlslBlob spirv_to_hlsl(const SpirvBlob& spirv, const std::string& debug_name) {
+	HlslBlob out;
+	if (!spirv.ok()) {
+		out.error = std::string("spirv_to_hlsl called with invalid SPIR-V [") + debug_name + "]";
+		return out;
+	}
+
+	try {
+		spirv_cross::CompilerHLSL comp(spirv.code);
+
+		spirv_cross::CompilerHLSL::Options opts;
+		opts.shader_model = 50;
+		opts.support_nonzero_base_vertex_base_instance = true;
+		comp.set_hlsl_options(opts);
+
+		out.source = comp.compile();
+
+		const auto active = comp.get_active_interface_variables();
+		const auto resources = comp.get_shader_resources(active);
+
+		for (const auto& r : resources.uniform_buffers)
+			add_binding(out.bindings, comp, r, HlslRegisterKind::CBV);
+		for (const auto& r : resources.storage_buffers) {
+			const bool read_only = comp.has_decoration(r.id, spv::DecorationNonWritable);
+			add_binding(out.bindings, comp, r, read_only ? HlslRegisterKind::SRV : HlslRegisterKind::UAV);
+		}
+		for (const auto& r : resources.storage_images) {
+			const bool read_only = comp.has_decoration(r.id, spv::DecorationNonWritable);
+			add_binding(out.bindings, comp, r, read_only ? HlslRegisterKind::SRV : HlslRegisterKind::UAV);
+		}
+		for (const auto& r : resources.separate_images)
+			add_binding(out.bindings, comp, r, HlslRegisterKind::SRV);
+		for (const auto& r : resources.separate_samplers)
+			add_binding(out.bindings, comp, r, HlslRegisterKind::Sampler);
+		for (const auto& r : resources.sampled_images) {
+			// Combined image+sampler: HLSL backend splits into a Texture (SRV)
+			// and a SamplerState (Sampler), both at the same register index.
+			add_binding(out.bindings, comp, r, HlslRegisterKind::SRV);
+			add_binding(out.bindings, comp, r, HlslRegisterKind::Sampler);
+		}
+
+		if (out.source.empty())
+			out.error = std::string("SPIRV-Cross produced empty HLSL for ") + debug_name;
+	} catch (const std::exception& e) {
+		out.error = std::string("SPIRV-Cross HLSL failed [") + debug_name + "]: " + e.what();
+	}
+	return out;
+}
+
+DxbcBlob compile_hlsl_to_dxbc(const std::string& hlsl_source,
+							  const std::string& target_profile,
+							  const std::string& debug_name) {
+	DxbcBlob out;
+
+	UINT flags = D3DCOMPILE_ENABLE_STRICTNESS;
+#ifdef _DEBUG
+	flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+	flags |= D3DCOMPILE_OPTIMIZATION_LEVEL3;
+#endif
+
+	Microsoft::WRL::ComPtr<ID3DBlob> code_blob;
+	Microsoft::WRL::ComPtr<ID3DBlob> error_blob;
+	const HRESULT hr = D3DCompile(hlsl_source.data(), hlsl_source.size(),
+								   debug_name.c_str(), nullptr, nullptr,
+								   "main", target_profile.c_str(), flags, 0,
+								   code_blob.GetAddressOf(), error_blob.GetAddressOf());
+	if (FAILED(hr)) {
+		out.error = std::string("D3DCompile failed [") + debug_name + ", " + target_profile + "]";
+		if (error_blob)
+			out.error += std::string(":\n") + (const char*)error_blob->GetBufferPointer();
+		return out;
+	}
+
+	const uint8_t* begin = (const uint8_t*)code_blob->GetBufferPointer();
+	out.code.assign(begin, begin + code_blob->GetBufferSize());
 	return out;
 }
