@@ -563,6 +563,7 @@
     <ClCompile Include="Source\Render\Dx11\Dx11Device.cpp" />
     <ClCompile Include="Source\Render\Dx11\Dx11TextureImpl.cpp" />
     <ClCompile Include="Source\Render\Dx11\Dx11BufferImpl.cpp" />
+    <ClCompile Include="Source\Render\Dx11\Dx11ShaderImpl.cpp" />
     <ClCompile Include="Source\Render\ShaderSourceLoader.cpp" />
     <ClCompile Include="Source\Render\SpirvCompile.cpp" />
     <ClCompile Include="Source\Render\RenderExtra_LightCookieAtlas.cpp" />

@@ -5,11 +5,16 @@
 
 #include "Dx11Local.h"
 #include "Framework/Util.h"
+#include "Render/SpirvCompile.h"
 
 #include <SDL3/SDL.h>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxgi.lib")
+
+// Defined here, used by every Dx11*Impl.cpp factory (see Dx11Local.h).
+Microsoft::WRL::ComPtr<ID3D11Device> g_dx11_device;
+Microsoft::WRL::ComPtr<ID3D11DeviceContext> g_dx11_context;
 
 namespace {
 
@@ -31,6 +36,8 @@ public:
 	}
 
 	GraphicsDeviceType get_device_type() override { return GraphicsDeviceType::Dx11; }
+
+	void shutdown_backend() override { spirv_compile_shutdown(); }
 
 	void create_backbuffer_rtv() {
 		Microsoft::WRL::ComPtr<ID3D11Texture2D> back_tex;
@@ -100,10 +107,10 @@ public:
 	void reset_state_cache() override { DX11_STUB; }
 
 	// ---- Resources (D2) ------------------------------------------------------
-	IGraphicsTexture* create_texture(const CreateTextureArgs& args) override { DX11_STUB; return nullptr; }
-	IGraphicsBuffer* create_buffer(const CreateBufferArgs& args) override { DX11_STUB; return nullptr; }
-	IGraphicsVertexInput* create_vertex_input(const CreateVertexInputArgs& args) override { DX11_STUB; return nullptr; }
-	IGraphicsSampler* create_sampler(const CreateSamplerArgs& args) override { DX11_STUB; return nullptr; }
+	IGraphicsTexture* create_texture(const CreateTextureArgs& args) override { return dx11_create_texture(args); }
+	IGraphicsBuffer* create_buffer(const CreateBufferArgs& args) override { return dx11_create_buffer(args); }
+	IGraphicsVertexInput* create_vertex_input(const CreateVertexInputArgs& args) override { return dx11_create_vertex_input(args); }
+	IGraphicsSampler* create_sampler(const CreateSamplerArgs& args) override { return dx11_create_sampler(args); }
 
 	// ---- Scissor / draws (D3) ------------------------------------------------
 	void set_scissor(int x, int y, int w, int h) override { DX11_STUB; }
@@ -137,8 +144,35 @@ public:
 	void memory_barrier(uint32_t bits) override { DX11_STUB; }
 
 	// ---- Buffer clear/readback (D2) ----------------------------------------------
-	void clear_buffer_uint32(IGraphicsBuffer* buf, uint32_t value) override { DX11_STUB; }
-	void download_buffer(IGraphicsBuffer* buf, int offset, int size, void* dest) override { DX11_STUB; }
+	void clear_buffer_uint32(IGraphicsBuffer* buf, uint32_t value) override {
+		const UINT values[4] = {value, value, value, value};
+		context->ClearUnorderedAccessViewUint(((Dx11Buffer*)buf)->get_uav(), values);
+	}
+	void download_buffer(IGraphicsBuffer* buf, int offset, int size, void* dest) override {
+		ASSERT(size >= 0 && offset >= 0);
+		Dx11Buffer* b = (Dx11Buffer*)buf;
+
+		D3D11_BUFFER_DESC staging_desc{};
+		staging_desc.ByteWidth = (UINT)size;
+		staging_desc.Usage = D3D11_USAGE_STAGING;
+		staging_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+		Microsoft::WRL::ComPtr<ID3D11Buffer> staging;
+		HRESULT hr = device->CreateBuffer(&staging_desc, nullptr, staging.GetAddressOf());
+		ASSERT(SUCCEEDED(hr) && "Dx11: download_buffer staging create failed");
+
+		D3D11_BOX box{};
+		box.left = (UINT)offset;
+		box.right = (UINT)(offset + size);
+		box.top = 0; box.bottom = 1;
+		box.front = 0; box.back = 1;
+		context->CopySubresourceRegion(staging.Get(), 0, 0, 0, 0, b->buf.Get(), 0, &box);
+
+		D3D11_MAPPED_SUBRESOURCE mapped{};
+		hr = context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &mapped);
+		ASSERT(SUCCEEDED(hr) && "Dx11: download_buffer Map failed");
+		memcpy(dest, mapped.pData, size);
+		context->Unmap(staging.Get(), 0);
+	}
 
 	// ---- Misc state (D3/D4) -------------------------------------------------------
 	void set_line_width(float width) override { DX11_STUB; }
@@ -159,10 +193,10 @@ public:
 	bool imgui_process_event(const union SDL_Event* event) override { DX11_STUB; return false; }
 
 	// ---- Shader factory (D2) -----------------------------------------------------------
-	IGraphicsShader* create_shader_vert_frag(const std::string& vert_path, const std::string& frag_path, const std::string& defines) override { DX11_STUB; return nullptr; }
+	IGraphicsShader* create_shader_vert_frag(const std::string& vert_path, const std::string& frag_path, const std::string& defines) override { return dx11_create_shader_vert_frag(vert_path, frag_path, defines); }
 	IGraphicsShader* create_shader_vert_frag_geo(const std::string& vert_path, const std::string& frag_path, const std::string& geo_path, const std::string& defines) override { DX11_STUB; return nullptr; }
-	IGraphicsShader* create_shader_compute(const std::string& compute_path, const std::string& defines) override { DX11_STUB; return nullptr; }
-	IGraphicsShader* create_shader_single_file(const std::string& shared_path, const std::string& defines) override { DX11_STUB; return nullptr; }
+	IGraphicsShader* create_shader_compute(const std::string& compute_path, const std::string& defines) override { return dx11_create_shader_compute(compute_path, defines); }
+	IGraphicsShader* create_shader_single_file(const std::string& shared_path, const std::string& defines) override { return dx11_create_shader_single_file(shared_path, defines); }
 	IGraphicsShader* create_shader_single_file_tess(const std::string& shared_path, const std::string& defines) override { DX11_STUB; return nullptr; }
 };
 
@@ -211,7 +245,11 @@ void gfx_init_dx11(SDL_Window* window) {
 	if (FAILED(hr))
 		Fatalf("gfx_init_dx11: D3D11CreateDeviceAndSwapChain failed (hr=0x%08lx)\n", (unsigned long)hr);
 
+	g_dx11_device = impl->device;
+	g_dx11_context = impl->context;
+
 	impl->create_backbuffer_rtv();
+	spirv_compile_init();
 
 	sys_print(Debug, "DX11 device created, feature level 0x%x, backbuffer %dx%d\n", (unsigned)got_fl, w, h);
 
