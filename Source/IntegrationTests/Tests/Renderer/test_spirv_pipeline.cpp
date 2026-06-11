@@ -207,10 +207,6 @@ static TestTask test_spirv_vfog(TestContext& t) {
 	auto gl = shader->reflect();
 	shader->release();
 
-	sys_print(Debug, "spirv_vfog: cs samplers=%d images=%d ubo=%d ssbo=%d | gl samplers=%d images=%d ubo=%d ssbo=%d\n",
-		cs.num_samplers, cs.num_storage_textures, cs.num_uniform_buffers, cs.num_storage_buffers,
-		gl.compute.num_samplers, gl.compute.num_storage_textures, gl.compute.num_uniform_buffers, gl.compute.num_storage_buffers);
-
 	t.check(cs.num_samplers         == gl.compute.num_samplers,         "CS sampler count matches GL");
 	t.check(cs.num_storage_textures == gl.compute.num_storage_textures, "CS image count matches GL");
 	t.check(cs.num_uniform_buffers  == gl.compute.num_uniform_buffers,  "CS UBO count matches GL");

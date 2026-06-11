@@ -132,9 +132,14 @@ void count_bindings(const std::vector<HlslResourceBinding>& bindings, IGraphicsS
 		case HlslRegisterKind::Sampler: out.num_samplers++; break;
 		case HlslRegisterKind::UAV: (b.is_image ? out.num_storage_textures : out.num_storage_buffers)++; break;
 		case HlslRegisterKind::SRV: {
+			// Sampled images get a paired Sampler entry at the same
+			// register_index (assign_registers keeps both entries of a
+			// combined image+sampler in sync). spirv_binding alone isn't
+			// unique here - unrelated resources from different descriptor
+			// sets can share the same original SPIR-V binding number.
 			bool has_sampler = false;
 			for (auto& s : bindings)
-				if (s.kind == HlslRegisterKind::Sampler && s.spirv_binding == b.spirv_binding)
+				if (s.kind == HlslRegisterKind::Sampler && s.register_index == b.register_index)
 					has_sampler = true;
 			if (!has_sampler)
 				(b.is_image ? out.num_storage_textures : out.num_storage_buffers)++;
@@ -163,8 +168,6 @@ IGraphicsShader::Reflection Dx11ShaderImpl::reflect() {
 	count_bindings(vs_bindings, out.vertex);
 	count_bindings(ps_bindings, out.fragment);
 	count_bindings(cs_bindings, out.compute);
-	for (auto& b : cs_bindings)
-		sys_print(Debug, "cs_binding: %s spirv=%u reg=%u kind=%d is_image=%d\n", b.name.c_str(), b.spirv_binding, b.register_index, (int)b.kind, b.is_image);
 	return out;
 }
 

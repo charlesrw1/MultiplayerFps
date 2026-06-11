@@ -114,6 +114,26 @@ Dx11FormatInfo dx11_texture_format_info(GraphicsTextureFormat fmt) {
 	return f;
 }
 
+namespace {
+void dump_info_queue_on_failure(HRESULT hr) {
+	if (SUCCEEDED(hr))
+		return;
+	Microsoft::WRL::ComPtr<ID3D11InfoQueue> iq;
+	if (SUCCEEDED(g_dx11_device.As(&iq))) {
+		UINT64 n = iq->GetNumStoredMessages();
+		for (UINT64 i = 0; i < n; i++) {
+			SIZE_T len = 0;
+			iq->GetMessage(i, nullptr, &len);
+			std::vector<uint8_t> mbuf(len);
+			D3D11_MESSAGE* msg = (D3D11_MESSAGE*)mbuf.data();
+			iq->GetMessage(i, msg, &len);
+			sys_print(Error, "Dx11 InfoQueue: %.*s\n", (int)msg->DescriptionByteLength, msg->pDescription);
+		}
+		iq->ClearStoredMessages();
+	}
+}
+} // namespace
+
 // ---------------------------------------------------------------------------
 // Construction
 // ---------------------------------------------------------------------------
@@ -167,12 +187,20 @@ Dx11Texture::Dx11Texture(const CreateTextureArgs& args) {
 		desc.MiscFlags = misc_flags;
 		Microsoft::WRL::ComPtr<ID3D11Texture3D> tex3d;
 		hr = g_dx11_device->CreateTexture3D(&desc, nullptr, tex3d.GetAddressOf());
+		dump_info_queue_on_failure(hr);
 		ASSERT(SUCCEEDED(hr) && "Dx11: CreateTexture3D failed");
 		resource = tex3d;
 	} else {
 		D3D11_TEXTURE2D_DESC desc{};
-		desc.Width = width;
-		desc.Height = height;
+		// D3D11 requires block-compressed (BC) textures' base mip dimensions
+		// to be multiples of 4; DDS assets commonly have non-aligned
+		// dimensions (e.g. 470x458) that GL accepts but CreateTexture2D
+		// rejects with E_INVALIDARG when MipLevels > 1. Pad the GPU
+		// allocation up to the next multiple of 4 - `width`/`height` (used
+		// for UVs/reflection) stay at the logical size, and sub_image_upload
+		// already does whole-subresource updates for non-4-aligned dims.
+		desc.Width = fmt_info.is_compressed ? (width + 3) & ~3 : width;
+		desc.Height = fmt_info.is_compressed ? (height + 3) & ~3 : height;
 		desc.MipLevels = mips;
 		desc.ArraySize = depth_or_layers;
 		desc.Format = fmt_info.resource_format;
@@ -182,6 +210,10 @@ Dx11Texture::Dx11Texture(const CreateTextureArgs& args) {
 		desc.MiscFlags = misc_flags;
 		Microsoft::WRL::ComPtr<ID3D11Texture2D> tex2d;
 		hr = g_dx11_device->CreateTexture2D(&desc, nullptr, tex2d.GetAddressOf());
+		if (FAILED(hr))
+			sys_print(Error, "Dx11: CreateTexture2D failed hr=0x%08x w=%u h=%u mips=%u array=%u fmt=%d bind=0x%x misc=0x%x\n",
+				(unsigned)hr, desc.Width, desc.Height, desc.MipLevels, desc.ArraySize, (int)desc.Format, desc.BindFlags, desc.MiscFlags);
+		dump_info_queue_on_failure(hr);
 		ASSERT(SUCCEEDED(hr) && "Dx11: CreateTexture2D failed");
 		resource = tex2d;
 	}
