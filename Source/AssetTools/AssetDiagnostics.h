@@ -5,7 +5,8 @@
 #include <optional>
 #include <unordered_map>
 
-enum class AssetSeverity { Warning, Error };
+// Ordering matters: higher value = higher priority in get_severity()
+enum class AssetSeverity { TransitiveWarning = 0, Warning = 1, Error = 2 };
 
 struct AssetDiagnostic {
     AssetSeverity severity;
@@ -24,9 +25,9 @@ public:
     void save() const;
     void load();
 
-    // Reads asset file as text/JSON, extracts referenced paths, checks they exist on disk
+    // Reads asset file, checks direct source file dependencies exist
     void scan_dependencies(const std::string& gamepath);
-    // Scan all game files — run at editor startup + after any compile
+    // Two-pass full scan: direct errors then transitive propagation
     void scan_all();
 
 private:

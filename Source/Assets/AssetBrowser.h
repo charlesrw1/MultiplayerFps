@@ -23,6 +23,7 @@ public:
 	AssetBrowser();
 
 	void imgui_draw();
+	void imgui_draw_inspector(); // separate dockable "Asset Inspector" window
 
 	void clear_filter() { filter_type_mask = -1; }
 	void filter_all() { filter_type_mask = 0; }

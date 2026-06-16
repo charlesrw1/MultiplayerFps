@@ -26,6 +26,17 @@ static FnFactory<IPropertyEditor>& get_basic_factory() {
     return factory;
 }
 
+// Cache that persists across frames so PropertyGrid rows keep their void* pointers alive.
+// Destruction order (reverse of declaration): pg → reader → objmaker — this is correct:
+//   pg must die before reader (pg rows hold pointers into reader-owned objects).
+//   reader must die before objmaker (reader holds objmaker reference, though only needed during read).
+struct InspectorCache {
+    MakeObjectFromPathGeneric objmaker;
+    std::unique_ptr<ReadSerializerBackendJson> reader;
+    std::unique_ptr<PropertyGrid> pg;
+    ClassBase* obj = nullptr; // non-owning; reader owns the lifetime
+};
+
 static std::string read_game_text(const std::string& gamepath) {
     auto f = FileSys::open_read_game(gamepath);
     if (!f) return {};
@@ -35,6 +46,13 @@ static std::string read_game_text(const std::string& gamepath) {
     return buf.data();
 }
 
+// Strip the "!json\n" prefix written by write_texture_import_settings / write_model_import_settings
+static std::string strip_json_prefix(const std::string& text) {
+    if (text.find("!json") != 0) return {};
+    size_t nl = text.find('\n');
+    return (nl != std::string::npos) ? text.substr(nl + 1) : text.substr(5);
+}
+
 AssetInspectorPane::AssetInspectorPane() = default;
 AssetInspectorPane::~AssetInspectorPane() = default;
 
@@ -42,6 +60,22 @@ void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
     last_selected = selected;
     raw_file_contents = read_game_text(selected.filename);
     settings_dirty = false;
+    cache_.reset();
+
+    auto ext = StringUtils::get_extension_no_dot(selected.filename);
+    if (ext != "tis" && ext != "mis") return;
+
+    std::string json = strip_json_prefix(raw_file_contents);
+    if (json.empty()) return;
+
+    auto c = std::make_unique<InspectorCache>();
+    c->reader = std::make_unique<ReadSerializerBackendJson>("inspector", json, c->objmaker);
+    c->obj = c->reader->get_root_obj();
+    if (c->obj) {
+        c->pg = std::make_unique<PropertyGrid>(get_basic_factory());
+        c->pg->add_class_to_grid(c->obj);
+        cache_ = std::move(c);
+    }
 }
 
 void AssetInspectorPane::apply_changes() {
@@ -56,66 +90,47 @@ void AssetInspectorPane::apply_changes() {
 }
 
 void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
-    std::string text = read_game_text(gamepath);
-    if (text.empty()) { ImGui::TextDisabled("(no .tis found)"); return; }
-    if (text.find("!json") != 0) { ImGui::TextDisabled("(old format)"); return; }
-    text = text.substr(6);
+    if (!cache_ || !cache_->pg) { ImGui::TextDisabled("(parse error)"); return; }
+    auto* tis = cache_->obj ? cache_->obj->cast_to<TextureImportSettings>() : nullptr;
+    if (!tis) { ImGui::TextDisabled("(not TIS)"); return; }
 
-    MakeObjectFromPathGeneric objmaker;
-    ReadSerializerBackendJson reader("insp_tis", text, objmaker);
-    auto* tis = reader.get_root_obj() ? reader.get_root_obj()->cast_to<TextureImportSettings>() : nullptr;
-    if (!tis) { ImGui::TextDisabled("(parse error)"); return; }
-
-    PropertyGrid grid(get_basic_factory());
-    grid.add_class_to_grid(tis);
-    grid.update();
-
-    if (grid.rows_had_changes) {
+    cache_->pg->update();
+    if (cache_->pg->rows_had_changes) {
+        cache_->pg->rows_had_changes = false;
         write_texture_import_settings(tis, gamepath);
         AssetCompiler::compile_asset(gamepath);
     }
 }
 
 void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
-    std::string text = read_game_text(gamepath);
-    if (text.empty()) { ImGui::TextDisabled("(no .mis found)"); return; }
-    if (text.find("!json") != 0) { ImGui::TextDisabled("(old format)"); return; }
-    text = text.substr(6);
+    if (!cache_ || !cache_->pg) { ImGui::TextDisabled("(parse error)"); return; }
+    auto* mis = cache_->obj ? cache_->obj->cast_to<ModelImportSettings>() : nullptr;
+    if (!mis) { ImGui::TextDisabled("(not MIS)"); return; }
 
-    MakeObjectFromPathGeneric objmaker;
-    ReadSerializerBackendJson reader("insp_mis", text, objmaker);
-    auto* mis = reader.get_root_obj() ? reader.get_root_obj()->cast_to<ModelImportSettings>() : nullptr;
-    if (!mis) { ImGui::TextDisabled("(parse error)"); return; }
-
-    PropertyGrid grid(get_basic_factory());
-    grid.add_class_to_grid(mis);
-    grid.update();
-
-    if (grid.rows_had_changes) {
+    cache_->pg->update();
+    if (cache_->pg->rows_had_changes) {
+        cache_->pg->rows_had_changes = false;
         write_model_import_settings(mis, gamepath);
         AssetCompiler::compile_asset(gamepath);
     }
 }
 
 void AssetInspectorPane::draw_material_text(const std::string& gamepath) {
-    // raw_file_contents is loaded once per selection in load_for()
     static constexpr int kEditBufExtra = 4096;
     std::string& buf = raw_file_contents;
 
-    // Reserve room for in-place editing
     if (buf.capacity() < buf.size() + kEditBufExtra)
         buf.reserve(buf.size() + kEditBufExtra);
-    buf.resize(buf.capacity(), 0);
+    buf.resize(buf.capacity(), '\0');
 
     if (ImGui::InputTextMultiline("##mattext", buf.data(), buf.capacity(),
-                                  ImVec2(-1, 200))) {
+                                  ImVec2(-1, -30))) {
         buf.resize(strlen(buf.data()));
         settings_dirty = true;
     }
 
     if (settings_dirty) {
-        if (ImGui::Button("Apply"))
-            apply_changes();
+        if (ImGui::Button("Apply"))  apply_changes();
         ImGui::SameLine();
         if (ImGui::Button("Revert")) {
             raw_file_contents = read_game_text(gamepath);
@@ -125,8 +140,14 @@ void AssetInspectorPane::draw_material_text(const std::string& gamepath) {
 }
 
 void AssetInspectorPane::imgui_draw(const AssetOnDisk& selected) {
+    if (!ImGui::Begin("Asset Inspector")) {
+        ImGui::End();
+        return;
+    }
+
     if (selected.filename.empty()) {
         ImGui::TextDisabled("(no asset selected)");
+        ImGui::End();
         return;
     }
 
@@ -138,15 +159,12 @@ void AssetInspectorPane::imgui_draw(const AssetOnDisk& selected) {
 
     auto ext = StringUtils::get_extension_no_dot(selected.filename);
 
-    if (ext == "tis") {
-        draw_tis_settings(selected.filename);
-    } else if (ext == "mis") {
-        draw_mis_settings(selected.filename);
-    } else if (ext == "mm" || ext == "mi") {
-        draw_material_text(selected.filename);
-    } else {
-        ImGui::TextDisabled("Extension: .%s", ext.c_str());
-    }
+    if      (ext == "tis") draw_tis_settings(selected.filename);
+    else if (ext == "mis") draw_mis_settings(selected.filename);
+    else if (ext == "mm" || ext == "mi") draw_material_text(selected.filename);
+    else    ImGui::TextDisabled("Extension: .%s", ext.c_str());
+
+    ImGui::End();
 }
 
 #endif

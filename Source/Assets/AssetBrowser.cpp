@@ -244,7 +244,12 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 		// Error indicator prefix
 		auto sev = AssetDiagnostics::get().get_severity(asset.filename);
 		if (sev) {
-			ImVec4 col = (*sev == AssetSeverity::Error) ? ImVec4(1, 0.2f, 0.2f, 1) : ImVec4(1, 0.8f, 0.1f, 1);
+			ImVec4 col;
+			switch (*sev) {
+			case AssetSeverity::Error:            col = ImVec4(1.0f, 0.2f, 0.2f, 1.0f); break;
+			case AssetSeverity::Warning:          col = ImVec4(1.0f, 0.8f, 0.1f, 1.0f); break;
+			case AssetSeverity::TransitiveWarning: col = ImVec4(0.9f, 0.65f, 0.3f, 1.0f); break;
+			}
 			ImGui::TextColored(col, "[!]");
 			ImGui::SameLine();
 		}
@@ -328,15 +333,29 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 
 		bool is_selected = (b->selected_folder == folder_path);
 
+		// Reserve space for icon first; draw it after Selectable so the
+		// open/closed state reflects any click that just happened this frame.
 		ImGui::Dummy(ImVec2(indent * folder_indent, 1.0f));
 		ImGui::SameLine();
-		auto t = child->folder_is_open ? b->folder_open : b->folder_closed;
-		my_imgui_image(t, -1);
+		const float ICON_SIZE = 14.0f;
+		ImVec2 icon_pos = ImGui::GetCursorScreenPos();
+		ImGui::Dummy(ImVec2(ICON_SIZE, ICON_SIZE));
 		ImGui::SameLine();
 
 		if (ImGui::Selectable(child->name.c_str(), is_selected, ImGuiSelectableFlags_AllowItemOverlap)) {
 			b->selected_folder = folder_path;
 			child->folder_is_open = !child->folder_is_open;
+		}
+
+		// Draw icon after click is processed so it always matches folder_is_open
+		{
+			auto* t = child->folder_is_open ? b->folder_open : b->folder_closed;
+			if (t) {
+				ImGui::GetWindowDrawList()->AddImage(
+					ImTextureID(uint64_t(t->get_internal_render_handle())),
+					icon_pos, ImVec2(icon_pos.x + ICON_SIZE, icon_pos.y + ICON_SIZE),
+					ImVec2(0, 1), ImVec2(1, 0));
+			}
 		}
 
 		// Drag-drop target: accept file drops to move asset into this folder
@@ -477,7 +496,13 @@ void AssetBrowser::draw_browser_grid() {
 		auto sev = AssetDiagnostics::get().get_severity(c->asset.filename);
 		if (sev) {
 			ImDrawList* dl = ImGui::GetWindowDrawList();
-			ImU32 badge_col = (*sev == AssetSeverity::Error) ? IM_COL32(220, 30, 30, 230) : IM_COL32(220, 180, 0, 230);
+			ImU32 badge_col;
+			switch (*sev) {
+			case AssetSeverity::Error:             badge_col = IM_COL32(220, 40, 40, 230);  break;
+			case AssetSeverity::Warning:           badge_col = IM_COL32(220, 180, 0, 230);  break;
+			case AssetSeverity::TransitiveWarning: badge_col = IM_COL32(200, 140, 40, 200); break;
+			default:                               badge_col = IM_COL32(200, 140, 40, 200); break;
+			}
 			ImVec2 badge_min = ImVec2(thumb_screen_pos.x + THUMB_SIZE - 18, thumb_screen_pos.y + 2);
 			ImVec2 badge_max = ImVec2(thumb_screen_pos.x + THUMB_SIZE - 2,  thumb_screen_pos.y + 16);
 			dl->AddRectFilled(badge_min, badge_max, badge_col, 3.0f);
@@ -618,12 +643,9 @@ void AssetBrowser::imgui_draw() {
 	}
 
 	// Split layout: folder tree | asset view
-	// Reserve space for inspector pane at the bottom when an asset is selected
-	const float inspector_height = (!selected_resource.filename.empty()) ? 220.0f : 0.0f;
 	const float splitter_w = 6.0f;
 	ImVec2 avail = ImGui::GetContentRegionAvail();
-	float main_h = avail.y - inspector_height - (inspector_height > 0 ? 4.0f : 0.0f);
-	main_h = std::max(main_h, 40.0f);
+	float main_h = std::max(avail.y, 40.0f);
 
 	// Left panel: folder tree
 	ImGui::BeginChild("##folder_tree", ImVec2(left_panel_width, main_h), true);
@@ -652,15 +674,14 @@ void AssetBrowser::imgui_draw() {
 	}
 	ImGui::EndChild();
 
-	// Inspector pane at the bottom
-	if (!selected_resource.filename.empty() && inspector_pane) {
-		ImGui::Separator();
-		ImGui::BeginChild("##inspector", ImVec2(0.0f, inspector_height - 4.0f), false);
-		inspector_pane->imgui_draw(selected_resource);
-		ImGui::EndChild();
-	}
-
 	ImGui::End();
+}
+
+// Separate call — caller should invoke this once per frame alongside imgui_draw().
+// AssetInspectorPane::imgui_draw() opens its own Begin/End dockable window.
+void AssetBrowser::imgui_draw_inspector() {
+    if (inspector_pane)
+        inspector_pane->imgui_draw(selected_resource);
 }
 #include "Render/DrawPublic.h"
 
