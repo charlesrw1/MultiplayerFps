@@ -25,10 +25,13 @@ public:
     void save() const;
     void load();
 
-    // Reads asset file, checks direct source file dependencies exist
+    // Fast single-file existence check (no content reading)
     void scan_dependencies(const std::string& gamepath);
-    // Two-pass full scan: direct errors then transitive propagation
+    // Fast startup scan: file-existence checks only, no content reading
     void scan_all();
+    // Slow transitive pass: reads text-asset content to propagate severity.
+    // Only call during explicit build_all(), never at startup.
+    void scan_transitive();
 
 private:
     std::unordered_map<std::string, std::vector<AssetDiagnostic>> cache_;

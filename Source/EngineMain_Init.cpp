@@ -29,6 +29,8 @@
 #include "Game/Components/CameraComponent.h"
 #include "Physics/Physics2.h"
 #include "Assets/AssetBrowser.h"
+#include "AssetTools/AssetDiagnostics.h"
+#include "AssetTools/AssetCompiler.h"
 #include "Sound/SoundPublic.h"
 #include "imgui.h"
 #include "Framework/EditorTheme.h"
@@ -449,6 +451,9 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 		AssetBrowser::inst = new AssetBrowser();
 		loaded_in_tool_mode = true;
 		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+		AssetDiagnostics::get().load();
+		AssetDiagnostics::get().scan_all();
+		AssetCompiler::register_console_commands();
 		print_time("asset reg and browser init");
 	} else {
 		start_game();

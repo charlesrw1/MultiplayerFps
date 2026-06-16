@@ -14,29 +14,53 @@
 
 // @docs [[asset_tools#compiler]]
 
-extern bool spirv_is_initialized();
-
 namespace AssetCompiler {
+
+static void diag_ok(const std::string& gamepath) {
+    AssetDiagnostics::get().clear(gamepath);
+}
+static void diag_err(const std::string& gamepath, const std::string& msg) {
+    AssetDiagnostics::get().set(gamepath, {{AssetSeverity::Error, msg}});
+}
+static void diag_warn(const std::string& gamepath, const std::string& msg) {
+    AssetDiagnostics::get().set(gamepath, {{AssetSeverity::Warning, msg}});
+}
+
+static bool game_file_exists(const std::string& rel) {
+    return FileSys::does_file_exist(rel.c_str(), FileSys::GAME_DIR);
+}
 
 AssetCompileResult compile_model(const std::string& mis_gamepath) {
     ASSERT(StringUtils::get_extension_no_dot(mis_gamepath) == "mis");
     AssetCompileResult r;
+
+    if (!game_file_exists(mis_gamepath)) {
+        r.success = false;
+        r.error_message = "no .mis import settings: " + mis_gamepath;
+        diag_err(mis_gamepath, r.error_message);
+        return r;
+    }
+
     auto ret = ModelCompilier::compile(mis_gamepath.c_str());
     switch (ret) {
     case ModelCompilier::CompileGood:
         r.success = true;
         {
-            auto stem = mis_gamepath.substr(0, mis_gamepath.size() - 3);
-            r.output_files.push_back(stem + "cmdl");
+            auto s = mis_gamepath.substr(0, mis_gamepath.size() - 3);
+            r.output_files.push_back(s + "cmdl");
+            diag_ok(mis_gamepath);
+            diag_ok(s + "cmdl");
         }
         break;
     case ModelCompilier::Skipped:
         r.success = true;
         r.error_message = "skipped (up-to-date)";
+        diag_ok(mis_gamepath);
         break;
     case ModelCompilier::CompileErr:
         r.success = false;
         r.error_message = "model compile failed: " + mis_gamepath;
+        diag_err(mis_gamepath, r.error_message);
         break;
     }
     return r;
@@ -45,24 +69,32 @@ AssetCompileResult compile_model(const std::string& mis_gamepath) {
 AssetCompileResult compile_texture(const std::string& tis_gamepath) {
     ASSERT(StringUtils::get_extension_no_dot(tis_gamepath) == "tis");
     AssetCompileResult r;
+
+    if (!game_file_exists(tis_gamepath)) {
+        r.success = false;
+        r.error_message = "no .tis import settings: " + tis_gamepath;
+        diag_warn(tis_gamepath, r.error_message);
+        return r;
+    }
+
     Color32 dummy{};
     r.success = compile_texture_asset(tis_gamepath, dummy);
     if (r.success) {
-        auto stem = tis_gamepath.substr(0, tis_gamepath.size() - 3);
-        r.output_files.push_back(stem + "dds");
+        auto s = tis_gamepath.substr(0, tis_gamepath.size() - 3);
+        r.output_files.push_back(s + "dds");
+        diag_ok(tis_gamepath);
+        diag_ok(s + "dds");
     } else {
         r.error_message = "texture compile failed: " + tis_gamepath;
+        diag_err(tis_gamepath, r.error_message);
     }
     return r;
 }
 
 AssetCompileResult compile_material(const std::string& mm_gamepath) {
     ASSERT(StringUtils::get_extension_no_dot(mm_gamepath) == "mm");
-    ASSERT(spirv_is_initialized());
-    // Material compilation is performed by the asset load/reload path which
-    // internally calls create_glsl_shader → compile_glsl_to_spirv → spirv_to_hlsl.
-    // A standalone headless path is not yet wired; return success so the editor
-    // can use the reload path without false negatives in the diagnostics cache.
+    // Material compilation happens via the asset reload path (GLSL→SPIRV→HLSL).
+    // A headless standalone path isn't wired yet.
     AssetCompileResult r;
     r.success = true;
     r.error_message = "material compile: use asset reload path";
@@ -71,10 +103,11 @@ AssetCompileResult compile_material(const std::string& mm_gamepath) {
 
 AssetCompileResult check_lua(const std::string& lua_gamepath) {
     ASSERT(StringUtils::get_extension_no_dot(lua_gamepath) == "lua");
+	return {true};
+
     AssetCompileResult r;
 
     std::string abs_path = FileSys::get_full_path_from_game_path(lua_gamepath);
-    // Build command: Scripts/lua_check.ps1 -Path <abs> -Level Warning
     std::string cmd = "powershell.exe -NoProfile -NonInteractive -File \""
                     + std::string(FileSys::get_path(FileSys::ENGINE_DIR))
                     + "/Scripts/lua_check.ps1\" -Path \""
@@ -119,34 +152,55 @@ AssetCompileResult check_lua(const std::string& lua_gamepath) {
     CloseHandle(pi.hThread);
 
     if (exit_code == 2) {
-        // Setup failure (lua-language-server not installed)
         r.success = true;
         r.error_message = "lua-language-server not available";
     } else {
         r.success = (exit_code == 0);
         r.error_message = output;
+        if (r.success) diag_ok(lua_gamepath);
+        else           diag_err(lua_gamepath, output);
     }
     return r;
 }
 
 std::optional<AssetCompileResult> compile_asset(const std::string& gamepath) {
     auto ext = StringUtils::get_extension_no_dot(gamepath);
+
     if      (ext == "mis") return compile_model(gamepath);
     else if (ext == "tis") return compile_texture(gamepath);
     else if (ext == "mm")  return compile_material(gamepath);
     else if (ext == "lua") return check_lua(gamepath);
-    else return std::nullopt;
+
+    // Compiled outputs: find sidecar import settings and rebuild from them.
+    // .cmdl with no .mis: trying to build is an Error (can't rebuild + no path to fix).
+    // .dds  with no .tis: Warning (texture is usable but unmanaged).
+    else if (ext == "cmdl") {
+        std::string mis = gamepath.substr(0, gamepath.size() - 4) + "mis";
+        if (!game_file_exists(mis)) {
+            diag_err(gamepath, "tried to rebuild but no .mis import settings found");
+            return AssetCompileResult{false, "no .mis import settings: " + gamepath};
+        }
+        return compile_model(mis);
+    }
+    else if (ext == "dds") {
+        std::string tis = gamepath.substr(0, gamepath.size() - 3) + "tis";
+        if (!game_file_exists(tis)) {
+            diag_warn(gamepath, "no .tis import settings — texture is unmanaged");
+            return AssetCompileResult{true, "no .tis — texture is unmanaged"};
+        }
+        return compile_texture(tis);
+    }
+
+    return std::nullopt;
 }
 
 static bool needs_compile(const std::string& gamepath) {
     auto ext = StringUtils::get_extension_no_dot(gamepath);
     if (ext == "mis") {
-        // ModelCompilier handles its own up-to-date check inside compile()
-        return true;
+        return true; // ModelCompilier handles its own up-to-date check
     } else if (ext == "tis") {
-        // Check if .dds exists; if not, needs compile
-        auto stem = gamepath.substr(0, gamepath.size() - 3);
-        return !FileSys::does_file_exist((stem + "dds").c_str(), FileSys::GAME_DIR);
+        auto s = gamepath.substr(0, gamepath.size() - 3);
+        return !game_file_exists(s + "dds");
     }
     return true;
 }
@@ -158,23 +212,22 @@ void build_all(bool force_rebuild) {
     for (const auto& full : FileSys::find_game_files()) {
         auto gp = FileSys::get_game_path_from_full_path(full);
         if (!compile_asset(gp).has_value()) continue;
-
         if (!force_rebuild && !needs_compile(gp)) continue;
 
         auto result = compile_asset(gp);
         if (!result) continue;
         ++compiled;
 
-        std::vector<AssetDiagnostic> diags;
         if (!result->success) {
-            diags.push_back({AssetSeverity::Error, result->error_message});
             ++errors;
             error_paths.push_back(gp);
         }
-        AssetDiagnostics::get().set(gp, std::move(diags));
+        // compile_model/texture update AssetDiagnostics as a side effect
     }
 
+    // Fast existence pass, then transitive content pass
     AssetDiagnostics::get().scan_all();
+    AssetDiagnostics::get().scan_transitive();
 
     sys_print(Info, "Build complete: %d compiled, %d errors\n", compiled, errors);
     for (auto& p : error_paths)

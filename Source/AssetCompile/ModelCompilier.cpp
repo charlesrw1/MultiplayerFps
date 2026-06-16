@@ -283,7 +283,7 @@ ModelCompilier::Ret ModelCompilier::compile(const char* game_path) {
 	}
 	catch (std::runtime_error er) {
 		sys_print(Error, "ModelCompilier::compile: when model compiling %s: %s\n", game_path, er.what());
-		return Ret::Skipped;
+		return Ret::CompileErr;
 	}
 
 	return ModelCompileHelper::compile_model(game_path, def);
