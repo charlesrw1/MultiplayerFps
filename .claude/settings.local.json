@@ -424,7 +424,21 @@
       "Bash(magick.exe compare *)",
       "Bash(magick.exe identify *)",
       "Bash(tasklist)",
-      "PowerShell(Get-WinEvent *)"
+      "PowerShell(Get-WinEvent *)",
+      "PowerShell(java *)",
+      "Bash(mkdir -p ~/GhidraProjects)",
+      "Bash(\"D:\\\\Softwares\\\\ghidra_12.1.2_PUBLIC\\\\support\\\\analyzeHeadless.bat\" \"C:\\\\Users\\\\charl\\\\GhidraProjects\" hd2_project -import \"C:\\\\GOG Games\\\\Hidden and Dangerous 2\\\\hd2.exe\" -overwrite)",
+      "Bash(\"D:\\\\Softwares\\\\ghidra_12.1.2_PUBLIC\\\\ghidraRun.bat\" \"C:\\\\Users\\\\charl\\\\GhidraProjects\\\\hd2_project.gpr\")",
+      "Bash(disown)",
+      "Bash(\"D:\\\\Softwares\\\\ghidra_12.1.2_PUBLIC\\\\support\\\\analyzeHeadless.bat\" \"C:\\\\Users\\\\charl\\\\GhidraProjects\" hd2_project -process hd2.exe -noanalysis -scriptPath \"C:\\\\Users\\\\charl\\\\ghidra_scripts\" -postScript ExportDecompiledCpp.java)",
+      "Bash(\"D:\\\\Softwares\\\\ghidra_12.1.2_PUBLIC\\\\support\\\\analyzeHeadless.bat\" \"C:\\\\Users\\\\charl\\\\GhidraProjects\" hd2_project -process hd2.exe -noanalysis -scriptPath \"C:\\\\Users\\\\charl\\\\ghidra_scripts\" -postScript CountFunctions.java)",
+      "Bash(where x32dbg *)",
+      "Bash(start hd2.exe)",
+      "Bash(\"D:\\\\Softwares\\\\ghidra_12.1.2_PUBLIC\\\\support\\\\analyzeHeadless.bat\" \"C:\\\\Users\\\\charl\\\\GhidraProjects\" hd2_project -import \"C:\\\\Users\\\\charl\\\\GhidraProjects\\\\hd2_memdump.bin\" -processor \"x86:LE:32:default\" -loader \"BinaryLoader\" -loader-baseAddr 0x400000 -overwrite)",
+      "Bash(\"D:\\\\Softwares\\\\ghidra_12.1.2_PUBLIC\\\\support\\\\analyzeHeadless.bat\" \"C:\\\\Users\\\\charl\\\\GhidraProjects\" hd2_project -process hd2_memdump.bin -noanalysis -scriptPath \"C:\\\\Users\\\\charl\\\\ghidra_scripts\" -postScript CountFunctions.java)",
+      "Bash(GHIDRA_EXPORT_DIR=\"C:/Users/charl/GhidraProjects/hd2_decompiled\" \"D:\\\\Softwares\\\\ghidra_12.1.2_PUBLIC\\\\support\\\\analyzeHeadless.bat\" \"C:\\\\Users\\\\charl\\\\GhidraProjects\" hd2_project -process hd2_memdump.bin -noanalysis -scriptPath \"C:\\\\Users\\\\charl\\\\ghidra_scripts\" -postScript ExportDecompiledCpp.java)",
+      "PowerShell(\\(Get-Process -Id 17324\\).Modules | ForEach-Object { \"{0,-20} 0x{1:X8}  0x{2:X}\" -f $_.ModuleName, $_.BaseAddress.ToInt64\\(\\), $_.ModuleMemorySize })",
+      "Bash(\"D:\\\\Softwares\\\\ghidra_12.1.2_PUBLIC\\\\support\\\\analyzeHeadless.bat\" \"C:\\\\Users\\\\charl\\\\GhidraProjects\" hd2_project -process hd2_memdump.bin -noanalysis -scriptPath \"C:\\\\Users\\\\charl\\\\ghidra_scripts\" -postScript FindEntries.java)"
     ]
   },
   "enabledPlugins": {

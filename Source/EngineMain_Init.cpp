@@ -105,7 +105,7 @@ void set_app_window_size(glm::ivec2 i) {
 // SDL window creation
 // ---------------------------------------------------------------------------
 
-#include <tracy/public/tracy/TracyOpenGL.hpp>
+
 void GameEngineLocal::init_sdl_window() {
 	ASSERT(!window);
 

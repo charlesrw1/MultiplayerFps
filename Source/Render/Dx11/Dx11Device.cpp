@@ -643,8 +643,11 @@ IGraphicsTimerQuery* Dx11DeviceImpl::create_timer_query() {
 void gfx_init_dx11(SDL_Window* window) {
 	ASSERT(g_gfx_instance == nullptr);
 	ASSERT(window != nullptr);
-	ASSERT(r_indirect_loop.get_bool() &&
-		"Dx11: r_indirect_loop must be 1 (DX11 has no MultiDrawIndirect; see multi_draw_elements_indirect)");
+	if (!r_indirect_loop.get_bool()) {
+		printf("Dx11: r_indirect_loop must be 1 (DX11 has no MultiDrawIndirect; see multi_draw_elements_indirect)");
+		r_indirect_loop.set_bool(true);
+	}
+	// hello world
 
 	HWND hwnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
 	ASSERT(hwnd != nullptr && "gfx_init_dx11: window has no Win32 HWND property");
@@ -690,7 +693,7 @@ void gfx_init_dx11(SDL_Window* window) {
 	hr = impl->context.As(&impl->annotation);
 	ASSERT(SUCCEEDED(hr) && "Dx11: ID3DUserDefinedAnnotation query failed");
 
-#ifdef _DEBUG
+
 	// Under a debugger (e.g. integration tests run via cdb), the SDK debug
 	// layer's CORRUPTION/ERROR/WARNING messages can raise a first-chance SEH
 	// exception that our crash handler treats as fatal. Log them instead.
@@ -702,7 +705,7 @@ void gfx_init_dx11(SDL_Window* window) {
 			info_queue->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, FALSE);
 		}
 	}
-#endif
+
 
 	impl->create_backbuffer_rtv();
 	spirv_compile_init();
