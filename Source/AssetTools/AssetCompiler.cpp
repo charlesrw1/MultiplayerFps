@@ -61,6 +61,7 @@ AssetCompileResult compile_model(const std::string& mis_gamepath) {
         r.success = false;
         r.error_message = "model compile failed: " + mis_gamepath;
         diag_err(mis_gamepath, r.error_message);
+        diag_err(mis_gamepath.substr(0, mis_gamepath.size() - 3) + "cmdl", r.error_message);
         break;
     }
     return r;
@@ -87,6 +88,7 @@ AssetCompileResult compile_texture(const std::string& tis_gamepath) {
     } else {
         r.error_message = "texture compile failed: " + tis_gamepath;
         diag_err(tis_gamepath, r.error_message);
+        diag_err(tis_gamepath.substr(0, tis_gamepath.size() - 3) + "dds", r.error_message);
     }
     return r;
 }
