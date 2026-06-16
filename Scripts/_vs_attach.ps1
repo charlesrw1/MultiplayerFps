@@ -60,6 +60,9 @@ function Invoke-AppWithDebugger {
     # $PSScriptRoot inside this function refers to the directory of the
     # dot-sourced helper, which is Scripts/. Repo root is one level up.
     $repoRoot = Split-Path -Parent $PSScriptRoot
+    # Resolve any symbolic link so CL.exe tlog paths are canonical and match VS GUI.
+    $repoItem = Get-Item $repoRoot
+    if ($repoItem.LinkType) { $repoRoot = $repoItem.Target.TrimEnd('\') }
 
     $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
     $msbuild = & $vswhere -latest -prerelease -requires Microsoft.Component.MSBuild `
@@ -68,7 +71,7 @@ function Invoke-AppWithDebugger {
     Write-Host "Using MSBuild: $msbuild" -ForegroundColor DarkGray
 
     Write-Host "=== Building $ExeName ($Config|x64) ===" -ForegroundColor Cyan
-    & $msbuild "$repoRoot\CsRemake.sln" /t:$ExeName /p:Configuration=$Config /p:Platform=x64 /v:minimal /m
+    & $msbuild "$repoRoot\CsRemake.sln" /t:$ExeName /p:Configuration=$Config /p:Platform=x64 /p:BuildingInsideVisualStudio=true /p:PreferredToolArchitecture=x64 /v:minimal /m
     if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
 
     $exe = "$repoRoot\x64\$Config\$ExeName.exe"

@@ -541,7 +541,11 @@
     <ClCompile Include="Source\IEditorTool.cpp" />
     <ClCompile Include="Source\Input\InputSystem.cpp" />
     <ClCompile Include="Source\Level.cpp" />
-    <ClCompile Include="Source\EngineMain.cpp" />
+    <ClCompile Include="Source\EngineMain.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">true</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Source\EngineMain_Commands.cpp" />
     <ClCompile Include="Source\EngineMain_Loop.cpp" />
     <ClCompile Include="Source\EngineMain_Debug.cpp" />

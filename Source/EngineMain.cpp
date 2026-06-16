@@ -169,9 +169,14 @@ void add_events_test(Model* model) {
 // ---------------------------------------------------------------------------
 
 void Quit() {
+	// blah blah
 	sys_print(Info, "Quiting... (runtime %f)\n", TimeSinceStart());
 	eng_local.cleanup();
 	exit(0);
+
+	//asdfasdf
+
+	printf("");
 }
 
 // ---------------------------------------------------------------------------
@@ -326,6 +331,8 @@ int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 			options.init_file = "";
 			options.editor_mode = true;
 		}
+
+
 
 		set_assert_hook([](const char* cond) {
 			fprintf(stderr, "\n[ASSERT FAILED] %s\n", cond);

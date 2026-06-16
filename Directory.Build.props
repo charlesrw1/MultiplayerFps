@@ -5,5 +5,17 @@
          Without this, VS IDE's own FUTDC layer doesn't recognise CLI MSBuild
          builds as up-to-date and forces a full rebuild every time. -->
     <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+
+    <!-- Hardcode SolutionDir to the canonical real path (no symlinks).
+         $(MSBuildThisFileDirectory) would inherit whichever path VS used to
+         open the file, so we pin the real path explicitly. -->
+    <SolutionDir>C:\Users\charl\source\repos\CsRemake\</SolutionDir>
+
+    <!-- Match VS's default tool architecture. VS sets PreferredToolArchitecture=x64
+         (uses 64-bit compiler host), but CLI MSBuild defaults to Native32Bit.
+         The lastbuildstate key includes VCToolArchitecture, so any mismatch
+         triggers a full recompile on every VS<->CLI switch. -->
+    <PreferredToolArchitecture Condition="'$(PreferredToolArchitecture)' == ''">x64</PreferredToolArchitecture>
   </PropertyGroup>
+
 </Project>

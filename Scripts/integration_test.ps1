@@ -118,6 +118,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
+$_item = Get-Item $root; if ($_item.LinkType) { $root = $_item.Target.TrimEnd('\') }
 
 # ---- vars.txt backend toggle -----------------------------------------------
 # Sets r.render_backend (and ensures r_indirect_loop 1, required by the DX11
@@ -178,7 +179,7 @@ Get-Process App, WerFault, vsjitdebugger -ErrorAction SilentlyContinue |
     Stop-Process -Force -ErrorAction SilentlyContinue
 
 Write-Host "=== Building App ($Config|x64) ===" -ForegroundColor Cyan
-& $msbuild "$root\CsRemake.sln" /t:App /p:Configuration=$Config /p:Platform=x64 /v:minimal /m
+& $msbuild "$root\CsRemake.sln" /t:App /p:Configuration=$Config /p:Platform=x64 /p:BuildingInsideVisualStudio=true /p:PreferredToolArchitecture=x64 /v:minimal /m
 if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
 
 $exe = "$root\x64\$Config\App.exe"

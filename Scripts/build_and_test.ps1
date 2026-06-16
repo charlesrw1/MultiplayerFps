@@ -9,6 +9,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path $PSScriptRoot -Parent
+$_item = Get-Item $RepoRoot; if ($_item.LinkType) { $RepoRoot = $_item.Target.TrimEnd('\') }
 
 # Locate msbuild (include -prerelease so VS 2026 Insiders is picked up)
 $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
@@ -26,7 +27,7 @@ $testExe = Join-Path $RepoRoot "$Platform\$Configuration\UnitTests.exe"
 
 # Build only the UnitTests project
 Write-Host "==> Building UnitTests ($Configuration|$Platform)..." -ForegroundColor Cyan
-& $msbuild $sln /t:UnitTests /p:Configuration=$Configuration /p:Platform=$Platform /v:minimal
+& $msbuild $sln /t:UnitTests /p:Configuration=$Configuration /p:Platform=$Platform /p:BuildingInsideVisualStudio=true /p:PreferredToolArchitecture=x64 /v:minimal
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Build failed (exit $LASTEXITCODE)"
     exit $LASTEXITCODE
