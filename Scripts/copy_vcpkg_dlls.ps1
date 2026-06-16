@@ -34,7 +34,9 @@ $dlls = @(
     "SDL3.dll",
     "SDL3_mixer.dll",
     "lua.dll",
-    "meshoptimizer.dll"
+    "meshoptimizer.dll",
+    "gmock.dll",
+    "gtest.dll"
 )
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
