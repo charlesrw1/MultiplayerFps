@@ -438,7 +438,12 @@
       "Bash(\"D:\\\\Softwares\\\\ghidra_12.1.2_PUBLIC\\\\support\\\\analyzeHeadless.bat\" \"C:\\\\Users\\\\charl\\\\GhidraProjects\" hd2_project -process hd2_memdump.bin -noanalysis -scriptPath \"C:\\\\Users\\\\charl\\\\ghidra_scripts\" -postScript CountFunctions.java)",
       "Bash(GHIDRA_EXPORT_DIR=\"C:/Users/charl/GhidraProjects/hd2_decompiled\" \"D:\\\\Softwares\\\\ghidra_12.1.2_PUBLIC\\\\support\\\\analyzeHeadless.bat\" \"C:\\\\Users\\\\charl\\\\GhidraProjects\" hd2_project -process hd2_memdump.bin -noanalysis -scriptPath \"C:\\\\Users\\\\charl\\\\ghidra_scripts\" -postScript ExportDecompiledCpp.java)",
       "PowerShell(\\(Get-Process -Id 17324\\).Modules | ForEach-Object { \"{0,-20} 0x{1:X8}  0x{2:X}\" -f $_.ModuleName, $_.BaseAddress.ToInt64\\(\\), $_.ModuleMemorySize })",
-      "Bash(\"D:\\\\Softwares\\\\ghidra_12.1.2_PUBLIC\\\\support\\\\analyzeHeadless.bat\" \"C:\\\\Users\\\\charl\\\\GhidraProjects\" hd2_project -process hd2_memdump.bin -noanalysis -scriptPath \"C:\\\\Users\\\\charl\\\\ghidra_scripts\" -postScript FindEntries.java)"
+      "Bash(\"D:\\\\Softwares\\\\ghidra_12.1.2_PUBLIC\\\\support\\\\analyzeHeadless.bat\" \"C:\\\\Users\\\\charl\\\\GhidraProjects\" hd2_project -process hd2_memdump.bin -noanalysis -scriptPath \"C:\\\\Users\\\\charl\\\\ghidra_scripts\" -postScript FindEntries.java)",
+      "PowerShell(New-Item *)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\Source\\\\AssetTools\\\\AssetTools.vcxproj\" /p:Configuration=Debug /p:Platform=x64 /t:Build /m /nologo 2>&1 | Select-Object -Last 40)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\CsRemake.sln\" /p:Configuration=Debug /p:Platform=x64 /t:Build /m /nologo 2>&1 | Where-Object { $_ -match \"error|warning|succeeded|failed\" } | Select-Object -Last 50)",
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\CsRemake.sln\" /p:Configuration=Debug /p:Platform=x64 /t:Build /m /nologo 2>&1 | Where-Object { $_ -match \"error C|error LNK|Build succeeded|Build FAILED|Warning\\\\\\(s\\\\\\)|Error\\\\\\(s\\\\\\)\" } | Select-Object -Last 20)",
+      "PowerShell(& \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\Scripts\\\\build_and_test.ps1\" 2>&1 | Select-Object -Last 30)"
     ]
   },
   "enabledPlugins": {

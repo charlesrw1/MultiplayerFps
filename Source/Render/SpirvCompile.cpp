@@ -83,6 +83,11 @@ void spirv_compile_shutdown() {
 	g_initialized = false;
 }
 
+bool spirv_is_initialized() {
+	std::lock_guard<std::mutex> lk(g_init_mutex);
+	return g_initialized;
+}
+
 SpirvBlob compile_glsl_to_spirv(SpirvStage stage,
 								const std::string& glsl_source,
 								const std::string& debug_name) {

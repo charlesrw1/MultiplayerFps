@@ -42,11 +42,7 @@ REGISTER_ASSETMETADATA_MACRO(MaterialAssetMetadata);
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-class MasterMaterialExcept : public std::runtime_error
-{
-public:
-	MasterMaterialExcept(const std::string& error) : std::runtime_error(error) {}
-};
+// MasterMaterialExcept defined in MaterialLocal.h
 
 inline std::string remove_filename_from_path(std::string& path) {
 	auto find = path.rfind("/");

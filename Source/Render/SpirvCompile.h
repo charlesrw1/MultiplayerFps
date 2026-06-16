@@ -39,6 +39,7 @@ struct SpirvBlob
 // no-op, second shutdown is a no-op.
 void spirv_compile_init();
 void spirv_compile_shutdown();
+bool spirv_is_initialized();
 
 // Compile a single shader stage. `glsl_source` must include a #version
 // directive. `debug_name` (e.g. engine-relative shader path) is folded into

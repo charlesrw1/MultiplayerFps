@@ -14,6 +14,7 @@
 #include "HackedReloader.h"
 #include "Framework/Config.h"
 #include "Assets/AssetDatabase.h"
+#include "AssetTools/AssetTemplates.h"
 
 void TOUCH_ASSET(const Cmd_Args& args) {
 	if (args.size() != 2) {
@@ -292,6 +293,12 @@ void AssetRegistrySystem::update() {
 				g_assets.reload<Model>(asset);
 			}
 		} else if (ext == "png" || ext == "jpg" || ext == "tis") {
+			// Auto-import: create a .tis sidecar for new .png files
+			if (ext == "png") {
+				std::string tis = rel_path.substr(0, rel_path.size() - 3) + "tis";
+				if (!file_exists(tis))
+					AssetTemplates::create_tis_for_png(rel_path);
+			}
 			std::string dds = rel_path;
 			StringUtils::remove_extension(dds);
 			dds += ".dds";

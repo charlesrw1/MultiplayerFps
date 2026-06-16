@@ -22,6 +22,7 @@ public:
 	virtual const ClassTypeInfo* get_asset_class_type() const { return nullptr; }
 
 	virtual void draw_browser_menu(const string& assetPath) const {}
+	virtual void draw_browser_context_menu(const string& gamepath) {}
 
 	// fills extra assets
 	virtual void fill_extra_assets(std::vector<std::string>& out) const {}

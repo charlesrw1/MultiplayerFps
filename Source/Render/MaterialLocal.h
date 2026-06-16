@@ -95,6 +95,14 @@ struct InstanceData
 	int index = 0;
 };
 #include "Framework/Optional.h"
+#include <stdexcept>
+
+// Thrown by MasterMaterialImpl::load_from_file and create_glsl_shader on parse/compile errors
+class MasterMaterialExcept : public std::runtime_error {
+public:
+    explicit MasterMaterialExcept(const std::string& error) : std::runtime_error(error) {}
+};
+
 // compilied material, material instances can be based off it to allow for variation but minimize draw call changes
 class MasterMaterialImpl
 {

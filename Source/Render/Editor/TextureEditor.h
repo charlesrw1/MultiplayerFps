@@ -30,3 +30,5 @@ public:
 
 	REF Color32 simplifiedColor = COLOR_BLACK;
 };
+
+extern void write_texture_import_settings(TextureImportSettings* tis, const std::string& path);

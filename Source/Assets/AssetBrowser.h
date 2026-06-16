@@ -5,6 +5,8 @@
 
 #include "Framework/ConsoleCmdGroup.h"
 
+class AssetInspectorPane;
+
 class ThumbnailManager
 {
 public:
@@ -49,6 +51,10 @@ public:
 
 	AssetOnDisk selected_resource;
 	bool double_clicked_selected = false;
+
+	std::string selected_folder;
+	float left_panel_width = 200.0f;
+	uptr<AssetInspectorPane> inspector_pane;
 
 	Texture* folder_open{};
 	Texture* folder_closed{};

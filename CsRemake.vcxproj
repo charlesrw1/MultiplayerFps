@@ -222,7 +222,7 @@
     <ClCompile Include="Source\Render\MaterialLocal_Loading.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal_Manager.cpp" />
     <ClCompile Include="Source\Render\MaterialLocal_Shader.cpp" />
-    <ClCompile Include="Source\Render\MaterialLocal_ShaderGen.cpp" />
+    <!-- MaterialLocal_ShaderGen moved to AssetTools project -->
     <ClCompile Include="Source\Render\Model.cpp" />
     <ClCompile Include="Source\Render\ModelGpuUpload.cpp" />
     <ClCompile Include="Source\Render\ModelLoad.cpp" />
@@ -257,12 +257,7 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="Source\Render\ShaderSourceLoader.cpp" />
-    <ClCompile Include="Source\Render\SpirvCompile.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
+    <!-- ShaderSourceLoader and SpirvCompile moved to AssetTools project -->
     <ClCompile Include="Source\Render\RenderExtra.cpp" />
     <ClCompile Include="Source\Render\RenderExtra_LightCookieAtlas.cpp" />
     <ClCompile Include="Source\Render\RenderExtra_SSR.cpp" />
@@ -315,6 +310,7 @@
     <ClInclude Include="Source\AssetCompile\SkeletonAsset.h" />
     <ClInclude Include="Source\AssetCompile\Someutils.h" />
     <ClInclude Include="Source\Assets\AssetBrowser.h" />
+    <ClInclude Include="Source\Assets\AssetInspectorPane.h" />
     <ClInclude Include="Source\Assets\AssetBundle.h" />
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
@@ -537,32 +533,7 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="Source\AssetCompile\ModelCompilier.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Source\AssetCompile\ModelCompile_Skeleton.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Source\AssetCompile\ModelCompile_Mesh.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Source\AssetCompile\ModelCompile_Animation.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="Source\AssetCompile\ModelCompile_AnimSkeleton.cpp" />
-    <ClCompile Include="Source\AssetCompile\ModelCompile_Output.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
+    <!-- ModelCompile files moved to AssetTools project -->
     <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp" />
     <ClCompile Include="Source\Framework\Hashset.cpp" />
     <ClCompile Include="Source\Framework\Tests\Containers.cpp" />
@@ -578,11 +549,8 @@
     <ClCompile Include="Source\EngineMain_ViewSetup.cpp" />
     <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Source\Physics\Physics2Local.cpp" />
-    <ClCompile Include="Source\Render\Editor\TextureEditor.cpp">
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
-      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
-    </ClCompile>
+    <!-- TextureEditor moved to AssetTools project -->
+    <ClCompile Include="Source\Assets\AssetInspectorPane.cpp" />
     <ClCompile Include="Source\Render\Meshlet.cpp" />
     <ClCompile Include="Source\Sound\SoundComponent.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
