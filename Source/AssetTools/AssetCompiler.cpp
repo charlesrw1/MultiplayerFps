@@ -172,6 +172,11 @@ std::optional<AssetCompileResult> compile_asset(const std::string& gamepath) {
     else if (ext == "tis") return compile_texture(gamepath);
     else if (ext == "mm")  return compile_material(gamepath);
     else if (ext == "lua") return check_lua(gamepath);
+    else if (ext == "mi") {
+        // .mi files aren't compiled; validate PARENT and texture refs
+        AssetDiagnostics::get().scan_dependencies(gamepath);
+        return AssetCompileResult{true, "material instance validated"};
+    }
 
     // Compiled outputs: find sidecar import settings and rebuild from them.
     // .cmdl with no .mis: trying to build is an Error (can't rebuild + no path to fix).

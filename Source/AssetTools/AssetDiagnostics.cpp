@@ -149,10 +149,44 @@ void AssetDiagnostics::scan_all() {
     save();
 }
 
+// Parse PARENT and VAR texture refs from a .mi (material instance) file.
+// Format: "PARENT foo.mm" and "VAR <name> <value>" where value is a texture
+// gamepath or built-in (built-ins start with '_', numerics and multi-token are skipped).
+static std::vector<std::string> parse_mi_refs(const std::string& text) {
+    static constexpr std::string_view kTexExts[] = { "dds", "hdr", "png", "tga" };
+    std::vector<std::string> refs;
+    std::istringstream ss(text);
+    std::string line;
+    while (std::getline(ss, line)) {
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.size() > 7 && line.substr(0, 7) == "PARENT ") {
+            std::string p = line.substr(7);
+            while (!p.empty() && std::isspace((unsigned char)p.back())) p.pop_back();
+            if (!p.empty()) refs.push_back(p);
+        } else if (line.size() > 4 && line.substr(0, 4) == "VAR ") {
+            size_t name_end = line.find(' ', 4);
+            if (name_end == std::string::npos) continue;
+            std::string val = line.substr(name_end + 1);
+            while (!val.empty() && std::isspace((unsigned char)val.back())) val.pop_back();
+            // skip multi-token (colors/vectors), built-ins, numbers
+            if (val.find(' ') != std::string::npos) continue;
+            if (val.empty() || val[0] == '_') continue;
+            if (std::isdigit((unsigned char)val[0])) continue;
+            auto dot = val.rfind('.');
+            if (dot == std::string::npos) continue;
+            auto e = val.substr(dot + 1);
+            for (auto& ke : kTexExts)
+                if (e == ke) { refs.push_back(val); break; }
+        }
+    }
+    return refs;
+}
+
 // scan_transitive: content-reading pass for propagating errors across references.
 // Runs only during build_all(), never at startup.
 void AssetDiagnostics::scan_transitive() {
-    static constexpr const char* kTextExts[] = { "mi", "mm", "mis", "tis", "tmap", nullptr };
+    // .mi uses a custom PARENT/VAR format — handled by parse_mi_refs, not extract_refs
+    static constexpr const char* kTextExts[] = { "mm", "mis", "tis", "tmap", nullptr };
 
     static constexpr std::string_view kRefExts[] = {
         "dds","png","cmdl","mm","mi","glb","tis","mis","lua","tmap"
@@ -198,6 +232,7 @@ void AssetDiagnostics::scan_transitive() {
 
         auto refs = extract_refs(text);
         if (refs.empty()) continue;
+        // Note: .mi files use parse_mi_refs — handled in the separate loop below.
 
         AssetSeverity worst_dep = AssetSeverity::TransitiveWarning;
         bool has_issue = false;
@@ -224,6 +259,52 @@ void AssetDiagnostics::scan_transitive() {
             std::vector<AssetDiagnostic> merged;
             if (d) merged = *d;
             merged.push_back({new_sev, "transitive dependency issue"});
+            set(gp, std::move(merged));
+        }
+    }
+
+    // .mi (material instance): PARENT/VAR format — separate pass using parse_mi_refs.
+    for (const auto& full : FileSys::find_game_files()) {
+        auto gp = FileSys::get_game_path_from_full_path(full);
+        if (StringUtils::get_extension_no_dot(gp) != "mi") continue;
+
+        auto existing = get_severity(gp);
+        if (existing && *existing == AssetSeverity::Error) continue;
+
+        auto f = FileSys::open_read_game(gp);
+        if (!f) continue;
+        std::vector<char> buf(f->size() + 1, 0);
+        f->read(buf.data(), f->size());
+        f->close();
+
+        auto refs = parse_mi_refs(std::string(buf.data()));
+        if (refs.empty()) continue;
+
+        AssetSeverity worst_dep = AssetSeverity::TransitiveWarning;
+        bool has_issue = false;
+        for (auto& ref : refs) {
+            if (!game_file_exists(ref)) {
+                worst_dep = AssetSeverity::Error;
+                has_issue = true;
+            } else {
+                auto dep_sev = get_severity(ref);
+                if (dep_sev) {
+                    has_issue = true;
+                    if (*dep_sev > worst_dep) worst_dep = *dep_sev;
+                }
+            }
+        }
+        if (!has_issue) continue;
+
+        AssetSeverity new_sev = (worst_dep == AssetSeverity::Error)
+            ? AssetSeverity::Warning
+            : AssetSeverity::TransitiveWarning;
+
+        if (!existing || new_sev > *existing) {
+            auto* d = get_diags(gp);
+            std::vector<AssetDiagnostic> merged;
+            if (d) merged = *d;
+            merged.push_back({new_sev, "dependency issue"});
             set(gp, std::move(merged));
         }
     }
@@ -255,16 +336,40 @@ void AssetDiagnostics::scan_transitive() {
     save();
 }
 
-// scan_dependencies: kept for compatibility — delegates to both passes.
 void AssetDiagnostics::scan_dependencies(const std::string& gamepath) {
-    // Individual file fast-check: just re-run scan_all logic for one file.
     auto ext = StringUtils::get_extension_no_dot(gamepath);
     auto existing = get_severity(gamepath);
     if (existing && *existing == AssetSeverity::Error) return;
 
+    // .mi: read content to check PARENT and VAR texture refs
+    if (ext == "mi") {
+        auto f = FileSys::open_read_game(gamepath);
+        if (!f) return;
+        std::vector<char> buf(f->size() + 1, 0);
+        f->read(buf.data(), f->size());
+        f->close();
+        auto refs = parse_mi_refs(std::string(buf.data()));
+        AssetSeverity worst = AssetSeverity::TransitiveWarning;
+        bool has_issue = false;
+        for (auto& ref : refs) {
+            if (!game_file_exists(ref)) { worst = AssetSeverity::Error; has_issue = true; }
+            else { auto s = get_severity(ref); if (s) { has_issue = true; if (*s > worst) worst = *s; } }
+        }
+        if (!has_issue) { clear(gamepath); return; }
+        AssetSeverity new_sev = (worst == AssetSeverity::Error) ? AssetSeverity::Warning : AssetSeverity::TransitiveWarning;
+        if (!existing || new_sev > *existing) {
+            auto* d = get_diags(gamepath);
+            std::vector<AssetDiagnostic> merged;
+            if (d) merged = *d;
+            merged.push_back({new_sev, "dependency issue"});
+            set(gamepath, std::move(merged));
+        }
+        return;
+    }
+
+    // Fast existence-check for other types (no content reading)
     auto s = stem(gamepath, ext);
     std::vector<AssetDiagnostic> diags;
-
     if      (ext == "cmdl" && !game_file_exists(s + "mis"))
         diags.push_back({AssetSeverity::Warning, "no .mis import settings"});
     else if (ext == "dds"  && !game_file_exists(s + "tis"))
