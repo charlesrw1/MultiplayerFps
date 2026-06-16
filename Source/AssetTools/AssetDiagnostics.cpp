@@ -227,6 +227,32 @@ void AssetDiagnostics::scan_transitive() {
             set(gp, std::move(merged));
         }
     }
+
+    // Propagate sidecar diagnostics to compiled outputs:
+    //   .mis issues (bad material refs, etc.) -> .cmdl
+    //   .tis issues (bad texture refs, etc.)  -> .dds
+    // Snapshot keys first to avoid modifying the map while iterating.
+    std::vector<std::pair<std::string, std::string>> pairs;
+    for (auto& [path, _] : cache_) {
+        auto ext = StringUtils::get_extension_no_dot(path);
+        if (ext == "mis")
+            pairs.emplace_back(path, path.substr(0, path.size() - 3) + "cmdl");
+        else if (ext == "tis")
+            pairs.emplace_back(path, path.substr(0, path.size() - 3) + "dds");
+    }
+    for (auto& [src, dst] : pairs) {
+        auto src_sev = get_severity(src);
+        if (!src_sev) continue;
+        auto dst_sev = get_severity(dst);
+        if (dst_sev && *dst_sev >= *src_sev) continue;
+        auto* d = get_diags(dst);
+        std::vector<AssetDiagnostic> merged;
+        if (d) merged = *d;
+        merged.push_back({*src_sev, "from " + src});
+        set(dst, std::move(merged));
+    }
+
+    save();
 }
 
 // scan_dependencies: kept for compatibility — delegates to both passes.
