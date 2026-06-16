@@ -1,8 +1,11 @@
 This is a game engine project. Uses C++ VS2026 , OpenGL, SDL2, vcpkg. No CMAKE.
 
-path to compilier: "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\MSBuild.exe"'
+path to compilier: "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\MSBuild.exe"' OR use msbuild.bat which is in PATH
 
 NEVER use VS compilier under "C:\Program Files (x86)\...", that is old compilier.
+
+If you see error code c0000135, then it most likely means NO DLLs were copied to the x64/Debug or x64/Release folder for some reason? Bug with vcpkg.
+
 
 Write tests. Testing documentation found at [[docs/testing.md]]. Use Scripts/build_and_test.ps1 to build and run unit tests. Use Scripts/integration_tests.ps1 to build and run integration tests (with cli options).
 

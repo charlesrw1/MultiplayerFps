@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <!-- Let MSBuild's tlog-based incremental check decide what to recompile.
+         Without this, VS IDE's own FUTDC layer doesn't recognise CLI MSBuild
+         builds as up-to-date and forces a full rebuild every time. -->
+    <DisableFastUpToDateCheck>true</DisableFastUpToDateCheck>
+  </PropertyGroup>
+</Project>

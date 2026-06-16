@@ -1,4 +1,5 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
+
 #include <SDL3/SDL.h>
 #include "glad/glad.h"
 #include <cstdio>
@@ -234,7 +235,8 @@ struct TestModeArgs {
 	bool promote = false;
 	bool interactive = false;
 	bool timing_assert = false;
-	bool editor = false; // --editor (launch editor app)
+	bool editor = false;              // --editor (launch editor app)
+	bool wait_for_debugger = false;   // --wait-for-debugger
 };
 
 static void read_pattern_file(const char* path, std::vector<std::string>& out) {
@@ -288,6 +290,8 @@ static TestModeArgs parse_test_mode_args(int argc, char** argv) {
 			out.timing_assert = true;
 		} else if (a == "--editor") {
 			out.editor = true;
+		} else if (a == "--wait-for-debugger") {
+			out.wait_for_debugger = true;
 		}
 	}
 	return out;
@@ -296,10 +300,14 @@ static TestModeArgs parse_test_mode_args(int argc, char** argv) {
 // ---------------------------------------------------------------------------
 // Top-level entry point
 // ---------------------------------------------------------------------------
-
+extern void wait_for_debugger_windows();
 int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 	ASSERT(argc >= 1 && argv);
 	const TestModeArgs test_args = parse_test_mode_args(argc, argv);
+
+	if (test_args.wait_for_debugger) {
+		wait_for_debugger_windows();
+	}
 	options.editor_mode = test_args.editor;
 	if (test_args.present) {
 		eng_local.m_is_test_mode = true;

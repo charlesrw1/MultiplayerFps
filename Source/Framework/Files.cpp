@@ -17,6 +17,13 @@ static ConfigVar g_user_save_dir("g_user_save_dir", "User", CVAR_DEV, "what fold
 static ConfigVar file_print_all_openfile_fails("file_print_all_openfile_fails", "0", CVAR_DEV | CVAR_BOOL,
 											   "prints an error log for all CreateFile errors");
 
+void wait_for_debugger_windows()
+{
+	while (!IsDebuggerPresent())
+		Sleep(10);
+	DebugBreak();
+}
+
 class OSFile : public IFile
 {
 public:

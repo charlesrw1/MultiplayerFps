@@ -3,9 +3,10 @@
     VS 2026 debugger attach helper. Dot-source from launcher scripts.
 
 .DESCRIPTION
-    Attaches an already-running Visual Studio instance (whichever one is in the
-    ROT) to a target PID via DTE. Probes VS 2026 Insiders first, then older
-    ProgIDs. Falls back to vsjitdebugger.exe if no VS is running.
+    Launches the target process with --wait-for-debugger so it spins until the
+    debugger is present, then attaches VS via DTE and the process resumes.
+    Probes VS 2026 Insiders first, then older ProgIDs. Falls back to
+    vsjitdebugger.exe if no VS is running.
 #>
 
 function Attach-VSDebugger {
@@ -53,7 +54,8 @@ function Attach-VSDebugger {
 function Invoke-AppWithDebugger {
     param(
         [Parameter(Mandatory)][string]$Config,
-        [string[]]$AppArgs = @()
+        [string[]]$AppArgs = @(),
+        [string]$ExeName = "App"
     )
     # $PSScriptRoot inside this function refers to the directory of the
     # dot-sourced helper, which is Scripts/. Repo root is one level up.
@@ -65,22 +67,19 @@ function Invoke-AppWithDebugger {
     if (-not $msbuild) { Write-Error "MSBuild not found"; exit 1 }
     Write-Host "Using MSBuild: $msbuild" -ForegroundColor DarkGray
 
-    Write-Host "=== Building App ($Config|x64) ===" -ForegroundColor Cyan
-    & $msbuild "$repoRoot\CsRemake.sln" /t:App /p:Configuration=$Config /p:Platform=x64 /v:minimal /m
+    Write-Host "=== Building $ExeName ($Config|x64) ===" -ForegroundColor Cyan
+    & $msbuild "$repoRoot\CsRemake.sln" /t:$ExeName /p:Configuration=$Config /p:Platform=x64 /v:minimal /m
     if ($LASTEXITCODE -ne 0) { Write-Error "Build failed"; exit 1 }
 
-    $exe = "$repoRoot\x64\$Config\App.exe"
+    $exe = "$repoRoot\x64\$Config\$ExeName.exe"
     if (-not (Test-Path $exe)) { Write-Error "Binary not found: $exe"; exit 1 }
 
-    Write-Host ("=== Launching App.exe " + ($AppArgs -join ' ') + " ===") -ForegroundColor Cyan
-    $spParams = @{
-        FilePath         = $exe
-        PassThru         = $true
-        NoNewWindow      = $true
-        WorkingDirectory = $repoRoot
-    }
-    if ($AppArgs -and $AppArgs.Count -gt 0) { $spParams.ArgumentList = $AppArgs }
-    $proc = Start-Process @spParams
+    # --wait-for-debugger makes the app spin on IsDebuggerPresent() before doing
+    # anything, so the attach always wins the race.
+    $launchArgs = @("--wait-for-debugger") + $AppArgs
+    Write-Host ("=== Launching $ExeName.exe " + ($launchArgs -join ' ') + " ===") -ForegroundColor Cyan
+
+    $proc = Start-Process -FilePath $exe -ArgumentList $launchArgs -PassThru -NoNewWindow -WorkingDirectory $repoRoot
     Attach-VSDebugger -TargetPid $proc.Id
     $proc.WaitForExit()
     exit $proc.ExitCode
