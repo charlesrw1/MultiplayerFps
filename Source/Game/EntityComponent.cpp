@@ -52,8 +52,6 @@ public:
 		filepaths.push_back("NavMeshSettingsComponent");
 		filepaths.push_back("NavAgentComponent");
 
-		filepaths.push_back("daf");
-
 		// Surface only Lua-defined Component subclasses whose annotation block
 		// contains a `---editor` tag (see ScriptLoadingUtil::parse_text).
 		// Untagged Lua components remain fully usable from script but stay out
