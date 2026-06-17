@@ -26,7 +26,7 @@ void ParticleSystemComponent::start()
 		editor_shape_gizmo = get_owner()->create_component<MeshBuilderComponent>();
 		editor_shape_gizmo->dont_serialize_or_edit = true;
 		editor_shape_gizmo->use_transform = true;
-		editor_shape_gizmo->depth_tested = false;
+		editor_shape_gizmo->depth_tested = true;
 	}
 
 	rng.state = wang_hash((uint32_t)get_instance_id());
