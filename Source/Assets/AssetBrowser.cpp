@@ -715,9 +715,115 @@ void AssetBrowser::imgui_draw() {
 	} else {
 		draw_browser_tree_view(this);
 	}
+
+	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && ImGui::IsMouseClicked(1) && !ImGui::IsAnyItemHovered()) {
+		ImGui::OpenPopup("create_asset_menu");
+	}
+	if (ImGui::BeginPopup("create_asset_menu")) {
+		ImGui::TextDisabled("Create New...");
+		ImGui::Separator();
+		if (ImGui::MenuItem("Map")) {
+			create_asset_type = CreateAssetType::Map;
+			memset(create_asset_name, 0, sizeof(create_asset_name));
+			ImGui::OpenPopup("create_asset_name_popup");
+		}
+		if (ImGui::MenuItem("Particle")) {
+			create_asset_type = CreateAssetType::Particle;
+			memset(create_asset_name, 0, sizeof(create_asset_name));
+			ImGui::OpenPopup("create_asset_name_popup");
+		}
+		if (ImGui::MenuItem("Master Material")) {
+			create_asset_type = CreateAssetType::MasterMaterial;
+			create_mm_domain = 0;
+			memset(create_asset_name, 0, sizeof(create_asset_name));
+			ImGui::OpenPopup("create_asset_name_popup");
+		}
+		if (ImGui::MenuItem("Material Instance")) {
+			create_asset_type = CreateAssetType::MaterialInstance;
+			create_mi_master_path = "eng/fallback.mm";
+			memset(create_asset_name, 0, sizeof(create_asset_name));
+			ImGui::OpenPopup("create_asset_name_popup");
+		}
+		ImGui::EndPopup();
+	}
 	ImGui::EndChild();
 
+	draw_create_asset_popup();
+
 	ImGui::End();
+}
+
+#include "AssetTools/AssetTemplates.h"
+
+void AssetBrowser::draw_create_asset_popup() {
+	if (create_asset_type == CreateAssetType::None)
+		return;
+
+	const char* titles[] = {"", "Create Map", "Create Particle", "Create Master Material", "Create Material Instance"};
+	const char* title = titles[(int)create_asset_type];
+
+	ImGui::OpenPopup(title);
+	ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+	ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+
+	if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::Text("Name (no extension):");
+		bool enter_pressed = ImGui::InputText("##name", create_asset_name, sizeof(create_asset_name),
+			ImGuiInputTextFlags_EnterReturnsTrue);
+
+		if (create_asset_type == CreateAssetType::MasterMaterial) {
+			const char* domain_names[] = {"Default", "PostProcess", "Terrain", "Decal", "UI", "Particle"};
+			ImGui::Combo("Domain", &create_mm_domain, domain_names, 6);
+		}
+
+		if (create_asset_type == CreateAssetType::MaterialInstance) {
+			ImGui::Text("Master: %s", create_mi_master_path.c_str());
+		}
+
+		ImGui::Separator();
+
+		bool do_create = enter_pressed || ImGui::Button("Create", ImVec2(120, 0));
+		ImGui::SameLine();
+		bool do_cancel = ImGui::Button("Cancel", ImVec2(120, 0));
+
+		if (do_create && strlen(create_asset_name) > 0) {
+			std::optional<std::string> result;
+			switch (create_asset_type) {
+			case CreateAssetType::Map:
+				result = AssetTemplates::create_empty_map(selected_folder, create_asset_name);
+				break;
+			case CreateAssetType::Particle:
+				result = AssetTemplates::create_empty_particle(selected_folder, create_asset_name);
+				break;
+			case CreateAssetType::MasterMaterial: {
+				const char* domain_names[] = {"Default", "PostProcess", "Terrain", "Decal", "UI", "Particle"};
+				result = AssetTemplates::create_mm_from_template(selected_folder, create_asset_name, domain_names[create_mm_domain]);
+				break;
+			}
+			case CreateAssetType::MaterialInstance:
+				result = AssetTemplates::create_mi_from_master(selected_folder, create_asset_name, create_mi_master_path);
+				break;
+			default:
+				break;
+			}
+
+			if (result) {
+				sys_print(Info, "Created asset: %s\n", result->c_str());
+			} else {
+				sys_print(Warning, "Failed to create asset (already exists or write error)\n");
+			}
+
+			create_asset_type = CreateAssetType::None;
+			ImGui::CloseCurrentPopup();
+		}
+
+		if (do_cancel) {
+			create_asset_type = CreateAssetType::None;
+			ImGui::CloseCurrentPopup();
+		}
+
+		ImGui::EndPopup();
+	}
 }
 
 // Separate call — caller should invoke this once per frame alongside imgui_draw().

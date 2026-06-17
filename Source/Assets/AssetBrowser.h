@@ -68,6 +68,13 @@ public:
 	uptr<ConsoleCmdGroup> commands;
 
 	ThumbnailManager thumbnails;
+
+	enum class CreateAssetType { None, Map, Particle, MasterMaterial, MaterialInstance };
+	CreateAssetType create_asset_type = CreateAssetType::None;
+	char create_asset_name[128] = {};
+	int create_mm_domain = 0;
+	std::string create_mi_master_path;
+	void draw_create_asset_popup();
 };
 
 #endif

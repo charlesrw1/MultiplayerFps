@@ -1,6 +1,7 @@
 #pragma once
 #include "AllHeader.h"
 #include "Framework/PropertyEd.h"
+#include "Game/EntityComponent.h"
 class ISelectionApi;
 class EdPropertyGrid
 {
@@ -45,4 +46,7 @@ private:
 	};
 
 	GridWithClasses grid_cache;
+
+	std::unique_ptr<IComponentEditorUi> editor_ui;
+	Component* editor_ui_component = nullptr;
 };

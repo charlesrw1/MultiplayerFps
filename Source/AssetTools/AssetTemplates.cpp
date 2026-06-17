@@ -5,6 +5,8 @@
 #include "Render/Editor/TextureEditor.h"
 #include "AssetCompile/ModelAsset2.h"
 #include "Framework/Util.h"
+#include "Render/MaterialLocal.h"
+#include "Assets/AssetDatabase.h"
 
 // @docs [[asset_tools#templates]]
 
@@ -63,6 +65,141 @@ std::optional<std::string> create_mi_from_template(const std::string& dir,
         return std::nullopt;
 
     std::string text = "PARENT " + master_mm_path + "\n";
+
+    auto f = FileSys::open_write_game(mi_gamepath);
+    if (!f) return std::nullopt;
+    f->write(text.data(), text.size());
+    f->close();
+
+    return mi_gamepath;
+}
+
+std::optional<std::string> create_mm_from_template(const std::string& dir,
+    const std::string& name, const std::string& domain) {
+    std::string mm_gamepath = dir.empty() ? (name + ".mm") : (dir + "/" + name + ".mm");
+
+    if (FileSys::does_file_exist(mm_gamepath.c_str(), FileSys::GAME_DIR))
+        return std::nullopt;
+
+    std::string text;
+    text += "TYPE MaterialMaster\n";
+    text += "DOMAIN " + domain + "\n";
+    text += "OPT BlendMode Opaque\n";
+    text += "OPT LightingMode Lit\n";
+    text += "\n";
+    text += "VAR texture2D Albedo \"_white\"\n";
+    text += "VAR texture2D Normalmap \"_flat_normal\"\n";
+    text += "VAR texture2D Roughness \"_white\"\n";
+    text += "VAR float RoughnessMult 1.0\n";
+    text += "VAR float MetallicValue 0.0\n";
+    text += "\n";
+    text += "_FS_BEGIN\n";
+    text += "void FSmain()\n";
+    text += "{\n";
+    text += "    ALBEDO = texture(Albedo, FS_IN_Texcoord).xyz;\n";
+    text += "    NORMAL = texture(Normalmap, FS_IN_Texcoord).xyz;\n";
+    text += "    ROUGHNESS = texture(Roughness, FS_IN_Texcoord).r * RoughnessMult;\n";
+    text += "    METALLIC = MetallicValue;\n";
+    text += "}\n";
+    text += "_FS_END\n";
+
+    auto f = FileSys::open_write_game(mm_gamepath);
+    if (!f) return std::nullopt;
+    f->write(text.data(), text.size());
+    f->close();
+
+    return mm_gamepath;
+}
+
+std::optional<std::string> create_empty_map(const std::string& dir, const std::string& name) {
+    std::string map_gamepath = dir.empty() ? (name + ".tmap") : (dir + "/" + name + ".tmap");
+
+    if (FileSys::does_file_exist(map_gamepath.c_str(), FileSys::GAME_DIR))
+        return std::nullopt;
+
+    std::string text = "!json\n{\"objs\":[]}\n";
+
+    auto f = FileSys::open_write_game(map_gamepath);
+    if (!f) return std::nullopt;
+    f->write(text.data(), text.size());
+    f->close();
+
+    return map_gamepath;
+}
+
+std::optional<std::string> create_empty_particle(const std::string& dir, const std::string& name) {
+    std::string path = dir.empty() ? (name + ".particle") : (dir + "/" + name + ".particle");
+
+    if (FileSys::does_file_exist(path.c_str(), FileSys::GAME_DIR))
+        return std::nullopt;
+
+    std::string text =
+        "{ \"subsystems\": [\n"
+        "    { \"name\": \"Default\", \"editor_visible\": true,\n"
+        "      \"main\": { \"duration\": 5.0, \"looping\": true, \"start_lifetime\": { \"mode\": \"Constant\", \"min\": 1.0 }, \"start_speed\": { \"mode\": \"Constant\", \"min\": 5.0 }, \"start_size\": { \"mode\": \"Constant\", \"min\": 1.0 } },\n"
+        "      \"emission\": { \"enabled\": true, \"rate_over_time\": { \"mode\": \"Constant\", \"min\": 10.0 } },\n"
+        "      \"shape\": { \"enabled\": true, \"shape\": \"Cone\", \"radius\": 1.0, \"angle\": 25.0 },\n"
+        "      \"renderer\": { \"enabled\": true, \"material\": \"\", \"render_mode\": \"Billboard\" }\n"
+        "    }\n"
+        "] }\n";
+
+    auto f = FileSys::open_write_game(path);
+    if (!f) return std::nullopt;
+    f->write(text.data(), text.size());
+    f->close();
+
+    return path;
+}
+
+std::optional<std::string> create_mi_from_master(const std::string& dir,
+    const std::string& name, const std::string& master_mm_path) {
+    std::string mi_gamepath = dir.empty() ? (name + ".mi") : (dir + "/" + name + ".mi");
+
+    if (FileSys::does_file_exist(mi_gamepath.c_str(), FileSys::GAME_DIR))
+        return std::nullopt;
+
+    std::string text;
+    text += "TYPE MaterialInstance\n";
+    text += "PARENT " + master_mm_path + "\n";
+
+    auto mat = g_assets.find<MaterialInstance>(master_mm_path);
+    if (mat.get() && mat->is_valid_to_use() && mat->impl) {
+        auto* master = mat->impl->get_master_impl();
+        if (master) {
+            for (auto& def : master->param_defs) {
+                auto& val = def.default_value;
+                switch (val.type) {
+                case MatParamType::Float:
+                    text += "VAR " + def.name + " " + std::to_string(val.scalar) + "\n";
+                    break;
+                case MatParamType::Vector:
+                {
+                    Color32 c(val.color32);
+                    text += "VAR " + def.name + " " + std::to_string(c.r) + " "
+                        + std::to_string(c.g) + " " + std::to_string(c.b) + " "
+                        + std::to_string(c.a) + "\n";
+                    break;
+                }
+                case MatParamType::Texture2D:
+                    if (val.tex)
+                        text += "VAR " + def.name + " " + val.tex->get_name() + "\n";
+                    else
+                        text += "VAR " + def.name + " _white\n";
+                    break;
+                case MatParamType::FloatVec:
+                    text += "VAR " + def.name + " " + std::to_string(val.vector.x) + " "
+                        + std::to_string(val.vector.y) + " " + std::to_string(val.vector.z) + " "
+                        + std::to_string(val.vector.w) + "\n";
+                    break;
+                case MatParamType::Bool:
+                    text += "VAR " + def.name + " " + (val.boolean ? "1" : "0") + "\n";
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
 
     auto f = FileSys::open_write_game(mi_gamepath);
     if (!f) return std::nullopt;

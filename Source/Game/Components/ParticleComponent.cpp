@@ -1,4 +1,5 @@
 #include "ParticleComponent.h"
+#include "ParticleSystemComponent.h"
 #include "Render/RenderObj.h"
 #include "GameEnginePublic.h"
 #include "ParticleMgr.h"
@@ -210,6 +211,8 @@ void ParticleMgr::draw(const View_Setup& vs) {
 	glm::mat4 invview = glm::inverse(vs.view);
 
 	for (auto c : all_components)
+		c->draw(invview[1], invview[0], invview[2]);
+	for (auto c : all_new_components)
 		c->draw(invview[1], invview[0], invview[2]);
 	for (auto t : all_trails)
 		t->draw(invview[1], invview[0], invview[2]);

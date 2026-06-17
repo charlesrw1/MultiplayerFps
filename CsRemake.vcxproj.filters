@@ -31,6 +31,9 @@
     <Filter Include="Source\Game\Components">
       <UniqueIdentifier>{769420d0-c524-5895-9147-98d7a54540ff}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source\Game\Particles">
+      <UniqueIdentifier>{a1b2c3d4-e5f6-7890-abcd-ef1234567890}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Source\Game\Entities">
       <UniqueIdentifier>{835ee852-76d7-5aad-b0e2-96b587c70696}</UniqueIdentifier>
     </Filter>
@@ -165,6 +168,9 @@
     <ClCompile Include="Source\Framework\CurveEditorImgui.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Framework\GradientEditorImgui.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Framework\DictParser.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
@@ -245,6 +251,21 @@
     </ClCompile>
     <ClCompile Include="Source\Game\Components\ParticleComponent.cpp">
       <Filter>Source\Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Components\ParticleSystemComponent.cpp">
+      <Filter>Source\Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Particles\ParticleTypes.cpp">
+      <Filter>Source\Game\Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Particles\ParticleModules.cpp">
+      <Filter>Source\Game\Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Particles\ParticleAsset.cpp">
+      <Filter>Source\Game\Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Particles\ParticleEditorUI.cpp">
+      <Filter>Source\Game\Particles</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp">
       <Filter>Source\Game\Components</Filter>
@@ -850,6 +871,24 @@
     </ClInclude>
     <ClInclude Include="Source\Game\Components\ParticleComponent.h">
       <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\ParticleSystemComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Particles\ParticleTypes.h">
+      <Filter>Source\Game\Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Particles\ParticleModules.h">
+      <Filter>Source\Game\Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Particles\ParticleAsset.h">
+      <Filter>Source\Game\Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Particles\ParticleEditorUI.h">
+      <Filter>Source\Game\Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\GradientEditorImgui.h">
+      <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\Guid.h">
       <Filter>Source\Framework</Filter>

@@ -2,6 +2,7 @@
 #include "Framework/Hashset.h"
 struct View_Setup;
 class ParticleComponent;
+class ParticleSystemComponent;
 class TrailComponent;
 class BeamComponent;
 class ParticleMgr
@@ -13,6 +14,8 @@ public:
 	void draw(const View_Setup& setup);
 	void register_this(ParticleComponent* c) { all_components.insert(c); }
 	void unregister_this(ParticleComponent* c) { all_components.remove(c); }
+	void register_this(ParticleSystemComponent* c) { all_new_components.insert(c); }
+	void unregister_this(ParticleSystemComponent* c) { all_new_components.remove(c); }
 	void register_this(TrailComponent* t) { all_trails.insert(t); }
 	void unregister_this(TrailComponent* t) { all_trails.remove(t); }
 	void register_this(BeamComponent* t) { all_beams.insert(t); }
@@ -20,6 +23,7 @@ public:
 
 private:
 	hash_set<ParticleComponent> all_components;
+	hash_set<ParticleSystemComponent> all_new_components;
 	hash_set<TrailComponent> all_trails;
 	hash_set<BeamComponent> all_beams;
 };

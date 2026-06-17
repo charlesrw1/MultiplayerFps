@@ -62,6 +62,7 @@
     <ClCompile Include="Source\Framework\ClassTypePtr.cpp" />
     <ClCompile Include="Source\Framework\Config.cpp" />
     <ClCompile Include="Source\Framework\CurveEditorImgui.cpp" />
+    <ClCompile Include="Source\Framework\GradientEditorImgui.cpp" />
     <ClCompile Include="Source\Framework\CurveEditorImgui_Curves.cpp" />
     <ClCompile Include="Source\Framework\CurveEditorImgui_Events.cpp" />
     <ClCompile Include="Source\Framework\CurveEditorImgui_Grid.cpp" />
@@ -142,6 +143,11 @@
     <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp" />
     <ClCompile Include="Source\Game\Components\MeshComponent.cpp" />
     <ClCompile Include="Source\Game\Components\ParticleComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\ParticleSystemComponent.cpp" />
+    <ClCompile Include="Source\Game\Particles\ParticleTypes.cpp" />
+    <ClCompile Include="Source\Game\Particles\ParticleModules.cpp" />
+    <ClCompile Include="Source\Game\Particles\ParticleAsset.cpp" />
+    <ClCompile Include="Source\Game\Particles\ParticleEditorUI.cpp" />
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp" />
     <ClCompile Include="Source\Game\Components\PhysicsJoints.cpp" />
     <ClCompile Include="Source\Game\Components\PhysicsShapes.cpp" />
@@ -410,6 +416,12 @@
     <ClInclude Include="Source\Framework\Hashset.h" />
     <ClInclude Include="Source\Game\Components\CameraComponent.h" />
     <ClInclude Include="Source\Game\Components\ParticleComponent.h" />
+    <ClInclude Include="Source\Game\Components\ParticleSystemComponent.h" />
+    <ClInclude Include="Source\Game\Particles\ParticleTypes.h" />
+    <ClInclude Include="Source\Game\Particles\ParticleModules.h" />
+    <ClInclude Include="Source\Game\Particles\ParticleAsset.h" />
+    <ClInclude Include="Source\Game\Particles\ParticleEditorUI.h" />
+    <ClInclude Include="Source\Framework\GradientEditorImgui.h" />
     <ClInclude Include="Source\Framework\Guid.h" />
     <ClInclude Include="Source\Framework\ScopedBoolean.h" />
     <ClInclude Include="Source\Framework\UniquePtrReflection.h" />

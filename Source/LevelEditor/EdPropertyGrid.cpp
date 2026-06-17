@@ -141,6 +141,21 @@ void EdPropertyGrid::draw(const ISelectionApi& api) {
 
 					on_property_change_internal.invoke();
 				}
+
+				if (selected) {
+					if (!editor_ui || editor_ui_component != selected) {
+						editor_ui = selected->create_editor_ui();
+						editor_ui_component = selected;
+					}
+					if (editor_ui) {
+						ImGui::Separator();
+						editor_ui->draw();
+					}
+				}
+				else {
+					editor_ui.reset();
+					editor_ui_component = nullptr;
+				}
 			}
 		} else {
 			ImGui::Text("Nothing selected\n");

@@ -21,6 +21,10 @@
 // ---------------------------------------------------------------------------
 
 #ifdef EDITOR_BUILD
+#include "AssetTools/AssetTemplates.h"
+#include "Framework/StringUtils.h"
+#include "Assets/AssetBrowser.h"
+
 class MaterialAssetMetadata : public AssetMetadata
 {
 public:
@@ -33,6 +37,19 @@ public:
 	virtual std::string get_type_name() const override { return "Material"; }
 	virtual const ClassTypeInfo* get_asset_class_type() const override { return &MaterialInstance::StaticType; }
 	void draw_browser_menu(const string& path) const final {}
+	void draw_browser_context_menu(const string& gamepath) final {
+		auto ext = StringUtils::get_extension_no_dot(gamepath);
+		if (ext == "mm") {
+			if (ImGui::MenuItem("Create Material Instance")) {
+				auto* browser = AssetBrowser::inst;
+				if (browser) {
+					browser->create_asset_type = AssetBrowser::CreateAssetType::MaterialInstance;
+					browser->create_mi_master_path = gamepath;
+					memset(browser->create_asset_name, 0, sizeof(browser->create_asset_name));
+				}
+			}
+		}
+	}
 };
 
 REGISTER_ASSETMETADATA_MACRO(MaterialAssetMetadata);
