@@ -60,6 +60,7 @@ public:
 	std::unique_ptr<IComponentEditorUi> create_editor_ui() final;
 	void update_shape_gizmo(int subsystem_index);
 	class MeshBuilderComponent* editor_shape_gizmo = nullptr;
+	bool gizmo_drawn_this_frame = false;
 #endif
 
 	REF AssetPtr<ParticleAsset> particle_asset;

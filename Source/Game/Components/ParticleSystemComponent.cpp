@@ -238,8 +238,9 @@ void ParticleSystemComponent::emit_particles(int ss_idx, int count)
 void ParticleSystemComponent::update()
 {
 #ifdef EDITOR_BUILD
-	if (editor_shape_gizmo && !editor_is_selected)
+	if (editor_shape_gizmo && !gizmo_drawn_this_frame)
 		update_shape_gizmo(-1);
+	gizmo_drawn_this_frame = false;
 #endif
 
 	if (!playing)
@@ -518,7 +519,7 @@ void ParticleSystemComponent::update_shape_gizmo(int subsystem_index)
 	if (!editor_shape_gizmo)
 		return;
 	auto* asset = particle_asset.get();
-	if (!editor_is_selected || !asset || !asset->is_valid_to_use() || subsystem_index < 0
+	if (!asset || !asset->is_valid_to_use() || subsystem_index < 0
 		|| subsystem_index >= (int)asset->subsystems.size()) {
 		editor_shape_gizmo->mb.Begin();
 		editor_shape_gizmo->mb.End();
@@ -594,6 +595,7 @@ void ParticleSystemComponent::update_shape_gizmo(int subsystem_index)
 
 	mb.End();
 	editor_shape_gizmo->sync_render_data();
+	gizmo_drawn_this_frame = true;
 }
 
 #endif
