@@ -280,8 +280,12 @@ void ParticleSystemEditorUi::draw_subsystem_list()
 			selected_subsystem = i;
 	}
 	if (ImGui::Button("Add Subsystem")) {
-		asset->subsystems.push_back(ParticleSubSystem());
-		asset->subsystems.back().name = "SubSystem " + std::to_string(asset->subsystems.size());
+		ParticleSubSystem ss;
+		ss.name = "SubSystem " + std::to_string(asset->subsystems.size() + 1);
+		ss.renderer.material = g_assets.find<MaterialInstance>("eng/default_particle.mi");
+		asset->subsystems.push_back(std::move(ss));
+		comp->clear();
+		comp->play();
 	}
 	if (asset->subsystems.size() > 1 && selected_subsystem >= 0
 		&& selected_subsystem < (int)asset->subsystems.size()) {
@@ -290,6 +294,8 @@ void ParticleSystemEditorUi::draw_subsystem_list()
 			asset->subsystems.erase(asset->subsystems.begin() + selected_subsystem);
 			if (selected_subsystem >= (int)asset->subsystems.size())
 				selected_subsystem = (int)asset->subsystems.size() - 1;
+			comp->clear();
+			comp->play();
 		}
 	}
 }
