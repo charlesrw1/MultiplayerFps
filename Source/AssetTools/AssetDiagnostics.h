@@ -22,6 +22,8 @@ public:
     const std::vector<AssetDiagnostic>* get_diags(const std::string& gamepath) const;
     std::optional<AssetSeverity> get_severity(const std::string& gamepath) const;
 
+    const auto& get_all() const { return cache_; }
+
     void save() const;
     void load();
 

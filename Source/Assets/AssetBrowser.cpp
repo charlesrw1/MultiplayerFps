@@ -46,6 +46,27 @@ AssetBrowser::AssetBrowser() {
 
 	commands = ConsoleCmdGroup::create("");
 	commands->add("CLEAR_AB_FILTER", [this](const Cmd_Args&) { clear_filter(); });
+	commands->add("ASSET_DIAG_LOG", [](const Cmd_Args&) {
+		auto& diag = AssetDiagnostics::get();
+		auto& all = diag.get_all();
+		if (all.empty()) {
+			sys_print(Info, "No asset diagnostics.\n");
+			return;
+		}
+		int errors = 0, warnings = 0, transitive = 0;
+		for (auto& [path, diags] : all) {
+			for (auto& d : diags) {
+				const char* label;
+				switch (d.severity) {
+				case AssetSeverity::Error:   label = "ERR"; errors++; break;
+				case AssetSeverity::Warning: label = "WRN"; warnings++; break;
+				default:                     label = "DEP"; transitive++; break;
+				}
+				sys_print(Warning, "[%s] %s: %s\n", label, path.c_str(), d.message.c_str());
+			}
+		}
+		sys_print(Info, "Asset diagnostics: %d errors, %d warnings, %d transitive\n", errors, warnings, transitive);
+	});
 	commands->add("FILTER_FOR", [this](const Cmd_Args& args) {
 		if (args.size() != 2) {
 			sys_print(Warning, "FILTER_FOR <asset type>\n");
@@ -173,6 +194,25 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 extern void OpenInNotepad(const string& name);
 extern void SetClipboardText(const string& name);
 
+static void draw_diag_tooltip(const std::string& gamepath) {
+	auto* diags = AssetDiagnostics::get().get_diags(gamepath);
+	if (!diags || !ImGui::IsItemHovered()) return;
+	ImGui::BeginTooltip();
+	for (auto& d : *diags) {
+		ImVec4 col;
+		const char* label;
+		switch (d.severity) {
+		case AssetSeverity::Error:             col = ImVec4(1, 0.2f, 0.2f, 1); label = "ERR"; break;
+		case AssetSeverity::Warning:           col = ImVec4(1, 0.8f, 0.1f, 1); label = "WRN"; break;
+		default:                               col = ImVec4(0.9f, 0.65f, 0.3f, 1); label = "DEP"; break;
+		}
+		ImGui::TextColored(col, "[%s]", label);
+		ImGui::SameLine();
+		ImGui::TextUnformatted(d.message.c_str());
+	}
+	ImGui::EndTooltip();
+}
+
 static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesystemNode* node, string parent_path) {
 	const float folder_indent = 20.0;
 	const int name_filter_len = strlen(b->asset_name_filter);
@@ -251,6 +291,7 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 			case AssetSeverity::TransitiveWarning: col = ImVec4(0.9f, 0.65f, 0.3f, 1.0f); break;
 			}
 			ImGui::TextColored(col, "[!]");
+			draw_diag_tooltip(asset.filename);
 			ImGui::SameLine();
 		}
 
@@ -333,30 +374,25 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 
 		bool is_selected = (b->selected_folder == folder_path);
 
-		// Reserve space for icon first; draw it after Selectable so the
-		// open/closed state reflects any click that just happened this frame.
 		ImGui::Dummy(ImVec2(indent * folder_indent, 1.0f));
 		ImGui::SameLine();
 		const float ICON_SIZE = 14.0f;
-		ImVec2 icon_pos = ImGui::GetCursorScreenPos();
-		ImGui::Dummy(ImVec2(ICON_SIZE, ICON_SIZE));
+
+		auto* t = child->folder_is_open ? b->folder_open : b->folder_closed;
+		if (t) {
+			ImVec2 icon_pos = ImGui::GetCursorScreenPos();
+			ImGui::PushID("##icon");
+			if (ImGui::InvisibleButton("##toggle", ImVec2(ICON_SIZE, ICON_SIZE)))
+				child->folder_is_open = !child->folder_is_open;
+			ImGui::PopID();
+			ImGui::GetWindowDrawList()->AddImage(
+				ImTextureID(uint64_t(t->get_internal_render_handle())),
+				icon_pos, ImVec2(icon_pos.x + ICON_SIZE, icon_pos.y + ICON_SIZE));
+		}
 		ImGui::SameLine();
 
-		if (ImGui::Selectable(child->name.c_str(), is_selected, ImGuiSelectableFlags_AllowItemOverlap)) {
+		if (ImGui::Selectable(child->name.c_str(), is_selected, ImGuiSelectableFlags_AllowItemOverlap))
 			b->selected_folder = folder_path;
-			child->folder_is_open = !child->folder_is_open;
-		}
-
-		// Draw icon after click is processed so it always matches folder_is_open
-		{
-			auto* t = child->folder_is_open ? b->folder_open : b->folder_closed;
-			if (t) {
-				ImGui::GetWindowDrawList()->AddImage(
-					ImTextureID(uint64_t(t->get_internal_render_handle())),
-					icon_pos, ImVec2(icon_pos.x + ICON_SIZE, icon_pos.y + ICON_SIZE),
-					ImVec2(0, 1), ImVec2(1, 0));
-			}
-		}
 
 		// Drag-drop target: accept file drops to move asset into this folder
 		if (ImGui::BeginDragDropTarget()) {
@@ -507,6 +543,8 @@ void AssetBrowser::draw_browser_grid() {
 			ImVec2 badge_max = ImVec2(thumb_screen_pos.x + THUMB_SIZE - 2,  thumb_screen_pos.y + 16);
 			dl->AddRectFilled(badge_min, badge_max, badge_col, 3.0f);
 			dl->AddText(ImVec2(badge_min.x + 2, badge_min.y + 1), IM_COL32(255, 255, 255, 255), "!");
+
+			draw_diag_tooltip(c->asset.filename);
 		}
 
 		ImGui::PopStyleColor();

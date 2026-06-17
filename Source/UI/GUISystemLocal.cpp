@@ -75,6 +75,7 @@ void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
 		dock_over_viewport(ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode, editorState);
 		editorState->draw_imgui_public();
 		AssetBrowser::inst->imgui_draw();
+		AssetBrowser::inst->imgui_draw_inspector();
 		//editorState->drdrawaw_tab_window();
 	}
 #endif

@@ -1,6 +1,6 @@
 This is a game engine project. Uses C++ VS2026 , OpenGL, SDL2, vcpkg. No CMAKE.
 
-path to compilier: "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\MSBuild.exe"' OR use msbuild.bat which is in PATH
+path to compilier: "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\MSBuild.exe"' OR use msbuild.cmd which is in PATH
 
 NEVER use VS compilier under "C:\Program Files (x86)\...", that is old compilier.
 
