@@ -12,6 +12,7 @@
 #include "Render/Texture.h"
 #include "Render/RenderConfigVars.h"
 #include "Assets/AssetRegistry.h"
+#include "Assets/AssetSizeViewer.h"
 #include "UI/GUISystemPublic.h"
 #include "UI/Widgets/Layouts.h"
 #include "Game/LevelAssets.h"
@@ -437,6 +438,12 @@ void EditorDoc::hook_menu_bar() {
 			}
 		}
 
+		ImGui::EndMenu();
+	}
+	if (ImGui::BeginMenu("Tools")) {
+		if (ImGui::MenuItem("Asset Size Viewer")) {
+			AssetSizeViewer::get().open();
+		}
 		ImGui::EndMenu();
 	}
 	if (ImGui::BeginMenu("Mode")) {

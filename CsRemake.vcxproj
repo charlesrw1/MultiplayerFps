@@ -196,6 +196,7 @@
     <ClCompile Include="Source\LevelEditor\ViewportHandles.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
     <ClCompile Include="Source\Logging.cpp" />
+    <ClCompile Include="Source\MyGame\fpsApp.cpp" />
     <ClCompile Include="Source\Render\DdsExport.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
@@ -311,6 +312,7 @@
     <ClInclude Include="Source\AssetCompile\Someutils.h" />
     <ClInclude Include="Source\Assets\AssetBrowser.h" />
     <ClInclude Include="Source\Assets\AssetInspectorPane.h" />
+    <ClInclude Include="Source\Assets\AssetSizeViewer.h" />
     <ClInclude Include="Source\Assets\AssetBundle.h" />
     <ClInclude Include="Source\Assets\AssetDatabase.h" />
     <ClInclude Include="Source\Assets\AssetRegistry.h" />
@@ -388,6 +390,8 @@
     <ClInclude Include="Source\LevelEditor\ViewportHandles.h" />
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Source\Logging.h" />
+    <ClInclude Include="Source\MyGame\fpsApp.h" />
+    <ClInclude Include="Source\MyGame\fpsObjects.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\Dx11\Dx11Local.h" />
     <ClInclude Include="Source\Render\GpuAllocator.h" />
@@ -555,6 +559,7 @@
     <ClCompile Include="Source\Physics\Physics2Local.cpp" />
     <!-- TextureEditor moved to AssetTools project -->
     <ClCompile Include="Source\Assets\AssetInspectorPane.cpp" />
+    <ClCompile Include="Source\Assets\AssetSizeViewer.cpp" />
     <ClCompile Include="Source\Render\Meshlet.cpp" />
     <ClCompile Include="Source\Sound\SoundComponent.cpp" />
     <ClCompile Include="Source\Sound\SoundLocal.cpp" />
