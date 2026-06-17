@@ -313,6 +313,8 @@ int game_engine_main(MainConfigurationOptions& options, int argc, char** argv) {
 	if (test_args.wait_for_debugger) {
 		wait_for_debugger_windows();
 	}
+	install_crash_handler();
+
 	options.editor_mode = test_args.editor;
 	if (test_args.present) {
 		eng_local.m_is_test_mode = true;

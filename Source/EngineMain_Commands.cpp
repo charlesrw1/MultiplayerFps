@@ -184,6 +184,7 @@ void load_imgui_ini(const Cmd_Args& args) {
 
 	ImGui::LoadIniSettingsFromDisk(path.c_str());
 }
+#include "AssetTools/AssetCompiler.h"
 
 // tech debt nonsense
 extern void IMPORT_TEX_FOLDER(const Cmd_Args& args);
@@ -191,6 +192,7 @@ extern void IMPORT_TEX(const Cmd_Args& args);
 extern void COMPILE_TEX(const Cmd_Args& args);
 extern void dump_render_memory_usage();
 void GameEngineLocal::add_commands() {
+	AssetCompiler::register_console_commands();
 	commands = ConsoleCmdGroup::create("");
 
 	commands->add("print_assets", [](const Cmd_Args&) { g_assets.print_usage(); });

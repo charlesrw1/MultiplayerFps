@@ -1,5 +1,5 @@
 #pragma once
-#ifdef EDITOR_BUILD
+
 #include <string>
 #include <vector>
 #include <optional>
@@ -27,5 +27,3 @@ namespace AssetCompiler {
 
     void register_console_commands();
 }
-
-#endif

@@ -293,14 +293,16 @@ void install_crash_handler() {
 	// box, and debug-CRT _CrtDbgReport asserts. Our SEH filter + assert path
 	// already write a minidump and the symbolised stack to the engine log;
 	// the popups add nothing and freeze the integration_test.ps1 pipeline.
+	if (!IsDebuggerPresent()) {
 	SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
 	_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
-#ifdef _DEBUG
-	_CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
-	_CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
-	_CrtSetReportMode(_CRT_ERROR,  _CRTDBG_MODE_FILE);
-	_CrtSetReportFile(_CRT_ERROR,  _CRTDBG_FILE_STDERR);
-#endif
+
+		_CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
+		_CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
+		_CrtSetReportMode(_CRT_ERROR,  _CRTDBG_MODE_FILE);
+		_CrtSetReportFile(_CRT_ERROR,  _CRTDBG_FILE_STDERR);
+	}
+
 	// Backstop: if abort() fires without going through the SEH filter (e.g.
 	// after the filter has already returned, or from a thread the filter
 	// didn't see), terminate immediately with a non-zero code instead of
@@ -338,6 +340,8 @@ void handle_assert_internal(const char* cond) {
 	if (ProgramTester::get().get_is_in_test())
 		throw std::runtime_error();
 #else
+	if (_CrtDbgReport(_CRT_ASSERT, nullptr, 0, nullptr, "%s", cond) == 1)
+		_CrtDbgBreak();
 	std::abort();
 #endif // WITH_TEST_ASSERT
 }

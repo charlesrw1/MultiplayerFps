@@ -133,6 +133,11 @@ void append_a_found_mesh_node(const ModelDefData& def, ModelCompileData& mcd, cg
 
 	for (int i = 0; i < mesh->primitives_count; i++) {
 		const cgltf_primitive& prim = mesh->primitives[i];
+		if (!(prim.attributes_count >= 1 && prim.attributes[0].type == cgltf_attribute_type_position)) {
+			sys_print(Warning,
+					  "!(prim.attributes_count >= 1 && prim.attributes[0].type == cgltf_attribute_type_position)\n");
+			continue;
+		}
 
 		Submesh part;
 		Bounds bounds;
@@ -155,7 +160,6 @@ void append_a_found_mesh_node(const ModelDefData& def, ModelCompileData& mcd, cg
 		if (prim.material)
 			part.material_idx = cgltf_material_index(mcd.gltf_file, prim.material);
 
-		assert(prim.attributes_count >= 1 && prim.attributes[0].type == cgltf_attribute_type_position);
 		const int vert_count = prim.attributes[0].data->count;
 		const size_t vert_start = part.base_vertex;
 		part.vertex_count = vert_count;
