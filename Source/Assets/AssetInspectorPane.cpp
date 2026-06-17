@@ -80,9 +80,10 @@ void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
 
 void AssetInspectorPane::apply_changes() {
     if (!settings_dirty || last_selected.filename.empty()) return;
+    size_t len = strlen(raw_file_contents.c_str());
     auto f = FileSys::open_write_game(last_selected.filename);
     if (f) {
-        f->write(raw_file_contents.data(), raw_file_contents.size());
+        f->write(raw_file_contents.data(), len);
         f->close();
     }
     AssetCompiler::compile_asset(last_selected.filename);
