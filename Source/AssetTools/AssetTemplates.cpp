@@ -171,7 +171,7 @@ std::optional<std::string> create_empty_particle(const std::string& dir, const s
         "      \"main\": { \"duration\": 5.0, \"looping\": true, \"start_lifetime\": { \"mode\": \"Constant\", \"min\": 1.0 }, \"start_speed\": { \"mode\": \"Constant\", \"min\": 5.0 }, \"start_size\": { \"mode\": \"Constant\", \"min\": 1.0 } },\n"
         "      \"emission\": { \"enabled\": true, \"rate_over_time\": { \"mode\": \"Constant\", \"min\": 10.0 } },\n"
         "      \"shape\": { \"enabled\": true, \"shape\": \"Cone\", \"radius\": 1.0, \"angle\": 25.0 },\n"
-        "      \"renderer\": { \"enabled\": true, \"material\": \"\", \"render_mode\": \"Billboard\" }\n"
+        "      \"renderer\": { \"enabled\": true, \"material\": \"eng/default_particle.mi\", \"render_mode\": \"Billboard\" }\n"
         "    }\n"
         "] }\n";
 

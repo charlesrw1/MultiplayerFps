@@ -3,6 +3,11 @@
 #include "GameEnginePublic.h"
 #include "ParticleMgr.h"
 #include "BillboardComponent.h"
+#include "MeshbuilderComponent.h"
+#include "Game/Entity.h"
+#include "Game/Particles/ParticleAsset.h"
+#include "AssetTools/AssetTemplates.h"
+#include "Assets/AssetDatabase.h"
 #include <glm/gtc/noise.hpp>
 
 void ParticleSystemComponent::start()
@@ -11,6 +16,17 @@ void ParticleSystemComponent::start()
 		auto billboard = get_owner()->create_component<BillboardComponent>();
 		billboard->set_texture(Texture::load("eng/icon/_nearest/particle.png"));
 		billboard->dont_serialize_or_edit = true;
+
+		if (!particle_asset.get() || !particle_asset->is_valid_to_use()) {
+			auto result = AssetTemplates::create_empty_particle("", "default_particle");
+			std::string path = result.value_or("default_particle.particle");
+			particle_asset = g_assets.find<ParticleAsset>(path);
+		}
+
+		editor_shape_gizmo = get_owner()->create_component<MeshBuilderComponent>();
+		editor_shape_gizmo->dont_serialize_or_edit = true;
+		editor_shape_gizmo->use_transform = false;
+		editor_shape_gizmo->depth_tested = false;
 	}
 
 	rng.state = wang_hash((uint32_t)get_instance_id());
@@ -27,6 +43,11 @@ void ParticleSystemComponent::stop()
 	batch_states.clear();
 	ParticleMgr::inst->unregister_this(this);
 	subsystem_states.clear();
+
+	if (editor_shape_gizmo) {
+		editor_shape_gizmo->destroy();
+		editor_shape_gizmo = nullptr;
+	}
 }
 
 void ParticleSystemComponent::on_changed_transform()
@@ -443,3 +464,133 @@ void ParticleSystemComponent::draw(const glm::vec3& side, const glm::vec3& up, c
 	for (auto& [mat, batch] : batch_states)
 		batch.builder.End();
 }
+
+#ifdef EDITOR_BUILD
+
+static void add_line_circle_3d(MeshBuilder& mb, glm::vec3 center, glm::vec3 axis_up,
+	float radius, int segments, Color32 color, float arc_degrees = 360.f)
+{
+	glm::vec3 right, forward;
+	if (glm::abs(glm::dot(axis_up, glm::vec3(0, 1, 0))) < 0.99f)
+		right = glm::normalize(glm::cross(axis_up, glm::vec3(0, 1, 0)));
+	else
+		right = glm::normalize(glm::cross(axis_up, glm::vec3(0, 0, 1)));
+	forward = glm::cross(right, axis_up);
+
+	float arc_rad = glm::radians(arc_degrees);
+	glm::vec3 prev = center + right * radius;
+	for (int i = 1; i <= segments; i++) {
+		float theta = arc_rad * (float)i / segments;
+		glm::vec3 pt = center + (right * glm::cos(theta) + forward * glm::sin(theta)) * radius;
+		mb.PushLine(prev, pt, color);
+		prev = pt;
+	}
+}
+
+static void add_line_cone(MeshBuilder& mb, glm::vec3 origin, float radius, float angle_deg,
+	float height, int segments, Color32 color)
+{
+	float angle_rad = glm::radians(angle_deg);
+	float top_radius = radius + height * glm::tan(angle_rad);
+
+	add_line_circle_3d(mb, origin, glm::vec3(0, 1, 0), radius, segments, color);
+	glm::vec3 top = origin + glm::vec3(0, height, 0);
+	add_line_circle_3d(mb, top, glm::vec3(0, 1, 0), top_radius, segments, color);
+
+	for (int i = 0; i < 4; i++) {
+		float theta = glm::two_pi<float>() * i / 4.f;
+		float cos_t = glm::cos(theta);
+		float sin_t = glm::sin(theta);
+		glm::vec3 bottom_pt = origin + glm::vec3(cos_t * radius, 0, sin_t * radius);
+		glm::vec3 top_pt = top + glm::vec3(cos_t * top_radius, 0, sin_t * top_radius);
+		mb.PushLine(bottom_pt, top_pt, color);
+	}
+}
+
+void ParticleSystemComponent::update_shape_gizmo(int subsystem_index)
+{
+	if (!editor_shape_gizmo)
+		return;
+	auto* asset = particle_asset.get();
+	if (!asset || !asset->is_valid_to_use() || subsystem_index < 0
+		|| subsystem_index >= (int)asset->subsystems.size()) {
+		editor_shape_gizmo->mb.Begin();
+		editor_shape_gizmo->mb.End();
+		editor_shape_gizmo->sync_render_data();
+		return;
+	}
+
+	auto& ss = asset->subsystems[subsystem_index];
+	if (!ss.shape.enabled) {
+		editor_shape_gizmo->mb.Begin();
+		editor_shape_gizmo->mb.End();
+		editor_shape_gizmo->sync_render_data();
+		return;
+	}
+
+	auto& shape = ss.shape;
+	glm::mat4 ws = get_ws_transform();
+	glm::vec3 ws_pos = glm::vec3(ws[3]);
+	glm::vec3 offset = glm::mat3(ws) * shape.position_offset;
+	glm::vec3 center = ws_pos + offset;
+
+	const Color32 gizmo_color = Color32(0, 200, 100, 200);
+	const int segments = 32;
+
+	auto& mb = editor_shape_gizmo->mb;
+	mb.Begin();
+
+	switch (shape.shape) {
+	case ParticleShapeType::Sphere:
+		mb.AddLineSphere(center, shape.radius, gizmo_color);
+		if (shape.radius_thickness < 1.f)
+			mb.AddLineSphere(center, shape.radius * (1.f - shape.radius_thickness), Color32(0, 150, 75, 120));
+		break;
+
+	case ParticleShapeType::Hemisphere:
+		add_line_circle_3d(mb, center, glm::vec3(0, 1, 0), shape.radius, segments, gizmo_color);
+		for (int j = 0; j < 4; j++) {
+			float theta = glm::two_pi<float>() * j / 4.f;
+			glm::vec3 prev_pt = center;
+			for (int i = 0; i <= 16; i++) {
+				float phi = glm::half_pi<float>() * (float)i / 16.f;
+				float x = glm::sin(phi) * glm::cos(theta) * shape.radius;
+				float y = glm::cos(phi) * shape.radius;
+				float z = glm::sin(phi) * glm::sin(theta) * shape.radius;
+				glm::vec3 pt = center + glm::vec3(x, y, z);
+				if (i > 0) mb.PushLine(prev_pt, pt, gizmo_color);
+				prev_pt = pt;
+			}
+		}
+		break;
+
+	case ParticleShapeType::Cone:
+		add_line_cone(mb, center, shape.radius, shape.angle, shape.radius * 2.f, segments, gizmo_color);
+		break;
+
+	case ParticleShapeType::Box: {
+		glm::vec3 half = shape.scale_offset * 0.5f;
+		mb.PushOrientedLineBox(-half, half, glm::translate(glm::mat4(1.f), center), gizmo_color);
+		break;
+	}
+	case ParticleShapeType::Circle:
+		add_line_circle_3d(mb, center, glm::vec3(0, 1, 0), shape.radius, segments, gizmo_color, shape.arc);
+		if (shape.arc < 360.f) {
+			mb.PushLine(center, center + glm::vec3(shape.radius, 0, 0), gizmo_color);
+			float arc_rad = glm::radians(shape.arc);
+			glm::vec3 end_pt = center + glm::vec3(glm::cos(arc_rad), 0, glm::sin(arc_rad)) * shape.radius;
+			mb.PushLine(center, end_pt, gizmo_color);
+		}
+		if (shape.radius_thickness < 1.f) {
+			float inner = shape.radius * (1.f - shape.radius_thickness);
+			add_line_circle_3d(mb, center, glm::vec3(0, 1, 0), inner, segments,
+				Color32(0, 150, 75, 120), shape.arc);
+		}
+		break;
+	}
+
+	mb.End();
+	editor_shape_gizmo->sync_render_data();
+}
+
+#endif

@@ -206,6 +206,8 @@ bool ParticleSystemEditorUi::draw()
 		} else ss.renderer.enabled = enabled_rend;
 	}
 
+	comp->update_shape_gizmo(selected_subsystem);
+
 	ImGui::Separator();
 	if (ImGui::Button("Save")) {
 		asset->save_to_disk();

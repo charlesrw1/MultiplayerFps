@@ -58,6 +58,8 @@ public:
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final { return "eng/editor/particle.png"; }
 	std::unique_ptr<IComponentEditorUi> create_editor_ui() final;
+	void update_shape_gizmo(int subsystem_index);
+	class MeshBuilderComponent* editor_shape_gizmo = nullptr;
 #endif
 
 	REF AssetPtr<ParticleAsset> particle_asset;
