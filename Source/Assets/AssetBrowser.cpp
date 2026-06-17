@@ -264,6 +264,28 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 				ImGui::Separator();
 				b->selected_resource.type->draw_browser_context_menu(b->selected_resource.filename);
 			}
+			ImGui::Separator();
+			if (ImGui::BeginMenu("Create New...")) {
+				if (ImGui::MenuItem("Map")) {
+					b->create_asset_type = AssetBrowser::CreateAssetType::Map;
+					memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
+				}
+				if (ImGui::MenuItem("Particle")) {
+					b->create_asset_type = AssetBrowser::CreateAssetType::Particle;
+					memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
+				}
+				if (ImGui::MenuItem("Master Material")) {
+					b->create_asset_type = AssetBrowser::CreateAssetType::MasterMaterial;
+					b->create_mm_domain = 0;
+					memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
+				}
+				if (ImGui::MenuItem("Material Instance")) {
+					b->create_asset_type = AssetBrowser::CreateAssetType::MaterialInstance;
+					b->create_mi_master_path = "eng/fallback.mm";
+					memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
+				}
+				ImGui::EndMenu();
+			}
 			ImGui::EndPopup();
 		}
 
@@ -693,6 +715,29 @@ void AssetBrowser::imgui_draw() {
 	// Left panel: folder tree
 	ImGui::BeginChild("##folder_tree", ImVec2(left_panel_width, main_h), true);
 	draw_folder_tree(this);
+	if (ImGui::BeginPopupContextWindow("create_asset_menu", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
+		ImGui::TextDisabled("Create in: %s", selected_folder.empty() ? "(root)" : selected_folder.c_str());
+		ImGui::Separator();
+		if (ImGui::MenuItem("New Map")) {
+			create_asset_type = CreateAssetType::Map;
+			memset(create_asset_name, 0, sizeof(create_asset_name));
+		}
+		if (ImGui::MenuItem("New Particle")) {
+			create_asset_type = CreateAssetType::Particle;
+			memset(create_asset_name, 0, sizeof(create_asset_name));
+		}
+		if (ImGui::MenuItem("New Master Material")) {
+			create_asset_type = CreateAssetType::MasterMaterial;
+			create_mm_domain = 0;
+			memset(create_asset_name, 0, sizeof(create_asset_name));
+		}
+		if (ImGui::MenuItem("New Material Instance")) {
+			create_asset_type = CreateAssetType::MaterialInstance;
+			create_mi_master_path = "eng/fallback.mm";
+			memset(create_asset_name, 0, sizeof(create_asset_name));
+		}
+		ImGui::EndPopup();
+	}
 	ImGui::EndChild();
 
 	ImGui::SameLine();
@@ -714,30 +759,6 @@ void AssetBrowser::imgui_draw() {
 		draw_browser_grid();
 	} else {
 		draw_browser_tree_view(this);
-	}
-
-	if (ImGui::BeginPopupContextWindow("create_asset_menu", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
-		ImGui::TextDisabled("Create New...");
-		ImGui::Separator();
-		if (ImGui::MenuItem("Map")) {
-			create_asset_type = CreateAssetType::Map;
-			memset(create_asset_name, 0, sizeof(create_asset_name));
-		}
-		if (ImGui::MenuItem("Particle")) {
-			create_asset_type = CreateAssetType::Particle;
-			memset(create_asset_name, 0, sizeof(create_asset_name));
-		}
-		if (ImGui::MenuItem("Master Material")) {
-			create_asset_type = CreateAssetType::MasterMaterial;
-			create_mm_domain = 0;
-			memset(create_asset_name, 0, sizeof(create_asset_name));
-		}
-		if (ImGui::MenuItem("Material Instance")) {
-			create_asset_type = CreateAssetType::MaterialInstance;
-			create_mi_master_path = "eng/fallback.mm";
-			memset(create_asset_name, 0, sizeof(create_asset_name));
-		}
-		ImGui::EndPopup();
 	}
 	ImGui::EndChild();
 
