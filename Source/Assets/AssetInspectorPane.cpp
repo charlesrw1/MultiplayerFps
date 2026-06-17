@@ -116,14 +116,15 @@ void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
 }
 
 void AssetInspectorPane::draw_material_text(const std::string& gamepath) {
-    static constexpr int kEditBufExtra = 4096;
+    static constexpr size_t kEditBufExtra = 4096;
     std::string& buf = raw_file_contents;
 
-    if (buf.capacity() < buf.size() + kEditBufExtra)
-        buf.reserve(buf.size() + kEditBufExtra);
-    buf.resize(buf.capacity(), '\0');
+    size_t text_len = strlen(buf.c_str());
+    size_t needed = text_len + kEditBufExtra;
+    if (buf.size() < needed)
+        buf.resize(needed, '\0');
 
-    if (ImGui::InputTextMultiline("##mattext", buf.data(), buf.capacity(),
+    if (ImGui::InputTextMultiline("##mattext", buf.data(), buf.size(),
                                   ImVec2(-1, -30))) {
         buf.resize(strlen(buf.data()));
         settings_dirty = true;
