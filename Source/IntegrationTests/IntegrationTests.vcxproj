@@ -86,6 +86,7 @@
     <ClCompile Include="RenderDump.cpp" />
     <ClCompile Include="StateDump.cpp" />
     <ClCompile Include="GpuTimer.cpp" />
+    <ClCompile Include="Tests\Editor\test_auto_import.cpp" />
     <ClCompile Include="Tests\Renderer\test_basic.cpp" />
     <ClCompile Include="Tests\Renderer\test_material_hotreload.cpp" />
     <ClCompile Include="Tests\Renderer\test_dynamic_model.cpp" />

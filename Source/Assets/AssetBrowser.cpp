@@ -53,19 +53,21 @@ AssetBrowser::AssetBrowser() {
 			sys_print(Info, "No asset diagnostics.\n");
 			return;
 		}
-		int errors = 0, warnings = 0, transitive = 0;
+		int errors = 0, warnings = 0, transitive = 0, infos = 0;
 		for (auto& [path, diags] : all) {
 			for (auto& d : diags) {
 				const char* label;
 				switch (d.severity) {
 				case AssetSeverity::Error:   label = "ERR"; errors++; break;
 				case AssetSeverity::Warning: label = "WRN"; warnings++; break;
+				case AssetSeverity::Info:    label = "INF"; infos++; break;
 				default:                     label = "DEP"; transitive++; break;
 				}
-				sys_print(Warning, "[%s] %s: %s\n", label, path.c_str(), d.message.c_str());
+				if (d.severity > AssetSeverity::Info)
+					sys_print(Warning, "[%s] %s: %s\n", label, path.c_str(), d.message.c_str());
 			}
 		}
-		sys_print(Info, "Asset diagnostics: %d errors, %d warnings, %d transitive\n", errors, warnings, transitive);
+		sys_print(Info, "Asset diagnostics: %d errors, %d warnings, %d transitive, %d info\n", errors, warnings, transitive, infos);
 	});
 	commands->add("FILTER_FOR", [this](const Cmd_Args& args) {
 		if (args.size() != 2) {
@@ -204,6 +206,7 @@ static void draw_diag_tooltip(const std::string& gamepath) {
 		switch (d.severity) {
 		case AssetSeverity::Error:             col = ImVec4(1, 0.2f, 0.2f, 1); label = "ERR"; break;
 		case AssetSeverity::Warning:           col = ImVec4(1, 0.8f, 0.1f, 1); label = "WRN"; break;
+		case AssetSeverity::Info:              col = ImVec4(0.8f, 0.8f, 0.8f, 1); label = "INF"; break;
 		default:                               col = ImVec4(0.9f, 0.65f, 0.3f, 1); label = "DEP"; break;
 		}
 		ImGui::TextColored(col, "[%s]", label);
@@ -289,8 +292,9 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 			case AssetSeverity::Error:            col = ImVec4(1.0f, 0.2f, 0.2f, 1.0f); break;
 			case AssetSeverity::Warning:          col = ImVec4(1.0f, 0.8f, 0.1f, 1.0f); break;
 			case AssetSeverity::TransitiveWarning: col = ImVec4(0.9f, 0.65f, 0.3f, 1.0f); break;
+			case AssetSeverity::Info:             col = ImVec4(0.8f, 0.8f, 0.8f, 1.0f); break;
 			}
-			ImGui::TextColored(col, "[!]");
+			ImGui::TextColored(col, *sev == AssetSeverity::Info ? "[?]" : "[!]");
 			draw_diag_tooltip(asset.filename);
 			ImGui::SameLine();
 		}
@@ -537,6 +541,7 @@ void AssetBrowser::draw_browser_grid() {
 			case AssetSeverity::Error:             badge_col = IM_COL32(220, 40, 40, 230);  break;
 			case AssetSeverity::Warning:           badge_col = IM_COL32(220, 180, 0, 230);  break;
 			case AssetSeverity::TransitiveWarning: badge_col = IM_COL32(200, 140, 40, 200); break;
+			case AssetSeverity::Info:              badge_col = IM_COL32(180, 180, 180, 160); break;
 			default:                               badge_col = IM_COL32(200, 140, 40, 200); break;
 			}
 			ImVec2 badge_min = ImVec2(thumb_screen_pos.x + THUMB_SIZE - 18, thumb_screen_pos.y + 2);

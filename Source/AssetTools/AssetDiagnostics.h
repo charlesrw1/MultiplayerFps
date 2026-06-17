@@ -6,7 +6,7 @@
 #include <unordered_map>
 
 // Ordering matters: higher value = higher priority in get_severity()
-enum class AssetSeverity { TransitiveWarning = 0, Warning = 1, Error = 2 };
+enum class AssetSeverity { Info = 0, TransitiveWarning = 1, Warning = 2, Error = 3 };
 
 struct AssetDiagnostic {
     AssetSeverity severity;

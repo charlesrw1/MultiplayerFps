@@ -49,6 +49,7 @@
     <ClCompile Include="AssetOps.cpp" />
     <ClCompile Include="AssetTemplates.cpp" />
     <ClCompile Include="AssetPackager.cpp" />
+    <ClCompile Include="DiagnosticsWindow.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AssetCompiler.h" />
@@ -56,6 +57,7 @@
     <ClInclude Include="AssetOps.h" />
     <ClInclude Include="AssetTemplates.h" />
     <ClInclude Include="AssetPackager.h" />
+    <ClInclude Include="DiagnosticsWindow.h" />
     <ClInclude Include="..\..\Source\AssetCompile\Compiliers.h" />
     <ClInclude Include="..\..\Source\AssetCompile\ModelAsset2.h" />
     <ClInclude Include="..\..\Source\Render\SpirvCompile.h" />

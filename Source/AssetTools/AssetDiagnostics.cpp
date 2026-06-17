@@ -1,7 +1,9 @@
 #ifdef EDITOR_BUILD
 #include "AssetTools/AssetDiagnostics.h"
+#include "AssetTools/AssetTemplates.h"
 #include "Framework/Files.h"
 #include "Framework/StringUtils.h"
+#include "Framework/Util.h"
 #include "json.hpp"
 #include <fstream>
 #include <sstream>
@@ -36,7 +38,7 @@ std::optional<AssetSeverity> AssetDiagnostics::get_severity(const std::string& g
     auto* diags = get_diags(gamepath);
     if (!diags || diags->empty())
         return std::nullopt;
-    AssetSeverity worst = AssetSeverity::TransitiveWarning;
+    AssetSeverity worst = AssetSeverity::Info;
     for (auto& d : *diags)
         if (d.severity > worst) worst = d.severity;
     return worst;
@@ -51,14 +53,16 @@ static const char* sev_to_str(AssetSeverity s) {
     case AssetSeverity::Error:             return "error";
     case AssetSeverity::Warning:           return "warning";
     case AssetSeverity::TransitiveWarning: return "transitive";
+    case AssetSeverity::Info:              return "info";
     }
-    return "transitive";
+    return "info";
 }
 
 static AssetSeverity str_to_sev(const std::string& s) {
     if (s == "error")   return AssetSeverity::Error;
     if (s == "warning") return AssetSeverity::Warning;
-    return AssetSeverity::TransitiveWarning;
+    if (s == "transitive") return AssetSeverity::TransitiveWarning;
+    return AssetSeverity::Info;
 }
 
 void AssetDiagnostics::save() const {
@@ -112,6 +116,10 @@ static std::string stem(const std::string& gp, const std::string& ext) {
 // Does NOT overwrite existing Error-level diagnostics (set by the compiler).
 // Called at editor startup (after load()) and at the end of build_all().
 void AssetDiagnostics::scan_all() {
+    int imported = AssetTemplates::auto_import_all_png();
+    if (imported > 0)
+        sys_print(Info, "Auto-imported %d .tis sidecar(s) for orphan .png files\n", imported);
+
     for (const auto& full : FileSys::find_game_files()) {
         auto gp = FileSys::get_game_path_from_full_path(full);
         auto ext = StringUtils::get_extension_no_dot(gp);
@@ -128,9 +136,8 @@ void AssetDiagnostics::scan_all() {
             if (!game_file_exists(s + "mis"))
                 diags.push_back({AssetSeverity::Warning, "no .mis import settings"});
         } else if (ext == "dds") {
-            // Compiled texture: usable but can't reimport without .tis
             if (!game_file_exists(s + "tis"))
-                diags.push_back({AssetSeverity::Warning, "no .tis import settings"});
+                diags.push_back({AssetSeverity::Info, "no .tis import settings"});
         } else if (ext == "mis") {
             // Import settings: source .glb should be nearby (same-stem convention)
             if (!game_file_exists(s + "glb"))
@@ -243,7 +250,7 @@ void AssetDiagnostics::scan_transitive() {
                 has_issue = true;
             } else {
                 auto dep_sev = get_severity(ref);
-                if (dep_sev) {
+                if (dep_sev && *dep_sev > AssetSeverity::Info) {
                     has_issue = true;
                     if (*dep_sev > worst_dep) worst_dep = *dep_sev;
                 }
@@ -289,7 +296,7 @@ void AssetDiagnostics::scan_transitive() {
                 has_issue = true;
             } else {
                 auto dep_sev = get_severity(ref);
-                if (dep_sev) {
+                if (dep_sev && *dep_sev > AssetSeverity::Info) {
                     has_issue = true;
                     if (*dep_sev > worst_dep) worst_dep = *dep_sev;
                 }
@@ -324,7 +331,7 @@ void AssetDiagnostics::scan_transitive() {
     }
     for (auto& [src, dst] : pairs) {
         auto src_sev = get_severity(src);
-        if (!src_sev) continue;
+        if (!src_sev || *src_sev == AssetSeverity::Info) continue;
         auto dst_sev = get_severity(dst);
         if (dst_sev && *dst_sev >= *src_sev) continue;
         auto* d = get_diags(dst);
@@ -354,7 +361,7 @@ void AssetDiagnostics::scan_dependencies(const std::string& gamepath) {
         bool has_issue = false;
         for (auto& ref : refs) {
             if (!game_file_exists(ref)) { worst = AssetSeverity::Error; has_issue = true; }
-            else { auto s = get_severity(ref); if (s) { has_issue = true; if (*s > worst) worst = *s; } }
+            else { auto s = get_severity(ref); if (s && *s > AssetSeverity::Info) { has_issue = true; if (*s > worst) worst = *s; } }
         }
         if (!has_issue) { clear(gamepath); return; }
         AssetSeverity new_sev = (worst == AssetSeverity::Error) ? AssetSeverity::Warning : AssetSeverity::TransitiveWarning;
@@ -374,7 +381,7 @@ void AssetDiagnostics::scan_dependencies(const std::string& gamepath) {
     if      (ext == "cmdl" && !game_file_exists(s + "mis"))
         diags.push_back({AssetSeverity::Warning, "no .mis import settings"});
     else if (ext == "dds"  && !game_file_exists(s + "tis"))
-        diags.push_back({AssetSeverity::Warning, "no .tis import settings"});
+        diags.push_back({AssetSeverity::Info, "no .tis import settings"});
     else if (ext == "mis"  && !game_file_exists(s + "glb"))
         diags.push_back({AssetSeverity::Warning, "source .glb not found alongside .mis"});
     else if (ext == "tis"  && !game_file_exists(s + "png"))

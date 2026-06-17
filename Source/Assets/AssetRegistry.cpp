@@ -293,11 +293,13 @@ void AssetRegistrySystem::update() {
 				g_assets.reload<Model>(asset);
 			}
 		} else if (ext == "png" || ext == "jpg" || ext == "tis") {
-			// Auto-import: create a .tis sidecar for new .png files
 			if (ext == "png") {
 				std::string tis = rel_path.substr(0, rel_path.size() - 3) + "tis";
-				if (!file_exists(tis))
-					AssetTemplates::create_tis_for_png(rel_path);
+				if (!file_exists(tis)) {
+					auto created = AssetTemplates::create_tis_for_png(rel_path);
+					if (created)
+						sys_print(Info, "Auto-import: created %s for %s\n", created->c_str(), rel_path.c_str());
+				}
 			}
 			std::string dds = rel_path;
 			StringUtils::remove_extension(dds);

@@ -1,6 +1,7 @@
 #ifdef EDITOR_BUILD
 #include "AssetTools/AssetCompiler.h"
 #include "AssetTools/AssetDiagnostics.h"
+#include "AssetTools/AssetTemplates.h"
 #include "AssetCompile/Compiliers.h"
 #include "Render/Editor/TextureEditor.h"
 #include "Render/SpirvCompile.h"
@@ -24,6 +25,9 @@ static void diag_err(const std::string& gamepath, const std::string& msg) {
 }
 static void diag_warn(const std::string& gamepath, const std::string& msg) {
     AssetDiagnostics::get().set(gamepath, {{AssetSeverity::Warning, msg}});
+}
+static void diag_info(const std::string& gamepath, const std::string& msg) {
+    AssetDiagnostics::get().set(gamepath, {{AssetSeverity::Info, msg}});
 }
 
 static bool game_file_exists(const std::string& rel) {
@@ -192,7 +196,7 @@ std::optional<AssetCompileResult> compile_asset(const std::string& gamepath) {
     else if (ext == "dds") {
         std::string tis = gamepath.substr(0, gamepath.size() - 3) + "tis";
         if (!game_file_exists(tis)) {
-            diag_warn(gamepath, "no .tis import settings — texture is unmanaged");
+            diag_info(gamepath, "no .tis import settings — texture is unmanaged");
             return AssetCompileResult{true, "no .tis — texture is unmanaged"};
         }
         return compile_texture(tis);
@@ -262,6 +266,10 @@ void register_console_commands() {
         auto errs = check_all_errors();
         for (auto& e : errs) sys_print(Error, "%s\n", e.c_str());
         sys_print(Info, "%d error(s)\n", (int)errs.size());
+    });
+    cmds->add("ASSET_AUTO_IMPORT", [](const Cmd_Args&) {
+        int n = AssetTemplates::auto_import_all_png();
+        sys_print(Info, "Auto-imported %d .tis sidecar(s)\n", n);
     });
     cmds->add("ASSET_COMPILE", [](const Cmd_Args& a) {
         if (a.size() < 2) { sys_print(Warning, "usage: ASSET_COMPILE <gamepath>\n"); return; }

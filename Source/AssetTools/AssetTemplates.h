@@ -11,6 +11,10 @@ namespace AssetTemplates {
     // Create a .mi material instance in dir with the given name, optionally specifying master .mm
     std::optional<std::string> create_mi_from_template(const std::string& dir,
         const std::string& name, const std::string& master_mm_path = "eng/fallback.mm");
+
+    // Scan all .png files in the game directory and create .tis sidecars for any missing ones.
+    // Returns the number of .tis files created.
+    int auto_import_all_png();
 }
 
 #endif
