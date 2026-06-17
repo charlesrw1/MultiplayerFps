@@ -83,12 +83,6 @@ bool ParticleAsset::load_asset()
 
 void ParticleAsset::post_load()
 {
-	for (auto& ss : subsystems) {
-		auto& rm = ss.renderer;
-		if (!rm.material.get()) {
-			// material path is stored as a string, resolve it here
-		}
-	}
 }
 
 void ParticleAsset::uninstall()

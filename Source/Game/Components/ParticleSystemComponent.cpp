@@ -8,7 +8,9 @@
 #include "Game/Particles/ParticleAsset.h"
 #include "AssetTools/AssetTemplates.h"
 #include "Assets/AssetDatabase.h"
+#include <algorithm>
 #include <glm/gtc/noise.hpp>
+#include <glm/gtx/euler_angles.hpp>
 
 void ParticleSystemComponent::start()
 {
@@ -187,6 +189,14 @@ void ParticleSystemComponent::spawn_from_shape(const ShapeModule& shape, glm::ve
 		break;
 	}
 	}
+
+	// apply rotation offset
+	if (shape.rotation_offset != glm::vec3(0.f)) {
+		glm::vec3 rad = glm::radians(shape.rotation_offset);
+		glm::mat3 rot = glm::mat3(glm::eulerAngleYXZ(rad.y, rad.x, rad.z));
+		out_pos = rot * (out_pos - shape.position_offset) + shape.position_offset;
+		out_vel = rot * out_vel;
+	}
 }
 
 void ParticleSystemComponent::emit_particles(int ss_idx, int count)
@@ -305,7 +315,10 @@ void ParticleSystemComponent::update()
 				float vx = vol.x.evaluate(normalized_life, p.random_seed);
 				float vy = vol.y.evaluate(normalized_life, p.random_seed);
 				float vz = vol.z.evaluate(normalized_life, p.random_seed);
-				p.velocity += glm::vec3(vx, vy, vz) * dt;
+				glm::vec3 linear_vel(vx, vy, vz);
+				if (vol.space == SimulationSpace::Local && main.simulation_space == SimulationSpace::World)
+					linear_vel = glm::mat3(get_ws_transform()) * linear_vel;
+				p.velocity += linear_vel * dt;
 
 				// orbital velocity: rotate position around emitter origin per axis
 				float ox = vol.orbital_x.evaluate(normalized_life, p.random_seed);
@@ -379,8 +392,13 @@ void ParticleSystemComponent::update()
 
 			// size over lifetime
 			if (subsys.size_over_lifetime.enabled) {
-				float s = subsys.size_over_lifetime.size.evaluate(normalized_life, p.random_seed);
-				p.scale = p.start_size * s;
+				if (subsys.size_over_lifetime.separate_axes) {
+					float sx = subsys.size_over_lifetime.x.evaluate(normalized_life, p.random_seed);
+					p.scale = p.start_size * sx;
+				} else {
+					float s = subsys.size_over_lifetime.size.evaluate(normalized_life, p.random_seed);
+					p.scale = p.start_size * s;
+				}
 			}
 
 			// color over lifetime
@@ -403,8 +421,14 @@ void ParticleSystemComponent::update()
 			if (subsys.texture_sheet.enabled) {
 				auto& ts = subsys.texture_sheet;
 				int total_frames = ts.tiles_x * ts.tiles_y;
-				float frame_f = ts.frame_over_time.evaluate(normalized_life, p.random_seed);
-				p.tex_frame = glm::clamp((int)(frame_f * total_frames), 0, total_frames - 1);
+				if (ts.animation == TextureSheetAnimation::SingleRow)
+					total_frames = ts.tiles_x;
+				int start = (int)ts.start_frame.evaluate(0.f, p.random_seed);
+				start = glm::clamp(start, 0, total_frames - 1);
+				float cycled_life = glm::fract(normalized_life * ts.cycles);
+				float frame_f = ts.frame_over_time.evaluate(cycled_life, p.random_seed);
+				int frame = start + (int)(frame_f * (total_frames - start));
+				p.tex_frame = glm::clamp(frame, 0, total_frames - 1);
 			}
 
 			// kill dead particles
@@ -459,7 +483,34 @@ void ParticleSystemComponent::draw(const glm::vec3& side, const glm::vec3& up, c
 		glm::mat4 local_to_world = (subsys.main.simulation_space == SimulationSpace::Local)
 			? get_ws_transform() : glm::mat4(1.f);
 
-		for (auto& p : subsystem_states[ss_idx].particles) {
+		auto& particles_ref = subsystem_states[ss_idx].particles;
+
+		// sort particles if needed
+		if (subsys.renderer.sort_mode != ParticleSortMode::None && particles_ref.size() > 1) {
+			switch (subsys.renderer.sort_mode) {
+			case ParticleSortMode::ByDistance:
+				std::sort(particles_ref.begin(), particles_ref.end(),
+					[&](const ParticleSystemDef& a, const ParticleSystemDef& b) {
+						return glm::dot(a.position, front) < glm::dot(b.position, front);
+					});
+				break;
+			case ParticleSortMode::OldestFirst:
+				std::sort(particles_ref.begin(), particles_ref.end(),
+					[](const ParticleSystemDef& a, const ParticleSystemDef& b) {
+						return a.lifeTime > b.lifeTime;
+					});
+				break;
+			case ParticleSortMode::YoungestFirst:
+				std::sort(particles_ref.begin(), particles_ref.end(),
+					[](const ParticleSystemDef& a, const ParticleSystemDef& b) {
+						return a.lifeTime < b.lifeTime;
+					});
+				break;
+			default: break;
+			}
+		}
+
+		for (auto& p : particles_ref) {
 			glm::vec3 world_pos = (subsys.main.simulation_space == SimulationSpace::Local)
 				? glm::vec3(local_to_world * glm::vec4(p.position, 1.f))
 				: p.position;
@@ -468,8 +519,18 @@ void ParticleSystemComponent::draw(const glm::vec3& side, const glm::vec3& up, c
 			float rot = p.rotation;
 			float cos_r = glm::cos(rot);
 			float sin_r = glm::sin(rot);
-			glm::vec3 r_side = (side * cos_r + up * sin_r) * s;
-			glm::vec3 r_up = (-side * sin_r + up * cos_r) * s;
+			glm::vec3 r_side, r_up;
+
+			if (subsys.renderer.render_mode == ParticleRenderMode::StretchedBillboard) {
+				float speed = glm::length(p.velocity);
+				glm::vec3 vel_dir = speed > 0.001f ? p.velocity / speed : front;
+				float stretch = subsys.renderer.length_scale + speed * subsys.renderer.speed_scale;
+				r_up = vel_dir * s * stretch;
+				r_side = glm::normalize(glm::cross(vel_dir, front)) * s;
+			} else {
+				r_side = (side * cos_r + up * sin_r) * s;
+				r_up = (-side * sin_r + up * cos_r) * s;
+			}
 
 			int base = batch.builder.GetBaseVertex();
 			MbVertex v;

@@ -79,7 +79,7 @@ void ParticleSystemEditorUi::draw_minmax_curve(const char* label, MinMaxCurve& c
 			if (curve.curve0.points.empty())
 				curve.curve0 = make_default_linear_curve();
 			curve_editor_popup.add_curve(curve.curve0);
-			curve_editor_popup.fit_to_content();
+			curve_editor_popup.request_fit();
 		}
 		break;
 	case MinMaxCurveMode::RandomBetweenCurves:
@@ -97,7 +97,7 @@ void ParticleSystemEditorUi::draw_minmax_curve(const char* label, MinMaxCurve& c
 				curve.curve1 = make_default_linear_curve();
 			curve_editor_popup.add_curve(curve.curve0);
 			curve_editor_popup.add_curve(curve.curve1);
-			curve_editor_popup.fit_to_content();
+			curve_editor_popup.request_fit();
 		}
 		break;
 	}
@@ -266,7 +266,7 @@ bool ParticleSystemEditorUi::draw()
 				auto apply_preset = [&](EditingCurve c) {
 					curve_editor_popup.clear_all();
 					curve_editor_popup.add_curve(c);
-					curve_editor_popup.fit_to_content();
+					curve_editor_popup.request_fit();
 				};
 				if (ImGui::MenuItem("Linear (0 to 1)")) {
 					apply_preset(make_default_linear_curve());
@@ -316,7 +316,7 @@ bool ParticleSystemEditorUi::draw()
 			}
 			ImGui::SameLine();
 			if (ImGui::Button("Fit"))
-				curve_editor_popup.fit_to_content();
+				curve_editor_popup.request_fit();
 			ImGui::Separator();
 
 			curve_editor_popup.draw_content();

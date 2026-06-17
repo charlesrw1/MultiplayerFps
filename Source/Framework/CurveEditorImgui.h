@@ -89,6 +89,9 @@ public:
 	// reset zoom/pan to fit all curve content in view
 	void fit_to_content();
 
+	// request a fit on the next draw frame (when WINDOW_SIZE is valid)
+	void request_fit() { pending_fit = true; }
+
 	std::string window_name = "Curve Editor";
 
 	// this callback is used when right-clicking on canvas when "Events" is selected
@@ -217,6 +220,7 @@ private:
 	int dragged_point_type = 0; // 0 = point, 1=tangent0,2=tangent1
 
 	bool dragging_scrubber = false;
+	bool pending_fit = false;
 
 	ImVec2 clickpos{};
 

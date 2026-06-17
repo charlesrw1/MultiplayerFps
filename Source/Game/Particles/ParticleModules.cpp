@@ -277,7 +277,9 @@ void to_json(nlohmann::json& j, const RendererModule& m)
 void from_json(const nlohmann::json& j, RendererModule& m)
 {
 	m.enabled = j.value("enabled", true);
-	// material path resolved later in post_load
+	std::string mat_path = j.value("material", std::string(""));
+	if (!mat_path.empty())
+		m.material = g_assets.find<MaterialInstance>(mat_path);
 	if (j.contains("render_mode"))
 		m.render_mode = (ParticleRenderMode)enum_val(
 			EnumTrait<ParticleRenderMode>::StaticEnumType, j["render_mode"].get<std::string>());

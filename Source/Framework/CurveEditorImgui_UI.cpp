@@ -146,6 +146,10 @@ void CurveEditorImgui::draw_content()
 		ImGui::TableNextColumn();
 		BASE_SCREENPOS = ImGui::GetCursorScreenPos();
 		WINDOW_SIZE    = ImGui::GetContentRegionAvail();
+		if (pending_fit && WINDOW_SIZE.x > 0 && WINDOW_SIZE.y > 0) {
+			pending_fit = false;
+			fit_to_content();
+		}
 		draw_editor_space();
 
 		ImGui::EndTable();
@@ -218,8 +222,10 @@ void CurveEditorImgui::fit_to_content()
 	grid_offset = ImVec2(x_min, y_max);
 	float sx = x_range * (1.f + 2.f * padding);
 	float sy = y_range * (1.f + 2.f * padding);
-	scale.x = glm::max(sx * 32.f / 600.f, 0.01f);
-	scale.y = glm::max(sy * 30.f / 350.f, 0.01f);
+	float win_w = (WINDOW_SIZE.x > 0) ? WINDOW_SIZE.x : 600.f;
+	float win_h = (WINDOW_SIZE.y > 0) ? WINDOW_SIZE.y : 350.f;
+	scale.x = glm::max(sx / (win_w * base_scale.x), 0.01f);
+	scale.y = glm::max(sy / (-win_h * base_scale.y), 0.01f);
 }
 
 bool CurveEditorImgui::draw_curve_preview(const char* id, const EditingCurve& curve, float width, float height)
