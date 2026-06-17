@@ -85,6 +85,16 @@ void IEditorTool::draw_menu_bar() {
 
 		hook_menu_bar();
 
+		if (ImGui::BeginMenu("Layout")) {
+			if (ImGui::MenuItem("Save Layout")) {
+				Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, "dump_imgui_ini layout.ini");
+			}
+			if (ImGui::MenuItem("Load Layout")) {
+				Cmd_Manager::inst->execute(Cmd_Execute_Mode::NOW, "load_imgui_ini layout.ini");
+			}
+			ImGui::EndMenu();
+		}
+
 		ImGui::EndMenuBar();
 	}
 }
