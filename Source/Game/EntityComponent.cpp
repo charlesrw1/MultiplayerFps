@@ -39,7 +39,7 @@ public:
 
 		filepaths.push_back("SoundComponent");
 
-		filepaths.push_back("ParticleInstComponent");
+		filepaths.push_back("ParticleSystemComponent");
 
 		filepaths.push_back("AnimPreviewComponent");
 

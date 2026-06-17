@@ -56,8 +56,8 @@ public:
 
 	// Marks this IAsset as a runtime asset that is NOT owned by AssetDatabase.
 	// Intended for the dynamic-pool path only (ModelMan dynamic models,
-	// DynamicMaterialAllocator dynamic materials, ParticleDefinition::create
-	// resetting an existing instance).  Sets `path` and `load_attempted = true`
+	// DynamicMaterialAllocator dynamic materials).
+	// Sets `path` and `load_attempted = true`
 	// so the asset reads as valid_to_use.  Asset-DB-managed assets go through
 	// AssetDatabase::install_runtime instead.
 	void init_runtime_unmanaged(const std::string& name) {
