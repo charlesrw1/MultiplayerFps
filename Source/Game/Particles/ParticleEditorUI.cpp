@@ -9,6 +9,17 @@
 #include "AssetTools/AssetTemplates.h"
 #include "imgui.h"
 
+static EditingCurve make_default_linear_curve()
+{
+	EditingCurve c;
+	c.name = "Curve";
+	c.color = Color32(200, 200, 100);
+	CurvePoint p0; p0.time = 0.f; p0.value = 0.f; p0.type = CurvePointType::Linear;
+	CurvePoint p1; p1.time = 1.f; p1.value = 1.f; p1.type = CurvePointType::Linear;
+	c.points = {p0, p1};
+	return c;
+}
+
 ParticleSystemEditorUi::ParticleSystemEditorUi(ParticleSystemComponent* comp)
 	: comp(comp)
 {
@@ -16,6 +27,8 @@ ParticleSystemEditorUi::ParticleSystemEditorUi(ParticleSystemComponent* comp)
 	curve_editor_popup.min_y_value = 0.0;
 	curve_editor_popup.max_y_value = 1.0;
 	curve_editor_popup.show_add_curve_button = false;
+	curve_editor_popup.enable_grid_snapping_x = false;
+	curve_editor_popup.enable_grid_snapping_y = false;
 }
 
 bool ParticleSystemEditorUi::draw_module_header(const char* name, bool& enabled, bool& expanded)
@@ -63,7 +76,10 @@ void ParticleSystemEditorUi::draw_minmax_curve(const char* label, MinMaxCurve& c
 			editing_curve = &curve;
 			show_curve_popup = true;
 			curve_editor_popup.clear_all();
+			if (curve.curve0.points.empty())
+				curve.curve0 = make_default_linear_curve();
 			curve_editor_popup.add_curve(curve.curve0);
+			curve_editor_popup.fit_to_content();
 		}
 		break;
 	case MinMaxCurveMode::RandomBetweenCurves:
@@ -75,8 +91,13 @@ void ParticleSystemEditorUi::draw_minmax_curve(const char* label, MinMaxCurve& c
 			editing_curve = &curve;
 			show_curve_popup = true;
 			curve_editor_popup.clear_all();
+			if (curve.curve0.points.empty())
+				curve.curve0 = make_default_linear_curve();
+			if (curve.curve1.points.empty())
+				curve.curve1 = make_default_linear_curve();
 			curve_editor_popup.add_curve(curve.curve0);
 			curve_editor_popup.add_curve(curve.curve1);
+			curve_editor_popup.fit_to_content();
 		}
 		break;
 	}
@@ -147,7 +168,19 @@ bool ParticleSystemEditorUi::draw()
 
 	if (selected_subsystem >= 0 && selected_subsystem < (int)asset->subsystems.size()) {
 		auto& ss = asset->subsystems[selected_subsystem];
+
+		ImGui::Spacing();
+		ImGui::PushStyleColor(ImGuiCol_Separator, ImVec4(0.4f, 0.4f, 0.5f, 1.f));
 		ImGui::Separator();
+		ImGui::Separator();
+		ImGui::PopStyleColor();
+		ImGui::Spacing();
+
+		ImGui::Text("Editing: %s", ss.name.c_str());
+
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.13f, 0.13f, 0.16f, 1.f));
+		ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.f);
+		ImGui::BeginChild("##modules", ImVec2(0, 0), true);
 
 		draw_main_module(ss.main);
 
@@ -204,6 +237,10 @@ bool ParticleSystemEditorUi::draw()
 			ss.renderer.enabled = enabled_rend;
 			draw_renderer_module(ss.renderer);
 		} else ss.renderer.enabled = enabled_rend;
+
+		ImGui::EndChild();
+		ImGui::PopStyleVar();
+		ImGui::PopStyleColor();
 	}
 
 	comp->update_shape_gizmo(selected_subsystem);
@@ -223,6 +260,65 @@ bool ParticleSystemEditorUi::draw()
 	if (show_curve_popup) {
 		ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
 		if (ImGui::Begin("Curve Editor##ParticlePopup", &show_curve_popup)) {
+			// presets dropdown
+			if (ImGui::Button("Presets")) ImGui::OpenPopup("CurvePresets");
+			if (ImGui::BeginPopup("CurvePresets")) {
+				auto apply_preset = [&](EditingCurve c) {
+					curve_editor_popup.clear_all();
+					curve_editor_popup.add_curve(c);
+					curve_editor_popup.fit_to_content();
+				};
+				if (ImGui::MenuItem("Linear (0 to 1)")) {
+					apply_preset(make_default_linear_curve());
+				}
+				if (ImGui::MenuItem("Linear (1 to 0)")) {
+					EditingCurve c; c.name = "Curve"; c.color = Color32(200, 200, 100);
+					CurvePoint p0; p0.time = 0.f; p0.value = 1.f; p0.type = CurvePointType::Linear;
+					CurvePoint p1; p1.time = 1.f; p1.value = 0.f; p1.type = CurvePointType::Linear;
+					c.points = {p0, p1};
+					apply_preset(c);
+				}
+				if (ImGui::MenuItem("Ease In")) {
+					EditingCurve c; c.name = "Curve"; c.color = Color32(200, 200, 100);
+					CurvePoint p0; p0.time = 0.f; p0.value = 0.f; p0.type = CurvePointType::Aligned;
+					p0.tangent0 = glm::vec2(-0.3f, 0.f); p0.tangent1 = glm::vec2(0.3f, 0.f);
+					CurvePoint p1; p1.time = 1.f; p1.value = 1.f; p1.type = CurvePointType::Aligned;
+					p1.tangent0 = glm::vec2(-0.3f, 0.f); p1.tangent1 = glm::vec2(0.3f, 0.f);
+					c.points = {p0, p1};
+					apply_preset(c);
+				}
+				if (ImGui::MenuItem("Ease Out")) {
+					EditingCurve c; c.name = "Curve"; c.color = Color32(200, 200, 100);
+					CurvePoint p0; p0.time = 0.f; p0.value = 0.f; p0.type = CurvePointType::Aligned;
+					p0.tangent0 = glm::vec2(-0.3f, 0.f); p0.tangent1 = glm::vec2(0.3f, 1.f);
+					CurvePoint p1; p1.time = 1.f; p1.value = 1.f; p1.type = CurvePointType::Aligned;
+					p1.tangent0 = glm::vec2(-0.3f, 0.f); p1.tangent1 = glm::vec2(0.3f, 0.f);
+					c.points = {p0, p1};
+					apply_preset(c);
+				}
+				if (ImGui::MenuItem("Ease In-Out")) {
+					EditingCurve c; c.name = "Curve"; c.color = Color32(200, 200, 100);
+					CurvePoint p0; p0.time = 0.f; p0.value = 0.f; p0.type = CurvePointType::Aligned;
+					p0.tangent0 = glm::vec2(-0.3f, 0.f); p0.tangent1 = glm::vec2(0.3f, 0.f);
+					CurvePoint p1; p1.time = 1.f; p1.value = 1.f; p1.type = CurvePointType::Aligned;
+					p1.tangent0 = glm::vec2(-0.3f, 0.f); p1.tangent1 = glm::vec2(0.3f, 0.f);
+					c.points = {p0, p1};
+					apply_preset(c);
+				}
+				if (ImGui::MenuItem("Constant (1)")) {
+					EditingCurve c; c.name = "Curve"; c.color = Color32(200, 200, 100);
+					CurvePoint p0; p0.time = 0.f; p0.value = 1.f; p0.type = CurvePointType::Constant;
+					CurvePoint p1; p1.time = 1.f; p1.value = 1.f; p1.type = CurvePointType::Constant;
+					c.points = {p0, p1};
+					apply_preset(c);
+				}
+				ImGui::EndPopup();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Fit"))
+				curve_editor_popup.fit_to_content();
+			ImGui::Separator();
+
 			curve_editor_popup.draw_content();
 			if (editing_curve) {
 				auto& curves = curve_editor_popup.get_curve_array();
@@ -273,12 +369,32 @@ void ParticleSystemEditorUi::draw_subsystem_list()
 	auto* asset = comp->particle_asset.get();
 	if (!asset) return;
 
-	ImGui::Text("Subsystems:");
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.15f, 0.15f, 0.18f, 1.f));
+	ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.f);
+	float list_height = glm::max(40.f, (float)asset->subsystems.size() * 28.f + 8.f);
+	ImGui::BeginChild("##subsystem_list", ImVec2(0, list_height), true);
+
 	for (int i = 0; i < (int)asset->subsystems.size(); i++) {
+		auto& ss = asset->subsystems[i];
+		ImGui::PushID(i);
+
+		// visible toggle
+		bool vis = ss.editor_visible;
+		if (ImGui::Checkbox("##vis", &vis))
+			ss.editor_visible = vis;
+		ImGui::SameLine();
+
 		bool selected = (i == selected_subsystem);
-		if (ImGui::Selectable(asset->subsystems[i].name.c_str(), selected))
+		if (ImGui::Selectable(ss.name.c_str(), selected))
 			selected_subsystem = i;
+
+		ImGui::PopID();
 	}
+
+	ImGui::EndChild();
+	ImGui::PopStyleVar();
+	ImGui::PopStyleColor();
+
 	if (ImGui::Button("Add Subsystem")) {
 		ParticleSubSystem ss;
 		ss.name = "SubSystem " + std::to_string(asset->subsystems.size() + 1);

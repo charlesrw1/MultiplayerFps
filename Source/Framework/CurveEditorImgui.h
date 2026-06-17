@@ -86,6 +86,9 @@ public:
 	// draw a small non-interactive curve preview; returns true if clicked
 	static bool draw_curve_preview(const char* id, const EditingCurve& curve, float width = 0.f, float height = 24.f);
 
+	// reset zoom/pan to fit all curve content in view
+	void fit_to_content();
+
 	std::string window_name = "Curve Editor";
 
 	// this callback is used when right-clicking on canvas when "Events" is selected

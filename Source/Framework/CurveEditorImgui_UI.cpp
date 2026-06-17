@@ -186,6 +186,42 @@ void CurveEditorImgui::draw_content()
 	}
 }
 
+void CurveEditorImgui::fit_to_content()
+{
+	float x_min = 0.f, x_max = max_x_value;
+	float y_min = min_y_value, y_max = max_y_value;
+
+	bool has_points = false;
+	for (auto& c : curves) {
+		for (auto& p : c.points) {
+			if (!has_points) {
+				x_min = x_max = p.time;
+				y_min = y_max = p.value;
+				has_points = true;
+			} else {
+				x_min = glm::min(x_min, p.time);
+				x_max = glm::max(x_max, p.time);
+				y_min = glm::min(y_min, p.value);
+				y_max = glm::max(y_max, p.value);
+			}
+		}
+	}
+
+	float padding = 0.1f;
+	float x_range = glm::max(x_max - x_min, 0.01f);
+	float y_range = glm::max(y_max - y_min, 0.01f);
+	x_min -= x_range * padding;
+	x_max += x_range * padding;
+	y_min -= y_range * padding;
+	y_max += y_range * padding;
+
+	grid_offset = ImVec2(x_min, y_max);
+	float sx = x_range * (1.f + 2.f * padding);
+	float sy = y_range * (1.f + 2.f * padding);
+	scale.x = glm::max(sx * 32.f / 600.f, 0.01f);
+	scale.y = glm::max(sy * 30.f / 350.f, 0.01f);
+}
+
 bool CurveEditorImgui::draw_curve_preview(const char* id, const EditingCurve& curve, float width, float height)
 {
 	ImGui::PushID(id);

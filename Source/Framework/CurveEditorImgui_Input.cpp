@@ -211,8 +211,12 @@ void CurveEditorImgui::draw_editor_input_and_scrubber(
 		ImGui::OpenPopup("creation_ctx_menu");
 	}
 	if (ImGui::BeginPopup("creation_ctx_menu")) {
-		if (callback)
+		if (ImGui::MenuItem("Fit to Window"))
+			fit_to_content();
+		if (callback) {
+			ImGui::Separator();
 			callback(this);
+		}
 		ImGui::EndPopup();
 	}
 }

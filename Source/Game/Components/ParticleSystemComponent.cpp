@@ -447,7 +447,7 @@ void ParticleSystemComponent::draw(const glm::vec3& side, const glm::vec3& up, c
 		if (ss_idx >= (int)subsystem_states.size())
 			break;
 		auto& subsys = asset->subsystems[ss_idx];
-		if (!subsys.renderer.enabled)
+		if (!subsys.renderer.enabled || !subsys.editor_visible)
 			continue;
 
 		MaterialInstance* mat = subsys.renderer.material.get();
