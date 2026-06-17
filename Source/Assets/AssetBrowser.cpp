@@ -716,33 +716,26 @@ void AssetBrowser::imgui_draw() {
 		draw_browser_tree_view(this);
 	}
 
-	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup) && ImGui::IsMouseClicked(1) && !ImGui::IsAnyItemHovered()) {
-		ImGui::OpenPopup("create_asset_menu");
-	}
-	if (ImGui::BeginPopup("create_asset_menu")) {
+	if (ImGui::BeginPopupContextWindow("create_asset_menu", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
 		ImGui::TextDisabled("Create New...");
 		ImGui::Separator();
 		if (ImGui::MenuItem("Map")) {
 			create_asset_type = CreateAssetType::Map;
 			memset(create_asset_name, 0, sizeof(create_asset_name));
-			ImGui::OpenPopup("create_asset_name_popup");
 		}
 		if (ImGui::MenuItem("Particle")) {
 			create_asset_type = CreateAssetType::Particle;
 			memset(create_asset_name, 0, sizeof(create_asset_name));
-			ImGui::OpenPopup("create_asset_name_popup");
 		}
 		if (ImGui::MenuItem("Master Material")) {
 			create_asset_type = CreateAssetType::MasterMaterial;
 			create_mm_domain = 0;
 			memset(create_asset_name, 0, sizeof(create_asset_name));
-			ImGui::OpenPopup("create_asset_name_popup");
 		}
 		if (ImGui::MenuItem("Material Instance")) {
 			create_asset_type = CreateAssetType::MaterialInstance;
 			create_mi_master_path = "eng/fallback.mm";
 			memset(create_asset_name, 0, sizeof(create_asset_name));
-			ImGui::OpenPopup("create_asset_name_popup");
 		}
 		ImGui::EndPopup();
 	}
