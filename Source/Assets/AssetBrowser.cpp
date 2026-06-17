@@ -216,6 +216,8 @@ static void draw_diag_tooltip(const std::string& gamepath) {
 	ImGui::EndTooltip();
 }
 
+static void draw_create_new_menu_items(AssetBrowser* b, const std::string& folder);
+
 static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesystemNode* node, string parent_path) {
 	const float folder_indent = 20.0;
 	const int name_filter_len = strlen(b->asset_name_filter);
@@ -265,27 +267,7 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 				b->selected_resource.type->draw_browser_context_menu(b->selected_resource.filename);
 			}
 			ImGui::Separator();
-			if (ImGui::BeginMenu("Create New...")) {
-				if (ImGui::MenuItem("Map")) {
-					b->create_asset_type = AssetBrowser::CreateAssetType::Map;
-					memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
-				}
-				if (ImGui::MenuItem("Particle")) {
-					b->create_asset_type = AssetBrowser::CreateAssetType::Particle;
-					memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
-				}
-				if (ImGui::MenuItem("Master Material")) {
-					b->create_asset_type = AssetBrowser::CreateAssetType::MasterMaterial;
-					b->create_mm_domain = 0;
-					memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
-				}
-				if (ImGui::MenuItem("Material Instance")) {
-					b->create_asset_type = AssetBrowser::CreateAssetType::MaterialInstance;
-					b->create_mi_master_path = "eng/fallback.mm";
-					memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
-				}
-				ImGui::EndMenu();
-			}
+			draw_create_new_menu_items(b, b->selected_folder);
 			ImGui::EndPopup();
 		}
 
@@ -386,6 +368,34 @@ static void draw_browser_tree_view(AssetBrowser* b) {
 	clipper.End();
 }
 
+static void draw_create_new_menu_items(AssetBrowser* b, const std::string& folder) {
+	if (ImGui::BeginMenu("Create New...")) {
+		if (ImGui::MenuItem("Map")) {
+			b->create_asset_type = AssetBrowser::CreateAssetType::Map;
+			b->create_folder_override = folder;
+			memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
+		}
+		if (ImGui::MenuItem("Particle")) {
+			b->create_asset_type = AssetBrowser::CreateAssetType::Particle;
+			b->create_folder_override = folder;
+			memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
+		}
+		if (ImGui::MenuItem("Master Material")) {
+			b->create_asset_type = AssetBrowser::CreateAssetType::MasterMaterial;
+			b->create_folder_override = folder;
+			b->create_mm_domain = 0;
+			memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
+		}
+		if (ImGui::MenuItem("Material Instance")) {
+			b->create_asset_type = AssetBrowser::CreateAssetType::MaterialInstance;
+			b->create_folder_override = folder;
+			b->create_mi_master_path = "eng/fallback.mm";
+			memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
+		}
+		ImGui::EndMenu();
+	}
+}
+
 // Recursive folder-only tree for the left panel.
 // parent_path is the gamepath prefix (e.g. "" for root, "textures" for the textures folder).
 static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode* node, const std::string& parent_path) {
@@ -419,6 +429,13 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 
 		if (ImGui::Selectable(child->name.c_str(), is_selected, ImGuiSelectableFlags_AllowItemOverlap))
 			b->selected_folder = folder_path;
+
+		if (ImGui::BeginPopupContextItem()) {
+			ImGui::TextDisabled("%s", folder_path.c_str());
+			ImGui::Separator();
+			draw_create_new_menu_items(b, folder_path);
+			ImGui::EndPopup();
+		}
 
 		// Drag-drop target: accept file drops to move asset into this folder
 		if (ImGui::BeginDragDropTarget()) {
@@ -718,24 +735,7 @@ void AssetBrowser::imgui_draw() {
 	if (ImGui::BeginPopupContextWindow("create_asset_menu", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
 		ImGui::TextDisabled("Create in: %s", selected_folder.empty() ? "(root)" : selected_folder.c_str());
 		ImGui::Separator();
-		if (ImGui::MenuItem("New Map")) {
-			create_asset_type = CreateAssetType::Map;
-			memset(create_asset_name, 0, sizeof(create_asset_name));
-		}
-		if (ImGui::MenuItem("New Particle")) {
-			create_asset_type = CreateAssetType::Particle;
-			memset(create_asset_name, 0, sizeof(create_asset_name));
-		}
-		if (ImGui::MenuItem("New Master Material")) {
-			create_asset_type = CreateAssetType::MasterMaterial;
-			create_mm_domain = 0;
-			memset(create_asset_name, 0, sizeof(create_asset_name));
-		}
-		if (ImGui::MenuItem("New Material Instance")) {
-			create_asset_type = CreateAssetType::MaterialInstance;
-			create_mi_master_path = "eng/fallback.mm";
-			memset(create_asset_name, 0, sizeof(create_asset_name));
-		}
+		draw_create_new_menu_items(this, selected_folder);
 		ImGui::EndPopup();
 	}
 	ImGui::EndChild();
@@ -781,6 +781,7 @@ void AssetBrowser::draw_create_asset_popup() {
 	ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
 
 	if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::TextDisabled("Folder: %s", create_folder_override.empty() ? "(root)" : create_folder_override.c_str());
 		ImGui::Text("Name (no extension):");
 		bool enter_pressed = ImGui::InputText("##name", create_asset_name, sizeof(create_asset_name),
 			ImGuiInputTextFlags_EnterReturnsTrue);
@@ -804,18 +805,18 @@ void AssetBrowser::draw_create_asset_popup() {
 			std::optional<std::string> result;
 			switch (create_asset_type) {
 			case CreateAssetType::Map:
-				result = AssetTemplates::create_empty_map(selected_folder, create_asset_name);
+				result = AssetTemplates::create_empty_map(create_folder_override, create_asset_name);
 				break;
 			case CreateAssetType::Particle:
-				result = AssetTemplates::create_empty_particle(selected_folder, create_asset_name);
+				result = AssetTemplates::create_empty_particle(create_folder_override, create_asset_name);
 				break;
 			case CreateAssetType::MasterMaterial: {
 				const char* domain_names[] = {"Default", "PostProcess", "Terrain", "Decal", "UI", "Particle"};
-				result = AssetTemplates::create_mm_from_template(selected_folder, create_asset_name, domain_names[create_mm_domain]);
+				result = AssetTemplates::create_mm_from_template(create_folder_override, create_asset_name, domain_names[create_mm_domain]);
 				break;
 			}
 			case CreateAssetType::MaterialInstance:
-				result = AssetTemplates::create_mi_from_master(selected_folder, create_asset_name, create_mi_master_path);
+				result = AssetTemplates::create_mi_from_master(create_folder_override, create_asset_name, create_mi_master_path);
 				break;
 			default:
 				break;

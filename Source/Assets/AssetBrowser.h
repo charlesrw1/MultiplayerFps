@@ -74,6 +74,7 @@ public:
 	char create_asset_name[128] = {};
 	int create_mm_domain = 0;
 	std::string create_mi_master_path;
+	std::string create_folder_override;
 	void draw_create_asset_popup();
 };
 
