@@ -420,8 +420,7 @@ def write_scriptable_class(newclass : ClassDef) -> str:
     append_to_array_R(virtual_function_types, newclass)
 
 
-    for f in newclass.properties:
-        if f.new_type.type==FUNCTION_TYPE and f.is_virtual:
+    for f in virtual_function_types:
             output += "\t" + f.return_type.get_raw_type_string() + f" {f.name}("
             for argType,argName in f.func_args:
                 output += argType.get_raw_type_string() + " " + argName
@@ -533,6 +532,10 @@ def has_any_functions(newclass:ClassDef)->bool:
     for f in newclass.properties:
         if f.new_type.type==FUNCTION_TYPE:
             return True
+    for idef in newclass.interface_defs:
+        for f in idef.properties:
+            if f.new_type.type==FUNCTION_TYPE:
+                return True
     return False
 def get_bool_str(b:bool)->str:
     if b:
@@ -554,10 +557,18 @@ def write_class_old(typenames:dict[str,ClassDef],newclass : ClassDef)->str:
         if has_any_functions(newclass):
             output += f"FunctionInfo {newclass.classname}_function_list[] = {{"
             count = 0
+            seen_names : set[str] = set()
             for f in newclass.properties:
                 if f.new_type.type==FUNCTION_TYPE:
                     output += f"{{ \"{f.name}\",{get_bool_str(f.is_static)},{get_bool_str(f.is_virtual)}, lua_binding_{newclass.classname}_{f.name}  }},\n"
+                    seen_names.add(f.name)
                     count += 1
+            for idef in newclass.interface_defs:
+                for f in idef.properties:
+                    if f.new_type.type==FUNCTION_TYPE and f.name not in seen_names:
+                        output += f"{{ \"{f.name}\",false,{get_bool_str(f.is_virtual)}, lua_binding_{idef.classname}_{f.name}  }},\n"
+                        seen_names.add(f.name)
+                        count += 1
             output = output[:-2]
             output += "};\n"
             function_str = f"{newclass.classname}_function_list,{count}"
