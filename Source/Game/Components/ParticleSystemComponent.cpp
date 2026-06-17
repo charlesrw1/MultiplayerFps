@@ -237,6 +237,11 @@ void ParticleSystemComponent::emit_particles(int ss_idx, int count)
 
 void ParticleSystemComponent::update()
 {
+#ifdef EDITOR_BUILD
+	if (editor_shape_gizmo && !editor_is_selected)
+		update_shape_gizmo(-1);
+#endif
+
 	if (!playing)
 		return;
 	auto* asset = particle_asset.get();
@@ -460,9 +465,10 @@ void ParticleSystemComponent::draw(const glm::vec3& side, const glm::vec3& up, c
 		}
 	}
 
-	// end all batch builders
+	// end all batch builders and push to renderer
 	for (auto& [mat, batch] : batch_states)
 		batch.builder.End();
+	sync_render_data();
 }
 
 #ifdef EDITOR_BUILD
@@ -512,7 +518,7 @@ void ParticleSystemComponent::update_shape_gizmo(int subsystem_index)
 	if (!editor_shape_gizmo)
 		return;
 	auto* asset = particle_asset.get();
-	if (!asset || !asset->is_valid_to_use() || subsystem_index < 0
+	if (!editor_is_selected || !asset || !asset->is_valid_to_use() || subsystem_index < 0
 		|| subsystem_index >= (int)asset->subsystems.size()) {
 		editor_shape_gizmo->mb.Begin();
 		editor_shape_gizmo->mb.End();
