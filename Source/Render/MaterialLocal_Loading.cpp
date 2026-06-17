@@ -108,6 +108,7 @@ void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 	ASSERT(file);
 
 	DictParser in;
+	in.double_slash_comments = true;
 	in.load_from_file(file);
 	std::string vs_code;
 	std::string fs_code;
