@@ -167,6 +167,7 @@ static std::vector<std::string> parse_mi_refs(const std::string& text) {
             size_t name_end = line.find(' ', 4);
             if (name_end == std::string::npos) continue;
             std::string val = line.substr(name_end + 1);
+            while (!val.empty() && std::isspace((unsigned char)val.front())) val.erase(val.begin());
             while (!val.empty() && std::isspace((unsigned char)val.back())) val.pop_back();
             // skip multi-token (colors/vectors), built-ins, numbers
             if (val.find(' ') != std::string::npos) continue;
