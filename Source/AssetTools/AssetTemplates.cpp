@@ -18,6 +18,11 @@ extern void write_texture_import_settings(TextureImportSettings* tis, const std:
 
 namespace AssetTemplates {
 
+static std::string strip_name(const std::string& name) {
+    auto result = StringUtils::strip_extension(name);
+    return result.empty() ? name : result;
+}
+
 std::optional<std::string> create_tis_for_png(const std::string& png_gamepath) {
     ASSERT(StringUtils::get_extension_no_dot(png_gamepath) == "png");
 
@@ -59,7 +64,8 @@ std::optional<std::string> create_mis_for_glb(const std::string& glb_gamepath) {
 
 std::optional<std::string> create_mi_from_template(const std::string& dir,
     const std::string& name, const std::string& master_mm_path) {
-    std::string mi_gamepath = dir.empty() ? (name + ".mi") : (dir + "/" + name + ".mi");
+    auto base = strip_name(name);
+    std::string mi_gamepath = dir.empty() ? (base + ".mi") : (dir + "/" + base + ".mi");
 
     if (FileSys::does_file_exist(mi_gamepath.c_str(), FileSys::GAME_DIR))
         return std::nullopt;
@@ -76,7 +82,8 @@ std::optional<std::string> create_mi_from_template(const std::string& dir,
 
 std::optional<std::string> create_mm_from_template(const std::string& dir,
     const std::string& name, const std::string& domain) {
-    std::string mm_gamepath = dir.empty() ? (name + ".mm") : (dir + "/" + name + ".mm");
+    auto base = strip_name(name);
+    std::string mm_gamepath = dir.empty() ? (base + ".mm") : (dir + "/" + base + ".mm");
 
     if (FileSys::does_file_exist(mm_gamepath.c_str(), FileSys::GAME_DIR))
         return std::nullopt;
@@ -112,7 +119,8 @@ std::optional<std::string> create_mm_from_template(const std::string& dir,
 }
 
 std::optional<std::string> create_empty_map(const std::string& dir, const std::string& name) {
-    std::string map_gamepath = dir.empty() ? (name + ".tmap") : (dir + "/" + name + ".tmap");
+    auto base = strip_name(name);
+    std::string map_gamepath = dir.empty() ? (base + ".tmap") : (dir + "/" + base + ".tmap");
 
     if (FileSys::does_file_exist(map_gamepath.c_str(), FileSys::GAME_DIR))
         return std::nullopt;
@@ -128,7 +136,8 @@ std::optional<std::string> create_empty_map(const std::string& dir, const std::s
 }
 
 std::optional<std::string> create_empty_particle(const std::string& dir, const std::string& name) {
-    std::string path = dir.empty() ? (name + ".particle") : (dir + "/" + name + ".particle");
+    auto base = strip_name(name);
+    std::string path = dir.empty() ? (base + ".particle") : (dir + "/" + base + ".particle");
 
     if (FileSys::does_file_exist(path.c_str(), FileSys::GAME_DIR))
         return std::nullopt;
@@ -153,7 +162,8 @@ std::optional<std::string> create_empty_particle(const std::string& dir, const s
 
 std::optional<std::string> create_mi_from_master(const std::string& dir,
     const std::string& name, const std::string& master_mm_path) {
-    std::string mi_gamepath = dir.empty() ? (name + ".mi") : (dir + "/" + name + ".mi");
+    auto base = strip_name(name);
+    std::string mi_gamepath = dir.empty() ? (base + ".mi") : (dir + "/" + base + ".mi");
 
     if (FileSys::does_file_exist(mi_gamepath.c_str(), FileSys::GAME_DIR))
         return std::nullopt;
