@@ -25,7 +25,7 @@ void ParticleSystemComponent::start()
 
 		editor_shape_gizmo = get_owner()->create_component<MeshBuilderComponent>();
 		editor_shape_gizmo->dont_serialize_or_edit = true;
-		editor_shape_gizmo->use_transform = false;
+		editor_shape_gizmo->use_transform = true;
 		editor_shape_gizmo->depth_tested = false;
 	}
 
@@ -529,10 +529,7 @@ void ParticleSystemComponent::update_shape_gizmo(int subsystem_index)
 	}
 
 	auto& shape = ss.shape;
-	glm::mat4 ws = get_ws_transform();
-	glm::vec3 ws_pos = glm::vec3(ws[3]);
-	glm::vec3 offset = glm::mat3(ws) * shape.position_offset;
-	glm::vec3 center = ws_pos + offset;
+	glm::vec3 center = shape.position_offset;
 
 	const Color32 gizmo_color = Color32(0, 200, 100, 200);
 	const int segments = 32;
