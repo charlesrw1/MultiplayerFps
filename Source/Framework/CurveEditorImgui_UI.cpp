@@ -7,6 +7,7 @@
 #include "MyImguiLib.h"
 
 extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
+extern float evaluate_editing_curve(const EditingCurve& curve, float t);
 
 void CurveEditorImgui::draw()
 {
@@ -17,6 +18,15 @@ void CurveEditorImgui::draw()
 		ImGui::End();
 		return;
 	}
+
+	draw_content();
+
+	ImGui::End();
+}
+
+void CurveEditorImgui::draw_content()
+{
+	set_scrubber_this_frame = false;
 
 	uint32_t ent_list_flags =
 		ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
@@ -174,6 +184,39 @@ void CurveEditorImgui::draw()
 		}
 		ImGui::EndPopup();
 	}
+}
 
-	ImGui::End();
+bool CurveEditorImgui::draw_curve_preview(const char* id, const EditingCurve& curve, float width, float height)
+{
+	ImGui::PushID(id);
+	if (width <= 0.f)
+		width = ImGui::GetContentRegionAvail().x;
+	width = glm::max(width, 20.f);
+
+	ImVec2 pos = ImGui::GetCursorScreenPos();
+	ImVec2 size(width, height);
+	ImDrawList* draw_list = ImGui::GetWindowDrawList();
+
+	draw_list->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(40, 40, 40, 255));
+
+	if (!curve.points.empty()) {
+		const int segments = (int)width;
+		for (int i = 0; i < segments; i++) {
+			float t0 = (float)i / segments;
+			float t1 = (float)(i + 1) / segments;
+			float v0 = evaluate_editing_curve(curve, t0);
+			float v1 = evaluate_editing_curve(curve, t1);
+			v0 = glm::clamp(v0, 0.f, 1.f);
+			v1 = glm::clamp(v1, 0.f, 1.f);
+			ImVec2 p0(pos.x + t0 * size.x, pos.y + (1.f - v0) * size.y);
+			ImVec2 p1(pos.x + t1 * size.x, pos.y + (1.f - v1) * size.y);
+			draw_list->AddLine(p0, p1, IM_COL32(200, 200, 100, 255), 1.5f);
+		}
+	}
+
+	draw_list->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(100, 100, 100, 255));
+
+	bool clicked = ImGui::InvisibleButton("##preview", size);
+	ImGui::PopID();
+	return clicked;
 }

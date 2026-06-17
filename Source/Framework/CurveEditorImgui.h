@@ -77,8 +77,14 @@ class CurveEditorImgui
 public:
 	CurveEditorImgui() {}
 
-	// call this every imgui frame
+	// call this every imgui frame (opens its own ImGui::Begin/End window)
 	void draw();
+
+	// draw just the editor content without Begin/End wrapper (for embedding in existing windows)
+	void draw_content();
+
+	// draw a small non-interactive curve preview; returns true if clicked
+	static bool draw_curve_preview(const char* id, const EditingCurve& curve, float width = 0.f, float height = 24.f);
 
 	std::string window_name = "Curve Editor";
 

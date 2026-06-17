@@ -56,10 +56,10 @@ void ParticleSystemEditorUi::draw_minmax_curve(const char* label, MinMaxCurve& c
 		break;
 	case MinMaxCurveMode::Curve:
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(80);
+		ImGui::SetNextItemWidth(60);
 		ImGui::DragFloat("##scalar", &curve.curve_scalar, 0.01f);
 		ImGui::SameLine();
-		if (ImGui::Button("Edit##curve0")) {
+		if (CurveEditorImgui::draw_curve_preview("##preview0", curve.curve0, 80)) {
 			editing_curve = &curve;
 			show_curve_popup = true;
 			curve_editor_popup.clear_all();
@@ -68,10 +68,10 @@ void ParticleSystemEditorUi::draw_minmax_curve(const char* label, MinMaxCurve& c
 		break;
 	case MinMaxCurveMode::RandomBetweenCurves:
 		ImGui::SameLine();
-		ImGui::SetNextItemWidth(80);
+		ImGui::SetNextItemWidth(60);
 		ImGui::DragFloat("##scalar", &curve.curve_scalar, 0.01f);
 		ImGui::SameLine();
-		if (ImGui::Button("Edit##curves")) {
+		if (CurveEditorImgui::draw_curve_preview("##preview01", curve.curve0, 80)) {
 			editing_curve = &curve;
 			show_curve_popup = true;
 			curve_editor_popup.clear_all();
@@ -88,7 +88,10 @@ void ParticleSystemEditorUi::draw_gradient_field(const char* label, Gradient& gr
 	ImGui::PushID(label);
 	ImGui::Text("%s", label);
 	ImGui::SameLine(120);
-	gradient_editor.draw_inline(label, gradient);
+	if (gradient_editor.draw_preview(label, gradient)) {
+		editing_gradient = &gradient;
+		show_gradient_popup = true;
+	}
 	ImGui::PopID();
 }
 
@@ -216,14 +219,26 @@ bool ParticleSystemEditorUi::draw()
 
 	// curve editor popup window
 	if (show_curve_popup) {
-		ImGui::Begin("Curve Editor##ParticlePopup", &show_curve_popup);
-		curve_editor_popup.draw();
-		if (editing_curve) {
-			auto& curves = curve_editor_popup.get_curve_array();
-			if (curves.size() > 0)
-				editing_curve->curve0 = curves[0];
-			if (curves.size() > 1)
-				editing_curve->curve1 = curves[1];
+		ImGui::SetNextWindowSize(ImVec2(600, 400), ImGuiCond_FirstUseEver);
+		if (ImGui::Begin("Curve Editor##ParticlePopup", &show_curve_popup)) {
+			curve_editor_popup.draw_content();
+			if (editing_curve) {
+				auto& curves = curve_editor_popup.get_curve_array();
+				if (curves.size() > 0)
+					editing_curve->curve0 = curves[0];
+				if (curves.size() > 1)
+					editing_curve->curve1 = curves[1];
+			}
+		}
+		ImGui::End();
+	}
+
+	// gradient editor popup window
+	if (show_gradient_popup) {
+		ImGui::SetNextWindowSize(ImVec2(400, 200), ImGuiCond_FirstUseEver);
+		if (ImGui::Begin("Gradient Editor##ParticlePopup", &show_gradient_popup)) {
+			if (editing_gradient)
+				gradient_window_editor.draw_editor("##gradient_edit", *editing_gradient);
 		}
 		ImGui::End();
 	}
@@ -280,6 +295,7 @@ void ParticleSystemEditorUi::draw_subsystem_list()
 void ParticleSystemEditorUi::draw_main_module(MainModule& mod)
 {
 	if (ImGui::CollapsingHeader("Main", ImGuiTreeNodeFlags_DefaultOpen)) {
+		ImGui::Indent();
 		ImGui::DragFloat("Duration", &mod.duration, 0.1f, 0.f, 100.f);
 		ImGui::Checkbox("Looping", &mod.looping);
 		draw_minmax_curve("Start Lifetime", mod.start_lifetime);
@@ -296,11 +312,13 @@ void ParticleSystemEditorUi::draw_main_module(MainModule& mod)
 
 		ImGui::DragInt("Max Particles", &mod.max_particles, 1, 1, 10000);
 		ImGui::Checkbox("Play on Awake", &mod.play_on_awake);
+		ImGui::Unindent();
 	}
 }
 
 void ParticleSystemEditorUi::draw_emission_module(EmissionModule& mod)
 {
+	ImGui::Indent();
 	draw_minmax_curve("Rate over Time", mod.rate_over_time);
 
 	ImGui::Text("Bursts:");
@@ -321,10 +339,12 @@ void ParticleSystemEditorUi::draw_emission_module(EmissionModule& mod)
 	}
 	if (ImGui::Button("Add Burst"))
 		mod.bursts.push_back(EmissionBurst());
+	ImGui::Unindent();
 }
 
 void ParticleSystemEditorUi::draw_shape_module(ShapeModule& mod)
 {
+	ImGui::Indent();
 	const char* shape_names[] = {"Sphere", "Hemisphere", "Cone", "Box", "Circle"};
 	int shape = (int)mod.shape;
 	if (ImGui::Combo("Shape", &shape, shape_names, 5))
@@ -339,10 +359,12 @@ void ParticleSystemEditorUi::draw_shape_module(ShapeModule& mod)
 	ImGui::DragFloat3("Position", &mod.position_offset.x, 0.01f);
 	ImGui::DragFloat3("Rotation", &mod.rotation_offset.x, 0.5f);
 	ImGui::DragFloat3("Scale", &mod.scale_offset.x, 0.01f);
+	ImGui::Unindent();
 }
 
 void ParticleSystemEditorUi::draw_velocity_module(VelocityOverLifetimeModule& mod)
 {
+	ImGui::Indent();
 	draw_minmax_curve("X", mod.x);
 	draw_minmax_curve("Y", mod.y);
 	draw_minmax_curve("Z", mod.z);
@@ -356,15 +378,19 @@ void ParticleSystemEditorUi::draw_velocity_module(VelocityOverLifetimeModule& mo
 	draw_minmax_curve("Orbital Y", mod.orbital_y);
 	draw_minmax_curve("Orbital Z", mod.orbital_z);
 	draw_minmax_curve("Radial", mod.radial);
+	ImGui::Unindent();
 }
 
 void ParticleSystemEditorUi::draw_color_module(ColorOverLifetimeModule& mod)
 {
+	ImGui::Indent();
 	draw_gradient_field("Color", mod.color);
+	ImGui::Unindent();
 }
 
 void ParticleSystemEditorUi::draw_size_module(SizeOverLifetimeModule& mod)
 {
+	ImGui::Indent();
 	ImGui::Checkbox("Separate Axes", &mod.separate_axes);
 	if (mod.separate_axes) {
 		draw_minmax_curve("X", mod.x);
@@ -374,16 +400,20 @@ void ParticleSystemEditorUi::draw_size_module(SizeOverLifetimeModule& mod)
 	else {
 		draw_minmax_curve("Size", mod.size);
 	}
+	ImGui::Unindent();
 }
 
 void ParticleSystemEditorUi::draw_rotation_module(RotationOverLifetimeModule& mod)
 {
+	ImGui::Indent();
 	ImGui::Checkbox("Separate Axes", &mod.separate_axes);
 	draw_minmax_curve("Angular Velocity", mod.angular_velocity);
+	ImGui::Unindent();
 }
 
 void ParticleSystemEditorUi::draw_texture_sheet_module(TextureSheetModule& mod)
 {
+	ImGui::Indent();
 	ImGui::DragInt("Tiles X", &mod.tiles_x, 1, 1, 32);
 	ImGui::DragInt("Tiles Y", &mod.tiles_y, 1, 1, 32);
 
@@ -395,10 +425,12 @@ void ParticleSystemEditorUi::draw_texture_sheet_module(TextureSheetModule& mod)
 	draw_minmax_curve("Frame over Time", mod.frame_over_time);
 	draw_minmax_curve("Start Frame", mod.start_frame);
 	ImGui::DragInt("Cycles", &mod.cycles, 1, 1, 100);
+	ImGui::Unindent();
 }
 
 void ParticleSystemEditorUi::draw_noise_module(NoiseModule& mod)
 {
+	ImGui::Indent();
 	draw_minmax_curve("Strength", mod.strength);
 	ImGui::DragFloat("Frequency", &mod.frequency, 0.01f, 0.01f, 10.f);
 	draw_minmax_curve("Scroll Speed", mod.scroll_speed);
@@ -409,13 +441,20 @@ void ParticleSystemEditorUi::draw_noise_module(NoiseModule& mod)
 	int q = (int)mod.quality;
 	if (ImGui::Combo("Quality", &q, quality_names, 3))
 		mod.quality = (NoiseQuality)q;
+	ImGui::Unindent();
 }
 
 void ParticleSystemEditorUi::draw_renderer_module(RendererModule& mod)
 {
+	ImGui::Indent();
+
 	// Material drag-drop target
 	const char* mat_name = mod.material.get() ? mod.material.get()->get_name().c_str() : "<none>";
-	ImGui::Text("Material: %s", mat_name);
+	ImGui::Text("Material");
+	ImGui::SameLine(120);
+	ImGui::Button(mat_name, ImVec2(ImGui::GetContentRegionAvail().x, 0));
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("Drag and drop a Material asset here");
 	if (ImGui::BeginDragDropTarget()) {
 		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
 		if (payload) {
@@ -444,6 +483,7 @@ void ParticleSystemEditorUi::draw_renderer_module(RendererModule& mod)
 		ImGui::DragFloat("Speed Scale", &mod.speed_scale, 0.01f);
 		ImGui::DragFloat("Length Scale", &mod.length_scale, 0.01f);
 	}
+	ImGui::Unindent();
 }
 
 std::unique_ptr<IComponentEditorUi> ParticleSystemComponent::create_editor_ui()

@@ -36,9 +36,13 @@ private:
 	int selected_subsystem = 0;
 	CurveEditorImgui curve_editor_popup;
 	GradientEditorImgui gradient_editor;
+	GradientEditorImgui gradient_window_editor;
 
 	MinMaxCurve* editing_curve = nullptr;
 	bool show_curve_popup = false;
+
+	Gradient* editing_gradient = nullptr;
+	bool show_gradient_popup = false;
 
 	bool expanded_main = true;
 	bool expanded_emission = true;
