@@ -306,6 +306,46 @@ void ParticleSystemComponent::update()
 				float vy = vol.y.evaluate(normalized_life, p.random_seed);
 				float vz = vol.z.evaluate(normalized_life, p.random_seed);
 				p.velocity += glm::vec3(vx, vy, vz) * dt;
+
+				// orbital velocity: rotate position around emitter origin per axis
+				float ox = vol.orbital_x.evaluate(normalized_life, p.random_seed);
+				float oy = vol.orbital_y.evaluate(normalized_life, p.random_seed);
+				float oz = vol.orbital_z.evaluate(normalized_life, p.random_seed);
+				if (ox != 0.f || oy != 0.f || oz != 0.f) {
+					glm::vec3 emitter_pos = (subsys.main.simulation_space == SimulationSpace::World)
+						? get_ws_position() : glm::vec3(0.f);
+					glm::vec3 rel = p.position - emitter_pos;
+					if (ox != 0.f) {
+						float a = ox * dt;
+						float cy = rel.y * glm::cos(a) - rel.z * glm::sin(a);
+						float cz = rel.y * glm::sin(a) + rel.z * glm::cos(a);
+						rel.y = cy; rel.z = cz;
+					}
+					if (oy != 0.f) {
+						float a = oy * dt;
+						float cx = rel.x * glm::cos(a) + rel.z * glm::sin(a);
+						float cz = -rel.x * glm::sin(a) + rel.z * glm::cos(a);
+						rel.x = cx; rel.z = cz;
+					}
+					if (oz != 0.f) {
+						float a = oz * dt;
+						float cx = rel.x * glm::cos(a) - rel.y * glm::sin(a);
+						float cy = rel.x * glm::sin(a) + rel.y * glm::cos(a);
+						rel.x = cx; rel.y = cy;
+					}
+					p.position = emitter_pos + rel;
+				}
+
+				// radial velocity: push away from emitter origin
+				float rad = vol.radial.evaluate(normalized_life, p.random_seed);
+				if (rad != 0.f) {
+					glm::vec3 emitter_pos = (subsys.main.simulation_space == SimulationSpace::World)
+						? get_ws_position() : glm::vec3(0.f);
+					glm::vec3 dir = p.position - emitter_pos;
+					float len = glm::length(dir);
+					if (len > 0.001f)
+						p.position += (dir / len) * rad * dt;
+				}
 			}
 
 			// gravity
