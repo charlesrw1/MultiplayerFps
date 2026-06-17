@@ -205,8 +205,13 @@ void ScriptManager::reload_from_content(const std::string& source, const std::st
 			auto info = std::make_unique<LuaClassTypeInfo>();
 			info->set_classname(t.name);
 			bool b = info->set_superclass(t.inherited.at(0));
-			if (b)
+			if (b) {
+				// inherited[1..] may be interface names
+				for (size_t i = 1; i < t.inherited.size(); i++) {
+					info->pending_interfaces.push_back(t.inherited[i]);
+				}
 				newClasses.push_back(std::move(info));
+			}
 		}
 	}
 	had_changes = true;

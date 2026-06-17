@@ -1,4 +1,5 @@
 #include "ScriptManager.h"
+#include "Framework/InterfaceTypeInfo.h"
 #include "Framework/StringUtils.h"
 #include "Framework/MapUtil.h"
 #include "Game/EntityComponent.h"
@@ -312,6 +313,18 @@ void LuaClassTypeInfo::init_lua_type() {
 		assert(lua_gettop(L) == 0);
 		ScriptManager::inst->set_class_type_global(this);
 	}
+	// Apply pending interface registrations (Lua-only, offset = -1)
+	num_interfaces = 0; // reset before re-applying
+	for (auto& iface_name : pending_interfaces) {
+		auto* iface = InterfaceTypeInfo::find_interface(iface_name.c_str());
+		if (iface) {
+			add_interface(iface->id, -1);
+		} else {
+			sys_print(Warning, "LuaClassTypeInfo[%s]: unknown interface '%s'\n",
+					  lua_classname.c_str(), iface_name.c_str());
+		}
+	}
+
 	// Synthesize PROP_LUA_BACKED reflection from the most recent parse. Must happen AFTER
 	// the metatable is rebuilt, BEFORE live-instance shadow buffers are reallocated by
 	// the reload-merge path in check_for_reload().

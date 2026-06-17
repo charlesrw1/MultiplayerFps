@@ -153,6 +153,9 @@
     <ClCompile Include="Source\Framework\ClassBase.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Framework\InterfaceTypeInfo.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Framework\ClassTypePtr.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
@@ -963,6 +966,9 @@
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\ClassBase.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\InterfaceTypeInfo.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\ClassTypePtr.h">

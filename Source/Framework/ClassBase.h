@@ -91,6 +91,12 @@ public:
 	REFLECT();
 	bool is_subclass_of(const ClassTypeInfo* type) const;
 
+	template<typename T> T* cast_interface();
+	template<typename T> const T* cast_interface() const;
+	template<typename T> bool has_interface() const;
+	REFLECT();
+	bool has_interface_by_id(int32_t interface_id) const;
+
 	// you really should never use these, manual memory management from lua
 	REFLECT(lua_generic);
 	static ClassBase* alloc(const ClassTypeInfo* type);
@@ -170,6 +176,19 @@ public:
 
 template <typename T> inline bool ClassBase::is_a() const {
 	return get_type().is_a(T::StaticType);
+}
+
+template<typename T> inline T* ClassBase::cast_interface() {
+	auto& ti = get_type();
+	auto* entry = ti.find_interface_entry(T::StaticInterfaceType.id);
+	if (!entry || entry->offset < 0) return nullptr;
+	return reinterpret_cast<T*>(reinterpret_cast<char*>(this) + entry->offset);
+}
+template<typename T> inline const T* ClassBase::cast_interface() const {
+	return const_cast<ClassBase*>(this)->cast_interface<T>();
+}
+template<typename T> inline bool ClassBase::has_interface() const {
+	return get_type().has_interface(T::StaticInterfaceType.id);
 }
 
 // allocate a class by string

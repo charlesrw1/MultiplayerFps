@@ -58,6 +58,7 @@
     <ClCompile Include="Source\Framework\BVHBuild.cpp" />
     <ClCompile Include="Source\Framework\BakedCurve.cpp" />
     <ClCompile Include="Source\Framework\ClassBase.cpp" />
+    <ClCompile Include="Source\Framework\InterfaceTypeInfo.cpp" />
     <ClCompile Include="Source\Framework\ClassTypePtr.cpp" />
     <ClCompile Include="Source\Framework\Config.cpp" />
     <ClCompile Include="Source\Framework\CurveEditorImgui.cpp" />
@@ -453,6 +454,7 @@
     <ClInclude Include="Source\Framework\BVH.h" />
     <ClInclude Include="Source\Framework\Bytepacker.h" />
     <ClInclude Include="Source\Framework\ClassBase.h" />
+    <ClInclude Include="Source\Framework\InterfaceTypeInfo.h" />
     <ClInclude Include="Source\Framework\ClassTypePtr.h" />
     <ClInclude Include="Source\Framework\Config.h" />
     <ClInclude Include="Source\Framework\Curve.h" />

@@ -101,6 +101,7 @@ private:
 	uint32_t              lua_field_shadow_size = 0;
 
 	std::unordered_set<Component*> live_instances;
+	std::vector<std::string> pending_interfaces;
 
 	void synthesize_lua_props_for_component_subclass();
 };

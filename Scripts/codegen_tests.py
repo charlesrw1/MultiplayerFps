@@ -417,5 +417,115 @@ class TestNewenum(unittest.TestCase):
         names = [p.name for p in classes[0].properties]
         self.assertEqual(names, ["Linear", "CubicEaseIn", "CubicEaseOut", "CubicEaseInOut", "Constant"])
 
+class TestInterfaceParsing(unittest.TestCase):
+    def test_interface_body_detected(self):
+        text = """class IMyInterface {
+public:
+    INTERFACE_BODY();
+    REF virtual int get_value() { return 0; }
+};
+"""
+        typenames = cg.read_typenames_from_text(io.StringIO(text), "<test>")
+        self.assertIn("IMyInterface", typenames)
+        self.assertEqual(typenames["IMyInterface"].object_type, cg.ClassDef.TYPE_INTERFACE)
+
+    def test_class_with_interface(self):
+        text = """class IMyInterface {
+public:
+    INTERFACE_BODY();
+};
+class MyBase {
+public:
+    CLASS_BODY(MyBase);
+};
+class MyChild : public MyBase, public IMyInterface {
+public:
+    CLASS_BODY(MyChild);
+};
+"""
+        typenames = cg.read_typenames_from_text(io.StringIO(text), "<test>")
+        cg.ClassDef.fixup_types(typenames)
+        child = typenames["MyChild"]
+        self.assertEqual(len(child.interface_defs), 1)
+        self.assertEqual(child.interface_defs[0].classname, "IMyInterface")
+
+    def test_max_interfaces_exceeded(self):
+        ifaces = ""
+        for i in range(5):
+            ifaces += f"class I{i} {{\npublic:\n    INTERFACE_BODY();\n}};\n"
+        names = ", ".join(f"public I{i}" for i in range(5))
+        text = ifaces + f"""class MyBase {{
+public:
+    CLASS_BODY(MyBase);
+}};
+class Bad : public MyBase, {names} {{
+public:
+    CLASS_BODY(Bad);
+}};
+"""
+        typenames = cg.read_typenames_from_text(io.StringIO(text), "<test>")
+        with self.assertRaises(cg.CodegenError):
+            cg.ClassDef.fixup_types(typenames)
+
+    def test_duplicate_interface_rejected(self):
+        text = """class IFoo {
+public:
+    INTERFACE_BODY();
+};
+class MyBase {
+public:
+    CLASS_BODY(MyBase);
+};
+class Bad : public MyBase, public IFoo, public IFoo {
+public:
+    CLASS_BODY(Bad);
+};
+"""
+        typenames = cg.read_typenames_from_text(io.StringIO(text), "<test>")
+        with self.assertRaises(cg.CodegenError):
+            cg.ClassDef.fixup_types(typenames)
+
+    def test_non_interface_rejected(self):
+        text = """class NotAnInterface {
+public:
+    CLASS_BODY(NotAnInterface);
+};
+class MyBase {
+public:
+    CLASS_BODY(MyBase);
+};
+class Bad : public MyBase, public NotAnInterface {
+public:
+    CLASS_BODY(Bad);
+};
+"""
+        typenames = cg.read_typenames_from_text(io.StringIO(text), "<test>")
+        with self.assertRaises(cg.CodegenError):
+            cg.ClassDef.fixup_types(typenames)
+
+    def test_interface_properties_parsed(self):
+        text = """class IMyInterface {
+public:
+    INTERFACE_BODY();
+    REF virtual int get_value() { return 0; }
+    REF virtual void do_stuff() {}
+};
+"""
+        typenames = cg.read_typenames_from_text(io.StringIO(text), "<test>")
+        cg.ClassDef.fixup_types(typenames)
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.h', delete=False) as f:
+            f.write(text)
+            tmp_path = f.name
+        try:
+            classes, _ = cg.parse_file(tmp_path, typenames)
+        finally:
+            os.unlink(tmp_path)
+        self.assertEqual(len(classes), 1)
+        iface = classes[0]
+        self.assertEqual(iface.object_type, cg.ClassDef.TYPE_INTERFACE)
+        func_names = [p.name for p in iface.properties if p.new_type.type == cg.FUNCTION_TYPE]
+        self.assertEqual(func_names, ["get_value", "do_stuff"])
+
+
 if __name__ == "__main__":
     unittest.main()

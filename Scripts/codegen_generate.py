@@ -16,6 +16,7 @@ def write_headers(path:str, additional_includes:list[str]):
     out += "#include \"Framework/ReflectionMacros.h\"\n"
     out += "#include \"Framework/VectorReflect2.h\"\n"
     out += "#include \"Framework/EnumDefReflection.h\"\n"
+    out += "#include \"Framework/InterfaceTypeInfo.h\"\n"
     out += "#include \"Scripting/ScriptFunctionCodegen.h\"\n"
     out += "#include \"Scripting/ScriptManager.h\"\n"
     for inc in additional_includes:
@@ -342,7 +343,10 @@ def write_script_function(newclass:ClassDef, funcProp : Property) -> str:
     calling_template = ""
     if not funcProp.is_static:
         output += "\tClassBase* obj = get_object_from_lua(L,1);\n"
-        output += f"\t{my_obj_type}* myObj = obj ? obj->cast_to<{my_obj_type}>() : nullptr;\n"
+        if newclass.object_type == ClassDef.TYPE_INTERFACE:
+            output += f"\t{my_obj_type}* myObj = obj ? obj->cast_interface<{my_obj_type}>() : nullptr;\n"
+        else:
+            output += f"\t{my_obj_type}* myObj = obj ? obj->cast_to<{my_obj_type}>() : nullptr;\n"
         # assert it
         output += f'\tif(!myObj) {{  luaL_error(L,"null dereference for object calling {newclass.classname}::{funcProp.name}");  }}\n'# fixme
         # call into function
@@ -396,6 +400,11 @@ def append_to_array_R(arr:list[Property],classdef:ClassDef):
             arr.append(f)
     if classdef.super_type_def is not None:
         append_to_array_R(arr,classdef.super_type_def)
+    for idef in classdef.interface_defs:
+        for f in idef.properties:
+            if f.new_type.type==FUNCTION_TYPE and f.is_virtual:
+                if not any(existing.name == f.name for existing in arr):
+                    arr.append(f)
 
 def write_scriptable_class(newclass : ClassDef) -> str:
     assert(newclass.scriptable)
@@ -565,6 +574,13 @@ def write_class_old(typenames:dict[str,ClassDef],newclass : ClassDef)->str:
                     {newclass.classname}::get_props,\n \
                     default_class_create<{newclass.classname}>(),\n \
                     {newclass.classname}::CreateDefaultObject,{function_str},{scriptable_alloc});\n"
+        for idef in newclass.interface_defs:
+            output += f"static struct Register_{newclass.classname}_{idef.classname} {{\n"
+            output += f"\tRegister_{newclass.classname}_{idef.classname}() {{\n"
+            output += f"\t\tint32_t offset = (int32_t)((char*)({idef.classname}*)(({newclass.classname}*)0x100) - (char*)(ClassBase*)(({newclass.classname}*)0x100));\n"
+            output += f"\t\t{newclass.classname}::StaticType.add_interface({idef.classname}::StaticInterfaceType.id, offset);\n"
+            output += f"\t}}\n"
+            output += f"}} s_reg_{newclass.classname}_{idef.classname};\n"
     elif newclass.object_type == ClassDef.TYPE_STRUCT:
         # write a lua getter/pusher
         output += write_struct_getter_setter(newclass)
@@ -585,6 +601,11 @@ def write_class_old(typenames:dict[str,ClassDef],newclass : ClassDef)->str:
             output += "nullptr\n"
         output += "\t);\n"
 
+
+    if newclass.object_type == ClassDef.TYPE_INTERFACE:
+        output += write_class_script_functions(newclass)
+        output += f'InterfaceTypeInfo {newclass.classname}::StaticInterfaceType("{newclass.classname}");\n'
+        return output
 
     if newclass.object_type == ClassDef.TYPE_CLASS or newclass.object_type == ClassDef.TYPE_STRUCT:
 
@@ -664,6 +685,24 @@ def get_lua_type_string(new_type:CppType, no_nil:bool=False) -> str:
 def write_lua_class(newclass:ClassDef) -> str:
     output = ""
 
+    if newclass.object_type == ClassDef.TYPE_INTERFACE:
+        output += "---@class " + newclass.classname + "\n"
+        output += newclass.classname + " = {}\n"
+        output += newclass.classname + "Id = 0\n"
+        for p in newclass.properties:
+            if p.new_type.type == FUNCTION_TYPE:
+                if p.return_type.type != NONE_TYPE:
+                    output += "---@return " + get_lua_type_string(p.return_type, p.no_nil) + "\n"
+                for argType, argName in p.func_args:
+                    output += "---@param " + argName + " " + get_lua_type_string(argType, p.no_nil) + "\n"
+                output += f"function {newclass.classname}:{p.name}("
+                for _, argName in p.func_args:
+                    output += argName + ","
+                if len(p.func_args) > 0:
+                    output = output[:-1]
+                output += ") end\n"
+        return output
+
     if newclass.object_type == ClassDef.TYPE_ENUM:
         index = 0
         for p in newclass.properties:
@@ -674,6 +713,8 @@ def write_lua_class(newclass:ClassDef) -> str:
         output += "---@class " + newclass.classname
         if newclass.object_type==ClassDef.TYPE_CLASS and newclass.super_type_def != None:
             output += " : " + newclass.super_type_def.classname
+            for idef in newclass.interface_defs:
+                output += ", " + idef.classname
         output += "\n"
         for p in newclass.properties:
             if p.new_type.type != FUNCTION_TYPE:
@@ -758,7 +799,11 @@ def write_output_file(LUA_GEN_DIR :str, GENERATED_DIR:str,filename:str,root:str,
                     output += f"{c.classname} get_{c.classname}_from_lua(lua_State* L, int index);\n"
             file.write(output)
 
-            for c in classes:
+            interfaces = [c for c in classes if c.object_type == ClassDef.TYPE_INTERFACE]
+            non_interfaces = [c for c in classes if c.object_type != ClassDef.TYPE_INTERFACE]
+            for c in interfaces:
+                file.write(write_class_old(typenames,c))
+            for c in non_interfaces:
                 file.write(write_class_old(typenames,c))
 
 

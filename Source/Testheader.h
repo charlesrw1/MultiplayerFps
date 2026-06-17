@@ -1,7 +1,38 @@
 #pragma once
 #include <string>
 #include "Framework/ClassBase.h"
+#include "Framework/InterfaceTypeInfo.h"
 #include "Framework/MulticastDelegate.h"
+
+class ITestInterface {
+public:
+	INTERFACE_BODY();
+	REF virtual int interface_value() { return 42; }
+	REF virtual void interface_action() {}
+};
+
+class ISecondInterface {
+public:
+	INTERFACE_BODY();
+	REF virtual std::string second_name() { return "default"; }
+};
+
+class TestWithInterface : public ClassBase, public ITestInterface
+{
+public:
+	CLASS_BODY(TestWithInterface, scriptable);
+	int interface_value() override { return 100; }
+	void interface_action() override {}
+};
+
+class TestWithTwoInterfaces : public ClassBase, public ITestInterface, public ISecondInterface
+{
+public:
+	CLASS_BODY(TestWithTwoInterfaces);
+	int interface_value() override { return 200; }
+	void interface_action() override {}
+	std::string second_name() override { return "two_ifaces"; }
+};
 
 class InterfaceClass : public ClassBase
 {

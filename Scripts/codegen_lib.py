@@ -223,7 +223,23 @@ class ClassDef:
                 raise CodegenError(
                     f"class '{self.classname}' uses unknown interface '{t}'",
                     path=self.source_file, line=self.source_file_line)
-            self.interface_defs.append(typenames[t])
+            idef = typenames[t]
+            if idef.object_type != ClassDef.TYPE_INTERFACE:
+                raise CodegenError(
+                    f"class '{self.classname}' lists '{t}' as interface but it is not an INTERFACE_BODY type",
+                    path=self.source_file, line=self.source_file_line)
+            self.interface_defs.append(idef)
+        if len(self.interface_defs) > 4:
+            raise CodegenError(
+                f"class '{self.classname}' implements {len(self.interface_defs)} interfaces (max 4)",
+                path=self.source_file, line=self.source_file_line)
+        seen_ids : set[str] = set()
+        for idef in self.interface_defs:
+            if idef.classname in seen_ids:
+                raise CodegenError(
+                    f"class '{self.classname}' lists interface '{idef.classname}' more than once",
+                    path=self.source_file, line=self.source_file_line)
+            seen_ids.add(idef.classname)
     def is_self_derived_from(self,other:"ClassDef"):
         assert(other.object_type==ClassDef.TYPE_CLASS)
         assert(self.object_type==ClassDef.TYPE_CLASS)
@@ -448,8 +464,19 @@ def find_class_in_typenames(line:str,file_iter:enumerate[str], typenames:dict[st
     name_and_bases = parse_class_decl(line)
     classname = name_and_bases[0]
     if classname in typenames:
-        assert(typenames[classname].object_type==ClassDef.TYPE_CLASS)
+        if typenames[classname].object_type != ClassDef.TYPE_CLASS:
+            return None
         return typenames[classname]
+    return None
+
+def find_interface_in_typenames(line:str,file_iter:enumerate[str], typenames:dict[str,ClassDef])->ClassDef|None:
+    if remove_comment_from_end(line).strip().endswith(";"):
+        return None
+    name_and_bases = parse_class_decl(line)
+    classname = name_and_bases[0]
+    if classname in typenames:
+        if typenames[classname].object_type == ClassDef.TYPE_INTERFACE:
+            return typenames[classname]
     return None
 
 def find_struct_in_typenames(line:str,file_iter:enumerate[str], typenames:dict[str,ClassDef])->ClassDef|None:
@@ -504,13 +531,17 @@ def parse_class_from_start(line:str, file_iter:enumerate[str]) -> ClassDef|None:
     name_and_bases = parse_class_decl(line)
     c = ClassDef(name_and_bases, ClassDef.TYPE_CLASS, False)
 
-    # now check its really a class, expects CLASS_BODY(name) on next 1-3 lines...
+    # now check its really a class, expects CLASS_BODY(name) or INTERFACE_BODY() on next 1-3 lines...
     good = False
     for i in range(0,3):
         _,line = next(file_iter)
         line = line.strip()
         if line.startswith(f"CLASS_BODY("):
             parse_class_body_macro(line, c)
+            good = True
+            break
+        if line.startswith("INTERFACE_BODY("):
+            c = ClassDef([name_and_bases[0]], ClassDef.TYPE_INTERFACE, False)
             good = True
             break
     if good:
@@ -524,6 +555,7 @@ def parse_struct_decl(line : str) -> str:
     tokens = line.split()
     assert(tokens[0]=="struct")
     return tokens[1]
+
 
 def parse_struct_from_start(line:str, file_iter:enumerate[str]) -> ClassDef|None:
     if remove_comment_from_end(line).strip().endswith(";"):  # to skip forward declares, hacky
@@ -775,6 +807,8 @@ def parse_file(file_path:str, typenames:dict[str,ClassDef]):
                         classes.append(current_class)
                         current_class = None
                     current_class = find_class_in_typenames(line,file_iter,typenames)  # valid if current class is none
+                    if current_class is None:
+                        current_class = find_interface_in_typenames(line,file_iter,typenames)
                     if current_class != None:
                         current_class.tooltip = combine_comments(current_comments)
                         current_comments.clear()

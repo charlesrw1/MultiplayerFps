@@ -1,6 +1,7 @@
 #pragma once
 #include "ClassBase.h"
 #include "Reflection2.h"
+#include "InterfaceTypeInfo.h"
 #include <string>
 
 struct SerializedForDiffing;
@@ -57,6 +58,18 @@ public:
 	int get_prototype_index_table() const;
 	static void set_typenum_R(TypeInfoWithExtra* node);
 	bool get_is_lua_class() const { return is_lua_implemented; }
+
+	static constexpr int MAX_INTERFACES = 4;
+	struct InterfaceEntry {
+		int32_t interface_id = -1;
+		int32_t offset = 0;
+	};
+	int num_interfaces = 0;
+	InterfaceEntry interfaces[MAX_INTERFACES] = {};
+
+	void add_interface(int32_t interface_id, int32_t offset);
+	bool has_interface(int32_t interface_id) const;
+	const InterfaceEntry* find_interface_entry(int32_t interface_id) const;
 
 protected:
 	friend struct ClassTypeIterator;

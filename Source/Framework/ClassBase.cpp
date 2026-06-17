@@ -1,4 +1,5 @@
 #include "Framework/ClassBase.h"
+#include "Framework/InterfaceTypeInfo.h"
 #include <unordered_map>
 #include <vector>
 #include "Framework/Util.h"
@@ -78,6 +79,31 @@ ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_t
 
 ClassTypeInfo::~ClassTypeInfo() {}
 
+void ClassTypeInfo::add_interface(int32_t interface_id, int32_t offset) {
+	ASSERT(num_interfaces < MAX_INTERFACES);
+	for (int i = 0; i < num_interfaces; i++)
+		ASSERT(interfaces[i].interface_id != interface_id);
+	interfaces[num_interfaces++] = {interface_id, offset};
+}
+
+bool ClassTypeInfo::has_interface(int32_t interface_id) const {
+	for (int i = 0; i < num_interfaces; i++)
+		if (interfaces[i].interface_id == interface_id)
+			return true;
+	return false;
+}
+
+const ClassTypeInfo::InterfaceEntry* ClassTypeInfo::find_interface_entry(int32_t interface_id) const {
+	for (int i = 0; i < num_interfaces; i++)
+		if (interfaces[i].interface_id == interface_id)
+			return &interfaces[i];
+	return nullptr;
+}
+
+bool ClassBase::has_interface_by_id(int32_t interface_id) const {
+	return get_type().has_interface(interface_id);
+}
+
 ClassTypeIterator::ClassTypeIterator(ClassTypeInfo* ti) {
 	if (ti) {
 		index = ti->id;
@@ -150,6 +176,17 @@ void ClassBase::post_changes_class_init() {
 	auto root_class = get_registry().string_to_typeinfo.find(ClassBase::StaticType.classname);
 	ASSERT(root_class != get_registry().string_to_typeinfo.end());
 	ClassTypeInfo::set_typenum_R(&root_class->second);
+
+	// propagate interface entries from parent to child
+	for (auto* cti : get_registry().id_to_typeinfo) {
+		if (!cti->super_typeinfo)
+			continue;
+		auto* parent = const_cast<ClassTypeInfo*>(cti->super_typeinfo);
+		for (int i = 0; i < parent->num_interfaces; i++) {
+			if (!cti->has_interface(parent->interfaces[i].interface_id))
+				cti->add_interface(parent->interfaces[i].interface_id, parent->interfaces[i].offset);
+		}
+	}
 }
 
 void TypeInfoWithExtra::init() {
@@ -247,6 +284,9 @@ const ClassTypeInfo* ClassBase::find_class(int32_t id) {
 	return nullptr;
 }
 #include "Framework/StringUtils.h"
+extern "C" {
+#include <lua.h>
+}
 void ClassBase::init_class_info_for_script() {
 	auto& classes = get_registry().id_to_typeinfo;
 	for (auto c : classes) {
@@ -260,6 +300,16 @@ void ClassBase::init_class_info_for_script() {
 	auto& all_enums = EnumRegistry::get_all_enums();
 	for (auto& [enumName, enumType] : all_enums) {
 		ScriptManager::inst->set_enum_global(enumName, enumType);
+	}
+	// push interface ID globals so Lua can call obj:has_interface_by_id(IFooId)
+	for (int32_t i = 0; i < InterfaceTypeInfo::get_count(); i++) {
+		auto* iface = InterfaceTypeInfo::find_interface(i);
+		if (iface) {
+			auto L = ScriptManager::inst->get_lua_state();
+			lua_pushinteger(L, iface->id);
+			std::string global_name = std::string(iface->name) + "Id";
+			lua_setglobal(L, global_name.c_str());
+		}
 	}
 }
 int ClassBase::get_table_registry_id() {
