@@ -101,6 +101,9 @@ class ParticleInstComponent : public Component
 {
 public:
 	CLASS_BODY(ParticleInstComponent);
+	ParticleInstComponent() { set_call_init_in_editor(true); }
+	void start() final;
+	void stop() final {}
 	REF ParticleDefinition* def = nullptr;
 
 #ifdef EDITOR_BUILD

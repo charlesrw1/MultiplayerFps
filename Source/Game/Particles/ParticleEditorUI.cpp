@@ -5,6 +5,8 @@
 #include "Game/Components/ParticleSystemComponent.h"
 #include "Assets/AssetDatabase.h"
 #include "Assets/AssetRegistry.h"
+#include "Assets/AssetBrowser.h"
+#include "AssetTools/AssetTemplates.h"
 #include "imgui.h"
 
 ParticleSystemEditorUi::ParticleSystemEditorUi(ParticleSystemComponent* comp)
@@ -95,6 +97,44 @@ bool ParticleSystemEditorUi::draw()
 	auto* asset = comp->particle_asset.get();
 	if (!asset || !asset->is_valid_to_use()) {
 		ImGui::TextColored(ImVec4(1, 0.5f, 0, 1), "No particle asset assigned");
+		if (ImGui::Button("Create New...")) {
+			show_create_popup = true;
+			memset(create_name, 0, sizeof(create_name));
+		}
+		if (show_create_popup) {
+			ImGui::OpenPopup("Create Particle Asset");
+			ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+			ImGui::SetNextWindowPos(center, ImGuiCond_Appearing, ImVec2(0.5f, 0.5f));
+		}
+		if (ImGui::BeginPopupModal("Create Particle Asset", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+			std::string folder;
+			if (AssetBrowser::inst)
+				folder = AssetBrowser::inst->selected_folder;
+			ImGui::TextDisabled("Folder: %s", folder.empty() ? "(root)" : folder.c_str());
+			ImGui::Text("Name (no extension):");
+			bool enter = ImGui::InputText("##name", create_name, sizeof(create_name), ImGuiInputTextFlags_EnterReturnsTrue);
+
+			bool do_create = enter || ImGui::Button("Create", ImVec2(120, 0));
+			ImGui::SameLine();
+			bool do_cancel = ImGui::Button("Cancel", ImVec2(120, 0));
+
+			if (do_create && strlen(create_name) > 0) {
+				auto result = AssetTemplates::create_empty_particle(folder, create_name);
+				if (result) {
+					comp->particle_asset = g_assets.find<ParticleAsset>(*result);
+					sys_print(Info, "Created particle asset: %s\n", result->c_str());
+				} else {
+					sys_print(Warning, "Failed to create particle asset (already exists?)\n");
+				}
+				show_create_popup = false;
+				ImGui::CloseCurrentPopup();
+			}
+			if (do_cancel) {
+				show_create_popup = false;
+				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndPopup();
+		}
 		return false;
 	}
 

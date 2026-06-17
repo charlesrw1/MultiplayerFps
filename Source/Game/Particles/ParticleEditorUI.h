@@ -50,6 +50,9 @@ private:
 	bool expanded_texture = false;
 	bool expanded_noise = false;
 	bool expanded_renderer = true;
+
+	bool show_create_popup = false;
+	char create_name[128] = {};
 };
 
 #endif

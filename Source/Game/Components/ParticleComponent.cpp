@@ -27,6 +27,14 @@ public:
 };
 REGISTER_ASSETMETADATA_MACRO(ParticleTypeMetadata);
 
+void ParticleInstComponent::start() {
+	if (eng->is_editor_level()) {
+		auto billboard = get_owner()->create_component<BillboardComponent>();
+		billboard->set_texture(Texture::load("eng/icon/_nearest/particle.png"));
+		billboard->dont_serialize_or_edit = true;
+	}
+}
+
 void ParticleComponent::on_sync_render_data() {
 	if (!obj.is_valid())
 		obj = idraw->get_scene()->register_particle_obj();
