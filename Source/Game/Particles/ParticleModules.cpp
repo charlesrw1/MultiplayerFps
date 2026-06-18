@@ -262,6 +262,56 @@ void from_json(const nlohmann::json& j, NoiseModule& m)
 			EnumTrait<NoiseQuality>::StaticEnumType, j["quality"].get<std::string>());
 }
 
+// --- ForceOverLifetimeModule ---
+
+void to_json(nlohmann::json& j, const ForceOverLifetimeModule& m)
+{
+	j["enabled"] = m.enabled;
+	j["x"] = m.x;
+	j["y"] = m.y;
+	j["z"] = m.z;
+	j["space"] = enum_str(EnumTrait<SimulationSpace>::StaticEnumType, (int64_t)m.space);
+}
+
+void from_json(const nlohmann::json& j, ForceOverLifetimeModule& m)
+{
+	m.enabled = j.value("enabled", false);
+	if (j.contains("x")) j["x"].get_to(m.x);
+	if (j.contains("y")) j["y"].get_to(m.y);
+	if (j.contains("z")) j["z"].get_to(m.z);
+	if (j.contains("space"))
+		m.space = (SimulationSpace)enum_val(
+			EnumTrait<SimulationSpace>::StaticEnumType, j["space"].get<std::string>());
+}
+
+// --- LimitVelocityOverLifetimeModule ---
+
+void to_json(nlohmann::json& j, const LimitVelocityOverLifetimeModule& m)
+{
+	j["enabled"] = m.enabled;
+	j["speed"] = m.speed;
+	j["dampen"] = m.dampen;
+	j["separate_axes"] = m.separate_axes;
+	j["x"] = m.x;
+	j["y"] = m.y;
+	j["z"] = m.z;
+	j["space"] = enum_str(EnumTrait<SimulationSpace>::StaticEnumType, (int64_t)m.space);
+}
+
+void from_json(const nlohmann::json& j, LimitVelocityOverLifetimeModule& m)
+{
+	m.enabled = j.value("enabled", false);
+	if (j.contains("speed")) j["speed"].get_to(m.speed);
+	m.dampen = j.value("dampen", 1.f);
+	m.separate_axes = j.value("separate_axes", false);
+	if (j.contains("x")) j["x"].get_to(m.x);
+	if (j.contains("y")) j["y"].get_to(m.y);
+	if (j.contains("z")) j["z"].get_to(m.z);
+	if (j.contains("space"))
+		m.space = (SimulationSpace)enum_val(
+			EnumTrait<SimulationSpace>::StaticEnumType, j["space"].get<std::string>());
+}
+
 // --- RendererModule ---
 
 void to_json(nlohmann::json& j, const RendererModule& m)

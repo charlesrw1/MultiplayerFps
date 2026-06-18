@@ -158,6 +158,23 @@ struct NoiseModule
 	}
 };
 
+struct ForceOverLifetimeModule
+{
+	bool enabled = false;
+	MinMaxCurve x, y, z;
+	SimulationSpace space = SimulationSpace::Local;
+};
+
+struct LimitVelocityOverLifetimeModule
+{
+	bool enabled = false;
+	MinMaxCurve speed;
+	float dampen = 1.f;
+	bool separate_axes = false;
+	MinMaxCurve x, y, z;
+	SimulationSpace space = SimulationSpace::Local;
+};
+
 struct RendererModule
 {
 	bool enabled = true;
@@ -187,5 +204,9 @@ void to_json(nlohmann::json& j, const TextureSheetModule& m);
 void from_json(const nlohmann::json& j, TextureSheetModule& m);
 void to_json(nlohmann::json& j, const NoiseModule& m);
 void from_json(const nlohmann::json& j, NoiseModule& m);
+void to_json(nlohmann::json& j, const ForceOverLifetimeModule& m);
+void from_json(const nlohmann::json& j, ForceOverLifetimeModule& m);
+void to_json(nlohmann::json& j, const LimitVelocityOverLifetimeModule& m);
+void from_json(const nlohmann::json& j, LimitVelocityOverLifetimeModule& m);
 void to_json(nlohmann::json& j, const RendererModule& m);
 void from_json(const nlohmann::json& j, RendererModule& m);

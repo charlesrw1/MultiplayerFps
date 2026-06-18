@@ -361,6 +361,18 @@ void ParticleSystemComponent::update()
 				}
 			}
 
+			// force over lifetime
+			if (subsys.force_over_lifetime.enabled) {
+				auto& fol = subsys.force_over_lifetime;
+				glm::vec3 force(
+					fol.x.evaluate(normalized_life, p.random_seed),
+					fol.y.evaluate(normalized_life, p.random_seed),
+					fol.z.evaluate(normalized_life, p.random_seed));
+				if (fol.space == SimulationSpace::Local && main.simulation_space == SimulationSpace::World)
+					force = glm::mat3(get_ws_transform()) * force;
+				p.velocity += force * dt;
+			}
+
 			// gravity
 			float grav = main.gravity_modifier.evaluate(normalized_life, p.random_seed);
 			p.velocity.y -= grav * 9.81f * dt;
@@ -385,6 +397,27 @@ void ParticleSystemComponent::update()
 					amplitude *= (nm.damping ? 0.5f : 1.f);
 				}
 				p.position += displacement * strength * dt;
+			}
+
+			// limit velocity over lifetime
+			if (subsys.limit_velocity_over_lifetime.enabled) {
+				auto& lv = subsys.limit_velocity_over_lifetime;
+				if (lv.separate_axes) {
+					float lx = lv.x.evaluate(normalized_life, p.random_seed);
+					float ly = lv.y.evaluate(normalized_life, p.random_seed);
+					float lz = lv.z.evaluate(normalized_life, p.random_seed);
+					if (glm::abs(p.velocity.x) > lx)
+						p.velocity.x = glm::mix(p.velocity.x, glm::sign(p.velocity.x) * lx, lv.dampen);
+					if (glm::abs(p.velocity.y) > ly)
+						p.velocity.y = glm::mix(p.velocity.y, glm::sign(p.velocity.y) * ly, lv.dampen);
+					if (glm::abs(p.velocity.z) > lz)
+						p.velocity.z = glm::mix(p.velocity.z, glm::sign(p.velocity.z) * lz, lv.dampen);
+				} else {
+					float limit = lv.speed.evaluate(normalized_life, p.random_seed);
+					float speed = glm::length(p.velocity);
+					if (speed > limit && speed > 0.001f)
+						p.velocity *= glm::mix(1.f, limit / speed, lv.dampen);
+				}
 			}
 
 			// integrate position

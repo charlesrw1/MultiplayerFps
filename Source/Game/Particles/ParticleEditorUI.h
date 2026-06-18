@@ -20,6 +20,8 @@ private:
 	void draw_emission_module(struct EmissionModule& mod);
 	void draw_shape_module(struct ShapeModule& mod);
 	void draw_velocity_module(struct VelocityOverLifetimeModule& mod);
+	void draw_force_module(struct ForceOverLifetimeModule& mod);
+	void draw_limit_velocity_module(struct LimitVelocityOverLifetimeModule& mod);
 	void draw_color_module(struct ColorOverLifetimeModule& mod);
 	void draw_size_module(struct SizeOverLifetimeModule& mod);
 	void draw_rotation_module(struct RotationOverLifetimeModule& mod);
@@ -48,6 +50,8 @@ private:
 	bool expanded_emission = true;
 	bool expanded_shape = false;
 	bool expanded_velocity = false;
+	bool expanded_force = false;
+	bool expanded_limit_velocity = false;
 	bool expanded_color = false;
 	bool expanded_size = false;
 	bool expanded_rotation = false;

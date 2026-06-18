@@ -24,6 +24,8 @@ void to_json(nlohmann::json& j, const ParticleSubSystem& ss)
 	j["emission"] = ss.emission;
 	j["shape"] = ss.shape;
 	j["velocity_over_lifetime"] = ss.velocity_over_lifetime;
+	j["force_over_lifetime"] = ss.force_over_lifetime;
+	j["limit_velocity_over_lifetime"] = ss.limit_velocity_over_lifetime;
 	j["color_over_lifetime"] = ss.color_over_lifetime;
 	j["size_over_lifetime"] = ss.size_over_lifetime;
 	j["rotation_over_lifetime"] = ss.rotation_over_lifetime;
@@ -40,6 +42,8 @@ void from_json(const nlohmann::json& j, ParticleSubSystem& ss)
 	if (j.contains("emission")) j["emission"].get_to(ss.emission);
 	if (j.contains("shape")) j["shape"].get_to(ss.shape);
 	if (j.contains("velocity_over_lifetime")) j["velocity_over_lifetime"].get_to(ss.velocity_over_lifetime);
+	if (j.contains("force_over_lifetime")) j["force_over_lifetime"].get_to(ss.force_over_lifetime);
+	if (j.contains("limit_velocity_over_lifetime")) j["limit_velocity_over_lifetime"].get_to(ss.limit_velocity_over_lifetime);
 	if (j.contains("color_over_lifetime")) j["color_over_lifetime"].get_to(ss.color_over_lifetime);
 	if (j.contains("size_over_lifetime")) j["size_over_lifetime"].get_to(ss.size_over_lifetime);
 	if (j.contains("rotation_over_lifetime")) j["rotation_over_lifetime"].get_to(ss.rotation_over_lifetime);

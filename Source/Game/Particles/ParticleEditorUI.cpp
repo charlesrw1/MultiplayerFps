@@ -198,6 +198,18 @@ bool ParticleSystemEditorUi::draw()
 			draw_velocity_module(ss.velocity_over_lifetime);
 		} else ss.velocity_over_lifetime.enabled = enabled_vel;
 
+		bool enabled_force = ss.force_over_lifetime.enabled;
+		if (draw_module_header("Force over Lifetime", enabled_force, expanded_force)) {
+			ss.force_over_lifetime.enabled = enabled_force;
+			draw_force_module(ss.force_over_lifetime);
+		} else ss.force_over_lifetime.enabled = enabled_force;
+
+		bool enabled_limit_vel = ss.limit_velocity_over_lifetime.enabled;
+		if (draw_module_header("Limit Velocity over Lifetime", enabled_limit_vel, expanded_limit_velocity)) {
+			ss.limit_velocity_over_lifetime.enabled = enabled_limit_vel;
+			draw_limit_velocity_module(ss.limit_velocity_over_lifetime);
+		} else ss.limit_velocity_over_lifetime.enabled = enabled_limit_vel;
+
 		bool enabled_col = ss.color_over_lifetime.enabled;
 		if (draw_module_header("Color over Lifetime", enabled_col, expanded_color)) {
 			ss.color_over_lifetime.enabled = enabled_col;
@@ -494,6 +506,40 @@ void ParticleSystemEditorUi::draw_velocity_module(VelocityOverLifetimeModule& mo
 	draw_minmax_curve("Orbital Y", mod.orbital_y);
 	draw_minmax_curve("Orbital Z", mod.orbital_z);
 	draw_minmax_curve("Radial", mod.radial);
+	ImGui::Unindent();
+}
+
+void ParticleSystemEditorUi::draw_force_module(ForceOverLifetimeModule& mod)
+{
+	ImGui::Indent();
+	draw_minmax_curve("X", mod.x);
+	draw_minmax_curve("Y", mod.y);
+	draw_minmax_curve("Z", mod.z);
+
+	const char* space_names[] = {"Local", "World"};
+	int space = (int)mod.space;
+	if (ImGui::Combo("Space", &space, space_names, 2))
+		mod.space = (SimulationSpace)space;
+	ImGui::Unindent();
+}
+
+void ParticleSystemEditorUi::draw_limit_velocity_module(LimitVelocityOverLifetimeModule& mod)
+{
+	ImGui::Indent();
+	ImGui::Checkbox("Separate Axes", &mod.separate_axes);
+	if (mod.separate_axes) {
+		draw_minmax_curve("X", mod.x);
+		draw_minmax_curve("Y", mod.y);
+		draw_minmax_curve("Z", mod.z);
+	} else {
+		draw_minmax_curve("Speed", mod.speed);
+	}
+	ImGui::DragFloat("Dampen", &mod.dampen, 0.01f, 0.f, 1.f);
+
+	const char* space_names[] = {"Local", "World"};
+	int space = (int)mod.space;
+	if (ImGui::Combo("Space", &space, space_names, 2))
+		mod.space = (SimulationSpace)space;
 	ImGui::Unindent();
 }
 

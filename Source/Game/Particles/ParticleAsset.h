@@ -13,6 +13,8 @@ struct ParticleSubSystem
 	EmissionModule emission;
 	ShapeModule shape;
 	VelocityOverLifetimeModule velocity_over_lifetime;
+	ForceOverLifetimeModule force_over_lifetime;
+	LimitVelocityOverLifetimeModule limit_velocity_over_lifetime;
 	ColorOverLifetimeModule color_over_lifetime;
 	SizeOverLifetimeModule size_over_lifetime;
 	RotationOverLifetimeModule rotation_over_lifetime;
