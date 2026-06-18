@@ -192,40 +192,21 @@ void CurveEditorImgui::draw_content()
 
 void CurveEditorImgui::fit_to_content()
 {
-	float x_min = 0.f, x_max = max_x_value;
-	float y_min = min_y_value, y_max = max_y_value;
+	float padding = 0.05f;
+	float x_range = glm::max(max_x_value, 0.01f);
+	float y_range = glm::max(max_y_value - min_y_value, 0.01f);
 
-	bool has_points = false;
-	for (auto& c : curves) {
-		for (auto& p : c.points) {
-			if (!has_points) {
-				x_min = x_max = p.time;
-				y_min = y_max = p.value;
-				has_points = true;
-			} else {
-				x_min = glm::min(x_min, p.time);
-				x_max = glm::max(x_max, p.time);
-				y_min = glm::min(y_min, p.value);
-				y_max = glm::max(y_max, p.value);
-			}
-		}
-	}
+	float x0 = -x_range * padding;
+	float y0 = min_y_value - y_range * padding;
+	float y1 = max_y_value + y_range * padding;
+	float total_x = x_range * (1.f + 2.f * padding);
+	float total_y = y_range * (1.f + 2.f * padding);
 
-	float padding = 0.1f;
-	float x_range = glm::max(x_max - x_min, 0.01f);
-	float y_range = glm::max(y_max - y_min, 0.01f);
-	x_min -= x_range * padding;
-	x_max += x_range * padding;
-	y_min -= y_range * padding;
-	y_max += y_range * padding;
-
-	grid_offset = ImVec2(x_min, y_max);
-	float sx = x_range * (1.f + 2.f * padding);
-	float sy = y_range * (1.f + 2.f * padding);
+	grid_offset = ImVec2(x0, y1);
 	float win_w = (WINDOW_SIZE.x > 0) ? WINDOW_SIZE.x : 600.f;
 	float win_h = (WINDOW_SIZE.y > 0) ? WINDOW_SIZE.y : 350.f;
-	scale.x = glm::max(sx / (win_w * base_scale.x), 0.01f);
-	scale.y = glm::max(sy / (-win_h * base_scale.y), 0.01f);
+	scale.x = glm::max(total_x / (win_w * base_scale.x), 0.01f);
+	scale.y = glm::max(total_y / (-win_h * base_scale.y), 0.01f);
 }
 
 bool CurveEditorImgui::draw_curve_preview(const char* id, const EditingCurve& curve, float width, float height)

@@ -178,10 +178,6 @@ bool ParticleSystemEditorUi::draw()
 
 		ImGui::Text("Editing: %s", ss.name.c_str());
 
-		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.13f, 0.13f, 0.16f, 1.f));
-		ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 1.f);
-		ImGui::BeginChild("##modules", ImVec2(0, 0), true);
-
 		draw_main_module(ss.main);
 
 		bool enabled_emission = ss.emission.enabled;
@@ -237,10 +233,6 @@ bool ParticleSystemEditorUi::draw()
 			ss.renderer.enabled = enabled_rend;
 			draw_renderer_module(ss.renderer);
 		} else ss.renderer.enabled = enabled_rend;
-
-		ImGui::EndChild();
-		ImGui::PopStyleVar();
-		ImGui::PopStyleColor();
 	}
 
 	comp->update_shape_gizmo(selected_subsystem);
