@@ -161,6 +161,7 @@
     <ClCompile Include="Source\Game\Entities\Player_GameplayStatic.cpp" />
     <ClCompile Include="Source\Game\Entities\PlayerAnimDriver.cpp" />
     <ClCompile Include="Source\Game\Entity.cpp" />
+    <ClCompile Include="Source\Game\GameEventBus.cpp" />
     <ClCompile Include="Source\Game\EntityComponent.cpp" />
     <ClCompile Include="Source\Game\Game.cpp" />
     <ClCompile Include="Source\Game\LevelAssets.cpp" />
@@ -501,6 +502,7 @@
     <ClInclude Include="Source\Game\Entities\BikeSystem.h" />
     <ClInclude Include="Source\Game\Entities\CharacterController.h" />
     <ClInclude Include="Source\Game\Entity.h" />
+    <ClInclude Include="Source\Game\GameEventBus.h" />
     <ClInclude Include="Source\Game\EntityComponent.h" />
     <ClInclude Include="Source\Game\GameModes\MainMenuMode.h" />
     <ClInclude Include="Source\Game\Entities\Player.h" />

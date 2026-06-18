@@ -291,6 +291,9 @@
     <ClCompile Include="Source\Game\Entity.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Game\GameEventBus.cpp">
+      <Filter>Source\Game</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Game\EntityComponent.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
@@ -1103,6 +1106,9 @@
       <Filter>Source\Game\Entities</Filter>
     </ClInclude>
     <ClInclude Include="Source\Game\Entity.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\GameEventBus.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
     <ClInclude Include="Source\Game\EntityComponent.h">

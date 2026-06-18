@@ -10,6 +10,11 @@ public:
 	REF virtual void deal_damage(int amount) {}
 };
 
+NEWENUM(fpsGameEvent, int32_t){
+	PLAYER_ENTERED,
+	PLAYER_LEFT,
+};
+
 class fpsSpawnPoint : public Component {
 public:
 	CLASS_BODY(fpsSpawnPoint,spawnable);

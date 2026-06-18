@@ -17,7 +17,7 @@
 #include "Framework/ReflectionProp.h"
 #include "Framework/ReflectionMacros.h"
 #include "Framework/AddClassToFactory.h"
-
+#include "GameEventBus.h"
 #include "Framework/Serializer.h"
 
 Entity::Entity() {}
@@ -113,6 +113,8 @@ void Entity::destroy_internal() {
 	if (init_state == initialization_state::CALLED_START) {
 		init_state = initialization_state::HAS_ID;
 	}
+
+	GameEventBus::get()->remove_listeners(this);
 
 	if (get_parent())
 		get_parent()->remove_this(this);
@@ -470,4 +472,27 @@ Component* Entity::get_component(const ClassTypeInfo* ti) const {
 		if (all_components[i]->get_type().is_a(*ti))
 			return all_components[i];
 	return nullptr;
+}
+
+void Entity::broadcast_event(int event_id, const char* data) {
+	GameEventBus::get()->broadcast(event_id, this, data);
+}
+
+void Entity::broadcast_event_lua(int event_id, std::string str) {
+	broadcast_event(event_id, str.c_str());
+}
+
+void Entity::listen_for_event(int event_id, ClassBase* listener, GameEventBus::Callback&& callback) {
+	GameEventBus::get()->listen(event_id, this, listener, std::move(callback));
+}
+
+void Entity::listen_for_event_lua(int event_id, ClassBase* listener, LuaEventBusFunction* ptr) {
+	std::shared_ptr<LuaEventBusFunction> owned(ptr);
+	listen_for_event(event_id, listener, [owned = std::move(owned)](const GameEvent& event) {
+		owned->invoke(event.sender, event.payload);
+	});
+}
+
+void Entity::remove_listener(int event_id, ClassBase* listener) {
+	GameEventBus::get()->remove(event_id, this, listener);
 }

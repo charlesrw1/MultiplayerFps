@@ -60,10 +60,10 @@ static Entity* spawn_trigger_box(glm::vec3 center, glm::vec3 size, F&& on_overla
 	bc->set_is_simulating(false);
 	bc->set_is_trigger(true);
 	bc->set_send_overlap(true);
-	bc->on_trigger.add(e, [cb = std::forward<F>(on_overlap)](PhysicsBodyEventArg arg) {
-		if (arg.entered_trigger && arg.who.get())
-			cb(arg.who.get());
-	});
+	//bc->on_trigger.add(e, [cb = std::forward<F>(on_overlap)](PhysicsBodyEventArg arg) {
+	//	if (arg.entered_trigger && arg.who.get())
+	//		cb(arg.who.get());
+	//});
 	return e;
 }
 

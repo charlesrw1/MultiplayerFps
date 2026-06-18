@@ -10,6 +10,7 @@
 #include <string>
 #include "Framework/Reflection2.h"
 #include "Framework/StructReflection.h"
+#include "GameEventBus.h"
 
 class Model;
 class PhysicsActor;
@@ -134,6 +135,13 @@ public:
 	void validate_check();
 
 	REF std::string get_editor_name_lua() const { return editor_name; }
+
+	// GameEventBus convience functions
+	void broadcast_event(int event_id, const char* data = "");
+	REF void broadcast_event_lua(int event_id, std::string str);
+	void listen_for_event(int event_id, ClassBase* listener, GameEventBus::Callback&& callback);
+	REF void listen_for_event_lua(int event_id, ClassBase* listener, LuaEventBusFunction* ptr);
+	REF void remove_listener(int event_id, ClassBase* listener);
 
 private:
 	std::vector<Component*> all_components;

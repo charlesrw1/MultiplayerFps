@@ -185,6 +185,7 @@ void Level::destroy_component(Component* ec) {
 Level::Level(bool is_editor) : all_world_ents(4 /*2^4*/), tick_list(4), wants_sync_update(4) {}
 
 void Level::start(string source_name, UnserializedSceneFile* source) {
+	GameEventBus::get()->clear();
 	this->source_name = source_name;
 	ASSERT(source);
 	double start = GetTime();

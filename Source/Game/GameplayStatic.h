@@ -11,6 +11,10 @@ struct HitResult
 	REF glm::vec3 normal;
 	REF bool hit = false;
 };
+
+
+
+
 using std::vector;
 class PhysicsBody;
 #include "Game/Components/PhysicsComponents.h"
@@ -74,4 +78,8 @@ public:
 
 	REF static void debug_break() { __debugbreak(); }
 	REF static bool is_editor() { return eng->is_editor_level(); }
+
+
+
+
 };

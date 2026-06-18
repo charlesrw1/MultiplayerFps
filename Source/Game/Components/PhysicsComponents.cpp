@@ -73,12 +73,13 @@ void PhysicsBody::enable_with_initial_transforms(const glm::mat4& t0, const glm:
 
 void PhysicsBody::add_triggered_callback(IPhysicsEventCallback* callback) {
 	ASSERT(callback);
-	std::shared_ptr<IPhysicsEventCallback> ptr(callback);
-	IPhysicsEventCallback* key = ptr.get();
-	std::function<void(PhysicsBodyEventArg)> func = [moved_ptr = std::move(ptr)](PhysicsBodyEventArg arg) {
-		moved_ptr->on_event(arg);
-	};
-	on_trigger.add(key, func);
+	ASSERT(0);
+	//std::shared_ptr<IPhysicsEventCallback> ptr(callback);
+	//IPhysicsEventCallback* key = ptr.get();
+	//std::function<void(PhysicsBodyEventArg)> func = [moved_ptr = std::move(ptr)](PhysicsBodyEventArg arg) {
+	//	moved_ptr->on_event(arg);
+	//};
+	//on_trigger.add(key, func);
 }
 
 void PhysicsBody::update() {
