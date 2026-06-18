@@ -197,7 +197,7 @@ void DebugShapeCtx::update(float dt) {
 	mbo.owner = nullptr;
 	mbo.meshbuilder = &mb;
 	mbo.visible = true;
-	mbo.depth_tested = false;
+	mbo.depth_tested = true;
 	mbo.use_background_color = true;
 
 	idraw->get_scene()->update_meshbuilder(handle, mbo);
