@@ -649,7 +649,7 @@ void ParticleSystemComponent::draw(const glm::vec3& side, const glm::vec3& up, c
 		// build trail ribbons
 		if (subsys.trail.enabled) {
 			auto& trail_vec = subsystem_states[ss_idx].trail_data;
-			for (int ti = 0; ti < (int)trail_vec.size(); ti++) {
+			for (int ti = 0; ti < (int)trail_vec.size() && ti < (int)particles_ref.size(); ti++) {
 				auto& trail = trail_vec[ti];
 				if (!trail.has_trail || trail.points.size() < 2)
 					continue;
