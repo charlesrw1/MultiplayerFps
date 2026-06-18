@@ -17,7 +17,8 @@ public:
 
 	ClassTypeInfo(const char* classname, const ClassTypeInfo* super_typeinfo, GetPropsFunc_t get_prop_func,
 				  CreateObjectFunc alloc, bool create_default_obj, const FunctionInfo* func_infos, int func_info_count,
-				  CreateObjectFunc scriptable_alloc = nullptr, bool is_lua_obj = false);
+				  CreateObjectFunc scriptable_alloc = nullptr, bool is_lua_obj = false,
+				  bool editor_spawnable = false);
 	~ClassTypeInfo();
 
 	const char* classname = "";
@@ -38,6 +39,7 @@ public:
 	// allocates a scriptable version of this object
 	// it overrides virtal functions to call into lua
 	ClassBase* (*scriptable_allocate)(const ClassTypeInfo*) = nullptr;
+	bool editor_spawnable = false;
 
 	template <typename T> static ClassBase* default_allocate(const ClassTypeInfo*) { return (ClassBase*)(new T); }
 	bool is_this_scriptable() const { return scriptable_allocate; }

@@ -195,6 +195,7 @@ class ClassDef:
         self.tooltip = ""
 
         self.scriptable = scriptable
+        self.editor_spawnable = False
 
     def find_property_for_name(self, name:str) -> Property|None:
         for p in self.properties:
@@ -511,6 +512,8 @@ def parse_class_body_macro(line : str, inDef : ClassDef):
             if t == "scriptable":
                 #print(f"found scriptable tag for {inDef.classname}")
                 inDef.scriptable = True
+            elif t == "spawnable":
+                inDef.editor_spawnable = True
             else:
                 raise Exception(f"unexpected CLASS_BODY(...) arg \"{t}\"")
 

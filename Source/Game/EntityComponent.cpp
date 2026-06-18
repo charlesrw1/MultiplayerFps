@@ -8,6 +8,7 @@
 #include "Framework/Serializer.h"
 #include "Scripting/ScriptManager.h"
 #include <stdexcept>
+#include "Components/MeshComponent.h"
 
 #ifdef EDITOR_BUILD
 // create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
@@ -58,6 +59,9 @@ public:
 		// of the editor picker to keep authoring-only types from cluttering it.
 		for (auto it = ClassBase::get_subclasses(&Component::StaticType); !it.is_end(); it.next()) {
 			auto* ti = it.get_type();
+			if (ti && ti->editor_spawnable)
+				filepaths.push_back(ti->get_classname());
+
 			if (!ti || !ti->get_is_lua_class() || !ti->has_allocate_func())
 				continue;
 			auto* lua_ti = static_cast<const LuaClassTypeInfo*>(ti);
@@ -108,6 +112,8 @@ void Component::activate_internal_step2() {
 		init_updater();
 		init_state = initialization_state::CALLED_START;
 	}
+	if (eng->is_editor_level())
+		editor_start();
 }
 
 void Component::deactivate_internal() {
@@ -136,6 +142,15 @@ void Component::destroy_internal() {
 	ASSERT(entity_owner);
 	entity_owner->remove_this_component_internal(this);
 	ASSERT(entity_owner == nullptr);
+}
+
+void Component::editor_set_model(std::string_view modelname, bool draw_text) {
+	if (eng->is_editor_app()) {
+		auto* mesh = entity_owner->create_component<MeshComponent>();
+		mesh->set_model_str(modelname.data());
+		mesh->dont_serialize_or_edit=true;
+		this->draw_text_in_editor = draw_text;
+	}
 }
 
 Component::~Component() {

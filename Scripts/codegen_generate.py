@@ -579,12 +579,13 @@ def write_class_old(typenames:dict[str,ClassDef],newclass : ClassDef)->str:
             output += write_scriptable_class(newclass)
             scriptable_alloc = f"get_allocate_script_impl_internal<ScriptImpl_{newclass.classname}>()"
 
+        spawnable_str = "true" if newclass.editor_spawnable else "false"
         output += f"ClassTypeInfo {newclass.classname}::StaticType = ClassTypeInfo(\n \
                     \"{newclass.classname}\",\n \
                     {super_typeinfo_str},\n \
                     {newclass.classname}::get_props,\n \
                     default_class_create<{newclass.classname}>(),\n \
-                    {newclass.classname}::CreateDefaultObject,{function_str},{scriptable_alloc});\n"
+                    {newclass.classname}::CreateDefaultObject,{function_str},{scriptable_alloc},false,{spawnable_str});\n"
         for idef in newclass.interface_defs:
             output += f"static struct Register_{newclass.classname}_{idef.classname} {{\n"
             output += f"\tRegister_{newclass.classname}_{idef.classname}() {{\n"

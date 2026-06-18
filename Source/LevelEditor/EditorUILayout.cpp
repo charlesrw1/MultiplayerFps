@@ -70,6 +70,8 @@ bool EditorUILayout::draw(EditorInputs& inputs, std::function<void()> draw_windo
 		for (auto c : o.e->get_components()) {
 			if (c->dont_serialize_or_edit_this())
 				continue;
+			if (c->get_draw_text_in_editor())
+				found_script = true;
 			const char* s = c->get_editor_outliner_icon();
 			if (c->get_type().get_is_lua_class()) {
 				found_script = true;

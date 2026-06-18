@@ -203,7 +203,8 @@
     <ClCompile Include="Source\LevelEditor\ViewportHandles.cpp" />
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp" />
     <ClCompile Include="Source\Logging.cpp" />
-    <ClCompile Include="Source\MyGame\fpsApp.cpp" />
+    <ClCompile Include="Source\MyGame\fps\fpsApp.cpp" />
+    <ClCompile Include="Source\MyGame\fps\fpsObjects.cpp" />
     <ClCompile Include="Source\Render\DdsExport.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
@@ -397,8 +398,8 @@
     <ClInclude Include="Source\LevelEditor\ViewportHandles.h" />
     <ClInclude Include="Source\LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Source\Logging.h" />
-    <ClInclude Include="Source\MyGame\fpsApp.h" />
-    <ClInclude Include="Source\MyGame\fpsObjects.h" />
+    <ClInclude Include="Source\MyGame\fps\fpsApp.h" />
+    <ClInclude Include="Source\MyGame\fps\fpsObjects.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\Dx11\Dx11Local.h" />
     <ClInclude Include="Source\Render\GpuAllocator.h" />

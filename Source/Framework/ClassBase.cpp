@@ -56,7 +56,8 @@ static ClassRegistryData& get_registry() {
 
 ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_typeinfo, GetPropsFunc_t get_props_func,
 							 CreateObjectFunc alloc, bool create_default_obj, const FunctionInfo* lua_funcs,
-							 int lua_func_count, CreateObjectFunc scriptAlloc, bool is_lua_obj) {
+							 int lua_func_count, CreateObjectFunc scriptAlloc, bool is_lua_obj,
+							 bool editor_spawnable) {
 	this->classname = classname;
 	this->superclassname = "";
 	this->props = nullptr;
@@ -69,6 +70,7 @@ ClassTypeInfo::ClassTypeInfo(const char* classname, const ClassTypeInfo* super_t
 	this->lua_functions = lua_funcs;
 	this->lua_function_count = lua_func_count;
 	this->scriptable_allocate = scriptAlloc;
+	this->editor_spawnable = editor_spawnable;
 	if (is_lua_obj)
 		this->default_class_object = nullptr;
 	else {

@@ -27,6 +27,7 @@ public:
 	REF virtual void start() {}
 	REF virtual void update() {}
 	REF virtual void stop() {}
+	REF virtual void editor_start() {}
 	void init_updater();
 	void shutdown_updater();
 	REF void set_ticking(bool shouldTick);
@@ -92,11 +93,15 @@ public:
 	void set_lua_owner_type(const LuaClassTypeInfo* t) { lua_owner_type = t; }
 	const LuaClassTypeInfo* get_lua_owner_type() const { return lua_owner_type; }
 
+	bool get_draw_text_in_editor() const { return draw_text_in_editor; }
+	void editor_set_model(std::string_view modelname, bool draw_text = false);
+
 private:
 	const LuaClassTypeInfo* lua_owner_type = nullptr;
 	Entity* entity_owner = nullptr;
 	bool call_init_in_editor = false;
 	bool tick_enabled = false;
+	bool draw_text_in_editor = false;
 
 	friend class Entity;
 	friend class EdPropertyGrid;
