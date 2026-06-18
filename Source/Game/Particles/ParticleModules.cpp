@@ -341,3 +341,35 @@ void from_json(const nlohmann::json& j, RendererModule& m)
 	m.speed_scale = j.value("speed_scale", 0.f);
 	m.length_scale = j.value("length_scale", 2.f);
 }
+
+// --- TrailModule ---
+
+void to_json(nlohmann::json& j, const TrailModule& m)
+{
+	j["enabled"] = m.enabled;
+	j["ratio"] = m.ratio;
+	j["lifetime"] = m.lifetime;
+	j["minimum_vertex_distance"] = m.minimum_vertex_distance;
+	j["die_with_particles"] = m.die_with_particles;
+	j["width_over_trail"] = m.width_over_trail;
+	j["size_affects_width"] = m.size_affects_width;
+	j["inherit_particle_color"] = m.inherit_particle_color;
+	j["color_over_trail"] = m.color_over_trail;
+	j["texture_mode"] = enum_str(EnumTrait<TrailTextureMode>::StaticEnumType, (int64_t)m.texture_mode);
+}
+
+void from_json(const nlohmann::json& j, TrailModule& m)
+{
+	m.enabled = j.value("enabled", false);
+	m.ratio = j.value("ratio", 1.f);
+	m.lifetime = j.value("lifetime", 1.f);
+	m.minimum_vertex_distance = j.value("minimum_vertex_distance", 0.1f);
+	m.die_with_particles = j.value("die_with_particles", true);
+	if (j.contains("width_over_trail")) j["width_over_trail"].get_to(m.width_over_trail);
+	m.size_affects_width = j.value("size_affects_width", true);
+	m.inherit_particle_color = j.value("inherit_particle_color", true);
+	if (j.contains("color_over_trail")) j["color_over_trail"].get_to(m.color_over_trail);
+	if (j.contains("texture_mode"))
+		m.texture_mode = (TrailTextureMode)enum_val(
+			EnumTrait<TrailTextureMode>::StaticEnumType, j["texture_mode"].get<std::string>());
+}

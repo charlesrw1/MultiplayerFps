@@ -27,6 +27,7 @@ private:
 	void draw_rotation_module(struct RotationOverLifetimeModule& mod);
 	void draw_texture_sheet_module(struct TextureSheetModule& mod);
 	void draw_noise_module(struct NoiseModule& mod);
+	void draw_trail_module(struct TrailModule& mod);
 	void draw_renderer_module(struct RendererModule& mod);
 	void draw_playback_controls();
 
@@ -57,6 +58,7 @@ private:
 	bool expanded_rotation = false;
 	bool expanded_texture = false;
 	bool expanded_noise = false;
+	bool expanded_trail = false;
 	bool expanded_renderer = true;
 
 	bool show_create_popup = false;

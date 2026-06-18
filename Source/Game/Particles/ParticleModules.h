@@ -186,6 +186,30 @@ struct RendererModule
 	float length_scale = 2.f;
 };
 
+NEWENUM(TrailTextureMode, uint8_t){
+	Stretch,
+	Tile,
+};
+
+struct TrailModule
+{
+	bool enabled = false;
+	float ratio = 1.f;
+	float lifetime = 1.f;
+	float minimum_vertex_distance = 0.1f;
+	bool die_with_particles = true;
+	MinMaxCurve width_over_trail;
+	bool size_affects_width = true;
+	bool inherit_particle_color = true;
+	Gradient color_over_trail;
+	TrailTextureMode texture_mode = TrailTextureMode::Stretch;
+
+	TrailModule() {
+		width_over_trail.constant_min = 1.f;
+		color_over_trail.keys.push_back({COLOR_WHITE, 1.f, 0.f});
+	}
+};
+
 // JSON serialization for all modules
 void to_json(nlohmann::json& j, const MainModule& m);
 void from_json(const nlohmann::json& j, MainModule& m);
@@ -211,3 +235,5 @@ void to_json(nlohmann::json& j, const LimitVelocityOverLifetimeModule& m);
 void from_json(const nlohmann::json& j, LimitVelocityOverLifetimeModule& m);
 void to_json(nlohmann::json& j, const RendererModule& m);
 void from_json(const nlohmann::json& j, RendererModule& m);
+void to_json(nlohmann::json& j, const TrailModule& m);
+void from_json(const nlohmann::json& j, TrailModule& m);

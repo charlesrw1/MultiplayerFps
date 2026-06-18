@@ -20,6 +20,7 @@ struct ParticleSubSystem
 	RotationOverLifetimeModule rotation_over_lifetime;
 	TextureSheetModule texture_sheet;
 	NoiseModule noise;
+	TrailModule trail;
 	RendererModule renderer;
 };
 

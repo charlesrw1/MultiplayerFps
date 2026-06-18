@@ -23,6 +23,20 @@ struct ParticleSystemDef
 	int tex_frame = 0;
 };
 
+struct TrailPoint
+{
+	glm::vec3 position{};
+	float time_created = 0.f;
+	float width = 1.f;
+	Color32 color = COLOR_WHITE;
+};
+
+struct TrailData
+{
+	std::vector<TrailPoint> points;
+	bool has_trail = false;
+};
+
 struct SubSystemState
 {
 	bool is_emitting = false;
@@ -30,6 +44,7 @@ struct SubSystemState
 	float emission_accumulator = 0.f;
 	int next_burst_index = 0;
 	std::vector<ParticleSystemDef> particles;
+	std::vector<TrailData> trail_data;
 	Random rng{0};
 };
 

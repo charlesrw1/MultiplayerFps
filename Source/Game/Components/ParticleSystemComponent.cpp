@@ -99,8 +99,10 @@ void ParticleSystemComponent::stop_emitting()
 
 void ParticleSystemComponent::clear()
 {
-	for (auto& ss : subsystem_states)
+	for (auto& ss : subsystem_states) {
 		ss.particles.clear();
+		ss.trail_data.clear();
+	}
 	playing = false;
 	total_elapsed = 0.f;
 }
@@ -130,6 +132,7 @@ void ParticleSystemComponent::init_subsystem_states()
 		state.emission_accumulator = 0.f;
 		state.next_burst_index = 0;
 		state.particles.clear();
+		state.trail_data.clear();
 		state.rng.state = wang_hash(rng.Rand() + i);
 	}
 }
@@ -242,6 +245,20 @@ void ParticleSystemComponent::emit_particles(int ss_idx, int count)
 		p.colorA = start_col;
 
 		state.particles.push_back(p);
+
+		if (subsys.trail.enabled) {
+			TrailData td;
+			td.has_trail = (r.RandF() <= subsys.trail.ratio);
+			if (td.has_trail) {
+				TrailPoint tp;
+				tp.position = p.position;
+				tp.time_created = state.elapsed_time;
+				tp.width = p.scale;
+				tp.color = p.colorA;
+				td.points.push_back(tp);
+			}
+			state.trail_data.push_back(std::move(td));
+		}
 	}
 }
 
@@ -427,6 +444,26 @@ void ParticleSystemComponent::update()
 			// integrate position
 			p.position += p.velocity * dt;
 
+			// trail sampling
+			if (subsys.trail.enabled && i < (int)state.trail_data.size()
+				&& state.trail_data[i].has_trail) {
+				auto& trail = state.trail_data[i];
+				if (!trail.points.empty()) {
+					float dist = glm::length(p.position - trail.points.back().position);
+					if (dist >= subsys.trail.minimum_vertex_distance) {
+						TrailPoint tp;
+						tp.position = p.position;
+						tp.time_created = state.elapsed_time;
+						tp.width = p.scale;
+						tp.color = p.colorA;
+						trail.points.push_back(tp);
+					}
+				}
+				float expire_time = state.elapsed_time - subsys.trail.lifetime;
+				while (!trail.points.empty() && trail.points.front().time_created < expire_time)
+					trail.points.erase(trail.points.begin());
+			}
+
 			// size over lifetime
 			if (subsys.size_over_lifetime.enabled) {
 				if (subsys.size_over_lifetime.separate_axes) {
@@ -471,6 +508,11 @@ void ParticleSystemComponent::update()
 			// kill dead particles
 			p.lifeTime -= dt;
 			if (p.lifeTime <= 0.f) {
+				if (subsys.trail.enabled && !state.trail_data.empty()) {
+					if (i < (int)state.trail_data.size() - 1)
+						state.trail_data[i] = std::move(state.trail_data.back());
+					state.trail_data.pop_back();
+				}
 				if (i < (int)particles.size() - 1)
 					particles[i] = particles.back();
 				particles.pop_back();
@@ -522,8 +564,9 @@ void ParticleSystemComponent::draw(const glm::vec3& side, const glm::vec3& up, c
 
 		auto& particles_ref = subsystem_states[ss_idx].particles;
 
-		// sort particles if needed
-		if (subsys.renderer.sort_mode != ParticleSortMode::None && particles_ref.size() > 1) {
+		// sort particles if needed (disabled when trails are on — breaks parallel indexing)
+		if (subsys.renderer.sort_mode != ParticleSortMode::None && particles_ref.size() > 1
+			&& !subsys.trail.enabled) {
 			switch (subsys.renderer.sort_mode) {
 			case ParticleSortMode::ByDistance:
 				std::sort(particles_ref.begin(), particles_ref.end(),
@@ -601,6 +644,48 @@ void ParticleSystemComponent::draw(const glm::vec3& side, const glm::vec3& up, c
 			batch.builder.AddVertex(v);
 
 			batch.builder.AddQuad(base, base + 1, base + 2, base + 3);
+		}
+
+		// build trail ribbons
+		if (subsys.trail.enabled) {
+			auto& trail_vec = subsystem_states[ss_idx].trail_data;
+			for (int ti = 0; ti < (int)trail_vec.size(); ti++) {
+				auto& trail = trail_vec[ti];
+				if (!trail.has_trail || trail.points.size() < 2)
+					continue;
+
+				auto& p = particles_ref[ti];
+				int trail_size = (int)trail.points.size();
+
+				for (int pi = 0; pi < trail_size; pi++) {
+					auto& tp = trail.points[pi];
+					float trail_alpha = (float)pi / (float)(trail_size - 1);
+
+					float w = subsys.trail.width_over_trail.evaluate(trail_alpha, p.random_seed);
+					if (subsys.trail.size_affects_width)
+						w *= tp.width;
+
+					Color32 trail_color = subsys.trail.inherit_particle_color
+						? tp.color : subsys.trail.color_over_trail.evaluate(trail_alpha);
+
+					glm::vec3 world_pos = (subsys.main.simulation_space == SimulationSpace::Local)
+						? glm::vec3(local_to_world * glm::vec4(tp.position, 1.f))
+						: tp.position;
+
+					int base = batch.builder.GetBaseVertex();
+					MbVertex v;
+					v.color = trail_color;
+					v.position = world_pos + up * w;
+					v.uv = glm::vec2(0.f, trail_alpha);
+					batch.builder.AddVertex(v);
+					v.position = world_pos - up * w;
+					v.uv = glm::vec2(1.f, trail_alpha);
+					batch.builder.AddVertex(v);
+
+					if (pi > 0)
+						batch.builder.AddQuad(base - 2, base, base + 1, base - 1);
+				}
+			}
 		}
 	}
 

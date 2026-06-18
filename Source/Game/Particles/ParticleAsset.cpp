@@ -31,6 +31,7 @@ void to_json(nlohmann::json& j, const ParticleSubSystem& ss)
 	j["rotation_over_lifetime"] = ss.rotation_over_lifetime;
 	j["texture_sheet"] = ss.texture_sheet;
 	j["noise"] = ss.noise;
+	j["trail"] = ss.trail;
 	j["renderer"] = ss.renderer;
 }
 
@@ -49,6 +50,7 @@ void from_json(const nlohmann::json& j, ParticleSubSystem& ss)
 	if (j.contains("rotation_over_lifetime")) j["rotation_over_lifetime"].get_to(ss.rotation_over_lifetime);
 	if (j.contains("texture_sheet")) j["texture_sheet"].get_to(ss.texture_sheet);
 	if (j.contains("noise")) j["noise"].get_to(ss.noise);
+	if (j.contains("trail")) j["trail"].get_to(ss.trail);
 	if (j.contains("renderer")) j["renderer"].get_to(ss.renderer);
 }
 

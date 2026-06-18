@@ -240,6 +240,12 @@ bool ParticleSystemEditorUi::draw()
 			draw_noise_module(ss.noise);
 		} else ss.noise.enabled = enabled_noise;
 
+		bool enabled_trail = ss.trail.enabled;
+		if (draw_module_header("Trail", enabled_trail, expanded_trail)) {
+			ss.trail.enabled = enabled_trail;
+			draw_trail_module(ss.trail);
+		} else ss.trail.enabled = enabled_trail;
+
 		bool enabled_rend = ss.renderer.enabled;
 		if (draw_module_header("Renderer", enabled_rend, expanded_renderer)) {
 			ss.renderer.enabled = enabled_rend;
@@ -604,6 +610,20 @@ void ParticleSystemEditorUi::draw_noise_module(NoiseModule& mod)
 	int q = (int)mod.quality;
 	if (ImGui::Combo("Quality", &q, quality_names, 3))
 		mod.quality = (NoiseQuality)q;
+	ImGui::Unindent();
+}
+
+void ParticleSystemEditorUi::draw_trail_module(TrailModule& mod)
+{
+	ImGui::Indent();
+	ImGui::DragFloat("Ratio", &mod.ratio, 0.01f, 0.f, 1.f);
+	ImGui::DragFloat("Lifetime", &mod.lifetime, 0.01f, 0.01f, 10.f);
+	ImGui::DragFloat("Min Vertex Distance", &mod.minimum_vertex_distance, 0.01f, 0.001f, 10.f);
+	draw_minmax_curve("Width over Trail", mod.width_over_trail);
+	draw_gradient_field("Color over Trail", mod.color_over_trail);
+	ImGui::Checkbox("Size Affects Width", &mod.size_affects_width);
+	ImGui::Checkbox("Inherit Particle Color", &mod.inherit_particle_color);
+	ImGui::Checkbox("Die with Particles", &mod.die_with_particles);
 	ImGui::Unindent();
 }
 
