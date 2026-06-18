@@ -418,6 +418,10 @@ void ParticleSystemComponent::update()
 					if (speed > limit && speed > 0.001f)
 						p.velocity *= glm::mix(1.f, limit / speed, lv.dampen);
 				}
+
+				float d = lv.drag.evaluate(normalized_life, p.random_seed);
+				if (d > 0.f)
+					p.velocity *= glm::max(1.f - d * dt, 0.f);
 			}
 
 			// integrate position

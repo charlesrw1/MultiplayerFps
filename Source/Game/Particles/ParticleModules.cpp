@@ -291,6 +291,7 @@ void to_json(nlohmann::json& j, const LimitVelocityOverLifetimeModule& m)
 	j["enabled"] = m.enabled;
 	j["speed"] = m.speed;
 	j["dampen"] = m.dampen;
+	j["drag"] = m.drag;
 	j["separate_axes"] = m.separate_axes;
 	j["x"] = m.x;
 	j["y"] = m.y;
@@ -303,6 +304,7 @@ void from_json(const nlohmann::json& j, LimitVelocityOverLifetimeModule& m)
 	m.enabled = j.value("enabled", false);
 	if (j.contains("speed")) j["speed"].get_to(m.speed);
 	m.dampen = j.value("dampen", 1.f);
+	if (j.contains("drag")) j["drag"].get_to(m.drag);
 	m.separate_axes = j.value("separate_axes", false);
 	if (j.contains("x")) j["x"].get_to(m.x);
 	if (j.contains("y")) j["y"].get_to(m.y);

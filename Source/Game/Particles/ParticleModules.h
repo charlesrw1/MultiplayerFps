@@ -170,6 +170,7 @@ struct LimitVelocityOverLifetimeModule
 	bool enabled = false;
 	MinMaxCurve speed;
 	float dampen = 1.f;
+	MinMaxCurve drag;
 	bool separate_axes = false;
 	MinMaxCurve x, y, z;
 	SimulationSpace space = SimulationSpace::Local;

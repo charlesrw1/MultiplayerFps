@@ -535,6 +535,7 @@ void ParticleSystemEditorUi::draw_limit_velocity_module(LimitVelocityOverLifetim
 		draw_minmax_curve("Speed", mod.speed);
 	}
 	ImGui::DragFloat("Dampen", &mod.dampen, 0.01f, 0.f, 1.f);
+	draw_minmax_curve("Drag", mod.drag);
 
 	const char* space_names[] = {"Local", "World"};
 	int space = (int)mod.space;
