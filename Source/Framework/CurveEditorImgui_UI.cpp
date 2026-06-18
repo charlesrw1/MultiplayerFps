@@ -205,8 +205,8 @@ void CurveEditorImgui::fit_to_content()
 	grid_offset = ImVec2(x0, y1);
 	float win_w = (WINDOW_SIZE.x > 0) ? WINDOW_SIZE.x : 600.f;
 	float win_h = (WINDOW_SIZE.y > 0) ? WINDOW_SIZE.y : 350.f;
-	scale.x = glm::max(total_x / (win_w * base_scale.x), 0.01f);
-	scale.y = glm::max(total_y / (-win_h * base_scale.y), 0.01f);
+	scale.x = glm::max(win_w * base_scale.x / total_x, 0.01f);
+	scale.y = glm::max(-win_h * base_scale.y / total_y, 0.01f);
 }
 
 bool CurveEditorImgui::draw_curve_preview(const char* id, const EditingCurve& curve, float width, float height)

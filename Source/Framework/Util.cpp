@@ -340,8 +340,8 @@ void handle_assert_internal(const char* cond) {
 	if (ProgramTester::get().get_is_in_test())
 		throw std::runtime_error();
 #else
-	if (_CrtDbgReport(_CRT_ASSERT, nullptr, 0, nullptr, "%s", cond) == 1)
-		_CrtDbgBreak();
+	//if (_CrtDbgReport(_CRT_ASSERT, nullptr, 0, nullptr, "%s", cond) == 1)
+	//	_CrtDbgBreak();
 	std::abort();
 #endif // WITH_TEST_ASSERT
 }
