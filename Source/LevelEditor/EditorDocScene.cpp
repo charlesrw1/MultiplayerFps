@@ -51,6 +51,15 @@ void EditorDoc::instantiate_into_scene(BaseUpdater* u) {
 
 void DrawHandlesObject::tick() {
 	ASSERT(&doc);
+
+	// draw gizmos for selected entities' components
+	for (auto& sel : doc.selection_state->get_selection_as_vector()) {
+		if (auto* e = sel.get()) {
+			for (auto* comp : e->get_components())
+				comp->editor_on_draw_gizmos_selected();
+		}
+	}
+
 	if (!ed_show_box_handles.get_bool())
 		return;
 

@@ -12,4 +12,8 @@ public:
 
 	static void add_transformed_box(glm::mat4 transform, glm::vec3 size, Color32 color, float lifetime,
 									bool fixedupdate = true);
+	static void add_circle(glm::vec3 center, glm::vec3 normal, float radius, Color32 color,
+						   float lifetime, bool fixedupdate = true, int segments = 32);
+	static void add_cone(glm::vec3 apex, glm::vec3 direction, float length, float angle_degrees,
+						 Color32 color, float lifetime, bool fixedupdate = true, int segments = 32);
 };

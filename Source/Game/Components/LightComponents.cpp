@@ -15,6 +15,7 @@
 #include "Framework/ReflectionProp.h"
 
 #include "GameEnginePublic.h"
+#include "Debug.h"
 
 #include <filesystem>
 ////
@@ -155,6 +156,30 @@ void SunLightComponent::stop() {
 	e = eng->get_object(editor_arrow);
 	if (e)
 		((Component*)e)->destroy();
+}
+
+void SpotLightComponent::editor_on_draw_gizmos_selected()
+{
+	auto& transform = get_owner()->get_ws_transform();
+	glm::vec3 pos = transform[3];
+	glm::vec3 dir = glm::normalize(-glm::vec3(transform[2]));
+
+	Color32 gizmo_color(255, 200, 50, 180);
+	Debug::add_cone(pos, dir, radius, cone_angle, gizmo_color, 0, false);
+
+	if (inner_cone < cone_angle) {
+		Color32 inner_color(255, 200, 50, 80);
+		glm::vec3 tip = pos + dir * radius;
+		float inner_r = radius * glm::tan(glm::radians(inner_cone));
+		Debug::add_circle(tip, dir, inner_r, inner_color, 0, false);
+	}
+}
+
+void PointLightComponent::editor_on_draw_gizmos_selected()
+{
+	glm::vec3 pos = get_ws_position();
+	Color32 gizmo_color(255, 200, 50, 180);
+	Debug::add_sphere(pos, radius, gizmo_color, 0, false);
 }
 
 SunLightComponent::~SunLightComponent() {}

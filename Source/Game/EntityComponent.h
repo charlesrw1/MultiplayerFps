@@ -50,6 +50,7 @@ public:
 #ifdef EDITOR_BUILD
 	virtual const char* get_editor_outliner_icon() const { return ""; }
 	virtual std::unique_ptr<IComponentEditorUi> create_editor_ui() { return nullptr; }
+	virtual void editor_on_draw_gizmos_selected() {}
 #endif
 protected:
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)

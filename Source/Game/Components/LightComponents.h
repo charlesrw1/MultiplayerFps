@@ -53,6 +53,7 @@ public:
 	}
 	REF void set_shadows(bool b) { shadow = (b) ? ShadowMode::Realtime : ShadowMode::Disabled; }
 	REF void set_cookie(const Texture* t) { this->cookie_asset = t; }
+	void editor_on_draw_gizmos_selected() final;
 
 	REF Color32 color = COLOR_WHITE;
 	REF float intensity = 1.f;
@@ -91,6 +92,7 @@ public:
 	}
 	REF void set_radius(float r) { this->radius = r; }
 	REF void set_visible(bool b) { this->visible = b; }
+	void editor_on_draw_gizmos_selected() final;
 
 	REF const Texture* cookie_asset = nullptr;
 

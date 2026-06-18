@@ -119,6 +119,52 @@ void Debug::add_sphere(glm::vec3 c, float radius, Color32 color, float duration,
 	DebugShapeCtx::get().add(shape, fixedupdate);
 }
 
+void Debug::add_circle(glm::vec3 center, glm::vec3 normal, float radius, Color32 color,
+					   float lifetime, bool fixedupdate, int segments)
+{
+	normal = glm::normalize(normal);
+	glm::vec3 right;
+	if (glm::abs(glm::dot(normal, glm::vec3(0, 1, 0))) < 0.99f)
+		right = glm::normalize(glm::cross(normal, glm::vec3(0, 1, 0)));
+	else
+		right = glm::normalize(glm::cross(normal, glm::vec3(0, 0, 1)));
+	glm::vec3 forward = glm::cross(right, normal);
+
+	for (int i = 0; i < segments; i++) {
+		float t0 = glm::two_pi<float>() * i / segments;
+		float t1 = glm::two_pi<float>() * (i + 1) / segments;
+		glm::vec3 p0 = center + (right * glm::cos(t0) + forward * glm::sin(t0)) * radius;
+		glm::vec3 p1 = center + (right * glm::cos(t1) + forward * glm::sin(t1)) * radius;
+		add_line(p0, p1, color, lifetime, fixedupdate);
+	}
+}
+
+void Debug::add_cone(glm::vec3 apex, glm::vec3 direction, float length, float angle_degrees,
+					 Color32 color, float lifetime, bool fixedupdate, int segments)
+{
+	direction = glm::normalize(direction);
+	float angle_rad = glm::radians(angle_degrees);
+	float end_radius = length * glm::tan(angle_rad);
+	glm::vec3 tip = apex + direction * length;
+
+	glm::vec3 right;
+	if (glm::abs(glm::dot(direction, glm::vec3(0, 1, 0))) < 0.99f)
+		right = glm::normalize(glm::cross(direction, glm::vec3(0, 1, 0)));
+	else
+		right = glm::normalize(glm::cross(direction, glm::vec3(0, 0, 1)));
+	glm::vec3 up = glm::cross(right, direction);
+
+	// circle at end
+	add_circle(tip, direction, end_radius, color, lifetime, fixedupdate, segments);
+
+	// lines from apex to circle edge
+	for (int i = 0; i < 4; i++) {
+		float theta = glm::two_pi<float>() * i / 4.f;
+		glm::vec3 edge = tip + (right * glm::cos(theta) + up * glm::sin(theta)) * end_radius;
+		add_line(apex, edge, color, lifetime, fixedupdate);
+	}
+}
+
 void DebugShapeCtx::update(float dt) {
 
 	auto& builder = mb;
