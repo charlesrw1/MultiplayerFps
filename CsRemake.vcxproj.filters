@@ -603,6 +603,7 @@
     <ClCompile Include="Source\Navigation\NavMeshBaker.cpp" />
     <ClCompile Include="Source\Navigation\NavMeshDebugDraw.cpp" />
     <ClCompile Include="Source\MyGame\fps\fpsApp.cpp" />
+    <ClCompile Include="Source\MyGame\fps\fpsDebugCamera.cpp" />
     <ClCompile Include="Source\MyGame\fps\fpsObjects.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -1278,6 +1279,7 @@
     <ClInclude Include="Source\Navigation\NavMeshBaker.h" />
     <ClInclude Include="Source\Navigation\NavMeshDebugDraw.h" />
     <ClInclude Include="Source\MyGame\fps\fpsApp.h" />
+    <ClInclude Include="Source\MyGame\fps\fpsDebugCamera.h" />
     <ClInclude Include="Source\MyGame\fps\fpsObjects.h" />
   </ItemGroup>
   <ItemGroup>

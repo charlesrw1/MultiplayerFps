@@ -1,6 +1,7 @@
 #include "ParticleSystemComponent.h"
 #include "Render/RenderObj.h"
 #include "GameEnginePublic.h"
+#include "Debug.h"
 #include "ParticleMgr.h"
 #include "BillboardComponent.h"
 #include "MeshbuilderComponent.h"
@@ -603,10 +604,17 @@ void ParticleSystemComponent::draw(const glm::vec3& side, const glm::vec3& up, c
 
 			if (subsys.renderer.render_mode == ParticleRenderMode::StretchedBillboard) {
 				float speed = glm::length(p.velocity);
-				glm::vec3 vel_dir = speed > 0.001f ? p.velocity / speed : front;
+				glm::vec3 vel_dir = speed > 0.001f ? p.velocity / speed : up;
 				float stretch = subsys.renderer.length_scale + speed * subsys.renderer.speed_scale;
+				glm::vec3 to_cam = front;
+				glm::vec3 perp = glm::cross(vel_dir, to_cam);
+				float perp_len = glm::length(perp);
+				if (perp_len < 0.001f)
+					perp = side;
+				else
+					perp /= perp_len;
 				r_up = vel_dir * s * stretch;
-				r_side = glm::normalize(glm::cross(vel_dir, front)) * s;
+				r_side = perp * s;
 			} else {
 				r_side = (side * cos_r + up * sin_r) * s;
 				r_up = (-side * sin_r + up * cos_r) * s;

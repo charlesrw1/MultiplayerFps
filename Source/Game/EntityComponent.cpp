@@ -146,7 +146,9 @@ void Component::destroy_internal() {
 
 void Component::editor_set_model(std::string_view modelname, bool draw_text) {
 	if (eng->is_editor_app()) {
-		auto* mesh = entity_owner->create_component<MeshComponent>();
+		auto* mesh = entity_owner->get_component<MeshComponent>();
+		if (!mesh)
+			mesh = entity_owner->create_component<MeshComponent>();
 		mesh->set_model_str(modelname.data());
 		mesh->dont_serialize_or_edit=true;
 		this->draw_text_in_editor = draw_text;

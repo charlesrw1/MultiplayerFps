@@ -451,7 +451,8 @@
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\x64\\\\Debug\\\\intermediate\" -Recurse -Filter \"CL.command.1.tlog\" | ForEach-Object { Write-Host \"=== $\\($_.FullName\\) ===\" ; Get-Content $_.FullName | Select-Object -First 6 })",
       "Read(//c/Program Files/Microsoft Visual Studio/18/Insiders/MSBuild/Microsoft/VC/**)",
       "Read(//c/Program Files/Microsoft Visual Studio/18/Insiders/MSBuild/Microsoft/**)",
-      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\Source\\\\External\\\\External.vcxproj\" /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir=\"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\\" /p:BuildingInsideVisualStudio=true /v:minimal /nologo 2>&1)"
+      "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\Source\\\\External\\\\External.vcxproj\" /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir=\"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\\" /p:BuildingInsideVisualStudio=true /v:minimal /nologo 2>&1)",
+      "Bash(msbuild.cmd CsRemake.vcxproj -p:Configuration=Debug -p:Platform=x64 -nologo -verbosity:minimal)"
     ]
   },
   "enabledPlugins": {

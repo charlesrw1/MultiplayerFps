@@ -2,6 +2,7 @@
 #include "GameEnginePublic.h"
 #include "../../Game/Entity.h"
 #include "fpsObjects.h"
+#include "fpsDebugCamera.h"
 
 class fpsGameMgr {
 public:
@@ -12,8 +13,7 @@ public:
 	Entity* spawn_player();
 
 	EntityPtr player;
-
-	EntityPtr camera;
+	fpsDebugCamera debug_camera;
 };
 
 class fpsApp : public Application {
@@ -26,4 +26,6 @@ public:
 
 	void start() override;
 	void update() override;
+	void stop() override;
+	void on_imgui() override;
 };

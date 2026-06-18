@@ -236,7 +236,24 @@ public:
 			arg.entered_trigger = p.is_start;
 			if (p.other)
 				arg.who = p.other->get_owner();
-			p.trigger->on_trigger.invoke(arg);
+
+			auto invoke_on_trigger = [&]() {
+				Entity* owner = p.trigger->get_owner();
+				ASSERT(owner);
+				EntityPtr handle = owner;
+				for (int i = 0; i < owner->get_components().size(); i++) {
+					// have to be careful here...
+					auto* c = owner->get_components().at(i);
+					if (c == p.trigger)
+						continue;
+					c->on_trigger(arg.who, p.is_start);
+					// now, have to make sure entity didnt delete itself
+					if (!handle.get())
+						return;
+				}
+			};
+
+			invoke_on_trigger();
 		}
 		triggered_pairs.clear();
 	}

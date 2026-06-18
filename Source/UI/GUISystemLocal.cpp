@@ -71,6 +71,9 @@ void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
 	if (g_drawdebugmenu.get_bool())
 		Debug_Interface::get()->draw();
 
+	if (auto* app = eng->get_app())
+		app->on_imgui();
+
 #ifdef EDITOR_BUILD
 	// draw tool interface if its active
 	if (editorState) {

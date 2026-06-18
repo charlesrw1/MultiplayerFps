@@ -136,8 +136,6 @@ public:
 		on_shape_changes();
 	}
 
-	MulticastDelegate<PhysicsBodyEventArg> on_trigger;
-
 protected:
 	void add_model_shape_to_actor(const Model* m);
 	void add_sphere_shape_to_actor(const glm::vec3& pos, float radius);

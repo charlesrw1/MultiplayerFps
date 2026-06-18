@@ -28,6 +28,12 @@ public:
 	REF virtual void update() {}
 	REF virtual void stop() {}
 	REF virtual void editor_start() {}
+
+	// callbacks for stuff. func called on every sibling component of caller.
+	REF virtual void on_trigger(Entity* other, bool entered) {}
+
+
+
 	void init_updater();
 	void shutdown_updater();
 	REF void set_ticking(bool shouldTick);

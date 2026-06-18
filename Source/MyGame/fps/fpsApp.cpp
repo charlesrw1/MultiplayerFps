@@ -3,6 +3,9 @@
 #include "../../Game/GameplayStatic.h"
 #include "../../Game/Entities/CharacterController.h"
 #include "../../Game/Components/CameraComponent.h"
+#include "Input/InputSystem.h"
+
+extern void Quit();
 fpsApp* fpsApp::inst = nullptr;
 
 void fpsApp::start() {
@@ -14,12 +17,27 @@ void fpsApp::start() {
 }
 
 void fpsApp::update() {
+	if (Input::is_alt_down() && Input::was_key_pressed(SDL_SCANCODE_F4))
+		Quit();
+
 	game->update();
 }
+
+void fpsApp::stop() {
+	game->stop();
+	inst = nullptr;
+}
+
+void fpsApp::on_imgui() {
+	game->debug_camera.on_imgui();
+}
+
 void fpsGameMgr::update() {
 	auto* playerptr = player->get_component<fpsPlayer>();
 	playerptr->manualtick();
-	playerptr->camera->get_component<CameraComponent>()->set_is_enabled(true);
+
+	// pass game camera entity to debug camera for switching
+	debug_camera.update(playerptr->camera);
 }
 
 void fpsGameMgr::start_level(const std::string& name) {
@@ -44,4 +62,10 @@ void fpsGameMgr::start_level(const std::string& name) {
 	};
 	auto* player = create_player();
 	this->player = player;
+
+	debug_camera.init();
+}
+
+void fpsGameMgr::stop() {
+	debug_camera.shutdown();
 }

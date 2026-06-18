@@ -395,6 +395,12 @@ void GameEngineLocal::loop() {
 			// TracyGpuCollect;
 			wait_for_swap(skip_rendering); // wait for swap last
 
+			if (!is_test_mode()) {
+				auto flags = SDL_GetWindowFlags(window);
+				if (!(flags & SDL_WINDOW_INPUT_FOCUS))
+					SDL_Delay(200);
+			}
+
 			FrameMark;							  // tracy profiling
 			Profiler::end_frame_tick(frame_time); // my crappy profilier
 		}

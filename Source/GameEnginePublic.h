@@ -54,6 +54,9 @@ public:
 	REF virtual void on_map_changed() {}
 
 	// misc callbacks
+	REF virtual void on_imgui() {}
+
+	// misc callbacks
 	REF virtual void on_controller_status(int index, bool connected) {}
 
 	// can do asset (post?) processing here after it loads
