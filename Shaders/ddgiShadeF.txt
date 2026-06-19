@@ -22,6 +22,9 @@ layout(binding = 3) uniform sampler2D DEPTH;		// depth texture (writes disabled)
 layout(binding = 4) uniform sampler2D probe_irradiance;
 layout(binding = 5) uniform sampler2D probe_depth;
 layout(binding = 6) uniform sampler2D SSAOBlurred;
+#ifndef HALFRES_DDGI
+layout(binding = 10) uniform sampler2D ssr_accum;
+#endif
 
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
@@ -134,15 +137,28 @@ void main()
 #else
 	vec4 albedo = texelFetch(GBUFFER1,texel_to_fetch,0);
 	float ssao_value = texture(SSAOBlurred, uv).r;
-	vec3 albedo_mult =  pbr_get_albedo_mult(worldspace, albedo.rgb, metal_rough.y, metal_rough.x, direction);
-	vec3 rad = vec3(0.0);//*albedo_mult * ssao_value;
-	rad = outirrad * albedo_mult * ssao_value;
+	vec3 albedo_mult = pbr_get_albedo_mult(worldspace, albedo.rgb, metal_rough.y, metal_rough.x, direction);
+	vec3 rad = outirrad * albedo_mult * ssao_value;
 	if(include_cubemaps) {
-		vec3 spec_color = pbr_calculate_reflection(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz,pow(ssao_value,specular_ao_intensity),outirrad);
-		FS_OUT_Color = vec4(rad+spec_color,1);	
+		vec3 V = normalize(g.viewpos_time.xyz - worldspace);
+		float NdotV = max(dot(direction, V), 0.0);
+		float spec_ao = pow(ssao_value, specular_ao_intensity);
+		float spec_occlusion = compute_specular_occlusion(spec_ao, NdotV, metal_rough.g);
+
+		vec3 R = reflect(-V, direction);
+		vec3 cubemap_raw = get_prefiltered_color(worldspace + direction * 0.3, R, metal_rough.y, NdotV, outirrad);
+
+		vec4 ssr = texture(ssr_accum, uv);
+		vec3 reflections = mix(cubemap_raw, ssr.rgb, clamp(ssr.a, 0.0, 1.0));
+
+		vec3 F0 = mix(vec3(0.04), albedo.rgb, metal_rough.x);
+		vec3 F = FresnelSchlickRougness(NdotV, F0, metal_rough.y);
+		vec2 env_brdf = texture(PBR_brdflut, vec2(NdotV, metal_rough.y)).rg;
+		vec3 spec_color = reflections * (F * env_brdf.x + env_brdf.y) * spec_occlusion;
+		FS_OUT_Color = vec4(rad + spec_color, 1);
 	}
 	else {
-		FS_OUT_Color = vec4(rad,1);
+		FS_OUT_Color = vec4(rad, 1);
 	}
 #endif
 

@@ -157,6 +157,12 @@ void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap
     draw.ubo.ddgi_runtime_params->upload(&dp, sizeof(dp));
     gfx().bind_uniform_buffer_base(7, draw.ubo.ddgi_runtime_params);
 
+    extern ConfigVar enable_ssr;
+    if (enable_ssr.get_bool())
+        draw.bind_texture_ptr(10, draw.tex.reflection_accum);
+    else
+        draw.bind_texture_ptr(10, draw.black_texture);
+
     gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }
 

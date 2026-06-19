@@ -52,20 +52,24 @@ void main()
 	const vec3 outirrad = texture(ddgi_accum, uv).rgb;
 	vec3 rad = outirrad * pbr_get_albedo_mult(worldspace, albedo.rgb, metal_rough.y, metal_rough.x, direction) * ssao_value;
 
+	const vec3 V = normalize(g.viewpos_time.xyz - worldspace);
+	const float NdotV = max(dot(direction, V), 0.0);
 	const float spec_ao = pow(ssao_value, specular_ao_intensity);
-	vec3 cubemap_color = pbr_calculate_reflection(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz, spec_ao, outirrad);
+	const float spec_occlusion = compute_specular_occlusion(spec_ao, NdotV, metal_rough.g);
+
+	// Raw cubemap color (before BRDF weighting)
+	vec3 R = reflect(-V, direction);
+	vec3 cubemap_raw = get_prefiltered_color(worldspace + direction * 0.3, R, metal_rough.y, NdotV, outirrad);
 
 	// SSR: alpha channel carries hit confidence (0=miss, 1=full hit)
 	vec4 ssr = texture(ssr_accum, uv);
-	vec3 reflections = mix(cubemap_color, ssr.rgb, clamp(ssr.a, 0.0, 1.0));
+	vec3 reflections = mix(cubemap_raw, ssr.rgb, clamp(ssr.a, 0.0, 1.0));
 
-	// Apply specular BRDF weighting
-	const vec3 V = -normalize(worldspace - g.viewpos_time.xyz);
+	// Apply specular BRDF weighting once to the mixed result
 	vec3 F0 = mix(vec3(0.04), albedo.rgb, metal_rough.x);
-	float NdotV = max(dot(direction, V), 0.0);
 	vec3 F = FresnelSchlickRougness(NdotV, F0, metal_rough.y);
 	vec2 env_brdf = texture(PBR_brdflut, vec2(NdotV, metal_rough.y)).rg;
-	vec3 spec_color = reflections * (F * env_brdf.x + env_brdf.y);
+	vec3 spec_color = reflections * (F * env_brdf.x + env_brdf.y) * spec_occlusion;
 
 	FS_OUT_Color = vec4(rad + spec_color, 1);
 }
