@@ -331,6 +331,9 @@ void Renderer::check_cubemaps_dirty() {
 ConfigVar r_no_postprocess("r.skip_pp", "0", CVAR_BOOL | CVAR_DEV, "disable post processing");
 ConfigVar r_devicecycle("r.devicecycle", "0", CVAR_INTEGER | CVAR_DEV, "", 0, 10);
 ConfigVar r_taa_blend("r.taa_blend", "0.75", CVAR_FLOAT, "", 0, 1.0);
+ConfigVar r_taa_stationary_blend("r.taa_stationary_blend", "0.95", CVAR_FLOAT, "TAA history blend for stationary pixels", 0, 0.99);
+ConfigVar r_taa_motion_blend("r.taa_motion_blend", "0.85", CVAR_FLOAT, "TAA history blend for moving pixels", 0, 0.99);
+ConfigVar r_taa_sharpness("r.taa_sharpness", "0.1", CVAR_FLOAT, "TAA sharpening strength", 0, 3.0);
 ConfigVar r_taa_flicker_remove("r.taa_flicker_remove", "1", CVAR_BOOL, "");
 ConfigVar r_taa_reproject("r.taa_reproject", "0", CVAR_BOOL, "");
 ConfigVar r_taa_dilate_velocity("r.taa_dilate_velocity", "1", CVAR_BOOL, "");
@@ -340,6 +343,12 @@ float taa_doc_bias = 0.2;
 float taa_doc_pow = 0.15;
 
 void taa_menu() {
+	float sb = r_taa_stationary_blend.get_float();
+	float mb = r_taa_motion_blend.get_float();
+	float sh = r_taa_sharpness.get_float();
+	if (ImGui::DragFloat("stationary_blend", &sb, 0.01f, 0.f, 0.99f)) r_taa_stationary_blend.set_float(sb);
+	if (ImGui::DragFloat("motion_blend", &mb, 0.01f, 0.f, 0.99f)) r_taa_motion_blend.set_float(mb);
+	if (ImGui::DragFloat("sharpness", &sh, 0.01f, 0.f, 3.0f)) r_taa_sharpness.set_float(sh);
 	ImGui::DragFloat("taa_doc_mult", &taa_doc_mult, 0.1, 1, 100);
 	ImGui::DragFloat("taa_doc_vel_bias", &taa_doc_vel_bias, 0.001, 0.0001, 0.01);
 	ImGui::DragFloat("taa_doc_bias", &taa_doc_bias, 0.01, 0.001, 0.2);

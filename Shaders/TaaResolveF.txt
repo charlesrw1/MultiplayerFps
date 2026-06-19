@@ -13,67 +13,55 @@ layout(binding=2) uniform sampler2D sceneDepth;
 layout(binding=3) uniform sampler2D sceneMotion;
 layout(binding=4) uniform sampler2D lastSceneMotion;
 
-vec2 reproject_to_last(vec2 uv)
+// [Pedersen, 2016, "Temporal Reprojection Anti-Aliasing in INSIDE"]
+vec4 ClipToAABB(vec4 color, vec4 minimum, vec4 maximum)
 {
-	float depth = textureLod(sceneDepth,uv,0.0).r;
-	uv = uv*2.0 - vec2(1.0);
-	vec4 worldspace = g.inv_viewproj * vec4(uv.x,uv.y,depth,1.0);
-	worldspace /= worldspace.w;
-	vec4 lastClipspace = params.lastViewProj * vec4(worldspace.xyz,1.0);
-	lastClipspace /= lastClipspace.w;
-	
-	vec2 reproject_uv = lastClipspace.xy*0.5 + vec2(0.5);
-	return reproject_uv;
+	vec4 center = (maximum + minimum) * 0.5;
+	vec4 extents = (maximum - minimum) * 0.5;
+	vec4 shift = color - center;
+	vec4 absUnit = abs(shift / max(extents, vec4(0.0001)));
+	float maxUnit = max(max(absUnit.x, absUnit.y), absUnit.z);
+	return maxUnit > 1.0 ? center + (shift / maxUnit) : color;
 }
 
-vec4 sampleLevel0( sampler2D tex, vec2 uv )
+// [Jimenez, 2016, "Filmic SMAA", p92 — Catmull-Rom 5-tap]
+vec4 SampleTextureCatmullRom5(sampler2D tex, vec2 uv)
 {
-    return textureLod( tex, uv, 0.0);
+	vec2 texsiz = vec2(textureSize(tex, 0).xy);
+	vec4 rtMetrics = vec4(1.0 / texsiz.xy, texsiz.xy);
+
+	vec2 position = rtMetrics.zw * uv;
+	vec2 centerPosition = floor(position - 0.5) + 0.5;
+	vec2 f = position - centerPosition;
+	vec2 f2 = f * f;
+	vec2 f3 = f * f2;
+
+	const float c = 0.5;
+	vec2 w0 =        -c  * f3 +  2.0 * c         * f2 - c * f;
+	vec2 w1 =  (2.0 - c) * f3 - (3.0 - c)        * f2         + 1.0;
+	vec2 w2 = -(2.0 - c) * f3 + (3.0 -  2.0 * c) * f2 + c * f;
+	vec2 w3 =         c  * f3 -                c * f2;
+
+	vec2 w12 = w1 + w2;
+	vec2 tc12 = rtMetrics.xy * (centerPosition + w2 / w12);
+	vec3 centerColor = textureLod(tex, vec2(tc12.x, tc12.y), 0.0).rgb;
+
+	vec2 tc0 = rtMetrics.xy * (centerPosition - 1.0);
+	vec2 tc3 = rtMetrics.xy * (centerPosition + 2.0);
+	vec4 color = vec4(textureLod(tex, vec2(tc12.x, tc0.y ), 0.0).rgb, 1.0) * (w12.x * w0.y ) +
+	             vec4(textureLod(tex, vec2(tc0.x,  tc12.y), 0.0).rgb, 1.0) * (w0.x  * w12.y) +
+	             vec4(centerColor,                                     1.0) * (w12.x * w12.y) +
+	             vec4(textureLod(tex, vec2(tc3.x,  tc12.y), 0.0).rgb, 1.0) * (w3.x  * w12.y) +
+	             vec4(textureLod(tex, vec2(tc12.x, tc3.y ), 0.0).rgb, 1.0) * (w12.x * w3.y );
+	return vec4(color.rgb / color.a, 1.0);
 }
 
-//note: refitting weights to a +
-//      (from https://advances.realtimerendering.com/s2016/Filmic%20SMAA%20v7.pptx , p 92 )
-vec4 SampleTextureCatmullRom5( sampler2D tex, vec2 uv )
+float Luminance(vec3 c)
 {
-    vec2 texsiz = vec2(textureSize( tex, 0 ).xy);
-    vec4 rtMetrics = vec4( 1.0 / texsiz.xy, texsiz.xy );
-    
-    vec2 position = rtMetrics.zw * uv;
-    vec2 centerPosition = floor(position - 0.5) + 0.5;
-    vec2 f = position - centerPosition;
-    vec2 f2 = f * f;
-    vec2 f3 = f * f2;
-
-
-    const float c = 0.5; //note: [0;1] ( SMAA_FILMIC_REPROJECTION_SHARPNESS / 100.0 )
-    vec2 w0 =        -c  * f3 +  2.0 * c         * f2 - c * f;
-    vec2 w1 =  (2.0 - c) * f3 - (3.0 - c)        * f2         + 1.0;
-    vec2 w2 = -(2.0 - c) * f3 + (3.0 -  2.0 * c) * f2 + c * f;
-    vec2 w3 =         c  * f3 -                c * f2;
-
-    vec2 w12 = w1 + w2;
-    vec2 tc12 = rtMetrics.xy * (centerPosition + w2 / w12);
-    vec3 centerColor = sampleLevel0(tex, vec2(tc12.x, tc12.y)).rgb;
-
-    vec2 tc0 = rtMetrics.xy * (centerPosition - 1.0);
-    vec2 tc3 = rtMetrics.xy * (centerPosition + 2.0);
-    vec4 color = vec4(sampleLevel0(tex, vec2(tc12.x, tc0.y )).rgb, 1.0) * (w12.x * w0.y ) +
-                 vec4(sampleLevel0(tex, vec2(tc0.x,  tc12.y)).rgb, 1.0) * (w0.x  * w12.y) +
-                 vec4(centerColor,                                 1.0) * (w12.x * w12.y) +
-                 vec4(sampleLevel0(tex, vec2(tc3.x,  tc12.y)).rgb, 1.0) * (w3.x  * w12.y) +
-                 vec4(sampleLevel0(tex, vec2(tc12.x, tc3.y )).rgb, 1.0) * (w12.x * w3.y );
-    return vec4( color.rgb / color.a, 1.0 );
+	return dot(c, vec3(0.299, 0.587, 0.114));
 }
 
-vec4 AdjustHDRColor(vec3 color)
-{
-    {
-        float luminance = dot(color, vec3(0.299, 0.587, 0.114));
-        float luminanceWeight = 1.0 / (1.0 + luminance);
-        return vec4(color*luminanceWeight, luminanceWeight);
-    }
-}
-vec2 GetVelocity(vec2 uv)
+vec2 GetDilatedVelocity(vec2 uv, vec2 invsize)
 {
 	float closestDepth = 100.0;
 	vec2 closestUVOffset = vec2(0.0);
@@ -81,81 +69,87 @@ vec2 GetVelocity(vec2 uv)
 	{
 		for(int i = -1; i <= 1; ++i)
 		{
-			 vec2 uvOffset = vec2(i, j) / g.viewport_size.xy;
-			 float neighborDepth = texture(sceneDepth,uv+uvOffset).r;
-			 if(neighborDepth < closestDepth)
-			 {
-				 closestUVOffset = uvOffset;
-				 closestDepth = neighborDepth;
-			 }
+			vec2 uvOffset = vec2(i, j) * invsize;
+			float neighborDepth = textureLod(sceneDepth, uv + uvOffset, 0.0).r;
+			if(neighborDepth < closestDepth)
+			{
+				closestUVOffset = uvOffset;
+				closestDepth = neighborDepth;
+			}
 		}
 	}
-	return texture(sceneMotion, uv+closestUVOffset).rg;
+	return textureLod(sceneMotion, uv + closestUVOffset, 0.0).rg;
 }
 
 void main()
 {
 	vec2 invsize = 1.0 / g.viewport_size.xy;
-	vec2 input_uv = vec2(gl_FragCoord.xy) * invsize;
-	vec3 current = texture(sceneColor,input_uv).rgb;
-	
-	vec2 velocity_uv = texture(sceneMotion,input_uv).rg;
-	//if(dilate_velocity)
-	//	velocity_uv = GetVelocity(input_uv);
-	
-	if(length(velocity_uv)<0.00001)
-		velocity_uv=vec2(0.5);
-	
-	//velocity_uv = vec2(0.5);
-	vec2 ndc_input = input_uv*2.0-vec2(1.0);
-	vec2 velocity_uv_ndc = velocity_uv*2.0-vec2(1.0);
-	ndc_input += velocity_uv_ndc;
-	vec2 uv_to_use = ndc_input * 0.5 + 0.5;
-	//uv_to_use = reproject_to_last(input_uv);
-	uv_to_use = clamp(uv_to_use,vec2(0.0),vec2(1.0));
-	
-	vec2 actual_uv = reproject_to_last(input_uv);
-	//uv_to_use = actual_uv;
-	if(params.use_reproject != 0)
-		uv_to_use = actual_uv;
-	
-	//vec3 last = SampleTextureCatmullRom5(lastColor,uv_to_use).rgb;
-	vec3 last = textureLod(lastColor,uv_to_use,0).rgb;// looks better than the cubic filter...
-	vec2 lastVelocityUv = textureLod(lastSceneMotion,uv_to_use,0).rg;
-	float vel_len = length(lastVelocityUv-velocity_uv);
-	float velocityDisocclusion = clamp(pow(max((vel_len-params.doc_vel_bias)*params.doc_mult-params.doc_bias, 0.0),params.doc_pow),0.0,1.0);
-	
+	vec2 input_uv = gl_FragCoord.xy * invsize;
 
-	// color clamping
-	vec3 minColor=vec3(9999);
-	vec3 maxColor = vec3(-9999);
-	for(int x = -1;x<=1;x++) {
-		for(int y=-1;y<=1;y++) {
-			vec3 color = texture(sceneColor,input_uv+vec2(x,y)*invsize).rgb;
-			minColor = min(minColor,color);
-			maxColor = max(maxColor,color);
+	// Velocity dilation: use closest-depth neighbor's velocity for clean edges
+	vec2 velocity_uv = GetDilatedVelocity(input_uv, invsize);
+
+	// Reproject to previous frame
+	vec2 velocity_ndc = velocity_uv * 2.0 - 1.0;
+	float velocityLength = length(velocity_ndc);
+	vec2 prevUV = (input_uv * 2.0 - 1.0 + velocity_ndc) * 0.5 + 0.5;
+	prevUV = clamp(prevUV, vec2(0.0), vec2(1.0));
+
+	// Build 3x3 neighborhood min/max and average
+	vec3 current = texture(sceneColor, input_uv).rgb;
+	vec4 neighborhoodMin = vec4(9999.0);
+	vec4 neighborhoodMax = vec4(-9999.0);
+	vec4 neighborhoodSum = vec4(0.0);
+	for(int x = -1; x <= 1; ++x)
+	{
+		for(int y = -1; y <= 1; ++y)
+		{
+			vec4 neighbor = vec4(texture(sceneColor, input_uv + vec2(x, y) * invsize).rgb, 1.0);
+			neighborhoodMin = min(neighborhoodMin, neighbor);
+			neighborhoodMax = max(neighborhoodMax, neighbor);
+			neighborhoodSum += neighbor;
 		}
 	}
-	
-	// luminance weighting to get rid of flickering, subtle effect
-	if(params.remove_flicker != 0) {
-		vec4 prevAdjust = AdjustHDRColor(last);
-		vec3 prev_clamped = AdjustHDRColor(clamp(last,minColor,maxColor)).rgb;
-		vec4 currentAdjust = AdjustHDRColor(current);
-		vec3 outputColor = (prev_clamped.rgb*params.amt + currentAdjust.rgb*(1-params.amt));
-		outputColor /= max((prevAdjust.a*params.amt+currentAdjust.a*(1-params.amt)),0.000001);
-		FS_OUT_Color = outputColor;
-	}
-	else {
-		vec3 clamped = clamp(last,minColor,maxColor);
-		FS_OUT_Color = current * (1-params.amt) + clamped*params.amt;
-	}
-	FS_OUT_Color = mix(FS_OUT_Color,current,velocityDisocclusion);
-	//FS_OUT_Color = vec3(length(velocity_uv_ndc.xy));
-	//vec3 prev_clamped = clamp(prevColorAdjust.rgb,minColorAdjust.rgb,maxColorAdjust.rgb);
-	//float currentWeight = (1-amt)*currentColorAdjust.a;
-	//float prevWeight = (amt)*currentColorAdjust.a;
-	//vec3 outputColor = (currentColorAdjust.rgb*currentWeight+prevColorAdjust.rgb*prevWeight);
-	//outputColor /= (currentWeight+prevWeight);
-	//FS_OUT_Color = vec3(abs(actual_uv-uv_to_use)*10.0,0.0);
+	vec4 neighborhoodAvg = neighborhoodSum / 9.0;
+
+	// Sharpening: boost current relative to neighborhood average
+	vec4 currentVec = vec4(current, 1.0);
+	currentVec += (currentVec - neighborhoodAvg) * params.sharpness;
+	currentVec = max(currentVec, vec4(0.0));
+
+	// Sample history with Catmull-Rom 5-tap for sharper reconstruction
+	vec4 history = vec4(SampleTextureCatmullRom5(lastColor, prevUV).rgb, 1.0);
+
+	// Clip history to neighborhood AABB with luma-adaptive margin
+	float lumaOffset = abs(Luminance(neighborhoodAvg.rgb) - Luminance(currentVec.rgb));
+	float aabbMargin = mix(4.0, 0.25, clamp(velocityLength * 100.0, 0.0, 1.0)) * lumaOffset;
+	history = ClipToAABB(history, neighborhoodMin - aabbMargin, neighborhoodMax + aabbMargin);
+
+	// Velocity-adaptive blend factor (Flax-style)
+	float motion = clamp(velocityLength * 1000.0, 0.0, 1.0);
+	float blendfactor = mix(params.stationary_blending, params.motion_blending, motion);
+
+	// Luminance weighting for flicker reduction
+	float lumaCurrent = Luminance(currentVec.rgb);
+	float lumaHistory = Luminance(history.rgb);
+	float currentWeight = (1.0 - blendfactor) / (1.0 + lumaCurrent);
+	float historyWeight = blendfactor / (1.0 + lumaHistory);
+	vec3 color = (currentVec.rgb * currentWeight + history.rgb * historyWeight) /
+	             max(currentWeight + historyWeight, 0.00001);
+
+	// Velocity disocclusion (elopezr "length of difference" metric)
+	vec2 lastVelocityUv = textureLod(lastSceneMotion, prevUV, 0.0).rg;
+	float vel_len = length(lastVelocityUv - velocity_uv);
+	float velocityDisocclusion = clamp(
+		pow(max((vel_len - params.doc_vel_bias) * params.doc_mult - params.doc_bias, 0.0), params.doc_pow),
+		0.0, 1.0);
+
+	// Off-screen rejection
+	float offscreen = any(greaterThanEqual(abs(prevUV * 2.0 - 1.0), vec2(1.0))) ? 1.0 : 0.0;
+
+	// Blend towards neighborhood on disocclusion or off-screen
+	vec3 neighborhoodSharp = mix(neighborhoodAvg.rgb, currentVec.rgb, 0.5);
+	color = mix(color, neighborhoodSharp, clamp(velocityDisocclusion + offscreen, 0.0, 1.0));
+
+	FS_OUT_Color = max(color, vec3(0.0));
 }
