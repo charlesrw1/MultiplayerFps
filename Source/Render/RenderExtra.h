@@ -240,34 +240,21 @@ class SSRSystem
 public:
 	static SSRSystem* inst;
 	SSRSystem();
-	void execute_compute();
-	IGraphicsSampler* hiz_max_sampler = nullptr;
-	program_handle hiz_downsample{};
-	program_handle ssr_compute{};
+	void execute();
+
+	program_handle ssr_raytrace{};
 	program_handle ssr_downsample{};
-	program_handle ssr_upsample{};
-	program_handle temporal_upsample{};
-	program_handle apply_temporal{};
+	program_handle ssr_resolve{};
+	program_handle ssr_temporal{};
 
-	IGraphicsTexture* depth_pyramid = nullptr;
-	glm::ivec2 depth_size{};
-	glm::ivec2 actual_depth_size{};
-	void init_depth_pyramid(int w, int h);
-	void compute_depth();
+	IGraphicsTexture* trace_buffer = nullptr;
+	IGraphicsTexture* resolve_buffer = nullptr;
+
 	void do_downsample();
-	void do_upsample();
+	void do_raytrace();
+	void do_resolve();
 	void do_temporal();
-
-	glm::ivec2 get_frame_offset() const {
-		const std::array offs = {
-			glm::ivec2(0, 0),
-			glm::ivec2(1, 0),
-			glm::ivec2(0, 1),
-			glm::ivec2(1, 1),
-		};
-		return offs.at(temporalframe % 4);
-	}
-	void increment_temporal_frame() { temporalframe = (temporalframe + 1) % 2048; }
+	void ensure_buffers(int half_w, int half_h);
 
 	int temporalframe = 0;
 };

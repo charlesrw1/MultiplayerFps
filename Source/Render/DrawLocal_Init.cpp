@@ -469,8 +469,8 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	tex.last_ddgi_accum->clear_image();
 
 	delete_and_create_texture_halfresmips(tex.scene_color_mipchain, gtf::r11f_g11f_b10f, 5);
-	delete_and_create_texture(tex.reflection_accum, gtf::r11f_g11f_b10f);
-	delete_and_create_texture(tex.last_reflection_accum, gtf::r11f_g11f_b10f);
+	delete_and_create_texture(tex.reflection_accum, gtf::rgba16f);
+	delete_and_create_texture(tex.last_reflection_accum, gtf::rgba16f);
 	Texture::load("_ssr")->update_specs_ptr(tex.reflection_accum);
 	tex.reflection_accum->clear_image();
 	tex.last_reflection_accum->clear_image();

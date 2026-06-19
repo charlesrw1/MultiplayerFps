@@ -222,7 +222,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	// device.reset_states();
 
 	if (enable_ssr.get_bool() && r_debug_mode.get_integer() == 0 && !params.skybox_only) {
-		SSRSystem::inst->execute_compute();
+		SSRSystem::inst->execute();
 	}
 
 	if (r_debug_mode.get_integer() == 0 && enable_ssao.get_bool() && !params.is_cubemap_view)

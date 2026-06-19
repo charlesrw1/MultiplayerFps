@@ -1,6 +1,6 @@
 
 
-
+layout(location = 0) in vec2 texCoord;
 layout(location = 0) out vec4 FS_OUT_Color;
 
 #include "SharedGpuTypes.txt"
@@ -8,115 +8,71 @@ layout(location = 0) out vec4 FS_OUT_Color;
 layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 	Ubo_View_Constants_Struct g;
 };
-layout (binding = 7, std140) uniform TemporalParamsUbo { TemporalParams params; };
+layout (binding = 7, std140) uniform SsrParamsUbo { SsrParams params; };
 
-layout(binding=0) uniform sampler2D halfResColor;
-layout(binding=1) uniform sampler2D lastFullColor;
-layout(binding=2) uniform sampler2D sceneDepth;
-layout(binding=3) uniform sampler2D sceneMotion;
-layout(binding=4) uniform sampler2D lastSceneMotion;
+layout(binding=0) uniform sampler2D resolvedSSR;
+layout(binding=1) uniform sampler2D prevTemporalSSR;
+layout(binding=2) uniform sampler2D sceneMotion;
 
+float Luminance(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }
 
-vec2 reproject_to_last(vec2 uv)
+vec4 ClipToAABB(vec4 color, vec4 aabbMin, vec4 aabbMax)
 {
-	float depth = textureLod(sceneDepth,uv,0.0).r;
-	uv = uv*2.0 - vec2(1.0);
-	vec4 worldspace = g.inv_viewproj * vec4(uv.x,uv.y,depth,1.0);
-	worldspace /= worldspace.w;
-	vec4 lastClipspace = params.lastViewProj * vec4(worldspace.xyz,1.0);
-	lastClipspace /= lastClipspace.w;
-	
-	vec2 reproject_uv = lastClipspace.xy*0.5 + vec2(0.5);
-	return reproject_uv;
-}
-// to save my fucking eyeballs
-float sanitize_float(float v)
-{
-    if (isnan(v) || isinf(v))
-        return 0.0;
-    return v;
-}
-vec3 sanitize(vec3 v)
-{
-    return vec3(
-        sanitize_float(v.x),
-        sanitize_float(v.y),
-		sanitize_float(v.z)
-    );
-}
-
-vec3 temporal_upscale()
-{
-	const ivec2 input_texel = ivec2(gl_FragCoord.xy);
-	const vec2 invsize = 1.0 / g.viewport_size.xy;
-	const vec2 input_uv = vec2(vec2(input_texel)+vec2(0.5)) * invsize;
-	
-	const ivec2 my_texel_offset = ivec2(uvec2(input_texel)%uvec2(2,2));
-	const float weight = (my_texel_offset == params.halfres_texel_offset)? 1.0 : 0.1;
-	
-	const ivec2 halfres_texel_coord_i_map_to = (input_texel/ivec2(2));
-	//const ivec2 fullres_texel_sampled_this_frame = halfres_texel_coord_i_map_to*ivec2(2) + halfres_texel_offset;
-	
-	
-	const vec3 current = texelFetch(halfResColor,halfres_texel_coord_i_map_to,0).rgb;
-	
-	
-	vec2 velocity_uv = texelFetch(sceneMotion,input_texel,0).rg;
-	//if(dilate_velocity)
-	//	velocity_uv = GetVelocity(input_uv);
-	
-	if(length(velocity_uv)<0.00001)
-		velocity_uv=vec2(0.5);
-	
-	//velocity_uv = vec2(0.5);
-	vec2 ndc_input = input_uv*2.0-vec2(1.0);
-	vec2 velocity_uv_ndc = velocity_uv*2.0-vec2(1.0);
-	ndc_input += velocity_uv_ndc;
-	vec2 uv_to_use = ndc_input * 0.5 + 0.5;
-	//uv_to_use = reproject_to_last(input_uv);
-	uv_to_use = clamp(uv_to_use,vec2(0.0),vec2(1.0));
-	
-	vec2 actual_uv = reproject_to_last(input_uv);
-	//uv_to_use = actual_uv;
-	if(params.use_reproject != 0)
-		uv_to_use = actual_uv;
-	
-	//vec3 last = SampleTextureCatmullRom5(lastColor,uv_to_use).rgb;
-	vec3 last = textureLod(lastFullColor,uv_to_use,0).rgb;// looks better than the cubic filter...
-	vec2 lastVelocityUv = textureLod(lastSceneMotion,uv_to_use,0).rg;
-	float vel_len = length(lastVelocityUv-velocity_uv);
-	float velocityDisocclusion = clamp(pow(max((vel_len-params.doc_vel_bias)*params.doc_mult-params.doc_bias, 0.0),params.doc_pow),0.0,1.0);
-	
-	// when dioccluded, lerp to 1.0
-	// else, lerp to weight. weight is 0 if this texel wasnt fetched this frame, else 1. so ddgi is basically updating at 15hz (assuming 60hz rendering)
-	const float weight_with_dissocclusion = mix(weight*params.ssr_nonoccluded_weight_mult,1.0,velocityDisocclusion);
-
-	//color clamping (for ddgi: clamp to halfres? idk)
-	vec3 minColor=vec3(9999);
-	vec3 maxColor = vec3(-9999);
-	for(int x = -1;x<=1;x++) {
-		for(int y=-1;y<=1;y++) {
-			vec3 color = texture(lastFullColor,input_uv+vec2(x,y)*invsize).rgb;
-			minColor = min(minColor,color);
-			maxColor = max(maxColor,color);
-		}
-	}
-	
-	vec3 out_return = vec3(0.0);
-	{
-		vec3 clamped = clamp(last,minColor,maxColor);
-		out_return = current * (1-params.amt) + clamped*params.amt;
-		
-		//out_return = last;
-	}
-	out_return = mix(out_return,current,weight_with_dissocclusion);
-	
-	return sanitize(out_return);
+	vec4 center = 0.5 * (aabbMax + aabbMin);
+	vec4 extents = 0.5 * (aabbMax - aabbMin) + 1e-5;
+	vec4 offset = color - center;
+	vec4 ts = abs(extents / (offset + 1e-10));
+	float t = min(min(ts.x, ts.y), min(ts.z, ts.w));
+	t = clamp(t, 0.0, 1.0);
+	return center + offset * t;
 }
 
 void main()
 {
-	FS_OUT_Color = vec4(
-		temporal_upscale(),
-		1.0);
+	vec2 uv = texCoord;
+
+	// Motion vectors: 0.5 = no motion, offset in UV space
+	vec2 velocity_uv = textureLod(sceneMotion, uv, 0.0).rg;
+	vec2 velocityDelta = velocity_uv - vec2(0.5);
+	float velocityLength = length(velocityDelta);
+
+	// Reproject to previous frame
+	vec2 ndc = uv * 2.0 - 1.0;
+	vec2 velNDC = velocityDelta * 2.0;
+	vec2 prevUV = clamp((ndc + velNDC) * 0.5 + 0.5, vec2(0.0), vec2(1.0));
+
+	vec4 current = textureLod(resolvedSSR, uv, 0.0);
+	vec2 du = vec2(params.ssrTexelSize.x, 0.0);
+	vec2 dv = vec2(0.0, params.ssrTexelSize.y);
+
+	// 3x3 neighborhood for AABB clamping
+	vec4 tl = textureLod(resolvedSSR, uv - dv - du, 0.0);
+	vec4 tc = textureLod(resolvedSSR, uv - dv, 0.0);
+	vec4 tr = textureLod(resolvedSSR, uv - dv + du, 0.0);
+	vec4 ml = textureLod(resolvedSSR, uv - du, 0.0);
+	vec4 mc = current;
+	vec4 mr = textureLod(resolvedSSR, uv + du, 0.0);
+	vec4 bl = textureLod(resolvedSSR, uv + dv - du, 0.0);
+	vec4 bc = textureLod(resolvedSSR, uv + dv, 0.0);
+	vec4 br = textureLod(resolvedSSR, uv + dv + du, 0.0);
+
+	vec4 currentMin = min(tl, min(tc, min(tr, min(ml, min(mc, min(mr, min(bl, min(bc, br))))))));
+	vec4 currentMax = max(tl, max(tc, max(tr, max(ml, max(mc, max(mr, max(bl, max(bc, br))))))));
+	vec4 currentAvg = (tl + tc + tr + ml + mc + mr + bl + bc + br) / 9.0;
+
+	// Sharpening
+	current += (current - currentAvg) * 0.1;
+
+	// Clamp history to neighborhood AABB with velocity-adaptive margin
+	float lumaOffset = abs(Luminance(currentAvg.rgb) - Luminance(current.rgb));
+	float aabbMargin = mix(4.0, 0.25, clamp(velocityLength * 100.0, 0.0, 1.0)) * lumaOffset;
+	vec4 previous = textureLod(prevTemporalSSR, prevUV, 0.0);
+	previous = ClipToAABB(previous, currentMin - aabbMargin, currentMax + aabbMargin);
+
+	// Velocity-adaptive temporal blend
+	float response = params.temporalResponse * (1.0 - velocityLength * 8.0);
+	current = mix(current, previous, clamp(response, 0.0, 1.0));
+	current = clamp(current, vec4(0.0), vec4(65000.0));
+
+	FS_OUT_Color = current;
 }

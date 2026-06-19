@@ -82,44 +82,33 @@ struct CullParams {
 };
 
 // ---- D. SSR pipeline -------------------------------------------------------
-// Union of fields previously set by name on ssr_f (the main HiZ/raymarch
-// pass), ssr_downsample (color-mipchain per-mip), and ssr_upsample (full-res
-// reconstruction). Each shader reads only the fields it needs:
-//   ssr_f          : lastViewProj, g_proj, MAX_STEPS, max_distance, bias,
-//                    step_size, max_thickness, temporalTime,
-//                    ssr_max_roughness, ssr_brdf_bias, ssr_mip_bias,
-//                    random_repeat, max_ssr_iters, num_traces_per_pixel,
-//                    debug_toggle, res_mode, texel_offset
-//   ssr_downsample : mip_level, myimg_size, inv_prev_size
-//   ssr_upsample   : temporal_frame, num_samples_to_get, debug_toggle, res_mode
-// ssr_downsample re-uploads per-mip in the loop; the other two upload once
-// per frame. Bound at the per-pass slot 7.
-// (reflectionShared.txt also declares uniforms but is shared with groups
-//  A and E — its lum_adjust_mode / num_cubemaps don't live in SsrParams.)
+// SSR pipeline params. Shared across ray-trace, resolve, temporal, and
+// downsample passes. Each shader reads only its subset. Bound at slot 7.
 struct SsrParams {
-    mat4  lastViewProj;          //   0 .. 64    (ssr_f)
-    mat4  g_proj;                //  64 .. 128   (ssr_f)
-    int   MAX_STEPS;             // 128
-    float max_distance;          // 132
-    float bias;                  // 136
-    float step_size;             // 140
-    float max_thickness;         // 144
-    float temporalTime;          // 148
-    float ssr_max_roughness;     // 152
-    float ssr_brdf_bias;         // 156
-    float ssr_mip_bias;          // 160
-    int   random_repeat;         // 164
-    int   max_ssr_iters;         // 168         (ssr_f; default 100)
-    int   num_traces_per_pixel;  // 172         (ssr_f; default 1)
-    int   debug_toggle;          // 176         (ssr_f + ssr_upsample; bool)
-    int   res_mode;              // 180         (ssr_f + ssr_upsample)
-    int   temporal_frame;        // 184         (ssr_upsample)
-    int   num_samples_to_get;    // 188         (ssr_upsample)
-    int   mip_level;             // 192         (ssr_downsample)
-    int   _pad0;                 // 196         pad before ivec2 (8B align)
-    ivec2 texel_offset;          // 200 .. 208  (ssr_f)
-    vec2  myimg_size;            // 208 .. 216  (ssr_downsample)
-    vec2  inv_prev_size;         // 216 .. 224  (ssr_downsample; struct size 224, /16)
+    // Ray trace
+    float maxTraceSamples;       //   0
+    float roughnessFade;         //   4
+    float brdfBias;              //   8
+    float worldAntiSelfOccBias;  //  12
+    float edgeFadeFactor;        //  16
+    float temporalTime;          //  20
+    float temporalEffect;        //  24  (0 or 1)
+    float rayTraceStep;          //  28
+    float maxColorMiplevel;      //  32
+    float traceSizeMax;          //  36
+    float intensity;             //  40
+    float fadeOutDistance;        //  44
+    // Resolve / temporal
+    vec2  ssrTexelSize;          //  48 .. 56
+    float temporalResponse;      //  56
+    int   resolveSamples;        //  60
+    // Downsample
+    int   mip_level;             //  64
+    int   _pad0;                 //  68
+    vec2  myimg_size;            //  72 .. 80
+    vec2  inv_prev_size;         //  80 .. 88
+    float _pad1;                 //  88
+    float _pad2;                 //  92 .. 96
 };
 
 // ---- J. Probe / GI baking --------------------------------------------------
