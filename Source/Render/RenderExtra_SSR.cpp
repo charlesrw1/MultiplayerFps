@@ -90,7 +90,7 @@ void SSRSystem::do_downsample() {
 			gfx().bind_uniform_buffer_base(7, draw.ubo.ssr_params);
 		}
 		if (i == 0)
-			device.bind_texture(0, draw.tex.last_scene_color);
+			device.bind_texture(0, draw.tex.scene_color);
 		else
 			device.bind_texture(0, draw.tex.scene_color_mipchain);
 		device.set_viewport(0, 0, size.x, size.y);
