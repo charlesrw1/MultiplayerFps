@@ -220,6 +220,7 @@ void Renderer::create_default_textures() {
 	Texture::install_system("_ddgi_accum");
 	Texture::install_system("_ddgi_accum_prev");
 	Texture::install_system("_ssr");
+	Texture::install_system("_scene_color_mipchain");
 
 	tex.read_scene_color_for_transparents_handle = Texture::install_system("_read_scene_color");
 }
@@ -469,6 +470,7 @@ void Renderer::InitFramebuffers(bool create_composite_texture, int s_w, int s_h)
 	tex.last_ddgi_accum->clear_image();
 
 	delete_and_create_texture_halfresmips(tex.scene_color_mipchain, gtf::r11f_g11f_b10f, 5);
+	Texture::load("_scene_color_mipchain")->update_specs_ptr(tex.scene_color_mipchain);
 	delete_and_create_texture(tex.reflection_accum, gtf::rgba16f);
 	delete_and_create_texture(tex.last_reflection_accum, gtf::rgba16f);
 	Texture::load("_ssr")->update_specs_ptr(tex.reflection_accum);
