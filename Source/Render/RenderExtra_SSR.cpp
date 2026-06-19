@@ -133,9 +133,6 @@ void SSRSystem::do_raytrace() {
 	int trace_h = trace_buffer->get_size().y;
 	device.set_viewport(0, 0, trace_w, trace_h);
 
-	const int color_mips = 5;
-	float max_color_mip = float(color_mips - 2);
-
 	{
 		gpu::SsrParams sp{};
 		sp.maxTraceSamples = ssr_max_trace_samples;
@@ -146,7 +143,6 @@ void SSRSystem::do_raytrace() {
 		sp.temporalTime = float(temporalframe);
 		sp.temporalEffect = 1.0f;
 		sp.rayTraceStep = 1.0f / float(vs.width);
-		sp.maxColorMiplevel = max_color_mip;
 		sp.traceSizeMax = float(glm::max(trace_w, trace_h));
 		sp.intensity = ssr_intensity;
 		sp.fadeOutDistance = ssr_fade_out_distance;
@@ -158,7 +154,7 @@ void SSRSystem::do_raytrace() {
 	device.bind_texture(1, draw.tex.scene_gbuffer1);
 	device.bind_texture(2, draw.tex.scene_gbuffer2);
 	device.bind_texture(3, draw.tex.scene_depth);
-	device.bind_texture(4, draw.tex.scene_color_mipchain);
+	device.bind_texture(4, draw.tex.last_scene_color);
 
 	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }
@@ -264,7 +260,6 @@ void SSRSystem::execute() {
 	std::swap(draw.tex.reflection_accum, draw.tex.last_reflection_accum);
 	temporalframe = (temporalframe + 1) % 2048;
 
-	do_downsample();
 	do_raytrace();
 	do_resolve();
 	do_temporal();
