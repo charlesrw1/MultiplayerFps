@@ -130,9 +130,21 @@ void main()
 	float aabbMargin = mix(4.0, 0.25, clamp(velocityLength * 100.0, 0.0, 1.0)) * lumaOffset;
 	history = ClipToAABB(history, neighborhoodMin - aabbMargin, neighborhoodMax + aabbMargin);
 
-	// Velocity-adaptive blend factor
+	// Velocity disocclusion (elopezr "length of difference" metric)
+	// Computed before blend so it can reduce the blend factor at edges
+	vec2 lastVelocityUv = textureLod(lastSceneMotion, prevUV, 0.0).rg;
+	float vel_len = length(lastVelocityUv - velocity_uv);
+	float velocityDisocclusion = clamp(
+		pow(max((vel_len - params.doc_vel_bias) * params.doc_mult - params.doc_bias, 0.0), params.doc_pow),
+		0.0, 1.0);
+
+	// Off-screen rejection
+	float offscreen = any(greaterThanEqual(abs(prevUV * 2.0 - 1.0), vec2(1.0))) ? 1.0 : 0.0;
+
+	// Velocity-adaptive blend factor, reduced by disocclusion/off-screen
 	float motion = clamp(velocityLength * 1000.0, 0.0, 1.0);
 	float blendfactor = mix(params.stationary_blending, params.motion_blending, motion);
+	blendfactor *= 1.0 - clamp(velocityDisocclusion + offscreen, 0.0, 1.0);
 
 	// Blend in tonemapped space
 	vec3 color = mix(currentVec.rgb, history.rgb, blendfactor);
@@ -143,20 +155,6 @@ void main()
 
 	// Inverse tonemap back to linear HDR
 	color = color / max(1.0 - Luminance(color), 0.001);
-
-	// Velocity disocclusion (elopezr "length of difference" metric)
-	vec2 lastVelocityUv = textureLod(lastSceneMotion, prevUV, 0.0).rg;
-	float vel_len = length(lastVelocityUv - velocity_uv);
-	float velocityDisocclusion = clamp(
-		pow(max((vel_len - params.doc_vel_bias) * params.doc_mult - params.doc_bias, 0.0), params.doc_pow),
-		0.0, 1.0);
-
-	// Off-screen rejection
-	float offscreen = any(greaterThanEqual(abs(prevUV * 2.0 - 1.0), vec2(1.0))) ? 1.0 : 0.0;
-
-	// Blend towards current on disocclusion or off-screen (in linear space)
-	vec3 fallback = mix(currentLinear, color, 0.5);
-	color = mix(color, fallback, clamp(velocityDisocclusion + offscreen, 0.0, 1.0));
 
 	FS_OUT_Color = max(color, vec3(0.0));
 }
