@@ -32,8 +32,8 @@ SSRSystem::SSRSystem() {
 	ssr_temporal = draw.get_prog_man().create_raster("fullscreenquad.txt", "temporal_upsample_ssr.txt");
 }
 
-void SSRSystem::ensure_buffers(int half_w, int half_h) {
-	auto create_halfres = [](IGraphicsTexture*& tex, int w, int h) {
+void SSRSystem::ensure_buffers(int w, int h) {
+	auto create_buffer = [](IGraphicsTexture*& tex, int w, int h) {
 		if (tex) tex->release();
 		CreateTextureArgs args;
 		args.format = GraphicsTextureFormat::rgba16f;
@@ -45,12 +45,12 @@ void SSRSystem::ensure_buffers(int half_w, int half_h) {
 	};
 
 	bool needs_recreate = !trace_buffer
-		|| trace_buffer->get_size().x != half_w
-		|| trace_buffer->get_size().y != half_h;
+		|| trace_buffer->get_size().x != w
+		|| trace_buffer->get_size().y != h;
 
 	if (needs_recreate) {
-		create_halfres(trace_buffer, half_w, half_h);
-		create_halfres(resolve_buffer, half_w, half_h);
+		create_buffer(trace_buffer, w, h);
+		create_buffer(resolve_buffer, w, h);
 	}
 }
 
@@ -110,6 +110,7 @@ static float ssr_intensity = 1.0f;
 static float ssr_fade_out_distance = 5000.f;
 static float ssr_temporal_response = 0.85f;
 static int   ssr_resolve_samples = 4;
+static bool  ssr_fullres_trace = false;
 
 void SSRSystem::do_raytrace() {
 	GPUSCOPESTART(ssr_raytrace_pass);
@@ -245,6 +246,7 @@ void imgui_menu_ssr() {
 	ImGui::DragFloat("fade_out_distance", &ssr_fade_out_distance, 10.f, 100.f, 50000.f);
 	ImGui::DragFloat("temporal_response", &ssr_temporal_response, 0.01f, 0.0f, 1.0f);
 	ImGui::SliderInt("resolve_samples", &ssr_resolve_samples, 1, 8);
+	ImGui::Checkbox("fullres_trace", &ssr_fullres_trace);
 }
 ADD_TO_DEBUG_MENU(imgui_menu_ssr);
 
@@ -253,9 +255,9 @@ void SSRSystem::execute() {
 	ASSERT(SSRSystem::inst != nullptr);
 
 	const auto& vs = draw.current_frame_view;
-	int half_w = vs.width / 2;
-	int half_h = vs.height / 2;
-	ensure_buffers(half_w, half_h);
+	int trace_w = ssr_fullres_trace ? vs.width : vs.width / 2;
+	int trace_h = ssr_fullres_trace ? vs.height : vs.height / 2;
+	ensure_buffers(trace_w, trace_h);
 
 	std::swap(draw.tex.reflection_accum, draw.tex.last_reflection_accum);
 	temporalframe = (temporalframe + 1) % 2048;
