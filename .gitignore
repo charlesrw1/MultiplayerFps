@@ -29,6 +29,7 @@ Source/.generated/
 *.ini
 *.xml
 *.bat
+*.dmp
 
 todo.txt
 

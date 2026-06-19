@@ -30,6 +30,10 @@ static float jump_impulse = 5.f;
 static float gravity = 18.f;
 static float mouse_sens = 0.15f;
 
+static bool is_in_debug_mode() {
+	return g_debugcamera.get_bool();
+}
+
 static void fps_move_vars_menu() {
 	ImGui::SliderFloat("eye_height", &eye_height, 0.5f, 2.5f);
 	ImGui::SliderFloat("ground_accel", &ground_accel, 1.f, 100.f);
@@ -71,6 +75,9 @@ void fpsPlayer::manualtick() {
 }
 
 void fpsPlayer::update_look() {
+	if (is_in_debug_mode())
+		return;
+
 	if (!UiSystem::inst->is_game_capturing_mouse()) {
 		if (Input::was_mouse_pressed(0) && !UiSystem::inst->blocking_mouse_inputs())
 			UiSystem::inst->set_game_capture_mouse(true);
@@ -94,7 +101,7 @@ void fpsPlayer::update_look() {
 
 void fpsPlayer::update_movement() {
 	float dt = (float)eng->get_dt();
-	bool has_focus = UiSystem::inst->is_game_capturing_mouse();
+	const bool has_focus = UiSystem::inst->is_game_capturing_mouse() && !is_in_debug_mode();
 
 	// input (only when mouse is captured)
 	vec2 input_dir{};

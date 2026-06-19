@@ -1,8 +1,12 @@
 #pragma once
 #include "Framework/InterfaceTypeInfo.h"
 #include "../Game/Entity.h"
+#include "../Game/Components/LightComponents.h"
+
 #include "../Game/EntityPtr.h"
 #include "../Game/EntityComponent.h"
+#include "../Game/GameplayStatic.h"
+
 #include <memory>
 
 class fpsIDamageable {
@@ -26,6 +30,44 @@ public:
 	void start();
 
 	REF Model* model = nullptr;
+};
+
+class fpsFlickeringLightScript : public Component {
+public:
+	CLASS_BODY(fpsFlickeringLightScript,spawnable);
+	fpsFlickeringLightScript() { set_call_init_in_editor(true); }
+	void start() { 
+		auto* light = get_owner()->create_component<PointLightComponent>();
+		set_ticking(true);
+	}
+	void update() {
+		auto* light = get_owner()->get_component<PointLightComponent>();
+		light->color = color;
+		light->intensity = evaluate_intsensity();
+		light->sync_render_data();
+		light->set_radius(radius);
+	}
+	float evaluate_intsensity() {
+		const int numoctaves_to_use = glm::min(octaves, 6);
+		const float time = eng->get_game_time();
+		float sum = 0.0;
+		float amplitude = 1.f;
+		for (int i = 0; i < numoctaves_to_use; i++) {
+			sum += glm::perlin(glm::vec2(time * frequency + offset, 31.7 * i))*amplitude;
+			amplitude *= 0.5f;
+		}
+		sum = sum * 0.5 + 0.5;
+		sum = glm::clamp(sum, 0.f, 1.f);
+		return glm::mix(min_intensity, max_intensity, sum);
+	}
+
+	REF float min_intensity = 0.0;
+	REF float max_intensity = 1.0;
+	REF float radius = 5.0;
+	REF Color32 color = Color32();
+	REF float frequency = 1.f;
+	REF float offset = 0.f;
+	REF int octaves = 1;
 };
 
 class CharacterController;

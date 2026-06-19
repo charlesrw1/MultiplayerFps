@@ -20,6 +20,7 @@ class PhysicsBody;
 #include "Game/Components/PhysicsComponents.h"
 #include "../Level.h"
 #include "Sound/SoundPublic.h"
+#include <glm/gtc/noise.hpp>
 class SpawnerComponent;
 class GameplayStatic : public ClassBase
 {
@@ -80,6 +81,8 @@ public:
 	REF static bool is_editor() { return eng->is_editor_level(); }
 
 
-
+	REF static float perlin_noise(float x, float y) { 
+		return glm::perlin(glm::vec2(x,y));
+	}
 
 };

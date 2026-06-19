@@ -260,6 +260,7 @@ void AssetRegistrySystem::update() {
 	assert(prefabMeta);
 
 	bool tree_dirty = false;
+	bool lua_changed = false;
 
 	// Helper: skip hot-reload when the watcher fires for a deletion. In-place
 	// reload destroys the asset's old impl before calling load_asset(); on a
@@ -315,6 +316,7 @@ void AssetRegistrySystem::update() {
 			}
 		} else if (ext == "lua") {
 			ScriptManager::inst->reload_one_file(rel_path);
+			lua_changed = true;
 		}
 
 		// Incremental tree update: resolve to the canonical asset entry
@@ -354,6 +356,21 @@ void AssetRegistrySystem::update() {
 		} else {
 			remove_from_tree(*root, aod.filename);
 			tree_dirty = true;
+		}
+	}
+
+	if (lua_changed) {
+		tree_dirty = true;
+		auto* ctype = find_type("Component-Entity");
+		ASSERT(ctype);
+		std::vector<std::string> extras;
+		ctype->fill_extra_assets(extras);
+		auto add = [&](AssetOnDisk aod) { root->add_path(aod, split(aod.filename, '/')); };
+		for (auto& e : extras) {
+			AssetOnDisk aod;
+			aod.filename = std::move(e);
+			aod.type = (AssetMetadata*)ctype;
+			add(std::move(aod));
 		}
 	}
 
