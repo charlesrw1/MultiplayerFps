@@ -246,17 +246,10 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	auto taa_resolve_pass = [&]() -> IGraphicsTexture* {
 		GPUSCOPESTART(TaaResolve);
 		ZoneScopedN("TaaResolve");
-
-		if (!r_taa_enabled.get_bool() || params.is_cubemap_view) {
-			disable_taa_this_frame = false;
+		bool wants_disable = disable_taa_this_frame || params.is_cubemap_view;
+		disable_taa_this_frame = false;
+		if (!r_taa_enabled.get_bool() || wants_disable) {
 			return tex.scene_color;
-		}
-
-		// On camera cut, still run the shader but with zero blend to prime history
-		float blend_strength = 1.0f;
-		if (disable_taa_this_frame) {
-			blend_strength = 0.0f;
-			disable_taa_this_frame = false;
 		}
 
 		gfx().bind_uniform_buffer_base(0, ubo.current_frame);
@@ -273,19 +266,23 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 
 		extern ConfigVar r_taa_stationary_blend;
 		extern ConfigVar r_taa_motion_blend;
+		extern ConfigVar r_taa_adaptive_blend;
 		extern ConfigVar r_taa_sharpness;
-		extern ConfigVar r_taa_catmull_rom;
 
 		gpu::TemporalParams tp{};
 		tp.lastViewProj = last_frame_main_view.viewproj;
+		tp.amt = r_taa_blend.get_float();
 		tp.doc_mult = taa_doc_mult;
 		tp.doc_vel_bias = taa_doc_vel_bias;
 		tp.doc_bias = taa_doc_bias;
 		tp.doc_pow = taa_doc_pow;
-		tp.stationary_blending = r_taa_stationary_blend.get_float() * blend_strength;
-		tp.motion_blending = r_taa_motion_blend.get_float() * blend_strength;
+		tp.remove_flicker = r_taa_flicker_remove.get_bool();
+		tp.use_reproject = r_taa_reproject.get_bool();
+		tp.dilate_velocity = r_taa_dilate_velocity.get_bool();
+		tp.stationary_blending = r_taa_stationary_blend.get_float();
+		tp.motion_blending = r_taa_motion_blend.get_float();
 		tp.sharpness = r_taa_sharpness.get_float();
-		tp.use_catmull_rom = r_taa_catmull_rom.get_bool();
+		tp.adaptive_blend = r_taa_adaptive_blend.get_bool();
 		ubo.temporal_params->upload(&tp, sizeof(tp));
 		gfx().bind_uniform_buffer_base(7, ubo.temporal_params);
 

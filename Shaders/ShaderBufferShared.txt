@@ -230,13 +230,14 @@ struct SsaoHbaoParams {
 // ---- C. Temporal upsample --------------------------------------------------
 // Union of fields previously set by name on TaaResolveF, temporal_upsample_ddgi,
 // and temporal_upsample_ssr. Each shader reads only the fields it needs:
-//   TAA   : lastViewProj, doc_*, stationary_blending, motion_blending, sharpness
-//   DDGI  : lastViewProj, amt, doc_*, remove_flicker, use_reproject, dilate_velocity, halfres_texel_offset
-//   SSR   : same as DDGI + ssr_nonoccluded_weight_mult
+//   TAA   : lastViewProj, amt, doc_*, remove_flicker, use_reproject, dilate_velocity,
+//           stationary_blending, motion_blending, adaptive_blend, sharpness
+//   DDGI  : same + halfres_texel_offset
+//   SSR   : same + halfres_texel_offset + ssr_nonoccluded_weight_mult
 // One UBO storage, three call sites — three uploads/frame, all under slot 7.
 struct TemporalParams {
     mat4 lastViewProj;                  //   0 .. 64
-    float amt;                          //  64    (used by SSR/DDGI temporal upsample)
+    float amt;                          //  64
     float doc_mult;                     //  68
     float doc_vel_bias;                 //  72
     float doc_bias;                     //  76
@@ -247,10 +248,10 @@ struct TemporalParams {
     int   dilate_velocity;              //  96
     int   _pad0;                        // 100   pad before ivec2 (8B align)
     ivec2 halfres_texel_offset;         // 104 .. 112
-    float stationary_blending;          // 112   (TAA only)
-    float motion_blending;              // 116   (TAA only)
-    float sharpness;                    // 120   (TAA only)
-    int   use_catmull_rom;              // 124   (TAA only; struct size 128, /16)
+    float stationary_blending;          // 112
+    float motion_blending;              // 116
+    float sharpness;                    // 120
+    int   adaptive_blend;               // 124 .. 128  (struct size 128, /16)
 };
 
 // ---------------------------------------------------------------------------
