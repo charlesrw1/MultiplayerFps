@@ -59,8 +59,16 @@ void SSRSystem::ensure_buffers(int w, int h) {
 	bool needs_blur_buf = !blur_intermediate
 		|| blur_intermediate->get_size().x != half_w
 		|| blur_intermediate->get_size().y != half_h;
-	if (needs_blur_buf)
-		create_buffer(blur_intermediate, half_w, half_h, GraphicsTextureFormat::r11f_g11f_b10f);
+	if (needs_blur_buf) {
+		if (blur_intermediate) blur_intermediate->release();
+		CreateTextureArgs args;
+		args.format = GraphicsTextureFormat::r11f_g11f_b10f;
+		args.num_mip_maps = 5;
+		args.width = half_w;
+		args.height = half_h;
+		args.sampler_type = GraphicsSamplerType::LinearDefault;
+		blur_intermediate = gfx().create_texture(args);
+	}
 }
 
 void SSRSystem::do_gaussian_mipchain() {
@@ -84,9 +92,9 @@ void SSRSystem::do_gaussian_mipchain() {
 		glm::ivec2 dst_size = glm::max(src_size / 2, glm::ivec2(1));
 		glm::vec2 src_texel = 1.f / glm::vec2(src_size);
 
-		// Horizontal blur: source → blur_intermediate
+		// Horizontal blur: source → blur_intermediate mip i
 		{
-			auto targets = {ColorTargetInfo(blur_intermediate)};
+			auto targets = {ColorTargetInfo(blur_intermediate, -1, i)};
 			RenderPassState rp;
 			rp.color_infos = targets;
 			gfx().set_render_pass(rp);
@@ -107,7 +115,7 @@ void SSRSystem::do_gaussian_mipchain() {
 			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 		}
 
-		// Vertical blur: blur_intermediate → scene_color_mipchain mip i
+		// Vertical blur: blur_intermediate mip i → scene_color_mipchain mip i
 		{
 			auto targets = {ColorTargetInfo(draw.tex.scene_color_mipchain, -1, i)};
 			RenderPassState rp;
@@ -118,7 +126,7 @@ void SSRSystem::do_gaussian_mipchain() {
 			gpu::SsrParams sp{};
 			sp.myimg_size = glm::vec2(0.f, 1.f);
 			sp.inv_prev_size = 1.f / glm::vec2(dst_size);
-			sp.mip_level = 0;
+			sp.mip_level = i;
 			draw.ubo.ssr_params->upload(&sp, sizeof(sp));
 			gfx().bind_uniform_buffer_base(7, draw.ubo.ssr_params);
 
