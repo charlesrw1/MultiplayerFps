@@ -113,7 +113,16 @@ void main()
 	// Build ray path in UV space (z = raw depth)
 	vec3 startWS = worldPos + worldNormal * params.worldAntiSelfOccBias;
 	vec3 startUV = ProjectWorldToUv(startWS);
-	vec3 endUV = ProjectWorldToUv(startWS + reflectWS);
+
+	// Guard against reflection endpoint going behind camera (w < 0 flips UV)
+	vec3 endWS = startWS + reflectWS;
+	vec4 endClip = g.viewproj * vec4(endWS, 1.0);
+	if (endClip.w < 0.01) {
+		vec4 startClip = g.viewproj * vec4(startWS, 1.0);
+		float t = (startClip.w - 0.01) / (startClip.w - endClip.w);
+		endWS = startWS + reflectWS * max(t, 0.001);
+	}
+	vec3 endUV = ProjectWorldToUv(endWS);
 	vec3 rayUV = endUV - startUV;
 	vec2 rayUVAbs = abs(rayUV.xy);
 	rayUV *= params.rayTraceStep / max(rayUVAbs.x, rayUVAbs.y);
