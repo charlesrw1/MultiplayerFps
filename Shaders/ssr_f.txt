@@ -108,6 +108,11 @@ void main()
 	vec3 H = (params.temporalEffect > 0.5)
 		? TangentToWorld(worldNormal, ImportanceSampleGGX(Xi, roughness).xyz)
 		: worldNormal;
+	// At steep viewing angles, the perturbed H can cross into the wrong
+	// hemisphere (dot(viewWS, H) > 0), which sends reflect() through the
+	// surface. Fall back to the unperturbed normal in that case.
+	if (dot(viewWS, H) >= 0.0)
+		H = worldNormal;
 	vec3 reflectWS = reflect(viewWS, H);
 
 	// Build ray path in UV space (z = raw depth)
