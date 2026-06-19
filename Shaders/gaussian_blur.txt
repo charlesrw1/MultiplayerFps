@@ -10,16 +10,16 @@ layout(binding=0) uniform sampler2D srcTexture;
 void main()
 {
 	// 9-tap Gaussian using 5 bilinear fetches (offsets chosen for hardware interpolation)
-	// Kernel: [0.028, 0.066, 0.124, 0.179, 0.204, 0.179, 0.124, 0.066, 0.028]
 	vec2 blurDir = params.myimg_size;
 	vec2 texelSize = params.inv_prev_size;
 	vec2 step = blurDir * texelSize;
+	float srcMip = float(params.mip_level);
 
-	vec3 result = texture(srcTexture, texCoord).rgb * 0.204;
-	result += texture(srcTexture, texCoord + step * 1.385).rgb * 0.303;
-	result += texture(srcTexture, texCoord - step * 1.385).rgb * 0.303;
-	result += texture(srcTexture, texCoord + step * 3.231).rgb * 0.094;
-	result += texture(srcTexture, texCoord - step * 3.231).rgb * 0.094;
+	vec3 result = textureLod(srcTexture, texCoord, srcMip).rgb * 0.204;
+	result += textureLod(srcTexture, texCoord + step * 1.385, srcMip).rgb * 0.303;
+	result += textureLod(srcTexture, texCoord - step * 1.385, srcMip).rgb * 0.303;
+	result += textureLod(srcTexture, texCoord + step * 3.231, srcMip).rgb * 0.094;
+	result += textureLod(srcTexture, texCoord - step * 3.231, srcMip).rgb * 0.094;
 
 	FS_OUT_Color = vec4(max(result, vec3(0.0)), 1.0);
 }

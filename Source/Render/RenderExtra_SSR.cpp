@@ -95,6 +95,7 @@ void SSRSystem::do_gaussian_mipchain() {
 			gpu::SsrParams sp{};
 			sp.myimg_size = glm::vec2(1.f, 0.f);
 			sp.inv_prev_size = src_texel;
+			sp.mip_level = (i == 0) ? 0 : i - 1;
 			draw.ubo.ssr_params->upload(&sp, sizeof(sp));
 			gfx().bind_uniform_buffer_base(7, draw.ubo.ssr_params);
 
@@ -117,6 +118,7 @@ void SSRSystem::do_gaussian_mipchain() {
 			gpu::SsrParams sp{};
 			sp.myimg_size = glm::vec2(0.f, 1.f);
 			sp.inv_prev_size = 1.f / glm::vec2(dst_size);
+			sp.mip_level = 0;
 			draw.ubo.ssr_params->upload(&sp, sizeof(sp));
 			gfx().bind_uniform_buffer_base(7, draw.ubo.ssr_params);
 
