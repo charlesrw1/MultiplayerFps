@@ -1,6 +1,7 @@
 #pragma once
 #include "Framework/InterfaceTypeInfo.h"
 #include "../Game/Entity.h"
+#include "../Game/EntityPtr.h"
 #include "../Game/EntityComponent.h"
 #include <memory>
 
@@ -10,10 +11,6 @@ public:
 	REF virtual void deal_damage(int amount) {}
 };
 
-NEWENUM(fpsGameEvent, int32_t){
-	PLAYER_ENTERED,
-	PLAYER_LEFT,
-};
 
 class fpsSpawnPoint : public Component {
 public:
@@ -34,7 +31,50 @@ public:
 class CharacterController;
 class CameraComponent;
 
-class fpsPlayer : public Component, public fpsIDamageable {
+
+// items
+// swap to
+// drop (or no)
+// holster
+// update
+
+enum class fpsItem {
+	empty,
+	pistol,
+	flamethrower,
+	rocket_launcher,
+	grenade,
+};
+enum class fpsItemState {
+	deploying,
+	idle,
+	holstering,
+};
+
+struct fpsFlamethrowerData {
+};
+class fpsPlayer;
+class fpsInventoryLogic
+{
+public:
+	void start();
+	void update();
+	void stop();
+	void update_viewmodel();
+
+	fpsPlayer* player = nullptr;
+	fpsItem current_item = fpsItem::empty;
+	fpsItem next_item = fpsItem::empty;
+	fpsItemState state = fpsItemState::idle;
+
+	float state_timer = 0.0;
+	float next_attack_time = 0.0;
+
+	fpsFlamethrowerData flamedata;
+
+};
+
+class fpsPlayer : public Component {
 public:
 	CLASS_BODY(fpsPlayer);
 	void start() override;
@@ -49,6 +89,7 @@ private:
 	void update_movement();
 	void update_camera();
 
+	std::unique_ptr<fpsInventoryLogic> inventory;
 	std::unique_ptr<CharacterController> controller;
 	glm::vec3 velocity{};
 	float view_pitch = 0.f;

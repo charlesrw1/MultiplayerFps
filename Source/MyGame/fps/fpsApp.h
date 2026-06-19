@@ -4,6 +4,12 @@
 #include "fpsObjects.h"
 #include "fpsDebugCamera.h"
 
+class fpsLuaBridge : public ClassBase {
+public:
+	CLASS_BODY(fpsLuaBridge);
+	REF virtual void start_level_script() {}
+	REF virtual void tick() {}
+};
 class fpsGameMgr {
 public:
 	void start_level(const std::string& name);

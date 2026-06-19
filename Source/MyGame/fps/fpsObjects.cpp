@@ -202,3 +202,11 @@ void fpsPropPhysics::start() {
 		physics->set_physics_layer(PL::PhysicsObject);
 	}
 }
+
+void fpsInventoryLogic::update()
+{
+	// update item transitions
+	// update current item
+	//		- updates state machine and also viewmodel
+
+}

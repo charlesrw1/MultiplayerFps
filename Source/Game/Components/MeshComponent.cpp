@@ -54,12 +54,11 @@ MeshComponent::MeshComponent() {
 	set_call_init_in_editor(true);
 }
 void MeshComponent::refresh_after_model_reload(Model* reloaded) {
-	// Our Model* is stable across reload (AssetDatabase reloads in place),
-	// so the AssetPtr<Model> field needs no fixup.  Forward to the animator,
-	// which may hold dangling AnimationSeq*/BoneIndexRetargetMap* into the
-	// reloaded model's now-cleared skeleton.
+	if (model.get() != reloaded)
+		return;
 	if (animator)
 		animator->refresh_after_model_reload(reloaded);
+	sync_render_data();
 }
 glm::mat4 MeshComponent::get_ls_transform_of_bone(StringName bonename) const {
 	auto mod = model;

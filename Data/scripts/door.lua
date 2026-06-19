@@ -11,9 +11,13 @@ FPDOOR_OPENING = 3
 DOOR_OPEN_TIME = 0.6
 
 ---@class FpDoor : Component
+---editor
 FpDoor = {
-
+    ---@type number
+    myfield = 0
 }
+
+
 function FpDoor:start()
     self.state = FPDOOR_CLOSED
     self.alpha = 0
