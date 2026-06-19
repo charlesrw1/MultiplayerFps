@@ -306,4 +306,7 @@ void SSRSystem::execute() {
 	do_raytrace();
 	do_resolve();
 	do_temporal();
+
+	// Restore full-res viewport for subsequent passes (SSAO, DDGI lighting)
+	gfx().set_viewport(0, 0, vs.width, vs.height);
 }
