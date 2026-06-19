@@ -157,11 +157,7 @@ void DdgiTesting::draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap
     draw.ubo.ddgi_runtime_params->upload(&dp, sizeof(dp));
     gfx().bind_uniform_buffer_base(7, draw.ubo.ddgi_runtime_params);
 
-    extern ConfigVar enable_ssr;
-    if (enable_ssr.get_bool())
-        draw.bind_texture_ptr(10, draw.tex.reflection_accum);
-    else
-        draw.bind_texture_ptr(10, draw.black_texture);
+    draw.bind_texture_ptr(10, draw.tex.reflection_accum);
 
     gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }
@@ -259,11 +255,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     draw.bind_texture_ptr(3, draw.tex.scene_depth);
     draw.bind_texture_ptr(4, ssao);
     draw.bind_texture_ptr(5, draw.tex.ddgi_accum);
-    extern ConfigVar enable_ssr;
-    if (enable_ssr.get_bool())
-        draw.bind_texture_ptr(6, draw.tex.reflection_accum);
-    else
-        draw.bind_texture_ptr(6, draw.black_texture);
+    draw.bind_texture_ptr(6, draw.tex.reflection_accum);
 
     {
         gpu::DdgiRuntimeParams dp_apply{};
