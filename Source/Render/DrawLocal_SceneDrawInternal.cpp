@@ -274,6 +274,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		extern ConfigVar r_taa_stationary_blend;
 		extern ConfigVar r_taa_motion_blend;
 		extern ConfigVar r_taa_sharpness;
+		extern ConfigVar r_taa_catmull_rom;
 
 		gpu::TemporalParams tp{};
 		tp.lastViewProj = last_frame_main_view.viewproj;
@@ -284,6 +285,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		tp.stationary_blending = r_taa_stationary_blend.get_float() * blend_strength;
 		tp.motion_blending = r_taa_motion_blend.get_float() * blend_strength;
 		tp.sharpness = r_taa_sharpness.get_float();
+		tp.use_catmull_rom = r_taa_catmull_rom.get_bool();
 		ubo.temporal_params->upload(&tp, sizeof(tp));
 		gfx().bind_uniform_buffer_base(7, ubo.temporal_params);
 

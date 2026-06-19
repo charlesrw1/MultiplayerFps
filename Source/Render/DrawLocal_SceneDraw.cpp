@@ -334,6 +334,7 @@ ConfigVar r_taa_blend("r.taa_blend", "0.75", CVAR_FLOAT, "", 0, 1.0);
 ConfigVar r_taa_stationary_blend("r.taa_stationary_blend", "0.95", CVAR_FLOAT, "TAA history blend for stationary pixels", 0, 0.99);
 ConfigVar r_taa_motion_blend("r.taa_motion_blend", "0.85", CVAR_FLOAT, "TAA history blend for moving pixels", 0, 0.99);
 ConfigVar r_taa_sharpness("r.taa_sharpness", "0.1", CVAR_FLOAT, "TAA sharpening strength", 0, 3.0);
+ConfigVar r_taa_catmull_rom("r.taa_catmull_rom", "0", CVAR_BOOL, "use Catmull-Rom 5-tap history sampling instead of bilinear");
 ConfigVar r_taa_flicker_remove("r.taa_flicker_remove", "1", CVAR_BOOL, "");
 ConfigVar r_taa_reproject("r.taa_reproject", "0", CVAR_BOOL, "");
 ConfigVar r_taa_dilate_velocity("r.taa_dilate_velocity", "1", CVAR_BOOL, "");

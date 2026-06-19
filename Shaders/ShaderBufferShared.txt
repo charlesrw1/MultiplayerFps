@@ -250,7 +250,7 @@ struct TemporalParams {
     float stationary_blending;          // 112   (TAA only)
     float motion_blending;              // 116   (TAA only)
     float sharpness;                    // 120   (TAA only)
-    float _pad1;                        // 124 .. 128  (struct size 128, /16)
+    int   use_catmull_rom;              // 124   (TAA only; struct size 128, /16)
 };
 
 // ---------------------------------------------------------------------------
