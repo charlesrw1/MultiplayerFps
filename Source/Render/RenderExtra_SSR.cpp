@@ -27,16 +27,16 @@ SSRSystem::SSRSystem() {
 	ASSERT(gfx_is_initialized());
 
 	ssr_raytrace = draw.get_prog_man().create_raster("fullscreenquad.txt", "ssr_f.txt");
-	ssr_downsample = draw.get_prog_man().create_raster("fullscreenquad.txt", "ssr_downsample.txt");
 	ssr_resolve = draw.get_prog_man().create_raster("fullscreenquad.txt", "ssr_upsample.txt");
 	ssr_temporal = draw.get_prog_man().create_raster("fullscreenquad.txt", "temporal_upsample_ssr.txt");
+	gaussian_blur = draw.get_prog_man().create_raster("fullscreenquad.txt", "gaussian_blur.txt");
 }
 
 void SSRSystem::ensure_buffers(int w, int h) {
-	auto create_buffer = [](IGraphicsTexture*& tex, int w, int h) {
+	auto create_buffer = [](IGraphicsTexture*& tex, int w, int h, GraphicsTextureFormat fmt = GraphicsTextureFormat::rgba16f) {
 		if (tex) tex->release();
 		CreateTextureArgs args;
-		args.format = GraphicsTextureFormat::rgba16f;
+		args.format = fmt;
 		args.num_mip_maps = 1;
 		args.width = w;
 		args.height = h;
@@ -52,51 +52,80 @@ void SSRSystem::ensure_buffers(int w, int h) {
 		create_buffer(trace_buffer, w, h);
 		create_buffer(resolve_buffer, w, h);
 	}
+
+	const auto& vs = draw.current_frame_view;
+	int half_w = vs.width / 2;
+	int half_h = vs.height / 2;
+	bool needs_blur_buf = !blur_intermediate
+		|| blur_intermediate->get_size().x != half_w
+		|| blur_intermediate->get_size().y != half_h;
+	if (needs_blur_buf)
+		create_buffer(blur_intermediate, half_w, half_h, GraphicsTextureFormat::r11f_g11f_b10f);
 }
 
-void SSRSystem::do_downsample() {
-	GPUSCOPESTART(ssr_downsample_pass);
-	ASSERT(ssr_downsample != 0);
+void SSRSystem::do_gaussian_mipchain() {
+	GPUSCOPESTART(ssr_gaussian_mipchain);
 
 	const auto& viewsetup = draw.current_frame_view;
 	auto& device = draw.get_device();
+	const int num_mips = 5;
 
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
-	state.program = draw.get_prog_man().get_obj(ssr_downsample);
+	state.program = draw.get_prog_man().get_obj(gaussian_blur);
 	state.blend = BlendState::OPAQUE;
 	state.depth_testing = false;
 	state.depth_writes = false;
 	device.set_pipeline(state);
 
-	const int num_mips = 5;
-	glm::ivec2 size(viewsetup.width, viewsetup.height);
-	glm::vec2 inv_presize = 1.f / glm::vec2(size);
+	glm::ivec2 src_size(viewsetup.width, viewsetup.height);
 
 	for (int i = 0; i < num_mips; i++) {
-		size /= 2;
-		auto targets = {ColorTargetInfo(draw.tex.scene_color_mipchain, -1, i)};
-		RenderPassState rp;
-		rp.color_infos = targets;
-		gfx().set_render_pass(rp);
+		glm::ivec2 dst_size = glm::max(src_size / 2, glm::ivec2(1));
+		glm::vec2 src_texel = 1.f / glm::vec2(src_size);
 
-		int mip_to_fetch = (i == 0) ? 0 : i - 1;
+		// Horizontal blur: source → blur_intermediate
 		{
+			auto targets = {ColorTargetInfo(blur_intermediate)};
+			RenderPassState rp;
+			rp.color_infos = targets;
+			gfx().set_render_pass(rp);
+			device.set_viewport(0, 0, dst_size.x, dst_size.y);
+
 			gpu::SsrParams sp{};
-			sp.mip_level = mip_to_fetch;
-			sp.myimg_size = glm::vec2(size);
-			sp.inv_prev_size = inv_presize;
+			sp.myimg_size = glm::vec2(1.f, 0.f);
+			sp.inv_prev_size = src_texel;
 			draw.ubo.ssr_params->upload(&sp, sizeof(sp));
 			gfx().bind_uniform_buffer_base(7, draw.ubo.ssr_params);
-		}
-		if (i == 0)
-			device.bind_texture(0, draw.tex.last_scene_color);
-		else
-			device.bind_texture(0, draw.tex.scene_color_mipchain);
-		device.set_viewport(0, 0, size.x, size.y);
-		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
-		inv_presize = 1.f / glm::vec2(size);
+			if (i == 0)
+				device.bind_texture(0, draw.tex.last_scene_color);
+			else
+				device.bind_texture(0, draw.tex.scene_color_mipchain);
+
+			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
+		}
+
+		// Vertical blur: blur_intermediate → scene_color_mipchain mip i
+		{
+			auto targets = {ColorTargetInfo(draw.tex.scene_color_mipchain, -1, i)};
+			RenderPassState rp;
+			rp.color_infos = targets;
+			gfx().set_render_pass(rp);
+			device.set_viewport(0, 0, dst_size.x, dst_size.y);
+
+			gpu::SsrParams sp{};
+			sp.myimg_size = glm::vec2(0.f, 1.f);
+			sp.inv_prev_size = 1.f / glm::vec2(dst_size);
+			draw.ubo.ssr_params->upload(&sp, sizeof(sp));
+			gfx().bind_uniform_buffer_base(7, draw.ubo.ssr_params);
+
+			device.bind_texture(0, blur_intermediate);
+
+			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
+		}
+
+		src_size = dst_size;
 	}
 }
 
@@ -145,6 +174,7 @@ void SSRSystem::do_raytrace() {
 		sp.temporalEffect = 1.0f;
 		sp.rayTraceStep = 1.0f / float(vs.width);
 		sp.traceSizeMax = float(glm::max(trace_w, trace_h));
+		sp.maxColorMiplevel = 3.f;
 		sp.intensity = ssr_intensity;
 		sp.fadeOutDistance = ssr_fade_out_distance;
 		draw.ubo.ssr_params->upload(&sp, sizeof(sp));
@@ -155,7 +185,7 @@ void SSRSystem::do_raytrace() {
 	device.bind_texture(1, draw.tex.scene_gbuffer1);
 	device.bind_texture(2, draw.tex.scene_gbuffer2);
 	device.bind_texture(3, draw.tex.scene_depth);
-	device.bind_texture(4, draw.tex.last_scene_color);
+	device.bind_texture(4, draw.tex.scene_color_mipchain);
 
 	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 }
@@ -262,6 +292,7 @@ void SSRSystem::execute() {
 	std::swap(draw.tex.reflection_accum, draw.tex.last_reflection_accum);
 	temporalframe = (temporalframe + 1) % 2048;
 
+	do_gaussian_mipchain();
 	do_raytrace();
 	do_resolve();
 	do_temporal();

@@ -15,7 +15,7 @@ layout(binding=0) uniform sampler2D GBUFFER0;
 layout(binding=1) uniform sampler2D GBUFFER1;
 layout(binding=2) uniform sampler2D GBUFFER2;
 layout(binding=3) uniform sampler2D DEPTH;
-layout(binding=4) uniform sampler2D SceneColor;
+layout(binding=4) uniform sampler2D SceneColorMips;
 
 vec2 RandN2(vec2 n)
 {
@@ -77,7 +77,7 @@ void main()
 	float depth = textureLod(DEPTH, uv, 0.0).r;
 	vec4 metal_rough = textureLod(GBUFFER2, uv, 0.0);
 
-	vec4 base = vec4(textureLod(SceneColor, uv, 0.0).rgb, 0.0);
+	vec4 base = vec4(textureLod(SceneColorMips, uv, 0.0).rgb, 0.0);
 
 	uint matType = get_gbuffer_material_type(metal_rough);
 	float roughness = metal_rough.g;
@@ -186,9 +186,14 @@ void main()
 
 	float hitMask = fadeOnBorder * roughnessFade * distanceFade * reflectFade;
 
-	// Sample color at hit point from mip 0. Roughness blur comes from
-	// stochastic ray directions + resolve gather + temporal accumulation.
-	vec3 sampleColor = textureLod(SceneColor, currOffset.xy, 0.0).rgb;
+	// Cone-based mip selection: rougher surfaces sample from blurrier mips
+	vec3 viewVector = -viewWS;
+	float NdotV = clamp(dot(worldNormal, viewVector), 0.0, 1.0);
+	float coneTangent = mix(0.0, roughness * 5.0 * (1.0 - params.brdfBias),
+		pow(NdotV, 1.5) * sqrt(roughness));
+	float intersectionCircleRadius = coneTangent * length(currOffset.xy - uv);
+	float mip = clamp(log2(intersectionCircleRadius * params.traceSizeMax), 0.0, params.maxColorMiplevel);
+	vec3 sampleColor = textureLod(SceneColorMips, currOffset.xy, mip).rgb;
 
 	FS_OUT_Color = vec4(sampleColor, hitMask);
 }

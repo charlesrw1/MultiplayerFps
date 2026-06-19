@@ -243,18 +243,19 @@ public:
 	void execute();
 
 	program_handle ssr_raytrace{};
-	program_handle ssr_downsample{};
 	program_handle ssr_resolve{};
 	program_handle ssr_temporal{};
+	program_handle gaussian_blur{};
 
 	IGraphicsTexture* trace_buffer = nullptr;
 	IGraphicsTexture* resolve_buffer = nullptr;
+	IGraphicsTexture* blur_intermediate = nullptr;
 
-	void do_downsample();
+	void do_gaussian_mipchain();
 	void do_raytrace();
 	void do_resolve();
 	void do_temporal();
-	void ensure_buffers(int half_w, int half_h);
+	void ensure_buffers(int w, int h);
 
 	int temporalframe = 0;
 };
