@@ -92,9 +92,9 @@ void main()
 	vec3 normalVS = normalize((g.view * vec4(worldNormal, 0.0)).xyz);
 	vec3 viewPos = (g.view * vec4(worldPos, 1.0)).xyz;
 
-	// Check reflection goes toward viewer (away from screen in view space)
+	// OpenGL view space: -Z is forward. Reject reflections going toward camera (+Z)
 	vec3 reflectVS = normalize(reflect(normalize(viewPos), normalVS));
-	if (reflectVS.z < 0.001) {
+	if (reflectVS.z > -0.001) {
 		FS_OUT_Color = base;
 		return;
 	}
@@ -133,7 +133,8 @@ void main()
 	while (currSampleIndex < numSamples)
 	{
 		float currSample = textureLod(DEPTH, currOffset.xy, 0.0).r;
-		float depthDiff = currOffset.z - currSample;
+		// Reverse-Z: closer = larger depth. Ray behind surface = ray depth < surface depth.
+		float depthDiff = currSample - currOffset.z;
 
 		if (depthDiff >= 0.0)
 		{
@@ -172,8 +173,8 @@ void main()
 	float viewDist = length(viewPos);
 	float distanceFade = clamp((params.fadeOutDistance - viewDist) / params.fadeOutDistance, 0.0, 1.0);
 
-	// Reflection angle fade
-	float reflectFade = clamp(reflectVS.z * 8.0, 0.0, 1.0);
+	// Reflection angle fade (negate for OpenGL: -Z is forward)
+	float reflectFade = clamp(-reflectVS.z * 8.0, 0.0, 1.0);
 
 	float hitMask = fadeOnBorder * roughnessFade * distanceFade * reflectFade;
 
