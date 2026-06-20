@@ -97,6 +97,8 @@ public:
 
 private:
 	EntityPtr last_selected;
+	bool was_dragging = false;
+	glm::mat4 pre_drag_transform{};
 };
 
 class EntityVisiblityFilter

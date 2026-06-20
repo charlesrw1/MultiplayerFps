@@ -237,9 +237,10 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 	ImGui::Separator();
 
 	// -- Overlay toggles --------------------------------------------------
-	const bool show_handles = ed_show_box_handles.get_bool();
-	if (toolbar_btn(get_icon("bounding_box_pivot.png"), show_handles, "Show Bounding Box Handles"))
-		ed_show_box_handles.set_bool(!show_handles);
+	const int box_handle_mode = ed_show_box_handles.get_integer();
+	const char* box_handle_labels[] = {"Box Handles: Off", "Box Handles: Face", "Box Handles: Edge"};
+	if (toolbar_btn(get_icon("bounding_box_pivot.png"), box_handle_mode > 0, box_handle_labels[box_handle_mode]))
+		ed_show_box_handles.set_integer((box_handle_mode + 1) % 3);
 
 	const bool show_text = editor_draw_name_text.get_bool();
 	if (toolbar_btn(show_text ? get_icon("show_text_on.png") : get_icon("show_text_off.png"),

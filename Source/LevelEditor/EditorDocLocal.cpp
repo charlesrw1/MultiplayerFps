@@ -72,7 +72,7 @@ ConfigVar ed_scale_snap("ed_scale_snap", "1.0", CVAR_FLOAT, "what editor scale s
 ConfigVar ed_scale_snap_exp("ed_scale_snap_exp", "3", CVAR_FLOAT, "editor scale snap increment exponent", 1, 10);
 ConfigVar ed_force_guizmo("ed.force_guizmo", "0", CVAR_BOOL, "");
 
-ConfigVar ed_show_box_handles("ed.show_box_handles", "0", CVAR_BOOL, "");
+ConfigVar ed_show_box_handles("ed.show_box_handles", "0", CVAR_INTEGER, "box handle mode: 0=off 1=face 2=edge", 0, 2);
 
 extern void export_godot_scene(const std::string& base_export_path);
 extern void export_level_scene();

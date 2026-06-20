@@ -11,6 +11,7 @@
 #include "Game/Components/DecalComponent.h"
 #include "Game/Components/SpawnerComponenth.h"
 #include "Debug.h"
+#include "Commands.h"
 
 // ---------------------------------------------------------------------------
 // Scene entity helpers
@@ -60,61 +61,68 @@ void DrawHandlesObject::tick() {
 		}
 	}
 
-	if (!ed_show_box_handles.get_bool())
+	int box_mode = ed_show_box_handles.get_integer();
+	if (box_mode == 0)
 		return;
 
+	BoxHandleMode handle_mode = (box_mode == 1) ? BoxHandleMode::Face : BoxHandleMode::Edge;
+
 	if (doc.selection_state->has_only_one_selected()) {
-		auto selected = doc.selection_state->get_only_one_selected();
-		if (selected->get_editor_name() == "___handle_marker") {
-
-		} else {
-			last_selected = selected;
-		}
+		last_selected = doc.selection_state->get_only_one_selected();
 	} else {
 		last_selected = EntityPtr();
 	}
-	if (last_selected.get()) {
 
-		bool good_to_use = false;
-		Bounds bounds_to_use;
-
-		auto mesh = last_selected->get_component<MeshComponent>();
-		if (mesh && mesh->get_model()) {
-			bounds_to_use = mesh->get_model()->get_bounds();
-			good_to_use = true;
-		} else if (auto cubemap = last_selected->get_component<CubemapComponent>()) {
-			bounds_to_use = Bounds(-vec3(0.5), vec3(0.5));
-			good_to_use = true;
-		} else if (auto decal = last_selected->get_component<DecalComponent>()) {
-			bounds_to_use = Bounds(-vec3(0.5), vec3(0.5));
-			good_to_use = true;
-		}
-
-		if (good_to_use) {
-			auto transform = last_selected->get_ws_transform();
-			glm::mat4 m = transform * glm::translate(glm::mat4(1), bounds_to_use.bmin);
-			auto extents = bounds_to_use.bmax - bounds_to_use.bmin;
-			auto result = doc.handle_dragger->box_handles(1, m, extents);
-
-			if (result == VHResult::Changing) {
-
-				// now do the inverse... (m was set)
-
-				mat4 want = m * glm::inverse(glm::translate(glm::mat4(1), bounds_to_use.bmin));
-				glm::vec3 p, s;
-				glm::quat q;
-				decompose_transform(want, p, q, s);
-				q = glm::normalize(q);
-				want = compose_transform(p, q, s);
-
-				last_selected->set_ws_transform(want);
-			}
-
-			Debug::add_transformed_box(m, extents, {255, 165, 0}, 0, false);
-		}
-	} else {
+	if (!last_selected.get()) {
 		last_selected = EntityPtr();
+		return;
 	}
+
+	Bounds bounds_to_use;
+	bool good_to_use = false;
+
+	if (auto mesh = last_selected->get_component<MeshComponent>(); mesh && mesh->get_model()) {
+		bounds_to_use = mesh->get_model()->get_bounds();
+		good_to_use = true;
+	} else if (last_selected->get_component<CubemapComponent>() || last_selected->get_component<DecalComponent>()) {
+		bounds_to_use = Bounds(-vec3(0.5), vec3(0.5));
+		good_to_use = true;
+	}
+
+	if (!good_to_use)
+		return;
+
+	auto transform = last_selected->get_ws_transform();
+	glm::mat4 m = transform * glm::translate(glm::mat4(1), bounds_to_use.bmin);
+	auto extents = bounds_to_use.bmax - bounds_to_use.bmin;
+	auto result = doc.handle_dragger->box_handles(1, m, extents, handle_mode);
+
+	if (result == VHResult::Changing && !was_dragging) {
+		pre_drag_transform = transform;
+		was_dragging = true;
+	}
+
+	if (result == VHResult::Changing || result == VHResult::Finished) {
+		mat4 want = m * glm::inverse(glm::translate(glm::mat4(1), bounds_to_use.bmin));
+		glm::vec3 p, s;
+		glm::quat q;
+		decompose_transform(want, p, q, s);
+		q = glm::normalize(q);
+		want = compose_transform(p, q, s);
+		last_selected->set_ws_transform(want);
+		doc.manipulate->update_pivot_and_cached();
+	}
+
+	if (result == VHResult::Finished && was_dragging) {
+		uint64_t id = last_selected->get_instance_id();
+		std::unordered_set<uint64_t> sel_set = {id};
+		std::unordered_map<uint64_t, glm::mat4> pre_map = {{id, pre_drag_transform}};
+		doc.command_mgr->add_command(new TransformCommand(doc, sel_set, pre_map));
+		was_dragging = false;
+	}
+
+	Color32 box_color = (handle_mode == BoxHandleMode::Face) ? Color32(255, 165, 0) : Color32(255, 220, 80);
+	Debug::add_transformed_box(m, extents, box_color, 0, false);
 }
 
 // ---------------------------------------------------------------------------
