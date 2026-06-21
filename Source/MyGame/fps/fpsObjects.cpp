@@ -217,3 +217,30 @@ void fpsInventoryLogic::update()
 	//		- updates state machine and also viewmodel
 
 }
+
+inline void fpsFlickeringLightScript::start() {
+	auto* light = get_owner()->create_component<PointLightComponent>();
+	set_ticking(true);
+}
+
+inline void fpsFlickeringLightScript::update() {
+	auto* light = get_owner()->get_component<PointLightComponent>();
+	light->color = color;
+	light->intensity = evaluate_intsensity();
+	light->sync_render_data();
+	light->set_radius(radius);
+}
+
+inline float fpsFlickeringLightScript::evaluate_intsensity() {
+	const int numoctaves_to_use = glm::min(octaves, 6);
+	const float time = eng->get_game_time();
+	float sum = 0.0;
+	float amplitude = 1.f;
+	for (int i = 0; i < numoctaves_to_use; i++) {
+		sum += glm::perlin(glm::vec2(time * frequency + offset, 31.7 * i)) * amplitude;
+		amplitude *= 0.5f;
+	}
+	sum = sum * 0.5 + 0.5;
+	sum = glm::clamp(sum, 0.f, 1.f);
+	return glm::mix(min_intensity, max_intensity, sum);
+}

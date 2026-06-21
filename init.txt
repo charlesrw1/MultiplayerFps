@@ -86,7 +86,7 @@ r.taa 0
 loglevel 5
 developer_mode 1
 
-open-editor maps/bike_test_map.tmap
+open-editor physics_test_world.tmap
 
 #ot _ddgi_accum
 #otex 1 1 0 _ssr
