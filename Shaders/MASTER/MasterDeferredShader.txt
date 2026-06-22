@@ -469,7 +469,10 @@ void main()
 		vec3 Normalized_IN_N = normalize(FS_IN_Normal);
 		// World space normal
 		vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
-		Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
+		Final_Normal = normalize(FS_IN_TBN * Final_Normal);
+		// Translucent foliage: flip normal for back-faces so lighting sees the front
+		if (_MATERIAL_TYPE == MATERIAL_TYPE_TRANSLUCENT && !gl_FrontFacing)
+			Final_Normal = -Final_Normal;
 		GBUFFER_OUT_Normal = Final_Normal;
 
 		// Bake texture AO into albedo, freeing RT1.A for per-material alias data.
