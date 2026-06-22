@@ -157,6 +157,10 @@ void main()
 
 		vec3 F0 = mix(vec3(0.04), albedo.rgb, metal_rough.x);
 		vec3 F = FresnelSchlickRougness(NdotV, F0, metal_rough.y);
+		if (type == MATERIAL_TYPE_IRIDESCENCE) {
+			vec3 irid_tint = thin_film_iridescence(NdotV, alias0);
+			F *= mix(vec3(1.0), irid_tint * 2.0, alias1);
+		}
 		vec2 env_brdf = texture(PBR_brdflut, vec2(NdotV, metal_rough.y)).rg;
 		vec3 spec_color = reflections * (F * env_brdf.x + env_brdf.y) * spec_occlusion;
 
