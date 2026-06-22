@@ -32,6 +32,7 @@ layout (binding = 7, std140) uniform LitCompositorParamsUbo { LitCompositorParam
 #define uEpsilon params.uEpsilon
 #include "commonUtil.txt"
 #include "pbrShared.txt"
+#include "pbrModels.txt"
 
 vec3 pbr_calculate_sun_disk(vec4 sunDir4, vec4 sunCol4, vec3 worldspace, vec3 Albedo, float Roughness, float Metalness, vec3 Normal)
 {
@@ -214,6 +215,9 @@ void main()
 	#else
 		float shadow_factor = sample_sun_shadow(worldspace,linear_depth);
 		vec3 out_color = pbr_calculate_sun_disk(params.uSunDirection, params.uSunColor, worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz);
+		out_color = apply_material_directional(type, out_color, normal_t.xyz, worldspace,
+		                                        -params.uSunDirection.xyz, params.uSunColor.xyz,
+		                                        get_gbuffer_alias0(metal_rough), get_gbuffer_alias1(albedo));
 		FS_OUT_Color = vec4(shadow_factor*out_color,1.0);
 	#endif
 }

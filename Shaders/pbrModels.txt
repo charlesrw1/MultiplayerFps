@@ -1,0 +1,77 @@
+// Per-material-type BRDF extensions.
+// Included after pbrShared.txt + LightingShared.txt in all lighting shaders.
+// Adding a new material type = add cases here, not in every lighting shader.
+
+// --- Clearcoat: second GGX specular lobe, IOR 1.5 (F0 = 0.04) ---
+
+vec3 clearcoat_specular_lobe(vec3 N, vec3 V, vec3 L, float cc_roughness, float cc_intensity, out vec3 base_attenuation)
+{
+	cc_roughness = max(cc_roughness, 0.045);
+	vec3 H = normalize(V + L);
+	float NdotL = max(dot(N, L), 0.0);
+	float NdotV = max(dot(N, V), 0.0);
+
+	float NDF = DistributionGGX(N, H, cc_roughness);
+	float G   = GeometrySmith(N, V, L, cc_roughness);
+	vec3  F   = fresnelSchlick(max(dot(H, V), 0.0), vec3(0.04));
+
+	vec3 spec = (NDF * G * F) / (4.0 * NdotV * NdotL + 0.0001);
+
+	base_attenuation = vec3(1.0) - F * cc_intensity;
+	return spec * NdotL * cc_intensity;
+}
+
+// --- Dispatch: punctual lights (point / spot) ---
+
+vec3 apply_material_punctual(uint mat_type, vec3 base_result, vec3 N, vec3 worldspace,
+                              vec3 L, vec3 light_color, float alias0, float alias1)
+{
+	if (mat_type <= MATERIAL_TYPE_UNLIT)
+		return base_result;
+
+	vec3 V = normalize(g.viewpos_time.xyz - worldspace);
+
+	if (mat_type == MATERIAL_TYPE_CLEARCOAT) {
+		vec3 atten;
+		vec3 cc = clearcoat_specular_lobe(N, V, L, alias1, alias0, atten);
+		return base_result * atten + cc * light_color;
+	}
+
+	return base_result;
+}
+
+// --- Dispatch: directional / sun light ---
+
+vec3 apply_material_directional(uint mat_type, vec3 base_result, vec3 N, vec3 worldspace,
+                                 vec3 light_dir, vec3 light_color, float alias0, float alias1)
+{
+	if (mat_type <= MATERIAL_TYPE_UNLIT)
+		return base_result;
+
+	vec3 V = normalize(g.viewpos_time.xyz - worldspace);
+
+	if (mat_type == MATERIAL_TYPE_CLEARCOAT) {
+		vec3 atten;
+		vec3 cc = clearcoat_specular_lobe(N, V, light_dir, alias1, alias0, atten);
+		return base_result * atten + cc * light_color;
+	}
+
+	return base_result;
+}
+
+// --- Dispatch: diffuse ambient / GI attenuation ---
+
+vec3 apply_material_diffuse_atten(uint mat_type, vec3 N, vec3 worldspace, float alias0, float alias1)
+{
+	if (mat_type <= MATERIAL_TYPE_UNLIT)
+		return vec3(1.0);
+
+	if (mat_type == MATERIAL_TYPE_CLEARCOAT) {
+		vec3 V = normalize(g.viewpos_time.xyz - worldspace);
+		float NdotV = max(dot(N, V), 0.0);
+		vec3 F_cc = FresnelSchlickRougness(NdotV, vec3(0.04), alias1);
+		return vec3(1.0) - F_cc * alias0;
+	}
+
+	return vec3(1.0);
+}

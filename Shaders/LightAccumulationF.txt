@@ -144,7 +144,7 @@ vec3 pbr_calculate(vec3 LightColor, vec3 LighDir, vec3 worldspace, vec3 Albedo, 
 	return Lo;
 }
 
-
+#include "pbrModels.txt"
 
 float sample_shadow(vec3 WorldSpace)
 {
@@ -231,7 +231,9 @@ void main()
 	float attenuation = 1.0/distance_to_light_2 * clamp(1-distance_to_light_2/radius_2,0.0,1.0);
 	
 	vec3 out_color = pbr_calculate(color, L, worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz);
-	
+	out_color = apply_material_punctual(type, out_color, normal_t.xyz, worldspace, L, color,
+	                                     get_gbuffer_alias0(metal_rough), get_gbuffer_alias1(albedo));
+
 	if(is_spot_light) {
 		float angle = dot(-L, spot_normal);
 	#ifndef COOKIE

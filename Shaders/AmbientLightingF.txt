@@ -27,6 +27,7 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 
 #include "commonUtil.txt"
 #include "pbrShared.txt"
+#include "pbrModels.txt"
 #include "ShaderBufferShared.txt"
 layout (binding = 7, std140) uniform LitCompositorParamsUbo { LitCompositorParams params; };
 #define sky_color    params.sky_color.xyz
@@ -54,7 +55,9 @@ void main()
 	
 	vec3 albedo_mult =pbr_get_albedo_mult(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz) * ssao_value * PI;
 	vec3 out_color = mix(ground_color,sky_color,normal_t.y*0.5+0.5)*albedo_mult;
-		
+	out_color *= apply_material_diffuse_atten(type, normal_t.xyz, worldspace,
+	                                           get_gbuffer_alias0(metal_rough), get_gbuffer_alias1(albedo));
+
 	FS_OUT_Color = vec4(out_color,1.0);
 }
 #endif 

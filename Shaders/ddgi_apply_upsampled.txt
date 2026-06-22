@@ -26,6 +26,7 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 #include "commonUtil.txt"
 #include "LightingShared.txt"
 #include "pbrShared.txt"
+#include "pbrModels.txt"
 #include "ddgiShared.txt"
 #include "reflectionShared.txt"
 
@@ -50,7 +51,10 @@ void main()
 	const float ssao_value = texture(SSAOBlurred, uv).r;
 
 	const vec3 outirrad = texture(ddgi_accum, uv).rgb;
+	float alias0 = get_gbuffer_alias0(metal_rough);
+	float alias1 = get_gbuffer_alias1(albedo);
 	vec3 rad = outirrad * pbr_get_albedo_mult(worldspace, albedo.rgb, metal_rough.y, metal_rough.x, direction) * ssao_value;
+	rad *= apply_material_diffuse_atten(type, direction, worldspace, alias0, alias1);
 
 	const vec3 V = normalize(g.viewpos_time.xyz - worldspace);
 	const float NdotV = max(dot(direction, V), 0.0);
@@ -70,6 +74,18 @@ void main()
 	vec3 F = FresnelSchlickRougness(NdotV, F0, metal_rough.y);
 	vec2 env_brdf = texture(PBR_brdflut, vec2(NdotV, metal_rough.y)).rg;
 	vec3 spec_color = reflections * (F * env_brdf.x + env_brdf.y) * spec_occlusion;
+
+	if (type == MATERIAL_TYPE_CLEARCOAT) {
+		float cc_intensity = alias0;
+		float cc_roughness = alias1;
+		vec3 F_cc = FresnelSchlickRougness(NdotV, vec3(0.04), cc_roughness);
+		vec3 cc_refl = get_prefiltered_color(worldspace + direction * 0.3, R, cc_roughness, NdotV, outirrad);
+		vec4 cc_ssr = texture(ssr_accum, uv);
+		cc_refl = mix(cc_refl, cc_ssr.rgb, clamp(cc_ssr.a, 0.0, 1.0));
+		vec2 cc_brdf = texture(PBR_brdflut, vec2(NdotV, cc_roughness)).rg;
+		spec_color *= vec3(1.0) - F_cc * cc_intensity;
+		spec_color += cc_refl * (F_cc * cc_brdf.x + cc_brdf.y) * cc_intensity * spec_occlusion;
+	}
 
 	FS_OUT_Color = vec4(rad + spec_color, 1);
 }
