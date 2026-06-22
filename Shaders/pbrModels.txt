@@ -143,31 +143,23 @@ vec3 anisotropic_specular(vec3 N, vec3 V, vec3 L, vec3 albedo, float roughness, 
 
 // --- Iridescence: analytical thin-film interference (Airy approximation) ---
 
-vec3 thin_film_iridescence(float cos_theta, float film_thickness, float intensity)
+// Returns a per-channel color tint from thin-film interference.
+// Output is a 0-1 multiplier per channel that shifts the base Fresnel color.
+// Constructive interference = 1, destructive = 0.
+vec3 thin_film_iridescence(float cos_theta, float film_thickness)
 {
-	// film_thickness mapped to 100-800nm range
-	float thickness_nm = mix(100.0, 800.0, film_thickness);
-	float ior = 1.3;
+	float thickness_nm = mix(200.0, 800.0, film_thickness);
+	float ior = 1.5;
 
-	// Snell's law: refraction angle inside film
 	float sin_theta = sqrt(max(1.0 - cos_theta * cos_theta, 0.0));
-	float sin_theta_t = sin_theta / ior;
-	float cos_theta_t = sqrt(max(1.0 - sin_theta_t * sin_theta_t, 0.0));
+	float cos_theta_t = sqrt(max(1.0 - sin_theta * sin_theta / (ior * ior), 0.0));
 
-	// optical path difference
 	float opd = 2.0 * ior * thickness_nm * cos_theta_t;
 
-	// per-channel interference: approximate RGB wavelengths
 	vec3 wavelengths = vec3(650.0, 510.0, 475.0);
 	vec3 phase = 2.0 * PI * opd / wavelengths;
 
-	// Fresnel at film boundaries (simplified)
-	float R0 = pow((ior - 1.0) / (ior + 1.0), 2.0);
-	float R = R0 + (1.0 - R0) * pow(1.0 - cos_theta, 5.0);
-
-	// interference modulates reflectance per channel
-	vec3 film_R = vec3(R) * (1.0 + cos(phase)) * 0.5;
-	return mix(vec3(R), film_R, intensity);
+	return 0.5 + 0.5 * cos(phase);
 }
 
 // --- Hair (deferred/opaque): dual-lobe Kajiya-Kay specular ---
@@ -239,16 +231,16 @@ vec3 apply_material_punctual(uint mat_type, vec3 base_result, vec3 N, vec3 world
 	}
 
 	if (mat_type == MATERIAL_TYPE_IRIDESCENCE) {
-		float NdotV = max(dot(N, V), 0.0);
-		vec3 irid_F = thin_film_iridescence(NdotV, alias0, alias1);
 		vec3 H = normalize(V + L);
 		float HdotV = max(dot(H, V), 0.0);
+		float NdotV = max(dot(N, V), 0.0);
+		float NdotL = max(dot(N, L), 0.0);
+		vec3 irid_tint = thin_film_iridescence(HdotV, alias0);
 		vec3 base_F0 = mix(vec3(0.04), albedo, metallic);
 		vec3 F_base = fresnelSchlick(HdotV, base_F0);
-		vec3 F_mod = mix(F_base, irid_F, alias1);
+		vec3 F_mod = F_base * mix(vec3(1.0), irid_tint * 2.0, alias1);
 		float NDF = DistributionGGX(N, H, roughness);
 		float G = GeometrySmith(N, V, L, roughness);
-		float NdotL = max(dot(N, L), 0.0);
 		vec3 spec = (NDF * G * F_mod) / (4.0 * NdotV * NdotL + 0.0001);
 		vec3 kD = (vec3(1.0) - F_mod) * (1.0 - metallic);
 		return (kD * albedo / PI + spec) * NdotL * light_color;
@@ -335,8 +327,9 @@ vec3 apply_material_diffuse_atten(uint mat_type, vec3 N, vec3 worldspace, float 
 	if (mat_type == MATERIAL_TYPE_IRIDESCENCE) {
 		vec3 V = normalize(g.viewpos_time.xyz - worldspace);
 		float NdotV = max(dot(N, V), 0.0);
-		vec3 irid_F = thin_film_iridescence(NdotV, alias0, alias1);
-		return vec3(1.0) - irid_F * alias1;
+		vec3 irid_tint = thin_film_iridescence(NdotV, alias0);
+		vec3 F_irid = FresnelSchlickRougness(NdotV, vec3(0.04), 0.3) * irid_tint * 2.0 * alias1;
+		return vec3(1.0) - F_irid;
 	}
 
 	return vec3(1.0);
