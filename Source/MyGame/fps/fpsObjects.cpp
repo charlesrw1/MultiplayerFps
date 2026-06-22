@@ -218,12 +218,12 @@ void fpsInventoryLogic::update()
 
 }
 
-inline void fpsFlickeringLightScript::start() {
+void fpsFlickeringLightScript::start() {
 	auto* light = get_owner()->create_component<PointLightComponent>();
 	set_ticking(true);
 }
 
-inline void fpsFlickeringLightScript::update() {
+void fpsFlickeringLightScript::update() {
 	auto* light = get_owner()->get_component<PointLightComponent>();
 	light->color = color;
 	light->intensity = evaluate_intsensity();
@@ -231,7 +231,7 @@ inline void fpsFlickeringLightScript::update() {
 	light->set_radius(radius);
 }
 
-inline float fpsFlickeringLightScript::evaluate_intsensity() {
+float fpsFlickeringLightScript::evaluate_intsensity() {
 	const int numoctaves_to_use = glm::min(octaves, 6);
 	const float time = eng->get_game_time();
 	float sum = 0.0;
