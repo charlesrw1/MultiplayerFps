@@ -104,7 +104,7 @@ std::string MasterMaterialImpl::create_glsl_shader(std::string& vs_code, std::st
 	}
 	if (blend != BlendState::OPAQUE) {
 		masterShader += "#define FORWARD_SHADER\n";
-		if (light_mode == LightingMode::Lit) {
+		if (light_mode != LightingMode::Unlit) {
 			masterShader += "#define FORWARD_LIT\n";
 		}
 	}
@@ -192,10 +192,17 @@ std::string MasterMaterialImpl::create_glsl_shader(std::string& vs_code, std::st
 	std::string actual_fs_code;
 	actual_fs_code += "const uint _MATERIAL_TYPE = ";
 	// names defined in SharedGpuTypes.txt
-	if (light_mode == LightingMode::Lit)
-		actual_fs_code += "MATERIAL_TYPE_LIT;\n";
-	else
-		actual_fs_code += "MATERIAL_TYPE_UNLIT;\n";
+	switch (light_mode) {
+	case LightingMode::Lit:          actual_fs_code += "MATERIAL_TYPE_LIT;\n"; break;
+	case LightingMode::Unlit:        actual_fs_code += "MATERIAL_TYPE_UNLIT;\n"; break;
+	case LightingMode::Clearcoat:    actual_fs_code += "MATERIAL_TYPE_CLEARCOAT;\n"; break;
+	case LightingMode::Iridescence:  actual_fs_code += "MATERIAL_TYPE_IRIDESCENCE;\n"; break;
+	case LightingMode::Sheen:        actual_fs_code += "MATERIAL_TYPE_SHEEN;\n"; break;
+	case LightingMode::Subsurface:   actual_fs_code += "MATERIAL_TYPE_SUBSURFACE;\n"; break;
+	case LightingMode::Translucent:  actual_fs_code += "MATERIAL_TYPE_TRANSLUCENT;\n"; break;
+	case LightingMode::Anisotropic:  actual_fs_code += "MATERIAL_TYPE_ANISOTROPIC;\n"; break;
+	case LightingMode::Hair:         actual_fs_code += "MATERIAL_TYPE_HAIR;\n"; break;
+	}
 
 	if (!fs_code.empty()) {
 		autogen_code("FS", actual_fs_code, fs_code);

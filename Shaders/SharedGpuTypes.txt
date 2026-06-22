@@ -46,8 +46,15 @@ const uint DEBUG_OVERDRAW = 12;
 
 const uint INSTANCE_NON_UNIFORM_SCALE = 1;
 
-const uint MATERIAL_TYPE_LIT = 0;
-const uint MATERIAL_TYPE_UNLIT = 1;
+const uint MATERIAL_TYPE_LIT          = 0;
+const uint MATERIAL_TYPE_UNLIT        = 1;
+const uint MATERIAL_TYPE_CLEARCOAT    = 2;
+const uint MATERIAL_TYPE_IRIDESCENCE  = 3;
+const uint MATERIAL_TYPE_SHEEN        = 4;
+const uint MATERIAL_TYPE_SUBSURFACE   = 5;
+const uint MATERIAL_TYPE_TRANSLUCENT  = 6;
+const uint MATERIAL_TYPE_ANISOTROPIC  = 7;
+const uint MATERIAL_TYPE_HAIR         = 8;
 
 struct Ubo_View_Constants_Struct
 {

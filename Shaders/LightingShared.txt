@@ -3,3 +3,13 @@ uint get_gbuffer_material_type(vec4 GBUFFER2_value)
 {
 	return uint(GBUFFER2_value.a *255.0);
 }
+
+float get_gbuffer_alias0(vec4 GBUFFER2_value)
+{
+	return GBUFFER2_value.b;
+}
+
+float get_gbuffer_alias1(vec4 GBUFFER1_value)
+{
+	return GBUFFER1_value.a;
+}

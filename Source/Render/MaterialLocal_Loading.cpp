@@ -188,7 +188,7 @@ void MasterMaterialImpl::load_from_file(const std::string& fullpath, IFile* file
 				} else if (tok.cmp("BlendMode")) {
 					blend = (BlendState)parse_options({"Opaque", "Blend", "Add", "Mult", "Screen", "PreMult"});
 				} else if (tok.cmp("LightingMode")) {
-					light_mode = (LightingMode)parse_options({"Lit", "Unlit"});
+					light_mode = (LightingMode)parse_options({"Lit", "Unlit", "Clearcoat", "Iridescence", "Sheen", "Subsurface", "Translucent", "Anisotropic", "Hair"});
 				} else if (tok.cmp("ShowBackfaces")) {
 					backface = parse_options({"false", "true"});
 				} else if (tok.cmp("WriteAlbedo")) {

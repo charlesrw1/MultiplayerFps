@@ -12,7 +12,7 @@ Four parts: `OPT`, `VAR`, `DOMAIN`, shader blocks (`_VS_BEGIN`/`_VS_END`, `_FS_B
 
 - `AlphaTested` (`false` / `true`) — uses `Opacity` output.
 - `BlendMode` (`Opaque` / `Blend` / `Add`) — transparency.
-- `LightingMode` (`Lit` / `Unlit`).
+- `LightingMode` (`Lit` / `Unlit` / `Clearcoat` / `Iridescence` / `Sheen` / `Subsurface` / `Translucent` / `Anisotropic` / `Hair`).
 - `ShowBackfaces` (`false` / `true`) — disables backface culling.
 - Decals: `WriteNormal`, `WriteAlbedo`, `WriteRoughMetal` — see [[rendering/decals]].
 
@@ -64,6 +64,8 @@ Available in `_FS_BEGIN`/`_FS_END`:
 - `(vec3) NORMALMAP` — tangent-space
 - `(float) OPACITY` — `AlphaTested` + transparent opacity
 - `(float) AOMAP` — multiplied with `BASE_COLOR`
+- `(float) MATERIAL_AO` — alias channel RT2.B, per-material data (clearcoat intensity, film thickness, etc.)
+- `(float) MATERIAL_CUSTOM` — alias channel RT1.A, per-material data (clearcoat roughness, film intensity, etc.)
 
 ### Material Instance (`.mi`) format
 

@@ -21,7 +21,7 @@ OpenGL deferred renderer: sort-key batched draw calls, material instancing, GPU 
 - `MAX_MATERIALS = 1024`
 - `ModelVertex = 40` bytes (pos, uv, normal, tangent, color/boneW+I)
 - `Submesh` material index packs the transparency flag in its high bit.
-- Material enums: `BlendState` {OPAQUE, BLEND, ADD, MULT, SCREEN, PREMULT_BLEND}; `LightingMode` {Lit, Unlit}; `MaterialUsage` {Default, Postprocess, Terrain, Decal, UI, Particle}.
+- Material enums: `BlendState` {OPAQUE, BLEND, ADD, MULT, SCREEN, PREMULT_BLEND}; `LightingMode` {Lit, Unlit, Clearcoat, Iridescence, Sheen, Subsurface, Translucent, Anisotropic, Hair}; `MaterialUsage` {Default, Postprocess, Terrain, Decal, UI, Particle}.
 
 ### `draw_call_key` 64-bit layout
 

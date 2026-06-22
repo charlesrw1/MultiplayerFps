@@ -19,7 +19,14 @@ const int MAX_MAXTERIALS_BUFFER_SIZE = MATERIAL_SIZE * MAX_MATERIALS;
 enum class LightingMode : int8_t
 {
 	Lit,
-	Unlit
+	Unlit,
+	Clearcoat,
+	Iridescence,
+	Sheen,
+	Subsurface,
+	Translucent,
+	Anisotropic,
+	Hair,
 };
 enum class MaterialUsage : int8_t
 {

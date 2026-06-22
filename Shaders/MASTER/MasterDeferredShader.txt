@@ -348,6 +348,8 @@ vec3 EMISSIVE = vec3(0.0);		// emissive color, added after lighting (also main i
 vec3 NORMALMAP = vec3(0.5,0.5,1.0);		// tangent space normal map
 float OPACITY = 1.0;					// opacity, for alpha test
 float AOMAP = 1.0;						// small detail ao map
+float MATERIAL_AO = 0.0;				// alias channel RT2.B (per-material data)
+float MATERIAL_CUSTOM = 0.0;			// alias channel RT1.A (per-material data)
 
 // const uint _MATERIAL_TYPE = <shading_model>
 
@@ -469,9 +471,12 @@ void main()
 		vec3 Final_Normal = NORMALMAP * 2 - vec3(1.0);	// 0,1 -> -1,1
 		Final_Normal = normalize(FS_IN_TBN * Final_Normal); 
 		GBUFFER_OUT_Normal = Final_Normal;
-		
-		GBUFFER_OUT_Albedo_AO = vec4(BASE_COLOR*AOMAP, AOMAP);
-		GBUFFER_OUT_M_R_Custom_Matid = vec4(METALLIC,ROUGHNESS,0,float(_MATERIAL_TYPE)/255.0);
+
+		// Bake texture AO into albedo, freeing RT1.A for per-material alias data.
+		// Metallic surfaces preserve F0: attenuate less so specular stays correct.
+		vec3 ao_baked_albedo = BASE_COLOR * mix(AOMAP, 1.0, METALLIC);
+		GBUFFER_OUT_Albedo_AO = vec4(ao_baked_albedo, MATERIAL_CUSTOM);
+		GBUFFER_OUT_M_R_Custom_Matid = vec4(METALLIC, ROUGHNESS, MATERIAL_AO, float(_MATERIAL_TYPE)/255.0);
 		
 	#ifdef LIGHTMAPPED
 		vec4 uvoffsets = vec4(0);//g_objects[FS_IN_Objid].colorval;
