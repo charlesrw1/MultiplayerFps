@@ -29,11 +29,48 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 
 #include "ShaderBufferShared.txt"
 layout (binding = 7, std140) uniform LitCompositorParamsUbo { LitCompositorParams params; };
-#define uSunDirection params.uSunDirection.xyz
-#define uSunColor     params.uSunColor.xyz
-#define uEpsilon      params.uEpsilon
+#define uEpsilon params.uEpsilon
 #include "commonUtil.txt"
 #include "pbrShared.txt"
+
+vec3 pbr_calculate_sun_disk(vec4 sunDir4, vec4 sunCol4, vec3 worldspace, vec3 Albedo, float Roughness, float Metalness, vec3 Normal)
+{
+	vec3 LightDir = -sunDir4.xyz;
+	vec3 LightColor = sunCol4.xyz;
+	float sinAlpha = sunDir4.w;
+	float cosAlpha = sunCol4.w;
+
+	vec3 view_pos = g.viewpos_time.xyz;
+	vec3 V = normalize(view_pos - worldspace);
+	vec3 R = reflect(-V, Normal);
+	vec3 F0 = mix(vec3(0.04), Albedo, Metalness);
+
+	float NdotL = max(dot(Normal, LightDir), 0.0);
+
+	// diffuse: punctual
+	vec3 kS_diffuse = fresnelSchlick(max(dot(normalize(V + LightDir), V), 0.0), F0);
+	vec3 kD = (vec3(1.0) - kS_diffuse) * (1.0 - Metalness);
+	vec3 diffuse = kD * Albedo / PI * LightColor * NdotL;
+
+	// specular: representative point on disk
+	float DdotR = dot(LightDir, R);
+	vec3 S = R - DdotR * LightDir;
+	float S2 = dot(S, S);
+	vec3 Lspec = LightDir;
+	if (DdotR >= cosAlpha)
+		Lspec = R;
+	else if (S2 > 1e-8)
+		Lspec = normalize(cosAlpha * LightDir + (S / sqrt(S2)) * sinAlpha);
+
+	vec3 Hspec = normalize(V + Lspec);
+	float NdotLspec = max(dot(Normal, Lspec), 0.0);
+	float NDF = DistributionGGX(Normal, Hspec, Roughness);
+	float G   = GeometrySmith(Normal, V, Lspec, Roughness);
+	vec3 F    = fresnelSchlick(max(dot(Hspec, V), 0.0), F0);
+	vec3 specular = (NDF * G * F) / (4.0 * max(dot(Normal, V), 0.0) * NdotLspec + 0.0001);
+
+	return diffuse + specular * LightColor * NdotLspec;
+}
 
 const int CASCADES_USED = 3;	// change this in C++ also
 
@@ -176,7 +213,7 @@ void main()
 		//FS_OUT_Color = vec4(shadow_factor);
 	#else
 		float shadow_factor = sample_sun_shadow(worldspace,linear_depth);
-		vec3 out_color = pbr_calculate_punctual(uSunColor, -uSunDirection, worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz);
+		vec3 out_color = pbr_calculate_sun_disk(params.uSunDirection, params.uSunColor, worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz);
 		FS_OUT_Color = vec4(shadow_factor*out_color,1.0);
 	#endif
 }

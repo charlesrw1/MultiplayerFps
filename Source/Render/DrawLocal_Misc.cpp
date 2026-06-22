@@ -75,6 +75,7 @@ ConfigVar r_drawdecals("r.drawdecals", "1", CVAR_BOOL | CVAR_DEV, "enable/disabl
 ConfigVar thumbnail_fov("thumbnail_fov", "60", CVAR_FLOAT | CVAR_UNBOUNDED, "");
 
 ConfigVar debug_sun_shadow("r.debug_csm", "0", CVAR_BOOL | CVAR_DEV, "debug csm shadow rendering");
+ConfigVar r_sun_disk_light("r.sun_disk_light", "1", CVAR_BOOL | CVAR_DEV, "use disk area light for sun specular");
 ConfigVar debug_specular_reflection("r.debug_specular", "0", CVAR_BOOL | CVAR_DEV, "debug specular lighting");
 ConfigVar r_no_indirect("r.no_indirect", "0", CVAR_BOOL, "");
 

@@ -400,8 +400,8 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 
 		{
 			gpu::LitCompositorParams lp{};
-			lp.uSunDirection = glm::vec4(sun_internal->sun.direction, 0);
-			lp.uSunColor     = glm::vec4(sun_internal->sun.color, 0);
+			lp.uSunDirection = glm::vec4(sun_internal->sun.direction, glm::sin(sun_internal->sun.angular_radius));
+			lp.uSunColor     = glm::vec4(sun_internal->sun.color, glm::cos(sun_internal->sun.angular_radius));
 			lp.uEpsilon      = sun_internal->sun.epsilon;
 			ubo.lit_compositor_params->upload(&lp, sizeof(lp));
 			gfx().bind_uniform_buffer_base(7, ubo.lit_compositor_params);

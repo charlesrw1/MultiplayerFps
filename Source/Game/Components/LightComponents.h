@@ -127,6 +127,7 @@ public:
 	REF float max_shadow_dist = 80.f;
 	REF float epsilon = 0.008f;
 	REF float z_dist_scaling = 1.f;
+	REF float sun_angular_radius = 0.00465f;
 	REF bool visible = true;
 	handle<Render_Sun> light_handle;
 	uint64_t editor_billboard = 0;

@@ -7,6 +7,8 @@ struct Render_Sun
 	glm::vec3 color = glm::vec3(2.f);
 	glm::vec3 direction = glm::vec3(0, -1, 0);
 
+	float angular_radius = 0.00465f; // real sun ~0.267 deg
+
 	bool enabled = true;
 	bool cast_shadows = true;
 

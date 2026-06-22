@@ -151,8 +151,8 @@ struct BakeParams {
 // in DdgiRuntimeParams — reflectionShared is included only by group E shaders.
 // Bound at slot 7. TILED=2 loop re-uploads per tile.
 struct LitCompositorParams {
-    vec4 uSunDirection;          //   0 .. 16  (xyz used; SunLightAccumulationF)
-    vec4 uSunColor;              //  16 .. 32  (xyz used; SunLightAccumulationF)
+    vec4 uSunDirection;          //   0 .. 16  (xyz=dir, w=sin(angularRadius); SunLightAccumulationF)
+    vec4 uSunColor;              //  16 .. 32  (xyz=color, w=cos(angularRadius); SunLightAccumulationF)
     vec4 sky_color;              //  32 .. 48  (xyz used; AmbientLightingF)
     vec4 ground_color;           //  48 .. 64  (xyz used; AmbientLightingF)
     float uEpsilon;              //  64        (SunLightAccumulationF)
