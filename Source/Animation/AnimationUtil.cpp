@@ -362,7 +362,8 @@ void bone_menu() {
 ADD_TO_DEBUG_MENU(bone_menu);
 
 void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, float time,
-						 const BoneIndexRetargetMap* remap_indicies, Pose& outpose) {
+						 const BoneIndexRetargetMap* remap_indicies, Pose& outpose,
+						 bool looping) {
 	const int count = skeleton->get_num_bones();
 	int keyframe = clip->get_frame_for_time(time);
 	float lerp_amt = MidLerp(clip->get_time_of_keyframe(keyframe), clip->get_time_of_keyframe(keyframe + 1), time);
@@ -378,7 +379,17 @@ void util_calc_rotations(const MSkeleton* skeleton, const AnimationSeq* clip, fl
 			continue;
 		}
 
-		ScalePositionRot transform = clip->get_keyframe(src_idx, keyframe, lerp_amt);
+		ScalePositionRot transform;
+		if (looping && keyframe == clip->get_num_keyframes_exclusive() - 1) {
+			auto last = clip->get_keyframe(src_idx, keyframe, 0.0f);
+			auto first = clip->get_keyframe(src_idx, 0, 0.0f);
+			transform.pos = glm::mix(last.pos, first.pos, lerp_amt);
+			glm::quat first_rot = (glm::dot(last.rot, first.rot) < 0.f) ? -first.rot : first.rot;
+			transform.rot = glm::slerp(last.rot, first_rot, lerp_amt);
+			transform.scale = glm::mix(last.scale, first.scale, lerp_amt);
+		} else {
+			transform = clip->get_keyframe(src_idx, keyframe, lerp_amt);
+		}
 		outpose.pos[dest_idx] = transform.pos;
 		outpose.q[dest_idx] = transform.rot;
 		outpose.scale[dest_idx] = transform.scale;

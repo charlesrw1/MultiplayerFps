@@ -269,6 +269,10 @@ bool Model::load_internal() {
 			aseq->is_additive_clip = read.read_byte();
 			aseq->has_rootmotion = read.read_byte();
 
+			aseq->fps = (aseq->num_frames > 0 && aseq->duration > 0.f)
+				? (float)aseq->num_frames / aseq->duration
+				: 30.f;
+
 			aseq->channel_offsets.resize(num_bones);
 			read.read_bytes_ptr(aseq->channel_offsets.data(), num_bones * sizeof(ChannelOffset));
 			uint32_t packed_size = read.read_int32();

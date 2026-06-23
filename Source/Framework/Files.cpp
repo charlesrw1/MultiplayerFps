@@ -20,8 +20,7 @@ static ConfigVar file_print_all_openfile_fails("file_print_all_openfile_fails", 
 void wait_for_debugger_windows()
 {
 	while (!IsDebuggerPresent())
-		Sleep(10);
-	DebugBreak();
+		Sleep(10);	DebugBreak();
 }
 
 class OSFile : public IFile

@@ -11,6 +11,7 @@
 #include "Framework/Files.h"
 #include "glm/gtc/type_ptr.hpp"
 #include <algorithm>
+#include <cmath>
 
 #include "Animation/AnimationUtil.h"
 
@@ -106,13 +107,13 @@ void ModelCompileHelper::append_animation_seq_to_list(AnimationSourceToCompile s
 
 	AnimationSeq out_seq;
 
-	const float fps = data.override_fps;
+	const float fps = (data.override_fps > 0.f) ? data.override_fps : source_a->fps;
 	out_seq.fps = fps;
 	if (definition)
 		out_seq.has_rootmotion = definition->enableRootMotion;
 
 	int START_keyframe = 0;
-	int NUM_keyframes = source_a->total_duration * fps;
+	int NUM_keyframes = (int)std::lround(source_a->total_duration * fps);
 	int END_keyframe = NUM_keyframes;
 	if (definition && definition->crop.has_crop) {
 		if (definition->crop.start >= 0 && definition->crop.start < END_keyframe)
@@ -125,7 +126,7 @@ void ModelCompileHelper::append_animation_seq_to_list(AnimationSourceToCompile s
 		NUM_keyframes = END_keyframe - START_keyframe;
 	}
 
-	out_seq.duration = source_a->total_duration;
+	out_seq.duration = glm::max(source_a->total_duration, (float)NUM_keyframes / fps);
 	out_seq.num_frames = NUM_keyframes;
 
 	out_seq.channel_offsets.resize(target_count);
@@ -276,6 +277,25 @@ void ModelCompileHelper::append_animation_seq_to_list(AnimationSourceToCompile s
 #undef SET_HIGH_BIT
 	}
 
+	// strip trailing keyframes that duplicate frame 0 (common in looping animations exported from UE/Blender)
+	while (out_seq.num_frames > 2) {
+		const int check_frame = out_seq.num_frames - 1;
+		bool all_match = true;
+		for (int bone = 0; bone < target_count && all_match; bone++) {
+			auto first = out_seq.get_keyframe(bone, 0, 0.0f);
+			auto last = out_seq.get_keyframe(bone, check_frame, 0.0f);
+			float pos_dist_sq = glm::dot(first.pos - last.pos, first.pos - last.pos);
+			float quat_dot = glm::abs(glm::dot(first.rot, last.rot));
+			float scale_diff = glm::abs(first.scale - last.scale);
+			if (pos_dist_sq > 0.0001f || quat_dot < 0.9999f || scale_diff > 0.001f)
+				all_match = false;
+		}
+		if (!all_match)
+			break;
+		out_seq.num_frames--;
+		out_seq.duration = (float)out_seq.num_frames / fps;
+	}
+
 	// do reparenting here
 	for (int i = 0; i < final_->reparents.size(); i++) {
 		auto& r = final_->reparents[i];
@@ -325,7 +345,7 @@ void ModelCompileHelper::append_animation_seq_to_list(AnimationSourceToCompile s
 #define IS_HIGH_BIT_SET(x) (x & (1u << 31u))
 #define CLEAR_HIGH_BIT(x) (x & ~(1u << 31u))
 
-	out_seq.duration = (float)NUM_keyframes / fps;
+	out_seq.duration = (float)out_seq.num_frames / fps;
 
 	// Apply any retargeting
 	if (source.should_retarget_this) {

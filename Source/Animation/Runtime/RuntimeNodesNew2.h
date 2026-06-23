@@ -287,16 +287,19 @@ public:
 class agStatemachineBase : public agBaseNode
 {
 public:
-	CLASS_BODY(agStatemachineBase);
+	CLASS_BODY(agStatemachineBase, scriptable);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
 	void refresh_after_model_reload(Model* reloaded) override;
+
 	REF virtual void update(agGetPoseCtx* ctx, bool wantsReset) {} // ABSTRACT CLASS
+
 	// each update, use set_pose to set what state is active
+	// ...and use set_transition before a pose change to set how it transitions
 	REF void set_pose(agBaseNode* pose);
-	// use set_transition before a pose change to set how it transitions
 	REF void set_transition_parameters(Easing easing, float blend_time);
-	// various getters to use in your logic
+
+	// various getters to use in your transition logic
 	REF bool is_transitioning() const { return blendingOut != nullptr; }
 	REF float get_transition_time_left() const { return curTransitionDuration - curTransitionTime; }
 	REF float get_transition_percent() const { return curTransitionTime / curTransitionDuration; }

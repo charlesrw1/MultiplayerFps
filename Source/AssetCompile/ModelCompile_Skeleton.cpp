@@ -221,6 +221,7 @@ static Animation_Set* load_animation_set_for_gltf_skin(cgltf_data* data, cgltf_s
 		my_anim.pos_offset = set->positions.size();
 		my_anim.rot_offset = set->rotations.size();
 		my_anim.scale_offset = set->scales.size();
+		int max_keyframe_count = 0;
 		set->channels.resize(set->channels.size() + skin->joints_count);
 		for (int c = 0; c < gltf_anim->channels_count; c++) {
 			cgltf_animation_channel* gltf_channel = &gltf_anim->channels[c];
@@ -255,6 +256,7 @@ static Animation_Set* load_animation_set_for_gltf_skin(cgltf_data* data, cgltf_s
 			ASSERT(time_bv->stride == 0);
 
 			my_anim.total_duration = glm::max(my_anim.total_duration, (float)timevals->max[0]);
+			max_keyframe_count = glm::max(max_keyframe_count, (int)timevals->count);
 
 			char* buffer_byte_data = (char*)buffer->data;
 
@@ -304,7 +306,10 @@ static Animation_Set* load_animation_set_for_gltf_skin(cgltf_data* data, cgltf_s
 		my_anim.num_pos = set->positions.size() - my_anim.pos_offset;
 		my_anim.num_rot = set->rotations.size() - my_anim.rot_offset;
 		my_anim.num_scale = set->scales.size() - my_anim.scale_offset;
-		my_anim.fps = 1.0;
+		if (max_keyframe_count > 1 && my_anim.total_duration > 0.f)
+			my_anim.fps = (float)(max_keyframe_count - 1) / my_anim.total_duration;
+		else
+			my_anim.fps = 30.f;
 		set->clips.push_back(my_anim);
 	}
 

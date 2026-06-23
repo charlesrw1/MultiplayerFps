@@ -111,7 +111,7 @@ static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip, bo
 				}
 			}
 			sync.write_to_update_time(SyncOption, 0.5 /*TODO*/, owner, Percentage(anim_time, clip->duration));
-			util_calc_rotations(&ctx.get_skeleton(), clip, time_to_evaluate_sequence, remap, *ctx.pose);
+			util_calc_rotations(&ctx.get_skeleton(), clip, time_to_evaluate_sequence, remap, *ctx.pose, loop);
 		}
 	}
 	// unsynced update
@@ -126,7 +126,7 @@ static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip, bo
 				stopped_flag = true;
 			}
 		}
-		util_calc_rotations(&ctx.get_skeleton(), clip, time_to_evaluate_sequence, remap, *ctx.pose);
+		util_calc_rotations(&ctx.get_skeleton(), clip, time_to_evaluate_sequence, remap, *ctx.pose, loop);
 	}
 }
 
