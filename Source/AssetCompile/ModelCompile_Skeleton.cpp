@@ -114,6 +114,79 @@ void ModelCompileHelper::load_gltf_skeleton(cgltf_data* data, glm::mat4& armatur
 	}
 }
 
+bool ModelCompileHelper::apply_armature_root_to_skeleton(SkeletonCompileData* scd) {
+	glm::mat4& armature_root = scd->armature_root;
+
+	if (armature_root == glm::mat4(1.0f))
+		return true;
+
+	glm::vec3 arm_scale(glm::length(glm::vec3(armature_root[0])), glm::length(glm::vec3(armature_root[1])),
+						glm::length(glm::vec3(armature_root[2])));
+
+	constexpr float scale_epsilon = 0.001f;
+	if (glm::abs(arm_scale.x - arm_scale.y) > scale_epsilon ||
+		glm::abs(arm_scale.y - arm_scale.z) > scale_epsilon) {
+		sys_print(Error,
+				  "armature root has non-uniform scale (%.4f, %.4f, %.4f), skipping armature transform bake\n",
+				  arm_scale.x, arm_scale.y, arm_scale.z);
+		return false;
+	}
+
+	glm::mat3 arm_rot(glm::vec3(armature_root[0]) / arm_scale.x, glm::vec3(armature_root[1]) / arm_scale.y,
+					   glm::vec3(armature_root[2]) / arm_scale.z);
+	glm::quat arm_quat = glm::quat_cast(arm_rot);
+
+	for (auto& bone : scd->bones) {
+		glm::mat4 pose4 = glm::mat4(bone.posematrix);
+		pose4[3][3] = 1.0f;
+		pose4 = armature_root * pose4;
+		bone.posematrix = glm::mat4x3(pose4);
+		bone.invposematrix = glm::mat4x3(glm::inverse(pose4));
+	}
+
+	for (auto& bone : scd->bones) {
+		glm::vec3 pos = bone.localtransform[3];
+		if (bone.parent == -1) {
+			pos = glm::vec3(armature_root * glm::vec4(pos, 1.0));
+			bone.rot = arm_quat * bone.rot;
+		} else {
+			pos *= arm_scale;
+		}
+		glm::mat4 lt = glm::mat4_cast(bone.rot);
+		lt[3] = glm::vec4(pos, 1.0);
+		bone.localtransform = glm::mat4x3(lt);
+	}
+
+	if (scd->setself) {
+		Animation_Set* set = scd->setself.get();
+		for (auto& clip : set->clips) {
+			for (int ch = 0; ch < set->num_channels; ch++) {
+				bool is_root = (scd->bones[ch].parent == -1);
+				AnimChannel& channel = set->channels[clip.channel_offset + ch];
+
+				for (int k = 0; k < channel.num_positions; k++) {
+					auto& pkf = set->positions[channel.pos_start + k];
+					if (is_root)
+						pkf.val = glm::vec3(armature_root * glm::vec4(pkf.val, 1.0));
+					else
+						pkf.val *= arm_scale;
+				}
+
+				if (is_root) {
+					for (int k = 0; k < channel.num_rotations; k++) {
+						auto& rkf = set->rotations[channel.rot_start + k];
+						rkf.val = arm_quat * rkf.val;
+					}
+				}
+			}
+		}
+	}
+
+	sys_print(Info, "applied armature root transform (uniform scale=%.4f)\n", arm_scale.x);
+	armature_root = glm::mat4(1.0);
+	return true;
+}
+
 static std::unordered_map<int, int> fill_out_node_to_index(cgltf_data* data, cgltf_skin* skin) {
 	std::unordered_map<int, int> node_to_index;
 

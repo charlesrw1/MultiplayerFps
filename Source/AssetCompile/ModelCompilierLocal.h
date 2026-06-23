@@ -125,6 +125,7 @@ public:
 	std::vector<mirror> mirrored_bones;
 	std::vector<WeightlistDef> weightlists;
 	float override_fps = 30.0;
+	bool apply_armature_transform = true;
 
 	// PHYSICS
 	std::vector<PhysicsCollisionShapeDefLoad> physicsshapes;
@@ -370,6 +371,7 @@ public:
 
 	static void load_gltf_skeleton(cgltf_data* data, glm::mat4& armature_root, std::vector<BoneData>& bones,
 								   cgltf_skin* skin);
+	static bool apply_armature_root_to_skeleton(SkeletonCompileData* scd);
 
 	static void addskeleton_R(std::unordered_map<std::string, int>& bone_to_index, cgltf_data* data,
 							  std::vector<BoneData>& bones, cgltf_node* node);

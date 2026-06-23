@@ -195,6 +195,7 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 		final_out->bones = res.first;
 		final_out->reparents = res.second;
 	}
+	// After bake, armature_root is identity. Runtime get_root_transform() is currently unused (zero callers).
 	final_out->armature_root_transform = compile_data->armature_root;
 
 	for (int i = 0; i < imports.size(); i++) {

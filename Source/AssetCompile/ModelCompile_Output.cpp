@@ -642,8 +642,11 @@ ModelCompilier::Ret ModelCompileHelper::compile_model(const std::string& defname
 	finalpath += ".cmdl";
 
 	unique_ptr<SkeletonCompileData> skeleton_data = get_skin_from_file(out.data, defname.c_str(), def.armature_name);
-	if (skeleton_data)
+	if (skeleton_data) {
 		add_bone_def_data_to_skeleton(def, skeleton_data.get());
+		if (def.apply_armature_transform)
+			ModelCompileHelper::apply_armature_root_to_skeleton(skeleton_data.get());
+	}
 
 	const ProcessNodesAndMeshOutput post_traverse = process_nodes_and_mesh(
 		out.data, skeleton_data.get(), (skeleton_data) ? skeleton_data->using_skin : nullptr, def);

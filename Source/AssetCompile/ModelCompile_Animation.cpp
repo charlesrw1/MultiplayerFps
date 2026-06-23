@@ -341,6 +341,7 @@ void ModelCompileHelper::append_animation_seq_to_list(AnimationSourceToCompile s
 			glm::mat4 transform_matrix = glm::mat4(1.0);
 
 			if (myskel->get_bone_parent(LOAD_idx) == -1) {
+				// TODO: retarget assumes both skeletons have armature_root baked (identity). Breaks if source wasn't baked. Needs retarget rewrite.
 				glm::mat4 local_other = source.skel->bones[SRC_idx].localtransform;
 				transform_matrix = glm::inverse(myskel->armature_root) * source.skel->armature_root;
 			}
