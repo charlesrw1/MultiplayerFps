@@ -93,11 +93,19 @@ vec2 GetVelocity(vec2 uv)
 	return texture(sceneMotion, uv+closestUVOffset).rg;
 }
 
+// replace NaN/Inf with 0 so they can't propagate through the history feedback loop
+// must use bvec mix (component select) — float mix does NaN*0=NaN
+const float HDR_MAX = 65000.0;
+vec3 sanitize(vec3 c) {
+	bvec3 bad = bvec3(isnan(c.x) || isinf(c.x), isnan(c.y) || isinf(c.y), isnan(c.z) || isinf(c.z));
+	return clamp(mix(c, vec3(0.0), bad), vec3(0.0), vec3(HDR_MAX));
+}
+
 void main()
 {
 	vec2 invsize = 1.0 / g.viewport_size.xy;
 	vec2 input_uv = vec2(gl_FragCoord.xy) * invsize;
-	vec3 current = texture(sceneColor,input_uv).rgb;
+	vec3 current = sanitize(texture(sceneColor,input_uv).rgb);
 
 	vec2 velocity_uv = texture(sceneMotion,input_uv).rg;
 	if(params.dilate_velocity != 0)
@@ -118,7 +126,7 @@ void main()
 		uv_to_use = actual_uv;
 
 	//vec3 last = SampleTextureCatmullRom5(lastColor,uv_to_use).rgb;
-	vec3 last = textureLod(lastColor,uv_to_use,0).rgb;// looks better than the cubic filter...
+	vec3 last = sanitize(textureLod(lastColor,uv_to_use,0).rgb);
 	vec2 lastVelocityUv = textureLod(lastSceneMotion,uv_to_use,0).rg;
 	float vel_len = length(lastVelocityUv-velocity_uv);
 	float velocityDisocclusion = clamp(pow(max((vel_len-params.doc_vel_bias)*params.doc_mult-params.doc_bias, 0.0),params.doc_pow),0.0,1.0);
@@ -130,7 +138,7 @@ void main()
 	vec3 colorSum = vec3(0.0);
 	for(int x = -1;x<=1;x++) {
 		for(int y=-1;y<=1;y++) {
-			vec3 color = texture(sceneColor,input_uv+vec2(x,y)*invsize).rgb;
+			vec3 color = sanitize(texture(sceneColor,input_uv+vec2(x,y)*invsize).rgb);
 			minColor = min(minColor,color);
 			maxColor = max(maxColor,color);
 			colorSum += color;
@@ -140,8 +148,7 @@ void main()
 
 	// luminance weighting to get rid of flickering, subtle effect
 	if(params.remove_flicker != 0) {
-		vec4 prevAdjust = AdjustHDRColor(last);
-		vec3 prev_clamped = AdjustHDRColor(clamp(last,minColor,maxColor)).rgb;
+		vec4 prev_clamped = AdjustHDRColor(clamp(last,minColor,maxColor));
 		vec4 currentAdjust = AdjustHDRColor(current);
 
 		// Velocity-adaptive blend factor
@@ -152,7 +159,7 @@ void main()
 		}
 
 		vec3 outputColor = (prev_clamped.rgb*blend + currentAdjust.rgb*(1-blend));
-		outputColor /= max((prevAdjust.a*blend+currentAdjust.a*(1-blend)),0.000001);
+		outputColor /= max((prev_clamped.a*blend+currentAdjust.a*(1-blend)),0.000001);
 		FS_OUT_Color = outputColor;
 	}
 	else {
@@ -169,6 +176,8 @@ void main()
 	FS_OUT_Color = mix(FS_OUT_Color,current,velocityDisocclusion);
 
 	// Post-blend sharpening to counteract temporal blur
-	FS_OUT_Color += (FS_OUT_Color - neighborhoodAvg) * params.sharpness;
-	FS_OUT_Color = max(FS_OUT_Color, vec3(0.0));
+	// clamp negative contribution so sharpening can't push pixels below zero on bright edges
+	vec3 sharpen = (FS_OUT_Color - neighborhoodAvg) * params.sharpness;
+	FS_OUT_Color += max(sharpen, -FS_OUT_Color);
+	FS_OUT_Color = sanitize(FS_OUT_Color);
 }
