@@ -24,6 +24,27 @@
 #include "GpuCullingTest.h"
 #include "Framework/ArenaStd.h"
 #include <algorithm>
+void Renderer::draw_editor_ortho_grid(IGraphicsTexture* target) {
+	GPUSCOPESTART(draw_editor_ortho_grid_scope);
+
+	RenderPassState state;
+	auto color_info = {ColorTargetInfo(target)};
+	state.color_infos = color_info;
+	gfx().set_render_pass(state);
+
+	RenderPipelineState setup;
+	setup.depth_testing = false;
+	setup.depth_writes = false;
+	setup.program = get_prog_man().get_obj(prog.editor_ortho_grid);
+	setup.vao = get_empty_vao();
+	gfx().set_pipeline(setup);
+
+	gfx().bind_uniform_buffer_base(0, ubo.current_frame);
+	bind_texture_ptr(0, tex.scene_depth);
+
+	gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
+}
+
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	// TracyGpuZone("scene_draw_internal");
 	// ZoneScoped;
@@ -153,12 +174,21 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 			ColorTargetInfo(tex.editor_id_buffer), ColorTargetInfo(tex.scene_motion),
 		};
 
-		// Per-attachment clear-to-gray (previously RenderPassState::use_gray_clear).
 		if (clear_color) {
+			const int dbg = r_debug_mode.get_integer();
+			const bool is_wireframe = dbg == gpu::DEBUG_WIREFRAME;
+			const bool is_debug = dbg != 0;
+			const glm::vec4 bg_color =
+				is_wireframe ? glm::vec4(0.12f, 0.12f, 0.12f, 1.0f) :
+				is_debug ? glm::vec4(0, 0, 0, 1) :
+				(view.is_ortho && params.is_editor) ? glm::vec4(0.12f, 0.12f, 0.12f, 1.0f) :
+				glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);
 			for (auto& ct : color_targets) {
 				ct.wants_clear = true;
-				ct.clear_color = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);
+				ct.clear_color = bg_color;
 			}
+			// motion buffer: 0.5 = no motion in the velocity encoding
+			color_targets[5].clear_color = glm::vec4(0.5f, 0.5f, 0.0f, 1.0f);
 		}
 
 		std::span<const ColorTargetInfo> ct_span = color_targets;
@@ -332,8 +362,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	};
 	draw_forward_pass();
 
-	// no fog in cubemaps?
-	if (!params.is_cubemap_view)
+	if (!params.is_cubemap_view && r_debug_mode.get_integer() == 0)
 		draw_height_fog(scene_color_handle);
 
 
@@ -440,6 +469,9 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 	};
 	do_composite_pass();
+
+	if (params.is_editor && view.is_ortho)
+		draw_editor_ortho_grid(read_from_texture);
 
 	if (ddgi_test.get_bool())
 		ddgi->render_probes();

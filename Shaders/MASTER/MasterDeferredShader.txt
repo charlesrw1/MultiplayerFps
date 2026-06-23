@@ -14,41 +14,44 @@ layout (binding = 2, std430) readonly buffer Object_Data_Buffer {
 	uint gobject_buffer[];
 };
 
-// some functions
-mat4 load_object_transform(uint obj_offset_) {
-	const uint obj_offset = obj_offset_*16;
+// per-object data: 32 uints (128 bytes) per object
+// [0-11]  current model matrix (3 rows)
+// [12-15] flags, cur_bone_ofs, unused, padding
+// [16-27] previous model matrix (3 rows)
+// [28-31] 0, prev_bone_ofs, 0, 0
+const uint OBJ_STRIDE = 32;
 
+mat4 _load_matrix_at(uint base) {
 	vec4 v1 = uintBitsToFloat(uvec4(
-		gobject_buffer[obj_offset],
-		gobject_buffer[obj_offset+1],
-		gobject_buffer[obj_offset+2],
-		gobject_buffer[obj_offset+3]));
+		gobject_buffer[base],   gobject_buffer[base+1],
+		gobject_buffer[base+2], gobject_buffer[base+3]));
 	vec4 v2 = uintBitsToFloat(uvec4(
-		gobject_buffer[obj_offset+4],
-		gobject_buffer[obj_offset+5],
-		gobject_buffer[obj_offset+6],
-		gobject_buffer[obj_offset+7]));
+		gobject_buffer[base+4], gobject_buffer[base+5],
+		gobject_buffer[base+6], gobject_buffer[base+7]));
 	vec4 v3 = uintBitsToFloat(uvec4(
-		gobject_buffer[obj_offset+8],
-		gobject_buffer[obj_offset+9],
-		gobject_buffer[obj_offset+10],
-		gobject_buffer[obj_offset+11]));
+		gobject_buffer[base+8], gobject_buffer[base+9],
+		gobject_buffer[base+10],gobject_buffer[base+11]));
 	return mat4(
 		vec4(v1.x,v2.x,v3.x,0),
 		vec4(v1.y,v2.y,v3.y,0),
 		vec4(v1.z,v2.z,v3.z,0),
-		vec4(v1.w,v2.w,v3.w,1)
-	);
+		vec4(v1.w,v2.w,v3.w,1));
 }
-uvec4 load_object_flags_and_anim(uint obj_offset_)
-{
-	const uint obj_offset = obj_offset_*16;
-	
+
+mat4 load_object_transform(uint obj_offset_) {
+	return _load_matrix_at(obj_offset_ * OBJ_STRIDE);
+}
+mat4 load_prev_object_transform(uint obj_offset_) {
+	return _load_matrix_at(obj_offset_ * OBJ_STRIDE + 16);
+}
+uvec4 load_object_flags_and_anim(uint obj_offset_) {
+	const uint base = obj_offset_ * OBJ_STRIDE;
 	return uvec4(
-		gobject_buffer[obj_offset+12],
-		gobject_buffer[obj_offset+13],
-		gobject_buffer[obj_offset+14],
-		gobject_buffer[obj_offset+15]);
+		gobject_buffer[base+12], gobject_buffer[base+13],
+		gobject_buffer[base+14], gobject_buffer[base+15]);
+}
+uint load_prev_bone_offset(uint obj_offset_) {
+	return gobject_buffer[obj_offset_ * OBJ_STRIDE + 29];
 }
 
 
@@ -120,17 +123,20 @@ ___USER_VS_CODE___
 #ifdef ANIMATED
 vec3 calc_local_animated_pos_last_frame(uint obj_index)
 {
-	vec3 local_pos = vec3(0.0);
-	uint obj_skin_offset = 0;	//FIXME g_objects[obj_index].prev_anim_mat_offset;
-	for(int i=0;i<4;i++) {
-		if(VS_IN_BoneIndicies[i]==-1)
-			continue;
-		vec3 posadded = vec3(g_skin_matricies[obj_skin_offset + VS_IN_BoneIndicies[i]]*vec4(VS_IN_Postion,1.0));
-		local_pos += posadded * VS_IN_BoneWeights[i];
+	vec3 prev_local_pos = vec3(0.0);
+	uint prev_skin_offset = load_prev_bone_offset(obj_index);
+	if(prev_skin_offset < 2000000000) {
+		for(int i=0;i<4;i++) {
+			if(VS_IN_BoneIndicies[i]==-1)
+				continue;
+			prev_local_pos += vec3(g_skin_matricies[prev_skin_offset + VS_IN_BoneIndicies[i]]*vec4(VS_IN_Postion,1.0)) * VS_IN_BoneWeights[i];
+		}
+	} else {
+		prev_local_pos = VS_IN_Postion;
 	}
-	return local_pos;
+	return prev_local_pos;
 }
-#endif // !ANIMATED
+#endif // ANIMATED
 
 #define INT16_MAX  32767
 vec4 get_tangent_handedness()
@@ -247,19 +253,14 @@ void main()
 	#ifndef DEPTH_ONLY
 	#ifndef NO_TAA
 	{
-		// calc last position for motion vectors
-		//#ifdef ANIMATED
-		//	vec3 prev_local_pos = calc_local_animated_pos_last_frame(obj_index);
-		//#else
-		// FIXME!
-			vec3 prev_local_pos = local_pos;
-		//#endif
-		
-		// fixme
-		vec4 lastfrag_pos = ObjModelMatrix*vec4(prev_local_pos,1.0) + vec4(WORLD_POSITION_OFFSET,0.0);	
-		
-		//vec4 lastfrag_pos = g_objects[obj_index].prev_model*vec4(prev_local_pos,1.0) + vec4(WORLD_POSITION_OFFSET,0.0);	// hack for WPO,not right
-		FS_IN_PrevNDC = g.prev_viewproj * vec4(lastfrag_pos.xyz,1.0);
+	#ifdef ANIMATED
+		vec3 prev_local_pos = calc_local_animated_pos_last_frame(obj_index);
+	#else
+		vec3 prev_local_pos = local_pos;
+	#endif
+		mat4 PrevModelMatrix = load_prev_object_transform(obj_index);
+		vec4 lastfrag_pos = PrevModelMatrix * vec4(prev_local_pos, 1.0) + vec4(WORLD_POSITION_OFFSET, 0.0);
+		FS_IN_PrevNDC = g.prev_viewproj * vec4(lastfrag_pos.xyz, 1.0);
 	}
 	#endif
 	#endif

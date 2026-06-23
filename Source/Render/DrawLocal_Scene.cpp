@@ -122,6 +122,8 @@ static void cull_objects(Frustum& frustum, int visible_array_size, uint8_t* out_
 	}
 }
 
+static constexpr int GPU_OBJECT_STRIDE = 128;
+
 void set_gpu_objects_data_job(uintptr_t p) {
 	const int current_bone_buffer_offset = draw.scene.get_front_bone_buffer_offset();
 	const int prev_bone_buffer_offset = draw.scene.get_back_bone_buffer_offset();
@@ -131,20 +133,41 @@ void set_gpu_objects_data_job(uintptr_t p) {
 	ZoneScopedN("SetGpuObjectData");
 	for (int i = 0; i < proxy_list.objects.size(); i++) {
 		auto& obj = proxy_list.objects[i];
-		auto& proxy = obj.type_.proxy;
+		auto& rop = obj.type_;
+		auto& proxy = rop.proxy;
 
-		const int offset = i * 64;
+		const int offset = i * GPU_OBJECT_STRIDE;
+
+		// current transform (3 rows)
 		glm::vec4* v1 = (glm::vec4*)(gpu_objects + offset);
 		*v1 = glm::vec4(proxy.transform[0][0], proxy.transform[1][0], proxy.transform[2][0], proxy.transform[3][0]);
 		v1 = (glm::vec4*)(gpu_objects + offset + 16);
 		*v1 = glm::vec4(proxy.transform[0][1], proxy.transform[1][1], proxy.transform[2][1], proxy.transform[3][1]);
 		v1 = (glm::vec4*)(gpu_objects + offset + 32);
 		*v1 = glm::vec4(proxy.transform[0][2], proxy.transform[1][2], proxy.transform[2][2], proxy.transform[3][2]);
+
+		// flags + current bone offset
 		glm::ivec4* flags = (glm::ivec4*)(gpu_objects + offset + 48);
 		int bone_ofs = proxy.animator_bone_ofs;
 		if (bone_ofs >= 0)
 			bone_ofs = current_bone_buffer_offset + bone_ofs;
 		*flags = glm::ivec4(0, bone_ofs, bone_ofs, 0);
+
+		// previous transform (3 rows)
+		auto& prev = rop.prev_transform;
+		v1 = (glm::vec4*)(gpu_objects + offset + 64);
+		*v1 = glm::vec4(prev[0][0], prev[1][0], prev[2][0], prev[3][0]);
+		v1 = (glm::vec4*)(gpu_objects + offset + 80);
+		*v1 = glm::vec4(prev[0][1], prev[1][1], prev[2][1], prev[3][1]);
+		v1 = (glm::vec4*)(gpu_objects + offset + 96);
+		*v1 = glm::vec4(prev[0][2], prev[1][2], prev[2][2], prev[3][2]);
+
+		// previous bone offset
+		glm::ivec4* prev_flags = (glm::ivec4*)(gpu_objects + offset + 112);
+		int prev_bone = rop.prev_bone_ofs;
+		if (prev_bone >= 0)
+			prev_bone = prev_bone_buffer_offset + prev_bone;
+		*prev_flags = glm::ivec4(0, prev_bone, 0, 0);
 	}
 }
 
@@ -269,7 +292,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		// JobSystem::inst->wait_and_free_counter(counter);
 	}
 	const size_t num_ren_objs = proxy_list.objects.size();
-	uint8* gpu_objects = memArena.alloc_bottom_type<uint8>(num_ren_objs * 64);
+	uint8* gpu_objects = memArena.alloc_bottom_type<uint8>(num_ren_objs * GPU_OBJECT_STRIDE);
 	ASSERT(gpu_objects);
 	if (add_to_passes)
 		set_gpu_objects_data_job(uintptr_t(gpu_objects));
@@ -408,7 +431,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 				// glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs,
 				// gpu_objects, GL_DYNAMIC_DRAW);
 
-				gpu_instance_buffer->upload(gpu_objects, num_ren_objs * 64);
+				gpu_instance_buffer->upload(gpu_objects, num_ren_objs * GPU_OBJECT_STRIDE);
 			}
 		}
 	};

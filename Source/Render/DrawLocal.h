@@ -117,6 +117,7 @@ public:
 
 	void accumulate_gbuffer_lighting(bool is_cubemap_view);
 	void deferred_decal_pass();
+	void draw_editor_ortho_grid(IGraphicsTexture* target);
 
 	void create_shaders();
 
@@ -177,6 +178,7 @@ public:
 
 		program_handle height_fog{};
 		program_handle volfog_apply{};
+		program_handle editor_ortho_grid{};
 	} prog;
 
 	struct textures

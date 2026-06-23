@@ -64,6 +64,7 @@ void Renderer::create_shaders() {
 
 	prog.height_fog = prog_man.create_raster("fullscreenquad.txt", "HeightFogF.txt");
 	prog.volfog_apply = prog_man.create_raster("fullscreenquad.txt", "VolfogApplyF.txt");
+	prog.editor_ortho_grid = prog_man.create_raster("fullscreenquad.txt", "EditorOrthoGridF.txt");
 
 	// prog_man.create_single_file()
 	// volumetric fog shaders
@@ -77,6 +78,15 @@ void Renderer::reload_shaders() {
 
 	ssao.reload_shaders();
 	// prog_man.recompile_all();
+}
+
+static float get_editor_grid_snap() {
+#ifdef EDITOR_BUILD
+	extern ConfigVar ed_translation_snap;
+	return ed_translation_snap.get_float();
+#else
+	return 1.0f;
+#endif
 }
 
 void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, IGraphicsBuffer* ubo, bool wireframe_secondpass) {
@@ -129,6 +139,7 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, IGraphic
 	if (r_normal_shaded_debug.get_bool()) {
 		constants.flags |= (1 << 1);
 	}
+	constants.editor_grid_snap = get_editor_grid_snap();
 
 	ASSERT(ubo != nullptr);
 	ubo->sub_upload(&constants, sizeof(gpu::Ubo_View_Constants_Struct), 0);

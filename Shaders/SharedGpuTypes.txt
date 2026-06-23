@@ -82,8 +82,8 @@ struct Ubo_View_Constants_Struct
 	uint debug_options;
 	
 	// bit 0: wireframe first pass or second pass
-	uint flags;	
-	uint padding1;
+	uint flags;
+	float editor_grid_snap;
 	uint padding2;
 	uint padding3;
 	
