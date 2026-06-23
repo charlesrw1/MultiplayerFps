@@ -16,13 +16,16 @@ Three operations, all in `ModelCompile_Skeleton.cpp::apply_armature_root_to_skel
 
 3. **Bake animation keyframes** — same root/child split applied to position and rotation keyframes in the self-contained animation set.
 
-Vertex positions are left untouched — glTF exporters pre-scale skinned mesh vertices into bind-pose space, so they are already in the target unit.
+Vertex positions are left untouched — the glTF spec requires exporters to pre-scale skinned mesh vertices into bind-pose space, so they arrive already in the target unit. Every major exporter (Blender, UE, Maya) follows this. If a non-conforming exporter does not pre-scale vertices, the skinned mesh will be in the wrong unit — apply `armature_root` to vertex positions in that case.
+
+Non-skinned meshes (static props) are unaffected; `globaltransform` from the node hierarchy handles their parent transforms already.
 
 ## Constraints
 
 - Only uniform scale is supported. Non-uniform armature root scale emits a compile error and skips the bake.
 - Only the immediate parent node is captured. Stacked scale nodes (e.g. two 0.01 parents) produce wrong results — fix the export instead.
 - The `apply_armature_transform` field on `ModelDefData` (default `true`) can disable the bake per-model.
+- Retarget path in `ModelCompile_Animation.cpp` assumes both skeletons are baked. Will break if a source skeleton was not baked. Needs retarget rewrite (TODO).
 
 ## Skinning equation
 
