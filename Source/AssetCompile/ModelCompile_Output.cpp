@@ -437,8 +437,6 @@ static FinalModelData create_final_model_data(const FinalSkeletonOutput* skel, c
 			}
 
 			glm::mat4 transform = lm.ref.globaltransform;
-			if (lm.has_bones())
-				transform = glm::mat4(1.0);
 
 			glm::vec3 a = transform * glm::vec4(lm.bounds.bmin, 1.0);
 			glm::vec3 b = transform * glm::vec4(lm.bounds.bmax, 1.0);
