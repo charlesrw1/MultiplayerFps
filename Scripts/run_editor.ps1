@@ -21,6 +21,8 @@ param(
     [ValidateSet("Debug", "Release")]
     [string]$Config = "Debug",
 
+    [switch]$WaitForDebugger,
+
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$AppArgs
 )
@@ -30,4 +32,4 @@ $ErrorActionPreference = "Stop"
 
 $launchArgs = @("--editor")
 if ($AppArgs) { $launchArgs += $AppArgs }
-Invoke-AppWithDebugger -Config $Config -AppArgs $launchArgs
+Invoke-AppWithDebugger -Config $Config -AppArgs $launchArgs -WaitForDebugger:$WaitForDebugger

@@ -55,7 +55,8 @@ function Invoke-AppWithDebugger {
     param(
         [Parameter(Mandatory)][string]$Config,
         [string[]]$AppArgs = @(),
-        [string]$ExeName = "App"
+        [string]$ExeName = "App",
+        [switch]$WaitForDebugger
     )
     # $PSScriptRoot inside this function refers to the directory of the
     # dot-sourced helper, which is Scripts/. Repo root is one level up.
@@ -77,13 +78,13 @@ function Invoke-AppWithDebugger {
     $exe = "$repoRoot\x64\$Config\$ExeName.exe"
     if (-not (Test-Path $exe)) { Write-Error "Binary not found: $exe"; exit 1 }
 
-    # --wait-for-debugger makes the app spin on IsDebuggerPresent() before doing
-    # anything, so the attach always wins the race.
-    $launchArgs = @("--wait-for-debugger") + $AppArgs
+    $launchArgs = @()
+    if ($WaitForDebugger) { $launchArgs += "--wait-for-debugger" }
+    $launchArgs += $AppArgs
     Write-Host ("=== Launching $ExeName.exe " + ($launchArgs -join ' ') + " ===") -ForegroundColor Cyan
 
     $proc = Start-Process -FilePath $exe -ArgumentList $launchArgs -PassThru -NoNewWindow -WorkingDirectory $repoRoot
-    Attach-VSDebugger -TargetPid $proc.Id
+    if ($WaitForDebugger) { Attach-VSDebugger -TargetPid $proc.Id }
     $proc.WaitForExit()
     exit $proc.ExitCode
 }
