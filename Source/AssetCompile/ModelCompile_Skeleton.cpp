@@ -114,6 +114,7 @@ void ModelCompileHelper::load_gltf_skeleton(cgltf_data* data, glm::mat4& armatur
 	}
 }
 
+// @docs [[rendering/skeleton_armature_bake]]
 bool ModelCompileHelper::apply_armature_root_to_skeleton(SkeletonCompileData* scd) {
 	glm::mat4& armature_root = scd->armature_root;
 

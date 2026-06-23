@@ -15,6 +15,7 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 - [[rendering/materials]] — `.mm` / `.mi` authoring + material system internals
 - [[rendering/decals]] — decal materials, write flags, parallax occlusion mapping
 - [[rendering/model_importing]] — `.glb` import, `.mis` settings, `.cmdl` paths
+- [[rendering/skeleton_armature_bake]] — how armature root transforms are baked into skeleton/animations at compile time
 - [[rendering/ddgi_baking]] — DDGI probe-volume + global bias parameters for baking
 - [[rendering/gfx_abstraction]] — IGraphicsDevice migration plan (wrap → redesign → DX11/DX12 backends)
 - [[rendering/gfx_abstraction_changelog]] — per-sub-phase status entries for Phase 1 + Phase 2 (as-landed notes split from the design doc)
