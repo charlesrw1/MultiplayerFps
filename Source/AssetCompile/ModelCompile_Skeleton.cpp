@@ -136,19 +136,12 @@ bool ModelCompileHelper::apply_armature_root_to_skeleton(SkeletonCompileData* sc
 					   glm::vec3(armature_root[2]) / arm_scale.z);
 	glm::quat arm_quat = glm::quat_cast(arm_rot);
 
-	// Skinning: finalPos = globalBoneMat * invBind * vertex
-	// All three must be in consistent units. Bake armature_root into:
-	//   1) bind poses (posematrix/invposematrix)
-	//   2) local transforms + animation keyframes (so globalBoneMat evaluates in target space)
+	// glTF invBindMatrices already incorporate the armature_root inverse (the exporter
+	// bakes the parent-of-skeleton transform into them). So posematrix/invposematrix are
+	// already in the correct target space — do NOT transform them again.
+	// Only bake armature_root into local transforms + animation keyframes so that
+	// hierarchy evaluation produces correctly-scaled global bone matrices.
 	// Vertex positions are baked separately (mesh compile applies globaltransform).
-
-	for (auto& bone : scd->bones) {
-		glm::mat4 pose4 = glm::mat4(bone.posematrix);
-		pose4[3][3] = 1.0f;
-		pose4 = armature_root * pose4;
-		bone.posematrix = glm::mat4x3(pose4);
-		bone.invposematrix = glm::mat4x3(glm::inverse(pose4));
-	}
 
 	for (auto& bone : scd->bones) {
 		glm::vec3 pos = bone.localtransform[3];
