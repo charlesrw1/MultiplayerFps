@@ -136,49 +136,17 @@ bool ModelCompileHelper::apply_armature_root_to_skeleton(SkeletonCompileData* sc
 					   glm::vec3(armature_root[2]) / arm_scale.z);
 	glm::quat arm_quat = glm::quat_cast(arm_rot);
 
-	// glTF invBindMatrices already incorporate the armature_root inverse (the exporter
-	// bakes the parent-of-skeleton transform into them). So posematrix/invposematrix are
-	// already in the correct target space — do NOT transform them again.
-	// Only bake armature_root into local transforms + animation keyframes so that
-	// hierarchy evaluation produces correctly-scaled global bone matrices.
-	// Vertex positions are baked separately (mesh compile applies globaltransform).
-
+	// glTF exporters bake armature_root's inverse into invBindMatrices, so posematrix
+	// has an embedded scale (e.g. 0.01) that the raw node local transforms don't have.
+	// Strip armature_root from bind poses so they match the local transforms' space.
+	// This keeps everything in the raw glTF space (e.g. cm) — no scale mismatch in skinning.
+	glm::mat4 inv_armature = glm::inverse(armature_root);
 	for (auto& bone : scd->bones) {
-		glm::vec3 pos = bone.localtransform[3];
-		if (bone.parent == -1) {
-			pos = glm::vec3(armature_root * glm::vec4(pos, 1.0));
-			bone.rot = arm_quat * bone.rot;
-		} else {
-			pos *= arm_scale;
-		}
-		glm::mat4 lt = glm::mat4_cast(bone.rot);
-		lt[3] = glm::vec4(pos, 1.0);
-		bone.localtransform = glm::mat4x3(lt);
-	}
-
-	if (scd->setself) {
-		Animation_Set* set = scd->setself.get();
-		for (auto& clip : set->clips) {
-			for (int ch = 0; ch < set->num_channels; ch++) {
-				bool is_root = (scd->bones[ch].parent == -1);
-				AnimChannel& channel = set->channels[clip.channel_offset + ch];
-
-				for (int k = 0; k < channel.num_positions; k++) {
-					auto& pkf = set->positions[channel.pos_start + k];
-					if (is_root)
-						pkf.val = glm::vec3(armature_root * glm::vec4(pkf.val, 1.0));
-					else
-						pkf.val *= arm_scale;
-				}
-
-				if (is_root) {
-					for (int k = 0; k < channel.num_rotations; k++) {
-						auto& rkf = set->rotations[channel.rot_start + k];
-						rkf.val = arm_quat * rkf.val;
-					}
-				}
-			}
-		}
+		glm::mat4 pose4 = glm::mat4(bone.posematrix);
+		pose4[3][3] = 1.0f;
+		pose4 = inv_armature * pose4;
+		bone.posematrix = glm::mat4x3(pose4);
+		bone.invposematrix = glm::mat4x3(glm::inverse(pose4));
 	}
 
 	sys_print(Info, "applied armature root transform (uniform scale=%.4f)\n", arm_scale.x);
