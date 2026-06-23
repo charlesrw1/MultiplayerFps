@@ -663,6 +663,54 @@ ModelCompilier::Ret ModelCompileHelper::compile_model(const std::string& defname
 								post_traverse.mcd, post_traverse.meshout.LOAD_bone_to_FINAL_bone, def);
 
 	bool res = write_out_compilied_model(finalpath, &final_model, final_skeleton.get());
+
+	// Debug dump for skeleton diagnostics
+	if (final_skeleton) {
+		std::string dumppath = strip_extension(defname) + "_skel_dump.txt";
+		std::string fullpath = std::string(FileSys::get_game_path()) + "/" + dumppath;
+		std::ofstream dump(fullpath);
+		if (dump.is_open()) {
+			dump << "=== Skeleton Dump: " << defname << " ===\n";
+			dump << "armature_root (after bake):\n";
+			if (skeleton_data) {
+				auto& ar = skeleton_data->armature_root;
+				dump << "  [" << ar[0][0] << ", " << ar[1][0] << ", " << ar[2][0] << ", " << ar[3][0] << "]\n";
+				dump << "  [" << ar[0][1] << ", " << ar[1][1] << ", " << ar[2][1] << ", " << ar[3][1] << "]\n";
+				dump << "  [" << ar[0][2] << ", " << ar[1][2] << ", " << ar[2][2] << ", " << ar[3][2] << "]\n";
+			}
+			dump << "\nBones (" << final_skeleton->bones.size() << "):\n";
+			for (int i = 0; i < (int)final_skeleton->bones.size() && i < 5; i++) {
+				auto& b = final_skeleton->bones[i];
+				dump << "[" << i << "] " << b.strname << " parent=" << b.parent << "\n";
+				dump << "  localTransform pos: (" << b.localtransform[3][0] << ", " << b.localtransform[3][1] << ", " << b.localtransform[3][2] << ")\n";
+				dump << "  localTransform 3x3 col lengths: (" << glm::length(glm::vec3(b.localtransform[0])) << ", " << glm::length(glm::vec3(b.localtransform[1])) << ", " << glm::length(glm::vec3(b.localtransform[2])) << ")\n";
+				dump << "  posematrix pos: (" << b.posematrix[3][0] << ", " << b.posematrix[3][1] << ", " << b.posematrix[3][2] << ")\n";
+				dump << "  posematrix 3x3 col lengths: (" << glm::length(glm::vec3(b.posematrix[0])) << ", " << glm::length(glm::vec3(b.posematrix[1])) << ", " << glm::length(glm::vec3(b.posematrix[2])) << ")\n";
+				dump << "  invposematrix 3x3 col lengths: (" << glm::length(glm::vec3(b.invposematrix[0])) << ", " << glm::length(glm::vec3(b.invposematrix[1])) << ", " << glm::length(glm::vec3(b.invposematrix[2])) << ")\n";
+				dump << "  rot: (" << b.rot.x << ", " << b.rot.y << ", " << b.rot.z << ", " << b.rot.w << ")\n";
+			}
+			dump << "\nVertex sample (first 3):\n";
+			for (int i = 0; i < (int)final_model.verticies.size() && i < 3; i++) {
+				auto& v = final_model.verticies[i];
+				dump << "  [" << i << "] pos=(" << v.pos.x << ", " << v.pos.y << ", " << v.pos.z << ")\n";
+			}
+			dump << "\nMesh globaltransform for first skinned node:\n";
+			for (int l = 0; l < (int)post_traverse.mcd.lod_where.size(); l++) {
+				for (int j = 0; j < (int)post_traverse.mcd.lod_where[l].mesh_nodes.size(); j++) {
+					auto& lm = post_traverse.mcd.lod_where[l].mesh_nodes[j];
+					if (lm.has_bones()) {
+						auto& gt = lm.ref.globaltransform;
+						dump << "  globaltransform diag: (" << gt[0][0] << ", " << gt[1][1] << ", " << gt[2][2] << ")\n";
+						goto done_gt;
+					}
+				}
+			}
+			done_gt:
+			dump.close();
+			sys_print(Info, "wrote skeleton dump to %s\n", fullpath.c_str());
+		}
+	}
+
 	out.free();
 	return res ? ModelCompilier::CompileGood : ModelCompilier::CompileErr;
 }
