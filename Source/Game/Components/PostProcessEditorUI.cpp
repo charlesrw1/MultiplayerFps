@@ -18,7 +18,7 @@ static bool create_ppset_file(const std::string& path) {
     j["saturation"]      = 1.f;
     j["bloom_intensity"] = 0.05f;
     j["bloom_enabled"]   = true;
-    j["tonemap_type"]    = 2;
+    j["tonemap_type"]    = 0;
     std::string text = j.dump(2);
     auto f = FileSys::open_write_game(path);
     if (!f) return false;

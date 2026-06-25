@@ -34,7 +34,7 @@ bool PostProcessSettings::load_asset() {
         saturation      = j.value("saturation",      1.f);
         bloom_intensity = j.value("bloom_intensity", 0.05f);
         bloom_enabled   = j.value("bloom_enabled",   true);
-        tonemap_type    = j.value("tonemap_type",    2);
+        tonemap_type    = j.value("tonemap_type",    0);
     } catch (const nlohmann::json::exception& e) {
         sys_print(Warning, "PostProcessSettings: JSON error in %s: %s\n", get_name().c_str(), e.what());
         return false;

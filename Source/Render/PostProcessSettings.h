@@ -17,7 +17,7 @@ public:
     REF float saturation      = 1.f;
     REF float bloom_intensity = 0.05f;
     REF bool  bloom_enabled   = true;
-    REF int   tonemap_type    = 2; // 0=linear,1=reinhard,2=aces,3=uncharted2
+    REF int   tonemap_type    = 0; // 0=linear,1=reinhard,2=aces,3=uncharted2
 
     PostProcessParams to_params() const {
         return {exposure, contrast, saturation, bloom_intensity, bloom_enabled, tonemap_type};

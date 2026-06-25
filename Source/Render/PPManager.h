@@ -7,7 +7,7 @@ struct PostProcessParams {
     float saturation      = 1.f;
     float bloom_intensity = 0.05f;
     bool  bloom_enabled   = true;
-    int   tonemap_type    = 2; // 0=linear,1=reinhard,2=aces,3=uncharted2
+    int   tonemap_type    = 0; // 0=linear,1=reinhard,2=aces,3=uncharted2
 };
 
 class PPManager {
