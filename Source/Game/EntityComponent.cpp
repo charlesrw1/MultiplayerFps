@@ -47,6 +47,8 @@ public:
 		filepaths.push_back("WorldTextComponent");
 		filepaths.push_back("GiVolumeComponent");
 
+		filepaths.push_back("PostProcessComponent");
+
 		filepaths.push_back("AreaishLightComponent");
 
 		filepaths.push_back("NavMeshVolumeComponent");

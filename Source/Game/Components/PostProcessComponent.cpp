@@ -1,7 +1,19 @@
 #include "PostProcessComponent.h"
+#include "BillboardComponent.h"
 #include "Render/PPManager.h"
+#include "Render/Texture.h"
+#include "Assets/AssetDatabase.h"
+#include "GameEnginePublic.h"
 
 void PostProcessComponent::start() {
+#ifdef EDITOR_BUILD
+    if (eng->is_editor_level()) {
+        auto b = get_owner()->create_component<BillboardComponent>();
+        b->set_texture(default_asset_load<Texture>("eng/icon/_nearest/worldsettings.png"));
+        b->dont_serialize_or_edit = true;
+        editor_billboard = b;
+    }
+#endif
     if (enabled && settings.get())
         pp_handle = PPManager::inst->register_settings(priority);
 }
