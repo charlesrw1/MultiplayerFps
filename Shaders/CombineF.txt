@@ -26,11 +26,6 @@ vec3 reinhard_extended_luminance(vec3 v, float max_white_l)
     return change_luminance(v, l_new);
 }
 
-vec3 contrast(vec3 v, vec3 amt)
-{
-	return max((v - vec3(0.5))*amt + vec3(0.5), vec3(0.0));
-}
-
 vec3 aces_approx(vec3 v)
 {
     float a = 2.51f;
@@ -56,7 +51,6 @@ vec3 uncharted2_filmic(vec3 v)
 {
     float exposure_bias = 2.0f;
     vec3 curr = uncharted2_tonemap_partial(v * exposure_bias);
-
     vec3 W = vec3(4.0);
     vec3 white_scale = vec3(1.0f) / uncharted2_tonemap_partial(W);
     return curr * white_scale;
@@ -69,7 +63,6 @@ mat3(
     0.02840, 0.13383, 0.83777
 );
 
-// ODT_SAT => XYZ => D60_2_D65 => sRGB
 mat3 ACESOutputMat =
 mat3(
      1.60475, -0.53108, -0.07367,
@@ -87,62 +80,99 @@ vec3 RRTAndODTFit(vec3 v)
 vec3 ACESFitted(vec3 color)
 {
     color = transpose(ACESInputMat) * color;
-
-    // Apply RRT and ODT
     color = RRTAndODTFit(color);
-
     color = transpose(ACESOutputMat) * color;
-
-    // Clamp to [0, 1]
-	//color = clamp(color, vec3(0.0),vec3(1.0));
-
     return color;
 }
 
 vec3 saturation_color_grade(vec3 color, float saturate_amt) {
-	float luminance = luminance(color);
-	return (color - luminance) * saturate_amt + luminance;
+	float lum = luminance(color);
+	return (color - lum) * saturate_amt + lum;
 }
 
-vec3 color_filter(vec3 color, vec3 filter_color) {
-	return color * filter_color;
-}
-
-vec3 color_contrast (vec3 color, float amt) {
-	const float ACEScc_MIDGRAY =   0.4135884;
+vec3 color_contrast(vec3 color, float amt) {
+	const float ACEScc_MIDGRAY = 0.4135884;
 	return (color - ACEScc_MIDGRAY) * amt + ACEScc_MIDGRAY;
 }
 
 #include "ShaderBufferShared.txt"
 layout (binding = 7, std140) uniform LitCompositorParamsUbo { LitCompositorParams params; };
-#define contrast_tweak   params.contrast_tweak
-#define saturation_tweak params.saturation_tweak
-#define tonemap_type     params.tonemap_type
-#define exposure         params.exposure
-#define bloom_lerp       params.bloom_lerp
-const float max_white = 1.0;       // never set from C++; shader default
-const vec3 tint_tweak = vec3(1.0); // never set from C++; shader default
+#define contrast_tweak     params.contrast_tweak
+#define saturation_tweak   params.saturation_tweak
+#define tonemap_type       params.tonemap_type
+#define exposure           params.exposure
+#define bloom_lerp         params.bloom_lerp
+#define vignette_intensity params.vignette_intensity
+#define vignette_falloff   params.vignette_falloff
+#define chromatic_ab       params.chromatic_ab
+#define grain_intensity    params.grain_intensity
+#define grain_size         params.grain_size
+#define sharpness          params.sharpness
+#define color_temp         params.color_temp
+#define grain_time         params.grain_time
+
+const float max_white = 1.0;
+
 void main()
 {
-	vec3 scene = texture(scene_lit, texCoord).rgb;
+	// Chromatic aberration: offset R and B channels radially from center
+	vec3 scene;
+	if (chromatic_ab > 0.0) {
+		vec2 offset = (texCoord - 0.5) * chromatic_ab;
+		scene.r = texture(scene_lit, texCoord - offset).r;
+		scene.g = texture(scene_lit, texCoord).g;
+		scene.b = texture(scene_lit, texCoord + offset).b;
+	} else {
+		scene = texture(scene_lit, texCoord).rgb;
+	}
+
+	// Sharpness: unsharp mask in linear (pre-tonemap) space
+	if (sharpness > 0.0) {
+		vec2 ts = 1.0 / vec2(textureSize(scene_lit, 0));
+		vec3 blur = (
+			texture(scene_lit, texCoord + vec2(-ts.x,    0.0)).rgb +
+			texture(scene_lit, texCoord + vec2( ts.x,    0.0)).rgb +
+			texture(scene_lit, texCoord + vec2(  0.0, -ts.y)).rgb +
+			texture(scene_lit, texCoord + vec2(  0.0,  ts.y)).rgb
+		) * 0.25;
+		scene = scene + (scene - blur) * sharpness;
+	}
+
 	vec3 bloom_add = texture(bloom, texCoord).rgb;
-	vec3 dirt = texture(lens_dirt, texCoord).rgb;
-	vec3 both = mix(scene,bloom_add+scene,bloom_lerp);
+	vec3 both = mix(scene, bloom_add + scene, bloom_lerp);
 	both *= exposure;
-	
-	if(tonemap_type==1)
-		both = reinhard_extended_luminance(both,max_white);
-	else if(tonemap_type==2)
+
+	if (tonemap_type == 1)
+		both = reinhard_extended_luminance(both, max_white);
+	else if (tonemap_type == 2)
 		both = aces_approx(both);
-	else if(tonemap_type==3)
+	else if (tonemap_type == 3)
 		both = uncharted2_filmic(both);
-	vec3 srgb = pow(both,vec3(1/2.2));
-	srgb = color_filter(srgb, tint_tweak);
-	srgb = color_contrast(srgb,contrast_tweak);
+
+	vec3 srgb = pow(max(both, vec3(0.0)), vec3(1.0/2.2));
+
+	srgb = color_contrast(srgb, contrast_tweak);
 	srgb = saturation_color_grade(srgb, saturation_tweak);
-	
-	
-	//srgb = contrast(srgb, vec3(1.1));
-	
+
+	// Color temperature: warm (+) shifts red up / blue down; cool (-) the reverse
+	if (color_temp != 0.0) {
+		srgb.r += color_temp * 0.08;
+		srgb.b -= color_temp * 0.08;
+		srgb = clamp(srgb, 0.0, 1.0);
+	}
+
+	// Vignette: darken corners
+	if (vignette_intensity > 0.0) {
+		float v = pow(texCoord.x * (1.0 - texCoord.x) * texCoord.y * (1.0 - texCoord.y) * 16.0, vignette_falloff);
+		srgb *= mix(1.0, v, vignette_intensity);
+	}
+
+	// Film grain: temporal hash noise
+	if (grain_intensity > 0.0) {
+		vec2 grain_uv = floor(texCoord * grain_size * 500.0);
+		float noise = fract(sin(dot(grain_uv, vec2(127.1, 311.7)) + grain_time * 7.3) * 43758.5453);
+		srgb += (noise - 0.5) * grain_intensity;
+	}
+
 	FS_OUT_Color = srgb;
 }

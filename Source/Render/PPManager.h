@@ -2,12 +2,19 @@
 #include <vector>
 
 struct PostProcessParams {
-    float exposure        = 1.f;
-    float contrast        = 1.f;
-    float saturation      = 1.f;
-    float bloom_intensity = 0.05f;
-    bool  bloom_enabled   = true;
-    int   tonemap_type    = 0; // 0=linear,1=reinhard,2=aces,3=uncharted2
+    float exposure          = 1.f;
+    float contrast          = 1.f;
+    float saturation        = 1.f;
+    float bloom_intensity   = 0.05f;
+    bool  bloom_enabled     = true;
+    int   tonemap_type      = 0;   // 0=linear,1=reinhard,2=aces,3=uncharted2
+    float vignette_intensity = 0.f;
+    float vignette_falloff   = 1.5f;
+    float chromatic_ab       = 0.f; // UV fraction; 0=off
+    float grain_intensity    = 0.f;
+    float grain_size         = 1.f; // higher = finer grain
+    float sharpness          = 0.f;
+    float color_temp         = 0.f; // -1=cool, +1=warm
 };
 
 class PPManager {

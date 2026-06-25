@@ -459,11 +459,19 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 
 		{
 			gpu::LitCompositorParams lp{};
-			lp.tonemap_type     = pp.tonemap_type;
-			lp.contrast_tweak   = pp.contrast;
-			lp.saturation_tweak = pp.saturation;
-			lp.bloom_lerp       = pp.bloom_intensity;
-			lp.exposure         = pp.exposure;
+			lp.tonemap_type       = pp.tonemap_type;
+			lp.contrast_tweak     = pp.contrast;
+			lp.saturation_tweak   = pp.saturation;
+			lp.bloom_lerp         = pp.bloom_intensity;
+			lp.exposure           = pp.exposure;
+			lp.vignette_intensity = pp.vignette_intensity;
+			lp.vignette_falloff   = pp.vignette_falloff;
+			lp.chromatic_ab       = pp.chromatic_ab;
+			lp.grain_intensity    = pp.grain_intensity;
+			lp.grain_size         = pp.grain_size;
+			lp.sharpness          = pp.sharpness;
+			lp.color_temp         = pp.color_temp;
+			lp.grain_time         = (float)(SDL_GetTicks() * 0.001);
 			ubo.lit_compositor_params->upload(&lp, sizeof(lp));
 			gfx().bind_uniform_buffer_base(7, ubo.lit_compositor_params);
 		}

@@ -146,7 +146,9 @@ struct BakeParams {
 //                                  LightListCuller::draw_lights re-uploads
 //                                  for TILED=2)
 //   CombineF                    : tonemap_type, contrast_tweak, saturation_tweak,
-//                                 bloom_lerp, exposure
+//                                 bloom_lerp, exposure, vignette_intensity,
+//                                 vignette_falloff, chromatic_ab, grain_intensity,
+//                                 grain_size, sharpness, color_temp, grain_time
 // Note: the shared `specular_ao_intensity` from reflectionShared.txt lives
 // in DdgiRuntimeParams — reflectionShared is included only by group E shaders.
 // Bound at slot 7. TILED=2 loop re-uploads per tile.
@@ -162,7 +164,16 @@ struct LitCompositorParams {
     float exposure;              //  80        (CombineF)
     int   tonemap_type;          //  84        (CombineF)
     int   num_lights;            //  88        (LightAccumulationFullScreen TILED=0/2)
-    int   light_indirect_offset; //  92 .. 96  (LightAccumulationFullScreen TILED=2; size 96, /16)
+    int   light_indirect_offset; //  92        (LightAccumulationFullScreen TILED=2)
+    float vignette_intensity;    //  96        (CombineF)
+    float vignette_falloff;      // 100        (CombineF)
+    float chromatic_ab;          // 104        (CombineF; UV fraction)
+    float grain_intensity;       // 108        (CombineF)
+    float grain_size;            // 112        (CombineF; higher=finer grain)
+    float sharpness;             // 116        (CombineF; unsharp mask strength)
+    float color_temp;            // 120        (CombineF; -1=cool, +1=warm)
+    float grain_time;            // 124        (CombineF; set per-frame for animated grain)
+                                 // total: 128 bytes (8*16, valid std140)
 };
 
 // ---- E. DDGI runtime -------------------------------------------------------

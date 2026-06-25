@@ -13,12 +13,19 @@ static bool create_ppset_file(const std::string& path) {
     if (FileSys::does_file_exist(path.c_str(), FileSys::GAME_DIR))
         return false;
     nlohmann::json j;
-    j["exposure"]        = 1.f;
-    j["contrast"]        = 1.f;
-    j["saturation"]      = 1.f;
-    j["bloom_intensity"] = 0.05f;
-    j["bloom_enabled"]   = true;
-    j["tonemap_type"]    = 0;
+    j["exposure"]           = 1.f;
+    j["contrast"]           = 1.f;
+    j["saturation"]         = 1.f;
+    j["bloom_intensity"]    = 0.05f;
+    j["bloom_enabled"]      = true;
+    j["tonemap_type"]       = 0;
+    j["vignette_intensity"] = 0.f;
+    j["vignette_falloff"]   = 1.5f;
+    j["chromatic_ab"]       = 0.f;
+    j["grain_intensity"]    = 0.f;
+    j["grain_size"]         = 1.f;
+    j["sharpness"]          = 0.f;
+    j["color_temp"]         = 0.f;
     std::string text = j.dump(2);
     auto f = FileSys::open_write_game(path);
     if (!f) return false;
@@ -78,23 +85,46 @@ bool PostProcessComponentEditorUi::draw() {
 
     // --- Parameter editing ---
     bool changed = false;
+    auto slider = [&](const char* label, float& v, float lo, float hi, const char* fmt = "%.3f") {
+        ImGui::SetNextItemWidth(180);
+        changed |= ImGui::SliderFloat(label, &v, lo, hi, fmt);
+    };
 
-    ImGui::SetNextItemWidth(180);
-    changed |= ImGui::SliderFloat("Exposure",        &asset->exposure,        0.f, 8.f);
-    ImGui::SetNextItemWidth(180);
-    changed |= ImGui::SliderFloat("Contrast",        &asset->contrast,        0.f, 3.f);
-    ImGui::SetNextItemWidth(180);
-    changed |= ImGui::SliderFloat("Saturation",      &asset->saturation,      0.f, 3.f);
-    ImGui::SetNextItemWidth(180);
-    changed |= ImGui::SliderFloat("Bloom Intensity", &asset->bloom_intensity, 0.f, 1.f);
-    changed |= ImGui::Checkbox("Bloom Enabled", &asset->bloom_enabled);
+    if (ImGui::CollapsingHeader("Tonemap & Exposure", ImGuiTreeNodeFlags_DefaultOpen)) {
+        static const char* tonemap_names[] = { "Linear", "Reinhard", "ACES", "Uncharted 2" };
+        int tm = asset->tonemap_type;
+        ImGui::SetNextItemWidth(180);
+        if (ImGui::Combo("Tonemap", &tm, tonemap_names, 4)) { asset->tonemap_type = tm; changed = true; }
+        slider("Exposure",    asset->exposure,   0.f, 8.f);
+    }
 
-    static const char* tonemap_names[] = { "Linear", "Reinhard", "ACES", "Uncharted 2" };
-    int tm = asset->tonemap_type;
-    ImGui::SetNextItemWidth(180);
-    if (ImGui::Combo("Tonemap", &tm, tonemap_names, 4)) {
-        asset->tonemap_type = tm;
-        changed = true;
+    if (ImGui::CollapsingHeader("Color Grading", ImGuiTreeNodeFlags_DefaultOpen)) {
+        slider("Contrast",    asset->contrast,   0.f, 3.f);
+        slider("Saturation",  asset->saturation, 0.f, 3.f);
+        slider("Color Temp",  asset->color_temp, -1.f, 1.f);
+    }
+
+    if (ImGui::CollapsingHeader("Bloom", ImGuiTreeNodeFlags_DefaultOpen)) {
+        changed |= ImGui::Checkbox("Bloom Enabled", &asset->bloom_enabled);
+        slider("Bloom Intensity", asset->bloom_intensity, 0.f, 1.f);
+    }
+
+    if (ImGui::CollapsingHeader("Vignette")) {
+        slider("Intensity", asset->vignette_intensity, 0.f, 1.f);
+        slider("Falloff",   asset->vignette_falloff,   0.5f, 4.f);
+    }
+
+    if (ImGui::CollapsingHeader("Chromatic Aberration")) {
+        slider("Amount", asset->chromatic_ab, 0.f, 0.02f, "%.4f");
+    }
+
+    if (ImGui::CollapsingHeader("Sharpness")) {
+        slider("Sharpness", asset->sharpness, 0.f, 3.f);
+    }
+
+    if (ImGui::CollapsingHeader("Film Grain")) {
+        slider("Intensity", asset->grain_intensity, 0.f, 0.2f, "%.3f");
+        slider("Scale",     asset->grain_size,      0.1f, 3.f);
     }
 
     if (changed)
