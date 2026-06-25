@@ -17,6 +17,8 @@ void PostProcessComponent::start() {
 #endif
     if (enabled && settings.get())
         pp_handle = PPManager::inst->register_settings(priority);
+
+    sync_render_data();
 }
 
 void PostProcessComponent::stop() {

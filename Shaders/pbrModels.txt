@@ -214,8 +214,9 @@ vec3 apply_material_punctual(uint mat_type, vec3 base_result, vec3 N, vec3 world
 	}
 
 	if (mat_type == MATERIAL_TYPE_SHEEN) {
+		vec3 sheen_tint = mix(vec3(1.0), sqrt(albedo), 0.6);
 		vec3 sheen = sheen_specular_lobe(N, V, L, alias1, alias0);
-		return base_result + sheen * light_color;
+		return base_result + sheen * sheen_tint * light_color;
 	}
 
 	if (mat_type == MATERIAL_TYPE_SUBSURFACE) {
@@ -261,8 +262,9 @@ vec3 apply_material_directional(uint mat_type, vec3 base_result, vec3 N, vec3 wo
 	}
 
 	if (mat_type == MATERIAL_TYPE_SHEEN) {
+		vec3 sheen_tint = mix(vec3(1.0), sqrt(albedo), 0.6);
 		vec3 sheen = sheen_specular_lobe(N, V, light_dir, alias1, alias0);
-		return base_result + sheen * light_color;
+		return base_result + sheen * sheen_tint * light_color;
 	}
 
 	if (mat_type == MATERIAL_TYPE_SUBSURFACE) {
