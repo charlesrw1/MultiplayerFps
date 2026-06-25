@@ -266,11 +266,52 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 	ImGui::PushStyleColor(ImGuiCol_Button,        dbg_active ? col_active   : col_inactive);
 	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, dbg_active ? col_hov_act  : col_hov);
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
-	if (ImGui::Button(view_label))
-		ImGui::OpenPopup("##dbg_view");
+	const bool dbg_btn_clicked = ImGui::Button(view_label);
+	ImGui::PopStyleColor(3);
+
+	ImGui::Separator();
+
+	// -- Overlay texture dropdown (ot command) ----------------------------
+	struct OtEntry { const char* label; const char* tex; bool has_mip; };
+	static const OtEntry ot_list[] = {
+		{"Scene Color",      "_scene_color",          false},
+		{"Scene Depth",      "_scene_depth",          false},
+		{"GBuffer 0",        "_gbuffer0",             false},
+		{"GBuffer 1",        "_gbuffer1",             false},
+		{"GBuffer 2",        "_gbuffer2",             false},
+		{"SSAO",             "_ssao_result",          false},
+		{"SSAO Blur",        "_ssao_blur",            false},
+		{"Linear Depth",     "_linear_depth",         false},
+		{"CSM Shadow",       "_csm_shadow",           true },
+		{"Spot Shadows",     "_spto_shadow",          false},
+		{"Bloom",            "_bloom_result",         false},
+		{"Velocity",         "_scene_motion",         false},
+		{"SSR",              "_ssr",                  false},
+		{"DDGI Accum",       "_ddgi_accum",           false},
+		{"Scene Mip Chain",  "_scene_color_mipchain", true },
+	};
+
+	const auto ov = idraw->editor_get_debug_overlay_state();
+	const bool ot_active = ov.active_tex != nullptr;
+	const char* ot_btn_label = "OT: Off";
+	if (ot_active) {
+		ot_btn_label = ov.active_tex;
+		for (auto& o : ot_list)
+			if (strcmp(o.tex, ov.active_tex) == 0) { ot_btn_label = o.label; break; }
+	}
+
+	ImGui::PushStyleColor(ImGuiCol_Button,        ot_active ? col_active   : col_inactive);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ot_active ? col_hov_act  : col_hov);
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
+	const bool ot_btn_clicked = ImGui::Button(ot_btn_label);
 	ImGui::PopStyleColor(3);
 
 	ImGui::EndMenuBar();
+
+	// OpenPopup must be called outside BeginMenuBar()/EndMenuBar() so it shares
+	// the same window ID namespace as the BeginPopup() calls below.
+	if (dbg_btn_clicked) ImGui::OpenPopup("##dbg_view");
+	if (ot_btn_clicked)  ImGui::OpenPopup("##ot_view");
 
 	// Popup rendered outside the menu bar scope so it can overlap freely
 	if (ImGui::BeginPopup("##dbg_view")) {
@@ -280,6 +321,45 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 			bool sel = r_debug_mode.get_integer() == m.mode;
 			if (ImGui::Selectable(m.name, sel, ImGuiSelectableFlags_DontClosePopups))
 				r_debug_mode.set_integer(m.mode);
+		}
+		ImGui::EndPopup();
+	}
+
+	if (ImGui::BeginPopup("##ot_view")) {
+		static float s_ot_scale = 1.f, s_ot_alpha = 1.f, s_ot_mip = 0.f;
+
+		const auto ov2 = idraw->editor_get_debug_overlay_state();
+
+		bool cur_has_mip = false;
+		if (ov2.active_tex)
+			for (auto& o : ot_list)
+				if (strcmp(o.tex, ov2.active_tex) == 0) { cur_has_mip = o.has_mip; break; }
+
+		bool params_changed = false;
+		ImGui::SetNextItemWidth(180.f);
+		if (ImGui::SliderFloat("Scale", &s_ot_scale, 0.1f, 4.f)) params_changed = true;
+		ImGui::SetNextItemWidth(180.f);
+		if (ImGui::SliderFloat("Alpha", &s_ot_alpha, 0.f,  1.f)) params_changed = true;
+		if (cur_has_mip) {
+			ImGui::SetNextItemWidth(180.f);
+			if (ImGui::SliderFloat("Mip / Slice", &s_ot_mip, 0.f, 7.f)) params_changed = true;
+		}
+		if (params_changed && ov2.active_tex)
+			idraw->editor_set_debug_overlay(ov2.active_tex, s_ot_scale, s_ot_alpha, s_ot_mip);
+
+		ImGui::Separator();
+
+		if (ImGui::Selectable("Off", !ov2.active_tex, ImGuiSelectableFlags_DontClosePopups))
+			idraw->editor_clear_debug_overlay();
+
+		ImGui::Separator();
+
+		for (auto& o : ot_list) {
+			const bool sel = ov2.active_tex && strcmp(o.tex, ov2.active_tex) == 0;
+			if (ImGui::Selectable(o.label, sel, ImGuiSelectableFlags_DontClosePopups)) {
+				s_ot_scale = 1.f; s_ot_alpha = 1.f; s_ot_mip = 0.f;
+				idraw->editor_set_debug_overlay(o.tex, s_ot_scale, s_ot_alpha, s_ot_mip);
+			}
 		}
 		ImGui::EndPopup();
 	}

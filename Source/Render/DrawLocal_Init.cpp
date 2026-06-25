@@ -572,3 +572,25 @@ void Renderer::init_bloom_buffers() {
 
 	tex.bloom_vts_handle->update_specs_ptr(tex.bloom_chain[0].texture);
 }
+
+#ifdef EDITOR_BUILD
+void Renderer::editor_set_debug_overlay(const char* tex_name, float scale, float alpha, float mip) {
+	debug_tex_out.output_tex = g_assets.find<Texture>(tex_name).get();
+	debug_tex_out.scale = scale;
+	debug_tex_out.alpha = alpha;
+	debug_tex_out.mip   = mip;
+	if (!debug_tex_out.output_tex)
+		sys_print(Error, "editor_set_debug_overlay: texture '%s' not found\n", tex_name);
+}
+void Renderer::editor_clear_debug_overlay() {
+	debug_tex_out.output_tex = nullptr;
+}
+RendererPublic::EditorDebugOverlayState Renderer::editor_get_debug_overlay_state() const {
+	EditorDebugOverlayState s;
+	s.active_tex = debug_tex_out.output_tex ? debug_tex_out.output_tex->get_name().c_str() : nullptr;
+	s.scale = debug_tex_out.scale;
+	s.alpha = debug_tex_out.alpha;
+	s.mip   = debug_tex_out.mip;
+	return s;
+}
+#endif

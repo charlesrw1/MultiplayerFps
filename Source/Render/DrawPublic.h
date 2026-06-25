@@ -111,6 +111,16 @@ public:
 	// hm.
 	virtual void editor_render_thumbnail_for(Model* model, MaterialInstance* override_mat, int w, int h,
 											 std::string disk_path) = 0;
+
+	struct EditorDebugOverlayState {
+		const char* active_tex = nullptr; // null = disabled; points into the Texture asset's name
+		float scale = 1.f;
+		float alpha = 1.f;
+		float mip   = 0.f;
+	};
+	virtual void editor_set_debug_overlay(const char* tex_name, float scale, float alpha, float mip) = 0;
+	virtual void editor_clear_debug_overlay() = 0;
+	virtual EditorDebugOverlayState editor_get_debug_overlay_state() const = 0;
 #endif
 };
 

@@ -101,6 +101,9 @@ public:
 		thumbnailRenderer->render(model, override_mat);
 		thumbnailRenderer->output_to_path(path);
 	}
+	void editor_set_debug_overlay(const char* tex_name, float scale, float alpha, float mip) final;
+	void editor_clear_debug_overlay() final;
+	EditorDebugOverlayState editor_get_debug_overlay_state() const final;
 #endif
 	void pre_sync_update() final { matman.pre_render_update(); }
 
