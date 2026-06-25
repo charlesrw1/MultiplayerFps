@@ -138,6 +138,7 @@
     <ClCompile Include="Source\Game\Components\GraphCurveComponent.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents_Environment.cpp" />
+    <ClCompile Include="Source\Game\Components\PostProcessComponent.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents_GiScene.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents_Lightmap.cpp" />
     <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp" />
@@ -269,6 +270,8 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
     <!-- ShaderSourceLoader and SpirvCompile moved to AssetTools project -->
+    <ClCompile Include="Source\Render\PPManager.cpp" />
+    <ClCompile Include="Source\Render\PostProcessSettings.cpp" />
     <ClCompile Include="Source\Render\RenderExtra.cpp" />
     <ClCompile Include="Source\Render\RenderExtra_LightCookieAtlas.cpp" />
     <ClCompile Include="Source\Render\RenderExtra_SSR.cpp" />
@@ -434,6 +437,7 @@
     <ClInclude Include="Source\Game\Components\BillboardComponent.h" />
     <ClInclude Include="Source\Game\Components\DecalComponent.h" />
     <ClInclude Include="Source\Game\Components\LightComponents.h" />
+    <ClInclude Include="Source\Game\Components\PostProcessComponent.h" />
     <ClInclude Include="Source\Game\Components\MeshbuilderComponent.h" />
     <ClInclude Include="Source\Game\Components\MeshComponent.h" />
     <ClInclude Include="Source\Game\Components\RoadNetworkComponent.h" />
@@ -532,6 +536,8 @@
     <ClInclude Include="Source\Render\Model.h" />
     <ClInclude Include="Source\Render\MaterialLocal.h" />
     <ClInclude Include="Source\Render\MaterialPublic.h" />
+    <ClInclude Include="Source\Render\PPManager.h" />
+    <ClInclude Include="Source\Render\PostProcessSettings.h" />
     <ClInclude Include="Source\Render\RenderExtra.h" />
     <ClInclude Include="Source\Render\RenderObj.h" />
     <ClInclude Include="Source\Render\RenderScene.h" />

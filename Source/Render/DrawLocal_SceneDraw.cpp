@@ -356,21 +356,17 @@ void taa_menu() {
 	ImGui::DragFloat("taa_doc_pow", &taa_doc_pow, 0.01, 0, 1);
 }
 ADD_TO_DEBUG_MENU(taa_menu);
-static float pp_contrast = 1.0;
-static float pp_saturation = 1.0;
-static float pp_exposure = 1.0;
-static float pp_bloom_add = 0.05;
 static glm::vec3 pp_color_tint = glm::vec3(1.f);
-static int pp_tonemap_type = 0;
 
 void post_process_menu() {
-	if (ImGui::InputInt("pp_tonemap_type", &pp_tonemap_type)) {
-		pp_tonemap_type = glm::clamp(pp_tonemap_type, 0, 3);
-	}
-	ImGui::DragFloat("pp_contrast", &pp_contrast, 0.01);
-	ImGui::DragFloat("pp_saturation", &pp_saturation, 0.01);
-	ImGui::DragFloat("pp_exposure", &pp_exposure, 0.01);
-	ImGui::DragFloat("pp_bloom_add", &pp_bloom_add, 0.0001);
+	if (!PPManager::inst) return;
+	// Display the currently-active blended settings (read-only in debug menu)
+	auto pp = PPManager::inst->get_active();
+	ImGui::Text("tonemap_type: %d", pp.tonemap_type);
+	ImGui::Text("contrast:     %.3f", pp.contrast);
+	ImGui::Text("saturation:   %.3f", pp.saturation);
+	ImGui::Text("exposure:     %.3f", pp.exposure);
+	ImGui::Text("bloom:        %s  intensity %.4f", pp.bloom_enabled ? "on" : "off", pp.bloom_intensity);
 }
 ADD_TO_DEBUG_MENU(post_process_menu);
 

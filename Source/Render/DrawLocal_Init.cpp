@@ -238,6 +238,8 @@ void Renderer::create_default_textures() {
 
 extern int total_gfx_mem_usage;
 void Renderer::init() {
+	pp_manager = std::make_unique<PPManager>();
+
 	sys_print(Info, "--------- Initializing Renderer ---------\n");
 
 	double start = GetTime();

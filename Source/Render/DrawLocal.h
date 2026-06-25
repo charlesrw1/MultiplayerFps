@@ -28,6 +28,7 @@
 #include "RT/RaytraceTest.h"
 
 #include "Framework/ConsoleCmdGroup.h"
+#include "Render/PPManager.h"
 #include <array>
 #include "IGraphicsDevice.h"
 
@@ -298,6 +299,8 @@ public:
 	void draw_meshbuilders();
 
 	Texture* lens_dirt = nullptr;
+
+	std::unique_ptr<PPManager> pp_manager;
 
 	SSAO_System ssao;
 	CascadeShadowMapSystem shadowmap;

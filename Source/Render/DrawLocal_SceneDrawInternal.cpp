@@ -448,8 +448,10 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		state.vao = get_empty_vao();
 		gfx().set_pipeline(state);
 
+		const PostProcessParams pp = PPManager::inst ? PPManager::inst->get_active() : PostProcessParams{};
+
 		IGraphicsTexture* bloom_tex = tex.bloom_chain[0].texture;
-		if (!enable_bloom.get_bool())
+		if (!enable_bloom.get_bool() || !pp.bloom_enabled)
 			bloom_tex = black_texture;
 		bind_texture_ptr(0, scene_color_handle);
 		bind_texture_ptr(1, bloom_tex);
@@ -457,11 +459,11 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 
 		{
 			gpu::LitCompositorParams lp{};
-			lp.tonemap_type     = pp_tonemap_type;
-			lp.contrast_tweak   = pp_contrast;
-			lp.saturation_tweak = pp_saturation;
-			lp.bloom_lerp       = pp_bloom_add;
-			lp.exposure         = pp_exposure;
+			lp.tonemap_type     = pp.tonemap_type;
+			lp.contrast_tweak   = pp.contrast;
+			lp.saturation_tweak = pp.saturation;
+			lp.bloom_lerp       = pp.bloom_intensity;
+			lp.exposure         = pp.exposure;
 			ubo.lit_compositor_params->upload(&lp, sizeof(lp));
 			gfx().bind_uniform_buffer_base(7, ubo.lit_compositor_params);
 		}
