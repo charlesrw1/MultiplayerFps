@@ -1,5 +1,6 @@
 #include "PostProcessComponent.h"
 #include "BillboardComponent.h"
+#include "PostProcessEditorUI.h"
 #include "Render/PPManager.h"
 #include "Render/Texture.h"
 #include "Assets/AssetDatabase.h"
@@ -21,6 +22,12 @@ void PostProcessComponent::start() {
 void PostProcessComponent::stop() {
     PPManager::inst->remove_settings(pp_handle);
 }
+
+#ifdef EDITOR_BUILD
+std::unique_ptr<IComponentEditorUi> PostProcessComponent::create_editor_ui() {
+    return std::make_unique<PostProcessComponentEditorUi>(this);
+}
+#endif
 
 void PostProcessComponent::on_sync_render_data() {
     ASSERT(PPManager::inst);

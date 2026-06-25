@@ -13,12 +13,16 @@ class BillboardComponent;
 class PostProcessComponent : public Component {
 public:
     CLASS_BODY(PostProcessComponent);
+    PostProcessComponent() { 
+        set_call_init_in_editor(true);
+    }
     void start() final;
     void stop() final;
     void on_sync_render_data() final;
 #ifdef EDITOR_BUILD
     void editor_on_change_property() final { sync_render_data(); }
     const char* get_editor_outliner_icon() const final { return "eng/icon/_nearest/worldsettings.png"; }
+    std::unique_ptr<IComponentEditorUi> create_editor_ui() final;
 #endif
 
     REF AssetPtr<PostProcessSettings> settings;

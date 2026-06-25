@@ -139,6 +139,7 @@
     <ClCompile Include="Source\Game\Components\LightComponents.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents_Environment.cpp" />
     <ClCompile Include="Source\Game\Components\PostProcessComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\PostProcessEditorUI.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents_GiScene.cpp" />
     <ClCompile Include="Source\Game\Components\LightComponents_Lightmap.cpp" />
     <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp" />
@@ -438,6 +439,7 @@
     <ClInclude Include="Source\Game\Components\DecalComponent.h" />
     <ClInclude Include="Source\Game\Components\LightComponents.h" />
     <ClInclude Include="Source\Game\Components\PostProcessComponent.h" />
+    <ClInclude Include="Source\Game\Components\PostProcessEditorUI.h" />
     <ClInclude Include="Source\Game\Components\MeshbuilderComponent.h" />
     <ClInclude Include="Source\Game\Components\MeshComponent.h" />
     <ClInclude Include="Source\Game\Components\RoadNetworkComponent.h" />
