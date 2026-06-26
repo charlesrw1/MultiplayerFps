@@ -105,6 +105,7 @@ void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
     if (ext != "tis" && ext != "mis") return;
 
     active_tis_path_ = (ext == "tis") ? load_path : "";
+    selected_mip_ = 0;
 
     std::string json = strip_json_prefix(raw_file_contents);
     if (json.empty()) return;
@@ -113,8 +114,11 @@ void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
     c->reader = std::make_unique<ReadSerializerBackendJson>("inspector", json, c->objmaker);
     c->obj = c->reader->get_root_obj();
     if (c->obj) {
-        c->pg = std::make_unique<PropertyGrid>(get_basic_factory());
-        c->pg->add_class_to_grid(c->obj);
+        // PropertyGrid only needed for .mis; .tis uses a manual editor
+        if (ext == "mis") {
+            c->pg = std::make_unique<PropertyGrid>(get_basic_factory());
+            c->pg->add_class_to_grid(c->obj);
+        }
         cache_ = std::move(c);
     }
 }
@@ -132,8 +136,8 @@ void AssetInspectorPane::apply_changes() {
 }
 
 void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
-    if (!cache_ || !cache_->pg) { ImGui::TextDisabled("(parse error)"); return; }
-    auto* tis = cache_->obj ? cache_->obj->cast_to<TextureImportSettings>() : nullptr;
+    if (!cache_ || !cache_->obj) { ImGui::TextDisabled("(parse error)"); return; }
+    auto* tis = cache_->obj->cast_to<TextureImportSettings>();
     if (!tis) { ImGui::TextDisabled("(not TIS)"); return; }
 
     // --- Texture preview ---
@@ -141,80 +145,122 @@ void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
     Texture* tex = g_assets.find<Texture>(dds_path).get();
 
     if (tex && tex->gpu_ptr) {
-        auto sz      = tex->gpu_ptr->get_size();
-        int  mips    = tex->gpu_ptr->get_num_mips();
-        auto fmt_str = texture_format_to_string(tex->gpu_ptr->get_texture_format());
+        auto sz   = tex->gpu_ptr->get_size();
+        int  mips = tex->gpu_ptr->get_num_mips();
 
-        // Thumbnail — cap at 256px on the longest axis
+        // Clamp selected mip to valid range
+        selected_mip_ = std::max(0, std::min(selected_mip_, mips - 1));
+        int mip_w = std::max(1, sz.x >> selected_mip_);
+        int mip_h = std::max(1, sz.y >> selected_mip_);
+
+        // Display at mip dimensions, capped at MAX_THUMB — this causes the GPU
+        // to naturally sample the selected mip level given the screen pixel ratio
         const float MAX_THUMB = 256.f;
-        float scale = (sz.x > 0 && sz.y > 0)
-            ? std::min(MAX_THUMB / sz.x, MAX_THUMB / sz.y)
-            : 1.f;
-        ImVec2 thumb_size(sz.x * scale, sz.y * scale);
+        float scale = std::min({ 1.f, MAX_THUMB / (float)mip_w, MAX_THUMB / (float)mip_h });
+        ImVec2 thumb_size(mip_w * scale, mip_h * scale);
 
-        ImGui::Image(ImTextureID(uint64_t(tex->get_internal_render_handle())), thumb_size);
+        auto tex_id = ImTextureID(uint64_t(tex->get_internal_render_handle()));
+        ImGui::Image(tex_id, thumb_size);
 
-        // Metadata column to the right
+        // Hover to zoom: show magnified region in tooltip
+        if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
+            ImVec2 mouse    = ImGui::GetMousePos();
+            ImVec2 item_min = ImGui::GetItemRectMin();
+            ImVec2 item_sz  = ImGui::GetItemRectSize();
+            float mx = (item_sz.x > 0) ? (mouse.x - item_min.x) / item_sz.x : 0.5f;
+            float my = (item_sz.y > 0) ? (mouse.y - item_min.y) / item_sz.y : 0.5f;
+            const float region = 0.2f; // fraction of the texture shown in tooltip
+            float u0 = mx - region * 0.5f, u1 = mx + region * 0.5f;
+            float v0 = my - region * 0.5f, v1 = my + region * 0.5f;
+            // Shift window to stay in [0,1] without changing its size
+            if (u0 < 0.f) { u1 -= u0; u0 = 0.f; }
+            if (u1 > 1.f) { u0 -= (u1 - 1.f); u1 = 1.f; u0 = std::max(0.f, u0); }
+            if (v0 < 0.f) { v1 -= v0; v0 = 0.f; }
+            if (v1 > 1.f) { v0 -= (v1 - 1.f); v1 = 1.f; v0 = std::max(0.f, v0); }
+            ImGui::Image(tex_id, ImVec2(256, 256), ImVec2(u0, v0), ImVec2(u1, v1));
+            ImGui::EndTooltip();
+        }
+
+        // Metadata + mip selector to the right of thumbnail
         ImGui::SameLine();
         ImGui::BeginGroup();
 
-        ImGui::TextUnformatted(fmt_str);
+        ImGui::TextUnformatted(texture_format_to_string(tex->gpu_ptr->get_texture_format()));
         ImGui::Text("%d x %d", sz.x, sz.y);
-        ImGui::Text("%d mip%s", mips, mips != 1 ? "s" : "");
 
-        // Simplified color swatch (read-only)
+        if (mips > 1) {
+            ImGui::Text("Mip");
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(80.f);
+            ImGui::SliderInt("##mip", &selected_mip_, 0, mips - 1);
+            ImGui::SameLine();
+            ImGui::TextDisabled("%dx%d", mip_w, mip_h);
+        } else {
+            ImGui::TextDisabled("1 mip");
+        }
+
         Color32 sc = tis->simplifiedColor;
-        ImVec4 col(sc.r / 255.f, sc.g / 255.f, sc.b / 255.f, sc.a / 255.f);
-        ImGui::ColorButton("##simpcol", col,
+        ImGui::ColorButton("##simpcol",
+            ImVec4(sc.r / 255.f, sc.g / 255.f, sc.b / 255.f, sc.a / 255.f),
             ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoBorder,
             ImVec2(16, 16));
         ImGui::SameLine();
         ImGui::TextDisabled("Simplified color");
 
         ImGui::EndGroup();
-
-        // Mip chain table
-        if (mips > 1) {
-            ImGui::Spacing();
-            if (ImGui::BeginTable("##mips", 2, ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingFixedFit)) {
-                ImGui::TableSetupColumn("Mip", ImGuiTableColumnFlags_WidthFixed, 40.f);
-                ImGui::TableSetupColumn("Size");
-                ImGui::TableHeadersRow();
-                int w = sz.x, h = sz.y;
-                for (int i = 0; i < mips; ++i) {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0); ImGui::Text("%d", i);
-                    ImGui::TableSetColumnIndex(1); ImGui::Text("%d x %d", w, h);
-                    w = std::max(1, w / 2);
-                    h = std::max(1, h / 2);
-                }
-                ImGui::EndTable();
-            }
-        }
     } else {
-        ImGui::TextDisabled("(no compiled .dds — click Apply to compile)");
+        ImGui::TextDisabled("(no compiled .dds)");
     }
 
     ImGui::Separator();
 
-    // --- Settings PropertyGrid ---
-    cache_->pg->update();
-    if (cache_->pg->rows_had_changes) {
-        cache_->pg->rows_had_changes = false;
-        settings_dirty = true;
+    // --- Manual settings editor ---
+    bool changed = false;
+
+    ImGui::LabelText("Source", "%s", tis->src_file.c_str());
+
+    changed |= ImGui::Checkbox("sRGB",              &tis->is_srgb);
+    changed |= ImGui::Checkbox("Normal map (BC5)",  &tis->is_normalmap);
+    changed |= ImGui::Checkbox("Uncompressed (R8)", &tis->make_uncompressed);
+    changed |= ImGui::Checkbox("Nearest filtering", &tis->nearest_filtering);
+
+    // resize_width with power-of-2 step buttons
+    ImGui::AlignTextToFramePadding();
+    ImGui::Text("Resize width");
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(72.f);
+    if (ImGui::InputInt("##rw", &tis->resize_width, 0)) {
+        tis->resize_width = std::max(0, tis->resize_width);
+        changed = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("x2")) {
+        tis->resize_width = (tis->resize_width < 1) ? 64 : tis->resize_width * 2;
+        changed = true;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("/2")) {
+        tis->resize_width = std::max(0, tis->resize_width / 2);
+        changed = true;
+    }
+    if (tis->resize_width == 0) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("(no resize)");
     }
 
+    if (changed) settings_dirty = true;
+
     if (settings_dirty) {
+        ImGui::Spacing();
         if (ImGui::Button("Apply")) {
             write_texture_import_settings(tis, gamepath);
             AssetCompiler::compile_asset(gamepath);
             settings_dirty = false;
-            load_for(last_selected); // refresh cache: compile updates simplifiedColor
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Revert")) {
             load_for(last_selected);
         }
+        ImGui::SameLine();
+        if (ImGui::Button("Revert"))
+            load_for(last_selected);
     }
 }
 
