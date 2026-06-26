@@ -6,7 +6,7 @@
 #include "AssetTools/AssetDiagnostics.h"
 #include "AssetTools/AssetTemplates.h"
 
-extern bool compile_texture_asset(const std::string& gamepath, Color32&);
+extern bool compile_texture_asset(const std::string& gamepath, Color32& outColor);
 
 static bool write_game_file(const std::string& path, const std::string& content) {
 	auto f = FileSys::open_write_game(path);

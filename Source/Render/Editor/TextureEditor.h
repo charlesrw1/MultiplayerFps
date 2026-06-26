@@ -27,6 +27,7 @@ public:
 	REF int resize_width = 0; // ie 1024, 2048 etc resize source image
 
 	REF bool make_uncompressed = false;
+	REF bool nearest_filtering = false;
 
 	REF Color32 simplifiedColor = COLOR_BLACK;
 };

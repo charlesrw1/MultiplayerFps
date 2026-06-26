@@ -26,9 +26,32 @@
 #undef APIENTRY
 
 #include "IGraphicsDevice.h"
+#include <json.hpp>
 
 // TextureEditor.cpp
 extern bool compile_texture_asset(const std::string& gamepath, Color32& outColor);
+
+// Read just the nearest_filtering field from a .tis sidecar for a given gamepath
+// (any extension — strips to stem then appends .tis). Returns false if no .tis or field absent.
+static bool read_tis_nearest_filtering(const std::string& gamepath) {
+	const std::string tis_path = strip_extension(gamepath) + ".tis";
+	auto f = FileSys::open_read_game(tis_path);
+	if (!f)
+		return false;
+	std::string text(f->size(), '\0');
+	f->read(text.data(), text.size());
+	f->close();
+	// Strip the "!json\n" header written by write_texture_import_settings
+	const std::string_view prefix = "!json\n";
+	if (text.size() < prefix.size() || text.compare(0, prefix.size(), prefix) != 0)
+		return false;
+	try {
+		auto j = nlohmann::json::parse(text.data() + prefix.size(), text.data() + text.size());
+		return j.value("nearest_filtering", false);
+	} catch (...) {
+		return false;
+	}
+}
 
 // ---------------------------------------------------------------------------
 // Editor-only: PNG/HDR write wrappers and asset metadata registration
@@ -181,8 +204,8 @@ bool Texture::load_asset() {
 	auto& is_float = user->is_float;
 	auto& channels = user->channels;
 
-	if (path.find("/_nearest") != std::string::npos)
-		user->wantsNearestFiltering = true; // hack moment
+	if (path.find(".png") != std::string::npos || path.find(".jpg") != std::string::npos)
+		user->wantsNearestFiltering = read_tis_nearest_filtering(path);
 	user->wantsNearestFiltering |= force_nearest;
 
 	user->filedata.resize(file->size());
