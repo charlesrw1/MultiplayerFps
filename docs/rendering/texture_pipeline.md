@@ -16,12 +16,13 @@ Every game texture and UI texture that needs non-default settings has a `.tis` s
 
 Key fields:
 
-- `src_file` — relative filename of the source image (e.g. `folder_closed.png`). **Empty means UI texture** — no texconv compile is triggered.
+- `src_file` — relative filename of the source image (e.g. `folder_closed.png`).
+- `load_source_file` — when true, skip texconv and load the source image directly (UI textures). No `.dds` is produced.
 - `nearest_filtering` — load with nearest/point sampler instead of linear.
 - `is_srgb`, `is_normalmap`, `make_uncompressed`, `resize_width` — compiler hints; ignored for UI textures.
 - `simplifiedColor` — average pixel colour computed by the compiler and stored back; read-only in the inspector.
 
-The file watcher auto-creates a `.tis` with `src_file = <basename>` when a new `.png` appears in the Data directory. For UI textures you set `src_file = ""` manually (or via the inspector) to opt out of compilation.
+The file watcher auto-creates a `.tis` with `src_file = <basename>` when a new `.png` appears in the Data directory. For UI textures, set `load_source_file = true` via the inspector to opt out of compilation.
 
 ## compile_texture_asset flow
 
@@ -30,7 +31,7 @@ compile_texture_asset(gamepath)
   ├─ open stem.dds + stem.tis
   ├─ parse .tis → TextureImportSettings
   ├─ if .dds newer than .tis → return true  (up-to-date)
-  ├─ if src_file == ""       → return true  (UI texture, no-op)
+  ├─ if load_source_file     → return true  (UI texture, no-op)
   ├─ if src_file not found   → return false (missing source)
   └─ spawn texconv → write .dds, update simplifiedColor in .tis
 ```

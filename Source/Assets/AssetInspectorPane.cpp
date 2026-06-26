@@ -232,6 +232,7 @@ void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
     changed |= ImGui::Checkbox("Normal map (BC5)",  &tis->is_normalmap);
     changed |= ImGui::Checkbox("Uncompressed (R8)", &tis->make_uncompressed);
     changed |= ImGui::Checkbox("Nearest filtering", &tis->nearest_filtering);
+    changed |= ImGui::Checkbox("Load source file (UI texture, skips compile)", &tis->load_source_file);
 
     // resize_width with power-of-2 step buttons
     ImGui::AlignTextToFramePadding();

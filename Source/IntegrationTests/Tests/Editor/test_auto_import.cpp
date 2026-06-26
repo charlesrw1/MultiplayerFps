@@ -217,10 +217,10 @@ static TestTask test_ui_texture_no_compile(TestContext& t) {
 
 	t.require(write_game_file(png_path, "dummy png"), "wrote .png");
 
-	// Write a properly serialized .tis with empty src_file — simulates a UI texture
+	// Write a properly serialized .tis with load_source_file=true — simulates a UI texture
 	{
 		TextureImportSettings ui_tis;
-		ui_tis.src_file = ""; // empty = UI texture, no compile
+		ui_tis.load_source_file = true;
 		write_texture_import_settings(&ui_tis, tis_path);
 	}
 	t.require(FileSys::does_file_exist(tis_path.c_str(), FileSys::GAME_DIR), "wrote UI .tis");

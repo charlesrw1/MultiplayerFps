@@ -28,6 +28,7 @@ public:
 
 	REF bool make_uncompressed = false;
 	REF bool nearest_filtering = false;
+	REF bool load_source_file = false; // load .png directly instead of compiling to .dds (UI textures)
 
 	REF Color32 simplifiedColor = COLOR_BLACK;
 };
