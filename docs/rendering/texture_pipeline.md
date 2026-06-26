@@ -43,6 +43,19 @@ compile_texture_asset(gamepath)
 
 `force_nearest` on the `Texture` object (set by `force_load_for_ui`) overrides and always wins.
 
+## Asset Browser representation
+
+The browser shows each logical texture as exactly one entry:
+
+| Files on disk | Browser entry | Notes |
+|---|---|---|
+| `foo.tis` + `foo.dds` | `foo.dds` | game texture — compiled output is canonical |
+| `foo.tis` + `foo.png` (no `.dds`) | `foo.png` | UI texture — .tis has empty `src_file` |
+| `foo.dds` (no `.tis`) | `foo.dds` | baked/orphan — shows Info diagnostic |
+
+`.tis` and source `.png`/`.jpg` files are never shown as top-level entries.
+When a `.dds` is compiled (appears on disk), the `foo.png` entry is removed and `foo.dds` takes its place; when a `.dds` is deleted, the reverse happens.
+
 ## Asset Inspector
 
 Selecting a `.dds` or `.tis` in the Asset Browser opens the texture inspector which shows a thumbnail, format string, mip selector, hover-zoom, simplified colour swatch, and editable settings. Apply writes the `.tis` and re-triggers `compile_texture_asset`. Source: `Source/Assets/AssetInspectorPane.cpp`.

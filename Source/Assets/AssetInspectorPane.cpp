@@ -93,9 +93,9 @@ void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
 
     auto ext = StringUtils::get_extension_no_dot(selected.filename);
 
-    // .dds → resolve to the .tis sidecar
+    // .dds / .png → resolve to the .tis sidecar
     std::string load_path = selected.filename;
-    if (ext == "dds") {
+    if (ext == "dds" || ext == "png" || ext == "jpg") {
         load_path = strip_extension(selected.filename) + ".tis";
         ext = "tis";
     }
@@ -141,8 +141,12 @@ void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
     if (!tis) { ImGui::TextDisabled("(not TIS)"); return; }
 
     // --- Texture preview ---
+    // For game textures: show the compiled .dds. For UI textures (no .dds): show the .png directly.
     std::string dds_path = strip_extension(gamepath) + ".dds";
+    std::string png_path = strip_extension(gamepath) + ".png";
     Texture* tex = g_assets.find<Texture>(dds_path).get();
+    if (!tex || !tex->gpu_ptr)
+        tex = g_assets.find<Texture>(png_path).get();
 
     if (tex && tex->gpu_ptr) {
         auto sz   = tex->gpu_ptr->get_size();
@@ -328,7 +332,7 @@ void AssetInspectorPane::imgui_draw(const AssetOnDisk& selected) {
     auto ext = StringUtils::get_extension_no_dot(selected.filename);
 
     if      (ext == "tis") draw_tis_settings(selected.filename);
-    else if (ext == "dds") draw_tis_settings(active_tis_path_.empty() ? strip_extension(selected.filename) + ".tis" : active_tis_path_);
+    else if (ext == "dds" || ext == "png" || ext == "jpg") draw_tis_settings(active_tis_path_.empty() ? strip_extension(selected.filename) + ".tis" : active_tis_path_);
     else if (ext == "mis") draw_mis_settings(selected.filename);
     else if (ext == "mm" || ext == "mi") draw_material_text(selected.filename);
     else    ImGui::TextDisabled("Extension: .%s", ext.c_str());

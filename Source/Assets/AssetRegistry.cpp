@@ -319,12 +319,33 @@ void AssetRegistrySystem::update() {
 			lua_changed = true;
 		}
 
-		// Incremental tree update: resolve to the canonical asset entry
+		// Incremental tree update: resolve to the canonical asset entry.
+		// UI textures (.tis with no .dds) are represented by their .png path in the browser.
 		AssetOnDisk aod;
 		aod.filename = rel_path;
-		if (ext == "hdr" || ext == "dds")
+		if (ext == "hdr" || ext == "dds") {
 			aod.type = texMeta;
-		else if (ext == "tmap")
+
+			// When a .dds appears or disappears, also reconcile the UI-texture .png entry
+			// for the same stem — they are mutually exclusive in the browser.
+			std::string stem = strip_extension(rel_path);
+			std::string png_path = stem + ".png";
+			std::string tis_path = stem + ".tis";
+			bool dds_exists = file_exists(rel_path);
+			bool png_exists = file_exists(png_path);
+			bool tis_exists = file_exists(tis_path);
+
+			if (dds_exists) {
+				// .dds just appeared — remove any UI-texture .png entry for this stem
+				remove_from_tree(*root, png_path);
+			} else if (tis_exists && png_exists) {
+				// .dds just disappeared — expose the UI-texture .png entry
+				AssetOnDisk png_aod;
+				png_aod.filename = png_path;
+				png_aod.type = texMeta;
+				root->add_path(png_aod, split(png_path, '/'));
+			}
+		} else if (ext == "tmap")
 			aod.type = mapMeta;
 		else if (ext == "mm" || ext == "mi")
 			aod.type = matMeta;
@@ -340,6 +361,24 @@ void AssetRegistrySystem::update() {
 			StringUtils::remove_extension(aod.filename);
 			aod.filename += ".cmdl";
 			aod.type = modelMeta;
+		} else if (ext == "tis" || ext == "png" || ext == "jpg") {
+			// UI-texture browser entry: shown as .png when .tis exists but no .dds.
+			std::string stem = strip_extension(rel_path);
+			std::string png_path = stem + ".png";
+			std::string tis_path = stem + ".tis";
+			std::string dds_path = stem + ".dds";
+
+			bool show_as_png = file_exists(tis_path) && file_exists(png_path) && !file_exists(dds_path);
+			if (show_as_png) {
+				AssetOnDisk png_aod;
+				png_aod.filename = png_path;
+				png_aod.type = texMeta;
+				root->add_path(png_aod, split(png_path, '/'));
+			} else {
+				remove_from_tree(*root, png_path);
+			}
+			tree_dirty = true;
+			continue; // aod.type is unset; handled above
 		} else {
 			continue; // not a tracked asset type; skip tree update
 		}
@@ -402,6 +441,11 @@ void AssetRegistrySystem::reindex_all_assets() {
 
 	auto add = [&](AssetOnDisk aod) { root->add_path(aod, split(aod.filename, '/')); };
 
+	// tis_stems: stems that have a .tis but no .dds → shown as .png (UI textures).
+	// Populated during the scan and resolved after all .dds entries are collected.
+	std::unordered_set<std::string> dds_stems;
+	std::vector<std::string>        tis_stems;
+
 	for (const auto& full : FileSys::find_game_files()) {
 		auto gp = FileSys::get_game_path_from_full_path(full);
 		auto ext = get_extension_no_dot(gp);
@@ -417,11 +461,17 @@ void AssetRegistrySystem::reindex_all_assets() {
 			continue;
 		}
 
+		if (ext == "tis") {
+			tis_stems.push_back(strip_extension(gp));
+			continue;
+		}
+
 		AssetOnDisk aod;
 		aod.filename = std::move(gp);
-		if (ext == "hdr" || ext == "dds")
+		if (ext == "hdr" || ext == "dds") {
 			aod.type = texMeta;
-		else if (ext == "tmap")
+			dds_stems.insert(strip_extension(aod.filename));
+		} else if (ext == "tmap")
 			aod.type = mapMeta;
 		else if (ext == "mm" || ext == "mi")
 			aod.type = matMeta;
@@ -435,10 +485,24 @@ void AssetRegistrySystem::reindex_all_assets() {
 			aod.type = particleMeta;
 		else if (ext == "ppset")
 			aod.type = ppsetMeta;
-
 		else
 			continue;
 
+		add(std::move(aod));
+	}
+
+	// UI textures: .tis exists but no compiled .dds — show as .png in the browser.
+	// Game textures always produce a .dds, so they're already in the tree above.
+	for (const auto& stem : tis_stems) {
+		if (dds_stems.count(stem))
+			continue; // game texture — already shown as .dds
+		std::string png_path = stem + ".png";
+		auto f = FileSys::open_read_game(png_path);
+		if (!f) continue; // .png not present either
+		f->close();
+		AssetOnDisk aod;
+		aod.filename = std::move(png_path);
+		aod.type = texMeta;
 		add(std::move(aod));
 	}
 
