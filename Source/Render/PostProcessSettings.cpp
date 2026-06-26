@@ -59,6 +59,8 @@ bool PostProcessSettings::load_asset() {
         ae_max_ev     = j.value("ae_max_ev",     3.f);
         ae_speed      = j.value("ae_speed",      1.f);
         ae_key        = j.value("ae_key",        0.18f);
+        ae_low_pct    = j.value("ae_low_pct",    0.4f);
+        ae_high_pct   = j.value("ae_high_pct",   0.1f);
     } catch (const nlohmann::json::exception& e) {
         sys_print(Warning, "PostProcessSettings: JSON error in %s: %s\n", get_name().c_str(), e.what());
         return false;
@@ -87,6 +89,8 @@ void PostProcessSettings::save_to_disk() {
     j["ae_max_ev"]     = ae_max_ev;
     j["ae_speed"]      = ae_speed;
     j["ae_key"]        = ae_key;
+    j["ae_low_pct"]    = ae_low_pct;
+    j["ae_high_pct"]   = ae_high_pct;
     j["lift"]          = {lift.r, lift.g, lift.b};
     j["gamma_rgb"] = {gamma_rgb.r, gamma_rgb.g, gamma_rgb.b};
     j["gain"]      = {gain.r,      gain.g,      gain.b};

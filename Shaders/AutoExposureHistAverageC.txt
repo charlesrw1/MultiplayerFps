@@ -1,4 +1,6 @@
 // Parallel-reduce 256-bin histogram → weighted avg log-lum → adapted exposure.
+// ae_low_pct: skip darkest fraction (e.g. 0.4 = ignore bottom 40% of pixels)
+// ae_high_pct: skip brightest fraction (e.g. 0.1 = ignore top 10% of pixels)
 
 layout(local_size_x = 256) in;
 
@@ -17,24 +19,71 @@ layout(std140, binding = 8) uniform AutoExposureParamsUBO {
     float ae_dt;
     float ae_hist_min_log;
     float ae_hist_max_log;
-    float ae_pad;
+    float ae_low_pct;
+    float ae_high_pct;
+    float ae_pad1;
+    float ae_pad2;
+    float ae_pad3;
 } ae;
 
-shared float s_log_lum[256];
-shared uint  s_count[256];
+shared uint  s_count_all[256]; // raw per-bin counts (for total + prefix scan)
+shared float s_log_lum[256];   // weighted log-lum contribution per bin
+shared uint  s_count[256];     // masked count per bin (after percentile cut)
 
 void main() {
     uint idx = gl_LocalInvocationIndex;
 
-    uint count       = bins[idx];
+    // Load raw counts
+    s_count_all[idx] = bins[idx];
+    barrier();
+
+    // Prefix-sum reduction to find total pixel count (all 256 threads contribute)
+    // Each thread accumulates a running sum in shared mem via a standard tree reduce.
+    // After this, s_count_all[0] holds the total.
+    for (uint stride = 128u; stride > 0u; stride >>= 1u) {
+        if (idx < stride)
+            s_count_all[idx] += s_count_all[idx + stride];
+        barrier();
+    }
+
+    // Now compute per-bin cumulative range boundaries
+    uint total = s_count_all[0];
+    uint low_cut  = uint(float(total) * ae.ae_low_pct);
+    uint high_cut = uint(float(total) * (1.0 - ae.ae_high_pct));
+
+    // Reload raw counts and compute bin-level cumulative prefix (each thread does its own bin)
+    // Thread idx computes the running sum up to (but not including) bin idx
+    // via a second load + inclusive prefix scan.
+    // Simpler: compute cumulative sum for each bin directly using a loop in thread 0, then
+    // broadcast via shared mem. 256 bins is cheap.
+    barrier();
+
+    // Thread 0 builds cumulative sums into s_count_all[], then all threads read theirs.
+    if (idx == 0u) {
+        uint cum = 0u;
+        for (uint b = 0u; b < 256u; b++) {
+            uint cnt = bins[b];
+            uint cum_before = cum;
+            cum += cnt;
+            // bin b contributes if its cumulative range [cum_before, cum) intersects [low_cut, high_cut]
+            if (cum > low_cut && cum_before < high_cut)
+                s_count_all[b] = cnt;
+            else
+                s_count_all[b] = 0u;
+        }
+    }
+    barrier();
+
+    // Each thread now sets up its bin's weighted contribution
     float bin_center = (float(idx) + 0.5) / 256.0;
     float log_lum    = ae.ae_hist_min_log +
                        bin_center * (ae.ae_hist_max_log - ae.ae_hist_min_log);
 
-    s_log_lum[idx] = log_lum * float(count);
-    s_count[idx]   = count;
+    s_log_lum[idx] = log_lum * float(s_count_all[idx]);
+    s_count[idx]   = s_count_all[idx];
     barrier();
 
+    // Parallel reduction of masked bins
     for (uint stride = 128u; stride > 0u; stride >>= 1u) {
         if (idx < stride) {
             s_log_lum[idx] += s_log_lum[idx + stride];
@@ -44,15 +93,13 @@ void main() {
     }
 
     if (idx == 0u) {
-        uint  total   = max(s_count[0], 1u);
-        float avg_log = s_log_lum[0] / float(total);
-        float avg_lum = exp2(avg_log);
-        avg_lum       = max(avg_lum, 0.0001);
+        uint  masked_total = max(s_count[0], 1u);
+        float avg_log      = s_log_lum[0] / float(masked_total);
+        float avg_lum      = exp2(avg_log);
+        avg_lum            = max(avg_lum, 0.0001);
 
         float target_exp = ae.ae_key / avg_lum;
-        target_exp = clamp(target_exp,
-                           exp2(ae.ae_min_ev),
-                           exp2(ae.ae_max_ev));
+        target_exp = clamp(target_exp, exp2(ae.ae_min_ev), exp2(ae.ae_max_ev));
 
         float prev = imageLoad(prev_exposure, ivec2(0, 0)).r;
         if (prev < 0.0001) prev = target_exp;

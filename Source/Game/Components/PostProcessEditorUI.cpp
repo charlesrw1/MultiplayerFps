@@ -208,6 +208,12 @@ bool PostProcessComponentEditorUi::draw() {
             slider("Max EV",     asset->ae_max_ev,  0.f,  8.f);
             slider("Speed",      asset->ae_speed,   0.1f, 5.f);
             slider("Key (grey)", asset->ae_key,     0.01f, 1.f, "%.3f");
+            if (asset->ae_method == 1) {
+                ImGui::Spacing();
+                ImGui::TextDisabled("Metering (histogram only)");
+                slider("Exclude dark %%", asset->ae_low_pct,  0.f, 0.8f);
+                slider("Exclude bright %%", asset->ae_high_pct, 0.f, 0.5f);
+            }
         }
     }
     ImGui::PopID();

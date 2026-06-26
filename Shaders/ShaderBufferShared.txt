@@ -193,8 +193,12 @@ struct AutoExposureParams {
     float ae_dt;           // 16  frame delta time
     float ae_hist_min_log; // 20  histogram log2-lum range min (-10)
     float ae_hist_max_log; // 24  histogram log2-lum range max (4)
-    float ae_pad;          // 28
-                           // total: 32 bytes (2*16, valid std140)
+    float ae_low_pct;      // 28  fraction of darkest pixels to exclude (0=none)
+    float ae_high_pct;     // 32  fraction of brightest pixels to exclude (0=none)
+    float ae_pad1;         // 36
+    float ae_pad2;         // 40
+    float ae_pad3;         // 44
+                           // total: 48 bytes (3*16, valid std140)
 };
 
 // ---- E. DDGI runtime -------------------------------------------------------

@@ -36,13 +36,16 @@ public:
     REF float ae_max_ev     =  3.f;
     REF float ae_speed      =  1.f;
     REF float ae_key        = 0.18f;
+    REF float ae_low_pct    =  0.4f; // fraction of darkest pixels to exclude
+    REF float ae_high_pct   =  0.1f; // fraction of brightest pixels to exclude
 
     PostProcessParams to_params() const {
         return {exposure, contrast, saturation, bloom_intensity, bloom_enabled, tonemap_type,
                 vignette_intensity, vignette_falloff, chromatic_ab,
                 grain_intensity, grain_size, sharpness, color_temp,
                 lift, gamma_rgb, gain,
-                auto_exposure, ae_method, ae_min_ev, ae_max_ev, ae_speed, ae_key};
+                auto_exposure, ae_method, ae_min_ev, ae_max_ev, ae_speed, ae_key,
+                ae_low_pct, ae_high_pct};
     }
 
     void save_to_disk();

@@ -351,7 +351,7 @@ void Renderer::init() {
 	// Auto-exposure params UBO (AutoExposureParams, 32 bytes)
 	{
 		CreateBufferArgs args;
-		args.size  = 32; // sizeof(AutoExposureParams) — must match ShaderBufferShared.txt
+		args.size  = 48; // sizeof(AutoExposureParams) — must match ShaderBufferShared.txt
 		args.flags = BUFFER_USE_DYNAMIC;
 		buf.ae_params = gfx().create_buffer(args);
 	}

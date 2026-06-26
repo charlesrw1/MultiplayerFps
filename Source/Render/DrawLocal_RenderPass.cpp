@@ -29,7 +29,7 @@ namespace {
 // gpu::BloomParams is declared in Shaders/ShaderBufferShared.txt and shared
 // verbatim with the BloomDownsampleF/BloomUpsampleF GLSL.
 static_assert(sizeof(gpu::BloomParams) == 16, "std140");
-static_assert(sizeof(gpu::AutoExposureParams) == 32, "std140");
+static_assert(sizeof(gpu::AutoExposureParams) == 48, "std140");
 
 // Per-pass UBO group slot. See [[rendering/gfx_abstraction#2a]].
 constexpr int PER_PASS_PARAMS_UBO_BINDING = 7;
@@ -146,6 +146,8 @@ void Renderer::render_auto_exposure(IGraphicsTexture* scene_hdr, const PostProce
 	aep.ae_dt           = dt;
 	aep.ae_hist_min_log = -10.f;
 	aep.ae_hist_max_log =  4.f;
+	aep.ae_low_pct      = pp.ae_low_pct;
+	aep.ae_high_pct     = pp.ae_high_pct;
 	buf.ae_params->upload(&aep, sizeof(aep));
 	gfx().bind_uniform_buffer_base(AE_PARAMS_UBO_BINDING, buf.ae_params);
 

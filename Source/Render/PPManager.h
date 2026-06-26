@@ -26,6 +26,8 @@ struct PostProcessParams {
     float ae_max_ev     =  3.f; // max log2 exposure clamp
     float ae_speed      =  1.f; // adaptation speed (1/seconds)
     float ae_key        = 0.18f;// target middle grey
+    float ae_low_pct    =  0.4f;// fraction of darkest pixels to exclude (0=none)
+    float ae_high_pct   =  0.1f;// fraction of brightest pixels to exclude (0=none)
 };
 
 class PPManager {
