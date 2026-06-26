@@ -394,6 +394,7 @@ void AssetRegistrySystem::reindex_all_assets() {
 	auto* fontMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("GuiFont"));
 	auto* prefabMeta = (AssetMetadata*)find_type("Prefab");
 	auto* particleMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("ParticleAsset"));
+	auto* ppsetMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("PostProcessSettings"));
 	assert(prefabMeta);
 
 	// Use a set to deduplicate model entries: both .cmdl and .mis map to the same .cmdl asset.
@@ -432,6 +433,8 @@ void AssetRegistrySystem::reindex_all_assets() {
 			aod.type = prefabMeta;
 		else if (ext == "particle")
 			aod.type = particleMeta;
+		else if (ext == "ppset")
+			aod.type = ppsetMeta;
 
 		else
 			continue;
