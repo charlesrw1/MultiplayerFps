@@ -165,7 +165,9 @@ bool compile_texture_asset(const std::string& gamepath, Color32& outColor) {
 	TextureImportSettings* tis = nullptr;
 
 	{
-		auto texfile = FileSys::open_read_game(gamepath);
+		// Always compare the compiled .dds output against the .tis settings,
+		// regardless of whether gamepath is .png, .dds, or .tis.
+		auto texfile = FileSys::open_read_game(strip_extension(gamepath) + ".dds");
 		auto tisfile = FileSys::open_read_game(strip_extension(gamepath) + ".tis");
 		if (!tisfile) {
 			sys_print(Warning, "couldn't find texture import settings file %s\n", gamepath.c_str());
@@ -198,7 +200,7 @@ bool compile_texture_asset(const std::string& gamepath, Color32& outColor) {
 		if (!needsCompile) {
 			needsCompile = texfile->get_timestamp() < tisFileTimeStamp;
 			if (needsCompile)
-				sys_print(Debug, "%s needs compile because texFile is newer tha tisFile\n", gamepath.c_str());
+				sys_print(Debug, "%s needs compile because .tis is newer than .dds\n", gamepath.c_str());
 		} else {
 			sys_print(Debug, "%s needs compile because texFile==null\n", gamepath.c_str());
 		}

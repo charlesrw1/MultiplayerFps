@@ -2,8 +2,11 @@
 #include "IntegrationTests/TestContext.h"
 #include "IntegrationTests/TestRegistry.h"
 #include "Framework/Files.h"
+#include "Framework/Util.h"
 #include "AssetTools/AssetDiagnostics.h"
 #include "AssetTools/AssetTemplates.h"
+
+extern bool compile_texture_asset(const std::string& gamepath, Color32&);
 
 static bool write_game_file(const std::string& path, const std::string& content) {
 	auto f = FileSys::open_write_game(path);
@@ -142,5 +145,57 @@ static TestTask test_filewatcher_auto_import_png(TestContext& t) {
 	co_return;
 }
 EDITOR_TEST("editor/filewatcher_auto_import_png", 10.f, test_filewatcher_auto_import_png);
+
+// ---------------------------------------------------------------------------
+// Test 5: compile_texture_asset does not recompile when .dds is up-to-date,
+//         even when called with a .png gamepath (regression: it compared .png
+//         timestamp vs .tis timestamp, which is always true after any compile).
+// ---------------------------------------------------------------------------
+
+static TestTask test_png_gamepath_no_spurious_recompile(TestContext& t) {
+	const std::string png_path = "textures/__test_no_recompile.png";
+	const std::string tis_path = "textures/__test_no_recompile.tis";
+	const std::string dds_path = "textures/__test_no_recompile.dds";
+
+	FileSys::delete_game_file(png_path);
+	FileSys::delete_game_file(tis_path);
+	FileSys::delete_game_file(dds_path);
+	ScopedTempFile guard_png(png_path);
+	ScopedTempFile guard_tis(tis_path);
+	ScopedTempFile guard_dds(dds_path);
+
+	t.require(write_game_file(png_path, "dummy png"), "wrote .png");
+
+	auto created = AssetTemplates::create_tis_for_png(png_path);
+	t.require(created.has_value(), "created .tis sidecar");
+
+	// Wait a tick so .dds timestamp is guaranteed >= .tis on any filesystem granularity.
+	co_await t.wait_ticks(2);
+
+	t.require(write_game_file(dds_path, "dummy dds"), "wrote .dds newer than .tis");
+
+	uint64_t dds_ts_before = 0;
+	{
+		auto f = FileSys::open_read_game(dds_path);
+		t.require(f != nullptr, ".dds readable before check");
+		dds_ts_before = f->get_timestamp();
+	}
+
+	// Call with .png gamepath — before the fix this always triggered a recompile
+	// because it compared .png timestamp (old) vs .tis timestamp (recently written).
+	Color32 dummy{};
+	bool result = compile_texture_asset(png_path, dummy);
+	t.check(result, "compile_texture_asset returned true (up-to-date)");
+
+	// .dds must not have been touched — texconv was not spawned
+	{
+		auto f = FileSys::open_read_game(dds_path);
+		t.require(f != nullptr, ".dds still exists after no-op check");
+		t.check(f->get_timestamp() == dds_ts_before, ".dds timestamp unchanged — no spurious recompile");
+	}
+
+	co_return;
+}
+EDITOR_TEST("editor/png_gamepath_no_spurious_recompile", 5.f, test_png_gamepath_no_spurious_recompile);
 
 #endif
