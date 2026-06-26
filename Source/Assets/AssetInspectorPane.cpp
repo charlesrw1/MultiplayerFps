@@ -264,7 +264,12 @@ void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
         ImGui::Spacing();
         if (ImGui::Button("Apply")) {
             write_texture_import_settings(tis, gamepath);
-            AssetCompiler::compile_asset(gamepath);
+            if (tis->load_source_file) {
+                // Remove any compiled .dds so the file watcher switches the browser entry to .png
+                FileSys::delete_game_file(strip_extension(gamepath) + ".dds");
+            } else {
+                AssetCompiler::compile_asset(gamepath);
+            }
             settings_dirty = false;
             load_for(last_selected);
         }
