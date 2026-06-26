@@ -153,22 +153,27 @@ void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
         int mip_w = std::max(1, sz.x >> selected_mip_);
         int mip_h = std::max(1, sz.y >> selected_mip_);
 
-        // Display at mip dimensions, capped at MAX_THUMB — this causes the GPU
-        // to naturally sample the selected mip level given the screen pixel ratio
+        // Always display at MAX_THUMB on the longest axis regardless of selected mip,
+        // so the thumbnail never shrinks when browsing mip levels.
         const float MAX_THUMB = 256.f;
-        float scale = std::min({ 1.f, MAX_THUMB / (float)mip_w, MAX_THUMB / (float)mip_h });
-        ImVec2 thumb_size(mip_w * scale, mip_h * scale);
+        float base_scale = (sz.x >= sz.y)
+            ? MAX_THUMB / std::max(1, sz.x)
+            : MAX_THUMB / std::max(1, sz.y);
+        ImVec2 thumb_size(sz.x * base_scale, sz.y * base_scale);
 
         auto tex_id = ImTextureID(uint64_t(tex->get_internal_render_handle()));
         ImGui::Image(tex_id, thumb_size);
 
-        // Hover to zoom: show magnified region in tooltip
-        if (ImGui::IsItemHovered() && ImGui::BeginTooltip()) {
-            ImVec2 mouse    = ImGui::GetMousePos();
-            ImVec2 item_min = ImGui::GetItemRectMin();
-            ImVec2 item_sz  = ImGui::GetItemRectSize();
-            float mx = (item_sz.x > 0) ? (mouse.x - item_min.x) / item_sz.x : 0.5f;
-            float my = (item_sz.y > 0) ? (mouse.y - item_min.y) / item_sz.y : 0.5f;
+        // Capture rect BEFORE BeginTooltip — inside the tooltip window GetItemRect*
+        // refers to the tooltip's last item, not the image we just drew.
+        bool hovered    = ImGui::IsItemHovered();
+        ImVec2 item_min = ImGui::GetItemRectMin();
+        ImVec2 item_sz  = ImGui::GetItemRectSize();
+
+        if (hovered && ImGui::BeginTooltip()) {
+            ImVec2 mouse = ImGui::GetMousePos();
+            float mx = (item_sz.x > 0.f) ? (mouse.x - item_min.x) / item_sz.x : 0.5f;
+            float my = (item_sz.y > 0.f) ? (mouse.y - item_min.y) / item_sz.y : 0.5f;
             const float region = 0.2f; // fraction of the texture shown in tooltip
             float u0 = mx - region * 0.5f, u1 = mx + region * 0.5f;
             float v0 = my - region * 0.5f, v1 = my + region * 0.5f;
