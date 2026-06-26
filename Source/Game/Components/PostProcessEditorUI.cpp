@@ -112,41 +112,54 @@ bool PostProcessComponentEditorUi::draw() {
     }
     ImGui::PopID();
 
-    // Lift/Gamma/Gain color wheels
-    // Picker maps [0,1] with 0.5=neutral. lift: neutral=0, range=0.2; gamma/gain: neutral=1, range=1.
-    auto draw_lgq_wheel = [&](const char* label, glm::vec3& val,
-                               float neutral, float range,
-                               const char* picker_id, const char* reset_id) {
-        ImGui::Text("%s", label);
-        ImGui::SameLine();
-        if (ImGui::SmallButton(reset_id)) { val = glm::vec3(neutral); changed = true; }
-        float col[4] = {
-            (val.r - neutral) / (2.f * range) + 0.5f,
-            (val.g - neutral) / (2.f * range) + 0.5f,
-            (val.b - neutral) / (2.f * range) + 0.5f,
-            1.f
-        };
-        col[0] = col[0] < 0.f ? 0.f : (col[0] > 1.f ? 1.f : col[0]);
-        col[1] = col[1] < 0.f ? 0.f : (col[1] > 1.f ? 1.f : col[1]);
-        col[2] = col[2] < 0.f ? 0.f : (col[2] > 1.f ? 1.f : col[2]);
-        const int flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_PickerHueWheel |
-                          ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoInputs;
-        if (ImGui::ColorPicker4(picker_id, col, flags)) {
-            val.r = (col[0] - 0.5f) * 2.f * range + neutral;
-            val.g = (col[1] - 0.5f) * 2.f * range + neutral;
-            val.b = (col[2] - 0.5f) * 2.f * range + neutral;
-            changed = true;
-        }
-        ImGui::Text("R:%.3f G:%.3f B:%.3f", val.r, val.g, val.b);
-    };
-
     ImGui::PushID("ppset_lgq");
     if (ImGui::CollapsingHeader("Lift / Gamma / Gain")) {
-        draw_lgq_wheel("Shadows (Lift)",     asset->lift,      0.f, 0.2f, "##lift_w",  "Reset##lift_r");
-        ImGui::Separator();
-        draw_lgq_wheel("Midtones (Gamma)",   asset->gamma_rgb, 1.f, 1.0f, "##gam_w",   "Reset##gam_r");
-        ImGui::Separator();
-        draw_lgq_wheel("Highlights (Gain)",  asset->gain,      1.f, 1.0f, "##gain_w",  "Reset##gain_r");
+        // Picker 0.5 = neutral for all bands. lift: neutral=0 range=0.2; gamma/gain: neutral=1 range=1
+        struct LgqBand { const char* label; glm::vec3* val; float neutral; float range;
+                         const char* pid; const char* rid; };
+        LgqBand bands[] = {
+            { "Shadows",    &asset->lift,      0.f, 0.2f, "##lift_w", "R##lift_r" },
+            { "Midtones",   &asset->gamma_rgb, 1.f, 1.0f, "##gam_w",  "R##gam_r"  },
+            { "Highlights", &asset->gain,      1.f, 1.0f, "##gain_w", "R##gain_r" },
+        };
+        constexpr int picker_flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_PickerHueWheel |
+                                     ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoInputs;
+
+        if (ImGui::BeginTable("##lgq_tbl", 3, ImGuiTableFlags_SizingStretchSame)) {
+            // Row 1: labels + reset buttons
+            ImGui::TableNextRow();
+            for (auto& b : bands) {
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(b.label);
+                ImGui::SameLine();
+                if (ImGui::SmallButton(b.rid)) { *b.val = glm::vec3(b.neutral); changed = true; }
+            }
+            // Row 2: color wheels (picker fills column width → automatically small)
+            ImGui::TableNextRow();
+            for (auto& b : bands) {
+                ImGui::TableNextColumn();
+                float col[4] = {
+                    (b.val->r - b.neutral) / (2.f * b.range) + 0.5f,
+                    (b.val->g - b.neutral) / (2.f * b.range) + 0.5f,
+                    (b.val->b - b.neutral) / (2.f * b.range) + 0.5f,
+                    1.f
+                };
+                for (int i = 0; i < 3; ++i) col[i] = col[i] < 0.f ? 0.f : (col[i] > 1.f ? 1.f : col[i]);
+                if (ImGui::ColorPicker4(b.pid, col, picker_flags)) {
+                    b.val->r = (col[0] - 0.5f) * 2.f * b.range + b.neutral;
+                    b.val->g = (col[1] - 0.5f) * 2.f * b.range + b.neutral;
+                    b.val->b = (col[2] - 0.5f) * 2.f * b.range + b.neutral;
+                    changed = true;
+                }
+            }
+            // Row 3: compact RGB readout
+            ImGui::TableNextRow();
+            for (auto& b : bands) {
+                ImGui::TableNextColumn();
+                ImGui::Text("%.2f %.2f %.2f", b.val->r, b.val->g, b.val->b);
+            }
+            ImGui::EndTable();
+        }
     }
     ImGui::PopID();
 
