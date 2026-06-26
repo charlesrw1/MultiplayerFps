@@ -10,14 +10,18 @@ layout(std430, binding = 0) buffer HistogramSSBO {
 };
 
 layout(std140, binding = 8) uniform AutoExposureParamsUBO {
-    float ae_speed;
+    float ae_speed_up;
     float ae_key;
     float ae_min_ev;
     float ae_max_ev;
     float ae_dt;
     float ae_hist_min_log;
     float ae_hist_max_log;
-    float ae_pad;
+    float ae_low_pct;
+    float ae_high_pct;
+    float ae_speed_down;
+    float ae_pad2;
+    float ae_pad3;
 } ae;
 
 void main() {

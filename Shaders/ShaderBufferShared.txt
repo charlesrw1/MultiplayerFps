@@ -186,7 +186,7 @@ struct LitCompositorParams {
 
 // ---- Auto-exposure params (bound at slot 8 in AE passes) ------------------
 struct AutoExposureParams {
-    float ae_speed;        //  0  adaptation speed (1/seconds)
+    float ae_speed_up;     //  0  dark→bright adaptation speed (1/seconds)
     float ae_key;          //  4  target middle grey (0.18)
     float ae_min_ev;       //  8  min log2 exposure clamp
     float ae_max_ev;       // 12  max log2 exposure clamp
@@ -195,7 +195,7 @@ struct AutoExposureParams {
     float ae_hist_max_log; // 24  histogram log2-lum range max (4)
     float ae_low_pct;      // 28  fraction of darkest pixels to exclude (0=none)
     float ae_high_pct;     // 32  fraction of brightest pixels to exclude (0=none)
-    float ae_pad1;         // 36
+    float ae_speed_down;   // 36  bright→dark adaptation speed (1/seconds)
     float ae_pad2;         // 40
     float ae_pad3;         // 44
                            // total: 48 bytes (3*16, valid std140)

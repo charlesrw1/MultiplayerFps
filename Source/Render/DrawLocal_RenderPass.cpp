@@ -139,7 +139,8 @@ void Renderer::render_auto_exposure(IGraphicsTexture* scene_hdr, const PostProce
 
 	// Build and upload AutoExposureParams
 	gpu::AutoExposureParams aep{};
-	aep.ae_speed        = pp.ae_speed;
+	aep.ae_speed_up     = pp.ae_speed_up;
+	aep.ae_speed_down   = pp.ae_speed_down;
 	aep.ae_key          = pp.ae_key;
 	aep.ae_min_ev       = pp.ae_min_ev;
 	aep.ae_max_ev       = pp.ae_max_ev;

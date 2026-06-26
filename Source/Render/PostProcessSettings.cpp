@@ -57,7 +57,8 @@ bool PostProcessSettings::load_asset() {
         ae_method     = j.value("ae_method",     0);
         ae_min_ev     = j.value("ae_min_ev",    -3.f);
         ae_max_ev     = j.value("ae_max_ev",     3.f);
-        ae_speed      = j.value("ae_speed",      1.f);
+        ae_speed_up   = j.value("ae_speed_up",   3.f);
+        ae_speed_down = j.value("ae_speed_down", 1.f);
         ae_key        = j.value("ae_key",        0.18f);
         ae_low_pct    = j.value("ae_low_pct",    0.4f);
         ae_high_pct   = j.value("ae_high_pct",   0.1f);
@@ -87,7 +88,8 @@ void PostProcessSettings::save_to_disk() {
     j["ae_method"]     = ae_method;
     j["ae_min_ev"]     = ae_min_ev;
     j["ae_max_ev"]     = ae_max_ev;
-    j["ae_speed"]      = ae_speed;
+    j["ae_speed_up"]   = ae_speed_up;
+    j["ae_speed_down"] = ae_speed_down;
     j["ae_key"]        = ae_key;
     j["ae_low_pct"]    = ae_low_pct;
     j["ae_high_pct"]   = ae_high_pct;

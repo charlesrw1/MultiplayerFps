@@ -6,14 +6,18 @@ layout(binding = 0) uniform sampler2D bloom_avg;       // bloom tail (already sp
 layout(binding = 1) uniform sampler2D prev_exposure;   // previous frame 1x1 R16F
 
 layout(std140, binding = 8) uniform AutoExposureParamsUBO {
-    float ae_speed;
+    float ae_speed_up;
     float ae_key;
     float ae_min_ev;
     float ae_max_ev;
     float ae_dt;
     float ae_hist_min_log;
     float ae_hist_max_log;
-    float ae_pad;
+    float ae_low_pct;
+    float ae_high_pct;
+    float ae_speed_down;
+    float ae_pad2;
+    float ae_pad3;
 } ae;
 
 layout(location = 0) out vec4 out_color;
@@ -32,7 +36,8 @@ void main() {
     float prev = texture(prev_exposure, vec2(0.5)).r;
     if (prev < 0.0001) prev = target_exp; // first frame: no flash
 
-    // exponential adaptation
-    float adapted = prev + (target_exp - prev) * (1.0 - exp(-ae.ae_dt * ae.ae_speed));
+    // exponential adaptation — faster toward bright, slower toward dark
+    float speed   = (target_exp > prev) ? ae.ae_speed_up : ae.ae_speed_down;
+    float adapted = prev + (target_exp - prev) * (1.0 - exp(-ae.ae_dt * speed));
     out_color = vec4(adapted, 0.0, 0.0, 1.0);
 }

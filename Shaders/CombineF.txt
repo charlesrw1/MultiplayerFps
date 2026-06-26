@@ -145,8 +145,11 @@ void main()
 
 	vec3 bloom_add = texture(bloom, texCoord).rgb;
 	vec3 both = mix(scene, bloom_add + scene, bloom_lerp);
-	// Auto-exposure: replace manual exposure with adapted value when enabled
-	float final_exposure = (ae_enabled != 0) ? texture(ae_exposure_tex, vec2(0.5)).r : exposure;
+	// When AE is on, adapted exposure * manual exposure (acts as trim/bias).
+	// When AE is off, manual exposure only.
+	float final_exposure = (ae_enabled != 0)
+	    ? texture(ae_exposure_tex, vec2(0.5)).r * exposure
+	    : exposure;
 	both *= final_exposure;
 
 	if (tonemap_type == 1)
