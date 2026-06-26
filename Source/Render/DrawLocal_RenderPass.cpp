@@ -201,7 +201,8 @@ void Renderer::render_auto_exposure(IGraphicsTexture* scene_hdr, const PostProce
 		gfx().bind_image_for_compute(1, tex.ae_lum[ping], 0, -1, GraphicsImageAccess::ReadOnly);
 		gfx().bind_image_for_compute(2, tex.ae_lum[pong], 0, -1, GraphicsImageAccess::WriteOnly);
 		gfx().dispatch_compute(1, 1, 1);
-		gfx().memory_barrier(BARRIER_SHADER_IMAGE_ACCESS);
+		// TEXTURE_FETCH barrier: makes imageStore writes visible to subsequent texture() calls
+		gfx().memory_barrier(BARRIER_SHADER_IMAGE_ACCESS | BARRIER_TEXTURE_FETCH);
 	}
 
 	ae_ping = pong; // swap for next frame

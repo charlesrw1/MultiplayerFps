@@ -1,4 +1,3 @@
-#version 430 core
 // Clear 256-bin histogram SSBO to zero.
 
 layout(local_size_x = 256) in;

@@ -193,7 +193,7 @@ struct AutoExposureParams {
     float ae_dt;           // 16  frame delta time
     float ae_hist_min_log; // 20  histogram log2-lum range min (-10)
     float ae_hist_max_log; // 24  histogram log2-lum range max (4)
-    float _pad;            // 28
+    float ae_pad;          // 28
                            // total: 32 bytes (2*16, valid std140)
 };
 
