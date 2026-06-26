@@ -110,6 +110,9 @@ layout (binding = 7, std140) uniform LitCompositorParamsUbo { LitCompositorParam
 #define sharpness          params.sharpness
 #define color_temp         params.color_temp
 #define grain_time         params.grain_time
+#define lgq_lift           params.lgq_lift.xyz
+#define lgq_gamma          params.lgq_gamma.xyz
+#define lgq_gain           params.lgq_gain.xyz
 
 const float max_white = 1.0;
 
@@ -150,6 +153,9 @@ void main()
 		both = uncharted2_filmic(both);
 
 	vec3 srgb = pow(max(both, vec3(0.0)), vec3(1.0/2.2));
+
+	// CDL primary grading: out = pow(max(in * gain + lift, 0), 1/gamma)
+	srgb = pow(max(srgb * lgq_gain + lgq_lift, vec3(0.0)), 1.0 / max(lgq_gamma, vec3(0.01)));
 
 	srgb = color_contrast(srgb, contrast_tweak);
 	srgb = saturation_color_grade(srgb, saturation_tweak);

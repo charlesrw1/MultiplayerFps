@@ -25,11 +25,16 @@ public:
     REF float grain_size         = 1.f;
     REF float sharpness          = 0.f;
     REF float color_temp         = 0.f; // -1=cool, +1=warm
+    // CDL primary grading — not REF (handled by color wheel custom UI)
+    glm::vec3 lift      = {0.f, 0.f, 0.f};
+    glm::vec3 gamma_rgb = {1.f, 1.f, 1.f};
+    glm::vec3 gain      = {1.f, 1.f, 1.f};
 
     PostProcessParams to_params() const {
         return {exposure, contrast, saturation, bloom_intensity, bloom_enabled, tonemap_type,
                 vignette_intensity, vignette_falloff, chromatic_ab,
-                grain_intensity, grain_size, sharpness, color_temp};
+                grain_intensity, grain_size, sharpness, color_temp,
+                lift, gamma_rgb, gain};
     }
 
     void save_to_disk();

@@ -472,6 +472,9 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 			lp.sharpness          = pp.sharpness;
 			lp.color_temp         = pp.color_temp;
 			lp.grain_time         = (float)(SDL_GetTicks() * 0.001);
+			lp.lgq_lift           = vec4(pp.lift,      0.f);
+			lp.lgq_gamma          = vec4(pp.gamma_rgb, 0.f);
+			lp.lgq_gain           = vec4(pp.gain,      0.f);
 			ubo.lit_compositor_params->upload(&lp, sizeof(lp));
 			gfx().bind_uniform_buffer_base(7, ubo.lit_compositor_params);
 		}

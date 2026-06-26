@@ -148,7 +148,8 @@ struct BakeParams {
 //   CombineF                    : tonemap_type, contrast_tweak, saturation_tweak,
 //                                 bloom_lerp, exposure, vignette_intensity,
 //                                 vignette_falloff, chromatic_ab, grain_intensity,
-//                                 grain_size, sharpness, color_temp, grain_time
+//                                 grain_size, sharpness, color_temp, grain_time,
+//                                 lgq_lift, lgq_gamma, lgq_gain (CDL grading)
 // Note: the shared `specular_ao_intensity` from reflectionShared.txt lives
 // in DdgiRuntimeParams — reflectionShared is included only by group E shaders.
 // Bound at slot 7. TILED=2 loop re-uploads per tile.
@@ -173,7 +174,10 @@ struct LitCompositorParams {
     float sharpness;             // 116        (CombineF; unsharp mask strength)
     float color_temp;            // 120        (CombineF; -1=cool, +1=warm)
     float grain_time;            // 124        (CombineF; set per-frame for animated grain)
-                                 // total: 128 bytes (8*16, valid std140)
+    vec4 lgq_lift;               // 128..143   (CombineF; .xyz = CDL lift / shadow offset)
+    vec4 lgq_gamma;              // 144..159   (CombineF; .xyz = CDL gamma / midtone power)
+    vec4 lgq_gain;               // 160..175   (CombineF; .xyz = CDL gain / highlight scale)
+                                 // total: 176 bytes (11*16, valid std140)
 };
 
 // ---- E. DDGI runtime -------------------------------------------------------

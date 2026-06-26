@@ -6,6 +6,7 @@
 #include "Assets/AssetBrowser.h"
 #include "Framework/Files.h"
 #include "Framework/StringUtils.h"
+#include "glm/vec3.hpp"
 #include <json.hpp>
 #include "imgui.h"
 
@@ -26,6 +27,9 @@ static bool create_ppset_file(const std::string& path) {
     j["grain_size"]         = 1.f;
     j["sharpness"]          = 0.f;
     j["color_temp"]         = 0.f;
+    j["lift"]      = {0.f, 0.f, 0.f};
+    j["gamma_rgb"] = {1.f, 1.f, 1.f};
+    j["gain"]      = {1.f, 1.f, 1.f};
     std::string text = j.dump(2);
     auto f = FileSys::open_write_game(path);
     if (!f) return false;
@@ -105,6 +109,44 @@ bool PostProcessComponentEditorUi::draw() {
         slider("Contrast",   asset->contrast,   0.f, 3.f);
         slider("Saturation", asset->saturation, 0.f, 3.f);
         slider("Color Temp", asset->color_temp, -1.f, 1.f);
+    }
+    ImGui::PopID();
+
+    // Lift/Gamma/Gain color wheels
+    // Picker maps [0,1] with 0.5=neutral. lift: neutral=0, range=0.2; gamma/gain: neutral=1, range=1.
+    auto draw_lgq_wheel = [&](const char* label, glm::vec3& val,
+                               float neutral, float range,
+                               const char* picker_id, const char* reset_id) {
+        ImGui::Text("%s", label);
+        ImGui::SameLine();
+        if (ImGui::SmallButton(reset_id)) { val = glm::vec3(neutral); changed = true; }
+        float col[4] = {
+            (val.r - neutral) / (2.f * range) + 0.5f,
+            (val.g - neutral) / (2.f * range) + 0.5f,
+            (val.b - neutral) / (2.f * range) + 0.5f,
+            1.f
+        };
+        col[0] = col[0] < 0.f ? 0.f : (col[0] > 1.f ? 1.f : col[0]);
+        col[1] = col[1] < 0.f ? 0.f : (col[1] > 1.f ? 1.f : col[1]);
+        col[2] = col[2] < 0.f ? 0.f : (col[2] > 1.f ? 1.f : col[2]);
+        const int flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_PickerHueWheel |
+                          ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoInputs;
+        if (ImGui::ColorPicker4(picker_id, col, flags)) {
+            val.r = (col[0] - 0.5f) * 2.f * range + neutral;
+            val.g = (col[1] - 0.5f) * 2.f * range + neutral;
+            val.b = (col[2] - 0.5f) * 2.f * range + neutral;
+            changed = true;
+        }
+        ImGui::Text("R:%.3f G:%.3f B:%.3f", val.r, val.g, val.b);
+    };
+
+    ImGui::PushID("ppset_lgq");
+    if (ImGui::CollapsingHeader("Lift / Gamma / Gain")) {
+        draw_lgq_wheel("Shadows (Lift)",     asset->lift,      0.f, 0.2f, "##lift_w",  "Reset##lift_r");
+        ImGui::Separator();
+        draw_lgq_wheel("Midtones (Gamma)",   asset->gamma_rgb, 1.f, 1.0f, "##gam_w",   "Reset##gam_r");
+        ImGui::Separator();
+        draw_lgq_wheel("Highlights (Gain)",  asset->gain,      1.f, 1.0f, "##gain_w",  "Reset##gain_r");
     }
     ImGui::PopID();
 

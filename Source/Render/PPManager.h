@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include "glm/vec3.hpp"
 
 struct PostProcessParams {
     float exposure          = 1.f;
@@ -15,6 +16,9 @@ struct PostProcessParams {
     float grain_size         = 1.f; // higher = finer grain
     float sharpness          = 0.f;
     float color_temp         = 0.f; // -1=cool, +1=warm
+    glm::vec3 lift     = {0.f, 0.f, 0.f}; // shadow offset (CDL)
+    glm::vec3 gamma_rgb = {1.f, 1.f, 1.f}; // midtone power (CDL)
+    glm::vec3 gain     = {1.f, 1.f, 1.f}; // highlight scale (CDL)
 };
 
 class PPManager {

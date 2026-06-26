@@ -1,6 +1,7 @@
 #include "PostProcessSettings.h"
 #include "Framework/Files.h"
 #include "Framework/Util.h"
+#include "glm/vec3.hpp"
 #include <json.hpp>
 
 #ifdef EDITOR_BUILD
@@ -42,6 +43,16 @@ bool PostProcessSettings::load_asset() {
         grain_size         = j.value("grain_size",         1.f);
         sharpness          = j.value("sharpness",          0.f);
         color_temp         = j.value("color_temp",         0.f);
+        auto load_vec3 = [&](const char* key, glm::vec3 def) -> glm::vec3 {
+            if (!j.contains(key) || !j[key].is_array()) return def;
+            auto& a = j[key];
+            return { a.size()>0 ? a[0].get<float>() : def.r,
+                     a.size()>1 ? a[1].get<float>() : def.g,
+                     a.size()>2 ? a[2].get<float>() : def.b };
+        };
+        lift      = load_vec3("lift",      {0.f,0.f,0.f});
+        gamma_rgb = load_vec3("gamma_rgb", {1.f,1.f,1.f});
+        gain      = load_vec3("gain",      {1.f,1.f,1.f});
     } catch (const nlohmann::json::exception& e) {
         sys_print(Warning, "PostProcessSettings: JSON error in %s: %s\n", get_name().c_str(), e.what());
         return false;
@@ -64,6 +75,9 @@ void PostProcessSettings::save_to_disk() {
     j["grain_size"]         = grain_size;
     j["sharpness"]          = sharpness;
     j["color_temp"]         = color_temp;
+    j["lift"]      = {lift.r,      lift.g,      lift.b};
+    j["gamma_rgb"] = {gamma_rgb.r, gamma_rgb.g, gamma_rgb.b};
+    j["gain"]      = {gain.r,      gain.g,      gain.b};
 
     std::string text = j.dump(2);
     auto file = FileSys::open_write_game(get_name());
