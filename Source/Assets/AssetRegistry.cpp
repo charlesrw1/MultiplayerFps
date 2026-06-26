@@ -276,6 +276,8 @@ void AssetRegistrySystem::update() {
 	};
 
 	for (auto rel_path : changed) {
+		if (rel_path.find(".thumbnails/") != std::string::npos)
+			continue;
 		sys_print(Info, "AssetRegistry: file changed: %s\n", rel_path.c_str());
 		auto ext = StringUtils::get_extension_no_dot(rel_path);
 
@@ -448,6 +450,8 @@ void AssetRegistrySystem::reindex_all_assets() {
 
 	for (const auto& full : FileSys::find_game_files()) {
 		auto gp = FileSys::get_game_path_from_full_path(full);
+		if (gp.find(".thumbnails/") != std::string::npos)
+			continue;
 		auto ext = get_extension_no_dot(gp);
 
 		if (ext == "cmdl" || ext == "mis") {
