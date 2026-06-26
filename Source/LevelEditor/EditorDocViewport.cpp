@@ -328,6 +328,8 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 
 	// Popup rendered outside the menu bar scope so it can overlap freely
 	if (ImGui::BeginPopup("##snap_settings")) {
+		ImGui::TextDisabled("Snap Settings");
+		ImGui::Separator();
 		auto snap_row = [](const char* label, ConfigVar& cvar, float min_val, float max_val, const char* fmt) {
 			float val = cvar.get_float();
 			ImGui::TextUnformatted(label);
