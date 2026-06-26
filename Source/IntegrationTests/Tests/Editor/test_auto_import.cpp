@@ -7,6 +7,7 @@
 #include "AssetTools/AssetTemplates.h"
 
 extern bool compile_texture_asset(const std::string& gamepath, Color32& outColor);
+#include "Render/Editor/TextureEditor.h" // TextureImportSettings, write_texture_import_settings
 
 static bool write_game_file(const std::string& path, const std::string& content) {
 	auto f = FileSys::open_write_game(path);
@@ -197,5 +198,103 @@ static TestTask test_png_gamepath_no_spurious_recompile(TestContext& t) {
 	co_return;
 }
 EDITOR_TEST("editor/png_gamepath_no_spurious_recompile", 5.f, test_png_gamepath_no_spurious_recompile);
+
+// ---------------------------------------------------------------------------
+// Test 6: compile_texture_asset returns true (no-op) for a UI texture whose
+//         .tis has an empty src_file — no .dds should be created.
+// ---------------------------------------------------------------------------
+
+static TestTask test_ui_texture_no_compile(TestContext& t) {
+	const std::string png_path = "textures/__test_ui_tex.png";
+	const std::string tis_path = "textures/__test_ui_tex.tis";
+	const std::string dds_path = "textures/__test_ui_tex.dds";
+
+	FileSys::delete_game_file(png_path);
+	FileSys::delete_game_file(tis_path);
+	FileSys::delete_game_file(dds_path);
+	ScopedTempFile guard_png(png_path);
+	ScopedTempFile guard_tis(tis_path);
+
+	t.require(write_game_file(png_path, "dummy png"), "wrote .png");
+
+	// Write a properly serialized .tis with empty src_file — simulates a UI texture
+	{
+		TextureImportSettings ui_tis;
+		ui_tis.src_file = ""; // empty = UI texture, no compile
+		write_texture_import_settings(&ui_tis, tis_path);
+	}
+	t.require(FileSys::does_file_exist(tis_path.c_str(), FileSys::GAME_DIR), "wrote UI .tis");
+
+	Color32 dummy{};
+	bool result = compile_texture_asset(png_path, dummy);
+	t.check(result, "compile_texture_asset returns true for UI texture (no-op)");
+	t.check(!FileSys::does_file_exist(dds_path.c_str(), FileSys::GAME_DIR),
+			"no .dds produced for UI texture");
+
+	co_return;
+}
+EDITOR_TEST("editor/ui_texture_no_compile", 5.f, test_ui_texture_no_compile);
+
+// ---------------------------------------------------------------------------
+// Test 7: nearest_filtering is read correctly from .tis for a .png load path
+// ---------------------------------------------------------------------------
+
+// Forward-declare the static helper from Texture.cpp via a thin wrapper in this TU
+// so we can test it in isolation without loading a GPU texture.
+// We replicate the logic directly here — if the impl changes, update both.
+#include <json.hpp>
+#include "AssetCompile/Someutils.h"
+static bool test_read_tis_nearest(const std::string& gamepath) {
+	const std::string tis_path = strip_extension(gamepath) + ".tis";
+	auto f = FileSys::open_read_game(tis_path);
+	if (!f) return false;
+	std::string text(f->size(), '\0');
+	f->read(text.data(), text.size());
+	f->close();
+	const std::string_view prefix = "!json\n";
+	if (text.size() < prefix.size() || text.compare(0, prefix.size(), prefix) != 0)
+		return false;
+	try {
+		auto j = nlohmann::json::parse(text.data() + prefix.size(), text.data() + text.size());
+		return j.value("nearest_filtering", false);
+	} catch (...) { return false; }
+}
+
+static TestTask test_nearest_filtering_tis_roundtrip(TestContext& t) {
+	const std::string png_path = "textures/__test_nearest.png";
+	const std::string tis_path = "textures/__test_nearest.tis";
+
+	FileSys::delete_game_file(png_path);
+	FileSys::delete_game_file(tis_path);
+	ScopedTempFile guard_png(png_path);
+	ScopedTempFile guard_tis(tis_path);
+
+	t.require(write_game_file(png_path, "dummy png"), "wrote .png");
+
+	// nearest_filtering = false (default)
+	{
+		TextureImportSettings tis;
+		tis.src_file = "";
+		tis.nearest_filtering = false;
+		write_texture_import_settings(&tis, tis_path);
+	}
+	t.check(!test_read_tis_nearest(png_path), "nearest_filtering false reads back false");
+
+	// nearest_filtering = true
+	{
+		TextureImportSettings tis;
+		tis.src_file = "";
+		tis.nearest_filtering = true;
+		write_texture_import_settings(&tis, tis_path);
+	}
+	t.check(test_read_tis_nearest(png_path), "nearest_filtering true reads back true");
+
+	// Missing .tis → defaults to false
+	FileSys::delete_game_file(tis_path);
+	t.check(!test_read_tis_nearest(png_path), "missing .tis returns false");
+
+	co_return;
+}
+EDITOR_TEST("editor/nearest_filtering_tis_roundtrip", 5.f, test_nearest_filtering_tis_roundtrip);
 
 #endif

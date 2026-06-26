@@ -160,6 +160,7 @@ std::string turn_gamepath_into_src_path(const std::string& gamepath, const std::
 	return dir;
 }
 
+// @docs [[rendering/texture_pipeline#compile_texture_asset flow]]
 bool compile_texture_asset(const std::string& gamepath, Color32& outColor) {
 #ifdef WITH_TEXTURE_COMPILE
 	TextureImportSettings* tis = nullptr;
@@ -206,6 +207,13 @@ bool compile_texture_asset(const std::string& gamepath, Color32& outColor) {
 		}
 
 		if (!needsCompile) {
+			return true;
+		}
+
+		// Empty src_file means this is a UI/direct-load texture — no texconv needed.
+		// The .tis sidecar exists only to carry settings (nearest_filtering, etc.).
+		if (tis->src_file.empty()) {
+			sys_print(Debug, "%s has empty src_file (UI texture), skipping compile\n", gamepath.c_str());
 			return true;
 		}
 

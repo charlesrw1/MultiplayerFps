@@ -31,6 +31,7 @@
 // TextureEditor.cpp
 extern bool compile_texture_asset(const std::string& gamepath, Color32& outColor);
 
+// @docs [[rendering/texture_pipeline#nearest_filtering at load time]]
 // Read just the nearest_filtering field from a .tis sidecar for a given gamepath
 // (any extension — strips to stem then appends .tis). Returns false if no .tis or field absent.
 static bool read_tis_nearest_filtering(const std::string& gamepath) {

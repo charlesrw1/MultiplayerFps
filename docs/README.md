@@ -12,6 +12,7 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 ## Rendering & Assets
 
 - [[asset_tools]] — AssetTools static lib: compiler, diagnostics, file ops (mv/rm/cp), asset templates
+- [[rendering/texture_pipeline]] — .tis/.dds/.png flow: compile, nearest_filtering, UI textures, inspector
 - [[rendering/materials]] — `.mm` / `.mi` authoring + material system internals
 - [[rendering/decals]] — decal materials, write flags, parallax occlusion mapping
 - [[rendering/model_importing]] — `.glb` import, `.mis` settings, `.cmdl` paths
