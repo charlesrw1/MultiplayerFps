@@ -196,6 +196,22 @@ bool PostProcessComponentEditorUi::draw() {
     }
     ImGui::PopID();
 
+    ImGui::PushID("ppset_ae");
+    if (ImGui::CollapsingHeader("Auto-Exposure")) {
+        changed |= ImGui::Checkbox("Enabled", &asset->auto_exposure);
+        if (asset->auto_exposure) {
+            static const char* ae_methods[] = { "Downsample (bloom avg)", "Histogram (256-bin)" };
+            int m = asset->ae_method;
+            ImGui::SetNextItemWidth(200);
+            if (ImGui::Combo("Method", &m, ae_methods, 2)) { asset->ae_method = m; changed = true; }
+            slider("Min EV",     asset->ae_min_ev, -8.f,  0.f);
+            slider("Max EV",     asset->ae_max_ev,  0.f,  8.f);
+            slider("Speed",      asset->ae_speed,   0.1f, 5.f);
+            slider("Key (grey)", asset->ae_key,     0.01f, 1.f, "%.3f");
+        }
+    }
+    ImGui::PopID();
+
     if (changed)
         comp->sync_render_data();
 

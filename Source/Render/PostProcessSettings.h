@@ -30,11 +30,19 @@ public:
     glm::vec3 gamma_rgb = {1.f, 1.f, 1.f};
     glm::vec3 gain      = {1.f, 1.f, 1.f};
 
+    REF bool  auto_exposure = false;
+    REF int   ae_method     = 0;
+    REF float ae_min_ev     = -3.f;
+    REF float ae_max_ev     =  3.f;
+    REF float ae_speed      =  1.f;
+    REF float ae_key        = 0.18f;
+
     PostProcessParams to_params() const {
         return {exposure, contrast, saturation, bloom_intensity, bloom_enabled, tonemap_type,
                 vignette_intensity, vignette_falloff, chromatic_ab,
                 grain_intensity, grain_size, sharpness, color_temp,
-                lift, gamma_rgb, gain};
+                lift, gamma_rgb, gain,
+                auto_exposure, ae_method, ae_min_ev, ae_max_ev, ae_speed, ae_key};
     }
 
     void save_to_disk();

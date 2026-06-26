@@ -1,0 +1,39 @@
+#version 430 core
+// Downsample auto-exposure: reads 1x1 averaged HDR from bloom chain,
+// computes log-average luminance, lerps toward target exposure, stores in out_lum.
+// @docs [[rendering/post_process#auto-exposure]]
+
+layout(binding = 0) uniform sampler2D bloom_avg;       // 1x1 or Nx1 bloom tail
+layout(binding = 1) uniform sampler2D prev_exposure;   // previous frame 1x1 R16F
+
+layout(std140, binding = 8) uniform AutoExposureParamsUBO {
+    float ae_speed;
+    float ae_key;
+    float ae_min_ev;
+    float ae_max_ev;
+    float ae_dt;
+    float ae_hist_min_log;
+    float ae_hist_max_log;
+    float _pad;
+} ae;
+
+layout(location = 0) out float out_exposure;
+
+void main() {
+    vec3 hdr    = texture(bloom_avg, vec2(0.5)).rgb;
+    float lum   = dot(hdr, vec3(0.2126, 0.7152, 0.0722));
+    lum         = max(lum, 0.0001);
+
+    // target exposure: key / avg-lum
+    float target_exp = ae.ae_key / lum;
+    target_exp = clamp(target_exp,
+                       exp2(ae.ae_min_ev),
+                       exp2(ae.ae_max_ev));
+
+    float prev = texture(prev_exposure, vec2(0.5)).r;
+    if (prev < 0.0001) prev = target_exp; // first frame: no flash
+
+    // exponential adaptation
+    float adapted = prev + (target_exp - prev) * (1.0 - exp(-ae.ae_dt * ae.ae_speed));
+    out_exposure  = adapted;
+}

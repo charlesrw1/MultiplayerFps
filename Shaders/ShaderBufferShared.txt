@@ -177,7 +177,24 @@ struct LitCompositorParams {
     vec4 lgq_lift;               // 128..143   (CombineF; .xyz = CDL lift / shadow offset)
     vec4 lgq_gamma;              // 144..159   (CombineF; .xyz = CDL gamma / midtone power)
     vec4 lgq_gain;               // 160..175   (CombineF; .xyz = CDL gain / highlight scale)
-                                 // total: 176 bytes (11*16, valid std140)
+    int  ae_enabled;             // 176        (CombineF; 1=use ae_exposure_tex at binding 4)
+    int  _ae_pad0;               // 180
+    int  _ae_pad1;               // 184
+    int  _ae_pad2;               // 188
+                                 // total: 192 bytes (12*16, valid std140)
+};
+
+// ---- Auto-exposure params (bound at slot 8 in AE passes) ------------------
+struct AutoExposureParams {
+    float ae_speed;        //  0  adaptation speed (1/seconds)
+    float ae_key;          //  4  target middle grey (0.18)
+    float ae_min_ev;       //  8  min log2 exposure clamp
+    float ae_max_ev;       // 12  max log2 exposure clamp
+    float ae_dt;           // 16  frame delta time
+    float ae_hist_min_log; // 20  histogram log2-lum range min (-10)
+    float ae_hist_max_log; // 24  histogram log2-lum range max (4)
+    float _pad;            // 28
+                           // total: 32 bytes (2*16, valid std140)
 };
 
 // ---- E. DDGI runtime -------------------------------------------------------

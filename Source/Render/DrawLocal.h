@@ -183,6 +183,12 @@ public:
 		program_handle height_fog{};
 		program_handle volfog_apply{};
 		program_handle editor_ortho_grid{};
+
+		// Auto-exposure
+		program_handle ae_downsample{};      // fullscreen frag (method 0)
+		program_handle ae_hist_clear{};      // compute: zero 256 bins
+		program_handle ae_hist_build{};      // compute: build histogram from scene HDR
+		program_handle ae_hist_average{};    // compute: reduce → adapted exposure
 	} prog;
 
 	struct textures
@@ -240,6 +246,9 @@ public:
 		std::array<BloomChain, MAX_BLOOM_MIPS> bloom_chain = {};
 		int number_bloom_mips = 0;
 
+		// Auto-exposure ping-pong: 1×1 R16F, alternates each frame
+		IGraphicsTexture* ae_lum[2] = {};
+
 		// "virtual texture system" handles, does that even make sense?
 		Texture* bloom_vts_handle = nullptr;
 		Texture* scene_color_vts_handle = nullptr;
@@ -278,6 +287,8 @@ public:
 		IGraphicsBuffer* lighting_uniforms{};
 		IGraphicsBuffer* decal_uniforms{};
 		IGraphicsBuffer* fog_uniforms{};
+		IGraphicsBuffer* ae_histogram{};    // 256 × uint32 SSBO (1KB)
+		IGraphicsBuffer* ae_params{};       // AutoExposureParams UBO (32 bytes)
 	} buf;
 
 	struct vertex_array_objects
@@ -342,6 +353,7 @@ private:
 
 	void init_bloom_buffers();
 	void render_bloom_chain(IGraphicsTexture* scene_color);
+	void render_auto_exposure(IGraphicsTexture* scene_hdr, const PostProcessParams& pp, float dt);
 
 	void InitFramebuffers(bool create_composite_texture, int s_w, int s_h);
 
@@ -349,6 +361,7 @@ private:
 
 	int cur_w = 0;
 	int cur_h = 0;
+	int ae_ping = 0; // alternates 0/1 each frame for AE ping-pong
 
 	Program_Manager prog_man;
 

@@ -53,6 +53,12 @@ bool PostProcessSettings::load_asset() {
         lift      = load_vec3("lift",      {0.f,0.f,0.f});
         gamma_rgb = load_vec3("gamma_rgb", {1.f,1.f,1.f});
         gain      = load_vec3("gain",      {1.f,1.f,1.f});
+        auto_exposure = j.value("auto_exposure", false);
+        ae_method     = j.value("ae_method",     0);
+        ae_min_ev     = j.value("ae_min_ev",    -3.f);
+        ae_max_ev     = j.value("ae_max_ev",     3.f);
+        ae_speed      = j.value("ae_speed",      1.f);
+        ae_key        = j.value("ae_key",        0.18f);
     } catch (const nlohmann::json::exception& e) {
         sys_print(Warning, "PostProcessSettings: JSON error in %s: %s\n", get_name().c_str(), e.what());
         return false;
@@ -75,7 +81,13 @@ void PostProcessSettings::save_to_disk() {
     j["grain_size"]         = grain_size;
     j["sharpness"]          = sharpness;
     j["color_temp"]         = color_temp;
-    j["lift"]      = {lift.r,      lift.g,      lift.b};
+    j["auto_exposure"] = auto_exposure;
+    j["ae_method"]     = ae_method;
+    j["ae_min_ev"]     = ae_min_ev;
+    j["ae_max_ev"]     = ae_max_ev;
+    j["ae_speed"]      = ae_speed;
+    j["ae_key"]        = ae_key;
+    j["lift"]          = {lift.r, lift.g, lift.b};
     j["gamma_rgb"] = {gamma_rgb.r, gamma_rgb.g, gamma_rgb.b};
     j["gain"]      = {gain.r,      gain.g,      gain.b};
 

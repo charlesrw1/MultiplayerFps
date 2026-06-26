@@ -6,6 +6,7 @@ layout(binding = 0) uniform sampler2D scene_lit;
 layout(binding = 1) uniform sampler2D bloom;
 layout(binding = 2) uniform sampler2D lens_dirt;
 layout(binding = 3) uniform sampler2D last_scene_lit;	// for TAA
+layout(binding = 4) uniform sampler2D ae_exposure_tex; // 1x1 R16F adapted exposure
 
 float luminance(vec3 v)
 {
@@ -113,6 +114,7 @@ layout (binding = 7, std140) uniform LitCompositorParamsUbo { LitCompositorParam
 #define lgq_lift           params.lgq_lift.xyz
 #define lgq_gamma          params.lgq_gamma.xyz
 #define lgq_gain           params.lgq_gain.xyz
+#define ae_enabled         params.ae_enabled
 
 const float max_white = 1.0;
 
@@ -143,7 +145,9 @@ void main()
 
 	vec3 bloom_add = texture(bloom, texCoord).rgb;
 	vec3 both = mix(scene, bloom_add + scene, bloom_lerp);
-	both *= exposure;
+	// Auto-exposure: replace manual exposure with adapted value when enabled
+	float final_exposure = (ae_enabled != 0) ? texture(ae_exposure_tex, vec2(0.5)).r : exposure;
+	both *= final_exposure;
 
 	if (tonemap_type == 1)
 		both = reinhard_extended_luminance(both, max_white);

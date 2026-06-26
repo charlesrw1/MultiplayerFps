@@ -19,6 +19,13 @@ struct PostProcessParams {
     glm::vec3 lift     = {0.f, 0.f, 0.f}; // shadow offset (CDL)
     glm::vec3 gamma_rgb = {1.f, 1.f, 1.f}; // midtone power (CDL)
     glm::vec3 gain     = {1.f, 1.f, 1.f}; // highlight scale (CDL)
+    // Auto-exposure
+    bool  auto_exposure = false;
+    int   ae_method     = 0;    // 0=downsample(bloom), 1=histogram
+    float ae_min_ev     = -3.f; // min log2 exposure clamp
+    float ae_max_ev     =  3.f; // max log2 exposure clamp
+    float ae_speed      =  1.f; // adaptation speed (1/seconds)
+    float ae_key        = 0.18f;// target middle grey
 };
 
 class PPManager {

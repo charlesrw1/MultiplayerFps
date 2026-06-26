@@ -29,9 +29,12 @@ namespace {
 // gpu::BloomParams is declared in Shaders/ShaderBufferShared.txt and shared
 // verbatim with the BloomDownsampleF/BloomUpsampleF GLSL.
 static_assert(sizeof(gpu::BloomParams) == 16, "std140");
+static_assert(sizeof(gpu::AutoExposureParams) == 32, "std140");
 
 // Per-pass UBO group slot. See [[rendering/gfx_abstraction#2a]].
 constexpr int PER_PASS_PARAMS_UBO_BINDING = 7;
+// Auto-exposure UBO sits at slot 8 (non-conflicting).
+constexpr int AE_PARAMS_UBO_BINDING = 8;
 }
 
 void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
@@ -127,6 +130,81 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 	}
 
 	// gfx().reset_state_cache();
+}
+
+void Renderer::render_auto_exposure(IGraphicsTexture* scene_hdr, const PostProcessParams& pp, float dt) {
+	if (!pp.auto_exposure) return;
+	ZoneScoped;
+	GPUFUNCTIONSTART;
+
+	// Build and upload AutoExposureParams
+	gpu::AutoExposureParams aep{};
+	aep.ae_speed        = pp.ae_speed;
+	aep.ae_key          = pp.ae_key;
+	aep.ae_min_ev       = pp.ae_min_ev;
+	aep.ae_max_ev       = pp.ae_max_ev;
+	aep.ae_dt           = dt;
+	aep.ae_hist_min_log = -10.f;
+	aep.ae_hist_max_log =  4.f;
+	buf.ae_params->upload(&aep, sizeof(aep));
+	gfx().bind_uniform_buffer_base(AE_PARAMS_UBO_BINDING, buf.ae_params);
+
+	int ping = ae_ping;
+	int pong = 1 - ae_ping;
+
+	if (pp.ae_method == 0) {
+		// --- Method 0: downsample (read bloom chain tail) ---
+		// The smallest bloom mip is already a spatial average of the scene.
+		IGraphicsTexture* bloom_avg = (tex.number_bloom_mips > 0)
+			? tex.bloom_chain[tex.number_bloom_mips - 1].texture
+			: scene_hdr;
+
+		RenderPipelineState ps;
+		ps.vao     = get_empty_vao();
+		ps.program = draw.get_prog_man().get_obj(prog.ae_downsample);
+		gfx().set_pipeline(ps);
+
+		ColorTargetInfo target(tex.ae_lum[pong]);
+		auto color_infos = { target };
+		RenderPassState pass_state;
+		pass_state.color_infos = color_infos;
+		gfx().set_render_pass(pass_state);
+		gfx().set_viewport(0, 0, 1, 1);
+
+		gfx().bind_texture(0, bloom_avg);
+		gfx().bind_texture(1, tex.ae_lum[ping]);
+		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
+	} else {
+		// --- Method 1: histogram ---
+		gfx().begin_compute_pass();
+
+		// Clear histogram
+		{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(prog.ae_hist_clear); gfx().set_pipeline(ps); }
+		gfx().bind_storage_buffer_base(0, buf.ae_histogram);
+		gfx().dispatch_compute(1, 1, 1);
+		gfx().memory_barrier(BARRIER_SHADER_STORAGE);
+
+		// Build histogram
+		{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(prog.ae_hist_build); gfx().set_pipeline(ps); }
+		gfx().bind_texture(0, scene_hdr);
+		gfx().bind_storage_buffer_base(0, buf.ae_histogram);
+		{
+			int gx = (cur_w + 15) / 16;
+			int gy = (cur_h + 15) / 16;
+			gfx().dispatch_compute(gx, gy, 1);
+		}
+		gfx().memory_barrier(BARRIER_SHADER_STORAGE);
+
+		// Reduce → adapted exposure
+		{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(prog.ae_hist_average); gfx().set_pipeline(ps); }
+		gfx().bind_storage_buffer_base(0, buf.ae_histogram);
+		gfx().bind_image_for_compute(1, tex.ae_lum[ping], 0, -1, GraphicsImageAccess::ReadOnly);
+		gfx().bind_image_for_compute(2, tex.ae_lum[pong], 0, -1, GraphicsImageAccess::WriteOnly);
+		gfx().dispatch_compute(1, 1, 1);
+		gfx().memory_barrier(BARRIER_SHADER_IMAGE_ACCESS);
+	}
+
+	ae_ping = pong; // swap for next frame
 }
 
 void setup_batch(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled, bool force_show_backfaces,

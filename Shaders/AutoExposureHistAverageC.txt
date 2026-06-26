@@ -1,0 +1,68 @@
+#version 430 core
+// Parallel-reduce 256-bin histogram → weighted avg log-lum → adapted exposure.
+// Skips darkest bins (sky/lights exclusion) then lerps prev exposure.
+
+layout(local_size_x = 256) in;
+
+layout(std430, binding = 0) buffer HistogramSSBO {
+    uint bins[256];
+};
+
+layout(binding = 1, r16f) uniform image2D prev_exposure; // ping-pong in
+layout(binding = 2, r16f) uniform image2D out_exposure;  // ping-pong out
+
+layout(std140, binding = 8) uniform AutoExposureParamsUBO {
+    float ae_speed;
+    float ae_key;
+    float ae_min_ev;
+    float ae_max_ev;
+    float ae_dt;
+    float ae_hist_min_log;
+    float ae_hist_max_log;
+    float _pad;
+} ae;
+
+shared float s_log_lum[256];
+shared uint  s_count[256];
+
+void main() {
+    uint idx = gl_LocalInvocationIndex;
+
+    // Load bin into shared memory
+    uint count       = bins[idx];
+    float bin_center = (float(idx) + 0.5) / 256.0;
+    float log_lum    = ae.ae_hist_min_log +
+                       bin_center * (ae.ae_hist_max_log - ae.ae_hist_min_log);
+
+    s_log_lum[idx] = log_lum * float(count);
+    s_count[idx]   = count;
+    barrier();
+
+    // Parallel reduction
+    for (uint stride = 128u; stride > 0u; stride >>= 1u) {
+        if (idx < stride) {
+            s_log_lum[idx] += s_log_lum[idx + stride];
+            s_count[idx]   += s_count[idx + stride];
+        }
+        barrier();
+    }
+
+    if (idx == 0u) {
+        uint  total   = max(s_count[0], 1u);
+        float avg_log = s_log_lum[0] / float(total);
+        float avg_lum = exp2(avg_log);
+        avg_lum       = max(avg_lum, 0.0001);
+
+        float target_exp = ae.ae_key / avg_lum;
+        target_exp = clamp(target_exp,
+                           exp2(ae.ae_min_ev),
+                           exp2(ae.ae_max_ev));
+
+        float prev = imageLoad(prev_exposure, ivec2(0, 0)).r;
+        if (prev < 0.0001) prev = target_exp;
+
+        float adapted = prev + (target_exp - prev) *
+                        (1.0 - exp(-ae.ae_dt * ae.ae_speed));
+        imageStore(out_exposure, ivec2(0, 0), vec4(adapted, 0, 0, 0));
+    }
+}

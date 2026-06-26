@@ -425,6 +425,12 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	// Bloom update
 	render_bloom_chain(scene_color_handle);
 
+	// Auto-exposure (after bloom so method 0 can read bloom tail)
+	{
+		const PostProcessParams ae_pp = PPManager::inst ? PPManager::inst->get_active() : PostProcessParams{};
+		render_auto_exposure(scene_color_handle, ae_pp, params.dt);
+	}
+
 	IGraphicsTexture* read_from_texture = tex.output_composite;
 	const auto& view_to_use = current_frame_view;
 	assert(cur_w == view_to_use.width && cur_h == view_to_use.height);
@@ -456,6 +462,10 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		bind_texture_ptr(0, scene_color_handle);
 		bind_texture_ptr(1, bloom_tex);
 		bind_texture_ptr(2, lens_dirt->gpu_ptr);
+		// binding 3 is reserved (lens dirt was 2, keep old layout)
+		// binding 4: adapted exposure texture (1x1 R16F); use previous ping so it's ready
+		IGraphicsTexture* ae_tex = tex.ae_lum[ae_ping] ? tex.ae_lum[ae_ping] : black_texture;
+		bind_texture_ptr(4, ae_tex);
 
 		{
 			gpu::LitCompositorParams lp{};
@@ -475,6 +485,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 			lp.lgq_lift           = vec4(pp.lift,      0.f);
 			lp.lgq_gamma          = vec4(pp.gamma_rgb, 0.f);
 			lp.lgq_gain           = vec4(pp.gain,      0.f);
+			lp.ae_enabled         = pp.auto_exposure ? 1 : 0;
 			ubo.lit_compositor_params->upload(&lp, sizeof(lp));
 			gfx().bind_uniform_buffer_base(7, ubo.lit_compositor_params);
 		}

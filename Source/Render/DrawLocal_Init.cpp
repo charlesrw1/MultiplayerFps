@@ -66,6 +66,12 @@ void Renderer::create_shaders() {
 	prog.volfog_apply = prog_man.create_raster("fullscreenquad.txt", "VolfogApplyF.txt");
 	prog.editor_ortho_grid = prog_man.create_raster("fullscreenquad.txt", "EditorOrthoGridF.txt");
 
+	// Auto-exposure shaders
+	prog.ae_downsample   = prog_man.create_raster("fullscreenquad.txt", "AutoExposureF.txt");
+	prog.ae_hist_clear   = prog_man.create_compute("AutoExposureHistClearC.txt");
+	prog.ae_hist_build   = prog_man.create_compute("AutoExposureHistBuildC.txt");
+	prog.ae_hist_average = prog_man.create_compute("AutoExposureHistAverageC.txt");
+
 	// prog_man.create_single_file()
 	// volumetric fog shaders
 	volfog.prog.lightcalc = prog_man.create_compute("VfogScatteringC.txt");
@@ -335,6 +341,20 @@ void Renderer::init() {
 	create_storage_uniform_buffer(buf.lighting_uniforms);
 	create_storage_uniform_buffer(buf.decal_uniforms);
 	create_storage_uniform_buffer(buf.fog_uniforms);
+	// Auto-exposure histogram SSBO: 256 × uint32
+	{
+		CreateBufferArgs args;
+		args.size  = 256 * sizeof(uint32_t);
+		args.flags = GraphicsBufferUseFlags(BUFFER_USE_AS_STORAGE_READ | BUFFER_USE_DYNAMIC);
+		buf.ae_histogram = gfx().create_buffer(args);
+	}
+	// Auto-exposure params UBO (AutoExposureParams, 32 bytes)
+	{
+		CreateBufferArgs args;
+		args.size  = 32; // sizeof(AutoExposureParams) — must match ShaderBufferShared.txt
+		args.flags = BUFFER_USE_DYNAMIC;
+		buf.ae_params = gfx().create_buffer(args);
+	}
 	create_uniform_buffer(ubo.bloom_params);
 	create_uniform_buffer(ubo.temporal_params);
 	create_uniform_buffer(ubo.cull_params);
@@ -573,6 +593,18 @@ void Renderer::init_bloom_buffers() {
 	}
 
 	tex.bloom_vts_handle->update_specs_ptr(tex.bloom_chain[0].texture);
+
+	// AE ping-pong: 1×1 R16F
+	for (int i = 0; i < 2; ++i) {
+		safe_release(tex.ae_lum[i]);
+		CreateTextureArgs args;
+		args.width   = 1;
+		args.height  = 1;
+		args.format  = GraphicsTextureFormat::r16f;
+		args.num_mip_maps = 1;
+		args.sampler_type = GraphicsSamplerType::NearestClamped;
+		tex.ae_lum[i] = gfx().create_texture(args);
+	}
 }
 
 #ifdef EDITOR_BUILD
