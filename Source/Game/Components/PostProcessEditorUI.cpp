@@ -90,42 +90,56 @@ bool PostProcessComponentEditorUi::draw() {
         changed |= ImGui::SliderFloat(label, &v, lo, hi, fmt);
     };
 
+    ImGui::PushID("ppset_tonemap");
     if (ImGui::CollapsingHeader("Tonemap & Exposure", ImGuiTreeNodeFlags_DefaultOpen)) {
         static const char* tonemap_names[] = { "Linear", "Reinhard", "ACES", "Uncharted 2" };
         int tm = asset->tonemap_type;
         ImGui::SetNextItemWidth(180);
         if (ImGui::Combo("Tonemap", &tm, tonemap_names, 4)) { asset->tonemap_type = tm; changed = true; }
-        slider("Exposure",    asset->exposure,   0.f, 8.f);
+        slider("Exposure", asset->exposure, 0.f, 8.f);
     }
+    ImGui::PopID();
 
+    ImGui::PushID("ppset_grade");
     if (ImGui::CollapsingHeader("Color Grading", ImGuiTreeNodeFlags_DefaultOpen)) {
-        slider("Contrast",    asset->contrast,   0.f, 3.f);
-        slider("Saturation",  asset->saturation, 0.f, 3.f);
-        slider("Color Temp",  asset->color_temp, -1.f, 1.f);
+        slider("Contrast",   asset->contrast,   0.f, 3.f);
+        slider("Saturation", asset->saturation, 0.f, 3.f);
+        slider("Color Temp", asset->color_temp, -1.f, 1.f);
     }
+    ImGui::PopID();
 
+    ImGui::PushID("ppset_bloom");
     if (ImGui::CollapsingHeader("Bloom", ImGuiTreeNodeFlags_DefaultOpen)) {
         changed |= ImGui::Checkbox("Bloom Enabled", &asset->bloom_enabled);
         slider("Bloom Intensity", asset->bloom_intensity, 0.f, 1.f);
     }
+    ImGui::PopID();
 
+    ImGui::PushID("ppset_vignette");
     if (ImGui::CollapsingHeader("Vignette")) {
         slider("Intensity", asset->vignette_intensity, 0.f, 1.f);
         slider("Falloff",   asset->vignette_falloff,   0.5f, 4.f);
     }
+    ImGui::PopID();
 
+    ImGui::PushID("ppset_ca");
     if (ImGui::CollapsingHeader("Chromatic Aberration")) {
         slider("Amount", asset->chromatic_ab, 0.f, 0.02f, "%.4f");
     }
+    ImGui::PopID();
 
+    ImGui::PushID("ppset_sharp");
     if (ImGui::CollapsingHeader("Sharpness")) {
-        slider("Sharpness", asset->sharpness, 0.f, 3.f);
+        slider("Amount", asset->sharpness, 0.f, 3.f);
     }
+    ImGui::PopID();
 
+    ImGui::PushID("ppset_grain");
     if (ImGui::CollapsingHeader("Film Grain")) {
         slider("Intensity", asset->grain_intensity, 0.f, 0.2f, "%.3f");
         slider("Scale",     asset->grain_size,      0.1f, 3.f);
     }
+    ImGui::PopID();
 
     if (changed)
         comp->sync_render_data();
