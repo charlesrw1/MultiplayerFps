@@ -87,12 +87,24 @@ AssetInspectorPane::~AssetInspectorPane() = default;
 
 void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
     last_selected = selected;
-    raw_file_contents = read_game_text(selected.filename);
     settings_dirty = false;
     cache_.reset();
+    active_tis_path_.clear();
 
     auto ext = StringUtils::get_extension_no_dot(selected.filename);
+
+    // .dds → resolve to the .tis sidecar
+    std::string load_path = selected.filename;
+    if (ext == "dds") {
+        load_path = strip_extension(selected.filename) + ".tis";
+        ext = "tis";
+    }
+
+    raw_file_contents = read_game_text(load_path);
+
     if (ext != "tis" && ext != "mis") return;
+
+    active_tis_path_ = (ext == "tis") ? load_path : "";
 
     std::string json = strip_json_prefix(raw_file_contents);
     if (json.empty()) return;
@@ -265,6 +277,7 @@ void AssetInspectorPane::imgui_draw(const AssetOnDisk& selected) {
     auto ext = StringUtils::get_extension_no_dot(selected.filename);
 
     if      (ext == "tis") draw_tis_settings(selected.filename);
+    else if (ext == "dds") draw_tis_settings(active_tis_path_.empty() ? strip_extension(selected.filename) + ".tis" : active_tis_path_);
     else if (ext == "mis") draw_mis_settings(selected.filename);
     else if (ext == "mm" || ext == "mi") draw_material_text(selected.filename);
     else    ImGui::TextDisabled("Extension: .%s", ext.c_str());

@@ -27,6 +27,7 @@ private:
 
     AssetOnDisk last_selected;
     std::string raw_file_contents;
+    std::string active_tis_path_; // resolved .tis path — may differ from last_selected when a .dds is selected
     bool settings_dirty = false;
 
     // Owns: MakeObjectFromPathGeneric + ReadSerializerBackendJson + PropertyGrid
