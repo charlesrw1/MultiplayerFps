@@ -39,6 +39,7 @@ struct InspectorCache {
     std::unique_ptr<ReadSerializerBackendJson> reader;
     std::unique_ptr<PropertyGrid> pg;
     ClassBase* obj = nullptr; // non-owning; reader owns the lifetime
+    std::vector<std::string> mat_paths; // editable material paths for MIS inspector
 };
 
 static std::string read_game_text(const std::string& gamepath) {
@@ -114,10 +115,12 @@ void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
     c->reader = std::make_unique<ReadSerializerBackendJson>("inspector", json, c->objmaker);
     c->obj = c->reader->get_root_obj();
     if (c->obj) {
-        // PropertyGrid only needed for .mis; .tis uses a manual editor
         if (ext == "mis") {
-            c->pg = std::make_unique<PropertyGrid>(get_basic_factory());
-            c->pg->add_class_to_grid(c->obj);
+            auto* mis = c->obj->cast_to<ModelImportSettings>();
+            if (mis) {
+                for (auto& m : mis->myMaterials)
+                    c->mat_paths.push_back(m.ptr ? m.ptr->get_name() : "");
+            }
         }
         cache_ = std::move(c);
     }
@@ -280,15 +283,118 @@ void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
 }
 
 void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
-    if (!cache_ || !cache_->pg) { ImGui::TextDisabled("(parse error)"); return; }
-    auto* mis = cache_->obj ? cache_->obj->cast_to<ModelImportSettings>() : nullptr;
+    if (!cache_ || !cache_->obj) { ImGui::TextDisabled("(parse error)"); return; }
+    auto* mis = cache_->obj->cast_to<ModelImportSettings>();
     if (!mis) { ImGui::TextDisabled("(not MIS)"); return; }
 
-    cache_->pg->update();
-    if (cache_->pg->rows_had_changes) {
-        cache_->pg->rows_had_changes = false;
-        write_model_import_settings(mis, gamepath);
-        AssetCompiler::compile_asset(gamepath);
+    bool changed = false;
+
+    ImGui::LabelText("Source", "%s", mis->srcGlbFile.c_str());
+    ImGui::Separator();
+
+    // --- LOD distances ---
+    ImGui::Text("LOD Screen-Space Thresholds");
+    ImGui::SameLine();
+    ImGui::TextDisabled("(fraction of screen height)");
+    ImGui::Indent();
+    auto& lods = mis->lodScreenSpaceSizes;
+    for (int i = 0; i < (int)lods.size(); i++) {
+        ImGui::PushID(i);
+        ImGui::Text("LOD %d:", i + 1);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(90.f);
+        if (ImGui::DragFloat("##lv", &lods[i], 0.001f, 0.0f, 1.0f, "%.4f"))
+            changed = true;
+        ImGui::SameLine();
+        char overlay[16];
+        snprintf(overlay, sizeof(overlay), "%.2f%%", lods[i] * 100.f);
+        ImGui::ProgressBar(std::min(lods[i], 1.0f), ImVec2(80.f, 0.f), overlay);
+        ImGui::SameLine();
+        if (ImGui::SmallButton("-##rm")) {
+            lods.erase(lods.begin() + i);
+            changed = true;
+            ImGui::PopID();
+            break;
+        }
+        ImGui::PopID();
+    }
+    ImGui::Unindent();
+    if (ImGui::Button("+ LOD")) {
+        float v = lods.empty() ? 0.1f : lods.back() * 0.5f;
+        lods.push_back(std::max(0.0001f, v));
+        changed = true;
+    }
+
+    ImGui::Separator();
+
+    // --- Material slots ---
+    ImGui::Text("Material Slots");
+    ImGui::Indent();
+    auto& mats = mis->myMaterials;
+    auto& mat_paths = cache_->mat_paths;
+    // Keep mat_paths in sync with mats (may have been modified in-session)
+    while (mat_paths.size() < mats.size())
+        mat_paths.push_back(mats[mat_paths.size()].ptr ? mats[mat_paths.size()].ptr->get_name() : "");
+    mat_paths.resize(mats.size());
+
+    static char mat_buf[512];
+    for (int i = 0; i < (int)mat_paths.size(); i++) {
+        ImGui::PushID(i);
+        ImGui::Text("[%d]", i);
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(-36.f);
+        strncpy_s(mat_buf, sizeof(mat_buf), mat_paths[i].c_str(), _TRUNCATE);
+        if (ImGui::InputText("##m", mat_buf, sizeof(mat_buf))) {
+            mat_paths[i] = mat_buf;
+            changed = true;
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("x##rm")) {
+            mats.erase(mats.begin() + i);
+            mat_paths.erase(mat_paths.begin() + i);
+            changed = true;
+            ImGui::PopID();
+            break;
+        }
+        ImGui::PopID();
+    }
+    ImGui::Unindent();
+    if (ImGui::Button("+ Material")) {
+        mats.emplace_back();
+        mat_paths.push_back("");
+        changed = true;
+    }
+
+    ImGui::Separator();
+
+    // --- Collision & generation flags ---
+    changed |= ImGui::Checkbox("Mesh as Convex", &mis->meshAsConvex);
+    changed |= ImGui::Checkbox("Mesh as Collision", &mis->meshAsCollision);
+    changed |= ImGui::Checkbox("Generate Auto LODs", &mis->generate_auto_lods);
+
+    if (changed) settings_dirty = true;
+
+    if (settings_dirty) {
+        ImGui::Spacing();
+        if (ImGui::Button("Apply")) {
+            // Sync edited material paths back into the AssetPtr array
+            mats.resize(mat_paths.size());
+            for (int i = 0; i < (int)mat_paths.size(); i++) {
+                if (mat_paths[i].empty()) {
+                    mats[i].ptr = nullptr;
+                } else {
+                    auto found = g_assets.find<MaterialInstance>(mat_paths[i]);
+                    mats[i].ptr = static_cast<MaterialInstance*>(found.ptr);
+                }
+            }
+            write_model_import_settings(mis, gamepath);
+            AssetCompiler::compile_asset(gamepath);
+            settings_dirty = false;
+            load_for(last_selected);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Revert"))
+            load_for(last_selected);
     }
 }
 
