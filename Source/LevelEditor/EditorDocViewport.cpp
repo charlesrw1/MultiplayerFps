@@ -228,6 +228,18 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 	                snap_on, "Snap to Grid", "Ctrl"))
 		ed_has_snap.set_bool(!snap_on);
 
+	ImGui::SameLine(0, 0);
+	ImGui::PushStyleColor(ImGuiCol_Button,        snap_on ? col_active   : col_inactive);
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, snap_on ? col_hov_act  : col_hov);
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImGui::GetStyle().Colors[ImGuiCol_HeaderActive]);
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(3, 3));
+	const bool snap_dd_clicked = ImGui::ArrowButton("##snap_dd", ImGuiDir_Down);
+	ImGui::PopStyleVar();
+	ImGui::PopStyleColor(3);
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+		ImGui::BeginTooltip(); ImGui::TextUnformatted("Snap Settings"); ImGui::EndTooltip();
+	}
+
 	// -- Coordinate space -------------------------------------------------
 	const bool is_local = manipulate->get_mode() == ImGuizmo::MODE::LOCAL;
 	if (toolbar_btn(is_local ? get_icon("local_coord.png") : get_icon("global_coord.png"),
@@ -310,10 +322,36 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 
 	// OpenPopup must be called outside BeginMenuBar()/EndMenuBar() so it shares
 	// the same window ID namespace as the BeginPopup() calls below.
+	if (snap_dd_clicked) ImGui::OpenPopup("##snap_settings");
 	if (dbg_btn_clicked) ImGui::OpenPopup("##dbg_view");
 	if (ot_btn_clicked)  ImGui::OpenPopup("##ot_view");
 
 	// Popup rendered outside the menu bar scope so it can overlap freely
+	if (ImGui::BeginPopup("##snap_settings")) {
+		auto snap_row = [](const char* label, ConfigVar& cvar, float min_val, float max_val, const char* fmt) {
+			float val = cvar.get_float();
+			ImGui::TextUnformatted(label);
+			ImGui::SameLine(110.f);
+			ImGui::PushID(label);
+			if (ImGui::SmallButton("/2")) cvar.set_float(glm::clamp(val * 0.5f, min_val, max_val));
+			ImGui::SameLine();
+			char buf[32]; snprintf(buf, sizeof(buf), fmt, val);
+			ImGui::SetNextItemWidth(70.f);
+			if (ImGui::InputText("##v", buf, sizeof(buf), ImGuiInputTextFlags_EnterReturnsTrue)) {
+				float parsed = (float)atof(buf);
+				if (parsed > 0.f) cvar.set_float(glm::clamp(parsed, min_val, max_val));
+			}
+			ImGui::SameLine();
+			if (ImGui::SmallButton("x2")) cvar.set_float(glm::clamp(val * 2.0f, min_val, max_val));
+			ImGui::PopID();
+		};
+
+		snap_row("Translation",  ed_translation_snap, 0.05f, 128.f,  "%.4g");
+		snap_row("Rotation (°)", ed_rotation_snap,    1.0f,  180.f,  "%.4g");
+		snap_row("Scale",        ed_scale_snap,        0.05f, 64.f,   "%.4g");
+		ImGui::EndPopup();
+	}
+
 	if (ImGui::BeginPopup("##dbg_view")) {
 		for (int i = 0; i < (int)(sizeof(debug_modes)/sizeof(debug_modes[0])); i++) {
 			if (i == 1) ImGui::Separator(); // separator after "Lit"
