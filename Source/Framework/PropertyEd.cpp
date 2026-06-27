@@ -214,10 +214,11 @@ void PropertyGrid::update() {
 
 	ImGuiTableFlags const flags =
 		ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit;
-	if (ImGui::BeginTable("Table", 2, flags)) {
+	if (ImGui::BeginTable("Table", 3, flags)) {
 
 		ImGui::TableSetupColumn("##Header", ImGuiTableColumnFlags_WidthFixed, 200);
 		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
+		ImGui::TableSetupColumn("##Reset",  ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize, 24);
 
 		for (int i = 0; i < rows.size(); i++) {
 			rows[i]->update(this, 0.0);
@@ -244,36 +245,27 @@ void IGridRow::update(PropertyGrid* parentGrid, float header_ofs) {
 	ImGui::PushID(this);
 
 	ImGui::TableNextRow();
+
+	// Column 0: property name
 	ImGui::TableNextColumn();
 	ImGui::AlignTextToFramePadding();
-
 	draw_header(header_ofs);
 
+	// Column 1: editor (stretches to fill)
 	ImGui::TableNextColumn();
-	ImGuiTableFlags const flags = ImGuiTableFlags_BordersInnerV;
-	if (ImGui::BeginTable("GridTable", 2, flags)) {
-		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
-		ImGui::TableSetupColumn("##Reset", ImGuiTableColumnFlags_WidthFixed, 30.0);
+	ImGui::AlignTextToFramePadding();
+	const bool had_changes = internal_update();
+	if (had_changes)
+		parentGrid->set_rows_had_changes();
 
-		ImGui::TableNextRow();
-
-		ImGui::TableNextColumn();
-		ImGui::AlignTextToFramePadding();
-
-		const bool had_changes = internal_update();
-		if (had_changes)
+	// Column 2: reset button (fixed, shared outer column — always aligned)
+	ImGui::TableNextColumn();
+	if (has_reset_button()) {
+		auto reset_img = g_assets.find<Texture>("eng/icon/undo.png");
+		if (my_imgui_image_button(reset_img, 14)) {
+			on_reset();
 			parentGrid->set_rows_had_changes();
-
-		ImGui::TableNextColumn();
-		if (has_reset_button()) {
-			auto reset_img = g_assets.find<Texture>("eng/icon/undo.png");
-			if (my_imgui_image_button(reset_img, 14)) {
-				on_reset();
-				parentGrid->set_rows_had_changes();
-			}
 		}
-
-		ImGui::EndTable();
 	}
 
 	ImGui::PopID();

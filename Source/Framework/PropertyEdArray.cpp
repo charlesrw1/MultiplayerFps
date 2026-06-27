@@ -64,7 +64,30 @@ bool ArrayRow::internal_update() {
 
 	ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1.0), "elements: %d", get_size());
 
-	if (header && !header->can_edit_array()) {
+	bool can_edit_arr = !header || header->can_edit_array();
+	if (can_edit_arr) {
+		auto addimg   = g_assets.find<Texture>("eng/icon/plus.png");
+		auto trashimg = g_assets.find<Texture>("eng/icon/trash.png");
+
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Button, 0);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint_arr({245, 242, 242, 55}));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+#pragma warning(disable : 4312)
+		if (my_imgui_image_button(addimg, 13))
+			pending_add = true;
+		if (!header || header->has_delete_all()) {
+			ImGui::SameLine();
+			ImGui::BeginDisabled(child_rows.empty());
+			if (my_imgui_image_button(trashimg, 13))
+				pending_clear = true;
+			ImGui::EndDisabled();
+		}
+#pragma warning(default : 4312)
+		ImGui::PopStyleColor(3);
+	}
+
+	if (!can_edit_arr) {
 		commands.clear();
 		pending_add = pending_clear = false;
 	}
@@ -187,31 +210,6 @@ void ArrayRow::draw_header(float header_ofs) {
 		ImGui::TreePop();
 	ImGui::PopStyleColor(3);
 
-	// Inline [+] and [trash] buttons — right of the label, only if editable
-	if (!header || header->can_edit_array()) {
-		auto addimg   = g_assets.find<Texture>("eng/icon/plus.png");
-		auto trashimg = g_assets.find<Texture>("eng/icon/trash.png");
-
-		ImGui::SameLine();
-		ImGui::PushStyleColor(ImGuiCol_Button, 0);
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint_arr({245, 242, 242, 55}));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
-
-#pragma warning(disable : 4312)
-		if (my_imgui_image_button(addimg, 13))
-			pending_add = true;
-
-		if (!header || header->has_delete_all()) {
-			ImGui::SameLine();
-			ImGui::BeginDisabled(child_rows.empty());
-			if (my_imgui_image_button(trashimg, 13))
-				pending_clear = true;
-			ImGui::EndDisabled();
-		}
-#pragma warning(default : 4312)
-
-		ImGui::PopStyleColor(3);
-	}
 }
 
 void ArrayRow::rebuild_child_rows() {

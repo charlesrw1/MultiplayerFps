@@ -137,8 +137,8 @@ void GroupRow::draw_header(float ofs) {
 	ArrayRow* array_ = is_array_item ? (ArrayRow*)parent : nullptr;
 	bool can_edit = array_ && (!array_->header || array_->header->can_edit_array());
 
-	// Drag handle for array items
-	if (is_array_item && can_edit && !array_->header) {
+	// Drag handle — all array items when editable
+	if (is_array_item && can_edit) {
 		ImGui::PushStyleColor(ImGuiCol_Button, 0);
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint_grp({255, 255, 255, 30}));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
@@ -157,11 +157,8 @@ void GroupRow::draw_header(float ofs) {
 	ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
 	ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
 
-	bool is_array = row_index != -1;
 	bool has_drawn = false;
-	if (is_array) {
-		ArrayRow* array_ = (ArrayRow*)parent;
-
+	if (is_array_item) {
 		array_->hook_update_pre_tree_node();
 
 		if (array_->header) {
@@ -170,31 +167,30 @@ void GroupRow::draw_header(float ofs) {
 		}
 	}
 	if (!has_drawn) {
-
 		uint32_t flags = (row_index == -1) ? ImGuiTreeNodeFlags_DefaultOpen : 0;
 		expanded = ImGui::TreeNodeEx(name.c_str(), flags);
 		if (property)
 			draw_tooltip_grp(property);
-
 		if (expanded)
 			ImGui::TreePop();
+	}
 
-		// Drop target on tree node for reordering (no custom header only)
-		if (is_array_item && can_edit && !array_->header) {
-			if (ImGui::BeginDragDropTarget()) {
-				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROP_ARRAY_ITEM")) {
-					int from = *(const int*)payload->Data;
-					if (from != row_index)
-						array_->reorder_index(from, row_index);
-				}
-				ImGui::EndDragDropTarget();
+	// Drop target on whatever label was drawn
+	if (is_array_item && can_edit) {
+		if (ImGui::BeginDragDropTarget()) {
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROP_ARRAY_ITEM")) {
+				int from = *(const int*)payload->Data;
+				if (from != row_index)
+					array_->reorder_index(from, row_index);
 			}
+			ImGui::EndDragDropTarget();
 		}
 	}
+
 	ImGui::PopStyleColor(3);
 
-	// Delete button inline at end of header (array items without custom header)
-	if (is_array_item && can_edit && !array_->header) {
+	// Delete button inline at end of header for all editable array items
+	if (is_array_item && can_edit) {
 		auto trash1 = g_assets.find<Texture>("eng/icon/trash1.png");
 		ImGui::SameLine();
 		ImGui::PushStyleColor(ImGuiCol_Button, 0);
