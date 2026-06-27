@@ -3,22 +3,27 @@
 #include "PropertyEditors.h"
 #include "Framework/FnFactory.h"
 #include "Assets/AssetRegistry.h"
+#include "Assets/AssetRegistryLocal.h"
 #include "Framework/Config.h"
 #include "Assets/AssetBrowser.h"
 #include "LevelEditor/EditorDocLocal.h"
 #include "Assets/AssetDatabase.h"
 #include "Framework/MyImguiLib.h"
+#include "Framework/StringUtils.h"
+#include "Render/Texture.h"
 
 #include "Game/Components/PhysicsComponents.h"
 #include "Game/Components/LightComponents.h"
 
 #include "imgui_internal.h"
+
+int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
+
 bool SharedAssetPropertyEditor::internal_update() {
-	assert(prop->class_type && prop->type == core_type_id::AssetPtr);
+	ASSERT(prop->class_type && prop->type == core_type_id::AssetPtr);
 	if (!has_init) {
 		has_init = true;
 		asset_str = get_str();
-
 		metadata = AssetRegistrySystem::get().find_for_classtype(prop->class_type);
 	}
 	if (!metadata) {
@@ -26,64 +31,193 @@ bool SharedAssetPropertyEditor::internal_update() {
 		return false;
 	}
 
-	auto drawlist = ImGui::GetWindowDrawList();
+	auto* drawlist = ImGui::GetWindowDrawList();
 	auto& style = ImGui::GetStyle();
-	auto min = ImGui::GetCursorScreenPos();
-	auto sz = ImGui::CalcTextSize(asset_str.c_str());
-	float width = ImGui::CalcItemWidth();
-	Color32 color = metadata->get_browser_color();
-	color.r *= 0.4;
-	color.g *= 0.4;
-	color.b *= 0.4;
+	const float frame_h = ImGui::GetFrameHeight();
+	const float spacing = style.ItemSpacing.x;
+	const float total_w = ImGui::CalcItemWidth();
+	const float btn_w = frame_h;
+	const float thumb_w = frame_h;
+	// two right-side buttons (× always reserved for stable layout) plus thumbnail
+	const float main_w = std::max(total_w - thumb_w - spacing - btn_w - spacing - btn_w - spacing, 40.f);
 
-	drawlist->AddRectFilled(ImVec2(min.x - style.FramePadding.x * 0.5f, min.y),
-							ImVec2(min.x + width, min.y + sz.y + style.FramePadding.y * 2.0), color.to_uint());
-	auto cursor = ImGui::GetCursorPos();
+	bool ret = false;
 
-	if (get_failed_load())
-		ImGui::TextColored(ImColor((Color32{255, 141, 133}).to_uint()), asset_str.c_str());
-	else
-		ImGui::Text(asset_str.c_str());
-	ImGui::SetCursorPos(cursor);
-	ImGui::InvisibleButton("##adfad", ImVec2(width, sz.y + style.FramePadding.y * 2.f));
+	// ---- 1. Thumbnail (real texture for Model/MaterialInstance; colored square otherwise) ----
+	{
+		ImVec2 thumb_pos = ImGui::GetCursorScreenPos();
+		Texture* thumb = nullptr;
+		if (!asset_str.empty() && AssetBrowser::inst) {
+			auto* node = AssetBrowser::inst->find_node_for_asset(asset_str);
+			if (node)
+				thumb = AssetBrowser::inst->thumbnails.get_thumbnail(node->asset);
+		}
+		if (thumb) {
+			ImGui::Image(ImTextureID(uint64_t(thumb->get_internal_render_handle())), ImVec2(thumb_w, frame_h),
+						 ImVec2(0, 1), ImVec2(1, 0));
+		} else {
+			Color32 tc = metadata->get_browser_color();
+			drawlist->AddRectFilled(thumb_pos, ImVec2(thumb_pos.x + thumb_w, thumb_pos.y + frame_h), tc.to_uint(),
+									3.f);
+			ImGui::Dummy(ImVec2(thumb_w, frame_h));
+		}
+		ImGui::SameLine(0, spacing);
+	}
+
+	// ---- 2. Main asset slot ----
+	{
+		ImVec2 slot_min = ImGui::GetCursorScreenPos();
+		ImVec2 slot_max = ImVec2(slot_min.x + main_w, slot_min.y + frame_h);
+
+		Color32 bg = metadata->get_browser_color();
+		bg.r = (uint8_t)(bg.r * 0.35f);
+		bg.g = (uint8_t)(bg.g * 0.35f);
+		bg.b = (uint8_t)(bg.b * 0.35f);
+		drawlist->AddRectFilled(slot_min, slot_max, bg.to_uint(), 3.f);
+
+		// Text clipped to slot
+		ImGui::PushClipRect(slot_min, slot_max, true);
+		ImVec2 text_cursor = ImGui::GetCursorPos();
+		ImGui::SetCursorPosY(text_cursor.y + style.FramePadding.y * 0.5f);
+		if (get_failed_load())
+			ImGui::TextColored(ImColor(Color32{255, 141, 133}.to_uint()), "%s", asset_str.c_str());
+		else if (asset_str.empty())
+			ImGui::TextDisabled("(none)");
+		else
+			ImGui::Text("%s", asset_str.c_str());
+		ImGui::PopClipRect();
+
+		ImGui::SetCursorPos(text_cursor);
+		ImGui::InvisibleButton("##asset_slot", ImVec2(main_w, frame_h));
+	}
+
+	// Hover tooltip
 	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
 		ImGui::BeginTooltip();
-		ImGui::Text(string_format("Drag and drop %s asset here", metadata->get_type_name().c_str()));
+		if (asset_str.empty())
+			ImGui::Text("Click or drag a %s here", metadata->get_type_name().c_str());
+		else
+			ImGui::Text("%s", asset_str.c_str());
 		ImGui::EndTooltip();
-
-		if (ImGui::GetIO().MouseClicked[0]) {
-			AssetBrowser::inst->filter_all();
-			AssetBrowser::inst->unset_filter(1 << metadata->self_index);
-		}
 	}
-	bool ret = false;
-	if (ImGui::BeginDragDropTarget()) {
-		// const ImGuiPayload* payload = ImGui::GetDragDropPayload();
-		// if (payload->IsDataType("AssetBrowserDragDrop"))
-		//	sys_print("``` accepting\n");
 
+	// Click on empty slot → open picker
+	if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && asset_str.empty()) {
+		ImGui::OpenPopup("##assetpicker");
+		picker_filter.clear();
+		picker_needs_focus = true;
+	}
+
+	// Right-click context menu
+	if (ImGui::BeginPopupContextItem("##asset_ctx")) {
+		if (ImGui::MenuItem("Copy Path", nullptr, false, !asset_str.empty()))
+			ImGui::SetClipboardText(asset_str.c_str());
+
+		const char* clipboard = ImGui::GetClipboardText();
+		bool can_paste = clipboard && *clipboard;
+		if (ImGui::MenuItem("Paste Path", nullptr, false, can_paste)) {
+			set_asset(clipboard);
+			asset_str = get_str();
+			ret = true;
+		}
+
+		if (ImGui::MenuItem("Clear", nullptr, false, !asset_str.empty())) {
+			set_asset("");
+			asset_str = "";
+			ret = true;
+		}
+
+		ImGui::Separator();
+
+		if (ImGui::MenuItem("Find in Browser", nullptr, false, !asset_str.empty())) {
+			AssetBrowser::inst->set_selected(asset_str);
+			AssetBrowser::inst->force_focus = true;
+		}
+
+		ImGui::EndPopup();
+	}
+
+	// Drag-drop target
+	if (ImGui::BeginDragDropTarget()) {
 		const ImGuiPayload* payload =
 			ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
 		if (payload) {
-
 			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
-			bool actually_accept = false;
 			if (resource->type == metadata) {
-				actually_accept = true;
-			}
-
-			if (actually_accept) {
-				if (payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")) {
-					// IAsset** ptr_to_asset = (IAsset**)prop->get_ptr(instance);
-
+				if ((payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))) {
 					set_asset(resource->filename);
 					asset_str = get_str();
-
 					ret = true;
 				}
 			}
 		}
 		ImGui::EndDragDropTarget();
+	}
+
+	// ---- Inline asset picker popup ----
+	ImGui::SetNextWindowSize(ImVec2(320, 360), ImGuiCond_Always);
+	if (ImGui::BeginPopup("##assetpicker")) {
+		if (picker_needs_focus) {
+			ImGui::SetKeyboardFocusHere();
+			picker_needs_focus = false;
+		}
+		ImGui::SetNextItemWidth(-1.f);
+		ImGui::InputText("##picker_filter", (char*)picker_filter.c_str(), picker_filter.size() + 1,
+						 ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &picker_filter);
+		picker_filter = picker_filter.c_str();
+
+		auto filter_lower = StringUtils::to_lower(picker_filter);
+		ImGui::BeginChild("##picker_list", ImVec2(0, 0));
+		for (auto* node : AssetRegistrySystem::get().get_linear_list()) {
+			if (node->is_folder() || node->asset.type != metadata)
+				continue;
+			if (!filter_lower.empty()) {
+				auto name_lower = StringUtils::to_lower(node->asset.filename);
+				if (name_lower.find(filter_lower) == std::string::npos)
+					continue;
+			}
+			if (ImGui::Selectable(node->asset.filename.c_str())) {
+				set_asset(node->asset.filename);
+				asset_str = get_str();
+				ret = true;
+				ImGui::CloseCurrentPopup();
+			}
+		}
+		ImGui::EndChild();
+		ImGui::EndPopup();
+	}
+
+	// ---- 3. × (clear) button ----
+	ImGui::SameLine(0, spacing);
+	ImGui::BeginDisabled(asset_str.empty());
+	if (ImGui::Button("x##clear", ImVec2(btn_w, frame_h))) {
+		set_asset("");
+		asset_str = "";
+		ret = true;
+	}
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) && !asset_str.empty()) {
+		ImGui::BeginTooltip();
+		ImGui::Text("Clear");
+		ImGui::EndTooltip();
+	}
+	ImGui::EndDisabled();
+
+	// ---- 4. Find-in-browser / open-picker button ----
+	ImGui::SameLine(0, spacing);
+	if (ImGui::Button(">>##browse", ImVec2(btn_w, frame_h))) {
+		if (!asset_str.empty()) {
+			AssetBrowser::inst->set_selected(asset_str);
+			AssetBrowser::inst->force_focus = true;
+		} else {
+			ImGui::OpenPopup("##assetpicker");
+			picker_filter.clear();
+			picker_needs_focus = true;
+		}
+	}
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
+		ImGui::BeginTooltip();
+		ImGui::Text(asset_str.empty() ? "Pick asset" : "Find in browser");
+		ImGui::EndTooltip();
 	}
 
 	return ret;
@@ -196,8 +330,6 @@ static bool drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&
 	return return_val;
 }
 
-int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
-
 #include "Framework/CurveEditorImgui.h"
 class GraphCurveEditor : public IPropertyEditor
 {
@@ -229,14 +361,6 @@ void PropertyFactoryUtil::register_mat_editor(MaterialEditorLocal& doc, FnFactor
 void PropertyFactoryUtil::register_anim_editor2(AnimationGraphEditorNew& ed, FnFactory<IPropertyEditor>& factory) {
 	// factory.add("StateAliasStruct", [&ed]() {return new StatemachineAliasEditor(ed); });
 }
-
-// Inherited via IPropertyEditor
-
-// Inherited via IPropertyEditor
-
-#include "Framework/StringUtils.h"
-
-// Inherited via IPropertyEditor
 
 EntityBoneParentStringEditor::~EntityBoneParentStringEditor() {
 	StringName* myName = (StringName*)prop->get_ptr(instance);

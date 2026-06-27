@@ -29,14 +29,14 @@ public:
 	virtual void reset_value() {
 		set_asset("");
 		asset_str = "";
-		// auto ptr = (IAsset**)prop->get_ptr(instance);
-		//*ptr = nullptr;
 	}
 
 private:
 	bool has_init = false;
 	std::string asset_str;
 	const AssetMetadata* metadata = nullptr;
+	std::string picker_filter;
+	bool picker_needs_focus = false;
 };
 
 class AssetPropertyEditor : public SharedAssetPropertyEditor
