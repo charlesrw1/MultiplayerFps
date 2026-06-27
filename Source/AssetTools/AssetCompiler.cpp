@@ -222,6 +222,7 @@ void build_all(bool force_rebuild) {
 
     for (const auto& full : FileSys::find_game_files()) {
         auto gp = FileSys::get_game_path_from_full_path(full);
+        if (gp.find(".thumbnails/") != std::string::npos) continue;
         if (!compile_asset(gp).has_value()) continue;
         if (!force_rebuild && !needs_compile(gp)) continue;
 
