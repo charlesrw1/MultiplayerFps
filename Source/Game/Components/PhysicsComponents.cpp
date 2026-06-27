@@ -238,9 +238,10 @@ void PhysicsBody::update_mass() {
 	ASSERT(physxActor);
 	if (!get_is_actor_static()) {
 		auto dyn = (PxRigidDynamic*)physxActor;
-		// updateMassAndInertia asserts inside PhysX if there are no attached shapes
-		// (InertiaTensorComputer gets zero-volume input). Guard here so degenerate or
-		// shape-less bodies don't crash — mass stays at PhysX default (1 kg).
+		// Kinematic bodies are position-driven — mass/inertia are irrelevant.
+		// Triangle mesh shapes also have no volume so updateMassAndInertia would
+		// divide by zero. Both cases are covered by skipping when not simulating.
+		if (!simulate_physics) return;
 		if (dyn->getNbShapes() == 0) return;
 		PxRigidBodyExt::updateMassAndInertia(*dyn, density);
 	}
