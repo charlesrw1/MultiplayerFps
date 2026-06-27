@@ -33,20 +33,21 @@ Follow DRY, SOLID principles. SELF DOCUMENTING code. Single Responsiblity Princi
 
 ## Documentation
 
-Project documentation lives under `docs/`. Documentation is _meant_ for AI agents to use, not humans. Writing should help AI use the code. Documentation should be concise, do not use execessive markdown or formatting. Do not use excessive writing, only key points and edge cases. use `// @docs [[file#section]` source comments to link do docs. The `docs.exe` CLI validates wiki-style `[[file#section]]` links and `@docs` source-code refs and is used for searching the documentation. See [[tooling/docs-cli]] for the full reference. Quick index at [[README]].
+Project documentation lives under `docs/`. Documentation is _meant_ for AI agents to use, not humans. Writing should help AI use the code. Documentation should be concise, do not use execessive markdown or formatting. Do not use excessive writing, only key points and edge cases.  Quick index at [[README]].
 
-Invoke `docs.exe` via `powershell.exe -NoProfile -Command "docs.exe check"` from the Bash tool, otherwise will fail.
+## Feature Workflow (GitHub Issues)
 
-- **Looking for a topic** — use rg.exe in docs/ to find relevant content such as matching for a path or topic.
-- **Before every commit** — `docs.exe check` must exit 0. The pre-commit clang-format step + `docs check` are both required.
-- **When adding a new doc** — add a one-line entry to [[README]]. If it documents internals, sprinkle `// @docs [[file#section]]` comments in the relevant source-file headers so `docs context` surfaces it.
+New feature or non-trivial bug fix:
+1. `/plan` to design approach, then create a GH issue with the plan as the body: `gh issue create --title "..." --label "..." --body "..."`
+2. Implement on current branch; reference the issue in every relevant commit (`#N` in message)
+3. Comment on the issue when the plan changes or a surprise is found: `gh issue comment N --body "..."`
+4. Final commit closes it: `Closes #N` in message
 
+Always append this footer to AI-created issues:
+```
+---
+> ✦ Created by Claude
+```
 
-## BikeDemo sign conventions (DO NOT get these wrong)
+GH repo: https://github.com/charlesrw1/MultiplayerFps
 
-See [[bike/sign_conventions]] for the canonical reference. Summary:
-
-- **+Y up, +Z forward, +X world-right.**
-- `bike_right = cross(bike_direction, up)` points **LEFT** in world space — it is misnamed.
-- **Positive steer = turn LEFT.**
-- `lateral_pos > 0` means road-right; corrective steer to return to centre is **`+sign(lateral_pos)`**, never negative.

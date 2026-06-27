@@ -94,7 +94,11 @@ static const PropertyInfoList* get_props() {
 ## Entity-Component System
 
 - **Entity** — world node. Transform (ws+ls pos/rot/scale). Can have children.
-- **Component / EntityComponent** — attached to entity. Override `start()` (once) and `update()` (per frame, if `set_ticking(true)`). Built-ins:
+- **Component / EntityComponent** — attached to entity. Lifecycle opt-ins (must be set in constructor):
+  - `set_call_init_in_editor(true)` — required for `start()` to be called at all.
+  - `editor_start()` — always called in editor regardless of the above.
+  - `set_ticking(true)` — required for `update()` to be called each frame.
+  Built-ins:
   - `MeshComponent` — renders a `.cmdl`.
   - `CapsuleComponent` / `BoxComponent` / `SphereComponent` — physics bodies (extend `PhysicsBody`).
   - `CharacterMovementComponent` — collide+slide wrapper (see Physics).
