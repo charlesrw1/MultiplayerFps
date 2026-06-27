@@ -34,18 +34,28 @@ bool SharedAssetPropertyEditor::internal_update() {
 	auto* drawlist = ImGui::GetWindowDrawList();
 	auto& style = ImGui::GetStyle();
 	const float frame_h = ImGui::GetFrameHeight();
-	const float spacing = style.ItemSpacing.x;
+	const float v_spacing = style.ItemSpacing.y;
+	const float h_spacing = style.ItemSpacing.x;
 	const float total_w = ImGui::CalcItemWidth();
 	const float btn_w = frame_h;
-	const float thumb_w = frame_h;
-	// two right-side buttons (× always reserved for stable layout) plus thumbnail
-	const float main_w = std::max(total_w - thumb_w - spacing - btn_w - spacing - btn_w - spacing, 40.f);
+	// Thumbnail is square, spans 2 rows + the gap between them
+	const float thumb_size = frame_h * 2.f + v_spacing;
+	// Right side: [main area | h_spacing | x_btn], then row2: [>> browse full width]
+	const float right_w = std::max(total_w - thumb_size - h_spacing, 80.f);
+	const float main_w = right_w - h_spacing - btn_w;
 
 	bool ret = false;
 
-	// ---- 1. Thumbnail (real texture for Model/MaterialInstance; colored square otherwise) ----
+	// ---- 1. Thumbnail (spans 2 rows) ----
+	ImVec2 thumb_pos = ImGui::GetCursorScreenPos();
+	ImVec2 thumb_max = ImVec2(thumb_pos.x + thumb_size, thumb_pos.y + thumb_size);
+
+	// InvisibleButton first so we can query hover/click before drawing
+	ImGui::InvisibleButton("##thumb", ImVec2(thumb_size, thumb_size));
+	bool thumb_hovered = ImGui::IsItemHovered();
+	bool thumb_clicked = ImGui::IsItemClicked(ImGuiMouseButton_Left);
+
 	{
-		ImVec2 thumb_pos = ImGui::GetCursorScreenPos();
 		Texture* thumb = nullptr;
 		if (!asset_str.empty() && AssetBrowser::inst) {
 			auto* node = AssetBrowser::inst->find_node_for_asset(asset_str);
@@ -53,18 +63,39 @@ bool SharedAssetPropertyEditor::internal_update() {
 				thumb = AssetBrowser::inst->thumbnails.get_thumbnail(node->asset);
 		}
 		if (thumb) {
-			ImGui::Image(ImTextureID(uint64_t(thumb->get_internal_render_handle())), ImVec2(thumb_w, frame_h),
-						 ImVec2(0, 1), ImVec2(1, 0));
+			drawlist->AddImage(ImTextureID(uint64_t(thumb->get_internal_render_handle())), thumb_pos, thumb_max,
+							   ImVec2(0, 1), ImVec2(1, 0));
 		} else {
 			Color32 tc = metadata->get_browser_color();
-			drawlist->AddRectFilled(thumb_pos, ImVec2(thumb_pos.x + thumb_w, thumb_pos.y + frame_h), tc.to_uint(),
-									3.f);
-			ImGui::Dummy(ImVec2(thumb_w, frame_h));
+			drawlist->AddRectFilled(thumb_pos, thumb_max, tc.to_uint(), 4.f);
 		}
-		ImGui::SameLine(0, spacing);
+		// Faint outline; brightens on hover to indicate clickability
+		ImU32 outline = thumb_hovered ? IM_COL32(220, 220, 220, 200) : IM_COL32(180, 180, 180, 60);
+		drawlist->AddRect(thumb_pos, thumb_max, outline, 4.f, 0, thumb_hovered ? 1.5f : 1.f);
 	}
 
-	// ---- 2. Main asset slot ----
+	if (thumb_hovered) {
+		ImGui::BeginTooltip();
+		ImGui::Text(asset_str.empty() ? "Click to pick a %s" : "Click to find in browser",
+					metadata->get_type_name().c_str());
+		ImGui::EndTooltip();
+	}
+	if (thumb_clicked) {
+		if (!asset_str.empty()) {
+			AssetBrowser::inst->set_selected(asset_str);
+			AssetBrowser::inst->force_focus = true;
+		} else {
+			ImGui::OpenPopup("##assetpicker");
+			picker_filter.clear();
+			picker_needs_focus = true;
+		}
+	}
+
+	// ---- 2. Right side: two rows ----
+	ImGui::SameLine(0, h_spacing);
+	ImGui::BeginGroup();
+
+	// Row 1: [asset name slot][x button]
 	{
 		ImVec2 slot_min = ImGui::GetCursorScreenPos();
 		ImVec2 slot_max = ImVec2(slot_min.x + main_w, slot_min.y + frame_h);
@@ -74,8 +105,9 @@ bool SharedAssetPropertyEditor::internal_update() {
 		bg.g = (uint8_t)(bg.g * 0.35f);
 		bg.b = (uint8_t)(bg.b * 0.35f);
 		drawlist->AddRectFilled(slot_min, slot_max, bg.to_uint(), 3.f);
+		// Faint slot border
+		drawlist->AddRect(slot_min, slot_max, IM_COL32(180, 180, 180, 50), 3.f);
 
-		// Text clipped to slot
 		ImGui::PushClipRect(slot_min, slot_max, true);
 		ImVec2 text_cursor = ImGui::GetCursorPos();
 		ImGui::SetCursorPosY(text_cursor.y + style.FramePadding.y * 0.5f);
@@ -91,28 +123,15 @@ bool SharedAssetPropertyEditor::internal_update() {
 		ImGui::InvisibleButton("##asset_slot", ImVec2(main_w, frame_h));
 	}
 
-	// Hover tooltip
 	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
 		ImGui::BeginTooltip();
-		if (asset_str.empty())
-			ImGui::Text("Click or drag a %s here", metadata->get_type_name().c_str());
-		else
-			ImGui::Text("%s", asset_str.c_str());
+		ImGui::Text("%s", asset_str.empty() ? "Drag a asset here or use the buttons below"
+											: asset_str.c_str());
 		ImGui::EndTooltip();
 	}
-
-	// Click on empty slot → open picker
-	if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && asset_str.empty()) {
-		ImGui::OpenPopup("##assetpicker");
-		picker_filter.clear();
-		picker_needs_focus = true;
-	}
-
-	// Right-click context menu
 	if (ImGui::BeginPopupContextItem("##asset_ctx")) {
 		if (ImGui::MenuItem("Copy Path", nullptr, false, !asset_str.empty()))
 			ImGui::SetClipboardText(asset_str.c_str());
-
 		const char* clipboard = ImGui::GetClipboardText();
 		bool can_paste = clipboard && *clipboard;
 		if (ImGui::MenuItem("Paste Path", nullptr, false, can_paste)) {
@@ -120,24 +139,18 @@ bool SharedAssetPropertyEditor::internal_update() {
 			asset_str = get_str();
 			ret = true;
 		}
-
 		if (ImGui::MenuItem("Clear", nullptr, false, !asset_str.empty())) {
 			set_asset("");
 			asset_str = "";
 			ret = true;
 		}
-
 		ImGui::Separator();
-
 		if (ImGui::MenuItem("Find in Browser", nullptr, false, !asset_str.empty())) {
 			AssetBrowser::inst->set_selected(asset_str);
 			AssetBrowser::inst->force_focus = true;
 		}
-
 		ImGui::EndPopup();
 	}
-
-	// Drag-drop target
 	if (ImGui::BeginDragDropTarget()) {
 		const ImGuiPayload* payload =
 			ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
@@ -153,6 +166,36 @@ bool SharedAssetPropertyEditor::internal_update() {
 		}
 		ImGui::EndDragDropTarget();
 	}
+
+	// × clear button (right of name slot)
+	ImGui::SameLine(0, h_spacing);
+	ImGui::BeginDisabled(asset_str.empty());
+	if (ImGui::Button("x##clear", ImVec2(btn_w, frame_h))) {
+		set_asset("");
+		asset_str = "";
+		ret = true;
+	}
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) && !asset_str.empty()) {
+		ImGui::BeginTooltip();
+		ImGui::Text("Clear");
+		ImGui::EndTooltip();
+	}
+	ImGui::EndDisabled();
+
+	// Row 2: full-width browse button
+	if (ImGui::Button(asset_str.empty() ? "Pick asset##browse" : "Find in browser##browse",
+					  ImVec2(right_w, frame_h))) {
+		if (!asset_str.empty()) {
+			AssetBrowser::inst->set_selected(asset_str);
+			AssetBrowser::inst->force_focus = true;
+		} else {
+			ImGui::OpenPopup("##assetpicker");
+			picker_filter.clear();
+			picker_needs_focus = true;
+		}
+	}
+
+	ImGui::EndGroup();
 
 	// ---- Inline asset picker popup ----
 	ImGui::SetNextWindowSize(ImVec2(320, 360), ImGuiCond_Always);
@@ -185,39 +228,6 @@ bool SharedAssetPropertyEditor::internal_update() {
 		}
 		ImGui::EndChild();
 		ImGui::EndPopup();
-	}
-
-	// ---- 3. × (clear) button ----
-	ImGui::SameLine(0, spacing);
-	ImGui::BeginDisabled(asset_str.empty());
-	if (ImGui::Button("x##clear", ImVec2(btn_w, frame_h))) {
-		set_asset("");
-		asset_str = "";
-		ret = true;
-	}
-	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) && !asset_str.empty()) {
-		ImGui::BeginTooltip();
-		ImGui::Text("Clear");
-		ImGui::EndTooltip();
-	}
-	ImGui::EndDisabled();
-
-	// ---- 4. Find-in-browser / open-picker button ----
-	ImGui::SameLine(0, spacing);
-	if (ImGui::Button(">>##browse", ImVec2(btn_w, frame_h))) {
-		if (!asset_str.empty()) {
-			AssetBrowser::inst->set_selected(asset_str);
-			AssetBrowser::inst->force_focus = true;
-		} else {
-			ImGui::OpenPopup("##assetpicker");
-			picker_filter.clear();
-			picker_needs_focus = true;
-		}
-	}
-	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
-		ImGui::BeginTooltip();
-		ImGui::Text(asset_str.empty() ? "Pick asset" : "Find in browser");
-		ImGui::EndTooltip();
 	}
 
 	return ret;

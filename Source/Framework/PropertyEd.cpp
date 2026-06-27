@@ -208,6 +208,10 @@ void PropertyGrid::update() {
 
 	ImGui::BeginDisabled(read_only);
 
+	ImGui::PushStyleColor(ImGuiCol_TableBorderLight, IM_COL32(35, 35, 35, 255));
+	ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, IM_COL32(20, 20, 20, 255));
+	ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(4, 1));
+
 	ImGuiTableFlags const flags =
 		ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit;
 	if (ImGui::BeginTable("Table", 2, flags)) {
@@ -221,6 +225,9 @@ void PropertyGrid::update() {
 
 		ImGui::EndTable();
 	}
+
+	ImGui::PopStyleVar();
+	ImGui::PopStyleColor(2);
 
 	ImGui::EndDisabled();
 }
@@ -243,7 +250,7 @@ void IGridRow::update(PropertyGrid* parentGrid, float header_ofs) {
 	draw_header(header_ofs);
 
 	ImGui::TableNextColumn();
-	ImGuiTableFlags const flags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingFixedFit;
+	ImGuiTableFlags const flags = ImGuiTableFlags_BordersInnerV;
 	int num_cols = (has_row_controls()) ? 3 : 2;
 	if (ImGui::BeginTable("GridTable", num_cols, flags)) {
 		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
