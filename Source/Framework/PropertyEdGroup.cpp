@@ -6,6 +6,7 @@
 #include "Render/Texture.h"
 #include "StructReflection.h"
 #include "FnFactory.h"
+#include "EditorTheme.h"
 
 // Forward declarations
 IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst,
@@ -130,6 +131,13 @@ bool GroupRow::draw_children() {
 
 void GroupRow::draw_header(float ofs) {
 	ASSERT(proplist || property);
+
+	// Full-row hover detection (before Dummy shifts the cursor)
+	const float fh = ImGui::GetFrameHeight();
+	const float row_top = ImGui::GetCursorScreenPos().y - ImGui::GetStyle().FramePadding.y;
+	const float my = ImGui::GetIO().MousePos.y;
+	const bool row_hov = (my >= row_top && my < row_top + fh + ImGui::GetStyle().CellPadding.y * 2.f);
+
 	ImGui::Dummy(ImVec2(ofs, 0));
 	ImGui::SameLine();
 
@@ -139,13 +147,28 @@ void GroupRow::draw_header(float ofs) {
 
 	// Drag handle — all array items when editable
 	if (is_array_item && can_edit) {
+		ImU32 drag_col = row_hov ? IM_COL32(255, 255, 255, 220) : IM_COL32(255, 255, 255, 50);
+
+		auto drag_tex = g_assets.find<Texture>("eng/icons/drag.png");
 		ImGui::PushStyleColor(ImGuiCol_Button, 0);
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint_grp({255, 255, 255, 30}));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint_grp({255, 255, 255, 20}));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
-		ImGui::Button("=##drag", ImVec2(14, 0));
+		if (drag_tex) {
+			ImVec2 btn_pos = ImGui::GetCursorScreenPos();
+			ImGui::InvisibleButton("##drag", ImVec2(14, fh));
+			// Draw as square, centered vertically
+			const float ico = std::min(14.f, fh);
+			const float yo = (fh - ico) * 0.5f;
+			ImGui::GetWindowDrawList()->AddImage(
+				ImTextureID(uint64_t(drag_tex->get_internal_render_handle())),
+				ImVec2(btn_pos.x, btn_pos.y + yo), ImVec2(btn_pos.x + ico, btn_pos.y + yo + ico),
+				ImVec2(0, 0), ImVec2(1, 1), drag_col);
+		} else {
+			ImGui::Button("=##drag", ImVec2(14, 0));
+		}
 		ImGui::PopStyleColor(3);
 
-		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+		if (ImGui::BeginDragDropSource()) {
 			ImGui::SetDragDropPayload("PROP_ARRAY_ITEM", &row_index, sizeof(int));
 			ImGui::Text("Item %d", row_index);
 			ImGui::EndDragDropSource();
@@ -157,6 +180,9 @@ void GroupRow::draw_header(float ofs) {
 	ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
 	ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
 
+	// Bold only for top-level group rows (not nested structs or array items)
+	bool is_top_level = (parent == nullptr);
+	if (is_top_level && g_prop_bold_font) ImGui::PushFont(g_prop_bold_font);
 	bool has_drawn = false;
 	if (is_array_item) {
 		array_->hook_update_pre_tree_node();
@@ -174,6 +200,7 @@ void GroupRow::draw_header(float ofs) {
 		if (expanded)
 			ImGui::TreePop();
 	}
+	if (is_top_level && g_prop_bold_font) ImGui::PopFont();
 
 	// Drop target on whatever label was drawn
 	if (is_array_item && can_edit) {
@@ -191,7 +218,7 @@ void GroupRow::draw_header(float ofs) {
 
 	// Delete button inline at end of header for all editable array items
 	if (is_array_item && can_edit) {
-		auto trash1 = g_assets.find<Texture>("eng/icon/trash1.png");
+		auto trash1 = g_assets.find<Texture>("eng/icons/delete.png");
 		ImGui::SameLine();
 		ImGui::PushStyleColor(ImGuiCol_Button, 0);
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint_grp({245, 242, 242, 55}));

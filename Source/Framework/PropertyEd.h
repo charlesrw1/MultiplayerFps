@@ -144,7 +144,7 @@ public:
 	virtual void draw_header(float header_ofs) override;
 	virtual bool draw_children() override;
 
-	virtual float get_indent_width() { return 30.0; }
+	virtual float get_indent_width() { return 12.0; }
 
 	virtual bool has_row_controls() override { return false; }
 
@@ -166,7 +166,7 @@ public:
 	virtual bool internal_update() override;
 	virtual void draw_header(float header_ofs) override;
 	virtual bool has_row_controls() override { return false; }
-	virtual float get_indent_width() { return 30.0; }
+	virtual float get_indent_width() { return 12.0; }
 	virtual bool is_array() override { return true; }
 	void rebuild_child_rows();
 	void hook_update_pre_tree_node();

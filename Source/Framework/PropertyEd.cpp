@@ -4,6 +4,7 @@
 #include "Assets/AssetDatabase.h"
 #include "FnFactory.h"
 #include "MyImguiLib.h"
+#include "EditorTheme.h"
 
 // ---- Internal helpers ----
 
@@ -153,7 +154,7 @@ IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent
 		auto row = new GroupRow(factory, parent, prop->get_ptr(inst), prop, row_idx, property_flag_mask);
 		return row;
 	} else {
-		PropertyRow* prop_ = new PropertyRow(factory, nullptr, inst, prop, row_idx);
+		PropertyRow* prop_ = new PropertyRow(factory, parent, inst, prop, row_idx);
 
 		if (prop_->prop_editor)
 			return prop_;
@@ -210,7 +211,7 @@ void PropertyGrid::update() {
 
 	ImGui::PushStyleColor(ImGuiCol_TableBorderLight, IM_COL32(35, 35, 35, 255));
 	ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, IM_COL32(20, 20, 20, 255));
-	ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(4, 1));
+	ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(4, 3));
 
 	ImGuiTableFlags const flags =
 		ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders | ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingFixedFit;
@@ -261,7 +262,7 @@ void IGridRow::update(PropertyGrid* parentGrid, float header_ofs) {
 	// Column 2: reset button (fixed, shared outer column — always aligned)
 	ImGui::TableNextColumn();
 	if (has_reset_button()) {
-		auto reset_img = g_assets.find<Texture>("eng/icon/undo.png");
+		auto reset_img = g_assets.find<Texture>("eng/icons/undo.png");
 		if (my_imgui_image_button(reset_img, 14)) {
 			on_reset();
 			parentGrid->set_rows_had_changes();
@@ -434,13 +435,89 @@ static std::string type_to_string(const PropertyInfo* p) {
 
 void PropertyRow::draw_header(float ofs) {
 	ASSERT(prop);
+
+	// Full-row hover: cursor has FramePadding.y added by AlignTextToFramePadding before this call
+	const float fh = ImGui::GetFrameHeight();
+	const float& cp_y = ImGui::GetStyle().CellPadding.y;
+	const float row_top = ImGui::GetCursorScreenPos().y - ImGui::GetStyle().FramePadding.y;
+	const float my = ImGui::GetIO().MousePos.y;
+	const bool row_hov = (my >= row_top && my < row_top + fh + cp_y * 2.f);
+
 	ImGui::Dummy(ImVec2(ofs, 0));
 	ImGui::SameLine();
-	if (name_override.empty())
-		ImGui::Text("%s", prop->name);
-	else
-		ImGui::Text("%s", name_override.c_str());
+
+	bool is_array_item = (row_index != -1);
+	ArrayRow* array_ = is_array_item ? (ArrayRow*)parent : nullptr;
+	bool can_edit = array_ && (!array_->header || array_->header->can_edit_array());
+
+	if (is_array_item && can_edit) {
+		ImU32 drag_col = row_hov ? IM_COL32(255, 255, 255, 220) : IM_COL32(255, 255, 255, 50);
+
+		auto drag_tex = g_assets.find<Texture>("eng/icons/drag.png");
+		ImGui::PushStyleColor(ImGuiCol_Button, 0);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 255, 255, 20));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+		if (drag_tex) {
+			ImVec2 btn_pos = ImGui::GetCursorScreenPos();
+			ImGui::InvisibleButton("##drag_pr", ImVec2(14, fh));
+			// Draw as square, centered vertically
+			const float ico = std::min(14.f, fh);
+			const float yo = (fh - ico) * 0.5f;
+			ImGui::GetWindowDrawList()->AddImage(
+				ImTextureID(uint64_t(drag_tex->get_internal_render_handle())),
+				ImVec2(btn_pos.x, btn_pos.y + yo), ImVec2(btn_pos.x + ico, btn_pos.y + yo + ico),
+				ImVec2(0, 0), ImVec2(1, 1), drag_col);
+		} else {
+			ImGui::Button("=##drag_pr", ImVec2(14, 0));
+		}
+		ImGui::PopStyleColor(3);
+
+		if (ImGui::BeginDragDropSource()) {
+			ImGui::SetDragDropPayload("PROP_ARRAY_ITEM", &row_index, sizeof(int));
+			ImGui::Text("Item %d", row_index);
+			ImGui::EndDragDropSource();
+		}
+		ImGui::SameLine(0, 4);
+	}
+
+	// Property name label — monospace (inconsolata bold = default font)
+	const char* label = name_override.empty() ? prop->name : name_override.c_str();
+	if (g_prop_bold_font) ImGui::PushFont(g_prop_bold_font);
+	if (is_array_item && can_edit) {
+		// Selectable registers with ItemAdd → gives BeginDragDropTarget valid hover data
+		float label_w = std::min(ImGui::CalcTextSize(label).x + 4.f,
+								 ImGui::GetContentRegionAvail().x - 20.f);
+		ImGui::PushStyleColor(ImGuiCol_Header, 0);
+		ImGui::PushStyleColor(ImGuiCol_HeaderHovered, 0);
+		ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
+		ImGui::Selectable(label, false, 0, ImVec2(label_w, 0));
+		ImGui::PopStyleColor(3);
+	} else {
+		ImGui::TextUnformatted(label);
+	}
+	if (g_prop_bold_font) ImGui::PopFont();
 	draw_tooltip(prop);
+
+	if (is_array_item && can_edit) {
+		if (ImGui::BeginDragDropTarget()) {
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROP_ARRAY_ITEM")) {
+				int from = *(const int*)payload->Data;
+				if (from != row_index)
+					array_->reorder_index(from, row_index);
+			}
+			ImGui::EndDragDropTarget();
+		}
+		auto trash_tex = g_assets.find<Texture>("eng/icons/delete.png");
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Button, 0);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(245, 242, 242, 55));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+#pragma warning(disable : 4312)
+		if (my_imgui_image_button(trash_tex.get(), 13))
+			array_->delete_index(row_index);
+#pragma warning(default : 4312)
+		ImGui::PopStyleColor(3);
+	}
 }
 
 bool PropertyRow::internal_update() {

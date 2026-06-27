@@ -416,6 +416,11 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 		ImGui::GetIO().Fonts->Build();
 	};
 	build_imgui_fonts();
+	{
+		auto& flist = *ImGui::GetIO().Fonts;
+		g_prop_bold_font    = flist.Fonts.Size > 0 ? flist.Fonts[0] : nullptr; // inconsolata bold 14pt
+		g_prop_regular_font = flist.Fonts.Size > 2 ? flist.Fonts[2] : nullptr; // inter regular 14pt
+	}
 	apply_editor_dark_theme();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	print_time("imgui font");

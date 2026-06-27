@@ -6,6 +6,7 @@
 #include "Render/Texture.h"
 #include "StructReflection.h"
 #include "FnFactory.h"
+#include "EditorTheme.h"
 
 // Forward declarations needed by rebuild_child_rows
 IGridRow* create_row(const FnFactory<IPropertyEditor>& factory, IGridRow* parent, PropertyInfo* prop, void* inst,
@@ -66,8 +67,8 @@ bool ArrayRow::internal_update() {
 
 	bool can_edit_arr = !header || header->can_edit_array();
 	if (can_edit_arr) {
-		auto addimg   = g_assets.find<Texture>("eng/icon/plus.png");
-		auto trashimg = g_assets.find<Texture>("eng/icon/trash.png");
+		auto addimg   = g_assets.find<Texture>("eng/icons/add_circle.png");
+		auto trashimg = g_assets.find<Texture>("eng/icons/delete.png");
 
 		ImGui::SameLine();
 		ImGui::PushStyleColor(ImGuiCol_Button, 0);
@@ -224,6 +225,7 @@ void ArrayRow::rebuild_child_rows() {
 		if (list->get_is_new_list_type()) { // new way
 			void* inst = list->get_index(prop->get_ptr(instance), i);
 			row = create_row(factory, this, (PropertyInfo*)list->get_property(), inst, i, property_flag_mask);
+			if (row) row->set_name_override(string_format("[ %d ]", i));
 		} else { // old way
 			const PropertyInfoList* struct_ = list->props_in_list;
 			row = new GroupRow(factory, this, list->get_index(prop->get_ptr(instance), i), struct_, i,

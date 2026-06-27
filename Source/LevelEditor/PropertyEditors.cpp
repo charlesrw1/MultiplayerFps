@@ -121,6 +121,12 @@ bool SharedAssetPropertyEditor::internal_update() {
 
 		ImGui::SetCursorPos(text_cursor);
 		ImGui::InvisibleButton("##asset_slot", ImVec2(main_w, frame_h));
+		// Clicking empty slot opens the picker
+		if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && asset_str.empty()) {
+			ImGui::OpenPopup("##assetpicker");
+			picker_filter.clear();
+			picker_needs_focus = true;
+		}
 	}
 
 	if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort)) {
@@ -182,16 +188,42 @@ bool SharedAssetPropertyEditor::internal_update() {
 	}
 	ImGui::EndDisabled();
 
-	// Row 2: full-width browse button
-	if (ImGui::Button(asset_str.empty() ? "Pick asset##browse" : "Find in browser##browse",
-					  ImVec2(right_w, frame_h))) {
-		if (!asset_str.empty()) {
-			AssetBrowser::inst->set_selected(asset_str);
-			AssetBrowser::inst->force_focus = true;
-		} else {
-			ImGui::OpenPopup("##assetpicker");
-			picker_filter.clear();
-			picker_needs_focus = true;
+	// Row 2: "Find in browser" icon button (also opens picker when slot is empty)
+	{
+		auto browse_tex = g_assets.find<Texture>("eng/icons/doc_search.png");
+
+		ImVec2 btn_pos = ImGui::GetCursorScreenPos();
+		ImGui::InvisibleButton("##browse", ImVec2(right_w, frame_h));
+		bool browse_hov = ImGui::IsItemHovered();
+		bool browse_click = ImGui::IsItemClicked();
+
+		ImU32 bg = browse_hov ? IM_COL32(75, 75, 75, 200) : IM_COL32(50, 50, 50, 160);
+		drawlist->AddRectFilled(btn_pos, ImVec2(btn_pos.x + right_w, btn_pos.y + frame_h), bg, 3.f);
+		drawlist->AddRect(btn_pos, ImVec2(btn_pos.x + right_w, btn_pos.y + frame_h), IM_COL32(100, 100, 100, 120), 3.f);
+
+		if (browse_tex) {
+			// Icon centered, square, correct UVs (file texture — no Y flip)
+			const float ico = frame_h - style.FramePadding.y * 2.f;
+			const float ico_x = btn_pos.x + (right_w - ico) * 0.5f;
+			const float ico_y = btn_pos.y + style.FramePadding.y;
+			drawlist->AddImage(
+				ImTextureID(uint64_t(browse_tex->get_internal_render_handle())),
+				ImVec2(ico_x, ico_y), ImVec2(ico_x + ico, ico_y + ico),
+				ImVec2(0, 0), ImVec2(1, 1));
+		}
+
+		if (browse_hov)
+			ImGui::SetTooltip(asset_str.empty() ? "Pick asset" : "Find in browser");
+
+		if (browse_click) {
+			if (!asset_str.empty()) {
+				AssetBrowser::inst->set_selected(asset_str);
+				AssetBrowser::inst->force_focus = true;
+			} else {
+				ImGui::OpenPopup("##assetpicker");
+				picker_filter.clear();
+				picker_needs_focus = true;
+			}
 		}
 	}
 
