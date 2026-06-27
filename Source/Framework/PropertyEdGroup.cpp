@@ -127,54 +127,31 @@ bool GroupRow::draw_children() {
 	return !passthrough_to_child();
 }
 
-bool GroupRow::draw_row_controls() {
-	ASSERT(parent);
-	ASSERT(row_index != -1);
-
-	ArrayRow* array_ = (ArrayRow*)parent;
-	if (!array_)
-		return false;
-	if (array_->header && !array_->header->can_edit_array())
-		return false;
-
-	bool canmoveup = row_index > 0;
-	bool canmovedown = (row_index != array_->get_size() - 1);
-
-	auto moveup = g_assets.find<Texture>("eng/icon/moveup.png");
-	auto movedown = g_assets.find<Texture>("eng/icon/movedown.png");
-	auto trash1 = g_assets.find<Texture>("eng/icon/trash1.png");
-
-	ImGui::PushStyleColor(ImGuiCol_Button, 0);
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint_grp({245, 242, 242, 55}));
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
-
-#pragma warning(disable : 4312)
-	ImGui::BeginDisabled(!canmoveup);
-	if (my_imgui_image_button(moveup, 16)) {
-		array_->moveup_index(row_index);
-	}
-	ImGui::EndDisabled();
-	ImGui::SameLine();
-	ImGui::BeginDisabled(!canmovedown);
-	if (my_imgui_image_button(movedown, 16)) {
-		array_->movedown_index(row_index);
-	}
-	ImGui::EndDisabled();
-	ImGui::SameLine();
-	if (my_imgui_image_button(trash1, 16)) {
-		array_->delete_index(row_index);
-	}
-
-	ImGui::PopStyleColor(3);
-#pragma warning(default : 4312)
-
-	return false; // array will update the flag itself
-}
 
 void GroupRow::draw_header(float ofs) {
 	ASSERT(proplist || property);
 	ImGui::Dummy(ImVec2(ofs, 0));
 	ImGui::SameLine();
+
+	bool is_array_item = (row_index != -1);
+	ArrayRow* array_ = is_array_item ? (ArrayRow*)parent : nullptr;
+	bool can_edit = array_ && (!array_->header || array_->header->can_edit_array());
+
+	// Drag handle for array items
+	if (is_array_item && can_edit && !array_->header) {
+		ImGui::PushStyleColor(ImGuiCol_Button, 0);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint_grp({255, 255, 255, 30}));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+		ImGui::Button("=##drag", ImVec2(14, 0));
+		ImGui::PopStyleColor(3);
+
+		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceAllowNullID)) {
+			ImGui::SetDragDropPayload("PROP_ARRAY_ITEM", &row_index, sizeof(int));
+			ImGui::Text("Item %d", row_index);
+			ImGui::EndDragDropSource();
+		}
+		ImGui::SameLine(0, 4);
+	}
 
 	ImGui::PushStyleColor(ImGuiCol_Header, 0);
 	ImGui::PushStyleColor(ImGuiCol_HeaderActive, 0);
@@ -201,8 +178,34 @@ void GroupRow::draw_header(float ofs) {
 
 		if (expanded)
 			ImGui::TreePop();
+
+		// Drop target on tree node for reordering (no custom header only)
+		if (is_array_item && can_edit && !array_->header) {
+			if (ImGui::BeginDragDropTarget()) {
+				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("PROP_ARRAY_ITEM")) {
+					int from = *(const int*)payload->Data;
+					if (from != row_index)
+						array_->reorder_index(from, row_index);
+				}
+				ImGui::EndDragDropTarget();
+			}
+		}
 	}
 	ImGui::PopStyleColor(3);
+
+	// Delete button inline at end of header (array items without custom header)
+	if (is_array_item && can_edit && !array_->header) {
+		auto trash1 = g_assets.find<Texture>("eng/icon/trash1.png");
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Button, 0);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint_grp({245, 242, 242, 55}));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+#pragma warning(disable : 4312)
+		if (my_imgui_image_button(trash1, 13))
+			array_->delete_index(row_index);
+#pragma warning(default : 4312)
+		ImGui::PopStyleColor(3);
+	}
 }
 
 bool GroupRow::internal_update() {

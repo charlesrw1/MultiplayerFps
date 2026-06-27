@@ -251,11 +251,8 @@ void IGridRow::update(PropertyGrid* parentGrid, float header_ofs) {
 
 	ImGui::TableNextColumn();
 	ImGuiTableFlags const flags = ImGuiTableFlags_BordersInnerV;
-	int num_cols = (has_row_controls()) ? 3 : 2;
-	if (ImGui::BeginTable("GridTable", num_cols, flags)) {
+	if (ImGui::BeginTable("GridTable", 2, flags)) {
 		ImGui::TableSetupColumn("##Editor", ImGuiTableColumnFlags_WidthStretch);
-		if (num_cols == 3)
-			ImGui::TableSetupColumn("##Controls", ImGuiTableColumnFlags_WidthFixed, 60.0);
 		ImGui::TableSetupColumn("##Reset", ImGuiTableColumnFlags_WidthFixed, 30.0);
 
 		ImGui::TableNextRow();
@@ -266,13 +263,6 @@ void IGridRow::update(PropertyGrid* parentGrid, float header_ofs) {
 		const bool had_changes = internal_update();
 		if (had_changes)
 			parentGrid->set_rows_had_changes();
-
-		if (has_row_controls()) {
-			ImGui::TableNextColumn();
-			const bool changes = draw_row_controls();
-			if (changes)
-				parentGrid->set_rows_had_changes();
-		}
 
 		ImGui::TableNextColumn();
 		if (has_reset_button()) {

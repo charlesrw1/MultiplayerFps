@@ -146,8 +146,7 @@ public:
 
 	virtual float get_indent_width() { return 30.0; }
 
-	virtual bool draw_row_controls() override;
-	virtual bool has_row_controls() { return row_index != -1; }
+	virtual bool has_row_controls() override { return false; }
 
 	virtual bool passthrough_to_child() override { return parent && parent->is_array() && proplist->count == 1; }
 
@@ -166,8 +165,7 @@ public:
 
 	virtual bool internal_update() override;
 	virtual void draw_header(float header_ofs) override;
-	virtual bool has_row_controls() override { return true; }
-	virtual bool draw_row_controls();
+	virtual bool has_row_controls() override { return false; }
 	virtual float get_indent_width() { return 30.0; }
 	virtual bool is_array() override { return true; }
 	void rebuild_child_rows();
@@ -177,15 +175,15 @@ public:
 	bool are_any_nodes_open();
 
 	void delete_index(int index) { commands.push_back({Delete, index}); }
-	void moveup_index(int index) { commands.push_back({Moveup, index}); }
-	void movedown_index(int index) { commands.push_back({Movedown, index}); }
+	void reorder_index(int from, int to) { commands.push_back({Reorder, from, to}); }
 
 	std::unique_ptr<IArrayHeader> header = nullptr; /* can be nullptr */
+	bool pending_add = false;
+	bool pending_clear = false;
 private:
 	enum CommandEnum
 	{
-		Moveup,
-		Movedown,
+		Reorder,
 		Delete,
 	};
 
@@ -200,6 +198,7 @@ private:
 	{
 		CommandEnum command;
 		int index = 0;
+		int index2 = 0; // used by Reorder (target index)
 	};
 
 	const FnFactory<IPropertyEditor>& factory;

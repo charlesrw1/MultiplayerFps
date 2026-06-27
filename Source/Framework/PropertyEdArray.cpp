@@ -55,112 +55,52 @@ bool ArrayRow::are_any_nodes_open() {
 	return false;
 }
 
-bool ArrayRow::draw_row_controls() {
-	ASSERT(prop && instance);
-	if (header && !header->can_edit_array())
-		return false;
-	bool ret = false;
-	auto trashimg = g_assets.find<Texture>("eng/icon/trash.png");
-	auto addimg = g_assets.find<Texture>("eng/icon/plus.png");
-
-	auto visible_icon = g_assets.find<Texture>("eng/icon/visible.png");
-	auto hidden_icon = g_assets.find<Texture>("eng/icon/hidden.png");
-
-	bool are_any_open = are_any_nodes_open();
-
-	uint8_t* list_instance_ptr = prop->get_ptr(instance);
-
-	ImGui::PushStyleColor(ImGuiCol_Button, 0);
-	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint_arr({245, 242, 242, 55}));
-	ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
-
-#pragma warning(disable : 4312)
-	if (my_imgui_image_button(addimg, 16)) {
-		ret = true;
-		clear_children();
-		prop->list_ptr->resize(list_instance_ptr, prop->list_ptr->get_size(list_instance_ptr) +
-													  1); // might invalidate childrens ptrs, so refresh
-		rebuild_child_rows();
-	}
-
-	ImGui::SameLine();
-
-	if (!header || header->has_delete_all()) {
-		ImGui::BeginDisabled(child_rows.empty());
-		if (my_imgui_image_button(trashimg, 16)) {
-			ret = true;
-			clear_children();
-			prop->list_ptr->resize(list_instance_ptr, 0);
-		}
-		ImGui::EndDisabled();
-		ImGui::SameLine();
-	}
-
-	set_next_state = next_state::keep;
-
-	if (are_any_open) {
-		if (my_imgui_image_button(visible_icon, 16)) {
-			set_next_state = next_state::hidden;
-		}
-	} else {
-		if (my_imgui_image_button(hidden_icon, 16)) {
-			set_next_state = next_state::visible;
-		}
-	}
-#pragma warning(default : 4312)
-
-	ImGui::PopStyleColor(3);
-
-	return ret;
-}
 
 bool ArrayRow::internal_update() {
 	ASSERT(prop && instance);
 	bool ret = false;
 
 	uint8_t* list_instance_ptr = prop->get_ptr(instance);
-	{
-		int count = get_size();
 
-		ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1.0), "elements: %d", count);
+	ImGui::TextColored(ImVec4(0.5, 0.5, 0.5, 1.0), "elements: %d", get_size());
+
+	if (header && !header->can_edit_array()) {
+		commands.clear();
+		pending_add = pending_clear = false;
 	}
 
-	if (header && !header->can_edit_array())
-		commands.clear();
+	if (pending_add) {
+		pending_add = false;
+		clear_children();
+		prop->list_ptr->resize(list_instance_ptr, get_size() + 1);
+		rebuild_child_rows();
+		ret = true;
+	}
+	if (pending_clear) {
+		pending_clear = false;
+		clear_children();
+		prop->list_ptr->resize(list_instance_ptr, 0);
+		ret = true;
+	}
 
-	for (int i = 0; i < commands.size(); i++) {
-		switch (commands[i].command) {
+	for (auto& cmd : commands) {
+		switch (cmd.command) {
 		case Delete: {
-
-			// do this here so destructors dont access stale pointers
-			child_rows.erase(child_rows.begin() + i);
-
-			int index_to_delete = commands[i].index;
+			int idx = cmd.index;
 			int size = get_size();
-			for (int i = index_to_delete; i < size - 1; i++) {
-
+			for (int i = idx; i < size - 1; i++)
 				prop->list_ptr->swap_elements(list_instance_ptr, i, i + 1);
-			}
 			prop->list_ptr->resize(list_instance_ptr, size - 1);
-
 		} break;
 
-		case Movedown: {
-			int size = get_size();
-
-			int index = commands[i].index;
-			if (index < size - 1) {
-				prop->list_ptr->swap_elements(list_instance_ptr, index, index + 1);
-			}
-
-		} break;
-
-		case Moveup: {
-			int index = commands[i].index;
-			if (index > 0) {
-				prop->list_ptr->swap_elements(list_instance_ptr, index - 1, index);
-			}
-
+		case Reorder: {
+			int from = cmd.index, to = cmd.index2;
+			if (from < to)
+				for (int i = from; i < to; i++)
+					prop->list_ptr->swap_elements(list_instance_ptr, i, i + 1);
+			else
+				for (int i = from; i > to; i--)
+					prop->list_ptr->swap_elements(list_instance_ptr, i - 1, i);
 		} break;
 		}
 	}
@@ -246,6 +186,32 @@ void ArrayRow::draw_header(float header_ofs) {
 	if (expanded)
 		ImGui::TreePop();
 	ImGui::PopStyleColor(3);
+
+	// Inline [+] and [trash] buttons — right of the label, only if editable
+	if (!header || header->can_edit_array()) {
+		auto addimg   = g_assets.find<Texture>("eng/icon/plus.png");
+		auto trashimg = g_assets.find<Texture>("eng/icon/trash.png");
+
+		ImGui::SameLine();
+		ImGui::PushStyleColor(ImGuiCol_Button, 0);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, color32_to_uint_arr({245, 242, 242, 55}));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, 0);
+
+#pragma warning(disable : 4312)
+		if (my_imgui_image_button(addimg, 13))
+			pending_add = true;
+
+		if (!header || header->has_delete_all()) {
+			ImGui::SameLine();
+			ImGui::BeginDisabled(child_rows.empty());
+			if (my_imgui_image_button(trashimg, 13))
+				pending_clear = true;
+			ImGui::EndDisabled();
+		}
+#pragma warning(default : 4312)
+
+		ImGui::PopStyleColor(3);
+	}
 }
 
 void ArrayRow::rebuild_child_rows() {
