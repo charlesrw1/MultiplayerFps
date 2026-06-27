@@ -11,6 +11,8 @@
 #include "Framework/MyImguiLib.h"
 #include "Render/Texture.h"
 #include "LevelEditor/PropertyEditors.h"
+#include "Framework/FnFactory.h"
+#include "Framework/ReflectionProp.h"
 
 // Thin SharedAssetPropertyEditor subclass that wraps AssetPtr<MaterialInstance>
 class RendererMaterialEditor : public SharedAssetPropertyEditor {
@@ -23,11 +25,17 @@ public:
 	}
 	void set_asset(const std::string& str) override {
 		if (!mat_ptr) return;
-		*mat_ptr = str.empty() ? AssetPtr<MaterialInstance>{}
-		                       : g_assets.find<MaterialInstance>(str);
+		*mat_ptr = str.empty() ? AssetPtr<MaterialInstance>{} : g_assets.find<MaterialInstance>(str);
 	}
 	AssetPtr<MaterialInstance>* mat_ptr = nullptr;
 };
+
+static FnFactory<IPropertyEditor>& get_basic_factory() {
+	static FnFactory<IPropertyEditor> factory;
+	static bool registered = false;
+	if (!registered) { PropertyFactoryUtil::register_basic(factory); registered = true; }
+	return factory;
+}
 
 ParticleSystemEditorUi::~ParticleSystemEditorUi() = default;
 
@@ -657,13 +665,17 @@ void ParticleSystemEditorUi::draw_renderer_module(RendererModule& mod)
 {
 	ImGui::Indent();
 
-	// Material — recreate editor if the subsystem has changed
-	if (mat_editor_subsystem != selected_subsystem) {
-		mat_editor = std::make_unique<RendererMaterialEditor>(&mod.material);
-		mat_editor_subsystem = selected_subsystem;
+	// Material — rebuild PropertyGrid if the subsystem changed
+	if (mat_pg_subsystem != selected_subsystem) {
+		static PropertyInfo s_mat_prop = make_assetptr_property_new(
+			"material", (uint16_t)offsetof(RendererModule, material), 0, "", &MaterialInstance::StaticType);
+		auto* editor = new RendererMaterialEditor(&mod.material);
+		editor->prop = &s_mat_prop;
+		mat_pg = std::make_unique<PropertyGrid>(get_basic_factory());
+		mat_pg->add_iproped_manual(editor);
+		mat_pg_subsystem = selected_subsystem;
 	}
-	ImGui::Text("Material:");
-	mat_editor->internal_update();
+	mat_pg->update();
 
 	const char* render_mode_names[] = {"Billboard", "Stretched Billboard", "Mesh"};
 	int rm = (int)mod.render_mode;

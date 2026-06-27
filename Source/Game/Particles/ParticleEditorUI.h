@@ -5,7 +5,7 @@
 #include "Framework/CurveEditorImgui.h"
 #include "Framework/GradientEditorImgui.h"
 #include "ParticleTypes.h"
-class RendererMaterialEditor;
+class PropertyGrid;
 
 class ParticleSystemComponent;
 
@@ -66,9 +66,9 @@ private:
 	bool show_create_popup = false;
 	char create_name[128] = {};
 
-	// One editor per subsystem; recreated when selected_subsystem changes
-	std::unique_ptr<RendererMaterialEditor> mat_editor;
-	int mat_editor_subsystem = -1;
+	// PropertyGrid for the material slot; rebuilt when selected subsystem changes
+	std::unique_ptr<PropertyGrid> mat_pg;
+	int mat_pg_subsystem = -1;
 };
 
 #endif
