@@ -83,7 +83,9 @@ function Invoke-AppWithDebugger {
     $launchArgs += $AppArgs
     Write-Host ("=== Launching $ExeName.exe " + ($launchArgs -join ' ') + " ===") -ForegroundColor Cyan
 
-    $proc = Start-Process -FilePath $exe -ArgumentList $launchArgs -PassThru -NoNewWindow -WorkingDirectory $repoRoot
+    $startParams = @{ FilePath = $exe; PassThru = $true; NoNewWindow = $true; WorkingDirectory = $repoRoot }
+    if ($launchArgs.Count -gt 0) { $startParams['ArgumentList'] = $launchArgs }
+    $proc = Start-Process @startParams
     if ($WaitForDebugger) { Attach-VSDebugger -TargetPid $proc.Id }
     $proc.WaitForExit()
     exit $proc.ExitCode
