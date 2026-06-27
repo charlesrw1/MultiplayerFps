@@ -9,6 +9,8 @@
 #include "glm/vec3.hpp"
 #include <json.hpp>
 #include "imgui.h"
+#include "Framework/MyImguiLib.h"
+#include "Render/Texture.h"
 
 static bool create_ppset_file(const std::string& path) {
     if (FileSys::does_file_exist(path.c_str(), FileSys::GAME_DIR))
@@ -223,12 +225,17 @@ bool PostProcessComponentEditorUi::draw() {
         comp->sync_render_data();
 
     ImGui::Separator();
-    if (ImGui::Button("Save"))
-        asset->save_to_disk();
-    ImGui::SameLine();
-    if (ImGui::Button("Revert")) {
-        g_assets.reload(asset);
-        comp->sync_render_data();
+    {
+        auto save_img = g_assets.find<Texture>("eng/icons/save.png");
+        if (my_imgui_icon_text_button(save_img, "Save"))
+            asset->save_to_disk();
+
+        float revert_w = ImGui::CalcTextSize("Revert").x + ImGui::GetStyle().FramePadding.x * 2.f;
+        ImGui::SameLine(ImGui::GetContentRegionMax().x - revert_w);
+        if (ImGui::Button("Revert")) {
+            g_assets.reload(asset);
+            comp->sync_render_data();
+        }
     }
 
     return false;

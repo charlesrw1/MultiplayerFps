@@ -21,6 +21,7 @@ int Curve(const char* label, const ImVec2& size, const int maxpoints, ImVec2* po
 class Texture;
 bool my_imgui_image_button(const Texture* t, int size);
 void my_imgui_image(const Texture* t, int size);
+bool my_imgui_icon_text_button(const Texture* icon, const char* label, float icon_size = 13.f);
 
 class IEditorTool;
 ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags dockspace_flags, IEditorTool* tool,

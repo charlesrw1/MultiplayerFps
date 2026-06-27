@@ -1,8 +1,24 @@
 #pragma once
 #include "Framework/PropertyEd.h"
 #ifdef EDITOR_BUILD
+#include <string>
 class EditorDoc;
 class AssetMetadata;
+
+// Reusable single-row asset slot widget [colored name slot | browse icon].
+// Handles hover, click-to-pick (when empty) or click-to-browse (when filled),
+// drag-drop from asset browser, inline browse button, and picker popup.
+// Caller holds one instance per logical slot to preserve picker state.
+struct AssetSlotWidget {
+    std::string picker_filter;
+    bool picker_needs_focus = false;
+
+    // total_avail: total width for the widget (slot + browse button).
+    //   Pass -1 to use the full content region.
+    // Returns true and sets out_path when the asset changes.
+    bool draw(const std::string& current_path, const AssetMetadata* metadata,
+              float total_avail, std::string& out_path);
+};
 class AnimationGraphEditor;
 class MaterialEditorLocal;
 class AnimationGraphEditorNew;

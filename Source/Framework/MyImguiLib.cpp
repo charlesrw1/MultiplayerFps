@@ -141,6 +141,34 @@ void my_imgui_image(const Texture* t, int size) {
 	}
 	ImGui::Image(ImTextureID(uint64_t(t->get_internal_render_handle())), sz_to_use);
 }
+
+bool my_imgui_icon_text_button(const Texture* icon, const char* label, float icon_size) {
+	const float fh = ImGui::GetFrameHeight();
+	const float pad = ImGui::GetStyle().FramePadding.x;
+	const float gap = 4.f;
+	const float text_w = ImGui::CalcTextSize(label).x;
+	const float total_w = pad + icon_size + gap + text_w + pad;
+	ImVec2 pos = ImGui::GetCursorScreenPos();
+	bool clicked = ImGui::InvisibleButton(label, ImVec2(total_w, fh));
+	bool hov = ImGui::IsItemHovered();
+	bool act = ImGui::IsItemActive();
+	ImU32 bg = act ? ImGui::GetColorU32(ImGuiCol_ButtonActive)
+	         : hov ? ImGui::GetColorU32(ImGuiCol_ButtonHovered)
+	               : ImGui::GetColorU32(ImGuiCol_Button);
+	auto* dl = ImGui::GetWindowDrawList();
+	float rounding = ImGui::GetStyle().FrameRounding;
+	dl->AddRectFilled(pos, ImVec2(pos.x + total_w, pos.y + fh), bg, rounding);
+	dl->AddRect(pos, ImVec2(pos.x + total_w, pos.y + fh), ImGui::GetColorU32(ImGuiCol_Border), rounding);
+	if (icon) {
+		float yo = (fh - icon_size) * 0.5f;
+		dl->AddImage(ImTextureID(uint64_t(icon->get_internal_render_handle())),
+			ImVec2(pos.x + pad, pos.y + yo), ImVec2(pos.x + pad + icon_size, pos.y + yo + icon_size),
+			ImVec2(0, 0), ImVec2(1, 1));
+	}
+	ImVec2 text_pos(pos.x + pad + icon_size + gap, pos.y + (fh - ImGui::GetTextLineHeight()) * 0.5f);
+	dl->AddText(text_pos, ImGui::GetColorU32(ImGuiCol_Text), label);
+	return clicked;
+}
 ImGuiID dock_over_viewport(const ImGuiViewport* viewport, ImGuiDockNodeFlags dockspace_flags, IEditorTool* tool,
 						   const ImGuiWindowClass* window_class) {
 	using namespace ImGui;

@@ -19,6 +19,136 @@
 
 int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 
+bool AssetSlotWidget::draw(const std::string& current_path, const AssetMetadata* metadata,
+                           float total_avail, std::string& out_path) {
+	ASSERT(metadata);
+	auto* drawlist = ImGui::GetWindowDrawList();
+	auto& style    = ImGui::GetStyle();
+	const float frame_h  = ImGui::GetFrameHeight();
+	const float browse_w = frame_h;
+	if (total_avail < 0.f)
+		total_avail = ImGui::GetContentRegionAvail().x;
+	const float slot_w   = total_avail - browse_w - style.ItemSpacing.x;
+
+	bool ret = false;
+	std::string new_path;
+
+	// Colored slot background
+	ImVec2 slot_min = ImGui::GetCursorScreenPos();
+	ImVec2 slot_max = ImVec2(slot_min.x + slot_w, slot_min.y + frame_h);
+	{
+		Color32 bg = metadata->get_browser_color();
+		bg.r = (uint8_t)(bg.r * 0.35f);
+		bg.g = (uint8_t)(bg.g * 0.35f);
+		bg.b = (uint8_t)(bg.b * 0.35f);
+		drawlist->AddRectFilled(slot_min, slot_max, bg.to_uint(), 3.f);
+	}
+	// Text (clipped to slot)
+	ImGui::PushClipRect(slot_min, slot_max, true);
+	ImVec2 text_cursor = ImGui::GetCursorPos();
+	ImGui::SetCursorPosY(text_cursor.y + style.FramePadding.y * 0.5f);
+	if (current_path.empty())
+		ImGui::TextDisabled("(none)");
+	else
+		ImGui::TextUnformatted(current_path.c_str());
+	ImGui::PopClipRect();
+	// InvisibleButton for interaction
+	ImGui::SetCursorPos(text_cursor);
+	ImGui::InvisibleButton("##slot", ImVec2(slot_w, frame_h));
+	bool slot_hov = ImGui::IsItemHovered();
+	// Outline
+	ImU32 outline = (slot_hov && current_path.empty())
+		? IM_COL32(200, 200, 200, 180) : IM_COL32(180, 180, 180, 50);
+	drawlist->AddRect(slot_min, slot_max, outline, 3.f);
+	if (slot_hov) {
+		ImGui::SetTooltip(current_path.empty() ? "Click to pick or drag an asset here"
+		                                       : current_path.c_str());
+	}
+	if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+		if (current_path.empty()) {
+			ImGui::OpenPopup("##assetpicker");
+			picker_filter.clear();
+			picker_needs_focus = true;
+		} else if (AssetBrowser::inst) {
+			AssetBrowser::inst->set_selected(current_path);
+			AssetBrowser::inst->force_focus = true;
+		}
+	}
+	// Drag-drop target
+	if (ImGui::BeginDragDropTarget()) {
+		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(
+			"AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
+		if (payload) {
+			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
+			if (resource->type == metadata) {
+				if (ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")) {
+					new_path = resource->filename;
+					ret = true;
+				}
+			}
+		}
+		ImGui::EndDragDropTarget();
+	}
+
+	// Browse icon button (inline, right of slot)
+	ImGui::SameLine(0, style.ItemSpacing.x);
+	{
+		auto browse_tex = g_assets.find<Texture>("eng/icons/doc_search.png");
+		const bool has_asset = !current_path.empty();
+		ImGui::BeginDisabled(!has_asset);
+		ImVec2 btn_pos = ImGui::GetCursorScreenPos();
+		ImGui::InvisibleButton("##browse", ImVec2(browse_w, frame_h));
+		bool browse_hov = ImGui::IsItemHovered();
+		ImU32 btn_bg = browse_hov ? IM_COL32(75, 75, 75, 200) : IM_COL32(50, 50, 50, 160);
+		drawlist->AddRectFilled(btn_pos, ImVec2(btn_pos.x + browse_w, btn_pos.y + frame_h), btn_bg, 3.f);
+		drawlist->AddRect(btn_pos, ImVec2(btn_pos.x + browse_w, btn_pos.y + frame_h), IM_COL32(100, 100, 100, 120), 3.f);
+		if (browse_tex) {
+			const float ico   = frame_h - style.FramePadding.y * 2.f;
+			const float ico_x = btn_pos.x + (browse_w - ico) * 0.5f;
+			const float ico_y = btn_pos.y + style.FramePadding.y;
+			drawlist->AddImage(
+				ImTextureID(uint64_t(browse_tex->get_internal_render_handle())),
+				ImVec2(ico_x, ico_y), ImVec2(ico_x + ico, ico_y + ico),
+				ImVec2(0, 0), ImVec2(1, 1), has_asset ? IM_COL32(255,255,255,255) : IM_COL32(255,255,255,60));
+		}
+		ImGui::EndDisabled();
+		if (has_asset && browse_hov) ImGui::SetTooltip("Find in browser");
+		if (ImGui::IsItemClicked() && has_asset && AssetBrowser::inst) {
+			AssetBrowser::inst->set_selected(current_path);
+			AssetBrowser::inst->force_focus = true;
+		}
+	}
+
+	// Picker popup
+	ImGui::SetNextWindowSize(ImVec2(320, 360), ImGuiCond_Always);
+	if (ImGui::BeginPopup("##assetpicker")) {
+		if (picker_needs_focus) { ImGui::SetKeyboardFocusHere(); picker_needs_focus = false; }
+		ImGui::SetNextItemWidth(-1.f);
+		ImGui::InputText("##picker_filter", (char*)picker_filter.c_str(), picker_filter.size() + 1,
+		                 ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &picker_filter);
+		picker_filter = picker_filter.c_str();
+		auto filter_lower = StringUtils::to_lower(picker_filter);
+		ImGui::BeginChild("##picker_list", ImVec2(0, 0));
+		for (auto* node : AssetRegistrySystem::get().get_linear_list()) {
+			if (node->is_folder() || node->asset.type != metadata) continue;
+			if (!filter_lower.empty()) {
+				auto name_lower = StringUtils::to_lower(node->asset.filename);
+				if (name_lower.find(filter_lower) == std::string::npos) continue;
+			}
+			if (ImGui::Selectable(node->asset.filename.c_str())) {
+				new_path = node->asset.filename;
+				ret = true;
+				ImGui::CloseCurrentPopup();
+			}
+		}
+		ImGui::EndChild();
+		ImGui::EndPopup();
+	}
+
+	if (ret) out_path = new_path;
+	return ret;
+}
+
 bool SharedAssetPropertyEditor::internal_update() {
 	ASSERT(prop->class_type && prop->type == core_type_id::AssetPtr);
 	if (!has_init) {
@@ -105,8 +235,6 @@ bool SharedAssetPropertyEditor::internal_update() {
 		bg.g = (uint8_t)(bg.g * 0.35f);
 		bg.b = (uint8_t)(bg.b * 0.35f);
 		drawlist->AddRectFilled(slot_min, slot_max, bg.to_uint(), 3.f);
-		// Faint slot border
-		drawlist->AddRect(slot_min, slot_max, IM_COL32(180, 180, 180, 50), 3.f);
 
 		ImGui::PushClipRect(slot_min, slot_max, true);
 		ImVec2 text_cursor = ImGui::GetCursorPos();
@@ -121,7 +249,14 @@ bool SharedAssetPropertyEditor::internal_update() {
 
 		ImGui::SetCursorPos(text_cursor);
 		ImGui::InvisibleButton("##asset_slot", ImVec2(main_w, frame_h));
-		// Clicking empty slot opens the picker
+		bool slot_hov = ImGui::IsItemHovered();
+
+		// Outline: brightens when hovering empty slot to signal it's clickable
+		ImU32 outline = (slot_hov && asset_str.empty())
+			? IM_COL32(200, 200, 200, 180)
+			: IM_COL32(180, 180, 180, 50);
+		drawlist->AddRect(slot_min, slot_max, outline, 3.f);
+
 		if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && asset_str.empty()) {
 			ImGui::OpenPopup("##assetpicker");
 			picker_filter.clear();
@@ -188,42 +323,37 @@ bool SharedAssetPropertyEditor::internal_update() {
 	}
 	ImGui::EndDisabled();
 
-	// Row 2: "Find in browser" icon button (also opens picker when slot is empty)
+	// Row 2: "Find in browser" icon button — small, left-aligned, disabled when no asset
 	{
 		auto browse_tex = g_assets.find<Texture>("eng/icons/doc_search.png");
+		const bool has_asset = !asset_str.empty();
 
+		ImGui::BeginDisabled(!has_asset);
 		ImVec2 btn_pos = ImGui::GetCursorScreenPos();
-		ImGui::InvisibleButton("##browse", ImVec2(right_w, frame_h));
+		ImGui::InvisibleButton("##browse", ImVec2(btn_w, frame_h));
 		bool browse_hov = ImGui::IsItemHovered();
-		bool browse_click = ImGui::IsItemClicked();
 
-		ImU32 bg = browse_hov ? IM_COL32(75, 75, 75, 200) : IM_COL32(50, 50, 50, 160);
-		drawlist->AddRectFilled(btn_pos, ImVec2(btn_pos.x + right_w, btn_pos.y + frame_h), bg, 3.f);
-		drawlist->AddRect(btn_pos, ImVec2(btn_pos.x + right_w, btn_pos.y + frame_h), IM_COL32(100, 100, 100, 120), 3.f);
+		ImU32 btn_bg = browse_hov ? IM_COL32(75, 75, 75, 200) : IM_COL32(50, 50, 50, 160);
+		drawlist->AddRectFilled(btn_pos, ImVec2(btn_pos.x + btn_w, btn_pos.y + frame_h), btn_bg, 3.f);
+		drawlist->AddRect(btn_pos, ImVec2(btn_pos.x + btn_w, btn_pos.y + frame_h), IM_COL32(100, 100, 100, 120), 3.f);
 
 		if (browse_tex) {
-			// Icon centered, square, correct UVs (file texture — no Y flip)
 			const float ico = frame_h - style.FramePadding.y * 2.f;
-			const float ico_x = btn_pos.x + (right_w - ico) * 0.5f;
+			const float ico_x = btn_pos.x + (btn_w - ico) * 0.5f;
 			const float ico_y = btn_pos.y + style.FramePadding.y;
+			const ImU32 ico_col = has_asset ? IM_COL32(255,255,255,255) : IM_COL32(255,255,255,60);
 			drawlist->AddImage(
 				ImTextureID(uint64_t(browse_tex->get_internal_render_handle())),
 				ImVec2(ico_x, ico_y), ImVec2(ico_x + ico, ico_y + ico),
-				ImVec2(0, 0), ImVec2(1, 1));
+				ImVec2(0, 0), ImVec2(1, 1), ico_col);
 		}
+		ImGui::EndDisabled();
 
-		if (browse_hov)
-			ImGui::SetTooltip(asset_str.empty() ? "Pick asset" : "Find in browser");
-
-		if (browse_click) {
-			if (!asset_str.empty()) {
-				AssetBrowser::inst->set_selected(asset_str);
-				AssetBrowser::inst->force_focus = true;
-			} else {
-				ImGui::OpenPopup("##assetpicker");
-				picker_filter.clear();
-				picker_needs_focus = true;
-			}
+		if (has_asset && browse_hov)
+			ImGui::SetTooltip("Find in browser");
+		if (ImGui::IsItemClicked() && has_asset) {
+			AssetBrowser::inst->set_selected(asset_str);
+			AssetBrowser::inst->force_focus = true;
 		}
 	}
 

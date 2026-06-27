@@ -8,6 +8,8 @@
 #include "Assets/AssetBrowser.h"
 #include "AssetTools/AssetTemplates.h"
 #include "imgui.h"
+#include "Framework/MyImguiLib.h"
+#include "Render/Texture.h"
 
 static EditingCurve make_default_linear_curve()
 {
@@ -256,14 +258,18 @@ bool ParticleSystemEditorUi::draw()
 	comp->update_shape_gizmo(selected_subsystem);
 
 	ImGui::Separator();
-	if (ImGui::Button("Save")) {
-		asset->save_to_disk();
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("Revert")) {
-		g_assets.reload(asset);
-		comp->clear();
-		comp->play();
+	{
+		auto save_img = g_assets.find<Texture>("eng/icons/save.png");
+		if (my_imgui_icon_text_button(save_img, "Save"))
+			asset->save_to_disk();
+
+		float revert_w = ImGui::CalcTextSize("Revert").x + ImGui::GetStyle().FramePadding.x * 2.f;
+		ImGui::SameLine(ImGui::GetContentRegionMax().x - revert_w);
+		if (ImGui::Button("Revert")) {
+			g_assets.reload(asset);
+			comp->clear();
+			comp->play();
+		}
 	}
 
 	// curve editor popup window
@@ -631,25 +637,15 @@ void ParticleSystemEditorUi::draw_renderer_module(RendererModule& mod)
 {
 	ImGui::Indent();
 
-	// Material drag-drop target
-	const char* mat_name = mod.material.get() ? mod.material.get()->get_name().c_str() : "<none>";
+	// Material slot
 	ImGui::Text("Material");
-	ImGui::SameLine(120);
-	ImGui::Button(mat_name, ImVec2(ImGui::GetContentRegionAvail().x, 0));
-	if (ImGui::IsItemHovered())
-		ImGui::SetTooltip("Drag and drop a Material asset here");
-	if (ImGui::BeginDragDropTarget()) {
-		const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
-		if (payload) {
-			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
-			auto* metadata = AssetRegistrySystem::get().find_for_classtype(&MaterialInstance::StaticType);
-			if (resource->type == metadata) {
-				if ((payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))) {
-					mod.material = g_assets.find<MaterialInstance>(resource->filename);
-				}
-			}
-		}
-		ImGui::EndDragDropTarget();
+	ImGui::SameLine();
+	{
+		auto* mat_meta = AssetRegistrySystem::get().find_for_classtype(&MaterialInstance::StaticType);
+		std::string cur = mod.material.get() ? mod.material.get()->get_name() : "";
+		std::string new_path;
+		if (mat_slot.draw(cur, mat_meta, -1.f, new_path))
+			mod.material = g_assets.find<MaterialInstance>(new_path);
 	}
 
 	const char* render_mode_names[] = {"Billboard", "Stretched Billboard", "Mesh"};

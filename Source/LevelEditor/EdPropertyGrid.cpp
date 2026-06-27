@@ -111,6 +111,7 @@ void EdPropertyGrid::draw(const ISelectionApi& api) {
 	auto selected_vec = api.get_selected();
 
 
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	if (ImGui::Begin("Properties")) {
 		if (selected_vec.size() == 1) {
 			auto* ent = selected_vec.at(0).get();
@@ -162,6 +163,7 @@ void EdPropertyGrid::draw(const ISelectionApi& api) {
 		}
 	}
 	ImGui::End();
+	ImGui::PopStyleVar(); // WindowPadding
 }
 
 void EdPropertyGrid::refresh_grid(const ISelectionApi& api) {

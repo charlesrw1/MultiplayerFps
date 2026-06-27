@@ -263,7 +263,7 @@ void IGridRow::update(PropertyGrid* parentGrid, float header_ofs) {
 	ImGui::TableNextColumn();
 	if (has_reset_button()) {
 		auto reset_img = g_assets.find<Texture>("eng/icons/undo.png");
-		if (my_imgui_image_button(reset_img, 14)) {
+		if (my_imgui_image_button(reset_img, 18)) {
 			on_reset();
 			parentGrid->set_rows_had_changes();
 		}
@@ -480,9 +480,9 @@ void PropertyRow::draw_header(float ofs) {
 		ImGui::SameLine(0, 4);
 	}
 
-	// Property name label — monospace (inconsolata bold = default font)
+	// Property name label — Consolas 12pt (lighter, smaller than group headers)
 	const char* label = name_override.empty() ? prop->name : name_override.c_str();
-	if (g_prop_bold_font) ImGui::PushFont(g_prop_bold_font);
+	if (g_prop_regular_font) ImGui::PushFont(g_prop_regular_font);
 	if (is_array_item && can_edit) {
 		// Selectable registers with ItemAdd → gives BeginDragDropTarget valid hover data
 		float label_w = std::min(ImGui::CalcTextSize(label).x + 4.f,
@@ -495,7 +495,7 @@ void PropertyRow::draw_header(float ofs) {
 	} else {
 		ImGui::TextUnformatted(label);
 	}
-	if (g_prop_bold_font) ImGui::PopFont();
+	if (g_prop_regular_font) ImGui::PopFont();
 	draw_tooltip(prop);
 
 	if (is_array_item && can_edit) {

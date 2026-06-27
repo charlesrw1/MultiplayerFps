@@ -41,7 +41,8 @@ struct InspectorCache {
     std::unique_ptr<ReadSerializerBackendJson> reader;
     std::unique_ptr<PropertyGrid> pg;
     ClassBase* obj = nullptr; // non-owning; reader owns the lifetime
-    std::vector<std::string> mat_paths; // editable material paths for MIS inspector
+    std::vector<std::string> mat_paths;         // editable material paths for MIS inspector
+    std::vector<AssetSlotWidget> mat_slot_widgets; // picker state per material slot
 };
 
 static std::string read_game_text(const std::string& gamepath) {
@@ -338,12 +339,13 @@ void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
     ImGui::Indent();
     auto& mats = mis->myMaterials;
     auto& mat_paths = cache_->mat_paths;
-    // Keep mat_paths in sync with mats (may have been modified in-session)
+    auto& mat_slots = cache_->mat_slot_widgets;
+    // Keep mat_paths and mat_slots in sync with mats
     while (mat_paths.size() < mats.size())
         mat_paths.push_back(mats[mat_paths.size()].ptr ? mats[mat_paths.size()].ptr->get_name() : "");
     mat_paths.resize(mats.size());
+    mat_slots.resize(mats.size());
 
-    // Fetch MaterialInstance metadata once for color + drag-drop type checking
     const AssetMetadata* mat_meta = AssetRegistrySystem::get().find_for_classtype(&MaterialInstance::StaticType);
 
     for (int i = 0; i < (int)mat_paths.size(); i++) {
@@ -352,64 +354,22 @@ void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
         ImGui::Text("[%d]", i);
         ImGui::SameLine();
 
-        // Colored asset-slot widget (mirrors SharedAssetPropertyEditor::internal_update)
-        auto* drawlist = ImGui::GetWindowDrawList();
-        auto& style    = ImGui::GetStyle();
-        auto  min      = ImGui::GetCursorScreenPos();
-        float width    = ImGui::CalcItemWidth() - 24.f; // leave room for x button
-        float line_h   = ImGui::GetTextLineHeight() + style.FramePadding.y * 2.f;
-
-        if (mat_meta) {
-            Color32 col = mat_meta->get_browser_color();
-            col.r = (uint8_t)(col.r * 0.4f);
-            col.g = (uint8_t)(col.g * 0.4f);
-            col.b = (uint8_t)(col.b * 0.4f);
-            drawlist->AddRectFilled(
-                ImVec2(min.x - style.FramePadding.x * 0.5f, min.y),
-                ImVec2(min.x + width, min.y + line_h), col.to_uint());
-        }
-
-        auto cursor_before = ImGui::GetCursorPos();
-        bool failed = mats[i].ptr && mats[i].ptr->did_load_fail();
-        if (failed)
-            ImGui::TextColored(ImColor(Color32{255, 141, 133}.to_uint()), "%s", mat_paths[i].c_str());
-        else
-            ImGui::TextUnformatted(mat_paths[i].empty() ? "(none)" : mat_paths[i].c_str());
-        ImGui::SetCursorPos(cursor_before);
-
-        ImGui::InvisibleButton("##slot", ImVec2(width, line_h));
-
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort) && mat_meta) {
-            ImGui::BeginTooltip();
-            ImGui::Text("Drag a %s asset here", mat_meta->get_type_name().c_str());
-            ImGui::EndTooltip();
-            if (ImGui::GetIO().MouseClicked[0] && AssetBrowser::inst) {
-                AssetBrowser::inst->filter_all();
-                AssetBrowser::inst->unset_filter(1 << mat_meta->self_index);
-            }
-        }
-
-        if (ImGui::BeginDragDropTarget()) {
-            const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(
-                "AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
-            if (payload && mat_meta) {
-                AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
-                if (resource->type == mat_meta) {
-                    if (ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")) {
-                        mat_paths[i] = resource->filename;
-                        mats[i].ptr  = static_cast<MaterialInstance*>(
-                            g_assets.find<MaterialInstance>(resource->filename).ptr);
-                        changed = true;
-                    }
-                }
-            }
-            ImGui::EndDragDropTarget();
+        // Reserve width for the x button that follows the slot widget
+        float x_btn_w = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.f;
+        float avail = ImGui::GetContentRegionAvail().x - x_btn_w - ImGui::GetStyle().ItemSpacing.x;
+        std::string new_path;
+        if (mat_meta && mat_slots[i].draw(mat_paths[i], mat_meta, avail, new_path)) {
+            mat_paths[i] = new_path;
+            mats[i].ptr  = static_cast<MaterialInstance*>(
+                g_assets.find<MaterialInstance>(new_path).ptr);
+            changed = true;
         }
 
         ImGui::SameLine();
         if (ImGui::SmallButton("x")) {
             mats.erase(mats.begin() + i);
             mat_paths.erase(mat_paths.begin() + i);
+            mat_slots.erase(mat_slots.begin() + i);
             changed = true;
             ImGui::PopID();
             break;

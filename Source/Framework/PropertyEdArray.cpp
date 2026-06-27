@@ -205,7 +205,9 @@ void ArrayRow::draw_header(float header_ofs) {
 	if (!name_override.empty())
 		name = name_override.c_str();
 
+	if (g_prop_regular_font) ImGui::PushFont(g_prop_regular_font);
 	expanded = ImGui::TreeNodeEx(name, ImGuiTreeNodeFlags_DefaultOpen);
+	if (g_prop_regular_font) ImGui::PopFont();
 	draw_tooltip_arr(prop);
 	if (expanded)
 		ImGui::TreePop();

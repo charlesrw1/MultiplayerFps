@@ -5,6 +5,7 @@
 #include "Framework/CurveEditorImgui.h"
 #include "Framework/GradientEditorImgui.h"
 #include "ParticleTypes.h"
+#include "LevelEditor/PropertyEditors.h"
 
 class ParticleSystemComponent;
 
@@ -63,6 +64,8 @@ private:
 
 	bool show_create_popup = false;
 	char create_name[128] = {};
+
+	AssetSlotWidget mat_slot; // picker state for material slot in draw_renderer_module
 };
 
 #endif
