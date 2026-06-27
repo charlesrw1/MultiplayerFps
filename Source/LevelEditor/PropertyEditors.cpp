@@ -36,7 +36,7 @@ bool SharedAssetPropertyEditor::internal_update() {
 	const float frame_h = ImGui::GetFrameHeight();
 	const float v_spacing = style.ItemSpacing.y;
 	const float h_spacing = style.ItemSpacing.x;
-	const float total_w = ImGui::CalcItemWidth();
+	const float total_w = ImGui::GetContentRegionAvail().x;
 	const float btn_w = frame_h;
 	// Thumbnail is square, spans 2 rows + the gap between them
 	const float thumb_size = frame_h * 2.f + v_spacing;
