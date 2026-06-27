@@ -41,8 +41,7 @@ struct InspectorCache {
     std::unique_ptr<ReadSerializerBackendJson> reader;
     std::unique_ptr<PropertyGrid> pg;
     ClassBase* obj = nullptr; // non-owning; reader owns the lifetime
-    std::vector<std::string> mat_paths;         // editable material paths for MIS inspector
-    std::vector<AssetSlotWidget> mat_slot_widgets; // picker state per material slot
+    std::unique_ptr<PropertyGrid> mat_pg; // property grid for myMaterials array
 };
 
 static std::string read_game_text(const std::string& gamepath) {
@@ -125,8 +124,18 @@ void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
         if (ext == "mis") {
             auto* mis = c->obj->cast_to<ModelImportSettings>();
             if (mis) {
-                for (auto& m : mis->myMaterials)
-                    c->mat_paths.push_back(m.ptr ? m.ptr->get_name() : "");
+                c->mat_pg = std::make_unique<PropertyGrid>(get_basic_factory());
+                // Point the grid at the reflected myMaterials property
+                auto* all_props = ModelImportSettings::StaticType.props;
+                if (all_props) {
+                    for (int pi = 0; pi < all_props->count; pi++) {
+                        if (strcmp(all_props->list[pi].name, "myMaterials") == 0) {
+                            PropertyInfoList syn{ &all_props->list[pi], 1, "Material Slots" };
+                            c->mat_pg->add_property_list_to_grid(&syn, mis, PG_LIST_PASSTHROUGH);
+                            break;
+                        }
+                    }
+                }
             }
         }
         cache_ = std::move(c);
@@ -334,54 +343,10 @@ void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
 
     ImGui::Separator();
 
-    // --- Material slots ---
-    ImGui::Text("Material Slots");
-    ImGui::Indent();
-    auto& mats = mis->myMaterials;
-    auto& mat_paths = cache_->mat_paths;
-    auto& mat_slots = cache_->mat_slot_widgets;
-    // Keep mat_paths and mat_slots in sync with mats
-    while (mat_paths.size() < mats.size())
-        mat_paths.push_back(mats[mat_paths.size()].ptr ? mats[mat_paths.size()].ptr->get_name() : "");
-    mat_paths.resize(mats.size());
-    mat_slots.resize(mats.size());
-
-    const AssetMetadata* mat_meta = AssetRegistrySystem::get().find_for_classtype(&MaterialInstance::StaticType);
-
-    for (int i = 0; i < (int)mat_paths.size(); i++) {
-        ImGui::PushID(i);
-
-        ImGui::Text("[%d]", i);
-        ImGui::SameLine();
-
-        // Reserve width for the x button that follows the slot widget
-        float x_btn_w = ImGui::CalcTextSize("x").x + ImGui::GetStyle().FramePadding.x * 2.f;
-        float avail = ImGui::GetContentRegionAvail().x - x_btn_w - ImGui::GetStyle().ItemSpacing.x;
-        std::string new_path;
-        if (mat_meta && mat_slots[i].draw(mat_paths[i], mat_meta, avail, new_path)) {
-            mat_paths[i] = new_path;
-            mats[i].ptr  = static_cast<MaterialInstance*>(
-                g_assets.find<MaterialInstance>(new_path).ptr);
-            changed = true;
-        }
-
-        ImGui::SameLine();
-        if (ImGui::SmallButton("x")) {
-            mats.erase(mats.begin() + i);
-            mat_paths.erase(mat_paths.begin() + i);
-            mat_slots.erase(mat_slots.begin() + i);
-            changed = true;
-            ImGui::PopID();
-            break;
-        }
-
-        ImGui::PopID();
-    }
-    ImGui::Unindent();
-    if (ImGui::Button("+ Material")) {
-        mats.emplace_back();
-        mat_paths.push_back("");
-        changed = true;
+    // --- Material slots (via PropertyGrid — full SharedAssetPropertyEditor widget per slot) ---
+    if (cache_->mat_pg) {
+        cache_->mat_pg->update();
+        if (cache_->mat_pg->rows_had_changes) changed = true;
     }
 
     ImGui::Separator();
@@ -396,16 +361,6 @@ void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
     if (settings_dirty) {
         ImGui::Spacing();
         if (ImGui::Button("Apply")) {
-            // Sync edited material paths back into the AssetPtr array
-            mats.resize(mat_paths.size());
-            for (int i = 0; i < (int)mat_paths.size(); i++) {
-                if (mat_paths[i].empty()) {
-                    mats[i].ptr = nullptr;
-                } else {
-                    auto found = g_assets.find<MaterialInstance>(mat_paths[i]);
-                    mats[i].ptr = static_cast<MaterialInstance*>(found.ptr);
-                }
-            }
             write_model_import_settings(mis, gamepath);
             AssetCompiler::compile_asset(gamepath);
             settings_dirty = false;

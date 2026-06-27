@@ -10,6 +10,26 @@
 #include "imgui.h"
 #include "Framework/MyImguiLib.h"
 #include "Render/Texture.h"
+#include "LevelEditor/PropertyEditors.h"
+
+// Thin SharedAssetPropertyEditor subclass that wraps AssetPtr<MaterialInstance>
+class RendererMaterialEditor : public SharedAssetPropertyEditor {
+public:
+	explicit RendererMaterialEditor(AssetPtr<MaterialInstance>* mat) : mat_ptr(mat) {
+		class_type_override = &MaterialInstance::StaticType;
+	}
+	std::string get_str() override {
+		return (mat_ptr && mat_ptr->get()) ? mat_ptr->get()->get_name() : "";
+	}
+	void set_asset(const std::string& str) override {
+		if (!mat_ptr) return;
+		*mat_ptr = str.empty() ? AssetPtr<MaterialInstance>{}
+		                       : g_assets.find<MaterialInstance>(str);
+	}
+	AssetPtr<MaterialInstance>* mat_ptr = nullptr;
+};
+
+ParticleSystemEditorUi::~ParticleSystemEditorUi() = default;
 
 static EditingCurve make_default_linear_curve()
 {
@@ -637,16 +657,13 @@ void ParticleSystemEditorUi::draw_renderer_module(RendererModule& mod)
 {
 	ImGui::Indent();
 
-	// Material slot
-	ImGui::Text("Material");
-	ImGui::SameLine();
-	{
-		auto* mat_meta = AssetRegistrySystem::get().find_for_classtype(&MaterialInstance::StaticType);
-		std::string cur = mod.material.get() ? mod.material.get()->get_name() : "";
-		std::string new_path;
-		if (mat_slot.draw(cur, mat_meta, -1.f, new_path))
-			mod.material = g_assets.find<MaterialInstance>(new_path);
+	// Material — recreate editor if the subsystem has changed
+	if (mat_editor_subsystem != selected_subsystem) {
+		mat_editor = std::make_unique<RendererMaterialEditor>(&mod.material);
+		mat_editor_subsystem = selected_subsystem;
 	}
+	ImGui::Text("Material:");
+	mat_editor->internal_update();
 
 	const char* render_mode_names[] = {"Billboard", "Stretched Billboard", "Mesh"};
 	int rm = (int)mod.render_mode;

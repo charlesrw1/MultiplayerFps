@@ -47,6 +47,9 @@ public:
 		asset_str = "";
 	}
 
+	// Set this when using the editor without a PropertyInfo (standalone mode)
+	const ClassTypeInfo* class_type_override = nullptr;
+
 private:
 	bool has_init = false;
 	std::string asset_str;

@@ -150,14 +150,15 @@ bool AssetSlotWidget::draw(const std::string& current_path, const AssetMetadata*
 }
 
 bool SharedAssetPropertyEditor::internal_update() {
-	ASSERT(prop->class_type && prop->type == core_type_id::AssetPtr);
 	if (!has_init) {
 		has_init = true;
 		asset_str = get_str();
-		metadata = AssetRegistrySystem::get().find_for_classtype(prop->class_type);
+		const ClassTypeInfo* ct = class_type_override ? class_type_override
+		                        : (prop ? prop->class_type : nullptr);
+		metadata = ct ? AssetRegistrySystem::get().find_for_classtype(ct) : nullptr;
 	}
 	if (!metadata) {
-		ImGui::Text("Asset has no metadata: %s\n", prop->class_type->classname);
+		ImGui::Text("Asset has no metadata");
 		return false;
 	}
 

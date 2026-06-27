@@ -5,7 +5,7 @@
 #include "Framework/CurveEditorImgui.h"
 #include "Framework/GradientEditorImgui.h"
 #include "ParticleTypes.h"
-#include "LevelEditor/PropertyEditors.h"
+class RendererMaterialEditor;
 
 class ParticleSystemComponent;
 
@@ -13,6 +13,7 @@ class ParticleSystemEditorUi : public IComponentEditorUi
 {
 public:
 	ParticleSystemEditorUi(ParticleSystemComponent* comp);
+	~ParticleSystemEditorUi();
 	bool draw() override;
 
 private:
@@ -65,7 +66,9 @@ private:
 	bool show_create_popup = false;
 	char create_name[128] = {};
 
-	AssetSlotWidget mat_slot; // picker state for material slot in draw_renderer_module
+	// One editor per subsystem; recreated when selected_subsystem changes
+	std::unique_ptr<RendererMaterialEditor> mat_editor;
+	int mat_editor_subsystem = -1;
 };
 
 #endif
