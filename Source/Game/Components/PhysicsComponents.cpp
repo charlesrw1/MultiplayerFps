@@ -238,6 +238,10 @@ void PhysicsBody::update_mass() {
 	ASSERT(physxActor);
 	if (!get_is_actor_static()) {
 		auto dyn = (PxRigidDynamic*)physxActor;
+		// updateMassAndInertia asserts inside PhysX if there are no attached shapes
+		// (InertiaTensorComputer gets zero-volume input). Guard here so degenerate or
+		// shape-less bodies don't crash — mass stays at PhysX default (1 kg).
+		if (dyn->getNbShapes() == 0) return;
 		PxRigidBodyExt::updateMassAndInertia(*dyn, density);
 	}
 }
