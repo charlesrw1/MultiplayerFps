@@ -104,13 +104,22 @@ void ThumbnailRenderer::render(Model* model, MaterialInstance* override_mat) {
 	// Compute view target and effective radius.
 	// Models: use AABB center + half-diagonal — tighter and better-centered than bounding sphere
 	//         for asymmetric meshes (characters, props with uneven extents).
-	// Materials: preview sphere is symmetric so bounding sphere is fine.
+	// Materials: use AABB min half-extent as the visual sphere radius.
+	//   get_bounding_sphere() uses bounds_to_sphere() which sets radius = length(half_extents),
+	//   the AABB half-diagonal. For sphere.cmdl that's R*sqrt(3) — camera ends up ~1.73x too
+	//   far, filling only ~58% of the image. Min half-extent = actual sphere mesh radius.
 	glm::vec3 center;
 	float radius;
 	if (override_mat) {
-		glm::vec4 sphere = model->get_bounding_sphere();
-		center = glm::vec3(sphere);
-		radius = sphere.w;
+		const auto& aabb = model->get_bounds();
+		center = (aabb.bmin + aabb.bmax) * 0.5f;
+		glm::vec3 half_ext = (aabb.bmax - aabb.bmin) * 0.5f;
+		radius = glm::min(half_ext.x, glm::min(half_ext.y, half_ext.z));
+		if (radius < 1e-3f) {
+			glm::vec4 sphere = model->get_bounding_sphere();
+			center = glm::vec3(sphere);
+			radius = sphere.w;
+		}
 	} else {
 		const auto& aabb = model->get_bounds();
 		center = (aabb.bmin + aabb.bmax) * 0.5f;
