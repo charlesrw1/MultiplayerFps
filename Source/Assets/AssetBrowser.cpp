@@ -303,15 +303,6 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 			ImGui::SameLine();
 		}
 
-		// Show DDS thumbnail inline for Texture assets
-		if (ThumbnailManager::supports_image_thumb(asset)) {
-			Texture* thumb = b->thumbnails.get_thumbnail(asset);
-			if (thumb) {
-				my_imgui_image(thumb, 20);
-				ImGui::SameLine();
-			}
-		}
-
 		if (ignore_folders.get_bool()) {
 			string name = parent_path + "/" + node->name;
 			ImGui::Text(name.c_str());
