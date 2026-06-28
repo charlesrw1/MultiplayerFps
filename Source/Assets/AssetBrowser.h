@@ -23,6 +23,10 @@ public:
 	// Must be called once per frame AFTER all get_thumbnail calls for that frame.
 	void tick();
 
+	// Mark the thumbnail for asset_gamepath as stale so it gets re-rendered next time visible.
+	// Call after a Model or MaterialInstance asset is reloaded.
+	void invalidate_thumbnail(const std::string& asset_gamepath);
+
 private:
 	enum class EntryState { Queued, NeedLoad, Loaded, Failed };
 
@@ -32,6 +36,7 @@ private:
 		EntryState state = EntryState::Queued;
 		Texture* tex = nullptr;
 		int last_seen_frame = 0;
+		bool force_rerender = false; // skip freshness check on next process_render
 	};
 
 	// Process one Queued entry: check freshness and render if needed, then advance to NeedLoad.

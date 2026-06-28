@@ -934,8 +934,9 @@ void ThumbnailManager::process_render(Entry& e) {
 	auto model_file     = FileSys::open_read_game(e.asset.filename);
 	auto thumbnail_file = FileSys::open_read_game(e.thumb_path);
 
-	bool needs_render = !thumbnail_file || !model_file ||
+	bool needs_render = e.force_rerender || !thumbnail_file || !model_file ||
 	                    model_file->get_timestamp() > thumbnail_file->get_timestamp();
+	e.force_rerender = false;
 	thumbnail_file.reset();
 	model_file.reset();
 
@@ -968,13 +969,33 @@ void ThumbnailManager::process_render(Entry& e) {
 
 void ThumbnailManager::process_load(Entry& e) {
 	ASSERT(e.state == EntryState::NeedLoad);
-	// force_load_for_ui sets force_nearest=true which skips generate_mipmaps — fast path.
-	Texture* t = Texture::force_load_for_ui(e.thumb_path);
-	if (t && t->gpu_ptr) {
-		e.tex   = t;
-		e.state = EntryState::Loaded;
+	if (e.tex) {
+		// Already has a GPU texture from a prior load — reload it in-place so the
+		// Texture* address stays stable and we avoid a duplicate install_system_asset.
+		g_assets.reload(e.tex);
+		e.state = e.tex->gpu_ptr ? EntryState::Loaded : EntryState::Failed;
 	} else {
-		e.state = EntryState::Failed;
+		// First load — force_load_for_ui sets force_nearest=true which skips generate_mipmaps.
+		Texture* t = Texture::force_load_for_ui(e.thumb_path);
+		if (t && t->gpu_ptr) {
+			e.tex   = t;
+			e.state = EntryState::Loaded;
+		} else {
+			e.state = EntryState::Failed;
+		}
+	}
+}
+
+void ThumbnailManager::invalidate_thumbnail(const std::string& asset_gamepath) {
+	auto it = entries.find(asset_gamepath);
+	if (it == entries.end())
+		return;
+	Entry& e = it->second;
+	// Only act on entries that have already been rendered or are in-flight for load.
+	// Queued/Failed entries will naturally re-process and pick up any changes.
+	if (e.state == EntryState::Loaded || e.state == EntryState::NeedLoad) {
+		e.state = EntryState::Queued;
+		e.force_rerender = true;
 	}
 }
 

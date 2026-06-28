@@ -205,6 +205,9 @@ void AssetRegistrySystem::init() {
 #include "Render/MaterialPublic.h"
 #include "Render/Model.h"
 #include "Scripting/ScriptManager.h"
+#ifdef EDITOR_BUILD
+#include "Assets/AssetBrowser.h"
+#endif
 
 // Remove a leaf node from the tree by game path, pruning any now-empty parent directories.
 static void remove_from_tree(AssetFilesystemNode& root, const std::string& game_path) {
@@ -286,6 +289,10 @@ void AssetRegistrySystem::update() {
 			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {
 				auto asset = g_assets.find<MaterialInstance>(rel_path);
 				g_assets.reload<MaterialInstance>(asset);
+#ifdef EDITOR_BUILD
+				if (AssetBrowser::inst)
+					AssetBrowser::inst->thumbnails.invalidate_thumbnail(rel_path);
+#endif
 			}
 		} else if (ext == "mis" || ext == "glb") {
 			std::string cmdl = rel_path;
@@ -294,6 +301,10 @@ void AssetRegistrySystem::update() {
 			if (g_assets.is_asset_loaded(cmdl) && file_exists(rel_path)) {
 				auto asset = g_assets.find<Model>(cmdl);
 				g_assets.reload<Model>(asset);
+#ifdef EDITOR_BUILD
+				if (AssetBrowser::inst)
+					AssetBrowser::inst->thumbnails.invalidate_thumbnail(cmdl);
+#endif
 			}
 		} else if (ext == "png" || ext == "jpg" || ext == "tis") {
 			if (ext == "png") {

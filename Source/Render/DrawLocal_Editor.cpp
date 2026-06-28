@@ -99,15 +99,38 @@ void ThumbnailRenderer::render(Model* model, MaterialInstance* override_mat) {
 	};
 	set_pass();
 
-	float mult_z = 1.0;
-	if (override_mat)
-		mult_z = 0.6;
-	glm::vec4 sphere = model->get_bounding_sphere();
 	const float fov_rad = glm::radians(thumbnail_fov.get_float());
-	glm::vec3 center = glm::vec3(sphere);
-	const float c_mult = 2.0 / fov_rad;
-	glm::vec3 cam_pos = center + glm::normalize(glm::vec3(1, 1, 1)) * sphere.w * c_mult * mult_z;
-	View_Setup viewSetup = View_Setup(glm::lookAt(cam_pos, center, glm::vec3(0, 1, 0)), fov_rad, 0.01, 100.0, w, h);
+
+	// Compute view target and effective radius.
+	// Models: use AABB center + half-diagonal — tighter and better-centered than bounding sphere
+	//         for asymmetric meshes (characters, props with uneven extents).
+	// Materials: preview sphere is symmetric so bounding sphere is fine.
+	glm::vec3 center;
+	float radius;
+	if (override_mat) {
+		glm::vec4 sphere = model->get_bounding_sphere();
+		center = glm::vec3(sphere);
+		radius = sphere.w;
+	} else {
+		const auto& aabb = model->get_bounds();
+		center = (aabb.bmin + aabb.bmax) * 0.5f;
+		glm::vec3 half_ext = (aabb.bmax - aabb.bmin) * 0.5f;
+		radius = glm::length(half_ext);
+		if (radius < 1e-3f) {
+			// Degenerate AABB — fall back to bounding sphere
+			glm::vec4 sphere = model->get_bounding_sphere();
+			center = glm::vec3(sphere);
+			radius = sphere.w;
+		}
+	}
+
+	// Camera: 45° horizontal + ~40° elevation, close to Unreal's thumbnail angle.
+	// sin(fov/2) is the correct inscribed-sphere formula; 1.1 adds a 10% padding margin.
+	const glm::vec3 cam_dir = glm::normalize(glm::vec3(1.0f, 0.85f, 1.0f));
+	const float dist = radius / glm::sin(fov_rad * 0.5f) * 1.1f;
+	const glm::vec3 cam_pos = center + cam_dir * dist;
+	const float far_plane = glm::max(100.0f, dist + radius * 2.0f);
+	View_Setup viewSetup = View_Setup(glm::lookAt(cam_pos, center, glm::vec3(0, 1, 0)), fov_rad, 0.01f, far_plane, w, h);
 
 	Render_Level_Params cmdparams(viewSetup, &list, &pass, Render_Level_Params::FORWARD_PASS);
 	cmdparams.upload_constants = true;
