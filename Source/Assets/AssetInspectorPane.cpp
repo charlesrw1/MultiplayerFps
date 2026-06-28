@@ -51,32 +51,179 @@ struct InspectorCache {
     std::unique_ptr<PropertyGrid> mat_pg; // property grid for myMaterials array
 };
 
-// Editable state for a .mi file — rebuilt each time a new .mi is selected.
-struct MiEditorState {
-    std::string parent_path; // path to the .mm master material
+// ── Custom IPropertyEditor subclasses for .mi VAR parameters ────────────────
 
-    // Parallel to the master's param_defs
+// Helper: make a minimal synthetic PropertyInfo with a name (no type-specific fields needed).
+static PropertyInfo make_mi_prop(const char* name) {
+    PropertyInfo p;
+    p.name    = name;
+    p.tooltip = "";
+    p.type    = core_type_id::Float; // arbitrary; only name is used for display
+    return p;
+}
+
+class MiFloatEditor : public IPropertyEditor {
+public:
+    MiFloatEditor(std::string nm, float* v, float def)
+        : value(v), default_val(def) {
+        name_storage = std::move(nm);
+        synth = make_mi_prop(name_storage.c_str());
+        prop  = &synth;
+    }
+    bool internal_update() override {
+        ImGui::SetNextItemWidth(-1.f);
+        return ImGui::DragFloat("##v", value, 0.01f);
+    }
+    bool can_reset() override  { return *value != default_val; }
+    void reset_value() override { *value = default_val; }
+private:
+    std::string name_storage;
+    PropertyInfo synth;
+    float* value;
+    float  default_val;
+};
+
+class MiFloat4Editor : public IPropertyEditor {
+public:
+    MiFloat4Editor(std::string nm, glm::vec4* v, glm::vec4 def)
+        : value(v), default_val(def) {
+        name_storage = std::move(nm);
+        synth = make_mi_prop(name_storage.c_str());
+        prop  = &synth;
+    }
+    bool internal_update() override {
+        ImGui::SetNextItemWidth(-1.f);
+        return ImGui::DragFloat4("##v", &value->x, 0.01f);
+    }
+    bool can_reset() override  { return *value != default_val; }
+    void reset_value() override { *value = default_val; }
+private:
+    std::string  name_storage;
+    PropertyInfo synth;
+    glm::vec4*   value;
+    glm::vec4    default_val;
+};
+
+class MiColorEditor : public IPropertyEditor {
+public:
+    MiColorEditor(std::string nm, unsigned int* v, unsigned int def)
+        : value(v), default_val(def) {
+        name_storage = std::move(nm);
+        synth = make_mi_prop(name_storage.c_str());
+        prop  = &synth;
+    }
+    bool internal_update() override {
+        Color32 c(*value);
+        float col[4] = { c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f };
+        ImGui::SetNextItemWidth(-1.f);
+        if (ImGui::ColorEdit4("##v", col, ImGuiColorEditFlags_Uint8 | ImGuiColorEditFlags_AlphaBar)) {
+            c.r = (uint8_t)(col[0] * 255.f + 0.5f);
+            c.g = (uint8_t)(col[1] * 255.f + 0.5f);
+            c.b = (uint8_t)(col[2] * 255.f + 0.5f);
+            c.a = (uint8_t)(col[3] * 255.f + 0.5f);
+            *value = c.to_uint();
+            return true;
+        }
+        return false;
+    }
+    bool can_reset() override  { return *value != default_val; }
+    void reset_value() override { *value = default_val; }
+private:
+    std::string  name_storage;
+    PropertyInfo synth;
+    unsigned int* value;
+    unsigned int  default_val;
+};
+
+class MiBoolEditor : public IPropertyEditor {
+public:
+    MiBoolEditor(std::string nm, bool* v, bool def)
+        : value(v), default_val(def) {
+        name_storage = std::move(nm);
+        synth = make_mi_prop(name_storage.c_str());
+        prop  = &synth;
+    }
+    bool internal_update() override { return ImGui::Checkbox("##v", value); }
+    bool can_reset() override  { return *value != default_val; }
+    void reset_value() override { *value = default_val; }
+private:
+    std::string  name_storage;
+    PropertyInfo synth;
+    bool* value;
+    bool  default_val;
+};
+
+class MiTextureEditor : public SharedAssetPropertyEditor {
+public:
+    MiTextureEditor(std::string nm, std::string* path_ptr)
+        : path(path_ptr) {
+        name_storage        = std::move(nm);
+        synth               = make_mi_prop(name_storage.c_str());
+        prop                = &synth;
+        class_type_override = &Texture::StaticType;
+    }
+    std::string get_str() override            { return *path; }
+    void set_asset(const std::string& s) override { *path = s; }
+private:
+    std::string  name_storage;
+    PropertyInfo synth;
+    std::string* path;
+};
+
+// ── MiEditorState ────────────────────────────────────────────────────────────
+
+struct MiEditorState {
+    std::string parent_path;
+
     std::vector<MaterialParameterDefinition> param_defs;
     std::vector<MaterialParameterValue>      param_values;
-    std::vector<std::string>                 texture_paths; // game-path strings for Texture2D params
-
-    // Per-slot widgets (indices match param_defs)
-    AssetSlotWidget              master_slot;
-    std::vector<AssetSlotWidget> tex_slots;
+    std::vector<std::string>                 texture_paths; // game-path per Texture2D param
 
     // Picker state for the master material slot
     std::string master_picker_filter;
     bool        master_picker_needs_focus = false;
+
+    // PropertyGrid for the VAR parameters (rebuilt on init / master change)
+    std::unique_ptr<PropertyGrid> params_pg;
+
+    void build_params_pg() {
+        params_pg = std::make_unique<PropertyGrid>(get_basic_factory());
+        for (int i = 0; i < (int)param_defs.size(); i++) {
+            const auto& def = param_defs[i];
+            auto& val        = param_values[i];
+            switch (def.default_value.type) {
+            case MatParamType::Float:
+                params_pg->add_iproped_manual(
+                    new MiFloatEditor(def.name, &val.scalar, def.default_value.scalar));
+                break;
+            case MatParamType::FloatVec:
+                params_pg->add_iproped_manual(
+                    new MiFloat4Editor(def.name, &val.vector, def.default_value.vector));
+                break;
+            case MatParamType::Vector:
+                params_pg->add_iproped_manual(
+                    new MiColorEditor(def.name, &val.color32, def.default_value.color32));
+                break;
+            case MatParamType::Bool:
+                params_pg->add_iproped_manual(
+                    new MiBoolEditor(def.name, &val.boolean, def.default_value.boolean));
+                break;
+            case MatParamType::Texture2D:
+                params_pg->add_iproped_manual(
+                    new MiTextureEditor(def.name, &texture_paths[i]));
+                break;
+            default:
+                break;
+            }
+        }
+    }
 
     void init_from(const MaterialInstance* mi) {
         ASSERT(mi && mi->impl);
         auto* master_impl = mi->impl->get_master_impl();
         ASSERT(master_impl);
 
-        if (mi->impl->masterMaterial)
-            parent_path = mi->impl->masterMaterial->get_name();
-        else
-            parent_path.clear();
+        parent_path = mi->impl->masterMaterial ? mi->impl->masterMaterial->get_name() : "";
 
         param_defs   = master_impl->param_defs;
         param_values = mi->impl->params;
@@ -87,7 +234,8 @@ struct MiEditorState {
             if (param_defs[i].default_value.type == MatParamType::Texture2D)
                 texture_paths[i] = param_values[i].tex ? param_values[i].tex->get_name() : "";
         }
-        tex_slots.resize(param_defs.size());
+
+        build_params_pg();
     }
 
     // Serializes back to the .mi text format matching the loader.
@@ -100,27 +248,19 @@ struct MiEditorState {
             const auto& val = param_values[i];
             out << "VAR " << def.name << " ";
             switch (def.default_value.type) {
-            case MatParamType::Float:
-                out << val.scalar;
-                break;
+            case MatParamType::Float:    out << val.scalar; break;
             case MatParamType::FloatVec:
                 out << val.vector.x << " " << val.vector.y << " "
                     << val.vector.z << " " << val.vector.w;
                 break;
             case MatParamType::Vector: {
                 Color32 c(val.color32);
-                out << (int)c.r << " " << (int)c.g << " "
-                    << (int)c.b << " " << (int)c.a;
+                out << (int)c.r << " " << (int)c.g << " " << (int)c.b << " " << (int)c.a;
                 break;
             }
-            case MatParamType::Bool:
-                out << (val.boolean ? "1" : "0");
-                break;
-            case MatParamType::Texture2D:
-                out << texture_paths[i];
-                break;
-            default:
-                break;
+            case MatParamType::Bool:     out << (val.boolean ? "1" : "0"); break;
+            case MatParamType::Texture2D: out << texture_paths[i]; break;
+            default: break;
             }
             out << "\n";
         }
@@ -495,87 +635,66 @@ void AssetInspectorPane::draw_material_text(const std::string& gamepath) {
 
 // Draws a single-row slot that only accepts .mm drag-drops and shows a .mm-filtered picker.
 // Returns true and sets out_path when the selection changes.
+// .mm-only asset slot: colored slot + drag-drop + browse button + picker popup.
+// Returns true and writes out_path when the selection changes.
 static bool draw_master_mat_slot(const std::string& current_path, const AssetMetadata* mat_meta,
                                   std::string& picker_filter, bool& picker_needs_focus,
                                   std::string& out_path) {
-    auto* drawlist  = ImGui::GetWindowDrawList();
-    auto& style     = ImGui::GetStyle();
-    const float fh  = ImGui::GetFrameHeight();
-    const float bw  = fh;
-    const float tw  = ImGui::GetContentRegionAvail().x - bw - style.ItemSpacing.x;
-
+    auto* dl   = ImGui::GetWindowDrawList();
+    auto& style = ImGui::GetStyle();
+    const float fh = ImGui::GetFrameHeight();
+    const float bw = fh;
+    const float tw = ImGui::GetContentRegionAvail().x - bw - style.ItemSpacing.x;
     bool changed = false;
 
-    // Colored slot background
-    ImVec2 slot_min = ImGui::GetCursorScreenPos();
-    ImVec2 slot_max = { slot_min.x + tw, slot_min.y + fh };
+    // Slot background
+    ImVec2 s_min = ImGui::GetCursorScreenPos();
+    ImVec2 s_max = { s_min.x + tw, s_min.y + fh };
     if (mat_meta) {
         Color32 bg = mat_meta->get_browser_color();
-        bg.r = (uint8_t)(bg.r * 0.35f);
-        bg.g = (uint8_t)(bg.g * 0.35f);
-        bg.b = (uint8_t)(bg.b * 0.35f);
-        drawlist->AddRectFilled(slot_min, slot_max, bg.to_uint(), 3.f);
+        bg.r = (uint8_t)(bg.r * 0.35f); bg.g = (uint8_t)(bg.g * 0.35f); bg.b = (uint8_t)(bg.b * 0.35f);
+        dl->AddRectFilled(s_min, s_max, bg.to_uint(), 3.f);
     }
-
-    // Text (clipped)
-    ImGui::PushClipRect(slot_min, slot_max, true);
-    ImVec2 text_cur = ImGui::GetCursorPos();
-    ImGui::SetCursorPosY(text_cur.y + style.FramePadding.y * 0.5f);
+    ImGui::PushClipRect(s_min, s_max, true);
+    ImVec2 tc = ImGui::GetCursorPos();
+    ImGui::SetCursorPosY(tc.y + style.FramePadding.y * 0.5f);
     if (current_path.empty()) ImGui::TextDisabled("(none — drag a .mm here)");
     else ImGui::TextUnformatted(current_path.c_str());
     ImGui::PopClipRect();
-
-    // Invisible button
-    ImGui::SetCursorPos(text_cur);
+    ImGui::SetCursorPos(tc);
     ImGui::InvisibleButton("##mm_slot", { tw, fh });
     bool hov = ImGui::IsItemHovered();
-    ImU32 outline = (hov && current_path.empty()) ? IM_COL32(200,200,200,180) : IM_COL32(180,180,180,50);
-    drawlist->AddRect(slot_min, slot_max, outline, 3.f);
+    dl->AddRect(s_min, s_max,
+        (hov && current_path.empty()) ? IM_COL32(200,200,200,180) : IM_COL32(180,180,180,50), 3.f);
     if (hov) ImGui::SetTooltip(current_path.empty() ? "Drag a .mm master material here" : current_path.c_str());
     if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && current_path.empty()) {
-        ImGui::OpenPopup("##mm_picker");
-        picker_filter.clear();
-        picker_needs_focus = true;
+        ImGui::OpenPopup("##mm_picker"); picker_filter.clear(); picker_needs_focus = true;
     }
-
-    // Drag-drop — only accept .mm
     if (ImGui::BeginDragDropTarget()) {
-        const ImGuiPayload* peek = ImGui::AcceptDragDropPayload(
-            "AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
+        const ImGuiPayload* peek = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
         if (peek) {
             AssetOnDisk* res = *(AssetOnDisk**)peek->Data;
-            if (res->type == mat_meta &&
-                StringUtils::get_extension_no_dot(res->filename) == "mm") {
-                if (ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")) {
-                    out_path = res->filename;
-                    changed = true;
-                }
-            }
+            if (res->type == mat_meta && StringUtils::get_extension_no_dot(res->filename) == "mm")
+                if (ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")) { out_path = res->filename; changed = true; }
         }
         ImGui::EndDragDropTarget();
     }
 
     // Browse button
     ImGui::SameLine(0, style.ItemSpacing.x);
-    ImVec2 btn_pos = ImGui::GetCursorScreenPos();
+    ImVec2 bp = ImGui::GetCursorScreenPos();
     ImGui::InvisibleButton("##mm_browse", { bw, fh });
     bool bhov = ImGui::IsItemHovered();
-    drawlist->AddRectFilled(btn_pos, { btn_pos.x+bw, btn_pos.y+fh },
-        bhov ? IM_COL32(75,75,75,200) : IM_COL32(50,50,50,160), 3.f);
-    drawlist->AddRect(btn_pos, { btn_pos.x+bw, btn_pos.y+fh }, IM_COL32(100,100,100,120), 3.f);
-    auto browse_tex = g_assets.find<Texture>("eng/icons/doc_search.png");
-    if (browse_tex) {
-        float ico = fh - style.FramePadding.y * 2.f;
-        float ix  = btn_pos.x + (bw - ico) * 0.5f;
-        float iy  = btn_pos.y + style.FramePadding.y;
-        drawlist->AddImage(ImTextureID(uint64_t(browse_tex->get_internal_render_handle())),
-            { ix, iy }, { ix+ico, iy+ico });
+    dl->AddRectFilled(bp, { bp.x+bw, bp.y+fh }, bhov ? IM_COL32(75,75,75,200) : IM_COL32(50,50,50,160), 3.f);
+    dl->AddRect(bp, { bp.x+bw, bp.y+fh }, IM_COL32(100,100,100,120), 3.f);
+    auto btex = g_assets.find<Texture>("eng/icons/doc_search.png");
+    if (btex) {
+        float ico = fh - style.FramePadding.y * 2.f, ix = bp.x + (bw-ico)*0.5f, iy = bp.y + style.FramePadding.y;
+        dl->AddImage(ImTextureID(uint64_t(btex->get_internal_render_handle())), {ix,iy}, {ix+ico,iy+ico});
     }
     if (bhov && !current_path.empty()) ImGui::SetTooltip("Find in browser");
-    if (ImGui::IsItemClicked() && !current_path.empty() && AssetBrowser::inst) {
-        AssetBrowser::inst->set_selected(current_path);
-        AssetBrowser::inst->force_focus = true;
-    }
+    if (ImGui::IsItemClicked() && !current_path.empty() && AssetBrowser::inst)
+        { AssetBrowser::inst->set_selected(current_path); AssetBrowser::inst->force_focus = true; }
 
     // Picker popup (.mm only)
     ImGui::SetNextWindowSize({ 320, 360 }, ImGuiCond_Always);
@@ -594,16 +713,10 @@ static bool draw_master_mat_slot(const std::string& current_path, const AssetMet
                 auto nl = StringUtils::to_lower(node->asset.filename);
                 if (nl.find(fl) == std::string::npos) continue;
             }
-            if (ImGui::Selectable(node->asset.filename.c_str())) {
-                out_path = node->asset.filename;
-                changed = true;
-                ImGui::CloseCurrentPopup();
-            }
+            if (ImGui::Selectable(node->asset.filename.c_str())) { out_path = node->asset.filename; changed = true; ImGui::CloseCurrentPopup(); }
         }
-        ImGui::EndChild();
-        ImGui::EndPopup();
+        ImGui::EndChild(); ImGui::EndPopup();
     }
-
     return changed;
 }
 
@@ -612,15 +725,12 @@ void AssetInspectorPane::draw_material_instance_editor(const std::string& gamepa
     auto& s = *mi_state_;
 
     const auto* mat_meta = AssetRegistrySystem::get().find_type("Material");
-    const auto* tex_meta = AssetRegistrySystem::get().find_type("Texture");
 
     // ── Master material ──────────────────────────────────────────────────────
     ImGui::SeparatorText("Master Material");
-
     std::string new_master;
     if (draw_master_mat_slot(s.parent_path, mat_meta, s.master_picker_filter,
                               s.master_picker_needs_focus, new_master)) {
-        // Validate and reload param defs from the new master
         auto new_mat = g_assets.find_sync_sptr<MaterialInstance>(new_master);
         if (new_mat && new_mat->impl && new_mat->impl->masterImpl) {
             s.parent_path = new_master;
@@ -629,70 +739,15 @@ void AssetInspectorPane::draw_material_instance_editor(const std::string& gamepa
             for (int i = 0; i < (int)s.param_defs.size(); i++)
                 s.param_values[i] = s.param_defs[i].default_value;
             s.texture_paths.assign(s.param_defs.size(), "");
-            s.tex_slots.resize(s.param_defs.size());
+            s.build_params_pg();
             settings_dirty = true;
         }
     }
 
-    // ── VAR parameters ───────────────────────────────────────────────────────
-    if (!s.param_defs.empty()) {
-        ImGui::SeparatorText("Parameters");
-
-        const float label_w = 130.f;
-        for (int i = 0; i < (int)s.param_defs.size(); i++) {
-            const auto& def = s.param_defs[i];
-            auto& val = s.param_values[i];
-
-            ImGui::PushID(i);
-            ImGui::AlignTextToFramePadding();
-            ImGui::TextUnformatted(def.name.c_str());
-            ImGui::SameLine(label_w);
-            ImGui::SetNextItemWidth(-1.f);
-
-            switch (def.default_value.type) {
-            case MatParamType::Float:
-                if (ImGui::DragFloat("##v", &val.scalar, 0.01f))
-                    settings_dirty = true;
-                break;
-            case MatParamType::FloatVec:
-                if (ImGui::DragFloat4("##v", &val.vector.x, 0.01f))
-                    settings_dirty = true;
-                break;
-            case MatParamType::Vector: {
-                Color32 c(val.color32);
-                float col[4] = { c.r / 255.f, c.g / 255.f, c.b / 255.f, c.a / 255.f };
-                if (ImGui::ColorEdit4("##v", col,
-                        ImGuiColorEditFlags_Uint8 | ImGuiColorEditFlags_AlphaBar)) {
-                    c.r = (uint8_t)(col[0] * 255.f + 0.5f);
-                    c.g = (uint8_t)(col[1] * 255.f + 0.5f);
-                    c.b = (uint8_t)(col[2] * 255.f + 0.5f);
-                    c.a = (uint8_t)(col[3] * 255.f + 0.5f);
-                    val.color32 = c.to_uint();
-                    settings_dirty = true;
-                }
-                break;
-            }
-            case MatParamType::Bool:
-                if (ImGui::Checkbox("##v", &val.boolean))
-                    settings_dirty = true;
-                break;
-            case MatParamType::Texture2D:
-                if (tex_meta) {
-                    std::string out_path;
-                    if (s.tex_slots[i].draw(s.texture_paths[i], tex_meta, -1.f, out_path)) {
-                        s.texture_paths[i] = out_path;
-                        settings_dirty = true;
-                    }
-                } else {
-                    ImGui::TextUnformatted(s.texture_paths[i].c_str());
-                }
-                break;
-            default:
-                break;
-            }
-
-            ImGui::PopID();
-        }
+    // ── VAR parameters via PropertyGrid ──────────────────────────────────────
+    if (s.params_pg) {
+        s.params_pg->update();
+        if (s.params_pg->rows_had_changes) settings_dirty = true;
     } else {
         ImGui::TextDisabled("(no parameters)");
     }
@@ -701,8 +756,7 @@ void AssetInspectorPane::draw_material_instance_editor(const std::string& gamepa
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
-    bool apply_en = settings_dirty && !s.parent_path.empty();
-    ImGui::BeginDisabled(!apply_en);
+    ImGui::BeginDisabled(!settings_dirty || s.parent_path.empty());
     if (ImGui::Button("Apply")) {
         std::string text = s.serialize();
         auto f = FileSys::open_write_game(gamepath);
@@ -713,8 +767,7 @@ void AssetInspectorPane::draw_material_instance_editor(const std::string& gamepa
     }
     ImGui::EndDisabled();
     ImGui::SameLine();
-    if (ImGui::Button("Revert"))
-        load_for(last_selected);
+    if (ImGui::Button("Revert")) load_for(last_selected);
 }
 
 void AssetInspectorPane::imgui_draw(const AssetOnDisk& selected) {
