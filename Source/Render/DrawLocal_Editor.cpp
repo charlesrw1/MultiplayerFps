@@ -125,9 +125,9 @@ void ThumbnailRenderer::render(Model* model, MaterialInstance* override_mat) {
 	}
 
 	// Camera: 45° horizontal + ~40° elevation, close to Unreal's thumbnail angle.
-	// sin(fov/2) is the correct inscribed-sphere formula; 1.1 adds a 10% padding margin.
+	// sin(fov/2) is the correct inscribed-sphere formula; 1.05 margin maximises screen fill.
 	const glm::vec3 cam_dir = glm::normalize(glm::vec3(1.0f, 0.85f, 1.0f));
-	const float dist = radius / glm::sin(fov_rad * 0.5f) * 1.1f;
+	const float dist = radius / glm::sin(fov_rad * 0.5f) * 1.05f;
 	const glm::vec3 cam_pos = center + cam_dir * dist;
 	const float far_plane = glm::max(100.0f, dist + radius * 2.0f);
 	View_Setup viewSetup = View_Setup(glm::lookAt(cam_pos, center, glm::vec3(0, 1, 0)), fov_rad, 0.01f, far_plane, w, h);

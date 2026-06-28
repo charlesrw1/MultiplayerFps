@@ -566,14 +566,18 @@ void AssetBrowser::draw_browser_grid() {
 		ImVec2 thumb_screen_pos = ImGui::GetCursorScreenPos();
 		ImVec2 thumb_size = ImVec2((float)THUMB_SIZE, (float)THUMB_SIZE);
 
+		const bool is_selected = (selected_resource.filename == c->asset.filename);
+		bool item_pressed = false;
+
 		if (t) {
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-			ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())),
-									   thumb_size, only_filename.c_str());
+			item_pressed = ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())),
+													  thumb_size, only_filename.c_str());
 			ImGui::PopStyleColor();
 		} else {
 			// Placeholder while streaming in
 			ImGui::InvisibleButton("##thumb", thumb_size);
+			item_pressed = ImGui::IsItemActive() && ImGui::IsMouseReleased(ImGuiMouseButton_Left);
 			ImDrawList* dl = ImGui::GetWindowDrawList();
 			ImVec2 bmax = ImVec2(thumb_screen_pos.x + THUMB_SIZE, thumb_screen_pos.y + THUMB_SIZE);
 			dl->AddRectFilled(thumb_screen_pos, bmax, IM_COL32(35, 35, 35, 255));
@@ -583,6 +587,24 @@ void AssetBrowser::draw_browser_grid() {
 						ImVec2(thumb_screen_pos.x + 4.f, thumb_screen_pos.y + 4.f),
 						IM_COL32(110, 110, 110, 255), only_filename.c_str(), nullptr, THUMB_SIZE - 8.f);
 			ImGui::PopClipRect();
+		}
+
+		// Selection highlight border
+		if (is_selected) {
+			ImVec2 bmax = ImVec2(thumb_screen_pos.x + THUMB_SIZE, thumb_screen_pos.y + THUMB_SIZE);
+			ImGui::GetWindowDrawList()->AddRect(thumb_screen_pos, bmax, IM_COL32(100, 180, 255, 230), 0.f, 0, 2.f);
+		}
+
+		// Left-click: select; double-click: open
+		if (item_pressed) {
+			selected_resource = c->asset;
+		}
+		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClickedCount[0] == 2) {
+			selected_resource = c->asset;
+			double_clicked_selected = true;
+			const auto& tname = c->asset.type->get_type_name();
+			if (tname == "Map" || tname == "Prefab")
+				Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, ("open-editor " + c->asset.filename).c_str());
 		}
 
 		// Hover tooltip: full path + type after short delay

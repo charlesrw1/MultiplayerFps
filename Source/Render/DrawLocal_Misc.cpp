@@ -72,7 +72,7 @@ ConfigVar test_thumbnail_model("test_thumbnail_model", "", CVAR_DEV, "");
 
 ConfigVar r_drawdecals("r.drawdecals", "1", CVAR_BOOL | CVAR_DEV, "enable/disable drawing of decals");
 
-ConfigVar thumbnail_fov("thumbnail_fov", "60", CVAR_FLOAT | CVAR_UNBOUNDED, "");
+ConfigVar thumbnail_fov("thumbnail_fov", "30", CVAR_FLOAT | CVAR_UNBOUNDED, "");
 
 ConfigVar debug_sun_shadow("r.debug_csm", "0", CVAR_BOOL | CVAR_DEV, "debug csm shadow rendering");
 ConfigVar r_sun_disk_light("r.sun_disk_light", "1", CVAR_BOOL | CVAR_DEV, "use disk area light for sun specular");
