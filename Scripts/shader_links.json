@@ -81,7 +81,7 @@
       "site": "Source/Render/DrawLocal_Init.cpp:38"
     },
     {
-      "vert": "MeshSimpleV.txt",
+      "vert": "MeshDebugProbeV.txt",
       "frag": "MeshDebugProbeF.txt",
       "defines": [],
       "site": "Source/Render/RT/RaytraceTest.cpp:53"

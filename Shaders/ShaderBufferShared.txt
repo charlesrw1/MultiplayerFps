@@ -312,20 +312,22 @@ struct MbSimpleFragPushConsts {
     vec4 solid_color;            //   0 ..  16   (struct size 16)
 };
 
-// MeshSimpleV.txt + MeshDebugProbeF.txt (DDGI probe debug draws -- see
-// RaytraceTest_Shade.cpp). VS needs per-probe Model; FS needs the probe
-// grid coordinate, full grid dims, and a global offset into the irradiance
-// atlas. ivec3 fields wrapped to ivec4 to keep std140 layout obvious.
+// MeshDebugProbeV.txt + MeshDebugProbeF.txt (DDGI probe debug draws -- see
+// RaytraceTest_Shade.cpp). Per-probe model+coord live in a SSBO indexed by
+// gl_InstanceID; vol_grid/vol_offset are per-volume push constants in FS.
+struct ProbeDebugInstance {
+    mat4  model;                 //   0 ..  64
+    ivec4 probe_coord;           //  64 ..  80   (.xyz = x,y,z; struct size 80)
+};
 struct MeshSimpleVertPushConsts {
     mat4 Model;                  //   0 ..  64   (struct size 64)
 };
 struct MeshDebugProbeFragPushConsts {
-    ivec4 probe_coord;           //   0 ..  16   (.xyz used)
-    ivec4 vol_grid;              //  16 ..  32   (.xyz used)
-    int   vol_offset;            //  32 ..  36
+    ivec4 vol_grid;              //   0 ..  16   (.xyz used)
+    int   vol_offset;            //  16 ..  20
     int   _pad0;
     int   _pad1;
-    int   _pad2;                 //   (struct size 48)
+    int   _pad2;                 //   (struct size 32)
 };
 
 // MasterUIShader.txt (UI material draws -- see DrawLocal_Misc.cpp).

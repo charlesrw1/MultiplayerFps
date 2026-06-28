@@ -8,7 +8,6 @@
 #include "Framework/MathLib.h"
 
 void set_shit_fuck();
-void draw_model_simple_no_material(Model* model);
 
 // Statics owned by RaytraceTest.cpp
 extern float irrad_mult;
@@ -26,23 +25,24 @@ extern ConfigVar r_ddgi_halfres_blend;
 // Probe debug rendering
 // ---------------------------------------------------------------------------
 
-ConfigVar draw_real_grid("draw_real_grid", "2", CVAR_INTEGER | CVAR_UNBOUNDED, "");
+ConfigVar ddgi_probe_debug("ddgi_probe_debug", "0", CVAR_BOOL, "");
+
+struct ProbeDebugInstanceCpu {
+    glm::mat4  model;
+    glm::ivec4 probe_coord;
+};
 
 void DdgiTesting::render_probes() {
-    ASSERT(true); // myvolumes may be empty — guard is at top of function
-    if (myvolumes.size() == 0)
+    if (!ddgi_probe_debug.get_bool() || myvolumes.empty())
         return;
 
     auto& device = draw.get_device();
 
-    auto set_composite_pass = [&]() {
-        RenderPassState pass_state;
-        auto color_infos = {ColorTargetInfo(draw.tex.output_composite)}; // no clear
-        pass_state.color_infos = color_infos;
-        pass_state.depth_info = draw.tex.scene_depth;
-        gfx().set_render_pass(pass_state);
-    };
-    set_composite_pass();
+    RenderPassState pass_state;
+    auto color_infos = {ColorTargetInfo(draw.tex.output_composite)};
+    pass_state.color_infos = color_infos;
+    pass_state.depth_info = draw.tex.scene_depth;
+    gfx().set_render_pass(pass_state);
 
     RenderPipelineState state = RenderPipelineState();
     state.program = draw.get_prog_man().get_obj(debug_probes);
@@ -50,36 +50,56 @@ void DdgiTesting::render_probes() {
     device.set_pipeline(state);
 
     Model* m = Model::load("sphere.cmdl");
+    if (!m || m->get_num_lods() == 0)
+        return;
 
     device.bind_texture(0, probe_irradiance);
     set_shit_fuck();
-    if (draw_real_grid.get_integer() == 2) {
-        for (auto& vol : myvolumes) {
-            auto ddgiGRID = vol.size_offset;
-            gpu::MeshDebugProbeFragPushConsts pcf{};
-            pcf.vol_grid   = glm::ivec4(glm::ivec3(ddgiGRID), 0);
-            pcf.vol_offset = ddgiGRID.w;
 
-            for (int x = 0; x < ddgiGRID.x; x++) {
-                for (int y = 0; y < ddgiGRID.y; y++) {
-                    for (int z = 0; z < ddgiGRID.z; z++) {
+    for (auto& vol : myvolumes) {
+        const auto ddgiGRID = vol.size_offset;
+        const int nx = ddgiGRID.x, ny = ddgiGRID.y, nz = ddgiGRID.z;
+        const int vol_probe_offset = ddgiGRID.w;
 
-                        const int global_index = x + y * ddgiGRID.x + z * ddgiGRID.x * ddgiGRID.y + ddgiGRID.w;
-                        glm::vec3 ofs = glm::vec3(temp_probe_relocate_thing.at(global_index));
-
-                        glm::mat4 tr = glm::translate(glm::mat4(1), glm::vec3(x, y, z) * glm::vec3(vol.density) +
-                                                                        glm::vec3(vol.origin_priority) + ofs);
-                        gpu::MeshSimpleVertPushConsts pcv{};
-                        pcv.Model = glm::scale(tr, glm::vec3(0.2));
-                        gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
-
-                        pcf.probe_coord = glm::ivec4(x, y, z, 0);
-                        gfx().push_fragment_constants(0, &pcf, sizeof(pcf));
-
-                        draw_model_simple_no_material(m);
-                    }
+        std::vector<ProbeDebugInstanceCpu> instances;
+        instances.reserve(nx * ny * nz);
+        for (int z = 0; z < nz; z++) {
+            for (int y = 0; y < ny; y++) {
+                for (int x = 0; x < nx; x++) {
+                    const int global_index = x + y * nx + z * nx * ny + vol_probe_offset;
+                    const glm::vec3 ofs = glm::vec3(temp_probe_relocate_thing.at(global_index));
+                    const glm::mat4 tr = glm::translate(glm::mat4(1),
+                        glm::vec3(x, y, z) * glm::vec3(vol.density) + glm::vec3(vol.origin_priority) + ofs);
+                    instances.push_back({ glm::scale(tr, glm::vec3(0.2f)), glm::ivec4(x, y, z, 0) });
                 }
             }
+        }
+
+        const int needed = (int)(instances.size() * sizeof(ProbeDebugInstanceCpu));
+        if (!probe_debug_instance_buf || probe_debug_instance_buf->get_buf_size() < needed) {
+            if (probe_debug_instance_buf) probe_debug_instance_buf->release();
+            CreateBufferArgs bargs;
+            bargs.size  = needed;
+            bargs.flags = (GraphicsBufferUseFlags)(BUFFER_USE_AS_STORAGE_READ | BUFFER_USE_DYNAMIC);
+            probe_debug_instance_buf = device.create_buffer(bargs);
+        }
+        probe_debug_instance_buf->upload(instances.data(), needed);
+        gfx().bind_storage_buffer_base(0, probe_debug_instance_buf);
+
+        gpu::MeshDebugProbeFragPushConsts pcf{};
+        pcf.vol_grid   = glm::ivec4(glm::ivec3(ddgiGRID), 0);
+        pcf.vol_offset = vol_probe_offset;
+        gfx().push_fragment_constants(0, &pcf, sizeof(pcf));
+
+        const auto& lod  = m->get_lod(0);
+        for (int p = 0; p < lod.part_count; p++) {
+            const auto& part = m->get_part(p);
+            gfx().draw_elements_instanced_base_vertex_base_instance(
+                GraphicsPrimitiveType::Triangles, part.element_count, MODEL_INDEX_TYPE,
+                part.element_offset + m->get_merged_index_ptr(),
+                (int)instances.size(),
+                part.base_vertex + m->get_merged_vertex_ofs(),
+                0);
         }
     }
 }

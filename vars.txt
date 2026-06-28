@@ -57,7 +57,7 @@ g_debug_skeletons 0
 ed_decal_active 0
 r.drawdecals 1
 
-draw_real_grid 0
+ddgi_probe_debug 0
 
 ignore_folders 1
 
@@ -96,7 +96,7 @@ disable_texture_loads 0
 g_debug_skeletons 0
 ed_decal_active 0
 r.drawdecals 1
-draw_real_grid 0
+ddgi_probe_debug 0
 ignore_folders 1
 debug.menu_width 400
 

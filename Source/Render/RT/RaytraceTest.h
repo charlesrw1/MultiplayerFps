@@ -78,6 +78,7 @@ public:
 	IGraphicsBuffer* ddgi_volumes = nullptr;
 	IGraphicsBuffer* ddgi_probe_relocation_offsets = nullptr;
 	IGraphicsBuffer* ddgi_probe_avg_value = nullptr;
+	IGraphicsBuffer* probe_debug_instance_buf = nullptr;
 
 	IGraphicsTexture* probe_irradiance = nullptr;
 	IGraphicsTexture* probe_depth = nullptr;

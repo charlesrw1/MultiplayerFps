@@ -1,0 +1,26 @@
+#include "SharedGpuTypes.txt"
+#include "ShaderBufferShared.txt"
+
+layout (location = 0) in vec3 VS_IN_Postion;
+layout (location = 2) in vec3 VS_IN_Normal;
+
+layout(location = 0) out vec3 FS_IN_Fragpos;
+layout(location = 1) out vec3 FS_IN_Normal;
+layout(location = 2) flat out ivec4 FS_IN_ProbeCoord;
+
+layout(std430, binding = 0) readonly buffer ProbeDebugInstanceBuffer {
+    ProbeDebugInstance probe_instances[];
+};
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+    Ubo_View_Constants_Struct g;
+};
+
+void main()
+{
+    ProbeDebugInstance inst = probe_instances[gl_InstanceID];
+    FS_IN_Normal     = VS_IN_Normal;
+    FS_IN_Fragpos    = VS_IN_Postion;
+    FS_IN_ProbeCoord = inst.probe_coord;
+    gl_Position      = g.viewproj * inst.model * vec4(VS_IN_Postion, 1.0);
+}

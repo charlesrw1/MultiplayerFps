@@ -21,7 +21,7 @@
 extern ConfigVar r_ddgi_halfres;     // "r.ddgi_halfres"
 extern ConfigVar ddgi_test;          // "dt"
 extern ConfigVar enable_ssr;         // "r.ssr"
-extern ConfigVar draw_real_grid;     // "draw_real_grid"
+extern ConfigVar ddgi_probe_debug;   // "ddgi_probe_debug"
 extern ConfigVar g_window_w;         // "vid.width"
 extern ConfigVar g_window_h;         // "vid.height"
 // r_taa_enabled comes from RenderConfigVars.h ("r.taa").
@@ -49,7 +49,7 @@ struct CvarRestore {
 
 static TestTask test_bake_probes_and_ddgi(TestContext& t) {
 	CvarRestore restore;
-	restore.save_int(draw_real_grid);
+	restore.save_bool(ddgi_probe_debug);
 	restore.save_bool(ddgi_test);
 	restore.save_bool(enable_ssr);
 	restore.save_bool(r_taa_enabled);
@@ -58,7 +58,7 @@ static TestTask test_bake_probes_and_ddgi(TestContext& t) {
 	restore.save_int(g_window_h);
 
 	// Deterministic render config — matches the user's intended bake setup.
-	draw_real_grid.set_integer(2);
+	ddgi_probe_debug.set_bool(true);
 	ddgi_test.set_bool(true);
 	enable_ssr.set_bool(false);
 	r_taa_enabled.set_bool(false);

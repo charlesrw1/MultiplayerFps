@@ -50,7 +50,7 @@ DdgiTesting::DdgiTesting() {
     shade_fs_halfres = draw.get_prog_man().create_raster("fullscreenquad.txt", "ddgiShadeF.txt", "HALFRES_DDGI");
 
     trace_shader = draw.get_prog_man().create_compute("trace_C.txt");
-    debug_probes = draw.get_prog_man().create_raster("MeshSimpleV.txt", "MeshDebugProbeF.txt");
+    debug_probes = draw.get_prog_man().create_raster("MeshDebugProbeV.txt", "MeshDebugProbeF.txt");
 
     relocate_shader = draw.get_prog_man().create_compute("trace_C.txt", "RELOCATE");
 
@@ -71,7 +71,9 @@ DdgiTesting::DdgiTesting() {
     Texture::install_system("_ddgi_d");
 }
 
-DdgiTesting::~DdgiTesting() {}
+DdgiTesting::~DdgiTesting() {
+    if (probe_debug_instance_buf) probe_debug_instance_buf->release();
+}
 
 // ---------------------------------------------------------------------------
 // GPU binding helper — sets DDGI uniform/storage buffer bindings
