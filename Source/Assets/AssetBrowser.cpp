@@ -484,7 +484,7 @@ bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* la
 	// Invisible button to handle interaction
 	ImGui::InvisibleButton(label, size);
 	bool hovered = ImGui::IsItemHovered();
-	bool pressed = ImGui::IsItemActive() && ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+	bool pressed = ImGui::IsItemDeactivated() && !ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 
 	// Draw the image
 	ImDrawList* draw_list = ImGui::GetWindowDrawList();
@@ -577,7 +577,7 @@ void AssetBrowser::draw_browser_grid() {
 		} else {
 			// Placeholder while streaming in
 			ImGui::InvisibleButton("##thumb", thumb_size);
-			item_pressed = ImGui::IsItemActive() && ImGui::IsMouseReleased(ImGuiMouseButton_Left);
+			item_pressed = ImGui::IsItemDeactivated() && !ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 			ImDrawList* dl = ImGui::GetWindowDrawList();
 			ImVec2 bmax = ImVec2(thumb_screen_pos.x + THUMB_SIZE, thumb_screen_pos.y + THUMB_SIZE);
 			dl->AddRectFilled(thumb_screen_pos, bmax, IM_COL32(35, 35, 35, 255));
@@ -821,11 +821,11 @@ void AssetBrowser::imgui_draw() {
 	ImGui::BeginChild("##asset_view", ImVec2(0.0f, main_h), false);
 	if (using_grid) {
 		draw_browser_grid();
-		// Tick after draw so items seen this frame already have their priority bumped.
-		thumbnails.tick();
 	} else {
 		draw_browser_tree_view(this);
 	}
+	// Tick every frame so property-grid thumbnails load even without the grid view open.
+	thumbnails.tick();
 	ImGui::EndChild();
 
 	draw_create_asset_popup();

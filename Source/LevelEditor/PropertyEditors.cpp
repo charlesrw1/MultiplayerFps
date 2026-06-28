@@ -358,6 +358,47 @@ bool SharedAssetPropertyEditor::internal_update() {
 		}
 	}
 
+	// "Set from selected" button — uses the asset currently highlighted in the browser
+	ImGui::SameLine(0, h_spacing);
+	{
+		auto bubble_tex = g_assets.find<Texture>("eng/icons/bubble_16.png");
+		const bool has_selected = AssetBrowser::inst &&
+		                          !AssetBrowser::inst->selected_resource.filename.empty() &&
+		                          AssetBrowser::inst->selected_resource.type == metadata;
+
+		ImGui::BeginDisabled(!has_selected);
+		ImVec2 btn2_pos = ImGui::GetCursorScreenPos();
+		ImGui::InvisibleButton("##setfrom", ImVec2(btn_w, frame_h));
+		bool btn2_hov = ImGui::IsItemHovered();
+
+		ImU32 btn2_bg = btn2_hov ? IM_COL32(75, 75, 75, 200) : IM_COL32(50, 50, 50, 160);
+		drawlist->AddRectFilled(btn2_pos, ImVec2(btn2_pos.x + btn_w, btn2_pos.y + frame_h), btn2_bg, 3.f);
+		drawlist->AddRect(btn2_pos, ImVec2(btn2_pos.x + btn_w, btn2_pos.y + frame_h), IM_COL32(100, 100, 100, 120), 3.f);
+		if (bubble_tex) {
+			const float ico   = frame_h - style.FramePadding.y * 2.f;
+			const float ico_x = btn2_pos.x + (btn_w - ico) * 0.5f;
+			const float ico_y = btn2_pos.y + style.FramePadding.y;
+			drawlist->AddImage(
+				ImTextureID(uint64_t(bubble_tex->get_internal_render_handle())),
+				ImVec2(ico_x, ico_y), ImVec2(ico_x + ico, ico_y + ico),
+				ImVec2(0, 0), ImVec2(1, 1), has_selected ? IM_COL32(255,255,255,255) : IM_COL32(255,255,255,60));
+		}
+		ImGui::EndDisabled();
+
+		if (btn2_hov) {
+			if (has_selected)
+				ImGui::SetTooltip("Set from browser selection:\n%s",
+				                  AssetBrowser::inst->selected_resource.filename.c_str());
+			else
+				ImGui::SetTooltip("Set from selected (select a matching asset in the browser first)");
+		}
+		if (ImGui::IsItemClicked() && has_selected) {
+			set_asset(AssetBrowser::inst->selected_resource.filename);
+			asset_str = get_str();
+			ret = true;
+		}
+	}
+
 	ImGui::EndGroup();
 
 	// ---- Inline asset picker popup ----
