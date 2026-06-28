@@ -190,7 +190,7 @@ bool SharedAssetPropertyEditor::internal_update() {
 		Texture* thumb = nullptr;
 		if (!asset_str.empty() && AssetBrowser::inst) {
 			auto* node = AssetBrowser::inst->find_node_for_asset(asset_str);
-			if (node)
+			if (node && ThumbnailManager::supports_thumbnail(node->asset))
 				thumb = AssetBrowser::inst->thumbnails.get_thumbnail(node->asset);
 		}
 		if (thumb) {

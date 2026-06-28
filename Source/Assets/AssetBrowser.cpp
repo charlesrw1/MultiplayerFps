@@ -930,7 +930,7 @@ bool ThumbnailManager::supports_thumbnail(const AssetOnDisk& asset) {
 }
 
 Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset) {
-	ASSERT(supports_thumbnail(asset));
+	if (!supports_thumbnail(asset)) return nullptr;
 
 	auto it = entries.find(asset.filename);
 	if (it == entries.end()) {
