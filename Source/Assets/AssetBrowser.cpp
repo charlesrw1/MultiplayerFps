@@ -529,47 +529,61 @@ void AssetBrowser::draw_browser_grid() {
 
 		const int name_filter_len = strlen(asset_name_filter);
 		for (auto& c : items) {
-			{
-				auto& asset = c->asset;
-				if (!selected_folder.empty()) {
-					if (asset.filename.find(selected_folder + "/") != 0)
-						continue;
-				}
-				if (!filter_match_case && name_filter_len > 0) {
-					std::string path = asset.filename;
-					for (int i = 0; i < path.size(); i++)
-						path[i] = tolower(path[i]);
-					if (path.find(all_lower_cast_filter_name, 0) == std::string::npos)
-						continue;
-				} else if (name_filter_len > 0) {
-					if (asset.filename.find(asset_name_filter) == std::string::npos)
-						continue;
-				}
-			}
-			Texture* t = thumbnails.get_thumbnail(c->asset);
-			if (!t)
+			auto& asset = c->asset;
+			if (!ThumbnailManager::supports_thumbnail(asset))
 				continue;
+			if (!selected_folder.empty()) {
+				if (asset.filename.find(selected_folder + "/") != 0)
+					continue;
+			}
+			if (!filter_match_case && name_filter_len > 0) {
+				std::string path = asset.filename;
+				for (int i = 0; i < (int)path.size(); i++)
+					path[i] = tolower(path[i]);
+				if (path.find(all_lower_cast_filter_name, 0) == std::string::npos)
+					continue;
+			} else if (name_filter_len > 0) {
+				if (asset.filename.find(asset_name_filter) == std::string::npos)
+					continue;
+			}
 			items2.push_back(c);
 		}
 	}
+
 	ImGuiListClipper clipper;
-	clipper.Begin(glm::ceil(items2.size() / float(boxes)));
+	clipper.Begin((int)glm::ceil(items2.size() / float(boxes)));
 
 	auto draw_item = [&](const int item_idx) {
 		auto& c = items2.at(item_idx);
-		Texture* t = thumbnails.get_thumbnail(c->asset);
-		ASSERT(t);
 		ImGui::TableNextColumn();
 		ImGui::PushID(c);
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+
+		Texture* t = thumbnails.get_thumbnail(c->asset); // marks as visible; may be null (loading)
 		string only_filename = c->asset.filename;
 		StringUtils::get_filename(only_filename);
 
 		const int THUMB_SIZE = (big_thumbnail) ? 128 : 64;
-
 		ImVec2 thumb_screen_pos = ImGui::GetCursorScreenPos();
-		ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())),
-								   ImVec2(THUMB_SIZE, THUMB_SIZE), only_filename.c_str());
+		ImVec2 thumb_size = ImVec2((float)THUMB_SIZE, (float)THUMB_SIZE);
+
+		if (t) {
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+			ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())),
+									   thumb_size, only_filename.c_str());
+			ImGui::PopStyleColor();
+		} else {
+			// Placeholder while streaming in
+			ImGui::InvisibleButton("##thumb", thumb_size);
+			ImDrawList* dl = ImGui::GetWindowDrawList();
+			ImVec2 bmax = ImVec2(thumb_screen_pos.x + THUMB_SIZE, thumb_screen_pos.y + THUMB_SIZE);
+			dl->AddRectFilled(thumb_screen_pos, bmax, IM_COL32(35, 35, 35, 255));
+			dl->AddRect(thumb_screen_pos, bmax, IM_COL32(60, 60, 60, 255));
+			ImGui::PushClipRect(thumb_screen_pos, bmax, true);
+			dl->AddText(ImGui::GetFont(), ImGui::GetFontSize(),
+						ImVec2(thumb_screen_pos.x + 4.f, thumb_screen_pos.y + 4.f),
+						IM_COL32(110, 110, 110, 255), only_filename.c_str(), nullptr, THUMB_SIZE - 8.f);
+			ImGui::PopClipRect();
+		}
 
 		// Hover tooltip: full path + type after short delay
 		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
@@ -621,20 +635,16 @@ void AssetBrowser::draw_browser_grid() {
 			ImVec2 badge_max = ImVec2(thumb_screen_pos.x + THUMB_SIZE - 2,  thumb_screen_pos.y + 16);
 			dl->AddRectFilled(badge_min, badge_max, badge_col, 3.0f);
 			dl->AddText(ImVec2(badge_min.x + 2, badge_min.y + 1), IM_COL32(255, 255, 255, 255), "!");
-
 			draw_diag_tooltip(c->asset.filename);
 		}
 
-		ImGui::PopStyleColor();
 		if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_None)) {
 			drag_drop = c->asset;
 			auto ptr = &drag_drop;
 			ImGui::SetDragDropPayload("AssetBrowserDragDrop", &ptr, sizeof(AssetOnDisk*));
-
 			ImGui::TextColored(color32_to_imvec4(c->asset.type->get_browser_color()), "%s",
 							   c->asset.type->get_type_name().c_str());
 			ImGui::Text("Asset: %s", c->asset.filename.c_str());
-
 			ImGui::EndDragDropSource();
 		}
 		ImGui::PopID();
@@ -645,22 +655,19 @@ void AssetBrowser::draw_browser_grid() {
 		const int start = row * boxes;
 		for (int i = 0; i < boxes; i++) {
 			const int index = start + i;
-			if (index >= items2.size())
+			if (index >= (int)items2.size())
 				break;
 			draw_item(index);
 		}
 	};
 
 	if (ImGui::BeginTable("Browser", boxes, ent_list_flags)) {
-		for (int i = 0; i < boxes; i++) {
+		for (int i = 0; i < boxes; i++)
 			ImGui::TableSetupColumn("##blah", ImGuiTableColumnFlags_WidthStretch);
-		}
 
 		while (clipper.Step()) {
-
-			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
+			for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++)
 				draw_in_row(i);
-			}
 		}
 		ImGui::EndTable();
 	}
@@ -792,6 +799,8 @@ void AssetBrowser::imgui_draw() {
 	ImGui::BeginChild("##asset_view", ImVec2(0.0f, main_h), false);
 	if (using_grid) {
 		draw_browser_grid();
+		// Tick after draw so items seen this frame already have their priority bumped.
+		thumbnails.tick();
 	} else {
 		draw_browser_tree_view(this);
 	}
@@ -887,54 +896,122 @@ void AssetBrowser::imgui_draw_inspector() {
 #include "Framework/MapUtil.h"
 #include "Render/MaterialPublic.h"
 #include "Render/MaterialLocal.h"
+
+// ---------------------------------------------------------------------------
+// ThumbnailManager — streaming thumbnail loader
+// ---------------------------------------------------------------------------
+
+bool ThumbnailManager::supports_thumbnail(const AssetOnDisk& asset) {
+	if (!asset.type) return false;
+	auto* cls = asset.type->get_asset_class_type();
+	return cls == &Model::StaticType || cls == &MaterialInstance::StaticType;
+}
+
 Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset) {
-	auto asset_class = asset.type->get_asset_class_type();
-	if (asset_class != &Model::StaticType && asset_class != &MaterialInstance::StaticType)
+	ASSERT(supports_thumbnail(asset));
+
+	auto it = entries.find(asset.filename);
+	if (it == entries.end()) {
+		Entry e;
+		e.asset = asset;
+		e.last_seen_frame = frame_counter;
+		string hashed = StringUtils::alphanumeric_hash(asset.filename);
+		e.thumb_path = ".thumbnails/" + hashed + ".png";
+		entries.emplace(asset.filename, std::move(e));
 		return nullptr;
-
-	if (MapUtil::contains(cache, asset.filename)) {
-		return cache[asset.filename];
 	}
-	// load it
-	auto model_file = FileSys::open_read_game(asset.filename);
-	// if (!model_file)
-	//	return nullptr;
 
-	string hashed = StringUtils::alphanumeric_hash(asset.filename);
-	string thumnail_path = ".thumbnails/" + hashed + ".png";
-	auto thumbnail_file = FileSys::open_read_game(thumnail_path);
+	Entry& e = it->second;
+	e.last_seen_frame = frame_counter; // bump priority — user can see this item
+	return (e.state == EntryState::Loaded) ? e.tex : nullptr;
+}
 
-	Texture* out_t = nullptr;
-	if (!thumbnail_file || !model_file || model_file->get_timestamp() > thumbnail_file->get_timestamp()) {
-		thumbnail_file.reset();
-		model_file.reset();
-		Model* the_model{};
-		MaterialInstance* override_mat{};
+void ThumbnailManager::process_render(Entry& e) {
+	ASSERT(e.state == EntryState::Queued);
+
+	auto* asset_class = e.asset.type->get_asset_class_type();
+
+	auto model_file     = FileSys::open_read_game(e.asset.filename);
+	auto thumbnail_file = FileSys::open_read_game(e.thumb_path);
+
+	bool needs_render = !thumbnail_file || !model_file ||
+	                    model_file->get_timestamp() > thumbnail_file->get_timestamp();
+	thumbnail_file.reset();
+	model_file.reset();
+
+	if (needs_render) {
+		Model* the_model = nullptr;
+		MaterialInstance* override_mat = nullptr;
+
 		if (asset_class == &Model::StaticType) {
-			the_model = Model::load(asset.filename);
+			the_model = Model::load(e.asset.filename);
 		} else {
-			auto mat = MaterialInstance::load(asset.filename);
+			auto mat = MaterialInstance::load(e.asset.filename);
 			if (mat && mat->impl && mat->impl->get_master_impl() &&
-				mat->impl->get_master_impl()->usage == MaterialUsage::Default) {
+			    mat->impl->get_master_impl()->usage == MaterialUsage::Default) {
 				override_mat = mat;
 				the_model = Model::load("sphere.cmdl");
-			} else {
-				return nullptr;
 			}
 		}
-		if (the_model) {
-			// hmm..
-			idraw->editor_render_thumbnail_for(the_model, override_mat, 128, 128,
-											   FileSys::get_full_path_from_game_path(thumnail_path));
+
+		if (!the_model) {
+			e.state = EntryState::Failed;
+			return;
 		}
-		out_t = Texture::force_load_for_ui(thumnail_path);
-		// out_t = Texture::load("eng/icon/_nearest/skylight.png");
-	} else {
-		thumbnail_file.reset();
-		model_file.reset();
-		out_t = Texture::force_load_for_ui(thumnail_path);
+
+		idraw->editor_render_thumbnail_for(the_model, override_mat, 128, 128,
+		                                   FileSys::get_full_path_from_game_path(e.thumb_path));
 	}
-	cache[asset.filename] = out_t;
-	return out_t;
+
+	e.state = EntryState::NeedLoad;
+}
+
+void ThumbnailManager::process_load(Entry& e) {
+	ASSERT(e.state == EntryState::NeedLoad);
+	// force_load_for_ui sets force_nearest=true which skips generate_mipmaps — fast path.
+	Texture* t = Texture::force_load_for_ui(e.thumb_path);
+	if (t && t->gpu_ptr) {
+		e.tex   = t;
+		e.state = EntryState::Loaded;
+	} else {
+		e.state = EntryState::Failed;
+	}
+}
+
+void ThumbnailManager::tick() {
+	++frame_counter;
+
+	// Find the highest-priority Queued entry (needs render check + optional GPU render).
+	// Find the top MAX_LOADS highest-priority NeedLoad entries (cheap: disk read + upload).
+	static constexpr int MAX_LOADS = 2;
+
+	Entry* best_render = nullptr;
+	Entry* best_load[MAX_LOADS] = {};
+	int load_count = 0;
+
+	for (auto& [path, e] : entries) {
+		if (e.state == EntryState::Queued) {
+			if (!best_render || e.last_seen_frame > best_render->last_seen_frame)
+				best_render = &e;
+		} else if (e.state == EntryState::NeedLoad) {
+			if (load_count < MAX_LOADS) {
+				best_load[load_count++] = &e;
+			} else {
+				// Replace the worst slot if this entry is more urgent
+				int worst = 0;
+				for (int i = 1; i < MAX_LOADS; i++)
+					if (best_load[i]->last_seen_frame < best_load[worst]->last_seen_frame)
+						worst = i;
+				if (e.last_seen_frame > best_load[worst]->last_seen_frame)
+					best_load[worst] = &e;
+			}
+		}
+	}
+
+	if (best_render)
+		process_render(*best_render);
+
+	for (int i = 0; i < load_count; i++)
+		process_load(*best_load[i]);
 }
 #endif

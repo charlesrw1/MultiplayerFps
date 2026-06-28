@@ -7,13 +7,40 @@
 
 class AssetInspectorPane;
 
+// Streaming thumbnail manager. Spreads expensive work (GPU render + disk load) across
+// frames so the UI never stutters. Single-threaded; call tick() once per frame.
 class ThumbnailManager
 {
 public:
+	// Returns true if this asset type can have a thumbnail.
+	static bool supports_thumbnail(const AssetOnDisk& asset);
+
+	// Returns the cached Texture* if ready, nullptr if still loading.
+	// Calling this marks the asset as visible this frame (raises priority).
 	Texture* get_thumbnail(const AssetOnDisk& asset);
 
+	// Advance the queue: renders up to 1 thumbnail to disk, loads up to 2 from disk.
+	// Must be called once per frame AFTER all get_thumbnail calls for that frame.
+	void tick();
+
 private:
-	std::unordered_map<std::string, Texture*> cache;
+	enum class EntryState { Queued, NeedLoad, Loaded, Failed };
+
+	struct Entry {
+		AssetOnDisk asset;
+		std::string thumb_path;
+		EntryState state = EntryState::Queued;
+		Texture* tex = nullptr;
+		int last_seen_frame = 0;
+	};
+
+	// Process one Queued entry: check freshness and render if needed, then advance to NeedLoad.
+	void process_render(Entry& e);
+	// Process one NeedLoad entry: load PNG from disk + upload to GPU, advance to Loaded/Failed.
+	void process_load(Entry& e);
+
+	std::unordered_map<std::string, Entry> entries;
+	int frame_counter = 0;
 };
 
 class AssetBrowser
