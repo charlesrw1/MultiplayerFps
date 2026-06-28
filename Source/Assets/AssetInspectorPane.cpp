@@ -763,7 +763,8 @@ void AssetInspectorPane::draw_material_instance_editor(const std::string& gamepa
         if (f) { f->write(text.data(), text.size()); f->close(); }
         AssetCompiler::compile_asset(gamepath);
         settings_dirty = false;
-        load_for(last_selected);
+        // Do NOT call load_for — mi_state_ already has the saved values;
+        // compile_asset reloads the scene async.
     }
     ImGui::EndDisabled();
     ImGui::SameLine();

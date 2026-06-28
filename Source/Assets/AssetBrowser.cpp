@@ -303,6 +303,15 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 			ImGui::SameLine();
 		}
 
+		// Show DDS thumbnail inline for Texture assets
+		if (ThumbnailManager::supports_image_thumb(asset)) {
+			Texture* thumb = b->thumbnails.get_thumbnail(asset);
+			if (thumb) {
+				my_imgui_image(thumb, 20);
+				ImGui::SameLine();
+			}
+		}
+
 		if (ignore_folders.get_bool()) {
 			string name = parent_path + "/" + node->name;
 			ImGui::Text(name.c_str());
@@ -914,6 +923,7 @@ void AssetBrowser::imgui_draw_inspector() {
         inspector_pane->imgui_draw(selected_resource);
 }
 #include "Render/DrawPublic.h"
+#include "Render/IGraphicsDevice.h"
 
 #include "Framework/MapUtil.h"
 #include "Render/MaterialPublic.h"
@@ -923,22 +933,143 @@ void AssetBrowser::imgui_draw_inspector() {
 // ThumbnailManager — streaming thumbnail loader
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// DDS mip loader for Texture thumbnails (list view only)
+// Redeclares minimal DDS structs locally to avoid depending on TextureDDS.cpp internals.
+// ---------------------------------------------------------------------------
+namespace {
+
+struct ThumbDdsPF {
+	uint32_t Size, Flags, FourCC, RGBBitCount;
+	uint32_t RBitMask, GBitMask, BBitMask, ABitMask;
+};
+struct ThumbDdsHdr {
+	uint32_t Size, Flags, Height, Width, PitchOrLinearSize, Depth, MipMapCount;
+	uint32_t Reserved1[11];
+	ThumbDdsPF ddspf;
+	uint32_t Caps1, Caps2;
+	uint32_t Reserved2[3];
+};
+static constexpr uint32_t kDDSF_FOURCC      = 0x00000004u;
+static constexpr uint32_t kDDSF_MIPMAPCOUNT = 0x00020000u;
+
+static Texture* load_dds_mip_for_thumb(const AssetOnDisk& asset) {
+	auto f = FileSys::open_read_game(asset.filename);
+	if (!f) return nullptr;
+	int len = f->size();
+	if (len < 4 + (int)sizeof(ThumbDdsHdr)) return nullptr;
+	std::vector<uint8_t> buf(len);
+	f->read(buf.data(), len);
+
+	if (buf[0] != 'D' || buf[1] != 'D' || buf[2] != 'S' || buf[3] != ' ') return nullptr;
+
+	const auto* hdr = reinterpret_cast<const ThumbDdsHdr*>(buf.data() + 4);
+	const uint8_t* data = buf.data() + 4 + sizeof(ThumbDdsHdr);
+
+	const uint32_t dxt1_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('1' << 24);
+	const uint32_t dxt5_fourcc = 'D' | ('X' << 8) | ('T' << 16) | ('5' << 24);
+	const uint32_t bc4u_fourcc = 'B' | ('C' << 8) | ('4' << 16) | ('U' << 24);
+	const uint32_t bc5u_fourcc = 'B' | ('C' << 8) | ('5' << 16) | ('U' << 24);
+
+	using gtf = GraphicsTextureFormat;
+	gtf fmt{};
+	bool is_compressed = (hdr->ddspf.Flags & kDDSF_FOURCC) != 0;
+	bool is_rgb8 = false;
+	int  block_bytes = 0;
+
+	if (is_compressed) {
+		if      (hdr->ddspf.FourCC == dxt1_fourcc) { fmt = gtf::bc1; block_bytes = 8;  }
+		else if (hdr->ddspf.FourCC == dxt5_fourcc) { fmt = gtf::bc3; block_bytes = 16; }
+		else if (hdr->ddspf.FourCC == bc4u_fourcc) { fmt = gtf::bc4; block_bytes = 8;  }
+		else if (hdr->ddspf.FourCC == bc5u_fourcc) { fmt = gtf::bc5; block_bytes = 16; }
+		else return nullptr; // unsupported fourcc
+	} else {
+		if      (hdr->ddspf.RGBBitCount == 32) fmt = gtf::rgba8;
+		else if (hdr->ddspf.RGBBitCount == 24) { fmt = gtf::rgba8; is_rgb8 = true; }
+		else return nullptr;
+	}
+
+	int num_mips = 1;
+	if (hdr->Flags & kDDSF_MIPMAPCOUNT) num_mips = (int)hdr->MipMapCount;
+
+	// Skip mips until both dimensions are ≤ 64
+	int mip_w = (int)hdr->Width, mip_h = (int)hdr->Height;
+	for (int i = 0; i < num_mips - 1 && (mip_w > 64 || mip_h > 64); ++i) {
+		int skip;
+		if (is_compressed)
+			skip = ((mip_w + 3) / 4) * ((mip_h + 3) / 4) * block_bytes;
+		else
+			skip = mip_w * mip_h * (is_rgb8 ? 3 : 4);
+		if (data + skip > buf.data() + len) return nullptr;
+		data += skip;
+		mip_w = std::max(1, mip_w / 2);
+		mip_h = std::max(1, mip_h / 2);
+	}
+
+	int upload_size;
+	if (is_compressed)
+		upload_size = ((mip_w + 3) / 4) * ((mip_h + 3) / 4) * block_bytes;
+	else
+		upload_size = mip_w * mip_h * (is_rgb8 ? 3 : 4);
+
+	if (data + upload_size > buf.data() + len) return nullptr;
+
+	// Widen RGB8 → RGBA8 (SDL3/GPU backends have no 24-bit upload)
+	std::vector<uint8_t> widened;
+	const void* upload_data = data;
+	if (is_rgb8) {
+		int pixels = mip_w * mip_h;
+		widened.resize(pixels * 4);
+		for (int i = 0; i < pixels; ++i) {
+			widened[i * 4 + 0] = data[i * 3 + 0];
+			widened[i * 4 + 1] = data[i * 3 + 1];
+			widened[i * 4 + 2] = data[i * 3 + 2];
+			widened[i * 4 + 3] = 255;
+		}
+		upload_size = pixels * 4;
+		upload_data = widened.data();
+	}
+
+	CreateTextureArgs args;
+	args.width        = mip_w;
+	args.height       = mip_h;
+	args.num_mip_maps = 1;
+	args.format       = fmt;
+	args.sampler_type = GraphicsSamplerType::NearestDefault;
+	IGraphicsTexture* gpu = gfx().create_texture(args);
+	gpu->sub_image_upload(0, 0, 0, mip_w, mip_h, upload_size, upload_data);
+
+	Texture* t = Texture::install_system("__dds_thumb/" + asset.filename);
+	t->update_specs_ptr(gpu);
+	return t;
+}
+
+} // anonymous namespace
+
 bool ThumbnailManager::supports_thumbnail(const AssetOnDisk& asset) {
 	if (!asset.type) return false;
 	auto* cls = asset.type->get_asset_class_type();
 	return cls == &Model::StaticType || cls == &MaterialInstance::StaticType;
 }
 
+bool ThumbnailManager::supports_image_thumb(const AssetOnDisk& asset) {
+	if (!asset.type) return false;
+	return asset.type->get_asset_class_type() == &Texture::StaticType;
+}
+
 Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset) {
-	if (!supports_thumbnail(asset)) return nullptr;
+	if (!supports_thumbnail(asset) && !supports_image_thumb(asset)) return nullptr;
 
 	auto it = entries.find(asset.filename);
 	if (it == entries.end()) {
 		Entry e;
 		e.asset = asset;
 		e.last_seen_frame = frame_counter;
-		string hashed = StringUtils::alphanumeric_hash(asset.filename);
-		e.thumb_path = ".thumbnails/" + hashed + ".png";
+		e.is_tex_entry = supports_image_thumb(asset);
+		if (!e.is_tex_entry) {
+			string hashed = StringUtils::alphanumeric_hash(asset.filename);
+			e.thumb_path = ".thumbnails/" + hashed + ".png";
+		}
 		entries.emplace(asset.filename, std::move(e));
 		return nullptr;
 	}
@@ -950,6 +1081,12 @@ Texture* ThumbnailManager::get_thumbnail(const AssetOnDisk& asset) {
 
 void ThumbnailManager::process_render(Entry& e) {
 	ASSERT(e.state == EntryState::Queued);
+
+	// DDS texture thumbnails are loaded directly from source — no GPU render needed.
+	if (e.is_tex_entry) {
+		e.state = EntryState::NeedLoad;
+		return;
+	}
 
 	auto* asset_class = e.asset.type->get_asset_class_type();
 
@@ -991,6 +1128,23 @@ void ThumbnailManager::process_render(Entry& e) {
 
 void ThumbnailManager::process_load(Entry& e) {
 	ASSERT(e.state == EntryState::NeedLoad);
+
+	if (e.is_tex_entry) {
+		if (e.tex) {
+			// Already loaded on a previous tick — nothing to do.
+			e.state = EntryState::Loaded;
+		} else {
+			Texture* t = load_dds_mip_for_thumb(e.asset);
+			if (t && t->gpu_ptr) {
+				e.tex   = t;
+				e.state = EntryState::Loaded;
+			} else {
+				e.state = EntryState::Failed;
+			}
+		}
+		return;
+	}
+
 	if (e.tex) {
 		// Already has a GPU texture from a prior load — reload it in-place so the
 		// Texture* address stays stable and we avoid a duplicate install_system_asset.

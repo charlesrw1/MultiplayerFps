@@ -12,8 +12,10 @@ class AssetInspectorPane;
 class ThumbnailManager
 {
 public:
-	// Returns true if this asset type can have a thumbnail.
+	// Returns true if this asset type can have a thumbnail (model/material — shown in grid AND list).
 	static bool supports_thumbnail(const AssetOnDisk& asset);
+	// Returns true if this asset type has an image thumbnail (Texture — list view only).
+	static bool supports_image_thumb(const AssetOnDisk& asset);
 
 	// Returns the cached Texture* if ready, nullptr if still loading.
 	// Calling this marks the asset as visible this frame (raises priority).
@@ -37,6 +39,7 @@ private:
 		Texture* tex = nullptr;
 		int last_seen_frame = 0;
 		bool force_rerender = false; // skip freshness check on next process_render
+		bool is_tex_entry = false;   // DDS image thumbnail — skip GPU render step
 	};
 
 	// Process one Queued entry: check freshness and render if needed, then advance to NeedLoad.
