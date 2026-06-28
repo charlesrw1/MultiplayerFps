@@ -299,7 +299,7 @@ bool SharedAssetPropertyEditor::internal_update() {
 			ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
 		if (payload) {
 			AssetOnDisk* resource = *(AssetOnDisk**)payload->Data;
-			if (resource->type == metadata) {
+			if (resource->type == metadata && accept_asset(*resource)) {
 				if ((payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop"))) {
 					set_asset(resource->filename);
 					asset_str = get_str();
@@ -365,7 +365,8 @@ bool SharedAssetPropertyEditor::internal_update() {
 		auto bubble_tex = g_assets.find<Texture>("eng/icons/bubble_16.png");
 		const bool has_selected = AssetBrowser::inst &&
 		                          !AssetBrowser::inst->selected_resource.filename.empty() &&
-		                          AssetBrowser::inst->selected_resource.type == metadata;
+		                          AssetBrowser::inst->selected_resource.type == metadata &&
+		                          accept_asset(AssetBrowser::inst->selected_resource);
 
 		ImGui::BeginDisabled(!has_selected);
 		ImVec2 btn2_pos = ImGui::GetCursorScreenPos();
@@ -417,7 +418,7 @@ bool SharedAssetPropertyEditor::internal_update() {
 		auto filter_lower = StringUtils::to_lower(picker_filter);
 		ImGui::BeginChild("##picker_list", ImVec2(0, 0));
 		for (auto* node : AssetRegistrySystem::get().get_linear_list()) {
-			if (node->is_folder() || node->asset.type != metadata)
+			if (node->is_folder() || node->asset.type != metadata || !accept_asset(node->asset))
 				continue;
 			if (!filter_lower.empty()) {
 				auto name_lower = StringUtils::to_lower(node->asset.filename);

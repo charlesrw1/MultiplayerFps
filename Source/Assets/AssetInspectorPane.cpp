@@ -22,6 +22,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <functional>
 #include <sstream>
 
 extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
@@ -170,6 +171,26 @@ private:
     std::string* path;
 };
 
+class MiMasterMatEditor : public SharedAssetPropertyEditor {
+public:
+    MiMasterMatEditor(std::string* path_ptr, std::function<void(const std::string&)> on_change)
+        : path(path_ptr), on_change_(std::move(on_change)) {
+        synth               = make_mi_prop("Master Material");
+        prop                = &synth;
+        class_type_override = &MaterialInstance::StaticType;
+    }
+    std::string get_str() override { return *path; }
+    void set_asset(const std::string& s) override { *path = s; on_change_(s); }
+    // Only accept .mm master materials, not .mi instances
+    bool accept_asset(const AssetOnDisk& asset) override {
+        return StringUtils::get_extension_no_dot(asset.filename) == "mm";
+    }
+private:
+    PropertyInfo synth;
+    std::string* path;
+    std::function<void(const std::string&)> on_change_;
+};
+
 // ── MiEditorState ────────────────────────────────────────────────────────────
 
 struct MiEditorState {
@@ -179,12 +200,29 @@ struct MiEditorState {
     std::vector<MaterialParameterValue>      param_values;
     std::vector<std::string>                 texture_paths; // game-path per Texture2D param
 
-    // Picker state for the master material slot
-    std::string master_picker_filter;
-    bool        master_picker_needs_focus = false;
+    // Separate PropertyGrids so the master slot and params have independent rows/separators
+    std::unique_ptr<PropertyGrid> master_pg;  // single-row: master material slot
+    std::unique_ptr<PropertyGrid> params_pg;  // one row per VAR param (rebuilt on master change)
 
-    // PropertyGrid for the VAR parameters (rebuilt on init / master change)
-    std::unique_ptr<PropertyGrid> params_pg;
+    void rebuild_params_on_master_change(const std::string& new_path) {
+        auto new_mat = g_assets.find_sync_sptr<MaterialInstance>(new_path);
+        if (new_mat && new_mat->impl && new_mat->impl->masterImpl) {
+            param_defs = new_mat->impl->masterImpl->param_defs;
+            param_values.resize(param_defs.size());
+            for (int i = 0; i < (int)param_defs.size(); i++)
+                param_values[i] = param_defs[i].default_value;
+            texture_paths.assign(param_defs.size(), "");
+            build_params_pg();
+        }
+    }
+
+    void build_master_pg() {
+        master_pg = std::make_unique<PropertyGrid>(get_basic_factory());
+        master_pg->add_iproped_manual(new MiMasterMatEditor(
+            &parent_path,
+            [this](const std::string& new_path) { rebuild_params_on_master_change(new_path); }
+        ));
+    }
 
     void build_params_pg() {
         params_pg = std::make_unique<PropertyGrid>(get_basic_factory());
@@ -235,6 +273,7 @@ struct MiEditorState {
                 texture_paths[i] = param_values[i].tex ? param_values[i].tex->get_name() : "";
         }
 
+        build_master_pg();
         build_params_pg();
     }
 
@@ -635,118 +674,19 @@ void AssetInspectorPane::draw_material_text(const std::string& gamepath) {
     }
 }
 
-// Draws a single-row slot that only accepts .mm drag-drops and shows a .mm-filtered picker.
-// Returns true and sets out_path when the selection changes.
-// .mm-only asset slot: colored slot + drag-drop + browse button + picker popup.
-// Returns true and writes out_path when the selection changes.
-static bool draw_master_mat_slot(const std::string& current_path, const AssetMetadata* mat_meta,
-                                  std::string& picker_filter, bool& picker_needs_focus,
-                                  std::string& out_path) {
-    auto* dl   = ImGui::GetWindowDrawList();
-    auto& style = ImGui::GetStyle();
-    const float fh = ImGui::GetFrameHeight();
-    const float bw = fh;
-    const float tw = ImGui::GetContentRegionAvail().x - bw - style.ItemSpacing.x;
-    bool changed = false;
-
-    // Slot background
-    ImVec2 s_min = ImGui::GetCursorScreenPos();
-    ImVec2 s_max = { s_min.x + tw, s_min.y + fh };
-    if (mat_meta) {
-        Color32 bg = mat_meta->get_browser_color();
-        bg.r = (uint8_t)(bg.r * 0.35f); bg.g = (uint8_t)(bg.g * 0.35f); bg.b = (uint8_t)(bg.b * 0.35f);
-        dl->AddRectFilled(s_min, s_max, bg.to_uint(), 3.f);
-    }
-    ImGui::PushClipRect(s_min, s_max, true);
-    ImVec2 tc = ImGui::GetCursorPos();
-    ImGui::SetCursorPosY(tc.y + style.FramePadding.y * 0.5f);
-    if (current_path.empty()) ImGui::TextDisabled("(none — drag a .mm here)");
-    else ImGui::TextUnformatted(current_path.c_str());
-    ImGui::PopClipRect();
-    ImGui::SetCursorPos(tc);
-    ImGui::InvisibleButton("##mm_slot", { tw, fh });
-    bool hov = ImGui::IsItemHovered();
-    dl->AddRect(s_min, s_max,
-        (hov && current_path.empty()) ? IM_COL32(200,200,200,180) : IM_COL32(180,180,180,50), 3.f);
-    if (hov) ImGui::SetTooltip(current_path.empty() ? "Drag a .mm master material here" : current_path.c_str());
-    if (ImGui::IsItemClicked(ImGuiMouseButton_Left) && current_path.empty()) {
-        ImGui::OpenPopup("##mm_picker"); picker_filter.clear(); picker_needs_focus = true;
-    }
-    if (ImGui::BeginDragDropTarget()) {
-        const ImGuiPayload* peek = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop", ImGuiDragDropFlags_AcceptPeekOnly);
-        if (peek) {
-            AssetOnDisk* res = *(AssetOnDisk**)peek->Data;
-            if (res->type == mat_meta && StringUtils::get_extension_no_dot(res->filename) == "mm")
-                if (ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")) { out_path = res->filename; changed = true; }
-        }
-        ImGui::EndDragDropTarget();
-    }
-
-    // Browse button
-    ImGui::SameLine(0, style.ItemSpacing.x);
-    ImVec2 bp = ImGui::GetCursorScreenPos();
-    ImGui::InvisibleButton("##mm_browse", { bw, fh });
-    bool bhov = ImGui::IsItemHovered();
-    dl->AddRectFilled(bp, { bp.x+bw, bp.y+fh }, bhov ? IM_COL32(75,75,75,200) : IM_COL32(50,50,50,160), 3.f);
-    dl->AddRect(bp, { bp.x+bw, bp.y+fh }, IM_COL32(100,100,100,120), 3.f);
-    auto btex = g_assets.find<Texture>("eng/icons/doc_search.png");
-    if (btex) {
-        float ico = fh - style.FramePadding.y * 2.f, ix = bp.x + (bw-ico)*0.5f, iy = bp.y + style.FramePadding.y;
-        dl->AddImage(ImTextureID(uint64_t(btex->get_internal_render_handle())), {ix,iy}, {ix+ico,iy+ico});
-    }
-    if (bhov && !current_path.empty()) ImGui::SetTooltip("Find in browser");
-    if (ImGui::IsItemClicked() && !current_path.empty() && AssetBrowser::inst)
-        { AssetBrowser::inst->set_selected(current_path); AssetBrowser::inst->force_focus = true; }
-
-    // Picker popup (.mm only)
-    ImGui::SetNextWindowSize({ 320, 360 }, ImGuiCond_Always);
-    if (ImGui::BeginPopup("##mm_picker")) {
-        if (picker_needs_focus) { ImGui::SetKeyboardFocusHere(); picker_needs_focus = false; }
-        ImGui::SetNextItemWidth(-1.f);
-        ImGui::InputText("##pf", (char*)picker_filter.c_str(), picker_filter.size() + 1,
-            ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &picker_filter);
-        picker_filter = picker_filter.c_str();
-        auto fl = StringUtils::to_lower(picker_filter);
-        ImGui::BeginChild("##pl", { 0, 0 });
-        for (auto* node : AssetRegistrySystem::get().get_linear_list()) {
-            if (node->is_folder() || node->asset.type != mat_meta) continue;
-            if (StringUtils::get_extension_no_dot(node->asset.filename) != "mm") continue;
-            if (!fl.empty()) {
-                auto nl = StringUtils::to_lower(node->asset.filename);
-                if (nl.find(fl) == std::string::npos) continue;
-            }
-            if (ImGui::Selectable(node->asset.filename.c_str())) { out_path = node->asset.filename; changed = true; ImGui::CloseCurrentPopup(); }
-        }
-        ImGui::EndChild(); ImGui::EndPopup();
-    }
-    return changed;
-}
-
 void AssetInspectorPane::draw_material_instance_editor(const std::string& gamepath) {
     if (!mi_state_) { ImGui::TextDisabled("(failed to load .mi)"); return; }
     auto& s = *mi_state_;
 
-    const auto* mat_meta = AssetRegistrySystem::get().find_type("Material");
-
-    // ── Master material ──────────────────────────────────────────────────────
+    // ── Master material (its own PropertyGrid) ───────────────────────────────
     ImGui::SeparatorText("Master Material");
-    std::string new_master;
-    if (draw_master_mat_slot(s.parent_path, mat_meta, s.master_picker_filter,
-                              s.master_picker_needs_focus, new_master)) {
-        auto new_mat = g_assets.find_sync_sptr<MaterialInstance>(new_master);
-        if (new_mat && new_mat->impl && new_mat->impl->masterImpl) {
-            s.parent_path = new_master;
-            s.param_defs  = new_mat->impl->masterImpl->param_defs;
-            s.param_values.resize(s.param_defs.size());
-            for (int i = 0; i < (int)s.param_defs.size(); i++)
-                s.param_values[i] = s.param_defs[i].default_value;
-            s.texture_paths.assign(s.param_defs.size(), "");
-            s.build_params_pg();
-            settings_dirty = true;
-        }
+    if (s.master_pg) {
+        s.master_pg->update();
+        if (s.master_pg->rows_had_changes) settings_dirty = true;
     }
 
-    // ── VAR parameters via PropertyGrid ──────────────────────────────────────
+    // ── VAR parameters (separate PropertyGrid) ───────────────────────────────
+    ImGui::Separator();
     if (s.params_pg) {
         s.params_pg->update();
         if (s.params_pg->rows_had_changes) settings_dirty = true;

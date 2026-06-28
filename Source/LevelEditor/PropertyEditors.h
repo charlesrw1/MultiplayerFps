@@ -4,6 +4,7 @@
 #include <string>
 class EditorDoc;
 class AssetMetadata;
+struct AssetOnDisk;
 
 // Reusable single-row asset slot widget [colored name slot | browse icon].
 // Handles hover, click-to-pick (when empty) or click-to-browse (when filled),
@@ -39,6 +40,8 @@ public:
 	virtual std::string get_str() = 0;
 	virtual void set_asset(const std::string& str) = 0;
 	virtual bool get_failed_load() const { return false; }
+	// Optional: override to further restrict which assets are accepted (beyond type check).
+	virtual bool accept_asset(const AssetOnDisk& asset) { return true; }
 	virtual bool internal_update();
 	virtual int extra_row_count() { return 0; }
 	virtual bool can_reset() { return !asset_str.empty(); }
