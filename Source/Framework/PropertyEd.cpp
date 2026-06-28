@@ -184,8 +184,9 @@ void PropertyGrid::add_property_list_to_grid(const PropertyInfoList* list, void*
 }
 
 void PropertyGrid::add_iproped_manual(IPropertyEditor* editor) {
-	ASSERT(editor);
-	PropertyRow* prop_ = new PropertyRow(editor, nullptr, editor, editor->prop /* hack job*/, -1);
+	ASSERT(editor && editor->prop);
+	editor->post_construct_for_custom_type(editor, editor->prop, nullptr);
+	PropertyRow* prop_ = new PropertyRow(editor, nullptr, editor, editor->prop, -1);
 	rows.push_back(std::unique_ptr<IGridRow>(prop_));
 }
 
