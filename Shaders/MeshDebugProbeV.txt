@@ -1,13 +1,6 @@
 #include "SharedGpuTypes.txt"
 #include "ShaderBufferShared.txt"
 
-layout (location = 0) in vec3 VS_IN_Postion;
-layout (location = 2) in vec3 VS_IN_Normal;
-
-layout(location = 0) out vec3 FS_IN_Fragpos;
-layout(location = 1) out vec3 FS_IN_Normal;
-layout(location = 2) flat out ivec4 FS_IN_ProbeCoord;
-
 layout(std430, binding = 0) readonly buffer ProbeDebugInstanceBuffer {
     ProbeDebugInstance probe_instances[];
 };
@@ -16,11 +9,31 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
     Ubo_View_Constants_Struct g;
 };
 
+layout(location = 0) out vec2  FS_IN_BillboardUV;
+layout(location = 1) flat out ivec4 FS_IN_ProbeCoord;
+layout(location = 2) flat out ivec4 FS_IN_VolGrid;
+
+const float PROBE_RADIUS = 0.15;
+
 void main()
 {
-    ProbeDebugInstance inst = probe_instances[gl_InstanceID];
-    FS_IN_Normal     = VS_IN_Normal;
-    FS_IN_Fragpos    = VS_IN_Postion;
-    FS_IN_ProbeCoord = inst.probe_coord;
-    gl_Position      = g.viewproj * inst.model * vec4(VS_IN_Postion, 1.0);
+    const vec2 corners[6] = vec2[6](
+        vec2(-1.0,-1.0), vec2( 1.0,-1.0), vec2( 1.0, 1.0),
+        vec2(-1.0,-1.0), vec2( 1.0, 1.0), vec2(-1.0, 1.0)
+    );
+
+    int  probe_idx  = gl_VertexID / 6;
+    vec2 corner     = corners[gl_VertexID % 6];
+
+    ProbeDebugInstance inst = probe_instances[probe_idx];
+
+    vec3 cam_right = g.invview[0].xyz;
+    vec3 cam_up    = g.invview[1].xyz;
+    vec3 pos       = inst.world_pos.xyz
+                   + (cam_right * corner.x + cam_up * corner.y) * PROBE_RADIUS;
+
+    FS_IN_BillboardUV = corner * 0.5 + 0.5;
+    FS_IN_ProbeCoord  = inst.probe_coord;
+    FS_IN_VolGrid     = inst.vol_grid;
+    gl_Position       = g.viewproj * vec4(pos, 1.0);
 }
