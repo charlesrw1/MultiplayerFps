@@ -571,6 +571,40 @@ void AssetBrowser::draw_browser_grid() {
 		ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())),
 								   ImVec2(THUMB_SIZE, THUMB_SIZE), only_filename.c_str());
 
+		// Hover tooltip: full path + type after short delay
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal)) {
+			ImGui::BeginTooltip();
+			ImGui::TextColored(color32_to_imvec4(c->asset.type->get_browser_color()), "%s",
+							   c->asset.type->get_type_name().c_str());
+			ImGui::TextUnformatted(c->asset.filename.c_str());
+			ImGui::EndTooltip();
+		}
+
+		// Right-click: select and open context menu
+		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
+			selected_resource = c->asset;
+			ImGui::OpenPopup("asset-click-menu");
+		}
+		if (ImGui::BeginPopup("asset-click-menu")) {
+			ImGui::Text("%s", selected_resource.filename.c_str());
+			ImGui::Separator();
+			if (ImGui::MenuItem("Copy to clipboard")) {
+				SetClipboardText(selected_resource.filename);
+				ImGui::CloseCurrentPopup();
+			}
+			if (ImGui::MenuItem("Open in notepad")) {
+				OpenInNotepad(selected_resource.filename);
+				ImGui::CloseCurrentPopup();
+			}
+			if (selected_resource.type) {
+				ImGui::Separator();
+				selected_resource.type->draw_browser_context_menu(selected_resource.filename);
+			}
+			ImGui::Separator();
+			draw_create_new_menu_items(this, selected_folder);
+			ImGui::EndPopup();
+		}
+
 		// Error/warning overlay badge in top-right corner of thumbnail
 		auto sev = AssetDiagnostics::get().get_severity(c->asset.filename);
 		if (sev) {
@@ -684,6 +718,12 @@ void AssetBrowser::imgui_draw() {
 	ImGui::InputTextWithHint("FILTER", "filter asset path", asset_name_filter, 256);
 	ImGui::SameLine();
 	ImGui::Checkbox("MATCH CASE", &match_case);
+	ImGui::SameLine();
+	ImGui::Checkbox("Grid", &using_grid);
+	if (using_grid) {
+		ImGui::SameLine();
+		ImGui::Checkbox("Big", &big_thumbnail);
+	}
 	const int name_filter_len = strlen(asset_name_filter);
 	filter_match_case = match_case;
 
@@ -712,16 +752,11 @@ void AssetBrowser::imgui_draw() {
 	if (ImGui::SmallButton("Close All")) {
 		AssetRegistrySystem::get().get_root_files()->set_folder_open_R(false);
 	}
-	ImGui::Checkbox("Grid", &using_grid);
 
 	if (!match_case) {
 		all_lower_cast_filter_name = asset_name_filter;
 		for (int i = 0; i < name_filter_len; i++)
 			all_lower_cast_filter_name[i] = tolower(all_lower_cast_filter_name[i]);
-	}
-	if (using_grid) {
-		ImGui::SameLine();
-		ImGui::Checkbox("Big", &big_thumbnail);
 	}
 
 	// Split layout: folder tree | asset view
