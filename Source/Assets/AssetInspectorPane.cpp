@@ -246,6 +246,8 @@ struct MiEditorState {
         for (int i = 0; i < (int)param_defs.size(); i++) {
             const auto& def = param_defs[i];
             const auto& val = param_values[i];
+            if (def.default_value.type == MatParamType::Texture2D && texture_paths[i].empty())
+                continue;
             out << "VAR " << def.name << " ";
             switch (def.default_value.type) {
             case MatParamType::Float:    out << val.scalar; break;
