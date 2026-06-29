@@ -117,7 +117,7 @@ public:
 
 	// grid snap settings
 	bool snap_scrubber_to_grid = false;
-	bool enable_grid_snapping_x = true;
+	bool enable_grid_snapping_x = false;
 	bool enable_grid_snapping_y = true;
 	ImVec2 grid_snap_size = ImVec2(1, 0.1);
 

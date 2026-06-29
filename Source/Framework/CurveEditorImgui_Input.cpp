@@ -133,37 +133,35 @@ void CurveEditorImgui::draw_editor_input_and_scrubber(
 
 	const bool canvas_hovered = ImRect(BASE_SCREENPOS, BASE_SCREENPOS + WINDOW_SIZE).Contains(ImGui::GetMousePos());
 
-	// Consume scroll whenever over the canvas so the outer inspector window doesn't also scroll.
-	if (canvas_hovered && std::abs(ImGui::GetIO().MouseWheel) > 0.00001f)
-		ImGui::GetIO().MouseWheel = 0.f;
+	// Zoom when canvas is hovered; consume scroll so the outer window never sees it.
+	if (canvas_hovered && std::abs(ImGui::GetIO().MouseWheel) > 0.00001f) {
+		if (ImGui::IsWindowFocused()) {
+			auto mousepos = ImGui::GetMousePos();
+			auto start    = screenspace_to_grid(mousepos);
+			bool ctrl_is_down = ImGui::GetIO().KeyCtrl;
+			float wh = ImGui::GetIO().MouseWheel;
 
-	if (std::abs(ImGui::GetIO().MouseWheel) > 0.00001f &&
-	    ImGui::IsWindowFocused() && ImGui::IsWindowHovered())
-	{
-		auto mousepos = ImGui::GetMousePos();
-		auto start    = screenspace_to_grid(mousepos);
-		bool ctrl_is_down = ImGui::GetIO().KeyCtrl;
-		float wh = ImGui::GetIO().MouseWheel;
-
-		if (wh > 0) {
-			if (ctrl_is_down)
-				scale.y += scale.y * MOUSE_SCALE_EXP;
-			else
-				scale.x += scale.x * MOUSE_SCALE_EXP;
-		} else {
-			if (ctrl_is_down) {
-				scale.y -= scale.y * MOUSE_SCALE_EXP;
-				if (scale.y < MIN_SCALE)
-					scale.y = MIN_SCALE;
+			if (wh > 0) {
+				if (ctrl_is_down)
+					scale.y += scale.y * MOUSE_SCALE_EXP;
+				else
+					scale.x += scale.x * MOUSE_SCALE_EXP;
 			} else {
-				scale.x -= scale.x * MOUSE_SCALE_EXP;
-				if (scale.x < MIN_SCALE)
-					scale.x = MIN_SCALE;
+				if (ctrl_is_down) {
+					scale.y -= scale.y * MOUSE_SCALE_EXP;
+					if (scale.y < MIN_SCALE)
+						scale.y = MIN_SCALE;
+				} else {
+					scale.x -= scale.x * MOUSE_SCALE_EXP;
+					if (scale.x < MIN_SCALE)
+						scale.x = MIN_SCALE;
+				}
 			}
+			// Maintain the world position under the cursor
+			auto grid_wo_off = screenspace_to_grid(mousepos) - grid_offset;
+			grid_offset      = start - grid_wo_off;
 		}
-		// Maintain the world position under the cursor
-		auto grid_wo_off = screenspace_to_grid(mousepos) - grid_offset;
-		grid_offset      = start - grid_wo_off;
+		ImGui::GetIO().MouseWheel = 0.f; // always consume to prevent outer scroll
 	}
 
 	// --- Scrubber update ---

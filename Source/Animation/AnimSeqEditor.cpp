@@ -14,6 +14,7 @@
 #include "GameEnginePublic.h"
 #include "LevelEditor/EditorDocLocal.h"
 #include "LevelEditor/SelectionState.h"
+#include "Animation/Runtime/RuntimeNodesNew2.h"
 #include <imgui.h>
 #include <algorithm>
 
@@ -225,38 +226,22 @@ void AnimSeqEditor::revert_editor() {
 
 void AnimSeqEditor::activate_preview() {
     cleanup_preview();
-    if (!model_ || !asset_ || !eng->get_level()) return;
+    if (!model_ || !asset_) return;
 
-    // Prefer the editor's currently selected entity if it has a matching model.
-    Entity* found_ent = nullptr;
+    // Only animate the entity the user has selected; never guess by scanning the scene.
     auto* editor_doc = static_cast<EditorDoc*>(eng->get_tool());
-    if (editor_doc && editor_doc->selection_state) {
-        Entity* sel = editor_doc->selection_state->get_only_one_selected().get();
-        if (sel) {
-            auto* mesh = sel->get_component<MeshComponent>();
-            if (mesh && mesh->get_model() == model_)
-                found_ent = sel;
-        }
-    }
+    if (!editor_doc || !editor_doc->selection_state) return;
+    if (!editor_doc->selection_state->has_only_one_selected()) return;
 
-    // Fallback: find any entity with matching model in the level.
-    if (!found_ent) {
-        auto& all = eng->get_level()->get_all_objects();
-        for (auto* updater : all) {
-            auto* ent = updater ? updater->cast_to<Entity>() : nullptr;
-            if (!ent) continue;
-            auto* mesh = ent->get_component<MeshComponent>();
-            if (!mesh || mesh->get_model() != model_) continue;
-            found_ent = ent;
-            break;
-        }
-    }
+    Entity* sel = editor_doc->selection_state->get_only_one_selected().get();
+    if (!sel) return;
 
-    if (!found_ent) return;
+    auto* mesh = sel->get_component<MeshComponent>();
+    if (!mesh || mesh->get_model() != model_) return;
 
-    auto* apc = found_ent->get_component<AnimPreviewComponent>();
+    auto* apc = sel->get_component<AnimPreviewComponent>();
     if (!apc) {
-        apc = found_ent->create_component<AnimPreviewComponent>();
+        apc = sel->create_component<AnimPreviewComponent>();
         we_added_preview_comp_ = true;
     } else {
         we_added_preview_comp_ = false;
@@ -266,7 +251,7 @@ void AnimSeqEditor::activate_preview() {
     apc->wants_force_frame = !auto_play_;
     apc->force_frame       = 0;
     apc->update_mesh_component();
-    preview_entity_ = EntityPtr(found_ent);
+    preview_entity_ = EntityPtr(sel);
 }
 
 void AnimSeqEditor::cleanup_preview() {
@@ -285,12 +270,17 @@ void AnimSeqEditor::update_preview_scrubber() {
     auto* apc = ent->get_component<AnimPreviewComponent>();
     if (!apc || !apc->asset || !apc->asset->seq) return;
 
-    if (auto_play_) {
-        apc->wants_force_frame = false;
-    } else {
+    bool wants_force = !auto_play_;
+    if (wants_force != apc->wants_force_frame) {
+        // Mode changed — rebuild animator for the new mode (looping vs. frame-locked).
+        apc->wants_force_frame = wants_force;
+        apc->update_mesh_component();
+    }
+
+    if (wants_force && apc->eval) {
         float fps = apc->asset->seq->fps > 0.f ? apc->asset->seq->fps : 30.f;
-        apc->wants_force_frame = true;
         apc->force_frame = (int)(curve_ed_->current_time * fps);
+        apc->eval->frame = apc->force_frame;
     }
 }
 
@@ -300,18 +290,6 @@ void AnimSeqEditor::update_preview_scrubber() {
 
 void AnimSeqEditor::draw_toolbar() {
     ImGui::TextUnformatted(clip_name_.c_str());
-    ImGui::SameLine();
-
-    if (model_ && model_->get_skel()) {
-        auto* seq = model_->get_skel()->find_clip(clip_name_);
-        if (seq) {
-            bool additive = seq->is_additive_clip;
-            if (ImGui::Checkbox("Additive", &additive)) {
-                seq->is_additive_clip = additive;
-                dirty_ = true;
-            }
-        }
-    }
 
     ImGui::SameLine();
     if (ImGui::Button(auto_play_ ? "[Auto]" : "[Manual]")) {
@@ -391,6 +369,18 @@ void AnimSeqEditor::imgui_draw() {
     if (!asset_ || !model_ || !model_->get_skel()) {
         ImGui::TextDisabled("Animation data unavailable.");
         return;
+    }
+
+    // Track editor selection — re-activate (or cleanup) whenever it changes.
+    {
+        auto* editor_doc = static_cast<EditorDoc*>(eng->get_tool());
+        Entity* editor_sel = nullptr;
+        if (editor_doc && editor_doc->selection_state &&
+            editor_doc->selection_state->has_only_one_selected())
+            editor_sel = editor_doc->selection_state->get_only_one_selected().get();
+
+        if (editor_sel != preview_entity_.get())
+            activate_preview();
     }
 
     update_preview_scrubber();
