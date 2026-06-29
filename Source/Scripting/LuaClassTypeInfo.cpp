@@ -60,12 +60,13 @@ static void restore_field(const LuaFieldSnapshot& v, const PropertyInfo& pi, uin
 	}
 }
 
-// Maps a Lua ---@type annotation string to a (core_type_id, optional EnumTypeInfo*) pair.
-// Returns true on a recognized scalar/enum. Unrecognized types (vec3, tables, asset refs, etc.)
-// are deferred to a later feature pass.
+// Maps a Lua ---@type annotation string to a (core_type_id, optional EnumTypeInfo*, optional
+// custom_type_str) tuple. Returns true on a recognized type. Unrecognized types (vec3, tables,
+// asset refs, etc.) are deferred to a later feature pass.
 static bool lua_type_str_to_core_type(const string& type_str, core_type_id& out_type,
-									  const EnumTypeInfo*& out_enum) {
+									  const EnumTypeInfo*& out_enum, const char*& out_custom_type) {
 	out_enum = nullptr;
+	out_custom_type = "";
 	if (type_str == "number" || type_str == "float") {
 		out_type = core_type_id::Float;
 		return true;
@@ -80,6 +81,11 @@ static bool lua_type_str_to_core_type(const string& type_str, core_type_id& out_
 	}
 	if (type_str == "string") {
 		out_type = core_type_id::StdString;
+		return true;
+	}
+	if (type_str == "entity_target") {
+		out_type = core_type_id::StdString;
+		out_custom_type = "EntityTarget";
 		return true;
 	}
 	if (auto e = EnumRegistry::find_enum_type(type_str)) {
@@ -126,7 +132,8 @@ static void synthesize_layout_from_parsed(LuaClassTypeInfo* /*self*/,
 	for (auto& parsed : parsed_properties) {
 		core_type_id ctype;
 		const EnumTypeInfo* einfo = nullptr;
-		if (!lua_type_str_to_core_type(parsed.type_str, ctype, einfo)) {
+		const char* custom_type = "";
+		if (!lua_type_str_to_core_type(parsed.type_str, ctype, einfo, custom_type)) {
 			sys_print(Warning, "LuaClassTypeInfo[%s]: skipping field '%s' with unsupported ---@type '%s'\n",
 					  lua_classname.c_str(), parsed.name.c_str(), parsed.type_str.c_str());
 			continue;
@@ -143,6 +150,7 @@ static void synthesize_layout_from_parsed(LuaClassTypeInfo* /*self*/,
 		pi.flags = PROP_DEFAULT | PROP_LUA_BACKED;
 		pi.type = ctype;
 		pi.enum_type = einfo;
+		pi.custom_type_str = custom_type;
 		lua_props_storage.push_back(pi);
 		cursor += size;
 	}
