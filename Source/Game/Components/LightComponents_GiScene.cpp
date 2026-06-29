@@ -180,6 +180,17 @@ void GameSceneGiUtil::check_changes() {
 
 void GameSceneGiUtil::save_to_disk() {
 	ASSERT(RenderGiManager::inst != nullptr);
+
+	auto cubemap_tex = RenderGiManager::inst->get_cubemap_array_texture();
+	if (!cubemap_tex) {
+		sys_print(Warning, "save_baked_gi: no cubemap texture to save (bake cubemaps first)\n");
+		return;
+	}
+	if (!draw.ddgi) {
+		sys_print(Warning, "save_baked_gi: DDGI not initialised (bake DDGI first)\n");
+		return;
+	}
+
 	// save specular cubemaps
 	// save spec volume info
 	// save diffuse volumes
@@ -202,8 +213,6 @@ void GameSceneGiUtil::save_to_disk() {
 	writer.write_bytes_ptr((uint8_t*)relocate.data(), relocate.size() * sizeof(glm::vec4));
 	IFilePtr out = FileSys::open_write_game(name + baked_gi_suffix);
 	out->write(writer.get_buffer(), writer.get_size());
-
-	auto cubemap_tex = RenderGiManager::inst->get_cubemap_array_texture();
 	const string dir = FileSys::get_game_path() + string("/") + name;
 	SaveCubeArrayToDDS(cubemap_tex, CUBEMAP_WIDTH, CUBEMAP_WIDTH,
 					   Texture::get_mip_map_count(CUBEMAP_WIDTH, CUBEMAP_WIDTH), volumes.size(),
