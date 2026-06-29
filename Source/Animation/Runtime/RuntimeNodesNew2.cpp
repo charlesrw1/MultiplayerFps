@@ -3,6 +3,7 @@
 #include "AnimationTreeLocal.h"
 #include "Render/Model.h"
 #include "Framework/Util.h"
+#include "Animation.h"
 
 void agClipNode::reset() {
 	anim_time = 0.0;
@@ -86,6 +87,41 @@ void agSlotPlayer::refresh_after_model_reload(Model* reloaded) {
 		input->refresh_after_model_reload(reloaded);
 }
 
+// Sample all AnimEvent crossings that occurred in [prev_time, curr_time).
+// When the clip looped this frame pass looped=true; the window wraps as
+// [prev_time, duration) ++ [0, curr_time).
+static void sample_events_from_clip(agGetPoseCtx& ctx, const AnimationSeq* seq,
+                                    float prev_time, float curr_time,
+                                    bool looped, bool b_mirrored)
+{
+    if (!seq || seq->anim_events.empty()) return;
+    auto& out    = ctx.object.sampled_events;
+    const float w = ctx.weight;
+
+    auto check_window = [&](const AnimEvent& ev, float p, float c) {
+        if (!ev.is_duration) {
+            if (ev.time_start >= p && ev.time_start < c)
+                out.push_back({&ev, ev.time_start, w, b_mirrored, AnimEventTrigger::Entered});
+        } else {
+            if (ev.time_start >= p && ev.time_start < c)
+                out.push_back({&ev, ev.time_start, w, b_mirrored, AnimEventTrigger::Entered});
+            if (ev.time_end > ev.time_start && ev.time_end >= p && ev.time_end < c)
+                out.push_back({&ev, ev.time_end,   w, b_mirrored, AnimEventTrigger::Left});
+        }
+    };
+
+    if (!looped) {
+        for (auto& ev : seq->anim_events)
+            check_window(ev, prev_time, curr_time);
+    } else {
+        const float dur = seq->duration;
+        for (auto& ev : seq->anim_events) {
+            check_window(ev, prev_time, dur);
+            check_window(ev, 0.f,       curr_time);
+        }
+    }
+}
+
 static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip, bool has_sync_group,
 								 StringName syncgroupname, sync_opt SyncOption, bool loop,
 								 const BoneIndexRetargetMap* remap, float speed, float& anim_time, bool& stopped_flag,
@@ -142,10 +178,14 @@ void agClipNode::get_pose(agGetPoseCtx& ctx) {
 	}
 
 	const float playSpeed = speed.get_float(ctx);
+	const float prev_time = anim_time;
 
 	bool stopped_flag = false;
 	get_clip_pose_shared(ctx, seq, !syncGroup.is_null(), syncGroup, syncType, looping, remap, playSpeed, anim_time,
 						 stopped_flag, nullptr);
+
+	const bool looped = looping && (anim_time < prev_time);
+	sample_events_from_clip(ctx, seq, prev_time, anim_time, looped, false);
 
 	ctx.add_playing_clip(this);
 
@@ -194,14 +234,20 @@ void agBlendNode::get_pose(agGetPoseCtx& ctx) {
 	const float alphaVal = alpha.get_float(ctx);
 	ctx.debug_enter("agBlend: " + std::to_string(alphaVal));
 
-	if (alphaVal <= 0.00001) {
+	if (alphaVal <= 0.00001f) {
+		// input1 contributes nothing; input0 keeps full parent weight
 		input0->get_pose(ctx);
-	} else if (alphaVal >= 0.99999) {
+	} else if (alphaVal >= 0.99999f) {
+		// input0 contributes nothing; input1 keeps full parent weight
 		input1->get_pose(ctx);
 	} else {
+		const float parent_weight = ctx.weight;
 		agGetPoseCtx other(ctx);
+		ctx.weight   = parent_weight * (1.f - alphaVal); // input0 share
+		other.weight = parent_weight * alphaVal;          // input1 share
 		input0->get_pose(ctx);
 		input1->get_pose(other);
+		ctx.weight = parent_weight; // restore for any parent accumulation
 		util_blend(ctx.get_num_bones(), *other.pose, *ctx.pose, alphaVal);
 	}
 	ctx.debug_exit();
@@ -215,10 +261,12 @@ void agAddNode::reset() {
 void agAddNode::get_pose(agGetPoseCtx& ctx) {
 	const float alphaVal = alpha.get_float(ctx);
 	ctx.debug_enter("agAddNode: " + std::to_string(alphaVal));
-	if (alphaVal <= 0.00001) {
+	if (alphaVal <= 0.00001f) {
 		input0->get_pose(ctx);
 	} else {
 		agGetPoseCtx other(ctx);
+		// Additive layer events scale with alpha; base events keep full parent weight.
+		other.weight = ctx.weight * alphaVal;
 		input0->get_pose(ctx);
 		input1->get_pose(other);
 		util_add(ctx.get_num_bones(), *other.pose, *ctx.pose, alphaVal);

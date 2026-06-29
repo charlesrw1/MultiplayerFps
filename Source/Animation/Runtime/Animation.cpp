@@ -108,6 +108,7 @@ ConfigVar force_animation_to_bind_pose("force_animation_to_bind_pose", "0", CVAR
 void AnimatorObject::update(float dt) {
 	assert(model.get_skel());
 	root_motion = RootMotionTransform();
+	sampled_events.clear();
 	if (using_global_bonemat_double_buffer)
 		last_cached_bonemats.swap(cached_bonemats);
 	debug_output_messages.clear();

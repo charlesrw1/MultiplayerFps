@@ -14,6 +14,7 @@
 #include "Framework/ClassBase.h"
 #include "Animation/Runtime/SyncTime.h"
 #include "Animation/AnimationSeqAsset.h"
+#include "Animation/AnimEvent.h"
 #include "Framework/MulticastDelegate.h"
 #include "Framework/ConsoleCmdGroup.h"
 
@@ -133,6 +134,10 @@ public:
 	DirectAnimationSlot* find_slot_with_name(StringName name);
 	void add_playing_clip(agClipNode* clip) { playingClipsThisUpdate.push_back(clip); }
 	const std::vector<agClipNode*>& get_playing_clips() { return playingClipsThisUpdate; }
+
+	// Populated each update() with all events whose time boundary was crossed this frame.
+	// Cleared at the start of update(); read by game code after update() returns.
+	std::vector<SampledAnimEvent> sampled_events;
 
 	// when debug printing enabled
 	void debug_print(int start_y);

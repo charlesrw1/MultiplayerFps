@@ -12,6 +12,36 @@ struct AnimEvent {
     bool is_duration = false;
 };
 
+// How a sampled event was triggered this frame.
+enum class AnimEventTrigger : uint8_t {
+    Entered, // animation time crossed time_start (all instant events; duration event began)
+    Left,    // animation time crossed time_end (duration events only)
+};
+
+// One sampled animation event collected during a single AnimatorObject::update().
+// Cleared at the start of each update and rebuilt by clip nodes traversing the blend tree.
+struct SampledAnimEvent {
+    const AnimEvent*  event        = nullptr; // points into AnimationSeq::anim_events (stable until model reload)
+    float             sampled_time = 0.f;     // animation clock (seconds) at the crossing
+    float             weight       = 1.f;     // blend weight of the source clip in [0,1]
+    bool              b_mirrored   = false;   // true if the event came through a mirrored pathway
+    AnimEventTrigger  trigger      = AnimEventTrigger::Entered;
+
+    // Convenience helpers (require knowledge of the source clip's duration)
+    float time_through_event() const {
+        if (!event || !event->is_duration) return 0.f;
+        return sampled_time - event->time_start;
+    }
+    float duration_of_event() const {
+        if (!event || !event->is_duration) return 0.f;
+        return event->time_end - event->time_start;
+    }
+    float percent_through_event() const {
+        float d = duration_of_event();
+        return d > 0.f ? time_through_event() / d : 0.f;
+    }
+};
+
 // Known event names for editor autocomplete and the right-click add-event menu.
 // Populated at startup; gameplay code may also register names at init time.
 struct AnimEventDef {
