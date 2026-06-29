@@ -146,53 +146,29 @@ void util_localspace_to_meshspace_ptr_2(const Pose& local, glm::mat4* out_bone_m
 void util_global_blend(const MSkeleton* skel, const Pose* a, Pose* b, float factor, const std::vector<float>& mask) {
 
 	const int bonecount = skel->get_num_bones();
+	ASSERT(bonecount <= Pose::MAX_BONES);
 
-	std::vector<glm::mat4> globalspace_base(bonecount);
+	glm::mat4 globalspace_base[Pose::MAX_BONES];
+	glm::mat4 globalspace_layer[Pose::MAX_BONES];
+	glm::quat globalspace_rotations[Pose::MAX_BONES];
 
-	// for (int i = 0; i < bonecount; i++)
-	//{
-	//	glm::mat4x4 matrix = glm::mat4_cast(glm::slerp(a->q[i],b->q[i],mask[i]));
-	//	matrix[3] = glm::vec4(glm::mix(a->pos[i],b->pos[i],mask[i]),1.f);
-	//
-	//	if (bone_vec[i].parent == -1) {
-	//		globalspace_base[i] = matrix;
-	//	}
-	//	else {
-	//		//assert(model->bones[i].parent < model->bones.size());
-	//		globalspace_base[i] = globalspace_base[bone_vec[i].parent] * matrix;
-	//	}
-	//}
-
-	util_localspace_to_meshspace_ptr_2(*a, globalspace_base.data(), skel);
-
-	std::vector<glm::mat4> globalspace_layer(bonecount);
-	util_localspace_to_meshspace_ptr_2(*b, globalspace_layer.data(), skel);
-
-	std::vector<glm::quat> globalspace_rotations(bonecount);
+	util_localspace_to_meshspace_ptr_2(*a, globalspace_base, skel);
+	util_localspace_to_meshspace_ptr_2(*b, globalspace_layer, skel);
 
 	for (int j = 0; j < bonecount; j++) {
-		glm::quat base = glm::quat_cast(globalspace_base[j]);
-		glm::quat layer = glm::quat_cast(globalspace_layer[j]);
-		glm::quat global = glm::slerp(base, layer, mask[j] * factor); // meshspace
+		const float w = mask[j] * factor;
+		const glm::quat base_g  = glm::quat_cast(globalspace_base[j]);
+		const glm::quat layer_g = glm::quat_cast(globalspace_layer[j]);
+		const glm::quat global  = glm::slerp(base_g, layer_g, w);
 		globalspace_rotations[j] = global;
-		// glm::vec4 t = globalspace_layer[j][3];
-		// globalspace_base[j] = glm::mat4_cast(layer);
-		// globalspace_base[j][3] = t;
-#if 1
-		int parent = skel->get_bone_parent(j);
-		if (parent == -1) {
-			b->q[j] = global;
-		} else {
-			// glm::mat3 matrix = glm::mat3_cast(global);
-			// glm::mat3 parent_mat = glm::mat3_cast(globalspace_rotations[parent]);
-			// matrix = glm::inverse(parent_mat) * matrix;
-			// b->q[j] = glm::quat_cast(matrix);
-			b->q[j] = glm::inverse(globalspace_rotations[parent]) * global;
-		}
 
-		b->pos[j] = a->pos[j];
-		b->scale[j] = a->scale[j];
-#endif
+		const int parent = skel->get_bone_parent(j);
+		b->q[j] = (parent == -1) ? global
+		                         : glm::inverse(globalspace_rotations[parent]) * global;
+
+		// Blend translation and scale in local space by the same weight.
+		b->pos[j]   = glm::mix(a->pos[j],   b->pos[j],   w);
+		b->scale[j] = glm::mix(a->scale[j], b->scale[j], w);
 	}
 }
 
