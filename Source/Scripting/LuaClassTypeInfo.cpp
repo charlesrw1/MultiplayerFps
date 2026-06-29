@@ -373,13 +373,12 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c) {
 	lua_pop(L, 2);
 	check_top(0);
 
-	// For Component subclasses with PROP_LUA_BACKED fields, allocate the shadow
-	// buffer and pull initial values from the template Lua table. The instance Lua
-	// table still holds the same defaults (copied above) for script-side reads;
-	// editor edits and serialization read/write only the shadow buffer.
+	// For Component subclasses with PROP_LUA_BACKED fields, register the type info
+	// so hot-reload tracking and ~Component cleanup work. Shadow buffer is left null
+	// and lazily allocated on first PROP_LUA_BACKED get_ptr() access (e.g. serialization,
+	// editor property panel) so runtime-spawned components pay no allocation cost.
 	if (luaInfo->lua_field_shadow_size > 0) {
 		if (Component* comp = out->cast_to<Component>()) {
-			comp->take_lua_field_shadow(allocate_and_init_shadow(L, luaInfo));
 			comp->set_lua_owner_type(luaInfo);
 			luaInfo->register_lua_instance(comp);
 		}
@@ -480,6 +479,17 @@ static void push_field_to_lua_table(lua_State* L, int tbl_idx, const PropertyInf
 		return;
 	}
 	lua_rawset(L, tbl_idx);
+}
+
+void ScriptManager::ensure_shadow_for(Component* comp) {
+	if (!inst)
+		return;
+	if (comp->get_lua_field_shadow())
+		return;
+	auto* lti = const_cast<LuaClassTypeInfo*>(comp->get_lua_owner_type());
+	if (!lti || lti->get_lua_field_shadow_size() == 0)
+		return;
+	comp->take_lua_field_shadow(allocate_and_init_shadow(inst->lua, lti));
 }
 
 void ScriptManager::sync_shadow_to_lua_table(Component* comp) {

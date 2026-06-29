@@ -10,8 +10,9 @@
 
 uint8_t* PropertyInfo::get_ptr(const void* inst) const {
 	if (flags & PROP_LUA_BACKED) {
-		// inst must be a ClassBase whose shadow buffer holds Lua-backed fields
-		uint8_t* shadow = static_cast<const ClassBase*>(inst)->get_lua_field_shadow();
+		auto* cb = const_cast<ClassBase*>(static_cast<const ClassBase*>(inst));
+		cb->ensure_lua_shadow();
+		uint8_t* shadow = cb->get_lua_field_shadow();
 		ASSERT(shadow && "PROP_LUA_BACKED requires owner to provide a shadow buffer");
 		return shadow + offset;
 	}

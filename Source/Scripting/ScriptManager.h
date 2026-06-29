@@ -149,6 +149,12 @@ public:
 	// No-op for plain C++ components (no shadow buffer) or when no ScriptManager exists.
 	static void sync_shadow_to_lua_table(Component* comp);
 
+	// Lazily allocates the shadow buffer for comp if it doesn't exist yet. Called by
+	// Component::ensure_lua_shadow() which is invoked from PropertyInfo::get_ptr()
+	// on first PROP_LUA_BACKED access (serialization, editor property panel, etc.).
+	// No-op if comp has no lua_owner_type or shadow already exists.
+	static void ensure_shadow_for(Component* comp);
+
 	// Fires at the end of check_for_reload() when at least one Lua class was rebuilt.
 	// Listeners must drop any cached `const PropertyInfo*` / `PropertyInfoList*` they
 	// hold into LuaClassTypeInfo storage — phase 3 reallocates lua_props_storage and

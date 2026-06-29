@@ -137,6 +137,8 @@ public:
 	// Lua-authored fields are stored (offsets defined by LuaClassTypeInfo). Default null
 	// for plain C++ classes; Component overrides to return its lua_field_shadow.
 	virtual uint8_t* get_lua_field_shadow() const { return nullptr; }
+	// Called by get_ptr() before accessing the shadow buffer. Override to lazily allocate.
+	virtual void ensure_lua_shadow() {}
 
 private:
 	// this is used for interop with lua

@@ -106,6 +106,10 @@ void Component::shutdown_updater() {
 		level->remove_from_update_list(this);
 }
 
+void Component::ensure_lua_shadow() {
+	ScriptManager::ensure_shadow_for(this);
+}
+
 void Component::activate_internal_step2() {
 	ASSERT(init_state == initialization_state::HAS_ID);
 	ASSERT(entity_owner);

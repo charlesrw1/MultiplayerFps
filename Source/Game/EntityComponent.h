@@ -95,6 +95,7 @@ public:
 	// StaticType (virtual dispatch is downgraded as derived dtors finish), making
 	// the live-instance unregister unreachable otherwise.
 	uint8_t* get_lua_field_shadow() const override { return lua_field_shadow.get(); }
+	void ensure_lua_shadow() override;
 	void take_lua_field_shadow(std::unique_ptr<uint8_t[]> buf) { lua_field_shadow = std::move(buf); }
 	void set_lua_owner_type(const LuaClassTypeInfo* t) { lua_owner_type = t; }
 	const LuaClassTypeInfo* get_lua_owner_type() const { return lua_owner_type; }
