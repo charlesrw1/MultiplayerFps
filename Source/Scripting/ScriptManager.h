@@ -144,6 +144,11 @@ public:
 	// No-op when c's type is not Lua-defined or no ScriptManager is alive.
 	static void on_component_destructed(Component* c);
 
+	// Copies every PROP_LUA_BACKED shadow field of comp into its Lua instance table so
+	// that scripts can read serialized values via self.field. Call before start() fires.
+	// No-op for plain C++ components (no shadow buffer) or when no ScriptManager exists.
+	static void sync_shadow_to_lua_table(Component* comp);
+
 	// Fires at the end of check_for_reload() when at least one Lua class was rebuilt.
 	// Listeners must drop any cached `const PropertyInfo*` / `PropertyInfoList*` they
 	// hold into LuaClassTypeInfo storage — phase 3 reallocates lua_props_storage and

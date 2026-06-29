@@ -466,6 +466,39 @@ void ScriptManager::check_for_reload() {
 		on_class_reloaded.invoke();
 }
 
+// Pushes one shadow field value into the Lua instance table at tbl_idx.
+static void push_field_to_lua_table(lua_State* L, int tbl_idx, const PropertyInfo& pi, const uint8_t* p) {
+	lua_pushstring(L, pi.name);
+	switch (pi.type) {
+	case core_type_id::Float:   lua_pushnumber(L, *(const float*)p); break;
+	case core_type_id::Int32:
+	case core_type_id::Enum32:  lua_pushinteger(L, *(const int32_t*)p); break;
+	case core_type_id::Bool:    lua_pushboolean(L, *(const int8_t*)p); break;
+	case core_type_id::StdString: lua_pushstring(L, ((const std::string*)p)->c_str()); break;
+	default:
+		lua_pop(L, 1); // pop the name
+		return;
+	}
+	lua_rawset(L, tbl_idx);
+}
+
+void ScriptManager::sync_shadow_to_lua_table(Component* comp) {
+	if (!inst)
+		return;
+	const auto* lti = comp->get_lua_owner_type();
+	if (!lti || lti->get_lua_field_shadow_size() == 0)
+		return;
+	const uint8_t* shadow = comp->get_lua_field_shadow();
+	if (!shadow)
+		return;
+	lua_State* L = inst->lua;
+	lua_rawgeti(L, LUA_REGISTRYINDEX, comp->get_table_registry_id());
+	int tbl_idx = lua_gettop(L);
+	for (const auto& pi : lti->get_lua_props_storage())
+		push_field_to_lua_table(L, tbl_idx, pi, shadow + pi.offset);
+	lua_pop(L, 1);
+}
+
 void ScriptManager::on_component_destructed(Component* c) {
 	if (!ScriptManager::inst || !c)
 		return;

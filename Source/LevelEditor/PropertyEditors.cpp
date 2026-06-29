@@ -812,7 +812,7 @@ void EntityTargetEditor::rebuild_debug_line() {
 
 	MeshBuilder_Object mbo;
 	mbo.visible = true;
-	mbo.depth_tested = false;
+	mbo.depth_tested = true;
 	mbo.meshbuilder = &mb;
 	idraw->get_scene()->update_meshbuilder(mb_handle, mbo);
 }
