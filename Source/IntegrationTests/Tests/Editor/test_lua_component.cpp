@@ -112,14 +112,15 @@ static TestTask test_place_edit_save_reload(TestContext& t) {
 
 	Component* comp = attach_test_lua_component(e, ti);
 	t.require(comp != nullptr, "attached TestLuaComp to entity");
-	t.require(comp->get_lua_field_shadow() != nullptr, "Lua component allocated a shadow buffer");
+	t.check(comp->get_lua_field_shadow() == nullptr, "shadow null before first property access");
 
-	// Template defaults must be present in the shadow.
+	// Template defaults must be present in the shadow once lazily created.
 	auto* hp_pi = find_field(ti, "hp");
 	auto* alive_pi = find_field(ti, "alive");
 	auto* display_pi = find_field(ti, "display");
 	t.require(hp_pi && alive_pi && display_pi, "all three reflected fields found");
 	t.check(hp_pi->get_float(comp) == 50.f, "hp defaulted to template value 50");
+	t.check(comp->get_lua_field_shadow() != nullptr, "shadow lazily created on first get_ptr");
 	t.check(alive_pi->get_int(comp) == 1, "alive defaulted to true");
 
 	// Edit through the same accessors the property grid uses.
@@ -560,10 +561,8 @@ static TestTask test_two_classes_one_entity_no_alias(TestContext& t) {
 	Component* comp_a = attach_test_lua_component(e, ti_a);
 	Component* comp_b = attach_test_lua_component(e, ti_b);
 	t.require(comp_a != nullptr && comp_b != nullptr, "both components attached");
-	t.require(comp_a->get_lua_field_shadow() != nullptr, "A shadow non-null");
-	t.require(comp_b->get_lua_field_shadow() != nullptr, "B shadow non-null");
-	t.check(comp_a->get_lua_field_shadow() != comp_b->get_lua_field_shadow(),
-			"A and B own disjoint shadow buffers");
+	t.check(comp_a->get_lua_field_shadow() == nullptr, "A shadow null before first property access");
+	t.check(comp_b->get_lua_field_shadow() == nullptr, "B shadow null before first property access");
 
 	auto* a_hp = find_field(ti_a, "hp");
 	auto* a_display = find_field(ti_a, "display");
@@ -579,6 +578,11 @@ static TestTask test_two_classes_one_entity_no_alias(TestContext& t) {
 	*(std::string*)a_display->get_ptr(comp_a) = "A";
 	b_power->set_float(comp_b, 99.f);
 	*(std::string*)b_tag->get_ptr(comp_b) = "B";
+
+	t.require(comp_a->get_lua_field_shadow() != nullptr, "A shadow created on first property access");
+	t.require(comp_b->get_lua_field_shadow() != nullptr, "B shadow created on first property access");
+	t.check(comp_a->get_lua_field_shadow() != comp_b->get_lua_field_shadow(),
+			"A and B own disjoint shadow buffers");
 
 	t.check(a_hp->get_float(comp_a) == 42.f, "A.hp reads back its own write");
 	t.check(*(std::string*)a_display->get_ptr(comp_a) == "A", "A.display reads back");
@@ -608,3 +612,44 @@ static TestTask test_two_classes_one_entity_no_alias(TestContext& t) {
 }
 EDITOR_TEST("editor/lua_component_two_classes_one_entity_no_alias", 30.f,
 			test_two_classes_one_entity_no_alias);
+
+// 9. Lazy shadow allocation: freshly allocated components have null shadow; first
+//    PROP_LUA_BACKED get_ptr call creates it with template defaults; components that
+//    are never accessed via get_ptr keep null shadow indefinitely.
+static TestTask test_lazy_shadow_allocation(TestContext& t) {
+	load_initial_lua_class();
+
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "open-editor");
+	co_await t.wait_ticks(4);
+
+	auto* ti = find_test_lua_comp();
+	t.require(ti != nullptr, "TestLuaComp registered");
+
+	auto* hp_pi = find_field(ti, "hp");
+	auto* alive_pi = find_field(ti, "alive");
+	t.require(hp_pi && alive_pi, "fields present");
+
+	Entity* e1 = spawn_entity_in_editor();
+	Component* comp = attach_test_lua_component(e1, ti);
+	t.require(comp != nullptr, "TestLuaComp attached");
+
+	// No property has been touched — shadow must not exist yet.
+	t.require(comp->get_lua_field_shadow() == nullptr,
+			"shadow null before any property access");
+
+	// First get_ptr triggers lazy creation; value must match template default.
+	float hp = hp_pi->get_float(comp);
+	t.check(comp->get_lua_field_shadow() != nullptr,
+			"shadow created on first get_ptr call");
+	t.check(hp == 50.f, "lazily-created shadow seeded with template default (hp=50)");
+	t.check(alive_pi->get_int(comp) == 1,
+			"lazily-created shadow seeded with template default (alive=true)");
+
+	// A second component that is never accessed via get_ptr keeps null shadow.
+	Entity* e2 = spawn_entity_in_editor();
+	Component* comp2 = attach_test_lua_component(e2, ti);
+	t.require(comp2 != nullptr, "second TestLuaComp attached");
+	t.check(comp2->get_lua_field_shadow() == nullptr,
+			"component never touched via get_ptr has no shadow");
+}
+EDITOR_TEST("editor/lua_component_lazy_shadow_allocation", 30.f, test_lazy_shadow_allocation);
