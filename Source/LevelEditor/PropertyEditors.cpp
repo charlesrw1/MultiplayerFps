@@ -797,18 +797,23 @@ Entity* EntityTargetEditor::find_target() const {
 }
 
 void EntityTargetEditor::rebuild_debug_line() {
-	MeshBuilder mb;
-	mb.Begin();
 	Entity* owner = owner_entity_from_instance(instance);
 	Entity* target = find_target();
-	if (owner && target) {
-		mb.PushLine(owner->get_ws_position(), target->get_ws_position(),
-		            target_valid ? Color32{60, 200, 80, 200} : Color32{220, 60, 60, 200});
+	if (!owner || !target) {
+		MeshBuilder_Object mbo;
+		mbo.visible = false;
+		idraw->get_scene()->update_meshbuilder(mb_handle, mbo);
+		return;
 	}
+
+	MeshBuilder mb;
+	mb.Begin();
+	mb.PushLine(owner->get_ws_position(), target->get_ws_position(),
+	            target_valid ? Color32{60, 200, 80, 200} : Color32{220, 60, 60, 200});
 	mb.End();
 
 	MeshBuilder_Object mbo;
-	mbo.visible = (owner && target);
+	mbo.visible = true;
 	mbo.depth_tested = false;
 	mbo.meshbuilder = &mb;
 	idraw->get_scene()->update_meshbuilder(mb_handle, mbo);
