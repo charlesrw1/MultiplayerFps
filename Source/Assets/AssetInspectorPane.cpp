@@ -1,6 +1,7 @@
 #ifdef EDITOR_BUILD
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "Assets/AssetInspectorPane.h"
+#include "Animation/AnimSeqEditor.h"
 #include "AssetTools/AssetCompiler.h"
 #include "Render/Editor/TextureEditor.h"
 #include "AssetCompile/ModelAsset2.h"
@@ -353,11 +354,23 @@ static const char* texture_format_to_string(GraphicsTextureFormat fmt) {
 AssetInspectorPane::AssetInspectorPane() = default;
 AssetInspectorPane::~AssetInspectorPane() = default;
 
+void AssetInspectorPane::draw_anim_seq_editor(const std::string& cmdl_gamepath) {
+    if (!anim_seq_editor_ || anim_seq_editor_->get_model_path() != cmdl_gamepath) {
+        anim_seq_editor_ = std::make_unique<AnimSeqEditor>();
+        anim_seq_editor_->set_model(cmdl_gamepath);
+    }
+    ImGui::Separator();
+    ImGui::TextUnformatted("Animation Sequence Editor");
+    ImGui::Separator();
+    anim_seq_editor_->imgui_draw();
+}
+
 void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
     last_selected = selected;
     settings_dirty = false;
     cache_.reset();
     mi_state_.reset();
+    anim_seq_editor_.reset();
     active_tis_path_.clear();
 
     auto ext = StringUtils::get_extension_no_dot(selected.filename);
@@ -736,7 +749,10 @@ void AssetInspectorPane::imgui_draw(const AssetOnDisk& selected) {
     if      (ext == "tis") draw_tis_settings(selected.filename);
     else if (ext == "dds" || ext == "png" || ext == "jpg") draw_tis_settings(active_tis_path_.empty() ? strip_extension(selected.filename) + ".tis" : active_tis_path_);
     else if (ext == "mis")  draw_mis_settings(selected.filename);
-    else if (ext == "cmdl") draw_mis_settings(strip_extension(selected.filename) + ".mis");
+    else if (ext == "cmdl") {
+        draw_mis_settings(strip_extension(selected.filename) + ".mis");
+        draw_anim_seq_editor(selected.filename);
+    }
     else if (ext == "mm") draw_material_text(selected.filename);
     else if (ext == "mi") draw_material_instance_editor(selected.filename);
     else    ImGui::TextDisabled("Extension: .%s", ext.c_str());

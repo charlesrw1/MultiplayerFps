@@ -341,8 +341,16 @@ ScalePositionRot AnimationSeq::get_keyframe(int bone, int keyframe, float lerpam
 	return output;
 }
 
-const AnimationEvent* AnimationSeq::get_events_for_keyframe(int keyframe, int* count) const {
-	return nullptr;
+void AnimationSeq::get_active_events(float time, vector<const AnimEvent*>& out) const {
+	for (auto& ev : anim_events) {
+		if (ev.is_duration) {
+			if (time >= ev.time_start && time <= ev.time_end)
+				out.push_back(&ev);
+		} else {
+			if (time == ev.time_start)
+				out.push_back(&ev);
+		}
+	}
 }
 
 #include "Animation/SkeletonData.h"

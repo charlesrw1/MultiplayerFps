@@ -3,6 +3,7 @@
 
 #include "Model.h"
 #include "ModelManager.h"
+#include "Animation/AnimSidecarFile.h"
 
 #include "Memory.h"
 #include <vector>
@@ -127,6 +128,7 @@ void Model::post_load() {
 		}
 	}
 
+	AnimSidecarFile::apply_to_model(this);
 	Model::on_model_loaded.invoke(this);
 }
 

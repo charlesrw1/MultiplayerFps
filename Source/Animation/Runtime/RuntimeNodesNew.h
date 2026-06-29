@@ -52,37 +52,21 @@ class SampledAnimEventBuffer
 public:
 	struct Sampled
 	{
-		enum DurationType
-		{
-			Started,
-			Ended,
-			Active,
-		};
-		struct DurationEv
-		{
-			const AnimDurationEvent* ptr = nullptr;
-			Percentage thru;
-			DurationType type{};
-		};
+		enum DurationType { Started, Ended, Active };
 
-		Sampled(const AnimationEvent& ev);
-		Sampled(DurationEv sampled);
+		const AnimEvent* ev = nullptr;
 		float weight = 1.f;
-		bool is_duration = false;
-		bool is_nameid_event = false;
 		bool ignore = false;
-		union {
-			DurationEv durEvent;
-			const AnimationEvent* instEvent;
-		};
+		DurationType duration_type{};
+		float thru = 0.f; // 0-1 progress through duration events
 	};
 	void blend_weights(int start, int end, float weight);
 	void mark_as_ignored(int start, int end);
-	using EventInfo = variant<StringName, const ClassTypeInfo*>;
-	bool did_event_start(EventInfo what);
-	bool did_event_end(EventInfo what);
-	bool is_duration_event_active(EventInfo what);
-	Percentage get_duration_event_thru(EventInfo what);
+	bool did_event_fire(const std::string& name) const;
+	bool did_duration_event_start(const std::string& name) const;
+	bool did_duration_event_end(const std::string& name) const;
+	bool is_duration_event_active(const std::string& name) const;
+	float get_duration_event_thru(const std::string& name) const;
 
 	vector<Sampled> events;
 };

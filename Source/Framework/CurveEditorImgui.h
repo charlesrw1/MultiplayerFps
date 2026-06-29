@@ -142,6 +142,11 @@ public:
 		is_dragging_selected = false;
 	}
 
+	// add an event with times already set on the item (for programmatic/deserialized loading)
+	void add_event_direct(std::unique_ptr<SequencerEditorItem> item) {
+		events.push_back(std::move(item));
+	}
+
 	// add an event, note that CurveEditor manages memory and will call destructor if event is deleted
 	void add_item_from_menu(std::unique_ptr<SequencerEditorItem> item) {
 		auto mousepos = ImGui::GetMousePos();

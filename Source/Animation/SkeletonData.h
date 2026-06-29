@@ -5,7 +5,7 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "Framework/StringName.h"
-#include "Event.h"
+#include "AnimEvent.h"
 #include "AnimationTypes.h"
 #include "Runtime/Easing.h"
 #include "Framework/ConsoleCmdGroup.h"
@@ -38,17 +38,6 @@ struct SyncMarker
 	StringName name;
 	int time = 0;
 };
-struct AnimCurveData
-{
-	StringName name;
-	struct Point
-	{
-		glm::vec2 val = glm::vec2(0.0, 0.0);
-		Easing interp = Easing::Linear;
-	};
-	void add_point(float time, float value, Easing interp) { points.push_back({{time, value}, interp}); }
-	std::vector<Point> points;
-};
 
 class AnimationSeq
 {
@@ -61,17 +50,12 @@ public:
 	float fps = 30.0;
 	float average_linear_velocity = 0.0;
 	bool has_rootmotion = false;
-	// store any animation events or curves here
-	vector<uptr<AnimationEvent>> events;
+	// Animation events authored in the .amd sidecar (data-driven, keyed by name string).
+	vector<AnimEvent> anim_events;
 	vector<SyncMarker> syncMarkers;
-	vector<uptr<AnimDurationEvent>> durationEvents;
-	vector<AnimCurveData> curveData;
 	SeqDirectPlayOpt directplayopt;
-	// creational functions
-	void add_event(AnimationEvent* ev);
-	void add_duration_event(AnimDurationEvent* ev);
-	void add_curve(AnimCurveData& curveData);
 	void add_sync_marker(SyncMarker marker);
+	const vector<AnimEvent>& get_anim_events() const { return anim_events; }
 
 	int get_num_keyframes_inclusive() const { return num_frames + 1; }
 	int get_num_keyframes_exclusive() const { return num_frames; }
@@ -91,7 +75,8 @@ public:
 	}
 	float get_time_of_keyframe(int keyframe) const { return (float)keyframe / fps; }
 	ScalePositionRot get_keyframe(int bone, int keyframe, float lerp) const;
-	const AnimationEvent* get_events_for_keyframe(int keyframe, int* out_count) const;
+	// Returns all events whose window covers the given time (seconds).
+	void get_active_events(float time, vector<const AnimEvent*>& out) const;
 
 private:
 	glm::vec3* get_pos_write_ptr(int channel, int keyframe);

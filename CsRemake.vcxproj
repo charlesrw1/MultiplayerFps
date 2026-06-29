@@ -30,6 +30,8 @@
     <ClCompile Include="Source\Animation\AnimationSeqAsset.cpp" />
     <ClCompile Include="Source\Animation\AnimationTypes.cpp" />
     <ClCompile Include="Source\Animation\AnimationUtil.cpp" />
+    <ClCompile Include="Source\Animation\AnimSidecarFile.cpp" />
+    <ClCompile Include="Source\Animation\AnimSeqEditor.cpp" />
     <ClCompile Include="Source\Animation\Runtime\Animation.cpp" />
     <ClCompile Include="Source\Animation\Runtime\AnimationTreeLocal.cpp" />
     <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew2.cpp" />
