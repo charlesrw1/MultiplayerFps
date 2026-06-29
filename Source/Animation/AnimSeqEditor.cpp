@@ -143,13 +143,13 @@ void AnimSeqEditor::set_asset(const std::string& asset_path) {
     auto pos = asset_path.rfind('/');
     clip_name_ = (pos != std::string::npos) ? asset_path.substr(pos + 1) : asset_path;
 
-    // Listen for model reloads so we can re-sync without rebuilding the editor.
+    // Listen for model reloads (e.g. external hot-reload) so we re-sync the editor.
     Model::on_model_loaded.add(this, [this](Model* reloaded) {
         if (reloaded != model_) return;
-        // Asset srcModel pointer may have changed — refresh.
-        if (asset_) {
-            clip_name_; // still valid; re-find seq
-        }
+        // asset_->seq is a dangling ptr after reload (AnimationSeqAsset has no
+        // on_model_loaded subscription). Reload it so seq points to the new clip.
+        if (asset_)
+            g_assets.reload(asset_);
         sync_editor_to_clip();
         activate_preview();
     });
@@ -208,11 +208,12 @@ void AnimSeqEditor::sync_clip_from_editor() {
 }
 
 void AnimSeqEditor::apply_sidecar() {
-    sync_clip_from_editor();
-    if (AnimSidecarFile::save_from_model(model_)) {
-        // reload is synchronous; on_model_loaded fires inside, which calls sync_editor_to_clip
-        g_assets.reload(model_);
-    }
+    sync_clip_from_editor();           // writes events into live AnimationSeq in-place
+    AnimSidecarFile::save_from_model(model_); // persist to .amd on disk
+    // No model reload: sync_clip_from_editor already updated the in-memory clips.
+    // A full reload would null all agClipNode::seq via refresh_after_model_reload on
+    // every scene entity using this model, crashing the game update loop.
+    dirty_ = false;
 }
 
 void AnimSeqEditor::revert_editor() {
