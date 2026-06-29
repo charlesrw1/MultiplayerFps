@@ -353,7 +353,23 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 	const float alphaVal = alpha.get_float(ctx);
 	vec3 tagetVec = target.get_vec3(ctx);
 
+	if (alphaVal <= 0.00001f) {
+		input->get_pose(ctx);
+		return;
+	}
+
 	input->get_pose(ctx);
+
+	// Capture pre-IK pose for alpha blend-back; avoid re-evaluating input.
+	Pose prePose;
+	const bool partial = alphaVal < 0.99999f;
+	if (partial) {
+		const int nb = ctx.get_num_bones();
+		Pose& cur = *ctx.pose;
+		std::memcpy(prePose.q,     cur.q,     sizeof(glm::quat) * nb);
+		std::memcpy(prePose.pos,   cur.pos,   sizeof(glm::vec3) * nb);
+		std::memcpy(prePose.scale, cur.scale, sizeof(float)      * nb);
+	}
 	auto& pose = *ctx.pose;
 	// build up global matrix when needed instead of recreating it every step
 	// not sure if this is optimal, should profile different ways to pass around pose
@@ -425,6 +441,9 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 
 		pose.q[bone_idx] = glm::inverse(q) * target_rotation;
 	}
+
+	if (partial)
+		util_blend(ctx.get_num_bones(), prePose, *ctx.pose, alphaVal);
 }
 
 void agModifyBone::reset() {
@@ -441,6 +460,12 @@ void agModifyBone::get_pose(agGetPoseCtx& ctx) {
 		has_init = true;
 	}
 
+	const float alphaVal = alpha.get_float(ctx);
+	if (alphaVal <= 0.00001f) {
+		input->get_pose(ctx);
+		return;
+	}
+
 	input->get_pose(ctx);
 	const int MYBONEINDEX = this->bone_index;
 
@@ -450,6 +475,8 @@ void agModifyBone::get_pose(agGetPoseCtx& ctx) {
 	glm::mat4 mats[ALLOCED_MATS];
 	const MSkeleton& skel = ctx.get_skeleton();
 	Pose& pose = *ctx.pose;
+	const glm::quat pre_q   = pose.q[MYBONEINDEX];
+	const glm::vec3 pre_pos = pose.pos[MYBONEINDEX];
 	bool more_than_one = false;
 	{
 		int count = 0;
@@ -528,6 +555,11 @@ void agModifyBone::get_pose(agGetPoseCtx& ctx) {
 		if (apply_position && apply_position_meshspace)
 			pose.pos[MYBONEINDEX] = mats[0][3];
 	}
+
+	if (alphaVal < 0.99999f) {
+		pose.q[MYBONEINDEX]   = glm::slerp(pre_q,   pose.q[MYBONEINDEX],   alphaVal);
+		pose.pos[MYBONEINDEX] = glm::mix  (pre_pos,  pose.pos[MYBONEINDEX], alphaVal);
+	}
 }
 
 void agCopyBone::reset() {
@@ -549,18 +581,20 @@ void agCopyBone::get_pose(agGetPoseCtx& ctx) {
 
 	input->get_pose(ctx);
 
+	const bool doRot   = copyRotation.get_bool(ctx);
+	const bool doTrans = copyTranslation.get_bool(ctx);
+	if (!doRot && !doTrans)
+		return;
+
 	const MSkeleton& skel = ctx.get_skeleton();
 	Pose& pose = *ctx.pose;
 	if (copyBonespace) {
-		// simple, just copy over pos/quat
-		pose.q[target_bone_idx] = pose.q[source_bone_idx];
-		pose.pos[target_bone_idx] = pose.pos[source_bone_idx];
-		pose.scale[target_bone_idx] = pose.scale[source_bone_idx];
+		if (doRot)   pose.q[target_bone_idx]   = pose.q[source_bone_idx];
+		if (doTrans) pose.pos[target_bone_idx]  = pose.pos[source_bone_idx];
 	} else {
 		glm::mat4 mat = build_global_transform_for_bone_index(&pose, &skel, source_bone_idx);
-		pose.q[target_bone_idx] = glm::quat_cast(mat);
-		pose.pos[target_bone_idx] = mat[3];
-		pose.scale[target_bone_idx] = glm::length(mat[0]);
+		if (doRot)   pose.q[target_bone_idx]   = glm::quat_cast(mat);
+		if (doTrans) pose.pos[target_bone_idx]  = mat[3];
 	}
 }
 
@@ -605,12 +639,17 @@ void agBlendMasked::get_pose(agGetPoseCtx& ctx) {
 
 	float alpha_val = alpha.get_float(ctx);
 	ctx.debug_enter("agBlendMasked: " + std::to_string(alpha_val));
-	if (alpha_val <= 0.00001) {
+	if (alpha_val <= 0.00001f) {
 		input0->get_pose(ctx);
+	} else if (alpha_val >= 0.99999f) {
+		input1->get_pose(ctx);
 	} else {
 		agGetPoseCtx basePose(ctx);
+		// Base always contributes at full parent weight; override layer scales with alpha.
+		ctx.weight = ctx.weight * alpha_val;
 		input0->get_pose(basePose);
 		input1->get_pose(ctx);
+		ctx.weight = basePose.weight;
 		if (meshspace_blend) {
 			util_global_blend(&ctx.get_skeleton(), &(*basePose.pose), &(*ctx.pose), alpha_val, maskWeights);
 		} else {
@@ -671,6 +710,10 @@ void agStatemachineBase::get_pose(agGetPoseCtx& ctx) {
 	if (blendingOut) {
 		float time_left = get_transition_time_left();
 		ctx.debug_enter("agStatemachineBase: transitoning " + std::to_string(time_left));
+		// Scale incoming state events by blend alpha; outgoing is a static capture so its events are suppressed.
+		float alpha = curTransitionDuration >= 0.00001f ? glm::clamp(curTransitionTime / curTransitionDuration, 0.f, 1.f) : 1.f;
+		alpha = evaluate_easing(curTransition, alpha);
+		ctx.weight *= alpha;
 	} else {
 		ctx.debug_enter("agStatemachineBase");
 	}
