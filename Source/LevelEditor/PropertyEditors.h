@@ -3,6 +3,7 @@
 #ifdef EDITOR_BUILD
 #include <string>
 #include "Framework/Handle.h"
+#include "Framework/MeshBuilder.h"
 class EditorDoc;
 class AssetMetadata;
 struct AssetOnDisk;
@@ -147,6 +148,7 @@ private:
 	bool target_valid = false;
 	bool set_keyboard_focus = true;
 	std::string filter_buf;
+	MeshBuilder mb;
 	handle<MeshBuilder_Object> mb_handle;
 };
 

@@ -686,7 +686,6 @@ bool ClassTypePtrPropertyEditor::internal_update() {
 // ---------------------------------------------------------------------------
 #include "Level.h"
 #include "Game/Entity.h"
-#include "Framework/MeshBuilder.h"
 #include "Render/RenderObj.h"
 
 static bool level_has_name_conflict(const std::string& name, void* skip_instance) {
@@ -806,7 +805,6 @@ void EntityTargetEditor::rebuild_debug_line() {
 		return;
 	}
 
-	MeshBuilder mb;
 	mb.Begin();
 	mb.PushLine(owner->get_ws_position(), target->get_ws_position(),
 	            target_valid ? Color32{60, 200, 80, 200} : Color32{220, 60, 60, 200});
