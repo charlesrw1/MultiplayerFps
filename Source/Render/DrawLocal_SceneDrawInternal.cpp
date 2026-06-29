@@ -422,11 +422,14 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	// scene_color_handle = gbuffer0
 	// render_transparents(scene_color_handle)
 
+	const bool in_debug_mode = r_debug_mode.get_integer() != 0;
+
 	// Bloom update
-	render_bloom_chain(scene_color_handle);
+	if (!in_debug_mode)
+		render_bloom_chain(scene_color_handle);
 
 	// Auto-exposure (after bloom so method 0 can read bloom tail)
-	{
+	if (!in_debug_mode) {
 		const PostProcessParams ae_pp = PPManager::inst ? PPManager::inst->get_active() : PostProcessParams{};
 		render_auto_exposure(scene_color_handle, ae_pp, params.dt);
 	}
@@ -454,7 +457,9 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		state.vao = get_empty_vao();
 		gfx().set_pipeline(state);
 
-		const PostProcessParams pp = PPManager::inst ? PPManager::inst->get_active() : PostProcessParams{};
+		PostProcessParams debug_pp;
+		debug_pp.bloom_enabled = false;
+		const PostProcessParams pp = in_debug_mode ? debug_pp : (PPManager::inst ? PPManager::inst->get_active() : PostProcessParams{});
 
 		IGraphicsTexture* bloom_tex = tex.bloom_chain[0].texture;
 		if (!enable_bloom.get_bool() || !pp.bloom_enabled)
