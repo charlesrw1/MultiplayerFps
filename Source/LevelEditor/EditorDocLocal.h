@@ -273,6 +273,18 @@ public:
 
 	std::unique_ptr<UndoRedoSystem> command_mgr;
 
+	// Delegates declared before prop_editor so they are destroyed after it
+	// (reverse declaration order). Editors subscribe to these in their ctors
+	// and unsubscribe in their dtors; the delegates must still be alive then.
+	MulticastDelegate<uint64_t> on_component_deleted;
+	MulticastDelegate<Component*> on_component_created;
+	MulticastDelegate<EntityPtr> on_entity_created; // after creation
+	MulticastDelegate<> post_node_changes;			// called after any nodes are deleted/created
+	MulticastDelegate<const Entity*> on_eyedropper_callback;
+	MulticastDelegate<> on_start;
+	MulticastDelegate<> on_close;
+	MulticastDelegate<uint64_t> on_change_name;
+
 	std::unique_ptr<EdPropertyGrid> prop_editor;
 	std::unique_ptr<ManipulateTransformTool> manipulate;
 	std::unique_ptr<DragDropPreview> drag_drop_preview;
@@ -287,15 +299,6 @@ public:
 	EditorCamera ed_cam;
 	IEditorMode* active_mode = nullptr;
 	EntityVisiblityFilter vis_filter;
-
-	MulticastDelegate<uint64_t> on_component_deleted;
-	MulticastDelegate<Component*> on_component_created;
-	MulticastDelegate<EntityPtr> on_entity_created; // after creation
-	MulticastDelegate<> post_node_changes;			// called after any nodes are deleted/created
-	MulticastDelegate<const Entity*> on_eyedropper_callback;
-	MulticastDelegate<> on_start;
-	MulticastDelegate<> on_close;
-	MulticastDelegate<uint64_t> on_change_name;
 
 private:
 	EditorDoc();
