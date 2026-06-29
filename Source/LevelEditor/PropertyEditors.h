@@ -2,6 +2,7 @@
 #include "Framework/PropertyEd.h"
 #ifdef EDITOR_BUILD
 #include <string>
+#include "Framework/Handle.h"
 class EditorDoc;
 class AssetMetadata;
 struct AssetOnDisk;
@@ -108,6 +109,45 @@ public:
 	bool has_init = false;
 
 	const ClassTypeInfo* type_of_base = nullptr;
+};
+
+class EditorDoc;
+// Validates editor_name uniqueness across all level entities; shows green/red icon.
+class EditorNameStringEditor : public IPropertyEditor
+{
+public:
+	bool internal_update() override;
+	bool can_reset() override;
+	void reset_value() override;
+private:
+	bool name_conflict = false;
+};
+
+struct MeshBuilder_Object;
+class MeshBuilder;
+// String property editor for entity references: combo dropdown of all entity names,
+// eyedropper button (colorize icon), select-target button (bubble icon), and a
+// 3D debug line from the owning entity to the target.
+class EntityTargetEditor : public IPropertyEditor
+{
+public:
+	explicit EntityTargetEditor(EditorDoc* doc);
+	~EntityTargetEditor() override;
+	bool internal_update() override;
+	bool can_reset() override { return !get_str().empty(); }
+	void reset_value() override;
+private:
+	std::string get_str() const;
+	void set_str(const std::string& v);
+	Entity* find_target() const;
+	void rebuild_debug_line();
+
+	EditorDoc* doc = nullptr;
+	bool has_init = false;
+	bool target_valid = false;
+	bool set_keyboard_focus = true;
+	std::string filter_buf;
+	handle<MeshBuilder_Object> mb_handle;
 };
 
 #endif

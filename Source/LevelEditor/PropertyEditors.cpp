@@ -569,6 +569,8 @@ void PropertyFactoryUtil::register_basic(FnFactory<IPropertyEditor>& factory) {
 }
 void PropertyFactoryUtil::register_editor(EditorDoc& doc, FnFactory<IPropertyEditor>& factory) {
 	factory.add("EntityBoneParentString", []() { return new EntityBoneParentStringEditor; });
+	factory.add("EditorNameString", []() { return new EditorNameStringEditor; });
+	factory.add("EntityTarget", [&doc]() { return new EntityTargetEditor(&doc); });
 }
 void PropertyFactoryUtil::register_anim_editor(AnimationGraphEditor& doc, FnFactory<IPropertyEditor>& factory) {}
 void PropertyFactoryUtil::register_mat_editor(MaterialEditorLocal& doc, FnFactory<IPropertyEditor>& factory) {}
@@ -677,6 +679,286 @@ bool ClassTypePtrPropertyEditor::internal_update() {
 	}
 
 	return has_update;
+}
+
+// ---------------------------------------------------------------------------
+// EditorNameStringEditor
+// ---------------------------------------------------------------------------
+#include "Level.h"
+#include "Game/Entity.h"
+#include "Framework/MeshBuilder.h"
+#include "Render/RenderObj.h"
+
+static bool level_has_name_conflict(const std::string& name, void* skip_instance) {
+	if (name.empty()) return false;
+	auto* level = eng->get_level();
+	if (!level) return false;
+	for (auto* obj : level->get_all_objects()) {
+		if (obj == skip_instance) continue;
+		auto* e = obj->cast_to<Entity>();
+		if (e && e->get_editor_name() == name)
+			return true;
+	}
+	return false;
+}
+
+bool EditorNameStringEditor::internal_update() {
+	ASSERT(prop->type == core_type_id::StdString);
+	std::string* str = (std::string*)prop->get_ptr(instance);
+
+	name_conflict = level_has_name_conflict(*str, instance);
+
+	auto* dl = ImGui::GetWindowDrawList();
+	auto& style = ImGui::GetStyle();
+	const float fh = ImGui::GetFrameHeight();
+	const float icon_w = fh;
+	const float avail = ImGui::GetContentRegionAvail().x;
+	const float input_w = avail - icon_w - style.ItemSpacing.x;
+
+	ImGui::SetNextItemWidth(input_w);
+	bool changed = ImGui::InputText("##edname", (char*)str->c_str(), str->size() + 1,
+		ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, str);
+	if (changed) *str = str->c_str();
+
+	ImGui::SameLine(0, style.ItemSpacing.x);
+	ImVec2 icon_pos = ImGui::GetCursorScreenPos();
+	ImGui::Dummy(ImVec2(icon_w, fh));
+	const float r = fh * 0.35f;
+	ImVec2 center = ImVec2(icon_pos.x + icon_w * 0.5f, icon_pos.y + fh * 0.5f);
+	if (name_conflict)
+		dl->AddCircleFilled(center, r, IM_COL32(220, 60, 60, 255));
+	else
+		dl->AddCircleFilled(center, r, IM_COL32(60, 200, 80, 255));
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip(name_conflict ? "Name conflict!" : "Name is unique");
+
+	return changed;
+}
+
+bool EditorNameStringEditor::can_reset() {
+	std::string* str = (std::string*)prop->get_ptr(instance);
+	return !str->empty();
+}
+
+void EditorNameStringEditor::reset_value() {
+	std::string* str = (std::string*)prop->get_ptr(instance);
+	str->clear();
+}
+
+// ---------------------------------------------------------------------------
+// EntityTargetEditor
+// ---------------------------------------------------------------------------
+
+static Entity* find_entity_by_name(const std::string& name) {
+	if (name.empty()) return nullptr;
+	auto* level = eng->get_level();
+	if (!level) return nullptr;
+	for (auto* obj : level->get_all_objects()) {
+		if (auto* e = obj->cast_to<Entity>()) {
+			if (e->get_editor_name() == name)
+				return e;
+		}
+	}
+	return nullptr;
+}
+
+static Entity* owner_entity_from_instance(void* instance) {
+	auto* cb = static_cast<ClassBase*>(instance);
+	if (auto* e = cb->cast_to<Entity>()) return e;
+	if (auto* c = cb->cast_to<Component>()) return c->get_owner();
+	return nullptr;
+}
+
+EntityTargetEditor::EntityTargetEditor(EditorDoc* doc) : doc(doc) {
+	ASSERT(doc);
+	mb_handle = idraw->get_scene()->register_meshbuilder();
+	doc->on_eyedropper_callback.add(this, [this](const Entity* picked) {
+		if (this->doc->get_active_eyedropper_user_id() == this && picked) {
+			set_str(picked->get_editor_name());
+		}
+	});
+}
+
+EntityTargetEditor::~EntityTargetEditor() {
+	idraw->get_scene()->remove_meshbuilder(mb_handle);
+	doc->on_eyedropper_callback.remove(this);
+}
+
+std::string EntityTargetEditor::get_str() const {
+	return *(std::string*)prop->get_ptr(instance);
+}
+
+void EntityTargetEditor::set_str(const std::string& v) {
+	*(std::string*)prop->get_ptr(instance) = v;
+}
+
+Entity* EntityTargetEditor::find_target() const {
+	return find_entity_by_name(get_str());
+}
+
+void EntityTargetEditor::rebuild_debug_line() {
+	MeshBuilder mb;
+	mb.Begin();
+	Entity* owner = owner_entity_from_instance(instance);
+	Entity* target = find_target();
+	if (owner && target) {
+		mb.PushLine(owner->get_ws_position(), target->get_ws_position(),
+		            target_valid ? Color32{60, 200, 80, 200} : Color32{220, 60, 60, 200});
+	}
+	mb.End();
+
+	MeshBuilder_Object mbo;
+	mbo.visible = (owner && target);
+	mbo.depth_tested = false;
+	mbo.meshbuilder = &mb;
+	idraw->get_scene()->update_meshbuilder(mb_handle, mbo);
+}
+
+bool EntityTargetEditor::internal_update() {
+	ASSERT(prop->type == core_type_id::StdString);
+	std::string cur = get_str();
+	target_valid = find_entity_by_name(cur) != nullptr || cur.empty();
+
+	auto* dl = ImGui::GetWindowDrawList();
+	auto& style = ImGui::GetStyle();
+	const float fh = ImGui::GetFrameHeight();
+	const float icon_w = fh;
+	const float avail = ImGui::GetContentRegionAvail().x;
+	bool changed = false;
+
+	// ---- Row 1: combo input + validity icon ----
+	ImGui::BeginGroup();
+
+	const float row1_input_w = avail - icon_w - style.ItemSpacing.x;
+	const char* preview = cur.empty() ? "<none>" : cur.c_str();
+	ImGui::SetNextItemWidth(row1_input_w);
+	if (ImGui::BeginCombo("##etcombo", preview, ImGuiComboFlags_HeightLarge)) {
+		if (set_keyboard_focus) {
+			ImGui::SetKeyboardFocusHere();
+			set_keyboard_focus = false;
+		}
+		ImGui::SetNextItemWidth(-1.f);
+		if (ImGui::InputText("##etfilter", (char*)filter_buf.c_str(), filter_buf.size() + 1,
+		                     ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &filter_buf))
+			filter_buf = filter_buf.c_str();
+
+		auto filter_lower = StringUtils::to_lower(filter_buf);
+		if (ImGui::Selectable("<none>", cur.empty())) {
+			set_str("");
+			cur.clear();
+			changed = true;
+		}
+		auto* level = eng->get_level();
+		if (level) {
+			for (auto* obj : level->get_all_objects()) {
+				auto* e = obj->cast_to<Entity>();
+				if (!e || e->get_editor_name().empty()) continue;
+				const std::string& name = e->get_editor_name();
+				if (!filter_lower.empty()) {
+					auto lower = StringUtils::to_lower(name);
+					if (lower.find(filter_lower) == std::string::npos) continue;
+				}
+				if (ImGui::Selectable(name.c_str(), name == cur)) {
+					set_str(name);
+					cur = name;
+					changed = true;
+				}
+			}
+		}
+		ImGui::EndCombo();
+	} else {
+		set_keyboard_focus = true;
+	}
+
+	// Validity icon
+	ImGui::SameLine(0, style.ItemSpacing.x);
+	{
+		ImVec2 icon_pos = ImGui::GetCursorScreenPos();
+		ImGui::Dummy(ImVec2(icon_w, fh));
+		const float r = fh * 0.35f;
+		ImVec2 center = ImVec2(icon_pos.x + icon_w * 0.5f, icon_pos.y + fh * 0.5f);
+		if (cur.empty())
+			dl->AddCircleFilled(center, r, IM_COL32(120, 120, 120, 180));
+		else if (target_valid)
+			dl->AddCircleFilled(center, r, IM_COL32(60, 200, 80, 255));
+		else
+			dl->AddCircleFilled(center, r, IM_COL32(220, 60, 60, 255));
+		if (ImGui::IsItemHovered()) {
+			if (cur.empty()) ImGui::SetTooltip("No target");
+			else if (target_valid) ImGui::SetTooltip("Target found: %s", cur.c_str());
+			else ImGui::SetTooltip("Entity not found: %s", cur.c_str());
+		}
+	}
+
+	// ---- Row 2: eyedropper + select target ----
+	{
+		auto eyedrop_tex = g_assets.find<Texture>("eng/icons/colorize_24.png");
+		auto bubble_tex  = g_assets.find<Texture>("eng/icons/bubble_16.png");
+
+		const bool in_eyedrop = doc->is_in_eyedropper_mode() &&
+		                        doc->get_active_eyedropper_user_id() == this;
+		const bool has_target = target_valid && !cur.empty();
+		const float btn_w = fh;
+
+		auto draw_icon_btn = [&](const char* id, AssetPtr<Texture> tex, bool active, bool enabled,
+		                         ImVec2& out_pos) -> bool {
+			ImVec2 pos = ImGui::GetCursorScreenPos();
+			out_pos = pos;
+			ImGui::BeginDisabled(!enabled);
+			ImGui::InvisibleButton(id, ImVec2(btn_w, fh));
+			bool hov = ImGui::IsItemHovered();
+			bool clicked = ImGui::IsItemClicked();
+			ImU32 bg = active    ? IM_COL32(60, 120, 200, 220) :
+			           hov       ? IM_COL32(75, 75,  75,  200) :
+			                       IM_COL32(50, 50,  50,  160);
+			dl->AddRectFilled(pos, ImVec2(pos.x + btn_w, pos.y + fh), bg, 3.f);
+			dl->AddRect(pos, ImVec2(pos.x + btn_w, pos.y + fh), IM_COL32(100, 100, 100, 120), 3.f);
+			if (tex) {
+				const float ico = fh - style.FramePadding.y * 2.f;
+				const float ix  = pos.x + (btn_w - ico) * 0.5f;
+				const float iy  = pos.y + style.FramePadding.y;
+				dl->AddImage(ImTextureID(uint64_t(tex->get_internal_render_handle())),
+				             ImVec2(ix, iy), ImVec2(ix + ico, iy + ico),
+				             ImVec2(0, 0), ImVec2(1, 1),
+				             enabled ? IM_COL32(255,255,255,255) : IM_COL32(255,255,255,60));
+			}
+			ImGui::EndDisabled();
+			return clicked && enabled;
+		};
+
+		ImVec2 dummy_pos;
+		if (draw_icon_btn("##eyedrop", eyedrop_tex, in_eyedrop, true, dummy_pos)) {
+			if (in_eyedrop)
+				doc->exit_eyedropper_mode();
+			else
+				doc->enable_entity_eyedropper_mode(this);
+		}
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip(in_eyedrop ? "Cancel eyedropper" : "Pick entity from viewport");
+
+		ImGui::SameLine(0, style.ItemSpacing.x);
+
+		if (draw_icon_btn("##select", bubble_tex, false, has_target, dummy_pos)) {
+			Entity* target = find_target();
+			if (target) {
+				doc->selection_state->clear_all_selected();
+				doc->selection_state->add_to_entity_selection(EntityPtr(target->get_instance_id()));
+			}
+		}
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
+			if (has_target) ImGui::SetTooltip("Select target entity: %s", cur.c_str());
+			else            ImGui::SetTooltip("Select target (set a valid entity name first)");
+		}
+	}
+
+	ImGui::EndGroup();
+
+	rebuild_debug_line();
+	return changed;
+}
+
+void EntityTargetEditor::reset_value() {
+	set_str("");
 }
 
 #endif

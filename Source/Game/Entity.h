@@ -153,7 +153,8 @@ private:
 	REF glm::vec3 position = glm::vec3(0.f);
 	REF glm::quat rotation = glm::quat(1, 0, 0, 0);
 	REF glm::vec3 scale = glm::vec3(1.f);
-	REF std::string editor_name;
+	REFLECT(type=EditorNameString)
+	std::string editor_name;
 	// REF bool start_disabled = false;
 	MeshComponent* cached_mesh_component = nullptr; // for bone lookups
 	glm::mat4 cached_world_transform =
