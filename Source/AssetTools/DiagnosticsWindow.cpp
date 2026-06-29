@@ -5,9 +5,14 @@
 #include "GameEnginePublic.h"
 #include "Level.h"
 #include "Game/Entity.h"
+#include "Game/EntityComponent.h"
 #include "Framework/StringUtils.h"
+#include "Framework/ReflectionProp.h"
+#include "LevelEditor/EditorDocLocal.h"
+#include "LevelEditor/SelectionState.h"
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 
 DiagnosticsWindow& DiagnosticsWindow::get() {
 	static DiagnosticsWindow inst;
@@ -208,6 +213,67 @@ void DiagnosticsWindow::draw_map_tab() {
 			ImGui::TextDisabled("JSON keys with no matching reflected property.");
 			for (auto& w : level->unknown_field_warnings)
 				ImGui::BulletText("%s", w.c_str());
+		}
+	}
+
+	// --- Missing Entity Targets ---
+	struct MissingTarget {
+		Entity* entity;
+		std::string component_type;
+		std::string field_name;
+		std::string target_name;
+	};
+	std::vector<MissingTarget> missing_targets;
+	{
+		// Build a set of all entity names for O(1) lookup.
+		std::unordered_set<std::string> entity_names;
+		for (auto* obj : level->get_all_objects()) {
+			if (auto* e = obj->cast_to<Entity>())
+				if (!e->get_editor_name().empty())
+					entity_names.insert(e->get_editor_name());
+		}
+
+		for (auto* obj : level->get_all_objects()) {
+			auto* entity = obj->cast_to<Entity>();
+			if (!entity) continue;
+			for (auto* comp : entity->get_components()) {
+				auto* props = comp->get_type().props;
+				if (!props) continue;
+				for (int i = 0; i < props->count; ++i) {
+					auto& pi = props->list[i];
+					if (!(pi.flags & PROP_LUA_BACKED)) continue;
+					if (std::string_view(pi.custom_type_str) != "EntityTarget") continue;
+					// Only flag non-empty names that don't resolve.
+					const std::string& val = *(const std::string*)pi.get_ptr(comp);
+					if (!val.empty() && entity_names.find(val) == entity_names.end())
+						missing_targets.push_back({entity, comp->get_type().classname, pi.name, val});
+				}
+			}
+		}
+	}
+
+	if (ImGui::CollapsingHeader(
+		("Missing Entity Targets (" + std::to_string(missing_targets.size()) + ")###missing_targets").c_str(),
+		ImGuiTreeNodeFlags_DefaultOpen)) {
+		if (missing_targets.empty()) {
+			ImGui::TextDisabled("None");
+		} else {
+			ImGui::TextDisabled("EntityTarget fields referencing a non-existent entity name.");
+			auto* doc = eng->is_editor_level() ? static_cast<EditorDoc*>(eng->get_tool()) : nullptr;
+			for (auto& mt : missing_targets) {
+				ImGui::PushID(&mt);
+				bool clicked = ImGui::SmallButton(">");
+				if (clicked && doc) {
+					doc->selection_state->set_select_only_this(mt.entity);
+				}
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Select entity");
+				ImGui::SameLine();
+				ImGui::TextColored({1.f, 0.3f, 0.3f, 1.f}, "[%s]", mt.entity->get_editor_name().c_str());
+				ImGui::SameLine();
+				ImGui::Text("%s.%s -> \"%s\"", mt.component_type.c_str(), mt.field_name.c_str(), mt.target_name.c_str());
+				ImGui::PopID();
+			}
 		}
 	}
 
