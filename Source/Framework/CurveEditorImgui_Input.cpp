@@ -132,6 +132,7 @@ void CurveEditorImgui::draw_editor_input_and_scrubber(
 	const float MIN_SCALE       = 0.01f;
 
 	const bool canvas_hovered = ImRect(BASE_SCREENPOS, BASE_SCREENPOS + WINDOW_SIZE).Contains(ImGui::GetMousePos());
+	canvas_hovered_ = canvas_hovered;
 
 	// Zoom when canvas is hovered; consume scroll so the outer window never sees it.
 	if (canvas_hovered && std::abs(ImGui::GetIO().MouseWheel) > 0.00001f) {

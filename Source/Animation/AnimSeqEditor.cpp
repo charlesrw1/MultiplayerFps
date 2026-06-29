@@ -386,7 +386,8 @@ void AnimSeqEditor::imgui_draw() {
     update_preview_scrubber();
     draw_toolbar();
     ImGui::Separator();
-    if (curve_ed_->draw_content())
+    float editor_h = std::max(150.f, ImGui::GetContentRegionAvail().y * 0.5f);
+    if (curve_ed_->draw_content(editor_h))
         dirty_ = true;
     ImGui::Separator();
     draw_event_properties();

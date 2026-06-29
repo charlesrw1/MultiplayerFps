@@ -24,11 +24,17 @@ void CurveEditorImgui::draw()
 	ImGui::End();
 }
 
-bool CurveEditorImgui::draw_content()
+bool CurveEditorImgui::draw_content(float fixed_height)
 {
 	set_scrubber_this_frame = false;
 	bool changed = events_changed_this_frame_;
 	events_changed_this_frame_ = false;
+
+	// Save BEFORE drawing so we can cancel the scroll UpdateMouseWheel() queued at NewFrame().
+	// GetScrollY() returns the committed scroll from the previous frame's End() — not the target
+	// that UpdateMouseWheel() just wrote — so restoring it via SetScrollY() overwrites the target.
+	const float scroll_y_before = ImGui::GetScrollY();
+	const float wheel_before    = ImGui::GetIO().MouseWheel;
 
 	uint32_t ent_list_flags =
 		ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
@@ -38,7 +44,8 @@ bool CurveEditorImgui::draw_content()
 	const int num_cols = 2;
 	bool open_curve_popup = false;
 
-	if (ImGui::BeginTable("curveedit", num_cols, ent_list_flags)) {
+	ImVec2 table_outer_size(0.f, fixed_height > 0.f ? fixed_height : 0.f);
+	if (ImGui::BeginTable("curveedit", num_cols, ent_list_flags, table_outer_size)) {
 		ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed,   100.0f, 0);
 		ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthStretch,   0.0f, 0);
 
@@ -190,6 +197,10 @@ bool CurveEditorImgui::draw_content()
 		}
 		ImGui::EndPopup();
 	}
+
+	// Cancel the scroll UpdateMouseWheel() applied to the parent window this frame.
+	if (canvas_hovered_ && std::abs(wheel_before) > 0.00001f)
+		ImGui::SetScrollY(scroll_y_before);
 
 	return changed;
 }

@@ -81,8 +81,9 @@ public:
 	void draw();
 
 	// draw just the editor content without Begin/End wrapper (for embedding in existing windows).
+	// fixed_height > 0 caps the table height (pass 0 to use all available space).
 	// Returns true if any event was added, moved, or deleted this frame.
-	bool draw_content();
+	bool draw_content(float fixed_height = 0.f);
 
 	// draw a small non-interactive curve preview; returns true if clicked
 	static bool draw_curve_preview(const char* id, const EditingCurve& curve, float width = 0.f, float height = 24.f);
@@ -228,7 +229,8 @@ private:
 
 	bool dragging_scrubber = false;
 	bool pending_fit = false;
-	bool events_changed_this_frame_ = false; // set when events are added/moved/deleted
+	bool events_changed_this_frame_ = false;
+	bool canvas_hovered_ = false; // set each frame by draw_editor_input_and_scrubber
 
 	ImVec2 clickpos{};
 
