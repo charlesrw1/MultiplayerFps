@@ -26,7 +26,7 @@ private:
     void draw_mis_settings(const std::string& gamepath);
     void draw_material_text(const std::string& gamepath);
     void draw_material_instance_editor(const std::string& gamepath);
-    void draw_anim_seq_editor(const std::string& cmdl_gamepath);
+    void draw_anim_seq_editor(const std::string& asset_path);
 
     void load_for(const AssetOnDisk& selected);
     void apply_changes();

@@ -2,12 +2,16 @@
 #include "AnimSeqEditor.h"
 #include "Animation/AnimEvent.h"
 #include "Animation/AnimSidecarFile.h"
+#include "Animation/AnimationSeqAsset.h"
 #include "Animation/SkeletonData.h"
 #include "Framework/CurveEditorImgui.h"
 #include "Framework/Util.h"
 #include "Render/Model.h"
 #include "Assets/AssetDatabase.h"
-#include "AssetCompile/Someutils.h"
+#include "Game/Components/MeshComponent.h"
+#include "Game/Entity.h"
+#include "Level.h"
+#include "GameEnginePublic.h"
 #include <imgui.h>
 #include <algorithm>
 
@@ -25,12 +29,6 @@ public:
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-static AnimationSeq* get_current_seq(Model* model, const std::vector<std::string>& clip_names, int idx) {
-    if (!model || idx < 0 || idx >= (int)clip_names.size()) return nullptr;
-    return model->get_skel() ? model->get_skel()->find_clip(clip_names[idx]) : nullptr;
-}
-
-// Collect all unique event names from every animation on this model (for autocomplete).
 static std::vector<std::string> collect_model_event_names(Model* model) {
     std::vector<std::string> names;
     if (!model || !model->get_skel()) return names;
@@ -42,7 +40,6 @@ static std::vector<std::string> collect_model_event_names(Model* model) {
                 names.push_back(ev.name);
         }
     }
-    // Also add registry names not already present.
     for (auto& def : AnimEventRegistry::get().get_defs()) {
         if (std::find(names.begin(), names.end(), def.name) == names.end())
             names.push_back(def.name);
@@ -52,24 +49,23 @@ static std::vector<std::string> collect_model_event_names(Model* model) {
 }
 
 // ---------------------------------------------------------------------------
-// Right-click canvas callback — add new event
+// Right-click canvas callback — add event menu
 // ---------------------------------------------------------------------------
 
 struct AddEventCtx {
-    AnimSeqEditor* editor;
-    std::vector<std::string> known_names;
+    AnimSeqEditor* editor = nullptr;
+    Model*         model  = nullptr;
     char custom_name[128] = {};
 };
 
-// user_ptr on the CurveEditorImgui points to AddEventCtx.
 void AnimSeqEditor::on_right_click_canvas(CurveEditorImgui* ed) {
     auto* ctx = static_cast<AddEventCtx*>(ed->user_ptr);
+    auto names = collect_model_event_names(ctx->model);
 
     ImGui::TextDisabled("Add Event");
     ImGui::Separator();
 
-    // Known names from registry + other animations
-    for (auto& name : ctx->known_names) {
+    for (auto& name : names) {
         const AnimEventDef* def = AnimEventRegistry::get().find(name);
         bool is_dur = def ? def->is_duration : false;
         std::string label = name + (is_dur ? "  [dur]" : "");
@@ -87,16 +83,14 @@ void AnimSeqEditor::on_right_click_canvas(CurveEditorImgui* ed) {
     ImGui::SetNextItemWidth(140.f);
     ImGui::InputText("##custom", ctx->custom_name, sizeof(ctx->custom_name));
     ImGui::SameLine();
-    if (ImGui::Button("Add Custom")) {
-        if (ctx->custom_name[0] != '\0') {
-            auto item = std::make_unique<AnimEventEditorItem>();
-            item->data.name = ctx->custom_name;
-            item->instant_item = true;
-            item->color = COLOR_GREEN;
-            ed->add_item_from_menu(std::move(item));
-            ctx->custom_name[0] = '\0';
-            ImGui::CloseCurrentPopup();
-        }
+    if (ImGui::Button("Add Custom") && ctx->custom_name[0] != '\0') {
+        auto item = std::make_unique<AnimEventEditorItem>();
+        item->data.name = ctx->custom_name;
+        item->instant_item = true;
+        item->color = COLOR_GREEN;
+        ed->add_item_from_menu(std::move(item));
+        ctx->custom_name[0] = '\0';
+        ImGui::CloseCurrentPopup();
     }
 }
 
@@ -106,33 +100,64 @@ void AnimSeqEditor::on_right_click_canvas(CurveEditorImgui* ed) {
 
 AnimSeqEditor::AnimSeqEditor() {
     curve_ed_ = std::make_unique<CurveEditorImgui>();
-    curve_ed_->show_add_curve_button = false; // events only, no curves
+    curve_ed_->show_add_curve_button = false;
     curve_ed_->window_name = "Anim Sequence";
     curve_ed_->callback = &AnimSeqEditor::on_right_click_canvas;
 }
 
-AnimSeqEditor::~AnimSeqEditor() = default;
+AnimSeqEditor::~AnimSeqEditor() {
+    cleanup_preview();
+    Model::on_model_loaded.remove(this);
+}
 
-void AnimSeqEditor::set_model(const std::string& cmdl_game_path) {
-    model_path_ = cmdl_game_path;
-    model_ = Model::load(cmdl_game_path);
-    selected_clip_idx_ = 0;
+void AnimSeqEditor::set_asset(const std::string& asset_path) {
+    cleanup_preview();
+    Model::on_model_loaded.remove(this);
+
+    asset_path_ = asset_path;
+    asset_ = g_assets.find<AnimationSeqAsset>(asset_path).get();
+    model_ = nullptr;
+    clip_name_.clear();
     dirty_ = false;
-    load_clips_from_model();
+    curve_ed_->clear_all();
+
+    if (!asset_ || !asset_->srcModel || !asset_->seq) return;
+
+    model_ = asset_->srcModel.get();
+
+    // Extract clip name: asset path is "model/path/ClipName"
+    auto pos = asset_path.rfind('/');
+    clip_name_ = (pos != std::string::npos) ? asset_path.substr(pos + 1) : asset_path;
+
+    // Listen for model reloads so we can re-sync without rebuilding the editor.
+    Model::on_model_loaded.add(this, [this](Model* reloaded) {
+        if (reloaded != model_) return;
+        // Asset srcModel pointer may have changed — refresh.
+        if (asset_) {
+            clip_name_; // still valid; re-find seq
+        }
+        sync_editor_to_clip();
+        activate_preview();
+    });
+
+    static AddEventCtx ctx;
+    ctx.editor = this;
+    ctx.model = model_;
+    curve_ed_->user_ptr = &ctx;
+
     sync_editor_to_clip();
+    activate_preview();
 }
 
-void AnimSeqEditor::load_clips_from_model() {
-    clip_names_.clear();
-    if (!model_ || !model_->get_skel()) return;
-    for (auto& [name, _] : model_->get_skel()->get_clips_hashmap())
-        clip_names_.push_back(name);
-    std::sort(clip_names_.begin(), clip_names_.end());
-}
+// ---------------------------------------------------------------------------
+// Sync editor <-> AnimationSeq
+// ---------------------------------------------------------------------------
 
 void AnimSeqEditor::sync_editor_to_clip() {
     curve_ed_->clear_all();
-    AnimationSeq* seq = get_current_seq(model_, clip_names_, selected_clip_idx_);
+    if (!model_ || !model_->get_skel()) return;
+
+    auto* seq = model_->get_skel()->find_clip(clip_name_);
     if (!seq) return;
 
     curve_ed_->max_x_value = seq->get_duration() > 0.f ? seq->get_duration() : 5.f;
@@ -140,7 +165,7 @@ void AnimSeqEditor::sync_editor_to_clip() {
     for (int i = 0; i < (int)seq->anim_events.size(); ++i) {
         const AnimEvent& ev = seq->anim_events[i];
         auto item = std::make_unique<AnimEventEditorItem>();
-        item->data = ev;
+        item->data       = ev;
         item->instant_item = !ev.is_duration;
         item->time_start = ev.time_start;
         item->time_end   = ev.is_duration ? ev.time_end : ev.time_start;
@@ -148,76 +173,119 @@ void AnimSeqEditor::sync_editor_to_clip() {
         item->color      = ev.is_duration ? COLOR_CYAN : COLOR_GREEN;
         curve_ed_->add_event_direct(std::move(item));
     }
-
-    // Refresh autocomplete context
-    static AddEventCtx ctx;
-    ctx.editor = this;
-    ctx.known_names = collect_model_event_names(model_);
-    curve_ed_->user_ptr = &ctx;
     curve_ed_->request_fit();
+    dirty_ = false;
 }
 
 void AnimSeqEditor::sync_clip_from_editor() {
-    AnimationSeq* seq = get_current_seq(model_, clip_names_, selected_clip_idx_);
+    if (!model_ || !model_->get_skel()) return;
+    auto* seq = model_->get_skel()->find_clip(clip_name_);
     if (!seq) return;
 
     seq->anim_events.clear();
     for (auto& item_ptr : curve_ed_->get_event_array()) {
         auto* item = static_cast<AnimEventEditorItem*>(item_ptr.get());
         AnimEvent ev = item->data;
-        ev.time_start  = item->time_start;
-        ev.time_end    = item->instant_item ? item->time_start : item->time_end;
         ev.is_duration = !item->instant_item;
+        ev.time_start  = item->time_start;
+        ev.time_end    = ev.is_duration ? item->time_end : item->time_start;
         seq->anim_events.push_back(std::move(ev));
     }
 }
 
-void AnimSeqEditor::save_sidecar() {
+void AnimSeqEditor::apply_sidecar() {
     sync_clip_from_editor();
     if (AnimSidecarFile::save_from_model(model_)) {
-        // Reload the model so the runtime picks up the new .amd immediately.
+        // reload is synchronous; on_model_loaded fires inside, which calls sync_editor_to_clip
         g_assets.reload(model_);
-        dirty_ = false;
     }
 }
 
+void AnimSeqEditor::revert_editor() {
+    dirty_ = false;
+    sync_editor_to_clip(); // discards unsaved editor changes
+}
+
 // ---------------------------------------------------------------------------
-// ImGui draw
+// Preview via AnimPreviewComponent
+// ---------------------------------------------------------------------------
+
+void AnimSeqEditor::activate_preview() {
+    cleanup_preview();
+    if (!model_ || !asset_ || !eng->get_level()) return;
+
+    auto& all = eng->get_level()->get_all_objects();
+    for (auto* updater : all) {
+        auto* ent = updater ? updater->cast_to<Entity>() : nullptr;
+        if (!ent) continue;
+        auto* mesh = ent->get_component<MeshComponent>();
+        if (!mesh || mesh->get_model() != model_) continue;
+
+        auto* apc = ent->get_component<AnimPreviewComponent>();
+        if (!apc) {
+            apc = ent->create_component<AnimPreviewComponent>();
+            we_added_preview_comp_ = true;
+        } else {
+            we_added_preview_comp_ = false;
+        }
+        apc->model          = model_;
+        apc->asset          = asset_;
+        apc->wants_force_frame = true;
+        apc->force_frame    = 0;
+        apc->update_mesh_component();
+
+        preview_entity_ = EntityPtr(ent);
+        break;
+    }
+}
+
+void AnimSeqEditor::cleanup_preview() {
+    Entity* ent = preview_entity_.get();
+    if (ent && we_added_preview_comp_) {
+        auto* apc = ent->get_component<AnimPreviewComponent>();
+        if (apc) apc->destroy();
+    }
+    preview_entity_ = EntityPtr{};
+    we_added_preview_comp_ = false;
+}
+
+void AnimSeqEditor::update_preview_scrubber() {
+    Entity* ent = preview_entity_.get();
+    if (!ent) return;
+    auto* apc = ent->get_component<AnimPreviewComponent>();
+    if (!apc || !apc->asset || !apc->asset->seq) return;
+
+    float fps = apc->asset->seq->fps > 0.f ? apc->asset->seq->fps : 30.f;
+    apc->force_frame = (int)(curve_ed_->current_time * fps);
+}
+
+// ---------------------------------------------------------------------------
+// Draw
 // ---------------------------------------------------------------------------
 
 void AnimSeqEditor::draw_toolbar() {
-    // Animation selector
-    ImGui::SetNextItemWidth(200.f);
-    const char* preview = clip_names_.empty() ? "(no clips)" :
-                          clip_names_[selected_clip_idx_].c_str();
-    if (ImGui::BeginCombo("##clip", preview)) {
-        for (int i = 0; i < (int)clip_names_.size(); ++i) {
-            if (ImGui::Selectable(clip_names_[i].c_str(), i == selected_clip_idx_)) {
-                sync_clip_from_editor(); // write pending edits back before switching
-                selected_clip_idx_ = i;
-                sync_editor_to_clip();
+    ImGui::TextUnformatted(clip_name_.c_str());
+    ImGui::SameLine();
+
+    if (model_ && model_->get_skel()) {
+        auto* seq = model_->get_skel()->find_clip(clip_name_);
+        if (seq) {
+            bool additive = seq->is_additive_clip;
+            if (ImGui::Checkbox("Additive", &additive)) {
+                seq->is_additive_clip = additive;
                 dirty_ = true;
             }
         }
-        ImGui::EndCombo();
     }
 
     ImGui::SameLine();
-
-    // Additive toggle
-    AnimationSeq* seq = get_current_seq(model_, clip_names_, selected_clip_idx_);
-    if (seq) {
-        bool additive = seq->is_additive_clip;
-        if (ImGui::Checkbox("Additive", &additive)) {
-            seq->is_additive_clip = additive;
-            dirty_ = true;
-        }
-    }
-
-    ImGui::SameLine();
-
     ImGui::BeginDisabled(!dirty_);
-    if (ImGui::Button("Save")) save_sidecar();
+    if (ImGui::Button("Apply")) apply_sidecar();
+    ImGui::EndDisabled();
+
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!dirty_);
+    if (ImGui::Button("Revert")) revert_editor();
     ImGui::EndDisabled();
 }
 
@@ -228,10 +296,7 @@ void AnimSeqEditor::draw_event_properties() {
         return;
     }
     auto* item = static_cast<AnimEventEditorItem*>(sel);
-
-    // Collect known names for the combo
-    static std::vector<std::string> s_known;
-    s_known = collect_model_event_names(model_);
+    auto known = collect_model_event_names(model_);
 
     ImGui::Text("Event");
     ImGui::Separator();
@@ -239,27 +304,25 @@ void AnimSeqEditor::draw_event_properties() {
     // Name — combo with autocomplete
     ImGui::SetNextItemWidth(200.f);
     if (ImGui::BeginCombo("Name##evname", item->data.name.c_str())) {
-        for (auto& n : s_known) {
-            bool sel_name = n == item->data.name;
-            if (ImGui::Selectable(n.c_str(), sel_name)) {
+        for (auto& n : known) {
+            if (ImGui::Selectable(n.c_str(), n == item->data.name)) {
                 item->data.name = n;
-                dirty_ = true;
-                // Sync duration type from registry if known
                 const AnimEventDef* def = AnimEventRegistry::get().find(n);
                 if (def) {
                     item->data.is_duration = def->is_duration;
-                    item->instant_item = !def->is_duration;
+                    item->instant_item     = !def->is_duration;
                 }
+                dirty_ = true;
             }
         }
         ImGui::EndCombo();
     }
 
-    // Custom name input
+    // Free-text override
     char buf[128];
     strncpy_s(buf, item->data.name.c_str(), sizeof(buf) - 1);
     ImGui::SetNextItemWidth(200.f);
-    if (ImGui::InputText("Custom##evname_custom", buf, sizeof(buf))) {
+    if (ImGui::InputText("Custom##evname2", buf, sizeof(buf))) {
         item->data.name = buf;
         dirty_ = true;
     }
@@ -276,38 +339,22 @@ void AnimSeqEditor::draw_event_properties() {
     // Duration toggle
     bool is_dur = !item->instant_item;
     if (ImGui::Checkbox("Duration", &is_dur)) {
-        item->instant_item = !is_dur;
+        item->instant_item     = !is_dur;
         item->data.is_duration = is_dur;
-        dirty_ = true;
-    }
-
-    ImGui::Spacing();
-    if (ImGui::Button("Delete Event")) {
-        // Remove from editor — next sync_clip_from_editor will drop it from the seq
-        // CurveEditorImgui doesn't expose a direct delete; force via right-click popup.
-        // For now mark dirty so Save will omit it after user deletes via right-click.
         dirty_ = true;
     }
 }
 
 void AnimSeqEditor::imgui_draw() {
-    if (!model_ || !model_->get_skel()) {
-        ImGui::TextDisabled("No skeleton on this model.");
+    if (!asset_ || !model_ || !model_->get_skel()) {
+        ImGui::TextDisabled("Animation data unavailable.");
         return;
     }
 
+    update_preview_scrubber();
     draw_toolbar();
     ImGui::Separator();
-
-    // Curve editor (events only)
-    // Mark dirty when scrubber or events change
-    bool was_dirty = dirty_;
     curve_ed_->draw_content();
-    if (!was_dirty) {
-        // Check if any event was dragged (heuristic: compare event count/times next frame)
-        // For simplicity, mark dirty on any interaction during draw
-    }
-
     ImGui::Separator();
     draw_event_properties();
 }

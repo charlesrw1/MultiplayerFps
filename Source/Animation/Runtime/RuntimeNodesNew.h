@@ -47,29 +47,6 @@ public:
 };
 using PoseNodeInst = AnimTreePoseNode::Inst;
 
-class SampledAnimEventBuffer
-{
-public:
-	struct Sampled
-	{
-		enum DurationType { Started, Ended, Active };
-
-		const AnimEvent* ev = nullptr;
-		float weight = 1.f;
-		bool ignore = false;
-		DurationType duration_type{};
-		float thru = 0.f; // 0-1 progress through duration events
-	};
-	void blend_weights(int start, int end, float weight);
-	void mark_as_ignored(int start, int end);
-	bool did_event_fire(const std::string& name) const;
-	bool did_duration_event_start(const std::string& name) const;
-	bool did_duration_event_end(const std::string& name) const;
-	bool is_duration_event_active(const std::string& name) const;
-	float get_duration_event_thru(const std::string& name) const;
-
-	vector<Sampled> events;
-};
 
 class atGraphContext
 {
@@ -81,7 +58,6 @@ public:
 
 	float dt = 1.f;
 	AnimatorObject& obj;
-	SampledAnimEventBuffer events;
 	SampledAnimCurveBuffer curves;
 	const MSkeleton& skeleton;
 	// vector<atClipNode::Inst*> relevant_playing_clips;

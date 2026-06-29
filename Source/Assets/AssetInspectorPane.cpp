@@ -2,6 +2,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "Assets/AssetInspectorPane.h"
 #include "Animation/AnimSeqEditor.h"
+#include "Animation/AnimationSeqAsset.h"
 #include "AssetTools/AssetCompiler.h"
 #include "Render/Editor/TextureEditor.h"
 #include "AssetCompile/ModelAsset2.h"
@@ -354,10 +355,10 @@ static const char* texture_format_to_string(GraphicsTextureFormat fmt) {
 AssetInspectorPane::AssetInspectorPane() = default;
 AssetInspectorPane::~AssetInspectorPane() = default;
 
-void AssetInspectorPane::draw_anim_seq_editor(const std::string& cmdl_gamepath) {
-    if (!anim_seq_editor_ || anim_seq_editor_->get_model_path() != cmdl_gamepath) {
+void AssetInspectorPane::draw_anim_seq_editor(const std::string& asset_path) {
+    if (!anim_seq_editor_ || anim_seq_editor_->get_asset_path() != asset_path) {
         anim_seq_editor_ = std::make_unique<AnimSeqEditor>();
-        anim_seq_editor_->set_model(cmdl_gamepath);
+        anim_seq_editor_->set_asset(asset_path);
     }
     ImGui::Separator();
     ImGui::TextUnformatted("Animation Sequence Editor");
@@ -749,10 +750,10 @@ void AssetInspectorPane::imgui_draw(const AssetOnDisk& selected) {
     if      (ext == "tis") draw_tis_settings(selected.filename);
     else if (ext == "dds" || ext == "png" || ext == "jpg") draw_tis_settings(active_tis_path_.empty() ? strip_extension(selected.filename) + ".tis" : active_tis_path_);
     else if (ext == "mis")  draw_mis_settings(selected.filename);
-    else if (ext == "cmdl") {
-        draw_mis_settings(strip_extension(selected.filename) + ".mis");
+    else if (ext == "cmdl") draw_mis_settings(strip_extension(selected.filename) + ".mis");
+    else if (selected.type &&
+             selected.type->get_asset_class_type() == &AnimationSeqAsset::StaticType)
         draw_anim_seq_editor(selected.filename);
-    }
     else if (ext == "mm") draw_material_text(selected.filename);
     else if (ext == "mi") draw_material_instance_editor(selected.filename);
     else    ImGui::TextDisabled("Extension: .%s", ext.c_str());

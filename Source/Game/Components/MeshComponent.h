@@ -53,6 +53,7 @@ public:
 	REF const Model* get_model() const;
 	REF AnimatorObject* get_animator() const { return animator.get(); }
 	REF AnimatorObject* create_animator(agBuilder* data);
+	void release_animator();
 
 	bool get_is_visible() const { return is_visible; }
 	bool get_nav_static() const { return nav_static; }

@@ -21,29 +21,6 @@ struct ValueType
 	variant<bool, int, float, glm::vec3, StringName> value;
 };
 
-class agSampledAnimEvents
-{
-public:
-	struct Sampled
-	{
-		enum DurationType { Started, Ended, Active };
-
-		const AnimEvent* ev = nullptr;
-		float weight = 1.f;
-		bool ignore = false;
-		DurationType duration_type{};
-		float thru = 0.f;
-	};
-	void blend_weights(int start, int end, float weight);
-	void mark_as_ignored(int start, int end);
-	bool did_event_fire(const std::string& name) const;
-	bool did_duration_event_start(const std::string& name) const;
-	bool did_duration_event_end(const std::string& name) const;
-	bool is_duration_event_active(const std::string& name) const;
-	float get_duration_event_thru(const std::string& name) const;
-
-	vector<Sampled> events;
-};
 
 //
 class agClipNode;

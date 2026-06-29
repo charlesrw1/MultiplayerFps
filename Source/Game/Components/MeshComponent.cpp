@@ -366,7 +366,12 @@ void AnimPreviewComponent::start() {
 
 void AnimPreviewComponent::update() {}
 
-void AnimPreviewComponent::stop() {}
+void MeshComponent::release_animator() { animator.reset(); }
+
+void AnimPreviewComponent::stop() {
+    auto* mesh = get_owner()->get_component<MeshComponent>();
+    if (mesh) mesh->release_animator();
+}
 
 #ifdef EDITOR_BUILD
 void AnimPreviewComponent::editor_on_change_property() {
