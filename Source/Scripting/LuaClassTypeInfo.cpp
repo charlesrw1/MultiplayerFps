@@ -83,7 +83,7 @@ static bool lua_type_str_to_core_type(const string& type_str, core_type_id& out_
 		out_type = core_type_id::StdString;
 		return true;
 	}
-	if (type_str == "entity_target") {
+	if (type_str == "EntityTarget") {
 		out_type = core_type_id::StdString;
 		out_custom_type = "EntityTarget";
 		return true;
