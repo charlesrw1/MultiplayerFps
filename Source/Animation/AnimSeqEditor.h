@@ -52,6 +52,7 @@ private:
     // Preview
     EntityPtr preview_entity_;
     bool      we_added_preview_comp_ = false;
+    bool      auto_play_ = false;
 };
 
 #endif // EDITOR_BUILD

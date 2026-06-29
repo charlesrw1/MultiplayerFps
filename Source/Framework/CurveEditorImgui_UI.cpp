@@ -24,9 +24,11 @@ void CurveEditorImgui::draw()
 	ImGui::End();
 }
 
-void CurveEditorImgui::draw_content()
+bool CurveEditorImgui::draw_content()
 {
 	set_scrubber_this_frame = false;
+	bool changed = events_changed_this_frame_;
+	events_changed_this_frame_ = false;
 
 	uint32_t ent_list_flags =
 		ImGuiTableFlags_PadOuterX | ImGuiTableFlags_Borders |
@@ -188,6 +190,8 @@ void CurveEditorImgui::draw_content()
 		}
 		ImGui::EndPopup();
 	}
+
+	return changed;
 }
 
 void CurveEditorImgui::fit_to_content()

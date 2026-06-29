@@ -114,6 +114,7 @@ void CurveEditorImgui::draw_events_and_event_popups(ImDrawList* drawlist, bool& 
 			ImGui::CloseCurrentPopup();
 		} else {
 			if (ImGui::Button("Delete")) {
+				events_changed_this_frame_ = true;
 				events.erase(events.begin() + selected_curve_or_event);
 				selected_curve_or_event = -1;
 				ImGui::CloseCurrentPopup();

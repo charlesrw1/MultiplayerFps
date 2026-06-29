@@ -734,6 +734,7 @@ void AssetInspectorPane::imgui_draw(const AssetOnDisk& selected) {
     }
 
     if (selected.filename.empty()) {
+        anim_seq_editor_.reset();
         ImGui::TextDisabled("(no asset selected)");
         ImGui::End();
         return;

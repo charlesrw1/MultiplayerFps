@@ -18,6 +18,7 @@ void CurveEditorImgui::draw_editor_input_and_scrubber(
 
 	// --- Drag: events ---
 	if (is_dragging_selected && selecting_event) {
+		events_changed_this_frame_ = true;
 		if (!is_selected_event_valid()) {
 			sys_print(Warning, "is_dragging_selected null entry\n");
 		} else {
@@ -129,6 +130,12 @@ void CurveEditorImgui::draw_editor_input_and_scrubber(
 	// --- Zoom (mouse wheel) ---
 	const float MOUSE_SCALE_EXP = 0.25f;
 	const float MIN_SCALE       = 0.01f;
+
+	const bool canvas_hovered = ImRect(BASE_SCREENPOS, BASE_SCREENPOS + WINDOW_SIZE).Contains(ImGui::GetMousePos());
+
+	// Consume scroll whenever over the canvas so the outer inspector window doesn't also scroll.
+	if (canvas_hovered && std::abs(ImGui::GetIO().MouseWheel) > 0.00001f)
+		ImGui::GetIO().MouseWheel = 0.f;
 
 	if (std::abs(ImGui::GetIO().MouseWheel) > 0.00001f &&
 	    ImGui::IsWindowFocused() && ImGui::IsWindowHovered())

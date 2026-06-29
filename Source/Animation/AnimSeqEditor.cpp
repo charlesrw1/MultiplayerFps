@@ -12,6 +12,8 @@
 #include "Game/Entity.h"
 #include "Level.h"
 #include "GameEnginePublic.h"
+#include "LevelEditor/EditorDocLocal.h"
+#include "LevelEditor/SelectionState.h"
 #include <imgui.h>
 #include <algorithm>
 
@@ -82,12 +84,23 @@ void AnimSeqEditor::on_right_click_canvas(CurveEditorImgui* ed) {
     ImGui::Separator();
     ImGui::SetNextItemWidth(140.f);
     ImGui::InputText("##custom", ctx->custom_name, sizeof(ctx->custom_name));
-    ImGui::SameLine();
-    if (ImGui::Button("Add Custom") && ctx->custom_name[0] != '\0') {
+    if (ImGui::Button("Add Instant") && ctx->custom_name[0] != '\0') {
         auto item = std::make_unique<AnimEventEditorItem>();
         item->data.name = ctx->custom_name;
+        item->data.is_duration = false;
         item->instant_item = true;
         item->color = COLOR_GREEN;
+        ed->add_item_from_menu(std::move(item));
+        ctx->custom_name[0] = '\0';
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Add Duration") && ctx->custom_name[0] != '\0') {
+        auto item = std::make_unique<AnimEventEditorItem>();
+        item->data.name = ctx->custom_name;
+        item->data.is_duration = true;
+        item->instant_item = false;
+        item->color = COLOR_CYAN;
         ed->add_item_from_menu(std::move(item));
         ctx->custom_name[0] = '\0';
         ImGui::CloseCurrentPopup();
@@ -214,29 +227,46 @@ void AnimSeqEditor::activate_preview() {
     cleanup_preview();
     if (!model_ || !asset_ || !eng->get_level()) return;
 
-    auto& all = eng->get_level()->get_all_objects();
-    for (auto* updater : all) {
-        auto* ent = updater ? updater->cast_to<Entity>() : nullptr;
-        if (!ent) continue;
-        auto* mesh = ent->get_component<MeshComponent>();
-        if (!mesh || mesh->get_model() != model_) continue;
-
-        auto* apc = ent->get_component<AnimPreviewComponent>();
-        if (!apc) {
-            apc = ent->create_component<AnimPreviewComponent>();
-            we_added_preview_comp_ = true;
-        } else {
-            we_added_preview_comp_ = false;
+    // Prefer the editor's currently selected entity if it has a matching model.
+    Entity* found_ent = nullptr;
+    auto* editor_doc = static_cast<EditorDoc*>(eng->get_tool());
+    if (editor_doc && editor_doc->selection_state) {
+        Entity* sel = editor_doc->selection_state->get_only_one_selected().get();
+        if (sel) {
+            auto* mesh = sel->get_component<MeshComponent>();
+            if (mesh && mesh->get_model() == model_)
+                found_ent = sel;
         }
-        apc->model          = model_;
-        apc->asset          = asset_;
-        apc->wants_force_frame = true;
-        apc->force_frame    = 0;
-        apc->update_mesh_component();
-
-        preview_entity_ = EntityPtr(ent);
-        break;
     }
+
+    // Fallback: find any entity with matching model in the level.
+    if (!found_ent) {
+        auto& all = eng->get_level()->get_all_objects();
+        for (auto* updater : all) {
+            auto* ent = updater ? updater->cast_to<Entity>() : nullptr;
+            if (!ent) continue;
+            auto* mesh = ent->get_component<MeshComponent>();
+            if (!mesh || mesh->get_model() != model_) continue;
+            found_ent = ent;
+            break;
+        }
+    }
+
+    if (!found_ent) return;
+
+    auto* apc = found_ent->get_component<AnimPreviewComponent>();
+    if (!apc) {
+        apc = found_ent->create_component<AnimPreviewComponent>();
+        we_added_preview_comp_ = true;
+    } else {
+        we_added_preview_comp_ = false;
+    }
+    apc->model             = model_;
+    apc->asset             = asset_;
+    apc->wants_force_frame = !auto_play_;
+    apc->force_frame       = 0;
+    apc->update_mesh_component();
+    preview_entity_ = EntityPtr(found_ent);
 }
 
 void AnimSeqEditor::cleanup_preview() {
@@ -255,8 +285,13 @@ void AnimSeqEditor::update_preview_scrubber() {
     auto* apc = ent->get_component<AnimPreviewComponent>();
     if (!apc || !apc->asset || !apc->asset->seq) return;
 
-    float fps = apc->asset->seq->fps > 0.f ? apc->asset->seq->fps : 30.f;
-    apc->force_frame = (int)(curve_ed_->current_time * fps);
+    if (auto_play_) {
+        apc->wants_force_frame = false;
+    } else {
+        float fps = apc->asset->seq->fps > 0.f ? apc->asset->seq->fps : 30.f;
+        apc->wants_force_frame = true;
+        apc->force_frame = (int)(curve_ed_->current_time * fps);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -277,6 +312,13 @@ void AnimSeqEditor::draw_toolbar() {
             }
         }
     }
+
+    ImGui::SameLine();
+    if (ImGui::Button(auto_play_ ? "[Auto]" : "[Manual]")) {
+        auto_play_ = !auto_play_;
+    }
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Toggle between manual scrubber and automatic looping playback");
 
     ImGui::SameLine();
     ImGui::BeginDisabled(!dirty_);
@@ -354,7 +396,8 @@ void AnimSeqEditor::imgui_draw() {
     update_preview_scrubber();
     draw_toolbar();
     ImGui::Separator();
-    curve_ed_->draw_content();
+    if (curve_ed_->draw_content())
+        dirty_ = true;
     ImGui::Separator();
     draw_event_properties();
 }
