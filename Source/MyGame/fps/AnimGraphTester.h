@@ -4,6 +4,7 @@
 #include "Framework/EnumDefReflection.h"
 #include "Assets/IAsset.h"
 #include "Animation/AnimationSeqAsset.h"
+#include "Render/Model.h"
 
 NEWENUM(AnimGraphTestMode, int) {
     BasicIK,      // IK right hand to moveable target entity
@@ -19,7 +20,6 @@ NEWENUM(AnimGraphTestMode, int) {
 
 class MeshComponent;
 class AnimatorObject;
-class Model;
 
 class AnimGraphTester : public Component
 {
@@ -35,28 +35,27 @@ public:
 
     REF AnimGraphTestMode mode = AnimGraphTestMode::BasicIK;
 
-    // Clip names — set to clips that exist on your model
-    REF std::string clip0 = "idle";
-    REF std::string clip1 = "walk";
-    REF std::string clip2 = "run_forward_unequip";
+    REF AssetPtr<Model> model;
 
-    // Bone names — default to Mixamo rig; adjust to match animman.cmdl
-    REF std::string bone_ik_upper  = "mixamorig:RightForeArm";
-    REF std::string bone_ik_end    = "mixamorig:RightHand";
-    REF std::string bone_head      = "mixamorig:Head";
-    REF std::string bone_foot_l    = "mixamorig:LeftFoot";
-    REF std::string bone_foot_r    = "mixamorig:RightFoot";
+    // Animation clips used by the graph modes
+    REF AssetPtr<AnimationSeqAsset> clip0;       // primary / idle clip
+    REF AssetPtr<AnimationSeqAsset> clip1;       // secondary clip (walk, upper-body, additive)
+    REF AssetPtr<AnimationSeqAsset> clip2;       // tertiary clip (BlendByInt state 2)
+    REF AssetPtr<AnimationSeqAsset> slot_clip;   // one-shot clip fired into SlotPlaying slot
+
+    // Bone names — adjust to match your model's rig
+    REF std::string bone_ik_upper    = "mixamorig:RightForeArm";
+    REF std::string bone_ik_end      = "mixamorig:RightHand";
+    REF std::string bone_head        = "mixamorig:Head";
+    REF std::string bone_foot_l      = "mixamorig:LeftFoot";
+    REF std::string bone_foot_r      = "mixamorig:RightFoot";
     REF std::string bone_upper_blend = "mixamorig:Spine2";
-    REF std::string bone_copy_src  = "mixamorig:Spine1";
-    REF std::string bone_copy_dst  = "mixamorig:Neck";
-    REF std::string bone_grip_other = "mixamorig:LeftHand";  // for GunGripIK other_bone
-    REF AssetPtr<AnimationSeqAsset> slot_clip;               // clip played into slot on timer
+    REF std::string bone_copy_src    = "mixamorig:Spine1";
+    REF std::string bone_copy_dst    = "mixamorig:Neck";
+    REF std::string bone_grip_other  = "mixamorig:LeftHand";
 
 private:
     void rebuild_graph();
-
-    // returns name if it exists in the model's skeleton, else the first available clip name
-    std::string safe_clip(const Model* m, const std::string& name) const;
 
     MeshComponent* mesh = nullptr;
     EntityPtr target_entity;
