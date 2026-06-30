@@ -193,6 +193,7 @@
     <ClCompile Include="bike_ai_test.cpp" />
     <ClCompile Include="crash_dump_smoke_test.cpp" />
     <ClCompile Include="legacy_gl_calls_test.cpp" />
+    <ClCompile Include="twobone_ik_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Unittest.h" />

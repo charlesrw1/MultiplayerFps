@@ -7,6 +7,7 @@
 #include "Animation/Runtime/RuntimeNodesNew2.h"
 #include "Animation/SkeletonData.h"
 #include "GameEnginePublic.h"
+#include "Framework/Util.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "glm/gtc/matrix_transform.hpp"
@@ -22,7 +23,6 @@ AnimGraphTester::AnimGraphTester() {
 
 // -----------------------------------------------------------------------
 void AnimGraphTester::editor_start() {
-    editor_set_model("animman/models/animman.cmdl", false);
 }
 
 // -----------------------------------------------------------------------
@@ -90,11 +90,10 @@ void AnimGraphTester::rebuild_graph() {
         agClipNode* idle = make_clip(clip0);
 
         agIk2Bone* ik = b.alloc<agIk2Bone>();
-        ik->input      = idle;
-        ik->bone_name  = StringName(bone_ik_upper.c_str());
-        ik->other_bone = StringName(bone_ik_end.c_str());
-        ik->target     = StringName("vHandTarget");
-        ik->alpha      = 1.f;
+        ik->input     = idle;
+        ik->bone_name = StringName(bone_ik_end.c_str());  // hand is the end effector; solver bends forearm+upper arm
+        ik->target    = StringName("vHandTarget");
+        ik->alpha     = 1.f;
 
         b.set_root(ik);
         break;
@@ -232,8 +231,100 @@ void AnimGraphTester::rebuild_graph() {
 }
 
 // -----------------------------------------------------------------------
+void AnimGraphTester::start_ik_dump() {
+    ik_dump_remaining = 3.f;
+    ik_dump_frame = 0;
+    sys_print(Debug, "=== IK dump started (3 sec) ===\n");
+}
+
+// -----------------------------------------------------------------------
+void AnimGraphTester::dump_ik_frame(int frame_num) {
+    AnimatorObject* anim = mesh ? mesh->get_animator() : nullptr;
+    if (!anim || !mesh->get_model()) return;
+
+    const auto& bonemats = anim->get_global_bonemats();
+    const MSkeleton* skel = mesh->get_model()->get_skel();
+    if (!skel) return;
+
+    // Chain must match what agIk2Bone actually solves: it takes the end-effector
+    // bone and walks PARENTS up the skeleton. So b = parent(end), a = parent(parent(end)).
+    // (Do NOT use bone_ik_upper/etc here — those are unrelated configs for other test
+    //  modes and resolve to -1 on this model, which is why a/b showed "bone not found".)
+    int end_idx   = mesh->get_index_of_bone(StringName(bone_ik_end.c_str()));
+    int upper_idx = (end_idx   >= 0) ? skel->get_bone_parent(end_idx)   : -1; // b (mid/forearm)
+    int root_idx  = (upper_idx >= 0) ? skel->get_bone_parent(upper_idx) : -1; // a (root/upper arm)
+
+    int indices[3] = { end_idx, upper_idx, root_idx };
+    const char* labels[3] = { "c(end/hand)", "b(mid/forearm)", "a(root/arm)" };
+
+    // Target info
+    Entity* tgt = target_entity.get();
+    glm::vec3 target_ws = tgt ? tgt->get_ws_position() : get_owner()->get_ws_position();
+    glm::mat4 ws_xf = get_owner()->get_ws_transform();
+    glm::mat4 to_mesh = glm::inverse(ws_xf);
+    glm::vec3 target_ms = glm::vec3(to_mesh * glm::vec4(target_ws, 1.f));
+
+    sys_print(Debug, "--- IK frame %d ---\n", frame_num);
+    sys_print(Debug, "  target  ws=(%.3f %.3f %.3f)  ms=(%.3f %.3f %.3f)\n",
+        target_ws.x, target_ws.y, target_ws.z,
+        target_ms.x, target_ms.y, target_ms.z);
+
+    for (int i = 0; i < 3; i++) {
+        int idx = indices[i];
+        if (idx < 0 || idx >= (int)bonemats.size()) {
+            sys_print(Debug, "  %s: bone not found (idx=%d)\n", labels[i], idx);
+            continue;
+        }
+
+        // Mesh-space (global) transform from cached bonemats
+        const glm::mat4& ms_mat = bonemats[idx];
+        glm::vec3 ms_pos = glm::vec3(ms_mat[3]);
+        glm::quat ms_rot = glm::quat_cast(glm::mat3(ms_mat));
+        glm::vec3 ms_euler = glm::degrees(glm::eulerAngles(ms_rot));
+
+        // World-space position
+        glm::vec3 ws_pos = glm::vec3(ws_xf * glm::vec4(ms_pos, 1.f));
+
+        // Local-space from skeleton pose (pos and rot stored per-bone)
+        glm::vec3 loc_pos = glm::vec3(0.f);
+        glm::vec3 loc_euler = glm::vec3(0.f);
+        // Local data lives in the pose, which we can reconstruct from parent inverse
+        int parent_idx = skel->get_bone_parent(idx);
+        if (parent_idx >= 0 && parent_idx < (int)bonemats.size()) {
+            glm::mat4 parent_inv = glm::inverse(bonemats[parent_idx]);
+            glm::mat4 local_mat = parent_inv * ms_mat;
+            loc_pos = glm::vec3(local_mat[3]);
+            glm::quat loc_rot = glm::quat_cast(glm::mat3(local_mat));
+            loc_euler = glm::degrees(glm::eulerAngles(loc_rot));
+        } else {
+            loc_pos = ms_pos;
+            glm::quat loc_rot = ms_rot;
+            loc_euler = glm::degrees(glm::eulerAngles(loc_rot));
+        }
+
+        // Distance from this bone to target (mesh space)
+        float dist_to_target = glm::length(ms_pos - target_ms);
+
+        sys_print(Debug, "  %s (bone %d):\n", labels[i], idx);
+        sys_print(Debug, "    local  pos=(%.3f %.3f %.3f)  euler=(%.1f %.1f %.1f)\n",
+            loc_pos.x, loc_pos.y, loc_pos.z, loc_euler.x, loc_euler.y, loc_euler.z);
+        sys_print(Debug, "    mesh   pos=(%.3f %.3f %.3f)  euler=(%.1f %.1f %.1f)\n",
+            ms_pos.x, ms_pos.y, ms_pos.z, ms_euler.x, ms_euler.y, ms_euler.z);
+        sys_print(Debug, "    world  pos=(%.3f %.3f %.3f)  dist_to_target=%.4f\n",
+            ws_pos.x, ws_pos.y, ws_pos.z, dist_to_target);
+    }
+
+    // End effector error: how far is c (hand) from target in mesh space?
+    if (end_idx >= 0 && end_idx < (int)bonemats.size()) {
+        glm::vec3 c_ms = glm::vec3(bonemats[end_idx][3]);
+        float err = glm::length(c_ms - target_ms);
+        sys_print(Debug, "  IK ERROR (hand ms - target ms) = %.4f m\n", err);
+    }
+}
+
+// -----------------------------------------------------------------------
 void AnimGraphTester::update() {
-    if (mode != last_mode) {
+    if (mode != last_mode || (mesh && mesh->get_model() && !mesh->get_animator())) {
         rebuild_graph();
         last_mode = mode;
     }
@@ -331,4 +422,11 @@ void AnimGraphTester::update() {
         break;
 
     } // switch
+
+    if (ik_dump_remaining > 0.f) {
+        dump_ik_frame(ik_dump_frame++);
+        ik_dump_remaining -= dt;
+        if (ik_dump_remaining <= 0.f)
+            sys_print(Debug, "=== IK dump ended (%d frames) ===\n", ik_dump_frame);
+    }
 }

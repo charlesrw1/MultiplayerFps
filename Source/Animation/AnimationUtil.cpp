@@ -185,38 +185,73 @@ void util_add(int bonecount, const Pose& additive, Pose& base, float fac) {
 	}
 }
 
+// Shortest-arc rotation that takes unit vector `from` onto unit vector `to`.
+// Handles the antiparallel (180 deg) case, which glm::rotation does not do robustly.
+static glm::quat util_rotation_between(vec3 from, vec3 to) {
+	from = normalize(from);
+	to = normalize(to);
+	float d = glm::clamp(dot(from, to), -1.f, 1.f);
+	if (d > 0.999999f)
+		return glm::quat(1, 0, 0, 0);
+	if (d < -0.999999f) {
+		// pick any axis perpendicular to `from`
+		vec3 axis = cross(vec3(1, 0, 0), from);
+		if (length(axis) < 1e-4f)
+			axis = cross(vec3(0, 1, 0), from);
+		return glm::angleAxis(glm::pi<float>(), normalize(axis));
+	}
+	return glm::angleAxis(acos(d), normalize(cross(from, to)));
+}
+
+// Analytic two-bone IK. Joints a (root, e.g. upper arm), b (mid, elbow), c (end, wrist)
+// are GLOBAL positions; a_global_rotation/b_global_rotation are the GLOBAL rotations of
+// bones a and b. On return a_local_rotation/b_local_rotation are post-multiplied by the
+// LOCAL deltas that place c on `target`.
+//
+// Two passes — the order matters and was the source of a long-standing bug:
+//   1. AIM:  rotate bone a so the a->c ray points straight at a->target. This pulls the
+//            target INTO the bend plane. (Doing bend+aim together fails whenever the
+//            target is out of the current a-b-c plane: reach comes out right but the
+//            hand lands off to the side — see TestTwoBoneIk.)
+//   2. BEND: with the chain now coplanar with the target, bend a and b within that plane
+//            (law of cosines) to set |a-c| = len_at, leaving c on the target ray.
+// pole_vector (in bone-b space) only breaks the tie when the arm is perfectly straight.
 void util_twobone_ik(const vec3& a, const vec3& b, const vec3& c, const vec3& target, const vec3& pole_vector,
 					 const glm::quat& a_global_rotation, const glm::quat& b_global_rotation,
 					 glm::quat& a_local_rotation, glm::quat& b_local_rotation) {
-	float eps = 0.01;
-	float len_ab = length(b - a);
-	float len_cb = length(b - c);
-	float len_at = glm::clamp(length(target - a), eps, len_ab + len_cb - eps);
+	const float eps = 0.01f;
+	const float len_ab = length(b - a);
+	const float len_cb = length(c - b);
+	const float len_at = glm::clamp(length(target - a), eps, len_ab + len_cb - eps);
 
-	// Interior angles of a and b
-	float a_interior_angle = acos(dot(normalize(c - a), normalize(b - a)));
-	float b_interior_angle = acos(dot(normalize(a - b), normalize(c - b)));
-	vec3 c_a = c - a;
-	vec3 target_a = normalize(target - a);
-	float dot_c_a_t_a = dot(normalize(c_a), target_a);
-	float c_interior_angle = acos(glm::clamp(dot_c_a_t_a, -0.9999999f, 0.9999999f));
+	// --- Pass 1: aim bone a so (c - a) points along (target - a) ---
+	// Apply a world-space rotation Q to bone a via: a_local *= inverse(a_gr) * Q * a_gr.
+	const glm::quat q_aim = util_rotation_between(c - a, target - a);
+	a_local_rotation = a_local_rotation * (glm::inverse(a_global_rotation) * q_aim * a_global_rotation);
+	const glm::quat a_gr2 = q_aim * a_global_rotation;
+	const glm::quat b_gr2 = q_aim * b_global_rotation;
+	const vec3 b2 = a + q_aim * (b - a);
+	const vec3 c2 = a + q_aim * (c - a); // now colinear with a->target
 
-	// Law of cosines to get the desired angles of the triangle
-	float a_desired_angle = acos(LawOfCosines(len_cb, len_ab, len_at));
-	float b_desired_angle = acos(LawOfCosines(len_at, len_ab, len_cb));
+	// --- Pass 2: bend within the now-coplanar configuration ---
+	const float a_interior = acos(glm::clamp(dot(normalize(c2 - a), normalize(b2 - a)), -1.f, 1.f));
+	const float b_interior = acos(glm::clamp(dot(normalize(a - b2), normalize(c2 - b2)), -1.f, 1.f));
+	const float a_desired = acos(LawOfCosines(len_cb, len_ab, len_at));
+	const float b_desired = acos(LawOfCosines(len_at, len_ab, len_cb));
 
-	// Axis to rotate around
-	vec3 d = b_global_rotation * pole_vector;
-	// vec3 axis0 =   normalize(cross(c - a, d));
-	vec3 axis0 = normalize(cross(c - a, b - a));
-	vec3 t_a = target - a;
-	vec3 cross_c_a_ta = cross(c_a, t_a);
-	vec3 axis1 = normalize(cross_c_a_ta);
-	glm::quat rot0 = glm::angleAxis(a_desired_angle - a_interior_angle, glm::inverse(a_global_rotation) * axis0);
-	glm::quat rot1 = glm::angleAxis(b_desired_angle - b_interior_angle, glm::inverse(b_global_rotation) * axis0);
-	glm::quat rot2 = glm::angleAxis(c_interior_angle, glm::inverse(a_global_rotation) * axis1);
+	// Bend-plane normal of the aimed triangle. Degenerate only when the arm is straight
+	// (b on the a->c line); there the pole vector picks a stable bend direction.
+	vec3 axis0 = cross(c2 - a, b2 - a);
+	if (length(axis0) < 1e-5f) {
+		axis0 = cross(c2 - a, b_gr2 * pole_vector);
+		if (length(axis0) < 1e-5f)
+			axis0 = vec3(0.f, 1.f, 0.f);
+	}
+	axis0 = normalize(axis0);
 
-	a_local_rotation = a_local_rotation * (rot0 * rot2);
+	const glm::quat rot0 = glm::angleAxis(a_desired - a_interior, glm::inverse(a_gr2) * axis0);
+	const glm::quat rot1 = glm::angleAxis(b_desired - b_interior, glm::inverse(b_gr2) * axis0);
+	a_local_rotation = a_local_rotation * rot0;
 	b_local_rotation = b_local_rotation * rot1;
 }
 

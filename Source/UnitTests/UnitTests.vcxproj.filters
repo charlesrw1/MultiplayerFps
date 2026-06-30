@@ -19,6 +19,7 @@
     <ClCompile Include="scripting_classreg_test.cpp" />
     <ClCompile Include="scripting_lua_dispatch_test.cpp" />
     <ClCompile Include="bike_ai_test.cpp" />
+    <ClCompile Include="twobone_ik_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Unittest.h" />
