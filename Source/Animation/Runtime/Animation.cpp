@@ -188,6 +188,12 @@ void AnimatorObject::set_float_variable(StringName name, float f) {
 void AnimatorObject::set_int_variable(StringName name, int f) {
 	blackboard[name.get_hash()] = f;
 }
+void AnimatorObject::set_bool_variable(StringName name, bool f) {
+	blackboard[name.get_hash()] = f;
+}
+void AnimatorObject::set_vec3_variable(StringName name, glm::vec3 f) {
+	blackboard[name.get_hash()] = f;
+}
 
 #include "Assets/AssetDatabase.h"
 #include "UI/UILoader.h"
@@ -350,4 +356,7 @@ REF agBaseNode* agBuilder::alloc(const ClassTypeInfo* info) {
 
 REF void agBuilder::set_root(agBaseNode* node) {
 	this->root = node;
+}
+void agBuilder::add_slot_name(StringName name) {
+	slot_names.push_back(name);
 }
