@@ -1,6 +1,7 @@
 #include "AnimGraphTester.h"
 #include "Game/Components/MeshComponent.h"
 #include "Game/Components/BillboardComponent.h"
+#include "Render/Texture.h"
 #include "Game/GameplayStatic.h"
 #include "Animation/Runtime/Animation.h"
 #include "Animation/Runtime/RuntimeNodesNew2.h"
@@ -40,7 +41,8 @@ void AnimGraphTester::start() {
     // Spawn the moveable target entity (billboard, transient)
     Entity* tgt = eng->get_level()->spawn_entity();
     tgt->set_editor_transient(true);
-    tgt->create_component<BillboardComponent>();
+    auto* bb = tgt->create_component<BillboardComponent>();
+    bb->set_texture(Texture::load("eng/icon/_nearest/blue_poi.png"));
     tgt->set_ws_position(get_owner()->get_ws_position() + glm::vec3(0.f, 1.5f, 2.f));
     target_entity = tgt->get_self_ptr();
 
