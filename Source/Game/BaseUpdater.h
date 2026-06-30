@@ -19,7 +19,9 @@ public:
 	static const int INVALID_FILEID = 0;
 	// Editor Data >>>>
 	bool dont_serialize_or_edit = false;
+	bool dont_serialize = false; // skips serialization but still selectable/editable in editor
 	void set_editor_transient(bool transient) { dont_serialize_or_edit = transient; }
+	void set_no_serialize() { dont_serialize = true; }
 
 	bool dont_serialize_or_edit_this() const { return dont_serialize_or_edit; }
 	// Entity* creator_source = nullptr;		// my creator

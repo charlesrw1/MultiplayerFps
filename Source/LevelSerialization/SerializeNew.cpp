@@ -160,7 +160,7 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 	for (auto ent : input_objs) {
 		if (ent->get_components().size() == 0)
 			continue;
-		if (ent->dont_serialize_or_edit)
+		if (ent->dont_serialize_or_edit || ent->dont_serialize)
 			continue;
 		if (ent->get_parent())
 			continue;
@@ -209,14 +209,14 @@ void UnserializedSceneFile::delete_objs() {
 // * path based on source
 
 bool serialize_this_objects_children(const Entity* b) {
-	if (b->dont_serialize_or_edit)
+	if (b->dont_serialize_or_edit || b->dont_serialize)
 		return false;
 	return true;
 }
 
 bool this_is_a_serializeable_object(const BaseUpdater* b) {
 	assert(b);
-	if (b->dont_serialize_or_edit)
+	if (b->dont_serialize_or_edit || b->dont_serialize)
 		return false;
 
 	if (auto as_comp = b->cast_to<Component>()) {
