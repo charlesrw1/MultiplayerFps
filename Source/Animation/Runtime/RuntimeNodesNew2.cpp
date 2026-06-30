@@ -337,18 +337,18 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 	if (!has_init) {
 		bone_idx = ctx.get_skeleton().get_bone_index(bone_name);
-		if (bone_idx == -1) {
-			sys_print(Error, " agIk2Bone::get_pose: model doesnt have bone %s\n", bone_name.get_c_str());
-			throw std::runtime_error("doesn't have bone");
-		}
+		if (bone_idx == -1)
+			sys_print(Error, " agIk2Bone::get_pose: model doesnt have bone '%s'\n", bone_name.get_c_str());
 		if (ik_in_bone_space) {
 			other_bone_idx = ctx.get_skeleton().get_bone_index(other_bone);
-			if (other_bone_idx == -1) {
-				sys_print(Error, " agIk2Bone::get_pose: other model doesnt have bone %s\n", bone_name.get_c_str());
-				throw std::runtime_error("doesn't have other bone");
-			}
+			if (other_bone_idx == -1)
+				sys_print(Error, " agIk2Bone::get_pose: model doesnt have other bone '%s'\n", other_bone.get_c_str());
 		}
 		has_init = true;
+	}
+	if (bone_idx == -1 || (ik_in_bone_space && other_bone_idx == -1)) {
+		input->get_pose(ctx);
+		return;
 	}
 	const float alphaVal = alpha.get_float(ctx);
 	vec3 tagetVec = target.get_vec3(ctx);
@@ -452,12 +452,14 @@ void agModifyBone::reset() {
 
 void agModifyBone::get_pose(agGetPoseCtx& ctx) {
 	if (!has_init) {
-		this->bone_index = ctx.get_skeleton().get_bone_index(boneName);
-		if (bone_index == -1) {
-			sys_print(Error, "agModifyBone::get_pose: no bone found %s\n", boneName.get_c_str());
-			throw std::runtime_error("couldnt find bone");
-		}
+		bone_index = ctx.get_skeleton().get_bone_index(boneName);
+		if (bone_index == -1)
+			sys_print(Error, "agModifyBone::get_pose: no bone found '%s'\n", boneName.get_c_str());
 		has_init = true;
+	}
+	if (bone_index == -1) {
+		input->get_pose(ctx);
+		return;
 	}
 
 	const float alphaVal = alpha.get_float(ctx);
@@ -467,98 +469,97 @@ void agModifyBone::get_pose(agGetPoseCtx& ctx) {
 	}
 
 	input->get_pose(ctx);
-	const int MYBONEINDEX = this->bone_index;
-
-	// build up global matrix when needed instead of recreating it every step
-	// not sure if this is optimal, should profile different ways to pass around pose
-	const int ALLOCED_MATS = 36;
-	glm::mat4 mats[ALLOCED_MATS];
+	const int B = bone_index;
 	const MSkeleton& skel = ctx.get_skeleton();
 	Pose& pose = *ctx.pose;
-	const glm::quat pre_q   = pose.q[MYBONEINDEX];
-	const glm::vec3 pre_pos = pose.pos[MYBONEINDEX];
+
+	const glm::quat pre_q     = pose.q[B];
+	const glm::vec3 pre_pos   = pose.pos[B];
+	const float     pre_scale = pose.scale[B];
+
+	const glm::vec3 set_pos   = translationVal.get_vec3(ctx);
+	const glm::quat set_rot   = glm::quat(rotationVal.get_vec3(ctx));
+	const glm::vec3 set_scale = scaleVal.get_vec3(ctx);
+
+	// Build global matrix chain only when meshspace channels are active.
+	const bool needs_global = (translation == ModifyBoneType::Meshspace || translation == ModifyBoneType::MeshspaceAdd ||
+	                           rotation    == ModifyBoneType::Meshspace || rotation    == ModifyBoneType::MeshspaceAdd);
+	glm::mat4 mats[36];
+	int count = 0;
 	bool more_than_one = false;
-	{
-		int count = 0;
-		int index = MYBONEINDEX;
+	if (needs_global) {
+		int index = B;
 		while (index != -1) {
-			assert(count < ALLOCED_MATS);
-			glm::mat4x4 matrix = glm::mat4_cast(pose.q[index]);
-			matrix[3] = glm::vec4(pose.pos[index], 1.0);
-			mats[count++] = matrix;
+			assert(count < 36);
+			glm::mat4 m = glm::mat4_cast(pose.q[index]);
+			m[3] = glm::vec4(pose.pos[index], 1.f);
+			mats[count++] = m;
 			index = skel.get_bone_parent(index);
 		}
-		for (int i = count - 2; i >= 0; i--) {
+		for (int i = count - 2; i >= 0; i--)
 			mats[i] = mats[i + 1] * mats[i];
-		}
 		more_than_one = count > 1;
 	}
 
-	const glm::vec3 set_pos = translationVal.get_vec3(ctx);			// ->get_value<glm::vec3>(ctx);
-	const glm::quat set_rot = glm::quat(rotationVal.get_vec3(ctx)); // rotation->get_value<glm::quat>(ctx);
-
-	const glm::vec3 global_pos = mats[0][3];
-	const glm::quat global_rot = glm::quat_cast(mats[0]);
-
-	const bool apply_position = translation != ModifyBoneType::None;
-	const bool apply_position_meshspace =
-		translation == ModifyBoneType::Meshspace || translation == ModifyBoneType::MeshspaceAdd;
-	const bool apply_position_additive =
-		translation == ModifyBoneType::LocalspaceAdd || translation == ModifyBoneType::MeshspaceAdd;
-
-	const bool apply_rotation = rotation != ModifyBoneType::None;
-	const bool apply_rotation_meshspace =
-		rotation == ModifyBoneType::Meshspace || rotation == ModifyBoneType::MeshspaceAdd;
-	const bool apply_rotation_additive =
-		rotation == ModifyBoneType::LocalspaceAdd || rotation == ModifyBoneType::MeshspaceAdd;
-
-	if (apply_position) {
-		if (apply_position_meshspace) {
-			if (apply_position_additive)
-				mats[0][3] = glm::vec4(global_pos + set_pos, 1.0f);
-			else
-				mats[0][3] = glm::vec4(set_pos, 1.0f);
-		} else {
-			if (apply_position_additive)
-				pose.pos[MYBONEINDEX] += set_pos;
-			else
-				pose.pos[MYBONEINDEX] = set_pos;
-		}
-	}
-	if (apply_rotation) {
-		if (apply_rotation_meshspace) {
-			if (apply_rotation_additive) {
-				glm::quat q = set_rot * global_rot;
-				glm::vec4 lastcol = mats[0][3];
-				mats[0] = glm::mat4_cast(q);
-				mats[0][3] = lastcol;
-			} else {
-				glm::quat q = set_rot;
-				glm::vec4 lastcol = mats[0][3];
-				mats[0] = glm::mat4_cast(q);
-				mats[0][3] = lastcol;
-			}
-		} else {
-			if (apply_rotation_additive)
-				pose.q[MYBONEINDEX] = set_rot * pose.q[MYBONEINDEX];
-			else
-				pose.q[MYBONEINDEX] = set_rot;
-		}
+	// Translation
+	switch (translation) {
+	case ModifyBoneType::Localspace:    pose.pos[B] = set_pos; break;
+	case ModifyBoneType::LocalspaceAdd: pose.pos[B] += set_pos; break;
+	// BonespaceAdd: offset along bone's own axes (post-rotate offset into parent frame)
+	case ModifyBoneType::Bonespace:     pose.pos[B] = pose.q[B] * set_pos; break;
+	case ModifyBoneType::BonespaceAdd:  pose.pos[B] += pose.q[B] * set_pos; break;
+	case ModifyBoneType::Meshspace:     mats[0][3] = glm::vec4(set_pos, 1.f); break;
+	case ModifyBoneType::MeshspaceAdd:  mats[0][3] = glm::vec4(glm::vec3(mats[0][3]) + set_pos, 1.f); break;
+	default: break;
 	}
 
-	if (apply_position_meshspace || apply_rotation_meshspace) {
-		// go from global to local again
+	// Rotation — key distinction: LocalspaceAdd pre-multiplies (rotates in parent frame),
+	//            BonespaceAdd post-multiplies (rotates around the bone's own axes).
+	switch (rotation) {
+	case ModifyBoneType::Localspace:
+	case ModifyBoneType::Bonespace:     pose.q[B] = set_rot; break;
+	case ModifyBoneType::LocalspaceAdd: pose.q[B] = set_rot * pose.q[B]; break;
+	case ModifyBoneType::BonespaceAdd:  pose.q[B] = pose.q[B] * set_rot; break;
+	case ModifyBoneType::Meshspace: {
+		glm::vec4 col3 = mats[0][3];
+		mats[0] = glm::mat4_cast(set_rot);
+		mats[0][3] = col3;
+		break;
+	}
+	case ModifyBoneType::MeshspaceAdd: {
+		glm::vec4 col3 = mats[0][3];
+		mats[0] = glm::mat4_cast(set_rot * glm::quat_cast(mats[0]));
+		mats[0][3] = col3;
+		break;
+	}
+	default: break;
+	}
+
+	// Scale — bone/mesh space has no meaningful distinction; treat as local.
+	switch (scale) {
+	case ModifyBoneType::Localspace:
+	case ModifyBoneType::Bonespace:
+	case ModifyBoneType::Meshspace:     pose.scale[B] = set_scale.x; break;
+	case ModifyBoneType::LocalspaceAdd:
+	case ModifyBoneType::BonespaceAdd:
+	case ModifyBoneType::MeshspaceAdd:  pose.scale[B] += set_scale.x; break;
+	default: break;
+	}
+
+	// Convert meshspace result back to local.
+	if (needs_global) {
 		if (more_than_one)
 			mats[0] = glm::inverse(mats[1]) * mats[0];
-		if (apply_rotation && apply_rotation_meshspace)
-			pose.q[MYBONEINDEX] = glm::quat_cast(mats[0]);
-		if (apply_position && apply_position_meshspace)
-			pose.pos[MYBONEINDEX] = mats[0][3];
+		if (rotation    == ModifyBoneType::Meshspace || rotation    == ModifyBoneType::MeshspaceAdd)
+			pose.q[B]   = glm::quat_cast(mats[0]);
+		if (translation == ModifyBoneType::Meshspace || translation == ModifyBoneType::MeshspaceAdd)
+			pose.pos[B] = mats[0][3];
 	}
 
 	if (alphaVal < 0.99999f) {
-		pose.q[MYBONEINDEX]   = glm::slerp(pre_q,   pose.q[MYBONEINDEX],   alphaVal);
-		pose.pos[MYBONEINDEX] = glm::mix  (pre_pos,  pose.pos[MYBONEINDEX], alphaVal);
+		pose.q[B]     = glm::slerp(pre_q,     pose.q[B],     alphaVal);
+		pose.pos[B]   = glm::mix  (pre_pos,   pose.pos[B],   alphaVal);
+		pose.scale[B] = glm::mix  (pre_scale, pose.scale[B], alphaVal);
 	}
 }
 
@@ -570,31 +571,52 @@ void agCopyBone::get_pose(agGetPoseCtx& ctx) {
 	if (!has_init) {
 		source_bone_idx = ctx.get_skeleton().get_bone_index(sourceBone);
 		target_bone_idx = ctx.get_skeleton().get_bone_index(targetBone);
-
-		if (source_bone_idx == -1 || target_bone_idx == -1) {
-			sys_print(Error, "agCopyBone::get_pose: couldn't find bone\n");
-			throw std::runtime_error("no bone found");
-		}
-
+		if (source_bone_idx == -1 || target_bone_idx == -1)
+			sys_print(Error, "agCopyBone::get_pose: couldn't find bone (src='%s' dst='%s')\n",
+				sourceBone.get_c_str(), targetBone.get_c_str());
 		has_init = true;
+	}
+	if (source_bone_idx == -1 || target_bone_idx == -1) {
+		input->get_pose(ctx);
+		return;
+	}
+
+	const float alphaVal = alpha.get_float(ctx);
+	if (alphaVal <= 0.00001f) {
+		input->get_pose(ctx);
+		return;
 	}
 
 	input->get_pose(ctx);
 
 	const bool doRot   = copyRotation.get_bool(ctx);
 	const bool doTrans = copyTranslation.get_bool(ctx);
-	if (!doRot && !doTrans)
+	const bool doScale = copyScale.get_bool(ctx);
+	if (!doRot && !doTrans && !doScale)
 		return;
 
 	const MSkeleton& skel = ctx.get_skeleton();
 	Pose& pose = *ctx.pose;
+
+	const glm::quat pre_q     = pose.q[target_bone_idx];
+	const glm::vec3 pre_pos   = pose.pos[target_bone_idx];
+	const float     pre_scale = pose.scale[target_bone_idx];
+
 	if (copyBonespace) {
-		if (doRot)   pose.q[target_bone_idx]   = pose.q[source_bone_idx];
-		if (doTrans) pose.pos[target_bone_idx]  = pose.pos[source_bone_idx];
+		if (doRot)   pose.q[target_bone_idx]     = pose.q[source_bone_idx];
+		if (doTrans) pose.pos[target_bone_idx]   = pose.pos[source_bone_idx];
+		if (doScale) pose.scale[target_bone_idx] = pose.scale[source_bone_idx];
 	} else {
 		glm::mat4 mat = build_global_transform_for_bone_index(&pose, &skel, source_bone_idx);
-		if (doRot)   pose.q[target_bone_idx]   = glm::quat_cast(mat);
-		if (doTrans) pose.pos[target_bone_idx]  = mat[3];
+		if (doRot)   pose.q[target_bone_idx]     = glm::quat_cast(mat);
+		if (doTrans) pose.pos[target_bone_idx]   = mat[3];
+		if (doScale) pose.scale[target_bone_idx] = pose.scale[source_bone_idx]; // scale has no global-space meaning
+	}
+
+	if (alphaVal < 0.99999f) {
+		if (doRot)   pose.q[target_bone_idx]     = glm::slerp(pre_q,     pose.q[target_bone_idx],     alphaVal);
+		if (doTrans) pose.pos[target_bone_idx]   = glm::mix  (pre_pos,   pose.pos[target_bone_idx],   alphaVal);
+		if (doScale) pose.scale[target_bone_idx] = glm::mix  (pre_scale, pose.scale[target_bone_idx], alphaVal);
 	}
 }
 
