@@ -71,6 +71,7 @@ ModelDefData new_import_settings_to_modeldef_data(const std::string& gamepath, M
 		mdd.directMaterialSet.push_back((mat) ? mat->get_name() : "eng/fallback.mm");
 	}
 	mdd.keepbones = is->keepBones;
+	mdd.disable_prune_bones = is->disablePruneUnusedBones;
 	for (int i = 0; i < is->additionalAnimationGlbFiles.size(); i++) {
 		auto& p = is->additionalAnimationGlbFiles[i];
 		if (p.rfind('/') != std::string::npos) {

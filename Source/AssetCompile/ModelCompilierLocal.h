@@ -116,6 +116,7 @@ public:
 	std::unordered_map<std::string, std::string> bone_reparent;
 	std::unordered_map<std::string, std::string> bone_rename;
 	std::vector<std::string> keepbones;
+	bool disable_prune_bones = false;
 	std::unordered_map<std::string, RetargetBoneType> bone_retarget_type;
 	struct mirror
 	{

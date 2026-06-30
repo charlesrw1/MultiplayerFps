@@ -357,7 +357,7 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 	std::vector<bool> bone_is_referenced;
 
 	if (scd) {
-		const bool default_val = (modcompile_disable_pruning_bones.get_bool());
+		const bool default_val = (modcompile_disable_pruning_bones.get_bool() || def.disable_prune_bones);
 		bone_is_referenced.resize(scd->get_num_bones(), default_val);
 
 		for (int i = 0; i < def.keepbones.size(); i++) {

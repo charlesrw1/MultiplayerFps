@@ -2,6 +2,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "Assets/AssetInspectorPane.h"
 #include "Animation/AnimSeqEditor.h"
+#include "Animation/SkeletonEditor.h"
 #include "Animation/AnimationSeqAsset.h"
 #include "AssetTools/AssetCompiler.h"
 #include "Render/Editor/TextureEditor.h"
@@ -366,12 +367,20 @@ void AssetInspectorPane::draw_anim_seq_editor(const std::string& asset_path) {
     anim_seq_editor_->imgui_draw();
 }
 
+void AssetInspectorPane::draw_skeleton_section(const std::string& cmdl_path) {
+    if (!skeleton_editor_)
+        skeleton_editor_ = std::make_unique<SkeletonEditor>();
+    skeleton_editor_->set_asset(cmdl_path);
+    skeleton_editor_->imgui_draw();
+}
+
 void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
     last_selected = selected;
     settings_dirty = false;
     cache_.reset();
     mi_state_.reset();
     anim_seq_editor_.reset();
+    skeleton_editor_.reset();
     active_tis_path_.clear();
 
     auto ext = StringUtils::get_extension_no_dot(selected.filename);
@@ -646,6 +655,7 @@ void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
     changed |= ImGui::Checkbox("Mesh as Convex", &mis->meshAsConvex);
     changed |= ImGui::Checkbox("Mesh as Collision", &mis->meshAsCollision);
     changed |= ImGui::Checkbox("Generate Auto LODs", &mis->generate_auto_lods);
+    changed |= ImGui::Checkbox("Disable Prune Unused Bones", &mis->disablePruneUnusedBones);
 
     if (changed) settings_dirty = true;
 
@@ -750,8 +760,8 @@ void AssetInspectorPane::imgui_draw(const AssetOnDisk& selected) {
 
     if      (ext == "tis") draw_tis_settings(selected.filename);
     else if (ext == "dds" || ext == "png" || ext == "jpg") draw_tis_settings(active_tis_path_.empty() ? strip_extension(selected.filename) + ".tis" : active_tis_path_);
-    else if (ext == "mis")  draw_mis_settings(selected.filename);
-    else if (ext == "cmdl") draw_mis_settings(strip_extension(selected.filename) + ".mis");
+    else if (ext == "mis")  { draw_mis_settings(selected.filename); draw_skeleton_section(strip_extension(selected.filename) + ".cmdl"); }
+    else if (ext == "cmdl") { draw_mis_settings(strip_extension(selected.filename) + ".mis"); draw_skeleton_section(selected.filename); }
     else if (selected.type &&
              selected.type->get_asset_class_type() == &AnimationSeqAsset::StaticType)
         draw_anim_seq_editor(selected.filename);

@@ -70,6 +70,7 @@ public:
 	// REF AssetPtr<DataClass> mirrorTableAsset;			// this is a SkeletonMirror object ptr, fixme needs better
 	// type hints
 	REF std::vector<std::string> keepBones;	 // array of bones to keep (compilier automatically prunes out unused bones)
+	REF bool disablePruneUnusedBones = false; // if true, keep all bones (don't prune unused/unreferenced bones)
 	REF std::vector<std::string> curveNames; // array of strings that can be used to name custom curves for animations
 
 	// additional glb files to source animations from (will retarget)
