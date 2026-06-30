@@ -168,14 +168,20 @@ static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip, bo
 
 void agClipNode::get_pose(agGetPoseCtx& ctx) {
 	if (!has_init) {
-		if (!seq || !clipFrom)
-			throw std::runtime_error("agClipNode: no sequence");
-
-		if (!clipFrom->get_skel())
-			throw std::runtime_error("agClipNode: sequence without skel");
+		if (!seq || !clipFrom) {
+			sys_print(Error, "agClipNode::get_pose: no sequence set\n");
+			has_init = true;
+			return; // output pose is already default (bind pose)
+		}
+		if (!clipFrom->get_skel()) {
+			sys_print(Error, "agClipNode::get_pose: clip model has no skeleton\n");
+			has_init = true;
+			return;
+		}
 		remap = ctx.get_skeleton().get_remap(clipFrom->get_skel());
 		has_init = true;
 	}
+	if (!seq) return; // was set but later cleared (e.g. hot-reload)
 
 	const float playSpeed = speed.get_float(ctx);
 	const float prev_time = anim_time;
