@@ -165,6 +165,7 @@ private:
 class agAddNode : public agBaseNode
 {
 public:
+	CLASS_BODY(agAddNode);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
 	void refresh_after_model_reload(Model* reloaded) final;
@@ -175,6 +176,7 @@ public:
 class agIk2Bone : public agBaseNode
 {
 public:
+	CLASS_BODY(agIk2Bone);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
 	void refresh_after_model_reload(Model* reloaded) final;
@@ -196,6 +198,7 @@ private:
 class agModifyBone : public agBaseNode
 {
 public:
+	CLASS_BODY(agModifyBone);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
 	void refresh_after_model_reload(Model* reloaded) final;
@@ -203,8 +206,10 @@ public:
 	agBaseNode* input = nullptr;
 	ValueType translationVal = glm::vec3(0.f);
 	ValueType rotationVal = glm::vec3(0.f);
+	ValueType scaleVal = glm::vec3(1.f);
 	ModifyBoneType translation = {};
 	ModifyBoneType rotation = {};
+	ModifyBoneType scale = {};
 	ValueType alpha = 0.f;
 	StringName boneName;
 
@@ -215,6 +220,7 @@ private:
 class agCopyBone : public agBaseNode
 {
 public:
+	CLASS_BODY(agCopyBone);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
 	void refresh_after_model_reload(Model* reloaded) final;
@@ -223,6 +229,8 @@ public:
 	StringName targetBone;
 	ValueType copyTranslation = false;
 	ValueType copyRotation = false;
+	ValueType copyScale = false;
+	ValueType alpha = 1.f;
 	bool copyBonespace = false;
 
 private:

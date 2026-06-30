@@ -37,12 +37,14 @@ void AnimGraphTester::start() {
     else
         mesh->set_model_str("animman/models/animman.cmdl");
 
-    // Spawn the moveable target entity (billboard, transient)
-    Entity* tgt = eng->get_level()->spawn_entity();
-    tgt->set_editor_transient(true);
-    tgt->create_component<BillboardComponent>();
-    tgt->set_ws_position(get_owner()->get_ws_position() + glm::vec3(0.f, 1.5f, 2.f));
-    target_entity = tgt->get_self_ptr();
+    // Spawn the moveable target entity (billboard, transient) — runtime only
+    if (!eng->is_editor_level()) {
+        Entity* tgt = eng->get_level()->spawn_entity();
+        tgt->set_editor_transient(true);
+        tgt->create_component<BillboardComponent>();
+        tgt->set_ws_position(get_owner()->get_ws_position() + glm::vec3(0.f, 1.5f, 2.f));
+        target_entity = tgt->get_self_ptr();
+    }
 
     rebuild_graph();
     last_mode = mode;
