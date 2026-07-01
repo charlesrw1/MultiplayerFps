@@ -337,12 +337,16 @@ void AnimSeqEditor::draw_additive_settings() {
     changed |= ImGui::Checkbox("From self (subtract a frame of this clip)", &mis_additive_self_);
 
     if (mis_additive_self_) {
-        int max_frame = 0;
         auto* seq = (model_ && model_->get_skel()) ? model_->get_skel()->find_clip(clip_name_) : nullptr;
-        if (seq) max_frame = std::max(0, seq->get_num_keyframes_inclusive() - 1);
+        int max_frame = seq ? std::max(0, seq->get_num_keyframes_inclusive() - 1) : 0;
+        float max_time = seq ? seq->get_time_of_keyframe(max_frame) : 0.f;
+        float time = seq ? seq->get_time_of_keyframe(mis_additive_frame_) : 0.f;
         ImGui::SetNextItemWidth(160.f);
-        if (ImGui::SliderInt("Frame to diff from", &mis_additive_frame_, 0, max_frame))
+        // Exposed to the user in seconds (duration units); converted to a frame index for storage.
+        if (ImGui::SliderFloat("Time to diff from", &time, 0.f, max_time)) {
+            mis_additive_frame_ = seq ? seq->get_frame_for_time(time) : 0;
             changed = true;
+        }
     } else {
         char buf[128];
         strncpy_s(buf, mis_subtract_clip_.c_str(), sizeof(buf) - 1);
