@@ -83,6 +83,12 @@ public:
 	IGraphicsTexture* probe_irradiance = nullptr;
 	IGraphicsTexture* probe_depth = nullptr;
 
+	// True once execute() bakes fresh probe textures this session; false when
+	// probe_irradiance/probe_depth were only just reloaded unchanged from disk
+	// (load_the_gi), so save_to_disk knows the on-disk copy is already current
+	// and skips re-downloading/re-encoding them.
+	bool ddgi_baked_this_session = false;
+
 	float max_relocate_dist = 1.0; // in meteres, how far can probe trace and relocate?
 	float indirect_boost = 1.0;	   // probe_irrad += albedo * sample_irradiance() * indirect_boost
 private:

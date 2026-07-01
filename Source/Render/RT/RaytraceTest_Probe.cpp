@@ -130,6 +130,7 @@ void DdgiTesting::execute() {
     gfx().bind_storage_buffer_base(11, draw.buf.lighting_uniforms);
 
     create_textures_raybuffer(width_probe_space, height_probe_space);
+    ddgi_baked_this_session = true;
 
     auto& device = draw.get_device();
 

@@ -162,6 +162,7 @@ void DdgiTesting::load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, 
         this->probe_depth->release();
     }
     probe_depth = depth;
+    ddgi_baked_this_session = false;
 
     compute_avg_probe_value();
 }

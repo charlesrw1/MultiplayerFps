@@ -220,7 +220,12 @@ void GameSceneGiUtil::save_to_disk() {
 
 	);
 
-	if (draw.ddgi->probe_irradiance) {
+	if (!draw.ddgi->ddgi_baked_this_session) {
+		// DDGI wasn't (re)baked this session, just reloaded from disk unchanged
+		// (e.g. only cubemaps were baked) -- the on-disk copy is already
+		// current, and it may not even be in a format download() can decode.
+		sys_print(Info, "save_baked_gi: ddgi unchanged, skipping probe irrad/depth save\n");
+	} else if (draw.ddgi->probe_irradiance) {
 		auto t = draw.ddgi->probe_irradiance;
 		save_float_texture_as_dds(t, t->get_size().x, t->get_size().y, 1,
 								  (dir + irrad_suffix).c_str());
