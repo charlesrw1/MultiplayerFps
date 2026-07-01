@@ -15,8 +15,16 @@
 #include "LevelEditor/EditorDocLocal.h"
 #include "LevelEditor/SelectionState.h"
 #include "Animation/Runtime/RuntimeNodesNew2.h"
+#include "AssetCompile/ModelAsset2.h"
+#include "AssetCompile/Someutils.h"
+#include "AssetTools/AssetCompiler.h"
+#include "Framework/SerializerJson.h"
+#include "Framework/Files.h"
 #include <imgui.h>
 #include <algorithm>
+
+// Defined in Model.cpp; forward-declare to avoid pulling in extra headers.
+extern void write_model_import_settings(ModelImportSettings* mis, const std::string& savepath);
 
 // ---------------------------------------------------------------------------
 // AnimEventEditorItem — SequencerEditorItem backed by an AnimEvent
@@ -160,6 +168,7 @@ void AnimSeqEditor::set_asset(const std::string& asset_path) {
     curve_ed_->user_ptr = &ctx;
 
     sync_editor_to_clip();
+    load_additive_settings();
     activate_preview();
 }
 
@@ -219,6 +228,155 @@ void AnimSeqEditor::apply_sidecar() {
 void AnimSeqEditor::revert_editor() {
     dirty_ = false;
     sync_editor_to_clip(); // discards unsaved editor changes
+}
+
+// ---------------------------------------------------------------------------
+// Additive import settings (.mis) — separate from the .amd sidecar
+// ---------------------------------------------------------------------------
+
+namespace {
+// Read a game file and strip the "!json\n" prefix written by write_model_import_settings.
+std::string read_mis_json(const std::string& mis_path) {
+    auto f = FileSys::open_read_game(mis_path);
+    if (!f) return {};
+    std::string text(f->size(), '\0');
+    f->read(text.data(), f->size());
+    f->close();
+    if (text.find("!json") != 0) return {};
+    size_t nl = text.find('\n');
+    return (nl != std::string::npos) ? text.substr(nl + 1) : std::string{};
+}
+
+// Holds the parsed object together with the backend that owns its memory.
+struct MisLoad {
+    MakeObjectFromPathGeneric objmaker;
+    std::unique_ptr<ReadSerializerBackendJson> reader;
+    ModelImportSettings* mis = nullptr;
+};
+bool load_mis(const std::string& mis_path, MisLoad& out) {
+    std::string json = read_mis_json(mis_path);
+    if (json.empty()) return false;
+    out.reader = std::make_unique<ReadSerializerBackendJson>("anim_seq_mis", json, out.objmaker);
+    ClassBase* obj = out.reader->get_root_obj();
+    out.mis = obj ? obj->cast_to<ModelImportSettings>() : nullptr;
+    return out.mis != nullptr;
+}
+} // namespace
+
+void AnimSeqEditor::load_additive_settings() {
+    mis_make_additive_ = mis_additive_self_ = false;
+    mis_additive_frame_ = 0;
+    mis_subtract_clip_.clear();
+    mis_dirty_ = false;
+    mis_path_.clear();
+    if (!model_) return;
+
+    mis_path_ = strip_extension(model_->get_name()) + ".mis";
+
+    MisLoad load;
+    if (load_mis(mis_path_, load)) {
+        for (auto& a : load.mis->animations) {
+            if (a.clipName == clip_name_) {
+                mis_make_additive_  = a.makeAdditive;
+                mis_additive_self_  = a.additiveFromSelf;
+                mis_additive_frame_ = a.additiveSelfFrame;
+                mis_subtract_clip_  = a.otherClipToSubtract;
+                break;
+            }
+        }
+    }
+    orig_make_additive_  = mis_make_additive_;
+    orig_additive_self_  = mis_additive_self_;
+    orig_additive_frame_ = mis_additive_frame_;
+    orig_subtract_clip_  = mis_subtract_clip_;
+}
+
+void AnimSeqEditor::apply_additive_settings() {
+    if (!mis_dirty_ || mis_path_.empty()) return;
+
+    // Re-parse fresh so we preserve every other field in the .mis untouched.
+    MisLoad load;
+    if (!load_mis(mis_path_, load)) {
+        sys_print(Error, "AnimSeqEditor: cannot load %s to write additive settings\n", mis_path_.c_str());
+        return;
+    }
+
+    AnimImportSettings* entry = nullptr;
+    for (auto& a : load.mis->animations)
+        if (a.clipName == clip_name_) { entry = &a; break; }
+    if (!entry) {
+        AnimImportSettings a;
+        a.clipName = clip_name_;
+        load.mis->animations.push_back(std::move(a));
+        entry = &load.mis->animations.back();
+    }
+    entry->makeAdditive       = mis_make_additive_;
+    entry->additiveFromSelf   = mis_additive_self_;
+    entry->additiveSelfFrame  = mis_additive_frame_;
+    entry->otherClipToSubtract = mis_additive_self_ ? std::string{} : mis_subtract_clip_;
+
+    write_model_import_settings(load.mis, mis_path_);
+    AssetCompiler::compile_asset(mis_path_); // forces a model recompile (slow) — only reached when dirty
+
+    orig_make_additive_  = mis_make_additive_;
+    orig_additive_self_  = mis_additive_self_;
+    orig_additive_frame_ = mis_additive_frame_;
+    orig_subtract_clip_  = mis_subtract_clip_;
+    mis_dirty_ = false;
+}
+
+void AnimSeqEditor::draw_additive_settings() {
+    ImGui::SeparatorText("Additive (model import settings)");
+    ImGui::TextDisabled("In %s — Apply forces a model recompile.",
+                        mis_path_.empty() ? "(no .mis)" : mis_path_.c_str());
+
+    bool changed = false;
+    changed |= ImGui::Checkbox("Make additive", &mis_make_additive_);
+
+    ImGui::BeginDisabled(!mis_make_additive_);
+    changed |= ImGui::Checkbox("From self (subtract a frame of this clip)", &mis_additive_self_);
+
+    if (mis_additive_self_) {
+        int max_frame = 0;
+        auto* seq = (model_ && model_->get_skel()) ? model_->get_skel()->find_clip(clip_name_) : nullptr;
+        if (seq) max_frame = std::max(0, seq->get_num_keyframes_inclusive() - 1);
+        ImGui::SetNextItemWidth(160.f);
+        if (ImGui::SliderInt("Frame to diff from", &mis_additive_frame_, 0, max_frame))
+            changed = true;
+    } else {
+        char buf[128];
+        strncpy_s(buf, mis_subtract_clip_.c_str(), sizeof(buf) - 1);
+        ImGui::SetNextItemWidth(220.f);
+        if (ImGui::InputText("Subtract clip", buf, sizeof(buf))) {
+            mis_subtract_clip_ = buf;
+            changed = true;
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("(?)");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Another clip whose first frame is subtracted.\nLeave empty (with 'From self' off) to subtract this clip's own frame 0.");
+    }
+    ImGui::EndDisabled();
+
+    // Only treat as dirty (recompile-worthy) when a value actually differs from disk.
+    if (changed) {
+        mis_dirty_ = (mis_make_additive_  != orig_make_additive_)  ||
+                     (mis_additive_self_  != orig_additive_self_)  ||
+                     (mis_additive_frame_ != orig_additive_frame_) ||
+                     (mis_subtract_clip_  != orig_subtract_clip_);
+    }
+
+    ImGui::BeginDisabled(!mis_dirty_);
+    if (ImGui::Button("Apply & Recompile")) apply_additive_settings();
+    ImGui::SameLine();
+    if (ImGui::Button("Revert##add")) {
+        mis_make_additive_  = orig_make_additive_;
+        mis_additive_self_  = orig_additive_self_;
+        mis_additive_frame_ = orig_additive_frame_;
+        mis_subtract_clip_  = orig_subtract_clip_;
+        mis_dirty_ = false;
+    }
+    ImGui::EndDisabled();
 }
 
 // ---------------------------------------------------------------------------
@@ -392,6 +550,7 @@ void AnimSeqEditor::imgui_draw() {
         dirty_ = true;
     ImGui::Separator();
     draw_event_properties();
+    draw_additive_settings();
 }
 
 #endif // EDITOR_BUILD

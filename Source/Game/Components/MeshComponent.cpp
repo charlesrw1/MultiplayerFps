@@ -346,17 +346,35 @@ void AnimPreviewComponent::update_mesh_component() {
 	mesh->set_model((Model*)model);
 	if (asset && model) {
 		agBuilder builder;
+
+		// The clip source node: frame-locked (scrubber) or looping playback.
+		agBaseNode* clip = nullptr;
 		if (wants_force_frame) {
-			auto clip = builder.alloc<agEvaluateClip>();
-			clip->set_clip(asset);
-			builder.set_root(clip);
-			this->eval = clip;
+			auto ev = builder.alloc<agEvaluateClip>();
+			ev->set_clip(asset);
+			this->eval = ev;
+			clip = ev;
 		} else {
-			auto clip = builder.alloc<agClipNode>();
-			clip->set_clip(asset);
-			clip->set_looping(true);
+			auto loop = builder.alloc<agClipNode>();
+			loop->set_clip(asset);
+			loop->set_looping(true);
+			clip = loop;
+		}
+
+		// An additive clip stores per-bone deltas, not an absolute pose — playing it
+		// straight up garbles the skeleton. Preview it the way it's meant to be used:
+		// the additive delta applied on top of the bind pose (bind + delta).
+		if (asset->seq && asset->seq->is_additive_clip) {
+			auto base = builder.alloc<agBindPose>();
+			auto add  = builder.alloc<agAddNode>();
+			add->input0 = base;
+			add->input1 = clip;
+			add->alpha  = 1.f;
+			builder.set_root(add);
+		} else {
 			builder.set_root(clip);
 		}
+
 		mesh->create_animator(&builder);
 	}
 }

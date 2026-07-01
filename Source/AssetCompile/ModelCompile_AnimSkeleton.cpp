@@ -241,7 +241,7 @@ unique_ptr<FinalSkeletonOutput> ModelCompileHelper::create_final_skeleton(
 				}
 			}
 			if (other) {
-				subtract_clips(FINAL_bone_to_LOAD_bone.size(), a, other);
+				subtract_clips(FINAL_bone_to_LOAD_bone.size(), a, other, clip.second.subtract_frame);
 				a->is_additive_clip = true;
 			}
 		}

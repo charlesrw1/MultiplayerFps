@@ -47,6 +47,7 @@ struct AnimationClip_Load
 {
 	SubtractType_Load sub = SubtractType_Load::None;
 	std::string subtract_clipname;
+	int subtract_frame = 0; // reference frame subtracted to form the additive delta
 	float fps = 30.0;
 	ClipCrop crop;
 
@@ -386,7 +387,7 @@ public:
 																 const SkeletonCompileData* compile_data,
 																 const ModelDefData& data);
 
-	static void subtract_clips(const int num_bones, AnimationSeq* target, const AnimationSeq* source);
+	static void subtract_clips(const int num_bones, AnimationSeq* target, const AnimationSeq* source, int ref_frame = 0);
 	static std::vector<std::string> create_final_material_names(const std::string& modelname,
 																const ModelCompileData& comp, const ModelDefData& data,
 																const std::vector<bool>& mats_refed);

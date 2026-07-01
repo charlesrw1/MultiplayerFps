@@ -135,6 +135,7 @@ ModelDefData new_import_settings_to_modeldef_data(const std::string& gamepath, M
 				acl.subtract_clipname = isa.otherClipToSubtract.substr(ofs);
 			} else {
 				acl.sub = SubtractType_Load::FromThis;
+				acl.subtract_frame = isa.additiveSelfFrame; // frame to diff against (additive-from-self)
 			}
 		} else
 			acl.sub = SubtractType_Load::None;

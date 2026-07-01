@@ -48,6 +48,7 @@ struct AnimImportSettings
 	REF bool fixLoop = false;
 	REF bool makeAdditive = false;
 	REF bool additiveFromSelf = false;
+	REF int additiveSelfFrame = 0; // when additiveFromSelf, subtract this frame of the clip (default = first frame)
 	REF bool removeLinearVelocity = false; // if true, then subtracts linear_velocity*t from each position
 	REF bool enableRootMotion = false;	   // if true, then marks clip for root motion, note that you shouldnt use
 										   // removeLinearVelocity or setRootToFirstPose

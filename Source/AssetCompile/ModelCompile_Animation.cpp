@@ -467,10 +467,11 @@ void ModelCompileHelper::append_animation_seq_to_list(AnimationSourceToCompile s
 	final_->add_sequence(source.get_animation_name(), std::move(out_seq));
 }
 
-void ModelCompileHelper::subtract_clips(const int num_bones, AnimationSeq* target, const AnimationSeq* source) {
+void ModelCompileHelper::subtract_clips(const int num_bones, AnimationSeq* target, const AnimationSeq* source, int ref_frame) {
+	ref_frame = glm::clamp(ref_frame, 0, std::max(0, source->get_num_keyframes_inclusive() - 1));
 	Pose ref_pose;
 	for (int i = 0; i < num_bones; i++) {
-		ScalePositionRot transform = source->get_keyframe(i, 0, 0.0);
+		ScalePositionRot transform = source->get_keyframe(i, ref_frame, 0.0);
 		ref_pose.pos[i] = transform.pos;
 		ref_pose.q[i] = transform.rot;
 		ref_pose.scale[i] = transform.scale;

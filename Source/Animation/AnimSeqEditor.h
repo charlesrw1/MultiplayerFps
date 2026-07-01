@@ -32,6 +32,13 @@ private:
     void apply_sidecar();                // save .amd + reload model + re-sync editor
     void revert_editor();                // discard editor changes, re-sync from model
 
+    // Additive import settings live in the model's .mis, NOT the .amd sidecar. Writing
+    // them forces a (slow) model recompile, so they have their own load/apply path and
+    // dirty flag, and we only write the .mis when one of them actually changed.
+    void load_additive_settings();       // read this clip's AnimImportSettings from the .mis
+    void draw_additive_settings();       // UI section
+    void apply_additive_settings();      // write .mis + recompile (only if mis_dirty_)
+
     void activate_preview();             // find matching entity in scene, add AnimPreviewComponent
     void cleanup_preview();              // remove AnimPreviewComponent if we added it
     void update_preview_scrubber();      // sync current_time → force_frame each frame
@@ -48,6 +55,15 @@ private:
 
     std::unique_ptr<CurveEditorImgui> curve_ed_;
     bool dirty_ = false;
+
+    // Mirror of the current clip's additive import settings (.mis). `orig_*` holds the
+    // last-loaded/saved values so we can tell whether a recompile is actually needed.
+    std::string mis_path_;
+    bool        mis_make_additive_   = false,  orig_make_additive_   = false;
+    bool        mis_additive_self_   = false,  orig_additive_self_   = false;
+    int         mis_additive_frame_  = 0,      orig_additive_frame_  = 0;
+    std::string mis_subtract_clip_,            orig_subtract_clip_;
+    bool        mis_dirty_ = false;
 
     // Preview
     EntityPtr preview_entity_;
