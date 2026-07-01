@@ -2,9 +2,9 @@
 
 A custom C++ game engine
 
-## Build
+## Stats
 
-Let your AI agent figure it out.
+![C++ LOC over time](docs/images/loc_history_.png)
 
 ## Screenshots
 
@@ -12,6 +12,6 @@ Let your AI agent figure it out.
 ![Screenshot 2](docs/images/screenshot_1821.png)
 ![Screenshot 3](docs/images/screenshot_1818.png)
 
-## Stats
+## Build
 
-![C++ LOC over time](docs/images/loc_history_.png)
+Let your AI agent figure it out.
