@@ -1,0 +1,281 @@
+"""
+Stylized Tiling Ground Texture - Substance Designer Python Script
+Run via: Tools > Script Editor > paste + Run
+
+Graph outputs: basecolor, normal, roughness
+Style: stone/concrete tiles, edge wear, pooled dust/dirt, stylized normals
+
+CAVEATS:
+  - Node definition IDs (sbs::compositing::xxx) and property IDs are SD-version-dependent.
+  - Run the script and check the console for WARNING lines — those are params that
+    didn't resolve. Use SD's node property panel to find the real param name.
+  - Tested structure is correct; param name mismatches are the expected failure mode.
+"""
+
+import sd
+from sd.api.sdproperty import SDPropertyCategory
+from sd.api.sdvaluefloat import SDValueFloat
+from sd.api.sdvalueint import SDValueInt
+from sd.api.sdvaluestring import SDValueString
+from sd.api.sdvaluecolorrgba import SDValueColorRGBA
+from sd.api.sdbasetypes import float2, ColorRGBA
+# Try multiple import paths — SD version determines which works
+SDSBSCompGraph = None
+_graph_import_paths = [
+    ("sd.api.sbs.sdsbscompgraph", "SDSBSCompGraph"),
+    ("sd.api.sbs.sdsbsgraph",     "SDSBSCompGraph"),
+    ("sd.api.sdgraph",            "SDSBSCompGraph"),
+]
+for _mod, _cls in _graph_import_paths:
+    try:
+        import importlib
+        _m = importlib.import_module(_mod)
+        SDSBSCompGraph = getattr(_m, _cls)
+        print(f"Imported {_cls} from {_mod}")
+        break
+    except Exception:
+        pass
+if SDSBSCompGraph is None:
+    raise ImportError("Could not find SDSBSCompGraph — run the discovery snippet below to find it")
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def new_node(graph, node_id, x, y):
+    node = graph.newNode(node_id)
+    if node is None:
+        raise RuntimeError(f"newNode returned None — bad identifier: '{node_id}'\n"
+                           "Run discover_nodes() to find the real IDs.")
+    try:
+        node.setPosition(float2(x, y))
+    except Exception:
+        pass  # position is cosmetic, don't abort
+    return node
+
+
+def probe_nodes(graph, candidates):
+    """Try creating each candidate node ID; print OK/FAIL. Deletes test nodes after."""
+    for node_id in candidates:
+        try:
+            n = graph.newNode(node_id)
+            if n is not None:
+                print(f"OK:   {node_id}")
+                try:
+                    graph.deleteNode(n)
+                except Exception:
+                    pass
+            else:
+                print(f"FAIL: {node_id}")
+        except Exception as e:
+            print(f"ERR:  {node_id}  ({e})")
+
+def connect(graph, src, src_slot, dst, dst_slot):
+    s = src.getPropertyFromId(src_slot, SDPropertyCategory.Output)
+    d = dst.getPropertyFromId(dst_slot, SDPropertyCategory.Input)
+    if s and d:
+        graph.newConnection(s, d)
+    else:
+        print(f"WARNING: connect failed  {src_slot} -> {dst_slot}")
+
+def set_f(node, pid, val):
+    p = node.getPropertyFromId(pid, SDPropertyCategory.Input)
+    if p:
+        node.setPropertyValue(p, SDValueFloat.sNew(val))
+    else:
+        print(f"WARNING: float param not found: {pid}")
+
+def set_i(node, pid, val):
+    p = node.getPropertyFromId(pid, SDPropertyCategory.Input)
+    if p:
+        node.setPropertyValue(p, SDValueInt.sNew(val))
+    else:
+        print(f"WARNING: int param not found: {pid}")
+
+def set_color(node, pid, r, g, b, a=1.0):
+    p = node.getPropertyFromId(pid, SDPropertyCategory.Input)
+    if p:
+        node.setPropertyValue(p, SDValueColorRGBA.sNew(ColorRGBA(r, g, b, a)))
+    else:
+        print(f"WARNING: color param not found: {pid}")
+
+def make_output(graph, label, x, y):
+    node = new_node(graph, "sbs::compositing::output", x, y)
+    p = node.getPropertyFromId("identifier", SDPropertyCategory.Annotation)
+    if p:
+        node.setAnnotationPropertyValue(p, SDValueString.sNew(label))
+    else:
+        print(f"WARNING: could not set output identifier for {label}")
+    return node
+
+
+# ---------------------------------------------------------------------------
+# Main graph build
+# ---------------------------------------------------------------------------
+
+def build():
+    ctx = sd.getContext()
+    app = ctx.getSDApplication()
+    pkg_mgr = app.getPackageMgr()
+
+    pkg = pkg_mgr.newUserPackage()
+    graph = SDSBSCompGraph.sNew(pkg)
+    graph.setIdentifier("StylizedTiledGround")
+
+    # Probe which node IDs actually work — remove the return below after probing
+    probe_nodes(graph, [
+        # Tile / pattern generators
+        "sbs::compositing::tile_generator",
+        "sbs::compositing::tilegenerator",
+        "sbs::compositing::tile_random",
+        # Edge
+        "sbs::compositing::edge_detect",
+        "sbs::compositing::edgedetect",
+        # Blur
+        "sbs::compositing::blur_hq",
+        "sbs::compositing::blurhq",
+        "sbs::compositing::blur",
+        # Clouds / noise
+        "sbs::compositing::clouds_1",
+        "sbs::compositing::clouds1",
+        "sbs::compositing::clouds",
+        "sbs::compositing::perlin_noise",
+        "sbs::compositing::perlinnoise",
+        # Warp
+        "sbs::compositing::directional_warp",
+        "sbs::compositing::directionalwarp",
+        "sbs::compositing::warp",
+        # Levels / histogram
+        "sbs::compositing::histogram_scan",
+        "sbs::compositing::histogramscan",
+        "sbs::compositing::levels",
+        # Core
+        "sbs::compositing::blend",
+        "sbs::compositing::normal",
+        "sbs::compositing::uniform_color",
+        "sbs::compositing::uniform",
+        "sbs::compositing::output",
+    ])
+    return  # remove this line after probing
+
+    # ---- 1. TILE GENERATOR -------------------------------------------------
+    # Produces the base tile height/mask: white tiles, dark grout gaps.
+    tile = new_node(graph, "sbs::compositing::tile_generator", 0, 0)
+    set_i(tile, "x_amount", 6)            # 6x6 tile grid
+    set_i(tile, "y_amount", 6)
+    set_f(tile, "interstice", 0.025)      # grout gap width
+    set_f(tile, "corner_rounding", 0.06)  # softens corners (stylized)
+    set_f(tile, "height_variance", 0.08)  # slight per-tile height variation
+
+    # ---- 2. EDGE DETECT (grout/wear mask) ----------------------------------
+    # Finds the grout lines — used to mask where wear and dirt pools.
+    edge = new_node(graph, "sbs::compositing::edge_detect", 300, 0)
+    connect(graph, tile, "output", edge, "input")
+    set_f(edge, "width", 0.035)
+    set_f(edge, "contrast", 1.0)
+
+    # ---- 3. BLUR: soften edge mask -----------------------------------------
+    edge_blur = new_node(graph, "sbs::compositing::blur_hq", 600, 0)
+    connect(graph, edge, "output", edge_blur, "input")
+    set_f(edge_blur, "intensity", 5.0)
+
+    # ---- 4. CLOUDS (dirt/dust texture) -------------------------------------
+    # Large, soft blobs of dirt/dust to scatter across the surface.
+    clouds = new_node(graph, "sbs::compositing::clouds_1", 0, -400)
+    set_f(clouds, "scale", 3.5)
+
+    # ---- 5. WARP: break up cloud regularity --------------------------------
+    warp = new_node(graph, "sbs::compositing::directional_warp", 300, -400)
+    connect(graph, clouds, "output", warp, "input")
+    connect(graph, clouds, "output", warp, "intensity_input")  # warp by itself
+    set_f(warp, "intensity", 10.0)
+
+    # ---- 6. HISTOGRAM SCAN: sharpen dirt contrast --------------------------
+    dirt_levels = new_node(graph, "sbs::compositing::histogram_scan", 600, -400)
+    connect(graph, warp, "output", dirt_levels, "input")
+    set_f(dirt_levels, "position", 0.55)
+    set_f(dirt_levels, "contrast", 0.65)
+
+    # ---- 7. BLEND: dirt pooled into grout lines ----------------------------
+    # Dirt is strongest at tile edges.
+    edge_dirt = new_node(graph, "sbs::compositing::blend", 900, -200)
+    connect(graph, dirt_levels, "output", edge_dirt, "source")
+    connect(graph, edge_blur,  "output", edge_dirt, "destination")
+    connect(graph, edge_blur,  "output", edge_dirt, "mask")
+    set_i(edge_dirt, "blending_mode", 6)  # 6 = multiply
+    set_f(edge_dirt, "opacity", 0.85)
+
+    # ---- 8. BLEND: light surface dirt scatter on tile faces ----------------
+    surface_dirt = new_node(graph, "sbs::compositing::blend", 900, -400)
+    connect(graph, dirt_levels,   "output", surface_dirt, "source")
+    connect(graph, tile,          "output", surface_dirt, "destination")
+    connect(graph, dirt_levels,   "output", surface_dirt, "mask")
+    set_i(surface_dirt, "blending_mode", 3)  # 3 = add soft
+    set_f(surface_dirt, "opacity", 0.18)
+
+    # ---- 9. HEIGHT: merge tile + edge dirt into final height ---------------
+    height = new_node(graph, "sbs::compositing::blend", 1200, 0)
+    connect(graph, tile,      "output", height, "destination")
+    connect(graph, edge_dirt, "output", height, "source")
+    set_i(height, "blending_mode", 2)   # 2 = subtract (edges dip lower)
+    set_f(height, "opacity", 0.25)
+
+    # ---- 10. NORMAL from height --------------------------------------------
+    # Moderate intensity — stylized look, not hyper-detailed.
+    normal = new_node(graph, "sbs::compositing::normal", 1500, 0)
+    connect(graph, height, "output", normal, "input")
+    set_f(normal, "intensity", 3.5)
+
+    # ---- 11. BASE COLOR: tile + dirt colors --------------------------------
+    tile_color = new_node(graph, "sbs::compositing::uniform_color", 0, 400)
+    set_color(tile_color, "outputcolor", 0.80, 0.74, 0.62)  # warm light stone
+
+    dirt_color = new_node(graph, "sbs::compositing::uniform_color", 300, 400)
+    set_color(dirt_color, "outputcolor", 0.33, 0.26, 0.18)  # dark earthy dirt
+
+    color_blend = new_node(graph, "sbs::compositing::blend", 900, 400)
+    connect(graph, tile_color,    "output", color_blend, "destination")
+    connect(graph, dirt_color,    "output", color_blend, "source")
+    connect(graph, surface_dirt,  "output", color_blend, "mask")
+    set_i(color_blend, "blending_mode", 0)  # 0 = normal
+    set_f(color_blend, "opacity", 1.0)
+
+    # ---- 12. ROUGHNESS: smooth tile, rough dirt ----------------------------
+    rough_base = new_node(graph, "sbs::compositing::uniform_color", 600, 600)
+    set_color(rough_base, "outputcolor", 0.28, 0.28, 0.28)  # smooth tile base
+
+    roughness = new_node(graph, "sbs::compositing::blend", 900, 600)
+    connect(graph, rough_base,   "output", roughness, "destination")
+    connect(graph, dirt_levels,  "output", roughness, "source")
+    connect(graph, surface_dirt, "output", roughness, "mask")
+    set_i(roughness, "blending_mode", 1)  # 1 = add
+    set_f(roughness, "opacity", 0.55)     # dirt adds significant roughness
+
+    # ---- 13. OUTPUT NODES --------------------------------------------------
+    out_color = make_output(graph, "basecolor", 1800, 400)
+    connect(graph, color_blend, "output", out_color, "inputNodeOutput")
+
+    out_normal = make_output(graph, "normal", 1800, 0)
+    connect(graph, normal, "output", out_normal, "inputNodeOutput")
+
+    out_rough = make_output(graph, "roughness", 1800, 600)
+    connect(graph, roughness, "output", out_rough, "inputNodeOutput")
+
+    print("="*50)
+    print("Graph created: StylizedTiledGround")
+    print("Outputs: basecolor | normal | roughness")
+    print("Check warnings above for any broken param names.")
+    print("="*50)
+
+
+build()
+
+# ============================================================
+# DISCOVERY SNIPPET — run standalone if import still fails.
+# Prints every sd.* module containing "graph" or "sbs".
+# ============================================================
+import pkgutil, sd
+for finder, name, ispkg in pkgutil.walk_packages(sd.__path__, sd.__name__ + '.'):
+    if 'graph' in name.lower() or 'sbs' in name.lower():
+        print(name)
