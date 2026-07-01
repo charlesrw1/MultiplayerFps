@@ -218,8 +218,8 @@ public:
 		// | gbuffer		|		X		|		Y		|		Z		|		A		|
 		// ----------------------------------------------------------------------------------
 		// | RGB16F			|	NORMAL X	|	NORMAL Y	|	NORMAL Z	|				|
-		// | R8G8B8A8		|	albedo R	|	albedo G	|	albedo B	|	AO			|
-		// | R8G8B8A8		|	Metallic	|	Roughness	|	Custom		|	MatID		|
+		// | R8G8B8A8		|	albedo R	|	albedo G	|	albedo B	|	alias2		|
+		// | R8G8B8A8		|	Metallic	|	Roughness	|	alias1		|	MatID		|
 		// ----------------------------------------------------------------------------------
 
 		// Emissive outputs to scene color

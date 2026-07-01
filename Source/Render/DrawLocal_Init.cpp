@@ -594,16 +594,17 @@ void Renderer::init_bloom_buffers() {
 
 	tex.bloom_vts_handle->update_specs_ptr(tex.bloom_chain[0].texture);
 
-	// AE ping-pong: 1×1 R16F
-	for (int i = 0; i < 2; ++i) {
-		safe_release(tex.ae_lum[i]);
-		CreateTextureArgs args;
-		args.width   = 1;
-		args.height  = 1;
-		args.format  = GraphicsTextureFormat::r16f;
-		args.num_mip_maps = 1;
-		args.sampler_type = GraphicsSamplerType::NearestClamped;
-		tex.ae_lum[i] = gfx().create_texture(args);
+	// AE ping-pong: 1×1 R16F — screen-size-independent; preserve across resizes to avoid exposure flash
+	if (!tex.ae_lum[0]) {
+		for (int i = 0; i < 2; ++i) {
+			CreateTextureArgs args;
+			args.width   = 1;
+			args.height  = 1;
+			args.format  = GraphicsTextureFormat::r16f;
+			args.num_mip_maps = 1;
+			args.sampler_type = GraphicsSamplerType::NearestClamped;
+			tex.ae_lum[i] = gfx().create_texture(args);
+		}
 	}
 }
 

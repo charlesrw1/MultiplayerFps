@@ -452,7 +452,25 @@
       "Read(//c/Program Files/Microsoft Visual Studio/18/Insiders/MSBuild/Microsoft/VC/**)",
       "Read(//c/Program Files/Microsoft Visual Studio/18/Insiders/MSBuild/Microsoft/**)",
       "PowerShell(& \"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Insiders\\\\MSBuild\\\\Current\\\\Bin\\\\MSBuild.exe\" \"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\Source\\\\External\\\\External.vcxproj\" /p:Configuration=Debug /p:Platform=x64 /p:SolutionDir=\"C:\\\\Users\\\\charl\\\\source\\\\repos\\\\CsRemake\\\\\" /p:BuildingInsideVisualStudio=true /v:minimal /nologo 2>&1)",
-      "Bash(msbuild.cmd CsRemake.vcxproj -p:Configuration=Debug -p:Platform=x64 -nologo -verbosity:minimal)"
+      "Bash(msbuild.cmd CsRemake.vcxproj -p:Configuration=Debug -p:Platform=x64 -nologo -verbosity:minimal)",
+      "Bash(gh issue *)",
+      "PowerShell(Scripts\\\\build_and_test.ps1 -BuildOnly 2>&1 | Select-Object -Last 40)",
+      "PowerShell(msbuild.cmd CsRemake.sln /p:Configuration=Debug /p:Platform=x64 /t:CsRemake /m /nologo /v:minimal 2>&1 | Select-Object -Last 30)",
+      "PowerShell(msbuild.cmd CsRemake.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal 2>&1 | Select-Object -Last 30)",
+      "PowerShell(msbuild.cmd Source/App/App.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal 2>&1 | Select-Object -Last 30)",
+      "PowerShell(msbuild.cmd CsRemake.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal 2>&1 | Select-Object -Last 20; msbuild.cmd Source/App/App.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal 2>&1 | Select-Object -Last 15)",
+      "PowerShell(msbuild.cmd CsRemake.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal 2>&1 | Select-Object -Last 15)",
+      "PowerShell(msbuild.cmd Source/App/App.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal 2>&1 | Select-Object -Last 10)",
+      "PowerShell(msbuild.cmd CsRemake.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal 2>&1 | Select-Object -Last 8; msbuild.cmd Source/App/App.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal 2>&1 | Select-Object -Last 8)",
+      "PowerShell(msbuild.cmd CsRemake.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal 2>&1 | Select-Object -Last 4; msbuild.cmd Source/App/App.vcxproj /p:Configuration=Debug /p:Platform=x64 /m /nologo /v:minimal 2>&1 | Select-Object -Last 4)",
+      "Bash(grep -v \"//\\\\|return\\\\|nullptr\\\\|none\\\\|func\\\\|internal\\\\|index\\\\|min\\\\|inline\\\\|union\\\\|column\\\\|enum\\\\|clone\\\\|pin\\\\|begin\\\\|continue\\\\|open\\\\|own\\\\|typename\\\\|token\\\\|known\\\\|btn\\\\|contain\\\\|spawn\\\\|anim\\\\|line\\\\|done\\\\|hen\\\\|skin\\\\|bone\\\\|in/out\\\\|sign\\\\|once\\\\|can\\\\|icon\")",
+      "Bash(grep -v \"//\\\\|\\\\.h:\")",
+      "Bash(grep -v \"//\\\\|External\\\\|\\\\.h:\")",
+      "Bash(mkdir -p D:/data/eng/icons)",
+      "Bash(cp ~/Downloads/undo_16dp_E3E3E3_FILL0_wght400_GRAD0_opsz20.png D:/data/eng/icons/undo.png)",
+      "Bash(cp ~/Downloads/delete_16dp_E3E3E3_FILL0_wght400_GRAD0_opsz20.png D:/data/eng/icons/delete.png)",
+      "Bash(cp ~/Downloads/add_circle_16dp_E3E3E3_FILL0_wght400_GRAD0_opsz20.png D:/data/eng/icons/add_circle.png)",
+      "Bash(cp ~/Downloads/document_search_16dp_E3E3E3_FILL0_wght400_GRAD0_opsz20.png D:/data/eng/icons/doc_search.png)"
     ]
   },
   "enabledPlugins": {
