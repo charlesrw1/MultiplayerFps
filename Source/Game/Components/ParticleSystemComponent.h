@@ -81,8 +81,9 @@ public:
 	REF AssetPtr<ParticleAsset> particle_asset;
 	REF bool play_on_awake = true;
 	REF float playback_speed = 1.f;
+
 	// if set, owning entity is destroyed the moment this system finishes playing (no looping subsystems, no particles alive)
-	REF bool destroy_owner_when_finished = false;
+	bool destroy_owner_when_finished = false;
 
 	REF void play();
 	REF void stop_emitting();
