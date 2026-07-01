@@ -126,10 +126,11 @@ public:
 	void create_shaders();
 
 	void render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled, bool force_show_backface,
-							  bool depth_less_than_op, float poly_offset_factor = 0.f);
+							  bool depth_less_than_op, float poly_offset_factor = 0.f,
+							  bool wireframe_overlay = false);
 	void execute_render_lists(Render_Lists& lists, Render_Pass& pass, bool depth_test_enabled,
 							  bool force_show_backfaces, bool depth_less_than_op,
-							  float poly_offset_factor = 0.f);
+							  float poly_offset_factor = 0.f, bool wireframe_overlay = false);
 
 	void scene_draw_internal(SceneDrawParamsEx params, View_Setup view);
 	IGraphicsTexture* do_post_process_stack(const std::vector<MaterialInstance*>& stack);
@@ -347,7 +348,8 @@ private:
 	std::unique_ptr<ThumbnailRenderer> thumbnailRenderer;
 #endif
 
-	void upload_ubo_view_constants(const View_Setup& view, IGraphicsBuffer* ubo, bool wireframe_secondpass = false);
+	void upload_ubo_view_constants(const View_Setup& view, IGraphicsBuffer* ubo, bool wireframe_secondpass = false,
+								   bool wireframe_overlay_pass = false);
 
 	void upload_light_and_decal_buffers();
 

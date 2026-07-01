@@ -93,7 +93,8 @@ void BuildSceneData_CpuFast::upload_gpu_cmds(int sum_count) {
 }
 
 void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, bool depth_less_than_op,
-				  bool force_backface, Model* m, bool overdraw_vis, float poly_offset_factor = 0.f) {
+				  bool force_backface, Model* m, bool overdraw_vis, float poly_offset_factor = 0.f,
+				  bool wireframe_overlay = false) {
 	ASSERT(mat != nullptr);
 	ASSERT(m != nullptr);
 
@@ -136,6 +137,16 @@ void setup_batch2(const MaterialInstance* mat, const int offset, bool is_depth, 
 		state.polygon_offset_enabled = true;
 		state.polygon_offset_factor = poly_offset_factor;
 		state.polygon_offset_units = 4.f; // historic value; comment claimed "this does nothing?"
+	}
+	if (wireframe_overlay) {
+		// soft line overlay on top of the already-shaded gbuffer: alpha-blend toward a light
+		// color (not black) so it stays visible against dark albedo; no depth write; only touch
+		// the emissive/color target (index 3) so gbuffer0-2/objid/motion stay intact.
+		state.blend = BlendState::BLEND;
+		state.depth_writes = false;
+		for (auto& mask : state.color_write_masks)
+			mask = {false, false, false, false};
+		state.color_write_masks[3] = {true, true, true, true};
 	}
 
 	gfx().set_pipeline(state);
@@ -184,7 +195,8 @@ void BuildSceneData_CpuFast::do_draw_shared(int flags, float poly_factor) {
 			if (count != 0) {
 
 				setup_batch2(cmd_to_extra.at(mat_ofs).material, offset, is_depth, want_less_than, force_backface,
-							 cmd_to_extra.at(mat_ofs).model, flags & OVERDRAWVIS, effective_poly_offset);
+							 cmd_to_extra.at(mat_ofs).model, flags & OVERDRAWVIS, effective_poly_offset,
+							 flags & WIREFRAME_OVERLAY);
 
 				const int indirect_byte_offset = offset_buffer_start + offset * DEIcmdSz;
 				if (r_indirect_loop.get_bool()) {
@@ -255,12 +267,14 @@ GpuCullInput BuildSceneData_CpuFast::get_cull_input_shadow() const {
 	return input;
 }
 
-void BuildSceneData_CpuFast::do_gbuffer_draw(bool overdraw_visualization_2nd_pass) {
+void BuildSceneData_CpuFast::do_gbuffer_draw(bool overdraw_visualization_2nd_pass, bool wireframe_overlay) {
 	ASSERT(gpu.num_cullobjs >= 0);
 
 	int flags = 0;
 	if (overdraw_visualization_2nd_pass)
 		flags |= OVERDRAWVIS;
+	if (wireframe_overlay)
+		flags |= WIREFRAME_OVERLAY;
 	do_draw_shared(flags, 0);
 }
 

@@ -220,7 +220,8 @@ void Renderer::render_auto_exposure(IGraphicsTexture* scene_hdr, const PostProce
 }
 
 void setup_batch(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled, bool force_show_backfaces,
-				 bool depth_less_than_op, const int i, const int offset, float poly_offset_factor = 0.f) {
+				 bool depth_less_than_op, const int i, const int offset, float poly_offset_factor = 0.f,
+				 bool wireframe_overlay = false) {
 	const auto& batch = pass.batches[i];
 	const auto& mesh_batch = pass.mesh_batches[batch.first];
 
@@ -246,6 +247,16 @@ void setup_batch(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled,
 		state.polygon_offset_enabled = true;
 		state.polygon_offset_factor = poly_offset_factor;
 		state.polygon_offset_units = 4.f;
+	}
+	if (wireframe_overlay) {
+		// soft line overlay on top of the already-shaded gbuffer: alpha-blend toward a light
+		// color (not black) so it stays visible against dark albedo; no depth write; only touch
+		// the emissive/color target (index 3) so gbuffer0-2/objid/motion stay intact.
+		state.blend = BlendState::BLEND;
+		state.depth_writes = false;
+		for (auto& mask : state.color_write_masks)
+			mask = {false, false, false, false};
+		state.color_write_masks[3] = {true, true, true, true};
 	}
 	gfx().set_pipeline(state);
 
@@ -312,7 +323,7 @@ int setup_execute_render_lists(Render_Lists& list, Render_Pass& pass) {
 
 void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled,
 									bool force_show_backfaces, bool depth_less_than_op,
-									float poly_offset_factor) {
+									float poly_offset_factor, bool wireframe_overlay) {
 	const int offset_buffer_start = setup_execute_render_lists(list, pass);
 	int offset = 0;
 	const int DEIcmdSz = sizeof(gpu::DrawElementsIndirectCommand);
@@ -322,7 +333,7 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass, bool 
 		if (count != 0) {
 
 			setup_batch(list, pass, depth_test_enabled, force_show_backfaces, depth_less_than_op, i, offset,
-						poly_offset_factor);
+						poly_offset_factor, wireframe_overlay);
 
 			if (0) {
 				auto count_buf = list.get_count_buf();
@@ -369,12 +380,12 @@ void Renderer::execute_render_lists(Render_Lists& list, Render_Pass& pass, bool 
 
 void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool depth_test_enabled,
 									bool force_show_backfaces, bool depth_less_than_op,
-									float poly_offset_factor) {
+									float poly_offset_factor, bool wireframe_overlay) {
 	setup_execute_render_lists(list, pass);
 	int offset = 0;
 	for (int i = 0; i < pass.batches.size(); i++) {
 		setup_batch(list, pass, depth_test_enabled, force_show_backfaces, depth_less_than_op, i, offset,
-					poly_offset_factor);
+					poly_offset_factor, wireframe_overlay);
 
 		const int count = list.command_count[i];
 		const auto& batch = pass.batches[i];
@@ -407,7 +418,8 @@ void Renderer::render_level_to_target(const Render_Level_Params& params) {
 			upload = true;
 		}
 		if (upload)
-			upload_ubo_view_constants(params.view, what_ubo, params.wireframe_secondpass);
+			upload_ubo_view_constants(params.view, what_ubo, params.wireframe_secondpass,
+									  params.wireframe_overlay_pass);
 	}
 
 	gfx().bind_uniform_buffer_base(0, what_ubo);
@@ -441,10 +453,10 @@ void Renderer::render_level_to_target(const Render_Level_Params& params) {
 		// const bool depth_writes = params.pass != Render_Level_Params::TRANSLUCENT;
 		if (dont_use_mdi.get_bool()) {
 			render_lists_old_way(*params.rl, *params.rp, depth_testing, force_backface_state, depth_less_than,
-								 poly_offset_factor);
+								 poly_offset_factor, params.wireframe_overlay_pass);
 		} else {
 			execute_render_lists(*params.rl, *params.rp, depth_testing, force_backface_state, depth_less_than,
-								 poly_offset_factor);
+								 poly_offset_factor, params.wireframe_overlay_pass);
 		}
 	}
 

@@ -44,6 +44,7 @@ struct Render_Level_Params
 
 	bool is_wireframe_pass = false;
 	bool wireframe_secondpass = false;
+	bool wireframe_overlay_pass = false; // soft wireframe-over-shaded overlay (DEBUG_ALBEDO mode)
 
 	bool upload_constants = false;
 	IGraphicsBuffer* provied_constant_buffer = nullptr;

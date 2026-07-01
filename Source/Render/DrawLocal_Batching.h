@@ -161,7 +161,7 @@ public:
 	GpuCullInput get_cull_input() const;
 	GpuCullInput get_cull_input_shadow() const;
 
-	void do_gbuffer_draw(bool overdraw_visualization_2nd_pass);
+	void do_gbuffer_draw(bool overdraw_visualization_2nd_pass, bool wireframe_overlay = false);
 	void do_shadow_draw(float polyfac, bool lessthan);
 
 	int get_num_commands() const { return out_cmds.size(); }
@@ -179,6 +179,7 @@ private:
 		IS_SHADOW = 1,
 		DEPTH_LESSTHAN = 2,
 		OVERDRAWVIS = 4,
+		WIREFRAME_OVERLAY = 8,
 	};
 
 	void do_draw_shared(int flags, float polyfac);

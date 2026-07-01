@@ -44,6 +44,11 @@ const uint DEBUG_LIGHTMAP_UV = 10;
 const uint DEBUG_DRAWID = 11;
 const uint DEBUG_OVERDRAW = 12;
 
+// bits for Ubo_View_Constants_Struct.flags
+const uint FLAG_WIREFRAME_SECONDPASS = 1;
+const uint FLAG_NORMAL_SHADED_DEBUG = 2;
+const uint FLAG_WIREFRAME_OVERLAY = 4; // soft wireframe-over-shaded pass, see DEBUG_ALBEDO
+
 const uint INSTANCE_NON_UNIFORM_SCALE = 1;
 
 const uint MATERIAL_TYPE_LIT          = 0;

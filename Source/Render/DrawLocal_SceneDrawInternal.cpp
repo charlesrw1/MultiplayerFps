@@ -217,6 +217,29 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		if (!params.skybox_only)
 			BuildSceneData_CpuFast::inst->do_gbuffer_draw(type == GPRF_OVERDRAWVIS);
 		// GpuCullingTest::inst->dodraw();
+
+		// Unity-style "shaded wireframe": redraw the same triangles in line-fill mode,
+		// alpha-blended and depth-tested (no depth write) against the depth buffer just
+		// written, so hidden-line removal falls out for free. Occlusion culling splits
+		// the scene across GBUFFER_1 (last-frame-visible set, seeds the depth pyramid)
+		// and GBUFFER_2 (re-culled remainder) with separate GPU cull buffers, so this
+		// has to run right after each phase using that phase's own cull/visibility
+		// data - a single pass after both would only see whichever buffer was drawn
+		// last, missing every object exclusive to the other phase.
+		if (r_debug_mode.get_integer() == gpu::DEBUG_ALBEDO &&
+			(type == GPRF_GBUFFER_1 || type == GPRF_GBUFFER_2)) {
+			gfx().set_polygon_fill_mode(GraphicsFillMode::Line);
+			gfx().set_line_width(1.25f);
+
+			Render_Level_Params wf_params = cmdparams;
+			wf_params.wireframe_overlay_pass = true;
+			render_level_to_target(wf_params);
+
+			if (!params.skybox_only)
+				BuildSceneData_CpuFast::inst->do_gbuffer_draw(false, true);
+
+			gfx().set_polygon_fill_mode(GraphicsFillMode::Fill);
+		}
 	};
 
 	if (is_wireframe_mode) {

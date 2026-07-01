@@ -95,7 +95,8 @@ static float get_editor_grid_snap() {
 #endif
 }
 
-void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, IGraphicsBuffer* ubo, bool wireframe_secondpass) {
+void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, IGraphicsBuffer* ubo, bool wireframe_secondpass,
+										 bool wireframe_overlay_pass) {
 	gpu::Ubo_View_Constants_Struct constants;
 	auto& vs = view_to_use;
 	constants.view = vs.view;
@@ -145,6 +146,8 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, IGraphic
 	if (r_normal_shaded_debug.get_bool()) {
 		constants.flags |= (1 << 1);
 	}
+	if (wireframe_overlay_pass)
+		constants.flags |= (1 << 2);
 	constants.editor_grid_snap = get_editor_grid_snap();
 
 	ASSERT(ubo != nullptr);
