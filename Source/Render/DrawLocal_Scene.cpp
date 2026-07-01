@@ -256,7 +256,6 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 	//	cascade_vis[i] = memArena.alloc_bottom_type<uint8_t>(visible_count);
 
 	uint8_t* lod_to_render_array = memArena.alloc_bottom_type<uint8_t>(visible_count);
-	int16_t* camera_depth_array = memArena.alloc_bottom_type<int16_t>(visible_count);
 
 	{
 		CPUSCOPESTART(cpu_object_cull);
@@ -364,8 +363,20 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 				continue; // not visible
 
 			int16_t cam_depth = 0;
-			if (!dont_use_cam_depth)
-				cam_depth = camera_depth_array[i];
+			if (!dont_use_cam_depth) {
+				// camera_depth_array is allocated above but the job that used to fill it
+				// (cull_objects_job/calc_lod_job) is disabled, so it was never written —
+				// this read pulled uninitialized arena memory into the transparent sort
+				// key, causing nondeterministic back-to-front order. Compute it here
+				// instead, using linear (not squared) distance so nearby transparents
+				// keep enough precision in the 12-bit quantized bucket to sort correctly.
+				const glm::vec3 to_camera = glm::vec3(obj.type_.bounding_sphere_and_radius) - draw.current_frame_view.origin;
+				const float dist_to_camera = glm::length(to_camera);
+				const float max_cam_dist = 100.0f;
+				const float max_output = float(1 << 12);
+				float out_dist_cam = std::clamp(dist_to_camera / max_cam_dist, 0.f, 1.f);
+				cam_depth = (int16_t)(max_output * out_dist_cam);
+			}
 
 			auto model = proxy.model;
 			const auto& lod = model->get_lod(LOD_index);
