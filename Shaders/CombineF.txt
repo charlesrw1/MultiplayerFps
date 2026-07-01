@@ -115,6 +115,7 @@ layout (binding = 7, std140) uniform LitCompositorParamsUbo { LitCompositorParam
 #define lgq_gamma          params.lgq_gamma.xyz
 #define lgq_gain           params.lgq_gain.xyz
 #define ae_enabled         params.ae_enabled
+#define lens_dirt_intensity params.lens_dirt_intensity
 
 const float max_white = 1.0;
 
@@ -144,6 +145,17 @@ void main()
 	}
 
 	vec3 bloom_add = texture(bloom, texCoord).rgb;
+	// Lens dirt: mask texture streaks extra bloom energy through "dirty"
+	// specks/smudges. Weighted by bloom's own luminance (on top of the linear
+	// bloom_add factor already below) so it only shows up around genuinely
+	// bright bloom hotspots instead of uniformly over the whole low-level
+	// ambient glow (there's no bloom threshold, so bloom_add is nonzero almost
+	// everywhere in a lit scene). Additive so white mask + intensity=0 is a no-op.
+	if (lens_dirt_intensity > 0.0) {
+		vec3 dirt_mask = texture(lens_dirt, texCoord).rgb;
+		float bloom_lum = luminance(bloom_add);
+		bloom_add += bloom_add * dirt_mask * lens_dirt_intensity * bloom_lum;
+	}
 	vec3 both = mix(scene, bloom_add + scene, bloom_lerp);
 	// When AE is on, adapted exposure * manual exposure (acts as trim/bias).
 	// When AE is off, manual exposure only.

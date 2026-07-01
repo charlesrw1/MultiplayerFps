@@ -47,5 +47,7 @@ void main()
     FS_OUT_Upsample = e*4.0;
     FS_OUT_Upsample += (b+d+f+h)*2.0;
     FS_OUT_Upsample += (a+c+g+i);
-    FS_OUT_Upsample *= 1.0 / 16.0;
+    // mipWeight shapes the bloom curve: scales how much this mip's (blurrier,
+    // wider) contribution adds into the next-larger mip. 1.0 = unweighted.
+    FS_OUT_Upsample *= params.mipWeight / 16.0;
 }

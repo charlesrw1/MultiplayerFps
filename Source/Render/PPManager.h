@@ -1,6 +1,13 @@
 #pragma once
 #include <vector>
+#include <array>
 #include "glm/vec3.hpp"
+
+class Texture;
+
+// Per-mip weight curve for the bloom upsample chain. Must match MAX_BLOOM_MIPS
+// in Render/DrawLocal_Helpers.h (enforced by a static_assert in DrawLocal_RenderPass.cpp).
+constexpr int kBloomCurveMips = 6;
 
 struct PostProcessParams {
     float exposure          = 1.f;
@@ -8,6 +15,11 @@ struct PostProcessParams {
     float saturation        = 1.f;
     float bloom_intensity   = 0.05f;
     bool  bloom_enabled     = true;
+    float bloom_filter_radius = 0.005f; // upsample tent-filter radius, in UV space
+    Texture* bloom_lens_dirt = nullptr; // optional dirt/smudge mask; null = no dirt effect
+    float bloom_lens_dirt_intensity = 0.f;    // 0=off
+    std::array<float, kBloomCurveMips> bloom_mip_curve =
+        {1.f, 1.f, 1.f, 1.f, 1.f, 1.f}; // per-mip upsample weight; index = source mip level
     int   tonemap_type      = 0;   // 0=linear,1=reinhard,2=aces,3=uncharted2
     float vignette_intensity = 0.f;
     float vignette_falloff   = 1.5f;

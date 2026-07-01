@@ -2,6 +2,8 @@
 #include "Framework/Files.h"
 #include "Framework/Util.h"
 #include "glm/vec3.hpp"
+#include "Game/Particles/ParticleTypes.h" // evaluate_editing_curve, to_json/from_json(EditingCurve)
+#include "Assets/AssetDatabase.h"
 #include <json.hpp>
 
 #ifdef EDITOR_BUILD
@@ -35,6 +37,16 @@ bool PostProcessSettings::load_asset() {
         saturation         = j.value("saturation",         1.f);
         bloom_intensity    = j.value("bloom_intensity",    0.05f);
         bloom_enabled      = j.value("bloom_enabled",      true);
+        bloom_filter_radius = j.value("bloom_filter_radius", 0.005f);
+        bloom_lens_dirt_intensity = j.value("bloom_lens_dirt_intensity", 0.f);
+        {
+            std::string dirt_path = j.value("bloom_lens_dirt", std::string());
+            bloom_lens_dirt = dirt_path.empty() ? AssetPtr<Texture>{} : g_assets.find<Texture>(dirt_path);
+        }
+        if (j.contains("bloom_mip_curve"))
+            bloom_mip_curve = j["bloom_mip_curve"].get<EditingCurve>();
+        else
+            bloom_mip_curve = make_flat_bloom_curve();
         tonemap_type       = j.value("tonemap_type",       0);
         vignette_intensity = j.value("vignette_intensity", 0.f);
         vignette_falloff   = j.value("vignette_falloff",   1.5f);
@@ -76,6 +88,14 @@ void PostProcessSettings::save_to_disk() {
     j["saturation"]         = saturation;
     j["bloom_intensity"]    = bloom_intensity;
     j["bloom_enabled"]      = bloom_enabled;
+    j["bloom_filter_radius"] = bloom_filter_radius;
+    j["bloom_lens_dirt_intensity"] = bloom_lens_dirt_intensity;
+    j["bloom_lens_dirt"] = bloom_lens_dirt.get_unsafe() ? bloom_lens_dirt.get_unsafe()->get_name() : std::string();
+    {
+        nlohmann::json curve_j;
+        to_json(curve_j, bloom_mip_curve);
+        j["bloom_mip_curve"] = curve_j;
+    }
     j["tonemap_type"]       = tonemap_type;
     j["vignette_intensity"] = vignette_intensity;
     j["vignette_falloff"]   = vignette_falloff;
@@ -105,4 +125,41 @@ void PostProcessSettings::save_to_disk() {
     }
     file->write(text.data(), text.size());
     file->close();
+}
+
+PostProcessParams PostProcessSettings::to_params() const {
+    PostProcessParams p;
+    p.exposure           = exposure;
+    p.contrast            = contrast;
+    p.saturation          = saturation;
+    p.bloom_intensity     = bloom_intensity;
+    p.bloom_enabled       = bloom_enabled;
+    p.bloom_filter_radius = bloom_filter_radius;
+    p.bloom_lens_dirt     = bloom_lens_dirt.get();
+    p.bloom_lens_dirt_intensity = bloom_lens_dirt_intensity;
+    for (int i = 0; i < kBloomCurveMips; i++) {
+        float t = (kBloomCurveMips > 1) ? (float)i / (float)(kBloomCurveMips - 1) : 0.f;
+        p.bloom_mip_curve[i] = evaluate_editing_curve(bloom_mip_curve, t);
+    }
+    p.tonemap_type        = tonemap_type;
+    p.vignette_intensity  = vignette_intensity;
+    p.vignette_falloff    = vignette_falloff;
+    p.chromatic_ab        = chromatic_ab;
+    p.grain_intensity     = grain_intensity;
+    p.grain_size          = grain_size;
+    p.sharpness           = sharpness;
+    p.color_temp          = color_temp;
+    p.lift                = lift;
+    p.gamma_rgb           = gamma_rgb;
+    p.gain                = gain;
+    p.auto_exposure       = auto_exposure;
+    p.ae_method           = ae_method;
+    p.ae_min_ev           = ae_min_ev;
+    p.ae_max_ev           = ae_max_ev;
+    p.ae_speed_up         = ae_speed_up;
+    p.ae_speed_down       = ae_speed_down;
+    p.ae_key              = ae_key;
+    p.ae_low_pct          = ae_low_pct;
+    p.ae_high_pct         = ae_high_pct;
+    return p;
 }

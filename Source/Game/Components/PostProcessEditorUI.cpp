@@ -11,6 +11,7 @@
 #include "imgui.h"
 #include "Framework/MyImguiLib.h"
 #include "Render/Texture.h"
+#include "Assets/AssetRegistry.h"
 
 static bool create_ppset_file(const std::string& path) {
     if (FileSys::does_file_exist(path.c_str(), FileSys::GAME_DIR))
@@ -21,6 +22,8 @@ static bool create_ppset_file(const std::string& path) {
     j["saturation"]         = 1.f;
     j["bloom_intensity"]    = 0.05f;
     j["bloom_enabled"]      = true;
+    j["bloom_filter_radius"] = 0.005f;
+    j["bloom_lens_dirt_intensity"] = 0.f;
     j["tonemap_type"]       = 0;
     j["vignette_intensity"] = 0.f;
     j["vignette_falloff"]   = 1.5f;
@@ -169,6 +172,36 @@ bool PostProcessComponentEditorUi::draw() {
     if (ImGui::CollapsingHeader("Bloom", ImGuiTreeNodeFlags_DefaultOpen)) {
         changed |= ImGui::Checkbox("Bloom Enabled", &asset->bloom_enabled);
         slider("Bloom Intensity", asset->bloom_intensity, 0.f, 1.f);
+        slider("Filter Radius", asset->bloom_filter_radius, 0.0001f, 0.02f, "%.4f");
+
+        ImGui::Spacing();
+        ImGui::TextUnformatted("Mip Curve");
+        ImGui::SameLine(120);
+        if (CurveEditorImgui::draw_curve_preview("##bloom_mip_curve_preview", asset->bloom_mip_curve, 80)) {
+            editing_bloom_curve = &asset->bloom_mip_curve;
+            show_curve_popup = true;
+            curve_editor_popup.clear_all();
+            curve_editor_popup.max_x_value = 1.0f;       // x = normalized mip index
+            curve_editor_popup.min_y_value = 0.0f;
+            curve_editor_popup.max_y_value = 2.0f;       // y = per-mip weight; >1 boosts that mip
+            curve_editor_popup.show_add_curve_button = false;
+            curve_editor_popup.add_curve(asset->bloom_mip_curve);
+            curve_editor_popup.request_fit();
+        }
+
+        ImGui::Spacing();
+        ImGui::TextUnformatted("Lens Dirt");
+        ImGui::SameLine(120);
+        {
+            std::string dirt_path = asset->bloom_lens_dirt.get_unsafe() ? asset->bloom_lens_dirt.get_unsafe()->get_name() : std::string();
+            const AssetMetadata* tex_meta = AssetRegistrySystem::get().find_for_classtype(&Texture::StaticType);
+            std::string new_path;
+            if (lens_dirt_slot.draw(dirt_path, tex_meta, 220, new_path)) {
+                asset->bloom_lens_dirt = new_path.empty() ? AssetPtr<Texture>{} : g_assets.find<Texture>(new_path);
+                changed = true;
+            }
+        }
+        slider("Lens Dirt Intensity", asset->bloom_lens_dirt_intensity, 0.f, 4.f);
     }
     ImGui::PopID();
 
@@ -236,6 +269,22 @@ bool PostProcessComponentEditorUi::draw() {
             g_assets.reload(asset);
             comp->sync_render_data();
         }
+    }
+
+    // bloom mip curve editor popup
+    if (show_curve_popup) {
+        ImGui::SetNextWindowSize(ImVec2(500, 350), ImGuiCond_FirstUseEver);
+        if (ImGui::Begin("Bloom Mip Curve##ppset", &show_curve_popup)) {
+            curve_editor_popup.draw_content();
+            if (editing_bloom_curve) {
+                auto& curves = curve_editor_popup.get_curve_array();
+                if (curves.size() > 0)
+                    *editing_bloom_curve = curves[0];
+            }
+        }
+        ImGui::End();
+        if (!show_curve_popup)
+            comp->sync_render_data();
     }
 
     return false;

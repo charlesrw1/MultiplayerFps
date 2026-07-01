@@ -1,7 +1,20 @@
 #pragma once
 #include "Assets/IAsset.h"
 #include "Framework/Reflection2.h"
+#include "Framework/CurveEditorImgui.h"
 #include "PPManager.h"
+#include "Render/Texture.h"
+
+// Flat curve at y=1 across the whole domain: matches the pre-curve behavior
+// (every bloom mip contributes with an unweighted upsample).
+inline EditingCurve make_flat_bloom_curve() {
+    EditingCurve c;
+    c.name = "Bloom Mip Curve";
+    CurvePoint p0; p0.time = 0.f; p0.value = 1.f; p0.type = CurvePointType::Linear;
+    CurvePoint p1; p1.time = 1.f; p1.value = 1.f; p1.type = CurvePointType::Linear;
+    c.points = {p0, p1};
+    return c;
+}
 
 // Asset file extension: .ppset
 // Holds post-process parameters that can be shared across multiple PostProcessComponents.
@@ -17,6 +30,14 @@ public:
     REF float saturation         = 1.f;
     REF float bloom_intensity    = 0.05f;
     REF bool  bloom_enabled      = true;
+    REF float bloom_filter_radius = 0.005f; // upsample tent-filter radius, in UV space
+    REF AssetPtr<Texture> bloom_lens_dirt;  // optional dirt/smudge mask
+    REF float bloom_lens_dirt_intensity = 0.f;
+    // Per-mip upsample weight curve. X = normalized mip index (0=largest/first
+    // upsample .. 1=smallest/last mip), Y = weight (1=default/unweighted).
+    // Not REF: edited via the dedicated curve popup in PostProcessComponentEditorUi,
+    // like MinMaxCurve fields elsewhere.
+    EditingCurve bloom_mip_curve = make_flat_bloom_curve();
     REF int   tonemap_type       = 0; // 0=linear,1=reinhard,2=aces,3=uncharted2
     REF float vignette_intensity = 0.f;
     REF float vignette_falloff   = 1.5f;
@@ -40,14 +61,7 @@ public:
     REF float ae_low_pct    =  0.4f; // fraction of darkest pixels to exclude
     REF float ae_high_pct   =  0.1f; // fraction of brightest pixels to exclude
 
-    PostProcessParams to_params() const {
-        return {exposure, contrast, saturation, bloom_intensity, bloom_enabled, tonemap_type,
-                vignette_intensity, vignette_falloff, chromatic_ab,
-                grain_intensity, grain_size, sharpness, color_temp,
-                lift, gamma_rgb, gain,
-                auto_exposure, ae_method, ae_min_ev, ae_max_ev, ae_speed_up, ae_speed_down, ae_key,
-                ae_low_pct, ae_high_pct};
-    }
+    PostProcessParams to_params() const;
 
     void save_to_disk();
 };

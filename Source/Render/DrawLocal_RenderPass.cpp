@@ -28,8 +28,11 @@
 namespace {
 // gpu::BloomParams is declared in Shaders/ShaderBufferShared.txt and shared
 // verbatim with the BloomDownsampleF/BloomUpsampleF GLSL.
-static_assert(sizeof(gpu::BloomParams) == 16, "std140");
+static_assert(sizeof(gpu::BloomParams) == 20, "std140");
 static_assert(sizeof(gpu::AutoExposureParams) == 48, "std140");
+// PostProcessParams::bloom_mip_curve is baked to one weight per bloom mip;
+// keep it in sync with the actual mip chain length cap.
+static_assert(kBloomCurveMips == (int)MAX_BLOOM_MIPS, "keep PPManager::kBloomCurveMips in sync with MAX_BLOOM_MIPS");
 
 // Per-pass UBO group slot. See [[rendering/gfx_abstraction#2a]].
 constexpr int PER_PASS_PARAMS_UBO_BINDING = 7;
@@ -43,6 +46,8 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 
 	if (!enable_bloom.get_bool())
 		return;
+
+	const PostProcessParams pp = PPManager::inst ? PPManager::inst->get_active() : PostProcessParams{};
 
 	// gfx().reset_state_cache();
 
@@ -105,6 +110,11 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 		for (int i = tex.number_bloom_mips - 1; i > 0; i--) {
 			auto& bc = tex.bloom_chain[i - 1];
 
+			// Source is the smaller mip (chain[i]) we're upsampling FROM; it must be
+			// bound before set_render_pass retargets to the destination (chain[i-1]),
+			// otherwise this would bind the render target as its own sampler input.
+			gfx().bind_texture(0, tex.bloom_chain[i].texture);
+
 			// glNamedFramebufferTexture(fbo.bloom, GL_COLOR_ATTACHMENT0, bc.texture->get_internal_handle(), 0);
 			auto setup_pass = [&]() {
 				auto color_infos = {ColorTargetInfo(bc.texture)};
@@ -117,11 +127,9 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 			vec2 destsize = bc.fsize;
 			gfx().set_viewport(0, 0, destsize.x, destsize.y);
 
-			// glBindTextureUnit(0, bc.texture->get_internal_handle());
-			gfx().bind_texture(0, bc.texture);
-
 			gpu::BloomParams params{};
-			params.filterRadius = 0.0001f;
+			params.filterRadius = pp.bloom_filter_radius;
+			params.mipWeight = pp.bloom_mip_curve[i];
 			ubo.bloom_params->upload(&params, sizeof(params));
 			gfx().bind_uniform_buffer_base(PER_PASS_PARAMS_UBO_BINDING, ubo.bloom_params);
 

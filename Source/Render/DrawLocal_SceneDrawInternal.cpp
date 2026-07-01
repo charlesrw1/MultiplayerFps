@@ -464,9 +464,10 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		IGraphicsTexture* bloom_tex = tex.bloom_chain[0].texture;
 		if (!enable_bloom.get_bool() || !pp.bloom_enabled)
 			bloom_tex = black_texture;
+		Texture* dirt_tex = pp.bloom_lens_dirt ? pp.bloom_lens_dirt : lens_dirt;
 		bind_texture_ptr(0, scene_color_handle);
 		bind_texture_ptr(1, bloom_tex);
-		bind_texture_ptr(2, lens_dirt->gpu_ptr);
+		bind_texture_ptr(2, dirt_tex->gpu_ptr);
 		// binding 3 is reserved (lens dirt was 2, keep old layout)
 		// binding 4: adapted exposure texture (1x1 R16F); use previous ping so it's ready
 		IGraphicsTexture* ae_tex = tex.ae_lum[ae_ping] ? tex.ae_lum[ae_ping] : black_texture;
@@ -491,6 +492,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 			lp.lgq_gamma          = vec4(pp.gamma_rgb, 0.f);
 			lp.lgq_gain           = vec4(pp.gain,      0.f);
 			lp.ae_enabled         = pp.auto_exposure ? 1 : 0;
+			lp.lens_dirt_intensity = pp.bloom_lens_dirt_intensity;
 			ubo.lit_compositor_params->upload(&lp, sizeof(lp));
 			gfx().bind_uniform_buffer_base(7, ubo.lit_compositor_params);
 		}

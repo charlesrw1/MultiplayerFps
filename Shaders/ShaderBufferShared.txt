@@ -26,11 +26,12 @@ namespace gpu {
 
 // ---- B. Bloom (pilot — done) -----------------------------------------------
 // Used by BloomDownsampleF (srcResolution, mipLevel) and BloomUpsampleF
-// (filterRadius). Both shaders iterate per-mip; each pass re-uploads.
+// (filterRadius, mipWeight). Both shaders iterate per-mip; each pass re-uploads.
 struct BloomParams {
     vec2  srcResolution;
     int   mipLevel;
     float filterRadius;
+    float mipWeight;     // BloomUpsampleF: per-mip curve weight (1=default/unweighted)
 };
 
 // ---- G. Volumetric fog -----------------------------------------------------
@@ -178,7 +179,7 @@ struct LitCompositorParams {
     vec4 lgq_gamma;              // 144..159   (CombineF; .xyz = CDL gamma / midtone power)
     vec4 lgq_gain;               // 160..175   (CombineF; .xyz = CDL gain / highlight scale)
     int  ae_enabled;             // 176        (CombineF; 1=use ae_exposure_tex at binding 4)
-    int  _ae_pad0;               // 180
+    float lens_dirt_intensity;   // 180        (CombineF; 0=off, scales dirt-mask bloom streaking)
     int  _ae_pad1;               // 184
     int  _ae_pad2;               // 188
                                  // total: 192 bytes (12*16, valid std140)
