@@ -11,6 +11,7 @@ struct InspectorCache;
 struct MiEditorState;
 
 class AnimSeqEditor;
+class SkeletonEditor;
 
 // Separate dockable ImGui window showing per-asset settings.
 // Call imgui_draw() every frame; it opens its own Begin/End.
@@ -27,6 +28,7 @@ private:
     void draw_material_text(const std::string& gamepath);
     void draw_material_instance_editor(const std::string& gamepath);
     void draw_anim_seq_editor(const std::string& asset_path);
+    void draw_skeleton_section(const std::string& cmdl_path);
 
     void load_for(const AssetOnDisk& selected);
     void apply_changes();
@@ -44,6 +46,8 @@ private:
     std::unique_ptr<MiEditorState> mi_state_;
     // Owns animation sequence editor (active when a .cmdl with a skeleton is selected).
     std::unique_ptr<AnimSeqEditor> anim_seq_editor_;
+    // Owns skeleton viewer (active when a .cmdl/.mis model with a skeleton is selected).
+    std::unique_ptr<SkeletonEditor> skeleton_editor_;
 };
 
 #endif

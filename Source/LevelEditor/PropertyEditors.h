@@ -102,6 +102,28 @@ public:
 	std::string node_menu_filter_buf;
 };
 
+// Searchable bone-name picker for std::string properties.
+// Shows a flat filtered list when text is typed; hierarchical tree when empty.
+// Reads the skeleton from the owner entity's MeshComponent.
+class BoneNameStringEditor : public IPropertyEditor
+{
+public:
+	bool internal_update() override;
+	bool can_reset() override;
+	void reset_value() override;
+private:
+	void ensure_init();
+	bool draw_tree_node(int bone_idx, const std::string& current, std::string& out_selection);
+
+	bool set_keyboard_focus = true;
+	std::string filter_buf;
+
+	struct BoneNode { std::string name; std::vector<int> children; };
+	std::vector<BoneNode> bone_nodes;
+	std::vector<int> root_bones;
+	const void* last_model = nullptr; // rebuild when model changes
+};
+
 class ClassTypePtrPropertyEditor : public IPropertyEditor
 {
 public:

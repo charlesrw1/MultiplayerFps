@@ -248,6 +248,8 @@ int auto_import_all_png() {
         auto gp = FileSys::get_game_path_from_full_path(full);
         if (StringUtils::get_extension_no_dot(gp) != "png")
             continue;
+        if (gp.find(".thumbnails/") != std::string::npos)
+            continue;
         auto result = create_tis_for_png(gp);
         if (result) {
             sys_print(Info, "Auto-import: created %s for %s\n", result->c_str(), gp.c_str());

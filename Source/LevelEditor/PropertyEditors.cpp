@@ -571,6 +571,7 @@ void PropertyFactoryUtil::register_editor(EditorDoc& doc, FnFactory<IPropertyEdi
 	factory.add("EntityBoneParentString", []() { return new EntityBoneParentStringEditor; });
 	factory.add("EditorNameString", []() { return new EditorNameStringEditor; });
 	factory.add("EntityTarget", [&doc]() { return new EntityTargetEditor(&doc); });
+	factory.add("BoneNameString", []() { return new BoneNameStringEditor; });
 }
 void PropertyFactoryUtil::register_anim_editor(AnimationGraphEditor& doc, FnFactory<IPropertyEditor>& factory) {}
 void PropertyFactoryUtil::register_mat_editor(MaterialEditorLocal& doc, FnFactory<IPropertyEditor>& factory) {}
@@ -962,6 +963,144 @@ bool EntityTargetEditor::internal_update() {
 
 void EntityTargetEditor::reset_value() {
 	set_str("");
+}
+
+// ---------------------------------------------------------------------------
+// BoneNameStringEditor
+// ---------------------------------------------------------------------------
+#include "Game/EntityComponent.h"
+
+void BoneNameStringEditor::ensure_init() {
+	auto* cb = static_cast<ClassBase*>(instance);
+	Component* comp = cb->cast_to<Component>();
+	if (!comp) return;
+	Entity* owner = comp->get_owner();
+	if (!owner) return;
+	MeshComponent* mesh = owner->get_component<MeshComponent>();
+	const Model* model = mesh ? mesh->get_model() : nullptr;
+
+	if (model == last_model) return; // nothing changed
+	last_model = model;
+	bone_nodes.clear();
+	root_bones.clear();
+
+	if (!model) return;
+	const MSkeleton* skel = model->get_skel();
+	if (!skel) return;
+
+	const auto& all_bones = skel->get_all_bones();
+	bone_nodes.resize(all_bones.size());
+	for (int i = 0; i < (int)all_bones.size(); i++) {
+		bone_nodes[i].name = all_bones[i].strname;
+		int parent = (int)all_bones[i].parent;
+		if (parent >= 0 && parent < i)
+			bone_nodes[parent].children.push_back(i);
+		else
+			root_bones.push_back(i);
+	}
+}
+
+bool BoneNameStringEditor::draw_tree_node(int bone_idx, const std::string& current, std::string& out_selection) {
+	const auto& node = bone_nodes[bone_idx];
+	bool is_selected = (!current.empty() && current == node.name);
+	bool has_children = !node.children.empty();
+
+	ImGuiTreeNodeFlags flags = ImGuiTreeNodeFlags_SpanAvailWidth | ImGuiTreeNodeFlags_OpenOnArrow;
+	if (is_selected) flags |= ImGuiTreeNodeFlags_Selected;
+	if (!has_children) flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
+
+	// Use push ID to avoid label collisions for bones with same names at different depths
+	ImGui::PushID(bone_idx);
+	bool open = ImGui::TreeNodeEx(node.name.c_str(), flags);
+	bool any_selected = false;
+
+	if (ImGui::IsItemClicked() && !ImGui::IsItemToggledOpen()) {
+		out_selection = node.name;
+		any_selected = true;
+	}
+
+	if (has_children) {
+		if (open) {
+			for (int child : node.children) {
+				if (draw_tree_node(child, current, out_selection))
+					any_selected = true;
+			}
+			ImGui::TreePop();
+		}
+	}
+	ImGui::PopID();
+	return any_selected;
+}
+
+bool BoneNameStringEditor::internal_update() {
+	ASSERT(prop->type == core_type_id::StdString);
+	ensure_init();
+
+	std::string* str = (std::string*)prop->get_ptr(instance);
+	if (bone_nodes.empty()) {
+		ImGui::TextDisabled("No skeleton (attach a model with bones)");
+		return false;
+	}
+
+	bool changed = false;
+	const char* preview = str->empty() ? "<none>" : str->c_str();
+
+	if (ImGui::BeginCombo("##bonecombo", preview, ImGuiComboFlags_HeightLarge)) {
+		if (set_keyboard_focus) {
+			ImGui::SetKeyboardFocusHere();
+			set_keyboard_focus = false;
+		}
+		ImGui::SetNextItemWidth(-1.f);
+		if (ImGui::InputText("##bonefilter", (char*)filter_buf.c_str(), filter_buf.size() + 1,
+		                     ImGuiInputTextFlags_CallbackResize, imgui_std_string_resize, &filter_buf))
+			filter_buf = filter_buf.c_str();
+
+		ImGui::Separator();
+
+		if (ImGui::Selectable("<none>", str->empty()))
+			str->clear(), changed = true;
+
+		if (filter_buf.empty()) {
+			// Hierarchical tree view
+			std::string selected_bone;
+			bool any_selected = false;
+			for (int root : root_bones) {
+				if (draw_tree_node(root, *str, selected_bone))
+					any_selected = true;
+			}
+			if (any_selected) {
+				*str = selected_bone;
+				changed = true;
+				ImGui::CloseCurrentPopup();
+			}
+		} else {
+			// Flat filtered list
+			const auto filter_lower = StringUtils::to_lower(filter_buf);
+			for (auto& node : bone_nodes) {
+				const auto lower = StringUtils::to_lower(node.name);
+				if (lower.find(filter_lower) == std::string::npos) continue;
+				bool is_selected = (*str == node.name);
+				if (ImGui::Selectable(node.name.c_str(), is_selected))
+					*str = node.name, changed = true;
+			}
+		}
+
+		ImGui::EndCombo();
+	} else {
+		set_keyboard_focus = true;
+	}
+
+	return changed;
+}
+
+bool BoneNameStringEditor::can_reset() {
+	std::string* str = (std::string*)prop->get_ptr(instance);
+	return !str->empty();
+}
+
+void BoneNameStringEditor::reset_value() {
+	std::string* str = (std::string*)prop->get_ptr(instance);
+	str->clear();
 }
 
 #endif
