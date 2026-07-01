@@ -101,7 +101,7 @@ public:
 	const MSkeleton* get_skel() const { return model.get_skel(); }
 	int num_bones() const { return cached_bonemats.size(); }
 	Entity* get_owner() const { return owner; }
-	bool play_animation(const AnimationSeqAsset* seq, float play_speed = 1.f, float start_pos = 0.f);
+	bool play_animation(StringName slot, const AnimationSeqAsset* seq, float play_speed = 1.f, float start_pos = 0.f);
 	// callback: returns true if interrupted, false if not. guaranteed to fire.
 	void play_animation(const AnimationSeqAsset* seq, float play_speed, float start_pos, function<void(bool)> callback);
 	void stop_animation_in_slot(StringName slot);
@@ -124,10 +124,14 @@ public:
 	opt<bool> get_bool_variable(StringName name) const;
 	opt<int> get_int_variable(StringName name) const;
 	opt<glm::vec3> get_vec3_variable(StringName name) const;
+	opt<glm::quat> get_quat_variable(StringName name) const;
 	REF void set_float_variable(StringName name, float f);
 	REF void set_int_variable(StringName name, int f);
 	void set_bool_variable(StringName name, bool f);
 	void set_vec3_variable(StringName name, glm::vec3 f);
+	// Rotations are delivered as quaternions (no euler round-trip). agModifyBone reads
+	// rotationVal as a quat; a vec3 variable is still accepted and treated as euler radians.
+	void set_quat_variable(StringName name, glm::quat q);
 	agBaseNode* find_cached_pose_node(StringName name);
 	agBaseNode& get_root_node() const;
 	SyncGroupData& find_or_create_sync_group(StringName name);
@@ -153,7 +157,7 @@ private:
 
 	std::vector<agClipNode*> playingClipsThisUpdate;
 	std::unordered_map<uint64_t, float> curve_values;
-	std::unordered_map<uint64_t, std::variant<bool, float, int, glm::vec3>> blackboard;
+	std::unordered_map<uint64_t, std::variant<bool, float, int, glm::vec3, glm::quat>> blackboard;
 	bool using_global_bonemat_double_buffer = true;
 	vector<glm::mat4> cached_bonemats; // global bonemats
 	vector<glm::mat4> last_cached_bonemats;

@@ -76,7 +76,6 @@ extern ConfigVar g_window_h;
 extern ConfigVar g_project_name;
 extern ConfigVar g_application_class;
 extern ConfigVar developer_mode;
-extern void add_events_test(Model* model);
 double GetTime();
 double TimeSinceStart();
 
@@ -386,7 +385,6 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	ParticleMgr::inst = new ParticleMgr;
 	RuntimeNavManager::inst = new RuntimeNavManager;
 
-	Model::on_model_loaded.add(this, [](Model* mod) { add_events_test(mod); });
 	print_time("init mods,sounds");
 
 	imgui_context = ImGui::CreateContext();

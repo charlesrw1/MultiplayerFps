@@ -10,15 +10,20 @@ struct ValueType
 	ValueType(bool b) : value(b) {}
 	ValueType(int i) : value(i) {}
 	ValueType(glm::vec3 v) : value(v) {}
+	ValueType(glm::quat q) : value(q) {}
 	ValueType(StringName name) : value(name) {}
+	ValueType(const char* name) : value(StringName(name)) {}
+
 
 	// throws on failure
 	float get_float(agGetPoseCtx& ctx);
 	int get_int(agGetPoseCtx& ctx);
 	int get_bool(agGetPoseCtx& ctx);
 	glm::vec3 get_vec3(agGetPoseCtx& ctx);
+	// Resolves to a quaternion. An inline/variable vec3 is treated as euler radians.
+	glm::quat get_quat(agGetPoseCtx& ctx);
 
-	variant<bool, int, float, glm::vec3, StringName> value;
+	variant<bool, int, float, glm::vec3, glm::quat, StringName> value;
 };
 
 
@@ -38,6 +43,7 @@ public:
 
 	float get_float_var(StringName name) const;
 	glm::vec3 get_vec3_var(StringName name) const;
+	glm::quat get_quat_var(StringName name) const;
 	bool get_bool_var(StringName name) const;
 	int get_int_var(StringName name) const;
 	bool is_event_active(const ClassTypeInfo& info) const;
@@ -115,6 +121,16 @@ public:
 	bool has_init = false;
 };
 
+// Leaf node that outputs the skeleton's bind (reference) pose. Useful as the base
+// of an agAddNode when previewing an additive clip (additive delta on top of bind).
+class agBindPose : public agBaseNode
+{
+public:
+	CLASS_BODY(agBindPose);
+	void reset() final {}
+	void get_pose(agGetPoseCtx& ctx) final;
+};
+
 class agBlendNode : public agBaseNode
 {
 public:
@@ -172,6 +188,31 @@ public:
 	agBaseNode* input0 = nullptr;
 	agBaseNode* input1 = nullptr;
 	ValueType alpha = 0.f;
+};
+// Builds an additive (delta) pose at runtime: output = input - reference, where
+// `reference` is typically the first frame of the same motion clip (agEvaluateClip
+// frame 0). The delta can then be applied with agAddNode. Bones flagged via
+// mask_bone_and_children() have their delta zeroed (identity rot, zero pos/scale),
+// so adding the result leaves those bones untouched -- used to keep an additive
+// upper-body motion off the IK arm chain.
+// FIXME: the reference subtraction should be baked into the asset (is_additive_clip)
+//        instead of recomputed every frame.
+class agMakeAdditive : public agBaseNode
+{
+public:
+	CLASS_BODY(agMakeAdditive);
+	void reset() final;
+	void get_pose(agGetPoseCtx& ctx) final;
+	void refresh_after_model_reload(Model* reloaded) final;
+
+	REF void init_mask(const Model* model);                            // all bones contribute by default
+	REF void mask_bone_and_children(const Model* model, string bone);  // zero the delta for bone + descendants
+
+	agBaseNode* input = nullptr;      // the motion clip
+	agBaseNode* reference = nullptr;  // pose subtracted from input (e.g. first frame of the motion)
+
+private:
+	std::vector<uint8_t> masked;      // 1 = delta zeroed (bone left untouched by the add)
 };
 class agIk2Bone : public agBaseNode
 {
@@ -288,6 +329,8 @@ struct DirectAnimationSlot;
 class agSlotClipInternal : public agBaseNode
 {
 public:
+	CLASS_BODY(agSlotClipInternal);
+
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
 	DirectAnimationSlot* slot = nullptr;
@@ -296,6 +339,7 @@ public:
 class agSlotPlayer : public agStatemachineBase
 {
 public:
+	CLASS_BODY(agSlotPlayer);
 	void update(agGetPoseCtx* ctx, bool wantsReset) final;
 	void refresh_after_model_reload(Model* reloaded) final;
 	bool updateChildrenWhenPlaying = false;

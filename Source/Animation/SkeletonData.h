@@ -53,7 +53,6 @@ public:
 	// Animation events authored in the .amd sidecar (data-driven, keyed by name string).
 	vector<AnimEvent> anim_events;
 	vector<SyncMarker> syncMarkers;
-	SeqDirectPlayOpt directplayopt;
 	void add_sync_marker(SyncMarker marker);
 	const vector<AnimEvent>& get_anim_events() const { return anim_events; }
 

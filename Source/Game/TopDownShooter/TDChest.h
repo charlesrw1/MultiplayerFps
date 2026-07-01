@@ -22,7 +22,7 @@ public:
 
 			isound->play_sound(soundfx, 1, 1, 1, 1, {}, false, false, {});
 
-			m->get_animator()->play_animation(openanim);
+			//m->get_animator()->play_animation(openanim);
 
 			is_open = true;
 		} else {

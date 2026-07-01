@@ -12,9 +12,33 @@
 #include "glm/gtc/quaternion.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtx/euler_angles.hpp"
+#include <algorithm>
+#include <cmath>
+#include "../../Debug.h"
+static const StringName default_slot = StringName("MySlot");
+static const StringName default_slot_2 = StringName("MySlot2");
 
 static const uint32_t TERRAIN_MASK =
     (1u << (int)PL::Default) | (1u << (int)PL::StaticObject);
+
+// Shortest-arc rotation taking unit vector `from` onto unit vector `to`. Robust at the
+// antiparallel (180 deg) singularity, which glm::rotation handles poorly.
+static glm::quat rotation_between(glm::vec3 from, glm::vec3 to) {
+    from = glm::normalize(from);
+    to   = glm::normalize(to);
+    const float d = glm::clamp(glm::dot(from, to), -1.f, 1.f);
+    if (d > 0.999999f)
+        return glm::quat(1.f, 0.f, 0.f, 0.f);
+    if (d < -0.999999f) {
+        // Pick any axis orthogonal to `from`.
+        glm::vec3 axis = glm::cross(glm::vec3(1.f, 0.f, 0.f), from);
+        if (glm::length(axis) < 1e-4f)
+            axis = glm::cross(glm::vec3(0.f, 1.f, 0.f), from);
+        return glm::angleAxis(glm::pi<float>(), glm::normalize(axis));
+    }
+    const glm::vec3 axis = glm::cross(from, to);
+    return glm::normalize(glm::angleAxis(std::acos(d), glm::normalize(axis)));
+}
 
 // -----------------------------------------------------------------------
 AnimGraphTester::AnimGraphTester() {
@@ -47,6 +71,7 @@ void AnimGraphTester::start() {
     target_entity = tgt->get_self_ptr();
 
     rebuild_graph();
+    rebuild_prop();
     last_mode = mode;
 }
 
@@ -54,6 +79,8 @@ void AnimGraphTester::start() {
 void AnimGraphTester::stop() {
     if (Entity* tgt = target_entity.get())
         tgt->destroy();
+    if (Entity* p = prop_entity.get())
+        p->destroy();
 }
 
 // -----------------------------------------------------------------------
@@ -63,7 +90,32 @@ void AnimGraphTester::editor_on_change_property() {
         if (model && !model->did_load_fail())
             mesh->set_model(model.get());
         rebuild_graph();
+        rebuild_prop();
     }
+}
+
+// -----------------------------------------------------------------------
+// Spawn (or respawn) a transient child mesh parented to prop_bone on the character.
+// No-op cleanup happens unconditionally so editing the field swaps/clears the prop.
+void AnimGraphTester::rebuild_prop() {
+	auto local_transform = glm::mat4(1.f);
+	if (Entity* old = prop_entity.get()) {
+		local_transform = old->get_ls_transform();
+        old->destroy();
+    }
+    prop_entity = EntityPtr();
+
+    if (!prop || prop->did_load_fail())
+        return;
+
+    Entity* e = eng->get_level()->spawn_entity();
+    e->set_no_serialize();
+    auto* pm = e->create_component<MeshComponent>();
+    pm->set_model(prop.get());
+    e->parent_to(get_owner());
+    e->set_parent_bone(StringName(prop_bone.c_str()));
+	e->set_ls_transform(local_transform);
+    prop_entity = e->get_self_ptr();
 }
 
 // -----------------------------------------------------------------------
@@ -83,6 +135,12 @@ void AnimGraphTester::rebuild_graph() {
         n->looping = true;
         return n;
     };
+	auto make_eval_clip = [&](const AssetPtr<AnimationSeqAsset>& asset) -> agEvaluateClip* {
+		auto* n = b.alloc<agEvaluateClip>();
+		if (asset && !asset->did_load_fail())
+			n->set_clip(asset.get());
+		return n;
+	};
 
     switch (mode) {
 
@@ -93,7 +151,7 @@ void AnimGraphTester::rebuild_graph() {
         ik->input     = idle;
         ik->bone_name = StringName(bone_ik_end.c_str());  // hand is the end effector; solver bends forearm+upper arm
         ik->target    = StringName("vHandTarget");
-        ik->alpha     = 1.f;
+		ik->alpha = generic_alpha;
 
         b.set_root(ik);
         break;
@@ -105,46 +163,104 @@ void AnimGraphTester::rebuild_graph() {
         agModifyBone* mb = b.alloc<agModifyBone>();
         mb->input       = idle;
         mb->boneName    = StringName(bone_head.c_str());
-        mb->rotation    = ModifyBoneType::MeshspaceAdd;
+        // Absolute mesh-space orientation (authoritative look-at). update() computes the full
+        // desired head rotation each frame, so an additive delta here would double-apply / fight
+        // last frame's result. The value is a quaternion variable, not euler.
+        mb->rotation    = ModifyBoneType::Meshspace;
         mb->rotationVal = StringName("vHeadRot");
-        mb->alpha       = 1.f;
+        mb->alpha       = generic_alpha;
 
         b.set_root(mb);
         break;
     }
 
     case AnimGraphTestMode::GunGripIK: {
-        agClipNode* idle = make_clip(clip0);
+        // 1. Base pose clip.
 
-        agIk2Bone* ik = b.alloc<agIk2Bone>();
-        ik->input              = idle;
-        ik->bone_name          = StringName(bone_ik_upper.c_str());
-        ik->other_bone         = StringName(bone_grip_other.c_str());
-        ik->target             = glm::vec3(0.f, 0.f, 0.2f);
-        ik->alpha              = 1.f;
-        ik->ik_in_bone_space   = true;
-        ik->take_rotation_of_other = true;
 
-        b.set_root(ik);
+        agEvaluateClip* eval_clip = make_eval_clip(clip0);
+		eval_clip->frame = gungrip_frame_eval;
+		agBaseNode* pose = eval_clip;
+
+        // 2-4. Layer an additive secondary motion (clip1) on top of the base. The additive
+        //      is built at runtime as (clip1 - clip1's first frame), with the IK arm chain
+        //      masked out so the add leaves those bones untouched. Only when clip1 is set.
+        if (clip1 && !clip1->did_load_fail()) {
+            agClipNode*     motion = make_clip(clip1);
+
+            agAddNode* add = b.alloc<agAddNode>();
+			add->input0 = pose;
+			add->input1 = motion;
+            add->alpha  = 1.f;
+            pose = add;
+        }
+
+        auto make_ik_node = [&](StringName hand, StringName ik_grip) -> agBaseNode* {
+            // 5. IK the right hand to the gun grip on the left-hand bone (IK bones untouched above).
+            agIk2Bone* ik = b.alloc<agIk2Bone>();
+            ik->input              = pose;
+			ik->bone_name = StringName(hand);
+			ik->other_bone = StringName(ik_grip);
+            ik->target             = glm::vec3(0.f, 0.f, 0.0f);
+			ik->alpha = generic_alpha;
+            ik->ik_in_bone_space   = true;
+            ik->take_rotation_of_other = true;
+
+            return ik;
+		};
+		pose = make_ik_node(bone_hand_l.c_str(), ik_hand_l.c_str());
+		pose = make_ik_node(bone_hand_r.c_str(), ik_hand_r.c_str());
+
+
+        b.set_root(pose);
         break;
     }
 
     case AnimGraphTestMode::FeetIK: {
-        agClipNode* walk = make_clip(clip1);
+        agBaseNode* node = make_clip(clip1);
 
-        agIk2Bone* ikL = b.alloc<agIk2Bone>();
-        ikL->input     = walk;
-        ikL->bone_name = StringName(bone_foot_l.c_str());
-        ikL->target    = StringName("vFootTargetL");
-        ikL->alpha     = StringName("flFootIkAlpha");
+        // Two-bone IK each foot directly to an ABSOLUTE mesh-space target supplied by
+        // update() (vFootTarget*). The target is the foot's animated X/Z with Y regrounded
+        // onto the surface, so there is no relative offset to feed back on. A modify-bone
+        // AFTER the IK tilts the planted foot to the surface normal (vFootRot*).
+		auto ik_foot = [&](agBaseNode* input, const std::string& bone, const char* tgtVar) -> agIk2Bone* {
+            agIk2Bone* ik = b.alloc<agIk2Bone>();
+            ik->input            = input;
+            ik->bone_name        = StringName(bone.c_str());
+            ik->target           = StringName(tgtVar);   // absolute, in mesh space
+            ik->ik_in_bone_space = false;
+            ik->alpha            = StringName("flFootIkAlpha");
+            return ik;
+        };
+        auto tilt_foot = [&](agBaseNode* input, const std::string& bone, const char* rotVar) -> agModifyBone* {
+            agModifyBone* mb = b.alloc<agModifyBone>();
+            mb->input       = input;
+            mb->boneName    = StringName(bone.c_str());
+            // Add the surface-normal tilt on top of the (now IK'd) foot's mesh-space rotation.
+            mb->rotation    = ModifyBoneType::MeshspaceAdd;
+            mb->rotationVal = StringName(rotVar);
+            mb->alpha       = 1.f;
+            return mb;
+        };
 
-        agIk2Bone* ikR = b.alloc<agIk2Bone>();
-        ikR->input     = ikL;
-        ikR->bone_name = StringName(bone_foot_r.c_str());
-        ikR->target    = StringName("vFootTargetR");
-        ikR->alpha     = StringName("flFootIkAlpha");
+        // Pelvis drop FIRST (so the feet IK re-plant relative to the lowered hips and the
+        // reaching-down leg doesn't over-extend), then per-foot IK, then surface tilt.
+        {
+            agModifyBone* pelvis = b.alloc<agModifyBone>();
+            pelvis->input          = node;
+            pelvis->boneName       = StringName(bone_pelvis.c_str());
+            pelvis->translation    = ModifyBoneType::MeshspaceAdd;
+            pelvis->translationVal = StringName("vPelvisOffset");
+            pelvis->alpha          = 1.f;
+            node = pelvis;
+        }
 
-        b.set_root(ikR);
+        node = ik_foot(node, bone_foot_l, "vFootTargetL");
+		node = ik_foot(node, bone_foot_r, "vFootTargetR");
+        node = tilt_foot(node, bone_foot_l, "vFootRotL");
+		node = tilt_foot(node, bone_foot_r, "vFootRotR");
+
+        b.set_root(node);
         break;
     }
 
@@ -180,12 +296,12 @@ void AnimGraphTester::rebuild_graph() {
     }
 
     case AnimGraphTestMode::SlotPlaying: {
-        b.add_slot_name(StringName("TestSlot"));
+        b.add_slot_name(default_slot);
 
         agClipNode* idle = make_clip(clip0);
 
         agSlotPlayer* slot = b.alloc<agSlotPlayer>();
-        slot->slotName = StringName("TestSlot");
+		slot->slotName = default_slot;
         slot->input    = idle;
 
         b.set_root(slot);
@@ -213,8 +329,8 @@ void AnimGraphTester::rebuild_graph() {
 
         agBlendByInt* bbi = b.alloc<agBlendByInt>();
         bbi->integer           = StringName("iState");
-        bbi->easing            = Easing::CubicEaseOut;
-        bbi->blending_duration = 0.4f;
+		bbi->easing = transition_easing;
+        bbi->blending_duration = transition_time;
         bbi->inputs.push_back(s0);
         bbi->inputs.push_back(s1);
         bbi->inputs.push_back(s2);
@@ -228,6 +344,19 @@ void AnimGraphTester::rebuild_graph() {
     } // switch
 
     mesh->create_animator(&b);
+
+    // Seed variables to safe defaults. The graph can evaluate before update() first runs,
+    // and agIk2Bone reads its vec3 target unconditionally (get_vec3_var THROWS on a missing
+    // variable, unlike floats which fall back to 0). Initializing here prevents that crash.
+    if (AnimatorObject* a = mesh->get_animator()) {
+        a->set_float_variable(StringName("flFootIkAlpha"), 0.f);
+        a->set_vec3_variable(StringName("vFootTargetL"), glm::vec3(0.f));
+        a->set_vec3_variable(StringName("vFootTargetR"), glm::vec3(0.f));
+        a->set_vec3_variable(StringName("vFootRotL"),    glm::vec3(0.f));
+        a->set_vec3_variable(StringName("vFootRotR"),    glm::vec3(0.f));
+        a->set_vec3_variable(StringName("vPelvisOffset"),glm::vec3(0.f));
+        a->set_quat_variable(StringName("vHeadRot"),     glm::quat(1.f, 0.f, 0.f, 0.f));
+    }
 }
 
 // -----------------------------------------------------------------------
@@ -352,15 +481,29 @@ void AnimGraphTester::update() {
         break;
 
     case AnimGraphTestMode::LookAt: {
+        const MSkeleton* skel = mesh->get_model() ? mesh->get_model()->get_skel() : nullptr;
         const auto& bonemats = anim->get_global_bonemats();
         int headIdx = mesh->get_index_of_bone(StringName(bone_head.c_str()));
-        if (headIdx >= 0 && headIdx < (int)bonemats.size()) {
-            glm::vec3 head_mesh_pos = glm::vec3(bonemats[headIdx][3]);
-            glm::vec3 dir = glm::normalize(world_to_mesh(target_ws) - head_mesh_pos);
-            glm::quat desired = glm::quatLookAt(dir, glm::vec3(0.f, 1.f, 0.f));
-            glm::quat current = glm::quat_cast(glm::mat3(bonemats[headIdx]));
-            glm::quat delta = desired * glm::inverse(current);
-            anim->set_vec3_variable(StringName("vHeadRot"), glm::eulerAngles(delta));
+        if (skel && headIdx >= 0 && headIdx < (int)bonemats.size()) {
+            // Reference frame MUST be one the modify-bone never overwrites, otherwise reading
+            // the live bonemats back in (which already contain last frame's look-at) forms a
+            // feedback loop whose equilibrium ignores look_forward_axis entirely. So aim from
+            // the BIND pose (constant) -- only the head POSITION is taken from the live pose so
+            // the target direction is correct.
+            const glm::vec3   head_pos  = glm::vec3(bonemats[headIdx][3]);
+            const glm::mat4x3& bind      = skel->get_all_bones()[headIdx].posematrix; // bone->mesh
+            const glm::quat   rest_rot  = glm::normalize(glm::quat_cast(glm::mat3(bind[0], bind[1], bind[2])));
+
+            const glm::vec3 to_target = world_to_mesh(target_ws) - head_pos;
+            if (glm::length(to_target) > 1e-5f) {
+                const glm::vec3 desired_dir = glm::normalize(to_target);
+                // Rest-pose mesh-space facing of the head's local "face" axis, then a
+                // minimal-twist (shortest-arc) aim onto the target. Fully determined, no
+                // feedback. Delivered as a quaternion -- no euler round-trip.
+                const glm::vec3 rest_forward = rest_rot * glm::normalize(look_forward_axis);
+                const glm::quat aim = rotation_between(rest_forward, desired_dir);
+                anim->set_quat_variable(StringName("vHeadRot"), glm::normalize(aim * rest_rot));
+            }
         }
         break;
     }
@@ -370,22 +513,76 @@ void AnimGraphTester::update() {
 
     case AnimGraphTestMode::FeetIK: {
         const auto& bonemats = anim->get_global_bonemats();
-        anim->set_float_variable(StringName("flFootIkAlpha"), 1.f);
+        const glm::quat R = glm::normalize(glm::quat_cast(glm::mat3(ws_transform))); // mesh -> world
+        const float max_tilt = glm::radians(foot_max_tilt_deg);
+        // Reference plane the animation plants its feet on (the character's base/origin).
+        // Foot IK adds the terrain delta relative to THIS, so the animated foot lift is kept.
+        const float root_y = get_owner()->get_ws_position().y;
 
-        auto ik_foot = [&](const std::string& bone_name, StringName var_name) {
-            int idx = mesh->get_index_of_bone(StringName(bone_name.c_str()));
-            if (idx < 0 || idx >= (int)bonemats.size()) return;
-            glm::vec3 foot_mesh  = glm::vec3(bonemats[idx][3]);
-            glm::vec3 foot_world = glm::vec3(ws_transform * glm::vec4(foot_mesh, 1.f));
+        // Per foot: trace straight down from the IK BONE (the animation-driven reference
+        // that the IK below never modifies, so reading it never feeds back), then hand the
+        // real foot an ABSOLUTE mesh-space target = (IK bone X/Z, surface Y + height off).
+        // Because the target is absolute and the trace is vertical (ground Y is independent
+        // of the foot's current Y), there is no feedback loop -- only a 1-frame latency.
+        auto ground_foot = [&](const std::string& ik_bone_name, const char* tgtVar, const char* rotVar, float& out_ground_delta) -> bool {
+            out_ground_delta = 0.f;   // flat / no-hit contributes nothing to the pelvis drop
+            int idx = mesh->get_index_of_bone(StringName(ik_bone_name.c_str()));
+            if (idx < 0 || idx >= (int)bonemats.size()) return false;
+
+            auto foot_mesh = glm::vec3(bonemats[idx][3]);
+			glm::vec3 foot_world = glm::vec3(ws_transform * glm::vec4(foot_mesh, 1.f));
             HitResult hit = GameplayStatic::cast_ray(
-                foot_world + glm::vec3(0.f,  0.5f, 0.f),
-                foot_world + glm::vec3(0.f, -0.5f, 0.f),
+                foot_world + glm::vec3(0.f,  foot_trace_dist, 0.f),
+                foot_world + glm::vec3(0.f, -foot_trace_dist, 0.f),
                 TERRAIN_MASK, nullptr);
-            anim->set_vec3_variable(var_name, world_to_mesh(hit.hit ? hit.pos : foot_world));
+
+            // Target defaults to the current foot pos (IK is a no-op) when nothing is hit.
+            glm::vec3 target_world = foot_world;
+            glm::vec3 rot_euler(0.f);
+            if (hit.hit) {
+				Debug::add_sphere(glm::vec3(foot_world.x, hit.pos.y, foot_world.z), 0.1, COLOR_PINK, 0.f);
+                // ADD the terrain delta to the animated foot height (don't pin to the ground),
+                // so a lifted/swinging foot stays lifted and only the planted foot lands.
+                const float terrain_delta = (hit.pos.y + foot_height_off) - root_y;
+                target_world.y = foot_world.y + terrain_delta;
+                // How far below the base plane this foot's ground is (used for the pelvis drop).
+                out_ground_delta = hit.pos.y - root_y;
+                if (foot_align_rot) {
+                    // Shortest-arc rotation from world-up to surface normal, clamped, then
+                    // expressed in mesh space (conjugation by the mesh->world rotation).
+                    glm::vec3 n = glm::normalize(hit.normal);
+                    glm::vec3 axis = glm::cross(glm::vec3(0.f, 1.f, 0.f), n);
+                    float axis_len = glm::length(axis);
+                    if (axis_len > 1e-4f) {
+                        float ang = std::min(std::acos(glm::clamp(n.y, -1.f, 1.f)), max_tilt);
+                        glm::quat q_mesh = glm::inverse(R) * glm::angleAxis(ang, axis / axis_len) * R;
+                        rot_euler = glm::eulerAngles(q_mesh);
+                    }
+                }
+            }
+
+            // Absolute mesh-space target: keep the animated foot's X/Z, ground only Y.
+            glm::vec3 in_meshspace = world_to_mesh(target_world);
+			glm::vec3 foot_target  = glm::vec3(foot_mesh.x, in_meshspace.y, foot_mesh.z);
+
+            anim->set_vec3_variable(StringName(tgtVar), foot_target);
+            anim->set_vec3_variable(StringName(rotVar), rot_euler);
+            return true;
         };
 
-        ik_foot(bone_foot_l, StringName("vFootTargetL"));
-        ik_foot(bone_foot_r, StringName("vFootTargetR"));
+        // Only enable IK once both targets resolve; otherwise an unset/zero target would
+        // yank the foot toward the mesh origin.
+        float deltaL = 0.f, deltaR = 0.f;
+        bool okL = ground_foot(ik_foot_l, "vFootTargetL", "vFootRotL", deltaL);
+        bool okR = ground_foot(ik_foot_r, "vFootTargetR", "vFootRotR", deltaR);
+        anim->set_float_variable(StringName("flFootIkAlpha"), (okL && okR) ? 1.f : 0.f);
+
+        // Pelvis drop = how far the LOWEST-ground foot must reach below the base plane
+        // (only ever down, never up). Interpolated so terrain changes don't pop the hips.
+        const float pelvis_target = (okL && okR) ? std::min({ deltaL, deltaR, 0.f }) : 0.f;
+        const float t = glm::clamp(pelvis_interp_speed * dt, 0.f, 1.f);
+        pelvis_offset += (pelvis_target - pelvis_offset) * t;
+        anim->set_vec3_variable(StringName("vPelvisOffset"), glm::vec3(0.f, pelvis_offset, 0.f));
         break;
     }
 
@@ -403,7 +600,7 @@ void AnimGraphTester::update() {
         if (slot_timer >= 3.f) {
             slot_timer = 0.f;
             if (slot_clip && !slot_clip->did_load_fail())
-                anim->play_animation(slot_clip.get(), 1.f, 0.f);
+				anim->play_animation(default_slot,slot_clip.get(), 1.f, 0.f);
         }
         break;
 

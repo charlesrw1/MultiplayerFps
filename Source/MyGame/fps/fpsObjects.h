@@ -20,6 +20,9 @@ class fpsSpawnPoint : public Component {
 public:
 	CLASS_BODY(fpsSpawnPoint,spawnable);
 	void editor_start() { editor_set_model("cylinder_nose.cmdl", true); }
+
+	REFLECT(type = EntityTarget);
+	std::string other;
 };
 class fpsPropPhysics : public Component {
 public:

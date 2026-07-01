@@ -147,22 +147,7 @@ double TimeSinceStart() {
 // Model event hooks
 // ---------------------------------------------------------------------------
 
-void add_player_model_events(MSkeleton* skel) {
-	ASSERT(skel);
-	if (auto runClip = skel->find_clip("RUN")) {
-		runClip->directplayopt.slotname = StringName("TheSlot");
-	}
-}
 
-void add_events_test(Model* model) {
-	ASSERT(model);
-	if (model->get_name() == "SWAT_model.cmdl") {
-		auto skel = model->get_skel();
-		if (skel) {
-			add_player_model_events(skel);
-		}
-	}
-}
 
 // ---------------------------------------------------------------------------
 // Quit

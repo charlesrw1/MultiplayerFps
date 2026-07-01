@@ -57,7 +57,7 @@ AnimatorObject::AnimatorObject(const Model& model, agBuilder& ingraph, Entity* e
 
 	slots.resize(graph.get_slots().size());
 	for (int i = 0; i < slots.size(); i++)
-		slots[i].name = slots.at(i).name;
+		slots[i].name = graph.get_slots().at(i);
 	this->owner = ent;
 
 	get_root_node().reset(); // reset it
@@ -181,6 +181,18 @@ opt<glm::vec3> AnimatorObject::get_vec3_variable(StringName name) const {
 	return std::nullopt;
 }
 
+opt<glm::quat> AnimatorObject::get_quat_variable(StringName name) const {
+	auto find = MapUtil::get_opt(blackboard, name.get_hash());
+	if (!find)
+		return std::nullopt;
+	if (std::holds_alternative<glm::quat>(*find))
+		return std::get<glm::quat>(*find);
+	// Back-compat: a vec3 variable is interpreted as euler radians.
+	if (std::holds_alternative<glm::vec3>(*find))
+		return glm::quat(std::get<glm::vec3>(*find));
+	return std::nullopt;
+}
+
 void AnimatorObject::set_float_variable(StringName name, float f) {
 	blackboard[name.get_hash()] = f;
 }
@@ -193,6 +205,9 @@ void AnimatorObject::set_bool_variable(StringName name, bool f) {
 }
 void AnimatorObject::set_vec3_variable(StringName name, glm::vec3 f) {
 	blackboard[name.get_hash()] = f;
+}
+void AnimatorObject::set_quat_variable(StringName name, glm::quat q) {
+	blackboard[name.get_hash()] = q;
 }
 
 #include "Assets/AssetDatabase.h"
@@ -317,14 +332,14 @@ SyncGroupData& AnimatorObject::find_or_create_sync_group(StringName name) {
 	return active_sync_groups.back();
 }
 
-bool AnimatorObject::play_animation(const AnimationSeqAsset* seqAsset, float play_speed, float start_pos) {
+bool AnimatorObject::play_animation(StringName slot, const AnimationSeqAsset* seqAsset, float play_speed, float start_pos) {
 	if (!seqAsset || !seqAsset->seq) {
 		sys_print(Warning, "play_animation: sequence invalid\n");
 		return false;
 	}
 	auto seq = seqAsset->seq;
 
-	auto slot_to_play_in = find_slot_with_name(seq->directplayopt.slotname);
+	auto slot_to_play_in = find_slot_with_name(slot);
 	if (!slot_to_play_in) {
 		sys_print(Warning, "no slot with name\n");
 		return false;

@@ -85,4 +85,8 @@ struct atClipNodeStruct
 	REF int start_frame = 0;
 };
 
-NEWENUM(ModifyBoneType, int){None, Meshspace, MeshspaceAdd, Localspace, LocalspaceAdd};
+// Space/mode for agModifyBone channels.
+// Localspace   = parent-relative (set/add in parent bone frame)
+// Bonespace     = bone's own current frame (rotates/translates along the bone's own axes)
+// Meshspace     = component/mesh space (set/add in mesh-local frame)
+NEWENUM(ModifyBoneType, int){None, Localspace, LocalspaceAdd, Bonespace, BonespaceAdd, Meshspace, MeshspaceAdd};

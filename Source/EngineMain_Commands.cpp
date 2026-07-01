@@ -61,6 +61,7 @@
 #include "EngineMain.h"
 #include "EditorPopupTemplate.h"
 #include "Animation/SkeletonData.h"
+#include "MyGame/fps/AnimGraphTester.h"
 #include "IntegrationTests/TestRegistry.h"
 #include "IntegrationTests/TestRunner.h"
 #include "IntegrationTests/StateDump.h"
@@ -352,6 +353,21 @@ void GameEngineLocal::add_commands() {
 	commands->add("reload_script", [](const Cmd_Args& args) { ScriptManager::inst->reload_all_scripts(); });
 
 	g_modelMgr.add_commands(*commands);
+
+#ifdef EDITOR_BUILD
+	commands->add("dump_ik", [](const Cmd_Args&) {
+		IEditorTool* tool = eng->get_tool();
+		if (!tool) { sys_print(Warning, "dump_ik: no editor tool active\n"); return; }
+		auto selected = tool->get_editor_api().selection()->get_selected();
+		for (auto& ptr : selected) {
+			Entity* e = ptr.get();
+			if (!e) continue;
+			auto* tester = e->get_component<AnimGraphTester>();
+			if (tester) { tester->start_ik_dump(); return; }
+		}
+		sys_print(Warning, "dump_ik: select an entity with AnimGraphTester first\n");
+	});
+#endif
 }
 
 #include "LevelSerialization/SerializeNew.h"

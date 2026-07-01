@@ -46,9 +46,6 @@ void apply_to_model(Model* model) {
         AnimationSeq* seq = skel->find_clip(clip_name);
         if (!seq) continue;
 
-        if (auto it = clip_json.find("is_additive"); it != clip_json.end() && it->is_boolean())
-            seq->is_additive_clip = it->get<bool>();
-
         seq->anim_events.clear();
         auto events_it = clip_json.find("events");
         if (events_it == clip_json.end() || !events_it->is_array()) continue;

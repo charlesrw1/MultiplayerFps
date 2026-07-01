@@ -171,17 +171,22 @@ void agClipNode::get_pose(agGetPoseCtx& ctx) {
 		if (!seq || !clipFrom) {
 			sys_print(Error, "agClipNode::get_pose: no sequence set\n");
 			has_init = true;
-			return; // output pose is already default (bind pose)
+			util_set_to_bind_pose(*ctx.pose, &ctx.get_skeleton()); // pool buffer is garbage; reset
+			return;
 		}
 		if (!clipFrom->get_skel()) {
 			sys_print(Error, "agClipNode::get_pose: clip model has no skeleton\n");
 			has_init = true;
+			util_set_to_bind_pose(*ctx.pose, &ctx.get_skeleton());
 			return;
 		}
 		remap = ctx.get_skeleton().get_remap(clipFrom->get_skel());
 		has_init = true;
 	}
-	if (!seq) return; // was set but later cleared (e.g. hot-reload)
+	if (!seq) { // was set but later cleared (e.g. hot-reload)
+		util_set_to_bind_pose(*ctx.pose, &ctx.get_skeleton());
+		return;
+	}
 
 	const float playSpeed = speed.get_float(ctx);
 	const float prev_time = anim_time;
@@ -201,13 +206,24 @@ void agClipNode::get_pose(agGetPoseCtx& ctx) {
 
 void agEvaluateClip::get_pose(agGetPoseCtx& ctx) {
 	if (!has_init) {
-		if (!seq || !clipFrom)
-			throw std::runtime_error("agClipNode: no sequence");
-
-		if (!clipFrom->get_skel())
-			throw std::runtime_error("agClipNode: sequence without skel");
+		if (!seq || !clipFrom) {
+			sys_print(Error, "agEvaluateClip::get_pose: no sequence set\n");
+			has_init = true;
+			util_set_to_bind_pose(*ctx.pose, &ctx.get_skeleton()); // pool buffer is garbage; reset
+			return;
+		}
+		if (!clipFrom->get_skel()) {
+			sys_print(Error, "agEvaluateClip::get_pose: clip model has no skeleton\n");
+			has_init = true;
+			util_set_to_bind_pose(*ctx.pose, &ctx.get_skeleton());
+			return;
+		}
 		remap = ctx.get_skeleton().get_remap(clipFrom->get_skel());
 		has_init = true;
+	}
+	if (!seq) { // was set but later cleared (e.g. hot-reload)
+		util_set_to_bind_pose(*ctx.pose, &ctx.get_skeleton());
+		return;
 	}
 
 	bool stopped_flag = false;
@@ -218,6 +234,10 @@ void agEvaluateClip::get_pose(agGetPoseCtx& ctx) {
 void agEvaluateClip::set_clip(const AnimationSeqAsset* asset) {
 	seq = asset->seq;
 	clipFrom = asset->srcModel.get();
+}
+
+void agBindPose::get_pose(agGetPoseCtx& ctx) {
+	util_set_to_bind_pose(*ctx.pose, &ctx.get_skeleton());
 }
 
 void agClipNode::set_clip(const Model* m, string clipName) {
@@ -280,6 +300,78 @@ void agAddNode::get_pose(agGetPoseCtx& ctx) {
 	ctx.debug_exit();
 }
 
+void agMakeAdditive::reset() {
+	if (input)     input->reset();
+	if (reference) reference->reset();
+}
+
+void agMakeAdditive::refresh_after_model_reload(Model* reloaded) {
+	if (input)     input->refresh_after_model_reload(reloaded);
+	if (reference) reference->refresh_after_model_reload(reloaded);
+}
+
+void agMakeAdditive::get_pose(agGetPoseCtx& ctx) {
+	if (!input || !reference) {
+		sys_print(Error, "agMakeAdditive::get_pose: missing input or reference\n");
+		// This node outputs an additive delta; the neutral value is the identity delta
+		// (zero translation/scale, identity rotation) so a downstream agAddNode is a no-op.
+		// The pool buffer is garbage, so write it explicitly rather than leaving UB.
+		const int nb = ctx.get_num_bones();
+		Pose& p = *ctx.pose;
+		for (int i = 0; i < nb; i++) {
+			p.q[i]     = glm::quat(1.f, 0.f, 0.f, 0.f);
+			p.pos[i]   = glm::vec3(0.f);
+			p.scale[i] = 0.f;
+		}
+		return;
+	}
+	ctx.debug_enter("agMakeAdditive");
+
+	// Motion clip into ctx.pose; reference (e.g. first frame) into a sibling pose.
+	input->get_pose(ctx);
+	agGetPoseCtx refCtx(ctx);
+	reference->get_pose(refCtx);
+
+	const int nb = ctx.get_num_bones();
+	Pose& delta = *ctx.pose;
+	util_subtract(nb, *refCtx.pose, delta); // delta = motion - reference
+
+	// Zero the delta on masked bones so a later agAddNode leaves them untouched
+	// (identity rotation, zero translation, zero scale-delta == no change in util_add).
+	for (int i = 0; i < nb && i < (int)masked.size(); i++) {
+		if (masked[i]) {
+			delta.q[i]     = glm::quat(1.f, 0.f, 0.f, 0.f);
+			delta.pos[i]   = glm::vec3(0.f);
+			delta.scale[i] = 0.f;
+		}
+	}
+	ctx.debug_exit();
+}
+
+void agMakeAdditive::init_mask(const Model* model) {
+	assert(model && model->get_skel());
+	masked.assign(model->get_skel()->get_num_bones(), 0);
+}
+
+void agMakeAdditive::mask_bone_and_children(const Model* model, string bone) {
+	assert(model && model->get_skel());
+	if (masked.empty())
+		init_mask(model);
+	const int myIndex = model->bone_for_name(StringName(bone.c_str()));
+	if (myIndex == -1)
+		throw std::runtime_error("agMakeAdditive::mask_bone_and_children: invalid bone");
+	const int num_bones = model->get_skel()->get_num_bones();
+	masked.at(myIndex) = 1;
+	// Same contiguous-children walk as agBlendMasked::set_all_children_weights:
+	// bones are stored parent-before-child, so a child has index > parent.
+	for (int i = myIndex + 1; i < num_bones; i++) {
+		const int parent = model->get_skel()->get_bone_parent(i);
+		if (parent < myIndex)
+			break;
+		masked.at(i) = 1;
+	}
+}
+
 SyncGroupData& agGetPoseCtx::find_sync_group(StringName name) const {
 	// TODO: insert return statement here
 	return object.find_or_create_sync_group(name);
@@ -317,6 +409,16 @@ glm::vec3 ValueType::get_vec3(agGetPoseCtx& ctx) {
 	throw std::runtime_error("ValueType::get_vec3: doesn't hold vec3");
 }
 
+glm::quat ValueType::get_quat(agGetPoseCtx& ctx) {
+	if (std::holds_alternative<glm::quat>(value))
+		return std::get<glm::quat>(value);
+	else if (std::holds_alternative<glm::vec3>(value))
+		return glm::quat(std::get<glm::vec3>(value)); // inline euler radians
+	else if (std::holds_alternative<StringName>(value))
+		return ctx.get_quat_var(std::get<StringName>(value));
+	throw std::runtime_error("ValueType::get_quat: doesn't hold a rotation");
+}
+
 void agIk2Bone::reset() {
 	input->reset();
 }
@@ -339,7 +441,9 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 	glm::mat4 final_ = mats[0];
 	return final_;
 }
-
+#include "../../Debug.h"
+#include "../../Game/Entity.h"
+ConfigVar a_draw_ik_debug("a_draw_ik_debug", "0", CVAR_BOOL | CVAR_DEV, "");
 void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 	if (!has_init) {
 		bone_idx = ctx.get_skeleton().get_bone_index(bone_name);
@@ -402,7 +506,7 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 		sys_print(Error, "agIk2Bone::get_pose: ik attempted on some root bone %s\n", bone_name.get_c_str());
 		throw std::runtime_error("ik error");
 	}
-
+	auto ent_transform = ctx.object.get_owner()->get_ws_transform();
 	auto ikfunctor = [&](glm::quat& outlocal1, glm::quat& outlocal2, vec3 target, bool print = false) {
 		const float dist_eps = 0.0001f;
 		// GLOBAL positions
@@ -414,13 +518,15 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 			return;
 		}
 
-		// Debug::add_sphere(ent_transform * vec4(a, 1.0), 0.01, COLOR_GREEN, 0.0, true);
-		// Debug::add_sphere(ent_transform * vec4(b, 1.0), 0.01, COLOR_BLUE, 0.0, true);
-		// Debug::add_sphere(ent_transform * vec4(c, 1.0), 0.01, COLOR_CYAN, 0.0, true);
-
 		glm::quat a_global = glm::quat_cast(mats[2]);
 		glm::quat b_global = glm::quat_cast(mats[1]);
 		util_twobone_ik(a, b, c, target, vec3(0.0, 0.0, 1.0), a_global, b_global, outlocal2, outlocal1);
+
+		if (a_draw_ik_debug.get_bool()) {
+			Debug::add_sphere(ent_transform * glm::vec4(a, 1.0), 0.01, COLOR_GREEN, 0.0, true);
+			Debug::add_sphere(ent_transform * glm::vec4(b, 1.0), 0.01, COLOR_BLUE, 0.0, true);
+			Debug::add_sphere(ent_transform * glm::vec4(c, 1.0), 0.01, COLOR_CYAN, 0.0, true);
+		}
 	};
 
 	glm::quat target_rotation = {};
@@ -484,7 +590,7 @@ void agModifyBone::get_pose(agGetPoseCtx& ctx) {
 	const float     pre_scale = pose.scale[B];
 
 	const glm::vec3 set_pos   = translationVal.get_vec3(ctx);
-	const glm::quat set_rot   = glm::quat(rotationVal.get_vec3(ctx));
+	const glm::quat set_rot   = rotationVal.get_quat(ctx);
 	const glm::vec3 set_scale = scaleVal.get_vec3(ctx);
 
 	// Build global matrix chain only when meshspace channels are active.
@@ -639,6 +745,14 @@ glm::vec3 agGetPoseCtx::get_vec3_var(StringName name) const {
 	if (var.has_value())
 		return var.value();
 	sys_print(Error, "agGetPoseCtx::get_vec3_var: no variable exists: %s\n", name.get_c_str());
+	throw std::runtime_error("no variable exists");
+}
+
+glm::quat agGetPoseCtx::get_quat_var(StringName name) const {
+	auto var = object.get_quat_variable(name);
+	if (var.has_value())
+		return var.value();
+	sys_print(Error, "agGetPoseCtx::get_quat_var: no variable exists: %s\n", name.get_c_str());
 	throw std::runtime_error("no variable exists");
 }
 
