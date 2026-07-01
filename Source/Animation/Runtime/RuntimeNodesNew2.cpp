@@ -75,12 +75,17 @@ static void sample_events_from_clip(agGetPoseCtx& ctx, const AnimationSeq* seq,
         if (!ev.is_duration) {
             if (ev.time_start >= p && ev.time_start < c)
                 out.push_back({&ev, ev.time_start, w, b_mirrored, AnimEventTrigger::Entered});
-        } else {
-            if (ev.time_start >= p && ev.time_start < c)
-                out.push_back({&ev, ev.time_start, w, b_mirrored, AnimEventTrigger::Entered});
-            if (ev.time_end > ev.time_start && ev.time_end >= p && ev.time_end < c)
-                out.push_back({&ev, ev.time_end,   w, b_mirrored, AnimEventTrigger::Left});
+            return;
         }
+        const bool entered = ev.time_start >= p && ev.time_start < c;
+        const bool left    = ev.time_end > ev.time_start && ev.time_end >= p && ev.time_end < c;
+        if (entered)
+            out.push_back({&ev, ev.time_start, w, b_mirrored, AnimEventTrigger::Entered});
+        if (left)
+            out.push_back({&ev, ev.time_end, w, b_mirrored, AnimEventTrigger::Left});
+        // Still inside the duration window and didn't just cross a boundary this frame.
+        if (!entered && !left && c > ev.time_start && c < ev.time_end)
+            out.push_back({&ev, c, w, b_mirrored, AnimEventTrigger::Active});
     };
 
     if (!looped) {

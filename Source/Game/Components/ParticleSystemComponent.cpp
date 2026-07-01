@@ -280,6 +280,8 @@ void ParticleSystemComponent::update()
 	const float dt = eng->get_dt() * playback_speed;
 	total_elapsed += dt;
 
+	const bool treat_as_editor_particle = eng->is_editor_level() && !destroy_owner_when_finished;
+
 	for (int ss_idx = 0; ss_idx < (int)asset->subsystems.size(); ss_idx++) {
 		if (ss_idx >= (int)subsystem_states.size())
 			break;
@@ -290,12 +292,14 @@ void ParticleSystemComponent::update()
 
 		state.elapsed_time += dt;
 
-		// handle looping
-		if (main.looping && state.elapsed_time > main.duration) {
+		// handle looping (in the editor, always loop for previewing regardless of the asset's looping flag,
+		// which only governs actual game runtime behavior)
+		const bool loops = main.looping || treat_as_editor_particle;
+		if (loops && state.elapsed_time > main.duration) {
 			state.elapsed_time = fmod(state.elapsed_time, main.duration);
 			state.next_burst_index = 0;
 		}
-		else if (!main.looping && state.elapsed_time > main.duration) {
+		else if (!loops && state.elapsed_time > main.duration) {
 			state.is_emitting = false;
 		}
 
@@ -531,8 +535,11 @@ void ParticleSystemComponent::update()
 				break;
 			}
 		}
-		if (all_done)
+		if (all_done && playing) {
 			playing = false;
+			if (destroy_owner_when_finished)	// destroy_owner_when_finished is exclusively a non-editable particle thing
+				get_owner()->destroy();
+		}
 	}
 }
 

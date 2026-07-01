@@ -340,6 +340,11 @@ void AnimGraphTester::rebuild_graph() {
         cycle_timer = 0.f;
         break;
     }
+	case AnimGraphTestMode::DurationEventTest:
+		auto* clip = make_clip(clip0);
+		b.set_root(clip);
+
+		break;
 
     } // switch
 
@@ -473,7 +478,9 @@ void AnimGraphTester::update() {
     auto world_to_mesh = [&](glm::vec3 wp) {
         return glm::vec3(to_mesh * glm::vec4(wp, 1.f));
     };
-
+    auto mesh_to_world = [&](glm::vec3 mp) {
+        return glm::vec3(ws_transform * glm::vec4(mp, 1.f));
+    };
     switch (mode) {
 
     case AnimGraphTestMode::BasicIK:
@@ -524,7 +531,11 @@ void AnimGraphTester::update() {
         // real foot an ABSOLUTE mesh-space target = (IK bone X/Z, surface Y + height off).
         // Because the target is absolute and the trace is vertical (ground Y is independent
         // of the foot's current Y), there is no feedback loop -- only a 1-frame latency.
-        auto ground_foot = [&](const std::string& ik_bone_name, const char* tgtVar, const char* rotVar, float& out_ground_delta) -> bool {
+
+        glm::vec3 foot_l_pos = ws_transform[3];
+		glm::vec3 foot_r_pos = ws_transform[3];
+
+        auto ground_foot = [&](const std::string& ik_bone_name, const char* tgtVar, const char* rotVar, float& out_ground_delta, glm::vec3& out_foot_pos) -> bool {
             out_ground_delta = 0.f;   // flat / no-hit contributes nothing to the pelvis drop
             int idx = mesh->get_index_of_bone(StringName(ik_bone_name.c_str()));
             if (idx < 0 || idx >= (int)bonemats.size()) return false;
@@ -567,14 +578,17 @@ void AnimGraphTester::update() {
 
             anim->set_vec3_variable(StringName(tgtVar), foot_target);
             anim->set_vec3_variable(StringName(rotVar), rot_euler);
+
+            out_foot_pos = mesh_to_world(foot_target);
+
             return true;
         };
 
         // Only enable IK once both targets resolve; otherwise an unset/zero target would
         // yank the foot toward the mesh origin.
         float deltaL = 0.f, deltaR = 0.f;
-        bool okL = ground_foot(ik_foot_l, "vFootTargetL", "vFootRotL", deltaL);
-        bool okR = ground_foot(ik_foot_r, "vFootTargetR", "vFootRotR", deltaR);
+        bool okL = ground_foot(ik_foot_l, "vFootTargetL", "vFootRotL", deltaL, foot_l_pos);
+        bool okR = ground_foot(ik_foot_r, "vFootTargetR", "vFootRotR", deltaR, foot_r_pos);
         anim->set_float_variable(StringName("flFootIkAlpha"), (okL && okR) ? 1.f : 0.f);
 
         // Pelvis drop = how far the LOWEST-ground foot must reach below the base plane
@@ -583,6 +597,19 @@ void AnimGraphTester::update() {
         const float t = glm::clamp(pelvis_interp_speed * dt, 0.f, 1.f);
         pelvis_offset += (pelvis_target - pelvis_offset) * t;
         anim->set_vec3_variable(StringName("vPelvisOffset"), glm::vec3(0.f, pelvis_offset, 0.f));
+
+        if (footstep_particle.get()) {
+			for (auto& e : anim->sampled_events) {
+				if (e.event->name == "foot_r") {
+					// spawn particle system at footstep
+					GameplayStatic::spawn_particle_effect(footstep_particle.get(), foot_r_pos);
+				}
+				else if (e.event->name == "foot_l") {
+					// spawn particle system at footstep
+					GameplayStatic::spawn_particle_effect(footstep_particle.get(), foot_l_pos);
+				}
+			}
+		}
         break;
     }
 
@@ -616,6 +643,31 @@ void AnimGraphTester::update() {
             blend_state = (blend_state + 1) % 3;
         }
         anim->set_int_variable(StringName("iState"), blend_state);
+        break;
+	case AnimGraphTestMode::DurationEventTest:
+
+        bool in_event = false;
+        for (auto& anim_event : anim->sampled_events) {
+			if (anim_event.event->name == "roll") {
+			
+                if (anim_event.trigger == AnimEventTrigger::Entered) {
+					if (footstep_particle.get()) {
+						GameplayStatic::spawn_particle_effect(footstep_particle.get(), get_ws_position());
+					}
+					in_event = true;
+                }
+                else if (anim_event.trigger == AnimEventTrigger::Active) {
+					in_event = true;
+                }
+            }
+        }
+		if (in_event) {
+			mesh->set_material_override(matoverride.get());
+        }
+        else {
+			mesh->set_material_override(nullptr);
+        }
+
         break;
 
     } // switch

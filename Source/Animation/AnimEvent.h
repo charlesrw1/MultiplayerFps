@@ -15,6 +15,7 @@ struct AnimEvent {
 // How a sampled event was triggered this frame.
 enum class AnimEventTrigger : uint8_t {
     Entered, // animation time crossed time_start (all instant events; duration event began)
+    Active,  // duration event is still active this frame (didn't cross time_start or time_end)
     Left,    // animation time crossed time_end (duration events only)
 };
 

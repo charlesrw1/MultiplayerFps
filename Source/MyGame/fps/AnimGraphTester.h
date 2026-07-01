@@ -5,7 +5,8 @@
 #include "Assets/IAsset.h"
 #include "Animation/AnimationSeqAsset.h"
 #include "Render/Model.h"
-
+#include "../../Game/Particles/ParticleAsset.h"
+#include "../../Render/MaterialPublic.h"
 NEWENUM(AnimGraphTestMode, int) {
     BasicIK,      // IK right hand to moveable target entity
     LookAt,       // agModifyBone head look-at moveable target
@@ -16,6 +17,7 @@ NEWENUM(AnimGraphTestMode, int) {
     SlotPlaying,  // agSlotPlayer: base idle + periodic one-shot slot clips
     Additive,     // agAddNode: pulsing additive layer
     BlendByInt,   // agBlendByInt: auto-cycling integer state machine
+    DurationEventTest,
 };
 
 class MeshComponent;
@@ -36,6 +38,7 @@ public:
     REF AnimGraphTestMode mode = AnimGraphTestMode::BasicIK;
 
     REF AssetPtr<Model> model;
+	REF AssetPtr<MaterialInstance> matoverride;
 
     // Optional prop: when set, a transient child MeshComponent entity is spawned and
     // parented to prop_bone on the character (e.g. a rifle on the right hand) for testing.
@@ -48,6 +51,7 @@ public:
     REF AssetPtr<AnimationSeqAsset> clip1;       // secondary clip (walk, upper-body, additive)
     REF AssetPtr<AnimationSeqAsset> clip2;       // tertiary clip (BlendByInt state 2)
     REF AssetPtr<AnimationSeqAsset> slot_clip;   // one-shot clip fired into SlotPlaying slot
+	REF AssetPtr<ParticleAsset> footstep_particle;
 
     // Bone names — use the dropdown picker to select from the attached model's skeleton
     REFLECT(type = BoneNameString)

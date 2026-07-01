@@ -24,6 +24,8 @@
 #include "UI/UILoader.h"
 
 #include "Game/Components/SpawnerComponenth.h"
+#include "Game/Components/ParticleSystemComponent.h"
+#include "Game/Particles/ParticleAsset.h"
 
 #include <cassert>
 
@@ -91,6 +93,36 @@ Entity* GameplayStatic::spawn_entity() {
 	return eng->get_level()->spawn_entity();
 }
 
+static ParticleSystemComponent* spawn_particle_effect_internal(ParticleAsset* asset) {
+	ASSERT(asset);
+	Entity* e = GameplayStatic::spawn_entity();
+	auto* pc = e->create_component<ParticleSystemComponent>();
+	pc->particle_asset = asset;
+	pc->play_on_awake = false;
+	pc->destroy_owner_when_finished = true;
+	e->dont_serialize_or_edit = true;
+
+	return pc;
+}
+
+ParticleSystemComponent* GameplayStatic::spawn_particle_effect(ParticleAsset* asset, glm::vec3 world_pos) {
+	auto* pc = spawn_particle_effect_internal(asset);
+	pc->get_owner()->set_ws_position(world_pos);
+	pc->play();
+	return pc;
+}
+
+ParticleSystemComponent* GameplayStatic::spawn_particle_effect_attached(
+	ParticleAsset* asset, Entity* parent_entity, StringName bone_name) {
+	ASSERT(parent_entity);
+	auto* pc = spawn_particle_effect_internal(asset);
+	pc->get_owner()->parent_to(parent_entity);
+	if (bone_name.get_hash() != 0)
+		pc->get_owner()->set_parent_bone(bone_name);
+	pc->play();
+	return pc;
+}
+
 std::vector<SpawnerComponent*> GameplayStatic::find_spawners_in_class(std::string name) {
 	ASSERT(!name.empty());
 	std::vector<SpawnerComponent*> test_ents;
@@ -111,12 +143,14 @@ HitResult GameplayStatic::cast_ray(glm::vec3 start, glm::vec3 end, int channel_m
 	if (ignore_this)
 		ignore.push_back(ignore_this);
 
-	g_physics.trace_ray(res, start, end, &ignore, channel_mask);
-	out.hit = res.component != nullptr;
-	if (res.component) {
+	out.hit = g_physics.trace_ray(res, start, end, &ignore, channel_mask);
+	if (out.hit) {
 		out.pos = res.hit_pos;
-		out.what = res.component->get_owner();
 		out.normal = res.hit_normal;
+		// res.component is null for physics actors that aren't backed by a PhysicsBody
+		// (e.g. static meshes optimized out of the entity/component system) - still a valid hit.
+		if (res.component)
+			out.what = res.component->get_owner();
 	}
 	return out;
 }

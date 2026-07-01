@@ -22,6 +22,8 @@ class PhysicsBody;
 #include "Sound/SoundPublic.h"
 #include <glm/gtc/noise.hpp>
 class SpawnerComponent;
+class ParticleAsset;
+class ParticleSystemComponent;
 class GameplayStatic : public ClassBase
 {
 public:
@@ -63,6 +65,12 @@ public:
 		return eng->get_level()->get_source_asset_name();
 	}
 	REF static std::vector<obj<Entity>> sphere_overlap(glm::vec3 center, float radius, int channel_mask);
+
+	// spawns a new entity at world_pos with a playing, one-shot ParticleSystemComponent that
+	// destroys its owning entity automatically once the effect finishes
+	REF static ParticleSystemComponent* spawn_particle_effect(ParticleAsset* asset, glm::vec3 world_pos);
+	// same as spawn_particle_effect, but parents the new entity to parent_entity (optionally on a named bone)
+	REF static ParticleSystemComponent* spawn_particle_effect_attached(ParticleAsset* asset, Entity* parent_entity, StringName bone_name);
 
 	REF static void reset_debug_text_height();
 	REF static void debug_text(string s);
