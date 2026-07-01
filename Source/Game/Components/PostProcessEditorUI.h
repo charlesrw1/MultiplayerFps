@@ -3,9 +3,11 @@
 
 #include "Game/EntityComponent.h"
 #include "Framework/CurveEditorImgui.h"
-#include "LevelEditor/PropertyEditors.h"
+#include <memory>
 
 class PostProcessComponent;
+class PostProcessSettings;
+class PropertyGrid;
 
 class PostProcessComponentEditorUi : public IComponentEditorUi
 {
@@ -23,8 +25,11 @@ private:
     EditingCurve* editing_bloom_curve = nullptr;
     bool show_curve_popup = false;
 
-    // Bloom lens-dirt texture slot
-    AssetSlotWidget lens_dirt_slot;
+    // Bloom lens-dirt texture slot: synthetic-AssetPtr SharedAssetPropertyEditor in a
+    // single-row PropertyGrid (same pattern as RendererMaterialEditor / MiTextureEditor),
+    // rebuilt when the underlying settings asset changes.
+    std::unique_ptr<PropertyGrid> lens_dirt_pg;
+    PostProcessSettings* lens_dirt_pg_for = nullptr;
 };
 
 #endif

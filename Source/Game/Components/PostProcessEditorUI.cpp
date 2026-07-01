@@ -12,6 +12,38 @@
 #include "Framework/MyImguiLib.h"
 #include "Render/Texture.h"
 #include "Assets/AssetRegistry.h"
+#include "LevelEditor/PropertyEditors.h"
+#include "Framework/FnFactory.h"
+#include "Framework/ReflectionProp.h"
+
+static FnFactory<IPropertyEditor>& get_basic_factory() {
+    static FnFactory<IPropertyEditor> factory;
+    static bool registered = false;
+    if (!registered) { PropertyFactoryUtil::register_basic(factory); registered = true; }
+    return factory;
+}
+
+// Synthetic-AssetPtr editor: wraps AssetPtr<Texture>* directly (like
+// RendererMaterialEditor / MiTextureEditor) so the lens-dirt slot gets the
+// full SharedAssetPropertyEditor widget (thumbnail, drag-drop, browse, picker).
+class LensDirtTextureEditor : public SharedAssetPropertyEditor {
+public:
+    explicit LensDirtTextureEditor(AssetPtr<Texture>* tex) : tex_ptr(tex) {
+        synth = make_assetptr_property_new("Lens Dirt", 0, 0, "", &Texture::StaticType);
+        prop = &synth;
+        class_type_override = &Texture::StaticType;
+    }
+    std::string get_str() override {
+        return (tex_ptr && tex_ptr->get_unsafe()) ? tex_ptr->get_unsafe()->get_name() : "";
+    }
+    void set_asset(const std::string& str) override {
+        if (!tex_ptr) return;
+        *tex_ptr = str.empty() ? AssetPtr<Texture>{} : g_assets.find<Texture>(str);
+    }
+private:
+    PropertyInfo synth;
+    AssetPtr<Texture>* tex_ptr = nullptr;
+};
 
 static bool create_ppset_file(const std::string& path) {
     if (FileSys::does_file_exist(path.c_str(), FileSys::GAME_DIR))
@@ -190,17 +222,13 @@ bool PostProcessComponentEditorUi::draw() {
         }
 
         ImGui::Spacing();
-        ImGui::TextUnformatted("Lens Dirt");
-        ImGui::SameLine(120);
-        {
-            std::string dirt_path = asset->bloom_lens_dirt.get_unsafe() ? asset->bloom_lens_dirt.get_unsafe()->get_name() : std::string();
-            const AssetMetadata* tex_meta = AssetRegistrySystem::get().find_for_classtype(&Texture::StaticType);
-            std::string new_path;
-            if (lens_dirt_slot.draw(dirt_path, tex_meta, 220, new_path)) {
-                asset->bloom_lens_dirt = new_path.empty() ? AssetPtr<Texture>{} : g_assets.find<Texture>(new_path);
-                changed = true;
-            }
+        if (lens_dirt_pg_for != asset) {
+            lens_dirt_pg = std::make_unique<PropertyGrid>(get_basic_factory());
+            lens_dirt_pg->add_iproped_manual(new LensDirtTextureEditor(&asset->bloom_lens_dirt));
+            lens_dirt_pg_for = asset;
         }
+        lens_dirt_pg->update();
+        changed |= lens_dirt_pg->rows_had_changes;
         slider("Lens Dirt Intensity", asset->bloom_lens_dirt_intensity, 0.f, 4.f);
     }
     ImGui::PopID();
