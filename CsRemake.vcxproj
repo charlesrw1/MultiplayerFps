@@ -212,6 +212,7 @@
     <ClCompile Include="Source\MyGame\fps\fpsApp.cpp" />
     <ClCompile Include="Source\MyGame\fps\fpsDebugCamera.cpp" />
     <ClCompile Include="Source\MyGame\fps\AnimGraphTester.cpp" />
+    <ClCompile Include="Source\MyGame\fps\AnimGraphTesterEditorUI.cpp" />
     <ClCompile Include="Source\MyGame\fps\fpsObjects.cpp" />
     <ClCompile Include="Source\Render\DdsExport.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
@@ -412,6 +413,7 @@
     <ClInclude Include="Source\MyGame\fps\fpsApp.h" />
     <ClInclude Include="Source\MyGame\fps\fpsDebugCamera.h" />
     <ClInclude Include="Source\MyGame\fps\AnimGraphTester.h" />
+    <ClInclude Include="Source\MyGame\fps\AnimGraphTesterEditorUI.h" />
     <ClInclude Include="Source\MyGame\fps\fpsObjects.h" />
     <ClInclude Include="Source\Render\DynamicMaterialPtr.h" />
     <ClInclude Include="Source\Render\Dx11\Dx11Local.h" />

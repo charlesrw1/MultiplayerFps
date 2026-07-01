@@ -18,6 +18,7 @@ NEWENUM(AnimGraphTestMode, int) {
     Additive,     // agAddNode: pulsing additive layer
     BlendByInt,   // agBlendByInt: auto-cycling integer state machine
     DurationEventTest,
+    BlendSpace2D, // agBlendSpace2D: clip0..clip3 at the 4 corners of a square parameter grid
 };
 
 class MeshComponent;
@@ -49,7 +50,8 @@ public:
     // Animation clips used by the graph modes
     REF AssetPtr<AnimationSeqAsset> clip0;       // primary / idle clip
     REF AssetPtr<AnimationSeqAsset> clip1;       // secondary clip (walk, upper-body, additive)
-    REF AssetPtr<AnimationSeqAsset> clip2;       // tertiary clip (BlendByInt state 2)
+    REF AssetPtr<AnimationSeqAsset> clip2;       // tertiary clip (BlendByInt state 2 / BlendSpace2D corner)
+    REF AssetPtr<AnimationSeqAsset> clip3;       // quaternary clip (BlendSpace2D corner)
     REF AssetPtr<AnimationSeqAsset> slot_clip;   // one-shot clip fired into SlotPlaying slot
 	REF AssetPtr<ParticleAsset> footstep_particle;
 
@@ -114,7 +116,19 @@ public:
     REF Easing transition_easing = Easing::CubicEaseIn;
 	REF float transition_time = 0.4f;
 
+    // BlendSpace2D: clip0=(-1,-1) clip1=(1,-1) clip2=(-1,1) clip3=(1,1). When bs2d_manual is
+    // false the input auto-sweeps in a circle; the editor preview UI (see
+    // AnimGraphTesterEditorUI) sets bs2d_manual=true and writes bs2d_x/y directly when the
+    // user drags the marker.
+    REF float bs2d_x = 0.f;
+    REF float bs2d_y = 0.f;
+    REF bool bs2d_manual = false;
+
     void start_ik_dump();  // called externally (console command)
+
+#ifdef EDITOR_BUILD
+    std::unique_ptr<IComponentEditorUi> create_editor_ui() final;
+#endif
 
 private:
 

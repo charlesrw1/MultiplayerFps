@@ -1,4 +1,7 @@
 #include "AnimGraphTester.h"
+#ifdef EDITOR_BUILD
+#include "AnimGraphTesterEditorUI.h"
+#endif
 #include "Game/Components/MeshComponent.h"
 #include "Game/Components/BillboardComponent.h"
 #include "Render/Texture.h"
@@ -48,6 +51,12 @@ AnimGraphTester::AnimGraphTester() {
 // -----------------------------------------------------------------------
 void AnimGraphTester::editor_start() {
 }
+
+#ifdef EDITOR_BUILD
+std::unique_ptr<IComponentEditorUi> AnimGraphTester::create_editor_ui() {
+    return std::make_unique<AnimGraphTesterEditorUi>(this);
+}
+#endif
 
 // -----------------------------------------------------------------------
 void AnimGraphTester::start() {
@@ -340,11 +349,25 @@ void AnimGraphTester::rebuild_graph() {
         cycle_timer = 0.f;
         break;
     }
-	case AnimGraphTestMode::DurationEventTest:
+	case AnimGraphTestMode::DurationEventTest: {
 		auto* clip = make_clip(clip0);
 		b.set_root(clip);
-
 		break;
+	}
+
+    case AnimGraphTestMode::BlendSpace2D: {
+        agBlendSpace2D* bs = b.alloc<agBlendSpace2D>();
+        if (clip0 && !clip0->did_load_fail()) bs->add_sample(clip0.get(), -1.f, -1.f);
+        if (clip1 && !clip1->did_load_fail()) bs->add_sample(clip1.get(),  1.f, -1.f);
+        if (clip2 && !clip2->did_load_fail()) bs->add_sample(clip2.get(), -1.f,  1.f);
+        if (clip3 && !clip3->did_load_fail()) bs->add_sample(clip3.get(),  1.f,  1.f);
+        bs->set_x_var("flBsX");
+        bs->set_y_var("flBsY");
+        bs->set_looping(true);
+
+        b.set_root(bs);
+        break;
+    }
 
     } // switch
 
@@ -361,6 +384,8 @@ void AnimGraphTester::rebuild_graph() {
         a->set_vec3_variable(StringName("vFootRotR"),    glm::vec3(0.f));
         a->set_vec3_variable(StringName("vPelvisOffset"),glm::vec3(0.f));
         a->set_quat_variable(StringName("vHeadRot"),     glm::quat(1.f, 0.f, 0.f, 0.f));
+        a->set_float_variable(StringName("flBsX"), bs2d_x);
+        a->set_float_variable(StringName("flBsY"), bs2d_y);
     }
 }
 
@@ -644,7 +669,7 @@ void AnimGraphTester::update() {
         }
         anim->set_int_variable(StringName("iState"), blend_state);
         break;
-	case AnimGraphTestMode::DurationEventTest:
+	case AnimGraphTestMode::DurationEventTest: {
 
         bool in_event = false;
         for (auto& anim_event : anim->sampled_events) {
@@ -669,6 +694,19 @@ void AnimGraphTester::update() {
         }
 
         break;
+    }
+
+    case AnimGraphTestMode::BlendSpace2D: {
+        // Auto-sweep a circle over the 4-corner grid unless the editor preview UI has taken
+        // manual control (dragging the marker there sets bs2d_manual and bs2d_x/y directly).
+        if (!bs2d_manual) {
+            bs2d_x = cosf(cycle_timer * 0.5f);
+            bs2d_y = sinf(cycle_timer * 0.5f);
+        }
+        anim->set_float_variable(StringName("flBsX"), bs2d_x);
+        anim->set_float_variable(StringName("flBsY"), bs2d_y);
+        break;
+    }
 
     } // switch
 

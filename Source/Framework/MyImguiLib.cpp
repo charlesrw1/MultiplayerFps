@@ -40,17 +40,20 @@ ImVec2 get_screen_pos(ImRect frame, ImVec2 param, ImVec2 min, ImVec2 max) {
 	return screen;
 }
 
+// current_pos is both an in param (draws the current blend-input marker at that position)
+// and an out param (dragging inside the plot writes the new position back into it). Returns
+// true the frame the user drags the marker to a new position.
 bool MyImDrawBlendSpace(const char* label, const std::vector<ImVec2>& verts, const std::vector<int>& indicies,
 						const std::vector<const char*>& vert_names, ImVec2 minbound, ImVec2 maxbound,
-						ImVec2* hover_pos) {
+						ImVec2* current_pos) {
 	assert(indicies.size() % 3 == 0);
 
 	using namespace ImGui;
 
+	bool changed = false;
+
 	ImVec2 size = ImVec2(maxbound.x - minbound.x, maxbound.y - minbound.y);
 	float height_scale = size.y / size.x;
-
-	ImGui::Text("placeholder");
 
 	ImGuiWindow* window = GetCurrentWindow();
 	auto& style = GetStyle();
@@ -87,6 +90,22 @@ bool MyImDrawBlendSpace(const char* label, const std::vector<ImVec2>& verts, con
 	}
 	ImGui::EndChild();
 
+	// Whole-plot drag catcher, added first so the smaller per-sample buttons below (added
+	// after, so they win hover/hit-test priority on their own circles) can still show
+	// tooltips on top of it. Click/drag anywhere in the plot to move the current blend input.
+	SetCursorScreenPos(sub_bb.Min);
+	ImGui::PushID(label);
+	InvisibleButton("##blendspace_drag", sub_bb.GetSize());
+	ImGui::PopID();
+	if (current_pos && IsItemActive()) {
+		ImVec2 mouse = GetIO().MousePos;
+		ImVec2 t = (mouse - sub_bb.Min) / sub_bb.GetSize();
+		t.x = ImClamp(t.x, 0.f, 1.f);
+		t.y = ImClamp(t.y, 0.f, 1.f);
+		*current_pos = ImVec2(minbound.x + t.x * size.x, minbound.y + t.y * size.y);
+		changed = true;
+	}
+
 	for (int i = 0; i < indicies.size(); i += 3) {
 		ImVec2 p1 = get_screen_pos(sub_bb, verts[indicies[i]], minbound, maxbound);
 		ImVec2 p2 = get_screen_pos(sub_bb, verts[indicies[i + 1]], minbound, maxbound);
@@ -116,9 +135,19 @@ bool MyImDrawBlendSpace(const char* label, const std::vector<ImVec2>& verts, con
 		}
 		ImGui::PopID();
 	}
+
+	// Current blend-input marker: a crosshair over a filled dot, drawn last so it's on top.
+	if (current_pos) {
+		ImVec2 p = get_screen_pos(sub_bb, *current_pos, minbound, maxbound);
+		window->DrawList->AddCircleFilled(p, 6, color32_to_int({255, 60, 60, 255}), 12);
+		window->DrawList->AddCircle(p, 10, color32_to_int({255, 255, 255, 255}), 12, 2.f);
+		window->DrawList->AddLine(p - ImVec2(14, 0), p + ImVec2(14, 0), color32_to_int({255, 60, 60, 255}));
+		window->DrawList->AddLine(p - ImVec2(0, 14), p + ImVec2(0, 14), color32_to_int({255, 60, 60, 255}));
+	}
+
 	SetCursorScreenPos(restore_pos);
 
-	return false;
+	return changed;
 }
 
 #include "IEditorTool.h"

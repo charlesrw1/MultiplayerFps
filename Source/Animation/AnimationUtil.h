@@ -52,9 +52,6 @@ void util_twobone_ik(const vec3& a, const vec3& b, const vec3& c, const vec3& ta
 					 const glm::quat& a_global_rotation, const glm::quat& b_global_rotation,
 					 glm::quat& a_local_rotation, glm::quat& b_local_rotation);
 
-// y2 = blend( blend(x1,x2,fac.x), blend(y1,y2,fac.x), fac.y)
-void util_bilinear_blend(int bonecount, const Pose& x1, Pose& x2, const Pose& y1, Pose& y2, glm::vec2 fac);
-
 void util_set_to_bind_pose(Pose& pose, const MSkeleton* skel);
 
 void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& out_bone_matricies,

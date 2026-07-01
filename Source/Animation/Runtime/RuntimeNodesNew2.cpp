@@ -4,6 +4,8 @@
 #include "Render/Model.h"
 #include "Framework/Util.h"
 #include "Animation.h"
+#include <algorithm>
+#include <limits>
 
 void agClipNode::reset() {
 	anim_time = 0.0;
@@ -98,6 +100,115 @@ static void sample_events_from_clip(agGetPoseCtx& ctx, const AnimationSeq* seq,
             check_window(ev, 0.f,       curr_time);
         }
     }
+}
+
+// One currently-blended sample inside a blend space: its clip, the retarget map to evaluate
+// it with, and its normalized contribution weight (weights across all actives sum to 1).
+struct ActiveBlendSample
+{
+	const AnimationSeq* seq = nullptr;
+	const BoneIndexRetargetMap* remap = nullptr;
+	float weight = 0.f;
+};
+
+// Advances a blend space's own normalized [0,1) playhead. Participates in an optional
+// SyncGroup exactly like a virtual clip of duration 1 -- SyncGroupData::time is already a
+// plain ratio, so a blend space's normalized time and a clip's normalized time interoperate
+// with no rescaling. Unlike get_clip_pose_shared, the pose is evaluated every frame
+// regardless of leader/follower election; only whether *this* node advances/writes the
+// group's time is gated on winning the election. Returns the normalized time to evaluate
+// samples at this frame; `animTime` is updated to hold next frame's starting time.
+static float advance_blendspace_time(agGetPoseCtx& ctx, StringName syncGroup, sync_opt syncType, bool loop,
+									 float speed, float avg_duration, float& animTime, bool& stopped) {
+	const float rate = speed / glm::max(avg_duration, 0.0001f);
+	float eval_time = animTime;
+	auto step = [&](float from) {
+		float next = from + ctx.dt * rate;
+		if (next > 1.f || next < 0.f) {
+			if (loop)
+				next = fmod(fmod(next, 1.f) + 1.f, 1.f);
+			else {
+				next = 0.999f;
+				stopped = true;
+			}
+		}
+		return next;
+	};
+	if (!syncGroup.is_null()) {
+		SyncGroupData& sync = ctx.find_sync_group(syncGroup);
+		if (!sync.is_this_first_update())
+			eval_time = sync.time.get();
+		if (sync.should_write_new_update_weight(syncType, ctx.weight)) {
+			const float next = step(eval_time);
+			sync.write_to_update_time(syncType, ctx.weight, nullptr, Percentage(next, 1.f));
+			animTime = next;
+		} else {
+			animTime = eval_time; // another node in the group owns advancing this frame
+		}
+	} else {
+		animTime = step(eval_time);
+	}
+	return eval_time;
+}
+
+// Shared blend-space evaluation: normalizes weights, advances the shared playhead, samples
+// each active clip at that playhead scaled by its own duration, and combines them into
+// ctx.pose via successive weighted lerps (a running convex combination -- correct regardless
+// of how many samples are active, so agBlendSpace1D's pairs and agBlendSpace2D's triangle
+// corners share this same code).
+static void blend_space_evaluate(agGetPoseCtx& ctx, std::vector<ActiveBlendSample>& actives, StringName syncGroup,
+								 sync_opt syncType, bool loop, float speed, float& animTime) {
+	actives.erase(std::remove_if(actives.begin(), actives.end(), [](const ActiveBlendSample& a) { return a.seq == nullptr; }),
+				 actives.end());
+	if (actives.empty()) {
+		util_set_to_bind_pose(*ctx.pose, &ctx.get_skeleton());
+		return;
+	}
+	float weight_sum = 0.f;
+	for (auto& a : actives) weight_sum += a.weight;
+	if (weight_sum > 0.00001f)
+		for (auto& a : actives) a.weight /= weight_sum;
+	else
+		for (auto& a : actives) a.weight = 1.f / actives.size();
+
+	float avg_duration = 0.f;
+	for (auto& a : actives) avg_duration += a.weight * a.seq->get_duration();
+
+	const float prev_time = animTime;
+	bool stopped = false;
+	const float eval_time = advance_blendspace_time(ctx, syncGroup, syncType, loop, speed, avg_duration, animTime, stopped);
+	const bool looped = loop && (animTime < prev_time);
+
+	size_t dominant = 0;
+	float running_weight = 0.f;
+	for (size_t i = 0; i < actives.size(); i++) {
+		ActiveBlendSample& a = actives[i];
+		const float dur = a.seq->get_duration();
+		const float local_time = glm::clamp(eval_time * dur, 0.f, dur);
+
+		if (i == 0) {
+			util_calc_rotations(&ctx.get_skeleton(), a.seq, local_time, a.remap, *ctx.pose, loop);
+			running_weight = a.weight;
+		} else {
+			agGetPoseCtx other(ctx);
+			util_calc_rotations(&ctx.get_skeleton(), a.seq, local_time, a.remap, *other.pose, loop);
+			const float total = running_weight + a.weight;
+			const float lerp_alpha = total > 0.00001f ? a.weight / total : 0.f;
+			util_blend(ctx.get_num_bones(), *other.pose, *ctx.pose, lerp_alpha);
+			running_weight = total;
+			if (a.weight > actives[dominant].weight)
+				dominant = i;
+		}
+	}
+
+	// Matches Unreal's default: notifies/events only fire from the single highest-weighted
+	// sample in the blend, not scaled-and-fired from every active sample (which would double
+	// up footstep/etc events during a transition between two clips).
+	const ActiveBlendSample& dom = actives[dominant];
+	const float dom_dur = dom.seq->get_duration();
+	const float dom_local = glm::clamp(eval_time * dom_dur, 0.f, dom_dur);
+	const float dom_prev_local = glm::clamp(prev_time * dom_dur, 0.f, dom_dur);
+	sample_events_from_clip(ctx, dom.seq, dom_prev_local, dom_local, looped, false);
 }
 
 static void get_clip_pose_shared(agGetPoseCtx& ctx, const AnimationSeq* clip, bool has_sync_group,
@@ -934,4 +1045,254 @@ void agSlotClipInternal::get_pose(agGetPoseCtx& ctx) {
 	bool stopped_flag = false;
 	float time_in = slot->time;
 	get_clip_pose_shared(ctx, slot->active->seq, false, {}, {}, false, nullptr, 0.0, time_in, stopped_flag, nullptr);
+}
+
+// Eases a blend space axis value from `state.target` toward `newTarget` over
+// params.smoothingTime seconds, shaped by params.smoothingType. Restarting from the
+// currently-interpolated value (not from the old start) avoids a pop if the target moves
+// again mid-transition.
+static float step_axis_smoothing(const BlendSpaceAxisSmoothing& params, AxisSmoothState& state, float newTarget,
+								 float dt) {
+	if (!state.hasValue) {
+		state.start = state.target = newTarget;
+		state.elapsed = 0.f;
+		state.hasValue = true;
+		return newTarget;
+	}
+	if (!params.enabled || params.smoothingTime <= 0.00001f) {
+		state.start = state.target = newTarget;
+		state.elapsed = 0.f;
+		return newTarget;
+	}
+	const float alpha_prev = glm::clamp(state.elapsed / params.smoothingTime, 0.f, 1.f);
+	const float current = glm::mix(state.start, state.target, evaluate_easing(params.smoothingType, alpha_prev));
+	if (glm::abs(newTarget - state.target) > 0.00001f) {
+		state.start = current;
+		state.target = newTarget;
+		state.elapsed = 0.f;
+	}
+	state.elapsed += dt;
+	const float alpha = glm::clamp(state.elapsed / params.smoothingTime, 0.f, 1.f);
+	return glm::mix(state.start, state.target, evaluate_easing(params.smoothingType, alpha));
+}
+
+// Unreal's "Target Weight Interpolation": rather than a sample's blend weight snapping to its
+// instantaneous target every frame, ramp each sample's weight toward its target at a max rate
+// of `speed` per second (e.g. a sample that just dropped out of the active bracket/triangle
+// fades out over 1/speed seconds instead of disappearing on the spot), then renormalize so
+// the ramping weights still sum to 1.
+static void apply_weight_speed(std::vector<float>& smoothed, const std::vector<float>& targets, bool enabled,
+							   float speed, float dt) {
+	smoothed.resize(targets.size(), 0.f);
+	if (!enabled || speed <= 0.00001f) {
+		smoothed = targets;
+		return;
+	}
+	const float maxStep = speed * dt;
+	for (size_t i = 0; i < targets.size(); i++) {
+		const float diff = targets[i] - smoothed[i];
+		if (diff > maxStep)
+			smoothed[i] += maxStep;
+		else if (diff < -maxStep)
+			smoothed[i] -= maxStep;
+		else
+			smoothed[i] = targets[i];
+	}
+	float sum = 0.f;
+	for (float w : smoothed) sum += w;
+	if (sum > 0.00001f)
+		for (float& w : smoothed) w /= sum;
+}
+
+static ResolvedBlendSample resolve_blend_sample(const BlendSpaceSample& s, MSkeleton& targetSkel) {
+	ResolvedBlendSample out;
+	const AnimationSeqAsset* asset = s.Clip.get();
+	if (!asset || !asset->seq || !asset->srcModel || !asset->srcModel->get_skel()) {
+		sys_print(Error, "BlendSpace: sample has no valid clip\n");
+		return out;
+	}
+	out.seq = asset->seq;
+	out.remap = targetSkel.get_remap(asset->srcModel->get_skel());
+	return out;
+}
+
+void agBlendSpace1D::reset() {
+	animTime = 0.f;
+	xSmoothState = {};
+	smoothedWeights.clear();
+}
+void agBlendSpace1D::refresh_after_model_reload(Model* reloaded) {
+	dirty = true; // see agClipNode::refresh_after_model_reload: remap cache was wiped
+}
+void agBlendSpace1D::add_sample(const AnimationSeqAsset* asset, float position) {
+	BlendSpaceSample s;
+	s.Clip = AssetPtr<AnimationSeqAsset>(const_cast<AnimationSeqAsset*>(asset)); // AssetPtr is read-only here
+	s.PosX = position;
+	samples.push_back(s);
+	dirty = true;
+}
+void agBlendSpace1D::build_if_dirty(MSkeleton& skel) {
+	if (!dirty)
+		return;
+	resolved.resize(samples.size());
+	for (size_t i = 0; i < samples.size(); i++) {
+		resolved[i] = resolve_blend_sample(samples[i], skel);
+		if (resolved[i].seq && resolved[i].seq->is_additive_clip != isAdditive)
+			sys_print(Warning, "agBlendSpace1D: sample %zu additive-clip flag doesn't match blend space's isAdditive\n", i);
+	}
+	sortedOrder.resize(samples.size());
+	for (size_t i = 0; i < samples.size(); i++)
+		sortedOrder[i] = (int)i;
+	std::sort(sortedOrder.begin(), sortedOrder.end(),
+			 [&](int a, int b) { return samples[a].PosX < samples[b].PosX; });
+	dirty = false;
+}
+void agBlendSpace1D::get_pose(agGetPoseCtx& ctx) {
+	build_if_dirty(ctx.get_skeleton());
+	if (sortedOrder.empty()) {
+		sys_print(Error, "agBlendSpace1D::get_pose: no samples\n");
+		util_set_to_bind_pose(*ctx.pose, &ctx.get_skeleton());
+		return;
+	}
+	ctx.debug_enter("agBlendSpace1D");
+
+	const float target = xInput.get_float(ctx);
+	const float smoothedX = step_axis_smoothing(xSmoothing, xSmoothState, target, ctx.dt);
+
+	// Find the pair of samples bracketing smoothedX (clamped to the sample range).
+	int lo = 0;
+	while (lo + 1 < (int)sortedOrder.size() && samples[sortedOrder[lo + 1]].PosX < smoothedX)
+		lo++;
+	const int iA = sortedOrder[lo];
+	const int iB = sortedOrder[glm::min(lo + 1, (int)sortedOrder.size() - 1)];
+	const float posA = samples[iA].PosX, posB = samples[iB].PosX;
+	const float alpha = (iA == iB || posB - posA < 0.00001f)
+							? 0.f
+							: glm::clamp((smoothedX - posA) / (posB - posA), 0.f, 1.f);
+
+	std::vector<float> targetWeights(samples.size(), 0.f);
+	targetWeights[iA] += 1.f - alpha;
+	targetWeights[iB] += alpha; // += so iA==iB (single active sample) still ends at 1.0
+
+	apply_weight_speed(smoothedWeights, targetWeights, enableWeightSpeed, weightSpeed, ctx.dt);
+
+	std::vector<ActiveBlendSample> actives;
+	for (size_t i = 0; i < smoothedWeights.size(); i++)
+		if (smoothedWeights[i] > 0.0001f)
+			actives.push_back({resolved[i].seq, resolved[i].remap, smoothedWeights[i]});
+
+	blend_space_evaluate(ctx, actives, syncGroup, syncType, looping, speed.get_float(ctx), animTime);
+	ctx.debug_exit();
+}
+
+void agBlendSpace2D::reset() {
+	animTime = 0.f;
+	xSmoothState = {};
+	ySmoothState = {};
+	smoothedWeights.clear();
+}
+void agBlendSpace2D::refresh_after_model_reload(Model* reloaded) {
+	dirty = true;
+}
+void agBlendSpace2D::add_sample(const AnimationSeqAsset* asset, float x, float y) {
+	BlendSpaceSample s;
+	s.Clip = AssetPtr<AnimationSeqAsset>(const_cast<AnimationSeqAsset*>(asset));
+	s.PosX = x;
+	s.PosY = y;
+	samples.push_back(s);
+	dirty = true;
+}
+void agBlendSpace2D::build_if_dirty(MSkeleton& skel) {
+	if (!dirty)
+		return;
+	resolved.resize(samples.size());
+	std::vector<glm::vec2> points(samples.size());
+	for (size_t i = 0; i < samples.size(); i++) {
+		resolved[i] = resolve_blend_sample(samples[i], skel);
+		if (resolved[i].seq && resolved[i].seq->is_additive_clip != isAdditive)
+			sys_print(Warning, "agBlendSpace2D: sample %zu additive-clip flag doesn't match blend space's isAdditive\n", i);
+		points[i] = samples[i].grid_pos();
+	}
+	triangles = delaunay_triangulate_2d(points);
+	dirty = false;
+}
+void agBlendSpace2D::get_pose(agGetPoseCtx& ctx) {
+	build_if_dirty(ctx.get_skeleton());
+	if (samples.empty()) {
+		sys_print(Error, "agBlendSpace2D::get_pose: no samples\n");
+		util_set_to_bind_pose(*ctx.pose, &ctx.get_skeleton());
+		return;
+	}
+	ctx.debug_enter("agBlendSpace2D");
+
+	const glm::vec2 target(xInput.get_float(ctx), yInput.get_float(ctx));
+	const glm::vec2 smoothedPos(step_axis_smoothing(xSmoothing, xSmoothState, target.x, ctx.dt),
+								step_axis_smoothing(ySmoothing, ySmoothState, target.y, ctx.dt));
+
+	std::vector<float> targetWeights(samples.size(), 0.f);
+	if (samples.size() == 1) {
+		targetWeights[0] = 1.f;
+	} else if (triangles.empty()) {
+		// Fewer than 3 non-degenerate samples to triangulate: fall back to a 1D-style blend
+		// between the first two samples, projecting the input onto the segment between them.
+		const glm::vec2 posA = samples[0].grid_pos(), posB = samples[1].grid_pos();
+		const glm::vec2 dir = posB - posA;
+		const float lenSq = glm::dot(dir, dir);
+		const float alpha = lenSq > 0.00001f ? glm::clamp(glm::dot(smoothedPos - posA, dir) / lenSq, 0.f, 1.f) : 0.f;
+		targetWeights[0] += 1.f - alpha;
+		targetWeights[1] += alpha;
+	} else {
+		// Find the triangle containing smoothedPos; if it's outside every triangle (outside
+		// the sample hull), fall back to whichever triangle clamps closest (least negative
+		// barycentric overshoot), matching Unreal's clamp-to-hull behavior for out-of-range input.
+		int best = -1;
+		float bestOverflow = std::numeric_limits<float>::max();
+		float bu = 0.f, bv = 0.f, bw = 0.f;
+		for (int ti = 0; ti < (int)triangles.size(); ti++) {
+			const Triangle2D& t = triangles[ti];
+			float u, v, w;
+			const bool inside = barycentric_2d(samples[t.a].grid_pos(), samples[t.b].grid_pos(), samples[t.c].grid_pos(),
+											   smoothedPos, u, v, w);
+			if (inside) {
+				best = ti;
+				bu = u;
+				bv = v;
+				bw = w;
+				break;
+			}
+			const float overflow = glm::max(0.f, -u) + glm::max(0.f, -v) + glm::max(0.f, -w);
+			if (overflow < bestOverflow) {
+				bestOverflow = overflow;
+				best = ti;
+				bu = u;
+				bv = v;
+				bw = w;
+			}
+		}
+		const Triangle2D& t = triangles[best];
+		bu = glm::max(bu, 0.f);
+		bv = glm::max(bv, 0.f);
+		bw = glm::max(bw, 0.f);
+		const float sum = bu + bv + bw;
+		if (sum > 0.00001f) {
+			bu /= sum;
+			bv /= sum;
+			bw /= sum;
+		} else {
+			bu = 1.f;
+		}
+		targetWeights[t.a] += bu;
+		targetWeights[t.b] += bv;
+		targetWeights[t.c] += bw;
+	}
+
+	apply_weight_speed(smoothedWeights, targetWeights, enableWeightSpeed, weightSpeed, ctx.dt);
+
+	std::vector<ActiveBlendSample> actives;
+	for (size_t i = 0; i < smoothedWeights.size(); i++)
+		if (smoothedWeights[i] > 0.0001f)
+			actives.push_back({resolved[i].seq, resolved[i].remap, smoothedWeights[i]});
+
+	blend_space_evaluate(ctx, actives, syncGroup, syncType, looping, speed.get_float(ctx), animTime);
+	ctx.debug_exit();
 }

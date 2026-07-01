@@ -1,5 +1,6 @@
 #pragma once
 #include "RuntimeNodesNew.h"
+#include "Framework/MathLib.h"
 
 // inline constant values or StringName which sources a value from variables/curves
 
@@ -279,10 +280,180 @@ private:
 	int target_bone_idx = -1;
 };
 
-class agBlendspace : public agBlendNode
+// One sample of a blend space: a clip placed at a point in the space's parameter grid.
+// BlendSpace1D only reads PosX; BlendSpace2D uses both axes. Stored as two floats rather
+// than a glm::vec2 because the reflection codegen doesn't support vec2 properties.
+struct BlendSpaceSample
+{
+	STRUCT_BODY();
+	REF AssetPtr<AnimationSeqAsset> Clip;
+	REF float PosX = 0.f;
+	REF float PosY = 0.f;
+	glm::vec2 grid_pos() const { return glm::vec2(PosX, PosY); }
+};
+
+// Resolved runtime pointers for a sample, cached alongside `samples` (parallel array,
+// rebuilt whenever a sample is added or the model reloads). Kept separate from
+// BlendSpaceSample since these aren't authored/reflected data.
+struct ResolvedBlendSample
+{
+	const AnimationSeq* seq = nullptr;
+	const BoneIndexRetargetMap* remap = nullptr;
+};
+
+// Unreal's per-axis blend space smoothing: rather than snapping the input value used to pick
+// samples, ease it toward the latest target over `smoothingTime` seconds using `smoothingType`
+// as the easing curve. Independent per axis (moving X doesn't reset Y's transition).
+struct BlendSpaceAxisSmoothing
+{
+	STRUCT_BODY();
+	REF bool enabled = false;
+	REF float smoothingTime = 0.2f;
+	REF Easing smoothingType = Easing::Linear;
+};
+
+// Runtime (non-reflected) state for BlendSpaceAxisSmoothing: an in-flight ease from `start`
+// to `target`, restarted (from the current interpolated value, not from `start`, to avoid a
+// pop) whenever the caller's target moves.
+struct AxisSmoothState
+{
+	float start = 0.f;
+	float target = 0.f;
+	float elapsed = 0.f;
+	bool hasValue = false;
+};
+
+// 1D blend space (Unreal's BlendSpace1D): samples are placed along a single axis and the
+// two samples bracketing the current input value are blended together. All active samples
+// share one normalized playhead (scaled per-sample by that sample's own clip duration) so
+// e.g. a walk/run blend doesn't foot-slide; the playhead can also lead/follow an external
+// SyncGroup like a virtual clip of duration 1.
+class agBlendSpace1D : public agBaseNode
 {
 public:
-	ValueType vecInput = 0;
+	CLASS_BODY(agBlendSpace1D);
+	void reset() final;
+	void get_pose(agGetPoseCtx& ctx) final;
+	void refresh_after_model_reload(Model* reloaded) final;
+
+	REF void add_sample(const AnimationSeqAsset* asset, float position);
+	REF void set_x_const(float f) { xInput = f; }
+	REF void set_x_var(string name) { xInput = StringName(name.c_str()); }
+	REF void set_looping(bool b) { looping = b; }
+	REF void set_speed_const(float f) { speed = f; }
+	REF void set_speed_var(string name) { speed = StringName(name.c_str()); }
+	REF void set_x_smoothing(bool enabled, float time, Easing type) {
+		xSmoothing.enabled = enabled;
+		xSmoothing.smoothingTime = time;
+		xSmoothing.smoothingType = type;
+	}
+	// Unreal's "Target Weight Interpolation": instead of a sample's blend weight snapping to
+	// its instantaneous value every frame, ramp it at a max rate of `speed` per second (e.g.
+	// a sample that just dropped out of the active bracket fades out over 1/speed seconds
+	// instead of disappearing on the spot).
+	REF void set_weight_speed(bool enabled, float speed) {
+		enableWeightSpeed = enabled;
+		weightSpeed = speed;
+	}
+	REF void set_sync_group(string name, sync_opt opt) {
+		syncGroup = StringName(name.c_str());
+		syncType = opt;
+	}
+
+	REF std::vector<BlendSpaceSample> samples;
+	// Author-facing flag: samples are expected to be additive clips meant to feed an
+	// agAddNode downstream (see agMakeAdditive/agAddNode for the actual additive combine).
+	// Blending additive deltas together uses the exact same per-bone lerp math as blending
+	// full poses, so this doesn't change how get_pose() works -- it's only used to sanity
+	// check the assigned clips.
+	REF bool isAdditive = false;
+	REF BlendSpaceAxisSmoothing xSmoothing;
+	REF bool enableWeightSpeed = false;
+	REF float weightSpeed = 1.f;
+
+private:
+	void build_if_dirty(MSkeleton& skel);
+
+	ValueType xInput = 0.f;
+	ValueType speed = 1.f;
+	bool looping = true;
+	StringName syncGroup;
+	sync_opt syncType = sync_opt::Default;
+
+	std::vector<int> sortedOrder; // indices into samples, ascending by PosX
+	std::vector<ResolvedBlendSample> resolved;
+	bool dirty = true;
+
+	AxisSmoothState xSmoothState;
+	std::vector<float> smoothedWeights; // parallel to samples, target-weight-interpolated
+	float animTime = 0.f;				 // normalized [0,1) playhead shared by all active samples
+};
+
+// 2D blend space (Unreal's BlendSpace): samples are Delaunay-triangulated over their grid
+// positions, and the triangle containing the current input point is used to blend its 3
+// corner samples via barycentric weights (points outside the hull clamp to the
+// least-out-of-range triangle). See agBlendSpace1D for the shared normalized-time /
+// sync-group / smoothing behavior.
+class agBlendSpace2D : public agBaseNode
+{
+public:
+	CLASS_BODY(agBlendSpace2D);
+	void reset() final;
+	void get_pose(agGetPoseCtx& ctx) final;
+	void refresh_after_model_reload(Model* reloaded) final;
+
+	REF void add_sample(const AnimationSeqAsset* asset, float x, float y);
+	REF void set_x_const(float f) { xInput = f; }
+	REF void set_x_var(string name) { xInput = StringName(name.c_str()); }
+	REF void set_y_const(float f) { yInput = f; }
+	REF void set_y_var(string name) { yInput = StringName(name.c_str()); }
+	REF void set_looping(bool b) { looping = b; }
+	REF void set_speed_const(float f) { speed = f; }
+	REF void set_speed_var(string name) { speed = StringName(name.c_str()); }
+	REF void set_x_smoothing(bool enabled, float time, Easing type) {
+		xSmoothing.enabled = enabled;
+		xSmoothing.smoothingTime = time;
+		xSmoothing.smoothingType = type;
+	}
+	REF void set_y_smoothing(bool enabled, float time, Easing type) {
+		ySmoothing.enabled = enabled;
+		ySmoothing.smoothingTime = time;
+		ySmoothing.smoothingType = type;
+	}
+	REF void set_weight_speed(bool enabled, float speed) {
+		enableWeightSpeed = enabled;
+		weightSpeed = speed;
+	}
+	REF void set_sync_group(string name, sync_opt opt) {
+		syncGroup = StringName(name.c_str());
+		syncType = opt;
+	}
+
+	REF std::vector<BlendSpaceSample> samples;
+	REF bool isAdditive = false; // see agBlendSpace1D::isAdditive
+	REF BlendSpaceAxisSmoothing xSmoothing;
+	REF BlendSpaceAxisSmoothing ySmoothing;
+	REF bool enableWeightSpeed = false;
+	REF float weightSpeed = 1.f;
+
+private:
+	void build_if_dirty(MSkeleton& skel);
+
+	ValueType xInput = 0.f;
+	ValueType yInput = 0.f;
+	ValueType speed = 1.f;
+	bool looping = true;
+	StringName syncGroup;
+	sync_opt syncType = sync_opt::Default;
+
+	std::vector<Triangle2D> triangles;
+	std::vector<ResolvedBlendSample> resolved;
+	bool dirty = true;
+
+	AxisSmoothState xSmoothState;
+	AxisSmoothState ySmoothState;
+	std::vector<float> smoothedWeights; // parallel to samples, target-weight-interpolated
+	float animTime = 0.f;				 // normalized [0,1) playhead shared by all active samples
 };
 
 // a state machine. override this class to use it ( or use blend by int or slot )

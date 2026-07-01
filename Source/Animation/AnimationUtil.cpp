@@ -256,12 +256,6 @@ void util_twobone_ik(const vec3& a, const vec3& b, const vec3& c, const vec3& ta
 }
 
 // y2 = blend( blend(x1,x2,fac.x), blend(y1,y2,fac.x), fac.y)
-void util_bilinear_blend(int bonecount, const Pose& x1, Pose& x2, const Pose& y1, Pose& y2, glm::vec2 fac) {
-	util_blend(bonecount, x1, x2, fac.x);
-	util_blend(bonecount, y1, y2, fac.x);
-	util_blend(bonecount, x2, y2, fac.y);
-}
-
 #define IS_HIGH_BIT_SET(x) (x & (1u << 31u))
 #define UNSET_HIGH_BIT(x) (x & ~(1u << 31u))
 

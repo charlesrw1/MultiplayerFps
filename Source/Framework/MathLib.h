@@ -4,6 +4,7 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "Framework/Util.h"
+#include <vector>
 
 inline glm::vec3 AnglesToVector(float pitch, float yaw) {
 	return glm::vec3(cos(yaw) * cos(pitch), sin(pitch), sin(yaw) * cos(pitch));
@@ -171,6 +172,18 @@ Bounds transform_bounds(glm::mat4 transform, Bounds b);
 bool to_barycentric(glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, glm::vec3 point, float& u, float& v, float& w);
 bool line_plane_intersect(Ray r, glm::vec3 plane, float planed, glm::vec3& intersect);
 glm::vec3 project_onto_line(glm::vec3 a, glm::vec3 b, glm::vec3 p);
+
+// Always computes barycentric weights (u,v,w) of p relative to triangle (a,b,c), even when
+// p lies outside it (some weights then come out negative). Returns whether p is inside.
+bool barycentric_2d(glm::vec2 a, glm::vec2 b, glm::vec2 c, glm::vec2 p, float& u, float& v, float& w);
+
+struct Triangle2D
+{
+	int a = 0, b = 0, c = 0;
+};
+// Bowyer-Watson Delaunay triangulation. Meant for small point sets (blend-space sample
+// counts), not large meshes. Returned triangles index into `points`.
+std::vector<Triangle2D> delaunay_triangulate_2d(const std::vector<glm::vec2>& points);
 
 inline unsigned int wang_hash(unsigned int seed) {
 	seed = (seed ^ 61) ^ (seed >> 16);
