@@ -124,6 +124,7 @@ ModelDefData new_import_settings_to_modeldef_data(const std::string& gamepath, M
 		acl.crop.has_crop = isa.hasEndCrop || isa.hasStartCrop;
 		acl.crop.start = isa.cropStart;
 		acl.crop.end = isa.cropEnd;
+		acl.lengthScale = isa.lengthScale;
 		if (!isa.otherClipToSubtract.empty())
 			isa.makeAdditive = true;
 

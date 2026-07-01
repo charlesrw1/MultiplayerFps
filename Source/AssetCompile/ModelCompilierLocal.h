@@ -55,6 +55,7 @@ struct AnimationClip_Load
 	bool fixloop = false;
 	bool enableRootMotion = false;
 	bool setRootToFirstFrame = false;
+	float lengthScale = 1.f; // stretches compiled duration; see AnimImportSettings::lengthScale
 
 	// if non empty, then set origin of clip to this
 	std::string make_relative_to_locator;

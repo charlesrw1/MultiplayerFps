@@ -53,6 +53,13 @@ struct AnimImportSettings
 	REF bool enableRootMotion = false;	   // if true, then marks clip for root motion, note that you shouldnt use
 										   // removeLinearVelocity or setRootToFirstPose
 	REF bool setRootToFirstPose = false;   // if true, then sets all root poses to first frame
+	// Stretches the compiled clip's stored duration by this factor (fps/keyframes unchanged).
+	// For single-frame pose clips this lets you make the clip "as long as" a normal cycle
+	// (e.g. a matching walk/run anim) so blend-space sync-group timing, which derives its
+	// shared playback rate from a weight-averaged sample duration, isn't skewed by a near-zero
+	// duration outlier -- without that, the group rate spikes and every other active sample in
+	// the blend plays back far too fast whenever the 1-frame sample carries meaningful weight.
+	REF float lengthScale = 1.f;
 };
 
 class ModelImportSettings : public ClassBase

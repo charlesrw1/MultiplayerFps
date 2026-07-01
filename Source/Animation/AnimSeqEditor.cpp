@@ -267,6 +267,7 @@ void AnimSeqEditor::load_additive_settings() {
     mis_make_additive_ = mis_additive_self_ = false;
     mis_additive_frame_ = 0;
     mis_subtract_clip_.clear();
+    mis_length_scale_ = 1.f;
     mis_dirty_ = false;
     mis_path_.clear();
     if (!model_) return;
@@ -281,6 +282,7 @@ void AnimSeqEditor::load_additive_settings() {
                 mis_additive_self_  = a.additiveFromSelf;
                 mis_additive_frame_ = a.additiveSelfFrame;
                 mis_subtract_clip_  = a.otherClipToSubtract;
+                mis_length_scale_   = a.lengthScale;
                 break;
             }
         }
@@ -289,6 +291,7 @@ void AnimSeqEditor::load_additive_settings() {
     orig_additive_self_  = mis_additive_self_;
     orig_additive_frame_ = mis_additive_frame_;
     orig_subtract_clip_  = mis_subtract_clip_;
+    orig_length_scale_   = mis_length_scale_;
 }
 
 void AnimSeqEditor::apply_additive_settings() {
@@ -314,6 +317,7 @@ void AnimSeqEditor::apply_additive_settings() {
     entry->additiveFromSelf   = mis_additive_self_;
     entry->additiveSelfFrame  = mis_additive_frame_;
     entry->otherClipToSubtract = mis_additive_self_ ? std::string{} : mis_subtract_clip_;
+    entry->lengthScale        = mis_length_scale_;
 
     write_model_import_settings(load.mis, mis_path_);
     AssetCompiler::compile_asset(mis_path_); // forces a model recompile (slow) — only reached when dirty
@@ -322,6 +326,7 @@ void AnimSeqEditor::apply_additive_settings() {
     orig_additive_self_  = mis_additive_self_;
     orig_additive_frame_ = mis_additive_frame_;
     orig_subtract_clip_  = mis_subtract_clip_;
+    orig_length_scale_   = mis_length_scale_;
     mis_dirty_ = false;
 }
 
@@ -362,12 +367,25 @@ void AnimSeqEditor::draw_additive_settings() {
     }
     ImGui::EndDisabled();
 
+    ImGui::SeparatorText("Playback");
+    changed |= ImGui::DragFloat("Length scale", &mis_length_scale_, 0.01f, 0.01f, 100.f);
+    ImGui::SameLine();
+    ImGui::TextDisabled("(?)");
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Stretches this clip's stored duration by this factor (fps/keyframes\n"
+                           "are unchanged). Use on single-frame pose clips inside a blend space\n"
+                           "so their duration matches a normal cycle (e.g. the walk/run clips it's\n"
+                           "blended with) -- otherwise the sync group's shared playback rate, which\n"
+                           "is a weight-average of active sample durations, gets skewed by the\n"
+                           "near-zero duration and every other sample in the blend plays too fast.");
+
     // Only treat as dirty (recompile-worthy) when a value actually differs from disk.
     if (changed) {
         mis_dirty_ = (mis_make_additive_  != orig_make_additive_)  ||
                      (mis_additive_self_  != orig_additive_self_)  ||
                      (mis_additive_frame_ != orig_additive_frame_) ||
-                     (mis_subtract_clip_  != orig_subtract_clip_);
+                     (mis_subtract_clip_  != orig_subtract_clip_)  ||
+                     (mis_length_scale_   != orig_length_scale_);
     }
 
     ImGui::BeginDisabled(!mis_dirty_);
@@ -378,6 +396,7 @@ void AnimSeqEditor::draw_additive_settings() {
         mis_additive_self_  = orig_additive_self_;
         mis_additive_frame_ = orig_additive_frame_;
         mis_subtract_clip_  = orig_subtract_clip_;
+        mis_length_scale_   = orig_length_scale_;
         mis_dirty_ = false;
     }
     ImGui::EndDisabled();

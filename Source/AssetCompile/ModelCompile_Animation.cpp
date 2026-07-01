@@ -464,6 +464,9 @@ void ModelCompileHelper::append_animation_seq_to_list(AnimationSourceToCompile s
 		}
 	}
 
+	if (definition && definition->lengthScale != 1.f)
+		out_seq.duration *= definition->lengthScale;
+
 	final_->add_sequence(source.get_animation_name(), std::move(out_seq));
 }
 
