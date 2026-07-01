@@ -28,6 +28,8 @@
 #include "Framework/Files.h"
 #include "Animation/Runtime/Animation.h"
 #include "Animation/Runtime/RuntimeNodesNew2.h"
+#include "Animation/AnimationSeqAsset.h"
+#include "Animation/SkeletonData.h"
 #include "Animation/SkeletonData.h"
 
 // ---------------------------------------------------------------------------
@@ -393,3 +395,42 @@ static TestTask test_animator_survives_model_reload(TestContext& t) {
 	t.check(mesh->get_animator() != nullptr, "animator survived a post-reload tick");
 }
 GAME_TEST("assets/animator_survives_model_reload", 20.f, test_animator_survives_model_reload);
+
+// ---------------------------------------------------------------------------
+// Test 12: AnimationSeqAsset::seq stays in sync across a Model reload
+// ---------------------------------------------------------------------------
+// AssetDatabase::reload() only reloads the single asset passed to it -- there's
+// no dependency graph, so reloading a Model does NOT by itself cascade to any
+// AnimationSeqAsset that resolved `seq` into that model's MSkeleton::clips.
+// AnimationSeqAsset.cpp installs a global Model::on_model_loaded subscriber to
+// close that gap. This test never touches the AnimationSeqAsset directly --
+// only the cascade can be keeping it in sync.
+
+static TestTask test_animseq_asset_survives_model_reload(TestContext& t) {
+	eng->load_level("");
+
+	auto* ent = eng->get_level()->spawn_entity();
+	auto* mesh = ent->create_component<MeshComponent>();
+	mesh->set_model_str("characters/swat_model/swat_model.cmdl");
+	co_await t.wait_ticks(1);
+
+	Model* m = const_cast<Model*>(mesh->get_model());
+	t.require(m != nullptr, "swat_model.cmdl loaded");
+	t.require(m->get_skel() != nullptr, "model has a skeleton");
+
+	const auto& clips = m->get_skel()->get_all_clips();
+	t.require(!clips.empty(), "skeleton has at least one clip baked in");
+	const std::string clip_name = clips.begin()->first;
+	const std::string asset_path = "characters/swat_model/swat_model/" + clip_name;
+
+	auto seqAsset = g_assets.find<AnimationSeqAsset>(asset_path).get();
+	t.require(seqAsset != nullptr, "AnimationSeqAsset resolved");
+	t.require(seqAsset->seq != nullptr, "seq resolved before reload");
+
+	g_assets.reload<Model>(m);
+	co_await t.wait_ticks(1);
+
+	t.check(seqAsset->seq != nullptr, "seq re-resolved after reload without touching the asset directly");
+	t.check(seqAsset->srcModel.get() == m, "srcModel still points at the same (in-place reloaded) Model instance");
+}
+GAME_TEST("assets/animseq_asset_survives_model_reload", 20.f, test_animseq_asset_survives_model_reload);

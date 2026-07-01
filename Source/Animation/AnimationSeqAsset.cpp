@@ -38,6 +38,12 @@ public:
 REGISTER_ASSETMETADATA_MACRO(AnimationSeqAssetMetadata);
 #endif
 
+std::string AnimationSeqAsset::get_clip_name() const {
+	auto& path = get_name();
+	auto pos = path.rfind('/');
+	return pos == std::string::npos ? "" : path.substr(pos + 1);
+}
+
 bool AnimationSeqAsset::load_asset() {
 	auto& path = get_name();
 	auto pos = path.rfind('/');
@@ -63,3 +69,27 @@ void AnimationSeqAsset::uninstall() {
 	srcModel.reset();
 	seq = nullptr;
 }
+
+// AssetDatabase::reload() only reloads the single asset passed to it -- it has no
+// dependency graph, so reloading a Model does NOT cascade to AnimationSeqAsset
+// instances that resolved `seq` into that model's (now wiped) MSkeleton::clips.
+// Subscribe once, globally, so every loaded AnimationSeqAsset stays in sync with
+// its source model instead of leaving `seq` dangling until someone happens to
+// touch that specific asset. Mirrors the MaterialInstance master->instance cascade
+// in MaterialLocal.cpp, just triggered from the referenced type's load event
+// instead of the referencing type's own post_load (Model can't depend on Animation).
+static const bool s_animseq_reload_on_model_reload = [] {
+	static int s_key = 0;
+	Model::on_model_loaded.add(&s_key, [](Model* reloaded) {
+		if (!reloaded)
+			return;
+		std::vector<IAsset*> assets;
+		g_assets.get_assets_of_type(assets, &AnimationSeqAsset::StaticType);
+		for (IAsset* a : assets) {
+			auto* seqAsset = static_cast<AnimationSeqAsset*>(a);
+			if (seqAsset->srcModel.get() == reloaded)
+				g_assets.reload(seqAsset);
+		}
+	});
+	return true;
+}();

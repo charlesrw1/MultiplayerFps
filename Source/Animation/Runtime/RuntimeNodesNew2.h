@@ -71,11 +71,12 @@ public:
 	virtual void reset() = 0;
 	virtual void get_pose(agGetPoseCtx& ctx) = 0;
 
-	// Called by AnimatorObject::refresh_after_model_reload when a Model that the
-	// animator references (its own model or any clipFrom) has been hot-reloaded.
-	// Container nodes override to forward to their child inputs; leaf nodes that
-	// cache pointers (seq, remap) or bone indices override to invalidate them.
-	// Default no-op so unaware leaves (e.g. agSlotClipInternal) need no override.
+	// Called directly on every node in agBuilder::get_all_nodes() (see
+	// AnimatorObject::refresh_after_model_reload) when a Model that the animator
+	// references (its own model or any clipFrom) has been hot-reloaded. No tree
+	// descent needed -- the flat node list already reaches every leaf, including
+	// ones on inactive statemachine branches. Only leaf nodes that cache pointers
+	// (seq, remap) or bone indices need to override; default is a no-op.
 	virtual void refresh_after_model_reload(Model* reloaded) {}
 };
 struct BoneIndexRetargetMap;
@@ -100,6 +101,7 @@ private:
 	const Model* clipFrom = nullptr;
 	const AnimationSeq* seq = nullptr;
 	const BoneIndexRetargetMap* remap = nullptr;
+	string clip_name; // remembered so refresh_after_model_reload can re-find_clip() after reload
 	float anim_time = 0.f;
 	bool has_init = false;
 };
@@ -118,6 +120,7 @@ public:
 	const Model* clipFrom = nullptr;
 	const AnimationSeq* seq = nullptr;
 	const BoneIndexRetargetMap* remap = nullptr;
+	string clip_name; // remembered so refresh_after_model_reload can re-find_clip() after reload
 	bool has_init = false;
 };
 
@@ -137,7 +140,6 @@ public:
 	CLASS_BODY(agBlendNode);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
-	void refresh_after_model_reload(Model* reloaded) override;
 	REF void set_inputs(agBaseNode* inp0, agBaseNode* inp1) {
 		this->input0 = inp0;
 		this->input1 = inp1;
@@ -156,7 +158,6 @@ public:
 
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
-	void refresh_after_model_reload(Model* reloaded) final;
 
 	REF void set_inputs(agBaseNode* inp0, agBaseNode* inp1) {
 		this->input0 = inp0;
@@ -184,7 +185,6 @@ public:
 	CLASS_BODY(agAddNode);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
-	void refresh_after_model_reload(Model* reloaded) final;
 	agBaseNode* input0 = nullptr;
 	agBaseNode* input1 = nullptr;
 	ValueType alpha = 0.f;
@@ -203,7 +203,6 @@ public:
 	CLASS_BODY(agMakeAdditive);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
-	void refresh_after_model_reload(Model* reloaded) final;
 
 	REF void init_mask(const Model* model);                            // all bones contribute by default
 	REF void mask_bone_and_children(const Model* model, string bone);  // zero the delta for bone + descendants
@@ -300,7 +299,6 @@ public:
 	CLASS_BODY(agStatemachineBase, scriptable);
 	void reset() final;
 	void get_pose(agGetPoseCtx& ctx) final;
-	void refresh_after_model_reload(Model* reloaded) override;
 
 	REF virtual void update(agGetPoseCtx* ctx, bool wantsReset) {} // ABSTRACT CLASS
 
@@ -315,7 +313,16 @@ public:
 	REF float get_transition_percent() const { return curTransitionTime / curTransitionDuration; }
 	REF float get_state_duration() const { return curTime; }
 
+	REF virtual void append_input(agBaseNode* tree) {
+		for (int i = 0; i < trees.size(); i++)
+			ASSERT(trees[i] != tree);
+
+		trees.push_back(tree);
+	}
+
 private:
+	std::vector<agBaseNode*> trees;
+
 	float curTime = 0.0;
 	agBaseNode* currentTree = nullptr;
 	// cur transition
@@ -341,7 +348,6 @@ class agSlotPlayer : public agStatemachineBase
 public:
 	CLASS_BODY(agSlotPlayer);
 	void update(agGetPoseCtx* ctx, bool wantsReset) final;
-	void refresh_after_model_reload(Model* reloaded) final;
 	bool updateChildrenWhenPlaying = false;
 	StringName slotName;
 	agBaseNode* input = nullptr;
@@ -360,7 +366,10 @@ public:
 		this->easing = easing;
 		this->blending_duration = duration;
 	}
-	REF void append_input(agBaseNode* node) { inputs.push_back(node); }
+	void append_input(agBaseNode* node) final {
+		agStatemachineBase::append_input(node);
+		inputs.push_back(node);
+	}
 	REF void set_integer_var(string str) { integer = StringName(str.c_str()); }
 
 	Easing easing = Easing::CubicEaseIn;

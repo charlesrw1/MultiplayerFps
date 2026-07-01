@@ -70,11 +70,16 @@ public:
 	std::vector<agBaseNode*>& get_cache_nodes() { return cachePoseNodes; }
 	void add_slot_name(StringName name);
 	std::vector<StringName>& get_slots() { return slot_names; }
+	// Every node ever alloc()'d through this builder, flat. Lets refresh_after_model_reload
+	// notify every leaf directly instead of relying on tree/statemachine descent, which misses
+	// branches that aren't currently active (e.g. non-current states in a statemachine).
+	const std::vector<agBaseNode*>& get_all_nodes() const { return allNodes; }
 
 private:
 	agBaseNode* root = nullptr;
 	std::vector<agBaseNode*> cachePoseNodes;
 	std::vector<StringName> slot_names;
+	std::vector<agBaseNode*> allNodes;
 };
 class RagdollComponent;
 #include "Game/EntityPtr.h"

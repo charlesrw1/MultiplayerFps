@@ -16,13 +16,16 @@ void agClipNode::refresh_after_model_reload(Model* reloaded) {
 	remap = nullptr;
 	has_init = false;
 	if (clipFrom == reloaded) {
-		// `seq` lived in clipFrom->get_skel()->clips, now wiped.  We have no
-		// stored clip name to re-resolve, so null the dangling ptr.  Next
-		// get_pose throws "no sequence"; caller must re-issue set_clip.
-		sys_print(Error, "agClipNode: clipFrom '%s' reloaded; seq invalidated. set_clip must be called again.\n",
-				  reloaded ? reloaded->get_name().c_str() : "<null>");
-		seq = nullptr;
-		clipFrom = nullptr;
+		// `seq` lived in clipFrom->get_skel()->clips, now wiped. Re-find it by
+		// name against the reloaded skeleton instead of requiring the caller
+		// to re-issue set_clip.
+		seq = reloaded && reloaded->get_skel() && !clip_name.empty() ? reloaded->get_skel()->find_clip(clip_name)
+																	   : nullptr;
+		if (!seq) {
+			sys_print(Error, "agClipNode: clipFrom '%s' reloaded; clip '%s' no longer exists. set_clip must be called again.\n",
+					  reloaded ? reloaded->get_name().c_str() : "<null>", clip_name.c_str());
+			clipFrom = nullptr;
+		}
 	}
 }
 
@@ -30,34 +33,17 @@ void agEvaluateClip::refresh_after_model_reload(Model* reloaded) {
 	remap = nullptr;
 	has_init = false;
 	if (clipFrom == reloaded) {
-		sys_print(Error, "agEvaluateClip: clipFrom '%s' reloaded; seq invalidated.\n",
-				  reloaded ? reloaded->get_name().c_str() : "<null>");
-		seq = nullptr;
-		clipFrom = nullptr;
+		seq = reloaded && reloaded->get_skel() && !clip_name.empty() ? reloaded->get_skel()->find_clip(clip_name)
+																	   : nullptr;
+		if (!seq) {
+			sys_print(Error, "agEvaluateClip: clipFrom '%s' reloaded; clip '%s' no longer exists. set_clip must be called again.\n",
+					  reloaded ? reloaded->get_name().c_str() : "<null>", clip_name.c_str());
+			clipFrom = nullptr;
+		}
 	}
 }
 
-void agBlendNode::refresh_after_model_reload(Model* reloaded) {
-	if (input0)
-		input0->refresh_after_model_reload(reloaded);
-	if (input1)
-		input1->refresh_after_model_reload(reloaded);
-}
-void agBlendMasked::refresh_after_model_reload(Model* reloaded) {
-	if (input0)
-		input0->refresh_after_model_reload(reloaded);
-	if (input1)
-		input1->refresh_after_model_reload(reloaded);
-}
-void agAddNode::refresh_after_model_reload(Model* reloaded) {
-	if (input0)
-		input0->refresh_after_model_reload(reloaded);
-	if (input1)
-		input1->refresh_after_model_reload(reloaded);
-}
 void agIk2Bone::refresh_after_model_reload(Model* reloaded) {
-	if (input)
-		input->refresh_after_model_reload(reloaded);
 	// bone_idx / other_bone_idx were resolved against the animator's skel; the
 	// skel address is stable but bone names may have moved.  Force re-resolve.
 	has_init = false;
@@ -65,26 +51,13 @@ void agIk2Bone::refresh_after_model_reload(Model* reloaded) {
 	other_bone_idx = -1;
 }
 void agModifyBone::refresh_after_model_reload(Model* reloaded) {
-	if (input)
-		input->refresh_after_model_reload(reloaded);
 	has_init = false;
 	bone_index = -1;
 }
 void agCopyBone::refresh_after_model_reload(Model* reloaded) {
-	if (input)
-		input->refresh_after_model_reload(reloaded);
 	has_init = false;
 	source_bone_idx = -1;
 	target_bone_idx = -1;
-}
-void agStatemachineBase::refresh_after_model_reload(Model* reloaded) {
-	if (currentTree)
-		currentTree->refresh_after_model_reload(reloaded);
-}
-void agSlotPlayer::refresh_after_model_reload(Model* reloaded) {
-	agStatemachineBase::refresh_after_model_reload(reloaded);
-	if (input)
-		input->refresh_after_model_reload(reloaded);
 }
 
 // Sample all AnimEvent crossings that occurred in [prev_time, curr_time).
@@ -234,6 +207,7 @@ void agEvaluateClip::get_pose(agGetPoseCtx& ctx) {
 void agEvaluateClip::set_clip(const AnimationSeqAsset* asset) {
 	seq = asset->seq;
 	clipFrom = asset->srcModel.get();
+	clip_name = asset->get_clip_name();
 }
 
 void agBindPose::get_pose(agGetPoseCtx& ctx) {
@@ -244,11 +218,13 @@ void agClipNode::set_clip(const Model* m, string clipName) {
 	assert(m->get_skel());
 	seq = m->get_skel()->find_clip(clipName);
 	clipFrom = m;
+	clip_name = std::move(clipName);
 }
 
 void agClipNode::set_clip(const AnimationSeqAsset* asset) {
 	seq = asset->seq;
 	clipFrom = asset->srcModel.get();
+	clip_name = asset->get_clip_name();
 }
 
 void agBlendNode::reset() {
@@ -303,11 +279,6 @@ void agAddNode::get_pose(agGetPoseCtx& ctx) {
 void agMakeAdditive::reset() {
 	if (input)     input->reset();
 	if (reference) reference->reset();
-}
-
-void agMakeAdditive::refresh_after_model_reload(Model* reloaded) {
-	if (input)     input->refresh_after_model_reload(reloaded);
-	if (reference) reference->refresh_after_model_reload(reloaded);
 }
 
 void agMakeAdditive::get_pose(agGetPoseCtx& ctx) {
@@ -849,6 +820,7 @@ void agStatemachineBase::get_pose(agGetPoseCtx& ctx) {
 		}
 	}
 
+	const float parent_weight = ctx.weight;
 	if (blendingOut) {
 		float time_left = get_transition_time_left();
 		ctx.debug_enter("agStatemachineBase: transitoning " + std::to_string(time_left));
@@ -860,6 +832,11 @@ void agStatemachineBase::get_pose(agGetPoseCtx& ctx) {
 		ctx.debug_enter("agStatemachineBase");
 	}
 	currentTree->get_pose(ctx);
+	// ctx is a reference to the caller's context (not a copy); weight must only
+	// propagate downward into children, so restore it before returning -- otherwise
+	// a sibling node evaluated after us on the same ctx (or the parent itself) would
+	// see this node's scaled-down weight instead of the original parent weight.
+	ctx.weight = parent_weight;
 	ctx.debug_exit();
 
 	// update transitions
@@ -945,6 +922,10 @@ void agSlotClipInternal::reset() {
 }
 #include "Animation.h"
 void agSlotClipInternal::get_pose(agGetPoseCtx& ctx) {
+	if (!slot || !slot->active || !slot->active->seq) { // cleared by model reload or never set
+		util_set_to_bind_pose(*ctx.pose, &ctx.get_skeleton());
+		return;
+	}
 	bool stopped_flag = false;
 	float time_in = slot->time;
 	get_clip_pose_shared(ctx, slot->active->seq, false, {}, {}, false, nullptr, 0.0, time_in, stopped_flag, nullptr);

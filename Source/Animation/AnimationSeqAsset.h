@@ -19,4 +19,6 @@ public:
 	bool load_asset() override;
 	std::shared_ptr<Model> srcModel;
 	const AnimationSeq* seq = nullptr;
+	// clip name portion of this asset's path (everything after the last '/').
+	std::string get_clip_name() const;
 };

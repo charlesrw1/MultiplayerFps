@@ -33,17 +33,37 @@ using glm::vec3;
 
 AnimatorObject::~AnimatorObject() {
 	GameAnimationMgr::inst->remove_from_animating_set(*this);
+	// Nodes are heap-allocated by agBuilder::alloc() (ClassTypeInfo::alloc(), i.e. `new`)
+	// and were never freed. `graph` is a per-AnimatorObject copy built fresh by the
+	// construction function (see TopDownPlayer::make_player_tree, MeshComponent::create_animator)
+	// and never shared, so it exclusively owns every node in get_all_nodes().
+	for (auto* n : graph.get_all_nodes())
+		delete n;
 }
 agBaseNode& AnimatorObject::get_root_node() const {
 	assert(graph.get_root());
 	return *graph.get_root();
 }
 void AnimatorObject::refresh_after_model_reload(Model* reloaded) {
-	if (auto* root = graph.get_root())
-		root->refresh_after_model_reload(reloaded);
-	for (auto* n : graph.get_cache_nodes())
+	// Flat list of every node alloc()'d through the builder -- notifies every leaf
+	// directly, regardless of whether it's on the graph's currently-active branch
+	// (tree descent used to skip inactive statemachine states, e.g. agBlendByInt
+	// inputs that aren't the current index, leaving them with dangling seq ptrs).
+	for (auto* n : graph.get_all_nodes())
 		if (n)
 			n->refresh_after_model_reload(reloaded);
+	// direct-play slots aren't agBaseNode graph nodes;
+	// their AnimationSeqAsset::seq was resolved into the reloaded model's (now
+	// wiped) MSkeleton::clips, so it's dangling. Clear it; caller must re-issue
+	// play_animation.
+	for (auto& s : slots) {
+		if (s.active && s.active->srcModel.get() == reloaded) {
+			sys_print(Error, "AnimatorObject: slot '%s' animation from '%s' reloaded; cleared.\n",
+					  s.name.get_c_str(), reloaded ? reloaded->get_name().c_str() : "<null>");
+			s.active = nullptr;
+			s.time = 0.0;
+		}
+	}
 }
 AnimatorObject::AnimatorObject(const Model& model, agBuilder& ingraph, Entity* ent) : model(model), graph(ingraph) {
 	if (!model.get_skel()) {
@@ -366,7 +386,9 @@ REF agBaseNode* agBuilder::alloc(const ClassTypeInfo* info) {
 		sys_print(Error, "agBuilder::alloc subclass not a agBaseNode\n");
 		return nullptr;
 	}
-	return (agBaseNode*)info->alloc();
+	agBaseNode* node = (agBaseNode*)info->alloc();
+	allNodes.push_back(node);
+	return node;
 }
 
 REF void agBuilder::set_root(agBaseNode* node) {
