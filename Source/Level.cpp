@@ -16,6 +16,7 @@
 namespace physx { class PxRigidActor; }
 #include "Navigation/LevelNavUtil.h"
 #include "Navigation/NavMeshDebugDraw.h"
+#include "Scripting/ScriptManager.h"
 
 ConfigVar r_disable_static_strip("r_disable_static_strip", "0", CVAR_BOOL | CVAR_DEV,
 								  "If true, skip the runtime static-prop strip pass — every Entity stays in all_world_ents.");
@@ -353,7 +354,15 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 				delete ec;
 				objs[i] = nullptr;
 			} else {
-				ec->activate_internal_step2();
+				// A Lua-scripted start() can throw; letting it propagate would unwind through
+				// this loop and destroy already-started sibling entities without stopping them,
+				// tripping the "destroyed while started" assert in ~Entity. Isolate it instead.
+				try {
+					ec->activate_internal_step2();
+				}
+				catch (LuaRuntimeError& er) {
+					sys_print(Error, "Level::insert_unserialized_entities_into_level: %s\n", er.what());
+				}
 			}
 		} else
 			ASSERT(!"Non Eentity/Component?");
