@@ -7,6 +7,7 @@
 #include "Render/Model.h"
 #include "../../Game/Particles/ParticleAsset.h"
 #include "../../Render/MaterialPublic.h"
+#include <vector>
 NEWENUM(AnimGraphTestMode, int) {
     BasicIK,      // IK right hand to moveable target entity
     LookAt,       // agModifyBone head look-at moveable target
@@ -60,34 +61,18 @@ public:
     std::string bone_ik_upper    = "mixamorig:RightForeArm";
     REFLECT(type = BoneNameString)
     std::string bone_ik_end      = "mixamorig:RightHand";
-    REFLECT(type = BoneNameString)
-    std::string bone_head        = "mixamorig:Head";
+
     // LookAt: the head bone's local "face" axis. Skeleton dependent (a head has no intrinsic
     // computable facing), so it is exposed for in-editor tuning -- the look-at aims THIS local
     // axis at the target. If the head is 90 deg off, try the X axes; if 180, negate; if it
     // rolls, the perpendicular axis is slightly off. This model wants +X.
+
+    // ALSO: used for IK as offset for pole bone
     REF glm::vec3 look_forward_axis = glm::vec3(1.f, 0.f, 0.f);
-    REFLECT(type = BoneNameString)
-    std::string bone_foot_l      = "mixamorig:LeftFoot";
-    REFLECT(type = BoneNameString)
-    std::string bone_foot_r      = "mixamorig:RightFoot";
+   
 
-    REFLECT(type = BoneNameString)
-	std::string bone_hand_l;
-	REFLECT(type = BoneNameString)
-	std::string bone_hand_r;
-	REFLECT(type = BoneNameString)
-	std::string ik_hand_l;
-	REFLECT(type = BoneNameString)
-	std::string ik_hand_r;
+    REF bool use_pole_bone_for_ik = true;
 
-    REFLECT(type = BoneNameString)
-	std::string ik_foot_l = "mixamorig:LeftFoot";
-	REFLECT(type = BoneNameString)
-	std::string ik_foot_r = "mixamorig:RightFoot";
-
-    REFLECT(type = BoneNameString)
-    std::string bone_pelvis = "mixamorig:Hips";   // dropped down so reaching feet don't over-extend
 
     REFLECT(type = BoneNameString)
     std::string bone_upper_blend = "mixamorig:Spine2";
@@ -124,10 +109,14 @@ public:
     REF float bs2d_y = 0.f;
     REF bool bs2d_manual = false;
 
-    void start_ik_dump();  // called externally (console command)
+	REF float bs_smooth_time = 0.0;
+	REF float bs_input_smooth = 0.0;
+
+	void start_ik_dump(); // called externally (console command)
 
 #ifdef EDITOR_BUILD
     std::unique_ptr<IComponentEditorUi> create_editor_ui() final;
+    void editor_on_draw_gizmos_selected() final;
 #endif
 
 private:
@@ -150,4 +139,15 @@ private:
 
     float ik_dump_remaining = 0.f;
     int   ik_dump_frame     = 0;
+
+    // Pole/joint-target config of each agIk2Bone allocated by the last rebuild_graph(),
+    // mirroring agIk2Bone::pole/pole_bone/pole_in_bone_space. Populated at the same spot
+    // each IK node's pole is set so it can't drift out of sync; consumed by
+    // editor_on_draw_gizmos_selected() to draw where the pole vector actually resolves to.
+    struct PoleTargetVis {
+        StringName pole_bone;      // unused when in_bone_space is false
+        glm::vec3  pole = glm::vec3(0.f);
+        bool       in_bone_space  = false;
+    };
+    std::vector<PoleTargetVis> pole_vis;
 };

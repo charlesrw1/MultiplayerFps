@@ -223,18 +223,23 @@ public:
 	void refresh_after_model_reload(Model* reloaded) final;
 
 	agBaseNode* input = nullptr;
-	ValueType target = glm::vec3(0.f);
-	ValueType pole = glm::vec3(0.f);
-	ValueType alpha = 0.f;
-	StringName bone_name;
-	StringName other_bone;
+	StringName bone_name; // bone that is being IK'd
+
+	ValueType target = glm::vec3(0.f);	// mesh-space position, or offset from other_bone if ik_in_bone_space
+	StringName other_bone;	// space `target` is relative to; only read when ik_in_bone_space is set
 	bool take_rotation_of_other = false;
 	bool ik_in_bone_space = false;
 
+	ValueType pole = glm::vec3(0.f);	// mesh-space Joint Target position, or offset from pole_bone if pole_in_bone_space
+	StringName pole_bone;	// space `pole` is relative to; only read when pole_in_bone_space is set
+	bool pole_in_bone_space = false;
+
+	ValueType alpha = 0.f;
 private:
 	bool has_init = false;
 	int bone_idx = -1;
 	int other_bone_idx = -1;
+	int pole_bone_idx = -1;
 }; //
 class agModifyBone : public agBaseNode
 {

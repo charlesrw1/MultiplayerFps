@@ -51,6 +51,7 @@ void agIk2Bone::refresh_after_model_reload(Model* reloaded) {
 	has_init = false;
 	bone_idx = -1;
 	other_bone_idx = -1;
+	pole_bone_idx = -1;
 }
 void agModifyBone::refresh_after_model_reload(Model* reloaded) {
 	has_init = false;
@@ -541,14 +542,20 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 			if (other_bone_idx == -1)
 				sys_print(Error, " agIk2Bone::get_pose: model doesnt have other bone '%s'\n", other_bone.get_c_str());
 		}
+		if (pole_in_bone_space) {
+			pole_bone_idx = ctx.get_skeleton().get_bone_index(pole_bone);
+			if (pole_bone_idx == -1)
+				sys_print(Error, " agIk2Bone::get_pose: model doesnt have pole bone '%s'\n", pole_bone.get_c_str());
+		}
 		has_init = true;
 	}
-	if (bone_idx == -1 || (ik_in_bone_space && other_bone_idx == -1)) {
+	if (bone_idx == -1 || (ik_in_bone_space && other_bone_idx == -1) || (pole_in_bone_space && pole_bone_idx == -1)) {
 		input->get_pose(ctx);
 		return;
 	}
 	const float alphaVal = alpha.get_float(ctx);
 	vec3 tagetVec = target.get_vec3(ctx);
+	vec3 poleVec = pole.get_vec3(ctx);
 
 	if (alphaVal <= 0.00001f) {
 		input->get_pose(ctx);
@@ -594,7 +601,7 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 		throw std::runtime_error("ik error");
 	}
 	auto ent_transform = ctx.object.get_owner()->get_ws_transform();
-	auto ikfunctor = [&](glm::quat& outlocal1, glm::quat& outlocal2, vec3 target, bool print = false) {
+	auto ikfunctor = [&](glm::quat& outlocal1, glm::quat& outlocal2, vec3 target, vec3 pole_target, bool print = false) {
 		const float dist_eps = 0.0001f;
 		// GLOBAL positions
 		vec3 a = mats[2] * glm::vec4(0.0, 0.0, 0.0, 1.0);
@@ -607,7 +614,7 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 
 		glm::quat a_global = glm::quat_cast(mats[2]);
 		glm::quat b_global = glm::quat_cast(mats[1]);
-		util_twobone_ik(a, b, c, target, vec3(0.0, 0.0, 1.0), a_global, b_global, outlocal2, outlocal1);
+		util_twobone_ik(a, b, c, target, pole_target, a_global, b_global, outlocal2, outlocal1);
 
 		if (a_draw_ik_debug.get_bool()) {
 			Debug::add_sphere(ent_transform * glm::vec4(a, 1.0), 0.01, COLOR_GREEN, 0.0, true);
@@ -624,11 +631,15 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 		if (take_rotation_of_other)
 			target_rotation = glm::quat_cast(matrix);
 	}
+	if (pole_in_bone_space) {
+		glm::mat4 matrix = build_global_transform_for_bone_index(&pose, &skel, pole_bone_idx);
+		poleVec = matrix * glm::vec4(poleVec, 1.0);
+	}
 
 	int index1 = indicies[1];
 	int index2 = indicies[2];
 
-	ikfunctor(pose.q[index1], pose.q[index2], tagetVec, false);
+	ikfunctor(pose.q[index1], pose.q[index2], tagetVec, poleVec, false);
 
 	if (ik_in_bone_space && take_rotation_of_other) {
 		// compute the global rotation now

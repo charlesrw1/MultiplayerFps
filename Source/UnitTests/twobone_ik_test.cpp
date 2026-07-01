@@ -44,6 +44,26 @@ float solve_error(Bone A, Bone B, Bone C, glm::vec3 target) {
 	return glm::length(c - target);
 }
 
+// Same as solve(), but with an explicit pole target and returning the elbow (b) position too.
+void solve_with_pole(Bone A, Bone B, Bone C, glm::vec3 target, glm::vec3 pole,
+					  glm::vec3& out_a, glm::vec3& out_b, glm::vec3& out_c) {
+	glm::mat4 Ga = local_mat(A);
+	glm::mat4 Gb = Ga * local_mat(B);
+	glm::mat4 Gc = Gb * local_mat(C);
+	const glm::vec3 a = Ga[3], b = Gb[3], c = Gc[3];
+	const glm::quat a_gr = glm::quat_cast(Ga);
+	const glm::quat b_gr = glm::quat_cast(Gb);
+
+	util_twobone_ik(a, b, c, target, pole, a_gr, b_gr, A.q, B.q);
+
+	Ga = local_mat(A);
+	Gb = Ga * local_mat(B);
+	Gc = Gb * local_mat(C);
+	out_a = Ga[3];
+	out_b = Gb[3];
+	out_c = Gc[3];
+}
+
 constexpr float kEps = 1e-3f; // 1 mm
 } // namespace
 
@@ -100,4 +120,26 @@ TEST(TwoBoneIkTest, UnreachableExtendsTowardTarget) {
 	const float reach = 2.0f;
 	EXPECT_NEAR(glm::length(c - a), reach, 0.02f); // ~fully extended (minus safety eps)
 	EXPECT_GT(glm::dot(glm::normalize(c - a), glm::normalize(target - a)), 0.9999f); // aimed at target
+}
+
+// The pole/joint target must actually steer which side the elbow bends towards (mirrors
+// Unreal's Two Bone IK Joint Target), not just tie-break a perfectly straight arm.
+TEST(TwoBoneIkTest, PoleVectorSteersBendDirection) {
+	Bone A{ glm::quat(1,0,0,0), glm::vec3(0,0,0) };
+	Bone B{ glm::angleAxis(glm::radians(90.f), glm::vec3(0,0,1)), glm::vec3(1,0,0) };
+	Bone C{ glm::quat(1,0,0,0), glm::vec3(1,0,0) };
+	const glm::vec3 target(1.0f, 0.f, 1.4f); // out of the initial a-b-c (xy) plane
+
+	glm::vec3 a, b_up, c;
+	solve_with_pole(A, B, C, target, glm::vec3(0.f, 5.f, 0.f), a, b_up, c);
+	EXPECT_LT(glm::length(c - target), kEps); // still reaches the target
+
+	glm::vec3 b_down;
+	solve_with_pole(A, B, C, target, glm::vec3(0.f, -5.f, 0.f), a, b_down, c);
+	EXPECT_LT(glm::length(c - target), kEps);
+
+	// Elbow should sit on the pole's side of the aim axis in both cases.
+	EXPECT_GT(b_up.y, a.y);
+	EXPECT_LT(b_down.y, a.y);
+	EXPECT_GT(b_up.y - b_down.y, 0.5f); // meaningfully different, not a coincidence
 }

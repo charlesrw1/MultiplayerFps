@@ -208,15 +208,20 @@ static glm::quat util_rotation_between(vec3 from, vec3 to) {
 // bones a and b. On return a_local_rotation/b_local_rotation are post-multiplied by the
 // LOCAL deltas that place c on `target`.
 //
-// Two passes — the order matters and was the source of a long-standing bug:
-//   1. AIM:  rotate bone a so the a->c ray points straight at a->target. This pulls the
-//            target INTO the bend plane. (Doing bend+aim together fails whenever the
-//            target is out of the current a-b-c plane: reach comes out right but the
-//            hand lands off to the side — see TestTwoBoneIk.)
-//   2. BEND: with the chain now coplanar with the target, bend a and b within that plane
-//            (law of cosines) to set |a-c| = len_at, leaving c on the target ray.
-// pole_vector (in bone-b space) only breaks the tie when the arm is perfectly straight.
-void util_twobone_ik(const vec3& a, const vec3& b, const vec3& c, const vec3& target, const vec3& pole_vector,
+// Three passes — the order matters and the first was the source of a long-standing bug:
+//   1. AIM:   rotate bone a so the a->c ray points straight at a->target. This pulls the
+//             target INTO the bend plane. (Doing bend+aim together fails whenever the
+//             target is out of the current a-b-c plane: reach comes out right but the
+//             hand lands off to the side — see TestTwoBoneIk.)
+//   2. TWIST: rotate around the aim axis so the elbow (b) swings into the plane that
+//             contains the pole/joint target. The BEND pass below is only valid within
+//             whatever plane b actually sits in, so the pole vector has to move b there
+//             first rather than just picking an arbitrary bend-plane normal.
+//   3. BEND:  with the chain now coplanar with the target AND the pole, bend a and b
+//             within that plane (law of cosines) to set |a-c| = len_at, leaving c on the
+//             target ray. This mirrors Unreal's Joint Target: the pole vector fully
+//             determines which side the joint bends towards.
+void util_twobone_ik(const vec3& a, const vec3& b, const vec3& c, const vec3& target, const vec3& pole_target,
 					 const glm::quat& a_global_rotation, const glm::quat& b_global_rotation,
 					 glm::quat& a_local_rotation, glm::quat& b_local_rotation) {
 	const float eps = 0.01f;
@@ -228,24 +233,42 @@ void util_twobone_ik(const vec3& a, const vec3& b, const vec3& c, const vec3& ta
 	// Apply a world-space rotation Q to bone a via: a_local *= inverse(a_gr) * Q * a_gr.
 	const glm::quat q_aim = util_rotation_between(c - a, target - a);
 	a_local_rotation = a_local_rotation * (glm::inverse(a_global_rotation) * q_aim * a_global_rotation);
-	const glm::quat a_gr2 = q_aim * a_global_rotation;
-	const glm::quat b_gr2 = q_aim * b_global_rotation;
-	const vec3 b2 = a + q_aim * (b - a);
+	glm::quat a_gr2 = q_aim * a_global_rotation;
+	glm::quat b_gr2 = q_aim * b_global_rotation;
+	vec3 b2 = a + q_aim * (b - a);
 	const vec3 c2 = a + q_aim * (c - a); // now colinear with a->target
 
-	// --- Pass 2: bend within the now-coplanar configuration ---
+	// --- Pass 2: twist around the aim axis to swing b into the pole's plane ---
+	const vec3 aim_dir = c2 - a; // parallel to target - a after pass 1
+	const float aim_len = length(aim_dir);
+	if (aim_len > 1e-6f) {
+		const vec3 aim_axis = aim_dir / aim_len;
+		const vec3 to_b = (b2 - a) - aim_axis * dot(b2 - a, aim_axis);
+		const vec3 to_pole = (pole_target - a) - aim_axis * dot(pole_target - a, aim_axis);
+		if (length(to_b) > 1e-6f && length(to_pole) > 1e-6f) {
+			// signed angle about aim_axis, to guarantee the twist stays on-axis even
+			// when to_b/to_pole are nearly anti-parallel (unlike a generic quat-between).
+			const float twist_angle = atan2(dot(cross(to_b, to_pole), aim_axis), dot(to_b, to_pole));
+			const glm::quat q_twist = glm::angleAxis(twist_angle, aim_axis);
+			a_local_rotation = a_local_rotation * (glm::inverse(a_gr2) * q_twist * a_gr2);
+			a_gr2 = q_twist * a_gr2;
+			b_gr2 = q_twist * b_gr2;
+			b2 = a + q_twist * (b2 - a);
+		}
+	}
+
+	// --- Pass 3: bend within the now pole-aligned plane ---
 	const float a_interior = acos(glm::clamp(dot(normalize(c2 - a), normalize(b2 - a)), -1.f, 1.f));
 	const float b_interior = acos(glm::clamp(dot(normalize(a - b2), normalize(c2 - b2)), -1.f, 1.f));
 	const float a_desired = acos(LawOfCosines(len_cb, len_ab, len_at));
 	const float b_desired = acos(LawOfCosines(len_at, len_ab, len_cb));
 
-	// Bend-plane normal of the aimed triangle. Degenerate only when the arm is straight
-	// (b on the a->c line); there the pole vector picks a stable bend direction.
+	// Degenerate only when the arm is perfectly straight (b on the a->c line).
 	vec3 axis0 = cross(c2 - a, b2 - a);
 	if (length(axis0) < 1e-5f) {
-		axis0 = cross(c2 - a, b_gr2 * pole_vector);
+		axis0 = cross(aim_dir, vec3(0.f, 1.f, 0.f));
 		if (length(axis0) < 1e-5f)
-			axis0 = vec3(0.f, 1.f, 0.f);
+			axis0 = cross(aim_dir, vec3(0.f, 0.f, 1.f));
 	}
 	axis0 = normalize(axis0);
 

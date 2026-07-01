@@ -56,6 +56,33 @@ void AnimGraphTester::editor_start() {
 std::unique_ptr<IComponentEditorUi> AnimGraphTester::create_editor_ui() {
     return std::make_unique<AnimGraphTesterEditorUi>(this);
 }
+
+// Draws a sphere at each active agIk2Bone's resolved pole/joint-target position, so the
+// bend direction can be tuned visually. pole_vis is filled by rebuild_graph(); no work
+// happens here for modes without a pole configured (e.g. BasicIK).
+void AnimGraphTester::editor_on_draw_gizmos_selected() {
+    if (!mesh || pole_vis.empty())
+        return;
+    AnimatorObject* anim = mesh->get_animator();
+    if (!anim)
+        return;
+
+    const auto& bonemats = anim->get_global_bonemats(); // mesh space
+    const glm::mat4 ws_transform = get_owner()->get_ws_transform();
+    const Color32 pole_color(255, 255, 0, 255);
+
+    for (const PoleTargetVis& p : pole_vis) {
+        glm::vec3 pole_ms = p.pole;
+        if (p.in_bone_space) {
+            const int idx = mesh->get_index_of_bone(p.pole_bone);
+            if (idx < 0 || idx >= (int)bonemats.size())
+                continue;
+            pole_ms = glm::vec3(bonemats[idx] * glm::vec4(p.pole, 1.f));
+        }
+        const glm::vec3 pole_ws = glm::vec3(ws_transform * glm::vec4(pole_ms, 1.f));
+        Debug::add_sphere(pole_ws, 0.04f, pole_color, 0.f, false);
+    }
+}
 #endif
 
 // -----------------------------------------------------------------------
@@ -111,6 +138,8 @@ void AnimGraphTester::rebuild_prop() {
 	if (Entity* old = prop_entity.get()) {
 		local_transform = old->get_ls_transform();
         old->destroy();
+	} else {
+		local_transform = glm::mat4_cast(glm::quat(glm::vec3(glm::radians(90.f), 0.f, 0.f)));
     }
     prop_entity = EntityPtr();
 
@@ -129,6 +158,7 @@ void AnimGraphTester::rebuild_prop() {
 
 // -----------------------------------------------------------------------
 void AnimGraphTester::rebuild_graph() {
+    pole_vis.clear();
     if (!mesh || !mesh->get_model()) return;
     const Model* m = mesh->get_model();
 
@@ -171,7 +201,7 @@ void AnimGraphTester::rebuild_graph() {
 
         agModifyBone* mb = b.alloc<agModifyBone>();
         mb->input       = idle;
-        mb->boneName    = StringName(bone_head.c_str());
+		mb->boneName = StringName("head");
         // Absolute mesh-space orientation (authoritative look-at). update() computes the full
         // desired head rotation each frame, so an additive delta here would double-apply / fight
         // last frame's result. The value is a quaternion variable, not euler.
@@ -204,7 +234,7 @@ void AnimGraphTester::rebuild_graph() {
             pose = add;
         }
 
-        auto make_ik_node = [&](StringName hand, StringName ik_grip) -> agBaseNode* {
+        auto make_ik_node = [&](StringName hand, StringName ik_grip, StringName polebone) -> agBaseNode* {
             // 5. IK the right hand to the gun grip on the left-hand bone (IK bones untouched above).
             agIk2Bone* ik = b.alloc<agIk2Bone>();
             ik->input              = pose;
@@ -215,10 +245,17 @@ void AnimGraphTester::rebuild_graph() {
             ik->ik_in_bone_space   = true;
             ik->take_rotation_of_other = true;
 
+            if (use_pole_bone_for_ik) {
+				ik->pole_bone = polebone;
+				ik->pole_in_bone_space = true;
+				ik->pole = look_forward_axis;
+				pole_vis.push_back({ ik->pole_bone, look_forward_axis, ik->pole_in_bone_space });
+            }
+
             return ik;
 		};
-		pose = make_ik_node(bone_hand_l.c_str(), ik_hand_l.c_str());
-		pose = make_ik_node(bone_hand_r.c_str(), ik_hand_r.c_str());
+		pose = make_ik_node("hand_l", "ik_hand_l", "lowerarm_l");
+		pose = make_ik_node("hand_r", "ik_hand_r", "lowerarm_r");
 
 
         b.set_root(pose);
@@ -232,13 +269,21 @@ void AnimGraphTester::rebuild_graph() {
         // update() (vFootTarget*). The target is the foot's animated X/Z with Y regrounded
         // onto the surface, so there is no relative offset to feed back on. A modify-bone
         // AFTER the IK tilts the planted foot to the surface normal (vFootRot*).
-		auto ik_foot = [&](agBaseNode* input, const std::string& bone, const char* tgtVar) -> agIk2Bone* {
+		auto ik_foot = [&](agBaseNode* input, const std::string& bone, const char* tgtVar, const std::string& polebone) -> agIk2Bone* {
             agIk2Bone* ik = b.alloc<agIk2Bone>();
             ik->input            = input;
             ik->bone_name        = StringName(bone.c_str());
             ik->target           = StringName(tgtVar);   // absolute, in mesh space
             ik->ik_in_bone_space = false;
             ik->alpha            = StringName("flFootIkAlpha");
+
+            if (use_pole_bone_for_ik) {
+				ik->pole_in_bone_space = true;
+				ik->pole_bone = StringName(polebone.c_str());
+				ik->pole = look_forward_axis;
+				pole_vis.push_back({ ik->pole_bone, look_forward_axis, ik->pole_in_bone_space });
+            }
+
             return ik;
         };
         auto tilt_foot = [&](agBaseNode* input, const std::string& bone, const char* rotVar) -> agModifyBone* {
@@ -257,17 +302,17 @@ void AnimGraphTester::rebuild_graph() {
         {
             agModifyBone* pelvis = b.alloc<agModifyBone>();
             pelvis->input          = node;
-            pelvis->boneName       = StringName(bone_pelvis.c_str());
+			pelvis->boneName = StringName("pelvis");
             pelvis->translation    = ModifyBoneType::MeshspaceAdd;
             pelvis->translationVal = StringName("vPelvisOffset");
             pelvis->alpha          = 1.f;
             node = pelvis;
         }
 
-        node = ik_foot(node, bone_foot_l, "vFootTargetL");
-		node = ik_foot(node, bone_foot_r, "vFootTargetR");
-        node = tilt_foot(node, bone_foot_l, "vFootRotL");
-		node = tilt_foot(node, bone_foot_r, "vFootRotR");
+        node = ik_foot(node, "foot_l", "vFootTargetL", "calf_l");
+		node = ik_foot(node, "foot_r", "vFootTargetR", "calf_r");
+		node = tilt_foot(node, "foot_l", "vFootRotL");
+		node = tilt_foot(node, "foot_r", "vFootRotR");
 
         b.set_root(node);
         break;
@@ -364,6 +409,10 @@ void AnimGraphTester::rebuild_graph() {
         bs->set_x_var("flBsX");
         bs->set_y_var("flBsY");
         bs->set_looping(true);
+		bs->set_weight_speed(bs_input_smooth > 0.0001, bs_input_smooth);
+		bs->set_x_smoothing(bs_smooth_time > 0.0001, bs_smooth_time, Easing::Linear);
+		bs->set_y_smoothing(bs_smooth_time > 0.0001, bs_smooth_time, Easing::Linear);
+
 
         b.set_root(bs);
         break;
@@ -515,7 +564,7 @@ void AnimGraphTester::update() {
     case AnimGraphTestMode::LookAt: {
         const MSkeleton* skel = mesh->get_model() ? mesh->get_model()->get_skel() : nullptr;
         const auto& bonemats = anim->get_global_bonemats();
-        int headIdx = mesh->get_index_of_bone(StringName(bone_head.c_str()));
+		int headIdx = mesh->get_index_of_bone(StringName("head"));
         if (skel && headIdx >= 0 && headIdx < (int)bonemats.size()) {
             // Reference frame MUST be one the modify-bone never overwrites, otherwise reading
             // the live bonemats back in (which already contain last frame's look-at) forms a
@@ -612,8 +661,8 @@ void AnimGraphTester::update() {
         // Only enable IK once both targets resolve; otherwise an unset/zero target would
         // yank the foot toward the mesh origin.
         float deltaL = 0.f, deltaR = 0.f;
-        bool okL = ground_foot(ik_foot_l, "vFootTargetL", "vFootRotL", deltaL, foot_l_pos);
-        bool okR = ground_foot(ik_foot_r, "vFootTargetR", "vFootRotR", deltaR, foot_r_pos);
+		bool okL = ground_foot("ik_foot_l", "vFootTargetL", "vFootRotL", deltaL, foot_l_pos);
+		bool okR = ground_foot("ik_foot_r", "vFootTargetR", "vFootRotR", deltaR, foot_r_pos);
         anim->set_float_variable(StringName("flFootIkAlpha"), (okL && okR) ? 1.f : 0.f);
 
         // Pelvis drop = how far the LOWEST-ground foot must reach below the base plane

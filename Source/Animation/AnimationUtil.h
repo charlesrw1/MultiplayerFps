@@ -48,7 +48,9 @@ void util_blend_with_mask(int bonecount, const Pose& a, Pose& b, float factor, c
 // returns output in b
 void util_global_blend(const MSkeleton* skel, const Pose* a, Pose* b, float factor, const std::vector<float>& mask);
 
-void util_twobone_ik(const vec3& a, const vec3& b, const vec3& c, const vec3& target, const vec3& pole_vector,
+// pole_target: WORLD-space position the joint (elbow/knee) should bend towards, i.e.
+// Unreal's "Joint Target" location. It always drives the bend plane (see .cpp).
+void util_twobone_ik(const vec3& a, const vec3& b, const vec3& c, const vec3& target, const vec3& pole_target,
 					 const glm::quat& a_global_rotation, const glm::quat& b_global_rotation,
 					 glm::quat& a_local_rotation, glm::quat& b_local_rotation);
 
