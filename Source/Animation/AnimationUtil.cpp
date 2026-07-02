@@ -227,6 +227,12 @@ void util_twobone_ik(const vec3& a, const vec3& b, const vec3& c, const vec3& ta
 	const float eps = 0.01f;
 	const float len_ab = length(b - a);
 	const float len_cb = length(c - b);
+	// Safety margin so the chain never goes perfectly straight (singular bend-plane normal,
+	// see axis0 below) or has target exactly on `a`. This deliberately leaves a small residual
+	// gap/bend near max reach -- callers that care about closing it should use
+	// util_twobone_stretch_scale's start_stretch_ratio to start stretching *before* the chain
+	// gets this close to fully straight, rather than shrinking eps (which just moves the
+	// singularity closer and trades the gap for a pop -- see agIk2Bone allow_stretching).
 	const float len_at = glm::clamp(length(target - a), eps, len_ab + len_cb - eps);
 
 	// --- Pass 1: aim bone a so (c - a) points along (target - a) ---
@@ -276,6 +282,27 @@ void util_twobone_ik(const vec3& a, const vec3& b, const vec3& c, const vec3& ta
 	const glm::quat rot1 = glm::angleAxis(b_desired - b_interior, glm::inverse(b_gr2) * axis0);
 	a_local_rotation = a_local_rotation * rot0;
 	b_local_rotation = b_local_rotation * rot1;
+}
+
+float util_twobone_stretch_scale(float len_ab, float len_cb, float dist_to_target, float max_stretch, float start_stretch_ratio) {
+	const float max_reach = len_ab + len_cb;
+	if (max_reach < 1e-5f)
+		return 1.f;
+	const float clamped_max = glm::max(1.f, max_stretch);
+	const float start_ratio = glm::clamp(start_stretch_ratio, 0.f, 1.f);
+	const float start_dist = max_reach * start_ratio;
+	const float max_dist = max_reach * clamped_max;
+	if (dist_to_target <= start_dist)
+		return 1.f;
+	// Ramp stretch in starting *before* the chain is fully extended (start_ratio < 1), the way
+	// Unreal's Two Bone IK "Start Stretch Ratio" works. This means by the time dist reaches the
+	// unstretched max reach, the chain is already partway stretched -- so util_twobone_ik's
+	// eps safety margin lands on a comfortably-bent, non-singular configuration instead of
+	// forcing the un-stretched solve right up against the straight-arm singularity.
+	if (max_dist <= start_dist)
+		return clamped_max;
+	const float t = glm::clamp((dist_to_target - start_dist) / (max_dist - start_dist), 0.f, 1.f);
+	return glm::mix(1.f, clamped_max, t);
 }
 
 // y2 = blend( blend(x1,x2,fac.x), blend(y1,y2,fac.x), fac.y)

@@ -6,6 +6,7 @@
 #include "Animation.h"
 #include <algorithm>
 #include <limits>
+#include <cstdio>
 
 void agClipNode::reset() {
 	anim_time = 0.0;
@@ -532,6 +533,38 @@ static glm::mat4 build_global_transform_for_bone_index(Pose* pose, const MSkelet
 #include "../../Debug.h"
 #include "../../Game/Entity.h"
 ConfigVar a_draw_ik_debug("a_draw_ik_debug", "0", CVAR_BOOL | CVAR_DEV, "");
+
+// PINK = desired target. WHITE = where the effector actually ended up after IK (+stretch,
+// +take_rotation_of_other). RED = the farthest point this chain could reach along the
+// root->target ray this frame (root position + max reach, where max reach includes the
+// stretch cap if allow_stretching is on). If PINK sits inside the RED marker's distance from
+// the root but WHITE doesn't reach it, stretching isn't engaging correctly; if PINK sits
+// beyond RED, the target is out of reach even with the configured max_stretch_scale and a gap
+// there is expected.
+static void draw_ik_debug_visualization(const glm::mat4& ent_transform, Pose& pose, const MSkeleton& skel,
+										 const int indicies[36], int bone_idx, const StringName& bone_name,
+										 const vec3& tagetVec, float unstretched_reach, float applied_stretch,
+										 bool allow_stretching, float max_stretch_scale) {
+	const glm::mat4 root_mat = build_global_transform_for_bone_index(&pose, &skel, indicies[2]);
+	const vec3 a_global = root_mat[3];
+	const float max_reach = unstretched_reach * (allow_stretching ? glm::max(1.f, max_stretch_scale) : 1.f);
+	const vec3 to_target = tagetVec - a_global;
+	const float to_target_len = length(to_target);
+
+	Debug::add_sphere(ent_transform * glm::vec4(tagetVec, 1.0), 0.02f, COLOR_PINK, 0.0f, true);
+	if (to_target_len > 1e-5f) {
+		const vec3 cap_point = a_global + (to_target / to_target_len) * glm::min(to_target_len, max_reach);
+		Debug::add_sphere(ent_transform * glm::vec4(cap_point, 1.0), 0.015f, COLOR_RED, 0.0f, true);
+	}
+	const glm::mat4 effector_mat = build_global_transform_for_bone_index(&pose, &skel, bone_idx);
+	const vec3 effector_pos = effector_mat[3];
+	Debug::add_sphere(ent_transform * glm::vec4(effector_pos, 1.0), 0.018f, COLOR_WHITE, 0.0f, true);
+
+	char buf[192];
+	std::snprintf(buf, sizeof(buf), "%s\ndist=%.3f\nreach=%.3f\nmax=%.3f\nstretch=%.3f\ngap=%.3f",
+		bone_name.get_c_str(), to_target_len, unstretched_reach, max_reach, applied_stretch, length(effector_pos - tagetVec));
+	Debug::add_text(ent_transform * glm::vec4(effector_pos, 1.0), buf, COLOR_WHITE, 0.0f, true);
+}
 void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 	if (!has_init) {
 		bone_idx = ctx.get_skeleton().get_bone_index(bone_name);
@@ -582,19 +615,23 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 	int indicies[36];
 
 	auto& skel = ctx.get_skeleton();
-	int index = bone_idx;
 	int count = 0;
-	while (index != -1) {
-		assert(count < ALLOCED_MATS);
-		glm::mat4x4 matrix = glm::mat4_cast(pose.q[index]);
-		matrix[3] = glm::vec4(pose.pos[index], 1.0);
-		mats[count++] = matrix;
-		indicies[count - 1] = index;
-		index = skel.get_bone_parent(index);
-	}
-	for (int i = count - 2; i >= 0; i--) {
-		mats[i] = mats[i + 1] * mats[i];
-	}
+	auto build_chain = [&]() {
+		count = 0;
+		int index = bone_idx;
+		while (index != -1) {
+			assert(count < ALLOCED_MATS);
+			glm::mat4x4 matrix = glm::mat4_cast(pose.q[index]);
+			matrix[3] = glm::vec4(pose.pos[index], 1.0);
+			mats[count++] = matrix;
+			indicies[count - 1] = index;
+			index = skel.get_bone_parent(index);
+		}
+		for (int i = count - 2; i >= 0; i--) {
+			mats[i] = mats[i + 1] * mats[i];
+		}
+	};
+	build_chain();
 
 	if (count <= 2) {
 		sys_print(Error, "agIk2Bone::get_pose: ik attempted on some root bone %s\n", bone_name.get_c_str());
@@ -636,6 +673,29 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 		poleVec = matrix * glm::vec4(poleVec, 1.0);
 	}
 
+	// Only walk the pre-stretch chain when something will actually use it: the stretch-scale
+	// decision, or the debug overlay's "reach" readout.
+	float unstretched_reach = 0.f;
+	float applied_stretch = 1.f;
+	if (allow_stretching || a_draw_ik_debug.get_bool()) {
+		// indicies[0]=effector(c) indicies[1]=mid(b) indicies[2]=root(a), matching ikfunctor's mats[0..2]
+		const vec3 pre_stretch_a = mats[2] * glm::vec4(0.0, 0.0, 0.0, 1.0);
+		const vec3 pre_stretch_b = mats[1] * glm::vec4(0.0, 0.0, 0.0, 1.0);
+		const vec3 pre_stretch_c = mats[0] * glm::vec4(0.0, 0.0, 0.0, 1.0);
+		unstretched_reach = length(pre_stretch_b - pre_stretch_a) + length(pre_stretch_c - pre_stretch_b);
+
+		if (allow_stretching) {
+			applied_stretch = util_twobone_stretch_scale(length(pre_stretch_b - pre_stretch_a), length(pre_stretch_c - pre_stretch_b), length(tagetVec - pre_stretch_a), max_stretch_scale, start_stretch_ratio);
+			if (applied_stretch > 1.f) {
+				// scale each bone's local translation (== its length) so the rebuilt chain below
+				// reflects the lengthened limb; util_twobone_ik then sees the stretched a/b/c.
+				pose.pos[indicies[1]] *= applied_stretch;
+				pose.pos[indicies[0]] *= applied_stretch;
+				build_chain();
+			}
+		}
+	}
+
 	int index1 = indicies[1];
 	int index2 = indicies[2];
 
@@ -650,6 +710,11 @@ void agIk2Bone::get_pose(agGetPoseCtx& ctx) {
 		q = q * pose.q[index1];
 
 		pose.q[bone_idx] = glm::inverse(q) * target_rotation;
+	}
+
+	if (a_draw_ik_debug.get_bool()) {
+		draw_ik_debug_visualization(ent_transform, pose, skel, indicies, bone_idx, bone_name,
+									 tagetVec, unstretched_reach, applied_stretch, allow_stretching, max_stretch_scale);
 	}
 
 	if (partial)

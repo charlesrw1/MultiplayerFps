@@ -19,10 +19,13 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl3.h"
 #include "UI/GUISystemPublic.h"
+#include "UI/UILoader.h"
 #include "DebugConsole.h"
 #include "EditorPopups.h"
 #include "Framework/Util.h"
 #include "Input/InputSystem.h"
+#include "Render/DrawLocal.h"
+#include "Render/ViewSetup.h"
 #include <mutex>
 
 #include "Logging.h"
@@ -74,12 +77,106 @@ private:
 	MeshBuilder mb;
 };
 
+struct Debug_Text
+{
+	glm::vec3 pos;
+	std::string text;
+	Color32 color;
+	float lifetime = 0.0;
+};
+// Projects world-space debug text to screen every frame and draws it through the same
+// immediate-mode UI window regular HUD text uses (RenderWindow), so it's automatically
+// screen-space (no depth test) and gets flushed by the normal UI sync each frame.
+class DebugTextCtx
+{
+public:
+	static DebugTextCtx& get() {
+		static DebugTextCtx inst;
+		return inst;
+	}
+	void add(Debug_Text text, bool fixedupdate) {
+		if (text.lifetime <= 0.f && fixedupdate)
+			one_frame_fixedupdate.push_back(std::move(text));
+		else
+			texts.push_back(std::move(text));
+	}
+	void draw_and_tick(float dt);
+	void fixed_update_start() { one_frame_fixedupdate.clear(); }
+
+private:
+	std::vector<Debug_Text> texts;
+	std::vector<Debug_Text> one_frame_fixedupdate;
+};
+
+void DebugTextCtx::draw_and_tick(float dt) {
+	const View_Setup& vs = draw.get_current_frame_vs();
+	const Rect2d vp = UiSystem::inst->get_vp_rect();
+	const GuiFont* mono_font = GuiFont::load("eng/fonts/monospace12.fnt");
+
+	// Distance (meters) over which text fades from fully opaque to invisible.
+	const float fade_start = 4.f;
+	const float fade_end   = 30.f;
+
+	auto draw_one = [&](const Debug_Text& t) {
+		glm::vec4 clip = vs.viewproj * glm::vec4(t.pos, 1.f);
+		if (clip.w < 0.001f)
+			return; // behind camera
+		glm::vec3 ndc = glm::vec3(clip) / clip.w;
+		if (ndc.x < -1.f || ndc.x > 1.f || ndc.y < -1.f || ndc.y > 1.f)
+			return; // offscreen
+
+		const float dist = glm::length(t.pos - vs.origin);
+		const float fade = 1.f - glm::clamp((dist - fade_start) / (fade_end - fade_start), 0.f, 1.f);
+		if (fade <= 0.01f)
+			return;
+
+		TextShape shape;
+		shape.font  = mono_font;
+		shape.color = t.color;
+		shape.color.a = (uint8_t)(shape.color.a * fade);
+		// RenderWindow's ortho projection (UiSystem::update(), GUISystemLocal.cpp) is built
+		// from get_vp_rect().get_size() only, no offset -- window.draw() rects are
+		// viewport-local (0,0 = viewport top-left), NOT window-local. Do not add vp.x/vp.y.
+		const int16_t x = (int16_t)((ndc.x * 0.5f + 0.5f) * vp.w);
+		int16_t y = (int16_t)((1.f - (ndc.y * 0.5f + 0.5f)) * vp.h);
+		const int line_height = mono_font ? mono_font->lineHeight : 12;
+
+		// draw_text_to_meshbuilder treats '\n' as an unknown glyph rather than a line
+		// break, so split multi-line text into one TextShape per line here.
+		size_t start = 0;
+		while (start <= t.text.size()) {
+			size_t nl = t.text.find('\n', start);
+			size_t end = (nl == std::string::npos) ? t.text.size() : nl;
+			shape.text = std::string_view(t.text).substr(start, end - start);
+			shape.rect.x = x;
+			shape.rect.y = y;
+			UiSystem::inst->window.draw(shape);
+			y += (int16_t)line_height;
+			if (nl == std::string::npos)
+				break;
+			start = nl + 1;
+		}
+	};
+	for (auto& t : texts) draw_one(t);
+	for (auto& t : one_frame_fixedupdate) draw_one(t);
+
+	for (int i = 0; i < (int)texts.size(); i++) {
+		texts[i].lifetime -= dt;
+		if (texts[i].lifetime <= 0.f) {
+			texts.erase(texts.begin() + i);
+			i--;
+		}
+	}
+}
+
 // Free functions used by EngineMain_Loop.cpp and other translation units
 void debug_shape_ctx_update(float dt) {
 	DebugShapeCtx::get().update(dt);
+	DebugTextCtx::get().draw_and_tick(dt);
 }
 void debug_shape_ctx_fixed_update_start() {
 	DebugShapeCtx::get().fixed_update_start();
+	DebugTextCtx::get().fixed_update_start();
 }
 
 void Debug::add_line(glm::vec3 f, glm::vec3 to, Color32 color, float duration, bool fixedupdate) {
@@ -117,6 +214,14 @@ void Debug::add_sphere(glm::vec3 c, float radius, Color32 color, float duration,
 	shape.color = color;
 	shape.lifetime = duration;
 	DebugShapeCtx::get().add(shape, fixedupdate);
+}
+void Debug::add_text(glm::vec3 pos, std::string text, Color32 color, float duration, bool fixedupdate) {
+	Debug_Text t;
+	t.pos = pos;
+	t.text = std::move(text);
+	t.color = color;
+	t.lifetime = duration;
+	DebugTextCtx::get().add(std::move(t), fixedupdate);
 }
 
 void Debug::add_circle(glm::vec3 center, glm::vec3 normal, float radius, Color32 color,

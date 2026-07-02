@@ -234,6 +234,13 @@ public:
 	StringName pole_bone;	// space `pole` is relative to; only read when pole_in_bone_space is set
 	bool pole_in_bone_space = false;
 
+	bool allow_stretching = false;	// lengthen both bones toward `target` when it exceeds max reach
+	float max_stretch_scale = 1.5f;	// cap on the length multiplier applied to each bone
+	// Fraction (0-1) of the natural reach at which stretching starts ramping in, before the
+	// chain is fully extended. Mirrors Unreal's "Start Stretch Ratio"; keeping this below 1
+	// avoids the solve ever sitting right at the straight-arm singularity (see util_twobone_ik).
+	float start_stretch_ratio = 1.f;
+
 	ValueType alpha = 0.f;
 private:
 	bool has_init = false;

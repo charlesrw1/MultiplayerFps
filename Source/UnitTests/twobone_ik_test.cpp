@@ -143,3 +143,34 @@ TEST(TwoBoneIkTest, PoleVectorSteersBendDirection) {
 	EXPECT_LT(b_down.y, a.y);
 	EXPECT_GT(b_up.y - b_down.y, 0.5f); // meaningfully different, not a coincidence
 }
+
+TEST(TwoBoneIkTest, StretchScaleNoopWhenInReach) {
+	EXPECT_FLOAT_EQ(util_twobone_stretch_scale(1.f, 1.f, 1.5f, 2.f), 1.f);
+	EXPECT_FLOAT_EQ(util_twobone_stretch_scale(1.f, 1.f, 2.f, 2.f), 1.f); // exactly at max reach
+}
+
+TEST(TwoBoneIkTest, StretchScaleGrowsToReachTarget) {
+	// len_ab+len_cb = 2, target at distance 3 -> needs a 1.5x length multiplier
+	EXPECT_NEAR(util_twobone_stretch_scale(1.f, 1.f, 3.f, 10.f), 1.5f, kEps);
+}
+
+TEST(TwoBoneIkTest, StretchScaleClampedToMax) {
+	// distance 10 would need 5x, but capped at 1.5x
+	EXPECT_FLOAT_EQ(util_twobone_stretch_scale(1.f, 1.f, 10.f, 1.5f), 1.5f);
+}
+
+// start_stretch_ratio < 1 should ramp stretch in *before* the chain reaches its natural max
+// reach (mirrors Unreal's "Start Stretch Ratio"), so the chain is already partway stretched by
+// the time dist == reach instead of solving right at the straight-arm singularity.
+TEST(TwoBoneIkTest, StretchScaleRampsInBeforeFullReach) {
+	// len_ab+len_cb = 2, start_stretch_ratio = 0.5 -> ramp begins at dist=1.0
+	EXPECT_FLOAT_EQ(util_twobone_stretch_scale(1.f, 1.f, 0.9f, 2.f, 0.5f), 1.f);   // below start, no stretch
+	EXPECT_GT(util_twobone_stretch_scale(1.f, 1.f, 1.5f, 2.f, 0.5f), 1.f);        // past start, ramping
+	EXPECT_GT(util_twobone_stretch_scale(1.f, 1.f, 2.0f, 2.f, 0.5f), 1.f);        // already stretched at exactly full reach
+}
+
+TEST(TwoBoneIkTest, StretchScaleDefaultRatioMatchesOldBehavior) {
+	// start_stretch_ratio defaults to 1.0, i.e. identical to the pre-existing no-ramp behavior
+	EXPECT_FLOAT_EQ(util_twobone_stretch_scale(1.f, 1.f, 1.5f, 2.f), util_twobone_stretch_scale(1.f, 1.f, 1.5f, 2.f, 1.f));
+	EXPECT_FLOAT_EQ(util_twobone_stretch_scale(1.f, 1.f, 3.f, 10.f, 1.f), 1.5f);
+}

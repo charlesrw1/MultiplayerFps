@@ -54,6 +54,17 @@ void util_twobone_ik(const vec3& a, const vec3& b, const vec3& c, const vec3& ta
 					 const glm::quat& a_global_rotation, const glm::quat& b_global_rotation,
 					 glm::quat& a_local_rotation, glm::quat& b_local_rotation);
 
+// Per-bone length multiplier (>=1) so a two-bone chain of rest length (len_ab+len_cb) can
+// reach dist_to_target, capped at max_stretch. Returns 1 (no stretch) below start_stretch_ratio
+// of the natural reach; ramps linearly from 1 to max_stretch as dist goes from
+// (start_stretch_ratio * reach) to (max_stretch * reach) -- mirrors Unreal's Two Bone IK
+// "Start Stretch Ratio". Starting the ramp before dist == reach (start_stretch_ratio < 1) means
+// the chain is already partway stretched by the time it would otherwise hit the straight-arm
+// singularity in util_twobone_ik. Apply the returned scale to both bones' local translations
+// before calling util_twobone_ik so the a/b/c positions it receives already reflect the
+// lengthened chain.
+float util_twobone_stretch_scale(float len_ab, float len_cb, float dist_to_target, float max_stretch, float start_stretch_ratio = 1.f);
+
 void util_set_to_bind_pose(Pose& pose, const MSkeleton* skel);
 
 void util_localspace_to_meshspace(const Pose& local, std::vector<glm::mat4x4>& out_bone_matricies,

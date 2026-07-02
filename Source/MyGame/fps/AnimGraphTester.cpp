@@ -191,6 +191,9 @@ void AnimGraphTester::rebuild_graph() {
         ik->bone_name = StringName(bone_ik_end.c_str());  // hand is the end effector; solver bends forearm+upper arm
         ik->target    = StringName("vHandTarget");
 		ik->alpha = generic_alpha;
+		ik->allow_stretching = max_stretch > 1.f;
+		ik->max_stretch_scale = max_stretch;
+		ik->start_stretch_ratio = start_stretch_ratio;
 
         b.set_root(ik);
         break;
@@ -244,6 +247,9 @@ void AnimGraphTester::rebuild_graph() {
 			ik->alpha = generic_alpha;
             ik->ik_in_bone_space   = true;
             ik->take_rotation_of_other = true;
+			ik->allow_stretching = max_stretch > 1.f;
+			ik->max_stretch_scale = max_stretch;
+			ik->start_stretch_ratio = start_stretch_ratio;
 
             if (use_pole_bone_for_ik) {
 				ik->pole_bone = polebone;
@@ -276,7 +282,9 @@ void AnimGraphTester::rebuild_graph() {
             ik->target           = StringName(tgtVar);   // absolute, in mesh space
             ik->ik_in_bone_space = false;
             ik->alpha            = StringName("flFootIkAlpha");
-
+			ik->allow_stretching = max_stretch > 1.f;
+			ik->max_stretch_scale = max_stretch;
+			ik->start_stretch_ratio = start_stretch_ratio;
             if (use_pole_bone_for_ik) {
 				ik->pole_in_bone_space = true;
 				ik->pole_bone = StringName(polebone.c_str());

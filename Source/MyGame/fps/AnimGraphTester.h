@@ -73,6 +73,14 @@ public:
 
     REF bool use_pole_bone_for_ik = true;
 
+    // Two-bone IK limb stretching. <= 1.0 disables stretching (limb stays fixed-length and
+    // stops short when unreachable); above 1.0 is the max length multiplier allowed.
+    REF float max_stretch = 1.f;
+    // Fraction (0-1) of natural reach at which stretching starts ramping in, before the limb
+    // is fully extended. Lower than 1 avoids a pop/lock right at full extension. Only matters
+    // when max_stretch > 1.
+    REF float start_stretch_ratio = 1.f;
+
 
     REFLECT(type = BoneNameString)
     std::string bone_upper_blend = "mixamorig:Spine2";
