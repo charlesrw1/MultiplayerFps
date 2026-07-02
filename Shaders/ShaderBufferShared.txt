@@ -139,8 +139,7 @@ struct BakeParams {
 // ---- A. Lit + compositor ---------------------------------------------------
 // Active lit/compositor shaders (sun, tile-lighting, tonemap composite).
 // Each shader reads only its subset:
-//   SunLightAccumulationF       : uSunDirection, uSunColor, uEpsilon,
-//                                 contactShadowParams (CONTACT_SHADOWS variant only)
+//   SunLightAccumulationF       : uSunDirection, uSunColor, uEpsilon
 //   LightAccumulationFullScreen : num_lights, light_indirect_offset
 //                                 (TILED=1 variant reads its own locals from
 //                                  the tiled SSBO; the per-tile loop in
@@ -183,9 +182,7 @@ struct LitCompositorParams {
     float lens_dirt_intensity;   // 148        (CombineF; 0=off, scales dirt-mask bloom streaking)
     int  _ae_pad1;               // 152
     int  _ae_pad2;               // 156
-    vec4 contactShadowParams;    // 160..176  x=maxDist(ws), y=thickness(ws), z=steps, w=intensity
-                                 //           (SunLightAccumulationF, CONTACT_SHADOWS)
-                                 // total: 176 bytes (11*16, valid std140)
+                                 // total: 160 bytes (10*16, valid std140)
 };
 
 // ---- Auto-exposure params (bound at slot 8 in AE passes) ------------------

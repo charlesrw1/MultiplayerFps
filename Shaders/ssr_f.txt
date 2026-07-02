@@ -46,6 +46,24 @@ vec4 ImportanceSampleGGX(vec2 e, float roughness)
 	return vec4(h, d * cosTheta);
 }
 
+// 0:1 UV from -1:1 clip
+vec2 ClipToUv(vec2 clipPos)
+{
+	return clipPos * vec2(0.5, 0.5) + vec2(0.5, 0.5);
+}
+
+vec3 ProjectWorldToClip(vec3 wsPos)
+{
+	vec4 clipPos = g.viewproj * vec4(wsPos, 1.0);
+	return clipPos.xyz / clipPos.w;
+}
+
+vec3 ProjectWorldToUv(vec3 wsPos)
+{
+	vec3 clipPos = ProjectWorldToClip(wsPos);
+	return vec3(ClipToUv(clipPos.xy), clipPos.z);
+}
+
 float RayAttenBorder(vec2 pos, float value)
 {
 	float borderDist = min(1.0 - max(pos.x, pos.y), min(pos.x, pos.y));
