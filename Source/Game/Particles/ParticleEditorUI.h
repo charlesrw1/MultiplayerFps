@@ -66,9 +66,14 @@ private:
 	bool show_create_popup = false;
 	char create_name[128] = {};
 
-	// PropertyGrid for the material slot; rebuilt when selected subsystem changes
+	// PropertyGrid for the material slot; rebuilt whenever it would point at a
+	// different RendererModule than last frame. Keyed on the module's address
+	// (not the subsystem index) because the index alone can't detect an asset
+	// swap or a subsystems-vector reallocation (Add/Remove Subsystem) that
+	// leaves the index unchanged but relocates/repoints the underlying module —
+	// a stale pointer here writes into whatever memory used to be there.
 	std::unique_ptr<PropertyGrid> mat_pg;
-	int mat_pg_subsystem = -1;
+	void* mat_pg_owner = nullptr;
 };
 
 #endif

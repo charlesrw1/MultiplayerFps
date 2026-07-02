@@ -665,15 +665,16 @@ void ParticleSystemEditorUi::draw_renderer_module(RendererModule& mod)
 {
 	ImGui::Indent();
 
-	// Material — rebuild PropertyGrid if the subsystem changed
-	if (mat_pg_subsystem != selected_subsystem) {
+	// Material — rebuild PropertyGrid whenever it would target a different module than
+	// last frame (asset swap, subsystem reallocation, or index change all show up here).
+	if (mat_pg_owner != (void*)&mod) {
 		static PropertyInfo s_mat_prop = make_assetptr_property_new(
 			"material", (uint16_t)offsetof(RendererModule, material), 0, "", &MaterialInstance::StaticType);
 		auto* editor = new RendererMaterialEditor(&mod.material);
 		editor->prop = &s_mat_prop;
 		mat_pg = std::make_unique<PropertyGrid>(get_basic_factory());
 		mat_pg->add_iproped_manual(editor);
-		mat_pg_subsystem = selected_subsystem;
+		mat_pg_owner = (void*)&mod;
 	}
 	mat_pg->update();
 

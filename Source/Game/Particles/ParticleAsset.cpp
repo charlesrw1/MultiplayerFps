@@ -98,6 +98,9 @@ void ParticleAsset::uninstall()
 
 void ParticleAsset::save_to_disk()
 {
+	sys_print(Info, "ParticleAsset::save_to_disk: this=%p path=%s subsystems=%zu\n",
+		(void*)this, get_name().c_str(), subsystems.size());
+
 	nlohmann::json root;
 	auto& arr = root["subsystems"] = nlohmann::json::array();
 	for (auto& ss : subsystems) {
@@ -114,4 +117,6 @@ void ParticleAsset::save_to_disk()
 	}
 	file->write(text.data(), text.size());
 	file->close();
+
+	sys_print(Info, "ParticleAsset::save_to_disk: wrote %zu bytes to %s\n", text.size(), get_name().c_str());
 }

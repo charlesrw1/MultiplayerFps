@@ -205,6 +205,8 @@ void AssetRegistrySystem::init() {
 #include "Render/MaterialPublic.h"
 #include "Render/Model.h"
 #include "Scripting/ScriptManager.h"
+#include "Game/Particles/ParticleAsset.h"
+#include "Render/PostProcessSettings.h"
 #ifdef EDITOR_BUILD
 #include "Assets/AssetBrowser.h"
 #endif
@@ -260,6 +262,8 @@ void AssetRegistrySystem::update() {
 	auto* fontMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("GuiFont"));
 	auto* mapMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("SceneAsset"));
 	auto* prefabMeta = (AssetMetadata*)find_type("Prefab");
+	auto* particleMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("ParticleAsset"));
+	auto* ppsetMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("PostProcessSettings"));
 	assert(prefabMeta);
 
 	bool tree_dirty = false;
@@ -330,6 +334,16 @@ void AssetRegistrySystem::update() {
 		} else if (ext == "lua") {
 			ScriptManager::inst->reload_one_file(rel_path);
 			lua_changed = true;
+		} else if (ext == "particle") {
+			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {
+				auto asset = g_assets.find<ParticleAsset>(rel_path);
+				g_assets.reload<ParticleAsset>(asset);
+			}
+		} else if (ext == "ppset") {
+			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {
+				auto asset = g_assets.find<PostProcessSettings>(rel_path);
+				g_assets.reload<PostProcessSettings>(asset);
+			}
 		}
 
 		// Incremental tree update: resolve to the canonical asset entry.
@@ -370,6 +384,10 @@ void AssetRegistrySystem::update() {
 			aod.type = modelMeta;
 		else if (ext == "tprefab")
 			aod.type = prefabMeta;
+		else if (ext == "particle")
+			aod.type = particleMeta;
+		else if (ext == "ppset")
+			aod.type = ppsetMeta;
 		else if (ext == "mis") {
 			StringUtils::remove_extension(aod.filename);
 			aod.filename += ".cmdl";
