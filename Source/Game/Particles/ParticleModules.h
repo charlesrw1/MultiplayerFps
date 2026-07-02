@@ -77,10 +77,24 @@ struct EmissionModule
 {
 	bool enabled = true;
 	MinMaxCurve rate_over_time;
+	MinMaxCurve rate_over_distance;
 	std::vector<EmissionBurst> bursts;
 
 	EmissionModule() {
 		rate_over_time.constant_min = 10.f;
+		rate_over_distance.constant_min = 0.f;
+	}
+};
+
+struct LifetimeByEmitterSpeedModule
+{
+	bool enabled = false;
+	MinMaxCurve lifetime_multiplier;
+	float speed_range_min = 0.f;
+	float speed_range_max = 1.f;
+
+	LifetimeByEmitterSpeedModule() {
+		lifetime_multiplier.constant_min = 1.f;
 	}
 };
 
@@ -95,6 +109,22 @@ struct ShapeModule
 	glm::vec3 position_offset = glm::vec3(0.f);
 	glm::vec3 rotation_offset = glm::vec3(0.f);
 	glm::vec3 scale_offset = glm::vec3(1.f);
+};
+
+NEWENUM(InheritVelocityMode, uint8_t){
+	Initial,
+	Current,
+};
+
+struct InheritVelocityModule
+{
+	bool enabled = false;
+	InheritVelocityMode mode = InheritVelocityMode::Initial;
+	MinMaxCurve multiplier;
+
+	InheritVelocityModule() {
+		multiplier.constant_min = 1.f;
+	}
 };
 
 struct VelocityOverLifetimeModule
@@ -237,3 +267,7 @@ void to_json(nlohmann::json& j, const RendererModule& m);
 void from_json(const nlohmann::json& j, RendererModule& m);
 void to_json(nlohmann::json& j, const TrailModule& m);
 void from_json(const nlohmann::json& j, TrailModule& m);
+void to_json(nlohmann::json& j, const LifetimeByEmitterSpeedModule& m);
+void from_json(const nlohmann::json& j, LifetimeByEmitterSpeedModule& m);
+void to_json(nlohmann::json& j, const InheritVelocityModule& m);
+void from_json(const nlohmann::json& j, InheritVelocityModule& m);

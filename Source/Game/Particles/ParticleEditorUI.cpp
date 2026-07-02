@@ -228,6 +228,12 @@ bool ParticleSystemEditorUi::draw()
 			draw_velocity_module(ss.velocity_over_lifetime);
 		} else ss.velocity_over_lifetime.enabled = enabled_vel;
 
+		bool enabled_inherit_vel = ss.inherit_velocity.enabled;
+		if (draw_module_header("Inherit Velocity", enabled_inherit_vel, expanded_inherit_velocity)) {
+			ss.inherit_velocity.enabled = enabled_inherit_vel;
+			draw_inherit_velocity_module(ss.inherit_velocity);
+		} else ss.inherit_velocity.enabled = enabled_inherit_vel;
+
 		bool enabled_force = ss.force_over_lifetime.enabled;
 		if (draw_module_header("Force over Lifetime", enabled_force, expanded_force)) {
 			ss.force_over_lifetime.enabled = enabled_force;
@@ -257,6 +263,12 @@ bool ParticleSystemEditorUi::draw()
 			ss.rotation_over_lifetime.enabled = enabled_rot;
 			draw_rotation_module(ss.rotation_over_lifetime);
 		} else ss.rotation_over_lifetime.enabled = enabled_rot;
+
+		bool enabled_lbes = ss.lifetime_by_emitter_speed.enabled;
+		if (draw_module_header("Lifetime by Emitter Speed", enabled_lbes, expanded_lifetime_by_emitter_speed)) {
+			ss.lifetime_by_emitter_speed.enabled = enabled_lbes;
+			draw_lifetime_by_emitter_speed_module(ss.lifetime_by_emitter_speed);
+		} else ss.lifetime_by_emitter_speed.enabled = enabled_lbes;
 
 		bool enabled_tex = ss.texture_sheet.enabled;
 		if (draw_module_header("Texture Sheet", enabled_tex, expanded_texture)) {
@@ -488,6 +500,7 @@ void ParticleSystemEditorUi::draw_emission_module(EmissionModule& mod)
 {
 	ImGui::Indent();
 	draw_minmax_curve("Rate over Time", mod.rate_over_time);
+	draw_minmax_curve("Rate over Distance", mod.rate_over_distance);
 
 	ImGui::Text("Bursts:");
 	for (int i = 0; i < (int)mod.bursts.size(); i++) {
@@ -611,6 +624,26 @@ void ParticleSystemEditorUi::draw_rotation_module(RotationOverLifetimeModule& mo
 	ImGui::Indent();
 	ImGui::Checkbox("Separate Axes", &mod.separate_axes);
 	draw_minmax_curve("Angular Velocity", mod.angular_velocity);
+	ImGui::Unindent();
+}
+
+void ParticleSystemEditorUi::draw_inherit_velocity_module(InheritVelocityModule& mod)
+{
+	ImGui::Indent();
+	const char* mode_names[] = {"Initial", "Current"};
+	int mode = (int)mod.mode;
+	if (ImGui::Combo("Mode", &mode, mode_names, 2))
+		mod.mode = (InheritVelocityMode)mode;
+	draw_minmax_curve("Multiplier", mod.multiplier);
+	ImGui::Unindent();
+}
+
+void ParticleSystemEditorUi::draw_lifetime_by_emitter_speed_module(LifetimeByEmitterSpeedModule& mod)
+{
+	ImGui::Indent();
+	ImGui::DragFloat("Speed Range Min", &mod.speed_range_min, 0.1f, 0.f, 1000.f);
+	ImGui::DragFloat("Speed Range Max", &mod.speed_range_max, 0.1f, 0.f, 1000.f);
+	draw_minmax_curve("Lifetime Multiplier", mod.lifetime_multiplier);
 	ImGui::Unindent();
 }
 

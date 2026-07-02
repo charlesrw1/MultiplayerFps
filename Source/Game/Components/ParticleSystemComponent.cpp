@@ -131,6 +131,9 @@ void ParticleSystemComponent::init_subsystem_states()
 		state.is_emitting = true;
 		state.elapsed_time = 0.f;
 		state.emission_accumulator = 0.f;
+		state.distance_emission_accumulator = 0.f;
+		state.has_last_emitter_position = false;
+		state.emitter_speed = 0.f;
 		state.next_burst_index = 0;
 		state.particles.clear();
 		state.trail_data.clear();
@@ -217,6 +220,15 @@ void ParticleSystemComponent::emit_particles(int ss_idx, int count)
 		p.random_seed = r.RandF();
 
 		float lifetime = subsys.main.start_lifetime.evaluate(0.f, p.random_seed);
+
+		if (subsys.lifetime_by_emitter_speed.enabled) {
+			auto& lbes = subsys.lifetime_by_emitter_speed;
+			float range = lbes.speed_range_max - lbes.speed_range_min;
+			float normalized_speed = range > 0.f ? (state.emitter_speed - lbes.speed_range_min) / range : 0.f;
+			normalized_speed = glm::clamp(normalized_speed, 0.f, 1.f);
+			lifetime *= lbes.lifetime_multiplier.evaluate(normalized_speed, p.random_seed);
+		}
+
 		float speed = subsys.main.start_speed.evaluate(0.f, p.random_seed);
 		float size = subsys.main.start_size.evaluate(0.f, p.random_seed);
 		float rot = subsys.main.start_rotation.evaluate(0.f, p.random_seed);
@@ -231,6 +243,11 @@ void ParticleSystemComponent::emit_particles(int ss_idx, int count)
 			glm::mat4 transform = get_ws_transform();
 			pos = glm::vec3(transform * glm::vec4(pos, 1.f));
 			vel = glm::mat3(transform) * vel;
+		}
+
+		if (subsys.inherit_velocity.enabled && subsys.inherit_velocity.mode == InheritVelocityMode::Initial) {
+			float mult = subsys.inherit_velocity.multiplier.evaluate(0.f, p.random_seed);
+			vel += state.emitter_velocity * mult;
 		}
 
 		Color32 start_col = subsys.main.start_color.evaluate(p.random_seed);
@@ -303,6 +320,18 @@ void ParticleSystemComponent::update()
 			state.is_emitting = false;
 		}
 
+		// track emitter movement, used by rate-over-distance, lifetime-by-emitter-speed, and inherit-velocity
+		glm::vec3 emitter_pos = get_ws_position();
+		float emitter_move_distance = 0.f;
+		if (state.has_last_emitter_position) {
+			glm::vec3 delta = emitter_pos - state.last_emitter_position;
+			emitter_move_distance = glm::length(delta);
+			state.emitter_velocity = dt > 0.f ? delta / dt : glm::vec3(0.f);
+			state.emitter_speed = dt > 0.f ? emitter_move_distance / dt : 0.f;
+		}
+		state.last_emitter_position = emitter_pos;
+		state.has_last_emitter_position = true;
+
 		// emission
 		if (state.is_emitting && subsys.emission.enabled) {
 			float normalized_t = main.duration > 0.f ? state.elapsed_time / main.duration : 0.f;
@@ -312,6 +341,14 @@ void ParticleSystemComponent::update()
 			state.emission_accumulator -= to_emit;
 			if (to_emit > 0)
 				emit_particles(ss_idx, to_emit);
+
+			// rate over distance
+			float rate_per_distance = subsys.emission.rate_over_distance.evaluate(normalized_t, state.rng.RandF());
+			state.distance_emission_accumulator += rate_per_distance * emitter_move_distance;
+			int to_emit_distance = (int)state.distance_emission_accumulator;
+			state.distance_emission_accumulator -= to_emit_distance;
+			if (to_emit_distance > 0)
+				emit_particles(ss_idx, to_emit_distance);
 
 			// bursts
 			for (int bi = state.next_burst_index; bi < (int)subsys.emission.bursts.size(); bi++) {
@@ -381,6 +418,15 @@ void ParticleSystemComponent::update()
 					if (len > 0.001f)
 						p.position += (dir / len) * rad * dt;
 				}
+			}
+
+			// inherit velocity (Current mode): continuously track the emitter's velocity,
+			// replacing last frame's contribution so it doesn't accumulate
+			if (subsys.inherit_velocity.enabled && subsys.inherit_velocity.mode == InheritVelocityMode::Current) {
+				float mult = subsys.inherit_velocity.multiplier.evaluate(normalized_life, p.random_seed);
+				glm::vec3 contribution = state.emitter_velocity * mult;
+				p.velocity += contribution - p.inherited_velocity_contribution;
+				p.inherited_velocity_contribution = contribution;
 			}
 
 			// force over lifetime

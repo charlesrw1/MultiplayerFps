@@ -21,6 +21,7 @@ struct ParticleSystemDef
 	float start_size = 1.f;
 	Color32 start_color = COLOR_WHITE;
 	int tex_frame = 0;
+	glm::vec3 inherited_velocity_contribution{};
 };
 
 struct TrailPoint
@@ -42,6 +43,11 @@ struct SubSystemState
 	bool is_emitting = false;
 	float elapsed_time = 0.f;
 	float emission_accumulator = 0.f;
+	float distance_emission_accumulator = 0.f;
+	glm::vec3 last_emitter_position{};
+	bool has_last_emitter_position = false;
+	float emitter_speed = 0.f;
+	glm::vec3 emitter_velocity{};
 	int next_burst_index = 0;
 	std::vector<ParticleSystemDef> particles;
 	std::vector<TrailData> trail_data;

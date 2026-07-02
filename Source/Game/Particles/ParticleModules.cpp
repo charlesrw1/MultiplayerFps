@@ -65,6 +65,7 @@ void to_json(nlohmann::json& j, const EmissionModule& m)
 {
 	j["enabled"] = m.enabled;
 	j["rate_over_time"] = m.rate_over_time;
+	j["rate_over_distance"] = m.rate_over_distance;
 	auto& ba = j["bursts"] = nlohmann::json::array();
 	for (auto& b : m.bursts) {
 		nlohmann::json bj;
@@ -77,6 +78,7 @@ void from_json(const nlohmann::json& j, EmissionModule& m)
 {
 	m.enabled = j.value("enabled", true);
 	if (j.contains("rate_over_time")) j["rate_over_time"].get_to(m.rate_over_time);
+	if (j.contains("rate_over_distance")) j["rate_over_distance"].get_to(m.rate_over_distance);
 	m.bursts.clear();
 	if (j.contains("bursts")) {
 		for (auto& bj : j["bursts"]) {
@@ -372,4 +374,40 @@ void from_json(const nlohmann::json& j, TrailModule& m)
 	if (j.contains("texture_mode"))
 		m.texture_mode = (TrailTextureMode)enum_val(
 			EnumTrait<TrailTextureMode>::StaticEnumType, j["texture_mode"].get<std::string>());
+}
+
+// --- LifetimeByEmitterSpeedModule ---
+
+void to_json(nlohmann::json& j, const LifetimeByEmitterSpeedModule& m)
+{
+	j["enabled"] = m.enabled;
+	j["lifetime_multiplier"] = m.lifetime_multiplier;
+	j["speed_range_min"] = m.speed_range_min;
+	j["speed_range_max"] = m.speed_range_max;
+}
+
+void from_json(const nlohmann::json& j, LifetimeByEmitterSpeedModule& m)
+{
+	m.enabled = j.value("enabled", false);
+	if (j.contains("lifetime_multiplier")) j["lifetime_multiplier"].get_to(m.lifetime_multiplier);
+	m.speed_range_min = j.value("speed_range_min", 0.f);
+	m.speed_range_max = j.value("speed_range_max", 1.f);
+}
+
+// --- InheritVelocityModule ---
+
+void to_json(nlohmann::json& j, const InheritVelocityModule& m)
+{
+	j["enabled"] = m.enabled;
+	j["mode"] = enum_str(EnumTrait<InheritVelocityMode>::StaticEnumType, (int64_t)m.mode);
+	j["multiplier"] = m.multiplier;
+}
+
+void from_json(const nlohmann::json& j, InheritVelocityModule& m)
+{
+	m.enabled = j.value("enabled", false);
+	if (j.contains("mode"))
+		m.mode = (InheritVelocityMode)enum_val(
+			EnumTrait<InheritVelocityMode>::StaticEnumType, j["mode"].get<std::string>());
+	if (j.contains("multiplier")) j["multiplier"].get_to(m.multiplier);
 }

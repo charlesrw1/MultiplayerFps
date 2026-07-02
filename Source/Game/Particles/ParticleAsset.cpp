@@ -33,6 +33,8 @@ void to_json(nlohmann::json& j, const ParticleSubSystem& ss)
 	j["noise"] = ss.noise;
 	j["trail"] = ss.trail;
 	j["renderer"] = ss.renderer;
+	j["lifetime_by_emitter_speed"] = ss.lifetime_by_emitter_speed;
+	j["inherit_velocity"] = ss.inherit_velocity;
 }
 
 void from_json(const nlohmann::json& j, ParticleSubSystem& ss)
@@ -52,6 +54,8 @@ void from_json(const nlohmann::json& j, ParticleSubSystem& ss)
 	if (j.contains("noise")) j["noise"].get_to(ss.noise);
 	if (j.contains("trail")) j["trail"].get_to(ss.trail);
 	if (j.contains("renderer")) j["renderer"].get_to(ss.renderer);
+	if (j.contains("lifetime_by_emitter_speed")) j["lifetime_by_emitter_speed"].get_to(ss.lifetime_by_emitter_speed);
+	if (j.contains("inherit_velocity")) j["inherit_velocity"].get_to(ss.inherit_velocity);
 }
 
 bool ParticleAsset::load_asset()

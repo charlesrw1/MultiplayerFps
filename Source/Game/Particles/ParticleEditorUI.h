@@ -22,11 +22,13 @@ private:
 	void draw_emission_module(struct EmissionModule& mod);
 	void draw_shape_module(struct ShapeModule& mod);
 	void draw_velocity_module(struct VelocityOverLifetimeModule& mod);
+	void draw_inherit_velocity_module(struct InheritVelocityModule& mod);
 	void draw_force_module(struct ForceOverLifetimeModule& mod);
 	void draw_limit_velocity_module(struct LimitVelocityOverLifetimeModule& mod);
 	void draw_color_module(struct ColorOverLifetimeModule& mod);
 	void draw_size_module(struct SizeOverLifetimeModule& mod);
 	void draw_rotation_module(struct RotationOverLifetimeModule& mod);
+	void draw_lifetime_by_emitter_speed_module(struct LifetimeByEmitterSpeedModule& mod);
 	void draw_texture_sheet_module(struct TextureSheetModule& mod);
 	void draw_noise_module(struct NoiseModule& mod);
 	void draw_trail_module(struct TrailModule& mod);
@@ -53,11 +55,13 @@ private:
 	bool expanded_emission = true;
 	bool expanded_shape = false;
 	bool expanded_velocity = false;
+	bool expanded_inherit_velocity = false;
 	bool expanded_force = false;
 	bool expanded_limit_velocity = false;
 	bool expanded_color = false;
 	bool expanded_size = false;
 	bool expanded_rotation = false;
+	bool expanded_lifetime_by_emitter_speed = false;
 	bool expanded_texture = false;
 	bool expanded_noise = false;
 	bool expanded_trail = false;

@@ -22,6 +22,8 @@ struct ParticleSubSystem
 	NoiseModule noise;
 	TrailModule trail;
 	RendererModule renderer;
+	LifetimeByEmitterSpeedModule lifetime_by_emitter_speed;
+	InheritVelocityModule inherit_velocity;
 };
 
 void to_json(nlohmann::json& j, const ParticleSubSystem& ss);
