@@ -277,8 +277,16 @@ void ModelCompileHelper::append_animation_seq_to_list(AnimationSourceToCompile s
 #undef SET_HIGH_BIT
 	}
 
-	// strip trailing keyframes that duplicate frame 0 (common in looping animations exported from UE/Blender)
-	while (out_seq.num_frames > 2) {
+	// Strip the trailing keyframe if it's a literal duplicate of frame 0 (some exporters, e.g. UE/Blender,
+	// append one to mark the loop point). This must only ever remove that single exact duplicate: the runtime's
+	// looping wraparound (see util_calc_rotations) already synthesizes the last->first blend itself, so a real
+	// duplicate frame is redundant. The tolerance is intentionally near bit-exact (not a perceptual "close enough"
+	// threshold) and this is a single check, not a loop: animations with a decelerating/eased loop point (e.g.
+	// idle sway) can have several trailing frames that are perceptually close to frame 0 without being the
+	// exporter's duplicate; looping this check with a loose tolerance chews into that real motion and truncates
+	// the clip early, which then forces the runtime wraparound to cover the remaining motion in a single frame
+	// (a visible snap).
+	if (out_seq.num_frames > 2) {
 		const int check_frame = out_seq.num_frames - 1;
 		bool all_match = true;
 		for (int bone = 0; bone < target_count && all_match; bone++) {
@@ -287,13 +295,13 @@ void ModelCompileHelper::append_animation_seq_to_list(AnimationSourceToCompile s
 			float pos_dist_sq = glm::dot(first.pos - last.pos, first.pos - last.pos);
 			float quat_dot = glm::abs(glm::dot(first.rot, last.rot));
 			float scale_diff = glm::abs(first.scale - last.scale);
-			if (pos_dist_sq > 0.0001f || quat_dot < 0.9999f || scale_diff > 0.001f)
+			if (pos_dist_sq > 1e-8f || quat_dot < 0.999999f || scale_diff > 1e-5f)
 				all_match = false;
 		}
-		if (!all_match)
-			break;
-		out_seq.num_frames--;
-		out_seq.duration = (float)out_seq.num_frames / fps;
+		if (all_match) {
+			out_seq.num_frames--;
+			out_seq.duration = (float)out_seq.num_frames / fps;
+		}
 	}
 
 	// do reparenting here
