@@ -59,6 +59,8 @@ void Renderer::create_shaders() {
 	prog.sunlight_accumulation = prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt");
 	prog.sunlight_accumulation_debug =
 		prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt", "DEBUG");
+	prog.sunlight_accumulation_contact =
+		prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt", "CONTACT_SHADOWS");
 
 	prog.ambient_accumulation = prog_man.create_raster("fullscreenquad.txt", "AmbientLightingF.txt");
 	prog.const_ambient_accumulation = prog_man.create_raster("fullscreenquad.txt", "ConstAmbientF.txt");

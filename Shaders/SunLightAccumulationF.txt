@@ -181,6 +181,56 @@ float sample_sun_shadow(vec3 WorldSpace,float linear_depth
 	return 1.0-shadow;
 }
 
+#ifdef CONTACT_SHADOWS
+#define contactShadowMaxDist   params.contactShadowParams.x
+#define contactShadowThickness params.contactShadowParams.y
+#define contactShadowSteps     params.contactShadowParams.z
+#define contactShadowIntensity params.contactShadowParams.w
+
+// Short fixed-length screen-space ray march toward the sun, catching near-camera
+// contact occlusion (thin/small geometry) that cascade shadow map resolution misses.
+// Mirrors the ssr_f.txt raymarch pattern but marches a fixed short world-space
+// distance toward the light instead of a long variable-length reflection ray, so no
+// binary refinement is needed.
+float sample_contact_shadow(vec3 worldspace, vec3 normalWS)
+{
+	vec3 lightDirWS = -params.uSunDirection.xyz; // points from surface toward the sun
+
+	vec3 startWS = worldspace + normalWS * contactShadowThickness;
+	vec3 endWS = startWS + lightDirWS * contactShadowMaxDist;
+
+	vec3 startUV = ProjectWorldToUv(startWS);
+	vec3 endUV = ProjectWorldToUv(endWS);
+
+	int steps = int(contactShadowSteps);
+	vec3 rayStep = (endUV - startUV) / float(steps);
+
+	// Reverse-Z: depth values shrink with distance from the ray-start plane, so scale
+	// the thickness window by the per-step depth delta to reject far-behind false hits.
+	float depthThickness = abs(rayStep.z) * 2.0 + 0.0001;
+
+	vec3 curr = startUV + rayStep;
+	float occlusion = 0.0;
+	for (int i = 0; i < steps; i++)
+	{
+		if (curr.x < 0.0 || curr.x > 1.0 || curr.y < 0.0 || curr.y > 1.0)
+			break;
+
+		float sampledDepth = textureLod(DEPTH, curr.xy, 0.0).r;
+		float depthDiff = sampledDepth - curr.z;
+		if (depthDiff >= 0.0 && depthDiff < depthThickness)
+		{
+			occlusion = 1.0;
+			break;
+		}
+
+		curr += rayStep;
+	}
+
+	return 1.0 - occlusion * contactShadowIntensity;
+}
+#endif
+
 void main()
 {
 	vec2 uv = vec2(gl_FragCoord.xy) / vec2(g.viewport_size.xy);
@@ -214,6 +264,9 @@ void main()
 		//FS_OUT_Color = vec4(shadow_factor);
 	#else
 		float shadow_factor = sample_sun_shadow(worldspace,linear_depth);
+		#ifdef CONTACT_SHADOWS
+			shadow_factor = min(shadow_factor, sample_contact_shadow(worldspace, normal_t.xyz));
+		#endif
 		vec3 out_color = pbr_calculate_sun_disk(params.uSunDirection, params.uSunColor, worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz);
 		out_color = apply_material_directional(type, out_color, normal_t.xyz, worldspace,
 		                                        -params.uSunDirection.xyz, params.uSunColor.xyz,

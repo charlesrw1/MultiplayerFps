@@ -319,6 +319,20 @@ void LightListCuller::cull(const View_Setup& setup) {
 	tiled_uniforms->upload(&uniforms, sizeof(gpu::TiledLightUniforms));
 }
 
+// Artist-tunable contact shadow knobs (see r.contact_shadows to enable/disable).
+static float contact_shadow_length    = 0.3f;   // world-space max ray reach, meters
+static float contact_shadow_thickness = 0.03f;  // world-space anti-self-occlusion bias / thickness, meters
+static int   contact_shadow_steps     = 12;
+static float contact_shadow_intensity = 1.0f;
+
+static void imgui_menu_contact_shadows() {
+	ImGui::DragFloat("length", &contact_shadow_length, 0.01f, 0.02f, 2.0f);
+	ImGui::DragFloat("thickness", &contact_shadow_thickness, 0.005f, 0.005f, 0.5f);
+	ImGui::SliderInt("steps", &contact_shadow_steps, 4, 32);
+	ImGui::DragFloat("intensity", &contact_shadow_intensity, 0.01f, 0.0f, 1.0f);
+}
+ADD_TO_DEBUG_MENU(imgui_menu_contact_shadows);
+
 void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 	ZoneScoped;
 	GPUSCOPESTART(accumulate_gbuffer_lighting);
@@ -403,6 +417,9 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		if (debug_sun_shadow.get_bool()) {
 			state.program = get_prog_man().get_obj(prog.sunlight_accumulation_debug);
 			state.blend = BlendState::OPAQUE;
+		} else if (r_contact_shadows.get_bool()) {
+			state.program = get_prog_man().get_obj(prog.sunlight_accumulation_contact);
+			state.blend = BlendState::ADD;
 		} else {
 			state.program = get_prog_man().get_obj(prog.sunlight_accumulation);
 			state.blend = BlendState::ADD;
@@ -423,6 +440,8 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 			lp.uSunDirection = glm::vec4(sun_internal->sun.direction, glm::sin(sun_internal->sun.angular_radius));
 			lp.uSunColor     = glm::vec4(sun_internal->sun.color, glm::cos(sun_internal->sun.angular_radius));
 			lp.uEpsilon      = sun_internal->sun.epsilon;
+			lp.contactShadowParams = glm::vec4(contact_shadow_length, contact_shadow_thickness,
+												(float)contact_shadow_steps, contact_shadow_intensity);
 			ubo.lit_compositor_params->upload(&lp, sizeof(lp));
 			gfx().bind_uniform_buffer_base(7, ubo.lit_compositor_params);
 		}
