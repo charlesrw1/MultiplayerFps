@@ -29,6 +29,7 @@ public:
 	void update_ddgi_volumes(const DdgiVolumeGpu& volumes);
 	const std::vector<DdgiVolumeGpu>& get_baked_ddgi_volumes() const;
 	void set_loaded_ddgi_data(BakedDdgiInputData&& input);
+	void clear_ddgi_data();
 	void bake_ddgi();
 
 	const std::vector<R_CubemapVolume>& get_cubemap_volumes_vector() { return cm_volumes; }

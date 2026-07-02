@@ -35,6 +35,8 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 #define specular_ao_intensity params.specular_ao_intensity
 #define include_cubemaps      (params.include_cubemaps != 0)
 #define selected_probe_pos    params.selected_probe_pos.xyz
+#define sky_color             params.sky_color.xyz
+#define ground_color          params.ground_color.xyz
 
 
 #include "commonUtil.txt"
@@ -47,6 +49,9 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 #include "pbrModels.txt"
 
 #include "reflectionShared.txt"
+#ifndef HALFRES_DDGI
+#include "specularReflectionShared.txt"	// references ssr_accum, only declared in the non-halfres variant
+#endif
 
 
 //ivec3 get_actual_probe_coord(ivec3 input_)
@@ -130,7 +135,13 @@ void main()
 	
 
 	vec3 biased_world_position = worldspace+direction*ddgi_global.normal_bias-normalize(worldspace-g.viewpos_time.xyz)*ddgi_global.view_bias;
-	vec3 outirrad = calculate_irradiance(direction, worldspace, biased_world_position);
+	vec3 outirrad;
+	if(!calculate_irradiance(direction, worldspace, biased_world_position, outirrad)) {
+		// no DDGI volume covers this point (none baked, or outside all volumes) - use sky ambient.
+		// scaled by PI to match calculate_irradiance's normalization, since downstream code
+		// multiplies outirrad by albedo/ssao without re-applying that factor.
+		outirrad = mix(ground_color, sky_color, direction.y*0.5+0.5) * PI;
+	}
 	//outirrad.irrad = vec3(0.0);
 	
 #ifdef HALFRES_DDGI
@@ -143,44 +154,11 @@ void main()
 	float alias0 = get_gbuffer_alias0(metal_rough);
 	float alias1 = get_gbuffer_alias1(albedo);
 	rad *= apply_material_diffuse_atten(type, direction, worldspace, alias0, alias1);
-	if(include_cubemaps) {
-		vec3 V = normalize(g.viewpos_time.xyz - worldspace);
-		float NdotV = max(dot(direction, V), 0.0);
-		float spec_ao = pow(ssao_value, specular_ao_intensity);
-		float spec_occlusion = compute_specular_occlusion(spec_ao, NdotV, metal_rough.g);
 
-		vec3 R = reflect(-V, direction);
-		vec3 cubemap_raw = get_prefiltered_color(worldspace + direction * 0.3, R, metal_rough.y, NdotV, outirrad);
+	rad = apply_specular_reflections(rad, worldspace, direction, albedo, metal_rough, type, alias0, alias1,
+		ssao_value, uv, outirrad, include_cubemaps, specular_ao_intensity);
 
-		vec4 ssr = texture(ssr_accum, uv);
-		vec3 reflections = mix(cubemap_raw, ssr.rgb, clamp(ssr.a, 0.0, 1.0));
-
-		vec3 F0 = mix(vec3(0.04), albedo.rgb, metal_rough.x);
-		vec3 F = FresnelSchlickRougness(NdotV, F0, metal_rough.y);
-		if (type == MATERIAL_TYPE_IRIDESCENCE) {
-			vec3 irid_tint = thin_film_iridescence(NdotV, alias0);
-			F *= mix(vec3(1.0), irid_tint * 2.0, alias1);
-		}
-		vec2 env_brdf = texture(PBR_brdflut, vec2(NdotV, metal_rough.y)).rg;
-		vec3 spec_color = reflections * (F * env_brdf.x + env_brdf.y) * spec_occlusion;
-
-		if (type == MATERIAL_TYPE_CLEARCOAT) {
-			float cc_intensity = alias0;
-			float cc_roughness = alias1;
-			vec3 F_cc = FresnelSchlickRougness(NdotV, vec3(0.04), cc_roughness);
-			vec3 cc_refl = get_prefiltered_color(worldspace + direction * 0.3, R, cc_roughness, NdotV, outirrad);
-			vec4 cc_ssr = texture(ssr_accum, uv);
-			cc_refl = mix(cc_refl, cc_ssr.rgb, clamp(cc_ssr.a, 0.0, 1.0));
-			vec2 cc_brdf = texture(PBR_brdflut, vec2(NdotV, cc_roughness)).rg;
-			spec_color *= vec3(1.0) - F_cc * cc_intensity;
-			spec_color += cc_refl * (F_cc * cc_brdf.x + cc_brdf.y) * cc_intensity * spec_occlusion;
-		}
-
-		FS_OUT_Color = vec4(rad + spec_color, 1);
-	}
-	else {
-		FS_OUT_Color = vec4(rad, 1);
-	}
+	FS_OUT_Color = vec4(rad, 1);
 #endif
 
 }

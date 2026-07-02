@@ -61,6 +61,7 @@ void Renderer::create_shaders() {
 		prog_man.create_raster("fullscreenquad.txt", "SunLightAccumulationF.txt", "DEBUG");
 
 	prog.ambient_accumulation = prog_man.create_raster("fullscreenquad.txt", "AmbientLightingF.txt");
+	prog.const_ambient_accumulation = prog_man.create_raster("fullscreenquad.txt", "ConstAmbientF.txt");
 
 	prog.height_fog = prog_man.create_raster("fullscreenquad.txt", "HeightFogF.txt");
 	prog.volfog_apply = prog_man.create_raster("fullscreenquad.txt", "VolfogApplyF.txt");

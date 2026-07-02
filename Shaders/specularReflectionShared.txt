@@ -1,0 +1,50 @@
+// Cubemap + SSR specular compositing, shared by ddgiShadeF.txt (DDGI path) and
+// AmbientLightingF.txt (no-baked-GI fallback path) so both diffuse methods get
+// the same reflections instead of only whichever ran the DDGI shader.
+//
+// Requires the includer to have already included reflectionShared.txt (for
+// get_prefiltered_color/compute_specular_occlusion), pbrModels.txt (for
+// FresnelSchlickRougness/thin_film_iridescence/MATERIAL_TYPE_*), and to
+// declare its own `layout(binding = 10) uniform sampler2D ssr_accum;`.
+
+vec3 apply_specular_reflections(vec3 rad, vec3 worldspace, vec3 direction, vec4 albedo, vec4 metal_rough,
+	uint type, float alias0, float alias1, float ssao_value, vec2 uv,
+	vec3 diffuse_irradiance, bool do_reflections, float spec_ao_intensity)
+{
+	if (!do_reflections)
+		return rad;
+
+	vec3 V = normalize(g.viewpos_time.xyz - worldspace);
+	float NdotV = max(dot(direction, V), 0.0);
+	float spec_ao = pow(ssao_value, spec_ao_intensity);
+	float spec_occlusion = compute_specular_occlusion(spec_ao, NdotV, metal_rough.g);
+
+	vec3 R = reflect(-V, direction);
+	vec3 cubemap_raw = get_prefiltered_color(worldspace + direction * 0.3, R, metal_rough.y, NdotV, diffuse_irradiance);
+
+	vec4 ssr = texture(ssr_accum, uv);
+	vec3 reflections = mix(cubemap_raw, ssr.rgb, clamp(ssr.a, 0.0, 1.0));
+
+	vec3 F0 = mix(vec3(0.04), albedo.rgb, metal_rough.x);
+	vec3 F = FresnelSchlickRougness(NdotV, F0, metal_rough.y);
+	if (type == MATERIAL_TYPE_IRIDESCENCE) {
+		vec3 irid_tint = thin_film_iridescence(NdotV, alias0);
+		F *= mix(vec3(1.0), irid_tint * 2.0, alias1);
+	}
+	vec2 env_brdf = texture(PBR_brdflut, vec2(NdotV, metal_rough.y)).rg;
+	vec3 spec_color = reflections * (F * env_brdf.x + env_brdf.y) * spec_occlusion;
+
+	if (type == MATERIAL_TYPE_CLEARCOAT) {
+		float cc_intensity = alias0;
+		float cc_roughness = alias1;
+		vec3 F_cc = FresnelSchlickRougness(NdotV, vec3(0.04), cc_roughness);
+		vec3 cc_refl = get_prefiltered_color(worldspace + direction * 0.3, R, cc_roughness, NdotV, diffuse_irradiance);
+		vec4 cc_ssr = texture(ssr_accum, uv);
+		cc_refl = mix(cc_refl, cc_ssr.rgb, clamp(cc_ssr.a, 0.0, 1.0));
+		vec2 cc_brdf = texture(PBR_brdflut, vec2(NdotV, cc_roughness)).rg;
+		spec_color *= vec3(1.0) - F_cc * cc_intensity;
+		spec_color += cc_refl * (F_cc * cc_brdf.x + cc_brdf.y) * cc_intensity * spec_occlusion;
+	}
+
+	return rad + spec_color;
+}

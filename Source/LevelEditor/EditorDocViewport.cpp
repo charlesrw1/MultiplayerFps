@@ -20,7 +20,6 @@
 #include "LevelEditor/Commands.h"
 #include "Framework/Rect2d.h"
 #include "Game/EntityComponent.h"
-#include "Game/Components/LightComponents.h"
 #include "Input/InputSystem.h"
 #include "Debug.h"
 #include <glm/gtc/type_ptr.hpp>
@@ -125,6 +124,11 @@ void EditorDoc::imgui_draw() {
 			std::string warn = "Map has " + std::to_string(nf) +
 							   " unknown field(s) — see Commands > Unknown Fields";
 			draw_text(warn.c_str());
+		}
+		// No skylight means indirect lighting/reflections fall back to a flat 0.1 constant ambient
+		// with no specular (see ConstAmbientF.txt) - every real map should have one.
+		if (!idraw->get_scene()->has_skylight()) {
+			draw_text("Scene has no skylight — indirect lighting/reflections disabled");
 		}
 	}
 

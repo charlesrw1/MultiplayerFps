@@ -85,6 +85,10 @@ void RenderGiManager::set_loaded_ddgi_data(BakedDdgiInputData&& input) {
 	draw.ddgi->load_the_gi(input.irrad, input.depths, input.offsets, input.volumes);
 }
 
+void RenderGiManager::clear_ddgi_data() {
+	draw.ddgi->clear_loaded_gi();
+}
+
 void RenderGiManager::bake_ddgi() {}
 
 void RenderGiManager::update_cubemap_volumes(const std::vector<R_CubemapVolume>& volumes) {

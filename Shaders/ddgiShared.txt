@@ -105,11 +105,14 @@ vec2 get_irrad_probe_uv(vec2 octant_uv, ivec3 probe_coord, ivec3 vol_grid, int v
 	const int DEPTH_TILE_SIZE = 8;
 	return get_probe_uv_shared(octant_uv,probe_coord,vol_grid,vol_offset,DEPTH_IN_SIZE,DEPTH_TILE_SIZE);
 }
+#ifndef IS_POINT_IN_AABB_DEFINED
+#define IS_POINT_IN_AABB_DEFINED
 bool is_point_in_aabb(vec3 pos, vec3 bmin, vec3 bmax)
 {
     return all(greaterThanEqual(pos, bmin)) &&
            all(lessThanEqual(pos, bmax));
 }
+#endif
 
 #ifdef DDGILIGHTING
 vec3 get_probe_world_from_coords(ivec3 coords, vec3 volume_origin, vec3 volume_spacing, ivec3 vol_grid, int vol_offset)
@@ -130,7 +133,10 @@ vec3 get_probe_world_from_coords_original(ivec3 coords, vec3 volume_origin, vec3
 
 
 
-// find volume (with priority etc)
+// find volume (with priority etc). Returns -1 if no volume is baked/loaded,
+// or the point falls outside every loaded volume's AABB — callers must treat
+// -1 as "no DDGI data here" and fall back to ambient lighting instead of
+// indexing the volumes SSBO with it.
 int find_best_ddgi_volume(vec3 worldpos)
 {
 	const int num_volumes = ddgi_global.num_volumes;
@@ -138,18 +144,23 @@ int find_best_ddgi_volume(vec3 worldpos)
 		vec3 volume_origin = volumes[v].origin_pri.xyz;
 		vec3 density = volumes[v].density.xyz;
 		ivec3 size = volumes[v].size_offset.xyz;
-		
+
 		if(is_point_in_aabb(worldpos,volume_origin,volume_origin+(size-ivec3(1))*density)) {
 			return v;
 		}
 	}
-	return num_volumes-1;
+	return -1;
 
 }
 
-vec3 calculate_irradiance(vec3 direction, vec3 worldspace, vec3 biased_world_position)
+// Returns false (and leaves out_irradiance untouched) if worldspace isn't
+// covered by any loaded DDGI volume; caller should use sky ambient instead.
+bool calculate_irradiance(vec3 direction, vec3 worldspace, vec3 biased_world_position, out vec3 out_irradiance)
 {
 	const int volume_index = find_best_ddgi_volume(worldspace);
+	if(volume_index < 0) {
+		return false;
+	}
 	const vec3 volume_origin = volumes[volume_index].origin_pri.xyz;
 	const vec3 volume_spacing = volumes[volume_index].density.xyz;
 	const ivec3 vol_grid = volumes[volume_index].size_offset.xyz;
@@ -237,8 +248,9 @@ vec3 calculate_irradiance(vec3 direction, vec3 worldspace, vec3 biased_world_pos
 	irradiance *= (1.0/accum_weight);
 	irradiance*=irradiance;	// go back to linear
 	irradiance*= 2.0 * 3.1415;
-	
-	return irradiance;
+
+	out_irradiance = irradiance;
+	return true;
 
 }
 

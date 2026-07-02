@@ -118,6 +118,7 @@ void GameSceneGiUtil::on_scene_load_gi(const string& mapname) {
 void GameSceneGiUtil::on_scene_exit() {
 	ASSERT(RenderGiManager::inst != nullptr);
 	RenderGiManager::inst->update_cubemap_volumes({}); // clear all
+	RenderGiManager::inst->clear_ddgi_data(); // drop DDGI probes so a map with no baked GI doesn't inherit stale ones
 }
 
 void GameSceneGiUtil::bake_all_cubemaps() {

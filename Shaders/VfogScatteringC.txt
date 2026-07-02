@@ -94,9 +94,14 @@ vec3 get_worldpos_new(ivec3 fragcoords,vec3 invpixelsize, vec3 poffset)
 #define DDGILIGHTING
 #include "ddgiShared.txt"
 
-vec3 calculate_irradiance2(vec3 direction, vec3 worldspace, vec3 biased_world_position)
+// Returns false (leaving out_irradiance untouched) if worldspace isn't covered by any loaded
+// DDGI volume - caller should skip the DDGI contribution for this fog sample.
+bool calculate_irradiance2(vec3 direction, vec3 worldspace, vec3 biased_world_position, out vec3 out_irradiance)
 {
 	const int volume_index = find_best_ddgi_volume(worldspace);
+	if (volume_index < 0) {
+		return false;
+	}
 	const vec3 volume_origin = volumes[volume_index].origin_pri.xyz;
 	const vec3 volume_spacing = volumes[volume_index].density.xyz;
 	const ivec3 vol_grid = volumes[volume_index].size_offset.xyz;
@@ -189,8 +194,9 @@ vec3 calculate_irradiance2(vec3 direction, vec3 worldspace, vec3 biased_world_po
 	}
 	
 	irradiance *= (1.0/accum_weight);
-	
-	return irradiance;
+
+	out_irradiance = irradiance;
+	return true;
 
 }
 vec3 get_inscattering(vec3 worldspace)
@@ -246,7 +252,9 @@ vec3 get_inscattering(vec3 worldspace)
 
 	vec3 sum = vec3(0.0);
 	vec3 biased_towards_cam = worldspace-raydir*0.4;
-	sum += calculate_irradiance2(-raydir,biased_towards_cam,biased_towards_cam);
+	vec3 ddgi_irrad;
+	if (calculate_irradiance2(-raydir,biased_towards_cam,biased_towards_cam,ddgi_irrad))
+		sum += ddgi_irrad;
 	//sum += calculate_irradiance(vec3(-1,0,0),worldspace,worldspace);
 	//sum += calculate_irradiance(vec3(0,1,0),worldspace,worldspace);
 	//sum += calculate_irradiance(vec3(0,-1,0),worldspace,worldspace);

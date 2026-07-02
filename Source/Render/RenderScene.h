@@ -359,6 +359,7 @@ public:
 		skylights.push_back(internal_skylight);
 		return id;
 	}
+	bool has_skylight() const override { return !skylights.empty(); }
 	void update_skylight(handle<Render_Skylight> handle, const Render_Skylight& sky) override {
 		ASSERT(!eng->get_is_in_overlapped_period());
 		int i = 0;

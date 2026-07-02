@@ -1,0 +1,49 @@
+// Graceful-degrade fallback when the scene has no skylight at all (shouldn't happen in real maps -
+// see the "no skylight" editor warning). Flat constant ambient, no specular/reflections/DDGI.
+
+layout(location = 0) out vec4 FS_OUT_Color;
+
+layout(binding = 0) uniform sampler2D GBUFFER0;		// ws normal (xyz)
+layout(binding = 1) uniform sampler2D GBUFFER1;		// albedo, ao
+layout(binding = 2) uniform sampler2D GBUFFER2;		// metallic,roughness, custom, matid
+layout(binding = 3) uniform sampler2D DEPTH;		// depth texture (writes disabled)
+layout(binding = 4) uniform sampler2D SSAOBlurred;
+
+#include "SharedGpuTypes.txt"
+#include "LightingShared.txt"
+
+layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
+	Ubo_View_Constants_Struct g;
+};
+
+#include "commonUtil.txt"
+#include "pbrShared.txt"
+#include "pbrModels.txt"
+
+const vec3 CONST_AMBIENT = vec3(0.1);
+
+void main()
+{
+	vec2 uv = vec2(gl_FragCoord.xy) / vec2(g.viewport_size.xy);
+	vec4 metal_rough = texture(GBUFFER2,uv);
+	vec4 albedo = texture(GBUFFER1,uv);
+
+	vec4 depth_tex = texture(DEPTH,uv);
+	vec4 normal_t = texture(GBUFFER0,uv);
+
+	uint type = get_gbuffer_material_type(metal_rough);
+	if(type==MATERIAL_TYPE_UNLIT)
+		discard;
+
+	float ssao_value = texture(SSAOBlurred, uv).r;
+
+	float depth_value = depth_tex.r;
+	vec3 worldspace = WorldPosFromDepth(uv, depth_value);
+
+	vec3 albedo_mult = pbr_get_albedo_mult(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz) * ssao_value * PI;
+	vec3 out_color = CONST_AMBIENT * albedo_mult;
+	out_color *= apply_material_diffuse_atten(type, normal_t.xyz, worldspace,
+	                                           get_gbuffer_alias0(metal_rough), get_gbuffer_alias1(albedo));
+
+	FS_OUT_Color = vec4(out_color,1.0);
+}

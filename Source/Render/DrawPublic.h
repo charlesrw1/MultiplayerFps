@@ -59,6 +59,9 @@ public:
 	virtual handle<Render_Skylight> register_skylight() = 0;
 	virtual void update_skylight(handle<Render_Skylight> handle, const Render_Skylight& v) = 0;
 	virtual void remove_skylight(handle<Render_Skylight>& handle) = 0;
+	// cheap check for editor warnings etc - no baked/dynamic indirect lighting falls back to a flat
+	// constant ambient when this is false (see Renderer::accumulate_gbuffer_lighting)
+	virtual bool has_skylight() const = 0;
 
 	// only one fog allowed in a scene, others will just not work
 	virtual handle<RenderFog> register_fog() = 0;

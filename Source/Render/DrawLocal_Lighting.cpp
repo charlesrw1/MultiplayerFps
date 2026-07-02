@@ -341,7 +341,27 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 	gfx().bind_uniform_buffer_base(0, ubo.current_frame);
 
 	gfx().reset_state_cache();
-	if (ddgi_test.get_bool()) {
+	if (scene.skylights.empty()) {
+		// Graceful fallback: no real map should ship without a skylight (editor warns about this
+		// in the viewport), but don't render garbage/uninitialized reflection state if one's missing.
+		if (!r_no_indirect.get_bool()) {
+			RenderPipelineState state;
+			state.vao = get_empty_vao();
+			state.program = get_prog_man().get_obj(prog.const_ambient_accumulation);
+			state.blend = BlendState::ADD;
+			state.depth_testing = false;
+			state.depth_writes = false;
+			gfx().set_pipeline(state);
+
+			bind_texture_ptr(0, tex.scene_gbuffer0);
+			bind_texture_ptr(1, tex.scene_gbuffer1);
+			bind_texture_ptr(2, tex.scene_gbuffer2);
+			bind_texture_ptr(3, tex.scene_depth);
+			bind_texture_ptr(4, ssao_tex);
+
+			gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
+		}
+	} else if (ddgi_test.get_bool() && ddgi->has_loaded_volumes()) {
 		ddgi->draw_lighting(ssao_tex, is_cubemap_view);
 	} else if (!r_no_indirect.get_bool()) {
 		RenderPipelineState state;
@@ -353,19 +373,19 @@ void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
 		state.depth_writes = false;
 		gfx().set_pipeline(state);
 
-		if (!scene.skylights.empty()) {
-			gpu::LitCompositorParams lp{};
-			lp.sky_color    = glm::vec4(scene.skylights.at(0).ambientCube[2], 0);
-			lp.ground_color = glm::vec4(scene.skylights.at(0).ambientCube[3], 0);
-			ubo.lit_compositor_params->upload(&lp, sizeof(lp));
-			gfx().bind_uniform_buffer_base(7, ubo.lit_compositor_params);
-		}
+		// Shares DdgiRuntimeParams (sky/ground ambient + cubemap/SSR reflection setup) with the
+		// DDGI shading pass, so this no-baked-GI fallback still gets reflections (see ddgiShadeF.txt).
+		gpu::DdgiRuntimeParams dp{};
+		ddgi->fill_reflection_params(dp, is_cubemap_view);
+		ubo.ddgi_runtime_params->upload(&dp, sizeof(dp));
+		gfx().bind_uniform_buffer_base(7, ubo.ddgi_runtime_params);
 
 		bind_texture_ptr(0, tex.scene_gbuffer0);
 		bind_texture_ptr(1, tex.scene_gbuffer1);
 		bind_texture_ptr(2, tex.scene_gbuffer2);
 		bind_texture_ptr(3, tex.scene_depth);
 		bind_texture_ptr(4, ssao_tex);
+		bind_texture_ptr(10, tex.reflection_accum);
 
 		// fullscreen shader, no vao used
 		gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);

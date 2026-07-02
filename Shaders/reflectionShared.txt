@@ -1,5 +1,14 @@
 
 
+#ifndef IS_POINT_IN_AABB_DEFINED
+#define IS_POINT_IN_AABB_DEFINED
+bool is_point_in_aabb(vec3 pos, vec3 bmin, vec3 bmax)
+{
+    return all(greaterThanEqual(pos, bmin)) &&
+           all(lessThanEqual(pos, bmax));
+}
+#endif
+
 layout(binding = 7) uniform sampler2D PBR_brdflut;
 layout(binding = 8) uniform samplerCubeArray probes;
 layout(binding = 9) uniform samplerCube skyprobe;

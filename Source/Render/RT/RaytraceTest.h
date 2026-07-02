@@ -61,9 +61,20 @@ public:
 	// scene load
 	void load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, std::vector<glm::vec4>& relocate,
 					 std::vector<DdgiVolumeGpu>& vols);
+	// releases probe textures and drops myvolumes; call on level exit so a map with no baked
+	// DDGI data doesn't keep rendering the previous level's stale probes
+	void clear_loaded_gi();
 
 	// main func
 	void draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view);
+	// false when no DDGI volumes are baked/loaded - callers should fall back to sky ambient instead
+	bool has_loaded_volumes() const { return !myvolumes.empty(); }
+
+	// Sets up cubemap/SSR reflection state (specular_ao_intensity, include_cubemaps, cubemap array +
+	// volume buffer, sky/ground ambient fallback) shared by the DDGI shading pass and the plain
+	// ambient fallback pass (AmbientLightingF.txt) - both composite reflections the same way.
+	void fill_reflection_params(gpu::DdgiRuntimeParams& out_params, bool for_cubemap_view);
+
 	// debug funcs
 	void render_rt();
 	void render_probes();
@@ -95,7 +106,6 @@ private:
 	void draw_lighting_fullres(IGraphicsTexture* ssao, bool for_cubemap_view);
 	void draw_lighting_halfres(IGraphicsTexture* ssao);
 	void draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap, gpu::DdgiRuntimeParams& out_params);
-	void fill_reflection_params(gpu::DdgiRuntimeParams& out_params);  // formerly set_reflection_uniforms; also binds the cubemap texture/SSBO
 
 	void compute_avg_probe_value();
 

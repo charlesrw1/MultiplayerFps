@@ -15,6 +15,7 @@ layout(binding = 2) uniform sampler2D GBUFFER2;		// metallic,roughness, custom, 
 layout(binding = 3) uniform sampler2D DEPTH;		// depth texture (writes disabled)
 
 layout(binding = 4) uniform sampler2D SSAOBlurred;
+layout(binding = 10) uniform sampler2D ssr_accum;
 
 
 #include "SharedGpuTypes.txt"
@@ -29,35 +30,49 @@ layout (binding = 0, std140) uniform Ubo_View_Constant_Buffer {
 #include "pbrShared.txt"
 #include "pbrModels.txt"
 #include "ShaderBufferShared.txt"
-layout (binding = 7, std140) uniform LitCompositorParamsUbo { LitCompositorParams params; };
-#define sky_color    params.sky_color.xyz
-#define ground_color params.ground_color.xyz
+
+// Bound with the same DdgiRuntimeParams the DDGI shading pass uses (see ShaderBufferShared.txt)
+// so this no-baked-GI fallback pass can share its sky/ground ambient and reflection setup. Must be
+// declared before reflectionShared.txt, which references `params` via macro in its own functions.
+layout (binding = 7, std140) uniform DdgiRuntimeParamsUbo { DdgiRuntimeParams params; };
+#define sky_color             params.sky_color.xyz
+#define ground_color          params.ground_color.xyz
+#define specular_ao_intensity params.specular_ao_intensity
+#define include_cubemaps      (params.include_cubemaps != 0)
+
+#include "reflectionShared.txt"
+#include "specularReflectionShared.txt"
 
 void main()
 {
 	//
-	
+
 	vec2 uv = vec2(gl_FragCoord.xy) / vec2(g.viewport_size.xy);
 	vec4 metal_rough = texture(GBUFFER2,uv);
 	vec4 albedo = texture(GBUFFER1,uv);
-	
+
 	vec4 depth_tex = texture(DEPTH,uv);
 	vec4 normal_t = texture(GBUFFER0,uv);
-	
+
 	uint type = get_gbuffer_material_type(metal_rough);
 	if(type==MATERIAL_TYPE_UNLIT)
 		discard;
-	
+
 	float ssao_value = texture(SSAOBlurred, uv).r;
-	
+
 	float depth_value = depth_tex.r;
 	vec3 worldspace = WorldPosFromDepth(uv, depth_value);
-	
+
+	vec3 irrad = mix(ground_color,sky_color,normal_t.y*0.5+0.5);
 	vec3 albedo_mult =pbr_get_albedo_mult(worldspace, albedo.xyz, metal_rough.y, metal_rough.x, normal_t.xyz) * ssao_value * PI;
-	vec3 out_color = mix(ground_color,sky_color,normal_t.y*0.5+0.5)*albedo_mult;
-	out_color *= apply_material_diffuse_atten(type, normal_t.xyz, worldspace,
-	                                           get_gbuffer_alias0(metal_rough), get_gbuffer_alias1(albedo));
+	vec3 out_color = irrad*albedo_mult;
+	float alias0 = get_gbuffer_alias0(metal_rough);
+	float alias1 = get_gbuffer_alias1(albedo);
+	out_color *= apply_material_diffuse_atten(type, normal_t.xyz, worldspace, alias0, alias1);
+
+	out_color = apply_specular_reflections(out_color, worldspace, normal_t.xyz, albedo, metal_rough, type,
+		alias0, alias1, ssao_value, uv, irrad, include_cubemaps, specular_ao_intensity);
 
 	FS_OUT_Color = vec4(out_color,1.0);
 }
-#endif 
+#endif

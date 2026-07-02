@@ -94,12 +94,14 @@ void DdgiTesting::render_probes() {
 // Reflection / cubemap uniforms
 // ---------------------------------------------------------------------------
 
-void DdgiTesting::fill_reflection_params(gpu::DdgiRuntimeParams& out_params) {
+void DdgiTesting::fill_reflection_params(gpu::DdgiRuntimeParams& out_params, bool for_cubemap_view) {
     ASSERT(RenderGiManager::inst);
+    ASSERT(!draw.scene.skylights.empty());
 
     extern ConfigVar r_specular_ao_intensity;
     out_params.specular_ao_intensity = r_specular_ao_intensity.get_float();
     out_params.lum_adjust_mode = lum_adjust_mode;
+    out_params.include_cubemaps = (!for_cubemap_view && include_cubemaps.get_bool()) ? 1 : 0;
 
     IGraphicsTexture* const cubemap_array = RenderGiManager::inst->get_cubemap_array_texture();
     const int num_cubemaps = RenderGiManager::inst->get_num_cubemaps();
@@ -111,6 +113,11 @@ void DdgiTesting::fill_reflection_params(gpu::DdgiRuntimeParams& out_params) {
 
     draw.bind_texture_ptr(7, EnviornmentMapHelper::get().integrator.get_texture());
     draw.bind_texture_ptr(9, draw.scene.skylights.at(0).skylight.generated_cube->gpu_ptr);
+
+    // Sky ambient fallback - used by ddgiShadeF.txt for samples outside every loaded DDGI volume,
+    // and as the sole diffuse term in the plain ambient fallback pass (AmbientLightingF.txt).
+    out_params.sky_color = glm::vec4(draw.scene.skylights.at(0).ambientCube[2], 0);
+    out_params.ground_color = glm::vec4(draw.scene.skylights.at(0).ambientCube[3], 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,13 +140,12 @@ void DdgiTesting::draw_lighting_shared(IGraphicsTexture* ssao, bool for_cubemap_
     draw.bind_texture_ptr(5, probe_depth);
     draw.bind_texture_ptr(6, ssao);
 
-    out_params.include_cubemaps = (!for_cubemap_view && include_cubemaps.get_bool()) ? 1 : 0;
-
     set_shit_fuck();
 
     out_params.selected_probe_pos = glm::ivec4(selected_probe, 0);
     out_params.irrad_mult = irrad_mult;
-    fill_reflection_params(out_params);
+
+    fill_reflection_params(out_params, for_cubemap_view);
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +272,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     {
         gpu::DdgiRuntimeParams dp_apply{};
         dp_apply.ssr_lum_range = ssr_lum_range;
-        fill_reflection_params(dp_apply);
+        fill_reflection_params(dp_apply, false); // halfres path never runs for cubemap views
         draw.ubo.ddgi_runtime_params->upload(&dp_apply, sizeof(dp_apply));
         gfx().bind_uniform_buffer_base(7, draw.ubo.ddgi_runtime_params);
     }
@@ -283,8 +289,9 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
 
 void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view) {
     ASSERT(ssao);
-    if (draw.scene.skylights.empty())
-        return; // fixme
+    // Caller (Renderer::accumulate_gbuffer_lighting) only reaches here once it's confirmed a
+    // skylight exists - the no-skylight case is handled entirely by the caller's fallback pass.
+    ASSERT(!draw.scene.skylights.empty());
 
     auto& device = draw.get_device();
 

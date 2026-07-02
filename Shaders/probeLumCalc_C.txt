@@ -76,14 +76,15 @@ void main()
 	vec3 middle = (boxmax+boxmin)*0.5;
 	
 	vec3 sum = vec3(0.0);
-	
-	sum += calculate_irradiance(vec3(1,0,0),middle,middle);
-	sum += calculate_irradiance(vec3(-1,0,0),middle,middle);
-	sum += calculate_irradiance(vec3(0,1,0),middle,middle);
-	sum += calculate_irradiance(vec3(0,-1,0),middle,middle);
-	sum += calculate_irradiance(vec3(0,0,1),middle,middle);
-	sum += calculate_irradiance(vec3(0,0,-1),middle,middle);
-	
+	vec3 tmp;
+
+	if(calculate_irradiance(vec3(1,0,0),middle,middle,tmp)) sum += tmp;
+	if(calculate_irradiance(vec3(-1,0,0),middle,middle,tmp)) sum += tmp;
+	if(calculate_irradiance(vec3(0,1,0),middle,middle,tmp)) sum += tmp;
+	if(calculate_irradiance(vec3(0,-1,0),middle,middle,tmp)) sum += tmp;
+	if(calculate_irradiance(vec3(0,0,1),middle,middle,tmp)) sum += tmp;
+	if(calculate_irradiance(vec3(0,0,-1),middle,middle,tmp)) sum += tmp;
+
 	sum /= 6.0;
 	
 	float lum = luminance(sum);

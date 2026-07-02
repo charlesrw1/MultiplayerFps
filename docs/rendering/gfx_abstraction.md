@@ -279,7 +279,7 @@ each shader in the group so the std140 layout is identical at link time.
 | **F. Cull pipeline** | `CullCompute`, `compact_mdi`, `cpu_vis_to_mdi`, `zero_instances_mdi`, `debugCull`, `DepthPyramidC` | 1–3 cull passes (re-upload per pass); DepthPyramid iterates per-mip | `ubo.cull_params` | `CullParams` | 5 + 2 + 1 + 1 + 3 + 4 = 16 |
 | **G. Volumetric fog** | `VfogScatteringC`, `VfogRaymarchC` | once each | `ubo.volfog_pass_params` (separate from existing `buf.fog_uniforms` at binding 4) | `VolfogPassParams` | 4 + n |
 | **H. SSAO blur** | `BilateralBlurF`, `hbao/linearizedepth` | once each | `ubo.ssao_blur_params` | `SsaoBlurParams` | 3 + 1 = 4 |
-| **J. Probe / GI baking** | `compute_irrad_pos_C`, `get_best_cubemap_C`, `probeLumCalc_C`, `avgProbeCalc_C`, `trace_C`, `gather_C`, `PerlinGenF` | once each (editor / bake time) | `ubo.bake_params` | `BakeParams` | 4 + 4 + 1 + n + 5 + 1 + 6 ≈ 22 |
+| **J. Probe / GI baking** | `get_best_cubemap_C`, `probeLumCalc_C`, `avgProbeCalc_C`, `trace_C`, `gather_C`, `PerlinGenF` | once each (editor / bake time) | `ubo.bake_params` | `BakeParams` | 4 + 1 + n + 5 + 1 + 6 ≈ 18 |
 | **K. Raytrace debug** | `Raytracing/RaytracedShadows`, `Raytracing/RaytracedReflections`, `Raytracing/RaytraceSphere` | once each (debug / one-off) | `ubo.rt_debug_params` | `RtDebugParams` | 4 + 4 + 8 = 16 |
 | **PER-DRAW** (own UBO each) | `MbSimpleV/F`, `MbTexturedV/F`, `MeshSimpleV`, `SimpleMeshV`, `MeshDebugProbeF`, `fullscreen_quad_textureF`, `Helpers/EqrtCubemap*`, `Helpers/PrefilterSpecular*`, `LightAccumulationV/F`, all `MASTER/*` material shaders | per-draw / per-instance / per-light | `ubo.<shader>_params` each (or push-const later) | `<Shader>Params` | varies |
 

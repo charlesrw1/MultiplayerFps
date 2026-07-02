@@ -141,9 +141,10 @@ vec3 evaluate_lighting(vec3 pos, vec3 normal, vec3 albedo)
 	vec3 irrad = vec3(0.0);
 	if(params.do_irrad_calcs != 0) {
 		vec3 biased_world_position = pos+normal*0.1;
-	
-		irrad =  calculate_irradiance(normal,pos,biased_world_position) * ddgi_global.indirect_boost;
-		
+
+		vec3 ddgi_irrad;
+		if(calculate_irradiance(normal,pos,biased_world_position,ddgi_irrad))
+			irrad = ddgi_irrad * ddgi_global.indirect_boost;
 	}
 	
 	irrad = irrad * albedo / 3.14159;

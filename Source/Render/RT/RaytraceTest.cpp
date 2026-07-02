@@ -166,3 +166,24 @@ void DdgiTesting::load_the_gi(IGraphicsTexture* irrad, IGraphicsTexture* depth, 
 
     compute_avg_probe_value();
 }
+
+void DdgiTesting::clear_loaded_gi() {
+    if (myvolumes.empty())
+        return;
+
+    myvolumes.clear();
+    temp_probe_relocate_thing.clear();
+
+    theglobals.num_volumes = 0;
+    ddgi_globals->upload(&theglobals, sizeof(theglobals));
+
+    if (probe_irradiance) {
+        probe_irradiance->release();
+        probe_irradiance = nullptr;
+    }
+    if (probe_depth) {
+        probe_depth->release();
+        probe_depth = nullptr;
+    }
+    ddgi_baked_this_session = false;
+}
