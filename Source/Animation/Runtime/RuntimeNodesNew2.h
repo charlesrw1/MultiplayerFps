@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include "RuntimeNodesNew.h"
 #include "Framework/MathLib.h"
 
@@ -513,6 +514,43 @@ private:
 	float curTransitionDuration = 0.0;
 	float curTransitionTime = 0.0;
 	Pose* blendingOut = nullptr;
+};
+
+// Unreal's "Save Cached Pose": wraps a subgraph and evaluates it at most once per frame,
+// no matter how many agUseCachedPose nodes pull from it that frame -- register with the
+// builder via agBuilder::add_cached_pose_root() so agUseCachedPose can find it by name.
+class agSaveCachedPose : public agBaseNode
+{
+public:
+	CLASS_BODY(agSaveCachedPose);
+	void reset() final { if (input) input->reset(); }
+	void get_pose(agGetPoseCtx& ctx) final;
+	REF void set_cache_name(string name) { cacheName = StringName(name.c_str()); }
+	StringName get_cache_name() const { return cacheName; }
+
+	agBaseNode* input = nullptr;
+
+private:
+	StringName cacheName;
+	Pose cachedPose{};
+	uint64_t evaluatedFrame = UINT64_MAX;
+};
+
+// Unreal's "Use Cached Pose": links by name to a agSaveCachedPose node registered elsewhere
+// in the graph and forwards get_pose() to it. The name -> node link is resolved once, right
+// after construction (see AnimatorObject::AnimatorObject), not lazily during get_pose().
+class agUseCachedPose : public agBaseNode
+{
+public:
+	CLASS_BODY(agUseCachedPose);
+	void reset() final { if (resolved) resolved->reset(); }
+	void get_pose(agGetPoseCtx& ctx) final;
+	REF void set_cache_name(string name) { cacheName = StringName(name.c_str()); }
+	void resolve(AnimatorObject& obj);
+
+private:
+	StringName cacheName;
+	agSaveCachedPose* resolved = nullptr;
 };
 
 struct DirectAnimationSlot;

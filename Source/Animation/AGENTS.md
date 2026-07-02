@@ -11,7 +11,7 @@ Skeletal animation runtime: playback, blending, root motion, ragdoll, and curve-
 - **Retargeting** — `SkeletonMirror` plus retarget maps let clips play on differently-rigged skeletons; bone mirroring supports symmetry.
 - **Ragdoll blending** — Partial ragdoll via per-bone blend weights on `AnimatorObject`.
 - **Curve values** — Per-clip float curves sampled per-frame to drive effects (e.g. footstep intensity).
-- **Cached pose roots** — Named reusable pose caches registered via `agBuilder`.
+- **Cached pose roots** — `agSaveCachedPose`/`agUseCachedPose` (Unreal's Save/Use Cached Pose). `agSaveCachedPose` is registered by name via `agBuilder::add_cached_pose_root`; any number of `agUseCachedPose` nodes link to it by name (resolved once, right after construction) and forward `get_pose()` to it. The save node only re-evaluates its input once per `AnimatorObject::update()` (tracked via `AnimatorObject::get_eval_frame_id()`), so multiple consumers in the same frame reuse the same stored pose.
 - **Pose clips** — Static single-frame poses (no duration); flagged on `AnimationSeq`.
 
 ## Invariants

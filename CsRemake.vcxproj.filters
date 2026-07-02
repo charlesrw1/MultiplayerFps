@@ -123,6 +123,9 @@
     <ClCompile Include="Source\Animation\Runtime\RuntimeNodesNew2.cpp">
       <Filter>Source\Animation\Runtime</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Animation\Runtime\SpringBones.cpp">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Animation\SkeletonData.cpp">
       <Filter>Source\Animation</Filter>
     </ClCompile>
@@ -623,6 +626,9 @@
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
     <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew2.h">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Runtime\SpringBones.h">
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
     <ClInclude Include="Source\Animation\SkeletonData.h">

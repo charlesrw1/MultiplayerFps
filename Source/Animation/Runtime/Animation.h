@@ -13,6 +13,7 @@
 #include "Framework/ReflectionProp.h"
 #include "Framework/ClassBase.h"
 #include "Animation/Runtime/SyncTime.h"
+#include "Animation/Runtime/SpringBones.h"
 #include "Animation/AnimationSeqAsset.h"
 #include "Animation/AnimEvent.h"
 #include "Framework/MulticastDelegate.h"
@@ -119,6 +120,12 @@ public:
 	// void remove_simulating_physics_object(Entity* obj);
 	// REF void set_update_owner_position_to_root(bool b) { update_owner_position_to_root = b; }
 	void set_ragdoll(RagdollComponent* ragdoll);
+	// Registers a bone (by name, must exist on this model's skeleton) to be simulated
+	// as a spring/jiggle bone each update, after the anim graph has run. Chains work
+	// automatically: register every bone in the chain, parent to tip.
+	void add_spring_bone(StringName boneName, const SpringBoneParams& params) {
+		springBones.add_spring_bone(get_skel(), boneName, params);
+	}
 
 	RootMotionTransform get_last_root_motion() const { return root_motion; }
 	void set_matrix_palette_offset(int ofs) { matrix_palette_offset = ofs; }
@@ -139,6 +146,11 @@ public:
 	void set_quat_variable(StringName name, glm::quat q);
 	agBaseNode* find_cached_pose_node(StringName name);
 	agBaseNode& get_root_node() const;
+	// Incremented once per update(). agSaveCachedPose compares this against the frame it
+	// last evaluated on to decide whether to re-run its input or reuse the stored pose --
+	// this is what makes a cached pose evaluate at most once per frame regardless of how
+	// many agUseCachedPose nodes pull from it (mirrors Unreal's Save/Use Cached Pose).
+	uint64_t get_eval_frame_id() const { return evalFrameId; }
 	SyncGroupData& find_or_create_sync_group(StringName name);
 	DirectAnimationSlot* find_slot_with_name(StringName name);
 	void add_playing_clip(agClipNode* clip) { playingClipsThisUpdate.push_back(clip); }
@@ -163,6 +175,7 @@ private:
 	std::vector<agClipNode*> playingClipsThisUpdate;
 	std::unordered_map<uint64_t, float> curve_values;
 	std::unordered_map<uint64_t, std::variant<bool, float, int, glm::vec3, glm::quat>> blackboard;
+	uint64_t evalFrameId = 0;
 	bool using_global_bonemat_double_buffer = true;
 	vector<glm::mat4> cached_bonemats; // global bonemats
 	vector<glm::mat4> last_cached_bonemats;
@@ -174,6 +187,7 @@ private:
 	RootMotionTransform root_motion;
 	// std::unordered_set<uint64_t> simulating_physics_objects;
 	obj<RagdollComponent> ragdoll;
+	SpringBones springBones;
 
 	// active sync groups for graph
 	vector<SyncGroupData> active_sync_groups;

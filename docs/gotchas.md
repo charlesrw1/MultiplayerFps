@@ -12,3 +12,5 @@
 - animation import's trailing-duplicate-frame strip (ModelCompile_Animation.cpp) must be a single near-bit-exact
   check, not a loop with a loose tolerance — a loose/looped check chews into real frames on eased/decelerating
   loops (e.g. idle sway), truncating the clip and causing a snap at the loop point
+  
+ - shader cache. if you change a header that is included in a shder, engine doesnt pick up on that and loads stale shader from cache. it does pick up on the source file changes, but not includes.

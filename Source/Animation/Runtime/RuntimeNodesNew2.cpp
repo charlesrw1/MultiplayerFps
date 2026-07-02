@@ -332,6 +332,34 @@ void agBindPose::get_pose(agGetPoseCtx& ctx) {
 	util_set_to_bind_pose(*ctx.pose, &ctx.get_skeleton());
 }
 
+void agSaveCachedPose::get_pose(agGetPoseCtx& ctx) {
+	ASSERT(input && "agSaveCachedPose: no input set");
+	const uint64_t frame = ctx.object.get_eval_frame_id();
+	if (frame != evaluatedFrame) {
+		input->get_pose(ctx);
+		cachedPose = *ctx.pose;
+		evaluatedFrame = frame;
+	} else {
+		*ctx.pose = cachedPose;
+	}
+}
+
+void agUseCachedPose::resolve(AnimatorObject& obj) {
+	if (resolved)
+		return;
+	agBaseNode* found = obj.find_cached_pose_node(cacheName);
+	resolved = found ? found->cast_to<agSaveCachedPose>() : nullptr;
+	ASSERT(resolved && "agUseCachedPose: no matching Save Cached Pose node found for name");
+	if (resolved)
+		resolved->reset();
+}
+
+void agUseCachedPose::get_pose(agGetPoseCtx& ctx) {
+	ASSERT(resolved && "agUseCachedPose used before its cache link was resolved");
+	if (resolved)
+		resolved->get_pose(ctx);
+}
+
 void agClipNode::set_clip(const Model* m, string clipName) {
 	assert(m->get_skel());
 	seq = m->get_skel()->find_clip(clipName);
@@ -945,10 +973,14 @@ void agBlendMasked::get_pose(agGetPoseCtx& ctx) {
 	float alpha_val = alpha.get_float(ctx);
 	ctx.debug_enter("agBlendMasked: " + std::to_string(alpha_val));
 	if (alpha_val <= 0.00001f) {
+		// Per-bone blend factor is alpha_val*maskWeights[i], which is 0 everywhere
+		// regardless of the mask -- input0 wins on every bone, so input1 need not run.
 		input0->get_pose(ctx);
-	} else if (alpha_val >= 0.99999f) {
-		input1->get_pose(ctx);
 	} else {
+		// NOTE: alpha_val == 1 must NOT shortcut to input1 alone -- the mask is what
+		// decides per-bone which input wins (that's the whole point of this node), and
+		// alpha=1 is the normal "permanent" split (e.g. upper/lower body), not "fully
+		// replace the skeleton with input1".
 		agGetPoseCtx basePose(ctx);
 		// Base always contributes at full parent weight; override layer scales with alpha.
 		ctx.weight = ctx.weight * alpha_val;

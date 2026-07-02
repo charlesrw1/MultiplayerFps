@@ -44,6 +44,17 @@ agBaseNode& AnimatorObject::get_root_node() const {
 	assert(graph.get_root());
 	return *graph.get_root();
 }
+void agBuilder::add_cached_pose_root(agBaseNode* node) {
+	cachePoseNodes.push_back(node);
+}
+agBaseNode* AnimatorObject::find_cached_pose_node(StringName name) {
+	for (agBaseNode* n : graph.get_cache_nodes()) {
+		auto* save = n ? n->cast_to<agSaveCachedPose>() : nullptr;
+		if (save && save->get_cache_name() == name)
+			return save;
+	}
+	return nullptr;
+}
 void AnimatorObject::refresh_after_model_reload(Model* reloaded) {
 	// Flat list of every node alloc()'d through the builder -- notifies every leaf
 	// directly, regardless of whether it's on the graph's currently-active branch
@@ -81,6 +92,14 @@ AnimatorObject::AnimatorObject(const Model& model, agBuilder& ingraph, Entity* e
 	this->owner = ent;
 
 	get_root_node().reset(); // reset it
+
+	// Second pass: agUseCachedPose nodes may sit off the tree that get_root_node().reset()
+	// just walked (their whole point is to be reachable from places the graph's normal tree
+	// structure doesn't reach), so their linked agSaveCachedPose input never got reset above.
+	// Resolve the name -> node link now, once, and reset that subtree here instead.
+	for (auto* n : graph.get_all_nodes())
+		if (auto* use = n ? n->cast_to<agUseCachedPose>() : nullptr)
+			use->resolve(*this);
 
 	// Init bone arrays
 	const int bones = model.get_skel()->get_num_bones();
@@ -127,6 +146,7 @@ static std::vector<int> get_indicies(const Animation_Set* set, const std::vector
 ConfigVar force_animation_to_bind_pose("force_animation_to_bind_pose", "0", CVAR_BOOL | CVAR_DEV, "");
 void AnimatorObject::update(float dt) {
 	assert(model.get_skel());
+	evalFrameId++;
 	root_motion = RootMotionTransform();
 	sampled_events.clear();
 	if (using_global_bonemat_double_buffer)
@@ -162,6 +182,8 @@ void AnimatorObject::update(float dt) {
 	} else {
 		util_localspace_to_meshspace(*pose_base, cached_bonemats, get_skel());
 	}
+	const glm::mat4 ownerWorld = owner ? owner->get_ws_transform() : glm::mat4(1.f);
+	springBones.update(dt, *pose_base, cached_bonemats, get_skel(), ownerWorld);
 
 	ConcatWithInvPose();
 }

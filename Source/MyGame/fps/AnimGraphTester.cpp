@@ -105,6 +105,7 @@ void AnimGraphTester::start() {
     bb->set_texture(Texture::load("eng/icon/_nearest/blue_poi.png"));
     tgt->set_ws_position(get_owner()->get_ws_position() + glm::vec3(0.f, 1.5f, 2.f));
     target_entity = tgt->get_self_ptr();
+    target_billboard = bb;
 
     rebuild_graph();
     rebuild_prop();
@@ -408,6 +409,80 @@ void AnimGraphTester::rebuild_graph() {
 		break;
 	}
 
+	case AnimGraphTestMode::SpringBoneTest: {
+		auto* clip = make_clip(clip0);
+		b.set_root(clip);
+		break;
+	}
+
+    case AnimGraphTestMode::CachedPoseTest: {
+        // Lower body: blend-by-int between two looping locomotion clips, evaluated and
+        // cached once behind agSaveCachedPose("LowerBody").
+        agClipNode* walk = make_clip(clip0);
+        agClipNode* run  = make_clip(clip1);
+
+        agBlendByInt* loco = b.alloc<agBlendByInt>();
+        loco->integer           = StringName("iLocoState");
+        loco->easing            = transition_easing;
+        loco->blending_duration = transition_time;
+        loco->inputs.push_back(walk);
+        loco->inputs.push_back(run);
+
+        agSaveCachedPose* lowerSave = b.alloc<agSaveCachedPose>();
+        lowerSave->input = loco;
+        lowerSave->set_cache_name("LowerBody");
+        b.add_cached_pose_root(lowerSave);
+
+        // Upper body: two single-frame poses blended by generic_alpha, cached once behind
+        // agSaveCachedPose("UpperBody").
+        agEvaluateClip* poseA = make_eval_clip(clip2);
+		poseA->frame = gungrip_frame_eval;
+        agEvaluateClip* poseB = make_eval_clip(clip2);
+		poseB->frame = cachepose_frame_eval_2;
+
+
+        agBlendNode* upperBlend = b.alloc<agBlendNode>();
+        upperBlend->input0 = poseA;
+        upperBlend->input1 = poseB;
+        upperBlend->alpha  = 1.f;
+
+        agSaveCachedPose* upperSave = b.alloc<agSaveCachedPose>();
+        upperSave->input = upperBlend;
+        upperSave->set_cache_name("UpperBody");
+        b.add_cached_pose_root(upperSave);
+
+        // Two masked combines of the SAME lower/upper cached poses -- one blends the masked
+        // bones' rotation in mesh space, the other in the default (local/component) space --
+        // so the top-level toggle below isolates exactly what meshspace_blend changes.
+        auto make_masked = [&](bool meshspace) -> agBlendMasked* {
+            agUseCachedPose* lower = b.alloc<agUseCachedPose>();
+            lower->set_cache_name("LowerBody");
+            agUseCachedPose* upper = b.alloc<agUseCachedPose>();
+            upper->set_cache_name("UpperBody");
+
+            agBlendMasked* masked = b.alloc<agBlendMasked>();
+            masked->init_mask_for_model(m, 0.f);
+            masked->set_all_children_weights(m, bone_upper_blend, generic_alpha);
+            masked->meshspace_blend = meshspace;
+            masked->input0 = lower;
+            masked->input1 = upper;
+            masked->alpha  = 1.f;
+            return masked;
+        };
+        agBlendMasked* maskedMeshspace = make_masked(true);
+        agBlendMasked* maskedLocal     = make_masked(false);
+
+        agBlendByInt* toggle = b.alloc<agBlendByInt>();
+        toggle->integer           = StringName("iMeshspaceToggle");
+        toggle->easing            = transition_easing;
+        toggle->blending_duration = transition_time;
+        toggle->inputs.push_back(maskedMeshspace);
+        toggle->inputs.push_back(maskedLocal);
+
+        b.set_root(toggle);
+        break;
+    }
+
     case AnimGraphTestMode::BlendSpace2D: {
         agBlendSpace2D* bs = b.alloc<agBlendSpace2D>();
         if (clip0 && !clip0->did_load_fail()) bs->add_sample(clip0.get(), -1.f, -1.f);
@@ -443,6 +518,19 @@ void AnimGraphTester::rebuild_graph() {
         a->set_quat_variable(StringName("vHeadRot"),     glm::quat(1.f, 0.f, 0.f, 0.f));
         a->set_float_variable(StringName("flBsX"), bs2d_x);
         a->set_float_variable(StringName("flBsY"), bs2d_y);
+
+        if (mode == AnimGraphTestMode::SpringBoneTest) {
+            SpringBoneParams params;
+            params.yaw_stiffness = spring_yaw_stiffness;
+            params.yaw_damping = spring_yaw_damping;
+            params.pitch_stiffness = spring_pitch_stiffness;
+            params.pitch_damping = spring_pitch_damping;
+            params.along_stiffness = spring_along_stiffness;
+            params.along_damping = spring_along_damping;
+            params.allow_length_flex = spring_allow_length_flex;
+            params.gravity = spring_gravity;
+            a->add_spring_bone(StringName(bone_spring.c_str()), params);
+        }
     }
 }
 
@@ -547,6 +635,12 @@ void AnimGraphTester::update() {
 
     AnimatorObject* anim = mesh ? mesh->get_animator() : nullptr;
     if (!anim) return;
+
+    // blue_poi marker is only meaningful for the modes that actually aim at target_entity
+    if (target_billboard) {
+        const bool wants_target = mode == AnimGraphTestMode::BasicIK || mode == AnimGraphTestMode::LookAt;
+        target_billboard->set_is_visible(wants_target);
+    }
 
     const float dt = eng->get_dt();
     cycle_timer += dt;
@@ -752,6 +846,11 @@ void AnimGraphTester::update() {
 
         break;
     }
+
+    case AnimGraphTestMode::CachedPoseTest:
+        anim->set_int_variable(StringName("iLocoState"), cached_use_run ? 1 : 0);
+        anim->set_int_variable(StringName("iMeshspaceToggle"), cached_use_meshspace ? 0 : 1);
+        break;
 
     case AnimGraphTestMode::BlendSpace2D: {
         // Auto-sweep a circle over the 4-corner grid unless the editor preview UI has taken

@@ -19,7 +19,13 @@ NEWENUM(AnimGraphTestMode, int) {
     Additive,     // agAddNode: pulsing additive layer
     BlendByInt,   // agBlendByInt: auto-cycling integer state machine
     DurationEventTest,
-    BlendSpace2D, // agBlendSpace2D: clip0..clip3 at the 4 corners of a square parameter grid
+    BlendSpace2D,   // agBlendSpace2D: clip0..clip3 at the 4 corners of a square parameter grid
+    SpringBoneTest, // plays clip0 and applies a spring bone to bone_spring, tuned by spring_stiffness/spring_damping
+    // agSaveCachedPose/agUseCachedPose: lower body (clip0/clip1 blend-by-int) and upper body
+    // (clip2/clip3 single-frame poses blended by generic_alpha) are each evaluated once and
+    // cached, then read by TWO agBlendMasked combines (mesh-space vs local-space rotation
+    // blend on the masked bones) which a top-level blend-by-int cross-fades between.
+    CachedPoseTest,
 };
 
 class MeshComponent;
@@ -95,6 +101,18 @@ public:
     REFLECT(type = BoneNameString)
     std::string bone_grip_mask   = "mixamorig:RightArm";
 
+    // SpringBoneTest
+    REFLECT(type = BoneNameString)
+    std::string bone_spring = "mixamorig:Spine2";
+    REF float spring_yaw_stiffness   = 100.f;
+    REF float spring_yaw_damping     = 8.f;
+    REF float spring_pitch_stiffness = 100.f;
+    REF float spring_pitch_damping   = 8.f;
+    REF float spring_along_stiffness = 100.f;
+    REF float spring_along_damping   = 8.f;
+    REF bool  spring_allow_length_flex = false;
+    REF float spring_gravity   = 0.f;
+
     // FeetIK grounding tuning
     REF float foot_trace_dist   = 0.5f;   // half-length of the downward probe (meters), centered on foot
     REF float foot_height_off   = 0.05f;  // keep foot this far above the hit surface (meters)
@@ -103,6 +121,8 @@ public:
     REF float pelvis_interp_speed = 10.f; // pelvis-drop smoothing rate (higher = snappier)
 
     REF int gungrip_frame_eval = 0;
+	REF int cachepose_frame_eval_2 = 0;
+
 
     REF float generic_alpha = 1.f;
 
@@ -119,6 +139,10 @@ public:
 
 	REF float bs_smooth_time = 0.0;
 	REF float bs_input_smooth = 0.0;
+
+    // CachedPoseTest: manual toggles (instead of auto-cycling on a timer).
+    REF bool cached_use_run       = false; // lower body: false = clip0 (walk), true = clip1 (run)
+    REF bool cached_use_meshspace = false; // final toggle: false = local-space masked blend, true = mesh-space
 
 	void start_ik_dump(); // called externally (console command)
 
@@ -137,6 +161,7 @@ private:
 
     MeshComponent* mesh = nullptr;
     EntityPtr target_entity;
+    class BillboardComponent* target_billboard = nullptr; // blue_poi marker on target_entity; only relevant to IK modes that use the target
     EntityPtr prop_entity;
 
     AnimGraphTestMode last_mode = AnimGraphTestMode::BasicIK;
