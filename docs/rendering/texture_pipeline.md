@@ -17,12 +17,24 @@ Every game texture and UI texture that needs non-default settings has a `.tis` s
 Key fields:
 
 - `src_file` — relative filename of the source image (e.g. `folder_closed.png`).
-- `load_source_file` — when true, skip texconv and load the source image directly (UI textures). No `.dds` is produced.
 - `nearest_filtering` — load with nearest/point sampler instead of linear.
-- `is_srgb`, `is_normalmap`, `make_uncompressed`, `resize_width` — compiler hints; ignored for UI textures.
+- `compression` — `TextureCompressionType` enum, one of:
+  - `Compressed_BC1` — general color textures, no alpha (default)
+  - `Uncompressed` — R8G8B8A8, no compression artifacts
+  - `NormalMap_BC5` — tangent-space normal maps
+  - `GreyscaleMask_BC4` — single-channel masks (roughness, AO, etc)
+  - `HighQuality_BC7` — color + alpha, higher quality than BC1
+  - `UseSourceFile` — skip texconv, load the source `.png`/`.jpg` directly at runtime (UI textures). No `.dds` is produced.
+- `is_srgb` — only applies to `Compressed_BC1`/`HighQuality_BC7`; ignored for normal maps/masks (non-color data), `Uncompressed`, and `UseSourceFile`.
+- `resize_width` — compiler hint; ignored when `compression == UseSourceFile`.
 - `simplifiedColor` — average pixel colour computed by the compiler and stored back; read-only in the inspector.
 
-The file watcher auto-creates a `.tis` with `src_file = <basename>` when a new `.png` appears in the Data directory. For UI textures, set `load_source_file = true` via the inspector to opt out of compilation.
+The file watcher auto-creates a `.tis` with `src_file = <basename>` when a new `.png` appears in the Data directory. For UI textures, set `compression = UseSourceFile` via the inspector to opt out of compilation.
+
+### Legacy format migration
+
+Pre-existing `.tis` files predate the `compression` enum and instead carry `is_normalmap`/`make_uncompressed`/`load_source_file` bools. Those fields are still reflected (so old files still parse) but are otherwise unused. `migrate_legacy_tis_compression()` runs on every parsed `TextureImportSettings` (in `compile_texture_asset` and the inspector) and, only if `compression == Unset`, derives it from the legacy bools once, in priority order:
+`load_source_file` → `UseSourceFile`, else `is_normalmap` → `NormalMap_BC5`, else `make_uncompressed` → `Uncompressed` (previously R8_UNORM, now R8G8B8A8_UNORM), else → `Compressed_BC1`. Once set, `compression` is never `Unset` again, so migration only ever runs once per file (the next Apply/save writes the explicit enum value).
 
 ## compile_texture_asset flow
 
@@ -30,9 +42,9 @@ The file watcher auto-creates a `.tis` with `src_file = <basename>` when a new `
 compile_texture_asset(gamepath)
   ├─ open stem.dds + stem.tis
   ├─ parse .tis → TextureImportSettings
-  ├─ if .dds newer than .tis → return true  (up-to-date)
-  ├─ if load_source_file     → return true  (UI texture, no-op)
-  ├─ if src_file not found   → return false (missing source)
+  ├─ if .dds newer than .tis          → return true  (up-to-date)
+  ├─ if compression == UseSourceFile  → return true  (UI texture, no-op)
+  ├─ if src_file not found            → return false (missing source)
   └─ spawn texconv → write .dds, update simplifiedColor in .tis
 ```
 

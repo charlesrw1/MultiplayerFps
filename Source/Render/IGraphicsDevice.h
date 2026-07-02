@@ -80,6 +80,8 @@ enum class GraphicsTextureFormat : int8_t
 	bc4,
 	bc5,
 	bc6,
+	bc7,
+	bc7_srgb,
 	depth16f,
 	depth24f,
 	depth32f,

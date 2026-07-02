@@ -337,6 +337,8 @@ static const char* texture_format_to_string(GraphicsTextureFormat fmt) {
     case gtf::bc4:              return "BC4_UNORM";
     case gtf::bc5:              return "BC5_UNORM";
     case gtf::bc6:              return "BC6H";
+    case gtf::bc7:              return "BC7_UNORM";
+    case gtf::bc7_srgb:         return "BC7_UNORM_SRGB";
     case gtf::r8:               return "R8_UNORM";
     case gtf::rg8:              return "RG8_UNORM";
     case gtf::rgb8:             return "RGB8_UNORM";
@@ -458,6 +460,7 @@ void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
     if (!cache_ || !cache_->obj) { ImGui::TextDisabled("(parse error)"); return; }
     auto* tis = cache_->obj->cast_to<TextureImportSettings>();
     if (!tis) { ImGui::TextDisabled("(not TIS)"); return; }
+    migrate_legacy_tis_compression(tis);
 
     // --- Texture preview ---
     // For game textures: show the compiled .dds. For UI textures (no .dds): show the .png directly.
@@ -547,11 +550,40 @@ void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
 
     ImGui::LabelText("Source", "%s", tis->src_file.c_str());
 
-    changed |= ImGui::Checkbox("sRGB",              &tis->is_srgb);
-    changed |= ImGui::Checkbox("Normal map (BC5)",  &tis->is_normalmap);
-    changed |= ImGui::Checkbox("Uncompressed (R8)", &tis->make_uncompressed);
+    {
+        using tct = TextureCompressionType;
+        static const tct kOptions[] = {
+            tct::Compressed_BC1, tct::Uncompressed, tct::NormalMap_BC5,
+            tct::GreyscaleMask_BC4, tct::HighQuality_BC7, tct::UseSourceFile,
+        };
+        static const char* kLabels[] = {
+            "Compressed (BC1)", "Uncompressed (RGBA8)", "Normal map (BC5)",
+            "Greyscale mask (BC4)", "High quality / alpha (BC7)",
+            "Use source file (don't compress, UI texture)",
+        };
+        const int kCount = (int)(sizeof(kOptions) / sizeof(kOptions[0]));
+        int cur = 0;
+        for (int i = 0; i < kCount; i++)
+            if (kOptions[i] == tis->compression) { cur = i; break; }
+
+        ImGui::AlignTextToFramePadding();
+        ImGui::Text("Compression");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(220.f);
+        if (ImGui::Combo("##compression", &cur, kLabels, kCount)) {
+            tis->compression = kOptions[cur];
+            changed = true;
+        }
+    }
+
+    // sRGB only affects Compressed_BC1 / HighQuality_BC7; normal maps and masks are non-color data.
+    bool srgb_applicable = tis->compression == TextureCompressionType::Compressed_BC1 ||
+                            tis->compression == TextureCompressionType::HighQuality_BC7;
+    if (!srgb_applicable) ImGui::BeginDisabled();
+    changed |= ImGui::Checkbox("sRGB", &tis->is_srgb);
+    if (!srgb_applicable) ImGui::EndDisabled();
+
     changed |= ImGui::Checkbox("Nearest filtering", &tis->nearest_filtering);
-    changed |= ImGui::Checkbox("Load source file (UI texture, skips compile)", &tis->load_source_file);
 
     // resize_width with power-of-2 step buttons
     ImGui::AlignTextToFramePadding();
@@ -583,7 +615,7 @@ void AssetInspectorPane::draw_tis_settings(const std::string& gamepath) {
         ImGui::Spacing();
         if (ImGui::Button("Apply")) {
             write_texture_import_settings(tis, gamepath);
-            if (tis->load_source_file) {
+            if (tis->compression == TextureCompressionType::UseSourceFile) {
                 // Remove any compiled .dds so the file watcher switches the browser entry to .png
                 FileSys::delete_game_file(strip_extension(gamepath) + ".dds");
             } else {
@@ -655,6 +687,13 @@ void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
     changed |= ImGui::Checkbox("Mesh as Convex", &mis->meshAsConvex);
     changed |= ImGui::Checkbox("Mesh as Collision", &mis->meshAsCollision);
     changed |= ImGui::Checkbox("Generate Auto LODs", &mis->generate_auto_lods);
+    if (mis->generate_auto_lods) {
+        ImGui::SetNextItemWidth(120.f);
+        changed |= ImGui::SliderInt("Prune Disconnected Islands From LOD", &mis->prune_disconnected_islands_min_lod, 0, 4,
+            mis->prune_disconnected_islands_min_lod == 0 ? "Disabled" : "%d");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Auto-LOD level (1-4) at which meshopt may drop disconnected mesh islands. 0 disables island pruning entirely.");
+    }
     changed |= ImGui::Checkbox("Disable Prune Unused Bones", &mis->disablePruneUnusedBones);
 
     if (changed) settings_dirty = true;

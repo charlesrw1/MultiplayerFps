@@ -241,6 +241,10 @@ bool load_dds_file(Texture* output, IGraphicsTexture*& out_ptr, uint8_t* buffer,
 				fmt = gtf::bc1_srgb;
 			else if (dx10->dxgiFormat == DXGI_FORMAT_BC1_UNORM)
 				fmt = gtf::bc1;
+			else if (dx10->dxgiFormat == DXGI_FORMAT_BC7_UNORM_SRGB)
+				fmt = gtf::bc7_srgb;
+			else if (dx10->dxgiFormat == DXGI_FORMAT_BC7_UNORM)
+				fmt = gtf::bc7;
 			else
 				ASSERT(0 && "UNHANDLED DDS FORMAT");
 		} else {

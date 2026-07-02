@@ -110,6 +110,7 @@ public:
 	std::vector<LODDef> loddefs;
 	const int num_lods() const { return loddefs.size(); }
 	bool generate_auto_lods = false;
+	int prune_disconnected_islands_min_lod = 1;
 
 	// SKELETON
 	bool merge_meshes_into_skeleton = false;

@@ -27,6 +27,18 @@ void write_texture_import_settings(TextureImportSettings* tis, const std::string
 				  path.c_str());
 	}
 }
+void migrate_legacy_tis_compression(TextureImportSettings* tis) {
+	if (!tis || tis->compression != TextureCompressionType::Unset)
+		return;
+	if (tis->load_source_file)
+		tis->compression = TextureCompressionType::UseSourceFile;
+	else if (tis->is_normalmap)
+		tis->compression = TextureCompressionType::NormalMap_BC5;
+	else if (tis->make_uncompressed)
+		tis->compression = TextureCompressionType::Uncompressed;
+	else
+		tis->compression = TextureCompressionType::Compressed_BC1;
+}
 void SetClipboardText(const std::string& text) {
 	if (!OpenClipboard(nullptr))
 		return;
@@ -90,6 +102,7 @@ void IMPORT_TEX(const Cmd_Args& args) {
 	}
 	std::string gamepath = args.at(1);
 	TextureImportSettings tis;
+	tis.compression = TextureCompressionType::Compressed_BC1;
 	auto findSlash = gamepath.rfind('/');
 	tis.src_file = gamepath;
 	if (findSlash != std::string::npos)
@@ -130,7 +143,9 @@ void IMPORT_TEX_FOLDER(const Cmd_Args& args) {
 				tis.src_file = gamepath.substr(findSlash + 1);
 			if (gamepath.find("normal") != std::string::npos || gamepath.find("Normal") != std::string::npos ||
 				gamepath.find("NRM") != std::string::npos)
-				tis.is_normalmap = true;
+				tis.compression = TextureCompressionType::NormalMap_BC5;
+			else
+				tis.compression = TextureCompressionType::Compressed_BC1;
 
 			auto path = strip_extension(gamepath) + ".tis";
 			write_texture_import_settings(&tis, path);
@@ -185,6 +200,7 @@ bool compile_texture_asset(const std::string& gamepath, Color32& outColor) {
 			ReadSerializerBackendJson reader("compile_texture_asset", to_str, objmaker);
 			if (reader.get_root_obj()) {
 				tis = reader.get_root_obj()->cast_to<TextureImportSettings>();
+				migrate_legacy_tis_compression(tis);
 			}
 		} else {
 			sys_print(Warning, "OLD TIS FORMAT\n");
@@ -210,10 +226,10 @@ bool compile_texture_asset(const std::string& gamepath, Color32& outColor) {
 			return true;
 		}
 
-		// load_source_file = true means this is a UI/direct-load texture — no texconv needed.
+		// UseSourceFile means this is a UI/direct-load texture — no texconv needed.
 		// The .tis sidecar exists only to carry settings (nearest_filtering, etc.).
-		if (tis->load_source_file) {
-			sys_print(Debug, "%s load_source_file=true (UI texture), skipping compile\n", gamepath.c_str());
+		if (tis->compression == TextureCompressionType::UseSourceFile) {
+			sys_print(Debug, "%s compression=UseSourceFile (UI texture), skipping compile\n", gamepath.c_str());
 			return true;
 		}
 
@@ -275,19 +291,25 @@ bool compile_texture_asset(const std::string& gamepath, Color32& outColor) {
 
 	const std::string pathToNvidiaTextureConvertTool = "./x64/Debug/texconv.exe";
 
-	string format = "BC1_UNORM";
-	if (tis->is_normalmap)
-		format = "BC5_UNORM";
-	else if (tis->is_srgb)
-		format = "BC1_UNORM_SRGB";
-	if (tis->make_uncompressed)
-		format = "R8_UNORM";
+	// sRGB only makes sense for color formats (BC1/BC7/uncompressed); normal maps and
+	// masks are non-color data and are always sampled linearly.
+	using tct = TextureCompressionType;
+	string format;
+	bool apply_srgb = false;
+	switch (tis->compression) {
+	case tct::NormalMap_BC5:     format = "BC5_UNORM"; break;
+	case tct::GreyscaleMask_BC4: format = "BC4_UNORM"; break;
+	case tct::Uncompressed:      format = "R8G8B8A8_UNORM"; break;
+	case tct::HighQuality_BC7:   format = tis->is_srgb ? "BC7_UNORM_SRGB" : "BC7_UNORM"; apply_srgb = tis->is_srgb; break;
+	case tct::Compressed_BC1:
+	default:                     format = tis->is_srgb ? "BC1_UNORM_SRGB" : "BC1_UNORM"; apply_srgb = tis->is_srgb; break;
+	}
 
 	std::string commandLine = pathToNvidiaTextureConvertTool + " -f ";
 	commandLine += format;
 
 	// otherwise texconv picks up on input .png srgb randomly incorrectly
-	if (tis->is_srgb)
+	if (apply_srgb)
 		commandLine += " -srgb ";
 
 	if (tis->resize_width != 0) {

@@ -34,11 +34,13 @@ std::optional<std::string> create_tis_for_png(const std::string& png_gamepath) {
     auto slash = png_gamepath.rfind('/');
     std::string src_filename = (slash != std::string::npos) ? png_gamepath.substr(slash + 1) : png_gamepath;
 
+    bool is_normal = (src_filename.find("normal") != std::string::npos ||
+                      src_filename.find("Normal") != std::string::npos);
+
     TextureImportSettings tis;
     tis.src_file = src_filename;
-    tis.is_normalmap = (src_filename.find("normal") != std::string::npos ||
-                        src_filename.find("Normal") != std::string::npos);
-    tis.is_srgb = !tis.is_normalmap;
+    tis.compression = is_normal ? TextureCompressionType::NormalMap_BC5 : TextureCompressionType::Compressed_BC1;
+    tis.is_srgb = !is_normal;
 
     write_texture_import_settings(&tis, tis_gamepath);
     return tis_gamepath;

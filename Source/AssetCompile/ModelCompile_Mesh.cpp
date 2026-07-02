@@ -510,6 +510,12 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 				for (int i = 0; i < lod_gen; i++)
 					err_allowed *= 0.6f;
 
+				const int current_lod_num = lod_gen + 1; // lod_gen 0 produces LOD1
+				const bool allow_prune_islands =
+					def.prune_disconnected_islands_min_lod > 0 &&
+					current_lod_num >= def.prune_disconnected_islands_min_lod;
+				const unsigned int simplify_options = allow_prune_islands ? meshopt_SimplifyPrune : 0;
+
 				const auto attribute_weights = {1.f, 1.f, 1.f};
 				int result_count = (int)meshopt_simplifyWithAttributes(
 					indicies.data(),
@@ -525,7 +531,7 @@ ProcessMeshOutput ModelCompileHelper::process_mesh(ModelCompileData& mcd, const 
 					nullptr,
 					target_i,
 					err_allowed,
-					meshopt_SimplifyPrune,
+					simplify_options,
 					&out_er);
 
 				bool append_original = false;

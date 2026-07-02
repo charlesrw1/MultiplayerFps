@@ -30,6 +30,7 @@ Common options:
 
 - `"meshAsCollision": true` — mesh becomes physics collider.
 - `"generate_auto_lods": true` — auto LOD generation.
+- `"prune_disconnected_islands_min_lod": 1` — auto-LOD level (1-4) at which meshopt may drop disconnected mesh islands during simplification; `0` disables island pruning entirely (default `1`, i.e. always allowed).
 - `"lodScreenSpaceSizes": [0.05, 0.01]` — screen-space cutoffs for LOD0/LOD1.
 - `"myMaterials": ["my_mat.mi"]` — per-submesh override (in submesh order). Path relative to `Data/`.
 

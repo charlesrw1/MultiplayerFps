@@ -583,15 +583,16 @@ void ParticleSystemComponent::draw(const glm::vec3& side, const glm::vec3& up, c
 					});
 				break;
 			case ParticleSortMode::OldestFirst:
+				// lifeTime is remaining life (decrements toward 0), so oldest = lowest lifeTime.
 				std::sort(particles_ref.begin(), particles_ref.end(),
 					[](const ParticleSystemDef& a, const ParticleSystemDef& b) {
-						return a.lifeTime > b.lifeTime;
+						return a.lifeTime < b.lifeTime;
 					});
 				break;
 			case ParticleSortMode::YoungestFirst:
 				std::sort(particles_ref.begin(), particles_ref.end(),
 					[](const ParticleSystemDef& a, const ParticleSystemDef& b) {
-						return a.lifeTime < b.lifeTime;
+						return a.lifeTime > b.lifeTime;
 					});
 				break;
 			default: break;

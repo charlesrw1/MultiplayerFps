@@ -81,6 +81,14 @@ Dx11FormatInfo dx11_texture_format_info(GraphicsTextureFormat fmt) {
 		f.resource_format = f.srv_format = f.rtv_dsv_format = DXGI_FORMAT_BC6H_UF16;
 		f.is_compressed = true;
 		break;
+	case gtf::bc7:
+		f.resource_format = f.srv_format = f.rtv_dsv_format = DXGI_FORMAT_BC7_UNORM;
+		f.is_compressed = true;
+		break;
+	case gtf::bc7_srgb:
+		f.resource_format = f.srv_format = f.rtv_dsv_format = DXGI_FORMAT_BC7_UNORM_SRGB;
+		f.is_compressed = true;
+		break;
 	case gtf::depth16f:
 		f.resource_format = DXGI_FORMAT_R16_TYPELESS;
 		f.srv_format = DXGI_FORMAT_R16_UNORM;

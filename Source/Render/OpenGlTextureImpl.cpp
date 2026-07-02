@@ -23,6 +23,8 @@ const char* opengl_texture_format_to_str(GraphicsTextureFormat fmt) {
 									"bc4",
 									"bc5",
 									"bc6",
+									"bc7",
+									"bc7_srgb",
 									"depth16f",
 									"depth24f",
 									"depth32f",
@@ -69,6 +71,8 @@ public:
 		case GraphicsTextureFormat::bc4:             return 1;
 		case GraphicsTextureFormat::bc5:             return 1;
 		case GraphicsTextureFormat::bc6:             return 1; // fixme
+		case GraphicsTextureFormat::bc7:             return 1;
+		case GraphicsTextureFormat::bc7_srgb:        return 1;
 		case GraphicsTextureFormat::depth24f:        return 4;
 		case GraphicsTextureFormat::depth32f:        return 4;
 		case GraphicsTextureFormat::depth24stencil8: return 4;
@@ -129,6 +133,8 @@ public:
 		case GraphicsTextureFormat::bc4:
 		case GraphicsTextureFormat::bc5:
 		case GraphicsTextureFormat::bc6:
+		case GraphicsTextureFormat::bc7:
+		case GraphicsTextureFormat::bc7_srgb:
 		case GraphicsTextureFormat::depth16f:
 		case GraphicsTextureFormat::depth24f:
 		case GraphicsTextureFormat::depth32f:
@@ -159,6 +165,8 @@ public:
 		case GraphicsTextureFormat::bc4:             return GL_COMPRESSED_RED_RGTC1;
 		case GraphicsTextureFormat::bc5:             return GL_COMPRESSED_RG_RGTC2;
 		case GraphicsTextureFormat::bc6:             return GL_COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT;
+		case GraphicsTextureFormat::bc7:             return GL_COMPRESSED_RGBA_BPTC_UNORM;
+		case GraphicsTextureFormat::bc7_srgb:        return GL_COMPRESSED_SRGB_ALPHA_BPTC_UNORM;
 		case GraphicsTextureFormat::depth16f:        return GL_DEPTH_COMPONENT16;
 		case GraphicsTextureFormat::depth24f:        return GL_DEPTH_COMPONENT24;
 		case GraphicsTextureFormat::depth32f:        return GL_DEPTH_COMPONENT32F;
@@ -303,7 +311,7 @@ public:
 
 	bool is_compressed() const {
 		int first = (int)GraphicsTextureFormat::bc1;
-		int last  = (int)GraphicsTextureFormat::bc6;
+		int last  = (int)GraphicsTextureFormat::bc7_srgb;
 		int fmt_i = (int)my_fmt;
 		return fmt_i >= first && fmt_i <= last;
 	}
