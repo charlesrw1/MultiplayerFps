@@ -111,7 +111,7 @@ public:
 
 	bool get_draw_text_in_editor() const { return draw_text_in_editor; }
 	void editor_set_model(std::string_view modelname, bool draw_text = false);
-
+	void editor_set_billboard(std::string_view billboard_texture, bool draw_text = false, float scale = 1.f);
 private:
 	const LuaClassTypeInfo* lua_owner_type = nullptr;
 	Entity* entity_owner = nullptr;

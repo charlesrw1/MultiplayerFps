@@ -14,7 +14,7 @@
 // A 1 means the two layers collide/overlap; a 0 disables their pair entirely.
 // See PhysicsManImpl::set_physics_layer_collisions for the exact index mapping.
 static const bool DEFAULT_RESPONSE_ARRAY[] = {
-	//	C	P	D	S	De
+//	C	P	D	S	De
 	1,	1,	1,	1,	1,		// default
 	1,	1,	1,	1,			// static
 	1,	0,	1,				// dynamic

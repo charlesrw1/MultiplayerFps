@@ -161,6 +161,17 @@ void Component::editor_set_model(std::string_view modelname, bool draw_text) {
 		this->draw_text_in_editor = draw_text;
 	}
 }
+#include <Game/Components/BillboardComponent.h>
+void Component::editor_set_billboard(std::string_view billboard_texture, bool draw_text, float scale) {
+	if (eng->is_editor_app()) {
+		auto* mesh = entity_owner->get_component<BillboardComponent>();
+		if (!mesh)
+			mesh = entity_owner->create_component<BillboardComponent>();
+		mesh->set_texture(Texture::load(billboard_texture.data()));
+		mesh->dont_serialize_or_edit = true;
+		this->draw_text_in_editor = draw_text;
+	}
+}
 
 Component::~Component() {
 	ASSERT(init_state != initialization_state::CALLED_START);
