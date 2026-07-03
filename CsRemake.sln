@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.8.11904.113 insiders
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Core", "CsRemake.vcxproj", "{359193A0-4260-402D-968F-060546D8C049}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Core", "Source\CsRemake.vcxproj", "{359193A0-4260-402D-968F-060546D8C049}"
 	ProjectSection(ProjectDependencies) = postProject
 		{B5F2A3C1-D4E6-4F8A-9B0C-1D2E3F4A5B6C} = {B5F2A3C1-D4E6-4F8A-9B0C-1D2E3F4A5B6C}
 	EndProjectSection

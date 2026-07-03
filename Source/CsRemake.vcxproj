@@ -1,0 +1,814 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="NoEditRelease|Win32">
+      <Configuration>NoEditRelease</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="NoEditRelease|x64">
+      <Configuration>NoEditRelease</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Animation\AnimationSeqAsset.cpp" />
+    <ClCompile Include="Animation\AnimationTypes.cpp" />
+    <ClCompile Include="Animation\AnimationUtil.cpp" />
+    <ClCompile Include="Animation\AnimSidecarFile.cpp" />
+    <ClCompile Include="Animation\AnimSeqEditor.cpp" />
+    <ClCompile Include="Animation\SkeletonEditor.cpp" />
+    <ClCompile Include="Animation\Runtime\Animation.cpp" />
+    <ClCompile Include="Animation\Runtime\AnimationTreeLocal.cpp" />
+    <ClCompile Include="Animation\Runtime\RuntimeNodesNew2.cpp" />
+    <ClCompile Include="Animation\Runtime\SpringBones.cpp" />
+    <ClCompile Include="Animation\SkeletonData.cpp" />
+    <ClCompile Include="AssetCompile\write_gltf.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Assets\AssetBrowser.cpp" />
+    <ClCompile Include="Assets\AssetDatabase.cpp" />
+    <ClCompile Include="Assets\AssetRegistry.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Assets\FileWatcher.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Assets\IAsset.cpp" />
+    <ClCompile Include="Debug_Console.cpp" />
+    <ClCompile Include="EditorPopups.cpp" />
+    <ClCompile Include="EditorPopupTemplate.cpp" />
+    <ClCompile Include="Framework\BVHBuild.cpp" />
+    <ClCompile Include="Framework\BakedCurve.cpp" />
+    <ClCompile Include="Framework\ClassBase.cpp" />
+    <ClCompile Include="Framework\InterfaceTypeInfo.cpp" />
+    <ClCompile Include="Framework\ClassTypePtr.cpp" />
+    <ClCompile Include="Framework\Config.cpp" />
+    <ClCompile Include="Framework\CurveEditorImgui.cpp" />
+    <ClCompile Include="Framework\GradientEditorImgui.cpp" />
+    <ClCompile Include="Framework\CurveEditorImgui_Curves.cpp" />
+    <ClCompile Include="Framework\CurveEditorImgui_Events.cpp" />
+    <ClCompile Include="Framework\CurveEditorImgui_Grid.cpp" />
+    <ClCompile Include="Framework\CurveEditorImgui_Input.cpp" />
+    <ClCompile Include="Framework\CurveEditorImgui_UI.cpp" />
+    <ClCompile Include="Framework\DictParser.cpp" />
+    <ClCompile Include="Framework\EnumDefReflection.cpp" />
+    <ClCompile Include="Framework\Files.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Framework\Jobs.cpp" />
+    <ClCompile Include="Framework\MathLib.cpp" />
+    <ClCompile Include="Framework\MeshBuilder.cpp" />
+    <ClCompile Include="Framework\EditorTheme.cpp" />
+    <ClCompile Include="Framework\MyImguiLib.cpp" />
+    <ClCompile Include="Framework\Profilier.cpp" />
+    <ClCompile Include="Framework\PropertyEd.cpp" />
+    <ClCompile Include="Framework\PropertyEdArray.cpp" />
+    <ClCompile Include="Framework\PropertyEdGroup.cpp" />
+    <ClCompile Include="Framework\PropertyEdWidgets.cpp" />
+    <ClCompile Include="Framework\PropertyPtr.cpp" />
+    <ClCompile Include="Framework\ReflectionProp.cpp" />
+    <ClCompile Include="Framework\Serializer.cpp" />
+    <ClCompile Include="Framework\SerializerBinary.cpp" />
+    <ClCompile Include="Framework\SerializerJson.cpp" />
+    <ClCompile Include="Framework\SerializerJson2.cpp" />
+    <ClCompile Include="Framework\StringName.cpp" />
+    <ClCompile Include="Framework\StringUtils.cpp" />
+    <ClCompile Include="Framework\Util.cpp" />
+    <ClCompile Include="Game\BaseUpdater.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeAI.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeApplication.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeApplication_AIDebug.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeApplication_Debug.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeApplication_Pack.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeApplication_PackAI.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeApplication_PackAvoid.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeApplication_PackDebug.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeApplication_Player.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeCourse.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeCourseDebug.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Game\BikeDemo\BikeCourseRacingLine.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Game\BikeDemo\BikeCourseRoadNetwork.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Game\BikeDemo\BikeCamera.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeObject.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeObject_Physics.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeObject_Stamina.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeObject_Steer.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeUI.cpp" />
+    <ClCompile Include="Game\BikeDemo\BikeWind.cpp" />
+    <ClCompile Include="Game\ObsGame\ObsGameApplication.cpp" />
+    <ClCompile Include="Game\ObsGame\ObsPlayer.cpp" />
+    <ClCompile Include="Game\ObsGame\ObsHand.cpp" />
+    <ClCompile Include="Game\ObsGame\ObsCamera.cpp" />
+    <ClCompile Include="Game\CarGame\CarGame.cpp" />
+    <ClCompile Include="Game\Components\BillboardComponent.cpp" />
+    <ClCompile Include="Game\Components\CameraComponent.cpp" />
+    <ClCompile Include="Game\Components\DecalComponent.cpp" />
+    <ClCompile Include="Game\Components\GraphCurveComponent.cpp" />
+    <ClCompile Include="Game\Components\LightComponents.cpp" />
+    <ClCompile Include="Game\Components\LightComponents_Environment.cpp" />
+    <ClCompile Include="Game\Components\PostProcessComponent.cpp" />
+    <ClCompile Include="Game\Components\PostProcessEditorUI.cpp" />
+    <ClCompile Include="Game\Components\LightComponents_GiScene.cpp" />
+    <ClCompile Include="Game\Components\LightComponents_Lightmap.cpp" />
+    <ClCompile Include="Game\Components\MeshbuilderComponent.cpp" />
+    <ClCompile Include="Game\Components\MeshComponent.cpp" />
+    <ClCompile Include="Game\Components\ParticleComponent.cpp" />
+    <ClCompile Include="Game\Components\ParticleSystemComponent.cpp" />
+    <ClCompile Include="Game\Particles\ParticleTypes.cpp" />
+    <ClCompile Include="Game\Particles\ParticleModules.cpp" />
+    <ClCompile Include="Game\Particles\ParticleAsset.cpp" />
+    <ClCompile Include="Game\Particles\ParticleEditorUI.cpp" />
+    <ClCompile Include="Game\Components\PhysicsComponents.cpp" />
+    <ClCompile Include="Game\Components\PhysicsJoints.cpp" />
+    <ClCompile Include="Game\Components\PhysicsShapes.cpp" />
+    <ClCompile Include="Game\Components\PrefabAssetComponent.cpp" />
+    <ClCompile Include="Game\Components\RagdollComponent.cpp" />
+    <ClCompile Include="Game\Components\RagdollConfigComponent.cpp" />
+    <ClCompile Include="Game\Components\SpawnerComponenth.cpp" />
+    <ClCompile Include="Game\Entities\BikeEntity.cpp" />
+    <ClCompile Include="Game\Entities\CharacterController.cpp" />
+    <ClCompile Include="Game\Entities\Player.cpp" />
+    <ClCompile Include="Game\Entities\Player_CameraPath.cpp" />
+    <ClCompile Include="Game\Entities\Player_GameplayStatic.cpp" />
+    <ClCompile Include="Game\Entities\PlayerAnimDriver.cpp" />
+    <ClCompile Include="Game\Entity.cpp" />
+    <ClCompile Include="Game\GameEventBus.cpp" />
+    <ClCompile Include="Game\EntityComponent.cpp" />
+    <ClCompile Include="Game\Game.cpp" />
+    <ClCompile Include="Game\LevelAssets.cpp" />
+    <ClCompile Include="Game\Prefab.cpp" />
+    <ClCompile Include="Game\TopDownShooter\TopDownPlayer.cpp" />
+    <ClCompile Include="Game\TopDownShooter\TopDownShooterGame.cpp" />
+    <ClCompile Include="Game\TP\TPGame.cpp" />
+    <ClCompile Include="LevelEditor\AddEditorCommands.cpp" />
+    <ClCompile Include="LevelEditor\Commands.cpp" />
+    <ClCompile Include="LevelEditor\CommandsComponent.cpp" />
+    <ClCompile Include="LevelEditor\CommandsPrefab.cpp" />
+    <ClCompile Include="LevelEditor\CommandsUndoRedo.cpp" />
+    <ClCompile Include="LevelEditor\DecalStampTool.cpp" />
+    <ClCompile Include="LevelEditor\DragDetector.cpp" />
+    <ClCompile Include="LevelEditor\DragDropPreview.cpp" />
+    <ClCompile Include="LevelEditor\EditorDocLocal.cpp" />
+    <ClCompile Include="LevelEditor\EditorDocInput.cpp" />
+    <ClCompile Include="LevelEditor\EditorRecents.cpp" />
+    <ClCompile Include="LevelEditor\EditorDocScene.cpp" />
+    <ClCompile Include="LevelEditor\EditorDocViewport.cpp" />
+    <ClCompile Include="LevelEditor\EditorUILayout.cpp" />
+    <ClCompile Include="LevelEditor\EdPropertyGrid.cpp" />
+    <ClCompile Include="LevelEditor\FoliagePaintTool.cpp" />
+    <ClCompile Include="LevelEditor\LevelEditorCamera.cpp" />
+    <ClCompile Include="LevelEditor\ManipulateTransformTool.cpp" />
+    <ClCompile Include="LevelEditor\ObjectOutliner.cpp" />
+    <ClCompile Include="LevelEditor\ObjectOutlinerContextMenu.cpp" />
+    <ClCompile Include="LevelEditor\ObjectOutlinerDraw.cpp" />
+    <ClCompile Include="LevelEditor\ObjectOutlinerFilter.cpp" />
+    <ClCompile Include="LevelEditor\OrthoCamera.cpp" />
+    <ClCompile Include="LevelEditor\PropertyEditors.cpp" />
+    <ClCompile Include="LevelEditor\RoadBuilderTool.cpp" />
+    <ClCompile Include="LevelEditor\RoadBuilderTool_Helpers.cpp" />
+    <ClCompile Include="LevelEditor\RoadBuilderTool_Overlay.cpp" />
+    <ClCompile Include="LevelEditor\RoadBuilderTool_Tick.cpp" />
+    <ClCompile Include="Game\Components\RoadNetworkComponent.cpp" />
+    <ClCompile Include="LevelEditor\SceneExport.cpp" />
+    <ClCompile Include="LevelEditor\SelectionMode.cpp" />
+    <ClCompile Include="LevelEditor\SelectionState.cpp" />
+    <ClCompile Include="LevelEditor\ViewportHandles.cpp" />
+    <ClCompile Include="LevelSerialization\SerializeNew.cpp" />
+    <ClCompile Include="Logging.cpp" />
+    <ClCompile Include="MyGame\fps\fpsApp.cpp" />
+    <ClCompile Include="MyGame\fps\fpsDebugCamera.cpp" />
+    <ClCompile Include="MyGame\fps\AnimGraphTester.cpp" />
+    <ClCompile Include="MyGame\fps\AnimGraphTesterEditorUI.cpp" />
+    <ClCompile Include="MyGame\fps\fpsObjects.cpp" />
+    <ClCompile Include="MyGame\fps\fpsTestObjects.cpp" />
+    <ClCompile Include="Render\DdsExport.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Render\DecalBatcher.cpp" />
+    <ClCompile Include="Render\DrawLocal_Misc.cpp" />
+    <ClCompile Include="Render\DrawLocal_Device.cpp" />
+    <ClCompile Include="Render\DrawLocal_Init.cpp" />
+    <ClCompile Include="Render\DrawLocal_RenderPass.cpp" />
+    <ClCompile Include="Render\DrawLocal_Scene.cpp" />
+    <ClCompile Include="Render\DrawLocal_Lighting.cpp" />
+    <ClCompile Include="Render\DrawLocal_Editor.cpp" />
+    <ClCompile Include="Render\DrawLocal_SceneDraw.cpp" />
+    <ClCompile Include="Render\DrawLocal_SceneDrawInternal.cpp" />
+    <ClCompile Include="Render\DrawLocal_Debug.cpp" />
+    <ClCompile Include="Render\DrawLocal_BatchScene.cpp" />
+    <ClCompile Include="Render\DrawLocal_CullShadow.cpp" />
+    <ClCompile Include="Render\EnvProbe.cpp" />
+    <ClCompile Include="Render\Frustum.cpp" />
+    <ClCompile Include="Render\GpuAllocator.cpp" />
+    <ClCompile Include="Render\GpuCullingTest.cpp" />
+    <ClCompile Include="Render\MaterialLocal.cpp" />
+    <ClCompile Include="Render\MaterialLocal_Loading.cpp" />
+    <ClCompile Include="Render\MaterialLocal_Manager.cpp" />
+    <ClCompile Include="Render\MaterialLocal_Shader.cpp" />
+    <!-- MaterialLocal_ShaderGen moved to AssetTools project -->
+    <ClCompile Include="Render\Model.cpp" />
+    <ClCompile Include="Render\ModelGpuUpload.cpp" />
+    <ClCompile Include="Render\ModelLoad.cpp" />
+    <ClCompile Include="Render\ModelDynamic.cpp" />
+    <ClCompile Include="Render\OpenGlDevice.cpp" />
+    <ClCompile Include="Render\OpenGlBufferImpl.cpp" />
+    <ClCompile Include="Render\OpenGlShaderImpl.cpp" />
+    <ClCompile Include="Render\OpenGlTextureImpl.cpp" />
+    <ClCompile Include="Render\GraphicsDeviceCommon.cpp" />
+    <ClCompile Include="Render\Dx11\Dx11Device.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Render\Dx11\Dx11TextureImpl.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Render\Dx11\Dx11BufferImpl.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Render\Dx11\Dx11ShaderImpl.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Render\Dx11\Dx11PipelineImpl.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <!-- ShaderSourceLoader and SpirvCompile moved to AssetTools project -->
+    <ClCompile Include="Render\PPManager.cpp" />
+    <ClCompile Include="Render\PostProcessSettings.cpp" />
+    <ClCompile Include="Render\RenderExtra.cpp" />
+    <ClCompile Include="Render\RenderExtra_LightCookieAtlas.cpp" />
+    <ClCompile Include="Render\RenderExtra_SSR.cpp" />
+    <ClCompile Include="Render\RenderGiManager.cpp" />
+    <ClCompile Include="Render\RenderScene.cpp" />
+    <ClCompile Include="Render\RenderWindow.cpp" />
+    <ClCompile Include="Render\RT\RaytraceTest.cpp" />
+    <ClCompile Include="Render\RT\RaytraceTest_BVH.cpp" />
+    <ClCompile Include="Render\RT\RaytraceTest_Probe.cpp" />
+    <ClCompile Include="Render\RT\RaytraceTest_Shade.cpp" />
+    <ClCompile Include="Render\Shadowmap.cpp" />
+    <ClCompile Include="Render\Ssao.cpp" />
+    <ClCompile Include="Render\Texture.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Render\TextureDDS.cpp" />
+    <ClCompile Include="Render\TextureUpload.cpp" />
+    <ClCompile Include="Render\Volumetricfog.cpp" />
+    <ClCompile Include="Scripting\LuaTestRunner.cpp" />
+    <ClCompile Include="Scripting\ScriptFunctionCodegen.cpp" />
+    <ClCompile Include="Scripting\ScriptingStdLib.cpp" />
+    <ClCompile Include="Scripting\ScriptManager.cpp" />
+    <ClCompile Include="Scripting\ScriptLoadingUtil.cpp" />
+    <ClCompile Include="Scripting\LuaClassTypeInfo.cpp" />
+    <ClCompile Include="UI\BaseGUI.cpp" />
+    <ClCompile Include="UI\GUISystemLocal.cpp" />
+    <ClCompile Include="UI\Gui.cpp" />
+    <ClCompile Include="UI\GUISystemPublic.cpp" />
+    <ClCompile Include="UI\UIBuilder.cpp" />
+    <ClCompile Include="UI\UILoader.cpp" />
+    <ClCompile Include="UI\Widgets\EditorCube.cpp" />
+    <ClCompile Include="UI\Widgets\SharedFuncs.cpp" />
+    <ClCompile Include="User_Camera.cpp" />
+    <ClInclude Include="Animation\AnimationTypes.h" />
+    <ClInclude Include="Animation\AnimationUtil.h" />
+    <ClInclude Include="Animation\Event.h" />
+    <ClInclude Include="Animation\Runtime\RuntimeNodesNew.h" />
+    <ClInclude Include="Animation\Runtime\RuntimeNodesNew2.h" />
+    <ClInclude Include="Animation\Runtime\SpringBones.h" />
+    <ClInclude Include="Animation\SkeletonData.h" />
+    <ClInclude Include="Animation\SkeletonEditor.h" />
+    <ClInclude Include="Animation\Runtime\Animation.h" />
+    <ClInclude Include="Animation\Runtime\AnimationTreeLocal.h" />
+    <ClInclude Include="Animation\Runtime\Easing.h" />
+    <ClInclude Include="Animation\Runtime\Percentage.h" />
+    <ClInclude Include="Animation\Runtime\SyncTime.h" />
+    <ClInclude Include="Animation\AnimationSeqAsset.h" />
+    <ClInclude Include="AssetCompile\Compiliers.h" />
+    <ClInclude Include="AssetCompile\GltfExport.h" />
+    <ClInclude Include="AssetCompile\ModelAsset2.h" />
+    <ClInclude Include="AssetCompile\ModelCompilierLocal.h" />
+    <ClInclude Include="AssetCompile\SkeletonAsset.h" />
+    <ClInclude Include="AssetCompile\Someutils.h" />
+    <ClInclude Include="Assets\AssetBrowser.h" />
+    <ClInclude Include="Assets\AssetInspectorPane.h" />
+    <ClInclude Include="Assets\AssetSizeViewer.h" />
+    <ClInclude Include="Assets\AssetBundle.h" />
+    <ClInclude Include="Assets\AssetDatabase.h" />
+    <ClInclude Include="Assets\AssetRegistry.h" />
+    <ClInclude Include="Assets\AssetRegistryLocal.h" />
+    <ClInclude Include="Assets\FileWatcher.h" />
+    <ClInclude Include="Assets\HackedReloader.h" />
+    <ClInclude Include="Assets\IAsset.h" />
+    <ClInclude Include="DebugConsole.h" />
+    <ClInclude Include="EditorPopups.h" />
+    <ClInclude Include="EditorPopupTemplate.h" />
+    <ClInclude Include="EngineMain.h" />
+    <ClInclude Include="Framework\ArenaAllocator.h" />
+    <ClInclude Include="Framework\ArenaStd.h" />
+    <ClInclude Include="Framework\BoolButton.h" />
+    <ClInclude Include="Framework\ClassTypeInfo.h" />
+    <ClInclude Include="Framework\ConsoleCmdGroup.h" />
+    <ClInclude Include="Framework\FnFactory.h" />
+    <ClInclude Include="Framework\InterfaceBase.h" />
+    <ClInclude Include="Framework\Log.h" />
+    <ClInclude Include="Framework\LuaColor.h" />
+    <ClInclude Include="Framework\MapUtil.h" />
+    <ClInclude Include="Framework\MeshBuilderImpl.h" />
+    <ClInclude Include="Framework\NodeMenuItem.h" />
+    <ClInclude Include="Framework\PropertyPtr.h" />
+    <ClInclude Include="Framework\PropertyUtil.h" />
+    <ClInclude Include="Framework\Range.h" />
+    <ClInclude Include="Framework\Reflection2.h" />
+    <ClInclude Include="Framework\RingBuffer.h" />
+    <ClInclude Include="Framework\SerializedForDiffing.h" />
+    <ClInclude Include="Framework\Serializer.h" />
+    <ClInclude Include="Framework\SerializerBinary.h" />
+    <ClInclude Include="Framework\SerializerJson.h" />
+    <ClInclude Include="Framework\SerializerJson2.h" />
+    <ClInclude Include="Framework\SerializerOldDict.h" />
+    <ClInclude Include="Framework\SharedPtr.h" />
+    <ClInclude Include="Framework\StringUtils.h" />
+    <ClInclude Include="Framework\StructReflection.h" />
+    <ClInclude Include="Framework\SysPrint.h" />
+    <ClInclude Include="Framework\Jobs.h" />
+    <ClInclude Include="Framework\VectorReflect2.h" />
+    <ClInclude Include="Game\BikeDemo\BikeHeaders.h" />
+    <ClInclude Include="Game\ObsGame\ObsGameHeaders.h" />
+    <ClInclude Include="Game\CarGame\CarGame.h" />
+    <ClInclude Include="Game\CarGame\CarGui.h" />
+    <ClInclude Include="Game\Components\GraphCurveComponent.h" />
+    <ClInclude Include="Game\Components\GameAnimationMgr.h" />
+    <ClInclude Include="Game\Components\NavComps.h" />
+    <ClInclude Include="Game\Components\ParticleMgr.h" />
+    <ClInclude Include="Game\Components\RagdollComponent.h" />
+    <ClInclude Include="Game\Components\RagdollConfigComponent.h" />
+    <ClInclude Include="Game\Components\SpawnerComponenth.h" />
+    <ClInclude Include="Game\EntityPtr.h" />
+    <ClInclude Include="Game\GameplayStatic.h" />
+    <ClInclude Include="Game\TopDownShooter\TDChest.h" />
+    <ClInclude Include="Game\TopDownShooter\TopDownPlayer.h" />
+    <ClInclude Include="Game\TP\DefaultGameHeader.h" />
+    <ClInclude Include="Game\TP\TPGame.h" />
+    <ClInclude Include="ITestRunner.h" />
+    <ClInclude Include="LevelEditor\DragDetector.h" />
+    <ClInclude Include="LevelEditor\DragDropPreview.h" />
+    <ClInclude Include="LevelEditor\EditorFolderComponent.h" />
+    <ClInclude Include="LevelEditor\EditorInputs.h" />
+    <ClInclude Include="LevelEditor\EditorModes.h" />
+    <ClInclude Include="LevelEditor\EditorUILayout.h" />
+    <ClInclude Include="LevelEditor\EdPropertyGrid.h" />
+    <ClInclude Include="LevelEditor\IEditorApi.h" />
+    <ClInclude Include="LevelEditor\IInputReciever.h" />
+    <ClInclude Include="LevelEditor\LevelEditorCamera.h" />
+    <ClInclude Include="LevelEditor\EditorRecents.h" />
+    <ClInclude Include="LevelEditor\ManipulateTransformTool.h" />
+    <ClInclude Include="LevelEditor\ObjectOutlineFilter.h" />
+    <ClInclude Include="LevelEditor\OrthoCamera.h" />
+    <ClInclude Include="LevelEditor\PropertyEditors.h" />
+    <ClInclude Include="LevelEditor\SelectionState.h" />
+    <ClInclude Include="LevelEditor\TagManager.h" />
+    <ClInclude Include="LevelEditor\ViewportHandles.h" />
+    <ClInclude Include="LevelSerialization\SerializeNew.h" />
+    <ClInclude Include="Logging.h" />
+    <ClInclude Include="MyGame\fps\fpsApp.h" />
+    <ClInclude Include="MyGame\fps\fpsDebugCamera.h" />
+    <ClInclude Include="MyGame\fps\AnimGraphTester.h" />
+    <ClInclude Include="MyGame\fps\AnimGraphTesterEditorUI.h" />
+    <ClInclude Include="MyGame\fps\fpsObjects.h" />
+    <ClInclude Include="MyGame\fps\fpsTestObjects.h" />
+    <ClInclude Include="Render\DynamicMaterialPtr.h" />
+    <ClInclude Include="Render\Dx11\Dx11Local.h" />
+    <ClInclude Include="Render\GpuAllocator.h" />
+    <ClInclude Include="Render\GpuCullingTest.h" />
+    <ClInclude Include="Render\IGraphicsDevice.h" />
+    <ClInclude Include="Render\ShaderSourceLoader.h" />
+    <ClInclude Include="Render\SpirvCompile.h" />
+    <ClInclude Include="Render\ModelManager.h" />
+    <ClInclude Include="Render\RectPackerUtil.h" />
+    <ClInclude Include="Render\RenderConfigVars.h" />
+    <ClInclude Include="Render\RenderGiManager.h" />
+    <ClInclude Include="Render\RenderWindow.h" />
+    <ClInclude Include="Render\RT\RaytraceTest.h" />
+    <ClInclude Include="Framework\Hashmap.h" />
+    <ClInclude Include="Framework\Hashset.h" />
+    <ClInclude Include="Game\Components\CameraComponent.h" />
+    <ClInclude Include="Game\Components\ParticleComponent.h" />
+    <ClInclude Include="Game\Components\ParticleSystemComponent.h" />
+    <ClInclude Include="Game\Particles\ParticleTypes.h" />
+    <ClInclude Include="Game\Particles\ParticleModules.h" />
+    <ClInclude Include="Game\Particles\ParticleAsset.h" />
+    <ClInclude Include="Game\Particles\ParticleEditorUI.h" />
+    <ClInclude Include="Framework\GradientEditorImgui.h" />
+    <ClInclude Include="Framework\Guid.h" />
+    <ClInclude Include="Framework\ScopedBoolean.h" />
+    <ClInclude Include="Framework\UniquePtrReflection.h" />
+    <ClInclude Include="Game\BaseUpdater.h" />
+    <ClInclude Include="Game\Components\ArrowComponent.h" />
+    <ClInclude Include="Game\Components\BillboardComponent.h" />
+    <ClInclude Include="Game\Components\DecalComponent.h" />
+    <ClInclude Include="Game\Components\LightComponents.h" />
+    <ClInclude Include="Game\Components\PostProcessComponent.h" />
+    <ClInclude Include="Game\Components\PostProcessEditorUI.h" />
+    <ClInclude Include="Game\Components\MeshbuilderComponent.h" />
+    <ClInclude Include="Game\Components\MeshComponent.h" />
+    <ClInclude Include="Game\Components\RoadNetworkComponent.h" />
+    <ClInclude Include="LevelEditor\RoadBuilderTool.h" />
+    <ClInclude Include="Game\Components\PhysicsComponents.h" />
+    <ClInclude Include="Game\Components\PrefabAssetComponent.h" />
+    <ClInclude Include="Debug.h" />
+    <ClInclude Include="Game\LevelAssets.h" />
+    <ClInclude Include="Game\Prefab.h" />
+    <ClInclude Include="Game\TopDownShooter\TopDownShooterGame.h" />
+    <ClInclude Include="LevelEditor\Commands.h" />
+    <ClInclude Include="LevelEditor\EditorDocLocal.h" />
+    <ClInclude Include="External\cgltf.h" />
+    <ClInclude Include="External\glad\glad.h" />
+    <ClInclude Include="External\imconfig.h" />
+    <ClInclude Include="External\imgui.h" />
+    <ClInclude Include="External\ImGuizmo.h" />
+    <ClInclude Include="External\imgui_impl_opengl3.h" />
+    <ClInclude Include="External\imgui_impl_opengl3_loader.h" />
+    <ClInclude Include="External\imgui_impl_sdl2.h" />
+    <ClInclude Include="External\imgui_internal.h" />
+    <ClInclude Include="External\imnodes.h" />
+    <ClInclude Include="External\imnodes_internal.h" />
+    <ClInclude Include="External\ImSequencer.h" />
+    <ClInclude Include="External\imstb_rectpack.h" />
+    <ClInclude Include="External\imstb_textedit.h" />
+    <ClInclude Include="External\imstb_truetype.h" />
+    <ClInclude Include="External\json.hpp" />
+    <ClInclude Include="External\KHR\khrplatform.h" />
+    <ClInclude Include="External\stb_image.h" />
+    <ClInclude Include="External\stb_image_write.h" />
+    <ClInclude Include="Framework\AddClassToFactory.h" />
+    <ClInclude Include="Framework\BinaryReadWrite.h" />
+    <ClInclude Include="Framework\BVH.h" />
+    <ClInclude Include="Framework\Bytepacker.h" />
+    <ClInclude Include="Framework\ClassBase.h" />
+    <ClInclude Include="Framework\InterfaceTypeInfo.h" />
+    <ClInclude Include="Framework\ClassTypePtr.h" />
+    <ClInclude Include="Framework\Config.h" />
+    <ClInclude Include="Framework\Curve.h" />
+    <ClInclude Include="Framework\CurveEditorImgui.h" />
+    <ClInclude Include="Framework\DictParser.h" />
+    <ClInclude Include="Framework\DictWriter.h" />
+    <ClInclude Include="Framework\EnumDefReflection.h" />
+    <ClInclude Include="Framework\Factory.h" />
+    <ClInclude Include="Framework\Files.h" />
+    <ClInclude Include="Framework\FreeList.h" />
+    <ClInclude Include="Framework\Handle.h" />
+    <ClInclude Include="Framework\InlineVec.h" />
+    <ClInclude Include="Framework\MathLib.h" />
+    <ClInclude Include="Framework\MemArena.h" />
+    <ClInclude Include="Framework\MeshBuilder.h" />
+    <ClInclude Include="Framework\MulticastDelegate.h" />
+    <ClInclude Include="Framework\MyImguiLib.h" />
+    <ClInclude Include="Framework\PoolAllocator.h" />
+    <ClInclude Include="Framework\PropertyEd.h" />
+    <ClInclude Include="Framework\Rect2d.h" />
+    <ClInclude Include="Framework\ReflectionProp.h" />
+    <ClInclude Include="Framework\ReflectionMacros.h" />
+    <ClInclude Include="Framework\ArrayReflection.h" />
+    <ClInclude Include="Framework\StringName.h" />
+    <ClInclude Include="Framework\StringUtil.h" />
+    <ClInclude Include="Framework\Util.h" />
+    <ClInclude Include="GameEnginePublic.h" />
+    <ClInclude Include="Game\Entities\BikeEntity.h" />
+    <ClInclude Include="Game\Entities\BikeSystem.h" />
+    <ClInclude Include="Game\Entities\CharacterController.h" />
+    <ClInclude Include="Game\Entity.h" />
+    <ClInclude Include="Game\GameEventBus.h" />
+    <ClInclude Include="Game\EntityComponent.h" />
+    <ClInclude Include="Game\GameModes\MainMenuMode.h" />
+    <ClInclude Include="Game\Entities\Player.h" />
+    <ClInclude Include="Game\Entities\PlayerAnimDriver.h" />
+    <ClInclude Include="GameEngineLocal.h" />
+    <ClInclude Include="IEditorTool.h" />
+    <ClInclude Include="Input\InputSystem.h" />
+    <ClInclude Include="Level.h" />
+    <ClInclude Include="Physics\Physics2Local.h" />
+    <ClInclude Include="Render\ViewSetup.h" />
+    <ClInclude Include="Scripting\LuaTestRunner.h" />
+    <ClInclude Include="Scripting\ScriptFunctionCodegen.h" />
+    <ClInclude Include="Scripting\ScriptingStdLib.h" />
+    <ClInclude Include="Scripting\ScriptManager.h" />
+    <ClInclude Include="Sound\SoundComponent.h" />
+    <ClInclude Include="Testheader.h" />
+    <ClInclude Include="UI\OnScreenLogGui.h" />
+    <ClInclude Include="Physics\ChannelsAndPresets.h" />
+    <ClInclude Include="Physics\Physics2.h" />
+    <ClInclude Include="Render\DrawLocal.h" />
+    <ClInclude Include="Render\DrawPublic.h" />
+    <ClInclude Include="Render\DrawTypedefs.h" />
+    <ClInclude Include="Render\Editor\TextureEditor.h" />
+    <ClInclude Include="Render\EnvProbe.h" />
+    <ClInclude Include="Render\Frustum.h" />
+    <ClInclude Include="Render\Meshlet.h" />
+    <ClInclude Include="Render\Model.h" />
+    <ClInclude Include="Render\MaterialLocal.h" />
+    <ClInclude Include="Render\MaterialPublic.h" />
+    <ClInclude Include="Render\PPManager.h" />
+    <ClInclude Include="Render\PostProcessSettings.h" />
+    <ClInclude Include="Render\RenderExtra.h" />
+    <ClInclude Include="Render\RenderObj.h" />
+    <ClInclude Include="Render\RenderScene.h" />
+    <ClInclude Include="Render\Render_Decal.h" />
+    <ClInclude Include="Render\Render_Light.h" />
+    <ClInclude Include="Render\Render_Sun.h" />
+    <ClInclude Include="Render\Render_Volumes.h" />
+    <ClInclude Include="Render\Texture.h" />
+    <ClInclude Include="Sound\SoundPublic.h" />
+    <ClInclude Include="User_Camera.h" />
+    <ClInclude Include="UI\BaseGUI.h" />
+    <ClInclude Include="UI\Gui.h" />
+    <ClInclude Include="UI\GUISystemPublic.h" />
+    <ClInclude Include="UI\UIBuilder.h" />
+    <ClInclude Include="UI\UILoader.h" />
+    <ClInclude Include="UI\Widgets\EditorCube.h" />
+    <ClInclude Include="UI\Widgets\Layouts.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include=".generated\MEGA.gen.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <!-- ModelCompile files moved to AssetTools project -->
+    <ClCompile Include="AssetCompile\SkeletonAsset.cpp" />
+    <ClCompile Include="Framework\Hashset.cpp" />
+    <ClCompile Include="Framework\Tests\Containers.cpp" />
+    <ClCompile Include="Game\GameModes\MainMenuMode.cpp" />
+    <ClCompile Include="IEditorTool.cpp" />
+    <ClCompile Include="Input\InputSystem.cpp" />
+    <ClCompile Include="Level.cpp" />
+    <ClCompile Include="EngineMain.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">true</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="EngineMain_Commands.cpp" />
+    <ClCompile Include="EngineMain_Loop.cpp" />
+    <ClCompile Include="EngineMain_Debug.cpp" />
+    <ClCompile Include="EngineMain_Init.cpp" />
+    <ClCompile Include="EngineMain_ViewSetup.cpp" />
+    <ClCompile Include="Physics\ChannelsAndPresets.cpp" />
+    <ClCompile Include="Physics\Physics2Local.cpp" />
+    <!-- TextureEditor moved to AssetTools project -->
+    <ClCompile Include="Assets\AssetInspectorPane.cpp" />
+    <ClCompile Include="Assets\AssetSizeViewer.cpp" />
+    <ClCompile Include="Render\Meshlet.cpp" />
+    <ClCompile Include="Sound\SoundComponent.cpp" />
+    <ClCompile Include="Sound\SoundLocal.cpp" />
+    <ClInclude Include="Sound\SoundLocal.h" />
+    <ClCompile Include="Navigation\RuntimeNavManager.cpp" />
+    <ClCompile Include="Navigation\LevelNavUtil.cpp" />
+    <ClCompile Include="Navigation\NavMeshVolumeComponent.cpp" />
+    <ClCompile Include="Navigation\NavMeshSettingsComponent.cpp" />
+    <ClCompile Include="Navigation\NavAgentComponent.cpp" />
+    <ClCompile Include="Navigation\NavMeshBaker.cpp" />
+    <ClCompile Include="Navigation\NavMeshDebugDraw.cpp" />
+    <ClInclude Include="Navigation\RuntimeNavManager.h" />
+    <ClInclude Include="Navigation\LevelNavUtil.h" />
+    <ClInclude Include="Navigation\NavMeshVolumeComponent.h" />
+    <ClInclude Include="Navigation\NavMeshSettingsComponent.h" />
+    <ClInclude Include="Navigation\NavAgentComponent.h" />
+    <ClInclude Include="Navigation\NavMeshBaker.h" />
+    <ClInclude Include="Navigation\NavMeshDebugDraw.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\.clang-format" />
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{359193a0-4260-402d-968f-060546d8c049}</ProjectGuid>
+    <RootNamespace>CsRemake</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>Core</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
+    <MultiProcCL>true</MultiProcCL>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
+    <MultiProcCL>true</MultiProcCL>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|Win32'">
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
+    <PlatformToolset>v145</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <EnableUnitySupport>true</EnableUnitySupport>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <MultiProcCL>true</MultiProcCL>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\intermediate\$(ProjectName)\</IntDir>
+    <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
+    <EnableMicrosoftCodeAnalysis>false</EnableMicrosoftCodeAnalysis>
+    <IncludePath>$(ProjectDir);$(ProjectDir)External;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\intermediate\$(ProjectName)\</IntDir>
+    <IncludePath>$(ProjectDir);$(ProjectDir)External;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\intermediate\$(ProjectName)\</IntDir>
+    <IncludePath>$(ProjectDir);$(ProjectDir)External;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <VcpkgTriplet>x64-windows</VcpkgTriplet>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <VcpkgTriplet>x64-windows</VcpkgTriplet>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <VcpkgTriplet>x64-windows</VcpkgTriplet>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <VcpkgTriplet>x64-windows</VcpkgTriplet>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg" Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
+    <VcpkgTriplet>x64-windows</VcpkgTriplet>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)External;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)External;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;_DEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD;WITH_ASSERT</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)External;$(ProjectDir);$(ProjectDir)..\steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <AdditionalOptions>/bigobj
+ %(AdditionalOptions)</AdditionalOptions>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD;WITH_ASSERT;TRACY_ENABLE</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)External;$(ProjectDir);$(ProjectDir)..\steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
+    <ClCompile>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <AdditionalIncludeDirectories>$(ProjectDir)External;$(ProjectDir);$(ProjectDir)..\steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <Optimization>MaxSpeed</Optimization>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+  <ItemGroup>
+    <_CodegenInputHeader Include="$(ProjectDir)**\*.h" Exclude="$(ProjectDir).generated\**;$(ProjectDir)External\**" />
+    <_CodegenScript Include="$(SolutionDir)Scripts\codegen.py;$(SolutionDir)Scripts\codegen_run.py;$(SolutionDir)Scripts\codegen_lib.py;$(SolutionDir)Scripts\codegen_generate.py" />
+  </ItemGroup>
+  <Target Name="GenerateMEGA" BeforeTargets="ClCompile" Inputs="@(_CodegenInputHeader);@(_CodegenScript)" Outputs="$(ProjectDir).generated\MEGA.gen.cpp">
+    <Message Text="Running codegen (inputs changed)..." Importance="high" />
+    <Exec Command="py &quot;$(SolutionDir)Scripts\codegen.py&quot;" WorkingDirectory="$(SolutionDir)" />
+  </Target>
+</Project>
