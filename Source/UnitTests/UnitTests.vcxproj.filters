@@ -18,6 +18,7 @@
     <ClCompile Include="scripting_manager_test.cpp" />
     <ClCompile Include="scripting_classreg_test.cpp" />
     <ClCompile Include="scripting_lua_dispatch_test.cpp" />
+    <ClCompile Include="lua_transform_test.cpp" />
     <ClCompile Include="bike_ai_test.cpp" />
     <ClCompile Include="twobone_ik_test.cpp" />
     <ClCompile Include="blend_space_math_test.cpp" />

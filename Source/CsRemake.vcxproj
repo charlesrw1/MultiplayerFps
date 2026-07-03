@@ -301,6 +301,7 @@
     <ClCompile Include="Render\Volumetricfog.cpp" />
     <ClCompile Include="Scripting\LuaTestRunner.cpp" />
     <ClCompile Include="Scripting\ScriptFunctionCodegen.cpp" />
+    <ClCompile Include="Scripting\LuaTransform.cpp" />
     <ClCompile Include="Scripting\ScriptingStdLib.cpp" />
     <ClCompile Include="Scripting\ScriptManager.cpp" />
     <ClCompile Include="Scripting\ScriptLoadingUtil.cpp" />
@@ -535,6 +536,7 @@
     <ClInclude Include="Render\ViewSetup.h" />
     <ClInclude Include="Scripting\LuaTestRunner.h" />
     <ClInclude Include="Scripting\ScriptFunctionCodegen.h" />
+    <ClInclude Include="Scripting\LuaTransform.h" />
     <ClInclude Include="Scripting\ScriptingStdLib.h" />
     <ClInclude Include="Scripting\ScriptManager.h" />
     <ClInclude Include="Sound\SoundComponent.h" />

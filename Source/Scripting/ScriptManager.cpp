@@ -3,6 +3,7 @@
 #include "Framework/Files.h"
 #include "Framework/MapUtil.h"
 #include "Framework/Config.h"
+#include "LuaTransform.h"
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -42,6 +43,8 @@ ScriptManager::ScriptManager() {
 	lua_pushstring(lua, new_path.c_str());
 	lua_setfield(lua, -2, "path");
 	lua_pop(lua, 1);
+
+	register_lua_transform(lua);
 }
 
 ScriptManager::~ScriptManager() {

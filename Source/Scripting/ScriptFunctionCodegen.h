@@ -152,6 +152,14 @@ public:
 		out.side = side;
 		return out;
 	}
+
+	// glm::mat4 in/out of a REF function -- crosses as the Transform userdata
+	// (MAT4_TYPE in codegen_lib.py). Exercised by
+	// Data/scripts/tests/transform_userdata.lua and lua_transform_test.cpp.
+	REF static glm::mat4 mat4_from_pos_rot_scale(const lVec3& pos, const lQuat& rot, const lVec3& scale) {
+		return compose_transform(pos, rot, scale);
+	}
+	REF static lVec3 mat4_get_translation(const glm::mat4& m) { return glm::vec3(m[3]); }
 };
 
 // sets error handler
@@ -171,6 +179,9 @@ int64_t get_int_from_lua(lua_State* L, int index);
 std::string get_std_string_from_lua(lua_State* L, int index);
 ClassBase* get_object_from_lua(lua_State* L, int index);
 StringName get_stringname_from_lua(lua_State* L, int index);
+// glm::mat4 crosses as the Transform userdata, not a table -- see Source/Scripting/LuaTransform.cpp.
+void push_mat4_to_lua(lua_State* L, const glm::mat4& m);
+glm::mat4 get_mat4_from_lua(lua_State* L, int index);
 
 template <typename T> ClassBase* allocate_script_impl_internal(const ClassTypeInfo* info) {
 	T* ptr = new T();

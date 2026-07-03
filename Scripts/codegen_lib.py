@@ -59,6 +59,7 @@ VEC2_TYPE = 30
 VEC3_TYPE = 31
 QUAT_TYPE = 32
 COLOR32_TYPE = 33
+MAT4_TYPE = 34 # glm::mat4, crosses as the Transform userdata (Source/Scripting/LuaTransform.cpp)
 
 STRUCT_TYPE = 40 # STRUCT_BODY() type
 OLD_VOID_STRUCT_TYPE = 41 # old, get rid of this
@@ -77,12 +78,13 @@ OTHER_CLASS_TYPE = 100
 
 
 class CppType:
-    def __init__(self,type_string_raw:str, typename: Any, type: int, templates: Optional[List["CppType"]] = None, const: bool = False, is_ptr : bool=False) -> None:
+    def __init__(self,type_string_raw:str, typename: Any, type: int, templates: Optional[List["CppType"]] = None, const: bool = False, is_ptr : bool=False, is_ref: bool=False) -> None:
         self.type: int = type
         self.template_args: List["CppType"] = templates if templates is not None else []
         self.constant: bool = const
         self.typename: ClassDef|None = typename
         self.is_pointer : bool = is_ptr
+        self.is_reference : bool = is_ref
 
         self.type_string_raw : str = type_string_raw
 
@@ -98,6 +100,8 @@ class CppType:
             out += ">"
         if self.is_pointer:
             out += "*"
+        elif self.is_reference:
+            out += "&"
         return out
 
 class Property:
@@ -383,6 +387,8 @@ STANDARD_CPP_TYPES: dict[str, int] = {
     # std containers
     "std::string": STRING_TYPE,
     "string":STRING_TYPE,
+    "std::string_view": STRING_TYPE,
+    "string_view": STRING_TYPE,
     "std::vector": ARRAY_TYPE,
     "vector":ARRAY_TYPE,
     "std::unordered_set":UNORDERED_SET,
@@ -423,6 +429,8 @@ STANDARD_CPP_TYPES: dict[str, int] = {
     "vec2": VEC2_TYPE,
     "glm::quat": QUAT_TYPE,
     "quat": QUAT_TYPE,
+    "glm::mat4": MAT4_TYPE,
+    "mat4": MAT4_TYPE,
 
     "Color32":COLOR32_TYPE,
 }
@@ -654,7 +662,7 @@ def parse_type_from_tokens(idx: int, tokens:list[str], typenames: dict[str, Clas
         is_reference = True
         idx += 1
 
-    return CppType(base, base_typename,base_type, template_args, const_local, is_pointer), idx
+    return CppType(base, base_typename,base_type, template_args, const_local, is_pointer, is_reference), idx
 
 def parse_type(string: str, typenames: dict[str, ClassDef]) -> CppType:
     string = string.replace("<", " < ")

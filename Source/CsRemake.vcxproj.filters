@@ -846,6 +846,9 @@
     <ClCompile Include="Scripting\ScriptFunctionCodegen.cpp">
       <Filter>Source\Scripting</Filter>
     </ClCompile>
+    <ClCompile Include="Scripting\LuaTransform.cpp">
+      <Filter>Source\Scripting</Filter>
+    </ClCompile>
     <ClCompile Include="Scripting\ScriptingStdLib.cpp">
       <Filter>Source\Scripting</Filter>
     </ClCompile>
@@ -1638,6 +1641,9 @@
       <Filter>Source\Scripting</Filter>
     </ClInclude>
     <ClInclude Include="Scripting\ScriptFunctionCodegen.h">
+      <Filter>Source\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="Scripting\LuaTransform.h">
       <Filter>Source\Scripting</Filter>
     </ClInclude>
     <ClInclude Include="Scripting\ScriptingStdLib.h">

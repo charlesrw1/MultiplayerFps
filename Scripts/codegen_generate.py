@@ -274,6 +274,8 @@ def write_get_type_from_lua_func(newType:CppType, index:int) -> str:
         return f"get_lVec3_from_lua(L,{index})"
     elif newType.type == QUAT_TYPE:
         return f"get_lQuat_from_lua(L,{index})"
+    elif newType.type == MAT4_TYPE:
+        return f"get_mat4_from_lua(L,{index})"
     elif newType.type == STRING_TYPE:
         return f"get_std_string_from_lua(L,{index})"
     elif newType.type == ASSET_PTR_TYPE or newType.type == HANDLE_PTR_TYPE:
@@ -310,6 +312,8 @@ def write_push_type_to_lua_func(newType:CppType, cppVarName:str) -> str:
         return f"push_lVec3_to_lua(L,{cppVarName})"
     elif newType.type == QUAT_TYPE:
         return f"push_lQuat_to_lua(L,{cppVarName})"
+    elif newType.type == MAT4_TYPE:
+        return f"push_mat4_to_lua(L,{cppVarName})"
     elif newType.type == STRING_TYPE:
         return f"push_std_string_to_lua(L,{cppVarName})"
     elif newType.type == ASSET_PTR_TYPE or newType.type == HANDLE_PTR_TYPE:
@@ -689,6 +693,8 @@ def get_lua_type_string(new_type:CppType, no_nil:bool=False) -> str:
         output += "lVec3"
     elif new_type.type == QUAT_TYPE:
         output += "lQuat"
+    elif new_type.type == MAT4_TYPE:
+        output += "Transform"
     elif new_type.type == ARRAY_TYPE:
         assert(len(new_type.template_args)==1)
         output += get_lua_type_string(new_type.template_args[0], no_nil)+"[]"
