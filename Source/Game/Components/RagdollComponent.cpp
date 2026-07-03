@@ -25,9 +25,16 @@ void RagdollComponent::enable() {
 		auto phys = b.ptr.get();
 		if (!phys || phys->is_a<AdvancedJointComponent>())
 			continue;
-		auto ls = phys->get_owner()->get_ls_transform();
+		// Use the *stored* bind offset, not the entity's live ls_transform. enable_with_initial_transforms
+		// below flips each body to is_top_level, so after one enable/disable cycle (e.g. the config editor's
+		// "Restart Simulating") get_ls_transform() returns the body's full world pose instead of the small
+		// bone-local rotation offset -- feeding that back through this_ws*poseMatrix*ls collapses the ragdoll.
+		// This matches the ls used in the enable_with_initial_transforms loop, so enable() is idempotent.
+		auto ls = compose_transform(b.bindPosePos, b.bindPoseRot, glm::vec3(1));
 		auto& poseMatrix = animator->get_model().get_skel()->get_all_bones().at(b.bone_index).posematrix;
-		phys->get_owner()->set_ws_transform(poseMatrix * ls);
+		// poseMatrix is bone space -> mesh space; this_ws converts mesh space -> world space
+		// (matches the this_ws usage a few lines below in enable_with_initial_transforms).
+		phys->get_owner()->set_ws_transform(this_ws * (glm::mat4)poseMatrix * ls);
 		auto joint = phys->get_owner()->get_component<PhysicsJointComponent>();
 		if (joint)
 			joints.push_back(joint);
@@ -43,7 +50,9 @@ void RagdollComponent::enable() {
 		// Configure the body to dynamic+simulating before enabling so a misconfigured
 		// ragdoll body warns instead of crashing the asserts.
 		if (phys->get_is_static() || !phys->get_is_simulating()) {
-			sys_print(Warning, "RagdollComponent::enable: body %s is not dynamic+simulating, forcing\n",
+			// Expected on every disable()->enable() cycle (e.g. ragdoll config editor's
+			// "Restart Simulating"): disable() intentionally leaves bodies kinematic.
+			sys_print(Debug, "RagdollComponent::enable: body %s is not dynamic+simulating, forcing\n",
 					  phys->get_owner()->get_editor_name().c_str());
 			phys->set_is_static(false);
 			phys->set_is_simulating(true);
@@ -64,7 +73,28 @@ void RagdollComponent::stop() {
 	}
 }
 
-void RagdollComponent::disable() {}
+void RagdollComponent::disable() {
+	MeshComponent* mesh = meshComponent.get();
+	if (!mesh)
+		return;
+	AnimatorObject* animator = mesh->get_animator();
+	if (!animator)
+		return;
+	const glm::mat4& this_ws = get_owner()->get_ws_transform();
+	for (auto& b : bodies) {
+		auto phys = b.ptr.get();
+		if (!phys || phys->is_a<AdvancedJointComponent>())
+			continue;
+		// freeze back to kinematic (not static, not simulating) then snap to the current
+		// animated pose -- must switch mode before pushing the transform, since dynamic
+		// bodies ignore direct Entity transform pushes.
+		phys->set_is_simulating(false);
+		phys->set_is_static(false);
+		auto ls = compose_transform(b.bindPosePos, b.bindPoseRot, glm::vec3(1));
+		phys->get_owner()->set_ws_transform(this_ws * animator->get_global_bonemats().at(b.bone_index) * ls);
+	}
+	animator->set_ragdoll(nullptr);
+}
 
 void RagdollComponent::on_pre_get_bones() {
 	if (root_body_index != -1) {
@@ -94,6 +124,15 @@ glm::mat4 RagdollComponent::get_body_bone_transform(int i) {
 }
 void RagdollComponent::add_body(StringName parented_bone, PhysicsBody* body) {
 	assert(body);
+	// INVARIANT: ragdoll physics bodies must be FREE (unparented) entities, never children of the
+	// mesh/owner entity. A simulating body's transform is owned by PhysX; if the body's entity has a
+	// parent that moves (e.g. the animated mesh entity, whose transform on_pre_get_bones rewrites every
+	// frame), that parent move propagates into the child and PhysicsBody::on_changed_transform ->
+	// set_transform zeroes the body's velocity every frame -- gravity never accumulates and the ragdoll
+	// crawls instead of falling. Keep bodies parentless (see RagdollConfigComponent::rebuild_bodies,
+	// which spawns them via level->spawn_entity()) and this whole class of bug cannot happen.
+	ASSERT(body->get_owner() && body->get_owner()->get_parent() == nullptr &&
+		   "ragdoll physics bodies must not be parented -- they must be free/top-level entities");
 	MeshComponent* c = this->meshComponent.get();
 	if (!c)
 		return;
@@ -114,7 +153,14 @@ void RagdollComponent::add_body(StringName parented_bone, PhysicsBody* body) {
 }
 
 REF void RagdollComponent::add_root_body(StringName parented_bone, PhysicsBody* body) {
+	size_t before = bodies.size();
 	add_body(parented_bone, body);
-	assert(!bodies.empty());
+	if (bodies.size() == before) {
+		// add_body already logged the reason (unknown bone / no meshcomponent); don't crash
+		// callers that pass an unresolvable bone name for the root.
+		sys_print(Error, "RagdollComponent::add_root_body: failed to add root body for bone %s\n",
+				  parented_bone.get_c_str());
+		return;
+	}
 	root_body_index = (int)bodies.size() - 1;
 }

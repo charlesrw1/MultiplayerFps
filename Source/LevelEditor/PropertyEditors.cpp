@@ -506,6 +506,35 @@ bool ButtonPropertyEditor::can_reset() {
 	return false;
 }
 
+bool RagdollGroupMaskEditor::internal_update() {
+	uint8_t* mask = prop->get_ptr(instance);
+	static const char* names[] = {"Torso", "Head", "Arm Left", "Arm Right", "Leg Left", "Leg Right"};
+	bool changed = false;
+	for (int i = 1; i <= 6; i++) {
+		uint8_t bit = (uint8_t)(1 << i);
+		bool on = (*mask & bit) != 0;
+		if (ImGui::Checkbox(names[i - 1], &on)) {
+			if (on)
+				*mask |= bit;
+			else
+				*mask &= ~bit;
+			changed = true;
+		}
+		if (i != 6)
+			ImGui::SameLine();
+	}
+	if (ImGui::SmallButton("All")) {
+		*mask = 0xFF;
+		changed = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::SmallButton("None")) {
+		*mask = 0;
+		changed = true;
+	}
+	return changed;
+}
+
 template <typename FUNCTOR>
 static bool drag_drop_property_ed_func(std::string* str, Color32 color, FUNCTOR&& callback, const char* targetname,
 									   const char* tooltip) {
@@ -566,6 +595,7 @@ void PropertyFactoryUtil::register_basic(FnFactory<IPropertyEditor>& factory) {
 	factory.add("AssetPtr", []() { return new AssetPropertyEditor; });
 	factory.add("ClassTypePtr", []() { return new ClassTypePtrPropertyEditor; });
 	factory.add("GraphCurve", []() { return new GraphCurveEditor; });
+	factory.add("RagdollGroupMask", []() { return new RagdollGroupMaskEditor; });
 }
 void PropertyFactoryUtil::register_editor(EditorDoc& doc, FnFactory<IPropertyEditor>& factory) {
 	factory.add("EntityBoneParentString", []() { return new EntityBoneParentStringEditor; });

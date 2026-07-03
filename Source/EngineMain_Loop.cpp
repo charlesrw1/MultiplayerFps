@@ -148,7 +148,17 @@ void GameEngineLocal::game_update_tick() {
 	if (app)
 		app->pre_update();
 
-	for (int i = 0; i < 1; i++) {
+	// Step the fixed-timestep physics using the accumulator computed above, so dynamic
+	// physics advances real time regardless of render fps (previously hardcoded to a single
+	// step per frame, which ran pure-dynamic sims like ragdolls in slow motion whenever the
+	// editor/game dipped below the tick rate). frame_remainder was already drained by the full
+	// num_ticks, so clamping steps here just discards backlog on a hitch (anti spiral-of-death).
+	int steps = num_ticks;
+	if (steps < 0)
+		steps = 0;
+	if (steps > 5)
+		steps = 5;
+	for (int i = 0; i < steps; i++) {
 		fixed_update(tick_interval);
 	}
 

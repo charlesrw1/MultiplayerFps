@@ -41,6 +41,7 @@ class RagdollComponent : public Component
 {
 public:
 	CLASS_BODY(RagdollComponent);
+	RagdollComponent() { set_call_init_in_editor(true); }
 	void start() final;
 	void stop() final;
 

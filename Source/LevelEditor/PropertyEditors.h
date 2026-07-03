@@ -89,6 +89,14 @@ class ButtonPropertyEditor : public IPropertyEditor
 	bool can_reset();
 };
 
+// Bitmask-over-enum checkbox row, with "All"/"None" quick buttons. Used for
+// RagdollConfigComponent::sim_group_mask (a uint8_t bitmask over RagdollLimbGroup).
+class RagdollGroupMaskEditor : public IPropertyEditor
+{
+public:
+	bool internal_update() override;
+};
+
 class EntityBoneParentStringEditor : public IPropertyEditor
 {
 public:

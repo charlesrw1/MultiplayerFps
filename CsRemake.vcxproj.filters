@@ -273,6 +273,9 @@
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Game\Components\RagdollConfigComponent.cpp">
+      <Filter>Source\Game\Components</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Game\Components\RagdollComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
@@ -803,6 +806,9 @@
       <Filter>Source\Game\Components</Filter>
     </ClInclude>
     <ClInclude Include="Source\Game\Components\ParticleMgr.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\RagdollConfigComponent.h">
       <Filter>Source\Game\Components</Filter>
     </ClInclude>
     <ClInclude Include="Source\Game\Components\RagdollComponent.h">

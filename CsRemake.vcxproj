@@ -159,6 +159,7 @@
     <ClCompile Include="Source\Game\Components\PhysicsShapes.cpp" />
     <ClCompile Include="Source\Game\Components\PrefabAssetComponent.cpp" />
     <ClCompile Include="Source\Game\Components\RagdollComponent.cpp" />
+    <ClCompile Include="Source\Game\Components\RagdollConfigComponent.cpp" />
     <ClCompile Include="Source\Game\Components\SpawnerComponenth.cpp" />
     <ClCompile Include="Source\Game\Entities\BikeEntity.cpp" />
     <ClCompile Include="Source\Game\Entities\CharacterController.cpp" />
@@ -384,6 +385,7 @@
     <ClInclude Include="Source\Game\Components\NavComps.h" />
     <ClInclude Include="Source\Game\Components\ParticleMgr.h" />
     <ClInclude Include="Source\Game\Components\RagdollComponent.h" />
+    <ClInclude Include="Source\Game\Components\RagdollConfigComponent.h" />
     <ClInclude Include="Source\Game\Components\SpawnerComponenth.h" />
     <ClInclude Include="Source\Game\EntityPtr.h" />
     <ClInclude Include="Source\Game\GameplayStatic.h" />
