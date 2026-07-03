@@ -1,5 +1,6 @@
 #include "ScriptFunctionCodegen.h"
 #include "Framework/ClassBase.h"
+#include "Framework/StringName.h"
 
 void push_bool_to_lua(lua_State* L, bool b) {
 	lua_pushboolean(L, b);
@@ -13,8 +14,8 @@ void push_int_to_lua(lua_State* L, int64_t i) {
 	lua_pushinteger(L, i);
 }
 
-void push_std_string_to_lua(lua_State* L, const std::string& str) {
-	lua_pushstring(L, str.c_str());
+void push_std_string_to_lua(lua_State* L, std::string_view str) {
+	lua_pushlstring(L, str.data(), str.size());
 }
 
 void push_object_to_lua(lua_State* L, const ClassBase* ptrConst) {
@@ -42,6 +43,26 @@ int64_t get_int_from_lua(lua_State* L, int index) {
 std::string get_std_string_from_lua(lua_State* L, int index) {
 	auto str = luaL_checkstring(L, index);
 	return std::string(str);
+}
+
+// Crosses the boundary as a bare 64-bit hash (lua_Integer), not a string: comparisons on the
+// Lua side become native integer ==, and neither direction re-hashes or re-allocates a string.
+// get_int_from_lua can't be reused here since it round-trips through luaL_checknumber (a
+// double), which would silently truncate a full 64-bit hash.
+void push_stringname_to_lua(lua_State* L, StringName name) {
+	lua_pushinteger(L, (int64_t)name.get_hash());
+}
+
+// Accepts either a plain Lua string (interned on the fly, straight from Lua's own buffer with
+// no intermediate std::string) or an already-interned hash integer (e.g. from Name(...) or a
+// StringName round-tripped back from C++) — zero-cost in that case.
+StringName get_stringname_from_lua(lua_State* L, int index) {
+	if (lua_type(L, index) == LUA_TSTRING) {
+		size_t len = 0;
+		const char* str = lua_tolstring(L, index, &len);
+		return StringName::intern(str, len);
+	}
+	return StringName((name_hash_t)luaL_checkinteger(L, index));
 }
 extern void stack_dump(lua_State* L);
 ClassBase* get_object_from_lua(lua_State* L, int index) {

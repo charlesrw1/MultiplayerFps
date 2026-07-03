@@ -3,11 +3,10 @@
 #include <string>
 #include <unordered_map>
 
-#ifdef EDITOR_BUILD
-#endif
-
-
-
+// Always-on debug name table (not gated to EDITOR_BUILD): get_c_str() must work in every
+// build, since it's the only path back to a readable name once a StringName crosses into
+// Lua as a bare hash (see get_stringname_from_lua in ScriptFunctionCodegen.cpp). Memory cost
+// is one std::string per unique identifier, trivial next to everything else in a game engine.
 static std::unordered_map<uint64_t, std::string>& get_g_name_map() {
 	static std::unordered_map<uint64_t, std::string> inst;
 	return inst;
@@ -40,13 +39,17 @@ StringName::StringName(const char* name) {
 	}
 
 	hash = StringUtils_Hash::fnv1a_64(name, StringUtils_Hash::const_strlen(name));
-#ifdef EDITOR_BUILD
 	add_to_nametable(name, hash);
-#endif // DEBUG_STRING_NAME
 }
-#ifdef EDITOR_BUILD
 StringName::StringName(const char* name, name_hash_t hash) : hash(hash) {
-
 	add_to_nametable(name, hash);
 }
-#endif
+
+StringName StringName::intern(const char* str, size_t len) {
+	if (len == 0)
+		return StringName();
+
+	name_hash_t hash = StringUtils_Hash::fnv1a_64(str, len);
+	add_to_nametable(str, hash);
+	return StringName(hash);
+}

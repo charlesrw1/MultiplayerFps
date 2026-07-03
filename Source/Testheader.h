@@ -3,6 +3,7 @@
 #include "Framework/ClassBase.h"
 #include "Framework/InterfaceTypeInfo.h"
 #include "Framework/MulticastDelegate.h"
+#include "Framework/StringName.h"
 
 class ITestInterface {
 public:
@@ -57,6 +58,12 @@ public:
 	}
 	REF void set_str(string s) { myStr = s; }
 
+	// StringName Lua/C++ boundary round-trip, exercised by scripting_lua_dispatch_test.cpp.
+	REF StringName get_name_field() { return nameField; }
+	REF void set_name_field(StringName n) { nameField = n; }
+	REF bool name_field_is(std::string s) { return nameField == StringName(s.c_str()); }
+
 	std::string myStr;
 	int variable = 0;
+	StringName nameField;
 };

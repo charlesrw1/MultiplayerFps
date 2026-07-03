@@ -12,6 +12,7 @@
 // has a lua impl, which sets inst
 #include "Framework/ConsoleCmdGroup.h"
 #include "Framework/Config.h"
+#include "Framework/StringName.h"
 class LuaCallbackShim : public ClassBase
 {
 public:
@@ -78,4 +79,12 @@ public:
 	REF static void log_fullscreen(int type, std::string str) {
 		eng->log_to_fullscreen_gui(LogType(type), str.c_str());
 	}
+
+	// Interns str and returns its StringName (crosses to Lua as a bare hash integer, see
+	// push_stringname_to_lua). Scripts should cache the result in a local/upvalue for hot
+	// paths instead of re-interning the same literal every call:
+	//   local N_IDLE = LuaSystem.name("idle")
+	REF static StringName name(std::string str) { return StringName(str.c_str()); }
+	// Debug-only: resolves a StringName back to its readable form. Not for hot paths.
+	REF static std::string name_to_string(StringName n) { return n.get_c_str(); }
 };

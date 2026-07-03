@@ -13,12 +13,15 @@ class StringName
 public:
 	StringName() : hash(0) {}
 	StringName(const char* name);
-	StringName(name_hash_t hash) : hash(hash) {}
-#ifndef EDITOR_BUILD
-	StringName(const char* name, name_hash_t hash) : hash(hash) {}
-#else
+	explicit StringName(name_hash_t hash) : hash(hash) {}
 	StringName(const char* name, name_hash_t hash);
-#endif
+
+	// Hashes [str,str+len) directly with no intermediate std::string allocation and registers
+	// the debug name. str must be null-terminated at str[len] (guaranteed by lua_tolstring).
+	// Used at the Lua/C++ boundary to avoid re-hashing through a temporary std::string on
+	// every call (see get_stringname_from_lua in ScriptFunctionCodegen.cpp).
+	static StringName intern(const char* str, size_t len);
+
 	StringName(const StringName& other) { hash = other.hash; }
 	StringName& operator=(const StringName& other) {
 		hash = other.hash;

@@ -337,3 +337,73 @@ TEST_F(LuaScriptableClassTest, FixtureFile_OverridesAndSelfAccess) {
 	iface->buzzer();
 	EXPECT_EQ(iface->variable, 20); // call_count=2
 }
+
+// ============================================================
+// StringName Lua/C++ boundary: exercises get_stringname_from_lua /
+// push_stringname_to_lua (ScriptFunctionCodegen.cpp) through the real
+// codegen'd bindings on InterfaceClass::get_name_field/set_name_field.
+// ============================================================
+
+// C++ -> Lua: a StringName set from C++ must be readable from a Lua override,
+// comparing equal to a hash the Lua side interned itself via LuaSystem.name(...).
+TEST_F(LuaScriptableClassTest, StringName_CppToLua_ComparesEqualByHash) {
+	load_lua("---@class LuaTestImpl : InterfaceClass\n"
+			 "LuaTestImpl = {}\n"
+			 "function LuaTestImpl:buzzer()\n"
+			 "    local n = self:get_name_field()\n"
+			 "    if n == LuaSystem.name('foo_bar_baz') then\n"
+			 "        self:set_var(1)\n"
+			 "    else\n"
+			 "        self:set_var(0)\n"
+			 "    end\n"
+			 "end\n",
+			 {"LuaTestImpl"});
+
+	ClassBase* obj = alloc_obj("LuaTestImpl");
+	ASSERT_NE(obj, nullptr);
+	InterfaceClass* iface = obj->cast_to<InterfaceClass>();
+	ASSERT_NE(iface, nullptr);
+
+	iface->set_name_field(StringName("foo_bar_baz"));
+	iface->buzzer();
+	EXPECT_EQ(iface->variable, 1);
+}
+
+// Lua -> C++: a plain Lua string literal passed into a StringName parameter must intern
+// to the same StringName as the equivalent C++-constructed one.
+TEST_F(LuaScriptableClassTest, StringName_LuaStringLiteral_InternsToSameName) {
+	load_lua("---@class LuaTestImpl : InterfaceClass\n"
+			 "LuaTestImpl = {}\n"
+			 "function LuaTestImpl:buzzer()\n"
+			 "    self:set_name_field('hello_from_lua')\n"
+			 "end\n",
+			 {"LuaTestImpl"});
+
+	ClassBase* obj = alloc_obj("LuaTestImpl");
+	ASSERT_NE(obj, nullptr);
+	InterfaceClass* iface = obj->cast_to<InterfaceClass>();
+	ASSERT_NE(iface, nullptr);
+
+	iface->buzzer();
+	EXPECT_TRUE(iface->name_field_is("hello_from_lua"));
+}
+
+// Lua -> C++: an already-interned hash (from LuaSystem.name) must also be accepted directly,
+// with no re-hashing (dual string/integer accept in get_stringname_from_lua).
+TEST_F(LuaScriptableClassTest, StringName_LuaPrehashedInteger_IsAccepted) {
+	load_lua("---@class LuaTestImpl : InterfaceClass\n"
+			 "LuaTestImpl = {}\n"
+			 "local N_CACHED = LuaSystem.name('cached_name')\n"
+			 "function LuaTestImpl:buzzer()\n"
+			 "    self:set_name_field(N_CACHED)\n"
+			 "end\n",
+			 {"LuaTestImpl"});
+
+	ClassBase* obj = alloc_obj("LuaTestImpl");
+	ASSERT_NE(obj, nullptr);
+	InterfaceClass* iface = obj->cast_to<InterfaceClass>();
+	ASSERT_NE(iface, nullptr);
+
+	iface->buzzer();
+	EXPECT_TRUE(iface->name_field_is("cached_name"));
+}

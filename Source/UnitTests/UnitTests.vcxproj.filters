@@ -21,6 +21,7 @@
     <ClCompile Include="bike_ai_test.cpp" />
     <ClCompile Include="twobone_ik_test.cpp" />
     <ClCompile Include="blend_space_math_test.cpp" />
+    <ClCompile Include="stringname_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Unittest.h" />

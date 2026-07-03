@@ -285,7 +285,7 @@ def write_get_type_from_lua_func(newType:CppType, index:int) -> str:
         assert(newType.typename!=None)
         return f"({newType.typename.classname})get_int_from_lua(L,{index})"
     elif newType.type == STRINGNAME_TYPE:
-        return f"StringName(get_std_string_from_lua(L,{index}).c_str())"
+        return f"get_stringname_from_lua(L,{index})"
     elif newType.type == ARRAY_TYPE:
         assert(len(newType.template_args)==1)
         type_of_template = newType.template_args[0].get_raw_type_string()
@@ -320,7 +320,7 @@ def write_push_type_to_lua_func(newType:CppType, cppVarName:str) -> str:
     elif newType.type == ENUM_TYPE:
         return f"push_int_to_lua(L,(int64_t){cppVarName})"
     elif newType.type == STRINGNAME_TYPE:
-        return f"push_std_string_to_lua(L,{cppVarName}.get_c_str())"
+        return f"push_stringname_to_lua(L,{cppVarName})"
     elif newType.type == ARRAY_TYPE:
         assert(len(newType.template_args)==1)
         type_of_template = newType.template_args[0].get_raw_type_string()
@@ -678,8 +678,10 @@ def get_lua_type_string(new_type:CppType, no_nil:bool=False) -> str:
         output += f"{new_type.typename.classname}"
     elif new_type.type == ASSET_PTR_TYPE or new_type.type == HANDLE_PTR_TYPE:
         output += f"{type_of_template}{nil_suffix}"
-    elif new_type.type == STRING_TYPE or new_type.type == STRINGNAME_TYPE:
+    elif new_type.type == STRING_TYPE:
         output += f"string"
+    elif new_type.type == STRINGNAME_TYPE:
+        output += f"string|integer"
     elif new_type.type == OTHER_CLASS_TYPE:
         assert(new_type.typename!=None)
         output += f"{new_type.typename.classname}{nil_suffix}"
