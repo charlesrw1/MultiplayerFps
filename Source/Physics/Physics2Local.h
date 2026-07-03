@@ -27,16 +27,8 @@
 #include "Render/RenderObj.h"
 
 #include <memory>
+#include <array>
 
-struct CollisionResponse
-{
-	uint32_t blockMask = 0;	  // mask of objects to block
-	uint32_t overlapMask = 0; // mask of objects to overlap with
-	uint8_t type = 0;		  // 0-32 value to set what "type" the object is
-	uint8_t preset = 0;
-	bool generateHitEvent : 1;
-	bool generateOverlapEvent : 1;
-};
 using namespace physx;
 
 inline glm::vec3 physx_to_glm(const physx::PxVec3& v) {
@@ -63,6 +55,13 @@ class PhysicsManImpl
 public:
 	PhysicsManImpl();
 	~PhysicsManImpl();
+	void set_physics_layer_collisions(std::span<const bool> triangular_matrix);
+
+	// Max number of physics layers, bounded by the 32 bits of a PxFilterData word.
+	static const int MAX_PHYSICS_LAYERS = 32;
+	// Per-layer collision masks. layer_collision_masks[i] has bit j set if layer i
+	// collides with layer j. Built by set_physics_layer_collisions.
+	std::array<uint32_t, MAX_PHYSICS_LAYERS> layer_collision_masks;
 
 	bool sweep_shared(world_query_result& out, physx::PxGeometry& geom, const glm::vec3& start, const glm::vec3& dir,
 					  float length, const TraceIgnoreVec* ignored_components = nullptr,

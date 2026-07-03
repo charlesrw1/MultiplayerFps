@@ -28,8 +28,7 @@ static Entity* spawn_static_box(glm::vec3 center, glm::vec3 size, PL layer = PL:
 	e->set_ws_position(center);
 	e->set_ls_scale(size);
 	auto* bc = e->create_component<BoxComponent>();
-	bc->set_is_static(true);
-	bc->set_is_simulating(false);
+	bc->set_body_type(BodyType::Static);
 	bc->set_physics_layer(layer);
 	return e;
 }
@@ -40,8 +39,7 @@ static Entity* spawn_static_sphere(glm::vec3 center, float radius, PL layer = PL
 	Entity* e = GameplayStatic::spawn_entity();
 	e->set_ws_position(center);
 	auto* sc = e->create_component<SphereComponent>();
-	sc->set_is_static(true);
-	sc->set_is_simulating(false);
+	sc->set_body_type(BodyType::Static);
 	sc->set_physics_layer(layer);
 	sc->set_radius(radius);
 	return e;
@@ -56,10 +54,9 @@ static Entity* spawn_trigger_box(glm::vec3 center, glm::vec3 size, F&& on_overla
 	e->set_ws_position(center);
 	e->set_ls_scale(size);
 	auto* bc = e->create_component<BoxComponent>();
-	bc->set_is_static(true);
-	bc->set_is_simulating(false);
+	bc->set_body_type(BodyType::Static);
 	bc->set_is_trigger(true);
-	bc->set_send_overlap(true);
+	//bc->set_send_overlap(true);
 	//bc->on_trigger.add(e, [cb = std::forward<F>(on_overlap)](PhysicsBodyEventArg arg) {
 	//	if (arg.entered_trigger && arg.who.get())
 	//		cb(arg.who.get());
@@ -110,8 +107,7 @@ void ObsGameApplication::spawn_player(glm::vec3 pos)
 
 	auto* cap = chest->create_component<CapsuleComponent>();
 	cap->set_data(capsule_height, capsule_radius, 0.f);
-	cap->set_is_static(false);
-	cap->set_is_simulating(false);       // Kinematic — controller-driven.
+	cap->set_body_type(BodyType::Kinematic);
 	cap->set_physics_layer(PL::Character);
 
 	auto* mov = chest->create_component<CharacterMovementComponent>();
@@ -131,8 +127,7 @@ void ObsGameApplication::spawn_player(glm::vec3 pos)
 		h->set_ws_position(hand_pos);
 
 		auto* sph = h->create_component<SphereComponent>();
-		sph->set_is_static(false);
-		sph->set_is_simulating(true);          // Dynamic.
+		sph->set_body_type(BodyType::Dynamic);
 		sph->set_radius(hand_radius);
 		sph->set_density(hand_density);
 		sph->set_physics_layer(PL::Character);

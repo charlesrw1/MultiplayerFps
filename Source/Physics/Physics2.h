@@ -4,6 +4,7 @@
 #include "glm/gtc/quaternion.hpp"
 #include "Framework/InlineVec.h"
 #include <vector>
+#include <span>
 #include "Framework/ClassBase.h"
 
 namespace physx {
@@ -156,6 +157,17 @@ public:
 
 	// debug mesh
 	void sync_render_data();
+
+	// Sets which physics layers collide/overlap with which, from an upper-triangular
+	// matrix (see get_default_layer_collision_matrix for the layout). Must contain
+	// exactly N*(N+1)/2 entries for N layers, N <= 32. Layers not covered by the
+	// matrix default to colliding with everything. Call before shapes are created;
+	// existing shapes keep their cached mask until re-created.
+	void set_physics_layer_collisions(std::span<const bool> triangular_matrix);
+
+	// Returns the bitmask of layers that `layer` collides/overlaps with. Used to fill
+	// PxFilterData::word1 when building a shape. layer must be in [0, 32).
+	uint32_t get_collision_mask_for_layer(int layer);
 
 private:
 	PhysicsManImpl* impl = nullptr;

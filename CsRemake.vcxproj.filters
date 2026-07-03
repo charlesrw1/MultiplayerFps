@@ -2,109 +2,118 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Source">
-      <UniqueIdentifier>{136f582a-16f5-5431-8579-0428231c73ef}</UniqueIdentifier>
+      <UniqueIdentifier>{968371d8-86ea-57e7-be6a-66adbc4e0428}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\.generated">
+      <UniqueIdentifier>{1d5470c0-1418-5469-a829-1652688d129f}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source\Animation">
-      <UniqueIdentifier>{472e5cff-a5a0-50cf-ab56-5b3ef1e15d3a}</UniqueIdentifier>
+      <UniqueIdentifier>{51a47c5a-be2c-5cc5-84a4-803d7648e12e}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source\Animation\Runtime">
-      <UniqueIdentifier>{31ffa0e9-d205-5657-ac89-3ce561bef70f}</UniqueIdentifier>
+      <UniqueIdentifier>{beaa529f-d184-5335-a203-5db936c971e0}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source\AssetCompile">
-      <UniqueIdentifier>{2af8e051-fde0-5699-a2ce-f25526ff92e2}</UniqueIdentifier>
+      <UniqueIdentifier>{18699238-98ed-54a4-9ef7-5f1f52f2caa4}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source\Assets">
-      <UniqueIdentifier>{32fb9b7e-09da-5c1d-9d5a-2aa7559e4fa4}</UniqueIdentifier>
+      <UniqueIdentifier>{e363d28c-78b7-5c40-a080-315d3ee0778a}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source\External">
-      <UniqueIdentifier>{33af1638-c759-5a95-a155-02dd5004743a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Framework">
-      <UniqueIdentifier>{298a2467-a2c3-585c-8620-9a7f624ff4fb}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Game">
-      <UniqueIdentifier>{a63ef55f-35db-5f0b-9a6c-a88395bb78c0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Game\CarGame">
-      <UniqueIdentifier>{e67097e8-5007-5f68-be77-f885deadacb8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Game\Components">
-      <UniqueIdentifier>{769420d0-c524-5895-9147-98d7a54540ff}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Game\Particles">
-      <UniqueIdentifier>{a1b2c3d4-e5f6-7890-abcd-ef1234567890}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Game\Entities">
-      <UniqueIdentifier>{835ee852-76d7-5aad-b0e2-96b587c70696}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Game\TopDownShooter">
-      <UniqueIdentifier>{4d661fe1-7407-567d-8c0a-80ac6dd45d92}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Game\TP">
-      <UniqueIdentifier>{a5dd581c-25bd-5a0c-ad11-79f3bdee61e3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\LevelEditor">
-      <UniqueIdentifier>{52687380-8ff3-5fb3-90ae-32865fb3313c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\LevelSerialization">
-      <UniqueIdentifier>{c043cdc9-63a8-5493-9d86-7363e9a5a5c7}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Render">
-      <UniqueIdentifier>{b68fff35-1864-5377-ad1f-e04bf7453afe}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Render\RT">
-      <UniqueIdentifier>{b4413b7e-8ca6-50c4-bd9e-8c2ab9e609cc}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Scripting">
-      <UniqueIdentifier>{3f5ac068-ffa2-5bae-9e1b-b4487fbfc943}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\UI">
-      <UniqueIdentifier>{2903f724-bfd9-5dbe-bcd9-c3672c4a0521}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\UI\Widgets">
-      <UniqueIdentifier>{9ded36b1-f32d-543f-bf3a-b44e6de203a5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\UnitTests">
-      <UniqueIdentifier>{cce6e86f-0d9d-55d2-94e7-840cb18bbe18}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Animation\Editor">
-      <UniqueIdentifier>{65b062ea-0f43-5c93-b82b-7da0e60db892}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\External\glad">
-      <UniqueIdentifier>{c02b9c8f-4705-5e6f-bf2e-97da0dc5b071}</UniqueIdentifier>
+      <UniqueIdentifier>{ebaa1d09-f4fc-5ca6-95e0-baa9f28ea7fc}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source\External\KHR">
-      <UniqueIdentifier>{4fe91cf1-d7cc-5637-a98c-5811d229bd4c}</UniqueIdentifier>
+      <UniqueIdentifier>{7baa7335-029e-54ef-bd26-093b3da96715}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source\Game\GameModes">
-      <UniqueIdentifier>{4d9e0cc0-ee85-5d35-a478-4e2906b7d265}</UniqueIdentifier>
+    <Filter Include="Source\External\glad">
+      <UniqueIdentifier>{1b07a77b-1559-5bf4-b6c7-9e631c6339cb}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source\Input">
-      <UniqueIdentifier>{300bfa22-7a5f-53ae-9b6e-5dc36524bb5d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Physics">
-      <UniqueIdentifier>{c4b1c207-99a6-5904-bd3f-80b8ae30d726}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Sound">
-      <UniqueIdentifier>{51c4b6b7-7762-5117-ac4b-7eeb55d2738c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\Render\Editor">
-      <UniqueIdentifier>{bbc2c76a-4420-520e-9afb-8c56a24a15e0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\External\tracy">
-      <UniqueIdentifier>{0923c5c4-9e7c-5949-b32d-bc3f72b9246c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source\External\tracy\public">
-      <UniqueIdentifier>{b85c7574-8c35-5076-afb0-afff80071600}</UniqueIdentifier>
+    <Filter Include="Source\Framework">
+      <UniqueIdentifier>{580f486d-557a-5ab3-8ece-7e158f6f2450}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source\Framework\Tests">
-      <UniqueIdentifier>{f15efcb3-3c64-5379-967f-ace0f3c25466}</UniqueIdentifier>
+      <UniqueIdentifier>{375e5baa-5a6f-50c5-a203-d1b9796f5500}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source\LevelEditor\Tools">
-      <UniqueIdentifier>{e5c82610-1e77-4ae3-ada2-67c5fbba2b3f}</UniqueIdentifier>
+    <Filter Include="Source\Game">
+      <UniqueIdentifier>{42742b7f-2d62-5f32-a415-43d019454b12}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Game\BikeDemo">
+      <UniqueIdentifier>{0cb8eb50-a033-5e45-b530-1fb82bda588d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Game\CarGame">
+      <UniqueIdentifier>{669de82b-c3eb-571b-9281-bdd235bbf7df}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Game\Components">
+      <UniqueIdentifier>{810cc49a-f068-5f53-ab3b-b4eaa335cb26}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Game\Entities">
+      <UniqueIdentifier>{1734c40d-d5f2-53a3-ae11-7e174baf0d8c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Game\GameModes">
+      <UniqueIdentifier>{b3c68b3d-b459-5461-9ad0-fa3df3d31abf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Game\ObsGame">
+      <UniqueIdentifier>{bafb7265-c7a2-54a9-b1aa-534366977aab}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Game\Particles">
+      <UniqueIdentifier>{7268a9a7-435c-55ad-9a31-19c65933cea1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Game\TP">
+      <UniqueIdentifier>{22fe6126-4d43-5b66-8a24-6a8543ad5128}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Game\TopDownShooter">
+      <UniqueIdentifier>{277d44b1-5a37-5587-aa77-da1d64b145db}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Input">
+      <UniqueIdentifier>{7c8524a8-9183-5c69-9232-2166450894be}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\LevelEditor">
+      <UniqueIdentifier>{c69d1596-ac21-5491-afb4-cd104bcffcf4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\LevelSerialization">
+      <UniqueIdentifier>{60d6f248-1671-5ee1-a869-95d23c1a0012}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\MyGame">
+      <UniqueIdentifier>{eca3032f-d126-58f5-a76c-221bff66f62b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\MyGame\fps">
+      <UniqueIdentifier>{3b5d3484-5fdc-5855-af39-e2537c59a8fc}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Navigation">
+      <UniqueIdentifier>{8289910c-33ea-5b02-8c90-dd7fdb203753}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Physics">
+      <UniqueIdentifier>{a6e43029-457f-5470-a1c8-67b7f233df3c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Render">
+      <UniqueIdentifier>{dcbb99e2-6efc-5e1d-b459-bf9c53e5d5fb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Render\Dx11">
+      <UniqueIdentifier>{7a310789-4bf2-5f1f-af85-ae71e112454f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Render\Editor">
+      <UniqueIdentifier>{d94b45a2-388d-5191-8be1-6656d39f8ac7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Render\RT">
+      <UniqueIdentifier>{fcecc58a-d5c2-5b10-a9f5-c54faf2e125c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Scripting">
+      <UniqueIdentifier>{2fbebf6b-3a91-568a-9031-0371b8b342a6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\Sound">
+      <UniqueIdentifier>{6e19dc29-704a-51ae-9841-fc1dc3f1cd36}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\UI">
+      <UniqueIdentifier>{08cd70be-4308-570f-86a2-afd876f22e55}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source\UI\Widgets">
+      <UniqueIdentifier>{d36a705a-77ca-5f10-910a-0736a8b3ba1d}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Source\.generated\MEGA.gen.cpp">
+      <Filter>Source\.generated</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Animation\AnimationSeqAsset.cpp">
       <Filter>Source\Animation</Filter>
     </ClCompile>
@@ -112,6 +121,12 @@
       <Filter>Source\Animation</Filter>
     </ClCompile>
     <ClCompile Include="Source\Animation\AnimationUtil.cpp">
+      <Filter>Source\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\AnimSeqEditor.cpp">
+      <Filter>Source\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Animation\AnimSidecarFile.cpp">
       <Filter>Source\Animation</Filter>
     </ClCompile>
     <ClCompile Include="Source\Animation\Runtime\Animation.cpp">
@@ -129,6 +144,12 @@
     <ClCompile Include="Source\Animation\SkeletonData.cpp">
       <Filter>Source\Animation</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Animation\SkeletonEditor.cpp">
+      <Filter>Source\Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp">
+      <Filter>Source\AssetCompile</Filter>
+    </ClCompile>
     <ClCompile Include="Source\AssetCompile\write_gltf.cpp">
       <Filter>Source\AssetCompile</Filter>
     </ClCompile>
@@ -138,7 +159,16 @@
     <ClCompile Include="Source\Assets\AssetDatabase.cpp">
       <Filter>Source\Assets</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Assets\AssetInspectorPane.cpp">
+      <Filter>Source\Assets</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Assets\AssetRegistry.cpp">
+      <Filter>Source\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Assets\AssetSizeViewer.cpp">
+      <Filter>Source\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Assets\FileWatcher.cpp">
       <Filter>Source\Assets</Filter>
     </ClCompile>
     <ClCompile Include="Source\Assets\IAsset.cpp">
@@ -153,13 +183,31 @@
     <ClCompile Include="Source\EditorPopupTemplate.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="Source\EngineMain.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EngineMain_Commands.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EngineMain_Debug.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EngineMain_Init.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EngineMain_Loop.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EngineMain_ViewSetup.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\BakedCurve.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Framework\BVHBuild.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\ClassBase.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\InterfaceTypeInfo.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\ClassTypePtr.cpp">
@@ -171,10 +219,25 @@
     <ClCompile Include="Source\Framework\CurveEditorImgui.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Framework\GradientEditorImgui.cpp">
+    <ClCompile Include="Source\Framework\CurveEditorImgui_Curves.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\CurveEditorImgui_Events.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\CurveEditorImgui_Grid.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\CurveEditorImgui_Input.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\CurveEditorImgui_UI.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\DictParser.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\EditorTheme.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\EnumDefReflection.cpp">
@@ -183,7 +246,19 @@
     <ClCompile Include="Source\Framework\Files.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Framework\GradientEditorImgui.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\Hashset.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\InterfaceTypeInfo.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Framework\Jobs.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\MathLib.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\MeshBuilder.cpp">
@@ -196,6 +271,15 @@
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\PropertyEd.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\PropertyEdArray.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\PropertyEdGroup.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Framework\PropertyEdWidgets.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Framework\PropertyPtr.cpp">
@@ -222,11 +306,74 @@
     <ClCompile Include="Source\Framework\StringUtils.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Framework\Tests\Containers.cpp">
+      <Filter>Source\Framework\Tests</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Framework\Util.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\BaseUpdater.cpp">
       <Filter>Source\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeAI.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_AIDebug.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Debug.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Pack.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_PackAI.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_PackAvoid.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_PackDebug.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Player.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeCamera.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeCourse.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeCourseDebug.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeCourseRacingLine.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeCourseRoadNetwork.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeObject.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeObject_Physics.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeObject_Stamina.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeObject_Steer.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeUI.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\BikeDemo\BikeWind.cpp">
+      <Filter>Source\Game\BikeDemo</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\CarGame\CarGame.cpp">
       <Filter>Source\Game\CarGame</Filter>
@@ -246,6 +393,15 @@
     <ClCompile Include="Source\Game\Components\LightComponents.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Game\Components\LightComponents_Environment.cpp">
+      <Filter>Source\Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Components\LightComponents_GiScene.cpp">
+      <Filter>Source\Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Components\LightComponents_Lightmap.cpp">
+      <Filter>Source\Game\Components</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Game\Components\MeshbuilderComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
@@ -258,25 +414,31 @@
     <ClCompile Include="Source\Game\Components\ParticleSystemComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Game\Particles\ParticleTypes.cpp">
-      <Filter>Source\Game\Particles</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Game\Particles\ParticleModules.cpp">
-      <Filter>Source\Game\Particles</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Game\Particles\ParticleAsset.cpp">
-      <Filter>Source\Game\Particles</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Game\Particles\ParticleEditorUI.cpp">
-      <Filter>Source\Game\Particles</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Game\Components\PhysicsComponents.cpp">
+      <Filter>Source\Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Components\PhysicsJoints.cpp">
+      <Filter>Source\Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Components\PhysicsShapes.cpp">
+      <Filter>Source\Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Components\PostProcessComponent.cpp">
+      <Filter>Source\Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Components\PostProcessEditorUI.cpp">
+      <Filter>Source\Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Components\PrefabAssetComponent.cpp">
+      <Filter>Source\Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Components\RagdollComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\Components\RagdollConfigComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Game\Components\RagdollComponent.cpp">
+    <ClCompile Include="Source\Game\Components\RoadNetworkComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\Components\SpawnerComponenth.cpp">
@@ -291,13 +453,16 @@
     <ClCompile Include="Source\Game\Entities\Player.cpp">
       <Filter>Source\Game\Entities</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Game\Entities\Player_CameraPath.cpp">
+      <Filter>Source\Game\Entities</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Entities\Player_GameplayStatic.cpp">
+      <Filter>Source\Game\Entities</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Game\Entities\PlayerAnimDriver.cpp">
       <Filter>Source\Game\Entities</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\Entity.cpp">
-      <Filter>Source\Game</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Game\GameEventBus.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\EntityComponent.cpp">
@@ -306,7 +471,40 @@
     <ClCompile Include="Source\Game\Game.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Game\GameEventBus.cpp">
+      <Filter>Source\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp">
+      <Filter>Source\Game\GameModes</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Game\LevelAssets.cpp">
+      <Filter>Source\Game</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\ObsGame\ObsCamera.cpp">
+      <Filter>Source\Game\ObsGame</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\ObsGame\ObsGameApplication.cpp">
+      <Filter>Source\Game\ObsGame</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\ObsGame\ObsHand.cpp">
+      <Filter>Source\Game\ObsGame</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\ObsGame\ObsPlayer.cpp">
+      <Filter>Source\Game\ObsGame</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Particles\ParticleAsset.cpp">
+      <Filter>Source\Game\Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Particles\ParticleEditorUI.cpp">
+      <Filter>Source\Game\Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Particles\ParticleModules.cpp">
+      <Filter>Source\Game\Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Particles\ParticleTypes.cpp">
+      <Filter>Source\Game\Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Game\Prefab.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
     <ClCompile Include="Source\Game\TopDownShooter\TopDownPlayer.cpp">
@@ -318,23 +516,161 @@
     <ClCompile Include="Source\Game\TP\TPGame.cpp">
       <Filter>Source\Game\TP</Filter>
     </ClCompile>
+    <ClCompile Include="Source\IEditorTool.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Input\InputSystem.cpp">
+      <Filter>Source\Input</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Level.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\AddEditorCommands.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
     <ClCompile Include="Source\LevelEditor\Commands.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\CommandsComponent.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\CommandsPrefab.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\CommandsUndoRedo.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\DecalStampTool.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\DragDetector.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\DragDropPreview.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\EditorDocInput.cpp">
       <Filter>Source\LevelEditor</Filter>
     </ClCompile>
     <ClCompile Include="Source\LevelEditor\EditorDocLocal.cpp">
       <Filter>Source\LevelEditor</Filter>
     </ClCompile>
+    <ClCompile Include="Source\LevelEditor\EditorDocScene.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\EditorDocViewport.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\EditorRecents.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\EditorUILayout.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\EdPropertyGrid.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\FoliagePaintTool.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\LevelEditorCamera.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\ManipulateTransformTool.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
     <ClCompile Include="Source\LevelEditor\ObjectOutliner.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\ObjectOutlinerContextMenu.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\ObjectOutlinerDraw.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\ObjectOutlinerFilter.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\OrthoCamera.cpp">
       <Filter>Source\LevelEditor</Filter>
     </ClCompile>
     <ClCompile Include="Source\LevelEditor\PropertyEditors.cpp">
       <Filter>Source\LevelEditor</Filter>
     </ClCompile>
+    <ClCompile Include="Source\LevelEditor\RoadBuilderTool.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\RoadBuilderTool_Helpers.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\RoadBuilderTool_Overlay.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\RoadBuilderTool_Tick.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
     <ClCompile Include="Source\LevelEditor\SceneExport.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\SelectionMode.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\SelectionState.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\LevelEditor\ViewportHandles.cpp">
       <Filter>Source\LevelEditor</Filter>
     </ClCompile>
     <ClCompile Include="Source\LevelSerialization\SerializeNew.cpp">
       <Filter>Source\LevelSerialization</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Logging.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\MyGame\fps\AnimGraphTester.cpp">
+      <Filter>Source\MyGame\fps</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\MyGame\fps\AnimGraphTesterEditorUI.cpp">
+      <Filter>Source\MyGame\fps</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\MyGame\fps\fpsApp.cpp">
+      <Filter>Source\MyGame\fps</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\MyGame\fps\fpsDebugCamera.cpp">
+      <Filter>Source\MyGame\fps</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\MyGame\fps\fpsObjects.cpp">
+      <Filter>Source\MyGame\fps</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\MyGame\fps\fpsTestObjects.cpp">
+      <Filter>Source\MyGame\fps</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Navigation\LevelNavUtil.cpp">
+      <Filter>Source\Navigation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Navigation\NavAgentComponent.cpp">
+      <Filter>Source\Navigation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Navigation\NavMeshBaker.cpp">
+      <Filter>Source\Navigation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Navigation\NavMeshDebugDraw.cpp">
+      <Filter>Source\Navigation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Navigation\NavMeshSettingsComponent.cpp">
+      <Filter>Source\Navigation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Navigation\NavMeshVolumeComponent.cpp">
+      <Filter>Source\Navigation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Navigation\RuntimeNavManager.cpp">
+      <Filter>Source\Navigation</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp">
+      <Filter>Source\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Physics\Physics2Local.cpp">
+      <Filter>Source\Physics</Filter>
     </ClCompile>
     <ClCompile Include="Source\Render\DdsExport.cpp">
       <Filter>Source\Render</Filter>
@@ -342,13 +678,28 @@
     <ClCompile Include="Source\Render\DecalBatcher.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Render\DrawLocal_Misc.cpp">
+    <ClCompile Include="Source\Render\DrawLocal_BatchScene.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\DrawLocal_CullShadow.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\DrawLocal_Debug.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
     <ClCompile Include="Source\Render\DrawLocal_Device.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Render\DrawLocal_Editor.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Render\DrawLocal_Init.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\DrawLocal_Lighting.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\DrawLocal_Misc.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
     <ClCompile Include="Source\Render\DrawLocal_RenderPass.cpp">
@@ -357,20 +708,26 @@
     <ClCompile Include="Source\Render\DrawLocal_Scene.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Render\DrawLocal_Lighting.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\DrawLocal_Editor.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Render\DrawLocal_SceneDraw.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
     <ClCompile Include="Source\Render\DrawLocal_SceneDrawInternal.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Render\DrawLocal_Debug.cpp">
-      <Filter>Source\Render</Filter>
+    <ClCompile Include="Source\Render\Dx11\Dx11BufferImpl.cpp">
+      <Filter>Source\Render\Dx11</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Dx11\Dx11Device.cpp">
+      <Filter>Source\Render\Dx11</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Dx11\Dx11PipelineImpl.cpp">
+      <Filter>Source\Render\Dx11</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Dx11\Dx11ShaderImpl.cpp">
+      <Filter>Source\Render\Dx11</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Dx11\Dx11TextureImpl.cpp">
+      <Filter>Source\Render\Dx11</Filter>
     </ClCompile>
     <ClCompile Include="Source\Render\EnvProbe.cpp">
       <Filter>Source\Render</Filter>
@@ -384,16 +741,61 @@
     <ClCompile Include="Source\Render\GpuCullingTest.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Render\GraphicsDeviceCommon.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Render\MaterialLocal.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\MaterialLocal_Loading.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\MaterialLocal_Manager.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\MaterialLocal_Shader.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\Meshlet.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
     <ClCompile Include="Source\Render\Model.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Render\ModelDynamic.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\ModelGpuUpload.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\ModelLoad.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\OpenGlBufferImpl.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Render\OpenGlDevice.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Render\OpenGlShaderImpl.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\OpenGlTextureImpl.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\PostProcessSettings.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\PPManager.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Render\RenderExtra.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\RenderExtra_LightCookieAtlas.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\RenderExtra_SSR.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
     <ClCompile Include="Source\Render\RenderGiManager.cpp">
@@ -408,6 +810,15 @@
     <ClCompile Include="Source\Render\RT\RaytraceTest.cpp">
       <Filter>Source\Render\RT</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Render\RT\RaytraceTest_BVH.cpp">
+      <Filter>Source\Render\RT</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\RT\RaytraceTest_Probe.cpp">
+      <Filter>Source\Render\RT</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\RT\RaytraceTest_Shade.cpp">
+      <Filter>Source\Render\RT</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Render\Shadowmap.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
@@ -417,8 +828,20 @@
     <ClCompile Include="Source\Render\Texture.cpp">
       <Filter>Source\Render</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Render\TextureDDS.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Render\TextureUpload.cpp">
+      <Filter>Source\Render</Filter>
+    </ClCompile>
     <ClCompile Include="Source\Render\Volumetricfog.cpp">
       <Filter>Source\Render</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Scripting\LuaClassTypeInfo.cpp">
+      <Filter>Source\Scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Scripting\LuaTestRunner.cpp">
+      <Filter>Source\Scripting</Filter>
     </ClCompile>
     <ClCompile Include="Source\Scripting\ScriptFunctionCodegen.cpp">
       <Filter>Source\Scripting</Filter>
@@ -426,16 +849,22 @@
     <ClCompile Include="Source\Scripting\ScriptingStdLib.cpp">
       <Filter>Source\Scripting</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scripting\ScriptManager.cpp">
-      <Filter>Source\Scripting</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Scripting\ScriptLoadingUtil.cpp">
       <Filter>Source\Scripting</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Scripting\LuaClassTypeInfo.cpp">
+    <ClCompile Include="Source\Scripting\ScriptManager.cpp">
       <Filter>Source\Scripting</Filter>
     </ClCompile>
+    <ClCompile Include="Source\Sound\SoundComponent.cpp">
+      <Filter>Source\Sound</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Sound\SoundLocal.cpp">
+      <Filter>Source\Sound</Filter>
+    </ClCompile>
     <ClCompile Include="Source\UI\BaseGUI.cpp">
+      <Filter>Source\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\UI\Gui.cpp">
       <Filter>Source\UI</Filter>
     </ClCompile>
     <ClCompile Include="Source\UI\GUISystemLocal.cpp">
@@ -456,166 +885,14 @@
     <ClCompile Include="Source\UI\Widgets\SharedFuncs.cpp">
       <Filter>Source\UI\Widgets</Filter>
     </ClCompile>
-    <ClCompile Include="Source\AssetCompile\SkeletonAsset.cpp">
-      <Filter>Source\AssetCompile</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\Hashset.cpp">
-      <Filter>Source\Framework</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Framework\Tests\Containers.cpp">
-      <Filter>Source\Framework\Tests</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Game\GameModes\MainMenuMode.cpp">
-      <Filter>Source\Game\GameModes</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\IEditorTool.cpp">
+    <ClCompile Include="Source\User_Camera.cpp">
       <Filter>Source</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Input\InputSystem.cpp">
-      <Filter>Source\Input</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Level.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\EngineMain.cpp">
-      <Filter>Source</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Physics\ChannelsAndPresets.cpp">
-      <Filter>Source\Physics</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Physics\Physics2Local.cpp">
-      <Filter>Source\Physics</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Render\Meshlet.cpp">
-      <Filter>Source\Render</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Sound\SoundComponent.cpp">
-      <Filter>Source\Sound</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Sound\SoundLocal.cpp">
-      <Filter>Source\Sound</Filter>
-    </ClCompile>
-    <ClCompile Include="Source\Scripting\LuaTestRunner.cpp" />
-    <ClCompile Include="Source\UI\Gui.cpp" />
-    <ClCompile Include="Source\Assets\FileWatcher.cpp" />
-    <ClCompile Include="Source\LevelEditor\DragDropPreview.cpp" />
-    <ClCompile Include="Source\LevelEditor\DragDetector.cpp" />
-    <ClCompile Include="Source\LevelEditor\DecalStampTool.cpp" />
-    <ClCompile Include="Source\LevelEditor\LevelEditorCamera.cpp" />
-    <ClCompile Include="Source\LevelEditor\EditorRecents.cpp" />
-    <ClCompile Include="Source\LevelEditor\ManipulateTransformTool.cpp" />
-    <ClCompile Include="Source\LevelEditor\OrthoCamera.cpp" />
-    <ClCompile Include="Source\LevelEditor\SelectionMode.cpp" />
-    <ClCompile Include="Source\LevelEditor\SelectionState.cpp" />
-    <ClCompile Include="Source\LevelEditor\ViewportHandles.cpp" />
-    <ClCompile Include="Source\LevelEditor\FoliagePaintTool.cpp" />
-    <ClCompile Include="Source\LevelEditor\EdPropertyGrid.cpp" />
-    <ClCompile Include="Source\User_Camera.cpp" />
-    <ClCompile Include="Source\LevelEditor\AddEditorCommands.cpp" />
-    <ClCompile Include="Source\LevelEditor\EditorUILayout.cpp" />
-    <ClCompile Include="Source\Framework\MathLib.cpp" />
-    <ClCompile Include="Source\Logging.cpp" />
-    <ClCompile Include="Source\Game\Components\PrefabAssetComponent.cpp" />
-    <ClCompile Include="Source\Game\Prefab.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeApplication.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_AIDebug.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Debug.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Pack.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_Player.cpp" />
-    <ClCompile Include="Source\Framework\BakedCurve.cpp" />
-    <ClCompile Include="Source\Framework\CurveEditorImgui_Curves.cpp" />
-    <ClCompile Include="Source\Framework\CurveEditorImgui_Events.cpp" />
-    <ClCompile Include="Source\Framework\CurveEditorImgui_Grid.cpp" />
-    <ClCompile Include="Source\Framework\CurveEditorImgui_Input.cpp" />
-    <ClCompile Include="Source\Framework\CurveEditorImgui_UI.cpp" />
-    <ClCompile Include="Source\Framework\EditorTheme.cpp" />
-    <ClCompile Include="Source\Framework\PropertyEdArray.cpp" />
-    <ClCompile Include="Source\Framework\PropertyEdGroup.cpp" />
-    <ClCompile Include="Source\Framework\PropertyEdWidgets.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeAI.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_PackAI.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_PackAvoid.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeApplication_PackDebug.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeCourse.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeCourseDebug.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeCourseRacingLine.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeCourseRoadNetwork.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeCamera.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeObject.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeObject_Physics.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeObject_Stamina.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeObject_Steer.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeUI.cpp" />
-    <ClCompile Include="Source\Game\BikeDemo\BikeWind.cpp" />
-    <ClCompile Include="Source\Game\ObsGame\ObsGameApplication.cpp" />
-    <ClCompile Include="Source\Game\ObsGame\ObsPlayer.cpp" />
-    <ClCompile Include="Source\Game\ObsGame\ObsHand.cpp" />
-    <ClCompile Include="Source\Game\ObsGame\ObsCamera.cpp" />
-    <ClCompile Include="Source\Game\Components\LightComponents_Environment.cpp" />
-    <ClCompile Include="Source\Game\Components\LightComponents_GiScene.cpp" />
-    <ClCompile Include="Source\Game\Components\LightComponents_Lightmap.cpp" />
-    <ClCompile Include="Source\Game\Components\PhysicsJoints.cpp" />
-    <ClCompile Include="Source\Game\Components\PhysicsShapes.cpp" />
-    <ClCompile Include="Source\Game\Entities\Player_CameraPath.cpp" />
-    <ClCompile Include="Source\Game\Entities\Player_GameplayStatic.cpp" />
-    <ClCompile Include="Source\LevelEditor\CommandsComponent.cpp" />
-    <ClCompile Include="Source\LevelEditor\CommandsPrefab.cpp" />
-    <ClCompile Include="Source\LevelEditor\CommandsUndoRedo.cpp" />
-    <ClCompile Include="Source\LevelEditor\EditorDocInput.cpp" />
-    <ClCompile Include="Source\LevelEditor\EditorDocScene.cpp" />
-    <ClCompile Include="Source\LevelEditor\EditorDocViewport.cpp" />
-    <ClCompile Include="Source\LevelEditor\ObjectOutlinerContextMenu.cpp" />
-    <ClCompile Include="Source\LevelEditor\ObjectOutlinerDraw.cpp" />
-    <ClCompile Include="Source\LevelEditor\ObjectOutlinerFilter.cpp" />
-    <ClCompile Include="Source\LevelEditor\RoadBuilderTool.cpp" />
-    <ClCompile Include="Source\LevelEditor\RoadBuilderTool_Helpers.cpp" />
-    <ClCompile Include="Source\LevelEditor\RoadBuilderTool_Overlay.cpp" />
-    <ClCompile Include="Source\LevelEditor\RoadBuilderTool_Tick.cpp" />
-    <ClCompile Include="Source\Game\Components\RoadNetworkComponent.cpp" />
-    <ClCompile Include="Source\Render\DrawLocal_BatchScene.cpp" />
-    <ClCompile Include="Source\Render\DrawLocal_CullShadow.cpp" />
-    <ClCompile Include="Source\Render\MaterialLocal_Loading.cpp" />
-    <ClCompile Include="Source\Render\MaterialLocal_Manager.cpp" />
-    <ClCompile Include="Source\Render\MaterialLocal_Shader.cpp" />
-    <ClCompile Include="Source\Render\ModelGpuUpload.cpp" />
-    <ClCompile Include="Source\Render\ModelLoad.cpp" />
-    <ClCompile Include="Source\Render\ModelDynamic.cpp" />
-    <ClCompile Include="Source\Render\OpenGlBufferImpl.cpp" />
-    <ClCompile Include="Source\Render\OpenGlShaderImpl.cpp" />
-    <ClCompile Include="Source\Render\OpenGlTextureImpl.cpp" />
-    <ClCompile Include="Source\Render\GraphicsDeviceCommon.cpp" />
-    <ClCompile Include="Source\Render\Dx11\Dx11Device.cpp" />
-    <ClCompile Include="Source\Render\Dx11\Dx11TextureImpl.cpp" />
-    <ClCompile Include="Source\Render\Dx11\Dx11BufferImpl.cpp" />
-    <ClCompile Include="Source\Render\Dx11\Dx11ShaderImpl.cpp" />
-    <ClCompile Include="Source\Render\Dx11\Dx11PipelineImpl.cpp" />
-    <ClCompile Include="Source\Render\RenderExtra_LightCookieAtlas.cpp" />
-    <ClCompile Include="Source\Render\RenderExtra_SSR.cpp" />
-    <ClCompile Include="Source\Render\RT\RaytraceTest_BVH.cpp" />
-    <ClCompile Include="Source\Render\RT\RaytraceTest_Probe.cpp" />
-    <ClCompile Include="Source\Render\RT\RaytraceTest_Shade.cpp" />
-    <ClCompile Include="Source\Render\TextureDDS.cpp" />
-    <ClCompile Include="Source\Render\TextureUpload.cpp" />
-    <ClCompile Include="Source\EngineMain_Commands.cpp" />
-    <ClCompile Include="Source\EngineMain_Loop.cpp" />
-    <ClCompile Include="Source\EngineMain_Debug.cpp" />
-    <ClCompile Include="Source\EngineMain_Init.cpp" />
-    <ClCompile Include="Source\EngineMain_ViewSetup.cpp" />
-    <ClCompile Include="Source\.generated\MEGA.gen.cpp" />
-    <ClCompile Include="Source\Assets\AssetInspectorPane.cpp" />
-    <ClCompile Include="Source\Assets\AssetSizeViewer.cpp" />
-    <ClCompile Include="Source\Navigation\RuntimeNavManager.cpp" />
-    <ClCompile Include="Source\Navigation\LevelNavUtil.cpp" />
-    <ClCompile Include="Source\Navigation\NavMeshVolumeComponent.cpp" />
-    <ClCompile Include="Source\Navigation\NavMeshSettingsComponent.cpp" />
-    <ClCompile Include="Source\Navigation\NavAgentComponent.cpp" />
-    <ClCompile Include="Source\Navigation\NavMeshBaker.cpp" />
-    <ClCompile Include="Source\Navigation\NavMeshDebugDraw.cpp" />
-    <ClCompile Include="Source\MyGame\fps\fpsApp.cpp" />
-    <ClCompile Include="Source\MyGame\fps\fpsDebugCamera.cpp" />
-    <ClCompile Include="Source\MyGame\fps\fpsObjects.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Source\Animation\AnimationSeqAsset.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Animation\AnimationTypes.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>
@@ -623,18 +900,6 @@
       <Filter>Source\Animation</Filter>
     </ClInclude>
     <ClInclude Include="Source\Animation\Event.h">
-      <Filter>Source\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew.h">
-      <Filter>Source\Animation\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew2.h">
-      <Filter>Source\Animation\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\Runtime\SpringBones.h">
-      <Filter>Source\Animation\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Animation\SkeletonData.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>
     <ClInclude Include="Source\Animation\Runtime\Animation.h">
@@ -649,10 +914,22 @@
     <ClInclude Include="Source\Animation\Runtime\Percentage.h">
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew.h">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Runtime\RuntimeNodesNew2.h">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\Runtime\SpringBones.h">
+      <Filter>Source\Animation\Runtime</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Animation\Runtime\SyncTime.h">
       <Filter>Source\Animation\Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Animation\AnimationSeqAsset.h">
+    <ClInclude Include="Source\Animation\SkeletonData.h">
+      <Filter>Source\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Animation\SkeletonEditor.h">
       <Filter>Source\Animation</Filter>
     </ClInclude>
     <ClInclude Include="Source\AssetCompile\Compiliers.h">
@@ -682,10 +959,19 @@
     <ClInclude Include="Source\Assets\AssetDatabase.h">
       <Filter>Source\Assets</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Assets\AssetInspectorPane.h">
+      <Filter>Source\Assets</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Assets\AssetRegistry.h">
       <Filter>Source\Assets</Filter>
     </ClInclude>
     <ClInclude Include="Source\Assets\AssetRegistryLocal.h">
+      <Filter>Source\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Assets\AssetSizeViewer.h">
+      <Filter>Source\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Assets\FileWatcher.h">
       <Filter>Source\Assets</Filter>
     </ClInclude>
     <ClInclude Include="Source\Assets\HackedReloader.h">
@@ -693,6 +979,9 @@
     </ClInclude>
     <ClInclude Include="Source\Assets\IAsset.h">
       <Filter>Source\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Debug.h">
+      <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\DebugConsole.h">
       <Filter>Source</Filter>
@@ -703,257 +992,8 @@
     <ClInclude Include="Source\EditorPopupTemplate.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\ArenaAllocator.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\ArenaStd.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\BoolButton.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\ClassTypeInfo.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\ConsoleCmdGroup.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\FnFactory.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\InterfaceBase.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Log.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\LuaColor.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\MapUtil.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\MeshBuilderImpl.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\NodeMenuItem.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\PropertyPtr.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\PropertyUtil.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Range.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Reflection2.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\RingBuffer.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\SerializedForDiffing.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Serializer.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\SerializerBinary.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\SerializerJson.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\SerializerJson2.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\SerializerOldDict.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\SharedPtr.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\StringUtils.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\StructReflection.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\SysPrint.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Jobs.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\VectorReflect2.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\CarGame\CarGame.h">
-      <Filter>Source\Game\CarGame</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\CarGame\CarGui.h">
-      <Filter>Source\Game\CarGame</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\GraphCurveComponent.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\GameAnimationMgr.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\NavComps.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\ParticleMgr.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\RagdollConfigComponent.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\RagdollComponent.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\SpawnerComponenth.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\EntityPtr.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\TopDownShooter\TDChest.h">
-      <Filter>Source\Game\TopDownShooter</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h">
-      <Filter>Source\Game\TopDownShooter</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\TP\DefaultGameHeader.h">
-      <Filter>Source\Game\TP</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\TP\TPGame.h">
-      <Filter>Source\Game\TP</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h">
-      <Filter>Source\LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h">
-      <Filter>Source\LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\LevelEditor\PropertyEditors.h">
-      <Filter>Source\LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\LevelEditor\TagManager.h">
-      <Filter>Source\LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\LevelSerialization\SerializeNew.h">
-      <Filter>Source\LevelSerialization</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\DynamicMaterialPtr.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\Dx11\Dx11Local.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\GpuAllocator.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\GpuCullingTest.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\IGraphicsDevice.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\ModelManager.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\RectPackerUtil.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\RenderGiManager.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\RenderWindow.h">
-      <Filter>Source\Render</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Render\RT\RaytraceTest.h">
-      <Filter>Source\Render\RT</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Hashmap.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Hashset.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\CameraComponent.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\ParticleComponent.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\ParticleSystemComponent.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Particles\ParticleTypes.h">
-      <Filter>Source\Game\Particles</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Particles\ParticleModules.h">
-      <Filter>Source\Game\Particles</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Particles\ParticleAsset.h">
-      <Filter>Source\Game\Particles</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Particles\ParticleEditorUI.h">
-      <Filter>Source\Game\Particles</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\GradientEditorImgui.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\Guid.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\ScopedBoolean.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Framework\UniquePtrReflection.h">
-      <Filter>Source\Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\BaseUpdater.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\ArrowComponent.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\BillboardComponent.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\DecalComponent.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\LightComponents.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\MeshbuilderComponent.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\MeshComponent.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\Components\PhysicsComponents.h">
-      <Filter>Source\Game\Components</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Debug.h">
+    <ClInclude Include="Source\EngineMain.h">
       <Filter>Source</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\LevelAssets.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\TopDownShooter\TopDownShooterGame.h">
-      <Filter>Source\Game\TopDownShooter</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\LevelEditor\Commands.h">
-      <Filter>Source\LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\LevelEditor\EditorDocLocal.h">
-      <Filter>Source\LevelEditor</Filter>
     </ClInclude>
     <ClInclude Include="Source\External\cgltf.h">
       <Filter>Source\External</Filter>
@@ -967,16 +1007,19 @@
     <ClInclude Include="Source\External\imgui.h">
       <Filter>Source\External</Filter>
     </ClInclude>
-    <ClInclude Include="Source\External\ImGuizmo.h">
-      <Filter>Source\External</Filter>
-    </ClInclude>
     <ClInclude Include="Source\External\imgui_impl_opengl3.h">
       <Filter>Source\External</Filter>
     </ClInclude>
     <ClInclude Include="Source\External\imgui_impl_opengl3_loader.h">
       <Filter>Source\External</Filter>
     </ClInclude>
+    <ClInclude Include="Source\External\imgui_impl_sdl2.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
     <ClInclude Include="Source\External\imgui_internal.h">
+      <Filter>Source\External</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\External\ImGuizmo.h">
       <Filter>Source\External</Filter>
     </ClInclude>
     <ClInclude Include="Source\External\imnodes.h">
@@ -1012,7 +1055,19 @@
     <ClInclude Include="Source\Framework\AddClassToFactory.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\ArenaAllocator.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ArenaStd.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ArrayReflection.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Framework\BinaryReadWrite.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\BoolButton.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\BVH.h">
@@ -1024,13 +1079,16 @@
     <ClInclude Include="Source\Framework\ClassBase.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\InterfaceTypeInfo.h">
+    <ClInclude Include="Source\Framework\ClassTypeInfo.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\ClassTypePtr.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\Config.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ConsoleCmdGroup.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\Curve.h">
@@ -1054,13 +1112,46 @@
     <ClInclude Include="Source\Framework\Files.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\FnFactory.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Framework\FreeList.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\GradientEditorImgui.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Guid.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\Handle.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\Hashmap.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Hashset.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Framework\InlineVec.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\InterfaceBase.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\InterfaceTypeInfo.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Jobs.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Log.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\LuaColor.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\MapUtil.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\MathLib.h">
@@ -1072,10 +1163,16 @@
     <ClInclude Include="Source\Framework\MeshBuilder.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\MeshBuilderImpl.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Framework\MulticastDelegate.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\MyImguiLib.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\NodeMenuItem.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\PoolAllocator.h">
@@ -1084,16 +1181,52 @@
     <ClInclude Include="Source\Framework\PropertyEd.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\PropertyPtr.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\PropertyUtil.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Range.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Framework\Rect2d.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\ReflectionProp.h">
+    <ClInclude Include="Source\Framework\Reflection2.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\ReflectionMacros.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Framework\ArrayReflection.h">
+    <ClInclude Include="Source\Framework\ReflectionProp.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\RingBuffer.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\ScopedBoolean.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\SerializedForDiffing.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\Serializer.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\SerializerBinary.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\SerializerJson.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\SerializerJson2.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\SerializerOldDict.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\SharedPtr.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Source\Framework\StringName.h">
@@ -1102,11 +1235,98 @@
     <ClInclude Include="Source\Framework\StringUtil.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Framework\StringUtils.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\StructReflection.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\SysPrint.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Framework\UniquePtrReflection.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Framework\Util.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Source\GameEnginePublic.h">
-      <Filter>Source</Filter>
+    <ClInclude Include="Source\Framework\VectorReflect2.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\BaseUpdater.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\BikeDemo\BikeHeaders.h">
+      <Filter>Source\Game\BikeDemo</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\CarGame\CarGame.h">
+      <Filter>Source\Game\CarGame</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\CarGame\CarGui.h">
+      <Filter>Source\Game\CarGame</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\ArrowComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\BillboardComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\CameraComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\DecalComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\GameAnimationMgr.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\GraphCurveComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\LightComponents.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\MeshbuilderComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\MeshComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\NavComps.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\ParticleComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\ParticleMgr.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\ParticleSystemComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\PhysicsComponents.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\PostProcessComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\PostProcessEditorUI.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\PrefabAssetComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\RagdollComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\RagdollConfigComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\RoadNetworkComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Components\SpawnerComponenth.h">
+      <Filter>Source\Game\Components</Filter>
     </ClInclude>
     <ClInclude Include="Source\Game\Entities\BikeEntity.h">
       <Filter>Source\Game\Entities</Filter>
@@ -1117,25 +1337,70 @@
     <ClInclude Include="Source\Game\Entities\CharacterController.h">
       <Filter>Source\Game\Entities</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Game\Entity.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\GameEventBus.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\EntityComponent.h">
-      <Filter>Source\Game</Filter>
-    </ClInclude>
-    <ClInclude Include="Source\Game\GameModes\MainMenuMode.h">
-      <Filter>Source\Game\GameModes</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Game\Entities\Player.h">
       <Filter>Source\Game\Entities</Filter>
     </ClInclude>
     <ClInclude Include="Source\Game\Entities\PlayerAnimDriver.h">
       <Filter>Source\Game\Entities</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Game\Entity.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\EntityComponent.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\EntityPtr.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\GameEventBus.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\GameModes\MainMenuMode.h">
+      <Filter>Source\Game\GameModes</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\GameplayStatic.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\LevelAssets.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\ObsGame\ObsGameHeaders.h">
+      <Filter>Source\Game\ObsGame</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Particles\ParticleAsset.h">
+      <Filter>Source\Game\Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Particles\ParticleEditorUI.h">
+      <Filter>Source\Game\Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Particles\ParticleModules.h">
+      <Filter>Source\Game\Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Particles\ParticleTypes.h">
+      <Filter>Source\Game\Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\Prefab.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\TopDownShooter\TDChest.h">
+      <Filter>Source\Game\TopDownShooter</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\TopDownShooter\TopDownPlayer.h">
+      <Filter>Source\Game\TopDownShooter</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\TopDownShooter\TopDownShooterGame.h">
+      <Filter>Source\Game\TopDownShooter</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\TP\DefaultGameHeader.h">
+      <Filter>Source\Game\TP</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Game\TP\TPGame.h">
+      <Filter>Source\Game\TP</Filter>
+    </ClInclude>
     <ClInclude Include="Source\GameEngineLocal.h">
+      <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\GameEnginePublic.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\IEditorTool.h">
@@ -1144,34 +1409,127 @@
     <ClInclude Include="Source\Input\InputSystem.h">
       <Filter>Source\Input</Filter>
     </ClInclude>
+    <ClInclude Include="Source\ITestRunner.h">
+      <Filter>Source</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Level.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Physics\Physics2Local.h">
-      <Filter>Source\Physics</Filter>
+    <ClInclude Include="Source\LevelEditor\Commands.h">
+      <Filter>Source\LevelEditor</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scripting\ScriptFunctionCodegen.h">
-      <Filter>Source\Scripting</Filter>
+    <ClInclude Include="Source\LevelEditor\DragDetector.h">
+      <Filter>Source\LevelEditor</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scripting\ScriptingStdLib.h">
-      <Filter>Source\Scripting</Filter>
+    <ClInclude Include="Source\LevelEditor\DragDropPreview.h">
+      <Filter>Source\LevelEditor</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scripting\ScriptManager.h">
-      <Filter>Source\Scripting</Filter>
+    <ClInclude Include="Source\LevelEditor\EditorDocLocal.h">
+      <Filter>Source\LevelEditor</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Sound\SoundComponent.h">
-      <Filter>Source\Sound</Filter>
+    <ClInclude Include="Source\LevelEditor\EditorFolderComponent.h">
+      <Filter>Source\LevelEditor</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Testheader.h">
+    <ClInclude Include="Source\LevelEditor\EditorInputs.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\EditorModes.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\EditorRecents.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\EditorUILayout.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\EdPropertyGrid.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\IEditorApi.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\IInputReciever.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\LevelEditorCamera.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\ManipulateTransformTool.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\ObjectOutlineFilter.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\OrthoCamera.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\PropertyEditors.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\RoadBuilderTool.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\SelectionState.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\TagManager.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelEditor\ViewportHandles.h">
+      <Filter>Source\LevelEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\LevelSerialization\SerializeNew.h">
+      <Filter>Source\LevelSerialization</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Logging.h">
       <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\UI\OnScreenLogGui.h">
-      <Filter>Source\UI</Filter>
+    <ClInclude Include="Source\MyGame\fps\AnimGraphTester.h">
+      <Filter>Source\MyGame\fps</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MyGame\fps\AnimGraphTesterEditorUI.h">
+      <Filter>Source\MyGame\fps</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MyGame\fps\fpsApp.h">
+      <Filter>Source\MyGame\fps</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MyGame\fps\fpsDebugCamera.h">
+      <Filter>Source\MyGame\fps</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MyGame\fps\fpsObjects.h">
+      <Filter>Source\MyGame\fps</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\MyGame\fps\fpsTestObjects.h">
+      <Filter>Source\MyGame\fps</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Navigation\LevelNavUtil.h">
+      <Filter>Source\Navigation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Navigation\NavAgentComponent.h">
+      <Filter>Source\Navigation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Navigation\NavMeshBaker.h">
+      <Filter>Source\Navigation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Navigation\NavMeshDebugDraw.h">
+      <Filter>Source\Navigation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Navigation\NavMeshSettingsComponent.h">
+      <Filter>Source\Navigation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Navigation\NavMeshVolumeComponent.h">
+      <Filter>Source\Navigation</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Navigation\RuntimeNavManager.h">
+      <Filter>Source\Navigation</Filter>
     </ClInclude>
     <ClInclude Include="Source\Physics\ChannelsAndPresets.h">
       <Filter>Source\Physics</Filter>
     </ClInclude>
     <ClInclude Include="Source\Physics\Physics2.h">
+      <Filter>Source\Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Physics\Physics2Local.h">
       <Filter>Source\Physics</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\DrawLocal.h">
@@ -1183,6 +1541,12 @@
     <ClInclude Include="Source\Render\DrawTypedefs.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Render\Dx11\Dx11Local.h">
+      <Filter>Source\Render\Dx11</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\DynamicMaterialPtr.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Render\Editor\TextureEditor.h">
       <Filter>Source\Render\Editor</Filter>
     </ClInclude>
@@ -1192,10 +1556,13 @@
     <ClInclude Include="Source\Render\Frustum.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\Meshlet.h">
+    <ClInclude Include="Source\Render\GpuAllocator.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\Model.h">
+    <ClInclude Include="Source\Render\GpuCullingTest.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\IGraphicsDevice.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\MaterialLocal.h">
@@ -1204,13 +1571,22 @@
     <ClInclude Include="Source\Render\MaterialPublic.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\RenderExtra.h">
+    <ClInclude Include="Source\Render\Meshlet.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\RenderObj.h">
+    <ClInclude Include="Source\Render\Model.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Render\RenderScene.h">
+    <ClInclude Include="Source\Render\ModelManager.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\PostProcessSettings.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\PPManager.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\RectPackerUtil.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
     <ClInclude Include="Source\Render\Render_Decal.h">
@@ -1225,19 +1601,73 @@
     <ClInclude Include="Source\Render\Render_Volumes.h">
       <Filter>Source\Render</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Render\RenderConfigVars.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\RenderExtra.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\RenderGiManager.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\RenderObj.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\RenderScene.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\RenderWindow.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\RT\RaytraceTest.h">
+      <Filter>Source\Render\RT</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\ShaderSourceLoader.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\SpirvCompile.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
     <ClInclude Include="Source\Render\Texture.h">
       <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Render\ViewSetup.h">
+      <Filter>Source\Render</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Scripting\LuaTestRunner.h">
+      <Filter>Source\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Scripting\ScriptFunctionCodegen.h">
+      <Filter>Source\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Scripting\ScriptingStdLib.h">
+      <Filter>Source\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Scripting\ScriptManager.h">
+      <Filter>Source\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Sound\SoundComponent.h">
+      <Filter>Source\Sound</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Sound\SoundLocal.h">
+      <Filter>Source\Sound</Filter>
     </ClInclude>
     <ClInclude Include="Source\Sound\SoundPublic.h">
       <Filter>Source\Sound</Filter>
     </ClInclude>
-    <ClInclude Include="Source\User_Camera.h">
+    <ClInclude Include="Source\Testheader.h">
       <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="Source\UI\BaseGUI.h">
       <Filter>Source\UI</Filter>
     </ClInclude>
+    <ClInclude Include="Source\UI\Gui.h">
+      <Filter>Source\UI</Filter>
+    </ClInclude>
     <ClInclude Include="Source\UI\GUISystemPublic.h">
+      <Filter>Source\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\UI\OnScreenLogGui.h">
       <Filter>Source\UI</Filter>
     </ClInclude>
     <ClInclude Include="Source\UI\UIBuilder.h">
@@ -1252,53 +1682,9 @@
     <ClInclude Include="Source\UI\Widgets\Layouts.h">
       <Filter>Source\UI\Widgets</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Sound\SoundLocal.h">
-      <Filter>Source\Sound</Filter>
+    <ClInclude Include="Source\User_Camera.h">
+      <Filter>Source</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Scripting\LuaTestRunner.h" />
-    <ClInclude Include="Source\UI\Gui.h" />
-    <ClInclude Include="Source\EngineMain.h" />
-    <ClInclude Include="Source\Render\RenderConfigVars.h" />
-    <ClInclude Include="Source\LevelEditor\OrthoCamera.h" />
-    <ClInclude Include="Source\LevelEditor\LevelEditorCamera.h" />
-    <ClInclude Include="Source\LevelEditor\EditorRecents.h" />
-    <ClInclude Include="Source\LevelEditor\IInputReciever.h" />
-    <ClInclude Include="Source\Render\ViewSetup.h" />
-    <ClInclude Include="Source\LevelEditor\EditorInputs.h" />
-    <ClInclude Include="Source\LevelEditor\SelectionState.h" />
-    <ClInclude Include="Source\LevelEditor\ManipulateTransformTool.h" />
-    <ClInclude Include="Source\LevelEditor\ViewportHandles.h" />
-    <ClInclude Include="Source\Game\GameplayStatic.h" />
-    <ClInclude Include="Source\LevelEditor\EdPropertyGrid.h" />
-    <ClInclude Include="Source\LevelEditor\EditorModes.h" />
-    <ClInclude Include="Source\Assets\FileWatcher.h" />
-    <ClInclude Include="Source\LevelEditor\DragDetector.h" />
-    <ClInclude Include="Source\LevelEditor\DragDropPreview.h" />
-    <ClInclude Include="Source\LevelEditor\EditorUILayout.h" />
-    <ClInclude Include="Source\Logging.h" />
-    <ClInclude Include="Source\LevelEditor\IEditorApi.h" />
-    <ClInclude Include="Source\Game\Components\PrefabAssetComponent.h" />
-    <ClInclude Include="Source\Game\Prefab.h" />
-    <ClInclude Include="Source\Game\BikeDemo\BikeHeaders.h" />
-    <ClInclude Include="Source\Game\ObsGame\ObsGameHeaders.h" />
-    <ClInclude Include="Source\Game\Components\RoadNetworkComponent.h" />
-    <ClInclude Include="Source\LevelEditor\RoadBuilderTool.h" />
-    <ClInclude Include="Source\ITestRunner.h" />
-    <ClInclude Include="Source\Assets\AssetInspectorPane.h" />
-    <ClInclude Include="Source\Assets\AssetSizeViewer.h" />
-    <ClInclude Include="Source\Render\ShaderSourceLoader.h" />
-    <ClInclude Include="Source\Render\SpirvCompile.h" />
-    <ClInclude Include="Source\External\imgui_impl_sdl2.h" />
-    <ClInclude Include="Source\Navigation\RuntimeNavManager.h" />
-    <ClInclude Include="Source\Navigation\LevelNavUtil.h" />
-    <ClInclude Include="Source\Navigation\NavMeshVolumeComponent.h" />
-    <ClInclude Include="Source\Navigation\NavMeshSettingsComponent.h" />
-    <ClInclude Include="Source\Navigation\NavAgentComponent.h" />
-    <ClInclude Include="Source\Navigation\NavMeshBaker.h" />
-    <ClInclude Include="Source\Navigation\NavMeshDebugDraw.h" />
-    <ClInclude Include="Source\MyGame\fps\fpsApp.h" />
-    <ClInclude Include="Source\MyGame\fps\fpsDebugCamera.h" />
-    <ClInclude Include="Source\MyGame\fps\fpsObjects.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include=".clang-format" />

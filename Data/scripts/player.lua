@@ -94,7 +94,7 @@ function explode_shared(pos,player)
     local objs = GameplayStatic.sphere_overlap(pos,3.0,GameplayStatic.get_collision_mask_for_physics_layer(PL_PHYSICSOBJECT))
     for index, value in ipairs(objs) do
         local body = value:get_component(PhysicsBody)
-        if body~=nil and (not body:get_is_static()) then
+        if body~=nil and (body:get_body_type() ~= BODYTYPE_STATIC) then
             local dir = normalize(vec_sub(body:get_owner():get_ws_position(),pos))
             
             body:apply_impulse(pos,vec_multf(dir,GRANDE_EXPLODE_FORCE))
@@ -186,7 +186,7 @@ function FpPlayer:_shoot_hitscan()
     if hitresult.hit then
         print("HIT")
         local body = hitresult.what:get_component(PhysicsBody)
-        if body ~= nil and body:get_is_simulating() then
+        if body ~= nil and body:get_body_type() == BODYTYPE_DYNAMIC then
             print("applied impulse")
             body:apply_impulse(hitresult.what:get_ws_position(),vec_multf(vdir,IMPULSE_STR))
             gExplosionMgr:create_explosion(hitresult.pos)
@@ -398,7 +398,7 @@ function FpPlayer:update()
 end
 function FpPlayer:start()
     local cap = self:get_owner():create_component(CapsuleComponent)
-    cap:set_is_static(false)
+    cap:set_body_type(BODYTYPE_KINEMATIC)
     cap:set_data(1.9,0.25,0.8)
     cap:set_physics_layer(PL_CHARACTER)
     --cap:set_is_trigger(true)
@@ -458,8 +458,7 @@ function create_enemy_position(pos)
     local capsule = ent:create_component(CapsuleComponent)
     capsule:set_data(1.8,0.3,0.9)
     capsule:set_physics_layer(PL_CHARACTER)
-    capsule:set_is_static(false)
-    capsule:set_is_simulating(false)
+    capsule:set_body_type(BODYTYPE_KINEMATIC)
     --capsule:set_is_trigger(true)
     
     local mesh = ent:create_component(MeshComponent)

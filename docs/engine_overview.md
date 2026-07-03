@@ -154,9 +154,8 @@ Static utility, exposed to Lua:
 
 PhysX wrapper. Bodies are components: `CapsuleComponent`, `BoxComponent`, `SphereComponent`, `MeshColliderComponent`.
 
-- `set_is_static(bool)` — static vs dynamic.
-- `set_is_simulating(bool)` — kinematic vs simulated.
-- Triggers: `set_is_trigger(true)` + `add_triggered_callback(IPhysicsEventCallback*)`.
+- `set_body_type(BodyType)` — `Static` / `Kinematic` / `Dynamic` (Lua: `BODYTYPE_*`).
+- Triggers: `set_is_trigger(true)` + `set_send_overlap(true)`.
 
 **CharacterMovementComponent** (`Source/Game/Entities/CharacterController.h`) — wraps a `CharacterController`, NOT a physics body:
 - Requires separate body via `set_physics_body(body)`.

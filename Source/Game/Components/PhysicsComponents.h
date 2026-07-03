@@ -28,21 +28,6 @@ class MeshBuilderComponent;
 class BillboardComponent;
 class Model;
 
-// hack bs to work with script fixme
-struct PhysicsBodyEventArg
-{
-	STRUCT_BODY();
-	REF obj<Entity> who;
-	REF bool entered_trigger = false; // false = left
-};
-
-class IPhysicsEventCallback : public ClassBase
-{
-public:
-	CLASS_BODY(IPhysicsEventCallback, scriptable);
-	REF virtual void on_event(PhysicsBodyEventArg event) {}
-};
-
 // Canonical encoding of "what kind of physics object is this?".
 // Static    — RigidStatic; immovable, scene-query only.
 // Kinematic — RigidDynamic with eKINEMATIC; moved by user code, not the simulation.
@@ -79,11 +64,7 @@ public:
 	// Unity/Unreal cheat-sheet in docs/physics/transforms.md.
 
 	// --- Canonical body-type API. Prefer these in C++. ---
-	REF BodyType get_body_type() const {
-		if (is_static)
-			return BodyType::Static;
-		return simulate_physics ? BodyType::Dynamic : BodyType::Kinematic;
-	}
+	REF BodyType get_body_type() const { return body_type; }
 	REF void set_body_type(BodyType t);
 
 	// `enabled` is orthogonal to body type: it gates whether the actor ticks at
@@ -94,8 +75,11 @@ public:
 	REF bool get_is_trigger() const { return is_trigger; }
 	REF void set_is_trigger(bool is_trig);
 
-	REF void set_send_overlap(bool send_overlap);
+	// Opt this body into simulation contact events. When set, a collision against
+	// another body fires Component::on_hit on this entity's components. Cheap to
+	// leave off: PhysX only reports contacts for pairs where a body opts in.
 	REF void set_send_hit(bool send_hit);
+	REF bool get_send_hit() const { return send_hit; }
 
 	REF PL get_physics_layer() const { return physics_layer; }
 	REF void set_physics_layer(PL l);
@@ -119,48 +103,45 @@ public:
 	REF void apply_force(const glm::vec3& worldspace, const glm::vec3& force);
 
 	REF float get_mass() const;
+	// Mass authoring — two mutually exclusive modes for a Dynamic body:
+	//   density mode (default): mass/inertia derived from shape volume * density.
+	//   explicit-mass mode:     total mass is fixed; inertia is derived from the
+	//                           shape distribution scaled to hit that mass.
+	// The last setter called wins. Both recompute on the next shape change.
 	REF void set_density(float d) {
 		this->density = d;
+		this->use_explicit_mass = false;
 		on_shape_changes();
 	}
+	REF void set_mass(float m) {
+		this->mass = m;
+		this->use_explicit_mass = true;
+		on_shape_changes();
+	}
+	// Overrides the local-space center of mass. Applies on top of either mass mode.
+	// Without this, PhysX computes the COM from the shape distribution.
+	REF void set_center_of_gravity(const glm::vec3& local_com) {
+		this->center_of_gravity = local_com;
+		this->override_center_of_gravity = true;
+		on_shape_changes();
+	}
+	// Reverts to the PhysX-computed center of mass (undoes set_center_of_gravity).
+	REF void clear_center_of_gravity() {
+		this->override_center_of_gravity = false;
+		on_shape_changes();
+	}
+	REF glm::vec3 get_center_of_gravity() const;
 
 	void enable_with_initial_transforms(const glm::mat4& t0, const glm::mat4& t1, float dt);
 
-	// ============================ DEPRECATED ============================
-	// Grouped here so it can be removed as a block later. Two categories:
-	//
-	// (A) Safe to delete once C++ callers are migrated (NOT Lua-bound):
-	//     - set_transform(): superseded by teleport_to()/move_to().
-	//       (get_transform() was renamed to get_physics_pose().)
-	//
-	// (B) Lua-compat shims -- KEEP until Data/scripts stop using them. Each
-	//     dispatches through set_body_type() so the canonical funnel still owns
-	//     the transition. C++ code must use get/set_body_type() instead.
-	// ---------------------------------------------------------------------
-	// (A)
-	void set_transform(const glm::mat4& transform, bool teleport = false); // -> teleport_to
-	// (B)
-	REF bool get_is_kinematic() const { return get_body_type() == BodyType::Kinematic; }
-	REF void set_is_kinematic(bool kinematic);
-	REF bool get_is_simulating() const { return simulate_physics; }
-	REF void set_is_simulating(bool is_simulating);
-	REF bool get_is_static() const { return is_static; }
-	REF void set_is_static(bool is_static);
-	// ========================== END DEPRECATED ==========================
 
 	physx::PxRigidActor* get_physx_actor() const { return physxActor; }
 
 	// Introspection (mostly for tests / asserts): read the underlying PhysX actor's
 	// type, not the configured field. These can diverge before apply_actor_config
-	// runs, so use these — not get_is_static() etc. — to check what physics actually sees.
+	// runs, so use these — not get_body_type() — to check what physics actually sees.
 	bool get_is_actor_static() const;
 	bool get_is_actor_kinematic() const;
-
-	// allocate but DO NOT FREE IPhysicsEventCallback. ownership is taken
-	// this is for lua code, c++ use on_trigger. bs fixme etc
-	//
-	// see add_physics_callback and PhysicsEventCallbackImpl in lua for usage
-	REF void add_triggered_callback(IPhysicsEventCallback* callback);
 
 	// doesnt take ownership, physics materials have forever lifetimes, see class PhysicsMaterialWrapper
 	REF void set_material(PhysicsMaterialWrapper* material) {
@@ -180,44 +161,43 @@ protected:
 	MeshBuilderComponent* get_editor_meshbuilder() const;
 
 private:
-	void on_actor_type_change();
-	// Single funnel: reconciles physxActor with (enabled, simulate_physics, is_static).
+	// Single funnel: reconciles physxActor with (enabled, body_type).
 	// Rebuilds the actor when static<->dynamic, otherwise just toggles flags. Call
-	// after mutating any of the three fields.
+	// after mutating body_type or enabled.
 	void apply_actor_config();
+	void on_actor_type_change();
+	void refresh_shapes();
+	virtual void add_actor_shapes() {}
+	void set_shape_flags(physx::PxShape* shape);
+	
+	virtual void add_editor_shapes() {}
 
 	void update_bone_parent_animator();
-
-	void refresh_shapes();
 
 	friend class PhysicsManImpl;
 	void fetch_new_transform();
 
 	// override this
-	virtual void add_actor_shapes() {}
-	virtual void add_editor_shapes() {}
 
 	bool has_initialized() const { return physxActor != nullptr; }
 	physx::PxRigidDynamic* get_dynamic_actor() const;
-	void set_shape_flags(physx::PxShape* shape);
 
-	REF PL physics_layer = PL::Default;
-	REF bool enabled = true;
-	REF bool simulate_physics = false; // if true, then object is a DYNAMIC object driven by the physics simulation
-	REF bool is_static =
-		true; // if true, then the object is a STATIC object driven that cant ever move
-			  // if false, then this object is KINEMATIC if simulate_physics is false or DYNAMIC if its true
-			  // isStatic and simulate_physics is illogical so it falls back to isStatic in that case
-	REF bool is_trigger = false; // if true, then the objects shapes are treated like triggers and sends OVERLAP events
-								 // for a generic static trigger box, use with is_static = true
-	REF bool send_overlap = false; // if true on both objects, then a overlap event will be sent (one of the objects has
-								   // to be a trigger object)
-	REF bool send_hit = false;	   // if true on both objects, then a hit event will be sent when the 2 objects hit each
+	PL physics_layer = PL::Default;
+	bool enabled = true;
+	// Static / Kinematic / Dynamic. See get_body_type() and the ownership model above.
+	BodyType body_type = BodyType::Static;
+	bool is_trigger = false; // if true, then the objects shapes are treated like triggers and sends OVERLAP events
+								 // for a generic static trigger box, use with body_type = Static
+
+	bool send_hit = false;	   // if true on both objects, then a hit event will be sent when the 2 objects hit each
 								   // other in the simulation
-	// UNUSED: visual interpolation is not implemented. Field kept only so existing
-	// serialized levels don't drop a property. Do not build logic on this.
-	REF bool interpolate_visuals = true;
-	REF float density = 2.0;
+
+	float density = 2.0; // used when use_explicit_mass == false
+	float mass = 1.0;	 // used when use_explicit_mass == true
+	bool use_explicit_mass = false;
+	// Local-space center-of-mass override, active only when override_center_of_gravity is set.
+	glm::vec3 center_of_gravity = glm::vec3(0.f);
+	bool override_center_of_gravity = false;
 
 	physx::PxRigidActor* physxActor = nullptr;
 	PhysicsMaterialWrapper* material = nullptr;
@@ -239,7 +219,7 @@ public:
 
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
-		return get_is_simulating() ? "eng/editor/phys_capsule_simulate.png" : "eng/editor/phys_capsule.png";
+		return get_body_type() == BodyType::Dynamic ? "eng/editor/phys_capsule_simulate.png" : "eng/editor/phys_capsule.png";
 	}
 #endif
 	REF void set_data(float height, float radius, float height_ofs) {
@@ -264,7 +244,7 @@ public:
 
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
-		return get_is_simulating() ? "eng/editor/phys_box_simulate.png" : "eng/editor/phys_box.png";
+		return get_body_type() == BodyType::Dynamic ? "eng/editor/phys_box_simulate.png" : "eng/editor/phys_box.png";
 	}
 #endif
 };
@@ -278,7 +258,7 @@ public:
 
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
-		return get_is_simulating() ? "eng/editor/phys_sphere_simulate.png" : "eng/editor/phys_sphere.png";
+		return get_body_type() == BodyType::Dynamic ? "eng/editor/phys_sphere_simulate.png" : "eng/editor/phys_sphere.png";
 	}
 #endif
 
@@ -300,7 +280,7 @@ public:
 
 #ifdef EDITOR_BUILD
 	const char* get_editor_outliner_icon() const final {
-		return get_is_simulating() ? "eng/editor/phys_mesh_simulate.png" : "eng/editor/phys_mesh.png";
+		return get_body_type() == BodyType::Dynamic ? "eng/editor/phys_mesh_simulate.png" : "eng/editor/phys_mesh.png";
 	}
 #endif
 };

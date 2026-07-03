@@ -1,33 +1,27 @@
--- Smoke test for the PhysicsBody lifecycle setters from Lua. Mirrors the
--- pattern used in import_scripts.lua (set_is_static / set_is_simulating /
--- set_is_enable) and confirms the funnel introduced in apply_actor_config()
--- did not regress the script-facing API.
+-- Smoke test for the PhysicsBody body-type API from Lua (get/set_body_type +
+-- set_is_enable). Mirrors the pattern used in import_scripts.lua and confirms
+-- the funnel in apply_actor_config() did not regress the script-facing API.
 
 add_test("physics/body/lua_smoke_static_dynamic_toggle", function()
     local ent = GameplayStatic.spawn_entity()
     local body = ent:create_component(BoxComponent)
 
-    assert(body:get_is_static(), "default body should be static")
-    assert(not body:get_is_simulating(), "default body should not simulate")
+    assert(body:get_body_type() == BODYTYPE_STATIC, "default body should be static")
 
-    body:set_is_static(false)
-    body:set_is_simulating(true)
-    assert(not body:get_is_static(), "set_is_static(false) takes effect")
-    assert(body:get_is_simulating(), "set_is_simulating(true) takes effect")
+    body:set_body_type(BODYTYPE_DYNAMIC)
+    assert(body:get_body_type() == BODYTYPE_DYNAMIC, "set Dynamic takes effect")
 
-    -- Flip back. Setting static must canonicalize simulate_physics to false
-    -- (per apply_actor_config's illegal-combo guard).
-    body:set_is_static(true)
-    assert(body:get_is_static(), "set_is_static(true) takes effect")
-    assert(not body:get_is_simulating(),
-           "static body must not report simulating (canonicalized)")
+    body:set_body_type(BODYTYPE_KINEMATIC)
+    assert(body:get_body_type() == BODYTYPE_KINEMATIC, "set Kinematic takes effect")
+
+    body:set_body_type(BODYTYPE_STATIC)
+    assert(body:get_body_type() == BODYTYPE_STATIC, "set Static takes effect")
 end)
 
 add_test("physics/body/lua_smoke_enable_disable", function()
     local ent = GameplayStatic.spawn_entity()
     local body = ent:create_component(BoxComponent)
-    body:set_is_static(false)
-    body:set_is_simulating(true)
+    body:set_body_type(BODYTYPE_DYNAMIC)
 
     assert(body:get_is_enabled(), "default enabled")
     body:set_is_enable(false)

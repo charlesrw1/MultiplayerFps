@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Framework/EnumDefReflection.h"
+#include <span>
 
 // physics layers
 NEWENUM(PL, uint8_t){
@@ -15,4 +16,6 @@ NEWENUM(PL, uint8_t){
 };
 using PhysicsLayer = PL;
 
-uint32_t get_collision_mask_for_physics_layer(PhysicsLayer layer);
+// The engine's built-in default collision matrix, fed to
+// PhysicsManager::set_physics_layer_collisions at startup.
+std::span<const bool> get_default_layer_collision_matrix();

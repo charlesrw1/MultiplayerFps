@@ -137,7 +137,7 @@ function weapon_shoot_hitscan(parent)
     if hitresult.hit then
         print("HIT")
         local body = hitresult.what:get_component(PhysicsBody)
-        if body ~= nil and body:get_is_simulating() then
+        if body ~= nil and body:get_body_type() == BODYTYPE_DYNAMIC then
             print("applied impulse")
             body:apply_impulse(hitresult.what:get_ws_position(),vec_multf(vdir,IMPULSE_STR))
             gExplosionMgr:create_explosion(hitresult.pos)
@@ -187,8 +187,7 @@ function WeaponC4:update()
         mesh:set_model(Model.load("c4_object.cmdl"))
         local phys = c4_obj:create_component(SphereComponent)
         phys:set_physics_layer(PL_PHYSICSOBJECT)
-        phys:set_is_static(false)
-        phys:set_is_simulating(true)
+        phys:set_body_type(BODYTYPE_DYNAMIC)
         phys:set_radius(0.08)
         phys:apply_impulse(vpos,vec_multf(vdir,C4_IMPULSE))
         local trail = c4_obj:create_component(TrailComponent)
@@ -269,12 +268,12 @@ function WeaponPhysics:update()
             local hitresult = GameplayStatic.cast_ray(vpos,vec_add(vpos,vec_multf(vdir,10.0)),visMask, self.parent.physics)
             if hitresult.hit and hitresult.what then
                 local pb = hitresult.what:get_component(PhysicsBody)
-                if pb and not pb:get_is_static() then
+                if pb and pb:get_body_type() ~= BODYTYPE_STATIC then
                     self.theBeam:set_visible(true)
                     self.theBeam:set_target_pos(hitresult.pos)
                     self.theBeam:reset()
                     self.manipulating_object = pb
-                    pb:set_is_simulating(false)
+                    pb:set_body_type(BODYTYPE_KINEMATIC)
                     local manipPos = self.manipulating_object:get_owner():get_ws_position()
                     local toManip = vec_sub(manipPos,vpos)
                     local toManipLen = lMath.length(toManip)
@@ -298,7 +297,7 @@ function WeaponPhysics:update()
                 self.theBeam:set_target_pos(manipObj:get_ws_position())
 
                 if lInput.was_mouse_pressed(2) then
-                    self.manipulating_object:set_is_simulating(true)
+                    self.manipulating_object:set_body_type(BODYTYPE_DYNAMIC)
                     self.manipulating_object:set_linear_velocity(vec_multf(actual_gun_dir,10.0))
                     self.theBeam:set_visible(false)
                 end
@@ -309,7 +308,7 @@ function WeaponPhysics:update()
         end
     else
         if not GameplayStatic.is_null(self.manipulating_object) then
-            self.manipulating_object:set_is_simulating(true)
+            self.manipulating_object:set_body_type(BODYTYPE_DYNAMIC)
         end
         self.manipulating_object = nil
 
@@ -352,8 +351,7 @@ function WeaponGrenadeLauncher:_create_grenade()
     local phys = sphere:create_component(SphereComponent)
     phys:set_physics_layer(PL_PHYSICSOBJECT)
     phys:set_radius(0.2)
-    phys:set_is_static(false)
-    phys:set_is_simulating(true)
+    phys:set_body_type(BODYTYPE_DYNAMIC)
     phys:apply_impulse(vpos,vec_multf(vdir,GRENADE_IMPULSE))
 
 

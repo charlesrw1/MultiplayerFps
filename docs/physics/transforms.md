@@ -38,14 +38,14 @@ of fall" bug. It is now a deprecated shim; do not use it.)
 ## Body type
 
 `enum BodyType { Static, Kinematic, Dynamic }` via `get/set_body_type()` — the
-canonical C++ API. Internally: `Static` = RigidStatic; `Kinematic` =
-RigidDynamic+eKINEMATIC (code-driven); `Dynamic` = RigidDynamic (simulated).
-`static + simulating` is illegal and canonicalizes to Static.
-`set_is_enable(bool)` is orthogonal — it gates whether the actor ticks at all.
+sole body-type API (C++ and Lua). Internally: `Static` = RigidStatic;
+`Kinematic` = RigidDynamic+eKINEMATIC (code-driven); `Dynamic` = RigidDynamic
+(simulated). Stored as one `BodyType body_type` field, so illegal combos are
+unrepresentable. `set_is_enable(bool)` is orthogonal — it gates whether the
+actor ticks at all. Lua uses the `BODYTYPE_STATIC/KINEMATIC/DYNAMIC` constants.
 
-The bool API (`set_is_static/set_is_simulating/set_is_kinematic`) is DEPRECATED
-for C++ (kept only as Lua-compat shims) — use `set_body_type`. All deprecated
-symbols are grouped in one block at the bottom of the `PhysicsBody` class.
+The old bool API (`set_is_static/set_is_simulating/set_is_kinematic`) has been
+removed; use `set_body_type`.
 
 ## Scale (known limitation)
 

@@ -1,5 +1,6 @@
 #include "Physics2.h"
 #include "Physics2Local.h"
+#include "ChannelsAndPresets.h"
 #include "Render/RenderObj.h"
 #include <physx/PxRigidActor.h>
 #include <physx/PxRigidDynamic.h>
@@ -98,6 +99,15 @@ void PhysicsManager::simulate_and_fetch(float dt) {
 
 bool PhysicsManager::load_physics_into_shape(BinaryReader& reader, physics_shape_def& def) {
 	return impl->load_physics_into_shape(reader, def);
+}
+
+void PhysicsManager::set_physics_layer_collisions(std::span<const bool> triangular_matrix) {
+	impl->set_physics_layer_collisions(triangular_matrix);
+}
+
+uint32_t PhysicsManager::get_collision_mask_for_layer(int layer) {
+	ASSERT(layer >= 0 && layer < PhysicsManImpl::MAX_PHYSICS_LAYERS);
+	return impl->layer_collision_masks[layer];
 }
 
 #include "Render/RenderObj.h"
@@ -212,7 +222,25 @@ public:
 	virtual void onWake(PxActor** actors, PxU32 count) override {}
 	virtual void onSleep(PxActor** actors, PxU32 count) override {}
 	virtual void onContact(const PxContactPairHeader& pairHeader, const PxContactPair* pairs, PxU32 nbPairs) override {
-		sys_print(Debug, "contact\n");
+		PhysicsBody* a = (PhysicsBody*)pairHeader.actors[0]->userData;
+		PhysicsBody* b = (PhysicsBody*)pairHeader.actors[1]->userData;
+		if (!a || !b)
+			return;
+		for (PxU32 i = 0; i < nbPairs; i++) {
+			const PxContactPair& cp = pairs[i];
+			// Only the initial touch fires a hit (matches Unreal's OnComponentHit,
+			// which is enter-only, not a per-frame "still touching" event).
+			if (!(cp.events & PxPairFlag::eNOTIFY_TOUCH_FOUND))
+				continue;
+			contact_pair out{a, b};
+			PxContactPairPoint pt;
+			if (cp.extractContacts(&pt, 1) > 0) {
+				out.position = physx_to_glm(pt.position);
+				out.normal = physx_to_glm(pt.normal);
+				out.impulse = pt.impulse.magnitude();
+			}
+			contact_pairs.push_back(out);
+		}
 	}
 	virtual void onTrigger(PxTriggerPair* pairs, PxU32 count) override {
 		for (int i = 0; i < (int)count; i++) {
@@ -232,10 +260,10 @@ public:
 		ZoneScoped;
 
 		for (auto& p : triggered_pairs) {
-			PhysicsBodyEventArg arg;
-			arg.entered_trigger = p.is_start;
+			Entity* who = nullptr;
+			const bool entered_trigger = p.is_start;
 			if (p.other)
-				arg.who = p.other->get_owner();
+				who = p.other->get_owner();
 
 			auto invoke_on_trigger = [&]() {
 				Entity* owner = p.trigger->get_owner();
@@ -246,7 +274,7 @@ public:
 					auto* c = owner->get_components().at(i);
 					if (c == p.trigger)
 						continue;
-					c->on_trigger(arg.who, p.is_start);
+					c->on_collider_trigger(who, entered_trigger);
 					// now, have to make sure entity didnt delete itself
 					if (!handle.get())
 						return;
@@ -258,6 +286,37 @@ public:
 		triggered_pairs.clear();
 	}
 
+	// Dispatch a single body's Component::on_hit to its siblings (skips the body
+	// itself, like the trigger path). Only fires if the body opted in via send_hit.
+	void dispatch_hit(PhysicsBody* self, PhysicsBody* other, const glm::vec3& pos, const glm::vec3& normal,
+					  float impulse) {
+		if (!self || !self->get_send_hit())
+			return;
+		Entity* owner = self->get_owner();
+		ASSERT(owner);
+		Entity* other_owner = other ? other->get_owner() : nullptr;
+		EntityPtr handle = owner;
+		for (int i = 0; i < owner->get_components().size(); i++) {
+			auto* c = owner->get_components().at(i);
+			if (c == self)
+				continue;
+			c->on_collider_hit(other_owner, pos, normal, impulse);
+			// on_hit may have destroyed the entity — bail if so.
+			if (!handle.get())
+				return;
+		}
+	}
+
+	void call_all_hits() {
+		ZoneScoped;
+		for (auto& p : contact_pairs) {
+			// Each side gets the other as `other`, with the normal pointing toward it.
+			dispatch_hit(p.a, p.b, p.position, p.normal, p.impulse);
+			dispatch_hit(p.b, p.a, p.position, -p.normal, p.impulse);
+		}
+		contact_pairs.clear();
+	}
+
 	struct trigger_pair
 	{
 		PhysicsBody* trigger = nullptr;
@@ -265,6 +324,16 @@ public:
 		bool is_start = false;
 	};
 	std::vector<trigger_pair> triggered_pairs;
+
+	struct contact_pair
+	{
+		PhysicsBody* a = nullptr;
+		PhysicsBody* b = nullptr;
+		glm::vec3 position{0.f};
+		glm::vec3 normal{0.f};
+		float impulse = 0.f;
+	};
+	std::vector<contact_pair> contact_pairs;
 };
 PhysicsManImpl::~PhysicsManImpl() {}
 PhysicsManImpl::PhysicsManImpl() {}
@@ -286,6 +355,11 @@ static PxFilterFlags my_filter_shader(PxFilterObjectAttributes attributes0, PxFi
 		return PxFilterFlag::eDEFAULT;
 	}
 	pairFlags = PxPairFlag::eCONTACT_DEFAULT;
+	// word2 bit0 = "send_hit" opt-in (set in PhysicsBody::set_shape_flags). If either
+	// body opts in, ask PhysX to report the touch + contact points so onContact can
+	// dispatch Component::on_hit. Non-opted pairs stay notification-free (no cost).
+	if ((filterData0.word2 | filterData1.word2) & 1u)
+		pairFlags |= PxPairFlag::eNOTIFY_TOUCH_FOUND | PxPairFlag::eNOTIFY_CONTACT_POINTS;
 	return PxFilterFlag::eDEFAULT;
 }
 #include "Framework/Jobs.h"
@@ -343,6 +417,40 @@ void PhysicsManImpl::init() {
 
 	mycallback.reset(new MyPhysicsCallback);
 	scene->setSimulationEventCallback(mycallback.get());
+
+	set_physics_layer_collisions(get_default_layer_collision_matrix());
+}
+
+void PhysicsManImpl::set_physics_layer_collisions(std::span<const bool> triangular_matrix) {
+	// Recover the layer count N from the flat size: N*(N+1)/2 entries.
+	const size_t count = triangular_matrix.size();
+	int N = 0;
+	while (size_t(N) * (N + 1) / 2 < count)
+		++N;
+	ASSERT(size_t(N) * (N + 1) / 2 == count &&
+		   "layer collision matrix must be triangular: N*(N+1)/2 entries");
+	ASSERT(N <= MAX_PHYSICS_LAYERS);
+
+	// Layers not described by the matrix (e.g. Visibility, UserStart+) collide with
+	// everything by default, so start fully permissive and only edit the NxN region.
+	for (int i = 0; i < MAX_PHYSICS_LAYERS; ++i)
+		layer_collision_masks[i] = UINT32_MAX;
+
+	// Row i lists columns j = N-1 .. i (reverse enum order, own layer last). Each
+	// entry toggles the pair (i,j) symmetrically in both layers' masks.
+	size_t idx = 0;
+	for (int i = 0; i < N; ++i) {
+		for (int j = N - 1; j >= i; --j) {
+			const bool collide = triangular_matrix[idx++];
+			if (collide) {
+				layer_collision_masks[i] |= (1u << j);
+				layer_collision_masks[j] |= (1u << i);
+			} else {
+				layer_collision_masks[i] &= ~(1u << j);
+				layer_collision_masks[j] &= ~(1u << i);
+			}
+		}
+	}
 }
 
 void PhysicsManImpl::simulate_and_fetch(float dt) {
@@ -353,6 +461,7 @@ void PhysicsManImpl::simulate_and_fetch(float dt) {
 		scene->fetchResults(true /* block */);
 	}
 	mycallback->call_all_triggered();
+	mycallback->call_all_hits();
 
 	{
 		ZoneScopedN("fetch_transforms");
@@ -506,3 +615,4 @@ void PhysicsMaterialWrapper::set_friction(float static_f, float dynamic_f) {
 void PhysicsMaterialWrapper::set_restitution(float r) {
 	material->setRestitution(r);
 }
+

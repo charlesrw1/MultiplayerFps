@@ -85,7 +85,7 @@ void GameplayStatic::debug_line_normal(glm::vec3 p, glm::vec3 n, float len, floa
 }
 
 int GameplayStatic::get_collision_mask_for_physics_layer(PL physics_layer) {
-	return (int)::get_collision_mask_for_physics_layer(physics_layer);
+	return (int)g_physics.get_collision_mask_for_layer((int)physics_layer);
 }
 
 Entity* GameplayStatic::spawn_entity() {

@@ -518,8 +518,7 @@ void RagdollConfigComponent::rebuild_bodies() {
 		// entity origin is the bone's own (proximal) position; extend the shape distally by half
 		// its height so it spans the bone segment instead of straddling the joint.
 		capsule->set_data(cfg.capsule_height, cfg.capsule_radius, cfg.capsule_height * 0.5f);
-		capsule->set_is_static(false);
-		capsule->set_is_simulating(true);
+		capsule->set_body_type(BodyType::Dynamic);
 
 		bone_name_to_entity[cfg.bone_name.get_hash()] = body_entity;
 

@@ -403,7 +403,7 @@ Player::Player() {
 	// player_capsule->set_is_trigger(true);
 	// player_capsule->set_send_overlap(true);
 	// player_capsule->set_is_enable(false);
-	// player_capsule->set_is_static(false);
+	// player_capsule->set_body_type(BodyType::Kinematic);
 	// player_capsule->height = 1.7;
 	// player_capsule->radius = 0.3;
 

@@ -24,22 +24,33 @@ public:
 	virtual ~Component() override;
 	// ClassBase override
 	void serialize(Serializer& s) override;
+	// called when start, only called in editor when set_call_init_in_editor(true) in ctor
 	REF virtual void start() {}
+	// called when set_ticking(true)
 	REF virtual void update() {}
+	// called when destroyed (if start() was called)
 	REF virtual void stop() {}
+	// always called for every component in editor
 	REF virtual void editor_start() {}
 
 	// callbacks for stuff. func called on every sibling component of caller.
-	REF virtual void on_trigger(Entity* other, bool entered) {}
+	REF virtual void on_collider_trigger(Entity* other, bool entered) {}
+
+	// Called on every sibling component when this entity's physics body collides with
+	// another in the simulation. Requires set_send_hit(true)
+	// on the PhysicsBody. `other` is the entity that was hit; `position` is the
+	// world-space contact point; `normal` is the world-space contact normal pointing
+	// toward `other`; `impulse` is the applied normal-impulse magnitude (0 if unknown).
+	REF virtual void on_collider_hit(Entity* other, glm::vec3 position, glm::vec3 normal, float impulse) {}
 
 
+	REF void set_ticking(bool shouldTick);
+	REF void destroy();
 
 	void init_updater();
 	void shutdown_updater();
-	REF void set_ticking(bool shouldTick);
 	void set_call_init_in_editor(bool b) { call_init_in_editor = b; }
 	bool get_call_init_in_editor() const { return call_init_in_editor; }
-	REF void destroy();
 
 	// Invoked by the scene walk in Model::post_load (reload path).  Default no-op.
 	// Override if this component caches anything derived from a Model's contents
@@ -53,11 +64,12 @@ public:
 	glm::vec3 get_ws_position() { return get_ws_transform()[3]; }
 	// helper function which calls eng->get_level()->add_to_sync_render_data_list(this)
 	void sync_render_data();
-	void set_owner_dont_serialize_or_edit(bool b);
+	REF void set_owner_dont_serialize_or_edit(bool b);
 #ifdef EDITOR_BUILD
 	virtual const char* get_editor_outliner_icon() const { return ""; }
 	virtual std::unique_ptr<IComponentEditorUi> create_editor_ui() { return nullptr; }
 	virtual void editor_on_draw_gizmos_selected() {}
+	REF virtual void editor_on_change_property() {}
 #endif
 protected:
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)
@@ -65,9 +77,6 @@ protected:
 	// called when syncing data to renderer
 	virtual void on_sync_render_data() {}
 #ifdef EDITOR_BUILD
-	// compile any data relevant to the node
-	virtual bool editor_compile() { return true; }
-	virtual void editor_on_change_property() {}
 	bool editor_is_selected = false;
 	bool editor_is_editor_only = false; // set in CTOR
 #endif
