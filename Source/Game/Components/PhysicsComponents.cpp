@@ -23,21 +23,15 @@ ConfigVar ed_physics_shapes_depth_tested("ed_physics_shapes_depth_tested", "1", 
 
 using namespace physx;
 
+// Called once per sim step for each Dynamic body that moved: PhysX drives the
+// Entity, so we write the solver's pose back into the owner transform. The
+// resulting on_changed_transform is a no-op for Dynamic bodies (see ownership
+// model in the header), so this does not feed back into the solver.
 void PhysicsBody::fetch_new_transform() {
 	ASSERT(get_is_simulating());
 	ASSERT(has_initialized());
 	auto pose = physxActor->getGlobalPose();
-	in_transform_fetch = true;
-	if (0 && interpolate_visuals) {
-		last_position = next_position;
-		last_rot = next_rot;
-		next_position = physx_to_glm(pose.p);
-		next_rot = physx_to_glm(pose.q);
-		set_ticking(true);
-	} else {
-		get_owner()->set_ws_transform(physx_to_glm(pose.p), physx_to_glm(pose.q), get_owner()->get_ls_scale());
-	}
-	in_transform_fetch = false;
+	get_owner()->set_ws_transform(physx_to_glm(pose.p), physx_to_glm(pose.q), get_owner()->get_ls_scale());
 }
 
 glm::vec3 calc_angular_vel(const glm::quat& q1, const glm::quat& q2, float dt) {
@@ -61,14 +55,11 @@ void PhysicsBody::enable_with_initial_transforms(const glm::mat4& t0, const glm:
 	glm::vec3 ang_vel = calc_angular_vel(rot0, rot1, dt);
 	set_linear_velocity(lin_vel);
 	set_angular_velocity(ang_vel);
-	last_position = t0[3];
-	next_position = t1[3];
-	last_rot = rot0;
-	next_rot = rot1;
 	get_owner()->set_is_top_level(true);
 	get_owner()->set_ws_transform(t1);
-	force_set_transform(t1);
-	set_ticking(true);
+	// Entity is now top-level Dynamic, so the set_ws_transform above is ignored by
+	// physics -- push the pose in explicitly.
+	teleport_to(t1);
 }
 
 void PhysicsBody::add_triggered_callback(IPhysicsEventCallback* callback) {
@@ -183,9 +174,6 @@ void PhysicsBody::start() {
 		ASSERT(has_initialized());
 
 		set_ticking(false);
-		// latch physics interpolation
-		next_position = get_owner()->get_ls_position();
-		next_rot = get_owner()->get_ls_rotation();
 
 		if (get_is_simulating()) {
 			auto& ws = get_ws_transform();
@@ -269,9 +257,14 @@ void PhysicsBody::on_changed_transform() {
 		return;
 	if (!enabled) // not enabled, skip
 		return;
-	if (simulate_physics && in_transform_fetch) // skip if in transform fetching
-		return;
-	set_transform(get_ws_transform());
+	// Push the Entity transform into physics per the ownership model (see header).
+	// A Dynamic body is driven BY physics, so an external Entity move is ignored
+	// here -- reposition it with teleport_to() instead.
+	switch (get_body_type()) {
+	case BodyType::Static:    teleport_to(get_ws_transform()); break;
+	case BodyType::Kinematic: move_to(get_ws_transform());     break;
+	case BodyType::Dynamic:   break; // physics owns the transform
+	}
 }
 
 PhysicsBody::~PhysicsBody() {
@@ -309,7 +302,7 @@ void PhysicsBody::apply_force(const glm::vec3& worldspace, const glm::vec3& forc
 	}
 }
 
-glm::mat4 PhysicsBody::get_transform() const {
+glm::mat4 PhysicsBody::get_physics_pose() const {
 	ASSERT(has_initialized());
 	auto pose = physxActor->getGlobalPose();
 	auto mat = glm::translate(glm::mat4(1), physx_to_glm(pose.p));
@@ -548,12 +541,6 @@ void PhysicsBody::refresh_shapes() {
 	}
 }
 
-void PhysicsBody::force_set_transform(const glm::mat4& m) {
-	if (has_initialized()) {
-		physxActor->setGlobalPose(glm_to_physx(m), true);
-	}
-}
-
 static void remove_scale_mat4(glm::mat4& m) {
 	vec3 right = vec3(m[0][0], m[1][0], m[2][0]);
 	vec3 up = vec3(m[0][1], m[1][1], m[2][1]);
@@ -576,27 +563,42 @@ static void remove_scale_mat4(glm::mat4& m) {
 	m[2][2] = fwd.z;
 }
 
-void PhysicsBody::set_transform(const glm::mat4& transform, bool teleport) {
+// Instant reposition for any body type. Preserves velocity (no hidden zeroing).
+// Scale is stripped: PhysX poses are rigid, and a scaled matrix would corrupt
+// the rotation quaternion. Shapes keep the scale baked at creation time.
+void PhysicsBody::teleport_to(const glm::mat4& world_transform) {
 	ASSERT(get_owner());
-	if (has_initialized()) {
-		if (simulate_physics || get_is_actor_static()) {
-			glm::mat4 temp = transform;
-			remove_scale_mat4(temp);
-			auto t = glm_to_physx(temp);
-			t.q.normalize();
-			physxActor->setGlobalPose(t);
-			if (simulate_physics) {
-				set_angular_velocity({});
-				set_linear_velocity({});
-			}
-		} else {
-			auto dyn = get_dynamic_actor();
-			auto t = glm_to_physx(transform);
-			t.q.normalize();
+	if (!has_initialized())
+		return;
+	glm::mat4 temp = world_transform;
+	remove_scale_mat4(temp);
+	auto t = glm_to_physx(temp);
+	t.q.normalize();
+	physxActor->setGlobalPose(t, /*autowake*/ true);
+}
 
-			dyn->setKinematicTarget(t);
-		}
-	}
+// Swept move toward the target for a Kinematic body (generates contacts along
+// the path). Only valid on a Kinematic body -- Static/Dynamic must use teleport_to.
+void PhysicsBody::move_to(const glm::mat4& world_transform) {
+	ASSERT(get_owner());
+	ASSERT(get_body_type() == BodyType::Kinematic &&
+		   "move_to() is Kinematic-only; use teleport_to() for Static/Dynamic bodies");
+	if (!has_initialized())
+		return;
+	glm::mat4 temp = world_transform;
+	remove_scale_mat4(temp);
+	auto t = glm_to_physx(temp);
+	t.q.normalize();
+	get_dynamic_actor()->setKinematicTarget(t);
+}
+
+// DEPRECATED shim -> teleport_to / move_to. The `teleport` flag is ignored
+// (routing is decided by body type). Retained only for signature compatibility.
+void PhysicsBody::set_transform(const glm::mat4& transform, bool /*teleport*/) {
+	if (get_body_type() == BodyType::Kinematic)
+		move_to(transform);
+	else
+		teleport_to(transform);
 }
 
 void PhysicsBody::set_is_trigger(bool is_trig) {
@@ -649,9 +651,6 @@ void PhysicsBody::apply_actor_config() {
 	if (!have_static) {
 		auto dyn = (PxRigidDynamic*)physxActor;
 		dyn->setRigidBodyFlag(PxRigidBodyFlag::eKINEMATIC, !simulate_physics);
-		// Resync interpolation latches when sim/kinematic mode flips.
-		next_position = get_owner()->get_ls_position();
-		next_rot = get_owner()->get_ls_rotation();
 	}
 	const bool drives_transform = enabled && !is_static && simulate_physics;
 	get_owner()->set_is_top_level(drives_transform);

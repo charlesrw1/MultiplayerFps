@@ -63,7 +63,22 @@ public:
 	void update() override;
 	void on_changed_transform() override;
 
-	// --- Canonical body-type API. Prefer these. ---
+	// ── Transform ownership model (READ THIS before touching transforms) ──
+	// A PhysicsBody has ONE of two relationships with its Entity's transform,
+	// selected by get_body_type():
+	//
+	//   Static / Kinematic : the ENTITY drives the body. Move the Entity
+	//       (Entity::set_ws_transform) and the body follows -- Static snaps
+	//       instantly, Kinematic sweeps toward the target (generates contacts).
+	//   Dynamic (simulating): PHYSX drives the Entity. Each simulation step the
+	//       solver writes the resulting pose back into the Entity transform, so
+	//       you READ a Dynamic body via entity->get_ws_transform(). Do NOT push
+	//       Entity transforms into a Dynamic body every frame -- it fights the
+	//       solver. To reposition one, call teleport_to().
+	//
+	// Unity/Unreal cheat-sheet in docs/physics/transforms.md.
+
+	// --- Canonical body-type API. Prefer these in C++. ---
 	REF BodyType get_body_type() const {
 		if (is_static)
 			return BodyType::Static;
@@ -71,18 +86,8 @@ public:
 	}
 	REF void set_body_type(BodyType t);
 
-	// --- Deprecated bool API. Kept REF for Lua backwards-compat (heavy use in
-	// Data/scripts). Each setter computes the equivalent BodyType and dispatches
-	// through set_body_type() so the canonical funnel still owns the transition. ---
-	REF bool get_is_kinematic() const { return get_body_type() == BodyType::Kinematic; }
-	REF void set_is_kinematic(bool kinematic);
-
-	REF bool get_is_simulating() const { return simulate_physics; }
-	REF void set_is_simulating(bool is_simulating);
-
-	REF bool get_is_static() const { return is_static; }
-	REF void set_is_static(bool is_static);
-
+	// `enabled` is orthogonal to body type: it gates whether the actor ticks at
+	// all. (set_is_enable kept as the real setter -- there is no BodyType for it.)
 	REF bool get_is_enabled() const { return enabled; }
 	REF void set_is_enable(bool enable);
 
@@ -95,9 +100,18 @@ public:
 	REF PL get_physics_layer() const { return physics_layer; }
 	REF void set_physics_layer(PL l);
 
-	glm::mat4 get_transform() const;
+	// --- Transform. Intent is explicit; neither call ever mutates velocity. ---
+	// Instant reposition (PhysX setGlobalPose). Valid for any body type; keeps
+	// current velocity. Unity Rigidbody.position / Unreal SetWorldLocation(Teleport).
+	void teleport_to(const glm::mat4& world_transform);
+	// Swept move for KINEMATIC bodies (PhysX setKinematicTarget) -- generates
+	// contacts along the path. Asserts if the body is not Kinematic. Unity MovePosition.
+	void move_to(const glm::mat4& world_transform);
+	// PhysX world pose (position+rotation only, NO scale). For a Dynamic body you
+	// usually want entity->get_ws_transform() instead -- physics writes it there.
+	glm::mat4 get_physics_pose() const;
 
-	// valid for dynamic actors only
+	// --- Velocity / forces (dynamic actors only) ---
 	REF glm::vec3 get_linear_velocity() const;
 	REF void set_linear_velocity(const glm::vec3& v);
 	REF void set_angular_velocity(const glm::vec3& v);
@@ -110,11 +124,29 @@ public:
 		on_shape_changes();
 	}
 
-	// REF void set_objects_mass(float mass);
-	// REF void set_objects_density(float density);
-	void set_transform(const glm::mat4& transform, bool teleport = false);
-
 	void enable_with_initial_transforms(const glm::mat4& t0, const glm::mat4& t1, float dt);
+
+	// ============================ DEPRECATED ============================
+	// Grouped here so it can be removed as a block later. Two categories:
+	//
+	// (A) Safe to delete once C++ callers are migrated (NOT Lua-bound):
+	//     - set_transform(): superseded by teleport_to()/move_to().
+	//       (get_transform() was renamed to get_physics_pose().)
+	//
+	// (B) Lua-compat shims -- KEEP until Data/scripts stop using them. Each
+	//     dispatches through set_body_type() so the canonical funnel still owns
+	//     the transition. C++ code must use get/set_body_type() instead.
+	// ---------------------------------------------------------------------
+	// (A)
+	void set_transform(const glm::mat4& transform, bool teleport = false); // -> teleport_to
+	// (B)
+	REF bool get_is_kinematic() const { return get_body_type() == BodyType::Kinematic; }
+	REF void set_is_kinematic(bool kinematic);
+	REF bool get_is_simulating() const { return simulate_physics; }
+	REF void set_is_simulating(bool is_simulating);
+	REF bool get_is_static() const { return is_static; }
+	REF void set_is_static(bool is_static);
+	// ========================== END DEPRECATED ==========================
 
 	physx::PxRigidActor* get_physx_actor() const { return physxActor; }
 
@@ -154,8 +186,6 @@ private:
 	// after mutating any of the three fields.
 	void apply_actor_config();
 
-	void force_set_transform(const glm::mat4& m);
-
 	void update_bone_parent_animator();
 
 	void refresh_shapes();
@@ -184,6 +214,8 @@ private:
 								   // to be a trigger object)
 	REF bool send_hit = false;	   // if true on both objects, then a hit event will be sent when the 2 objects hit each
 								   // other in the simulation
+	// UNUSED: visual interpolation is not implemented. Field kept only so existing
+	// serialized levels don't drop a property. Do not build logic on this.
 	REF bool interpolate_visuals = true;
 	REF float density = 2.0;
 
@@ -192,12 +224,6 @@ private:
 
 	uint64_t editor_shape_id = 0;
 
-	// will interpolate position if simulated
-	glm::vec3 last_position = glm::vec3(0.f);
-	glm::quat last_rot = glm::quat();
-	glm::vec3 next_position = glm::vec3(0.f);
-	glm::quat next_rot = glm::quat();
-	bool in_transform_fetch = false;
 	friend class PhysicsJointComponent;
 };
 

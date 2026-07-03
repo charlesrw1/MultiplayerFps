@@ -26,6 +26,10 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 
 - [[bike/sign_conventions]] — DO NOT get these wrong (axes, steer sign, lateral_pos)
 
+## Physics
+
+- [[physics/transforms]] — PhysicsBody transform ownership model (who drives whom), teleport_to/move_to vs set_transform, body types, Unity/Unreal name map, trigger rules & gotchas
+
 ## AI
 
 - [[navigation]] — Recast/Detour navmesh system: components, baker, sidecar format, debug cvars

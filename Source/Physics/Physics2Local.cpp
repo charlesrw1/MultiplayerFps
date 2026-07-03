@@ -272,17 +272,21 @@ PhysicsManImpl::PhysicsManImpl() {}
 static PxFilterFlags my_filter_shader(PxFilterObjectAttributes attributes0, PxFilterData filterData0,
 									  PxFilterObjectAttributes attributes1, PxFilterData filterData1,
 									  PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize) {
-	// let triggers through
+	// Layer matrix (word0 = own layer bit, word1 = mask of layers to interact with).
+	// Applied to triggers too, so a trigger's physics_layer actually filters --
+	// previously triggers ignored the layer matrix entirely.
+	const bool layers_interact =
+		(filterData0.word0 & filterData1.word1) && (filterData1.word0 & filterData0.word1);
+	if (!layers_interact)
+		return PxFilterFlag::eKILL;
+
+	// Trigger pairs report overlap enter/leave; contact pairs report touches.
 	if (PxFilterObjectIsTrigger(attributes0) || PxFilterObjectIsTrigger(attributes1)) {
 		pairFlags = PxPairFlag::eTRIGGER_DEFAULT;
 		return PxFilterFlag::eDEFAULT;
 	}
-	// generate contacts for all that were not filtered above
-	if ((filterData0.word0 & filterData1.word1) && (filterData1.word0 & filterData0.word1)) {
-		pairFlags = PxPairFlag::eCONTACT_DEFAULT;
-		return PxFilterFlag::eDEFAULT;
-	} else
-		return PxFilterFlag::eKILL;
+	pairFlags = PxPairFlag::eCONTACT_DEFAULT;
+	return PxFilterFlag::eDEFAULT;
 }
 #include "Framework/Jobs.h"
 void physx_run_job(uintptr_t p) {
@@ -329,6 +333,13 @@ void PhysicsManImpl::init() {
 
 	scene->setFlag(PxSceneFlag::eENABLE_ACTIVE_ACTORS, true);
 	scene->setFlag(PxSceneFlag::eEXCLUDE_KINEMATICS_FROM_ACTIVE_ACTORS, true);
+	// NOTE on kinematic triggers: PhysX 3.x needed PxSceneFlag::eENABLE_KINEMATIC_
+	// (STATIC_)PAIRS to make a Static trigger fire against a Kinematic body. Those
+	// flags were REMOVED in PhysX 4.0 -- kinematic-static and kinematic-kinematic
+	// pairs are now always processed, so the only gate is my_filter_shader below
+	// (which returns eTRIGGER_DEFAULT for trigger pairs that pass the layer mask).
+	// Trigger-vs-Kinematic firing is covered by an integration test. See
+	// docs/physics/transforms.md.
 
 	mycallback.reset(new MyPhysicsCallback);
 	scene->setSimulationEventCallback(mycallback.get());
