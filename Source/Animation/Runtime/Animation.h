@@ -131,7 +131,6 @@ public:
 	void set_matrix_palette_offset(int ofs) { matrix_palette_offset = ofs; }
 	int get_matrix_palette_offset() const { return matrix_palette_offset; }
 	bool get_is_for_editor() const { return get_owner() == nullptr; }
-	opt<float> get_curve_value(StringName name) const;
 	opt<float> get_float_variable(StringName name) const;
 	opt<bool> get_bool_variable(StringName name) const;
 	opt<int> get_int_variable(StringName name) const;
@@ -140,10 +139,10 @@ public:
 	REF void set_float_variable(StringName name, float f);
 	REF void set_int_variable(StringName name, int f);
 	void set_bool_variable(StringName name, bool f);
-	void set_vec3_variable(StringName name, glm::vec3 f);
+	REF void set_vec3_variable(StringName name, const glm::vec3& f);
 	// Rotations are delivered as quaternions (no euler round-trip). agModifyBone reads
 	// rotationVal as a quat; a vec3 variable is still accepted and treated as euler radians.
-	void set_quat_variable(StringName name, glm::quat q);
+	REF void set_quat_variable(StringName name, const glm::quat& q);
 	agBaseNode* find_cached_pose_node(StringName name);
 	agBaseNode& get_root_node() const;
 	// Incremented once per update(). agSaveCachedPose compares this against the frame it
@@ -173,7 +172,6 @@ private:
 	vector<string> debug_output_messages;
 
 	std::vector<agClipNode*> playingClipsThisUpdate;
-	std::unordered_map<uint64_t, float> curve_values;
 	std::unordered_map<uint64_t, std::variant<bool, float, int, glm::vec3, glm::quat>> blackboard;
 	uint64_t evalFrameId = 0;
 	bool using_global_bonemat_double_buffer = true;

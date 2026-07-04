@@ -14,6 +14,10 @@ class AnimationSeqAsset : public IAsset
 {
 public:
 	CLASS_BODY(AnimationSeqAsset);
+
+	REF static AnimationSeqAsset* load(const std::string& name);
+
+
 	void uninstall() override;
 	void post_load() override {}
 	bool load_asset() override;

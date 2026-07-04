@@ -59,7 +59,7 @@ Model::~Model() {
 		printf("");
 	}
 }
-Model* Model::load(std::string path) {
+Model* Model::load(const std::string& path) {
 	ASSERT(!path.empty());
 	return g_assets.find<Model>(path).get();
 }

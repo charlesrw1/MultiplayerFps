@@ -34,7 +34,7 @@ void CameraPathFollower::update() {
 	glm::quat rot = glm::slerp(points.at(index).q, points.at(next).q, frac);
 	glm::vec3 pos = glm::mix(points.at(index).p, points.at(next).p, frac);
 
-	CameraComponent::get_scene_camera()->get_owner()->set_ws_transform(pos, rot, glm::vec3(1));
+	CameraComponent::get_scene_camera()->get_owner()->set_ws_transform_comp(pos, rot, glm::vec3(1));
 }
 
 void CamPathFollowerLua::update() {

@@ -124,3 +124,7 @@ void ParticleAsset::save_to_disk()
 
 	sys_print(Info, "ParticleAsset::save_to_disk: wrote %zu bytes to %s\n", text.size(), get_name().c_str());
 }
+
+REF ParticleAsset* ParticleAsset::load(const std::string& name) {
+	return g_assets.find<ParticleAsset>(name).get();
+}

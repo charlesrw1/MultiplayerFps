@@ -195,8 +195,8 @@ void Entity::parent_to(Entity* other) {
 void Entity::transform_look_at(glm::vec3 pos, glm::vec3 look_pos) {
 	set_ws_transform(glm::inverse(glm::lookAt(pos, look_pos, glm::vec3(0, 1, 0))));
 }
-void Entity::set_ls_rotation(glm::quat q) {
-	set_ls_transform(get_ls_position(), q, get_ls_scale());
+void Entity::set_ls_rotation(const glm::quat& q) {
+	set_ls_transform_comp(get_ls_position(), q, get_ls_scale());
 }
 
 void Entity::remove_this_component_internal(Component* component_to_remove) {
@@ -329,14 +329,14 @@ void Entity::set_ls_transform(const glm::mat4& transform) {
 	check_for_transform_nans();
 	post_change_transform_R();
 }
-void Entity::set_ls_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale) {
+void Entity::set_ls_transform_comp(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale) {
 	position = v;
 	rotation = q;
 	this->scale = scale;
 	check_for_transform_nans();
 	post_change_transform_R();
 }
-void Entity::set_ls_euler_rotation(glm::vec3 euler) {
+void Entity::set_ls_euler_rotation(const glm::vec3& euler) {
 	rotation = glm::quat(euler);
 	post_change_transform_R();
 }
@@ -355,19 +355,19 @@ void Entity::post_change_transform_R(bool ws_is_dirty, Component* skipthis) {
 		children[i]->post_change_transform_R();
 }
 
-void Entity::set_ws_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale) {
+void Entity::set_ws_transform_comp(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale) {
 	if (!has_transform_parent()) {
-		set_ls_transform(v, q, scale);
+		set_ls_transform_comp(v, q, scale);
 	} else {
 		auto matrix = compose_transform(v, q, scale);
 		set_ws_transform(matrix);
 	}
 }
-void Entity::set_ls_position(glm::vec3 v) {
+void Entity::set_ls_position(const glm::vec3& v) {
 	position = v;
 	post_change_transform_R();
 }
-void Entity::set_ls_scale(glm::vec3 v) {
+void Entity::set_ls_scale(const glm::vec3& v) {
 	scale = v;
 	post_change_transform_R();
 }
@@ -440,16 +440,16 @@ glm::vec3 Entity::get_ws_scale() {
 	return glm::vec3(1.f);
 }
 
-void Entity::set_ws_position(glm::vec3 v) {
-	set_ws_transform(v, get_ws_rotation(), get_ws_scale());
+void Entity::set_ws_position(const glm::vec3& v) {
+	set_ws_transform_comp(v, get_ws_rotation(), get_ws_scale());
 }
 
-void Entity::set_ws_position_rotation(glm::vec3 pos, glm::quat rot) {
-	set_ws_transform(pos, rot, get_ws_scale()); // fixme
+void Entity::set_ws_position_rotation(const glm::vec3& pos, const glm::quat& rot) {
+	set_ws_transform_comp(pos, rot, get_ws_scale()); // fixme
 }
 
-void Entity::set_ls_position_rotation(glm::vec3 pos, glm::quat rot) {
-	set_ls_transform(pos, rot, get_ls_scale());
+void Entity::set_ls_position_rotation(const glm::vec3& pos, const glm::quat& rot) {
+	set_ls_transform_comp(pos, rot, get_ls_scale());
 }
 
 void Entity::set_is_top_level(bool b) {

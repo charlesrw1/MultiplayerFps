@@ -188,12 +188,6 @@ void AnimatorObject::update(float dt) {
 	ConcatWithInvPose();
 }
 
-opt<float> AnimatorObject::get_curve_value(StringName name) const {
-	auto find = MapUtil::get_opt(curve_values, name.get_hash());
-	if (find)
-		return *find;
-	return std::nullopt;
-}
 
 opt<float> AnimatorObject::get_float_variable(StringName name) const {
 	auto find = MapUtil::get_opt(blackboard, name.get_hash());
@@ -245,10 +239,10 @@ void AnimatorObject::set_int_variable(StringName name, int f) {
 void AnimatorObject::set_bool_variable(StringName name, bool f) {
 	blackboard[name.get_hash()] = f;
 }
-void AnimatorObject::set_vec3_variable(StringName name, glm::vec3 f) {
+void AnimatorObject::set_vec3_variable(StringName name, const glm::vec3& f) {
 	blackboard[name.get_hash()] = f;
 }
-void AnimatorObject::set_quat_variable(StringName name, glm::quat q) {
+void AnimatorObject::set_quat_variable(StringName name, const glm::quat& q) {
 	blackboard[name.get_hash()] = q;
 }
 

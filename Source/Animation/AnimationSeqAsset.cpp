@@ -64,6 +64,10 @@ bool AnimationSeqAsset::load_asset() {
 		return false;
 }
 
+AnimationSeqAsset* AnimationSeqAsset::load(const std::string& name) {
+	return g_assets.find<AnimationSeqAsset>(name).get();
+}
+
 void AnimationSeqAsset::uninstall() {
 	// Drop the cached pointer; load_asset will re-resolve it on reload.
 	srcModel.reset();

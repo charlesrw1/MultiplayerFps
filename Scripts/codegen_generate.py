@@ -510,6 +510,13 @@ def write_struct_getter_setter(newclass : ClassDef) -> str:
             except Exception as e :
                 print(f"Err: write_struct_getter_setter{newclass.classname}: " + str(e.args))
 
+    # lVec3/lQuat get a metatable so their tables support operators/methods
+    # (see Source/Scripting/LuaVecQuat.cpp) -- registered under "lVec3_mt"/"lQuat_mt".
+    # Every other struct stays a plain metatable-less table.
+    if newclass.classname in ("lVec3", "lQuat"):
+        output += f"\tluaL_getmetatable(L, \"{newclass.classname}_mt\");\n"
+        output += "\tlua_setmetatable(L, -2);\n"
+
     output += "}\n\n"
 
     # Function to get struct from Lua
@@ -661,7 +668,19 @@ def write_class_old(typenames:dict[str,ClassDef],newclass : ClassDef)->str:
 
     return output
 
-def get_lua_type_string(new_type:CppType, no_nil:bool=False) -> str:
+# Vec3/Quat are the metatable-bearing tables scripts should write going forward
+# (see Source/Scripting/LuaVecQuat.cpp); lVec3/lQuat are the legacy plain-table
+# shape, still readable everywhere but being phased out. Return types/fields are
+# always annotated as the new name since every push now attaches the metatable;
+# params additionally accept the deprecated plain-table form via for_param.
+def _vec3_or_quat_type_name(classname:str, for_param:bool) -> str|None:
+    if classname == "lVec3":
+        return "Vec3|lVec3" if for_param else "Vec3"
+    if classname == "lQuat":
+        return "Quat|lQuat" if for_param else "Quat"
+    return None
+
+def get_lua_type_string(new_type:CppType, no_nil:bool=False, for_param:bool=False) -> str:
     output = ""
     nil_suffix = "" if no_nil else "|nil"
     type_of_template :str= ""
@@ -679,7 +698,8 @@ def get_lua_type_string(new_type:CppType, no_nil:bool=False) -> str:
         output += f"integer"
     elif new_type.type == STRUCT_TYPE:
         assert(new_type.typename!=None)
-        output += f"{new_type.typename.classname}"
+        vec_or_quat = _vec3_or_quat_type_name(new_type.typename.classname, for_param)
+        output += vec_or_quat if vec_or_quat != None else new_type.typename.classname
     elif new_type.type == ASSET_PTR_TYPE or new_type.type == HANDLE_PTR_TYPE:
         output += f"{type_of_template}{nil_suffix}"
     elif new_type.type == STRING_TYPE:
@@ -690,9 +710,9 @@ def get_lua_type_string(new_type:CppType, no_nil:bool=False) -> str:
         assert(new_type.typename!=None)
         output += f"{new_type.typename.classname}{nil_suffix}"
     elif new_type.type == VEC3_TYPE:
-        output += "lVec3"
+        output += "Vec3|lVec3" if for_param else "Vec3"
     elif new_type.type == QUAT_TYPE:
-        output += "lQuat"
+        output += "Quat|lQuat" if for_param else "Quat"
     elif new_type.type == MAT4_TYPE:
         output += "Transform"
     elif new_type.type == ARRAY_TYPE:
@@ -714,7 +734,7 @@ def write_lua_class(newclass:ClassDef) -> str:
                 if p.return_type.type != NONE_TYPE:
                     output += "---@return " + get_lua_type_string(p.return_type, p.no_nil) + "\n"
                 for argType, argName in p.func_args:
-                    output += "---@param " + argName + " " + get_lua_type_string(argType, p.no_nil) + "\n"
+                    output += "---@param " + argName + " " + get_lua_type_string(argType, p.no_nil, for_param=True) + "\n"
                 output += f"function {newclass.classname}:{p.name}("
                 for _, argName in p.func_args:
                     output += argName + ","
@@ -756,7 +776,7 @@ def write_lua_class(newclass:ClassDef) -> str:
                     if p.lua_generic and argType.type == OTHER_CLASS_TYPE and argType.typename != None and argType.typename.classname == "ClassTypeInfo":
                         output += f"---@param {argName} T\n"
                     else:
-                        output += "---@param " + argName + " " + get_lua_type_string(argType, p.no_nil) + "\n"
+                        output += "---@param " + argName + " " + get_lua_type_string(argType, p.no_nil, for_param=True) + "\n"
                 output += f"function {newclass.classname}"
                 if p.is_static:
                     output += "."
@@ -780,7 +800,7 @@ def write_lua_class(newclass:ClassDef) -> str:
                 # invoker
                 count = 0
                 for t in p.new_type.template_args:
-                    output += f"---@param arg{count} {get_lua_type_string(t, p.no_nil)}\n"
+                    output += f"---@param arg{count} {get_lua_type_string(t, p.no_nil, for_param=True)}\n"
                     count += 1
                 output += f"function {newclass.classname}:invoke_{p.name}("
                 for i in range(count):

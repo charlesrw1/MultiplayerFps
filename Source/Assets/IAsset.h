@@ -47,8 +47,7 @@ public:
 	IAsset();
 	virtual ~IAsset();
 
-	const std::string& get_name() const { return path; }
-	REF std::string get_name_l() { return path; }
+	REF const std::string& get_name() const { return path; }
 
 	bool was_load_attempted() const { return load_attempted; }
 	bool did_load_fail() const { return load_failed; }

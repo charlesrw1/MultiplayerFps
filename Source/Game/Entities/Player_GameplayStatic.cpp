@@ -84,6 +84,18 @@ void GameplayStatic::debug_line_normal(glm::vec3 p, glm::vec3 n, float len, floa
 	Debug::add_line(p, p + n * len, color.to_color32(), life);
 }
 
+void GameplayStatic::debug_text_world(const vec3& pos, const string& text, float life, const lColor& color) {
+	Debug::add_text(pos, text, color, life);
+}
+
+void GameplayStatic::debug_transformed_box(const glm::mat4& pos, float life, const lColor& color) {
+	Debug::add_transformed_box(pos, vec3(1), color, life);
+}
+
+void GameplayStatic::debug_circle(const vec3& pos, const vec3& normal, float radius, float life, const lColor& color) {
+	Debug::add_circle(pos, normal, radius, color, life);
+}
+
 int GameplayStatic::get_collision_mask_for_physics_layer(PL physics_layer) {
 	return (int)g_physics.get_collision_mask_for_layer((int)physics_layer);
 }

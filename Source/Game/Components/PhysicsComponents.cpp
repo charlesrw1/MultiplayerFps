@@ -31,7 +31,7 @@ void PhysicsBody::fetch_new_transform() {
 	ASSERT(get_body_type() == BodyType::Dynamic);
 	ASSERT(has_initialized());
 	auto pose = physxActor->getGlobalPose();
-	get_owner()->set_ws_transform(physx_to_glm(pose.p), physx_to_glm(pose.q), get_owner()->get_ls_scale());
+	get_owner()->set_ws_transform_comp(physx_to_glm(pose.p), physx_to_glm(pose.q), get_owner()->get_ls_scale());
 }
 
 glm::vec3 calc_angular_vel(const glm::quat& q1, const glm::quat& q2, float dt) {

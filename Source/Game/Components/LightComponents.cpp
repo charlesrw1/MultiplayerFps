@@ -36,7 +36,7 @@ void SpotLightComponent::start() {
 		auto arrow_obj = get_owner()->create_child_entity();
 		arrow_obj->dont_serialize_or_edit = true;
 		auto arrow_comp = arrow_obj->create_component<ArrowComponent>();
-		arrow_obj->set_ls_transform(glm::vec3(0, 0, 0.4), {}, glm::vec3(0.25f));
+		arrow_obj->set_ls_transform_comp(glm::vec3(0, 0, 0.4), {}, glm::vec3(0.25f));
 		editor_arrow = arrow_comp;
 		editor_billboard = billboard;
 	}

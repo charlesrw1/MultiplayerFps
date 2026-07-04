@@ -24,6 +24,8 @@ class PhysicsBody;
 class SpawnerComponent;
 class ParticleAsset;
 class ParticleSystemComponent;
+using glm::vec3;
+using glm::mat4;
 class GameplayStatic : public ClassBase
 {
 public:
@@ -76,6 +78,12 @@ public:
 	REF static void debug_text(string s);
 	REF static void debug_sphere(glm::vec3 center, float radius, float life, const lColor& color);
 	REF static void debug_line_normal(glm::vec3 p, glm::vec3 n, float len, float life, const lColor& color);
+	REF static void debug_text_world(const vec3& pos, const string& text, float life, const lColor& color);
+	REF static void debug_transformed_box(const glm::mat4& pos, float life, const lColor& color);
+	REF static void debug_circle(const vec3& pos, const vec3& normal, float radius, float life, const lColor& color);
+
+
+
 
 	// kind of hack bs till i work it out better
 	// basically nil tables are null and can be checked, but when an object is deleted, the _ptr field int he table is

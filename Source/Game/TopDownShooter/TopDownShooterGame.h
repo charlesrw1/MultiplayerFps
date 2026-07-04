@@ -288,7 +288,7 @@ public:
 		auto q = glm::angleAxis(angle, glm::vec3(0, 1, 0));
 
 		last_ws = get_ws_transform();
-		get_owner()->set_ws_transform(ccontroller->get_character_pos(), q, get_owner()->get_ls_scale());
+		get_owner()->set_ws_transform_comp(ccontroller->get_character_pos(), q, get_owner()->get_ls_scale());
 	}
 	void stop() {}
 

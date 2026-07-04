@@ -167,7 +167,7 @@ void EditorDoc::add_editor_commands() {
 		glm::vec3 frac = glm::abs(bounds.bmin / bounds_size);
 
 		glm::vec3 set_center = frac * set_size + min;
-		e->set_ws_transform(set_center, glm::quat(), scale);
+		e->set_ws_transform_comp(set_center, glm::quat(), scale);
 	});
 	cmds->add("bone-list", [this](const Cmd_Args& args) {
 		if (!selection_state->has_only_one_selected())

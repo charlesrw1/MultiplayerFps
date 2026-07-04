@@ -59,27 +59,27 @@ public:
 	// ONLY USE in serialization!
 	void add_component_from_unserialization(Component* component);
 	// ws = world space, ls = local space
-	void set_ls_transform(const glm::mat4& transform);
-	void set_ls_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
-	REF void set_ls_position(glm::vec3 v);
-	REF void set_ls_euler_rotation(glm::vec3 euler);
-	REF void set_ls_rotation(glm::quat quat);
-	REF void set_ls_scale(glm::vec3 scale);
-	glm::mat4 get_ls_transform() const;
-	REF glm::vec3 get_ls_position() const { return position; }
-	REF glm::vec3 get_ls_scale() const { return scale; }
-	REF glm::quat get_ls_rotation() const { return rotation; }
-	void set_ws_transform(const glm::mat4& transform);
-	void set_ws_transform(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
-	const glm::mat4& get_ws_transform();
+	REF void set_ls_transform(const glm::mat4& transform);
+	REF void set_ls_transform_comp(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
+	REF void set_ls_position(const glm::vec3& v);
+	REF void set_ls_euler_rotation(const glm::vec3& euler);
+	REF void set_ls_rotation(const glm::quat& quat);
+	REF void set_ls_scale(const glm::vec3& scale);
+	REF glm::mat4 get_ls_transform() const;
+	REF const glm::vec3& get_ls_position() const { return position; }
+	REF const glm::vec3& get_ls_scale() const { return scale; }
+	REF const glm::quat& get_ls_rotation() const { return rotation; }
+	REF void set_ws_transform(const glm::mat4& transform);
+	REF void set_ws_transform_comp(const glm::vec3& v, const glm::quat& q, const glm::vec3& scale);
+	REF const glm::mat4& get_ws_transform();
 	REF glm::vec3 get_ws_position();
 	REF glm::quat get_ws_rotation();
 	REF glm::vec3 get_ws_scale();
-	REF void set_ws_position(glm::vec3 v);
-	REF void set_ws_position_rotation(glm::vec3 pos, glm::quat rot);
-	REF void set_ls_position_rotation(glm::vec3 pos, glm::quat rot);
-	REF void set_ws_rotation(glm::quat q) { set_ws_transform(get_ws_position(), q, get_ws_scale()); }
-	void set_ws_scale(const glm::vec3& s) { set_ws_transform(get_ws_position(), get_ws_rotation(), s); }
+	REF void set_ws_position(const glm::vec3& v);
+	REF void set_ws_position_rotation(const glm::vec3& pos, const glm::quat& rot);
+	REF void set_ls_position_rotation(const glm::vec3& pos, const glm::quat& rot);
+	REF void set_ws_rotation(const glm::quat& q) { set_ws_transform_comp(get_ws_position(), q, get_ws_scale()); }
+	REF void set_ws_scale(const glm::vec3& s) { set_ws_transform_comp(get_ws_position(), get_ws_rotation(), s); }
 	// parent the root component of this to another entity
 	// can use nullptr to unparent
 	REF void parent_to(Entity* parentEntity);
@@ -103,7 +103,7 @@ public:
 	void remove_this_component_internal(Component* component);
 	MeshComponent* get_cached_mesh_component() const { return cached_mesh_component; }
 	void set_cached_mesh_component(MeshComponent* c) { cached_mesh_component = c; }
-	glm::mat4 get_parent_transform() const;
+	REF glm::mat4 get_parent_transform() const;
 	REF void set_parent_bone(StringName name) {
 		parent_bone.name = name;
 		world_transform_is_dirty = true;
@@ -123,7 +123,7 @@ public:
 	void set_tag(StringName name) { tag.name = name; }
 	REF bool get_is_top_level() const { return is_top_level; }
 	REF void set_is_top_level(bool b);
-	const std::string& get_editor_name() const { return editor_name; }
+	REF const std::string& get_editor_name() const { return editor_name; }
 	void set_editor_name(const std::string& n) { editor_name = n; }
 #ifdef EDITOR_BUILD
 	bool get_hidden_in_editor() const { return hidden_in_editor; }
@@ -133,8 +133,6 @@ public:
 #endif
 	void check_for_transform_nans();
 	void validate_check();
-
-	REF std::string get_editor_name_lua() const { return editor_name; }
 
 	// GameEventBus convience functions
 	void broadcast_event(int event_id, const char* data = "");

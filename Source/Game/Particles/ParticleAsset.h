@@ -34,6 +34,8 @@ class ParticleAsset : public IAsset
 public:
 	CLASS_BODY(ParticleAsset);
 
+	REF static ParticleAsset* load(const std::string& name);
+
 	bool load_asset() final;
 	void post_load() final;
 	void uninstall() final;

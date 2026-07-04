@@ -927,8 +927,9 @@ float agGetPoseCtx::get_float_var(StringName name) const {
 	auto var = object.get_float_variable(name);
 	if (var.has_value())
 		return var.value();
-	auto curve = object.get_curve_value(name);
-	return curve.value_or(0.f);
+	sys_print(Error, "agGetPoseCtx::get_float_var: no variable exists: %s\n", name.get_c_str());
+
+	return 0.f;
 }
 
 glm::vec3 agGetPoseCtx::get_vec3_var(StringName name) const {

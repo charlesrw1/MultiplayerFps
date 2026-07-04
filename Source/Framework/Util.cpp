@@ -354,3 +354,9 @@ Color32::Color32(unsigned int c) {
 }
 
 Color32::Color32(int r, int g, int b, int a) : r(r), g(g), b(b), a(a) {}
+
+#include <Framework/LuaColor.h>
+
+Color32::Color32(const lColor& lcolor) {
+	*this = lcolor.to_color32();
+}

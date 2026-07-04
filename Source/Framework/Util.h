@@ -54,11 +54,13 @@ inline const char* print_get_bool_string(bool b) {
 	return b ? "True" : "False";
 }
 
+struct lColor;
 struct Color32
 {
 	Color32() = default;
 	Color32(unsigned int c);
 	Color32(int r, int g, int b, int a = 0xff);
+	Color32(const lColor& lcolor);
 
 	uint8_t r = 0;
 	uint8_t g = 0;

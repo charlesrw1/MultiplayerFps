@@ -4,6 +4,7 @@
 #include "Framework/MapUtil.h"
 #include "Framework/Config.h"
 #include "LuaTransform.h"
+#include "LuaVecQuat.h"
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -45,6 +46,7 @@ ScriptManager::ScriptManager() {
 	lua_pop(lua, 1);
 
 	register_lua_transform(lua);
+	register_lua_vec_quat(lua);
 }
 
 ScriptManager::~ScriptManager() {

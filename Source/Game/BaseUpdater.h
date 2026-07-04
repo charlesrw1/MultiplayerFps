@@ -20,10 +20,10 @@ public:
 	// Editor Data >>>>
 	bool dont_serialize_or_edit = false;
 	bool dont_serialize = false; // skips serialization but still selectable/editable in editor
-	void set_editor_transient(bool transient) { dont_serialize_or_edit = transient; }
-	void set_no_serialize() { dont_serialize = true; }
+	REF void set_editor_transient(bool transient) { dont_serialize_or_edit = transient; }
+	REF void set_no_serialize() { dont_serialize = true; }
 
-	bool dont_serialize_or_edit_this() const { return dont_serialize_or_edit; }
+	REF bool dont_serialize_or_edit_this() const { return dont_serialize_or_edit; }
 	// Entity* creator_source = nullptr;		// my creator
 	// PrefabAsset* what_prefab = nullptr;	// (optional) what prefab created this (might be differnt than owner's
 	// prefab) int unique_file_id = INVALID_FILEID;			// unique id in source owner (either native c++, prefab,

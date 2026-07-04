@@ -149,7 +149,7 @@ void CarComponent::update() {
 		float xang = wheel_angles[i];
 		if (i == 1 || i == 3)
 			xang *= -1;
-		wheels[i]->get_owner()->set_ls_transform(wheelpos, glm::quat(glm::vec3(xang, yang, 0)), glm::vec3(1.f));
+		wheels[i]->get_owner()->set_ls_transform_comp(wheelpos, glm::quat(glm::vec3(xang, yang, 0)), glm::vec3(1.f));
 
 		last_dist[i] = touching_ground ? dist : max_spring;
 		last_ws_pos[i] = ws_pos;
