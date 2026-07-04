@@ -405,6 +405,11 @@ glm::mat4 Entity::get_parent_transform() const {
 		return parent->get_ws_transform() * cached_mesh->get_ls_transform_of_bone(parent_bone.name);
 	}
 }
+REF void Entity::set_parent_bone(StringName name) {
+	parent_bone.name = name;
+	world_transform_is_dirty = true;
+	post_change_transform_R();
+}
 bool Entity::has_parent_bone() const {
 	return !parent_bone.name.is_null();
 }

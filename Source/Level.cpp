@@ -38,7 +38,6 @@ bool is_strippable_static_prop(const Entity* e) {
 	if (!e) return false;
 	if (&e->get_type() != &Entity::StaticType) return false;
 	if (!e->get_editor_name().empty()) return false;
-	if (e->has_tag()) return false;
 	if (!e->get_children().empty()) return false;
 	if (e->get_parent() != nullptr) return false;
 	const auto& comps = e->get_components();

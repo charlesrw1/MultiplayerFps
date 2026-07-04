@@ -147,8 +147,7 @@ public:
 		auto e = get_owner();
 		auto& children = e->get_children();
 		for (auto c : children) {
-			if (c->get_tag() != StringName("Ragdoll"))
-				continue;
+			
 			auto phys = c->get_component<PhysicsBody>();
 			if (!phys)
 				continue;
@@ -175,8 +174,7 @@ public:
 	static void enable_ragdoll_shared(Entity* e, const glm::mat4& last_ws, bool enable) {
 		auto& children = e->get_children();
 		for (auto c : children) {
-			if (c->get_tag() != StringName("Ragdoll"))
-				continue;
+			
 			auto phys = c->get_component<PhysicsBody>();
 			if (!phys || phys->is_a<AdvancedJointComponent>())
 				continue;

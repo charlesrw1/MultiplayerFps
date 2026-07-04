@@ -18,13 +18,13 @@ Vec3 = {}
 ---@param x number?
 ---@param y number?
 ---@param z number?
----@return lVec3
+---@return Vec3
 function Vec3.new(x, y, z) end
 
 ---@return number
 function Vec3:length() end
 
----@return lVec3
+---@return Vec3
 function Vec3:normalize() end
 
 ---@param other lVec3
@@ -32,22 +32,22 @@ function Vec3:normalize() end
 function Vec3:dot(other) end
 
 ---@param other lVec3
----@return lVec3
+---@return Vec3
 function Vec3:cross(other) end
 
 --- Same as the `+` operator.
----@param other lVec3
----@return lVec3
+---@param other Vec3
+---@return Vec3
 function Vec3.__add(self, other) end
 
 --- Same as the `-` operator.
 ---@param other lVec3
----@return lVec3
+---@return Vec3
 function Vec3.__sub(self, other) end
 
 --- Same as the `*` operator; Vec3 * Vec3 is component-wise, Vec3 * number scales.
 ---@param other lVec3|number
----@return lVec3
+---@return Vec3
 function Vec3.__mul(self, other) end
 
 ---@class Quat : lQuat
@@ -57,19 +57,19 @@ Quat = {}
 ---@param x number?
 ---@param y number?
 ---@param z number?
----@return lQuat
+---@return Quat
 function Quat.new(w, x, y, z) end
 
----@return lQuat
+---@return Quat
 function Quat.identity() end
 
----@return lQuat
+---@return Quat
 function Quat:inverse() end
 
----@return lVec3
+---@return Vec3
 function Quat:to_euler() end
 
 --- Same as the `*` operator; Quat * Quat composes, Quat * {x,y,z} rotates a point.
 ---@param other lQuat|lVec3
----@return lQuat|lVec3
+---@return Quat|Vec3
 function Quat.__mul(self, other) end

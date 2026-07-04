@@ -94,6 +94,7 @@ public:
 	void set_clip(const AnimationSeqAsset* asset);
 	REF void set_looping(bool b) { looping = b; }
 
+
 	StringName syncGroup;
 	sync_opt syncType = sync_opt::Default;
 	ValueType speed = 1.f;
@@ -147,7 +148,7 @@ public:
 		this->input1 = inp1;
 	}
 	REF void set_alpha_const(float f) { alpha = f; }
-	REF void set_alpha_var(string name) { alpha = StringName(name.c_str()); }
+	REF void set_alpha_var(StringName name) { alpha = name; }
 
 	agBaseNode* input0 = nullptr;
 	agBaseNode* input1 = nullptr;
@@ -166,7 +167,7 @@ public:
 		this->input1 = inp1;
 	}
 	REF void set_alpha_const(float f) { alpha = f; }
-	REF void set_alpha_var(string name) { alpha = StringName(name.c_str()); }
+	REF void set_alpha_var(StringName name) { alpha = name; }
 	REF void set_meshspace_blend(bool b) { this->meshspace_blend = b; }
 
 	agBaseNode* input0 = nullptr;
@@ -351,10 +352,10 @@ public:
 
 	REF void add_sample(const AnimationSeqAsset* asset, float position);
 	REF void set_x_const(float f) { xInput = f; }
-	REF void set_x_var(string name) { xInput = StringName(name.c_str()); }
+	REF void set_x_var(StringName name) { xInput = name; }
 	REF void set_looping(bool b) { looping = b; }
 	REF void set_speed_const(float f) { speed = f; }
-	REF void set_speed_var(string name) { speed = StringName(name.c_str()); }
+	REF void set_speed_var(StringName name) { speed = name; }
 	REF void set_x_smoothing(bool enabled, float time, Easing type) {
 		xSmoothing.enabled = enabled;
 		xSmoothing.smoothingTime = time;
@@ -368,8 +369,8 @@ public:
 		enableWeightSpeed = enabled;
 		weightSpeed = speed;
 	}
-	REF void set_sync_group(string name, sync_opt opt) {
-		syncGroup = StringName(name.c_str());
+	REF void set_sync_group(StringName name, sync_opt opt) {
+		syncGroup = name;
 		syncType = opt;
 	}
 
@@ -417,12 +418,12 @@ public:
 
 	REF void add_sample(const AnimationSeqAsset* asset, float x, float y);
 	REF void set_x_const(float f) { xInput = f; }
-	REF void set_x_var(string name) { xInput = StringName(name.c_str()); }
+	REF void set_x_var(StringName name) { xInput = name; }
 	REF void set_y_const(float f) { yInput = f; }
-	REF void set_y_var(string name) { yInput = StringName(name.c_str()); }
+	REF void set_y_var(StringName name) { yInput = name; }
 	REF void set_looping(bool b) { looping = b; }
 	REF void set_speed_const(float f) { speed = f; }
-	REF void set_speed_var(string name) { speed = StringName(name.c_str()); }
+	REF void set_speed_var(StringName name) { speed = name; }
 	REF void set_x_smoothing(bool enabled, float time, Easing type) {
 		xSmoothing.enabled = enabled;
 		xSmoothing.smoothingTime = time;
@@ -437,8 +438,8 @@ public:
 		enableWeightSpeed = enabled;
 		weightSpeed = speed;
 	}
-	REF void set_sync_group(string name, sync_opt opt) {
-		syncGroup = StringName(name.c_str());
+	REF void set_sync_group(StringName name, sync_opt opt) {
+		syncGroup = name;
 		syncType = opt;
 	}
 
@@ -525,7 +526,7 @@ public:
 	CLASS_BODY(agSaveCachedPose);
 	void reset() final { if (input) input->reset(); }
 	void get_pose(agGetPoseCtx& ctx) final;
-	REF void set_cache_name(string name) { cacheName = StringName(name.c_str()); }
+	REF void set_cache_name(StringName name) { cacheName = name; }
 	StringName get_cache_name() const { return cacheName; }
 
 	agBaseNode* input = nullptr;
@@ -545,7 +546,7 @@ public:
 	CLASS_BODY(agUseCachedPose);
 	void reset() final { if (resolved) resolved->reset(); }
 	void get_pose(agGetPoseCtx& ctx) final;
-	REF void set_cache_name(string name) { cacheName = StringName(name.c_str()); }
+	REF void set_cache_name(StringName name) { cacheName = name; }
 	void resolve(AnimatorObject& obj);
 
 private:
@@ -591,7 +592,7 @@ public:
 		agStatemachineBase::append_input(node);
 		inputs.push_back(node);
 	}
-	REF void set_integer_var(string str) { integer = StringName(str.c_str()); }
+	REF void set_integer_var(StringName str) { integer = str; }
 
 	Easing easing = Easing::CubicEaseIn;
 	float blending_duration = 0.5;
