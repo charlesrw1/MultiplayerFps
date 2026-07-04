@@ -119,7 +119,7 @@ public:
 	~ScriptManager();
 	void update();
 	void check_for_reload();
-	void load_script_files();
+	void load_script_files(bool start_debugger = false, bool debugger_wait = false);
 	// Loads Data/scripts/tests/**/*.lua. Called only in --tests mode so
 	// add_test(...) calls at file scope don't fire in normal app runs.
 	void load_test_scripts();
@@ -135,9 +135,9 @@ public:
 	// Load and execute Lua source text directly, without touching the filesystem.
 	// Used by reload_one_file and directly by tests.
 	void reload_from_content(const std::string& source, const std::string& chunkname);
-	// Start EmmyLuaDebugger TCP listener so VS Code (tangzx.emmylua) can attach.
-	// Call after load_script_files(). See docs/scripting/vscode_debugger.md.
-	void activate_debugger(const char* host, int port);
+	// Start lua-debug (actboy168.lua-debug) TCP listener so VS Code can attach.
+	// See docs/scripting/vscode_debugger.md.
+	void activate_debugger(const char* host, int port, bool wait);
 
 	// Called from Component::~Component to drop the instance from its LuaClassTypeInfo
 	// live set and run destructors over any non-POD shadow fields (e.g. std::string).

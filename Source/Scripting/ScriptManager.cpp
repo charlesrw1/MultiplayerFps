@@ -18,15 +18,15 @@ extern "C"
 }
 
 // @docs [[scripting/vscode_debugger]]
-static ConfigVar g_lua_debug("g_lua_debug", "0", CVAR_BOOL,
-							 "Start EmmyLuaDebugger on script load; attach VS Code (tangzx.emmylua) to g_lua_debug_port");
-static ConfigVar g_lua_debug_host("g_lua_debug_host", "localhost", 0, "EmmyLuaDebugger listen host");
+// Whether/when to start lua-debug is a launch-time choice, not persistent state,
+// so it's the --lua_debug / --lua_debug_wait CLI flags (see EngineMain_Init.cpp),
+// not a ConfigVar.
+// Must be a literal IPv4 (lua-debug's socket.lua only parses "%d+.%d+.%d+.%d+:%d+"; "localhost" fails to parse).
+static ConfigVar g_lua_debug_host("g_lua_debug_host", "127.0.0.1", 0, "lua-debug listen host");
 static ConfigVar g_lua_debug_port("g_lua_debug_port", "9966", CVAR_INTEGER | CVAR_UNBOUNDED,
-								  "EmmyLuaDebugger listen port (VS Code attach)");
-static ConfigVar g_lua_debug_wait("g_lua_debug_wait", "0", CVAR_BOOL,
-								  "Block on emmy_core.waitIDE() at startup so early breakpoints land before scripts run");
+								  "lua-debug listen port (VS Code attach)");
 // Extra directory to add to Lua package.cpath for loading native Lua C modules
-// (emmy_core.dll for the debugger, socket/core.dll, mime/core.dll).
+// (socket/core.dll, mime/core.dll).
 // Set to a dir containing those dlls, e.g.: C:/Users/you/source/vcpkg/installed/x64-windows/bin
 static ConfigVar g_lua_cpath_extra("g_lua_cpath_extra", "", 0,
 								   "Extra dir appended to Lua package.cpath for native Lua C modules");
@@ -198,7 +198,10 @@ void ScriptManager::reload_one_file(const std::string& strFilePath) {
 	if (file) {
 		string out(file->size(), ' ');
 		file->read(out.data(), out.size());
-		reload_from_content(out, strFilePath);
+		// Chunkname is the full path (via g_project_base) rather than the
+		// game-relative path, so lua-debug can resolve breakpoints to the real
+		// file on disk without depending on VS Code's workspace root/cwd.
+		reload_from_content(out, FileSys::get_full_path_from_game_path(strFilePath));
 	}
 }
 
@@ -221,7 +224,11 @@ void ScriptManager::reload_from_content(const std::string& source, const std::st
 	}
 	had_changes = true;
 
-	if (luaL_loadbuffer(lua, source.c_str(), source.size(), chunkname.c_str()) != LUA_OK) {
+	// "@"-prefixed chunkname marks this as a real file to Lua (and to lua-debug's
+	// source.lua, which requires the '@' prefix to treat a source as a debuggable
+	// file instead of an anonymous in-memory chunk).
+	const std::string lua_chunkname = "@" + chunkname;
+	if (luaL_loadbuffer(lua, source.c_str(), source.size(), lua_chunkname.c_str()) != LUA_OK) {
 		sys_print(Error, "ScriptManager: error loading script %s: %s\n", chunkname.c_str(), lua_tostring(lua, -1));
 		lua_pop(lua, 1);
 		lua_settop(lua, 0);
@@ -294,7 +301,7 @@ void ScriptManager::load_test_scripts() {
 
 ScriptManager* ScriptManager::inst = nullptr;
 
-void ScriptManager::load_script_files() {
+void ScriptManager::load_script_files(bool start_debugger, bool debugger_wait) {
 	ClassBase::init_class_info_for_script();
 	sys_print(Debug, "ScriptManager::load_script_files\n");
 
@@ -314,20 +321,19 @@ void ScriptManager::load_script_files() {
 
 	reload_all_scripts();
 
-	if (g_lua_debug.get_bool())
-		activate_debugger(g_lua_debug_host.get_string(), g_lua_debug_port.get_integer());
+	if (start_debugger)
+		activate_debugger(g_lua_debug_host.get_string(), g_lua_debug_port.get_integer(), debugger_wait);
 }
 
-void ScriptManager::activate_debugger(const char* host, int port) {
-	const bool wait = g_lua_debug_wait.get_bool();
-	sys_print(Info, "ScriptManager: starting EmmyLuaDebugger on %s:%d (wait=%d)\n", host, port, wait ? 1 : 0);
-	std::string code = "local ok, dbg = pcall(require, 'emmy_core')\n";
-	code += "if not ok then error('emmy_core not found on package.cpath; set g_lua_cpath_extra to a dir containing emmy_core.dll: ' .. tostring(dbg)) end\n";
-	code += "dbg.tcpListen('" + std::string(host) + "', " + std::to_string(port) + ")\n";
+void ScriptManager::activate_debugger(const char* host, int port, bool wait) {
+	sys_print(Info, "ScriptManager: starting lua-debug on %s:%d (wait=%d)\n", host, port, wait ? 1 : 0);
+	std::string code = "local ok, dbg = pcall(require, 'debugger')\n";
+	code += "if not ok then error('lua-debug shim not found; ensure actboy168.lua-debug extension is installed and Data/scripts/lib/debugger.lua is present: ' .. tostring(dbg)) end\n";
+	code += "dbg:start('" + std::string(host) + ":" + std::to_string(port) + "')\n";
 	if (wait)
-		code += "dbg.waitIDE()\n";
+		code += "dbg:event('wait')\n";
 	if (luaL_dostring(lua, code.c_str()) != LUA_OK) {
-		sys_print(Error, "ScriptManager: EmmyLuaDebugger start failed: %s\n", lua_tostring(lua, -1));
+		sys_print(Error, "ScriptManager: lua-debug start failed: %s\n", lua_tostring(lua, -1));
 		lua_pop(lua, 1);
 	}
 }

@@ -359,7 +359,8 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	print_time("job sys init");
 
 	ScriptManager::inst = new ScriptManager();
-	ScriptManager::inst->load_script_files();
+	const bool lua_debug_wait = has_arg(argc, argv, "--lua_debug_wait");
+	ScriptManager::inst->load_script_files(has_arg(argc, argv, "--lua_debug") || lua_debug_wait, lua_debug_wait);
 	if (options.pending_test_runnner)
 		ScriptManager::inst->load_test_scripts();
 	print_time("script init");

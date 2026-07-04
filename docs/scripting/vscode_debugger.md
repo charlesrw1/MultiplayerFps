@@ -1,37 +1,50 @@
-# VS Code Lua Debugger (EmmyLuaDebugger)
+# VS Code Lua Debugger (actboy168.lua-debug)
 
 Attach VS Code to a running game/editor build and step through `Data/scripts/**/*.lua`.
 
 ## Setup (one-time)
 
-1. **VS Code extension** — install `tangzx.emmylua` (recommended via `.vscode/extensions.json`).
-2. **Native module** — download the prebuilt `emmy_core.dll` matching Lua 5.4 / x64-windows from the [EmmyLuaDebugger releases](https://github.com/EmmyLua/EmmyLuaDebugger/releases) (`emmy_core@emmy.x64-Lua5.4.zip` → `emmy_core.dll`).
-3. **Drop the dll** into the dir referenced by `g_lua_cpath_extra` (typically the vcpkg bin dir where `socket/core.dll` already lives, e.g. `C:/Users/<you>/source/vcpkg/installed/x64-windows/bin`).
+1. **VS Code extension** — install `actboy168.lua-debug` (recommended via `.vscode/extensions.json`). No separate dll download needed — the extension bundles prebuilt debugger runtimes for Lua 5.1-5.5/LuaJIT and picks the right one at runtime.
+2. **Shim script** — `Data/scripts/lib/debugger.lua` is checked in (copied from lua-debug's `examples/attach/debugger.lua`). It locates the installed extension under `%USERPROFILE%/.vscode/extensions/actboy168.lua-debug-*` and loads its bundled `script/debugger.lua`. Nothing to configure here; it's found via `require("debugger")` since `Data/scripts/lib/?.lua` is already on Lua's `package.path` (see `ScriptManager::ScriptManager`).
 
-## Config vars (`vars.txt`)
+## Enabling the debugger
+
+Whether/when to start lua-debug is a launch-time choice, not persistent state, so it's a pair of CLI flags rather than `vars.txt` config vars:
+
+| flag | meaning |
+|------|---------|
+| `--lua_debug` | Calls `debugger:start(host:port)` after script load. |
+| `--lua_debug_wait` | With `--lua_debug`, blocks at startup on `debugger:event("wait")` so breakpoints set before launch hit on first frame. |
+
+`Scripts/run_game.ps1 -LuaDebug [-LuaDebugWait]` and `Scripts/run_editor.ps1 -LuaDebug [-LuaDebugWait]` forward these. Host/port are still config vars since they're real values, not toggles:
 
 | var | default | meaning |
 |-----|---------|---------|
-| `g_lua_debug` | `0` | When `1`, calls `emmy_core.tcpListen` after script load. |
-| `g_lua_debug_host` | `localhost` | Listen host. |
-| `g_lua_debug_port` | `9966` | Listen port. Must match `.vscode/launch.json`. |
-| `g_lua_debug_wait` | `0` | When `1`, blocks at startup on `emmy_core.waitIDE()` so breakpoints set before launch hit on first frame. |
-| `g_lua_cpath_extra` | `""` | Dir appended to Lua `package.cpath` (must contain `emmy_core.dll`). |
+| `g_lua_debug_host` | `127.0.0.1` | Listen host. Must be a literal IPv4 — lua-debug's `socket.lua` only parses `%d+.%d+.%d+.%d+:%d+` and errors on hostnames like `localhost`. |
+| `g_lua_debug_port` | `9966` | Listen port. Must match `.vscode/launch.json`'s `address`. |
+| `g_lua_cpath_extra` | `""` | Dir appended to Lua `package.cpath` (needed for LuaSocket's `socket/core.dll`, `mime/core.dll` — unrelated to the debugger itself now). |
 
 ## Attach workflow
 
-1. Set `g_lua_debug 1` (and optionally `g_lua_debug_wait 1`) in `vars.txt`.
-2. Launch the game. Console prints `ScriptManager: starting EmmyLuaDebugger on localhost:9966 (wait=...)`. With `wait=1`, the main thread blocks here.
-3. In VS Code → Run → **EmmyLua Attach (localhost:9966)**. Game unblocks.
-4. Set breakpoints in any `Data/scripts/**/*.lua`. Source mapping is identity — `ScriptManager::reload_from_content` (ScriptManager.cpp:209) passes game-relative paths as chunknames.
+1. Launch via `Scripts/run_game.ps1 -LuaDebug` or `Scripts/run_editor.ps1 -LuaDebug` (add `-LuaDebugWait` too if you want early breakpoints to hit before scripts run).
+2. Console prints `ScriptManager: starting lua-debug on 127.0.0.1:9966 (wait=...)`. With `-LuaDebugWait`, the main thread blocks here until VS Code attaches.
+3. In VS Code → Run → **lua-debug Attach (127.0.0.1:9966)**. Game unblocks (if waiting).
+4. Set breakpoints in any `Data/scripts/**/*.lua`.
+
+## Source mapping
+
+`ScriptManager::reload_one_file` (ScriptManager.cpp) passes the script's **full path** (`FileSys::get_full_path_from_game_path`, e.g. `D:/Data/scripts/foo.lua`), not the game-relative one, as the Lua chunkname — prefixed with `@` by `reload_from_content` so Lua (and lua-debug) treat it as a real file rather than an anonymous in-memory chunk. Because the chunkname is already a full path, lua-debug resolves it directly without needing `cwd`/`sourceMaps` tricks in `launch.json`, and it works the same regardless of which folder you have open as the VS Code workspace root (repo root, `D:/Data/scripts`, whatever).
+
+If `g_project_base` changes to a different absolute path (or a relative one like `"Data"`, resolved against the game process's own working directory), no `launch.json` changes are needed — the chunkname always reflects wherever the file actually is on disk.
 
 ## Troubleshooting
 
-- **`emmy_core not found on package.cpath`** — dll missing or wrong dir; verify `g_lua_cpath_extra` and that the dll is built for Lua 5.4 / x64.
-- **Wrong Lua version** — vcpkg ships Lua 5.4.4; only the `Lua5.4` build of `emmy_core.dll` works.
-- **Breakpoints unbound** — confirm `sourcePaths` in `.vscode/launch.json` points at `Data/scripts`.
-- **Port in use** — change both `g_lua_debug_port` and `port` in launch.json (must match).
+- **`lua-debug shim not found`** — `actboy168.lua-debug` isn't installed, or `Data/scripts/lib/debugger.lua` (repo) / the shim location under `g_project_base` is missing/moved.
+- **"Missing `program` to debug" when starting** — VS Code resolved a `launch`-mode config instead of our `attach` one. Check the Run and Debug dropdown has **lua-debug Attach (127.0.0.1:9966)** selected, and that the *currently open workspace root's* `.vscode/launch.json` (not necessarily the repo's, if a different folder is open) actually contains it.
+- **Pausing lands on a blank `<Memory>` view / breakpoints never bind** — the chunkname passed to Lua wasn't `@`-prefixed (or wasn't a real resolvable path), so lua-debug treated the script as an anonymous in-memory chunk rather than a file. Should not happen now that `reload_one_file` uses `@` + full path; if it recurs, check `ScriptManager::reload_from_content`.
+- **Port in use** — change both `g_lua_debug_port` and `address` in launch.json (must match).
+- **Debug session opens then immediately closes, engine stays frozen in `dbg:event("wait")`** — check the extension's own logs at `%USERPROFILE%/.vscode/extensions/actboy168.lua-debug-*/master.log` and `client.log` (separate from VS Code's Debug Console). `"Invalid address"` there means `address` isn't a literal IPv4 (e.g. `localhost` was used instead of `127.0.0.1`).
 
 ## Implementation
 
-Single entry point: `ScriptManager::activate_debugger` in `Source/Scripting/ScriptManager.cpp` runs a small `luaL_dostring` snippet that requires `emmy_core`, calls `tcpListen`, and conditionally `waitIDE`. No C++ build-time dependency — emmy_core is a runtime Lua C module loaded via `package.cpath`.
+Single entry point: `ScriptManager::activate_debugger` in `Source/Scripting/ScriptManager.cpp` runs a small `luaL_dostring` snippet equivalent to `require("debugger"):start(host..":"..port)`, optionally chaining `:event("wait")`. No C++ build-time dependency — the debugger is a runtime Lua module loaded via `package.path`, same pattern as the old EmmyLua wiring it replaced.
