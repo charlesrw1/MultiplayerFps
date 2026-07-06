@@ -16,6 +16,7 @@
 
 #include <json.hpp>
 #include <stdexcept>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -57,8 +58,19 @@ UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_
 	if (!objarr.is_array())
 		throw SerializeInputError(std::string(debug_tag) + ": 'objs' must be an array");
 
+	// Parallel to objarr: the built Entity at each array position (nullptr for unknown-type blobs
+	// that were preserved instead of instantiated). Lets `__parent` index directly even when an
+	// earlier obj failed to build. Captured hierarchy metadata is applied in a second pass once
+	// every entity exists.
+	std::vector<Entity*> entity_by_index(objarr.size(), nullptr);
+	std::vector<int> parent_index(objarr.size(), -1);
+	std::vector<bool> is_top_level(objarr.size(), false);
+	std::vector<std::string> parent_bone(objarr.size());
+
 	std::unordered_set<uint64_t> seen_ids;
+	int obj_index = -1;
 	for (auto& ent : objarr) {
+		++obj_index;
 		require_object(ent, debug_tag);
 		require_field(ent, "__typename", debug_tag);
 		const auto& typefield = ent["__typename"];
@@ -113,8 +125,52 @@ UnserializedSceneFile NewSerialization::unserialize_from_json(const char* debug_
 										  std::to_string(instid));
 			e->post_unserialization(instid);
 		}
+		// Capture hierarchy metadata (prefabs only; absent on level files). Validated/applied below
+		// once every entity is built. `__parent` is an index into this objs array.
+		if (ent.contains("__parent")) {
+			const auto& pf = ent["__parent"];
+			if (!pf.is_number_integer())
+				throw SerializeInputError(std::string(debug_tag) + ": '__parent' must be an integer");
+			parent_index[obj_index] = pf.get<int>();
+		}
+		if (ent.contains("__is_top_level") && ent["__is_top_level"].is_boolean())
+			is_top_level[obj_index] = ent["__is_top_level"].get<bool>();
+		if (ent.contains("__parent_bone") && ent["__parent_bone"].is_string())
+			parent_bone[obj_index] = ent["__parent_bone"].get<std::string>();
+
+		entity_by_index[obj_index] = e.get();
 		outfile.all_obj_vec.push_back(e.release());
 		outfile.all_obj_vec.push_back(c.release());
+	}
+
+	// Second pass: resolve parent references to pointers and validate, but DO NOT call parent_to()
+	// here. Level::insert_* asserts every scene-file entity is unparented on entry and applies the
+	// hierarchy only after all entities are inserted+initialized. We record the links for it to
+	// apply. parent_to() there does not touch the child's local pos/rot/scale, so the loaded local
+	// transform is preserved as-is.
+	for (int i = 0; i < (int)entity_by_index.size(); ++i) {
+		Entity* child = entity_by_index[i];
+		if (!child)
+			continue;
+		SceneHierarchyLink link;
+		link.child = child;
+		const int pidx = parent_index[i];
+		if (pidx >= 0) {
+			if (pidx == i)
+				throw SerializeInputError(std::string(debug_tag) + ": '__parent' points to itself at index " +
+										  std::to_string(i));
+			if (pidx >= (int)entity_by_index.size() || !entity_by_index[pidx])
+				throw SerializeInputError(std::string(debug_tag) + ": '__parent' index " + std::to_string(pidx) +
+										  " out of range at index " + std::to_string(i));
+			link.parent = entity_by_index[pidx];
+		}
+		link.is_top_level = is_top_level[i];
+		if (!parent_bone[i].empty()) {
+			link.has_bone = true;
+			link.parent_bone = parent_bone[i];
+		}
+		if (link.parent || link.is_top_level || link.has_bone)
+			outfile.hierarchy.push_back(std::move(link));
 	}
 	return outfile;
 }
@@ -151,18 +207,39 @@ UnserializedSceneFile NewSerialization::unserialize_from_text(const char* debug_
 
 SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, const std::vector<Entity*>& input_objs,
 														bool write_ids, const char* prefab_name,
-														const std::vector<nlohmann::json>* preserved_unknown_objs) {
+														const std::vector<nlohmann::json>* preserved_unknown_objs,
+														bool serialize_hierarchy) {
 	double now = GetTime();
+
+	// An entity is emitted if it has a component and isn't marked non-serializeable. In the
+	// legacy flat format (serialize_hierarchy==false) parented entities are additionally skipped,
+	// preserving the exact .tmap layout. With hierarchy on, children are emitted too.
+	auto should_emit = [&](const Entity* ent) -> bool {
+		if (ent->get_components().size() == 0)
+			return false;
+		if (ent->dont_serialize_or_edit || ent->dont_serialize)
+			return false;
+		if (!serialize_hierarchy && ent->get_parent())
+			return false;
+		return true;
+	};
+
+	// Pass 1 (hierarchy only): assign each emitted entity its position in the `objs` array so a
+	// child can reference its parent by index. Parents that aren't themselves emitted (e.g. a
+	// non-serializeable prefab root) are absent from the map and the child serializes as a root.
+	std::unordered_map<const Entity*, int> index_of;
+	if (serialize_hierarchy) {
+		int next_index = 0;
+		for (auto ent : input_objs)
+			if (should_emit(ent))
+				index_of[ent] = next_index++;
+	}
 
 	nlohmann::json obj;
 	obj["__version"] = kSerializeFormatVersion;
 	obj["objs"] = nlohmann::json::array();
 	for (auto ent : input_objs) {
-		if (ent->get_components().size() == 0)
-			continue;
-		if (ent->dont_serialize_or_edit || ent->dont_serialize)
-			continue;
-		if (ent->get_parent())
+		if (!should_emit(ent))
 			continue;
 
 		nlohmann::json out;
@@ -180,6 +257,19 @@ SerializedSceneFile NewSerialization::serialize_to_text(const char* debug_tag, c
 		out["__typename"] = c->get_type().classname;
 		if (write_ids)
 			out["__retid"] = ent->get_instance_id();
+		// Hierarchy metadata: only written for prefabs. Old readers ignore any `__`-prefixed key,
+		// so these are additive and don't require a format version bump.
+		if (serialize_hierarchy) {
+			if (Entity* p = ent->get_parent()) {
+				auto it = index_of.find(p);
+				if (it != index_of.end())
+					out["__parent"] = it->second;
+			}
+			if (ent->get_is_top_level())
+				out["__is_top_level"] = true;
+			if (ent->has_parent_bone())
+				out["__parent_bone"] = ent->get_parent_bone().get_c_str();
+		}
 		obj["objs"].push_back(out);
 	}
 	// Splice preserved unknown-typename blobs back in verbatim. Opt-in (nullptr default)

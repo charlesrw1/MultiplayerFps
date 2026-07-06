@@ -400,6 +400,22 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 		}
 	}
 
+	// Apply deferred prefab hierarchy now that every entity is inserted + initialized. This is the
+	// only place parenting is established for scene-file entities; unserialize deliberately leaves
+	// them flat so the unparented-on-entry assert above holds. Skip any link whose child or parent
+	// was stripped/baked (those pointers are freed; strip_set holds their now-dangling values, which
+	// we only compare, never dereference). Level files carry no hierarchy, so this is a no-op there.
+	for (auto& link : scene.hierarchy) {
+		if (strip_set.count(link.child))
+			continue;
+		if (link.parent && !strip_set.count(link.parent))
+			link.child->parent_to(link.parent);
+		if (link.is_top_level)
+			link.child->set_is_top_level(true);
+		if (link.has_bone)
+			link.child->set_parent_bone(StringName(link.parent_bone.c_str()));
+	}
+
 	// Take ownership of any unknown-typename JSON blobs the reader stashed. They round-trip
 	// to the next save so unresolved component types aren't silently dropped from the .tmap.
 	preserved_unknown_objs.insert(preserved_unknown_objs.end(),
