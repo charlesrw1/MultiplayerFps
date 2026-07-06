@@ -17,6 +17,15 @@ SelectionState::SelectionState(EditorDoc& ed_doc) {
 	return EntityPtr(*selected_entity_handles.begin());
 }
 
+ EntityPtr SelectionState::get_active() const {
+	if (last_active.get() && is_entity_selected(last_active))
+		return last_active;
+	// stale/unset — fall back to any selected entity
+	if (!selected_entity_handles.empty())
+		return EntityPtr(*selected_entity_handles.begin());
+	return EntityPtr();
+}
+
  const std::unordered_set<uint64_t>& SelectionState::get_selection() const { return selected_entity_handles; }
 
  std::vector<EntityPtr> SelectionState::get_selection_as_vector() const {
@@ -42,6 +51,7 @@ SelectionState::SelectionState(EditorDoc& ed_doc) {
 			selected_entity_handles.insert(ptr.handle);
 			had_changes = true;
 		}
+		last_active = ptr; // most-recently referenced becomes the active target
 	}
 	if (had_changes) {
 		on_selection_changed.invoke();

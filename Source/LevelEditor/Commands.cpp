@@ -387,7 +387,10 @@ std::unique_ptr<SerializedSceneFile> CommandSerializeUtil::serialize_entities_te
 	}
 	ed_doc.validate_fileids_before_serialize();
 
-	return std::make_unique<SerializedSceneFile>(
-		NewSerialization::serialize_to_text("Command::serialize_entities_text", ents, true));
+	// Preserve parent/child links in undo snapshots while editing a prefab so remove/duplicate undo
+	// restores the hierarchy, not just the flat entities.
+	return std::make_unique<SerializedSceneFile>(NewSerialization::serialize_to_text(
+		"Command::serialize_entities_text", ents, true, nullptr, nullptr,
+		/*serialize_hierarchy*/ ed_doc.is_editing_prefab()));
 }
 #endif

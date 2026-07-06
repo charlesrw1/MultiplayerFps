@@ -86,6 +86,21 @@ void InstantiatePrefabCommand::execute() {
 		return;
 	}
 
+	// Scene (level) mode: spawn a live PrefabAssetComponent instance. Its internal parenting is
+	// rebuilt at runtime and works, but a level file can't serialize parent links (parenting is a
+	// prefab-only feature), so warn the user that the hierarchy is only live and would be lost if
+	// the instance were unpacked into the level.
+	{
+		const std::string prefab_text = PrefabFile::load_text(prefab_path);
+		if (prefab_text.find("\"__parent\"") != std::string::npos) {
+			sys_print(Warning,
+					  "Instantiating prefab '%s' which contains entity parenting: parent links live only "
+					  "inside the prefab instance and are not preserved if unpacked into the level.\n",
+					  prefab_path.c_str());
+			eng->log_to_fullscreen_gui(Warning, "Prefab parenting links are not editable/saved in a level");
+		}
+	}
+
 	try {
 		auto e = spawn_prefab(ed_doc, prefab_path, transform);
 		handles.push_back(e);
@@ -134,7 +149,8 @@ void MakePrefabFromSelectionCommand::execute() {
 		if (last_slash != std::string::npos) {
 			prefab_name = prefab_name.substr(last_slash + 1);
 		}
-		auto serialized = NewSerialization::serialize_to_text("make_prefab", entities, false, prefab_name.c_str());
+		auto serialized = NewSerialization::serialize_to_text("make_prefab", entities, false, prefab_name.c_str(),
+															  nullptr, /*serialize_hierarchy*/ true);
 		prefab_text = std::make_unique<SerializedSceneFile>(serialized);
 
 		if (!PrefabFile::save_text(save_path, serialized.text)) {
@@ -205,8 +221,8 @@ void MakePrefabAndReplaceCommand::execute() {
 		if (last_slash != std::string::npos) {
 			prefab_name = prefab_name.substr(last_slash + 1);
 		}
-		auto serialized =
-			NewSerialization::serialize_to_text("make_prefab_replace", entities, false, prefab_name.c_str());
+		auto serialized = NewSerialization::serialize_to_text("make_prefab_replace", entities, false,
+															  prefab_name.c_str(), nullptr, /*serialize_hierarchy*/ true);
 		original_selection = std::make_unique<SerializedSceneFile>(serialized);
 
 		if (!PrefabFile::save_text(prefab_path, serialized.text)) {

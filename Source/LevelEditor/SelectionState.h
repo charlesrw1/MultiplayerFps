@@ -15,6 +15,10 @@ public:
 
 	EntityPtr get_only_one_selected() const;
 
+	// The "active" entity — the most recently added to the selection. Used as the default parent
+	// target for Ctrl+P. Falls back to any selected entity if the last-active handle went stale.
+	EntityPtr get_active() const;
+
 	const std::unordered_set<uint64_t>& get_selection() const;
 	std::vector<EntityPtr> get_selection_as_vector() const;
 
@@ -43,4 +47,5 @@ private:
 	}
 
 	std::unordered_set<uint64_t> selected_entity_handles;
+	EntityPtr last_active; // most recently added selection; the Ctrl+P parent target
 };

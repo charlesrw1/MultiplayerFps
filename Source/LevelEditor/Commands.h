@@ -199,6 +199,40 @@ public:
 	EntityPtr entPtr{};
 };
 
+// Reparents entities, preserving world transforms. Undoable. Prefab-edit mode only (parenting is a
+// prefab-only feature; is_valid() rejects it in level-edit mode). Three modes selected by ctor args:
+//   * parent to an existing entity      (new_parent set, create_new_parent=false, clear_parent=false)
+//   * parent under a fresh empty node    (create_new_parent=true)   -> spawns an EmptyComponent group
+//   * clear parent                       (clear_parent=true)        -> unparents, keeps world xform
+// Optional parent_bone attaches children to a bone of the parent's skeletal mesh.
+class ParentToCommand : public Command
+{
+public:
+	EditorDoc& ed_doc;
+	ParentToCommand(EditorDoc& ed_doc, std::vector<Entity*> children, Entity* new_parent, bool create_new_parent,
+					bool clear_parent, StringName parent_bone = StringName());
+	bool is_valid() final;
+	void execute() final;
+	void undo() final;
+	std::string to_string() final { return "Parent Entities"; }
+
+	struct SavedChild
+	{
+		EntityPtr child;
+		EntityPtr prev_parent;
+		bool prev_top_level = false;
+		StringName prev_bone;
+		glm::mat4 prev_ws_transform = glm::mat4(1);
+	};
+	std::vector<SavedChild> saved;
+	EntityPtr new_parent;		// requested target (null for clear / create-new)
+	EntityPtr created_parent;	// the empty node we spawned, so undo can delete it
+	bool create_new_parent = false;
+	bool clear_parent = false;
+	StringName parent_bone;
+	bool valid_flag = true;
+};
+
 class CreateComponentCommand : public Command
 {
 public:

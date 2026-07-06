@@ -14,3 +14,7 @@
   loops (e.g. idle sway), truncating the clip and causing a snap at the loop point
   
  - shader cache. if you change a header that is included in a shder, engine doesnt pick up on that and loads stale shader from cache. it does pick up on the source file changes, but not includes.
+ 
+ - DOMAIN Particle for meshbuilder rendering
+ 
+ - parenting only is in prefab mode, not in level edit mode. instantiating a prefab with parenting removes the parenting.

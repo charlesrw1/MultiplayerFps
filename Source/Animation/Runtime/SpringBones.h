@@ -51,6 +51,15 @@ struct SpringBoneState
 	bool initialized = false;
 };
 
+// Integrates one spring bone for one frame given its "rest" transform this frame (world space --
+// where it would be if it rigidly followed its parent with no independent motion of its own) and
+// its parent's current world position. Updates `state` in place and returns the bone's new
+// simulated world transform. Shared by SpringBones (skeleton-bone chains) and
+// SpringBoneManagerComponent (manually-authored bone chains) -- the oscillator math doesn't care
+// where the rest transform came from.
+glm::mat4 integrate_spring_bone(float dt, const SpringBoneParams& params, const glm::mat4& worldRestMat,
+								 const glm::vec3& worldParentPos, SpringBoneState& state);
+
 // Owned directly by AnimatorObject. Runs after the anim graph has produced a
 // local-space pose and cached_bonemats has been filled with the fully
 // animated mesh-space chain; overwrites cached_bonemats entries for bones

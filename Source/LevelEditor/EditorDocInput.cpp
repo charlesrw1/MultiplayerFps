@@ -57,6 +57,20 @@ void EditorDoc::do_mouse_selection(MouseSelectionAction action, const Entity* e,
 
 void EditorDoc::do_mouse_selection(MouseSelectionAction action, vector<EntityPtr> ents, bool select_root_most_entity) {
 	ASSERT(selection_state);
+	if (select_root_most_entity) {
+		// Match single-click picking: map each hit to its outermost editable ancestor, dropping
+		// dont_serialize_or_edit entities (e.g. prefab-internal nodes) so box-select can't grab them.
+		vector<EntityPtr> mapped;
+		mapped.reserve(ents.size());
+		for (auto& ep : ents) {
+			const Entity* e = ep.get();
+			if (!e)
+				continue;
+			if (const Entity* outer = select_outermost_entity(e))
+				mapped.push_back(EntityPtr(outer));
+		}
+		ents = std::move(mapped);
+	}
 	if (action == MouseSelectionAction::SELECT_ONLY) {
 		selection_state->clear_all_selected();
 		selection_state->add_entities_to_selection(ents);
@@ -121,6 +135,14 @@ void EditorDoc::check_inputs() {
 		command_mgr->undo();
 	} else if (Input::was_key_pressed(SDL_SCANCODE_S) && has_ctrl) {
 		save();
+	} else if (Input::was_key_pressed(SDL_SCANCODE_P) && has_ctrl && is_editing_prefab()) {
+		// Ctrl+P: open the "Set Parent" popup (parenting is prefab-only).
+		if (selection_state->has_any_selected())
+			want_open_parent_menu = true;
+	} else if (Input::was_key_pressed(SDL_SCANCODE_P) && Input::is_alt_down() && is_editing_prefab()) {
+		// Alt+P: open the "Clear Parent" popup.
+		if (selection_state->has_any_selected())
+			want_open_unparent_menu = true;
 	} else if (ed_cam.handle_events()) {
 	}
 }

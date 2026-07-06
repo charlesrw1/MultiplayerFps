@@ -519,8 +519,22 @@ void main()
 #ifdef DEBUG_SHADER
 	#ifndef FORWARD_SHADER
 		float normal_mult_debug = 1.0;
-		if((g.flags & 2)!=0)
-			normal_mult_debug = max(dot(Final_Normal,normalize(g.viewpos_time.xyz-FS_IN_FragPos)),0.08);
+		if((g.flags & 2)!=0) {
+			// Blender "Studio" solid-mode style shading: a soft key + fill plus a
+			// sky/ground hemispheric gradient, evaluated in a camera-anchored basis
+			// so the light follows the view. Gives smooth rounded shading instead of
+			// the flat N.V headlight term.
+			vec3 dbg_N     = normalize(Final_Normal);
+			vec3 dbg_fwd   = normalize(g.viewfront.xyz);
+			vec3 dbg_right = normalize(cross(dbg_fwd, vec3(0,1,0)));
+			vec3 dbg_up    = cross(dbg_right, dbg_fwd);
+			vec3 dbg_key   = normalize(-dbg_fwd*0.5 + dbg_up*0.8 + dbg_right*0.5); // upper-front-right
+			vec3 dbg_fill  = normalize(-dbg_fwd*0.3 - dbg_up*0.4 - dbg_right*0.6); // lower-back-left
+			float dbg_kterm = max(dot(dbg_N, dbg_key), 0.0);
+			float dbg_fterm = max(dot(dbg_N, dbg_fill), 0.0);
+			float dbg_hemi  = dot(dbg_N, dbg_up)*0.5 + 0.5;
+			normal_mult_debug = clamp(0.30 + dbg_kterm*0.75 + dbg_fterm*0.20 + dbg_hemi*0.20, 0.0, 1.25);
+		}
 		if((g.flags & FLAG_WIREFRAME_OVERLAY) != 0) {
 			// soft dark line blended over the already-shaded pixel underneath (BlendState::BLEND)
 			GBUFFER_OUT_Emissive = vec4(0.0,0.0,0.0,0.35);

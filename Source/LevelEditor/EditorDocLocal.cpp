@@ -270,8 +270,10 @@ bool EditorDoc::save_document_internal() {
 		if (auto e = o->cast_to<Entity>())
 			all_ents.push_back(e);
 	string debug_tag = "saving:" + assetName.value_or("<new>");
+	// Prefabs persist parent/child links; level (.tmap) saves stay flat (see serialize_to_text).
 	auto serialized = NewSerialization::serialize_to_text(debug_tag.c_str(), all_ents, false, nullptr,
-														  &eng->get_level()->preserved_unknown_objs);
+														  &eng->get_level()->preserved_unknown_objs,
+														  /*serialize_hierarchy*/ is_editing_prefab());
 	assert(assetName.has_value());
 	const string path = assetName.value();
 
@@ -353,7 +355,8 @@ void EditorDoc::init_for_scene(opt<string> scene) {
 			SerializedSceneFile prefab_content;
 			if (!prefab_entities.empty()) {
 				try {
-					prefab_content = NewSerialization::serialize_to_text("prefab_edit_backup", prefab_entities, false);
+					prefab_content = NewSerialization::serialize_to_text("prefab_edit_backup", prefab_entities, false,
+																		nullptr, nullptr, /*serialize_hierarchy*/ true);
 				}
 				catch (const std::exception& e) {
 					sys_print(Warning, "Failed to backup prefab content: %s\n", e.what());

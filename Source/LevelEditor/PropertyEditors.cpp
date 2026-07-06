@@ -494,7 +494,7 @@ bool ButtonPropertyEditor::internal_update() {
 	BoolButton* b = (BoolButton*)prop->get_ptr(instance);
 
 	bool ret = false;
-	if (ImGui::Button(prop->tooltip)) {
+	if (ImGui::Button(prop->name)) {
 		ret = true;
 		b->b = true;
 	}

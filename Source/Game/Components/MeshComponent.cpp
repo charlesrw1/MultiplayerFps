@@ -13,6 +13,7 @@
 #include "Framework/VectorReflect2.h"
 #include "Render/ModelManager.h"
 #include "GameAnimationMgr.h"
+#include "SpringBoneManagerComponent.h"
 #include "Debug.h"
 #include "Framework/Jobs.h"
 #include "tracy/public/tracy/Tracy.hpp"
@@ -246,6 +247,12 @@ void GameAnimationMgr::add_to_animating_set(AnimatorObject& mc) {
 	// ASSERT(!animating_meshcomponents.find(mc));
 	animating_meshcomponents.insert(&mc);
 }
+void GameAnimationMgr::remove_from_post_animate_set(SpringBoneManagerComponent& c) {
+	post_animate_components.remove(&c);
+}
+void GameAnimationMgr::add_to_post_animate_set(SpringBoneManagerComponent& c) {
+	post_animate_components.insert(&c);
+}
 
 extern ConfigVar g_debug_skeletons;
 
@@ -277,13 +284,13 @@ void GameAnimationMgr::update_animating() {
 
 	matricies_used = 0;
 
+	const float dt = eng->get_dt();
+
 	for (AnimatorObject* ai : animating_meshcomponents) {
 		if (ai) {
 			if (matricies_used + ai->num_bones() > matricies_allocated)
 				Fatalf("animator out of memory\n");
 			ai->set_matrix_palette_offset(matricies_used);
-
-			float dt = eng->get_dt();
 
 			ai->update(dt);
 			matricies_used += ai->num_bones();
@@ -295,6 +302,13 @@ void GameAnimationMgr::update_animating() {
 				draw_skeleton(ai, 0.05, ai->get_owner()->get_ws_transform());
 			}
 		}
+	}
+
+	// Runs after every AnimatorObject above has produced this frame's pose, so components here
+	// can read fresh bone matrices instead of lagging a frame behind.
+	for (SpringBoneManagerComponent* c : post_animate_components) {
+		if (c)
+			c->late_update(dt);
 	}
 }
 #include "LevelEditor/EditorDocLocal.h"

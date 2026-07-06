@@ -1,6 +1,7 @@
 #include "EditorModes.h"
 #include "EditorDocLocal.h"
 #include "Game/Components/BillboardComponent.h"
+#include <algorithm>
 
 void SelectionMode::tick(EditorInputs& inputs) {
 	dragger.tick(inputs);
@@ -47,7 +48,9 @@ void SelectionMode::tick(EditorInputs& inputs) {
 		std::vector<EntityPtr> selectThese;
 		for (auto o : objs) {
 			if (auto as_ent = o->cast_to<Entity>()) {
-				if (as_ent->get_hidden_in_editor())
+				// Same filter as click-picking (select_outermost_entity): skip hidden and
+				// non-editable entities (e.g. prefab-internal nodes) — they aren't selectable.
+				if (as_ent->get_hidden_in_editor() || as_ent->dont_serialize_or_edit)
 					continue;
 				selectThese.push_back(as_ent);
 			}
@@ -60,7 +63,7 @@ void SelectionMode::tick(EditorInputs& inputs) {
 		std::vector<EntityPtr> selectThese;
 		for (auto o : objs) {
 			if (auto as_ent = o->cast_to<Entity>()) {
-				if (as_ent->get_hidden_in_editor())
+				if (as_ent->get_hidden_in_editor() || as_ent->dont_serialize_or_edit)
 					continue;
 				if (!selection_state->is_entity_selected(as_ent)) {
 					selectThese.push_back(as_ent);
@@ -72,20 +75,48 @@ void SelectionMode::tick(EditorInputs& inputs) {
 	}
 }
 
+// Dashed marquee border in the dashed_line.png style (light grey/white dashes). The 2D UI quad path
+// can't tile/rotate a horizontal sprite down the vertical edges, so the dashes are emitted as short
+// solid rects — consistent on all four edges.
+static void draw_dashed_border(RenderWindow& window, Rect2d r) {
+	const Color32 dash_color = {230, 230, 230, 255}; // light grey / near-white marquee
+	const int dash = 8, gap = 5, thick = 2;
+	const int period = dash + gap;
+	// Normalize so a drag in any direction yields x0<x1, y0<y1.
+	const int x0 = std::min<int>(r.x, r.x + r.w), x1 = std::max<int>(r.x, r.x + r.w);
+	const int y0 = std::min<int>(r.y, r.y + r.h), y1 = std::max<int>(r.y, r.y + r.h);
+
+	auto dash_run = [&](int a, int b, auto make_rect) {
+		for (int t = a; t < b; t += period) {
+			const int len = std::min(dash, b - t);
+			RectangleShape s;
+			s.rect = make_rect(t, len);
+			s.color = dash_color;
+			window.draw(s);
+		}
+	};
+	dash_run(x0, x1, [&](int t, int len) { return Rect2d(t, y0, len, thick); });		  // top
+	dash_run(x0, x1, [&](int t, int len) { return Rect2d(t, y1 - thick, len, thick); });	  // bottom
+	dash_run(y0, y1, [&](int t, int len) { return Rect2d(x0, t, thick, len); });		  // left
+	dash_run(y0, y1, [&](int t, int len) { return Rect2d(x1 - thick, t, thick, len); });	  // right
+}
+
 void SelectionMode::draw_ui()
 {
 	if (dragger.get_is_dragging()) {
 		auto rect = dragger.get_drag_rect();
-		// builder.draw_solid_rect({ rect.x,rect.y }, { rect.w,rect.h }, { 200,200,200,50 });
 		rect.x -= UiSystem::inst->get_vp_rect().get_pos().x;
 		rect.y -= UiSystem::inst->get_vp_rect().get_pos().y;
 
-		RectangleShape shape;
-		shape.rect = rect;
-		Uint8 c = 200;// test1.get_integer();
-		Uint8 a = 200;// test2.get_integer();
-		shape.color = { c, c, c, a };
-		UiSystem::inst->window.draw(shape);
+		auto& window = UiSystem::inst->window;
+
+		// Faint fill so the marquee area reads clearly without hiding what's underneath.
+		RectangleShape fill;
+		fill.rect = rect;
+		fill.color = {230, 230, 230, 30};
+		window.draw(fill);
+
+		draw_dashed_border(window, rect);
 	}
 }
 SelectionMode::SelectionMode(EditorDoc& doc) : doc(doc) {

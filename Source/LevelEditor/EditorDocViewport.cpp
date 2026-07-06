@@ -20,12 +20,17 @@
 #include "LevelEditor/Commands.h"
 #include "Framework/Rect2d.h"
 #include "Game/EntityComponent.h"
+#include "Game/Components/MeshComponent.h"
+#include "Render/Model.h"
+#include "Animation/SkeletonData.h"
 #include "Input/InputSystem.h"
+#include "Framework/StringUtils.h"
 #include "Debug.h"
 #include <glm/gtc/type_ptr.hpp>
 
 extern void export_level_scene();
 extern void start_play_process();
+extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 
 ConfigVar draw_coords_under_mouse("draw_coords_under_mouse", "0", CVAR_BOOL, "");
 
@@ -330,6 +335,10 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 	if (dbg_btn_clicked) ImGui::OpenPopup("##dbg_view");
 	if (ot_btn_clicked)  ImGui::OpenPopup("##ot_view");
 
+	// Ctrl+P / Alt+P parenting popups (opened via flags from check_inputs so they share this
+	// window's ID namespace, same as the popups above).
+	draw_parenting_popups();
+
 	// Popup rendered outside the menu bar scope so it can overlap freely
 	if (ImGui::BeginPopup("##snap_settings")) {
 		ImGui::TextDisabled("Snap Settings");
@@ -405,6 +414,92 @@ void EditorDoc::hook_pre_scene_viewport_draw() {
 				idraw->editor_set_debug_overlay(o.tex, s_ot_scale, s_ot_alpha, s_ot_mip);
 			}
 		}
+		ImGui::EndPopup();
+	}
+}
+
+// Ctrl+P "Set Parent" and Alt+P "Clear Parent" popups. Parenting is prefab-only; the shortcuts in
+// check_inputs already gate on is_editing_prefab(). All actions route through the undoable
+// ParentToCommand.
+void EditorDoc::draw_parenting_popups() {
+	if (want_open_parent_menu) {
+		ImGui::OpenPopup("##parent_menu");
+		want_open_parent_menu = false;
+	}
+	if (want_open_unparent_menu) {
+		ImGui::OpenPopup("##unparent_menu");
+		want_open_unparent_menu = false;
+	}
+
+	std::vector<Entity*> selected;
+	for (auto& ptr : selection_state->get_selection_as_vector())
+		if (Entity* e = ptr.get())
+			selected.push_back(e);
+	Entity* active = selection_state->get_active().get();
+
+	auto children_excluding = [&](Entity* target) {
+		std::vector<Entity*> out;
+		for (auto* e : selected)
+			if (e != target)
+				out.push_back(e);
+		return out;
+	};
+
+	if (ImGui::BeginPopup("##parent_menu")) {
+		ImGui::TextDisabled("Set Parent");
+		ImGui::Separator();
+
+		const bool can_parent_active = active && selected.size() >= 2;
+		if (ImGui::MenuItem("Parent to Active", nullptr, false, can_parent_active))
+			command_mgr->add_command(new ParentToCommand(*this, children_excluding(active), active, false, false));
+		if (ImGui::MenuItem("Parent to New Empty", nullptr, false, !selected.empty()))
+			command_mgr->add_command(new ParentToCommand(*this, selected, nullptr, true, false));
+
+		// "Parent to Bone" — only when the active target carries a skeletal mesh. Searchable combo
+		// (same pattern as EntityBoneParentStringEditor): opening focuses the filter box so you can
+		// type; clicking away closes the combo without issuing a command (skips parenting).
+		MeshComponent* mesh = active ? active->get_component<MeshComponent>() : nullptr;
+		const MSkeleton* skel = (mesh && mesh->get_model()) ? mesh->get_model()->get_skel() : nullptr;
+		if (skel && can_parent_active) {
+			if (ImGui::BeginCombo("Parent to Bone", "<pick a bone>")) {
+				if (parent_bone_focus_filter) {
+					ImGui::SetKeyboardFocusHere();
+					parent_bone_focus_filter = false;
+				}
+				ImGui::InputText("##bonefilter", (char*)parent_bone_filter_buf.c_str(),
+								 parent_bone_filter_buf.size() + 1, ImGuiInputTextFlags_CallbackResize,
+								 imgui_std_string_resize, &parent_bone_filter_buf);
+
+				const std::string filter_lower = StringUtils::to_lower(parent_bone_filter_buf.c_str());
+				for (auto& bone : skel->get_all_bones()) {
+					const char* label = bone.strname.empty() ? bone.name.get_c_str() : bone.strname.c_str();
+					if (!label)
+						label = "<bone>";
+					if (!filter_lower.empty() &&
+						StringUtils::to_lower(label).find(filter_lower) == std::string::npos)
+						continue;
+					if (ImGui::Selectable(label)) {
+						command_mgr->add_command(
+							new ParentToCommand(*this, children_excluding(active), active, false, false, bone.name));
+						ImGui::CloseCurrentPopup(); // dismiss the whole parent menu after picking
+					}
+				}
+				ImGui::EndCombo();
+			} else {
+				// Combo closed (clicked away or never opened): reset so it re-focuses next open, and
+				// clear the stale filter text. No command issued -> parenting skipped, as requested.
+				parent_bone_focus_filter = true;
+				parent_bone_filter_buf.clear();
+			}
+		}
+		ImGui::EndPopup();
+	}
+
+	if (ImGui::BeginPopup("##unparent_menu")) {
+		ImGui::TextDisabled("Clear Parent");
+		ImGui::Separator();
+		if (ImGui::MenuItem("Clear Parent (Keep Transform)", nullptr, false, !selected.empty()))
+			command_mgr->add_command(new ParentToCommand(*this, selected, nullptr, false, true));
 		ImGui::EndPopup();
 	}
 }

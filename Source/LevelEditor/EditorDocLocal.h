@@ -325,6 +325,9 @@ private:
 	// parenting popups live (must OpenPopup in the same imgui window as their BeginPopup).
 	bool want_open_parent_menu = false;
 	bool want_open_unparent_menu = false;
+	// "Parent to Bone" searchable combo state (same pattern as EntityBoneParentStringEditor).
+	std::string parent_bone_filter_buf;
+	bool parent_bone_focus_filter = true;
 	void draw_parenting_popups();
 	FnFactory<IPropertyEditor> grid_factory;
 	uptr<ConsoleCmdGroup> cmds;

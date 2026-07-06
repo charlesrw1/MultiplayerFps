@@ -51,8 +51,11 @@ void PrefabAssetComponent::update_path(std::string new_path) {
 		eng->get_level()->insert_unserialized_entities_into_level(unserialized);
 		for (auto base_updater : unserialized.all_obj_vec) {
 			if (auto entity = base_updater->cast_to<Entity>()) {
-				// Parent the entity to this component's owner
-				entity->parent_to(owner);
+				// Only the prefab's root entities attach to the owner. Entities that already have a
+				// parent were linked to another entity *inside* the prefab by unserialize_from_text;
+				// reparenting them here would flatten (and thus break) the prefab's own hierarchy.
+				if (!entity->get_parent())
+					entity->parent_to(owner);
 				entity->dont_serialize_or_edit = true;
 			}
 		}

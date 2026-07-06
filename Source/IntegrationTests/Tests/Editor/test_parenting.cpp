@@ -265,6 +265,47 @@ static TestTask test_parenting_command_undo_redo(TestContext& t) {
 }
 EDITOR_TEST("editor/parenting_command_undo_redo", 20.f, test_parenting_command_undo_redo);
 
+// Regression: reparenting a bone-attached child (or clearing its parent) must not leave a stale
+// parent_bone behind. execute() overwrites the bone to match the command's intent; undo restores it.
+static TestTask test_parenting_clears_stale_bone(TestContext& t) {
+	const std::string pp = "_parenting_bone.tprefab";
+	FileSys::delete_game_file(pp.c_str());
+	PrefabFile::save_text(pp, kScratchPrefab);
+	co_await t.wait_ticks(1);
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, (std::string("open-editor ") + pp).c_str());
+	co_await t.wait_ticks(5);
+	EditorDoc* editor = static_cast<EditorDoc*>(eng->get_tool());
+	t.require(editor && editor->is_editing_prefab(), "in prefab mode");
+
+	Entity* parent = editor->spawn_entity();
+	parent->create_component<MeshComponent>();
+
+	Entity* child = editor->spawn_entity();
+	child->create_component<MeshComponent>();
+	child->set_parent_bone(NAME("spine_01")); // pretend it was bone-attached earlier
+
+	// Reparent to a plain entity with no bone: the stale "spine_01" must be dropped.
+	ParentToCommand reparent(*editor, {child}, parent, false, false);
+	t.check(reparent.is_valid(), "reparent valid");
+	reparent.execute();
+	t.check(!child->has_parent_bone(), "reparent-without-bone clears stale parent_bone");
+	reparent.undo();
+	t.check(child->has_parent_bone() && child->get_parent_bone() == NAME("spine_01"),
+			"undo restores prior parent_bone");
+
+	// Clearing the parent must also drop the bone.
+	child->set_parent_bone(NAME("spine_01"));
+	ParentToCommand clear(*editor, {child}, nullptr, false, /*clear_parent*/ true);
+	clear.execute();
+	t.check(!child->has_parent_bone(), "clear-parent drops parent_bone");
+
+	parent->destroy();
+	child->destroy();
+	FileSys::delete_game_file(pp.c_str());
+	co_await t.wait_ticks(1);
+}
+EDITOR_TEST("editor/parenting_clears_stale_bone", 20.f, test_parenting_clears_stale_bone);
+
 // "Parent to New Empty" spawns an EmptyComponent group node; undo removes it and unparents.
 static TestTask test_parenting_new_empty(TestContext& t) {
 	const std::string pp = "_parenting_empty.tprefab";

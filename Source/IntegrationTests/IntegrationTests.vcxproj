@@ -96,6 +96,7 @@
     <ClCompile Include="Tests\Renderer\test_spirv_pipeline.cpp" />
     <ClCompile Include="Tests\Editor\test_serialize.cpp" />
     <ClCompile Include="Tests\Editor\test_prefabs.cpp" />
+    <ClCompile Include="Tests\Editor\test_parenting.cpp" />
     <ClCompile Include="Tests\Editor\test_lua_component.cpp" />
     <ClCompile Include="Tests\Editor\test_bake_gi.cpp" />
     <ClCompile Include="Tests\Framework\test_filesys.cpp" />

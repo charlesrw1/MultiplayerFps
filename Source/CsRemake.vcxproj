@@ -159,6 +159,7 @@
     <ClCompile Include="Game\Components\PhysicsShapes.cpp" />
     <ClCompile Include="Game\Components\PrefabAssetComponent.cpp" />
     <ClCompile Include="Game\Components\RagdollComponent.cpp" />
+    <ClCompile Include="Game\Components\SpringBoneManagerComponent.cpp" />
     <ClCompile Include="Game\Components\RagdollConfigComponent.cpp" />
     <ClCompile Include="Game\Components\SpawnerComponenth.cpp" />
     <ClCompile Include="Game\Entities\BikeEntity.cpp" />
@@ -179,6 +180,7 @@
     <ClCompile Include="LevelEditor\AddEditorCommands.cpp" />
     <ClCompile Include="LevelEditor\Commands.cpp" />
     <ClCompile Include="LevelEditor\CommandsComponent.cpp" />
+    <ClCompile Include="LevelEditor\CommandsParenting.cpp" />
     <ClCompile Include="LevelEditor\CommandsPrefab.cpp" />
     <ClCompile Include="LevelEditor\CommandsUndoRedo.cpp" />
     <ClCompile Include="LevelEditor\DecalStampTool.cpp" />
@@ -388,6 +390,7 @@
     <ClInclude Include="Game\Components\NavComps.h" />
     <ClInclude Include="Game\Components\ParticleMgr.h" />
     <ClInclude Include="Game\Components\RagdollComponent.h" />
+    <ClInclude Include="Game\Components\SpringBoneManagerComponent.h" />
     <ClInclude Include="Game\Components\RagdollConfigComponent.h" />
     <ClInclude Include="Game\Components\SpawnerComponenth.h" />
     <ClInclude Include="Game\EntityPtr.h" />
@@ -451,6 +454,7 @@
     <ClInclude Include="Framework\UniquePtrReflection.h" />
     <ClInclude Include="Game\BaseUpdater.h" />
     <ClInclude Include="Game\Components\ArrowComponent.h" />
+    <ClInclude Include="Game\Components\GroupComponent.h" />
     <ClInclude Include="Game\Components\BillboardComponent.h" />
     <ClInclude Include="Game\Components\DecalComponent.h" />
     <ClInclude Include="Game\Components\LightComponents.h" />

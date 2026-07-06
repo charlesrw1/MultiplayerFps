@@ -432,6 +432,9 @@
     <ClCompile Include="Game\Components\PrefabAssetComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Components\SpringBoneManagerComponent.cpp">
+      <Filter>Source\Game\Components</Filter>
+    </ClCompile>
     <ClCompile Include="Game\Components\RagdollComponent.cpp">
       <Filter>Source\Game\Components</Filter>
     </ClCompile>
@@ -535,6 +538,9 @@
       <Filter>Source\LevelEditor</Filter>
     </ClCompile>
     <ClCompile Include="LevelEditor\CommandsPrefab.cpp">
+      <Filter>Source\LevelEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="LevelEditor\CommandsParenting.cpp">
       <Filter>Source\LevelEditor</Filter>
     </ClCompile>
     <ClCompile Include="LevelEditor\CommandsUndoRedo.cpp">
@@ -1274,6 +1280,9 @@
     <ClInclude Include="Game\Components\ArrowComponent.h">
       <Filter>Source\Game\Components</Filter>
     </ClInclude>
+    <ClInclude Include="Game\Components\GroupComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
     <ClInclude Include="Game\Components\BillboardComponent.h">
       <Filter>Source\Game\Components</Filter>
     </ClInclude>
@@ -1320,6 +1329,9 @@
       <Filter>Source\Game\Components</Filter>
     </ClInclude>
     <ClInclude Include="Game\Components\PrefabAssetComponent.h">
+      <Filter>Source\Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Components\SpringBoneManagerComponent.h">
       <Filter>Source\Game\Components</Filter>
     </ClInclude>
     <ClInclude Include="Game\Components\RagdollComponent.h">
