@@ -60,7 +60,7 @@ def output_macro_for_prop(typenames : dict[str,ClassDef],cpptype:CppType,name:st
         #return f'make_struct_property({name_offset_flags}, "ObjPtr", {type_of_template}.classname)'
         return f'make_objhandleptr_property({name_offset_flags},{tooltip},&{type_of_template})'
     elif type == VEC3_TYPE:
-        return f"make_vec3_property({name_offset_flags})"
+        return f"make_vec3_property({name_offset_flags},{custom_type})"
         #return f"REG_VEC3({name},{flags})"
     elif type == QUAT_TYPE:
         return f"make_quat_property({name_offset_flags})"

@@ -170,7 +170,7 @@ PropertyInfo make_list_property(const char* name, uint16_t offset, uint32_t flag
 								const char* customtype = "");
 PropertyInfo make_struct_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype = "",
 								  const char* hint = "");
-PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
+PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype = "");
 PropertyInfo make_quat_property(const char* name, uint16_t offset, uint32_t flags, const char* hint = "");
 
 PropertyInfo make_stringname_property(const char* name, uint16_t offset, int flags, const char* tooltip);

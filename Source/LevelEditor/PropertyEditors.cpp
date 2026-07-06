@@ -589,6 +589,42 @@ public:
 	CurveEditorImgui editor;
 };
 
+#include "Game/Entity.h"
+bool EntityTransformCopyEditor::internal_update() {
+	ASSERT(prop && instance);
+	glm::vec3* v = (glm::vec3*)prop->get_ptr(instance);
+
+	// Leave room on the right for the copy button (square, one frame high).
+	const float button_w = ImGui::GetFrameHeight();
+	ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - button_w - ImGui::GetStyle().ItemSpacing.x);
+	bool ret = ImGui::DragFloat3("##vec", (float*)v, 0.05f);
+
+	ImGui::SameLine();
+	auto* ent = (Entity*)instance;
+	auto icon = g_assets.find<Texture>("eng/icons/content_copy_16.png");
+	bool clicked = false;
+	if (icon) {
+		clicked = ImGui::ImageButton("##copy_xform",
+			ImTextureID(uint64_t(icon->get_internal_render_handle())),
+			ImVec2(button_w - ImGui::GetStyle().FramePadding.y * 2.f, button_w - ImGui::GetStyle().FramePadding.y * 2.f));
+	} else {
+		clicked = ImGui::Button("C", ImVec2(button_w, button_w));
+	}
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("Copy transform as Lua Transform.from_pos_rot_scale(...)");
+	if (clicked) {
+		const glm::vec3& p = ent->get_ls_position();
+		const glm::quat& q = ent->get_ls_rotation();
+		const glm::vec3& s = ent->get_ls_scale();
+		char buf[512];
+		snprintf(buf, sizeof(buf),
+			"Transform.from_pos_rot_scale({x=%g,y=%g,z=%g}, {w=%g,x=%g,y=%g,z=%g}, {x=%g,y=%g,z=%g})",
+			p.x, p.y, p.z, q.w, q.x, q.y, q.z, s.x, s.y, s.z);
+		ImGui::SetClipboardText(buf);
+	}
+	return ret;
+}
+
 void PropertyFactoryUtil::register_basic(FnFactory<IPropertyEditor>& factory) {
 	factory.add("BoolButton", []() { return new ButtonPropertyEditor; });
 	factory.add("ColorUint", []() { return new ColorEditor; });
@@ -602,6 +638,7 @@ void PropertyFactoryUtil::register_editor(EditorDoc& doc, FnFactory<IPropertyEdi
 	factory.add("EditorNameString", []() { return new EditorNameStringEditor; });
 	factory.add("EntityTarget", [&doc]() { return new EntityTargetEditor(&doc); });
 	factory.add("BoneNameString", []() { return new BoneNameStringEditor; });
+	factory.add("EntityTransformCopy", []() { return new EntityTransformCopyEditor; });
 }
 void PropertyFactoryUtil::register_anim_editor(AnimationGraphEditor& doc, FnFactory<IPropertyEditor>& factory) {}
 void PropertyFactoryUtil::register_mat_editor(MaterialEditorLocal& doc, FnFactory<IPropertyEditor>& factory) {}

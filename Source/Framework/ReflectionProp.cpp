@@ -34,10 +34,10 @@ static StringView delimit(const char* start, const char character = ',') {
 	return s;
 }
 
-PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint32_t flags, const char* hint) {
+PropertyInfo make_vec3_property(const char* name, uint16_t offset, uint32_t flags, const char* customtype) {
 	PropertyInfo prop(name, offset, flags);
 	prop.type = core_type_id::Vec3;
-	prop.range_hint = hint;
+	prop.custom_type_str = customtype;
 	return prop;
 }
 PropertyInfo make_quat_property(const char* name, uint16_t offset, uint32_t flags, const char* hint) {

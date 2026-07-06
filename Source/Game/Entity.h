@@ -127,7 +127,8 @@ private:
 	std::vector<Entity*> children;
 	REFLECT(transient)
 	EntityBoneParentString parent_bone;
-	REF glm::vec3 position = glm::vec3(0.f);
+	REFLECT(type=EntityTransformCopy)
+	glm::vec3 position = glm::vec3(0.f);
 	REF glm::quat rotation = glm::quat(1, 0, 0, 0);
 	REF glm::vec3 scale = glm::vec3(1.f);
 	REFLECT(type=EditorNameString)

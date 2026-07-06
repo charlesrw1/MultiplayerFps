@@ -132,6 +132,15 @@ private:
 	const void* last_model = nullptr; // rebuild when model changes
 };
 
+// Vec3 editor for an Entity's local-space `position` property. Draws the normal
+// DragFloat3, plus a copy-icon button that writes the entity's full transform to
+// the clipboard as a `Transform.from_pos_rot_scale(...)` Lua literal.
+class EntityTransformCopyEditor : public IPropertyEditor
+{
+public:
+	bool internal_update() override;
+};
+
 class ClassTypePtrPropertyEditor : public IPropertyEditor
 {
 public:
