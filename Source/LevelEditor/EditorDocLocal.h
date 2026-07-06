@@ -87,18 +87,31 @@ EditorCamera
 #include "UI/Widgets/EditorCube.h"
 
 #include "Render/DrawPublic.h"
+#include "Framework/MeshBuilder.h"
 
+class MaterialInstance;
 class DrawHandlesObject
 {
 public:
 	DrawHandlesObject(EditorDoc& doc) : doc(doc) {}
+	~DrawHandlesObject();
 	EditorDoc& doc;
 	void tick();
 
 private:
+	// Blender-style dashed parent lines: rebuilt each frame into a single textured ribbon (a stretched
+	// dashed sprite, not GL lines). Drawn as a particle object because that is the only meshbuilder
+	// render path that actually binds a material/texture; the plain meshbuilder path ignores it and
+	// renders flat vertex-colour lines. Prefab-edit mode only (empty meshbuilder = nothing drawn).
+	void tick_parent_lines();
 	EntityPtr last_selected;
 	bool was_dragging = false;
 	glm::mat4 pre_drag_transform{};
+
+	MeshBuilder parent_line_mb;
+	handle<Particle_Object> parent_line_handle;
+	MaterialInstance* dashed_mat = nullptr;
+	bool tried_load_dashed_mat = false;
 };
 
 class EntityVisiblityFilter
@@ -308,6 +321,11 @@ private:
 	bool eye_dropper_active = false;
 	void* active_eyedropper_user_id = nullptr; // for id purposes only
 	bool editing_prefab = false;
+	// Set by check_inputs() on Ctrl+P / Alt+P; consumed in the viewport menu-bar draw where the
+	// parenting popups live (must OpenPopup in the same imgui window as their BeginPopup).
+	bool want_open_parent_menu = false;
+	bool want_open_unparent_menu = false;
+	void draw_parenting_popups();
 	FnFactory<IPropertyEditor> grid_factory;
 	uptr<ConsoleCmdGroup> cmds;
 	opt<string> assetName;

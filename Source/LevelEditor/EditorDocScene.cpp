@@ -12,6 +12,9 @@
 #include "Game/Components/SpawnerComponenth.h"
 #include "Debug.h"
 #include "Commands.h"
+#include "Assets/AssetDatabase.h"
+#include "Render/MaterialPublic.h"
+#include "Framework/Config.h"
 
 // ---------------------------------------------------------------------------
 // Scene entity helpers
@@ -50,8 +53,103 @@ void EditorDoc::instantiate_into_scene(BaseUpdater* u) {
 // DrawHandlesObject
 // ---------------------------------------------------------------------------
 
+// Live-tunable dashed-line params (exposed in the "Parent Lines" debug menu below).
+static float g_dashed_half_w_px = 16.f;   // on-screen half-thickness of the ribbon, in pixels
+static float g_dashed_period_px = 250.f;   // on-screen length of one dash+gap cell, in pixels
+
+static void draw_dashed_line_debug_menu() {
+	ImGui::SliderFloat("thickness (px)", &g_dashed_half_w_px, 1.f, 50.f, "%.2f");
+	ImGui::SliderFloat("dash period (px)", &g_dashed_period_px, 20.f, 500.f, "%.1f");
+	ImGui::TextDisabled("prefab-edit relationship lines");
+}
+static AddToDebugMenu s_dashed_line_menu("Parent Lines", draw_dashed_line_debug_menu);
+
+// Builds one camera-facing dashed ribbon (a stretched textured quad) from `from` to `to`. Both the
+// UV.x tiling and the ribbon width are driven off the line's *screen-space* size so the dash sprite
+// stays a constant pixel length and the ribbon a constant pixel thickness regardless of distance:
+// UV.x is tiled 0..N where N = on-screen length / dash-period-in-pixels, and the world half-width is
+// whatever projects to a fixed pixel thickness at the segment's distance.
+static void push_dashed_ribbon(MeshBuilder& mb, glm::vec3 from, glm::vec3 to, const View_Setup& view) {
+	glm::vec3 along = to - from;
+	float len = glm::length(along);
+	if (len < 1e-4f)
+		return;
+	along /= len;
+	glm::vec3 mid = 0.5f * (from + to);
+	glm::vec3 to_cam = view.origin - mid;
+	// Distance from the eye to the segment. Euclidean (not view-space depth) so it is always positive
+	// and never flips scale for segments off to the side or straddling the near plane.
+	float cam_dist = glm::length(to_cam);
+	if (cam_dist < 1e-4f)
+		return;
+	// Isotropic pixels-per-world at this distance: proj[1][1] = cot(fovy/2), and for square pixels the
+	// x density (proj[0][0]*w/2) equals the y density (proj[1][1]*h/2), so one factor covers both.
+	const float px_per_world = (view.proj[1][1] * 0.5f * (float)view.height) / cam_dist;
+	if (px_per_world < 1e-6f)
+		return;
+	glm::vec3 side = glm::cross(along, to_cam);
+	float sl = glm::length(side);
+	if (sl < 1e-5f)
+		return; // viewing straight down the line — nothing sensible to draw
+	const float half_w = g_dashed_half_w_px / px_per_world;
+	side *= (half_w / sl);
+	const float u_max = (len * px_per_world) / glm::max(g_dashed_period_px, 1e-3f);
+	const Color32 col = COLOR_WHITE; // color comes from the sprite texture
+	const int base = mb.GetBaseVertex();
+	MbVertex v0(from - side, col); v0.uv = glm::vec2(0.f, 0.f);
+	MbVertex v1(from + side, col); v1.uv = glm::vec2(0.f, 1.f);
+	MbVertex v2(to + side, col);   v2.uv = glm::vec2(u_max, 1.f);
+	MbVertex v3(to - side, col);   v3.uv = glm::vec2(u_max, 0.f);
+	mb.AddVertex(v0);
+	mb.AddVertex(v1);
+	mb.AddVertex(v2);
+	mb.AddVertex(v3);
+	mb.AddQuad(base, base + 1, base + 2, base + 3);
+}
+
+DrawHandlesObject::~DrawHandlesObject() {
+	if (parent_line_handle.is_valid() && idraw && idraw->get_scene())
+		idraw->get_scene()->remove_particle_obj(parent_line_handle);
+}
+
+void DrawHandlesObject::tick_parent_lines() {
+	if (!tried_load_dashed_mat) {
+		tried_load_dashed_mat = true;
+		dashed_mat = g_assets.find<MaterialInstance>("eng/dashed_line.mi").get();
+	}
+	if (!parent_line_handle.is_valid())
+		parent_line_handle = idraw->get_scene()->register_particle_obj();
+
+	// Rebuild the ribbon every frame. Parenting is prefab-only, so outside prefab-edit mode the
+	// meshbuilder is left empty and nothing is drawn (the particle path just uploads zero indices).
+	parent_line_mb.Begin();
+	if (doc.is_editing_prefab()) {
+		if (Level* level = eng->get_level()) {
+			for (auto obj : level->get_all_objects()) {
+				Entity* e = obj->cast_to<Entity>();
+				if (!e || !e->get_parent())
+					continue;
+				const glm::vec3 child_p = e->get_ws_position();
+				// get_parent_transform() resolves the bone attach point when parented to a bone,
+				// otherwise the parent entity's world transform.
+				const glm::vec3 parent_p = glm::vec3(e->get_parent_transform()[3]);
+				push_dashed_ribbon(parent_line_mb, child_p, parent_p, doc.vs_setup);
+			}
+		}
+	}
+	parent_line_mb.End();
+
+	Particle_Object po;
+	po.meshbuilder = &parent_line_mb;
+	po.material = dashed_mat; // null falls back to particle_default.mm (flat vertex colour)
+	po.transform = glm::mat4(1.f);
+	idraw->get_scene()->update_particle_obj(parent_line_handle, po);
+}
+
 void DrawHandlesObject::tick() {
 	ASSERT(&doc);
+
+	tick_parent_lines();
 
 	// draw gizmos for selected entities' components
 	for (auto& sel : doc.selection_state->get_selection_as_vector()) {
