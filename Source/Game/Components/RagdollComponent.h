@@ -16,7 +16,7 @@
 // meshcomponent:set_model(Model.load("animated_model.cmdl"))
 // set_animator_tree(meshcomponent) -- implment this function, see example code
 //
-// local rotate_sideways = lMath.from_euler({x=math.pi*0.5})
+// local rotate_sideways = Quat.from_euler(Vec3.new(math.pi*0.5,0,0))
 // local spine = GampleStatic.spawn_entity()
 // local sb = spine:create_component(CapsuleComponent)
 // spine:set_ws_rotation(rotate_sideways)

@@ -108,6 +108,53 @@ TEST_F(LuaVecQuatTest, DotAndCross) {
 		"assert(math.abs(c.z - 1) < 1e-5)\n");
 }
 
+TEST_F(LuaVecQuatTest, Splat) {
+	run("local v = Vec3.splat(2)\n"
+		"assert(v.x == 2 and v.y == 2 and v.z == 2)\n");
+}
+
+TEST_F(LuaVecQuatTest, ClampMinMax) {
+	run("local v = Vec3.new(-1, 5, 0.5)\n"
+		"local lo = Vec3.new(0,0,0)\n"
+		"local hi = Vec3.new(1,1,1)\n"
+		"local c = v:clamp(lo, hi)\n"
+		"assert(c.x == 0 and c.y == 1 and math.abs(c.z - 0.5) < 1e-6)\n"
+		"local mn = v:min(hi)\n"
+		"assert(mn.x == -1 and mn.y == 1 and mn.z == 0.5)\n"
+		"local mx = v:max(lo)\n"
+		"assert(mx.x == 0 and mx.y == 5 and mx.z == 0.5)\n");
+}
+
+TEST_F(LuaVecQuatTest, Mix) {
+	run("local a = Vec3.new(0,0,0)\n"
+		"local b = Vec3.new(10,20,30)\n"
+		"local m = a:mix(b, 0.5)\n"
+		"assert(m.x == 5 and m.y == 10 and m.z == 15)\n");
+}
+
+TEST_F(LuaVecQuatTest, QuatFromEulerRoundTrips) {
+	run("local q = Quat.from_euler(Vec3.new(0, 0, 0))\n"
+		"assert(q == Quat.identity())\n");
+}
+
+TEST_F(LuaVecQuatTest, QuatSlerpEndpoints) {
+	// Compare by rotating a test point -- avoids quaternion double-cover pitfalls.
+	run("local a = Quat.identity()\n"
+		"local b = Quat.new(0,1,0,0)\n"     // 180 deg about x
+		"local p = Vec3.new(1,2,3)\n"
+		"assert(((a:slerp(b,0) * p) - (a * p)):length() < 1e-4)\n"
+		"assert(((a:slerp(b,1) * p) - (b * p)):length() < 1e-4)\n");
+}
+
+TEST_F(LuaVecQuatTest, QuatDeltaTo) {
+	// from:delta_to(to) == to * inverse(from), so (delta * from) rotates like to.
+	run("local a = Quat.new(0,0,1,0)\n"   // 180 about y
+		"local b = Quat.new(0,1,0,0)\n"   // 180 about x
+		"local d = a:delta_to(b)\n"
+		"local p = Vec3.new(1,2,3)\n"
+		"assert((((d * a) * p) - (b * p)):length() < 1e-4)\n");
+}
+
 TEST_F(LuaVecQuatTest, ToStringDoesNotError) {
 	run("local v = Vec3.new(1,2,3)\n"
 		"local s = tostring(v)\n"

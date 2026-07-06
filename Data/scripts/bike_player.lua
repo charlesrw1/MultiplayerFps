@@ -1,21 +1,14 @@
 BIKE_ASSET = "bike.cmdl"
 
-vec_add = lMath.vec_add
-vec_sub = lMath.vec_sub
-vec_mult = lMath.vec_mult
-vec_multf = lMath.vec_multf
-normalize = lMath.normalize
-cross = lMath.cross
-
 
 function create_bike_entity()
-    local e = create_mesh_in_world(lMath.vec_new(0), BIKE_ASSET)
+    local e = create_mesh_in_world(Vec3.new(), BIKE_ASSET)
     return e
 end
 
 ---@class BikeVars
 BikeVars = {
-    velocity=lMath.vec_new(0),
+    velocity=Vec3.new(),
 }
 function BikeVars.new()
     return CopyInst(BikeVars)
@@ -34,7 +27,7 @@ BikeGameManager = {
     cur_forward_power = 0,
 
     cur_speed = 0,
-    cur_direction = {x=0,y=0,z=1}
+    cur_direction = Vec3.new(0,0,1)
 }
 function BikeGameManager.new()
     return CopyInst(BikeGameManager)
@@ -96,17 +89,17 @@ function BikeGameManager:update()
 
     BikeCppUtils.debug_pre_draw_bike(self.bike_entity)
     
-    local side_vec = normalize(cross(self.cur_direction,{y=1}))
-    local next_dir = vec_add(self.cur_direction, vec_multf(side_vec, 1.0*TURN_RADIUS * turn_force*dt))
-    self.cur_direction = normalize(next_dir)
+    local side_vec = self.cur_direction:cross(Vec3.new(0,1,0)):normalize()
+    local next_dir = self.cur_direction + side_vec * (1.0*TURN_RADIUS * turn_force*dt)
+    self.cur_direction = next_dir:normalize()
 
     ---@type number
     local forward_power = self.cur_forward_power * 2
     local now_pos = self.bike_entity:get_ws_position()
-    local add_vec = vec_multf(self.cur_direction,dt*forward_power)
-    now_pos = vec_add(now_pos,add_vec)
+    local add_vec = self.cur_direction * (dt*forward_power)
+    now_pos = now_pos + add_vec
    -- self.bike_entity:set_ws_position(now_pos)
-    self.bike_entity:transform_look_at(now_pos,vec_sub(now_pos,self.cur_direction))
+    self.bike_entity:transform_look_at(now_pos,now_pos - self.cur_direction)
 
     BikeCppUtils.debug_draw_bike(self.bike_entity,0,1,5)
 
@@ -114,10 +107,10 @@ function BikeGameManager:update()
     -- update the camera
     local cam_pos = self.camera_ent:get_ws_position()
     local want_pos = self.bike_entity:get_ws_position()
-    local offset_vec = vec_add({y=Y_DIST},vec_multf(self.cur_direction,Z_DIST))
-    want_pos = vec_add(self.bike_entity:get_ws_position(), offset_vec)
+    local offset_vec = Vec3.new(0,Y_DIST,0) + self.cur_direction * Z_DIST
+    want_pos = self.bike_entity:get_ws_position() + offset_vec
     cam_pos = lMath.damp_vector(want_pos,cam_pos,CAM_DAMP,dt)
-    self.camera_ent:transform_look_at(cam_pos, vec_add(self.bike_entity:get_ws_position(),{y=PIVOT_OFS}))
+    self.camera_ent:transform_look_at(cam_pos, self.bike_entity:get_ws_position() + Vec3.new(0,PIVOT_OFS,0))
 
     if USE_TOP_DOWN_CAMERA then
         self.camera_ent:transform_look_at({y=10},{x=1,y=0})

@@ -211,7 +211,7 @@ function CreateRagdollSwat()
             end
             local elbow = create_joint(farm,uparm)
             if enable_arm then
-                elbow:set_joint_anchor({},lMath.from_euler({y=math.pi*0.5}),0)
+                elbow:set_joint_anchor({},Quat.from_euler(Vec3.new(0,math.pi*0.5,0)),0)
                 elbow:set_rotation_joint_motion(JM_LIMITED,JM_LOCKED,JM_LOCKED)
                 elbow:set_twist_vars(-2.1,0.2,JOINT_DAMP,JOINT_STIFF)
                 elbow:set_cone_vars(0,0.9,JOINT_DAMP,JOINT_STIFF)
@@ -426,7 +426,7 @@ function ThePrefabFactory:start()
             end
             local elbow = create_joint(farm,uparm)
             if enable_arm then
-                elbow:set_joint_anchor({},lMath.from_euler({y=math.pi*0.5}),0)
+                elbow:set_joint_anchor({},Quat.from_euler(Vec3.new(0,math.pi*0.5,0)),0)
                 elbow:set_rotation_joint_motion(JM_LIMITED,JM_LOCKED,JM_LOCKED)
                 elbow:set_twist_vars(-2.1,0.2,JOINT_DAMP,JOINT_STIFF)
                 elbow:set_cone_vars(0,0.9,JOINT_DAMP,JOINT_STIFF)

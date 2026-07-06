@@ -21,6 +21,11 @@ Vec3 = {}
 ---@return Vec3
 function Vec3.new(x, y, z) end
 
+--- Broadcast a scalar into all three components: Vec3.splat(2) == Vec3.new(2,2,2).
+---@param f number
+---@return Vec3
+function Vec3.splat(f) end
+
 ---@return number
 function Vec3:length() end
 
@@ -34,6 +39,28 @@ function Vec3:dot(other) end
 ---@param other lVec3
 ---@return Vec3
 function Vec3:cross(other) end
+
+--- Component-wise clamp into [min, max]. All args must be full {x,y,z} vectors.
+---@param min lVec3
+---@param max lVec3
+---@return Vec3
+function Vec3:clamp(min, max) end
+
+--- Component-wise minimum.
+---@param other lVec3
+---@return Vec3
+function Vec3:min(other) end
+
+--- Component-wise maximum.
+---@param other lVec3
+---@return Vec3
+function Vec3:max(other) end
+
+--- Linear interpolation toward other; t in [0,1].
+---@param other lVec3
+---@param t number
+---@return Vec3
+function Vec3:mix(other, t) end
 
 --- Same as the `+` operator.
 ---@param other Vec3
@@ -63,11 +90,28 @@ function Quat.new(w, x, y, z) end
 ---@return Quat
 function Quat.identity() end
 
+--- Build a quaternion from XYZ Euler angles (radians) held in a {x,y,z} vec.
+--- The vec must be a full {x,y,z} table.
+---@param euler lVec3
+---@return Quat
+function Quat.from_euler(euler) end
+
 ---@return Quat
 function Quat:inverse() end
 
 ---@return Vec3
 function Quat:to_euler() end
+
+--- Spherical interpolation toward other; alpha in [0,1].
+---@param other lQuat
+---@param alpha number
+---@return Quat
+function Quat:slerp(other, alpha) end
+
+--- The rotation that takes self to other (other * inverse(self)).
+---@param other lQuat
+---@return Quat
+function Quat:delta_to(other) end
 
 --- Same as the `*` operator; Quat * Quat composes, Quat * {x,y,z} rotates a point.
 ---@param other lQuat|lVec3

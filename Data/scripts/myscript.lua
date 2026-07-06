@@ -99,7 +99,7 @@ function TestComponent:update()
 	local t = GameplayStatic.get_time()
 	local yToUse = math.sin(t)
 	v.y = yToUse
-	self:get_owner():set_ls_position_rotation(v,lMath.from_euler({y=t}))
+	self:get_owner():set_ls_position_rotation(v,Quat.from_euler(Vec3.new(0,t,0)))
 end
 
 function create_test_object(pos)
@@ -108,7 +108,7 @@ function create_test_object(pos)
 	e:set_model(m)
 	e:get_owner():create_component(TestComponent)
 	e:get_owner():set_ws_position(pos)
-	e:get_owner():set_ls_scale(lMath.vec_new(0.4))
+	e:get_owner():set_ls_scale(Vec3.splat(0.4))
 end
 
 
@@ -328,7 +328,7 @@ function TdGameplayMgr:pre_start()
 		local c = self.spawn_points[1]
 		local pos = c:get_owner():get_ws_position()
 		PrintTable(pos)
-		pos = lMath.vec_add(pos,{y=2})
+		pos = pos + Vec3.new(0,2,0)
 	end
 	init_level_0()
 	print("Global game start")
@@ -411,7 +411,7 @@ TestClassI = {
 
 function TestClassI:get_value(str)
 	local result = GameplayStatic.cast_ray()
-	local dotRes = lMath.dot(result.pos,{x=0.4})
+	local dotRes = result.pos:dot(Vec3.new(0.4,0,0))
 	if result.hit then
 		print("hit! " .. dotRes)
 	end

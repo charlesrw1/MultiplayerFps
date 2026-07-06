@@ -32,9 +32,9 @@ add_test("lua/transform/inverse_round_trips", function()
 end)
 
 add_test("lua/transform/interops_with_lmath_vec3", function()
-    -- lMath.vec_add returns a plain lVec3 table; Transform methods must accept
+    -- Vec3 + Vec3 returns a plain lVec3 table; Transform methods must accept
     -- and return that same {x,y,z} shape without any special conversion.
-    local base = lMath.vec_add({x=1,y=1,z=1}, {x=1,y=1,z=1})
+    local base = Vec3.new(1,1,1) + Vec3.new(1,1,1)
     local t = Transform.from_pos(base)
     local p = t:translation()
     assert(p.x == 2 and p.y == 2 and p.z == 2, "Transform should interop with lMath vec3 tables")

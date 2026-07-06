@@ -90,6 +90,38 @@ static int l_vec3_cross(lua_State* L) {
 	push_vec3(L, glm::cross(check_vec3(L, 1), check_vec3(L, 2)));
 	return 1;
 }
+// v:clamp(min, max) -- component-wise clamp into [min, max]
+static int l_vec3_clamp(lua_State* L) {
+	glm::vec3 v = check_vec3(L, 1);
+	glm::vec3 lo = check_vec3(L, 2);
+	glm::vec3 hi = check_vec3(L, 3);
+	push_vec3(L, glm::clamp(v, lo, hi));
+	return 1;
+}
+// v:min(other) -- component-wise minimum
+static int l_vec3_min(lua_State* L) {
+	push_vec3(L, glm::min(check_vec3(L, 1), check_vec3(L, 2)));
+	return 1;
+}
+// v:max(other) -- component-wise maximum
+static int l_vec3_max(lua_State* L) {
+	push_vec3(L, glm::max(check_vec3(L, 1), check_vec3(L, 2)));
+	return 1;
+}
+// v:mix(other, t) -- linear interpolation toward other, t in [0,1]
+static int l_vec3_mix(lua_State* L) {
+	glm::vec3 a = check_vec3(L, 1);
+	glm::vec3 b = check_vec3(L, 2);
+	float t = (float)luaL_checknumber(L, 3);
+	push_vec3(L, glm::mix(a, b, t));
+	return 1;
+}
+// Vec3.splat(f) -- broadcast a scalar into all three components
+static int l_vec3_splat(lua_State* L) {
+	float f = (float)luaL_checknumber(L, 1);
+	push_vec3(L, glm::vec3(f));
+	return 1;
+}
 
 static int l_vec3_add(lua_State* L) {
 	push_vec3(L, check_vec3(L, 1) + check_vec3(L, 2));
@@ -128,6 +160,10 @@ static const luaL_Reg VEC3_METHODS[] = {
 	{"normalize", l_vec3_normalize},
 	{"dot", l_vec3_dot},
 	{"cross", l_vec3_cross},
+	{"clamp", l_vec3_clamp},
+	{"min", l_vec3_min},
+	{"max", l_vec3_max},
+	{"mix", l_vec3_mix},
 	{nullptr, nullptr},
 };
 static const luaL_Reg VEC3_METAMETHODS[] = {
@@ -137,6 +173,7 @@ static const luaL_Reg VEC3_METAMETHODS[] = {
 };
 static const luaL_Reg VEC3_STATICS[] = {
 	{"new", l_vec3_new},
+	{"splat", l_vec3_splat},
 	{nullptr, nullptr},
 };
 
@@ -161,6 +198,26 @@ static int l_quat_inverse(lua_State* L) {
 // q:to_euler() -> Vec3
 static int l_quat_to_euler(lua_State* L) {
 	push_vec3(L, glm::eulerAngles(check_quat(L, 1)));
+	return 1;
+}
+// q:slerp(other, alpha) -- spherical interpolation toward other, alpha in [0,1]
+static int l_quat_slerp(lua_State* L) {
+	glm::quat a = check_quat(L, 1);
+	glm::quat b = check_quat(L, 2);
+	float alpha = (float)luaL_checknumber(L, 3);
+	push_quat(L, glm::slerp(a, b, alpha));
+	return 1;
+}
+// q:delta_to(other) -- the rotation that takes q to other (other * inverse(q))
+static int l_quat_delta_to(lua_State* L) {
+	glm::quat from = check_quat(L, 1);
+	glm::quat to = check_quat(L, 2);
+	push_quat(L, to * glm::inverse(from));
+	return 1;
+}
+// Quat.from_euler(euler) -- build from XYZ Euler angles (radians) held in a {x,y,z} vec
+static int l_quat_from_euler(lua_State* L) {
+	push_quat(L, glm::quat(check_vec3(L, 1)));
 	return 1;
 }
 // __mul: Quat * Quat (compose) or Quat * {x,y,z} (rotate vector). Tables aren't
@@ -193,6 +250,8 @@ static int l_quat_tostring(lua_State* L) {
 static const luaL_Reg QUAT_METHODS[] = {
 	{"inverse", l_quat_inverse},
 	{"to_euler", l_quat_to_euler},
+	{"slerp", l_quat_slerp},
+	{"delta_to", l_quat_delta_to},
 	{nullptr, nullptr},
 };
 static const luaL_Reg QUAT_METAMETHODS[] = {
@@ -201,6 +260,7 @@ static const luaL_Reg QUAT_METAMETHODS[] = {
 static const luaL_Reg QUAT_STATICS[] = {
 	{"new", l_quat_new},
 	{"identity", l_quat_identity},
+	{"from_euler", l_quat_from_euler},
 	{nullptr, nullptr},
 };
 

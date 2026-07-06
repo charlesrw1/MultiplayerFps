@@ -68,7 +68,7 @@ WeaponNone = {
 WeaponShotgun = {
     modelname = "top_down/rifle.cmdl",
     offset = {x=0.1,y=-0.12,z=-0.12},
-    rotation = {x=-0.1,y=0.05+math.pi},
+    rotation = {x=-0.1,y=0.05+math.pi,z=0},
     scale = 0.5,
     ---@type FpPlayer
     parent = nil,
@@ -80,7 +80,7 @@ WeaponShotgun = {
 WeaponGrenadeLauncher = {
     modelname = "grenade_launcher.cmdl",
     offset = {x=0.07,y=-0.06,z=-0.2},
-    rotation = {x=0.1,y=0.05},
+    rotation = {x=0.1,y=0.05,z=0},
     scale = 0.1,
     ---@type FpPlayer
     parent = nil,
@@ -93,7 +93,7 @@ WeaponGrenadeLauncher = {
 WeaponPhysics = {
     modelname = "supershotgun.cmdl",
     offset = {x=0.07,y=-0.06,z=-0.2},
-    rotation = {x=0.1,y=0.05},
+    rotation = {x=0.1,y=0.05,z=0},
     scale = 0.07,
     ---@type FpPlayer
     parent = nil,
@@ -103,7 +103,7 @@ WeaponPhysics = {
 WeaponC4 = {
     modelname = "c4_detonator.cmdl",
     offset = {x=0.07,y=-0.06,z=-0.1},
-    rotation = {x=0.1,y=0.05},
+    rotation = {x=0.1,y=0.05,z=0},
     scale = 0.1,
     ---@type FpPlayer
     parent = nil,
@@ -117,8 +117,8 @@ function weapon_switch_shared(item)
     local model = Model.load(item.modelname)
     item.parent.fp_gun:set_is_visible(true)
     item.parent.fp_gun:set_model(model)
-    item.parent.fp_gun:get_owner():set_ls_scale(lMath.vec_new(item.scale))
-    item.parent.fp_gun:get_owner():set_ls_position_rotation(item.offset,lMath.from_euler(item.rotation))
+    item.parent.fp_gun:get_owner():set_ls_scale(Vec3.splat(item.scale))
+    item.parent.fp_gun:get_owner():set_ls_position_rotation(item.offset,Quat.from_euler(item.rotation))
     item.parent.fp_gun:set_material_override(nil)
 end
 
@@ -242,22 +242,20 @@ end
 function WeaponPhysics:_get_player_view_quat()
     local angles = self.parent.view_angles
 
-    return lMath.from_euler({x=angles.x,y=-angles.y-math.pi*0.5})
+    return Quat.from_euler(Vec3.new(angles.x,-angles.y-math.pi*0.5,0))
 end
-quat_mult =lMath.quat_mult
-quat_inv = lMath.quat_inv
 
 function WeaponPhysics:update()
     GameplayStatic.debug_text("weapon physics")
     local dt = GameplayStatic.get_dt()
     local cur_player_quat = self:_get_player_view_quat()
     self.gun_angle = lMath.damp_quat(cur_player_quat,self.gun_angle,0.001,dt)
-    local as_euler = lMath.to_euler(lMath.quat_delta(cur_player_quat,self.gun_angle))
-    local delta_q = quat_mult(quat_inv(self.gun_angle),cur_player_quat)
+    local as_euler = cur_player_quat:delta_to(self.gun_angle):to_euler()
+    local delta_q = self.gun_angle:inverse() * cur_player_quat
     --self.parent.fp_gun:get_owner():set_ws_rotation(delta_q)
     --self.parent.fp_gun:get_owner():set_ws_position({y=1.5})
     self.parent.fp_gun:get_owner():set_ls_rotation(delta_q)
-    local rot = quat_mult(cur_player_quat,delta_q)
+    local rot = cur_player_quat * delta_q
    
 
 
@@ -265,7 +263,7 @@ function WeaponPhysics:update()
         if not self.has_pos then 
             local vpos,vdir = self.parent:_get_view_pos_and_dir()
             local visMask = GameplayStatic.get_collision_mask_for_physics_layer(PL_VISIBLITY)
-            local hitresult = GameplayStatic.cast_ray(vpos,vec_add(vpos,vec_multf(vdir,10.0)),visMask, self.parent.physics)
+            local hitresult = GameplayStatic.cast_ray(vpos,vpos + vdir * 10.0,visMask, self.parent.physics)
             if hitresult.hit and hitresult.what then
                 local pb = hitresult.what:get_component(PhysicsBody)
                 if pb and pb:get_body_type() ~= BODYTYPE_STATIC then
@@ -275,8 +273,8 @@ function WeaponPhysics:update()
                     self.manipulating_object = pb
                     pb:set_body_type(BODYTYPE_KINEMATIC)
                     local manipPos = self.manipulating_object:get_owner():get_ws_position()
-                    local toManip = vec_sub(manipPos,vpos)
-                    local toManipLen = lMath.length(toManip)
+                    local toManip = manipPos - vpos
+                    local toManipLen = toManip:length()
                     self.manip_dist = toManipLen
                 end
             end
@@ -284,13 +282,13 @@ function WeaponPhysics:update()
         else
             local vpos,vdir = self.parent:_get_view_pos_and_dir()
             if not GameplayStatic.is_null(self.manipulating_object) then
-                as_euler = lMath.to_euler(self.gun_angle)
+                as_euler = self.gun_angle:to_euler()
                 --local rot = self.parent.fp_gun:get_owner():get_ws_rotation()
 
-                local actual_gun_dir = lMath.quat_multv(rot,{z=-1})
+                local actual_gun_dir = rot * Vec3.new(0,0,-1)
                 GameplayStatic.debug_line_normal({},actual_gun_dir,1,0,{})
 
-                local newPos = vec_add(vpos,vec_multf(actual_gun_dir,self.manip_dist))
+                local newPos = vpos + actual_gun_dir * self.manip_dist
                 local manipObj = self.manipulating_object:get_owner()
                 local actualPos = lMath.damp_vector(newPos,manipObj:get_ws_position(),0.01,GameplayStatic.get_dt())
                 manipObj:set_ws_position(actualPos)
@@ -298,7 +296,7 @@ function WeaponPhysics:update()
 
                 if lInput.was_mouse_pressed(2) then
                     self.manipulating_object:set_body_type(BODYTYPE_DYNAMIC)
-                    self.manipulating_object:set_linear_velocity(vec_multf(actual_gun_dir,10.0))
+                    self.manipulating_object:set_linear_velocity(actual_gun_dir * 10.0)
                     self.theBeam:set_visible(false)
                 end
             else

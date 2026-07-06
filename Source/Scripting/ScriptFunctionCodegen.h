@@ -87,37 +87,12 @@ class lMath : public ClassBase
 {
 public:
 	CLASS_BODY(lMath);
-	REF static float length(const lVec3& v) { return glm::length(glm::vec3(v)); }
-	REF static float dot(const lVec3& v1, const lVec3& v2) { return glm::dot(glm::vec3(v1), glm::vec3(v2)); }
-	REF static lVec3 cross(const lVec3& v1, const lVec3& v2) { return glm::cross(glm::vec3(v1), glm::vec3(v2)); }
-	REF static lVec3 normalize(const lVec3& v) { return glm::normalize(glm::vec3(v)); }
-	REF static lVec3 vec_new(float f) { return lVec3(f, f, f); }
-	REF static lVec3 vec_sub(const lVec3& v1, const lVec3& v2) { return glm::vec3(v1) - glm::vec3(v2); }
-	REF static lVec3 vec_add(const lVec3& v1, const lVec3& v2) { return glm::vec3(v1) + glm::vec3(v2); }
-	REF static lVec3 vec_mult(const lVec3& v1, const lVec3& v2) { return glm::vec3(v1) * glm::vec3(v2); }
-	REF static lVec3 vec_multf(const lVec3& v1, float f) { return glm::vec3(v1) * f; }
-	REF static lVec3 vec_clamp(const lVec3& v1, const lVec3& min, const lVec3& max) {
-		return glm::clamp(glm::vec3(v1), glm::vec3(min), glm::vec3(max));
-	}
-	REF static lVec3 vec_min(const lVec3& v1, const lVec3& min) { return glm::min(glm::vec3(v1), glm::vec3(min)); }
-	REF static lVec3 vec_max(const lVec3& v1, const lVec3& max) { return glm::max(glm::vec3(v1), glm::vec3(max)); }
-	REF static lVec3 vec_mix(const lVec3& v1, const lVec3& v2, float f) {
-		return glm::mix(glm::vec3(v1), glm::vec3(v2), f);
-	}
-
-	REF static lQuat from_euler(const lVec3& v) { return glm::quat(v); }
-	REF static lVec3 to_euler(const lQuat& q) { return glm::eulerAngles(glm::quat(q)); }
-	REF static lQuat slerp(const lQuat& q1, const lQuat& q2, float alpha) {
-		return glm::slerp(glm::quat(q1), glm::quat(q2), alpha);
-	}
+	// NOTE: vector/quat math (length, dot, cross, normalize, add/sub/mult, clamp,
+	// min, max, mix, from_euler, to_euler, slerp, quat compose/inverse/delta/rotate)
+	// now lives on the Vec3/Quat metatables as operators + methods -- see
+	// Source/Scripting/LuaVecQuat.cpp and Data/scripts/vec_quat_lua_stubs.lua.
+	// Only scalar helpers and utilities without a clean Vec3/Quat receiver remain here.
 	REF static float eval_easing(Easing easing, float t) { return evaluate_easing(easing, t); }
-	REF static lQuat quat_mult(const lQuat& q1, const lQuat& q2) { return glm::quat(q1) * glm::quat(q2); }
-	REF static lQuat quat_inv(const lQuat& q) { return glm::inverse(glm::quat(q)); }
-
-	REF static lQuat quat_delta(const lQuat& from, const lQuat& to) {
-		return glm::quat(to) * glm::inverse(glm::quat(from));
-	}
-	REF static lVec3 quat_multv(const lQuat& q, const lVec3& v) { return glm::quat(q) * glm::vec3(v); }
 
 	REF static float damp_float(float a, float b, float smoothing, float dt) {
 		return damp_dt_independent<float>(a, b, smoothing, dt);

@@ -60,7 +60,7 @@ function ExplosionMgr:create_explosion(pos)
     dynMat:set_float_parameter("Time",0.0)
     local ent = GameplayStatic.spawn_entity()
     ent:set_ws_position(pos)
-    ent:set_ls_scale(lMath.vec_new(2.0))
+    ent:set_ls_scale(Vec3.splat(2.0))
     local mesh = ent:create_component(MeshComponent)
     mesh:set_model(Model.load("sphere.cmdl"))
     mesh:set_material_override(dynMat)
@@ -95,15 +95,15 @@ function explode_shared(pos,player)
     for index, value in ipairs(objs) do
         local body = value:get_component(PhysicsBody)
         if body~=nil and (body:get_body_type() ~= BODYTYPE_STATIC) then
-            local dir = normalize(vec_sub(body:get_owner():get_ws_position(),pos))
-            
-            body:apply_impulse(pos,vec_multf(dir,GRANDE_EXPLODE_FORCE))
+            local dir = (body:get_owner():get_ws_position() - pos):normalize()
+
+            body:apply_impulse(pos,dir * GRANDE_EXPLODE_FORCE)
         end
     end
     
     if player~=nil then
         
-        local dist = lMath.length(vec_sub(player:get_owner():get_ws_position(), pos))
+        local dist = (player:get_owner():get_ws_position() - pos):length()
         print("dist="..dist)
         print("me=")
         PrintTable(pos)
@@ -182,13 +182,13 @@ IMPULSE_STR = 80
 function FpPlayer:_shoot_hitscan()
     local vpos,vdir = self:_get_view_pos_and_dir()
     local visMask = GameplayStatic.get_collision_mask_for_physics_layer(PL_VISIBLITY)
-    local hitresult = GameplayStatic.cast_ray(vpos,vec_add(vpos,vec_multf(vdir,10.0)),visMask, nil)
+    local hitresult = GameplayStatic.cast_ray(vpos,vpos + vdir * 10.0,visMask, nil)
     if hitresult.hit then
         print("HIT")
         local body = hitresult.what:get_component(PhysicsBody)
         if body ~= nil and body:get_body_type() == BODYTYPE_DYNAMIC then
             print("applied impulse")
-            body:apply_impulse(hitresult.what:get_ws_position(),vec_multf(vdir,IMPULSE_STR))
+            body:apply_impulse(hitresult.what:get_ws_position(),vdir * IMPULSE_STR)
             gExplosionMgr:create_explosion(hitresult.pos)
         end
         
@@ -211,7 +211,7 @@ end
 function FpPlayer:_get_view_pos_and_dir()
     local look_dir = lMath.angles_to_vector(self.view_angles.x,self.view_angles.y)
     local pos = self.move:get_position()
-    pos = vec_add(pos, {y=PLAYER_HEIGHT})
+    pos = pos + Vec3.new(0,PLAYER_HEIGHT,0)
     return pos,look_dir
 end
 CONTROLLER_EXP = 2.0
@@ -299,13 +299,11 @@ function FpPlayer:update()
 
     local look_dir = lMath.angles_to_vector(self.view_angles.x,self.view_angles.y)
 
-    local move_dir = CopyInst(look_dir)
-    move_dir.y = 0
-    move_dir = normalize(move_dir)  -- ground plane
-    local side_dir = cross(move_dir,{y=1})
+    local move_dir = Vec3.new(look_dir.x, 0, look_dir.z):normalize()  -- ground plane
+    local side_dir = move_dir:cross(Vec3.new(0,1,0))
 
     -- apply velocity changes
-    local curSpeed = lMath.length(self.velocity)
+    local curSpeed = self.velocity:length()
     if curSpeed > 0.0001 then
         local dropAmt = curSpeed * MOVE_FRICTION * dt
         local newSpd = curSpeed - dropAmt
@@ -320,29 +318,29 @@ function FpPlayer:update()
 
 
 
-    local moveVec = {x=moveX,y=moveY}
-    local moveVecLen = lMath.length(moveVec)
+    local moveVec = Vec3.new(moveX,moveY,0)
+    local moveVecLen = moveVec:length()
     if moveVecLen > 1 then
-        moveVec = vec_multf(moveVec,1.0/moveVecLen)
+        moveVec = moveVec * (1.0/moveVecLen)
         moveVecLen = 1
     end
     ---@type lVec3
-    local xzVelocity = {x=self.velocity.x,y=0,z=self.velocity.z}
+    local xzVelocity = Vec3.new(self.velocity.x,0,self.velocity.z)
     local wishSpeed = moveVecLen * MAX_SPEED
-    local wishDir = vec_add(vec_multf(look_dir,-moveVec.y),vec_multf(side_dir,moveVec.x))
+    local wishDir = look_dir * (-moveVec.y) + side_dir * moveVec.x
     wishDir.y = 0
-    local wishDirLen = lMath.length(wishDir)
+    local wishDirLen = wishDir:length()
     if wishDirLen>0.001 then
-        wishDir = vec_multf(wishDir,1.0/wishDirLen)
+        wishDir = wishDir * (1.0/wishDirLen)
     end
-    local addSpeed = math.max(wishSpeed - lMath.dot(xzVelocity,wishDir),0)
-    xzVelocity = vec_add(xzVelocity,vec_multf(wishDir,math.min(ACCEL_VAL*wishSpeed*dt,addSpeed)))
-    local velLen = lMath.length(xzVelocity)
+    local addSpeed = math.max(wishSpeed - xzVelocity:dot(wishDir),0)
+    xzVelocity = xzVelocity + wishDir * math.min(ACCEL_VAL*wishSpeed*dt,addSpeed)
+    local velLen = xzVelocity:length()
 
     GameplayStatic.debug_text("wishSpd:"..wishSpeed)
 
     if velLen<0.1 then
-        xzVelocity = {x=0,y=0,z=0}
+        xzVelocity = Vec3.new()
     end
     self.velocity.x = xzVelocity.x
     self.velocity.z = xzVelocity.z
@@ -353,7 +351,7 @@ function FpPlayer:update()
     --local disp = vec_multf(move_dir,-moveVec.y*dt*MOVE_SPEED)
    -- disp = vec_add(disp,vec_multf(side_dir,moveVec.x*dt*MOVE_SPEED))
 
-    local disp = vec_multf(self.velocity,dt)
+    local disp = self.velocity * dt
 
     self.move:move(disp,dt,0.001)
     self.velocity = self.move:get_result_velocity()
@@ -362,11 +360,11 @@ function FpPlayer:update()
 
 
     local pos = self.move:get_position()
-    pos = vec_add(pos, {y=PLAYER_HEIGHT})
+    pos = pos + Vec3.new(0,PLAYER_HEIGHT,0)
 
     pos = self.cam_shake:evaluate(pos,look_dir,dt)
 
-    self.cam:get_owner():transform_look_at(pos,vec_add(pos,look_dir))
+    self.cam:get_owner():transform_look_at(pos,pos + look_dir)
     self.cam:set_fov(85)
    -- GameplayStatic.debug_text("x="..self.view_angles.x)
     --GameplayStatic.debug_text("y="..self.view_angles.y)
@@ -381,7 +379,7 @@ function FpPlayer:update()
     self:_draw_player_ui()
 
     if lInput.was_key_pressed(SDL_SCANCODE_F) then    
-        local hit_result = GameplayStatic.cast_ray(pos,vec_add(pos,vec_multf(look_dir,2.0)),GameplayStatic.get_collision_mask_for_physics_layer(PL_DYNAMICOBJECT),self.physics)
+        local hit_result = GameplayStatic.cast_ray(pos,pos + look_dir * 2.0,GameplayStatic.get_collision_mask_for_physics_layer(PL_DYNAMICOBJECT),self.physics)
         if hit_result.hit and hit_result.what then
             local door_obj = hit_result.what:get_component(FpDoor)
             local c = hit_result.what:get_component(MeshComponent)
@@ -406,7 +404,7 @@ function FpPlayer:start()
 
     self.move = self:get_owner():create_component(CharacterMovementComponent)
     self.move:set_physics_body(self.physics)
-    self.view_angles = lMath.vec_new(0)
+    self.view_angles = Vec3.new()
 
     local cam_ent = GameplayStatic.spawn_entity()
     self.cam = cam_ent:create_component(CameraComponent)
@@ -428,7 +426,7 @@ function FpPlayer:start()
 
     self.weapon_data = WeaponsContainer.new(self)
 
-    self.velocity = lMath.vec_new(0)
+    self.velocity = Vec3.new()
     self.game_focused = false
 end
 function FpPlayer:stop()
