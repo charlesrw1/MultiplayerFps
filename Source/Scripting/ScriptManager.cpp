@@ -5,6 +5,9 @@
 #include "Framework/Config.h"
 #include "LuaTransform.h"
 #include "LuaVecQuat.h"
+#include "ScriptFunctionCodegen.h"
+#include "Game/EntityComponent.h"
+#include "GameEnginePublic.h"
 #include <cassert>
 #include <cstring>
 #include <iostream>
@@ -54,6 +57,83 @@ ScriptManager::~ScriptManager() {
 	lua = nullptr;
 }
 
+// Raw (metamethod-bypassing) fetch of the ClassBase* stashed under "__ptr" on the table at
+// `index`. Must not reuse get_object_from_lua here: that does a metamethod-aware lua_getfield,
+// and calling it from inside our own __index/__newindex before "__ptr" is set (e.g. while
+// ScriptManager::create_class_table_for is still assembling the table) would re-enter this same
+// metamethod looking for "__ptr" and recurse until stack overflow.
+static ClassBase* get_self_ptr_raw(lua_State* L, int index) {
+	lua_pushstring(L, "__ptr");
+	lua_rawget(L, index);
+	ClassBase* obj = lua_islightuserdata(L, -1) ? (ClassBase*)lua_touserdata(L, -1) : nullptr;
+	lua_pop(L, 1);
+	return obj;
+}
+
+// Shared lookup used by both metamethods below: resolve `self` (arg 1) to the Component it
+// wraps and, if it's a Lua-authored subclass, find the PROP_LUA_BACKED property named by the
+// string key at `key_idx`. Returns nullptr if this access isn't a reflected-field access at all
+// (native object, plain Lua class, or unknown key) -- callers fall back to normal behavior.
+static const PropertyInfo* find_lua_backed_prop(lua_State* L, int key_idx, Component** out_comp) {
+	if (lua_type(L, key_idx) != LUA_TSTRING)
+		return nullptr;
+	ClassBase* obj = get_self_ptr_raw(L, 1);
+	Component* comp = obj ? obj->cast_to<Component>() : nullptr;
+	if (!comp)
+		return nullptr;
+	const LuaClassTypeInfo* lti = comp->get_lua_owner_type();
+	if (!lti)
+		return nullptr;
+	const char* key = lua_tostring(L, key_idx);
+	for (auto& pi : lti->get_lua_props_storage()) {
+		if (strcmp(pi.name, key) == 0) {
+			*out_comp = comp;
+			return &pi;
+		}
+	}
+	return nullptr;
+}
+
+// __index metamethod for every scriptable class's per-class metatable. Only invoked by Lua when
+// the key is absent from the instance table -- which, for PROP_LUA_BACKED fields, is only true
+// while sitting in the level editor (design mode): sync_shadow_to_lua_table only ever populates
+// those keys into the table from start(), i.e. when actually playing. So in the editor this
+// serves the live shadow-buffer value (kept current by the property grid via
+// PropertyInfo::get_ptr); everywhere else it's the normal method-table lookup (bound as upvalue
+// 1), unchanged from before.
+static int lua_component_index(lua_State* L) {
+	if (eng && eng->is_editor_level()) {
+		Component* comp = nullptr;
+		if (const PropertyInfo* pi = find_lua_backed_prop(L, 2, &comp)) {
+			comp->ensure_lua_shadow();
+			push_lua_shadow_field(L, *pi, comp->get_lua_field_shadow() + pi->offset);
+			return 1;
+		}
+	}
+	lua_pushvalue(L, lua_upvalueindex(1));
+	lua_pushvalue(L, 2);
+	lua_gettable(L, -2);
+	return 1;
+}
+
+// __newindex counterpart: while in the editor, writes to a PROP_LUA_BACKED field go straight
+// into the shadow buffer instead of the instance table, so a Lua-side edit (e.g. from an
+// editor_on_change_property() override) is visible to the property grid immediately.
+// Everywhere else (actually playing, or a non-reflected field) this is a plain rawset, i.e. the
+// same behavior as if no metatable were installed at all.
+static int lua_component_newindex(lua_State* L) {
+	if (eng && eng->is_editor_level()) {
+		Component* comp = nullptr;
+		if (const PropertyInfo* pi = find_lua_backed_prop(L, 2, &comp)) {
+			comp->ensure_lua_shadow();
+			write_lua_shadow_field(L, 3, *pi, comp->get_lua_field_shadow() + pi->offset);
+			return 0;
+		}
+	}
+	lua_rawset(L, 1);
+	return 0;
+}
+
 void ScriptManager::init_this_class_type(ClassTypeInfo* classTypeInfo) {
 	int height = lua_gettop(lua);
 	assert(height == 0);
@@ -73,8 +153,16 @@ void ScriptManager::init_this_class_type(ClassTypeInfo* classTypeInfo) {
 
 	height = lua_gettop(lua);
 	assert(height == 2);
+	// Wrap the method table as an upvalue in a closure so __index can intercept
+	// PROP_LUA_BACKED field reads in the editor; see lua_component_index above.
+	lua_pushcclosure(lua, lua_component_index, 1);
 	lua_setfield(lua, -2, "__index");
 	assert(lua_gettop(lua) == 1);
+
+	lua_pushcfunction(lua, lua_component_newindex);
+	lua_setfield(lua, -2, "__newindex");
+	assert(lua_gettop(lua) == 1);
+
 	// store a reference to the metatable
 	if (classTypeInfo->lua_prototype_index_table != 0)
 		luaL_unref(lua, LUA_REGISTRYINDEX, classTypeInfo->lua_prototype_index_table);
@@ -114,7 +202,10 @@ int ScriptManager::create_class_table_for(ClassBase* type) {
 
 	lua_pushstring(lua, "__ptr");
 	lua_pushlightuserdata(lua, type);
-	lua_settable(lua, -3);
+	// Raw set: this table's metatable is already attached above, and "__ptr" doesn't exist yet,
+	// so a metamethod-aware lua_settable here would invoke our __newindex -- which itself needs
+	// to read "__ptr" back off this same table to identify the object, recursing forever.
+	lua_rawset(lua, -3);
 	height = lua_gettop(lua);
 	assert(height == startheight + 1);
 	int out = luaL_ref(lua, LUA_REGISTRYINDEX);

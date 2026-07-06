@@ -61,7 +61,7 @@ public:
 	bool get_is_skybox() const { return is_skybox; }
 	REF void set_material_override(const MaterialInstance* mi);
 	REF const MaterialInstance* get_material_override() const;
-	glm::mat4 get_ls_transform_of_bone(StringName bone) const;
+	REF glm::mat4 get_ls_transform_of_bone(StringName bone) const;
 	int get_index_of_bone(StringName bone) const;
 	REF void set_is_visible(bool b) {
 		is_visible = b;
@@ -71,7 +71,7 @@ public:
 		cast_shadows = b;
 		sync_render_data();
 	}
-	void set_is_skybox(bool b) {
+	REF void set_is_skybox(bool b) {
 		is_skybox = b;
 		sync_render_data();
 	}

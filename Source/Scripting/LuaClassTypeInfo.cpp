@@ -373,15 +373,14 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c) {
 	lua_pop(L, 2);
 	check_top(0);
 
-	// For Component subclasses with PROP_LUA_BACKED fields, register the type info
-	// so hot-reload tracking and ~Component cleanup work. Shadow buffer is left null
-	// and lazily allocated on first PROP_LUA_BACKED get_ptr() access (e.g. serialization,
-	// editor property panel) so runtime-spawned components pay no allocation cost.
-	if (luaInfo->lua_field_shadow_size > 0) {
-		if (Component* comp = out->cast_to<Component>()) {
-			comp->set_lua_owner_type(luaInfo);
-			luaInfo->register_lua_instance(comp);
-		}
+	// Register every live Component instance (not just ones with PROP_LUA_BACKED fields) so
+	// check_for_reload's live-instance walk can refresh already-spawned objects' methods on
+	// reload -- see the function-recopy phase there. Shadow buffer itself is left null and
+	// lazily allocated on first PROP_LUA_BACKED get_ptr() access (e.g. serialization, editor
+	// property panel) so runtime-spawned components pay no allocation cost regardless.
+	if (Component* comp = out->cast_to<Component>()) {
+		comp->set_lua_owner_type(luaInfo);
+		luaInfo->register_lua_instance(comp);
 	}
 	return out;
 }
@@ -433,6 +432,35 @@ void ScriptManager::check_for_reload() {
 	for (auto* cti : changed)
 		cti->init_lua_type();
 
+	// Phase 3.5: re-copy the fresh template's function entries onto every live instance's own
+	// table, so already-spawned objects call the new implementations instead of the ones they
+	// were constructed with. Deliberately skips non-function entries: field values are field
+	// data, migrated separately (and more carefully, preserving live values) by Phase 4 below;
+	// blindly overwriting them here would reintroduce template defaults over live/edited state.
+	for (auto* cti : changed) {
+		int tmpl_ref = cti->get_template_lua_table();
+		if (tmpl_ref == 0 || cti->get_live_instances().empty())
+			continue;
+		lua_rawgeti(lua, LUA_REGISTRYINDEX, tmpl_ref);
+		int tmpl_idx = lua_gettop(lua);
+		for (auto* inst : cti->get_live_instances()) {
+			lua_rawgeti(lua, LUA_REGISTRYINDEX, inst->get_table_registry_id());
+			int inst_idx = lua_gettop(lua);
+			lua_pushnil(lua);
+			while (lua_next(lua, tmpl_idx)) {
+				// stack: ... key, value
+				if (lua_isfunction(lua, -1)) {
+					lua_pushvalue(lua, -2); // dup key
+					lua_pushvalue(lua, -2); // dup value (function)
+					lua_rawset(lua, inst_idx);
+				}
+				lua_pop(lua, 1); // pop value, keep key for lua_next
+			}
+			lua_pop(lua, 1); // pop instance table
+		}
+		lua_pop(lua, 1); // pop template table
+	}
+
 	// Phase 4: reallocate each live instance's shadow against the NEW layout,
 	// seed with template defaults, then overlay snapshot values where (name,type) match.
 	for (auto& [cti, snaps] : per_class) {
@@ -465,19 +493,49 @@ void ScriptManager::check_for_reload() {
 		on_class_reloaded.invoke();
 }
 
-// Pushes one shadow field value into the Lua instance table at tbl_idx.
-static void push_field_to_lua_table(lua_State* L, int tbl_idx, const PropertyInfo& pi, const uint8_t* p) {
-	lua_pushstring(L, pi.name);
+static bool is_lua_shadow_field_type_supported(core_type_id type) {
+	switch (type) {
+	case core_type_id::Float:
+	case core_type_id::Int32:
+	case core_type_id::Enum32:
+	case core_type_id::Bool:
+	case core_type_id::StdString: return true;
+	default: return false;
+	}
+}
+
+void push_lua_shadow_field(lua_State* L, const PropertyInfo& pi, const uint8_t* p) {
 	switch (pi.type) {
 	case core_type_id::Float:   lua_pushnumber(L, *(const float*)p); break;
 	case core_type_id::Int32:
 	case core_type_id::Enum32:  lua_pushinteger(L, *(const int32_t*)p); break;
 	case core_type_id::Bool:    lua_pushboolean(L, *(const int8_t*)p); break;
 	case core_type_id::StdString: lua_pushstring(L, ((const std::string*)p)->c_str()); break;
-	default:
-		lua_pop(L, 1); // pop the name
-		return;
+	default: lua_pushnil(L); break;
 	}
+}
+
+void write_lua_shadow_field(lua_State* L, int validx, const PropertyInfo& pi, uint8_t* p) {
+	switch (pi.type) {
+	case core_type_id::Float:   *(float*)p = (float)lua_tonumber(L, validx); break;
+	case core_type_id::Int32:
+	case core_type_id::Enum32:  *(int32_t*)p = (int32_t)lua_tointeger(L, validx); break;
+	case core_type_id::Bool:    *(int8_t*)p = (int8_t)lua_toboolean(L, validx); break;
+	case core_type_id::StdString: {
+		const char* s = lua_tostring(L, validx);
+		*(std::string*)p = s ? s : "";
+		break;
+	}
+	default: break;
+	}
+}
+
+// Pushes one shadow field value into the Lua instance table at tbl_idx.
+static void push_field_to_lua_table(lua_State* L, int tbl_idx, const PropertyInfo& pi, const uint8_t* p) {
+	if (!is_lua_shadow_field_type_supported(pi.type))
+		return;
+	lua_pushstring(L, pi.name);
+	push_lua_shadow_field(L, pi, p);
 	lua_rawset(L, tbl_idx);
 }
 

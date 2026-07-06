@@ -111,6 +111,16 @@ public:
 	LuaRuntimeError(std::string msg) : std::runtime_error("LuaError: " + msg) {}
 };
 struct lua_State;
+
+// Pushes a single PROP_LUA_BACKED field's current value (read from a shadow buffer at `p`)
+// onto the Lua stack top. Shared by the shadow->table sync and the editor-only __index
+// metamethod (ScriptManager.cpp) so both agree on the same type conversions.
+void push_lua_shadow_field(lua_State* L, const PropertyInfo& pi, const uint8_t* p);
+// Reads the Lua value at stack index `validx` and writes it into a shadow buffer field at `p`.
+// Used by the editor-only __newindex metamethod (ScriptManager.cpp) when a Lua script assigns
+// to a PROP_LUA_BACKED field on `self` while sitting in the level editor.
+void write_lua_shadow_field(lua_State* L, int validx, const PropertyInfo& pi, uint8_t* p);
+
 class ScriptManager
 {
 public:

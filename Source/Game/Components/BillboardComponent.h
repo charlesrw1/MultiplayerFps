@@ -38,14 +38,14 @@ public:
 #endif
 	void on_changed_transform() final;
 	void on_sync_render_data() final;
-	void set_texture(const Texture* tex);
-	void set_is_visible(bool b) {
+	REF void set_texture(const Texture* tex);
+	REF void set_is_visible(bool b) {
 		if (visible != b) {
 			visible = b;
 			sync_render_data();
 		}
 	}
-	bool get_is_visible() const { return visible; }
+	REF bool get_is_visible() const { return visible; }
 
 private:
 	REF bool visible = true;

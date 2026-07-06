@@ -87,10 +87,10 @@ public:
 	// --- Transform. Intent is explicit; neither call ever mutates velocity. ---
 	// Instant reposition (PhysX setGlobalPose). Valid for any body type; keeps
 	// current velocity. Unity Rigidbody.position / Unreal SetWorldLocation(Teleport).
-	void teleport_to(const glm::mat4& world_transform);
+	REF void teleport_to(const glm::mat4& world_transform);
 	// Swept move for KINEMATIC bodies (PhysX setKinematicTarget) -- generates
 	// contacts along the path. Asserts if the body is not Kinematic. Unity MovePosition.
-	void move_to(const glm::mat4& world_transform);
+	REF void move_to(const glm::mat4& world_transform);
 	// PhysX world pose (position+rotation only, NO scale). For a Dynamic body you
 	// usually want entity->get_ws_transform() instead -- physics writes it there.
 	glm::mat4 get_physics_pose() const;

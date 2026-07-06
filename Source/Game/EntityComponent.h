@@ -49,7 +49,7 @@ public:
 
 	void init_updater();
 	void shutdown_updater();
-	void set_call_init_in_editor(bool b) { call_init_in_editor = b; }
+	REF void set_call_init_in_editor(bool b) { call_init_in_editor = b; }
 	bool get_call_init_in_editor() const { return call_init_in_editor; }
 
 	// Invoked by the scene walk in Model::post_load (reload path).  Default no-op.

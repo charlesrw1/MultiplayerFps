@@ -108,6 +108,10 @@ public:
 
 	void manualtick();
 
+	REF const std::vector<Component*> get_blah_components() const { 
+		return get_owner()->get_components();
+	}
+
 	EntityPtr camera;
 
 private:

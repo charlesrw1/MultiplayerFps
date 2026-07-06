@@ -83,6 +83,11 @@ public:
 	class MeshBuilderComponent* editor_shape_gizmo = nullptr;
 	bool gizmo_drawn_this_frame = false;
 #endif
+	REF void set_parameters(ParticleAsset* asset, bool play_on_awake, bool destroy_owner_when_finished) {
+		particle_asset = asset;
+		this->play_on_awake = play_on_awake;
+		this->destroy_owner_when_finished = destroy_owner_when_finished;
+	}
 
 	REF AssetPtr<ParticleAsset> particle_asset;
 	REF bool play_on_awake = true;

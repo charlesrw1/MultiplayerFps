@@ -113,14 +113,14 @@ void Component::ensure_lua_shadow() {
 void Component::activate_internal_step2() {
 	ASSERT(init_state == initialization_state::HAS_ID);
 	ASSERT(entity_owner);
+	if (eng->is_editor_level())
+		editor_start();
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
 		ScriptManager::sync_shadow_to_lua_table(this);
 		start();
 		init_updater();
 		init_state = initialization_state::CALLED_START;
 	}
-	if (eng->is_editor_level())
-		editor_start();
 }
 
 void Component::deactivate_internal() {
