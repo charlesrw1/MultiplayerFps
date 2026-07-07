@@ -76,6 +76,18 @@ struct SavedCreateObj
 {
 	uint64_t eng_handle = 0;
 };
+// Records how a removed subtree-root was attached to the rest of the scene BEFORE deletion. The
+// serialized snapshot only carries parent links internal to the removed set, so a root whose parent
+// survives the delete (e.g. deleting a middle-of-chain entity) has no __parent recorded — we restore
+// it explicitly on undo. Bone + is_top_level are captured too so bone-parenting is fully restored.
+struct SavedRootParent
+{
+	uint64_t child_id = 0;
+	uint64_t parent_id = 0; // 0 == was unparented
+	StringName parent_bone;
+	bool is_top_level = false;
+	glm::mat4 ws_transform = glm::mat4(1);
+};
 class RemoveEntitiesCommand : public Command
 {
 public:
@@ -92,6 +104,7 @@ public:
 
 	std::unique_ptr<SerializedSceneFile> scene;
 	std::vector<EntityPtr> handles;
+	std::vector<SavedRootParent> saved_root_parents;
 };
 
 class CreateStaticMeshCommand : public Command
@@ -176,6 +189,10 @@ public:
 
 	std::unique_ptr<SerializedSceneFile> scene;
 	std::vector<EntityPtr> handles;
+	// One entry per emitted (should_emit) entity in `handles`, in the same order the serializer
+	// emits them — lets execute() re-attach each duplicate to the original's external parent (a
+	// parent that wasn't itself duplicated, so the serialized hierarchy has no __parent for it).
+	std::vector<SavedRootParent> saved_root_parents;
 };
 
 class MovePositionInHierarchy : public Command

@@ -60,6 +60,21 @@ static void add_to_remove_list_R(vector<SavedCreateObj>& objs, Entity* e, std::u
 	}
 }
 
+// Collects an entity and all of its serializable descendants (depth-first, root before children).
+// destroy() cascades to children, so a remove snapshot must serialize the whole subtree or undo
+// can only bring the roots back — the children have no saved state to restore from.
+static void collect_subtree_entities_R(std::vector<EntityPtr>& out, std::unordered_set<Entity*>& seen, Entity* e) {
+	ASSERT(e != nullptr);
+	if (!this_is_a_serializeable_object(e))
+		return;
+	if (SetUtil::contains(seen, e))
+		return;
+	SetUtil::insert_test_exists(seen, e);
+	out.push_back(e->get_self_ptr());
+	for (auto c : e->get_children())
+		collect_subtree_entities_R(out, seen, c);
+}
+
 // ---------------------------------------------------------------------------
 // RemoveEntitiesCommand
 // ---------------------------------------------------------------------------
@@ -86,8 +101,33 @@ RemoveEntitiesCommand::RemoveEntitiesCommand(EditorDoc& ed_doc, std::vector<Enti
 		}
 	}
 
-	scene = CommandSerializeUtil::serialize_entities_text(ed_doc, handles);
+	// Serialize the full subtree (roots + all descendants), not just the selected roots: destroy()
+	// below cascade-destroys children, so without their snapshot undo cannot put them back.
+	std::vector<EntityPtr> subtree;
+	std::unordered_set<Entity*> subtree_seen;
+	for (EntityPtr e : handles) {
+		if (Entity* ent = e.get())
+			collect_subtree_entities_R(subtree, subtree_seen, ent);
+	}
+	scene = CommandSerializeUtil::serialize_entities_text(ed_doc, subtree);
 	assert(seen.size() == removed_objs.size());
+
+	// Capture each removed root's external attachment (parent that survives the delete, bone, and
+	// is_top_level) so undo can re-establish it — the serialized snapshot only records links internal
+	// to the removed set.
+	for (EntityPtr e : handles) {
+		Entity* ent = e.get();
+		if (!ent)
+			continue;
+		SavedRootParent link;
+		link.child_id = ent->get_instance_id();
+		Entity* p = ent->get_parent();
+		link.parent_id = p ? p->get_instance_id() : 0;
+		link.parent_bone = ent->get_parent_bone();
+		link.is_top_level = ent->get_is_top_level();
+		link.ws_transform = ent->get_ws_transform();
+		saved_root_parents.push_back(link);
+	}
 
 	this->handles = handles;
 }
@@ -115,6 +155,26 @@ void RemoveEntitiesCommand::undo() {
 		}
 
 		assert(obj->get_instance_id() == c.eng_handle);
+	}
+
+	// Re-establish each restored root's external attachment. Its serialized local transform was
+	// unparented, so we reparent (to the surviving parent, possibly a bone), then force the exact
+	// pre-delete world transform back.
+	Level* level = eng->get_level();
+	for (const SavedRootParent& link : saved_root_parents) {
+		BaseUpdater* child_obj = level->get_entity(link.child_id);
+		Entity* child = child_obj ? child_obj->cast_to<Entity>() : nullptr;
+		if (!child)
+			continue;
+		Entity* parent = nullptr;
+		if (link.parent_id != 0) {
+			BaseUpdater* parent_obj = level->get_entity(link.parent_id);
+			parent = parent_obj ? parent_obj->cast_to<Entity>() : nullptr;
+		}
+		child->parent_to(parent);
+		child->set_parent_bone(link.parent_bone);
+		child->set_is_top_level(link.is_top_level);
+		child->set_ws_transform(link.ws_transform);
 	}
 
 	// refresh handles i guess ? fixme
@@ -285,6 +345,59 @@ DuplicateEntitiesCommand::DuplicateEntitiesCommand(EditorDoc& ed_doc, std::vecto
 	if (!is_valid_flag)
 		return;
 
+	// Expand the selection to the full subtree (roots + all descendants) so duplicating a parented
+	// entity brings its children along too, not just the roots the user clicked on.
+	{
+		std::vector<EntityPtr> subtree;
+		std::unordered_set<Entity*> subtree_seen;
+		for (EntityPtr h : handles)
+			if (Entity* e = h.get())
+				collect_subtree_entities_R(subtree, subtree_seen, e);
+		handles = std::move(subtree);
+	}
+	if (handles.empty())
+		is_valid_flag = false;
+	if (!is_valid_flag)
+		return;
+
+	// Mirrors NewSerialization::serialize_to_text's should_emit filter so saved_root_parents lines
+	// up index-for-index with the entities the serializer actually emits (see execute()).
+	const bool serialize_hierarchy = ed_doc.is_editing_prefab();
+	auto should_emit = [&](Entity* e) {
+		if (!e)
+			return false;
+		if (e->get_components().empty())
+			return false;
+		if (e->dont_serialize_or_edit || e->dont_serialize)
+			return false;
+		if (!serialize_hierarchy && e->get_parent())
+			return false;
+		return true;
+	};
+
+	std::unordered_set<Entity*> selected_set;
+	for (auto h : handles)
+		if (Entity* e = h.get())
+			selected_set.insert(e);
+
+	// For each duplicated root, remember a parent that survives outside the duplicated set (not
+	// itself being duplicated) — the serialized snapshot only records __parent links internal to
+	// the selection, so without this the duplicate comes back unparented and its local-space
+	// transform gets read as world-space, producing the wrong position/scale.
+	for (auto h : handles) {
+		Entity* e = h.get();
+		if (!should_emit(e))
+			continue;
+		SavedRootParent link;
+		Entity* parent = e->get_parent();
+		if (parent && !SetUtil::contains(selected_set, parent)) {
+			link.parent_id = parent->get_instance_id();
+			link.parent_bone = e->get_parent_bone();
+			link.is_top_level = e->get_is_top_level();
+		}
+		saved_root_parents.push_back(link);
+	}
+
 	scene = CommandSerializeUtil::serialize_entities_text(ed_doc, handles);
 }
 
@@ -303,6 +416,25 @@ void DuplicateEntitiesCommand::execute() {
 			ents.push_back(ent);
 			handles.push_back(ent);
 		}
+
+	// Re-attach duplicates whose original had an external parent (see constructor comment).
+	// parent_to() doesn't touch the child's local pos/rot/scale, so the local-space values already
+	// baked into the duplicate (copied from the original) become correct again once reparented.
+	Level* level = eng->get_level();
+	for (size_t i = 0; i < ents.size() && i < saved_root_parents.size(); i++) {
+		const SavedRootParent& link = saved_root_parents[i];
+		if (link.parent_id == 0)
+			continue;
+		Entity* dup = ents[i].get();
+		BaseUpdater* parent_obj = level->get_entity(link.parent_id);
+		Entity* parent = parent_obj ? parent_obj->cast_to<Entity>() : nullptr;
+		if (!dup || !parent)
+			continue;
+		dup->parent_to(parent);
+		dup->set_parent_bone(link.parent_bone);
+		dup->set_is_top_level(link.is_top_level);
+	}
+
 	ed_doc.selection_state->add_entities_to_selection(ents);
 
 	ed_doc.manipulate->set_force_op(ImGuizmo::TRANSLATE);

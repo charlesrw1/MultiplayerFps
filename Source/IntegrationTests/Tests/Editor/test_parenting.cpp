@@ -306,6 +306,63 @@ static TestTask test_parenting_clears_stale_bone(TestContext& t) {
 }
 EDITOR_TEST("editor/parenting_clears_stale_bone", 20.f, test_parenting_clears_stale_bone);
 
+// Regression: deleting the root of a parented chain then undoing must restore the WHOLE subtree,
+// not just the root. destroy() cascade-destroys children, so the remove snapshot has to serialize
+// all descendants (previously it only serialized the selected roots -> children never came back).
+static TestTask test_remove_parented_chain_undo(TestContext& t) {
+	const std::string pp = "_remove_chain.tprefab";
+	FileSys::delete_game_file(pp.c_str());
+	PrefabFile::save_text(pp, kScratchPrefab);
+	co_await t.wait_ticks(1);
+	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, (std::string("open-editor ") + pp).c_str());
+	co_await t.wait_ticks(5);
+	EditorDoc* editor = static_cast<EditorDoc*>(eng->get_tool());
+	t.require(editor && editor->is_editing_prefab(), "in prefab mode");
+
+	// Build a parented chain: root -> mid -> leaf, each with a MeshComponent.
+	Entity* root = editor->spawn_entity();
+	root->create_component<MeshComponent>();
+	root->set_editor_name("chain_root");
+	Entity* mid = editor->spawn_entity();
+	mid->create_component<MeshComponent>();
+	mid->set_editor_name("chain_mid");
+	Entity* leaf = editor->spawn_entity();
+	leaf->create_component<MeshComponent>();
+	leaf->set_editor_name("chain_leaf");
+	mid->parent_to(root);
+	leaf->parent_to(mid);
+	const uint64_t root_id = root->get_instance_id();
+	const uint64_t mid_id = mid->get_instance_id();
+	const uint64_t leaf_id = leaf->get_instance_id();
+
+	// Delete only the root; destroy() cascades to mid + leaf.
+	RemoveEntitiesCommand cmd(*editor, {root->get_self_ptr()});
+	t.check(cmd.is_valid(), "remove command valid");
+	cmd.execute();
+	co_await t.wait_ticks(1);
+	t.check(find_in_level("chain_root") == nullptr, "root destroyed");
+	t.check(find_in_level("chain_mid") == nullptr, "mid destroyed (cascade)");
+	t.check(find_in_level("chain_leaf") == nullptr, "leaf destroyed (cascade)");
+
+	// Undo must restore the entire subtree with hierarchy + ids intact.
+	cmd.undo();
+	co_await t.wait_ticks(1);
+	Entity* r2 = find_in_level("chain_root");
+	Entity* m2 = find_in_level("chain_mid");
+	Entity* l2 = find_in_level("chain_leaf");
+	t.require(r2 && m2 && l2, "all three entities restored on undo");
+	t.check(m2->get_parent() == r2, "mid re-parented to root on undo");
+	t.check(l2->get_parent() == m2, "leaf re-parented to mid on undo");
+	t.check(r2->get_instance_id() == root_id, "root id preserved");
+	t.check(m2->get_instance_id() == mid_id, "mid id preserved");
+	t.check(l2->get_instance_id() == leaf_id, "leaf id preserved");
+
+	r2->destroy();
+	FileSys::delete_game_file(pp.c_str());
+	co_await t.wait_ticks(1);
+}
+EDITOR_TEST("editor/remove_parented_chain_undo", 25.f, test_remove_parented_chain_undo);
+
 // "Parent to New Empty" spawns an EmptyComponent group node; undo removes it and unparents.
 static TestTask test_parenting_new_empty(TestContext& t) {
 	const std::string pp = "_parenting_empty.tprefab";

@@ -649,8 +649,11 @@ void PropertyFactoryUtil::register_anim_editor2(AnimationGraphEditorNew& ed, FnF
 }
 
 EntityBoneParentStringEditor::~EntityBoneParentStringEditor() {
-	StringName* myName = (StringName*)prop->get_ptr(instance);
-	*myName = StringName(str.c_str());
+	// Intentionally does NOT write `str` back to the field. The entity's parent_bone is the single
+	// authoritative source: selections update it live via Entity::set_parent_bone(). Writing the
+	// cached `str` here clobbered the field whenever it went stale (e.g. the bone was changed by
+	// ParentToCommand or a remove/undo while this editor's `str` still held the old value, or the
+	// panel was destroyed before internal_update ever ran and `str` was empty).
 }
 #include "Game/Components/MeshComponent.h"
 #include "Animation/SkeletonData.h"
@@ -671,13 +674,13 @@ bool EntityBoneParentStringEditor::internal_update() {
 				}
 			}
 		}
-		EntityBoneParentString* val = PropertyPtr(prop, instance).as_struct().get_struct<EntityBoneParentString>();
-		assert(val);
 		has_init = true;
-		StringName* myName = &val->name;
-		if (!myName->is_null())
-			str = myName->get_c_str();
 	}
+
+	// The entity's parent_bone field is authoritative — mirror it into the display every frame so an
+	// external change (ParentToCommand, remove/undo) is reflected and never clobbered by a stale str.
+	if (EntityBoneParentString* val = PropertyPtr(prop, instance).as_struct().get_struct<EntityBoneParentString>())
+		str = val->name.is_null() ? std::string() : val->name.get_c_str();
 
 	if (options.empty()) {
 		ImGui::Text("No options (add a MeshComponent with a skeleton)");
