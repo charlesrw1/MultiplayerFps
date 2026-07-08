@@ -369,6 +369,25 @@ public:
 	std::vector<EntityPtr> handles;
 };
 
+// Replaces each targeted PrefabAssetComponent instance entity with the loose entities from its
+// referenced .tprefab, placed at the instance's transform (the reverse of instantiating a prefab).
+// Targets without a PrefabAssetComponent are skipped, so a mixed selection is safe to pass in whole.
+class UnpackPrefabCommand : public Command
+{
+public:
+	EditorDoc& ed_doc;
+	UnpackPrefabCommand(EditorDoc& ed_doc, std::vector<EntityPtr> targets);
+	bool is_valid() final;
+
+	void execute() final;
+	void undo() final;
+	std::string to_string() final { return "Unpack Prefab"; }
+
+	std::vector<EntityPtr> targets;
+	std::vector<std::vector<EntityPtr>> unpacked_entities_per_target;
+	std::vector<std::unique_ptr<SerializedSceneFile>> original_entities;
+};
+
 class MakePrefabFromSelectionCommand : public Command
 {
 public:

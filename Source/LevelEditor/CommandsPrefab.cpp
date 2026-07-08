@@ -20,6 +20,27 @@ static Entity* spawn_prefab(EditorDoc& ed_doc, const std::string& path, const gl
 	return ent->get_owner();
 }
 
+// Materializes a prefab's serialized text as loose, top-level entities positioned at `transform`.
+// Shared by InstantiatePrefabCommand's prefab-in-prefab flatten and UnpackPrefabCommand: both turn a
+// prefab reference into its literal contents, just triggered from different starting points (a
+// dropped asset vs. an existing PrefabAssetComponent instance). Throws on malformed prefab text.
+static std::vector<EntityPtr> flatten_prefab_into_scene(EditorDoc& ed_doc, const std::string& prefab_text,
+														 const glm::mat4& transform) {
+	std::vector<EntityPtr> out;
+	UnserializedSceneFile unserialized = NewSerialization::unserialize_from_text("prefab_flatten", prefab_text, false);
+	ed_doc.insert_unserialized_into_scene(unserialized);
+
+	for (auto base_updater : unserialized.all_obj_vec) {
+		if (auto entity = base_updater->cast_to<Entity>()) {
+			if (entity->get_parent())
+				continue; // inner-prefab children inherit through their root; skip
+			entity->set_ws_transform(transform * entity->get_ls_transform());
+			out.push_back(entity);
+		}
+	}
+	return out;
+}
+
 CreateSpawnerCommand::CreateSpawnerCommand(EditorDoc& ed_doc, const std::string& cppclassname,
 										   const glm::mat4& transform)
 	: ed_doc(ed_doc) {
@@ -66,18 +87,7 @@ void InstantiatePrefabCommand::execute() {
 		}
 
 		try {
-			UnserializedSceneFile unserialized = NewSerialization::unserialize_from_text(
-				"prefab_flatten", prefab_text, false);
-			ed_doc.insert_unserialized_into_scene(unserialized);
-
-			for (auto base_updater : unserialized.all_obj_vec) {
-				if (auto entity = base_updater->cast_to<Entity>()) {
-					if (entity->get_parent())
-						continue; // inner-prefab children inherit through their root; skip
-					entity->set_ws_transform(transform * entity->get_ls_transform());
-					handles.push_back(entity);
-				}
-			}
+			handles = flatten_prefab_into_scene(ed_doc, prefab_text, transform);
 		}
 		catch (const std::exception& e) {
 			sys_print(Warning, "Failed to flatten prefab %s: %s\n", prefab_path.c_str(), e.what());
@@ -119,6 +129,88 @@ void InstantiatePrefabCommand::undo() {
 		}
 	}
 	handles.clear();
+	ed_doc.post_node_changes.invoke();
+}
+
+UnpackPrefabCommand::UnpackPrefabCommand(EditorDoc& ed_doc, std::vector<EntityPtr> targets)
+	: ed_doc(ed_doc), targets(std::move(targets)) {}
+
+bool UnpackPrefabCommand::is_valid() {
+	for (auto& t : targets) {
+		Entity* ent = t.get();
+		if (ent && ent->get_component<PrefabAssetComponent>())
+			return true;
+	}
+	return false;
+}
+
+void UnpackPrefabCommand::execute() {
+	std::vector<EntityPtr> all_unpacked;
+	for (auto& t : targets) {
+		Entity* ent = t.get();
+		PrefabAssetComponent* pac = ent ? ent->get_component<PrefabAssetComponent>() : nullptr;
+		if (!pac)
+			continue; // not (or no longer) a prefab instance -- skip rather than assert, since
+					  // targets may be a mixed selection (see draw_scene_context_menu)
+
+		const std::string path = pac->prefab_path;
+		const glm::mat4 transform = ent->get_ws_transform();
+
+		// Save the instance entity so undo can restore it exactly (same pattern as
+		// MakePrefabAndReplaceCommand::undo).
+		{
+			std::vector<Entity*> orig{ent};
+			auto serialized =
+				NewSerialization::serialize_to_text("unpack_prefab_undo", orig, false, nullptr, nullptr, false);
+			original_entities.push_back(std::make_unique<SerializedSceneFile>(serialized));
+		}
+
+		const std::string prefab_text = PrefabFile::load_text(path);
+		if (prefab_text.empty()) {
+			sys_print(Warning, "Failed to load prefab for unpack: %s\n", path.c_str());
+			original_entities.pop_back();
+			continue;
+		}
+
+		try {
+			auto unpacked = flatten_prefab_into_scene(ed_doc, prefab_text, transform);
+			all_unpacked.insert(all_unpacked.end(), unpacked.begin(), unpacked.end());
+			unpacked_entities_per_target.push_back(std::move(unpacked));
+		}
+		catch (const std::exception& e) {
+			sys_print(Warning, "Failed to unpack prefab %s: %s\n", path.c_str(), e.what());
+			original_entities.pop_back();
+			continue;
+		}
+
+		ent->destroy();
+	}
+
+	ed_doc.selection_state->clear_all_selected();
+	ed_doc.selection_state->add_entities_to_selection(all_unpacked);
+	ed_doc.post_node_changes.invoke();
+}
+
+void UnpackPrefabCommand::undo() {
+	for (auto& group : unpacked_entities_per_target) {
+		for (auto& h : group) {
+			if (auto entity = h.get())
+				entity->destroy();
+		}
+	}
+	unpacked_entities_per_target.clear();
+
+	for (auto& original : original_entities) {
+		try {
+			UnserializedSceneFile unserialized =
+				NewSerialization::unserialize_from_text("unpack_prefab_restore", original->text, true);
+			ed_doc.insert_unserialized_into_scene(unserialized);
+		}
+		catch (const std::exception& e) {
+			sys_print(Warning, "Failed to restore prefab instance during undo: %s\n", e.what());
+		}
+	}
+	original_entities.clear();
 	ed_doc.post_node_changes.invoke();
 }
 

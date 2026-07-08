@@ -471,6 +471,9 @@
     <ClCompile Include="Game\EntityComponent.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
+    <ClCompile Include="Game\EditorAddMenu.cpp">
+      <Filter>Source\Game</Filter>
+    </ClCompile>
     <ClCompile Include="Game\Game.cpp">
       <Filter>Source\Game</Filter>
     </ClCompile>
@@ -1365,6 +1368,9 @@
       <Filter>Source\Game</Filter>
     </ClInclude>
     <ClInclude Include="Game\EntityComponent.h">
+      <Filter>Source\Game</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\EditorAddMenu.h">
       <Filter>Source\Game</Filter>
     </ClInclude>
     <ClInclude Include="Game\EntityPtr.h">

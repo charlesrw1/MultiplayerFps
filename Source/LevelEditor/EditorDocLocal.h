@@ -35,6 +35,7 @@
 #include "Game/LevelAssets.h"
 #include "Render/DrawPublic.h"
 #include "Game/EntityComponent.h"
+#include "Game/EditorAddMenu.h"
 
 #include "Framework/FnFactory.h"
 #include "Framework/ConsoleCmdGroup.h"
@@ -325,10 +326,35 @@ private:
 	// parenting popups live (must OpenPopup in the same imgui window as their BeginPopup).
 	bool want_open_parent_menu = false;
 	bool want_open_unparent_menu = false;
+	// Ctrl+Tab quick-switcher over EditorRecents (see EditorRecents.h). While open, repeated Tab
+	// (Shift+Tab reverses) or Up/Down cycle recent_switcher_index; Enter or releasing Ctrl confirms
+	// (alt-tab style); Escape cancels. Confirm executes the same "recent N" command as the Open
+	// Recent menu, deferred through Cmd_Manager for the same imgui-teardown-safety reason.
+	bool want_open_recent_switcher = false;
+	bool recent_switcher_open = false;
+	int recent_switcher_index = 0;
+	bool check_recent_switcher_input(bool has_ctrl, bool has_shift);
+	void confirm_recent_switcher();
+	void draw_recent_switcher_popup();
 	// "Parent to Bone" searchable combo state (same pattern as EntityBoneParentStringEditor).
 	std::string parent_bone_filter_buf;
 	bool parent_bone_focus_filter = true;
 	void draw_parenting_popups();
+
+	// Right-click scene context menu. EditorCamera::tick() unconditionally grabs input focus on
+	// right-mouse-down (for fly-camera), so a still right-click vs. a right-click-drag is
+	// disambiguated here by tracking press/release ourselves rather than relying on focus state.
+	// Movement is accumulated relative motion, not absolute screen position, since the fly camera
+	// captures the mouse (relative/warped) while held.
+	bool rmb_press_tracking = false;
+	uint64_t rmb_press_time_ms = 0;
+	glm::ivec2 rmb_drag_accum_px{0, 0};
+	bool want_open_scene_context_menu = false;
+	glm::mat4 scene_context_menu_transform = glm::mat4(1.f);
+	void check_scene_context_menu_input();
+	void draw_scene_context_menu();
+	// Draws the nested "Add" submenu tree built from EditorAddMenuRegistry entries (Game/EditorAddMenu.h).
+	void draw_add_menu_tree(const std::vector<EditorAddMenuEntry>& entries, const glm::mat4& transform);
 	FnFactory<IPropertyEditor> grid_factory;
 	uptr<ConsoleCmdGroup> cmds;
 	opt<string> assetName;

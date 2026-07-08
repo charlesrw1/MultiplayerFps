@@ -5,6 +5,7 @@
 #include "EditorRecents.h"
 #include "Framework/Config.h"
 #include "imgui.h"
+#include "imgui_internal.h" // ImGuiItemFlags_NoNav for the recent-switcher popup
 #include "glad/glad.h"
 #include "External/ImGuizmo.h"
 #include "Framework/MyImguiLib.h"
@@ -12,6 +13,7 @@
 #include "Render/Texture.h"
 #include "Render/RenderConfigVars.h"
 #include "Assets/AssetRegistry.h"
+#include "Assets/AssetBrowser.h"
 #include "Assets/AssetSizeViewer.h"
 #include "AssetTools/DiagnosticsWindow.h"
 #include "UI/GUISystemPublic.h"
@@ -25,8 +27,11 @@
 #include "Animation/SkeletonData.h"
 #include "Input/InputSystem.h"
 #include "Framework/StringUtils.h"
+#include "Game/EditorAddMenu.h"
+#include "Game/Components/PrefabAssetComponent.h"
 #include "Debug.h"
 #include <glm/gtc/type_ptr.hpp>
+#include <algorithm>
 
 extern void export_level_scene();
 extern void start_play_process();
@@ -87,6 +92,7 @@ void EditorDoc::imgui_draw() {
 	});
 	active_mode->tick(inputs); // selection,foliage, or decal
 	check_inputs();
+	draw_recent_switcher_popup();
 	draw_handles->tick();
 	vis_filter.tick();
 
@@ -504,6 +510,55 @@ void EditorDoc::draw_parenting_popups() {
 	}
 }
 
+// Opens the recent doc named by recent_switcher_index (same "recent N" command as the Open Recent
+// menu, deferred through Cmd_Manager since imgui-time teardown of this doc isn't safe) and closes
+// the switcher. If the selected entry is the document already open (e.g. only one other doc has
+// ever been visited and the user tabs back to where they started), treat it as a cancel instead of
+// re-loading the current map.
+void EditorDoc::confirm_recent_switcher() {
+	auto entry = g_editor_recents.at_slot(recent_switcher_index + 1);
+	if (entry && entry->path != get_asset_path()) {
+		std::string cmd = "recent " + std::to_string(recent_switcher_index + 1);
+		Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, cmd.c_str());
+	}
+	recent_switcher_open = false;
+}
+
+// Ctrl+Tab quick-switcher popup. Selection is driven entirely by recent_switcher_index (set in
+// check_recent_switcher_input) rather than imgui nav, so held-Ctrl+Tab cycling and Up/Down agree
+// with what's highlighted. Closing via check_inputs (Escape/Enter/Ctrl-release) is signaled by
+// recent_switcher_open going false, which we notice here and turn into CloseCurrentPopup().
+void EditorDoc::draw_recent_switcher_popup() {
+	if (want_open_recent_switcher) {
+		ImGui::OpenPopup("##recent_switcher");
+		want_open_recent_switcher = false;
+	}
+
+	if (ImGui::BeginPopup("##recent_switcher")) {
+		if (!recent_switcher_open) {
+			ImGui::CloseCurrentPopup();
+		} else {
+			ImGui::TextDisabled("Switch Document (Ctrl+Tab)");
+			ImGui::Separator();
+			const int count = g_editor_recents.size();
+			// Selection highlight is driven entirely by recent_switcher_index (see
+			// check_recent_switcher_input), not imgui's own nav focus. NoNav keeps imgui's nav
+			// highlight rectangle from independently drifting with the same arrow-key presses,
+			// which otherwise showed up as two highlighted rows moving out of sync.
+			ImGui::PushItemFlag(ImGuiItemFlags_NoNav, true);
+			for (int slot = 1; slot <= count; ++slot) {
+				auto entry = g_editor_recents.at_slot(slot);
+				if (!entry) continue;
+				const bool is_sel = (slot - 1) == recent_switcher_index;
+				if (ImGui::Selectable(entry->path.c_str(), is_sel))
+					confirm_recent_switcher();
+			}
+			ImGui::PopItemFlag();
+		}
+		ImGui::EndPopup();
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Scene viewport overlay (drag-drop + manipulator update)
 // ---------------------------------------------------------------------------
@@ -562,6 +617,146 @@ void EditorDoc::hook_scene_viewport_draw() {
 	}
 
 	manipulate->update(inputs);
+
+	draw_scene_context_menu();
+}
+
+// Builds a menu tree out of the flat, '/'-delimited EditorAddMenuRegistry entries (see
+// Game/EditorAddMenu.h) and draws it as nested ImGui submenus, e.g. "NPCs/Enemy" becomes a "NPCs"
+// submenu containing an "Enemy" item.
+namespace {
+struct AddMenuNode {
+	std::string name;
+	std::vector<AddMenuNode> children;
+	const EditorAddMenuEntry* leaf = nullptr;
+};
+
+AddMenuNode build_add_menu_tree(const std::vector<EditorAddMenuEntry>& entries) {
+	AddMenuNode root;
+	for (auto& entry : entries) {
+		AddMenuNode* cur = &root;
+		size_t start = 0;
+		for (;;) {
+			const size_t slash = entry.menu_path.find('/', start);
+			const bool is_last = slash == std::string::npos;
+			const std::string segment = entry.menu_path.substr(start, is_last ? std::string::npos : slash - start);
+
+			auto found = std::find_if(cur->children.begin(), cur->children.end(),
+									  [&](const AddMenuNode& n) { return n.name == segment; });
+			if (found == cur->children.end()) {
+				cur->children.push_back(AddMenuNode{segment});
+				found = std::prev(cur->children.end());
+			}
+			cur = &(*found);
+			if (is_last) {
+				cur->leaf = &entry;
+				break;
+			}
+			start = slash + 1;
+		}
+	}
+	return root;
+}
+
+void draw_add_menu_node(const AddMenuNode& node, EditorDoc& doc, const glm::mat4& transform) {
+	for (auto& child : node.children) {
+		if (child.leaf) {
+			if (ImGui::MenuItem(child.name.c_str()))
+				doc.command_mgr->add_command(new CreateCppClassCommand(doc, child.leaf->classname, transform,
+																		 EntityPtr(), child.leaf->is_component));
+		} else if (ImGui::BeginMenu(child.name.c_str())) {
+			draw_add_menu_node(child, doc, transform);
+			ImGui::EndMenu();
+		}
+	}
+}
+} // namespace
+
+void EditorDoc::draw_add_menu_tree(const std::vector<EditorAddMenuEntry>& entries, const glm::mat4& transform) {
+	const AddMenuNode root = build_add_menu_tree(entries);
+	draw_add_menu_node(root, *this, transform);
+}
+
+// Right-click scene context menu. Opened by check_scene_context_menu_input() (EditorDocInput.cpp) on
+// a still right-click; runs here (inside the "Scene viewport" imgui window, see GUISystemLocal.cpp)
+// so OpenPopup/BeginPopup share the same window ID namespace. Spawns land at
+// scene_context_menu_transform, the world position raycast under the cursor at click time.
+void EditorDoc::draw_scene_context_menu() {
+	if (want_open_scene_context_menu) {
+		ImGui::OpenPopup("##scene_ctx_menu");
+		want_open_scene_context_menu = false;
+	}
+	if (!ImGui::BeginPopup("##scene_ctx_menu"))
+		return;
+
+	// -- Parenting: same actions as the Ctrl+P / Alt+P popups (draw_parenting_popups), parenting is
+	// prefab-only.
+	if (is_editing_prefab()) {
+		std::vector<Entity*> selected;
+		for (auto& ptr : selection_state->get_selection_as_vector())
+			if (Entity* e = ptr.get())
+				selected.push_back(e);
+		Entity* active = selection_state->get_active().get();
+		auto children_excluding = [&](Entity* target) {
+			std::vector<Entity*> out;
+			for (auto* e : selected)
+				if (e != target)
+					out.push_back(e);
+			return out;
+		};
+
+		const bool can_parent_active = active && selected.size() >= 2;
+		if (ImGui::MenuItem("Parent to Active", "Ctrl+P", false, can_parent_active))
+			command_mgr->add_command(new ParentToCommand(*this, children_excluding(active), active, false, false));
+		if (ImGui::MenuItem("Parent to New Empty", nullptr, false, !selected.empty()))
+			command_mgr->add_command(new ParentToCommand(*this, selected, nullptr, true, false));
+		if (ImGui::MenuItem("Clear Parent (Keep Transform)", "Alt+P", false, !selected.empty()))
+			command_mgr->add_command(new ParentToCommand(*this, selected, nullptr, false, true));
+		ImGui::Separator();
+	}
+
+	// -- Unpack Prefab: replaces every selected PrefabAssetComponent instance with the loose entities
+	// from its referenced .tprefab (reverse of instantiating one). Non-prefab entities in a mixed
+	// selection are skipped by the command. Greyed out unless at least one selected entity qualifies.
+	{
+		std::vector<EntityPtr> prefab_instances;
+		for (auto& ptr : selection_state->get_selection_as_vector())
+			if (Entity* e = ptr.get())
+				if (e->get_component<PrefabAssetComponent>())
+					prefab_instances.push_back(ptr);
+		if (ImGui::MenuItem("Unpack Prefab", nullptr, false, !prefab_instances.empty()))
+			command_mgr->add_command(new UnpackPrefabCommand(*this, std::move(prefab_instances)));
+	}
+
+	ImGui::Separator();
+
+	// -- Add...: common built-in component types, plus any game-specific classes registered via
+	// REGISTER_EDITOR_ADD_MENU_ENTRY (Game/EditorAddMenu.h), which may nest into submenus
+	// (e.g. "NPCs/Enemy").
+	if (ImGui::BeginMenu("Add")) {
+		auto spawn_component = [&](const char* classname) {
+			command_mgr->add_command(
+				new CreateCppClassCommand(*this, classname, scene_context_menu_transform, EntityPtr(), true));
+		};
+
+		if (ImGui::MenuItem("Point Light"))     spawn_component("PointLightComponent");
+		if (ImGui::MenuItem("Spot Light"))      spawn_component("SpotLightComponent");
+		if (ImGui::MenuItem("Particle System")) spawn_component("ParticleSystemComponent");
+		if (ImGui::MenuItem("GI Volume"))       spawn_component("GiVolumeComponent");
+		if (ImGui::MenuItem("Cubemap Volume"))  spawn_component("CubemapComponent");
+		if (ImGui::MenuItem("Mesh"))            spawn_component("MeshComponent");
+		if (ImGui::MenuItem("Audio Player"))    spawn_component("SoundComponent");
+
+		const auto& registered = EditorAddMenuRegistry::get().get_entries();
+		if (!registered.empty()) {
+			ImGui::Separator();
+			draw_add_menu_tree(registered, scene_context_menu_transform);
+		}
+
+		ImGui::EndMenu();
+	}
+
+	ImGui::EndPopup();
 }
 
 // ---------------------------------------------------------------------------
@@ -596,6 +791,10 @@ void EditorDoc::hook_menu_bar() {
 	if (ImGui::BeginMenu("Commands")) {
 		if (ImGui::MenuItem("Export as .glb")) {
 			export_level_scene();
+		}
+		if (ImGui::MenuItem("Import Model...")) {
+			if (AssetBrowser::inst)
+				AssetBrowser::inst->import_model_dialog();
 		}
 		ImGui::Separator();
 		if (ImGui::MenuItem("Import lightmap from baking")) {
