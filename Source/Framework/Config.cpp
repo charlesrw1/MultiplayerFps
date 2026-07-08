@@ -267,7 +267,6 @@ static int classify_string(const char* s) {
 }
 
 #include "DebugConsole.h"
-extern Color32 get_color_of_print(LogType type);
 #include <algorithm>
 void Cmd_Args::sys_print(LogType type, const char* fmt, ...) const {
 	if (type == Error)
@@ -281,7 +280,7 @@ void Cmd_Args::sys_print(LogType type, const char* fmt, ...) const {
 		*pipe_output_to_this += buf;
 	} else {
 		if (Debug_Console::inst)
-			Debug_Console::inst->print_args(get_color_of_print(type), fmt, args);
+			Debug_Console::inst->print_args(type, fmt, args);
 	}
 
 	va_end(args);

@@ -26,6 +26,8 @@
 #include "Input/InputSystem.h"
 #include "Render/DrawLocal.h"
 #include "Render/ViewSetup.h"
+#include "Render/Texture.h"
+#include "Assets/AssetDatabase.h"
 #include <mutex>
 
 #include "Logging.h"
@@ -471,31 +473,75 @@ void Debug_Console::draw() {
 		return;
 	}
 
+	static Texture* filter_icon = g_assets.find<Texture>("eng/icons/filter.png").get();
+	static const char* level_names[5] = { "Error", "Warning", "Info", "Debug", "Command" };
+	const float FILTER_ICON_SIZE = 16.0f;
+
 	ImGui::PushStyleColor(ImGuiCol_ChildBg, uint32_t(ImColor(5, 5, 5)));
+
+	auto copy_selected_lines = [this]() {
+		if (select_anchor_line == -1)
+			return;
+		int lo = std::min(select_anchor_line, select_end_line);
+		int hi = std::max(select_anchor_line, select_end_line);
+		std::string clip;
+		for (int i = lo; i <= hi && i < (int)lines.size(); i++) {
+			if (!show_level[(int)lines[i].type])
+				continue;
+			clip += lines[i].line;
+			clip += "\n";
+		}
+		ImGui::SetClipboardText(clip.c_str());
+	};
 
 	const float footer_height_to_reserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
 	if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), false)) {
 		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
+		ImGui::PushStyleColor(ImGuiCol_HeaderHovered, ImVec4(0.3f, 0.5f, 0.9f, 0.25f));
+		ImGui::PushStyleColor(ImGuiCol_Header, ImVec4(0.3f, 0.5f, 0.9f, 0.45f));
 		for (int i = 0; i < lines.size(); i++) {
-			Color32 color;
-
 			auto& line = lines[i];
-			auto& lineStr = line.line;
-			auto lineColor = line.color;
+			if (!show_level[(int)line.type])
+				continue;
 
-			// if (!lines[i].empty() && lines[i][0] == '>') {
-			//	color = { 136,23,152 };
-			//	has_color = true;
-			//}
+			// Selectable row (click / shift-click for a range) with the text drawn
+			// on top, so lines can be multi-selected and copied without "##" in
+			// log text being parsed as an ImGui id.
+			bool is_selected = select_anchor_line != -1 &&
+								i >= std::min(select_anchor_line, select_end_line) &&
+								i <= std::max(select_anchor_line, select_end_line);
 
-			ImGui::PushStyleColor(ImGuiCol_Text, lineColor.to_uint());
-			ImGui::TextUnformatted(lineStr.c_str());
+			ImGui::PushID(i);
+			ImVec2 text_pos = ImGui::GetCursorScreenPos();
+			if (ImGui::Selectable("##line", is_selected, ImGuiSelectableFlags_AllowItemOverlap)) {
+				if (ImGui::GetIO().KeyShift && select_anchor_line != -1)
+					select_end_line = i;
+				else {
+					select_anchor_line = i;
+					select_end_line = i;
+				}
+			}
+			ImGui::SetCursorScreenPos(text_pos);
+			ImGui::PushStyleColor(ImGuiCol_Text, line.color.to_uint());
+			ImGui::TextUnformatted(line.line.c_str());
 			ImGui::PopStyleColor();
+			ImGui::PopID();
 		}
+
+		if (ImGui::BeginPopupContextWindow("console_copy_menu")) {
+			if (ImGui::MenuItem("Copy", "Ctrl+C", false, select_anchor_line != -1))
+				copy_selected_lines();
+			ImGui::EndPopup();
+		}
+		if (select_anchor_line != -1 && ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows) &&
+			ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C))
+			copy_selected_lines();
+
 		if (scroll_to_bottom || (auto_scroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()))
 			ImGui::SetScrollHereY(1.0f);
 		scroll_to_bottom = false;
 
+		ImGui::PopStyleColor(2);
 		ImGui::PopStyleVar();
 	}
 	ImGui::EndChild();
@@ -509,6 +555,10 @@ void Debug_Console::draw() {
 	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_EscapeClearsAll |
 										   ImGuiInputTextFlags_CallbackHistory | ImGuiInputTextFlags_CallbackCompletion;
 
+	if (filter_icon) {
+		float input_width = ImGui::GetContentRegionAvail().x - FILTER_ICON_SIZE - ImGui::GetStyle().ItemSpacing.x;
+		ImGui::SetNextItemWidth(input_width);
+	}
 	if (ImGui::InputText("##Input", input_buffer, IM_ARRAYSIZE(input_buffer), input_text_flags,
 						 debug_console_text_callback, this)) {
 		char* s = input_buffer;
@@ -555,21 +605,39 @@ void Debug_Console::draw() {
 			}
 		}
 	}
+
+	if (filter_icon) {
+		ImGui::SameLine();
+		ImVec4 bg = ImGui::GetStyle().Colors[ImGuiCol_Button];
+		if (ImGui::ImageButton("##console_filter",
+				ImTextureID(uint64_t(filter_icon->get_internal_render_handle())),
+				ImVec2(FILTER_ICON_SIZE, FILTER_ICON_SIZE), ImVec2(0, 0), ImVec2(1, 1), bg))
+			ImGui::OpenPopup("console_filter_popup");
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("Filter log levels");
+	}
+	if (ImGui::BeginPopup("console_filter_popup")) {
+		for (int i = 0; i < 5; i++)
+			ImGui::Checkbox(level_names[i], &show_level[i]);
+		ImGui::EndPopup();
+	}
+
 	ImGui::End();
 }
-void Debug_Console::print_args(Color32 color, const char* fmt, va_list args) {
+void Debug_Console::print_args(LogType type, const char* fmt, va_list args) {
 	std::lock_guard<std::mutex> printLock(printMutex);
 
 	char buf[1024];
 	vsnprintf(buf, IM_ARRAYSIZE(buf), fmt, args);
 	buf[IM_ARRAYSIZE(buf) - 1] = 0;
 	LineAndColor lc;
-	lc.color = color;
+	lc.color = get_color_of_print(type);
+	lc.type = type;
 	lc.line = buf;
 	bufferedLines.push_back(lc);
 }
 
-void Debug_Console::print(Color32 color, const char* fmt, ...) {
+void Debug_Console::print(LogType type, const char* fmt, ...) {
 	std::lock_guard<std::mutex> printLock(printMutex);
 
 	char buf[1024];
@@ -579,7 +647,8 @@ void Debug_Console::print(Color32 color, const char* fmt, ...) {
 	buf[IM_ARRAYSIZE(buf) - 1] = 0;
 	va_end(args);
 	LineAndColor lc;
-	lc.color = color;
+	lc.color = get_color_of_print(type);
+	lc.type = type;
 	lc.line = buf;
 	bufferedLines.push_back(lc);
 }

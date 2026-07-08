@@ -94,7 +94,7 @@ class GameConsoleSink : public LogSink
 {
 	void log(LogType type, const std::string& message) override {
 		if (Debug_Console::inst)
-			Debug_Console::inst->print(get_color_of_print(type), "%s", message.c_str());
+			Debug_Console::inst->print(type, "%s", message.c_str());
 		if (type == LogType::LtConsoleCommand)
 			eng->log_to_fullscreen_gui(LtConsoleCommand, message.c_str());
 	}
@@ -161,7 +161,7 @@ void sys_vprint(const char* fmt, va_list args) {
 	std::lock_guard<std::mutex> printLock(printMutex);
 
 	vprintf(fmt, args);
-	Debug_Console::inst->print_args(get_color_of_print(Info), fmt, args);
+	Debug_Console::inst->print_args(Info, fmt, args);
 }
 
 void Fatalf(const char* format, ...) {
