@@ -303,9 +303,13 @@ void Level::insert_unserialized_entities_into_level_internal(UnserializedSceneFi
 	// Components are also added to strip_set so the insert+init loops skip them; they get
 	// freed during the bake loop via their owner Entity (we never iterate Components in the
 	// bake — they're at later indices in objs and would be dangling pointers by then).
+	// addSpawnNames is only true for the initial .tmap load (Level::start). Runtime prefab
+	// spawns (PrefabAssetComponent, PrefabAsset::spawn) reuse this same insertion path but pass
+	// addSpawnNames=false; their root entities are about to be parented to a live owner and must
+	// stay as real, movable Entities instead of being baked into the static pool.
 	std::unordered_set<BaseUpdater*> strip_set;
 	std::vector<Entity*> strip_entities;
-	const bool can_strip = !eng->is_editor_level() && !r_disable_static_strip.get_bool();
+	const bool can_strip = addSpawnNames && !eng->is_editor_level() && !r_disable_static_strip.get_bool();
 	if (can_strip) {
 		for (auto* o : objs) {
 			if (auto* e = o->cast_to<Entity>()) {

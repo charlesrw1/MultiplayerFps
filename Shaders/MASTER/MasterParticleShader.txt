@@ -64,7 +64,12 @@ void main()
 {
 	FS_IN_Matid = pcf.FS_IN_Matid;
 	FSmain();
-	
+
+#ifdef ALPHATEST
+	if (OPACITY * FS_IN_Color.a < 0.5)
+		discard;
+#endif
+
 	FS_OUT_Color = vec4(EMISSIVE*FS_IN_Color.rgb, OPACITY*FS_IN_Color.a);
 }
 

@@ -25,6 +25,7 @@ void PrefabAssetComponent::stop() {
 	// deliberately reparent our children elsewhere *before* destroying the owner entity, so
 	// they survive independently; destroying them here regardless of current parent would
 	// undo that promotion out from under the caller.
+	/*
 	Entity* owner = get_owner();
 	for (auto& entity_ptr : spawned_entities) {
 		if (auto entity = entity_ptr.get()) {
@@ -33,6 +34,7 @@ void PrefabAssetComponent::stop() {
 		}
 	}
 	spawned_entities.clear();
+	*/
 }
 #include "Level.h"
 void PrefabAssetComponent::update_path(std::string new_path) {
@@ -62,13 +64,15 @@ void PrefabAssetComponent::update_path(std::string new_path) {
 		}
 		eng->get_level()->insert_unserialized_entities_into_level(unserialized);
 		for (auto base_updater : unserialized.all_obj_vec) {
+			if (!base_updater)	// if entities were stripped (in game builds, then they are nullptr here). strippping only happens in game builds, not editor builds. 
+				continue;
 			if (auto entity = base_updater->cast_to<Entity>()) {
 				// Only the prefab's root entities attach to the owner. Entities that already have a
 				// parent were linked to another entity *inside* the prefab by unserialize_from_text;
 				// reparenting them here would flatten (and thus break) the prefab's own hierarchy.
 				if (!entity->get_parent()) {
 					entity->parent_to(owner);
-					spawned_entities.push_back(entity);
+					//spawned_entities.push_back(entity);
 				}
 				entity->dont_serialize_or_edit = true;
 			}

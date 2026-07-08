@@ -72,6 +72,7 @@ g_lua_debug_port 9966
 
 
 [game_test]
+r.render_backend opengl
 
 r_indirect_loop 1
 gpu.draw_collision_tris 0
@@ -115,6 +116,7 @@ colorLog 0
 r.enable_vsync 0
 
 [editor_test]
+r.render_backend opengl
 
 r_indirect_loop 1
 g_project_base "Data"
