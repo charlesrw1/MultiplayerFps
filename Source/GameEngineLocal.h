@@ -34,6 +34,7 @@ struct SceneDrawParamsEx;
 struct View_Setup;
 class EditorState;
 struct MainConfigurationOptions;
+struct CameraSnapshot;
 class GameEngineLocal : public GameEnginePublic
 {
 public:
@@ -76,7 +77,11 @@ public:
 
 	// local functions
 public:
-	void open_tool(string mapname);
+	// switches to a different scene/prefab document; if the currently open document has
+	// unsaved changes, prompts to save/discard/cancel before switching (see do_open_tool).
+	// restore_cam, if given, is applied to the newly opened doc's editor camera once the
+	// switch actually happens (which may be deferred behind the unsaved-changes prompt).
+	void open_tool(string mapname, const CameraSnapshot* restore_cam = nullptr);
 	void init(MainConfigurationOptions& options, int argc, char** argv);
 	void cleanup();
 
@@ -141,6 +146,9 @@ public:
 private:
 	bool is_hosting_game = false;
 	bool skip_swap = false;
+	// actually performs the switch to mapname; open_tool defers to this after
+	// resolving any unsaved-changes prompt
+	void do_open_tool(string mapname, const CameraSnapshot* restore_cam = nullptr);
 	void init_sdl_window();
 	void key_event(SDL_Event event);
 	void draw_any_imgui_interfaces();

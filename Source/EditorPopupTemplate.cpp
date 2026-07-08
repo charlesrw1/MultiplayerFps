@@ -1,4 +1,5 @@
 #include "EditorPopupTemplate.h"
+#include "IEditorTool.h"
 #include "imgui.h"
 void PopupTemplate::create_are_you_sure(EditorPopupManager* mgr, const string& desc, function<void()> continue_func) {
 	mgr->add_popup("Are you sure?", [desc, continue_func]() -> bool {
@@ -22,6 +23,46 @@ void PopupTemplate::create_basic_okay(EditorPopupManager* mgr, const std::string
 		ImGui::Text("%s", desc.c_str());
 		ImGui::Spacing();
 		return ImGui::Button("Okay");
+	});
+}
+
+namespace {
+struct UnsavedChangesState
+{
+	bool waiting_for_save = false;
+};
+} // namespace
+
+void PopupTemplate::create_unsaved_changes_prompt(EditorPopupManager* mgr, IEditorTool* tool,
+												  function<void()> continue_func) {
+	UnsavedChangesState state;
+	mgr->add_popup("Unsaved Changes", [tool, continue_func, state]() mutable -> bool {
+		if (state.waiting_for_save) {
+			if (!tool->get_has_editor_changes()) {
+				continue_func();
+				return true;
+			}
+			ImGui::Text("Waiting for save to complete...");
+			return false;
+		}
+		ImGui::Text("This document has unsaved changes.");
+		ImGui::Text("Save before continuing?");
+		ImGui::Spacing();
+		bool ret = false;
+		if (ImGui::Button("Save")) {
+			tool->save();
+			state.waiting_for_save = true;
+		}
+		ImGui::SameLine(0, 20);
+		if (ImGui::Button("Discard")) {
+			continue_func();
+			ret = true;
+		}
+		ImGui::SameLine(0, 20);
+		if (ImGui::Button("Cancel")) {
+			ret = true;
+		}
+		return ret;
 	});
 }
 

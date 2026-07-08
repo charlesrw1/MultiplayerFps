@@ -181,9 +181,55 @@ static std::string append_strings(int c, char** str) {
 // Editor tool open
 // ---------------------------------------------------------------------------
 
-void GameEngineLocal::open_tool(string mapname) {
+#ifdef EDITOR_BUILD
+namespace {
+// Wraps a lambda so it can be handed to Cmd_Manager::append_cmd. The switch has to happen
+// via the deferred systemCommands queue (drained in execute_buffer() at frame start), not
+// synchronously from inside the popup's imgui callback: at that point in the frame other
+// code (dock_over_viewport) has already cached the raw IEditorTool* for this frame, and
+// destroying/replacing editor_tool out from under it is a use-after-free.
+class LambdaSystemCommand : public SystemCommand
+{
+public:
+	explicit LambdaSystemCommand(std::function<void()> f) : func(std::move(f)) {}
+	void execute() override { func(); }
+	string to_string() override { return "<deferred open_tool switch>"; }
+
+private:
+	std::function<void()> func;
+};
+} // namespace
+#endif
+
+void GameEngineLocal::open_tool(string mapname, const CameraSnapshot* restore_cam) {
 	ASSERT(!mapname.empty());
 
+#ifdef EDITOR_BUILD
+	// Don't silently discard unsaved work: if the outgoing doc is dirty, prompt to
+	// save/discard/cancel and only actually switch once that's resolved. Skip during
+	// tests — they manage their own doc lifecycle and there's no user to answer a popup.
+	if (!is_test_mode() && this->editor_tool && this->editor_tool->get_has_editor_changes()) {
+		// Copy by value: restore_cam may point at a recents-list entry that could be
+		// invalidated before the deferred switch actually runs.
+		const bool has_cam = restore_cam != nullptr;
+		const CameraSnapshot cam_copy = has_cam ? *restore_cam : CameraSnapshot();
+		PopupTemplate::create_unsaved_changes_prompt(EditorPopupManager::inst, this->editor_tool.get(),
+													 [this, mapname, cam_copy, has_cam]() {
+														 Cmd_Manager::inst->append_cmd(
+															 std::make_unique<LambdaSystemCommand>(
+																 [this, mapname, cam_copy, has_cam]() {
+																	 do_open_tool(mapname,
+																				 has_cam ? &cam_copy : nullptr);
+																 }));
+													 });
+		return;
+	}
+#endif
+
+	do_open_tool(mapname, restore_cam);
+}
+
+void GameEngineLocal::do_open_tool(string mapname, const CameraSnapshot* restore_cam) {
 #ifdef EDITOR_BUILD
 	// Snapshot the doc we are about to leave BEFORE load_level runs — load_level
 	// internally calls editor_tool.reset(), so by the time we get back here the
@@ -211,6 +257,10 @@ void GameEngineLocal::open_tool(string mapname) {
 		// a test runner is active so integration tests don't churn the list.
 		if (!outgoing_path.empty() && !is_test_mode())
 			g_editor_recents.record(outgoing_path, outgoing_cam);
+		if (restore_cam) {
+			if (auto* new_doc = dynamic_cast<EditorDoc*>(this->editor_tool.get()))
+				new_doc->ed_cam.apply_snapshot(*restore_cam);
+		}
 #endif
 	} else {
 		// Keep the current editor_tool intact so a failed open doesn't destroy

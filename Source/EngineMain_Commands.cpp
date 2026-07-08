@@ -333,11 +333,10 @@ void GameEngineLocal::add_commands() {
 		// Copy by value: open_tool may push to the deque, invalidating element refs.
 		const string path = entry->path;
 		const CameraSnapshot cam = entry->camera;
-		open_tool(path);
-		if (auto* doc = dynamic_cast<EditorDoc*>(this->editor_tool.get())) {
-			if (doc->get_asset_path() == path)
-				doc->ed_cam.apply_snapshot(cam);
-		}
+		// Pass the camera through open_tool rather than applying it here: if the
+		// current doc has unsaved changes, open_tool defers the actual switch behind
+		// a save prompt, so editor_tool won't be the new doc yet by the time we'd check it.
+		open_tool(path, &cam);
 	});
 #endif
 
