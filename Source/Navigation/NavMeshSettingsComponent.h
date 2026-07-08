@@ -16,6 +16,9 @@ public:
 		editor_is_editor_only = true;
 #endif
 	}
+	void start() override { 
+		editor_set_billboard("eng/icon/trafficcone.png");
+	}
 
 	// Recast voxelization
 	REF float cell_size            = 0.3f;
@@ -41,7 +44,4 @@ public:
 	// Workflow
 	REF bool  auto_save_on_bake    = true;
 
-#ifdef EDITOR_BUILD
-	const char* get_editor_outliner_icon() const final { return "eng/editor/settings_icon.png"; }
-#endif
 };

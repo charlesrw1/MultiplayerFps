@@ -94,6 +94,7 @@ public:
 
 	Texture* folder_open{};
 	Texture* folder_closed{};
+	Texture* import_model_icon{};
 
 	bool using_grid = false;
 
@@ -104,13 +105,17 @@ public:
 
 	ThumbnailManager thumbnails;
 
-	enum class CreateAssetType { None, Map, Particle, MasterMaterial, MaterialInstance };
+	enum class CreateAssetType { None, Map, Particle, MasterMaterial, MaterialInstance, Prefab };
 	CreateAssetType create_asset_type = CreateAssetType::None;
 	char create_asset_name[128] = {};
 	int create_mm_domain = 0;
 	std::string create_mi_master_path;
 	std::string create_folder_override;
 	void draw_create_asset_popup();
+
+	// Opens a native file picker rooted at the project data dir, filtered to .glb,
+	// then writes a .mis sidecar for the picked model so it shows up as an importable asset.
+	void import_model_dialog();
 };
 
 #endif

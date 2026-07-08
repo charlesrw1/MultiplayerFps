@@ -19,6 +19,8 @@ namespace AssetTemplates {
 
     std::optional<std::string> create_empty_particle(const std::string& dir, const std::string& name);
 
+    std::optional<std::string> create_empty_prefab(const std::string& dir, const std::string& name);
+
     std::optional<std::string> create_mi_from_master(const std::string& dir,
         const std::string& name, const std::string& master_mm_path);
 

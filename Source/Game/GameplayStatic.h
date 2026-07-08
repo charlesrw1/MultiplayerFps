@@ -56,6 +56,9 @@ public:
 
 	REF static vector<Component*> find_components(const ClassTypeInfo* info);
 	REF static Entity* find_by_name(string name);
+	REF static Entity* find_first_all_entities_by_name(string name);
+
+
 	REF static float get_dt() { return eng->get_dt(); }
 	REF static float get_time() { return eng->get_game_time(); }
 

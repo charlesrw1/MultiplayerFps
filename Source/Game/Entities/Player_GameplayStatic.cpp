@@ -47,8 +47,11 @@ vector<Component*> GameplayStatic::find_components(const ClassTypeInfo* info) {
 }
 
 Entity* GameplayStatic::find_by_name(string name) {
-	ASSERT(!name.empty());
 	return eng->get_level()->find_initial_entity_by_name(name);
+}
+
+Entity* GameplayStatic::find_first_all_entities_by_name(string name) {
+	return eng->get_level()->find_any_by_name(name);
 }
 
 static int GameplayStatic_debug_text_start = 10;
@@ -58,7 +61,6 @@ void GameplayStatic::reset_debug_text_height() {
 }
 
 void GameplayStatic::debug_text(string text) {
-	ASSERT(!text.empty());
 	auto font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
 	auto draw_text = [&](const char* s) {
 		string str = s;

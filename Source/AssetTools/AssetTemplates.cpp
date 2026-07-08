@@ -185,6 +185,23 @@ std::optional<std::string> create_empty_particle(const std::string& dir, const s
     return path;
 }
 
+std::optional<std::string> create_empty_prefab(const std::string& dir, const std::string& name) {
+    auto base = strip_name(name);
+    std::string path = dir.empty() ? (base + ".tprefab") : (dir + "/" + base + ".tprefab");
+
+    if (FileSys::does_file_exist(path.c_str(), FileSys::GAME_DIR))
+        return std::nullopt;
+
+    std::string text = "!json\n{\"__version\":1,\"objs\":[]}\n";
+
+    auto f = FileSys::open_write_game(path);
+    if (!f) return std::nullopt;
+    f->write(text.data(), text.size());
+    f->close();
+
+    return path;
+}
+
 std::optional<std::string> create_mi_from_master(const std::string& dir,
     const std::string& name, const std::string& master_mm_path) {
     auto base = strip_name(name);

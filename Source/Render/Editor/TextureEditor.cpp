@@ -4,6 +4,7 @@
 
 #include <Windows.h>
 #include <unordered_set>
+#include <optional>
 // static TextureEditorTool s_texture_editor_tool;
 // IEditorTool* g_texture_editor_tool = &s_texture_editor_tool;
 
@@ -93,6 +94,51 @@ void OpenInNotepad(const string& name) {
 	CloseHandle(out.hProcess);
 	CloseHandle(out.hThread);
 	return;
+}
+
+#include <commdlg.h>
+#pragma comment(lib, "comdlg32.lib")
+#pragma comment(lib, "shell32.lib")
+
+// Opens a native "Open File" dialog filtered to .glb, rooted at the project data dir.
+// Returns the picked file as a game-relative path, or nullopt if cancelled or outside the data dir.
+std::optional<std::string> OpenGlbFileDialog() {
+	char file_buf[MAX_PATH] = {};
+	char game_dir_full[MAX_PATH] = {};
+	GetFullPathNameA(FileSys::get_game_path(), MAX_PATH, game_dir_full, nullptr);
+	std::string game_dir = game_dir_full;
+
+	OPENFILENAMEA ofn = {};
+	ofn.lStructSize = sizeof(ofn);
+	ofn.lpstrFilter = "GLB Model (*.glb)\0*.glb\0";
+	ofn.lpstrFile = file_buf;
+	ofn.nMaxFile = MAX_PATH;
+	ofn.lpstrInitialDir = game_dir.c_str();
+	ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+
+	if (!GetOpenFileNameA(&ofn))
+		return std::nullopt;
+
+	std::string picked = file_buf;
+	for (auto& c : picked)
+		if (c == '\\') c = '/';
+	std::string prefix = game_dir + "/";
+	if (picked.size() <= prefix.size() ||
+		_strnicmp(picked.c_str(), prefix.c_str(), (int)prefix.size()) != 0) {
+		sys_print(Error, "OpenGlbFileDialog: picked file is outside the project data dir\n");
+		return std::nullopt;
+	}
+	return picked.substr(prefix.size());
+}
+
+// Opens Windows Explorer with the given game-relative asset selected.
+void ShowInExplorer(const std::string& game_path) {
+	std::string fullpath = FileSys::get_full_path_from_game_path(game_path);
+	for (auto& c : fullpath)
+		if (c == '/') c = '\\';
+
+	std::string params = "/select,\"" + fullpath + "\"";
+	ShellExecuteA(nullptr, "open", "explorer.exe", params.c_str(), nullptr, SW_SHOWNORMAL);
 }
 
 void IMPORT_TEX(const Cmd_Args& args) {

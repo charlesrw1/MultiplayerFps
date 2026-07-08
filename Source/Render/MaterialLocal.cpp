@@ -149,10 +149,10 @@ void MaterialInstance::set_float_parameter(StringName name, float f) {
 	}
 }
 
-void MaterialInstance::set_floatvec_parameter(StringName name, glm::vec4 f) {
+void MaterialInstance::set_floatvec_parameter(StringName name, glm::vec3 xyz, float a) {
 	ASSERT(impl);
 	if (auto p = impl->find_param_type(name, MatParamType::FloatVec)) {
-		p->vector = f;
+		p->vector = glm::vec4(xyz,a);
 		matman.add_to_dirty_list(this);
 	} else {
 		sys_print(Error, "couldnt find parameter for set_floatvec_parameter\n");

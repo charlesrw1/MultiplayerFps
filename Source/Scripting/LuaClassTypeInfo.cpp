@@ -4,6 +4,7 @@
 #include "Framework/MapUtil.h"
 #include "Game/EntityComponent.h"
 #include "Game/LevelAssets.h"
+#include "GameEnginePublic.h"
 #include <cassert>
 #include <cstring>
 #include <new>
@@ -356,16 +357,42 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c) {
 	};
 	check_top(2);
 
-	// Copy table1 into dst
+	// Copy table1 into dst. In the editor, skip PROP_LUA_BACKED fields: those live in the
+	// shadow buffer and must stay absent from the instance table so that
+	// lua_component_index/__newindex (see ScriptManager.cpp) actually fire and serve the
+	// live shadow value instead of a stale copy of the template's literal default -- the
+	// editor property panel edits the shadow buffer directly, and this instance table copy
+	// would otherwise permanently shadow (pun intended) those edits from Lua.
+	// Outside the editor, PROP_LUA_BACKED fields are copied like everything else: a
+	// runtime-spawned component (not loaded from a level file) never gets its shadow
+	// buffer allocated (see comment below), so this copy is its only source of default
+	// values -- sync_shadow_to_lua_table() no-ops when the shadow is null. Components that
+	// *do* get a shadow (via level deserialization or the editor) simply have this default
+	// overwritten later by sync_shadow_to_lua_table() before start() runs.
+	const bool skip_lua_backed = eng && eng->is_editor_level();
 	lua_pushnil(L); // first key
 	check_top(3);
 
 	while (lua_next(L, -2)) {
 		check_top(4);
-		lua_pushvalue(L, -2); // duplicate key
-		lua_insert(L, -2);	  // move key below value
-		lua_settable(L, -5); // dst[key] = value
-							 // leaves key for next lua_next
+		bool is_lua_backed = false;
+		if (skip_lua_backed && lua_isstring(L, -2)) {
+			const char* key = lua_tostring(L, -2);
+			for (auto& pi : luaInfo->get_lua_props_storage()) {
+				if (strcmp(pi.name, key) == 0) {
+					is_lua_backed = true;
+					break;
+				}
+			}
+		}
+		if (!is_lua_backed) {
+			lua_pushvalue(L, -2); // duplicate key
+			lua_insert(L, -2);	  // move key below value
+			lua_settable(L, -5); // dst[key] = value
+								 // leaves key for next lua_next
+		} else {
+			lua_pop(L, 1); // pop value, leave key on stack for next lua_next
+		}
 	}
 	check_top(2);
 	check_top(2);

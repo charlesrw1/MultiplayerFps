@@ -6,6 +6,7 @@
 
 #include "imgui.h"
 #include <algorithm>
+#include <optional>
 #include "Framework/MyImguiLib.h"
 #include "Framework/Config.h"
 
@@ -41,6 +42,7 @@ AssetBrowser::AssetBrowser() {
 	folder_open = g_assets.find<Texture>("eng/editor/folder_open.png").get();
 	if (!folder_closed || !folder_open)
 		Fatalf("no folder icons\n");
+	import_model_icon = g_assets.find<Texture>("eng/icons/publish.png").get();
 
 	inspector_pane = std::make_unique<AssetInspectorPane>();
 
@@ -195,6 +197,8 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 }
 extern void OpenInNotepad(const string& name);
 extern void SetClipboardText(const string& name);
+extern void ShowInExplorer(const string& name);
+extern std::optional<std::string> OpenGlbFileDialog();
 
 static void draw_diag_tooltip(const std::string& gamepath) {
 	auto* diags = AssetDiagnostics::get().get_diags(gamepath);
@@ -260,6 +264,10 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 			}
 			if (ImGui::MenuItem("Open in notepad")) {
 				OpenInNotepad(b->selected_resource.filename);
+				ImGui::CloseCurrentPopup();
+			}
+			if (ImGui::MenuItem("Show in Explorer")) {
+				ShowInExplorer(b->selected_resource.filename);
 				ImGui::CloseCurrentPopup();
 			}
 			if (b->selected_resource.type) {
@@ -390,6 +398,11 @@ static void draw_create_new_menu_items(AssetBrowser* b, const std::string& folde
 			b->create_asset_type = AssetBrowser::CreateAssetType::MaterialInstance;
 			b->create_folder_override = folder;
 			b->create_mi_master_path = "eng/fallback.mm";
+			memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
+		}
+		if (ImGui::MenuItem("Prefab")) {
+			b->create_asset_type = AssetBrowser::CreateAssetType::Prefab;
+			b->create_folder_override = folder;
 			memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
 		}
 		ImGui::EndMenu();
@@ -632,6 +645,10 @@ void AssetBrowser::draw_browser_grid() {
 				OpenInNotepad(selected_resource.filename);
 				ImGui::CloseCurrentPopup();
 			}
+			if (ImGui::MenuItem("Show in Explorer")) {
+				ShowInExplorer(selected_resource.filename);
+				ImGui::CloseCurrentPopup();
+			}
 			if (selected_resource.type) {
 				ImGui::Separator();
 				selected_resource.type->draw_browser_context_menu(selected_resource.filename);
@@ -741,6 +758,18 @@ void AssetBrowser::imgui_draw() {
 		return;
 	}
 
+	if (import_model_icon) {
+		const float ICON_SIZE = 16.0f;
+		ImVec4 bg = ImGui::GetStyle().Colors[ImGuiCol_Button];
+		if (ImGui::ImageButton("##import_model",
+				ImTextureID(uint64_t(import_model_icon->get_internal_render_handle())),
+				ImVec2(ICON_SIZE, ICON_SIZE), ImVec2(0, 0), ImVec2(1, 1), bg, ImVec4(0.3f, 0.75f, 0.35f, 1.0f)))
+			import_model_dialog();
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("Import Model (.glb)");
+		ImGui::SameLine();
+	}
+
 	// Filter bar
 	static bool match_case = false;
 	ImGui::SetNextItemWidth(200.0);
@@ -839,7 +868,7 @@ void AssetBrowser::draw_create_asset_popup() {
 	if (create_asset_type == CreateAssetType::None)
 		return;
 
-	const char* titles[] = {"", "Create Map", "Create Particle", "Create Master Material", "Create Material Instance"};
+	const char* titles[] = {"", "Create Map", "Create Particle", "Create Master Material", "Create Material Instance", "Create Prefab"};
 	const char* title = titles[(int)create_asset_type];
 
 	ImGui::OpenPopup(title);
@@ -884,6 +913,9 @@ void AssetBrowser::draw_create_asset_popup() {
 			case CreateAssetType::MaterialInstance:
 				result = AssetTemplates::create_mi_from_master(create_folder_override, create_asset_name, create_mi_master_path);
 				break;
+			case CreateAssetType::Prefab:
+				result = AssetTemplates::create_empty_prefab(create_folder_override, create_asset_name);
+				break;
 			default:
 				break;
 			}
@@ -904,6 +936,20 @@ void AssetBrowser::draw_create_asset_popup() {
 		}
 
 		ImGui::EndPopup();
+	}
+}
+
+void AssetBrowser::import_model_dialog() {
+	auto glb_gamepath = OpenGlbFileDialog();
+	if (!glb_gamepath)
+		return;
+
+	auto result = AssetTemplates::create_mis_for_glb(*glb_gamepath);
+	if (result) {
+		sys_print(Info, "Imported model: %s\n", result->c_str());
+		set_selected(*glb_gamepath);
+	} else {
+		sys_print(Warning, "Failed to import model (already imported or write error): %s\n", glb_gamepath->c_str());
 	}
 }
 

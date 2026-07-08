@@ -458,6 +458,16 @@ Entity* Level::find_initial_entity_by_name(const string& name) const {
 	return MapUtil::get_or(spawnNameToEntity, name, EntityPtr()).get();
 }
 
+Entity* Level::find_any_by_name(const string& name) const {
+	for (auto o : all_world_ents) {
+		if (auto* e = o->cast_to<Entity>()) {
+			if (e->get_editor_name() == name)
+				return e;
+		}
+	}
+	return nullptr;
+}
+
 Component* Level::find_first_component(const ClassTypeInfo* type) const {
 	for (auto o : all_world_ents) {
 		if (o->is_a<Component>() && o->get_type().is_a(*type))

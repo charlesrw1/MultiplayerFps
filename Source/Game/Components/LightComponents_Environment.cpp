@@ -176,15 +176,18 @@ void AreaishLightComponent::start() {
 	auto mesh = get_owner()->create_component<MeshComponent>();
 	mesh->set_model(get_model_to_use());
 	mesh->set_material_override(mat.get());
-	mat->set_floatvec_parameter("EmissiveColor", color32_to_vec4(color) * intensity);
+	{
+		glm::vec4 c = color32_to_vec4(color) * intensity;
+		mat->set_floatvec_parameter("EmissiveColor", glm::vec3(c), c.a);
+	}
 }
 
 void AreaishLightComponent::stop() {}
 
 void AreaishLightComponent::editor_on_change_property() {
 	ASSERT(mat != nullptr);
-	glm::vec4 linear = colorvec_srgb_to_linear(color32_to_vec4(color));
-	mat->set_floatvec_parameter("EmissiveColor", linear * intensity);
+	glm::vec4 linear = colorvec_srgb_to_linear(color32_to_vec4(color)) * intensity;
+	mat->set_floatvec_parameter("EmissiveColor", glm::vec3(linear), linear.a);
 	get_owner()->get_component<MeshComponent>()->set_model(get_model_to_use());
 }
 

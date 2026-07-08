@@ -33,6 +33,7 @@
 #include "AssetTools/AssetCompiler.h"
 #include "Sound/SoundPublic.h"
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "Framework/EditorTheme.h"
 #include "UI/UILoader.h"
 #include "UI/Widgets/Layouts.h"
@@ -424,6 +425,11 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	}
 	apply_editor_dark_theme();
 	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	// Ctrl+Tab is repurposed as the editor's recent-doc switcher (EditorDoc::check_recent_switcher_input);
+	// free it from imgui's built-in window-windowing-overlay switcher so the two don't fight over input
+	// and the overlay doesn't render on top of our popup.
+	ImGui::GetCurrentContext()->ConfigNavWindowingKeyNext = ImGuiKey_None;
+	ImGui::GetCurrentContext()->ConfigNavWindowingKeyPrev = ImGuiKey_None;
 	print_time("imgui font");
 
 	SDL_SetWindowPosition(window, startx, starty);

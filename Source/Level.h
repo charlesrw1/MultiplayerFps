@@ -73,6 +73,8 @@ public:
 
 	void validate();
 	Entity* find_initial_entity_by_name(const string& name) const;
+	Entity* find_any_by_name(const string& name) const;
+
 	Component* find_first_component(const ClassTypeInfo* type) const;
 
 	// Raw entity JSON for objs whose __typename couldn't be instantiated at load.
