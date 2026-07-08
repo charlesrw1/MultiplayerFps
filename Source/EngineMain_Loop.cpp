@@ -56,10 +56,48 @@ extern GameEngineLocal eng_local;
 extern ConfigVar g_window_fullscreen;
 extern ConfigVar g_engine_ticks_per_frame;
 extern ConfigVar g_slomo;
+extern ConfigVar stat_fps;
 
 // Free functions defined in EngineMain_Debug.cpp
 extern void debug_shape_ctx_update(float dt);
 extern void debug_shape_ctx_fixed_update_start();
+
+// Unreal-style "stat fps" overlay: current framerate and frametime in the top-right
+// corner, colored by how close the frame came to a 60/30 fps budget.
+static void draw_fps_counter(double dt) {
+	if (!stat_fps.get_bool())
+		return;
+
+	auto font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
+	if (!font)
+		return;
+
+	const float ms = (float)(dt * 1000.0);
+	const float fps = dt > 0.0 ? (float)(1.0 / dt) : 0.f;
+
+	char buf[64];
+	snprintf(buf, sizeof(buf), "%.0f fps  %.1f ms", fps, ms);
+
+	Color32 color;
+	if (ms <= 16.7f) // 60+ fps
+		color = Color32(60, 230, 60, 255);
+	else if (ms <= 33.3f) // 30-60 fps
+		color = Color32(230, 200, 40, 255);
+	else // <30 fps
+		color = Color32(230, 50, 50, 255);
+
+	Rect2d size = GuiHelpers::calc_text_size_no_wrap(std::string_view(buf), font);
+	glm::ivec2 pos = GuiHelpers::calc_layout({-size.w - 12, 10}, guiAnchor::TopRight, UiSystem::inst->get_vp_rect());
+
+	TextShape shape;
+	shape.rect = Rect2d(pos, {0, 0});
+	shape.font = font;
+	shape.text = buf;
+	shape.color = color;
+	shape.with_drop_shadow = true;
+	shape.drop_shadow_ofs = 1;
+	UiSystem::inst->window.draw(shape);
+}
 
 struct GameUpdateOuput
 {
@@ -325,6 +363,7 @@ void GameEngineLocal::loop() {
 		ZoneScopedN("ImGuiUpdate");
 
 		gui_log.draw(UiSystem::inst->window);
+		draw_fps_counter(frame_time);
 
 		UiSystem::inst->draw_imgui_interfaces(editor_tool.get());
 

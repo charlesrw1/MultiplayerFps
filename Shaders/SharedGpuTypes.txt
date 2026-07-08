@@ -89,7 +89,7 @@ struct Ubo_View_Constants_Struct
 	// bit 0: wireframe first pass or second pass
 	uint flags;
 	float editor_grid_snap;
-	uint padding2;
+	uint is_ortho;
 	uint padding3;
 	
 	vec4 current_and_prev_jitter;

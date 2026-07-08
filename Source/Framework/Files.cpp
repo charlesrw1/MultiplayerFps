@@ -339,11 +339,13 @@ bool FileSys::create_directory(std::string_view relative_path, WhereEnum where) 
 
 
 // stick it here for windows.h
-void start_play_process() {
+void start_play_process(const std::string& play_map_path) {
 
 	const std::string pathToProcess = "./x64/Debug/App.exe";
 
 	std::string commandLine = pathToProcess;
+	if (!play_map_path.empty())
+		commandLine += " --play \"" + play_map_path + "\"";
 
 	STARTUPINFOA startup = {};
 	PROCESS_INFORMATION out = {};

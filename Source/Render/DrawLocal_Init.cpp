@@ -113,6 +113,7 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, IGraphic
 	constants.far = vs.far;
 	constants.shadowmap_epsilon = shadowmap.tweak.epsilon;
 	constants.inv_scale_by_proj_distance = 1.0 / (2.0 * tan(vs.fov * 0.5));
+	constants.is_ortho = vs.is_ortho ? 1 : 0;
 
 	constants.fogcolor = vec4(vec3(0.7), 1);
 	constants.fogparams = vec4(10, 30, 0, 0);

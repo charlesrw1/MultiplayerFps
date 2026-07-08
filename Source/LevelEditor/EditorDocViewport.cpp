@@ -35,7 +35,7 @@
 #include <algorithm>
 
 extern void export_level_scene();
-extern void start_play_process();
+extern void start_play_process(const std::string& play_map_path);
 extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 
 ConfigVar draw_coords_under_mouse("draw_coords_under_mouse", "0", CVAR_BOOL, "");
@@ -942,7 +942,7 @@ void EditorDoc::hook_menu_bar() {
 		}
 		ImGui::Separator();
 		if (ImGui::MenuItem("Play")) {
-			start_play_process();
+			start_play_process(get_asset_path());
 		}
 
 		ImGui::Separator();

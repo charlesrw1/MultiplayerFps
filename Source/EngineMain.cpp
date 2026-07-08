@@ -129,6 +129,7 @@ ConfigVar g_slomo("slomo", "1.0", CVAR_FLOAT | CVAR_DEV, "multiplier of dt in up
 ConfigVar g_engine_ticks_per_frame("engine.ticks_per_frame", "1", CVAR_INTEGER,
     "game ticks to simulate per render frame; render+present are skipped for all but the last", 1, 10000);
 ConfigVar ui_disable_screen_log("ui.disable_screen_log", "0", CVAR_BOOL, "");
+ConfigVar stat_fps("stat.fps", "0", CVAR_BOOL, "show fps/frametime counter overlay in the top-right corner");
 ConfigVar disable_render_time_tick("disable_render_time_tick", "0", CVAR_BOOL, "");
 
 // ---------------------------------------------------------------------------

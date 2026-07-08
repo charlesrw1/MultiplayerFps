@@ -61,7 +61,7 @@ ddgi_probe_debug 0
 
 ignore_folders 1
 
-
+stat.fps 1
 debug.menu_width 400
 
 # Lua debugger (VS Code via actboy168.lua-debug). See docs/scripting/vscode_debugger.md.

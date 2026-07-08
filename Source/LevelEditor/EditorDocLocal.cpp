@@ -76,7 +76,7 @@ ConfigVar ed_show_box_handles("ed.show_box_handles", "0", CVAR_INTEGER, "box han
 
 extern void export_godot_scene(const std::string& base_export_path);
 extern void export_level_scene();
-extern void start_play_process();
+extern void start_play_process(const std::string& play_map_path);
 extern int imgui_std_string_resize(ImGuiInputTextCallbackData* data);
 
 // ---------------------------------------------------------------------------

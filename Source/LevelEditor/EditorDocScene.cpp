@@ -82,9 +82,15 @@ static void push_dashed_ribbon(MeshBuilder& mb, glm::vec3 from, glm::vec3 to, co
 	float cam_dist = glm::length(to_cam);
 	if (cam_dist < 1e-4f)
 		return;
-	// Isotropic pixels-per-world at this distance: proj[1][1] = cot(fovy/2), and for square pixels the
-	// x density (proj[0][0]*w/2) equals the y density (proj[1][1]*h/2), so one factor covers both.
-	const float px_per_world = (view.proj[1][1] * 0.5f * (float)view.height) / cam_dist;
+	// Isotropic pixels-per-world: proj[1][1] = cot(fovy/2) in perspective, or 2/ortho_height in ortho,
+	// and for square pixels the x density (proj[0][0]*w/2) equals the y density (proj[1][1]*h/2), so
+	// one factor covers both. Perspective divides by eye distance (screen size shrinks with depth);
+	// ortho does not -- the projection matrix already maps world units to screen space independent of
+	// depth, so dividing by cam_dist there would make the ribbon shrink/balloon with camera distance
+	// instead of staying a constant on-screen thickness.
+	const float px_per_world = view.is_ortho
+		? (view.proj[1][1] * 0.5f * (float)view.height)
+		: (view.proj[1][1] * 0.5f * (float)view.height) / cam_dist;
 	if (px_per_world < 1e-6f)
 		return;
 	glm::vec3 side = glm::cross(along, to_cam);
