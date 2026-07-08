@@ -81,11 +81,12 @@ void InstantiatePrefabCommand::execute() {
 				  "Prefab-in-prefab not supported: flattening '%s' into separate entities of the outer prefab\n",
 				  prefab_path.c_str());
 
-		std::string prefab_text = PrefabFile::load_text(prefab_path);
-		if (prefab_text.empty()) {
+		auto prefab_asset = g_assets.find<PrefabAsset>(prefab_path);
+		if (!prefab_asset) {
 			sys_print(Warning, "Failed to load prefab for flatten: %s\n", prefab_path.c_str());
 			return;
 		}
+		const std::string& prefab_text = prefab_asset->get_text();
 
 		try {
 			handles = flatten_prefab_into_scene(ed_doc, prefab_text, transform);
@@ -102,7 +103,8 @@ void InstantiatePrefabCommand::execute() {
 	// prefab-only feature), so warn the user that the hierarchy is only live and would be lost if
 	// the instance were unpacked into the level.
 	{
-		const std::string prefab_text = PrefabFile::load_text(prefab_path);
+		auto prefab_asset = g_assets.find<PrefabAsset>(prefab_path);
+		const std::string prefab_text = prefab_asset ? prefab_asset->get_text() : std::string();
 		if (prefab_text.find("\"__parent\"") != std::string::npos) {
 			sys_print(Warning,
 					  "Instantiating prefab '%s' which contains entity parenting: parent links live only "
@@ -166,15 +168,15 @@ void UnpackPrefabCommand::execute() {
 			original_entities.push_back(std::make_unique<SerializedSceneFile>(serialized));
 		}
 
-		const std::string prefab_text = PrefabFile::load_text(path);
-		if (prefab_text.empty()) {
+		auto prefab_asset = g_assets.find<PrefabAsset>(path);
+		if (!prefab_asset) {
 			sys_print(Warning, "Failed to load prefab for unpack: %s\n", path.c_str());
 			original_entities.pop_back();
 			continue;
 		}
 
 		try {
-			auto unpacked = flatten_prefab_into_scene(ed_doc, prefab_text, transform);
+			auto unpacked = flatten_prefab_into_scene(ed_doc, prefab_asset->get_text(), transform);
 			all_unpacked.insert(all_unpacked.end(), unpacked.begin(), unpacked.end());
 			unpacked_entities_per_target.push_back(std::move(unpacked));
 		}
@@ -249,6 +251,11 @@ void MakePrefabFromSelectionCommand::execute() {
 		if (!PrefabFile::save_text(save_path, serialized.text)) {
 			sys_print(Warning, "Failed to save prefab to: %s\n", save_path.c_str());
 			prefab_text = nullptr;
+		}
+		else if (g_assets.is_asset_loaded(save_path)) {
+			// Keep the cached PrefabAsset in sync with what was just written to disk, rather
+			// than waiting on the async file watcher to notice the change.
+			g_assets.reload<PrefabAsset>(g_assets.find<PrefabAsset>(save_path));
 		}
 	}
 	catch (const std::exception& e) {
@@ -330,6 +337,11 @@ void MakePrefabAndReplaceCommand::execute() {
 				entities[i]->set_ws_position(original_positions[i]);
 			}
 			return;
+		}
+		else if (g_assets.is_asset_loaded(prefab_path)) {
+			// Keep the cached PrefabAsset in sync with what was just written to disk (this
+			// path may overwrite an already-loaded prefab, unlike MakePrefabFromSelection).
+			g_assets.reload<PrefabAsset>(g_assets.find<PrefabAsset>(prefab_path));
 		}
 	}
 	catch (const std::exception& e) {

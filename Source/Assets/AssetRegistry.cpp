@@ -207,6 +207,7 @@ void AssetRegistrySystem::init() {
 #include "Scripting/ScriptManager.h"
 #include "Game/Particles/ParticleAsset.h"
 #include "Render/PostProcessSettings.h"
+#include "Game/Prefab.h"
 #ifdef EDITOR_BUILD
 #include "Assets/AssetBrowser.h"
 #endif
@@ -343,6 +344,11 @@ void AssetRegistrySystem::update() {
 			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {
 				auto asset = g_assets.find<PostProcessSettings>(rel_path);
 				g_assets.reload<PostProcessSettings>(asset);
+			}
+		} else if (ext == "tprefab") {
+			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {
+				auto asset = g_assets.find<PrefabAsset>(rel_path);
+				g_assets.reload<PrefabAsset>(asset);
 			}
 		}
 

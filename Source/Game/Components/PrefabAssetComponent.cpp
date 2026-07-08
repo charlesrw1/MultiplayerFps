@@ -5,6 +5,11 @@
 #include "Assets/AssetDatabase.h"
 #include "Framework/Util.h"
 
+void PrefabAssetComponent::refresh_after_prefab_reload(PrefabAsset* reloaded) {
+	if (reloaded && reloaded->get_name() == prefab_path)
+		update_path(prefab_path);
+}
+
 void PrefabAssetComponent::start() {
 
 	if (prefab_path.empty()) {
@@ -15,10 +20,16 @@ void PrefabAssetComponent::start() {
 }
 
 void PrefabAssetComponent::stop() {
-	// Destroy all spawned entities
+	// Destroy the entities this component spawned -- but only the ones still actually
+	// parented to us. Callers like the prefab-in-prefab auto-flatten (EditorDocLocal.cpp)
+	// deliberately reparent our children elsewhere *before* destroying the owner entity, so
+	// they survive independently; destroying them here regardless of current parent would
+	// undo that promotion out from under the caller.
+	Entity* owner = get_owner();
 	for (auto& entity_ptr : spawned_entities) {
 		if (auto entity = entity_ptr.get()) {
-			entity->destroy();
+			if (entity->get_parent() == owner)
+				entity->destroy();
 		}
 	}
 	spawned_entities.clear();
@@ -28,12 +39,13 @@ void PrefabAssetComponent::update_path(std::string new_path) {
 	PrefabAssetComponent::stop();
 	this->prefab_path = new_path;
 
-	// Load prefab file
-	std::string prefab_text = PrefabFile::load_text(prefab_path);
-	if (prefab_text.empty()) {
+	// Load prefab text via the cached, hot-reloadable PrefabAsset (not a raw disk read).
+	auto asset = g_assets.find<PrefabAsset>(prefab_path);
+	if (!asset) {
 		sys_print(Warning, "PrefabAssetComponent: failed to load prefab: %s\n", prefab_path.c_str());
 		return;
 	}
+	const std::string& prefab_text = asset->get_text();
 
 	// Deserialize entities from the prefab file
 	// keepid=false: assign new instance IDs (this is runtime instantiation, not persistence)
@@ -54,8 +66,10 @@ void PrefabAssetComponent::update_path(std::string new_path) {
 				// Only the prefab's root entities attach to the owner. Entities that already have a
 				// parent were linked to another entity *inside* the prefab by unserialize_from_text;
 				// reparenting them here would flatten (and thus break) the prefab's own hierarchy.
-				if (!entity->get_parent())
+				if (!entity->get_parent()) {
 					entity->parent_to(owner);
+					spawned_entities.push_back(entity);
+				}
 				entity->dont_serialize_or_edit = true;
 			}
 		}

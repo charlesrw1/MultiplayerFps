@@ -29,6 +29,7 @@
 #include "Framework/StringUtils.h"
 #include "Game/EditorAddMenu.h"
 #include "Game/Components/PrefabAssetComponent.h"
+#include "Game/Prefab.h"
 #include "Debug.h"
 #include <glm/gtc/type_ptr.hpp>
 #include <algorithm>
@@ -591,6 +592,8 @@ void EditorDoc::hook_scene_viewport_draw() {
 				} else if (asset_class_type->is_a(Model::StaticType)) {
 					Model* mod = Model::load(resource->filename);
 					drag_drop_preview->set_preview_model(mod, drop_transform);
+				} else if (asset_class_type->is_a(PrefabAsset::StaticType)) {
+					drag_drop_preview->set_preview_prefab(resource->filename, drop_transform);
 				}
 			}
 

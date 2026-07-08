@@ -15,6 +15,7 @@ public:
 struct PropertyInfoList;
 class Entity;
 class Model;
+class PrefabAsset;
 class LuaClassTypeInfo;
 class Component : public BaseUpdater
 {
@@ -58,6 +59,11 @@ public:
 	// the named model is hot-reloaded.  Implementations must NOT subscribe to a
 	// delegate — the scene walk drives the call.
 	virtual void refresh_after_model_reload(Model* reloaded) {}
+
+	// Invoked by the scene walk in PrefabAsset::post_load (reload path). Default no-op.
+	// Override if this component instantiates children from a prefab path and needs to
+	// respawn them when the prefab's source data changes. See PrefabAssetComponent.
+	virtual void refresh_after_prefab_reload(PrefabAsset* reloaded) {}
 	REFLECT(no_nil)
 	Entity* get_owner() const { return entity_owner; }
 	const glm::mat4& get_ws_transform();
