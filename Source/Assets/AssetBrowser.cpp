@@ -3,6 +3,7 @@
 #include "Assets/AssetInspectorPane.h"
 #include "AssetTools/AssetDiagnostics.h"
 #include "AssetTools/AssetOps.h"
+#include "Assets/AssetReferenceViewer.h"
 
 #include "imgui.h"
 #include <algorithm>
@@ -922,6 +923,10 @@ static void draw_asset_action_menu_items(AssetBrowser* b, const AssetOnDisk& ass
 	if (ImGui::MenuItem("Select Entities Using This Asset")) {
 		if (IEditorTool* tool = eng->get_tool())
 			tool->select_entities_using_asset(asset.filename);
+	}
+
+	if (ImGui::MenuItem("View References...")) {
+		AssetReferenceViewer::get().open_for(asset.filename);
 	}
 }
 

@@ -45,6 +45,12 @@
     </ClCompile>
     <ClCompile Include="Assets\AssetBrowser.cpp" />
     <ClCompile Include="Assets\AssetDatabase.cpp" />
+    <ClCompile Include="Assets\AssetReferenceQuery.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Assets\AssetReferenceViewer.cpp" />
     <ClCompile Include="Assets\AssetRegistry.cpp">
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
@@ -342,6 +348,8 @@
     <ClInclude Include="Assets\AssetBrowser.h" />
     <ClInclude Include="Assets\AssetInspectorPane.h" />
     <ClInclude Include="Assets\AssetSizeViewer.h" />
+    <ClInclude Include="Assets\AssetReferenceQuery.h" />
+    <ClInclude Include="Assets\AssetReferenceViewer.h" />
     <ClInclude Include="Assets\AssetBundle.h" />
     <ClInclude Include="Assets\AssetDatabase.h" />
     <ClInclude Include="Assets\AssetRegistry.h" />

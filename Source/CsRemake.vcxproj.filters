@@ -156,6 +156,12 @@
     <ClCompile Include="Assets\AssetBrowser.cpp">
       <Filter>Source\Assets</Filter>
     </ClCompile>
+    <ClCompile Include="Assets\AssetReferenceQuery.cpp">
+      <Filter>Source\Assets</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\AssetReferenceViewer.cpp">
+      <Filter>Source\Assets</Filter>
+    </ClCompile>
     <ClCompile Include="Assets\AssetDatabase.cpp">
       <Filter>Source\Assets</Filter>
     </ClCompile>
@@ -984,6 +990,12 @@
       <Filter>Source\Assets</Filter>
     </ClInclude>
     <ClInclude Include="Assets\AssetSizeViewer.h">
+      <Filter>Source\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\AssetReferenceQuery.h">
+      <Filter>Source\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="Assets\AssetReferenceViewer.h">
       <Filter>Source\Assets</Filter>
     </ClInclude>
     <ClInclude Include="Assets\FileWatcher.h">

@@ -73,6 +73,7 @@ public:
 	AssetFilesystemNode* get_root_files() const { return root.get(); }
 	const std::vector<AssetFilesystemNode*>& get_linear_list() const { return linear_list; }
 	const ClassTypeInfo* find_asset_type_for_ext(const std::string& ext);
+	const AssetMetadata* find_metadata_for_ext(const std::string& ext) const;
 private:
 	uptr<ConsoleCmdGroup> consoleCommands;
 	void reindex_all_assets();

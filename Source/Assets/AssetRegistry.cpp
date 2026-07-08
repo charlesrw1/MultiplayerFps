@@ -49,90 +49,33 @@ void SYS_LS_CMD(const Cmd_Args& args) {
 #include "Render/Texture.h"
 #include "Render/Model.h"
 #include "Sound/SoundPublic.h"
-static std::string get_valid_asset_types_glob() {
-	std::string out;
+#include "Assets/AssetReferenceQuery.h"
 
-	out += " --glob \"*.mis\" "; // model import settings
-	out += " --glob \"*.tis\" "; // texture import settings
-
-	out += " --glob \"*.tmap\" ";
-	out += " --glob \"*.lua\" ";
-	out += " --glob \"*.mm\" ";
-	out += " --glob \"*.mi\" ";
-
-	std::vector<const char*> exts = {"tmap", "lua", "mm", "mi"};
-
-	auto& types = AssetRegistrySystem::get().get_types();
-	for (auto& ext : exts) {
-		out += " --glob \"*." + std::string(ext) + "\" ";
-	}
-	return out;
-}
-static std::string get_asset_references_pattern() {
-	std::string out;
-	out += ".mis\\b|.tis\\b";
-	auto& types = AssetRegistrySystem::get().get_types();
-	std::vector<const char*> exts = {"tmap", "lua", "mm", "mi", "cmdl", "dds", "wav"};
-	for (auto& ext : exts) {
-		out += "|." + std::string(ext) + "\\b";
-	}
-	return out;
+static void print_ref_hits(const std::vector<AssetRefHit>& hits) {
+	for (auto& hit : hits)
+		sys_print(Info, "%-50s %-20s x%d\n", hit.game_path.c_str(),
+			hit.type ? hit.type->get_type_name().c_str() : "?", hit.count);
+	sys_print(Info, "%zu reference(s)\n", hits.size());
 }
 
 // DECLARE_ENGINE_CMD_CAT("sys.", print_refs)
+// Prints what references <asset_path> (backward references).
 void SYS_PRINT_REFS_CMD(const Cmd_Args& args) {
 	if (args.size() != 2) {
 		sys_print(Error, "usage: sys.print_refs <asset_path>\n");
 		return;
 	}
-
-	std::string parentDir = FileSys::get_full_path_from_game_path(args.at(1));
-	auto findSlash = parentDir.rfind('/');
-	if (findSlash != std::string::npos)
-		parentDir = parentDir.substr(0, findSlash + 1);
-
-	const std::string rg = "./x64/Debug/rg.exe ";
-	std::string commandLine = rg + '\'' + std::string(args.at(1)) + "\' " + std::string(FileSys::get_game_path()) +
-							  "/ " + get_valid_asset_types_glob();
-
-	STARTUPINFOA si = {};
-	PROCESS_INFORMATION out = {};
-	commandLine = "powershell.exe -Command \"" + commandLine + "\"";
-	// commandLine = "dir\n";
-	sys_print(Info, "executing search: %s\n", commandLine.c_str());
-	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &out)) {
-		sys_print(Error, "couldn't create process\n");
-		return;
-	}
-	WaitForSingleObject(out.hProcess, INFINITE);
-	CloseHandle(out.hProcess);
-	CloseHandle(out.hThread);
+	print_ref_hits(AssetReferenceQuery::find_backward_references(args.at(1)));
 }
 
 // DECLARE_ENGINE_CMD_CAT("sys.", print_deps)
+// Prints what <asset_path> itself references (forward references).
 void SYS_PRINT_DEPS_CMD(const Cmd_Args& args) {
 	if (args.size() != 2) {
 		sys_print(Error, "usage: sys.print_deps <asset_path>\n");
 		return;
 	}
-
-	std::string full_path = FileSys::get_full_path_from_game_path(args.at(1));
-
-	const std::string rg = "./x64/Debug/rg.exe ";
-	std::string commandLine = rg + "\'" + get_asset_references_pattern() + "\' " + full_path;
-
-	STARTUPINFOA si = {};
-	PROCESS_INFORMATION out = {};
-	commandLine = "powershell.exe -Command \"" + commandLine + "\"";
-	// commandLine = "dir\n";
-	sys_print(Info, "executing search: %s\n", commandLine.c_str());
-	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, 0, nullptr, nullptr, &si, &out)) {
-		sys_print(Error, "couldn't create process\n");
-		return;
-	}
-	WaitForSingleObject(out.hProcess, INFINITE);
-	CloseHandle(out.hProcess);
-	CloseHandle(out.hThread);
+	print_ref_hits(AssetReferenceQuery::find_forward_references(args.at(1)));
 }
 
 AssetRegistrySystem& AssetRegistrySystem::get() {
@@ -577,6 +520,15 @@ const ClassTypeInfo* AssetRegistrySystem::find_asset_type_for_ext(const std::str
 		for (auto& ext_ : type->extensions)
 			if (ext_ == ext)
 				return type->get_asset_class_type();
+	}
+	return nullptr;
+}
+
+const AssetMetadata* AssetRegistrySystem::find_metadata_for_ext(const std::string& ext) const {
+	for (auto& type : all_assettypes) {
+		for (auto& ext_ : type->extensions)
+			if (ext_ == ext)
+				return type.get();
 	}
 	return nullptr;
 }

@@ -10,6 +10,7 @@
 #include "Assets/AssetBrowser.h"
 #include "Assets/AssetSizeViewer.h"
 #include "AssetTools/DiagnosticsWindow.h"
+#include "Assets/AssetReferenceViewer.h"
 #include "GameEnginePublic.h"
 #include "Render/DrawPublic.h"
 #include "Assets/AssetDatabase.h"
@@ -83,6 +84,7 @@ void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
 		AssetBrowser::inst->imgui_draw_inspector();
 		AssetSizeViewer::get().imgui_draw();
 		DiagnosticsWindow::get().imgui_draw();
+		AssetReferenceViewer::get().imgui_draw();
 		//editorState->drdrawaw_tab_window();
 	}
 #endif
