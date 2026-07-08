@@ -27,6 +27,7 @@
 #include "Assets/AssetRegistry.h"
 #include "Assets/AssetBrowser.h"
 #include "Framework/MulticastDelegate.h"
+#include "Framework/MyImguiLib.h"
 #include "GameEnginePublic.h"
 #include "AssetCompile/Someutils.h"
 #include <algorithm>
@@ -353,6 +354,14 @@ private:
 	glm::mat4 scene_context_menu_transform = glm::mat4(1.f);
 	void check_scene_context_menu_input();
 	void draw_scene_context_menu();
+	// Set while the "Add" submenu (or one of its nested categories) is open, so the Blender-style
+	// auto-close-on-mouse-distance check in draw_scene_context_menu() doesn't close the root popup
+	// out from under it.
+	bool scene_ctx_menu_has_open_submenu = false;
+	// Path prompt for "Make Prefab Using..." in the scene context menu; drawn unconditionally each
+	// frame alongside draw_scene_context_menu() so it survives the right-click popup closing.
+	FolderNamePopup make_prefab_path_popup;
+	void select_entities_using_asset(const std::string& asset_gamepath) override;
 	// Draws the nested "Add" submenu tree built from EditorAddMenuRegistry entries (Game/EditorAddMenu.h).
 	void draw_add_menu_tree(const std::vector<EditorAddMenuEntry>& entries, const glm::mat4& transform);
 	FnFactory<IPropertyEditor> grid_factory;

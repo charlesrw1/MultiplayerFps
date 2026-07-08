@@ -6,6 +6,7 @@
 #include "AssetCompile/ModelAsset2.h"
 #include "Framework/Util.h"
 #include "Render/MaterialLocal.h"
+#include "Render/Model.h"
 #include "Assets/AssetDatabase.h"
 
 // @docs [[asset_tools#templates]]
@@ -193,6 +194,39 @@ std::optional<std::string> create_empty_prefab(const std::string& dir, const std
         return std::nullopt;
 
     std::string text = "!json\n{\"__version\":1,\"objs\":[]}\n";
+
+    auto f = FileSys::open_write_game(path);
+    if (!f) return std::nullopt;
+    f->write(text.data(), text.size());
+    f->close();
+
+    return path;
+}
+
+std::optional<std::string> create_prefab_for_model(const std::string& dir, const std::string& name,
+    const std::string& model_gamepath) {
+    auto base = strip_name(name);
+    std::string path = dir.empty() ? (base + ".tprefab") : (dir + "/" + base + ".tprefab");
+
+    if (FileSys::does_file_exist(path.c_str(), FileSys::GAME_DIR))
+        return std::nullopt;
+
+    // Offset the mesh within the prefab so the model's bounding box sits x/z-centered with its
+    // bottom on the ground plane (y=0) -- the prefab's own local origin, not the model's raw pivot,
+    // becomes the "stand on the ground" point. Falls back to no offset (identity) if the model can't
+    // be loaded yet (e.g. not imported).
+    std::string position_field;
+    auto model = g_assets.find_sync_sptr<Model>(model_gamepath);
+    if (model) {
+        const Bounds b = model->get_bounds();
+        const glm::vec3 center = b.get_center();
+        const glm::vec3 offset = glm::vec3(-center.x, -b.bmin.y, -center.z);
+        position_field = ",\"position\":[" + std::to_string(offset.x) + "," + std::to_string(offset.y) + ","
+            + std::to_string(offset.z) + "]";
+    }
+
+    std::string text = "!json\n{\"__version\":1,\"objs\":[{\"__typename\":\"MeshComponent\",\"model\":\""
+        + model_gamepath + "\"" + position_field + "}]}\n";
 
     auto f = FileSys::open_write_game(path);
     if (!f) return std::nullopt;

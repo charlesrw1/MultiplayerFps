@@ -619,6 +619,7 @@ void EditorDoc::hook_scene_viewport_draw() {
 	manipulate->update(inputs);
 
 	draw_scene_context_menu();
+	make_prefab_path_popup.draw();
 }
 
 // Builds a menu tree out of the flat, '/'-delimited EditorAddMenuRegistry entries (see
@@ -686,8 +687,46 @@ void EditorDoc::draw_scene_context_menu() {
 		ImGui::OpenPopup("##scene_ctx_menu");
 		want_open_scene_context_menu = false;
 	}
-	if (!ImGui::BeginPopup("##scene_ctx_menu"))
+	if (!ImGui::BeginPopup("##scene_ctx_menu")) {
+		scene_ctx_menu_has_open_submenu = false;
 		return;
+	}
+
+	// -- Blender-style auto-close: if the mouse has wandered far enough outside the popup's own
+	// rect, close it -- unless a submenu (e.g. "Add") is open, since navigating into one can put the
+	// mouse well outside the root popup's rect. scene_ctx_menu_has_open_submenu reflects last frame's
+	// submenu state (set below, near the "Add" BeginMenu); a one-frame lag here is imperceptible.
+	{
+		const float close_margin_px = 70.0f;
+		const ImVec2 wpos = ImGui::GetWindowPos();
+		const ImVec2 wsize = ImGui::GetWindowSize();
+		const ImVec2 mouse = ImGui::GetMousePos();
+		const bool outside = mouse.x < wpos.x - close_margin_px || mouse.x > wpos.x + wsize.x + close_margin_px ||
+							  mouse.y < wpos.y - close_margin_px || mouse.y > wpos.y + wsize.y + close_margin_px;
+		if (outside && !scene_ctx_menu_has_open_submenu) {
+			ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+			return;
+		}
+	}
+	scene_ctx_menu_has_open_submenu = false;
+
+	// Single selected prefab instance, if any -- used both for the header below and "Edit Prefab".
+	PrefabAssetComponent* single_selected_prefab = nullptr;
+	if (selection_state->has_only_one_selected()) {
+		Entity* e = selection_state->get_only_one_selected().get();
+		if (e)
+			single_selected_prefab = e->get_component<PrefabAssetComponent>();
+	}
+
+	// -- Header: the prefab's name, when right-clicking a single prefab instance.
+	if (single_selected_prefab) {
+		const std::string& path = single_selected_prefab->prefab_path;
+		const auto slash = path.find_last_of('/');
+		const std::string name = (slash == std::string::npos) ? path : path.substr(slash + 1);
+		ImGui::TextDisabled("%s", name.c_str());
+		ImGui::Separator();
+	}
 
 	// -- Parenting: same actions as the Ctrl+P / Alt+P popups (draw_parenting_popups), parenting is
 	// prefab-only.
@@ -728,12 +767,35 @@ void EditorDoc::draw_scene_context_menu() {
 			command_mgr->add_command(new UnpackPrefabCommand(*this, std::move(prefab_instances)));
 	}
 
+	// -- Edit Prefab: opens the selected prefab instance's .tprefab in its own editor tab, same as
+	// double-clicking it in the asset browser. Only offered for a single selected prefab instance.
+	if (single_selected_prefab) {
+		if (ImGui::MenuItem("Edit Prefab"))
+			Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND,
+									   ("open-editor " + single_selected_prefab->prefab_path).c_str());
+	}
+
+	// -- Make Prefab Using...: inverse of Unpack Prefab. Serializes the selection into a new
+	// .tprefab and replaces it in-place with a single PrefabAssetComponent instance (undoable).
+	// Not valid while already editing a prefab (would nest a prefab reference inside itself).
+	{
+		auto selected = selection_state->get_selection_as_vector();
+		if (ImGui::MenuItem("Make Prefab Using...", nullptr, false, !selected.empty() && !is_editing_prefab())) {
+			std::string folder = AssetBrowser::inst ? AssetBrowser::inst->selected_folder : std::string();
+			make_prefab_path_popup.open("Make Prefab Using...", folder, "new_prefab", ".tprefab",
+				[this, selected](const std::string& path) {
+					command_mgr->add_command(new MakePrefabAndReplaceCommand(*this, selected, path));
+				});
+		}
+	}
+
 	ImGui::Separator();
 
 	// -- Add...: common built-in component types, plus any game-specific classes registered via
 	// REGISTER_EDITOR_ADD_MENU_ENTRY (Game/EditorAddMenu.h), which may nest into submenus
 	// (e.g. "NPCs/Enemy").
 	if (ImGui::BeginMenu("Add")) {
+		scene_ctx_menu_has_open_submenu = true;
 		auto spawn_component = [&](const char* classname) {
 			command_mgr->add_command(
 				new CreateCppClassCommand(*this, classname, scene_context_menu_transform, EntityPtr(), true));
@@ -760,6 +822,63 @@ void EditorDoc::draw_scene_context_menu() {
 }
 
 // ---------------------------------------------------------------------------
+// Asset usage search
+// ---------------------------------------------------------------------------
+
+// Recurses into a component's reflected properties looking for an AssetPtr field whose asset's
+// gamepath matches `target` exactly. Also recurses into List-typed sub-properties, since a
+// component may hold an array of asset refs. Same walk as
+// ObjectOutlinerFilter.cpp's check_props_for_assetptr_or_entityptr, but an exact-match query
+// instead of a substring search.
+static bool component_references_asset(void* inst, const PropertyInfoList* list, const std::string& target) {
+	if (!list)
+		return false;
+	for (int i = 0; i < list->count; i++) {
+		auto& prop = list->list[i];
+		if (prop.type == core_type_id::AssetPtr) {
+			IAsset** asset = (IAsset**)prop.get_ptr(inst);
+			if (*asset && (*asset)->get_name() == target)
+				return true;
+		} else if (prop.type == core_type_id::List) {
+			auto listptr = prop.get_ptr(inst);
+			auto size = prop.list_ptr->get_size(listptr);
+			for (int j = 0; j < size; j++) {
+				auto elem_ptr = prop.list_ptr->get_index(listptr, j);
+				if (component_references_asset(elem_ptr, prop.list_ptr->props_in_list, target))
+					return true;
+			}
+		}
+	}
+	return false;
+}
+
+void EditorDoc::select_entities_using_asset(const std::string& asset_gamepath) {
+	std::vector<EntityPtr> matches;
+	auto& objs = eng->get_level()->get_all_objects();
+	for (auto obj : objs) {
+		Entity* e = obj->cast_to<Entity>();
+		if (!e)
+			continue;
+		bool found = false;
+		for (auto& c : e->get_components()) {
+			for (auto type = &c->get_type(); type && !found; type = type->super_typeinfo)
+				found = component_references_asset(c, type->props, asset_gamepath);
+			if (found)
+				break;
+		}
+		if (found)
+			matches.push_back(e->get_self_ptr());
+	}
+
+	if (matches.empty()) {
+		sys_print(Info, "No entities in the open level reference '%s'\n", asset_gamepath.c_str());
+		return;
+	}
+	selection_state->clear_all_selected();
+	selection_state->add_entities_to_selection(matches);
+}
+
+// ---------------------------------------------------------------------------
 // Camera focus on selection
 // ---------------------------------------------------------------------------
 
@@ -772,9 +891,12 @@ void EditorDoc::set_camera_target_to_sel() {
 			auto mesh = ptr->get_component<MeshComponent>();
 			auto pos = ptr->get_ws_position();
 			if (mesh && mesh->get_model()) {
-				radius = glm::max(mesh->get_model()->get_bounding_sphere().w, 0.5f);
-				auto sphere = glm::vec3(mesh->get_model()->get_bounding_sphere());
-				pos = glm::vec3(ptr->get_ws_transform() * glm::vec4(sphere, 1.0));
+				// Transform the model-space AABB by the full world transform (incl. scale) rather than
+				// scaling only the sphere center — a raw model-space radius under-/over-shoots on
+				// non-unit-scaled entities.
+				Bounds ws_bounds = transform_bounds(ptr->get_ws_transform(), mesh->get_model()->get_bounds());
+				pos = ws_bounds.get_center();
+				radius = glm::max(glm::length(ws_bounds.bmax - ws_bounds.bmin) * 0.5f, 0.5f);
 			}
 
 			ed_cam.set_orbit_target(pos, radius);

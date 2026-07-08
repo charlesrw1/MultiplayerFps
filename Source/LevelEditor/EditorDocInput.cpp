@@ -137,7 +137,10 @@ void EditorDoc::check_scene_context_menu_input() {
 	// Button index 2 is right mouse in this codebase's convention (0=left, 1=middle, 2=right; see
 	// Input::tick()'s SDL_BUTTON_MASK(i+1) loop and fpsDebugCamera.cpp's `rmb = is_mouse_down(2)`).
 	if (Input::was_mouse_pressed(2)) {
-		rmb_press_tracking = UiSystem::inst->is_vp_hovered();
+		// If the manipulate tool just used this same right-click to cancel a forced (G/R/S) transform
+		// and reset it back (Blender-style), don't also treat it as a context-menu click.
+		const bool used_by_manipulate = manipulate && manipulate->consume_right_click_cancel_flag();
+		rmb_press_tracking = !used_by_manipulate && UiSystem::inst->is_vp_hovered();
 		rmb_press_time_ms = SDL_GetTicks();
 		rmb_drag_accum_px = glm::ivec2(0, 0);
 	}

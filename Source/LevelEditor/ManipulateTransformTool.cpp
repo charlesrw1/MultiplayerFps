@@ -310,6 +310,7 @@ void ManipulateTransformTool::on_focused_tick(EditorInputs& inputs) {
 			set_force_gizmo_on(false);
 			inputs.set_focus(nullptr);
 			inputs.eat_mouse_click();
+			right_click_consumed_by_cancel = true;
 		}
 	}
 	if (Input::was_mouse_pressed(0)) {

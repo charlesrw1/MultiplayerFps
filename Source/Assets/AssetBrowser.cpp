@@ -221,6 +221,10 @@ static void draw_diag_tooltip(const std::string& gamepath) {
 }
 
 static void draw_create_new_menu_items(AssetBrowser* b, const std::string& folder);
+// Duplicate / Make Prefab Using... / Select Entities Using This Asset — shared by the tree-view and
+// grid-view right-click popups. Implemented further down, after the Files.h/AssetTemplates.h
+// includes it needs.
+static void draw_asset_action_menu_items(AssetBrowser* b, const AssetOnDisk& asset);
 
 static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesystemNode* node, string parent_path) {
 	const float folder_indent = 20.0;
@@ -274,6 +278,8 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 				ImGui::Separator();
 				b->selected_resource.type->draw_browser_context_menu(b->selected_resource.filename);
 			}
+			ImGui::Separator();
+			draw_asset_action_menu_items(b, b->selected_resource);
 			ImGui::Separator();
 			draw_create_new_menu_items(b, b->selected_folder);
 			ImGui::EndPopup();
@@ -654,6 +660,8 @@ void AssetBrowser::draw_browser_grid() {
 				selected_resource.type->draw_browser_context_menu(selected_resource.filename);
 			}
 			ImGui::Separator();
+			draw_asset_action_menu_items(this, selected_resource);
+			ImGui::Separator();
 			draw_create_new_menu_items(this, selected_folder);
 			ImGui::EndPopup();
 		}
@@ -858,11 +866,64 @@ void AssetBrowser::imgui_draw() {
 	ImGui::EndChild();
 
 	draw_create_asset_popup();
+	path_popup.draw();
 
 	ImGui::End();
 }
 
 #include "AssetTools/AssetTemplates.h"
+#include "IEditorTool.h"
+
+// Splits a gamepath "dir/sub/name.ext" into dir ("dir/sub", may be empty), base name ("name"), and
+// extension (".ext", may be empty).
+static void split_gamepath(const std::string& gamepath, std::string& dir, std::string& base, std::string& ext) {
+	auto slash = gamepath.find_last_of('/');
+	dir = (slash == std::string::npos) ? "" : gamepath.substr(0, slash);
+	std::string filename = (slash == std::string::npos) ? gamepath : gamepath.substr(slash + 1);
+	auto dot = filename.rfind('.');
+	base = (dot == std::string::npos) ? filename : filename.substr(0, dot);
+	ext = (dot == std::string::npos) ? "" : filename.substr(dot);
+}
+
+static void draw_asset_action_menu_items(AssetBrowser* b, const AssetOnDisk& asset) {
+	if (!asset.type)
+		return;
+	const std::string type_name = asset.type->get_type_name();
+
+	if (type_name == "Map" || type_name == "Prefab") {
+		if (ImGui::MenuItem("Duplicate...")) {
+			std::string src = asset.filename;
+			std::string dir, base, ext;
+			split_gamepath(src, dir, base, ext);
+			b->path_popup.open("Duplicate Asset", dir, base + "_copy", ext, [src](const std::string& dst) {
+				if (!FileSys::copy_file(src, dst, FileSys::GAME_DIR))
+					sys_print(Warning, "Duplicate failed (destination may already exist): %s -> %s\n", src.c_str(), dst.c_str());
+			});
+		}
+	}
+
+	if (type_name == "Model") {
+		if (ImGui::MenuItem("Make Prefab Using...")) {
+			std::string model_path = asset.filename;
+			std::string dir, base, ext;
+			split_gamepath(model_path, dir, base, ext);
+			b->path_popup.open("Make Prefab Using...", dir, base, ".tprefab", [model_path](const std::string& dst) {
+				std::string dstdir, dstbase, dstext;
+				split_gamepath(dst, dstdir, dstbase, dstext);
+				auto result = AssetTemplates::create_prefab_for_model(dstdir, dstbase, model_path);
+				if (result)
+					sys_print(Info, "Created prefab: %s\n", result->c_str());
+				else
+					sys_print(Warning, "Failed to create prefab (already exists or write error): %s\n", dst.c_str());
+			});
+		}
+	}
+
+	if (ImGui::MenuItem("Select Entities Using This Asset")) {
+		if (IEditorTool* tool = eng->get_tool())
+			tool->select_entities_using_asset(asset.filename);
+	}
+}
 
 void AssetBrowser::draw_create_asset_popup() {
 	if (create_asset_type == CreateAssetType::None)

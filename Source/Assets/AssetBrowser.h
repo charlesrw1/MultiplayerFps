@@ -4,6 +4,7 @@
 #include "Render/Texture.h"
 
 #include "Framework/ConsoleCmdGroup.h"
+#include "Framework/MyImguiLib.h"
 
 class AssetInspectorPane;
 
@@ -112,6 +113,10 @@ public:
 	std::string create_mi_master_path;
 	std::string create_folder_override;
 	void draw_create_asset_popup();
+
+	// Shared path-prompt for the right-click context menu's Duplicate / Make Prefab Using... /
+	// actions. Drawn unconditionally once per frame (see imgui_draw()).
+	FolderNamePopup path_popup;
 
 	// Opens a native file picker rooted at the project data dir, filtered to .glb,
 	// then writes a .mis sidecar for the picked model so it shows up as an importable asset.

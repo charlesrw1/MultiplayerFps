@@ -21,6 +21,10 @@ namespace AssetTemplates {
 
     std::optional<std::string> create_empty_prefab(const std::string& dir, const std::string& name);
 
+    // Create a .tprefab in dir containing a single MeshComponent entity referencing model_gamepath.
+    std::optional<std::string> create_prefab_for_model(const std::string& dir, const std::string& name,
+        const std::string& model_gamepath);
+
     std::optional<std::string> create_mi_from_master(const std::string& dir,
         const std::string& name, const std::string& master_mm_path);
 

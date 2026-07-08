@@ -47,6 +47,11 @@ public:
 	void clear_editor_changes() { has_editor_changes = false; }
 	void set_has_editor_changes();
 
+	// Selects every entity in this tool's open document that references asset_gamepath (any
+	// AssetPtr-typed component property). No-op for tools without a selectable entity list.
+	// Used by the asset browser's "Select Entities Using This Asset" context-menu action.
+	virtual void select_entities_using_asset(const std::string& asset_gamepath) {}
+
 protected:
 	// various hooks to add imgui calls
 	virtual void hook_menu_bar_file_menu() {}

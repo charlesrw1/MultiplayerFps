@@ -2,6 +2,55 @@
 #include "imgui_internal.h"
 #include "imgui.h"
 #include "MyImguiLib.h"
+#include <cstring>
+
+// Strips a trailing "name.ext" extension, if any, leaving just the base name.
+static std::string strip_ext(const std::string& name) {
+	auto dot = name.rfind('.');
+	return dot == std::string::npos ? name : name.substr(0, dot);
+}
+
+void FolderNamePopup::open(const std::string& title_, const std::string& folder_, const std::string& initial_name_no_ext,
+							const std::string& extension_, std::function<void(const std::string&)> on_confirm_) {
+	want_open = true;
+	title = title_;
+	folder = folder_;
+	extension = extension_;
+	on_confirm = std::move(on_confirm_);
+	std::string base = strip_ext(initial_name_no_ext);
+	strncpy(name_buf, base.c_str(), BUF_SIZE - 1);
+	name_buf[BUF_SIZE - 1] = '\0';
+}
+
+void FolderNamePopup::draw() {
+	if (want_open) {
+		ImGui::OpenPopup(title.c_str());
+		want_open = false;
+	}
+	if (!ImGui::BeginPopupModal(title.c_str(), nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		return;
+
+	ImGui::TextDisabled("Folder: %s", folder.empty() ? "(root)" : folder.c_str());
+	ImGui::Text("Name (no extension):");
+	bool enter_pressed = ImGui::InputText("##folder_name_popup", name_buf, BUF_SIZE, ImGuiInputTextFlags_EnterReturnsTrue);
+
+	ImGui::Separator();
+	bool do_confirm = enter_pressed || ImGui::Button("Confirm", ImVec2(120, 0));
+	ImGui::SameLine();
+	bool do_cancel = ImGui::Button("Cancel", ImVec2(120, 0));
+
+	if (do_confirm && name_buf[0] != '\0') {
+		std::string base = strip_ext(name_buf);
+		std::string full_path = (folder.empty() ? base : folder + "/" + base) + extension;
+		if (on_confirm)
+			on_confirm(full_path);
+		ImGui::CloseCurrentPopup();
+	} else if (do_cancel) {
+		ImGui::CloseCurrentPopup();
+	}
+
+	ImGui::EndPopup();
+}
 
 void MyImSeperator(float x1, float x2, float width) {
 	using namespace ImGui;

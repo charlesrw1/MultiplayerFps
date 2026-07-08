@@ -424,7 +424,11 @@ public:
 	std::vector<EntityPtr> selection;
 	std::unique_ptr<SerializedSceneFile> original_selection;
 	std::vector<EntityPtr> spawned_prefab_instances;
-	glm::vec3 bbox_center = glm::vec3(0.0f);
+	// World-space pivot the selection is re-centered around: bottom-center of the selection's true
+	// geometric bounding box (bbox x/z center, bbox min.y) rather than the origin centroid, so the
+	// prefab's local origin sits on the ground plane under the content, Blender-"snap cursor to
+	// selection, bottom"-style.
+	glm::vec3 pivot_ws = glm::vec3(0.0f);
 };
 
 #endif

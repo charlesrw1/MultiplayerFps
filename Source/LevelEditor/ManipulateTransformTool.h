@@ -51,8 +51,19 @@ public:
 	ImGuizmo::MODE get_mode() const { return mode; }
 	void update_pivot_and_cached();
 
+	// True for exactly the frame a right-click was used to cancel a forced (G/R/S hotkey) transform
+	// and reset it back to its pre-transform state (Blender-style). Read-and-clear: the scene
+	// context menu's still-click detector (EditorDoc::check_scene_context_menu_input) calls this to
+	// know it should not treat that same click as "open the context menu".
+	bool consume_right_click_cancel_flag() {
+		bool b = right_click_consumed_by_cancel;
+		right_click_consumed_by_cancel = false;
+		return b;
+	}
+
 private:
 	bool force_gizmo_on = false;
+	bool right_click_consumed_by_cancel = false;
 
 	void on_close();
 	void on_open();

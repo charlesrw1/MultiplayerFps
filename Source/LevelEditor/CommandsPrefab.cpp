@@ -6,11 +6,12 @@
 #include "LevelSerialization/SerializeNew.h"
 #include "Game/Prefab.h"
 #include "Game/Components/PrefabAssetComponent.h"
+#include "Game/Components/MeshComponent.h"
+#include "Render/Model.h"
 #include "Assets/AssetDatabase.h"
 #include "Level.h"
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
-#include <limits>
 
 static Entity* spawn_prefab(EditorDoc& ed_doc, const std::string& path, const glm::mat4 transform) {
 	ASSERT(!path.empty());
@@ -286,23 +287,27 @@ void MakePrefabAndReplaceCommand::execute() {
 		return;
 	}
 
-	// Calculate bounding box and center of all entities
-	glm::vec3 bbox_min(std::numeric_limits<float>::infinity());
-	glm::vec3 bbox_max(-std::numeric_limits<float>::infinity());
-
+	// Calculate the true geometric bounding box of the selection (mesh AABBs, transformed by each
+	// entity's world transform incl. scale; entities without a mesh contribute just their origin
+	// point) and pivot on its bottom-center -- x/z centered, y at the box's bottom -- so the prefab's
+	// local origin lands on the ground plane under the content instead of floating at the geometric
+	// center (matches the "F" focus-camera bounds fix; see EditorDoc::set_camera_target_to_sel).
+	Bounds selection_bounds;
 	for (auto entity : entities) {
-		glm::vec3 pos = entity->get_ws_position();
-		bbox_min = glm::min(bbox_min, pos);
-		bbox_max = glm::max(bbox_max, pos);
+		auto mesh = entity->get_component<MeshComponent>();
+		if (mesh && mesh->get_model())
+			selection_bounds = bounds_union(selection_bounds, transform_bounds(entity->get_ws_transform(), mesh->get_model()->get_bounds()));
+		else
+			selection_bounds = bounds_union(selection_bounds, entity->get_ws_position());
 	}
+	const glm::vec3 center = selection_bounds.get_center();
+	pivot_ws = glm::vec3(center.x, selection_bounds.bmin.y, center.z);
 
-	bbox_center = (bbox_min + bbox_max) * 0.5f;
-
-	// Store original positions and offset entities to center at origin
+	// Store original positions and offset entities so the pivot lands at the origin
 	std::vector<glm::vec3> original_positions;
 	for (auto entity : entities) {
 		original_positions.push_back(entity->get_ws_position());
-		glm::vec3 new_pos = entity->get_ws_position() - bbox_center;
+		glm::vec3 new_pos = entity->get_ws_position() - pivot_ws;
 		entity->set_ws_position(new_pos);
 	}
 
@@ -343,8 +348,8 @@ void MakePrefabAndReplaceCommand::execute() {
 		}
 	}
 
-	// Spawn prefab at the original center point (to restore the placement)
-	glm::mat4 spawn_transform = glm::translate(glm::mat4(1.0f), bbox_center);
+	// Spawn prefab at the pivot point (to restore the placement)
+	glm::mat4 spawn_transform = glm::translate(glm::mat4(1.0f), pivot_ws);
 	auto e = spawn_prefab(ed_doc, prefab_path, spawn_transform);
 	spawned_prefab_instances.push_back(e);
 
@@ -368,11 +373,11 @@ void MakePrefabAndReplaceCommand::undo() {
 				"undo_prefab_replace", original_selection->text, true);
 			ed_doc.insert_unserialized_into_scene(unserialized);
 
-			// Apply bbox_center offset to restored entities to place them back at original positions
+			// Apply the pivot offset to restored entities to place them back at original positions
 			for (auto obj : unserialized.all_obj_vec) {
 				if (auto entity = dynamic_cast<Entity*>(obj)) {
 					glm::vec3 current_pos = entity->get_ws_position();
-					entity->set_ws_position(current_pos + bbox_center);
+					entity->set_ws_position(current_pos + pivot_ws);
 				}
 			}
 		}
