@@ -83,7 +83,6 @@ public:
 	bool show_filter_type_options = true;
 	Mode mode = Mode::Grid;
 	char asset_name_filter[256];
-	bool filter_match_case = false;
 	uint32_t filter_type_mask = -1;
 
 	AssetOnDisk selected_resource;
@@ -96,6 +95,7 @@ public:
 	Texture* folder_open{};
 	Texture* folder_closed{};
 	Texture* import_model_icon{};
+	Texture* filter_icon{};
 
 	bool using_grid = false;
 

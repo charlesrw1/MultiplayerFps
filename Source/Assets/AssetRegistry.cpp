@@ -363,11 +363,11 @@ void AssetRegistrySystem::update() {
 			continue; // not a tracked asset type; skip tree update
 		}
 
-		// Check whether the file actually exists now to distinguish add vs delete
-		auto f = FileSys::open_read_game(aod.filename);
-		const bool exists = (f != nullptr);
-		if (f)
-			f->close();
+		// Check whether the file actually exists now to distinguish add vs delete.
+		// Use rel_path (the file the watcher actually saw), not aod.filename: for
+		// "mis" the two differ (aod.filename is the not-yet-compiled .cmdl), and
+		// checking the compiled output would wrongly prune a freshly-written .mis.
+		const bool exists = file_exists(rel_path);
 
 		if (exists) {
 			root->add_path(aod, split(aod.filename, '/'));

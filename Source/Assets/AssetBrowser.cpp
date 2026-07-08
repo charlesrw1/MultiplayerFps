@@ -44,6 +44,7 @@ AssetBrowser::AssetBrowser() {
 	if (!folder_closed || !folder_open)
 		Fatalf("no folder icons\n");
 	import_model_icon = g_assets.find<Texture>("eng/icons/publish.png").get();
+	filter_icon = g_assets.find<Texture>("eng/icons/filter.png").get();
 
 	inspector_pane = std::make_unique<AssetInspectorPane>();
 
@@ -100,13 +101,8 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 				continue;
 			}
 			if (name_filter_len > 0) {
-				if (b->filter_match_case) {
-					if (asset.filename.find(b->asset_name_filter) == std::string::npos)
-						continue;
-				} else {
-					if (!contains_case_insensitive(asset.filename, b->all_lower_cast_filter_name))
-						continue;
-				}
+				if (!contains_case_insensitive(asset.filename, b->all_lower_cast_filter_name))
+					continue;
 			}
 
 			ImGui::PushID(node);
@@ -200,6 +196,7 @@ extern void OpenInNotepad(const string& name);
 extern void SetClipboardText(const string& name);
 extern void ShowInExplorer(const string& name);
 extern std::optional<std::string> OpenGlbFileDialog();
+extern std::vector<std::string> OpenGlbFileDialogMulti();
 
 static void draw_diag_tooltip(const std::string& gamepath) {
 	auto* diags = AssetDiagnostics::get().get_diags(gamepath);
@@ -348,13 +345,8 @@ static void draw_browser_tree_view(AssetBrowser* b) {
 				continue;
 		}
 		if (name_filter_len > 0) {
-			if (b->filter_match_case) {
-				if (asset.filename.find(b->asset_name_filter) == std::string::npos)
-					continue;
-			} else {
-				if (!contains_case_insensitive(asset.filename, b->all_lower_cast_filter_name))
-					continue;
-			}
+			if (!contains_case_insensitive(asset.filename, b->all_lower_cast_filter_name))
+				continue;
 		}
 		linear2.push_back(node);
 	}
@@ -454,6 +446,11 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 			ImGui::TextDisabled("%s", folder_path.c_str());
 			ImGui::Separator();
 			draw_create_new_menu_items(b, folder_path);
+			ImGui::Separator();
+			if (ImGui::MenuItem("Expand"))
+				child->set_folder_open_R(true);
+			if (ImGui::MenuItem("Collapse"))
+				child->set_folder_open_R(false);
 			ImGui::EndPopup();
 		}
 
@@ -556,14 +553,8 @@ void AssetBrowser::draw_browser_grid() {
 				if (asset.filename.find(selected_folder + "/") != 0)
 					continue;
 			}
-			if (!filter_match_case && name_filter_len > 0) {
-				std::string path = asset.filename;
-				for (int i = 0; i < (int)path.size(); i++)
-					path[i] = tolower(path[i]);
-				if (path.find(all_lower_cast_filter_name, 0) == std::string::npos)
-					continue;
-			} else if (name_filter_len > 0) {
-				if (asset.filename.find(asset_name_filter) == std::string::npos)
+			if (name_filter_len > 0) {
+				if (!contains_case_insensitive(asset.filename, all_lower_cast_filter_name))
 					continue;
 			}
 			items2.push_back(c);
@@ -780,22 +771,27 @@ void AssetBrowser::imgui_draw() {
 	}
 
 	// Filter bar
-	static bool match_case = false;
 	ImGui::SetNextItemWidth(200.0);
 	ImGui::InputTextWithHint("FILTER", "filter asset path", asset_name_filter, 256);
 	ImGui::SameLine();
-	ImGui::Checkbox("MATCH CASE", &match_case);
-	ImGui::SameLine();
+	if (show_filter_type_options && filter_icon) {
+		const float ICON_SIZE = 16.0f;
+		ImVec4 bg = ImGui::GetStyle().Colors[ImGuiCol_Button];
+		if (ImGui::ImageButton("##type_filters",
+				ImTextureID(uint64_t(filter_icon->get_internal_render_handle())),
+				ImVec2(ICON_SIZE, ICON_SIZE), ImVec2(0, 0), ImVec2(1, 1), bg))
+			ImGui::OpenPopup("type_popup_assets");
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("Type filters...");
+		ImGui::SameLine();
+	}
 	ImGui::Checkbox("Grid", &using_grid);
 	if (using_grid) {
 		ImGui::SameLine();
 		ImGui::Checkbox("Big", &big_thumbnail);
 	}
 	const int name_filter_len = strlen(asset_name_filter);
-	filter_match_case = match_case;
 
-	if (show_filter_type_options && ImGui::SmallButton("Type filters..."))
-		ImGui::OpenPopup("type_popup_assets");
 	if (ImGui::BeginPopup("type_popup_assets")) {
 		bool is_hiding_all = filter_type_mask != 0;
 		if (ImGui::Checkbox("Show/Hide all", &is_hiding_all)) {
@@ -807,24 +803,16 @@ void AssetBrowser::imgui_draw() {
 
 		auto& types = AssetRegistrySystem::get().get_types();
 		for (int i = 0; i < types.size(); i++) {
+			ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4(types[i]->get_browser_color()));
 			ImGui::CheckboxFlags(types[i]->get_type_name().c_str(), &filter_type_mask, 1 << types[i]->self_index);
+			ImGui::PopStyleColor();
 		}
 		ImGui::EndPopup();
 	}
-	ImGui::SameLine();
-	if (ImGui::SmallButton("Expand All")) {
-		AssetRegistrySystem::get().get_root_files()->set_folder_open_R(true);
-	}
-	ImGui::SameLine();
-	if (ImGui::SmallButton("Close All")) {
-		AssetRegistrySystem::get().get_root_files()->set_folder_open_R(false);
-	}
 
-	if (!match_case) {
-		all_lower_cast_filter_name = asset_name_filter;
-		for (int i = 0; i < name_filter_len; i++)
-			all_lower_cast_filter_name[i] = tolower(all_lower_cast_filter_name[i]);
-	}
+	all_lower_cast_filter_name = asset_name_filter;
+	for (int i = 0; i < name_filter_len; i++)
+		all_lower_cast_filter_name[i] = tolower(all_lower_cast_filter_name[i]);
 
 	// Split layout: folder tree | asset view
 	const float splitter_w = 6.0f;
@@ -838,6 +826,11 @@ void AssetBrowser::imgui_draw() {
 		ImGui::TextDisabled("Create in: %s", selected_folder.empty() ? "(root)" : selected_folder.c_str());
 		ImGui::Separator();
 		draw_create_new_menu_items(this, selected_folder);
+		ImGui::Separator();
+		if (ImGui::MenuItem("Expand All"))
+			AssetRegistrySystem::get().get_root_files()->set_folder_open_R(true);
+		if (ImGui::MenuItem("Collapse All"))
+			AssetRegistrySystem::get().get_root_files()->set_folder_open_R(false);
 		ImGui::EndPopup();
 	}
 	ImGui::EndChild();
@@ -1006,17 +999,24 @@ void AssetBrowser::draw_create_asset_popup() {
 }
 
 void AssetBrowser::import_model_dialog() {
-	auto glb_gamepath = OpenGlbFileDialog();
-	if (!glb_gamepath)
+	auto glb_gamepaths = OpenGlbFileDialogMulti();
+	if (glb_gamepaths.empty())
 		return;
 
-	auto result = AssetTemplates::create_mis_for_glb(*glb_gamepath);
-	if (result) {
-		sys_print(Info, "Imported model: %s\n", result->c_str());
-		set_selected(*glb_gamepath);
-	} else {
-		sys_print(Warning, "Failed to import model (already imported or write error): %s\n", glb_gamepath->c_str());
+	std::string last_imported;
+	int imported_count = 0;
+	for (auto& glb_gamepath : glb_gamepaths) {
+		auto result = AssetTemplates::create_mis_for_glb(glb_gamepath);
+		if (result) {
+			sys_print(Info, "Imported model: %s\n", result->c_str());
+			last_imported = glb_gamepath;
+			imported_count++;
+		} else {
+			sys_print(Warning, "Failed to import model (already imported or write error): %s\n", glb_gamepath.c_str());
+		}
 	}
+	if (imported_count > 0)
+		set_selected(last_imported);
 }
 
 // Separate call — caller should invoke this once per frame alongside imgui_draw().

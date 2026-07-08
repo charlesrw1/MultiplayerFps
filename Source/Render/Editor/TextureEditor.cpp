@@ -5,6 +5,7 @@
 #include <Windows.h>
 #include <unordered_set>
 #include <optional>
+#include <vector>
 // static TextureEditorTool s_texture_editor_tool;
 // IEditorTool* g_texture_editor_tool = &s_texture_editor_tool;
 
@@ -100,6 +101,19 @@ void OpenInNotepad(const string& name) {
 #pragma comment(lib, "comdlg32.lib")
 #pragma comment(lib, "shell32.lib")
 
+// Converts a picked absolute path to a game-relative path, or nullopt if outside the data dir.
+static std::optional<std::string> make_game_relative_glb_path(const std::string& game_dir, std::string picked) {
+	for (auto& c : picked)
+		if (c == '\\') c = '/';
+	std::string prefix = game_dir + "/";
+	if (picked.size() <= prefix.size() ||
+		_strnicmp(picked.c_str(), prefix.c_str(), (int)prefix.size()) != 0) {
+		sys_print(Error, "OpenGlbFileDialog: picked file is outside the project data dir: %s\n", picked.c_str());
+		return std::nullopt;
+	}
+	return picked.substr(prefix.size());
+}
+
 // Opens a native "Open File" dialog filtered to .glb, rooted at the project data dir.
 // Returns the picked file as a game-relative path, or nullopt if cancelled or outside the data dir.
 std::optional<std::string> OpenGlbFileDialog() {
@@ -107,6 +121,8 @@ std::optional<std::string> OpenGlbFileDialog() {
 	char game_dir_full[MAX_PATH] = {};
 	GetFullPathNameA(FileSys::get_game_path(), MAX_PATH, game_dir_full, nullptr);
 	std::string game_dir = game_dir_full;
+	for (auto& c : game_dir)
+		if (c == '\\') c = '/';
 
 	OPENFILENAMEA ofn = {};
 	ofn.lStructSize = sizeof(ofn);
@@ -119,16 +135,54 @@ std::optional<std::string> OpenGlbFileDialog() {
 	if (!GetOpenFileNameA(&ofn))
 		return std::nullopt;
 
-	std::string picked = file_buf;
-	for (auto& c : picked)
+	return make_game_relative_glb_path(game_dir, file_buf);
+}
+
+// Opens a native "Open File" dialog filtered to .glb, allowing multiple files to be
+// selected at once, rooted at the project data dir. Returns game-relative paths for
+// every file that was picked and lies inside the data dir.
+std::vector<std::string> OpenGlbFileDialogMulti() {
+	// OPENFILENAMEA with OFN_ALLOWMULTISELECT needs a large buffer to hold all the
+	// selected filenames back-to-back, since the exact count isn't known up front.
+	constexpr size_t BUF_SIZE = 32768;
+	std::vector<char> file_buf(BUF_SIZE, 0);
+	char game_dir_full[MAX_PATH] = {};
+	GetFullPathNameA(FileSys::get_game_path(), MAX_PATH, game_dir_full, nullptr);
+	std::string game_dir = game_dir_full;
+	for (auto& c : game_dir)
 		if (c == '\\') c = '/';
-	std::string prefix = game_dir + "/";
-	if (picked.size() <= prefix.size() ||
-		_strnicmp(picked.c_str(), prefix.c_str(), (int)prefix.size()) != 0) {
-		sys_print(Error, "OpenGlbFileDialog: picked file is outside the project data dir\n");
-		return std::nullopt;
+
+	OPENFILENAMEA ofn = {};
+	ofn.lStructSize = sizeof(ofn);
+	ofn.lpstrFilter = "GLB Model (*.glb)\0*.glb\0";
+	ofn.lpstrFile = file_buf.data();
+	ofn.nMaxFile = (DWORD)BUF_SIZE;
+	ofn.lpstrInitialDir = game_dir.c_str();
+	ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | OFN_ALLOWMULTISELECT | OFN_EXPLORER;
+
+	std::vector<std::string> results;
+	if (!GetOpenFileNameA(&ofn))
+		return results;
+
+	// When multiple files are selected, the buffer is: dir\0file1\0file2\0...\0\0
+	// When a single file is selected, the buffer is just: fullpath\0
+	const char* dir_str = file_buf.data();
+	size_t dir_len = strlen(dir_str);
+	const char* cursor = dir_str + dir_len + 1;
+	if (*cursor == '\0') {
+		// single selection: the whole buffer is one full path
+		if (auto rel = make_game_relative_glb_path(game_dir, dir_str))
+			results.push_back(*rel);
+		return results;
 	}
-	return picked.substr(prefix.size());
+	while (*cursor != '\0') {
+		size_t name_len = strlen(cursor);
+		std::string full_path = std::string(dir_str) + "\\" + cursor;
+		if (auto rel = make_game_relative_glb_path(game_dir, full_path))
+			results.push_back(*rel);
+		cursor += name_len + 1;
+	}
+	return results;
 }
 
 // Opens Windows Explorer with the given game-relative asset selected.
