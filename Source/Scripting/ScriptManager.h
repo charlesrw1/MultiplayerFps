@@ -29,6 +29,11 @@ struct ParseType
 	// `---editor` line. Gates whether Component subclasses show up in the
 	// editor add-component picker. See LuaClassTypeInfo::is_editor_placeable.
 	bool editor_placeable = false;
+	// True when the `---editor` line also listed `init_in_editor` (e.g.
+	// `---editor, init_in_editor`). Equivalent to the instance calling
+	// set_call_init_in_editor(true) in its ctor: start()/stop() run in the
+	// editor too. See LuaClassTypeInfo::is_init_in_editor_placeable.
+	bool init_in_editor = false;
 };
 // parses the script
 class ScriptLoadingUtil
@@ -65,6 +70,12 @@ public:
 	void set_editor_placeable(bool b) { editor_placeable = b; }
 	bool is_editor_placeable() const { return editor_placeable; }
 
+	// Whether newly allocated instances of this Lua-defined Component subclass should
+	// have set_call_init_in_editor(true) applied automatically. Set from the
+	// `init_in_editor` tag alongside `---editor` on each reload. See lua_class_alloc.
+	void set_init_in_editor_placeable(bool b) { init_in_editor = b; }
+	bool is_init_in_editor_placeable() const { return init_in_editor; }
+
 	// Reflection accessors used by the reload-merge pass + tests.
 	uint32_t get_lua_field_shadow_size() const { return lua_field_shadow_size; }
 	const PropertyInfoList* get_lua_props_list() const { return lua_props_list.list ? &lua_props_list : nullptr; }
@@ -87,6 +98,7 @@ private:
 
 	bool had_changes = false;
 	bool editor_placeable = false;
+	bool init_in_editor = false;
 	int template_lua_table = 0;
 	static ClassBase* lua_class_alloc(const ClassTypeInfo* c);
 	string lua_classname;

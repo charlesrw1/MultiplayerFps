@@ -144,6 +144,17 @@ void EdPropertyGrid::draw(const ISelectionApi& api) {
 				}
 
 				if (selected) {
+					// The outer "Properties" window is opened with zero WindowPadding (see
+					// PushStyleVar below the ISelectionApi grab) so the reflected property
+					// grid can butt up against the edges. That padding can't be reinstated
+					// retroactively for this section, so fake it with indent + spacing.
+					const float pad = ImGui::GetStyle().WindowPadding.x;
+					ImGui::Dummy(ImVec2(0, pad));
+					ImGui::Indent(pad);
+					selected->on_inspector_imgui();
+					ImGui::Unindent(pad);
+					ImGui::Dummy(ImVec2(0, pad));
+
 					if (!editor_ui || editor_ui_component != selected) {
 						editor_ui = selected->create_editor_ui();
 						editor_ui_component = selected;

@@ -76,6 +76,10 @@ public:
 	virtual std::unique_ptr<IComponentEditorUi> create_editor_ui() { return nullptr; }
 	virtual void editor_on_draw_gizmos_selected() {}
 	REF virtual void editor_on_change_property() {}
+	// Called every frame the component is selected in the editor property panel, after the
+	// reflected property grid. Override to draw extra inspector controls with the LuaSystem
+	// im_* imgui bindings (im_button, im_text, im_drag_float, etc).
+	REF virtual void on_inspector_imgui() {}
 #endif
 protected:
 	// called when this components world space transform is changed (ie directly changed or a parents one was changed)

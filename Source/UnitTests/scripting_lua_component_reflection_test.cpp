@@ -94,6 +94,26 @@ TEST_F(LuaComponentReflectionTest, ParserDetectsEditorTag) {
 	EXPECT_FALSE(lookalike[0].editor_placeable);
 }
 
+TEST_F(LuaComponentReflectionTest, ParserDetectsInitInEditorTag) {
+	// `---editor, init_in_editor` sets both editor_placeable and init_in_editor.
+	auto tagged = ScriptLoadingUtil::parse_text("---@class FpDoor : Component\n"
+												"---editor, init_in_editor\n"
+												"FpDoor = {\n"
+												"}\n");
+	ASSERT_EQ(tagged.size(), 1u);
+	EXPECT_TRUE(tagged[0].editor_placeable);
+	EXPECT_TRUE(tagged[0].init_in_editor);
+
+	// Plain `---editor` (no init_in_editor) leaves the flag false.
+	auto untagged = ScriptLoadingUtil::parse_text("---@class FpDoor2 : Component\n"
+												  "---editor\n"
+												  "FpDoor2 = {\n"
+												  "}\n");
+	ASSERT_EQ(untagged.size(), 1u);
+	EXPECT_TRUE(untagged[0].editor_placeable);
+	EXPECT_FALSE(untagged[0].init_in_editor);
+}
+
 TEST_F(LuaComponentReflectionTest, ParserConsumesTypeAnnotationOncePerField) {
 	// A single ---@type annotation applies to the NEXT field only, never carries over.
 	auto out = ScriptLoadingUtil::parse_text("---@class C\n"

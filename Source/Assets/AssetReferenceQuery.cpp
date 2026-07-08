@@ -129,7 +129,8 @@ static bool is_leaf_binary_ext(const std::string& ext) {
 // is the one binary format that embeds outward text references (material paths).
 static std::string build_glob_excludes() {
 	std::string out;
-	for (auto& ext : {"dds", "wav", "png", "jpg", "jpeg", "hdr", "glb", "blend", "ssbar"})
+	for (auto& ext :
+		 {"dds", "wav", "png", "jpg","tga", "jpeg", "hdr", "glb", "blend", "ssbar", "psd", "fbx", "zip", "exr", "gltf"})
 		out += " --glob \"!*." + std::string(ext) + "\"";
 	return out;
 }

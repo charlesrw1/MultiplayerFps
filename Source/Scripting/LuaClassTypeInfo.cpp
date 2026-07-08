@@ -408,6 +408,8 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c) {
 	if (Component* comp = out->cast_to<Component>()) {
 		comp->set_lua_owner_type(luaInfo);
 		luaInfo->register_lua_instance(comp);
+		if (luaInfo->is_init_in_editor_placeable())
+			comp->set_call_init_in_editor(true);
 	}
 	return out;
 }

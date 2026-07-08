@@ -346,6 +346,7 @@ void ScriptManager::reload_from_content(const std::string& source, const std::st
 		if (found) {
 			(*found)->set_parsed_properties(std::move(t.props));
 			(*found)->set_editor_placeable(t.editor_placeable);
+			(*found)->set_init_in_editor_placeable(t.init_in_editor);
 		}
 	}
 }
