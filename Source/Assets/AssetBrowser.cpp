@@ -53,6 +53,30 @@ static std::string node_parent_folder_path(const AssetFilesystemNode* node) {
 	return path;
 }
 
+// Walks down from root via the children map to find the node for a folder gamepath
+// (e.g. "textures/env"). O(depth), not O(assets) — cheap to call once per frame,
+// unlike reconstructing every leaf's path string to compare against folder_path.
+// Returns root itself for an empty path. Returns nullptr if the path no longer exists
+// (e.g. folder was deleted/renamed since selected_folder was set).
+static AssetFilesystemNode* resolve_folder_node(AssetFilesystemNode* root, const std::string& folder_path) {
+	if (folder_path.empty())
+		return root;
+	AssetFilesystemNode* cur = root;
+	size_t start = 0;
+	while (start <= folder_path.size()) {
+		size_t slash = folder_path.find('/', start);
+		std::string part = folder_path.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
+		auto it = cur->children.find(part);
+		if (it == cur->children.end())
+			return nullptr;
+		cur = &it->second;
+		if (slash == std::string::npos)
+			break;
+		start = slash + 1;
+	}
+	return cur;
+}
+
 AssetBrowser::AssetBrowser() {
 	asset_name_filter[0] = 0;
 	folder_closed = g_assets.find<Texture>("eng/editor/folder_closed.png").get();
@@ -356,10 +380,17 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 }
 
 static void draw_browser_tree_view(AssetBrowser* b) {
+	CPU_FUNCTION();
 	auto& linear = AssetRegistrySystem::get().get_linear_list();
 	const int name_filter_len = strlen(b->asset_name_filter);
 	const bool has_filter = name_filter_len > 0;
+	// Resolved once per frame (O(depth)), not per asset — avoids rebuilding every
+	// leaf's containing-folder path string just to compare it against selected_folder.
+	AssetFilesystemNode* target_folder = has_filter
+		? nullptr
+		: resolve_folder_node(AssetRegistrySystem::get().get_root_files(), b->selected_folder);
 	std::vector<AssetFilesystemNode*> linear2;
+	linear2.reserve(linear.size());
 	for (auto node : linear) {
 		auto& asset = node->asset;
 		if (!b->should_type_show(1 << asset.type->self_index)) {
@@ -375,7 +406,7 @@ static void draw_browser_tree_view(AssetBrowser* b) {
 		} else {
 			// No active search: Unity-style folder browsing — only direct children
 			// of the selected folder, not the whole subtree.
-			if (node_parent_folder_path(node) != b->selected_folder)
+			if (node->parent != target_folder)
 				continue;
 		}
 		linear2.push_back(node);
@@ -595,6 +626,8 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 }
 
 static void draw_folder_tree(AssetBrowser* b) {
+	CPU_FUNCTION();
+
 	auto* root = AssetRegistrySystem::get().get_root_files();
 	if (!root)
 		return;
@@ -607,10 +640,6 @@ static void draw_folder_tree(AssetBrowser* b) {
 	draw_folder_tree_R(b, 0, root, "");
 }
 
-// too much of a brainlet do the dumb thing
-void fill_big_vector(std::vector<AssetFilesystemNode*>& nodes, AssetFilesystemNode* root) {
-	nodes = AssetRegistrySystem::get().get_linear_list();
-}
 #include "Render/Model.h"
 #include "Framework/StringUtils.h"
 #include "Framework/Files.h"
@@ -651,7 +680,7 @@ bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* la
 }
 
 void AssetBrowser::draw_browser_grid() {
-
+	CPU_FUNCTION();
 	const int SIZE_PER = (big_thumbnail) ? 144 : 80;
 	auto win_size = ImGui::GetWindowSize();
 	int boxes = win_size.x / SIZE_PER;
@@ -662,11 +691,16 @@ void AssetBrowser::draw_browser_grid() {
 
 	std::vector<AssetFilesystemNode*> items2;
 	{
-		std::vector<AssetFilesystemNode*> items;
-		fill_big_vector(items, AssetRegistrySystem::get().get_root_files());
+		// Iterate the registry's linear list directly instead of copying it into a
+		// fresh vector every frame (fill_big_vector used to do exactly that).
+		auto& items = AssetRegistrySystem::get().get_linear_list();
 
 		const int name_filter_len = strlen(asset_name_filter);
 		const bool has_filter = name_filter_len > 0;
+		AssetFilesystemNode* target_folder = has_filter
+			? nullptr
+			: resolve_folder_node(AssetRegistrySystem::get().get_root_files(), selected_folder);
+		items2.reserve(items.size());
 		for (auto& c : items) {
 			auto& asset = c->asset;
 			if (!ThumbnailManager::supports_thumbnail(asset))
@@ -681,7 +715,7 @@ void AssetBrowser::draw_browser_grid() {
 			} else {
 				// No active search: Unity-style folder browsing — only direct children
 				// of the selected folder, not the whole subtree.
-				if (node_parent_folder_path(c) != selected_folder)
+				if (c->parent != target_folder)
 					continue;
 			}
 			items2.push_back(c);
@@ -886,6 +920,8 @@ void AssetBrowser::set_selected(const std::string& path) {
 }
 
 void AssetBrowser::imgui_draw() {
+	CPU_FUNCTION();
+
 	double_clicked_selected = false;
 	if (ping_timer > 0.0f)
 		ping_timer = std::max(0.0f, ping_timer - ImGui::GetIO().DeltaTime);
