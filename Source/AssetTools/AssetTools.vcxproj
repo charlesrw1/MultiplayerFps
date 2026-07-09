@@ -36,6 +36,7 @@
     <ClCompile Include="..\..\Source\AssetCompile\ModelCompile_Animation.cpp" />
     <ClCompile Include="..\..\Source\AssetCompile\ModelCompile_AnimSkeleton.cpp" />
     <ClCompile Include="..\..\Source\AssetCompile\ModelCompile_Output.cpp" />
+    <ClCompile Include="..\..\Source\AssetCompile\SoundCompilier.cpp" />
     <!-- Moved from Render/Editor — EDITOR_BUILD guarded -->
     <ClCompile Include="..\..\Source\Render\Editor\TextureEditor.cpp" />
     <!-- Moved from Render — compiles in all configs -->
@@ -60,6 +61,7 @@
     <ClInclude Include="DiagnosticsWindow.h" />
     <ClInclude Include="..\..\Source\AssetCompile\Compiliers.h" />
     <ClInclude Include="..\..\Source\AssetCompile\ModelAsset2.h" />
+    <ClInclude Include="..\..\Source\AssetCompile\SoundAsset.h" />
     <ClInclude Include="..\..\Source\Render\SpirvCompile.h" />
     <ClInclude Include="..\..\Source\Render\ShaderSourceLoader.h" />
     <ClInclude Include="..\..\Source\Render\Editor\TextureEditor.h" />

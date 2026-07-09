@@ -3,6 +3,7 @@
 #include "AssetTools/AssetDiagnostics.h"
 #include "AssetTools/AssetTemplates.h"
 #include "AssetCompile/Compiliers.h"
+#include "AssetCompile/SoundAsset.h"
 #include "Render/Editor/TextureEditor.h"
 #include "Render/SpirvCompile.h"
 #include "Framework/Files.h"
@@ -97,6 +98,31 @@ AssetCompileResult compile_texture(const std::string& tis_gamepath) {
     return r;
 }
 
+AssetCompileResult compile_sound(const std::string& ais_gamepath) {
+    ASSERT(StringUtils::get_extension_no_dot(ais_gamepath) == "ais");
+    AssetCompileResult r;
+
+    if (!game_file_exists(ais_gamepath)) {
+        r.success = false;
+        r.error_message = "no .ais import settings: " + ais_gamepath;
+        diag_err(ais_gamepath, r.error_message);
+        return r;
+    }
+
+    r.success = compile_sound_asset(ais_gamepath);
+    if (r.success) {
+        auto s = ais_gamepath.substr(0, ais_gamepath.size() - 3);
+        r.output_files.push_back(s + "csnd");
+        diag_ok(ais_gamepath);
+        diag_ok(s + "csnd");
+    } else {
+        r.error_message = "sound compile failed: " + ais_gamepath;
+        diag_err(ais_gamepath, r.error_message);
+        diag_err(ais_gamepath.substr(0, ais_gamepath.size() - 3) + "csnd", r.error_message);
+    }
+    return r;
+}
+
 AssetCompileResult compile_material(const std::string& mm_gamepath) {
     ASSERT(StringUtils::get_extension_no_dot(mm_gamepath) == "mm");
     // Material compilation happens via the asset reload path (GLSL→SPIRV→HLSL).
@@ -174,6 +200,7 @@ std::optional<AssetCompileResult> compile_asset(const std::string& gamepath) {
 
     if      (ext == "mis") return compile_model(gamepath);
     else if (ext == "tis") return compile_texture(gamepath);
+    else if (ext == "ais") return compile_sound(gamepath);
     else if (ext == "mm")  return compile_material(gamepath);
     else if (ext == "lua") return check_lua(gamepath);
     else if (ext == "mi") {
@@ -201,6 +228,16 @@ std::optional<AssetCompileResult> compile_asset(const std::string& gamepath) {
         }
         return compile_texture(tis);
     }
+    // .csnd with no .ais: Error, not unmanaged — runtime only loads .csnd, there's no
+    // raw-source fallback for audio (unlike .dds's UseSourceFile/unmanaged case above).
+    else if (ext == "csnd") {
+        std::string ais = gamepath.substr(0, gamepath.size() - 4) + "ais";
+        if (!game_file_exists(ais)) {
+            diag_err(gamepath, "tried to rebuild but no .ais import settings found");
+            return AssetCompileResult{false, "no .ais import settings: " + gamepath};
+        }
+        return compile_sound(ais);
+    }
 
     return std::nullopt;
 }
@@ -212,6 +249,8 @@ static bool needs_compile(const std::string& gamepath) {
     } else if (ext == "tis") {
         auto s = gamepath.substr(0, gamepath.size() - 3);
         return !game_file_exists(s + "dds");
+    } else if (ext == "ais") {
+        return true; // compile_sound_asset handles its own up-to-date check
     }
     return true;
 }
@@ -219,6 +258,12 @@ static bool needs_compile(const std::string& gamepath) {
 void build_all(bool force_rebuild) {
     int errors = 0, compiled = 0;
     std::vector<std::string> error_paths;
+
+    // Create .ais sidecars for any orphan source audio *before* the compile loop below,
+    // so a freshly-dropped .wav gets both its .ais and its .csnd within this same call
+    // (AssetDiagnostics::scan_all(), further down, also auto-imports but runs after the
+    // loop -- too late to compile a brand-new file in the same pass).
+    AssetTemplates::auto_import_all_wav();
 
     for (const auto& full : FileSys::find_game_files()) {
         auto gp = FileSys::get_game_path_from_full_path(full);
@@ -271,6 +316,8 @@ void register_console_commands() {
     cmds->add("ASSET_AUTO_IMPORT", [](const Cmd_Args&) {
         int n = AssetTemplates::auto_import_all_png();
         sys_print(Info, "Auto-imported %d .tis sidecar(s)\n", n);
+        int s = AssetTemplates::auto_import_all_wav();
+        sys_print(Info, "Auto-imported %d .ais sidecar(s)\n", s);
     });
     cmds->add("ASSET_COMPILE", [](const Cmd_Args& a) {
         if (a.size() < 2) { sys_print(Warning, "usage: ASSET_COMPILE <gamepath>\n"); return; }

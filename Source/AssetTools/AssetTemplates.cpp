@@ -4,6 +4,7 @@
 #include "Framework/StringUtils.h"
 #include "Render/Editor/TextureEditor.h"
 #include "AssetCompile/ModelAsset2.h"
+#include "AssetCompile/SoundAsset.h"
 #include "Framework/Util.h"
 #include "Render/MaterialLocal.h"
 #include "Render/Model.h"
@@ -322,6 +323,46 @@ int auto_import_all_png() {
         if (gp.find(".thumbnails/") != std::string::npos)
             continue;
         auto result = create_tis_for_png(gp);
+        if (result) {
+            sys_print(Info, "Auto-import: created %s for %s\n", result->c_str(), gp.c_str());
+            ++count;
+        }
+    }
+    return count;
+}
+
+// Source audio extensions ffmpeg can read — not just .wav, since ffmpeg's -i doesn't care.
+static bool is_source_audio_ext(const std::string& ext) {
+    return ext == "wav" || ext == "flac" || ext == "mp3" || ext == "aiff" || ext == "ogg";
+}
+
+std::optional<std::string> create_ais_for_wav(const std::string& wav_gamepath) {
+    ASSERT(is_source_audio_ext(StringUtils::get_extension_no_dot(wav_gamepath)));
+
+    std::string ais_gamepath = StringUtils::strip_extension(wav_gamepath) + ".ais";
+
+    if (FileSys::does_file_exist(ais_gamepath.c_str(), FileSys::GAME_DIR))
+        return std::nullopt;
+
+    auto slash = wav_gamepath.rfind('/');
+    std::string src_filename = (slash != std::string::npos) ? wav_gamepath.substr(slash + 1) : wav_gamepath;
+
+    AudioImportSettings ais;
+    ais.src_file = src_filename;
+
+    write_audio_import_settings(&ais, ais_gamepath);
+    return ais_gamepath;
+}
+
+int auto_import_all_wav() {
+    int count = 0;
+    for (const auto& full : FileSys::find_game_files()) {
+        auto gp = FileSys::get_game_path_from_full_path(full);
+        if (!is_source_audio_ext(StringUtils::get_extension_no_dot(gp)))
+            continue;
+        if (gp.find(".thumbnails/") != std::string::npos)
+            continue;
+        auto result = create_ais_for_wav(gp);
         if (result) {
             sys_print(Info, "Auto-import: created %s for %s\n", result->c_str(), gp.c_str());
             ++count;

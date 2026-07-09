@@ -36,6 +36,13 @@ namespace AssetTemplates {
     // Scan all .png files in the game directory and create .tis sidecars for any missing ones.
     // Returns the number of .tis files created.
     int auto_import_all_png();
+
+    // Create a .ais sidecar for a source audio file (.wav) — returns the ais gamepath on success
+    std::optional<std::string> create_ais_for_wav(const std::string& wav_gamepath);
+
+    // Scan all source audio files in the game directory and create .ais sidecars for any missing ones.
+    // Returns the number of .ais files created.
+    int auto_import_all_wav();
 }
 
 #endif

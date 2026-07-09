@@ -24,7 +24,7 @@ static bool is_ref_ext(const std::string& ext) {
 }
 
 // Returns sidecar path if one exists for this extension, else empty.
-// .tis <-> .dds,  .mis <-> .cmdl
+// .tis <-> .dds,  .mis <-> .cmdl,  .ais <-> .csnd
 static std::string sidecar(const std::string& gamepath) {
     auto ext = StringUtils::get_extension_no_dot(gamepath);
     auto stem = gamepath.substr(0, gamepath.size() - ext.size() - 1);
@@ -32,6 +32,8 @@ static std::string sidecar(const std::string& gamepath) {
     if (ext == "dds")  return stem + ".tis";
     if (ext == "mis")  return stem + ".cmdl";
     if (ext == "cmdl") return stem + ".mis";
+    if (ext == "ais")  return stem + ".csnd";
+    if (ext == "csnd") return stem + ".ais";
     return {};
 }
 

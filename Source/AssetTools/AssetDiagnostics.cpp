@@ -120,6 +120,10 @@ void AssetDiagnostics::scan_all() {
     if (imported > 0)
         sys_print(Info, "Auto-imported %d .tis sidecar(s) for orphan .png files\n", imported);
 
+    int sound_imported = AssetTemplates::auto_import_all_wav();
+    if (sound_imported > 0)
+        sys_print(Info, "Auto-imported %d .ais sidecar(s) for orphan audio files\n", sound_imported);
+
     for (const auto& full : FileSys::find_game_files()) {
         auto gp = FileSys::get_game_path_from_full_path(full);
         auto ext = StringUtils::get_extension_no_dot(gp);
@@ -146,6 +150,10 @@ void AssetDiagnostics::scan_all() {
             // Import settings: source .png should be nearby (same-stem convention)
             if (!game_file_exists(s + "png"))
                 diags.push_back({AssetSeverity::Warning, "source .png not found alongside .tis"});
+        } else if (ext == "csnd") {
+            // Compiled sound: hard cutover, no raw playback fallback — missing .ais is an Error.
+            if (!game_file_exists(s + "ais"))
+                diags.push_back({AssetSeverity::Error, "no .ais import settings"});
         }
 
         // Only update if we found something new and it's not already covered.

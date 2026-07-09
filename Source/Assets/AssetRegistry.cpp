@@ -16,6 +16,12 @@
 #include "Assets/AssetDatabase.h"
 #include "AssetTools/AssetTemplates.h"
 
+// Source audio extensions that get a .ais sidecar auto-created (mirrors the equivalent
+// static helper in AssetTemplates.cpp, kept in sync manually since it's a tiny set).
+static bool is_source_audio_ext(const std::string& ext) {
+	return ext == "wav" || ext == "flac" || ext == "mp3" || ext == "aiff" || ext == "ogg";
+}
+
 void TOUCH_ASSET(const Cmd_Args& args) {
 	if (args.size() != 2) {
 		sys_print(Warning, "TOUCH_ASSET <asset path>\n");
@@ -272,10 +278,28 @@ void AssetRegistrySystem::update() {
 				auto asset = g_assets.find<Texture>(dds);
 				g_assets.reload<Texture>(asset);
 			}
-		} else if (ext == "wav") {
-			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {
-				auto asset = g_assets.find<SoundFile>(rel_path);
+		} else if (ext == "ais" || ext == "csnd") {
+			std::string csnd = rel_path;
+			StringUtils::remove_extension(csnd);
+			csnd += ".csnd";
+			if (g_assets.is_asset_loaded(csnd) && file_exists(rel_path)) {
+				auto asset = g_assets.find<SoundFile>(csnd);
 				g_assets.reload<SoundFile>(asset);
+#ifdef EDITOR_BUILD
+				if (AssetBrowser::inst)
+					AssetBrowser::inst->thumbnails.invalidate_thumbnail(csnd);
+#endif
+			}
+		} else if (is_source_audio_ext(ext)) {
+			// Source audio changed live -- auto-import a .ais if this file doesn't have one yet
+			// (mirrors the .png auto-import branch above), and hot-reload if already compiled.
+			std::string ais = rel_path;
+			StringUtils::remove_extension(ais);
+			ais += ".ais";
+			if (!file_exists(ais)) {
+				auto created = AssetTemplates::create_ais_for_wav(rel_path);
+				if (created)
+					sys_print(Info, "Auto-import: created %s for %s\n", created->c_str(), rel_path.c_str());
 			}
 		} else if (ext == "lua") {
 			ScriptManager::inst->reload_one_file(rel_path);
@@ -332,7 +356,7 @@ void AssetRegistrySystem::update() {
 			aod.type = mapMeta;
 		else if (ext == "mm" || ext == "mi")
 			aod.type = matMeta;
-		else if (ext == "wav")
+		else if (ext == "csnd")
 			aod.type = soundMeta;
 		else if (ext == "fnt")
 			aod.type = fontMeta;
@@ -346,7 +370,11 @@ void AssetRegistrySystem::update() {
 			aod.type = ppsetMeta;
 		else if (ext == "sobj")
 			aod.type = sobjMeta;
-		else if (ext == "mis") {
+		else if (ext == "ais") {
+			StringUtils::remove_extension(aod.filename);
+			aod.filename += ".csnd";
+			aod.type = soundMeta;
+		} else if (ext == "mis") {
 			StringUtils::remove_extension(aod.filename);
 			aod.filename += ".cmdl";
 			aod.type = modelMeta;
@@ -428,6 +456,8 @@ void AssetRegistrySystem::reindex_all_assets() {
 
 	// Use a set to deduplicate model entries: both .cmdl and .mis map to the same .cmdl asset.
 	std::unordered_set<std::string> model_paths;
+	// Same idea for sound: both .csnd and .ais map to the same .csnd asset.
+	std::unordered_set<std::string> sound_paths;
 
 	auto add = [&](AssetOnDisk aod) { root->add_path(aod, split(aod.filename, '/')); };
 
@@ -453,6 +483,17 @@ void AssetRegistrySystem::reindex_all_assets() {
 			continue;
 		}
 
+		if (ext == "csnd" || ext == "ais") {
+			// Both .csnd and .ais (.ais is import settings that produce a .csnd) resolve to the
+			// same tree entry.  Collect and deduplicate before adding.
+			if (ext == "ais") {
+				StringUtils::remove_extension(gp);
+				gp += ".csnd";
+			}
+			sound_paths.insert(std::move(gp));
+			continue;
+		}
+
 		if (ext == "tis") {
 			tis_stems.push_back(strip_extension(gp));
 			continue;
@@ -467,8 +508,6 @@ void AssetRegistrySystem::reindex_all_assets() {
 			aod.type = mapMeta;
 		else if (ext == "mm" || ext == "mi")
 			aod.type = matMeta;
-		else if (ext == "wav")
-			aod.type = soundMeta;
 		else if (ext == "fnt")
 			aod.type = fontMeta;
 		else if (ext == "tprefab")
@@ -504,6 +543,13 @@ void AssetRegistrySystem::reindex_all_assets() {
 		AssetOnDisk aod;
 		aod.filename = m;
 		aod.type = modelMeta;
+		add(std::move(aod));
+	}
+
+	for (auto& s : sound_paths) {
+		AssetOnDisk aod;
+		aod.filename = s;
+		aod.type = soundMeta;
 		add(std::move(aod));
 	}
 

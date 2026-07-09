@@ -60,7 +60,7 @@ BikePlayer::BikePlayer()
 	this->cc = cc_comp;
 
 	freewheel_player = isound->register_sound_player();
-	freewheel_player->asset          = SoundFile::load("sounds/free_wheel.wav");
+	freewheel_player->asset          = SoundFile::load("sounds/free_wheel.csnd");
 	freewheel_player->looping        = true;
 	freewheel_player->attenuate      = false;
 	freewheel_player->spatialize     = false;
@@ -68,7 +68,7 @@ BikePlayer::BikePlayer()
 	freewheel_player->set_play(true);
 
 	wind_player = isound->register_sound_player();
-	wind_player->asset           = SoundFile::load("sounds/wind_loop.wav");
+	wind_player->asset           = SoundFile::load("sounds/wind_loop.csnd");
 	wind_player->looping         = true;
 	wind_player->attenuate       = false;
 	wind_player->spatialize      = false;
@@ -76,7 +76,7 @@ BikePlayer::BikePlayer()
 	wind_player->set_play(true);
 
 	pedal_player = isound->register_sound_player();
-	pedal_player->asset           = SoundFile::load("sounds/bike_pedal.wav");
+	pedal_player->asset           = SoundFile::load("sounds/bike_pedal.csnd");
 	pedal_player->looping         = true;
 	pedal_player->attenuate       = false;
 	pedal_player->spatialize      = false;
@@ -253,7 +253,7 @@ void BikePlayer::evaluate(BikeObject* my_bike)
 
 	// --- Sound: gear change one-shot ---
 	if (my_bike->just_shifted) {
-		static const SoundFile* gear_snd = SoundFile::load("sounds/gear_change.wav");
+		static const SoundFile* gear_snd = SoundFile::load("sounds/gear_change.csnd");
 		isound->play_sound(gear_snd, 0.2, 1.2f, 0.f, 0.f, SndAtn::Linear, false, false, {});
 	}
 

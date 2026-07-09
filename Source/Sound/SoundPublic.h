@@ -53,8 +53,13 @@ public:
 	void update();
 	// starts/stops playback
 	void set_play(bool b);
-	// returns -1 if finished, else current duration
-	float get_status();
+	// current playback position in seconds; 0 if not currently playing
+	float get_playback_position_seconds() const;
+	// seeks to the given position in seconds; if not currently playing, starts playback first
+	// (takes effect on the next tick() since voice acquisition happens there)
+	void seek_seconds(float seconds);
+	// true if this player currently holds an active voice slot and is playing
+	bool is_playing() const;
 };
 
 class SoundSystemPublic

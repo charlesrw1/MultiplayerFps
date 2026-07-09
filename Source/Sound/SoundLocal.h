@@ -186,6 +186,16 @@ public:
 				continue;
 			}
 
+			// A non-looping clip that finished playing on its own (not via an explicit
+			// set_play(false)/attenuation stop) leaves its SDL track idle but was never
+			// releasing the voice slot or clearing should_play -- so pressing Play again
+			// after natural completion was a no-op (voice_index stayed valid, should_play
+			// stayed true). Detect that and release the voice like any other stop.
+			if (!spi->looping && !MIX_TrackPlaying(tracks[i])) {
+				end_sound_object_play(spi);
+				continue;
+			}
+
 			spi->time_elapsed += dt;
 			if (spi->attenuate) {
 				float dist_sq = glm::dot(spi->spatial_pos - listener_position, spi->spatial_pos - listener_position);
