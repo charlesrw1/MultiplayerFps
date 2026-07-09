@@ -649,7 +649,10 @@ static void draw_folder_tree(AssetBrowser* b) {
 #include "Framework/StringUtils.h"
 #include "Framework/Files.h"
 
-bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* label, ImU32 tint_col = IM_COL32_WHITE) {
+// flip_v: rendered asset thumbnails (Model/MaterialInstance thumbnails, DDS texture mips) come out
+// upside-down relative to normal UI icons, so callers with real thumbnails need the V-flip (the
+// default, matching every existing call site) while regular UI icon PNGs (folder, document) need it off.
+bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* label, ImU32 tint_col = IM_COL32_WHITE, bool flip_v = true) {
 	ImVec2 pos = ImGui::GetCursorScreenPos();
 	ImVec2 label_pos = pos;
 
@@ -660,7 +663,9 @@ bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* la
 
 	// Draw the image
 	ImDrawList* draw_list = ImGui::GetWindowDrawList();
-	draw_list->AddImage(texture, pos, ImVec2(pos.x + size.x, pos.y + size.y), ImVec2(0, 1), ImVec2(1, 0), tint_col);
+	ImVec2 uv0 = flip_v ? ImVec2(0, 1) : ImVec2(0, 0);
+	ImVec2 uv1 = flip_v ? ImVec2(1, 0) : ImVec2(1, 1);
+	draw_list->AddImage(texture, pos, ImVec2(pos.x + size.x, pos.y + size.y), uv0, uv1, tint_col);
 
 	// Optional highlight on hover
 	if (hovered) {
@@ -746,7 +751,7 @@ void AssetBrowser::draw_browser_grid() {
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 		if (folder_big) {
 			ImageButtonWithOverlayText(ImTextureID(uint64_t(folder_big->get_internal_render_handle())),
-									   thumb_size, node->name.c_str());
+									   thumb_size, node->name.c_str(), IM_COL32_WHITE, false);
 		} else {
 			ImGui::InvisibleButton("##folder", thumb_size);
 		}
@@ -814,7 +819,7 @@ void AssetBrowser::draw_browser_grid() {
 			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
 			ImU32 tint = color32_to_int(c->asset.type->get_browser_color());
 			item_pressed = ImageButtonWithOverlayText(ImTextureID(uint64_t(document_icon->get_internal_render_handle())),
-													  thumb_size, only_filename.c_str(), tint);
+													  thumb_size, only_filename.c_str(), tint, false);
 			ImGui::PopStyleColor();
 		} else {
 			ImGui::InvisibleButton("##thumb", thumb_size);
