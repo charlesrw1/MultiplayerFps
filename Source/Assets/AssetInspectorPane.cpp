@@ -20,6 +20,7 @@
 #include "Assets/AssetDatabase.h"
 #include "Assets/AssetBrowser.h"
 #include "Assets/AssetRegistryLocal.h"
+#include "Assets/ScriptableObject.h"
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <vector>
@@ -312,6 +313,19 @@ struct MiEditorState {
     }
 };
 
+// ── SobjEditorState ──────────────────────────────────────────────────────────
+
+struct SobjEditorState {
+    std::shared_ptr<ScriptableObject> obj; // keeps it alive/registered while the pane holds it
+    std::unique_ptr<PropertyGrid> pg;
+
+    void init_from(std::shared_ptr<ScriptableObject> asset) {
+        obj = std::move(asset);
+        pg = std::make_unique<PropertyGrid>(get_basic_factory());
+        pg->add_class_to_grid(obj.get());
+    }
+};
+
 static std::string read_game_text(const std::string& gamepath) {
     auto f = FileSys::open_read_game(gamepath);
     if (!f) return {};
@@ -381,6 +395,7 @@ void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
     settings_dirty = false;
     cache_.reset();
     mi_state_.reset();
+    sobj_state_.reset();
     anim_seq_editor_.reset();
     skeleton_editor_.reset();
     active_tis_path_.clear();
@@ -405,6 +420,17 @@ void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
             auto state = std::make_unique<MiEditorState>();
             state->init_from(mat.get());
             mi_state_ = std::move(state);
+        }
+        return;
+    }
+
+    // Build .sobj property editor state from the loaded ScriptableObject.
+    if (ext == "sobj") {
+        auto so = g_assets.find_sync_sptr<ScriptableObject>(selected.filename);
+        if (so) {
+            auto state = std::make_unique<SobjEditorState>();
+            state->init_from(so);
+            sobj_state_ = std::move(state);
         }
         return;
     }
@@ -776,6 +802,40 @@ void AssetInspectorPane::draw_material_instance_editor(const std::string& gamepa
     if (ImGui::Button("Revert")) load_for(last_selected);
 }
 
+void AssetInspectorPane::draw_scriptable_object(const std::string& gamepath) {
+    if (!sobj_state_ || !sobj_state_->obj) { ImGui::TextDisabled("(failed to load)"); return; }
+    auto& s = *sobj_state_;
+
+    ImGui::TextDisabled("Type: %s", s.obj->get_type().classname);
+    ImGui::Separator();
+
+    bool changed = false;
+    if (s.pg) {
+        s.pg->update();
+        changed = s.pg->rows_had_changes;
+    }
+    if (changed) {
+        settings_dirty = true;
+        s.obj->on_property_change();
+    }
+    s.obj->on_editor_gui();
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
+    ImGui::BeginDisabled(!settings_dirty);
+    if (ImGui::Button("Save")) {
+        s.obj->save_to_disk();
+        settings_dirty = false;
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Revert")) {
+        g_assets.reload(s.obj.get());
+        settings_dirty = false;
+    }
+}
+
 void AssetInspectorPane::imgui_draw(const AssetOnDisk& selected) {
     if (!ImGui::Begin("Asset Inspector")) {
         ImGui::End();
@@ -806,6 +866,7 @@ void AssetInspectorPane::imgui_draw(const AssetOnDisk& selected) {
         draw_anim_seq_editor(selected.filename);
     else if (ext == "mm") draw_material_text(selected.filename);
     else if (ext == "mi") draw_material_instance_editor(selected.filename);
+    else if (ext == "sobj") draw_scriptable_object(selected.filename);
     else    ImGui::TextDisabled("Extension: .%s", ext.c_str());
 
     ImGui::End();

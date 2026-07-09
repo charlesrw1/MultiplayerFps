@@ -14,6 +14,7 @@ using std::vector;
 #include <stdexcept>
 
 class Component;
+class ScriptableObject;
 
 struct ParseProperty
 {
@@ -176,6 +177,12 @@ public:
 	// on first PROP_LUA_BACKED access (serialization, editor property panel, etc.).
 	// No-op if comp has no lua_owner_type or shadow already exists.
 	static void ensure_shadow_for(Component* comp);
+
+	// ScriptableObject counterparts of the two functions above, duplicated rather than
+	// templated/shared through ClassBase — see ScriptableObject.h for why. Called from
+	// ScriptableObject::ensure_lua_shadow() / ::uninstall().
+	static void ensure_shadow_for(ScriptableObject* obj);
+	static void destroy_shadow_for(ScriptableObject* obj);
 
 	// Fires at the end of check_for_reload() when at least one Lua class was rebuilt.
 	// Listeners must drop any cached `const PropertyInfo*` / `PropertyInfoList*` they

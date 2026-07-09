@@ -70,24 +70,25 @@ static ClassBase* get_self_ptr_raw(lua_State* L, int index) {
 	return obj;
 }
 
-// Shared lookup used by both metamethods below: resolve `self` (arg 1) to the Component it
-// wraps and, if it's a Lua-authored subclass, find the PROP_LUA_BACKED property named by the
-// string key at `key_idx`. Returns nullptr if this access isn't a reflected-field access at all
-// (native object, plain Lua class, or unknown key) -- callers fall back to normal behavior.
-static const PropertyInfo* find_lua_backed_prop(lua_State* L, int key_idx, Component** out_comp) {
+// Shared lookup used by both metamethods below: resolve `self` (arg 1) to the ClassBase it
+// wraps (Component or ScriptableObject, both of which override get_lua_owner_type/
+// get_lua_field_shadow) and, if it's a Lua-authored subclass, find the PROP_LUA_BACKED
+// property named by the string key at `key_idx`. Returns nullptr if this access isn't a
+// reflected-field access at all (native object, plain Lua class, or unknown key) -- callers
+// fall back to normal behavior.
+static const PropertyInfo* find_lua_backed_prop(lua_State* L, int key_idx, ClassBase** out_obj) {
 	if (lua_type(L, key_idx) != LUA_TSTRING)
 		return nullptr;
 	ClassBase* obj = get_self_ptr_raw(L, 1);
-	Component* comp = obj ? obj->cast_to<Component>() : nullptr;
-	if (!comp)
+	if (!obj)
 		return nullptr;
-	const LuaClassTypeInfo* lti = comp->get_lua_owner_type();
+	const LuaClassTypeInfo* lti = obj->get_lua_owner_type();
 	if (!lti)
 		return nullptr;
 	const char* key = lua_tostring(L, key_idx);
 	for (auto& pi : lti->get_lua_props_storage()) {
 		if (strcmp(pi.name, key) == 0) {
-			*out_comp = comp;
+			*out_obj = obj;
 			return &pi;
 		}
 	}
@@ -103,10 +104,10 @@ static const PropertyInfo* find_lua_backed_prop(lua_State* L, int key_idx, Compo
 // 1), unchanged from before.
 static int lua_component_index(lua_State* L) {
 	if (eng && eng->is_editor_level()) {
-		Component* comp = nullptr;
-		if (const PropertyInfo* pi = find_lua_backed_prop(L, 2, &comp)) {
-			comp->ensure_lua_shadow();
-			push_lua_shadow_field(L, *pi, comp->get_lua_field_shadow() + pi->offset);
+		ClassBase* obj = nullptr;
+		if (const PropertyInfo* pi = find_lua_backed_prop(L, 2, &obj)) {
+			obj->ensure_lua_shadow();
+			push_lua_shadow_field(L, *pi, obj->get_lua_field_shadow() + pi->offset);
 			return 1;
 		}
 	}
@@ -123,10 +124,10 @@ static int lua_component_index(lua_State* L) {
 // same behavior as if no metatable were installed at all.
 static int lua_component_newindex(lua_State* L) {
 	if (eng && eng->is_editor_level()) {
-		Component* comp = nullptr;
-		if (const PropertyInfo* pi = find_lua_backed_prop(L, 2, &comp)) {
-			comp->ensure_lua_shadow();
-			write_lua_shadow_field(L, 3, *pi, comp->get_lua_field_shadow() + pi->offset);
+		ClassBase* obj = nullptr;
+		if (const PropertyInfo* pi = find_lua_backed_prop(L, 2, &obj)) {
+			obj->ensure_lua_shadow();
+			write_lua_shadow_field(L, 3, *pi, obj->get_lua_field_shadow() + pi->offset);
 			return 0;
 		}
 	}

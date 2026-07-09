@@ -151,6 +151,7 @@ void AssetRegistrySystem::init() {
 #include "Game/Particles/ParticleAsset.h"
 #include "Render/PostProcessSettings.h"
 #include "Game/Prefab.h"
+#include "Assets/ScriptableObject.h"
 #ifdef EDITOR_BUILD
 #include "Assets/AssetBrowser.h"
 #endif
@@ -208,6 +209,7 @@ void AssetRegistrySystem::update() {
 	auto* prefabMeta = (AssetMetadata*)find_type("Prefab");
 	auto* particleMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("ParticleAsset"));
 	auto* ppsetMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("PostProcessSettings"));
+	auto* sobjMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("ScriptableObject"));
 	assert(prefabMeta);
 
 	bool tree_dirty = false;
@@ -293,6 +295,11 @@ void AssetRegistrySystem::update() {
 				auto asset = g_assets.find<PrefabAsset>(rel_path);
 				g_assets.reload<PrefabAsset>(asset);
 			}
+		} else if (ext == "sobj") {
+			if (g_assets.is_asset_loaded(rel_path) && file_exists(rel_path)) {
+				auto asset = g_assets.find<ScriptableObject>(rel_path);
+				g_assets.reload<ScriptableObject>(asset);
+			}
 		}
 
 		// Incremental tree update: resolve to the canonical asset entry.
@@ -337,6 +344,8 @@ void AssetRegistrySystem::update() {
 			aod.type = particleMeta;
 		else if (ext == "ppset")
 			aod.type = ppsetMeta;
+		else if (ext == "sobj")
+			aod.type = sobjMeta;
 		else if (ext == "mis") {
 			StringUtils::remove_extension(aod.filename);
 			aod.filename += ".cmdl";
@@ -414,6 +423,7 @@ void AssetRegistrySystem::reindex_all_assets() {
 	auto* prefabMeta = (AssetMetadata*)find_type("Prefab");
 	auto* particleMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("ParticleAsset"));
 	auto* ppsetMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("PostProcessSettings"));
+	auto* sobjMeta = (AssetMetadata*)find_for_classtype(ClassBase::find_class("ScriptableObject"));
 	assert(prefabMeta);
 
 	// Use a set to deduplicate model entries: both .cmdl and .mis map to the same .cmdl asset.
@@ -467,6 +477,8 @@ void AssetRegistrySystem::reindex_all_assets() {
 			aod.type = particleMeta;
 		else if (ext == "ppset")
 			aod.type = ppsetMeta;
+		else if (ext == "sobj")
+			aod.type = sobjMeta;
 		else
 			continue;
 

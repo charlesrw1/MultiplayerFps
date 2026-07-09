@@ -62,6 +62,7 @@
       <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="Assets\IAsset.cpp" />
+    <ClCompile Include="Assets\ScriptableObject.cpp" />
     <ClCompile Include="Debug_Console.cpp" />
     <ClCompile Include="EditorPopups.cpp" />
     <ClCompile Include="EditorPopupTemplate.cpp" />
@@ -358,6 +359,7 @@
     <ClInclude Include="Assets\FileWatcher.h" />
     <ClInclude Include="Assets\HackedReloader.h" />
     <ClInclude Include="Assets\IAsset.h" />
+    <ClInclude Include="Assets\ScriptableObject.h" />
     <ClInclude Include="DebugConsole.h" />
     <ClInclude Include="EditorPopups.h" />
     <ClInclude Include="EditorPopupTemplate.h" />

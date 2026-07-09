@@ -9,6 +9,8 @@
 struct InspectorCache;
 // Opaque state for the .mi property editor.
 struct MiEditorState;
+// Opaque state for the .sobj (ScriptableObject) property editor.
+struct SobjEditorState;
 
 class AnimSeqEditor;
 class SkeletonEditor;
@@ -27,6 +29,7 @@ private:
     void draw_mis_settings(const std::string& gamepath);
     void draw_material_text(const std::string& gamepath);
     void draw_material_instance_editor(const std::string& gamepath);
+    void draw_scriptable_object(const std::string& gamepath);
     void draw_anim_seq_editor(const std::string& asset_path);
     void draw_skeleton_section(const std::string& cmdl_path);
 
@@ -44,6 +47,8 @@ private:
     std::unique_ptr<InspectorCache> cache_;
     // Owns state for .mi property editor (rebuilt when selected asset changes).
     std::unique_ptr<MiEditorState> mi_state_;
+    // Owns state for .sobj (ScriptableObject) property editor (rebuilt when selected asset changes).
+    std::unique_ptr<SobjEditorState> sobj_state_;
     // Owns animation sequence editor (active when a .cmdl with a skeleton is selected).
     std::unique_ptr<AnimSeqEditor> anim_seq_editor_;
     // Owns skeleton viewer (active when a .cmdl/.mis model with a skeleton is selected).

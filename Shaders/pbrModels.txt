@@ -67,16 +67,23 @@ vec3 subsurface_extra_punctual(vec3 N, vec3 L, vec3 albedo, float thickness)
 	return albedo / PI * (extra_scatter + vec3(back));
 }
 
-// --- Translucent (foliage): thin-surface transmission ---
-// Normal is already flipped by gl_FrontFacing in the GBuffer write.
-// Transmission uses the original (unflipped) back-facing direction.
+// --- Translucent (foliage): forward-scattering wrap transmission ---
+// Barre-Brisebois & Bouchard, "Approximating Translucency for a Fast, Cheap
+// and Convincing Subsurface Scattering Look" (2011) - same technique as
+// Unity's "Fast Subsurface Scattering" sample. Thin organic media (leaves,
+// paper, skin) scatter forward-dominantly, so transmission peaks when the
+// viewer looks back along the light's direction of travel through the
+// surface, not simply whenever the back face is lit.
 
-vec3 translucent_extra_punctual(vec3 N, vec3 L, vec3 albedo, float thickness)
+vec3 translucent_extra_punctual(vec3 N, vec3 V, vec3 L, vec3 albedo, float thickness)
 {
-	// N is the front-facing normal from GBuffer (already flipped).
-	// Transmission: light arriving from behind the surface.
-	float NdotL_back = max(dot(-N, L), 0.0);
-	return albedo / PI * NdotL_back * thickness;
+	const float distortion = 0.2;	// bends L toward -N to fake internal scattering
+	const float power = 3.0;		// tightness of the forward-scatter lobe
+	const float scale = 1.0;		// brightness fudge
+
+	vec3 Lt = L + N * distortion;
+	float fLTDot = pow(clamp(dot(-V, Lt), 0.0, 1.0), power) * scale;
+	return albedo * fLTDot * thickness;
 }
 
 // --- Anisotropic: GGX with tangent-dependent roughness (Burley) ---
@@ -224,7 +231,7 @@ vec3 apply_material_punctual(uint mat_type, vec3 base_result, vec3 N, vec3 world
 	}
 
 	if (mat_type == MATERIAL_TYPE_TRANSLUCENT) {
-		return base_result + translucent_extra_punctual(N, L, albedo, alias0) * light_color;
+		return base_result + translucent_extra_punctual(N, V, L, albedo, alias0) * light_color;
 	}
 
 	if (mat_type == MATERIAL_TYPE_ANISOTROPIC) {
@@ -272,7 +279,7 @@ vec3 apply_material_directional(uint mat_type, vec3 base_result, vec3 N, vec3 wo
 	}
 
 	if (mat_type == MATERIAL_TYPE_TRANSLUCENT) {
-		return base_result + translucent_extra_punctual(N, light_dir, albedo, alias0) * light_color;
+		return base_result + translucent_extra_punctual(N, V, light_dir, albedo, alias0) * light_color;
 	}
 
 	if (mat_type == MATERIAL_TYPE_ANISOTROPIC) {

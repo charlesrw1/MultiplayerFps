@@ -106,12 +106,14 @@ public:
 
 	ThumbnailManager thumbnails;
 
-	enum class CreateAssetType { None, Map, Particle, MasterMaterial, MaterialInstance, Prefab };
+	enum class CreateAssetType { None, Map, Particle, MasterMaterial, MaterialInstance, Prefab, ScriptableObject };
 	CreateAssetType create_asset_type = CreateAssetType::None;
 	char create_asset_name[128] = {};
 	int create_mm_domain = 0;
 	std::string create_mi_master_path;
 	std::string create_folder_override;
+	// Concrete ScriptableObject subclass classname chosen from the "Scriptable Object" submenu.
+	std::string create_sobj_classname;
 	void draw_create_asset_popup();
 
 	// Shared path-prompt for the right-click context menu's Duplicate / Make Prefab Using... /

@@ -21,6 +21,11 @@ namespace AssetTemplates {
 
     std::optional<std::string> create_empty_prefab(const std::string& dir, const std::string& name);
 
+    // Create a .sobj file in dir holding an empty (default-constructed) instance of the given
+    // ScriptableObject subclass classname.
+    std::optional<std::string> create_scriptable_object(const std::string& dir, const std::string& name,
+        const std::string& classname);
+
     // Create a .tprefab in dir containing a single MeshComponent entity referencing model_gamepath.
     std::optional<std::string> create_prefab_for_model(const std::string& dir, const std::string& name,
         const std::string& model_gamepath);

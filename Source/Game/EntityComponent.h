@@ -117,7 +117,7 @@ public:
 	void ensure_lua_shadow() override;
 	void take_lua_field_shadow(std::unique_ptr<uint8_t[]> buf) { lua_field_shadow = std::move(buf); }
 	void set_lua_owner_type(const LuaClassTypeInfo* t) { lua_owner_type = t; }
-	const LuaClassTypeInfo* get_lua_owner_type() const { return lua_owner_type; }
+	const LuaClassTypeInfo* get_lua_owner_type() const override { return lua_owner_type; }
 
 	bool get_draw_text_in_editor() const { return draw_text_in_editor; }
 	void editor_set_model(std::string_view modelname, bool draw_text = false);

@@ -6,6 +6,7 @@
 #include "Game/LevelAssets.h"
 #include "GameEnginePublic.h"
 #include "Assets/AssetDatabase.h"
+#include "Assets/ScriptableObject.h"
 #include "ScriptFunctionCodegen.h"
 #include <cassert>
 #include <cstring>
@@ -318,15 +319,17 @@ void LuaClassTypeInfo::synthesize_lua_props_for_component_subclass() {
 	lua_props_list = {};
 	lua_field_shadow_size = 0;
 
-	// Only synthesize for classes whose super chain reaches Component. We walk the
-	// chain by pointer rather than calling ClassTypeInfo::is_a() because the latter
-	// compares id ranges set by ClassBase::post_changes_class_init() — which on the
-	// reload path runs AFTER init_lua_type(), so ids are still zeroed here.
+	// Only synthesize for classes whose super chain reaches Component or ScriptableObject
+	// (the two scriptable-allocate bases with shadow-buffer support). We walk the chain by
+	// pointer rather than calling ClassTypeInfo::is_a() because the latter compares id ranges
+	// set by ClassBase::post_changes_class_init() — which on the reload path runs AFTER
+	// init_lua_type(), so ids are still zeroed here.
 	auto component_ti = ClassBase::find_class("Component");
-	if (!component_ti)
+	auto sobj_ti = ClassBase::find_class("ScriptableObject");
+	if (!component_ti && !sobj_ti)
 		return;
 	const ClassTypeInfo* p = this->super_typeinfo;
-	while (p && p != component_ti)
+	while (p && p != component_ti && p != sobj_ti)
 		p = p->super_typeinfo;
 	if (!p)
 		return;
@@ -449,6 +452,13 @@ ClassBase* LuaClassTypeInfo::lua_class_alloc(const ClassTypeInfo* c) {
 		if (luaInfo->is_init_in_editor_placeable())
 			comp->set_call_init_in_editor(true);
 	}
+	// ScriptableObjects are asset data (loaded/unloaded through AssetDatabase, not
+	// spawned/despawned in a live level), so unlike Component there's no live-instance
+	// registration or init-in-editor flag here — just enough to make PROP_LUA_BACKED
+	// fields resolve through the shadow buffer (see ScriptableObject::ensure_lua_shadow).
+	else if (ScriptableObject* so = out->cast_to<ScriptableObject>()) {
+		so->set_lua_owner_type(luaInfo);
+	}
 	return out;
 }
 
@@ -484,7 +494,7 @@ void ScriptManager::check_for_reload() {
 	// the class's lua_props_storage is rewritten by init_lua_type().
 	for (auto& [cti, snaps] : per_class) {
 		for (auto& snap : snaps)
-			destroy_shadow_for(cti, snap.inst);
+			::destroy_shadow_for(cti, snap.inst);
 	}
 
 	// Phase 2.5: commit any new parsed_properties staged by reload_from_content.
@@ -665,6 +675,35 @@ void ScriptManager::on_component_destructed(Component* c) {
 	auto* lti = const_cast<LuaClassTypeInfo*>(c->get_lua_owner_type());
 	if (!lti)
 		return;
-	destroy_shadow_for(lti, c);
+	::destroy_shadow_for(lti, c);
 	lti->unregister_lua_instance(c);
+}
+
+// ScriptableObject counterparts, duplicated rather than shared with the Component versions
+// above (see ScriptableObject.h for why) — no live-instance tracking / register_lua_instance
+// here, since ScriptableObjects are asset data, not spawned/despawned level objects; a script
+// source edit is picked up the normal way, by reloading the .sobj file from disk.
+void ScriptManager::ensure_shadow_for(ScriptableObject* obj) {
+	if (!inst || !obj)
+		return;
+	if (obj->get_lua_field_shadow())
+		return;
+	auto* lti = const_cast<LuaClassTypeInfo*>(obj->get_lua_owner_type());
+	if (!lti || lti->get_lua_field_shadow_size() == 0)
+		return;
+	obj->take_lua_field_shadow(allocate_and_init_shadow(inst->lua, lti));
+}
+
+void ScriptManager::destroy_shadow_for(ScriptableObject* obj) {
+	if (!obj)
+		return;
+	auto* lti = const_cast<LuaClassTypeInfo*>(obj->get_lua_owner_type());
+	if (!lti)
+		return;
+	uint8_t* shadow = obj->get_lua_field_shadow();
+	if (!shadow)
+		return;
+	for (auto& pi : lti->get_lua_props_storage())
+		destruct_lua_field(pi, shadow + pi.offset);
+	obj->take_lua_field_shadow(nullptr);
 }

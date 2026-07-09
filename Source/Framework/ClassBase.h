@@ -5,6 +5,7 @@
 struct PropertyInfoList;
 class ClassBase;
 class ClassTypeInfo;
+class LuaClassTypeInfo;
 
 struct ClassTypeIterator
 {
@@ -139,6 +140,10 @@ public:
 	virtual uint8_t* get_lua_field_shadow() const { return nullptr; }
 	// Called by get_ptr() before accessing the shadow buffer. Override to lazily allocate.
 	virtual void ensure_lua_shadow() {}
+	// The LuaClassTypeInfo that owns this instance's shadow-buffer layout (offsets/sizes),
+	// set at alloc time. Default null for plain C++ classes; Component and ScriptableObject
+	// override to return their respective lua_owner_type.
+	virtual const LuaClassTypeInfo* get_lua_owner_type() const { return nullptr; }
 
 private:
 	// this is used for interop with lua

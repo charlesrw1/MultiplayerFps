@@ -5,6 +5,7 @@
 #include <algorithm>
 #include "Framework/Files.h"
 #include "Framework/MapUtil.h"
+#include "Assets/ScriptableObject.h"
 
 using std::string;
 using std::unordered_map;
@@ -52,7 +53,27 @@ public:
 		} else {
 			// asset doesnt exist
 			if (!existing) {
-				existing = (IAsset*)type->alloc();
+				// ScriptableObject subclasses all share the ".sobj" extension, so the caller's
+				// static `type` is only ever ScriptableObject::StaticType (or a specific
+				// subclass, e.g. AssetPtr<MyWeaponConfig> fields). The real concrete type lives
+				// in the file's "__classname" key and isn't known until we peek it — read it
+				// now, before the one-time alloc, and allocate that instead. Every other asset
+				// kind is unaffected (peek is a no-op unless type->is_a(ScriptableObject)).
+				const ClassTypeInfo* alloc_type = type;
+				if (type->is_a(ScriptableObject::StaticType)) {
+					const ClassTypeInfo* resolved = ScriptableObject::peek_concrete_type(str);
+					if (!resolved) {
+						sys_print(Error, "ScriptableObject: %s missing/unknown __classname\n", str.c_str());
+						return nullptr;
+					}
+					if (!resolved->is_a(*type)) {
+						sys_print(Error, "ScriptableObject: %s is a '%s', not a '%s'\n", str.c_str(),
+								  resolved->classname, type->classname);
+						return nullptr;
+					}
+					alloc_type = resolved;
+				}
+				existing = (IAsset*)alloc_type->alloc();
 				existing->path = str;
 				std::shared_ptr<IAsset> sptr(existing);
 				allAssets.insert({str, sptr});

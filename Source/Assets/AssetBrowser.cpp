@@ -15,6 +15,7 @@
 #include "AssetRegistryLocal.h"
 
 #include "AssetDatabase.h"
+#include "Assets/ScriptableObject.h"
 
 // Case-insensitive substring search without allocations
 static inline bool contains_case_insensitive(std::string_view haystack, std::string_view needle) {
@@ -403,6 +404,24 @@ static void draw_create_new_menu_items(AssetBrowser* b, const std::string& folde
 			b->create_asset_type = AssetBrowser::CreateAssetType::Prefab;
 			b->create_folder_override = folder;
 			memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
+		}
+		// Lists every concrete (non-abstract) ScriptableObject subclass currently registered
+		// with ClassBase — both C++-defined and any Lua-defined ones loaded so far. Unlike the
+		// fixed entries above, this list is built dynamically since new subclasses can be
+		// added without touching this file.
+		if (ImGui::BeginMenu("Scriptable Object")) {
+			for (auto it = ClassBase::get_subclasses<ScriptableObject>(); !it.is_end(); it.next()) {
+				const ClassTypeInfo* ti = it.get_type();
+				if (ti == &ScriptableObject::StaticType || !ti->has_allocate_func())
+					continue;
+				if (ImGui::MenuItem(ti->classname)) {
+					b->create_asset_type = AssetBrowser::CreateAssetType::ScriptableObject;
+					b->create_sobj_classname = ti->classname;
+					b->create_folder_override = folder;
+					memset(b->create_asset_name, 0, sizeof(b->create_asset_name));
+				}
+			}
+			ImGui::EndMenu();
 		}
 		ImGui::EndMenu();
 	}
@@ -927,7 +946,7 @@ void AssetBrowser::draw_create_asset_popup() {
 	if (create_asset_type == CreateAssetType::None)
 		return;
 
-	const char* titles[] = {"", "Create Map", "Create Particle", "Create Master Material", "Create Material Instance", "Create Prefab"};
+	const char* titles[] = {"", "Create Map", "Create Particle", "Create Master Material", "Create Material Instance", "Create Prefab", "Create Scriptable Object"};
 	const char* title = titles[(int)create_asset_type];
 
 	ImGui::OpenPopup(title);
@@ -947,6 +966,10 @@ void AssetBrowser::draw_create_asset_popup() {
 
 		if (create_asset_type == CreateAssetType::MaterialInstance) {
 			ImGui::Text("Master: %s", create_mi_master_path.c_str());
+		}
+
+		if (create_asset_type == CreateAssetType::ScriptableObject) {
+			ImGui::Text("Type: %s", create_sobj_classname.c_str());
 		}
 
 		ImGui::Separator();
@@ -974,6 +997,9 @@ void AssetBrowser::draw_create_asset_popup() {
 				break;
 			case CreateAssetType::Prefab:
 				result = AssetTemplates::create_empty_prefab(create_folder_override, create_asset_name);
+				break;
+			case CreateAssetType::ScriptableObject:
+				result = AssetTemplates::create_scriptable_object(create_folder_override, create_asset_name, create_sobj_classname);
 				break;
 			default:
 				break;
