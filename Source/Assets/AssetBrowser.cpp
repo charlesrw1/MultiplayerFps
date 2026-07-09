@@ -85,6 +85,9 @@ AssetBrowser::AssetBrowser() {
 		Fatalf("no folder icons\n");
 	import_model_icon = g_assets.find<Texture>("eng/icons/publish.png").get();
 	filter_icon = g_assets.find<Texture>("eng/icons/filter.png").get();
+	document_icon = g_assets.find<Texture>("eng/icon/document.png").get();
+	if (!document_icon)
+		sys_print(Warning, "AssetBrowser: no eng/icon/document.png, grid view fallback thumbnails will be blank\n");
 
 	inspector_pane = std::make_unique<AssetInspectorPane>();
 
@@ -643,7 +646,7 @@ static void draw_folder_tree(AssetBrowser* b) {
 #include "Framework/StringUtils.h"
 #include "Framework/Files.h"
 
-bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* label) {
+bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* label, ImU32 tint_col = IM_COL32_WHITE) {
 	ImVec2 pos = ImGui::GetCursorScreenPos();
 	ImVec2 label_pos = pos;
 
@@ -654,7 +657,7 @@ bool ImageButtonWithOverlayText(ImTextureID texture, ImVec2 size, const char* la
 
 	// Draw the image
 	ImDrawList* draw_list = ImGui::GetWindowDrawList();
-	draw_list->AddImage(texture, pos, ImVec2(pos.x + size.x, pos.y + size.y), ImVec2(0, 1), ImVec2(1, 0));
+	draw_list->AddImage(texture, pos, ImVec2(pos.x + size.x, pos.y + size.y), ImVec2(0, 1), ImVec2(1, 0), tint_col);
 
 	// Optional highlight on hover
 	if (hovered) {
@@ -690,46 +693,92 @@ void AssetBrowser::draw_browser_grid() {
 
 	std::vector<AssetFilesystemNode*> items2;
 	{
-		// Iterate the registry's linear list directly instead of copying it into a
-		// fresh vector every frame (fill_big_vector used to do exactly that).
-		auto& items = AssetRegistrySystem::get().get_linear_list();
-
 		const int name_filter_len = strlen(asset_name_filter);
 		const bool has_filter = name_filter_len > 0;
-		AssetFilesystemNode* target_folder = has_filter
-			? nullptr
-			: resolve_folder_node(AssetRegistrySystem::get().get_root_files(), selected_folder);
-		items2.reserve(items.size());
-		for (auto& c : items) {
-			auto& asset = c->asset;
-			if (!ThumbnailManager::supports_thumbnail(asset))
-				continue;
-			if (has_filter) {
+
+		if (has_filter) {
+			// Search flattens across every asset (all types now, not just thumbnail-able
+			// ones); folders aren't shown while a search filter is active.
+			auto& items = AssetRegistrySystem::get().get_linear_list();
+			items2.reserve(items.size());
+			for (auto& c : items) {
+				auto& asset = c->asset;
+				if (!should_type_show(asset.type->self_index))
+					continue;
 				if (!contains_case_insensitive(asset.filename, all_lower_cast_filter_name))
 					continue;
 				if (search_scope == AssetBrowser::SearchScope::Folder && !selected_folder.empty()) {
 					if (asset.filename.find(selected_folder + "/") != 0)
 						continue;
 				}
-			} else {
-				// No active search: Unity-style folder browsing — only direct children
-				// of the selected folder, not the whole subtree.
-				if (c->parent != target_folder)
-					continue;
+				items2.push_back(c);
 			}
-			items2.push_back(c);
+		} else {
+			// No active search: Unity-style folder browsing — direct children only.
+			// sorted_list is already ordered folders-first then alphabetical.
+			AssetFilesystemNode* target_folder =
+				resolve_folder_node(AssetRegistrySystem::get().get_root_files(), selected_folder);
+			if (target_folder) {
+				items2.reserve(target_folder->sorted_list.size());
+				for (auto* c : target_folder->sorted_list) {
+					if (c->is_folder() || should_type_show(c->asset.type->self_index))
+						items2.push_back(c);
+				}
+			}
 		}
 	}
 
 	ImGuiListClipper clipper;
 	clipper.Begin((int)glm::ceil(items2.size() / float(boxes)));
 
+	// Folder tile: navigates into the folder on double-click (Unity-style), and accepts
+	// asset drag-drop to move the dragged asset into it.
+	auto draw_folder_item = [&](AssetFilesystemNode* node) {
+		std::string parent_path = node_parent_folder_path(node);
+		std::string folder_path = parent_path.empty() ? node->name : (parent_path + "/" + node->name);
+
+		const int THUMB_SIZE = (big_thumbnail) ? 128 : 64;
+		ImVec2 thumb_size = ImVec2((float)THUMB_SIZE, (float)THUMB_SIZE);
+
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+		if (folder_closed) {
+			ImageButtonWithOverlayText(ImTextureID(uint64_t(folder_closed->get_internal_render_handle())),
+									   thumb_size, node->name.c_str());
+		} else {
+			ImGui::InvisibleButton("##folder", thumb_size);
+		}
+		ImGui::PopStyleColor();
+
+		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClickedCount[0] == 2)
+			selected_folder = folder_path;
+
+		if (ImGui::BeginDragDropTarget()) {
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")) {
+				ASSERT(payload->DataSize == sizeof(AssetOnDisk*));
+				const AssetOnDisk* src = *static_cast<const AssetOnDisk* const*>(payload->Data);
+				auto result = AssetOps::mv(src->filename, folder_path);
+				if (!result.success)
+					sys_print(Error, "AssetOps::mv failed: %s\n", result.error.c_str());
+			}
+			ImGui::EndDragDropTarget();
+		}
+	};
+
 	auto draw_item = [&](const int item_idx) {
 		auto& c = items2.at(item_idx);
 		ImGui::TableNextColumn();
 		ImGui::PushID(c);
 
-		Texture* t = thumbnails.get_thumbnail(c->asset); // marks as visible; may be null (loading)
+		if (c->is_folder()) {
+			draw_folder_item(c);
+			ImGui::PopID();
+			return;
+		}
+
+		// Assets with no real thumbnail (anything but Model/MaterialInstance/Texture)
+		// fall back to the generic document icon, tinted by the asset type's browser color.
+		const bool has_real_thumb = ThumbnailManager::supports_any_thumb(c->asset);
+		Texture* t = has_real_thumb ? thumbnails.get_thumbnail(c->asset) : nullptr; // marks as visible; may be null (loading)
 		string only_filename = c->asset.filename;
 		StringUtils::get_filename(only_filename);
 
@@ -745,7 +794,7 @@ void AssetBrowser::draw_browser_grid() {
 			item_pressed = ImageButtonWithOverlayText(ImTextureID(uint64_t(t->get_internal_render_handle())),
 													  thumb_size, only_filename.c_str());
 			ImGui::PopStyleColor();
-		} else {
+		} else if (has_real_thumb) {
 			// Placeholder while streaming in
 			ImGui::InvisibleButton("##thumb", thumb_size);
 			item_pressed = ImGui::IsItemDeactivated() && !ImGui::IsMouseDragging(ImGuiMouseButton_Left);
@@ -758,6 +807,15 @@ void AssetBrowser::draw_browser_grid() {
 						ImVec2(thumb_screen_pos.x + 4.f, thumb_screen_pos.y + 4.f),
 						IM_COL32(110, 110, 110, 255), only_filename.c_str(), nullptr, THUMB_SIZE - 8.f);
 			ImGui::PopClipRect();
+		} else if (document_icon) {
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+			ImU32 tint = color32_to_int(c->asset.type->get_browser_color());
+			item_pressed = ImageButtonWithOverlayText(ImTextureID(uint64_t(document_icon->get_internal_render_handle())),
+													  thumb_size, only_filename.c_str(), tint);
+			ImGui::PopStyleColor();
+		} else {
+			ImGui::InvisibleButton("##thumb", thumb_size);
+			item_pressed = ImGui::IsItemDeactivated() && !ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 		}
 
 		// Selection highlight border

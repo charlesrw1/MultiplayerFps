@@ -13,10 +13,13 @@ class AssetInspectorPane;
 class ThumbnailManager
 {
 public:
-	// Returns true if this asset type can have a thumbnail (model/material — shown in grid AND list).
+	// Returns true if this asset type can have a rendered thumbnail (model/material).
 	static bool supports_thumbnail(const AssetOnDisk& asset);
-	// Returns true if this asset type has an image thumbnail (Texture — list view only).
+	// Returns true if this asset type has an image thumbnail loaded directly from disk (Texture).
 	static bool supports_image_thumb(const AssetOnDisk& asset);
+	// True if get_thumbnail() can ever return a real texture for this asset (vs. always
+	// falling back to the tinted document icon).
+	static bool supports_any_thumb(const AssetOnDisk& asset) { return supports_thumbnail(asset) || supports_image_thumb(asset); }
 
 	// Returns the cached Texture* if ready, nullptr if still loading.
 	// Calling this marks the asset as visible this frame (raises priority).
@@ -107,6 +110,7 @@ public:
 	Texture* folder_closed{};
 	Texture* import_model_icon{};
 	Texture* filter_icon{};
+	Texture* document_icon{}; // fallback thumbnail (tinted by asset type color) for types with no real thumbnail
 
 	bool using_grid = false;
 
