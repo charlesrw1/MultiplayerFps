@@ -26,6 +26,7 @@
 #include "Physics/Physics2.h"
 #include "Sound/SoundPublic.h"
 #include "imgui.h"
+#include "imgui_internal.h" // ErrorCheckEndFrameRecover -- see lua_error_loop
 #include "Render/IGraphicsDevice.h"
 #include "UI/UILoader.h"
 #include "UI/Widgets/Layouts.h"
@@ -105,46 +106,78 @@ struct GameUpdateOuput
 	View_Setup vsOut;
 };
 
-static void lua_error_loop(string msg, auto&& frame_start, auto&& wait_for_swap, SceneDrawParamsEx drawparamsNext,
-						   View_Setup setupNext) {
+static void lua_error_loop(string msg, auto&& frame_start, auto&& wait_for_swap) {
 	// bsod is funny lol
 	sys_print(Error, "loop: caught LuaRuntimeError: %s\n", msg.c_str());
 	auto lines = StringUtils::to_lines(msg);
-	//	drawparamsNext.draw_world = false;
-	drawparamsNext.draw_ui = true;
 
+	// Deliberately don't go through the normal scene_draw / editor viewport / property-panel
+	// path here:
+	//  - In the editor, the game view renders into an offscreen texture that only reaches the
+	//    screen via the editor's own docked ImGui panel (UiSystem::draw_imgui_interfaces).
+	//    Reusing the last frame's SceneDrawParamsEx/View_Setup and calling idraw->scene_draw
+	//    directly (the old approach) therefore never actually reached the presented backbuffer
+	//    -- nothing appeared, which is why no BSOD showed up.
+	//  - Routing through the editor's panels instead would re-run property-grid/preview code,
+	//    which is what threw in the first place (Component::editor_start), causing it to throw
+	//    again every ~10ms -- the actual source of the "flicker".
+	// Drawing our own minimal, opaque, full-viewport ImGui window and pushing it straight to
+	// gfx().imgui_render_draw_data() sidesteps both problems: it touches none of the
+	// game/editor state that's implicated in the error, and ImGui always composites directly
+	// onto the real presented backbuffer regardless of editor/game mode.
 	while (1) {
 		SDL_Delay(10);
 
 		gfx().begin_frame();
-		frame_start();
 
-		if (Input::was_key_pressed(SDL_SCANCODE_RETURN))
-			break;
+		// A script can also error out from console-command handling, hot-reload, or other
+		// code paths reachable from frame_start() below. Catch it here instead of letting it
+		// escape this loop uncaught -- that would unwind past the try/catch in loop() and
+		// terminate the app, which looks like a freeze/crash right as the user is trying to
+		// fix the original error.
+		try {
+			frame_start();
 
-		RectangleShape shape;
-		shape.color = {50, 50, 255, 180};
-		shape.rect.w = setupNext.width;
-		shape.rect.h = setupNext.height;
-		UiSystem::inst->window.draw(shape);
-		TextShape text;
-		text.font = GuiFont::load("eng/fonts/monospace12.fnt");
-		text.color = COLOR_WHITE;
-		text.rect.x = 5;
-		text.rect.y = 5;
-		for (auto& l : lines) {
-			text.text = l;
-			text.rect.y += text.font->lineHeight;
-			UiSystem::inst->window.draw(text);
+			if (Input::was_key_pressed(SDL_SCANCODE_RETURN))
+				break;
+
+			// The throw that got us here (or a nested one caught below) may have happened
+			// mid-way through the editor's own ImGui drawing (e.g. a property panel refresh
+			// that calls back into a script while inside Begin("Properties")). That leaves
+			// ImGui's window/style/ID stacks with unmatched Begin/PushStyleVar/etc calls, and
+			// its NewFrame() itself left dangling without a matching Render()/EndFrame().
+			// ErrorCheckEndFrameRecover() force-closes everything left open (a no-op if the
+			// last frame actually closed cleanly), then EndFrame() is safe to call.
+			ImGui::ErrorCheckEndFrameRecover(nullptr);
+			ImGui::EndFrame();
+
+			gfx().imgui_new_frame();
+			ImGui::NewFrame();
+
+			ImGuiViewport* vp = ImGui::GetMainViewport();
+			ImGui::SetNextWindowPos(vp->Pos);
+			ImGui::SetNextWindowSize(vp->Size);
+			ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.05f, 0.05f, 0.25f, 1.0f));
+			ImGui::Begin("##lua_bsod", nullptr,
+						  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+							  ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNav);
+			ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "LUA RUNTIME ERROR");
+			ImGui::Separator();
+			for (auto& l : lines)
+				ImGui::TextUnformatted(l.c_str());
+			ImGui::Separator();
+			ImGui::TextColored(ImVec4(1, 1, 0, 1), "Fix the script and save, then press ENTER to continue.");
+			ImGui::End();
+			ImGui::PopStyleColor();
+
+			ImGui::Render();
+			gfx().imgui_render_draw_data();
+			wait_for_swap(false);
 		}
-		text.rect.y += text.font->lineHeight * 5;
-		text.text = "[PRESS ENTER TO CONTINUE]";
-		UiSystem::inst->window.draw(text);
-
-		UiSystem::inst->sync_to_renderer();
-		idraw->sync_update();
-		idraw->scene_draw(drawparamsNext, setupNext);
-		wait_for_swap(false);
+		catch (LuaRuntimeError& nested) {
+			sys_print(Error, "loop: caught LuaRuntimeError while showing error screen: %s\n", nested.what());
+			lines = StringUtils::to_lines(nested.what());
+		}
 	}
 	ScriptManager::inst->check_for_reload();
 }
@@ -460,8 +493,8 @@ void GameEngineLocal::loop() {
 
 			prof::Profiler::end_frame();
 		}
-		catch (LuaRuntimeError luaErr) {
-			lua_error_loop(luaErr.what(), frame_start, wait_for_swap, drawparamsNext, setupNext);
+		catch (LuaRuntimeError& luaErr) {
+			lua_error_loop(luaErr.what(), frame_start, wait_for_swap);
 		}
 	}
 }

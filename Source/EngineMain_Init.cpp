@@ -507,7 +507,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 			try {
 				app->on_post_material_load(m);
 			}
-			catch (LuaRuntimeError er) {
+			catch (LuaRuntimeError& er) {
 				sys_print(Error, "on_post_material_load %s\n", er.what());
 			}
 		});
