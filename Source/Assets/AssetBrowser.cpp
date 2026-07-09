@@ -967,6 +967,31 @@ void AssetBrowser::imgui_draw() {
 	}
 	const int name_filter_len = strlen(asset_name_filter);
 
+	// Search scope toggle (Unity-style): only shown while a filter is active, lets
+	// the user pick between searching every asset or just the selected folder's subtree.
+	// Kept on the same row as the rest of the filter bar.
+	if (name_filter_len > 0) {
+		auto scope_button = [this](const char* label, SearchScope scope) {
+			bool active = (search_scope == scope);
+			if (active)
+				ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
+			if (ImGui::Button(label))
+				search_scope = scope;
+			if (active)
+				ImGui::PopStyleColor();
+		};
+		ImGui::SameLine();
+		ImGui::AlignTextToFramePadding();
+		ImGui::TextUnformatted("Search:");
+		ImGui::SameLine();
+		scope_button("All", SearchScope::All);
+		ImGui::SameLine();
+		std::string folder_label = "'" + (selected_folder.empty() ? std::string("root") : selected_folder) + "'";
+		ImGui::BeginDisabled(selected_folder.empty());
+		scope_button(folder_label.c_str(), SearchScope::Folder);
+		ImGui::EndDisabled();
+	}
+
 	if (ImGui::BeginPopup("type_popup_assets")) {
 		bool is_hiding_all = filter_type_mask != 0;
 		if (ImGui::Checkbox("Show/Hide all", &is_hiding_all)) {
@@ -988,29 +1013,6 @@ void AssetBrowser::imgui_draw() {
 	all_lower_cast_filter_name = asset_name_filter;
 	for (int i = 0; i < name_filter_len; i++)
 		all_lower_cast_filter_name[i] = tolower(all_lower_cast_filter_name[i]);
-
-	// Search scope toggle (Unity-style): only shown while a filter is active, lets
-	// the user pick between searching every asset or just the selected folder's subtree.
-	if (name_filter_len > 0) {
-		auto scope_button = [this](const char* label, SearchScope scope) {
-			bool active = (search_scope == scope);
-			if (active)
-				ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
-			if (ImGui::Button(label))
-				search_scope = scope;
-			if (active)
-				ImGui::PopStyleColor();
-		};
-		ImGui::AlignTextToFramePadding();
-		ImGui::TextUnformatted("Search:");
-		ImGui::SameLine();
-		scope_button("All", SearchScope::All);
-		ImGui::SameLine();
-		std::string folder_label = "'" + (selected_folder.empty() ? std::string("root") : selected_folder) + "'";
-		ImGui::BeginDisabled(selected_folder.empty());
-		scope_button(folder_label.c_str(), SearchScope::Folder);
-		ImGui::EndDisabled();
-	}
 
 	// Split layout: folder tree | asset view
 	const float splitter_w = 6.0f;
