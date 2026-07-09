@@ -128,6 +128,19 @@ static void lua_error_loop(string msg, auto&& frame_start, auto&& wait_for_swap)
 	while (1) {
 		SDL_Delay(10);
 
+		// Quitting from here must not go through frame_start()'s normal ::Quit() path: that
+		// calls eng_local.cleanup() -> stop_game() -> Component::stop() on every live
+		// component, including whichever one has the still-broken Lua state that put us on
+		// this screen in the first place. That re-throws right back into this loop's own
+		// nested-LuaRuntimeError catch below, which just prints and loops again -- the
+		// exit(0) in Quit() never runs, so the close button silently does nothing. Peek (not
+		// consume, so ImGui/Input still see it) for the quit event and hard-exit before any
+		// cleanup gets a chance to touch the broken script.
+		if (SDL_HasEvent(SDL_EVENT_QUIT)) {
+			sys_print(Info, "loop: quit requested while showing Lua error screen, exiting without cleanup\n");
+			exit(0);
+		}
+
 		gfx().begin_frame();
 
 		// A script can also error out from console-command handling, hot-reload, or other
