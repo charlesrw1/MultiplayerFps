@@ -1051,7 +1051,7 @@ static void draw_breadcrumb(AssetBrowser* b) {
 
 	// No separator here — the asset grid/list table below already draws its own top
 	// border (ImGuiTableFlags_Borders), so a separator on top of that doubled the line.
-	ImGui::Dummy(ImVec2(0.0f, 2.0f));
+	// No spacer either: default ItemSpacing between this line and the table is enough.
 }
 
 void AssetBrowser::imgui_draw() {
