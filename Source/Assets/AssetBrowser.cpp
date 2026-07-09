@@ -88,6 +88,9 @@ AssetBrowser::AssetBrowser() {
 	document_icon = g_assets.find<Texture>("eng/icon/document.png").get();
 	if (!document_icon)
 		sys_print(Warning, "AssetBrowser: no eng/icon/document.png, grid view fallback thumbnails will be blank\n");
+	folder_big = g_assets.find<Texture>("eng/icon/folderbig.png").get();
+	if (!folder_big)
+		sys_print(Warning, "AssetBrowser: no eng/icon/folderbig.png, grid view folder tiles will be blank\n");
 
 	inspector_pane = std::make_unique<AssetInspectorPane>();
 
@@ -741,8 +744,8 @@ void AssetBrowser::draw_browser_grid() {
 		ImVec2 thumb_size = ImVec2((float)THUMB_SIZE, (float)THUMB_SIZE);
 
 		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
-		if (folder_closed) {
-			ImageButtonWithOverlayText(ImTextureID(uint64_t(folder_closed->get_internal_render_handle())),
+		if (folder_big) {
+			ImageButtonWithOverlayText(ImTextureID(uint64_t(folder_big->get_internal_render_handle())),
 									   thumb_size, node->name.c_str());
 		} else {
 			ImGui::InvisibleButton("##folder", thumb_size);

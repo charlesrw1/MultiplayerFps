@@ -111,6 +111,7 @@ public:
 	Texture* import_model_icon{};
 	Texture* filter_icon{};
 	Texture* document_icon{}; // fallback thumbnail (tinted by asset type color) for types with no real thumbnail
+	Texture* folder_big{}; // folder tile icon used in grid view
 
 	bool using_grid = false;
 
