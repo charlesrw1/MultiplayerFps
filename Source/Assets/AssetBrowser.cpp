@@ -437,6 +437,15 @@ static void draw_create_new_menu_items(AssetBrowser* b, const std::string& folde
 
 // Recursive folder-only tree for the left panel.
 // parent_path is the gamepath prefix (e.g. "" for root, "textures" for the textures folder).
+// True if this folder contains at least one subfolder (as opposed to only files).
+static bool folder_has_subfolders(const AssetFilesystemNode* node) {
+	for (auto& c : node->children) {
+		if (!c.second.children.empty())
+			return true;
+	}
+	return false;
+}
+
 static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode* node, const std::string& parent_path) {
 	const float folder_indent = 16.0f;
 	for (auto* child : node->sorted_list) {
@@ -448,6 +457,9 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 		ImGui::PushID(child);
 
 		bool is_selected = (b->selected_folder == folder_path);
+		// Folders with no subfolders (only files) can never be meaningfully expanded
+		// in this folder-only tree — render them dimmer and always closed.
+		bool has_subdirs = folder_has_subfolders(child);
 
 		// Ping flash: draw a fading yellow highlight behind the row that was just
 		// navigated to via "Find in Browser" (mirrors Unity's ping feedback).
@@ -461,8 +473,10 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 		}
 
 		// Animate the open/closed icon crossfade toward the current state.
+		// Folders without subfolders always animate toward closed, regardless of
+		// folder_is_open, since there's nothing underneath to reveal.
 		const float anim_speed = 25.f;
-		float target_anim = child->folder_is_open ? 1.0f : 0.0f;
+		float target_anim = (has_subdirs && child->folder_is_open) ? 1.0f : 0.0f;
 		child->folder_open_anim += (target_anim - child->folder_open_anim) * std::min(1.0f, ImGui::GetIO().DeltaTime * anim_speed);
 		if (fabsf(target_anim - child->folder_open_anim) < 0.001f)
 			child->folder_open_anim = target_anim;
@@ -475,19 +489,23 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 		ImGui::SameLine();
 		const float ICON_SIZE = 14.0f;
 
+		// Dim tint applied to both the icon and label for subfolder-less folders.
+		const ImVec4 dim_tint(0.6f, 0.6f, 0.6f, 1.0f);
+
 		if (b->folder_closed && b->folder_open) {
 			ImVec2 icon_pos = ImGui::GetCursorScreenPos();
 			ImGui::PushID("##icon");
 			if (ImGui::InvisibleButton("##toggle", ImVec2(ICON_SIZE, ICON_SIZE)))
 				child->folder_is_open = !child->folder_is_open;
 			ImGui::PopID();
-			float open_alpha = child->folder_open_anim;
+			float open_alpha = has_subdirs ? child->folder_open_anim : 0.0f;
 			ImDrawList* dl = ImGui::GetWindowDrawList();
 			ImVec2 icon_max(icon_pos.x + ICON_SIZE, icon_pos.y + ICON_SIZE);
+			ImVec4 closed_tint = has_subdirs ? ImVec4(1, 1, 1, 1.0f - open_alpha) : ImVec4(dim_tint.x, dim_tint.y, dim_tint.z, 1.0f);
 			if (open_alpha < 0.999f)
 				dl->AddImage(ImTextureID(uint64_t(b->folder_closed->get_internal_render_handle())),
 					icon_pos, icon_max, ImVec2(0, 0), ImVec2(1, 1),
-					ImGui::GetColorU32(ImVec4(1, 1, 1, 1.0f - open_alpha)));
+					ImGui::GetColorU32(closed_tint));
 			if (open_alpha > 0.001f)
 				dl->AddImage(ImTextureID(uint64_t(b->folder_open->get_internal_render_handle())),
 					icon_pos, icon_max, ImVec2(0, 0), ImVec2(1, 1),
@@ -495,8 +513,12 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 		}
 		ImGui::SameLine();
 
+		if (!has_subdirs)
+			ImGui::PushStyleColor(ImGuiCol_Text, dim_tint);
 		if (ImGui::Selectable(child->name.c_str(), is_selected, ImGuiSelectableFlags_AllowItemOverlap))
 			b->selected_folder = folder_path;
+		if (!has_subdirs)
+			ImGui::PopStyleColor();
 
 		ImGui::PopStyleVar();
 
