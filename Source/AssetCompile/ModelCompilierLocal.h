@@ -99,6 +99,7 @@ public:
 	bool worldLmMerge = false;
 	bool use_mesh_as_cvx_collision = false;
 	bool use_mesh_as_collision = false;
+	bool export_embedded_textures = false; // write out embedded "_ALB"/"_NRM" textures
 
 	std::string model_source;
 	uint64_t timestamp_of_def = 0;

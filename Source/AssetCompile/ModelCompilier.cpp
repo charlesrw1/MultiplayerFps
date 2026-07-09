@@ -45,6 +45,7 @@ ModelDefData new_import_settings_to_modeldef_data(const std::string& gamepath, M
 	ModelDefData mdd;
 	mdd.use_mesh_as_collision = is->meshAsCollision;
 	mdd.use_mesh_as_cvx_collision = is->meshAsConvex;
+	mdd.export_embedded_textures = is->exportEmbeddedTextures;
 	mdd.isLightmapped = is->withLightmap;
 	mdd.lightmapSizeX = is->lightmapSizeX;
 	mdd.lightmapSizeY = is->lightmapSizeY;

@@ -854,6 +854,9 @@ void AssetInspectorPane::draw_mis_settings(const std::string& gamepath) {
             ImGui::SetTooltip("Auto-LOD level (1-4) at which meshopt may drop disconnected mesh islands. 0 disables island pruning entirely.");
     }
     changed |= ImGui::Checkbox("Disable Prune Unused Bones", &mis->disablePruneUnusedBones);
+    changed |= ImGui::Checkbox("Export Embedded Textures", &mis->exportEmbeddedTextures);
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Write out the glb's embedded \"_ALB\"/\"_NRM\" textures on compile. Off by default.");
 
     if (changed) settings_dirty = true;
 

@@ -93,6 +93,10 @@ public:
 	REF bool meshAsConvex = false;
 	REF bool meshAsCollision = false;
 
+	// If true, write out the glb's embedded "_ALB"/"_NRM" textures during compile.
+	// Defaults to off since most models replace these with real material textures.
+	REF bool exportEmbeddedTextures = false;
+
 	REF bool generate_auto_lods = false;
 	REF int prune_disconnected_islands_min_lod = 1; // auto-LOD level (1-based) at which meshopt is allowed to drop disconnected islands; 0 disables pruning entirely
 
