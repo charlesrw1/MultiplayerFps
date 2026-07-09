@@ -170,6 +170,45 @@ TEST_F(LuaComponentReflectionTest, EmptyParsedPropsProducesNullList) {
 	EXPECT_EQ(cti.get_lua_field_shadow_size(), 0u);
 }
 
+TEST_F(LuaComponentReflectionTest, ParserAndSynthesisHandleAssetPtr) {
+	auto out = ScriptLoadingUtil::parse_text("---@class C\n"
+											 "C = {\n"
+											 "  ---@type IAsset\n"
+											 "  icon = nil,\n"
+											 "}\n");
+	ASSERT_EQ(out.size(), 1u);
+	ASSERT_EQ(out[0].props.size(), 1u);
+	EXPECT_EQ(out[0].props[0].name, "icon");
+	EXPECT_EQ(out[0].props[0].type_str, "IAsset");
+
+	LuaClassTypeInfo cti;
+	cti.set_classname("HasAsset");
+	cti.set_parsed_properties(std::move(out[0].props));
+	cti.synthesize_lua_props_unchecked_for_test();
+
+	auto* list = cti.get_lua_props_list();
+	ASSERT_NE(list, nullptr);
+	ASSERT_EQ(list->count, 1);
+	auto& storage = cti.get_lua_props_storage();
+	EXPECT_EQ(storage[0].type, core_type_id::AssetPtr);
+	EXPECT_EQ(storage[0].class_type, ClassBase::find_class("IAsset"));
+	EXPECT_TRUE(storage[0].can_serialize());
+	EXPECT_EQ(cti.get_lua_field_shadow_size(), sizeof(void*));
+}
+
+TEST_F(LuaComponentReflectionTest, SynthesisDropsAssetPtrForUnknownOrNonAssetClass) {
+	std::vector<ParseProperty> props = {
+		{"a", "NoSuchClass"},
+		{"b", "Component"}, // real class, but not IAsset-derived
+	};
+	LuaClassTypeInfo cti;
+	cti.set_classname("BadAsset");
+	cti.set_parsed_properties(std::move(props));
+	cti.synthesize_lua_props_unchecked_for_test();
+	EXPECT_EQ(cti.get_lua_props_list(), nullptr);
+	EXPECT_EQ(cti.get_lua_field_shadow_size(), 0u);
+}
+
 TEST_F(LuaComponentReflectionTest, ResynthesizeReplacesPriorLayout) {
 	// Hot-reload changes the field set: re-running synthesis must clear stale entries.
 	LuaClassTypeInfo cti;

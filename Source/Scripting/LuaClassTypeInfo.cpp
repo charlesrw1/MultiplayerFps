@@ -5,6 +5,8 @@
 #include "Game/EntityComponent.h"
 #include "Game/LevelAssets.h"
 #include "GameEnginePublic.h"
+#include "Assets/AssetDatabase.h"
+#include "ScriptFunctionCodegen.h"
 #include <cassert>
 #include <cstring>
 #include <new>
@@ -26,6 +28,8 @@ struct LuaFieldSnapshot
 	int32_t     i = 0;
 	int8_t      b = 0;
 	std::string s;
+	IAsset*     asset = nullptr;
+	const ClassTypeInfo* asset_class = nullptr;
 };
 
 struct LuaInstanceSnapshot
@@ -43,6 +47,7 @@ static LuaFieldSnapshot snapshot_field(const PropertyInfo& pi, uint8_t* p) {
 	case core_type_id::Enum32: v.i = *(int32_t*)p; break;
 	case core_type_id::Bool: v.b = *(int8_t*)p; break;
 	case core_type_id::StdString: v.s = *(std::string*)p; break;
+	case core_type_id::AssetPtr: v.asset = *(IAsset**)p; v.asset_class = pi.class_type; break;
 	default: break;
 	}
 	return v;
@@ -51,23 +56,28 @@ static LuaFieldSnapshot snapshot_field(const PropertyInfo& pi, uint8_t* p) {
 static void restore_field(const LuaFieldSnapshot& v, const PropertyInfo& pi, uint8_t* p) {
 	if (v.type != pi.type)
 		return; // type changed across reload — fall through to template default
+	if (pi.type == core_type_id::AssetPtr && v.asset_class != pi.class_type)
+		return; // asset class changed across reload (e.g. Texture -> Model) — same reasoning
 	switch (pi.type) {
 	case core_type_id::Float: *(float*)p = v.f; break;
 	case core_type_id::Int32:
 	case core_type_id::Enum32: *(int32_t*)p = v.i; break;
 	case core_type_id::Bool: *(int8_t*)p = v.b; break;
 	case core_type_id::StdString: *(std::string*)p = v.s; break;
+	case core_type_id::AssetPtr: *(IAsset**)p = v.asset; break;
 	default: break;
 	}
 }
 
 // Maps a Lua ---@type annotation string to a (core_type_id, optional EnumTypeInfo*, optional
-// custom_type_str) tuple. Returns true on a recognized type. Unrecognized types (vec3, tables,
-// asset refs, etc.) are deferred to a later feature pass.
+// custom_type_str, optional asset ClassTypeInfo*) tuple. Returns true on a recognized type.
+// Unrecognized types (vec3, tables, etc.) are deferred to a later feature pass.
 static bool lua_type_str_to_core_type(const string& type_str, core_type_id& out_type,
-									  const EnumTypeInfo*& out_enum, const char*& out_custom_type) {
+									  const EnumTypeInfo*& out_enum, const char*& out_custom_type,
+									  const ClassTypeInfo*& out_class_type) {
 	out_enum = nullptr;
 	out_custom_type = "";
+	out_class_type = nullptr;
 	if (type_str == "number" || type_str == "float") {
 		out_type = core_type_id::Float;
 		return true;
@@ -94,12 +104,30 @@ static bool lua_type_str_to_core_type(const string& type_str, core_type_id& out_
 		out_enum = e;
 		return true;
 	}
+	// A bare asset class name -- "Model", "MaterialInstance", "Texture", etc: same layout as an
+	// IAsset* (see AssetPtr<T> static_assert in IAsset.h) for every T, so the shadow buffer just
+	// stores the raw IAsset* and out_class_type records which asset class to constrain
+	// lookups/drag-drop/serialization to.
+	if (const ClassTypeInfo* ct = ClassBase::find_class(type_str.c_str())) {
+		// Walk by pointer (not is_a(), whose id ranges aren't valid until
+		// ClassBase::post_changes_class_init() runs -- see the same pattern in
+		// synthesize_lua_props_for_component_subclass() above) to confirm type_str derives IAsset.
+		const ClassTypeInfo* asset_base = ClassBase::find_class("IAsset");
+		const ClassTypeInfo* walk = ct;
+		while (walk && asset_base && walk != asset_base)
+			walk = walk->super_typeinfo;
+		if (asset_base && walk) {
+			out_type = core_type_id::AssetPtr;
+			out_class_type = ct;
+			return true;
+		}
+	}
 	return false;
 }
 
 // Returns the byte size required to store a value of the given core_type_id in the
 // per-instance shadow buffer. std::string is constructed/destructed via placement new
-// when the buffer is (re)allocated.
+// when the buffer is (re)allocated. AssetPtr fields store a raw IAsset* (see comment above).
 static uint32_t lua_backed_size_for_type(core_type_id t) {
 	switch (t) {
 	case core_type_id::Bool: return 1;
@@ -107,6 +135,7 @@ static uint32_t lua_backed_size_for_type(core_type_id t) {
 	case core_type_id::Enum32:
 	case core_type_id::Float: return 4;
 	case core_type_id::StdString: return sizeof(std::string);
+	case core_type_id::AssetPtr: return sizeof(IAsset*);
 	default: ASSERT(0); return 0;
 	}
 }
@@ -114,6 +143,7 @@ static uint32_t lua_backed_size_for_type(core_type_id t) {
 // Returns 4-byte alignment for primitives, alignof(std::string) for strings.
 static uint32_t lua_backed_align_for_type(core_type_id t) {
 	if (t == core_type_id::StdString) return alignof(std::string);
+	if (t == core_type_id::AssetPtr) return alignof(IAsset*);
 	if (t == core_type_id::Bool) return 1;
 	return 4;
 }
@@ -134,7 +164,8 @@ static void synthesize_layout_from_parsed(LuaClassTypeInfo* /*self*/,
 		core_type_id ctype;
 		const EnumTypeInfo* einfo = nullptr;
 		const char* custom_type = "";
-		if (!lua_type_str_to_core_type(parsed.type_str, ctype, einfo, custom_type)) {
+		const ClassTypeInfo* asset_class = nullptr;
+		if (!lua_type_str_to_core_type(parsed.type_str, ctype, einfo, custom_type, asset_class)) {
 			sys_print(Warning, "LuaClassTypeInfo[%s]: skipping field '%s' with unsupported ---@type '%s'\n",
 					  lua_classname.c_str(), parsed.name.c_str(), parsed.type_str.c_str());
 			continue;
@@ -152,6 +183,7 @@ static void synthesize_layout_from_parsed(LuaClassTypeInfo* /*self*/,
 		pi.type = ctype;
 		pi.enum_type = einfo;
 		pi.custom_type_str = custom_type;
+		pi.class_type = asset_class;
 		lua_props_storage.push_back(pi);
 		cursor += size;
 	}
@@ -197,6 +229,12 @@ static void apply_template_default(lua_State* L, int template_idx, const Propert
 		case core_type_id::StdString:
 			if (lua_isstring(L, -1))
 				*(std::string*)p = lua_tostring(L, -1);
+			break;
+		case core_type_id::AssetPtr:
+			// Template default is a path string (e.g. tex = "textures/icon.png"); resolve it
+			// through the normal asset database, same as level deserialization does.
+			if (lua_isstring(L, -1))
+				*(IAsset**)p = g_assets.generic_find(lua_tostring(L, -1), pi.class_type).get_unsafe();
 			break;
 		default:
 			break;
@@ -528,11 +566,17 @@ static bool is_lua_shadow_field_type_supported(core_type_id type) {
 	case core_type_id::Int32:
 	case core_type_id::Enum32:
 	case core_type_id::Bool:
-	case core_type_id::StdString: return true;
+	case core_type_id::StdString:
+	case core_type_id::AssetPtr: return true;
 	default: return false;
 	}
 }
 
+// AssetPtr fields cross into Lua the same way every other ClassBase* does (see
+// push_object_to_lua/get_object_from_lua in ScriptFunctionCodegen.cpp): the asset's own
+// __ptr-wrapped table, lazily created via ClassBase::get_table_registry_id(), not a path string.
+// That table already carries the asset's native method bindings (from its own codegen'd
+// metatable), so Lua can call methods on self.icon the same as on any other engine object.
 void push_lua_shadow_field(lua_State* L, const PropertyInfo& pi, const uint8_t* p) {
 	switch (pi.type) {
 	case core_type_id::Float:   lua_pushnumber(L, *(const float*)p); break;
@@ -540,6 +584,7 @@ void push_lua_shadow_field(lua_State* L, const PropertyInfo& pi, const uint8_t* 
 	case core_type_id::Enum32:  lua_pushinteger(L, *(const int32_t*)p); break;
 	case core_type_id::Bool:    lua_pushboolean(L, *(const int8_t*)p); break;
 	case core_type_id::StdString: lua_pushstring(L, ((const std::string*)p)->c_str()); break;
+	case core_type_id::AssetPtr: push_object_to_lua(L, *(IAsset* const*)p); break;
 	default: lua_pushnil(L); break;
 	}
 }
@@ -553,6 +598,20 @@ void write_lua_shadow_field(lua_State* L, int validx, const PropertyInfo& pi, ui
 	case core_type_id::StdString: {
 		const char* s = lua_tostring(L, validx);
 		*(std::string*)p = s ? s : "";
+		break;
+	}
+	case core_type_id::AssetPtr: {
+		// nil clears the field; otherwise expects the __ptr-wrapped table of a ClassBase
+		// instance that's-a pi.class_type (get_object_from_lua errors on anything else).
+		if (lua_isnil(L, validx)) {
+			*(IAsset**)p = nullptr;
+		} else {
+			ClassBase* obj = get_object_from_lua(L, validx);
+			IAsset* asset = obj ? obj->cast_to<IAsset>() : nullptr;
+			if (asset && pi.class_type && !asset->get_type().is_a(*pi.class_type))
+				asset = nullptr;
+			*(IAsset**)p = asset;
+		}
 		break;
 	}
 	default: break;

@@ -116,7 +116,13 @@ void Component::activate_internal_step2() {
 	if (eng->is_editor_level())
 		editor_start();
 	if (!eng->is_editor_level() || get_call_init_in_editor()) {
-		ScriptManager::sync_shadow_to_lua_table(this);
+		// Only bake shadow values into the raw Lua table outside the editor: it's a one-time
+		// lua_rawset (see sync_shadow_to_lua_table) that permanently defeats __index/__newindex
+		// for those keys (Lua only invokes metamethods when the key is absent). For an
+		// init_in_editor component, start() runs while still in the editor, so baking here
+		// would desync the property grid (shadow) from Lua (table) for the rest of its life.
+		if (!eng->is_editor_level())
+			ScriptManager::sync_shadow_to_lua_table(this);
 		start();
 		init_updater();
 		init_state = initialization_state::CALLED_START;
