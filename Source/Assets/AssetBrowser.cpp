@@ -1013,6 +1013,10 @@ static void draw_breadcrumb(AssetBrowser* b) {
 		}
 	}
 
+	// Left padding so the bar doesn't sit flush against the panel edge, matching the
+	// grid/list table below (which gets its own inset from ImGuiTableFlags_PadOuterX).
+	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + 4.0f);
+
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 2.0f));
 	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
 	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
