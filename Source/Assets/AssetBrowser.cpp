@@ -38,6 +38,21 @@ static inline bool contains_case_insensitive(std::string_view haystack, std::str
 	return false;
 }
 
+// Rebuilds a node's containing folder's gamepath by walking parent pointers (nodes
+// only store their own name). Returns "" for root-level nodes.
+static std::string node_parent_folder_path(const AssetFilesystemNode* node) {
+	std::vector<std::string> parts;
+	for (const AssetFilesystemNode* p = node->parent; p && p->parent; p = p->parent)
+		parts.push_back(p->name);
+	std::string path;
+	for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+		if (!path.empty())
+			path += "/";
+		path += *it;
+	}
+	return path;
+}
+
 AssetBrowser::AssetBrowser() {
 	asset_name_filter[0] = 0;
 	folder_closed = g_assets.find<Texture>("eng/editor/folder_closed.png").get();
@@ -343,18 +358,24 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 static void draw_browser_tree_view(AssetBrowser* b) {
 	auto& linear = AssetRegistrySystem::get().get_linear_list();
 	const int name_filter_len = strlen(b->asset_name_filter);
+	const bool has_filter = name_filter_len > 0;
 	std::vector<AssetFilesystemNode*> linear2;
 	for (auto node : linear) {
 		auto& asset = node->asset;
 		if (!b->should_type_show(1 << asset.type->self_index)) {
 			continue;
 		}
-		if (!b->selected_folder.empty()) {
-			if (asset.filename.find(b->selected_folder + "/") != 0)
-				continue;
-		}
-		if (name_filter_len > 0) {
+		if (has_filter) {
 			if (!contains_case_insensitive(asset.filename, b->all_lower_cast_filter_name))
+				continue;
+			if (b->search_scope == AssetBrowser::SearchScope::Folder && !b->selected_folder.empty()) {
+				if (asset.filename.find(b->selected_folder + "/") != 0)
+					continue;
+			}
+		} else {
+			// No active search: Unity-style folder browsing — only direct children
+			// of the selected folder, not the whole subtree.
+			if (node_parent_folder_path(node) != b->selected_folder)
 				continue;
 		}
 		linear2.push_back(node);
@@ -645,16 +666,22 @@ void AssetBrowser::draw_browser_grid() {
 		fill_big_vector(items, AssetRegistrySystem::get().get_root_files());
 
 		const int name_filter_len = strlen(asset_name_filter);
+		const bool has_filter = name_filter_len > 0;
 		for (auto& c : items) {
 			auto& asset = c->asset;
 			if (!ThumbnailManager::supports_thumbnail(asset))
 				continue;
-			if (!selected_folder.empty()) {
-				if (asset.filename.find(selected_folder + "/") != 0)
-					continue;
-			}
-			if (name_filter_len > 0) {
+			if (has_filter) {
 				if (!contains_case_insensitive(asset.filename, all_lower_cast_filter_name))
+					continue;
+				if (search_scope == AssetBrowser::SearchScope::Folder && !selected_folder.empty()) {
+					if (asset.filename.find(selected_folder + "/") != 0)
+						continue;
+				}
+			} else {
+				// No active search: Unity-style folder browsing — only direct children
+				// of the selected folder, not the whole subtree.
+				if (node_parent_folder_path(c) != selected_folder)
 					continue;
 			}
 			items2.push_back(c);
@@ -851,18 +878,8 @@ void AssetBrowser::set_selected(const std::string& path) {
 		f = f->parent;
 	}
 
-	// Rebuild the parent folder's gamepath (nodes only store their own name) so the
-	// folder tree/list can navigate to and select it, same as draw_folder_tree_R does.
-	std::vector<std::string> parts;
-	for (AssetFilesystemNode* p = find->parent; p && p->parent; p = p->parent)
-		parts.push_back(p->name);
-	std::string folder_path;
-	for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-		if (!folder_path.empty())
-			folder_path += "/";
-		folder_path += *it;
-	}
-	selected_folder = folder_path;
+	// Navigate to the asset's containing folder so the folder tree/list select it.
+	selected_folder = node_parent_folder_path(find);
 
 	selected_resource.filename = path;
 	ping_timer = PING_DURATION;
@@ -935,6 +952,29 @@ void AssetBrowser::imgui_draw() {
 	all_lower_cast_filter_name = asset_name_filter;
 	for (int i = 0; i < name_filter_len; i++)
 		all_lower_cast_filter_name[i] = tolower(all_lower_cast_filter_name[i]);
+
+	// Search scope toggle (Unity-style): only shown while a filter is active, lets
+	// the user pick between searching every asset or just the selected folder's subtree.
+	if (name_filter_len > 0) {
+		auto scope_button = [this](const char* label, SearchScope scope) {
+			bool active = (search_scope == scope);
+			if (active)
+				ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
+			if (ImGui::Button(label))
+				search_scope = scope;
+			if (active)
+				ImGui::PopStyleColor();
+		};
+		ImGui::AlignTextToFramePadding();
+		ImGui::TextUnformatted("Search:");
+		ImGui::SameLine();
+		scope_button("All", SearchScope::All);
+		ImGui::SameLine();
+		std::string folder_label = "'" + (selected_folder.empty() ? std::string("root") : selected_folder) + "'";
+		ImGui::BeginDisabled(selected_folder.empty());
+		scope_button(folder_label.c_str(), SearchScope::Folder);
+		ImGui::EndDisabled();
+	}
 
 	// Split layout: folder tree | asset view
 	const float splitter_w = 6.0f;

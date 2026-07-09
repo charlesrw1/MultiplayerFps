@@ -94,6 +94,12 @@ public:
 	bool double_clicked_selected = false;
 
 	std::string selected_folder;
+	// When a search filter is active, whether it searches every asset ("All") or is
+	// scoped to selected_folder and its subdirectories ("Folder"). Only used while
+	// asset_name_filter is non-empty; with no filter, selected_folder always shows
+	// just its direct children (Unity-style folder browsing).
+	enum class SearchScope { All, Folder };
+	SearchScope search_scope = SearchScope::All;
 	float left_panel_width = 200.0f;
 	uptr<AssetInspectorPane> inspector_pane;
 
