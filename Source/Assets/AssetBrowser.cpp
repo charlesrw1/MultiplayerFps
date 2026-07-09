@@ -467,6 +467,10 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 		if (fabsf(target_anim - child->folder_open_anim) < 0.001f)
 			child->folder_open_anim = target_anim;
 
+		// Tight spacing only around this row's own layout — must not leak into the
+		// context-menu popup or recursed children (which push/pop their own rows).
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 1.1f));
+
 		ImGui::Dummy(ImVec2(indent * folder_indent, 1.0f));
 		ImGui::SameLine();
 		const float ICON_SIZE = 14.0f;
@@ -493,6 +497,8 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 
 		if (ImGui::Selectable(child->name.c_str(), is_selected, ImGuiSelectableFlags_AllowItemOverlap))
 			b->selected_folder = folder_path;
+
+		ImGui::PopStyleVar();
 
 		if (ImGui::BeginPopupContextItem()) {
 			ImGui::TextDisabled("%s", folder_path.c_str());
@@ -918,9 +924,7 @@ void AssetBrowser::imgui_draw() {
 
 	// Left panel: folder tree
 	ImGui::BeginChild("##folder_tree", ImVec2(left_panel_width, main_h), true);
-	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 1.0f));
 	draw_folder_tree(this);
-	ImGui::PopStyleVar();
 	if (ImGui::BeginPopupContextWindow("create_asset_menu", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
 		ImGui::TextDisabled("Create in: %s", selected_folder.empty() ? "(root)" : selected_folder.c_str());
 		ImGui::Separator();
