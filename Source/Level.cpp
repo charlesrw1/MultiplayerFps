@@ -52,6 +52,7 @@ Level::~Level() {
 }
 
 void Level::update_level() {
+	CPU_FUNCTION();
 	{
 		BooleanScope scope(b_is_in_update_tick);
 

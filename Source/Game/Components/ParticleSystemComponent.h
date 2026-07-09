@@ -108,6 +108,12 @@ public:
 
 private:
 	void init_subsystem_states();
+	// Simulates one dt of all subsystems. Called from draw() (not update())
+	// so simulation and rendering run back-to-back for every particle system
+	// in ParticleMgr::draw's batch loop, instead of update() running earlier
+	// interleaved with unrelated component types' ticks -- keeps the CPU in
+	// particle-only code for the whole batch pass (icache locality).
+	void simulate();
 	void emit_particles(int ss_idx, int count);
 	void spawn_from_shape(const ShapeModule& shape, glm::vec3& out_pos, glm::vec3& out_vel, Random& rng);
 

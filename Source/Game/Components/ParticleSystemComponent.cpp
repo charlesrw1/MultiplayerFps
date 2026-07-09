@@ -287,7 +287,10 @@ void ParticleSystemComponent::update()
 		update_shape_gizmo(-1);
 	gizmo_drawn_this_frame = false;
 #endif
+}
 
+void ParticleSystemComponent::simulate()
+{
 	if (!playing)
 		return;
 	auto* asset = particle_asset.get();
@@ -572,25 +575,17 @@ void ParticleSystemComponent::update()
 		}
 	}
 
-	// check if everything is done
-	if (!subsystem_states.empty()) {
-		bool all_done = true;
-		for (auto& ss : subsystem_states) {
-			if (ss.is_emitting || !ss.particles.empty()) {
-				all_done = false;
-				break;
-			}
-		}
-		if (all_done && playing) {
-			playing = false;
-			if (destroy_owner_when_finished)	// destroy_owner_when_finished is exclusively a non-editable particle thing
-				get_owner()->destroy();
-		}
-	}
+	// NOTE: does NOT check/destroy the owner when finished here -- draw() is
+	// still using `this` after simulate() returns (batch building, trails,
+	// etc), and get_owner()->destroy() frees the entity (and this component)
+	// synchronously. That check runs at the very end of draw() instead, once
+	// nothing else touches `this` for the rest of the frame.
 }
 
 void ParticleSystemComponent::draw(const glm::vec3& side, const glm::vec3& up, const glm::vec3& front)
 {
+	simulate();
+
 	auto* asset = particle_asset.get();
 	if (!asset || !asset->is_valid_to_use())
 		return;
@@ -755,6 +750,24 @@ void ParticleSystemComponent::draw(const glm::vec3& side, const glm::vec3& up, c
 	for (auto& [mat, batch] : batch_states)
 		batch.builder.End();
 	sync_render_data();
+
+	// Check if everything is done, and possibly destroy the owner -- must be
+	// the last thing this function does: get_owner()->destroy() frees the
+	// owning entity (and this component) synchronously.
+	if (!subsystem_states.empty()) {
+		bool all_done = true;
+		for (auto& ss : subsystem_states) {
+			if (ss.is_emitting || !ss.particles.empty()) {
+				all_done = false;
+				break;
+			}
+		}
+		if (all_done && playing) {
+			playing = false;
+			if (destroy_owner_when_finished)	// destroy_owner_when_finished is exclusively a non-editable particle thing
+				get_owner()->destroy();
+		}
+	}
 }
 
 #ifdef EDITOR_BUILD

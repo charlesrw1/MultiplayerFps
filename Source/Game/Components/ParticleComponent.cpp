@@ -188,6 +188,8 @@ void ParticleComponent::draw(const glm::vec3& side, const glm::vec3& up, const g
 }
 
 void ParticleMgr::draw(const View_Setup& vs) {
+	CPU_FUNCTION();
+
 	glm::mat4 invview = glm::inverse(vs.view);
 
 	for (auto c : all_components)
