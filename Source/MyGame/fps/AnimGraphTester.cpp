@@ -774,15 +774,22 @@ void AnimGraphTester::update() {
         pelvis_offset += (pelvis_target - pelvis_offset) * t;
         anim->set_vec3_variable(StringName("vPelvisOffset"), glm::vec3(0.f, pelvis_offset, 0.f));
 
+        auto play_foot_sfx = [&](const glm::vec3& pos) { 
+            if (footstep_sfx) {
+				GameplayStatic::play_spatial_sound(pos, footstep_sfx, 1, 10, SndAtn::Linear);
+            }
+		};
         if (footstep_particle.get()) {
 			for (auto& e : anim->sampled_events) {
 				if (e.event->name == "foot_r") {
 					// spawn particle system at footstep
 					GameplayStatic::spawn_particle_effect(footstep_particle.get(), foot_r_pos);
+					play_foot_sfx(foot_r_pos);
 				}
 				else if (e.event->name == "foot_l") {
 					// spawn particle system at footstep
 					GameplayStatic::spawn_particle_effect(footstep_particle.get(), foot_l_pos);
+					play_foot_sfx(foot_l_pos);
 				}
 			}
 		}

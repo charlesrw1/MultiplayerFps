@@ -134,6 +134,7 @@ ClassBase* ClassBase::alloc(const ClassTypeInfo* type) {
 void ClassBase::free(ClassBase* ptr) {
 	if (!ptr)
 		return;
+	ASSERT(!ptr->is_a<ClassTypeInfo>());	// you can get an annoying lua bug doing 
 	delete ptr;
 }
 

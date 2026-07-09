@@ -946,7 +946,7 @@ void AssetBrowser::imgui_draw() {
 
 	// Filter bar
 	ImGui::SetNextItemWidth(200.0);
-	ImGui::InputTextWithHint("FILTER", "filter asset path", asset_name_filter, 256);
+	ImGui::InputTextWithHint("##FILTER", "filter asset path", asset_name_filter, 256);
 	ImGui::SameLine();
 	if (show_filter_type_options && filter_icon) {
 		const float ICON_SIZE = 16.0f;

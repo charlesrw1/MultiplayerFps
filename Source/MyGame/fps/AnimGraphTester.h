@@ -61,6 +61,7 @@ public:
     REF AssetPtr<AnimationSeqAsset> clip3;       // quaternary clip (BlendSpace2D corner)
     REF AssetPtr<AnimationSeqAsset> slot_clip;   // one-shot clip fired into SlotPlaying slot
 	REF AssetPtr<ParticleAsset> footstep_particle;
+	REF SoundFile* footstep_sfx = nullptr;
 
     // Bone names — use the dropdown picker to select from the attached model's skeleton
     REFLECT(type = BoneNameString)
