@@ -24,6 +24,8 @@ extern ConfigVar enable_ssr;         // "r.ssr"
 extern ConfigVar ddgi_probe_debug;   // "ddgi_probe_debug"
 extern ConfigVar g_window_w;         // "vid.width"
 extern ConfigVar g_window_h;         // "vid.height"
+extern ConfigVar ed_force_viewport_w; // "ed.force_viewport_w"
+extern ConfigVar ed_force_viewport_h; // "ed.force_viewport_h"
 // r_taa_enabled comes from RenderConfigVars.h ("r.taa").
 
 static Entity* find_entity_by_editor_name(const char* name) {
@@ -56,6 +58,8 @@ static TestTask test_bake_probes_and_ddgi(TestContext& t) {
 	restore.save_bool(r_ddgi_halfres);
 	restore.save_int(g_window_w);
 	restore.save_int(g_window_h);
+	restore.save_int(ed_force_viewport_w);
+	restore.save_int(ed_force_viewport_h);
 
 	// Deterministic render config — matches the user's intended bake setup.
 	ddgi_probe_debug.set_bool(true);
@@ -64,13 +68,16 @@ static TestTask test_bake_probes_and_ddgi(TestContext& t) {
 	r_taa_enabled.set_bool(false);
 	r_ddgi_halfres.set_bool(false);
 
-	// Editor dock chrome (asset browser, outliner, properties, console) eats most
-	// of the window; with the editor_test default 600x400 the scene panel collapses
-	// to ~128x128. Bump the window so the central viewport ends up ~600x400. The
-	// exact size is whatever the saved imgui dock layout produces — the golden
-	// matches it, so it stays deterministic run-to-run.
+	// Pin the scene viewport to a fixed resolution so the golden is independent of
+	// the imgui dock layout (editor.ini). Without this the scene panel size is
+	// whatever the saved dock layout produces — a layout change silently resizes
+	// the render target, breaking the golden compare (and, at odd widths, tripped
+	// a heap overflow in the rgb8 readback). The window stays large enough that the
+	// panel exists; the override drives the actual render/screenshot size.
 	g_window_w.set_integer(1280);
 	g_window_h.set_integer(480);
+	ed_force_viewport_w.set_integer(600);
+	ed_force_viewport_h.set_integer(400);
 	co_await t.wait_ticks(2);
 
 	Cmd_Manager::inst->execute(Cmd_Execute_Mode::APPEND, "open-editor maps/bake_probes_test.tmap");

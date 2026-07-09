@@ -395,6 +395,12 @@ public:
 			ASSERT(!"IGraphicsTexture::download: unsupported format (extend mapping)");
 			return;
 		}
+		// Callers always hand us a tightly packed buffer (width*height*channels with
+		// no row padding). GL's default GL_PACK_ALIGNMENT is 4, so for formats whose
+		// row byte count isn't a multiple of 4 (e.g. rgb8 at an odd width) the driver
+		// pads each row and writes PAST the buffer -> heap corruption. Force alignment
+		// to 1 so the packed rows match what the caller allocated, then restore.
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);
 		if (layer < 0) {
 			glGetTextureImage(id, mip, fmt, type, dest_size_bytes, dest);
 		} else {
@@ -403,6 +409,7 @@ public:
 			glGetTextureSubImage(id, mip, 0, 0, layer, w, h, 1, fmt, type,
 								 dest_size_bytes, dest);
 		}
+		glPixelStorei(GL_PACK_ALIGNMENT, 4);
 	}
 
 	void clear_image() final {

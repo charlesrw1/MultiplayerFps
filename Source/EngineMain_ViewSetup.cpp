@@ -20,6 +20,15 @@
 // Declared in EngineMain.cpp
 extern ConfigVar disable_render_time_tick;
 
+// Force the editor scene viewport to a fixed resolution, overriding whatever
+// size the imgui dock layout (editor.ini) hands us. 0 = disabled (use the real
+// panel size). Used by screenshot tests so goldens stay deterministic across
+// dock-layout changes. Both must be > 0 to take effect.
+ConfigVar ed_force_viewport_w("ed.force_viewport_w", "0", CVAR_INTEGER | CVAR_DEV,
+							  "force editor scene viewport width (0=off)", 0, 4000);
+ConfigVar ed_force_viewport_h("ed.force_viewport_h", "0", CVAR_INTEGER | CVAR_DEV,
+							  "force editor scene viewport height (0=off)", 0, 4000);
+
 // ---------------------------------------------------------------------------
 // is_drawing_to_window_viewport
 // ---------------------------------------------------------------------------
@@ -64,6 +73,14 @@ void GameEngineLocal::get_draw_params(SceneDrawParamsEx& params, View_Setup& set
 		}
 		isound->set_listener_position(vs->origin, glm::normalize(glm::cross(vs->front, glm::vec3(0, 1, 0))));
 		setup = *vs;
+
+		// Deterministic override for tests: pin the scene viewport to a fixed size
+		// so screenshot goldens don't depend on the imgui dock layout. Rebuild the
+		// View_Setup from the same camera so the projection aspect stays correct.
+		const int fw = ed_force_viewport_w.get_integer();
+		const int fh = ed_force_viewport_h.get_integer();
+		if (fw > 0 && fh > 0)
+			setup = View_Setup(setup.view, setup.fov, setup.near, setup.far, fw, fh);
 	} else
 #endif
 	{

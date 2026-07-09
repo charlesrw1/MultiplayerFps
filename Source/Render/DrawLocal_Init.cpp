@@ -565,7 +565,10 @@ void Renderer::init_bloom_buffers() {
 
 	int x = cur_w / 2;
 	int y = cur_h / 2;
-	tex.number_bloom_mips = glm::min((int)MAX_BLOOM_MIPS, Texture::get_mip_map_count(x, y));
+	// The chain halves BOTH dimensions each step, so the number of usable mips is
+	// bounded by the smaller dimension -- using max() here (get_mip_map_count) lets
+	// the smaller side reach 0 on extreme aspect ratios and creates a 0-sized texture.
+	tex.number_bloom_mips = glm::min((int)MAX_BLOOM_MIPS, Texture::get_mip_map_count(glm::min(x, y), glm::min(x, y)));
 	// glCreateTextures(GL_TEXTURE_2D, tex.number_bloom_mips, tex.bloom_chain);
 
 	float fx = x;
