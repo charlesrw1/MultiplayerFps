@@ -1049,9 +1049,9 @@ static void draw_breadcrumb(AssetBrowser* b) {
 	ImGui::PopStyleColor(4);
 	ImGui::PopStyleVar(2);
 
-	ImGui::Spacing();
-	ImGui::Separator();
-	ImGui::Spacing();
+	// No separator here — the asset grid/list table below already draws its own top
+	// border (ImGuiTableFlags_Borders), so a separator on top of that doubled the line.
+	ImGui::Dummy(ImVec2(0.0f, 2.0f));
 }
 
 void AssetBrowser::imgui_draw() {
