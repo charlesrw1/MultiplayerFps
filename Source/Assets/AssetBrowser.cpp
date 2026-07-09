@@ -123,8 +123,7 @@ AssetBrowser::AssetBrowser() {
 			sys_print(Warning, "no FILTER_FOR type name\n");
 			return;
 		}
-		filter_all();
-		unset_filter(1 << type->self_index);
+		filter_type_index = type->self_index;
 	});
 }
 AssetBrowser* AssetBrowser::inst = nullptr;
@@ -137,7 +136,7 @@ static void draw_browser_tree_view_R(AssetBrowser* b, int indents, AssetFilesyst
 		// leaf node
 		if (node->children.empty()) {
 			auto& asset = node->asset;
-			if (!b->should_type_show(1 << asset.type->self_index)) {
+			if (!b->should_type_show(asset.type->self_index)) {
 				continue;
 			}
 			if (name_filter_len > 0) {
@@ -393,7 +392,7 @@ static void draw_browser_tree_view(AssetBrowser* b) {
 	linear2.reserve(linear.size());
 	for (auto node : linear) {
 		auto& asset = node->asset;
-		if (!b->should_type_show(1 << asset.type->self_index)) {
+		if (!b->should_type_show(asset.type->self_index)) {
 			continue;
 		}
 		if (has_filter) {
@@ -993,18 +992,19 @@ void AssetBrowser::imgui_draw() {
 	}
 
 	if (ImGui::BeginPopup("type_popup_assets")) {
-		bool is_hiding_all = filter_type_mask != 0;
-		if (ImGui::Checkbox("Show/Hide all", &is_hiding_all)) {
-			if (filter_type_mask != 0)
-				filter_type_mask = 0;
-			else
-				filter_type_mask = -1;
+		if (ImGui::Selectable("All", filter_type_index < 0)) {
+			filter_type_index = -1;
+			ImGui::CloseCurrentPopup();
 		}
+		ImGui::Separator();
 
 		auto& types = AssetRegistrySystem::get().get_types();
 		for (int i = 0; i < types.size(); i++) {
 			ImGui::PushStyleColor(ImGuiCol_Text, color32_to_imvec4(types[i]->get_browser_color()));
-			ImGui::CheckboxFlags(types[i]->get_type_name().c_str(), &filter_type_mask, 1 << types[i]->self_index);
+			if (ImGui::Selectable(types[i]->get_type_name().c_str(), filter_type_index == types[i]->self_index)) {
+				filter_type_index = types[i]->self_index;
+				ImGui::CloseCurrentPopup();
+			}
 			ImGui::PopStyleColor();
 		}
 		ImGui::EndPopup();

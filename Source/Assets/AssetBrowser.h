@@ -61,11 +61,11 @@ public:
 	void imgui_draw();
 	void imgui_draw_inspector(); // separate dockable "Asset Inspector" window
 
-	void clear_filter() { filter_type_mask = -1; }
-	void filter_all() { filter_type_mask = 0; }
-	void unset_filter(int type) { filter_type_mask |= (uint32_t)type; }
-	void set_filter(int type) { filter_type_mask &= ~((uint32_t)type); }
-	bool should_type_show(int type) const { return filter_type_mask & (uint32_t)type; }
+	// Type filter is single-select: -1 shows every type ("All"), otherwise only
+	// assets whose AssetMetadata::self_index matches are shown.
+	void clear_filter() { filter_type_index = -1; }
+	void set_filter(int type_index) { filter_type_index = type_index; }
+	bool should_type_show(int type_index) const { return filter_type_index < 0 || filter_type_index == type_index; }
 	void set_selected(const std::string& path);
 	AssetFilesystemNode* find_node_for_asset(const std::string& path) const;
 
@@ -88,7 +88,7 @@ public:
 	bool show_filter_type_options = true;
 	Mode mode = Mode::Grid;
 	char asset_name_filter[256];
-	uint32_t filter_type_mask = -1;
+	int filter_type_index = -1;
 
 	AssetOnDisk selected_resource;
 	bool double_clicked_selected = false;
