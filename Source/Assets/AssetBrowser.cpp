@@ -77,6 +77,15 @@ static AssetFilesystemNode* resolve_folder_node(AssetFilesystemNode* root, const
 	return cur;
 }
 
+// Navigates to folder_path: makes it the current browsing folder and expands every ancestor
+// in the left tree panel so the folder is visible there without extra clicks.
+static void navigate_to_folder(AssetBrowser* b, const std::string& folder_path) {
+	b->selected_folder = folder_path;
+	AssetFilesystemNode* node = resolve_folder_node(AssetRegistrySystem::get().get_root_files(), folder_path);
+	for (AssetFilesystemNode* p = node ? node->parent : nullptr; p; p = p->parent)
+		p->folder_is_open = true;
+}
+
 AssetBrowser::AssetBrowser() {
 	asset_name_filter[0] = 0;
 	folder_closed = g_assets.find<Texture>("eng/editor/folder_closed.png").get();
@@ -758,7 +767,7 @@ void AssetBrowser::draw_browser_grid() {
 		ImGui::PopStyleColor();
 
 		if (ImGui::IsItemHovered() && ImGui::GetIO().MouseClickedCount[0] == 2)
-			selected_folder = folder_path;
+			navigate_to_folder(this, folder_path);
 
 		if (ImGui::BeginDragDropTarget()) {
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("AssetBrowserDragDrop")) {
@@ -984,6 +993,36 @@ void AssetBrowser::set_selected(const std::string& path) {
 	ping_timer = PING_DURATION;
 }
 
+// Unity-style breadcrumb: "Assets > My Folder > Materials", each segment clickable to
+// jump straight to that ancestor folder (also expanding it in the left tree panel).
+static void draw_breadcrumb(AssetBrowser* b) {
+	if (ImGui::SmallButton("Assets"))
+		navigate_to_folder(b, "");
+
+	std::string accum;
+	size_t start = 0;
+	while (start <= b->selected_folder.size()) {
+		size_t slash = b->selected_folder.find('/', start);
+		std::string part = b->selected_folder.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
+		if (part.empty())
+			break;
+		accum = accum.empty() ? part : (accum + "/" + part);
+
+		ImGui::SameLine();
+		ImGui::TextUnformatted(">");
+		ImGui::SameLine();
+		ImGui::PushID(accum.c_str());
+		if (ImGui::SmallButton(part.c_str()))
+			navigate_to_folder(b, accum);
+		ImGui::PopID();
+
+		if (slash == std::string::npos)
+			break;
+		start = slash + 1;
+	}
+	ImGui::Separator();
+}
+
 void AssetBrowser::imgui_draw() {
 	CPU_FUNCTION();
 
@@ -1116,6 +1155,7 @@ void AssetBrowser::imgui_draw() {
 
 	// Right panel: asset grid or list
 	ImGui::BeginChild("##asset_view", ImVec2(0.0f, main_h), false);
+	draw_breadcrumb(this);
 	if (using_grid) {
 		draw_browser_grid();
 	} else {
