@@ -17,8 +17,6 @@
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
 #include "Render/RenderWindow.h"
-#include "tracy/public/tracy/Tracy.hpp"
-#include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
 #include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
@@ -130,7 +128,7 @@ void set_gpu_objects_data_job(uintptr_t p) {
 
 	auto gpu_objects = (uint8*)p;
 	auto& proxy_list = draw.scene.proxy_list;
-	ZoneScopedN("SetGpuObjectData");
+	CPU_SCOPE("SetGpuObjectData");
 	for (int i = 0; i < proxy_list.objects.size(); i++) {
 		auto& obj = proxy_list.objects[i];
 		auto& rop = obj.type_;
@@ -172,7 +170,7 @@ void set_gpu_objects_data_job(uintptr_t p) {
 }
 
 void make_batches_job(uintptr_t p) {
-	ZoneScopedN("make_batches_job");
+	CPU_SCOPE("make_batches_job");
 	Render_Pass* pass = (Render_Pass*)p;
 	pass->make_batches(draw.scene);
 }
@@ -184,7 +182,7 @@ struct MakeShadowRenderListParam
 };
 
 void make_shadow_render_list_job(uintptr_t p) {
-	ZoneScopedN("make_shadow_render_list_job");
+	CPU_SCOPE("make_shadow_render_list_job");
 
 	auto param = (MakeShadowRenderListParam*)p;
 
@@ -204,8 +202,7 @@ ConfigVar r_depth_prepass_all_objects("r.depth_prepass_all_objects", "0", CVAR_B
 ConfigVar r_skip_add_to_passes("r.skip_add_to_passes", "0", CVAR_BOOL | CVAR_DEV, "");
 
 void Render_Scene::update_spotlight_data() {
-	ZoneScopedN("update_spotlight_data");
-	GPUSCOPESTART(update_spotlight_shadows_scope);
+	RENDER_SCOPE("update_spotlight_data");
 
 	std::vector<handle<Render_Light>> lightsToCalcShadow;
 	draw.spotShadows->get_lights_to_render(lightsToCalcShadow);
@@ -226,10 +223,8 @@ void Render_Scene::update_spotlight_data() {
 }
 
 void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, bool cubemap_view) {
-	GPUSCOPESTART(build_scene_data_scope);
-	ZoneScopedN("build_scene_data");
+	RENDER_SCOPE("build_scene_data");
 
-	// ZoneScoped;
 	if (r_debug_skip_build_scene_data.get_bool())
 		return;
 
@@ -258,8 +253,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 	uint8_t* lod_to_render_array = memArena.alloc_bottom_type<uint8_t>(visible_count);
 
 	{
-		CPUSCOPESTART(cpu_object_cull);
-		ZoneScopedN("lod_calcs");
+		CPU_SCOPE("lod_calcs");
 
 		// JobCounter* counter{};
 		//
@@ -299,9 +293,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 	BuildSceneData_CpuFast::inst->build_scene_data(cubemap_view, skybox_only);
 
 	auto add_objects_to_passes = [&]() {
-		CPUSCOPESTART(add_objects_to_passes);
-		ZoneScopedN("add_objects_to_passes");
-		// ZoneScopedN("LoopObjects");
+		CPU_SCOPE("add_objects_to_passes");
 
 		MaterialInstance* const debug_transparent_mat = MaterialInstance::load("transparent_debug.mm");
 		const bool wants_transparent_debug = debug_transparent_mat && r_debug_transparents.get_bool();
@@ -429,7 +421,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 		add_objects_to_passes();
 
 	auto make_batches_for_passes = [&]() {
-		ZoneScopedN("make_batches_for_passes");
+		CPU_SCOPE("make_batches_for_passes");
 
 		gbuffer_pass.make_batches(*this);
 		shadow_pass.make_batches(*this);
@@ -438,7 +430,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 
 		if (add_to_passes) {
 			{
-				ZoneScopedN("UploadGpuData");
+				CPU_SCOPE("UploadGpuData");
 				// glNamedBufferData(gpu_render_instance_buffer, sizeof(gpu::Object_Instance) * num_ren_objs,
 				// gpu_objects, GL_DYNAMIC_DRAW);
 
@@ -449,7 +441,7 @@ void Render_Scene::build_scene_data(bool skybox_only, bool build_for_editor, boo
 	make_batches_for_passes();
 
 	auto make_render_lists = [&]() {
-		ZoneScopedN("make_render_lists");
+		CPU_SCOPE("make_render_lists");
 
 		auto make_shadow_render_lists = [&]() {
 			JobDecl shadowlistdecl[CascadeShadowMapSystem::CASCADES_USED];

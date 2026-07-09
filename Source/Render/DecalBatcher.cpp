@@ -104,7 +104,7 @@ void DecalBatcher::build_batches() {
 }
 
 void DecalBatcher::draw_decals() {
-	GPUFUNCTIONSTART;
+	GPU_FUNCTION();
 
 	if (!r_drawdecals.get_bool())
 		return;

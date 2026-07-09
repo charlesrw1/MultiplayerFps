@@ -16,6 +16,7 @@
 #include "Assets/AssetBrowser.h"
 #include "Assets/AssetSizeViewer.h"
 #include "AssetTools/DiagnosticsWindow.h"
+#include "Framework/ProfilerUI.h"
 #include "UI/GUISystemPublic.h"
 #include "UI/Widgets/Layouts.h"
 #include "Game/LevelAssets.h"
@@ -991,6 +992,9 @@ void EditorDoc::hook_menu_bar() {
 		}
 		if (ImGui::MenuItem("Diagnostics")) {
 			DiagnosticsWindow::get().open();
+		}
+		if (ImGui::MenuItem("Profiler", nullptr, stat_profiler.get_bool())) {
+			stat_profiler.set_bool(!stat_profiler.get_bool());
 		}
 		ImGui::EndMenu();
 	}

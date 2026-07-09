@@ -16,8 +16,6 @@
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
 #include "Render/RenderWindow.h"
-#include "tracy/public/tracy/Tracy.hpp"
-#include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
 #include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
@@ -25,7 +23,7 @@
 #include "Framework/ArenaStd.h"
 #include <algorithm>
 void Renderer::draw_editor_ortho_grid(IGraphicsTexture* target) {
-	GPUSCOPESTART(draw_editor_ortho_grid_scope);
+	GPU_SCOPE("draw_editor_ortho_grid");
 
 	RenderPassState state;
 	auto color_info = {ColorTargetInfo(target)};
@@ -46,9 +44,7 @@ void Renderer::draw_editor_ortho_grid(IGraphicsTexture* target) {
 }
 
 void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
-	// TracyGpuZone("scene_draw_internal");
-	// ZoneScoped;
-	GPUSCOPESTART(scene_draw_internal_scope);
+	RENDER_SCOPE("scene_draw_internal");
 
 	current_time = params.time;
 
@@ -87,7 +83,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		windowDrawer->render();
 
 		if (params.output_to_screen) {
-			GPUSCOPESTART(Blit_composite_to_backbuffer);
+			GPU_SCOPE("Blit_composite_to_backbuffer");
 
 			GraphicsBlitInfo blitInfo;
 			blitInfo.dest.w = blitInfo.src.w = cur_w;
@@ -111,7 +107,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 
 #if 0
 	auto depth_prepass = [&]() {
-		GPUSCOPESTART(depth_prepass_scope);
+		GPU_SCOPE("depth_prepass");
 
 
 		const auto& view_to_use = current_frame_view;
@@ -251,7 +247,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		gfx().set_polygon_fill_mode(GraphicsFillMode::Fill);
 	} else {
 		{
-			GPUSCOPESTART(gbuffer_pass_scope1);
+			GPU_SCOPE("gbuffer_pass_1");
 			gbuffer_pass(GPRF_GBUFFER_1);
 		}
 		if (r_debug_mode.get_integer() == gpu::DEBUG_OVERDRAW) {
@@ -260,7 +256,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		if (!params.skybox_only)
 			GpuCullingTest::inst->build_data_2(BuildSceneData_CpuFast::inst->get_cull_input());
 		if (r_debug_mode.get_integer() != gpu::DEBUG_OVERDRAW) {
-			GPUSCOPESTART(gbuffer_pass_scope2);
+			GPU_SCOPE("gbuffer_pass_2");
 			gbuffer_pass(GPRF_GBUFFER_2); // second gbuffer pass
 		}
 	}
@@ -287,7 +283,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		accumulate_gbuffer_lighting(params.is_cubemap_view);
 	// STAMPS ON NORMALS IN GBUFFER0!
 	auto copy_forward_to_temporary = [&]() {
-		GPUSCOPESTART(copy_forward_to_temporary_scope);
+		GPU_SCOPE("copy_forward_to_temporary");
 		GraphicsBlitInfo blitInfo;
 		blitInfo.set_width_height_both(cur_w, cur_h);
 		blitInfo.src.texture = tex.scene_color;
@@ -299,8 +295,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		copy_forward_to_temporary();
 
 	auto taa_resolve_pass = [&]() -> IGraphicsTexture* {
-		GPUSCOPESTART(TaaResolve);
-		ZoneScopedN("TaaResolve");
+		RENDER_SCOPE("TaaResolve");
 		bool wants_disable = disable_taa_this_frame || params.is_cubemap_view;
 		disable_taa_this_frame = false;
 		if (!r_taa_enabled.get_bool() || wants_disable) {
@@ -360,7 +355,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	IGraphicsTexture* const scene_color_handle = taa_resolve_pass();
 
 	auto draw_forward_pass = [&]() {
-		GPUSCOPESTART(draw_forward_pass_scope);
+		GPU_SCOPE("draw_forward_pass");
 
 		const auto& view_to_use = current_frame_view;
 		// RenderPassSetup setup("transparents", fbo.forward_render, false, false, 0, 0, view_to_use.width,
@@ -395,7 +390,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		return;
 
 	if (params.is_editor) {
-		GPUSCOPESTART(editor_select_pass_scope);
+		GPU_SCOPE("editor_select_pass");
 
 		auto create_editor_pass = [&]() {
 			RenderPassState state;
@@ -419,7 +414,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 
 	// mesh builder stuff
 	auto draw_mesh_builders = [&]() {
-		GPUSCOPESTART(draw_mesh_builders);
+		GPU_SCOPE("draw_mesh_builders");
 		const auto& view_to_use = current_frame_view;
 		// RenderPassSetup setup("meshbuilders", fbo.forward_render, false, false, 0, 0, view_to_use.width,
 		// view_to_use.height); auto scope = device.start_render_pass(setup);
@@ -464,7 +459,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	// auto scope = device.start_render_pass(setup);
 
 	auto do_composite_pass = [&]() {
-		GPUSCOPESTART(composite_pass_scope);
+		GPU_SCOPE("composite_pass");
 		auto set_composite_pass = [&]() {
 			RenderPassState pass_state;
 			ColorTargetInfo target(read_from_texture);
@@ -535,7 +530,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 	GpuCullingTest::inst->debug_overlay();
 
 	auto post_process_stack = [&]() {
-		GPUSCOPESTART(post_process_stack_scope);
+		GPU_SCOPE("post_process_stack");
 
 		std::vector<MaterialInstance*> postProcesses;
 		if (r_debug_mode.get_integer() == gpu::DEBUG_OVERDRAW) {
@@ -571,7 +566,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 
 	tex.actual_output_composite = read_from_texture;
 	if (params.output_to_screen) {
-		GPUSCOPESTART(Blit_composite_to_backbuffer);
+		GPU_SCOPE("Blit_composite_to_backbuffer");
 
 		GraphicsBlitInfo blitInfo;
 		blitInfo.dest.y = 0;
@@ -585,7 +580,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 }
 
 IGraphicsTexture* Renderer::do_post_process_stack(const std::vector<MaterialInstance*>& postProcessMats) {
-	ZoneScoped;
+	CPU_FUNCTION();
 
 	auto renderToTexture = tex.output_composite_2;
 	auto renderFromTexture = tex.output_composite;

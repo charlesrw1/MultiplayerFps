@@ -9,7 +9,6 @@
 #include "Debug.h"
 #include "Assets/AssetDatabase.h"
 #include "Render/ModelManager.h"
-#include "tracy/public/tracy/Tracy.hpp"
 #include "Framework/ArenaAllocator.h"
 #include "IGraphicsDevice.h"
 #include "GpuCullingTest.h"
@@ -279,7 +278,7 @@ void BuildSceneData_CpuFast::do_gbuffer_draw(bool overdraw_visualization_2nd_pas
 }
 
 void BuildSceneData_CpuFast::rebuild_mod_data() {
-	ZoneScopedN("BuildSceneData_CpuFast::rebuild_mod_data");
+	CPU_SCOPE("BuildSceneData_CpuFast::rebuild_mod_data");
 	ASSERT(BuildSceneData_CpuFast::inst != nullptr);
 
 	ArenaScope scope(draw.mem_arena);

@@ -16,8 +16,6 @@
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
 #include "Render/RenderWindow.h"
-#include "tracy/public/tracy/Tracy.hpp"
-#include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
 #include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
@@ -41,8 +39,7 @@ constexpr int AE_PARAMS_UBO_BINDING = 8;
 }
 
 void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
-	ZoneScoped;
-	GPUFUNCTIONSTART;
+	RENDER_SCOPE("render_bloom_chain");
 
 	if (!enable_bloom.get_bool())
 		return;
@@ -142,8 +139,7 @@ void Renderer::render_bloom_chain(IGraphicsTexture* scene_color) {
 
 void Renderer::render_auto_exposure(IGraphicsTexture* scene_hdr, const PostProcessParams& pp, float dt) {
 	if (!pp.auto_exposure) return;
-	ZoneScoped;
-	GPUFUNCTIONSTART;
+	RENDER_SCOPE("render_auto_exposure");
 
 	// Build and upload AutoExposureParams
 	gpu::AutoExposureParams aep{};
@@ -405,8 +401,7 @@ void Renderer::render_lists_old_way(Render_Lists& list, Render_Pass& pass, bool 
 }
 
 void Renderer::render_level_to_target(const Render_Level_Params& params) {
-	ZoneScoped;
-	// TracyGpuZone("render_to_target");
+	RENDER_SCOPE("render_level_to_target");
 
 	gfx().reset_state_cache();
 
@@ -514,7 +509,7 @@ void Renderer::render_particles() {
 #include <algorithm>
 
 static void build_standard_cpu(Render_Lists& list, Render_Pass& src, Free_List<ROP_Internal>& proxy_list) {
-	ZoneScopedN("build_standard_cpu");
+	CPU_SCOPE("build_standard_cpu");
 
 	auto& memArena = draw.get_arena();
 	ArenaScope memScope(memArena);

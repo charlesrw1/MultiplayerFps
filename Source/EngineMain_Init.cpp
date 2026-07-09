@@ -47,8 +47,6 @@
 #include "Game/Components/ParticleMgr.h"
 #include "Game/Components/GameAnimationMgr.h"
 #include "Navigation/RuntimeNavManager.h"
-#include "tracy/public/tracy/Tracy.hpp"
-#include "tracy/public/tracy/TracyOpenGL.hpp"
 #include "Framework/Jobs.h"
 #include "EditorPopups.h"
 #include "DebugConsole.h"
@@ -140,6 +138,16 @@ void GameEngineLocal::init_sdl_window() {
 	else
 		// Backend creates the GL context, loads glad, takes over swap-interval.
 		gfx_init_opengl(window);
+
+	// Diagnostic: log the refresh rate SDL/the driver actually negotiated for
+	// this window's display, since it can silently differ from the monitor's
+	// rated max (cable bandwidth, GPU control panel override, scaled res, etc).
+	const SDL_DisplayID display_id = SDL_GetDisplayForWindow(window);
+	const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(display_id);
+	if (mode)
+		sys_print(Info, "display refresh rate: %.3f hz (%dx%d)\n", mode->refresh_rate, mode->w, mode->h);
+	else
+		sys_print(Error, "could not query display mode: %s\n", SDL_GetError());
 }
 
 // ---------------------------------------------------------------------------
@@ -366,7 +374,7 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	init_sdl_window();
 	print_time("init sdl window");
 
-	Profiler::init();
+	prof::Profiler::init();
 
 	int startx = SDL_WINDOWPOS_UNDEFINED;
 	int starty = SDL_WINDOWPOS_UNDEFINED;

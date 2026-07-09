@@ -10,7 +10,6 @@
 #include "Debug.h"
 #include "Assets/AssetDatabase.h"
 #include "Render/ModelManager.h"
-#include "tracy/public/tracy/Tracy.hpp"
 #include "Framework/ArenaAllocator.h"
 #include "Framework/ArenaStd.h"
 #include "IGraphicsDevice.h"
@@ -46,8 +45,7 @@ BuildSceneData_CpuFast::BuildSceneData_CpuFast() {
 }
 
 void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_only) {
-	ZoneScopedN("BuildSceneData_CpuFast");
-	CPUFUNCTIONSTART;
+	CPU_SCOPE("BuildSceneData_CpuFast");
 	ASSERT(BuildSceneData_CpuFast::inst != nullptr);
 
 	auto& arena = draw.get_arena();
@@ -91,13 +89,13 @@ void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_onl
 
 	// step 1.3 — expensive rebuild if a new model/material combo appeared
 	if (needs_new_model) {
-		ZoneScopedN("rebuild_model");
+		CPU_SCOPE("rebuild_model");
 		sys_print(Debug, "rebuilding fast path model data\n");
 		rebuild_mod_data();
 	}
 
 	if (needs_new_model || wants_rebuild_counts) {
-		ZoneScopedN("rebuild_counts");
+		CPU_SCOPE("rebuild_counts");
 
 		int count_sum = 0;
 		for (int cmdi = 0; cmdi < (int)out_cmds.size(); cmdi++) {
@@ -114,7 +112,7 @@ void BuildSceneData_CpuFast::build_scene_data(bool cubemap_view, bool skybox_onl
 
 	// step 2 — populate per-frame cull object list
 	{
-		ZoneScopedN("bsd_fast_step2");
+		CPU_SCOPE("bsd_fast_step2");
 
 		for (int i = 0; i < (int)out_cmds.size(); i++)
 			out_cmds[i].primCount = 0;

@@ -2,15 +2,13 @@
 
 #include <vector>
 #include <cassert>
-#include "tracy/public/tracy/Tracy.hpp"
-#undef TracyFiberEnter
-#define TracyFiberEnter(x)
-#undef max
+#include <string>
+#include "Framework/Profiler.h"
 
 // thread_local int osthread_id = 0;
 
 void JobSystem::worker_thread_loop(int id) {
-	// osthread_id = id;
+	prof::set_current_thread_profiler_name(("JobWorker " + std::to_string(id)).c_str());
 	for (;;) {
 		JobDecl job;
 		{

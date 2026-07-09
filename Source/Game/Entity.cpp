@@ -319,7 +319,6 @@ void Entity::add_component_from_unserialization(Component* component) {
 	all_components.push_back(component);
 }
 
-#include "tracy/public/tracy/Tracy.hpp"
 
 glm::mat4 Entity::get_ls_transform() const {
 	return compose_transform(position, rotation, scale);

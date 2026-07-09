@@ -86,7 +86,7 @@ void CascadeShadowMapSystem::render_cascades() {
 	// now setup scene for rendering
 	// glBindFramebuffer(GL_FRAMEBUFFER, fbo.shadow);
 	{
-		GPUSCOPESTART(render_csm_scope);
+		GPU_SCOPE("render_csm");
 
 		auto& device = draw.get_device();
 		// RenderPassSetup setup("shadowmap", fbo.shadow, false, false /* clear it below */, 0, 0, csm_resolution,
@@ -159,7 +159,7 @@ void CascadeShadowMapSystem::update_matricies() {
 	tweak.max_shadow_dist = sun.max_shadow_dist;
 	tweak.z_dist_scaling = sun.z_dist_scaling;
 	{
-		GPUSCOPESTART(CSM_SETUP);
+		GPU_SCOPE("CSM_SETUP");
 
 		glm::vec3 directional_dir = sun.direction;
 

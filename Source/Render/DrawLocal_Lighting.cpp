@@ -16,8 +16,6 @@
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
 #include "Render/RenderWindow.h"
-#include "tracy/public/tracy/Tracy.hpp"
-#include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
 #include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
@@ -172,7 +170,7 @@ LightListCuller::LightListCuller() {
 ConfigVar r_light_use_tiled("r.light_use_tiled", "2", CVAR_INTEGER, "", 0, 2);
 
 void LightListCuller::draw_lights() {
-	GPUFUNCTIONSTART;
+	GPU_FUNCTION();
 
 	RenderPipelineState state;
 	state.vao = draw.get_empty_vao();
@@ -249,7 +247,7 @@ void LightListCuller::draw_lights() {
 }
 
 void LightListCuller::cull(const View_Setup& setup) {
-	CPUFUNCTIONSTART;
+	CPU_FUNCTION();
 
 	using namespace glm;
 	auto& view = setup.view;
@@ -320,8 +318,7 @@ void LightListCuller::cull(const View_Setup& setup) {
 }
 
 void Renderer::accumulate_gbuffer_lighting(bool is_cubemap_view) {
-	ZoneScoped;
-	GPUSCOPESTART(accumulate_gbuffer_lighting);
+	RENDER_SCOPE("accumulate_gbuffer_lighting");
 
 	const auto& view_to_use = current_frame_view;
 

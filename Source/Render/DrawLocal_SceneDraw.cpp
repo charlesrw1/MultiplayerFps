@@ -17,8 +17,6 @@
 #include "Game/Components/GameAnimationMgr.h"
 #include "Render/ModelManager.h"
 #include "Render/RenderWindow.h"
-#include "tracy/public/tracy/Tracy.hpp"
-#include <tracy/public/tracy/TracyOpenGL.hpp>
 #include "Framework/ArenaAllocator.h"
 #include "IGraphicsDevice.h"
 #include "RenderGiManager.h"
@@ -27,7 +25,7 @@
 #include <algorithm>
 
 void Renderer::draw_height_fog(IGraphicsTexture* target) {
-	GPUSCOPESTART(draw_height_fog_scope);
+	GPU_SCOPE("draw_height_fog");
 
 	if (!r_drawfog.get_bool())
 		return;
@@ -102,7 +100,7 @@ void Renderer::deferred_decal_pass() {
 	decalBatcher->draw_decals();
 }
 void Renderer::sync_update() {
-	ZoneScoped;
+	CPU_FUNCTION();
 
 	if (enable_vsync.was_changed())
 		gfx().set_vsync(enable_vsync.get_bool());
@@ -139,16 +137,13 @@ void Renderer::sync_update() {
 ConfigVar r_print_light_tiles("r.print_light_tiles", "0", CVAR_BOOL | CVAR_DEV, "");
 
 void Renderer::scene_draw(SceneDrawParamsEx params, View_Setup view) {
-	GPUSCOPESTART(scene_draw_scope);
+	RENDER_SCOPE("scene_draw");
 
 	if (view.width > 5000 || view.height > 5000 || view.height <= 4|| view.width <= 4) {
 		// something went wrong
 		view.width = 100;
 		view.height = 100;
 	}
-
-	// ZoneNamed(RendererSceneDraw,true);
-	// TracyGpuZone("scene_draw");
 
 	// glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	// glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -302,7 +297,7 @@ void Renderer::update_cubemap_specular_irradiance(glm::vec3 ambientCube[6], Text
 }
 
 void Renderer::check_cubemaps_dirty() {
-	GPUFUNCTIONSTART;
+	GPU_FUNCTION();
 
 	bool had_changes = false;
 	double start = GetTime();
@@ -371,7 +366,7 @@ void post_process_menu() {
 ADD_TO_DEBUG_MENU(post_process_menu);
 
 void Renderer::upload_light_and_decal_buffers() {
-	GPUSCOPESTART(upload_light_and_decal_buffers_scope);
+	GPU_SCOPE("upload_light_and_decal_buffers");
 
 	auto upload_light_data = [&]() {
 		using glu = gpu::LightingObjectUniforms;

@@ -90,7 +90,8 @@
     <ClCompile Include="Framework\MeshBuilder.cpp" />
     <ClCompile Include="Framework\EditorTheme.cpp" />
     <ClCompile Include="Framework\MyImguiLib.cpp" />
-    <ClCompile Include="Framework\Profilier.cpp" />
+    <ClCompile Include="Framework\Profiler.cpp" />
+    <ClCompile Include="Framework\ProfilerUI.cpp" />
     <ClCompile Include="Framework\PropertyEd.cpp" />
     <ClCompile Include="Framework\PropertyEdArray.cpp" />
     <ClCompile Include="Framework\PropertyEdGroup.cpp" />
@@ -532,6 +533,8 @@
     <ClInclude Include="Framework\StringName.h" />
     <ClInclude Include="Framework\StringUtil.h" />
     <ClInclude Include="Framework\Util.h" />
+    <ClInclude Include="Framework\Profiler.h" />
+    <ClInclude Include="Framework\ProfilerUI.h" />
     <ClInclude Include="GameEnginePublic.h" />
     <ClInclude Include="Game\Entities\BikeEntity.h" />
     <ClInclude Include="Game\Entities\BikeSystem.h" />
@@ -790,7 +793,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD;WITH_ASSERT;TRACY_ENABLE</PreprocessorDefinitions>
+      <PreprocessorDefinitions>SDL_ENABLE_OLD_NAMES;NDEBUG;_CONSOLE;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;EDITOR_BUILD;WITH_ASSERT</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(ProjectDir)External;$(ProjectDir);$(ProjectDir)..\steamaudio_4.5.2\steamaudio\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>

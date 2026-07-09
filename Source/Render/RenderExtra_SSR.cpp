@@ -72,7 +72,7 @@ void SSRSystem::ensure_buffers(int w, int h) {
 }
 
 void SSRSystem::do_gaussian_mipchain() {
-	GPUSCOPESTART(ssr_gaussian_mipchain);
+	GPU_SCOPE("ssr_gaussian_mipchain");
 
 	const auto& viewsetup = draw.current_frame_view;
 	auto& device = draw.get_device();
@@ -152,7 +152,7 @@ static int   ssr_resolve_samples = 4;
 static bool  ssr_fullres_trace = false;
 
 void SSRSystem::do_raytrace() {
-	GPUSCOPESTART(ssr_raytrace_pass);
+	GPU_SCOPE("ssr_raytrace_pass");
 	const auto& vs = draw.current_frame_view;
 
 	auto& device = draw.get_device();
@@ -201,7 +201,7 @@ void SSRSystem::do_raytrace() {
 }
 
 void SSRSystem::do_resolve() {
-	GPUSCOPESTART(ssr_resolve_pass);
+	GPU_SCOPE("ssr_resolve_pass");
 
 	auto& device = draw.get_device();
 	auto targets = {ColorTargetInfo(resolve_buffer)};
@@ -237,7 +237,7 @@ void SSRSystem::do_resolve() {
 }
 
 void SSRSystem::do_temporal() {
-	GPUSCOPESTART(ssr_temporal_pass);
+	GPU_SCOPE("ssr_temporal_pass");
 
 	auto& device = draw.get_device();
 
@@ -291,7 +291,7 @@ void imgui_menu_ssr() {
 ADD_TO_DEBUG_MENU(imgui_menu_ssr);
 
 void SSRSystem::execute() {
-	GPUSCOPESTART(ssr_system_execute);
+	GPU_SCOPE("ssr_system_execute");
 	ASSERT(SSRSystem::inst != nullptr);
 
 	const auto& vs = draw.current_frame_view;

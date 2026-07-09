@@ -8,7 +8,6 @@
 #include "Game/EntityComponent.h"
 #include "Framework/Config.h"
 #include "GameEnginePublic.h"
-#include "tracy/public/tracy/Tracy.hpp"
 #include "Game/Components/LightComponents.h"
 #include "Game/Components/MeshComponent.h"
 #include "Game/Components/PhysicsComponents.h"
@@ -84,7 +83,7 @@ void Level::update_level() {
 	NavDebugDraw::tick();
 }
 void Level::sync_level_render_data() {
-	ZoneScoped;
+	CPU_FUNCTION();
 	for (auto ec : wants_sync_update)
 		ec->on_sync_render_data();
 	wants_sync_update.clear_all();
@@ -459,10 +458,14 @@ void Level::validate() {
 }
 
 Entity* Level::find_initial_entity_by_name(const string& name) const {
+	if (name.empty())
+		return nullptr;
 	return MapUtil::get_or(spawnNameToEntity, name, EntityPtr()).get();
 }
 
 Entity* Level::find_any_by_name(const string& name) const {
+	if (name.empty())
+		return nullptr;
 	for (auto o : all_world_ents) {
 		if (auto* e = o->cast_to<Entity>()) {
 			if (e->get_editor_name() == name)

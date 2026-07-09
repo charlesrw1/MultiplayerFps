@@ -219,7 +219,7 @@ void GpuCullingTest::do_cull(const GpuCullInput& input, Phase pass, bool is_for_
 }
 #include "Framework/ArenaAllocator.h"
 void GpuCullingTest::build_data(const GpuCullInput& input) {
-	GPUSCOPESTART(gpu_cull);
+	GPU_SCOPE("gpu_cull");
 
 	cull.cpu_obj_offset = input.num_objs;
 	cull.num_objects = input.num_objs;
@@ -314,7 +314,7 @@ static bool projectSphere(vec3 C, float r, float znear, float P00, float P11, ve
 }
 #include "UI/GUISystemPublic.h"
 void GpuCullingTest::downsample_depth() {
-	GPUSCOPESTART(downsample);
+	GPU_SCOPE("downsample");
 
 	gfx().begin_compute_pass();
 	{ RenderPipelineState ps; ps.program = draw.get_prog_man().get_obj(build_pyramid); gfx().set_pipeline(ps); }

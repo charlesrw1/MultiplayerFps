@@ -38,8 +38,6 @@
 #include "Framework/SysPrint.h"
 #include "Game/Components/ParticleMgr.h"
 #include "Game/Components/GameAnimationMgr.h"
-#include "tracy/public/tracy/Tracy.hpp"
-#include "tracy/public/tracy/TracyOpenGL.hpp"
 #include "Framework/Jobs.h"
 #include "EditorPopups.h"
 #include "DebugConsole.h"
@@ -48,6 +46,7 @@
 #include "EngineMain.h"
 #include "IntegrationTests/TestRunner.h"
 #include "Framework/Util.h"
+#include "Framework/ProfilerUI.h"
 #include <mutex>
 
 #include "Logging.h"
@@ -151,17 +150,16 @@ static void lua_error_loop(string msg, auto&& frame_start, auto&& wait_for_swap,
 }
 
 void GameEngineLocal::game_update_tick() {
-	ZoneScopedN("game_update_tick");
+	CPU_SCOPE("game_update_tick");
 
 	auto fixed_update = [&](double dt) {
-		ZoneScopedN("fixed_update");
+		CPU_SCOPE("fixed_update");
 
 		debug_shape_ctx_fixed_update_start();
 		g_physics.simulate_and_fetch(dt);
 	};
 	auto update = [&](double dt) {
-		ZoneScopedN("update");
-		CPUSCOPESTART(game_update_tick_update);
+		CPU_SCOPE("update");
 		if (level)
 			level->update_level();
 		if (app)
@@ -233,7 +231,7 @@ bool GameEngineLocal::game_thread_update() {
 
 void GameEngineLocal::loop() {
 	auto frame_start = [&]() {
-		ZoneScopedN("frame_start");
+		CPU_SCOPE("frame_start");
 		// update input
 		Input::inst->pre_events();
 		UiSystem::inst->pre_events();
@@ -308,8 +306,7 @@ void GameEngineLocal::loop() {
 
 	auto do_overlapped_update = [&](bool& shouldDrawNext, SceneDrawParamsEx& drawparamsNext, View_Setup& setupNext,
 									const bool skip_rendering) {
-		ZoneScopedN("OverlappedUpdate");
-		CPUSCOPESTART(OverlappedUpdate);
+		CPU_SCOPE("OverlappedUpdate");
 		BooleanScope scope(b_is_in_overlapped_period);
 		GameUpdateOuput out;
 
@@ -321,8 +318,7 @@ void GameEngineLocal::loop() {
 		// game_update_job(uintptr_t(&out));
 
 		{
-			ZoneScopedN("GameThreadUpdate");
-			CPUFUNCTIONSTART;
+			CPU_SCOPE("GameThreadUpdate");
 
 			// printf("abc\n");
 			out.drawOut = true;
@@ -357,15 +353,13 @@ void GameEngineLocal::loop() {
 	// This happens on main thread
 	// I could double buffer draw data so ImGui can update on game thread and render simultaneously
 	auto imgui_render = [&](const bool skip_rendering) {
-		// ZoneScopedN("ImguiDraw");
-		GPUSCOPESTART(imgui_update_scope);
-
-		ZoneScopedN("ImGuiUpdate");
+		RENDER_SCOPE("ImGuiUpdate");
 
 		gui_log.draw(UiSystem::inst->window);
 		draw_fps_counter(frame_time);
 
 		UiSystem::inst->draw_imgui_interfaces(editor_tool.get());
+		prof_ui::draw();
 
 		ImGui::Render();
 		if (!skip_rendering) {
@@ -373,7 +367,7 @@ void GameEngineLocal::loop() {
 		}
 	};
 	auto do_sync_update = [&]() {
-		ZoneScopedN("SyncUpdate");
+		CPU_SCOPE("SyncUpdate");
 		debug_shape_ctx_update(frame_time);
 #ifdef EDITOR_BUILD
 		AssetRegistrySystem::get().update(); // update hot reloading
@@ -387,8 +381,11 @@ void GameEngineLocal::loop() {
 		idraw->sync_update();
 	};
 	auto wait_for_swap = [&](const bool skiprender) {
-		// ZoneScopedN("SwapWindow");
-		GPUSCOPESTART(gl_swap_window_scope);
+		// SwapWindow blocks the CPU thread on vsync -- it must be a CPU_SCOPE
+		// (not just GPU_SCOPE) so the Main thread's frame span includes the
+		// wait, otherwise the profiler's FPS/frame-time reads high (CPU-busy
+		// time only) while stat.fps (measured wall-clock) reads correctly.
+		RENDER_SCOPE("SwapWindow");
 		if (!(skip_swap || skiprender))
 			gfx().submit_and_present();
 	};
@@ -441,7 +438,6 @@ void GameEngineLocal::loop() {
 			// sync period
 			imgui_render(skip_rendering);
 			do_sync_update();
-			// TracyGpuCollect;
 			wait_for_swap(skip_rendering); // wait for swap last
 
 			if (!is_test_mode()) {
@@ -450,8 +446,7 @@ void GameEngineLocal::loop() {
 					SDL_Delay(200);
 			}
 
-			FrameMark;							  // tracy profiling
-			Profiler::end_frame_tick(frame_time); // my crappy profilier
+			prof::Profiler::end_frame();
 		}
 		catch (LuaRuntimeError luaErr) {
 			lua_error_loop(luaErr.what(), frame_start, wait_for_swap, drawparamsNext, setupNext);

@@ -1,7 +1,6 @@
 #include "DrawLocal.h"
 #include "Model.h"
 #include "ModelManager.h"
-#include "tracy/public/tracy/Tracy.hpp"
 
 extern ConfigVar r_taa_enabled;
 extern ConfigVar r_debug_mode;
@@ -73,7 +72,7 @@ void Render_Pass::add_object(const Render_Object& proxy, handle<Render_Object> h
 							 uint32_t camera_dist, int submesh, int lod, int layer, bool is_editor_mode) {
 	ASSERT(handle.is_valid() && "null handle");
 	ASSERT(material && "null material");
-	ZoneScopedN("add_object");
+	CPU_SCOPE("add_object");
 	Pass_Object obj;
 	obj.sort_key = create_sort_key_from_obj(proxy, material, camera_dist, submesh, layer, is_editor_mode);
 	obj.render_obj = handle;

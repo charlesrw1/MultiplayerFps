@@ -44,8 +44,6 @@
 
 #include "Framework/Config.h"
 
-#include "tracy/public/tracy/Tracy.hpp"
-
 #define WARN_ONCE(a, ...)                                                                                              \
 	{                                                                                                                  \
 		static bool has_warned = false;                                                                                \
@@ -257,7 +255,7 @@ public:
 						   const PxU32 count) override {}
 
 	void call_all_triggered() {
-		ZoneScoped;
+		CPU_FUNCTION();
 
 		for (auto& p : triggered_pairs) {
 			Entity* who = nullptr;
@@ -308,7 +306,7 @@ public:
 	}
 
 	void call_all_hits() {
-		ZoneScoped;
+		CPU_FUNCTION();
 		for (auto& p : contact_pairs) {
 			// Each side gets the other as `other`, with the normal pointing toward it.
 			dispatch_hit(p.a, p.b, p.position, p.normal, p.impulse);
@@ -364,7 +362,7 @@ static PxFilterFlags my_filter_shader(PxFilterObjectAttributes attributes0, PxFi
 }
 #include "Framework/Jobs.h"
 void physx_run_job(uintptr_t p) {
-	ZoneScopedN("physx_run_job");
+	CPU_SCOPE("physx_run_job");
 	auto task = (PxBaseTask*)p;
 	task->run();
 	task->release();
@@ -454,9 +452,9 @@ void PhysicsManImpl::set_physics_layer_collisions(std::span<const bool> triangul
 }
 
 void PhysicsManImpl::simulate_and_fetch(float dt) {
-	ZoneScoped;
+	CPU_FUNCTION();
 	{
-		ZoneScopedN("physx simulate/fetchresults");
+		CPU_SCOPE("physx simulate/fetchresults");
 		scene->simulate(dt);
 		scene->fetchResults(true /* block */);
 	}
@@ -464,12 +462,12 @@ void PhysicsManImpl::simulate_and_fetch(float dt) {
 	mycallback->call_all_hits();
 
 	{
-		ZoneScopedN("fetch_transforms");
+		CPU_SCOPE("fetch_transforms");
 		// retrieve array of actors that moved
 		PxU32 nbActiveTransforms{};
 		PxActor** activeTransforms{};
 		{
-			ZoneScopedN("getActiveActors");
+			CPU_SCOPE("getActiveActors");
 			activeTransforms = scene->getActiveActors(nbActiveTransforms);
 		}
 

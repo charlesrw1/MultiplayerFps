@@ -16,7 +16,6 @@
 #include "SpringBoneManagerComponent.h"
 #include "Debug.h"
 #include "Framework/Jobs.h"
-#include "tracy/public/tracy/Tracy.hpp"
 #include "PhysicsComponents.h"
 
 GameAnimationMgr* GameAnimationMgr::inst = nullptr;
@@ -280,7 +279,7 @@ static void draw_skeleton(const AnimatorObject* a, float line_len, const glm::ma
 }
 
 void GameAnimationMgr::update_animating() {
-	ZoneScoped;
+	CPU_FUNCTION();
 
 	matricies_used = 0;
 

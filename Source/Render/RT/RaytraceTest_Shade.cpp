@@ -209,7 +209,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
     gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
 
     {
-        GPUSCOPESTART(temporal_upsample_ddgi);
+        GPU_SCOPE("temporal_upsample_ddgi");
 
         auto targets2 = {ColorTargetInfo(draw.tex.ddgi_accum)};
         rp.color_infos = targets2;
@@ -252,7 +252,7 @@ void DdgiTesting::draw_lighting_halfres(IGraphicsTexture* ssao) {
         gfx().draw_arrays(GraphicsPrimitiveType::Triangles, 0, 3);
     }
 
-    GPUSCOPESTART(ddgihalfres_apply);
+    GPU_SCOPE("ddgihalfres_apply");
 
     // Apply accumulated half-res ddgi to scene
     auto targets3 = {ColorTargetInfo(draw.tex.scene_color)};
@@ -295,7 +295,7 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view) {
 
     auto& device = draw.get_device();
 
-    GPUFUNCTIONSTART;
+    GPU_FUNCTION();
 
     if (r_ddgi_halfres.get_bool() && !for_cubemap_view)
         draw_lighting_halfres(ssao);
@@ -309,7 +309,7 @@ void DdgiTesting::draw_lighting(IGraphicsTexture* ssao, bool for_cubemap_view) {
 
 void DdgiTesting::render_rt() {
     ASSERT(raytrace_test != -1);
-    GPUFUNCTIONSTART;
+    GPU_FUNCTION();
 
     if (!verts) {
         build_world();

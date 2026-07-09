@@ -273,7 +273,10 @@
     <ClCompile Include="Framework\MyImguiLib.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
-    <ClCompile Include="Framework\Profilier.cpp">
+    <ClCompile Include="Framework\Profiler.cpp">
+      <Filter>Source\Framework</Filter>
+    </ClCompile>
+    <ClCompile Include="Framework\ProfilerUI.cpp">
       <Filter>Source\Framework</Filter>
     </ClCompile>
     <ClCompile Include="Framework\PropertyEd.cpp">
@@ -1275,6 +1278,12 @@
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Framework\Util.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\Profiler.h">
+      <Filter>Source\Framework</Filter>
+    </ClInclude>
+    <ClInclude Include="Framework\ProfilerUI.h">
       <Filter>Source\Framework</Filter>
     </ClInclude>
     <ClInclude Include="Framework\VectorReflect2.h">

@@ -4,7 +4,6 @@
 #include "DrawLocal.h"
 #include "Render/Model.h"
 #include "glad/glad.h"
-#include "tracy/public/tracy/Tracy.hpp"
 
 // ---------------------------------------------------------------------------
 // MaterialShaderTable

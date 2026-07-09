@@ -220,7 +220,7 @@ void SSAO_System::update_ubo() {
 ConfigVar r_ssao_blur("r.ssao_blur", "1", CVAR_BOOL | CVAR_DEV, "option to disable ssao blur for debug");
 void SSAO_System::render() {
 
-	GPUFUNCTIONSTART;
+	GPU_FUNCTION();
 	const auto& viewsetup = draw.current_frame_view;
 	int v_w = viewsetup.width;
 	int v_h = viewsetup.height;

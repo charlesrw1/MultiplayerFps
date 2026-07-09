@@ -57,7 +57,7 @@ void Volumetric_Fog_System::compute() {
 	if (!enable_volumetric_fog.get_bool())
 		return;
 
-	GPUFUNCTIONSTART;
+	GPU_FUNCTION();
 
 	gpu::VfogParams params{};
 

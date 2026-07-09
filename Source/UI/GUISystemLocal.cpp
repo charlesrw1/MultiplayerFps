@@ -63,7 +63,7 @@ void UiSystem::draw_imgui_interfaces(IEditorTool* edState) {
 	draw_imgui_internal(edState);
 }
 void UiSystem::draw_imgui_internal(IEditorTool* editorState) {
-	CPUSCOPESTART(imgui_draw);
+	CPU_SCOPE("imgui_draw");
 	ImGui::PushStyleColor(ImGuiCol_WindowBg, color32_to_imvec4({51, 51, 51}));
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, color32_to_imvec4({35, 35, 35}));
 
