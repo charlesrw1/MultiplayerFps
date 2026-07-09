@@ -461,7 +461,7 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 		}
 
 		// Animate the open/closed icon crossfade toward the current state.
-		const float anim_speed = 15.6f;
+		const float anim_speed = 25.f;
 		float target_anim = child->folder_is_open ? 1.0f : 0.0f;
 		child->folder_open_anim += (target_anim - child->folder_open_anim) * std::min(1.0f, ImGui::GetIO().DeltaTime * anim_speed);
 		if (fabsf(target_anim - child->folder_open_anim) < 0.001f)
@@ -918,7 +918,9 @@ void AssetBrowser::imgui_draw() {
 
 	// Left panel: folder tree
 	ImGui::BeginChild("##folder_tree", ImVec2(left_panel_width, main_h), true);
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, 1.0f));
 	draw_folder_tree(this);
+	ImGui::PopStyleVar();
 	if (ImGui::BeginPopupContextWindow("create_asset_menu", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems)) {
 		ImGui::TextDisabled("Create in: %s", selected_folder.empty() ? "(root)" : selected_folder.c_str());
 		ImGui::Separator();
