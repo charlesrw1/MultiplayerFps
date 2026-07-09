@@ -253,6 +253,14 @@ static void draw_browser_tree_view_R2(AssetBrowser* b, int indents, AssetFilesys
 				}
 			}
 		}
+		// Ping flash: fading yellow highlight on the row just navigated to via
+		// "Find in Browser" (mirrors Unity's ping feedback). Selectable spans the
+		// full row (SpanAllColumns), so its item rect covers both columns.
+		if (item_is_selected && b->ping_timer > 0.0f) {
+			float t = b->ping_timer / AssetBrowser::PING_DURATION;
+			ImGui::GetWindowDrawList()->AddRectFilled(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+				ImGui::GetColorU32(ImVec4(1.0f, 0.85f, 0.15f, 0.45f * t)));
+		}
 		if (ImGui::IsItemHovered() && ImGui::IsMouseClicked(1)) {
 			b->selected_resource = asset;
 			ImGui::OpenPopup("asset-click-menu");
@@ -440,6 +448,17 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 		ImGui::PushID(child);
 
 		bool is_selected = (b->selected_folder == folder_path);
+
+		// Ping flash: draw a fading yellow highlight behind the row that was just
+		// navigated to via "Find in Browser" (mirrors Unity's ping feedback).
+		ImVec2 row_screen_min = ImGui::GetCursorScreenPos();
+		if (is_selected && b->ping_timer > 0.0f) {
+			float t = b->ping_timer / AssetBrowser::PING_DURATION;
+			ImVec2 row_screen_max(ImGui::GetWindowPos().x + ImGui::GetWindowContentRegionMax().x,
+								   row_screen_min.y + ImGui::GetFrameHeight());
+			ImGui::GetWindowDrawList()->AddRectFilled(row_screen_min, row_screen_max,
+				ImGui::GetColorU32(ImVec4(1.0f, 0.85f, 0.15f, 0.45f * t)), 3.0f);
+		}
 
 		// Animate the open/closed icon crossfade toward the current state.
 		const float anim_speed = 15.6f;
@@ -662,6 +681,15 @@ void AssetBrowser::draw_browser_grid() {
 			ImGui::GetWindowDrawList()->AddRect(thumb_screen_pos, bmax, IM_COL32(100, 180, 255, 230), 0.f, 0, 2.f);
 		}
 
+		// Ping flash: fading yellow highlight on the tile just navigated to via
+		// "Find in Browser" (mirrors Unity's ping feedback).
+		if (is_selected && ping_timer > 0.0f) {
+			float t = ping_timer / AssetBrowser::PING_DURATION;
+			ImVec2 bmax = ImVec2(thumb_screen_pos.x + THUMB_SIZE, thumb_screen_pos.y + THUMB_SIZE);
+			ImGui::GetWindowDrawList()->AddRectFilled(thumb_screen_pos, bmax,
+				ImGui::GetColorU32(ImVec4(1.0f, 0.85f, 0.15f, 0.4f * t)));
+		}
+
 		// Left-click: select; double-click: open
 		if (item_pressed) {
 			selected_resource = c->asset;
@@ -797,15 +825,28 @@ void AssetBrowser::set_selected(const std::string& path) {
 		f->folder_is_open = true;
 		f = f->parent;
 	}
-	selected_resource.filename = path;
 
-	int len = std::min(255, (int)path.size());
-	memcpy(asset_name_filter, path.c_str(), len);
-	asset_name_filter[len] = 0;
+	// Rebuild the parent folder's gamepath (nodes only store their own name) so the
+	// folder tree/list can navigate to and select it, same as draw_folder_tree_R does.
+	std::vector<std::string> parts;
+	for (AssetFilesystemNode* p = find->parent; p && p->parent; p = p->parent)
+		parts.push_back(p->name);
+	std::string folder_path;
+	for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+		if (!folder_path.empty())
+			folder_path += "/";
+		folder_path += *it;
+	}
+	selected_folder = folder_path;
+
+	selected_resource.filename = path;
+	ping_timer = PING_DURATION;
 }
 
 void AssetBrowser::imgui_draw() {
 	double_clicked_selected = false;
+	if (ping_timer > 0.0f)
+		ping_timer = std::max(0.0f, ping_timer - ImGui::GetIO().DeltaTime);
 	if (force_focus)
 		ImGui::SetNextWindowFocus();
 	force_focus = false;

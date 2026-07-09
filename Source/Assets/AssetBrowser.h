@@ -69,6 +69,11 @@ public:
 	void set_selected(const std::string& path);
 	AssetFilesystemNode* find_node_for_asset(const std::string& path) const;
 
+	// "Ping" flash duration (seconds) for the yellow highlight shown on the folder/asset
+	// navigated to via set_selected(), mirroring Unity's "ping" find-in-browser feedback.
+	static constexpr float PING_DURATION = 0.8f;
+	float ping_timer = 0.0f;
+
 	void draw_browser_grid();
 
 	enum class Mode
