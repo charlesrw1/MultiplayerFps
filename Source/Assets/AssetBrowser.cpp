@@ -489,7 +489,8 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 		ImGui::SameLine();
 		const float ICON_SIZE = 14.0f;
 
-		// Dim tint applied to both the icon and label for subfolder-less folders.
+		// Dim tint applied to the folder icon only for subfolder-less folders; label
+		// text keeps the normal color.
 		const ImVec4 dim_tint(0.6f, 0.6f, 0.6f, 1.0f);
 
 		if (b->folder_closed && b->folder_open) {
@@ -513,12 +514,8 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 		}
 		ImGui::SameLine();
 
-		if (!has_subdirs)
-			ImGui::PushStyleColor(ImGuiCol_Text, dim_tint);
 		if (ImGui::Selectable(child->name.c_str(), is_selected, ImGuiSelectableFlags_AllowItemOverlap))
 			b->selected_folder = folder_path;
-		if (!has_subdirs)
-			ImGui::PopStyleColor();
 
 		ImGui::PopStyleVar();
 
