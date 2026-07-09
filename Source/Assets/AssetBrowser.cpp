@@ -441,20 +441,34 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 
 		bool is_selected = (b->selected_folder == folder_path);
 
+		// Animate the open/closed icon crossfade toward the current state.
+		const float anim_speed = 15.6f;
+		float target_anim = child->folder_is_open ? 1.0f : 0.0f;
+		child->folder_open_anim += (target_anim - child->folder_open_anim) * std::min(1.0f, ImGui::GetIO().DeltaTime * anim_speed);
+		if (fabsf(target_anim - child->folder_open_anim) < 0.001f)
+			child->folder_open_anim = target_anim;
+
 		ImGui::Dummy(ImVec2(indent * folder_indent, 1.0f));
 		ImGui::SameLine();
 		const float ICON_SIZE = 14.0f;
 
-		auto* t = child->folder_is_open ? b->folder_open : b->folder_closed;
-		if (t) {
+		if (b->folder_closed && b->folder_open) {
 			ImVec2 icon_pos = ImGui::GetCursorScreenPos();
 			ImGui::PushID("##icon");
 			if (ImGui::InvisibleButton("##toggle", ImVec2(ICON_SIZE, ICON_SIZE)))
 				child->folder_is_open = !child->folder_is_open;
 			ImGui::PopID();
-			ImGui::GetWindowDrawList()->AddImage(
-				ImTextureID(uint64_t(t->get_internal_render_handle())),
-				icon_pos, ImVec2(icon_pos.x + ICON_SIZE, icon_pos.y + ICON_SIZE));
+			float open_alpha = child->folder_open_anim;
+			ImDrawList* dl = ImGui::GetWindowDrawList();
+			ImVec2 icon_max(icon_pos.x + ICON_SIZE, icon_pos.y + ICON_SIZE);
+			if (open_alpha < 0.999f)
+				dl->AddImage(ImTextureID(uint64_t(b->folder_closed->get_internal_render_handle())),
+					icon_pos, icon_max, ImVec2(0, 0), ImVec2(1, 1),
+					ImGui::GetColorU32(ImVec4(1, 1, 1, 1.0f - open_alpha)));
+			if (open_alpha > 0.001f)
+				dl->AddImage(ImTextureID(uint64_t(b->folder_open->get_internal_render_handle())),
+					icon_pos, icon_max, ImVec2(0, 0), ImVec2(1, 1),
+					ImGui::GetColorU32(ImVec4(1, 1, 1, open_alpha)));
 		}
 		ImGui::SameLine();
 
@@ -485,8 +499,31 @@ static void draw_folder_tree_R(AssetBrowser* b, int indent, AssetFilesystemNode*
 			ImGui::EndDragDropTarget();
 		}
 
-		if (child->folder_is_open)
+		if (child->folder_is_open || child->folder_open_anim > 0.001f) {
+			bool fully_open = child->folder_open_anim >= 0.999f;
+			float start_y_local = ImGui::GetCursorPosY();
+			ImVec2 start_screen = ImGui::GetCursorScreenPos();
+
+			// Clip the reveal to the animated height (based on last frame's measured
+			// full height) so sibling folders below slide up/down smoothly instead
+			// of snapping, like Unity's project window expand/collapse.
+			float clip_h = std::max(0.0f, child->cached_full_height * child->folder_open_anim);
+			if (!fully_open) {
+				ImVec2 clip_min = start_screen;
+				ImVec2 clip_max(start_screen.x + 100000.0f, start_screen.y + clip_h);
+				ImGui::PushClipRect(clip_min, clip_max, true);
+			}
+
 			draw_folder_tree_R(b, indent + 1, child, folder_path);
+
+			float full_h = ImGui::GetCursorPosY() - start_y_local;
+			child->cached_full_height = full_h;
+
+			if (!fully_open) {
+				ImGui::PopClipRect();
+				ImGui::SetCursorPosY(start_y_local + clip_h);
+			}
+		}
 
 		ImGui::PopID();
 	}

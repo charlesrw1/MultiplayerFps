@@ -6,6 +6,8 @@ struct AssetFilesystemNode
 	AssetFilesystemNode* parent = nullptr;
 	bool is_used = true;
 	bool folder_is_open = false;
+	float folder_open_anim = 0.0f; // transient UI state, animates icon/expand toward folder_is_open
+	float cached_full_height = 0.0f; // transient UI state, last measured height of expanded children
 	AssetOnDisk asset;
 	std::string name;
 	std::unordered_map<std::string, AssetFilesystemNode> children;
