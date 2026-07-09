@@ -304,8 +304,18 @@ void GameEngineLocal::loop() {
 		}
 	};
 
+	auto wait_for_swap = [&](const bool skiprender) {
+		// SwapWindow blocks the CPU thread on vsync -- it must be a CPU_SCOPE
+		// (not just GPU_SCOPE) so the Main thread's frame span includes the
+		// wait, otherwise the profiler's FPS/frame-time reads high (CPU-busy
+		// time only) while stat.fps (measured wall-clock) reads correctly.
+		RENDER_SCOPE("SwapWindow");
+		if (!(skip_swap || skiprender))
+			gfx().submit_and_present();
+	};
+
 	auto do_overlapped_update = [&](bool& shouldDrawNext, SceneDrawParamsEx& drawparamsNext, View_Setup& setupNext,
-									const bool skip_rendering) {
+									const bool skip_rendering, bool& prev_skip_rendering) {
 		CPU_SCOPE("OverlappedUpdate");
 		BooleanScope scope(b_is_in_overlapped_period);
 		GameUpdateOuput out;
@@ -335,6 +345,15 @@ void GameEngineLocal::loop() {
 			// update particles, doesnt draw, only builds meshes FIXME
 			ParticleMgr::inst->draw(out.vsOut);
 		}
+
+		// Present the PREVIOUS frame's already-submitted GPU commands now,
+		// right after this frame's CPU-only game update -- that update is
+		// real work for the GPU's remaining render time to overlap with,
+		// instead of blocking on swap only after also submitting this
+		// frame's commands (which leaves the CPU idle for the whole wait).
+		// Costs one extra frame of submit-to-present latency in exchange.
+		wait_for_swap(prev_skip_rendering);
+		prev_skip_rendering = skip_rendering;
 
 		if (!skip_rendering) {
 			if (!shouldDrawNext) {
@@ -380,21 +399,13 @@ void GameEngineLocal::loop() {
 		g_physics.sync_render_data();
 		idraw->sync_update();
 	};
-	auto wait_for_swap = [&](const bool skiprender) {
-		// SwapWindow blocks the CPU thread on vsync -- it must be a CPU_SCOPE
-		// (not just GPU_SCOPE) so the Main thread's frame span includes the
-		// wait, otherwise the profiler's FPS/frame-time reads high (CPU-busy
-		// time only) while stat.fps (measured wall-clock) reads correctly.
-		RENDER_SCOPE("SwapWindow");
-		if (!(skip_swap || skiprender))
-			gfx().submit_and_present();
-	};
 
 	double last = GetTime() - 0.1;
 	// these are from the last game frame
 	SceneDrawParamsEx drawparamsNext(0, 0);
 	View_Setup setupNext;
 	bool shouldDrawNext = true;
+	bool prev_skip_rendering = true; // nothing submitted yet on the first iteration
 
 	for (;;) {
 		try {
@@ -432,13 +443,14 @@ void GameEngineLocal::loop() {
 #endif
 
 			const bool skip_rendering = !draw_this_frame();
-			// overlapped update (game+render)
-			do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering);
+			// overlapped update: game update, then present the previous
+			// frame (see wait_for_swap call inside), then submit this
+			// frame's scene_draw commands.
+			do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering, prev_skip_rendering);
 
 			// sync period
 			imgui_render(skip_rendering);
 			do_sync_update();
-			wait_for_swap(skip_rendering); // wait for swap last
 
 			if (!is_test_mode()) {
 				auto flags = SDL_GetWindowFlags(window);
