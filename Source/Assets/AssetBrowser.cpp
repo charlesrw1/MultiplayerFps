@@ -995,32 +995,63 @@ void AssetBrowser::set_selected(const std::string& path) {
 
 // Unity-style breadcrumb: "Assets > My Folder > Materials", each segment clickable to
 // jump straight to that ancestor folder (also expanding it in the left tree panel).
+// Segments render as flat text that only highlights on hover — not boxed buttons — so
+// the bar reads as a path, not a row of buttons. The last (current) segment is plain,
+// non-clickable text since navigating to it would be a no-op.
 static void draw_breadcrumb(AssetBrowser* b) {
-	if (ImGui::SmallButton("Assets"))
-		navigate_to_folder(b, "");
-
-	std::string accum;
-	size_t start = 0;
-	while (start <= b->selected_folder.size()) {
-		size_t slash = b->selected_folder.find('/', start);
-		std::string part = b->selected_folder.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
-		if (part.empty())
-			break;
-		accum = accum.empty() ? part : (accum + "/" + part);
-
-		ImGui::SameLine();
-		ImGui::TextUnformatted(">");
-		ImGui::SameLine();
-		ImGui::PushID(accum.c_str());
-		if (ImGui::SmallButton(part.c_str()))
-			navigate_to_folder(b, accum);
-		ImGui::PopID();
-
-		if (slash == std::string::npos)
-			break;
-		start = slash + 1;
+	std::vector<std::string> parts;
+	{
+		size_t start = 0;
+		while (start <= b->selected_folder.size()) {
+			size_t slash = b->selected_folder.find('/', start);
+			std::string part = b->selected_folder.substr(start, slash == std::string::npos ? std::string::npos : slash - start);
+			if (!part.empty())
+				parts.push_back(part);
+			if (slash == std::string::npos)
+				break;
+			start = slash + 1;
+		}
 	}
+
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(4.0f, 2.0f));
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 3.0f);
+	ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(1.f, 1.f, 1.f, 0.10f));
+	ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(1.f, 1.f, 1.f, 0.18f));
+	ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.75f, 0.75f, 0.75f, 1.f));
+
+	auto draw_crumb = [&](const char* label, bool is_current, const std::string& path) {
+		ImGui::AlignTextToFramePadding();
+		if (is_current) {
+			ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, 1.f, 1.f, 1.f));
+			ImGui::TextUnformatted(label);
+			ImGui::PopStyleColor();
+		} else if (ImGui::SmallButton(label)) {
+			navigate_to_folder(b, path);
+		}
+	};
+
+	draw_crumb("Assets", parts.empty(), "");
+	std::string accum;
+	for (size_t i = 0; i < parts.size(); i++) {
+		accum = accum.empty() ? parts[i] : (accum + "/" + parts[i]);
+
+		ImGui::SameLine(0.0f, 2.0f);
+		ImGui::AlignTextToFramePadding();
+		ImGui::TextDisabled(">");
+		ImGui::SameLine(0.0f, 2.0f);
+
+		ImGui::PushID((int)i);
+		draw_crumb(parts[i].c_str(), i == parts.size() - 1, accum);
+		ImGui::PopID();
+	}
+
+	ImGui::PopStyleColor(4);
+	ImGui::PopStyleVar(2);
+
+	ImGui::Spacing();
 	ImGui::Separator();
+	ImGui::Spacing();
 }
 
 void AssetBrowser::imgui_draw() {
