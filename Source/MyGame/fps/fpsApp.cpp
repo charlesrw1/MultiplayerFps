@@ -13,14 +13,20 @@ void fpsApp::start() {
 	inst = this;
 
 	game = std::make_unique<fpsGameMgr>();
+	lua.reset(ClassBase::create_class<fpsLuaBridge>("fpsLuaBridgeImpl"));
+	if (!lua)
+		sys_print(Warning, "no fpsLuaBridgeImpl");
+	else
+		lua->init();
 	game->start_level("physics_test_world.tmap");
 }
 
 void fpsApp::update() {
 	if (Input::is_alt_down() && Input::was_key_pressed(SDL_SCANCODE_F4))
 		Quit();
-
 	game->update();
+	if (lua)
+		lua->update();
 }
 
 void fpsApp::stop() {
@@ -30,6 +36,7 @@ void fpsApp::stop() {
 
 void fpsApp::on_imgui() {
 	game->debug_camera.on_imgui();
+	lua->imgui_tick();
 }
 
 void fpsGameMgr::update() {
