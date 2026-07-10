@@ -1,0 +1,17 @@
+#include "ShaderBufferShared.txt"
+
+layout (location = 0) in vec2 VS_IN_Postion;
+layout (location = 1) in vec4 VS_IN_Color;
+layout (location = 2) in vec2 VS_IN_TexCoord;
+
+layout(location = 0) out vec4 FS_IN_Color;
+layout(location = 1) out vec2 FS_IN_TexCoord;
+
+layout(std140, binding = 12) uniform RmlUiVertPushConstsUbo { RmlUiVertPushConsts pcv; };
+
+void main()
+{
+	FS_IN_Color = VS_IN_Color;
+    FS_IN_TexCoord = VS_IN_TexCoord;
+    gl_Position = pcv.Projection * vec4(VS_IN_Postion + pcv.Translation, 0.0, 1.0);
+}

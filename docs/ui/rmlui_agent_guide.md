@@ -1,8 +1,13 @@
 # RmlUi integration
 
 RmlUi 6.2 (`core` + `freetype` vcpkg features, no `[lua]` feature — this engine
-binds RmlUi to Lua itself, not via RmlUi's own Lua plugin). OpenGL backend
-only; DX11 backend log-warns and no-ops (`Source/Render/Dx11/Dx11Device.cpp`).
+binds RmlUi to Lua itself, not via RmlUi's own Lua plugin). The render
+interface (`Source/Render/RmlUiRenderInterface.h/.cpp`) is implemented
+entirely through `IGraphicsDevice` (textures/buffers/vertex-input/pipeline/
+push-constants) — no raw graphics-API calls — so it is backend-portable, but
+it's currently only instantiated by the OpenGL device; DX11 backend log-warns
+and no-ops (`Source/Render/Dx11/Dx11Device.cpp`) since it isn't wired up
+there yet.
 
 Draw order per frame: 3D scene -> `Gui::`/`Canvas::` immediate-mode HUD
 sprites -> RmlUi documents -> ImGui (editor, always on top). `Gui::`/`Canvas::`
@@ -13,19 +18,18 @@ document/DOM shape (menus, inventories, dialogs, HUD panels with layout).
 
 ## Known v1 limitations
 
-- **No file-based image loading.** `OpenGlRmlUiRenderInterface::LoadTexture`
-  is unimplemented (`<img src="...">` and RCSS `background-image` will not
-  render anything, just a log warning). Only `GenerateTexture` (RmlUi
-  generating a texture from in-memory pixel data, e.g. font glyph atlases)
-  works. Wiring `LoadTexture` through the engine's texture pipeline is a
-  follow-up.
+- **File-based image loading routes through the engine's asset system.**
+  `RmlUiRenderInterface::LoadTexture` calls `Texture::force_load_for_ui(source)`
+  (same synchronous immediate-load path `AssetBrowser` uses for thumbnails),
+  so `<img src="...">` / RCSS `background-image` paths resolve like any other
+  `Data/`-relative texture asset.
 - RCSS `filter`/`backdrop-filter`, `transform`, and custom
   `Rml::Decorator`/shader effects parse and animate correctly (RmlUi core
   handles that regardless of backend) but **do not visually apply** — the
   render interface only implements the "required" `Rml::RenderInterface`
   functions (geometry/texture/scissor). `SetTransform`/layer/filter/shader
   calls fall through to `RenderInterface`'s no-op defaults. See
-  `Source/Render/OpenGlRmlUiRenderInterface.h` for the extension point if
+  `Source/Render/RmlUiRenderInterface.h` for the extension point if
   this is needed later (custom decorator -> `CompileShader`/`RenderShader`
   binding a custom GLSL program via `gfx().create_shader_vert_frag()`;
   `transform` needs `SetTransform` wired to the vertex shader's model
@@ -195,15 +199,14 @@ local doc = RmlUi.load_document("ui/cards_test.rml")
 RmlUi.show_document(doc)
 ```
 
-(Given the image-loading limitation above, `data-attr-src` won't actually
-render a texture yet — the row/text binding and layout do work. Text itself
-needs a `.ttf`/`.otf` under `Data/ui/fonts/` loaded via `Rml::LoadFontFace`
-at `RmlUiSystem::init()` time — none ships yet, see the limitation below.)
+(`data-attr-src` now resolves through the asset system per the note above.
+Text itself needs a `.ttf`/`.otf` under `Data/ui/fonts/` loaded via
+`Rml::LoadFontFace` at `RmlUiSystem::init()` time — none ships yet, see the
+limitation below.)
 
 GAPS:
  Notable deviations/gaps flagged in the doc, not silently swept under the rug:
   - The plan's "delete old UI" list was mostly wrong — those files are live dependencies of Gui::/Canvas::, not dead code. Only two genuinely dead files were removed (confirmed with you first).
-  - No file-based image loading yet (<img>/background-image no-op) — only in-memory texture generation.
   - No fonts ship in the repo, so text won't render until a .ttf/.otf is added under Data/ui/fonts/.
   - Filters/transforms/custom shaders parse but don't visually apply (optional RenderInterface hooks not implemented).
   - A benign Resource was not properly shut down RmlUi log warning at process exit, not yet root-caused (no crash, not a leak in practice).

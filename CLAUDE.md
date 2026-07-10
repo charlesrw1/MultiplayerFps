@@ -1,8 +1,15 @@
 This is a game engine project. Uses C++ VS2026 , OpenGL, SDL2, vcpkg. No CMAKE.
 
-path to compilier: "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\MSBuild.exe"' OR use msbuild.cmd which is in PATH
+path to compiler: "C:\Program Files\Microsoft Visual Studio\18\Insiders\MSBuild\Current\Bin\amd64\MSBuild.exe" OR use msbuild.cmd which is in PATH.
 
-NEVER use VS compilier under "C:\Program Files (x86)\...", that is old compilier.
+CRITICAL: ALWAYS use the 64-bit MSBuild under `Bin\amd64\` (NOT the 32-bit `Bin\MSBuild.exe`).
+The VS 2026 IDE is 64-bit; building from the CLI with the 32-bit MSBuild corrupts the
+FileTracker .tlog state and makes the IDE full-rebuild everything on every build,
+persistently, until the tlogs are wiped. See docs/gotchas.md. Prefer the wrapper scripts
+(build_and_test.ps1 / integration_test.ps1 / run_editor.ps1 / run_game.ps1 / msbuild.cmd),
+which already select the 64-bit engine. Never invoke `...\Bin\MSBuild.exe` (32-bit) directly.
+
+NEVER use VS compiler under "C:\Program Files (x86)\...", that is old compiler.
 
 If you see error code c0000135, then it most likely means NO DLLs were copied to the x64/Debug or x64/Release folder for some reason? Bug with vcpkg.
 

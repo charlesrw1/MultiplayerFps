@@ -402,6 +402,15 @@ struct MasterParticleFragPushConsts {
     uint _pad2;
 };
 
+// RmlUiV.txt / RmlUiF.txt (RmlUi UI geometry -- see RmlUiRenderInterface.cpp).
+// VS needs an orthographic Projection + per-geometry-call Translation
+// (RmlUi passes translation separately from compiled geometry so the same
+// compiled vertex buffer can be redrawn at different positions).
+struct RmlUiVertPushConsts {
+    mat4 Projection;             //   0 ..  64
+    vec2 Translation;            //  64 ..  72   (struct size 80, padded)
+};
+
 #ifdef __cplusplus
 };
 #endif

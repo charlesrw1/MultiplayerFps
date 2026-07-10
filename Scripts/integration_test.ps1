@@ -168,8 +168,10 @@ function Set-VarsRenderBackend([string]$backend) {
 # ---- Build ----------------------------------------------------------------
 # -prerelease ensures VS 2026 Insiders (Dev18) is picked over older stable installs.
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+# 64-bit Bin\amd64\MSBuild.exe required: mixing 32-bit CLI MSBuild with the 64-bit
+# VS IDE corrupts FileTracker .tlog state and forces full rebuilds.
 $msbuild = & $vswhere -latest -prerelease -requires Microsoft.Component.MSBuild `
-    -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
+    -find "MSBuild\**\Bin\amd64\MSBuild.exe" | Select-Object -First 1
 if (-not $msbuild) { Write-Error "MSBuild not found"; exit 1 }
 Write-Host "Using MSBuild: $msbuild" -ForegroundColor DarkGray
 

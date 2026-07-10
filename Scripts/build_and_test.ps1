@@ -11,10 +11,12 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path $PSScriptRoot -Parent
 $_item = Get-Item $RepoRoot; if ($_item.LinkType) { $RepoRoot = $_item.Target.TrimEnd('\') }
 
-# Locate msbuild (include -prerelease so VS 2026 Insiders is picked up)
+# Locate msbuild (include -prerelease so VS 2026 Insiders is picked up).
+# MUST be the 64-bit Bin\amd64\MSBuild.exe: the VS IDE is 64-bit, and mixing a
+# 32-bit CLI MSBuild with the IDE corrupts FileTracker .tlog state -> full rebuilds.
 $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
     -latest -prerelease -requires Microsoft.Component.MSBuild `
-    -find MSBuild\**\Bin\MSBuild.exe 2>$null | Select-Object -First 1
+    -find MSBuild\**\Bin\amd64\MSBuild.exe 2>$null | Select-Object -First 1
 
 if (-not $msbuild) {
     Write-Error "Could not find MSBuild via vswhere. Is Visual Studio installed?"

@@ -330,7 +330,7 @@
     <ClCompile Include="UI\RmlUi\RmlUiDataModel.cpp" />
     <ClCompile Include="UI\RmlUi\RmlUiLua.cpp" />
     <ClCompile Include="UI\RmlUi\RmlUiDebugMenu.cpp" />
-    <ClCompile Include="Render\OpenGlRmlUiRenderInterface.cpp" />
+    <ClCompile Include="Render\RmlUiRenderInterface.cpp" />
     <ClCompile Include="User_Camera.cpp" />
     <ClInclude Include="Animation\AnimationTypes.h" />
     <ClInclude Include="Animation\AnimationUtil.h" />
@@ -567,7 +567,7 @@
     <ClInclude Include="UI\RmlUi\RmlUiDataModel.h" />
     <ClInclude Include="UI\RmlUi\RmlUiLua.h" />
     <ClInclude Include="UI\RmlUi\RmlUiRenderHook.h" />
-    <ClInclude Include="Render\OpenGlRmlUiRenderInterface.h" />
+    <ClInclude Include="Render\RmlUiRenderInterface.h" />
     <ClInclude Include="Physics\ChannelsAndPresets.h" />
     <ClInclude Include="Physics\Physics2.h" />
     <ClInclude Include="Render\DrawLocal.h" />
@@ -825,6 +825,15 @@
       <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <!-- Pin /errorReport (all configs) so the VS IDE and command-line msbuild emit an
+       IDENTICAL CL command line. Without this, BuildingInsideVisualStudio selects
+       prompt (IDE) vs queue (CLI); that one-flag difference changes CL.command.1.tlog
+       and forces a FULL rebuild every time you switch between the IDE and a CLI build. -->
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <ErrorReporting>Prompt</ErrorReporting>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

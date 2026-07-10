@@ -10,7 +10,7 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_opengl3.h"
 #include "../External/glad/glad.h"
-#include "OpenGlRmlUiRenderInterface.h"
+#include "RmlUiRenderInterface.h"
 #include "UI/RmlUi/RmlUiRenderHook.h"
 #include <RmlUi/Core/Core.h>
 #include <memory>
@@ -988,11 +988,11 @@ public:
 		return ImGui_ImplSDL3_ProcessEvent(event);
 	}
 
-	std::unique_ptr<OpenGlRmlUiRenderInterface> rmlui_render_iface;
+	std::unique_ptr<RmlUiRenderInterface> rmlui_render_iface;
 
 	void rmlui_init() override {
 		ASSERT(!rmlui_render_iface);
-		rmlui_render_iface = std::make_unique<OpenGlRmlUiRenderInterface>();
+		rmlui_render_iface = std::make_unique<RmlUiRenderInterface>();
 		Rml::SetRenderInterface(rmlui_render_iface.get());
 	}
 

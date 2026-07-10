@@ -777,7 +777,7 @@
     <ClCompile Include="Render\OpenGlDevice.cpp">
       <Filter>Render</Filter>
     </ClCompile>
-    <ClCompile Include="Render\OpenGlRmlUiRenderInterface.cpp">
+    <ClCompile Include="Render\RmlUiRenderInterface.cpp">
       <Filter>Render</Filter>
     </ClCompile>
     <ClCompile Include="Render\OpenGlShaderImpl.cpp">
@@ -1583,7 +1583,7 @@
     <ClInclude Include="Render\ModelManager.h">
       <Filter>Render</Filter>
     </ClInclude>
-    <ClInclude Include="Render\OpenGlRmlUiRenderInterface.h">
+    <ClInclude Include="Render\RmlUiRenderInterface.h">
       <Filter>Render</Filter>
     </ClInclude>
     <ClInclude Include="Render\PostProcessSettings.h">

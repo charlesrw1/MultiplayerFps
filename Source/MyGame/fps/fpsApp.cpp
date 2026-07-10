@@ -27,6 +27,8 @@ void fpsApp::update() {
 	game->update();
 	if (lua)
 		lua->update();
+
+	// test comment
 }
 
 void fpsApp::stop() {
