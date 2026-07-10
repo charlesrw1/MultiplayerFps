@@ -22,6 +22,10 @@ All project documentation lives here. Validated by `docs.exe` (see [[tooling/doc
 - [[rendering/gfx_abstraction_changelog]] — per-sub-phase status entries for Phase 1 + Phase 2 (as-landed notes split from the design doc)
 - [[rendering/gfx_abstraction_nextsteps]] — DX11 backend (M1) status / punch list
 
+## UI
+
+- [[ui/rmlui_agent_guide]] — RmlUi integration: RCSS vs CSS gotchas, data-binding attrs, Lua API, known v1 limitations
+
 ## Bike Demo
 
 - [[bike/sign_conventions]] — DO NOT get these wrong (axes, steer sign, lateral_pos)

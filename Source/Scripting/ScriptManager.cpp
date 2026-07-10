@@ -5,6 +5,7 @@
 #include "Framework/Config.h"
 #include "LuaTransform.h"
 #include "LuaVecQuat.h"
+#include "UI/RmlUi/RmlUiLua.h"
 #include "ScriptFunctionCodegen.h"
 #include "Game/EntityComponent.h"
 #include "GameEnginePublic.h"
@@ -50,6 +51,7 @@ ScriptManager::ScriptManager() {
 
 	register_lua_transform(lua);
 	register_lua_vec_quat(lua);
+	register_rmlui_lua(lua);
 }
 
 ScriptManager::~ScriptManager() {

@@ -29,9 +29,10 @@
 #include "imgui_internal.h" // ErrorCheckEndFrameRecover -- see lua_error_loop
 #include "Render/IGraphicsDevice.h"
 #include "UI/UILoader.h"
-#include "UI/Widgets/Layouts.h"
+#include "UI/BaseGUI.h"
 #include "UI/OnScreenLogGui.h"
 #include "UI/GUISystemPublic.h"
+#include "UI/RmlUi/RmlUiSystem.h"
 #include "Assets/AssetDatabase.h"
 #include "Input/InputSystem.h"
 #include "Render/RenderObj.h"
@@ -284,6 +285,7 @@ void GameEngineLocal::loop() {
 		SDL_Event event;
 		while (SDL_PollEvent(&event)) {
 			gfx().imgui_process_event(&event);
+			RmlUiSystem::inst->handle_event(event);
 			Input::inst->handle_event(event);
 			UiSystem::inst->handle_event(event);
 
@@ -431,6 +433,12 @@ void GameEngineLocal::loop() {
 			gfx().imgui_render_draw_data();
 		}
 	};
+	auto rmlui_render = [&](const bool skip_rendering) {
+		RENDER_SCOPE("RmlUiUpdate");
+		RmlUiSystem::inst->update();
+		if (!skip_rendering)
+			RmlUiSystem::inst->render();
+	};
 	auto do_sync_update = [&]() {
 		CPU_SCOPE("SyncUpdate");
 		debug_shape_ctx_update(frame_time);
@@ -495,6 +503,7 @@ void GameEngineLocal::loop() {
 			do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering, prev_skip_rendering);
 
 			// sync period
+			rmlui_render(skip_rendering);
 			imgui_render(skip_rendering);
 			do_sync_update();
 

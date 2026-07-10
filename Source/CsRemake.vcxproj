@@ -325,7 +325,11 @@
     <ClCompile Include="UI\UIBuilder.cpp" />
     <ClCompile Include="UI\UILoader.cpp" />
     <ClCompile Include="UI\Widgets\EditorCube.cpp" />
-    <ClCompile Include="UI\Widgets\SharedFuncs.cpp" />
+    <ClCompile Include="UI\RmlUi\RmlUiSystem.cpp" />
+    <ClCompile Include="UI\RmlUi\RmlUiSystemInterface.cpp" />
+    <ClCompile Include="UI\RmlUi\RmlUiDataModel.cpp" />
+    <ClCompile Include="UI\RmlUi\RmlUiLua.cpp" />
+    <ClCompile Include="Render\OpenGlRmlUiRenderInterface.cpp" />
     <ClCompile Include="User_Camera.cpp" />
     <ClInclude Include="Animation\AnimationTypes.h" />
     <ClInclude Include="Animation\AnimationUtil.h" />
@@ -563,6 +567,12 @@
     <ClInclude Include="Sound\SoundComponent.h" />
     <ClInclude Include="Testheader.h" />
     <ClInclude Include="UI\OnScreenLogGui.h" />
+    <ClInclude Include="UI\RmlUi\RmlUiSystem.h" />
+    <ClInclude Include="UI\RmlUi\RmlUiSystemInterface.h" />
+    <ClInclude Include="UI\RmlUi\RmlUiDataModel.h" />
+    <ClInclude Include="UI\RmlUi\RmlUiLua.h" />
+    <ClInclude Include="UI\RmlUi\RmlUiRenderHook.h" />
+    <ClInclude Include="Render\OpenGlRmlUiRenderInterface.h" />
     <ClInclude Include="Physics\ChannelsAndPresets.h" />
     <ClInclude Include="Physics\Physics2.h" />
     <ClInclude Include="Render\DrawLocal.h" />
@@ -593,7 +603,6 @@
     <ClInclude Include="UI\UIBuilder.h" />
     <ClInclude Include="UI\UILoader.h" />
     <ClInclude Include="UI\Widgets\EditorCube.h" />
-    <ClInclude Include="UI\Widgets\Layouts.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include=".generated\MEGA.gen.cpp">

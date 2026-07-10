@@ -40,7 +40,7 @@
 
 #include "Framework/FnFactory.h"
 #include "Framework/ConsoleCmdGroup.h"
-#include "UI/Widgets/Layouts.h"
+#include "UI/BaseGUI.h"
 #include "Input/InputSystem.h"
 #include <variant>
 #include "UI/GUISystemPublic.h"

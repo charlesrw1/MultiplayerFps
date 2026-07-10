@@ -18,7 +18,7 @@
 #include "AssetTools/DiagnosticsWindow.h"
 #include "Framework/ProfilerUI.h"
 #include "UI/GUISystemPublic.h"
-#include "UI/Widgets/Layouts.h"
+#include "UI/BaseGUI.h"
 #include "Game/LevelAssets.h"
 #include "LevelEditor/Commands.h"
 #include "Framework/Rect2d.h"
@@ -105,6 +105,7 @@ void EditorDoc::imgui_draw() {
 		shape.color = {200, 200, 200};
 		shape.with_drop_shadow = true;
 		shape.drop_shadow_ofs = 1;
+		shape.font = g_assets.find<GuiFont>("eng/fonts/monospace12.fnt").get();
 		// center it
 		Rect2d size = GuiHelpers::calc_text_size(shape.text, nullptr);
 		glm::ivec2 pos = {-size.w / 2, size.h + text_ofs};

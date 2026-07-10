@@ -36,9 +36,10 @@
 #include "imgui_internal.h"
 #include "Framework/EditorTheme.h"
 #include "UI/UILoader.h"
-#include "UI/Widgets/Layouts.h"
+#include "UI/BaseGUI.h"
 #include "UI/OnScreenLogGui.h"
 #include "UI/GUISystemPublic.h"
+#include "UI/RmlUi/RmlUiSystem.h"
 #include "Assets/AssetDatabase.h"
 #include "Input/InputSystem.h"
 #include "Render/RenderObj.h"
@@ -312,8 +313,15 @@ void GameEngineLocal::cleanup() {
 
 	// could get fatal error before initializing this stuff
 	if (window) {
-		if (gfx_is_initialized())
+		if (gfx_is_initialized()) {
+			if (RmlUiSystem::inst) {
+				RmlUiSystem::inst->shutdown();
+				delete RmlUiSystem::inst;
+				RmlUiSystem::inst = nullptr;
+			}
+			gfx().rmlui_shutdown();
 			gfx().imgui_shutdown();
+		}
 		gfx_shutdown();
 		SDL_DestroyWindow(window);
 	}
@@ -454,6 +462,11 @@ void GameEngineLocal::init(MainConfigurationOptions& options, int argc, char** a
 	ImGui::SetCurrentContext(imgui_context);
 	gfx().imgui_init();
 	print_time("imgui init");
+
+	gfx().rmlui_init();
+	RmlUiSystem::inst = new RmlUiSystem();
+	RmlUiSystem::inst->init();
+	print_time("rmlui init");
 
 #ifdef EDITOR_BUILD
 	g_editor_recents.load();

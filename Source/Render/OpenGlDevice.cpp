@@ -10,6 +10,10 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_opengl3.h"
 #include "../External/glad/glad.h"
+#include "OpenGlRmlUiRenderInterface.h"
+#include "UI/RmlUi/RmlUiRenderHook.h"
+#include <RmlUi/Core/Core.h>
+#include <memory>
 // ---------------------------------------------------------------------------
 // Global state (definitions)
 // ---------------------------------------------------------------------------
@@ -982,6 +986,30 @@ public:
 	bool imgui_process_event(const SDL_Event* event) override {
 		ASSERT(event != nullptr);
 		return ImGui_ImplSDL3_ProcessEvent(event);
+	}
+
+	std::unique_ptr<OpenGlRmlUiRenderInterface> rmlui_render_iface;
+
+	void rmlui_init() override {
+		ASSERT(!rmlui_render_iface);
+		rmlui_render_iface = std::make_unique<OpenGlRmlUiRenderInterface>();
+		Rml::SetRenderInterface(rmlui_render_iface.get());
+	}
+
+	void rmlui_shutdown() override {
+		Rml::SetRenderInterface(nullptr);
+		rmlui_render_iface.reset();
+	}
+
+	void rmlui_render() override {
+		if (!rmlui_render_iface)
+			return;
+		int w = 0, h = 0;
+		SDL_GetWindowSizeInPixels(window, &w, &h);
+		rmlui_render_iface->begin_frame(w, h);
+		if (g_rmlui_render_contexts)
+			g_rmlui_render_contexts();
+		rmlui_render_iface->end_frame();
 	}
 
 	void multi_draw_elements_indirect_count(GraphicsPrimitiveType mode,

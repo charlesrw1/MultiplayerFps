@@ -34,7 +34,7 @@
 #include "imgui_impl_sdl3.h"
 #include "Framework/EditorTheme.h"
 #include "UI/UILoader.h"
-#include "UI/Widgets/Layouts.h"
+#include "UI/BaseGUI.h"
 #include "UI/OnScreenLogGui.h"
 #include "UI/GUISystemPublic.h"
 #include "Assets/AssetDatabase.h"

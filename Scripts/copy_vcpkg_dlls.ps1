@@ -36,7 +36,24 @@ $dlls = @(
     "lua.dll",
     "meshoptimizer.dll",
     "gmock.dll",
-    "gtest.dll"
+    "gtest.dll",
+    "rmlui.dll",
+    "rmlui_debugger.dll",
+    # RmlUi's [freetype] feature transitively depends on these. Debug builds
+    # use a "d"-suffixed name (vcpkg convention); only one of each pair
+    # exists per config, the other is silently skipped by the missing-file
+    # check below.
+    "freetype.dll",
+    "freetyped.dll",
+    "zlib1.dll",
+    "zlibd1.dll",
+    "bz2.dll",
+    "bz2d.dll",
+    "libpng16.dll",
+    "libpng16d.dll",
+    "brotlicommon.dll",
+    "brotlidec.dll",
+    "brotlienc.dll"
 )
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null

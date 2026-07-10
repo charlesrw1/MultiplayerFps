@@ -23,7 +23,7 @@
 #include "Input/InputSystem.h"
 
 #include "UI/GUISystemPublic.h"
-#include "UI/Widgets/Layouts.h"
+#include "UI/BaseGUI.h"
 
 #include <SDL3/SDL_events.h>
 

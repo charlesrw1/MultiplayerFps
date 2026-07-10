@@ -575,6 +575,16 @@ public:
 		return ImGui_ImplSDL3_ProcessEvent(event);
 	}
 
+	// RmlUi is OpenGL-only for now. These are called unconditionally every
+	// frame regardless of backend, so they log-once and no-op rather than
+	// using DX11_STUB (which asserts) - there is no unimplemented-path bug
+	// here, just no DX11 renderer yet.
+	void rmlui_init() override {
+		sys_print(Warning, "RmlUi not supported on DX11 backend\n");
+	}
+	void rmlui_shutdown() override {}
+	void rmlui_render() override {}
+
 	// ---- Shader factory (D2) -----------------------------------------------------------
 	IGraphicsShader* create_shader_vert_frag(const std::string& vert_path, const std::string& frag_path, const std::string& defines) override { return dx11_create_shader_vert_frag(vert_path, frag_path, defines); }
 	IGraphicsShader* create_shader_vert_frag_geo(const std::string& vert_path, const std::string& frag_path, const std::string& geo_path, const std::string& defines) override { DX11_STUB; return nullptr; }

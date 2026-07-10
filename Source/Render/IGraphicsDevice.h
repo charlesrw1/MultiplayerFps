@@ -659,6 +659,14 @@ public:
 	virtual void imgui_render_draw_data() = 0;
 	virtual bool imgui_process_event(const union SDL_Event* event) = 0;
 
+	// RmlUi platform/renderer lifecycle, same shape as the ImGui block above.
+	// `rmlui_render` binds the default framebuffer internally before issuing
+	// draws for all active RmlUi contexts. DX11 backend stubs these (RmlUi is
+	// OpenGL-only in this engine for now).
+	virtual void rmlui_init() = 0;
+	virtual void rmlui_shutdown() = 0;
+	virtual void rmlui_render() = 0;
+
 	// ---- Shader factory ---------------------------------------------------
 
 	// Compile + link a GPU program. Path arguments are passed through to the

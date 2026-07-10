@@ -21,7 +21,7 @@
 #include "Render/Texture.h"
 #include "AssetCompile/Someutils.h" // string stuff
 #include "Assets/AssetRegistry.h"
-#include "UI/Widgets/Layouts.h"
+#include "UI/BaseGUI.h"
 #include "UI/GUISystemPublic.h"
 #include "Game/LevelAssets.h"
 #include "LevelEditor/Commands.h"
