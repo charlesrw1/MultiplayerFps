@@ -3,13 +3,17 @@
 #include "../../Game/Entity.h"
 #include "fpsObjects.h"
 #include "fpsDebugCamera.h"
-
+#include <Assets/ScriptableObject.h>
 class fpsLuaBridge : public ClassBase {
 public:
-	CLASS_BODY(fpsLuaBridge);
+	CLASS_BODY(fpsLuaBridge,scriptable);
+	REF virtual void init() {}
 	REF virtual void start_level_script() {}
-	REF virtual void tick() {}
+	REF virtual void update() {}
+	REF virtual void imgui_tick() {}
 };
+
+
 class fpsGameMgr {
 public:
 	void start_level(const std::string& name);
@@ -29,6 +33,15 @@ public:
 	static fpsApp* inst;
 
 	uptr<fpsGameMgr> game;
+	uptr<fpsLuaBridge> lua;
+
+	REF void change_level(const std::string& next_level) { 
+		game->stop();
+		game->start_level(next_level);
+	}
+	REF Entity* get_player() const {
+		return game->player.get();
+	}
 
 	void start() override;
 	void update() override;
