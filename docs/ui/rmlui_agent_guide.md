@@ -199,3 +199,11 @@ RmlUi.show_document(doc)
 render a texture yet — the row/text binding and layout do work. Text itself
 needs a `.ttf`/`.otf` under `Data/ui/fonts/` loaded via `Rml::LoadFontFace`
 at `RmlUiSystem::init()` time — none ships yet, see the limitation below.)
+
+GAPS:
+ Notable deviations/gaps flagged in the doc, not silently swept under the rug:
+  - The plan's "delete old UI" list was mostly wrong — those files are live dependencies of Gui::/Canvas::, not dead code. Only two genuinely dead files were removed (confirmed with you first).
+  - No file-based image loading yet (<img>/background-image no-op) — only in-memory texture generation.
+  - No fonts ship in the repo, so text won't render until a .ttf/.otf is added under Data/ui/fonts/.
+  - Filters/transforms/custom shaders parse but don't visually apply (optional RenderInterface hooks not implemented).
+  - A benign Resource was not properly shut down RmlUi log warning at process exit, not yet root-caused (no crash, not a leak in practice).

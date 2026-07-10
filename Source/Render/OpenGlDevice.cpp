@@ -1001,12 +1001,10 @@ public:
 		rmlui_render_iface.reset();
 	}
 
-	void rmlui_render() override {
+	void rmlui_render(int viewport_w, int viewport_h) override {
 		if (!rmlui_render_iface)
 			return;
-		int w = 0, h = 0;
-		SDL_GetWindowSizeInPixels(window, &w, &h);
-		rmlui_render_iface->begin_frame(w, h);
+		rmlui_render_iface->begin_frame(viewport_w, viewport_h);
 		if (g_rmlui_render_contexts)
 			g_rmlui_render_contexts();
 		rmlui_render_iface->end_frame();

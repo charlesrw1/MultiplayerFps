@@ -888,6 +888,9 @@
     <ClCompile Include="UI\RmlUi\RmlUiLua.cpp">
       <Filter>UI\RmlUi</Filter>
     </ClCompile>
+    <ClCompile Include="UI\RmlUi\RmlUiDebugMenu.cpp">
+      <Filter>UI\RmlUi</Filter>
+    </ClCompile>
     <ClCompile Include="UI\RmlUi\RmlUiSystem.cpp">
       <Filter>UI\RmlUi</Filter>
     </ClCompile>
@@ -969,9 +972,6 @@
     <ClInclude Include="Assets\AssetBrowser.h">
       <Filter>Assets</Filter>
     </ClInclude>
-    <ClInclude Include="Assets\AssetBundle.h">
-      <Filter>Assets</Filter>
-    </ClInclude>
     <ClInclude Include="Assets\AssetDatabase.h">
       <Filter>Assets</Filter>
     </ClInclude>
@@ -1026,9 +1026,6 @@
       <Filter>External</Filter>
     </ClInclude>
     <ClInclude Include="External\imgui_impl_opengl3_loader.h">
-      <Filter>External</Filter>
-    </ClInclude>
-    <ClInclude Include="External\imgui_impl_sdl2.h">
       <Filter>External</Filter>
     </ClInclude>
     <ClInclude Include="External\imgui_internal.h">
@@ -1151,9 +1148,6 @@
     <ClInclude Include="Framework\InlineVec.h">
       <Filter>Framework</Filter>
     </ClInclude>
-    <ClInclude Include="Framework\InterfaceBase.h">
-      <Filter>Framework</Filter>
-    </ClInclude>
     <ClInclude Include="Framework\InterfaceTypeInfo.h">
       <Filter>Framework</Filter>
     </ClInclude>
@@ -1242,9 +1236,6 @@
       <Filter>Framework</Filter>
     </ClInclude>
     <ClInclude Include="Framework\SerializerJson2.h">
-      <Filter>Framework</Filter>
-    </ClInclude>
-    <ClInclude Include="Framework\SerializerOldDict.h">
       <Filter>Framework</Filter>
     </ClInclude>
     <ClInclude Include="Framework\SharedPtr.h">
@@ -1447,9 +1438,6 @@
     <ClInclude Include="LevelEditor\EditorDocLocal.h">
       <Filter>LevelEditor</Filter>
     </ClInclude>
-    <ClInclude Include="LevelEditor\EditorFolderComponent.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
     <ClInclude Include="LevelEditor\EditorInputs.h">
       <Filter>LevelEditor</Filter>
     </ClInclude>
@@ -1490,9 +1478,6 @@
       <Filter>LevelEditor</Filter>
     </ClInclude>
     <ClInclude Include="LevelEditor\SelectionState.h">
-      <Filter>LevelEditor</Filter>
-    </ClInclude>
-    <ClInclude Include="LevelEditor\TagManager.h">
       <Filter>LevelEditor</Filter>
     </ClInclude>
     <ClInclude Include="LevelEditor\ViewportHandles.h">

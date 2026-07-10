@@ -583,7 +583,7 @@ public:
 		sys_print(Warning, "RmlUi not supported on DX11 backend\n");
 	}
 	void rmlui_shutdown() override {}
-	void rmlui_render() override {}
+	void rmlui_render(int viewport_w, int viewport_h) override {}
 
 	// ---- Shader factory (D2) -----------------------------------------------------------
 	IGraphicsShader* create_shader_vert_frag(const std::string& vert_path, const std::string& frag_path, const std::string& defines) override { return dx11_create_shader_vert_frag(vert_path, frag_path, defines); }

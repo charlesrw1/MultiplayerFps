@@ -660,12 +660,17 @@ public:
 	virtual bool imgui_process_event(const union SDL_Event* event) = 0;
 
 	// RmlUi platform/renderer lifecycle, same shape as the ImGui block above.
-	// `rmlui_render` binds the default framebuffer internally before issuing
-	// draws for all active RmlUi contexts. DX11 backend stubs these (RmlUi is
-	// OpenGL-only in this engine for now).
+	// `rmlui_render` draws all active RmlUi contexts into whatever render
+	// target is currently bound (the caller - Renderer::scene_draw_internal -
+	// binds the composite texture beforehand via set_render_pass, same as
+	// windowDrawer->render() right before it; this composite texture is later
+	// blitted to the backbuffer for on-screen output, or sampled directly by
+	// the editor's ImGui scene-viewport image). viewport_w/h must match the
+	// bound target's pixel size (== the RmlUi context's dimensions). DX11
+	// backend stubs these (RmlUi is OpenGL-only in this engine for now).
 	virtual void rmlui_init() = 0;
 	virtual void rmlui_shutdown() = 0;
-	virtual void rmlui_render() = 0;
+	virtual void rmlui_render(int viewport_w, int viewport_h) = 0;
 
 	// ---- Shader factory ---------------------------------------------------
 

@@ -17,6 +17,9 @@ public:
 
 	// Call once per frame before Context::Render(), with the current
 	// viewport size in pixels, and once after to restore engine GL state.
+	// Draws into whatever framebuffer is currently bound - does not bind one
+	// itself; the caller (Renderer::scene_draw_internal) already bound the
+	// target texture via gfx().set_render_pass() before calling this.
 	void begin_frame(int viewport_w, int viewport_h);
 	void end_frame();
 

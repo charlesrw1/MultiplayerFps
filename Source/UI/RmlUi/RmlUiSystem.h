@@ -28,10 +28,12 @@ public:
 
 	// Called each frame from the main loop's sync-update step: resizes the
 	// context on viewport change, polls hot reload, and calls Context::Update().
+	// The actual draw call happens later, inside Renderer::scene_draw_internal
+	// (Source/Render/DrawLocal_SceneDrawInternal.cpp) via gfx().rmlui_render(),
+	// which pulls this context's geometry through g_rmlui_render_contexts
+	// (RmlUiRenderHook.h) - not a method on this class, so it can draw into
+	// whatever composite render target the renderer currently has bound.
 	void update();
-	// Called each frame right before ImGui renders (RmlUi draws under ImGui,
-	// over the 3D scene and Gui:: HUD sprites). Delegates to gfx().rmlui_render().
-	void render();
 
 	// Backend-agnostic SDL event translation -> Rml::Context input calls.
 	void handle_event(const SDL_Event& event);

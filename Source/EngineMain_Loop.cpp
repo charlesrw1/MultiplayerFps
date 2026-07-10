@@ -433,11 +433,15 @@ void GameEngineLocal::loop() {
 			gfx().imgui_render_draw_data();
 		}
 	};
-	auto rmlui_render = [&](const bool skip_rendering) {
+	// Draw is triggered from within Renderer::scene_draw_internal (right
+	// after windowDrawer->render()), onto the same composite texture the 3D
+	// scene/Gui:: HUD render into - not here. That's what makes RmlUi show up
+	// both in the game's on-screen output (later blitted to backbuffer) and
+	// inside the editor's ImGui scene-viewport image, instead of only being
+	// visible when drawing straight to the backbuffer.
+	auto rmlui_update = [&]() {
 		RENDER_SCOPE("RmlUiUpdate");
 		RmlUiSystem::inst->update();
-		if (!skip_rendering)
-			RmlUiSystem::inst->render();
 	};
 	auto do_sync_update = [&]() {
 		CPU_SCOPE("SyncUpdate");
@@ -503,7 +507,7 @@ void GameEngineLocal::loop() {
 			do_overlapped_update(shouldDrawNext, drawparamsNext, setupNext, skip_rendering, prev_skip_rendering);
 
 			// sync period
-			rmlui_render(skip_rendering);
+			rmlui_update();
 			imgui_render(skip_rendering);
 			do_sync_update();
 

@@ -3,7 +3,7 @@
 #include "RmlUiLua.h"
 #include "UI/GUISystemPublic.h"
 #include "Framework/Log.h"
-#include "Render/IGraphicsDevice.h"
+#include <cstring>
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Core.h>
@@ -104,8 +104,16 @@ void RmlUiSystem::init() {
 	// RmlUi documents still lay out but render no glyphs (see
 	// docs/ui/rmlui_agent_guide.md).
 	int fonts_loaded = 0;
-	for (auto& file : FileSys::find_game_files_path("ui/fonts")) {
+	const int game_path_len = (int)strlen(FileSys::get_game_path());
+	for (auto file : FileSys::find_game_files_path("ui/fonts")) {
 		if (file.size() >= 4 && (file.compare(file.size() - 4, 4, ".ttf") == 0 || file.compare(file.size() - 4, 4, ".otf") == 0)) {
+			// find_game_files_path yields absolute disk paths; LoadFontFace goes
+			// through RmlUiFileInterface::Open -> FileSys::open_read_game, which
+			// expects a path relative to g_project_base (it prepends the base
+			// itself) - passing the absolute path back in double-prefixes it and
+			// fails to open.
+			if (file.compare(0, game_path_len, FileSys::get_game_path()) == 0)
+				file = file.substr(game_path_len + 1);
 			if (Rml::LoadFontFace(file))
 				fonts_loaded++;
 			else
@@ -142,10 +150,6 @@ void RmlUiSystem::update() {
 #endif
 
 	context->Update();
-}
-
-void RmlUiSystem::render() {
-	gfx().rmlui_render();
 }
 
 void RmlUiSystem::handle_event(const SDL_Event& event) {

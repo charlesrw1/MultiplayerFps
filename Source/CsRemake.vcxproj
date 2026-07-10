@@ -329,6 +329,7 @@
     <ClCompile Include="UI\RmlUi\RmlUiSystemInterface.cpp" />
     <ClCompile Include="UI\RmlUi\RmlUiDataModel.cpp" />
     <ClCompile Include="UI\RmlUi\RmlUiLua.cpp" />
+    <ClCompile Include="UI\RmlUi\RmlUiDebugMenu.cpp" />
     <ClCompile Include="Render\OpenGlRmlUiRenderInterface.cpp" />
     <ClCompile Include="User_Camera.cpp" />
     <ClInclude Include="Animation\AnimationTypes.h" />
@@ -356,7 +357,6 @@
     <ClInclude Include="Assets\AssetSizeViewer.h" />
     <ClInclude Include="Assets\AssetReferenceQuery.h" />
     <ClInclude Include="Assets\AssetReferenceViewer.h" />
-    <ClInclude Include="Assets\AssetBundle.h" />
     <ClInclude Include="Assets\AssetDatabase.h" />
     <ClInclude Include="Assets\AssetRegistry.h" />
     <ClInclude Include="Assets\AssetRegistryLocal.h" />
@@ -374,7 +374,6 @@
     <ClInclude Include="Framework\ClassTypeInfo.h" />
     <ClInclude Include="Framework\ConsoleCmdGroup.h" />
     <ClInclude Include="Framework\FnFactory.h" />
-    <ClInclude Include="Framework\InterfaceBase.h" />
     <ClInclude Include="Framework\Log.h" />
     <ClInclude Include="Framework\LuaColor.h" />
     <ClInclude Include="Framework\MapUtil.h" />
@@ -390,7 +389,6 @@
     <ClInclude Include="Framework\SerializerBinary.h" />
     <ClInclude Include="Framework\SerializerJson.h" />
     <ClInclude Include="Framework\SerializerJson2.h" />
-    <ClInclude Include="Framework\SerializerOldDict.h" />
     <ClInclude Include="Framework\SharedPtr.h" />
     <ClInclude Include="Framework\StringUtils.h" />
     <ClInclude Include="Framework\StructReflection.h" />
@@ -418,7 +416,6 @@
     <ClInclude Include="ITestRunner.h" />
     <ClInclude Include="LevelEditor\DragDetector.h" />
     <ClInclude Include="LevelEditor\DragDropPreview.h" />
-    <ClInclude Include="LevelEditor\EditorFolderComponent.h" />
     <ClInclude Include="LevelEditor\EditorInputs.h" />
     <ClInclude Include="LevelEditor\EditorModes.h" />
     <ClInclude Include="LevelEditor\EditorUILayout.h" />
@@ -432,7 +429,6 @@
     <ClInclude Include="LevelEditor\OrthoCamera.h" />
     <ClInclude Include="LevelEditor\PropertyEditors.h" />
     <ClInclude Include="LevelEditor\SelectionState.h" />
-    <ClInclude Include="LevelEditor\TagManager.h" />
     <ClInclude Include="LevelEditor\ViewportHandles.h" />
     <ClInclude Include="LevelSerialization\SerializeNew.h" />
     <ClInclude Include="Logging.h" />
@@ -495,7 +491,6 @@
     <ClInclude Include="External\ImGuizmo.h" />
     <ClInclude Include="External\imgui_impl_opengl3.h" />
     <ClInclude Include="External\imgui_impl_opengl3_loader.h" />
-    <ClInclude Include="External\imgui_impl_sdl2.h" />
     <ClInclude Include="External\imgui_internal.h" />
     <ClInclude Include="External\imnodes.h" />
     <ClInclude Include="External\imnodes_internal.h" />

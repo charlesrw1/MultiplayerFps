@@ -91,7 +91,8 @@ void OpenGlRmlUiRenderInterface::begin_frame(int viewport_w, int viewport_h) {
 	viewport_width = viewport_w;
 	viewport_height = viewport_h;
 
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// No glBindFramebuffer here - draws into whatever the caller already
+	// bound (see header comment).
 	glViewport(0, 0, viewport_w, viewport_h);
 	glEnable(GL_BLEND);
 	glBlendEquation(GL_FUNC_ADD);

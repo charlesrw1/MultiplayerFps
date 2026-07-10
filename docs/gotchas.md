@@ -18,3 +18,7 @@
  - DOMAIN Particle for meshbuilder rendering
  
  - parenting only is in prefab mode, not in level edit mode. instantiating a prefab with parenting removes the parenting.
+
+ - VS "Core recompiles every build" (full ~2min rebuild every F7, only Core, even with no source changes): caused by PHANTOM ClInclude/ClCompile entries in Source/CsRemake.vcxproj — items listed in the project whose file was deleted/moved on disk. VS's Fast Up-To-Date Check stats every project item; a missing one makes it report the project out-of-date every build -> full recompile. MSBuild's CL tracker ignores the ClInclude list (only tracks actually-#included files), so command-line `msbuild` stays perfectly incremental — that CLI-vs-VS split is the tell. Fix: remove the phantom entries (and matching .filters blocks). Find them:
+   `grep -oE '<(ClCompile|ClInclude) Include="[^"]+"' Source/CsRemake.vcxproj | sed -E 's/.*Include="([^"]+)"/\1/' | while read p; do d="${p//\\//}"; [ -f "Source/$d" ] || echo "MISSING: $p"; done`
+   This is a DIFFERENT bug from the codegen/GenerateMEGA FUTDC issue (that one was PreBuildEvent/wildcard ClCompile breaking FUTDC; already fixed).
