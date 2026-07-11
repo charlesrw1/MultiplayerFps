@@ -55,6 +55,21 @@ document/DOM shape (menus, inventories, dialogs, HUD panels with layout).
   cleanly released. Non-fatal (log-only, verified via integration test: no
   crash, all resources still functionally torn down), but not yet root-
   caused — a follow-up if it turns out to matter (e.g. leak detection noise).
+- **`ElementDocument:Close()` does not synchronously tear down its data
+  model** — actual document/model removal is deferred to the `Context`'s own
+  `Update()` pass. Calling `ctx:OpenDataModel()` again with the same model
+  name right after `Close()` (e.g. a fast open/close/reopen cycle) hits the
+  still-registered old model: `Log::Message` warnings like `Data model name
+  '...' already exists` / `Data model variable with name '...' already
+  exists`, and the new Lua table never actually gets bound — the on-screen
+  doc is left pointing at the OLD (about-to-be-destroyed) Lua table. Once
+  that table's only Lua reference gets overwritten it's GC'd, and the next
+  `data-for`/variable `Update()` (e.g. a bound button click doing
+  `table.insert(model.cards, ...)`) dereferences a dead Lua stack slot and
+  hard-crashes (`LuaTableDef::Size` → `lua_type` → `index2value`, `READ @
+  0xFFFFFFFFFFFFFFFF`). **Fix: call `OpenDataModel`/`LoadDocument` exactly
+  once per model name, ever.** Toggling a data-model-backed doc on/off
+  afterward is `Show()`/`Hide()` only, never `Close()` + reopen.
 
 ## RCSS vs CSS — do not assume standard CSS
 
@@ -102,14 +117,52 @@ Bound via `data-model="model_name"` on a container element, then inside it:
 
 - `data-value="field"` — two-way bind an `<input>`'s value to `field`.
 - `{{ field }}` inside text content — one-way display binding.
-- `data-for="row in array_field"` — repeats the element once per row in
-  `array_field`; inside, `{{ row.some_key }}` reads a per-row field.
+- `data-for="row:array_field"` — repeats the element once per row in
+  `array_field`; inside, `{{ row.some_key }}` reads a per-row field. Colon is
+  literal RmlUi Core syntax, not `... in ...` (that's a common hallucination
+  from web-JS `for...of`/Vue `v-for` habits) — `DataViewFor::Initialize`
+  (`Source/Core/DataViewDefault.cpp` in the RmlUi source) splits on `:` into
+  iterator-name(s) and container-name; getting this wrong doesn't error, it
+  just silently produces zero rows (`Could not find variable name '<whole
+  expression>' in data model` is the only symptom, easy to miss). An explicit
+  index name is available via a comma before the colon —
+  `data-for="row,row_index:array_field"` — but **`{{ }}` substitution only
+  works in text content**, not inside a plain attribute like `id=`; only
+  `data-*`-prefixed attributes get scanned for bindings at all
+  (`ElementUtilities::ApplyDataViewsControllers`), and those take a raw
+  `DataExpression` (numbers/`+`/`-`/comparisons/model variables), not `{{ }}`
+  template text — `data-attr-id="row_index"` sets `id` to the numeric index,
+  not `"row_2"`. Don't rely on generated per-row ids from a `data-for` loop
+  unless you've confirmed the expression does what you think.
 - `data-attr-<name>="expr"` — bind an element attribute.
 - `data-class-<name>="expr"` — toggle a class based on a boolean expression.
 - `data-if="expr"` — conditionally include the element.
-- `data-event-<name>="LuaFunctionName"` — now works, unlike the old
-  hand-rolled bridge: the official plugin wires `data-model`'s
-  `BindEventCallback` straight to a global Lua function of that name.
+- `data-event-<name>="key"` — binds to a **function-valued field on the
+  data-model table itself** (the one passed to `OpenDataModel`), not a
+  global Lua function of that name — `LuaDataModel.cpp`'s `BindVariable()`
+  checks `lua_type(dataL, top) == LUA_TFUNCTION` on the table field and
+  calls `BindEventCallback` for it. So `data-event-click="on_click"` needs
+  `model.on_click = function(event) ... end` set on the table *before*
+  `OpenDataModel`, not `function on_click(event) ... end` as a global.
+  **Prefer `Element:AddEventListener("click", fn)` from Lua instead of
+  this** (see below) — `data-event-<name>`'s callback closure captures a
+  stack index into a private "shadow" `lua_State` (`dataL`) that the plugin
+  uses to store bound model values, and that index is invalidated whenever
+  another field on the same model (e.g. a `data-for`-bound array) gets a new
+  element bound after the closure was created — `LuaScalarDef::Child`
+  truncates the shared shadow stack on every subsequent array-element bind.
+  Concretely: a `data-event-click` handler that does
+  `table.insert(model.some_array, ...)` on its OWN model shifts the stack
+  out from under its own captured slot — first click after that is a silent
+  no-op, the next hard-crashes (`index2value`/`lua_pushvalue`, `READ @
+  0xFFFFFFFFFFFFFFFF`, inside `DataExpressionInterface::EventCallback`).
+  This is a bug in RmlUi's official Lua plugin itself, not an engine-side
+  binding issue - avoid the whole class of failure by giving the element a
+  plain `id` and wiring the click via `doc:GetElementById(id):
+  AddEventListener("click", fn)` from Lua instead, which stores the Lua
+  function via `luaL_ref` on the main `lua_State` (`LuaEventListener.cpp`) -
+  a completely separate, stable mechanism unrelated to the data model's
+  scratch stack.
 
 ## Lua API — RmlUi's official Lua plugin (`rmlui[lua]` vcpkg feature)
 
@@ -145,25 +198,102 @@ end)
 
 -- Data models: same data-for/{{ field }} RCSS-side story as before, but
 -- constructed via RmlUi's own Lua data model API instead of this engine's
--- generic scalar/array shim. Context:OpenDataModel(name, table) binds a
--- plain Lua table directly - name must match data-model="hud_model" in the
--- .rml, table fields become RmlUi variables, array-valued fields drive
--- data-for. No separate get/set-value calls: read/write the table itself.
-local hud = {score = 0, cards = {}}
-rmlui.contexts["main"]:OpenDataModel("hud_model", hud)
-hud.score = 1200
-table.insert(hud.cards, {image = "ui/card1.png", text = "Draw 2"})
+-- generic scalar/array shim. Context:OpenDataModel(name, table) - name must
+-- match data-model="hud_model" in the .rml, table fields become RmlUi
+-- variables, array-valued fields drive data-for.
+--
+-- IMPORTANT: capture and use OpenDataModel's RETURN VALUE, not the table
+-- literal you passed in. `initial_table` above is walked ONCE (RmlUi's
+-- OpenLuaDataModel copies each field's value into its own private state),
+-- then discarded - it is NOT kept live. The return value is a separate
+-- proxy object whose assignment (__newindex) is what actually marks a
+-- field dirty for the next Context:Update() to re-run its bound views;
+-- mutating the original table afterward is a silent no-op (no error, view
+-- just never refreshes - see the "actual bug" callout below).
+local hud = rmlui.contexts["main"]:OpenDataModel("hud_model", {score = 0, cards = {}})
+hud.score = 1200                                      -- through the proxy: dirties "score"
+local cards = hud.cards                               -- same underlying table RmlUi holds
+table.insert(cards, {image = "ui/card1.png", text = "Draw 2"})
+hud.cards = cards                                     -- re-assign through the proxy to dirty "cards"
 ```
 
 Same underlying RmlUi constraint as before, Lua-plugin or not: a document's
 `{{ field }}`/`data-for` bindings resolve once at `LoadDocument()` time, so
-every field the `.rml` references needs to already exist on the table passed
-to `OpenDataModel` *before* `LoadDocument()` is called for that document —
-`hud = {score = 0, cards = {}}` up front, not added later.
+every field the `.rml` references needs to already exist on the initial
+table passed to `OpenDataModel` *before* `LoadDocument()` is called for that
+document — `{score = 0, cards = {}}` up front, not added later.
+
+- **The actual bug this caused (display silently never updates):**
+  `OpenLuaDataModel` (`Source/Lua/LuaDataModel.cpp`) walks the table you
+  pass in with `lua_next` exactly once, copying each field's value into its
+  own side-state via `BindVariable`'s `lua_xmove`, then returns a *separate*
+  userdata proxy — its metatable's `__index`/`__newindex` are
+  `lDataModelGet`/`lDataModelSet`, and it's specifically `lDataModelSet`
+  (i.e. an assignment *through the proxy*) that calls
+  `DataModelHandle::DirtyVariable(name)`. `DataModel::Update()`
+  (`Source/Core/DataModel.cpp`) only re-runs views for variables in its
+  `dirty_variables` set — so writing to the original table you passed to
+  `OpenDataModel` (`hud.score = 5` where `hud` is that original table, not
+  the proxy) changes a plain, now-disconnected Lua table: no crash, no
+  warning, the click handler visibly "works" (the Lua value changes) and
+  the `{{ }}`/`data-for` bound UI just never moves. For a table-valued field
+  like an array, the proxy's `__index` does return the *same* underlying
+  table reference RmlUi holds (tables are reference values in Lua), so
+  in-place mutation (`table.insert`) does land in the right storage — but
+  still doesn't mark it dirty on its own; re-assign it through the proxy
+  afterward (`hud.cards = cards`, even though it's the identical reference)
+  purely to trigger `DirtyVariable`.
 
 See RmlUi's own Lua binding documentation for the full `Element`/`Document`/
 `Event`/`Context`/data-model API surface — this engine no longer limits it to
 a hand-picked subset.
+
+- **`ElementFormControlInput`'s `.value`/`.min`/`.max`/`.step` Lua property
+  getters return `nil` for a `type="range"` input**, confirmed via a
+  throwaway `add_test()` (see `lua/smoke/rmlui_volume_popup` in
+  `Data/scripts/tests/rmlui_examples.lua`) that printed them before/after
+  both `Element:SetAttribute("value", ...)` and a manual
+  `Element:DispatchEvent("change", ...)` — nil every time, despite
+  `rmlui_lua_stubs.lua` declaring them (that stub documents RmlUi's intended
+  Lua surface, not a verified-working one). Two paths work reliably instead:
+  `el.attributes.value`/`.min`/`.max` (raw attribute values — read/write),
+  and the `"change"` event's own `event.parameters.value`. Evidence
+  `SetAttribute("value", ...)` alone synchronously fires `"change"` suggests
+  the widget's internal drag/scroll/keyboard handling also goes through
+  `SetAttribute`, so `attributes.value` should track live user interaction
+  the same way. See `Data/scripts/demo/rmlui_controls_demo.lua`'s volume
+  slider popup for the workaround in practice.
+
+- **A range input's internal `slidertrack`/`sliderbar` elements are NOT
+  exposed to the Lua DOM.** RCSS selectors like `input.range sliderbar` style
+  them fine, but from Lua the input has *zero* children:
+  `slider.first_child`, `slider:GetElementsByTagName("sliderbar")`, and
+  `slider:QuerySelector("sliderbar")` all return nothing/empty (confirmed by
+  dumping the subtree in `lua/smoke/rmlui_volume_popup`). So you cannot reach
+  the thumb to reparent something under it — anything that must follow the
+  thumb has to be positioned by Lua from the value (see below), not attached
+  to the thumb element.
+
+- **Update dynamic text via a `{{ }}` data-model binding, not `inner_rml`.**
+  `Element.inner_rml` destroys and rebuilds the child text node on every
+  write; a just-rebuilt `ElementText` renders blank for a frame or two before
+  layout, so rewriting a *visible* label every frame (e.g. a value readout
+  while dragging) flickers. Bind the text to a data-model variable instead and
+  write the variable through the `OpenDataModel` proxy — RmlUi updates the
+  existing text node in place, no rebuild, no flicker. The volume popup's `%`
+  uses this.
+
+- **`"change"` on a form control is dispatched from inside `Context::Update()`
+  (i.e. at `rmlui_update`), not during the input pump.** Input events like
+  `"mousemove"` fire synchronously from `ProcessMouseMove` in `frame_start`,
+  *before* `Context::Update()`. This matters for anything that reacts to a
+  control by writing a style/layout property: a write made in a `"change"`
+  handler lands one `Context::Update` behind the control's own re-layout (a
+  visible 1-frame trail), whereas the same write in a `"mousemove"` handler is
+  pending in time for the *same* layout pass. The volume popup positions from
+  `"mousemove"` (lag-free tracking) and only uses `"change"` for the text and
+  for non-drag value moves (wheel/keyboard) where a 1-frame settle is
+  imperceptible.
 
 ## Example: `.rml` + `.rcss` with a `data-for` card list
 
@@ -177,7 +307,7 @@ a hand-picked subset.
 <body data-model="hud_model">
 	<div id="score_label">Score: {{ score }}</div>
 	<div id="card_row">
-		<div data-for="card in cards" class="card" id="card_{{ card_index }}">
+		<div data-for="card:cards" class="card">
 			<img data-attr-src="card.image"/>
 			<span>{{ card.text }}</span>
 		</div>
@@ -205,16 +335,17 @@ body { width: 100%; height: 100%; }
 Corresponding Lua (`Data/scripts/`):
 
 ```lua
--- All fields the .rml references must already be on the table before
--- LoadDocument() (see the ordering note above).
-local hud = {
+-- All fields the .rml references must already be in the initial table
+-- before LoadDocument() (see the ordering note above). `hud` below is the
+-- PROXY returned by OpenDataModel - keep using it, not the table literal,
+-- for every later read/write (see the callout above for why).
+local hud = rmlui.contexts["main"]:OpenDataModel("hud_model", {
     score = 0,
     cards = {
         {image = "ui/card1.png", text = "Draw 2"},
         {image = "ui/card2.png", text = "Skip"},
     },
-}
-rmlui.contexts["main"]:OpenDataModel("hud_model", hud)
+})
 
 local doc = rmlui.contexts["main"]:LoadDocument("ui/cards_test.rml")
 doc:Show()

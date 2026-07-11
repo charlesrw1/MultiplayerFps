@@ -4,6 +4,7 @@
 #include "RmlUiSystem.h"
 #include "Framework/Config.h"
 #include "Render/RmlUiRenderInterface.h"
+#include "Scripting/ScriptManager.h"
 #include "imgui.h"
 
 namespace {
@@ -12,6 +13,8 @@ struct RmlUiExample {
 	const char* doc_path; // relative to Data/, passed to RmlUiSystem::load_document
 };
 
+// Static docs only - no data-model, so RmlUiSystem::load_document (plain
+// C++, no Lua involved) is enough to show them.
 const RmlUiExample rmlui_examples[] = {
 	{ "Typography", "ui/examples/ex_typography.rml" },
 	{ "Flexbox layout", "ui/examples/ex_flexbox.rml" },
@@ -19,9 +22,26 @@ const RmlUiExample rmlui_examples[] = {
 	{ "Compass HUD", "ui/examples/ex_compass.rml" },
 };
 constexpr int rmlui_example_count = sizeof(rmlui_examples) / sizeof(rmlui_examples[0]);
+// One extra slot for the Lua data-model demo, selected via rmlui_example_index == rmlui_example_count.
+constexpr int rmlui_lua_demo_index = rmlui_example_count;
+const char* rmlui_lua_demo_name = "Lua data model demo";
 
 int rmlui_example_index = -1; // -1 = nothing shown yet
 RmlDocHandle rmlui_example_doc = RML_INVALID_DOC;
+
+// ex_rmlui_lua_demo.rml has data-model="rmlui_lua_demo_model" and a
+// data-event-click callback bound to a function field on that model's Lua
+// table (Data/scripts/demo/rmlui_lua_demo.lua) - it must be opened via
+// rmlui.contexts["main"]:OpenDataModel from Lua, not RmlUiSystem::
+// load_document, which only knows how to LoadDocument() with no model.
+// ScriptManager::reload_from_content runs a snippet directly against the
+// engine's live lua_State, so the debug menu can drive the same
+// rmlui_demo_open()/rmlui_demo_close() globals the "rmlui_demo" console
+// command uses.
+void rmlui_run_lua(const char* snippet) {
+	if (ScriptManager::inst)
+		ScriptManager::inst->reload_from_content(snippet, "rmlui_debug_menu");
+}
 
 void rmlui_show_example(int index) {
 	if (!RmlUiSystem::inst)
@@ -30,7 +50,13 @@ void rmlui_show_example(int index) {
 		RmlUiSystem::inst->close_document(rmlui_example_doc);
 		rmlui_example_doc = RML_INVALID_DOC;
 	}
+	if (rmlui_example_index == rmlui_lua_demo_index)
+		rmlui_run_lua("rmlui_demo_close()");
 	rmlui_example_index = index;
+	if (index == rmlui_lua_demo_index) {
+		rmlui_run_lua("rmlui_demo_open()");
+		return;
+	}
 	if (index < 0 || index >= rmlui_example_count)
 		return;
 	rmlui_example_doc = RmlUiSystem::inst->load_document(rmlui_examples[index].doc_path);
@@ -45,16 +71,20 @@ void rmlui_examples_debug_menu() {
 		return;
 	}
 
-	const char* current_name = (rmlui_example_index >= 0) ? rmlui_examples[rmlui_example_index].display_name : "(none)";
+	const char* current_name = "(none)";
+	if (rmlui_example_index == rmlui_lua_demo_index)
+		current_name = rmlui_lua_demo_name;
+	else if (rmlui_example_index >= 0)
+		current_name = rmlui_examples[rmlui_example_index].display_name;
 	ImGui::Text("Current: %s", current_name);
 
 	if (ImGui::Button("<< Prev")) {
-		int next = (rmlui_example_index <= 0) ? rmlui_example_count - 1 : rmlui_example_index - 1;
+		int next = (rmlui_example_index <= 0) ? rmlui_lua_demo_index : rmlui_example_index - 1;
 		rmlui_show_example(next);
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Next >>")) {
-		int next = (rmlui_example_index < 0 || rmlui_example_index >= rmlui_example_count - 1) ? 0 : rmlui_example_index + 1;
+		int next = (rmlui_example_index < 0 || rmlui_example_index >= rmlui_lua_demo_index) ? 0 : rmlui_example_index + 1;
 		rmlui_show_example(next);
 	}
 	ImGui::SameLine();
@@ -66,6 +96,8 @@ void rmlui_examples_debug_menu() {
 		if (ImGui::Selectable(rmlui_examples[i].display_name, i == rmlui_example_index))
 			rmlui_show_example(i);
 	}
+	if (ImGui::Selectable(rmlui_lua_demo_name, rmlui_example_index == rmlui_lua_demo_index))
+		rmlui_show_example(rmlui_lua_demo_index);
 }
 ADD_TO_DEBUG_MENU(rmlui_examples_debug_menu);
 

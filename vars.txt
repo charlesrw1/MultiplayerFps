@@ -87,7 +87,7 @@ g_entry_level "mainMenuMap.tmap"
 ed_default_sky_material "indoorHdriSky"
 g_project_name DevEngine
 
-g_project_base "Data"
+g_project_base "TestFilesData"
 
 g_draw_grid 0
 enable_gl_debug_output 1
@@ -119,7 +119,7 @@ r.enable_vsync 0
 r.render_backend opengl
 
 r_indirect_loop 1
-g_project_base "Data"
+g_project_base "TestFilesData"
 r.taa 0
 ui.disable_screen_log 1
 disable_render_time_tick 1

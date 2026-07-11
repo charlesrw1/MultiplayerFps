@@ -55,3 +55,5 @@ tlog_*.txt
 .claude/worktrees/
 
 TestFiles/coverage/*.html
+
+TestFilesData/
