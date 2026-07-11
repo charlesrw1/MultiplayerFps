@@ -283,6 +283,44 @@ class CodegenUnitTest(unittest.TestCase):
         self.assertTrue(len(out.template_args)==2 and out.template_args[0].type==cg.INT_TYPE and out.template_args[1].type ==cg.OTHER_CLASS_TYPE)
         
 
+    def test_optional_type_parse(self):
+        out = cg.parse_type("std::optional<int>", {})
+        self.assertEqual(out.type, cg.OPTIONAL_TYPE)
+        self.assertEqual(len(out.template_args), 1)
+        self.assertEqual(out.template_args[0].type, cg.INT_TYPE)
+
+        out = cg.parse_type("opt<float>", {})
+        self.assertEqual(out.type, cg.OPTIONAL_TYPE)
+        self.assertEqual(out.template_args[0].type, cg.FLOAT_TYPE)
+
+    def test_pair_type_parse(self):
+        out = cg.parse_type("std::pair<bool,int>", {})
+        self.assertEqual(out.type, cg.PAIR_TYPE)
+        self.assertEqual(len(out.template_args), 2)
+        self.assertEqual(out.template_args[0].type, cg.BOOL_TYPE)
+        self.assertEqual(out.template_args[1].type, cg.INT_TYPE)
+
+    def test_optional_pair_function_codegen(self):
+        import codegen_generate as cgen
+        base = cg.ClassDef(["Base"], cg.ClassDef.TYPE_CLASS, False)
+        typenames: dict[str, cg.ClassDef] = {"Base": base}
+        emptyenum = enumerate(iter(""))
+
+        prop = cg.parse_property("REF opt<int> my_value()", emptyenum, typenames)
+        self.assertEqual(prop.return_type.type, cg.OPTIONAL_TYPE)
+        code = cgen.write_script_function(base, prop)
+        self.assertIn("push_std_optional_to_lua", code)
+        self.assertIn("return 1;", code)
+        self.assertEqual(cgen.get_lua_type_string(prop.return_type, False), "integer|nil")
+
+        prop2 = cg.parse_property("REF pair<bool,int> slider(int changed)", emptyenum, typenames)
+        self.assertEqual(prop2.return_type.type, cg.PAIR_TYPE)
+        code2 = cgen.write_script_function(base, prop2)
+        self.assertIn("return_value.first", code2)
+        self.assertIn("return_value.second", code2)
+        self.assertIn("return 2;", code2)
+        self.assertEqual(cgen.get_lua_return_annotation(prop2.return_type, False), "boolean, integer")
+
     def test_parse_class_decl(self):
         out = cg.parse_class_decl("class myclass")
         self.assertTrue(out[0]=="myclass")

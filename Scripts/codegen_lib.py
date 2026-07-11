@@ -54,6 +54,8 @@ ARRAY_TYPE = 20
 UNORDERED_SET = 21
 UNORDERED_MAP = 22
 STRING_TYPE = 23 # std::string
+OPTIONAL_TYPE = 24 # std::optional<T> / opt<T> -- crosses as T or nil
+PAIR_TYPE = 25 # std::pair<T1,T2> / pair<T1,T2> -- only supported as a direct function return type (2 lua return values)
 
 VEC2_TYPE = 30
 VEC3_TYPE = 31
@@ -395,6 +397,11 @@ STANDARD_CPP_TYPES: dict[str, int] = {
     "unordered_set":UNORDERED_SET,
     "std::unordered_map":UNORDERED_MAP,
     "unordered_map":UNORDERED_MAP,
+    "std::optional":OPTIONAL_TYPE,
+    "optional":OPTIONAL_TYPE,
+    "opt":OPTIONAL_TYPE,
+    "std::pair":PAIR_TYPE,
+    "pair":PAIR_TYPE,
 
     "MulticastDelegate": MULTICAST_TYPE,
 

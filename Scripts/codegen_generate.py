@@ -295,6 +295,12 @@ def write_get_type_from_lua_func(newType:CppType, index:int) -> str:
     elif newType.type == STRUCT_TYPE:
         assert(newType.typename!=None)
         return f"get_{newType.typename.classname}_from_lua(L,{index})"
+    elif newType.type == OPTIONAL_TYPE:
+        assert(len(newType.template_args)==1)
+        type_of_template = newType.template_args[0].get_raw_type_string()
+        return f"get_std_optional_from_lua<{type_of_template}>(L,{index},[&]() -> {type_of_template} {{ return {write_get_type_from_lua_func(newType.template_args[0],index)}; }})"
+    elif newType.type == PAIR_TYPE:
+        raise Exception("std::pair is only supported as a direct function return type (multiple lua return values), not as a parameter/field/nested type")
     else:
         raise Exception(f"cant get type from lua: {newType.get_raw_type_string()}")
 
@@ -332,6 +338,12 @@ def write_push_type_to_lua_func(newType:CppType, cppVarName:str) -> str:
     elif newType.type == STRUCT_TYPE:
         assert(newType.typename!=None)
         return f"push_{newType.typename.classname}_to_lua(L,{cppVarName})"
+    elif newType.type == OPTIONAL_TYPE:
+        assert(len(newType.template_args)==1)
+        type_of_template = newType.template_args[0].get_raw_type_string()
+        return f"push_std_optional_to_lua(L,{cppVarName},[&]({type_of_template} val) {{  {write_push_type_to_lua_func(newType.template_args[0],'val')}; }})"
+    elif newType.type == PAIR_TYPE:
+        raise Exception("std::pair is only supported as a direct function return type (multiple lua return values), not as a parameter/field/nested type")
     else:
         raise Exception(f"cant push type to lua: {newType.get_raw_type_string()} {cppVarName}")
     return ""
@@ -377,6 +389,11 @@ def write_script_function(newclass:ClassDef, funcProp : Property) -> str:
 
     if funcProp.return_type.type == NONE_TYPE:
         output += "\treturn 0;\n"
+    elif funcProp.return_type.type == PAIR_TYPE:
+        assert(len(funcProp.return_type.template_args)==2)
+        output += "\t" + write_push_type_to_lua_func(funcProp.return_type.template_args[0],"return_value.first") + ";\n"
+        output += "\t" + write_push_type_to_lua_func(funcProp.return_type.template_args[1],"return_value.second") + ";\n"
+        output += "\treturn 2;\n"
     else:
         output += "\t" + write_push_type_to_lua_func(funcProp.return_type,"return_value") + ";\n"
         output += "\treturn 1;\n"
@@ -450,7 +467,10 @@ def write_scriptable_class(newclass : ClassDef) -> str:
             for argType,argName in f.func_args:
                 output += "\t\t\t"+write_push_type_to_lua_func(argType,argName) + ";\n"
             return_num = 0
-            if f.return_type.type!=NONE_TYPE:
+            if f.return_type.type==PAIR_TYPE:
+                assert(len(f.return_type.template_args)==2)
+                return_num = 2
+            elif f.return_type.type!=NONE_TYPE:
                 return_num = 1
             arg_count = len(f.func_args)+1 # include self parameter
             
@@ -463,8 +483,16 @@ def write_scriptable_class(newclass : ClassDef) -> str:
                 throw LuaRuntimeError({error_str} + error);
             }}
             else {{\n"""
-            if return_num == 1:
-                
+            if return_num == 2:
+                t1 = f.return_type.template_args[0]
+                t2 = f.return_type.template_args[1]
+                output += f"\t\t\tauto value_first =  {write_get_type_from_lua_func(t1,-2)};\n"
+                output += f"\t\t\tauto value_second =  {write_get_type_from_lua_func(t2,-1)};\n"
+                output += f"\t\t\tlua_settop(L,top); // stack restore\n"
+                output += f"\t\t\treturn std::make_pair(value_first, value_second);\n"
+
+            elif return_num == 1:
+
                 output += f"\t\t\tauto value =  {write_get_type_from_lua_func(f.return_type,-1)};\n"
                 output += f"\t\t\tlua_settop(L,top); // stack restore\n"
                 output += f"\t\t\treturn value;\n"
@@ -718,9 +746,21 @@ def get_lua_type_string(new_type:CppType, no_nil:bool=False, for_param:bool=Fals
     elif new_type.type == ARRAY_TYPE:
         assert(len(new_type.template_args)==1)
         output += get_lua_type_string(new_type.template_args[0], no_nil)+"[]"
+    elif new_type.type == OPTIONAL_TYPE:
+        assert(len(new_type.template_args)==1)
+        output += get_lua_type_string(new_type.template_args[0], no_nil=True, for_param=for_param)+"|nil"
     else:
         output += "any"
     return output
+
+def get_lua_return_annotation(return_type:CppType, no_nil:bool) -> str:
+    """Emits the type list for a '---@return' line -- comma-separated for pair<T1,T2> (2 lua return values)."""
+    if return_type.type == PAIR_TYPE:
+        assert(len(return_type.template_args)==2)
+        t1 = get_lua_type_string(return_type.template_args[0], no_nil)
+        t2 = get_lua_type_string(return_type.template_args[1], no_nil)
+        return f"{t1}, {t2}"
+    return get_lua_type_string(return_type, no_nil)
 
 def write_lua_class(newclass:ClassDef) -> str:
     output = ""
@@ -732,7 +772,7 @@ def write_lua_class(newclass:ClassDef) -> str:
         for p in newclass.properties:
             if p.new_type.type == FUNCTION_TYPE:
                 if p.return_type.type != NONE_TYPE:
-                    output += "---@return " + get_lua_type_string(p.return_type, p.no_nil) + "\n"
+                    output += "---@return " + get_lua_return_annotation(p.return_type, p.no_nil) + "\n"
                 for argType, argName in p.func_args:
                     output += "---@param " + argName + " " + get_lua_type_string(argType, p.no_nil, for_param=True) + "\n"
                 output += f"function {newclass.classname}:{p.name}("
@@ -771,7 +811,7 @@ def write_lua_class(newclass:ClassDef) -> str:
                     if p.lua_generic:
                         output += "---@return T\n"
                     else:
-                        output += "---@return " + get_lua_type_string(p.return_type, p.no_nil) + "\n"
+                        output += "---@return " + get_lua_return_annotation(p.return_type, p.no_nil) + "\n"
                 for argType,argName in p.func_args:
                     if p.lua_generic and argType.type == OTHER_CLASS_TYPE and argType.typename != None and argType.typename.classname == "ClassTypeInfo":
                         output += f"---@param {argName} T\n"

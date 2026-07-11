@@ -60,16 +60,15 @@ class LuaSystem : public ClassBase
 {
 public:
 	CLASS_BODY(LuaSystem);
-	REF static bool im_checkbox(std::string name, bool b);
 	REF static bool im_button(std::string name);
-	REF static bool im_drag_float(std::string name, float f, float speed, float min, float max);
-	REF static bool im_input_int(std::string name, int i);
-	REF static bool im_slider_int(std::string name, int i, int min, int max);
+	REF static std::pair<bool,bool> im_checkbox(std::string name, bool b);
+	REF static std::pair<bool,float> im_drag_float(std::string name, float f, float speed, float min, float max);
+	REF static std::pair<bool,int> im_input_int(std::string name, int i);
+	REF static std::pair<bool,int> im_slider_int(std::string name, int i, int min, int max);
 	REF static void im_separator();
 	REF static void im_text(std::string name);
-	REF static float im_get_last_float();
-	REF static bool im_get_last_bool();
-	REF static int im_get_last_int();
+	REF static void im_same_line();
+
 
 	// 0=append,1=now
 	REF static void execute_command(int mode, std::string command);

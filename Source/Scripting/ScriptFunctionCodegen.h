@@ -9,6 +9,8 @@ extern "C"
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <optional>
+#include <utility>
 #include "glm/glm.hpp"
 #include "glm/gtc/quaternion.hpp"
 #include "Framework/StructReflection.h"
@@ -196,4 +198,19 @@ std::vector<T> get_std_vector_from_lua(lua_State* L, int index, FUNCTOR&& func) 
 		++i;
 	}
 	return result;
+}
+
+// std::optional<T> crosses as T or nil. FUNCTOR pushes/produces the wrapped value.
+template <typename T, typename FUNCTOR>
+void push_std_optional_to_lua(lua_State* L, const std::optional<T>& v, FUNCTOR&& func) {
+	if (v.has_value())
+		func(*v);
+	else
+		lua_pushnil(L);
+}
+template <typename T, typename FUNCTOR>
+std::optional<T> get_std_optional_from_lua(lua_State* L, int index, FUNCTOR&& func) {
+	if (lua_isnil(L, index))
+		return std::nullopt;
+	return func();
 }
