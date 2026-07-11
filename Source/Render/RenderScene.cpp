@@ -7,6 +7,7 @@ extern ConfigVar r_debug_mode;
 extern ConfigVar r_no_batching;
 extern ConfigVar r_better_depth_batching;
 extern ConfigVar r_skinned_mats_bone_buffer_size;
+extern ConfigVar r_ignore_depth_shader;
 
 Render_Pass::Render_Pass(pass_type type) : type(type) {}
 

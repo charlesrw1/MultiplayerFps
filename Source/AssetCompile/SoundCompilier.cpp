@@ -5,7 +5,9 @@
 #include "Framework/BinaryReadWrite.h"
 #include "Framework/SerializerJson.h"
 #include "Framework/Util.h"
-
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
 #include <filesystem>
 #include <algorithm>

@@ -13,6 +13,9 @@
 #undef EDITOR_BUILD
 
 #include <gtest/gtest.h>
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <string>
 #include <thread>

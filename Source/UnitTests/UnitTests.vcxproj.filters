@@ -24,6 +24,10 @@
     <ClCompile Include="twobone_ik_test.cpp" />
     <ClCompile Include="blend_space_math_test.cpp" />
     <ClCompile Include="stringname_test.cpp" />
+    <ClCompile Include="enum_reflection_test.cpp" />
+    <ClCompile Include="scripting_lua_component_reflection_test.cpp" />
+    <ClCompile Include="crash_dump_smoke_test.cpp" />
+    <ClCompile Include="legacy_gl_calls_test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Unittest.h" />

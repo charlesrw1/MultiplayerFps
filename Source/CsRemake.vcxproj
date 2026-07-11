@@ -105,7 +105,11 @@
     <ClCompile Include="Framework\SerializerJson2.cpp" />
     <ClCompile Include="Framework\StringName.cpp" />
     <ClCompile Include="Framework\StringUtils.cpp" />
-    <ClCompile Include="Framework\Util.cpp" />
+    <ClCompile Include="Framework\Util.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Game\BaseUpdater.cpp" />
     <ClCompile Include="Game\BikeDemo\BikeAI.cpp" />
     <ClCompile Include="Game\BikeDemo\BikeApplication.cpp" />
@@ -626,7 +630,11 @@
     <ClCompile Include="Physics\ChannelsAndPresets.cpp" />
     <ClCompile Include="Physics\Physics2Local.cpp" />
     <!-- TextureEditor moved to AssetTools project -->
-    <ClCompile Include="Assets\AssetInspectorPane.cpp" />
+    <ClCompile Include="Assets\AssetInspectorPane.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Assets\AssetSizeViewer.cpp" />
     <ClCompile Include="Render\Meshlet.cpp" />
     <ClCompile Include="Sound\SoundComponent.cpp" />
@@ -790,7 +798,7 @@
       <AdditionalOptions>/bigobj
  %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
-      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+      <CombineFilesOnlyFromTheSameFolder>false</CombineFilesOnlyFromTheSameFolder>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -807,7 +815,7 @@
       <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
       <TreatWarningAsError>true</TreatWarningAsError>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+      <CombineFilesOnlyFromTheSameFolder>false</CombineFilesOnlyFromTheSameFolder>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">
@@ -824,7 +832,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <EnableFiberSafeOptimizations>false</EnableFiberSafeOptimizations>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <CombineFilesOnlyFromTheSameFolder>true</CombineFilesOnlyFromTheSameFolder>
+      <CombineFilesOnlyFromTheSameFolder>false</CombineFilesOnlyFromTheSameFolder>
     </ClCompile>
   </ItemDefinitionGroup>
   <!-- Pin /errorReport (all configs) so the VS IDE and command-line msbuild emit an
@@ -834,6 +842,12 @@
   <ItemDefinitionGroup>
     <ClCompile>
       <ErrorReporting>Prompt</ErrorReporting>
+      <MinFilesInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4</MinFilesInUnityFile>
+      <MinFilesInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">4</MinFilesInUnityFile>
+      <MinFilesInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4</MinFilesInUnityFile>
+      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4</MinUnityFiles>
+      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">4</MinUnityFiles>
+      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4</MinUnityFiles>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

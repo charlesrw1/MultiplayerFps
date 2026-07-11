@@ -49,7 +49,7 @@ void load_lua_class() {
 	ScriptManager::inst->check_for_reload();
 }
 
-const PropertyInfo* find_field(const ClassTypeInfo* ti, const char* name) {
+const PropertyInfo* find_field_sobj(const ClassTypeInfo* ti, const char* name) {
 	if (!ti || !ti->props)
 		return nullptr;
 	for (int i = 0; i < ti->props->count; ++i) {
@@ -101,8 +101,8 @@ static TestTask test_sobj_lua_props_synthesized(TestContext& t) {
 	t.require(ti != nullptr, "TestLuaSobj registered after reload_from_content");
 	t.require(ti->props != nullptr, "TestLuaSobj synthesized a PropertyInfoList");
 	t.check(ti->props->count == 2, "TestLuaSobj exposes 2 fields (num, floating)");
-	t.check(find_field(ti, "num") != nullptr, "num field reflected");
-	t.check(find_field(ti, "floating") != nullptr, "floating field reflected");
+	t.check(find_field_sobj(ti, "num") != nullptr, "num field reflected");
+	t.check(find_field_sobj(ti, "floating") != nullptr, "floating field reflected");
 }
 EDITOR_TEST("editor/sobj_lua_props_synthesized", 15.f, test_sobj_lua_props_synthesized);
 
@@ -125,8 +125,8 @@ static TestTask test_sobj_edit_save_hotreload(TestContext& t) {
 	t.require(asset.get_unsafe() != nullptr, "loaded .sobj instance");
 	t.require(&asset.get_unsafe()->get_type() == ti, "loaded instance is concrete TestLuaSobj type");
 
-	auto* num_pi = find_field(ti, "num");
-	auto* floating_pi = find_field(ti, "floating");
+	auto* num_pi = find_field_sobj(ti, "num");
+	auto* floating_pi = find_field_sobj(ti, "floating");
 	t.require(num_pi && floating_pi, "both fields found on loaded instance");
 
 	num_pi->set_int(asset.get_unsafe(), 42);
@@ -175,8 +175,8 @@ static TestTask test_sobj_self_field_access_from_lua(TestContext& t) {
 	co_await t.wait_ticks(4);
 	t.require(eng->get_level() != nullptr, "editor level loaded");
 
-	auto* floating_pi = find_field(ti, "floating");
-	auto* read_back_pi = find_field(ti, "read_back");
+	auto* floating_pi = find_field_sobj(ti, "floating");
+	auto* read_back_pi = find_field_sobj(ti, "read_back");
 	t.require(floating_pi && read_back_pi, "both fields found");
 
 	std::unique_ptr<ClassBase> instance(ti->allocate_this_type());
@@ -228,7 +228,7 @@ static TestTask test_sobj_self_field_increment_persists(TestContext& t) {
 	auto asset = g_assets.find<ScriptableObject>(kName);
 	t.require(asset.get_unsafe() != nullptr, "loaded .sobj instance");
 
-	auto* num_pi = find_field(ti, "num");
+	auto* num_pi = find_field_sobj(ti, "num");
 	t.require(num_pi != nullptr, "num field found on loaded instance");
 	t.check(num_pi->get_int(asset.get_unsafe()) == 0, "num starts at template default 0");
 
@@ -281,7 +281,7 @@ static TestTask test_sobj_load_static_factory(TestContext& t) {
 
 	auto target_asset = g_assets.find<ScriptableObject>(kTargetName);
 	t.require(target_asset.get_unsafe() != nullptr, "target .sobj loaded");
-	auto* num_pi = find_field(target_ti, "num");
+	auto* num_pi = find_field_sobj(target_ti, "num");
 	t.require(num_pi != nullptr, "num field found on target");
 	num_pi->set_int(target_asset.get_unsafe(), 7);
 	static_cast<ScriptableObject*>(target_asset.get_unsafe())->save_to_disk();
@@ -302,7 +302,7 @@ static TestTask test_sobj_load_static_factory(TestContext& t) {
 	loader_obj->on_property_change();
 	co_await t.wait_ticks(1);
 
-	auto* loaded_num_pi = find_field(loader_ti, "loaded_num");
+	auto* loaded_num_pi = find_field_sobj(loader_ti, "loaded_num");
 	t.require(loaded_num_pi != nullptr, "loaded_num field found");
 	t.check(loaded_num_pi->get_int(loader_obj) == 7,
 			"Lua-called ScriptableObject.load() returned an object whose .num field read back correctly");

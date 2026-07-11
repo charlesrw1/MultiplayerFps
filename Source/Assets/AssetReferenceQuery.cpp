@@ -6,6 +6,9 @@
 #include "Framework/Log.h"
 #include "Framework/Util.h"
 #include "AssetCompile/Someutils.h"
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <algorithm>
 #include <unordered_map>

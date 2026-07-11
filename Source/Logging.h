@@ -2,6 +2,9 @@
 
 #include "Framework/SysPrint.h"
 #include <memory>
+#include <mutex>
+
+extern std::mutex printMutex;
 
 class LogSink
 {

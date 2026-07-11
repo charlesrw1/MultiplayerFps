@@ -40,6 +40,7 @@
 #include "Assets/AssetDatabase.h"
 #include "Input/InputSystem.h"
 #include "Render/RenderObj.h"
+#include "Logging.h"
 #include "Render/ModelManager.h"
 #include "Framework/SysPrint.h"
 #include "Game/Components/ParticleMgr.h"

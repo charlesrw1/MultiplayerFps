@@ -36,7 +36,11 @@
     <ClCompile Include="..\..\Source\AssetCompile\ModelCompile_Animation.cpp" />
     <ClCompile Include="..\..\Source\AssetCompile\ModelCompile_AnimSkeleton.cpp" />
     <ClCompile Include="..\..\Source\AssetCompile\ModelCompile_Output.cpp" />
-    <ClCompile Include="..\..\Source\AssetCompile\SoundCompilier.cpp" />
+    <ClCompile Include="..\..\Source\AssetCompile\SoundCompilier.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <!-- Moved from Render/Editor — EDITOR_BUILD guarded -->
     <ClCompile Include="..\..\Source\Render\Editor\TextureEditor.cpp" />
     <!-- Moved from Render — compiles in all configs -->
@@ -45,9 +49,17 @@
     <!-- MaterialLocal_ShaderGen has EDITOR_BUILD guard inside -->
     <ClCompile Include="..\..\Source\Render\MaterialLocal_ShaderGen.cpp" />
     <!-- New AssetTools files -->
-    <ClCompile Include="AssetCompiler.cpp" />
+    <ClCompile Include="AssetCompiler.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="AssetDiagnostics.cpp" />
-    <ClCompile Include="AssetOps.cpp" />
+    <ClCompile Include="AssetOps.cpp">
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">false</IncludeInUnityFile>
+      <IncludeInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="AssetTemplates.cpp" />
     <ClCompile Include="AssetPackager.cpp" />
     <ClCompile Include="DiagnosticsWindow.cpp" />
@@ -93,6 +105,7 @@
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -100,6 +113,7 @@
     <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
@@ -107,6 +121,7 @@
     <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
+    <EnableUnitySupport>true</EnableUnitySupport>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">

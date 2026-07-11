@@ -10,6 +10,9 @@
 // redefine it under a different value, which the strict /WX build promotes
 // to error. Drop the prior definition before including windows.h here.
 #undef APIENTRY
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <DbgHelp.h>
 #include <share.h>

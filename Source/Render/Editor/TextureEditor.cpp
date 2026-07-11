@@ -1,7 +1,9 @@
 #ifdef EDITOR_BUILD
 #include "TextureEditor.h"
 #include "Framework/Config.h"
-
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
 #include <unordered_set>
 #include <optional>

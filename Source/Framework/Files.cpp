@@ -4,6 +4,9 @@
 #include <unordered_map>
 #include <string>
 #include "Framework/StringUtil.h"
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
 #include "Framework/Files.h"
 #include "Framework/BinaryReadWrite.h"

@@ -3,6 +3,9 @@
 #include "Framework/Files.h"
 #include "Framework/StringUtils.h"
 #include "Framework/Util.h"
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
 #include <shellapi.h>
 #include <fstream>

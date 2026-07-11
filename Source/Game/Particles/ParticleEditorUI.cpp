@@ -30,7 +30,7 @@ public:
 	AssetPtr<MaterialInstance>* mat_ptr = nullptr;
 };
 
-static FnFactory<IPropertyEditor>& get_basic_factory() {
+static FnFactory<IPropertyEditor>& get_basic_factory_particle() {
 	static FnFactory<IPropertyEditor> factory;
 	static bool registered = false;
 	if (!registered) { PropertyFactoryUtil::register_basic(factory); registered = true; }
@@ -705,7 +705,7 @@ void ParticleSystemEditorUi::draw_renderer_module(RendererModule& mod)
 			"material", (uint16_t)offsetof(RendererModule, material), 0, "", &MaterialInstance::StaticType);
 		auto* editor = new RendererMaterialEditor(&mod.material);
 		editor->prop = &s_mat_prop;
-		mat_pg = std::make_unique<PropertyGrid>(get_basic_factory());
+		mat_pg = std::make_unique<PropertyGrid>(get_basic_factory_particle());
 		mat_pg->add_iproped_manual(editor);
 		mat_pg_owner = (void*)&mod;
 	}

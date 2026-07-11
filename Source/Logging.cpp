@@ -138,7 +138,7 @@ void sys_print(LogType type, const char* fmt, ...) {
 		vprintf(fmt, args);
 	va_end(args);
 }
-static std::mutex printMutex; // fixme
+std::mutex printMutex; // fixme
 
 char* string_format(const char* fmt, ...) {
 	std::lock_guard<std::mutex> printLock(printMutex); // fixme

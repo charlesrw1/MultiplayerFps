@@ -16,7 +16,7 @@
 #include "Framework/FnFactory.h"
 #include "Framework/ReflectionProp.h"
 
-static FnFactory<IPropertyEditor>& get_basic_factory() {
+static FnFactory<IPropertyEditor>& get_basic_factory_postprocess() {
     static FnFactory<IPropertyEditor> factory;
     static bool registered = false;
     if (!registered) { PropertyFactoryUtil::register_basic(factory); registered = true; }
@@ -223,7 +223,7 @@ bool PostProcessComponentEditorUi::draw() {
 
         ImGui::Spacing();
         if (lens_dirt_pg_for != asset) {
-            lens_dirt_pg = std::make_unique<PropertyGrid>(get_basic_factory());
+            lens_dirt_pg = std::make_unique<PropertyGrid>(get_basic_factory_postprocess());
             lens_dirt_pg->add_iproped_manual(new LensDirtTextureEditor(&asset->bloom_lens_dirt));
             lens_dirt_pg_for = asset;
         }

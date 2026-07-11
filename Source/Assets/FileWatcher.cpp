@@ -1,6 +1,9 @@
 // Source/Assets/FileWatcher.cpp
 #ifdef EDITOR_BUILD
 #include "Assets/FileWatcher.h"
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include <algorithm>
 #include <chrono>

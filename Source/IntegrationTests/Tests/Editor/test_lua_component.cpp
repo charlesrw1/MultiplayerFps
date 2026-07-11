@@ -80,7 +80,7 @@ Component* attach_test_lua_component(Entity* e, const ClassTypeInfo* ti) {
 }
 
 // Look up a single PROP_LUA_BACKED prop by name on the given instance's type.
-const PropertyInfo* find_field(const ClassTypeInfo* ti, const char* name) {
+const PropertyInfo* find_field_comp(const ClassTypeInfo* ti, const char* name) {
 	if (!ti || !ti->props)
 		return nullptr;
 	for (int i = 0; i < ti->props->count; ++i) {
@@ -115,9 +115,9 @@ static TestTask test_place_edit_save_reload(TestContext& t) {
 	t.check(comp->get_lua_field_shadow() == nullptr, "shadow null before first property access");
 
 	// Template defaults must be present in the shadow once lazily created.
-	auto* hp_pi = find_field(ti, "hp");
-	auto* alive_pi = find_field(ti, "alive");
-	auto* display_pi = find_field(ti, "display");
+	auto* hp_pi = find_field_comp(ti, "hp");
+	auto* alive_pi = find_field_comp(ti, "alive");
+	auto* display_pi = find_field_comp(ti, "display");
 	t.require(hp_pi && alive_pi && display_pi, "all three reflected fields found");
 	t.check(hp_pi->get_float(comp) == 50.f, "hp defaulted to template value 50");
 	t.check(comp->get_lua_field_shadow() != nullptr, "shadow lazily created on first get_ptr");
@@ -178,9 +178,9 @@ static TestTask test_hotreload_field_migration(TestContext& t) {
 	t.require(comp != nullptr, "Lua component attached");
 
 	// Set distinctive values on overlapping + soon-to-be-removed fields.
-	auto* hp_pi_old = find_field(ti, "hp");
-	auto* alive_pi_old = find_field(ti, "alive");
-	auto* display_pi_old = find_field(ti, "display");
+	auto* hp_pi_old = find_field_comp(ti, "hp");
+	auto* alive_pi_old = find_field_comp(ti, "alive");
+	auto* display_pi_old = find_field_comp(ti, "display");
 	t.require(hp_pi_old && alive_pi_old && display_pi_old, "pre-reload fields present");
 	hp_pi_old->set_float(comp, 777.f);
 	*(std::string*)display_pi_old->get_ptr(comp) = "before_reload";
@@ -202,10 +202,10 @@ static TestTask test_hotreload_field_migration(TestContext& t) {
 	t.require(ti->props != nullptr, "post-reload props non-null");
 	t.check(ti->props->count == 3, "post-reload has 3 fields (hp, display, speed)");
 
-	auto* hp_pi_new = find_field(ti, "hp");
-	auto* display_pi_new = find_field(ti, "display");
-	auto* speed_pi_new = find_field(ti, "speed");
-	auto* alive_pi_new = find_field(ti, "alive"); // removed in new layout
+	auto* hp_pi_new = find_field_comp(ti, "hp");
+	auto* display_pi_new = find_field_comp(ti, "display");
+	auto* speed_pi_new = find_field_comp(ti, "speed");
+	auto* alive_pi_new = find_field_comp(ti, "alive"); // removed in new layout
 	t.check(hp_pi_new != nullptr, "hp still reflected after reload");
 	t.check(display_pi_new != nullptr, "display still reflected after reload");
 	t.check(speed_pi_new != nullptr, "speed reflected after reload");
@@ -356,7 +356,7 @@ static TestTask test_destructor_string_dtor_and_unregister(TestContext& t) {
 	Component* comp = attach_test_lua_component(e, ti);
 	t.require(comp != nullptr, "TestLuaComp attached");
 
-	auto* display_pi = find_field(ti, "display");
+	auto* display_pi = find_field_comp(ti, "display");
 	t.require(display_pi != nullptr, "display field present");
 	// Force a heap allocation so a missing dtor would be visible to leak detection.
 	*(std::string*)display_pi->get_ptr(comp) = "non_empty_payload_to_force_string_alloc";
@@ -394,8 +394,8 @@ static TestTask test_multiple_instances_hot_reload_migration(TestContext& t) {
 	auto* ti = find_test_lua_comp();
 	t.require(ti != nullptr, "TestLuaComp registered");
 
-	auto* hp_pi_old = find_field(ti, "hp");
-	auto* display_pi_old = find_field(ti, "display");
+	auto* hp_pi_old = find_field_comp(ti, "hp");
+	auto* display_pi_old = find_field_comp(ti, "display");
 	t.require(hp_pi_old && display_pi_old, "pre-reload fields present");
 
 	constexpr int kN = 3;
@@ -424,9 +424,9 @@ static TestTask test_multiple_instances_hot_reload_migration(TestContext& t) {
 	ScriptManager::inst->check_for_reload();
 	co_await t.wait_ticks(1);
 
-	auto* hp_pi_new = find_field(ti, "hp");
-	auto* display_pi_new = find_field(ti, "display");
-	auto* speed_pi_new = find_field(ti, "speed");
+	auto* hp_pi_new = find_field_comp(ti, "hp");
+	auto* display_pi_new = find_field_comp(ti, "display");
+	auto* speed_pi_new = find_field_comp(ti, "speed");
 	t.require(hp_pi_new && display_pi_new && speed_pi_new, "post-reload fields present");
 
 	for (int i = 0; i < kN; ++i) {
@@ -462,9 +462,9 @@ static TestTask test_save_then_reload_class_drops_field(TestContext& t) {
 	auto* ti = find_test_lua_comp();
 	t.require(ti != nullptr, "TestLuaComp registered");
 
-	auto* hp_pi_pre = find_field(ti, "hp");
-	auto* alive_pi_pre = find_field(ti, "alive");
-	auto* display_pi_pre = find_field(ti, "display");
+	auto* hp_pi_pre = find_field_comp(ti, "hp");
+	auto* alive_pi_pre = find_field_comp(ti, "alive");
+	auto* display_pi_pre = find_field_comp(ti, "display");
 	t.require(hp_pi_pre && alive_pi_pre && display_pi_pre, "initial fields present");
 
 	Entity* e = spawn_entity_in_editor();
@@ -502,9 +502,9 @@ static TestTask test_save_then_reload_class_drops_field(TestContext& t) {
 			"Level::unknown_field_warnings contains an entry for TestLuaComp.alive");
 
 	// Surviving fields must load correctly under the new layout.
-	auto* hp_pi_new = find_field(ti, "hp");
-	auto* display_pi_new = find_field(ti, "display");
-	auto* speed_pi_new = find_field(ti, "speed");
+	auto* hp_pi_new = find_field_comp(ti, "hp");
+	auto* display_pi_new = find_field_comp(ti, "display");
+	auto* speed_pi_new = find_field_comp(ti, "speed");
 	t.require(hp_pi_new && display_pi_new && speed_pi_new, "post-reload fields present");
 
 	Component* reloaded = nullptr;
@@ -564,15 +564,15 @@ static TestTask test_two_classes_one_entity_no_alias(TestContext& t) {
 	t.check(comp_a->get_lua_field_shadow() == nullptr, "A shadow null before first property access");
 	t.check(comp_b->get_lua_field_shadow() == nullptr, "B shadow null before first property access");
 
-	auto* a_hp = find_field(ti_a, "hp");
-	auto* a_display = find_field(ti_a, "display");
-	auto* b_power = find_field(ti_b, "power");
-	auto* b_tag = find_field(ti_b, "tag");
+	auto* a_hp = find_field_comp(ti_a, "hp");
+	auto* a_display = find_field_comp(ti_a, "display");
+	auto* b_power = find_field_comp(ti_b, "power");
+	auto* b_tag = find_field_comp(ti_b, "tag");
 	t.require(a_hp && a_display && b_power && b_tag, "fields resolve on the right class");
 
 	// A's fields must not appear on B and vice versa.
-	t.check(find_field(ti_a, "power") == nullptr, "A does not expose B's 'power'");
-	t.check(find_field(ti_b, "hp") == nullptr, "B does not expose A's 'hp'");
+	t.check(find_field_comp(ti_a, "power") == nullptr, "A does not expose B's 'power'");
+	t.check(find_field_comp(ti_b, "hp") == nullptr, "B does not expose A's 'hp'");
 
 	a_hp->set_float(comp_a, 42.f);
 	*(std::string*)a_display->get_ptr(comp_a) = "A";
@@ -603,8 +603,8 @@ static TestTask test_two_classes_one_entity_no_alias(TestContext& t) {
 	t.check(*(std::string*)b_tag->get_ptr(comp_b) == "B", "B.tag preserved across A's reload");
 
 	// A migrated correctly (sanity).
-	auto* a_hp_new = find_field(ti_a, "hp");
-	auto* a_display_new = find_field(ti_a, "display");
+	auto* a_hp_new = find_field_comp(ti_a, "hp");
+	auto* a_display_new = find_field_comp(ti_a, "display");
 	t.require(a_hp_new && a_display_new, "A's overlapping fields still reflected");
 	t.check(a_hp_new->get_float(comp_a) == 42.f, "A.hp preserved across its own reload");
 	t.check(*(std::string*)a_display_new->get_ptr(comp_a) == "A",
@@ -625,8 +625,8 @@ static TestTask test_lazy_shadow_allocation(TestContext& t) {
 	auto* ti = find_test_lua_comp();
 	t.require(ti != nullptr, "TestLuaComp registered");
 
-	auto* hp_pi = find_field(ti, "hp");
-	auto* alive_pi = find_field(ti, "alive");
+	auto* hp_pi = find_field_comp(ti, "hp");
+	auto* alive_pi = find_field_comp(ti, "alive");
 	t.require(hp_pi && alive_pi, "fields present");
 
 	Entity* e1 = spawn_entity_in_editor();

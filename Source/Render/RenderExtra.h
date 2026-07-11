@@ -5,6 +5,7 @@
 #include "Framework/Util.h"
 #include "../Shaders/SharedGpuTypes.txt"
 #include "DrawTypedefs.h"
+#include "IGraphicsDevice.h"
 #include <unordered_map>
 
 class Volumetric_Fog_System

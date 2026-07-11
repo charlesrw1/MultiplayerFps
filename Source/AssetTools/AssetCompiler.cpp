@@ -10,6 +10,9 @@
 #include "Framework/StringUtils.h"
 #include "Framework/Util.h"
 #include "Framework/ConsoleCmdGroup.h"
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <Windows.h>
 #include <vector>
 #include <string>

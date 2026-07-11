@@ -60,6 +60,7 @@ extern ConfigVar ed_rotation_snap;
 extern ConfigVar ed_rotation_snap_exp;
 extern ConfigVar ed_scale_snap_exp;
 extern ConfigVar ed_scale_snap;
+extern ConfigVar ed_show_box_handles;
 
 extern ConfigVar editor_draw_name_text;
 

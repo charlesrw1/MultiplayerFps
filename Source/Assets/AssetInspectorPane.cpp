@@ -59,7 +59,7 @@ static const char* format_size_short(uint64_t bytes, char* buf, size_t buf_size)
     return buf;
 }
 
-static FnFactory<IPropertyEditor>& get_basic_factory() {
+static FnFactory<IPropertyEditor>& get_basic_factory_asset_inspector() {
     static FnFactory<IPropertyEditor> factory;
     static bool registered = false;
     if (!registered) {
@@ -246,7 +246,7 @@ struct MiEditorState {
     }
 
     void build_master_pg() {
-        master_pg = std::make_unique<PropertyGrid>(get_basic_factory());
+        master_pg = std::make_unique<PropertyGrid>(get_basic_factory_asset_inspector());
         master_pg->add_iproped_manual(new MiMasterMatEditor(
             &parent_path,
             [this](const std::string& new_path) { rebuild_params_on_master_change(new_path); }
@@ -254,7 +254,7 @@ struct MiEditorState {
     }
 
     void build_params_pg() {
-        params_pg = std::make_unique<PropertyGrid>(get_basic_factory());
+        params_pg = std::make_unique<PropertyGrid>(get_basic_factory_asset_inspector());
         for (int i = 0; i < (int)param_defs.size(); i++) {
             const auto& def = param_defs[i];
             auto& val        = param_values[i];
@@ -409,7 +409,7 @@ struct SobjEditorState {
 
     void init_from(std::shared_ptr<ScriptableObject> asset) {
         obj = std::move(asset);
-        pg = std::make_unique<PropertyGrid>(get_basic_factory());
+        pg = std::make_unique<PropertyGrid>(get_basic_factory_asset_inspector());
         pg->add_class_to_grid(obj.get());
     }
 };
@@ -585,7 +585,7 @@ void AssetInspectorPane::load_for(const AssetOnDisk& selected) {
         if (ext == "mis") {
             auto* mis = c->obj->cast_to<ModelImportSettings>();
             if (mis) {
-                c->mat_pg = std::make_unique<PropertyGrid>(get_basic_factory());
+                c->mat_pg = std::make_unique<PropertyGrid>(get_basic_factory_asset_inspector());
                 // Point the grid at the reflected myMaterials property
                 auto* all_props = ModelImportSettings::StaticType.props;
                 if (all_props) {

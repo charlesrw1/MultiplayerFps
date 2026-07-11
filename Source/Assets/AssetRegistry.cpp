@@ -8,6 +8,9 @@
 #include <unordered_set>
 #include <cassert>
 #include "Framework/Config.h"
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #include "AssetDatabase.h"
 #include "AssetRegistryLocal.h"
