@@ -5,7 +5,7 @@ files listed in a .vcxproj, so Solution Explorer filters always match disk layou
 Usage:
     py Scripts/generate_vcxproj_filters.py [path/to/Project.vcxproj]
 
-Defaults to Source/CsRemake.vcxproj (ProjectName "Core") if no path is given.
+Defaults to Source/Core.vcxproj (ProjectName "Core") if no path is given.
 """
 import re
 import sys
@@ -85,7 +85,7 @@ def build_filters_xml(vcxproj_path: Path) -> str:
 
 
 def main() -> None:
-    vcxproj_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("Source/CsRemake.vcxproj")
+    vcxproj_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("Source/Core.vcxproj")
     if not vcxproj_path.exists():
         print(f"error: {vcxproj_path} not found", file=sys.stderr)
         sys.exit(1)

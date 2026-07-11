@@ -247,7 +247,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\CsRemake.vcxproj">
+    <ProjectReference Include="..\Core.vcxproj">
       <Project>{359193a0-4260-402d-968f-060546d8c049}</Project>
       <UseLibraryDependencyInputs>false</UseLibraryDependencyInputs>
     </ProjectReference>

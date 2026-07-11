@@ -19,7 +19,7 @@ CsRemake/
   docs/               — documentation
   TestFiles/          — test inputs/goldens/outputs (partially gitignored)
   vars.txt            — runtime config (loaded at startup)
-  CsRemake.vcxproj    — main library project (all engine source)
+  Core.vcxproj    — main library project (all engine source)
 ```
 
 ---
@@ -27,7 +27,7 @@ CsRemake/
 ## Build System
 
 - **Solution:** `CsRemake.sln` — projects: `CsRemake` (static lib, all engine .cpp), `App` (links lib), `UnitTests`, `IntegrationTests`, `External`.
-- **Add source:** add `<ClCompile>` + `<ClInclude>` to `CsRemake.vcxproj`.
+- **Add source:** add `<ClCompile>` + `<ClInclude>` to `Core.vcxproj`.
 - **Codegen:** `py Scripts/codegen.py` — parses C++ headers, writes `Source/.generated/MEGA.gen.cpp` (Lua bindings). Rerun after adding/removing `REF` / `CLASS_BODY`.
 - **Unit tests:** `powershell Scripts/build_and_test.ps1 -Configuration Debug -Platform x64`.
 - **Integration tests:** `powershell Scripts/integration_test.ps1 -Config Debug` — see [[testing.md]].
@@ -239,7 +239,7 @@ Full lifecycle/dispatch: [[scripting_system]].
 
 1. Create `.h`/`.cpp` under appropriate `Source/` subdir.
 2. Add `CLASS_BODY(MyClass)` + `REF` methods.
-3. Add `<ClCompile>`/`<ClInclude>` to `CsRemake.vcxproj`.
+3. Add `<ClCompile>`/`<ClInclude>` to `Core.vcxproj`.
 4. `py Scripts/codegen.py`.
 5. Build & verify.
 
