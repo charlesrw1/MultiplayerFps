@@ -882,12 +882,6 @@
     <ClCompile Include="UI\GUISystemPublic.cpp">
       <Filter>UI</Filter>
     </ClCompile>
-    <ClCompile Include="UI\RmlUi\RmlUiDataModel.cpp">
-      <Filter>UI\RmlUi</Filter>
-    </ClCompile>
-    <ClCompile Include="UI\RmlUi\RmlUiLua.cpp">
-      <Filter>UI\RmlUi</Filter>
-    </ClCompile>
     <ClCompile Include="UI\RmlUi\RmlUiDebugMenu.cpp">
       <Filter>UI\RmlUi</Filter>
     </ClCompile>
@@ -1679,12 +1673,6 @@
     </ClInclude>
     <ClInclude Include="UI\OnScreenLogGui.h">
       <Filter>UI</Filter>
-    </ClInclude>
-    <ClInclude Include="UI\RmlUi\RmlUiDataModel.h">
-      <Filter>UI\RmlUi</Filter>
-    </ClInclude>
-    <ClInclude Include="UI\RmlUi\RmlUiLua.h">
-      <Filter>UI\RmlUi</Filter>
     </ClInclude>
     <ClInclude Include="UI\RmlUi\RmlUiRenderHook.h">
       <Filter>UI\RmlUi</Filter>

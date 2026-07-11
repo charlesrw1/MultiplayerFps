@@ -1,15 +1,16 @@
 #include "RmlUiSystem.h"
 #include "RmlUiRenderHook.h"
-#include "RmlUiLua.h"
 #include "UI/GUISystemPublic.h"
 #include "GameEnginePublic.h"
 #include "Framework/Log.h"
+#include "Scripting/ScriptManager.h"
 #include <cstring>
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Core.h>
 #include <RmlUi/Core/Input.h>
 #include <RmlUi/Core/Factory.h>
+#include <RmlUi/Lua.h>
 #include <SDL3/SDL.h>
 #ifdef EDITOR_BUILD
 #include "Assets/FileWatcher.h"
@@ -89,6 +90,17 @@ void RmlUiSystem::init() {
 	context = Rml::CreateContext("main", Rml::Vector2i(last_vp_w, last_vp_h));
 	ASSERT(context && "Rml::CreateContext failed");
 
+	// Official RmlUi Lua plugin, bound into the engine's own lua_State
+	// (ScriptManager owns creation/closing of that state; passing an
+	// existing state here per Rml::Lua::Initialise's contract means we keep
+	// that ownership - RmlUi just registers its Element/Document/Event/
+	// Context types, plus a global "rmlui" table, into it). Must run after
+	// Rml::Initialise()/CreateContext() above - it registers into RmlUi's
+	// live element factory. No manual global push needed: the plugin's own
+	// "rmlui" table exposes every named context, so Data/scripts/*.lua can
+	// do `local doc = rmlui.contexts["main"]:LoadDocument("ui/hud.rml")`.
+	Rml::Lua::Initialise(ScriptManager::inst->get_lua_state());
+
 	g_rmlui_render_contexts = [this]() {
 		CPU_SCOPE("RmlUI Render");
 		if (context)
@@ -130,7 +142,6 @@ void RmlUiSystem::init() {
 }
 
 void RmlUiSystem::shutdown() {
-	rmlui_lua_reset();
 	g_rmlui_render_contexts = nullptr;
 	documents.clear();
 	if (context)

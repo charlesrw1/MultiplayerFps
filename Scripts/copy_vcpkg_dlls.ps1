@@ -39,6 +39,7 @@ $dlls = @(
     "gtest.dll",
     "rmlui.dll",
     "rmlui_debugger.dll",
+    "rmlui_lua.dll",
     # RmlUi's [freetype] feature transitively depends on these. Debug builds
     # use a "d"-suffixed name (vcpkg convention); only one of each pair
     # exists per config, the other is silently skipped by the missing-file

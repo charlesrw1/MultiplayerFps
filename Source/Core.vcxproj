@@ -331,8 +331,6 @@
     <ClCompile Include="UI\Widgets\EditorCube.cpp" />
     <ClCompile Include="UI\RmlUi\RmlUiSystem.cpp" />
     <ClCompile Include="UI\RmlUi\RmlUiSystemInterface.cpp" />
-    <ClCompile Include="UI\RmlUi\RmlUiDataModel.cpp" />
-    <ClCompile Include="UI\RmlUi\RmlUiLua.cpp" />
     <ClCompile Include="UI\RmlUi\RmlUiDebugMenu.cpp" />
     <ClCompile Include="Render\RmlUiRenderInterface.cpp" />
     <ClCompile Include="User_Camera.cpp" />
@@ -568,8 +566,6 @@
     <ClInclude Include="UI\OnScreenLogGui.h" />
     <ClInclude Include="UI\RmlUi\RmlUiSystem.h" />
     <ClInclude Include="UI\RmlUi\RmlUiSystemInterface.h" />
-    <ClInclude Include="UI\RmlUi\RmlUiDataModel.h" />
-    <ClInclude Include="UI\RmlUi\RmlUiLua.h" />
     <ClInclude Include="UI\RmlUi\RmlUiRenderHook.h" />
     <ClInclude Include="Render\RmlUiRenderInterface.h" />
     <ClInclude Include="Physics\ChannelsAndPresets.h" />
@@ -845,9 +841,9 @@
       <MinFilesInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4</MinFilesInUnityFile>
       <MinFilesInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">4</MinFilesInUnityFile>
       <MinFilesInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4</MinFilesInUnityFile>
-      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6</MinUnityFiles>
-      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">6</MinUnityFiles>
-      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6</MinUnityFiles>
+      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">8</MinUnityFiles>
+      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">8</MinUnityFiles>
+      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">8</MinUnityFiles>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

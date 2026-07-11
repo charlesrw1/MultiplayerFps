@@ -107,60 +107,63 @@ Bound via `data-model="model_name"` on a container element, then inside it:
 - `data-attr-<name>="expr"` — bind an element attribute.
 - `data-class-<name>="expr"` — toggle a class based on a boolean expression.
 - `data-if="expr"` — conditionally include the element.
-- `data-event-<name>="lua_function_name(...)"` — RmlUi-native inline event
-  binding through the data model's `BindEventCallback`. **Not used by this
-  engine's bridge** — use `RmlUi.bind_event(...)` from Lua instead (below);
-  it stores an arbitrary Lua function reference, not a data-model-scoped
-  event name.
+- `data-event-<name>="LuaFunctionName"` — now works, unlike the old
+  hand-rolled bridge: the official plugin wires `data-model`'s
+  `BindEventCallback` straight to a global Lua function of that name.
 
-## Lua API (`Source/UI/RmlUi/RmlUiLua.h/.cpp`)
+## Lua API — RmlUi's official Lua plugin (`rmlui[lua]` vcpkg feature)
 
-Hand-written `lua_CFunction`s on a global `RmlUi` table (not the
-`ClassBase`/`REF` codegen path — that only marshals a fixed set of known C++
-types, and data-model values are dynamically typed Lua values).
+This engine used to expose a small hand-written `RmlUi.*` function table
+(`Source/UI/RmlUi/RmlUiLua.{h,cpp}` — deleted). It's now RmlUi's own official
+Lua bindings instead, initialised once in `RmlUiSystem::init()` via
+`Rml::Lua::Initialise(ScriptManager::inst->get_lua_state())`, into the same
+`lua_State` every other engine system uses (`ScriptManager`) — not a second
+Lua VM. This gives Lua real `Context`/`ElementDocument`/`Element`/`Event`
+objects instead of opaque int handles + a fixed function table, so anything
+in RmlUi's Lua binding surface is available directly (method/attribute names
+match RmlUi's own Lua documentation), not just what this engine hand-picked.
+
+The plugin registers a global `rmlui` table on init; contexts are reached
+through `rmlui.contexts[name]` (this engine creates exactly one, named
+`"main"`, in `RmlUiSystem::init()`):
 
 ```lua
--- Documents
-local doc = RmlUi.load_document("ui/hud.rml")  -- path relative to Data/, returns int handle (0 = failed)
-RmlUi.show_document(doc)
-RmlUi.hide_document(doc)
-RmlUi.close_document(doc)  -- invalidates the handle
+local ctx = rmlui.contexts["main"]
+local doc = ctx:LoadDocument("ui/hud.rml")   -- path relative to Data/, real ElementDocument object (or nil on failure)
+doc:Show()
+doc:Hide()
+doc:Close()
 
--- Data models: one Lua-created model = one Rml::DataModelConstructor,
--- backed by a generic dynamic (name -> value) store (Source/UI/RmlUi/RmlUiDataModel.h).
--- Every set_value/array_push call writes the value AND dirties the RmlUi
--- variable in the same call (push-then-pull-on-demand) -- next Context::Update()
--- (main loop, every frame) pulls the new value into the DOM. No manual dirty step needed.
---
--- ORDERING REQUIREMENT: fields bind lazily, on first set_value/array_push
--- call for that field name. RmlUi resolves a document's {{ field }} /
--- data-for bindings once, at load_document() time. So every field the RML
--- references must be set_value/array_push'd at least once BEFORE
--- load_document() is called for that document, even though the model
--- itself can be created any time before. A field only touched after
--- load_document() silently fails to bind (RmlUi logs "Could not find
--- variable name 'x' in data model" and that element's binding never
--- attaches, even though later set_value/DirtyVariable calls succeed).
-local model = RmlUi.create_data_model("hud_model")  -- name must match data-model="hud_model" in the .rml
-
-RmlUi.set_value(model, "score", 1200)         -- scalar field, any Lua bool/number/string
-local v = RmlUi.get_value(model, "score")      -- reads current value back (e.g. after an <input> edit)
-
--- Arrays (data-for): each row is a flat {key=value, ...} table of scalars
-RmlUi.array_push(model, "cards", {image = "card1.png", text = "Draw 2"})
-RmlUi.array_set(model, "cards", 0, {image = "card2.png", text = "Skip"})  -- 0-based index
-RmlUi.array_erase(model, "cards", 0)
-
--- Per-element property writes (procedural/spring-driven animation -- RmlUi
--- has no physics of its own; call this every tick from a Lua-side update)
-RmlUi.set_element_property(doc, "#card_3", "left", "120px")  -- selector: #id or a CSS selector (QuerySelector)
-
--- Events. callback receives (event_type: string, mouse_x: number, mouse_y: number).
--- Covers click and RmlUi's native drag events (dragstart/drag/dragend/dragover/dragdrop).
-RmlUi.bind_event(doc, "#card_3", "dragstart", function(event_type, x, y)
-    print("drag started at", x, y)
+-- Elements: real objects, not selector strings re-resolved per call.
+local el = doc:GetElementById("card_3")
+el.style.left = "120px"            -- SetProperty under the hood
+el:SetAttribute("data-count", "3")
+el:AddEventListener("click", function(event)
+    local target = event.target_element   -- the actual element that fired, not just doc-root - delegation works
+    print("clicked", target:GetId())
 end)
+
+-- Data models: same data-for/{{ field }} RCSS-side story as before, but
+-- constructed via RmlUi's own Lua data model API instead of this engine's
+-- generic scalar/array shim. Context:OpenDataModel(name, table) binds a
+-- plain Lua table directly - name must match data-model="hud_model" in the
+-- .rml, table fields become RmlUi variables, array-valued fields drive
+-- data-for. No separate get/set-value calls: read/write the table itself.
+local hud = {score = 0, cards = {}}
+rmlui.contexts["main"]:OpenDataModel("hud_model", hud)
+hud.score = 1200
+table.insert(hud.cards, {image = "ui/card1.png", text = "Draw 2"})
 ```
+
+Same underlying RmlUi constraint as before, Lua-plugin or not: a document's
+`{{ field }}`/`data-for` bindings resolve once at `LoadDocument()` time, so
+every field the `.rml` references needs to already exist on the table passed
+to `OpenDataModel` *before* `LoadDocument()` is called for that document —
+`hud = {score = 0, cards = {}}` up front, not added later.
+
+See RmlUi's own Lua binding documentation for the full `Element`/`Document`/
+`Event`/`Context`/data-model API surface — this engine no longer limits it to
+a hand-picked subset.
 
 ## Example: `.rml` + `.rcss` with a `data-for` card list
 
@@ -202,16 +205,19 @@ body { width: 100%; height: 100%; }
 Corresponding Lua (`Data/scripts/`):
 
 ```lua
--- Bind every field the .rml references BEFORE load_document() (see the
--- ordering requirement above) - model creation can come earlier, but
--- score/cards must be set_value/array_push'd first.
-local model = RmlUi.create_data_model("hud_model")
-RmlUi.set_value(model, "score", 0)
-RmlUi.array_push(model, "cards", {image = "ui/card1.png", text = "Draw 2"})
-RmlUi.array_push(model, "cards", {image = "ui/card2.png", text = "Skip"})
+-- All fields the .rml references must already be on the table before
+-- LoadDocument() (see the ordering note above).
+local hud = {
+    score = 0,
+    cards = {
+        {image = "ui/card1.png", text = "Draw 2"},
+        {image = "ui/card2.png", text = "Skip"},
+    },
+}
+rmlui.contexts["main"]:OpenDataModel("hud_model", hud)
 
-local doc = RmlUi.load_document("ui/cards_test.rml")
-RmlUi.show_document(doc)
+local doc = rmlui.contexts["main"]:LoadDocument("ui/cards_test.rml")
+doc:Show()
 ```
 
 (`data-attr-src` now resolves through the asset system per the note above.
@@ -225,3 +231,19 @@ GAPS:
   - No fonts ship in the repo, so text won't render until a .ttf/.otf is added under Data/ui/fonts/.
   - `transform` now visually applies (`RmlUiRenderInterface::SetTransform`). Filters/custom shaders still parse but don't visually apply (optional RenderInterface hooks not implemented).
   - A benign Resource was not properly shut down RmlUi log warning at process exit, not yet root-caused (no crash, not a leak in practice).
+  - Replaced the hand-rolled `RmlUi.*` Lua bridge (`Source/UI/RmlUi/RmlUiLua.{h,cpp}`,
+    `RmlUiDataModel.{h,cpp}` — deleted) with RmlUi's official Lua plugin
+    (`rmlui[lua]` vcpkg feature, `Rml::Lua::Initialise` in `RmlUiSystem::init()`).
+    Any `Data/scripts/*.lua` written against the old `RmlUi.load_document`/
+    `RmlUi.bind_event`/etc. function table needs rewriting against the `rmlui`
+    global documented above — the two APIs don't overlap.
+  - `Core.vcxproj`'s `MinUnityFiles` bumped 6→8 (Debug/Release/NoEditRelease)
+    to compensate for removing 2 `.cpp` files from the unity-build file
+    count — some unrelated `Source/Render/DrawLocal_*.cpp` files rely on
+    `static ConfigVar`s only being visible because MSVC's unity build
+    happens to merge them into the same translation unit as their users;
+    changing the total file count reshuffles that grouping. Fragile
+    pre-existing coupling, not something this change fixed — if adding/
+    removing files from `Core.vcxproj` ever produces `undeclared identifier`
+    errors in files you didn't touch, this is why; the previous fix for the
+    same symptom (commit 896b2a18) was the same lever.

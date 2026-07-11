@@ -5,7 +5,6 @@
 #include "Framework/Config.h"
 #include "LuaTransform.h"
 #include "LuaVecQuat.h"
-#include "UI/RmlUi/RmlUiLua.h"
 #include "ScriptFunctionCodegen.h"
 #include "Game/EntityComponent.h"
 #include "GameEnginePublic.h"
@@ -51,7 +50,11 @@ ScriptManager::ScriptManager() {
 
 	register_lua_transform(lua);
 	register_lua_vec_quat(lua);
-	register_rmlui_lua(lua);
+	// RmlUi's own official Lua plugin (Rml::Lua::Initialise) is registered
+	// separately, from RmlUiSystem::init() - it needs Rml::Initialise() to
+	// have already run first (it registers the "body" tag override in
+	// RmlUi's element factory), which happens after ScriptManager is
+	// constructed. See RmlUiSystem.cpp.
 }
 
 ScriptManager::~ScriptManager() {
