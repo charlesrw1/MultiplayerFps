@@ -1,6 +1,8 @@
 #include "RmlUiRenderInterface.h"
 #include "IGraphicsDevice.h"
 #include "Texture.h"
+#include "../Shaders/SharedGpuTypes.txt"
+#include "../Shaders/ShaderBufferShared.txt"
 #include "Framework/Log.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <cstddef>

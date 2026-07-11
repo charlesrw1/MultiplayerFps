@@ -845,9 +845,9 @@
       <MinFilesInUnityFile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4</MinFilesInUnityFile>
       <MinFilesInUnityFile Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">4</MinFilesInUnityFile>
       <MinFilesInUnityFile Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4</MinFilesInUnityFile>
-      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4</MinUnityFiles>
-      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">4</MinUnityFiles>
-      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4</MinUnityFiles>
+      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">6</MinUnityFiles>
+      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='NoEditRelease|x64'">6</MinUnityFiles>
+      <MinUnityFiles Condition="'$(Configuration)|$(Platform)'=='Release|x64'">6</MinUnityFiles>
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

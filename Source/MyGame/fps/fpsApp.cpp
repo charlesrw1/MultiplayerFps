@@ -19,6 +19,8 @@ void fpsApp::start() {
 	else
 		lua->init();
 	game->start_level("physics_test_world.tmap");
+
+	// a comment
 }
 
 void fpsApp::update() {

@@ -64,6 +64,8 @@
       <AdditionalIncludeDirectories>$(SolutionDir)Source\;$(SolutionDir)Source\External\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MinFilesInUnityFile>4</MinFilesInUnityFile>
+      <MinUnityFiles>4</MinUnityFiles>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -78,6 +80,8 @@
       <AdditionalIncludeDirectories>$(SolutionDir)Source\;$(SolutionDir)Source\External\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <DisableSpecificWarnings>4267;4305;4984;4101;26812;26495;4244</DisableSpecificWarnings>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MinFilesInUnityFile>4</MinFilesInUnityFile>
+      <MinUnityFiles>4</MinUnityFiles>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
