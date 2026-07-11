@@ -38,6 +38,13 @@ public:
 	// Backend-agnostic SDL event translation -> Rml::Context input calls.
 	void handle_event(const SDL_Event& event);
 
+	// Mirrors ImGui's WantCaptureMouse/WantTextInput: true when the mouse is
+	// over an interactive RmlUi element / a text-editable element has focus,
+	// so game code (UiSystem::blocking_mouse_inputs/blocking_keyboard_inputs)
+	// knows to withhold that input from gameplay.
+	bool wants_mouse_capture() const;
+	bool wants_keyboard_capture() const;
+
 	RmlDocHandle load_document(const std::string& path);
 	void show_document(RmlDocHandle handle);
 	void hide_document(RmlDocHandle handle);
@@ -60,6 +67,14 @@ private:
 	std::unordered_map<RmlDocHandle, std::string> document_paths;
 
 	int last_vp_w = 0, last_vp_h = 0;
+
+	// Tracks whether SDL_StartTextInput() is currently active for RmlUi, so
+	// update() can start/stop it on wants_keyboard_capture() transitions -
+	// SDL only dispatches SDL_EVENT_TEXT_INPUT (character composition) while
+	// text input mode is active; ProcessKeyDown alone (always fed) covers
+	// non-character keys like backspace/arrows/shift-select but never
+	// produces typed characters.
+	bool text_input_active = false;
 
 #ifdef EDITOR_BUILD
 	std::unique_ptr<FileWatcher> file_watcher;

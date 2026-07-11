@@ -23,20 +23,26 @@ document/DOM shape (menus, inventories, dialogs, HUD panels with layout).
   (same synchronous immediate-load path `AssetBrowser` uses for thumbnails),
   so `<img src="...">` / RCSS `background-image` paths resolve like any other
   `Data/`-relative texture asset.
-- RCSS `filter`/`backdrop-filter`, `transform`, and custom
-  `Rml::Decorator`/shader effects parse and animate correctly (RmlUi core
-  handles that regardless of backend) but **do not visually apply** — the
-  render interface only implements the "required" `Rml::RenderInterface`
-  functions (geometry/texture/scissor). `SetTransform`/layer/filter/shader
-  calls fall through to `RenderInterface`'s no-op defaults. See
-  `Source/Render/RmlUiRenderInterface.h` for the extension point if
-  this is needed later (custom decorator -> `CompileShader`/`RenderShader`
-  binding a custom GLSL program via `gfx().create_shader_vert_frag()`;
-  `transform` needs `SetTransform` wired to the vertex shader's model
-  matrix).
+- RCSS `transform` (2D/3D, with interpolation/`transition`/`@keyframes`) is
+  applied via `RmlUiRenderInterface::SetTransform`, which combines the
+  element's `Rml::Matrix4f` with the ortho projection before each
+  `RenderGeometry` call. `filter`/`backdrop-filter` and custom
+  `Rml::Decorator`/shader effects still parse and animate correctly (RmlUi
+  core handles that regardless of backend) but **do not visually apply** —
+  the render interface doesn't implement `CompileFilter`/`RenderShader`/
+  layer compositing yet. See `Source/Render/RmlUiRenderInterface.h` for the
+  extension point if this is needed later (custom decorator ->
+  `CompileShader`/`RenderShader` binding a custom GLSL program via
+  `gfx().create_shader_vert_frag()`).
 - Hot-reloading a changed `.rcss` reloads **every open document** (RmlUi has
   no in-place stylesheet-only reload API exposed on `Context`), not just the
-  one stylesheet's dependents.
+  one stylesheet's dependents. Also requires `Rml::Factory::ClearStyleSheetCache()`
+  before the reload - `Context::LoadDocument()` resolves `<link>` stylesheets
+  through RmlUi's internal `StyleSheetFactory` cache keyed by source path, so
+  re-loading the `.rml` alone silently reuses the stale pre-edit stylesheet
+  (`RmlUiSystem::poll_hot_reload()` calls this already; a symptom of
+  forgetting it is the `.rml` visibly reloading - e.g. layout/text edits
+  apply - while style edits don't).
 - **No fonts ship yet.** `RmlUiSystem::init()` loads every `.ttf`/`.otf`
   under `Data/ui/fonts/` via `Rml::LoadFontFace`, but that directory doesn't
   exist in this repo — add font files there for text to actually render.
@@ -77,6 +83,15 @@ properties from web CSS knowledge; the most common hallucination points:
   No `ch`, `fr`, `calc()`.
 - Pseudo-classes: `:hover`, `:active`, `:focus`, `:checked`, `:disabled`,
   `:nth-child()`. No `:has()`, `:is()`, `:where()`.
+- **`<div>` is NOT block by default** — unlike a browser's UA stylesheet,
+  RmlUi's initial `display` value is `inline` for generic elements (matches
+  the raw CSS spec, minus the browser HTML defaults layered on top). A
+  `<div>` used purely for layout grouping (a "row" wrapper, etc.) needs an
+  explicit `display: block;` or its children end up inline on the same line
+  as sibling divs instead of stacking. `<body>`, `<button>`, `<input>`,
+  `<progress>` etc. do get sensible built-in defaults since they're special
+  elements (see the tag list below), but plain `<div>`/`<span>`-equivalents
+  don't.
 - `<x-only-defined-tags>` — RmlUi ships `<button>`, `<input>`, `<select>`,
   `<textarea>`, `<progress>`, `<tabset>`/`<panel>`, `<handle>` (drag handle)
   as special elements with built-in behavior beyond plain `<div>`.
@@ -208,5 +223,5 @@ GAPS:
  Notable deviations/gaps flagged in the doc, not silently swept under the rug:
   - The plan's "delete old UI" list was mostly wrong — those files are live dependencies of Gui::/Canvas::, not dead code. Only two genuinely dead files were removed (confirmed with you first).
   - No fonts ship in the repo, so text won't render until a .ttf/.otf is added under Data/ui/fonts/.
-  - Filters/transforms/custom shaders parse but don't visually apply (optional RenderInterface hooks not implemented).
+  - `transform` now visually applies (`RmlUiRenderInterface::SetTransform`). Filters/custom shaders still parse but don't visually apply (optional RenderInterface hooks not implemented).
   - A benign Resource was not properly shut down RmlUi log warning at process exit, not yet root-caused (no crash, not a leak in practice).

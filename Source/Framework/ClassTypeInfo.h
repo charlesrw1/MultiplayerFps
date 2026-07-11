@@ -100,3 +100,42 @@ typename std::enable_if<is_abstract<T>::value, ClassTypeInfo::CreateObjectFunc>:
 template <typename T> inline T* class_cast(ClassBase* in) {
 	return in ? in->cast_to<T>() : nullptr;
 }
+
+// is this class a subclass or an instance of type T
+
+template <typename T> inline bool ClassBase::is_a() const {
+	return get_type().is_a(T::StaticType);
+}
+
+template<typename T> inline T* ClassBase::cast_interface() {
+	auto& ti = get_type();
+	auto* entry = ti.find_interface_entry(T::StaticInterfaceType.id);
+	if (!entry || entry->offset < 0) return nullptr;
+	return reinterpret_cast<T*>(reinterpret_cast<char*>(this) + entry->offset);
+}
+template<typename T> inline const T* ClassBase::cast_interface() const {
+	return const_cast<ClassBase*>(this)->cast_interface<T>();
+}
+template<typename T> inline bool ClassBase::has_interface() const {
+	return get_type().has_interface(T::StaticInterfaceType.id);
+}
+
+// allocate a class by string
+
+template <typename T> inline T* ClassBase::create_class(const char* classname) {
+	auto classinfo = find_class(classname);
+	if (!classinfo || !classinfo->is_a(T::StaticType))
+		return nullptr;
+	ClassBase* base = classinfo->allocate_this_type();
+	return static_cast<T*>(base);
+}
+
+// allocate by id
+
+template <typename T> inline T* ClassBase::create_class(int16_t id) {
+	auto classinfo = find_class(id);
+	if (!classinfo || !classinfo->is_a(T::StaticType))
+		return nullptr;
+	ClassBase* base = classinfo->allocate_this_type();
+	return static_cast<T*>(base);
+}

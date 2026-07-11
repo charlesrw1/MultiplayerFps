@@ -5,6 +5,7 @@
 #include "../Shaders/ShaderBufferShared.txt"
 #include "Framework/Log.h"
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <cstddef>
 
 RmlUiRenderInterface::RmlUiRenderInterface() {
@@ -99,7 +100,9 @@ void RmlUiRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry, 
 	gfx().set_pipeline(state);
 
 	gpu::RmlUiVertPushConsts pcv{};
-	pcv.Projection = projection;
+	// Apply the element's local transform before the ortho projection so
+	// `gl_Position = Projection * (Transform * (pos + translation))`.
+	pcv.Projection = projection * transform;
 	pcv.Translation = { translation.x, translation.y };
 	gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
 
@@ -168,4 +171,13 @@ void RmlUiRenderInterface::EnableScissorRegion(bool enable) {
 void RmlUiRenderInterface::SetScissorRegion(Rml::Rectanglei region) {
 	// Engine scissor origin is bottom-left; RmlUi's region origin is top-left.
 	gfx().set_scissor(region.Left(), viewport_height - region.Top() - region.Height(), region.Width(), region.Height());
+}
+
+void RmlUiRenderInterface::SetTransform(const Rml::Matrix4f* new_transform) {
+	if (new_transform)
+		// Rml::Matrix4f is column-major float[16] (RMLUI_MATRIX_ROW_MAJOR is
+		// not defined by this build), same layout as glm::mat4.
+		transform = glm::make_mat4(new_transform->data());
+	else
+		transform = glm::mat4(1.f);
 }

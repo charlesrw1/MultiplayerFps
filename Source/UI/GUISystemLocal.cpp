@@ -1,4 +1,5 @@
 #include "GUISystemPublic.h"
+#include "UI/RmlUi/RmlUiSystem.h"
 #include "BaseGUI.h"
 #include "UIBuilder.h"
 #include <algorithm>
@@ -224,9 +225,9 @@ void UiSystem::set_focus_to_viewport() {
 bool UiSystem::blocking_keyboard_inputs() const {
 	// keep it for text input, not keyboard input. imgui *always* seems to want keyboard capture (for navigation or
 	// whatever) which is annoying but i really do want it blocking for text input
-	return ImGui::GetIO().WantTextInput;
+	return ImGui::GetIO().WantTextInput || (RmlUiSystem::inst && RmlUiSystem::inst->wants_keyboard_capture());
 }
 
 bool UiSystem::blocking_mouse_inputs() const {
-	return ImGui::GetIO().WantCaptureMouse;
+	return ImGui::GetIO().WantCaptureMouse || (RmlUiSystem::inst && RmlUiSystem::inst->wants_mouse_capture());
 }

@@ -15,6 +15,7 @@ const RmlUiExample rmlui_examples[] = {
 	{ "Typography", "ui/examples/ex_typography.rml" },
 	{ "Flexbox layout", "ui/examples/ex_flexbox.rml" },
 	{ "Controls", "ui/examples/ex_controls.rml" },
+	{ "Compass HUD", "ui/examples/ex_compass.rml" },
 };
 constexpr int rmlui_example_count = sizeof(rmlui_examples) / sizeof(rmlui_examples[0]);
 

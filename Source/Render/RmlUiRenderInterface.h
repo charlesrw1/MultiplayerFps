@@ -37,6 +37,11 @@ public:
 	void EnableScissorRegion(bool enable) override;
 	void SetScissorRegion(Rml::Rectanglei region) override;
 
+	// RCSS `transform`/`transition`/`@keyframes` on transform properties.
+	// nullptr resets to identity (RmlUi calls this whenever the transform
+	// stack changes, including popping back to "no transform").
+	void SetTransform(const Rml::Matrix4f* transform) override;
+
 private:
 	struct CompiledGeometry {
 		IGraphicsBuffer* vbo = nullptr;
@@ -57,6 +62,7 @@ private:
 	int viewport_width = 0;
 	int viewport_height = 0;
 	glm::mat4 projection{ 1.f };
+	glm::mat4 transform{ 1.f };
 
 	std::unordered_map<Rml::CompiledGeometryHandle, CompiledGeometry> geometry_map;
 	Rml::CompiledGeometryHandle next_geometry_handle = 1;

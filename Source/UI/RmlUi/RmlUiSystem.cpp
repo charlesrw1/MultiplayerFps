@@ -2,12 +2,14 @@
 #include "RmlUiRenderHook.h"
 #include "RmlUiLua.h"
 #include "UI/GUISystemPublic.h"
+#include "GameEnginePublic.h"
 #include "Framework/Log.h"
 #include <cstring>
 #include <RmlUi/Core/Context.h>
 #include <RmlUi/Core/ElementDocument.h>
 #include <RmlUi/Core/Core.h>
 #include <RmlUi/Core/Input.h>
+#include <RmlUi/Core/Factory.h>
 #include <SDL3/SDL.h>
 #ifdef EDITOR_BUILD
 #include "Assets/FileWatcher.h"
@@ -94,7 +96,9 @@ void RmlUiSystem::init() {
 
 #ifdef EDITOR_BUILD
 	file_watcher = std::make_unique<FileWatcher>();
-	file_watcher->init(FileSys::get_full_path_from_game_path("ui"));
+	const std::string watch_dir = FileSys::get_full_path_from_game_path("ui");
+	if (!file_watcher->init(watch_dir))
+		sys_print(Error, "RmlUiSystem: FileWatcher::init failed for dir '%s' - .rml/.rcss hot reload disabled\n", watch_dir.c_str());
 #endif
 
 	// RmlUi's (freetype) font engine needs real .ttf/.otf files - the
@@ -150,6 +154,20 @@ void RmlUiSystem::update() {
 #endif
 
 	context->Update();
+
+	// SDL only emits SDL_EVENT_TEXT_INPUT (the events ProcessTextInput needs
+	// to insert typed characters) while text input mode is active; start/stop
+	// it as focus moves on/off a text-editable RmlUi element so typing works
+	// without permanently stealing IME/text-input mode from the rest of the
+	// engine (e.g. ImGui manages its own start/stop independently).
+	const bool wants_text = wants_keyboard_capture();
+	if (wants_text && !text_input_active) {
+		SDL_StartTextInput(eng->get_os_window());
+		text_input_active = true;
+	} else if (!wants_text && text_input_active) {
+		SDL_StopTextInput(eng->get_os_window());
+		text_input_active = false;
+	}
 }
 
 void RmlUiSystem::handle_event(const SDL_Event& event) {
@@ -181,6 +199,32 @@ void RmlUiSystem::handle_event(const SDL_Event& event) {
 	default:
 		break;
 	}
+}
+
+bool RmlUiSystem::wants_mouse_capture() const {
+	if (!context)
+		return false;
+	Rml::Element* hover = context->GetHoverElement();
+	// Hovering the document body itself means the mouse is over empty page
+	// area (e.g. a full-screen but mostly-transparent HUD document) - only
+	// count it as "over UI" when hovering an actual element inside it.
+	return hover && hover != static_cast<Rml::Element*>(hover->GetOwnerDocument());
+}
+
+bool RmlUiSystem::wants_keyboard_capture() const {
+	if (!context)
+		return false;
+	Rml::Element* focus = context->GetFocusElement();
+	if (!focus)
+		return false;
+	const Rml::String& tag = focus->GetTagName();
+	if (tag == "textarea")
+		return true;
+	if (tag == "input") {
+		const Rml::String type = focus->GetAttribute<Rml::String>("type", "text");
+		return type == "text" || type == "password" || type == "search";
+	}
+	return false;
 }
 
 Rml::ElementDocument* RmlUiSystem::find_doc(RmlDocHandle handle) {
@@ -255,6 +299,7 @@ void RmlUiSystem::poll_hot_reload() {
 
 	bool any_rcss = false;
 	for (auto& rel_path : changed) {
+		sys_print(Debug, "RmlUiSystem: hot reload detected change: %s\n", rel_path.c_str());
 		if (rel_path.size() >= 5 && rel_path.compare(rel_path.size() - 5, 5, ".rcss") == 0)
 			any_rcss = true;
 	}
@@ -262,6 +307,11 @@ void RmlUiSystem::poll_hot_reload() {
 	// a changed .rcss falls back to reloading every open document (keeps
 	// iteration tight without needing per-stylesheet dependency tracking).
 	if (any_rcss) {
+		// Context::LoadDocument() resolves <link> stylesheets through
+		// RmlUi's internal StyleSheetFactory cache, keyed by source path -
+		// without clearing it here, reload_document() would re-parse the
+		// .rml but silently reuse the stale pre-edit stylesheet.
+		Rml::Factory::ClearStyleSheetCache();
 		for (auto& [handle, doc] : std::unordered_map<RmlDocHandle, Rml::ElementDocument*>(documents))
 			reload_document(handle);
 		return;
