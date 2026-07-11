@@ -8,6 +8,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <cstddef>
 
+RmlUiRenderStats g_rmlui_render_stats;
+
 RmlUiRenderInterface::RmlUiRenderInterface() {
 	shader_program = gfx().create_shader_vert_frag("RmlUiV.txt", "RmlUiF.txt");
 
@@ -34,6 +36,11 @@ RmlUiRenderInterface::~RmlUiRenderInterface() {
 		safe_release(geo.vbo);
 		safe_release(geo.ebo);
 	}
+	for (auto& geo : geometry_pool) {
+		safe_release(geo.vao);
+		safe_release(geo.vbo);
+		safe_release(geo.ebo);
+	}
 }
 
 void RmlUiRenderInterface::begin_frame(int viewport_w, int viewport_h) {
@@ -41,6 +48,8 @@ void RmlUiRenderInterface::begin_frame(int viewport_w, int viewport_h) {
 	viewport_height = viewport_h;
 	// Orthographic projection matching pixel coordinates, origin top-left.
 	projection = glm::ortho(0.f, (float)viewport_w, (float)viewport_h, 0.f);
+
+	g_rmlui_render_stats = RmlUiRenderStats{};
 }
 
 void RmlUiRenderInterface::end_frame() {
@@ -48,31 +57,48 @@ void RmlUiRenderInterface::end_frame() {
 }
 
 Rml::CompiledGeometryHandle RmlUiRenderInterface::CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices) {
+	const int vertex_bytes = (int)(vertices.size() * sizeof(Rml::Vertex));
+	const int index_bytes = (int)(indices.size() * sizeof(int));
+
 	CompiledGeometry geo;
+	if (!geometry_pool.empty()) {
+		geo = geometry_pool.back();
+		geometry_pool.pop_back();
+	} else {
+		CreateBufferArgs vb_args;
+		vb_args.flags = (GraphicsBufferUseFlags)BUFFER_USE_AS_VB;
+		geo.vbo = gfx().create_buffer(vb_args);
 
-	CreateBufferArgs vb_args;
-	vb_args.flags = (GraphicsBufferUseFlags)BUFFER_USE_AS_VB;
-	geo.vbo = gfx().create_buffer(vb_args);
-	geo.vbo->upload(vertices.data(), (int)(vertices.size() * sizeof(Rml::Vertex)));
+		CreateBufferArgs ib_args;
+		ib_args.flags = (GraphicsBufferUseFlags)BUFFER_USE_AS_IB;
+		geo.ebo = gfx().create_buffer(ib_args);
 
-	CreateBufferArgs ib_args;
-	ib_args.flags = (GraphicsBufferUseFlags)BUFFER_USE_AS_IB;
-	geo.ebo = gfx().create_buffer(ib_args);
-	geo.ebo->upload(indices.data(), (int)(indices.size() * sizeof(int)));
+		const VertexLayout layout[] = {
+			VertexLayout(0, 2, GraphicsVertexAttribType::float32,       sizeof(Rml::Vertex), offsetof(Rml::Vertex, position)),
+			VertexLayout(1, 4, GraphicsVertexAttribType::u8_normalized, sizeof(Rml::Vertex), offsetof(Rml::Vertex, colour)),
+			VertexLayout(2, 2, GraphicsVertexAttribType::float32,       sizeof(Rml::Vertex), offsetof(Rml::Vertex, tex_coord)),
+		};
+		CreateVertexInputArgs vargs;
+		vargs.vertex = geo.vbo;
+		vargs.index = geo.ebo;
+		vargs.layout = layout;
+		vargs.index_type = VertexInputIndexType::uint32;
+		geo.vao = gfx().create_vertex_input(vargs);
 
-	const VertexLayout layout[] = {
-		VertexLayout(0, 2, GraphicsVertexAttribType::float32,       sizeof(Rml::Vertex), offsetof(Rml::Vertex, position)),
-		VertexLayout(1, 4, GraphicsVertexAttribType::u8_normalized, sizeof(Rml::Vertex), offsetof(Rml::Vertex, colour)),
-		VertexLayout(2, 2, GraphicsVertexAttribType::float32,       sizeof(Rml::Vertex), offsetof(Rml::Vertex, tex_coord)),
-	};
-	CreateVertexInputArgs vargs;
-	vargs.vertex = geo.vbo;
-	vargs.index = geo.ebo;
-	vargs.layout = layout;
-	vargs.index_type = VertexInputIndexType::uint32;
-	geo.vao = gfx().create_vertex_input(vargs);
+		g_rmlui_render_stats.gpu_objects_created++;
+	}
 
+	// upload() respecifies an existing buffer's contents in place - no new
+	// GPU object, whether this triple is freshly created above or pulled
+	// from the pool.
+	geo.vbo->upload(vertices.data(), vertex_bytes);
+	geo.ebo->upload(indices.data(), index_bytes);
 	geo.index_count = (int)indices.size();
+
+	g_rmlui_render_stats.compile_geometry_calls++;
+	g_rmlui_render_stats.vertex_bytes_uploaded += vertex_bytes;
+	g_rmlui_render_stats.index_bytes_uploaded += index_bytes;
+
 	Rml::CompiledGeometryHandle handle = next_geometry_handle++;
 	geometry_map[handle] = geo;
 	return handle;
@@ -108,16 +134,19 @@ void RmlUiRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry, 
 
 	gfx().bind_texture(0, tex);
 	gfx().draw_elements(GraphicsPrimitiveType::Triangles, it->second.index_count, VertexInputIndexType::uint32, 0);
+
+	g_rmlui_render_stats.render_geometry_calls++;
 }
 
 void RmlUiRenderInterface::ReleaseGeometry(Rml::CompiledGeometryHandle geometry) {
 	auto it = geometry_map.find(geometry);
 	if (it == geometry_map.end())
 		return;
-	safe_release(it->second.vao);
-	safe_release(it->second.vbo);
-	safe_release(it->second.ebo);
+
+	geometry_pool.push_back(it->second);
 	geometry_map.erase(it);
+
+	g_rmlui_render_stats.release_geometry_calls++;
 }
 
 Rml::TextureHandle RmlUiRenderInterface::LoadTexture(Rml::Vector2i& texture_dimensions, const Rml::String& source) {
@@ -132,6 +161,7 @@ Rml::TextureHandle RmlUiRenderInterface::LoadTexture(Rml::Vector2i& texture_dime
 
 	Rml::TextureHandle handle = next_texture_handle++;
 	texture_map[handle] = { t->gpu_ptr, false };
+	g_rmlui_render_stats.load_texture_calls++;
 	return handle;
 }
 
@@ -148,6 +178,7 @@ Rml::TextureHandle RmlUiRenderInterface::GenerateTexture(Rml::Span<const Rml::by
 
 	Rml::TextureHandle handle = next_texture_handle++;
 	texture_map[handle] = { tex, true };
+	g_rmlui_render_stats.generate_texture_calls++;
 	return handle;
 }
 

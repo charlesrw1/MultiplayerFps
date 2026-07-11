@@ -3,6 +3,7 @@
 // without a level or Lua glue. See docs/ui/rmlui_agent_guide.md.
 #include "RmlUiSystem.h"
 #include "Framework/Config.h"
+#include "Render/RmlUiRenderInterface.h"
 #include "imgui.h"
 
 namespace {
@@ -67,3 +68,21 @@ void rmlui_examples_debug_menu() {
 	}
 }
 ADD_TO_DEBUG_MENU(rmlui_examples_debug_menu);
+
+// Per-frame RenderInterface call counts (RmlUiRenderInterface.cpp) - use
+// this to see whether an animation/interaction is forcing geometry
+// recompilation (compile+release churn) vs. just cheap redraws (render
+// calls only). Numbers reflect the most recently rendered frame.
+void rmlui_render_stats_debug_menu() {
+	const RmlUiRenderStats& s = g_rmlui_render_stats;
+	ImGui::Text("Geometry compiles: %d", s.compile_geometry_calls);
+	ImGui::Text("  of which new GPU objects: %d", s.gpu_objects_created);
+	ImGui::Text("Geometry releases: %d", s.release_geometry_calls);
+	ImGui::Text("Draw calls (RenderGeometry): %d", s.render_geometry_calls);
+	ImGui::Text("Vertex bytes uploaded: %zu", s.vertex_bytes_uploaded);
+	ImGui::Text("Index bytes uploaded: %zu", s.index_bytes_uploaded);
+	ImGui::Separator();
+	ImGui::Text("Texture loads (LoadTexture): %d", s.load_texture_calls);
+	ImGui::Text("Texture generates (GenerateTexture): %d", s.generate_texture_calls);
+}
+ADD_TO_DEBUG_MENU(rmlui_render_stats_debug_menu);

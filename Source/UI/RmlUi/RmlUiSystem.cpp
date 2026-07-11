@@ -90,6 +90,7 @@ void RmlUiSystem::init() {
 	ASSERT(context && "Rml::CreateContext failed");
 
 	g_rmlui_render_contexts = [this]() {
+		CPU_SCOPE("RmlUI Render");
 		if (context)
 			context->Render();
 	};
