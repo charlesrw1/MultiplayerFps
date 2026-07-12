@@ -18,6 +18,7 @@ void fpsApp::start() {
 		sys_print(Warning, "no fpsLuaBridgeImpl");
 	else
 		lua->init();
+
 	game->start_level("physics_test_world.tmap");
 
 	// a comment
