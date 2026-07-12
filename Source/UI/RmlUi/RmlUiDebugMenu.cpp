@@ -20,6 +20,7 @@ const RmlUiExample rmlui_examples[] = {
 	{ "Flexbox layout", "ui/examples/ex_flexbox.rml" },
 	{ "Controls", "ui/examples/ex_controls.rml" },
 	{ "Compass HUD", "ui/examples/ex_compass.rml" },
+	{ "Source-style Settings", "ui/examples/ex_source_settings.rml" },
 };
 constexpr int rmlui_example_count = sizeof(rmlui_examples) / sizeof(rmlui_examples[0]);
 // One extra slot for the Lua data-model demo, selected via rmlui_example_index == rmlui_example_count.
