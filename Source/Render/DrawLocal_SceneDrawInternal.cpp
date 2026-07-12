@@ -81,7 +81,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		// draw_ui_local.render();
 
 		windowDrawer->render();
-		gfx().rmlui_render(cur_w, cur_h);
+		gfx().rmlui_render(cur_w, cur_h, tex.output_composite);
 
 		if (params.output_to_screen) {
 			GPU_SCOPE("Blit_composite_to_backbuffer");
@@ -559,7 +559,7 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 		// UI
 		if (params.draw_ui && !r_force_hide_ui.get_bool()) {
 			windowDrawer->render();
-			gfx().rmlui_render(cur_w, cur_h);
+			gfx().rmlui_render(cur_w, cur_h, read_from_texture);
 		}
 	};
 	do_ui_draw();

@@ -6,6 +6,7 @@
 
 #include <RmlUi/Core/RenderInterface.h>
 #include <glm/glm.hpp>
+#include <cstddef>
 #include <unordered_map>
 #include <vector>
 
@@ -45,11 +46,11 @@ public:
 	~RmlUiRenderInterface() override;
 
 	// Call once per frame before Context::Render(), with the current
-	// viewport size in pixels, and once after to restore engine gfx state.
-	// Draws into whatever render pass is currently bound - does not open one
-	// itself; the caller (Renderer::scene_draw_internal) already set up the
-	// target via gfx().set_render_pass() before calling this.
-	void begin_frame(int viewport_w, int viewport_h);
+	// viewport size in pixels and the render target the caller already bound
+	// via gfx().set_render_pass() (needed to restore the base layer when the
+	// layer stack pops back to it - see PopLayer()), and once after to
+	// restore engine gfx state.
+	void begin_frame(int viewport_w, int viewport_h, IGraphicsTexture* base_target);
 	void end_frame();
 
 	Rml::CompiledGeometryHandle CompileGeometry(Rml::Span<const Rml::Vertex> vertices, Rml::Span<const int> indices) override;
@@ -67,6 +68,16 @@ public:
 	// nullptr resets to identity (RmlUi calls this whenever the transform
 	// stack changes, including popping back to "no transform").
 	void SetTransform(const Rml::Matrix4f* transform) override;
+
+	// Layer stack + filters (`filter: blur()/drop-shadow()`, `opacity<1`
+	// stacking contexts). See docs/ui/rmlui_agent_guide.md and GH #22.
+	Rml::LayerHandle PushLayer() override;
+	void CompositeLayers(Rml::LayerHandle source, Rml::LayerHandle destination, Rml::BlendMode blend_mode,
+		Rml::Span<const Rml::CompiledFilterHandle> filters) override;
+	void PopLayer() override;
+
+	Rml::CompiledFilterHandle CompileFilter(const Rml::String& name, const Rml::Dictionary& parameters) override;
+	void ReleaseFilter(Rml::CompiledFilterHandle filter) override;
 
 private:
 	struct CompiledGeometry {
@@ -123,4 +134,68 @@ private:
 	// 1x1 white texture used for untextured geometry (RmlUi passes handle 0
 	// for "no texture"; RenderGeometry substitutes this instead).
 	IGraphicsTexture* white_texture = nullptr;
+
+	// ---- Layer stack + filters (PushLayer/PopLayer/CompositeLayers/CompileFilter) ----
+	// See GH #22 for the design writeup this section implements.
+
+	enum class FilterType { Opacity, Blur, DropShadow };
+	// CompiledFilterHandle is an opaque uintptr_t per RmlUi's contract (Types.h);
+	// the backend owns whatever it points to. RmlUi calls CompileFilter/ReleaseFilter
+	// in pairs like any other compile/release handle pair in this interface, so a
+	// plain new/delete here mirrors RmlUi's own reference GL3 backend exactly and is
+	// the one place in this file that's fine to depart from the engine's normal
+	// unique_ptr convention (there's no natural container to own it in instead - the
+	// handle IS the ownership token, same shape as CompiledGeometryHandle/TextureHandle).
+	struct CompiledFilter {
+		FilterType type = FilterType::Opacity;
+		float value = 1.f;      // Opacity
+		float sigma = 0.f;      // Blur, DropShadow
+		glm::vec2 offset{ 0.f }; // DropShadow, pixels
+		glm::vec4 color{ 0.f, 0.f, 0.f, 1.f }; // DropShadow, premultiplied
+	};
+
+	struct RenderLayer { IGraphicsTexture* color = nullptr; };
+	// [0] is always the base layer - its ->color aliases base_target (set fresh
+	// every begin_frame(), not owned/released here). Layers above it are owned
+	// viewport-sized offscreen textures, created via create_viewport_texture().
+	std::vector<RenderLayer> layer_stack;
+	// PopLayer() returns its texture here instead of releasing it, so a later
+	// PushLayer() (same frame or a later one) can reuse it - same pooling
+	// rationale as geometry_pool above. Drained on viewport resize.
+	std::vector<IGraphicsTexture*> layer_pool;
+	IGraphicsTexture* base_target = nullptr;
+
+	// Postprocess ping-pong buffers for running filters - viewport-sized RGBA8,
+	// created lazily on first use (most documents never push a layer). Resized
+	// (released + recreated) alongside layer_pool on viewport size change.
+	IGraphicsTexture* pp_primary = nullptr;
+	IGraphicsTexture* pp_secondary = nullptr;
+	IGraphicsTexture* pp_temp = nullptr;
+	// Fourth scratch buffer used only by render_drop_shadow to preserve the
+	// element content across render_blur (which consumes primary/secondary/temp
+	// as its own scratch and would otherwise clobber the copy we composite back
+	// on top of the blurred shadow).
+	IGraphicsTexture* pp_temp2 = nullptr;
+
+	IGraphicsShader* passthrough_shader = nullptr; // layer composite + opacity filter
+	IGraphicsShader* blur_shader = nullptr;
+	IGraphicsShader* drop_shadow_shader = nullptr;
+	// Empty vertex input for gl_VertexID-only fullscreen-triangle draws (matches
+	// Renderer::get_empty_vao()'s pattern, DrawLocal_Init.cpp - this class has no
+	// access to that instance so it keeps its own tiny copy).
+	IGraphicsBuffer* empty_vb = nullptr;
+	IGraphicsVertexInput* empty_vao = nullptr;
+
+	IGraphicsTexture* create_viewport_texture();
+	void ensure_postprocess_buffers();
+	// Draws a fullscreen triangle with `program` sampling `src` into `dst`
+	// (full viewport extent, no blending). frag_consts/size may be null/0.
+	void draw_fullscreen(IGraphicsShader* program, IGraphicsTexture* dst, IGraphicsTexture* src,
+		const void* frag_consts, size_t frag_consts_size);
+	// Blurs `buf` in place (reads and overwrites it), using the other two of
+	// {pp_primary, pp_secondary, pp_temp} as scratch space.
+	void render_blur(float sigma, IGraphicsTexture* buf);
+	// Renders the drop-shadow filter starting from `cur`'s contents, returning
+	// (via `cur`) whichever pp_* buffer now holds the result.
+	void render_drop_shadow(const CompiledFilter& filter, IGraphicsTexture*& cur);
 };

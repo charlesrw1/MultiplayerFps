@@ -1001,10 +1001,10 @@ public:
 		rmlui_render_iface.reset();
 	}
 
-	void rmlui_render(int viewport_w, int viewport_h) override {
+	void rmlui_render(int viewport_w, int viewport_h, IGraphicsTexture* target) override {
 		if (!rmlui_render_iface)
 			return;
-		rmlui_render_iface->begin_frame(viewport_w, viewport_h);
+		rmlui_render_iface->begin_frame(viewport_w, viewport_h, target);
 		if (g_rmlui_render_contexts)
 			g_rmlui_render_contexts();
 		rmlui_render_iface->end_frame();

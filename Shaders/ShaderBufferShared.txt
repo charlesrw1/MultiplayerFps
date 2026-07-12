@@ -431,6 +431,38 @@ struct RmlUiFragPushConsts {
     float _pad2;                 //   (struct size 16)
 };
 
+// RmlUiFilterPassthroughF.txt - fullscreen-triangle copy used for the layer
+// composite step (CompositeLayers) and the `opacity` filter (RmlUiRenderInterface
+// ::CompositeLayers/CompileFilter - see GH #22). opacity=1 for a plain copy.
+struct RmlUiFilterPassthroughFragPushConsts {
+    float opacity;                //   0 ..   4   (struct size 16, padded)
+    float _pad0;
+    float _pad1;
+    float _pad2;
+};
+
+// RmlUiBlurF.txt - one direction of the two-pass separable blur used by
+// `filter: blur()` and `filter: drop-shadow()` (RmlUiRenderInterface::render_blur).
+// weights are BLUR_NUM_WEIGHTS=4 taps by symmetry (RmlUi's own BLUR_SIZE=7 minus
+// mirrored duplicates), ported from RmlUi's reference GL3 backend's SetBlurWeights.
+// The downsampled image occupies only the top-left cw*ch corner of a full
+// viewport-sized texture; uv_scale remaps the fullscreen-quad texCoord onto that
+// corner and uv_limits (xy=min, zw=max, half-texel inset) clamps every tap to it.
+struct RmlUiBlurFragPushConsts {
+    vec2  texel_offset;           //   0 ..   8   (1/full_dim on the blur axis)
+    vec2  uv_scale;               //   8 ..  16   (cw/W, ch/H)
+    vec4  weights;                //  16 ..  32
+    vec4  uv_limits;              //  32 ..  48   (xy=min uv, zw=max uv; struct size 48)
+};
+
+// RmlUiDropShadowF.txt - alpha-mask tint pass for `filter: drop-shadow()`
+// (RmlUiRenderInterface::render_drop_shadow). color is premultiplied.
+struct RmlUiDropShadowFragPushConsts {
+    vec4  color;                  //   0 ..  16
+    vec2  uv_offset;               //  16 ..  24
+    vec2  _pad0;                   //  24 ..  32   (struct size 32)
+};
+
 #ifdef __cplusplus
 };
 #endif

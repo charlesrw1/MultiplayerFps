@@ -98,6 +98,7 @@
     <ClCompile Include="Tests\Renderer\test_material_hotreload.cpp" />
     <ClCompile Include="Tests\Renderer\test_dynamic_model.cpp" />
     <ClCompile Include="Tests\Renderer\test_rmlui_texture.cpp" />
+    <ClCompile Include="Tests\Renderer\test_rmlui_filters.cpp" />
     <ClCompile Include="Tests\Renderer\test_demo_level_shots.cpp" />
     <ClCompile Include="Tests\Renderer\test_shader_reflection.cpp" />
     <ClCompile Include="Tests\Renderer\test_spirv_pipeline.cpp" />

@@ -1,0 +1,16 @@
+#include "ShaderBufferShared.txt"
+
+layout(location = 0) in vec2 texCoord;
+layout(location = 0) out vec4 FS_OUT_Color;
+
+layout(binding = 0) uniform sampler2D the_texture;
+
+layout(std140, binding = 16) uniform RmlUiDropShadowFragPushConstsUbo { RmlUiDropShadowFragPushConsts pcf; };
+
+// Tints the source alpha with the shadow color, offset by uv_offset - see
+// RmlUiRenderInterface::render_drop_shadow.
+void main()
+{
+	float a = texture(the_texture, texCoord - pcf.uv_offset).a;
+	FS_OUT_Color = a * pcf.color;
+}

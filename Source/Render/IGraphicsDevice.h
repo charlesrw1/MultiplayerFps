@@ -666,11 +666,15 @@ public:
 	// windowDrawer->render() right before it; this composite texture is later
 	// blitted to the backbuffer for on-screen output, or sampled directly by
 	// the editor's ImGui scene-viewport image). viewport_w/h must match the
-	// bound target's pixel size (== the RmlUi context's dimensions). DX11
-	// backend stubs these (RmlUi is OpenGL-only in this engine for now).
+	// bound target's pixel size (== the RmlUi context's dimensions). `target`
+	// is that same bound texture, passed through explicitly because
+	// IGraphicsDevice has no "query current render target" - RmlUi's layer
+	// stack (PushLayer/PopLayer) needs it to restore the base render target
+	// after popping back to layer 0. DX11 backend stubs these (RmlUi is
+	// OpenGL-only in this engine for now).
 	virtual void rmlui_init() = 0;
 	virtual void rmlui_shutdown() = 0;
-	virtual void rmlui_render(int viewport_w, int viewport_h) = 0;
+	virtual void rmlui_render(int viewport_w, int viewport_h, IGraphicsTexture* target) = 0;
 
 	// ---- Shader factory ---------------------------------------------------
 

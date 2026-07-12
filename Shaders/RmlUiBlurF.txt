@@ -1,0 +1,30 @@
+#include "ShaderBufferShared.txt"
+
+layout(location = 0) in vec2 texCoord;
+layout(location = 0) out vec4 FS_OUT_Color;
+
+layout(binding = 0) uniform sampler2D the_texture;
+
+layout(std140, binding = 16) uniform RmlUiBlurFragPushConstsUbo { RmlUiBlurFragPushConsts pcf; };
+
+// 7-tap separable gaussian, weights symmetric around the center tap (4 unique
+// values covering offsets 0,1,2,3 both directions) - see RmlUiRenderInterface
+// ::render_blur, ported from RmlUi's reference GL3 backend's SetBlurWeights.
+//
+// The downsampled image lives in the top-left cw*ch corner of a full
+// viewport-sized ping-pong texture, so the fullscreen-triangle texCoord [0,1]
+// is remapped onto just that corner via uv_scale, and every tap is clamped to
+// the content rect (uv_limits) so the gaussian never bleeds the stale pixels
+// outside the downsampled region into the result.
+void main()
+{
+	vec2 base = texCoord * pcf.uv_scale;
+	vec4 color = texture(the_texture, clamp(base, pcf.uv_limits.xy, pcf.uv_limits.zw)) * pcf.weights.x;
+	for (int i = 1; i <= 3; i++) {
+		float w = pcf.weights[i];
+		vec2 o = pcf.texel_offset * float(i);
+		color += texture(the_texture, clamp(base + o, pcf.uv_limits.xy, pcf.uv_limits.zw)) * w;
+		color += texture(the_texture, clamp(base - o, pcf.uv_limits.xy, pcf.uv_limits.zw)) * w;
+	}
+	FS_OUT_Color = color;
+}
