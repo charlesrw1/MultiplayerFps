@@ -99,6 +99,131 @@ void OpenInNotepad(const string& name) {
 	return;
 }
 
+#include <tlhelp32.h>
+#include "EditorPopups.h"
+#include "imgui.h"
+
+static bool is_process_running(const wchar_t* exe_name) {
+	HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (snap == INVALID_HANDLE_VALUE)
+		return false;
+	PROCESSENTRY32W pe{};
+	pe.dwSize = sizeof(pe);
+	bool found = false;
+	if (Process32FirstW(snap, &pe)) {
+		do {
+			if (_wcsicmp(pe.szExeFile, exe_name) == 0) {
+				found = true;
+				break;
+			}
+		} while (Process32NextW(snap, &pe));
+	}
+	CloseHandle(snap);
+	return found;
+}
+
+// VS Code exposes no API to query a running instance's open workspaces, so this
+// substring-matches window titles instead ("<file> - <folder> - Visual Studio Code" or
+// "<folder> - Visual Studio Code"). Heuristic, not authoritative.
+struct VSCodeWindowSearch
+{
+	std::string folder_name;
+	bool found = false;
+};
+static BOOL CALLBACK find_vscode_folder_window(HWND hwnd, LPARAM lparam) {
+	auto* search = reinterpret_cast<VSCodeWindowSearch*>(lparam);
+	if (!IsWindowVisible(hwnd))
+		return TRUE;
+	char title[512] = {};
+	GetWindowTextA(hwnd, title, sizeof(title));
+	std::string t = title;
+	if (t.find("Visual Studio Code") != std::string::npos && t.find(search->folder_name) != std::string::npos) {
+		search->found = true;
+		return FALSE;
+	}
+	return TRUE;
+}
+static bool vscode_has_folder_open(const std::string& folder_leaf_name) {
+	VSCodeWindowSearch search;
+	search.folder_name = folder_leaf_name;
+	EnumWindows(find_vscode_folder_window, reinterpret_cast<LPARAM>(&search));
+	return search.found;
+}
+
+// PATH lookup first (works if VS Code's installer "Add to PATH" step ran), else fall back
+// to the well-known per-user install location - there's no registry key that reliably
+// points at the CLI.
+static std::string find_code_cmd_path() {
+	char buf[MAX_PATH];
+	if (SearchPathA(nullptr, "code.cmd", nullptr, MAX_PATH, buf, nullptr) > 0)
+		return buf;
+	char* local_app_data = nullptr;
+	size_t len = 0;
+	std::string fallback;
+	if (_dupenv_s(&local_app_data, &len, "LOCALAPPDATA") == 0 && local_app_data) {
+		fallback = std::string(local_app_data) + "\\Programs\\Microsoft VS Code\\bin\\code.cmd";
+		free(local_app_data);
+		if (GetFileAttributesA(fallback.c_str()) == INVALID_FILE_ATTRIBUTES)
+			fallback.clear();
+	}
+	return fallback;
+}
+
+// code.cmd is a batch file - CreateProcess can't exec it directly, so route through cmd.exe /c.
+// `code --goto <file>:<line>` reuses an already-running window via VS Code's own IPC unless
+// --new-window is passed, so this also serves the "already open" case.
+static void launch_code(const std::string& code_cmd, const std::string& scripts_dir, const std::string& full_path,
+						 int line, bool open_folder) {
+	std::string args = "\"" + code_cmd + "\"";
+	if (open_folder)
+		args += " \"" + scripts_dir + "\"";
+	args += " --goto \"" + full_path + ":" + std::to_string(line) + ":1\"";
+	std::string commandLine = "cmd.exe /c \"" + args + "\"";
+
+	STARTUPINFOA startup = {};
+	PROCESS_INFORMATION out = {};
+	if (!CreateProcessA(nullptr, (char*)commandLine.c_str(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr,
+						 nullptr, &startup, &out)) {
+		sys_print(Error, "OpenInVSCode: couldn't launch code.cmd\n");
+		return;
+	}
+	CloseHandle(out.hProcess);
+	CloseHandle(out.hThread);
+}
+
+// Opens full_path in VS Code at the given 1-indexed line. If VS Code isn't already running,
+// prompts before launching it (starting a whole new editor unprompted is disruptive); if it
+// is running, reuses the existing window via the CLI's IPC.
+void OpenInVSCode(const std::string& full_path, int line) {
+	std::string code_cmd = find_code_cmd_path();
+	if (code_cmd.empty()) {
+		sys_print(Error, "OpenInVSCode: couldn't find VS Code (code.cmd) on PATH or in the default install "
+						  "location\n");
+		return;
+	}
+	std::string scripts_dir = FileSys::get_full_path_from_game_path("scripts");
+
+	if (!is_process_running(L"Code.exe")) {
+		EditorPopupManager::inst->add_popup("Open in VS Code?", [code_cmd, scripts_dir, full_path, line]() {
+			ImGui::Text("Visual Studio Code doesn't appear to be running.");
+			ImGui::Text("Open it now and jump to the script?");
+			ImGui::Separator();
+			bool close = false;
+			if (ImGui::Button("Yes", ImVec2(120, 0))) {
+				launch_code(code_cmd, scripts_dir, full_path, line, true);
+				close = true;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("No", ImVec2(120, 0)))
+				close = true;
+			return close;
+		});
+		return;
+	}
+	bool folder_open = vscode_has_folder_open("scripts");
+	launch_code(code_cmd, scripts_dir, full_path, line, !folder_open);
+}
+
 #include <commdlg.h>
 #pragma comment(lib, "comdlg32.lib")
 #pragma comment(lib, "shell32.lib")

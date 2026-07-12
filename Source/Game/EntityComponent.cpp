@@ -11,6 +11,9 @@
 #include "Components/MeshComponent.h"
 
 #ifdef EDITOR_BUILD
+#include "imgui.h"
+extern void OpenInVSCode(const std::string& full_path, int line);
+
 // create native entities as a fake "Asset" for drag+drop and double click open to create instance abilities
 class ComponentTypeMetadata : public AssetMetadata
 {
@@ -19,6 +22,20 @@ public:
 	virtual Color32 get_browser_color() const override { return {181, 159, 245}; }
 
 	virtual std::string get_type_name() const override { return "Component-Entity"; }
+
+	// gamepath here is actually the component's classname (see fill_extra_assets below);
+	// this pseudo-asset type has no real file of its own. For Lua-defined components,
+	// jump to the .lua file that defines them instead.
+	void draw_browser_context_menu(const string& gamepath) final {
+		auto* ti = ClassBase::find_class(gamepath.c_str());
+		if (!ti || !ti->get_is_lua_class())
+			return;
+		auto* lua_ti = static_cast<const LuaClassTypeInfo*>(ti);
+		if (lua_ti->get_source_file().empty() || lua_ti->get_source_line() <= 0)
+			return;
+		if (ImGui::MenuItem("Open in code editor"))
+			OpenInVSCode(lua_ti->get_source_file(), lua_ti->get_source_line());
+	}
 
 	virtual void fill_extra_assets(std::vector<std::string>& filepaths) const override {
 

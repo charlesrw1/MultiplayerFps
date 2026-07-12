@@ -11,6 +11,7 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 		vector<ParseProperty> properties;
 		bool editor_placeable = false;
 		bool init_in_editor = false;
+		int class_line = 0;
 	};
 	vector<ParseType> out;
 
@@ -36,7 +37,7 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 
 		auto append_class = [&]() {
 			if (!currentClass.name.empty()) {
-				out.push_back({currentClass.name, currentClass.inherited, currentClass.properties, currentClass.editor_placeable, currentClass.init_in_editor});
+				out.push_back({currentClass.name, currentClass.inherited, currentClass.properties, currentClass.editor_placeable, currentClass.init_in_editor, currentClass.class_line});
 				currentClass = PendingClass();
 			}
 			inClass = false;
@@ -48,12 +49,13 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 		if (StringUtils::starts_with(original_stripped_line, "---@class") && tokens.size() > 2 && tokens.at(1) == "@class") {
 			if (inClass && !currentClass.name.empty()) {
 				// Save previous class
-				out.push_back({currentClass.name, currentClass.inherited, currentClass.properties, currentClass.editor_placeable, currentClass.init_in_editor});
+				out.push_back({currentClass.name, currentClass.inherited, currentClass.properties, currentClass.editor_placeable, currentClass.init_in_editor, currentClass.class_line});
 				currentClass = PendingClass();
 			}
 			currentClass.name = tokens.at(2);
 			currentClass.inherited.clear();
 			currentClass.properties.clear();
+			currentClass.class_line = i + 1;
 			inClass = false;
 			// Parse inheritance
 			for (size_t j = 3; j < tokens.size(); ++j) {
@@ -119,7 +121,7 @@ vector<ParseType> ScriptLoadingUtil::parse_text(string text) {
 	}
 	// Handle last class if file doesn't end with }
 	if (inClass && !currentClass.name.empty()) {
-		out.push_back({currentClass.name, currentClass.inherited, currentClass.properties, currentClass.editor_placeable, currentClass.init_in_editor});
+		out.push_back({currentClass.name, currentClass.inherited, currentClass.properties, currentClass.editor_placeable, currentClass.init_in_editor, currentClass.class_line});
 	}
 
 	return out;

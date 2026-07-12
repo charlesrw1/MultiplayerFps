@@ -35,6 +35,8 @@ struct ParseType
 	// set_call_init_in_editor(true) in its ctor: start()/stop() run in the
 	// editor too. See LuaClassTypeInfo::is_init_in_editor_placeable.
 	bool init_in_editor = false;
+	// 1-indexed line of the `---@class` annotation, for "open in code editor".
+	int class_line = 0;
 };
 // parses the script
 class ScriptLoadingUtil
@@ -77,6 +79,13 @@ public:
 	void set_init_in_editor_placeable(bool b) { init_in_editor = b; }
 	bool is_init_in_editor_placeable() const { return init_in_editor; }
 
+	// Full path + 1-indexed line of the `---@class` annotation that defined this class,
+	// as of the last (re)load. Used by the editor's "Open in code editor" context menu item.
+	// Empty/0 if this class was loaded from a non-file chunk (e.g. a test snippet).
+	void set_source_location(const string& file, int line) { source_file = file; source_line = line; }
+	const string& get_source_file() const { return source_file; }
+	int get_source_line() const { return source_line; }
+
 	// Reflection accessors used by the reload-merge pass + tests.
 	uint32_t get_lua_field_shadow_size() const { return lua_field_shadow_size; }
 	const PropertyInfoList* get_lua_props_list() const { return lua_props_list.list ? &lua_props_list : nullptr; }
@@ -100,6 +109,8 @@ private:
 	bool had_changes = false;
 	bool editor_placeable = false;
 	bool init_in_editor = false;
+	string source_file;
+	int source_line = 0;
 	int template_lua_table = 0;
 	static ClassBase* lua_class_alloc(const ClassTypeInfo* c);
 	string lua_classname;
