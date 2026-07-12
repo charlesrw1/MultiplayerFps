@@ -19,10 +19,15 @@ document/DOM shape (menus, inventories, dialogs, HUD panels with layout).
 ## Known v1 limitations
 
 - **File-based image loading routes through the engine's asset system.**
-  `RmlUiRenderInterface::LoadTexture` calls `Texture::force_load_for_ui(source)`
-  (same synchronous immediate-load path `AssetBrowser` uses for thumbnails),
-  so `<img src="...">` / RCSS `background-image` paths resolve like any other
-  `Data/`-relative texture asset.
+  `RmlUiRenderInterface::LoadTexture` calls `Texture::load(source)` — the same
+  synchronous, cached `g_assets`-backed load any 3D material texture uses (not
+  `force_load_for_ui`, which forces nearest filtering; that's reserved for
+  `AssetBrowser` thumbnails) — so `<img src="...">` / RCSS `background-image`
+  paths resolve like any other `Data/`-relative texture asset, respecting the
+  source's own `.tis` `nearest_filtering` setting instead of always forcing
+  it. Straight-alpha source images are premultiplied at sample time in
+  `RmlUiF.txt` (see `RmlUiFragPushConsts` in `Shaders/ShaderBufferShared.txt`)
+  to match RmlUi core's premultiplied vertex colours and `PREMULT_BLEND`.
 - RCSS `transform` (2D/3D, with interpolation/`transition`/`@keyframes`) is
   applied via `RmlUiRenderInterface::SetTransform`, which combines the
   element's `Rml::Matrix4f` with the ortho projection before each

@@ -13,6 +13,7 @@ class IGraphicsShader;
 class IGraphicsTexture;
 class IGraphicsVertexInput;
 class IGraphicsBuffer;
+class Texture;
 
 // Per-frame counters for the RmlUi debug menu (RmlUiDebugMenu.cpp) - reset in
 // begin_frame(), incremented from the RenderInterface calls below, read by
@@ -75,11 +76,19 @@ private:
 		int index_count = 0;
 	};
 
-	// Texture entries created via GenerateTexture own their IGraphicsTexture
-	// and must release() it; entries loaded via LoadTexture point at a
-	// Texture asset's gpu_ptr owned by the asset system, so must not.
+	// Texture entries created via GenerateTexture own a private IGraphicsTexture
+	// and must release() it. Entries loaded via LoadTexture instead keep the
+	// Texture* asset pointer and re-read ->gpu_ptr live every draw, rather than
+	// caching the IGraphicsTexture* once - Texture::load() returns a normal
+	// g_assets-cached asset that the file watcher can hot-reload at any time
+	// (unlike the old Texture::force_load_for_ui "system asset", which opted
+	// out of that), and a hot-reload frees + replaces gpu_ptr. Caching the raw
+	// pointer here left it dangling the moment that happened (confirmed via
+	// crash: editing ui/heart_icon.tis mid-run freed the texture RenderGeometry
+	// was about to bind).
 	struct LoadedTexture {
-		IGraphicsTexture* tex = nullptr;
+		IGraphicsTexture* owned_tex = nullptr; // GenerateTexture only
+		Texture* asset = nullptr;              // LoadTexture only
 		bool owns_texture = false;
 	};
 

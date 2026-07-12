@@ -30,7 +30,7 @@ RmlUiRenderInterface::~RmlUiRenderInterface() {
 	safe_release(shader_program);
 	for (auto& [handle, tex] : texture_map)
 		if (tex.owns_texture)
-			safe_release(tex.tex);
+			safe_release(tex.owned_tex);
 	for (auto& [handle, geo] : geometry_map) {
 		safe_release(geo.vao);
 		safe_release(geo.vbo);
@@ -110,10 +110,23 @@ void RmlUiRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry, 
 		return;
 
 	IGraphicsTexture* tex = white_texture;
+	// GenerateTexture entries (owns_texture) arrive already premultiplied by
+	// RmlUi core itself; LoadTexture entries come straight off the shared
+	// Texture asset system with straight alpha - see RmlUiFragPushConsts.
+	bool needs_premultiply = false;
 	if (texture != 0) {
 		auto tex_it = texture_map.find(texture);
-		if (tex_it != texture_map.end())
-			tex = tex_it->second.tex;
+		if (tex_it != texture_map.end()) {
+			const LoadedTexture& entry = tex_it->second;
+			// asset->gpu_ptr is re-read live (not cached) since Texture::load's
+			// hot-reload can free+replace it between LoadTexture and this draw -
+			// see the LoadedTexture comment in RmlUiRenderInterface.h.
+			IGraphicsTexture* resolved = entry.owns_texture ? entry.owned_tex
+				: (entry.asset ? entry.asset->gpu_ptr : nullptr);
+			if (resolved)
+				tex = resolved;
+			needs_premultiply = !entry.owns_texture;
+		}
 	}
 
 	RenderPipelineState state;
@@ -131,6 +144,10 @@ void RmlUiRenderInterface::RenderGeometry(Rml::CompiledGeometryHandle geometry, 
 	pcv.Projection = projection * transform;
 	pcv.Translation = { translation.x, translation.y };
 	gfx().push_vertex_constants(0, &pcv, sizeof(pcv));
+
+	gpu::RmlUiFragPushConsts pcf{};
+	pcf.needs_premultiply = needs_premultiply ? 1.f : 0.f;
+	gfx().push_fragment_constants(0, &pcf, sizeof(pcf));
 
 	gfx().bind_texture(0, tex);
 	gfx().draw_elements(GraphicsPrimitiveType::Triangles, it->second.index_count, VertexInputIndexType::uint32, 0);
@@ -150,7 +167,7 @@ void RmlUiRenderInterface::ReleaseGeometry(Rml::CompiledGeometryHandle geometry)
 }
 
 Rml::TextureHandle RmlUiRenderInterface::LoadTexture(Rml::Vector2i& texture_dimensions, const Rml::String& source) {
-	Texture* t = Texture::force_load_for_ui(source);
+	Texture* t = Texture::load(source);
 	if (!t || !t->gpu_ptr) {
 		sys_print(Warning, "RmlUiRenderInterface::LoadTexture failed for source '%s'\n", source.c_str());
 		texture_dimensions = { 0, 0 };
@@ -160,7 +177,10 @@ Rml::TextureHandle RmlUiRenderInterface::LoadTexture(Rml::Vector2i& texture_dime
 	texture_dimensions = { size.x, size.y };
 
 	Rml::TextureHandle handle = next_texture_handle++;
-	texture_map[handle] = { t->gpu_ptr, false };
+	LoadedTexture entry;
+	entry.asset = t;
+	entry.owns_texture = false;
+	texture_map[handle] = entry;
 	g_rmlui_render_stats.load_texture_calls++;
 	return handle;
 }
@@ -177,7 +197,10 @@ Rml::TextureHandle RmlUiRenderInterface::GenerateTexture(Rml::Span<const Rml::by
 	tex->sub_image_upload(0, 0, 0, source_dimensions.x, source_dimensions.y, 0, source.data());
 
 	Rml::TextureHandle handle = next_texture_handle++;
-	texture_map[handle] = { tex, true };
+	LoadedTexture entry;
+	entry.owned_tex = tex;
+	entry.owns_texture = true;
+	texture_map[handle] = entry;
 	g_rmlui_render_stats.generate_texture_calls++;
 	return handle;
 }
@@ -187,7 +210,7 @@ void RmlUiRenderInterface::ReleaseTexture(Rml::TextureHandle texture) {
 	if (it == texture_map.end())
 		return;
 	if (it->second.owns_texture)
-		safe_release(it->second.tex);
+		safe_release(it->second.owned_tex);
 	texture_map.erase(it);
 }
 

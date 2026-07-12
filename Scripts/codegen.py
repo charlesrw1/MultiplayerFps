@@ -6,7 +6,7 @@ import sys
 SOURCE_DIR = "/../Source/"
 DIRS_TO_SKIP = ["./.generated","./External"]
 FULL_REBUILD = False
-LUA_OUTPUT_PATH = "./../Data/scripts"
+LUA_OUTPUT_PATH = "./../TestFilesData/scripts"
 
 if __name__ == "__main__":
     do_rebuild = FULL_REBUILD or "rebuild" in sys.argv

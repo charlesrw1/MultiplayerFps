@@ -1,3 +1,5 @@
+#include "ShaderBufferShared.txt"
+
 layout(location = 0) out vec4 FS_OUT_Color;
 
 layout(location = 0) in vec4 FS_IN_Color;
@@ -5,7 +7,14 @@ layout(location = 1) in vec2 FS_IN_TexCoord;
 
 layout(binding = 0) uniform sampler2D the_texture;
 
+layout(std140, binding = 16) uniform RmlUiFragPushConstsUbo { RmlUiFragPushConsts pcf; };
+
 void main()
 {
-	FS_OUT_Color = FS_IN_Color * texture(the_texture, FS_IN_TexCoord);
+	vec4 texel = texture(the_texture, FS_IN_TexCoord);
+	// Straight-alpha source (LoadTexture) needs converting to premultiplied
+	// before the FS_IN_Color multiply below, to match PREMULT_BLEND - see
+	// RmlUiFragPushConsts in ShaderBufferShared.txt.
+	texel.rgb *= mix(1.0, texel.a, pcf.needs_premultiply);
+	FS_OUT_Color = FS_IN_Color * texel;
 }

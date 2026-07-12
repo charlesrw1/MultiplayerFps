@@ -410,6 +410,26 @@ struct RmlUiVertPushConsts {
     mat4 Projection;             //   0 ..  64
     vec2 Translation;            //  64 ..  72   (struct size 80, padded)
 };
+// FS blend is BlendState::PREMULT_BLEND, matching RmlUi core's own vertex
+// colours (Rml::ColourbPremultiplied, baked in for opacity/decorators/text -
+// see ElementBackgroundBorder.cpp, DecoratorGradient.cpp, ElementText.cpp in
+// RmlUi's own source). Textures reaching the shader come from two different
+// RenderInterface calls with different alpha conventions: GenerateTexture
+// (font glyphs, box-shadows, SVG/Lottie rasterization - RmlUi core premultiplies
+// this data itself before handing it to us, confirmed by the "unpremultiplied_copy"
+// step RmlUi's legacy compatibility shim needs to undo it) is already
+// premultiplied; LoadTexture (Texture::force_load_for_ui, straight off this
+// engine's shared Texture asset system, same loader 3D materials use) is not.
+// Premultiplying unconditionally in the shader would double-premultiply the
+// GenerateTexture case; needs_premultiply lets RenderGeometry flag it per draw
+// call based on which path the bound texture came from (LoadedTexture::owns_texture
+// - GenerateTexture entries own/premultiplied, LoadTexture entries don't/aren't).
+struct RmlUiFragPushConsts {
+    float needs_premultiply;     //   0 ..   4
+    float _pad0;
+    float _pad1;
+    float _pad2;                 //   (struct size 16)
+};
 
 #ifdef __cplusplus
 };

@@ -1,9 +1,6 @@
 .vs/
 Debug/
 Release/
-Data/*
-!Data/scripts/
-Data/scripts/lua_stubs.lua
 x64/
 Source/.generated/
 
