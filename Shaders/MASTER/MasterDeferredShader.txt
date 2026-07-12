@@ -560,10 +560,7 @@ void main()
 			}
 		}
 		else if(g.debug_options == DEBUG_WIREFRAME) {
-			if((g.flags & 1)!=0)	// second pass
-				GBUFFER_OUT_Emissive = vec4(0.0,0.5,0.5,1.0);
-			else	// first pass (black)
-				GBUFFER_OUT_Emissive = vec4(0,0,0,1.0);
+			GBUFFER_OUT_Emissive = vec4(0.0,0.5,0.5,1.0);
 		}
 		else if(g.debug_options==DEBUG_LIGHTMAP_UV) {
 			#ifdef LIGHTMAPPED

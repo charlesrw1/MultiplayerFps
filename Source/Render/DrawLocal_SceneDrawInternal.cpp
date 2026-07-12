@@ -241,10 +241,8 @@ void Renderer::scene_draw_internal(SceneDrawParamsEx params, View_Setup view) {
 
 	if (is_wireframe_mode) {
 		gfx().set_polygon_fill_mode(GraphicsFillMode::Line);
-		gfx().set_line_width(3);
-		gbuffer_pass(GPRF_WIREFRAME_1);
 		gfx().set_line_width(1);
-		gbuffer_pass(GPRF_WIREFRAME_2);
+		gbuffer_pass(GPRF_WIREFRAME_1);
 		gfx().set_polygon_fill_mode(GraphicsFillMode::Fill);
 	} else {
 		{
