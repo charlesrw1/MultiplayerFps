@@ -13,6 +13,7 @@ NEVER use VS compiler under "C:\Program Files (x86)\...", that is old compiler.
 
 If you see error code c0000135, then it most likely means NO DLLs were copied to the x64/Debug or x64/Release folder for some reason? Bug with vcpkg.
 
+D:/Data is the path to the data directory for assets (g_project_base) used in editor and game. ./TestFilesData/ is used for the test files used during integration tests.
 
 Write tests. Testing documentation found at [[docs/testing.md]]. Use Scripts/build_and_test.ps1 to build and run unit tests. Use Scripts/integration_tests.ps1 to build and run integration tests (with cli options).
 
@@ -37,6 +38,8 @@ Limit the source files you read to the module you are working on. Be brief, spar
 Use ASSERTS() liberaly, documenting its preconditions and invariants. 
 
 Follow DRY, SOLID principles. SELF DOCUMENTING code. Single Responsiblity Principle!
+
+Uses RmlUI for the gameplay UI framework, a C++/lua UI framework that is very similar to Css/Html/Js (using .rml files for layout and .rcss for styling). Includes the lua plugin for it. See '..vcpkg\buildtrees\rmlui\src\6.2-203a9587f9.clean\' for the source files for it. Also see 'D:\Data\scripts\rmlui_lua_stubs.lua' for a list of callable functions from the lua api. Look at '...rmlui\src\6.2-203a9587f9.clean\Samples' for samples of using rmlui and lua. See 'https://mikke89.github.io/RmlUiDoc/index.html' for documentation about RmlUI in general. 
 
 ## Documentation
 
