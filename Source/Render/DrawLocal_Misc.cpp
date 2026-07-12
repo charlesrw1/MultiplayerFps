@@ -194,6 +194,12 @@ public:
 	TaaManager() { generateHaltonSequence(MAX_TAA_SAMPLES, jitters); }
 
 	void start_frame() { index = (index + 1) % r_taa_samples.get_integer(); }
+	// Current jitter-sequence index (0..r_taa_samples-1). Shaders that need to
+	// stay temporally in sync with TAA (e.g. dithered pixel-depth-offset blends)
+	// should key their per-frame noise off this instead of an unrelated free-
+	// running counter, or the dither period will beat against the TAA jitter
+	// period and TAA will fail to resolve it cleanly (visible streaking).
+	int get_frame_index() const { return index; }
 	glm::vec2 get_last_frame_jitter(int w, int h) const {
 		int previndex = index - 1;
 		if (previndex < 0)

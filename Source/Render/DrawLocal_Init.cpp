@@ -134,6 +134,7 @@ void Renderer::upload_ubo_view_constants(const View_Setup& view_to_use, IGraphic
 	}
 
 	constants.current_and_prev_jitter = glm::vec4(cur_jit.x, cur_jit.y, prev_jit.x, prev_jit.y);
+	constants.taa_frame_index = (uint32_t)r_taa_manager.get_frame_index();
 
 	constants.debug_options = r_debug_mode.get_integer();
 	static const int DEBUG_OUTLINED = 100; // uses objID; not in the gpu:: enum

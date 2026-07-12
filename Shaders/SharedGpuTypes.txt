@@ -90,8 +90,8 @@ struct Ubo_View_Constants_Struct
 	uint flags;
 	float editor_grid_snap;
 	uint is_ortho;
-	uint padding3;
-	
+	uint taa_frame_index;	// r_taa_manager's current jitter-sequence index (0..r_taa_samples-1)
+
 	vec4 current_and_prev_jitter;
 };
 
