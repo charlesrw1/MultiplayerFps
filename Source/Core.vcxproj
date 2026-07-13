@@ -173,6 +173,10 @@
     <ClCompile Include="Game\Components\RagdollComponent.cpp" />
     <ClCompile Include="Game\Components\SpringBoneManagerComponent.cpp" />
     <ClCompile Include="Game\Components\RagdollConfigComponent.cpp" />
+    <ClCompile Include="Game\Components\RagdollGizmoMesh.cpp" />
+    <ClCompile Include="Game\Components\RagdollPhysicsBodyComponent.cpp" />
+    <ClCompile Include="Game\Components\RagdollJointComponent.cpp" />
+    <ClCompile Include="Game\Components\RagdollSetupComponent.cpp" />
     <ClCompile Include="Game\Components\SpawnerComponenth.cpp" />
     <ClCompile Include="Game\Entities\BikeEntity.cpp" />
     <ClCompile Include="Game\Entities\CharacterController.cpp" />
@@ -408,6 +412,11 @@
     <ClInclude Include="Game\Components\RagdollComponent.h" />
     <ClInclude Include="Game\Components\SpringBoneManagerComponent.h" />
     <ClInclude Include="Game\Components\RagdollConfigComponent.h" />
+    <ClInclude Include="Game\Components\RagdollUtil.h" />
+    <ClInclude Include="Game\Components\RagdollGizmoMesh.h" />
+    <ClInclude Include="Game\Components\RagdollPhysicsBodyComponent.h" />
+    <ClInclude Include="Game\Components\RagdollJointComponent.h" />
+    <ClInclude Include="Game\Components\RagdollSetupComponent.h" />
     <ClInclude Include="Game\Components\SpawnerComponenth.h" />
     <ClInclude Include="Game\EntityPtr.h" />
     <ClInclude Include="Game\GameplayStatic.h" />

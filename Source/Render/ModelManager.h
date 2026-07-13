@@ -84,7 +84,22 @@ public:
 	/// Release a dynamic model created with create_dynamic_model().
 	/// Frees GPU vertex/index allocations and deletes the Model object.
 	/// The pointer is invalid after this call.
+	///
+	/// If called during an overlapped period (eng->get_is_in_overlapped_period() -- CPU work for
+	/// the next frame running concurrently with the GPU still consuming the previous frame's
+	/// submitted Render_Object proxies), the actual free is deferred to
+	/// execute_deferred_model_frees(). A Render_Object proxy that still references this Model
+	/// (e.g. its owning MeshComponent's remove_obj() call *also* deferred, per the same
+	/// overlapped-period check in Render_Scene::remove_obj) must not have the Model out from
+	/// under it before that proxy is actually removed -- see docs/gotchas.md.
 	void free_dynamic_model(Model* m);
+
+	/// Frees any dynamic models whose free_dynamic_model() call was deferred because it landed
+	/// during an overlapped period. Call once per frame at a point where
+	/// !eng->get_is_in_overlapped_period() is guaranteed -- alongside
+	/// Render_Scene::execute_deferred_deletes(), which is the analogous mechanism for
+	/// Render_Object/Render_Light handles (see Renderer::sync_update()).
+	void execute_deferred_model_frees();
 
 	/// Re-upload a dynamic model in-place with new geometry from builder.
 	/// Existing GPU allocations are freed and replaced; the Model pointer stays valid.
@@ -100,6 +115,11 @@ private:
 	/// Owns all live dynamic models.  Indexed by Model* for O(n) lookup
 	/// on free (dynamic model counts are expected to be small).
 	std::vector<std::unique_ptr<Model>> live_dynamic_models;
+
+	/// free_dynamic_model() calls that landed during an overlapped period; flushed by
+	/// execute_deferred_model_frees().
+	std::vector<Model*> pending_dynamic_frees;
+	void free_dynamic_model_now(Model* m);
 
 	// Used for gbuffer lighting
 	Model* LIGHT_DOME = nullptr;

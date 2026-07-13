@@ -106,6 +106,7 @@ void Renderer::sync_update() {
 		gfx().set_vsync(enable_vsync.get_bool());
 
 	scene.execute_deferred_deletes();
+	g_modelMgr.execute_deferred_model_frees();
 
 	update_debug_grid(); // makes it visible/hidden
 

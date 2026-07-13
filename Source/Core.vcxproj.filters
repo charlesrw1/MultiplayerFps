@@ -435,6 +435,18 @@
     <ClCompile Include="Game\Components\RagdollConfigComponent.cpp">
       <Filter>Game\Components</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Components\RagdollGizmoMesh.cpp">
+      <Filter>Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Components\RagdollPhysicsBodyComponent.cpp">
+      <Filter>Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Components\RagdollJointComponent.cpp">
+      <Filter>Game\Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Components\RagdollSetupComponent.cpp">
+      <Filter>Game\Components</Filter>
+    </ClCompile>
     <ClCompile Include="Game\Components\RoadNetworkComponent.cpp">
       <Filter>Game\Components</Filter>
     </ClCompile>
@@ -1329,6 +1341,21 @@
       <Filter>Game\Components</Filter>
     </ClInclude>
     <ClInclude Include="Game\Components\RagdollConfigComponent.h">
+      <Filter>Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Components\RagdollUtil.h">
+      <Filter>Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Components\RagdollGizmoMesh.h">
+      <Filter>Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Components\RagdollPhysicsBodyComponent.h">
+      <Filter>Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Components\RagdollJointComponent.h">
+      <Filter>Game\Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Components\RagdollSetupComponent.h">
       <Filter>Game\Components</Filter>
     </ClInclude>
     <ClInclude Include="Game\Components\RoadNetworkComponent.h">

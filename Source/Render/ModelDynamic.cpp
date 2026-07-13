@@ -17,6 +17,7 @@
 #include "Framework/Files.h"
 
 #include "Framework/Config.h"
+#include "GameEnginePublic.h"
 #include <algorithm>
 
 #include "Render/MaterialPublic.h"
@@ -212,6 +213,20 @@ void ModelMan::refresh_dynamic_model(Model* m, const ModelBuilder& builder) {
 void ModelMan::free_dynamic_model(Model* m) {
     ASSERT(m && m->is_dynamic() && "free_dynamic_model: pointer is null or not a dynamic model");
 
+    // A Render_Object proxy may still reference this Model this frame: MeshComponent::stop()'s
+    // Render_Scene::remove_obj() defers the proxy's own removal until the overlapped period ends
+    // (CPU work for the next frame running while the GPU still consumes the previous frame's
+    // submitted proxies). Deleting the Model out from under a not-yet-removed proxy is a
+    // use-after-free the next time the render scene walks proxy_list and reads proxy.model --
+    // defer the same way, and flush both at the same safe point (see execute_deferred_model_frees).
+    if (eng->get_is_in_overlapped_period()) {
+        pending_dynamic_frees.push_back(m);
+        return;
+    }
+    free_dynamic_model_now(m);
+}
+
+void ModelMan::free_dynamic_model_now(Model* m) {
     const std::string name = m->get_name();  // capture before deletion
 
     // Release GPU allocations and remove from the renderer's all_models set.
@@ -225,6 +240,13 @@ void ModelMan::free_dynamic_model(Model* m) {
 
     sys_print(Debug, "ModelMan: freed dynamic model '%s' (%d remaining)\n",
               name.c_str(), (int)live_dynamic_models.size());
+}
+
+void ModelMan::execute_deferred_model_frees() {
+    ASSERT(!eng->get_is_in_overlapped_period());
+    for (Model* m : pending_dynamic_frees)
+        free_dynamic_model_now(m);
+    pending_dynamic_frees.clear();
 }
 
 // DynamicModelDeleter — defined here because it needs the full Model definition

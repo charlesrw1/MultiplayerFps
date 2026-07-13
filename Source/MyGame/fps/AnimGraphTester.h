@@ -7,6 +7,8 @@
 #include "Render/Model.h"
 #include "../../Game/Particles/ParticleAsset.h"
 #include "../../Render/MaterialPublic.h"
+#include "Sound/SoundPublic.h"
+#include "Animation/Runtime/Easing.h"
 #include <vector>
 NEWENUM(AnimGraphTestMode, int) {
     BasicIK,      // IK right hand to moveable target entity

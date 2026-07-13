@@ -3,6 +3,7 @@
 // Included by OpenGlDevice.cpp, OpenGlTextureImpl.cpp, OpenGlBufferImpl.cpp.
 // Do NOT include from any public header.
 
+#include "glad/glad.h" // GLenum and friends -- must not rely on an unrelated TU-mate include-ordering it in first
 #include "IGraphicsDevice.h"
 #include "DrawLocal.h"
 #include "Framework/StringUtils.h"
