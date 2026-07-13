@@ -151,13 +151,13 @@ bool PostProcessComponentEditorUi::draw() {
 
     ImGui::PushID("ppset_lgq");
     if (ImGui::CollapsingHeader("Lift / Gamma / Gain")) {
-        // Picker 0.5 = neutral for all bands. lift: neutral=0 range=0.2; gamma/gain: neutral=1 range=1
+        // Picker 0.5 = neutral for all bands. lift: neutral=0 range=0.2; gamma/gain: neutral=1 range=0.3
         struct LgqBand { const char* label; glm::vec3* val; float neutral; float range;
                          const char* pid; const char* rid; };
         LgqBand bands[] = {
             { "Shadows",    &asset->lift,      0.f, 0.2f, "##lift_w", "R##lift_r" },
-            { "Midtones",   &asset->gamma_rgb, 1.f, 1.0f, "##gam_w",  "R##gam_r"  },
-            { "Highlights", &asset->gain,      1.f, 1.0f, "##gain_w", "R##gain_r" },
+            { "Midtones",   &asset->gamma_rgb, 1.f, 0.3f, "##gam_w",  "R##gam_r"  },
+            { "Highlights", &asset->gain,      1.f, 0.3f, "##gain_w", "R##gain_r" },
         };
         constexpr int picker_flags = ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_PickerHueWheel |
                                      ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoInputs;
